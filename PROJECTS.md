@@ -206,14 +206,11 @@ Dự kiến ~14 bảng (`document_snapshots`, `document_deltas`, `print_jobs`,
 
 **Sentinel không gọi Internet.** Chỉ nói chuyện với Hub trong LAN.
 
-### Bốn tài liệu trong repo — thứ tự tin cậy
+### Tài liệu trong repo — Nguồn chân lý duy nhất
 
 | File | Vai trò |
 |---|---|
-| `intent_v2.md` | **Nền chính thức.** Hybrid Pipeline, quyết định đã chốt, phương án đã loại, 14 bảng DB |
-| `session_summary.md` | Mở rộng `intent_v2`: Evidence Record là dữ liệu gốc, Draft Case, confidence chuyển từ *loại bỏ* sang *xếp hạng* |
-| `gioi-thieu-du-an.md` | Bản cho chủ dự án: lộ trình 4 giai đoạn, chi phí, rủi ro, các câu phải thử trên máy thật |
-| `intent.md` | v0.1, **đã bị thay thế**. Chỉ đọc để tra lịch sử |
+| `intent.md` | **Nguồn Chân lý Duy nhất (v1.0 Consolidated).** Hợp nhất toàn diện: Tầm nhìn, phân tích nghiệp vụ, Hybrid Pipeline, Evidence Record, Draft Case, 14 bảng DB, quyết định đã chốt, phương án đã loại, lộ trình & chi phí |
 
 ### KHÔNG phải
 

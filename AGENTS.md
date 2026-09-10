@@ -37,3 +37,28 @@ repo đó. Khi xung đột, **repo con thắng** — và mâu thuẫn phải đ�
 | `contracts/README.md` | Quy tắc contract-trước-code |
 | `OPEN_DECISIONS.md` | Câu hỏi chưa chốt + phương án đã loại |
 | `HANDOFF.md` | Gói việc giao cho agent từng repo |
+
+## Quy tắc chọn tool cho agent
+
+Các quy tắc này chỉ hướng dẫn cách agent đọc và kiểm chứng tài liệu/code của
+repo con; folder `systemdocs` vẫn là tài liệu, không có runtime và không chạy
+Graphify/context-mode tại đây.
+
+- Biết rõ file, symbol hoặc chuỗi lỗi: tìm kiếm có giới hạn rồi đọc đúng đoạn
+  source; dùng LSP nếu client đã cung cấp.
+- Cần quan hệ qua nhiều file, caller/callee, dependency hoặc ownership: dùng
+  truy vấn Graphify hiện có nếu client/tool đã cung cấp. Bắt đầu hẹp (depth
+  1–2); nếu graph thiếu, cũ hoặc bị cắt thì đối chiếu source hiện tại và chỉ
+  refresh khi task cần. Không rebuild toàn bộ graph cho sửa nhỏ.
+- Log, JSON/CSV, output build/test hoặc dữ liệu lớn: dùng context-mode khi
+  capability đã được đăng ký (`ctx_execute`, `ctx_execute_file`,
+  `ctx_batch_execute`, `ctx_index`/`ctx_fetch_and_index`, `ctx_search`) để lọc,
+  đếm hoặc tổng hợp trước khi đưa vào context. `ctx_search` chỉ tìm trong nội
+  dung đã index; giữ exit code, lỗi hữu ích và đường dẫn tới dữ liệu đầy đủ.
+- Kết quả tool đã nhỏ, kể cả truy vấn graph có giới hạn: đọc trực tiếp, không
+  bọc thêm qua context-mode.
+- Không tự cài tool, bật daemon, tạo watcher, full-index hoặc tạo contract mới
+  trong folder này. Nếu Graphify/context-mode không có trong client hiện tại,
+  dùng source/tìm kiếm thông thường và ghi rõ trong bàn giao.
+- Sau thay đổi code ở repo con, chạy check phù hợp với repo đó; thay đổi chỉ ở
+  Markdown thì kiểm tra diff và tính nhất quán tài liệu.

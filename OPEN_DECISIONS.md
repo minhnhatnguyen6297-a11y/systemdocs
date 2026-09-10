@@ -12,7 +12,7 @@ Ký hiệu: 🔴 chưa có dữ liệu · 🟡 có khuyến nghị, chờ duyệ
 
 ## A. Phải đi đo trên máy thật, không suy luận được trên giấy
 
-Nguồn: `notaryoffice/gioi-thieu-du-an.md` §7. Mỗi câu 1–2 ngày kiểm tra, mỗi câu
+Nguồn: `notaryoffice/intent.md` §10.1. Mỗi câu 1–2 ngày kiểm tra, mỗi câu
 có thể thay đổi thiết kế `notaryoffice`.
 
 | # | Câu hỏi | Trạng thái | Hệ quả |
@@ -104,13 +104,13 @@ Agent không được nới giới hạn này để "tăng độ phủ dữ li�
 | Đọc API/DB của phần mềm quản lý hồ sơ hiện có | Không có API (B1) |
 | Server-centric FileWatcher: 1 server tự watch hết ổ mạng | Nghẽn băng thông LAN, bỏ sót sự kiện trên ổ local (~20% file) |
 | Full edge-processing: xử lý toàn bộ ngay trên máy con | Agent nặng, khó cập nhật logic trên 6 máy, ảnh hưởng máy nhân viên |
-| Auto-link chặt: chỉ ghép khi điểm ≥ 90, dưới ngưỡng thì bỏ | Mất quá nhiều dữ liệu. Đã đổi sang **xếp hạng ứng viên** rồi hỏi người 1 lần (`session_summary.md`) |
+| Auto-link chặt: chỉ ghép khi điểm ≥ 90, dưới ngưỡng thì bỏ | Mất quá nhiều dữ liệu. Đã đổi sang **xếp hạng ứng viên** rồi hỏi người 1 lần (`notaryoffice/intent.md` §8.1) |
 | Dùng số bản in từ Print Spooler | Spooler không cung cấp (A2) |
 | Đọc Zalo cá nhân của nhân viên | Ranh giới quyền riêng tư đã chốt (B2) |
 | Local OCR trong `notary_v2` | Đang **parked**, cần redesign được duyệt riêng mới mở lại |
 | Thêm OCR provider thứ hai song song với Qwen | Xem [`TECH_STACK.md`](./TECH_STACK.md) mục 2 |
 
-Chi tiết ba phương án kiến trúc bị loại: `notaryoffice/intent_v2.md`.
+Chi tiết ba phương án kiến trúc bị loại: `notaryoffice/intent.md` §6.3.
 
 ---
 

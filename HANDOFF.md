@@ -87,18 +87,15 @@ Tạo `D:\notaryoffice\AGENTS.md`:
 
 **Trạng thái: tài liệu, chưa có code.** Đừng mô tả nó như hệ thống đang chạy.
 
-## Sources of truth (theo thứ tự)
-1. `intent_v2.md` — quyết định kỹ thuật đã chốt, phương án đã loại, 14 bảng DB
-2. `session_summary.md` — Evidence Record, Draft Case, confidence = xếp hạng
-3. `gioi-thieu-du-an.md` — lộ trình, chi phí, câu hỏi cần quyết định
-4. `intent.md` — v0.1, đã bị thay thế. Chỉ tra lịch sử
+## Source of truth
+1. `intent.md` — Nguồn Chân lý Duy nhất: Tầm nhìn, nghiệp vụ, Hybrid Pipeline, Evidence Record, Draft Case, 14 bảng DB, quyết định đã chốt, phương án đã loại, lộ trình & chi phí.
 
 ## Rules
 - Trước khi viết code: A1 / A3 / A4 ở systemdocs `OPEN_DECISIONS.md` phải có câu
   trả lời thật (A2 đã chốt = Không).
 - Print Spooler **không cho biết số bản in**. Không thiết kế feature nào cần con
   số đó.
-- Không đề xuất lại các phương án đã loại trong `intent_v2.md`.
+- Không đề xuất lại các phương án đã loại trong `intent.md`.
 - Không quay màn hình, không keylogger, không dùng cho chấm công.
 - Zalo: chỉ tài khoản chung của Văn phòng, chỉ trên máy chủ. Không đọc tài khoản
   Zalo của nhân viên.
@@ -244,3 +241,266 @@ thật** — báo ngay, vì đây chính là thứ sẽ vỡ lúc gộp DB.
 - [ ] A1, A3, A4 — đi đo trên 6 máy thật (A2 và B1 đã chốt) (MIN-48)
 - [ ] B3 — nội quy lao động, làm trước khi triển khai (MIN-49)
 - [x] `researchskill` — không làm gì, đúng như thiết kế
+
+---
+
+## 6. BẢN NHÁP ĐỂ DUYỆT — giao diện desktop và chuẩn hóa tài liệu
+
+> **Trạng thái: CHƯA DUYỆT — KHÔNG GIAO IMPLEMENT.**
+>
+> Mục này chuyển hai hướng đang thảo luận thành các yêu cầu ngắn để chủ dự án
+> review. Electron và MarkItDown chưa phải lựa chọn công nghệ của hệ thống cho tới
+> khi các mục tương ứng được duyệt và `TECH_STACK.md` được cập nhật.
+
+### 6.1. Kết luận kỹ thuật cần duyệt trước
+
+1. **Electron có thể là vỏ desktop chung**, nhưng không chọn Electron vì cho rằng
+   nó làm Playwright thuận tiện hơn. Electron đóng gói Chromium; cửa sổ đó không
+   tự trở thành browser do Playwright Python quản lý.
+2. **Giai đoạn đầu, Playwright tiếp tục mở Chromium riêng có giao diện.** Electron
+   chỉ gửi lệnh và nhận trạng thái từ backend Python. Cách này giữ được uploader
+   Python hiện có (`D:\upload_lab_repo\requirements.txt:3`) và chế độ Dry-run /
+   Finalize hiện có (`D:\upload_lab_repo\README.md:15`;
+   `D:\upload_lab_repo\AGENTS.md:10`).
+3. **MarkItDown phù hợp làm lớp chuyển tài liệu thành văn bản trung gian**, không
+   phải schema hồ sơ hay dữ liệu nghiệp vụ cuối cùng.
+4. **Qwen có thể được thử như OCR backend của MarkItDown** qua giao diện
+   OpenAI-compatible. Đây mới là giả thuyết cần POC; Qwen hiện tại được khai báo ở
+   `D:\notary_v2\routers\ocr_ai.py:38-39`.
+5. **Không bật OCR cloud cho mọi ảnh nhúng.** Ảnh logo, chữ ký hoặc hình trang trí
+   trong DOCX/XLSX không được tự động gửi ra ngoài chỉ vì plugin phát hiện được.
+
+Nguồn ngoài đã kiểm tra cho phần đề xuất:
+
+- Playwright ghi hỗ trợ Electron là experimental:
+  <https://playwright.dev/docs/api/class-electron>.
+- Electron khuyến nghị `WebContentsView`; không khuyến nghị `<webview>` cho thiết
+  kế mới: <https://www.electronjs.org/docs/latest/api/web-contents-view> và
+  <https://www.electronjs.org/docs/latest/api/webview-tag>.
+- Plugin `markitdown-ocr` nhận `llm_client` tương thích OpenAI và hỗ trợ ảnh trong
+  PDF/DOCX/PPTX/XLSX:
+  <https://github.com/microsoft/markitdown/tree/main/packages/markitdown-ocr>.
+
+### 6.2. Lớp giao diện desktop
+
+#### UI-01 — Vỏ desktop Electron
+
+**Yêu cầu:** thử Electron làm một cửa sổ chung cho tiếp nhận tài liệu, review kết
+quả, tìm kiếm hồ sơ và khởi chạy upload.
+
+**Ranh giới:** không viết lại nghiệp vụ Python sang Node chỉ để dùng Electron.
+Electron gọi backend Python/FastAPI qua API local hoặc IPC hẹp được thiết kế sau.
+
+**Đề xuất:** duyệt POC.
+
+- [ ] Duyệt
+- [ ] Sửa yêu cầu
+- [ ] Hoãn
+
+#### UI-02 — Trình duyệt upload do Playwright quản lý
+
+**Yêu cầu:** khi người dùng bấm upload trong Electron, backend Python mở cửa sổ
+Chromium do Playwright quản lý; người dùng vẫn nhìn và kiểm tra được trước khi
+Finalize.
+
+**Không bao gồm:** nhúng trang web tỉnh vào Electron hoặc chuyển uploader sang
+Playwright Node.
+
+**Đề xuất:** duyệt.
+
+- [ ] Duyệt
+- [ ] Sửa yêu cầu
+- [ ] Hoãn
+
+#### UI-03 — Nhúng web tỉnh trong Electron
+
+**Yêu cầu:** chưa làm trong giai đoạn đầu. Nếu trải nghiệm hai cửa sổ gây khó dùng,
+tạo POC riêng bằng `WebContentsView`; phải kiểm tra đăng nhập, cookie, popup, tải
+file, cửa sổ mới và khả năng tự động hóa trước khi chọn.
+
+**Đề xuất:** hoãn.
+
+- [ ] Duyệt hoãn
+- [ ] Yêu cầu POC ngay
+- [ ] Bỏ hẳn phương án
+
+#### UI-04 — Sentinel vẫn là tiến trình riêng
+
+**Yêu cầu:** Electron không thay Sentinel C# trên máy trạm. Sentinel vẫn phải đáp
+ứng giới hạn tài nguyên đã thiết kế; Electron chỉ là ứng dụng người dùng mở khi
+cần thao tác. Thiết kế Sentinel hiện nằm ở
+`D:\notaryoffice\intent.md` §6.2 và chưa có code.
+
+**Đề xuất:** duyệt.
+
+- [ ] Duyệt
+- [ ] Sửa yêu cầu
+- [ ] Hoãn
+
+### 6.3. Lớp chuẩn hóa đầu vào
+
+#### DOC-01 — MarkItDown là cổng chuyển đổi chung
+
+**Yêu cầu:** POC một pipeline nhận PDF, DOCX, XLSX và ảnh, rồi xuất văn bản
+Markdown trung gian cùng metadata nguồn để parser nghiệp vụ xử lý tiếp.
+
+**Không bao gồm:** thay ngay `python-docx`, `openpyxl`, PyMuPDF hoặc IFilter đang
+chạy. Các thư viện hiện tại được kiểm chứng ở
+`D:\notary_v2\requirements.txt:17-20`,
+`D:\upload_lab_repo\requirements.txt:1-4` và
+`D:\upload_lab_repo\extract_contract.py:134-139`.
+
+**Đề xuất:** duyệt POC.
+
+- [ ] Duyệt
+- [ ] Sửa yêu cầu
+- [ ] Hoãn
+
+#### DOC-02 — Quy tắc định tuyến theo loại file
+
+**Yêu cầu:** áp dụng định tuyến sau trong POC.
+
+| Đầu vào | Đường xử lý đề xuất |
+|---|---|
+| PDF có text | MarkItDown đọc local trước |
+| PDF scan | Render trang rồi gọi Qwen OCR |
+| Ảnh giấy tờ | Qwen OCR |
+| DOCX có text | MarkItDown đọc local |
+| Ảnh nhúng trong DOCX | Chỉ OCR khi loại tài liệu yêu cầu |
+| XLSX | Đọc ô local; mặc định không OCR ảnh nhúng |
+| Word `.doc` cũ | Giữ Windows IFilter |
+
+**Đề xuất:** duyệt.
+
+- [ ] Duyệt
+- [ ] Sửa yêu cầu
+- [ ] Hoãn
+
+#### DOC-03 — Adapter Qwen cho MarkItDown
+
+**Yêu cầu:** tạo POC client Qwen tương thích đúng lời gọi
+`client.chat.completions.create`; ghi nhận model, prompt, thời gian, lỗi và số lần
+gọi. Không thêm OCR provider thứ hai.
+
+**Ranh giới dữ liệu:** chỉ các loại ảnh đã được duyệt mới được gửi ra DashScope.
+Không tự mở rộng từ “ảnh giấy tờ” sang mọi ảnh nhúng trong tài liệu Office.
+
+**Đề xuất:** duyệt POC.
+
+- [ ] Duyệt
+- [ ] Sửa yêu cầu
+- [ ] Hoãn
+
+#### DOC-04 — Markdown chỉ là bản trung gian
+
+**Yêu cầu:** mỗi lần chuyển đổi phải giữ tối thiểu:
+
+- File gốc hoặc đường dẫn tới file gốc.
+- Hash file và loại file.
+- Markdown/text đã chuyển đổi.
+- Converter, phiên bản, OCR model và prompt đã dùng.
+- Cảnh báo và lỗi; không được bỏ qua lỗi OCR mà vẫn báo thành công hoàn toàn.
+- Vị trí nguồn có thể xác định được như trang, sheet hoặc đoạn trích.
+
+Parser nghiệp vụ vẫn tạo người, giấy tờ, tài sản, số công chứng và quan hệ hồ sơ
+theo định nghĩa hệ thống; không ghi Markdown thẳng thành record nghiệp vụ.
+
+**Đề xuất:** duyệt.
+
+- [ ] Duyệt
+- [ ] Sửa yêu cầu
+- [ ] Hoãn
+
+### 6.4. Lớp dữ liệu nghiệp vụ
+
+#### DATA-01 — Raw và normalized tồn tại song song
+
+**Yêu cầu:** giữ nguyên giá trị đọc được từ nguồn và tạo thêm giá trị chuẩn hóa để
+so khớp. Không sửa đè dữ liệu gốc. Quy tắc canonical hiện tham chiếu
+`contracts/entities.md`.
+
+**Đề xuất:** duyệt.
+
+- [ ] Duyệt
+- [ ] Sửa yêu cầu
+- [ ] Hoãn
+
+#### DATA-02 — Mọi trường quan trọng truy ngược được về nguồn
+
+**Yêu cầu:** CCCD, serial GCN, số công chứng, số tiền, thửa/tờ và thông tin các bên
+phải chỉ ra được file và đoạn/trang/sheet đã sinh ra giá trị đó. Nếu converter
+không cung cấp đủ vị trí, ít nhất phải giữ đoạn text bằng chứng và file nguồn.
+
+**Đề xuất:** duyệt.
+
+- [ ] Duyệt
+- [ ] Sửa yêu cầu
+- [ ] Hoãn
+
+#### DATA-03 — Người dùng vẫn duyệt dữ liệu quan trọng
+
+**Yêu cầu:** kết quả OCR/LLM không được tự trở thành sự thật chỉ dựa trên confidence
+do model trả về. Kiểm tra định dạng và đối chiếu tất định được chạy trước; người
+dùng xác nhận các trường quan trọng theo luồng của từng sản phẩm.
+
+**Đề xuất:** duyệt.
+
+- [ ] Duyệt
+- [ ] Sửa yêu cầu
+- [ ] Hoãn
+
+### 6.5. Lớp triển khai và kiểm chứng
+
+#### DEV-01 — Hai POC độc lập
+
+**Yêu cầu:** sau khi duyệt công nghệ, tạo hai task riêng:
+
+1. Electron gọi backend Python và mở uploader Playwright trong Chromium riêng.
+2. MarkItDown chuyển bộ tài liệu mẫu và dùng Qwen cho các đầu vào cần OCR.
+
+Không tạo contract tích hợp giữa các repo và không đưa POC vào production trong
+hai task này.
+
+**Đề xuất:** duyệt.
+
+- [ ] Duyệt
+- [ ] Sửa yêu cầu
+- [ ] Hoãn
+
+#### DEV-02 — Điều kiện POC MarkItDown đạt
+
+**Yêu cầu:** chạy cùng bộ hồ sơ mẫu qua pipeline hiện tại và pipeline POC. Chỉ đề
+nghị thay converter của một định dạng khi POC:
+
+- Không đảo thứ tự Bên A/Bên B.
+- Không mất bảng hoặc các trường công chứng quan trọng.
+- Không bỏ sót OCR mà không cảnh báo.
+- Truy ngược được kết quả về nguồn.
+- Bằng hoặc tốt hơn pipeline hiện tại trên chính bộ mẫu đó.
+- Có cấu hình quay lại converter hiện tại.
+
+**Đề xuất:** duyệt.
+
+- [ ] Duyệt
+- [ ] Sửa yêu cầu
+- [ ] Hoãn
+
+#### DEV-03 — Cố định dependency trong POC
+
+**Yêu cầu:** dùng Python API của MarkItDown, cố định phiên bản hoặc commit; ghi rõ
+dependency nào được bật. Chưa dựa vào CLI của plugin OCR để vận hành production.
+
+**Đề xuất:** duyệt.
+
+- [ ] Duyệt
+- [ ] Sửa yêu cầu
+- [ ] Hoãn
+
+### 6.6. Sau khi chủ dự án review
+
+1. Chuyển riêng từng mục đã duyệt thành quyết định công nghệ trong
+   `TECH_STACK.md`, kèm lý do và phạm vi.
+2. Giữ mục hoãn hoặc bị bác ở đây để agent không đề xuất lại như quyết định mới.
+3. Tạo handoff triển khai riêng cho từng POC. Handoff này không được dùng trực
+   tiếp để viết code.
+4. Sau POC, báo kết quả để chủ dự án quyết định giữ, sửa hoặc bỏ từng công nghệ.

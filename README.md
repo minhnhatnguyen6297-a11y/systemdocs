@@ -38,6 +38,5 @@ không phải phân hệ công chứng.
 
 Folder này mô tả **quan hệ giữa các sản phẩm**. Hành vi bên trong một sản phẩm
 do docs của repo đó quyết định (`notary_v2/AGENTS.md` → `docs/`,
-`upload_lab_repo/README.md`, `notaryoffice/intent_v2.md` +
-`session_summary.md`). Khi folder này xung đột với repo con, repo con thắng về
+`upload_lab_repo/README.md`, `notaryoffice/intent.md`). Khi folder này xung đột với repo con, repo con thắng về
 hành vi nội bộ — và mâu thuẫn đó phải được báo lại để sửa ở đây.

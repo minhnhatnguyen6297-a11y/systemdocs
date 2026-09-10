@@ -112,8 +112,8 @@ bộ dữ liệu cũ.
 ## 4. Kiến trúc dự kiến của notaryoffice
 
 Sản phẩm này chưa có code nên toàn bộ mục này là **thiết kế**, không phải hiện
-trạng. Nguồn: `notaryoffice/intent_v2.md` (quyết định kỹ thuật) và
-`notaryoffice/session_summary.md` (mở rộng sang Evidence Record).
+trạng. Nguồn: `notaryoffice/intent.md` (Nguồn Chân lý Duy nhất: quyết định kỹ thuật,
+14 bảng DB, Evidence Record, Draft Case).
 
 Mô hình đã chọn: **Hybrid Pipeline — Edge IFilter + Central Processing Hub**
 
