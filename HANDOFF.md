@@ -236,11 +236,11 @@ thật** — báo ngay, vì đây chính là thứ sẽ vỡ lúc gộp DB.
 
 ## 5. Checklist cho chủ dự án
 
-- [ ] 0.1 — thêm khối cross-product vào `notary_v2/AGENTS.md`
-- [ ] 0.2 — tạo `upload_lab_repo/AGENTS.md`
-- [ ] 0.3 — tạo `notaryoffice/AGENTS.md` (+ quyết định có `git init` không)
-- [ ] 3.1 — sửa 2 chỗ regex trong `notaryoffice/intent.md`
-- [ ] 3.2 — sửa 4 chỗ trong tài liệu `notaryoffice` theo A2 / B1 / B2 / B3
-- [ ] A1, A3, A4 — đi đo trên 6 máy thật (A2 và B1 đã chốt)
-- [ ] B3 — nội quy lao động, làm trước khi triển khai
-- [ ] `researchskill` — không làm gì, đúng như thiết kế
+- [x] 0.1 — thêm khối cross-product vào `notary_v2/AGENTS.md` (MIN-43)
+- [x] 0.2 — tạo `upload_lab_repo/AGENTS.md` (MIN-44)
+- [x] 0.3 — tạo `notaryoffice/AGENTS.md` (+ quyết định có `git init` không: đã git init) (MIN-45)
+- [x] 3.1 — sửa 2 chỗ regex trong `notaryoffice/intent.md` (MIN-46)
+- [x] 3.2 — sửa 4 chỗ trong tài liệu `notaryoffice` theo A2 / B1 / B2 / B3 (MIN-47)
+- [ ] A1, A3, A4 — đi đo trên 6 máy thật (A2 và B1 đã chốt) (MIN-48)
+- [ ] B3 — nội quy lao động, làm trước khi triển khai (MIN-49)
+- [x] `researchskill` — không làm gì, đúng như thiết kế
