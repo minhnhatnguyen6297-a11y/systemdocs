@@ -1,7 +1,65 @@
-﻿# Contracts & Data Schemas
+# Contracts giữa các sản phẩm
 
-Thư mục này lưu trữ các đặc tả giao tiếp chung giữa các phân hệ:
+Thư mục này chỉ chứa **những gì đã được cả hai bên đồng ý**. Nó không phải nơi
+đề xuất ý tưởng tích hợp.
 
-1. **OCR Extraction Contract**: Định dạng đầu ra JSON chuẩn của pipeline OCR (`upload_lab_repo`) khi nạp vào `notary_v2`.
-2. **Case Schema**: Mô hình dữ liệu chuẩn của một hồ sơ công chứng (Case, Parties, Properties, Status).
-3. **Legal Audit Contract**: Định dạng input/output khi `notary_v2` truy vấn dịch vụ/kỹ năng pháp lý từ `researchskill`.
+## Trạng thái hôm nay: chưa có contract tích hợp nào
+
+Ba công cụ hiện **chạy độc lập** — chưa có API, chưa đọc DB của nhau, chưa có file
+trao đổi tự động. Đó là trạng thái của **giai đoạn hiện tại**, không phải đích
+đến: hệ thống sẽ gộp lại và dùng chung database
+([`../VISION.md`](../VISION.md) mục 4).
+
+Nhưng "sau này sẽ gộp" **không phải giấy phép** để nối bừa bây giờ. Mỗi kết nối
+vẫn phải có contract được duyệt trước. Xem
+[`../SYSTEM_ARCHITECTURE.md`](../SYSTEM_ARCHITECTURE.md) mục 5.
+
+Vì vậy thư mục này hiện chỉ có một file, và nó không mô tả luồng dữ liệu mà mô
+tả **cách gọi tên dữ liệu**:
+
+| File | Nội dung | Trạng thái |
+|---|---|---|
+| [`entities.md`](./entities.md) | Định nghĩa & chuẩn hóa các khóa định danh hồ sơ (CCCD, số GCN, thửa/tờ, số công chứng) | Bắt buộc tham chiếu, mỗi repo tự implement |
+| [`../TECH_STACK.md`](../TECH_STACK.md) | Công nghệ đã chọn cho từng việc + ràng buộc để lúc gộp DB không xung đột | Bắt buộc đọc trước khi chọn công nghệ mới |
+
+## Quy tắc: contract trước, code sau
+
+Khi hai sản phẩm cần nối với nhau:
+
+1. Viết một file contract trong thư mục này: ai gọi ai, dữ liệu gì, ai sở hữu,
+   xử lý lỗi thế nào, ai chịu trách nhiệm khi schema đổi.
+2. Người dùng (chủ dự án) duyệt.
+3. Rồi mới viết code ở hai repo.
+
+Không viết code tích hợp trước rồi mô tả lại sau. Không agent nào được tự tạo
+contract mới rồi tự implement trong cùng một task.
+
+## Tại sao chưa có "shared core library"
+
+Định nghĩa dùng chung ≠ code dùng chung. Ba repo cùng cần trích CCCD nhưng ba
+ngữ cảnh khác nhau (ảnh OCR / text Word / text IFilter theo thời gian thực), độ
+chịu lỗi khác nhau. Gộp thành thư viện chung lúc này sẽ khóa cả ba vào một
+abstraction chưa ai chứng minh được.
+
+Lưu ý phân biệt: **gộp hệ thống ≠ gộp code.** Đích đến là chung **dữ liệu và định
+nghĩa**; thư viện code dùng chung là chuyện riêng, chỉ làm khi có domain thật thứ
+hai chứng minh được contract.
+
+Nguyên tắc đã chốt trong `notary_v2`
+(`docs/platform/case-workspace/README.md`): **không tách abstraction dùng chung
+cho tới khi có domain thật thứ hai chứng minh contract.** Áp dụng cho toàn hệ
+thống.
+
+## Ba mục trong file cũ đã bị xóa vì sai
+
+File `contracts/README.md` trước đây liệt kê ba contract không tồn tại. Ghi lại
+để không ai dựng lại chúng từ ký ức:
+
+- ~~"OCR Extraction Contract: output JSON của pipeline OCR (`upload_lab_repo`)
+  nạp vào `notary_v2`"~~ — `upload_lab` không làm OCR ảnh (đầu vào là file
+  Word) và không có luồng nạp sang `notary_v2`.
+- ~~"Case Schema chuẩn dùng chung"~~ — chưa từng được thống nhất. Mỗi repo có
+  mô hình riêng. Xem `entities.md` cho phần *thật sự* cần khớp nhau.
+- ~~"Legal Audit Contract: `notary_v2` truy vấn dịch vụ pháp lý từ
+  `researchskill`"~~ — `researchskill` là skill hỗ trợ coding, không phải dịch
+  vụ tra cứu pháp luật, và nằm ngoài phạm vi hệ thống công chứng.

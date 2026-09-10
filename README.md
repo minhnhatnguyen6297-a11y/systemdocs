@@ -1,26 +1,43 @@
-﻿# Notary Work Intelligence — System Architecture & Vision Hub
+# Notary System — Hub tầm nhìn & kiến trúc
 
-> Trung tâm quản lý tầm nhìn, kiến trúc hệ thống và hợp đồng giao tiếp giữa các phân hệ trong hệ sinh thái **Notary Work Intelligence**.
+Nguồn tham chiếu cấp cha cho hệ sinh thái phần mềm công chứng.
+Repo con **không** cần đọc folder này để làm việc hằng ngày — chỉ đọc khi task
+đụng tới ranh giới giữa các sản phẩm, vocabulary dùng chung, hoặc quyết định
+kiến trúc xuyên sản phẩm.
 
----
+Một ngoại lệ bắt buộc: **trước khi chọn một công nghệ mới** (OCR provider khác,
+ORM khác, queue khác, framework UI khác) thì phải đọc
+[`TECH_STACK.md`](./TECH_STACK.md). Ba repo sẽ gộp về một database dùng chung;
+chọn lệch nhau bây giờ là viết lại sau.
 
-## 1. Bức Tranh Tổng Thể
+## Ba sản phẩm trong phạm vi
 
-Hệ sinh thái bao gồm 4 phân hệ chức năng độc lập nhưng phối hợp chặt chẽ:
+| Sản phẩm | Đường dẫn | Làm gì | Trạng thái |
+|---|---|---|---|
+| `notary_v2` | `D:\notary_v2` | Soạn thảo hồ sơ tự động (thừa kế, sinh Word, intake giấy tờ, Zalo inbox) | Đang chạy |
+| `upload_lab` | `D:\upload_lab_repo` | Số hóa hồ sơ giấy: Word cũ → trường có cấu trúc → upload web CSDL công chứng tỉnh | Đang chạy |
+| `notaryoffice` | `D:\notaryoffice` | Quản lý hồ sơ tại văn phòng: thu dấu vết từ máy con → tự dựng record hồ sơ | Tài liệu, chưa code |
 
-| STT | Phân hệ (Project) | Đường dẫn | Vai trò chính |
-|:---:|:---|:---|:---|
-| 1 | **`notaryoffice`** | `D:\notaryoffice` | **Nghiệp vụ & Triết lý**: Tài liệu định hướng, intent hệ thống, yêu cầu nghiệp vụ văn phòng công chứng. |
-| 2 | **`notary_v2`** | `D:\notary_v2` | **Core Platform**: Ứng dụng chính xử lý hồ sơ (Case Workspace, Thừa kế, OCR Cloud/Local, sinh file Word). |
-| 3 | **`upload_lab_repo`** | `D:\upload_lab_repo` | **Intake & OCR Lab**: Pipeline thử nghiệm bóc tách dữ liệu văn bản, OCR regex review, lab xử lý tài liệu thô. |
-| 4 | **`researchskill`** | `D:\researchskill` | **AI Legal Skills**: Kỹ năng tra cứu văn bản pháp lý, đánh giá và đối soát quy chuẩn pháp luật công chứng. |
+Ngoài phạm vi: `researchskill` (`D:\researchskill`) là skill hỗ trợ coding,
+không phải phân hệ công chứng.
 
----
+## Đọc gì khi nào
 
-## 2. Cấu Trúc Tài Liệu
+| Cần gì | File |
+|---|---|
+| Tại sao có hệ thống này, ba sản phẩm ghép lại thành gì | [`VISION.md`](./VISION.md) |
+| Ranh giới sản phẩm, sản phẩm nào sở hữu dữ liệu nào | [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md) |
+| Repo nào giải bài toán gì — feature gì — công nghệ gì | [`PROJECTS.md`](./PROJECTS.md) |
+| **Trước khi chọn công nghệ mới hoặc ra quyết định kiến trúc** | [`TECH_STACK.md`](./TECH_STACK.md) |
+| Vocabulary & schema dùng chung giữa các sản phẩm | [`contracts/README.md`](./contracts/README.md) |
+| Cái gì đã chốt, cái gì chưa chốt — đừng tự quyết | [`OPEN_DECISIONS.md`](./OPEN_DECISIONS.md) |
+| Giao việc cho agent sửa từng repo con | [`HANDOFF.md`](./HANDOFF.md) |
+| Quy tắc khi sửa chính folder này | [`AGENTS.md`](./AGENTS.md) |
 
-- **[`VISION.md`](./VISION.md)**: Tầm nhìn, triết lý "văn phòng không cần nhập tay" và bài toán nghiệp vụ cốt lõi.
-- **[`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md)**: Sơ đồ kiến trúc, luồng dữ liệu liên thông giữa 4 module.
-- **[`PROJECTS.md`](./PROJECTS.md)**: Chi tiết cấu hình, ranh giới trách nhiệm và cách liên kết các project trong Orca.
-- **[`contracts/`](./contracts/)**: Đặc tả hợp đồng dữ liệu chung (Data Schemas, API Specs, Event payloads).
-- **[`AGENTS.md`](./AGENTS.md)**: Chỉ dẫn cho AI Agent khi đảm nhận vai trò Kiến trúc sư hệ thống (System Architect).
+## Nguồn sự thật
+
+Folder này mô tả **quan hệ giữa các sản phẩm**. Hành vi bên trong một sản phẩm
+do docs của repo đó quyết định (`notary_v2/AGENTS.md` → `docs/`,
+`upload_lab_repo/README.md`, `notaryoffice/intent_v2.md` +
+`session_summary.md`). Khi folder này xung đột với repo con, repo con thắng về
+hành vi nội bộ — và mâu thuẫn đó phải được báo lại để sửa ở đây.
