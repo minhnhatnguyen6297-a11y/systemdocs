@@ -12,8 +12,12 @@ Cập nhật: 10/09/2026
 |---|---|---|---|
 | `notary_v2` | `D:\notary_v2` | `github.com/minhnhatnguyen6297-a11y/notary_v2` | Đang chạy |
 | `upload_lab` | `D:\upload_lab_repo` | `github.com/minhnhatnguyen6297-a11y/upload_lab` | Đang chạy |
-| `notaryoffice` | `D:\notaryoffice` | **chưa init** | **Chỉ có tài liệu, chưa có code** |
+| `notaryoffice` | `D:\notaryoffice` | Git local đã init; chưa cấu hình remote | **Chỉ có tài liệu, chưa có code** (`notaryoffice/AGENTS.md:3`) |
 | `researchskill` | `D:\researchskill` | `github.com/minhnhatnguyen6297-a11y/researchskill` | **Ngoài phạm vi** |
+
+Snapshot Git `notaryoffice` ngày 10/09/2026: HEAD `1c1b160`, 4 commits;
+kiểm tra bằng `git log -1`, `git rev-list --count HEAD`, `git remote -v`
+(không có remote). Đây là trạng thái kiểm chứng, không phải điều kiện kiến trúc.
 
 ---
 
@@ -53,9 +57,9 @@ một số CCCD trong hợp đồng công chứng là lỗi nặng.
 |---|---|
 | Backend | Python **FastAPI** 0.111 + uvicorn (`main.py`) |
 | Frontend | **Jinja2 template + static** (`frontend/templates`, `frontend/static`) — server-rendered, **không có** SPA, không có `package.json` |
-| OCR | **Qwen `qwen-vl-ocr-2025-11-20`** qua DashScope, endpoint OpenAI-compatible (`routers/ocr_ai.py`) |
-| DB | SQLite `notary.db` (nghiệp vụ) + `ocr_jobs.db` (OCR job), qua SQLAlchemy 2.0 |
-| Job nền | Celery (`celery_app.py`), broker `sqlalchemy+sqlite:///ocr_jobs.db` |
+| OCR | Qwen qua DashScope **native multimodal API** (`notary_v2/routers/ocr_ai.py:38-39,381-414`); endpoint và gate candidate tại `TECH_STACK.md` §1/§1.1 |
+| DB | SQLite `notary.db` chứa cả bảng `ocr_jobs` và Zalo (`notary_v2/database.py:8-24`, `models.py:161-171,186-300`), qua SQLAlchemy; không nhầm với file hạ tầng `ocr_jobs.db` |
+| Job nền | Celery: broker và result backend mặc định cùng dùng `ocr_jobs.db`; cấu hình tại `notary_v2/celery_app.py:5-11` |
 | PDF / ảnh | PyMuPDF (`fitz`), Pillow |
 | QR | `zxing-cpp` (tùy chọn) |
 | Word / Excel | `python-docx`, `openpyxl` |
@@ -92,7 +96,8 @@ Hai vấn đề chồng lên nhau:
 2. Hàng nghìn hồ sơ Word cũ phải được **nhập tay lên web CSDL công chứng tỉnh** —
    mở từng file, đọc bằng mắt, gõ lại vào form web. Tốn hàng trăm giờ.
 
-`upload_lab` đọc file Word cũ → trường có cấu trúc → tự điền và submit lên web tỉnh.
+`upload_lab` đọc file Word cũ → trường có cấu trúc → điền web tỉnh → người dùng
+kiểm tra/xác nhận lưu (`upload_lab_repo/README.md:15,32-47`).
 
 ### Feature gì
 
@@ -105,7 +110,8 @@ Ba giai đoạn:
    - Phân loại văn bản: `transfer_contract`, `asset_commitment`,
      `mortgage_contract`, `inheritance_partition`, `inheritance_refusal`,
      `generic`; phân loại tài sản `loai_tai_san`.
-   - Ghi JSON + SQLite trạng thái `SCANNED`.
+   - Ghi JSON + SQLite; quét khớp là `matched`, trích xuất thành công là
+     `extracted` (`upload_lab_repo/batch_scan.py:713,786`).
 2. **Đối chiếu sổ công chứng** (`ui/services/contract_book_audit.py`,
    `scan_classification_service.py`)
    - So danh sách quét với sổ Excel, **chuẩn hóa số công chứng** về `xxx/yyyy`
@@ -117,7 +123,23 @@ Ba giai đoạn:
    - Chromium điều khiển web CSDL công chứng **tỉnh Nam Định**, session ở
      `nd_storage_state.json`.
    - **Dry-run** (điền hết, dừng trước nút Lưu để người kiểm tra) và **Finalize**
-     (lưu → `UPLOADED`, không upload trùng).
+     (ghi nhận lưu thành công → `uploaded_success`,
+     `upload_lab_repo/batch_scan.py:353-364`).
+
+**Snapshot trạng thái registry — không phải enum contract xuyên repo:**
+
+| Nhóm | Giá trị thật | Nguồn trong `upload_lab_repo` |
+|---|---|---|
+| Quét/trích xuất thành công | `matched`, `extracted` | `batch_scan.py:713,786` |
+| Chuẩn bị đầy đủ/một phần | `prepared_dry_run`, `prepared_partial` | `playwright_uploader.py:81-83,2011,2141-2157` |
+| Đã upload thành công | `uploaded_success` | `batch_scan.py:353-364` |
+| Thất bại | `extract_failed`, `upload_failed` | `batch_scan.py:744`; `playwright_uploader.py:2170` |
+| Bỏ qua | `skipped_unsupported`, `skipped_old_file`, `skipped_duplicate` | `batch_scan.py:575,627,687` |
+
+Mười giá trị trên đối chiếu source ngày 10/09/2026, không khẳng định thứ tự
+chuyển trạng thái hay thay thế quy tắc nội bộ. Snapshot chỉ tạm đặt ở đây vì
+`upload_lab_repo/README.md:28` còn mô tả sai trạng thái quét. Follow-up ở repo
+con: sửa README, đưa enum về tài liệu owner; sau đó ở đây chỉ giữ dẫn chiếu.
 
 UI desktop cho chuyên viên tự chạy (`run.bat` bootstrap venv + mở UI), đóng gói
 ra `_release/`.
@@ -149,9 +171,12 @@ ra `_release/`.
 
 ## 3. `notaryoffice`
 
-> **Trạng thái: TÀI LIỆU THIẾT KẾ. Chưa có một dòng code nào, chưa `git init`.**
+> **Trạng thái: TÀI LIỆU THIẾT KẾ. Đã git init local, chưa có code.**
 > Mọi thứ dưới đây là **dự định**, không phải hiện thực. Đừng mô tả nó như phần
 > mềm đang chạy.
+
+Nguồn trạng thái code: `notaryoffice/AGENTS.md:3`; trạng thái Git theo snapshot
+đầu tài liệu.
 
 ### Giải bài toán gì
 
@@ -170,9 +195,10 @@ Mục tiêu cụ thể: trả lời "hồ sơ bà Gái đang ở đâu?" dưới
 - **Sentinel trên ~6 máy trạm** — theo dõi thay đổi file bằng
   `ReadDirectoryChangesW`, debounce cửa sổ trượt 3–5 phút để không bắn event mỗi
   lần Ctrl+S.
-- **Đọc nội dung tài liệu bằng IFilter** ngay khi Word còn đang giữ file (5–15ms,
-  ra plain text). Gửi về Hub dưới dạng **JSON 20–50KB, không bao giờ gửi file nhị
-  phân.**
+- **Dự kiến đọc nội dung tài liệu bằng IFilter** ra plain text. Khả năng đọc khi
+  Word còn giữ file và số đo thời gian **chưa được kiểm chứng trên 6 máy thật**
+  (`OPEN_DECISIONS.md` A1). Nếu đạt, gửi về Hub dưới dạng **JSON 20–50KB, không
+  gửi file nhị phân.**
 - **Bắt sự kiện in** qua Print Spooler **Event ID 307** — tín hiệu xương sống thứ
   hai, vì "in ra" gần như luôn nghĩa là hồ sơ tới một mốc thật.
 - **Buffer SQLite cục bộ trên máy trạm** — mất LAN thì xếp hàng FIFO, LAN về thì
@@ -197,7 +223,7 @@ Dự kiến ~14 bảng (`document_snapshots`, `document_deltas`, `print_jobs`,
 | Lớp | Công nghệ | Ràng buộc |
 |---|---|---|
 | Agent máy trạm | **C# .NET 8** | <30MB RAM, <0.5% CPU — chạy trên máy nhân viên đang làm việc |
-| Đọc nội dung | Windows IFilter | Đọc được khi Word đang giữ file |
+| Đọc nội dung | Windows IFilter | Candidate đã chọn trong thiết kế; hành vi khi Word giữ file còn chờ đo A1 |
 | Theo dõi file | `ReadDirectoryChangesW` | |
 | Tín hiệu in | Print Spooler Event ID 307 | Không có số bản in (A2) |
 | Buffer cục bộ | SQLite | FIFO, đẩy khi LAN hồi |
@@ -220,9 +246,10 @@ Dự kiến ~14 bảng (`document_snapshots`, `document_deltas`, `print_jobs`,
 - **Không phải phần mềm đang chạy.** Chưa có code.
 - **Không đọc gì ngoài thư mục nghiệp vụ đã thống nhất bằng văn bản.**
 - **Không đọc DB của `upload_lab` hay `notary_v2`** ở thời điểm này.
-- **Hai lỗi trong `intent.md` §5.2 phải sửa trước khi viết code:** CCCD ghi
-  `\b0\d{11}\b` (bắt buộc số 0 đầu — **sai**), và serial GCN cố định 6 chữ số
-  (thực tế `notary_v2` gặp cả 7–8 chữ số). Chuẩn đúng ở
+- **Hai lỗi regex cũ đã sửa trong `intent.md` v1.0 §7.2:** CCCD là
+  `\b\d{12}\b`, serial GCN là `[A-Z]{2}\s*\d{6,8}`
+  (`notaryoffice/intent.md:325-326`). Không còn là blocker sửa intent;
+  chuẩn thống nhất ở
   [`contracts/entities.md`](./contracts/entities.md).
 
 **Ba câu còn phải đo trên máy thật trước khi code:** `OPEN_DECISIONS.md` A1, A3,
@@ -248,5 +275,5 @@ thống công chứng.
   (`contracts/entities.md`), **lựa chọn công nghệ** (`TECH_STACK.md`), và những gì
   đang mở (`OPEN_DECISIONS.md`).
 - **Không quyết định:** hành vi nội bộ của một repo. Khi xung đột, docs của repo
-  con thắng về hành vi nội bộ — nhưng phải báo lại để sửa ở đây, xem
-  [`HANDOFF.md`](./HANDOFF.md) mục 4.
+  con thắng về hành vi nội bộ — nhưng phải báo lại để sửa ở đây theo
+  [`AGENTS.md`](./AGENTS.md).

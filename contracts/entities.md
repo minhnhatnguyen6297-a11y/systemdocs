@@ -1,14 +1,16 @@
 # Định danh hồ sơ — định nghĩa dùng chung
 
-**Phạm vi:** file này định nghĩa *ý nghĩa và cách chuẩn hóa* các khóa dùng để
-nhận ra "hai dữ liệu này nói về cùng một hồ sơ". Nó **không** áp đặt regex,
-không áp đặt tên biến, không áp đặt schema DB.
+**Phạm vi:** file này định nghĩa *ý nghĩa và cách chuẩn hóa* định danh người,
+giấy chứng nhận/tài sản và tham chiếu hồ sơ. Chúng cung cấp bằng chứng tìm hồ
+sơ liên quan, không mặc nhiên chứng minh "cùng một hồ sơ". Không áp đặt regex,
+tên biến, schema DB hay dùng định danh người/tài sản làm khóa chính Case.
 
 **Bắt buộc:** khi một repo trích xuất hoặc so khớp một trong các khóa dưới đây,
 nó phải chuẩn hóa về **dạng canonical** ghi ở đây trước khi so sánh hoặc trước
-khi ghi vào trường "khóa định danh". Muốn lưu thêm dạng raw thì tùy repo.
+khi ghi vào trường "khóa định danh". Giữ raw và provenance theo
+`SYSTEM_ARCHITECTURE.md` §6.2; chuẩn hóa không được ghi đè bằng chứng gốc.
 
-Cập nhật: 09/09/2026
+Cập nhật: 10/09/2026
 
 ---
 
@@ -20,13 +22,13 @@ Cập nhật: 09/09/2026
 - **Nguồn đọc được cả hai:** mã MRZ hộ chiếu/CCCD dạng `IDVNM(\d{9})(\d)(\d{12})`
   chứa cả CMND cũ và CCCD mới — lấy nhóm 12 số làm CCCD.
 
-**Ba repo hiện làm khác nhau — chưa cần sửa, nhưng phải biết:**
+**Cách nhận hiện hành và thiết kế dự kiến — không đồng nhất với canonical:**
 
 | Repo | Cách nhận | Ghi chú |
 |---|---|---|
 | `notary_v2` | `(?<!\d)(\d{12})(?!\d)` — mọi cụm 12 số (`routers/ocr_ai.py`) | Rộng nhất, vì OCR ảnh hay mất chữ đầu |
 | `upload_lab` | Neo theo nhãn: `(?:Căn cước\|CCCD\|CMND)\s*(?:số)?\s*:?\s*(\d+)` (`extract_contract.py`) | Chặt theo ngữ cảnh vì text Word có sẵn nhãn |
-| `notaryoffice` (dự kiến) | `\b0\d{11}\b` — bắt buộc bắt đầu bằng `0` (`intent.md` §5.2) | **Hẹp hơn thực tế**: có CCCD không bắt đầu bằng 0. Phải xem lại trước khi code |
+| `notaryoffice` (dự kiến) | `\b\d{12}\b` (`notaryoffice/intent.md` v1.0 §7.2, dòng 325) | Đã bỏ ràng buộc số 0 đầu; chưa có implementation |
 
 **Quy tắc thống nhất:** dù regex nào, giá trị đem đi so khớp phải là đúng 12 chữ
 số. Không so khớp một phần, không so khớp 9 số cuối.
@@ -35,13 +37,13 @@ số. Không so khớp một phần, không so khớp 9 số cuối.
 
 ## 2. Số serial GCN (sổ đỏ)
 
-- **Canonical:** 2 chữ cái in hoa + 6 chữ số, **không dấu cách**: `DD123456`.
+- **Canonical:** 2 chữ cái in hoa + **6–8 chữ số**, không dấu cách: `DD123456`.
 - Khi hiển thị cho người dùng có thể chèn dấu cách (`DD 123456`); khi so khớp thì
   không.
-- **Thực tế có phôi 7–8 số.** `notary_v2` nhận `[A-Z]{2}\s*\d{6,8}`. Vì vậy:
-  **không được reject serial dài hơn 6 số** — chấp nhận `[A-Z]{2}` + 6–8 số, chỉ
-  chuẩn hóa bằng cách bỏ hết khoảng trắng và viết hoa.
-- `notaryoffice/intent.md` ghi cứng 6 số — cần nới ra khi implement.
+- Dải được hệ thống chấp nhận là `[A-Z]{2}` + 6–8 số; chuẩn hóa bằng cách bỏ
+  khoảng trắng và viết hoa. Nguồn hiện hành:
+  `notary_v2/routers/ocr_ai.py:924-925,972`; thiết kế đã đồng bộ:
+  `notaryoffice/intent.md` v1.0 §7.2, dòng 326 (`[A-Z]{2}\s*\d{6,8}`).
 
 ---
 
@@ -62,7 +64,8 @@ số. Không so khớp một phần, không so khớp 9 số cuối.
 - **Chỉ có giá trị định danh khi kèm địa phương** (xã/phường + huyện). Cặp
   `(thửa, tờ, địa phương)` mới đủ mạnh để xếp hạng cao.
 - `notary_v2`: `so_thua_dat`, `so_to_ban_do`, `dia_chi`.
-- `notaryoffice` dự kiến: `thửa\s*(\d+)[\s,]+tờ\s*(\d+)`.
+- `notaryoffice` dự kiến dùng tên `so_thua_dat`, `so_to_ban_do`
+  (`notaryoffice/intent.md:327`), không quy định regex thửa/tờ tại mục đó.
 - `upload_lab` hiện **không tách thửa/tờ thành trường riêng** — nó trích cả khối
   mô tả tài sản dưới dạng text để điền web. Nếu sau này cần khớp hồ sơ giữa
   `upload_lab` và `notaryoffice`, đây là việc phải làm thêm ở `upload_lab`.
@@ -84,10 +87,11 @@ số. Không so khớp một phần, không so khớp 9 số cuối.
 
 - **Không zero-pad** số thứ tự. `07/2026` và `7/2026` là hai chuỗi khác nhau —
   nếu cần so khớp thì so bằng số nguyên, không so chuỗi.
-- Số công chứng **chỉ tồn tại sau khi hồ sơ hoàn tất**. Hồ sơ đang soạn không có
-  khóa này → không dùng nó làm khóa chính trong `notary_v2` hay `notaryoffice`.
-- Đây là khóa duy nhất **hệ thống nhà nước** cũng dùng, nên nó là khóa mạnh nhất
-  cho hồ sơ lưu trữ.
+- Không giả định hồ sơ đang soạn đã có số công chứng; không lấy trường này làm
+  khóa chính bắt buộc cho mọi giai đoạn. Thời điểm cấp số thuộc nghiệp vụ owner.
+- `xxx/yyyy` là tham chiếu hồ sơ trong **phạm vi sổ/đơn vị phát hành tương ứng**,
+  không phải ID toàn cục. Giữ provenance/phạm vi khi đối chiếu xuyên nguồn;
+  chưa đủ phạm vi thì chỉ tạo candidate link, không tự gộp.
 
 ---
 
@@ -102,18 +106,23 @@ trong nghề công chứng đắt hơn hai mươi lần gán đúng.
 
 ---
 
-## 7. Độ mạnh của khóa — thứ tự thống nhất
+## 7. Độ mạnh theo đối tượng — không phải thứ bậc khóa hồ sơ
 
-Từ mạnh đến yếu:
+| Tham chiếu | Đối tượng/phạm vi | Được dùng để |
+|---|---|---|
+| CCCD 12 số | Người được giấy tờ định danh | Đối chiếu người; tìm hồ sơ có người đó, không tự gộp Case |
+| Serial GCN | Giấy chứng nhận, dẫn tới tài sản liên quan | Đối chiếu giấy tờ/tài sản; không suy ra một hồ sơ duy nhất |
+| Thửa + tờ + địa phương | Thửa đất trong phạm vi địa phương | Xếp hạng tài sản/hồ sơ liên quan; giữ nguồn và bước xác nhận |
+| Số công chứng + năm + phạm vi sổ/đơn vị | Hồ sơ có tham chiếu công chứng | Liên kết khi đủ phạm vi và bằng chứng, không coi `xxx/yyyy` là ID toàn cục |
+| Số vào sổ GCN | Tham chiếu phụ giấy chứng nhận | Bổ sung bằng chứng, không đứng một mình để ghép hồ sơ |
+| Đường dẫn, họ tên | Ngữ cảnh yếu | Tìm kiếm/xếp hạng, không tự gán hoặc gộp record |
 
-1. CCCD (12 số) — đủ mạnh để tự ghép
-2. Số serial GCN — đủ mạnh để tự ghép
-3. Số công chứng `xxx/yyyy` — đủ mạnh cho hồ sơ đã xong
-4. `(thửa, tờ, địa phương)` — mạnh, nhưng nên có bước xác nhận
-5. Số vào sổ GCN — chỉ để tăng điểm
-6. Đường dẫn thư mục hồ sơ — chỉ để tăng điểm
-7. Họ tên — chỉ để xếp hạng, không để ghép
+Không có thứ tự mạnh/yếu chung để thay thế định danh người bằng định danh hồ
+sơ. Một người/tài sản có thể liên quan nhiều hồ sơ. Liên kết Case là inference
+có provenance, được người có thẩm quyền xác nhận theo owner; chuẩn hóa thành
+công không tự nâng dữ liệu thành `CONFIRMED`.
 
-Thứ tự này là nền của bảng tính điểm trong `notaryoffice`
-(`intent.md` §5.2, đã được `session_summary.md` chỉnh: điểm dùng để **xếp hạng**
-ứng viên, không dùng để **loại bỏ** ứng viên).
+Điểm bám thiết kế: `notaryoffice/intent.md:365-373` phân biệt `entities`,
+`cases` và `case_entities` M:N; `:385-394` mô tả xếp hạng rồi xác nhận.
+Không suy ra cardinality giữa Case của hai repo từ quan hệ nội bộ này; xem
+`SYSTEM_ARCHITECTURE.md` §7. Không định nghĩa thêm shared ID/schema trong lần sửa này.

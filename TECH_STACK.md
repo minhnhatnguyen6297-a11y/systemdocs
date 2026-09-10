@@ -17,9 +17,9 @@ Cập nhật: 10/09/2026
 
 | Việc | Công nghệ đã chọn | Đang dùng ở | Ghi chú |
 |---|---|---|---|
-| **OCR ảnh giấy tờ** | **Qwen-VL-OCR** qua DashScope (`qwen-vl-ocr-2025-11-20`) | `notary_v2` (`routers/ocr_ai.py`) | Base URL `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`. Có nhánh fallback OpenAI-compatible và biến `GEMINI_API_KEY` trong `.env` — **Qwen là lựa chọn chính** |
+| **OCR ảnh giấy tờ** | **Qwen-VL-OCR** qua DashScope **native multimodal API** (`qwen-vl-ocr-2025-11-20`) | `notary_v2/routers/ocr_ai.py:38-39,381-414` | Base mặc định `https://dashscope-intl.aliyuncs.com`; endpoint `{base}/api/v1/services/aigc/multimodal-generation/generation` (`:390`). Nhánh chọn key cho model không phải Qwen (`:69-79`) không chứng minh có transport fallback |
 | **Đọc `.docx`** | `python-docx` | `notary_v2`, `upload_lab` | Phải giữ thứ tự đoạn + bảng, nếu không sẽ trộn Bên A / Bên B |
-| **Đọc `.doc` cũ** | **Windows IFilter (`query.dll`)** | `upload_lab`; `notaryoffice` (dự kiến) | Không cần cài Word. Đọc được cả khi Word đang giữ file. `notary_v2` **không** dùng |
+| **Đọc `.doc` cũ** | **Windows IFilter (`query.dll`)** | `upload_lab`; `notaryoffice` (dự kiến) | Không cần cài Word. Khả năng đọc ổn định khi Word đang giữ file **chưa được đo trên 6 máy thật** (`OPEN_DECISIONS.md` A1). `notary_v2` **không** dùng |
 | **Đọc PDF / render ảnh** | `PyMuPDF` (`fitz`) | `notary_v2` | |
 | **Đọc QR / barcode** | `zxing-cpp` | `notary_v2` (`routers/ocr_local.py`) | |
 | **Sinh file Word** | `python-docx` + template placeholder | `notary_v2` (`services/word_engine.py`) | |
@@ -27,17 +27,78 @@ Cập nhật: 10/09/2026
 | **So khớp chuỗi mờ** | `rapidfuzz` | `notary_v2` (fast audit) | Dùng cho soát chính tả, **không** dùng để ghép hồ sơ |
 | **Web backend** | **Python FastAPI** | `notary_v2`; `notaryoffice` Central Hub (dự kiến) | |
 | **ORM** | SQLAlchemy 2.x | `notary_v2` | |
-| **Database** | **SQLite** | `notary_v2` (`notary.db`, `ocr_jobs.db`), `upload_lab` (`registry.sqlite3`) | Xem mục 3 về giai đoạn gộp |
-| **Job nền / queue** | Celery, broker là SQLAlchemy trên SQLite | `notary_v2` (`celery_app.py`) | |
+| **Database** | **SQLite** | `notary_v2` (`notary.db`), `upload_lab` (`registry.sqlite3`) | Bảng nghiệp vụ `ocr_jobs` và các bảng Zalo nằm trong `notary.db` (`notary_v2/database.py:8-24`, `models.py:161-171,186-300`); `ocr_jobs.db` là hạ tầng Celery, không phải DB nghiệp vụ OCR. Xem mục 3 về giai đoạn gộp |
+| **Job nền / queue** | Celery, broker SQLAlchemy + result backend DB | `notary_v2/celery_app.py:5-11` | Cả broker và result backend mặc định dùng `ocr_jobs.db`; URL có thể đổi qua cấu hình |
 | **UI web** | Jinja2 template + static (không SPA framework) | `notary_v2` (`frontend/`) | |
-| **UI desktop** | **PySide6 / Qt** | `upload_lab` (`ui_qt/`) | |
-| **Tự động hóa web nhà nước** | **Playwright** (Chromium) | `upload_lab` | Session lưu ở `nd_storage_state.json` |
+| **UI desktop** | **PySide6 / Qt** | `upload_lab` (`ui_qt/`) | Baseline đang chạy; Electron chỉ là candidate ở mục 1.1 |
+| **Tự động hóa web nhà nước** | **Playwright** (Chromium) | `upload_lab` | Session lưu ở `nd_storage_state.json`; Chromium headed riêng do Python quản lý |
 | **Agent trên máy trạm** | **C# .NET 8** | `notaryoffice` (dự kiến) | Ràng buộc: <30MB RAM, <0.5% CPU |
 | **Nhận media từ Zalo** | `zca-js` (Node) như connector thay thế được | `notary_v2` (Zalo Document Inbox) | Xem mục 4 |
 | **Test** | `pytest`; `playwright` cho e2e | cả `notary_v2` và `upload_lab` | |
 
 **API key và secret:** đặt trong `.env` của từng repo, đã `.gitignore`. Không bao
 giờ ghi key vào tài liệu, không commit `.env`. Mẫu biến ở `.env.example`.
+
+### 1.1. Candidate đang đánh giá — chưa phải công nghệ đã chọn
+
+MIN-50 đang hoàn thiện **đặc tả để duyệt** các candidate dưới đây. POC chỉ được
+triển khai sau khi được duyệt, bằng task riêng; lần sửa tài liệu này không cấp
+quyền implement. Không diễn giải bảng này thành migration hoặc dependency production.
+
+| Việc | Candidate | Baseline hiện tại | Lý do kỹ thuật để POC | Gate trước khi chọn |
+|---|---|---|---|---|
+| Desktop shell cấp hệ thống | **Electron** | PySide6/Qt trong `upload_lab` | Một cửa desktop có thể dùng lại cho upload, review OCR, search, status và diagnostics | So trực tiếp với PySide6 về cài đặt/đóng gói Windows, RAM, thời gian mở app, IPC/error handling và UX. Chỉ chọn nếu lợi ích đo được lớn hơn chi phí thêm Chromium/Node |
+| Adapter chuẩn hóa tài liệu | **Microsoft MarkItDown** | `python-docx`, Windows IFilter, `openpyxl`, PyMuPDF theo từng repo | Thử một lớp conversion thống nhất cho PDF có text, DOCX và XLSX trước hậu xử lý nghiệp vụ | Golden dataset phải chứng minh chất lượng, cấu trúc, provenance, lỗi và thời gian. `.doc` cũ không được giả định là đã giải quyết |
+| OCR ảnh nhúng trong adapter | **POC `markitdown-ocr` gọi Qwen qua giao diện OpenAI-compatible** | Đường OCR hiện hành dùng DashScope native (`notary_v2/routers/ocr_ai.py:381-414`) | Cùng provider, nhưng là **bề mặt tích hợp thứ hai**, chưa chứng minh tương đương đường hiện hành | Kiểm chứng payload, MIME/base64, phản hồi, lỗi, timeout và giới hạn; OCR gate phải cấp quyền trước từng nhánh, không bật plugin toàn cục |
+
+Ranh giới của POC desktop:
+
+- Electron chỉ là shell thử nghiệm; không chuyển business logic Python sang Node
+  và không chuyển UI PySide6 hiện hữu trong POC.
+- Backend Python tiếp tục mở **Chromium headed riêng** bằng Playwright để người
+  dùng xem form và tự xác nhận. Không dùng Playwright để điều khiển chính cửa sổ
+  Electron trong luồng upload.
+- Chưa nhúng web tỉnh vào Electron. Nếu sau này cần embed, phải mở lại review về
+  bảo mật, session, download/upload và lifecycle; không dùng `<webview>` theo
+  quán tính.
+- **Transport đã chốt cho POC:** server HTTP localhost tối thiểu bằng FastAPI,
+  chạy trong repo POC với entrypoint/tiến trình khởi động riêng. Không sửa hoặc
+  gắn vào app PySide6 đang chạy; đây không phải API production.
+- Bind `127.0.0.1`, port cấu hình được; xác thực bằng token phiên ngắn hạn,
+  không ghi token vào log. Caller là Electron **main process**, không phải
+  renderer; không bật CORS rộng. Không đưa credential web tỉnh vào command.
+- Điểm bám là mẫu command queue của `UploadWorker`
+  (`upload_lab_repo/ui_qt/workers.py:105-117,146-153,210-241`), không phải một
+  HTTP endpoint có sẵn hay object được phép gọi từ thread tùy ý.
+
+Ranh giới của POC conversion/OCR:
+
+- MarkItDown là **adapter**, không phải chủ sở hữu `ConversionEnvelope`, OCR
+  policy hay provenance.
+- `markitdown-ocr` đăng ký converter ưu tiên trước converter mặc định và có thể
+  OCR ảnh nhúng trong PDF/DOCX/PPTX/XLSX. Vì vậy không khởi tạo một instance có
+  plugin OCR rồi đưa mọi file vào mà không qua Document Router/OCR gate.
+- Qwen vẫn là OCR provider duy nhất. POC adapter không được thêm provider thứ
+  hai hoặc hồi sinh local OCR đang parked.
+- **Cổng kiểm chứng transport:** ngày 10/09/2026, tìm `chat.completions`,
+  `chat/completions`, `OpenAI(`, `compatible` và đối chiếu các HTTP call trong
+  `notary_v2/routers/ocr_ai.py` chưa thấy OpenAI-compatible OCR transport trong
+  file này. Hit `compatible` là helper so khớp trường (`:2261,2285-2287`), không
+  phải transport; nhánh chọn `OPENAI_API_KEY` (`:69-79`) chưa được chứng minh
+  là đường OCR khác hoạt động. Không suy rộng kết luận này ra toàn repo.
+- Vì vậy, tái sử dụng **provider Qwen** không đồng nghĩa tái sử dụng nguyên
+  tích hợp hiện tại. Khả năng chạy qua OpenAI-compatible là giả thuyết POC;
+  chưa đạt gate thì không thay adapter production.
+
+Nguồn kỹ thuật được kiểm tra ngày 10/09/2026:
+
+- Playwright mô tả hỗ trợ Electron là experimental:
+  <https://playwright.dev/docs/api/class-electron>.
+- Electron khuyến nghị tránh `<webview>` và cân nhắc `WebContentsView` hoặc kiến
+  trúc không embed nội dung:
+  <https://www.electronjs.org/docs/latest/api/webview-tag>.
+- Plugin OCR của MarkItDown và cơ chế converter ưu tiên:
+  <https://github.com/microsoft/markitdown/tree/main/packages/markitdown-ocr>.
 
 ---
 

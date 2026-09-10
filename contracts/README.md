@@ -10,6 +10,10 @@ trao đổi tự động. Đó là trạng thái của **giai đoạn hiện t�
 đến: hệ thống sẽ gộp lại và dùng chung database
 ([`../VISION.md`](../VISION.md) mục 4).
 
+Các shape `v0.experimental` trong `SYSTEM_ARCHITECTURE.md` mục 6 chỉ dùng để
+review/POC. Chúng **không phải contract đã duyệt**, không được dùng làm lý do tạo
+runtime integration và vì vậy chưa được đặt thành file riêng trong thư mục này.
+
 Nhưng "sau này sẽ gộp" **không phải giấy phép** để nối bừa bây giờ. Mỗi kết nối
 vẫn phải có contract được duyệt trước. Xem
 [`../SYSTEM_ARCHITECTURE.md`](../SYSTEM_ARCHITECTURE.md) mục 5.

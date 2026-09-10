@@ -36,7 +36,6 @@ repo đó. Khi xung đột, **repo con thắng** — và mâu thuẫn phải đ�
 | `contracts/entities.md` | Chuẩn hóa khóa định danh hồ sơ |
 | `contracts/README.md` | Quy tắc contract-trước-code |
 | `OPEN_DECISIONS.md` | Câu hỏi chưa chốt + phương án đã loại |
-| `HANDOFF.md` | Gói việc giao cho agent từng repo |
 
 ## Quy tắc chọn tool cho agent
 
