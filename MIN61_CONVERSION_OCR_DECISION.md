@@ -14,7 +14,7 @@ Qwen transport vào production. Baseline theo từng loại file vẫn giữ ngu
 
 | Đầu vào | Quyết định hiện tại | Lý do |
 |---|---|---|
-| PDF có text / DOCX / XLSX | **Iterate, giữ adapter hiện hữu** | POC local chạy được, nhưng `source_ref` chưa đạt gate provenance. |
+| PDF có text / DOCX / XLSX | **Iterate, giữ adapter hiện hữu** | POC text-PDF đã ghi `source_ref` theo trang; DOCX/XLSX vẫn explicit unavailable và chưa có dataset revision chung/chất lượng đủ để adopt. |
 | `.doc` cũ | **Không adopt MarkItDown; giữ Windows IFilter** | POC `upload_lab` cố ý route sang external legacy adapter; chưa có phép đo IFilter trên máy thật. |
 | PDF scan / ảnh | **Không adopt** | Gate đã được mô phỏng và ghi provenance theo trang, nhưng không có cloud smoke được duyệt và không test plugin. |
 | `markitdown-ocr` + Qwen compatible | **NOT VERIFIED** | Không có thử nghiệm plugin hoặc provider thật; Qwen-native đang chạy không chứng minh compatible surface. |
@@ -44,18 +44,21 @@ không phải contract tại `contracts/`.
 
 ### MIN-59 — notary_v2
 
-- Revision POC bất biến: `a4232f907e645f4f702312f78159d409c93e2700` trên
+- Revision POC bất biến: `664edb4` trên
   branch `codex/markitdown-qwen-poc`; đây là worktree riêng, không phải `main`
   và chưa merge.
 - POC tắt plugin khi gọi MarkItDown (`tools/document_conversion_poc/converter.py:41-47`),
-  render đầu vào OCR theo từng ảnh/trang, rồi ghi `source_ref`, hash input,
+  ghi segment text-PDF theo trang (`:50-101`), render đầu vào OCR theo từng ảnh/trang, rồi ghi `source_ref`, hash input,
   policy, lý do cho phép và attempt cho từng call
-  (`tools/document_conversion_poc/converter.py:84-133`; `models.py:45-68`).
+  (`tools/document_conversion_poc/converter.py:117-153`; `models.py:45-68`).
 - Test POC mô phỏng PDF hai trang, retry bounded và partial failure; đây là fake
   test, không phải cloud proof (`tests/test_document_conversion_poc.py:211-289`).
+- Manifest POC `gd-3` buộc GD-01 có provenance `{"page": 1}`; canonical test gọi
+  `convert_path` với converter offline injected, nên không che mismatch provenance
+  (`golden_manifest.json:1-16`; `tests/test_document_conversion_poc.py:452-483`).
 - Harness chủ động trả `review_required` và ghi chi phí cloud là `None`
   (`tools/document_conversion_poc/harness.py:205-226`). Focused suite hiện tại là
-  `21 passed`; kết quả execution và independent review được ghi ở [comment MIN-59](https://linear.app/minhnotary/issue/MIN-59/poc-kiem-chung-ocr-gate-pdf-nhieu-trang-va-provenance#comment-1a2942c0).
+  `22 passed`; kết quả execution và independent review được ghi ở [comment MIN-59](https://linear.app/minhnotary/issue/MIN-59/poc-kiem-chung-ocr-gate-pdf-nhieu-trang-va-provenance#comment-3bb7ecfd).
 
 ### Không được suy diễn quá mức
 
