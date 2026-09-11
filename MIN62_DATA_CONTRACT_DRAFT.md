@@ -252,6 +252,19 @@ Trong giai đoạn này:
    expected fields và trả `decision: review_required` thay vì tự adopt
    (`notary_v2/.worktrees/markitdown-qwen-poc/tools/document_conversion_poc/harness.py:76-90,108-114,155-165,210-224`).
 
+### 6.1. Golden revision không đồng nghĩa cùng mã mẫu
+
+Hai POC hiện có cùng mã GD-01..07, loại mẫu canonical và route
+`ocr_candidate`, nhưng manifest/fixture vẫn do từng repo sở hữu và SHA-256 chưa
+giống nhau. Việc mỗi harness chạy đủ 7 mẫu chỉ chứng minh tính đầy đủ nội bộ,
+không chứng minh parity xuyên repo.
+
+Gate dataset revision chung chỉ đạt khi một manifest/hash artifact bất biến được
+chủ sở hữu công bố, cả hai consumer kiểm tra cùng SHA-256 và report ghi rõ revision
+đó. Artifact có thể được copy/pin trong từng POC để tránh runtime dependency; không
+được coi là shared production contract cho tới khi Gate A được duyệt và Gate B có
+issue riêng. Cho tới lúc đó, MIN-61 phải giữ kết luận `ITERATE` và không mở ADOPT.
+
 Chỉ sau khi MIN-61 được owner quyết định và MIN-54/MIN-57 được duyệt mới được
 copy shape này vào `contracts/`, chốt version production và mở issue consumer.
 
