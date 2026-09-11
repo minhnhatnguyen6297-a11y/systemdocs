@@ -27,7 +27,7 @@ không phải contract tại `contracts/`.
 
 ### MIN-52 — upload_lab
 
-- Revision bất biến: `603795e2dfe0dd0c402671d1bf91bbb77e10fd4c` trên branch
+- Revision bất biến: `a143fc041ef94d6ad7863a8243dd36a5e78b17f4` trên branch
   `min-52-conversion-benchmark`; không phải `main` và chưa merge.
 - Router POC nhận biết PDF có text, `.doc`, và ảnh/PDF scan; nó khởi tạo
   MarkItDown với plugin bị tắt (`poc/conversion_benchmark/router.py:19-40`).
@@ -37,12 +37,14 @@ không phải contract tại `contracts/`.
   (`poc/conversion_benchmark/harness.py:94-105`).
 - Harness luôn trả `review_required`, đo cloud call từ `ocr_calls`, và không
   tự suy ra approval (`poc/conversion_benchmark/harness.py:145-169`).
-- Kết quả chạy và test đã được ghi ở [comment MIN-52](https://linear.app/minhnotary/issue/MIN-52/specpoc-benchmark-markitdown-va-ocr-gate#comment-4c6bc8b0).
-  Đó là evidence POC tổng hợp; không phải benchmark trên corpus nghiệp vụ.
+- Kết quả chạy và test đã được ghi ở [comment MIN-52](https://linear.app/minhnotary/issue/MIN-52/specpoc-benchmark-markitdown-va-ocr-gate#comment-d38239ac).
+  Focused suite hiện tại là `6 passed`, gồm manifest persistent và route
+  `ocr_candidate`; đây là evidence POC tổng hợp, không phải benchmark trên corpus
+  nghiệp vụ.
 
 ### MIN-59 — notary_v2
 
-- Revision POC bất biến: `674f56e17675565fefd38582c1204d2777e091e4` trên
+- Revision POC bất biến: `ea7b5b00b49dcf03bee12cd7eb5582d7ccfbe786` trên
   branch `codex/markitdown-qwen-poc`; đây là worktree riêng, không phải `main`
   và chưa merge.
 - POC tắt plugin khi gọi MarkItDown (`tools/document_conversion_poc/converter.py:41-47`),
@@ -52,17 +54,19 @@ không phải contract tại `contracts/`.
 - Test POC mô phỏng PDF hai trang, retry bounded và partial failure; đây là fake
   test, không phải cloud proof (`tests/test_document_conversion_poc.py:211-289`).
 - Harness chủ động trả `review_required` và ghi chi phí cloud là `None`
-  (`tools/document_conversion_poc/harness.py:205-226`). Kết quả execution và
-  independent review được ghi ở [comment MIN-59](https://linear.app/minhnotary/issue/MIN-59/poc-kiem-chung-ocr-gate-pdf-nhieu-trang-va-provenance#comment-e6fbb6fd).
+  (`tools/document_conversion_poc/harness.py:205-226`). Focused suite hiện tại là
+  `21 passed`; kết quả execution và independent review được ghi ở [comment MIN-59](https://linear.app/minhnotary/issue/MIN-59/poc-kiem-chung-ocr-gate-pdf-nhieu-trang-va-provenance#comment-1a2942c0).
 
 ### Không được suy diễn quá mức
 
-Hai POC cùng dùng nhãn GD-01…07 nhưng không chứng minh cùng **dataset revision**:
-`upload_lab` manifest định nghĩa GD-03 là DOCX và GD-06 là PNG
-(`poc/conversion_benchmark/golden_manifest.json:5-10`), trong khi manifest
-`notary_v2` là bộ fixture khác (`tools/document_conversion_poc/golden_manifest.json:1-84`).
-Do đó chưa được so parity hai phía, chưa có quality threshold chung, và không có
-kết luận latency/memory/cost so sánh được.
+Hai POC hiện đã thống nhất mã case GD-01…07, loại mẫu canonical và route
+`ocr_candidate`; manifest và fixture vẫn do từng repo sở hữu. SHA-256 hiện chưa
+giống nhau giữa hai bộ byte (`upload_lab`:
+`poc/conversion_benchmark/golden_manifest.json:4-10`; `notary_v2`:
+`tools/document_conversion_poc/golden_manifest.json:4-92`). Vì vậy gate **dataset
+revision chung** vẫn chưa đạt: chưa có một artifact/hash manifest duy nhất để chạy
+parity hai phía, cũng chưa có quality threshold hoặc kết luận latency/memory/cost
+so sánh được.
 
 Không có cloud call/provider thật hay integration `markitdown-ocr` trong hai
 POC. Đây không phải failure của code POC: chúng chủ đích giữ plugin off và zero
