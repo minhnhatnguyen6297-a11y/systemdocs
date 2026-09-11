@@ -95,12 +95,12 @@ quyết định này.
 
 | Gate còn thiếu | Evidence tối thiểu | Owner/đích issue |
 |---|---|---|
-| Một golden dataset revision chung | Manifest cùng SHA-256, sensitivity, expected text/facts/provenance; chạy được ở cả hai POC | MIN-53/MIN-62 sau khi chủ dự án duyệt scope. |
+| Một golden dataset revision chung | Manifest cùng SHA-256, sensitivity, expected text/facts/provenance; chạy được ở cả hai POC | MIN-70 sau Gate A/MIN-62 và khi owner chỉ định nơi lưu artifact. |
 | Provenance local | PDF page; DOCX paragraph/table/relationship hoặc warning; XLSX sheet+cell/range hoặc warning | Adapter owner được chỉ định trong task ADOPT. |
 | `.doc` boundary | Đo IFilter trên máy thật theo A1, có owner fallback và lỗi có cấu trúc | `upload_lab` / `notaryoffice`; A1 vẫn mở, không tự chốt. |
-| Compatible/plugin cloud proof | Synthetic/de-identified smoke được duyệt trước chi phí; kiểm tra MIME/base64, timeout, rate limit, retry/idempotency, response mapping và audit | Task POC riêng; **không** tự dùng key production. |
-| Quality/performance/cost | Ngưỡng text/table/Unicode, latency, memory, cloud cost và partial failure đã được chủ dự án chấp thuận | Chủ dự án duyệt trước task ADOPT. |
-| Reproducibility | Commit hoặc artifact version cố định cho cả hai phía; test/report lặp lại | Cả hai POC đã có commit; còn thiếu **cùng** manifest revision và report chạy chung. |
+| Compatible/plugin cloud proof | Synthetic/de-identified smoke được duyệt trước chi phí; kiểm tra MIME/base64, timeout, rate limit, retry/idempotency, response mapping và audit | MIN-71 sau MIN-70 và approval model/base URL/budget; **không** tự dùng key production. |
+| Quality/performance/cost | Ngưỡng text/table/Unicode, latency, memory, cloud cost và partial failure đã được chủ dự án chấp thuận | Chủ dự án duyệt threshold trước smoke MIN-71 và trước task ADOPT. |
+| Reproducibility | Commit hoặc artifact version cố định cho cả hai phía; test/report lặp lại | MIN-70 xuất chung manifest revision/report; hai POC hiện mới có commit riêng. |
 
 Unit test pass chỉ xác nhận hành vi giả lập; nó không thay thế benchmark trên
 dataset chung hoặc cloud proof. Các dữ liệu thật, credential, cookie và raw
