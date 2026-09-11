@@ -41,7 +41,7 @@ là tiền tố đường dẫn, không phải tên package/import.
 | `N/` | `D:/notary_v2/` | `cabfff98cd4e33eba2a06ce3998eb9f0d2a7be36` |
 | `U/` | `D:/upload_lab_repo/` | `a4349a24572faa8a593d6f0484eaadbf9c48e6bd` |
 | `O/` | `D:/notaryoffice/` | `1c1b160d0de3959d15573027f6f3ebd770235042` |
-| `P/` | `D:/notary_v2/.worktrees/markitdown-qwen-poc/` | `ea7b5b00b49dcf03bee12cd7eb5582d7ccfbe786` |
+| `P/` | `D:/notary_v2/.worktrees/markitdown-qwen-poc/` | `a4232f907e645f4f702312f78159d409c93e2700` |
 | `D/` | `D:/upload_lab_repo/.worktrees/desktop-command-poc/` | `53cc1784f4fb79b95fab1b97446a6abb01b4943d` |
 
 `N/AGENTS.md` có thay đổi chưa commit của người dùng; không sửa hoặc dùng thay đổi
