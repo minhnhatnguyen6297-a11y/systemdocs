@@ -283,13 +283,17 @@ task nếu chưa có quyết định explicit.
 
 ### Gate B — Publish contract và fixtures
 
-Sau Gate A, một issue riêng mới được phép:
+Sau Gate A, hai issue riêng mới được phép chạy song song:
 
-1. chuyển shape từ draft vào `contracts/`;
-2. thêm JSON/YAML examples hợp lệ, null/unknown/error và invalid examples;
-3. tạo golden fixture revision có hash và changelog;
-4. thêm validator/conformance check trong repo sở hữu, không thêm runtime vào
+1. **MIN-72** chuyển shape được owner duyệt từ draft vào `contracts/`, thêm
+   JSON/YAML examples hợp lệ, null/unknown/error, invalid examples và policy
+   compatibility/migration;
+2. **MIN-70** tạo golden fixture revision có hash/changelog và validator/
+   conformance check trong repo owner đã được chỉ định, không thêm runtime vào
    `systemdocs`.
+
+MIN-70 không tự publish contract; MIN-72 không tự chọn byte artifact. Cả hai
+đều bị chặn bởi Gate A và không mở consumer production trong cùng task.
 
 ### Gate C — Consumer adoption theo repo sở hữu
 
@@ -301,8 +305,9 @@ Sau Gate A, một issue riêng mới được phép:
   vocabulary; Sentinel/Hub chỉ ghi dữ kiện thuộc owner của nó.
 
 Các lát cắt này tương ứng các issue ADOPT MIN-68/MIN-69 và task notaryoffice
-riêng; chúng chỉ mở sau khi các spec blocker được duyệt. Không tạo shared
-runtime package trước khi có hai consumer thật và quyết định distribution.
+riêng; chúng chỉ mở sau MIN-70, MIN-72 và các spec blocker liên quan được duyệt.
+Không tạo shared runtime package trước khi có hai consumer thật và quyết định
+distribution.
 
 ### Gate D — Database/UI/consolidate
 
