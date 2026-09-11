@@ -141,7 +141,7 @@ worktree của repo sở hữu, có acceptance evidence và không đưa code v�
 - `notaryoffice` chưa có runtime; branch đặc tả chỉ có thể ghi nhận local nếu
   chưa có remote GitHub hợp lệ.
 - MIN-52 đã có bằng chứng synthetic: chạy `tests/test_markitdown_conversion_poc.py`
-  bằng POC venv cho kết quả `6 passed`; manifest persistent GD-01..07 được đối
+  bằng POC venv cho kết quả `7 passed`; manifest persistent GD-01..07 được đối
   chiếu SHA-256/route/provenance và `cloud_call_count=0`. POC `notary_v2` chạy
   `22 passed` và reviewer độc lập APPROVE cho manifest `gd-3` riêng. Hai bên cùng
   mã case/route nhưng khác SHA-256 fixture, nên shared dataset revision vẫn là gap;
