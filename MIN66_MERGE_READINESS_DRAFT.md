@@ -40,6 +40,7 @@ Ngoài phạm vi:
 | Ownership đích | Topology một DB, ba đường xử lý, một owner ghi mỗi bảng tại `SYSTEM_ARCHITECTURE.md:436-469` | Có thể đánh giá boundary trước khi thiết kế schema gộp |
 | UI/engine boundary | UI chỉ gửi command, Python giữ session/browser/OCR tại `SYSTEM_ARCHITECTURE.md:300-325`; POC command queue bám `upload_lab_repo/ui_qt/workers.py:105-117,146-153` | Không được truy cập DB/cookie/browser context trực tiếp từ shell |
 | Upload lifecycle | Các giá trị thật `matched`, `extracted`, `prepared_dry_run`, `uploaded_success` tại `upload_lab_repo/batch_scan.py:705-795` và `upload_lab_repo/playwright_uploader.py:81-83` | Không dùng enum display của DesktopCommand để thay registry nội bộ |
+| Golden dataset POC | Manifest tổng hợp GD-01..GD-07 tại `upload_lab_repo/poc/conversion_benchmark/golden_manifest.json:1-12`; harness materialize fixture và ghi SHA-256 tại `upload_lab_repo/poc/conversion_benchmark/harness.py:41-75,117-159`; test đối chiếu 7 route/provenance và zero cloud tại `upload_lab_repo/tests/test_markitdown_conversion_poc.py:87-104` | Bằng chứng POC đã có; fixture chỉ tồn tại trong temp khi chạy, chưa phải manifest production/persistent |
 | Bounded contexts | `notary_v2` có `InheritanceCase`/`inheritance_cases` tại `notary_v2/models.py:83-103`; `notaryoffice` mới là thiết kế dự kiến tại `notaryoffice/intent.md:365-373` | Chưa chứng minh cardinality hay runtime join xuyên repo |
 
 Các dòng trên là baseline kiểm chứng từ source/tài liệu hiện tại. Chúng không
@@ -139,6 +140,10 @@ worktree của repo sở hữu, có acceptance evidence và không đưa code v�
   repo con, không sửa trong tài liệu cha.
 - `notaryoffice` chưa có runtime; branch đặc tả chỉ có thể ghi nhận local nếu
   chưa có remote GitHub hợp lệ.
+- MIN-52 đã có bằng chứng synthetic: chạy `tests/test_markitdown_conversion_poc.py`
+  bằng POC venv cho kết quả `5 passed`; test golden harness tạo 7 mẫu, đối chiếu
+  SHA-256/route/provenance và `cloud_call_count=0`. Đây chưa thay thế manifest
+  persistent, contract review hoặc DB rehearsal.
 - MIN-51 và MIN-57 còn là gate trước MIN-64/MIN-67; chưa có owner approval trong
   baseline review này.
 - Chưa có rehearsal DB thật hoặc cutover; mọi quyết định physical schema,
