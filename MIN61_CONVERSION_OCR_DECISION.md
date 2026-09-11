@@ -44,7 +44,7 @@ không phải contract tại `contracts/`.
 
 ### MIN-59 — notary_v2
 
-- Revision POC bất biến: `ea7b5b00b49dcf03bee12cd7eb5582d7ccfbe786` trên
+- Revision POC bất biến: `a4232f907e645f4f702312f78159d409c93e2700` trên
   branch `codex/markitdown-qwen-poc`; đây là worktree riêng, không phải `main`
   và chưa merge.
 - POC tắt plugin khi gọi MarkItDown (`tools/document_conversion_poc/converter.py:41-47`),
