@@ -27,7 +27,7 @@ không phải contract tại `contracts/`.
 
 ### MIN-52 — upload_lab
 
-- Revision bất biến: `a143fc041ef94d6ad7863a8243dd36a5e78b17f4` trên branch
+- Revision bất biến: `ce05b52` trên branch
   `min-52-conversion-benchmark`; không phải `main` và chưa merge.
 - Router POC nhận biết PDF có text, `.doc`, và ảnh/PDF scan; nó khởi tạo
   MarkItDown với plugin bị tắt (`poc/conversion_benchmark/router.py:19-40`).
@@ -38,7 +38,7 @@ không phải contract tại `contracts/`.
 - Harness luôn trả `review_required`, đo cloud call từ `ocr_calls`, và không
   tự suy ra approval (`poc/conversion_benchmark/harness.py:145-169`).
 - Kết quả chạy và test đã được ghi ở [comment MIN-52](https://linear.app/minhnotary/issue/MIN-52/specpoc-benchmark-markitdown-va-ocr-gate#comment-d38239ac).
-  Focused suite hiện tại là `6 passed`, gồm manifest persistent và route
+  Focused suite hiện tại là `7 passed`, gồm manifest persistent, route
   `ocr_candidate`; đây là evidence POC tổng hợp, không phải benchmark trên corpus
   nghiệp vụ.
 
