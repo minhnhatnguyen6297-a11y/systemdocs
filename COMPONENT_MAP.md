@@ -41,8 +41,8 @@ là tiền tố đường dẫn, không phải tên package/import.
 | `N/` | `D:/notary_v2/` | `cabfff98cd4e33eba2a06ce3998eb9f0d2a7be36` |
 | `U/` | `D:/upload_lab_repo/` | `a4349a24572faa8a593d6f0484eaadbf9c48e6bd` |
 | `O/` | `D:/notaryoffice/` | `1c1b160d0de3959d15573027f6f3ebd770235042` |
-| `P/` | `D:/notary_v2/.worktrees/markitdown-qwen-poc/` | `674f56e17675565fefd38582c1204d2777e091e4` |
-| `D/` | `D:/upload_lab_repo/.worktrees/desktop-command-poc/` | `0c4edf78f708c7fcf3a9a03ba93dc42a0bb85d62` + dirty MIN-65 changes |
+| `P/` | `D:/notary_v2/.worktrees/markitdown-qwen-poc/` | `ea7b5b00b49dcf03bee12cd7eb5582d7ccfbe786` |
+| `D/` | `D:/upload_lab_repo/.worktrees/desktop-command-poc/` | `53cc1784f4fb79b95fab1b97446a6abb01b4943d` |
 
 `N/AGENTS.md` có thay đổi chưa commit của người dùng; không sửa hoặc dùng thay đổi
 đó để suy ra runtime khác. Các source được viện dẫn dưới đây được đọc trực tiếp.
@@ -57,8 +57,8 @@ là tiền tố đường dẫn, không phải tên package/import.
 - `O/` chỉ có hai file tracked `AGENTS.md`, `intent.md`; `O/AGENTS.md:3,8-17`
   xác nhận chưa có code và gate máy thật. Mọi ô `O` ở §3 là thiết kế dự kiến.
 - Checkout `D/` đã có source POC DesktopCommand tại revision
-  `0c4edf78f708c7fcf3a9a03ba93dc42a0bb85d62`; các thay đổi MIN-65 về shell,
-  renderer và fake-worker đang ở trạng thái chưa commit. FastAPI/uvicorn chỉ
+  `53cc1784f4fb79b95fab1b97446a6abb01b4943d`; các thay đổi MIN-65 về shell,
+  renderer và fake-worker đã được commit trong cùng POC branch. FastAPI/uvicorn chỉ
   nằm trong `D/poc/desktop_command/server.py:9-90`; đây là sidecar POC, không
   phải API của app PySide6. UI/worker production của `U/` vẫn dùng
   signals/queue (`U/ui_qt/workers.py:60-117`). Không suy rộng thành

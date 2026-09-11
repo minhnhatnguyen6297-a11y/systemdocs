@@ -244,7 +244,7 @@ Các điểm này được kiểm chứng tại:
 
 **Tách POC khỏi baseline ứng dụng:** `ConversionEnvelope` và converter/gate đã
 có trong worktree `notary_v2/.worktrees/markitdown-qwen-poc` tại
-`674f56e17675565fefd38582c1204d2777e091e4`
+`ea7b5b00b49dcf03bee12cd7eb5582d7ccfbe786`
 (`tools/document_conversion_poc/models.py:102-123`, `converter.py:24-30,33-71`).
 Chưa được xem là component production dùng chung. Không có bằng chứng UI/DB
 chung, shared package hay API tích hợp giữa ba repo trong phạm vi nguồn đã
