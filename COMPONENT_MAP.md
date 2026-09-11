@@ -41,7 +41,7 @@ là tiền tố đường dẫn, không phải tên package/import.
 | `N/` | `D:/notary_v2/` | `cabfff98cd4e33eba2a06ce3998eb9f0d2a7be36` |
 | `U/` | `D:/upload_lab_repo/` | `a4349a24572faa8a593d6f0484eaadbf9c48e6bd` |
 | `O/` | `D:/notaryoffice/` | `1c1b160d0de3959d15573027f6f3ebd770235042` |
-| `P/` | `D:/notary_v2/.worktrees/markitdown-qwen-poc/` | `a4232f907e645f4f702312f78159d409c93e2700` |
+| `P/` | `D:/notary_v2/.worktrees/markitdown-qwen-poc/` | `664edb4` |
 | `D/` | `D:/upload_lab_repo/.worktrees/desktop-command-poc/` | `f18a42fbbeb0a0c578a8e976e557b5594ff7761e` |
 
 `N/AGENTS.md` có thay đổi chưa commit của người dùng; không sửa hoặc dùng thay đổi
@@ -179,13 +179,14 @@ chứng đã tích hợp plugin OCR. Adapter gửi data URL trực tiếp
 (`P/tools/document_conversion_poc/qwen_compatible.py:66-83`) chưa tự chứng minh
 PDF nhiều trang/cloud-compatible hoạt động.
 
-Nhánh conversion local vẫn có `source_ref: null`
-(`P/tools/document_conversion_poc/converter.py:76`); nhánh OCR đã gắn
-`source_ref` theo input/page cho cả segment và mỗi OCR call
-(`P/tools/document_conversion_poc/converter.py:101-127`). Điều này chứng minh
-được provenance theo trang trong POC, nhưng chưa biến provenance DOCX/XLSX
-thành chuẩn production. Harness hiện đã so các trường expected, gồm cả facts và
-provenance, rồi đánh dấu mismatch là failed (`P/tools/document_conversion_poc/harness.py:76-97,155-163`);
+Text-PDF local trong POC đã gắn `source_ref` theo trang mà vẫn giữ Markdown của
+converter (`P/tools/document_conversion_poc/converter.py:50-101`); DOCX/XLSX vẫn
+dùng `source_ref: null` cùng warning. Nhánh OCR đã gắn `source_ref` theo
+input/page cho cả segment và mỗi OCR call (`P/tools/document_conversion_poc/converter.py:117-153`).
+Điều này chứng minh được provenance theo trang trong POC, nhưng chưa biến
+provenance DOCX/XLSX thành chuẩn production. Harness hiện đã so các trường
+expected, gồm cả facts và provenance, rồi đánh dấu mismatch là failed
+(`P/tools/document_conversion_poc/harness.py:76-90,155-164`);
 nó luôn phát hành `decision: review_required` và yêu cầu human approval
 (`P/tools/document_conversion_poc/harness.py:211-220`). Vì vậy **POC vẫn chưa
 phải nghiệm thu MIN-50/W2/W3**: còn thiếu dataset revision chung, plugin/cloud
