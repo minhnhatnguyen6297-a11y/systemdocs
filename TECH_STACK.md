@@ -9,7 +9,7 @@ dụ repo này OCR bằng Qwen, repo kia OCR bằng thứ khác), lúc gộp s�
 Chọn khác là được — nhưng phải **có lý do và ghi vào đây**, không chọn theo quán
 tính.
 
-Cập nhật: 10/09/2026
+Cập nhật trạng thái POC: 11/09/2026. Các lựa chọn công nghệ production không đổi.
 
 ---
 
@@ -41,9 +41,13 @@ giờ ghi key vào tài liệu, không commit `.env`. Mẫu biến ở `.env.exa
 
 ### 1.1. Candidate đang đánh giá — chưa phải công nghệ đã chọn
 
-MIN-50 đang hoàn thiện **đặc tả để duyệt** các candidate dưới đây. POC chỉ được
-triển khai sau khi được duyệt, bằng task riêng; lần sửa tài liệu này không cấp
-quyền implement. Không diễn giải bảng này thành migration hoặc dependency production.
+Đặc tả MIN-50 đã được **duyệt cho POC** theo
+`MIN50_IMPLEMENTATION_SPEC.md` §3/W0 ngày 11/09/2026; không phải duyệt adoption.
+POC conversion đã có code trong worktree riêng, nhưng chưa có đủ bằng chứng
+golden dataset/benchmark để chọn candidate vào production. Snapshot source và
+gap ở [`COMPONENT_MAP.md`](./COMPONENT_MAP.md) §2/6.2. Desktop vẫn ở bước plan
+trong snapshot được kiểm tra. Không diễn giải bảng này thành migration hoặc
+dependency production; không có candidate nào được nâng thành đã chọn trong MIN-57.
 
 | Việc | Candidate | Baseline hiện tại | Lý do kỹ thuật để POC | Gate trước khi chọn |
 |---|---|---|---|---|
@@ -123,9 +127,10 @@ queue thứ hai, hay một framework UI thứ ba mà không qua bước 3.
 thành công cụ xử lý dữ liệu theo mục đích riêng. Chưa làm bây giờ. Nhưng từ giờ,
 mỗi repo nên tuân theo mấy điều dưới đây để lúc gộp không phải viết lại:
 
-- **Khóa định danh hồ sơ chuẩn hóa giống nhau.** Đây là điều kiện quan trọng
-  nhất. Xem `contracts/entities.md`. Hai repo lưu CCCD khác định dạng thì lúc
-  gộp không join được.
+- **Định danh người/tài sản và tham chiếu hồ sơ chuẩn hóa giống nhau.** Xem
+  `contracts/entities.md`. CCCD cùng định dạng giúp đối chiếu người, không tự
+  chứng minh cùng Case; liên kết hồ sơ cần đủ phạm vi và bằng chứng. Không dùng
+  CCCD hoặc thửa/tờ làm khóa chính hồ sơ để giải quyết việc gộp DB.
 - **SQLite là mặc định hiện tại; đừng dùng tính năng riêng của SQLite ở tầng
   nghiệp vụ.** DB chung sau này có thể là PostgreSQL. Cụ thể: đi qua SQLAlchemy
   hoặc SQL chuẩn, tránh `rowid` ẩn, tránh dựa vào kiểu lỏng của SQLite, không
