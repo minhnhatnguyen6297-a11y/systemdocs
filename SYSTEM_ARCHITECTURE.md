@@ -162,42 +162,40 @@ Ba phương án đã **loại bỏ** (đừng đề xuất lại):
 Thứ tự bắt buộc là:
 
 ```text
-ALIGN → POC → ADOPT → CONSOLIDATE
+DECIDE → SPEC/CONTRACT → FOUNDATION → MIGRATE → VERIFY/CUTOVER
 ```
 
-### 5.1. ALIGN — giai đoạn hiện tại
+### 5.1. DECIDE — đã chốt desktop shell
 
-Chốt vocabulary, owner quyền ghi, provenance, data states và decision gate công
-nghệ ở cấp `systemdocs`. Repo con được tiếp tục sửa lỗi/ổn định hành vi đã có,
-nhưng không tự thêm shell, converter, OCR flow hoặc schema mới làm hệ thống phân
-kỳ.
+Owner đã chọn Electron làm desktop shell đích ngày 14/09/2026 (MIN-50). G1 chỉ
+bao gồm `notary_v2` và `upload_lab`; `notaryoffice` là placeholder và `excelTK`
+nằm ngoài phạm vi. Repo con tiếp tục sở hữu nghiệp vụ Python.
 
-Đầu ra ALIGN là tài liệu và issue đã duyệt. **Không có runtime integration** ở
-giai đoạn này.
+Runtime cấp hệ thống nằm trên nhánh `electron-system-shell`, không nằm trên
+`main` tài liệu. Kế hoạch và gate: `ELECTRON_G1_PLAN.md`.
 
-### 5.2. POC — kiểm chứng ranh giới nhỏ nhất
+### 5.2. SPEC/CONTRACT — trước implementation
 
-Mỗi giả thuyết được thử độc lập trong phạm vi POC được duyệt; desktop dùng repo
-POC tách biệt theo `TECH_STACK.md` §1.1, không sửa app đang chạy. POC có thể dùng
-shape `v0.experimental` ở mục 6 để so khả năng hội tụ, nhưng:
+POC cũ chỉ là bằng chứng. MIN-64 và contract phải được owner duyệt trước khi mở
+consumer production. Bắt buộc tách task publish contract khỏi task implement.
 
 - không tạo dependency runtime giữa các repo;
 - không thay production adapter;
 - không ghi shape experimental vào `contracts/`;
 - không coi kết quả chạy được là quyết định công nghệ đã duyệt.
 
-### 5.3. ADOPT — thay adapter, không rewrite nghiệp vụ
+### 5.3. FOUNDATION/MIGRATE — lát cắt chạy được
 
-Chỉ repo có lợi ích đã đo được mới nhận candidate. Việc adopt phải qua bốn bước
-ở `TECH_STACK.md` mục 2, có regression/golden dataset và một task riêng với POC.
-Business rules, quyền ghi dữ liệu và bước người dùng xác nhận không đổi chỉ vì
-đổi adapter hoặc UI shell.
+MIN-65/MIN-67 dựng shell/navigation; MIN-69 chuyển Upload/Audit; MIN-68 chuyển
+toàn bộ `notary_v2` được chọn trong inventory. Mỗi lát cắt phải chạy engine thật,
+có parity, packaged smoke và rollback. Business rules, quyền ghi và bước người
+dùng xác nhận không đổi chỉ vì đổi UI shell.
 
-### 5.4. CONSOLIDATE — hợp nhất khi boundary đã ổn định
+### 5.4. VERIFY/CUTOVER — rồi mới loại legacy
 
-Khi contract production đã được hai bên duyệt, mới quyết định package dùng
-chung, monorepo và thiết kế vật lý/lộ trình chuyển sang database chung đã định
-hướng. Điều kiện để không phải viết lại:
+G1 chuẩn hóa model/identity/provenance/ownership nhưng giữ DB vật lý hiện có sau
+adapter. Chọn DB chung là G2/ADR riêng sau khi model ổn định. Điều kiện để không
+phải viết lại:
 
 - khóa định danh đã thống nhất;
 - cùng một việc không có hai công nghệ production không chủ ý;
@@ -211,9 +209,9 @@ contract rồi tự implement trong cùng một task.
 
 ## 6. Ranh giới hội tụ và shape experimental
 
-**Trạng thái:** bản hoàn thiện ngày 10/09/2026 là đối tượng review/duyệt MIN-50,
-chưa phải bản đã duyệt. Các ranh giới an toàn áp dụng ngay; các shape
-`v0.experimental` chỉ được dùng sau khi chủ dự án duyệt POC. Chưa triển khai POC.
+**Trạng thái:** Electron đã được chọn làm shell đích ngày 14/09/2026. Contract
+production và DB engine vẫn chưa được duyệt; shape `v0.experimental` chỉ là bằng
+chứng POC, không phải contract production.
 
 ### 6.1. Trạng thái hiện tại và trạng thái dự định
 
@@ -237,9 +235,10 @@ Các điểm này được kiểm chứng tại:
   `:381-414`). Chưa phải gate đã implement; xem §6.5 về các đường gọi khác.
 - `notaryoffice/AGENTS.md:8-14`; `notaryoffice/intent.md:135-144`.
 
-**Hiện tại không có:** Electron app, MarkItDown trong runtime, Document Router
-dùng chung, `ConversionEnvelope`, Desktop Command API, event bus, shared package,
-API giữa ba repo, database dùng chung hoặc bộ file/manifest golden dataset.
+**Hiện tại không có trong nhánh production:** Electron app, Document Router dùng
+chung, DesktopCommand production, API giữa ba repo hoặc database dùng chung.
+Electron/DesktopCommand chỉ có POC tại
+`upload_lab_repo@codex/desktop-command-poc:poc/desktop_command/electron/`;
 `notaryoffice` chưa có code.
 
 Riêng `upload_lab`: chưa tìm thấy **HTTP server/API surface cho desktop command**
@@ -282,7 +281,8 @@ Các bất biến:
 | Ảnh/Zalo, OCR giấy tờ, Stage và Case Workspace hiện hành | `notary_v2` | Repo khác chỉ đọc sau contract production |
 | Kho Word cũ, extraction, registry và upload lifecycle | `upload_lab` | Repo khác chỉ đọc sau contract production |
 | Workstation event, Evidence Record, Draft Case và trạng thái công việc dự định | `notaryoffice` | Chưa có runtime; owner chỉ là thiết kế |
-| Vocabulary, shape xuyên sản phẩm và versioning | `systemdocs` | Chỉ quản trị tài liệu; không sở hữu runtime hoặc dữ liệu |
+| Vocabulary, shape xuyên sản phẩm và versioning | `systemdocs/main` | Chỉ quản trị tài liệu; không sở hữu runtime hoặc dữ liệu |
+| Electron shell cấp hệ thống | `systemdocs/electron-system-shell` | Sở hữu shell/lifecycle/navigation; không sở hữu nghiệp vụ hay tự ghi DB module |
 
 Dùng chung database sau này không thay đổi owner quyền ghi. `ConversionEnvelope`
 không biến converter thành owner của Evidence/Case; Evidence không cho phép

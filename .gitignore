@@ -1,0 +1,4 @@
+.scan-src/
+code-graphs/**/graphify-out/cache/
+code-graphs/**/graphify-out/index/
+*.log
