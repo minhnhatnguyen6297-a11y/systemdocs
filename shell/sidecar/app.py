@@ -1,0 +1,200 @@
+"""G1 shell sidecar — desktopcommand.v1 producer (FastAPI, loopback only).
+
+Contract: systemdocs contracts/desktop-command.md (desktopcommand.v1).
+Token: env SIDECAR_TOKEN (bat buoc — thieu thi khong khoi dong).
+Port:  env SIDECAR_PORT (Electron main chon port dong truoc khi spawn).
+"""
+import hmac
+import os
+import re
+import sys
+import threading
+import uuid
+
+import uvicorn
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+from command_registry import COMMANDS
+from errors import CommandError, error_object
+from fileref import validate_file_ref
+from jobstore import JobStore
+
+CONTRACT_VERSION = "desktopcommand.v1"
+SUPPORTED_VERSIONS = ["desktopcommand.v1"]
+ENGINE_VERSION = "g1-shell-sidecar/0.1.0"
+ENGINE_INSTANCE_ID = uuid.uuid4().hex  # doi moi moi lan process start — §5 restart
+
+TOKEN = os.environ.get("SIDECAR_TOKEN")
+if not TOKEN:
+    print("FATAL: thieu SIDECAR_TOKEN", file=sys.stderr)
+    sys.exit(2)
+PORT = int(os.environ.get("SIDECAR_PORT", "0"))
+if not PORT:
+    print("FATAL: thieu SIDECAR_PORT", file=sys.stderr)
+    sys.exit(2)
+
+SENSITIVE_KEY = re.compile(
+    r"password|passwd|secret|token|credential|cookie|auth|session|"
+    r"storage_state|api_key|bearer", re.I)
+
+app = FastAPI(title="g1-shell-sidecar", docs_url=None, redoc_url=None)
+store = JobStore()
+_server = None  # uvicorn.Server, set in main()
+
+
+def _err(status, code, message, retryable=False, next_action=None):
+    return JSONResponse(
+        {"error": error_object(code, message, retryable, next_action)},
+        status_code=status)
+
+
+def _walk_sensitive(obj):
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if SENSITIVE_KEY.search(str(k)):
+                return str(k)
+            found = _walk_sensitive(v)
+            if found:
+                return found
+    elif isinstance(obj, list):
+        for v in obj:
+            found = _walk_sensitive(v)
+            if found:
+                return found
+    return None
+
+
+def _walk_file_refs(obj):
+    """Tim dict dang file_ref (co key 'path' kieu str) de validate scope/path
+    ngay luc submit — contract §6 yeu cau 400 file_scope_not_supported."""
+    if isinstance(obj, dict):
+        if isinstance(obj.get("path"), str):
+            yield obj
+        for v in obj.values():
+            yield from _walk_file_refs(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            yield from _walk_file_refs(v)
+
+
+@app.middleware("http")
+async def auth_boundary(request: Request, call_next):
+    # Loopback API khong phuc vu browser: bat ky Origin nao cung bi tu choi
+    # (khong CORS — contract §1,§4).
+    if "origin" in request.headers:
+        return _err(403, "auth_forbidden", "Origin header khong duoc phep")
+    if request.url.path == "/healthz":
+        return await call_next(request)
+    auth = request.headers.get("authorization", "")
+    try:
+        ok = hmac.compare_digest(auth.encode(), f"Bearer {TOKEN}".encode())
+    except (TypeError, UnicodeError):
+        ok = False
+    if not ok:
+        return _err(401, "auth_unauthorized", "thieu/sai bearer token")
+    return await call_next(request)
+
+
+@app.get("/healthz")
+def healthz():
+    return {
+        "ok": True,
+        "engine_version": ENGINE_VERSION,
+        "engine_instance_id": ENGINE_INSTANCE_ID,
+        "supported_versions": SUPPORTED_VERSIONS,
+        "accepting": store.accepting,
+    }
+
+
+_UUID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+    re.I)
+
+
+@app.post("/v1/commands")
+async def submit_command(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        return _err(400, "validation_error", "body khong phai JSON hop le")
+    if not isinstance(body, dict):
+        return _err(400, "validation_error", "body phai la object")
+    if body.get("contract_version") != CONTRACT_VERSION:
+        return _err(400, "unsupported_contract_version",
+                    f"can {CONTRACT_VERSION}")
+    command_id = body.get("command_id")
+    if not isinstance(command_id, str) or not _UUID_RE.match(command_id):
+        return _err(400, "validation_error", "command_id phai la uuid")
+    meta = body.get("client_meta") or {}
+    if not isinstance(meta, dict) or not isinstance(meta.get("shell_version"), str) \
+            or not isinstance(meta.get("module"), str):
+        return _err(400, "validation_error",
+                    "client_meta can {shell_version, module}")
+    command = body.get("command")
+    if not isinstance(command, str) or "." not in command:
+        return _err(400, "validation_error", "command phai namespaced")
+    handler = COMMANDS.get(command)
+    if handler is None:
+        return _err(400, "command_unknown", f"khong biet command {command!r}")
+    payload = body.get("payload")
+    if payload is not None and not isinstance(payload, dict):
+        return _err(400, "validation_error", "payload phai la object/null")
+    bad_key = _walk_sensitive(payload)
+    if bad_key:
+        return _err(400, "payload_rejected_sensitive_key",
+                    f"key cam trong payload: {bad_key}")
+    if payload:
+        for ref in _walk_file_refs(payload):
+            try:
+                validate_file_ref(ref)
+            except CommandError as exc:
+                return _err(400, exc.code, exc.message)
+    try:
+        job = store.submit(command_id, command, handler, payload)
+    except CommandError as exc:
+        return _err(503, exc.code, exc.message, exc.retryable)
+    return job.snapshot()
+
+
+@app.get("/v1/jobs/{job_id}")
+def get_job(job_id: str):
+    job = store.get(job_id)
+    if job is None:
+        return _err(404, "job_not_found", f"khong co job {job_id!r}")
+    return job.snapshot()
+
+
+@app.post("/v1/jobs/{job_id}/cancel")
+def cancel_job(job_id: str):
+    outcome = store.cancel(job_id)
+    if outcome == "missing":
+        return _err(404, "job_not_found", f"khong co job {job_id!r}")
+    if outcome == "terminal":
+        return _err(409, "job_already_terminal", "job da ket thuc")
+    job = store.get(job_id)
+    return job.snapshot()
+
+
+@app.post("/shutdown")
+def shutdown():
+    def _stop():
+        store.drain(timeout=2)
+        if _server is not None:
+            _server.should_exit = True
+    threading.Timer(0.2, _stop).start()
+    return {"stopping": True}
+
+
+def main():
+    global _server
+    config = uvicorn.Config(app, host="127.0.0.1", port=PORT,
+                            log_level="warning", access_log=False)
+    _server = uvicorn.Server(config)
+    _server.run()
+    # worker threads co the chua daemon — thoat han process
+    os._exit(0)
+
+
+if __name__ == "__main__":
+    main()

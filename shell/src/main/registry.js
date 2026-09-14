@@ -1,0 +1,69 @@
+'use strict';
+
+// Module registry theo spec §6 — 7 muc, office la placeholder.
+// capabilities = command namespace sidecar ma module dung; 'shell' = xu ly
+// trong Electron main (khong goi sidecar).
+
+const MODULES = [
+  {
+    id: 'upload',
+    title: 'upload_lab',
+    namespaces: ['upload', 'file', 'diag'],
+    kind: 'engine',
+    status: 'available',
+  },
+  {
+    id: 'document-review',
+    title: 'notary_v2',
+    namespaces: ['notary', 'ocr', 'file', 'diag'],
+    kind: 'engine',
+    status: 'available',
+  },
+  {
+    id: 'excel-word',
+    title: 'Excel → Word',
+    namespaces: ['word'],
+    kind: 'engine',
+    status: 'available',
+  },
+  {
+    id: 'search',
+    title: 'Tra cứu',
+    namespaces: [],
+    kind: 'shell',
+    status: 'available',
+  },
+  {
+    id: 'status',
+    title: 'Trạng thái',
+    namespaces: [],
+    kind: 'shell',
+    status: 'available',
+  },
+  {
+    id: 'settings',
+    title: 'Cài đặt',
+    namespaces: [],
+    kind: 'shell',
+    status: 'available',
+  },
+  {
+    id: 'office',
+    title: 'notaryoffice',
+    namespaces: [],
+    kind: 'placeholder',
+    status: 'unavailable',
+    reason: 'not_implemented',
+  },
+];
+
+function listModules() {
+  return MODULES.map((m) => ({ ...m }));
+}
+
+function moduleForCommand(command) {
+  const ns = String(command).split('.')[0];
+  return MODULES.find((m) => m.namespaces.includes(ns)) || null;
+}
+
+module.exports = { MODULES, listModules, moduleForCommand };

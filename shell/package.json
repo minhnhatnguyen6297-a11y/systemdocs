@@ -1,0 +1,34 @@
+{
+  "name": "g1-shell",
+  "version": "0.1.0",
+  "private": true,
+  "description": "G1 Electron shell — desktopcommand.v1 consumer + Python sidecar",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron .",
+    "test": "node --test test/*.test.mjs",
+    "test:sidecar": "python test/test_sidecar_contract.py",
+    "build:sidecar": "powershell -ExecutionPolicy Bypass -File sidecar/build_sidecar.ps1",
+    "dist": "electron-builder --dir"
+  },
+  "devDependencies": {
+    "electron": "^31.0.2",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "dev.g1.shell",
+    "productName": "g1-shell",
+    "directories": { "output": "dist-app" },
+    "files": [
+      "src/main/**",
+      "src/preload/**",
+      "src/renderer/**",
+      "package.json"
+    ],
+    "extraResources": [
+      { "from": "sidecar/dist/g1-shell-sidecar", "to": "sidecar/g1-shell-sidecar" }
+    ],
+    "win": { "target": ["dir"] }
+  }
+}

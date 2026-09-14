@@ -1,0 +1,6 @@
+node_modules/
+dist-app/
+sidecar/build/
+sidecar/dist/
+sidecar/__pycache__/
+*.log
