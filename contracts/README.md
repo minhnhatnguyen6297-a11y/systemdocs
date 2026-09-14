@@ -3,12 +3,25 @@
 Thư mục này chỉ chứa **những gì đã được cả hai bên đồng ý**. Nó không phải nơi
 đề xuất ý tưởng tích hợp.
 
-## Trạng thái hôm nay: chưa có contract tích hợp nào
+## Trạng thái: một contract kênh nội bộ đã publish; chưa có contract xuyên-sản-phẩm
 
-Ba công cụ hiện **chạy độc lập** — chưa có API, chưa đọc DB của nhau, chưa có file
-trao đổi tự động. Đó là trạng thái của **giai đoạn hiện tại**, không phải đích
-đến: hệ thống sẽ gộp lại và dùng chung database
+Ba công cụ nghiệp vụ vẫn **chạy độc lập** — chưa có API giữa chúng, chưa đọc DB
+của nhau, chưa có file trao đổi tự động. Đó là trạng thái của **giai đoạn hiện
+tại**, không phải đích đến: hệ thống sẽ gộp lại và dùng chung database
 ([`../VISION.md`](../VISION.md) mục 4).
+
+Đã publish theo lộ trình G1 một máy (owner duyệt 14/09/2026, spec P2):
+
+| File | Nội dung | Trạng thái |
+|---|---|---|
+| [`desktop-command.md`](./desktop-command.md) | `desktopcommand.v1` — kênh lệnh Electron main ↔ Python sidecar trên một máy: auth, lifecycle, idempotency, waiting_user, error, file_ref machine-scope | APPROVED v1 |
+| [`g1-module-data.md`](./g1-module-data.md) | `g1.module.v1` — shape dữ liệu trong payload/result/error (FileRef, JobResult, ErrorObject, IdentityEvidence, ownership) | APPROVED v1 |
+| [`g1/examples/`](./g1/examples/) + [`g1/validate_examples.py`](./g1/validate_examples.py) | valid/invalid JSON + validator kiểm chứng được | kiểm: `python contracts/g1/validate_examples.py` |
+
+Hai contract trên là **kênh nội bộ shell↔engine** — không phải contract giữa ba
+sản phẩm nghiệp vụ. ConversionEnvelope/Evidence/DraftCase dùng chung xuyên repo
+vẫn theo Gate A–D của `MIN62_DATA_CONTRACT_DRAFT.md` (branch
+`min-62-data-contract-draft`) và chưa được publish tại đây.
 
 Các shape `v0.experimental` trong `SYSTEM_ARCHITECTURE.md` mục 6 chỉ dùng để
 review/POC. Chúng **không phải contract đã duyệt**, không được dùng làm lý do tạo

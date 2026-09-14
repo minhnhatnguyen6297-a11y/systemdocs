@@ -1,0 +1,11 @@
+{
+  "expected_error": "payload_rejected_sensitive_key",
+  "contract_version": "desktopcommand.v1",
+  "command_id": "e4f5a6b7-4444-4d5e-9f6a-7b8c9d0e1f2a",
+  "command": "upload.prepare",
+  "payload": {
+    "files": [{ "path": "D:/hs/a.docx", "scope": "machine_local" }],
+    "options": { "nd_password": "super-secret" }
+  },
+  "client_meta": { "shell_version": "0.1.0", "module": "upload" }
+}

@@ -1,0 +1,12 @@
+{
+  "expected_error": "file_scope_not_supported",
+  "contract_version": "desktopcommand.v1",
+  "command_id": "d3e4f5a6-3333-4c4d-8e5f-6a7b8c9d0e1f",
+  "command": "upload.prepare",
+  "payload": {
+    "files": [
+      { "path": "\\\\maychu\\D\\Minh\\mau.docx", "scope": "lan_share" }
+    ]
+  },
+  "client_meta": { "shell_version": "0.1.0", "module": "upload" }
+}
