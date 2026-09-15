@@ -1,0 +1,7 @@
+{
+  "expected_error": "unsupported_contract_version",
+  "command_id": "f5a6b7c8-5555-4e6f-8a7b-8c9d0e1f2a3b",
+  "command": "upload.prepare",
+  "payload": {},
+  "client_meta": { "shell_version": "0.1.0", "module": "upload" }
+}

@@ -1,0 +1,28 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_01HZY8K0M4",
+  "command_id": "c2d3e4f5-2222-4b3c-9d4e-5f6a7b8c9d0e",
+  "status": "partial",
+  "waiting_on": null,
+  "progress": { "done": 5, "total": 5, "current_label": "xong" },
+  "result": {
+    "kind": "upload_run",
+    "data": {
+      "breakdown": {
+        "succeeded": ["j_item_1", "j_item_2", "j_item_4"],
+        "failed": ["j_item_3", "j_item_5"]
+      }
+    },
+    "warnings": [{ "code": "upload.partial_failure", "message": "2/5 ho so loi" }],
+    "evidence": []
+  },
+  "error": {
+    "code": "upload.partial_failure",
+    "message": "2/5 ho so upload that bai",
+    "retryable": true,
+    "next_action": "retry",
+    "job_id": "j_01HZY8K0M4",
+    "details": null
+  },
+  "updated_at": "2026-09-14T10:10:00Z"
+}

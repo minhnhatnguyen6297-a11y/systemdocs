@@ -30,7 +30,8 @@ Cập nhật trạng thái POC: 11/09/2026. Các lựa chọn công nghệ produ
 | **Database** | **SQLite** | `notary_v2` (`notary.db`), `upload_lab` (`registry.sqlite3`) | Bảng nghiệp vụ `ocr_jobs` và các bảng Zalo nằm trong `notary.db` (`notary_v2/database.py:8-24`, `models.py:161-171,186-300`); `ocr_jobs.db` là hạ tầng Celery, không phải DB nghiệp vụ OCR. Xem mục 3 về giai đoạn gộp |
 | **Job nền / queue** | Celery, broker SQLAlchemy + result backend DB | `notary_v2/celery_app.py:5-11` | Cả broker và result backend mặc định dùng `ocr_jobs.db`; URL có thể đổi qua cấu hình |
 | **UI web** | Jinja2 template + static (không SPA framework) | `notary_v2` (`frontend/`) | |
-| **UI desktop** | **PySide6 / Qt** | `upload_lab` (`ui_qt/`) | Baseline đang chạy; Electron chỉ là candidate ở mục 1.1 |
+| **Desktop shell đích** | **Electron** | nhánh `systemdocs/electron-system-shell` (dự kiến triển khai); POC ở `upload_lab@codex/desktop-command-poc` | Owner chốt ngày 14/09/2026 qua MIN-50; Electron sở hữu shell/UI, không sở hữu nghiệp vụ Python |
+| **UI desktop legacy** | **PySide6 / Qt** | `upload_lab` (`ui_qt/`) | Baseline chuyển đổi; không tiếp tục là shell đích |
 | **Tự động hóa web nhà nước** | **Playwright** (Chromium) | `upload_lab` | Session lưu ở `nd_storage_state.json`; Chromium headed riêng do Python quản lý |
 | **Agent trên máy trạm** | **C# .NET 8** | `notaryoffice` (dự kiến) | Ràng buộc: <30MB RAM, <0.5% CPU |
 | **Nhận media từ Zalo** | `zca-js` (Node) như connector thay thế được | `notary_v2` (Zalo Document Inbox) | Xem mục 4 |
@@ -39,35 +40,34 @@ Cập nhật trạng thái POC: 11/09/2026. Các lựa chọn công nghệ produ
 **API key và secret:** đặt trong `.env` của từng repo, đã `.gitignore`. Không bao
 giờ ghi key vào tài liệu, không commit `.env`. Mẫu biến ở `.env.example`.
 
-### 1.1. Candidate đang đánh giá — chưa phải công nghệ đã chọn
+### 1.1. Candidate còn đang đánh giá
 
-Đặc tả MIN-50 đã được **duyệt cho POC** theo
+Electron đã được owner chọn làm desktop shell đích ngày 14/09/2026 và đã chuyển
+vào bảng công nghệ chính. Đặc tả MIN-50 đã được **duyệt cho POC** theo
 `MIN50_IMPLEMENTATION_SPEC.md` §3/W0 ngày 11/09/2026; không phải duyệt adoption.
 POC conversion đã có code trong worktree riêng, nhưng chưa có đủ bằng chứng
 golden dataset/benchmark để chọn candidate vào production. Snapshot source và
-gap ở [`COMPONENT_MAP.md`](./COMPONENT_MAP.md) §2/6.2. Desktop vẫn ở bước plan
-trong snapshot được kiểm tra. Không diễn giải bảng này thành migration hoặc
-dependency production; không có candidate nào được nâng thành đã chọn trong MIN-57.
+gap ở [`COMPONENT_MAP.md`](./COMPONENT_MAP.md) §2/6.2. Các candidate dưới đây
+chỉ được triển khai sau khi được duyệt, bằng task riêng; không diễn giải bảng
+này thành migration hoặc dependency production.
 
 | Việc | Candidate | Baseline hiện tại | Lý do kỹ thuật để POC | Gate trước khi chọn |
 |---|---|---|---|---|
-| Desktop shell cấp hệ thống | **Electron** | PySide6/Qt trong `upload_lab` | Một cửa desktop có thể dùng lại cho upload, review OCR, search, status và diagnostics | So trực tiếp với PySide6 về cài đặt/đóng gói Windows, RAM, thời gian mở app, IPC/error handling và UX. Chỉ chọn nếu lợi ích đo được lớn hơn chi phí thêm Chromium/Node |
 | Adapter chuẩn hóa tài liệu | **Microsoft MarkItDown** | `python-docx`, Windows IFilter, `openpyxl`, PyMuPDF theo từng repo | Thử một lớp conversion thống nhất cho PDF có text, DOCX và XLSX trước hậu xử lý nghiệp vụ | Golden dataset phải chứng minh chất lượng, cấu trúc, provenance, lỗi và thời gian. `.doc` cũ không được giả định là đã giải quyết |
 | OCR ảnh nhúng trong adapter | **POC `markitdown-ocr` gọi Qwen qua giao diện OpenAI-compatible** | Đường OCR hiện hành dùng DashScope native (`notary_v2/routers/ocr_ai.py:381-414`) | Cùng provider, nhưng là **bề mặt tích hợp thứ hai**, chưa chứng minh tương đương đường hiện hành | Kiểm chứng payload, MIME/base64, phản hồi, lỗi, timeout và giới hạn; OCR gate phải cấp quyền trước từng nhánh, không bật plugin toàn cục |
 
-Ranh giới của POC desktop:
+Ranh giới chuyển đổi desktop đã chốt:
 
-- Electron chỉ là shell thử nghiệm; không chuyển business logic Python sang Node
-  và không chuyển UI PySide6 hiện hữu trong POC.
+- Electron là shell đích; không chuyển business logic Python sang Node chỉ vì
+  đổi shell. UI PySide6 là baseline để kiểm chứng parity trước cutover.
 - Backend Python tiếp tục mở **Chromium headed riêng** bằng Playwright để người
   dùng xem form và tự xác nhận. Không dùng Playwright để điều khiển chính cửa sổ
   Electron trong luồng upload.
 - Chưa nhúng web tỉnh vào Electron. Nếu sau này cần embed, phải mở lại review về
   bảo mật, session, download/upload và lifecycle; không dùng `<webview>` theo
   quán tính.
-- **Transport đã chốt cho POC:** server HTTP localhost tối thiểu bằng FastAPI,
-  chạy trong repo POC với entrypoint/tiến trình khởi động riêng. Không sửa hoặc
-  gắn vào app PySide6 đang chạy; đây không phải API production.
+- POC localhost FastAPI hiện có chỉ là bằng chứng đầu vào. DesktopCommand
+  production, lifecycle LAN và auth phải được đặc tả/duyệt ở MIN-64 trước code.
 - Bind `127.0.0.1`, port cấu hình được; xác thực bằng token phiên ngắn hạn,
   không ghi token vào log. Caller là Electron **main process**, không phải
   renderer; không bật CORS rộng. Không đưa credential web tỉnh vào command.

@@ -14,12 +14,16 @@ chọn lệch nhau bây giờ là viết lại sau.
 
 | Sản phẩm | Đường dẫn | Làm gì | Trạng thái |
 |---|---|---|---|
-| `notary_v2` | `D:\notary_v2` | Soạn thảo hồ sơ tự động (thừa kế, sinh Word, intake giấy tờ, Zalo inbox) | Đang chạy |
-| `upload_lab` | `D:\upload_lab_repo` | Số hóa hồ sơ giấy: Word cũ → trường có cấu trúc → upload web CSDL công chứng tỉnh | Đang chạy |
+| `notary_v2` | `D:\notary_v2` | Soạn thảo hồ sơ tự động (thừa kế, sinh Word, intake giấy tờ, Zalo inbox) | Đang phát triển; chưa triển khai production |
+| `upload_lab` | `D:\upload_lab_repo` | Số hóa hồ sơ giấy: Word cũ → trường có cấu trúc → upload web CSDL công chứng tỉnh | Đang phát triển; chưa triển khai production |
 | `notaryoffice` | `D:\notaryoffice` | Quản lý hồ sơ tại văn phòng: thu dấu vết từ máy con → tự dựng record hồ sơ | Tài liệu, chưa code |
 
 Ngoài phạm vi: `researchskill` (`D:\researchskill`) là skill hỗ trợ coding,
 không phải phân hệ công chứng.
+
+`excelTK` là dự án riêng, không thuộc phạm vi hệ thống này. Kế hoạch chuyển
+nghiệp vụ thật sang Electron nằm ở [`ELECTRON_G1_PLAN.md`](./ELECTRON_G1_PLAN.md)
+trên nhánh `electron-system-shell`; `main` tiếp tục chỉ chứa tài liệu.
 
 ## Đọc gì khi nào
 

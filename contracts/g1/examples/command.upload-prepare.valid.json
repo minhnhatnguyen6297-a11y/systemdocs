@@ -1,0 +1,17 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "command_id": "8f3d2c10-6b4a-4e21-9c77-2a1b9d5f3e40",
+  "command": "upload.prepare",
+  "payload": {
+    "files": [
+      {
+        "path": "D:/ho so/GD-03.docx",
+        "scope": "machine_local",
+        "sha256": "ab12cd34ef56",
+        "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "size_bytes": 35427
+      }
+    ]
+  },
+  "client_meta": { "shell_version": "0.1.0", "module": "upload" }
+}

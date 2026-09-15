@@ -1,0 +1,18 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_01HZY8K0M3",
+  "command_id": "b1c2d3e4-1111-4a2b-8c3d-4e5f6a7b8c9d",
+  "status": "failed",
+  "waiting_on": null,
+  "progress": { "done": 1, "total": 5, "current_label": "dang nap ho so 2" },
+  "result": null,
+  "error": {
+    "code": "engine_restarted",
+    "message": "Engine khoi dong lai giua chung; job co the chay lai",
+    "retryable": true,
+    "next_action": "retry",
+    "job_id": "j_01HZY8K0M3",
+    "details": null
+  },
+  "updated_at": "2026-09-14T10:05:00Z"
+}

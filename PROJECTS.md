@@ -10,10 +10,13 @@ Cập nhật: 10/09/2026
 
 | Repo | Đường dẫn | Git | Trạng thái |
 |---|---|---|---|
-| `notary_v2` | `D:\notary_v2` | `github.com/minhnhatnguyen6297-a11y/notary_v2` | Đang chạy |
-| `upload_lab` | `D:\upload_lab_repo` | `github.com/minhnhatnguyen6297-a11y/upload_lab` | Đang chạy |
+| `notary_v2` | `D:\notary_v2` | `github.com/minhnhatnguyen6297-a11y/notary_v2` | Đang phát triển; chưa triển khai production |
+| `upload_lab` | `D:\upload_lab_repo` | `github.com/minhnhatnguyen6297-a11y/upload_lab` | Đang phát triển; chưa triển khai production |
 | `notaryoffice` | `D:\notaryoffice` | Git local đã init; chưa cấu hình remote | **Chỉ có tài liệu, chưa có code** (`notaryoffice/AGENTS.md:3`) |
 | `researchskill` | `D:\researchskill` | `github.com/minhnhatnguyen6297-a11y/researchskill` | **Ngoài phạm vi** |
+
+`excelTK` là dự án riêng, không phải sản phẩm con của hệ thống công chứng và
+không thuộc goal Electron MIN-56/G1.
 
 Snapshot Git `notaryoffice` ngày 10/09/2026: HEAD `1c1b160`, 4 commits;
 kiểm tra bằng `git log -1`, `git rev-list --count HEAD`, `git remote -v`
@@ -270,7 +273,9 @@ thống công chứng.
 
 ## 5. `systemdocs` — folder này, và thẩm quyền của nó
 
-- **Đường dẫn:** `D:\systemdocs\systemdocs`. Không có code, không có runtime.
+- **Đường dẫn:** `D:\systemdocs`. `main` không có code/runtime. Nhánh
+  `electron-system-shell` là ngoại lệ owner chọn làm nhánh tích hợp cấp hệ thống;
+  runtime chỉ được thêm theo `ELECTRON_G1_PLAN.md` và contract đã duyệt.
 - **Quyết định:** ranh giới sản phẩm, chuẩn hóa khóa định danh
   (`contracts/entities.md`), **lựa chọn công nghệ** (`TECH_STACK.md`), và những gì
   đang mở (`OPEN_DECISIONS.md`).

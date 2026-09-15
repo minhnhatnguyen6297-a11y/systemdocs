@@ -1,0 +1,28 @@
+{
+  "expected_error": "validation_error",
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_01HZY8K0M6",
+  "command_id": "b7c8d9e0-7777-4a8b-ac9d-0e1f2a3b4c5d",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "ocr_result",
+    "data": {},
+    "evidence": [
+      {
+        "evidence_id": "ev_empty",
+        "subject_type": "person",
+        "kind": "cccd",
+        "raw_value": "khong doc duoc",
+        "normalized_value": "",
+        "source_ref": { "page": 1 },
+        "observation_state": "observed",
+        "observed_at": "2026-09-14T10:00:00Z"
+      }
+    ],
+    "warnings": []
+  },
+  "error": null,
+  "updated_at": "2026-09-14T10:12:00Z"
+}

@@ -1,6 +1,10 @@
 # AGENTS.md — systemdocs
 
-Folder tài liệu cấp cha. **Không có code, không có runtime.**
+Folder tài liệu cấp cha. `main` **không có code, không có runtime**.
+
+Ngoại lệ owner chốt ngày 14/09/2026: nhánh `electron-system-shell` là nhánh
+tích hợp cấp hệ thống và được phép chứa runtime Electron sau khi spec/contract
+tương ứng được duyệt. Không merge runtime vào `main`; xem `ELECTRON_G1_PLAN.md`.
 
 ## Quyền hạn của folder này
 
@@ -18,6 +22,7 @@ repo đó. Khi xung đột, **repo con thắng** — và mâu thuẫn phải đ�
   tồn tại một luồng dữ liệu không tồn tại.
 - Phân biệt rõ **hiện trạng** và **dự định**. `notaryoffice` chưa có code.
 - Không tự chốt mục nào đang mở (🔴) trong `OPEN_DECISIONS.md`.
+- `excelTK` là dự án riêng, ngoài phạm vi hệ thống công chứng và G1 Electron.
 - Mọi lựa chọn công nghệ ghi ở `TECH_STACK.md`, không rải trong file khác. Thêm
   công nghệ mới cho một việc đã có công nghệ: phải qua 4 bước ở `TECH_STACK.md` §2.
 - Đích đến là **một hệ thống dùng chung database**. Đừng viết lại các mô tả kiểu
