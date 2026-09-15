@@ -174,7 +174,10 @@ function moduleHealth(modules) {
   }));
 }
 
-const api = {
+// Ten `G1_API` khong phai `api`: hai <script> classic chia chung global
+// lexical env — `const api` o day se xung `const api` trong renderer.js
+// (SyntaxError truoc khi renderer chay → trang trang).
+const G1_API = {
   NAV_SPEC, TERMINAL_STATUS, CANCELABLE_STATUS, STATUS_LABEL, STATUS_TONE,
   WAITING_CTA, ENGINE_STATE_LABEL, UNAVAILABLE_REASON,
   isTerminal, statusLabel, engineStateLabel, unavailableReason, navEntry,
@@ -185,5 +188,5 @@ const api = {
 // Electron sandboxed renderer VAN co module/exports (CommonJS-lite cho
 // builtin whitelist) — kiem `module` truoc se bo lo window.G1_LIB va lam
 // renderer trang. Set ca hai khi ton tai.
-if (typeof window !== 'undefined') window.G1_LIB = api;
-if (typeof module !== 'undefined' && module.exports) module.exports = api;
+if (typeof window !== 'undefined') window.G1_LIB = G1_API;
+if (typeof module !== 'undefined' && module.exports) module.exports = G1_API;
