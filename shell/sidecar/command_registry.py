@@ -1,11 +1,14 @@
 """Command registry — handler nghiep vu cho desktopcommand.v1.
 
-P4 chi co read-only command goi engine that (file.inspect) + mot diagnostic
-command de kiem chung progress/cancel end-to-end. Business commands cua
-upload_lab/notary_v2 duoc them o P6 theo dung namespace da duyet.
+P4 co read-only command goi engine that (file.inspect). P5 them diagnostic
+command de kiem chung waiting_user/resume/env-check end-to-end tu shell.
+Business commands cua upload_lab/notary_v2 duoc them o P6 theo dung
+namespace da duyet.
 """
 import hashlib
+import importlib.util
 import mimetypes
+import platform
 import time
 
 from errors import CommandError
@@ -108,7 +111,65 @@ def slow_task(job, payload):
             "evidence": [], "warnings": []}
 
 
+def waiting_task(job, payload):
+    """Diagnostic: vao waiting_user(review) roi tu resume sau wait_seconds.
+
+    Kiem chung banner waiting_user + cancel-khi-waiting + resume tu shell ma
+    khong can luong nghiep vu that (P5). Cancel ap dung ngay luc waiting.
+    """
+    wait = 20.0
+    if isinstance(payload, dict) and payload.get("wait_seconds") is not None:
+        try:
+            wait = max(1.0, min(float(payload["wait_seconds"]), 120.0))
+        except (TypeError, ValueError) as exc:
+            raise CommandError("validation_error",
+                               "wait_seconds phai la so") from exc
+    job.set_waiting("review")
+    deadline = time.time() + wait
+    while time.time() < deadline:
+        job.check_cancel()
+        time.sleep(0.1)
+    job.resume()
+    job.report_progress(1, 1, "buoc nguoi dung da xong")
+    return {"kind": "diag_result", "data": {"waited_seconds": wait},
+            "evidence": [], "warnings": []}
+
+
+def env_check(job, payload):
+    """Diagnostic: checklist moi truong engine (MIN-32 §6 — env service)."""
+    job.report_progress(0, 1, "doc moi truong")
+    checks = [{"name": "python", "ok": True,
+               "detail": platform.python_version()}]
+    for mod in ("fastapi", "uvicorn", "docx", "pymupdf"):
+        found = importlib.util.find_spec(mod) is not None
+        checks.append({"name": mod, "ok": found,
+                       "detail": "co san" if found else "thieu"})
+    # playwright optional trong G1-SM (finding F5 chua do) — thieu la warning,
+    # khong lam env fail.
+    pw = importlib.util.find_spec("playwright") is not None
+    checks.append({"name": "playwright", "ok": pw,
+                   "detail": "co san" if pw else "chua cai (optional G1-SM)"})
+    job.check_cancel()
+    job.report_progress(1, 1, "xong")
+    required_ok = all(c["ok"] for c in checks if c["name"] != "playwright")
+    return {
+        "kind": "env_check",
+        "data": {
+            "python_version": platform.python_version(),
+            "platform": platform.platform(),
+            "checks": checks,
+            "required_ok": required_ok,
+        },
+        "evidence": [],
+        "warnings": ([] if pw else [{
+            "code": "playwright_missing",
+            "message": "playwright chua cai — upload login/finalize se can"}]),
+    }
+
+
 COMMANDS = {
     "file.inspect": inspect_file,
     "diag.slow_task": slow_task,
+    "diag.waiting_task": waiting_task,
+    "diag.env_check": env_check,
 }

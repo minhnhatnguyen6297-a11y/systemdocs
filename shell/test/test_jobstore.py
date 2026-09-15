@@ -3,6 +3,7 @@
 Chay: python test/test_jobstore.py  (chi can stdlib)
 """
 import sys
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -38,6 +39,23 @@ def partial_bad(job, payload):
 def partial_ok(job, payload):
     return {"partial": True, "kind": "x",
             "data": {"breakdown": {"succeeded": ["a"], "failed": ["b"]}}}
+
+
+def waiting_then_resume(job, payload):
+    job.set_waiting("confirm")
+    while job.snapshot()["status"] == "waiting_user":
+        job.check_cancel()
+        time.sleep(0.01)
+    return {"kind": "ok", "data": {}}
+
+
+def resumer(store, job_id, delay=0.15):
+    """Goi job.resume() tu thread khac sau delay — nhu engine nhan xong
+    buoc nguoi dung."""
+    def _go():
+        time.sleep(delay)
+        store.get(job_id).resume()
+    threading.Thread(target=_go, daemon=True).start()
 
 
 def wait_terminal(store, job_id, timeout=5):
@@ -111,6 +129,26 @@ class JobStoreTest(unittest.TestCase):
         self.assertEqual(j1.job_id, j2.job_id)
         self.store.cancel(j1.job_id)
         wait_terminal(self.store, j1.job_id)
+
+    def test_resume_waiting_to_running(self):
+        # contract §2: waiting_user -> running khi buoc nguoi dung xong
+        job = self.store.submit("c-9", "diag.waiting_task",
+                                waiting_then_resume, {})
+        deadline = time.time() + 5
+        while job.snapshot()["status"] != "waiting_user":
+            self.assertLess(time.time(), deadline)
+            time.sleep(0.02)
+        resumer(self.store, job.job_id)
+        snap = wait_terminal(self.store, job.job_id)
+        self.assertEqual(snap["status"], "succeeded")
+        self.assertIsNone(snap["waiting_on"])
+
+    def test_resume_tren_job_khong_waiting_la_loi(self):
+        job = self.store.submit("c-10", "diag.slow_task", quick, {})
+        wait_terminal(self.store, job.job_id)
+        with self.assertRaises(CommandError) as ctx:
+            job.resume()
+        self.assertEqual(ctx.exception.code, "validation_error")
 
     def test_set_waiting_validates_enum(self):
         def bad_waiting(job, payload):

@@ -16,6 +16,9 @@ contextBridge.exposeInMainWorld('desktop', {
     getJob: (jobId) => ipcRenderer.invoke('desktop.v1.getJob', { job_id: jobId }),
     cancelJob: (jobId) =>
       ipcRenderer.invoke('desktop.v1.cancelJob', { job_id: jobId }),
+    listJobs: () => ipcRenderer.invoke('desktop.v1.listJobs'),
+    restartEngine: () => ipcRenderer.invoke('desktop.v1.restartEngine'),
+    getDiagnostics: () => ipcRenderer.invoke('desktop.v1.getDiagnostics'),
     onJobUpdate: (cb) => {
       ipcRenderer.on('desktop.v1.jobUpdate', (_e, job) => cb(job));
     },

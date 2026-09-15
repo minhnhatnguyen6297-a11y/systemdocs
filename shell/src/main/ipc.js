@@ -133,6 +133,37 @@ const HANDLERS = {
       return errEnvelope(err);
     }
   },
+
+  // Renderer reload chi mat view — job van o sidecar/tracker; listJobs cho
+  // phep noi lai toan bo snapshot (contract §5 reconnect).
+  'desktop.v1.listJobs': async (deps) => ({
+    ok: true,
+    data: { jobs: [...(deps.tracker.jobs || new Map()).values()] },
+  }),
+
+  // Retry sau khi engine unavailable — chi co tac dung khi sidecar dang
+  // stopped/unavailable; ready/starting thi tra status hien tai.
+  'desktop.v1.restartEngine': async (deps) => {
+    if (['unavailable', 'stopped'].includes(deps.sidecar.state)) {
+      try {
+        await deps.sidecar.start();
+      } catch (err) {
+        return errEnvelope(err);
+      }
+    }
+    return { ok: true, data: deps.sidecar.status() };
+  },
+
+  // Panel diagnostics (MIN-32 §6): shell/sidecar version, helper status,
+  // log da redact. diagnostics() do main cung cap (so huu log path).
+  'desktop.v1.getDiagnostics': async (deps) => ({
+    ok: true,
+    data: {
+      ...(deps.diagnostics ? deps.diagnostics() : {}),
+      sidecar: deps.sidecar.status(),
+      modules: listModules(),
+    },
+  }),
 };
 
 const ALLOWLIST = Object.keys(HANDLERS);

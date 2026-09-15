@@ -1,28 +1,109 @@
 * { box-sizing: border-box; }
 body { margin: 0; font-family: "Segoe UI", sans-serif; color: #1b1b1b; }
 #app { display: flex; height: 100vh; }
-#sidebar { width: 200px; background: #201f1e; color: #fff; padding: 12px 0; }
+#sidebar { width: 210px; background: #201f1e; color: #fff; padding: 12px 0;
+           flex-shrink: 0; overflow-y: auto; }
 #sidebar .brand { padding: 0 16px 12px; font-weight: 600; opacity: .8; }
 #module-list { list-style: none; margin: 0; padding: 0; }
 #module-list li { padding: 10px 16px; cursor: pointer; }
 #module-list li:hover { background: #323130; }
 #module-list li.active { background: #3b3a39; border-left: 3px solid #4cc2ff; }
-#module-list li.unavailable { opacity: .45; cursor: default; }
-#content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-#statusbar { display: flex; gap: 8px; padding: 10px 16px; border-bottom: 1px solid #e1dfdd; }
+#module-list li.unavailable { opacity: .5; }
+#content { flex: 1; display: flex; flex-direction: column; overflow: hidden;
+           min-width: 0; }
+#statusbar { display: flex; gap: 8px; padding: 10px 16px;
+             border-bottom: 1px solid #e1dfdd; }
 .pill { background: #f3f2f1; border: 1px solid #e1dfdd; border-radius: 12px;
         padding: 2px 10px; font-size: 12px; }
 #view { flex: 1; overflow: auto; padding: 20px 24px; }
+#view section { max-width: 860px; }
 h2 { margin-top: 0; font-size: 18px; }
+h3 { font-size: 14px; margin: 20px 0 8px; }
 button { padding: 6px 14px; margin-right: 8px; border: 1px solid #8a8886;
          background: #fff; border-radius: 4px; cursor: pointer; }
 button.primary { background: #0f6cbd; border-color: #0f6cbd; color: #fff; }
+button.primary.danger { background: #a4262c; border-color: #a4262c; }
 button:disabled { opacity: .5; cursor: default; }
 .file-row { padding: 6px 0; border-bottom: 1px solid #edebe9; font-size: 13px; }
+.tools { margin: 12px 0 6px; }
+.files { margin-top: 8px; }
+
+/* badges theo tone (STATUS_TONE trong lib.js) */
+.badge { display: inline-block; border-radius: 10px; padding: 1px 9px;
+         font-size: 12px; font-weight: 600; }
+.tone-info { background: #deecf9; color: #0f6cbd; }
+.tone-ok { background: #dff6dd; color: #107c10; }
+.tone-warn { background: #fff4ce; color: #9d5d00; }
+.tone-error { background: #fde7e9; color: #a4262c; }
+.tone-muted { background: #f3f2f1; color: #605e5c; }
+
+/* 4 mat trang thai (MIN-32 §3) */
+.face { border: 1px dashed #c8c6c4; border-radius: 6px; padding: 14px 16px;
+        margin: 12px 0; background: #faf9f8; max-width: 640px; }
+.face-title { font-weight: 600; margin-bottom: 4px; }
+.face-detail { font-size: 13px; }
+.face-hint { margin-top: 6px; }
+.face-actions { margin-top: 10px; }
+.face-loading .face-title::before { content: "… "; }
+.face-error { border-color: #a4262c; }
+.face-error .face-title { color: #a4262c; }
+.face-unavailable { border-color: #9d5d00; }
+.face-unavailable .face-title { color: #9d5d00; }
+
+/* waiting_user banner — noi bat trong module, khong chiem toan app */
+.waiting-banner { background: #fff4ce; border: 1px solid #e3b23c;
+                  border-radius: 6px; padding: 10px 12px; margin: 10px 0;
+                  font-size: 13px; }
+
+/* job card */
 .job-card { border: 1px solid #e1dfdd; border-radius: 6px; padding: 12px;
             margin: 12px 0; max-width: 720px; }
+.job-head { display: flex; gap: 8px; align-items: baseline; }
 .job-card .status { font-weight: 600; }
 .job-card pre { background: #f3f2f1; padding: 8px; overflow: auto;
                 max-height: 260px; font-size: 12px; }
+.job-card button { margin-top: 8px; }
+.job-result summary { cursor: pointer; color: #0f6cbd; font-size: 13px;
+                      margin-top: 8px; }
+.job-error { margin-top: 8px; }
+.breakdown { margin-top: 6px; }
 .error { color: #a4262c; }
 .muted { color: #605e5c; font-size: 12px; }
+
+/* overview / status */
+.conn-card { border: 1px solid #e1dfdd; border-radius: 6px; padding: 12px;
+             max-width: 640px; }
+.kv { display: grid; grid-template-columns: 130px 1fr; gap: 4px 12px;
+      font-size: 13px; }
+.kv-k { color: #605e5c; }
+.kv-v { word-break: break-all; }
+.health-table { border: 1px solid #e1dfdd; border-radius: 6px;
+                max-width: 640px; }
+.health-row { display: flex; gap: 12px; align-items: center;
+              padding: 8px 12px; border-bottom: 1px solid #edebe9; }
+.health-row:last-child { border-bottom: none; }
+.health-title { flex: 1; font-size: 13px; }
+
+/* modal confirm (cancel job, quyet dinh nguy hiem) */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.35);
+                  display: flex; align-items: center; justify-content: center;
+                  z-index: 10; }
+.modal { background: #fff; border-radius: 8px; padding: 18px 20px;
+         width: 420px; max-width: 90vw; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+.modal-title { font-weight: 600; margin-bottom: 8px; }
+.modal-body { font-size: 13px; color: #44413e; }
+.modal-actions { margin-top: 16px; text-align: right; }
+
+/* toast */
+#toast { position: fixed; right: 16px; bottom: 16px; z-index: 20;
+         display: flex; flex-direction: column; gap: 8px; }
+.toast-item { background: #323130; color: #fff; border-radius: 6px;
+              padding: 10px 14px; font-size: 13px; max-width: 380px;
+              box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+.toast-error { background: #a4262c; }
+
+/* usable o 760x520 (snap min) — sidebar co lai, view van doc duoc */
+@media (max-width: 800px) {
+  #sidebar { width: 150px; }
+  #view { padding: 12px 14px; }
+}

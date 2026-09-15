@@ -8,8 +8,8 @@ const path = require('path');
 const fs = require('fs');
 const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 
-const { sidecarCommand } = require('./config');
-const { makeLogger } = require('./redact');
+const { sidecarCommand, SHELL_VERSION } = require('./config');
+const { makeLogger, redactString } = require('./redact');
 const { SidecarManager } = require('./sidecar');
 const { JobTracker } = require('./job-tracker');
 const { registerIpc } = require('./ipc');
@@ -26,6 +26,8 @@ let win = null;
 let sidecar = null;
 let tracker = null;
 let log = makeLogger();
+let logPath = null;
+let allowClose = false;
 
 async function pickFiles(opts = {}) {
   const res = await dialog.showOpenDialog(win, {
@@ -42,9 +44,12 @@ async function pickFiles(opts = {}) {
 }
 
 function createWindow() {
+  // 1280x820 mac dinh, usable toi thieu 760x520 (MIN-32 §1)
   win = new BrowserWindow({
     width: 1280,
-    height: 800,
+    height: 820,
+    minWidth: 760,
+    minHeight: 520,
     show: !SMOKE,
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'preload.js'),
@@ -57,6 +62,27 @@ function createWindow() {
     },
   });
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  win.on('close', async (e) => {
+    // Quit giua luc job con chay se drain sidecar -> job chet engine_shutdown.
+    // Chan de user quyet dinh (spec §4 — khong mat job vi thao tac dong).
+    if (allowClose || SMOKE) return;
+    const active = tracker ? tracker.listActive().length : 0;
+    if (active === 0) return;
+    e.preventDefault();
+    const r = await dialog.showMessageBox(win, {
+      type: 'warning',
+      buttons: ['Hủy', 'Vẫn thoát'],
+      defaultId: 0,
+      cancelId: 0,
+      title: 'Còn job đang chạy',
+      message: `Còn ${active} job chưa kết thúc.`,
+      detail: 'Thoát sẽ dừng engine; các job chuyển canceled (engine_shutdown).',
+    });
+    if (r.response === 1) {
+      allowClose = true;
+      win.close();
+    }
+  });
   win.on('closed', () => { win = null; });
   // tat ca content la local — chan cua so moi va dieu huong ra ngoai
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -103,13 +129,35 @@ async function smokeProbe() {
   app.exit(record.ok ? 0 : 1);
 }
 
+function collectDiagnostics() {
+  // Panel diagnostics (MIN-32 §6): version, helper status, log da redact.
+  // Credential/cookie/token khong bao gio hien thi — doc log xong van redact
+  // lai tung dong (belt-and-suspenders).
+  const tail = [];
+  try {
+    if (logPath && fs.existsSync(logPath)) {
+      const raw = fs.readFileSync(logPath, 'utf8');
+      const lines = raw.trim().split('\n').slice(-40);
+      for (const line of lines) tail.push(redactString(line));
+    }
+  } catch (err) {
+    tail.push(`<khong doc duoc log: ${err.message}>`);
+  }
+  return {
+    shell_version: SHELL_VERSION,
+    user_data: app.getPath('userData'),
+    log_path: logPath,
+    log_tail: tail,
+  };
+}
+
 async function start() {
   app.setName('g1-shell');
   // packaged app khong co terminal — ghi diagnostics ra file (da redact)
   const logDir = path.join(app.getPath('userData'), 'logs');
   fs.mkdirSync(logDir, { recursive: true });
-  const fileStream = fs.createWriteStream(
-    path.join(logDir, 'main.log'), { flags: 'a' });
+  logPath = path.join(logDir, 'main.log');
+  const fileStream = fs.createWriteStream(logPath, { flags: 'a' });
   const stderr = process.stderr;
   log = makeLogger({ write: (s) => { fileStream.write(s); stderr.write(s); } });
   const cmd = sidecarCommand(
@@ -123,7 +171,10 @@ async function start() {
     if (win) win.webContents.send('desktop.v1.statusUpdate', sidecar.status());
   });
 
-  registerIpc(ipcMain, { sidecar, tracker, pickFiles, logger: log });
+  registerIpc(ipcMain, {
+    sidecar, tracker, pickFiles, logger: log,
+    diagnostics: () => collectDiagnostics(),
+  });
   createWindow();
 
   sidecar.start().catch((err) => {

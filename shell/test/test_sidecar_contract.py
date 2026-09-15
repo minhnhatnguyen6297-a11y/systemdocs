@@ -222,6 +222,53 @@ class SidecarContractTest(unittest.TestCase):
         self.assertEqual(r.status_code, 404)
         self.assertEqual(r.json()["error"]["code"], "job_not_found")
 
+    def test_env_check_tra_checklist(self):
+        job = self.http.post("/v1/commands", json=_new_cmd(
+            "diag.env_check")).json()
+        final = self._wait_job(job["job_id"])
+        self.assertEqual(final["status"], "succeeded")
+        self.assertEqual(final["result"]["kind"], "env_check")
+        data = final["result"]["data"]
+        names = {c["name"] for c in data["checks"]}
+        self.assertTrue({"python", "fastapi", "uvicorn"} <= names)
+        self.assertTrue(data["required_ok"])
+        for c in data["checks"]:
+            self.assertIn("ok", c)
+            self.assertIn("detail", c)
+
+    def test_waiting_task_waiting_roi_resume(self):
+        # waiting_user quan sat duoc tu ben ngoai, roi job tu resume
+        job = self.http.post("/v1/commands", json=_new_cmd(
+            "diag.waiting_task", {"wait_seconds": 2})).json()
+        deadline = time.time() + 10
+        seen_waiting = False
+        while time.time() < deadline:
+            cur = self.http.get(f"/v1/jobs/{job['job_id']}").json()
+            if cur["status"] == "waiting_user":
+                seen_waiting = True
+                self.assertEqual(cur["waiting_on"], "review")
+                break
+            time.sleep(0.1)
+        self.assertTrue(seen_waiting, "khong thay waiting_user")
+        final = self._wait_job(job["job_id"])
+        self.assertEqual(final["status"], "succeeded")
+        self.assertIsNone(final["waiting_on"])
+
+    def test_waiting_task_cancel_ngay_khi_waiting(self):
+        job = self.http.post("/v1/commands", json=_new_cmd(
+            "diag.waiting_task", {"wait_seconds": 60})).json()
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            cur = self.http.get(f"/v1/jobs/{job['job_id']}").json()
+            if cur["status"] == "waiting_user":
+                break
+            time.sleep(0.1)
+        r = self.http.post(f"/v1/jobs/{job['job_id']}/cancel")
+        self.assertEqual(r.status_code, 200)
+        final = self._wait_job(job["job_id"])
+        self.assertEqual(final["status"], "canceled")
+        self.assertEqual(final["error"]["code"], "user_canceled")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

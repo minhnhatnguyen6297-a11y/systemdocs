@@ -77,12 +77,24 @@ class Job:
             self.waiting_on = waiting_on
             self.updated_at = _now()
 
+    def resume(self):
+        """waiting_user -> running khi buoc can nguoi da xong (contract §2)."""
+        with self._lock:
+            if self.status != "waiting_user":
+                raise CommandError(
+                    "validation_error",
+                    f"resume khi status={self.status}, khong phai waiting_user")
+            self.status = "running"
+            self.waiting_on = None
+            self.updated_at = _now()
+
     def snapshot(self):
         with self._lock:
             return {
                 "contract_version": "desktopcommand.v1",
                 "job_id": self.job_id,
                 "command_id": self.command_id,
+                "command": self.command,
                 "status": self.status,
                 "waiting_on": self.waiting_on,
                 "progress": self.progress,
