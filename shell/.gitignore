@@ -3,4 +3,5 @@ dist-app/
 sidecar/build/
 sidecar/dist/
 sidecar/__pycache__/
+test/__pycache__/
 *.log
