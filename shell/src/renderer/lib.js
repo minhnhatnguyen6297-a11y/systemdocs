@@ -182,8 +182,8 @@ const api = {
   jobDisplay, moduleHealth,
 };
 
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = api;
-} else {
-  window.G1_LIB = api;
-}
+// Electron sandboxed renderer VAN co module/exports (CommonJS-lite cho
+// builtin whitelist) — kiem `module` truoc se bo lo window.G1_LIB va lam
+// renderer trang. Set ca hai khi ton tai.
+if (typeof window !== 'undefined') window.G1_LIB = api;
+if (typeof module !== 'undefined' && module.exports) module.exports = api;

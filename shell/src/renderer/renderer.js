@@ -11,8 +11,17 @@
    - Nav allowlist = G1_LIB.NAV_SPEC; id ngoai danh sach bi tu choi.
 */
 
-const api = window.desktop.v1;
+const api = window.desktop && window.desktop.v1;
 const L = window.G1_LIB;
+
+// Fail-visible: thieu bridge/lib thi bao loi ro thay vi man hinh trang.
+if (!api || !L) {
+  const v = document.getElementById('view');
+  v.textContent = 'Lỗi khởi tạo shell: ' +
+    (!api ? 'preload bridge (desktop.v1) không có. ' : '') +
+    (!L ? 'display lib (G1_LIB) không có.' : '');
+  throw new Error('renderer init failed: bridge/lib missing');
+}
 
 const view = document.getElementById('view');
 const moduleList = document.getElementById('module-list');
