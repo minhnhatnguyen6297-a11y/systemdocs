@@ -13,7 +13,19 @@ from docx import Document
 from docx.shared import Inches
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as ExcelImage
-from PIL import Image
+
+# PNG bytes written as literals so fixture hashes do not depend on the
+# installed Pillow version (encoder output differs across releases).
+_WHITE_PNG = bytes.fromhex(
+    "89504e470d0a1a0a0000000d4948445200000002000000020802000000fdd49a"
+    "730000001649444154789c63fcffff3f030303130303030303030024060301fc"
+    "35de9b0000000049454e44ae426082"
+)
+_BLACK_PNG = bytes.fromhex(
+    "89504e470d0a1a0a0000000d4948445200000002000000020802000000fdd49a"
+    "730000000b49444154789c6360400600000e0001a99173b10000000049454e44"
+    "ae426082"
+)
 
 
 def _pdf(path: Path, *, text: str | None) -> None:
@@ -68,9 +80,7 @@ def materialize_golden_fixtures(directory: Path) -> list[Path]:
     table.cell(0, 1).text = "Value"
     table.cell(1, 0).text = "Party"
     table.cell(1, 1).text = "Synthetic A"
-    image_buffer = io.BytesIO()
-    Image.new("RGB", (2, 2), "white").save(image_buffer, format="PNG")
-    image_buffer.seek(0)
+    image_buffer = io.BytesIO(_WHITE_PNG)
     document.add_picture(image_buffer, width=Inches(0.1))
     fixed = datetime(2020, 1, 1, tzinfo=timezone.utc)
     document.core_properties.created = fixed
@@ -86,9 +96,7 @@ def materialize_golden_fixtures(directory: Path) -> list[Path]:
     sheet.append(["Party", "Synthetic A"])
     second_sheet = workbook.create_sheet("Second")
     second_sheet.append(["Marker", "Synthetic B"])
-    image_buffer = io.BytesIO()
-    Image.new("RGB", (2, 2), "black").save(image_buffer, format="PNG")
-    image_buffer.seek(0)
+    image_buffer = io.BytesIO(_BLACK_PNG)
     sheet.add_image(ExcelImage(image_buffer), "D2")
     workbook.properties.created = fixed
     workbook.properties.modified = fixed
@@ -96,7 +104,7 @@ def materialize_golden_fixtures(directory: Path) -> list[Path]:
     _normalize_office_zip(directory / "gd-04-sheet.xlsx")
 
     (directory / "gd-05-legacy.doc").write_bytes(b"\xd0\xcf\x11\xe0" + b"synthetic")
-    Image.new("RGB", (2, 2), "white").save(directory / "gd-06-id.png", format="PNG")
+    (directory / "gd-06-id.png").write_bytes(_WHITE_PNG)
     (directory / "gd-07-unsupported.bin").write_bytes(b"synthetic unsupported")
     return [directory / f"gd-0{index}-{name}" for index, name in (
         (1, "text.pdf"), (2, "scanned.pdf"), (3, "contract.docx"),
