@@ -53,20 +53,27 @@ Cả ba đều nói về **hồ sơ (Case)** — chỉ khác thời điểm tron
 
 **đang soạn → đang chạy → đã xong và lưu trữ.**
 
-Vì cùng nói về một thực thể, điều kiện tiên quyết để gộp được là
-**định danh hồ sơ giống nhau ở cả ba** (CCCD, số GCN, thửa/tờ, số công chứng). Nếu
-ba công cụ cùng nhận ra "đây là hồ sơ bà Gái, thửa 125", việc nối lại là chuyện kỹ
-thuật nhỏ. Nếu không, không có tích hợp nào cứu được. Chuẩn ở
-[`contracts/entities.md`](./contracts/entities.md).
+Cùng tham gia vòng đời nghiệp vụ không có nghĩa cùng một record hoặc một khóa
+hồ sơ. CCCD định danh người, GCN/thửa-tờ giúp đối chiếu tài sản; chúng là bằng
+chứng tìm hồ sơ liên quan, **không phải Case primary key**. Tên người hoặc thửa
+đất trùng không đủ để tự gộp hồ sơ. Số công chứng cũng cần năm/phạm vi sổ/đơn vị.
+
+Hai aggregate soạn thảo và theo dõi chưa được chứng minh có quan hệ 1:1
+(`notary_v2/models.py:83-102`; `notaryoffice/intent.md:365-373`). Vì vậy phải
+thống nhất nghĩa của tham chiếu, giữ provenance và bước xác nhận trước khi
+thiết kế liên kết. Chuẩn ở [`contracts/entities.md`](./contracts/entities.md),
+ranh giới ở [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md) §7.
 
 ## 4. Lộ trình: làm tốt từng phần trước, gộp sau
 
-**Đích đến:** một hệ thống phần mềm thống nhất, **dùng chung một database**. Ba
-repo trở thành các công cụ xử lý dữ liệu theo mục đích riêng trong hệ thống đó.
+**Đích đến:** một hệ thống phần mềm thống nhất, **database chung, UI chung**,
+các chức năng chung dùng cùng thành phần và sẵn sàng gom vào một repo lớn.
+Ba repo trở thành các đường xử lý theo mục đích riêng trong hệ thống đó.
 
-**Giai đoạn hiện tại:** tập trung làm tốt **từng phần**, chưa vội kết hợp. Mỗi
-repo còn đang tự chứng minh giá trị của nó; gộp sớm sẽ khóa cả ba vào một thiết kế
-chưa ai kiểm chứng.
+**Ưu tiên hiện tại:** đồng bộ kiến trúc trước khi phát triển riêng thêm. Bản đồ
+[`COMPONENT_MAP.md`](./COMPONENT_MAP.md) đưa ra owner/reuse đề xuất để duyệt;
+POC và production contract đi trước từng lát cắt code chung. Không dùng việc
+merge repo để che các ranh giới dữ liệu/nghiệp vụ chưa thống nhất.
 
 **Việc phải làm ngay từ bây giờ** không phải là gộp, mà là **không để chúng phân
 kỳ** — để lúc gộp không phải viết lại:
@@ -97,8 +104,10 @@ Gộp thì gộp, nhưng **không tự ý gộp**: nối hai repo là tích hợ
 - **Không xây một "core library" dùng chung trước khi có hai domain thật chứng
   minh được contract.** Nguyên tắc này đã chốt trong `notary_v2`
   (`docs/platform/case-workspace/README.md`) và áp dụng cho cả hệ thống. Lưu ý:
-  điều này **không** mâu thuẫn với việc gộp hệ thống — gộp là thống nhất **dữ
-  liệu và định nghĩa**, không nhất thiết là gộp **code**.
+  điều này **không** có nghĩa giữ các bản sao logic mãi mãi. Đích hiện tại còn
+  yêu cầu thành phần chung có cùng implementation/version và UI/DB chung; chỉ
+  trích phần đã chứng minh ở hai consumer, không gộp toàn bộ nghiệp vụ thành
+  một core quá sớm. Bản đồ ownership không tự phê duyệt package hay integration.
 - **Không nối hai repo trước khi có contract được duyệt.**
 
 ## 6. Ràng buộc pháp lý cần nhớ
