@@ -6,6 +6,21 @@ Ngoại lệ owner chốt ngày 14/09/2026: nhánh `electron-system-shell` là n
 tích hợp cấp hệ thống và được phép chứa runtime Electron sau khi spec/contract
 tương ứng được duyệt. Không merge runtime vào `main`; xem `ELECTRON_G1_PLAN.md`.
 
+Nhánh `consolidate/monorepo` (base `electron-system-shell`) chứa toàn bộ code
+của ba sản phẩm dưới dạng snapshot để phát triển thống nhất một nhánh:
+
+| Thư mục | Nguồn | Nội dung |
+|---|---|---|
+| `shell/` | `electron-system-shell` | Vỏ Electron + Python sidecar FastAPI loopback |
+| `notary_v2/` | `notary_v2` branch `consolidate/latest` | FastAPI nghiệp vụ công chứng (đã gộp 4 nhánh codex) |
+| `upload_lab/` | `upload_lab` branch `consolidate/latest` | Số hóa + upload (đã gộp 2 nhánh POC) |
+| `notaryoffice/` | `notaryoffice` `main` | Tài liệu intent, chưa có code |
+
+Mỗi thư mục con giữ nguyên `AGENTS.md`/`README.md` của repo gốc — khi sửa code
+trong `notary_v2/` hay `upload_lab/`, tuân theo quy tắc của thư mục đó. Đây là
+snapshot một chiều: repo con vẫn tồn tại độc lập; quyết định repo nào là nguồn
+chính thức chưa chốt.
+
 ## Quyền hạn của folder này
 
 Được mô tả: quan hệ giữa các sản phẩm, vocabulary/khóa định danh dùng chung,

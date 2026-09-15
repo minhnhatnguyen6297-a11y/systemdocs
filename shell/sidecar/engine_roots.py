@@ -10,7 +10,8 @@ Thu tu resolve (uutien cao → thap):
   1. env G1_NOTARY_V2_ROOT / G1_UPLOAD_LAB_ROOT
   2. shell/engine-roots.json (gitignored — path tuyet doi cua tung may)
      {"notary_v2": "D:/notary_v2", "upload_lab": "D:/upload_lab_repo"}
-Thieu ca hai → engine_not_installed (khong retry, next_action ro rang).
+  3. thu muc cung ten trong repo gop: <repo>/notary_v2, <repo>/upload_lab
+Thieu ca ba → engine_not_installed (khong retry, next_action ro rang).
 
 G1_OUTPUT_DIR: thu muc output do sidecar so huu (word export, file tai ve).
 Default <shell>/output (gitignored). Electron main co the dat env nay toi
@@ -56,6 +57,9 @@ def engine_root(key):
         raise CommandError("validation_error", f"engine key la: {key!r}")
     raw = os.environ.get(env_name) or _load_roots_file().get(key)
     if not raw:
+        bundled = SHELL_ROOT.parent / key
+        if bundled.is_dir():
+            return bundled
         raise CommandError(
             "engine_not_installed",
             f"chua cau hinh engine root cho {key} "

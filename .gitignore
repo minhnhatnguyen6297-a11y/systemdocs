@@ -1,4 +1,26 @@
-.scan-src/
-code-graphs/**/graphify-out/cache/
-code-graphs/**/graphify-out/index/
-*.log
+# Monorepo-level ignores (child repos keep their own .gitignore in subdirs)
+
+# Python
+__pycache__/
+*.py[cod]
+.venv*/
+venv/
+
+# Node / Electron
+node_modules/
+shell/dist/
+shell/out/
+
+# Runtime / data — never commit
+runtime/
+output/
+*.db
+*.sqlite
+*.sqlite3
+.env
+.env.local
+**/engine-roots.json
+
+# OS / editor
+Thumbs.db
+.DS_Store

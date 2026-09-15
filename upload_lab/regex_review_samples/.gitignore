@@ -1,0 +1,10 @@
+input/*
+!input/.gitkeep
+reports/*
+!reports/.gitkeep
+cache/*
+!cache/.gitkeep
+golden/*
+!golden/.gitkeep
+packets/*
+!packets/.gitkeep

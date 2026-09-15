@@ -18,7 +18,26 @@ from errors import CommandError
 from engine_roots import engine_root, import_engine_module, output_dir
 
 
+_db_ready = False
+
+
+def _ensure_db():
+    """Khoi tao schema notary.db lan dau — cung loat migrate nhu main.py."""
+    global _db_ready
+    if _db_ready:
+        return
+    database = import_engine_module("notary_v2", "database")
+    database.migrate_customers_nullable()
+    database.migrate_inheritance_cases_schema()
+    database.migrate_properties_schema()
+    database.migrate_inheritance_case_properties_schema()
+    database.migrate_zalo_schema()
+    database.Base.metadata.create_all(bind=database.engine)
+    _db_ready = True
+
+
 def _db_session():
+    _ensure_db()
     database = import_engine_module("notary_v2", "database")
     return database.SessionLocal()
 

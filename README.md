@@ -12,11 +12,12 @@ chọn lệch nhau bây giờ là viết lại sau.
 
 ## Ba sản phẩm trong phạm vi
 
-| Sản phẩm | Đường dẫn | Làm gì | Trạng thái |
+| Sản phẩm | Đường dẫn (trên nhánh `consolidate/monorepo`) | Làm gì | Trạng thái |
 |---|---|---|---|
-| `notary_v2` | `D:\notary_v2` | Soạn thảo hồ sơ tự động (thừa kế, sinh Word, intake giấy tờ, Zalo inbox) | Đang phát triển; chưa triển khai production |
-| `upload_lab` | `D:\upload_lab_repo` | Số hóa hồ sơ giấy: Word cũ → trường có cấu trúc → upload web CSDL công chứng tỉnh | Đang phát triển; chưa triển khai production |
-| `notaryoffice` | `D:\notaryoffice` | Quản lý hồ sơ tại văn phòng: thu dấu vết từ máy con → tự dựng record hồ sơ | Tài liệu, chưa code |
+| `notary_v2` | `./notary_v2` (snapshot từ `D:\notary_v2`) | Soạn thảo hồ sơ tự động (thừa kế, sinh Word, intake giấy tờ, Zalo inbox) | Đang phát triển; chưa triển khai production |
+| `upload_lab` | `./upload_lab` (snapshot từ `D:\upload_lab_repo`) | Số hóa hồ sơ giấy: Word cũ → trường có cấu trúc → upload web CSDL công chứng tỉnh | Đang phát triển; chưa triển khai production |
+| `notaryoffice` | `./notaryoffice` (snapshot từ `D:\notaryoffice`) | Quản lý hồ sơ tại văn phòng: thu dấu vết từ máy con → tự dựng record hồ sơ | Tài liệu, chưa code |
+| `shell` | `./shell` | Vỏ Electron + Python sidecar FastAPI loopback | POC tích hợp; contract production chưa duyệt |
 
 Ngoài phạm vi: `researchskill` (`D:\researchskill`) là skill hỗ trợ coding,
 không phải phân hệ công chứng.

@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Ket qua upload Excel{% endblock %}
+{% block topbar_title %}Ket qua import hang loat{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2><i class="bi bi-file-earmark-spreadsheet me-2" style="color:var(--gold)"></i>Ket qua import Excel</h2>
+  <div class="d-flex gap-2">
+    <a href="/customers" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Ve danh sach</a>
+    <a href="/customers/download-template" class="btn btn-outline-success"><i class="bi bi-download me-1"></i>Tai lai mau</a>
+  </div>
+</div>
+
+{% if error_global %}
+<div class="alert alert-danger">
+  <i class="bi bi-exclamation-triangle-fill me-2"></i>
+  <strong>Khong the xu ly file:</strong> {{ error_global }}
+</div>
+{% else %}
+<div class="row g-3 mb-4">
+  <div class="col-md-3"><div class="stat-card" style="background: linear-gradient(135deg, #065f46, #059669);"><div class="d-flex justify-content-between"><div><div class="stat-num" id="stat-added">{{ added }}</div><div class="stat-label">Them thanh cong</div></div><div class="stat-icon"><i class="bi bi-check-circle"></i></div></div></div></div>
+  <div class="col-md-3"><div class="stat-card" style="background: linear-gradient(135deg, #92400e, #d97706);"><div class="d-flex justify-content-between"><div><div class="stat-num">{{ skipped }}</div><div class="stat-label">Bo qua (trung)</div></div><div class="stat-icon"><i class="bi bi-skip-forward"></i></div></div></div></div>
+  <div class="col-md-3"><div class="stat-card" style="background: linear-gradient(135deg, #7f1d1d, #dc2626);"><div class="d-flex justify-content-between"><div><div class="stat-num" id="stat-errors">{{ errors }}</div><div class="stat-label">Loi du lieu</div></div><div class="stat-icon"><i class="bi bi-x-circle"></i></div></div></div></div>
+  <div class="col-md-3"><div class="stat-card" style="background: linear-gradient(135deg, #1e3a5f, #2563eb);"><div class="d-flex justify-content-between"><div><div class="stat-num">{{ total }}</div><div class="stat-label">Tong dong xu ly</div></div><div class="stat-icon"><i class="bi bi-list-ul"></i></div></div></div></div>
+</div>
+
+{% if results %}
+<div class="card">
+  <div class="card-header">
+    <i class="bi bi-list-check me-2" style="color:var(--gold)"></i>Chi tiet tung dong
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm mb-0 align-middle">
+        <thead>
+          <tr>
+            <th style="width:70px">Dong</th>
+            <th style="width:220px">Ho va ten</th>
+            <th style="width:110px">Ket qua</th>
+            <th>Chi tiet / Sua truc tiep</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in results %}
+          <tr id="row-{{ r.row }}" class="{% if r.status == 'ok' %}table-success{% elif r.status == 'skip' %}table-warning{% else %}table-danger{% endif %}">
+            <td class="text-center">{{ r.row }}</td>
+            <td class="fw-bold">{{ r.name }}</td>
+            <td>
+              {% if r.status == 'ok' %}
+              <span class="badge bg-success" id="status-{{ r.row }}">OK</span>
+              {% elif r.status == 'skip' %}
+              <span class="badge bg-warning text-dark" id="status-{{ r.row }}">Skip</span>
+              {% else %}
+              <span class="badge bg-danger" id="status-{{ r.row }}">Loi</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="mb-2" id="msg-{{ r.row }}">{{ r.message }}</div>
+              {% if r.status == 'error' and r.raw %}
+              <form class="js-fix-row-form border rounded p-2 bg-white" data-row="{{ r.row }}">
+                <div class="row g-2">
+                  <div class="col-md-4">
+                    <input name="ho_ten" class="form-control form-control-sm js-input {% if r.field_errors and r.field_errors.ho_ten %}is-invalid{% endif %}" value="{{ r.raw.ho_ten }}" placeholder="Ho ten">
+                    <div class="invalid-feedback js-err" data-field="ho_ten">{{ r.field_errors.ho_ten if r.field_errors else '' }}</div>
+                  </div>
+                  <div class="col-md-2">
+                    <input name="gioi_tinh" class="form-control form-control-sm js-input {% if r.field_errors and r.field_errors.gioi_tinh %}is-invalid{% endif %}" value="{{ r.raw.gioi_tinh }}" placeholder="Nam/Nu">
+                    <div class="invalid-feedback js-err" data-field="gioi_tinh">{{ r.field_errors.gioi_tinh if r.field_errors else '' }}</div>
+                  </div>
+                  <div class="col-md-2">
+                    <input name="ngay_sinh" class="form-control form-control-sm js-input {% if r.field_errors and r.field_errors.ngay_sinh %}is-invalid{% endif %}" value="{{ r.raw.ngay_sinh }}" placeholder="yyyy hoac dd/mm/yyyy">
+                    <div class="invalid-feedback js-err" data-field="ngay_sinh">{{ r.field_errors.ngay_sinh if r.field_errors else '' }}</div>
+                  </div>
+                  <div class="col-md-2">
+                    <input name="ngay_chet" class="form-control form-control-sm js-input {% if r.field_errors and r.field_errors.ngay_chet %}is-invalid{% endif %}" value="{{ r.raw.ngay_chet }}" placeholder="yyyy hoac dd/mm/yyyy">
+                    <div class="invalid-feedback js-err" data-field="ngay_chet">{{ r.field_errors.ngay_chet if r.field_errors else '' }}</div>
+                  </div>
+                  <div class="col-md-2">
+                    <input name="so_giay_to" class="form-control form-control-sm js-input {% if r.field_errors and r.field_errors.so_giay_to %}is-invalid{% endif %}" value="{{ r.raw.so_giay_to }}" placeholder="So giay to">
+                    <div class="invalid-feedback js-err" data-field="so_giay_to">{{ r.field_errors.so_giay_to if r.field_errors else '' }}</div>
+                  </div>
+                  <div class="col-md-2">
+                    <input name="ngay_cap" class="form-control form-control-sm js-input {% if r.field_errors and r.field_errors.ngay_cap %}is-invalid{% endif %}" value="{{ r.raw.ngay_cap }}" placeholder="yyyy hoac dd/mm/yyyy">
+                    <div class="invalid-feedback js-err" data-field="ngay_cap">{{ r.field_errors.ngay_cap if r.field_errors else '' }}</div>
+                  </div>
+                  <div class="col-md-8">
+                    <input name="dia_chi" class="form-control form-control-sm js-input {% if r.field_errors and r.field_errors.dia_chi %}is-invalid{% endif %}" value="{{ r.raw.dia_chi }}" placeholder="Dia chi">
+                    <div class="invalid-feedback js-err" data-field="dia_chi">{{ r.field_errors.dia_chi if r.field_errors else '' }}</div>
+                  </div>
+                  <div class="col-md-2 d-grid">
+                    <button class="btn btn-sm btn-primary" type="submit">Sua va luu dong nay</button>
+                  </div>
+                </div>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="d-flex gap-2 mt-3">
+  <a href="/customers" class="btn btn-gold"><i class="bi bi-people me-1"></i>Xem danh sach nguoi</a>
+</div>
+<script type="application/json" id="import-added-customers-json">{{ (added_customers or [])|tojson }}</script>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.querySelectorAll('.js-fix-row-form').forEach((form) => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const row = form.dataset.row;
+      const msgEl = document.getElementById(`msg-${row}`);
+      const statusEl = document.getElementById(`status-${row}`);
+      const tr = document.getElementById(`row-${row}`);
+
+      form.querySelectorAll('.js-input').forEach((el) => el.classList.remove('is-invalid'));
+      form.querySelectorAll('.js-err').forEach((el) => { el.textContent = ''; });
+
+      const payload = new URLSearchParams(new FormData(form));
+      const res = await fetch('/customers/upload-excel/save-row', { method: 'POST', body: payload });
+      const data = await res.json();
+
+      if (!res.ok || !data.ok) {
+        if (data.errors) {
+          Object.entries(data.errors).forEach(([field, err]) => {
+            const input = form.querySelector(`[name="${field}"]`);
+            const errEl = form.querySelector(`.js-err[data-field="${field}"]`);
+            if (input) input.classList.add('is-invalid');
+            if (errEl) errEl.textContent = err;
+          });
+        }
+        msgEl.textContent = data.message || 'Luu that bai';
+        return;
+      }
+
+      msgEl.textContent = data.message || 'Da luu thanh cong';
+      statusEl.className = 'badge bg-success';
+      statusEl.textContent = 'OK';
+      tr.classList.remove('table-danger');
+      tr.classList.add('table-success');
+      form.remove();
+
+      const added = document.getElementById('stat-added');
+      const errs = document.getElementById('stat-errors');
+      if (added) added.textContent = String((parseInt(added.textContent || '0', 10) || 0) + 1);
+      if (errs) errs.textContent = String(Math.max((parseInt(errs.textContent || '0', 10) || 0) - 1, 0));
+    });
+  });
+</script>
+{% endblock %}

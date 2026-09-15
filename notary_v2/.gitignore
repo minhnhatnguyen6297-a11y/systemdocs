@@ -1,0 +1,51 @@
+.venv/
+.poc-venv/
+.poc-venv310/
+venv/
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.db
+.env
+.vscode/
+logs/
+tmp/
+
+# UPLOAD tool - generated outputs (now at tools/upload_lab/)
+tools/upload_lab/output/
+tools/upload_lab/runs/
+tools/upload_lab/upload_runs/
+tools/upload_lab/*.json
+tools/upload_lab/.ui_setup_state.json
+tools/upload_lab/nd_storage_state.json
+
+# Generated agent/tool state
+.claude/
+.hermes/
+.superpowers/
+.worktrees/
+.understand-anything/
+graphify-out/
+
+# Test data / fixtures (không phải source code)
+ocr test/
+ID template/
+tests/QR test/
+tests/bad QR test/
+benchmark_qr.py
+
+# Local scratch / benchmark
+.tmp_enotary/
+
+# Runtime dirs
+runtime/
+zalo_connector/node_modules/
+
+# Never track VPS credentials
+deploy/vps/ssh_credentials.env
+
+# Legacy accidental path after upload tool move
+tools/UPLOAD/
+
+# Local merge-test venv
+.venv-merge/

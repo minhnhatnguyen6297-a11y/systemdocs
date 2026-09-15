@@ -1,0 +1,7 @@
+python-docx==1.1.2
+python-dotenv
+playwright
+openpyxl
+PySide6
+PySide6-Fluent-Widgets>=1.11.0
+pyqtdarktheme-fork==2.3.6
