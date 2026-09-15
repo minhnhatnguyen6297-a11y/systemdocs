@@ -7,6 +7,7 @@
 const { spawn } = require('child_process');
 const crypto = require('crypto');
 const net = require('net');
+const path = require('path');
 const { EventEmitter } = require('events');
 
 const {
@@ -31,6 +32,17 @@ function freePort() {
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+function _defaultOutputDir() {
+  // require('electron') tra string path khi chay duoi node thuong (tests).
+  try {
+    const { app } = require('electron');
+    if (app && typeof app.getPath === 'function') {
+      return path.join(app.getPath('userData'), 'output');
+    }
+  } catch { /* plain node */ }
+  return path.join(__dirname, '..', '..', 'output');
 }
 
 class VersionMismatchError extends Error {}
@@ -81,6 +93,9 @@ class SidecarManager extends EventEmitter {
         ...process.env,
         SIDECAR_PORT: String(port),
         SIDECAR_TOKEN: this.token,
+        // Output sidecar so huu (word export, tai ve) — userData cho ban
+        // packaged; dev/test dung <shell>/output (gitignored).
+        G1_OUTPUT_DIR: process.env.G1_OUTPUT_DIR || _defaultOutputDir(),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,

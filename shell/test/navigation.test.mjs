@@ -39,8 +39,11 @@ test('module registry khong co muc nao "mo app legacy ben ngoai"', () => {
 });
 
 test('main/preload/renderer khong mo app legacy hay dieu huong ngoai', () => {
+  // shell.openPath la ngoai le duoc phep (MIN-68): mo file san pham .docx
+  // bang app mac dinh — path da validate tuyet doi + file ton tai + khong
+  // UNC trong main.js. Van cam dieu huong web ngoai va spawn app legacy.
   const forbidden = new RegExp(
-    'openExternal|shell\\.openPath|shell\\.openItem|execFile|' +
+    'openExternal|shell\\.openItem|execFile|' +
     'child_process.*exec\\s*\\(');
   for (const f of ['src/main/main.js', 'src/main/ipc.js',
                    'src/preload/preload.js', 'src/renderer/renderer.js',

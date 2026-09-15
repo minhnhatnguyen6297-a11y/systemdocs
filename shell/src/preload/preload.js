@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('desktop', {
     getModules: () => ipcRenderer.invoke('desktop.v1.getModules'),
     getStatus: () => ipcRenderer.invoke('desktop.v1.getStatus'),
     pickFiles: (opts) => ipcRenderer.invoke('desktop.v1.pickFiles', opts),
+    openPath: (path) => ipcRenderer.invoke('desktop.v1.openPath', { path }),
     submitCommand: (command, payload, commandId) =>
       ipcRenderer.invoke('desktop.v1.submitCommand',
                          { command, payload, command_id: commandId }),

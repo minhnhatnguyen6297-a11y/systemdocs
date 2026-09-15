@@ -15,7 +15,7 @@ const MODULES = [
   {
     id: 'document-review',
     title: 'notary_v2',
-    namespaces: ['notary', 'ocr', 'file', 'diag'],
+    namespaces: ['notary', 'ocr', 'zalo', 'file', 'diag'],
     kind: 'engine',
     status: 'available',
   },

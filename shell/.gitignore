@@ -5,3 +5,5 @@ sidecar/dist/
 sidecar/__pycache__/
 test/__pycache__/
 *.log
+engine-roots.json
+output/

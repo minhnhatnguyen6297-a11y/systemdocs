@@ -167,9 +167,50 @@ def env_check(job, payload):
     }
 
 
+# Business commands (P6 — MIN-68 notary_v2, MIN-69 upload_lab). Adapter import
+# lazy trong handler → thieu engine root chi lam command do loi
+# engine_not_installed, khong gay sap sidecar.
+def _notary(fn_name):
+    def call(job, payload):
+        import notary_adapter
+        return getattr(notary_adapter, fn_name)(job, payload)
+    return call
+
+
+def _upload(fn_name):
+    def call(job, payload):
+        import upload_adapter
+        return getattr(upload_adapter, fn_name)(job, payload)
+    return call
+
+
 COMMANDS = {
     "file.inspect": inspect_file,
     "diag.slow_task": slow_task,
     "diag.waiting_task": waiting_task,
     "diag.env_check": env_check,
+    # notary_v2 (document-review module) — MIN-68
+    "notary.case_list": _notary("case_list"),
+    "notary.case_get": _notary("case_get"),
+    "notary.case_create": _notary("case_create"),
+    "notary.customer_list": _notary("customer_list"),
+    "notary.customer_create": _notary("customer_create"),
+    "notary.property_list": _notary("property_list"),
+    "notary.property_create": _notary("property_create"),
+    "notary.participant_add": _notary("participant_add"),
+    "notary.word_templates": _notary("word_templates"),
+    "notary.export_word": _notary("export_word"),
+    "ocr.analyze": _notary("ocr_analyze"),
+    "zalo.status": _notary("zalo_status"),
+    # upload_lab — MIN-69
+    "upload.scan": _upload("scan_folder"),
+    "upload.audit_excel": _upload("audit_excel"),
+    "upload.env_check": _upload("env_check"),
+    "upload.session_start": _upload("session_start"),
+    "upload.session_status": _upload("session_status"),
+    "upload.confirm_login": _upload("confirm_login"),
+    "upload.session_close": _upload("session_close"),
+    "upload.download_export": _upload("download_export"),
+    "upload.prepare": _upload("prepare_upload"),
+    "upload.finish_review": _upload("finish_review"),
 }

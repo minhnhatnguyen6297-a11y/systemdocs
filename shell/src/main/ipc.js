@@ -70,6 +70,22 @@ const HANDLERS = {
     return { ok: true, data: { files } };
   },
 
+  // Mo file san pham (Word export, export download) bang app mac dinh.
+  // main.js validate: tuyet doi + ton tai + khong UNC.
+  'desktop.v1.openPath': async (deps, args) => {
+    if (!deps.openPath) {
+      return { ok: false, error: { code: 'engine_unavailable',
+        message: 'openPath chua cau hinh', retryable: false,
+        next_action: null, job_id: null, details: null } };
+    }
+    try {
+      const data = await deps.openPath(args || {});
+      return { ok: true, data };
+    } catch (err) {
+      return errEnvelope(err);
+    }
+  },
+
   'desktop.v1.submitCommand': async (deps, args) => {
     const check = validateCommandArgs(args);
     if (!check.ok) {

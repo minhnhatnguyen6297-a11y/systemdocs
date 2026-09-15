@@ -30,17 +30,43 @@ let logPath = null;
 let allowClose = false;
 
 async function pickFiles(opts = {}) {
-  const res = await dialog.showOpenDialog(win, {
-    properties: opts.multi === false ? ['openFile'] : ['openFile', 'multiSelections'],
-    filters: opts.filters,
-  });
+  const properties = opts.directory
+    ? ['openDirectory']
+    : opts.multi === false ? ['openFile'] : ['openFile', 'multiSelections'];
+  const res = await dialog.showOpenDialog(win, { properties, filters: opts.filters });
   if (res.canceled) return [];
   // file_ref machine_local theo contract §6 — path tuyet doi tu native dialog
-  return res.filePaths.map((p) => ({
-    path: p,
-    scope: 'machine_local',
-    size_bytes: fs.statSync(p).size,
-  }));
+  return res.filePaths.map((p) => {
+    const st = fs.statSync(p);
+    return {
+      path: p,
+      scope: 'machine_local',
+      size_bytes: st.isFile() ? st.size : null,
+      is_dir: st.isDirectory(),
+    };
+  });
+}
+
+async function openPath(opts = {}) {
+  // Mo file san pham (docx da export, log, ...) bang app mac dinh.
+  // Validate boundary: tuyet doi, ton tai, khong UNC — file_ref §6.
+  const p = typeof opts.path === 'string' ? opts.path : '';
+  const unc = p.startsWith('\\\\') ||
+    /^\\\\\?\\(UNC\\|\\\\)/i.test(p);
+  if (!p || unc || !/^[A-Za-z]:[\\/]/.test(p) && !p.startsWith('\\\\?\\')) {
+    throw Object.assign(new Error('path khong hop le'),
+      { code: 'file_scope_not_supported' });
+  }
+  if (!fs.existsSync(p) || !fs.statSync(p).isFile()) {
+    throw Object.assign(new Error('file khong ton tai'),
+      { code: 'file_not_found' });
+  }
+  const { shell } = require('electron');
+  const err = await shell.openPath(p);
+  if (err) {
+    throw Object.assign(new Error(err), { code: 'open_failed' });
+  }
+  return { opened: p };
 }
 
 function createWindow() {
@@ -172,7 +198,7 @@ async function start() {
   });
 
   registerIpc(ipcMain, {
-    sidecar, tracker, pickFiles, logger: log,
+    sidecar, tracker, pickFiles, openPath, logger: log,
     diagnostics: () => collectDiagnostics(),
   });
   createWindow();

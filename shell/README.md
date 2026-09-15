@@ -1,4 +1,4 @@
-# g1-shell — Electron foundation + navigation (MIN-65 P4 / MIN-67 P5)
+# g1-shell — Electron + nghiep vu that (MIN-65/67/68/69)
 
 Runtime Electron + Python sidecar theo contract `desktopcommand.v1`
 (`systemdocs/contracts/desktop-command.md`, branch `g1-single-machine-roadmap`).
@@ -32,6 +32,34 @@ shell/
 - Dong app khi con job chay → confirm (engine_shutdown se cancel job).
 - Renderer reload khong mat job: `desktop.v1.listJobs` noi lai snapshot.
 
+## Business modules (MIN-68 notary_v2 / MIN-69 upload_lab)
+
+Sidecar import engine that tu repo con qua `sys.path` theo engine root —
+khong port nghiep vu sang sidecar. Root resolve: env
+`G1_NOTARY_V2_ROOT`/`G1_UPLOAD_LAB_ROOT` hoac `shell/engine-roots.json`
+(gitignored, xem `engine-roots.example.json`).
+
+- `notary_adapter.py` — case/customer/property/participant qua models +
+  router handlers that (inline-create giu upsert/dedup/locked-case rule);
+  `export_word` qua `services.word_engine` (template resolve, mapping,
+  unresolved-placeholder check) ghi vao `G1_OUTPUT_DIR` (sidecar so huu,
+  mac dinh `<shell>/output`, Electron dat ve `%APPDATA%/g1-shell/output`);
+  `ocr.analyze` goi `routers/ocr_ai.analyze_images` that (cloud Qwen,
+  ket qua luon `observed` — chua confirm khong thanh truth); `zalo.status`
+  doc trang thai connector tu models (Zalo van server-side).
+- `upload_adapter.py` + `upload_session.py` — `upload.scan` qua
+  `batch_scan.run_batch_scan` (registry.sqlite3 dedup theo file_identity_key),
+  `upload.audit_excel` qua `contract_book_audit` (cot MIN-77: STT | Ngay |
+  So cong chung | Ghi chu), `upload.env_check` qua `environment_check_service`,
+  va phien browser: `NamDinhUploaderSession` song tren thread chuyen biet
+  `g1-upload-browser` (sync Playwright) — `session_start` → `waiting_user(login)`
+  cho nguoi dung xac nhan, `prepare` chi mo tab da dien (dry-run, khong tu
+  Finalize) → `waiting_user(review)` toi `finish_review`; `download_export`
+  tai so Excel tu web tinh. Credential/storage state khong qua contract.
+- IPC moi: `desktop.v1.openPath` (mo file san pham .docx bang app mac dinh,
+  path validate tuyet doi + file ton tai + khong UNC) va `pickFiles` ho tro
+  `directory: true` cho upload.scan.
+
 ## Dev
 
 ```powershell
@@ -46,6 +74,8 @@ npm start
 ```powershell
 npm test                                # redact, ipc allowlist, command client
 & $env:G1_PYTHON test/test_sidecar_contract.py   # contract conformance (uvicorn that)
+python test/test_jobstore.py            # jobstore cancel/drain
+python test/test_engine_adapters.py     # engine that: case→Word, scan, audit (can engine-roots.json)
 ```
 
 ## Package
