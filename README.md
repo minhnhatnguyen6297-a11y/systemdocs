@@ -32,6 +32,7 @@ không phải phân hệ công chứng.
 | **Trước khi chọn công nghệ mới hoặc ra quyết định kiến trúc** | [`TECH_STACK.md`](./TECH_STACK.md) |
 | Vocabulary & schema dùng chung giữa các sản phẩm | [`contracts/README.md`](./contracts/README.md) |
 | Cái gì đã chốt, cái gì chưa chốt — đừng tự quyết | [`OPEN_DECISIONS.md`](./OPEN_DECISIONS.md) |
+| Review kết quả POC conversion/OCR của MIN-52 và MIN-59 | [`MIN61_CONVERSION_OCR_DECISION.md`](./MIN61_CONVERSION_OCR_DECISION.md) |
 | Quy tắc khi sửa chính folder này | [`AGENTS.md`](./AGENTS.md) |
 
 ## Nguồn sự thật
