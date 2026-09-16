@@ -32,10 +32,12 @@ trên nhánh `electron-system-shell`; `main` tiếp tục chỉ chứa tài li�
 |---|---|
 | Tại sao có hệ thống này, ba sản phẩm ghép lại thành gì | [`VISION.md`](./VISION.md) |
 | Ranh giới sản phẩm, sản phẩm nào sở hữu dữ liệu nào | [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md) |
+| Sáu lớp thành phần chung, owner đề xuất và mức reuse — draft MIN-57 | [`COMPONENT_MAP.md`](./COMPONENT_MAP.md) |
 | Repo nào giải bài toán gì — feature gì — công nghệ gì | [`PROJECTS.md`](./PROJECTS.md) |
 | **Trước khi chọn công nghệ mới hoặc ra quyết định kiến trúc** | [`TECH_STACK.md`](./TECH_STACK.md) |
 | Vocabulary & schema dùng chung giữa các sản phẩm | [`contracts/README.md`](./contracts/README.md) |
 | Cái gì đã chốt, cái gì chưa chốt — đừng tự quyết | [`OPEN_DECISIONS.md`](./OPEN_DECISIONS.md) |
+| Review kết quả POC conversion/OCR của MIN-52 và MIN-59 | [`MIN61_CONVERSION_OCR_DECISION.md`](./MIN61_CONVERSION_OCR_DECISION.md) |
 | Quy tắc khi sửa chính folder này | [`AGENTS.md`](./AGENTS.md) |
 
 ## Nguồn sự thật

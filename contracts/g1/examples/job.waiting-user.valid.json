@@ -1,0 +1,31 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_01HZY8K0M2",
+  "command_id": "8f3d2c10-6b4a-4e21-9c77-2a1b9d5f3e40",
+  "status": "waiting_user",
+  "waiting_on": "finalize",
+  "progress": { "done": 3, "total": 3, "current_label": "dry-run xong" },
+  "result": {
+    "kind": "upload_prepare",
+    "data": { "prepared": 3, "failed": 0 },
+    "evidence": [
+      {
+        "evidence_id": "ev_001",
+        "subject_type": "case",
+        "kind": "notary_number",
+        "raw_value": "428/2026/CCGD",
+        "normalized_value": "428/2026",
+        "source_ref": { "page": 1 },
+        "observation_state": "inferred",
+        "confidence": 0.91,
+        "observed_at": "2026-09-14T10:00:00Z"
+      }
+    ],
+    "warnings": [],
+    "source_files": [
+      { "path": "D:/ho so/GD-03.docx", "scope": "machine_local" }
+    ]
+  },
+  "error": null,
+  "updated_at": "2026-09-14T10:01:00Z"
+}

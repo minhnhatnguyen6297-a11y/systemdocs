@@ -1,0 +1,28 @@
+{
+  "expected_error": "evidence_invalid",
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_01HZY8K0M5",
+  "command_id": "a6b7c8d9-6666-4f7a-9b8c-9d0e1f2a3b4c",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "ocr_result",
+    "data": {},
+    "evidence": [
+      {
+        "evidence_id": "ev_bad",
+        "subject_type": "person",
+        "kind": "cccd",
+        "raw_value": "0123",
+        "normalized_value": "0123",
+        "source_ref": { "page": 1 },
+        "observation_state": "normalized",
+        "observed_at": "2026-09-14T10:00:00Z"
+      }
+    ],
+    "warnings": []
+  },
+  "error": null,
+  "updated_at": "2026-09-14T10:11:00Z"
+}

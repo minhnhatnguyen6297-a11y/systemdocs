@@ -2,8 +2,11 @@
 
 ## 0. Đọc mục này trước
 
-Đích đến của hệ thống: **một hệ thống thống nhất, dùng chung một database.** Ba
-repo là ba công cụ xử lý dữ liệu cho ba mục đích khác nhau trong hệ thống đó.
+Đích đến của hệ thống: **một hệ thống thống nhất, database chung, UI chung và
+các thành phần chức năng chung được tái sử dụng.** Ba repo là ba đường xử lý
+cho ba mục đích khác nhau trong hệ thống đó, sẵn sàng gom thành một repo lớn.
+[`COMPONENT_MAP.md`](./COMPONENT_MAP.md) là bản đồ ownership/reuse **draft để duyệt**;
+không phải thiết kế vật lý hay quyền thực hiện migration.
 
 **Giai đoạn hiện tại: hai công cụ chạy độc lập, công cụ thứ ba mới có thiết kế.** Việc bây giờ
 là làm tốt từng phần, đồng thời **không để chúng phân kỳ** ở bốn chỗ: khóa định
@@ -23,7 +26,7 @@ dùng chung, chưa có luồng dữ liệu tự động nào giữa ba công c�
 flowchart TB
     subgraph NV2["notary_v2 — Soạn thảo hồ sơ mới"]
         direction TB
-        NV2IN["Ảnh giấy tờ / Zalo cá nhân"]
+        NV2IN["Ảnh giấy tờ / Zalo Inbox"]
         NV2OCR["Cloud AI OCR + parser regex<br/>(CCCD, sổ đỏ, giấy khai tử)"]
         NV2CASE["Case Workspace<br/>Stage / Pool / Diagram<br/>engine thừa kế"]
         NV2OUT["Word hợp đồng / văn bản<br/>(word_engine + template)"]
@@ -211,7 +214,10 @@ contract rồi tự implement trong cùng một task.
 
 **Trạng thái:** Electron đã được chọn làm shell đích ngày 14/09/2026. Contract
 production và DB engine vẫn chưa được duyệt; shape `v0.experimental` chỉ là bằng
-chứng POC, không phải contract production.
+chứng POC, không phải contract production. MIN-50 đã duyệt ranh giới và triển
+khai POC theo `MIN50_IMPLEMENTATION_SPEC.md` §3/W0. Đã có code conversion POC
+trong worktree riêng; chưa có bằng chứng đủ để nghiệm thu golden dataset hay
+tích hợp runtime. Snapshot source/giới hạn kiểm chứng ở `COMPONENT_MAP.md` §2/6.2.
 
 ### 6.1. Trạng thái hiện tại và trạng thái dự định
 
@@ -235,18 +241,28 @@ Các điểm này được kiểm chứng tại:
   `:381-414`). Chưa phải gate đã implement; xem §6.5 về các đường gọi khác.
 - `notaryoffice/AGENTS.md:8-14`; `notaryoffice/intent.md:135-144`.
 
+**Tách POC khỏi baseline ứng dụng:** `ConversionEnvelope` và converter/gate đã
+có trong worktree `notary_v2/.worktrees/markitdown-qwen-poc` tại
+`664edb4`
+(`tools/document_conversion_poc/models.py:102-123`, `converter.py:41-101`).
+Chưa được xem là component production dùng chung. Bộ GD-01–07 và benchmark chưa
+có bằng chứng đạt gate; không phủ nhận các fixture/unit test POC đã tồn tại.
+
 **Hiện tại không có trong nhánh production:** Electron app, Document Router dùng
 chung, DesktopCommand production, API giữa ba repo hoặc database dùng chung.
 Electron/DesktopCommand chỉ có POC tại
 `upload_lab_repo@codex/desktop-command-poc:poc/desktop_command/electron/`;
-`notaryoffice` chưa có code.
+`notaryoffice` chưa có code (`notaryoffice/AGENTS.md:3`). Không có bằng chứng
+UI/DB chung, shared package hay API tích hợp giữa ba repo trong phạm vi nguồn đã
+kiểm tra ở `COMPONENT_MAP.md` §2–3.
 
-Riêng `upload_lab`: chưa tìm thấy **HTTP server/API surface cho desktop command**
-trong source Python và manifest đã quét ngày 10/09/2026 (FastAPI, Flask, uvicorn,
-aiohttp và các dấu hiệu HTTP server). UI/worker hiện trao đổi in-process qua Qt
-signals và command queue (`upload_lab_repo/ui_qt/workers.py:60-117,146-153,210-241`).
-Điều này không có nghĩa repo không gọi HTTP tới web tỉnh. POC phải thêm lớp giao
-diện tối thiểu, không thể giả định API đã có.
+Riêng baseline `upload_lab`: không có **HTTP server/API surface cho desktop
+command**; UI/worker production trao đổi in-process qua Qt signals và command
+queue (`upload_lab_repo/ui_qt/workers.py:60-117,146-153,210-241`). DesktopCommand
+POC là ngoại lệ có phạm vi riêng: sidecar FastAPI tại worktree POC
+(`upload_lab_repo/.worktrees/desktop-command-poc/poc/desktop_command/server.py:9-90`),
+không gắn vào app PySide6 đang chạy và không phải production API. Điều này
+không có nghĩa repo không gọi HTTP tới web tỉnh.
 
 **Dự định:** dùng các shape dưới đây để viết spec và POC. Chúng chưa phải
 contract production, không cam kết tương thích và không cấp quyền triển khai
@@ -430,8 +446,11 @@ route mong đợi, facts/text mong đợi và provenance tối thiểu. POC ch�
 được chất lượng, thời gian, lỗi, partial failure và không có cloud call ngoài
 route đã duyệt.
 
-Đây mới là đặc tả mẫu/manifest; chưa tạo bộ file hay chạy phép đo. Duyệt MIN-50
-là duyệt đặc tả, không phải xác nhận POC/golden dataset đã đạt.
+Đây là tiêu chuẩn cho bộ mẫu/manifest. Code test/harness bước đầu đã có ở
+worktree conversion POC, nhưng chưa chứng minh đủ GD-01–07, expected facts và
+provenance (`COMPONENT_MAP.md` §6.2). Duyệt MIN-50 cho POC không phải xác nhận
+POC/golden dataset đã đạt; report kỹ thuật chỉ ghi `review_required`, không thay
+quyết định của người duyệt.
 
 ## 7. Kiến trúc đích — mức ownership & vocabulary
 
