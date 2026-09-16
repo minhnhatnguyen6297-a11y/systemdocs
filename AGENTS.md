@@ -1,83 +1,80 @@
-# AGENTS.md — systemdocs
+# AGENTS.md — systemdocs (monorepo)
 
-Folder tài liệu cấp cha. `main` **không có code, không có runtime**.
+Repo gốc của hệ thống công chứng. Từ 15/09/2026 (MIN-83) đây là **monorepo**:
+các repo con đã gộp vào làm module, phát triển trực tiếp tại đây trên nhánh
+`consolidate/monorepo` — nhánh phát triển duy nhất. Repo cũ trên GitHub
+(`notary_v2`, `upload_lab`, `notaryoffice`) chỉ còn vai trò archive đóng băng.
 
-Ngoại lệ owner chốt ngày 14/09/2026: nhánh `electron-system-shell` là nhánh
-tích hợp cấp hệ thống và được phép chứa runtime Electron sau khi spec/contract
-tương ứng được duyệt. Không merge runtime vào `main`; xem `ELECTRON_G1_PLAN.md`.
+Nhánh `main` vẫn là bản tài liệu cũ trước gộp — **không merge runtime vào
+`main`**.
 
-Nhánh `consolidate/monorepo` (base `electron-system-shell`) chứa toàn bộ code
-của ba sản phẩm dưới dạng snapshot để phát triển thống nhất một nhánh:
+## Cấu trúc
 
-| Thư mục | Nguồn | Nội dung |
+```text
+├── notary_v2/      # module: soạn thảo hồ sơ mới (FastAPI + Jinja2 + SQLite)
+├── upload_lab/     # module: số hóa Word cũ → upload web CSDL tỉnh (PySide6 + Playwright)
+├── shell/          # module: vỏ Electron + Python sidecar (desktopcommand.v1)
+├── notaryoffice/   # module: theo dõi hồ sơ đang chạy — CHƯA CÓ CODE, chỉ spec
+├── contracts/      # contract đã duyệt giữa các module + vocabulary chung
+├── docs/g1/        # tài liệu lộ trình G1/Electron + draft MIN-* (lịch sử/tham chiếu)
+└── code-graphs/    # graphify snapshot: <module>/monorepo/graphify-out/ là bản mới nhất
+```
+
+## Nguồn sự thật (SOT) — ai quyết định cái gì
+
+| Tầng | File | Phạm vi |
 |---|---|---|
-| `shell/` | `electron-system-shell` | Vỏ Electron + Python sidecar FastAPI loopback |
-| `notary_v2/` | `notary_v2` branch `consolidate/latest` | FastAPI nghiệp vụ công chứng (đã gộp 4 nhánh codex) |
-| `upload_lab/` | `upload_lab` branch `consolidate/latest` | Số hóa + upload (đã gộp 2 nhánh POC) |
-| `notaryoffice/` | `notaryoffice` `main` | Tài liệu intent, chưa có code |
+| Module | `<module>/docs/SPEC.md` | **SOT duy nhất về nghiệp vụ** của module đó |
+| Module | `<module>/AGENTS.md` | quyền hạn, quy trình, review gate của module |
+| Repo | `TECH_STACK.md` | công nghệ đã chọn + quy tắc thêm công nghệ mới |
+| Repo | `SYSTEM_ARCHITECTURE.md` | ranh giới, ownership dữ liệu giữa các module |
+| Repo | `contracts/` | contract đã duyệt + chuẩn hóa khóa định danh |
+| Repo | `OPEN_DECISIONS.md` | câu hỏi chưa chốt + phương án đã loại |
+| Repo | `VISION.md` | bài toán, nguyên tắc, điều cố tình không làm |
 
-Mỗi thư mục con giữ nguyên `AGENTS.md`/`README.md` của repo gốc — khi sửa code
-trong `notary_v2/` hay `upload_lab/`, tuân theo quy tắc của thư mục đó. Đây là
-snapshot một chiều: repo con vẫn tồn tại độc lập; quyết định repo nào là nguồn
-chính thức chưa chốt.
+Khi docs root xung đột với docs/code của module: **module thắng về hành vi nội
+bộ** — và mâu thuẫn phải được sửa lại ở root.
 
-## Quyền hạn của folder này
+## Quy tắc khi sửa repo này
 
-Được mô tả: quan hệ giữa các sản phẩm, vocabulary/khóa định danh dùng chung,
-quyết định kiến trúc xuyên sản phẩm, câu hỏi mở.
-
-Không được mô tả: hành vi nội bộ của một sản phẩm. Đó là việc của docs trong
-repo đó. Khi xung đột, **repo con thắng** — và mâu thuẫn phải được sửa ở đây.
-
-## Quy tắc khi sửa folder này
-
-- Mọi mô tả repo con phải **kiểm chứng bằng file thật** (đường dẫn + số dòng),
-  không viết theo suy luận. Tài liệu cũ ở đây từng sai nhiều vì lý do này.
+- Mọi mô tả module phải **kiểm chứng bằng file thật** trong repo (đường dẫn +
+  số dòng), không viết theo suy luận hay tài liệu cũ của repo bên ngoài.
+  Đường `D:\...` trong tài liệu cũ là từ trước khi gộp — giờ code ở ngay trong
+  repo.
 - Ghi rõ **cái gì KHÔNG có** ngang với cái gì có. Phần lớn lỗi cũ là giả định
   tồn tại một luồng dữ liệu không tồn tại.
-- Phân biệt rõ **hiện trạng** và **dự định**. `notaryoffice` chưa có code.
+- Phân biệt rõ **hiện trạng** và **dự định**. `notaryoffice/` chưa có code —
+  `docs/SPEC.md` của nó là đặc tả, không phải hệ thống đang chạy.
 - Không tự chốt mục nào đang mở (🔴) trong `OPEN_DECISIONS.md`.
-- `excelTK` là dự án riêng, ngoài phạm vi hệ thống công chứng và G1 Electron.
-- Mọi lựa chọn công nghệ ghi ở `TECH_STACK.md`, không rải trong file khác. Thêm
-  công nghệ mới cho một việc đã có công nghệ: phải qua 4 bước ở `TECH_STACK.md` §2.
-- Đích đến là **một hệ thống dùng chung database**. Đừng viết lại các mô tả kiểu
-  "ba sản phẩm độc lập vĩnh viễn" — phân biệt *hiện trạng* với *đích đến*.
+- `excelTK` là dự án riêng, ngoài phạm vi hệ thống.
+- Mọi lựa chọn công nghệ ghi ở `TECH_STACK.md`, không rải trong file khác.
+  Thêm công nghệ mới cho một việc đã có công nghệ: phải qua 4 bước ở
+  `TECH_STACK.md` §2.
+- Đích đến là **một hệ thống dùng chung database**. Phân biệt *hiện trạng*
+  (module độc lập về nghiệp vụ) với *đích đến*; `shell/` đã là kênh gọi thật
+  vào hai engine — không viết lại mô tả "ba sản phẩm độc lập vĩnh viễn".
 - Không tạo contract tích hợp mới rồi tự implement trong cùng một task.
-
-## Bản đồ file
-
-| File | Nội dung |
-|---|---|
-| `README.md` | Chỉ mục, ba sản phẩm, đọc gì khi nào |
-| `VISION.md` | Bài toán, nguyên tắc chung, điều cố tình không làm |
-| `SYSTEM_ARCHITECTURE.md` | Ranh giới sản phẩm, sở hữu dữ liệu, kiến trúc dự kiến `notaryoffice` |
-| `PROJECTS.md` | Từng repo: giải bài toán gì — feature gì — công nghệ gì |
-| `TECH_STACK.md` | Công nghệ đã chọn + quy tắc thêm công nghệ mới + ràng buộc để gộp DB không xung đột |
-| `contracts/entities.md` | Chuẩn hóa khóa định danh hồ sơ |
-| `contracts/README.md` | Quy tắc contract-trước-code |
-| `OPEN_DECISIONS.md` | Câu hỏi chưa chốt + phương án đã loại |
+- Task/issue được quản lý trên **Linear (team MIN, project systemdocs)** —
+  không tạo file task/plan/todo mới trong repo gốc. Mỗi module giữ workflow
+  riêng theo `AGENTS.md` của nó.
 
 ## Quy tắc chọn tool cho agent
-
-Các quy tắc này chỉ hướng dẫn cách agent đọc và kiểm chứng tài liệu/code của
-repo con; folder `systemdocs` vẫn là tài liệu, không có runtime và không chạy
-Graphify/context-mode tại đây.
 
 - Biết rõ file, symbol hoặc chuỗi lỗi: tìm kiếm có giới hạn rồi đọc đúng đoạn
   source; dùng LSP nếu client đã cung cấp.
 - Cần quan hệ qua nhiều file, caller/callee, dependency hoặc ownership: dùng
-  truy vấn Graphify hiện có nếu client/tool đã cung cấp. Bắt đầu hẹp (depth
-  1–2); nếu graph thiếu, cũ hoặc bị cắt thì đối chiếu source hiện tại và chỉ
-  refresh khi task cần. Không rebuild toàn bộ graph cho sửa nhỏ.
+  graph Graphify trong `code-graphs/<module>/monorepo/graphify-out/graph.json`:
+  `D:\graphify\.venv\Scripts\graphify.exe query "<câu hỏi>" --graph <path>`.
+  Bắt đầu hẹp (depth 1–2); graph chỉ dẫn đường — kết luận hành vi phải đọc
+  source thật. Graph cũ/thiếu thì chạy `graphify update <module>` hoặc
+  `extract <module> --code-only` rồi copy `graphify-out/` vào `code-graphs/`.
+- Các snapshot `code-graphs/<repo>/<nhánh-cũ>/` là **trước khi gộp** — chỉ để
+  tham chiếu lịch sử, nguồn `D:\...` có thể không còn.
 - Log, JSON/CSV, output build/test hoặc dữ liệu lớn: dùng context-mode khi
-  capability đã được đăng ký (`ctx_execute`, `ctx_execute_file`,
-  `ctx_batch_execute`, `ctx_index`/`ctx_fetch_and_index`, `ctx_search`) để lọc,
-  đếm hoặc tổng hợp trước khi đưa vào context. `ctx_search` chỉ tìm trong nội
-  dung đã index; giữ exit code, lỗi hữu ích và đường dẫn tới dữ liệu đầy đủ.
-- Kết quả tool đã nhỏ, kể cả truy vấn graph có giới hạn: đọc trực tiếp, không
-  bọc thêm qua context-mode.
-- Không tự cài tool, bật daemon, tạo watcher, full-index hoặc tạo contract mới
-  trong folder này. Nếu Graphify/context-mode không có trong client hiện tại,
-  dùng source/tìm kiếm thông thường và ghi rõ trong bàn giao.
-- Sau thay đổi code ở repo con, chạy check phù hợp với repo đó; thay đổi chỉ ở
-  Markdown thì kiểm tra diff và tính nhất quán tài liệu.
+  capability đã được đăng ký (`ctx_execute`, `ctx_batch_execute`,
+  `ctx_index`/`ctx_fetch_and_index`, `ctx_search`) để lọc trước khi đưa vào
+  context. Kết quả tool đã nhỏ thì đọc trực tiếp, không bọc thêm.
+- Không tự cài tool, bật daemon, tạo watcher, hay tạo contract mới tùy ý.
+- Sau thay đổi code ở module, chạy check theo `AGENTS.md`/verify script của
+  module đó (`notary_v2/verify.bat`, `upload_lab` unittest, `shell` npm test +
+  contract test). Thay đổi chỉ ở Markdown thì kiểm tra diff và tính nhất quán.

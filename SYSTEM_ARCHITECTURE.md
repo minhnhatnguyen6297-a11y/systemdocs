@@ -3,24 +3,36 @@
 ## 0. Đọc mục này trước
 
 Đích đến của hệ thống: **một hệ thống thống nhất, database chung, UI chung và
-các thành phần chức năng chung được tái sử dụng.** Ba repo là ba đường xử lý
-cho ba mục đích khác nhau trong hệ thống đó, sẵn sàng gom thành một repo lớn.
-[`COMPONENT_MAP.md`](./COMPONENT_MAP.md) là bản đồ ownership/reuse **draft để duyệt**;
-không phải thiết kế vật lý hay quyền thực hiện migration.
+các thành phần chức năng chung được tái sử dụng.**
 
-**Giai đoạn hiện tại: hai công cụ chạy độc lập, công cụ thứ ba mới có thiết kế.** Việc bây giờ
-là làm tốt từng phần, đồng thời **không để chúng phân kỳ** ở bốn chỗ: khóa định
-danh ([`contracts/entities.md`](./contracts/entities.md)), lựa chọn công nghệ
+Từ 15/09/2026 (MIN-83) ba sản phẩm đã gộp thành **module trong monorepo này**
+(nhánh `consolidate/monorepo`): `notary_v2/`, `upload_lab/`, `notaryoffice/`,
+cộng thêm `shell/` — vỏ Electron + sidecar Python là kênh tích hợp đã duyệt đầu
+tiên. "Repo con" trong tài liệu cũ = module trong repo này.
+
+[`docs/g1/COMPONENT_MAP.md`](./docs/g1/COMPONENT_MAP.md) là bản đồ ownership/reuse
+**draft** (issue MIN-57 đã cancel — chỉ còn giá trị tham chiếu); không phải
+thiết kế vật lý hay quyền thực hiện migration.
+
+**Giai đoạn hiện tại: hai module nghiệp vụ có thể chạy độc lập hoặc qua
+`shell/`; module thứ ba mới có đặc tả.** Việc bây giờ là làm tốt từng phần,
+đồng thời **không để chúng phân kỳ** ở bốn chỗ: khóa định danh
+([`contracts/entities.md`](./contracts/entities.md)), lựa chọn công nghệ
 ([`TECH_STACK.md`](./TECH_STACK.md)), schema/tên trường (`TECH_STACK.md` mục 3),
 và ranh giới dữ liệu/provenance (mục 6 dưới đây).
 
 Vì vậy đọc mục 1–3 dưới đây là **hiện trạng**, không phải trạng thái cuối cùng.
 
-## 1. Hiện trạng: chưa có tích hợp giữa các công cụ
+## 1. Hiện trạng: tích hợp duy nhất qua shell
 
 Hai nhánh đầu là hiện trạng; nhánh `notaryoffice` là thiết kế, chưa có runtime
-(`notaryoffice/AGENTS.md:3,8-14`). Chưa có API **giữa các repo**, chưa có DB
-dùng chung, chưa có luồng dữ liệu tự động nào giữa ba công cụ.
+(`notaryoffice/AGENTS.md`). **Không có API trực tiếp giữa ba module nghiệp vụ**,
+chưa có DB dùng chung, chưa có luồng dữ liệu tự động nào giữa chúng.
+
+Kênh tích hợp đã duyệt duy nhất: `shell/` gọi `notary_v2`/`upload_lab` qua
+sidecar (`desktopcommand.v1`, `contracts/desktop-command.md`) — sidecar import
+engine trong-process qua `engine_roots.py`/`sys.path`, không qua HTTP tới
+engine và không phải API giữa hai module nghiệp vụ.
 
 ```mermaid
 flowchart TB
@@ -53,17 +65,26 @@ flowchart TB
         NOSEN --> NOEV --> NODC --> NOCF --> NOSE
     end
 
-    SD["systemdocs<br/>vocabulary · ranh giới · quyết định mở"]
+    subgraph SH["shell — vỏ Electron + sidecar (desktopcommand.v1)"]
+        direction TB
+        SHUI["Electron main/renderer"] --> SHSC["Python sidecar<br/>import engine qua sys.path"]
+    end
+
+    SD["docs gốc<br/>vocabulary · ranh giới · quyết định mở"]
     SD -.->|tham chiếu, không ràng buộc runtime| NV2
     SD -.->|tham chiếu, không ràng buộc runtime| UL
     SD -.->|tham chiếu, không ràng buộc runtime| NO
 
-    NV2OUT -. "hôm nay: người copy file thủ công" .-> ULIN
+    SHSC ==>|"gọi hàm engine thật (in-process)"| NV2
+    SHSC ==>|"gọi hàm engine thật (in-process)"| ULEX
+    NV2OUT -. "hoặc: người copy file thủ công" .-> ULIN
 ```
 
-Mũi tên nét rời duy nhất giữa hai sản phẩm là **thao tác tay của con người**:
-Word do `notary_v2` sinh ra được lưu vào ổ đĩa, và sau đó `upload_lab` quét ổ
-đĩa đó như quét bất kỳ Word nào khác. Không có tích hợp code.
+Giữa hai module nghiệp vụ vẫn chỉ có **thao tác tay của con người**: Word do
+`notary_v2` sinh ra được lưu vào ổ đĩa, và sau đó `upload_lab` quét ổ đĩa đó
+như quét bất kỳ Word nào khác — không có tích hợp code giữa chúng. `shell/`
+gọi vào từng engine riêng lẻ; nó không tạo luồng dữ liệu `notary_v2` →
+`upload_lab`.
 
 ## 2. Ai sở hữu dữ liệu gì
 
@@ -74,10 +95,10 @@ cũng được ghi vào bảng của người khác.
 | Dữ liệu | Chủ sở hữu | Ghi chú |
 |---|---|---|
 | Hồ sơ đang soạn, các bên, tài sản, quan hệ thừa kế | `notary_v2` | `notary.db` |
-| Kết quả Cloud OCR giấy tờ + metadata Zalo | `notary_v2` | `notary.db`: bảng `ocr_jobs` và Zalo (`notary_v2/models.py:161-171,186-300`; `database.py:8-24`); file media ở storage backend. `ocr_jobs.db` là broker + result backend Celery mặc định (`celery_app.py:5-11`) |
+| Kết quả Cloud OCR giấy tờ + metadata Zalo | `notary_v2` | `notary.db`: `extracted_documents` + các bảng `zalo_*` (`notary_v2/models.py:161-300`); file media ở storage backend. Stack Celery/`ocr_jobs.db` **đã gỡ khi merge** — không còn trong module |
 | Word/hợp đồng sinh ra từ template | `notary_v2` | |
 | Trường dữ liệu bóc từ kho Word cũ | `upload_lab` | `output/*.json`, `registry.sqlite3` |
-| Trạng thái quét/chuẩn bị/upload lên web tỉnh | `upload_lab` | Ví dụ thật: `matched`, `extracted`, `prepared_dry_run`, `uploaded_success` (`upload_lab_repo/batch_scan.py:364,713,786`; `playwright_uploader.py:81-83`). Snapshot enum và nguồn ở `PROJECTS.md` §2; không phải enum chung xuyên repo |
+| Trạng thái quét/chuẩn bị/upload lên web tỉnh | `upload_lab` | Ví dụ thật: `matched`, `extracted`, `prepared_dry_run`, `uploaded_success` (`upload_lab/batch_scan.py`, `playwright_uploader.py`). Enum nội bộ module — xem `upload_lab/docs/SPEC.md` §2; không phải enum chung xuyên module |
 | Session đăng nhập web tỉnh | `upload_lab` | `nd_storage_state.json` |
 | Dấu vết thao tác trên máy con | `notaryoffice` | chưa tồn tại |
 | Trạng thái/giai đoạn/người đang giữ hồ sơ đang chạy | `notaryoffice` | chưa tồn tại |
@@ -87,7 +108,7 @@ giai đoạn hiện tại, không phải nguyên tắc vĩnh viễn — đích �
 
 Nhưng cho tới khi việc gộp được thiết kế và duyệt, mọi dữ liệu chéo phải đi qua
 một contract thống nhất trước (`contracts/README.md`). **Agent không được tự mở
-kết nối đọc DB của repo khác** vì "dù sao sau này cũng gộp".
+kết nối đọc DB của module khác** vì "dù sao sau này cũng gộp".
 
 Khi gộp thật: quyền **ghi** vẫn thuộc đúng một chủ sở hữu như bảng trên; các công
 cụ khác chỉ **đọc**.
@@ -107,7 +128,7 @@ bản chất, hợp nhất sớm sẽ tạo abstraction sai. Nhưng ba nơi cùn
 GCN hợp lệ là gì" là rủi ro thật: sửa một nơi, hai nơi kia lệch.
 
 **Cách xử lý đã chốt:** giai đoạn này chưa gộp code, nhưng **bắt buộc thống nhất
-định nghĩa thực thể** ở `contracts/entities.md`. Ba repo tự implement, cùng tham
+định nghĩa thực thể** ở `contracts/entities.md`. Ba module tự implement, cùng tham
 chiếu một định nghĩa.
 
 Đây chính là việc quan trọng nhất phải làm đúng từ bây giờ: nếu ba nơi lưu CCCD
@@ -117,8 +138,8 @@ bộ dữ liệu cũ.
 ## 4. Kiến trúc dự kiến của notaryoffice
 
 Sản phẩm này chưa có code nên toàn bộ mục này là **thiết kế**, không phải hiện
-trạng. Nguồn: `notaryoffice/intent.md` (Nguồn Chân lý Duy nhất: quyết định kỹ thuật,
-14 bảng DB, Evidence Record, Draft Case).
+trạng. Nguồn: `notaryoffice/docs/SPEC.md` (Nguồn Chân lý Duy nhất: quyết định
+kỹ thuật, 14 bảng DB, Evidence Record, Draft Case — trước đây là `intent.md`).
 
 Mô hình đã chọn: **Hybrid Pipeline — Edge IFilter + Central Processing Hub**
 
@@ -174,8 +195,10 @@ Owner đã chọn Electron làm desktop shell đích ngày 14/09/2026 (MIN-50). 
 bao gồm `notary_v2` và `upload_lab`; `notaryoffice` là placeholder và `excelTK`
 nằm ngoài phạm vi. Repo con tiếp tục sở hữu nghiệp vụ Python.
 
-Runtime cấp hệ thống nằm trên nhánh `electron-system-shell`, không nằm trên
-`main` tài liệu. Kế hoạch và gate: `ELECTRON_G1_PLAN.md`.
+Runtime cấp hệ thống trước nằm trên nhánh `electron-system-shell`; từ khi gộp
+monorepo nó là module `shell/` trên nhánh `consolidate/monorepo` — nhánh
+`electron-system-shell` đã xóa sau khi merge. Kế hoạch và gate:
+`docs/g1/ELECTRON_G1_PLAN.md`.
 
 ### 5.2. SPEC/CONTRACT — trước implementation
 
@@ -212,61 +235,52 @@ contract rồi tự implement trong cùng một task.
 
 ## 6. Ranh giới hội tụ và shape experimental
 
-**Trạng thái:** Electron đã được chọn làm shell đích ngày 14/09/2026. Contract
-production và DB engine vẫn chưa được duyệt; shape `v0.experimental` chỉ là bằng
-chứng POC, không phải contract production. MIN-50 đã duyệt ranh giới và triển
-khai POC theo `MIN50_IMPLEMENTATION_SPEC.md` §3/W0. Đã có code conversion POC
-trong worktree riêng; chưa có bằng chứng đủ để nghiệm thu golden dataset hay
-tích hợp runtime. Snapshot source/giới hạn kiểm chứng ở `COMPONENT_MAP.md` §2/6.2.
+**Trạng thái:** Electron đã được chọn làm shell đích ngày 14/09/2026; contract
+production `desktopcommand.v1` + `g1.module.v1` đã APPROVED và có runtime thật
+trong `shell/`. DB engine chung vẫn chưa được duyệt (MIN-63 backlog); shape
+`v0.experimental` chỉ là bằng chứng POC. POC conversion có code trong repo
+(`notary_v2/tools/document_conversion_poc/`, `upload_lab/poc/conversion_benchmark/`);
+chưa có bằng chứng đủ để nghiệm thu golden dataset. Snapshot source/giới hạn
+kiểm chứng ở `docs/g1/COMPONENT_MAP.md` §2/6.2 (draft MIN-57 đã cancel).
 
 ### 6.1. Trạng thái hiện tại và trạng thái dự định
 
-**Hiện tại có:** hai ứng dụng độc lập; PySide6 + Playwright Python ở `upload_lab`;
-Qwen OCR và bước Stage/xác nhận ở `notary_v2`; đặc tả Evidence/Draft Case ở
-`notaryoffice`.
+**Hiện tại có trong monorepo:** hai module nghiệp vụ (`notary_v2`,
+`upload_lab`) + `shell/` (Electron + sidecar, contract đã duyệt); đặc tả
+Evidence/Draft Case ở `notaryoffice`.
 
 Các điểm này được kiểm chứng tại:
 
-- Scope upload: `upload_lab_repo/README.md:3`; dry-run/finalize: `:15`;
-  bộ đọc Word: `:20-21`; session xuyên suốt: `:32-47`; UI PySide6: `:117`;
-  hướng dẫn chạy: `:130-145`. Chromium headed:
-  `upload_lab_repo/playwright_uploader.py:896-910`.
-- Worker/signals/thread: `upload_lab_repo/ui_qt/workers.py:60-103`;
-  command queue và public slots: `:105-117,146-153,210-241`.
-- `notary_v2/docs/platform/document-intake/spec.md:14-20,39-53,128-189,224-228`;
-  `notary_v2/docs/domains/inheritance/workflow.md:35-55,89`.
-- OCR dispatch per-file: `notary_v2/routers/ocr_ai.py:2624-2654`;
-  điểm chèn policy gate **dự kiến**, giữa đọc/chuẩn bị ảnh và gọi cloud:
-  `_process_single_image` tại `:2450-2459` (helper chuẩn bị `:326`, native call
-  `:381-414`). Chưa phải gate đã implement; xem §6.5 về các đường gọi khác.
-- `notaryoffice/AGENTS.md:8-14`; `notaryoffice/intent.md:135-144`.
+- Scope upload: `upload_lab/README.md:3`; dry-run/finalize: `:44-57`;
+  UI PySide6: `upload_lab/ui_qt/`; Chromium headed:
+  `upload_lab/playwright_uploader.py` (`NamDinhUploaderSession` ~:816).
+- Worker/signals/thread + command queue: `upload_lab/ui_qt/workers.py:60-105,211-240`.
+- `notary_v2/docs/platform/document-intake/spec.md`;
+  `notary_v2/docs/domains/inheritance/workflow.md`.
+- OCR dispatch per-file: `notary_v2/routers/ocr_ai.py` (native DashScope call
+  `:381-414`). Chưa có policy gate đã implement; xem §6.5 về các đường gọi khác.
+- `notaryoffice/AGENTS.md`; `notaryoffice/docs/SPEC.md` §5.
 
-**Tách POC khỏi baseline ứng dụng:** `ConversionEnvelope` và converter/gate đã
-có trong worktree `notary_v2/.worktrees/markitdown-qwen-poc` tại
-`664edb4`
-(`tools/document_conversion_poc/models.py:102-123`, `converter.py:41-101`).
-Chưa được xem là component production dùng chung. Bộ GD-01–07 và benchmark chưa
-có bằng chứng đạt gate; không phủ nhận các fixture/unit test POC đã tồn tại.
+**POC trong repo (không phải production):** `ConversionEnvelope`/converter/gate
+ở `notary_v2/tools/document_conversion_poc/`; harness benchmark ở
+`upload_lab/poc/conversion_benchmark/`; POC desktop command ở
+`upload_lab/poc/desktop_command/` (tiền thân của `shell/sidecar`, contract
+`v0.experimental` — không tương thích ngầm với `desktopcommand.v1`).
 
-**Hiện tại không có trong nhánh production:** Electron app, Document Router dùng
-chung, DesktopCommand production, API giữa ba repo hoặc database dùng chung.
-Electron/DesktopCommand chỉ có POC tại
-`upload_lab_repo@codex/desktop-command-poc:poc/desktop_command/electron/`;
-`notaryoffice` chưa có code (`notaryoffice/AGENTS.md:3`). Không có bằng chứng
-UI/DB chung, shared package hay API tích hợp giữa ba repo trong phạm vi nguồn đã
-kiểm tra ở `COMPONENT_MAP.md` §2–3.
+**Hiện tại vẫn không có:** Document Router dùng chung, API trực tiếp giữa ba
+module nghiệp vụ, database dùng chung, `notaryoffice` runtime. `shell/` chỉ gọi
+vào từng engine riêng lẻ qua sidecar.
 
-Riêng baseline `upload_lab`: không có **HTTP server/API surface cho desktop
-command**; UI/worker production trao đổi in-process qua Qt signals và command
-queue (`upload_lab_repo/ui_qt/workers.py:60-117,146-153,210-241`). DesktopCommand
-POC là ngoại lệ có phạm vi riêng: sidecar FastAPI tại worktree POC
-(`upload_lab_repo/.worktrees/desktop-command-poc/poc/desktop_command/server.py:9-90`),
-không gắn vào app PySide6 đang chạy và không phải production API. Điều này
-không có nghĩa repo không gọi HTTP tới web tỉnh.
+Riêng `upload_lab`: không có **HTTP server/API surface cho desktop command**
+trong app PySide6; UI/worker trao đổi in-process qua Qt signals + command queue
+(`upload_lab/ui_qt/workers.py`). Khi chạy qua `shell/`, sidecar
+(`shell/sidecar/upload_adapter.py` + `upload_session.py`) là điểm gọi duy nhất
+— không gắn vào app PySide6 đang chạy. Điều này không có nghĩa module không gọi
+HTTP tới web tỉnh.
 
 **Dự định:** dùng các shape dưới đây để viết spec và POC. Chúng chưa phải
 contract production, không cam kết tương thích và không cấp quyền triển khai
-tích hợp giữa các repo.
+tích hợp giữa các module.
 
 ### 6.2. Chuỗi trạng thái dữ liệu chung
 
@@ -290,24 +304,30 @@ Các bất biến:
    đoán.
 4. OCR/LLM không được tạo `CONFIRMED` business fact; con người xác nhận cuối.
 
-### 6.3. Ownership xuyên repo
+### 6.3. Ownership xuyên module
 
 | Phạm vi | Owner nghiệp vụ/quyền ghi | Consumer được phép |
 |---|---|---|
-| Ảnh/Zalo, OCR giấy tờ, Stage và Case Workspace hiện hành | `notary_v2` | Repo khác chỉ đọc sau contract production |
-| Kho Word cũ, extraction, registry và upload lifecycle | `upload_lab` | Repo khác chỉ đọc sau contract production |
+| Ảnh/Zalo, OCR giấy tờ, Stage và Case Workspace hiện hành | `notary_v2` | `shell/` đọc/ghi qua `notary_adapter` (contract v1); module khác chỉ đọc sau contract production |
+| Kho Word cũ, extraction, registry và upload lifecycle | `upload_lab` | `shell/` gọi qua `upload_adapter` (contract v1); module khác chỉ đọc sau contract production |
 | Workstation event, Evidence Record, Draft Case và trạng thái công việc dự định | `notaryoffice` | Chưa có runtime; owner chỉ là thiết kế |
-| Vocabulary, shape xuyên sản phẩm và versioning | `systemdocs/main` | Chỉ quản trị tài liệu; không sở hữu runtime hoặc dữ liệu |
-| Electron shell cấp hệ thống | `systemdocs/electron-system-shell` | Sở hữu shell/lifecycle/navigation; không sở hữu nghiệp vụ hay tự ghi DB module |
+| Vocabulary, shape xuyên sản phẩm và versioning | docs gốc repo này | Chỉ quản trị tài liệu; không sở hữu runtime hay dữ liệu nghiệp vụ |
+| Electron shell cấp hệ thống | `shell/` | Sở hữu shell/lifecycle/navigation; không sở hữu nghiệp vụ — ghi DB engine chỉ qua adapter đã duyệt |
 
 Dùng chung database sau này không thay đổi owner quyền ghi. `ConversionEnvelope`
 không biến converter thành owner của Evidence/Case; Evidence không cho phép
 `notaryoffice` ghi vào bảng Case Workspace của `notary_v2`.
 
-### 6.4. `DesktopCommand v0.experimental`
+### 6.4. `DesktopCommand v0.experimental` — ĐÃ HẾT HẠN
 
-Mục đích: kiểm chứng một desktop shell có thể gửi intent tới backend Python mà
-không biết internals của `upload_lab`.
+`v0.experimental` đã được thay bằng **`desktopcommand.v1` APPROVED** tại
+[`contracts/desktop-command.md`](./contracts/desktop-command.md) — shape mới
+không tương thích ngầm (status `completed`→`succeeded`, thêm
+`progress/waiting_on/file_ref`). Implementation thật: `shell/sidecar/`. Mục này
+giữ lại làm lịch sử thiết kế.
+
+Mục đích ban đầu: kiểm chứng một desktop shell có thể gửi intent tới backend
+Python mà không biết internals của `upload_lab`.
 
 Shape tối thiểu của request:
 
@@ -335,9 +355,9 @@ business logic, browser thread và Chromium headed. Không gửi credential, coo
 hoặc nội dung hồ sơ qua log/diagnostics. POC không tạo API production.
 
 Transport POC và bảo mật được chốt tại `TECH_STACK.md` §1.1: server loopback
-tối thiểu trong repo POC, khởi động riêng, không đụng app PySide6 đang chạy.
+tối thiểu trong POC, khởi động riêng, không đụng app PySide6 đang chạy.
 Shape ở đây độc lập với transport; queue hiện hành chỉ là điểm tham chiếu
-semantics, không phải API có sẵn (`upload_lab_repo/ui_qt/workers.py:105-117,146-153`).
+semantics, không phải API có sẵn (`upload_lab/ui_qt/workers.py:83-105,211-240`).
 Trạng thái job experimental không phải enum registry nội bộ của `upload_lab`.
 
 ### 6.5. `ConversionEnvelope v0.experimental`
@@ -446,9 +466,10 @@ route mong đợi, facts/text mong đợi và provenance tối thiểu. POC ch�
 được chất lượng, thời gian, lỗi, partial failure và không có cloud call ngoài
 route đã duyệt.
 
-Đây là tiêu chuẩn cho bộ mẫu/manifest. Code test/harness bước đầu đã có ở
-worktree conversion POC, nhưng chưa chứng minh đủ GD-01–07, expected facts và
-provenance (`COMPONENT_MAP.md` §6.2). Duyệt MIN-50 cho POC không phải xác nhận
+Đây là tiêu chuẩn cho bộ mẫu/manifest. Code test/harness bước đầu đã có trong
+repo (`upload_lab/poc/conversion_benchmark/`), nhưng chưa chứng minh đủ
+GD-01–07, expected facts và provenance (`docs/g1/COMPONENT_MAP.md` §6.2).
+Duyệt MIN-50 cho POC không phải xác nhận
 POC/golden dataset đã đạt; report kỹ thuật chỉ ghi `review_required`, không thay
 quyết định của người duyệt.
 
@@ -474,7 +495,8 @@ Hai ngữ cảnh cần nối nhưng không được đồng nhất tên gọi:
 - `notary_v2`: aggregate soạn thảo hiện có `InheritanceCase`, bảng
   `inheritance_cases` (`notary_v2/models.py:83-103`).
 - `notaryoffice`: aggregate theo dõi công việc **dự kiến**, bảng `cases` và
-  quan hệ `case_entities` M:N (`notaryoffice/intent.md:365-373`).
+  quan hệ `case_entities` M:N (`notaryoffice/docs/SPEC.md` — mục 14 bảng DB,
+  `case_entities` ~:461).
 
 Đây là hai aggregate ở hai bounded context có thể cùng liên quan tới một hồ sơ
 nghiệp vụ. Chưa chứng minh cardinality giữa chúng, không mặc định 1:1; quan hệ

@@ -1,15 +1,15 @@
 # Contract: G1 Module Data `v1`
 
 **Version:** `g1.module.v1` · **Status:** APPROVED (owner duyệt 14/09/2026) ·
-**Owner:** `systemdocs` branch `electron-system-shell` ·
+**Owner:** module `shell/` — trước đây branch `electron-system-shell` ·
 **Published:** P3 / MIN-72 · **Kênh mang:** `desktopcommand.v1`
 (`contracts/desktop-command.md`)
 
 Shape dữ liệu chung trong `payload`/`result`/`error` giữa Electron shell và
 Python sidecar trên một máy. **Đây không phải** contract xuyên-sản-phẩm
 (ConversionEnvelope giữa các repo vẫn theo Gate A–D của
-`MIN62_DATA_CONTRACT_DRAFT.md` trên branch `min-62-data-contract-draft` — file
-đó là normative reference, không bị tài liệu này thay thế).
+`docs/g1/MIN62_DATA_CONTRACT_DRAFT.md` — file đó là normative reference, không
+bị tài liệu này thay thế).
 
 ## 1. Vocabulary dùng lại (không nhân bản)
 
@@ -64,7 +64,7 @@ Producer thêm code mới được; đổi nghĩa code đã phát hành → tăn
 | Dữ liệu | Owner ghi | Shell/renderer được phép |
 |---|---|---|
 | Job/command registry | sidecar | đọc `GET /v1/jobs`, không ghi trực tiếp |
-| `notary.db`, `registry.sqlite3`, `ocr_jobs.db` | sidecar/engine | **không đọc/ghi trực tiếp** — qua command |
+| `notary.db`, `registry.sqlite3` | sidecar/engine | **không đọc/ghi trực tiếp** — qua command |
 | OCR call audit, Evidence | sidecar | hiển thị; không sửa/xóa |
 | `output/`, `runs/`, `downloads/`, `word_templates/custom/` | sidecar | chọn file qua dialog; không ghi thẳng |
 | Session portal (`nd_storage_state.json`), credential | sidecar | **không bao giờ qua contract** |

@@ -1,7 +1,7 @@
 # Contract: DesktopCommand `v1`
 
 **Version:** `desktopcommand.v1` · **Status:** APPROVED (owner duyệt 14/09/2026)
-· **Owner:** `systemdocs` branch `electron-system-shell` (runtime) ·
+· **Owner:** module `shell/` (runtime) — trước đây branch `electron-system-shell` ·
 **Published:** P3 / MIN-72 · **Supersedes:** POC `v0.experimental`
 (`upload_lab@f18a42f:poc/desktop_command/` — không tương thích ngầm)
 
@@ -34,7 +34,7 @@ Phạm vi G1-SM: loopback `127.0.0.1`; không LAN.
 ```yaml
 contract_version: "desktopcommand.v1"     # bắt buộc, đúng literal
 command_id: <uuid v4, client sinh>        # idempotency key
-command: <namespaced string>              # vd upload.prepare, notary.ocr_analyze
+command: <namespaced string>              # vd upload.scan, ocr.analyze
 payload: <object|null>
 client_meta: { shell_version: <semver>, module: <module id> }
 ```

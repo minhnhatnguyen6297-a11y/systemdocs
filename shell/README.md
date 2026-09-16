@@ -1,7 +1,8 @@
 # g1-shell — Electron + nghiep vu that (MIN-65/67/68/69)
 
 Runtime Electron + Python sidecar theo contract `desktopcommand.v1`
-(`systemdocs/contracts/desktop-command.md`, branch `g1-single-machine-roadmap`).
+(`../contracts/desktop-command.md`) — module `shell/` trong monorepo
+(nhánh `consolidate/monorepo`; trước đây `g1-single-machine-roadmap`).
 
 ## Layout
 
@@ -34,10 +35,11 @@ shell/
 
 ## Business modules (MIN-68 notary_v2 / MIN-69 upload_lab)
 
-Sidecar import engine that tu repo con qua `sys.path` theo engine root —
-khong port nghiep vu sang sidecar. Root resolve: env
-`G1_NOTARY_V2_ROOT`/`G1_UPLOAD_LAB_ROOT` hoac `shell/engine-roots.json`
-(gitignored, xem `engine-roots.example.json`).
+Sidecar import engine that tu module trong monorepo qua `sys.path` theo
+engine root — khong port nghiep vu sang sidecar. Root resolve: env
+`G1_NOTARY_V2_ROOT`/`G1_UPLOAD_LAB_ROOT` → `shell/engine-roots.json`
+(gitignored, xem `engine-roots.example.json`) → thu muc bundled cung repo
+(`../notary_v2`, `../upload_lab` — mac dinh trong monorepo).
 
 - `notary_adapter.py` — case/customer/property/participant qua models +
   router handlers that (inline-create giu upsert/dedup/locked-case rule);

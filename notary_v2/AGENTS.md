@@ -13,7 +13,7 @@ Quy định quyền quyết định, phạm vi, nơi tra cứu và điều kiệ
 
 ## 2. Nguồn chuẩn và tài liệu tham chiếu
 
-Thứ tự: `AGENTS.md` → ADR đã chấp nhận → đặc tả nghiệp vụ đã duyệt → platform contract → tài liệu kỹ thuật/UX → kế hoạch đang làm → nghiên cứu/lịch sử.
+Thứ tự: `AGENTS.md` → `docs/SPEC.md` (SOT nghiệp vụ của module) → ADR đã chấp nhận → đặc tả feature đã duyệt (`docs/superpowers/specs/`, domain spec) → platform contract → tài liệu kỹ thuật/UX → kế hoạch đang làm → nghiên cứu/lịch sử.
 
 Chỉ đọc `docs/README.md` khi chưa rõ khu vực công việc; nếu đã rõ, đi thẳng tới:
 
@@ -30,19 +30,19 @@ Chỉ đọc `docs/README.md` khi chưa rõ khu vực công việc; nếu đã r
 - Tiếp tục việc gián đoạn/chuyển máy: đọc `memory-bank/CURRENT.md` trước, đối chiếu Git rồi chỉ theo liên kết liên quan. Memory Bank không thay thế nguồn chuẩn hoặc bằng chứng mới.
 - Issue và đặc tả cục bộ: `docs/agents/issue-tracker.md`; cách dùng domain docs và ADR: `docs/agents/domain.md`.
 
-### Tài liệu chung giữa các repo: chỉ đọc khi cần
+### Tài liệu chung giữa các module: chỉ đọc khi cần
 
-`D:\systemdocs` dùng chung cho `notary_v2`, `upload_lab`, `notaryoffice`; ba dự án sẽ dùng chung một DB.
+Module này nằm trong monorepo (từ 15/09/2026, MIN-83) — phát triển trực tiếp tại đây trên `consolidate/monorepo`. Tài liệu cấp repo ở thư mục gốc (`../`); các module sẽ dùng chung một DB.
 
-- Khi chạm ranh giới sản phẩm, khóa định danh chung (CCCD, số sê-ri GCN, thửa đất, số công chứng) hoặc tích hợp: chỉ đọc tệp cần thiết — `PROJECTS.md`, `contracts/entities.md` (chuẩn hóa khóa), `OPEN_DECISIONS.md` (không tự chốt).
-- Trước khi chọn công nghệ mới (nhà cung cấp OCR, ORM, hàng đợi, UI framework…) hoặc quyết định kiến trúc: bắt buộc đọc `D:\systemdocs\TECH_STACK.md`.
-- Tài liệu chung không ghi đè quy định nội bộ repo; gặp mâu thuẫn phải báo, không âm thầm chọn một bên.
+- Khi chạm ranh giới module, khóa định danh chung (CCCD, số sê-ri GCN, thửa đất, số công chứng) hoặc tích hợp: chỉ đọc tệp cần thiết — `../SYSTEM_ARCHITECTURE.md`, `../contracts/entities.md` (chuẩn hóa khóa), `../contracts/desktop-command.md` (kênh gọi qua `shell/`), `../OPEN_DECISIONS.md` (không tự chốt). Nghiệp vụ module khác: `../<module>/docs/SPEC.md`.
+- Trước khi chọn công nghệ mới (nhà cung cấp OCR, ORM, hàng đợi, UI framework…) hoặc quyết định kiến trúc: bắt buộc đọc `../TECH_STACK.md`.
+- Tài liệu chung không ghi đè quy định nội bộ module; gặp mâu thuẫn phải báo, không âm thầm chọn một bên.
 
 ## 3. Tra cứu mã và đánh giá ảnh hưởng
 
 - Biết file/symbol/chuỗi cần tìm: tìm, đọc có mục tiêu hoặc dùng LSP; không gọi graph/index cho sửa đổi cục bộ đã rõ vị trí.
 - Chưa rõ quan hệ giữa các file hoặc ownership: dùng graph Graphify hiện có, bắt đầu ở độ sâu 1–2 và chỉ mở rộng khi thiếu bằng chứng:
-  `D:\graphify\.venv\Scripts\graphify.exe query "<câu hỏi>" --graph graphify-out/graph.json`
+  `D:\graphify\.venv\Scripts\graphify.exe query "<câu hỏi>" --graph ../code-graphs/notary_v2/monorepo/graphify-out/graph.json`
 - Graph chỉ dẫn đường; luôn đọc mã hiện tại trước khi sửa hoặc kết luận hành vi. Graph thiếu/cũ/không đủ thì đọc mã trực tiếp; chỉ cập nhật khi cần, không dựng lại toàn bộ cho sửa đổi thường lệ.
 - Log/dữ liệu lớn: dùng `ctx_execute`/`ctx_batch_execute` nếu có để lọc, giữ exit code và đường dẫn tới dữ liệu đầy đủ. Kết quả nhỏ đọc trực tiếp; `ctx_search` chỉ dùng sau `ctx_index`.
 

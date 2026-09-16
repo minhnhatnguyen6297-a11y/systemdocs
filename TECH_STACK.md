@@ -1,15 +1,17 @@
 # Lựa chọn công nghệ — SOT toàn hệ thống
 
 **Đây là file agent phải đọc TRƯỚC KHI ra quyết định kiến trúc hoặc chọn công
-nghệ mới trong bất kỳ repo nào.**
+nghệ mới trong bất kỳ module nào.**
 
-Lý do file này tồn tại: ba repo sẽ **gộp thành một hệ thống dùng chung database**
-ở giai đoạn sau. Nếu mỗi repo tự chọn công nghệ khác nhau cho cùng một việc (ví
-dụ repo này OCR bằng Qwen, repo kia OCR bằng thứ khác), lúc gộp sẽ phải viết lại.
-Chọn khác là được — nhưng phải **có lý do và ghi vào đây**, không chọn theo quán
-tính.
+Lý do file này tồn tại: các module sẽ **gộp thành một hệ thống dùng chung
+database** ở giai đoạn sau. Code đã nằm chung một monorepo (nhánh
+`consolidate/monorepo`) — nghiệp vụ vẫn tách theo module, nhưng nếu mỗi module
+tự chọn công nghệ khác nhau cho cùng một việc (ví dụ module này OCR bằng Qwen,
+module kia OCR bằng thứ khác), lúc gộp DB sẽ phải viết lại. Chọn khác là được —
+nhưng phải **có lý do và ghi vào đây**, không chọn theo quán tính.
 
-Cập nhật trạng thái POC: 11/09/2026. Các lựa chọn công nghệ production không đổi.
+Cập nhật sau khi gộp monorepo: 16/09/2026. Module = thư mục con trong repo này;
+đường `D:\...` ở tài liệu cũ là từ trước khi gộp.
 
 ---
 
@@ -17,43 +19,43 @@ Cập nhật trạng thái POC: 11/09/2026. Các lựa chọn công nghệ produ
 
 | Việc | Công nghệ đã chọn | Đang dùng ở | Ghi chú |
 |---|---|---|---|
-| **OCR ảnh giấy tờ** | **Qwen-VL-OCR** qua DashScope **native multimodal API** (`qwen-vl-ocr-2025-11-20`) | `notary_v2/routers/ocr_ai.py:38-39,381-414` | Base mặc định `https://dashscope-intl.aliyuncs.com`; endpoint `{base}/api/v1/services/aigc/multimodal-generation/generation` (`:390`). Nhánh chọn key cho model không phải Qwen (`:69-79`) không chứng minh có transport fallback |
+| **OCR ảnh giấy tờ** | **Qwen-VL-OCR** qua DashScope **native multimodal API** (`qwen-vl-ocr-2025-11-20`) | `notary_v2/routers/ocr_ai.py:38-39,381-414` | Base mặc định `https://dashscope-intl.aliyuncs.com`; endpoint `{base}/api/v1/services/aigc/multimodal-generation/generation` (`:386`). File **không còn** nhánh `OPENAI_API_KEY`/OpenAI-compatible nào — transport duy nhất là native DashScope |
 | **Đọc `.docx`** | `python-docx` | `notary_v2`, `upload_lab` | Phải giữ thứ tự đoạn + bảng, nếu không sẽ trộn Bên A / Bên B |
-| **Đọc `.doc` cũ** | **Windows IFilter (`query.dll`)** | `upload_lab`; `notaryoffice` (dự kiến) | Không cần cài Word. Khả năng đọc ổn định khi Word đang giữ file **chưa được đo trên 6 máy thật** (`OPEN_DECISIONS.md` A1). `notary_v2` **không** dùng |
+| **Đọc `.doc` cũ** | **Windows IFilter (`query.dll`)** | `upload_lab/`; `notaryoffice/` (dự kiến) | Không cần cài Word. Khả năng đọc ổn định khi Word đang giữ file **chưa được đo trên 6 máy thật** (`OPEN_DECISIONS.md` A1). `notary_v2` **không** dùng |
 | **Đọc PDF / render ảnh** | `PyMuPDF` (`fitz`) | `notary_v2` | |
-| **Đọc QR / barcode** | `zxing-cpp` | `notary_v2` (`routers/ocr_local.py`) | |
+| **Đọc QR / barcode** | `zxing-cpp` | `notary_v2` (tùy chọn; local OCR stack đã gỡ — QR đi kèm pipeline đó, mở lại cần review) | |
 | **Sinh file Word** | `python-docx` + template placeholder | `notary_v2` (`services/word_engine.py`) | |
 | **Đọc/ghi Excel** | `openpyxl` | `notary_v2`, `upload_lab` | |
 | **So khớp chuỗi mờ** | `rapidfuzz` | `notary_v2` (fast audit) | Dùng cho soát chính tả, **không** dùng để ghép hồ sơ |
 | **Web backend** | **Python FastAPI** | `notary_v2`; `notaryoffice` Central Hub (dự kiến) | |
 | **ORM** | SQLAlchemy 2.x | `notary_v2` | |
-| **Database** | **SQLite** | `notary_v2` (`notary.db`), `upload_lab` (`registry.sqlite3`) | Bảng nghiệp vụ `ocr_jobs` và các bảng Zalo nằm trong `notary.db` (`notary_v2/database.py:8-24`, `models.py:161-171,186-300`); `ocr_jobs.db` là hạ tầng Celery, không phải DB nghiệp vụ OCR. Xem mục 3 về giai đoạn gộp |
-| **Job nền / queue** | Celery, broker SQLAlchemy + result backend DB | `notary_v2/celery_app.py:5-11` | Cả broker và result backend mặc định dùng `ocr_jobs.db`; URL có thể đổi qua cấu hình |
+| **Database** | **SQLite** | `notary_v2` (`notary.db`), `upload_lab` (`registry.sqlite3`) | `notary.db` chứa bảng nghiệp vụ + bảng Zalo (`notary_v2/database.py`, `models.py`); sidecar `shell/` ghi cùng DB này qua `notary_adapter.py`. Xem mục 3 về giai đoạn gộp |
 | **UI web** | Jinja2 template + static (không SPA framework) | `notary_v2` (`frontend/`) | |
-| **Desktop shell đích** | **Electron** | nhánh `systemdocs/electron-system-shell` (dự kiến triển khai); POC ở `upload_lab@codex/desktop-command-poc` | Owner chốt ngày 14/09/2026 qua MIN-50; Electron sở hữu shell/UI, không sở hữu nghiệp vụ Python |
+| **Desktop shell đích** | **Electron** | module `shell/` (main + preload + renderer; sidecar FastAPI `shell/sidecar/`) | Owner chốt ngày 14/09/2026 qua MIN-50; contract `desktopcommand.v1` APPROVED ở `contracts/desktop-command.md`; Electron sở hữu shell/UI, không sở hữu nghiệp vụ Python. POC tiền thân: `upload_lab/poc/desktop_command/` |
 | **UI desktop legacy** | **PySide6 / Qt** | `upload_lab` (`ui_qt/`) | Baseline chuyển đổi; không tiếp tục là shell đích |
-| **Tự động hóa web nhà nước** | **Playwright** (Chromium) | `upload_lab` | Session lưu ở `nd_storage_state.json`; Chromium headed riêng do Python quản lý |
+| **Tự động hóa web nhà nước** | **Playwright** (Chromium) | `upload_lab`; `shell/sidecar/upload_session.py` | Session lưu ở `nd_storage_state.json`; Chromium headed riêng do Python quản lý — không điều khiển cửa sổ Electron |
 | **Agent trên máy trạm** | **C# .NET 8** | `notaryoffice` (dự kiến) | Ràng buộc: <30MB RAM, <0.5% CPU |
-| **Nhận media từ Zalo** | `zca-js` (Node) như connector thay thế được | `notary_v2` (Zalo Document Inbox) | Xem mục 4 |
-| **Test** | `pytest`; `playwright` cho e2e | cả `notary_v2` và `upload_lab` | |
+| **Nhận media từ Zalo** | `zca-js` (Node) như connector thay thế được | `notary_v2` (Zalo Document Inbox, `zalo_connector/`) | Xem mục 4 |
+| **Test** | `pytest`/`unittest`; `node --test` cho JS; `playwright` cho e2e | `notary_v2`, `upload_lab`, `shell` | |
 
-**API key và secret:** đặt trong `.env` của từng repo, đã `.gitignore`. Không bao
-giờ ghi key vào tài liệu, không commit `.env`. Mẫu biến ở `.env.example`.
+**API key và secret:** đặt trong `.env` của từng module, đã `.gitignore`. Không
+bao giờ ghi key vào tài liệu, không commit `.env`. Mẫu biến ở `.env.example`.
 
 ### 1.1. Candidate còn đang đánh giá
 
-Electron đã được owner chọn làm desktop shell đích ngày 14/09/2026 và đã chuyển
-vào bảng công nghệ chính. Đặc tả MIN-50 đã được **duyệt cho POC** theo
-`MIN50_IMPLEMENTATION_SPEC.md` §3/W0 ngày 11/09/2026; không phải duyệt adoption.
-POC conversion đã có code trong worktree riêng, nhưng chưa có đủ bằng chứng
-golden dataset/benchmark để chọn candidate vào production. Snapshot source và
-gap ở [`COMPONENT_MAP.md`](./COMPONENT_MAP.md) §2/6.2. Các candidate dưới đây
-chỉ được triển khai sau khi được duyệt, bằng task riêng; không diễn giải bảng
-này thành migration hoặc dependency production.
+Electron đã được owner chọn làm desktop shell đích ngày 14/09/2026 và đã có
+runtime thật trong module `shell/` (contract `desktopcommand.v1` APPROVED —
+xem `contracts/`). POC conversion có code trong repo
+(`notary_v2/tools/document_conversion_poc/`, `upload_lab/poc/conversion_benchmark/`),
+nhưng chưa có đủ bằng chứng golden dataset/benchmark để chọn candidate vào
+production. Snapshot source và gap ở [`docs/g1/COMPONENT_MAP.md`](./docs/g1/COMPONENT_MAP.md)
+§2/6.2 (draft MIN-57 — issue đã cancel, chỉ còn giá trị tham chiếu). Các
+candidate dưới đây chỉ được triển khai sau khi được duyệt, bằng task riêng;
+không diễn giải bảng này thành migration hoặc dependency production.
 
 | Việc | Candidate | Baseline hiện tại | Lý do kỹ thuật để POC | Gate trước khi chọn |
 |---|---|---|---|---|
-| Adapter chuẩn hóa tài liệu | **Microsoft MarkItDown** | `python-docx`, Windows IFilter, `openpyxl`, PyMuPDF theo từng repo | Thử một lớp conversion thống nhất cho PDF có text, DOCX và XLSX trước hậu xử lý nghiệp vụ | Golden dataset phải chứng minh chất lượng, cấu trúc, provenance, lỗi và thời gian. `.doc` cũ không được giả định là đã giải quyết |
+| Adapter chuẩn hóa tài liệu | **Microsoft MarkItDown** | `python-docx`, Windows IFilter, `openpyxl`, PyMuPDF theo từng module | Thử một lớp conversion thống nhất cho PDF có text, DOCX và XLSX trước hậu xử lý nghiệp vụ | Golden dataset phải chứng minh chất lượng, cấu trúc, provenance, lỗi và thời gian. `.doc` cũ không được giả định là đã giải quyết |
 | OCR ảnh nhúng trong adapter | **POC `markitdown-ocr` gọi Qwen qua giao diện OpenAI-compatible** | Đường OCR hiện hành dùng DashScope native (`notary_v2/routers/ocr_ai.py:381-414`) | Cùng provider, nhưng là **bề mặt tích hợp thứ hai**, chưa chứng minh tương đương đường hiện hành | Kiểm chứng payload, MIME/base64, phản hồi, lỗi, timeout và giới hạn; OCR gate phải cấp quyền trước từng nhánh, không bật plugin toàn cục |
 
 Ranh giới chuyển đổi desktop đã chốt:
@@ -66,13 +68,15 @@ Ranh giới chuyển đổi desktop đã chốt:
 - Chưa nhúng web tỉnh vào Electron. Nếu sau này cần embed, phải mở lại review về
   bảo mật, session, download/upload và lifecycle; không dùng `<webview>` theo
   quán tính.
-- POC localhost FastAPI hiện có chỉ là bằng chứng đầu vào. DesktopCommand
-  production, lifecycle LAN và auth phải được đặc tả/duyệt ở MIN-64 trước code.
+- DesktopCommand production đã được đặc tả/duyệt (MIN-64) và publish thành
+  `desktopcommand.v1` ở `contracts/desktop-command.md`; implementation thật ở
+  `shell/`. POC localhost FastAPI cũ (`upload_lab/poc/desktop_command/`) chỉ là
+  bằng chứng đầu vào, không tương thích ngầm với v1.
 - Bind `127.0.0.1`, port cấu hình được; xác thực bằng token phiên ngắn hạn,
   không ghi token vào log. Caller là Electron **main process**, không phải
   renderer; không bật CORS rộng. Không đưa credential web tỉnh vào command.
 - Điểm bám là mẫu command queue của `UploadWorker`
-  (`upload_lab_repo/ui_qt/workers.py:105-117,146-153,210-241`), không phải một
+  (`upload_lab/ui_qt/workers.py:83-105,211-240`), không phải một
   HTTP endpoint có sẵn hay object được phép gọi từ thread tùy ý.
 
 Ranh giới của POC conversion/OCR:
@@ -84,12 +88,12 @@ Ranh giới của POC conversion/OCR:
   plugin OCR rồi đưa mọi file vào mà không qua Document Router/OCR gate.
 - Qwen vẫn là OCR provider duy nhất. POC adapter không được thêm provider thứ
   hai hoặc hồi sinh local OCR đang parked.
-- **Cổng kiểm chứng transport:** ngày 10/09/2026, tìm `chat.completions`,
-  `chat/completions`, `OpenAI(`, `compatible` và đối chiếu các HTTP call trong
-  `notary_v2/routers/ocr_ai.py` chưa thấy OpenAI-compatible OCR transport trong
-  file này. Hit `compatible` là helper so khớp trường (`:2261,2285-2287`), không
-  phải transport; nhánh chọn `OPENAI_API_KEY` (`:69-79`) chưa được chứng minh
-  là đường OCR khác hoạt động. Không suy rộng kết luận này ra toàn repo.
+- **Cổng kiểm chứng transport:** đối chiếu 10/09/2026 trên repo cũ, vẫn đúng
+  sau gộp — trong `notary_v2/routers/ocr_ai.py` chưa có OpenAI-compatible OCR
+  transport (chỉ có native DashScope ở `:381-414`). Hit `compatible` trong file
+  là helper so khớp trường, không phải transport; nhánh chọn `OPENAI_API_KEY`
+  cũ **đã bị gỡ khỏi file** (`tests/test_ocr_ai.py:248` xác nhận env openai
+  legacy bị bỏ qua). Không suy rộng kết luận này ra toàn module.
 - Vì vậy, tái sử dụng **provider Qwen** không đồng nghĩa tái sử dụng nguyên
   tích hợp hiện tại. Khả năng chạy qua OpenAI-compatible là giả thuyết POC;
   chưa đạt gate thì không thay adapter production.
@@ -123,9 +127,9 @@ queue thứ hai, hay một framework UI thứ ba mà không qua bước 3.
 
 ## 3. Ràng buộc thiết kế để lúc gộp không xung đột
 
-Định hướng: gộp thành **một hệ thống, một database dùng chung**; các repo trở
+Định hướng: gộp thành **một hệ thống, một database dùng chung**; các module trở
 thành công cụ xử lý dữ liệu theo mục đích riêng. Chưa làm bây giờ. Nhưng từ giờ,
-mỗi repo nên tuân theo mấy điều dưới đây để lúc gộp không phải viết lại:
+mỗi module nên tuân theo mấy điều dưới đây để lúc gộp không phải viết lại:
 
 - **Định danh người/tài sản và tham chiếu hồ sơ chuẩn hóa giống nhau.** Xem
   `contracts/entities.md`. CCCD cùng định dạng giúp đối chiếu người, không tự
@@ -135,15 +139,15 @@ mỗi repo nên tuân theo mấy điều dưới đây để lúc gộp không p
   nghiệp vụ.** DB chung sau này có thể là PostgreSQL. Cụ thể: đi qua SQLAlchemy
   hoặc SQL chuẩn, tránh `rowid` ẩn, tránh dựa vào kiểu lỏng của SQLite, không
   lưu số/ngày dưới dạng chuỗi tự do.
-- **ID phải không trùng giữa các repo.** Đừng dùng số tự tăng bắt đầu từ 1 làm
+- **ID phải không trùng giữa các module.** Đừng dùng số tự tăng bắt đầu từ 1 làm
   khóa nghiệp vụ nếu record đó sẽ đi vào DB chung. Dùng UUID hoặc tiền tố nguồn.
 - **Ngày tháng lưu ISO-8601, giờ lưu kèm múi giờ hoặc quy ước rõ ràng.** Không
   lưu `dd/mm/yyyy` vào cột dữ liệu (hiển thị thì tùy).
 - **Tên trường cho cùng một thứ phải giống nhau khi tạo bảng mới.** Đang có sẵn
   từ `notary_v2/docs/platform/document-intake/property-rules.md`: `so_serial`,
   `so_vao_so`, `so_thua_dat`, `so_to_ban_do`, `dia_chi`, `ngay_cap`,
-  `co_quan_cap`, `dien_tich`. Repo khác tạo bảng tài sản thì dùng đúng các tên
-  này.
+  `co_quan_cap`, `dien_tich`. Module khác tạo bảng tài sản thì dùng đúng các
+  tên này.
 - **Không hard-code đường dẫn tuyệt đối và không hard-code môi trường.** Cấu
   hình qua `.env`.
 
@@ -154,10 +158,10 @@ mỗi repo nên tuân theo mấy điều dưới đây để lúc gộp không p
 Mặc định hệ thống chạy trong LAN. Mọi lần gọi ra Internet phải nằm trong danh
 sách này; thêm điểm mới là quyết định kiến trúc, phải hỏi.
 
-| Điểm | Ra đâu | Gửi gì | Repo |
+| Điểm | Ra đâu | Gửi gì | Module |
 |---|---|---|---|
-| Cloud OCR | DashScope (Alibaba) | ảnh giấy tờ khách hàng | `notary_v2` |
-| Upload CSDL công chứng | web tỉnh Nam Định | dữ liệu hồ sơ đã hoàn tất | `upload_lab` |
+| Cloud OCR | DashScope (Alibaba) | ảnh giấy tờ khách hàng | `notary_v2` (gọi trực tiếp; qua `shell/` vẫn là cùng engine này) |
+| Upload CSDL công chứng | web tỉnh Nam Định (`congchungnamdinh.ninhbinh.gov.vn`) | dữ liệu hồ sơ đã hoàn tất | `upload_lab` (kể cả khi chạy qua `shell/`) |
 | Zalo | server Zalo | tin nhắn/ảnh của tài khoản văn phòng | `notary_v2`; `notaryoffice` (dự kiến) |
 
 `notaryoffice` Sentinel trên máy trạm: **không gọi Internet**, chỉ gửi JSON về

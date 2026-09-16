@@ -1,48 +1,40 @@
-# Notary System — Hub tầm nhìn & kiến trúc
+# Notary System — monorepo
 
-Nguồn tham chiếu cấp cha cho hệ sinh thái phần mềm công chứng.
-Repo con **không** cần đọc folder này để làm việc hằng ngày — chỉ đọc khi task
-đụng tới ranh giới giữa các sản phẩm, vocabulary dùng chung, hoặc quyết định
-kiến trúc xuyên sản phẩm.
+Monorepo của hệ thống phần mềm công chứng. Từ 15/09/2026 (Linear MIN-83) các
+repo con đã gộp vào đây làm module; nhánh phát triển duy nhất là
+`consolidate/monorepo`. Repo cũ trên GitHub chỉ còn archive.
 
-Một ngoại lệ bắt buộc: **trước khi chọn một công nghệ mới** (OCR provider khác,
-ORM khác, queue khác, framework UI khác) thì phải đọc
-[`TECH_STACK.md`](./TECH_STACK.md). Ba repo sẽ gộp về một database dùng chung;
-chọn lệch nhau bây giờ là viết lại sau.
+## Các module
 
-## Ba sản phẩm trong phạm vi
-
-| Sản phẩm | Đường dẫn (trên nhánh `consolidate/monorepo`) | Làm gì | Trạng thái |
+| Module | Làm gì | SOT nghiệp vụ | Trạng thái |
 |---|---|---|---|
-| `notary_v2` | `./notary_v2` (snapshot từ `D:\notary_v2`) | Soạn thảo hồ sơ tự động (thừa kế, sinh Word, intake giấy tờ, Zalo inbox) | Đang phát triển; chưa triển khai production |
-| `upload_lab` | `./upload_lab` (snapshot từ `D:\upload_lab_repo`) | Số hóa hồ sơ giấy: Word cũ → trường có cấu trúc → upload web CSDL công chứng tỉnh | Đang phát triển; chưa triển khai production |
-| `notaryoffice` | `./notaryoffice` (snapshot từ `D:\notaryoffice`) | Quản lý hồ sơ tại văn phòng: thu dấu vết từ máy con → tự dựng record hồ sơ | Tài liệu, chưa code |
-| `shell` | `./shell` | Vỏ Electron + Python sidecar FastAPI loopback | POC tích hợp; contract production chưa duyệt |
+| `notary_v2/` | Soạn thảo hồ sơ mới: OCR giấy tờ, Case Workspace, engine thừa kế, sinh Word, Zalo inbox | [`notary_v2/docs/SPEC.md`](./notary_v2/docs/SPEC.md) | Đang phát triển; chưa production |
+| `upload_lab/` | Số hóa kho Word cũ → trường có cấu trúc → upload web CSDL công chứng tỉnh | [`upload_lab/docs/SPEC.md`](./upload_lab/docs/SPEC.md) | Đang phát triển; chưa production |
+| `shell/` | Vỏ desktop Electron + Python sidecar gọi hai engine qua `desktopcommand.v1` | [`shell/docs/SPEC.md`](./shell/docs/SPEC.md) | Đang phát triển (G1 một máy) |
+| `notaryoffice/` | Theo dõi hồ sơ đang chạy: thu dấu vết máy trạm → tự dựng record | [`notaryoffice/docs/SPEC.md`](./notaryoffice/docs/SPEC.md) | **Chỉ có spec, chưa code** |
 
-Ngoài phạm vi: `researchskill` (`D:\researchskill`) là skill hỗ trợ coding,
-không phải phân hệ công chứng.
-
-`excelTK` là dự án riêng, không thuộc phạm vi hệ thống này. Kế hoạch chuyển
-nghiệp vụ thật sang Electron nằm ở [`ELECTRON_G1_PLAN.md`](./ELECTRON_G1_PLAN.md)
-trên nhánh `electron-system-shell`; `main` tiếp tục chỉ chứa tài liệu.
+Ngoài phạm vi: `excelTK` (dự án riêng), `researchskill` (skill hỗ trợ coding).
 
 ## Đọc gì khi nào
 
 | Cần gì | File |
 |---|---|
-| Tại sao có hệ thống này, ba sản phẩm ghép lại thành gì | [`VISION.md`](./VISION.md) |
-| Ranh giới sản phẩm, sản phẩm nào sở hữu dữ liệu nào | [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md) |
-| Sáu lớp thành phần chung, owner đề xuất và mức reuse — draft MIN-57 | [`COMPONENT_MAP.md`](./COMPONENT_MAP.md) |
-| Repo nào giải bài toán gì — feature gì — công nghệ gì | [`PROJECTS.md`](./PROJECTS.md) |
+| Tại sao có hệ thống này, các module ghép lại thành gì | [`VISION.md`](./VISION.md) |
+| Nghiệp vụ của một module | `<module>/docs/SPEC.md` (bảng trên) |
+| Ranh giới module, ai sở hữu dữ liệu nào | [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md) |
 | **Trước khi chọn công nghệ mới hoặc ra quyết định kiến trúc** | [`TECH_STACK.md`](./TECH_STACK.md) |
-| Vocabulary & schema dùng chung giữa các sản phẩm | [`contracts/README.md`](./contracts/README.md) |
+| Contract đã duyệt + chuẩn hóa khóa định danh dùng chung | [`contracts/README.md`](./contracts/README.md) |
 | Cái gì đã chốt, cái gì chưa chốt — đừng tự quyết | [`OPEN_DECISIONS.md`](./OPEN_DECISIONS.md) |
-| Review kết quả POC conversion/OCR của MIN-52 và MIN-59 | [`MIN61_CONVERSION_OCR_DECISION.md`](./MIN61_CONVERSION_OCR_DECISION.md) |
-| Quy tắc khi sửa chính folder này | [`AGENTS.md`](./AGENTS.md) |
+| Lộ trình Electron G1, draft spec MIN-*, handoff cũ | [`docs/g1/`](./docs/g1/) |
+| Graph điều hướng code (graphify) | [`code-graphs/README.md`](./code-graphs/README.md) |
+| Quy tắc khi sửa repo này | [`AGENTS.md`](./AGENTS.md) |
 
-## Nguồn sự thật
+## Nguyên tắc nhanh
 
-Folder này mô tả **quan hệ giữa các sản phẩm**. Hành vi bên trong một sản phẩm
-do docs của repo đó quyết định (`notary_v2/AGENTS.md` → `docs/`,
-`upload_lab_repo/README.md`, `notaryoffice/intent.md`). Khi folder này xung đột với repo con, repo con thắng về
-hành vi nội bộ — và mâu thuẫn đó phải được báo lại để sửa ở đây.
+- Mỗi module có **một** `docs/SPEC.md` làm SOT nghiệp vụ duy nhất — đọc nó
+  trước khi sửa nghiệp vụ của module đó.
+- Task/issue quản lý trên **Linear** (team `MIN`, project `systemdocs`),
+  không lưu task trong repo.
+- Nối hai module = tích hợp = cần contract được duyệt trước
+  ([`contracts/README.md`](./contracts/README.md)). `shell/` là kênh tích hợp
+  đã duyệt duy nhất hiện nay.

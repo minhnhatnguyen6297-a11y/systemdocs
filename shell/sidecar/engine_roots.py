@@ -9,8 +9,10 @@ theo engine root. Nguon migrate duoc owner khoa:
 Thu tu resolve (uutien cao → thap):
   1. env G1_NOTARY_V2_ROOT / G1_UPLOAD_LAB_ROOT
   2. shell/engine-roots.json (gitignored — path tuyet doi cua tung may)
-     {"notary_v2": "D:/notary_v2", "upload_lab": "D:/upload_lab_repo"}
-  3. thu muc cung ten trong repo gop: <repo>/notary_v2, <repo>/upload_lab
+     {"notary_v2": "C:/path/to/notary_v2", "upload_lab": "C:/path/to/upload_lab"}
+  3. thu muc cung ten trong monorepo: <repo>/notary_v2, <repo>/upload_lab
+     (sau khi gop monorepo day la duong dan mac dinh — thuong khong can
+     engine-roots.json)
 Thieu ca ba → engine_not_installed (khong retry, next_action ro rang).
 
 G1_OUTPUT_DIR: thu muc output do sidecar so huu (word export, file tai ve).

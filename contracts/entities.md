@@ -28,7 +28,7 @@ Cập nhật: 10/09/2026
 |---|---|---|
 | `notary_v2` | `(?<!\d)(\d{12})(?!\d)` — mọi cụm 12 số (`routers/ocr_ai.py`) | Rộng nhất, vì OCR ảnh hay mất chữ đầu |
 | `upload_lab` | Neo theo nhãn: `(?:Căn cước\|CCCD\|CMND)\s*(?:số)?\s*:?\s*(\d+)` (`extract_contract.py`) | Chặt theo ngữ cảnh vì text Word có sẵn nhãn |
-| `notaryoffice` (dự kiến) | `\b\d{12}\b` (`notaryoffice/intent.md` v1.0 §7.2, dòng 325) | Đã bỏ ràng buộc số 0 đầu; chưa có implementation |
+| `notaryoffice` (dự kiến) | `\b\d{12}\b` (`notaryoffice/docs/SPEC.md` v1.0 §7.2, ~dòng 413) | Đã bỏ ràng buộc số 0 đầu; chưa có implementation |
 
 **Quy tắc thống nhất:** dù regex nào, giá trị đem đi so khớp phải là đúng 12 chữ
 số. Không so khớp một phần, không so khớp 9 số cuối.
@@ -42,8 +42,8 @@ số. Không so khớp một phần, không so khớp 9 số cuối.
   không.
 - Dải được hệ thống chấp nhận là `[A-Z]{2}` + 6–8 số; chuẩn hóa bằng cách bỏ
   khoảng trắng và viết hoa. Nguồn hiện hành:
-  `notary_v2/routers/ocr_ai.py:924-925,972`; thiết kế đã đồng bộ:
-  `notaryoffice/intent.md` v1.0 §7.2, dòng 326 (`[A-Z]{2}\s*\d{6,8}`).
+  `notary_v2/routers/ocr_ai.py:919-922,968`; thiết kế đã đồng bộ:
+  `notaryoffice/docs/SPEC.md` v1.0 §7.2 (~dòng 414, `[A-Z]{2}\s*\d{6,8}`).
 
 ---
 
@@ -65,7 +65,8 @@ số. Không so khớp một phần, không so khớp 9 số cuối.
   `(thửa, tờ, địa phương)` mới đủ mạnh để xếp hạng cao.
 - `notary_v2`: `so_thua_dat`, `so_to_ban_do`, `dia_chi`.
 - `notaryoffice` dự kiến dùng tên `so_thua_dat`, `so_to_ban_do`
-  (`notaryoffice/intent.md:327`), không quy định regex thửa/tờ tại mục đó.
+  (`notaryoffice/docs/SPEC.md` §7.2, ~:415-416), không quy định regex thửa/tờ
+  tại mục đó.
 - `upload_lab` hiện **không tách thửa/tờ thành trường riêng** — nó trích cả khối
   mô tả tài sản dưới dạng text để điền web. Nếu sau này cần khớp hồ sơ giữa
   `upload_lab` và `notaryoffice`, đây là việc phải làm thêm ở `upload_lab`.
@@ -122,7 +123,8 @@ sơ. Một người/tài sản có thể liên quan nhiều hồ sơ. Liên kế
 có provenance, được người có thẩm quyền xác nhận theo owner; chuẩn hóa thành
 công không tự nâng dữ liệu thành `CONFIRMED`.
 
-Điểm bám thiết kế: `notaryoffice/intent.md:365-373` phân biệt `entities`,
-`cases` và `case_entities` M:N; `:385-394` mô tả xếp hạng rồi xác nhận.
-Không suy ra cardinality giữa Case của hai repo từ quan hệ nội bộ này; xem
+Điểm bám thiết kế: `notaryoffice/docs/SPEC.md` §7.3 (~:418-472) phân biệt
+`entities`, `cases` và `case_entities` M:N; §8.1–8.2 (~:475-508) mô tả xếp
+hạng rồi xác nhận.
+Không suy ra cardinality giữa Case của hai module từ quan hệ nội bộ này; xem
 `SYSTEM_ARCHITECTURE.md` §7. Không định nghĩa thêm shared ID/schema trong lần sửa này.

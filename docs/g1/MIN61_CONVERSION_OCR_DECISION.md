@@ -20,7 +20,7 @@ Qwen transport vào production. Baseline theo từng loại file vẫn giữ ngu
 | `markitdown-ocr` + Qwen compatible | **NOT VERIFIED** | Không có thử nghiệm plugin hoặc provider thật; Qwen-native đang chạy không chứng minh compatible surface. |
 
 `ConversionEnvelope v0.experimental` chỉ tiếp tục là shape POC trong
-[`SYSTEM_ARCHITECTURE.md` §6.5](./SYSTEM_ARCHITECTURE.md#65-conversionenvelope-v0experimental),
+[`SYSTEM_ARCHITECTURE.md` §6.5](../../SYSTEM_ARCHITECTURE.md#65-conversionenvelope-v0experimental),
 không phải contract tại `contracts/`.
 
 ## 2. Bằng chứng đã đọc và giới hạn của bằng chứng
@@ -121,7 +121,7 @@ OCR audit hoặc trạng thái người dùng đã xác nhận.
 
 Chưa gán runtime owner, hai consumer production, hay phương thức distribution.
 Gán chúng ngay bây giờ sẽ biến shape POC thành contract/runtime integration,
-trái với [`contracts/README.md`](./contracts/README.md) và giai đoạn ALIGN.
+trái với [`contracts/README.md`](../../contracts/README.md) và giai đoạn ALIGN.
 
 Khi các gate đạt, task contract riêng phải để người duyệt chốt tối thiểu:
 

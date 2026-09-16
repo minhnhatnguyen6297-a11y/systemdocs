@@ -59,7 +59,7 @@ chứng tìm hồ sơ liên quan, **không phải Case primary key**. Tên ngư�
 đất trùng không đủ để tự gộp hồ sơ. Số công chứng cũng cần năm/phạm vi sổ/đơn vị.
 
 Hai aggregate soạn thảo và theo dõi chưa được chứng minh có quan hệ 1:1
-(`notary_v2/models.py:83-102`; `notaryoffice/intent.md:365-373`). Vì vậy phải
+(`notary_v2/models.py:83-102`; `notaryoffice/docs/SPEC.md` §7.3, ~:427-461). Vì vậy phải
 thống nhất nghĩa của tham chiếu, giữ provenance và bước xác nhận trước khi
 thiết kế liên kết. Chuẩn ở [`contracts/entities.md`](./contracts/entities.md),
 ranh giới ở [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md) §7.
@@ -71,7 +71,8 @@ các chức năng chung dùng cùng thành phần và sẵn sàng gom vào một
 Ba repo trở thành các đường xử lý theo mục đích riêng trong hệ thống đó.
 
 **Ưu tiên hiện tại:** đồng bộ kiến trúc trước khi phát triển riêng thêm. Bản đồ
-[`COMPONENT_MAP.md`](./COMPONENT_MAP.md) đưa ra owner/reuse đề xuất để duyệt;
+[`docs/g1/COMPONENT_MAP.md`](./docs/g1/COMPONENT_MAP.md) (snapshot trước gộp,
+MIN-57 canceled) đưa ra owner/reuse đề xuất để duyệt;
 POC và production contract đi trước từng lát cắt code chung. Không dùng việc
 merge repo để che các ranh giới dữ liệu/nghiệp vụ chưa thống nhất.
 
