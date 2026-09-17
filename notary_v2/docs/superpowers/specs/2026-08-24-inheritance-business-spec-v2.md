@@ -1,5 +1,11 @@
 # Nghiệp vụ sơ đồ thừa kế — bản hoàn chỉnh vòng 2
 
+> **Định tuyến 17/09/2026:** bản phản biện/đề xuất chưa duyệt, không phải SOT.
+> Sửa quy tắc tính tại [domain spec](../../domains/inheritance/spec.md) theo
+> [SPEC module](../../SPEC.md). Chỉ chuyển nội dung cụ thể khi người dùng duyệt;
+> không chọn bản này vì ngày mới hơn. Stage/commit nằm ở chương workspace,
+> không được định nghĩa lại bằng tài liệu tính thừa kế.
+
 > **Trạng thái:** DRAFT để user chỉnh tiếp. Chưa chuẩn tắc.
 > **Lập ngày:** 24/08/2026. **Nội dung phản biện diễn ra:** 22/08/2026.
 > **Quan hệ với tài liệu hiện có:** bản này là bản kế tiếp của

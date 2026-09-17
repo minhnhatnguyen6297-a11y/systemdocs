@@ -1,10 +1,13 @@
-# Repository documentation
+# Tài liệu notary_v2
 
-Status: current
-Source of truth: module specs and platform contracts routed below
-Read when: locating product or architecture documentation
+Bắt đầu tại [SPEC.md](SPEC.md). Đây là cửa vào duy nhất của bộ đặc tả nghiệp vụ.
+Bảng §1 trong SPEC chỉ rõ **chủ đề nào phải sửa file nào**, không sao chép bảng
+thành nhiều danh sách quyền quyết định khác nhau.
 
-- Business modules: `docs/domains/`
-- Shared capabilities: `docs/platform/`
-- Architecture decisions: `docs/architecture/`
-- Code navigation: use Graphify; do not duplicate code maps here
+- Muốn đổi nghiệp vụ: sửa chương do SPEC chỉ định; ghi trạng thái duyệt và code.
+- Chương có nhãn DRAFT chưa có quyền triển khai chỉ vì nằm trong bảng.
+- Technical/UX chưa duyệt, research, kế hoạch và bản có ngày là tham khảo.
+- [Hướng dẫn cập nhật](agents/domain.md) giải thích xử lý thay đổi, tài liệu cũ và kiểm tra liên kết.
+- [AGENTS.md](../AGENTS.md) giữ phạm vi/quy trình/review, không chép nghiệp vụ.
+- [ADR](architecture/README.md) giải thích quyết định kiến trúc, không vượt SPEC nghiệp vụ.
+- Công nghệ ở [TECH_STACK.md](../../TECH_STACK.md); task theo Linear, không theo repo archive.

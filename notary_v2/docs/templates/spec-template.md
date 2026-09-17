@@ -1,5 +1,11 @@
 # Feature specification: <business feature name>
 
+> **Cách dùng hiện tại:** chỉ dùng cấu trúc dưới đây như danh sách kiểm tra khi
+> sửa chương sở hữu trong [SPEC notary_v2](../SPEC.md#1-sửa-yêu-cầu-ở-đúng-một-nơi).
+> Không tạo file feature spec riêng song song với chương đang sở hữu nghiệp vụ;
+> đề xuất chưa duyệt nằm trong mục câu hỏi/draft tại chính chương đó.
+> Mẫu bên dưới giữ để tham chiếu cách mô tả, không phải một nguồn quy tắc mới.
+
 > **Status:** DRAFT
 > **Owner/approver:** User
 > **Input:** <user's original idea or request>

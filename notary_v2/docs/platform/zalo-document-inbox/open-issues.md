@@ -5,6 +5,11 @@ Updated: 2026-08-11
 
 This file records unresolved work only. It does not override `spec.md`.
 
+Định tuyến 17/09/2026: [spec.md](spec.md) đã đổi hướng Zalo về Stage.
+Bằng chứng/nhánh/test dưới đây là lịch sử; cần kiểm lại trên monorepo.
+Không dùng lỗi/gate cũ để khôi phục sửa/xác nhận OCR trong modal hoặc mở thêm
+quyền tài khoản. Runtime migration Stage chưa thực hiện trong task tài liệu.
+
 ## ZALO-LIVE-001 — Realtime My Documents is not live-verified
 
 - Status: open.
@@ -33,7 +38,10 @@ This file records unresolved work only. It does not override `spec.md`.
 ## OCR-SHARED-001 — Active OCR runtime must remove QR OCR
 
 - Decision: approved by user on 2026-08-11.
-- Normative rule: `docs/platform/document-intake/spec.md` is Qwen-only. Active Cloud AI OCR must not use server QR decode, client QR scan, QR rescue/fallback, QR-first routing, or QR/source priority.
+- Quyết định công nghệ hiện hành đọc tại [TECH_STACK.md](../../../../TECH_STACK.md);
+  chương [intake](../document-intake/spec.md) giữ hành vi sản phẩm. Kết luận
+  Qwen-only/không hồi sinh QR trong issue cũ không biến file intake thành nơi
+  chọn công nghệ hoặc cho phép tự sửa shared OCR trong task tài liệu.
 - Current blocker: the integrated Zalo verifier still reaches a shared OCR mismatch where `routers.zalo_inbox._output_job` references missing `ocr_ai.shape_cached_ocr`.
 - Required task: a separate shared-OCR implementation/review must align `routers/ocr_ai.py`, its frontend callers, and tests with the normative Qwen-only contract.
 - Scope boundary: do not solve this by restoring QR helpers or silently changing the Zalo module contract.

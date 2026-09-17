@@ -4,7 +4,12 @@ Status: parked design reference; non-normative pending reconciliation with the V
 
 This document contains the historical target design, including `case_state.js`. It must not direct implementation until reconciled with the V2 engine and explicitly approved. Root-cause history is explanatory and non-normative. Persisted `case_state_json.diagram.engineState` is a snapshot container and does not replace the `engineInput`/`engineResult` contract.
 
-Current observable UI behavior is governed by `../workflow.md`; `../spec.md` remains a draft requiring explicit user approval.
+Current target Stage/Pool/Diagram behavior is owned by
+[`../../../platform/case-workspace/contract.md`](../../../platform/case-workspace/contract.md);
+[`../workflow.md`](../workflow.md) only redirects to its owner chapters.
+The inheritance calculation in [`../spec.md`](../spec.md) remains a draft
+requiring explicit user approval. Old “Decisions” and schema examples below
+are historical design notes, not permission to implement them.
 
 ---
 

@@ -1,8 +1,9 @@
 # Fast text audit — Technical contract
 
-Status: active
-Owner: platform/fast-text-audit
-Source of truth: standalone fast text audit CLI contract
+Chương của [SPEC module](../../SPEC.md), giữ tên file cũ.
+Phần mục tiêu/đầu ra sở hữu nghiệp vụ soát văn bản độc lập; cấu hình và thuật
+toán bên dưới là tham khảo kỹ thuật, không đặt thêm lựa chọn công nghệ.
+Định tuyến cập nhật 17/09/2026, không là bằng chứng đã kiểm thử runtime.
 
 Cập nhật: 04/07/2026
 
@@ -24,7 +25,7 @@ Pipeline OCR nhanh, độc lập để soát chính tả và sai chuỗi trong h
 | 1 | CLI là giao diện duy nhất ở v1. Không web UI, không desktop app. |
 | 2 | Pipeline tách biệt: `services/fast_audit/` và `tools/run_fast_audit.py`. |
 | 3 | Không sửa `routers/ocr_ai.py` cho v1. |
-| 4 | OCR qua HTTP API (`qwen`/`openai`); không fallback local OCR nặng. |
+| 4 | Công nghệ OCR theo [TECH_STACK.md](../../../../TECH_STACK.md); không tự thêm provider hoặc fallback local OCR. |
 | 5 | Tin vào thứ tự scan thực tế; grouping rule-based, không AI. |
 | 6 | Cache page ảnh và OCR text theo `sha256(page_bytes)`. |
 | 7 | Bỏ qua toàn bộ trang/đoạn Lờ chứng trong Word lẫn OCR. |

@@ -1,16 +1,18 @@
-# Inheritance
+# Hồ sơ thừa kế
 
-Status: active documentation migration
-Source of truth: `workflow.md` for current observable UI behavior; no approved inheritance-calculation specification exists yet
-Read when: changing inheritance business rules, case workflow, Diagram UX, engine behavior, Word export, or active work
+Cửa vào duy nhất: [SPEC module](../../SPEC.md).
 
-`spec.md` is a draft/non-normative business-rule proposal, not a source of truth until the user explicitly approves it. Rule changes require explicit user approval; ask the user when ambiguous.
+| Cần thay đổi | Đọc/sửa |
+|---|---|
+| Hồ sơ, Người, Tài sản | [SPEC tổng](../../SPEC.md) |
+| Input/OCR | [Tiếp nhận](../../platform/document-intake/spec.md) |
+| Stage/Pool, Cập nhật, ảnh hưởng Diagram | [Chương Stage](../../platform/case-workspace/contract.md) |
+| Tính thừa kế | [spec.md](spec.md) — DRAFT chưa duyệt toàn bộ |
+| Bố trí/UX riêng Diagram | [ux.md](ux.md) — DRAFT |
+| Word | [word-export.md](word-export.md) |
 
-- Business-rule draft: `spec.md`
-- Workflow and Stage/Pool behavior: `workflow.md`
-- Diagram UI/UX: `ux.md`
-- Case-state parked design reference: `technical/case-state.md`
-- Inheritance engine V2 target pending implementation commit: `technical/inheritance-engine.md`
-- Word export flow: `word-export.md`
-- Active work: `plan.md`
-- Non-normative evidence and research: `research/`
+[workflow.md](workflow.md) chỉ chuyển tiếp, không còn định nghĩa hành vi riêng.
+Bản tính thừa kế 24/08 trong superpowers là đề xuất kế tiếp, không tự thay draft
+hiện hành và không có quyền ghi đè chương Stage. Technical/plan/research giữ
+bằng chứng, không là nguồn duyệt nghiệp vụ. Thêm quyết định mới phải cập nhật
+đúng chương theo SPEC §1, không tạo thêm một bản SOT có ngày.

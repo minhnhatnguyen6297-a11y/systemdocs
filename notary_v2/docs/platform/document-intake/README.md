@@ -1,10 +1,10 @@
-# Document intake
+# Tiếp nhận dữ liệu
 
-Status: active
-Source of truth: `spec.md`
-Read when: changing shared upload, Cloud AI OCR, OCR response contracts, or property-document extraction
+Cửa vào: [SPEC module](../../SPEC.md).
+**Đổi input/OCR: sửa [spec.md](spec.md).**
+Sửa/duyệt dữ liệu thuộc [Stage](../case-workspace/contract.md).
 
-- Cloud AI OCR: `spec.md`
-- Property extraction rules: `property-rules.md`
-- Local OCR has been removed from the active application; its last code is preserved on `codex/local-ocr-legacy`
-- Domain-specific role and Stage mapping belongs in the relevant domain module
+- [technical.md](technical.md): API/parser và đề xuất cũ, reference-only.
+- [property-rules.md](property-rules.md): heuristic sổ đỏ để đối chiếu source, không đặt nghiệp vụ.
+- Cửa sổ chung có gate engine; QR giấy tờ/loại khác để sau theo chương hiện hành.
+- Công nghệ và local OCR theo TECH_STACK/OPEN_DECISIONS cấp repo, không tự mở lại.

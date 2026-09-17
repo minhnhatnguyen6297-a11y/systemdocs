@@ -1,5 +1,14 @@
 # Spec: Mô hình đồng bộ Stage (SOT) → Pool → Diagram
 
+> **Định tuyến lại 17/09/2026 — bản tham khảo lịch sử, không sửa nghiệp vụ tại đây.**
+> Hành vi đã bàn ở D8/D9/D12 và yêu cầu Cập nhật toàn cục mới được tổng hợp tại
+> [chương Stage](../../platform/case-workspace/contract.md), thuộc [SPEC module](../../SPEC.md).
+> File hiện hành mở rộng từ Người sang Người + Tài sản + giấy tờ khác.
+> Các nhãn “quyết định”, “hiện tại”, “đã chốt” dưới đây là lịch sử từng mục,
+> không duyệt toàn bộ bản cũ. D1–D13 còn đề xuất kỹ thuật, schema/API, bản ghi
+> dùng chung và chẩn đoán nhánh cũ; không được tự implement hoặc coi là lỗi
+> hiện tại nếu chưa kiểm chứng. Đặc biệt D10 không cho lưu riêng một phần Stage.
+
 Ngày: 2026-08-18
 Trạng thái: **ĐỀ XUẤT — chờ user duyệt**. Chưa normative. Không được implement trước khi user duyệt.
 Module: Hồ sơ thừa kế (case workspace)

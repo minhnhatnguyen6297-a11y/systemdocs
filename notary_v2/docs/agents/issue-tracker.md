@@ -1,23 +1,14 @@
-# Issue Tracker: GitHub / Local Specs
+# Task và đặc tả
 
-Issues, tickets, and specifications for this repo can live as GitHub Issues or local markdown files.
+Task/issue hiện quản lý trên **Linear — team MIN, project systemdocs**, theo
+quy định monorepo. Repo GitHub notary_v2 cũ là archive, không tạo issue mới ở đó.
 
-## Primary: GitHub Issues (when online / gh CLI available)
+Đặc tả nghiệp vụ sống trong [bộ SPEC](../SPEC.md); [hướng dẫn cập nhật](domain.md)
+chỉ rõ cách tìm file sở hữu. Khi yêu cầu đổi, sửa chương hiện hành, không tạo
+local ticket/SPEC ngày mới làm nguồn nghiệp vụ thứ hai.
 
-- **Create an issue**: `gh issue create --title "..." --body "..."`
-- **Read an issue**: `gh issue view <number> --comments`
-- **List issues**: `gh issue list --state open`
-- **Comment / Edit**: `gh issue comment <number> --body "..."`, `gh issue edit <number>`
-- **Close**: `gh issue close <number> --comment "..."`
+Đề xuất chưa duyệt ghi rõ tại chương sở hữu hoặc issue; chỉ người dùng duyệt.
+Kế hoạch triển khai, nếu task cần, thuộc workflow module và dẫn về chương SPEC,
+không tự đặt thêm nghiệp vụ. Không tạo task/plan/todo mới ở repo gốc.
 
-Remote repository: `https://github.com/minhnhatnguyen6297-a11y/notary_v2.git`
-
-## Fallback / Local Specs & Plans (Offline or File-based workflow)
-
-When working locally or without `gh` CLI credentials:
-- **Specs from `/to-spec`**: Write to `docs/superpowers/specs/<feature-name>.md`
-- **Plans from `writing-plans`**: Write to `docs/superpowers/plans/<feature-name>.md`
-- **Tickets from `/to-tickets`**: Write to `.scratch/<feature-name>/ticket-*.md` or `docs/superpowers/specs/tickets-<feature-name>.md`
-
-## PRs as a request surface
-**PRs as a request surface: no.**
+Task này không tạo hoặc thay đổi Linear issue, PR hay trạng thái bên ngoài.

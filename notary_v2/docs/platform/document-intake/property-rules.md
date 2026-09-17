@@ -1,11 +1,13 @@
 # Quy tắc OCR Tài sản (Sổ đỏ / Sổ hồng)
 
-Status: active
-Owner: platform/document-intake
-Source of truth: property OCR field extraction and front/back merge rules
+Status: reference-only — snapshot parser/heuristic, không phải SOT nghiệp vụ.
+Nghiệp vụ input và ghép mặt sửa tại [spec.md](spec.md); Người/Tài sản và
+định danh sửa theo [SPEC module](../../SPEC.md). Không lấy heuristic dưới đây
+làm quyền gộp tài sản, chặn serial trùng hoặc phê duyệt classifier.
 
 > File này mô tả logic regex + scoring hiện tại trong `routers/ocr_ai.py`.
-> Khi muốn thay đổi rule, sửa file này trước rồi giao Codex implement theo.
+> Khi đổi nghiệp vụ, sửa chương được SPEC chỉ định trước. File này chỉ cập nhật
+> bằng chứng/parser sau kiểm tra source, không thay thế phê duyệt nghiệp vụ.
 > Cập nhật: 22/04/2026
 
 ---

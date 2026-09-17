@@ -13,18 +13,30 @@ Quy định quyền quyết định, phạm vi, nơi tra cứu và điều kiệ
 
 ## 2. Nguồn chuẩn và tài liệu tham chiếu
 
-Thứ tự: `AGENTS.md` → `docs/SPEC.md` (SOT nghiệp vụ của module) → ADR đã chấp nhận → đặc tả feature đã duyệt (`docs/superpowers/specs/`, domain spec) → platform contract → tài liệu kỹ thuật/UX → kế hoạch đang làm → nghiên cứu/lịch sử.
+Nguồn nghiệp vụ duy nhất: `docs/SPEC.md` và các chương được nó chỉ định.
+`AGENTS.md` quy định quyền/quy trình; ADR giải thích kiến trúc, không ghi đè
+nghiệp vụ. Technical/UX chưa duyệt, plan, research và bản có ngày trong
+`docs/superpowers/specs/` không tự trở thành SOT vì tiêu đề hoặc ngày mới hơn.
+Chương còn DRAFT phải được người dùng duyệt trước triển khai.
+
+**Khi yêu cầu nghiệp vụ đổi:** tìm chủ đề ở `docs/SPEC.md` §1, sửa đúng chương
+sở hữu tại chỗ; không tạo bản SPEC ngày mới để thay thế ngầm. Quy tắc dùng lại
+phải dẫn liên kết, không chép vào nhiều file. Ghi riêng yêu cầu đã duyệt và gap
+code. Đổi đường dẫn/chủ đề phải cập nhật bảng SPEC, routing dưới đây và link cũ.
+Chi tiết quy trình: `docs/agents/domain.md`.
 
 Chỉ đọc `docs/README.md` khi chưa rõ khu vực công việc; nếu đã rõ, đi thẳng tới:
 
 | Công việc | Đọc trước |
 | --- | --- |
-| Thừa kế và UX hồ sơ | `docs/domains/inheritance/README.md` |
-| Tiếp nhận tài liệu, Cloud AI OCR | `docs/platform/document-intake/README.md` |
-| OCR cục bộ — cần phạm vi riêng | `docs/platform/document-intake/README.md` |
-| Stage/Pool dùng chung | `docs/platform/case-workspace/README.md` |
-| Sinh văn bản Word | `docs/platform/document-generation/README.md` |
-| Kiểm tra văn bản nhanh | `docs/platform/fast-text-audit/README.md` |
+| Hồ sơ, Người, Tài sản, file cần cập nhật | `docs/SPEC.md` |
+| Quy tắc tính thừa kế (còn nháp) | `docs/domains/inheritance/spec.md` |
+| UX riêng Diagram (còn nháp) | `docs/domains/inheritance/ux.md` |
+| Input/OCR, gate cửa sổ chung, loại giấy tờ | `docs/platform/document-intake/spec.md` |
+| Stage/Pool, Cập nhật toàn cục, ảnh hưởng Diagram | `docs/platform/case-workspace/contract.md` |
+| Zalo input, nguồn/lô/đầu ra | `docs/platform/zalo-document-inbox/spec.md` |
+| Sinh văn bản Word | `docs/domains/inheritance/word-export.md` |
+| Kiểm tra văn bản nhanh | `docs/platform/fast-text-audit/technical.md` |
 | Quyết định kiến trúc | `docs/architecture/README.md` |
 
 - Tiếp tục việc gián đoạn/chuyển máy: đọc `memory-bank/CURRENT.md` trước, đối chiếu Git rồi chỉ theo liên kết liên quan. Memory Bank không thay thế nguồn chuẩn hoặc bằng chứng mới.
@@ -51,7 +63,13 @@ Module này nằm trong monorepo (từ 15/09/2026, MIN-83) — phát triển tr�
 Chỉ dẫn repo/người dùng ưu tiên hơn skill. Ưu tiên thay đổi nhỏ nhất, giữ hành vi hiện có và tận dụng mã sẵn có.
 
 - **Làm rõ yêu cầu (discovery)** (tính năng mới, tái cấu trúc lớn, yêu cầu chưa rõ): dùng `grill-with-docs` hoặc `grilling` + `domain-modeling`; không dùng `brainstorming` khi discovery theo Matt Pocock đang diễn ra. Có thể dùng `prototype`, nhưng phải xóa mã thử trước khi duyệt đặc tả và triển khai thật.
-- **Đặc tả**: kết thúc discovery bằng `to-spec`, lưu ở `docs/superpowers/specs/<feature>.md` hoặc issue. Người dùng duyệt tài liệu này là đủ điều kiện thiết kế; không làm lại discovery hoặc đổi nghiệp vụ đã duyệt nếu chưa được người dùng cho phép rõ ràng. Ưu tiên phiên mới/`handoff` sau khi lưu và được duyệt; tính năng lớn có thể dùng `to-tickets` để chia thành các task độc lập.
+- **Đặc tả**: kết thúc discovery bằng nội dung ở chương sở hữu do `docs/SPEC.md`
+  §1 chỉ định, hoặc đề xuất chưa duyệt trong issue. Nếu dùng `to-spec`, chỉ dẫn
+  nó cập nhật đúng file đó, không sinh SPEC có ngày song song. Chỉ thêm chương
+  khi có chủ đề mới và cập nhật bảng routing. Người dùng duyệt là đủ điều kiện
+  thiết kế; không làm lại discovery hoặc đổi nghiệp vụ đã duyệt khi chưa được
+  cho phép. Ưu tiên phiên mới/handoff sau khi lưu và được duyệt; task quản lý
+  trên Linear theo monorepo, không dùng repo archive.
 - **Kế hoạch và triển khai**: dùng `writing-plans`, lưu bước TDD, đường dẫn chính xác, lệnh và tiêu chí kiểm chứng ở `docs/superpowers/plans/<feature>.md`; thực hiện bằng `subagent-driven-development` hoặc `executing-plans`.
 - **Workspace riêng và verification**: dùng `using-git-worktrees` khi cần workspace riêng; nếu Windows khóa tệp, dùng nhánh riêng. Tuân thủ `test-driven-development`, `systematic-debugging` khi sửa lỗi và `verification-before-completion`; dùng `finishing-a-development-branch` sau khi đã kiểm chứng xong.
 - **Sửa lỗi**: bỏ qua discovery; đi thẳng từ `systematic-debugging` → test hồi quy thất bại → sửa nguyên nhân gốc → kiểm chứng lại.

@@ -1,8 +1,9 @@
 # DOCX generation — Technical contract
 
-Status: active
-Owner: platform/document-generation
-Source of truth: shared DOCX renderer and placeholder-engine technical contract
+Status: reference-only cho triển khai renderer; không phải SOT nghiệp vụ.
+Hành vi và ý nghĩa dữ liệu chỉ sửa tại [word-export.md](../../domains/inheritance/word-export.md),
+theo [SPEC module](../../SPEC.md). Chi tiết kỹ thuật dưới đây cần đối chiếu
+source, không được dùng để khôi phục hành vi khác với Stage/Cập nhật hiện hành.
 
 Cập nhật: 20/07/2026
 

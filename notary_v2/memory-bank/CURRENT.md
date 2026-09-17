@@ -1,5 +1,11 @@
 # Current dashboard
 
+> **Lưu ý 17/09/2026:** checkpoint bên dưới là lịch sử trước khi gộp monorepo,
+> không phản ánh branch/worktree hiện tại. Tiếp tục việc mới từ Git và
+> [AGENTS.md](../AGENTS.md); thay đổi nghiệp vụ phải sửa đúng chương trong
+> [SPEC notary_v2](../docs/SPEC.md#1-sửa-yêu-cầu-ở-đúng-một-nơi).
+> Không chạy lại các bước tái dựng worktree cũ dựa trên dashboard này.
+
 Updated: 2026-08-17
 Last verified: 2026-08-17 against Git and the named source worktrees.
 

@@ -1,11 +1,20 @@
 # Nghiệp vụ sơ đồ thừa kế
 
+> Chương DRAFT được [SPEC module](../../SPEC.md) chỉ định cho **quy tắc tính thừa kế**.
+> Đây là file cần cập nhật khi người dùng duyệt một quy tắc tính; không tạo
+> thêm bản có ngày song song. Tổ chức lại ngày 17/09/2026 không duyệt các luật
+> còn nháp. Stage/Pool/Cập nhật chỉ sửa tại [chương Stage](../../platform/case-workspace/contract.md);
+> `workflow.md` nay chỉ chuyển tiếp. Mọi chỗ bên dưới còn nhắc
+> `workflow.md:line` là mốc xung đột lịch sử, **không** chỉ nơi sửa luật hiện
+> hành; phải kiểm source mới trước triển khai.
+
 > **Trạng thái:** DRAFT chờ user đọc và duyệt lần cuối.
 > **Cập nhật:** 22/08/2026.
 > **Vai trò:** đề xuất draft, chưa chuẩn tắc cho đến khi user phê duyệt rõ ràng.
 >
 > Bài toán kiểm thử nằm tại `research/case-catalog.md`; UI/UX nằm tại `ux.md`;
-> luồng Stage/Pool/Diagram nằm tại `workflow.md`; hợp đồng kỹ thuật nằm tại
+> luồng Stage/Pool/Diagram nằm tại [chương Stage](../../platform/case-workspace/contract.md);
+> hợp đồng kỹ thuật nằm tại
 > `technical/inheritance-engine.md`.
 >
 > Khi tài liệu này mâu thuẫn với code đang chạy, đó là bằng chứng phải báo, không
@@ -29,7 +38,7 @@
 | `INV-8` | Không mở vòng di sản giá trị `0`. |
 | `INV-9` | Engine không tạo người, không đoán người vào ô trống, không tự nối quan hệ còn thiếu. |
 | `INV-10` | Trường hợp ngoài năng lực engine phải trả trạng thái `unsupported` kèm mã lý do, không tính gần đúng. |
-| `INV-11` | Engine không khoá thao tác của user. Kết quả engine là thông tin để user tự xem và tự quyết; điều kiện chặn lưu do `workflow.md` quy định, không do tài liệu này. |
+| `INV-11` | Đề xuất: engine không tự khóa thao tác của user chỉ vì cảnh báo. Quy tắc lỗi chặn **Cập nhật Stage** ở [chương Stage](../../platform/case-workspace/contract.md); điều kiện chặn lưu/xuất do kết quả thừa kế vẫn cần chủ dự án duyệt, không thể suy từ draft này. |
 | `INV-12` | Mọi số hiển thị và mọi số in ra văn bản đều đọc từ kết quả engine. Không lớp nào tự tính lại. |
 
 ## 2. Thuật ngữ
@@ -148,7 +157,7 @@ Chỉ khi cả hai ngày đều đầy đủ thì mới so đến cấp ngày.
   Excel, số năm) được chuyển về một dạng nội bộ duy nhất tại đây.
 - Engine chỉ nhận dạng nội bộ đó cộng dạng chỉ có năm. Engine không phải nơi đoán
   định dạng.
-- Ngày không phân giải được là lỗi ở lớp nhập theo `workflow.md`, hiện đúng hàng dữ
+- Ngày không phân giải được là lỗi ở lớp nhập theo [chương Stage](../../platform/case-workspace/contract.md), hiện đúng hàng dữ
   liệu sai. Nếu vẫn tới engine thì trả `invalid: invalid_death_date` kèm người cụ thể.
 
 ## 5. Vòng di sản
@@ -389,7 +398,8 @@ quan hệ cha/mẹ–con, không phải một mô hình khác. Giới hạn tố
 không đủ cho người có cả cha mẹ đẻ và cha mẹ nuôi; xem mục 11.
 
 Tài liệu này **không** quy định điều kiện chặn lưu, popup, cascade hay quyền xoá dữ
-liệu. Những việc đó thuộc `workflow.md` và spec luồng dữ liệu.
+liệu. Những việc đó thuộc [chương Stage](../../platform/case-workspace/contract.md);
+các điều kiện chặn lưu/xuất theo kết quả tính thừa kế còn cần duyệt riêng.
 
 ## 11. Đối chiếu code hiện tại
 
@@ -434,9 +444,12 @@ Thứ tự đề nghị: `1` trước tiên vì đây là chỗ duy nhất đang
 công chứng. Rồi `4` và `5` vì enum trạng thái mở đường cho `6`, `7`, `8`. `2` độc lập,
 làm song song được. `9` là canh hồi quy, không gấp.
 
-### 11.3 Tài liệu khác phải sửa sau khi bạn duyệt
+### 11.3 Xung đột lịch sử cần đối chiếu sau khi bạn duyệt
 
-Chỉ liệt kê, **không** tự sửa, vì đây là các tài liệu có thẩm quyền riêng.
+Chỉ liệt kê đối chiếu ở thời điểm 22/08, **không** tự sửa hoặc tự nâng dự thảo
+thành luật đã duyệt. `workflow.md:126-133` là số dòng cũ; quy tắc người
+không nhận hiện được dẫn từ [Word §2](word-export.md#2-nguồn-dữ-liệu-và-thẩm-quyền),
+còn quy tắc Cập nhật/Pool/Diagram nằm tại chương Stage.
 
 | Tài liệu | Chỗ chống với bản này | Điều khoản |
 |---|---|---|

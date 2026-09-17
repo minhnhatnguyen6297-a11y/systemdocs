@@ -1,7 +1,9 @@
 # Inheritance active work
 
 Status: active
-Source of truth: this file only for unresolved work; business rules remain in `spec.md`
+Vai trò: kế hoạch/tham khảo công việc cũ, không phải SOT.
+Nghiệp vụ theo [SPEC module](../../SPEC.md); Stage ở chương workspace, tính
+thừa kế còn DRAFT. Không tự triển khai dựa vào trạng thái/nhánh trong plan cũ.
 
 Persisted `case_state_json.diagram.engineState` is the snapshot container, distinct from the `engineInput`/`engineResult` contract. `diagram_payload` and legacy projections are listed below only as unresolved migration overlap, not as authoritative V2 APIs.
 

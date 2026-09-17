@@ -1,5 +1,10 @@
 # UI/UX sơ đồ thừa kế
 
+> Định tuyến 17/09/2026: chương DRAFT về bố trí/hiển thị theo [SPEC module](../../SPEC.md).
+> Hành vi sửa dữ liệu, commit, bỏ gán/cascade và Pool do [chương Stage](../../platform/case-workspace/contract.md)
+> quyết định; không sửa hoặc ghi đè các quy tắc đó tại đây. Phần UX còn nháp
+> bên dưới không được coi đã duyệt vì liên kết trong bộ SPEC.
+
 > **Trạng thái:** DRAFT chờ user duyệt và chờ audit code.
 > **Cập nhật:** 22/07/2026.
 > **Nguồn nghiệp vụ:** `spec.md`.

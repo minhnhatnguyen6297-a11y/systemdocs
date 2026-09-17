@@ -4,6 +4,20 @@
 - Date: 2026-07-28
 - Scope: Cấu trúc tài liệu và quy tắc định tuyến tri thức cho agent
 
+## Điều chỉnh thẩm quyền ngày 17/09/2026
+
+Phần tổ chức domain/platform còn dùng. **Các mục bên dưới về nguồn sự thật,
+file spec/contract độc lập và migration kho tài liệu đã được thay thế về
+định tuyến** bằng [SPEC module §1](../../SPEC.md#1-sửa-yêu-cầu-ở-đúng-một-nơi)
+và [hướng dẫn cập nhật](../../agents/domain.md), theo quyền chủ dự án giao
+agent tổ chức bộ SPEC.
+
+Một bộ SPEC gồm file tổng và các chương chỉ định; mỗi chủ đề một file sở hữu.
+Không tạo SPEC có ngày cạnh tranh, không coi technical/UX nháp hoặc bản lịch sử
+là normative. Không xóa kho/bản cũ tự động theo migration bên dưới; giữ reference
+hoặc redirect khi cần truy nguyên. Không thay runtime trong lần tổ chức docs.
+ADR không ghi đè nghiệp vụ đã được chủ dự án chốt.
+
 ## Bối cảnh
 
 Tài liệu hiện được chia ngang qua `docs/plans`, `docs/specs`, `docs/issues`,

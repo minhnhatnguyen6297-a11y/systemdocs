@@ -1,6 +1,13 @@
 # Word Export UX và Flow
 
-Cập nhật: 22/07/2026
+Chương của [SPEC module](../../SPEC.md), được chỉ định làm nơi sửa duy nhất
+cho hành vi Word và ý nghĩa nhóm dữ liệu trong văn bản. Định tuyến cập nhật
+17/09/2026; nội dung V1 kế thừa 22/07/2026, không tuyên bố mọi gate đã được
+code thực thi. Quy tắc tính thừa kế còn nháp, không được duyệt ngầm qua mẫu.
+
+Stage phải được [Cập nhật toàn cục](../../platform/case-workspace/contract.md)
+trước khi dùng dữ liệu đã sửa. Màn Word không được lưu riêng một phần Stage.
+File đã tải là một bản xuất, không tự đổi theo Stage; muốn dữ liệu mới phải xuất lại.
 
 ## 1. Mục đích
 
@@ -16,13 +23,13 @@ nơi giải thích placeholder đang hỗ trợ.
 
 | Nội dung | Nguồn chuẩn |
 |---|---|
-| Thông tin cá nhân | Stage |
+| Thông tin cá nhân | Stage đã cập nhật |
 | Quan hệ huyết thống/vợ chồng | Diagram |
 | Chủ đất | Nút `Chủ đất` trên Diagram |
 | Người nhận | Lựa chọn `Nhận` trên Diagram |
 | Người không nhận | `Tất cả người trên Diagram - Chủ đất - Người nhận` |
 | Người từ chối | Dữ liệu pháp lý được xác nhận riêng; không suy ra từ `Nhận` |
-| Tài sản | Dữ liệu tài sản của hồ sơ |
+| Tài sản | Dữ liệu tài sản đã cập nhật của hồ sơ |
 | Câu chữ pháp lý | Resolver và hàm dựng cụm |
 | Placeholder được phép | Catalog |
 

@@ -1,10 +1,9 @@
-# Case workspace
+# Stage / Pool / Diagram
 
-Status: active
-Source of truth: `../../domains/inheritance/workflow.md`
-Read when: extracting or changing shared Stage/Pool mechanics across two or more business modules
+Cửa vào: [SPEC module](../../SPEC.md).
+**Đổi hành vi Stage, Cập nhật toàn cục, Pool hoặc ảnh hưởng lên Diagram: sửa [contract.md](contract.md).**
+File này là chương nghiệp vụ dù giữ tên contract.md; không phải API contract mới.
 
-- Current implementation is inheritance-first
-- Provisional non-normative summary: `contract.md`
-- Do not extract a shared abstraction until a second real domain proves the contract
-- Inheritance behavior remains in `docs/domains/inheritance/README.md`
+Hiện trạng: implementation tập trung thừa kế, chưa đạt toàn bộ yêu cầu đích.
+Nguồn thảo luận cũ có liên kết trong chương Stage, không là SOT thứ hai.
+Không trích framework dùng chung chỉ vì tài liệu đã được phân chương.
