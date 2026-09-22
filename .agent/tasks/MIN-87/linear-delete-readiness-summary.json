@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "audit_date": "2026-09-22",
+  "rule_applied": "Delete only a pure obsolete UI/UX/frontend issue after every backend, system, logic, contract, and data-integrity requirement is preserved in a kept issue or verified replacement artifact. Mixed issues are not deletable.",
+  "ready_to_delete": [
+    {
+      "id": "MIN-34",
+      "title": "MIN-31.3 — Hoàn thiện Fluent shell, navigation và design tokens",
+      "snapshot_status": "Done",
+      "verdict": "READY_TO_DELETE",
+      "reason": "This is completed implementation history for the obsolete PySide/qfluentwidgets shell. Its only non-visual invariant—navigation must not lose business state—is explicitly preserved by the kept Electron shell issue. Responsive bounds are preserved in the existing unified UX artifact. No backend, contract, data model, or external relation remains unique to MIN-34.",
+      "replacement_issue_ids": [
+        "MIN-50",
+        "MIN-64",
+        "MIN-65",
+        "MIN-67"
+      ],
+      "prerequisite_reparenting": [
+        "None. MIN-34 has no children and no external relations; its parent MIN-31 remains kept."
+      ]
+    },
+    {
+      "id": "MIN-38",
+      "title": "MIN-31.7 — Tái cấu trúc UX/UI: Chuẩn hóa Fluent Spacing, giải quyết xung đột Theme và tinh gọn thao tác",
+      "snapshot_status": "Canceled",
+      "verdict": "READY_TO_DELETE",
+      "reason": "The issue is pure legacy Qt visual/interaction cleanup: qdarktheme versus qfluentwidgets, Qt widget substitutions, spacing tokens, table/tab layout, command grouping, and progress presentation. It contains no backend, contract, data-integrity, or system ownership requirement. The still-valid framework-neutral interaction principles are already present in the unified UX reference.",
+      "replacement_issue_ids": [
+        "MIN-50",
+        "MIN-64",
+        "MIN-65",
+        "MIN-67"
+      ],
+      "prerequisite_reparenting": [
+        "None. MIN-38 has no children and no external relations; its parent MIN-31 remains kept."
+      ]
+    }
+  ],
+  "keep_mixed": [
+    {
+      "id": "MIN-31",
+      "title": "Upload Lab — Fluent UI Redesign Specification (Windows 11)",
+      "snapshot_status": "Canceled",
+      "verdict": "KEEP_MIXED",
+      "reason": "The issue is not a pure visual redesign. Section 8 specifies preflight services, browser-thread/session ownership, network and filesystem checks, redacted atomic diagnostics, compatibility policy, timeouts, and automated tests. Those are backend, security, lifecycle, and data-handling requirements. Several are copied into kept issues, but the original also retains exact operational constraints not fully reproduced elsewhere.",
+      "replacement_issue_ids": [
+        "MIN-35",
+        "MIN-36",
+        "MIN-37",
+        "MIN-69",
+        "MIN-75",
+        "MIN-67"
+      ],
+      "prerequisite_reparenting": [
+        "None while MIN-31 is kept.",
+        "If deletion is ever reconsidered, first reparent kept children MIN-35, MIN-36, and MIN-37 to MIN-69; reparent MIN-33 to the shell decision/spec lineage (MIN-50 or MIN-64); and preserve the MIN-84 related link on a kept Upload/Audit issue."
+      ]
+    },
+    {
+      "id": "MIN-32",
+      "title": "SPEC — UX chung cho Electron",
+      "snapshot_status": "Done",
+      "verdict": "KEEP_MIXED",
+      "reason": "This is the framework-neutral Electron UX/system behavior gate, not a legacy PySide styling task. It defines job-state vocabulary, cancel/retry/diagnostics semantics, human confirmation, background-refresh data integrity, Chromium focus behavior, responsive bounds, and owner approval before implementation. It also directly blocks MIN-67 and is parented under MIN-64.",
+      "replacement_issue_ids": [
+        "MIN-64",
+        "MIN-67",
+        "MIN-69"
+      ],
+      "prerequisite_reparenting": [
+        "No child issue requires reparenting.",
+        "If deletion were ever reconsidered, preserve or replace the blocking edge to MIN-67 and the related edge to MIN-56, and record the replacement under MIN-64 before deletion."
+      ]
+    },
+    {
+      "id": "MIN-33",
+      "title": "MIN-31.2 — Chốt widget sau decision gate desktop shell",
+      "snapshot_status": "Canceled",
+      "verdict": "KEEP_MIXED",
+      "reason": "Despite “widget” in the title, this is a technology-governance and migration-boundary issue. It records the production baseline, conditional decision branches, TECH_STACK governance, Windows packaging/dependency smoke, and the invariant that business logic is not rewritten merely to replace the shell.",
+      "replacement_issue_ids": [
+        "MIN-50",
+        "MIN-64",
+        "MIN-65",
+        "MIN-69",
+        "MIN-75"
+      ],
+      "prerequisite_reparenting": [
+        "None while MIN-31 and MIN-33 are kept.",
+        "If MIN-31 is ever deleted, reparent MIN-33 to MIN-50 or MIN-64 so the technology-decision lineage is retained."
+      ]
+    },
+    {
+      "id": "MIN-77",
+      "title": "Bug: Chuẩn hóa cột 3 vùng Audit Excel và rút gọn cột bảng Upload",
+      "snapshot_status": "Done",
+      "verdict": "KEEP_MIXED",
+      "reason": "The issue is not only presentation cleanup. Its implementation comments add contract_date to FolderScanRow, map it from upload_form.ngay_cong_chung, preserve record_id in checkbox UserRole, and declare the exact schema as the Electron migration target. These are view-model/data-mapping and selection-integrity requirements. MIN-69 is high-level and the unified UX artifact intentionally uses a different target queue schema, so exact preservation is incomplete.",
+      "replacement_issue_ids": [
+        "MIN-35",
+        "MIN-69"
+      ],
+      "prerequisite_reparenting": [
+        "None. Keep MIN-77 under MIN-69."
+      ]
+    },
+    {
+      "id": "MIN-82",
+      "title": "IMPROVEMENT — Zalo Inbox: danh sách nguồn khó tìm (sort alphabet, cần search + sort theo hoạt động)",
+      "snapshot_status": "Backlog",
+      "verdict": "KEEP_MIXED",
+      "reason": "The issue combines a search control with backend ordering and rollout logic. It explicitly identifies the current query sort display_name.asc(), requires default ordering by last_activity_at descending or grouping by type, and requires porting/merging behavior into the running build. MIN-79 and MIN-81 cover source completeness and refresh, not search or activity ordering; the unified UX artifact also omits those exact requirements.",
+      "replacement_issue_ids": [
+        "MIN-79",
+        "MIN-81"
+      ],
+      "prerequisite_reparenting": [
+        "None for the keep verdict. MIN-82 currently has no parent or external relations in the snapshot; if backlog normalization proceeds, it may be parented under the kept notary_v2 migration lineage without deleting it."
+      ]
+    }
+  ],
+  "notes": [
+    "This is the curated committed summary. Full audit evidence remains in ignored local scratch.",
+    "No issue was changed to Cancelled as a substitute for delete/archive."
+  ]
+}

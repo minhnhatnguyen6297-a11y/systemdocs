@@ -1,0 +1,172 @@
+{
+  "schema_version": 1,
+  "generated_on": "2026-09-22",
+  "target_project": {
+    "name": "systemdocs",
+    "id": "c1cb0dc4-3822-4879-a192-78a08e92b02b"
+  },
+  "coordination_issue": "MIN-87",
+  "prototype_issue": {
+    "id": "MIN-88",
+    "state": "In Review",
+    "artifact": "D:/mono/.agent/scratch/he-thong-cong-chung-ui-design-brief.html"
+  },
+  "verified_project_issues": [
+    "MIN-31",
+    "MIN-32",
+    "MIN-33",
+    "MIN-35",
+    "MIN-36",
+    "MIN-37",
+    "MIN-39",
+    "MIN-40",
+    "MIN-41",
+    "MIN-42",
+    "MIN-43",
+    "MIN-44",
+    "MIN-45",
+    "MIN-46",
+    "MIN-47",
+    "MIN-48",
+    "MIN-49",
+    "MIN-50",
+    "MIN-51",
+    "MIN-52",
+    "MIN-53",
+    "MIN-54",
+    "MIN-55",
+    "MIN-56",
+    "MIN-57",
+    "MIN-58",
+    "MIN-59",
+    "MIN-60",
+    "MIN-61",
+    "MIN-62",
+    "MIN-63",
+    "MIN-64",
+    "MIN-65",
+    "MIN-66",
+    "MIN-67",
+    "MIN-68",
+    "MIN-69",
+    "MIN-70",
+    "MIN-71",
+    "MIN-72",
+    "MIN-74",
+    "MIN-75",
+    "MIN-76",
+    "MIN-77",
+    "MIN-78",
+    "MIN-79",
+    "MIN-80",
+    "MIN-81",
+    "MIN-82",
+    "MIN-83",
+    "MIN-84",
+    "MIN-85",
+    "MIN-86",
+    "MIN-87",
+    "MIN-88"
+  ],
+  "verified_project_issue_count": 55,
+  "component_counts": {
+    "component:notary_v2": 10,
+    "component:notaryoffice": 1,
+    "component:shell": 9,
+    "component:system": 21,
+    "component:upload_lab": 14
+  },
+  "issues_by_component": {
+    "component:notary_v2": [
+      "MIN-53",
+      "MIN-58",
+      "MIN-59",
+      "MIN-68",
+      "MIN-71",
+      "MIN-78",
+      "MIN-79",
+      "MIN-80",
+      "MIN-81",
+      "MIN-82"
+    ],
+    "component:notaryoffice": [
+      "MIN-54"
+    ],
+    "component:shell": [
+      "MIN-32",
+      "MIN-33",
+      "MIN-50",
+      "MIN-51",
+      "MIN-60",
+      "MIN-64",
+      "MIN-65",
+      "MIN-67",
+      "MIN-75"
+    ],
+    "component:system": [
+      "MIN-43",
+      "MIN-44",
+      "MIN-45",
+      "MIN-46",
+      "MIN-47",
+      "MIN-48",
+      "MIN-49",
+      "MIN-55",
+      "MIN-56",
+      "MIN-57",
+      "MIN-61",
+      "MIN-62",
+      "MIN-63",
+      "MIN-66",
+      "MIN-70",
+      "MIN-72",
+      "MIN-74",
+      "MIN-76",
+      "MIN-83",
+      "MIN-87",
+      "MIN-88"
+    ],
+    "component:upload_lab": [
+      "MIN-31",
+      "MIN-35",
+      "MIN-36",
+      "MIN-37",
+      "MIN-39",
+      "MIN-40",
+      "MIN-41",
+      "MIN-42",
+      "MIN-52",
+      "MIN-69",
+      "MIN-77",
+      "MIN-84",
+      "MIN-85",
+      "MIN-86"
+    ]
+  },
+  "deletion_pending": [
+    {
+      "id": "MIN-34",
+      "verdict": "READY_TO_DELETE",
+      "reason": "legacy Qt/Fluent frontend only",
+      "blocked_by": "No delete/archive issue tool; Linear web session not authenticated"
+    },
+    {
+      "id": "MIN-38",
+      "verdict": "READY_TO_DELETE",
+      "reason": "legacy Qt theme/spacing/frontend cleanup only",
+      "blocked_by": "No delete/archive issue tool; Linear web session not authenticated"
+    }
+  ],
+  "keep_mixed": [
+    "MIN-31",
+    "MIN-32",
+    "MIN-33",
+    "MIN-77",
+    "MIN-82"
+  ],
+  "notes": [
+    "Remote project read-back returned all listed issues in systemdocs with component labels and hasNextPage=false.",
+    "MIN-88 comment and In Review state were read back after update.",
+    "MIN-34 and MIN-38 were not converted to Cancelled as a substitute for deletion."
+  ]
+}

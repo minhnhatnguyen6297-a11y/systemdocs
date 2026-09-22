@@ -1,0 +1,977 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Đặc tả UX toàn hệ thống công chứng — Vòng 02</title>
+  <style>
+    :root {
+      --bg:      oklch(98% 0.004 95);
+      --surface: oklch(100% 0.002 95);
+      --fg:      oklch(20% 0.018 70);
+      --muted:   oklch(48% 0.012 70);
+      --border:  oklch(90% 0.006 95);
+      --accent:  oklch(52% 0.10 28);
+
+      --font-display: 'Iowan Old Style', 'Charter', Georgia, serif;
+      --font-body:    -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --font-mono: 'Cascadia Mono', 'SFMono-Regular', Consolas, monospace;
+      --success: oklch(46% 0.105 152);
+      --success-soft: oklch(95% 0.025 152);
+      --warn: oklch(58% 0.12 74);
+      --warn-soft: oklch(96% 0.035 82);
+      --danger: oklch(49% 0.16 26);
+      --danger-soft: oklch(95% 0.03 26);
+      --info: oklch(46% 0.09 245);
+      --info-soft: oklch(95% 0.025 245);
+      --sidebar: 288px;
+      --content: 1120px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 28px; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.72;
+      text-rendering: optimizeLegibility;
+    }
+    button, input, select { font: inherit; }
+    [hidden] { display: none !important; }
+    a { color: inherit; }
+    .skip-link {
+      position: fixed;
+      left: 16px;
+      top: -80px;
+      z-index: 100;
+      background: var(--fg);
+      color: var(--surface);
+      padding: 10px 14px;
+      text-decoration: none;
+    }
+    .skip-link:focus { top: 16px; }
+    .progress-line {
+      position: fixed;
+      inset: 0 auto auto 0;
+      width: 0;
+      height: 3px;
+      background: var(--fg);
+      z-index: 90;
+    }
+    .layout { min-height: 100vh; }
+    .sidebar {
+      position: fixed;
+      inset: 0 auto 0 0;
+      width: var(--sidebar);
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+      padding: 30px 24px 22px;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      z-index: 20;
+    }
+    .brand-kicker,
+    .eyebrow,
+    .section-kicker,
+    .meta-label,
+    .tag,
+    .status,
+    .nav-index {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 1.45;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .brand-kicker { color: var(--muted); font-weight: 650; }
+    .brand-title {
+      margin: 10px 0 6px;
+      font-family: var(--font-display);
+      font-size: 28px;
+      line-height: 1.08;
+      letter-spacing: -.02em;
+      font-weight: 600;
+    }
+    .brand-note { color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .toc { margin: 30px 0 24px; }
+    .toc a {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 8px;
+      align-items: baseline;
+      padding: 6px 8px;
+      margin-left: -8px;
+      border-left: 2px solid transparent;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    .toc a:hover { color: var(--fg); border-left-color: var(--border); }
+    .toc a[aria-current="true"] { color: var(--fg); border-left-color: var(--accent); }
+    .nav-index { letter-spacing: .02em; color: var(--muted); }
+    .sidebar-foot { margin-top: auto; border-top: 1px solid var(--border); padding-top: 16px; }
+    .sidebar-foot dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 0 0 14px; font-size: 12px; }
+    .sidebar-foot dt { color: var(--muted); }
+    .sidebar-foot dd { margin: 0; text-align: right; }
+    .print-button {
+      width: 100%;
+      min-height: 44px;
+      border: 1px solid var(--fg);
+      color: var(--fg);
+      background: transparent;
+      cursor: pointer;
+      font-weight: 600;
+      letter-spacing: .02em;
+    }
+    .print-button:hover { background: var(--fg); color: var(--surface); }
+    .main {
+      margin-left: var(--sidebar);
+      min-width: 0;
+    }
+    .document {
+      width: min(var(--content), calc(100% - 72px));
+      margin: 0 auto;
+      padding: 70px 0 100px;
+    }
+    .section {
+      position: relative;
+      padding: 82px 0 28px;
+      border-top: 1px solid var(--border);
+    }
+    .cover { border-top: 0; padding-top: 30px; min-height: 82vh; display: flex; flex-direction: column; justify-content: center; }
+    .eyebrow, .section-kicker { color: var(--muted); font-weight: 650; }
+    .cover h1 {
+      margin: 18px 0 22px;
+      max-width: 900px;
+      font-family: var(--font-display);
+      font-size: clamp(48px, 7vw, 82px);
+      line-height: 1.02;
+      letter-spacing: -.03em;
+      font-weight: 600;
+    }
+    .lede {
+      max-width: 760px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 20px;
+      line-height: 1.6;
+    }
+    .scope-line { margin: 34px 0 42px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .tag { display: inline-flex; align-items: center; min-height: 30px; padding: 5px 10px; border: 1px solid var(--border); color: var(--muted); }
+    .tag-strong { color: var(--accent); border-color: color-mix(in oklch, var(--accent), var(--border) 60%); }
+    .cover-decisions {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border-top: 1px solid var(--fg);
+      border-bottom: 1px solid var(--fg);
+    }
+    .cover-decision { padding: 18px 16px 20px 0; border-right: 1px solid var(--border); }
+    .cover-decision + .cover-decision { padding-left: 16px; }
+    .cover-decision:last-child { border-right: 0; }
+    .cover-decision b { display: block; font-family: var(--font-display); font-size: 27px; line-height: 1; margin-bottom: 9px; font-weight: 600; }
+    .cover-decision span { display: block; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .section-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 32px; align-items: start; margin-bottom: 38px; }
+    .section-head h2 {
+      margin: 8px 0 0;
+      max-width: 760px;
+      font-family: var(--font-display);
+      font-size: clamp(36px, 5vw, 58px);
+      line-height: 1.08;
+      letter-spacing: -.025em;
+      font-weight: 600;
+    }
+    .section-no { font-family: var(--font-display); font-size: 72px; line-height: .9; color: var(--border); letter-spacing: -.04em; }
+    .intro { max-width: 72ch; color: var(--muted); font-size: 17px; }
+    .intro strong { color: var(--fg); }
+    h3 { margin: 46px 0 14px; font-family: var(--font-display); font-size: 28px; line-height: 1.2; letter-spacing: -.015em; font-weight: 600; }
+    h4 { margin: 0 0 8px; font-size: 16px; line-height: 1.4; }
+    p { max-width: 72ch; }
+    .grid-2, .grid-3, .grid-4 { display: grid; gap: 0; border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .panel { min-width: 0; padding: 22px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--surface); }
+    .panel p, .panel li { font-size: 14px; line-height: 1.62; }
+    .panel p:last-child { margin-bottom: 0; }
+    .panel ul { margin: 10px 0 0; padding-left: 19px; }
+    .panel code, code { font-family: var(--font-mono); font-size: .9em; }
+    .panel-current { background: color-mix(in oklch, var(--surface), var(--bg) 55%); }
+    .meta-label { display: block; color: var(--muted); margin-bottom: 8px; }
+    .rule-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--border); }
+    .rule { display: grid; grid-template-columns: 42px 1fr; gap: 14px; padding: 22px 20px 22px 0; border-bottom: 1px solid var(--border); }
+    .rule:nth-child(odd) { border-right: 1px solid var(--border); padding-right: 26px; }
+    .rule:nth-child(even) { padding-left: 26px; }
+    .rule-number { font-family: var(--font-display); font-size: 30px; line-height: 1; color: var(--muted); }
+    .rule h4 { margin-bottom: 5px; }
+    .rule p { margin: 0; color: var(--muted); font-size: 14px; }
+    .callout { margin: 28px 0; padding: 18px 20px; border: 1px solid var(--border); border-left: 4px solid var(--fg); background: var(--surface); }
+    .callout strong { display: block; margin-bottom: 5px; }
+    .callout p { margin: 0; color: var(--muted); font-size: 14px; }
+    .callout-warn { border-left-color: var(--warn); background: var(--warn-soft); }
+    .callout-info { border-left-color: var(--info); background: var(--info-soft); }
+    .flow {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(0, 1fr);
+      align-items: stretch;
+      margin: 22px 0 30px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .flow-step { position: relative; padding: 18px 30px 18px 16px; border-right: 1px solid var(--border); min-width: 0; }
+    .flow-step:last-child { border-right: 0; }
+    .flow-step:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      right: -6px;
+      top: 50%;
+      width: 11px;
+      height: 11px;
+      border-top: 1px solid var(--fg);
+      border-right: 1px solid var(--fg);
+      background: var(--surface);
+      transform: translateY(-50%) rotate(45deg);
+      z-index: 2;
+    }
+    .flow-step b { display: block; font-size: 14px; line-height: 1.35; }
+    .flow-step span { display: block; color: var(--muted); font-size: 12px; line-height: 1.45; margin-top: 4px; }
+    .truth-ladder { display: grid; grid-template-columns: repeat(5, 1fr); border: 1px solid var(--border); background: var(--surface); }
+    .truth-step { padding: 20px 16px; border-right: 1px solid var(--border); }
+    .truth-step:last-child { border-right: 0; }
+    .truth-step b { display: block; font-family: var(--font-mono); font-size: 12px; letter-spacing: .04em; }
+    .truth-step span { display: block; margin-top: 8px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .truth-step-final { background: var(--success-soft); }
+    .spec-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 20px 0 30px; background: var(--surface); }
+    .spec-table th, .spec-table td { padding: 13px 14px; border: 1px solid var(--border); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+    .spec-table th { color: var(--muted); font-family: var(--font-mono); font-size: 11px; line-height: 1.45; letter-spacing: .06em; text-transform: uppercase; font-weight: 600; }
+    .spec-table td { font-size: 13.5px; line-height: 1.58; }
+    .status { display: inline-flex; align-items: center; padding: 3px 7px; border: 1px solid currentColor; letter-spacing: .03em; white-space: normal; }
+    .status-current { color: var(--info); }
+    .status-target { color: var(--success); }
+    .status-open { color: var(--warn); }
+    .status-blocked { color: var(--danger); }
+    .screen-map { display: grid; grid-template-columns: 180px minmax(0, 1fr) 230px; min-height: 420px; border: 1px solid var(--fg); background: var(--surface); }
+    .screen-map > div { min-width: 0; padding: 18px; }
+    .screen-map .screen-rail { border-right: 1px solid var(--border); }
+    .screen-map .screen-main { border-right: 1px solid var(--border); padding: 0; display: grid; grid-template-rows: auto 1fr; }
+    .screen-map .screen-inspector { background: color-mix(in oklch, var(--bg), var(--surface) 55%); }
+    .screen-title { padding: 15px 18px; border-bottom: 1px solid var(--border); font-weight: 650; font-size: 14px; }
+    .screen-body { padding: 18px; display: grid; gap: 12px; grid-template-rows: auto 1fr; }
+    .mini-box { border: 1px solid var(--border); padding: 12px; font-size: 12px; line-height: 1.45; }
+    .stage-box { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .diagram-box { min-height: 180px; display: grid; place-items: center; color: var(--muted); background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px; }
+    .module-tabs { display: flex; flex-wrap: wrap; gap: 0; border-bottom: 1px solid var(--fg); margin-bottom: 20px; }
+    .module-tab { padding: 8px 12px; border-right: 1px solid var(--border); font-size: 13px; }
+    .module-tab:first-child { border-left: 1px solid var(--border); }
+    .module-tab-active { background: var(--fg); color: var(--surface); }
+    .timeline { border-left: 1px solid var(--fg); margin: 20px 0 20px 12px; }
+    .timeline-item { position: relative; padding: 0 0 24px 24px; }
+    .timeline-item::before { content: ''; position: absolute; left: -5px; top: 6px; width: 9px; height: 9px; background: var(--surface); border: 1px solid var(--fg); border-radius: 50%; }
+    .timeline-item b { font-size: 14px; }
+    .timeline-item span { display: block; color: var(--muted); font-size: 13px; }
+    .toast-spec { max-width: 620px; border: 1px solid var(--fg); background: var(--surface); padding: 18px; }
+    .toast-spec .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .fake-button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 7px 13px; border: 1px solid var(--fg); font-size: 13px; font-weight: 600; }
+    .fake-button-primary { color: var(--surface); background: var(--fg); }
+    .source-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border); }
+    .source-list li { display: grid; grid-template-columns: 220px 1fr; gap: 20px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+    .source-list code { color: var(--muted); overflow-wrap: anywhere; }
+    .source-note { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+    .source-note a { text-underline-offset: 3px; }
+    .subnav { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 20px 0; font-size: 13px; }
+    .subnav a { min-height: 44px; display: inline-flex; align-items: center; text-underline-offset: 4px; }
+    .mode-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; margin: 20px 0; }
+    .mode-controls label { display: grid; gap: 6px; font-size: 13px; }
+    .mode-controls select { min-height: 44px; max-width: 100%; padding: 8px 12px; color: var(--fg); background: var(--surface); border: 1px solid var(--border); }
+    .diagram-preview { padding: 20px; border: 1px solid var(--fg); background: var(--surface); }
+    .diagram-preview h4 { margin-top: 12px; }
+    .party-grid, .family-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 14px 0; }
+    .party-zone { min-height: 140px; border: 1px dashed var(--muted); padding: 16px; }
+    .party-zone p { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+    .family-root { max-width: 330px; margin: 14px auto; padding: 14px; border: 1px solid var(--fg); text-align: center; }
+    .family-grid { border-top: 1px solid var(--border); padding-top: 18px; }
+    .family-grid .mini-box { text-align: center; }
+    .stage-box .mini-box { background: var(--surface); }
+    .case-example { border: 1px solid var(--fg); padding: 22px; margin: 24px 0; background: var(--surface); }
+    .case-example ul { margin-bottom: 0; padding-left: 22px; }
+    .checklist { padding-left: 22px; }
+    .checklist li { margin: 9px 0; }
+    .task-card { padding: 20px 0; border-top: 1px solid var(--fg); }
+    .task-card h4 { font-size: 19px; }
+    .task-card p, .task-card li { font-size: 14px; }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+    .acceptance { counter-reset: accept; display: grid; grid-template-columns: repeat(2, 1fr); border-top: 1px solid var(--border); }
+    .acceptance-item { counter-increment: accept; position: relative; padding: 20px 22px 20px 42px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); font-size: 14px; }
+    .acceptance-item:nth-child(even) { border-right: 0; }
+    .acceptance-item::before { content: counter(accept, decimal-leading-zero); position: absolute; left: 0; top: 20px; color: var(--muted); font-family: var(--font-mono); font-size: 11px; }
+    .acceptance-item b { display: block; margin-bottom: 4px; }
+    .acceptance-item span { color: var(--muted); }
+    details { border-bottom: 1px solid var(--border); }
+    summary { cursor: pointer; padding: 14px 0; font-weight: 650; }
+    details > div { padding: 0 0 18px; color: var(--muted); font-size: 14px; max-width: 76ch; }
+    :focus-visible { outline: 3px solid color-mix(in oklch, var(--accent), transparent 45%); outline-offset: 3px; }
+
+    @media (max-width: 1050px) {
+      :root { --sidebar: 236px; }
+      .document { width: min(var(--content), calc(100% - 44px)); }
+      .cover-decisions, .grid-4 { grid-template-columns: repeat(2, 1fr); }
+      .truth-ladder { grid-template-columns: 1fr; }
+      .truth-step { border-right: 0; border-bottom: 1px solid var(--border); }
+      .truth-step:last-child { border-bottom: 0; }
+      .flow { grid-auto-flow: row; grid-auto-columns: auto; }
+      .flow-step { border-right: 0; border-bottom: 1px solid var(--border); }
+      .flow-step:last-child { border-bottom: 0; }
+      .flow-step:not(:last-child)::after { right: auto; left: 50%; top: auto; bottom: -6px; transform: translateX(-50%) rotate(135deg); }
+      .screen-map { grid-template-columns: 150px minmax(0, 1fr); }
+      .screen-inspector { grid-column: 1 / -1; border-top: 1px solid var(--border); }
+      .screen-map .screen-main { border-right: 0; }
+    }
+
+    @media (max-width: 760px) {
+      html { scroll-padding-top: 76px; }
+      .sidebar { position: sticky; top: 0; width: 100%; height: auto; padding: 12px 16px; flex-direction: row; align-items: center; gap: 16px; border-right: 0; border-bottom: 1px solid var(--border); }
+      .brand-title { font-size: 18px; margin: 2px 0 0; }
+      .brand-note, .brand-kicker, .sidebar-foot { display: none; }
+      .toc { margin: 0 0 0 auto; display: flex; overflow: hidden; }
+      .toc a { display: none; }
+      .toc a[aria-current="true"] { display: grid; min-width: 150px; }
+      .main { margin-left: 0; }
+      .document { width: calc(100% - 32px); padding: 28px 0 70px; }
+      .cover { min-height: auto; padding: 52px 0 70px; }
+      .cover h1 { font-size: 48px; line-height: 1.05; }
+      .lede { font-size: 17px; }
+      .cover-decisions, .grid-2, .grid-3, .grid-4, .rule-list, .acceptance { grid-template-columns: 1fr; }
+      .cover-decision { border-right: 0; border-bottom: 1px solid var(--border); padding: 18px 0; }
+      .cover-decision + .cover-decision { padding-left: 0; }
+      .cover-decision:last-child { border-bottom: 0; }
+      .section { padding-top: 58px; }
+      .section-head { grid-template-columns: 1fr; gap: 10px; }
+      .section-no { font-size: 46px; order: -1; }
+      .rule:nth-child(odd), .rule:nth-child(even) { border-right: 0; padding: 18px 0; }
+      .screen-map { grid-template-columns: 1fr; }
+      .screen-map .screen-rail { border-right: 0; border-bottom: 1px solid var(--border); }
+      .screen-map .screen-main { border-right: 0; }
+      .stage-box { grid-template-columns: 1fr; }
+      .party-grid, .family-grid { grid-template-columns: 1fr; }
+      .mode-controls, .mode-controls label { width: 100%; }
+      .source-list li { grid-template-columns: 1fr; gap: 5px; }
+      .acceptance-item { border-right: 0; padding-right: 0; }
+      .spec-table, .spec-table tbody, .spec-table tr, .spec-table td { display: block; width: 100%; }
+      .spec-table thead { display: none; }
+      .spec-table tr { border: 1px solid var(--border); border-bottom: 0; }
+      .spec-table tr:last-child { border-bottom: 1px solid var(--border); }
+      .spec-table td { display: grid; grid-template-columns: minmax(110px, 36%) 1fr; gap: 12px; border: 0; border-bottom: 1px solid var(--border); }
+      .spec-table td:last-child { border-bottom: 0; }
+      .spec-table td::before { content: attr(data-label); color: var(--muted); font-family: var(--font-mono); font-size: 10px; line-height: 1.45; letter-spacing: .05em; text-transform: uppercase; }
+    }
+
+    @media print {
+      body { background: var(--surface); font-size: 12pt; }
+      .sidebar, .progress-line, .skip-link { display: none !important; }
+      .main { margin: 0; }
+      .document { width: 100%; padding: 0; }
+      .cover { min-height: 92vh; break-after: page; }
+      .section { break-before: page; padding-top: 22mm; }
+      .panel, .callout, .flow, .truth-ladder, .screen-map, .toast-spec { break-inside: avoid; }
+      a { text-decoration: none; }
+      .panel p, .panel li, .spec-table td, .intro, .source-note, .source-list li, .callout p, .mini-box, .acceptance-item, .task-card p, .task-card li { font-size: 12pt; }
+      .print-diagram { display: block !important; }
+      .mode-controls { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Bỏ qua mục lục</a>
+  <div class="progress-line" id="reading-progress" aria-hidden="true"></div>
+  <div class="layout">
+    <aside class="sidebar" data-od-id="document-navigation" aria-label="Mục lục đặc tả">
+      <div>
+        <div class="brand-kicker">UX / 02</div>
+        <div class="brand-title">Hệ thống công chứng</div>
+        <div class="brand-note">Bản tổng hợp để thiết kế frontend<br>phân biệt yêu cầu và code đã có</div>
+      </div>
+      <nav class="toc" id="toc">
+        <a href="#tom-tat" aria-current="true"><span class="nav-index">00</span><span>Tóm tắt quyết định</span></a>
+        <a href="#hien-trang"><span class="nav-index">01</span><span>Hiện trạng đã quét</span></a>
+        <a href="#nguyen-tac"><span class="nav-index">02</span><span>Nguyên tắc UX</span></a>
+        <a href="#kien-truc"><span class="nav-index">03</span><span>Kiến trúc thông tin</span></a>
+        <a href="#hop-dong-ux"><span class="nav-index">04</span><span>Case / Record & quy tắc chung</span></a>
+        <a href="#notary-v2"><span class="nav-index">05</span><span>Soạn hồ sơ</span></a>
+        <a href="#upload-lab"><span class="nav-index">06</span><span>Phân tích & Upload</span></a>
+        <a href="#notaryoffice"><span class="nav-index">07</span><span>Văn phòng</span></a>
+        <a href="#database"><span class="nav-index">08</span><span>Database</span></a>
+        <a href="#man-hinh"><span class="nav-index">09</span><span>Danh mục màn hình</span></a>
+        <a href="#nghiem-thu"><span class="nav-index">10</span><span>Nghiệm thu & task đề xuất</span></a>
+        <a href="#nguon"><span class="nav-index">11</span><span>Nguồn kiểm chứng</span></a>
+      </nav>
+      <div class="sidebar-foot">
+        <dl>
+          <dt>Phiên bản</dt><dd>0.2</dd>
+          <dt>Ngày</dt><dd>22.09.2026</dd>
+          <dt>Trạng thái</dt><dd>Yêu cầu + thiết kế vòng 02</dd>
+        </dl>
+        <button class="print-button" type="button" id="print-document" data-od-id="print-document-control">In / Lưu PDF</button>
+      </div>
+    </aside>
+
+    <main class="main" id="main-content">
+      <article class="document">
+        <section class="section cover" id="tom-tat" data-od-id="executive-summary">
+          <div class="eyebrow">Đặc tả UX · Vòng 02 · theo điều chỉnh của chủ dự án</div>
+          <h1 data-od-id="document-title">Một hệ thống,<br>ba nhịp công việc.</h1>
+          <p class="lede">Soạn văn bản chính bằng một trong hai kiểu diagram; đối soát và chuẩn bị đúng bộ file cho cổng tỉnh; nhìn một Case thành các Record công việc đủ chi tiết để theo dõi và tính phí.</p>
+          <div class="scope-line" aria-label="Phạm vi">
+            <span class="tag tag-strong">UX spec only</span>
+            <span class="tag">Desktop Windows</span>
+            <span class="tag">Không sửa runtime trong lượt này</span>
+            <span class="tag">Không hợp nhất DB trong vòng này</span>
+          </div>
+          <div class="cover-decisions" data-od-id="summary-decisions">
+            <div class="cover-decision"><b>01</b><span>Hai kiểu diagram: hai bên A/B và phả hệ thừa kế. Loại hợp đồng chọn bằng dropdown, không chia tab.</span></div>
+            <div class="cover-decision"><b>02</b><span>Thu nhận chung; Stage Người và Stage Tài sản riêng. Nhập tay trực tiếp tại Stage.</span></div>
+            <div class="cover-decision"><b>03</b><span>Đối soát theo năm; mỗi portal có yêu cầu file riêng, gồm PDF scan hoặc PDF kết xuất từ Word.</span></div>
+            <div class="cover-decision"><b>04</b><span>Case là yêu cầu chung của khách hàng. Record là từng việc tách được; Evidence và file không phải Record công việc.</span></div>
+          </div>
+          <div class="callout callout-info">
+            <strong>Cách đọc và phạm vi bản 0.2</strong>
+            <p>“Yêu cầu đã chốt” là điều chủ dự án yêu cầu, không có nghĩa code đã đáp ứng. “Có code/POC” là kết quả đọc source, không phải nghiệm thu runtime. “Đề xuất” là cách cụ thể hóa để review. File này vẫn ở scratch, chưa thay thế spec trong từng module; task trong bản này chưa phải issue Linear.</p>
+          </div>
+        </section>
+
+        <section class="section" id="hien-trang" data-od-id="current-state-audit">
+          <header class="section-head">
+            <div><div class="section-kicker">Quan sát từ repository</div><h2 data-od-id="current-state-heading">Có engine để kế thừa, còn khoảng cách phải ghi rõ.</h2></div>
+            <div class="section-no">01</div>
+          </header>
+          <p class="intro">Repository đã có Electron shell và hai engine thật, nhưng UI hiện tại vẫn phản ánh ranh giới triển khai. Phần dưới phân biệt rõ <strong>cái đang có</strong> với <strong>đích thiết kế</strong>.</p>
+          <div class="grid-2">
+            <article class="panel panel-current" data-od-id="audit-notary-v2">
+              <span class="meta-label">notary_v2 · hiện có</span>
+              <h4>Bàn làm việc thừa kế dồn vào một màn hình lớn</h4>
+              <p>Jinja UI có sidebar riêng, hồ sơ thừa kế, Zalo Inbox, người và tài sản. Form hồ sơ đặt Tài sản, Người tham gia, Pool, Diagram, quản lý mẫu và Xuất Word trong cùng trang; OCR người và OCR tài sản dùng modal riêng.</p>
+              <p><strong>Khoảng cách:</strong> chưa chứng minh có bàn soạn hai bên, Stage Tài sản theo thiết kế mới hay bộ xuất nhiều văn bản chính/phụ. Engine Word thừa kế đã có; conversion/MarkItDown mới có bằng chứng POC. <a href="#src-word">Nguồn Word</a> · <a href="#src-conversion">Nguồn conversion</a>.</p>
+            </article>
+            <article class="panel panel-current" data-od-id="audit-upload-lab">
+              <span class="meta-label">upload_lab · hiện có</span>
+              <h4>Hai trang đúng nghiệp vụ nhưng phụ thuộc ngầm vào nhau</h4>
+              <p>PySide6 tách “Audit Sổ Công Chứng” và “Quét & Upload Hồ Sơ”. Audit tạo danh sách thiếu/lỗi; trang Upload quét folder, chọn mục upload, mở Chromium và dừng trước nút Lưu.</p>
+              <p><strong>Khoảng cách:</strong> parser và hàm tìm số thiếu đã xét năm, nhưng chưa chứng minh flow năm hoàn chỉnh. Luồng hiện tại đưa file gốc vào trường upload; chưa thấy pipeline scan/Word → PDF phục vụ từng portal. <a href="#src-years">Nguồn audit</a> · <a href="#src-attachment">Nguồn attachment</a>.</p>
+            </article>
+            <article class="panel panel-current" data-od-id="audit-notaryoffice">
+              <span class="meta-label">notaryoffice · chỉ có tài liệu</span>
+              <h4>Định hướng rõ, chưa có runtime để kế thừa</h4>
+              <p>Intent hiện hành dùng Evidence Record và Work Item. Vòng này chốt lại từ vựng: Record là công việc đơn lẻ, Evidence là dữ kiện nguồn; cần ánh xạ và cập nhật intent trước code, không đổi tên bảng chỉ bằng một bản UX.</p>
+              <p><strong>Ràng buộc:</strong> không biến độ tin cậy liên kết thành điểm năng suất nhân viên; chưa được giả định A1, A3, A4 đã có câu trả lời.</p>
+            </article>
+            <article class="panel panel-current" data-od-id="audit-shell-database">
+              <span class="meta-label">shell & database</span>
+              <h4>Shell đã chứng minh contract; Database chưa có artifact</h4>
+              <p>Electron shell có navigation, job state, reconnect, waiting_user và adapter thật, nhưng giao diện còn thiên về POC: raw JSON, bảng kỹ thuật, command chẩn đoán lẫn với nghiệp vụ.</p>
+              <p><strong>Khoảng trống:</strong> workspace không có code/docs cho khu Database; vòng này chỉ giữ chỗ và định nghĩa ranh giới an toàn.</p>
+            </article>
+          </div>
+          <div class="callout" data-od-id="audit-conclusion">
+            <strong>Nhận định thiết kế</strong>
+            <p>Không chỉ “bọc” giao diện cũ vào sidebar. Kế thừa engine thật, giữ human gate và ownership; đồng thời đánh dấu các yêu cầu mới cần backend: diagram hai bên, bộ Word, đối soát năm, PDF và Record dùng chung. Đây không phải một đợt thay frontend thuần túy.</p>
+          </div>
+        </section>
+
+        <section class="section" id="nguyen-tac" data-od-id="ux-principles">
+          <header class="section-head">
+            <div><div class="section-kicker">Bất biến thiết kế</div><h2 data-od-id="principles-heading">Tự động hóa nhiều hơn, nhưng yêu cầu người dùng tin ít hơn.</h2></div>
+            <div class="section-no">02</div>
+          </header>
+          <div class="rule-list">
+            <div class="rule"><div class="rule-number">1</div><div><h4>Không nhập lại dữ liệu đã tồn tại</h4><p>Mọi form phải ưu tiên OCR, Word, Excel, Zalo hoặc record đã có; nhập tay là đường dự phòng có chủ đích.</p></div></div>
+            <div class="rule"><div class="rule-number">2</div><div><h4>Máy đề xuất, người xác nhận</h4><p>OCR, ranking và AI không tự nâng dữ liệu thành sự thật nghiệp vụ; điểm xác nhận phải nhìn thấy bằng chứng.</p></div></div>
+            <div class="rule"><div class="rule-number">3</div><div><h4>Một nguồn sự thật cho mỗi vùng</h4><p>Đích UX: Stage Người/Tài sản giữ dữ liệu đã cập nhật; Pool là dẫn xuất; Diagram giữ quan hệ, bên tham gia và quyết định nghiệp vụ, không giữ bản sao sửa riêng thông tin gốc.</p></div></div>
+            <div class="rule"><div class="rule-number">4</div><div><h4>Giữ ngữ cảnh khi đổi module</h4><p>Job, form dirty, file đã chọn và vị trí làm việc không biến mất vì người dùng đi kiểm tra việc khác.</p></div></div>
+            <div class="rule"><div class="rule-number">5</div><div><h4>Một hành động, một CTA chính</h4><p>Mỗi viewport chỉ có một nút quyết định nổi bật; các đường tắt khác là secondary hoặc text action.</p></div></div>
+            <div class="rule"><div class="rule-number">6</div><div><h4>Không che giới hạn của hệ thống</h4><p>Capability chưa có phải hiện “Chưa khả dụng” cùng lý do; không dựng dữ liệu giả, progress giả hay fallback ngầm.</p></div></div>
+            <div class="rule"><div class="rule-number">7</div><div><h4>Hồ sơ, không phải nhân viên</h4><p>notaryoffice dùng workstation/user để giải thích record và bàn giao; không tạo leaderboard, chấm công hoặc KPI cá nhân.</p></div></div>
+            <div class="rule"><div class="rule-number">8</div><div><h4>Bằng chứng không phải một công việc</h4><p>Mọi giá trị suy luận truy ngược được về Evidence. In, lưu lại, xuất lại hay đổi định dạng một file không mặc nhiên sinh Record mới hoặc phát sinh phí.</p></div></div>
+          </div>
+        </section>
+
+        <section class="section" id="kien-truc" data-od-id="information-architecture">
+          <header class="section-head">
+            <div><div class="section-kicker">Kiến trúc thông tin</div><h2 data-od-id="information-architecture-heading">Ba module nghiệp vụ; Database chỉ là khu vực dự kiến.</h2></div>
+            <div class="section-no">03</div>
+          </header>
+          <p class="intro">Tên repo không xuất hiện như nhãn chính. Người dùng vào hệ thống bằng kết quả họ muốn đạt; tên kỹ thuật chỉ nằm trong Diagnostics.</p>
+          <div class="flow" aria-label="Kiến trúc vòng đời hồ sơ">
+            <div class="flow-step"><b>Soạn hồ sơ</b><span>Thu nhận → cấu trúc → quan hệ → Word</span></div>
+            <div class="flow-step"><b>Văn phòng</b><span>Evidence → đề xuất Record/Case → xác nhận → tra cứu/phí</span></div>
+            <div class="flow-step"><b>Phân tích & Upload</b><span>Đối soát số → queue → portal tỉnh</span></div>
+            <div class="flow-step"><b>Lưu trữ</b><span>Dữ liệu chung khi contract/DB đã được duyệt</span></div>
+          </div>
+          <table class="spec-table" data-od-id="navigation-model">
+            <thead><tr><th>Khu vực</th><th>Trang vào</th><th>Điều hướng cấp hai</th><th>Không làm</th></tr></thead>
+            <tbody>
+              <tr><td data-label="Khu vực"><strong>Soạn hồ sơ</strong></td><td data-label="Trang vào">Danh sách Case / hồ sơ</td><td data-label="Cấp hai">Bàn soạn · Người · Tài sản; trong bàn soạn chọn kiểu diagram và loại văn bản chính</td><td data-label="Không làm">Không tạo tab Chuyển nhượng / Tặng cho / Cho thuê / Đặt cọc</td></tr>
+              <tr><td data-label="Khu vực"><strong>Phân tích & Upload</strong></td><td data-label="Trang vào">Tình trạng sổ theo portal/năm</td><td data-label="Cấp hai">Đúng hai tab: Phân tích dữ liệu · Upload; phiên portal nằm trong tab Upload</td><td data-label="Không làm">Không coi web tỉnh là UI chính của app</td></tr>
+              <tr><td data-label="Khu vực"><strong>Văn phòng</strong></td><td data-label="Trang vào">Tra cứu mọi trường</td><td data-label="Cấp hai">Record công việc · Case · Chuỗi sự kiện · Tổng hợp ngày/tháng · Máy trạm</td><td data-label="Không làm">Không đặt dashboard năng suất làm home; không gọi Evidence là Record công việc</td></tr>
+              <tr><td data-label="Khu vực"><strong>Database</strong></td><td data-label="Trang vào">Chưa triển khai</td><td data-label="Cấp hai">Sau này: nguồn · schema · truy vấn · lịch sử</td><td data-label="Không làm">Không mở kết nối/query giả trước governance</td></tr>
+            </tbody>
+          </table>
+          <h3>Tiện ích toàn hệ thống</h3>
+          <div class="grid-2">
+            <article class="panel"><span class="meta-label">Tiến trình</span><h4>Job drawer dùng chung</h4><p>Hiển thị job đang chạy/chờ người/lỗi ở mọi module. Mở job đưa người dùng về đúng bước; chuyển module không hủy job.</p></article>
+            <article class="panel"><span class="meta-label">Hệ thống</span><h4>Kết nối & Cài đặt</h4><p>Engine health, portal profile, module version, diagnostics đã redact. Cấu hình kỹ thuật không chen vào flow nghiệp vụ hằng ngày.</p></article>
+          </div>
+          <div class="callout callout-warn">
+            <strong>Đã thống nhất nghĩa nghiệp vụ; chưa giả định đã hợp nhất dữ liệu</strong>
+            <p>Hồ sơ tạo tại notary_v2 được hiểu là một Case. Record tạo từ notary_v2 và Record do notaryoffice nhận biết là cùng khái niệm công việc. Cùng một việc không nhân đôi chỉ vì hai module cùng quan sát. Mã dùng chung, owner ghi, migration và chống trùng xuyên module vẫn cần contract được duyệt; không dùng tên, CCCD, GCN hay số thửa làm khóa Case.</p>
+          </div>
+        </section>
+
+        <section class="section" id="hop-dong-ux" data-od-id="shared-ux-contract">
+          <header class="section-head">
+            <div><div class="section-kicker">Từ vựng và quy tắc UX chung · không phải contract API</div><h2 data-od-id="shared-contract-heading">Case chứa các việc. Record là một việc. Evidence chứng minh việc đó.</h2></div>
+            <div class="section-no">04</div>
+          </header>
+          <h3 id="case-record">Định nghĩa xuyên suốt hệ thống</h3>
+          <p class="intro"><span class="status status-target">Yêu cầu đã chốt</span> Dùng cùng nghĩa ở cả ba module; module tạo hoặc quan sát dữ liệu chỉ là nguồn gốc, không tạo một loại Record nghiệp vụ khác.</p>
+          <table class="spec-table" data-od-id="shared-vocabulary">
+            <thead><tr><th>Thuật ngữ</th><th>Định nghĩa</th><th>Ví dụ / không đồng nhất</th></tr></thead>
+            <tbody>
+              <tr><td data-label="Thuật ngữ"><strong>Case · Hồ sơ/yêu cầu</strong></td><td data-label="Định nghĩa">Một tình huống hoặc yêu cầu chung của khách hàng được tiếp nhận cùng lúc hoặc xử lý cùng đợt. Hồ sơ được tạo tại notary_v2 là một Case.</td><td data-label="Ví dụ">“Thừa kế cho ông A”. Một Case có thể liên quan nhiều người, tài sản, Record và văn bản; không đồng nhất Case với một khách hàng.</td></tr>
+              <tr><td data-label="Thuật ngữ"><strong>Record · Công việc</strong></td><td data-label="Định nghĩa">Một việc riêng lẻ, phân tách rõ theo danh mục nghiệp vụ, có trạng thái, đối tượng liên quan, bằng chứng và thông tin phục vụ tính phí.</td><td data-label="Ví dụ">Thừa kế; gia hạn đất; đo đạc. Record ở notary_v2 và notaryoffice là cùng khái niệm; một việc chỉ được ghi nhận một lần.</td></tr>
+              <tr><td data-label="Thuật ngữ"><strong>Evidence · Dữ kiện nguồn</strong></td><td data-label="Định nghĩa">Điều quan sát được: lưu Word, lệnh in, ảnh scan, nguồn Zalo, kết quả OCR hoặc xác nhận của người dùng. Có thời điểm và provenance.</td><td data-label="Ví dụ">Nhiều lần lưu/in có thể cùng chứng minh một Record. Evidence không tự có nghĩa là công việc thật, đã hoàn thành hoặc được tính phí.</td></tr>
+              <tr><td data-label="Thuật ngữ"><strong>Văn bản / file</strong></td><td data-label="Định nghĩa">Sản phẩm hoặc tài liệu liên quan đến việc: Word chính/phụ, ảnh, PDF đính kèm. Giữ nguồn và phiên bản.</td><td data-label="Ví dụ">Một Record có nhiều file; một file có thể gợi ý nhiều Record. Tờ khai thuế hỗ trợ việc chuyển nhượng không tự biến thành một khoản việc độc lập.</td></tr>
+            </tbody>
+          </table>
+          <div class="case-example" data-od-id="case-record-example">
+            <span class="meta-label">Ví dụ nghiệp vụ do chủ dự án đưa ra · không phải dữ liệu thật</span>
+            <h4>Case: Thừa kế cho ông A</h4>
+            <ul><li><strong>Record: Thừa kế</strong> — văn bản phân chia di sản và các tài liệu hỗ trợ.</li><li><strong>Record: Gia hạn đất</strong> — phát sinh nếu thực sự được yêu cầu/tiếp nhận trong Case.</li><li><strong>Record: Đo đạc</strong> — một việc riêng, không cần có Word mới được ghi nhận.</li></ul>
+            <p>Danh sách này được đề xuất từ loại văn bản, ngữ cảnh Case và danh mục công việc định sẵn; người dùng kiểm tra trước khi ghi nhận. Việc chỉ được nhắc tới trong nội dung hoặc nằm ở kế hoạch tương lai không mặc nhiên trở thành việc đã nhận.</p>
+          </div>
+          <h3>Ánh xạ thuật ngữ cũ — không đổi nghĩa ngầm</h3>
+          <p>Trong <code>notaryoffice/intent.md</code> hiện hành, <em>Evidence Record</em> tương ứng với <strong>Evidence</strong> trong bản UX này; <em>Work Item</em> là điểm cần đối chiếu khi thiết kế <strong>Record công việc</strong>. <code>UploadRecord.record_id</code> là định danh kỹ thuật của một mục upload hiện có, không được coi sẵn là mã Record toàn hệ thống. Đây là yêu cầu ánh xạ cần review, chưa phải migration schema.</p>
+          <p>Case có thể còn trống lúc khởi tạo; Record mới phát hiện có thể ở “Chưa gắn Case” chờ xác nhận. Khi đã nhận diện cùng một việc từ nguồn soạn thảo và nguồn quan sát, bổ sung Evidence vào Record đó thay vì tạo một việc thứ hai. Nếu chưa đủ bằng chứng trùng, hiển thị ứng viên, không tự gộp.</p>
+          <h3>1. Trạng thái sự thật của dữ liệu</h3>
+          <div class="truth-ladder" data-od-id="truth-state-ladder">
+            <div class="truth-step"><b>SOURCE</b><span>Ảnh, Word, message hoặc event gốc; không chỉnh source để che lỗi.</span></div>
+            <div class="truth-step"><b>RAW</b><span>Text/OCR/event thực sự quan sát được, kèm provenance.</span></div>
+            <div class="truth-step"><b>NORMALIZED</b><span>Giá trị chuẩn hóa tất định; raw vẫn còn và xem được.</span></div>
+            <div class="truth-step"><b>INFERRED</b><span>Ứng viên, phân loại, liên kết hoặc confidence; chưa là business truth.</span></div>
+            <div class="truth-step truth-step-final"><b>CONFIRMED</b><span>Fact do đúng owner hoặc người có thẩm quyền xác nhận.</span></div>
+          </div>
+          <p class="source-note">Đây là các lớp tin cậy, không phải chuỗi bắt buộc mọi dữ liệu đi qua: dữ liệu nhập tay tại Stage có nguồn “Thủ công”, không cần giả lập OCR hoặc suy luận trước khi được xác nhận.</p>
+          <h3>2. Trạng thái thực thi của job</h3>
+          <div class="flow" aria-label="Vòng đời job">
+            <div class="flow-step"><b>Đã tiếp nhận</b><span>accepted</span></div>
+            <div class="flow-step"><b>Đang chạy</b><span>running + progress thật</span></div>
+            <div class="flow-step"><b>Chờ người dùng</b><span>login · review · finalize · confirm</span></div>
+            <div class="flow-step"><b>Kết thúc</b><span>succeeded · partial · failed · canceled</span></div>
+          </div>
+          <table class="spec-table" data-od-id="state-face-spec">
+            <thead><tr><th>Mặt trạng thái</th><th>Hiển thị bắt buộc</th><th>Hành động</th></tr></thead>
+            <tbody>
+              <tr><td data-label="Trạng thái">Đang tải / kiểm tra</td><td data-label="Hiển thị">Tên việc đang làm; spinner hoặc skeleton; không bịa phần trăm</td><td data-label="Hành động">Hủy chỉ khi backend hỗ trợ</td></tr>
+              <tr><td data-label="Trạng thái">Trống</td><td data-label="Hiển thị">Vì sao trống và bước đầu tiên cụ thể</td><td data-label="Hành động">Một CTA chính</td></tr>
+              <tr><td data-label="Trạng thái">Chờ người dùng</td><td data-label="Hiển thị">Banner trong module, nêu đúng login/review/finalize/confirm</td><td data-label="Hành động">Đi thẳng tới bước cần xử lý</td></tr>
+              <tr><td data-label="Trạng thái">Lỗi</td><td data-label="Hiển thị"><code>code</code>, message, retryable, next action, job id</td><td data-label="Hành động">Retry chỉ khi retryable; không parse message để quyết nghiệp vụ</td></tr>
+              <tr><td data-label="Trạng thái">Không khả dụng</td><td data-label="Hiển thị">Capability, lý do, điều kiện bật nếu có</td><td data-label="Hành động">Không cho chạy job</td></tr>
+            </tbody>
+          </table>
+          <div class="callout callout-info">
+            <strong>Dirty state là trạng thái cấp field</strong>
+            <p>Polling và refresh nền không ghi đè trường đang focus/dirty. Rời module hoặc đóng app khi có thay đổi chưa lưu phải chọn Lưu, Bỏ thay đổi hoặc Ở lại.</p>
+          </div>
+          <div class="callout">
+            <strong>Xuất thành công ≠ làm xong việc ≠ đã thu phí</strong>
+            <p>Job xuất Word hoặc chuyển PDF chỉ cho biết tác vụ tạo file đã xong. Xác nhận “đúng là việc tôi làm” chỉ xác nhận Record; trạng thái xử lý nghiệp vụ, xác nhận khoản phí và tình trạng thanh toán phải hiển thị riêng, không cập nhật ngầm theo job.</p>
+          </div>
+        </section>
+
+        <section class="section" id="notary-v2" data-od-id="notary-v2-ux-spec">
+          <header class="section-head">
+            <div><div class="section-kicker">Module 01 · Soạn hồ sơ</div><h2 data-od-id="notary-v2-heading">Một bàn soạn theo tiến trình, không phải một form khổng lồ.</h2></div>
+            <div class="section-no">05</div>
+          </header>
+          <p class="intro"><span class="status status-target">Yêu cầu đã chốt</span> Không chia màn hình thành tab theo loại hợp đồng. Có <strong>hai kiểu diagram cho văn bản chính</strong>; chọn loại hợp đồng bằng dropdown. Văn bản phụ không có canvas kéo thả riêng.</p>
+          <nav class="subnav" aria-label="Các phần bàn soạn"><a href="#notary-diagrams">Hai kiểu diagram</a><a href="#notary-stages">Hai Stage</a><a href="#notary-intake-engine">Conversion/OCR</a><a href="#notary-zalo">Zalo</a><a href="#notary-word-engine">Engine Word</a></nav>
+          <div class="flow" data-od-id="notary-primary-flow">
+            <div class="flow-step"><b>Thu nhận</b><span>File/ảnh · Excel · Zalo; QR giấy tờ theo capability</span></div>
+            <div class="flow-step"><b>Chuyển đổi & đọc</b><span>Router → local conversion hoặc OCR → nhận diện dữ liệu</span></div>
+            <div class="flow-step"><b>Stage Người / Tài sản</b><span>Review, sửa và Cập nhật; nhập tay bắt đầu ngay tại đây</span></div>
+            <div class="flow-step"><b>Sắp xếp quan hệ</b><span>Pool dẫn xuất → Diagram</span></div>
+            <div class="flow-step"><b>Chọn bộ văn bản</b><span>Văn bản chính + văn bản phụ; kiểm tra readiness</span></div>
+            <div class="flow-step"><b>Xuất & rà soát việc</b><span>Word → kết quả file; đề xuất Record theo danh mục</span></div>
+          </div>
+          <h3 id="notary-diagrams">Hai kiểu diagram, không phải hai hợp đồng cố định</h3>
+          <div class="mode-controls" data-od-id="diagram-mode-preview">
+            <label for="diagram-mode">Kiểu sơ đồ minh họa<select id="diagram-mode"><option value="bilateral">Hai bên A / B</option><option value="inheritance">Phả hệ thừa kế</option></select></label>
+            <label for="contract-type" id="contract-type-label">Loại hợp đồng chính<select id="contract-type"><option value="Chuyển nhượng">Chuyển nhượng</option><option value="Tặng cho">Tặng cho</option><option value="Cho thuê">Cho thuê</option><option value="Đặt cọc">Đặt cọc</option></select></label>
+          </div>
+          <p class="source-note">Control này chỉ đổi hình minh họa trong tài liệu, không phải engine chạy thật. Chưa có thao tác kéo thả hay xuất file trong bản HTML. Ứng dụng thật chỉ bật loại văn bản đã có rule và template được duyệt.</p>
+          <div id="diagram-bilateral" class="diagram-preview print-diagram" data-od-id="bilateral-diagram">
+            <span class="meta-label">Loại 1 · văn bản chính hai bên</span><h4 id="contract-preview-title">Hợp đồng Chuyển nhượng</h4>
+            <div class="party-grid"><div class="party-zone"><strong>Bên A</strong><p>Kéo một hoặc nhiều Người đã cập nhật vào phía A. Nhãn vai trò thay đổi theo hợp đồng đang chọn.</p></div><div class="party-zone"><strong>Bên B</strong><p>Kéo một hoặc nhiều Người đã cập nhật vào phía B. Hiển thị người đại diện/đồng tham gia theo rule được hỗ trợ.</p></div></div>
+            <div class="mini-box"><strong>Tài sản của giao dịch</strong> · Chọn từ Stage Tài sản đã cập nhật; không nhập lại thông tin tài sản trong Diagram.</div>
+          </div>
+          <div id="diagram-inheritance" class="diagram-preview print-diagram" data-od-id="inheritance-diagram" hidden>
+            <span class="meta-label">Loại 2 · văn bản chính thừa kế</span><h4>Văn bản phân chia di sản / văn bản thừa kế theo mẫu</h4>
+            <div class="family-root">Người để lại di sản</div><div class="family-grid"><div class="mini-box">Nhánh quan hệ gia đình<br>Vợ/chồng · cha/mẹ</div><div class="mini-box">Các thế hệ / nhánh con cháu<br>Quan hệ + assignment nhận theo rule</div></div>
+            <p class="source-note">Minh họa cấu trúc màn hình, không phải ví dụ tính phần thừa kế. Engine phả hệ riêng; không ép vào hai cột A/B và không tự chốt quy tắc thừa kế đang nháp.</p>
+          </div>
+          <ul class="checklist"><li><strong>Cùng UX không có nghĩa cùng business rule:</strong> tặng cho, chuyển nhượng, cho thuê, đặt cọc dùng bố cục A/B nhưng khác trường, validation, cách gọi vai trò và template.</li><li>Đổi loại hợp đồng trong nhóm A/B phải rà soát gán và trường riêng; đổi kiểu A/B ↔ thừa kế phải cảnh báo quan hệ không tương thích. Không xóa Stage hoặc chuyển quan hệ ngầm.</li><li><strong>Văn bản phụ:</strong> phiếu đăng ký, tờ khai thuế, đơn đề nghị lấy dữ liệu theo logic từ Stage + Diagram. Chỉ chọn ở bước xuất Word; không dựng thêm diagram để điền lại người/tài sản.</li></ul>
+          <h3>Cấu trúc màn hình bàn soạn</h3>
+          <div class="screen-map" data-od-id="notary-workbench-blueprint" role="img" aria-label="Bản đồ bố cục bàn soạn hồ sơ">
+            <div class="screen-rail"><span class="meta-label">Thu nhận chung</span><div class="mini-box">Ảnh giấy tờ Người + Tài sản / file</div><div class="mini-box">Import Excel</div><div class="mini-box">Mở cửa sổ Zalo</div><div class="mini-box">Router / conversion / OCR<br>Nhãn bước đang chạy + lỗi từng file</div><div class="mini-box">QR giấy tờ · capability riêng</div></div>
+            <div class="screen-main"><div class="screen-title">Case / hồ sơ #… · Kiểu sơ đồ ▾ · Văn bản chính ▾</div><div class="screen-body"><div class="stage-box"><div class="mini-box"><b>Stage Người</b><br>+ Thêm người thủ công<br>Dữ liệu nháp / đã cập nhật + nguồn</div><div class="mini-box"><b>Stage Tài sản</b><br>+ Thêm tài sản thủ công<br>Mỗi tài sản một cột; liên kết ảnh/GCN</div></div><div class="mini-box"><strong>Cập nhật dữ liệu Stage</strong> · lỗi field / thay đổi chưa lưu</div><div class="mini-box"><strong>Pool / Chưa xếp</strong> · Người đã cập nhật; tài sản đã cập nhật sẵn để chọn</div><div class="mini-box diagram-box"><span>Văn bản chính: Diagram A/B hoặc phả hệ<br>Văn bản phụ: chọn ở Xuất Word, không có canvas riêng</span></div></div></div>
+            <div class="screen-inspector"><span class="meta-label">Thanh kiểm tra</span><h4>Nguyễn Văn A</h4><p class="brand-note">Ảnh nguồn · raw · normalized · provenance · lỗi field · vai trò trong sơ đồ.</p><div class="mini-box">Xem cách tính</div><div class="mini-box">Cảnh báo nghiệp vụ</div></div>
+          </div>
+          <h3 id="notary-stages">Stage Người và Stage Tài sản là hai vùng khác nhau</h3>
+          <p>Ảnh CCCD và giấy tờ tài sản có thể cùng vào một vùng thu nhận. Kết quả được phân loại, nhóm trang và đưa tới đúng Stage; loại chưa chắc chắn nằm trong “Cần xác định”, không tự đổ nhầm vào Stage Người. Một GCN có nhiều tài sản phải giữ được liên hệ về cùng nguồn, nhưng hiển thị riêng từng tài sản.</p>
+          <p><strong>Nhập thủ công không có panel nguồn riêng:</strong> nút “+ Thêm người” hoặc “+ Thêm tài sản” tạo mục nháp ngay trong Stage tương ứng; sửa trực tiếp tại đó. Dữ liệu OCR, Excel, Zalo và nhập tay dùng cùng quy trình Cập nhật trước khi Pool/Diagram sử dụng.</p>
+          <table class="spec-table" data-od-id="notary-zone-rules">
+            <thead><tr><th>Vùng</th><th>Nguồn sự thật</th><th>Thao tác được phép</th><th>Bất biến</th></tr></thead>
+            <tbody>
+              <tr><td data-label="Vùng"><strong>Thu nhận / review nguồn</strong></td><td data-label="SOT">File/media gốc + kết quả tạm</td><td data-label="Cho phép">Chọn nguồn, xem ảnh/text, nhận diện loại, nhóm trang, chuyển vào Stage</td><td data-label="Bất biến">Sửa dữ liệu nghiệp vụ tại Stage; đóng cửa sổ không đồng nghĩa duyệt, xóa cache hoặc tự commit</td></tr>
+              <tr><td data-label="Vùng"><strong>Stage Người</strong></td><td data-label="SOT">Thông tin người; phân biệt nháp và bản đã cập nhật</td><td data-label="Cho phép">Thêm tay, sửa field, bỏ mục nháp, Cập nhật</td><td data-label="Bất biến">Pool chỉ nhận dữ liệu đã cập nhật; định danh ổn định, không lấy tên/vị trí làm khóa</td></tr>
+              <tr><td data-label="Vùng"><strong>Stage Tài sản</strong></td><td data-label="SOT">Thông tin mỗi tài sản + liên hệ GCN/nguồn</td><td data-label="Cho phép">Thêm tay, sửa field, xem trang nguồn, Cập nhật</td><td data-label="Bất biến">Không coi một GCN luôn là một tài sản; không suy đã có commit nguyên tử Người + Tài sản trong code hiện tại</td></tr>
+              <tr><td data-label="Vùng"><strong>Chưa xếp / Pool</strong></td><td data-label="SOT">Stage − assignments hiện tại</td><td data-label="Cho phép">Tìm, kéo vào Diagram</td><td data-label="Bất biến">Không sửa/xóa dữ liệu Stage</td></tr>
+              <tr><td data-label="Vùng"><strong>Sơ đồ / Diagram</strong></td><td data-label="SOT">Bên A/B hoặc quan hệ phả hệ, assignment, kết quả engine</td><td data-label="Cho phép">Gán, di chuyển, bỏ assignment, xem rule/cách tính</td><td data-label="Bất biến">Bỏ card không xóa Người/Tài sản; Pool dẫn xuất lại từ Stage và gán hiện tại</td></tr>
+              <tr><td data-label="Vùng"><strong>Xuất Word</strong></td><td data-label="SOT">Case + Stage/Diagram đã lưu + template</td><td data-label="Cho phép">Chọn văn bản chính/phụ, kiểm tra, sinh, mở/lưu file</td><td data-label="Bất biến">Không sửa ngầm dữ liệu gốc; xuất lại không nhân đôi Record công việc</td></tr>
+            </tbody>
+          </table>
+          <h3 id="notary-intake-engine">Engine đầu vào: router / conversion / OCR phải có chỗ trong UX</h3>
+          <p><strong>Đích yêu cầu:</strong> đầu ra từ các kênh thu nhận được đưa vào một pipeline xử lý thống nhất trước Stage. Nhập tay đã là dữ liệu cấu trúc nên bắt đầu tại Stage, không chạy OCR giả. “Phân loại định dạng file” và “nhận diện Người/Tài sản/giấy tờ” là hai bước khác nhau; không gọi cả hai là khả năng có sẵn của MarkItDown.</p>
+          <div class="flow" data-od-id="conversion-routing-flow"><div class="flow-step"><b>Nguồn gốc</b><span>File / ảnh / dữ liệu được chọn từ Zalo</span></div><div class="flow-step"><b>Router + policy</b><span>Nhận diện loại file; có text hay cần OCR; kiểm tra quyền cloud</span></div><div class="flow-step"><b>Conversion / OCR</b><span>Local text: candidate MarkItDown; ảnh/scan: nhánh OCR được phép</span></div><div class="flow-step"><b>Nhận diện dữ liệu</b><span>Người / Tài sản / chưa xác định; nguồn và cảnh báo</span></div><div class="flow-step"><b>Stage phù hợp</b><span>Review tại field → Cập nhật → Pool/Diagram</span></div></div>
+          <table class="spec-table" data-od-id="conversion-evidence-matrix">
+            <thead><tr><th>Lớp</th><th>Đã kiểm chứng trong source</th><th>Cách thể hiện ở frontend</th></tr></thead>
+            <tbody>
+              <tr><td data-label="Lớp">Router POC</td><td data-label="Source"><code>classify_source</code> chọn local, OCR candidate, legacy DOC hoặc unsupported. <code>decide_ocr</code> yêu cầu cho phép cloud rõ ràng.</td><td data-label="Frontend">Nhãn route, loại file, lý do chặn; không tự gọi cloud khi local conversion lỗi.</td></tr>
+              <tr><td data-label="Lớp">MarkItDown</td><td data-label="Source">POC gọi <code>MarkItDown(enable_plugins=False)</code> cho nhánh local; có <code>ConversionEnvelope</code>, warning/error và provenance. Chưa phải đường vào production chung.</td><td data-label="Frontend">Hiển thị “Chuyển đổi văn bản” và adapter thực tế; chỉ ghi MarkItDown khi job thực sự dùng nó.</td></tr>
+              <tr><td data-label="Lớp">Nhánh OCR</td><td data-label="Source">POC có render từng trang PDF scan rồi gọi OCR qua gate. Luồng shell hiện tại vẫn gọi <code>routers.ocr_ai.analyze_images</code> trực tiếp, dùng Qwen-native.</td><td data-label="Frontend">Trạng thái từng file/trang: chờ, đọc, xong một phần, lỗi, chưa được phép gửi cloud; xem source cạnh kết quả.</td></tr>
+              <tr><td data-label="Lớp">Dữ liệu nghiệp vụ</td><td data-label="Source">Kết quả text/conversion không tự thành dữ liệu chuẩn. Việc phân loại, trích Người/Tài sản và đưa về Stage cần kiểm chứng riêng.</td><td data-label="Frontend">Hiển thị loại nhận diện, độ chắc chắn nếu engine cung cấp; cho xác định lại loại và sửa dữ liệu tại Stage.</td></tr>
+            </tbody>
+          </table>
+          <div class="callout callout-warn"><strong>Kết luận kiểm tra MarkItDown</strong><p>Đã tìm thấy POC trong snapshot và repo notary_v2 riêng; đã đối chiếu nhánh docs/monorepo-normalization. Chưa có bằng chứng mọi đầu vào production đều đi qua MarkItDown, hoặc plugin markitdown-ocr đã được adopt. MIN-61 còn là DRAFT/ITERATE. Không biến kết quả POC thành tuyên bố “đã triển khai toàn bộ”. Chi tiết refs và giới hạn ở <a href="#src-branch-audit">Nguồn kiểm chứng nhánh</a>.</p></div>
+          <p class="source-note"><a href="#src-conversion">converter.py:41–159; policy.py:19–74</a> · <a href="#src-ocr-runtime">notary_adapter.py:465–521</a> · <a href="#src-conversion-decision">MIN61_CONVERSION_OCR_DECISION.md:3–24, 80–92</a>.</p>
+
+          <h3 id="notary-zalo">Zalo: một cửa sổ đăng nhập, một cửa sổ quản lý</h3>
+          <div class="grid-2" data-od-id="zalo-window-spec">
+            <article class="panel"><span class="meta-label">Cửa sổ 1 · Kết nối</span><h4>Đăng nhập bằng QR của connector</h4><p>Chọn tài khoản chung của văn phòng theo chính sách hiện hành; hiển thị QR thật do connector cấp, thời hạn và trạng thái chờ quét/chờ xác nhận/đã kết nối. QR hết hạn có hành động tạo lại; lỗi có lý do và retry đúng khả năng.</p><p>Đăng nhập thành công chuyển sang cửa sổ quản lý. Hủy đăng nhập quay về bàn soạn, không xóa Stage. QR đăng nhập Zalo khác hoàn toàn QR đọc giấy tờ; không dùng chung nhãn “QR chưa khả dụng”.</p></article>
+            <article class="panel"><span class="meta-label">Cửa sổ 2 · Nguồn và dữ liệu nhận được</span><h4>Chọn bạn/nhóm trước, chọn dữ liệu sau</h4><p>Cột trái: danh sách bạn/nhóm đã được phép nghe, checkbox bật/tắt và trạng thái đã áp dụng/chờ áp dụng. Vùng giữa: dữ liệu nhận từ các nguồn đó theo thời gian, loại và người gửi. Vùng xem trước: ảnh/file, trang, thời điểm, nguồn, lỗi tải.</p><p>Checkbox từng mục hoặc lô → chọn Case đích → “Chuyển mục đã chọn vào Input”. Không chọn mặc định mọi cuộc trò chuyện; không tự đổ dữ liệu vào Stage khi có message mới.</p></article>
+          </div>
+          <div class="flow" data-od-id="zalo-intake-flow"><div class="flow-step"><b>Quét QR</b><span>Kết nối tài khoản được phép</span></div><div class="flow-step"><b>Chọn nguồn nghe</b><span>Bạn / nhóm được chọn; xác nhận policy đã áp dụng</span></div><div class="flow-step"><b>Tích chọn dữ liệu</b><span>Xem trước, tạo lô, sắp trang</span></div><div class="flow-step"><b>Chuyển vào Input</b><span>Pipeline chung; không có quy trình duyệt dữ liệu riêng của Zalo</span></div><div class="flow-step"><b>Stage</b><span>Người / Tài sản; giữ provenance Zalo</span></div></div>
+          <p><strong>Trạng thái cần thiết kế:</strong> chưa đăng nhập; QR hết hạn; mất kết nối; chưa chọn nguồn; policy chờ áp dụng; chưa có dữ liệu; nguồn ngừng nghe; tải lỗi; mục đã chuyển. Chuyển lại cùng mục phải cảnh báo/đối chiếu, không lặng lẽ nhân đôi dữ liệu. Đóng cửa sổ quản lý không có nghĩa đăng xuất; thao tác dừng nghe và đăng xuất phải rõ ràng.</p>
+          <p><strong>Ranh giới:</strong> không mở lại quyết định đọc Zalo cá nhân của nhân viên. UI chỉ hiển thị loại dữ liệu connector thực sự hỗ trợ; khả năng nhận mọi loại tệp/tin nhắn chưa được chứng minh thì để “Chưa hỗ trợ”, không giả lập.</p>
+          <p class="source-note">Hiện có API state trả QR/expiry, trạng thái connector, sources và media. Việc tách thành hai cửa sổ và chuyển vào pipeline chung là đích UX, chưa được nghiệm thu. <a href="#src-zalo">zalo_inbox.py:527–654; spec Zalo</a>.</p>
+
+          <h3 id="notary-word-engine">Engine xuất Word: từ dữ liệu đã lưu tới bộ văn bản</h3>
+          <p><span class="status status-current">Có engine thừa kế</span> <code>services/word_engine.py</code> dựng <code>WordExportContext</code> từ Case, Stage, Diagram và tài sản; tạo mapping rồi thay placeholder trong DOCX. Sidecar đã có lệnh xuất file Word. Không phải MarkItDown sinh hợp đồng.</p>
+          <div class="flow" data-od-id="word-engine-flow"><div class="flow-step"><b>Chọn bộ xuất</b><span>Văn bản chính + checkbox văn bản phụ + mẫu/phiên bản</span></div><div class="flow-step"><b>Kiểm tra đầu vào</b><span>Case đã lưu, Stage đã cập nhật, Diagram/rule tương thích, template có đủ mapping</span></div><div class="flow-step"><b>Dựng context</b><span>Người · tài sản · vai trò · kết quả nghiệp vụ; không nhập lại</span></div><div class="flow-step"><b>Render DOCX</b><span>Mapping → template → kiểm tra placeholder → file từng văn bản</span></div><div class="flow-step"><b>Nhận kết quả</b><span>Xem/mở/lưu file, lỗi từng văn bản; rà soát đề xuất Record</span></div></div>
+          <table class="spec-table" data-od-id="word-output-selection">
+            <thead><tr><th>Nhóm xuất</th><th>Nguồn dữ liệu</th><th>UX và giới hạn</th></tr></thead>
+            <tbody>
+              <tr><td data-label="Nhóm">Văn bản chính</td><td data-label="Dữ liệu">Diagram A/B hoặc phả hệ + Stage + loại hợp đồng</td><td data-label="UX">Kế thừa văn bản chính đang soạn; chọn mẫu hợp lệ. Chưa có engine/mapping thì không cho xuất giả.</td></tr>
+              <tr><td data-label="Nhóm">Văn bản phụ</td><td data-label="Dữ liệu">Projection theo logic từ cùng context đã lưu</td><td data-label="UX">Checkbox phiếu đăng ký, tờ khai thuế, đơn đề nghị… Chỉ hỏi field riêng còn thiếu, không có kéo thả hoặc bản sao sửa Người/Tài sản.</td></tr>
+              <tr><td data-label="Nhóm">Kết quả từng file</td><td data-label="Dữ liệu">Mẫu, dữ liệu/phiên bản nguồn, thời điểm xuất, vị trí file</td><td data-label="UX">Đích thiết kế: thành công/lỗi/chưa chạy từng văn bản. Nếu một văn bản lỗi, giữ kết quả đã có, báo partial và cho chạy lại phần lỗi.</td></tr>
+            </tbody>
+          </table>
+          <ul class="checklist"><li>Xuất bị chặn phải nói rõ blocker và đưa về đúng Stage, Diagram hoặc mẫu cần sửa. Không tự lưu nháp để lách validation.</li><li>Văn bản phụ không tự suy nhóm người khác với Diagram. Field riêng của một biểu mẫu phải được phân biệt với dữ liệu gốc của Case.</li><li>Thay đổi Stage/Diagram sau khi xuất làm bộ file cũ cần kiểm tra/xuất lại; không tuyên bố file Word trên máy tự cập nhật. Không ghi đè file người dùng đã sửa mà không xác nhận.</li><li>Rà soát Record dùng danh mục công việc chung, không tạo một Record cho mỗi file Word. Đề xuất việc mới và lỗi xuất là hai nhóm kết quả tách biệt.</li></ul>
+          <div class="callout callout-warn"><strong>Không mở rộng engine thừa kế hiện tại bằng lời mô tả</strong><p>Word V1 hiện có phạm vi riêng: nhóm chủ/nhận lấy theo Diagram; không coi “không nhận” là “từ chối”; chưa suy đã có gán người nhận theo từng tài sản. Sidecar chặn placeholder chưa hỗ trợ, nhưng route web export hiện tại chưa có cùng bước chặn. Bộ xuất nhiều văn bản và mapping cho A/B/phụ trợ cần triển khai và kiểm thử riêng.</p></div>
+          <p class="source-note"><a href="#src-word">word_engine.py:404–489, 1211–1242</a> · <a href="#src-word-adapters">notary_adapter.py:407–460; cases.py:1610–1663</a> · <a href="#src-word-spec">word-export.md</a>.</p>
+        </section>
+
+        <section class="section" id="upload-lab" data-od-id="upload-lab-ux-spec">
+          <header class="section-head">
+            <div><div class="section-kicker">Module 02 · Phân tích & Upload</div><h2 data-od-id="upload-lab-heading">Hai tab, một hàng đợi chung, một portal được chọn rõ ràng.</h2></div>
+            <div class="section-no">06</div>
+          </header>
+          <div class="module-tabs" aria-label="Điều hướng module upload">
+            <span class="module-tab module-tab-active">Phân tích dữ liệu</span><span class="module-tab">Upload</span>
+          </div>
+          <h3>Tab 1 · Phân tích dữ liệu</h3>
+          <p class="intro"><span class="status status-open">Cần hoàn thiện theo năm</span> Mỗi năm bắt đầu lại từ số 1. Năm là ngữ cảnh nghiệp vụ xuyên suốt tải sổ → đối soát → chọn file → upload, không chỉ là một bộ lọc giao diện. <a href="#task-upload-year">Task U-YEAR</a>.</p>
+          <div class="flow" data-od-id="audit-flow">
+            <div class="flow-step"><b>Chọn portal + năm</b><span>Profile tỉnh, trạng thái kết nối, lần đồng bộ</span></div>
+            <div class="flow-step"><b>Tải danh sách</b><span>Engine lấy dữ liệu từ web hoặc file Excel đã tải</span></div>
+            <div class="flow-step"><b>Chuẩn hóa số</b><span><code>xxx/yyyy</code>, giữ raw và dòng nguồn</span></div>
+            <div class="flow-step"><b>Đối soát</b><span>Hợp lệ · thiếu · lỗi/trùng</span></div>
+            <div class="flow-step"><b>Tạo hàng đợi</b><span>Gợi ý số thiếu cần tìm trong folder</span></div>
+          </div>
+          <table class="spec-table" data-od-id="audit-table-model">
+            <thead><tr><th>View</th><th>Mục đích</th><th>Cột chuẩn</th><th>Mặc định</th></tr></thead>
+            <tbody>
+              <tr><td data-label="View">Số còn thiếu</td><td data-label="Mục đích">Khoảng trống trong phạm vi năm/dải đã xác minh</td><td data-label="Cột">Năm · Số công chứng · Lý do · Phạm vi dữ liệu nguồn</td><td data-label="Mặc định">Số có dấu vết trong vùng lỗi được gắn nhãn cần kiểm tra, không tự đề xuất upload lại</td></tr>
+              <tr><td data-label="View">Lỗi / trùng</td><td data-label="Mục đích">Giải thích dòng cần sửa trước upload</td><td data-label="Cột">STT · Ngày · Số công chứng · Ghi chú</td><td data-label="Mặc định">Ghi chú dùng tiếng Việt, có dòng nguồn</td></tr>
+              <tr><td data-label="View">Đã có trên portal</td><td data-label="Mục đích">Đối chứng và ngăn upload trùng</td><td data-label="Cột">Số · ngày · nguồn · trạng thái</td><td data-label="Mặc định">Thu gọn, không chiếm màn hình chính</td></tr>
+            </tbody>
+          </table>
+          <div class="callout callout-info"><strong>Code đã có một phần, chưa phải flow năm hoàn chỉnh</strong><p><code>parse_contract_book_no</code> đọc <code>ordinal/year</code>; <code>_build_missing_numbers</code> nhóm theo năm. Tuy nhiên hàm đang tìm từ min tới max quan sát được và bỏ qua nhóm có ít hơn hai số, nên chưa đáp ứng yêu cầu kiểm tra từ số 1 khi đã có dữ liệu đầy đủ. Bản này ghi task hoàn thiện, không ghi sai rằng code hoàn toàn không biết năm. <a href="#src-years">Source: contract_book_audit.py:116–157, 185–205</a>.</p></div>
+          <ul class="checklist"><li>Đích UX hiển thị portal, văn phòng/sổ nếu portal có nhiều sổ, năm, khoảng ngày đã tải và dữ liệu đầy đủ hay một phần. Cùng số thứ tự ở hai năm khác nhau không phải trùng.</li><li>Khi tải đủ phạm vi từ đầu năm: tìm thiếu từ số 1 đến mốc cuối đã xác minh. Với khoảng ngày hẹp, không tự kết luận mọi số trước/sau khoảng đó là thiếu; chưa biết số cuối thực tế thì không bịa phần đuôi.</li><li>Năm thiếu, sai định dạng hoặc mâu thuẫn giữa số công chứng và ngày phải vào “Cần kiểm tra”, giữ raw và nguồn; không tự sửa năm từ đồng hồ máy.</li><li>Đổi portal/năm phải đổi hoặc vô hiệu hóa kết quả và lựa chọn hàng đợi không còn tương thích. Khóa ngữ cảnh đề xuất là portal + văn phòng/sổ + năm + số thứ tự; chưa phải schema được duyệt.</li></ul>
+          <h3>Tab 2 · Upload — chuẩn bị dữ liệu và bộ file</h3>
+          <div class="flow" data-od-id="upload-flow">
+            <div class="flow-step"><b>Chọn folder</b><span>Native dialog; hiển thị scope máy hiện tại</span></div>
+            <div class="flow-step"><b>Quét & đối chiếu</b><span>Word → thông tin hợp đồng → ghép đúng portal/năm/số còn thiếu</span></div>
+            <div class="flow-step"><b>Chuẩn bị attachment</b><span>PDF sẵn có / ảnh scan → PDF / Word → PDF nếu portal cho phép</span></div>
+            <div class="flow-step"><b>Preview & preflight</b><span>Đúng hồ sơ, đúng bộ file, đủ điều kiện rồi mới login/điền</span></div>
+            <div class="flow-step"><b>Điền thử</b><span>Mở N tab đã điền; chưa bấm Lưu</span></div>
+            <div class="flow-step"><b>Người kiểm tra & lưu</b><span>Portal xác nhận; app quan sát kết quả</span></div>
+          </div>
+          <div class="grid-2">
+            <article class="panel" data-od-id="portal-picker-spec"><span class="meta-label">Portal picker</span><h4>Profile portal là context bắt buộc</h4><p>Dropdown hiển thị tên tỉnh/cổng, trạng thái adapter, kiểu tích hợp (API hoặc trình duyệt), lần đăng nhập và capability thiếu. Mỗi adapter backend có logic riêng; frontend giữ cùng flow và state vocabulary.</p></article>
+            <article class="panel"><span class="meta-label">Human gate</span><h4>Không có nút “Finalize tất cả” giả tạo</h4><p>Luồng trình duyệt hiện hành dừng trước nút Lưu. Người dùng kiểm tra và tự lưu trên portal; retry phải chống mở lại cùng mục upload. Với adapter API tương lai, hành động gửi/lưu phải có xác nhận riêng tương đương, không suy API được miễn human gate.</p></article>
+            <article class="panel"><span class="meta-label">Queue row</span><h4>Phân biệt file lấy dữ liệu và file gửi đi</h4><p>Cột chính: số/năm, Word nguồn, lý do chọn, attachment được chọn, loại PDF, readiness và trạng thái upload. Một file Word dùng để trích dữ liệu không có nghĩa nó là file được gửi lên cổng.</p></article>
+            <article class="panel"><span class="meta-label">Focus policy</span><h4>Không giật cửa sổ liên tục</h4><p>Khi cần login, shell đưa Chromium lên trước một lần. Sau đó người dùng chủ động chuyển cửa sổ; polling không cướp focus.</p></article>
+          </div>
+          <h3 id="upload-pdf">PDF đính kèm là bước riêng, theo yêu cầu từng portal</h3>
+          <p><span class="status status-target">Yêu cầu mới</span> Mở chi tiết một mục upload để chọn “File đính kèm”. Hệ thống giữ nguyên file nguồn, cho xem trước file thực tế sẽ gửi và lưu nguồn gốc chuyển đổi. Không sửa đuôi file để giả thành PDF.</p>
+          <table class="spec-table" data-od-id="pdf-preparation-modes">
+            <thead><tr><th>Nguồn</th><th>Thao tác chuẩn bị</th><th>Điều kiện gửi</th></tr></thead>
+            <tbody>
+              <tr><td data-label="Nguồn">Hồ sơ giấy đã scan thành PDF</td><td data-label="Chuẩn bị">Chọn PDF; xem thumbnail/từng trang, xác nhận thuộc đúng hợp đồng, đủ trang và đúng thứ tự.</td><td data-label="Điều kiện">Đúng yêu cầu bản scan của portal; định dạng, giới hạn file và khả năng đọc hợp lệ.</td></tr>
+              <tr><td data-label="Nguồn">Ảnh scan nhiều trang</td><td data-label="Chuẩn bị">Chọn ảnh; sắp thứ tự, xoay trang, bỏ trang chọn nhầm; tạo PDF mới và xem trước.</td><td data-label="Điều kiện">Không tự bỏ trang nghi trùng hoặc nén làm mất nội dung; giữ ảnh gốc và dấu vết thứ tự.</td></tr>
+              <tr><td data-label="Nguồn">Word → PDF</td><td data-label="Chuẩn bị">Chọn đúng phiên bản Word; kết xuất giữ bố cục bằng engine được duyệt, kiểm tra font, ngắt trang và phần cuối văn bản.</td><td data-label="Điều kiện">Chỉ dùng khi portal chấp nhận PDF từ Word; không thay cho bản scan hồ sơ giấy có ký/đóng dấu khi portal yêu cầu loại đó.</td></tr>
+            </tbody>
+          </table>
+          <p><strong>Profile portal cần khai báo:</strong> có bắt buộc attachment không; nhận Word/PDF/ảnh nào; yêu cầu bản scan hay cho phép Word render; số lượng/tên trường attachment; giới hạn dung lượng/trang nếu có; cách attach qua API hoặc Playwright. Chưa biết capability thì chưa cho chuẩn bị/gửi như thể đã hỗ trợ.</p>
+          <p><strong>Preflight từng mục:</strong> chưa có file · thiếu trang/cần xem lại · đang chuyển đổi · engine chưa khả dụng · lỗi chuyển đổi · vượt giới hạn · source đã thay đổi · đã sẵn sàng. Chuyển đổi thất bại chỉ chặn mục bị lỗi; giữ dữ liệu đã quét và cho retry, không tự gửi Word thay PDF.</p>
+          <p><strong>Ràng buộc engine:</strong> MarkItDown phục vụ trích nội dung đầu vào trong POC, không thay cho engine kết xuất Word → PDF giữ bố cục. Lựa chọn công nghệ chuyển PDF phải theo TECH_STACK và có test trên máy đích; bản UX này không tự chọn thêm thư viện hay dịch vụ cloud.</p>
+          <p class="source-note">Hiện <code>build_upload_form_data</code> lấy đường dẫn file gốc, <code>_upload_file</code> chuyển đường dẫn đó tới <code>set_input_files</code>. Chưa tìm thấy pipeline tạo PDF theo ba chế độ trên trong các nguồn đã kiểm tra. <a href="#src-attachment">playwright_uploader.py:728–744, 807, 1767–1788</a> · <a href="#task-upload-pdf">Task U-PDF</a>.</p>
+          <div class="callout callout-warn">
+            <strong>Dry-run vẫn là mặc định; tạo PDF không đồng nghĩa upload/lưu</strong>
+            <p>“Điền thử · chưa lưu” phải xuất hiện tại header phiên, từng row và dialog xác nhận. Cancel, retry hoặc reconnect không bao giờ kích hoạt Save/Finalize.</p>
+          </div>
+        </section>
+
+        <section class="section" id="notaryoffice" data-od-id="notaryoffice-ux-spec">
+          <header class="section-head">
+            <div><div class="section-kicker">Module 03 · Văn phòng</div><h2 data-od-id="notaryoffice-heading">Record-first, search-first, xác nhận nhẹ nhưng không hời hợt.</h2></div>
+            <div class="section-no">07</div>
+          </header>
+          <p class="intro">Tên hiển thị là <strong>Văn phòng</strong>. Trung tâm là <strong>Record công việc</strong>, nhóm trong Case và tìm được qua khách hàng/tài sản/bất kỳ trường đã được lập chỉ mục trong phạm vi quyền xem. Evidence chỉ là dữ kiện đầu vào; điểm tin cậy đánh giá đề xuất công việc/liên kết, không đánh giá nhân viên.</p>
+          <div class="flow" data-od-id="office-evidence-flow">
+            <div class="flow-step"><b>Dấu vết máy trạm</b><span>Word · file · print · scan · Zalo chung</span></div>
+            <div class="flow-step"><b>Evidence</b><span>Điều quan sát được; không gọi là công việc</span></div>
+            <div class="flow-step"><b>Đề xuất Record</b><span>Theo danh mục định sẵn + Case ứng viên + chống trùng</span></div>
+            <div class="flow-step"><b>Xác nhận</b><span>Đúng việc · Sửa loại/Case · Nháp/hủy</span></div>
+            <div class="flow-step"><b>Tra cứu & tính phí</b><span>Case → các Record → chi tiết việc, timeline, khoản phí</span></div>
+          </div>
+          <h3 id="record-catalog">Tách Record bằng danh mục công việc, không đếm file</h3>
+          <p><span class="status status-target">Yêu cầu đã chốt</span> Hệ thống có danh mục công việc định sẵn để phân tách một Case. Loại văn bản và ngữ cảnh soạn thảo của notary_v2 là nguồn đề xuất có cấu trúc; notaryoffice dùng cùng danh mục khi phân tích dấu vết runtime hoặc Word soạn ngoài hệ thống.</p>
+          <table class="spec-table" data-od-id="record-catalog-spec">
+            <thead><tr><th>Mục của danh mục</th><th>Đề xuất UX / quy tắc</th></tr></thead>
+            <tbody>
+              <tr><td data-label="Mục">Mã và tên công việc ổn định</td><td data-label="Quy tắc">Ví dụ thừa kế, gia hạn đất, đo đạc. Nhãn UI có thể thay đổi, không làm đổi định danh công việc. Danh mục cụ thể còn phải được chủ dự án duyệt.</td></tr>
+              <tr><td data-label="Mục">Điều kiện nhận diện</td><td data-label="Quy tắc">Loại văn bản, nội dung/field và ngữ cảnh tiếp nhận; chỉ rõ phần bằng chứng nào gợi ý việc nào. Có “Chưa phân loại”, không ép vào mục gần giống.</td></tr>
+              <tr><td data-label="Mục">Phạm vi một lần thực hiện</td><td data-label="Quy tắc">Người/tài sản, yêu cầu/đợt và nguồn liên quan để phân biệt cùng việc quan sát lại với một việc mới thật sự. Không chống trùng chỉ bằng tên khách + tên việc.</td></tr>
+              <tr><td data-label="Mục">Thông tin phục vụ phí</td><td data-label="Quy tắc">Khả năng phát sinh phí, trường căn cứ và tham chiếu biểu phí đã duyệt nếu có; chưa cấu hình thì hiển thị “Chưa xác định”, không coi bằng 0.</td></tr>
+            </tbody>
+          </table>
+          <ol class="checklist"><li>Khi xuất bộ Word, dùng loại văn bản + dữ liệu Case/Diagram để đề xuất các Record; Word soạn ngoài notary_v2 vẫn đi qua nhận diện của notaryoffice khi runtime được triển khai.</li><li>Hiển thị từng việc: lý do phát hiện, nguồn, Case đề xuất và “Record đã có” nếu tìm thấy ứng viên trùng. Không mặc định một văn bản bằng một việc, hoặc một Case chỉ có một việc.</li><li>Người dùng xác nhận, sửa loại/Case, bỏ mục không phải việc thật hoặc thêm việc bị bỏ sót. Một việc chưa rõ Case có thể giữ ở hàng chờ, không tự tạo Case chỉ vì trùng tên.</li><li>Xuất lại, lưu lại, in lại, scan lại hoặc đổi Word thành PDF của cùng việc chỉ thêm phiên bản/Evidence; không nhân đôi Record hoặc khoản phí. Một việc phát sinh mới thực sự phải được phân biệt với việc cũ.</li><li>Đích tích hợp: notary_v2 và notaryoffice cùng tham chiếu Record, khác nguồn tạo/quan sát. Hợp đồng định danh, quyền ghi và cơ chế chống trùng chưa được triển khai trong lượt này.</li></ol>
+          <h3>Trang vào là ô tra cứu, không phải biểu đồ KPI</h3>
+          <div class="grid-2">
+            <article class="panel"><span class="meta-label">Omnibox</span><h4>Tìm bằng một trường bất kỳ</h4><p>Tên, CCCD, serial GCN, thửa/tờ/địa phương, số công chứng, mã Case/Record, file, máy trạm hoặc chuyên viên. Một trường cũng trả ứng viên, không bắt buộc nhập đủ bộ; trùng tên/thửa phải phân biệt bằng ngữ cảnh. Kết quả mở ra Case và các Record, tách rõ đã xác nhận/chưa xác nhận.</p></article>
+            <article class="panel"><span class="meta-label">Bộ lọc nhanh</span><h4>Ngày · máy · người · nguồn · trạng thái</h4><p>Máy trạm chỉ xem record sinh ở máy đó. Máy chủ xem toàn văn phòng. Nếu A4 cho biết tài khoản Windows dùng chung, không hiển thị user như một sự thật đã biết.</p></article>
+          </div>
+          <h3>Thao tác chủ động vẫn có, nhưng không trở thành gánh nặng</h3>
+          <div class="grid-2" data-od-id="office-manual-and-summary">
+            <article class="panel"><span class="meta-label">Nhập thủ công</span><h4>Ghi nhanh một việc hệ thống chưa quan sát được</h4><p>Chọn loại việc trong cùng danh mục, Case có sẵn hoặc chờ gắn Case, thời điểm và ghi chú; tìm trước để tránh trùng. Nguồn là “Thủ công”, vẫn là Record chung, không phải một hệ thống ghi việc riêng. Người xác nhận/thời điểm có dấu vết; không sửa Evidence đã thu.</p></article>
+            <article class="panel"><span class="meta-label">Tổng hợp ngày / tháng</span><h4>Thống kê khối lượng record, không xếp hạng nhân viên</h4><p>Đếm theo nguồn, loại việc, trạng thái xác nhận và máy trạm; cho phép đổi ngày/tháng và mở danh sách record phía sau. Không có leaderboard, điểm năng suất hoặc so sánh cá nhân.</p></article>
+          </div>
+          <h3>Xác nhận tại máy trạm</h3>
+          <div class="toast-spec" data-od-id="workstation-confirmation-spec">
+            <span class="meta-label">Gợi ý vừa phát hiện · 09:21 · PC-02</span>
+            <h4>Record đề xuất: Chuyển nhượng · Case của Nguyễn Văn A</h4>
+            <p>Minh họa: hệ thống tìm thấy Word và lệnh in có cùng thông tin tài sản. Đề xuất gắn Evidence vào Record Chuyển nhượng đã có, không tạo việc mới.</p>
+            <p class="brand-note"><strong>Lý do:</strong> trùng tham chiếu tài sản và ngữ cảnh Case · <strong>Độ tin cậy:</strong> ứng viên cần xác nhận, không phải điểm nhân viên.</p>
+            <div class="actions"><span class="fake-button fake-button-primary">Đúng, tôi làm việc này</span><span class="fake-button">Sửa việc / Case</span><span class="fake-button">Chỉ nháp / việc đã hủy</span></div>
+          </div>
+          <div class="callout callout-info">
+            <strong>“Bản nháp / hồ sơ đã hủy” không xóa Evidence</strong>
+            <p>Phân biệt “Chỉ nháp — không tạo việc thật” với “Việc đã hủy — giữ lịch sử xử lý”; ghi người xác nhận, thời điểm và lý do. Evidence vẫn còn. Không tự xóa khoản phí đã xác nhận hay đánh dấu đã hoàn tiền; việc điều chỉnh phí cần quy tắc và quyền riêng.</p>
+          </div>
+          <h3>Danh sách record và tổng kết cuối ngày</h3>
+          <table class="spec-table" data-od-id="office-record-list">
+            <thead><tr><th>Nhóm</th><th>Row hiển thị</th><th>Hành động chính</th><th>Quyền xem</th></tr></thead>
+            <tbody>
+              <tr><td data-label="Nhóm">Mới phát hiện</td><td data-label="Hiển thị">Loại việc · thời gian · nguồn · Case đề xuất · máy · lý do/độ tin cậy</td><td data-label="Hành động">Đúng việc / sửa / chỉ nháp / đã hủy</td><td data-label="Quyền">Máy trạm: record sinh ở máy mình; máy chủ: tất cả</td></tr>
+              <tr><td data-label="Nhóm">Cần xem lại</td><td data-label="Hiển thị">Chưa phân loại, thiếu text, chưa rõ Case hoặc nghi trùng Record</td><td data-label="Hành động">Chọn loại việc/Case; gắn việc đã có hoặc giữ hàng chờ</td><td data-label="Quyền">Giữ cùng giới hạn máy trạm/máy chủ; quyền sửa cần chốt</td></tr>
+              <tr><td data-label="Nhóm">Đã xác nhận</td><td data-label="Hiển thị">Mã/loại Record · Case · trạng thái việc · máy/người · provenance · tình trạng phí</td><td data-label="Hành động">Xem việc, timeline, tài liệu và chi tiết phí theo quyền</td><td data-label="Quyền">Máy trạm: record sinh ở máy mình; máy chủ: toàn văn phòng</td></tr>
+            </tbody>
+          </table>
+          <p class="intro">Popup giới hạn cứng tối đa 3 lần/người/ngày. Phần còn lại chuyển vào “Tổng kết hôm nay”; thời gian phản hồi dưới 1,5 giây liên tục là tín hiệu cần cảnh báo, không tự suy ra người dùng gian dối.</p>
+          <h3 id="record-fees">Tra cứu khách hàng → thấy từng Record → tính phí</h3>
+          <div class="case-example" data-od-id="record-fee-preview"><span class="meta-label">Minh họa, chưa có biểu phí hoặc số tiền được duyệt</span><h4>Case “Thừa kế cho ông A”</h4><table class="spec-table"><thead><tr><th>Record</th><th>Chi tiết có thể mở</th><th>Thông tin phí</th></tr></thead><tbody><tr><td data-label="Record">Thừa kế</td><td data-label="Chi tiết">Văn bản chính/phụ, người/tài sản, trạng thái xử lý</td><td data-label="Phí">Căn cứ/biểu phí: chưa cấu hình</td></tr><tr><td data-label="Record">Gia hạn đất</td><td data-label="Chi tiết">Phạm vi yêu cầu, tài sản, nguồn xác nhận</td><td data-label="Phí">Chờ xác định khoản áp dụng</td></tr><tr><td data-label="Record">Đo đạc</td><td data-label="Chi tiết">Việc đã tiếp nhận hay chỉ dự kiến; chứng từ liên quan</td><td data-label="Phí">Không tự tính chỉ từ tên công việc</td></tr></tbody></table><p>Mỗi dòng có trạng thái khoản phí, căn cứ/số lượng nếu áp dụng, số tiền khi đã xác định và người xác nhận. Tổng Case phải nêu rõ khoản nào đã xác định, khoản nào còn thiếu; không trình bày tổng thiếu thành tổng cuối cùng.</p></div>
+          <p>Thiết kế chi tiết bảng phí, nguồn biểu phí, thẩm quyền xác nhận/điều chỉnh và cách ghi nhận thanh toán còn cần duyệt; bản này không ấn định mức phí hoặc tạo module kế toán. Một Record có thể không tính phí hoặc có nhiều khoản, nhưng cùng khoản không được tính lại vì xuất thêm file.</p>
+          <h3>Nối Record thành chuỗi sự kiện</h3>
+          <p class="source-note">Ví dụ minh họa hành trình của Nguyễn Văn A, không phải dữ liệu hoạt động thật. Timeline có thể đi qua nhiều Case; cùng khách hàng không có nghĩa mọi đợt yêu cầu là cùng một Case.</p>
+          <div class="timeline" data-od-id="event-chain-example">
+            <div class="timeline-item"><b>20/05/2026 · Chuyển nhượng</b><span>Đã xác nhận · Word + lệnh in</span></div>
+            <div class="timeline-item"><b>21/05/2026 · Ủy quyền</b><span>Liên kết ứng viên · cần xác nhận vì cùng người nhưng khác việc</span></div>
+            <div class="timeline-item"><b>25/07/2026 · Trả hồ sơ</b><span>Nhập thủ công có actor và ghi chú</span></div>
+            <div class="timeline-item"><b>25/09/2026 · Đo đạc dự kiến</b><span>Mốc tương lai trong ví dụ tại ngày 22/09/2026; không hiển thị là việc đã hoàn thành</span></div>
+          </div>
+          <p>Timeline hiển thị loại Record, Case liên quan, sự kiện/mốc, thời điểm thực tế hoặc dự kiến và bằng chứng. Ví dụ “trả hồ sơ” là mốc của một Record hoặc việc riêng theo danh mục được duyệt; không tự tạo Record tính phí cho mọi event trên timeline.</p>
+          <div class="callout callout-warn">
+            <strong>Ba phụ thuộc chưa được tự chốt</strong>
+            <p>A1: đọc Word khi file đang mở; A3: độ đầy đủ event ổ mạng; A4: tài khoản Windows riêng hay chung. UI phải có trạng thái “thiếu bằng chứng” thay vì lấp khoảng trống bằng suy luận.</p>
+          </div>
+        </section>
+
+        <section class="section" id="database" data-od-id="database-ux-spec">
+          <header class="section-head">
+            <div><div class="section-kicker">Khu vực dự kiến · Database · không phải module nghiệp vụ thứ tư</div><h2 data-od-id="database-heading">Giữ một chỗ thật, nhưng không giả vờ đã có sản phẩm.</h2></div>
+            <div class="section-no">08</div>
+          </header>
+          <div class="grid-2">
+            <article class="panel"><span class="status status-open">Chưa triển khai</span><h4>Placeholder có chủ đích</h4><p>Nav hiển thị “Database · Chưa triển khai”. Trang giải thích phạm vi tương lai và link tới quyết định kiến trúc khi có; không có editor giả, kết quả giả hoặc nút Run vô hiệu.</p></article>
+            <article class="panel"><span class="status status-open">Sau governance</span><h4>Workbench dự kiến</h4><p>Nguồn dữ liệu, schema browser, query editor, kết quả, lịch sử và export. Mặc định read-only; quyền ghi, timeout, row limit, audit và môi trường phải được duyệt trước code.</p></article>
+          </div>
+          <div class="callout callout-warn">
+            <strong>Không dùng Database để đi vòng ownership</strong>
+            <p>Shell/renderer không đọc hoặc ghi thẳng <code>notary.db</code> hay <code>registry.sqlite3</code>. Dùng chung database sau này vẫn giữ một owner ghi cho mỗi loại dữ liệu.</p>
+          </div>
+        </section>
+
+        <section class="section" id="man-hinh" data-od-id="screen-inventory">
+          <header class="section-head">
+            <div><div class="section-kicker">Screen inventory</div><h2 data-od-id="screen-inventory-heading">Bộ màn hình đủ để thiết kế prototype, chưa phải kế hoạch code.</h2></div>
+            <div class="section-no">09</div>
+          </header>
+          <table class="spec-table" data-od-id="screen-list">
+            <thead><tr><th>Nhóm</th><th>Màn hình</th><th>Vai trò</th><th>Ưu tiên thiết kế</th></tr></thead>
+            <tbody>
+              <tr><td data-label="Nhóm">Shell</td><td data-label="Màn hình">Tổng quan · Job drawer · Cài đặt & kết nối</td><td data-label="Vai trò">Khung chung, module health, waiting_user, reconnect</td><td data-label="Ưu tiên"><span class="status status-target">P0</span></td></tr>
+              <tr><td data-label="Nhóm">Soạn hồ sơ</td><td data-label="Màn hình">Danh sách Case · Bàn soạn A/B hoặc phả hệ · Stage Người/Tài sản · Intake/router/OCR · QR login Zalo · Quản lý Zalo · Bộ Word chính/phụ</td><td data-label="Vai trò">Nguồn → Stage → Pool/Diagram → Word; rà soát Record theo catalog</td><td data-label="Ưu tiên"><span class="status status-target">P0 thiết kế</span></td></tr>
+              <tr><td data-label="Nhóm">Phân tích & Upload</td><td data-label="Màn hình">Tab Phân tích theo năm · Tab Upload/folder · Chuẩn bị PDF · Preview/preflight · Phiên portal · Kết quả</td><td data-label="Vai trò">Số thiếu đúng năm → metadata + attachment → human save</td><td data-label="Ưu tiên"><span class="status status-target">P0 thiết kế</span></td></tr>
+              <tr><td data-label="Nhóm">Văn phòng</td><td data-label="Màn hình">Tra cứu · Record/Case · Catalog việc · Popup · Tổng hợp ngày/tháng · Timeline · Chi tiết phí · Máy trạm</td><td data-label="Vai trò">Evidence → Record chung → xác nhận → tra cứu công việc/phí</td><td data-label="Ưu tiên"><span class="status status-open">Thiết kế trước; runtime sau các gate</span></td></tr>
+              <tr><td data-label="Nhóm">Database</td><td data-label="Màn hình">Placeholder</td><td data-label="Vai trò">Giữ vị trí phát triển tương lai</td><td data-label="Ưu tiên"><span class="status status-open">P2</span></td></tr>
+            </tbody>
+          </table>
+          <h3>Chuẩn nội dung và tương tác</h3>
+          <div class="grid-3">
+            <article class="panel"><h4>Tiếng Việt nghiệp vụ</h4><p>Stage → Dữ liệu Người / Tài sản; Pool → Chưa xếp; Diagram → Sơ đồ; Case → Hồ sơ/yêu cầu; Record → Công việc; Evidence → Dữ kiện nguồn; Dry-run → Điền thử · chưa lưu.</p></article>
+            <article class="panel"><h4>Bàn phím & focus</h4><p>Mọi control ≥44px, focus ring rõ, table chọn bằng bàn phím, modal giữ focus và trả focus về trigger. Không dùng màu làm tín hiệu duy nhất.</p></article>
+            <article class="panel"><h4>Co giãn desktop</h4><p>Thiết kế chuẩn 1280×820, dùng được 760×520. Ở cửa sổ hẹp: nav thu gọn, inspector xuống dưới, Diagram mở thành workspace riêng; trang không tràn ngang.</p></article>
+          </div>
+        </section>
+
+        <section class="section" id="nghiem-thu" data-od-id="acceptance-criteria">
+          <header class="section-head">
+            <div><div class="section-kicker">Definition of UX-ready</div><h2 data-od-id="acceptance-heading">Nghiệm thu bằng hành vi, không bằng việc “trông hiện đại”.</h2></div>
+            <div class="section-no">10</div>
+          </header>
+          <div class="acceptance">
+            <div class="acceptance-item"><b>Hai kiểu diagram</b><span>Không có tab theo từng hợp đồng; A/B dùng dropdown, thừa kế dùng phả hệ. Văn bản phụ chỉ chọn ở bước Word.</span></div>
+            <div class="acceptance-item"><b>Hai Stage và nhập tay tại chỗ</b><span>Một lô ảnh có Người/Tài sản đi đúng hai Stage. Thêm thủ công ngay tại Stage; chỉ dữ liệu đã Cập nhật đi tiếp.</span></div>
+            <div class="acceptance-item"><b>Zalo đúng hai cửa sổ</b><span>QR login → chọn bạn/nhóm → chọn dữ liệu → chuyển vào Input. Không nghe tất cả, không tự commit Stage.</span></div>
+            <div class="acceptance-item"><b>Pipeline có trạng thái thật</b><span>Phân biệt route, conversion, OCR và nhận diện nghiệp vụ; thể hiện POC/chưa khả dụng đúng mức, không gắn nhãn MarkItDown giả.</span></div>
+            <div class="acceptance-item"><b>Engine Word có đầu vào/đầu ra rõ</b><span>Context từ Stage/Diagram đã lưu; mẫu chính/phụ, blocker, placeholder và lỗi từng file được mô tả. Không nhập lại vai trò ở màn xuất.</span></div>
+            <div class="acceptance-item"><b>Đối soát theo năm</b><span>Không lẫn cùng số giữa hai năm; phân biệt thiếu thật, dấu vết lỗi và phạm vi dữ liệu chưa đầy đủ; queue giữ đúng ngữ cảnh.</span></div>
+            <div class="acceptance-item"><b>PDF theo portal</b><span>Hỗ trợ thiết kế PDF sẵn có, ảnh scan → PDF, Word → PDF; không thay scan bằng bản render khi bị cấm; kiểm tra file thực gửi.</span></div>
+            <div class="acceptance-item"><b>Case / Record / Evidence không lẫn</b><span>Case “Thừa kế cho ông A” hiện được các việc thừa kế, gia hạn, đo đạc khi có căn cứ; nhiều file của một việc không nhân đôi Record.</span></div>
+            <div class="acceptance-item"><b>Tra cứu được chi tiết để tính phí</b><span>Một trường trả ứng viên Case/Record đúng phạm vi quyền; từng việc có tình trạng phí. Thiếu biểu phí không được hiển thị bằng 0.</span></div>
+            <div class="acceptance-item"><b>Giữ các gate đã duyệt</b><span>Dry-run, human confirmation, provenance, privacy và một owner ghi vẫn được giữ; định nghĩa mới không tự đổi schema.</span></div>
+            <div class="acceptance-item"><b>Không mất ngữ cảnh</b><span>Đổi module, reload renderer hoặc reconnect không làm mất job; dirty field không bị polling ghi đè.</span></div>
+            <div class="acceptance-item"><b>State đầy đủ</b><span>Mỗi màn hình có loading, empty, waiting_user, error, unavailable và terminal state phù hợp.</span></div>
+            <div class="acceptance-item"><b>Không cướp focus</b><span>Chromium chỉ được đưa lên trước một lần có chủ đích; popup/tác vụ nền không giật cửa sổ lặp lại.</span></div>
+            <div class="acceptance-item"><b>Không bịa capability</b><span>Phân biệt QR giấy tờ với QR Zalo; Office/Database chưa có runtime. Hình minh họa trong tài liệu không được gọi là sản phẩm chạy thật.</span></div>
+          </div>
+          <h3 id="implementation-backlog">Task triển khai đề xuất — chờ tạo hoặc ghép issue Linear</h3>
+          <p class="source-note">Các mã U-YEAR, U-PDF, N-DESK, N-INTAKE, N-WORD và O-RECORD dưới đây chỉ là nhãn tham chiếu trong bản UX, không phải ID issue. Linear vẫn là SOT task; chưa tạo/cập nhật issue trong lượt này. Không lấy bảng này thay trạng thái thực thi ở Linear.</p>
+          <article class="task-card" id="task-upload-year" data-od-id="year-implementation-task"><span class="status status-open">U-YEAR · cần triển khai</span><h4>upload_lab — hoàn thiện ngữ cảnh năm từ phân tích tới upload</h4><p><strong>Phạm vi:</strong> chọn năm/portal/sổ; xác minh độ đầy đủ dữ liệu; tìm số thiếu đúng dải; phát hiện lỗi năm/ngày; giữ context qua folder scan và retry. Kế thừa parser/group-by-year đã có, không viết lại từ số 0.</p><p><strong>Nghiệm thu đề xuất:</strong></p><ul><li><code>1/2025</code> và <code>1/2026</code> không trùng; từng năm bắt đầu lại từ 1.</li><li>Dữ liệu đủ từ đầu năm tới số 4, có <code>2/2025</code> và <code>4/2025</code>: báo thiếu <code>1/2025</code>, <code>3/2025</code>. Có riêng <code>1/2026</code> không làm đổi kết quả năm 2025.</li><li>Nếu chỉ có một số hoặc năm trống: phân biệt mốc cuối/coverage đã xác minh với “chưa đủ dữ liệu”; không âm thầm bỏ kiểm tra hoặc bịa số cuối năm.</li><li>Khoảng ngày hẹp không sinh thiếu giả ở đầu/cuối năm; năm sai, năm thiếu, ngày mâu thuẫn vào vùng lỗi và không tự vào queue.</li><li>Đổi năm/portal và retry không tái sử dụng selection/result của context cũ; file sai năm bị chặn ghép.</li></ul><p><strong>SOT chức năng:</strong> <code>upload_lab/docs/spec_UI.md</code>; khi có issue thật bổ sung test tại module. Bản UX này không sửa code audit.</p></article>
+          <article class="task-card" id="task-upload-pdf" data-od-id="pdf-implementation-task"><span class="status status-open">U-PDF · chức năng mới</span><h4>upload_lab — chuẩn bị attachment PDF theo capability portal</h4><p><strong>Phạm vi:</strong> PDF có sẵn, ảnh scan → PDF, Word → PDF; liên kết attachment với đúng mục upload; preview, provenance, limits và lỗi từng mục. Chọn engine qua quy trình công nghệ, không dùng conversion-to-text để giả lập PDF giữ bố cục.</p><p><strong>Nghiệm thu:</strong> đúng thứ tự/trang; source không bị sửa; PDF đúng hợp đồng; file vượt giới hạn bị chặn; portal bắt scan không nhận PDF render thay thế; thiếu engine/retry/cancel không gửi nhầm file và không bấm Lưu. Kiểm tra thực tế với từng adapter trước bật capability.</p></article>
+          <table class="spec-table" data-od-id="remaining-implementation-work"><thead><tr><th>Nhánh việc</th><th>Phạm vi cần spec / triển khai riêng</th><th>Điều kiện nghiệm thu</th></tr></thead><tbody><tr><td data-label="Nhánh">N-DESK</td><td data-label="Phạm vi">Hai kiểu Diagram; hai Stage; nhập tay tại Stage; cảnh báo đổi kiểu/loại</td><td data-label="Nghiệm thu">Đổi hợp đồng không mất Stage, không giữ gán trái rule, văn bản phụ không sinh diagram.</td></tr><tr><td data-label="Nhánh">N-INTAKE</td><td data-label="Phạm vi">Zalo hai cửa sổ; pipeline conversion/OCR; đưa kết quả đúng Stage</td><td data-label="Nghiệm thu">Nguồn/ảnh truy ngược được; không lẫn QR; route và cloud gate đúng adapter được duyệt. Adoption MarkItDown phải qua gate riêng.</td></tr><tr><td data-label="Nhánh">N-WORD</td><td data-label="Phạm vi">Bộ văn bản chính/phụ; context dùng chung; parity validation route web/sidecar</td><td data-label="Nghiệm thu">Không còn placeholder unsupported; không suy từ chối; báo lỗi từng file; không nhân đôi việc khi xuất lại.</td></tr><tr><td data-label="Nhánh">O-RECORD</td><td data-label="Phạm vi">Cập nhật intent về Case/Record/Evidence; catalog, provenance, chống trùng, tra cứu và phí</td><td data-label="Nghiệm thu">Cùng việc khác nguồn vẫn một Record; Case nhiều việc; fees chưa biết không bằng 0. Spec/contract được duyệt trước, implementation ở task khác; A1/A3/A4 vẫn là gate runtime.</td></tr></tbody></table>
+          <h3>Tài liệu chi tiết về đúng module; cấp cha giữ bản đồ và liên kết</h3>
+          <p>Bản HTML tổng hợp dùng để nhìn ảnh hưởng toàn hệ thống, không thành một SOT nghiệp vụ cạnh tranh. Khi chuyển các quyết định sang tài liệu dài hạn, sửa chương sở hữu bên dưới; cấp cha chỉ trỏ tới chương và mô tả giao điểm. Không di chuyển hay ghi đè spec nguồn trong lượt sửa HTML này.</p>
+          <table class="spec-table" data-od-id="spec-ownership-map"><thead><tr><th>Chủ đề</th><th>Nơi lưu chi tiết / liên kết hiện có</th></tr></thead><tbody><tr><td data-label="Chủ đề">Bàn soạn và Stage</td><td data-label="Nơi lưu"><a href="../../notary_v2/docs/platform/case-workspace/contract.md">notary_v2/docs/platform/case-workspace/contract.md</a>; UX riêng thừa kế ở <a href="../../notary_v2/docs/domains/inheritance/ux.md">domains/inheritance/ux.md</a>.</td></tr><tr><td data-label="Chủ đề">Input và Zalo</td><td data-label="Nơi lưu"><a href="../../notary_v2/docs/platform/document-intake/spec.md">document-intake/spec.md</a> và <a href="../../notary_v2/docs/platform/zalo-document-inbox/spec.md">zalo-document-inbox/spec.md</a>.</td></tr><tr><td data-label="Chủ đề">Word</td><td data-label="Nơi lưu"><a href="../../notary_v2/docs/domains/inheritance/word-export.md">word-export.md</a>; cơ chế engine ở <a href="../../notary_v2/docs/platform/document-generation/technical.md">document-generation/technical.md</a>.</td></tr><tr><td data-label="Chủ đề">Phân tích năm và attachment</td><td data-label="Nơi lưu"><a href="../../upload_lab/docs/spec_UI.md">upload_lab/docs/spec_UI.md</a>, tách chương chức năng trong upload_lab/docs khi cần; không chép nghiệp vụ lên docs cấp cha.</td></tr><tr><td data-label="Chủ đề">Record, Case, catalog và phí</td><td data-label="Nơi lưu"><a href="../../notaryoffice/intent.md">notaryoffice/intent.md</a>; đánh dấu yêu cầu mới khác mô hình Evidence Record / Work Item cũ.</td></tr><tr><td data-label="Chủ đề">Giao điểm và công nghệ</td><td data-label="Nơi lưu">Cấp cha dẫn tới spec owner; <a href="../../contracts/README.md">contracts/README.md</a> giữ gate contract-trước-code; lựa chọn công nghệ chỉ ở <a href="../../docs/architecture/TECH_STACK.md">TECH_STACK.md</a>.</td></tr></tbody></table>
+          <p><strong>Mỗi lần thêm chức năng/công nghệ:</strong> rà soát tác động tới đầu vào → Stage → Diagram → Word → Record/Case → upload/attachment; chỉ cập nhật các chương bị ảnh hưởng, ghi rõ capability đang có hay dự định, bổ sung tiêu chí nghiệm thu rồi kiểm tra lại sơ đồ tổng thể. Không suy một thay đổi trong module đã tự đồng bộ sang module khác.</p>
+          <h3>Phụ thuộc phải giữ mở</h3>
+          <details open><summary>A1 / A3 / A4 của notaryoffice</summary><div>Kết quả đo thực địa quyết định cách hiển thị thiếu text, event ổ mạng và attribution người dùng. Prototype phải chứa cả nhánh có và không có bằng chứng.</div></details>
+          <details><summary>Danh sách portal tỉnh và capability từng portal</summary><div>UX đã dành Portal Profile, nhưng không thể chốt field, login mode, API/Playwright hoặc hành động cuối cho từng tỉnh trước khi có inventory backend thật.</div></details>
+          <details><summary>Định danh, quyền ghi và migration Case/Record</summary><div>Nghĩa nghiệp vụ đã chốt tại §04. Phần còn mở là mô hình lưu, mã chung, quyền ghi, đối chiếu dữ liệu cũ và chống trùng giữa các nguồn; không phải mở lại câu hỏi Record có nghĩa gì.</div></details>
+          <details><summary>Danh mục hợp đồng, văn bản phụ, công việc và biểu phí</summary><div>Dropdown chọn hợp đồng không chứng minh mọi loại đã có engine. Cần duyệt danh mục/mapping Word, catalog phân tách Record, biểu phí và thẩm quyền điều chỉnh. Cùng bố cục A/B không có nghĩa cùng validation.</div></details>
+        </section>
+
+        <section class="section" id="nguon" data-od-id="evidence-sources">
+          <header class="section-head">
+            <div><div class="section-kicker">Audit trail</div><h2 data-od-id="sources-heading">Nguồn đã đọc để không thiết kế từ giả định.</h2></div>
+            <div class="section-no">11</div>
+          </header>
+          <p class="intro">Yêu cầu vòng 02 đến từ điều chỉnh của chủ dự án ngày 22/09/2026. Các nhận định về hiện trạng bên dưới dựa trên source/docs và refs local; không phải kết quả chạy OCR cloud, portal thật hay runtime notaryoffice.</p>
+          <div class="callout" id="src-branch-audit"><strong>Phạm vi kiểm tra nhánh và code</strong><p>Worktree <code>D:/mono</code>: <code>consolidate/monorepo @ c207f69</code> với các thay đổi đã có của người dùng. Đối chiếu read-only <code>docs/monorepo-normalization @ 3415d3d</code> và repo <code>D:/notary_v2 main @ de7ad4c</code>. Converter POC có cùng git blob ở các bản trên; adapter shell và service audit năm cũng không khác giữa hai nhánh monorepo đã đối chiếu. Lịch sử notary_v2 có <code>fd076db</code> merge markitdown-qwen-poc vào consolidate/latest: POC đã được gom vào code, nhưng điều đó không chứng minh được adopt làm pipeline production.</p><p>Không checkout, merge hoặc fetch remote trong lượt này; không khẳng định đã kiểm tra commit chưa có trong refs local. Nhánh chuẩn hóa docs bổ sung SPEC/Stage ownership, không phải bằng chứng tích hợp runtime MarkItDown. Những câu “chưa merge” trong MIN-61 là trạng thái lịch sử của decision record, không dùng để phủ nhận POC hiện đã có trong snapshot.</p></div>
+          <ul class="source-list">
+            <li><code>docs/architecture/VISION.md:19–65</code><span>Nguyên tắc không nhập lại, máy đề xuất–người xác nhận, vòng đời ba module.</span></li>
+            <li><code>docs/architecture/SYSTEM_ARCHITECTURE.md:19–93, 271–305</code><span>Hiện trạng chưa tích hợp, ownership và chuỗi SOURCE → CONFIRMED.</span></li>
+            <li><code>contracts/entities.md:17–123</code><span>Canonical CCCD/GCN/thửa–tờ/số công chứng và điều cấm dùng làm Case key.</span></li>
+            <li><code>notary_v2/docs/domains/inheritance/workflow.md:23–149</code><span>Stage/Pool/Diagram, OCR modal và quyền xóa/commit.</span></li>
+            <li><code>notary_v2/frontend/templates/cases/form.html:1361–1999</code><span>Bố cục form hiện tại: tài sản, người, Pool, Diagram, export.</span></li>
+            <li><code>notary_v2/docs/platform/document-intake/spec.md:14–58, 96–142</code><span>Baseline OCR và giới hạn QR giấy tờ; bản UX mới đặt bước conversion/route cạnh intake, không tự sửa provider.</span></li>
+            <li id="src-conversion"><code>notary_v2/tools/document_conversion_poc/converter.py:41–159<br>policy.py:19–74</code><span>POC MarkItDown plugin off, route local/OCR/legacy/unsupported; gate cloud, render PDF scan theo trang, provenance và lỗi. Không thấy đây là production intake entry point.</span></li>
+            <li id="src-conversion-decision"><code>docs/product/MIN61_CONVERSION_OCR_DECISION.md:3–24, 80–100</code><span>DRAFT/ITERATE; chưa chốt adopt production, plugin/Qwen-compatible chưa được chứng minh; ConversionEnvelope là experimental, không phải contract mới.</span></li>
+            <li id="src-ocr-runtime"><code>shell/sidecar/notary_adapter.py:465–521</code><span>Luồng OCR thật trong adapter vẫn gọi routers.ocr_ai.analyze_images; không đi qua converter POC tại call path này.</span></li>
+            <li id="src-zalo"><code>notary_v2/routers/zalo_inbox.py:527–654<br>docs/platform/zalo-document-inbox/spec.md</code><span>Source refresh, state snapshot, QR/expiry, trạng thái nguồn đã/chưa áp dụng và dữ liệu nhận được. Hai cửa sổ là cách tổ chức UX mới.</span></li>
+            <li id="src-word"><code>notary_v2/services/word_engine.py:404–489, 1211–1242</code><span>Word context, Stage/Diagram/engine result, nhóm người active, tài sản; thay placeholder và tìm placeholder còn lại. Không phải engine MarkItDown.</span></li>
+            <li id="src-word-adapters"><code>shell/sidecar/notary_adapter.py:407–460<br>notary_v2/routers/cases.py:1610–1663</code><span>Sidecar tạo DOCX và chặn placeholder unresolved; route web thay mapping rồi trả file, chưa có cùng kiểm tra unresolved tại đường này.</span></li>
+            <li id="src-word-spec"><code>notary_v2/docs/domains/inheritance/word-export.md:15–45, 70–93, 137–160</code><span>SOT Word: vai trò ở Diagram; V1 dùng nhóm người chung cho các tài sản; không suy “từ chối” từ “không nhận”; không chọn lại người/tài sản ở bước xuất.</span></li>
+            <li><code>upload_lab/README.md:7–58</code><span>Scan → audit → Playwright; dry-run và người tự bấm Lưu trên portal.</span></li>
+            <li><code>upload_lab/ui_qt/main_window.py:137–500</code><span>Navigation và hai trang Audit / Quét & Upload hiện hành.</span></li>
+            <li id="src-years"><code>upload_lab/ui/services/contract_book_audit.py:116–157, 185–205, 208–234</code><span>Parser năm, phạm vi năm theo ngày, group-by-year, tìm khoảng min–max và chú thích số thiếu có dấu vết ở vùng lỗi. Cơ sở xác định phần cần hoàn thiện của U-YEAR.</span></li>
+            <li id="src-attachment"><code>upload_lab/playwright_uploader.py:728–744, 807, 1767–1788</code><span>Đường dẫn source file từ raw.file_goc tới input upload. U-PDF là yêu cầu bổ sung, không phải chức năng chuyển PDF đã kiểm chứng.</span></li>
+            <li><code>notaryoffice/intent.md:66–85, 141–175, 473–554</code><span>Privacy, Evidence Record cũ, candidate ranking, popup và search. Nghĩa Record công việc mới trong bản UX là yêu cầu cần cập nhật vào intent, không giả vờ tài liệu cũ đã thống nhất.</span></li>
+            <li><code>contracts/desktop-command.md:47–85</code><span>Job status, waiting_user, cancel, reconnect và idempotency.</span></li>
+            <li><code>shell/src/renderer/lib.js:8–174</code><span>Navigation, display vocabulary và module state hiện có.</span></li>
+            <li><code>shell/src/renderer/renderer.js:492–1043</code><span>Business views hiện tại cho Upload và notary_v2 trong Electron shell.</span></li>
+          </ul>
+          <div class="callout">
+            <strong>Kết luận vòng 02</strong>
+            <p>Bản này mô tả UX đích cho các điều chỉnh, có nguồn hiện trạng và task đề xuất. Có thể dùng để thiết kế frontend, nhưng không hứa “chỉ đổi UI”: các nhánh A/B, bộ Word, pipeline input, PDF và Record chung cần spec/backend tương ứng. Giữ A1/A3/A4, gate công nghệ và contract-trước-code; tiếp theo đưa quyết định được duyệt về đúng module và tạo/ghép issue Linear.</p>
+          </div>
+        </section>
+      </article>
+    </main>
+  </div>
+  <script>
+    (() => {
+      const progress = document.getElementById('reading-progress');
+      const links = [...document.querySelectorAll('#toc a')];
+      const sections = links.map((link) => document.querySelector(link.getAttribute('href'))).filter(Boolean);
+
+      // These controls only switch the documented layouts; no domain data is written.
+      const diagramMode = document.getElementById('diagram-mode');
+      const contractType = document.getElementById('contract-type');
+      const updateDiagramPreview = () => {
+        const inheritance = diagramMode.value === 'inheritance';
+        document.getElementById('diagram-bilateral').hidden = inheritance;
+        document.getElementById('diagram-inheritance').hidden = !inheritance;
+        document.getElementById('contract-type-label').hidden = inheritance;
+        document.getElementById('contract-preview-title').textContent = `Hợp đồng ${contractType.value}`;
+      };
+      diagramMode.addEventListener('change', updateDiagramPreview);
+      contractType.addEventListener('change', updateDiagramPreview);
+      updateDiagramPreview();
+
+      const setProgress = () => {
+        const root = document.documentElement;
+        const total = Math.max(1, root.scrollHeight - root.clientHeight);
+        progress.style.width = `${Math.min(100, Math.max(0, root.scrollTop / total * 100))}%`;
+      };
+
+      const observer = new IntersectionObserver((entries) => {
+        const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (!visible) return;
+        links.forEach((link) => link.setAttribute('aria-current', String(link.getAttribute('href') === `#${visible.target.id}`)));
+      }, { rootMargin: '-12% 0px -70% 0px', threshold: [0, .2, .5] });
+
+      sections.forEach((section) => observer.observe(section));
+      window.addEventListener('scroll', setProgress, { passive: true });
+      window.addEventListener('resize', setProgress);
+      document.getElementById('print-document').addEventListener('click', () => window.print());
+      setProgress();
+    })();
+  </script>
+</body>
+</html>
