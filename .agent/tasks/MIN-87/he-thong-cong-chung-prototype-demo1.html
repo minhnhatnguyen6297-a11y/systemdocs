@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Hồ sơ · Không gian công chứng</title>
+<style>
+/* OD-LAYOUT-PRIMITIVES v1 — structure only: display, flex/grid, overflow, wrapping, ratio.
+   Put this @layer first; product CSS outside the layer always wins. */
+@layer od-layout {
+  :where(.od-stack,.od-row,.od-row-top,.od-cluster,.od-grid,.od-field,.od-stat,.od-cell,.od-tile) > :where(*) { min-width: 0; }
+  /* containers */
+  .od-stack   { display: flex; flex-direction: column; gap: var(--od-gap, 8px); }
+  .od-row     { display: flex; align-items: center; gap: var(--od-gap, 8px); }
+  .od-row-top { display: flex; align-items: flex-start; gap: var(--od-gap, 8px); }
+  .od-cluster { display: flex; flex-wrap: wrap; align-items: center; gap: var(--od-gap, 8px); }
+  .od-fill    { flex: 1 1 0; min-width: 0; }
+  .od-fixed   { flex: none; }
+  .od-grid    { display: grid; gap: var(--od-gap, 12px); grid-template-columns: repeat(var(--od-cols, 3), minmax(0, 1fr)); }
+  /* stacked information: each piece is its own line — never sibling inline spans */
+  .od-stat, .od-field, .od-cell { display: grid; gap: var(--od-gap, 2px); }
+  :where(.od-stat,.od-field,.od-cell) > :where(*) { display: block; }
+  .od-tile { display: grid; grid-template-rows: auto 1fr; }
+  :where(.od-tile) > :where(*) { display: block; }
+  /* media keeps its intrinsic ratio by default; never a distorted or cropped
+     cover by accident. height:auto lets the ratio win over an <img height="…">
+     attribute. Cropping to a uniform box is an explicit opt-in: set --od-ratio
+     AND add .od-media-cover together (per the core rule, only where a crop is
+     deliberate — tile thumbs, decorative fills — never on full-frame content). */
+  .od-media { display: block; width: 100%; height: auto; aspect-ratio: var(--od-ratio, auto); }
+  .od-media-cover { object-fit: cover; }
+  /* data text only — authored copy is rewritten to its budget instead */
+  .od-truncate { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .od-clamp-2, .od-clamp-3 { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  .od-clamp-2 { -webkit-line-clamp: 2; }
+  .od-clamp-3 { -webkit-line-clamp: 3; }
+  .od-lines-2 { min-height: calc(2 * 1.4em); }
+  .od-nowrap  { white-space: nowrap; }
+  .od-keep    { word-break: keep-all; overflow-wrap: anywhere; }
+  /* screen skeleton (optional): bars take their own space, the middle scrolls — no padding guessed for chrome */
+  .od-screen { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100%; }
+  .od-scroll { overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
+  /* horizontal rail: the next item peeks at the edge; trailing room survives overflow */
+  .od-rail { display: flex; gap: var(--od-gap, 8px); overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none;
+             padding-inline: var(--od-rail-pad, 16px); scroll-padding-inline: var(--od-rail-pad, 16px); }
+  .od-rail::-webkit-scrollbar { display: none; }
+  :where(.od-rail) > :where(*) { flex: none; scroll-snap-align: start; }
+  :where(.od-rail) > :where(:last-child) { margin-inline-end: var(--od-rail-pad, 16px); }
+  .od-spacer { flex: none; visibility: hidden; pointer-events: none; }
+  .od-touch  { min-width: 44px; min-height: 44px; }
+}
+/* /OD-LAYOUT-PRIMITIVES v1 */
+:root{
+ --bg:#f3f4f8;--surface:#fff;--ink:#17191d;--muted:#59616d;--rail:#121418;--line:#dfe3e9;
+ --lime:#d9f76a;--lime-ink:#283900;--orange:#ffe4d6;--orange-ink:#863710;--danger:#9b2525;--danger-bg:#fde8e8;--focus:#2258a6;
+ --blue-bg:#e8effa;--blue-ink:#244a81;--s1:4px;--s2:8px;--s3:12px;--s4:16px;--s6:24px;--s8:32px;--s12:48px;--s16:64px;
+ --radius-control:12px;--radius:16px;--radius-shell:24px;--shadow:0 8px 24px rgb(18 20 24 / .06);
+ --text:16px;--small:16px;--medium:18px;--subhead:20px;--title:32px;--display:40px;
+ --body:"Segoe UI Variable Text","Segoe UI",sans-serif;--heading:Bahnschrift,"Segoe UI Variable Display","Segoe UI",sans-serif;--mono:"Cascadia Mono",Consolas,monospace;
+ --fast:180ms;--enter:240ms;--exit:150ms;--rail-width:104px;
+}
+*{box-sizing:border-box}body{margin:0;background:#e4e7ed;color:var(--ink);font:var(--text)/1.6 var(--body)}
+button,input,select,textarea{font:inherit}button,a,input,select,textarea{-webkit-tap-highlight-color:transparent}
+button{display:inline-flex;gap:var(--s2);align-items:center;justify-content:center;min-height:44px;min-width:44px;padding:var(--s2) var(--s4);border:1px solid var(--line);border-radius:var(--radius-control);background:var(--surface);color:var(--ink);cursor:pointer;line-height:1.3;max-width:100%}
+button:disabled{cursor:not-allowed;color:var(--muted);background:var(--bg);border-style:dashed}
+a{color:var(--blue-ink)}:focus-visible{outline:3px solid var(--focus);outline-offset:3px}button:focus-visible{position:relative;z-index:2}
+input,select,textarea{display:block;width:100%;min-width:0;min-height:44px;padding:var(--s2) var(--s3);background:var(--surface);border:1px solid #a7afb9;border-radius:var(--radius-control);color:var(--ink)}
+textarea{resize:vertical;min-height:96px}input[type=checkbox]{width:20px;min-height:20px;height:20px;flex:none;accent-color:var(--ink)}
+label{display:grid;gap:var(--s2)}label.check{display:flex;align-items:center;gap:var(--s3);min-height:44px;padding:var(--s2) 0;cursor:pointer}
+[hidden]{display:none!important}h1,h2,h3,h4,p{margin:0}h1,h2,h3,h4{font-family:var(--heading);line-height:1.25;font-weight:650}
+h1{font-size:clamp(24px,2.6vw,var(--title));letter-spacing:-.025em}h2{font-size:24px;letter-spacing:-.02em}h3{font-size:var(--subhead)}h4{font-size:var(--medium)}
+p{max-width:74ch}small{font-size:var(--small)}svg{display:block;flex:none}.icon{width:20px;height:20px}code,.screen-id,.mono{font-family:var(--mono);font-size:var(--small);overflow-wrap:anywhere}
+.muted{color:var(--muted)}.eyebrow{font-size:var(--small);color:var(--muted)}.error-text{color:var(--danger)}.strong{font-weight:650}
+.primary{background:var(--ink);color:#fff;border-color:var(--ink)}.lime-btn{background:var(--lime);color:var(--lime-ink);border-color:transparent}.quiet{border-color:transparent;background:transparent}.danger{color:var(--danger);border-color:#e4bcbc}.smallbtn{padding:var(--s2) var(--s3)}
+.shell{display:grid;grid-template-columns:var(--rail-width) minmax(0,1fr);min-height:calc(100dvh - 32px);max-width:1760px;margin:var(--s4) auto;background:var(--bg);border-radius:var(--radius-shell);box-shadow:var(--shadow)}
+.rail{background:var(--rail);border-radius:var(--radius-shell) 0 0 var(--radius-shell);padding:var(--s6) var(--s2);display:flex;flex-direction:column;align-items:center;gap:var(--s6)}
+.logo{display:grid;place-items:center;width:48px;height:48px;background:var(--lime);color:var(--ink);border-radius:var(--radius);font:700 24px var(--heading)}
+.rail-nav{display:flex;flex-direction:column;gap:var(--s3);width:100%}.rail button{display:flex;flex-direction:column;gap:var(--s2);width:100%;border:0;color:#e7e9ee;background:transparent;padding:var(--s3) var(--s1);border-radius:var(--radius-control)}.rail button .icon{width:24px;height:24px}
+.rail button[aria-current=page]{background:var(--surface);color:var(--ink)}.rail-bottom{margin-top:auto;width:100%;display:grid;gap:var(--s2)}.rail-caption{color:#bdc4ce;text-align:center}
+.workspace{min-width:0}.topbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--s4);padding:var(--s6) var(--s8) var(--s4);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:var(--s3)}.brand-name{font:650 20px var(--heading)}.avatar{display:grid;place-items:center;width:44px;height:44px;border:1px solid var(--line);border-radius:50%;background:var(--orange);font-weight:700}.tools{display:flex;flex-wrap:wrap;gap:var(--s2);align-items:center}
+.sim-banner{display:flex;align-items:flex-start;gap:var(--s2);font-size:var(--small);padding:var(--s3) var(--s8);color:var(--muted);background:#eef0f5}.sim-banner .icon{margin-top:var(--s1)}
+.main{padding:var(--s8);min-width:0}.page-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:var(--s4);margin-bottom:var(--s6)}
+.page-head p{margin-top:var(--s2);color:var(--muted)}.page-head .eyebrow{margin-bottom:var(--s2)}.screen-id{color:var(--muted);font-size:var(--small)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:var(--s6);min-width:0}
+.panel-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--s3);margin-bottom:var(--s6)}
+.stack{display:grid;gap:var(--s6);min-width:0}.cols{display:grid;grid-template-columns:minmax(0,1fr) 304px;gap:var(--s6);align-items:start}.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s6)}.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s4)}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s4);margin-bottom:var(--s6)}.statbox{display:flex;gap:var(--s4);align-items:center;padding:var(--s6);border-radius:var(--radius);background:#fff}.statbox:first-child{background:var(--lime)}.statbox:last-child{background:var(--orange)}
+.stat-num{font:650 clamp(24px,3vw,40px)/1.1 var(--heading);white-space:nowrap}.stat-icon{display:grid;place-items:center;width:48px;height:48px;border:1px solid rgb(23 25 29 / .16);border-radius:var(--radius-control)}
+.badge{display:inline-flex;align-items:center;gap:var(--s2);padding:var(--s1) var(--s2);border-radius:8px;font-size:var(--small);line-height:1.5;background:var(--bg);color:var(--muted);white-space:nowrap}
+.badge.good{background:#ecf7c7;color:var(--lime-ink)}.badge.warn{background:var(--orange);color:var(--orange-ink)}.badge.bad{background:var(--danger-bg);color:var(--danger)}.badge.info{background:var(--blue-bg);color:var(--blue-ink)}
+.notice{display:grid;gap:var(--s2);padding:var(--s4);border-radius:var(--radius-control);background:var(--blue-bg);color:var(--blue-ink)}.notice.warn{background:var(--orange);color:var(--orange-ink)}.notice.bad{background:var(--danger-bg);color:var(--danger)}.notice.good{background:#ecf7c7;color:var(--lime-ink)}
+.case-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--s4);padding:var(--s6) 0;border-top:1px solid var(--line);align-items:center}.case-row:first-child{border-top:0;padding-top:0}.case-row:last-child{padding-bottom:0}
+.case-name{font:650 20px var(--heading);margin-bottom:var(--s2)}.case-meta{display:flex;flex-wrap:wrap;gap:var(--s2);color:var(--muted);margin-top:var(--s3)}
+.title-line{display:flex;gap:var(--s3);align-items:flex-start}.folder-mark{display:grid;place-items:center;flex:none;width:48px;height:48px;border-radius:var(--radius-control);background:var(--bg)}
+.workflow{display:flex;flex-wrap:wrap;gap:var(--s2);margin-top:var(--s4);align-items:center}.workflow span{display:flex;gap:var(--s2);align-items:center;color:var(--muted)}.workflow .done{color:#355600}
+.aside-lime{background:var(--lime);border-color:transparent}.aside-peach{background:var(--orange);border-color:transparent}.divider{height:1px;background:var(--line);margin:var(--s4) 0}
+.list-row{display:flex;align-items:center;justify-content:space-between;gap:var(--s4);padding:var(--s4) 0;border-bottom:1px solid var(--line)}.list-row:last-child{border-bottom:0}
+.tabs{display:flex;flex-wrap:wrap;gap:var(--s2);margin-bottom:var(--s6);border-bottom:1px solid var(--line);padding-bottom:var(--s3)}.tabs button{border-color:transparent;background:transparent}.tabs button[aria-current=page]{color:var(--ink);background:#e6e9ef;border-color:#d7dce4;font-weight:650}
+.contextbar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:var(--s4);padding:var(--s4);background:#fff;border:1px solid var(--line);border-radius:var(--radius);margin-bottom:var(--s6)}.contextbar label{flex:1 1 176px}.contextbar .od-field{flex:1 1 224px}
+.workbench{display:grid;grid-template-columns:240px minmax(0,1fr);gap:var(--s4);align-items:start}.pool{padding:var(--s4)}.person{display:grid;gap:var(--s3);padding:var(--s4);border:1px solid var(--line);border-radius:var(--radius-control);background:#fff}.person+.person{margin-top:var(--s3)}.person .initial{display:grid;place-items:center;width:40px;height:40px;background:var(--blue-bg);color:var(--blue-ink);border-radius:50%;font-weight:650}
+.canvas{background:#eceef4;border:1px solid var(--line);border-radius:var(--radius);padding:var(--s6);display:grid;gap:var(--s6)}
+.sides{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s4)}.side{min-width:0;border:1px dashed #aab2bc;background:rgb(255 255 255 / .5);padding:var(--s4);border-radius:var(--radius)}.side-head{display:flex;align-items:center;gap:var(--s2);margin-bottom:var(--s4)}.side-letter{display:grid;place-items:center;width:32px;height:32px;background:var(--lime);border-radius:8px;font-weight:700}.side:nth-child(2) .side-letter{background:var(--orange)}
+.empty-slot{display:grid;place-items:center;gap:var(--s2);padding:var(--s6) var(--s4);text-align:center;color:var(--muted);min-height:144px}
+.family{display:grid;gap:var(--s4)}.family-root{max-width:440px;width:100%;justify-self:center}.family-line{height:24px;border-left:2px solid #919aaa;justify-self:center}.branches{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s4)}
+.source-info{font-size:var(--small);color:var(--muted);overflow-wrap:anywhere}.stage-card{display:grid;gap:var(--s4);padding:var(--s4) 0;border-bottom:1px solid var(--line)}.stage-card:last-child{border:0}
+.stage-header{display:flex;gap:var(--s3);justify-content:space-between;align-items:start;flex-wrap:wrap}.field-error{color:var(--danger);display:block}.pipeline{display:grid;gap:var(--s3)}.pipeline-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--s4);padding:var(--s4);background:var(--bg);border-radius:var(--radius-control)}
+.progress-steps{display:flex;flex-wrap:wrap;gap:var(--s2);align-items:center;margin:var(--s4) 0}.progress-steps span{padding:var(--s1) var(--s2);border-radius:8px;background:var(--bg)}.progress-steps .active{background:var(--lime);color:var(--lime-ink)}
+.actions{display:flex;gap:var(--s2);flex-wrap:wrap;align-items:center}.space-top{margin-top:var(--s6)}.space-small{margin-top:var(--s3)}
+.record-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(144px,.5fr) auto;gap:var(--s4);padding:var(--s4) 0;border-top:1px solid var(--line);align-items:center}.record-row:first-child{border:0}
+.summary-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s4)}.summary-strip button{align-items:flex-start;padding:var(--s6);background:var(--bg);border-color:transparent}
+.paper{display:grid;gap:var(--s4);padding:var(--s6);border:1px solid #adb5c0;border-radius:4px;background:white;max-width:100%;min-height:256px}.paper-mark{font-family:var(--mono);color:var(--danger);border-bottom:1px solid var(--line);padding-bottom:var(--s2)}.paper-lines{display:grid;gap:var(--s3)}.paper-lines i{display:block;height:8px;background:#e4e7ed;border-radius:4px}.paper-lines i:last-child{width:65%}
+.qr{display:grid;place-items:center;padding:var(--s6);background:var(--bg);border-radius:var(--radius);max-width:256px;margin:auto}.qr svg{width:176px;height:auto;max-width:100%}
+.timeline{list-style:none;margin:0;padding:0;display:grid;gap:var(--s4)}.timeline li{display:grid;grid-template-columns:24px minmax(0,1fr);gap:var(--s3)}.timeline-dot{display:block;width:12px;height:12px;margin-top:var(--s2);background:#688038;border-radius:50%;outline:4px solid #edf4de}
+.empty-state{display:grid;gap:var(--s4);justify-items:start;padding:var(--s8);background:#fff;border:1px dashed #aab3c0;border-radius:var(--radius)}
+.searchbox{display:flex;align-items:end;gap:var(--s3);padding:var(--s6);background:var(--surface);border-radius:var(--radius);border:1px solid var(--line)}.searchbox label{flex:1}
+.filter-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s3)}
+dialog{width:min(960px,calc(100vw - 32px));max-height:calc(100dvh - 32px);padding:0;border:0;border-radius:var(--radius);color:var(--ink);background:var(--bg);box-shadow:0 24px 64px rgb(0 0 0 / .2)}
+dialog::backdrop{background:rgb(15 21 30 / .48)}.dialog-head{position:sticky;top:0;background:var(--surface);z-index:2;padding:var(--s4) var(--s6);display:flex;gap:var(--s4);align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}.dialog-body{padding:var(--s6);display:grid;gap:var(--s6)}
+.dialog-head h2{font-size:24px}.dialog-actions{display:flex;justify-content:flex-end;gap:var(--s2);flex-wrap:wrap}
+.skeleton{display:grid;gap:var(--s4)}.skeleton span{display:block;height:24px;background:#e5e8ed;border-radius:8px}.skeleton span:nth-child(2){width:75%}
+.toast{position:fixed;bottom:var(--s6);left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100vw - 32px);background:var(--ink);color:white;border-radius:var(--radius-control);padding:var(--s3) var(--s6);z-index:10;box-shadow:var(--shadow);pointer-events:none}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.skip{position:fixed;top:var(--s2);left:var(--s2);z-index:20;transform:translateY(-200%);padding:var(--s3);background:white}.skip:focus{transform:none}
+.app-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(--s3);color:var(--muted);padding:0 var(--s8) var(--s6)}
+.fade{animation:enter var(--enter) ease-out}@keyframes enter{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media(hover:hover){button:not(:disabled):hover{background:#e8ecf1;border-color:#b6bfcb}.primary:not(:disabled):hover{background:#323a24;color:white;border-color:#323a24}.lime-btn:not(:disabled):hover{background:#caee4d}.quiet:not(:disabled):hover{background:#e8ecf1}.rail button:not(:disabled):hover{background:#333b45;color:#fff}.rail button[aria-current=page]:hover{background:var(--lime);color:var(--ink)}}
+@media(min-width:1440px){.main{padding:var(--s8) var(--s12)}.topbar{padding-inline:var(--s12)}.cols{grid-template-columns:minmax(0,1fr) 336px}}
+@media(max-width:1024px){:root{--rail-width:88px}.cols{grid-template-columns:1fr}.cols>aside{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s4)}.workbench{grid-template-columns:208px minmax(0,1fr)}.branches{grid-template-columns:1fr}.filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.stats .stat-icon{display:none}}
+@media(max-width:768px){body{background:var(--bg)}.shell{margin:0;border-radius:0;min-height:100dvh;grid-template-columns:1fr}.rail{border-radius:0;padding:var(--s2) var(--s4);flex-direction:row;gap:var(--s3);align-items:center}.logo{width:44px;height:44px}.rail-nav{flex-direction:row;flex:1;gap:var(--s2)}.rail button{padding:var(--s2);flex:1}.rail button .icon{width:20px;height:20px}.rail-bottom{display:none}.topbar{padding:var(--s4);gap:var(--s3)}.sim-banner{padding:var(--s3) var(--s4)}.main{padding:var(--s6) var(--s4)}.app-foot{padding:0 var(--s4) var(--s6)}.workbench,.two{grid-template-columns:1fr}.pool-people{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s3)}.person+.person{margin-top:0}.stats{gap:var(--s2)}.statbox{padding:var(--s4)}.stats .od-stat{gap:var(--s2)}.stats .stat-num{font-size:28px}.panel{padding:var(--s4)}.case-row{grid-template-columns:1fr}.case-row>.actions{justify-content:flex-end}.record-row{grid-template-columns:minmax(0,1fr) auto}.record-row>.od-field:nth-child(2){grid-column:1}.record-row>button{grid-column:2;grid-row:1 / 3}.tools{gap:var(--s2)}.three{grid-template-columns:1fr}.dialog-body{padding:var(--s4)}.filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:480px){.rail{padding:var(--s2);gap:var(--s2)}.rail>.logo{display:none}.rail-nav button{font-size:16px}.brand .eyebrow{display:none}.topbar .tools{width:100%}.tools button{flex:1}.stats{grid-template-columns:1fr}.statbox{display:flex;justify-content:space-between}.statbox .od-stat{grid-template-columns:auto 1fr;align-items:center;gap:var(--s4)}.sides,.pool-people,.cols>aside,.summary-strip,.filter-grid{grid-template-columns:1fr}.searchbox{flex-direction:column;align-items:stretch;padding:var(--s4)}.canvas{padding:var(--s3)}.pipeline-row{grid-template-columns:1fr}.dialog-head{padding:var(--s4)}.dialog-head h2{font-size:20px}.page-head>.actions{width:100%}.contextbar{padding:var(--s3)}.summary-strip button{padding:var(--s4)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Đi tới nội dung</a>
+<div id="app"></div>
+<dialog id="dialog" aria-labelledby="dialog-title"></dialog>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<noscript><p>Bật JavaScript để thao tác với bản demo ngoại tuyến này.</p></noscript>
+<script>
+'use strict';
+
+const $=s=>document.querySelector(s);
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clone=v=>JSON.parse(JSON.stringify(v));
+const ICONS={
+ folder:'<path d="M3 7h7l2 2h9v11H3z"/><path d="M3 7V4h7l2 3"/>',
+ upload:'<path d="M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6"/>',
+ office:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h2m4 0h2M8 11h2m4 0h2M10 21v-6h4v6"/>',
+ clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+ settings:'<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/>',
+ arrow:'<path d="M5 12h14m-5-5 5 5-5 5"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>',
+ close:'<path d="m6 6 12 12M6 18 18 6"/>',
+ check:'<path d="m5 12 4 4L19 6"/>',
+ search:'<circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/>',
+ file:'<path d="M5 3h9l5 5v13H5zM14 3v6h5M8 13h8m-8 4h6"/>',
+ users:'<circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3m1-16a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 4v2"/>',
+ alert:'<path d="m12 3 10 18H2zM12 9v5m0 3v1"/>',
+ info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/>',
+ back:'<path d="M19 12H5m5-5-5 5 5 5"/>',
+ layers:'<path d="m12 3 10 5-10 5L2 8zM2 12l10 5 10-5M2 16l10 5 10-5"/>',
+ shield:'<path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6z"/><path d="m8 12 3 3 5-6"/>',
+ refresh:'<path d="M20 7v5h-5M4 17v-5h5"/><path d="M5 8a8 8 0 0 1 14-2l1 6M4 12l1 6a8 8 0 0 0 14-2"/>'
+};
+const icon=n=>`<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]||ICONS.file}</svg>`;
+const attrs=o=>Object.entries(o||{}).map(([k,v])=>` data-${k}="${esc(v)}"`).join('');
+const btn=(a,t,d={},c='',disabled=false)=>{const name=t.replace(/<svg[\s\S]*?<\/svg>/g,'').replace(/<[^>]*>/g,'').trim()||({inspect:'Xem dữ kiện nguồn','case-search':'Tìm hồ sơ',close:'Đóng cửa sổ'})[a]||'Mở chi tiết';return `<button type="button" aria-label="${esc(name)}" data-action="${a}"${attrs(d)} class="${c}"${disabled?' disabled':''}>${t}</button>`};
+const badge=(t,c='')=>`<span class="badge ${c}">${esc(t)}</span>`;
+const note=(t,c='')=>`<div class="notice ${c}">${t}</div>`;
+const options=(list,v)=>list.map(o=>{const [val,label]=Array.isArray(o)?o:[o,o];return `<option value="${esc(val)}"${String(v)===String(val)?' selected':''}>${esc(label)}</option>`}).join('');
+const select=(a,l,v,list,d={})=>`<label>${esc(l)}<select data-change="${a}"${attrs(d)}>${options(list,v)}</select></label>`;
+const input=(a,l,v,d={},type='text')=>`<label>${esc(l)}<input type="${type}" data-input="${a}"${attrs(d)} value="${esc(v)}" autocomplete="off"></label>`;
+const check=(a,l,v,d={})=>`<label class="check"><input type="checkbox" data-change="${a}"${attrs(d)}${v?' checked':''}><span>${esc(l)}</span></label>`;
+const empty=(t,p,a)=>`<div class="empty-state">${icon('folder')}<h3>${t}</h3><p class="muted">${p}</p>${a||''}</div>`;
+const SIM='Mô phỏng trong prototype — không kết nối dịch vụ thật.';
+const STORE='min87-notary-demo-v1';
+function person(id,name,committed=true){return {id,name,detail:'Dữ liệu hư cấu, không phải giấy tờ hợp lệ',source:'DEMO_ID_A_FRONT.png',committed,dirty:false,snapshot:committed?{name,detail:'Dữ liệu hư cấu, không phải giấy tờ hợp lệ'}:null}}
+function makeCase(id,title,mode='ab',blank=false){
+ const people=blank?[]:[person('DEMO-PERSON-A','NHÂN VẬT HƯ CẤU A'),person('DEMO-PERSON-B','NHÂN VẬT HƯ CẤU B'),person('DEMO-PERSON-C','NHÂN VẬT HƯ CẤU C',false)];
+ const assets=blank?[]:[1,2].map(i=>({id:`DEMO-ASSET-0${i}`,name:`TÀI SẢN HƯ CẤU 0${i}`,detail:'Nguồn chung DEMO_GCN_NONVALID.pdf',source:'DEMO_GCN_NONVALID.pdf',committed:true,dirty:false,snapshot:{name:`TÀI SẢN HƯ CẤU 0${i}`,detail:'Nguồn chung DEMO_GCN_NONVALID.pdf'}}));
+ return {id,title,mode,contract:'Chuyển nhượng',people,assets,assign:blank?{}:{'DEMO-PERSON-A':mode==='ab'?'A':'root','DEMO-PERSON-B':mode==='ab'?'B':'children'},selectedAssets:blank?[]:['DEMO-ASSET-01'],revision:1,diagramVersion:1,diagramSaved:!blank,diagramStale:false,intake:'idle',intakeSelected:['id','asset','note'],classified:'unknown',cloud:false,intakeTransferred:false,word:{docs:{main:true,tax:true,request:true},template:'DEMO-TPL-v1',taxField:'',outputs:[],stale:false,prechecked:false}};
+}
+function initial(){return {
+ version:1,route:'NV2-01',caseId:'CASE-DEMO-001',caseQuery:'',cases:[makeCase('CASE-DEMO-001','Hồ sơ giao dịch DEMO-A'),makeCase('CASE-DEMO-THUAKE-01','Hồ sơ thừa kế DEMO-A','family')],
+ scroll:{},visits:{notary:'NV2-01',upload:'UL-01',office:'NO-01'},viewStates:{},jobs:[],health:'online',
+ zalo:{status:'waiting',sources:[],policy:false,messages:[],transferred:[]},
+ upload:{portal:'CỔNG TỈNH HƯ CẤU 01',book:'SỔ CÔNG CHỨNG DEMO-A',year:'2025',coverage:false,analyzed:false,analysisState:'idle',capability:'scan',engine:true,overLimit:false,queue:[],activeRow:'1/2025',portalState:'login',sessionStarted:false},
+ office:{query:'',searched:false,scope:'own',caseId:'CASE-DEMO-THUAKE-01',recordId:'REC-DEMO-THUA-01',period:'day',filterType:'all',filterStatus:'all',filterSource:'all',proposal:{type:'Thừa kế',caseId:'CASE-DEMO-THUAKE-01',state:'candidate',evidence:'full',decision:'',linkExisting:true,reason:''},records:[
+ {id:'REC-DEMO-THUA-01',caseId:'CASE-DEMO-THUAKE-01',type:'Thừa kế',status:'Đang xử lý',fee:'unknown',amount:'',source:'Word',station:'PC-DEMO-02',evidence:['EVD-DEMO-WORD-01'],files:['Văn bản chính DEMO'],history:['Tiếp nhận yêu cầu DEMO','Đang xử lý hồ sơ'],date:'2026-09-22'},
+ {id:'REC-DEMO-GIAHAN-01',caseId:'CASE-DEMO-THUAKE-01',type:'Gia hạn đất',status:'Đã tiếp nhận',fee:'unknown',amount:'',source:'Thủ công',station:'PC-DEMO-02',evidence:['EVD-DEMO-PRINT-01'],files:[],history:['Đã tiếp nhận yêu cầu DEMO'],date:'2026-09-22'},
+ {id:'REC-DEMO-DODAC-01',caseId:'CASE-DEMO-THUAKE-01',type:'Đo đạc',status:'Dự kiến',fee:'unknown',amount:'',source:'Scan',station:'PC-DEMO-02',evidence:['EVD-DEMO-SCAN-01'],files:[],history:['Dự kiến ngày 25/09/2026 — chưa hoàn thành'],date:'2026-09-22'}
+ ]},nextId:3
+}}
+let s;
+try{const raw=JSON.parse(localStorage.getItem(STORE)||'null');s=raw?.version===1&&raw.cases?.length&&raw.office?.records?raw:initial()}catch{s=initial()}
+const C=()=>s.cases.find(c=>c.id===s.caseId)||s.cases[0];
+const U=()=>s.upload;
+const R=()=>s.office.records.find(r=>r.id===s.office.recordId)||s.office.records[0];
+const dirty=()=>s.cases.some(c=>[...c.people,...c.assets].some(p=>p.dirty||!p.committed))||s.office.records.some(r=>r.feeDraft);
+const moduleOf=r=>r.startsWith('UL')?'upload':r.startsWith('NO')?'office':'notary';
+const moduleNames={notary:'Soạn hồ sơ',upload:'Phân tích & Upload',office:'Văn phòng'};
+const screens={
+ 'NV2-01':'Hồ sơ đang xử lý','NV2-02':'Bàn soạn hai bên','NV2-03':'Sơ đồ thừa kế','NV2-04':'Thu nhận & dữ liệu','NV2-05':'Kết nối Zalo','NV2-06':'Nguồn & tin nhắn','NV2-07':'Xuất bộ văn bản',
+ 'UL-01':'Ngữ cảnh đối soát','UL-02':'Phân tích dữ liệu','UL-03':'Hàng đợi upload','UL-04':'Chuẩn bị tệp đính kèm','UL-05':'Phiên cổng mô phỏng','UL-06':'Kết quả từng mục',
+ 'NO-01':'Tra cứu văn phòng','NO-02':'Rà soát đề xuất','NO-03':'Chi tiết hồ sơ','NO-04':'Chi tiết công việc','NO-05':'Tổng hợp công việc','DB-01':'Hạ tầng dữ liệu','SH-02':'Tác vụ & hệ thống'
+};
+let dialogReturn=null,dialogRoute=null,dialogData={},pendingConfirm=null,toastTimer;
+function save(){try{localStorage.setItem(STORE,JSON.stringify(s))}catch{}}
+function toast(t){const el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>{el.hidden=true},4200)}
+function job(id,title,route,status){let j=s.jobs.find(x=>x.id===id);if(!j){j={id,title,route,status,caseId:s.caseId};s.jobs.unshift(j)}Object.assign(j,{title,route,status});save()}
+const jobLabels={accepted:'Đã tiếp nhận',running:'Đang chạy',waiting_user:'Chờ bạn',partial:'Xong một phần',failed:'Lỗi',succeeded:'Đã xong',canceled:'Đã hủy'};
+function navigate(route,data={}){
+ if(!screens[route])return;
+ if(route==='NV2-05'||route==='NV2-06'||route==='SH-02'||route==='UL-04'){openScreen(route,data);return}
+ s.scroll[s.route]=window.scrollY;s.route=route;
+ if(data.case){s.caseId=data.case}
+ if(data.officecase)s.office.caseId=data.officecase;
+ if(data.record)s.office.recordId=data.record;
+ s.visits[moduleOf(route)]=route;closeDialog(false);save();render();
+ requestAnimationFrame(()=>{window.scrollTo(0,s.scroll[route]||0);$('#page-title')?.focus({preventScroll:true})});
+}
+function changeModule(m){
+ const target=s.visits[m]||({notary:'NV2-01',upload:'UL-01',office:'NO-01'}[m]);
+ if(m!==moduleOf(s.route)&&dirty())confirmBox('Giữ bản nháp khi chuyển phần?','Dữ liệu chưa xác nhận sẽ được giữ để bạn tiếp tục. Lưu nháp không đưa dữ liệu vào Chưa xếp.',()=>navigate(target),'Lưu nháp và chuyển');
+ else navigate(target);
+}
+function closeDialog(restore=true){const el=$('#dialog');if(el.open)el.close();dialogRoute=null;pendingConfirm=null;if(restore&&dialogReturn?.isConnected)dialogReturn.focus()}
+function showDialog(title,html,id=''){
+ const el=$('#dialog');if(!el.open)dialogReturn=document.activeElement;
+ el.innerHTML=`<div${id?` data-screen-id="${id}"`:''}><header class="dialog-head"><div class="od-field"><span class="screen-id">${esc(id||'Mô phỏng')}</span><h2 id="dialog-title">${esc(title)}</h2></div>${btn('close',icon('close'),{},'quiet')}</header><div class="dialog-body">${html}</div></div>`;
+ el.querySelector('[data-action=close]').setAttribute('aria-label','Đóng cửa sổ');
+ if(!el.open)el.showModal();
+ requestAnimationFrame(()=>el.querySelector('button,input,select,textarea')?.focus());
+}
+function confirmBox(title,text,fn,label='Xác nhận'){
+ pendingConfirm=fn;dialogRoute=null;showDialog(title,`<p>${esc(text)}</p><div class="dialog-actions">${btn('close','Ở lại')}${btn('confirm',esc(label),{},'primary')}</div>`);
+}
+function pageHead(id,desc='',actions=''){return `<header class="page-head"><div class="od-field"><div class="eyebrow">${moduleNames[moduleOf(id)]} <span aria-hidden="true">/</span> <span class="screen-id">${id}</span></div><h1 id="page-title" tabindex="-1">${screens[id]}</h1>${desc?`<p>${desc}</p>`:''}</div><div class="actions">${actions}</div></header>`}
+const routeBtn=(r,t,c='')=>btn('go',t,{route:r},c);
+function moduleTabs(){
+ const m=moduleOf(s.route);
+ const list=m==='notary'?[['NV2-01','Hồ sơ'],[C().mode==='ab'?'NV2-02':'NV2-03','Bàn soạn'],['NV2-04','Dữ liệu'],['NV2-07','Bộ văn bản']]:m==='upload'?[['UL-02','Phân tích dữ liệu'],['UL-03','Upload']]:[['NO-01','Tra cứu'],['NO-02','Đề xuất'],['NO-05','Tổng hợp']];
+ return `<nav class="tabs" aria-label="Điều hướng trong phần">${list.map(([r,l])=>`<button type="button" data-action="go" data-route="${r}"${(s.route===r||(r==='UL-03'&&['UL-04','UL-05','UL-06'].includes(s.route))||(r==='UL-02'&&s.route==='UL-01'))?' aria-current="page"':''}>${l}</button>`).join('')}</nav>`;
+}
+
+function focusKey(el){if(!el?.dataset||!['BUTTON','INPUT','SELECT','TEXTAREA'].includes(el.tagName))return null;const data=Object.entries(el.dataset);return data.length?{tag:el.tagName,data}:null}
+function restoreFocus(key){if(!key)return;const root=$('#dialog').open?$('#dialog'):document;const el=[...root.querySelectorAll(key.tag.toLowerCase())].find(e=>key.data.every(([k,v])=>e.dataset[k]===v));el?.focus({preventScroll:true})}
+function render(){
+ const returnKey=focusKey(document.activeElement);
+ const m=moduleOf(s.route),c=C(),activeJobs=s.jobs.filter(j=>['running','waiting_user','partial','failed'].includes(j.status)).length;
+ $('#app').innerHTML=`<div class="shell" data-screen-id="SH-01"><aside class="rail"><div class="logo" aria-label="Hồ sơ">h.</div><nav class="rail-nav" aria-label="Phần nghiệp vụ">${[['notary','folder','Soạn hồ sơ'],['upload','upload','Phân tích & Upload'],['office','office','Văn phòng']].map(([id,i,l])=>`<button type="button" data-action="module" data-module="${id}"${m===id?' aria-current="page"':''}>${icon(i)}<span>${l}</span></button>`).join('')}</nav><div class="rail-bottom">${btn('jobs',icon('clock')+'<span>Tác vụ</span>',{},'')}${btn('simulation',icon('settings')+'<span>Mô phỏng</span>',{},'')}<span class="rail-caption">SH-01</span></div></aside><div class="workspace"><header class="topbar"><div class="brand"><div class="od-field"><span class="brand-name">Không gian công chứng<span aria-hidden="true">.</span></span><span class="eyebrow">Một hồ sơ · xuyên suốt công việc</span></div></div><div class="tools">${btn('jobs',icon('clock')+`Tác vụ${activeJobs?' · '+activeJobs:''}`)}${btn('simulation',icon('settings')+'Tình huống')}<span class="avatar" title="Tài khoản minh họa" aria-label="Tài khoản demo">M</span></div></header><div class="sim-banner">${icon('shield')}<span>${SIM}</span></div><main id="main" class="main" data-screen-id="${s.route}">${moduleTabs()}<div class="fade">${renderRoute(s.route)}</div></main><footer class="app-foot"><span>Hồ sơ hư cấu · dữ liệu lưu trên trình duyệt này</span><span>22 tháng 09, 2026 · Bản demo</span></footer></div></div>`;
+ if(!$('#dialog').open)requestAnimationFrame(()=>restoreFocus(returnKey));
+}
+function renderRoute(id){
+ const state=s.viewStates[id]||'normal';
+ if(state!=='normal'){
+ const variants={empty:['Chưa có dữ liệu trong tình huống này','Chọn dữ liệu mẫu để bắt đầu thao tác.'],loading:['Đang tải dữ liệu mô phỏng','Tiến trình được điều khiển trong mục Tình huống; không có tác vụ mạng.'],error:['Chưa thể hoàn tất thao tác','DEMO-E01 · Lỗi mô phỏng. Dữ liệu và bản nháp vẫn được giữ; bạn có thể thử lại.'],unavailable:['Khả năng này chưa sẵn sàng','Dịch vụ mô phỏng chưa khả dụng. Không có kết nối thật hoặc thao tác chạy ngầm.']};
+ const [title,body]=variants[state]||variants.error;
+ return pageHead(id)+empty(title,body,btn('restore-state',state==='loading'?'Tiếp tục mô phỏng':'Dùng tình huống bình thường',{},'primary'))+(state==='loading'?'<div class="skeleton space-top" aria-hidden="true"><span></span><span></span><span></span></div>':'');
+ }
+ return views[id]?views[id]():empty('Mở qua cửa sổ chuyên biệt','Chọn thao tác dưới đây.',btn('open-screen','Mở cửa sổ',{route:id},'primary'));
+}
+const views={};
+function caseContext(){return `<div class="contextbar"><div class="od-field"><strong>${esc(C().title)}</strong><span class="source-info">${C().id} · dữ liệu v${C().revision}</span></div>${select('diagram-mode','Kiểu sơ đồ',C().mode,[['ab','Hai bên A / B'],['family','Phả hệ thừa kế']])}${C().mode==='ab'?select('contract','Văn bản chính',C().contract,['Chuyển nhượng','Tặng cho','Cho thuê','Đặt cọc']):'<div class="od-field"><span>Văn bản chính</span><strong>Phân chia di sản DEMO</strong></div>'}</div>`}
+views['NV2-01']=()=>{
+ const list=s.cases.filter(c=>(c.title+' '+c.id).toLowerCase().includes(s.caseQuery.toLowerCase()));
+ return pageHead('NV2-01','Tiếp tục hồ sơ, kiểm tra dữ liệu và xử lý phần còn chờ.',btn('new-case',icon('plus')+'Tạo hồ sơ',{},'primary'))+
+ `<div class="stats"><div class="statbox"><div class="od-stat"><strong class="stat-num">${s.cases.length}</strong><span>Hồ sơ mẫu</span></div><span class="stat-icon">${icon('folder')}</span></div><div class="statbox"><div class="od-stat"><strong class="stat-num">${s.cases.reduce((n,c)=>n+c.people.filter(p=>p.dirty||!p.committed).length+c.assets.filter(p=>p.dirty||!p.committed).length,0)}</strong><span>Mục cần xác nhận</span></div><span class="stat-icon">${icon('users')}</span></div><div class="statbox"><div class="od-stat"><strong class="stat-num">${s.jobs.filter(j=>j.status==='waiting_user'||j.status==='partial').length}</strong><span>Tác vụ cần xem</span></div><span class="stat-icon">${icon('clock')}</span></div></div>
+ <div class="cols"><section class="panel"><div class="panel-head"><h2>Hồ sơ gần đây</h2><span class="muted">Dữ liệu DEMO</span></div><div class="od-row">${input('case-query','Tìm hồ sơ',s.caseQuery)}${btn('case-search',icon('search'),{},'quiet')}</div><div class="space-top">${list.length?list.map(c=>`<article class="case-row"><div><div class="title-line"><span class="folder-mark">${icon(c.mode==='ab'?'folder':'users')}</span><div class="od-field"><h3 class="case-name">${esc(c.title)}</h3><span class="source-info">${c.id}</span></div></div><div class="case-meta">${badge(c.mode==='ab'?c.contract:'Thừa kế')}${badge(c.word.stale?'Văn bản cần cập nhật':'Đang soạn',c.word.stale?'warn':'info')}${badge(c.people.filter(p=>!p.committed||p.dirty).length+' mục chờ xác nhận','warn')}</div><div class="workflow"><span class="done">${icon('check')}Thu nhận</span><span>→ Dữ liệu</span><span>→ Sơ đồ</span><span>→ Văn bản</span></div></div><div class="actions">${btn('open-case','Mở hồ sơ '+icon('arrow'),{case:c.id})}</div></article>`).join(''):empty('Không thấy hồ sơ','Thử tên hoặc mã DEMO khác.')}</div></section>
+ <aside class="stack"><section class="panel aside-lime"><div class="panel-head"><h3>Cần bạn xác nhận</h3>${icon('alert')}</div><p>Người và tài sản chỉ vào sơ đồ sau khi được kiểm tra.</p><div class="divider"></div><div class="od-field"><strong>${esc(C().title)}</strong><span>Bản nháp chưa vào Chưa xếp</span></div><div class="space-top">${routeBtn('NV2-04','Xem dữ liệu '+icon('arrow'),'quiet')}</div></section><section class="panel aside-peach"><h3>Mỗi việc, đúng một lần</h3><p class="space-small">Xuất thêm văn bản không tạo thêm công việc hoặc tính lại phí.</p><div class="space-top">${routeBtn('NO-01','Tra cứu công việc '+icon('arrow'),'quiet')}</div></section></aside></div>`;
+};
+function roleLabel(role){
+ if(C().mode==='family')return {root:'Người để lại di sản',spouse:'Vợ / chồng',parents:'Cha / mẹ',children:'Con / cháu'}[role]||'Chưa xếp';
+ const map={'Chuyển nhượng':['Bên chuyển nhượng','Bên nhận chuyển nhượng'],'Tặng cho':['Bên tặng cho','Bên được tặng cho'],'Cho thuê':['Bên cho thuê','Bên thuê'],'Đặt cọc':['Bên nhận đặt cọc','Bên đặt cọc']};
+ return role==='A'?map[C().contract][0]:map[C().contract][1];
+}
+function personCard(p,assigned=false){
+ const name=p.snapshot?.name||p.name;
+ return `<article class="person" draggable="${p.committed&&!p.dirty}" data-person="${p.id}"><div class="od-row"><span class="initial">${esc(p.id.split('-').pop())}</span><div class="od-field od-fill"><strong>${esc(name)}</strong><span class="source-info">${p.id}</span></div></div>${p.dirty?badge('Dữ liệu đang sửa','warn'):''}<div class="actions">${btn('assign','Gán vào…',{person:p.id},'smallbtn',!p.committed||p.dirty)}${btn('inspect',icon('info'),{person:p.id},'quiet')}${assigned?btn('unassign','Bỏ gán',{person:p.id},'quiet'):''}</div></article>`;
+}
+function side(role){
+ const members=C().people.filter(p=>C().assign[p.id]===role);
+ return `<section class="side" data-drop="${role}" aria-label="${esc(roleLabel(role))}"><header class="side-head"><span class="side-letter">${C().mode==='ab'?role:icon('users')}</span><h3>${roleLabel(role)}</h3></header>${members.length?members.map(p=>personCard(p,true)).join(''):`<div class="empty-slot">${icon('plus')}<span>Gán người từ Chưa xếp</span></div>`}</section>`;
+}
+function workbench(){
+ const c=C(),id=c.mode==='ab'?'NV2-02':'NV2-03';
+ const pool=c.people.filter(p=>p.committed&&!p.dirty&&!c.assign[p.id]);
+ return pageHead(id,'Sắp xếp người tham gia; dữ liệu gốc được giữ tại phần Dữ liệu.',btn('save-diagram',icon('check')+'Lưu sơ đồ',{},'primary'))+caseContext()+
+ (c.diagramStale||!c.diagramSaved?note('<strong>Sơ đồ cần được rà soát.</strong><span>Dữ liệu hoặc cách gán đã đổi. Kiểm tra rồi lưu sơ đồ trước khi xuất văn bản.</span>','warn'):'')+
+ `<div class="workbench space-top"><section class="panel pool"><div class="panel-head"><h3>Chưa xếp</h3>${badge(String(pool.length))}</div><p class="muted">Chỉ gồm dữ liệu đã xác nhận.</p><div class="pool-people space-top">${pool.length?pool.map(p=>personCard(p)).join(''):note('Không còn người chưa xếp.')}</div><div class="space-top">${routeBtn('NV2-04',icon('plus')+'Dữ liệu người')}</div></section><div class="stack"><section class="canvas"><div class="panel-head"><div class="od-field"><span class="eyebrow">Văn bản chính</span><h2>${c.mode==='ab'?esc('Hợp đồng '+c.contract.toLowerCase()):'Phả hệ thừa kế'}</h2></div>${badge(c.diagramSaved&&!c.diagramStale?'Đã lưu':'Cần rà soát',c.diagramSaved&&!c.diagramStale?'good':'warn')}</div>${c.mode==='ab'?`<div class="sides">${side('A')}${side('B')}</div>`:`<div class="family"><div class="family-root">${side('root')}</div><div class="family-line" aria-hidden="true"></div><div class="branches">${side('spouse')}${side('parents')}${side('children')}</div>${note('Quan hệ dùng để review bố cục; demo không tự tính phần thừa kế hoặc suy người từ chối.','warn')}</div>`}<section class="panel"><h3>Tài sản trong hồ sơ</h3><p class="muted">Chọn từ dữ liệu đã xác nhận.</p>${c.assets.filter(a=>a.committed&&!a.dirty).map(a=>check('asset-select',a.snapshot.name,c.selectedAssets.includes(a.id),{asset:a.id})).join('')||'<p>Chưa có tài sản đã xác nhận.</p>'}</section></section><div class="actions">${routeBtn('NV2-04','Sửa dữ liệu')}${btn('zalo','Kết nối Zalo')}${routeBtn('NV2-07','Bộ văn bản '+icon('arrow'))}</div></div></div>`;
+}
+views['NV2-02']=workbench;views['NV2-03']=workbench;
+const INTAKE=[['id','DEMO_ID_A_FRONT.png','OCR · Người'],['asset','DEMO_GCN_NONVALID.pdf','OCR · Tài sản'],['note','DEMO_NOTE.txt','Chuyển đổi văn bản · Cần xác định']];
+function stage(kind){
+ const c=C(),people=kind==='people',list=c[kind];
+ return `<section class="panel"><div class="panel-head"><div class="od-field"><h2>Dữ liệu ${people?'người':'tài sản'}</h2><span class="muted">Xác nhận độc lập · v${c.revision}</span></div>${btn('add-item',icon('plus')+'Thêm tay',{kind},'quiet')}</div>${list.some(p=>!p.name.trim())?note('<strong>Cần bổ sung tên</strong>'+list.filter(p=>!p.name.trim()).map(p=>btn('focus-item',esc(p.id),{id:p.id},'quiet')).join(''),'bad'):''}${list.map(p=>`<article class="stage-card"><div class="stage-header"><code>${p.id}</code>${badge(!p.committed?'Bản nháp':p.dirty?'Chưa cập nhật':'Đã vào Chưa xếp',!p.committed||p.dirty?'warn':'good')}</div>${input('stage-name',people?'Tên nhân vật hư cấu *':'Tên tài sản hư cấu *',p.name,{kind,id:p.id})}<span id="error-${p.id}" class="field-error"${p.name.trim()?' hidden':''}>Cần nhập tên trước khi xác nhận.</span>${input('stage-detail','Ghi chú dữ liệu',p.detail,{kind,id:p.id})}<span class="source-info">Nguồn: ${esc(p.source)}${!people?' · có thể chung nguồn với tài sản khác':''}</span><div class="actions">${btn('revert-item',p.committed?'Bỏ chỉnh sửa':'Bỏ mục nháp',{kind,id:p.id},'quiet')}${btn('source-item','Xem nguồn',{kind,id:p.id},'quiet')}</div></article>`).join('')||empty('Chưa có dữ liệu',`Thêm ${people?'người':'tài sản'} thủ công hoặc lấy từ lô mẫu.`)}<div class="space-top">${btn('commit-stage',`Xác nhận ${people?'người':'tài sản'}`,{kind},'',!list.some(p=>!p.committed||p.dirty))}</div></section>`;
+}
+views['NV2-04']=()=>{
+ const c=C(),running=['routing','processing','classification'].includes(c.intake);
+ return pageHead('NV2-04','Đọc nguồn, kiểm tra rồi xác nhận riêng dữ liệu người và tài sản.',btn('intake-start',icon('plus')+'Xử lý lô mẫu',{},'primary',running||!c.intakeSelected.length))+
+ `<section class="panel"><div class="panel-head"><h2>Thu nhận tài liệu</h2>${btn('zalo','Kết nối Zalo '+icon('arrow'))}</div>${note(SIM)}<div class="space-small">${c.zaloProvenance?.length?note('Nguồn Zalo mẫu: '+c.zaloProvenance.map(esc).join(', ')):''}</div><div class="three space-small">${INTAKE.map(([id,file,route])=>`<div class="od-field">${check('intake-select',file,c.intakeSelected.includes(id),{id})}<span class="muted">${route}</span></div>`).join('')}</div>${check('cloud','Cho phép OCR cloud trong tình huống mô phỏng',c.cloud)}
+ <div class="progress-steps">${[['routing','Phân loại file'],['processing','Chuyển đổi / OCR'],['classification','Nhận diện dữ liệu'],['done','Đưa vào dữ liệu']].map(([id,t])=>`<span class="${c.intake===id?'active':''}">${t}</span>`).join('<span aria-hidden="true">→</span>')}</div>
+ ${c.intake==='idle'?'<p class="muted">Chọn lô mẫu phía trên. Thêm thủ công không chạy qua OCR.</p>':`<div class="pipeline">${INTAKE.filter(([id])=>c.intakeSelected.includes(id)).map(([id,file,route])=>`<div class="pipeline-row"><div class="od-field"><strong>${file}</strong><span class="muted">${route}${id==='note'?' · adapter chuyển đổi PoC':''}</span></div>${badge(id!=='note'&&!c.cloud?'Chờ cho phép OCR':c.intake==='done'?'Đã đọc nguồn':c.intake==='failed'?'Lỗi mẫu':'Đang xử lý',id!=='note'&&!c.cloud?'warn':'info')}</div>`).join('')}</div>`}
+ ${c.intake==='classification'||c.intake==='done'?`<div class="space-small">${select('classify','DEMO_NOTE.txt thuộc nhóm nào?',c.classified,[['unknown','Cần xác định'],['people','Người'],['assets','Tài sản']])}</div>`:''}
+ <div class="actions space-small">${running?btn('intake-next','Tiếp bước mô phỏng '+icon('arrow')):''}${running?btn('intake-cancel','Hủy xử lý',{},'quiet'):''}${c.intake==='done'?btn('intake-transfer','Đưa kết quả vào dữ liệu',{},'',c.intakeTransferred):''}${c.intake==='failed'?btn('intake-start','Thử lại lô mẫu'):''}</div></section>
+ <div class="two space-top">${stage('people')}${stage('assets')}</div><div class="actions space-top">${routeBtn(c.mode==='ab'?'NV2-02':'NV2-03','Trở về sơ đồ '+icon('arrow'))}</div>`;
+};
+function baseline(){
+ const c=C(),issues=[];
+ if([...c.people,...c.assets].some(p=>p.dirty||!p.committed))issues.push(['Dữ liệu còn bản nháp hoặc thay đổi chưa xác nhận.','NV2-04']);
+ if(!c.diagramSaved||c.diagramStale)issues.push(['Sơ đồ chưa lưu theo dữ liệu hiện tại.',c.mode==='ab'?'NV2-02':'NV2-03']);
+ const assigned=Object.values(c.assign);
+ if(c.mode==='ab'&&(!assigned.includes('A')||!assigned.includes('B')))issues.push(['Cần người tham gia ở cả bên A và B.','NV2-02']);
+ if(c.mode==='family'&&(!assigned.includes('root')||!assigned.some(r=>r!=='root')))issues.push(['Cần người để lại di sản và ít nhất một quan hệ.','NV2-03']);
+ if(!c.selectedAssets.length)issues.push(['Chưa chọn tài sản của văn bản.',c.mode==='ab'?'NV2-02':'NV2-03']);
+ return issues;
+}
+const DOC_NAMES={main:'Văn bản chính DEMO',tax:'Tờ khai thuế DEMO',request:'Đơn đề nghị DEMO'};
+const OUTPUT_LABELS={succeeded:'Thành công',failed:'Lỗi dữ liệu riêng',skipped:'Chưa chạy',running:'Đang tạo',queued:'Đang chờ'};
+views['NV2-07']=()=>{
+ const c=C(),w=c.word,issues=baseline(),selected=Object.keys(w.docs).filter(k=>w.docs[k]);
+ return pageHead('NV2-07','Một bộ văn bản, cùng nguồn dữ liệu đã xác nhận.',w.running?btn('word-finish','Xem kết quả mô phỏng',{},'primary'):btn('word-precheck','Kiểm tra bộ văn bản',{},'primary'))+
+ (w.stale?note('<strong>File này cũ hơn dữ liệu hiện tại.</strong><span>Giữ kết quả cũ để đối chiếu. Kiểm tra rồi xuất lại có chủ đích.</span>','warn'):'')+
+ `<div class="two space-top"><section class="panel stack"><div><h2>Chọn bộ xuất</h2><p class="muted">${esc(c.title)} · ${c.id}</p></div>${note(SIM)}${select('word-template','Mẫu / phiên bản',w.template,['DEMO-TPL-v1','DEMO-TPL-v2','DEMO-TPL-unavailable'])}<div>${Object.entries(DOC_NAMES).map(([id,name])=>check('word-doc',name,w.docs[id],{id})).join('')}</div>${input('tax-field','Mã căn cứ DEMO cho tờ khai thuế',w.taxField)}<p class="muted">Trường riêng của tờ khai; không sửa thông tin người hoặc tài sản.</p>${w.prechecked?`<div class="stack">${issues.length?note(`<strong>Chưa thể xuất</strong>${issues.map(([t,r])=>`<div>${esc(t)} ${routeBtn(r,'Đi tới chỗ sửa')}</div>`).join('')}`,'bad'):w.template==='DEMO-TPL-unavailable'?note('Mẫu chưa có mapping trong tình huống này. Chọn v1 hoặc v2.','bad'):!selected.length?note('Chọn ít nhất một văn bản.','bad'):note('Dữ liệu nền đã sẵn sàng.','good')}${w.docs.tax&&!w.taxField?note('Tờ khai thuế thiếu mã căn cứ riêng. Có thể xuất phần đủ dữ liệu và giữ lỗi từng file.','warn'):''}${btn('word-generate',w.outputs.length?'Kiểm tra và xuất lại':'Xuất phần đủ dữ liệu',{},'',issues.length>0||!selected.length||w.template==='DEMO-TPL-unavailable'||s.health==='unavailable'||w.running)}</div>`:''}</section><section class="panel"><div class="panel-head"><h2>Kết quả từng file</h2>${w.outputs.length?badge(w.running?'Đang tạo':w.outputs.every(o=>o.status==='succeeded')?'Đã xong':'Xong một phần',w.outputs.every(o=>o.status==='succeeded')?'good':'warn'):''}</div>${w.outputs.length?w.outputs.map(o=>`<article class="stage-card"><div class="od-field"><strong>${DOC_NAMES[o.id]}</strong><span class="source-info">Nguồn v${o.revision} · sơ đồ v${o.diagramVersion} · ${esc(o.template)}</span></div>${badge(OUTPUT_LABELS[o.status],o.status==='succeeded'?'good':o.status==='failed'?'bad':'warn')}${w.stale?badge('Cũ so với nguồn','warn'):''}<div class="actions">${o.status==='succeeded'?btn('word-view','Xem kết quả',{id:o.id}):btn('word-retry',o.status==='failed'?'Thử lại file lỗi':'Chạy file còn lại',{id:o.id},'',w.stale||w.running)}</div></article>`).join(''):empty('Chưa có bộ văn bản','Kiểm tra dữ liệu và chọn văn bản trước khi xuất mô phỏng.')}<div class="space-top">${note('Thành công ở đây chỉ là trạng thái tạo file mô phỏng. Công việc và khoản phí được xác nhận riêng.')}</div></section></div>`;
+};
+
+const contextReady=()=>Boolean(U().portal&&U().book&&U().year);
+function uploadContext(){
+ const u=U();
+ return `<div class="contextbar">${select('upload-context','Cổng tỉnh',u.portal,[['','Chọn cổng'],['CỔNG TỈNH HƯ CẤU 01','CỔNG TỈNH HƯ CẤU 01']],{field:'portal'})}${select('upload-context','Sổ / văn phòng',u.book,[['','Chọn sổ'],['SỔ CÔNG CHỨNG DEMO-A','SỔ CÔNG CHỨNG DEMO-A'],['SỔ CÔNG CHỨNG DEMO-B','SỔ CÔNG CHỨNG DEMO-B']],{field:'book'})}${select('upload-context','Năm',u.year,[['','Chọn năm'],'2025','2026'],{field:'year'})}</div>`;
+}
+const capLabel=()=>({scan:'Chỉ nhận bản scan',render:'Nhận scan hoặc Word render',unknown:'Chưa biết khả năng cổng'}[U().capability]);
+views['UL-01']=()=>pageHead('UL-01','Chọn đúng cổng, sổ và năm trước khi phân tích.',btn('analyze','Phân tích lô mẫu',{},'primary',!contextReady()||s.health==='unavailable'))+uploadContext()+`<div class="two"><section class="panel stack"><h2>Phạm vi nguồn</h2><p>VĂN PHÒNG HƯ CẤU</p>${note('Nguồn mẫu có 2/2025, 4/2025 và 1/2026. Năm là một phần của ngữ cảnh, không chỉ là bộ lọc.')}<div class="od-field"><strong>Độ phủ dữ liệu</strong><span class="muted">Ban đầu chưa có bằng chứng đủ dải. Bạn có thể chọn tình huống đã xác minh để xem số thiếu.</span></div>${select('coverage','Tình huống độ phủ',U().coverage?'verified':'unverified',[['unverified','Chưa xác minh'],['verified','Đã xác minh 2025: từ 1 đến 4']])}</section><section class="panel aside-peach stack"><h2>Khả năng cổng mô phỏng</h2>${badge(capLabel(),'warn')}<p>PDF scan được dùng trong tình huống mặc định. File nguồn Word và file gửi lên cổng là hai thứ riêng.</p>${note(SIM)}${btn('simulation','Đổi tình huống cổng',{},'quiet')}</section></div>`;
+views['UL-02']=()=>{
+ const u=U(),verified=u.coverage&&u.year==='2025'&&u.book==='SỔ CÔNG CHỨNG DEMO-A';
+ return pageHead('UL-02','Kiểm tra phạm vi nguồn trước khi kết luận số còn thiếu.',btn('create-queue','Tạo hàng đợi '+icon('arrow'),{},'primary',!u.analyzed||!verified))+uploadContext()+
+ (!contextReady()?empty('Chưa đủ ngữ cảnh','Chọn cổng, sổ và năm.',routeBtn('UL-01','Chọn ngữ cảnh','primary')):
+ !u.analyzed?`<section class="panel stack"><h2>${u.analysisState==='running'?'Đang phân tích lô mẫu':'Sẵn sàng phân tích'}</h2><p>Đọc các số quan sát được, giữ nguyên nguồn và năm.</p>${u.analysisState==='running'?'<div class="skeleton" aria-hidden="true"><span></span><span></span></div>':''}<div class="actions">${btn(u.analysisState==='running'?'analysis-finish':'analyze',u.analysisState==='running'?'Xem kết quả mô phỏng':'Phân tích lô mẫu',{},'primary',s.health==='unavailable')}${u.analysisState==='running'?btn('analysis-cancel','Hủy phân tích'):''}</div></section>`:
+ `<div class="stack">${select('coverage','Tình huống độ phủ',u.coverage?'verified':'unverified',[['unverified','Chưa xác minh'],['verified','Đã xác minh 2025: từ 1 đến 4']])}${verified?note('<strong>Đã xác minh phạm vi 1 → 4 của năm 2025</strong><span>Mốc cuối đã xác minh: 4. Không kết luận về phần còn lại của năm.</span>','good'):note('<strong>Chưa đủ bằng chứng để kết luận số thiếu.</strong><span>Độ phủ chưa được xác minh cho ngữ cảnh này. Không tạo danh sách số thiếu.</span>','warn')}<div class="two"><section class="panel"><div class="panel-head"><h2>Số còn thiếu</h2>${badge(verified?'2 mục':'Chưa kết luận',verified?'good':'warn')}</div>${verified?['1/2025','3/2025'].map(no=>`<div class="list-row"><div class="od-field"><strong class="od-nowrap">${no}</strong><span class="muted">Chưa thấy trong dải nguồn đã xác minh</span></div>${icon('file')}</div>`).join(''):empty('Chờ xác minh độ phủ','Không có danh sách thiếu không có nghĩa là không có số thiếu.')}</section><section class="panel"><h2>Đối chứng nguồn</h2>${['2/2025','4/2025','1/2026'].map((no,i)=>`<div class="list-row"><div class="od-field"><strong>${no}</strong><span class="muted">Dòng nguồn DEMO-${i+1}</span></div>${badge(no.endsWith(u.year)?'Trong năm':'Khác năm',no.endsWith(u.year)?'good':'')}</div>`).join('')}<p class="muted space-small">Cùng số ở hai năm khác nhau không phải trùng.</p></section></div><section class="panel"><h3>Lỗi cần kiểm tra</h3><p class="space-small">Lô đối chứng này không có số sai định dạng. Tình huống file sai năm và trùng số được xử lý riêng trong hàng đợi, không tự sửa năm.</p></section></div>`);
+};
+function newQueue(){return ['1/2025','3/2025'].map((no,i)=>({no,source:i?'DEMO_03-2026.docx':'DEMO_01-2025.docx',version:1,preparedVersion:0,attachment:null,attachmentType:'scan',pages:[{id:'DEMO_PAGE_01.png',rotation:0},{id:'DEMO_PAGE_02.png',rotation:0}],reviewed:false,result:'not_saved'}))}
+function rowErrors(row){
+ const errs=[];
+ if(!contextReady()||!U().coverage||U().year!=='2025'||U().book!=='SỔ CÔNG CHỨNG DEMO-A')errs.push('Ngữ cảnh chưa được xác minh');
+ if(row.source.includes('2026'))errs.push('File sai năm');
+ if(row.source==='duplicate')errs.push('Hai file cùng nhận một số');
+ if(!row.source)errs.push('Chưa chọn nguồn');
+ if(!row.attachment)errs.push('Chưa có attachment');
+ if(!row.reviewed)errs.push('Bộ tệp chưa xác nhận');
+ if(row.attachmentType==='unsupported')errs.push('Định dạng nguồn chưa hỗ trợ');
+ if(row.attachment&&row.preparedVersion!==row.version)errs.push('Nguồn đã thay đổi');
+ if(U().capability==='unknown')errs.push('Chưa biết khả năng cổng');
+ if(row.attachmentType==='render'&&U().capability==='scan')errs.push('Cổng yêu cầu bản scan');
+ if(U().overLimit)errs.push('Vượt giới hạn mẫu');
+ if(row.attachmentType==='render'&&!U().engine)errs.push('Engine PDF chưa khả dụng');
+ return errs;
+}
+const activeUploadRow=()=>U().queue.find(r=>r.no===U().activeRow)||U().queue[0];
+function sourceChoices(row){return row.no==='1/2025'?['DEMO_01-2025.docx']:['DEMO_03-2026.docx',['duplicate','Hai file A + B cùng nhận 3/2025'],'DEMO_03-2025_A.docx','DEMO_03-2025_B.docx']}
+views['UL-03']=()=>{
+ const u=U(),ready=u.queue.filter(r=>!rowErrors(r).length);
+ return pageHead('UL-03','Ghép đúng nguồn; kiểm tra từng file sẽ gửi.',btn('start-portal','Điền thử '+icon('arrow'),{},'primary',!ready.length||s.health==='unavailable'))+uploadContext()+
+ (u.queue.length?`<div class="stack">${note(`<strong>${ready.length}/${u.queue.length} mục đủ điều kiện</strong><span>Chỉ mục đã sẵn sàng được điền thử. Các mục bị chặn vẫn giữ nguyên trong hàng đợi.</span>`)}${u.queue.map(row=>{const err=rowErrors(row);return `<section class="panel"><div class="panel-head"><div class="od-field"><h2>${row.no}</h2><span class="source-info">${esc(u.book)} · nguồn v${row.version}</span></div>${badge(err.length?'Cần kiểm tra':'Sẵn sàng',err.length?'warn':'good')}</div><div class="two"><div class="stack">${select('queue-source','File Word lấy dữ liệu',row.source,sourceChoices(row),{no:row.no})}${row.source==='duplicate'?note('DEMO_03-2025_A.docx và DEMO_03-2025_B.docx cùng nhận 3/2025. Hãy chọn đúng một nguồn.','bad'):''}${btn('source-change','Giả lập nguồn đổi phiên bản',{no:row.no},'quiet')}</div><div class="stack"><div class="od-field"><strong>Tệp thực tế gửi lên cổng</strong><span>${esc(row.attachment||'Chưa chọn tệp')}</span><span class="muted">Được kiểm tra theo ${capLabel().toLowerCase()}.</span></div>${btn('attachment','Chuẩn bị attachment',{no:row.no})}</div></div>${err.length?`<div class="notice warn space-small">${err.map(e=>`<span>${esc(e)}</span>`).join('')}</div>`:''}</section>`}).join('')}<div class="actions">${routeBtn('UL-02','Quay lại phân tích')}${u.sessionStarted?routeBtn('UL-06','Xem phiên gần nhất'):''}</div></div>`:
+ empty('Hàng đợi đang trống','Xác minh độ phủ và tạo hàng đợi từ số thiếu.',routeBtn('UL-02','Đi tới phân tích','primary')));
+};
+const RESULT_LABELS={not_saved:'Chưa lưu',saved:'Đã lưu',unknown:'Chưa rõ kết quả',failed:'Lỗi'};
+views['UL-05']=()=>{
+ const u=U(),rows=u.queue.filter(r=>r.inSession);
+ return pageHead('UL-05','Bạn kiểm tra và bấm Lưu riêng từng mục trong cổng mô phỏng.',routeBtn('UL-06','Xem kết quả '+icon('arrow')))+note('<strong>Điền thử · chưa lưu</strong><span>'+SIM+' Hủy, thử lại hoặc nối lại phiên không kích hoạt Lưu.</span>','warn')+
+ (!u.sessionStarted?empty('Chưa có phiên điền thử','Chuẩn bị ít nhất một mục đủ điều kiện.',routeBtn('UL-03','Mở hàng đợi')):`<section class="panel stack space-top"><div class="panel-head"><div class="od-field"><span class="eyebrow">Cửa sổ cổng giả lập</span><h2>${esc(u.portal)}</h2></div>${badge(u.portalState==='login'?'Cần đăng nhập':u.portalState==='filling'?'Đang điền':'Chờ bạn kiểm tra','warn')}</div>${u.portalState==='login'?`<p>Phiên minh họa chưa đăng nhập. Không yêu cầu tài khoản hoặc mật khẩu thật.</p>${btn('portal-login','Giả lập đăng nhập',{},'primary')}`:u.portalState==='filling'?`<p>Đang điền thông tin vào các mục mẫu. Chưa có mục nào được lưu.</p><div class="skeleton" aria-hidden="true"><span></span><span></span></div>${btn('portal-filled','Hoàn tất điền thử',{},'primary')}`:
+ rows.map(row=>`<article class="panel"><div class="panel-head"><div class="od-field"><h3>${row.no}</h3><span>Điền thử · chưa lưu tự động</span></div>${badge(RESULT_LABELS[row.result],row.result==='saved'?'good':'warn')}</div><div class="od-field"><span>Nguồn: ${esc(row.source)}</span><span>Tệp gửi: ${esc(row.attachment)}</span></div>${rowErrors(row).length?note(rowErrors(row).join(' · '),'bad'):''}<div class="actions space-small">${btn('portal-save','Lưu mục này',{no:row.no},'',row.result==='saved'||rowErrors(row).length>0)}${btn('portal-result','Không lưu',{no:row.no,result:'not_saved'},'quiet',row.result==='saved')}</div></article>`).join('')}<div class="actions">${btn('portal-cancel','Đóng phiên',{},'quiet')}${btn('portal-reconnect','Nối lại mô phỏng',{},'quiet')}</div></section>`);
+};
+views['UL-06']=()=>{
+ const rows=U().queue.filter(r=>r.inSession),saved=rows.filter(r=>r.result==='saved').length;
+ return pageHead('UL-06','Kết quả theo từng mục; đã điền không đồng nghĩa đã lưu.',routeBtn('UL-03','Về hàng đợi'))+note(SIM)+
+ (rows.length?`<section class="panel space-top"><div class="panel-head"><h2>${saved===rows.length?'Các mục trong phiên đã lưu':saved?'Phiên hoàn tất một phần':'Phiên chưa hoàn tất'}</h2>${badge(saved+'/'+rows.length+' đã lưu',saved===rows.length?'good':'warn')}</div>${rows.map(row=>`<div class="record-row"><div class="od-field"><strong>${row.no}</strong><span class="source-info">${esc(row.attachment)}</span></div><div>${badge(RESULT_LABELS[row.result],row.result==='saved'?'good':row.result==='failed'?'bad':'warn')}</div>${row.result==='saved'?btn('upload-detail','Chi tiết',{no:row.no}):btn('upload-retry','Kiểm tra lại',{no:row.no})}</div>`).join('')}</section>`:empty('Chưa có kết quả','Bắt đầu phiên điền thử từ hàng đợi.',routeBtn('UL-03','Mở hàng đợi')));
+};
+function officeScope(){return `<div class="contextbar">${select('office-scope','Phạm vi mô phỏng',s.office.scope,[['own','Máy trạm của tôi · PC-DEMO-02'],['server','Toàn văn phòng · SERVER-DEMO']])}<div class="od-field"><strong>Chỉ mô phỏng phạm vi dữ liệu</strong><span class="muted">Quyền xem và bảo mật chưa được triển khai.</span></div></div>`}
+function recordStatus(r){return badge(r.status,r.status==='Đã hoàn thành'?'good':r.status==='Dự kiến'?'warn':'info')}
+const FEE_LABELS={unknown:'Chưa xác định',none:'Không tính phí',defined:'Chờ xác nhận',confirmed:'Đã xác nhận'};
+function feeText(r){return r.fee==='unknown'?'Chưa xác định':r.fee==='none'?'Không tính phí':(r.amount?Number(r.amount).toLocaleString('vi-VN')+' ₫ · '+FEE_LABELS[r.fee]:FEE_LABELS[r.fee])}
+function officeRecordRows(records){return records.map(r=>`<div class="record-row"><div class="od-field"><strong>${r.type}</strong><span class="source-info">${r.id}</span>${recordStatus(r)}</div><div class="od-field"><span class="muted">Phí</span><span>${esc(feeText(r))}</span></div>${btn('record','Chi tiết '+icon('arrow'),{record:r.id})}</div>`).join('')}
+views['NO-01']=()=>{
+ const q=s.office.query.trim().toLowerCase();
+ const candidates=s.cases.filter(c=>[c.title,c.id,'NHÂN VẬT HƯ CẤU A','DEMO-PERSON-A','1/2025','DEMO_NOTE.txt','PC-DEMO-02',...s.office.records.filter(r=>r.caseId===c.id).map(r=>r.id)].join(' ').toLowerCase().includes(q));
+ return pageHead('NO-01','Tìm một thông tin để thấy các hồ sơ liên quan.',routeBtn('NO-02','Rà soát đề xuất '+icon('arrow')))+officeScope()+
+ `<div class="searchbox">${input('office-query','Tên, mã hồ sơ, công việc, số công chứng hoặc file',s.office.query)}${btn('office-search',icon('search')+'Tìm kiếm',{},'primary')}</div><div class="space-small">${btn('sample-search','Thử tìm: NHÂN VẬT HƯ CẤU A',{},'quiet')}</div><div class="space-top">${!s.office.searched?`<div class="two"><section class="panel aside-lime stack"><h2>Bắt đầu từ một thông tin</h2><p>Kết quả là hồ sơ có khả năng phù hợp. Bạn chọn đúng ngữ cảnh trước khi mở.</p>${icon('search')}</section><section class="panel stack"><h2>Việc đang theo dõi</h2><p>Thừa kế, gia hạn đất và đo đạc được theo dõi riêng trong cùng một hồ sơ.</p>${btn('office-case','Mở hồ sơ thừa kế',{case:'CASE-DEMO-THUAKE-01'})}</section></div>`:!q?empty('Nhập một thông tin để tìm','Không cần nhập đủ bộ định danh.'):!candidates.length?empty('Không có kết quả phù hợp','Thử mã DEMO hoặc một phần tên hồ sơ. Không tự tạo hồ sơ mới từ tìm kiếm.'): `<section class="panel"><div class="panel-head"><h2>${candidates.length} hồ sơ có thể phù hợp</h2>${badge('Cần bạn chọn','warn')}</div>${note('Trùng một trường không chứng minh cùng người hay cùng hồ sơ. Không tự gộp dữ liệu.')}${candidates.map(c=>`<article class="case-row"><div class="od-field"><h3>${esc(c.title)}</h3><span>${c.id}</span><span class="muted">Thông tin có mặt trong hồ sơ: NHÂN VẬT HƯ CẤU A</span><span class="muted">Ngữ cảnh: ${c.mode==='family'?'yêu cầu thừa kế':'giao dịch hai bên'} · nguồn DEMO</span></div>${btn('office-case','Mở hồ sơ',{case:c.id})}</article>`).join('')}</section>`}</div>`;
+};
+const TYPES=['Thừa kế','Gia hạn đất','Đo đạc'];
+views['NO-02']=()=>{
+ const p=s.office.proposal,existing=s.office.records.find(r=>r.caseId===p.caseId&&r.type===p.type),terminal=['confirmed','draft','canceled'].includes(p.state);
+ return pageHead('NO-02','Dữ kiện chỉ tạo đề xuất. Bạn quyết định công việc được ghi nhận.',btn('proposal-confirm','Xác nhận đúng việc',{},'primary',terminal||p.evidence==='missing'))+
+ note('<strong>Văn phòng là mô hình UX mục tiêu.</strong><span>Chưa có watcher, định danh người dùng hoặc thu thập dữ liệu thật.</span>')+
+ `<div class="two space-top"><section class="panel stack"><div class="panel-head"><h2>Dữ kiện nguồn</h2>${badge('Mô phỏng','info')}</div><div class="od-field"><strong>EVD-DEMO-PRINT-01</strong><span>22/09/2026 · 09:21 · PC-DEMO-02</span><span class="muted">Nguồn: sự kiện in DEMO và văn bản mẫu</span></div><div class="paper"><div class="paper-mark">NỘI DUNG HƯ CẤU · KHÔNG CÓ GIÁ TRỊ PHÁP LÝ</div><h3>Yêu cầu thừa kế DEMO</h3><p>Đoạn bằng chứng mẫu: xử lý yêu cầu thừa kế. Gia hạn đất và đo đạc là các việc cần xem xét riêng.</p><div class="paper-lines" aria-hidden="true"><i></i><i></i><i></i></div></div>${select('evidence-state','Tình huống bằng chứng',p.evidence,[['full','Có đủ đoạn nội dung mẫu'],['missing','Thiếu text / thiếu event mạng']])}${p.evidence==='missing'?note('Có thể thiếu bằng chứng từ file đang mở hoặc ổ mạng. Giữ đề xuất để xem lại; không suy không có công việc.','warn'):''}</section>
+ <section class="panel stack"><div class="panel-head"><h2>Đề xuất công việc</h2>${badge(({candidate:'Chưa là công việc',confirmed:'Đã xác nhận',draft:'Chỉ nháp',canceled:'Đã hủy'})[p.state]||'Cần kiểm tra',p.state==='confirmed'?'good':'warn')}</div>${select('proposal-type','Loại việc',p.type,TYPES)}${select('proposal-case','Hồ sơ đề xuất',p.caseId,[['','Chưa gắn hồ sơ'],...s.cases.map(c=>[c.id,c.title])])}${existing?note(`<strong>Có công việc tương tự</strong><span>${existing.id} · ${existing.type}</span><span>Cần xác nhận cùng việc hay khác yêu cầu; không tự gộp.</span>`,'warn'):note('Chưa có công việc cùng loại trong hồ sơ đã chọn.')}${existing?check('proposal-link','Đây là cùng việc; bổ sung dữ kiện vào việc đã có',p.linkExisting):''}${input('proposal-reason','Ghi chú quyết định / lý do khác việc',p.reason)}<div class="actions">${btn('proposal-draft','Chỉ nháp',{},'',terminal)}${btn('proposal-cancel','Hủy đề xuất',{},'danger',terminal)}${terminal?btn('proposal-reset','Mở đề xuất mẫu mới',{},'quiet'):''}</div>${terminal?note(`<strong>${esc(p.decision)}</strong><span>Dữ kiện nguồn vẫn được giữ trong lịch sử.</span>`,'good'):note('Đổi loại việc hoặc hồ sơ ngay tại biểu mẫu trước khi xác nhận. Xuất Word không tự tạo công việc.')}</section></div>`;
+};
+views['NO-03']=()=>{
+ const c=s.cases.find(c=>c.id===s.office.caseId),records=s.office.records.filter(r=>r.caseId===s.office.caseId);
+ return pageHead('NO-03',esc(c?.title||'Hồ sơ DEMO'),routeBtn('NO-01','Về tra cứu'))+officeScope()+
+ `<div class="cols"><section class="panel"><div class="panel-head"><div class="od-field"><h2>${esc(c?.title||'Hồ sơ DEMO')}</h2><span class="source-info">${esc(s.office.caseId)}</span></div>${badge(records.length+' công việc','info')}</div>${records.length?officeRecordRows(records):empty('Chưa có công việc được xác nhận','Hồ sơ không tự tạo công việc từ số lượng văn bản.',routeBtn('NO-02','Rà soát đề xuất'))}<div class="space-top">${note('Tổng phí chưa xác định đầy đủ. Không coi các khoản chưa biết là 0 và không cộng lại khi xuất thêm file.','warn')}</div></section><aside class="stack"><section class="panel aside-peach"><h3>Một hồ sơ, nhiều việc</h3><p class="space-small">Mỗi công việc có trạng thái, nguồn và khoản phí riêng. Việc dự kiến chưa phải việc đã hoàn thành.</p></section><section class="panel"><h3>Mốc của hồ sơ</h3><ul class="timeline space-top"><li><span class="timeline-dot"></span><div class="od-field"><strong>22/09 · Tiếp nhận DEMO</strong><span class="muted">Dữ liệu mẫu được tạo</span></div></li><li><span class="timeline-dot"></span><div class="od-field"><strong>25/09 · Đo đạc dự kiến</strong><span class="muted">Chưa hoàn thành</span></div></li></ul></section></aside></div>`;
+};
+views['NO-04']=()=>{
+ const r=R(),draft=r.feeDraft||{state:r.fee,amount:r.amount};
+ return pageHead('NO-04',r.id,btn('office-case','Về hồ sơ',{case:r.caseId}))+
+ `<div class="two"><section class="panel stack"><div class="panel-head"><h2>${r.type}</h2>${recordStatus(r)}</div><p>Hồ sơ: <span class="mono">${r.caseId}</span></p>${select('record-status','Trạng thái công việc',r.status,['Dự kiến','Đã tiếp nhận','Đang xử lý','Đã hoàn thành','Đã hủy'])}${note('Xác nhận công việc, xuất file và xác nhận phí là ba thao tác độc lập.')}<h3>Dữ kiện & tài liệu</h3>${r.evidence.map(e=>`<div class="od-field"><strong>${e}</strong><span class="muted">Nguồn ${esc(r.source)} · ${r.station} · mô phỏng</span></div>`).join('')}${r.files.length?r.files.map(f=>`<div class="list-row"><span>${esc(f)} · v1</span>${btn('record-file','Xem mẫu')}</div>`).join(''):'<p class="muted">Chưa có văn bản. Công việc không bắt buộc phải có file Word.</p>'}</section><section class="panel stack"><h2>Thông tin phí</h2>${note(`<strong>${esc(feeText(r))}</strong><span>Chưa có biểu phí được duyệt trong bản demo.</span>`,r.fee==='unknown'?'warn':'')} ${select('fee-state','Trạng thái khoản phí',draft.state,[['unknown','Chưa xác định'],['none','Không tính phí'],['defined','Đã xác định, chờ xác nhận'],['confirmed','Đã xác nhận']])}${['defined','confirmed'].includes(draft.state)?input('fee-amount','Số tiền nhập để thử (VNĐ, hư cấu)',draft.amount,{},'number'):''}<div class="actions">${btn('fee-save','Ghi nhận phí mô phỏng')}</div><p class="muted">Không có giao dịch tiền. Không tự xác nhận thu tiền, hoàn tiền hoặc tính lại phí từ file.</p><h3>Lịch sử xử lý</h3><ul class="timeline">${r.history.map(t=>`<li><span class="timeline-dot"></span><span>${esc(t)}</span></li>`).join('')}</ul></section></div>`;
+};
+function filteredRecords(){
+ return s.office.records.filter(r=>(s.office.filterType==='all'||r.type===s.office.filterType)&&(s.office.filterStatus==='all'||r.status===s.office.filterStatus)&&(s.office.filterSource==='all'||r.source===s.office.filterSource)&&(s.office.scope==='server'||r.station==='PC-DEMO-02')&&(s.office.period==='day'?r.date==='2026-09-22':r.date.startsWith('2026-09')));
+}
+views['NO-05']=()=>{
+ const records=filteredRecords();
+ return pageHead('NO-05','Số lượng công việc theo dữ liệu mẫu; không đánh giá nhân viên.')+officeScope()+note('Phạm vi xem và quyền riêng tư cần được duyệt. Các lựa chọn máy trạm / toàn văn phòng chỉ là mô phỏng.','warn')+
+ `<section class="panel space-top"><div class="filter-grid">${select('office-filter','Thời gian',s.office.period,[['day','Ngày 22/09/2026'],['month','Tháng 09/2026']],{field:'period'})}${select('office-filter','Loại việc',s.office.filterType,[['all','Tất cả'],...TYPES],{field:'filterType'})}${select('office-filter','Trạng thái',s.office.filterStatus,[['all','Tất cả'],'Dự kiến','Đã tiếp nhận','Đang xử lý','Đã hoàn thành','Đã hủy'],{field:'filterStatus'})}${select('office-filter','Nguồn',s.office.filterSource,[['all','Tất cả'],'Word','Scan','Thủ công'],{field:'filterSource'})}</div><div class="summary-strip space-top">${TYPES.map(type=>btn('summary-type',`<span class="od-stat"><strong class="stat-num">${records.filter(r=>r.type===type).length}</strong><span>${type}</span></span>`,{type})).join('')}</div><div class="space-top"><h2>Danh sách phía sau số liệu</h2>${records.length?officeRecordRows(records):empty('Không có công việc phù hợp','Đổi bộ lọc để xem các công việc mẫu.')}</div></section>`;
+};
+views['DB-01']=()=>pageHead('DB-01','Thông tin hạ tầng, không phải module nghiệp vụ.',routeBtn('NV2-01','Về hồ sơ'))+`<section class="panel stack">${badge('Chưa triển khai','warn')}<h2>Dữ liệu dùng chung cần quy tắc rõ ràng</h2><p>Chưa có kết nối cơ sở dữ liệu trong bản demo. Quyền ghi, định danh, chuyển dữ liệu cũ và phạm vi quan sát cần được duyệt trước khi triển khai.</p>${note('A1: đọc Word đang mở. A3: độ đầy đủ của sự kiện mạng. A4: tài khoản máy dùng riêng hay chung. Các điều kiện này vẫn đang mở.','warn')}<p>Không có trình chạy truy vấn, kết quả giả hoặc đường đi vòng quyền sở hữu dữ liệu.</p></section>`;
+function qrIllustration(){return `<div class="qr"><svg viewBox="0 0 160 160" role="img" aria-label="Hình QR minh họa DEMO, không dùng để đăng nhập"><rect width="160" height="160" fill="white"/><g fill="none" stroke="#17191d" stroke-width="6"><rect x="12" y="12" width="36" height="36"/><rect x="112" y="12" width="36" height="36"/><rect x="12" y="112" width="36" height="36"/></g><g fill="#17191d"><rect x="22" y="22" width="16" height="16"/><rect x="122" y="22" width="16" height="16"/><rect x="22" y="122" width="16" height="16"/><path d="M64 12h12v24H64zm20 12h12v24H84zM12 64h24v12H12zm0 20h36v12H12zM64 116h12v32H64zm24 12h16v20H88zm28-12h32v12h-32zm20 20h12v12h-12z"/></g><rect x="40" y="60" width="112" height="40" fill="#d9f76a"/><text x="96" y="86" text-anchor="middle" font-family="Segoe UI,sans-serif" font-weight="bold" font-size="24">DEMO</text></svg><span class="muted">Không quét được</span></div>`}
+function zaloQr(){
+ const z=s.zalo;
+ return note(SIM)+qrIllustration()+`<div class="od-field"><strong>${({waiting:'Chờ quét mã mẫu',expired:'Mã mẫu đã hết hạn',confirming:'Chờ xác nhận trên thiết bị mẫu',connected:'Đã kết nối mô phỏng',error:'Không kết nối được trong tình huống này'})[z.status]}</strong><span class="muted">QR đăng nhập Zalo khác QR đọc giấy tờ. Demo không đăng nhập tài khoản thật.</span></div><div class="actions">${z.status==='waiting'?btn('qr-scan','Giả lập đã quét',{},'primary'):z.status==='confirming'?btn('qr-confirm','Giả lập xác nhận',{},'primary'):z.status==='connected'?btn('zalo-sources','Chọn nguồn '+icon('arrow'),{},'primary'):btn('qr-retry','Tạo mã mẫu mới',{},'primary')}${select('qr-state','Tình huống mã',z.status,[['waiting','Chờ quét'],['expired','Hết hạn'],['confirming','Chờ xác nhận'],['connected','Đã kết nối mẫu'],['error','Lỗi mẫu']])}</div>`;
+}
+function zaloSources(){
+ const z=s.zalo,names=['NHÓM MẪU HỒ SƠ 01','NGUỒN DEMO B'];
+ return note(SIM)+`<div class="two"><section class="panel stack"><h3>Chọn nguồn được phép</h3>${names.map((n,i)=>check('zalo-source',n,z.sources.includes(String(i)),{id:i})).join('')}${badge(z.policy?'Đã áp dụng lựa chọn':'Chờ áp dụng lựa chọn',z.policy?'good':'warn')}${btn('zalo-policy','Áp dụng nguồn',{},'',!z.sources.length)}<p class="muted">Không nghe mọi cuộc trò chuyện. Không nhận dữ liệu ngoài lô mẫu.</p></section><section class="panel"><h3>Tin nhắn & tệp</h3>${!z.sources.length?empty('Chưa chọn nguồn','Tích chọn nguồn bên trái.'):!z.policy?note('Áp dụng lựa chọn nguồn để hiện dữ liệu mẫu.','warn'):[1,2,3].filter(i=>z.sources.includes(i===3?'1':'0')).map(i=>`<article class="stage-card">${check('zalo-message',`MSG-DEMO-0${i} · ${i===1?'Ảnh người mẫu':i===2?'Tài liệu tài sản':'Ghi chú DEMO'}`,z.messages.includes(String(i)),{id:i})}${z.transferred.includes(String(i))?badge('Đã chuyển vào Input','warn'):''}${btn('zalo-preview','Xem nội dung',{id:i},'quiet')}</article>`).join('')||empty('Nguồn chưa có dữ liệu','Chọn nguồn khác trong lô mẫu.')}</section></div><div class="actions">${btn('zalo-transfer','Chuyển vào Input',{},'primary',!z.policy||!z.messages.length)}${btn('zalo-stop','Dừng nghe nguồn',{},'quiet')}${btn('zalo-logout','Đăng xuất mẫu',{},'quiet')}</div>`;
+}
+function attachmentView(){
+ const row=activeUploadRow();if(!row)return empty('Chưa có mục upload','Tạo hàng đợi trước.');
+ return note(SIM)+`<div class="od-field"><strong>${row.no} · ${esc(U().portal)}</strong><span>Word nguồn: ${esc(row.source)} · v${row.version}</span></div>${select('attachment-type','Nguồn PDF',row.attachmentType,[['scan','PDF scan có sẵn'],['images','Ảnh scan → PDF mô phỏng'],['render','Word → PDF mô phỏng'],['unsupported','Định dạng chưa hỗ trợ']])}${note(row.attachmentType==='unsupported'?'Định dạng nguồn chưa hỗ trợ. Chọn PDF scan hoặc ảnh mẫu.':capLabel(),U().capability==='unknown'||row.attachmentType==='unsupported'?'warn':'')}<div class="two"><section class="stack">${row.attachmentType==='images'?row.pages.map((p,i)=>`<div class="panel"><div class="od-field"><strong>Trang ${i+1}</strong><span class="source-info">${p.id} · xoay ${p.rotation}°</span></div><div class="actions space-small">${btn('page-up','Lên',{index:i},'quiet',i===0)}${btn('page-down','Xuống',{index:i},'quiet',i===row.pages.length-1)}${btn('page-rotate','Xoay',{index:i},'quiet')}${btn('page-remove','Bỏ trang',{index:i},'quiet')}</div></div>`).join('')+btn('pages-reset','Nạp lại hai trang mẫu',{},'quiet'):`<div class="od-field"><strong>${row.attachmentType==='scan'?'DEMO_SCAN_01.pdf':row.attachmentType==='unsupported'?'DEMO_SOURCE.unsupported':'DEMO_RENDER_SOURCE.docx'}</strong><span class="muted">${row.attachmentType==='scan'?'PDF scan mẫu · 2 trang':'Engine kết xuất PDF chỉ được mô phỏng'}</span></div>`}${check('attachment-reviewed','Đúng hồ sơ, đủ trang và đúng thứ tự',row.reviewed)}<p class="muted">Giới hạn fixture: 10 trang, 5 MB. Không đọc hoặc tạo PDF thật.</p></section><section class="paper"><div class="paper-mark">XEM TRƯỚC MÔ PHỎNG</div><h3>${row.attachmentType==='render'?'PDF từ Word DEMO':'Bản scan DEMO'}</h3><p>Hồ sơ ${row.no}<br>${row.attachmentType==='images'?row.pages.map((p,i)=>`${i+1}. ${esc(p.id)} · ${p.rotation}°`).join('<br>'):'Trang 1 / 2 · nội dung hư cấu'}</p><div class="paper-lines" aria-hidden="true"><i></i><i></i><i></i><i></i></div><p class="muted">Không phải bản scan có chữ ký hoặc dấu thật.</p></section></div><div class="actions">${btn('attachment-prepare','Kiểm tra & dùng tệp',{},'primary')}${btn('close','Quay lại hàng đợi')}</div>`;
+}
+function jobView(){
+ return note(SIM)+`<div class="two"><section class="panel stack"><h3>Tác vụ trong phiên</h3>${s.jobs.length?s.jobs.map(j=>`<article class="stage-card"><div class="od-field"><strong>${esc(j.title)}</strong><span class="source-info">${j.id} · ${j.caseId}</span></div>${badge(jobLabels[j.status],j.status==='succeeded'?'good':j.status==='failed'?'bad':'warn')}<div class="actions">${btn('resume-job','Đi tới tác vụ',{id:j.id})}${['accepted','running','waiting_user'].includes(j.status)?btn('cancel-job','Hủy tác vụ',{id:j.id},'quiet'):''}</div></article>`).join(''):empty('Chưa có tác vụ','Các bước xử lý lô mẫu sẽ xuất hiện ở đây.')}</section><section class="panel stack"><h3>Trạng thái hệ thống mẫu</h3>${select('health','Tình huống dịch vụ',s.health,[['online','Online · mô phỏng'],['degraded','Degraded · một phần'],['unavailable','Unavailable · chưa khả dụng']])}${['QR / Zalo','OCR','Word','Upload / Portal'].map(n=>`<div class="list-row"><span>${n}</span>${badge(s.health==='online'?'Sẵn sàng mẫu':s.health==='degraded'?'Hạn chế mẫu':'Chưa khả dụng',s.health==='online'?'good':'warn')}</div>`).join('')}${btn('database','Thông tin hạ tầng '+icon('arrow'))}</section></div>`;
+}
+function openScreen(route,data={}){
+ dialogRoute=route;dialogData=data;
+ if(route==='UL-04'&&data.no)U().activeRow=data.no;
+ const content=route==='NV2-05'?zaloQr():route==='NV2-06'?zaloSources():route==='UL-04'?attachmentView():jobView();
+ showDialog(screens[route],content,route);
+}
+function refreshDialog(){const returnKey=focusKey(document.activeElement);if(dialogRoute==='simulation')simulation();else if(dialogRoute)openScreen(dialogRoute,dialogData);requestAnimationFrame(()=>restoreFocus(returnKey))}
+function simulation(){
+ dialogRoute='simulation';
+ const u=U();
+ showDialog('Tình huống mô phỏng',`<p>Chỉ thay dữ liệu mẫu để xem phản hồi giao diện. Không điều khiển dịch vụ thật.</p><div class="two"><section class="panel stack"><h3>Màn hình hiện tại</h3><p>${s.route} · ${screens[s.route]}</p>${select('view-state','Trạng thái màn hình',s.viewStates[s.route]||'normal',[['normal','Bình thường'],['loading','Đang tải'],['empty','Trống'],['error','Lỗi có thể thử lại'],['unavailable','Chưa khả dụng']])}${select('health','Dịch vụ mô phỏng',s.health,[['online','Online'],['degraded','Degraded'],['unavailable','Unavailable']])}</section><section class="panel stack"><h3>Phân tích & Upload</h3>${select('coverage','Độ phủ 2025',u.coverage?'verified':'unverified',[['unverified','Chưa xác minh'],['verified','Đã xác minh 1 → 4']])}${select('capability','Khả năng cổng',u.capability,[['scan','Bắt buộc PDF scan'],['render','Cho phép PDF từ Word'],['unknown','Chưa rõ khả năng']])}${check('pdf-engine','Engine Word → PDF mẫu sẵn sàng',u.engine)}${check('over-limit','Tệp mẫu vượt giới hạn',u.overLimit)}${u.sessionStarted?select('session-result','Kết quả mục cuối phiên',u.queue.filter(r=>r.inSession).at(-1)?.result||'not_saved',[['not_saved','Chưa lưu'],['unknown','Chưa rõ kết quả'],['failed','Lỗi']]):''}</section></div><div class="notice warn"><strong>Các giới hạn vẫn giữ nguyên</strong><span>A1/A3/A4, bảo mật, biểu phí và khả năng cổng chưa được xác minh. Không tạo file Word/PDF hoặc gửi dữ liệu thật.</span></div><div class="dialog-actions">${btn('reset','Reset demo',{},'danger')}${btn('close','Trở lại thao tác',{},'primary')}`);
+}
+
+let assignmentPerson='',assignmentRole='',newTitle='Hồ sơ mới DEMO',newMode='ab';
+function rerender(){save();render()}
+function stale(c){c.word.stale=c.word.outputs.length>0;c.word.prechecked=false}
+function markDiagram(c){c.diagramSaved=false;stale(c)}
+function dialogError(message){
+ let el=$('#dialog-error');if(!el){el=document.createElement('div');el.id='dialog-error';el.className='notice bad';el.setAttribute('role','alert');$('#dialog .dialog-body')?.prepend(el)}el.textContent=message;
+}
+function readyService(){if(s.health==='unavailable'){toast('Dịch vụ mô phỏng chưa khả dụng. Đổi tình huống hệ thống để tiếp tục.');return false}return true}
+function requestRoute(route,data={}){
+ if(moduleOf(route)!==moduleOf(s.route)&&dirty())confirmBox('Giữ dữ liệu khi chuyển phần?','Bản nháp được lưu để tiếp tục; dữ liệu chưa xác nhận vẫn chưa vào Chưa xếp.',()=>navigate(route,data),'Lưu nháp và chuyển');
+ else navigate(route,data);
+}
+function assignment(pid,role){
+ const c=C(),p=c.people.find(x=>x.id===pid);
+ if(!p||!p.committed||p.dirty){toast('Xác nhận dữ liệu người trước khi gán vào sơ đồ.');return false}
+ if(role==='root'&&Object.entries(c.assign).some(([id,r])=>r==='root'&&id!==pid)){toast('Đã có người để lại di sản. Bỏ gán hiện tại trước khi thay.');return false}
+ if(role)c.assign[pid]=role;else delete c.assign[pid];
+ markDiagram(c);save();return true;
+}
+function showSource(item){
+ dialogRoute=null;
+ showDialog('Dữ kiện nguồn',`<div class="od-field"><strong>${esc(item.source)}</strong><span>${esc(item.id)} · nguồn chỉ là fixture</span></div><div class="paper"><div class="paper-mark">DEMO · KHÔNG PHẢI GIẤY TỜ THẬT</div><h3>${esc(item.snapshot?.name||item.name)}</h3><p>${esc(item.snapshot?.detail||item.detail)}</p><div class="paper-lines" aria-hidden="true"><i></i><i></i><i></i></div></div>${note('Dữ liệu nhập tay có nguồn Thủ công; demo không giả đã chạy OCR cho dữ liệu này.')}`);
+}
+function beginWord(){
+ const c=C(),w=c.word;
+ if(!readyService())return;
+ if(baseline().length||w.template==='DEMO-TPL-unavailable'||!Object.values(w.docs).some(Boolean)){toast('Sửa các điều kiện chưa đạt trước khi xuất.');return}
+ const run=()=>{
+ w.outputs=Object.keys(w.docs).filter(k=>w.docs[k]).map((id,i)=>({id,status:i===0?'running':'queued',revision:c.revision,diagramVersion:c.diagramVersion,template:w.template}));
+ w.running=true;w.stale=false;job('WORD-'+c.id,'Tạo bộ văn bản DEMO','NV2-07','running');rerender();
+ };
+ if(w.outputs.length)confirmBox('Tạo bộ kết quả mô phỏng mới?','Kết quả trong demo sẽ được thay bằng phiên bản hiện tại. Không có file thật trên máy bị ghi đè.',run,'Xuất lại mô phỏng');else run();
+}
+function finishWord(){
+ const c=C(),w=c.word;let priorError=false;
+ w.outputs.forEach(o=>{
+ if(o.id==='tax'&&!w.taxField.trim()){o.status='failed';priorError=true}
+ else if(o.id==='request'&&priorError)o.status='skipped';
+ else o.status='succeeded';
+ });
+ w.running=false;job('WORD-'+c.id,'Tạo bộ văn bản DEMO','NV2-07',w.outputs.every(o=>o.status==='succeeded')?'succeeded':'partial');rerender();toast('Đã cập nhật kết quả từng văn bản mô phỏng.');
+}
+function proposalConfirm(){
+ const p=s.office.proposal;
+ if(p.evidence==='missing'){toast('Chưa đủ bằng chứng. Giữ nháp để xem lại.');return}
+ if(p.state!=='candidate'){toast('Đề xuất này đã có quyết định.');return}
+ const existing=s.office.records.find(r=>r.caseId===p.caseId&&r.type===p.type);
+ if(existing&&!p.linkExisting&&!p.reason.trim()){toast('Ghi lý do đây là một yêu cầu khác trước khi tạo thêm công việc.');document.querySelector('[data-input=proposal-reason]')?.focus();return}
+ confirmBox('Xác nhận công việc mô phỏng?',existing&&p.linkExisting?'Bổ sung dữ kiện vào công việc đã có; không tạo công việc hoặc khoản phí trùng.':'Ghi nhận một công việc mới theo lựa chọn. Trạng thái ban đầu là Đã tiếp nhận, phí Chưa xác định.',()=>{
+ let record=existing&&p.linkExisting?existing:null;
+ if(record){for(const ev of ['EVD-DEMO-WORD-01','EVD-DEMO-PRINT-01'])if(!record.evidence.includes(ev))record.evidence.push(ev);record.history.push('Xác nhận bổ sung dữ kiện DEMO')}
+ else{record={id:'REC-DEMO-'+String(s.nextId++).padStart(3,'0'),caseId:p.caseId,type:p.type,status:'Đã tiếp nhận',fee:'unknown',amount:'',source:'Word',station:'PC-DEMO-02',evidence:['EVD-DEMO-WORD-01','EVD-DEMO-PRINT-01'],files:[],history:['Người xem demo xác nhận công việc'],date:'2026-09-22'};s.office.records.push(record)}
+ p.state='confirmed';p.decision=`Đã xác nhận vào ${record.id}. Không tự hoàn tất hoặc tính phí.`;s.office.recordId=record.id;rerender();toast('Đã ghi nhận quyết định trong dữ liệu mẫu.');
+ },'Xác nhận mô phỏng');
+}
+const actions={
+ go:(el)=>requestRoute(el.dataset.route),
+ module:el=>changeModule(el.dataset.module),
+ close:()=>closeDialog(),
+ confirm:()=>{const fn=pendingConfirm;closeDialog(false);fn?.()},
+ jobs:()=>openScreen('SH-02'),
+ simulation,
+ database:()=>navigate('DB-01'),
+ 'open-screen':el=>openScreen(el.dataset.route),
+ 'restore-state':()=>{s.viewStates[s.route]='normal';rerender()},
+ 'case-search':()=>render(),
+ 'focus-item':el=>document.querySelector('[data-input="stage-name"][data-id="'+el.dataset.id+'"]')?.focus(),
+ 'new-case':()=>{
+ newTitle='Hồ sơ mới DEMO';newMode='ab';dialogRoute=null;
+ showDialog('Tạo hồ sơ mẫu',`${input('new-title','Tên hồ sơ *',newTitle)}${select('new-mode','Kiểu sơ đồ',newMode,[['ab','Hai bên A / B'],['family','Phả hệ thừa kế']])}${note('Hồ sơ mới bắt đầu trống. Dùng dữ liệu hư cấu, không nhập thông tin cá nhân thật.')}<div class="dialog-actions">${btn('close','Hủy')}${btn('create-case','Tạo hồ sơ',{},'primary')}</div>`);
+ },
+ 'create-case':()=>{
+ if(!newTitle.trim()){dialogError('Cần nhập tên hồ sơ trước khi tạo.');return}
+ const id='CASE-DEMO-'+String(s.nextId++).padStart(3,'0');s.cases.unshift(makeCase(id,newTitle.trim(),newMode,true));s.caseId=id;navigate('NV2-04');toast('Đã tạo hồ sơ mẫu trống.');
+ },
+ 'open-case':el=>{
+ const c=s.cases.find(x=>x.id===el.dataset.case);if(!c)return;
+ const go=()=>{s.caseId=c.id;navigate(c.mode==='ab'?'NV2-02':'NV2-03')};
+ if(c.id!==s.caseId&&dirty())confirmBox('Chuyển hồ sơ đang mở?','Dữ liệu nháp của hồ sơ hiện tại được giữ riêng, không chuyển sang hồ sơ mới.',go,'Giữ nháp và chuyển');else go();
+ },
+ assign:el=>{
+ assignmentPerson=el.dataset.person;assignmentRole=C().assign[assignmentPerson]||'';
+ const roles=C().mode==='ab'?['A','B']:['root','spouse','parents','children'];dialogRoute=null;
+ showDialog('Gán người vào sơ đồ',`<p>${esc(C().people.find(p=>p.id===assignmentPerson)?.name)}</p>${select('assignment-role','Vị trí',assignmentRole,[['','Chưa xếp'],...roles.map(r=>[r,roleLabel(r)])])}<div class="dialog-actions">${btn('close','Hủy')}${btn('apply-assignment','Áp dụng',{},'primary')}</div>`);
+ },
+ 'apply-assignment':()=>{if(assignment(assignmentPerson,assignmentRole)){closeDialog();rerender();toast('Đã thay đổi cách gán. Lưu sơ đồ để tiếp tục.')}else dialogError('Không thể gán vào vị trí này. Kiểm tra dữ liệu hoặc vị trí đã có người.')},
+ unassign:el=>{assignment(el.dataset.person,'');rerender();toast('Đã trả người về Chưa xếp, dữ liệu gốc vẫn giữ.')},
+ inspect:el=>showSource(C().people.find(p=>p.id===el.dataset.person)),
+ 'save-diagram':()=>{
+ const c=C(),roles=Object.values(c.assign);
+ if(!c.selectedAssets.length){toast('Chọn ít nhất một tài sản đã xác nhận.');return}
+ if(c.mode==='ab'&&(!roles.includes('A')||!roles.includes('B'))){toast('Gán người vào cả bên A và B trước khi lưu.');return}
+ if(c.mode==='family'&&(!roles.includes('root')||!roles.some(r=>r!=='root'))){toast('Gán người để lại di sản và ít nhất một quan hệ.');return}
+ if(Object.keys(c.assign).some(id=>{const p=c.people.find(p=>p.id===id);return !p||p.dirty||!p.committed})){toast('Người đã gán có dữ liệu chưa xác nhận. Quay lại phần Dữ liệu.');return}
+ c.diagramSaved=true;c.diagramStale=false;c.diagramVersion++;stale(c);rerender();toast('Đã lưu sơ đồ theo dữ liệu hiện tại.');
+ },
+ 'add-item':el=>{
+ const kind=el.dataset.kind,id=(kind==='people'?'DEMO-PERSON-':'DEMO-ASSET-')+'NEW-'+s.nextId++;
+ const item=person(id,kind==='people'?'NHÂN VẬT HƯ CẤU MỚI':'TÀI SẢN HƯ CẤU MỚI',false);item.source='Thủ công';C()[kind].push(item);rerender();
+ },
+ 'revert-item':el=>{
+ const c=C(),kind=el.dataset.kind,p=c[kind].find(p=>p.id===el.dataset.id);
+ confirmBox(p.committed?'Bỏ chỉnh sửa chưa xác nhận?':'Bỏ mục nháp này?','Thao tác chỉ ảnh hưởng dữ liệu mẫu đang sửa. Nguồn gốc vẫn giữ nguyên.',()=>{
+ if(p.committed){p.name=p.snapshot.name;p.detail=p.snapshot.detail;p.dirty=false}else c[kind]=c[kind].filter(x=>x.id!==p.id);
+ rerender();
+ },'Bỏ thay đổi');
+ },
+ 'source-item':el=>showSource(C()[el.dataset.kind].find(p=>p.id===el.dataset.id)),
+ 'commit-stage':el=>{
+ const c=C(),list=c[el.dataset.kind],invalid=list.filter(p=>!p.name.trim());
+ if(invalid.length){render();toast('Có mục thiếu tên. Hãy bổ sung trước khi xác nhận.');requestAnimationFrame(()=>document.querySelector(`[data-input="stage-name"][data-id="${invalid[0].id}"]`)?.focus());return}
+ for(const p of list){p.snapshot={name:p.name.trim(),detail:p.detail};p.name=p.name.trim();p.committed=true;p.dirty=false}
+ c.revision++;c.diagramStale=true;stale(c);rerender();toast('Đã cập nhật vào Chưa xếp. Rà soát và lưu lại sơ đồ.');
+ },
+ 'intake-start':()=>{
+ if(!readyService())return;const c=C();if(!c.intakeSelected.length){toast('Chọn ít nhất một file mẫu.');return}
+ c.intake='routing';c.intakeTransferred=false;job('INTAKE-'+c.id,'Xử lý lô tài liệu mẫu','NV2-04','running');rerender();
+ },
+ 'intake-next':()=>{
+ const c=C(),next={routing:'processing',processing:'classification',classification:'done'};c.intake=next[c.intake]||'done';
+ job('INTAKE-'+c.id,'Xử lý lô tài liệu mẫu','NV2-04',c.intake==='done'?(!c.cloud&&c.intakeSelected.some(k=>k!=='note')?'partial':'waiting_user'):'running');rerender();
+ },
+ 'intake-cancel':()=>{C().intake='idle';job('INTAKE-'+C().id,'Xử lý lô tài liệu mẫu','NV2-04','canceled');rerender()},
+ 'intake-transfer':()=>{
+ const c=C();if(c.intakeTransferred)return;
+ let added=0;
+ const add=(kind,id,name,source)=>{if(!c[kind].some(p=>p.id===id)){const p=person(id,name,false);p.source=source+(c.zaloProvenance?.length?' · '+c.zaloProvenance.join(', '):'');c[kind].push(p);added++}};
+ if(c.cloud&&c.intakeSelected.includes('id'))add('people','DEMO-PERSON-INPUT','NHÂN VẬT HƯ CẤU TỪ ẢNH','DEMO_ID_A_FRONT.png');
+ if(c.cloud&&c.intakeSelected.includes('asset')){add('assets','DEMO-ASSET-INPUT-1','TÀI SẢN HƯ CẤU TỪ GCN 01','DEMO_GCN_NONVALID.pdf');add('assets','DEMO-ASSET-INPUT-2','TÀI SẢN HƯ CẤU TỪ GCN 02','DEMO_GCN_NONVALID.pdf')}
+ if(c.intakeSelected.includes('note')&&c.classified!=='unknown')add(c.classified,'DEMO-NOTE-INPUT',c.classified==='people'?'NHÂN VẬT HƯ CẤU TỪ GHI CHÚ':'TÀI SẢN HƯ CẤU TỪ GHI CHÚ','DEMO_NOTE.txt');
+ if(!added){toast('Chưa có kết quả mới đủ điều kiện: kiểm tra cho phép OCR và nhóm dữ liệu cần xác định.');return}
+ c.intakeTransferred=true;job('INTAKE-'+c.id,'Xử lý lô tài liệu mẫu','NV2-04',c.classified==='unknown'||!c.cloud?'partial':'succeeded');rerender();toast('Đã thêm '+added+' mục nháp; chưa xác nhận dữ liệu.');
+ },
+ zalo:()=>{if(readyService())openScreen(s.zalo.status==='connected'?'NV2-06':'NV2-05')},
+ 'qr-scan':()=>{s.zalo.status='confirming';save();refreshDialog()},
+ 'qr-confirm':()=>{s.zalo.status='connected';save();refreshDialog()},
+ 'qr-retry':()=>{s.zalo.status='waiting';save();refreshDialog()},
+ 'zalo-sources':()=>openScreen('NV2-06'),
+ 'zalo-policy':()=>{s.zalo.policy=true;save();refreshDialog()},
+ 'zalo-preview':el=>{
+ const id=el.dataset.id;
+ showDialog('Nội dung MSG-DEMO-0'+id,`<div class="paper"><div class="paper-mark">NỘI DUNG DEMO</div><h3>${id==='1'?'Ảnh giấy tờ người hư cấu':id==='2'?'Giấy tờ tài sản hư cấu':'Ghi chú hư cấu'}</h3><p>Không có ảnh cá nhân hoặc tài liệu thật. Mục này được dùng để thử việc chọn và chuyển vào Input.</p></div>${btn('zalo-sources','Trở về nguồn')}`);
+ },
+ 'zalo-transfer':()=>{
+ const z=s.zalo;if(!z.policy||!z.messages.length)return;
+ if(z.messages.some(id=>z.transferred.includes(id))){dialogError('Có mục đã chuyển. Bỏ chọn mục trùng trước khi tiếp tục.');return}
+ z.transferred.push(...z.messages);
+ const c=C();c.intakeSelected=[...new Set(z.messages.map(id=>id==='1'?'id':id==='2'?'asset':'note'))];c.intake='idle';c.intakeTransferred=false;c.zaloProvenance=z.messages.map(id=>'MSG-DEMO-0'+id);
+ z.messages=[];navigate('NV2-04');toast('Đã chuyển lô mẫu vào Input. Chưa xử lý hoặc xác nhận dữ liệu.');
+ },
+ 'zalo-stop':()=>{s.zalo.sources=[];s.zalo.messages=[];s.zalo.policy=false;save();refreshDialog()},
+ 'zalo-logout':()=>{s.zalo.status='waiting';s.zalo.policy=false;s.zalo.sources=[];s.zalo.messages=[];save();openScreen('NV2-05')},
+ 'word-precheck':()=>{C().word.prechecked=true;rerender();toast(baseline().length?'Có điều kiện cần sửa trước khi xuất.':'Đã kiểm tra dữ liệu nền; xem điều kiện từng văn bản.')},
+ 'word-generate':beginWord,
+ 'word-finish':finishWord,
+ 'word-retry':el=>{
+ const c=C(),w=c.word,o=w.outputs.find(o=>o.id===el.dataset.id);
+ if(!readyService()||!o)return;
+ if(w.stale||baseline().length){toast('Dữ liệu đã đổi hoặc chưa được lưu. Kiểm tra và xuất lại bộ văn bản.');return}
+ if(o.id==='tax'&&!w.taxField.trim()){toast('Bổ sung mã căn cứ DEMO riêng cho tờ khai thuế.');document.querySelector('[data-input=tax-field]')?.focus();return}
+ o.status='succeeded';job('WORD-'+c.id,'Tạo bộ văn bản DEMO','NV2-07',w.outputs.every(o=>o.status==='succeeded')?'succeeded':'partial');rerender();toast('Đã chạy lại đúng file; các kết quả khác được giữ.');
+ },
+ 'word-view':el=>{
+ const c=C(),o=c.word.outputs.find(o=>o.id===el.dataset.id);dialogRoute=null;
+ showDialog(DOC_NAMES[o.id],`${note(SIM)}${c.word.stale?note('Kết quả này cũ hơn nguồn hiện tại.','warn'):''}<div class="paper"><div class="paper-mark">KẾT QUẢ MÔ PHỎNG · KHÔNG PHẢI FILE WORD</div><h3>${DOC_NAMES[o.id]}</h3><p>${esc(c.title)}</p><p>Dữ liệu v${o.revision} · sơ đồ v${o.diagramVersion}<br>Mẫu ${esc(o.template)}</p><p>Bản demo thể hiện trạng thái tạo file, không soạn văn bản pháp lý dùng thực tế.</p></div>`);
+ },
+ analyze:()=>{
+ if(!contextReady()){toast('Chọn đủ cổng, sổ và năm.');return}if(!readyService())return;
+ U().analysisState='running';U().analyzed=false;job('AUDIT-DEMO','Phân tích sổ mẫu','UL-02','running');navigate('UL-02');
+ },
+ 'analysis-finish':()=>{U().analysisState='done';U().analyzed=true;job('AUDIT-DEMO','Phân tích sổ mẫu','UL-02',U().coverage&&U().year==='2025'&&U().book==='SỔ CÔNG CHỨNG DEMO-A'?'succeeded':'waiting_user');rerender()},
+ 'analysis-cancel':()=>{U().analysisState='idle';U().analyzed=false;job('AUDIT-DEMO','Phân tích sổ mẫu','UL-02','canceled');rerender()},
+ 'create-queue':()=>{
+ if(!U().analyzed||!U().coverage||U().year!=='2025'||U().book!=='SỔ CÔNG CHỨNG DEMO-A'){toast('Chỉ tạo số thiếu khi phạm vi đã được xác minh.');return}
+ if(!U().queue.length)U().queue=newQueue();navigate('UL-03');
+ },
+ 'source-change':el=>{
+ const row=U().queue.find(r=>r.no===el.dataset.no);row.version++;row.reviewed=false;rerender();toast('Nguồn đã đổi phiên bản; cần kiểm tra lại attachment.');
+ },
+ attachment:el=>openScreen('UL-04',{no:el.dataset.no}),
+ 'page-up':el=>{const r=activeUploadRow(),i=Number(el.dataset.index);if(i>0)[r.pages[i-1],r.pages[i]]=[r.pages[i],r.pages[i-1]];r.reviewed=false;save();refreshDialog()},
+ 'page-down':el=>{const r=activeUploadRow(),i=Number(el.dataset.index);if(i<r.pages.length-1)[r.pages[i+1],r.pages[i]]=[r.pages[i],r.pages[i+1]];r.reviewed=false;save();refreshDialog()},
+ 'page-rotate':el=>{const r=activeUploadRow();r.pages[Number(el.dataset.index)].rotation=(r.pages[Number(el.dataset.index)].rotation+90)%360;r.reviewed=false;save();refreshDialog()},
+ 'page-remove':el=>{const r=activeUploadRow();r.pages.splice(Number(el.dataset.index),1);r.reviewed=false;save();refreshDialog()},
+ 'pages-reset':()=>{activeUploadRow().pages=[{id:'DEMO_PAGE_01.png',rotation:0},{id:'DEMO_PAGE_02.png',rotation:0}];activeUploadRow().reviewed=false;save();refreshDialog()},
+ 'attachment-prepare':()=>{
+ const row=activeUploadRow(),u=U();
+ let error='';
+ if(row.attachmentType==='unsupported')error='Định dạng nguồn chưa hỗ trợ. Chọn PDF scan hoặc bộ ảnh mẫu.';
+ else if(!row.reviewed)error='Xác nhận đúng hồ sơ, đủ trang và thứ tự trước khi dùng tệp.';
+ else if(u.capability==='unknown')error='Chưa có thông tin khả năng cổng. Không thể đánh dấu sẵn sàng.';
+ else if(row.attachmentType==='render'&&u.capability==='scan')error='Cổng yêu cầu bản scan; PDF tạo từ Word không thay thế được.';
+ else if(row.attachmentType==='render'&&!u.engine)error='Engine Word → PDF chưa khả dụng trong tình huống này.';
+ else if(row.attachmentType==='images'&&row.pages.length!==2)error='Fixture yêu cầu đủ hai trang. Nạp lại trang bị thiếu và xác nhận thứ tự.';
+ else if(u.overLimit)error='Tệp mẫu vượt giới hạn 5 MB hoặc 10 trang. Đổi tình huống trước khi gửi.';
+ else if(row.source.includes('2026'))error='File nguồn sai năm. Chọn nguồn 2025 trong hàng đợi.';
+ else if(row.source==='duplicate')error='Có hai file cùng nhận một số. Chọn một nguồn trước.';
+ if(error){dialogError(error);return}
+ row.attachment=row.attachmentType==='scan'?'DEMO_SCAN_01.pdf':row.attachmentType==='images'?'DEMO_PAGES_COMBINED.pdf':'DEMO_WORD_RENDER.pdf';
+ row.preparedVersion=row.version;closeDialog();rerender();toast('Attachment mô phỏng đã sẵn sàng; chưa gửi hoặc lưu.');
+ },
+ 'start-portal':()=>{
+ if(!readyService())return;
+ const ready=U().queue.filter(r=>!rowErrors(r).length);if(!ready.length){toast('Chưa có mục đủ điều kiện.');return}
+ const begin=()=>{
+ const u=U();u.queue.forEach(r=>{r.inSession=!rowErrors(r).length;if(r.inSession&&r.result!=='saved')r.result='not_saved'});u.portalState='login';u.sessionStarted=true;job('PORTAL-DEMO','Điền thử cổng mẫu','UL-05','waiting_user');navigate('UL-05');
+ };
+ confirmBox('Mở phiên điền thử?','Chỉ điền các mục đủ điều kiện. Mỗi mục vẫn chờ bạn bấm Lưu riêng trong cổng mô phỏng.',begin,'Bắt đầu điền thử');
+ },
+ 'portal-login':()=>{U().portalState='filling';job('PORTAL-DEMO','Điền thử cổng mẫu','UL-05','running');rerender()},
+ 'portal-filled':()=>{U().portalState='waiting';job('PORTAL-DEMO','Điền thử cổng mẫu','UL-05','waiting_user');rerender()},
+ 'portal-save':el=>{
+ const row=U().queue.find(r=>r.no===el.dataset.no);if(rowErrors(row).length){toast('Mục này không còn đủ điều kiện. Kiểm tra lại nguồn.');return}
+ confirmBox('Lưu mục '+row.no+' trong cổng mẫu?','Đây là xác nhận của bạn cho riêng mục này. Không có dữ liệu nào gửi lên cổng thật.',()=>{
+ row.result='saved';job('PORTAL-DEMO','Điền thử cổng mẫu','UL-06',U().queue.filter(r=>r.inSession).every(r=>r.result==='saved')?'succeeded':'partial');rerender();toast('Đã lưu mục '+row.no+' trong mô phỏng.');
+ },'Lưu mục này');
+ },
+ 'portal-result':el=>{const row=U().queue.find(r=>r.no===el.dataset.no);if(row.result!=='saved')row.result=el.dataset.result;rerender()},
+ 'portal-cancel':()=>{job('PORTAL-DEMO','Điền thử cổng mẫu','UL-06',U().queue.some(r=>r.result==='saved')?'partial':'canceled');navigate('UL-06')},
+ 'portal-reconnect':()=>{U().portalState='waiting';job('PORTAL-DEMO','Điền thử cổng mẫu','UL-05','waiting_user');rerender();toast('Đã nối lại trạng thái mẫu, không kích hoạt Lưu.')},
+ 'upload-retry':el=>{
+ const row=U().queue.find(r=>r.no===el.dataset.no);
+ if(rowErrors(row).length){navigate('UL-03');toast('Nguồn hoặc attachment cần được kiểm tra lại.');return}
+ row.result='not_saved';U().portalState='waiting';job('PORTAL-DEMO','Kiểm tra lại mục upload','UL-05','waiting_user');navigate('UL-05');toast('Mục vẫn chờ bạn kiểm tra; không tự lưu lại.');
+ },
+ 'upload-detail':el=>{const row=U().queue.find(r=>r.no===el.dataset.no);dialogRoute=null;showDialog('Kết quả '+row.no,`${note(SIM)}<p>Trạng thái: ${RESULT_LABELS[row.result]}</p><p>Nguồn: ${esc(row.source)} · v${row.version}</p><p>Attachment: ${esc(row.attachment)}</p><p>Kết quả được ghi sau thao tác lưu riêng của người xem demo.</p>`)},
+ 'office-search':()=>{s.office.searched=true;rerender()},
+ 'sample-search':()=>{s.office.query='NHÂN VẬT HƯ CẤU A';s.office.searched=true;rerender()},
+ 'office-case':el=>{s.office.caseId=el.dataset.case;navigate('NO-03')},
+ record:el=>{s.office.recordId=el.dataset.record;navigate('NO-04')},
+ 'proposal-confirm':proposalConfirm,
+ 'proposal-draft':()=>{const p=s.office.proposal;p.state='draft';p.decision='Giữ nháp, chưa tạo công việc.';rerender()},
+ 'proposal-cancel':()=>{
+ const p=s.office.proposal;if(!p.reason.trim()){toast('Nhập lý do hủy để giữ lịch sử rõ ràng.');document.querySelector('[data-input=proposal-reason]')?.focus();return}
+ confirmBox('Hủy đề xuất này?','Dữ kiện nguồn và lý do hủy vẫn được giữ. Không xóa công việc hoặc điều chỉnh khoản phí đã xác nhận.',()=>{p.state='canceled';p.decision='Đã hủy đề xuất: '+p.reason;rerender()},'Hủy đề xuất');
+ },
+ 'proposal-reset':()=>{Object.assign(s.office.proposal,{state:'candidate',decision:'',reason:'',linkExisting:true});rerender()},
+ 'record-file':()=>{dialogRoute=null;showDialog('Văn bản mẫu của công việc',`${note(SIM)}<div class="paper"><div class="paper-mark">FILE DEMO · KHÔNG PHẢI VĂN BẢN PHÁP LÝ</div><h3>${R().type}</h3><p>${R().id}</p><p>Phiên bản mẫu v1. Xuất lại hoặc in lại không tạo thêm công việc.</p></div>`)},
+ 'fee-save':()=>{
+ const r=R(),d=r.feeDraft||{state:r.fee,amount:r.amount};
+ if(['defined','confirmed'].includes(d.state)&&(!String(d.amount).trim()||!Number.isFinite(Number(d.amount))||Number(d.amount)<0)){toast('Nhập số tiền hư cấu từ 0 trở lên; không để trống khoản đã xác định.');document.querySelector('[data-input=fee-amount]')?.focus();return}
+ const commit=()=>{r.fee=d.state;r.amount=['defined','confirmed'].includes(d.state)?d.amount:'';r.history.push('Cập nhật phí mô phỏng: '+FEE_LABELS[r.fee]);delete r.feeDraft;rerender();toast('Đã cập nhật khoản phí mẫu. Không ghi nhận thanh toán.')};
+ if(d.state==='confirmed')confirmBox('Xác nhận khoản phí mẫu?','Đây chỉ là số tiền để thử giao diện, không phải biểu phí hoặc khoản thu thật.',commit,'Xác nhận phí mẫu');else commit();
+ },
+ 'summary-type':el=>{s.office.filterType=el.dataset.type;rerender()},
+ 'resume-job':el=>{const j=s.jobs.find(j=>j.id===el.dataset.id);if(!j)return;if(s.cases.some(c=>c.id===j.caseId))s.caseId=j.caseId;navigate(j.route)},
+ 'cancel-job':el=>{
+ const j=s.jobs.find(j=>j.id===el.dataset.id);
+ confirmBox('Hủy tác vụ mô phỏng?','Giữ dữ liệu đã có và kết quả thành công. Không kích hoạt lưu hoặc gửi dữ liệu.',()=>{
+ j.status='canceled';const c=s.cases.find(c=>c.id===j.caseId);
+ if(j.id.startsWith('INTAKE')&&c)c.intake='idle';
+ if(j.id.startsWith('WORD')&&c){c.word.running=false;c.word.outputs.forEach(o=>{if(['queued','running'].includes(o.status))o.status='skipped'})}
+ if(j.id==='AUDIT-DEMO')U().analysisState='idle';
+ if(j.id==='PORTAL-DEMO')j.route='UL-06';
+ rerender();toast('Đã hủy tác vụ mẫu.');
+ },'Hủy tác vụ');
+ },
+ reset:()=>confirmBox('Reset toàn bộ dữ liệu demo?','Các chỉnh sửa, bản nháp và kết quả mô phỏng trong trình duyệt sẽ được thay bằng bộ mẫu ban đầu. Không ảnh hưởng file hoặc dịch vụ bên ngoài.',()=>{s=initial();save();render();toast('Đã khôi phục bộ dữ liệu mẫu.');window.scrollTo(0,0)},'Reset demo')
+};
+document.addEventListener('click',event=>{
+ const el=event.target.closest('button[data-action]');if(!el||el.disabled)return;
+ const handler=actions[el.dataset.action];if(handler)handler(el);
+});
+function changeContext(field,value,el){
+ const previous=U()[field];el.value=previous;
+ const apply=()=>{const u=U();u[field]=value;u.coverage=false;u.analyzed=false;u.analysisState='idle';u.queue=[];u.sessionStarted=false;u.portalState='login';s.jobs.filter(j=>['AUDIT-DEMO','PORTAL-DEMO'].includes(j.id)&&['running','waiting_user','partial'].includes(j.status)).forEach(j=>j.status='canceled');rerender();toast('Đã đổi ngữ cảnh; kết quả và lựa chọn cũ không được tái sử dụng.')};
+ if(previous!==value&&(U().analyzed||U().queue.length))confirmBox('Đổi ngữ cảnh đối soát?','Kết quả phân tích, lựa chọn file và phiên mẫu thuộc ngữ cảnh cũ sẽ được đặt lại.',apply,'Đổi và đặt lại');else if(previous!==value)apply();
+}
+document.addEventListener('change',event=>{
+ const el=event.target.closest('[data-change]');if(!el)return;
+ const a=el.dataset.change,v=el.value,on=el.checked,c=C(),u=U();
+ let repaint=true,repaintDialog=false;
+ switch(a){
+ case 'new-mode':newMode=v;repaint=false;break;
+ case 'assignment-role':assignmentRole=v;repaint=false;break;
+ case 'diagram-mode':{
+ const previous=c.mode;el.value=previous;
+ if(v!==previous)confirmBox('Đổi kiểu sơ đồ?','Dữ liệu Người và Tài sản được giữ. Các gán và quan hệ không tương thích sẽ được bỏ để bạn sắp xếp lại; văn bản cũ được đánh dấu cần cập nhật.',()=>{c.mode=v;c.assign={};markDiagram(c);c.diagramStale=true;navigate(v==='ab'?'NV2-02':'NV2-03')},'Đổi kiểu sơ đồ');
+ repaint=false;break;
+ }
+ case 'contract':{
+ const previous=c.contract;el.value=previous;
+ if(v!==previous)confirmBox('Rà soát khi đổi loại hợp đồng','Bố cục A/B và dữ liệu được giữ; nhãn vai trò thay đổi. Bạn cần kiểm tra cách gán và lưu lại sơ đồ trước khi xuất.',()=>{c.contract=v;markDiagram(c);c.diagramStale=true;rerender()},'Đổi và rà soát');
+ repaint=false;break;
+ }
+ case 'asset-select':c.selectedAssets=on?[...new Set([...c.selectedAssets,el.dataset.asset])]:c.selectedAssets.filter(id=>id!==el.dataset.asset);markDiagram(c);break;
+ case 'intake-select':c.intakeSelected=on?[...new Set([...c.intakeSelected,el.dataset.id])]:c.intakeSelected.filter(id=>id!==el.dataset.id);c.intakeTransferred=false;break;
+ case 'cloud':c.cloud=on;break;
+ case 'classify':c.classified=v;c.intakeTransferred=false;break;
+ case 'qr-state':s.zalo.status=v;repaintDialog=true;break;
+ case 'zalo-source':s.zalo.sources=on?[...new Set([...s.zalo.sources,el.dataset.id])]:s.zalo.sources.filter(id=>id!==el.dataset.id);s.zalo.policy=false;s.zalo.messages=[];repaintDialog=true;break;
+ case 'zalo-message':s.zalo.messages=on?[...new Set([...s.zalo.messages,el.dataset.id])]:s.zalo.messages.filter(id=>id!==el.dataset.id);repaintDialog=true;break;
+ case 'word-template':c.word.template=v;c.word.prechecked=false;break;
+ case 'word-doc':c.word.docs[el.dataset.id]=on;c.word.prechecked=false;break;
+ case 'upload-context':changeContext(el.dataset.field,v,el);return;
+ case 'coverage':
+ u.coverage=v==='verified';
+ if(!u.coverage&&u.queue.length){u.queue=[];u.sessionStarted=false;s.jobs.filter(j=>j.id==='PORTAL-DEMO'&&j.status!=='succeeded').forEach(j=>j.status='canceled');toast('Độ phủ chưa xác minh; hàng đợi từ số thiếu đã được bỏ.')}
+ break;
+ case 'queue-source':{const row=u.queue.find(r=>r.no===el.dataset.no);row.source=v;row.version++;row.reviewed=false;break}
+ case 'attachment-type':{const row=activeUploadRow();row.attachmentType=v;row.attachment=null;row.reviewed=false;repaintDialog=true;break}
+ case 'attachment-reviewed':activeUploadRow().reviewed=on;repaint=false;break;
+ case 'health':s.health=v;repaintDialog=dialogRoute==='SH-02';break;
+ case 'capability':u.capability=v;break;
+ case 'pdf-engine':u.engine=on;break;
+ case 'over-limit':u.overLimit=on;break;
+ case 'view-state':s.viewStates[s.route]=v;break;
+ case 'session-result':{const row=u.queue.filter(r=>r.inSession).at(-1);if(row){row.result=v;job('PORTAL-DEMO','Điền thử cổng mẫu','UL-06',v==='failed'?'failed':'partial')}break}
+ case 'office-scope':s.office.scope=v;break;
+ case 'proposal-type':s.office.proposal.type=v;s.office.proposal.state='candidate';s.office.proposal.decision='';break;
+ case 'proposal-case':s.office.proposal.caseId=v;s.office.proposal.state='candidate';s.office.proposal.decision='';break;
+ case 'proposal-link':s.office.proposal.linkExisting=on;break;
+ case 'evidence-state':s.office.proposal.evidence=v;break;
+ case 'record-status':{
+ const r=R(),old=r.status;el.value=old;
+ if(v!==old)confirmBox('Đổi trạng thái công việc?',`Đổi từ “${old}” sang “${v}”. Thao tác này không thay đổi file, khoản phí hoặc thanh toán.`,()=>{r.status=v;r.history.push('Trạng thái được xác nhận: '+v);rerender()},'Xác nhận trạng thái');
+ repaint=false;break;
+ }
+ case 'fee-state':{const r=R();r.feeDraft={state:v,amount:r.feeDraft?.amount??r.amount};break}
+ case 'office-filter':s.office[el.dataset.field]=v;break;
+ }
+ save();if(repaint)render();if(repaintDialog)refreshDialog();
+});
+document.addEventListener('input',event=>{
+ const el=event.target.closest('[data-input]');if(!el)return;
+ const a=el.dataset.input,v=el.value;
+ switch(a){
+ case 'new-title':newTitle=v;break;
+ case 'case-query':s.caseQuery=v;break;
+ case 'office-query':s.office.query=v;break;
+ case 'stage-name':
+ case 'stage-detail':{
+ const p=C()[el.dataset.kind].find(p=>p.id===el.dataset.id);if(!p)return;
+ p[a==='stage-name'?'name':'detail']=v;p.dirty=true;
+ const b=el.closest('.stage-card')?.querySelector('.badge');if(b){b.textContent='Chưa cập nhật';b.className='badge warn'}
+ const commit=document.querySelector(`[data-action="commit-stage"][data-kind="${el.dataset.kind}"]`);if(commit)commit.disabled=false;
+ break;
+ }
+ case 'tax-field':C().word.taxField=v;break;
+ case 'proposal-reason':s.office.proposal.reason=v;break;
+ case 'fee-amount':{const r=R();if(!r.feeDraft)r.feeDraft={state:r.fee,amount:r.amount};r.feeDraft.amount=v;break}
+ }
+ save();
+});
+document.addEventListener('focusout',event=>{
+ const el=event.target;
+ if(el.matches('[data-input="stage-name"]')){
+ const error=document.getElementById('error-'+el.dataset.id),invalid=!el.value.trim();
+ if(error)error.hidden=!invalid;
+ el.setAttribute('aria-invalid',String(invalid));el.setAttribute('aria-describedby','error-'+el.dataset.id);
+ }
+});
+document.addEventListener('keydown',event=>{
+ if(event.key==='Enter'&&event.target.matches('[data-input="office-query"]')){event.preventDefault();actions['office-search']()}
+ if(event.key==='Enter'&&event.target.matches('[data-input="case-query"]')){event.preventDefault();actions['case-search']()}
+ const dialog=$('#dialog');
+ if(event.key==='Tab'&&dialog.open){
+ const focusable=[...dialog.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex="0"]')].filter(e=>e.getClientRects().length);
+ if(!focusable.length)return;
+ const first=focusable[0],last=focusable.at(-1);
+ if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}
+ else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}
+ }
+});
+$('#dialog').addEventListener('cancel',event=>{event.preventDefault();closeDialog()});
+let dragging='';
+document.addEventListener('dragstart',event=>{const card=event.target.closest('[data-person]');if(!card)return;dragging=card.dataset.person;event.dataTransfer.setData('text/plain',dragging);event.dataTransfer.effectAllowed='move'});
+document.addEventListener('dragover',event=>{if(event.target.closest('[data-drop]')){event.preventDefault();event.dataTransfer.dropEffect='move'}});
+document.addEventListener('drop',event=>{const target=event.target.closest('[data-drop]');if(!target)return;event.preventDefault();const id=event.dataTransfer.getData('text/plain')||dragging;if(assignment(id,target.dataset.drop)){rerender();toast('Đã gán người. Lưu sơ đồ để xác nhận.')}dragging=''});
+if(!screens[s.route]||['SH-02','NV2-05','NV2-06','UL-04'].includes(s.route))s.route='NV2-01';
+render();
+</script>
+</body>
+</html>
