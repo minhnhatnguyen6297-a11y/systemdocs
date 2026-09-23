@@ -61,7 +61,7 @@ chứng tìm hồ sơ liên quan, **không phải Case primary key**. Tên ngư�
 Hai aggregate soạn thảo và theo dõi chưa được chứng minh có quan hệ 1:1
 (`notary_v2/models.py:83-102`; `notaryoffice/intent.md:365-373`). Vì vậy phải
 thống nhất nghĩa của tham chiếu, giữ provenance và bước xác nhận trước khi
-thiết kế liên kết. Chuẩn ở [`contracts/entities.md`](./contracts/entities.md),
+thiết kế liên kết. Chuẩn ở [`contracts/entities.md`](../../contracts/entities.md),
 ranh giới ở [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md) §7.
 
 ## 4. Lộ trình: làm tốt từng phần trước, gộp sau
@@ -80,7 +80,7 @@ kỳ** — để lúc gộp không phải viết lại:
 
 | Không được phân kỳ | Nơi ghi chuẩn |
 |---|---|
-| Cách chuẩn hóa khóa định danh (CCCD, GCN, thửa/tờ, số công chứng) | [`contracts/entities.md`](./contracts/entities.md) |
+| Cách chuẩn hóa khóa định danh (CCCD, GCN, thửa/tờ, số công chứng) | [`contracts/entities.md`](../../contracts/entities.md) |
 | Lựa chọn công nghệ cho cùng một việc (OCR, đọc Word, DB, backend…) | [`TECH_STACK.md`](./TECH_STACK.md) |
 | Tên trường cho cùng một dữ liệu, kiểu ngày/số, cách sinh ID | [`TECH_STACK.md`](./TECH_STACK.md) mục 3 |
 
@@ -93,7 +93,7 @@ là loại xung đột file `TECH_STACK.md` tồn tại để ngăn.
 kiến trúc hoặc chọn công nghệ mới.** Đây là nơi lưu tài liệu SOT.
 
 Gộp thì gộp, nhưng **không tự ý gộp**: nối hai repo là tích hợp, phải có contract
-được duyệt trước ([`contracts/README.md`](./contracts/README.md)).
+được duyệt trước ([`contracts/README.md`](../../contracts/README.md)).
 
 ## 5. Điều cố tình KHÔNG làm
 

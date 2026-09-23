@@ -4,7 +4,7 @@
 > vào `contracts/`; publish thuộc MIN-72 (P3).**
 >
 > Phạm vi G1-SM: contract giữa **Electron shell** và **Python sidecar** trên
-> một máy. Nó tái sử dụng vocabulary của `MIN62_DATA_CONTRACT_DRAFT.md`
+> một máy. Nó tái sử dụng vocabulary của `../MIN62_DATA_CONTRACT_DRAFT.md`
 > (branch `min-62-data-contract-draft`) bằng tham chiếu — không nhân bản.
 > Contract xuyên-sản-phẩm (ConversionEnvelope publish cho consumer repo khác)
 > vẫn theo Gate A/B/C/D của draft đó; tài liệu này chỉ chốt phần shell↔engine.

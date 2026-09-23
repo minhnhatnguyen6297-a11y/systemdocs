@@ -12,7 +12,7 @@ Cập nhật: 10/09/2026
 |---|---|---|---|
 | `notary_v2` | `D:\notary_v2` | `github.com/minhnhatnguyen6297-a11y/notary_v2` | Đang phát triển; chưa triển khai production |
 | `upload_lab` | `D:\upload_lab_repo` | `github.com/minhnhatnguyen6297-a11y/upload_lab` | Đang phát triển; chưa triển khai production |
-| `notaryoffice` | `D:\notaryoffice` | Git local đã init; chưa cấu hình remote | **Chỉ có tài liệu, chưa có code** (`notaryoffice/AGENTS.md:3`) |
+| `notaryoffice` | `D:\notaryoffice` | Git local đã init; chưa cấu hình remote | **Chỉ có tài liệu, chưa có code** (`notaryoffice/` chỉ chứa `intent.md`) |
 | `researchskill` | `D:\researchskill` | `github.com/minhnhatnguyen6297-a11y/researchskill` | **Ngoài phạm vi** |
 
 `excelTK` là dự án riêng, không phải sản phẩm con của hệ thống công chứng và
@@ -81,8 +81,10 @@ tài liệu.**
   đường local **không dùng**. Mở lại cần redesign được duyệt riêng.
 - **Chưa có shared abstraction cho Stage/Pool** — có chủ ý, chờ domain thật thứ hai.
 
-**Ràng buộc khi sửa repo này:** `AGENTS.md` của nó có scope-lock rất chặt (SCOPE
-BREAK REQUEST, review gate). Tôn trọng nó; systemdocs không ghi đè.
+**Ràng buộc khi sửa repo này:** SOT nội bộ là `notary_v2/docs/` — domain spec
+đã duyệt, ADR và platform contract. Repo gốc `D:\notary_v2` còn duy trì
+`AGENTS.md` với scope-lock chặt (SCOPE BREAK REQUEST, review gate); file đó
+không được snapshot vào monorepo.
 
 ---
 
@@ -178,7 +180,7 @@ ra `_release/`.
 > Mọi thứ dưới đây là **dự định**, không phải hiện thực. Đừng mô tả nó như phần
 > mềm đang chạy.
 
-Nguồn trạng thái code: `notaryoffice/AGENTS.md:3`; trạng thái Git theo snapshot
+Nguồn trạng thái code: `notaryoffice/` chỉ chứa `intent.md`; trạng thái Git theo snapshot
 đầu tài liệu.
 
 ### Giải bài toán gì
@@ -253,7 +255,7 @@ Dự kiến ~14 bảng (`document_snapshots`, `document_deltas`, `print_jobs`,
   `\b\d{12}\b`, serial GCN là `[A-Z]{2}\s*\d{6,8}`
   (`notaryoffice/intent.md:325-326`). Không còn là blocker sửa intent;
   chuẩn thống nhất ở
-  [`contracts/entities.md`](./contracts/entities.md).
+  [`contracts/entities.md`](../../contracts/entities.md).
 
 **Ba câu còn phải đo trên máy thật trước khi code:** `OPEN_DECISIONS.md` A1, A3,
 A4 (A2 đã có câu trả lời = Không).
@@ -281,4 +283,4 @@ thống công chứng.
   đang mở (`OPEN_DECISIONS.md`).
 - **Không quyết định:** hành vi nội bộ của một repo. Khi xung đột, docs của repo
   con thắng về hành vi nội bộ — nhưng phải báo lại để sửa ở đây theo
-  [`AGENTS.md`](./AGENTS.md).
+  [`AGENTS.md`](../../AGENTS.md).

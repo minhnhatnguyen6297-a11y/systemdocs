@@ -19,7 +19,7 @@ nhất. Snapshot tại **2026-09-14**, quét bằng
 | notary_v2 | `codex/inheritance-diagram-v2` (nhánh dev hiện tại — user gọi là "nhánh electron") | `2c59fae` | `D:\notary_v2` | 1410 / 3806 / 67 |
 | upload_lab_repo | `feat/fluent-ui-redesign` | `f4fe560` | `D:\upload_lab_repo-worktrees\feat-fluent-ui-redesign` | 690 / 1711 / 19 |
 | upload_lab_repo | `codex/desktop-command-poc` (Electron POC: `poc/desktop_command/electron/`) | `f18a42f` | `D:\upload_lab_repo\.worktrees\desktop-command-poc` | 792 / 1920 / 38 |
-| notaryoffice | — | — | **Chưa có code** — chỉ có `AGENTS.md` + `intent.md` (đặc tả); không có gì để quét. | — |
+| notaryoffice | — | — | **Chưa có code** — chỉ có `intent.md` (đặc tả); không có gì để quét. | — |
 
 Lưu ý: **không có code Electron nào trong notary_v2** ở mọi nhánh (đã kiểm
 chứng bằng `git ls-tree` toàn bộ 20 nhánh). "Nhánh electron" của notary_v2 ở

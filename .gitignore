@@ -24,3 +24,10 @@ output/
 # OS / editor
 Thumbs.db
 .DS_Store
+
+# Agent scratch & temp — bãi rác chính thức, không commit
+.agent/scratch/
+.tmp/
+.cache/
+logs/
+artifacts/

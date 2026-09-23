@@ -225,8 +225,8 @@ Local `D:/notaryoffice` main chưa commit, toàn untracked (`intent*.md`, `docs/
 | notary_v2 Node | `9a9bf9a` | `node --test tests/*.test.mjs` | **22 pass / 0 fail** | `cases_ui_dataflow_static`, `diagram_inheritance_engine`, `diagram_state` |
 | notary_v2 pytest (env tối thiểu, không numpy) | `9a9bf9a` | `pytest tests -q` | **collection error** trên `test_ocr_local_v4.py` (`import numpy`) | Suite main giả định local-OCR deps cho file test này dù tính năng parked |
 | upload_lab unittest | `a4349a2` (worktree, venv `D:/upload_lab_repo/.venv`) | `python -m unittest discover -s tests` | **120 pass / 0 fail** (26.3s) | README ghi "109 tests" — stale |
-| zalo branch | `d350048` | artifact `HANDOFF_2026-09-14.md` + **xác minh source lần này** | **1 fail**: `tests/test_ocr_ai.py::test_active_cloud_path_has_no_document_qr` | Nguyên nhân xác minh tại source: `form.html` ~dòng 8338-8366 chứa code QR legacy **sau `return;`** (dead code) trong khoảng `ocrExtractAll`→`ocrExtractLocal`; test quét cả khoảng nên fail. `routers/ocr_ai.py` trên nhánh sạch symbol QR. KHÔNG sửa trong task này |
-| ocr-stage-pool-diagram-v1 | `a800406` | artifact `HANDOFF_2026-09-14.md` | 75 pytest + 14 Node pass | Chưa rerun (không venv sẵn) |
+| zalo branch | `d350048` | artifact `HANDOFF_2026-09-14.md` (đã dọn khỏi root, xem git history) + **xác minh source lần này** | **1 fail**: `tests/test_ocr_ai.py::test_active_cloud_path_has_no_document_qr` | Nguyên nhân xác minh tại source: `form.html` ~dòng 8338-8366 chứa code QR legacy **sau `return;`** (dead code) trong khoảng `ocrExtractAll`→`ocrExtractLocal`; test quét cả khoảng nên fail. `routers/ocr_ai.py` trên nhánh sạch symbol QR. KHÔNG sửa trong task này |
+| ocr-stage-pool-diagram-v1 | `a800406` | artifact `HANDOFF_2026-09-14.md` (đã dọn khỏi root, xem git history) | 75 pytest + 14 Node pass | Chưa rerun (không venv sẵn) |
 
 Chưa chạy: suite trên `inheritance-diagram-v2`/`markitdown-qwen-poc` (cần venv
 riêng từng nhánh — làm khi P0 duyệt và task cụ thể cần); Electron POC tests

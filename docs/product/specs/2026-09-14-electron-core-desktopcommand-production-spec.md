@@ -7,8 +7,8 @@
 > thật qua DesktopCommand. Không LAN, không đa máy, không update server —
 > những phần đó thuộc G1-LAN (MIN-76).
 >
-> Bằng chứng nền: `G1_SINGLE_MACHINE_INVENTORY.md` (P0) và
-> `G1_SINGLE_MACHINE_COMPATIBILITY_MATRIX.md` (P1). POC:
+> Bằng chứng nền: `../G1_SINGLE_MACHINE_INVENTORY.md` (P0) và
+> `../G1_SINGLE_MACHINE_COMPATIBILITY_MATRIX.md` (P1). POC:
 > `upload_lab@f18a42f:poc/desktop_command/` — bằng chứng, không phải contract.
 
 ## 1. Process model (đã chứng minh ở P1)

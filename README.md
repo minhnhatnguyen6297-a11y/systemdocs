@@ -7,8 +7,8 @@ kiến trúc xuyên sản phẩm.
 
 Một ngoại lệ bắt buộc: **trước khi chọn một công nghệ mới** (OCR provider khác,
 ORM khác, queue khác, framework UI khác) thì phải đọc
-[`TECH_STACK.md`](./TECH_STACK.md). Ba repo sẽ gộp về một database dùng chung;
-chọn lệch nhau bây giờ là viết lại sau.
+[`TECH_STACK.md`](./docs/architecture/TECH_STACK.md). Ba repo sẽ gộp về một
+database dùng chung; chọn lệch nhau bây giờ là viết lại sau.
 
 ## Ba sản phẩm trong phạm vi
 
@@ -23,26 +23,43 @@ Ngoài phạm vi: `researchskill` (`D:\researchskill`) là skill hỗ trợ codi
 không phải phân hệ công chứng.
 
 `excelTK` là dự án riêng, không thuộc phạm vi hệ thống này. Kế hoạch chuyển
-nghiệp vụ thật sang Electron nằm ở [`ELECTRON_G1_PLAN.md`](./ELECTRON_G1_PLAN.md)
+nghiệp vụ thật sang Electron nằm ở
+[`ELECTRON_G1_PLAN.md`](./docs/architecture/ELECTRON_G1_PLAN.md)
 trên nhánh `electron-system-shell`; `main` tiếp tục chỉ chứa tài liệu.
 
 ## Đọc gì khi nào
 
 | Cần gì | File |
 |---|---|
-| Tại sao có hệ thống này, ba sản phẩm ghép lại thành gì | [`VISION.md`](./VISION.md) |
-| Ranh giới sản phẩm, sản phẩm nào sở hữu dữ liệu nào | [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md) |
-| Sáu lớp thành phần chung, owner đề xuất và mức reuse — draft MIN-57 | [`COMPONENT_MAP.md`](./COMPONENT_MAP.md) |
-| Repo nào giải bài toán gì — feature gì — công nghệ gì | [`PROJECTS.md`](./PROJECTS.md) |
-| **Trước khi chọn công nghệ mới hoặc ra quyết định kiến trúc** | [`TECH_STACK.md`](./TECH_STACK.md) |
+| Tại sao có hệ thống này, ba sản phẩm ghép lại thành gì | [`VISION.md`](./docs/architecture/VISION.md) |
+| Ranh giới sản phẩm, sản phẩm nào sở hữu dữ liệu nào | [`SYSTEM_ARCHITECTURE.md`](./docs/architecture/SYSTEM_ARCHITECTURE.md) |
+| Sáu lớp thành phần chung, owner đề xuất và mức reuse — draft MIN-57 | [`COMPONENT_MAP.md`](./docs/architecture/COMPONENT_MAP.md) |
+| Repo nào giải bài toán gì — feature gì — công nghệ gì | [`PROJECTS.md`](./docs/architecture/PROJECTS.md) |
+| **Trước khi chọn công nghệ mới hoặc ra quyết định kiến trúc** | [`TECH_STACK.md`](./docs/architecture/TECH_STACK.md) |
 | Vocabulary & schema dùng chung giữa các sản phẩm | [`contracts/README.md`](./contracts/README.md) |
-| Cái gì đã chốt, cái gì chưa chốt — đừng tự quyết | [`OPEN_DECISIONS.md`](./OPEN_DECISIONS.md) |
-| Review kết quả POC conversion/OCR của MIN-52 và MIN-59 | [`MIN61_CONVERSION_OCR_DECISION.md`](./MIN61_CONVERSION_OCR_DECISION.md) |
-| Quy tắc khi sửa chính folder này | [`AGENTS.md`](./AGENTS.md) |
+| Cái gì đã chốt, cái gì chưa chốt — đừng tự quyết | [`OPEN_DECISIONS.md`](./docs/architecture/OPEN_DECISIONS.md) |
+| Spec/draft theo từng issue (MIN-*, G1-SM) | [`docs/product/`](./docs/product/) |
+| Review kết quả POC conversion/OCR của MIN-52 và MIN-59 | [`MIN61_CONVERSION_OCR_DECISION.md`](./docs/product/MIN61_CONVERSION_OCR_DECISION.md) |
+| Quy tắc khi sửa chính folder này + nơi agent được ghi file | [`AGENTS.md`](./AGENTS.md) |
+
+## Cấu trúc folder
+
+| Chỗ | Dùng cho |
+|---|---|
+| `docs/architecture/` | Tài liệu SOT cấp hệ thống, giá trị dài hạn |
+| `docs/product/` | Spec theo feature/issue (`specs/` chứa spec có ngày) |
+| `contracts/` | Contract đã duyệt giữa các sản phẩm |
+| `code-graphs/` | Graphify snapshots các repo con |
+| `.agent/tasks/` | Trạng thái thực thi theo Linear issue |
+| `.agent/scratch/`, `.tmp/`, `.cache/`, `logs/`, `artifacts/` | File tạm — gitignore |
 
 ## Nguồn sự thật
 
 Folder này mô tả **quan hệ giữa các sản phẩm**. Hành vi bên trong một sản phẩm
-do docs của repo đó quyết định (`notary_v2/AGENTS.md` → `docs/`,
-`upload_lab_repo/README.md`, `notaryoffice/intent.md`). Khi folder này xung đột với repo con, repo con thắng về
-hành vi nội bộ — và mâu thuẫn đó phải được báo lại để sửa ở đây.
+do docs của repo đó quyết định (`notary_v2/docs/`, `upload_lab/README.md` +
+`upload_lab/docs/`, `notaryoffice/intent.md`). Khi folder này xung đột với repo
+con, repo con thắng về hành vi nội bộ — và mâu thuẫn đó phải được báo lại để
+sửa ở đây.
+
+Linear là SOT của task/issue; `.agent/tasks/` chỉ lưu trạng thái thực thi.
+Quy ước chi tiết ở [`AGENTS.md`](./AGENTS.md).

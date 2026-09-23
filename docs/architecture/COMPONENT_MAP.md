@@ -28,7 +28,7 @@ Bốn đề xuất của bản đồ:
 
 Các đề xuất owner ở trên chưa có hiệu lực production cho đến khi được duyệt.
 Nguồn chuẩn: [kiến trúc](./SYSTEM_ARCHITECTURE.md) §6–7,
-[định danh](./contracts/entities.md), [công nghệ](./TECH_STACK.md),
+[định danh](../../contracts/entities.md), [công nghệ](./TECH_STACK.md),
 [quyết định mở](./OPEN_DECISIONS.md). Không sao chép lựa chọn công nghệ sang bản đồ.
 
 ## 2. Phạm vi bằng chứng

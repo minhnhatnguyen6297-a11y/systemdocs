@@ -56,12 +56,12 @@ không dùng MIN-66 để tuyên bố cutover toàn hệ thống.
 
 - Nhánh `electron-system-shell` được phép chứa runtime; không merge runtime
   vào `main` trong G1
-  (`AGENTS.md:3-7`).
+  (`AGENTS.md` — phần ngoại lệ nhánh `electron-system-shell`).
 - Contract và implementation phải ở hai task khác nhau
-  (`AGENTS.md:30`; `ELECTRON_G1_PLAN.md:49-56`).
+  (`AGENTS.md` — quy tắc contract-trước-code; `../../architecture/ELECTRON_G1_PLAN.md:49-56`).
 - Bàn giao hiện tại yêu cầu thứ tự MIN-74 → MIN-75 → MIN-64/MIN-32/MIN-62 và
   cấm mở consumer trước approval
-  (`HANDOFF_2026-09-14.md:50-51`).
+  (`HANDOFF_2026-09-14.md:50-51` — file đã dọn khỏi root, xem git history).
 - `notary_v2` yêu cầu scope-lock trước sửa, spec duyệt cho thay đổi nghiệp vụ,
   reviewer độc lập và `verify.bat`
   (`D:/notary_v2/AGENTS.md:23-35,57-60,79-93,100-110`, kiểm tra tại revision

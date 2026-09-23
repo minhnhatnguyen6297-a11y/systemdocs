@@ -8,7 +8,7 @@ Thư mục này chỉ chứa **những gì đã được cả hai bên đồng �
 Ba công cụ nghiệp vụ vẫn **chạy độc lập** — chưa có API giữa chúng, chưa đọc DB
 của nhau, chưa có file trao đổi tự động. Đó là trạng thái của **giai đoạn hiện
 tại**, không phải đích đến: hệ thống sẽ gộp lại và dùng chung database
-([`../VISION.md`](../VISION.md) mục 4).
+([`../docs/architecture/VISION.md`](../docs/architecture/VISION.md) mục 4).
 
 Đã publish theo lộ trình G1 một máy (owner duyệt 14/09/2026, spec P2):
 
@@ -20,7 +20,7 @@ tại**, không phải đích đến: hệ thống sẽ gộp lại và dùng ch
 
 Hai contract trên là **kênh nội bộ shell↔engine** — không phải contract giữa ba
 sản phẩm nghiệp vụ. ConversionEnvelope/Evidence/DraftCase dùng chung xuyên repo
-vẫn theo Gate A–D của `MIN62_DATA_CONTRACT_DRAFT.md` (branch
+vẫn theo Gate A–D của `../docs/product/MIN62_DATA_CONTRACT_DRAFT.md` (branch
 `min-62-data-contract-draft`) và chưa được publish tại đây.
 
 Các shape `v0.experimental` trong `SYSTEM_ARCHITECTURE.md` mục 6 chỉ dùng để
@@ -29,7 +29,7 @@ runtime integration và vì vậy chưa được đặt thành file riêng trong
 
 Nhưng "sau này sẽ gộp" **không phải giấy phép** để nối bừa bây giờ. Mỗi kết nối
 vẫn phải có contract được duyệt trước. Xem
-[`../SYSTEM_ARCHITECTURE.md`](../SYSTEM_ARCHITECTURE.md) mục 5.
+[`../docs/architecture/SYSTEM_ARCHITECTURE.md`](../docs/architecture/SYSTEM_ARCHITECTURE.md) mục 5.
 
 Vì vậy thư mục này hiện chỉ có một file, và nó không mô tả luồng dữ liệu mà mô
 tả **cách gọi tên dữ liệu**:
@@ -37,7 +37,7 @@ tả **cách gọi tên dữ liệu**:
 | File | Nội dung | Trạng thái |
 |---|---|---|
 | [`entities.md`](./entities.md) | Định nghĩa & chuẩn hóa các khóa định danh hồ sơ (CCCD, số GCN, thửa/tờ, số công chứng) | Bắt buộc tham chiếu, mỗi repo tự implement |
-| [`../TECH_STACK.md`](../TECH_STACK.md) | Công nghệ đã chọn cho từng việc + ràng buộc để lúc gộp DB không xung đột | Bắt buộc đọc trước khi chọn công nghệ mới |
+| [`../docs/architecture/TECH_STACK.md`](../docs/architecture/TECH_STACK.md) | Công nghệ đã chọn cho từng việc + ràng buộc để lúc gộp DB không xung đột | Bắt buộc đọc trước khi chọn công nghệ mới |
 
 ## Quy tắc: contract trước, code sau
 

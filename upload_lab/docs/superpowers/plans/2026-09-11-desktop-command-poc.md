@@ -14,8 +14,8 @@ narrow context-isolated IPC. Chromium remains headed and Python-owned.
 **Tech Stack:** Python 3.10+, FastAPI/uvicorn in POC-only requirements, PySide6,
 pytest/httpx, Electron/Node in a POC-only package.
 
-**Spec:** `D:\systemdocs\MIN50_IMPLEMENTATION_SPEC.md` W4 and
-`D:\systemdocs\SYSTEM_ARCHITECTURE.md` §6.4.
+**Spec:** `D:\systemdocs\docs\product\MIN50_IMPLEMENTATION_SPEC.md` W4 and
+`D:\systemdocs\docs\architecture\SYSTEM_ARCHITECTURE.md` §6.4.
 
 ## Global Constraints
 

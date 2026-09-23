@@ -223,7 +223,7 @@ Nếu nhận OCR hay conversion, audit phải gắn với Evidence: converter na
 OCR provider/model, policy/version cho phép, input hash, duration, trạng thái,
 lỗi và source location thực sự biết được. Payload gốc, secret/cookie và dữ liệu
 nhạy cảm không được đưa vào log audit. Việc này khớp shape thử nghiệm
-`ConversionEnvelope v0.experimental` ở `systemdocs/SYSTEM_ARCHITECTURE.md`
+`ConversionEnvelope v0.experimental` ở `systemdocs/docs/architecture/SYSTEM_ARCHITECTURE.md`
 §6.5, nhưng Envelope chỉ là **input kỹ thuật tùy chọn** cho RAW; nó không sở hữu
 Evidence, không tự sinh Case và không cho plugin/converter quyết định gửi cloud.
 

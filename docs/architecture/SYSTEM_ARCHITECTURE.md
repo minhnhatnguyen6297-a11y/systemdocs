@@ -10,7 +10,7 @@ không phải thiết kế vật lý hay quyền thực hiện migration.
 
 **Giai đoạn hiện tại: hai công cụ chạy độc lập, công cụ thứ ba mới có thiết kế.** Việc bây giờ
 là làm tốt từng phần, đồng thời **không để chúng phân kỳ** ở bốn chỗ: khóa định
-danh ([`contracts/entities.md`](./contracts/entities.md)), lựa chọn công nghệ
+danh ([`contracts/entities.md`](../../contracts/entities.md)), lựa chọn công nghệ
 ([`TECH_STACK.md`](./TECH_STACK.md)), schema/tên trường (`TECH_STACK.md` mục 3),
 và ranh giới dữ liệu/provenance (mục 6 dưới đây).
 
