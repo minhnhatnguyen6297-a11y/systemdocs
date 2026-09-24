@@ -180,7 +180,7 @@ def test_workspace_commit_stage_stale_revision_maps_conflict(adapter_db):
     err = exc.value
     assert err.code == "workspace_conflict"
     assert err.retryable is True
-    assert err.next_action == "call notary.workspace_get"
+    assert err.next_action == "retry"  # envelope enum, khong phai command name
     assert err.details["server_revision"] == 2
 
 
@@ -213,7 +213,8 @@ def test_workspace_commit_stage_invalid_row_maps_error(adapter_db):
                 case.id, 1, [_person_row(ho_ten="   ")], []))
     err = exc.value
     assert err.code == "stage_validation_error"
-    assert err.retryable is True
+    assert err.retryable is False  # payload sai — retry mu van sai
+    assert err.next_action is None
     assert err.details["field_errors"]
 
 

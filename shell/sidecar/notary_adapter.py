@@ -568,14 +568,17 @@ def zalo_status(job, payload):
 
 # ---------- Case workspace (MIN-107 — contract notary.case-drafting.v1) ----------
 
-_WORKSPACE_RETRYABLE_CODES = {"workspace_conflict", "stage_validation_error"}
+# next_action phai nam trong envelope enum
+# (login_required|pick_files|retry|contact_admin|null):
+#   workspace_conflict      → retryable, client doc lai workspace roi retry
+#   stage_validation_error  → khong retryable (payload sai retry mu se lai sai)
+_WORKSPACE_RETRYABLE_CODES = {"workspace_conflict"}
 
 
 def _workspace_command_error(err):
     """WorkspaceError cua service → CommandError theo contract §9.
 
-    Giu nguyen `code`/`details`; retryable theo contract (conflict va
-    stage_validation_error duoc retry sau khi client doc lai workspace).
+    Giu nguyen `code`/`details` (server_revision, field_errors, ...).
     """
     code = getattr(err, "code", None) or "workspace_error"
     message = getattr(err, "message", None) or str(err) or code
@@ -583,7 +586,7 @@ def _workspace_command_error(err):
     retryable = code in _WORKSPACE_RETRYABLE_CODES
     return CommandError(
         code, message, retryable=retryable,
-        next_action="call notary.workspace_get" if retryable else None,
+        next_action="retry" if retryable else None,
         details=details)
 
 

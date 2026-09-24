@@ -554,6 +554,234 @@ def test_commit_stage_prunes_diagram_and_reevaluates(db):
     assert column_state["nodes"][0]["personId"] == str(deceased.id)
 
 
+def _diagram_nodes(owner_row, spouse_row, child_row, father_row,
+                   sib_row, gc_row):
+    """V2 state cho case gia đình đầy đủ: owner + cha + vợ + con + anh em
+    + cháu — dùng kiểm chứng legacy projection (H1) và participant sync (M2)."""
+    def node(nid, person, parents=(), spouse=None, **flags):
+        return {"id": nid, "personId": person,
+                "parentSlotIds": list(parents), "spouseSlotId": spouse,
+                "isLandOwner": flags.get("isLandOwner", False),
+                "willReceive": flags.get("willReceive", True),
+                "hidden": False, "deleted": False}
+    return [
+        node("owner", owner_row, parents=("father",), spouse="spouse",
+             isLandOwner=True, willReceive=False),
+        node("father", father_row),
+        node("spouse", spouse_row, spouse="owner"),
+        node("child1", child_row, parents=("owner", "spouse")),
+        node("sib1", sib_row, parents=("father",)),
+        node("gc1", gc_row, parents=("child1",)),
+    ]
+
+
+def _seed_diagram_case(db):
+    """Case với stage 6 người + diagram V2 gia đình đầy đủ (chưa commit)."""
+    case, deceased, prop, heirs = _make_case(db, with_participant=True)
+    spouse = heirs[0]
+    extras = {}
+    for key, name, gender, died in (
+            ("father", "Nguyễn Văn Cha", "Nam", date(1990, 1, 1)),
+            ("child", "Nguyễn Văn Con", "Nam", None),
+            ("sib", "Nguyễn Thị Em", "Nữ", None),
+            ("gc", "Nguyễn Văn Cháu", "Nam", None)):
+        cust = Customer(ho_ten=name, gioi_tinh=gender, ngay_chet=died)
+        db.add(cust)
+        db.flush()
+        extras[key] = cust
+    db.commit()
+    people = {
+        "owner": deceased, "spouse": spouse, "father": extras["father"],
+        "child": extras["child"], "sib": extras["sib"], "gc": extras["gc"],
+    }
+    rows = {k: str(uuid.uuid4()) for k in people}
+    state = {"version": 2,
+             "nodes": _diagram_nodes(
+                 rows["owner"], rows["spouse"], rows["child"],
+                 rows["father"], rows["sib"], rows["gc"])}
+    case.case_state_json = json.dumps({
+        "schemaVersion": 2,
+        "stage": [{"id": str(c.id), "row_id": rows[k],
+                   "ho_ten": c.ho_ten} for k, c in people.items()],
+        "assets": [{"id": str(prop.id), "row_id": str(uuid.uuid4()),
+                    "is_primary": True}],
+        "diagram": {"state": state, "render_model": None},
+    }, ensure_ascii=False)
+    db.commit()
+    return case, prop, people, rows
+
+
+def _commit_diagram_people(people, rows):
+    """Stage people rows cho toàn bộ entities theo row_id đã seed."""
+    wire = {
+        "owner": {"gioi_tinh": "Nam", "ngay_sinh": "1950",
+                  "ngay_chet": "2011-05-15"},
+        "spouse": {"gioi_tinh": "Nữ", "ngay_sinh": "1980-03-02"},
+        "father": {"gioi_tinh": "Nam", "ngay_chet": "1990-01-01"},
+        "child": {"gioi_tinh": "Nam", "ngay_sinh": "1978-01-01"},
+        "sib": {"gioi_tinh": "Nữ", "ngay_sinh": "1975-06-06"},
+        "gc": {"gioi_tinh": "Nam", "ngay_sinh": "2000-01-01"},
+    }
+    return [
+        _person_row(row_id=rows[k], entity_id=c.id, ho_ten=c.ho_ten,
+                    **wire[k])
+        for k, c in people.items()
+    ]
+
+
+def test_committed_legacy_projection_consumable_by_web(db):
+    """H1: engineState projection sau commit phải đọc được bởi web cũ —
+    `_extract_diagram_participants` 0 lỗi, vai_tro đúng, owner không là
+    participant; fields diagram_edges.js tiêu thụ đầy đủ."""
+    from routers.cases import _extract_diagram_participants
+
+    case, prop, people, rows = _seed_diagram_case(db)
+    _service(db).commit_stage(
+        case.id, 1, _commit_diagram_people(people, rows),
+        [_asset_row(entity_id=prop.id, so_serial="DD123456")])
+
+    persisted = json.loads(db.get(InheritanceCase, case.id).case_state_json)
+    engine_state = persisted["diagram"]["engineState"]
+    nodes = {n["id"]: n for n in engine_state["nodes"]}
+
+    # vocabulary mà diagram_edges.js + word_engine tiêu thụ
+    assert nodes["owner"]["relationType"] == "owner"
+    assert nodes["owner"]["role"] == "Owner"
+    assert nodes["father"]["relationType"] == "parent"
+    assert nodes["father"]["role"] == "Cha"
+    assert nodes["spouse"]["relationType"] == "spouse"
+    assert nodes["spouse"]["role"] == "Vợ/Chồng"
+    assert nodes["spouse"]["spouseOf"] == "owner"
+    assert nodes["child1"]["relationType"] == "child"
+    assert nodes["child1"]["role"] == "Con"
+    assert nodes["child1"]["familyGroupId"] == "ownerSpouse"
+    assert nodes["child1"]["parentPersonId"] == str(people["owner"].id)
+    assert nodes["sib1"]["relationType"] == "sibling"
+    assert nodes["sib1"]["role"] == "Anh/Chị/Em"
+    assert nodes["sib1"]["familyGroupId"] == "birthParents"
+    assert nodes["sib1"]["parentSlotId"] == "father"
+    assert nodes["gc1"]["relationType"] == "grandchild"
+    assert nodes["gc1"]["role"] == "Cháu"
+    assert nodes["gc1"]["parentSlotId"] == "child1"
+    assert nodes["gc1"]["parentPersonId"] == str(people["child"].id)
+    assert nodes["father"]["label"] == "Nguyễn Văn Cha"
+
+    # consumer thật của web: 0 lỗi, vai_tro đúng, owner không phải participant
+    customers = {str(c.id): c for c in db.query(Customer).all()}
+    participants, participant_ids = _extract_diagram_participants(
+        engine_state, customers, str(people["owner"].id))
+    roles = {p.customer_id: p.vai_tro for p in participants}
+    assert people["owner"].id not in participant_ids
+    assert roles[people["spouse"].id] == "Vợ/Chồng"
+    assert roles[people["father"].id] == "Cha"
+    assert roles[people["child"].id] == "Con"
+    assert roles[people["sib"].id] == "Anh/Chị/Em"
+    assert roles[people["gc"].id] == "Cháu"
+
+
+def test_commit_stage_rebuilds_participants_and_owner(db):
+    """M2: commit sync `case.participants` + `nguoi_chet_id` theo diagram."""
+    case, prop, people, rows = _seed_diagram_case(db)
+    _service(db).commit_stage(
+        case.id, 1, _commit_diagram_people(people, rows),
+        [_asset_row(entity_id=prop.id, so_serial="DD123456")])
+
+    db.refresh(case)
+    assert case.nguoi_chet_id == people["owner"].id
+    parts = {p.customer_id: p for p in case.participants}
+    assert people["owner"].id not in parts  # người chết không là participant
+    assert parts[people["spouse"].id].vai_tro == "Vợ/Chồng"
+    assert parts[people["spouse"].id].hang_thua_ke == 1
+    assert parts[people["spouse"].id].parent_customer_id is None
+    assert parts[people["father"].id].vai_tro == "Cha"
+    assert parts[people["child"].id].vai_tro == "Con"
+    assert parts[people["child"].id].parent_customer_id == people["owner"].id
+    assert parts[people["sib"].id].vai_tro == "Anh/Chị/Em"
+    assert parts[people["sib"].id].hang_thua_ke == 2
+    assert parts[people["gc"].id].vai_tro == "Cháu"
+    assert parts[people["gc"].id].parent_customer_id == people["child"].id
+    assert parts[people["father"].id].co_nhan_tai_san is True
+    assert case.tong_ty_le == 0.0
+
+
+def test_commit_stage_concurrent_same_base_conflicts(db, session_factory):
+    """M1: 2 commit cùng base_revision trên 2 session — chỉ 1 cái thắng,
+    cái thua nhận workspace_conflict với server_revision mới."""
+    case, deceased, prop, _h = _make_case(db)
+    s1 = session_factory()
+    s2 = session_factory()
+    try:
+        # hai session đều giữ snapshot revision=1
+        assert s1.get(InheritanceCase, case.id).workspace_revision == 1
+        assert s2.get(InheritanceCase, case.id).workspace_revision == 1
+        _service(s1).commit_stage(
+            case.id, 1, [_person_row(entity_id=deceased.id)],
+            [_asset_row(entity_id=prop.id, so_serial="DD123456")])
+        with pytest.raises(WorkspaceError) as exc:
+            _service(s2).commit_stage(
+                case.id, 1, [_person_row(entity_id=deceased.id)],
+                [_asset_row(entity_id=prop.id, so_serial="DD123456")])
+        assert exc.value.code == "workspace_conflict"
+        assert exc.value.details["server_revision"] == 2
+    finally:
+        s1.close()
+        s2.close()
+    s3 = session_factory()
+    try:
+        assert s3.get(InheritanceCase, case.id).workspace_revision == 2
+    finally:
+        s3.close()
+
+
+def test_get_migrate_on_read_does_not_overwrite_newer_commit(
+        db, session_factory):
+    """M1: get() trên snapshot cũ (stale ORM) không được ghi đè commit mới —
+    guarded UPDATE miss → đọc lại trạng thái mới."""
+    case, deceased, prop, _h = _make_case(db)
+    # cache attributes trong session `db` trước khi session khác commit —
+    # sau đó ORM object giữ snapshot cũ (rev 1, case_state_json=None).
+    assert case.workspace_revision == 1
+    assert case.case_state_json is None
+    s2 = session_factory()
+    try:
+        committed = _service(s2).commit_stage(
+            case.id, 1, [_person_row(entity_id=deceased.id)],
+            [_asset_row(entity_id=prop.id, so_serial="DD123456")])
+    finally:
+        s2.close()
+
+    data = _service(db).get(case.id)
+
+    assert data["case"]["revision"] == 2
+    assert [p["row_id"] for p in data["stage"]["people"]] == [
+        p["row_id"] for p in committed["stage"]["people"]]
+
+
+def test_get_normalizes_schema_invalid_legacy_values(db):
+    """M4: serial lạ → surrogate + warnings; dia_chi rỗng → null;
+    ho_ten rỗng → '(Chưa rõ)'."""
+    case, _d, prop, _h = _make_case(db)
+    prop.so_serial = "dd-12 34"
+    prop.dia_chi = ""
+    db.commit()
+
+    data = _service(db).get(case.id)
+
+    asset = data["stage"]["assets"][0]
+    assert asset["so_serial"] == f"XX{prop.id:06d}"[:8]
+    assert asset["dia_chi"] is None
+    assert any("so_serial" in w for w in data["diagram"]["warnings"])
+
+    case.case_state_json = json.dumps({
+        "schemaVersion": 2,
+        "stage": [{"id": "9999", "row_id": str(uuid.uuid4()),
+                   "ho_ten": ""}],
+        "assets": [], "diagram": {}}, ensure_ascii=False)
+    db.commit()
+    data2 = _service(db).get(case.id)
+    assert data2["stage"]["people"][0]["ho_ten"] == "(Chưa rõ)"
+
+
 def test_commit_stage_does_not_merge_duplicate_names(db):
     case, _d, prop, _h = _make_case(db)
     people = [
