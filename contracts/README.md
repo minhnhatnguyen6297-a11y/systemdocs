@@ -31,8 +31,8 @@ Nhưng "sau này sẽ gộp" **không phải giấy phép** để nối bừa b�
 vẫn phải có contract được duyệt trước. Xem
 [`../docs/architecture/SYSTEM_ARCHITECTURE.md`](../docs/architecture/SYSTEM_ARCHITECTURE.md) mục 5.
 
-Vì vậy thư mục này hiện chỉ có một file, và nó không mô tả luồng dữ liệu mà mô
-tả **cách gọi tên dữ liệu**:
+Ngoài hai contract kênh nội bộ G1 ở trên, thư mục này còn có chuẩn định danh
+dùng chung dưới đây. Hiện chưa có contract trao đổi dữ liệu xuyên sản phẩm:
 
 | File | Nội dung | Trạng thái |
 |---|---|---|

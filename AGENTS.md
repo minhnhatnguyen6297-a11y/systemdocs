@@ -8,8 +8,8 @@ tích hợp cấp hệ thống và được phép chứa runtime Electron sau kh
 tương ứng được duyệt. Không merge runtime vào `main`; xem
 `docs/architecture/ELECTRON_G1_PLAN.md`.
 
-Nhánh `consolidate/monorepo` (base `electron-system-shell`) chứa toàn bộ code
-của ba sản phẩm dưới dạng snapshot để phát triển thống nhất một nhánh:
+Nhánh `consolidate/monorepo` (base `electron-system-shell`) hiện chứa snapshot
+của ba sản phẩm nghiệp vụ và shell. Đích mới dành `zalo/` cho module thứ tư:
 
 | Thư mục | Nguồn | Nội dung |
 |---|---|---|
@@ -17,9 +17,17 @@ của ba sản phẩm dưới dạng snapshot để phát triển thống nhất
 | `notary_v2/` | `notary_v2` branch `consolidate/latest` | FastAPI nghiệp vụ công chứng (đã gộp 4 nhánh codex) |
 | `upload_lab/` | `upload_lab` branch `consolidate/latest` | Số hóa + upload (đã gộp 2 nhánh POC) |
 | `notaryoffice/` | `notaryoffice` `main` | Tài liệu intent, chưa có code |
+| `zalo/` | Repo Zalo độc lập (chưa tạo; `D:\zalo-intake` là đường dẫn local dự kiến) | Đích chuyển toàn engine Zalo; folder chưa có runtime |
 
-Đây là snapshot một chiều: repo con vẫn tồn tại độc lập; quyết định repo nào
-là nguồn chính thức chưa chốt.
+Các dòng hiện có là snapshot một chiều. Code Zalo hiện vẫn nằm trong
+`notary_v2/`; task migration mới phải chốt repo nào là nguồn chính thức và cách
+lấy snapshot/commit nguồn vào `zalo/`. Không tự tạo submodule hoặc `.git` lồng
+trong monorepo; không sửa tự do ở cả hai nơi.
+Task [MIN-103](https://linear.app/minhnotary/issue/MIN-103/migrate-engine-zalo-thanh-module-thu-tu-trong-repo-rieng-va-zalo)
+cũng phải chuyển tài liệu engine Zalo sang `zalo/docs/` khi folder được tạo;
+spec giao tiếp và consumer ở `notary_v2` giữ phần riêng. Trong lúc chưa chuyển,
+spec Zalo trong `notary_v2/docs/platform/zalo-document-inbox/` là nơi tạm được
+biết đến; không duy trì hai spec có cùng quyền quyết định song song.
 
 ## Cấu trúc thư mục
 
@@ -36,7 +44,8 @@ là nguồn chính thức chưa chốt.
 │  ├─ templates/        # Template brief/progress/decisions/handoff
 │  └─ scratch/          # Ghi tạm — gitignore
 ├─ .tmp/  .cache/  logs/  artifacts/   # Bãi rác chính thức — gitignore
-└─ notary_v2/  upload_lab/  shell/  notaryoffice/   # Snapshot repo con
+└─ notary_v2/  upload_lab/  shell/  notaryoffice/   # Snapshot hiện có
+   zalo/                                            # Dành cho module thứ tư, chưa migrate
 ```
 
 ## Quy tắc ghi file cho agent
@@ -103,8 +112,11 @@ repo đó. Khi xung đột, **repo con thắng** — và mâu thuẫn phải đ�
 - Mọi lựa chọn công nghệ ghi ở `docs/architecture/TECH_STACK.md`, không rải
   trong file khác. Thêm công nghệ mới cho một việc đã có công nghệ: phải qua 4
   bước ở `TECH_STACK.md` §2.
-- Đích đến là **một hệ thống dùng chung database**. Đừng viết lại các mô tả kiểu
-  "ba sản phẩm độc lập vĩnh viễn" — phân biệt *hiện trạng* với *đích đến*.
+- Đích đến là **một database nghiệp vụ chung** cho `notary_v2`, `upload_lab`
+  và `notaryoffice`. Module Zalo là adapter có thể tách chạy riêng, được giữ
+  DB/session/runtime riêng cho việc thu nhận và OCR; trao đổi với máy chính qua
+  contract, không bị ép dùng DB nghiệp vụ chung. Phân biệt *hiện trạng* với
+  *đích đến*.
 - Không tạo contract tích hợp mới rồi tự implement trong cùng một task.
 
 ## Rule riêng khi sửa repo con
@@ -117,12 +129,13 @@ SOT nội bộ của mỗi repo con là spec/docs của repo đó, không phải
 | `upload_lab/` | `upload_lab/README.md` + `upload_lab/docs/` (`regex-rules.md`, `spec_UI.md`) | Dry-run là mặc định — không tự đổi Finalize thành mặc định. Selector web tỉnh chỉ sửa ở `uploader_selectors.py`, không rải trong code. Thêm loại văn bản mới: cập nhật `docs/regex-rules.md` cùng lúc với code. Chạy test trước khi báo xong |
 | `notaryoffice/` | `notaryoffice/intent.md` (SOT duy nhất) | Trước khi viết code: A1/A3/A4 ở `docs/architecture/OPEN_DECISIONS.md` phải có câu trả lời thật (A2 đã chốt = Không). Không đề xuất lại phương án đã loại trong `intent.md` |
 | `shell/` | `shell/README.md` + `contracts/desktop-command.md` | POC tích hợp; runtime chỉ thêm theo `docs/architecture/ELECTRON_G1_PLAN.md` và contract đã duyệt |
+| `zalo/` (đích, chưa có code) | Spec Zalo hiện ở `notary_v2/docs/platform/zalo-document-inbox/`; repo riêng và SOT nội bộ sẽ chốt trong task migration | Sở hữu connector/session/listener/journal/media tạm, Qwen OCR, gói file raw và API OCR lại; không chứa parser/ghép/nhóm hồ sơ. Không tạo rule file riêng trong snapshot |
 
 ## Bản đồ file
 
 | File | Nội dung |
 |---|---|
-| `README.md` | Chỉ mục, ba sản phẩm, đọc gì khi nào |
+| `README.md` | Chỉ mục, bốn module đích và hiện trạng, đọc gì khi nào |
 | `docs/architecture/VISION.md` | Bài toán, nguyên tắc chung, điều cố tình không làm |
 | `docs/architecture/SYSTEM_ARCHITECTURE.md` | Ranh giới sản phẩm, sở hữu dữ liệu, kiến trúc dự kiến `notaryoffice` |
 | `docs/architecture/PROJECTS.md` | Từng repo: giải bài toán gì — feature gì — công nghệ gì |
