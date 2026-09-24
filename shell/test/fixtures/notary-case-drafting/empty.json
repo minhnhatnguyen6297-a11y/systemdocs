@@ -1,0 +1,19 @@
+{
+  "scenario": "empty",
+  "description": "Case 43 — ho so moi, stage rong, diagram chua danh gia (render_model null), revision 1.",
+  "cases": {
+    "43": {
+      "case_type": "inheritance",
+      "document_type": "khai_nhan",
+      "status": "draft",
+      "locked": false,
+      "revision": 1,
+      "stage": { "people": [], "assets": [] },
+      "diagram": {
+        "state": { "version": 2, "nodes": [] },
+        "render_model": null,
+        "warnings": []
+      }
+    }
+  }
+}

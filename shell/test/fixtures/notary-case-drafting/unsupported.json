@@ -1,0 +1,19 @@
+{
+  "scenario": "unsupported",
+  "description": "Case 45 — case_type 'gift' (ngoai cam ket v1 'inheritance'): capabilities tat het; moi command ghi/evaluate/export -> case_type_unsupported. workspace_get van doc duoc.",
+  "cases": {
+    "45": {
+      "case_type": "gift",
+      "document_type": "khai_nhan",
+      "status": "draft",
+      "locked": false,
+      "revision": 1,
+      "stage": { "people": [], "assets": [] },
+      "diagram": {
+        "state": { "version": 2, "nodes": [] },
+        "render_model": null,
+        "warnings": []
+      }
+    }
+  }
+}

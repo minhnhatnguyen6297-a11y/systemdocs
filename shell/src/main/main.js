@@ -8,7 +8,8 @@ const path = require('path');
 const fs = require('fs');
 const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 
-const { sidecarCommand, SHELL_VERSION } = require('./config');
+const { sidecarCommand, SHELL_VERSION, stripNotaryMockEnv } =
+  require('./config');
 const { makeLogger, redactString } = require('./redact');
 const { SidecarManager } = require('./sidecar');
 const { JobTracker } = require('./job-tracker');
@@ -186,6 +187,9 @@ async function start() {
   const fileStream = fs.createWriteStream(logPath, { flags: 'a' });
   const stderr = process.stderr;
   log = makeLogger({ write: (s) => { fileStream.write(s); stderr.write(s); } });
+  // G1_DEV_NOTARY_MOCK (MIN-106): dev truyen xuong sidecar qua env ke thua;
+  // packaged luon strip truoc khi spawn — mock khong bao gio chay packaged.
+  stripNotaryMockEnv(app.isPackaged, log);
   const cmd = sidecarCommand(
     app.isPackaged, process.resourcesPath, SHELL_ROOT);
   sidecar = new SidecarManager({ command: cmd, logger: log });

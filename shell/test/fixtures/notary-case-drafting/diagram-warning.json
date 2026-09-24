@@ -1,0 +1,138 @@
+{
+  "scenario": "diagram-warning",
+  "description": "Case 46 — nhu ready nhung stage co them Nguoi Mau E chua duoc gan vao node nao -> evaluate tra warnings[diagram.unassigned_pool_person] + status incomplete.",
+  "cases": {
+    "46": {
+      "case_type": "inheritance",
+      "document_type": "khai_nhan",
+      "status": "draft",
+      "locked": false,
+      "revision": 5,
+      "stage": {
+        "people": [
+          {
+            "row_id": "11111111-1111-4111-8111-111111111111",
+            "entity_id": 101,
+            "ho_ten": "Người Mẫu A",
+            "gioi_tinh": "Nam",
+            "ngay_sinh": "1950",
+            "ngay_chet": "2020-01-15",
+            "so_giay_to": "000000000101",
+            "ngay_cap": "2010-06-15",
+            "noi_cap": "CA Mẫu",
+            "dia_chi": "Địa chỉ mẫu 1",
+            "place_of_origin": "Tỉnh Mẫu"
+          },
+          {
+            "row_id": "22222222-2222-4222-8222-222222222222",
+            "entity_id": 102,
+            "ho_ten": "Người Mẫu B",
+            "gioi_tinh": "Nữ",
+            "ngay_sinh": "1955-03-02",
+            "ngay_chet": null,
+            "so_giay_to": null,
+            "ngay_cap": null,
+            "noi_cap": null,
+            "dia_chi": "Địa chỉ mẫu 1",
+            "place_of_origin": null
+          },
+          {
+            "row_id": "77777777-7777-4777-8777-777777777777",
+            "entity_id": 105,
+            "ho_ten": "Người Mẫu E",
+            "gioi_tinh": "Nam",
+            "ngay_sinh": "1985-01-01",
+            "ngay_chet": null,
+            "so_giay_to": null,
+            "ngay_cap": null,
+            "noi_cap": null,
+            "dia_chi": "Địa chỉ mẫu 5",
+            "place_of_origin": null
+          }
+        ],
+        "assets": [
+          {
+            "row_id": "55555555-5555-4555-8555-555555555555",
+            "entity_id": 201,
+            "is_primary": true,
+            "so_serial": "MM000001",
+            "so_vao_so": "CS 0001",
+            "so_thua_dat": "123",
+            "so_to_ban_do": "45",
+            "dia_chi": "Địa chỉ mẫu tài sản 1",
+            "loai_so": "GCN QSDĐ",
+            "hinh_thuc_su_dung": "Sử dụng riêng",
+            "thoi_han": "Lâu dài",
+            "nguon_goc": "Cấp đổi",
+            "ngay_cap": "2005-09-30",
+            "co_quan_cap": "UBND mẫu",
+            "land_rows": [
+              { "loai_dat": "ODT", "dien_tich": 85.5, "thoi_han": "Lâu dài" }
+            ]
+          }
+        ]
+      },
+      "diagram": {
+        "state": {
+          "version": 2,
+          "nodes": [
+            {
+              "id": "owner",
+              "personId": "11111111-1111-4111-8111-111111111111",
+              "parentSlotIds": [],
+              "spouseSlotId": "spouse",
+              "isLandOwner": true,
+              "willReceive": false,
+              "hidden": false,
+              "deleted": false
+            },
+            {
+              "id": "spouse",
+              "personId": "22222222-2222-4222-8222-222222222222",
+              "parentSlotIds": [],
+              "spouseSlotId": "owner",
+              "isLandOwner": false,
+              "willReceive": true,
+              "hidden": false,
+              "deleted": false
+            }
+          ]
+        },
+        "render_model": "auto",
+        "warnings": []
+      }
+    }
+  },
+  "request": {
+    "diagram_evaluate": {
+      "case_id": 46,
+      "diagram": {
+        "state": {
+          "version": 2,
+          "nodes": [
+            {
+              "id": "owner",
+              "personId": "11111111-1111-4111-8111-111111111111",
+              "parentSlotIds": [],
+              "spouseSlotId": "spouse",
+              "isLandOwner": true,
+              "willReceive": false,
+              "hidden": false,
+              "deleted": false
+            },
+            {
+              "id": "spouse",
+              "personId": "22222222-2222-4222-8222-222222222222",
+              "parentSlotIds": [],
+              "spouseSlotId": "owner",
+              "isLandOwner": false,
+              "willReceive": true,
+              "hidden": false,
+              "deleted": false
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,159 @@
+{
+  "scenario": "ready",
+  "description": "Case 42 — stage 4 nguoi + 2 tai san, diagram hoan chinh, revision 7. Tat ca du lieu la mau gia (khong PII). Mock compute render_model tu state khi seed ('auto').",
+  "cases": {
+    "42": {
+      "case_type": "inheritance",
+      "document_type": "khai_nhan",
+      "status": "draft",
+      "locked": false,
+      "revision": 7,
+      "stage": {
+        "people": [
+          {
+            "row_id": "11111111-1111-4111-8111-111111111111",
+            "entity_id": 101,
+            "ho_ten": "Người Mẫu A",
+            "gioi_tinh": "Nam",
+            "ngay_sinh": "1950",
+            "ngay_chet": "2020-01-15",
+            "so_giay_to": "000000000101",
+            "ngay_cap": "2010-06-15",
+            "noi_cap": "CA Mẫu",
+            "dia_chi": "Địa chỉ mẫu 1",
+            "place_of_origin": "Tỉnh Mẫu"
+          },
+          {
+            "row_id": "22222222-2222-4222-8222-222222222222",
+            "entity_id": 102,
+            "ho_ten": "Người Mẫu B",
+            "gioi_tinh": "Nữ",
+            "ngay_sinh": "1955-03-02",
+            "ngay_chet": null,
+            "so_giay_to": null,
+            "ngay_cap": null,
+            "noi_cap": null,
+            "dia_chi": "Địa chỉ mẫu 1",
+            "place_of_origin": null
+          },
+          {
+            "row_id": "33333333-3333-4333-8333-333333333333",
+            "entity_id": 103,
+            "ho_ten": "Người Mẫu C",
+            "gioi_tinh": "Nam",
+            "ngay_sinh": "1980-07-20",
+            "ngay_chet": null,
+            "so_giay_to": "000000000103",
+            "ngay_cap": "2021-01-10",
+            "noi_cap": "Cục CSĐKQL cư trú (mẫu)",
+            "dia_chi": "Địa chỉ mẫu 2",
+            "place_of_origin": "Tỉnh Mẫu"
+          },
+          {
+            "row_id": "44444444-4444-4444-8444-444444444444",
+            "entity_id": 104,
+            "ho_ten": "Người Mẫu D",
+            "gioi_tinh": "Nữ",
+            "ngay_sinh": "1983-11-05",
+            "ngay_chet": null,
+            "so_giay_to": null,
+            "ngay_cap": null,
+            "noi_cap": null,
+            "dia_chi": "Địa chỉ mẫu 3",
+            "place_of_origin": null
+          }
+        ],
+        "assets": [
+          {
+            "row_id": "55555555-5555-4555-8555-555555555555",
+            "entity_id": 201,
+            "is_primary": true,
+            "so_serial": "MM000001",
+            "so_vao_so": "CS 0001",
+            "so_thua_dat": "123",
+            "so_to_ban_do": "45",
+            "dia_chi": "Địa chỉ mẫu tài sản 1",
+            "loai_so": "GCN QSDĐ",
+            "hinh_thuc_su_dung": "Sử dụng riêng",
+            "thoi_han": "Lâu dài",
+            "nguon_goc": "Cấp đổi",
+            "ngay_cap": "2005-09-30",
+            "co_quan_cap": "UBND mẫu",
+            "land_rows": [
+              { "loai_dat": "ODT", "dien_tich": 85.5, "thoi_han": "Lâu dài" }
+            ]
+          },
+          {
+            "row_id": "66666666-6666-4666-8666-666666666666",
+            "entity_id": 202,
+            "is_primary": false,
+            "so_serial": "MM000002",
+            "so_vao_so": null,
+            "so_thua_dat": "77",
+            "so_to_ban_do": "12",
+            "dia_chi": "Địa chỉ mẫu tài sản 2",
+            "loai_so": null,
+            "hinh_thuc_su_dung": null,
+            "thoi_han": null,
+            "nguon_goc": null,
+            "ngay_cap": null,
+            "co_quan_cap": null,
+            "land_rows": [
+              { "loai_dat": "CLN", "dien_tich": 120.0, "thoi_han": null },
+              { "loai_dat": "ONT", "dien_tich": 60.0, "thoi_han": "Lâu dài" }
+            ]
+          }
+        ]
+      },
+      "diagram": {
+        "state": {
+          "version": 2,
+          "nodes": [
+            {
+              "id": "owner",
+              "personId": "11111111-1111-4111-8111-111111111111",
+              "parentSlotIds": [],
+              "spouseSlotId": "spouse",
+              "isLandOwner": true,
+              "willReceive": false,
+              "hidden": false,
+              "deleted": false
+            },
+            {
+              "id": "spouse",
+              "personId": "22222222-2222-4222-8222-222222222222",
+              "parentSlotIds": [],
+              "spouseSlotId": "owner",
+              "isLandOwner": false,
+              "willReceive": true,
+              "hidden": false,
+              "deleted": false
+            },
+            {
+              "id": "child_1",
+              "personId": "33333333-3333-4333-8333-333333333333",
+              "parentSlotIds": ["owner", "spouse"],
+              "spouseSlotId": null,
+              "isLandOwner": false,
+              "willReceive": true,
+              "hidden": false,
+              "deleted": false
+            },
+            {
+              "id": "child_2",
+              "personId": "44444444-4444-4444-8444-444444444444",
+              "parentSlotIds": ["owner", "spouse"],
+              "spouseSlotId": null,
+              "isLandOwner": false,
+              "willReceive": true,
+              "hidden": false,
+              "deleted": false
+            }
+          ]
+        },
+        "render_model": "auto",
+        "warnings": []
+      }
+    }
+  }
+}
