@@ -105,7 +105,17 @@
         : (job.progress || { done: 0, total: null });
     }
     if (!isTerminal(job) && job.status === 'waiting_user' && job.waiting_on) {
-      state.waitingBanner = { on: job.waiting_on, jobId: job.job_id };
+      // Banner chi pin khi job thuoc scope hien tai — job waiting cua
+      // website/run cu (du lieu bi tu choi) khong duoc hien banner.
+      const d = jobData(job);
+      const inScope = S.activeJobIds(state).has(job.job_id) ||
+        (d && S.acceptScopedResult(state, {
+          websiteId: d.website_id, runId: d.run_id,
+          browserId: d.browser_id,
+        }));
+      if (inScope) {
+        state.waitingBanner = { on: job.waiting_on, jobId: job.job_id };
+      }
     } else if (state.waitingBanner &&
                state.waitingBanner.jobId === job.job_id) {
       state.waitingBanner = null;
@@ -244,6 +254,21 @@
           state.audit = null;
           state.auditStale = false;
           state.auditError = job.error;
+          return true;
+        }
+        if (isTerminal(job)) {
+          // Terminal khong error (vd. canceled/khong result): so lieu cu
+          // khong con mo ta bo loc hien tai — xoa de khong hien bao cao cu.
+          state.audit = null;
+          state.auditStale = false;
+          state.auditError = {
+            code: `job_${job.status}`,
+            message: job.status === 'canceled'
+              ? 'Đã hủy nạp dữ liệu Excel.'
+              : 'Nạp dữ liệu Excel không hoàn tất.',
+            retryable: true,
+            next_action: 'retry',
+          };
           return true;
         }
         return false;

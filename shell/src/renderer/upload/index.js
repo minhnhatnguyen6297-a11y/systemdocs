@@ -21,6 +21,9 @@
   function syncTbody(h, tbody, rows, keyOf, renderRow, emptyText) {
     if (!rows.length) {
       const tr = h.el('tr');
+      // Khoa sentinel: lan goi non-empty sau do placeholder vao byKey va bi
+      // xoa nhu moi dong cu — khong de "(trong)" nam lai tren du lieu that.
+      tr.dataset.k = '__empty__';
       const td = h.el('td', 'muted', emptyText || '—');
       td.colSpan = 20;
       tr.append(td);
@@ -30,6 +33,7 @@
     const byKey = new Map();
     for (const tr of Array.from(tbody.children)) {
       if (tr.dataset && tr.dataset.k != null) byKey.set(tr.dataset.k, tr);
+      else tr.remove(); // node khong khoa (placeholder cu) khong duoc nam lai
     }
     const order = [];
     rows.forEach((row, idx) => {
@@ -117,21 +121,30 @@
         if (!inflight.catalog && !state.catalogTried) {
           inflight.catalog = true;
           state.catalogTried = true;
-          const r = await quiet('upload.websites', {});
-          inflight.catalog = false;
-          if (r.ok) {
-            await h.awaitJob(r.job.job_id, 30000);
-          } else if (r.error && C.VERSION_ERRORS.has(r.error.code)) {
-            state.workflowReady = false;
+          try {
+            const r = await quiet('upload.websites', {});
+            if (r.ok) {
+              await h.awaitJob(r.job.job_id, 30000);
+            } else if (r.error && C.VERSION_ERRORS.has(r.error.code)) {
+              state.workflowReady = false;
+            }
+          } catch (e) {
+            // Loi bat ngo: khong khoa co — lan bootstrap sau duoc thu lai.
+            state.catalogTried = false;
+          } finally {
+            inflight.catalog = false;
           }
           view.refresh();
         }
         if (!inflight.ws) {
           inflight.ws = true;
-          const r = await quiet('upload.workspace_get',
-            { website_id: state.websiteId });
-          inflight.ws = false;
-          if (r.ok) await h.awaitJob(r.job.job_id, 30000);
+          try {
+            const r = await quiet('upload.workspace_get',
+              { website_id: state.websiteId });
+            if (r.ok) await h.awaitJob(r.job.job_id, 30000);
+          } finally {
+            inflight.ws = false;
+          }
           view.refresh();
         }
       } catch (e) {
@@ -407,10 +420,12 @@
       setFromDate: (v) => {
         state.fromDate = v || state.fromDate;
         S.markAuditStale(state);
+        view.refresh(); // badge "chua cap nhat" hien ngay, khong cho poll
       },
       setToDate: (v) => {
         state.toDate = v || state.toDate;
         S.markAuditStale(state);
+        view.refresh();
       },
     };
 

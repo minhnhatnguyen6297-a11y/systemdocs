@@ -120,7 +120,7 @@ test('adoptJobResult: queue dung run duoc ap, chon mac dinh theo backend', () =>
   assert.equal(st.queueRevision, 7);
   assert.equal(st.hasExcel, true);
   assert.deepEqual([...st.selectedIds], [11]);
-  assert.ok(st.issueRecordIds ? true : true);
+  assert.deepEqual([...S.issueRecordIds(st)].sort((a, b) => a - b), [12]);
 });
 
 test('adoptJobResult: scan dung job tao run moi va xoa selection cu', () => {
@@ -481,3 +481,102 @@ test('view: doi tab giu DOM/scroll, cot bang dung chuan MIN-77', async () => {
   assert.equal(viewBox.scrollTop, 55, 'scroll cua tab audit phuc hoi');
   assert.equal(auditPanel.hidden, false);
 });
+
+test('view: syncTbody empty→non-empty→empty khong de dong placeholder thua',
+  async () => {
+    const { document } = makeDom();
+    const U = loadModule(document);
+    const L = require('../src/renderer/lib.js');
+    const jobs = new Map();
+    const view = U.buildView({
+      api: fakeApi(), L, jobs, notify: () => {},
+      entry: { id: 'upload', title: 'Upload Lab' },
+      module: { id: 'upload', namespaces: ['upload'], status: 'available' },
+      h: fakeHelpers(document, L),
+      submit: async () => null,
+    });
+    view.refresh();
+    const scanPanel = findById(view.el, 'ul-panel-scan-upload');
+    const qt = collect(scanPanel, (e) => e.tagName === 'TBODY')[0];
+    assert.ok(qt, 'khong tim thay tbody bang queue');
+    // Rong: dung 1 dong placeholder.
+    assert.equal(qt.children.length, 1);
+    assert.match(qt.children[0].textContent, /Chưa có hồ sơ/);
+
+    // Workspace + queue co dong → placeholder phai bien mat hoan toan.
+    jobs.set('job_ws1', job('upload.workspace_get', 'succeeded', {
+      workflow_version: V, website_id: 'nam_dinh', revision: 1,
+      run_id: 'run_1', audit_id: null, browser_id: null,
+      has_excel: true, queue_revision: 1,
+      needs_reconcile_record_ids: [], active_job_ids: ['job_q'],
+    }, { jobId: 'job_ws1', at: '2026-09-24T10:00:01Z' }));
+    jobs.set('job_q', job('upload.queue_get', 'succeeded', {
+      workflow_version: V, website_id: 'nam_dinh', run_id: 'run_1',
+      queue_revision: 2, has_excel: true,
+      folder_rows: [
+        { record_id: 1, contract_no: '1/2026', selected: true },
+        { record_id: 2, contract_no: '2/2026', selected: false },
+      ],
+      missing_in_excel_record_ids: [],
+    }, { jobId: 'job_q', at: '2026-09-24T10:00:02Z' }));
+    view.refresh();
+    assert.equal(qt.children.length, 2);
+    for (const tr of qt.children) {
+      assert.ok(tr.dataset.k && tr.dataset.k !== '__empty__',
+        'dong placeholder thua nam lai tren du lieu that');
+      assert.ok(!/Chưa có hồ sơ/.test(tr.textContent),
+        'chu placeholder con nam trong bang');
+    }
+
+    // Queue moi rong → tro lai dung 1 dong placeholder.
+    jobs.set('job_ws2', job('upload.workspace_get', 'succeeded', {
+      workflow_version: V, website_id: 'nam_dinh', revision: 2,
+      run_id: 'run_1', audit_id: null, browser_id: null,
+      has_excel: true, queue_revision: 3,
+      needs_reconcile_record_ids: [],
+      active_job_ids: ['job_q', 'job_q2'],
+    }, { jobId: 'job_ws2', at: '2026-09-24T10:00:03Z' }));
+    jobs.set('job_q2', job('upload.queue_get', 'succeeded', {
+      workflow_version: V, website_id: 'nam_dinh', run_id: 'run_1',
+      queue_revision: 3, has_excel: true,
+      folder_rows: [],
+      missing_in_excel_record_ids: [],
+    }, { jobId: 'job_q2', at: '2026-09-24T10:00:04Z' }));
+    view.refresh();
+    assert.equal(qt.children.length, 1);
+    assert.match(qt.children[0].textContent, /Chưa có hồ sơ/);
+  });
+
+test('adoptJobResult: waiting_user ngoai scope khong pin waitingBanner', () => {
+  const st = S.createUploadState();
+  st.websiteId = 'nam_dinh';
+  st.runId = 'run_b';
+  // Job waiting cua website khac, khong thuoc activeJobIds → khong banner.
+  const stale = job('upload.session_start', 'waiting_user', {
+    workflow_version: V, website_id: 'khac', browser_id: 'br_cu',
+  }, { jobId: 'job_la' });
+  stale.waiting_on = 'login';
+  C.adoptJobResult(st, stale);
+  assert.equal(st.waitingBanner, null);
+  // Job waiting cua chinh view (activeJobIds) → banner duoc pin.
+  st.sessionJobId = 'job_ss';
+  const mine = job('upload.session_start', 'waiting_user', null,
+    { jobId: 'job_ss' });
+  mine.waiting_on = 'login';
+  C.adoptJobResult(st, mine);
+  assert.deepEqual(st.waitingBanner, { on: 'login', jobId: 'job_ss' });
+});
+
+test('adoptJobResult: audit terminal khong error (canceled) xoa du lieu cu',
+  () => {
+    const st = S.createUploadState();
+    st.websiteId = 'nam_dinh';
+    st.audit = { audit_id: 'aud_cu', summary: { excel_total: 9 } };
+    st.auditJobId = 'job_ac';
+    const j = job('upload.audit_excel', 'canceled', null,
+      { jobId: 'job_ac' });
+    assert.equal(C.adoptJobResult(st, j), true);
+    assert.equal(st.audit, null);
+    assert.equal(st.auditStale, false);
+    assert.equal(st.auditError.code, 'job_canceled');
+  });
