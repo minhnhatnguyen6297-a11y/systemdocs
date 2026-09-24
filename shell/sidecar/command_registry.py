@@ -203,11 +203,13 @@ COMMANDS = {
     "ocr.analyze": _notary("ocr_analyze"),
     "zalo.status": _notary("zalo_status"),
     # upload_lab — MIN-69
-    "upload.scan": _upload("scan_folder"),
-    "upload.audit_excel": _upload("audit_excel"),
+    "upload.scan": _upload("scan_dispatch"),
+    "upload.audit_excel": _upload("audit_excel_dispatch"),
     "upload.env_check": _upload("env_check_dispatch"),
     # upload.workflow.v1 — website registry + workspace (MIN-69 task 2)
     "upload.websites": _upload("upload_websites"),
+    # upload.workflow.v1 — scan/audit/queue gan dung luot (MIN-69 task 3)
+    "upload.queue_get": _upload("upload_queue_get"),
     "upload.workspace_get": _upload("upload_workspace_get"),
     "upload.website_select": _upload("upload_website_select"),
     "upload.preferences": _upload("upload_preferences"),

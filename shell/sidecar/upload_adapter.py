@@ -12,14 +12,20 @@ Boundary (MIN-69):
     code + giu data root legacy; luong `upload.workflow.v1` doc/ghi qua
     `upload_workspace.website_data_dir(website_id)` duoi G1_UPLOAD_DATA_DIR.
 """
+import hashlib
+import json
+import re
+import sqlite3
 import threading
 import time
 from dataclasses import asdict, is_dataclass
+from datetime import date as _date, datetime as _datetime
 from pathlib import Path
 
 from errors import CommandError
 from engine_roots import engine_root, import_engine_module
-from fileref import validate_file_ref
+from fileref import existing_file, validate_file_ref
+from jobstore import CancelledByUser
 from upload_session import worker, LOGIN_WAIT_TIMEOUT_S, REVIEW_WAIT_TIMEOUT_S
 import upload_workspace
 
@@ -202,6 +208,22 @@ def env_check_dispatch(job, payload):
     if isinstance(payload, dict) and "workflow_version" in payload:
         return upload_env_check_v1(job, payload)
     return env_check(job, payload)
+
+
+def scan_dispatch(job, payload):
+    """Route `upload.scan`: co workflow_version → v1 scoped (data_dir cua
+    website + binding run→manifest); khong co → legacy engine-root."""
+    if isinstance(payload, dict) and "workflow_version" in payload:
+        return upload_scan_v1(job, payload)
+    return scan_folder(job, payload)
+
+
+def audit_excel_dispatch(job, payload):
+    """Route `upload.audit_excel`: co workflow_version → v1 scoped
+    (file_ref + binding audit); khong co → legacy `file` payload."""
+    if isinstance(payload, dict) and "workflow_version" in payload:
+        return upload_audit_excel_v1(job, payload)
+    return audit_excel(job, payload)
 
 
 # ---------- browser session (upload_lab/playwright_uploader) ----------
@@ -522,3 +544,471 @@ def upload_env_check_v1(job, payload):
         "status": report.get("overall") or report.get("status") or "blocked",
         "steps": _dc(steps),
     })
+
+
+# =====================================================================
+# upload.workflow.v1 — scan / audit_excel / queue_get (MIN-69 task 3).
+#
+# Khac biet then chot so voi legacy:
+#   - Moi ghi/doc di qua `website_data_dir(website_id)` — KHONG engine root.
+#   - manifest_ref la file cua CHINH run vua scan; binding run→manifest luu
+#     trong workspace store; khong fallback "file moi nhat" o bat cu dau.
+#   - Loi doc registry/Excel/output JSON la LOI (engine_unavailable /
+#     file_not_found / stale_revision) — khong bao gio tra danh sach rong
+#     gia thanh cong.
+#   - queue_get khong cham Playwright/browser: sai binding/run/audit fail
+#     truoc moi thao tac engine nang.
+# =====================================================================
+
+_SCAN_V1_KEYS = frozenset({
+    "workflow_version", "website_id", "folder", "expected_revision",
+    "full_rescan", "modified_since"})
+_AUDIT_V1_KEYS = frozenset({
+    "workflow_version", "website_id", "file_ref", "from_date", "to_date"})
+_QUEUE_V1_KEYS = frozenset({
+    "workflow_version", "website_id", "run_id", "audit_id"})
+# .xls (BIFF) chua co duong doc da kiem chung trong engine → tu choi.
+_AUDIT_EXCEL_SUFFIXES = (".xlsx", ".xlsm")
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_CANON_CONTRACT_NO_RE = re.compile(r"^\d+/\d{4}$")
+
+
+def _require_payload_keys(payload, allowed):
+    """Contract khong nhan key la: key ngoai schema → validation_error."""
+    extra = set(payload) - set(allowed)
+    if extra:
+        raise CommandError("validation_error",
+                           f"payload key khong ho tro: {sorted(extra)}")
+
+
+def _require_iso_date(value, field):
+    """Wire format ISO yyyy-mm-dd nghiem ngat — dd/mm/yyyy bi tu choi."""
+    if not isinstance(value, str) or not _ISO_DATE_RE.match(value):
+        raise CommandError("validation_error",
+                           f"{field} phai la ISO yyyy-mm-dd: {value!r}")
+    try:
+        return _datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError as exc:
+        raise CommandError("validation_error",
+                           f"{field} khong phai ngay that: {value!r}") from exc
+
+
+def _ddmmyyyy_from_iso(value, field):
+    """Boundary ISO → engine dd/mm/yyyy (engine audit dung dd/mm/yyyy)."""
+    return _require_iso_date(value, field).strftime("%d/%m/%Y")
+
+
+def _ngay_iso(value):
+    """Engine date (date/datetime hoac 'dd/mm/yyyy') → ISO hoac None."""
+    if isinstance(value, _datetime):
+        return value.date().isoformat()
+    if isinstance(value, _date):
+        return value.isoformat()
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return _datetime.strptime(text, "%d/%m/%Y").strftime("%Y-%m-%d")
+    except ValueError:
+        return None
+
+
+def _request_hash(payload) -> str:
+    return hashlib.sha256(json.dumps(
+        payload or {}, sort_keys=True, default=str
+    ).encode("utf-8")).hexdigest()
+
+
+def _begin_workflow_job(store, job, *, command, website_id, payload):
+    """Ghi dong workflow_jobs truoc khi engine chay (plan §3.2): recovery
+    toi thieu + job non-terminal chan doi website (workflow_busy)."""
+    store.upsert_job(
+        job.job_id, command_id=job.command_id,
+        request_hash=_request_hash(payload), command=command,
+        website_id=website_id, status="running")
+
+
+def _finish_workflow_job(store, job_id, status, **fields):
+    """Terminal status cho dong workflow_jobs — best-effort, khong che loi
+    nghiep vu khi store hu."""
+    try:
+        store.upsert_job(job_id, status=status, **fields)
+    except Exception:
+        pass
+
+
+def _engine_error(exc, *, generic):
+    """Engine exception → (code, message, retryable, next_action) strings.
+
+    Tra text thay vi giu object exc: traceback cua engine exception giu
+    frame dang mo sqlite connection/file handle — neu CommandError giu
+    __cause__/__context__ toi no thi handle bi pin mo tren Windows cho
+    toi khi cyclic GC chay (exception↔traceback↔frame tao cycle)."""
+    if isinstance(exc, FileNotFoundError):
+        return ("file_not_found", str(exc), True, "pick_files")
+    if isinstance(exc, PermissionError):
+        return ("file_locked", str(exc), True, "retry")
+    if isinstance(exc, RuntimeError):
+        return ("engine_unavailable", str(exc), True, None)
+    if isinstance(exc, ValueError):
+        return ("validation_error", str(exc), False, None)
+    code, retryable, next_action, label = generic
+    return (code, f"{label}: {type(exc).__name__}: {exc}",
+            retryable, next_action)
+
+
+def _run_engine(fn, *, generic):
+    """Chay callable engine; exception → CommandError theo _engine_error.
+
+    CommandError (structured tu tang duoi) di qua nguyen. Loi duoc raise
+    SAU khi except block ket thuc de context exception engine duoc giai
+    phong ngay — khong de lai handle mo tren Windows."""
+    err = None
+    try:
+        return fn()
+    except CommandError:
+        raise
+    except Exception as exc:
+        err = _engine_error(exc, generic=generic)
+    code, message, retryable, next_action = err
+    raise CommandError(code, message,
+                       retryable=retryable, next_action=next_action)
+
+
+def _analyze_excel(provider, excel, from_date, to_date):
+    """analyze_contract_book qua provider; exception → contract error.
+
+    from_date/to_date la ISO wire (da validate) — doi sang dd/mm/yyyy
+    cho engine o boundary nay."""
+    return _run_engine(
+        lambda: provider.audit_excel(
+            excel,
+            from_date=_ddmmyyyy_from_iso(from_date, "from_date"),
+            to_date=_ddmmyyyy_from_iso(to_date, "to_date")),
+        generic=("validation_error", False, "pick_files",
+                 f"khong doc duoc file Excel {excel.name}"))
+
+
+def _audit_rows(analysis):
+    """ContractBookAnalysis → hai bang MIN-77 (stt/ngay/so_cong_chung/ghi_chu)."""
+    missing = [
+        {"stt": i + 1, "ngay": None,
+         "so_cong_chung": str(m.contract_no),
+         "ghi_chu": str(getattr(m, "note", "") or "")}
+        for i, m in enumerate(analysis.missing_numbers)]
+
+    def _kind(r):
+        k = getattr(r, "kind", "")
+        return str(getattr(k, "value", k))
+
+    issues = [
+        {"stt": i + 1,
+         "ngay": _ngay_iso(getattr(r, "contract_date", None)),
+         "so_cong_chung": str(
+             getattr(r, "contract_no", "")
+             or getattr(r, "raw_contract_no", "")),
+         "ghi_chu": f"{_kind(r)}: {getattr(r, 'message', '')}"}
+        for i, r in enumerate(analysis.issue_rows)]
+    return missing, issues
+
+
+def _record_row(rd):
+    """Row registry cua run → records[] cua scan_report (§6.10)."""
+    return {
+        "record_id": int(rd.get("id") or 0),
+        "contract_no": str(rd.get("contract_no") or ""),
+        "status": str(rd.get("status") or ""),
+        "reason": str(rd.get("reason") or ""),
+        "last_error": str(rd.get("last_error") or ""),
+        "file_path": str(rd.get("file_path") or ""),
+    }
+
+
+def _queue_row(row):
+    """FolderScanRow cua engine → folder_rows[] cua upload_queue (§6.11)."""
+    ncn = str(row.normalized_contract_no or "").strip()
+    return {
+        "record_id": int(row.record_id),
+        "contract_no": str(row.contract_no or ""),
+        "normalized_contract_no": (
+            ncn if _CANON_CONTRACT_NO_RE.match(ncn) else None),
+        "ngay": _ngay_iso(row.contract_date),
+        "ghi_chu": str(row.note or ""),
+        "file_path": str(row.source_file or ""),
+        "status": str(row.status or ""),
+        "selected": bool(row.selected),
+        "has_issue": bool(row.has_issue),
+        "missing_fields": [str(f) for f in (row.missing_fields or [])],
+    }
+
+
+def upload_scan_v1(job, payload):
+    """`upload.scan` versioned → kind scan_report (contract §6.10).
+
+    Goi `provider.run_scan` (= run_folder_scan that) voi working_dir la
+    data_dir cua website; manifest cua chinh luot nay duoc gan vao store;
+    records doc lai tu registry cua website — loi doc la LOI."""
+    p = _require_workflow(payload)
+    _require_payload_keys(p, _SCAN_V1_KEYS)
+    wid = _require_website(p)
+    expected = _require_revision(p, "expected_revision")
+    folder = validate_file_ref(p.get("folder"))
+    if not folder.is_dir():
+        raise CommandError(
+            "file_not_found",
+            f"khong phai thu muc/khong ton tai: {folder}",
+            retryable=True, next_action="pick_files")
+    full_rescan = p.get("full_rescan", False)
+    if not isinstance(full_rescan, bool):
+        raise CommandError("validation_error", "full_rescan phai la bool")
+    modified_since = p.get("modified_since")
+    if modified_since == "":
+        raise CommandError("validation_error",
+                           "modified_since: dung null thay chuoi rong")
+    if modified_since is not None:
+        _require_iso_date(modified_since, "modified_since")
+
+    store = upload_workspace.open_store()
+    current = store.revision()
+    if expected != current:
+        raise CommandError(
+            "stale_revision",
+            f"expected_revision {expected} != hien tai {current} — "
+            "doc lai workspace_get",
+            retryable=True, next_action="retry")
+    data_dir = upload_workspace.website_data_dir(wid)
+    provider = upload_workspace.get_provider(wid)
+
+    _begin_workflow_job(store, job, command="upload.scan",
+                        website_id=wid, payload=p)
+    try:
+        def on_progress(snap):
+            total = snap.get("total_files") or 0
+            done = snap.get("processed_files") or 0
+            label = snap.get("current_file") or snap.get("step") or ""
+            job.report_progress(done, total or 1, label)
+
+        job.report_progress(0, 1, "indexing")
+        manifest, manifest_path = _run_engine(
+            lambda: provider.run_scan(
+                folder, data_dir,
+                modified_since=modified_since,
+                full_rescan=full_rescan,
+                progress_callback=on_progress),
+            generic=("engine_unavailable", True, None, "scan that bai"))
+        job.check_cancel()
+        # Binding run→manifest cua chinh luot nay — manifest da duoc
+        # finalize boi engine trong working_dir/runs.
+        run = upload_workspace.register_run(wid, manifest_path, store=store)
+        run_id = run["run_id"]
+        batch_scan = import_engine_module("upload_lab", "batch_scan")
+
+        def _read_run_records():
+            # sqlite3.connect truc tiep + close trong finally: registry
+            # cua run vua scan da ton tai. Khong qua connect_registry cua
+            # engine — neu ensure_registry_schema nem loi thi conn mo bi
+            # bo lai trong frame (statement-cache tao self-cycle, file
+            # bi khoa tren Windows toi khi cyclic GC chay).
+            conn = sqlite3.connect(str(data_dir / "registry.sqlite3"))
+            try:
+                conn.row_factory = sqlite3.Row
+                return batch_scan.fetch_registry_records_for_run(
+                    conn, run_id)
+            finally:
+                conn.close()
+
+        rows = _run_engine(
+            _read_run_records,
+            generic=("engine_unavailable", True, None,
+                     f"khong doc duoc registry cua run {run_id}"))
+        job.check_cancel()
+        revision = store.bump_revision()
+        _finish_workflow_job(store, job.job_id, "succeeded", run_id=run_id)
+    except CancelledByUser:
+        _finish_workflow_job(store, job.job_id, "canceled")
+        raise
+    except Exception:
+        _finish_workflow_job(store, job.job_id, "failed")
+        raise
+    return _result("scan_report", {
+        "workflow_version": WORKFLOW_VERSION,
+        "website_id": wid,
+        "run_id": run_id,
+        "manifest_ref": {
+            "path": str(manifest_path),
+            "scope": "machine_local",
+            "sha256": run["manifest_sha256"],
+            "size_bytes": run["manifest_size"],
+        },
+        "folder": {"path": str(folder), "scope": "machine_local"},
+        "stats": _dc(manifest.get("stats") or {}),
+        "records": [_record_row(dict(r)) for r in rows],
+        "revision": revision,
+    }, source_files=[{"path": str(folder), "scope": "machine_local"}])
+
+
+def upload_audit_excel_v1(job, payload):
+    """`upload.audit_excel` versioned → kind audit_report (contract §6.9).
+
+    file_ref → .xlsx/.xlsm that; ngay wire ISO → engine dd/mm/yyyy o
+    boundary; binding audit_id → website + file + hash + khoang ngay duoc
+    giu de queue_get/prepare loai tru sau."""
+    p = _require_workflow(payload)
+    _require_payload_keys(p, _AUDIT_V1_KEYS)
+    wid = _require_website(p)
+    excel = existing_file(p.get("file_ref"))
+    if excel.suffix.lower() not in _AUDIT_EXCEL_SUFFIXES:
+        raise CommandError(
+            "validation_error",
+            "chi ho tro .xlsx/.xlsm (.xls chua co duong doc da kiem chung)")
+    from_date = p.get("from_date")
+    to_date = p.get("to_date")
+    _require_iso_date(from_date, "from_date")
+    _require_iso_date(to_date, "to_date")
+
+    store = upload_workspace.open_store()
+    provider = upload_workspace.get_provider(wid)
+    _begin_workflow_job(store, job, command="upload.audit_excel",
+                        website_id=wid, payload=p)
+    try:
+        job.report_progress(0, 1, "doc so excel")
+        analysis = _analyze_excel(provider, excel, from_date, to_date)
+        job.check_cancel()
+        audit = upload_workspace.register_audit(
+            wid, excel, from_date=from_date, to_date=to_date, store=store)
+        revision = store.bump_revision()
+        _finish_workflow_job(store, job.job_id, "succeeded",
+                             audit_id=audit["audit_id"])
+    except CancelledByUser:
+        _finish_workflow_job(store, job.job_id, "canceled")
+        raise
+    except Exception:
+        _finish_workflow_job(store, job.job_id, "failed")
+        raise
+    missing, issues = _audit_rows(analysis)
+    job.report_progress(1, 1, "xong")
+    return _result("audit_report", {
+        "workflow_version": WORKFLOW_VERSION,
+        "website_id": wid,
+        "audit_id": audit["audit_id"],
+        "from_date": from_date,
+        "to_date": to_date,
+        "summary": _dc(getattr(analysis, "summary", None) or {}),
+        "missing": missing,
+        "issues": issues,
+        "revision": revision,
+    }, source_files=[{"path": str(excel), "scope": "machine_local"}])
+
+
+def upload_queue_get(job, payload):
+    """`upload.queue_get` → kind upload_queue (contract §6.11).
+
+    Manifest chi giai quyet qua binding da luu (`resolve_run` kiem website
+    + file + sha256); audit phai thuoc website va file Excel khong doi ke
+    tu luc audit. Khong fallback, khong browser, khong bump revision —
+    chi `queue_revision` tang khi gan audit moi cho run."""
+    p = _require_workflow(payload)
+    _require_payload_keys(p, _QUEUE_V1_KEYS)
+    wid = _require_website(p)
+    run_id = p.get("run_id")
+    if not isinstance(run_id, str) or not run_id.strip():
+        raise CommandError("validation_error",
+                           "run_id phai la chuoi khong rong")
+    run_id = run_id.strip()
+    audit_id = p.get("audit_id")
+    if audit_id is not None and (
+            not isinstance(audit_id, str) or not audit_id.strip()):
+        raise CommandError("validation_error",
+                           "audit_id phai la chuoi khong rong hoac null")
+    store = upload_workspace.open_store()
+    manifest_path = upload_workspace.resolve_run(wid, run_id, store=store)
+    audit_rec = upload_workspace.resolve_audit(wid, audit_id, store=store)
+    data_dir = upload_workspace.website_data_dir(wid, create=False)
+    provider = upload_workspace.get_provider(wid)
+    batch_scan = import_engine_module("upload_lab", "batch_scan")
+    uploader = import_engine_module("upload_lab", "playwright_uploader")
+
+    # Registry cua website phai con + doc duoc; thieu/hu = LOI, khong
+    # bao gio tra queue rong gia thanh cong.
+    registry_path = data_dir / "registry.sqlite3"
+    if not registry_path.is_file():
+        raise CommandError(
+            "engine_unavailable",
+            f"registry cua website {wid} khong con tren dia — quet lai",
+            retryable=True, next_action="retry")
+
+    def _read_queueable():
+        # sqlite3.connect truc tiep + close trong finally — registry hu
+        # thi SELECT that bai ngay (engine_unavailable), khong de lai
+        # conn mo trong frame nhu connect_registry cua engine.
+        conn = sqlite3.connect(str(registry_path))
+        try:
+            conn.row_factory = sqlite3.Row
+            return batch_scan.fetch_registry_records_for_run(
+                conn, run_id, statuses=uploader.QUEUE_STATUSES)
+        finally:
+            conn.close()
+
+    queueable = _run_engine(
+        _read_queueable,
+        generic=("engine_unavailable", True, None,
+                 "khong doc duoc registry"))
+    _manifest, records, _total = _run_engine(
+        lambda: uploader.load_upload_queue(
+            manifest_path, working_dir=data_dir),
+        generic=("engine_unavailable", True, None,
+                 f"khong doc duoc queue cua run {run_id}"))
+    if len(records) < len(queueable):
+        raise CommandError(
+            "engine_unavailable",
+            f"{len(queueable) - len(records)} ho so cua run {run_id} "
+            "thieu output JSON — quet lai folder",
+            retryable=True, next_action="retry")
+
+    analysis = None
+    if audit_rec is not None:
+        audit_file = Path(audit_rec["file_path"])
+        if not audit_file.is_file():
+            raise CommandError(
+                "file_not_found",
+                f"file Excel cua audit {audit_rec['audit_id']} khong con "
+                "tren dia — audit lai",
+                retryable=True, next_action="pick_files")
+        bound_hash = audit_rec.get("file_sha256")
+        if bound_hash and \
+                upload_workspace.sha256_file(audit_file) != bound_hash:
+            raise CommandError(
+                "stale_revision",
+                f"file Excel cua audit {audit_rec['audit_id']} da thay "
+                "doi — audit lai",
+                retryable=True, next_action="retry")
+        if not audit_rec.get("from_date") or not audit_rec.get("to_date"):
+            raise CommandError(
+                "validation_error",
+                "audit thieu khoang ngay — audit lai")
+        analysis = _analyze_excel(
+            provider, audit_file,
+            audit_rec["from_date"], audit_rec["to_date"])
+        # Ghi nhan audit dung voi run de prepare loai tru sau; gan audit
+        # moi khac audit da gan → queue thay doi → bump queue_revision.
+        bound = store.audit_for_run(run_id)
+        if bound is None or bound["audit_id"] != audit_rec["audit_id"]:
+            store.bind_run_audit(run_id, audit_rec["audit_id"])
+            store.bump_queue_revision(run_id)
+
+    classify_mod = import_engine_module(
+        "upload_lab", "ui.services.scan_classification_service")
+    classification = classify_mod.classify_scan_records(records, analysis)
+    job.check_cancel()
+    return _result("upload_queue", {
+        "workflow_version": WORKFLOW_VERSION,
+        "website_id": wid,
+        "run_id": run_id,
+        "audit_id": audit_rec["audit_id"] if audit_rec else None,
+        "queue_revision": store.queue_revision(run_id),
+        "has_excel": bool(classification.has_excel),
+        "folder_rows": [_queue_row(r) for r in classification.folder_rows],
+        "missing_in_excel_record_ids": sorted(
+            int(i) for i in classification.missing_in_excel_record_ids),
+    }, source_files=[{"path": str(manifest_path),
+                      "scope": "machine_local"}])
