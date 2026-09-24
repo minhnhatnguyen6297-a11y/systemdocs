@@ -1,0 +1,19 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_01HZX0051",
+  "command_id": "9a1b2c3d-0052-4e5f-8a6b-7c8d9e0f1a2b",
+  "status": "failed",
+  "waiting_on": null,
+  "progress": null,
+  "result": null,
+  "error": {
+    "code": "banana_code",
+    "message": "ma loi khong co trong contract",
+    "retryable": false,
+    "next_action": null,
+    "job_id": "j_01HZX0099",
+    "details": null
+  },
+  "updated_at": "2026-09-24T10:20:00Z",
+  "expected_error": "validation_error"
+}

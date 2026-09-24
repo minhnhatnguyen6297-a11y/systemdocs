@@ -1,0 +1,21 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "command_id": "9a1b2c3d-0010-4e5f-8a6b-7c8d9e0f1a2b",
+  "command": "upload.audit_excel",
+  "payload": {
+    "workflow_version": "upload.workflow.v1",
+    "website_id": "nam_dinh",
+    "file_ref": {
+      "path": "D:/g1data/upload_lab/websites/nam_dinh/downloads/so_2026_h1.xlsx",
+      "scope": "machine_local",
+      "sha256": "ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12",
+      "size_bytes": 18233
+    },
+    "from_date": "2026-01-01",
+    "to_date": "2026-09-24"
+  },
+  "client_meta": {
+    "shell_version": "0.2.0",
+    "module": "upload"
+  }
+}

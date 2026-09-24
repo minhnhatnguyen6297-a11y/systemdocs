@@ -1,0 +1,89 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_01HZX0026",
+  "command_id": "9a1b2c3d-0027-4e5f-8a6b-7c8d9e0f1a2b",
+  "status": "partial",
+  "waiting_on": null,
+  "progress": {
+    "done": 5,
+    "total": 5,
+    "current_label": "xong"
+  },
+  "result": {
+    "kind": "upload_prepare",
+    "data": {
+      "workflow_version": "upload.workflow.v1",
+      "website_id": "nam_dinh",
+      "browser_id": "brw_1",
+      "run_id": "a1b2c3d4",
+      "audit_id": "aud_7",
+      "summary": {
+        "total_requested": 5,
+        "prepared_count": 4,
+        "remaining": 26,
+        "open_record_ids": [
+          138,
+          139,
+          141,
+          142
+        ]
+      },
+      "breakdown": {
+        "succeeded": [
+          {
+            "record_id": 138,
+            "stage": "prepared"
+          },
+          {
+            "record_id": 139,
+            "stage": "prepared"
+          },
+          {
+            "record_id": 141,
+            "stage": "prepared"
+          },
+          {
+            "record_id": 142,
+            "stage": "prepared"
+          }
+        ],
+        "failed": [
+          {
+            "record_id": 140,
+            "stage": "prepared",
+            "code": "extract_failed",
+            "message": "mau dien thieu truong"
+          }
+        ]
+      },
+      "saved_record_ids": [
+        138,
+        139
+      ],
+      "needs_reconcile_record_ids": [
+        142
+      ]
+    },
+    "warnings": [
+      {
+        "code": "upload.partial_failure",
+        "message": "1/5 ho so loi"
+      }
+    ],
+    "source_files": [],
+    "evidence": []
+  },
+  "error": {
+    "code": "upload.partial_failure",
+    "message": "1/5 ho so prepare that bai",
+    "retryable": true,
+    "next_action": "retry",
+    "job_id": "j_01HZX0099",
+    "details": {
+      "failed_record_ids": [
+        140
+      ]
+    }
+  },
+  "updated_at": "2026-09-24T10:20:00Z"
+}

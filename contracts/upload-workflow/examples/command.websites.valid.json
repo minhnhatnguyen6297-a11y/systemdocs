@@ -1,0 +1,12 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "command_id": "9a1b2c3d-0001-4e5f-8a6b-7c8d9e0f1a2b",
+  "command": "upload.websites",
+  "payload": {
+    "workflow_version": "upload.workflow.v1"
+  },
+  "client_meta": {
+    "shell_version": "0.2.0",
+    "module": "upload"
+  }
+}

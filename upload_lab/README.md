@@ -51,7 +51,7 @@ flowchart LR
    - Điều hướng vào trang tạo mới hồ sơ công chứng.
    - Tự động điền: Tên hợp đồng, Số công chứng, Ngày công chứng, Nhóm HĐ (dropdown), Loại tài sản (radio/dropdown), Công chứng viên, Người yêu cầu, Đương sự (Textarea), Tài sản (Textarea).
 3. **Chuẩn bị theo đợt & người dùng tự bấm Lưu**:
-   - Người dùng chọn số tab mở mỗi đợt (1–30) ngay trên trang *Folder Scan & Upload*; mỗi tab gắn với một `record_id` nên không mở trùng hồ sơ.
+   - Người dùng chọn số tab mở mỗi đợt (1–30) ngay trên tab *Quét & Upload Hồ Sơ*; mỗi tab gắn với một `record_id` nên không mở trùng hồ sơ.
    - App điền sẵn rồi **dừng trước nút Lưu** — người dùng kiểm tra trực quan và tự bấm *Lưu*. App không bấm thay.
    - App nhận biết đã Lưu qua phản hồi `POST /api/hoso` thành công (hoặc web chuyển khỏi trang tạo nhanh), tự đóng tab đó, cập nhật `uploaded_success` vào `registry.sqlite3` và bỏ dòng khỏi bảng.
    - Bấm *Tiếp tục N số tiếp theo* để mở đợt mới; app không tự mở đợt kế tiếp.
@@ -116,7 +116,15 @@ upload_lab/
 
 ## 4. Chuẩn Giao diện (UI Design Standard)
 
-Giao diện là **PySide6 + PySide6-Fluent-Widgets (`qfluentwidgets`)**, dựng hoàn toàn bằng Python trong [`ui_qt/main_window.py`](ui_qt/main_window.py) — không dùng file `.ui` (Qt Designer) nữa.
+**Đích (MIN-69 — đang chuyển):** module **Upload Lab** trong Electron shell gồm
+đúng **hai tab** — *Audit Sổ Công Chứng* và *Quét & Upload Hồ Sơ*, mỗi tab toàn
+chiều rộng. Không còn tab Cấu hình (chuyển lên đầu tab Audit cùng dropdown
+website) và không còn trang Nhật ký (log chỉ là chẩn đoán backend đã lọc).
+Đặc tả đầy đủ: [`docs/spec_UI.md`](docs/spec_UI.md); giao tiếp shell ↔ Python
+theo contract [`../contracts/upload-workflow.md`](../contracts/upload-workflow.md)
+(`upload.workflow.v1`).
+
+**Hiện trạng:** giao diện là **PySide6 + PySide6-Fluent-Widgets (`qfluentwidgets`)**, dựng hoàn toàn bằng Python trong [`ui_qt/main_window.py`](ui_qt/main_window.py) — không dùng file `.ui` (Qt Designer) nữa. Bản Qt hiện có bốn trang (Audit Sổ Công Chứng, Quét & Upload Hồ Sơ, Cấu Hình & Hệ Thống, Nhật Ký Hệ Thống); hai trang nghiệp vụ đầu tương ứng hai tab đích ở trên.
 
 - **Cửa sổ chính**: kế thừa `FluentWindow`, điều hướng bằng `NavigationItemPosition` thay cho `QTabWidget` ngang kiểu cũ.
 - **Widget Fluent**: `CardWidget`/`ElevatedCardWidget` cho khối nội dung, `PrimaryPushButton`/`FluentPushButton` cho nút bấm, `FluentIcon` cho icon, `TitleLabel`/`BodyLabel`/`CaptionLabel` cho chữ.
@@ -125,7 +133,7 @@ Giao diện là **PySide6 + PySide6-Fluent-Widgets (`qfluentwidgets`)**, dựng 
 - **Kiểm tra hồi quy giao diện**: `./.venv/Scripts/python.exe ./tools/inspect_ui_style.py` để dump metric/màu thực tế của widget.
 
 > [!IMPORTANT]
-> Mọi thay đổi giao diện đi trực tiếp vào `ui_qt/main_window.py` và `ui_qt/theme.py`. Không tạo file `spec`/`plan`/`issue` hoặc tài liệu yêu cầu song song trong repo; cập nhật nguồn sự thật trên Linear.
+> Thiết kế UI đích (Electron shell) được đặc tả tại [`docs/spec_UI.md`](docs/spec_UI.md) — đó là file spec UI duy nhất của repo. Thay đổi giao diện Qt hiện trạng đi trực tiếp vào `ui_qt/main_window.py` và `ui_qt/theme.py`. Không tạo thêm file `spec`/`plan`/`issue` hoặc tài liệu yêu cầu song song; cập nhật nguồn sự thật trên Linear.
 
 ---
 

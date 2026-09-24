@@ -1,0 +1,18 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "command_id": "9a1b2c3d-0014-4e5f-8a6b-7c8d9e0f1a2b",
+  "command": "upload.preferences",
+  "payload": {
+    "workflow_version": "upload.workflow.v1",
+    "website_id": "nam_dinh",
+    "values": {
+      "chunk_size": 10,
+      "cong_chung_vien": "Phạm Minh Chi",
+      "thu_ky": "Nguyễn Nhật Minh"
+    }
+  },
+  "client_meta": {
+    "shell_version": "0.2.0",
+    "module": "upload"
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_01HZX0022",
+  "command_id": "9a1b2c3d-0023-4e5f-8a6b-7c8d9e0f1a2b",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "audit_report",
+    "data": {
+      "workflow_version": "upload.workflow.v1",
+      "website_id": "nam_dinh",
+      "audit_id": "aud_7",
+      "from_date": "2026-01-01",
+      "to_date": "2026-09-24",
+      "summary": {
+        "excel_total": 120,
+        "valid_count": 115,
+        "missing_count": 4,
+        "issue_count": 1,
+        "duplicate_count": 0
+      },
+      "missing": [
+        {
+          "stt": 1,
+          "ngay": null,
+          "so_cong_chung": "130/2026",
+          "ghi_chu": ""
+        },
+        {
+          "stt": 2,
+          "ngay": null,
+          "so_cong_chung": "131/2026",
+          "ghi_chu": ""
+        }
+      ],
+      "issues": [
+        {
+          "stt": 1,
+          "ngay": "2026-03-14",
+          "so_cong_chung": "98/2026",
+          "ghi_chu": "trung_so: so trung lap trong so"
+        }
+      ]
+    },
+    "warnings": [],
+    "source_files": [
+      {
+        "path": "D:/g1data/upload_lab/websites/nam_dinh/downloads/so_2026_h1.xlsx",
+        "scope": "machine_local"
+      }
+    ],
+    "evidence": []
+  },
+  "error": null,
+  "updated_at": "2026-09-24T10:20:00Z"
+}

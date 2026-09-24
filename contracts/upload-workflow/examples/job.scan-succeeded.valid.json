@@ -1,0 +1,59 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_01HZX0023",
+  "command_id": "9a1b2c3d-0024-4e5f-8a6b-7c8d9e0f1a2b",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "scan_report",
+    "data": {
+      "workflow_version": "upload.workflow.v1",
+      "website_id": "nam_dinh",
+      "run_id": "a1b2c3d4",
+      "manifest_ref": {
+        "path": "D:/g1data/upload_lab/websites/nam_dinh/runs/2026-09-24_10-12-00.json",
+        "scope": "machine_local",
+        "sha256": "ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12",
+        "size_bytes": 54012
+      },
+      "folder": {
+        "path": "D:/ho so/2026",
+        "scope": "machine_local"
+      },
+      "stats": {
+        "candidates_found": 31,
+        "processed_files": 31
+      },
+      "records": [
+        {
+          "record_id": 138,
+          "contract_no": "138/2026",
+          "status": "extracted",
+          "reason": "",
+          "last_error": "",
+          "file_path": "D:/ho so/2026/GD-138.docx"
+        },
+        {
+          "record_id": 140,
+          "contract_no": "",
+          "status": "extract_failed",
+          "reason": "khong doc duoc so",
+          "last_error": "docx loi cau truc",
+          "file_path": "D:/ho so/2026/GD-hong.docx"
+        }
+      ],
+      "revision": 5
+    },
+    "warnings": [],
+    "source_files": [
+      {
+        "path": "D:/ho so/2026",
+        "scope": "machine_local"
+      }
+    ],
+    "evidence": []
+  },
+  "error": null,
+  "updated_at": "2026-09-24T10:20:00Z"
+}

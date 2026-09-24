@@ -17,8 +17,11 @@ tại**, không phải đích đến: hệ thống sẽ gộp lại và dùng ch
 | [`desktop-command.md`](./desktop-command.md) | `desktopcommand.v1` — kênh lệnh Electron main ↔ Python sidecar trên một máy: auth, lifecycle, idempotency, waiting_user, error, file_ref machine-scope | APPROVED v1 |
 | [`g1-module-data.md`](./g1-module-data.md) | `g1.module.v1` — shape dữ liệu trong payload/result/error (FileRef, JobResult, ErrorObject, IdentityEvidence, ownership) | APPROVED v1 |
 | [`g1/examples/`](./g1/examples/) + [`g1/validate_examples.py`](./g1/validate_examples.py) | valid/invalid JSON + validator kiểm chứng được | kiểm: `python contracts/g1/validate_examples.py` |
+| [`upload-workflow.md`](./upload-workflow.md) | `upload.workflow.v1` — 17 command `upload.*` giữa shell (module `upload`/Upload Lab) và sidecar: website registry, workspace/scope binding, revision, run→manifest, waiting_user login/review, partial breakdown, compatibility với payload legacy | APPROVED v1 (MIN-69) |
+| [`upload-workflow/examples/`](./upload-workflow/examples/) + [`upload-workflow/validate_examples.py`](./upload-workflow/validate_examples.py) | valid/invalid JSON có `fixture` mô phỏng binding backend + validator kiểm chứng được | kiểm: `python contracts/upload-workflow/validate_examples.py` |
 
-Hai contract trên là **kênh nội bộ shell↔engine** — không phải contract giữa ba
+Ba contract trên (`desktopcommand.v1`, `g1.module.v1`, `upload.workflow.v1`)
+là **kênh nội bộ shell↔engine** — không phải contract giữa ba
 sản phẩm nghiệp vụ. ConversionEnvelope/Evidence/DraftCase dùng chung xuyên repo
 vẫn theo Gate A–D của `../docs/product/MIN62_DATA_CONTRACT_DRAFT.md` (branch
 `min-62-data-contract-draft`) và chưa được publish tại đây.

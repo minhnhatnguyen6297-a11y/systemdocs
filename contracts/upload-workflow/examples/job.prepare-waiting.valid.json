@@ -1,0 +1,15 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_01HZX0025",
+  "command_id": "9a1b2c3d-0026-4e5f-8a6b-7c8d9e0f1a2b",
+  "status": "waiting_user",
+  "waiting_on": "review",
+  "progress": {
+    "done": 4,
+    "total": 5,
+    "current_label": "da dien 4/5 - cho nguoi kiem tra"
+  },
+  "result": null,
+  "error": null,
+  "updated_at": "2026-09-24T10:20:00Z"
+}

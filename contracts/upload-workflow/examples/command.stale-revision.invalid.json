@@ -1,0 +1,67 @@
+{
+  "fixture": {
+    "websites": [
+      "nam_dinh"
+    ],
+    "workspace": {
+      "website_id": "nam_dinh",
+      "revision": 4
+    },
+    "browsers": {
+      "brw_1": {
+        "website_id": "nam_dinh",
+        "busy_with": null
+      }
+    },
+    "runs": {
+      "a1b2c3d4": {
+        "website_id": "nam_dinh",
+        "record_ids": [
+          138,
+          139,
+          140,
+          141,
+          142
+        ],
+        "manifest_exists": true,
+        "manifest_ok": true
+      }
+    },
+    "audits": {
+      "aud_7": {
+        "website_id": "nam_dinh"
+      },
+      "aud_8": {
+        "website_id": "nam_dinh"
+      }
+    },
+    "queues": {
+      "a1b2c3d4": {
+        "queue_revision": 7
+      }
+    }
+  },
+  "contract_version": "desktopcommand.v1",
+  "command_id": "9a1b2c3d-0041-4e5f-8a6b-7c8d9e0f1a2b",
+  "command": "upload.prepare",
+  "payload": {
+    "workflow_version": "upload.workflow.v1",
+    "website_id": "nam_dinh",
+    "browser_id": "brw_1",
+    "run_id": "a1b2c3d4",
+    "audit_id": "aud_7",
+    "queue_revision": 2,
+    "record_ids": [
+      138,
+      139
+    ],
+    "chunk_size": 10,
+    "cong_chung_vien": "Phạm Minh Chi",
+    "thu_ky": "Nguyễn Nhật Minh"
+  },
+  "client_meta": {
+    "shell_version": "0.2.0",
+    "module": "upload"
+  },
+  "expected_error": "stale_revision"
+}
