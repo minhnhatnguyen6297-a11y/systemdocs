@@ -57,3 +57,22 @@ def existing_file(ref):
     except PermissionError as exc:
         raise CommandError("file_locked", f"khong doc duoc: {p.name}") from exc
     return p
+
+
+def existing_dir(ref):
+    """Destination FileRef cua word_export_batch (contract §8.2):
+    is_dir:true + validate_file_ref (scope/UNC/path tuyet doi) + ton tai
+    + la thu muc. Tra Path; khong tao directory moi."""
+    if not isinstance(ref, dict) or ref.get("is_dir") is not True:
+        raise CommandError("validation_error",
+                           "file_ref destination phai co is_dir:true")
+    p = validate_file_ref(ref)
+    try:
+        if not p.exists():
+            raise CommandError("file_not_found", f"khong tim thay: {p.name}")
+        if not p.is_dir():
+            raise CommandError("file_not_found",
+                               f"khong phai thu muc: {p.name}")
+    except PermissionError as exc:
+        raise CommandError("file_locked", f"khong doc duoc: {p.name}") from exc
+    return p

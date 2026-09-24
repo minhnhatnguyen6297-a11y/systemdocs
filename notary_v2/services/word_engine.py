@@ -805,6 +805,36 @@ def _combined_heir_note(context: WordExportContext, person: WordPerson) -> str:
     return "; ".join(parts)
 
 
+def word_block_reason(context: WordExportContext) -> str | None:
+    """Contract `word.*` block_reason đầu tiên cho một context đã build.
+
+    Cùng thứ tự kiểm tra với `_add_block_placeholders` bên dưới (contract
+    notary.case-drafting.v1 §8.1 mapping). Trả None khi dữ liệu đủ để xuất.
+    Dùng bởi `services.word_batch_export` cho word_export_options +
+    per-document failure của word_export_batch (MIN-110)."""
+    if not context.assets:
+        return "word.no_assets"
+    if len(context.assets) > MAX_WORD_ASSETS:
+        return "word.too_many_assets"
+    if not context.landowners:
+        return "word.no_landowner"
+    if not context.deceased_landowners:
+        return "word.no_deceased_landowner"
+    if not context.receivers:
+        return "word.no_receiver"
+    if len(context.all_people) > 20:
+        return "word.too_many_people"
+    signers: list[WordPerson] = []
+    signer_ids: set[str] = set()
+    for person in [*context.living_landowners, *context.receivers]:
+        if str(person.id) not in signer_ids:
+            signers.append(person)
+            signer_ids.add(str(person.id))
+    if len(signers) > 20:
+        return "word.too_many_signers"
+    return None
+
+
 def _add_block_placeholders(mapping: dict[str, str], context: WordExportContext) -> None:
     if not context.assets:
         raise WordExportValidationError("Không có tài sản để xuất Word.")
