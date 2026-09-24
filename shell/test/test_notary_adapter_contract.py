@@ -24,6 +24,7 @@ from errors import CommandError  # noqa: E402
 from database import Base  # noqa: E402
 from models import Customer, InheritanceCase, Property  # noqa: E402
 import services.case_workspace as case_workspace  # noqa: E402
+import services.inheritance_workspace as inheritance_workspace  # noqa: E402
 
 from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
@@ -44,10 +45,12 @@ def adapter_db(tmp_path, monkeypatch):
     Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine, autoflush=False)
     monkeypatch.setattr(notary_adapter, "_db_session", lambda: Session())
+    svc_modules = {"case_workspace": case_workspace,
+                   "inheritance_workspace": inheritance_workspace}
     monkeypatch.setattr(
         notary_adapter, "_svc",
-        lambda name: case_workspace if name == "case_workspace"
-        else pytest.fail(f"unexpected _svc({name!r})"))
+        lambda name: svc_modules.get(name)
+        or pytest.fail(f"unexpected _svc({name!r})"))
     sess = Session()
     yield sess
     sess.close()
@@ -228,3 +231,142 @@ def test_workspace_commit_stage_bad_payload_shape(adapter_db):
             _Job(), {"case_id": 1, "base_revision": 1,
                      "stage": {"people": "x", "assets": []}})
     assert exc2.value.code == "validation_error"
+
+
+# ------------------------------------------------- diagram_evaluate / save
+
+
+def _diagram_node(nid, person_id=None, parents=(), spouse=None,
+                  owner=False, receive=True):
+    return {"id": nid, "personId": person_id,
+            "parentSlotIds": list(parents), "spouseSlotId": spouse,
+            "isLandOwner": owner, "willReceive": receive,
+            "hidden": False, "deleted": False}
+
+
+def _committed_case(adapter_db):
+    """Seed case + commit Stage qua service that → (case, owner_row_id).
+
+    Revision sau commit = 2. Person duy nhat la nguoi chet → draft hop le
+    nhat = owner slot isLandOwner (engine: estate unresolved, status
+    incomplete — du de kiem wire shape)."""
+    case, deceased, prop = _seed_case(adapter_db)
+    res = case_workspace.CaseWorkspaceService(adapter_db).commit_stage(
+        case.id, 1, [_person_row(entity_id=deceased.id)],
+        [_asset_row(entity_id=prop.id)])
+    row_id = res["stage"]["people"][0]["row_id"]
+    return case, row_id
+
+
+def _eval_payload(case_id, state):
+    return {"case_id": case_id, "diagram": {"state": state}}
+
+
+def _save_payload(case_id, base_revision, state):
+    return {"case_id": case_id, "base_revision": base_revision,
+            "diagram": {"state": state}}
+
+
+def test_diagram_evaluate_contract_shape(adapter_db):
+    case, owner_row = _committed_case(adapter_db)
+    state = {"version": 2, "nodes": [
+        _diagram_node("owner", owner_row, owner=True, receive=False)]}
+    res = notary_adapter.diagram_evaluate(_Job(), _eval_payload(case.id, state))
+    assert res["kind"] == "diagram_evaluate"
+    data = res["data"]
+    assert data["schema_version"] == "notary.case-drafting.v1"
+    assert data["evaluated_revision"] == 2
+    rm = data["render_model"]
+    assert rm["engineVersion"] == 2
+    assert rm["status"] in ("incomplete", "complete", "invalid")
+    assert rm["allocations"][owner_row]["baseShare"] == "1"
+
+
+def test_diagram_evaluate_outside_stage_maps_error(adapter_db):
+    case, _owner_row = _committed_case(adapter_db)
+    outside = str(uuid.uuid4())
+    state = {"version": 2, "nodes": [
+        _diagram_node("owner", outside, owner=True)]}
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.diagram_evaluate(_Job(), _eval_payload(case.id, state))
+    err = exc.value
+    assert err.code == "diagram_reference_outside_stage"
+    assert err.retryable is False
+    assert err.details["personId"] == outside
+
+
+def test_diagram_evaluate_invalid_state_maps_error(adapter_db):
+    case, owner_row = _committed_case(adapter_db)
+    state = {"version": 2, "nodes": [
+        _diagram_node("owner", owner_row, owner=True, receive=False),
+        _diagram_node("child", None, parents=("ghost_slot",))]}
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.diagram_evaluate(_Job(), _eval_payload(case.id, state))
+    err = exc.value
+    assert err.code == "diagram_invalid_state"
+    assert any(e["code"] == "dangling_parent"
+           for e in err.details["errors"])
+
+
+def test_diagram_evaluate_missing_diagram_is_validation_error(adapter_db):
+    case, _ = _committed_case(adapter_db)
+    for bad in ({}, {"diagram": None}, {"diagram": {}},
+                {"diagram": {"stae": {}}}):
+        p = {"case_id": case.id}
+        p.update(bad)
+        with pytest.raises(CommandError) as exc:
+            notary_adapter.diagram_evaluate(_Job(), p)
+        assert exc.value.code == "validation_error", bad
+
+
+def test_diagram_evaluate_allowed_on_locked_case(adapter_db):
+    case, _deceased, _prop = _seed_case(adapter_db, locked=True)
+    state = {"version": 2, "nodes": []}
+    res = notary_adapter.diagram_evaluate(_Job(), _eval_payload(case.id, state))
+    assert res["kind"] == "diagram_evaluate"
+    assert res["data"]["evaluated_revision"] == 1
+
+
+def test_diagram_save_persists_and_bumps_revision(adapter_db):
+    case, owner_row = _committed_case(adapter_db)
+    state = {"version": 2, "nodes": [
+        _diagram_node("owner", owner_row, owner=True, receive=False)]}
+    res = notary_adapter.diagram_save(
+        _Job(), _save_payload(case.id, 2, state))
+    assert res["kind"] == "diagram_save"
+    data = res["data"]
+    assert data["schema_version"] == "notary.case-drafting.v1"
+    assert data["revision"] == 3
+    assert data["diagram"]["state"] == state
+    assert data["diagram"]["render_model"]["engineVersion"] == 2
+    adapter_db.refresh(case)
+    assert case.workspace_revision == 3
+
+
+def test_diagram_save_conflict_maps_retryable(adapter_db):
+    case, owner_row = _committed_case(adapter_db)
+    state = {"version": 2, "nodes": [
+        _diagram_node("owner", owner_row, owner=True)]}
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.diagram_save(_Job(), _save_payload(case.id, 1, state))
+    err = exc.value
+    assert err.code == "workspace_conflict"
+    assert err.retryable is True
+    assert err.next_action == "retry"
+    assert err.details["server_revision"] == 2
+
+
+def test_diagram_save_locked_maps_error(adapter_db):
+    case, _deceased, _prop = _seed_case(adapter_db, locked=True)
+    state = {"version": 2, "nodes": []}
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.diagram_save(_Job(), _save_payload(case.id, 1, state))
+    assert exc.value.code == "workspace_locked"
+
+
+def test_diagram_save_missing_diagram_is_validation_error(adapter_db):
+    case, _ = _committed_case(adapter_db)
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.diagram_save(
+            _Job(), {"case_id": case.id, "base_revision": 2})
+    assert exc.value.code == "validation_error"
