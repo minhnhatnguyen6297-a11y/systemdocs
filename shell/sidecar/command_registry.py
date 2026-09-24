@@ -205,7 +205,12 @@ COMMANDS = {
     # upload_lab — MIN-69
     "upload.scan": _upload("scan_folder"),
     "upload.audit_excel": _upload("audit_excel"),
-    "upload.env_check": _upload("env_check"),
+    "upload.env_check": _upload("env_check_dispatch"),
+    # upload.workflow.v1 — website registry + workspace (MIN-69 task 2)
+    "upload.websites": _upload("upload_websites"),
+    "upload.workspace_get": _upload("upload_workspace_get"),
+    "upload.website_select": _upload("upload_website_select"),
+    "upload.preferences": _upload("upload_preferences"),
     "upload.session_start": _upload("session_start"),
     "upload.session_status": _upload("session_status"),
     "upload.confirm_login": _upload("confirm_login"),

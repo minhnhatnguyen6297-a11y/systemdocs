@@ -45,6 +45,19 @@ function _defaultOutputDir() {
   return path.join(__dirname, '..', '..', 'output');
 }
 
+function _defaultUploadDataDir() {
+  // Vung du lieu upload.workflow.v1 (plan §3.2): userData/upload_lab khi
+  // packaged — khong bao gio mac dinh vao thu muc cai dat/engine root.
+  // Dev/test (node thuong): <shell>/output/upload_lab (gitignored).
+  try {
+    const { app } = require('electron');
+    if (app && typeof app.getPath === 'function') {
+      return path.join(app.getPath('userData'), 'upload_lab');
+    }
+  } catch { /* plain node */ }
+  return path.join(_defaultOutputDir(), 'upload_lab');
+}
+
 class VersionMismatchError extends Error {}
 
 class SidecarManager extends EventEmitter {
@@ -96,6 +109,10 @@ class SidecarManager extends EventEmitter {
         // Output sidecar so huu (word export, tai ve) — userData cho ban
         // packaged; dev/test dung <shell>/output (gitignored).
         G1_OUTPUT_DIR: process.env.G1_OUTPUT_DIR || _defaultOutputDir(),
+        // Data root upload.workflow.v1 (websites/<id>/ + workspace.sqlite3)
+        // — tach khoi engine root, khong bao gio install dir.
+        G1_UPLOAD_DATA_DIR:
+          process.env.G1_UPLOAD_DATA_DIR || _defaultUploadDataDir(),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,

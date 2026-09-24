@@ -8,6 +8,9 @@ Boundary (MIN-69):
     registry.sqlite3 dedup theo file_identity_key trong engine.
   - Playwright sync API song tren upload_session worker thread.
   - Credential/session state (nd_storage_state.json) khong qua contract.
+  - Engine root vs data root (T2): `engine_root("upload_lab")` chi de IMPORT
+    code + giu data root legacy; luong `upload.workflow.v1` doc/ghi qua
+    `upload_workspace.website_data_dir(website_id)` duoi G1_UPLOAD_DATA_DIR.
 """
 import threading
 import time
@@ -18,6 +21,9 @@ from errors import CommandError
 from engine_roots import engine_root, import_engine_module
 from fileref import validate_file_ref
 from upload_session import worker, LOGIN_WAIT_TIMEOUT_S, REVIEW_WAIT_TIMEOUT_S
+import upload_workspace
+
+WORKFLOW_VERSION = "upload.workflow.v1"
 
 
 def _result(kind, data, warnings=None, source_files=None, evidence=None):
@@ -190,6 +196,14 @@ def env_check(job, payload):
     return _result("env_check", data)
 
 
+def env_check_dispatch(job, payload):
+    """Route `upload.env_check`: co workflow_version → luong v1 scoped
+    website; khong co → legacy engine-root nguyen trang (contract §9.2)."""
+    if isinstance(payload, dict) and "workflow_version" in payload:
+        return upload_env_check_v1(job, payload)
+    return env_check(job, payload)
+
+
 # ---------- browser session (upload_lab/playwright_uploader) ----------
 
 def session_status(job, payload):
@@ -341,3 +355,153 @@ def finish_review(job, payload):
     """Nguoi dung xac nhan da kiem tra xong cac tab → job prepare ket thuc."""
     worker().review_finished.set()
     return _result("session_state", {"review_finished": True})
+
+
+# =====================================================================
+# upload.workflow.v1 — luong versioned (contract upload-workflow.md).
+# Cac handler duoi chi chay khi payload.workflow_version dung literal;
+# command khong co version giu nguyen legacy path o tren.
+# =====================================================================
+
+_PREFERENCE_KEYS = ("chunk_size", "cong_chung_vien", "thu_ky")
+
+
+def _require_workflow(payload) -> dict:
+    """Gate version: thieu/sai workflow_version → unsupported_workflow_version
+    (contract §2 — command chi-co-o-v1 khong duoc chay nhu legacy)."""
+    p = payload or {}
+    version = p.get("workflow_version")
+    if version != WORKFLOW_VERSION:
+        raise CommandError(
+            "unsupported_workflow_version",
+            f"can workflow_version={WORKFLOW_VERSION!r}")
+    return p
+
+
+def _require_website(payload) -> str:
+    """website_id bat buoc + da dang ky → unknown_website/validation_error."""
+    wid = payload.get("website_id")
+    if wid is None:
+        raise CommandError("validation_error", "thieu website_id")
+    return upload_workspace.validate_website_id(wid)
+
+
+def _optional_website(payload):
+    """website_id cho phep null (workspace_get doc selection da luu)."""
+    wid = payload.get("website_id")
+    if wid is None:
+        return None
+    return upload_workspace.validate_website_id(wid)
+
+
+def _require_revision(payload, key="expected_revision") -> int:
+    value = payload.get(key)
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise CommandError("validation_error",
+                           f"{key} phai la int >= 0")
+    return value
+
+
+def upload_websites(job, payload):
+    """`upload.websites` → kind website_catalog (contract §6.1)."""
+    _require_workflow(payload)
+    store = upload_workspace.open_store()
+    return _result("website_catalog", {
+        "workflow_version": WORKFLOW_VERSION,
+        "websites": upload_workspace.list_websites(),
+        "selected_website_id": store.selected_website_id(),
+    })
+
+
+def upload_workspace_get(job, payload):
+    """`upload.workspace_get` → kind upload_workspace (§6.2).
+
+    website_id null → doc lua chon da luu; website chua chon lan nao →
+    workspace rong (website_id null, revision 0)."""
+    _require_workflow(payload)
+    wid = _optional_website(payload)
+    snap = upload_workspace.workspace_snapshot(wid)
+    return _result("upload_workspace", snap)
+
+
+def upload_website_select(job, payload):
+    """`upload.website_select` → kind upload_workspace (§6.2).
+
+    Backend kiem lai dieu kien doi (khong chi UI): website cu con job/
+    tab cho kiem tra → workflow_busy; revision lech → stale_revision."""
+    _require_workflow(payload)
+    wid = _require_website(payload)
+    expected = _require_revision(payload, "expected_revision")
+    snap = upload_workspace.select_website(wid, expected)
+    return _result("upload_workspace", snap)
+
+
+def upload_preferences(job, payload):
+    """`upload.preferences` → kind preferences (§6.13).
+
+    `values` thieu → doc; co → validate + luu theo website. Khong nhan
+    URL/token/gia tri tu do: key ngoai schema → validation_error."""
+    _require_workflow(payload)
+    wid = _require_website(payload)
+    values = payload.get("values")
+    store = upload_workspace.open_store()
+    if values is not None:
+        if not isinstance(values, dict):
+            raise CommandError("validation_error",
+                               "values phai la object")
+        unknown = set(values) - set(_PREFERENCE_KEYS)
+        if unknown:
+            raise CommandError(
+                "validation_error",
+                f"preferences key khong ho tro: {sorted(unknown)}")
+        if "chunk_size" in values:
+            cs = values["chunk_size"]
+            if not isinstance(cs, int) or isinstance(cs, bool) \
+                    or not 1 <= cs <= 30:
+                raise CommandError("validation_error",
+                                   "chunk_size phai la int 1..30")
+        for key in ("cong_chung_vien", "thu_ky"):
+            if values.get(key) == "":
+                raise CommandError("validation_error",
+                                   f"{key}: dung null thay chuoi rong")
+            if values.get(key) is not None \
+                    and not isinstance(values[key], str):
+                raise CommandError("validation_error",
+                                   f"{key} phai la string/null")
+        store.save_preferences(wid, values)
+        # Dong bo chunk_size vao .env cua website (engine-native store) —
+        # prepare cua engine doc ND_MAX_PREPARED_TABS tu day.
+        if "chunk_size" in values:
+            provider = upload_workspace.get_provider(wid)
+            provider.save_chunk_size(
+                upload_workspace.website_data_dir(wid), values["chunk_size"])
+    prefs = store.get_preferences(wid)
+    return _result("preferences", {
+        "workflow_version": WORKFLOW_VERSION,
+        "website_id": wid,
+        "chunk_size": prefs["chunk_size"],
+        "cong_chung_vien": prefs["cong_chung_vien"],
+        "thu_ky": prefs["thu_ky"],
+    })
+
+
+def upload_env_check_v1(job, payload):
+    """`upload.env_check` versioned → kind env_check (§6.3).
+
+    Engine run_environment_checks that nhung scoped vao data_dir cua
+    website; tra {website_id, status, steps[]} — khong le base_url thu
+    cong tu payload (base_url do provider quyet dinh)."""
+    _require_workflow(payload)
+    wid = _require_website(payload)
+    provider = upload_workspace.get_provider(wid)
+    data_dir = upload_workspace.website_data_dir(wid)
+    job.report_progress(0, 1, "kiem tra moi truong")
+    report = provider.env_check(data_dir)
+    job.check_cancel()
+    steps = report.get("steps") or []
+    return _result("env_check", {
+        "workflow_version": WORKFLOW_VERSION,
+        "website_id": wid,
+        "status": report.get("overall") or report.get("status") or "blocked",
+        "steps": _dc(steps),
+    })
