@@ -8,13 +8,16 @@ class CommandError(Exception):
     """Lỗi nghiệp vụ có cấu trúc — raise trong command handler."""
 
     def __init__(self, code, message, retryable=False, next_action=None,
-                 details=None):
+                 details=None, result=None):
         super().__init__(message)
         self.code = code
         self.message = message
         self.retryable = retryable
         self.next_action = next_action
         self.details = details
+        # result tuy chon: job failed nhung van tra payload mot phan
+        # (vd word_batch_failed kem breakdown.failed) — MIN-115.
+        self.result = result
 
 
 def error_object(code, message, retryable=False, next_action=None,

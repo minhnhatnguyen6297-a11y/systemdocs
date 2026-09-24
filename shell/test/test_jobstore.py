@@ -41,6 +41,27 @@ def partial_ok(job, payload):
             "data": {"breakdown": {"succeeded": ["a"], "failed": ["b"]}}}
 
 
+def slow_with_result(job, payload):
+    """Handler mang theo partial result khi bi cancel giua batch."""
+    result = {"kind": "word_export_batch",
+              "data": {"breakdown": {"succeeded": ["a.docx"],
+                                     "failed": [],
+                                     "skipped": ["b.docx"]}}}
+    for _ in range(200):
+        job.check_cancel(result)
+        time.sleep(0.01)
+    return {"kind": "ok", "data": {}}
+
+
+def failed_with_result(job, payload):
+    raise CommandError(
+        "word_batch_failed", "tat ca file deu loi",
+        result={"kind": "word_export_batch",
+                "data": {"breakdown": {"succeeded": [],
+                                       "failed": ["a.docx"],
+                                       "skipped": []}}})
+
+
 def waiting_then_resume(job, payload):
     job.set_waiting("confirm")
     while job.snapshot()["status"] == "waiting_user":
@@ -156,6 +177,27 @@ class JobStoreTest(unittest.TestCase):
         job = self.store.submit("c-8", "diag.slow_task", bad_waiting, {})
         snap = wait_terminal(self.store, job.job_id)
         self.assertEqual(snap["status"], "failed")
+
+    def test_cancel_giu_partial_result(self):
+        # contract word_export_batch: canceled job van can result.data.
+        # breakdown.skipped len wire (MIN-115).
+        job = self.store.submit("c-11", "diag.slow_task",
+                                slow_with_result, {})
+        self.assertEqual(self.store.cancel(job.job_id), "ok")
+        snap = wait_terminal(self.store, job.job_id)
+        self.assertEqual(snap["status"], "canceled")
+        self.assertEqual(snap["error"]["code"], "user_canceled")
+        self.assertEqual(
+            snap["result"]["data"]["breakdown"]["skipped"], ["b.docx"])
+
+    def test_failed_giu_result_payload(self):
+        job = self.store.submit("c-12", "diag.slow_task",
+                                failed_with_result, {})
+        snap = wait_terminal(self.store, job.job_id)
+        self.assertEqual(snap["status"], "failed")
+        self.assertEqual(snap["error"]["code"], "word_batch_failed")
+        self.assertEqual(
+            snap["result"]["data"]["breakdown"]["failed"], ["a.docx"])
 
 
 if __name__ == "__main__":

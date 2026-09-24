@@ -23,7 +23,11 @@ def _now():
 
 
 class CancelledByUser(Exception):
-    pass
+    """Huy giua chung — co the mang partial result len wire (MIN-115)."""
+
+    def __init__(self, result=None):
+        super().__init__("job bi huy")
+        self.result = result
 
 
 class Job:
@@ -42,9 +46,11 @@ class Job:
         self._cancel_message = "nguoi dung huy job"
         self._lock = threading.Lock()
 
-    def check_cancel(self):
+    def check_cancel(self, result=None):
+        """Cancel checkpoint; `result` (neu co) di len wire khi job canceled —
+        vd word batch tra breakdown.skipped (contract, MIN-115)."""
         if self._cancel.is_set():
-            raise CancelledByUser()
+            raise CancelledByUser(result)
 
     def request_cancel(self, code="user_canceled",
                        message="nguoi dung huy job"):
@@ -175,14 +181,16 @@ class JobStore:
                         "partial bat buoc data.breakdown={succeeded,failed}")
                 status = "partial"
             job._finish(status, result=result)
-        except CancelledByUser:
+        except CancelledByUser as exc:
             with job._lock:
-                job._finish_locked("canceled", error=error_object(
+                job._finish_locked("canceled", result=exc.result,
+                                   error=error_object(
                     job._cancel_code, job._cancel_message,
                     retryable=(job._cancel_code != "user_canceled"),
                     job_id=job.job_id))
         except CommandError as exc:
-            job._finish("failed", error=error_object(
+            job._finish("failed", result=exc.result,
+                        error=error_object(
                 exc.code, exc.message, exc.retryable, exc.next_action,
                 job.job_id, exc.details))
         except Exception as exc:  # noqa: BLE001 — boundary cuoi cung
