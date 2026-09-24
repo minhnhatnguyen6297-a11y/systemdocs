@@ -2,7 +2,7 @@
 
 Ghi đến đâu khi làm đến đó.
 
-## Trạng thái: contract hoàn chỉnh sau 2 vòng review-fix — 2026-09-24 (chờ owner duyệt, KHÔNG merge/runtime trước duyệt)
+## Trạng thái: APPROVED — owner duyệt 24/09/2026; contract là SOT wire; merge về `consolidate/monorepo`; MIN-106+ được mở cổng
 
 ## Đã làm
 - Worktree `D:\systemdocs-min-105`, branch `minhnhatnguyen6297/min-105-contract-notarycase-draftingv1` (base `a79cce5` — đã có spec MIN-104).
@@ -34,5 +34,10 @@ Ghi đến đâu khi làm đến đó.
 - Diagram wire = engine V2 (`parentSlotIds[]`/`spouseSlotId`), KHÔNG legacy JS (`parentSlotId`/`parentPersonId`/`familyGroupId`/`sourceId`) — renderer phải map.
 - OCR `type:"marriage"` ngoài mapping V1 — quan hệ do người dùng gán trên Diagram (§5.4).
 
+## Đã chốt sau duyệt
+- Contract status → APPROVED; `contracts/README.md` → APPROVED v1 (MIN-105).
+- Plan §2 đồng bộ `word.batch_failed` → `word_batch_failed` (contract là SOT).
+- Scratch audit files đã dọn theo AGENTS.md.
+
 ## Bước tiếp theo
-- Owner duyệt contract (đọc `contracts/notary-case-drafting.md` ở worktree) → duyệt xong mới mở MIN-106 (mock) / MIN-107+ (real backend).
+- MIN-106 (mock backend) + MIN-107..110 (real backend) theo plan §6 — được mở cổng, song song được.

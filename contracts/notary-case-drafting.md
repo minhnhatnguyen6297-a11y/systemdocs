@@ -1,7 +1,7 @@
 # Contract: Notary Case Drafting `v1`
 
-**Version:** `notary.case-drafting.v1` · **Status:** DRAFT — chờ owner duyệt
-(MIN-105) · **Owner:** `systemdocs` · **Published:** MIN-105 ·
+**Version:** `notary.case-drafting.v1` · **Status:** APPROVED — owner duyệt
+24/09/2026 (MIN-105) · **Owner:** `systemdocs` · **Published:** MIN-105 ·
 **Kênh mang:** `desktopcommand.v1` (`contracts/desktop-command.md`) ·
 **Domain data shape:** `g1.module.v1` (`contracts/g1-module-data.md`)
 
@@ -732,3 +732,5 @@ Consumer (Electron main/renderer) PHẢI:
 |---|---|---|
 | v1 (DRAFT) | 24/09/2026 | Publish draft đầu tiên (MIN-105): 7 command `notary.*` cho tab Soạn hồ sơ trên envelope `desktopcommand.v1`; mở rộng FileRef `is_dir`; chờ owner duyệt |
 | v1 (DRAFT, fix r1) | 24/09/2026 | Review round 1: commit re-evaluate + `render_model` non-null; `breakdown.skipped`; conflict khi base_revision `<` hoặc `>`; evaluate được phép trên case locked; registry data-codes `<ns>.<snake>`; `word.no_deceased_landowner`/`word.too_many_signers`; schema nâng normative (if/then intake, status↔file link); `document_type`/`text` siết chặt |
+| v1 (fix r2) | 24/09/2026 | Residuals round 2: `breakdown.skipped` vào schema; `workspace_conflict` `!=` server đồng bộ §9/§7.5; fraction integer form trong doc |
+| v1 (APPROVED) | 24/09/2026 | Owner duyệt — contract trở thành SOT wire cho tab Soạn hồ sơ; mở cổng MIN-106+ |

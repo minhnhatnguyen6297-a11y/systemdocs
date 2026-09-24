@@ -17,7 +17,7 @@ tại**, không phải đích đến: hệ thống sẽ gộp lại và dùng ch
 | [`desktop-command.md`](./desktop-command.md) | `desktopcommand.v1` — kênh lệnh Electron main ↔ Python sidecar trên một máy: auth, lifecycle, idempotency, waiting_user, error, file_ref machine-scope | APPROVED v1 |
 | [`g1-module-data.md`](./g1-module-data.md) | `g1.module.v1` — shape dữ liệu trong payload/result/error (FileRef, JobResult, ErrorObject, IdentityEvidence, ownership) | APPROVED v1 |
 | [`g1/examples/`](./g1/examples/) + [`g1/validate_examples.py`](./g1/validate_examples.py) | valid/invalid JSON + validator kiểm chứng được | kiểm: `python contracts/g1/validate_examples.py` |
-| [`notary-case-drafting.md`](./notary-case-drafting.md) | `notary.case-drafting.v1` — bảy command `notary.*` cho tab Soạn hồ sơ (workspace, intake suggestion, Stage commit atomic + revision, Diagram engine v2, xuất Word batch); mở rộng FileRef `is_dir` | DRAFT — chờ owner duyệt (MIN-105) |
+| [`notary-case-drafting.md`](./notary-case-drafting.md) | `notary.case-drafting.v1` — bảy command `notary.*` cho tab Soạn hồ sơ (workspace, intake suggestion, Stage commit atomic + revision, Diagram engine v2, xuất Word batch); mở rộng FileRef `is_dir` | APPROVED v1 (MIN-105) |
 | [`notary-case-drafting/`](./notary-case-drafting/) | JSON Schema draft-07 + valid/invalid examples + validator | kiểm: `python contracts/notary-case-drafting/validate_examples.py` |
 
 Các contract trên là **kênh nội bộ shell↔engine** — không phải contract giữa ba

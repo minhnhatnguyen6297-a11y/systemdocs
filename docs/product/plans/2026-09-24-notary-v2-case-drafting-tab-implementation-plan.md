@@ -189,7 +189,7 @@ Quy tắc job:
 
 - tất cả file thành công → `succeeded`;
 - có cả thành công và lỗi → `partial` + `breakdown`;
-- tất cả lỗi → `failed`, `error.code=word.batch_failed`, và `error.details.documents` chứa lỗi từng văn bản;
+- tất cả lỗi → `failed`, `error.code=word_batch_failed` (contract `notary-case-drafting.md` §9 là SOT — mã job-level dùng underscore), và `error.details.documents` chứa lỗi từng văn bản;
 - hủy giữa lượt chỉ dừng các file chưa bắt đầu; file đã lưu không bị xóa.
 
 ## 3. File Structure đích
