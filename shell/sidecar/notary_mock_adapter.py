@@ -26,7 +26,8 @@ Gioi han platform da biet (khong sua trong task nay — jobstore):
   - job failed/canceled -> result=null (jobstore huy result); mock van tra
     error code + details dung contract; thong tin per-file nam trong
     error.details.documents / tren dia.
-  - status "partial" di kem key "partial" trong result (marker jobstore).
+  - status "partial": handler tra result kem key "partial" lam marker —
+    JobStore doc roi POP khoi result truoc khi len wire (jobstore.py).
 """
 import copy
 import hashlib
@@ -510,6 +511,17 @@ def _required_slots(nodes):
             and not n.get("deleted")]
 
 
+def _payload_diagram_state(payload):
+    """Lay diagram.state tu payload — thieu field -> validation_error
+    (missing required field); state co mat nhung sai shape -> de
+    _evaluate_state_or_raise lo (diagram_invalid_state)."""
+    dg = (payload or {}).get("diagram")
+    if not isinstance(dg, dict) or "state" not in dg:
+        raise CommandError("validation_error",
+                           "payload.diagram.state bắt buộc")
+    return dg["state"]
+
+
 def _evaluate_state_or_raise(case, state):
     """Validate + render. Raise CommandError theo contract §7."""
     errors, outside_pid = _validate_diagram_state(state, case)
@@ -559,21 +571,23 @@ def _err_row(rid, label):
 
 def _validate_stage(stage):
     """Tra (field_errors, people_norm, assets_norm). Norm = strip field la
-    + dien null cho nullable thieu (producer strip — contract §4.1)."""
-    errs = []
+    + dien null cho nullable thieu (producer strip — contract §4.1).
+
+    Code parity voi validator oracle: loi CONTAINER shape (stage khong
+    dict / people|assets thieu hoac khong list) -> validation_error;
+    stage_validation_error chi cho loi ROW-level trong field_errors."""
     if not isinstance(stage, dict):
-        return ([_err("00000000-0000-4000-8000-000000000000", "stage",
-                      "invalid_type", "stage phải là object")], [], [])
-    people = stage.get("people")
-    assets = stage.get("assets")
-    if not isinstance(people, list):
-        errs.append(_err("00000000-0000-4000-8000-000000000000",
-                         "people", "invalid_type", "people phải là list"))
-        people = []
-    if not isinstance(assets, list):
-        errs.append(_err("00000000-0000-4000-8000-000000000000",
-                         "assets", "invalid_type", "assets phải là list"))
-        assets = []
+        raise CommandError("validation_error",
+                           "stage phải là object")
+    missing = [k for k in ("people", "assets")
+               if not isinstance(stage.get(k), list)]
+    if missing:
+        raise CommandError(
+            "validation_error",
+            f"stage.{', stage.'.join(missing)} phải là list")
+    errs = []
+    people = stage["people"]
+    assets = stage["assets"]
     seen = set()
     people_norm = []
     for i, r in enumerate(people):
@@ -907,8 +921,7 @@ def diagram_evaluate(job, payload):
     """Read-only — duoc phep tren case locked (§7.4); khong persist."""
     case = _case(payload)
     _check_supported(case)
-    dg = (payload or {}).get("diagram")
-    state = dg.get("state") if isinstance(dg, dict) else None
+    state = _payload_diagram_state(payload)
     rm = _evaluate_state_or_raise(case, state)
     job.check_cancel()
     return _result("diagram_evaluate", {
@@ -922,8 +935,7 @@ def diagram_save(job, payload):
     case = _case(payload)
     _check_writable(case)
     _check_base_revision(case, payload)
-    dg = (payload or {}).get("diagram")
-    state = dg.get("state") if isinstance(dg, dict) else None
+    state = _payload_diagram_state(payload)
     rm = _evaluate_state_or_raise(case, state)
     case["diagram"]["state"] = copy.deepcopy(state)
     case["diagram"]["render_model"] = rm
@@ -987,8 +999,9 @@ def word_export_options(job, payload):
                    {"schema_version": SCHEMA_VERSION, "documents": docs})
 
 
-def _write_docx(path, title, case):
-    """Tao DOCX that bang python-docx; fallback zip toi thieu hop le."""
+def _write_docx(out, title, case):
+    """Tao DOCX that bang python-docx; fallback zip toi thieu hop le.
+    `out` la file object mo san mode wb (exclusive create)."""
     try:
         import docx
         d = docx.Document()
@@ -997,7 +1010,7 @@ def _write_docx(path, title, case):
             f"Dữ liệu mô phỏng — hồ sơ #{case['id']} "
             f"(notary.case-drafting.v1 mock).")
         d.add_paragraph("Nội dung mẫu, không phải văn bản pháp lý.")
-        d.save(str(path))
+        d.save(out)
         return
     except ImportError:
         pass
@@ -1024,29 +1037,56 @@ def _write_docx(path, title, case):
         'wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Dữ liệu mô '
         'phỏng — mock notary.case-drafting.v1</w:t></w:r></w:p></w:body>'
         '</w:document>')
-    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("[Content_Types].xml", content_types)
         z.writestr("_rels/.rels", rels)
         z.writestr("word/document.xml", document)
 
 
-def _reserve_name(dest_dir, stem, case_id, taken):
-    """Naming <stem>_HS-<id>[_n].docx; n tu 2; khong ghi de (§8.3)."""
+def _reserve_and_write(dest_dir, stem, case_id, taken, title, case):
+    """Naming <stem>_HS-<id>[_n].docx (n>=2) + ghi file bang
+    open('xb') exclusive-create: ten trong `taken` + ten da ton tai deu
+    bo qua — KHONG BAO GIO ghi de (§8.3) va khong TOCTOU giua
+    exists-check va write. Tra actual_filename."""
     base = f"{stem}_HS-{case_id}"
-    name = f"{base}.docx"
-    n = 2
-    while name in taken or (dest_dir / name).exists():
-        name = f"{base}_{n}.docx"
+    n = 1
+    while True:
+        suffix = "" if n == 1 else f"_{n}"
+        name = f"{base}{suffix}.docx"
         n += 1
-    taken.add(name)
-    return name
+        if name in taken:
+            continue
+        path = dest_dir / name
+        try:
+            fh = open(path, "xb")          # exclusive create — atomic
+        except FileExistsError:
+            continue
+        taken.add(name)
+        try:
+            _write_docx(fh, title, case)
+            fh.close()
+        except Exception:
+            try:
+                fh.close()
+            finally:
+                try:
+                    path.unlink()          # khong de file hong lai
+                except OSError:
+                    pass
+            raise
+        return name
 
 
 def word_export_batch(job, payload):
     case = _case(payload)
     _check_writable(case)
     keys = (payload or {}).get("document_keys")
-    if not isinstance(keys, list) or not keys:
+    # Oracle parity: thieu/null/khong list -> validation_error;
+    # word_no_documents_selected CHI cho list rong [].
+    if not isinstance(keys, list):
+        raise CommandError("validation_error",
+                           "document_keys phải là list")
+    if not keys:
         raise CommandError("word_no_documents_selected",
                            "document_keys rỗng")
     if len(keys) != len(set(keys)):
@@ -1087,11 +1127,11 @@ def word_export_batch(job, payload):
         else:
             time.sleep(WORD_DOC_DELAY)       # mo phong render docx
             job.check_cancel()               # truoc khi ghi file
-            name = _reserve_name(dest_dir, meta["filename_stem"],
-                                 int(payload["case_id"]), taken)
+            name = _reserve_and_write(
+                dest_dir, meta["filename_stem"],
+                int(payload["case_id"]), taken,
+                meta["display_name"], {"id": payload["case_id"]})
             out_path = dest_dir / name
-            _write_docx(out_path, meta["display_name"],
-                        {"id": payload["case_id"]})
             docs.append({"document_key": key,
                          "display_name": meta["display_name"],
                          "status": "saved", "actual_filename": name,

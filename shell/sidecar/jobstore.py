@@ -161,7 +161,12 @@ class JobStore:
             result = handler(job, payload)
             job.check_cancel()
             status = "succeeded"
-            if isinstance(result, dict) and result.get("partial"):
+            # "partial" la marker noi bo handler->jobstore — pop khoi dict
+            # de khong len wire (result chi mang kind/data/evidence/
+            # warnings/source_files).
+            partial = bool(isinstance(result, dict)
+                           and result.pop("partial", None))
+            if partial:
                 bd = (result.get("data") or {}).get("breakdown") or {}
                 if not isinstance(bd.get("succeeded"), list) \
                         or not isinstance(bd.get("failed"), list):

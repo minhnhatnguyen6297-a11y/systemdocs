@@ -47,6 +47,21 @@
   → 0 hit trong 2 file mới (test file dùng `zalo_media` làm kind bị từ
   chối — phục vụ test `intake_unsupported_source`).
 
+## Review round 1 (commit tiep theo)
+
+- Error-code parity voi validator oracle: container-shape (stage khong
+  dict / people|assets khong list; document_keys thieu/khong list;
+  diagram/diagram.state thieu) -> `validation_error`; `stage_validation_error`
+  / `word_no_documents_selected` / `diagram_invalid_state` chi cho dung
+  ngu nghia (row-level / list rong / state co mat ma sai).
+- JobStore pop marker `partial` khoi result truoc khi len wire.
+- `_reserve_and_write` dung `open('xb')` exclusive-create — khu TOCTOU,
+  giu reservation `taken` intra-batch; ghi loi -> unlink file hong.
+- `g1-shell-sidecar.spec` comment: mock bundle nhung bat hoat packaged.
+- Tests: +3 case container-shape -> validation_error; sidecar test assert
+  `partial` khong len wire. 68 pass adapter, 25 pass contract, 10 pass
+  jobstore.
+
 ## Giới hạn đã biết (platform, không sửa trong task)
 
 - Job canceled/failed → jobstore `result=null` — per-file `skipped` của

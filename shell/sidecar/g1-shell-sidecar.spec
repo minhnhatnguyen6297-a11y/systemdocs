@@ -5,6 +5,11 @@ hiddenimports = []
 hiddenimports += collect_submodules('uvicorn')
 hiddenimports += collect_submodules('fastapi')
 
+# notary_mock_adapter (MIN-106) duoc bundle theo static import cua gateway,
+# nhung BAT HOAT tren ban packaged: notary_gateway chi chon mock khi
+# G1_DEV_NOTARY_MOCK=1 VA not sys.frozen — exe nay luon co sys.frozen.
+# Electron main con strip flag khoi env con (config.js stripNotaryMockEnv).
+
 a = Analysis(
     ['app.py'],
     pathex=[],

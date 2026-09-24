@@ -305,6 +305,8 @@ class SidecarContractTest(unittest.TestCase):
             {"case_id": 43, "sources": sources})).json()
         final = self._wait_job(job["job_id"])
         self.assertEqual(final["status"], "partial")
+        # marker "partial" la noi bo jobstore — khong len wire
+        self.assertNotIn("partial", final["result"])
         bd = final["result"]["data"]["breakdown"]
         self.assertEqual(len(bd["succeeded"]), 1)
         self.assertEqual(bd["failed"], [sources[1]["source_id"]])

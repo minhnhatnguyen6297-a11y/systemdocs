@@ -416,6 +416,23 @@ class TestCommitStage:
             if n["personId"] is not None:
                 assert n["personId"] == keep["row_id"]
 
+    def test_container_shape_is_validation_error(self):
+        """Oracle parity: stage khong dict / people|assets thieu hoac
+        khong list -> validation_error (KHONG stage_validation_error;
+        code do chi cho loi row-level)."""
+        mock.reset_backend(_load_fixture("empty.json"))
+        for bad_stage in (
+                "khong-phai-object",
+                {"people": "x", "assets": []},
+                {"people": []},                       # thieu assets
+                {"assets": []},                       # thieu people
+                {"people": [], "assets": "y"},
+                {"people": None, "assets": []}):
+            p = {"case_id": 43, "base_revision": 1, "stage": bad_stage}
+            with pytest.raises(CommandError) as exc:
+                _call("workspace_commit_stage", p)
+            assert exc.value.code == "validation_error", bad_stage
+
     def test_locked_case_rejected(self):
         mock.reset_backend(_load_fixture("locked.json"))
         p = {"case_id": 44, "base_revision": 3,
@@ -591,6 +608,35 @@ class TestDiagram:
         assert exc.value.code == "diagram_invalid_state"
         assert exc.value.details["errors"]
 
+    def test_evaluate_missing_diagram_is_validation_error(self):
+        """diagram/diagram.state thieu -> validation_error; state co mat
+        ma sai -> diagram_invalid_state (oracle parity)."""
+        mock.reset_backend(_load_fixture("ready.json"))
+        for bad in (
+                {},                                    # thieu diagram
+                {"diagram": None},
+                {"diagram": "x"},                      # khong phai object
+                {"diagram": {}},                       # thieu state
+                {"diagram": {"stae": {}}},             # key sai chinh ta
+        ):
+            p = {"case_id": 42}
+            p.update(bad)
+            with pytest.raises(CommandError) as exc:
+                _call("diagram_evaluate", p)
+            assert exc.value.code == "validation_error", bad
+        # state co mat nhung khong phai object -> diagram_invalid_state
+        with pytest.raises(CommandError) as exc:
+            _call("diagram_evaluate",
+                  {"case_id": 42, "diagram": {"state": None}})
+        assert exc.value.code == "diagram_invalid_state"
+
+    def test_save_missing_diagram_is_validation_error(self):
+        mock.reset_backend(_load_fixture("ready.json"))
+        with pytest.raises(CommandError) as exc:
+            _call("diagram_save",
+                  {"case_id": 42, "base_revision": 7})
+        assert exc.value.code == "validation_error"
+
     def test_evaluate_string_bool_is_invalid(self):
         mock.reset_backend(_load_fixture("ready.json"))
         state = _ready_state()
@@ -752,7 +798,19 @@ class TestWordExport:
 
     def test_batch_validates_before_writing(self, tmp_path):
         mock.reset_backend(_load_fixture("ready.json"))
-        # document_keys rong
+        # document_keys thieu/null/khong list -> validation_error
+        # (word_no_documents_selected CHI cho list rong)
+        for bad_keys in (None, "khai_nhan_di_san", 3, {"a": 1}):
+            with pytest.raises(CommandError) as exc:
+                _call("word_export_batch", {
+                    "case_id": 42, "document_keys": bad_keys,
+                    "destination": self._dest(tmp_path)})
+            assert exc.value.code == "validation_error", bad_keys
+        p_no_keys = {"case_id": 42, "destination": self._dest(tmp_path)}
+        with pytest.raises(CommandError) as exc:
+            _call("word_export_batch", p_no_keys)
+        assert exc.value.code == "validation_error"
+        # document_keys rong [] -> word_no_documents_selected
         with pytest.raises(CommandError) as exc:
             _call("word_export_batch", {
                 "case_id": 42, "document_keys": [],
