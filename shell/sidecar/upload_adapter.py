@@ -643,30 +643,40 @@ def _engine_error(exc, *, generic):
     Tra text thay vi giu object exc: traceback cua engine exception giu
     frame dang mo sqlite connection/file handle — neu CommandError giu
     __cause__/__context__ toi no thi handle bi pin mo tren Windows cho
-    toi khi cyclic GC chay (exception↔traceback↔frame tao cycle)."""
+    toi khi cyclic GC chay (exception↔traceback↔frame tao cycle).
+
+    engine_unavailable LUON di kem next_action="retry" theo contract §8 —
+    normalize o day de moi duong loi engine ra cung mot wire shape."""
     if isinstance(exc, FileNotFoundError):
-        return ("file_not_found", str(exc), True, "pick_files")
-    if isinstance(exc, PermissionError):
-        return ("file_locked", str(exc), True, "retry")
-    if isinstance(exc, RuntimeError):
-        return ("engine_unavailable", str(exc), True, None)
-    if isinstance(exc, ValueError):
-        return ("validation_error", str(exc), False, None)
-    code, retryable, next_action, label = generic
-    return (code, f"{label}: {type(exc).__name__}: {exc}",
-            retryable, next_action)
+        err = ("file_not_found", str(exc), True, "pick_files")
+    elif isinstance(exc, PermissionError):
+        err = ("file_locked", str(exc), True, "retry")
+    elif isinstance(exc, RuntimeError):
+        err = ("engine_unavailable", str(exc), True, None)
+    elif isinstance(exc, ValueError):
+        err = ("validation_error", str(exc), False, None)
+    else:
+        code, retryable, next_action, label = generic
+        err = (code, f"{label}: {type(exc).__name__}: {exc}",
+               retryable, next_action)
+    if err[0] == "engine_unavailable" and not err[3]:
+        err = (err[0], err[1], True, "retry")
+    return err
 
 
 def _run_engine(fn, *, generic):
     """Chay callable engine; exception → CommandError theo _engine_error.
 
-    CommandError (structured tu tang duoi) di qua nguyen. Loi duoc raise
-    SAU khi except block ket thuc de context exception engine duoc giai
-    phong ngay — khong de lai handle mo tren Windows."""
+    CommandError (structured tu tang duoi) va CancelledByUser (nguoi huy)
+    di qua nguyen — cancel khong bao gio bi map thanh loi engine. Loi duoc
+    raise SAU khi except block ket thuc de context exception engine duoc
+    giai phong ngay — khong de lai handle mo tren Windows."""
     err = None
     try:
         return fn()
     except CommandError:
+        raise
+    except CancelledByUser:
         raise
     except Exception as exc:
         err = _engine_error(exc, generic=generic)
@@ -787,6 +797,9 @@ def upload_scan_v1(job, payload):
             done = snap.get("processed_files") or 0
             label = snap.get("current_file") or snap.get("step") or ""
             job.report_progress(done, total or 1, label)
+            # Giong legacy scan_folder: cancel giua chung cat ngay, khong
+            # cho engine chay het folder moi thoat.
+            job.check_cancel()
 
         job.report_progress(0, 1, "indexing")
         manifest, manifest_path = _run_engine(
@@ -795,7 +808,7 @@ def upload_scan_v1(job, payload):
                 modified_since=modified_since,
                 full_rescan=full_rescan,
                 progress_callback=on_progress),
-            generic=("engine_unavailable", True, None, "scan that bai"))
+            generic=("engine_unavailable", True, "retry", "scan that bai"))
         job.check_cancel()
         # Binding run→manifest cua chinh luot nay — manifest da duoc
         # finalize boi engine trong working_dir/runs.
@@ -819,7 +832,7 @@ def upload_scan_v1(job, payload):
 
         rows = _run_engine(
             _read_run_records,
-            generic=("engine_unavailable", True, None,
+            generic=("engine_unavailable", True, "retry",
                      f"khong doc duoc registry cua run {run_id}"))
         job.check_cancel()
         revision = store.bump_revision()
@@ -856,7 +869,19 @@ def upload_audit_excel_v1(job, payload):
     p = _require_workflow(payload)
     _require_payload_keys(p, _AUDIT_V1_KEYS)
     wid = _require_website(p)
-    excel = existing_file(p.get("file_ref"))
+    try:
+        excel = existing_file(p.get("file_ref"))
+    except CommandError as exc:
+        # file_ref do nguoi dung chon: contract §8 bat retryable +
+        # next_action — fileref.py tra bare CommandError (legacy giu
+        # nguyen wire shape do), nang cap o boundary v1 nay.
+        if exc.code == "file_not_found":
+            raise CommandError("file_not_found", exc.message,
+                               retryable=True, next_action="pick_files")
+        if exc.code == "file_locked":
+            raise CommandError("file_locked", exc.message,
+                               retryable=True, next_action="retry")
+        raise
     if excel.suffix.lower() not in _AUDIT_EXCEL_SUFFIXES:
         raise CommandError(
             "validation_error",
@@ -951,12 +976,12 @@ def upload_queue_get(job, payload):
 
     queueable = _run_engine(
         _read_queueable,
-        generic=("engine_unavailable", True, None,
+        generic=("engine_unavailable", True, "retry",
                  "khong doc duoc registry"))
     _manifest, records, _total = _run_engine(
         lambda: uploader.load_upload_queue(
             manifest_path, working_dir=data_dir),
-        generic=("engine_unavailable", True, None,
+        generic=("engine_unavailable", True, "retry",
                  f"khong doc duoc queue cua run {run_id}"))
     if len(records) < len(queueable):
         raise CommandError(

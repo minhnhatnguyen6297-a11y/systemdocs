@@ -26,7 +26,7 @@ _SHELL = _HERE.parent
 sys.path.insert(0, str(_SHELL / "sidecar"))
 
 from errors import CommandError                      # noqa: E402
-from jobstore import Job                              # noqa: E402
+from jobstore import Job, CancelledByUser             # noqa: E402
 import command_registry as reg                        # noqa: E402
 import engine_roots                                   # noqa: E402
 import upload_adapter                                 # noqa: E402
@@ -382,10 +382,13 @@ class ScanAuditQueueTest(UploadWorkflowCase):
         with self.assertRaises(CommandError) as ctx:
             self.run_audit_fixture(fake_xls)
         self.assertEqual(ctx.exception.code, "validation_error")
-        # Missing file -> file_not_found.
+        # Missing file -> file_not_found, retryable + pick_files (§8 —
+        # file_ref do nguoi dung chon).
         with self.assertRaises(CommandError) as ctx:
             self.run_audit_fixture(Path(self.tempdir.name) / "ko-co.xlsx")
         self.assertEqual(ctx.exception.code, "file_not_found")
+        self.assertTrue(ctx.exception.retryable)
+        self.assertEqual(ctx.exception.next_action, "pick_files")
         # Bad dates -> validation_error (dd/mm/yyyy on the wire is rejected).
         self._excel_main()
         with self.assertRaises(CommandError) as ctx:
@@ -540,6 +543,45 @@ class ScanAuditQueueTest(UploadWorkflowCase):
             self.queue_get(scan["run_id"])
         self.assertEqual(ctx.exception.code, "engine_unavailable")
         self.assertTrue(ctx.exception.retryable)
+        self.assertEqual(ctx.exception.next_action, "retry")
+
+    def test_engine_unavailable_always_retry(self):
+        # §8: engine_unavailable phai co next_action="retry" o moi duong
+        # loi — ke ca khi engine nem RuntimeError qua _run_engine (truoc
+        # fix tra next_action=None).
+        scan = self.run_scan_fixture()["data"]
+        batch_scan = engine_roots.import_engine_module(
+            "upload_lab", "batch_scan")
+        with mock.patch.object(
+                batch_scan, "fetch_registry_records_for_run",
+                side_effect=RuntimeError("engine chet")):
+            with self.assertRaises(CommandError) as ctx:
+                self.queue_get(scan["run_id"])
+        self.assertEqual(ctx.exception.code, "engine_unavailable")
+        self.assertTrue(ctx.exception.retryable)
+        self.assertEqual(ctx.exception.next_action, "retry")
+
+    def test_scan_v1_cancel_mid_scan(self):
+        # Cancel giua luot scan: progress callback phai check_cancel de
+        # cat ngay, CancelledByUser khong bi map thanh loi engine, va
+        # workflow_jobs ghi "canceled" (khong "failed").
+        provider = upload_workspace.get_provider(WEBSITE)
+
+        def fake_run_scan(folder, working_dir, **kw):
+            self.last_job.request_cancel()
+            kw["progress_callback"]({
+                "total_files": 2, "processed_files": 1,
+                "current_file": "GD-138.docx"})
+            raise AssertionError("cancel phai cat truoc khi engine xong")
+
+        with mock.patch.object(provider, "run_scan",
+                               side_effect=fake_run_scan):
+            with self.assertRaises(CancelledByUser):
+                self.run_scan_fixture()
+        job_row = self.store.job_for(self.last_job.job_id)
+        self.assertEqual(job_row["status"], "canceled")
+        # Run khong duoc dang ky khi scan bi huy giua chung.
+        self.assertEqual(self.store.revision(), 0)
 
     def test_queue_get_scope_and_binding(self):
         scan = self.run_scan_fixture()["data"]
