@@ -2,20 +2,19 @@
 
 Ghi đến đâu khi làm đến đó.
 
-## Trạng thái: contract draft hoàn chỉnh — 2026-09-24 (chờ owner duyệt)
+## Trạng thái: contract hoàn chỉnh sau 2 vòng review-fix — 2026-09-24 (chờ owner duyệt, KHÔNG merge/runtime trước duyệt)
 
 ## Đã làm
 - Worktree `D:\systemdocs-min-105`, branch `minhnhatnguyen6297/min-105-contract-notarycase-draftingv1` (base `a79cce5` — đã có spec MIN-104).
 - Linear MIN-105 → In Progress.
 - Audit shape thật xong: `.agent/scratch/min-105-audit-stage-diagram.md` + `min-105-audit-engine-word.md`.
-- Viết `contracts/notary-case-drafting.md` (DRAFT, 12 mục): 7 command, ID/ngày/null rules, FileRef `is_dir`, intake limits, diagram state engine v2, Word batch naming/reservation/cancel, bảng error code.
-- `contracts/notary-case-drafting/`: `common.schema.json` + 5 schema command (draft-07).
-- Examples: 21 valid + 13 invalid trong `examples/{valid,invalid}/`.
-- `validate_examples.py` (stdlib-only): **34 files, 0 unexpected outcomes, exit 0**.
-- `contracts/README.md`: thêm 2 dòng index (DRAFT chờ owner duyệt).
-- Review round 1 (`5730915`): 18 findings I-*/M-* đã fix (schema + doc + fixtures + validator). Re-review residuals: `breakdown.skipped` trong schema, 2 chỗ `workspace_conflict` đồng bộ `!=` revision, fraction `"a/b"` hoặc integer string.
+- `1507301` — `contracts/notary-case-drafting.md` (DRAFT, 12 mục): 7 command, ID/ngày/null rules, FileRef `is_dir`, intake limits, diagram state engine v2, Word batch naming/reservation/cancel, bảng error code. `common.schema.json` + 5 schema command (draft-07). `contracts/README.md` +2 dòng index.
+- Reviewer round 1: 8 Important + 13 Minor → fix `5730915` (fraction pattern, breakdown_term required, land_rows null-safe, intake if/then, NEVER_EMPTY mở rộng, data-code registry §2.5, `word.no_deceased_landowner`/`word.too_many_signers`, commit re-evaluate render_model, `breakdown.skipped`, fixture canceled/`_3`/outside-stage request-side...).
+- Re-review: toàn bộ ADDRESSED; residuals → fix `1f7e04a` (`skipped` vào schema, `workspace_conflict` `!=` đồng bộ §9/§7.5, fraction integer form trong doc).
+- **Validator: 34 files (21 valid PASS + 13 invalid REJECTED-CORRECTLY), 0 unexpected outcomes, exit 0** — verified sau mỗi round.
+- Không runtime nào bị đụng (registry/adapter/DB/renderer không đổi — reviewer kiểm chứng anchor file).
 
-## Tự khóa cần reviewer kiểm
+## Tự khóa (đã được reviewer duyệt — giữ để owner đọc)
 - `validation_error` = mã chung cho vi phạm shape không có mã riêng (`confirmed` cấm, `""`-as-null, `is_dir` sai ngữ cảnh) — ngoài list pin.
 - `schema_version` bắt buộc trong `result.data` của cả 7 command (pin chỉ nói workspace).
 - `personId` = `row_id` (không phải `entity_id`) cho tham chiếu Diagram→Stage.
@@ -24,6 +23,16 @@ Ghi đến đâu khi làm đến đó.
 - `breakdown` bắt buộc luôn trong `word_export_batch` result (kể cả khi succeeded toàn bộ).
 - `backend_mode` optional trong workspace result (chuẩn bị cho mock MIN-106).
 - `fixture_context` top-level trong fixtures — không nằm trên wire.
+- `evaluated_revision` trong `diagram_evaluate` result; `size_bytes` bắt buộc ở intake file_ref; `so_serial` canonical `[A-Z]{2}\d{6,8}`.
+
+## Điểm flag cho owner (không chặn)
+- `word_batch_failed` (job-level underscore) khác literal plan §2 `word.batch_failed` — chủ đích theo convention envelope; contract làm SOT sau duyệt, plan nên sửa lại.
+- Data-codes (`block_reason`, per-file `error.code`, warnings, intake errors) dùng dạng `<ns>.<snake>` có chấm — khác convention underscore của job-level `error.code`; hai tầng tách rõ ở §2.5.
+- `document_key` catalog v1: `khai_nhan_di_san`, `thoa_thuan_phan_chia`, `niem_yet` (niem_yet chưa có template → blocked `word.template_missing` hợp lệ).
+- Intake limits v1: ≤8 nguồn/call, ≤20MB/file, PDF ≤50 trang, text ≤100.000 ký tự — backend được siết chặt hơn.
+- `word_export_batch` không mang `base_revision` (export là read-snapshot, không mutate workspace).
+- Diagram wire = engine V2 (`parentSlotIds[]`/`spouseSlotId`), KHÔNG legacy JS (`parentSlotId`/`parentPersonId`/`familyGroupId`/`sourceId`) — renderer phải map.
+- OCR `type:"marriage"` ngoài mapping V1 — quan hệ do người dùng gán trên Diagram (§5.4).
 
 ## Bước tiếp theo
-- Reviewer đọc contract + chạy validator → fix → commit → Linear In Review → DỪNG chờ owner trước MIN-106+.
+- Owner duyệt contract (đọc `contracts/notary-case-drafting.md` ở worktree) → duyệt xong mới mở MIN-106 (mock) / MIN-107+ (real backend).
