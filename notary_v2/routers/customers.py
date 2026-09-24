@@ -1,9 +1,6 @@
 """Customer router: CRUD + Excel import."""
 
 import io
-import re
-import unicodedata
-from datetime import date, datetime
 from typing import Any, Dict, Optional
 from sqlalchemy.exc import IntegrityError
 
@@ -15,111 +12,23 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import Customer
+from services.document_intake.excel_parse import (  # noqa: F401 — re-export cho tests/consumers
+    ExcelParseError,
+    as_input_value,
+    consonant_skeleton,
+    format_date_display,
+    header_matches_keyword,
+    normalize_excel_header,
+    normalize_gender,
+    parse_date,
+    parse_people_workbook,
+)
 
 router = APIRouter()
 templates = Jinja2Templates(directory="frontend/templates")
 
 EXCEL_COLUMNS = ["ho_ten", "gioi_tinh", "ngay_sinh", "ngay_chet", "so_giay_to", "ngay_cap", "dia_chi"]
 DATE_FIELDS = {"ngay_sinh", "ngay_chet", "ngay_cap"}
-
-
-def normalize_excel_header(value: Any) -> str:
-    s = str(value or "").strip()
-    if not s:
-        return ""
-    decomposed = unicodedata.normalize("NFD", s)
-    without_marks = "".join(ch for ch in decomposed if unicodedata.category(ch) != "Mn")
-    without_marks = without_marks.replace("đ", "d").replace("Đ", "D")
-    return re.sub(r"[^a-z0-9]+", " ", without_marks.lower()).strip()
-
-
-def consonant_skeleton(value: Any) -> str:
-    normalized = normalize_excel_header(value)
-    if not normalized:
-        return ""
-    compact = normalized.replace(" ", "")
-    return re.sub(r"[aeiouy]", "", compact)
-
-
-def header_matches_keyword(header: Any, keyword: Any) -> bool:
-    norm_header = normalize_excel_header(header)
-    norm_keyword = normalize_excel_header(keyword)
-    if not norm_header or not norm_keyword:
-        return False
-    if norm_keyword in norm_header:
-        return True
-    header_skeleton = consonant_skeleton(norm_header)
-    return len(header_skeleton) >= 3 and header_skeleton == consonant_skeleton(norm_keyword)
-
-
-def parse_date(value: Any, allow_year_only: bool = True) -> Optional[date]:
-    if value is None:
-        return None
-    if isinstance(value, datetime):
-        return value.date()
-    if isinstance(value, date):
-        return value
-
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
-        v = int(value)
-        # Người dùng gõ năm trực tiếp (1900-2099) vào ô Excel chưa format Text
-        # → Excel lưu integer, không phải serial ngày. Ưu tiên xử lý như năm.
-        if allow_year_only and 1900 <= v <= 2099:
-            return date(v, 1, 1)
-        try:
-            from openpyxl.utils.datetime import from_excel
-            dt = from_excel(value)
-            if isinstance(dt, datetime):
-                return dt.date()
-            if isinstance(dt, date):
-                return dt
-        except Exception:
-            pass
-
-    s = str(value).strip()
-    if not s or s.lower() in ("nan", "none"):
-        return None
-
-    if allow_year_only and len(s) == 4 and s.isdigit():
-        y = int(s)
-        if 1 <= y <= 9999:
-            return date(y, 1, 1)
-
-    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d", "%Y-%m-%d %H:%M:%S"):
-        try:
-            return datetime.strptime(s, fmt).date()
-        except ValueError:
-            pass
-    return None
-
-
-def format_date_display(d: Optional[date]) -> str:
-    if not d:
-        return ""
-    if d.day == 1 and d.month == 1:
-        return f"{d.year:04d}"
-    return d.strftime("%d/%m/%Y")
-
-
-def normalize_gender(value: str) -> str:
-    s = (value or "").strip().lower()
-    if not s:
-        return ""
-    if s in ("nam", "male", "m"):
-        return "Nam"
-    if s in ("nữ", "nu", "female", "f"):
-        return "Nữ"
-    return ""
-
-
-def as_input_value(value: Any, is_date: bool = False) -> str:
-    if value is None:
-        return ""
-    if is_date:
-        d = parse_date(value, allow_year_only=True)
-        if d:
-            return format_date_display(d)
-    return str(value).strip()
 
 
 def to_customer_json(c: Customer) -> Dict[str, Any]:
@@ -254,8 +163,6 @@ def download_template():
 
 @router.post("/upload-excel")
 async def upload_excel(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    import openpyxl
-
     filename = (file.filename or "").lower()
     if not filename.endswith(".xlsx"):
         return templates.TemplateResponse("customers/upload_result.html", {
@@ -265,71 +172,20 @@ async def upload_excel(request: Request, file: UploadFile = File(...), db: Sessi
 
     content = await file.read()
     try:
-        wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
-    except Exception as e:
+        sheet = parse_people_workbook(content)
+    except ExcelParseError as e:
         return templates.TemplateResponse("customers/upload_result.html", {
-            "request": request, "error_global": f"Khong the mo file: {e}",
+            "request": request, "error_global": str(e),
             "results": [], "added": 0, "skipped": 0, "errors": 0, "total": 0
         })
-
-    ws = wb.active
-    rows = list(ws.iter_rows(values_only=True))
-    if len(rows) < 2:
-        return templates.TemplateResponse("customers/upload_result.html", {
-            "request": request, "error_global": "File khong co du lieu.",
-            "results": [], "added": 0, "skipped": 0, "errors": 0, "total": 0
-        })
-
-    raw_headers = [str(h).strip() if h else "" for h in rows[0]]
-    normalized_headers = [normalize_excel_header(h) for h in raw_headers]
-
-    def find_col(keywords):
-        for kw in keywords:
-            if not normalize_excel_header(kw):
-                continue
-            for i, h in enumerate(normalized_headers):
-                if header_matches_keyword(h, kw):
-                    return i
-        return None
-
-    col = {
-        "ho_ten": find_col(["ho_ten", "ho ten", "ho va ten", "ten", "full_name"]),
-        "gioi_tinh": find_col(["gioi_tinh", "gioi", "gender"]),
-        "ngay_sinh": find_col(["ngay_sinh", "ngay sinh", "birth"]),
-        "ngay_chet": find_col(["ngay_chet", "ngay mat", "death", "chet"]),
-        "so_giay_to": find_col(["so_giay_to", "cccd", "giay to", "id_number", "khai tu"]),
-        "ngay_cap": find_col(["ngay_cap", "ngay cap", "issue"]),
-        "dia_chi": find_col(["dia_chi", "dia chi", "a ch", "a chi", "address"]),
-    }
-
-    missing = [f for f in ["ho_ten"] if col[f] is None]
-    if missing:
-        return templates.TemplateResponse("customers/upload_result.html", {
-            "request": request,
-            "error_global": f"Khong nhan dien duoc cot: {', '.join(missing)}",
-            "results": [], "added": 0, "skipped": 0, "errors": 0, "total": 0
-        })
-
-    def get_raw(row_vals, field):
-        idx = col.get(field)
-        if idx is None or idx >= len(row_vals):
-            return None
-        return row_vals[idx]
 
     results = []
     added_customers = []
     added = skipped = errors = 0
 
-    for row_num, row in enumerate(rows[1:], start=2):
-        raw_form = {
-            "ho_ten": as_input_value(get_raw(row, "ho_ten")),
-            "gioi_tinh": as_input_value(get_raw(row, "gioi_tinh")),
-            "ngay_sinh": as_input_value(get_raw(row, "ngay_sinh"), is_date=True),
-            "ngay_chet": as_input_value(get_raw(row, "ngay_chet"), is_date=True),
-            "so_giay_to": as_input_value(get_raw(row, "so_giay_to")),
-            "ngay_cap": as_input_value(get_raw(row, "ngay_cap"), is_date=True),
-            "dia_chi": as_input_value(get_raw(row, "dia_chi")),
-        }
+    for parsed_row in sheet["rows"]:
+        row_num = parsed_row["row_num"]
+        raw_form = parsed_row["form"]
 
         if not raw_form["ho_ten"] and not raw_form["so_giay_to"]:
             continue
