@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse
 from command_registry import COMMANDS
 from errors import CommandError, error_object
 from fileref import validate_file_ref
+from job_repository import JobRepository
 from jobstore import JobStore
 
 CONTRACT_VERSION = "desktopcommand.v1"
@@ -41,7 +42,27 @@ SENSITIVE_KEY = re.compile(
     r"storage_state|api_key|bearer", re.I)
 
 app = FastAPI(title="g1-shell-sidecar", docs_url=None, redoc_url=None)
-store = JobStore()
+
+
+def _build_store():
+    """JobStore + journal ben trong workspace.sqlite3 (MIN-69 T5).
+
+    Repository mo cung file SQLite cua upload workspace — reconnect theo
+    job_id/command_id song xuyen restart, job non-terminal cua process
+    truoc thanh failed{engine_restarted} va handler khong chay lai.
+    Khong mo duoc db → chay degraded (in-memory nhu cu), khong che boot.
+    """
+    try:
+        import upload_workspace
+        return JobStore(
+            repository=JobRepository(upload_workspace.workspace_db_path()))
+    except Exception as exc:  # noqa: BLE001 — boot khong duoc chet vi journal
+        print(f"WARN: job repository khong mo duoc ({exc}) — "
+              "chay in-memory", file=sys.stderr)
+        return JobStore()
+
+
+store = _build_store()
 _server = None  # uvicorn.Server, set in main()
 
 
@@ -155,6 +176,10 @@ async def submit_command(request: Request):
     try:
         job = store.submit(command_id, command, handler, payload)
     except CommandError as exc:
+        if exc.code == "command_id_conflict":
+            # Cung command_id nhung noi dung request khac — xung dot
+            # identity, KHONG duoc ghi de job cu (contract §8).
+            return _err(409, exc.code, exc.message, exc.retryable)
         return _err(503, exc.code, exc.message, exc.retryable)
     return job.snapshot()
 
@@ -181,7 +206,15 @@ def cancel_job(job_id: str):
 @app.post("/shutdown")
 def shutdown():
     def _stop():
+        # Drain job truoc (cancel engine_shutdown + persist terminal),
+        # roi cho browser worker reconcile/dong an toan — tab chua xac
+        # minh Luu duoc giu dau needs_reconcile, khong coi la saved.
         store.drain(timeout=2)
+        try:
+            import upload_session
+            upload_session.worker().shutdown(timeout=2)
+        except Exception:
+            pass
         if _server is not None:
             _server.should_exit = True
     threading.Timer(0.2, _stop).start()

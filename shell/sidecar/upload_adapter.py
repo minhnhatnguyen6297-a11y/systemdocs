@@ -483,8 +483,15 @@ def _v1_boundary(fn):
                 exc.retryable = False
                 exc.next_action = "contact_admin"
             elif exc.code == "engine_unavailable":
-                exc.retryable = True
-                exc.next_action = "retry"
+                if (exc.details or {}).get("needs_reconcile_record_ids"):
+                    # Ho so chua ro da Luu (MIN-69 T5): KHONG auto-retry
+                    # mu — phai upload.reconcile truoc, retry co chu y la
+                    # command moi. Giu marker trong details cho client.
+                    exc.retryable = False
+                    exc.next_action = None
+                else:
+                    exc.retryable = True
+                    exc.next_action = "retry"
             elif exc.code == "file_scope_not_supported":
                 exc.next_action = "pick_files"
             elif exc.next_action is not None \
@@ -691,11 +698,30 @@ def _request_hash(payload) -> str:
 def _begin_workflow_job(store, job, *, command, website_id, payload,
                         **job_fields):
     """Ghi dong workflow_jobs truoc khi engine chay (plan §3.2): recovery
-    toi thieu + job non-terminal chan doi website (workflow_busy)."""
+    toi thieu + job non-terminal chan doi website (workflow_busy).
+
+    Listener mirror status/waiting_on cua Job vao row sau moi transition
+    (MIN-69 T5): khi cancel thang cuoc dua finish — handler da viet
+    'succeeded'/'failed' nhung Job ket luan 'canceled' — row van hoi tu
+    ve terminal THAT, khong de lai 'succeeded' gia trong journal.
+    Mirror la duong ghi CO THAM QUYEN (set_job_status — khong bao gio bi
+    terminal-guard cua upsert_job chan): Job moi la chu the terminal,
+    'succeeded' handler viet som la du doan chua xac nhan, phai bi dung
+    terminal cua Job ghi de lai."""
     store.upsert_job(
         job.job_id, command_id=job.command_id,
         request_hash=_request_hash(payload), command=command,
         website_id=website_id, status="running", **job_fields)
+
+    def _mirror(j):
+        snap = j.snapshot()
+        try:
+            store.set_job_status(j.job_id, snap["status"],
+                                 waiting_on=snap["waiting_on"])
+        except Exception:
+            pass
+
+    job._listeners.append(_mirror)
 
 
 def _finish_workflow_job(store, job_id, status, **fields):
@@ -1893,11 +1919,12 @@ def upload_prepare_v1(job, payload):
         if not batch_open:
             # Khong con gi de kiem tra (excluded het hoac fail toan bo)
             # → terminal ngay, KHONG waiting_user.
+            job.check_cancel()
             data = _prepare_result_data(
                 wid, bid, run_id, audit_id, record_ids, summary,
                 errors, store, adapter_excluded=len(dropped_excel))
             _finish_workflow_job(
-                store, job.job_id, "partial" if errors else "succeeded")
+                store, job.job_id, _prepare_terminal_status(data))
             return _prepare_result(data, errors)
         store.upsert_job(job.job_id, status="waiting_user",
                          waiting_on="review")
@@ -1920,19 +1947,20 @@ def upload_prepare_v1(job, payload):
             lambda: worker().call("_poll_now", website_id=wid),
             generic=("engine_unavailable", True, "retry",
                      "khong doi chieu duoc tab sau kiem tra"))
+        job.check_cancel()
         data = _prepare_result_data(
             wid, bid, run_id, audit_id, record_ids, summary,
             errors, store, adapter_excluded=len(dropped_excel))
         _finish_workflow_job(
-            store, job.job_id, "partial" if errors else "succeeded",
+            store, job.job_id, _prepare_terminal_status(data),
             verified_record_ids=data["saved_record_ids"])
         return _prepare_result(data, errors)
     except CancelledByUser:
         _finish_workflow_job(store, job.job_id, "canceled")
         raise
-    except Exception:
+    except Exception as exc:
         _finish_workflow_job(store, job.job_id, "failed")
-        raise
+        raise _guard_unclear_retry(store, wid, exc)
     finally:
         done.set()
 
@@ -1991,16 +2019,60 @@ def _prepare_result_data(wid, bid, run_id, audit_id, record_ids,
     }
 
 
+def _prepare_terminal_status(data):
+    """Terminal status cua dot prepare theo breakdown (MIN-69 T5).
+
+    partial = HON HOP (co muc thanh cong + muc loi). Toan bo muc loi →
+    'failed' — batch loi het khong phai partial; khong loi →
+    'succeeded'."""
+    bd = (data or {}).get("breakdown") or {}
+    ok_list = bd.get("succeeded") or []
+    fail_list = bd.get("failed") or []
+    if fail_list:
+        return "partial" if ok_list else "failed"
+    return "succeeded"
+
+
+def _guard_unclear_retry(store, wid, exc):
+    """Tra exception se raise tu duong loi cua prepare.
+
+    Khi con ho so chua ro da Luu (needs_reconcile) thi cam auto-retry mu
+    theo contract §7.4 — khong phat lai upload khi ket qua chua ro:
+    retryable=False, next_action=None, details keo theo
+    needs_reconcile_record_ids. Client phai upload.reconcile truoc;
+    retry co chu y la command MOI (command_id moi)."""
+    try:
+        unclear = store.needs_reconcile_ids(wid)
+    except Exception:
+        unclear = []
+    if not unclear:
+        return exc
+    details = dict(getattr(exc, "details", None) or {})
+    details["needs_reconcile_record_ids"] = unclear
+    if isinstance(exc, CommandError):
+        exc.retryable = False
+        exc.next_action = None
+        exc.details = details
+        return exc
+    return CommandError(
+        "engine_unavailable", f"chuan bi ho so that bai: {exc}",
+        retryable=False, details=details)
+
+
 def _prepare_result(data, errors):
-    """upload_prepare result; co loi tung muc → partial + error code
-    upload.partial_failure (contract §6.14/§8)."""
+    """upload_prepare result; co loi tung muc → partial flag + error code
+    upload.partial_failure (contract §6.14/§8). Con ho so chua ro da Luu
+    (needs_reconcile) → retryable=False: cam auto-replay, phai reconcile
+    truoc khi thu lai co chu y bang command_id moi."""
     result = _result("upload_prepare", data)
     if errors:
+        unclear = data.get("needs_reconcile_record_ids") or []
         result["partial"] = True
         result["error"] = error_object(
             "upload.partial_failure",
             f"{len(errors)} ho so chuan bi that bai",
-            retryable=True, next_action="retry")
+            retryable=not unclear,
+            next_action=None if unclear else "retry")
     return result
 
 

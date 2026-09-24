@@ -16,6 +16,13 @@ website cua luong upload.workflow.v1:
 - `preferences` — chunk_size/cong_chung_vien/thu_ky THEO website
 
 Khong co truong credential/cookie/token/storage_state — dung y contract §7.4.
+
+Crash recovery (MIN-69 T5): mot store instance tuong duong mot process —
+constructor quet lai di trang thai do tien trinh truoc de lai:
+workflow_jobs non-terminal → 'failed', browsers 'open' → 'closed',
+open_tabs con treo → needs_reconcile (chua ro da Luu — tuyet doi khong
+coi la saved). Sidecar_jobs journal (command identity cho moi command)
+nam o `job_repository.py` tren cung file nay.
 """
 from __future__ import annotations
 
@@ -128,6 +135,46 @@ class UploadWorkspaceStore:
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.executescript(_SCHEMA)
         self._conn.commit()
+        self._recover_interrupted()
+
+    def _recover_interrupted(self):
+        """Don trang thai do tien trinh truoc de lai (crash/kill).
+
+        - workflow_jobs con non-terminal → 'failed' (process moi khong
+          the co job dang chay; chi tiet loi song o sidecar_jobs qua
+          engine_restarted).
+        - browsers 'open' → 'closed' (process moi khong so huu browser
+          nao; open_tabs cua no da duoc dua vao needs_reconcile).
+        - open_tabs con lai → needs_reconcile giu run_id: tab khong con
+          chu so huu = khong xac dinh duoc da Luu — KHONG bao gio coi la
+          saved (contract §7.4: chi POST /api/hoso 2xx da xac minh moi la
+          Luu)."""
+        with self._lock:
+            marks = ",".join("?" for _ in TERMINAL_STATUSES)
+            self._conn.execute(
+                f"UPDATE workflow_jobs SET status='failed',"
+                f" waiting_on=NULL, updated_at=? WHERE status NOT IN"
+                f" ({marks})", (_now(), *TERMINAL_STATUSES))
+            self._conn.execute(
+                "UPDATE browsers SET status='closed', closed_at=?"
+                " WHERE status='open'", (_now(),))
+            rows = self._conn.execute(
+                "SELECT website_id, run_id, record_id FROM open_tabs"
+            ).fetchall()
+            for row in rows:
+                self._conn.execute(
+                    "INSERT INTO needs_reconcile(website_id, run_id,"
+                    " record_id, reason, created_at) VALUES(?,?,?,?,?)"
+                    " ON CONFLICT(website_id, record_id) DO UPDATE SET"
+                    " run_id=excluded.run_id, reason=excluded.reason,"
+                    " created_at=excluded.created_at",
+                    (row["website_id"], row["run_id"],
+                     int(row["record_id"]),
+                     "tien trinh truoc dung dot ngot — chua xac minh Luu",
+                     _now()))
+            if rows:
+                self._conn.execute("DELETE FROM open_tabs")
+            self._conn.commit()
 
     def close(self):
         with self._lock:
@@ -305,6 +352,13 @@ class UploadWorkspaceStore:
                    run_id=None, audit_id=None, record_ids=None,
                    verified_record_ids=None, status="running",
                    waiting_on=None):
+        # Terminal-state integrity (MIN-69 T5): row da terminal KHONG bi
+        # upsert thuong ghi de status/waiting_on/verified_record_ids —
+        # cancel da chap nhan luon thang cuoc dua finish cua handler
+        # (handler viet 'succeeded'/'failed' som vao row da 'canceled'
+        # bi bo qua). Duong ghi co tham quyen duy nhat vao row terminal
+        # la mirror Job → set_job_status (Job moi la chu the terminal).
+        marks = ",".join("?" for _ in TERMINAL_STATUSES)
         with self._lock:
             self._conn.execute(
                 "INSERT INTO workflow_jobs(job_id, command_id, request_hash,"
@@ -320,16 +374,22 @@ class UploadWorkspaceStore:
                 " run_id=COALESCE(excluded.run_id, workflow_jobs.run_id),"
                 " audit_id=COALESCE(excluded.audit_id, workflow_jobs.audit_id),"
                 " record_ids=COALESCE(excluded.record_ids, workflow_jobs.record_ids),"
-                " verified_record_ids=COALESCE(excluded.verified_record_ids,"
-                "   workflow_jobs.verified_record_ids),"
-                " status=excluded.status, waiting_on=excluded.waiting_on,"
+                f" verified_record_ids=CASE WHEN workflow_jobs.status IN ({marks})"
+                "   THEN workflow_jobs.verified_record_ids"
+                "   ELSE COALESCE(excluded.verified_record_ids,"
+                "     workflow_jobs.verified_record_ids) END,"
+                f" status=CASE WHEN workflow_jobs.status IN ({marks})"
+                "   THEN workflow_jobs.status ELSE excluded.status END,"
+                f" waiting_on=CASE WHEN workflow_jobs.status IN ({marks})"
+                "   THEN workflow_jobs.waiting_on ELSE excluded.waiting_on END,"
                 " updated_at=excluded.updated_at",
                 (job_id, command_id, request_hash, command, website_id,
                  browser_id, run_id, audit_id,
                  json.dumps(record_ids) if record_ids is not None else None,
                  json.dumps(verified_record_ids)
                  if verified_record_ids is not None else None,
-                 status, waiting_on, _now()))
+                 status, waiting_on, _now(),
+                 *TERMINAL_STATUSES, *TERMINAL_STATUSES, *TERMINAL_STATUSES))
             self._conn.commit()
 
     def job_for(self, job_id) -> dict | None:

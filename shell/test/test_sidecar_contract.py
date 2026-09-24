@@ -205,6 +205,35 @@ class SidecarContractTest(unittest.TestCase):
         self.assertEqual(j1["job_id"], j2["job_id"])
         self._wait_job(j1["job_id"])
 
+    def test_command_id_conflict_different_payload_409(self):
+        """MIN-69 T5: cung command_id + noi dung khac → 409
+        command_id_conflict (khong ghi de identity, khong tao job moi);
+        cung noi dung → van idempotent tra dung job cu."""
+        cid = str(uuid.uuid4())
+        cmd = _new_cmd("diag.slow_task", {"steps": 2}, command_id=cid)
+        j1 = self.http.post("/v1/commands", json=cmd).json()
+        self.assertEqual(j1["command_id"], cid)
+
+        r = self.http.post("/v1/commands", json=_new_cmd(
+            "diag.slow_task", {"steps": 3}, command_id=cid))
+        self.assertEqual(r.status_code, 409)
+        err = r.json()["error"]
+        self.assertEqual(err["code"], "command_id_conflict")
+        self.assertFalse(err["retryable"])
+
+        # Command KHAC tren cung command_id cung conflict (hash gom
+        # command + payload, khong chi payload).
+        r2 = self.http.post("/v1/commands", json=_new_cmd(
+            "diag.env_check", None, command_id=cid))
+        self.assertEqual(r2.status_code, 409)
+        self.assertEqual(r2.json()["error"]["code"],
+                         "command_id_conflict")
+
+        # Cung noi dung → idempotent nguyen trang.
+        j2 = self.http.post("/v1/commands", json=cmd).json()
+        self.assertEqual(j2["job_id"], j1["job_id"])
+        self._wait_job(j1["job_id"])
+
     def test_cancel_running_and_terminal_409(self):
         job = self.http.post("/v1/commands", json=_new_cmd(
             "diag.slow_task", {"steps": 60})).json()

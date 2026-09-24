@@ -157,6 +157,147 @@ class JobStoreTest(unittest.TestCase):
         snap = wait_terminal(self.store, job.job_id)
         self.assertEqual(snap["status"], "failed")
 
+    # ---------- MIN-69 T5: terminal-state integrity + command identity
+
+    def _wait_waiting(self, job, timeout=5):
+        deadline = time.time() + timeout
+        while job.snapshot()["status"] != "waiting_user":
+            self.assertLess(time.time(), deadline)
+            time.sleep(0.02)
+
+    def test_cancel_in_waiting_beats_late_handler_failure(self):
+        """Race huy/hoan tat (T5): huy trong waiting_user → handler ngu
+        tinh nem loi sau do — terminal cuoi van canceled, khong bi ghi de
+        thanh failed. Gate Event kiem soat, khong sleep timing."""
+        gate = threading.Event()
+
+        def late_fail(job, payload):
+            job.set_waiting("review")
+            gate.wait(5)
+            raise CommandError("engine_unavailable", "boom",
+                               retryable=True)
+
+        job = self.store.submit("c-race1", "diag.x", late_fail, {})
+        self._wait_waiting(job)
+        self.store.cancel(job.job_id)
+        self.assertEqual(job.snapshot()["status"], "canceled")
+        gate.set()  # handler tiep tuc → nem CommandError muon
+        snap = wait_terminal(self.store, job.job_id)
+        self.assertEqual(snap["status"], "canceled")
+        self.assertEqual(snap["error"]["code"], "user_canceled")
+
+    def test_cancel_in_waiting_beats_late_success(self):
+        """Huy trong waiting → handler thu resume + tra ket qua — van
+        canceled (resume tren job da huy phai abort, khong duoc tro lai
+        running roi succeeded)."""
+        gate = threading.Event()
+
+        def late_ok(job, payload):
+            job.set_waiting("review")
+            gate.wait(5)
+            job.resume()
+            return {"kind": "ok", "data": {}}
+
+        job = self.store.submit("c-race2", "diag.x", late_ok, {})
+        self._wait_waiting(job)
+        self.store.cancel(job.job_id)
+        gate.set()
+        snap = wait_terminal(self.store, job.job_id)
+        self.assertEqual(snap["status"], "canceled")
+        self.assertEqual(snap["error"]["code"], "user_canceled")
+
+    def test_cancel_in_waiting_beats_late_progress_write(self):
+        """report_progress sau cancel phai abort handler (CancelledByUser)
+        thay vi ghi progress len job da terminal."""
+        gate = threading.Event()
+
+        def late_progress(job, payload):
+            job.set_waiting("review")
+            gate.wait(5)
+            job.report_progress(1, 2, "sau huy")   # phai raise
+            return {"kind": "ok", "data": {}}
+
+        job = self.store.submit("c-race3", "diag.x", late_progress, {})
+        self._wait_waiting(job)
+        self.store.cancel(job.job_id)
+        gate.set()
+        snap = wait_terminal(self.store, job.job_id)
+        self.assertEqual(snap["status"], "canceled")
+        self.assertIsNone(snap["progress"],
+                          "progress khong duoc ghi len job da huy")
+
+    def test_finish_before_cancel_is_terminal(self):
+        """Cancel-after-finish: job da succeeded → cancel tra 'terminal'
+        (409 o API) va snapshot khong doi."""
+        job = self.store.submit("c-f1", "diag.x", quick, {})
+        snap = wait_terminal(self.store, job.job_id)
+        self.assertEqual(snap["status"], "succeeded")
+        self.assertEqual(self.store.cancel(job.job_id), "terminal")
+        snap2 = job.snapshot()
+        self.assertEqual(snap2["status"], "succeeded")
+        self.assertIsNotNone(snap2["result"])
+        self.assertIsNone(snap2["error"])
+
+    def test_finish_never_overwrites_terminal(self):
+        """_finish vao job da terminal bi tu choi cho moi huong —
+        succeeded/failed/partial/canceled deu bat bien."""
+        job = self.store.submit("c-f2", "diag.x", quick, {})
+        snap = wait_terminal(self.store, job.job_id)
+        self.assertEqual(snap["status"], "succeeded")
+        self.assertFalse(job._finish("failed"))
+        self.assertFalse(job._finish("partial", result={"k": 1}))
+        self.assertFalse(job._finish("canceled"))
+        self.assertFalse(job.request_cancel(code="engine_shutdown"))
+        snap2 = job.snapshot()
+        self.assertEqual(snap2["status"], "succeeded")
+        self.assertIsNone(snap2["error"])
+
+    def test_command_id_conflict_on_different_payload(self):
+        """Cung command_id + noi dung khac → command_id_conflict (khong
+        tra job cu, khong ghi de identity); cung noi dung → idempotent."""
+        j1 = self.store.submit("dup-x", "diag.slow_task", quick,
+                               {"steps": 1})
+        wait_terminal(self.store, j1.job_id)
+        with self.assertRaises(CommandError) as ctx:
+            self.store.submit("dup-x", "diag.slow_task", quick,
+                              {"steps": 2})
+        self.assertEqual(ctx.exception.code, "command_id_conflict")
+        self.assertFalse(ctx.exception.retryable)
+        j2 = self.store.submit("dup-x", "diag.slow_task", quick,
+                               {"steps": 1})
+        self.assertEqual(j2.job_id, j1.job_id)
+
+    def test_partial_all_failed_maps_to_failed(self):
+        """Toan bo muc loi → job failed (khong phai partial); breakdown
+        giu nguyen de khach doc chi tiet tung muc."""
+        def all_failed(job, payload):
+            return {"partial": True, "kind": "x",
+                    "data": {"breakdown": {
+                        "succeeded": [],
+                        "failed": [{"record_id": 7, "stage": "prepared",
+                                    "code": "upload_failed",
+                                    "message": "fake"}]}}}
+
+        job = self.store.submit("c-af", "diag.x", all_failed, {})
+        snap = wait_terminal(self.store, job.job_id)
+        self.assertEqual(snap["status"], "failed")
+        self.assertEqual(
+            snap["result"]["data"]["breakdown"]["failed"][0]
+            ["record_id"], 7)
+
+    def test_next_action_trong_enum(self):
+        """Error next_action chi nam trong enum contract §8."""
+        allowed = {"login_required", "pick_files", "retry",
+                   "contact_admin", None}
+
+        def fail_with_bad_next(job, payload):
+            raise CommandError("engine_unavailable", "x", retryable=True,
+                               next_action="retry")
+
+        job = self.store.submit("c-na", "diag.x", fail_with_bad_next, {})
+        snap = wait_terminal(self.store, job.job_id)
+        self.assertIn(snap["error"]["next_action"], allowed)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

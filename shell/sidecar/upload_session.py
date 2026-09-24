@@ -147,15 +147,36 @@ class _BrowserWorker:
                 target=self._loop, name="g1-upload-browser", daemon=True)
             self._thread.start()
 
-    def shutdown(self):
-        """Dung browser thread + dong session (test teardown / drain)."""
-        self._stop.set()
+    def shutdown(self, timeout=5.0):
+        """Dung browser thread (drain/shutdown sidecar, test teardown).
+
+        Thu tu (MIN-69 T5): bao op mutating dang chay dung som → poll/
+        reconcile + dong session TREN browser thread (Save da xac minh
+        ghi registry truoc khi dong) → stop loop → join toi da `timeout`.
+        Qua thoi han (browser hang): thread con lai la daemon — tab chua
+        xac minh van duoc giu dau needs_reconcile qua open_tabs sweep khi
+        process sau mo store, khong bao gio coi la 'da Luu'."""
         thread = self._thread
-        if thread is not None:
-            thread.join(timeout=5)
+        if thread is None:
+            return
+        self.request_stop()   # engine dung sau don vi dang xu ly
+        wid = self._website_id
+        if self.browser_alive():
+            try:
+                # Reconcile cac tab doc duoc ROI moi dong — mot op tren
+                # browser thread, bounded de shutdown khong treo vo han.
+                self.call("_poll_then_close", website_id=wid,
+                          timeout=max(1.0, float(timeout) - 1.0))
+            except Exception:
+                pass
+        self._stop.set()
+        thread.join(timeout=timeout)
+        # Timeout/hang: danh dau phan con lai la can doi chieu (giu
+        # run_id) de lan khoi dong sau hoac reconcile doi chieu lai.
+        self._mark_open_tabs_needs_reconcile(wid)
 
     def call(self, op, *args, website_id=None, mutating=False,
-             stop_event=None, stop_current=False, **kwargs):
+             stop_event=None, stop_current=False, timeout=None, **kwargs):
         """Chay fn session tren browser thread, tra ket qua/raise loi.
 
         `website_id`: None → session legacy (working_dir = engine root);
@@ -165,7 +186,15 @@ class _BrowserWorker:
         nay — duoc dang ky de `request_stop()`/`_close` dat tu ben ngoai.
         `stop_current`: dat stop event cua op dang chay TRUOC khi xep hang
         (dung cho `_close` — engine dung som thay vi het batch).
+        `timeout`: gioi han cho ket qua — None = cho vo han (default giu
+        nguyen). Worker da shutdown (_stop set) → engine_unavailable thay
+        vi spawn lai thread moi sau lenh tat.
         """
+        if self._stop.is_set():
+            raise CommandError(
+                "engine_unavailable",
+                "browser worker da dung — khong nhan op moi",
+                retryable=True, next_action="retry")
         if stop_current:
             self.request_stop()
         acquired = False
@@ -183,7 +212,7 @@ class _BrowserWorker:
             fut = _Future()
             try:
                 self._queue.put((op, args, kwargs, website_id, fut))
-                return fut.result()
+                return fut.result(timeout)
             finally:
                 if stop_event is not None:
                     self._register_active_stop(None)
@@ -492,6 +521,29 @@ class _BrowserWorker:
             tabs["closed_record_ids"].sort()
             tabs["unknown_record_ids"].sort()
             self._snapshot["login"] = login
+
+    def _mark_open_tabs_needs_reconcile(self, wid):
+        """Tab con mo trong store ma browser da dong/mat truoc khi xac
+        minh Luu → needs_reconcile (giu run_id de upload.reconcile doi
+        chieu theo dung run). An toan goi tu moi thread — doc/ghi qua
+        store lock; store loi bi nuot (khong che shutdown)."""
+        if not wid:
+            return
+        try:
+            from upload_workspace import open_store
+            store = open_store()
+            open_ids = store.open_tab_record_ids(wid)
+            if not open_ids:
+                return
+            with self._lock:
+                run_map = dict(self._tab_runs)
+            store.remove_open_tabs(wid, open_ids)
+            for rid in open_ids:
+                store.add_needs_reconcile(
+                    wid, [rid], run_id=run_map.get(rid),
+                    reason="browser dong truoc khi xac minh Luu")
+        except Exception:
+            pass
 
     def _session_lost(self):
         """Browser khong con doc duoc (crash/target closed).

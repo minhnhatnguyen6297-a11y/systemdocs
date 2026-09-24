@@ -961,7 +961,15 @@ class SessionProblemTest(BrowserWorkflowCase):
         snap = self.wait_terminal(job)
         self.assertEqual(snap["status"], "failed")
         self.assertEqual(snap["error"]["code"], "engine_unavailable")
-        self.assertTrue(snap["error"]["retryable"])
+        # MIN-69 T5: con ho so chua ro da Luu → cam auto-retry mu (§7.4);
+        # client phai upload.reconcile truoc, retry co chu y la command
+        # moi. Marker di kem details cho client.
+        self.assertFalse(snap["error"]["retryable"])
+        self.assertIsNone(snap["error"]["next_action"])
+        details = snap["error"].get("details") or {}
+        self.assertEqual(
+            sorted(details.get("needs_reconcile_record_ids") or []),
+            sorted(ids[:2]))
         # lost tabs -> needs reconcile, never silently 'saved'
         held = self.store.needs_reconcile_ids(WEBSITE)
         for rid in ids[:2]:
