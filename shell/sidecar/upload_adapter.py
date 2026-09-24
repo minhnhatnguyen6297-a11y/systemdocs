@@ -12,6 +12,7 @@ Boundary (MIN-69):
     code + giu data root legacy; luong `upload.workflow.v1` doc/ghi qua
     `upload_workspace.website_data_dir(website_id)` duoi G1_UPLOAD_DATA_DIR.
 """
+import functools
 import hashlib
 import json
 import re
@@ -430,6 +431,32 @@ def _require_revision(payload, key="expected_revision") -> int:
     return value
 
 
+def _v1_boundary(fn):
+    """Guard wire-shape contract §8 o ranh gioi upload.workflow.v1.
+
+    Helper dung chung co the nem CommandError thieu next_action —
+    `import_engine_module` (engine_roots) tra `engine_unavailable`
+    retryable nhung next_action=None, `fileref` tra
+    `file_scope_not_supported` khong next_action. Hai file do la infra
+    chia se voi legacy (wire shape legacy khong doi), nen normalize tai
+    boundary v1 thay vi sua chung: moi duong loi thoat ra command v1 deu
+    co next_action dung bang §8."""
+    @functools.wraps(fn)
+    def wrapper(job, payload):
+        try:
+            return fn(job, payload)
+        except CommandError as exc:
+            if not exc.next_action:
+                if exc.code == "engine_unavailable":
+                    exc.retryable = True
+                    exc.next_action = "retry"
+                elif exc.code == "file_scope_not_supported":
+                    exc.next_action = "pick_files"
+            raise
+    return wrapper
+
+
+@_v1_boundary
 def upload_websites(job, payload):
     """`upload.websites` → kind website_catalog (contract §6.1)."""
     _require_workflow(payload)
@@ -441,6 +468,7 @@ def upload_websites(job, payload):
     })
 
 
+@_v1_boundary
 def upload_workspace_get(job, payload):
     """`upload.workspace_get` → kind upload_workspace (§6.2).
 
@@ -452,6 +480,7 @@ def upload_workspace_get(job, payload):
     return _result("upload_workspace", snap)
 
 
+@_v1_boundary
 def upload_website_select(job, payload):
     """`upload.website_select` → kind upload_workspace (§6.2).
 
@@ -464,6 +493,7 @@ def upload_website_select(job, payload):
     return _result("upload_workspace", snap)
 
 
+@_v1_boundary
 def upload_preferences(job, payload):
     """`upload.preferences` → kind preferences (§6.13).
 
@@ -524,6 +554,7 @@ def upload_preferences(job, payload):
     })
 
 
+@_v1_boundary
 def upload_env_check_v1(job, payload):
     """`upload.env_check` versioned → kind env_check (§6.3).
 
@@ -752,6 +783,7 @@ def _queue_row(row):
     }
 
 
+@_v1_boundary
 def upload_scan_v1(job, payload):
     """`upload.scan` versioned → kind scan_report (contract §6.10).
 
@@ -860,6 +892,7 @@ def upload_scan_v1(job, payload):
     }, source_files=[{"path": str(folder), "scope": "machine_local"}])
 
 
+@_v1_boundary
 def upload_audit_excel_v1(job, payload):
     """`upload.audit_excel` versioned → kind audit_report (contract §6.9).
 
@@ -925,6 +958,7 @@ def upload_audit_excel_v1(job, payload):
     }, source_files=[{"path": str(excel), "scope": "machine_local"}])
 
 
+@_v1_boundary
 def upload_queue_get(job, payload):
     """`upload.queue_get` → kind upload_queue (contract §6.11).
 

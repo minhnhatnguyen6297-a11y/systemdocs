@@ -273,6 +273,18 @@ class ScanAuditQueueTest(UploadWorkflowCase):
             })
         self.assertEqual(ctx.exception.code, "file_not_found")
         self.assertEqual(ctx.exception.next_action, "pick_files")
+        # Non-absolute FileRef -> file_scope_not_supported + pick_files (§8).
+        with self.assertRaises(CommandError) as ctx:
+            self._run("upload.scan", {
+                "workflow_version": V1,
+                "website_id": WEBSITE,
+                "folder": {"path": "ho so tuong doi",
+                           "scope": "machine_local"},
+                "expected_revision": self.store.revision(),
+            })
+        self.assertEqual(ctx.exception.code, "file_scope_not_supported")
+        self.assertFalse(ctx.exception.retryable)
+        self.assertEqual(ctx.exception.next_action, "pick_files")
 
     def test_scan_v1_modified_since_and_key_validation(self):
         with self.assertRaises(CommandError) as ctx:
@@ -388,6 +400,12 @@ class ScanAuditQueueTest(UploadWorkflowCase):
             self.run_audit_fixture(Path(self.tempdir.name) / "ko-co.xlsx")
         self.assertEqual(ctx.exception.code, "file_not_found")
         self.assertTrue(ctx.exception.retryable)
+        self.assertEqual(ctx.exception.next_action, "pick_files")
+        # Non-absolute file_ref -> file_scope_not_supported + pick_files.
+        with self.assertRaises(CommandError) as ctx:
+            self.run_audit_fixture("tuong-doi.xlsx")
+        self.assertEqual(ctx.exception.code, "file_scope_not_supported")
+        self.assertFalse(ctx.exception.retryable)
         self.assertEqual(ctx.exception.next_action, "pick_files")
         # Bad dates -> validation_error (dd/mm/yyyy on the wire is rejected).
         self._excel_main()
@@ -555,6 +573,22 @@ class ScanAuditQueueTest(UploadWorkflowCase):
         with mock.patch.object(
                 batch_scan, "fetch_registry_records_for_run",
                 side_effect=RuntimeError("engine chet")):
+            with self.assertRaises(CommandError) as ctx:
+                self.queue_get(scan["run_id"])
+        self.assertEqual(ctx.exception.code, "engine_unavailable")
+        self.assertTrue(ctx.exception.retryable)
+        self.assertEqual(ctx.exception.next_action, "retry")
+
+    def test_engine_import_error_normalized(self):
+        # engine_roots.import_engine_module nem CommandError
+        # ("engine_unavailable", retryable=True) KHONG next_action;
+        # boundary v1 phai bo sung "retry" truoc khi ra wire (§8).
+        scan = self.run_scan_fixture()["data"]
+        bare = CommandError("engine_unavailable",
+                            "khong import duoc upload_lab.batch_scan",
+                            retryable=True)
+        with mock.patch.object(upload_adapter, "import_engine_module",
+                               side_effect=bare):
             with self.assertRaises(CommandError) as ctx:
                 self.queue_get(scan["run_id"])
         self.assertEqual(ctx.exception.code, "engine_unavailable")
