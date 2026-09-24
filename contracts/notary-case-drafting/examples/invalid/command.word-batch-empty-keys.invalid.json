@@ -1,0 +1,16 @@
+{
+  "expected_error": "word_no_documents_selected",
+  "contract_version": "desktopcommand.v1",
+  "command_id": "b1b2c3d4-0006-4006-8006-000000000106",
+  "command": "notary.word_export_batch",
+  "payload": {
+    "case_id": 42,
+    "document_keys": [],
+    "destination": {
+      "path": "D:/Ho-so/HS-42",
+      "scope": "machine_local",
+      "is_dir": true
+    }
+  },
+  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+}

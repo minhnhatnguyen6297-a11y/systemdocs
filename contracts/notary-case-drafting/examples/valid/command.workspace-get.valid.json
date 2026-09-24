@@ -1,0 +1,7 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-0001-4001-8001-000000000001",
+  "command": "notary.workspace_get",
+  "payload": { "case_id": 42 },
+  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+}

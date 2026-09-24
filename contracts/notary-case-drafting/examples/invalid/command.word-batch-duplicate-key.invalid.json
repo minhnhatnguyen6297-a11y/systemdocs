@@ -1,0 +1,16 @@
+{
+  "expected_error": "word_duplicate_document_key",
+  "contract_version": "desktopcommand.v1",
+  "command_id": "b1b2c3d4-0007-4007-8007-000000000107",
+  "command": "notary.word_export_batch",
+  "payload": {
+    "case_id": 42,
+    "document_keys": ["khai_nhan_di_san", "khai_nhan_di_san"],
+    "destination": {
+      "path": "D:/Ho-so/HS-42",
+      "scope": "machine_local",
+      "is_dir": true
+    }
+  },
+  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+}

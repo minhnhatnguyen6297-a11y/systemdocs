@@ -1,0 +1,36 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-0004-4004-8004-000000000004",
+  "command": "notary.intake_analyze",
+  "payload": {
+    "case_id": 42,
+    "sources": [
+      {
+        "source_id": "77777777-7777-4777-8777-777777777777",
+        "kind": "image",
+        "file_ref": {
+          "path": "D:/intake/cccd-mat-truoc.jpg",
+          "scope": "machine_local",
+          "media_type": "image/jpeg",
+          "size_bytes": 1843200
+        }
+      },
+      {
+        "source_id": "88888888-8888-4888-8888-888888888888",
+        "kind": "pdf",
+        "file_ref": {
+          "path": "D:/intake/gcn-scan.pdf",
+          "scope": "machine_local",
+          "media_type": "application/pdf",
+          "size_bytes": 5242880
+        }
+      },
+      {
+        "source_id": "99999999-9999-4999-8999-999999999999",
+        "kind": "text",
+        "text": "Ông Nguyễn Văn An, sinh năm 1950, CCCD 012345678901, địa chỉ: Số 1 phố Huế, Hà Nội."
+      }
+    ]
+  },
+  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+}

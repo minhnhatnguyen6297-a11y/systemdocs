@@ -1,0 +1,51 @@
+{
+  "expected_error": "word_path_traversal",
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_word_batch_bad_008",
+  "command_id": "b1b2c3d4-0008-4008-8008-000000000108",
+  "status": "partial",
+  "waiting_on": null,
+  "progress": { "done": 2, "total": 2, "current_label": "Xong 1/2 văn bản" },
+  "result": {
+    "kind": "word_export_batch",
+    "data": {
+      "schema_version": "notary.case-drafting.v1",
+      "destination": {
+        "path": "D:/Ho-so/HS-42",
+        "scope": "machine_local",
+        "is_dir": true
+      },
+      "documents": [
+        {
+          "document_key": "khai_nhan_di_san",
+          "display_name": "Văn bản khai nhận di sản",
+          "status": "saved",
+          "actual_filename": "..\\..\\evil_HS-42.docx",
+          "output_file": {
+            "path": "D:/Ho-so/evil_HS-42.docx",
+            "scope": "machine_local"
+          },
+          "error": null
+        },
+        {
+          "document_key": "thoa_thuan_phan_chia",
+          "display_name": "Thỏa thuận phân chia di sản",
+          "status": "failed",
+          "actual_filename": null,
+          "output_file": null,
+          "error": {
+            "code": "word.unresolved_placeholders",
+            "message": "Mẫu còn trường chưa hỗ trợ"
+          }
+        }
+      ],
+      "breakdown": {
+        "succeeded": ["khai_nhan_di_san"],
+        "failed": ["thoa_thuan_phan_chia"]
+      }
+    },
+    "warnings": []
+  },
+  "error": null,
+  "updated_at": "2026-09-24T10:05:00Z"
+}

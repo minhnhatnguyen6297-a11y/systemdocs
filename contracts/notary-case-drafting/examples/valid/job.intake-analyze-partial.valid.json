@@ -1,0 +1,120 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_intake_005",
+  "command_id": "a1b2c3d4-0005-4005-8005-000000000005",
+  "status": "partial",
+  "waiting_on": null,
+  "progress": { "done": 3, "total": 3, "current_label": "Hoàn tất 2/3 nguồn" },
+  "result": {
+    "kind": "intake_analyze",
+    "data": {
+      "schema_version": "notary.case-drafting.v1",
+      "suggestions": [
+        {
+          "suggestion_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          "source_id": "77777777-7777-4777-8777-777777777777",
+          "target": "person",
+          "fields": {
+            "ho_ten": {
+              "raw_value": "NGUYỄN VĂN AN",
+              "normalized_value": "Nguyễn Văn An",
+              "observation_state": "normalized",
+              "confidence": 0.97,
+              "source_refs": [{ "page": 1, "box": [12, 40, 300, 64] }]
+            },
+            "ngay_sinh": {
+              "raw_value": "01/01/1950",
+              "normalized_value": "1950-01-01",
+              "observation_state": "normalized",
+              "confidence": 0.91,
+              "source_refs": [{ "page": 1 }]
+            },
+            "so_giay_to": {
+              "raw_value": "012345678901",
+              "normalized_value": "012345678901",
+              "observation_state": "normalized",
+              "confidence": 0.99,
+              "source_refs": [{ "page": 1 }]
+            },
+            "gioi_tinh": {
+              "raw_value": "Nam",
+              "normalized_value": "Nam",
+              "observation_state": "observed",
+              "confidence": null,
+              "source_refs": [{ "page": 1 }]
+            },
+            "dia_chi": {
+              "raw_value": "Số 1 phố Huế, Hà Nội",
+              "normalized_value": "Số 1 phố Huế, Hà Nội",
+              "observation_state": "observed",
+              "confidence": null,
+              "source_refs": [{ "page": 1 }]
+            }
+          },
+          "warnings": []
+        },
+        {
+          "suggestion_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          "source_id": "88888888-8888-4888-8888-888888888888",
+          "target": "asset",
+          "fields": {
+            "so_serial": {
+              "raw_value": "DD 123456",
+              "normalized_value": "DD123456",
+              "observation_state": "normalized",
+              "confidence": 0.88,
+              "source_refs": [{ "page": 1 }]
+            },
+            "dia_chi": {
+              "raw_value": "Thửa 123, tờ 45, phường Bạch Mai, Hà Nội",
+              "normalized_value": null,
+              "observation_state": "observed",
+              "confidence": null,
+              "source_refs": [{ "page": 1 }]
+            },
+            "so_thua_dat": {
+              "raw_value": "123",
+              "normalized_value": "123",
+              "observation_state": "normalized",
+              "confidence": 0.85,
+              "source_refs": [{ "page": 2 }]
+            }
+          },
+          "warnings": [
+            {
+              "code": "intake.low_confidence",
+              "message": "Độ tin cậy so_serial dưới ngưỡng đề xuất"
+            }
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "source_id": "99999999-9999-4999-8999-999999999999",
+          "code": "intake.parse_failed",
+          "message": "Không trích được thực thể nào từ đoạn text"
+        }
+      ],
+      "breakdown": {
+        "succeeded": [
+          "77777777-7777-4777-8777-777777777777",
+          "88888888-8888-4888-8888-888888888888"
+        ],
+        "failed": ["99999999-9999-4999-8999-999999999999"]
+      }
+    },
+    "warnings": [],
+    "source_files": [
+      {
+        "path": "D:/intake/cccd-mat-truoc.jpg",
+        "scope": "machine_local"
+      },
+      {
+        "path": "D:/intake/gcn-scan.pdf",
+        "scope": "machine_local"
+      }
+    ]
+  },
+  "error": null,
+  "updated_at": "2026-09-24T09:10:00Z"
+}

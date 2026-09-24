@@ -1,0 +1,38 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_ws_empty_001",
+  "command_id": "a1b2c3d4-0002-4002-8002-000000000002",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "workspace_get",
+    "data": {
+      "schema_version": "notary.case-drafting.v1",
+      "backend_mode": "real",
+      "case": {
+        "id": 42,
+        "case_type": "inheritance",
+        "document_type": "khai_nhan",
+        "status": "draft",
+        "locked": false,
+        "revision": 1
+      },
+      "stage": { "people": [], "assets": [] },
+      "diagram": {
+        "domain": "inheritance",
+        "state": { "version": 2, "nodes": [] },
+        "render_model": null,
+        "warnings": []
+      },
+      "capabilities": {
+        "intake": ["image", "pdf", "docx", "xlsx", "text"],
+        "diagram": true,
+        "word_export": true
+      }
+    },
+    "warnings": []
+  },
+  "error": null,
+  "updated_at": "2026-09-24T09:00:00Z"
+}

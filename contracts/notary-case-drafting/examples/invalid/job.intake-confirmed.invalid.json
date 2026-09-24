@@ -1,0 +1,37 @@
+{
+  "expected_error": "validation_error",
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_intake_bad_009",
+  "command_id": "b1b2c3d4-0009-4009-8009-000000000109",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "intake_analyze",
+    "data": {
+      "schema_version": "notary.case-drafting.v1",
+      "suggestions": [
+        {
+          "suggestion_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          "source_id": "77777777-7777-4777-8777-777777777777",
+          "target": "person",
+          "confirmed": true,
+          "fields": {
+            "ho_ten": {
+              "raw_value": "NGUYỄN VĂN AN",
+              "normalized_value": "Nguyễn Văn An",
+              "observation_state": "normalized",
+              "confidence": 0.97,
+              "source_refs": [{ "page": 1 }]
+            }
+          },
+          "warnings": []
+        }
+      ],
+      "errors": []
+    },
+    "warnings": []
+  },
+  "error": null,
+  "updated_at": "2026-09-24T10:10:00Z"
+}

@@ -1,0 +1,22 @@
+{
+  "expected_error": "intake_source_too_large",
+  "contract_version": "desktopcommand.v1",
+  "command_id": "b1b2c3d4-0011-4011-8011-000000000111",
+  "command": "notary.intake_analyze",
+  "payload": {
+    "case_id": 42,
+    "sources": [
+      {
+        "source_id": "77777777-7777-4777-8777-777777777777",
+        "kind": "pdf",
+        "file_ref": {
+          "path": "D:/intake/gcn-rat-lon.pdf",
+          "scope": "machine_local",
+          "media_type": "application/pdf",
+          "size_bytes": 26214400
+        }
+      }
+    ]
+  },
+  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+}

@@ -1,0 +1,482 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://systemdocs/contracts/notary-case-drafting/common.schema.json",
+  "title": "notary.case-drafting.v1 — shared definitions",
+  "description": "Definitions dùng chung cho bảy command notary.* trên envelope desktopcommand.v1. Normative text: contracts/notary-case-drafting.md.",
+  "definitions": {
+    "uuid4": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "notary.case-drafting.v1"
+    },
+    "date_or_year": {
+      "type": ["string", "null"],
+      "pattern": "^\\d{4}(-\\d{2}-\\d{2})?$"
+    },
+    "date_full": {
+      "type": ["string", "null"],
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "non_empty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nullable_string": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "fraction": {
+      "type": "string",
+      "pattern": "^\\d+/\\d+$"
+    },
+    "file_ref": {
+      "type": "object",
+      "description": "desktop-command.md §6 + extension is_dir (notary-case-drafting.md §3)",
+      "required": ["path", "scope"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^([A-Za-z]:[\\\\/]|\\\\\\\\\\?\\\\)",
+          "description": "Absolute local path hoặc \\\\?\\ prefix. Cấm UNC \\\\server\\share."
+        },
+        "scope": { "type": "string", "const": "machine_local" },
+        "is_dir": {
+          "type": "boolean",
+          "description": "true = tham chiếu thư mục. Bắt buộc true cho destination của word_export_batch; absent/false cho file."
+        },
+        "sha256": { "type": "string" },
+        "media_type": { "type": "string" },
+        "size_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "file_ref_dir": {
+      "description": "FileRef thư mục — destination của word_export_batch",
+      "allOf": [
+        { "$ref": "#/definitions/file_ref" },
+        {
+          "type": "object",
+          "required": ["is_dir"],
+          "properties": { "is_dir": { "const": true } }
+        }
+      ]
+    },
+    "file_ref_file": {
+      "description": "FileRef file thường — is_dir absent hoặc false",
+      "allOf": [
+        { "$ref": "#/definitions/file_ref" },
+        {
+          "type": "object",
+          "properties": { "is_dir": { "const": false } }
+        }
+      ]
+    },
+    "person_row": {
+      "type": "object",
+      "required": [
+        "row_id", "entity_id", "ho_ten", "gioi_tinh", "ngay_sinh",
+        "ngay_chet", "so_giay_to", "ngay_cap", "noi_cap", "dia_chi",
+        "place_of_origin"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "row_id": { "$ref": "#/definitions/uuid4" },
+        "entity_id": { "type": ["integer", "null"], "minimum": 1 },
+        "ho_ten": { "$ref": "#/definitions/non_empty_string" },
+        "gioi_tinh": { "enum": ["Nam", "Nữ", null] },
+        "ngay_sinh": { "$ref": "#/definitions/date_or_year" },
+        "ngay_chet": { "$ref": "#/definitions/date_or_year" },
+        "so_giay_to": { "$ref": "#/definitions/nullable_string" },
+        "ngay_cap": { "$ref": "#/definitions/date_or_year" },
+        "noi_cap": { "$ref": "#/definitions/nullable_string" },
+        "dia_chi": { "$ref": "#/definitions/nullable_string" },
+        "place_of_origin": { "$ref": "#/definitions/nullable_string" }
+      }
+    },
+    "land_row": {
+      "type": "object",
+      "required": ["loai_dat", "dien_tich", "thoi_han"],
+      "additionalProperties": false,
+      "properties": {
+        "loai_dat": { "$ref": "#/definitions/nullable_string" },
+        "dien_tich": { "type": ["number", "null"] },
+        "thoi_han": { "$ref": "#/definitions/nullable_string" }
+      }
+    },
+    "asset_row": {
+      "type": "object",
+      "required": [
+        "row_id", "entity_id", "is_primary", "so_serial", "so_vao_so",
+        "so_thua_dat", "so_to_ban_do", "dia_chi", "loai_so",
+        "hinh_thuc_su_dung", "thoi_han", "nguon_goc", "ngay_cap",
+        "co_quan_cap", "land_rows"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "row_id": { "$ref": "#/definitions/uuid4" },
+        "entity_id": { "type": ["integer", "null"], "minimum": 1 },
+        "is_primary": { "type": "boolean" },
+        "so_serial": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}\\d{6,8}$",
+          "description": "Canonical serial GCN theo entities.md §2"
+        },
+        "so_vao_so": { "$ref": "#/definitions/nullable_string" },
+        "so_thua_dat": { "$ref": "#/definitions/nullable_string" },
+        "so_to_ban_do": { "$ref": "#/definitions/nullable_string" },
+        "dia_chi": { "$ref": "#/definitions/non_empty_string" },
+        "loai_so": { "$ref": "#/definitions/nullable_string" },
+        "hinh_thuc_su_dung": { "$ref": "#/definitions/nullable_string" },
+        "thoi_han": { "$ref": "#/definitions/nullable_string" },
+        "nguon_goc": { "$ref": "#/definitions/nullable_string" },
+        "ngay_cap": { "$ref": "#/definitions/date_full" },
+        "co_quan_cap": { "$ref": "#/definitions/nullable_string" },
+        "land_rows": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/land_row" }
+        }
+      }
+    },
+    "diagram_node": {
+      "type": "object",
+      "required": [
+        "id", "personId", "parentSlotIds", "spouseSlotId",
+        "isLandOwner", "willReceive", "hidden", "deleted"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/definitions/non_empty_string" },
+        "personId": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "description": "row_id của dòng Người trong Stage đã commit; null = slot trống"
+        },
+        "parentSlotIds": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/non_empty_string" },
+          "maxItems": 2
+        },
+        "spouseSlotId": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "isLandOwner": { "type": "boolean" },
+        "willReceive": { "type": "boolean" },
+        "hidden": { "type": "boolean" },
+        "deleted": { "type": "boolean" }
+      }
+    },
+    "diagram_state": {
+      "type": "object",
+      "required": ["version", "nodes"],
+      "additionalProperties": false,
+      "properties": {
+        "version": { "type": "integer", "const": 2 },
+        "nodes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/diagram_node" }
+        }
+      }
+    },
+    "allocation": {
+      "type": "object",
+      "required": [
+        "baseShare", "inheritedShare", "distributedShare",
+        "finalShare", "displayPercent"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "baseShare": { "$ref": "#/definitions/fraction" },
+        "inheritedShare": { "$ref": "#/definitions/fraction" },
+        "distributedShare": { "$ref": "#/definitions/fraction" },
+        "finalShare": { "$ref": "#/definitions/fraction" },
+        "displayPercent": { "type": "string" }
+      }
+    },
+    "breakdown_term": {
+      "type": "object",
+      "required": ["kind", "fraction", "sourcePersonId", "viaBranchPersonIds"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["base", "inheritance", "representation"] },
+        "fraction": { "$ref": "#/definitions/fraction" },
+        "sourcePersonId": { "type": ["string", "null"] },
+        "viaBranchPersonIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "breakdown": {
+      "type": "object",
+      "required": ["personId", "total", "terms"],
+      "additionalProperties": false,
+      "properties": {
+        "personId": { "type": "string" },
+        "total": { "$ref": "#/definitions/fraction" },
+        "terms": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/breakdown_term" }
+        }
+      }
+    },
+    "required_slot": {
+      "type": "object",
+      "required": ["anchorSlotId", "reason", "slotTypes", "minimumEmptyChildSlots"],
+      "additionalProperties": false,
+      "properties": {
+        "anchorSlotId": { "type": "string" },
+        "reason": { "enum": ["active_estate", "representation_branch"] },
+        "slotTypes": {
+          "type": "array",
+          "items": { "enum": ["father", "mother", "spouse", "child"] }
+        },
+        "minimumEmptyChildSlots": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "engine_error": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" }
+      },
+      "additionalProperties": true,
+      "description": "code ∈ bộ engine v2 (contract §7.3) hoặc reserved unsupported codes"
+    },
+    "unresolved_estate": {
+      "type": "object",
+      "required": ["sourcePersonId", "eventDate", "fraction", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "sourcePersonId": { "type": "string" },
+        "eventDate": { "$ref": "#/definitions/date_full" },
+        "fraction": { "$ref": "#/definitions/fraction" },
+        "reason": { "type": "string", "const": "no_valid_heir" }
+      }
+    },
+    "conservation": {
+      "type": "object",
+      "required": ["allocated", "unresolved", "total"],
+      "additionalProperties": false,
+      "properties": {
+        "allocated": { "$ref": "#/definitions/fraction" },
+        "unresolved": { "$ref": "#/definitions/fraction" },
+        "total": { "$ref": "#/definitions/fraction" }
+      }
+    },
+    "render_model": {
+      "type": "object",
+      "required": [
+        "engineVersion", "status", "allocations", "breakdowns",
+        "requiredSlots", "warnings", "errors", "unresolvedEstates",
+        "conservation"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "engineVersion": { "type": "integer", "const": 2 },
+        "status": {
+          "enum": ["invalid", "unsupported", "incomplete", "complete"]
+        },
+        "allocations": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/allocation" }
+        },
+        "breakdowns": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/breakdown" }
+        },
+        "requiredSlots": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/required_slot" }
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/warning" }
+        },
+        "errors": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/engine_error" }
+        },
+        "unresolvedEstates": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/unresolved_estate" }
+        },
+        "conservation": { "$ref": "#/definitions/conservation" }
+      }
+    },
+    "warning": {
+      "type": "object",
+      "required": ["code", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "source_ref": { "type": ["object", "string", "null"] }
+      }
+    },
+    "field_value": {
+      "type": "object",
+      "description": "Một field gợi ý của intake — §5.3",
+      "required": [
+        "raw_value", "normalized_value", "observation_state",
+        "confidence", "source_refs"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "raw_value": { "type": ["string", "null"] },
+        "normalized_value": {
+          "type": ["string", "number", "null"],
+          "minLength": 1
+        },
+        "observation_state": {
+          "enum": ["observed", "normalized", "inferred"]
+        },
+        "confidence": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "source_refs": {
+          "type": "array",
+          "items": { "type": ["object", "string"] }
+        }
+      }
+    },
+    "suggestion": {
+      "type": "object",
+      "required": [
+        "suggestion_id", "source_id", "target", "fields", "warnings"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "suggestion_id": { "$ref": "#/definitions/uuid4" },
+        "source_id": { "$ref": "#/definitions/uuid4" },
+        "target": { "enum": ["person", "asset"] },
+        "fields": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/field_value" }
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/warning" }
+        }
+      }
+    },
+    "intake_error": {
+      "type": "object",
+      "required": ["source_id", "code", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "source_id": { "type": ["string", "null"] },
+        "code": { "type": "string" },
+        "message": { "type": "string" }
+      }
+    },
+    "intake_source": {
+      "type": "object",
+      "required": ["source_id", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "source_id": { "$ref": "#/definitions/uuid4" },
+        "kind": { "enum": ["image", "pdf", "docx", "xlsx", "text"] },
+        "file_ref": { "$ref": "#/definitions/file_ref_file" },
+        "text": { "type": "string", "maxLength": 100000 }
+      },
+      "description": "kind=text: bắt buộc text, cấm file_ref. kind khác: bắt buộc file_ref (có size_bytes), cấm text."
+    },
+    "error_object": {
+      "type": "object",
+      "required": [
+        "code", "message", "retryable", "next_action", "job_id"
+      ],
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "retryable": { "type": "boolean" },
+        "next_action": {
+          "enum": ["login_required", "pick_files", "retry", "contact_admin", null]
+        },
+        "job_id": { "type": "string" },
+        "details": { "type": ["object", "null"] }
+      }
+    },
+    "field_error": {
+      "type": "object",
+      "required": ["row_id", "field", "code", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "row_id": { "$ref": "#/definitions/uuid4" },
+        "field": { "type": "string" },
+        "code": {
+          "enum": [
+            "required", "invalid_type", "invalid_enum", "invalid_date",
+            "invalid_format", "duplicate_row_id", "primary_count"
+          ]
+        },
+        "message": { "type": "string" }
+      }
+    },
+    "document_key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "document_option": {
+      "type": "object",
+      "required": ["document_key", "display_name", "ready", "block_reason"],
+      "additionalProperties": false,
+      "properties": {
+        "document_key": { "$ref": "#/definitions/document_key" },
+        "display_name": { "$ref": "#/definitions/non_empty_string" },
+        "ready": { "type": "boolean" },
+        "block_reason": {
+          "enum": [
+            "word.no_assets", "word.no_landowner", "word.no_receiver",
+            "word.too_many_assets", "word.too_many_people",
+            "word.template_missing", null
+          ]
+        }
+      }
+    },
+    "word_document_result": {
+      "type": "object",
+      "required": [
+        "document_key", "display_name", "status", "actual_filename",
+        "output_file", "error"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "document_key": { "$ref": "#/definitions/document_key" },
+        "display_name": { "$ref": "#/definitions/non_empty_string" },
+        "status": { "enum": ["saved", "failed", "skipped"] },
+        "actual_filename": {
+          "type": ["string", "null"],
+          "pattern": "^[A-Za-z0-9_-]+_HS-\\d+(_\\d+)?\\.docx$"
+        },
+        "output_file": {
+          "anyOf": [
+            { "$ref": "#/definitions/file_ref_file" },
+            { "type": "null" }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "object",
+              "required": ["code", "message"],
+              "additionalProperties": false,
+              "properties": {
+                "code": { "type": "string" },
+                "message": { "type": "string" }
+              }
+            },
+            { "type": "null" }
+          ]
+        }
+      }
+    }
+  }
+}

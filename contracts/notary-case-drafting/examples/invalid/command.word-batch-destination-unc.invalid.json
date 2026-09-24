@@ -1,0 +1,16 @@
+{
+  "expected_error": "file_scope_not_supported",
+  "contract_version": "desktopcommand.v1",
+  "command_id": "b1b2c3d4-0004-4004-8004-000000000104",
+  "command": "notary.word_export_batch",
+  "payload": {
+    "case_id": 42,
+    "document_keys": ["khai_nhan_di_san"],
+    "destination": {
+      "path": "\\\\maychu\\chia-se\\Ho-so\\HS-42",
+      "scope": "machine_local",
+      "is_dir": true
+    }
+  },
+  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+}

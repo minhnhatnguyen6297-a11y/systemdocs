@@ -1,0 +1,124 @@
+{
+  "fixture_context": {
+    "stage_row_ids": [
+      "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222",
+      "33333333-3333-4333-8333-333333333333"
+    ]
+  },
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_diag_save_008",
+  "command_id": "a1b2c3d4-0008-4008-8008-000000000008",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "diagram_save",
+    "data": {
+      "schema_version": "notary.case-drafting.v1",
+      "revision": 8,
+      "diagram": {
+        "state": {
+          "version": 2,
+          "nodes": [
+            {
+              "id": "owner",
+              "personId": "11111111-1111-4111-8111-111111111111",
+              "parentSlotIds": [],
+              "spouseSlotId": "spouse",
+              "isLandOwner": true,
+              "willReceive": false,
+              "hidden": false,
+              "deleted": false
+            },
+            {
+              "id": "spouse",
+              "personId": "22222222-2222-4222-8222-222222222222",
+              "parentSlotIds": [],
+              "spouseSlotId": "owner",
+              "isLandOwner": false,
+              "willReceive": true,
+              "hidden": false,
+              "deleted": false
+            },
+            {
+              "id": "child_1",
+              "personId": "33333333-3333-4333-8333-333333333333",
+              "parentSlotIds": ["owner", "spouse"],
+              "spouseSlotId": null,
+              "isLandOwner": false,
+              "willReceive": true,
+              "hidden": false,
+              "deleted": false
+            }
+          ]
+        },
+        "render_model": {
+          "engineVersion": 2,
+          "status": "complete",
+          "allocations": {
+            "11111111-1111-4111-8111-111111111111": {
+              "baseShare": "1",
+              "inheritedShare": "0",
+              "distributedShare": "1",
+              "finalShare": "0",
+              "displayPercent": "0.00"
+            },
+            "22222222-2222-4222-8222-222222222222": {
+              "baseShare": "0",
+              "inheritedShare": "1/2",
+              "distributedShare": "0",
+              "finalShare": "1/2",
+              "displayPercent": "50.00"
+            },
+            "33333333-3333-4333-8333-333333333333": {
+              "baseShare": "0",
+              "inheritedShare": "1/2",
+              "distributedShare": "0",
+              "finalShare": "1/2",
+              "displayPercent": "50.00"
+            }
+          },
+          "breakdowns": [
+            {
+              "personId": "22222222-2222-4222-8222-222222222222",
+              "total": "1/2",
+              "terms": [
+                {
+                  "kind": "inheritance",
+                  "fraction": "1/2",
+                  "sourcePersonId": "11111111-1111-4111-8111-111111111111",
+                  "viaBranchPersonIds": []
+                }
+              ]
+            },
+            {
+              "personId": "33333333-3333-4333-8333-333333333333",
+              "total": "1/2",
+              "terms": [
+                {
+                  "kind": "inheritance",
+                  "fraction": "1/2",
+                  "sourcePersonId": "11111111-1111-4111-8111-111111111111",
+                  "viaBranchPersonIds": []
+                }
+              ]
+            }
+          ],
+          "requiredSlots": [],
+          "warnings": [],
+          "errors": [],
+          "unresolvedEstates": [],
+          "conservation": {
+            "allocated": "1",
+            "unresolved": "0",
+            "total": "1"
+          }
+        }
+      }
+    },
+    "warnings": []
+  },
+  "error": null,
+  "updated_at": "2026-09-24T09:20:00Z"
+}

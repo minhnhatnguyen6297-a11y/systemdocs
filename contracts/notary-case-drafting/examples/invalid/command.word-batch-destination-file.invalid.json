@@ -1,0 +1,16 @@
+{
+  "expected_error": "validation_error",
+  "contract_version": "desktopcommand.v1",
+  "command_id": "b1b2c3d4-0005-4005-8005-000000000105",
+  "command": "notary.word_export_batch",
+  "payload": {
+    "case_id": 42,
+    "document_keys": ["khai_nhan_di_san"],
+    "destination": {
+      "path": "D:/Ho-so/HS-42/bao-cao.docx",
+      "scope": "machine_local",
+      "is_dir": false
+    }
+  },
+  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+}

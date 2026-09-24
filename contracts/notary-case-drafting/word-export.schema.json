@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://systemdocs/contracts/notary-case-drafting/word-export.schema.json",
+  "title": "notary.word_export_options + notary.word_export_batch — payload + result.data",
+  "definitions": {
+    "options_payload": {
+      "type": "object",
+      "required": ["case_id"],
+      "additionalProperties": false,
+      "properties": {
+        "case_id": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "options_result_data": {
+      "type": "object",
+      "required": ["schema_version", "documents"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/definitions/schema_version" },
+        "documents": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/definitions/document_option" }
+        }
+      }
+    },
+    "batch_payload": {
+      "type": "object",
+      "required": ["case_id", "document_keys", "destination"],
+      "additionalProperties": false,
+      "properties": {
+        "case_id": { "type": "integer", "minimum": 1 },
+        "document_keys": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "common.schema.json#/definitions/document_key" },
+          "uniqueItems": true
+        },
+        "destination": { "$ref": "common.schema.json#/definitions/file_ref_dir" }
+      }
+    },
+    "batch_result_data": {
+      "type": "object",
+      "required": [
+        "schema_version", "destination", "documents", "breakdown"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/definitions/schema_version" },
+        "destination": { "$ref": "common.schema.json#/definitions/file_ref_dir" },
+        "documents": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/definitions/word_document_result" }
+        },
+        "breakdown": {
+          "type": "object",
+          "required": ["succeeded", "failed"],
+          "additionalProperties": false,
+          "properties": {
+            "succeeded": {
+              "type": "array",
+              "items": { "$ref": "common.schema.json#/definitions/document_key" }
+            },
+            "failed": {
+              "type": "array",
+              "items": { "$ref": "common.schema.json#/definitions/document_key" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

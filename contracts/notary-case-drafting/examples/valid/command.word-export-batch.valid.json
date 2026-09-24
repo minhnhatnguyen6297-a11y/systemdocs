@@ -1,0 +1,15 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-0010-4010-8010-000000000010",
+  "command": "notary.word_export_batch",
+  "payload": {
+    "case_id": 42,
+    "document_keys": ["khai_nhan_di_san", "thoa_thuan_phan_chia"],
+    "destination": {
+      "path": "D:/Ho-so/HS-42",
+      "scope": "machine_local",
+      "is_dir": true
+    }
+  },
+  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+}

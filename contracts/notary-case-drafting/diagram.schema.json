@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://systemdocs/contracts/notary-case-drafting/diagram.schema.json",
+  "title": "notary.diagram_evaluate + notary.diagram_save — payload + result.data",
+  "definitions": {
+    "evaluate_payload": {
+      "type": "object",
+      "required": ["case_id", "diagram"],
+      "additionalProperties": false,
+      "properties": {
+        "case_id": { "type": "integer", "minimum": 1 },
+        "diagram": {
+          "type": "object",
+          "required": ["state"],
+          "additionalProperties": false,
+          "properties": {
+            "state": { "$ref": "common.schema.json#/definitions/diagram_state" }
+          }
+        }
+      }
+    },
+    "evaluate_result_data": {
+      "type": "object",
+      "required": ["schema_version", "evaluated_revision", "render_model"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/definitions/schema_version" },
+        "evaluated_revision": { "type": "integer", "minimum": 1 },
+        "render_model": { "$ref": "common.schema.json#/definitions/render_model" }
+      }
+    },
+    "save_payload": {
+      "type": "object",
+      "required": ["case_id", "base_revision", "diagram"],
+      "additionalProperties": false,
+      "properties": {
+        "case_id": { "type": "integer", "minimum": 1 },
+        "base_revision": { "type": "integer", "minimum": 1 },
+        "diagram": {
+          "type": "object",
+          "required": ["state"],
+          "additionalProperties": false,
+          "properties": {
+            "state": { "$ref": "common.schema.json#/definitions/diagram_state" }
+          }
+        }
+      }
+    },
+    "save_result_data": {
+      "type": "object",
+      "required": ["schema_version", "revision", "diagram"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/definitions/schema_version" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "diagram": {
+          "type": "object",
+          "required": ["state", "render_model"],
+          "additionalProperties": false,
+          "properties": {
+            "state": { "$ref": "common.schema.json#/definitions/diagram_state" },
+            "render_model": {
+              "anyOf": [
+                { "$ref": "common.schema.json#/definitions/render_model" },
+                { "type": "null" }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

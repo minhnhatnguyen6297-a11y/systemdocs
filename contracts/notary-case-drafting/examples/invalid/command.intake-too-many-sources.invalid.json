@@ -1,0 +1,57 @@
+{
+  "expected_error": "intake_too_many_sources",
+  "contract_version": "desktopcommand.v1",
+  "command_id": "b1b2c3d4-0010-4010-8010-000000000110",
+  "command": "notary.intake_analyze",
+  "payload": {
+    "case_id": 42,
+    "sources": [
+      {
+        "source_id": "10000000-0000-4000-8000-000000000001",
+        "kind": "image",
+        "file_ref": { "path": "D:/intake/01.jpg", "scope": "machine_local", "size_bytes": 1000 }
+      },
+      {
+        "source_id": "10000000-0000-4000-8000-000000000002",
+        "kind": "image",
+        "file_ref": { "path": "D:/intake/02.jpg", "scope": "machine_local", "size_bytes": 1000 }
+      },
+      {
+        "source_id": "10000000-0000-4000-8000-000000000003",
+        "kind": "image",
+        "file_ref": { "path": "D:/intake/03.jpg", "scope": "machine_local", "size_bytes": 1000 }
+      },
+      {
+        "source_id": "10000000-0000-4000-8000-000000000004",
+        "kind": "image",
+        "file_ref": { "path": "D:/intake/04.jpg", "scope": "machine_local", "size_bytes": 1000 }
+      },
+      {
+        "source_id": "10000000-0000-4000-8000-000000000005",
+        "kind": "image",
+        "file_ref": { "path": "D:/intake/05.jpg", "scope": "machine_local", "size_bytes": 1000 }
+      },
+      {
+        "source_id": "10000000-0000-4000-8000-000000000006",
+        "kind": "image",
+        "file_ref": { "path": "D:/intake/06.jpg", "scope": "machine_local", "size_bytes": 1000 }
+      },
+      {
+        "source_id": "10000000-0000-4000-8000-000000000007",
+        "kind": "image",
+        "file_ref": { "path": "D:/intake/07.jpg", "scope": "machine_local", "size_bytes": 1000 }
+      },
+      {
+        "source_id": "10000000-0000-4000-8000-000000000008",
+        "kind": "image",
+        "file_ref": { "path": "D:/intake/08.jpg", "scope": "machine_local", "size_bytes": 1000 }
+      },
+      {
+        "source_id": "10000000-0000-4000-8000-000000000009",
+        "kind": "image",
+        "file_ref": { "path": "D:/intake/09.jpg", "scope": "machine_local", "size_bytes": 1000 }
+      }
+    ]
+  },
+  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+}

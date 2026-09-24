@@ -1,0 +1,37 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_word_opts_009",
+  "command_id": "a1b2c3d4-0009-4009-8009-000000000009",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "word_export_options",
+    "data": {
+      "schema_version": "notary.case-drafting.v1",
+      "documents": [
+        {
+          "document_key": "khai_nhan_di_san",
+          "display_name": "Văn bản khai nhận di sản",
+          "ready": true,
+          "block_reason": null
+        },
+        {
+          "document_key": "thoa_thuan_phan_chia",
+          "display_name": "Thỏa thuận phân chia di sản",
+          "ready": true,
+          "block_reason": null
+        },
+        {
+          "document_key": "niem_yet",
+          "display_name": "Thông báo niêm yết",
+          "ready": false,
+          "block_reason": "word.template_missing"
+        }
+      ]
+    },
+    "warnings": []
+  },
+  "error": null,
+  "updated_at": "2026-09-24T09:25:00Z"
+}

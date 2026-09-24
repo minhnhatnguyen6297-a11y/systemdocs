@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://systemdocs/contracts/notary-case-drafting/workspace.schema.json",
+  "title": "notary.workspace_get — payload + result.data",
+  "definitions": {
+    "payload": {
+      "type": "object",
+      "required": ["case_id"],
+      "additionalProperties": false,
+      "properties": {
+        "case_id": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "result_data": {
+      "type": "object",
+      "required": [
+        "schema_version", "case", "stage", "diagram", "capabilities"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/definitions/schema_version" },
+        "backend_mode": { "enum": ["real", "mock"] },
+        "case": {
+          "type": "object",
+          "required": [
+            "id", "case_type", "document_type", "status", "locked",
+            "revision"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "integer", "minimum": 1 },
+            "case_type": {
+              "type": "string",
+              "description": "v1 cam kết 'inheritance'; giá trị khác → capabilities tắt / case_type_unsupported"
+            },
+            "document_type": { "type": "string" },
+            "status": { "enum": ["draft", "locked"] },
+            "locked": { "type": "boolean" },
+            "revision": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "stage": {
+          "type": "object",
+          "required": ["people", "assets"],
+          "additionalProperties": false,
+          "properties": {
+            "people": {
+              "type": "array",
+              "items": { "$ref": "common.schema.json#/definitions/person_row" }
+            },
+            "assets": {
+              "type": "array",
+              "items": { "$ref": "common.schema.json#/definitions/asset_row" }
+            }
+          }
+        },
+        "diagram": {
+          "type": "object",
+          "required": ["domain", "state", "render_model"],
+          "additionalProperties": false,
+          "properties": {
+            "domain": { "type": "string" },
+            "state": { "$ref": "common.schema.json#/definitions/diagram_state" },
+            "render_model": {
+              "anyOf": [
+                { "$ref": "common.schema.json#/definitions/render_model" },
+                { "type": "null" }
+              ]
+            },
+            "warnings": {
+              "type": "array",
+              "items": { "$ref": "common.schema.json#/definitions/warning" }
+            }
+          }
+        },
+        "capabilities": {
+          "type": "object",
+          "required": ["intake", "diagram", "word_export"],
+          "additionalProperties": false,
+          "properties": {
+            "intake": {
+              "type": "array",
+              "items": { "enum": ["image", "pdf", "docx", "xlsx", "text"] },
+              "uniqueItems": true
+            },
+            "diagram": { "type": "boolean" },
+            "word_export": { "type": "boolean" }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://systemdocs/contracts/notary-case-drafting/stage.schema.json",
+  "title": "notary.workspace_commit_stage — payload + result.data",
+  "definitions": {
+    "payload": {
+      "type": "object",
+      "required": ["case_id", "base_revision", "stage"],
+      "additionalProperties": false,
+      "properties": {
+        "case_id": { "type": "integer", "minimum": 1 },
+        "base_revision": { "type": "integer", "minimum": 1 },
+        "stage": {
+          "type": "object",
+          "required": ["people", "assets"],
+          "additionalProperties": false,
+          "properties": {
+            "people": {
+              "type": "array",
+              "items": { "$ref": "common.schema.json#/definitions/person_row" }
+            },
+            "assets": {
+              "type": "array",
+              "items": { "$ref": "common.schema.json#/definitions/asset_row" }
+            }
+          }
+        }
+      }
+    },
+    "result_data": {
+      "type": "object",
+      "required": ["schema_version", "revision", "stage", "diagram"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/definitions/schema_version" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "stage": {
+          "type": "object",
+          "required": ["people", "assets"],
+          "additionalProperties": false,
+          "properties": {
+            "people": {
+              "type": "array",
+              "items": { "$ref": "common.schema.json#/definitions/person_row" }
+            },
+            "assets": {
+              "type": "array",
+              "items": { "$ref": "common.schema.json#/definitions/asset_row" }
+            }
+          }
+        },
+        "diagram": {
+          "type": "object",
+          "required": ["state"],
+          "additionalProperties": false,
+          "properties": {
+            "state": { "$ref": "common.schema.json#/definitions/diagram_state" }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "expected_error": "intake_unsupported_source",
+  "contract_version": "desktopcommand.v1",
+  "command_id": "b1b2c3d4-0003-4003-8003-000000000103",
+  "command": "notary.intake_analyze",
+  "payload": {
+    "case_id": 42,
+    "sources": [
+      {
+        "source_id": "77777777-7777-4777-8777-777777777777",
+        "kind": "zip",
+        "file_ref": {
+          "path": "D:/intake/ho-so-nen.zip",
+          "scope": "machine_local",
+          "size_bytes": 2048000
+        }
+      }
+    ]
+  },
+  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+}

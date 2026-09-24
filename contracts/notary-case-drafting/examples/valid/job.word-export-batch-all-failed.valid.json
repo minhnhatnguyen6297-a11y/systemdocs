@@ -1,0 +1,70 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_word_batch_012",
+  "command_id": "a1b2c3d4-0012-4012-8012-000000000012",
+  "status": "failed",
+  "waiting_on": null,
+  "progress": { "done": 2, "total": 2, "current_label": "Lỗi toàn bộ" },
+  "result": {
+    "kind": "word_export_batch",
+    "data": {
+      "schema_version": "notary.case-drafting.v1",
+      "destination": {
+        "path": "D:/Ho-so/HS-42",
+        "scope": "machine_local",
+        "is_dir": true
+      },
+      "documents": [
+        {
+          "document_key": "khai_nhan_di_san",
+          "display_name": "Văn bản khai nhận di sản",
+          "status": "failed",
+          "actual_filename": null,
+          "output_file": null,
+          "error": {
+            "code": "word.unresolved_placeholders",
+            "message": "Mẫu còn 2 trường chưa hỗ trợ"
+          }
+        },
+        {
+          "document_key": "niem_yet",
+          "display_name": "Thông báo niêm yết",
+          "status": "failed",
+          "actual_filename": null,
+          "output_file": null,
+          "error": {
+            "code": "word.template_missing",
+            "message": "Văn bản chưa có template"
+          }
+        }
+      ],
+      "breakdown": {
+        "succeeded": [],
+        "failed": ["khai_nhan_di_san", "niem_yet"]
+      }
+    },
+    "warnings": []
+  },
+  "error": {
+    "code": "word_batch_failed",
+    "message": "Toàn bộ văn bản trong lượt xuất đều lỗi",
+    "retryable": true,
+    "next_action": "retry",
+    "job_id": "j_word_batch_012",
+    "details": {
+      "documents": [
+        {
+          "document_key": "khai_nhan_di_san",
+          "code": "word.unresolved_placeholders",
+          "message": "Mẫu còn 2 trường chưa hỗ trợ"
+        },
+        {
+          "document_key": "niem_yet",
+          "code": "word.template_missing",
+          "message": "Văn bản chưa có template"
+        }
+      ]
+    }
+  },
+  "updated_at": "2026-09-24T09:40:00Z"
+}

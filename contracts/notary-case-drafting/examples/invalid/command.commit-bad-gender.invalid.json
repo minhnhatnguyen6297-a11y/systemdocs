@@ -1,0 +1,30 @@
+{
+  "expected_error": "stage_validation_error",
+  "fixture_context": { "server_revision": 2 },
+  "contract_version": "desktopcommand.v1",
+  "command_id": "b1b2c3d4-0012-4012-8012-000000000112",
+  "command": "notary.workspace_commit_stage",
+  "payload": {
+    "case_id": 42,
+    "base_revision": 2,
+    "stage": {
+      "people": [
+        {
+          "row_id": "11111111-1111-4111-8111-111111111111",
+          "entity_id": 101,
+          "ho_ten": "Nguyễn Văn An",
+          "gioi_tinh": "Khác",
+          "ngay_sinh": "1950",
+          "ngay_chet": "2011-05-15",
+          "so_giay_to": null,
+          "ngay_cap": null,
+          "noi_cap": null,
+          "dia_chi": "Số 1 phố Huế, Hà Nội",
+          "place_of_origin": null
+        }
+      ],
+      "assets": []
+    }
+  },
+  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+}
