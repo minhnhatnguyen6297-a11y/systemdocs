@@ -171,6 +171,13 @@ def is_safe_windows_filename(name: Any) -> bool:
 
 
 def _assert_safe_filename(name: str) -> None:
+    # `..`/separator dùng data-code đã register của contract (§8.3);
+    # các dạng unsafe khác → word.invalid_filename.
+    if isinstance(name, str) and (
+            ".." in name or "/" in name or "\\" in name):
+        raise _DocFailed(
+            "word_path_traversal",
+            f"tên file sinh ra thoát khỏi destination: {name!r}")
     if not is_safe_windows_filename(name):
         raise _DocFailed(
             "word.invalid_filename",
@@ -263,6 +270,8 @@ def _publish(tmp_path: Path, dest_dir: Path, spec: WordDocumentSpec,
         if name in taken:
             continue
         target = dest_dir / name
+        if target.is_dir():
+            continue                       # directory cùng tên → _n kế
         try:
             fh = open(target, "xb")          # exclusive create — atomic
         except FileExistsError:
@@ -273,6 +282,7 @@ def _publish(tmp_path: Path, dest_dir: Path, spec: WordDocumentSpec,
                 shutil.copyfileobj(src, fh)
             fh.close()
         except BaseException:
+            taken.discard(name)            # trả reservation khi fail
             try:
                 fh.close()
             finally:
@@ -343,6 +353,12 @@ def _export_one_document(*, spec: WordDocumentSpec, case: Any,
             },
             "error": None,
         }
+    except ImportError as exc:
+        # Thiếu python-docx = lỗi hạ tầng, không phải lỗi của 1 văn bản —
+        # thoát khỏi per-doc boundary thành job-level engine_unavailable.
+        raise WordBatchError(
+            "engine_unavailable",
+            f"thiếu dependency python-docx: {exc}") from exc
     except Exception as exc:  # noqa: BLE001 — per-document boundary
         check()   # cancel pending → raise tại đây (doc tính skipped)
         code, message = _doc_error_from(exc, context)

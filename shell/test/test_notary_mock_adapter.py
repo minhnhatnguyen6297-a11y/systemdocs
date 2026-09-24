@@ -798,6 +798,11 @@ class TestWordExport:
         assert exc.value.code == "word_batch_failed"
         assert len(exc.value.details["documents"]) == 2
         assert list(tmp_path.iterdir()) == []      # khong file nao duoc tao
+        # MIN-115: failed job van mang result.data.breakdown.failed
+        bd = exc.value.result["data"]["breakdown"]
+        assert len(bd["failed"]) == 2
+        assert all(d["status"] == "failed"
+                   for d in exc.value.result["data"]["documents"])
 
     def test_batch_validates_before_writing(self, tmp_path):
         mock.reset_backend(_load_fixture("ready.json"))
@@ -964,11 +969,8 @@ class TestJobLifecycle:
 
     def test_word_export_canceled_mid_batch(self, tmp_path, monkeypatch):
         """Cancel giua batch: file da ghi giu nguyen, file chua bat dau
-        khong duoc tao; job canceled{user_canceled}.
-
-        LUU Y platform: jobstore huy job voi result=null — per-file
-        skipped chi ton tai tren dia, khong di vao result cua job
-        (gioi han jobstore hien tai, giong real backend MIN-110)."""
+        khong duoc tao; job canceled{user_canceled} VAN mang
+        result.data.breakdown.skipped len wire (MIN-115)."""
         monkeypatch.setattr(mock, "WORD_DOC_DELAY", 0.4)
         doc = _load_fixture("word-canceled.json")
         mock.reset_backend(doc)
@@ -996,6 +998,10 @@ class TestJobLifecycle:
             files = sorted(p.name for p in tmp_path.glob("*.docx"))
             # file dau giu lai; hai file sau khong bao gio duoc tao
             assert files == ["Van_ban_khai_nhan_di_san_HS-42.docx"]
+            # contract §8.4: canceled job van tra breakdown.skipped
+            bd = final.result["data"]["breakdown"]
+            assert bd["succeeded"] == ["khai_nhan_di_san"]
+            assert bd["skipped"] == ["thoa_thuan_phan_chia", "niem_yet"]
         finally:
             store.drain(2)
 

@@ -406,10 +406,10 @@ class TestExportBatch:
         files = sorted(p.name for p in tmp_path.glob("*.docx"))
         assert files == ["Van_ban_khai_nhan_di_san_HS-99.docx"]
 
-    def test_unsafe_generated_filename_fails_document(
+    def test_traversal_generated_filename_fails_document(
             self, tmp_path, monkeypatch):
-        """Defense-in-depth: filename_stem từ catalog phải là tên Windows
-        hợp lệ — stem xấu → doc failed, không file nào được tạo."""
+        """Defense-in-depth: stem chứa `..`/separator → word_path_traversal
+        (code đã register §8.3), không file nào được tạo."""
         spec = dataclasses.replace(
             wbe.DOC_CATALOG_BY_KEY["khai_nhan_di_san"],
             filename_stem="..\\evil")
@@ -420,8 +420,32 @@ class TestExportBatch:
         assert exc.value.code == "word_batch_failed"
         result = exc.value.result_data["documents"][0]
         assert result["status"] == "failed"
+        assert result["error"]["code"] == "word_path_traversal"
+        assert list(tmp_path.iterdir()) == []
+
+    def test_unsafe_generated_filename_fails_document(
+            self, tmp_path, monkeypatch):
+        """Stem xấu nhưng không traversal → word.invalid_filename."""
+        spec = dataclasses.replace(
+            wbe.DOC_CATALOG_BY_KEY["khai_nhan_di_san"],
+            filename_stem="bad:name")
+        monkeypatch.setitem(
+            wbe.DOC_CATALOG_BY_KEY, "khai_nhan_di_san", spec)
+        with pytest.raises(wbe.WordBatchError) as exc:
+            _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path)
+        assert exc.value.code == "word_batch_failed"
+        result = exc.value.result_data["documents"][0]
+        assert result["status"] == "failed"
         assert result["error"]["code"] == "word.invalid_filename"
         assert list(tmp_path.iterdir()) == []
+
+    def test_same_name_directory_in_destination_increments(
+            self, tmp_path, monkeypatch):
+        """Directory trùng tên file đích → tăng `_2`, không fail doc."""
+        (tmp_path / "Van_ban_khai_nhan_di_san_HS-99.docx").mkdir()
+        data = _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path)
+        assert data["documents"][0]["status"] == "saved"
+        assert data["documents"][0]["actual_filename"].endswith("_2.docx")
 
     def test_progress_reported_per_document(self, tmp_path):
         calls = []

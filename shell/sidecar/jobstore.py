@@ -165,7 +165,6 @@ class JobStore:
             job.updated_at = _now()
         try:
             result = handler(job, payload)
-            job.check_cancel()
             status = "succeeded"
             # "partial" la marker noi bo handler->jobstore — pop khoi dict
             # de khong len wire (result chi mang kind/data/evidence/
@@ -180,6 +179,9 @@ class JobStore:
                         "validation_error",
                         "partial bat buoc data.breakdown={succeeded,failed}")
                 status = "partial"
+            # Cancel roi vao khe giua handler-return va finish van giu
+            # result len wire (MIN-115 + MIN-110 review finding).
+            job.check_cancel(result)
             job._finish(status, result=result)
         except CancelledByUser as exc:
             with job._lock:

@@ -718,10 +718,9 @@ def _word_case_id(payload):
     """case_id int >= 1 (mock oracle: bool/non-int/<1 → validation_error)."""
     p = payload if isinstance(payload, dict) else {}
     raw = _require(p.get("case_id"), "case_id")
-    cid = _int_id(raw, "case_id")
-    if isinstance(raw, bool) or cid < 1:
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 1:
         raise CommandError("validation_error", "case_id phai la int >= 1")
-    return cid
+    return raw
 
 
 def _word_case(sess, models, cid, *, writable):
@@ -742,7 +741,7 @@ def _word_case(sess, models, cid, *, writable):
 def _word_batch_command_error(err):
     """WordBatchError cua service → CommandError. word_batch_failed kem
     result.data (breakdown + per-file errors len wire — §8.4 example)."""
-    retryable = err.code == "word_batch_failed"
+    retryable = err.code in ("word_batch_failed", "engine_unavailable")
     result = (_result("word_export_batch", err.result_data)
               if err.result_data is not None else None)
     return CommandError(
@@ -756,6 +755,11 @@ def word_export_options(job, payload):
 
     Read-only: duoc phep tren locked/unsupported (§5.3 chi workspace_get
     quyet dinh capability) — mock oracle khong _check_writable."""
+    p = payload if isinstance(payload, dict) else {}
+    extra = set(p) - {"case_id"}
+    if extra:
+        raise CommandError("validation_error",
+                           f"payload key la: {sorted(extra)}")
     cid = _word_case_id(payload)
     wbe = _svc("word_batch_export")
     models = _models()
@@ -784,6 +788,10 @@ def word_export_batch(job, payload):
     from fileref import existing_dir
 
     p = payload if isinstance(payload, dict) else {}
+    extra = set(p) - {"case_id", "document_keys", "destination"}
+    if extra:
+        raise CommandError("validation_error",
+                           f"payload key la: {sorted(extra)}")
     cid = _word_case_id(payload)
     wbe = _svc("word_batch_export")
     models = _models()
