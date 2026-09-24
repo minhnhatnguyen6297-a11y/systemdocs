@@ -201,6 +201,7 @@ COMMANDS = {
     "notary.word_templates": _notary("word_templates"),
     "notary.export_word": _notary("export_word"),
     "ocr.analyze": _notary("ocr_analyze"),
+    "notary.intake_analyze": _notary("intake_analyze"),
     "zalo.status": _notary("zalo_status"),
     # upload_lab — MIN-69
     "upload.scan": _upload("scan_folder"),

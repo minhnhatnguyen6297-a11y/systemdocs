@@ -475,7 +475,7 @@ def ocr_analyze(job, payload):
         raise CommandError("validation_error", "toi da 8 anh/lan")
     ocr = _router("ocr_ai")
     model = ocr._get_model()
-    if not ocr._get_api_key(model):
+    if not ocr._get_api_key():
         raise CommandError(
             "ocr.engine_unavailable",
             "thieu API key OCR (QWEN_API_KEY/DASHSCOPE_API_KEY trong "
@@ -564,3 +564,68 @@ def zalo_status(job, payload):
         })
     finally:
         sess.close()
+
+
+# ---------- document intake da nguon (MIN-108, notary.case-drafting.v1) ----------
+
+def intake_analyze(job, payload):
+    """notary.intake_analyze: 5 source kinds → suggestions theo contract.
+
+    Sidecar chi map envelope ↔ service; toan bo validate/parse/normalize nam
+    trong notary_v2.services.document_intake (dung chung voi web OCR path).
+    Mot source loi khong huy sources khac (partial + breakdown).
+    """
+    svc = _svc("document_intake.service")
+    p = payload or {}
+    extra = set(p) - {"case_id", "sources"}
+    if extra:
+        raise CommandError("validation_error",
+                           f"payload co key ngoai schema: {sorted(extra)}")
+    cid = _int_id(_require(p.get("case_id"), "case_id"), "case_id")
+    if cid < 1:
+        raise CommandError("validation_error", "case_id phai >= 1")
+    sources = p.get("sources")
+    if not isinstance(sources, list) or not sources:
+        raise CommandError("validation_error", "can sources: [..]")
+
+    models = _models()
+    sess = _db_session()
+    try:
+        case = sess.get(models.InheritanceCase, cid)
+        if case is None:
+            raise CommandError("case_not_found",
+                               f"khong co ho so #{cid}")
+        if case.is_locked:
+            raise CommandError("workspace_locked",
+                               f"ho so #{cid} da khoa")
+    finally:
+        sess.close()
+
+    def _progress(done, _total, label=""):
+        job.report_progress(done, _total, label)
+
+    try:
+        outcome = svc.analyze(
+            sources,
+            check_cancel=job.check_cancel,
+            report_progress=_progress)
+    except svc.IntakeError as exc:
+        raise CommandError(exc.code, exc.message,
+                           details=exc.details) from exc
+    job.check_cancel()
+
+    source_files = []
+    for s in sources:
+        if not isinstance(s, dict):
+            continue
+        ref = s.get("file_ref")
+        if isinstance(ref, dict) and isinstance(ref.get("path"), str):
+            source_files.append(
+                {"path": ref["path"], "scope": "machine_local"})
+    result = _result("intake_analyze", outcome.result_data,
+                     source_files=source_files)
+    # Contract §5.3: lifecycle succeeded | partial — partial bat buoc
+    # breakdown={succeeded,failed} (da co trong result_data khi co loi).
+    if outcome.status == "partial":
+        result["partial"] = True
+    return result
