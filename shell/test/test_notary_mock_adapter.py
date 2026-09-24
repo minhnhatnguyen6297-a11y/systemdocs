@@ -217,11 +217,14 @@ class TestGateway:
     def test_packaged_dispatch_goes_real(self, monkeypatch):
         monkeypatch.setenv("G1_DEV_NOTARY_MOCK", "1")
         monkeypatch.setattr(sys, "frozen", True, raising=False)
-        # Real backend cho 7 command chua implement (MIN-107+) -> structured
-        with pytest.raises(CommandError) as exc:
-            gw.dispatch("workspace_get", _job(), {"case_id": 42})
-        assert exc.value.code == "engine_not_installed"
-        assert exc.value.retryable is False
+        # Packaged bo qua flag mock -> dispatch phai toi real adapter
+        # (MIN-107+), khong phai mock va khong phai engine_not_installed.
+        import notary_adapter
+        sentinel = object()
+        monkeypatch.setattr(
+            notary_adapter, "workspace_get",
+            lambda job, payload: sentinel)
+        assert gw.dispatch("workspace_get", _job(), {"case_id": 42}) is sentinel
 
     def test_dispatch_mock(self):
         res = gw.dispatch("workspace_get", _job(), {"case_id": 42})
