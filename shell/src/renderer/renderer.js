@@ -342,7 +342,7 @@ function buildEngineView(entry, mod) {
       return;
     }
     for (const f of ctx.files) {
-      filesBox.append(el('div', 'file-row', f.path));
+      filesBox.append(el('div', 'file-row', f.name));
     }
   }
 
@@ -369,7 +369,7 @@ function buildEngineView(entry, mod) {
   inspectBtn.onclick = () => {
     for (const f of ctx.files) {
       submit('file.inspect',
-        { file: { path: f.path, scope: f.scope } }, f._cmdId);
+        { file: { file_token: f.file_token } }, f._cmdId);
     }
   };
   slowBtn.onclick = () =>
@@ -437,8 +437,9 @@ function formRow(labelText, ...controls) {
   return row;
 }
 
-async function awaitJob(jobId, timeoutMs = 120000) {
+async function awaitJob(jobId, timeoutMs = 120000, onTick) {
   // Cho job toi terminal hoac waiting_user — khong an state giua chung.
+  // onTick(job) sau moi poll: dialogs hien thi progress (MIN-112).
   let cur = jobs.get(jobId);
   const deadline = Date.now() + timeoutMs;
   while (cur && !L.isTerminal(cur.status) && Date.now() < deadline) {
@@ -446,6 +447,7 @@ async function awaitJob(jobId, timeoutMs = 120000) {
     await sleep(400);
     const g = await api.getJob(cur.job_id);
     if (g.ok) { cur = g.data; jobs.set(cur.job_id, cur); }
+    if (onTick) onTick(cur);
   }
   return cur;
 }
@@ -465,17 +467,21 @@ function resultData(jobMapEntry, command) {
 // nay chay duoc ngay voi mock backend (G1_DEV_NOTARY_MOCK=1).
 function makeCommandRunner() {
   return {
-    async run(command, payload) {
+    async run(command, payload, opts) {
       const job = await submit(command, payload, crypto.randomUUID());
       if (!job) {
         return { ok: false, error: { code: 'submit_failed',
           message: 'không gửi được command', retryable: true } };
       }
-      const final = await awaitJob(job.job_id, 300000);
+      // MIN-112: dialogs can job_id ngay (cancel) + progress moi poll.
+      if (opts && opts.onJob) opts.onJob(job);
+      const final = await awaitJob(job.job_id, 300000,
+        opts && opts.onJob ? opts.onJob : null);
       if (!final) {
         return { ok: false, error: { code: 'engine_unavailable',
           message: 'job không phản hồi', retryable: true } };
       }
+      if (opts && opts.onJob) opts.onJob(final);
       if (final.status === 'succeeded' || final.status === 'partial') {
         return { ok: true, data: (final.result && final.result.data) || {},
                  partial: final.status === 'partial', job: final };
@@ -530,13 +536,13 @@ function buildUploadView(entry, mod) {
     if (!r.ok) { notify(`${r.error.code}: ${r.error.message}`, true); return; }
     if (!r.data.files.length) return;
     ctx.folder = r.data.files[0];
-    folderLabel.textContent = ctx.folder.path;
+    folderLabel.textContent = ctx.folder.name;
     scanBtn.disabled = false;
   };
   scanBtn.onclick = async () => {
     ctx.scanJobId = crypto.randomUUID();
     const job = await submit('upload.scan',
-      { folder: { path: ctx.folder.path, scope: 'machine_local' } },
+      { folder: { file_token: ctx.folder.file_token } },
       ctx.scanJobId);
     if (job) ctx.scanJobId = job.job_id;
   };
@@ -607,12 +613,12 @@ function buildUploadView(entry, mod) {
     if (!r.ok) { notify(`${r.error.code}: ${r.error.message}`, true); return; }
     if (!r.data.files.length) return;
     ctx.excel = r.data.files[0];
-    excelLabel.textContent = ctx.excel.path;
+    excelLabel.textContent = ctx.excel.name;
     auditBtn.disabled = false;
   };
   auditBtn.onclick = async () => {
     const job = await submit('upload.audit_excel', {
-      file: { path: ctx.excel.path, scope: 'machine_local' },
+      file: { file_token: ctx.excel.file_token },
       from_date: fromIn.value.trim(), to_date: toIn.value.trim(),
     }, crypto.randomUUID());
     if (job) ctx.auditJobId = job.job_id;
@@ -721,7 +727,14 @@ function buildUploadView(entry, mod) {
 
 function buildNotaryView(entry, mod) {
   const runner = makeCommandRunner();
-  const model = window.G1_NOTARY_MODEL.createModel({ client: runner });
+  const model = window.G1_NOTARY_MODEL.createModel({
+    client: runner,
+    // Dirty flag → main window-close guard (MIN-112). Fire-and-forget;
+    // loi bridge khong lam sap draft.
+    onUnsavedChange: (d) => {
+      try { api.setDirtyState(d); } catch (e) { /* bridge cu */ }
+    },
+  });
   const view = window.G1_NOTARY_VIEW.createNotaryModuleView({
     model,
     lib: L,
@@ -729,6 +742,10 @@ function buildNotaryView(entry, mod) {
     confirm: confirmModal,
     pickFiles: (opts) => api.pickFiles(opts),
     openPath: (p) => api.openPath(p),
+    registerDroppedFile: api.registerDroppedFile
+      ? (f) => api.registerDroppedFile(f)
+      : null,
+    cancelJob: (jobId) => api.cancelJob(jobId),
     runCommand: runner.run.bind(runner),
   });
   const s = el('section', 'cd-root-outer');

@@ -205,6 +205,39 @@
 .cd-word-row { display: flex; gap: 8px; align-items: center;
                padding: 6px 0; border-bottom: 1px solid var(--cd-border);
                font-size: 13px; flex-wrap: wrap; }
+.cd-word-name { font-weight: 600; }
+
+/* --- MIN-112: intake drop-zone + source list --- */
+.cd-dropzone { border: 2px dashed var(--cd-border);
+               border-radius: var(--cd-card-radius); padding: 18px;
+               text-align: center; color: #605e5c; font-size: 13px;
+               min-height: var(--cd-tap); margin: 8px 0; cursor: pointer; }
+.cd-dropzone-on { border-color: var(--cd-rail); background: var(--cd-bg); }
+.cd-dropzone:focus-visible { outline: 2px solid var(--cd-rail);
+                             outline-offset: 2px; }
+.cd-src-list { margin: 8px 0; }
+.cd-src-row { display: flex; gap: 8px; align-items: center;
+              min-height: var(--cd-tap); padding: 4px 0;
+              border-bottom: 1px dashed var(--cd-border); font-size: 13px;
+              flex-wrap: wrap; }
+.cd-src-name { flex: 1 1 auto; min-width: 0; overflow: hidden;
+               text-overflow: ellipsis; }
+
+/* --- MIN-112: diagram edges + allocation + explain --- */
+.cd-edges { margin: 4px 0 10px; padding: 8px 10px;
+            background: var(--cd-bg); border-radius: var(--cd-ctl-radius); }
+.cd-edge-row { display: flex; align-items: center; gap: 8px;
+               padding: 2px 0; font-size: 12px; }
+.cd-edge-svg { width: 44px; height: 12px; flex: 0 0 44px; }
+.cd-edge-svg line { stroke: #8a8886; stroke-width: 1.5; }
+.cd-edge-svg path { fill: #8a8886; }
+.cd-edge-spouse line { stroke: #b4009e; }
+.cd-edge-spouse path { fill: #b4009e; }
+.cd-node-rel { font-size: 11px; margin-top: 2px; }
+.cd-badge-alloc { background: #dff6dd; border-color: #9ed69a; }
+.cd-explain { padding: 3px 0; font-size: 12px; }
+.cd-pool-search { width: 100%; box-sizing: border-box; margin-bottom: 6px; }
+.cd-field-err { display: block; font-size: 12px; margin-top: 2px; }
 
 /* --- breakpoint <1000px: Stage cards xep doc; Pool/Diagram giu
        cuon ngang thay vi ep the qua nho (spec §3) --- */

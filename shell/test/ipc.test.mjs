@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { ALLOWLIST, HANDLERS, validateCommandArgs }
+import { ALLOWLIST, HANDLERS, validateCommandArgs, resolveFileTokens }
   from '../src/main/ipc.js';
 import { moduleForCommand, listModules } from '../src/main/registry.js';
+import { makeFileTokenStore, pickedEntry }
+  from '../src/main/file-tokens.js';
 
 test('allowlist chi gom desktop.v1.* da dang ky', () => {
   assert.ok(ALLOWLIST.length >= 5);
@@ -73,4 +75,178 @@ test('submitCommand tu choi command khong thuoc module nao', async () => {
     deps, { command: 'hack.run', payload: {} });
   assert.equal(r.ok, false);
   assert.equal(r.error.code, 'command_unknown');
+});
+
+// ---------- opaque file token (MIN-112) ----------
+
+function depsReady(captured) {
+  return {
+    sidecar: {
+      state: 'ready', status: () => ({}),
+      client: {
+        submitCommand: async (command, payload, moduleId, commandId) => {
+          captured.push({ command, payload, moduleId, commandId });
+          return { job_id: 'j_t1', status: 'accepted' };
+        },
+      },
+    },
+    tracker: { track() {} },
+    fileTokens: makeFileTokenStore(),
+    pickFiles: async () => [],
+    logger: { error() {} },
+  };
+}
+
+test('fileTokenStore: issue/resolve tra FileRef; entry cho renderer khong co path', () => {
+  const store = makeFileTokenStore();
+  const stat = { isFile: () => true, isDirectory: () => false, size: 99 };
+  const entry = pickedEntry(store, 'D:\\in\\anh1.png', stat);
+  // entry di ve renderer: file_token + name + size + is_dir — KHONG path
+  assert.ok(entry.file_token);
+  assert.equal(entry.name, 'anh1.png');
+  assert.equal(entry.size_bytes, 99);
+  assert.equal(entry.is_dir, false);
+  assert.equal('path' in entry, false);
+  assert.equal('scope' in entry, false);
+  // resolve tra FileRef that (scope machine_local)
+  const ref = store.resolve(entry.file_token);
+  assert.equal(ref.path, 'D:\\in\\anh1.png');
+  assert.equal(ref.scope, 'machine_local');
+  assert.equal(ref.size_bytes, 99);
+  assert.equal(ref.is_dir, false);
+  // token la → null
+  assert.equal(store.resolve('khong-co'), null);
+  // clear → token het han (window close/reload)
+  store.clear();
+  assert.equal(store.resolve(entry.file_token), null);
+});
+
+test('submitCommand thay file_token o sources[].file_ref (intake_analyze)', async () => {
+  const captured = [];
+  const deps = depsReady(captured);
+  const t = deps.fileTokens.issue(
+    { path: 'D:\\in\\a.png', size_bytes: 12, is_dir: false });
+  const r = await HANDLERS['desktop.v1.submitCommand'](deps, {
+    command: 'notary.intake_analyze',
+    payload: {
+      case_id: 42,
+      sources: [
+        { source_id: '11111111-1111-4111-8111-111111111111',
+          kind: 'image', file_ref: { file_token: t } },
+        { source_id: '22222222-2222-4222-8222-222222222222',
+          kind: 'text', text: 'ghi chu' },
+      ],
+    } });
+  assert.equal(r.ok, true);
+  const sent = captured[0].payload;
+  assert.equal(sent.sources[0].file_ref.path, 'D:\\in\\a.png');
+  assert.equal(sent.sources[0].file_ref.scope, 'machine_local');
+  assert.equal(sent.sources[0].file_ref.size_bytes, 12);
+  assert.equal('file_token' in sent.sources[0].file_ref, false);
+  assert.equal(sent.sources[1].kind, 'text');   // text source nguyen ven
+});
+
+test('submitCommand thay file_token o destination (word_export_batch)', async () => {
+  const captured = [];
+  const deps = depsReady(captured);
+  const t = deps.fileTokens.issue(
+    { path: 'D:\\out-dir', size_bytes: null, is_dir: true });
+  const r = await HANDLERS['desktop.v1.submitCommand'](deps, {
+    command: 'notary.word_export_batch',
+    payload: { case_id: 42, document_keys: ['khai_nhan_di_san'],
+               destination: { file_token: t } } });
+  assert.equal(r.ok, true);
+  const dest = captured[0].payload.destination;
+  assert.equal(dest.path, 'D:\\out-dir');
+  assert.equal(dest.scope, 'machine_local');
+  assert.equal(dest.is_dir, true);
+  assert.equal('file_token' in dest, false);
+});
+
+test('submitCommand tu choi token la/het han — validation_error, khong forward', async () => {
+  const captured = [];
+  const deps = depsReady(captured);
+  const r = await HANDLERS['desktop.v1.submitCommand'](deps, {
+    command: 'notary.intake_analyze',
+    payload: { case_id: 42, sources: [
+      { source_id: 'x', kind: 'image',
+        file_ref: { file_token: 'deadbeef-0000-4000-8000-000000000000' } } ] } });
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, 'validation_error');
+  assert.equal(captured.length, 0);             // khong forward len sidecar
+});
+
+test('submitCommand: payload thuong (khong file_token) nguyen ven', async () => {
+  const captured = [];
+  const deps = depsReady(captured);
+  const r = await HANDLERS['desktop.v1.submitCommand'](deps, {
+    command: 'notary.workspace_get', payload: { case_id: 42 } });
+  assert.equal(r.ok, true);
+  assert.deepEqual(captured[0].payload, { case_id: 42 });
+});
+
+test('pickFiles handler tra shape token; registerDroppedFile + setDirtyState co trong allowlist', async () => {
+  assert.ok(ALLOWLIST.includes('desktop.v1.pickFiles'));
+  assert.ok(ALLOWLIST.includes('desktop.v1.registerDroppedFile'));
+  assert.ok(ALLOWLIST.includes('desktop.v1.setDirtyState'));
+  const deps = {
+    pickFiles: async (opts) => opts.directory
+      ? [{ file_token: 't-dir', name: 'out', size_bytes: null,
+           is_dir: true }]
+      : [{ file_token: 't-f', name: 'a.png', size_bytes: 5,
+           is_dir: false }],
+    logger: { error() {} },
+  };
+  const r = await HANDLERS['desktop.v1.pickFiles'](deps, { directory: true });
+  assert.equal(r.ok, true);
+  assert.equal(r.data.files[0].is_dir, true);   // directory pick co is_dir
+  assert.equal('path' in r.data.files[0], false);
+});
+
+test('registerDroppedFile handler: deps thieu → loi; deps co → tra token entry', async () => {
+  const r0 = await HANDLERS['desktop.v1.registerDroppedFile'](
+    { logger: { error() {} } }, { path: 'D:\\x.png' });
+  assert.equal(r0.ok, false);
+  const r = await HANDLERS['desktop.v1.registerDroppedFile']({
+    registerDroppedFile: async (p) => ({ file_token: 't1', name: 'a.png',
+      size_bytes: 1, is_dir: false, _p: p }),
+    logger: { error() {} },
+  }, { path: 'D:\\a.png' });
+  assert.equal(r.ok, true);
+  assert.equal(r.data.file.file_token, 't1');
+  assert.equal(r.data.file._p, 'D:\\a.png');
+  // loi ben trong → errEnvelope, khong throw
+  const rErr = await HANDLERS['desktop.v1.registerDroppedFile']({
+    registerDroppedFile: async () => {
+      throw Object.assign(new Error('khong ton tai'),
+                          { code: 'file_not_found' });
+    },
+    logger: { error() {} },
+  }, { path: 'D:\\none.png' });
+  assert.equal(rErr.ok, false);
+  assert.equal(rErr.error.code, 'file_not_found');
+});
+
+test('setDirtyState handler: ghi flag renderer dirty len deps.setDirty', async () => {
+  let cur = null;
+  const deps = { setDirty: (d) => { cur = d; }, logger: { error() {} } };
+  const r = await HANDLERS['desktop.v1.setDirtyState'](deps, { dirty: true });
+  assert.equal(r.ok, true);
+  assert.equal(cur, true);
+  await HANDLERS['desktop.v1.setDirtyState'](deps, { dirty: false });
+  assert.equal(cur, false);
+});
+
+test('resolveFileTokens: nested/array — token o sau van duoc thay', () => {
+  const store = makeFileTokenStore();
+  const t = store.issue({ path: 'D:\\f.docx', size_bytes: 7 });
+  const r = resolveFileTokens(store, {
+    a: [{ b: { file_token: t } }],
+    c: 'plain',
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.value.a[0].b.path, 'D:\\f.docx');
+  assert.equal(r.value.c, 'plain');
+  const bad = resolveFileTokens(store, { x: { file_token: 'la' } });
+  assert.equal(bad.ok, false);
 });

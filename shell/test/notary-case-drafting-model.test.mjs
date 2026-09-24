@@ -201,7 +201,7 @@ function fakeClient(seed) {
         return ok({
           schema_version: 'notary.case-drafting.v1',
           suggestions: [{
-            suggestion_id: '99999999-9999-4999-8999-999999999999',
+            suggestion_id: crypto.randomUUID(),   // moi lan mot id (backend sinh)
             source_id: sid,
             target: 'person',
             fields: {
@@ -752,4 +752,120 @@ test('onChange: subscriber duoc goi sau mutation/load', async () => {
 test('model khong depend DOM: module load duoc trong node (khong window)', () => {
   assert.ok(M.createModel);
   assert.equal(typeof M.createModel, 'function');
+});
+
+// ---------- MIN-112: intake/word wiring day du ----------
+
+test('intakeAnalyze: lan chay sau them suggestion LEN DAU, khong xoa ngam cu', async () => {
+  const { model } = makeModel(seedCases('empty'));
+  await model.openCase(43);
+  await model.intakeAnalyze([
+    { source_id: crypto.randomUUID(), kind: 'text', text: 'lan 1' }]);
+  const firstId = model.state.suggestions[0].suggestion_id;
+  await model.intakeAnalyze([
+    { source_id: crypto.randomUUID(), kind: 'text', text: 'lan 2' }]);
+  assert.equal(model.state.suggestions.length, 2);
+  // ket qua moi nhat dung dau danh sach (plan §13 — them len tren)
+  assert.notEqual(model.state.suggestions[0].suggestion_id, firstId);
+  assert.equal(model.state.suggestions[1].suggestion_id, firstId);
+});
+
+test('intakeAnalyze: opts passthrough (onJob cho progress/cancel); user_canceled → notice khong phai error', async () => {
+  const { model, client } = makeModel(seedCases('empty'));
+  await model.openCase(43);
+  let gotJob = null;
+  const orig = client.run.bind(client);
+  client.run = async (cmd, payload, opts) => {
+    if (opts && opts.onJob) opts.onJob({ job_id: 'j_intake_9' });
+    return orig(cmd, payload);
+  };
+  await model.intakeAnalyze(
+    [{ source_id: crypto.randomUUID(), kind: 'text', text: 'x' }],
+    { onJob: (j) => { gotJob = j.job_id; } });
+  assert.equal(gotJob, 'j_intake_9');   // dialog can job_id de cancel
+  // user_canceled: khong phai loi — giu suggestion cu, hien notice
+  client.run = async () => ({ ok: false, error: {
+    code: 'user_canceled', message: 'nguoi dung huy', retryable: false } });
+  const before = model.state.suggestions.length;
+  const r = await model.intakeAnalyze(
+    [{ source_id: crypto.randomUUID(), kind: 'text', text: 'y' }]);
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, 'user_canceled');
+  assert.equal(model.state.error, null);
+  assert.equal(model.state.notice, 'Đã hủy phân tích');
+  assert.equal(model.state.suggestions.length, before);
+  assert.equal(model.state.intakeBusy, false);
+});
+
+test('intakeAnalyze: loi that → state.error; intakeErrors tich luy tu data.errors', async () => {
+  const { model, client } = makeModel(seedCases('empty'));
+  await model.openCase(43);
+  client.run = async () => ({ ok: false, error: {
+    code: 'engine_not_installed', message: 'thieu OCR', retryable: false } });
+  const r = await model.intakeAnalyze(
+    [{ source_id: crypto.randomUUID(), kind: 'image',
+       file_ref: { file_token: 't' } }]);
+  assert.equal(r.ok, false);
+  assert.equal(model.state.error.code, 'engine_not_installed');
+  assert.equal(model.state.intakeBusy, false);
+});
+
+test('exportWord: opts passthrough; word_batch_failed → wordResult normalized per-doc', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  let gotJob = null;
+  const orig = client.run.bind(client);
+  client.run = async (cmd, payload, opts) => {
+    if (opts && opts.onJob) opts.onJob({ job_id: 'j_word_1' });
+    return orig(cmd, payload);
+  };
+  await model.exportWord(['khai_nhan_di_san'],
+    { file_token: 't-dir' }, { onJob: (j) => { gotJob = j.job_id; } });
+  assert.equal(gotJob, 'j_word_1');
+
+  // all-failed: error.details.documents (dang compact) → normalize thanh
+  // document rows day du de UI render thong nhat.
+  client.run = async () => ({ ok: false,
+    job: { status: 'failed' },
+    error: { code: 'word_batch_failed', message: 'tat ca loi',
+             retryable: true, next_action: 'retry',
+             details: { documents: [
+               { document_key: 'niem_yet', code: 'word.template_missing',
+                 message: 'chua co template' } ] } } });
+  const r = await model.exportWord(['niem_yet'], { file_token: 't' });
+  assert.equal(r.ok, false);
+  const res = model.state.wordResult;
+  assert.ok(res && res.documents, 'wordResult.documents phai co');
+  assert.equal(res.documents[0].document_key, 'niem_yet');
+  assert.equal(res.documents[0].status, 'failed');
+  assert.equal(res.documents[0].error.code, 'word.template_missing');
+});
+
+test('exportWord: canceled job giu result (breakdown.skipped len wire — MIN-115)', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  client.run = async () => ({ ok: false,
+    job: { status: 'canceled',
+      result: { data: {
+        schema_version: 'notary.case-drafting.v1',
+        documents: [
+          { document_key: 'khai_nhan_di_san', display_name: 'KN',
+            status: 'saved', actual_filename: 'a.docx',
+            output_file: { path: 'D:/o/a.docx', scope: 'machine_local' },
+            error: null },
+          { document_key: 'thoa_thuan_phan_chia', display_name: 'TT',
+            status: 'skipped', actual_filename: null,
+            output_file: null, error: null },
+        ],
+        breakdown: { succeeded: ['khai_nhan_di_san'], failed: [],
+                     skipped: ['thoa_thuan_phan_chia'] } } } },
+    error: { code: 'user_canceled', message: 'da huy', retryable: false } });
+  const r = await model.exportWord(
+    ['khai_nhan_di_san', 'thoa_thuan_phan_chia'], { file_token: 't' });
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, 'user_canceled');
+  const res = model.state.wordResult;
+  assert.equal(res.breakdown.skipped.length, 1);
+  assert.equal(res.documents[1].status, 'skipped');
+  assert.equal(model.state.wordBusy, false);
 });

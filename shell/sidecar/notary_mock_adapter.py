@@ -706,6 +706,68 @@ def _validate_stage(stage):
 
 # ---------- commands ----------
 
+def _mock_case_row(cid, case):
+    """Row shape parity voi notary_adapter._case_row — nguoi_chet = person
+    co ngay_chet (chu the da mat), tai_san = asset primary/dau tien."""
+    stage = case.get("stage") or {}
+    deceased = next(
+        (p for p in stage.get("people", []) if p.get("ngay_chet")), None)
+    assets = stage.get("assets", [])
+    primary = next((a for a in assets if a.get("is_primary")), None) \
+        or (assets[0] if assets else None)
+    return {
+        "id": cid,
+        "nguoi_chet": {
+            "id": deceased.get("entity_id"), "ho_ten": deceased.get("ho_ten"),
+            "gioi_tinh": deceased.get("gioi_tinh"),
+            "ngay_sinh": deceased.get("ngay_sinh"),
+            "ngay_chet": deceased.get("ngay_chet"),
+            "so_giay_to": deceased.get("so_giay_to"),
+            "ngay_cap": deceased.get("ngay_cap"),
+            "dia_chi": deceased.get("dia_chi"), "con_song": False,
+        } if deceased else None,
+        "tai_san": {
+            "id": primary.get("entity_id"),
+            "so_serial": primary.get("so_serial"),
+            "so_vao_so": primary.get("so_vao_so"),
+            "so_thua_dat": primary.get("so_thua_dat"),
+            "so_to_ban_do": primary.get("so_to_ban_do"),
+            "dia_chi": primary.get("dia_chi"),
+            "loai_dat": primary.get("loai_dat"),
+            "dien_tich": primary.get("dien_tich"),
+            "loai_so": primary.get("loai_so"),
+            "hinh_thuc_su_dung": primary.get("hinh_thuc_su_dung"),
+            "thoi_han": primary.get("thoi_han"),
+            "nguon_goc": primary.get("nguon_goc"),
+            "ngay_cap": primary.get("ngay_cap"),
+            "co_quan_cap": primary.get("co_quan_cap"),
+        } if primary else None,
+        "ngay_lap_ho_so": case.get("ngay_lap_ho_so"),
+        "loai_van_ban": case.get("document_type"),
+        "trang_thai": case.get("status"),
+        "noi_niem_yet": case.get("noi_niem_yet"),
+        "ghi_chu": case.get("ghi_chu"),
+        "is_locked": bool(case.get("locked")),
+        "tong_ty_le": case.get("tong_ty_le"),
+    }
+
+
+def case_list(job, payload):
+    """notary.case_list mock (MIN-112): danh sach fixture case cho tab
+    Tong quan ho so — cung query/limit semantic voi real adapter."""
+    q = str((payload or {}).get("query") or "").strip()
+    limit = max(1, min(int((payload or {}).get("limit") or 50), 200))
+    st = _state()
+    items = [_mock_case_row(cid, st.cases[cid])
+             for cid in sorted(st.cases, reverse=True)][:limit]
+    if q:
+        ql = q.lower()
+        items = [i for i in items
+                 if ql in json.dumps(i, ensure_ascii=False).lower()]
+    job.check_cancel()
+    return _result("case_list", {"cases": items, "total": len(items)})
+
+
 def workspace_get(job, payload):
     case = _case(payload)
     caps = case.get("case_type") == SUPPORTED_CASE_TYPE

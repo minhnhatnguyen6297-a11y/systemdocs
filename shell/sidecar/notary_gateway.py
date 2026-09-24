@@ -1,4 +1,5 @@
-"""Gateway chon backend cho 7 command notary.* case-drafting (MIN-106).
+"""Gateway chon backend cho command notary.* case-drafting (MIN-106) +
+notary.case_list dung cho tab Tong quan ho so (MIN-112 — mock parity).
 
 Contract SOT: contracts/notary-case-drafting.md (notary.case-drafting.v1).
 

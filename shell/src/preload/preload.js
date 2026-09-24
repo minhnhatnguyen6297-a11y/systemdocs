@@ -2,8 +2,11 @@
 
 // Preload — contextBridge expose dung IPC allowlist desktop.v1.*.
 // Renderer khong co Node, khong fetch sidecar, khong thay token.
+// MIN-112: file tu drop-zone di qua webUtils.getPathForFile (path that,
+// khong the forge tu renderer) roi main cap opaque token — renderer khong
+// bao gio doc thuoc tinh path cua File truc tiep.
 
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('desktop', {
   v1: {
@@ -20,6 +23,14 @@ contextBridge.exposeInMainWorld('desktop', {
     listJobs: () => ipcRenderer.invoke('desktop.v1.listJobs'),
     restartEngine: () => ipcRenderer.invoke('desktop.v1.restartEngine'),
     getDiagnostics: () => ipcRenderer.invoke('desktop.v1.getDiagnostics'),
+    // File tha vao drop-zone → opaque token entry (giong pickFiles).
+    // Tra {ok:true,data:{file:{file_token,name,size_bytes,is_dir}}}.
+    registerDroppedFile: (file) =>
+      ipcRenderer.invoke('desktop.v1.registerDroppedFile',
+                         { path: webUtils.getPathForFile(file) }),
+    // Bao trang thai nhap chua luu len main — window-close guard.
+    setDirtyState: (dirty) =>
+      ipcRenderer.invoke('desktop.v1.setDirtyState', { dirty: !!dirty }),
     onJobUpdate: (cb) => {
       ipcRenderer.on('desktop.v1.jobUpdate', (_e, job) => cb(job));
     },

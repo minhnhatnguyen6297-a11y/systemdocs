@@ -52,6 +52,54 @@ function unavailable() {
   };
 }
 
+// ---------- opaque file token (MIN-112) ----------
+// Renderer gui {file_token} thay cho FileRef trong payload; main resolve
+// thanh FileRef that ngay truoc khi forward sidecar. Token unknown/expired
+// -> validation_error va KHONG forward. Resolved node chi lay ref da luu —
+// sibling keys (name/size_bytes/is_dir do renderer gui) bi bo qua de tranh
+// renderer tu khai metadata file.
+
+const TOKEN_BAD = Symbol('token_bad');
+
+function resolveFileTokens(store, payload) {
+  const walk = (v) => {
+    if (Array.isArray(v)) {
+      const out = [];
+      for (const item of v) {
+        const w = walk(item);
+        if (w === TOKEN_BAD) return TOKEN_BAD;
+        out.push(w);
+      }
+      return out;
+    }
+    if (v && typeof v === 'object') {
+      if (typeof v.file_token === 'string') {
+        const ref = store && store.resolve(v.file_token);
+        if (!ref) return TOKEN_BAD;
+        const out = { path: ref.path, scope: ref.scope };
+        if (ref.size_bytes != null) out.size_bytes = ref.size_bytes;
+        if (ref.is_dir) out.is_dir = true;
+        return out;
+      }
+      const out = {};
+      for (const [k, x] of Object.entries(v)) {
+        const w = walk(x);
+        if (w === TOKEN_BAD) return TOKEN_BAD;
+        out[k] = w;
+      }
+      return out;
+    }
+    return v;
+  };
+  const res = walk(payload);
+  if (res === TOKEN_BAD) {
+    return { ok: false, error: { code: 'validation_error',
+      message: 'file_token het han hoac khong hop le — chon lai file',
+      retryable: false, next_action: null, job_id: null, details: null } };
+  }
+  return { ok: true, value: res };
+}
+
 // Tat ca handler nhan deps {sidecar, tracker, pickFiles, logger}.
 // Tra {ok:true, data} hoac {ok:false, error:{...}}.
 const HANDLERS = {
@@ -104,9 +152,18 @@ const HANDLERS = {
                                    retryable: false, next_action: null,
                                    job_id: null, details: null } };
     }
+    // Opaque file token → FileRef that (MIN-112). Bat ky node
+    // {file_token} nao trong payload duoc resolve; token la/het han →
+    // validation_error, khong forward sidecar.
+    let payload = args.payload ?? null;
+    if (deps.fileTokens) {
+      const rr = resolveFileTokens(deps.fileTokens, payload);
+      if (!rr.ok) return { ok: false, error: rr.error };
+      payload = rr.value;
+    }
     try {
       const job = await deps.sidecar.client.submitCommand(
-        args.command, args.payload ?? null, mod.id, args.command_id);
+        args.command, payload, mod.id, args.command_id);
       deps.tracker.track(job);
       return { ok: true, data: job };
     } catch (err) {
@@ -180,6 +237,40 @@ const HANDLERS = {
       modules: listModules(),
     },
   }),
+
+  // Dang ky file drop vao drop-zone (MIN-112): preload doc path qua
+  // webUtils.getPathForFile (forge-proof), main stat + cap token — renderer
+  // chi nhan {file_token, name, size_bytes, is_dir} nhu pickFiles.
+  'desktop.v1.registerDroppedFile': async (deps, args) => {
+    const p = args && typeof args.path === 'string' ? args.path : '';
+    const unc = p.startsWith('\\\\') || /^\\\\\?\\UNC\\/i.test(p);
+    if (!p || unc || !deps.registerDroppedFile) {
+      return { ok: false, error: { code: 'validation_error',
+        message: 'file tha vao khong hop le', retryable: false,
+        next_action: null, job_id: null, details: null } };
+    }
+    try {
+      const entry = await deps.registerDroppedFile(p);
+      if (!entry) {
+        return { ok: false, error: { code: 'file_not_found',
+          message: 'file tha vao khong doc duoc', retryable: false,
+          next_action: null, job_id: null, details: null } };
+      }
+      // data.file — cung shape pickFiles (data.files[]) de renderer dung
+      // chung mot addEntry cho picker + drop.
+      return { ok: true, data: { file: entry } };
+    } catch (err) {
+      return errEnvelope(err);
+    }
+  },
+
+  // Dirty flag cho window-close guard (MIN-112): renderer bao moi khi
+  // hasUnsaved doi; main chan close khi con nhap chua luu.
+  'desktop.v1.setDirtyState': async (deps, args) => {
+    const dirty = !!(args && args.dirty);
+    if (deps.setDirty) deps.setDirty(dirty);
+    return { ok: true, data: {} };
+  },
 };
 
 const ALLOWLIST = Object.keys(HANDLERS);
@@ -201,4 +292,5 @@ function registerIpc(ipcMain, deps) {
   }
 }
 
-module.exports = { ALLOWLIST, HANDLERS, registerIpc, validateCommandArgs };
+module.exports = { ALLOWLIST, HANDLERS, registerIpc, validateCommandArgs,
+                   resolveFileTokens };

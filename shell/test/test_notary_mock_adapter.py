@@ -1053,3 +1053,36 @@ class TestContractInvariants:
         r2 = _call("intake_analyze", payload)
         assert (r1["data"]["suggestions"][0]["suggestion_id"]
                 == r2["data"]["suggestions"][0]["suggestion_id"])
+
+
+# ---------- case_list (MIN-112 — mock parity cho overview) ----------
+
+class TestCaseListMock:
+    """notary.case_list route qua gateway: mock tra danh sach fixture case
+    (42–46) dung shape _case_row cua real adapter de overview chay duoc
+    khong can engine that."""
+
+    def test_registry_routes_case_list_via_gateway(self):
+        job = _job("notary.case_list")
+        res = reg.COMMANDS["notary.case_list"](job, {})
+        assert res["kind"] == "case_list"
+        ids = {c["id"] for c in res["data"]["cases"]}
+        assert {42, 43, 44, 45, 46} <= ids
+        assert res["data"]["total"] == len(res["data"]["cases"])
+
+    def test_case_list_row_shape_and_query(self):
+        res = _call("case_list", {})
+        c42 = next(c for c in res["data"]["cases"] if c["id"] == 42)
+        # shape parity voi notary_adapter._case_row
+        for k in ("id", "nguoi_chet", "tai_san", "ngay_lap_ho_so",
+                  "loai_van_ban", "trang_thai", "is_locked"):
+            assert k in c42, f"thieu key {k}"
+        assert c42["nguoi_chet"]["ho_ten"] == "Người Mẫu A"
+        assert c42["tai_san"]["so_serial"] == "MM000001"
+        assert c42["trang_thai"] == "draft"
+        # query filter giong real adapter: substring tren row json —
+        # '"id": 45' chi khop case 45 (row luon co truong "id": <so>).
+        res2 = _call("case_list", {"query": '"id": 45'})
+        assert {c["id"] for c in res2["data"]["cases"]} == {45}
+        res3 = _call("case_list", {"query": "khong-co-gi"})
+        assert res3["data"]["cases"] == []

@@ -123,7 +123,19 @@ function createModel(deps) {
     busy: null,                  // command dang chay (commit/evaluate/save)
   };
 
+  let lastUnsaved = false;
+
   function emit() {
+    // Bao main biet hasUnsaved doi → window-close guard (MIN-112). Tinh o
+    // day vi moi thay doi draft deu di qua emit (touchStage/touchDiagram/
+    // commit/save/applyWorkspace).
+    const u = state.stageDirty || state.diagramDirty;
+    if (u !== lastUnsaved) {
+      lastUnsaved = u;
+      if (typeof deps.onUnsavedChange === 'function') {
+        try { deps.onUnsavedChange(u); } catch (e) { /* bridge loi */ }
+      }
+    }
     for (const cb of subs) {
       try { cb(state); } catch (e) { /* subscriber loi khong lam sap model */ }
     }
@@ -565,9 +577,10 @@ function createModel(deps) {
     return { ok: true };
   }
 
-  // ---------- intake (thin — UI review o MIN-112) ----------
+  // ---------- intake ----------
 
-  async function intakeAnalyze(sources) {
+  // opts: {onJob} — dialog can job_id/progress de hien thi + cancel.
+  async function intakeAnalyze(sources, opts) {
     if (!canWrite()) {
       return { ok: false, error: errObj(
         state.locked ? 'workspace_locked' : 'case_type_unsupported',
@@ -578,17 +591,30 @@ function createModel(deps) {
     const r = await client.run('notary.intake_analyze', {
       case_id: state.caseId,
       sources: clone(sources),
-    });
+    }, opts);
     state.intakeBusy = false;
     if (!r.ok) {
-      state.error = r.error || errObj('unknown');
+      const err = r.error || errObj('unknown');
+      if (err.code === 'user_canceled') {
+        // Huy khong phai loi: giu nguyen suggestion tray, chi notice.
+        state.notice = 'Đã hủy phân tích';
+      } else {
+        state.error = err;
+        // Loi job-level co the kem errors per-source — tach rieng de
+        // dialog/toa do hien thi dung nguon.
+        const per = err.details && err.details.errors;
+        if (Array.isArray(per) && per.length) {
+          state.intakeErrors = per.concat(state.intakeErrors);
+        }
+      }
       emit();
       return r;
     }
     const d = r.data || {};
-    // Ket qua moi them len tren, khong xoa ngam suggestion cu (plan §13).
-    state.suggestions = state.suggestions.concat(d.suggestions || []);
-    state.intakeErrors = d.errors || [];
+    // Ket qua moi them LEN TREN, khong xoa ngam suggestion cu (plan §13);
+    // loi per-source tich luy theo source_id, khong lan sang nguon khac.
+    state.suggestions = (d.suggestions || []).concat(state.suggestions);
+    state.intakeErrors = (d.errors || []).concat(state.intakeErrors);
     state.intakePartial = !!r.partial;
     emit();
     return r;
@@ -636,7 +662,64 @@ function createModel(deps) {
     return r;
   }
 
-  async function exportWord(documentKeys, destination) {
+  // Chuan hoa 1 document row ve shape contract §8.4 du nguon la result
+  // day du (success/partial/canceled) hay error.details.documents dang
+  // compact {document_key, code, message} (all-failed word_batch_failed).
+  function normalizeWordDoc(d, key) {
+    if (d && typeof d === 'object' &&
+        typeof d.status === 'string') {
+      return {
+        document_key: d.document_key || key || null,
+        display_name: d.display_name ?? null,
+        status: d.status,
+        actual_filename: d.actual_filename ?? null,
+        output_file: d.output_file ?? null,
+        error: d.error ?? null,
+      };
+    }
+    return {
+      document_key: (d && d.document_key) || key || null,
+      display_name: (d && d.display_name) ?? null,
+      status: 'failed',
+      actual_filename: null,
+      output_file: null,
+      error: { code: (d && d.code) || 'unknown',
+               message: (d && d.message) || 'lỗi xuất' },
+    };
+  }
+
+  function normalizeWordResult(raw, keys) {
+    if (!raw || typeof raw !== 'object') return null;
+    const docs = (raw.documents || []).map(
+      (d) => normalizeWordDoc(d, null));
+    return {
+      schema_version: raw.schema_version || null,
+      destination: raw.destination || null,
+      // breakdown.skipped giu nguyen tu wire (MIN-115). Key trong skipped
+      // ma khong co row trong documents[] → tong hop row 'skipped' de
+      // dialog hien thi tung van ban bi bo qua (cancel giua batch).
+      documents: docs.concat(
+        ((raw.breakdown && raw.breakdown.skipped) || [])
+          .filter((k) => !docs.some((d) => d.document_key === k))
+          .map((k) => ({
+            document_key: k, display_name: null, status: 'skipped',
+            actual_filename: null, output_file: null, error: null,
+          }))),
+      breakdown: raw.breakdown || {
+        succeeded: docs.filter((d) => d.status === 'saved')
+          .map((d) => d.document_key),
+        failed: docs.filter((d) => d.status === 'failed')
+          .map((d) => d.document_key),
+        skipped: docs.filter((d) => d.status === 'skipped')
+          .map((d) => d.document_key)
+          .concat((keys || []).filter(
+            (k) => !docs.some((d) => d.document_key === k))),
+      },
+    };
+  }
+
+  // opts: {onJob} — dialog hien thi progress + cancel theo job_id.
+  async function exportWord(documentKeys, destination, opts) {
     if (!canWrite()) {
       return { ok: false, error: errObj(
         state.locked ? 'workspace_locked' : 'case_type_unsupported',
@@ -649,18 +732,25 @@ function createModel(deps) {
       case_id: state.caseId,
       document_keys: documentKeys,
       destination,
-    });
+    }, opts);
     state.wordBusy = false;
     if (!r.ok) {
-      // failed job van co the mang result (breakdown) tren wire.
-      state.wordResult = (r.job && r.job.result && r.job.result.data) ||
-        (r.error && r.error.details && r.error.details.documents
-          ? { documents: r.error.details.documents } : null);
-      state.error = r.error || errObj('unknown');
+      // Failed/canceled/partial job van co the mang result (breakdown)
+      // tren wire: job.result.data (MIN-115) hoac error.details.documents.
+      const raw = (r.job && r.job.result && r.job.result.data) ||
+        (r.error && r.error.details &&
+         (r.error.details.documents ? r.error.details : null)) || null;
+      state.wordResult = normalizeWordResult(raw, documentKeys);
+      const err = r.error || errObj('unknown');
+      if (err.code === 'user_canceled') {
+        state.notice = 'Đã hủy xuất Word';
+      } else {
+        state.error = err;
+      }
       emit();
       return r;
     }
-    state.wordResult = r.data || null;
+    state.wordResult = normalizeWordResult(r.data, documentKeys);
     emit();
     return r;
   }
