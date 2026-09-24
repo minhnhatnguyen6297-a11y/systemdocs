@@ -33,7 +33,7 @@
               "type": "string",
               "description": "v1 cam kết 'inheritance'; giá trị khác → capabilities tắt / case_type_unsupported"
             },
-            "document_type": { "type": "string" },
+            "document_type": { "enum": ["khai_nhan", "thoa_thuan"] },
             "status": { "enum": ["draft", "locked"] },
             "locked": { "type": "boolean" },
             "revision": { "type": "integer", "minimum": 1 }

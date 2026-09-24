@@ -21,7 +21,7 @@
               "raw_value": "NGUYỄN VĂN AN",
               "normalized_value": "Nguyễn Văn An",
               "observation_state": "normalized",
-              "confidence": 0.97,
+              "confidence": null,
               "source_refs": [{ "page": 1 }]
             }
           },

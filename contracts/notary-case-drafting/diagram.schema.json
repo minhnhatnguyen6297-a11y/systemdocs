@@ -60,10 +60,8 @@
           "properties": {
             "state": { "$ref": "common.schema.json#/definitions/diagram_state" },
             "render_model": {
-              "anyOf": [
-                { "$ref": "common.schema.json#/definitions/render_model" },
-                { "type": "null" }
-              ]
+              "$ref": "common.schema.json#/definitions/render_model",
+              "description": "non-null — save thành công luôn kèm evaluate"
             }
           }
         }

@@ -68,7 +68,27 @@
         ]
       },
       "diagram": {
-        "state": { "version": 2, "nodes": [] }
+        "state": { "version": 2, "nodes": [] },
+        "render_model": {
+          "engineVersion": 2,
+          "status": "invalid",
+          "allocations": {},
+          "breakdowns": [],
+          "requiredSlots": [],
+          "warnings": [],
+          "errors": [
+            {
+              "code": "missing_land_owner",
+              "message": "Sơ đồ chưa có chủ đất"
+            }
+          ],
+          "unresolvedEstates": [],
+          "conservation": {
+            "allocated": "0",
+            "unresolved": "0",
+            "total": "0"
+          }
+        }
       }
     },
     "warnings": []

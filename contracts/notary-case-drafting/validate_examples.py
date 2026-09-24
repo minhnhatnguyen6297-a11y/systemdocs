@@ -37,11 +37,12 @@ STATUSES = {"accepted", "running", "waiting_user", "partial",
 WAITING_ON = {"login", "review", "finalize", "confirm", None}
 SOURCE_KINDS = {"image", "pdf", "docx", "xlsx", "text"}
 GENDERS = {"Nam", "Nữ", None}
+# registry mở — khi backend thêm document_key phải cập nhật set này
 DOC_CATALOG = {"khai_nhan_di_san", "thoa_thuan_phan_chia", "niem_yet"}
 BLOCK_REASONS = {
-    "word.no_assets", "word.no_landowner", "word.no_receiver",
-    "word.too_many_assets", "word.too_many_people",
-    "word.template_missing",
+    "word.no_assets", "word.no_landowner", "word.no_deceased_landowner",
+    "word.no_receiver", "word.too_many_assets", "word.too_many_people",
+    "word.too_many_signers", "word.template_missing",
 }
 RENDER_STATUSES = {"invalid", "unsupported", "incomplete", "complete"}
 DOC_STATUSES = {"saved", "failed", "skipped"}
@@ -66,9 +67,16 @@ SENSITIVE_KEY = re.compile(
 
 # Field nullable — "" cấm thay null (g1-module-data §6 + contract §2.2/2.3)
 NEVER_EMPTY = {
-    "normalized_value", "ho_ten", "so_serial", "dia_chi", "display_name",
-    "actual_filename", "path", "row_id", "personId", "source_id",
-    "suggestion_id", "document_key", "id", "case_type", "filename_stem",
+    "normalized_value", "raw_value", "ho_ten", "so_serial", "dia_chi",
+    "display_name", "actual_filename", "path", "row_id", "personId",
+    "source_id", "suggestion_id", "document_key", "id", "case_type",
+    "filename_stem", "text",
+    # person_row nullable strings
+    "so_giay_to", "noi_cap", "place_of_origin",
+    # asset_row + land_rows nullable strings
+    "so_vao_so", "so_thua_dat", "so_to_ban_do", "loai_so",
+    "hinh_thuc_su_dung", "thoi_han", "nguon_goc", "co_quan_cap",
+    "loai_dat",
 }
 
 PERSON_FIELDS = {
@@ -108,14 +116,18 @@ ERRORS = {
 }
 
 
-def walk_keys(obj, path=""):
+def walk_keys(obj, path="", key=None):
+    """Yield (path, key, value) cho MỌI node — kể cả dict bên trong list
+    (key của phần tử list = "<parent_key>[i]")."""
+    if key is not None:
+        yield path, key, obj
     if isinstance(obj, dict):
         for k, v in obj.items():
-            yield path + "/" + str(k), k, v
-            yield from walk_keys(v, path + "/" + str(k))
+            yield from walk_keys(v, path + "/" + str(k), str(k))
     elif isinstance(obj, list):
         for i, v in enumerate(obj):
-            yield from walk_keys(v, f"{path}[{i}]")
+            yield from walk_keys(v, f"{path}[{i}]",
+                                 (key or "") + f"[{i}]")
 
 
 def is_abs_local(p):
@@ -388,18 +400,18 @@ def check_intake_payload(payload, v):
 
 def check_word_batch_payload(payload, v):
     keys = payload.get("document_keys")
-    if keys is not None:
-        if not isinstance(keys, list) or not keys:
-            v.append(("word_no_documents_selected",
-                      "document_keys empty"))
-        else:
-            if len(keys) != len(set(keys)):
-                v.append(("word_duplicate_document_key",
-                          "duplicate document_key"))
-            for k in keys:
-                if not (isinstance(k, str) and DOC_KEY_RX.match(k)) \
-                        or k not in DOC_CATALOG:
-                    v.append(("word_unknown_document_key", f"key={k!r}"))
+    if not isinstance(keys, list):
+        v.append(("validation_error", "document_keys missing/not list"))
+    elif not keys:
+        v.append(("word_no_documents_selected", "document_keys empty"))
+    else:
+        if len(keys) != len(set(keys)):
+            v.append(("word_duplicate_document_key",
+                      "duplicate document_key"))
+        for k in keys:
+            if not (isinstance(k, str) and DOC_KEY_RX.match(k)) \
+                    or k not in DOC_CATALOG:
+                v.append(("word_unknown_document_key", f"key={k!r}"))
     dest = payload.get("destination")
     if not isinstance(dest, dict):
         v.append(("validation_error", "destination missing/not object"))
@@ -414,9 +426,9 @@ def check_base_revision(payload, ctx, v):
         v.append(("validation_error", f"base_revision={br!r}"))
         return
     srv = ctx.get("server_revision")
-    if isinstance(srv, int) and br < srv:
+    if isinstance(srv, int) and br != srv:
         v.append(("workspace_conflict",
-                  f"base_revision={br} < server_revision={srv}"))
+                  f"base_revision={br} != server_revision={srv}"))
 
 
 def norm(p):
@@ -435,6 +447,7 @@ def check_word_batch_result(data, v):
         if isinstance(dest.get("path"), str):
             dest_norm = norm(dest["path"])
     docs = data.get("documents")
+    seen_by_status = {"saved": [], "failed": [], "skipped": []}
     if not isinstance(docs, list):
         v.append(("validation_error", "data.documents missing"))
     else:
@@ -443,9 +456,20 @@ def check_word_batch_result(data, v):
             if not isinstance(d, dict):
                 v.append(("validation_error", f"{w} not object"))
                 continue
+            for rk in ("document_key", "display_name", "status",
+                       "actual_filename", "output_file", "error"):
+                if rk not in d:
+                    v.append(("validation_error",
+                              f"{w} missing {rk}"))
+            if not (isinstance(d.get("display_name"), str)
+                    and d["display_name"].strip()):
+                v.append(("validation_error",
+                          f"{w} display_name required"))
             if d.get("status") not in DOC_STATUSES:
                 v.append(("validation_error",
                           f"{w} status={d.get('status')!r}"))
+            else:
+                seen_by_status[d["status"]].append(d.get("document_key"))
             fn = d.get("actual_filename")
             if fn is not None:
                 if (not isinstance(fn, str) or ".." in fn
@@ -477,10 +501,23 @@ def check_word_batch_result(data, v):
             if st == "failed" and not isinstance(d.get("error"), dict):
                 v.append(("validation_error",
                           f"{w} failed without error"))
+            if st == "skipped" and (
+                    fn is not None or of is not None
+                    or d.get("error") is not None):
+                v.append(("validation_error",
+                          f"{w} skipped must have nulls"))
     bd = data.get("breakdown")
     if not (isinstance(bd, dict) and isinstance(bd.get("succeeded"), list)
-            and isinstance(bd.get("failed"), list)):
-        v.append(("validation_error", "data.breakdown missing"))
+            and isinstance(bd.get("failed"), list)
+            and isinstance(bd.get("skipped"), list)):
+        v.append(("validation_error",
+                  "data.breakdown missing (need succeeded+failed+skipped)"))
+    elif isinstance(docs, list):
+        if set(bd["succeeded"]) != set(seen_by_status["saved"]) \
+                or set(bd["failed"]) != set(seen_by_status["failed"]) \
+                or set(bd["skipped"]) != set(seen_by_status["skipped"]):
+            v.append(("validation_error",
+                      "breakdown sets != documents statuses"))
 
 
 def check_suggestion(s, where, v):
@@ -494,6 +531,8 @@ def check_suggestion(s, where, v):
     if s.get("target") not in ("person", "asset"):
         v.append(("validation_error",
                   f"{where} target={s.get('target')!r}"))
+    if not isinstance(s.get("warnings"), list):
+        v.append(("validation_error", f"{where}.warnings missing"))
     fields = s.get("fields")
     if not isinstance(fields, dict):
         v.append(("validation_error", f"{where}.fields not object"))
@@ -523,6 +562,19 @@ def check_result_data(kind, data, stage_ids, v):
         v.append(("validation_error",
                   f"schema_version={data.get('schema_version')!r}"))
     if kind == "workspace_get":
+        case = data.get("case")
+        if not isinstance(case, dict):
+            v.append(("validation_error", "data.case missing"))
+        else:
+            for rk in ("id", "case_type", "document_type", "status",
+                       "locked", "revision"):
+                if rk not in case:
+                    v.append(("validation_error", f"data.case missing {rk}"))
+        caps = data.get("capabilities")
+        if not (isinstance(caps, dict)
+                and {"intake", "diagram", "word_export"} <= set(caps)):
+            v.append(("validation_error",
+                      "data.capabilities missing keys"))
         check_stage(data.get("stage"), "data.stage", v)
         dg = data.get("diagram")
         if isinstance(dg, dict):
@@ -550,6 +602,13 @@ def check_result_data(kind, data, stage_ids, v):
         if isinstance(dg, dict):
             check_diagram_state(dg.get("state"), "data.diagram.state",
                                 stage_ids, v)
+            # I-8: commit result luôn kèm render_model non-null
+            if dg.get("render_model") is None:
+                v.append(("validation_error",
+                          "data.diagram.render_model required after commit"))
+            else:
+                check_render_model(dg["render_model"],
+                                   "data.diagram.render_model", v)
         else:
             v.append(("validation_error", "data.diagram missing"))
     elif kind == "diagram_evaluate":
@@ -569,9 +628,13 @@ def check_result_data(kind, data, stage_ids, v):
         if isinstance(dg, dict):
             check_diagram_state(dg.get("state"), "data.diagram.state",
                                 stage_ids, v)
-            rm = dg.get("render_model")
-            if rm is not None:
-                check_render_model(rm, "data.diagram.render_model", v)
+            # M-12: save thành công luôn kèm render_model non-null
+            if dg.get("render_model") is None:
+                v.append(("validation_error",
+                          "data.diagram.render_model required after save"))
+            else:
+                check_render_model(dg["render_model"],
+                                   "data.diagram.render_model", v)
         else:
             v.append(("validation_error", "data.diagram missing"))
     elif kind == "word_export_options":
@@ -584,10 +647,19 @@ def check_result_data(kind, data, stage_ids, v):
                 if not isinstance(d, dict):
                     v.append(("validation_error", f"{w} not object"))
                     continue
+                for rk in ("document_key", "display_name", "ready",
+                           "block_reason"):
+                    if rk not in d:
+                        v.append(("validation_error",
+                                  f"{w} missing {rk}"))
                 k = d.get("document_key")
                 if not (isinstance(k, str) and DOC_KEY_RX.match(k)):
                     v.append(("validation_error",
                               f"{w} document_key={k!r}"))
+                if not (isinstance(d.get("display_name"), str)
+                        and d["display_name"].strip()):
+                    v.append(("validation_error",
+                              f"{w} display_name required"))
                 if not isinstance(d.get("ready"), bool):
                     v.append(("validation_error", f"{w} ready not bool"))
                 br = d.get("block_reason")
@@ -670,6 +742,8 @@ def violations(doc):
     if cmd is not None:
         if cmd not in COMMANDS:
             v.append(("validation_error", f"command={cmd!r}"))
+        elif not isinstance(payload, dict):
+            v.append(("validation_error", "payload missing/not object"))
         elif cmd == "notary.intake_analyze":
             check_intake_payload(payload, v)
         elif cmd == "notary.workspace_commit_stage":
@@ -679,6 +753,12 @@ def violations(doc):
             check_base_revision(payload, ctx, v)
         elif cmd == "notary.word_export_batch":
             check_word_batch_payload(payload, v)
+        # case_id bắt buộc trong mọi payload của 7 command
+        if cmd in COMMANDS and isinstance(payload, dict):
+            if not (isinstance(payload.get("case_id"), int)
+                    and payload["case_id"] >= 1):
+                v.append(("validation_error",
+                          f"payload.case_id={payload.get('case_id')!r}"))
         # diagram state trong payload (evaluate/save)
         dg = payload.get("diagram") if isinstance(payload, dict) else None
         if isinstance(dg, dict) and "state" in dg:

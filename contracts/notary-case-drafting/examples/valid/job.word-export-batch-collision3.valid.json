@@ -1,0 +1,40 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_word_batch_015",
+  "command_id": "a1b2c3d4-0015-4015-8015-000000000015",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": { "done": 1, "total": 1, "current_label": "Xong 1/1 văn bản" },
+  "result": {
+    "kind": "word_export_batch",
+    "data": {
+      "schema_version": "notary.case-drafting.v1",
+      "destination": {
+        "path": "D:/Ho-so/HS-42",
+        "scope": "machine_local",
+        "is_dir": true
+      },
+      "documents": [
+        {
+          "document_key": "khai_nhan_di_san",
+          "display_name": "Văn bản khai nhận di sản",
+          "status": "saved",
+          "actual_filename": "Van_ban_khai_nhan_di_san_HS-42_3.docx",
+          "output_file": {
+            "path": "D:/Ho-so/HS-42/Van_ban_khai_nhan_di_san_HS-42_3.docx",
+            "scope": "machine_local"
+          },
+          "error": null
+        }
+      ],
+      "breakdown": {
+        "succeeded": ["khai_nhan_di_san"],
+        "failed": [],
+        "skipped": []
+      }
+    },
+    "warnings": []
+  },
+  "error": null,
+  "updated_at": "2026-09-24T09:55:00Z"
+}

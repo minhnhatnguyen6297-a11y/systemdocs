@@ -18,6 +18,13 @@ Schema chuẩn: `contracts/notary-case-drafting/*.schema.json`
 (JSON Schema draft-07). Examples kiểm chứng:
 `contracts/notary-case-drafting/examples/`.
 
+**Ghi chú khác biệt có chủ đích so với plan §2:** mã job-level dùng dạng
+underscore — `word_batch_failed` thay literal `word.batch_failed` trong
+plan — theo convention error code của envelope (`user_canceled`,
+`file_scope_not_supported`). Mã dạng `word.*` có chấm chỉ là
+**data-code** trong payload/result (§2.5), không phải `error.code`
+job-level. Quyết định giữ nguyên sau review round 1.
+
 ## 1. Phạm vi và danh mục command
 
 | Command | Mục đích | Tính chất | `result.kind` |
@@ -56,7 +63,7 @@ Schema chuẩn: `contracts/notary-case-drafting/*.schema.json`
 | `row_id` | string UUID v4 | Do UI tạo khi thêm dòng Stage; ổn định qua commit/reload; dùng gắn lỗi đúng dòng (`field_errors[].row_id`) |
 | `entity_id` | integer \| null | ID DB thật; `null` trước lần commit đầu của dòng; backend gán khi commit |
 | `revision` | integer ≥ 1 | Số phiên bản workspace của case; mọi write thành công (`workspace_commit_stage`, `diagram_save`) tăng đúng 1 |
-| `base_revision` | integer ≥ 1 | Revision client đang giữ khi ghi; bắt buộc trên mọi command **ghi** (`workspace_commit_stage`, `diagram_save`) |
+| `base_revision` | integer ≥ 1 | Revision client đang giữ khi ghi; bắt buộc trên mọi command **ghi** (`workspace_commit_stage`, `diagram_save`); khác server (`<` **hoặc** `>`) → `workspace_conflict` |
 | `source_id`, `suggestion_id` | string UUID v4 | `source_id` do client sinh khi build request; `suggestion_id` do backend sinh |
 | `document_key` | string `^[a-z][a-z0-9_]*$` | Khóa ổn định của văn bản; không đổi khi đổi tên hiển thị/template; registry mở — backend được thêm key mới, không được đổi nghĩa key đã publish |
 | `node.id` (Diagram slot) | string non-empty | Định danh slot trên Diagram do UI đặt; khác namespace với `row_id`/`personId` |
@@ -97,7 +104,7 @@ Kiểu ID không được đổi giữa mock và real backend.
 - `Chưa hỗ trợ` cấp **loại việc** (case_type) khác `unsupported` cấp
   **kết quả engine** (§7) — hai tầng riêng.
 
-### 2.5 Error object và `validation_error`
+### 2.5 Error object, `validation_error` và data-codes
 
 - Shape `error` theo `desktop-command.md` §4
   (`code/message/retryable/next_action/job_id/details`).
@@ -105,10 +112,17 @@ Kiểu ID không được đổi giữa mock và real backend.
   riêng: sai kiểu, thiếu field bắt buộc, `""` thay null, `confirmed`
   cấm, `is_dir` sai ngữ cảnh, date format sai ngoài Stage row. Mã nghiệp
   vụ riêng liệt kê ở §9 — ưu tiên dùng mã riêng khi có.
-- Error code dạng `snake_case` không chấm (theo convention envelope
-  `user_canceled`, `file_scope_not_supported`). Ngoại lệ duy nhất:
-  `block_reason` của `word_export_options` dùng code hóa dạng `word.*`
-  (§8.1) — đó là giá trị dữ liệu, không phải `error.code`.
+- `error.code` job-level dạng `snake_case` **không chấm** (theo
+  convention envelope `user_canceled`, `file_scope_not_supported`).
+- **Data-codes** là registry mở các mã nằm **trong dữ liệu**, không phải
+  `error.code` job-level: `block_reason` (§8.1), per-file
+  `documents[].error.code` (§8.4), intake `errors[].code` (§5.3),
+  `warnings[].code`, engine `errors[].code` (§7.3). Dạng
+  `<ns>.<snake_case>` (vd `word.template_missing`,
+  `intake.parse_failed`, `intake.low_confidence`,
+  `diagram.unassigned_pool_person`, `intake.unsupported_target`).
+  Producer được thêm mã mới vào registry này; consumer render theo mã,
+  không parse `message`.
 
 ## 3. FileRef — mở rộng `is_dir`
 
@@ -152,7 +166,7 @@ result.data:
   case:
     id: <int>
     case_type: <string>            # v1 cam kết "inheritance"; giá trị khác → xem §2.4
-    document_type: <string>        # vd "khai_nhan" | "thoa_thuan"
+    document_type: khai_nhan | thoa_thuan
     status: draft | locked
     locked: <bool>
     revision: <int ≥ 1>
@@ -171,8 +185,14 @@ result.data:
 ```
 
 - `stage` luôn trả cấu trúc `{people, assets}` kể cả rỗng (`[]`).
-- `case.locked:true` → mọi write command trên case đó →
-  `failed{code:workspace_locked}`; read vẫn trả đầy đủ.
+- `diagram.render_model` luôn là output của lần evaluate/save/commit
+  gần nhất và **khớp `state` hiện tại** — `workspace_commit_stage`
+  re-evaluate sau khi prune (§6.1) nên không có render_model cũ lệch
+  state; `null` chỉ khi hồ sơ chưa từng được evaluate.
+- `case.locked:true` → mọi command **ghi** (`workspace_commit_stage`,
+  `diagram_save`, `word_export_batch`) →
+  `failed{code:workspace_locked}`; các command read-only — kể cả
+  `diagram_evaluate` — vẫn được phép (§7.4).
 - `case_id` không tồn tại → `failed{code:case_not_found}`.
 - `backend_mode` là field duy nhất phân biệt mock/real; renderer bắt
   buộc hiển thị nhãn khi `mock`.
@@ -241,7 +261,7 @@ payload:
       kind: image | pdf | docx | xlsx | text
       file_ref: <file_ref>          # bắt buộc khi kind ≠ text; cấm khi
                                     # kind = text
-      text: <string>                # bắt buộc khi kind = text; cấm khi
+      text: <string non-empty>      # bắt buộc khi kind = text; cấm khi
                                     # kind ≠ text
 ```
 
@@ -280,7 +300,7 @@ result.data:
       warnings: [{code, message}]
   errors:                           # lỗi theo từng nguồn — không làm
     - source_id: <uuid4 | null>     #   mất suggestion của nguồn khác
-      code: <string>
+      code: <data-code>             # <ns>.<snake>, registry mở — §2.5
       message: <string>
 ```
 
@@ -294,6 +314,11 @@ result.data:
   (quy tắc `partial` của envelope §5).
 - Suggestion **không** tự ghi hồ sơ/tạo quan hệ/chọn người nhận/xuất
   Word — chỉ hiển thị review (drafting-tab §5).
+- Loại `marriage` của pipeline OCR hiện trạng **ngoài phạm vi V1**:
+  intake chỉ emit `target: person|asset`; quan hệ vợ chồng được gán tay
+  trên Diagram (`spouseSlotId`), không qua suggestion. Adapter gặp loại
+  không map được có thể ghi `errors[]` với data-code
+  `intake.unsupported_target`.
 - `case_id` không tồn tại/`locked`/case_type khác →
   `case_not_found`/`workspace_locked`/`case_type_unsupported`. Engine
   OCR thiếu → `engine_not_installed` (reuse envelope §8).
@@ -318,15 +343,20 @@ result.data:
     assets: [<asset_row>]          #   đã gán cho dòng mới
   diagram:
     state: <diagram_state>         # state sau prune — §6.1
+    render_model: <render_model>   # non-null — kết quả re-evaluate
+                                   # trong cùng transaction — §6.1
 ```
 
 ### 6.1 Semantics
 
-- **Atomic:** validate → upsert/link → prune Diagram → `revision+1` →
-  commit, trong **một transaction**. Một dòng sai → Stage không đổi.
-- `base_revision` < `revision` hiện server →
-  `failed{code:workspace_conflict, details:{server_revision}}`. Không có
-  ghi đè cưỡng bức — client tải bản mới hoặc giữ nháp.
+- **Atomic:** validate → upsert/link → prune Diagram → **re-evaluate
+  Diagram đã prune** → `revision+1` → commit, trong **một
+  transaction**. Một dòng sai → Stage không đổi. `render_model` mới được
+  lưu cùng state để `workspace_get` luôn trả model khớp state hiện tại.
+- `base_revision` khác `revision` hiện server — **nhỏ hơn HOẶC lớn
+  hơn** — → `failed{code:workspace_conflict,
+  details:{server_revision}}`. Không có ghi đè cưỡng bức — client tải
+  bản mới hoặc giữ nháp.
 - Xóa phần tử khỏi Stage → backend prune mọi `personId`/`slot` Diagram
   tham chiếu phần tử đó trong cùng transaction; `diagram.state` trả về
   đã prune.
@@ -463,7 +493,8 @@ result.data:
 ```
 
 - Read-only theo DB: evaluate **không** ghi state, không đổi Stage,
-  không đổi revision.
+  không đổi revision. Vì read-only, evaluate **được phép trên case
+  `locked`** (chỉ các command ghi bị `workspace_locked`).
 - `personId` ngoài Stage đã commit → `diagram_reference_outside_stage`;
   state sai cấu trúc → `diagram_invalid_state`.
 
@@ -512,16 +543,24 @@ result.data:
       block_reason: <null | code>   # chỉ khi ready:false
 ```
 
-`block_reason` code hóa (v1):
+`block_reason` code hóa (v1 — data-code dạng `word.*`, §2.5):
 
 ```
-word.no_assets            # hồ sơ chưa có tài sản
-word.no_landowner         # chưa có chủ đất trên Diagram
-word.no_receiver          # chưa có người nhận
-word.too_many_assets      # > 5 tài sản
-word.too_many_people      # > 20 người trên Diagram
-word.template_missing     # văn bản chưa có template
+word.no_assets              # hồ sơ chưa có tài sản
+word.no_landowner           # chưa có chủ đất trên Diagram
+word.no_deceased_landowner  # không có chủ đất đã chết
+word.no_receiver            # chưa có người nhận
+word.too_many_assets        # > 5 tài sản
+word.too_many_people        # > 20 người trên Diagram
+word.too_many_signers       # > 20 người ký
+word.template_missing       # văn bản chưa có template
 ```
+
+Mapping từ validation thật của `word_engine` (audit `services/word_engine.py`
+:809-910): không tài sản → `no_assets`; >5 tài sản → `too_many_assets`;
+không chủ đất → `no_landowner`; không chủ đất đã chết →
+`no_deceased_landowner`; không người nhận → `no_receiver`; >20 người trên
+Diagram → `too_many_people`; >20 người ký → `too_many_signers`.
 
 Catalog `document_key` v1 (registry mở — backend được thêm):
 
@@ -578,26 +617,27 @@ result.data:
       status: saved | failed | skipped
       actual_filename: <string | null>   # tên file thật khi saved
       output_file: <file_ref | null>     # path tuyệt đối file đã ghi
-      error: {code, message} | null      # per-file — vd
-                                         # word.template_missing,
-                                         # word.unresolved_placeholders
+      error: {code, message} | null      # per-file — data-code (§2.5)
   breakdown:
     succeeded: [<document_key>]
     failed: [<document_key>]
+    skipped: [<document_key>]            # file chưa bắt đầu khi cancel
 ```
 
-- `breakdown` **luôn** có mặt (kể cả khi `succeeded` toàn bộ) — đồng
-  nhất với quy tắc `partial` của envelope.
+- `breakdown` **luôn** có mặt cả ba list (kể cả khi `succeeded` toàn
+  bộ — lúc đó `failed`/`skipped` rỗng) — đồng nhất với quy tắc
+  `partial` của envelope.
 - Job status: tất cả `saved` → `succeeded`; trộn → `partial`; tất cả
   `failed` → `failed{code:word_batch_failed,
   details.documents:[per-file errors]}`.
 - Cancel: file đã lưu **giữ nguyên** (không xóa); file chưa bắt đầu →
-  `status:skipped`; job `canceled{code:user_canceled}`; file đang ghi
-  dở được dọn theo chính sách engine (không để file nửa vời nếu tránh
-  được).
-- Per-file `error.code` dùng mã block_reason tương ứng
-  (`word.template_missing`, `word.unresolved_placeholders`, …) hoặc
-  mã runtime (`file_locked`, `file_not_found`).
+  `status:skipped` và vào `breakdown.skipped`; job
+  `canceled{code:user_canceled}`; file đang ghi dở được dọn theo chính
+  sách engine (không để file nửa vời nếu tránh được).
+- Per-file `error.code` là **data-code** `<ns>.<snake>` (§2.5): registry
+  v1 gồm `word.template_missing`, `word.unresolved_placeholders` và mã
+  envelope reuse (`file_locked`, `file_not_found`). Producer được thêm
+  data-code mới.
 
 ## 9. Bảng error code
 
@@ -619,8 +659,8 @@ Namespace `notary.*` (snake_case không chấm):
 | `word_no_documents_selected` | `document_keys` rỗng | — |
 | `word_duplicate_document_key` | key lặp | `{document_key}` |
 | `word_unknown_document_key` | key ngoài catalog/sai pattern | `{document_key}` |
-| `word_template_missing` | văn bản chưa có template | `{document_key}` |
-| `word_unresolved_placeholders` | DOCX còn placeholder chưa thay | `{document_key, tokens[]}` |
+| `word_template_missing` | văn bản chưa có template *(reserved — dạng per-file dùng data-code `word.template_missing`)* | `{document_key}` |
+| `word_unresolved_placeholders` | DOCX còn placeholder chưa thay *(reserved — dạng per-file dùng data-code `word.unresolved_placeholders`)* | `{document_key, tokens[]}` |
 | `word_batch_failed` | tất cả file trong batch lỗi | `{documents:[per-file]}` |
 | `word_path_traversal` | output thoát khỏi destination | `{path}` |
 | `validation_error` | vi phạm shape chung (§2.5) | `{detail}` |
@@ -641,9 +681,11 @@ Producer (sidecar/backend) PHẢI:
       emit `""` thay `null`; boolean strict.
 - [ ] Không emit `confirmed` ở bất kỳ cấp nào của suggestion/intake.
 - [ ] Commit Stage atomic: một dòng sai → Stage không đổi; lỗi gắn
-      `row_id`+field; prune Diagram trong cùng transaction; `revision+1`.
-- [ ] Reject `base_revision` cũ bằng `workspace_conflict` trên mọi
-      command ghi; reject write trên case locked/unsupported.
+      `row_id`+field; prune **và re-evaluate** Diagram trong cùng
+      transaction; `revision+1`; `render_model` trả về khớp state mới.
+- [ ] Reject `base_revision` khác server (`<` hoặc `>`) bằng
+      `workspace_conflict` trên mọi command ghi; reject write trên case
+      locked/unsupported — `diagram_evaluate` vẫn cho phép khi locked.
 - [ ] Reject `personId` ngoài Stage đã commit
       (`diagram_reference_outside_stage`); chỉ emit `diagram_state`
       version 2.
@@ -653,7 +695,8 @@ Producer (sidecar/backend) PHẢI:
 - [ ] Naming `*_HS-<case_id>[_n].docx`; reservation nội batch; không
       ghi đè; output nằm trong destination.
 - [ ] `word_export_batch`: tất cả lỗi → `word_batch_failed`; cancel →
-      `skipped` cho file chưa bắt đầu, giữ file đã lưu.
+      file chưa bắt đầu `status:skipped` + vào `breakdown.skipped`,
+      giữ file đã lưu; `breakdown` luôn đủ ba list.
 - [ ] Mock backend trả `backend_mode:"mock"` trong `workspace_get`.
 
 Consumer (Electron main/renderer) PHẢI:
@@ -687,3 +730,4 @@ Consumer (Electron main/renderer) PHẢI:
 | Version | Ngày | Thay đổi |
 |---|---|---|
 | v1 (DRAFT) | 24/09/2026 | Publish draft đầu tiên (MIN-105): 7 command `notary.*` cho tab Soạn hồ sơ trên envelope `desktopcommand.v1`; mở rộng FileRef `is_dir`; chờ owner duyệt |
+| v1 (DRAFT, fix r1) | 24/09/2026 | Review round 1: commit re-evaluate + `render_model` non-null; `breakdown.skipped`; conflict khi base_revision `<` hoặc `>`; evaluate được phép trên case locked; registry data-codes `<ns>.<snake>`; `word.no_deceased_landowner`/`word.too_many_signers`; schema nâng normative (if/then intake, status↔file link); `document_type`/`text` siết chặt |

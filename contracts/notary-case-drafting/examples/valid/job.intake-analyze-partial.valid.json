@@ -19,21 +19,21 @@
               "raw_value": "NGUYỄN VĂN AN",
               "normalized_value": "Nguyễn Văn An",
               "observation_state": "normalized",
-              "confidence": 0.97,
+              "confidence": null,
               "source_refs": [{ "page": 1, "box": [12, 40, 300, 64] }]
             },
             "ngay_sinh": {
               "raw_value": "01/01/1950",
               "normalized_value": "1950-01-01",
               "observation_state": "normalized",
-              "confidence": 0.91,
+              "confidence": null,
               "source_refs": [{ "page": 1 }]
             },
             "so_giay_to": {
               "raw_value": "012345678901",
               "normalized_value": "012345678901",
               "observation_state": "normalized",
-              "confidence": 0.99,
+              "confidence": null,
               "source_refs": [{ "page": 1 }]
             },
             "gioi_tinh": {
@@ -61,8 +61,8 @@
             "so_serial": {
               "raw_value": "DD 123456",
               "normalized_value": "DD123456",
-              "observation_state": "normalized",
-              "confidence": 0.88,
+              "observation_state": "inferred",
+              "confidence": 0.62,
               "source_refs": [{ "page": 1 }]
             },
             "dia_chi": {
@@ -76,7 +76,7 @@
               "raw_value": "123",
               "normalized_value": "123",
               "observation_state": "normalized",
-              "confidence": 0.85,
+              "confidence": null,
               "source_refs": [{ "page": 2 }]
             }
           },

@@ -51,10 +51,14 @@
         },
         "diagram": {
           "type": "object",
-          "required": ["state"],
+          "required": ["state", "render_model"],
           "additionalProperties": false,
           "properties": {
-            "state": { "$ref": "common.schema.json#/definitions/diagram_state" }
+            "state": { "$ref": "common.schema.json#/definitions/diagram_state" },
+            "render_model": {
+              "$ref": "common.schema.json#/definitions/render_model",
+              "description": "non-null — re-evaluate trong cùng transaction (contract §6.1)"
+            }
           }
         }
       }

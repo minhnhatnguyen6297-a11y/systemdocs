@@ -1,0 +1,18 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_ws_nf_016",
+  "command_id": "a1b2c3d4-0016-4016-8016-000000000016",
+  "status": "failed",
+  "waiting_on": null,
+  "progress": null,
+  "result": null,
+  "error": {
+    "code": "case_not_found",
+    "message": "Không tìm thấy hồ sơ #9999",
+    "retryable": false,
+    "next_action": null,
+    "job_id": "j_ws_nf_016",
+    "details": { "case_id": 9999 }
+  },
+  "updated_at": "2026-09-24T10:00:00Z"
+}

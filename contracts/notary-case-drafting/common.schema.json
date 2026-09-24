@@ -30,7 +30,8 @@
     },
     "fraction": {
       "type": "string",
-      "pattern": "^\\d+/\\d+$"
+      "pattern": "^\\d+(/\\d+)?$",
+      "description": "\"1/2\" hoặc số nguyên dạng chuỗi \"1\"/\"0\" (engine emit cả hai)"
     },
     "file_ref": {
       "type": "object",
@@ -52,6 +53,16 @@
         "media_type": { "type": "string" },
         "size_bytes": { "type": "integer", "minimum": 0 }
       }
+    },
+    "file_ref_intake": {
+      "description": "FileRef của intake source — file + bắt buộc size_bytes (pre-check §5.2)",
+      "allOf": [
+        { "$ref": "#/definitions/file_ref_file" },
+        {
+          "type": "object",
+          "required": ["size_bytes"]
+        }
+      ]
     },
     "file_ref_dir": {
       "description": "FileRef thư mục — destination của word_export_batch",
@@ -112,7 +123,7 @@
         "row_id", "entity_id", "is_primary", "so_serial", "so_vao_so",
         "so_thua_dat", "so_to_ban_do", "dia_chi", "loai_so",
         "hinh_thuc_su_dung", "thoi_han", "nguon_goc", "ngay_cap",
-        "co_quan_cap", "land_rows"
+        "co_quan_cap"
       ],
       "additionalProperties": false,
       "properties": {
@@ -135,8 +146,9 @@
         "ngay_cap": { "$ref": "#/definitions/date_full" },
         "co_quan_cap": { "$ref": "#/definitions/nullable_string" },
         "land_rows": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/land_row" }
+          "type": ["array", "null"],
+          "items": { "$ref": "#/definitions/land_row" },
+          "description": "null-safe: thiếu/null/[] đều hợp lệ"
         }
       }
     },
@@ -198,12 +210,15 @@
     },
     "breakdown_term": {
       "type": "object",
-      "required": ["kind", "fraction", "sourcePersonId", "viaBranchPersonIds"],
+      "required": ["kind", "fraction"],
       "additionalProperties": false,
       "properties": {
         "kind": { "enum": ["base", "inheritance", "representation"] },
         "fraction": { "$ref": "#/definitions/fraction" },
-        "sourcePersonId": { "type": ["string", "null"] },
+        "sourcePersonId": {
+          "type": ["string", "null"],
+          "description": "optional — term kind=base không có; inheritance có thể thiếu khi via rỗng"
+        },
         "viaBranchPersonIds": {
           "type": "array",
           "items": { "type": "string" }
@@ -383,10 +398,21 @@
       "properties": {
         "source_id": { "$ref": "#/definitions/uuid4" },
         "kind": { "enum": ["image", "pdf", "docx", "xlsx", "text"] },
-        "file_ref": { "$ref": "#/definitions/file_ref_file" },
-        "text": { "type": "string", "maxLength": 100000 }
+        "file_ref": { "$ref": "#/definitions/file_ref_intake" },
+        "text": { "type": "string", "minLength": 1, "maxLength": 100000 }
       },
-      "description": "kind=text: bắt buộc text, cấm file_ref. kind khác: bắt buộc file_ref (có size_bytes), cấm text."
+      "description": "kind=text: bắt buộc text, cấm file_ref. kind khác: bắt buộc file_ref (có size_bytes), cấm text.",
+      "if": {
+        "properties": { "kind": { "const": "text" } }
+      },
+      "then": {
+        "required": ["text"],
+        "not": { "required": ["file_ref"] }
+      },
+      "else": {
+        "required": ["file_ref"],
+        "not": { "required": ["text"] }
+      }
     },
     "error_object": {
       "type": "object",
@@ -434,9 +460,10 @@
         "ready": { "type": "boolean" },
         "block_reason": {
           "enum": [
-            "word.no_assets", "word.no_landowner", "word.no_receiver",
+            "word.no_assets", "word.no_landowner",
+            "word.no_deceased_landowner", "word.no_receiver",
             "word.too_many_assets", "word.too_many_people",
-            "word.template_missing", null
+            "word.too_many_signers", "word.template_missing", null
           ]
         }
       }
@@ -476,7 +503,40 @@
             { "type": "null" }
           ]
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "saved" } } },
+          "then": {
+            "properties": {
+              "actual_filename": { "type": "string" },
+              "output_file": { "$ref": "#/definitions/file_ref_file" },
+              "error": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "const": "failed" } } },
+          "then": {
+            "properties": {
+              "error": {
+                "type": "object",
+                "required": ["code", "message"]
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "const": "skipped" } } },
+          "then": {
+            "properties": {
+              "actual_filename": { "type": "null" },
+              "output_file": { "type": "null" },
+              "error": { "type": "null" }
+            }
+          }
+        }
+      ]
     }
   }
 }

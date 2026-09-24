@@ -40,7 +40,8 @@
       ],
       "breakdown": {
         "succeeded": [],
-        "failed": ["khai_nhan_di_san", "niem_yet"]
+        "failed": ["khai_nhan_di_san", "niem_yet"],
+        "skipped": []
       }
     },
     "warnings": []

@@ -40,7 +40,8 @@
       ],
       "breakdown": {
         "succeeded": ["khai_nhan_di_san", "thoa_thuan_phan_chia"],
-        "failed": []
+        "failed": [],
+        "skipped": []
       }
     },
     "warnings": []
