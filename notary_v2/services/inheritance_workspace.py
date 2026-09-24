@@ -32,11 +32,10 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import text as sa_text
 
-from models import InheritanceCase
 from services.case_workspace import (
     CASE_TYPE_INHERITANCE,
     SCHEMA_VERSION,

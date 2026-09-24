@@ -11,8 +11,9 @@ Backend thật cho `notary.diagram_evaluate` + `notary.diagram_save`
   trước code (TDD): Pool invariant, outside-Stage, owner/Nhận, thế vị,
   xóa assignment → về Pool, revision cũ/mới, locked, evaluate không
   persist, save persist + bump revision, invalid state không persist,
-  strict boolean, V2 wire (legacy field bị reject), spouse heal/conflict,
-  ancestry cycle, concurrent save.
+  strict boolean, V2 wire (legacy field bị reject), concurrent save.
+  (spouse heal/conflict và ancestry cycle được cover ở engine level —
+  `test_inheritance_engine.py` — không có case service-level riêng.)
 - `notary_v2/services/inheritance_workspace.py` (mới) —
   `InheritanceWorkspaceService.evaluate_diagram`/`save_diagram`. Tái dùng
   seam `case_workspace` (compose Stage, revision, payload, participant
