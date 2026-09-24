@@ -213,4 +213,7 @@ COMMANDS = {
     "upload.download_export": _upload("download_export"),
     "upload.prepare": _upload("prepare_upload"),
     "upload.finish_review": _upload("finish_review"),
+    # notary_v2 case workspace — MIN-107 (notary.case-drafting.v1)
+    "notary.workspace_get": _notary("workspace_get"),
+    "notary.workspace_commit_stage": _notary("workspace_commit_stage"),
 }

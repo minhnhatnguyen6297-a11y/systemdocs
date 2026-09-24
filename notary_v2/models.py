@@ -94,6 +94,8 @@ class InheritanceCase(Base):
     ghi_chu          = Column(Text,    nullable=True)
     engine_state_json = Column(Text,   nullable=True)            # JSON state cua engine/sơ đồ thừa kế mới
     case_state_json   = Column(Text,   nullable=True)            # JSON SSoT V2 cho stage/pool/diagram
+    workspace_revision = Column(Integer, nullable=False, default=1, server_default=text("1"))  # revision workspace (notary.case-drafting.v1)
+    updated_at       = Column(DateTime, server_default=func.now(), onupdate=func.now())
     created_at       = Column(DateTime, server_default=func.now())
 
     # Quan hệ

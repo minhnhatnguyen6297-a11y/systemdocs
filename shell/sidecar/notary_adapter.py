@@ -564,3 +564,78 @@ def zalo_status(job, payload):
         })
     finally:
         sess.close()
+
+
+# ---------- Case workspace (MIN-107 — contract notary.case-drafting.v1) ----------
+
+_WORKSPACE_RETRYABLE_CODES = {"workspace_conflict", "stage_validation_error"}
+
+
+def _workspace_command_error(err):
+    """WorkspaceError cua service → CommandError theo contract §9.
+
+    Giu nguyen `code`/`details`; retryable theo contract (conflict va
+    stage_validation_error duoc retry sau khi client doc lai workspace).
+    """
+    code = getattr(err, "code", None) or "workspace_error"
+    message = getattr(err, "message", None) or str(err) or code
+    details = getattr(err, "details", None) or None
+    retryable = code in _WORKSPACE_RETRYABLE_CODES
+    return CommandError(
+        code, message, retryable=retryable,
+        next_action="call notary.workspace_get" if retryable else None,
+        details=details)
+
+
+def _workspace_module():
+    return _svc("case_workspace")
+
+
+def workspace_get(job, payload):
+    """notary.workspace_get — doc workspace + stage + diagram V2."""
+    if not isinstance(payload, dict):
+        payload = {}
+    case_id = _int_id(_require(payload.get("case_id"), "case_id"),
+                      "case_id")
+    sess = _db_session()
+    try:
+        module = _workspace_module()
+        try:
+            data = module.CaseWorkspaceService(sess).get(case_id)
+        except module.WorkspaceError as err:
+            raise _workspace_command_error(err)
+        job.check_cancel()
+        return _result("workspace_get", data)
+    finally:
+        sess.close()
+
+
+def workspace_commit_stage(job, payload):
+    """notary.workspace_commit_stage — commit Stage nguyen tu + revision."""
+    if not isinstance(payload, dict):
+        payload = {}
+    case_id = _int_id(_require(payload.get("case_id"), "case_id"), "case_id")
+    base_revision = _int_id(
+        _require(payload.get("base_revision"), "base_revision"),
+        "base_revision")
+    stage = payload.get("stage")
+    if not isinstance(stage, dict):
+        raise CommandError("validation_error", "stage phai la object")
+    people = stage.get("people")
+    assets = stage.get("assets")
+    if not isinstance(people, list) or not isinstance(assets, list):
+        raise CommandError(
+            "validation_error",
+            "stage.people/stage.assets phai la danh sach")
+    sess = _db_session()
+    try:
+        module = _workspace_module()
+        try:
+            data = module.CaseWorkspaceService(sess).commit_stage(
+                case_id, base_revision, people, assets)
+        except module.WorkspaceError as err:
+            raise _workspace_command_error(err)
+        job.check_cancel()
+        return _result("workspace_commit_stage", data)
+    finally:
+        sess.close()
