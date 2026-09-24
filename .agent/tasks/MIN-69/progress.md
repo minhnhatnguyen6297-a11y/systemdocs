@@ -1,20 +1,27 @@
 # Progress — MIN-69
 
-## Trạng thái: bàn giao kế hoạch — 24/09/2026
+## Trạng thái: triển khai theo kế hoạch — 25/09/2026 (cập nhật)
 
-Linear đang In Review tại lúc đọc; chưa đổi trạng thái issue. Phiên này chưa triển khai code.
+Triển khai tại worktree riêng `D:/systemdocs-min-69`, nhánh `minhnhatnguyen6297/min-69-migrate-uploadaudit-vao-electron` (base `consolidate/monorepo` @ 1abbb20). Quy trình: subagent-driven development — mỗi task có implementer + reviewer + fix loop riêng. Owner duyệt contract khi review nhánh trước merge (user đã chọn "code hết T1–T9").
 
-## Đã làm
+## Tiến độ task (theo kế hoạch)
+
+- **T1 (xong, review sạch):** spec_UI.md + README viết lại theo 2 tab; `contracts/upload-workflow.md` (DRAFT — chờ owner duyệt) + 53 examples + `validate_examples.py` (37 valid pass / 16 invalid reject đúng mã); 17 commands, `workflow_version`, scope/revision guards.
+- **T2 (xong, review sạch):** `upload_lab/providers/` (nam_dinh duy nhất, unknown → `unknown_website`); `shell/sidecar/upload_workspace{,_store}.py` (data root qua `G1_UPLOAD_DATA_DIR`, per-website `websites/<id>/`, SQLite store); `upload_lab/tools/migrate_shell_data.py` (inspect/apply, snapshot+hash verify); `shell/test/test_upload_workspace.py` 27 tests.
+- **T6 (xong, review sạch):** `shell/src/renderer/upload/` 2 tab (Audit Sổ Công Chứng + Quét & Upload Hồ Sơ), state chung `createUploadState/selectTab/acceptScopedResult`, CSS scoped `.upload-lab` full-width, 31 tests mjs mới (70/70 npm test).
+- **T3 (xong, review sạch):** `upload.scan/audit_excel/queue_get` v1 — manifest file của đúng run (binding+sha256, không fallback file mới nhất), audit_id gắn website+khoảng ngày, `classify_scan_records` thật, `_v1_boundary` chuẩn hóa next_action; `test_upload_workflow.py` 21 tests.
+- **T4 (xong):** `_BrowserWorker` wait-state theo job + op-slot `browser_busy` + idle poll snapshot + `_session_lost` reconcile; v1 handlers session_start/confirm_login/session_status/session_close/download_export/staff_options/prepare/finish_review/reconcile; `upload.staff_options` + `upload.reconcile` đăng ký mới; `/health` quảng bá `upload.workflow.v1`; `test_upload_browser_workflow.py` 28 tests qua localhost fake portal (27F+1E RED → GREEN).
+- **T5, T7, T8, T9:** chưa bắt đầu — theo thứ tự plan.
+
+## Đã làm (phiên kế hoạch trước)
 
 - Lập [kế hoạch chuyển đổi](D:/systemdocs/docs/product/plans/2026-09-24-upload-lab-shell-migration-plan.md).
 - Đọc chuỗi launcher: bản Fluent UI/Qt hiện tại là giao diện được run.bat mở.
-- Đối chiếu source với hai manifest codegraph Upload Lab: bản Fluent có 9/38 tệp khác dấu kiểm tra; bản thử nghiệm Electron có 10/53. Graph không còn là bản chụp khớp hoàn toàn.
-- Tạo brief và [handoff](D:/systemdocs/.agent/tasks/MIN-69/handoff.md) để tiếp tục đúng mốc chuẩn.
-
-## Bước tiếp theo
-
-Bắt đầu Task 1 theo handoff; quy ước giao tiếp phải được duyệt trước code phụ thuộc. Giữ nguyên các thay đổi chưa commit ngoài phạm vi.
+- Đối chiếu source với hai manifest codegraph Upload Lab: bản Fluent có 9/38 tệp khác dấu kiểm tra; bản thử nghiệm Electron có 10/53.
+- Tạo brief và [handoff](D:/systemdocs/.agent/tasks/MIN-69/handoff.md).
 
 ## Kiểm chứng và giới hạn
 
-Đã đối chiếu trực tiếp mã nguồn và dấu kiểm tra tệp trong phiên audit trước; chưa chạy ứng dụng, test runtime, launcher tự cài đặt hoặc portal thật. Phiên viết handoff chỉ kiểm tra nội dung và đường dẫn tài liệu. Chưa có commit hoặc bằng chứng nghiệm thu chuyển đổi.
+- Python test env: `D:/systemdocs/notary_v2/venv/Scripts/python.exe` (shell/sidecar), `D:/systemdocs/upload_lab/.venv/Scripts/python.exe` (upload_lab, có PySide6). Baseline xanh trước khi code.
+- Chưa chạy portal thật, chưa đóng gói, chưa chuyển dữ liệu thật — T9/T10 còn lại. Contract vẫn DRAFT chờ owner duyệt.
+- Venv không nằm trong worktree (machine-local ở checkout chính) — implementers dùng đường dẫn tuyệt đối ở trên.

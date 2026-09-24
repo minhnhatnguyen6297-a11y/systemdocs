@@ -21,7 +21,9 @@ from fileref import validate_file_ref
 from jobstore import JobStore
 
 CONTRACT_VERSION = "desktopcommand.v1"
-SUPPORTED_VERSIONS = ["desktopcommand.v1"]
+# desktopcommand.v1 = envelope transport; upload.workflow.v1 = workflow
+# Upload Lab da implement (MIN-69) — client kiem capability qua /health.
+SUPPORTED_VERSIONS = ["desktopcommand.v1", "upload.workflow.v1"]
 ENGINE_VERSION = "g1-shell-sidecar/0.1.0"
 ENGINE_INSTANCE_ID = uuid.uuid4().hex  # doi moi moi lan process start — §5 restart
 

@@ -23,7 +23,7 @@ from dataclasses import asdict, is_dataclass
 from datetime import date as _date, datetime as _datetime
 from pathlib import Path
 
-from errors import CommandError
+from errors import CommandError, error_object
 from engine_roots import engine_root, import_engine_module
 from fileref import existing_file, validate_file_ref
 from jobstore import CancelledByUser
@@ -253,17 +253,26 @@ def session_start(job, payload):
             "engine_unavailable",
             f"khong mo duoc trinh duyet: {exc}", retryable=True) from exc
     job.report_progress(1, 3, "cho dang nhap")
+    ev = worker().register_wait(
+        job.job_id, waiting_on="login", website_id=None, browser_id=None)
     job.set_waiting("login")
-    worker().login_confirmed.clear()
     deadline = time.time() + LOGIN_WAIT_TIMEOUT_S
-    while not worker().login_confirmed.is_set():
-        job.check_cancel()
-        if time.time() > deadline:
-            raise CommandError(
-                "ocr.login_timeout",
-                "het thoi gian cho dang nhap", retryable=True,
-                next_action="upload.session_start lai")
-        time.sleep(0.3)
+    try:
+        while not ev.wait(0.3):
+            job.check_cancel()
+            if not worker().browser_alive():
+                raise CommandError(
+                    "engine_unavailable",
+                    "trinh duyet da dong giua cho dang nhap",
+                    retryable=True)
+            if time.time() > deadline:
+                raise CommandError(
+                    "ocr.login_timeout",
+                    "het thoi gian cho dang nhap", retryable=True,
+                    next_action="upload.session_start lai")
+    finally:
+        worker().unregister_wait(job.job_id)
+    job.check_cancel()
     job.resume()
     job.report_progress(2, 3, "xac nhan dang nhap")
     result = worker().call("poll_manual_login", force=True)
@@ -281,7 +290,7 @@ def session_start(job, payload):
 
 def confirm_login(job, payload):
     """Nguoi dung xac nhan da dang nhap → giai phong job session_start."""
-    worker().login_confirmed.set()
+    worker().release_any_wait("login")
     return _result("session_state", {"login_confirmed": True})
 
 
@@ -291,8 +300,8 @@ def session_close(job, payload):
     except CommandError:
         raise
     except Exception:
-        worker().login_confirmed.set()
-        worker().review_finished.set()
+        worker().release_any_wait("login")
+        worker().release_any_wait("review")
     return _result("session_state", {"closed": True})
 
 
@@ -357,15 +366,25 @@ def prepare_upload(job, payload):
         thu_ky=p.get("thu_ky") or None,
         progress_callback=on_progress)
     job.check_cancel()
-    worker().review_finished.clear()
+    ev = worker().register_wait(
+        job.job_id, waiting_on="review", website_id=None, browser_id=None)
     job.set_waiting("review")
     deadline = time.time() + REVIEW_WAIT_TIMEOUT_S
-    while not worker().review_finished.is_set():
-        job.check_cancel()
-        if time.time() > deadline:
-            raise CommandError("upload.review_timeout",
-                               "het thoi gian cho review", retryable=True)
-        time.sleep(0.5)
+    try:
+        while not ev.wait(0.5):
+            job.check_cancel()
+            if not worker().browser_alive():
+                raise CommandError(
+                    "engine_unavailable",
+                    "trinh duyet da dong giua cho kiem tra",
+                    retryable=True)
+            if time.time() > deadline:
+                raise CommandError(
+                    "upload.review_timeout",
+                    "het thoi gian cho review", retryable=True)
+    finally:
+        worker().unregister_wait(job.job_id)
+    job.check_cancel()
     job.resume()
     pages = worker().call("poll_prepared_pages")
     return _result(
@@ -376,7 +395,7 @@ def prepare_upload(job, payload):
 
 def finish_review(job, payload):
     """Nguoi dung xac nhan da kiem tra xong cac tab → job prepare ket thuc."""
-    worker().review_finished.set()
+    worker().release_any_wait("review")
     return _result("session_state", {"review_finished": True})
 
 
@@ -650,13 +669,14 @@ def _request_hash(payload) -> str:
     ).encode("utf-8")).hexdigest()
 
 
-def _begin_workflow_job(store, job, *, command, website_id, payload):
+def _begin_workflow_job(store, job, *, command, website_id, payload,
+                        **job_fields):
     """Ghi dong workflow_jobs truoc khi engine chay (plan §3.2): recovery
     toi thieu + job non-terminal chan doi website (workflow_busy)."""
     store.upsert_job(
         job.job_id, command_id=job.command_id,
         request_hash=_request_hash(payload), command=command,
-        website_id=website_id, status="running")
+        website_id=website_id, status="running", **job_fields)
 
 
 def _finish_workflow_job(store, job_id, status, **fields):
@@ -1071,3 +1091,953 @@ def upload_queue_get(job, payload):
             int(i) for i in classification.missing_in_excel_record_ids),
     }, source_files=[{"path": str(manifest_path),
                       "scope": "machine_local"}])
+
+
+# =====================================================================
+# upload.workflow.v1 — phien browser, tai so, tung dot chuan bi
+# (MIN-69 task 4 — contract §6.4-§6.8/§6.12/§6.14/§6.15, §7, §8).
+#
+# Nguyen tac:
+# - Moi Playwright call tren upload_session worker thread duy nhat; op
+#   mutating (open/prepare/download/staff/close) chiem op slot — op mutating
+#   thu hai trong luc do bi `browser_busy` thay vi xep hang.
+# - Wait-state THEO JOB: confirm_login/finish_review chi giai phong job
+#   dang cho dung buoc + dung (website_id, browser_id) — wrong_job cho moi
+#   truong hop khac, khong bao gio danh thuc nham.
+# - Status/snapshot doc bo nho do browser thread cap nhat — khong spawn
+#   thread, khong enqueue op, khong tao browser ngam.
+# - Save chi duoc ghi nhan qua POST /api/hoso 2xx (engine xac minh);
+#   tab dong thieu bang chung → needs_reconcile, khong bao gio 'da luu'.
+# =====================================================================
+
+_SESSION_START_V1_KEYS = frozenset({
+    "workflow_version", "website_id", "expected_revision"})
+_CONFIRM_V1_KEYS = frozenset({
+    "workflow_version", "website_id", "browser_id", "target_job_id"})
+_BROWSER_V1_KEYS = frozenset({
+    "workflow_version", "website_id", "browser_id"})
+_DOWNLOAD_V1_KEYS = frozenset({
+    "workflow_version", "website_id", "browser_id",
+    "from_date", "to_date"})
+_STAFF_V1_KEYS = frozenset({
+    "workflow_version", "website_id", "browser_id", "refresh"})
+_PREPARE_V1_KEYS = frozenset({
+    "workflow_version", "website_id", "browser_id", "run_id", "audit_id",
+    "queue_revision", "record_ids", "chunk_size",
+    "cong_chung_vien", "thu_ky"})
+_RECONCILE_V1_KEYS = frozenset({
+    "workflow_version", "website_id", "run_id", "audit_id"})
+
+_STAFF_CACHE_NAME = "uploader_staff_options.json"
+
+
+def _require_browser_id(payload) -> str:
+    bid = payload.get("browser_id")
+    if bid is None:
+        raise CommandError("validation_error", "thieu browser_id")
+    if not isinstance(bid, str) or not bid.strip() or bid != bid.strip():
+        raise CommandError("validation_error",
+                           "browser_id phai la chuoi khong rong")
+    return bid
+
+
+def _require_target_job_id(payload) -> str:
+    target = payload.get("target_job_id")
+    if target is None:
+        raise CommandError("validation_error", "thieu target_job_id")
+    if not isinstance(target, str) or not target.strip() \
+            or target != target.strip():
+        raise CommandError("validation_error",
+                           "target_job_id phai la chuoi khong rong")
+    return target
+
+
+def _require_run_id(payload) -> str:
+    run_id = payload.get("run_id")
+    if run_id is None:
+        raise CommandError("validation_error", "thieu run_id")
+    if not isinstance(run_id, str) or not run_id.strip() \
+            or run_id != run_id.strip():
+        raise CommandError("validation_error",
+                           "run_id phai la chuoi khong rong")
+    return run_id
+
+
+def _optional_audit_id(payload):
+    """audit_id null duoc phep (prepare); '' → validation_error (§3)."""
+    audit_id = payload.get("audit_id")
+    if audit_id == "":
+        raise CommandError("validation_error",
+                           "audit_id: dung null thay chuoi rong")
+    if audit_id is not None and not isinstance(audit_id, str):
+        raise CommandError("validation_error",
+                           "audit_id phai la chuoi khong rong hoac null")
+    return audit_id
+
+
+def _browser_scope(store, website_id, browser_id):
+    """Kiem browser_id ton tai, dang mo, thuoc website va LA phien song
+    hien tai cua worker — truoc moi thao tac browser (contract §3 rule 1)."""
+    rec = store.browser_for(browser_id)
+    if rec is None or rec.get("status") != "open":
+        raise CommandError(
+            "scope_violation",
+            f"browser_id {browser_id!r} khong ton tai hoac da dong")
+    upload_workspace.require_same_website(website_id, rec["website_id"])
+    if worker().browser_id != browser_id:
+        raise CommandError(
+            "scope_violation",
+            f"browser_id {browser_id!r} khong phai phien browser hien tai")
+    return rec
+
+
+def _require_login_confirmed():
+    """Snapshot login phai la authenticated truoc op can phien that."""
+    snap = worker().snapshot()
+    if snap["login"].get("status") != "authenticated":
+        raise CommandError(
+            "upload.login_not_confirmed",
+            "chua xac minh duoc dang nhap tren browser",
+            retryable=True, next_action="login_required")
+
+
+def _wait_for_release(job, ev, *, timeout_s, timeout_code, timeout_msg):
+    """Vong cho chung cua waiting_user: release / cancel / browser chet /
+    timeout — khong mot duong nao khac ket thuc job dang cho."""
+    deadline = time.time() + timeout_s
+    while True:
+        job.check_cancel()
+        released = ev.wait(0.3)
+        if not worker().browser_alive():
+            raise CommandError(
+                "engine_unavailable",
+                "browser da dong hoac mat ket noi trong luc cho",
+                retryable=True, next_action="retry")
+        if released:
+            break
+        if time.time() > deadline:
+            raise CommandError(timeout_code, timeout_msg,
+                               retryable=True, next_action="retry")
+    job.check_cancel()
+    try:
+        job.resume()
+    except CommandError:
+        # Cancel co the dat job vao terminal giua check_cancel va resume —
+        # uu tien huy cua nguoi dung thay vi loi resume.
+        job.check_cancel()
+        raise
+
+
+def _utc_now_z() -> str:
+    from datetime import timezone as _tz
+    return _datetime.now(_tz.utc).isoformat(timespec="seconds").replace(
+        "+00:00", "Z")
+
+
+def _cache_fetched_at(data_dir) -> str | None:
+    """mtime cua uploader_staff_options.json → fetched_at cho cache read."""
+    path = Path(data_dir) / _STAFF_CACHE_NAME
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        return None
+    from datetime import timezone as _tz
+    return _datetime.fromtimestamp(mtime, _tz.utc).isoformat(
+        timespec="seconds").replace("+00:00", "Z")
+
+
+def _run_record_rows(data_dir, run_id):
+    """Rows registry cua run (sqlite truc tiep + close trong finally —
+    cung mau upload_queue_get: registry hu = LOI, khong tra rong)."""
+    batch_scan = import_engine_module("upload_lab", "batch_scan")
+
+    def _read():
+        conn = sqlite3.connect(str(data_dir / "registry.sqlite3"))
+        try:
+            conn.row_factory = sqlite3.Row
+            return batch_scan.fetch_registry_records_for_run(conn, run_id)
+        finally:
+            conn.close()
+
+    return _run_engine(
+        _read,
+        generic=("engine_unavailable", True, "retry",
+                 f"khong doc duoc registry cua run {run_id}"))
+
+
+# ---------- dispatchers (legacy giu nguyen khi khong co workflow_version) --
+
+def session_start_dispatch(job, payload):
+    if isinstance(payload, dict) and "workflow_version" in payload:
+        return upload_session_start_v1(job, payload)
+    return session_start(job, payload)
+
+
+def confirm_login_dispatch(job, payload):
+    if isinstance(payload, dict) and "workflow_version" in payload:
+        return upload_confirm_login_v1(job, payload)
+    return confirm_login(job, payload)
+
+
+def session_status_dispatch(job, payload):
+    if isinstance(payload, dict) and "workflow_version" in payload:
+        return upload_session_status_v1(job, payload)
+    return session_status(job, payload)
+
+
+def session_close_dispatch(job, payload):
+    if isinstance(payload, dict) and "workflow_version" in payload:
+        return upload_session_close_v1(job, payload)
+    return session_close(job, payload)
+
+
+def download_export_dispatch(job, payload):
+    if isinstance(payload, dict) and "workflow_version" in payload:
+        return upload_download_export_v1(job, payload)
+    return download_export(job, payload)
+
+
+def prepare_dispatch(job, payload):
+    if isinstance(payload, dict) and "workflow_version" in payload:
+        return upload_prepare_v1(job, payload)
+    return prepare_upload(job, payload)
+
+
+def finish_review_dispatch(job, payload):
+    if isinstance(payload, dict) and "workflow_version" in payload:
+        return upload_finish_review_v1(job, payload)
+    return finish_review(job, payload)
+
+
+# ---------- upload.session_start (§6.4) ----------
+
+@_v1_boundary
+def upload_session_start_v1(job, payload):
+    """`upload.session_start` versioned → kind session_state.
+
+    Mo Chromium tren website data dir → job waiting_user(login); confirm
+    dung (website, browser, job) moi giai phong; job van kiem trang thai
+    portal that truoc khi succeeded (login_not_confirmed neu chua that).
+    """
+    p = _require_workflow(payload)
+    _require_payload_keys(p, _SESSION_START_V1_KEYS)
+    wid = _require_website(p)
+    expected = _require_revision(p, "expected_revision")
+    store = upload_workspace.open_store()
+    current = store.revision()
+    if expected != current:
+        raise CommandError(
+            "stale_revision",
+            f"expected_revision {expected} != hien tai {current} — "
+            "doc lai workspace_get",
+            retryable=True, next_action="retry")
+    _begin_workflow_job(store, job, command="upload.session_start",
+                        website_id=wid, payload=p)
+    bid = None
+    try:
+        job.report_progress(0, 3, "mo Chromium")
+        _run_engine(
+            lambda: worker().call("open_manual_login",
+                                  website_id=wid, mutating=True),
+            generic=("engine_unavailable", True, "retry",
+                     "khong mo duoc trinh duyet"))
+        bid = worker().browser_id
+        if not bid:
+            raise CommandError(
+                "engine_unavailable",
+                "browser mo len nhung khong co browser_id",
+                retryable=True, next_action="retry")
+        # Browser moi = binding workspace moi → revision tang de client
+        # doc lai (contract §3 rule 2).
+        revision = store.bump_revision()
+        store.upsert_job(job.job_id, browser_id=bid)
+        job.report_progress(1, 3, "cho dang nhap")
+        ev = worker().register_wait(
+            job.job_id, waiting_on="login",
+            website_id=wid, browser_id=bid)
+        try:
+            store.upsert_job(job.job_id, status="waiting_user",
+                             waiting_on="login")
+            job.set_waiting("login")
+            _wait_for_release(
+                job, ev,
+                timeout_s=LOGIN_WAIT_TIMEOUT_S,
+                timeout_code="upload.login_timeout",
+                timeout_msg="het 15 phut cho dang nhap")
+        finally:
+            worker().unregister_wait(job.job_id)
+        job.report_progress(2, 3, "xac nhan dang nhap")
+        result = _run_engine(
+            lambda: worker().call("poll_manual_login",
+                                  website_id=wid, force=True),
+            generic=("engine_unavailable", True, "retry",
+                     "khong doc duoc trang thai dang nhap"))
+        status = str((result or {}).get("status") or "")
+        if status != "authenticated":
+            raise CommandError(
+                "upload.login_not_confirmed",
+                f"trang thai dang nhap: {status or 'khong ro'}",
+                retryable=True, next_action="login_required")
+        options = _run_engine(
+            lambda: worker().call("fetch_staff_options",
+                                  website_id=wid, mutating=True),
+            generic=("engine_unavailable", True, "retry",
+                     "khong doc duoc danh sach nhan su"))
+        _finish_workflow_job(store, job.job_id, "succeeded")
+    except CancelledByUser:
+        _finish_workflow_job(store, job.job_id, "canceled")
+        raise
+    except Exception:
+        _finish_workflow_job(store, job.job_id, "failed")
+        raise
+    job.report_progress(3, 3, "da dang nhap")
+    return _result("session_state", {
+        "workflow_version": WORKFLOW_VERSION,
+        "website_id": wid,
+        "browser_id": bid,
+        "login": {"status": "authenticated",
+                  "checked_at": _utc_now_z()},
+        "staff_options": {
+            "cong_chung_vien": [
+                str(v) for v in (options or {}).get("cong_chung_vien") or []],
+            "thu_ky": [
+                str(v) for v in (options or {}).get("thu_ky") or []],
+            "source": "portal",
+        },
+        "revision": revision,
+    })
+
+
+# ---------- upload.confirm_login / upload.finish_review (§6.5) ----------
+
+def _confirm_or_finish(job, payload, *, waiting_on, result_flag):
+    p = _require_workflow(payload)
+    _require_payload_keys(p, _CONFIRM_V1_KEYS)
+    wid = _require_website(p)
+    bid = _require_browser_id(p)
+    target = _require_target_job_id(p)
+    store = upload_workspace.open_store()
+    _browser_scope(store, wid, bid)
+    released = worker().confirm_wait(
+        target, waiting_on=waiting_on,
+        website_id=wid, browser_id=bid)
+    if not released:
+        raise CommandError(
+            "wrong_job",
+            f"target_job_id khong phai job dang cho "
+            f"'{waiting_on}' tren browser/website nay")
+    return _result("session_state", {
+        "workflow_version": WORKFLOW_VERSION,
+        "website_id": wid,
+        "browser_id": bid,
+        "target_job_id": target,
+        result_flag: True,
+    })
+
+
+@_v1_boundary
+def upload_confirm_login_v1(job, payload):
+    """`upload.confirm_login` versioned — xin xac nhan dang nhap.
+
+    Chi dat event cua dung job dang waiting_on=login; job session_start
+    van phai tu kiem portal that (§6.5)."""
+    return _confirm_or_finish(
+        job, payload, waiting_on="login", result_flag="login_confirmed")
+
+
+@_v1_boundary
+def upload_finish_review_v1(job, payload):
+    """`upload.finish_review` versioned — xong buoc kiem tra tab.
+
+    Giai phong dung job prepare waiting_on=review; KHONG danh dau
+    uploaded_success — saves doc qua session_status (§6.5/§7.7)."""
+    return _confirm_or_finish(
+        job, payload, waiting_on="review", result_flag="review_finished")
+
+
+# ---------- upload.session_status (§6.6) ----------
+
+@_v1_boundary
+def upload_session_status_v1(job, payload):
+    """`upload.session_status` versioned → kind session_state.
+
+    Doc snapshot do browser thread cap nhat lien tuc — KHONG enqueue op,
+    KHONG spawn thread, KHONG tao browser ngam (§7.1/§7.2)."""
+    p = _require_workflow(payload)
+    _require_payload_keys(p, _BROWSER_V1_KEYS)
+    wid = _require_website(p)
+    bid = _require_browser_id(p)
+    store = upload_workspace.open_store()
+    _browser_scope(store, wid, bid)
+    snap = worker().snapshot()
+    return _result("session_state", {
+        "workflow_version": WORKFLOW_VERSION,
+        "website_id": wid,
+        "browser_id": bid,
+        "login": snap["login"],
+        "tabs": snap["tabs"],
+    })
+
+
+# ---------- upload.session_close (§6.7) ----------
+
+@_v1_boundary
+def upload_session_close_v1(job, payload):
+    """`upload.session_close` versioned → kind session_state.
+
+    Poll/reconcile lan cuoi tren browser thread truoc khi dong; tab con
+    mo ma khong xac dinh → needs_reconcile. Khong bao gio tu bam Luu va
+    khong hoan tac save da xac minh (§7.3)."""
+    p = _require_workflow(payload)
+    _require_payload_keys(p, _BROWSER_V1_KEYS)
+    wid = _require_website(p)
+    bid = _require_browser_id(p)
+    store = upload_workspace.open_store()
+    _browser_scope(store, wid, bid)
+    _begin_workflow_job(store, job, command="upload.session_close",
+                        website_id=wid, browser_id=bid, payload=p)
+    try:
+        # Reconcile lan cuoi: _poll_now chay _poll_browser ngay trong
+        # dispatch → snapshot/store moi nhat truoc khi dong (_close cung
+        # xep hang sau no tren cung browser thread).
+        _run_engine(
+            lambda: worker().call("_poll_now", website_id=wid),
+            generic=("engine_unavailable", True, "retry",
+                     "khong doi chieu duoc tab truoc khi dong"))
+        # _close xep hang sau op dang chay (cho no nha browser) va dat
+        # stop event truoc de engine dung som (§7.3).
+        _run_engine(
+            lambda: worker().call("_close", website_id=wid,
+                                  stop_current=True),
+            generic=("engine_unavailable", True, "retry",
+                     "khong dong duoc browser"))
+        # Tab van con mo sau poll cuoi → khong xac dinh → needs_reconcile
+        # (giu run_id de upload.reconcile doi chieu theo dung run).
+        open_ids = store.open_tab_record_ids(wid)
+        if open_ids:
+            run_map = worker().tab_run_map()
+            store.remove_open_tabs(wid, open_ids)
+            for rid in open_ids:
+                store.add_needs_reconcile(
+                    wid, [rid], run_id=run_map.get(rid),
+                    reason="browser dong khi tab chua xac minh Luu")
+        snap = worker().snapshot()
+        _finish_workflow_job(store, job.job_id, "succeeded")
+    except CancelledByUser:
+        _finish_workflow_job(store, job.job_id, "canceled")
+        raise
+    except Exception:
+        _finish_workflow_job(store, job.job_id, "failed")
+        raise
+    return _result("session_state", {
+        "workflow_version": WORKFLOW_VERSION,
+        "website_id": wid,
+        "browser_id": bid,
+        "closed": True,
+        "verified_record_ids": snap["tabs"]["saved_record_ids"],
+        "needs_reconcile_record_ids": store.needs_reconcile_ids(wid),
+    })
+
+
+# ---------- upload.download_export (§6.8) ----------
+
+@_v1_boundary
+def upload_download_export_v1(job, payload):
+    """`upload.download_export` versioned → kind export_download.
+
+    Cung browser cua website; ngay wire ISO → dd/mm/yyyy cho engine o
+    boundary. Chi tra file HOAN TAT (file_ref + sha256 + size) — download
+    gian doan nem loi truoc khi file_ref duoc tra (§6.8/§7.5/§7.6)."""
+    p = _require_workflow(payload)
+    _require_payload_keys(p, _DOWNLOAD_V1_KEYS)
+    wid = _require_website(p)
+    bid = _require_browser_id(p)
+    from_iso = p.get("from_date")
+    to_iso = p.get("to_date")
+    _require_iso_date(from_iso, "from_date")
+    _require_iso_date(to_iso, "to_date")
+    store = upload_workspace.open_store()
+    _browser_scope(store, wid, bid)
+    _require_login_confirmed()
+    _begin_workflow_job(store, job, command="upload.download_export",
+                        website_id=wid, browser_id=bid, payload=p)
+    try:
+        job.report_progress(0, 2, "tai so cong chung")
+        path = _run_engine(
+            lambda: worker().call(
+                "download_contract_book_export",
+                website_id=wid, mutating=True,
+                from_date=_ddmmyyyy_from_iso(from_iso, "from_date"),
+                to_date=_ddmmyyyy_from_iso(to_iso, "to_date")),
+            generic=("engine_unavailable", True, "retry",
+                     "tai export that bai"))
+        job.check_cancel()
+        path = Path(path)
+        if not path.is_file():
+            raise CommandError(
+                "engine_unavailable",
+                "export ket thuc nhung khong thay file tren dia",
+                retryable=True, next_action="retry")
+        job.report_progress(1, 2, "xong")
+        _finish_workflow_job(store, job.job_id, "succeeded")
+    except CancelledByUser:
+        _finish_workflow_job(store, job.job_id, "canceled")
+        raise
+    except Exception:
+        _finish_workflow_job(store, job.job_id, "failed")
+        raise
+    return _result("export_download", {
+        "workflow_version": WORKFLOW_VERSION,
+        "website_id": wid,
+        "file_ref": {
+            "path": str(path),
+            "scope": "machine_local",
+            "sha256": upload_workspace.sha256_file(path),
+            "size_bytes": path.stat().st_size,
+        },
+        "from_date": from_iso,
+        "to_date": to_iso,
+    }, source_files=[{"path": str(path), "scope": "machine_local"}])
+
+
+# ---------- upload.staff_options (§6.12) ----------
+
+@_v1_boundary
+def upload_staff_options_v1(job, payload):
+    """`upload.staff_options` → kind staff_options.
+
+    refresh=false doc cache theo website (co the khong can browser);
+    refresh=true can browser_id da dang nhap, chay tren browser thread.
+    Khong lo credential/cookie/storage state (§7.4)."""
+    p = _require_workflow(payload)
+    _require_payload_keys(p, _STAFF_V1_KEYS)
+    wid = _require_website(p)
+    refresh = p.get("refresh")
+    if not isinstance(refresh, bool):
+        raise CommandError("validation_error", "refresh phai la bool")
+    bid = p.get("browser_id")
+    if bid is not None and not isinstance(bid, str):
+        raise CommandError("validation_error",
+                           "browser_id phai la chuoi khong rong hoac null")
+    if bid == "":
+        raise CommandError("validation_error",
+                           "browser_id: dung null thay chuoi rong")
+    store = upload_workspace.open_store()
+    data_dir = upload_workspace.website_data_dir(wid)
+    provider = upload_workspace.get_provider(wid)
+    if refresh:
+        if bid is None:
+            raise CommandError(
+                "validation_error",
+                "refresh=true can browser_id cua phien da dang nhap")
+        _browser_scope(store, wid, bid)
+        _require_login_confirmed()
+        _begin_workflow_job(store, job, command="upload.staff_options",
+                            website_id=wid, browser_id=bid, payload=p)
+        try:
+            options = _run_engine(
+                lambda: worker().call("fetch_staff_options",
+                                      website_id=wid, mutating=True),
+                generic=("engine_unavailable", True, "retry",
+                         "khong doc duoc danh sach nhan su"))
+            _finish_workflow_job(store, job.job_id, "succeeded")
+        except CancelledByUser:
+            _finish_workflow_job(store, job.job_id, "canceled")
+            raise
+        except Exception:
+            _finish_workflow_job(store, job.job_id, "failed")
+            raise
+        source = "portal"
+        fetched_at = _utc_now_z()
+    else:
+        options = _run_engine(
+            lambda: provider.load_staff_options_cache(data_dir),
+            generic=("engine_unavailable", True, "retry",
+                     "khong doc duoc cache nhan su"))
+        source = "cache"
+        fetched_at = _cache_fetched_at(data_dir)
+    return _result("staff_options", {
+        "workflow_version": WORKFLOW_VERSION,
+        "website_id": wid,
+        "cong_chung_vien": [
+            str(v) for v in (options or {}).get("cong_chung_vien") or []],
+        "thu_ky": [str(v) for v in (options or {}).get("thu_ky") or []],
+        "source": source,
+        "fetched_at": fetched_at,
+    })
+
+
+# ---------- upload.prepare (§6.14) ----------
+
+@_v1_boundary
+def upload_prepare_v1(job, payload):
+    """`upload.prepare` versioned → kind upload_prepare.
+
+    Manifest giai quyet qua binding run→manifest (resolve_run kiem website
+    + file + hash). Backend tinh loai tru tu audit that + needs_reconcile
+    — khong tin danh sach renderer. Dry-run: mo toi da chunk_size tab da
+    dien roi waiting_user(review); Save chi dem khi engine xac minh POST
+    /api/hoso 2xx (poll ghi registry uploaded_success + bo khoi queue).
+    """
+    p = _require_workflow(payload)
+    _require_payload_keys(p, _PREPARE_V1_KEYS)
+    wid = _require_website(p)
+    bid = _require_browser_id(p)
+    run_id = _require_run_id(p)
+    audit_id = _optional_audit_id(p)
+    queue_rev = _require_revision(p, "queue_revision")
+    ids = p.get("record_ids")
+    if not isinstance(ids, list) or not ids:
+        raise CommandError("validation_error",
+                           "record_ids phai la list khong rong")
+    record_ids = []
+    for item in ids:
+        if not isinstance(item, int) or isinstance(item, bool) or item < 1:
+            raise CommandError("validation_error",
+                               "record_ids phai la list int >= 1")
+        if item in record_ids:
+            raise CommandError("validation_error",
+                               "record_ids trung lap")
+        record_ids.append(item)
+    chunk_size = p.get("chunk_size")
+    if not isinstance(chunk_size, int) or isinstance(chunk_size, bool) \
+            or not 1 <= chunk_size <= 30:
+        raise CommandError("validation_error",
+                           "chunk_size phai la int 1..30")
+    for key in ("cong_chung_vien", "thu_ky"):
+        if p.get(key) == "":
+            raise CommandError("validation_error",
+                               f"{key}: dung null thay chuoi rong")
+        if p.get(key) is not None and not isinstance(p[key], str):
+            raise CommandError("validation_error",
+                               f"{key} phai la string/null")
+    cong_chung_vien = p.get("cong_chung_vien")
+    thu_ky = p.get("thu_ky")
+
+    store = upload_workspace.open_store()
+    _browser_scope(store, wid, bid)
+    manifest_path = upload_workspace.resolve_run(wid, run_id, store=store)
+    audit_rec = upload_workspace.resolve_audit(wid, audit_id, store=store)
+    current_qrev = store.queue_revision(run_id)
+    if queue_rev != current_qrev:
+        raise CommandError(
+            "stale_revision",
+            f"queue_revision {queue_rev} != hien tai {current_qrev} — "
+            "doc lai queue_get",
+            retryable=True, next_action="retry")
+    data_dir = upload_workspace.website_data_dir(wid)
+    provider = upload_workspace.get_provider(wid)
+    uploader = import_engine_module("upload_lab", "playwright_uploader")
+    registry_path = data_dir / "registry.sqlite3"
+    if not registry_path.is_file():
+        raise CommandError(
+            "engine_unavailable",
+            f"registry cua website {wid} khong con tren dia — quet lai",
+            retryable=True, next_action="retry")
+    run_rows = _run_record_rows(data_dir, run_id)
+    run_record_ids = {int(r["id"]) for r in run_rows}
+    contract_no_by_id = {
+        int(r["id"]): str(r["contract_no"] or "") for r in run_rows}
+    outside = sorted(set(record_ids) - run_record_ids)
+    if outside:
+        raise CommandError(
+            "scope_violation",
+            f"record_ids khong thuoc run {run_id}: {outside}")
+
+    # --- Backend tinh loai tru (contract §3 rule 4) ---------------------
+    # a) so cong chung da co tren web theo audit that
+    exclude = set()
+    if audit_rec is not None:
+        audit_file = Path(audit_rec["file_path"])
+        if not audit_file.is_file():
+            raise CommandError(
+                "file_not_found",
+                f"file Excel cua audit {audit_rec['audit_id']} khong con "
+                "tren dia — audit lai",
+                retryable=True, next_action="pick_files")
+        bound_hash = audit_rec.get("file_sha256")
+        if bound_hash and \
+                upload_workspace.sha256_file(audit_file) != bound_hash:
+            raise CommandError(
+                "stale_revision",
+                f"file Excel cua audit {audit_rec['audit_id']} da thay "
+                "doi — audit lai",
+                retryable=True, next_action="retry")
+        if not audit_rec.get("from_date") or not audit_rec.get("to_date"):
+            raise CommandError(
+                "validation_error",
+                "audit thieu khoang ngay — audit lai")
+        analysis = _analyze_excel(
+            provider, audit_file,
+            audit_rec["from_date"], audit_rec["to_date"])
+        for row in analysis.display_rows:
+            cn = uploader.normalize_contract_no_for_compare(
+                getattr(row, "contract_no", ""))
+            if cn:
+                exclude.add(cn)
+    # b) ho so can doi chieu giu chan khoi dot chuan bi (§6.15)
+    needs = set(store.needs_reconcile_ids(wid))
+    dropped_needs = sorted(set(record_ids) & needs)
+    for rid in dropped_needs:
+        cn = uploader.normalize_contract_no_for_compare(
+            contract_no_by_id.get(rid, ""))
+        if cn:
+            exclude.add(cn)
+    selected = [rid for rid in record_ids if rid not in needs]
+
+    _require_login_confirmed()
+    _begin_workflow_job(
+        store, job, command="upload.prepare", website_id=wid,
+        browser_id=bid, run_id=run_id, audit_id=audit_id,
+        record_ids=record_ids, payload=p)
+
+    stop = threading.Event()
+    done = threading.Event()
+
+    def _watch_cancel():
+        while not done.is_set():
+            if job._cancel.wait(0.05):
+                stop.set()
+                return
+
+    threading.Thread(target=_watch_cancel, daemon=True).start()
+    try:
+        def on_progress(ev2):
+            job.check_cancel()
+            prepared = int(
+                ev2.get("prepared_count") or ev2.get("prepared") or 0)
+            total = int(ev2.get("filtered_pending")
+                        or ev2.get("total_pending") or 0)
+            job.report_progress(prepared, total or 1,
+                                str(ev2.get("event") or "prepare"))
+
+        job.report_progress(0, 1, "mo tab da dien (dry-run)")
+        summary = _run_engine(
+            lambda: worker().call(
+                "prepare_manifest", manifest_path, stop,
+                website_id=wid, mutating=True, stop_event=stop,
+                selected_record_ids=set(selected),
+                exclude_contract_nos=exclude,
+                cong_chung_vien=cong_chung_vien,
+                thu_ky=thu_ky,
+                chunk_size=chunk_size,
+                progress_callback=on_progress),
+            generic=("engine_unavailable", True, "retry",
+                     "chuan bi ho so that bai"))
+        job.check_cancel()
+        errors = list((summary or {}).get("errors") or [])
+        open_ids = {int(i) for i in
+                    (summary or {}).get("open_record_ids") or []}
+        batch_open = sorted(open_ids & set(selected))
+        if batch_open:
+            store.add_open_tabs(wid, batch_open, run_id=run_id,
+                                browser_id=bid)
+            worker().note_open_tabs(run_id, batch_open)
+        if not batch_open:
+            # Khong con gi de kiem tra (excluded het hoac fail toan bo)
+            # → terminal ngay, KHONG waiting_user.
+            data = _prepare_result_data(
+                wid, bid, run_id, audit_id, record_ids, summary,
+                errors, store)
+            _finish_workflow_job(
+                store, job.job_id, "partial" if errors else "succeeded")
+            return _prepare_result(data, errors)
+        store.upsert_job(job.job_id, status="waiting_user",
+                         waiting_on="review")
+        ev = worker().register_wait(
+            job.job_id, waiting_on="review",
+            website_id=wid, browser_id=bid)
+        try:
+            job.set_waiting("review")
+            _wait_for_release(
+                job, ev,
+                timeout_s=REVIEW_WAIT_TIMEOUT_S,
+                timeout_code="upload.review_timeout",
+                timeout_msg="het 60 phut cho kiem tra tab")
+        finally:
+            worker().unregister_wait(job.job_id)
+        # Reconcile lan cuoi TRUOC khi doc ket qua: save via POST /api/hoso
+        # vua bam co the chua kip mot nhip idle poll — _poll_now bao dam
+        # snapshot/store cap nhat dong bo tren browser thread.
+        _run_engine(
+            lambda: worker().call("_poll_now", website_id=wid),
+            generic=("engine_unavailable", True, "retry",
+                     "khong doi chieu duoc tab sau kiem tra"))
+        data = _prepare_result_data(
+            wid, bid, run_id, audit_id, record_ids, summary,
+            errors, store)
+        _finish_workflow_job(
+            store, job.job_id, "partial" if errors else "succeeded",
+            verified_record_ids=data["saved_record_ids"])
+        return _prepare_result(data, errors)
+    except CancelledByUser:
+        _finish_workflow_job(store, job.job_id, "canceled")
+        raise
+    except Exception:
+        _finish_workflow_job(store, job.job_id, "failed")
+        raise
+    finally:
+        done.set()
+
+
+def _prepare_result_data(wid, bid, run_id, audit_id, record_ids,
+                         summary, errors, store):
+    """Data §6.14 — breakdown tach 'da dien' (prepared) khoi 'da Luu'
+    (saved); saved chi tu snapshot da xac minh cua browser thread."""
+    snap = worker().snapshot()
+    tabs = snap["tabs"]
+    requested = set(record_ids)
+    saved = sorted(set(tabs["saved_record_ids"]) & requested)
+    closed = sorted(set(tabs["closed_record_ids"]) & requested)
+    unknown = sorted(set(tabs["unknown_record_ids"]) & requested)
+    still_open = sorted(set(tabs["open_record_ids"]) & requested)
+    failed_ids = {int(e.get("record_id") or 0) for e in errors}
+    prepared_ids = set(still_open) | set(saved) | set(closed) | set(unknown)
+    succeeded = []
+    for rid in record_ids:
+        if rid in failed_ids or rid not in prepared_ids:
+            continue
+        succeeded.append({
+            "record_id": rid,
+            "stage": "saved" if rid in saved else "prepared",
+        })
+    failed = [{
+        "record_id": int(e.get("record_id") or 0),
+        "stage": "prepared",
+        "code": "upload_failed",
+        "message": str(e.get("error") or ""),
+    } for e in errors]
+    needs_reconcile = sorted(
+        (set(closed) | set(unknown)
+         | (set(store.needs_reconcile_ids(wid, run_id=run_id))
+            & requested)))
+    return {
+        "workflow_version": WORKFLOW_VERSION,
+        "website_id": wid,
+        "browser_id": bid,
+        "run_id": run_id,
+        "audit_id": audit_id,
+        "summary": {
+            "total_requested": len(record_ids),
+            "prepared_count": int((summary or {}).get("prepared_count") or 0),
+            "remaining": int((summary or {}).get("remaining") or 0),
+            "open_record_ids": still_open,
+            "excluded_duplicates": int(
+                (summary or {}).get("excluded_duplicates") or 0),
+        },
+        "breakdown": {"succeeded": succeeded, "failed": failed},
+        "saved_record_ids": saved,
+        "needs_reconcile_record_ids": needs_reconcile,
+    }
+
+
+def _prepare_result(data, errors):
+    """upload_prepare result; co loi tung muc → partial + error code
+    upload.partial_failure (contract §6.14/§8)."""
+    result = _result("upload_prepare", data)
+    if errors:
+        result["partial"] = True
+        result["error"] = error_object(
+            "upload.partial_failure",
+            f"{len(errors)} ho so chuan bi that bai",
+            retryable=True, next_action="retry")
+    return result
+
+
+# ---------- upload.reconcile (§6.15) ----------
+
+@_v1_boundary
+def upload_reconcile_v1(job, payload):
+    """`upload.reconcile` → kind reconcile_report.
+
+    Doi chieu ho so needs_reconcile cua run voi audit MOI (bat buoc):
+    so da thay tren web → verified (registry uploaded_success + mo khoa
+    needs_reconcile); con lai giu cho doi chieu sau. Khong tu gui lai."""
+    p = _require_workflow(payload)
+    _require_payload_keys(p, _RECONCILE_V1_KEYS)
+    wid = _require_website(p)
+    run_id = _require_run_id(p)
+    audit_id = p.get("audit_id")
+    if not isinstance(audit_id, str) or not audit_id.strip():
+        raise CommandError("validation_error",
+                           "reconcile can audit_id (audit moi da nap)")
+    audit_id = audit_id.strip()
+    store = upload_workspace.open_store()
+    upload_workspace.resolve_run(wid, run_id, store=store)
+    audit_rec = upload_workspace.resolve_audit(wid, audit_id, store=store)
+    data_dir = upload_workspace.website_data_dir(wid)
+    provider = upload_workspace.get_provider(wid)
+    uploader = import_engine_module("upload_lab", "playwright_uploader")
+
+    audit_file = Path(audit_rec["file_path"])
+    if not audit_file.is_file():
+        raise CommandError(
+            "file_not_found",
+            f"file Excel cua audit {audit_rec['audit_id']} khong con "
+            "tren dia — audit lai",
+            retryable=True, next_action="pick_files")
+    bound_hash = audit_rec.get("file_sha256")
+    if bound_hash and \
+            upload_workspace.sha256_file(audit_file) != bound_hash:
+        raise CommandError(
+            "stale_revision",
+            f"file Excel cua audit {audit_rec['audit_id']} da thay doi — "
+            "audit lai",
+            retryable=True, next_action="retry")
+    if not audit_rec.get("from_date") or not audit_rec.get("to_date"):
+        raise CommandError("validation_error",
+                           "audit thieu khoang ngay — audit lai")
+    analysis = _analyze_excel(
+        provider, audit_file, audit_rec["from_date"], audit_rec["to_date"])
+    existing = {
+        uploader.normalize_contract_no_for_compare(
+            getattr(row, "contract_no", ""))
+        for row in analysis.display_rows}
+    existing.discard("")
+
+    needs = store.needs_reconcile_ids(wid, run_id=run_id)
+    _begin_workflow_job(store, job, command="upload.reconcile",
+                        website_id=wid, run_id=run_id,
+                        audit_id=audit_id, record_ids=needs, payload=p)
+    try:
+        verified = []
+        if needs:
+            rows = _run_record_rows(data_dir, run_id)
+            cn_by_id = {int(r["id"]): str(r["contract_no"] or "")
+                        for r in rows}
+            for rid in needs:
+                cn = uploader.normalize_contract_no_for_compare(
+                    cn_by_id.get(rid, ""))
+                if cn and cn in existing:
+                    verified.append(rid)
+        if verified:
+            _run_engine(
+                lambda: uploader.finalize_uploaded_records(
+                    verified, working_dir=data_dir),
+                generic=("engine_unavailable", True, "retry",
+                         "khong ghi duoc uploaded_success"))
+            store.clear_needs_reconcile(wid, verified)
+            store.remove_open_tabs(wid, verified)
+            store.bump_queue_revision(run_id)
+        # Audit moi gan vao run (nhu queue_get) de dot sau dung so nay.
+        bound = store.audit_for_run(run_id)
+        if bound is None or bound["audit_id"] != audit_rec["audit_id"]:
+            store.bind_run_audit(run_id, audit_rec["audit_id"])
+            store.bump_queue_revision(run_id)
+        remaining = store.needs_reconcile_ids(wid, run_id=run_id)
+        _finish_workflow_job(store, job.job_id, "succeeded",
+                             verified_record_ids=verified)
+    except CancelledByUser:
+        _finish_workflow_job(store, job.job_id, "canceled")
+        raise
+    except Exception:
+        _finish_workflow_job(store, job.job_id, "failed")
+        raise
+    return _result("reconcile_report", {
+        "workflow_version": WORKFLOW_VERSION,
+        "website_id": wid,
+        "run_id": run_id,
+        "audit_id": audit_id,
+        "verified_record_ids": verified,
+        "needs_reconcile_record_ids": remaining,
+    })
