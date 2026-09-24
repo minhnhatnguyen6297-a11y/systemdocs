@@ -87,6 +87,8 @@ def migrate_inheritance_cases_schema():
         "noi_niem_yet": "VARCHAR(200)",
         "engine_state_json": "TEXT",
         "case_state_json": "TEXT",
+        "workspace_revision": "INTEGER NOT NULL DEFAULT 1",
+        "updated_at": "DATETIME",
     })
     _ensure_table_columns(cur, "inheritance_participants", {
         "parent_customer_id": "INTEGER",
