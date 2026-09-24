@@ -93,3 +93,18 @@
 
 - Branch `minhnhatnguyen6297/min-110-backend-xuat-word-nhieu-van-ban`,
   message: `feat(notary): export independent Word documents as a batch`.
+
+## Trạng thái merge (post-review)
+
+- Review: LGTM (0 Critical/Important; 7 Minor — đã vá tất cả trong
+  `9b63100`): word_path_traversal cho stem `..`/separator; directory
+  cùng tên → `_n`; `taken` discard khi publish fail; strict case_id +
+  reject extra payload keys; ImportError python-docx → job-level
+  `engine_unavailable` retryable; jobstore check_cancel(result) vá race
+  giữa handler-return và finish.
+- Mock parity vá cùng round: `check_cancel(result)` + `word_batch_failed`
+  mang result trên wire; `too_many_signers` = living_landowners +
+  receivers dedupe (khớp word_engine.word_block_reason).
+- Merged vào `consolidate/monorepo` (`1723f1d`) — resolve append-conflict
+  notary_adapter.py + test_notary_adapter_contract.py giữ cả diagram
+  (MIN-109) và word (MIN-110) blocks.

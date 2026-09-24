@@ -119,3 +119,12 @@ EXIT_CODE=0
 - `case_type_unsupported`: guard đã thêm nhưng hiện unreachable vì
   `InheritanceCase` chưa có cột case_type (precedent MIN-108, đã comment
   trong code).
+
+## Trạng thái merge (post-review)
+
+- Review: LGTM (0 Critical/Important; 14 Minor — chủ yếu mock-side
+  fidelity gaps: spouse_conflict đối xứng, hidden node trong estate,
+  unresolvedEstates.eventDate, viaBranchPersonIds optional-absent).
+- Vá nhẹ trước merge: `c0f680c` (unused imports + sửa claim coverage).
+- Merged vào `consolidate/monorepo` (`a6e2177`). Mock parity gaps đã gom
+  vá ở MIN-110 fix round (`9b63100` phần mock).
