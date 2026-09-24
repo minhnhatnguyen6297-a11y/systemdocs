@@ -3,21 +3,23 @@
 Thư mục này chỉ chứa **những gì đã được cả hai bên đồng ý**. Nó không phải nơi
 đề xuất ý tưởng tích hợp.
 
-## Trạng thái: một contract kênh nội bộ đã publish; chưa có contract xuyên-sản-phẩm
+## Trạng thái: hai contract kênh nội bộ đã publish + một draft chờ duyệt; chưa có contract xuyên-sản-phẩm
 
 Ba công cụ nghiệp vụ vẫn **chạy độc lập** — chưa có API giữa chúng, chưa đọc DB
 của nhau, chưa có file trao đổi tự động. Đó là trạng thái của **giai đoạn hiện
 tại**, không phải đích đến: hệ thống sẽ gộp lại và dùng chung database
 ([`../docs/architecture/VISION.md`](../docs/architecture/VISION.md) mục 4).
 
-Đã publish theo lộ trình G1 một máy (owner duyệt 14/09/2026, spec P2):
+Cột **Trạng thái** ghi rõ đã duyệt hay draft — không ngầm coi draft là đã
+publish. `desktopcommand.v1` và `g1.module.v1` đã owner duyệt 14/09/2026
+(spec P2):
 
 | File | Nội dung | Trạng thái |
 |---|---|---|
 | [`desktop-command.md`](./desktop-command.md) | `desktopcommand.v1` — kênh lệnh Electron main ↔ Python sidecar trên một máy: auth, lifecycle, idempotency, waiting_user, error, file_ref machine-scope | APPROVED v1 |
 | [`g1-module-data.md`](./g1-module-data.md) | `g1.module.v1` — shape dữ liệu trong payload/result/error (FileRef, JobResult, ErrorObject, IdentityEvidence, ownership) | APPROVED v1 |
 | [`g1/examples/`](./g1/examples/) + [`g1/validate_examples.py`](./g1/validate_examples.py) | valid/invalid JSON + validator kiểm chứng được | kiểm: `python contracts/g1/validate_examples.py` |
-| [`upload-workflow.md`](./upload-workflow.md) | `upload.workflow.v1` — 17 command `upload.*` giữa shell (module `upload`/Upload Lab) và sidecar: website registry, workspace/scope binding, revision, run→manifest, waiting_user login/review, partial breakdown, compatibility với payload legacy | APPROVED v1 (MIN-69) |
+| [`upload-workflow.md`](./upload-workflow.md) | `upload.workflow.v1` — 17 command `upload.*` giữa shell (module `upload`/Upload Lab) và sidecar: website registry, workspace/scope binding, revision, run→manifest, waiting_user login/review, partial breakdown, compatibility với payload legacy | **DRAFT** — chờ owner duyệt (MIN-69) |
 | [`upload-workflow/examples/`](./upload-workflow/examples/) + [`upload-workflow/validate_examples.py`](./upload-workflow/validate_examples.py) | valid/invalid JSON có `fixture` mô phỏng binding backend + validator kiểm chứng được | kiểm: `python contracts/upload-workflow/validate_examples.py` |
 
 Ba contract trên (`desktopcommand.v1`, `g1.module.v1`, `upload.workflow.v1`)

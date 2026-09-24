@@ -1,7 +1,7 @@
 # Contract: Upload Workflow `v1`
 
-**Version:** `upload.workflow.v1` · **Status:** APPROVED v1 (publish theo plan
-MIN-69, task T1 — 24/09/2026) · **Owner:** `systemdocs` branch
+**Version:** `upload.workflow.v1` · **Status:** DRAFT — chờ owner duyệt
+(soạn theo plan MIN-69, task T1 — 24/09/2026) · **Owner:** `systemdocs` branch
 `electron-system-shell` · **Kênh mang:** `desktopcommand.v1`
 ([`desktop-command.md`](./desktop-command.md)) + shape `g1.module.v1`
 ([`g1-module-data.md`](./g1-module-data.md)) · **Spec UI:**
@@ -78,15 +78,23 @@ codes và quy tắc nghiệp vụ của namespace `upload.*`.
 4. Backend tính danh sách loại trừ (đã có trên web / đã Lưu / cần đối chiếu)
    từ audit và registry thật — không tin danh sách số do renderer tự dựng.
 
-**Quy ước null:** giá trị không có/không áp dụng là `null`; `""` **không hợp
-lệ** thay `null` trên các khóa ID/tham chiếu. `ghi_chu` rỗng là dữ liệu hiển
-thị hợp lệ (ô trống theo MIN-77). Ngày trên wire: ISO `YYYY-MM-DD` hoặc
+**Quy ước null:** `null` = không quan sát được / không áp dụng; `""` **không
+hợp lệ** thay `null` (g1 §6) — cụ thể áp cho các khóa ID/tham chiếu/datetime/
+staff mà validator cưỡng chế (`website_id`, `browser_id`, `run_id`,
+`audit_id`, `target_job_id`, `selected_website_id`,
+`normalized_contract_no`, `cong_chung_vien`, `thu_ky`, `modified_since`,
+`fetched_at`, `checked_at`). Trường văn bản do engine sinh (`ghi_chu`,
+`contract_no`, `so_cong_chung`, `reason`, `last_error`, `guidance`,
+`message`) được phép `""` làm **dữ liệu rỗng** (ô trống theo MIN-77) —
+`""` ở đây mang nghĩa "engine trả về rỗng", khác với "không áp dụng".
+Ngày trên wire: ISO `YYYY-MM-DD` hoặc
 `null`; UI hiển thị `DD/MM/YYYY`; bộ xử lý website đổi sang định dạng portal.
 
 **Khóa cấm:** không key nào trong payload (mọi cấp) được mang tên khớp bộ lọc
-nhạy cảm của `desktop-command.md` §3 — bao gồm **`session_id`** và mọi key
-chứa `session`, `password`, `token`, `credential`, `cookie`, `auth`,
-`storage_state`, `api_key`, `bearer` → `payload_rejected_sensitive_key`.
+11 mẫu của `desktop-command.md` §3 — `password`, `passwd`, `secret`,
+`token`, `credential`, `cookie`, `auth`, `session`, `storage_state`,
+`api_key`, `bearer` (gồm cả **`session_id`**; `authorization`/`authenticator`
+cũng bị chặn theo mẫu `auth`) → `payload_rejected_sensitive_key`.
 Không credential/cookie/token trong payload, result, error.details, log hay
 ví dụ.
 
@@ -314,7 +322,9 @@ data:
 
 Backend giữ binding `audit_id → website + file_ref + khoảng ngày + tập số hợp
 lệ` để phục vụ `queue_get`/`prepare` loại trừ. `ngay` ISO hoặc `null`;
-`ghi_chu` có thể `""`.
+`ghi_chu` có thể `""`. `ghi_chu` ở bảng audit là văn bản do **engine tự định
+nghĩa** (vd `trung_so: ...`) — không chia từ vựng với `ghi_chu` của queue
+ở §6.11.
 
 ### 6.10 `upload.scan` → kind `scan_report`
 
@@ -338,7 +348,9 @@ data:
 
 `manifest_ref` trỏ tới **file** manifest của chính `run_id` — không phải
 thư mục `runs/`, không fallback "file mới nhất". Scan mới tạo run mới; các
-`record_id`/selection của run cũ hết hiệu lực tham chiếu.
+`record_id`/selection của run cũ hết hiệu lực tham chiếu. `contract_no`,
+`reason`, `last_error` trong `records[]` là trường văn bản engine — `""`
+hợp lệ khi không trích được (quy ước null §3).
 
 ### 6.11 `upload.queue_get` → kind `upload_queue`
 
@@ -563,9 +575,12 @@ credential/cookie.
 - Quy ước `fixture`: file JSON có thể mang khối `fixture` — **metadata test,
   không đi trên wire** — mô phỏng binding phía backend (`websites`,
   `workspace`, `browsers`, `runs`, `audits`, `queues`, `waiting_jobs`,
-  `legacy_holds_browser`). Validator dùng nó để kiểm scope/revision/job
-  deterministically. `expected_error` và `fixture` không phải field của
-  envelope.
+  `legacy_holds_browser`). Bên trong `fixture.workspace`, hai khóa trạng thái
+  backend `active_job_ids` và `open_tab_record_ids` (tab đang chờ kiểm tra —
+  trạng thái phía server, **không** nằm trong schema result §6.2) dùng để
+  kích `workflow_busy` của `upload.website_select`. Validator dùng fixture
+  để kiểm scope/revision/job deterministically. `expected_error` và
+  `fixture` không phải field của envelope.
 - Ví dụ phủ: command hợp lệ từng loại; job succeeded/waiting/partial/failed;
   sai website, ID ngoài run, revision cũ, manifest mất, xác nhận sai job,
   partial, browser busy, engine restart (recovery qua `upload.reconcile`),
@@ -607,4 +622,4 @@ Consumer (Electron main/renderer) PHẢI:
 
 | Version | Ngày | Thay đổi |
 |---|---|---|
-| v1 | 24/09/2026 | Publish đầu tiên theo plan MIN-69 (§4) — 17 command, scope/revision, capability + compatibility policy, examples + validator |
+| v1-draft | 24/09/2026 | Draft đầu tiên theo plan MIN-69 (§4) — 17 command, scope/revision, capability + compatibility policy, examples + validator; **chờ owner duyệt** trước khi coi là publish |

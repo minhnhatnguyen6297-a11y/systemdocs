@@ -6,7 +6,9 @@ Quy tắc: mọi *.valid.json phải pass hết rule; mọi *.invalid.json phả
 
 Phạm vi: chỉ ví dụ của luồng `upload.workflow.v1`. Payload không mang
 workflow_version literal là legacy — nằm ngoài validator này (xem
-contracts/upload-workflow.md §2, §9).
+contracts/upload-workflow.md §2, §9). Validator **không** nhận diện legacy
+path: đưa ví dụ legacy vào đây sẽ bị báo `unsupported_workflow_version` —
+đó là hành vi đúng của check v1, không phải lỗi validator.
 
 `fixture` là metadata test (không đi trên wire) mô phỏng binding phía
 backend: websites / workspace / browsers / runs / audits / queues /
@@ -555,6 +557,12 @@ def _check_command(doc, viols):
             and not payload.get("browser_id"):
         viols.append(("validation_error",
                       "refresh=true requires browser_id"))
+    if cmd == "upload.audit_excel":
+        fr = payload.get("file_ref")
+        if isinstance(fr, dict) and isinstance(fr.get("path"), str):
+            if not fr["path"].lower().endswith((".xlsx", ".xlsm")):
+                viols.append(("validation_error",
+                              "file_ref phai la file .xlsx/.xlsm"))
 
     # ---- fixture scope simulation ----
     fx = doc.get("fixture") or {}
@@ -727,6 +735,14 @@ def _check_job(doc, viols):
         bd = (res or {}).get("data", {}).get("breakdown") \
             if isinstance(res, dict) else None
         _check_breakdown(bd, viols)
+        # Contract §6.14: job partial bat buoc kem
+        # error.code == "upload.partial_failure".
+        err2 = doc.get("error")
+        if not isinstance(err2, dict) or \
+                err2.get("code") != "upload.partial_failure":
+            viols.append(("validation_error",
+                          "partial requires error.code "
+                          "upload.partial_failure"))
 
 
 def violations(doc):
