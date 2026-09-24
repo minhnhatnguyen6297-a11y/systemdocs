@@ -6,15 +6,19 @@
 // o day — moi mapping trang thai/vocabulary tap trung mot cho de test.
 
 const NAV_SPEC = [
-  // 7 muc theo spec MIN-32 §1; placeholder van hien, khong an.
-  // id khop module registry (main/registry.js) tru 'overview' la view shell.
-  { id: 'overview', title: 'Tổng quan', registry: null },
-  { id: 'upload', title: 'Upload/Audit', registry: 'upload' },
-  { id: 'document-review', title: 'Hồ sơ', registry: 'document-review' },
-  { id: 'excel-word', title: 'Excel/Word', registry: 'excel-word' },
-  { id: 'office', title: 'Văn phòng', registry: 'office' },
-  { id: 'search', title: 'Tìm kiếm', registry: 'search' },
-  // 'Trạng thái/Cài đặt' gop status + settings (registry §6) trong mot view.
+  // Taxonomy MIN-104 §1 (khoa): 3 module nghiep vu + 2 tien ich shell.
+  // 'document-review' giu lam id ky thuat tuong thich mot chu ky
+  // (registry giu nguyen; command notary.* route qua module do).
+  // 'Excel → Word' khong con tren nav chinh — module excel-word van con
+  // trong registry cho compat (chua xoa command cu).
+  // 'Tổng quan' cu gop vao 'Trạng thái/Cài đặt' (module health + jobs).
+  { id: 'notary_v2', title: 'notary_v2', registry: 'document-review',
+    aliases: ['document-review'] },
+  { id: 'upload', title: 'upload_lab', registry: 'upload' },
+  { id: 'office', title: 'notaryoffice', registry: 'office' },
+  { id: 'search', title: 'Tra cứu', registry: 'search' },
+  // 'Trạng thái/Cài đặt' gop status + settings + health/jobs (tru day
+  // 'Tổng quan' cu) trong mot view.
   { id: 'status', title: 'Trạng thái/Cài đặt', registry: 'status' },
 ];
 
@@ -87,7 +91,9 @@ function unavailableReason(code) {
 
 function navEntry(id) {
   // Nav allowlist: chi muc trong NAV_SPEC duoc route; id la bi tu choi.
-  return NAV_SPEC.find((n) => n.id === id) || null;
+  // aliases giu id ky thuat cu ('document-review') route sang entry moi.
+  return NAV_SPEC.find((n) => n.id === id ||
+    (n.aliases || []).includes(id)) || null;
 }
 
 function moduleFace(mod) {

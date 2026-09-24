@@ -1,0 +1,219 @@
+/* Tab Soạn hồ sơ — visual tokens §1.2 spec (MIN-111).
+   Nen #f3f4f8 · card trang, vien #dfe3e9, radius 16px · rail toi #121418
+   · accent #d9f76a · canh bao #ffe4d6 · control radius 12px · vung bam >=44px */
+
+.cd-root {
+  --cd-bg: #f3f4f8;
+  --cd-card: #ffffff;
+  --cd-border: #dfe3e9;
+  --cd-rail: #121418;
+  --cd-accent: #d9f76a;
+  --cd-warn: #ffe4d6;
+  --cd-ctl-radius: 12px;
+  --cd-card-radius: 16px;
+  --cd-tap: 44px;
+  background: var(--cd-bg);
+  min-height: 100%;
+  margin: -20px -24px;             /* bleed qua padding cua #view */
+  padding: 16px 20px;
+}
+
+#view section.cd-root { max-width: none; }
+
+/* --- local nav (3 tab con cua notary_v2) --- */
+.cd-localnav { display: flex; gap: 8px; margin-bottom: 12px;
+               border-bottom: 1px solid var(--cd-border); }
+.cd-tab { border: none; background: transparent; padding: 0 16px;
+          min-height: var(--cd-tap); border-radius: var(--cd-ctl-radius)
+          var(--cd-ctl-radius) 0 0; font-size: 14px; cursor: pointer; }
+.cd-tab.active { background: var(--cd-accent); color: var(--cd-rail);
+                 font-weight: 600; }
+
+/* --- controls chung --- */
+.cd-btn { min-height: var(--cd-tap); min-width: var(--cd-tap);
+          padding: 0 14px; border: 1px solid var(--cd-border);
+          border-radius: var(--cd-ctl-radius); background: var(--cd-card);
+          font-size: 13px; cursor: pointer; margin-right: 6px; }
+.cd-btn.primary { background: var(--cd-accent); border-color: var(--cd-accent);
+                  color: var(--cd-rail); font-weight: 600; }
+.cd-btn:disabled { opacity: .45; cursor: default; }
+.cd-btn:focus-visible, .cd-input:focus-visible, .cd-textarea:focus-visible,
+.cd-check-row input:focus-visible, .cd-tab:focus-visible,
+.cd-row-head:focus-visible {
+  outline: 3px solid var(--cd-rail); outline-offset: 2px; }
+.cd-input { min-height: var(--cd-tap); padding: 4px 10px;
+            border: 1px solid var(--cd-border);
+            border-radius: var(--cd-ctl-radius); font-size: 13px; }
+.cd-textarea { width: 100%; min-height: 96px; margin-top: 8px; }
+.cd-toolbar { display: flex; gap: 6px; align-items: center;
+              flex-wrap: wrap; margin: 8px 0; }
+.cd-slot { margin: 8px 0; }
+
+/* --- context bar --- */
+.cd-context { display: flex; align-items: center; gap: 10px;
+              flex-wrap: wrap; margin-bottom: 12px; }
+.cd-case-title { font-weight: 600; font-size: 15px; }
+.cd-badge { display: inline-block; border-radius: 10px; padding: 2px 10px;
+            font-size: 12px; font-weight: 600; background: var(--cd-card);
+            border: 1px solid var(--cd-border); }
+.cd-badge-lock { background: var(--cd-warn); border-color: #f0b494; }
+.cd-badge-warn { background: var(--cd-warn); border-color: #f0b494; }
+.cd-badge-ok { background: #dff6dd; border-color: #9ed69a; }
+.cd-badge-err { background: #fde7e9; border-color: #e8a0a7; }
+.cd-save { margin-left: auto; }
+
+/* --- banners --- */
+.cd-mock-banner { background: var(--cd-accent); color: var(--cd-rail);
+                  border-radius: var(--cd-ctl-radius); padding: 8px 14px;
+                  font-weight: 600; margin-bottom: 10px; }
+.cd-warn-banner { background: var(--cd-warn); border: 1px solid #f0b494;
+                  border-radius: var(--cd-ctl-radius); padding: 10px 14px;
+                  margin-bottom: 10px; font-size: 13px; }
+.cd-notice { background: #dff6dd; border: 1px solid #9ed69a;
+             border-radius: var(--cd-ctl-radius); padding: 8px 14px;
+             margin-bottom: 10px; font-size: 13px;
+             display: flex; justify-content: space-between; }
+.cd-error-banner { background: #fde7e9; border: 1px solid #e8a0a7;
+                   border-radius: var(--cd-ctl-radius); padding: 8px 14px;
+                   margin-bottom: 10px; font-size: 13px;
+                   display: flex; justify-content: space-between; }
+.cd-busy { margin: 6px 0; }
+
+/* --- Stage tier: Tai san 36 / Nguoi 64 --- */
+.cd-stage { display: flex; gap: 12px; align-items: flex-start; }
+.cd-card { background: var(--cd-card); border: 1px solid var(--cd-border);
+           border-radius: var(--cd-card-radius); padding: 12px 14px;
+           min-width: 0; }
+.cd-assets { flex: 0 1 36%; }
+.cd-people { flex: 0 1 64%; }
+.cd-card-head { display: flex; align-items: center; gap: 8px;
+                flex-wrap: wrap; margin-bottom: 6px; }
+.cd-card-title { margin: 0; font-size: 14px; flex: 0 0 auto; }
+.cd-card-tools { display: flex; gap: 6px; flex-wrap: wrap;
+                 margin-left: auto; }
+.cd-card-body { min-height: 40px; }
+
+/* --- Stage rows --- */
+.cd-row { border: 1px solid var(--cd-border); border-radius:
+          var(--cd-ctl-radius); margin: 6px 0; position: relative; }
+.cd-row-err { border-color: #a4262c; }
+.cd-row-head { display: flex; width: 100%; min-height: var(--cd-tap);
+               align-items: baseline; gap: 10px; border: none;
+               background: transparent; text-align: left;
+               padding: 8px 40px 8px 12px; cursor: pointer;
+               border-radius: var(--cd-ctl-radius); }
+.cd-row-main { font-weight: 600; }
+.cd-row-meta { font-size: 12px; }
+.cd-row-detail { display: none; padding: 8px 12px 10px;
+                 border-top: 1px dashed var(--cd-border);
+                 flex-wrap: wrap; gap: 8px; }
+.cd-row.open .cd-row-detail { display: flex; }
+.cd-row-errors { padding: 4px 12px; font-size: 12px; }
+.cd-field { display: flex; flex-direction: column; gap: 2px;
+            font-size: 12px; min-width: 150px; }
+.cd-field-check { flex-direction: row; align-items: center;
+                  align-self: end; min-height: var(--cd-tap); }
+.cd-field-check input { width: 20px; height: 20px; }
+.cd-del { position: absolute; top: 4px; right: 4px;
+          min-width: var(--cd-tap); min-height: var(--cd-tap);
+          width: var(--cd-tap); height: var(--cd-tap);
+          padding: 0; border-radius: var(--cd-ctl-radius);
+          border: 1px solid var(--cd-border); background: var(--cd-card);
+          cursor: pointer; color: #a4262c; }
+.cd-dirty-dot { display: inline-block; width: 8px; height: 8px;
+                border-radius: 50%; background: var(--cd-rail);
+                margin-left: 6px; vertical-align: middle; }
+
+/* --- Relation tier: Pool 22 / Diagram 78 --- */
+.cd-rel { display: flex; gap: 12px; margin-top: 12px;
+          align-items: flex-start; }
+.cd-pool { flex: 0 0 22%; }
+.cd-diagram { flex: 1 1 78%; min-width: 0; }
+.cd-pool-card { border: 1px solid var(--cd-border);
+                border-radius: var(--cd-ctl-radius); padding: 8px 10px;
+                margin: 6px 0; display: flex; flex-direction: column;
+                gap: 6px; }
+.cd-pool-card[draggable="true"] { cursor: grab; }
+.cd-pool-label { font-weight: 600; font-size: 13px; }
+.cd-diagram-body { overflow-x: auto; }
+.cd-nodes { display: flex; gap: 10px; flex-wrap: wrap; padding: 4px 0;
+            min-width: min-content; }
+.cd-node { border: 1px solid var(--cd-border); border-radius:
+           var(--cd-ctl-radius); padding: 10px; min-width: 180px;
+           background: var(--cd-bg); }
+.cd-node-deleted { opacity: .4; }
+.cd-node-head { display: flex; flex-direction: column; margin-bottom: 8px; }
+.cd-node-id { font-size: 11px; }
+.cd-node-name { font-weight: 600; }
+.cd-node-flags { display: flex; flex-wrap: wrap; gap: 4px; }
+.cd-node-flags .cd-btn { min-height: var(--cd-tap);
+                         min-width: var(--cd-tap);
+                         padding: 0 10px; font-size: 12px;
+                         margin-right: 0; }
+.cd-node-flags .cd-del { position: static; }
+
+/* --- suggestion tray (intake review) --- */
+.cd-suggest { margin-top: 12px; border: 1px dashed var(--cd-border);
+              border-radius: var(--cd-card-radius); padding: 10px 12px; }
+.cd-suggest-title { font-weight: 600; margin-bottom: 8px; }
+.cd-suggest-card { background: var(--cd-card); border: 1px solid
+                   var(--cd-border); border-radius: var(--cd-ctl-radius);
+                   padding: 8px 10px; margin: 6px 0; }
+.cd-suggest-head { display: flex; gap: 8px; align-items: baseline; }
+.cd-suggest-text { font-size: 12.5px; }
+
+/* --- calc panel (Xem cach tinh — chi doc output engine) --- */
+.cd-calc { border-top: 1px solid var(--cd-border); margin-top: 10px;
+           padding-top: 8px; }
+.cd-calc-status { font-weight: 600; margin-bottom: 8px; }
+.cd-alloc-row { display: flex; gap: 10px; align-items: baseline;
+                padding: 4px 0; border-bottom: 1px dashed var(--cd-border); }
+.cd-alloc-name { min-width: 160px; }
+
+/* --- case list (Tong quan ho so) --- */
+.cd-caselist { display: flex; flex-direction: column; gap: 6px;
+               max-width: 720px; }
+.cd-case-row { display: flex; justify-content: space-between;
+               align-items: center; gap: 12px; min-height: var(--cd-tap);
+               padding: 8px 14px; border: 1px solid var(--cd-border);
+               border-radius: var(--cd-ctl-radius);
+               background: var(--cd-card); cursor: pointer;
+               text-align: left; }
+.cd-case-name { font-weight: 600; }
+.cd-dev { border: 1px dashed #b0b0b0; border-radius:
+          var(--cd-ctl-radius); padding: 8px 10px; margin-top: 12px; }
+.cd-chip { border-radius: 999px; }
+
+/* --- modal --- */
+.cd-modal-backdrop { position: fixed; inset: 0; background:
+                     rgba(0,0,0,.35); display: flex; align-items: center;
+                     justify-content: center; z-index: 30; }
+.cd-modal { background: var(--cd-card); border-radius:
+            var(--cd-card-radius); padding: 18px 20px; width: 560px;
+            max-width: 92vw; max-height: 84vh; overflow: auto;
+            box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+.cd-modal-title { font-weight: 600; margin-bottom: 10px; }
+.cd-menu-item { display: block; width: 100%; text-align: left;
+                min-height: var(--cd-tap); margin: 4px 0;
+                border: 1px solid var(--cd-border);
+                border-radius: var(--cd-ctl-radius);
+                background: var(--cd-bg); cursor: pointer;
+                padding: 0 12px; }
+.cd-check-row { display: flex; align-items: center; gap: 8px;
+                min-height: var(--cd-tap); font-size: 13px; }
+.cd-check-row input { width: 20px; height: 20px; }
+.cd-word-row { display: flex; gap: 8px; align-items: center;
+               padding: 6px 0; border-bottom: 1px solid var(--cd-border);
+               font-size: 13px; flex-wrap: wrap; }
+
+/* --- breakpoint <1000px: Stage cards xep doc; Pool/Diagram giu
+       cuon ngang thay vi ep the qua nho (spec §3) --- */
+@media (max-width: 1000px) {
+  .cd-stage { flex-direction: column; }
+  .cd-assets, .cd-people { flex: 1 1 auto; width: 100%; }
+  .cd-rel { flex-direction: row; }
+  .cd-pool { flex: 0 0 30%; }
+}
+@media (max-width: 800px) {
+  .cd-root { margin: -12px -14px; padding: 12px 14px; }
+}

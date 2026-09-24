@@ -20,10 +20,19 @@ body { margin: 0; font-family: "Segoe UI", sans-serif; color: #1b1b1b; }
 h2 { margin-top: 0; font-size: 18px; }
 h3 { font-size: 14px; margin: 20px 0 8px; }
 button { padding: 6px 14px; margin-right: 8px; border: 1px solid #8a8886;
-         background: #fff; border-radius: 4px; cursor: pointer; }
+         background: #fff; border-radius: 4px; cursor: pointer;
+         min-height: 44px; }
 button.primary { background: #0f6cbd; border-color: #0f6cbd; color: #fff; }
 button.primary.danger { background: #a4262c; border-color: #a4262c; }
 button:disabled { opacity: .5; cursor: default; }
+/* Focus state nhin thay ro (a11y — UX spec MIN-104) */
+button:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid #0f6cbd; outline-offset: 2px; }
+input, select, textarea { min-height: 44px; box-sizing: border-box; }
+input[type="checkbox"], input[type="radio"] { min-height: 0; }
+/* Workspace Soạn hồ sơ can rong hon default 860px (layout 36/64 + 22/78) */
+#view section.cd-root-outer { max-width: none; }
 .file-row { padding: 6px 0; border-bottom: 1px solid #edebe9; font-size: 13px; }
 .tools { margin: 12px 0 6px; }
 .files { margin-top: 8px; }
