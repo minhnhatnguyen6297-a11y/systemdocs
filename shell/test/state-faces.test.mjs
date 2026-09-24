@@ -18,7 +18,7 @@ test('nav spec co dung 7 muc theo thu tu MIN-32 §1', () => {
 });
 
 test('navEntry: id trong allowlist tra entry, ngoai bi tu choi', () => {
-  assert.equal(L.navEntry('upload').title, 'Upload/Audit');
+  assert.equal(L.navEntry('upload').title, 'Upload Lab');
   assert.equal(L.navEntry('__proto__'), null);
   assert.equal(L.navEntry('notary_v2'), null);      // id cu khong hop le
   assert.equal(L.navEntry(''), null);

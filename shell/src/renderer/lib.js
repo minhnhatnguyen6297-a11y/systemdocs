@@ -9,7 +9,7 @@ const NAV_SPEC = [
   // 7 muc theo spec MIN-32 §1; placeholder van hien, khong an.
   // id khop module registry (main/registry.js) tru 'overview' la view shell.
   { id: 'overview', title: 'Tổng quan', registry: null },
-  { id: 'upload', title: 'Upload/Audit', registry: 'upload' },
+  { id: 'upload', title: 'Upload Lab', registry: 'upload' },
   { id: 'document-review', title: 'Hồ sơ', registry: 'document-review' },
   { id: 'excel-word', title: 'Excel/Word', registry: 'excel-word' },
   { id: 'office', title: 'Văn phòng', registry: 'office' },
