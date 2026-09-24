@@ -10,6 +10,7 @@ Rules (contract §2.2, §4):
 
 from __future__ import annotations
 
+import json
 import re
 import unicodedata
 import uuid
@@ -244,6 +245,61 @@ _EXCEL_FIELD_NORMALIZERS = {
     "dia_chi": norm_text,
 }
 
+
+def _land_rows_field(rows_in, refs) -> Optional[dict]:
+    """Emit field `land_rows` khi GCN có ≥2 thửa (I-1).
+
+    - `raw_value`: dạng người đọc được, vd "ONT: 200m2 (Lâu dài); CLN: 247m2".
+    - `normalized_value`: JSON string theo shape `land_row` của
+      common.schema ({loai_dat, dien_tich:number|null, thoi_han}) — wire-legal
+      (field_value chỉ cho string|number|null), commit-side json.loads được.
+    - observation_state = normalized: rows từ parser deterministic, không
+      phải suy luận → confidence null.
+    """
+    if not isinstance(rows_in, list) or len(rows_in) < 2:
+        return None
+    rows: list[dict] = []
+    raw_parts: list[str] = []
+    for r in rows_in:
+        if not isinstance(r, dict):
+            continue
+        loai = clean_ws(r.get("loai_dat")) or None
+        area_text = clean_ws(r.get("dien_tich"))
+        term = clean_ws(r.get("thoi_han")) or None
+        area = None
+        if area_text:
+            num, _, _ = norm_number(area_text)
+            area = num
+        if loai is None and area is None and term is None:
+            continue
+        rows.append({"loai_dat": loai, "dien_tich": area, "thoi_han": term})
+        seg = loai or "Thửa"
+        if area_text:
+            seg += f": {area_text}m2"
+        if term:
+            seg += f" ({term})"
+        raw_parts.append(seg)
+    if len(rows) < 2:
+        return None
+    return field_value(
+        "; ".join(raw_parts),
+        json.dumps(rows, ensure_ascii=False),
+        "normalized",
+        None,
+        refs,
+    )
+
+
+def unsupported_target_code(doc: dict) -> str:
+    """Phân biệt lỗi khi doc không map được (M-1, contract §5.3):
+    doc_type đã nhận diện nhưng không phải person/property (vd marriage)
+    → `intake.unsupported_target`; `unknown`/thiếu → `intake.parse_failed`."""
+    dt = str((doc or {}).get("doc_type") or "")
+    if dt and dt not in ("person", "property", "unknown"):
+        return "intake.unsupported_target"
+    return "intake.parse_failed"
+
+
 _DOC_WARNING_CODES = {
     "missing_front": ("intake.missing_front", "Thiếu ảnh mặt trước CCCD"),
     "missing_back": ("intake.missing_back", "Thiếu ảnh mặt sau CCCD"),
@@ -318,6 +374,7 @@ def doc_to_suggestion(doc: dict, source_id: str, source_ref: dict) -> Optional[d
     refs = [source_ref]
     fields: dict[str, dict] = {}
 
+    extra_warnings: list[dict] = []
     if doc_type == "person":
         for name, normalizer in _PERSON_FIELD_NORMALIZERS.items():
             _emit(fields, name, data.get(name), normalizer, refs)
@@ -330,6 +387,13 @@ def doc_to_suggestion(doc: dict, source_id: str, source_ref: dict) -> Optional[d
             else:
                 _emit(fields, name, data.get(name), normalizer, refs)
         target = "asset"
+        land_field = _land_rows_field(data.get("land_rows"), refs)
+        if land_field is not None:
+            fields["land_rows"] = land_field
+            extra_warnings.append({
+                "code": "intake.multi_parcel",
+                "message": "GCN nhiều thửa — kiểm tra từng thửa trước khi commit",
+            })
     else:
         return None
 
@@ -339,7 +403,8 @@ def doc_to_suggestion(doc: dict, source_id: str, source_ref: dict) -> Optional[d
         source_id=source_id,
         target=target,
         fields=fields,
-        warnings=map_doc_warnings(doc) + _low_confidence_warnings(fields),
+        warnings=(map_doc_warnings(doc) + extra_warnings
+                  + _low_confidence_warnings(fields)),
     )
 
 

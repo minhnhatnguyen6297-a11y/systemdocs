@@ -83,12 +83,32 @@ Worktree `D:\systemdocs-min-108` từ `consolidate/monorepo @6da4eb0`.
 - Engine OCR thiếu key → per-source `ocr.engine_unavailable` (data-code
   `<ns>.<snake>` giống `ocr.analyze`), các nguồn khác vẫn chạy.
 
+## Review fix (b88b191 → fix commit)
+
+- **I-1 land_rows**: `doc_to_suggestion` emit field `land_rows` khi GCN
+  ≥2 thửa — `raw_value` dạng đọc được ("ONT: 200.0m2 (Lâu dài); ..."),
+  `normalized_value` = JSON string theo `land_row` schema
+  (dien_tich number|null), `observation_state=normalized`, refs đúng
+  trang/vùng; warning `intake.multi_parcel` kèm suggestion. Flat fields
+  giữ nguyên (dien_tich sum, loai_dat thửa đầu — do
+  `_fill_property_from_land_rows` pipeline sẵn có).
+- **M-1 unsupported_target**: helper `unsupported_target_code(doc)` —
+  doc_type đã nhận diện nhưng không map person/asset (vd marriage) →
+  `intake.unsupported_target`; unknown/thiếu → `intake.parse_failed`.
+  Áp dụng ở image_ocr/text/docx adapters + pdf (track last_unmapped).
+- **M-3**: comment guard `case_type_unsupported` unreachable tại
+  `intake_analyze` (DB chỉ có InheritanceCase).
+- Tests: 43 passed (`test_document_intake.py`) — thêm
+  `test_land_rows_multi_parcel`, `test_single_parcel_no_land_rows_field`,
+  `test_unsupported_target_vs_parse_failed`; shell 6 passed; validator
+  34/34; output land_rows qua `violations()` = 0.
+
 ## Giới hạn còn lại
 
 - Image/PDF-scan path cần QWEN_API_KEY khi chạy thật (test inject
   `ocr_call`).
-- Doc type pipeline `marriage`/unknown → `intake.parse_failed`
-  (`intake.unsupported_target` chưa có doc type tương ứng trong
-  pipeline hiện trạng).
+- `land_rows` đi dây dưới dạng JSON string trong `normalized_value`
+  (field_value chỉ cho string|number|null) — commit-side phải
+  `json.loads` khi map vào `asset_row.land_rows`.
 - Sidecar test ghi case fixture vào notary.db dev (giống
   test_engine_adapters hiện có).

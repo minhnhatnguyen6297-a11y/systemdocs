@@ -6,7 +6,11 @@ import io
 
 from .. import ocr_pipeline
 from ..models import AdapterContext, SourceFailed, SourceSpec
-from ..normalization import doc_to_suggestion, make_source_ref
+from ..normalization import (
+    doc_to_suggestion,
+    make_source_ref,
+    unsupported_target_code,
+)
 
 
 async def extract(spec: SourceSpec, ctx: AdapterContext) -> list[dict]:
@@ -38,6 +42,6 @@ async def extract(spec: SourceSpec, ctx: AdapterContext) -> list[dict]:
         parsed, spec.source_id, make_source_ref(filename=spec.filename))
     if not suggestion:
         raise SourceFailed(
-            "intake.parse_failed",
+            unsupported_target_code(parsed),
             "không trích được thực thể nào từ DOCX")
     return [suggestion]

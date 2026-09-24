@@ -595,6 +595,9 @@ def intake_analyze(job, payload):
         if case is None:
             raise CommandError("case_not_found",
                                f"khong co ho so #{cid}")
+        # case_type: engine DB hien chi co InheritanceCase nen
+        # case_type_unsupported unreachable — khi case_type thanh column
+        # phai guard tai day (contract §5.3).
         if case.is_locked:
             raise CommandError("workspace_locked",
                                f"ho so #{cid} da khoa")

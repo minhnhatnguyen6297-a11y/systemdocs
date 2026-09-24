@@ -12,6 +12,7 @@ from ..normalization import (
     doc_to_suggestion,
     make_source_ref,
     person_data_to_suggestion,
+    unsupported_target_code,
 )
 
 
@@ -34,6 +35,6 @@ async def extract(spec: SourceSpec, ctx: AdapterContext) -> list[dict]:
     suggestion = doc_to_suggestion(parsed, spec.source_id, span_ref)
     if not suggestion:
         raise SourceFailed(
-            "intake.parse_failed",
+            unsupported_target_code(parsed),
             "không trích được thực thể nào từ text")
     return [suggestion]

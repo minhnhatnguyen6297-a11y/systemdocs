@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import re
+from typing import Optional
 
 from .. import ocr_pipeline
 from ..models import (
@@ -24,6 +25,7 @@ from ..normalization import (
     doc_to_suggestion,
     make_source_ref,
     person_data_to_suggestion,
+    unsupported_target_code,
 )
 from . import check_cancel
 
@@ -98,6 +100,7 @@ async def extract(spec: SourceSpec, ctx: AdapterContext) -> list[dict]:
                 "intake_source_too_large",
                 f"PDF vượt {MAX_PDF_PAGES} trang ({page_count})")
         page_docs: list[tuple[int, dict]] = []
+        last_unmapped: Optional[dict] = None
         for i in range(page_count):
             check_cancel(ctx)
             page = pdf.load_page(i)
@@ -110,6 +113,10 @@ async def extract(spec: SourceSpec, ctx: AdapterContext) -> list[dict]:
                 parsed = await _ocr_page(page, spec, ctx, i + 1)
             if parsed and parsed.get("doc_type") in ("person", "property"):
                 page_docs.append((i + 1, parsed))
+            elif parsed and unsupported_target_code(parsed) == "intake.unsupported_target":
+                # Trang nhận diện được loại nhưng chưa map person/asset
+                # (vd marriage) — ghi nhớ để error code cuối chính xác.
+                last_unmapped = parsed
     finally:
         pdf.close()
 
@@ -141,6 +148,6 @@ async def extract(spec: SourceSpec, ctx: AdapterContext) -> list[dict]:
 
     if not suggestions:
         raise SourceFailed(
-            "intake.parse_failed",
+            unsupported_target_code(last_unmapped or {}),
             "không trích được thực thể nào từ PDF")
     return suggestions

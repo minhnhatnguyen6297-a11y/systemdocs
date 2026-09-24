@@ -91,6 +91,21 @@ DEATH_LINES = [
     "Đã chết vào ngày: 10/11/2020",
 ]
 
+# GCN nhiều thửa — parser thật trích land_rows=[{ONT,200.0,Lâu dài},{CLN,247.0,12/2043}]
+# và fill flat fields: dien_tich=447 (sum), loai_dat=ONT (thửa đầu).
+MULTI_PARCEL_LINES = [
+    "GIẤY CHỨNG NHẬN",
+    "QUYỀN SỬ DỤNG ĐẤT",
+    "Số phát hành (serial): DD 123456",
+    "Số vào sổ: VP00166",
+    "Thửa đất số: 10",
+    "Tờ bản đồ số: 5",
+    "c. Loại đất: Đất ở tại nông thôn 200,0m²; Đất trồng cây lâu năm 247,0m²",
+    "d. Thời hạn sử dụng: Đất ở tại nông thôn: Lâu dài; Đất trồng cây lâu năm: 12/2043",
+    "Địa chỉ: Thôn A, Xã B",
+    "Ngày cấp: 20/05/2010",
+]
+
 
 async def _fake_ocr_image(client, *, api_key, model, image_b64, filename, enable_rotate=False):
     """Trả lines theo tên file — fixture CCCD 2 mặt / GCN / giấy báo tử."""
@@ -569,6 +584,69 @@ class TextAdapterTests(unittest.TestCase):
         outcome = analyze([_text_source(1, "12345")], api_key="k")
         self.assertEqual(outcome.status, "partial")
         self.assertEqual(outcome.errors[0]["code"], "intake.parse_failed")
+
+    def test_land_rows_multi_parcel(self):
+        # I-1: GCN nhiều thửa → field land_rows (JSON normalized_value) +
+        # warning intake.multi_parcel; flat fields vẫn đúng (sum / thửa đầu).
+        import json
+        outcome = analyze(
+            [_text_source(1, "\n".join(MULTI_PARCEL_LINES))], api_key="k")
+        self.assertEqual(outcome.status, "succeeded")
+        sug = outcome.result_data["suggestions"][0]
+        self.assertEqual(sug["target"], "asset")
+
+        land = sug["fields"].get("land_rows")
+        self.assertIsNotNone(land, "thiếu field land_rows cho GCN nhiều thửa")
+        rows = json.loads(land["normalized_value"])
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(
+            rows[0],
+            {"loai_dat": "ONT", "dien_tich": 200, "thoi_han": "Lâu dài"})
+        self.assertEqual(
+            rows[1],
+            {"loai_dat": "CLN", "dien_tich": 247, "thoi_han": "12/2043"})
+        self.assertEqual(land["observation_state"], "normalized")
+        self.assertIsNone(land["confidence"])
+        self.assertTrue(land["raw_value"])
+        self.assertTrue(any("span" in r for r in land["source_refs"]))
+
+        codes = [w["code"] for w in sug["warnings"]]
+        self.assertIn("intake.multi_parcel", codes)
+        # Flat fields không đổi: dien_tich = tổng, loai_dat = thửa đầu.
+        self.assertEqual(sug["fields"]["dien_tich"]["normalized_value"], 447)
+        self.assertEqual(sug["fields"]["loai_dat"]["normalized_value"], "ONT")
+
+    def test_single_parcel_no_land_rows_field(self):
+        # 1 thửa → flat fields đủ, không emit land_rows (field chỉ cho ≥2).
+        lines = [ln for ln in MULTI_PARCEL_LINES
+                 if not ln.startswith(("c.", "d."))]
+        lines.insert(6, "Loại đất: Đất ở tại nông thôn 200,0m²")
+        outcome = analyze([_text_source(1, "\n".join(lines))], api_key="k")
+        sug = outcome.result_data["suggestions"][0]
+        self.assertNotIn("land_rows", sug["fields"])
+        codes = [w["code"] for w in sug["warnings"]]
+        self.assertNotIn("intake.multi_parcel", codes)
+
+    def test_unsupported_target_vs_parse_failed(self):
+        # M-1: doc_type nhận diện được nhưng chưa map person/asset
+        # → intake.unsupported_target (unknown/missing → parse_failed).
+        from services.document_intake import ocr_pipeline
+        orig = ocr_pipeline._normalize_native_ocr_doc
+
+        def _fake_marriage(lines, filename):
+            return {"doc_type": "marriage",
+                    "data": {"vo": "A", "chong": "B"},
+                    "filename": filename}
+
+        ocr_pipeline._normalize_native_ocr_doc = _fake_marriage
+        try:
+            outcome = analyze([_text_source(1, "giay chung nhan ket hon")],
+                              api_key="k")
+        finally:
+            ocr_pipeline._normalize_native_ocr_doc = orig
+        self.assertEqual(outcome.status, "partial")
+        self.assertEqual(
+            outcome.errors[0]["code"], "intake.unsupported_target")
 
 
 class AggregationTests(unittest.TestCase):

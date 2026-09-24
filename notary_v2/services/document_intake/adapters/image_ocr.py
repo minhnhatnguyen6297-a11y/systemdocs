@@ -10,7 +10,11 @@ from pathlib import Path
 
 from .. import ocr_pipeline
 from ..models import AdapterContext, SourceFailed, SourceSpec
-from ..normalization import doc_to_suggestion, make_source_ref
+from ..normalization import (
+    doc_to_suggestion,
+    make_source_ref,
+    unsupported_target_code,
+)
 
 _IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff", ".bmp"}
 
@@ -47,6 +51,6 @@ async def extract(spec: SourceSpec, ctx: AdapterContext) -> list[dict]:
     )
     if not suggestion:
         raise SourceFailed(
-            "intake.parse_failed",
+            unsupported_target_code(doc if isinstance(doc, dict) else {}),
             "không nhận diện được giấy tờ trong ảnh")
     return [suggestion]
