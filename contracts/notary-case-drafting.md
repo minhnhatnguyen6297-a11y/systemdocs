@@ -413,7 +413,7 @@ render_model:                       # null = chưa từng evaluate
   status: invalid | unsupported | incomplete | complete
   allocations:
     <personId>:
-      baseShare: <fraction string, vd "1/2">
+      baseShare: <fraction string, vd "1/2" hoặc "1">
       inheritedShare: <fraction>
       distributedShare: <fraction>
       finalShare: <fraction>
@@ -452,7 +452,8 @@ render_model:                       # null = chưa từng evaluate
 - `allocations` phủ mọi active person (kể cả share `0`); `breakdowns`
   chỉ người có `finalShare > 0`. `unresolvedEstates[].reason` v1 chỉ
   `no_valid_heir`.
-- Fraction biểu diễn chuỗi `"a/b"` — consumer **không** tự tính tỷ lệ;
+- Fraction biểu diễn chuỗi `"a/b"` hoặc số nguyên dạng string
+  (`"1"`, `"0"`) theo output engine — consumer **không** tự tính tỷ lệ;
   `Xem cách tính` chỉ đọc output này (drafting-tab §6).
 
 ### 7.3 Engine error codes
@@ -521,8 +522,8 @@ result.data:
 - Atomic write: validate state → evaluate → persist → `revision+1` →
   commit. State invalid → không persist (`diagram_invalid_state`).
 - Save **không** đổi `stage.people`/`stage.assets` (drafting-tab §6).
-- `base_revision` cũ → `workspace_conflict`; case locked →
-  `workspace_locked`.
+- `base_revision` khác revision server (cả nhỏ hơn lẫn lớn hơn) →
+  `workspace_conflict`; case locked → `workspace_locked`.
 
 ## 8. `notary.word_export_options` + `notary.word_export_batch`
 
@@ -648,7 +649,7 @@ Namespace `notary.*` (snake_case không chấm):
 | `case_not_found` | `case_id` không tồn tại | — |
 | `case_type_unsupported` | `case_type` khác `inheritance` trên command ghi/evaluate/export | `{case_type}` |
 | `workspace_locked` | write trên case `locked` | — |
-| `workspace_conflict` | `base_revision` < revision server | `{server_revision}` |
+| `workspace_conflict` | `base_revision` khác revision server (cả nhỏ hơn lẫn lớn hơn) | `{server_revision}` |
 | `stage_validation_error` | field Stage vi phạm | `{field_errors:[{row_id,field,code,message}]}` |
 | `intake_unsupported_source` | `kind` ngoài enum | `{source_id, kind}` |
 | `intake_source_too_large` | file > 20MB / PDF > 50 trang | `{source_id, limit}` |

@@ -10,9 +10,10 @@ Ghi đến đâu khi làm đến đó.
 - Audit shape thật xong: `.agent/scratch/min-105-audit-stage-diagram.md` + `min-105-audit-engine-word.md`.
 - Viết `contracts/notary-case-drafting.md` (DRAFT, 12 mục): 7 command, ID/ngày/null rules, FileRef `is_dir`, intake limits, diagram state engine v2, Word batch naming/reservation/cancel, bảng error code.
 - `contracts/notary-case-drafting/`: `common.schema.json` + 5 schema command (draft-07).
-- Examples: 17 valid + 12 invalid trong `examples/{valid,invalid}/`.
-- `validate_examples.py` (stdlib-only): **29 files, 0 unexpected outcomes, exit 0**.
+- Examples: 21 valid + 13 invalid trong `examples/{valid,invalid}/`.
+- `validate_examples.py` (stdlib-only): **34 files, 0 unexpected outcomes, exit 0**.
 - `contracts/README.md`: thêm 2 dòng index (DRAFT chờ owner duyệt).
+- Review round 1 (`5730915`): 18 findings I-*/M-* đã fix (schema + doc + fixtures + validator). Re-review residuals: `breakdown.skipped` trong schema, 2 chỗ `workspace_conflict` đồng bộ `!=` revision, fraction `"a/b"` hoặc integer string.
 
 ## Tự khóa cần reviewer kiểm
 - `validation_error` = mã chung cho vi phạm shape không có mã riêng (`confirmed` cấm, `""`-as-null, `is_dir` sai ngữ cảnh) — ngoài list pin.
