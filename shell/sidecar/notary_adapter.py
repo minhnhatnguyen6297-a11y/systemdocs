@@ -774,3 +774,110 @@ def diagram_save(job, payload):
         return _result("diagram_save", data)
     finally:
         sess.close()
+# ---------- word export nhieu van ban (MIN-110, contract §8) ----------
+
+def _word_case_id(payload):
+    """case_id int >= 1 (mock oracle: bool/non-int/<1 → validation_error)."""
+    p = payload if isinstance(payload, dict) else {}
+    raw = _require(p.get("case_id"), "case_id")
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 1:
+        raise CommandError("validation_error", "case_id phai la int >= 1")
+    return raw
+
+
+def _word_case(sess, models, cid, *, writable):
+    """Load case cho word export. Session PHAI mo trong suot batch —
+    build_word_context lazy-load participants/property_links/nguoi_chet."""
+    case = sess.get(models.InheritanceCase, cid)
+    if case is None:
+        raise CommandError("case_not_found", f"khong co ho so #{cid}",
+                           details={"case_id": cid})
+    # case_type_unsupported unreachable: engine DB hien chi co
+    # InheritanceCase (contract §5.3) — guard tai day khi case_type
+    # thanh column.
+    if writable and case.is_locked:
+        raise CommandError("workspace_locked", f"ho so #{cid} da khoa")
+    return case
+
+
+def _word_batch_command_error(err):
+    """WordBatchError cua service → CommandError. word_batch_failed kem
+    result.data (breakdown + per-file errors len wire — §8.4 example)."""
+    retryable = err.code in ("word_batch_failed", "engine_unavailable")
+    result = (_result("word_export_batch", err.result_data)
+              if err.result_data is not None else None)
+    return CommandError(
+        err.code, err.message, retryable=retryable,
+        next_action="retry" if retryable else None,
+        details=err.details, result=result)
+
+
+def word_export_options(job, payload):
+    """notary.word_export_options — catalog + readiness theo case that.
+
+    Read-only: duoc phep tren locked/unsupported (§5.3 chi workspace_get
+    quyet dinh capability) — mock oracle khong _check_writable."""
+    p = payload if isinstance(payload, dict) else {}
+    extra = set(p) - {"case_id"}
+    if extra:
+        raise CommandError("validation_error",
+                           f"payload key la: {sorted(extra)}")
+    cid = _word_case_id(payload)
+    wbe = _svc("word_batch_export")
+    models = _models()
+    sess = _db_session()
+    try:
+        case = _word_case(sess, models, cid, writable=False)
+        data = wbe.export_options(
+            case,
+            resolve_template=lambda _key: _resolve_template(sess, None))
+        job.check_cancel()
+        return _result("word_export_options", data)
+    finally:
+        sess.close()
+
+
+def word_export_batch(job, payload):
+    """notary.word_export_batch — nhieu DOCX doc lap vao destination
+    nguoi dung chon: khong ZIP, khong output mac dinh, KHONG BAO GIO
+    ghi de (open "xb" + reservation noi batch).
+
+    Nghiep vu (catalog, readiness word.*, render, collision naming,
+    per-document saved|failed|skipped) nam trong
+    services.word_batch_export; sidecar chi map case/FileRef va noi
+    job.check_cancel(result)/report_progress/partial vao jobstore.
+    """
+    from fileref import existing_dir
+
+    p = payload if isinstance(payload, dict) else {}
+    extra = set(p) - {"case_id", "document_keys", "destination"}
+    if extra:
+        raise CommandError("validation_error",
+                           f"payload key la: {sorted(extra)}")
+    cid = _word_case_id(payload)
+    wbe = _svc("word_batch_export")
+    models = _models()
+    sess = _db_session()
+    try:
+        case = _word_case(sess, models, cid, writable=True)
+        try:
+            keys = wbe.validate_document_keys(p.get("document_keys"))
+            dest_dir = existing_dir(p.get("destination"))
+            data = wbe.export_batch(
+                case, case_id=cid, document_keys=keys, dest_dir=dest_dir,
+                resolve_template=lambda _key: _resolve_template(sess, None),
+                # Cancel giua batch: pending docs -> skipped trong result
+                # di len wire (contract §8.4 canceled example, MIN-115).
+                check_cancel=lambda d: job.check_cancel(
+                    _result("word_export_batch", d)),
+                report_progress=job.report_progress)
+        except wbe.WordBatchError as exc:
+            raise _word_batch_command_error(exc) from exc
+        # Checkpoint cuoi: cancel o day van mang full result len wire.
+        job.check_cancel(_result("word_export_batch", data))
+        result = _result("word_export_batch", data)
+        if data["breakdown"]["failed"]:
+            result["partial"] = True   # marker jobstore -> status 'partial'
+        return result
+    finally:
+        sess.close()

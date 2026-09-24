@@ -978,7 +978,13 @@ def _word_block_reason(case, document_key):
     assigned = [n for n in nodes if n.get("personId")]
     if len(assigned) > 20:
         return "word.too_many_people"
-    if len(receivers) > 20:
+    # signers = living landowners + receivers, dedupe personId — parity
+    # voi word_engine.word_block_reason (real, MIN-110 review).
+    living_landowners = [n for n in landowners if n not in deceased]
+    signer_ids = {n["personId"]
+                  for n in [*living_landowners, *receivers]
+                  if n.get("personId")}
+    if len(signer_ids) > 20:
         return "word.too_many_signers"
     return None
 
@@ -1112,8 +1118,30 @@ def word_export_batch(job, payload):
     taken = set()
     failed = []
     saved = []
+
+    def _pending_result():
+        """Snapshot result: doc chua bat dau -> skipped — canceled job
+        van mang breakdown.skipped len wire (MIN-115, §8.4 fixture)."""
+        entries = list(docs)
+        remaining = keys[len(entries):]
+        for key in remaining:
+            meta = DOC_CATALOG[key]
+            entries.append({"document_key": key,
+                            "display_name": meta["display_name"],
+                            "status": "skipped", "actual_filename": None,
+                            "output_file": None, "error": None})
+        return _result(
+            "word_export_batch",
+            {"schema_version": SCHEMA_VERSION,
+             "destination": {"path": str(dest_dir),
+                             "scope": "machine_local", "is_dir": True},
+             "documents": entries,
+             "breakdown": {"succeeded": list(saved),
+                           "failed": list(failed),
+                           "skipped": list(remaining)}})
+
     for i, key in enumerate(keys):
-        job.check_cancel()                   # cancel giua batch
+        job.check_cancel(_pending_result())  # cancel giua batch
         meta = DOC_CATALOG[key]
         reason = _word_block_reason(case, key)
         if reason is not None:
@@ -1126,7 +1154,7 @@ def word_export_batch(job, payload):
             failed.append(key)
         else:
             time.sleep(WORD_DOC_DELAY)       # mo phong render docx
-            job.check_cancel()               # truoc khi ghi file
+            job.check_cancel(_pending_result())  # truoc khi ghi file
             name = _reserve_and_write(
                 dest_dir, meta["filename_stem"],
                 int(payload["case_id"]), taken,
@@ -1154,7 +1182,10 @@ def word_export_batch(job, payload):
             details={"documents": [
                 {"document_key": d["document_key"],
                  "code": d["error"]["code"],
-                 "message": d["error"]["message"]} for d in docs]})
+                 "message": d["error"]["message"]} for d in docs]},
+            # result van len wire: breakdown.failed per-file (fixture
+            # job.word-export-batch-all-failed; MIN-115 mechanism).
+            result=_result("word_export_batch", data))
     return _result("word_export_batch", data, partial=bool(failed))
 
 

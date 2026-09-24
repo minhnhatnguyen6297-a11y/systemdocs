@@ -22,19 +22,25 @@ import notary_adapter  # noqa: E402
 from errors import CommandError  # noqa: E402
 
 from database import Base  # noqa: E402
-from models import Customer, InheritanceCase, Property  # noqa: E402
+from models import (Customer, InheritanceCase, InheritanceParticipant,  # noqa: E402
+                    Property)
 import services.case_workspace as case_workspace  # noqa: E402
 import services.inheritance_workspace as inheritance_workspace  # noqa: E402
+import services.word_batch_export as word_batch_export  # noqa: E402
 
 from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 
 
 class _Job:
-    """Stub Job — chi can check_cancel()."""
+    """Stub Job — check_cancel (co the mang result) + report_progress."""
 
-    def check_cancel(self):
+    def check_cancel(self, result=None):
         return None
+
+    def report_progress(self, done, total, label=""):
+        self.progress = {"done": done, "total": total,
+                         "current_label": label}
 
 
 @pytest.fixture()
@@ -46,7 +52,8 @@ def adapter_db(tmp_path, monkeypatch):
     Session = sessionmaker(bind=engine, autoflush=False)
     monkeypatch.setattr(notary_adapter, "_db_session", lambda: Session())
     svc_modules = {"case_workspace": case_workspace,
-                   "inheritance_workspace": inheritance_workspace}
+                   "inheritance_workspace": inheritance_workspace,
+                   "word_batch_export": word_batch_export}
     monkeypatch.setattr(
         notary_adapter, "_svc",
         lambda name: svc_modules.get(name)
@@ -370,3 +377,189 @@ def test_diagram_save_missing_diagram_is_validation_error(adapter_db):
         notary_adapter.diagram_save(
             _Job(), {"case_id": case.id, "base_revision": 2})
     assert exc.value.code == "validation_error"
+
+
+# ------------------------------------- word_export_options/batch (MIN-110)
+
+
+def _seed_word_ready_case(sess, locked=False):
+    """Case du dieu kien xuat Word: chu dat da chet + tai san + nguoi nhan
+    (participants fallback path — khong can case_state_json)."""
+    case, _deceased, _prop = _seed_case(sess, locked=locked)
+    heir = Customer(ho_ten="Nguyen Thi Con")
+    sess.add(heir)
+    sess.flush()
+    sess.add(InheritanceParticipant(
+        ho_so_id=case.id, customer_id=heir.id,
+        vai_tro="Con", co_nhan_tai_san=True, ty_le=100.0))
+    sess.commit()
+    return case
+
+
+def _dest(tmp_path):
+    return {"path": str(tmp_path), "scope": "machine_local", "is_dir": True}
+
+
+def test_registry_wires_word_commands():
+    assert "notary.word_export_options" in reg.COMMANDS
+    assert "notary.word_export_batch" in reg.COMMANDS
+    assert callable(reg.COMMANDS["notary.word_export_options"])
+    assert callable(reg.COMMANDS["notary.word_export_batch"])
+
+
+def test_word_export_options_ready_case(adapter_db):
+    case = _seed_word_ready_case(adapter_db)
+    res = notary_adapter.word_export_options(_Job(), {"case_id": case.id})
+    assert res["kind"] == "word_export_options"
+    data = res["data"]
+    assert data["schema_version"] == "notary.case-drafting.v1"
+    docs = {d["document_key"]: d for d in data["documents"]}
+    assert set(docs) == {"khai_nhan_di_san", "thoa_thuan_phan_chia",
+                       "niem_yet"}
+    assert docs["khai_nhan_di_san"]["ready"] is True
+    assert docs["khai_nhan_di_san"]["block_reason"] is None
+    assert docs["niem_yet"]["ready"] is False
+    assert docs["niem_yet"]["block_reason"] == "word.template_missing"
+
+
+def test_word_export_options_locked_case_still_readonly(adapter_db):
+    # options la read-only — locked case khong bi workspace_locked (§5.3).
+    case = _seed_word_ready_case(adapter_db, locked=True)
+    res = notary_adapter.word_export_options(_Job(), {"case_id": case.id})
+    assert res["data"]["documents"][0]["document_key"]
+
+
+def test_word_export_options_missing_case(adapter_db):
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.word_export_options(_Job(), {"case_id": 9999})
+    assert exc.value.code == "case_not_found"
+
+
+def test_word_export_batch_writes_docx(adapter_db, tmp_path):
+    case = _seed_word_ready_case(adapter_db)
+    res = notary_adapter.word_export_batch(_Job(), {
+        "case_id": case.id,
+        "document_keys": ["khai_nhan_di_san", "thoa_thuan_phan_chia"],
+        "destination": _dest(tmp_path)})
+    assert res["kind"] == "word_export_batch"
+    assert res.get("partial") is not True
+    data = res["data"]
+    assert data["schema_version"] == "notary.case-drafting.v1"
+    assert data["destination"]["is_dir"] is True
+    assert data["breakdown"] == {
+        "succeeded": ["khai_nhan_di_san", "thoa_thuan_phan_chia"],
+        "failed": [], "skipped": []}
+    import docx
+    for d in data["documents"]:
+        assert d["status"] == "saved"
+        assert d["error"] is None
+        assert ".." not in d["actual_filename"]
+        out = Path(d["output_file"]["path"])
+        assert out.parent == tmp_path       # ghi thang vao destination
+        assert out.is_file()
+        docx.Document(str(out))             # DOCX that, mo duoc
+
+
+def test_word_export_batch_collision_suffix(adapter_db, tmp_path):
+    case = _seed_word_ready_case(adapter_db)
+    old = tmp_path / f"Van_ban_khai_nhan_di_san_HS-{case.id}.docx"
+    old.write_bytes(b"cu")
+    res = notary_adapter.word_export_batch(_Job(), {
+        "case_id": case.id,
+        "document_keys": ["khai_nhan_di_san"],
+        "destination": _dest(tmp_path)})
+    d = res["data"]["documents"][0]
+    assert d["actual_filename"] == (
+        f"Van_ban_khai_nhan_di_san_HS-{case.id}_2.docx")
+    assert old.read_bytes() == b"cu"        # khong bao gio ghi de
+
+
+def test_word_export_batch_partial(adapter_db, tmp_path):
+    case = _seed_word_ready_case(adapter_db)
+    res = notary_adapter.word_export_batch(_Job(), {
+        "case_id": case.id,
+        "document_keys": ["khai_nhan_di_san", "niem_yet"],
+        "destination": _dest(tmp_path)})
+    assert res["partial"] is True           # marker jobstore -> partial
+    docs = {d["document_key"]: d for d in res["data"]["documents"]}
+    assert docs["khai_nhan_di_san"]["status"] == "saved"
+    assert docs["niem_yet"]["status"] == "failed"
+    assert docs["niem_yet"]["error"]["code"] == "word.template_missing"
+    assert res["data"]["breakdown"]["failed"] == ["niem_yet"]
+
+
+def test_word_export_batch_all_failed_keeps_result(adapter_db, tmp_path):
+    case = _seed_word_ready_case(adapter_db)
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.word_export_batch(_Job(), {
+            "case_id": case.id,
+            "document_keys": ["niem_yet"],
+            "destination": _dest(tmp_path)})
+    err = exc.value
+    assert err.code == "word_batch_failed"
+    assert err.retryable is True
+    assert err.next_action == "retry"
+    assert err.details["documents"][0]["code"] == "word.template_missing"
+    # Result giu lai tren wire — breakdown + per-file errors (§8.4).
+    assert err.result["kind"] == "word_export_batch"
+    assert err.result["data"]["breakdown"]["failed"] == ["niem_yet"]
+    assert list(tmp_path.glob("*.docx")) == []
+
+
+def test_word_export_batch_validates_before_writing(adapter_db, tmp_path):
+    case = _seed_word_ready_case(adapter_db)
+    # document_keys rong -> word_no_documents_selected
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.word_export_batch(_Job(), {
+            "case_id": case.id, "document_keys": [],
+            "destination": _dest(tmp_path)})
+    assert exc.value.code == "word_no_documents_selected"
+    # key trung / ngoai catalog
+    for keys, code in (
+            (["khai_nhan_di_san", "khai_nhan_di_san"],
+             "word_duplicate_document_key"),
+            (["khong_co"], "word_unknown_document_key"),
+            ("khai_nhan_di_san", "validation_error")):
+        with pytest.raises(CommandError) as exc:
+            notary_adapter.word_export_batch(_Job(), {
+                "case_id": case.id, "document_keys": keys,
+                "destination": _dest(tmp_path)})
+        assert exc.value.code == code, (keys, exc.value.code)
+    assert list(tmp_path.glob("*.docx")) == []  # chua file nao duoc tao
+
+
+def test_word_export_batch_destination_rules(adapter_db, tmp_path):
+    case = _seed_word_ready_case(adapter_db)
+    # is_dir thieu/false -> validation_error
+    for bad in ({"path": str(tmp_path), "scope": "machine_local"},
+                {"path": str(tmp_path), "scope": "machine_local",
+                 "is_dir": False}):
+        with pytest.raises(CommandError) as exc:
+            notary_adapter.word_export_batch(_Job(), {
+                "case_id": case.id, "document_keys": ["khai_nhan_di_san"],
+                "destination": bad})
+        assert exc.value.code == "validation_error"
+    # folder khong ton tai -> file_not_found
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.word_export_batch(_Job(), {
+            "case_id": case.id, "document_keys": ["khai_nhan_di_san"],
+            "destination": _dest(tmp_path / "khong-co")})
+    assert exc.value.code == "file_not_found"
+    # destination tro toi FILE -> file_not_found
+    f = tmp_path / "file.txt"
+    f.write_text("x")
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.word_export_batch(_Job(), {
+            "case_id": case.id, "document_keys": ["khai_nhan_di_san"],
+            "destination": {"path": str(f), "scope": "machine_local",
+                            "is_dir": True}})
+    assert exc.value.code == "file_not_found"
+
+
+def test_word_export_batch_locked_case(adapter_db, tmp_path):
+    case = _seed_word_ready_case(adapter_db, locked=True)
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.word_export_batch(_Job(), {
+            "case_id": case.id, "document_keys": ["khai_nhan_di_san"],
+            "destination": _dest(tmp_path)})
+    assert exc.value.code == "workspace_locked"
