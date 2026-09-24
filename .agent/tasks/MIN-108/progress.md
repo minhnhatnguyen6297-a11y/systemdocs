@@ -112,3 +112,10 @@ Worktree `D:\systemdocs-min-108` từ `consolidate/monorepo @6da4eb0`.
   `json.loads` khi map vào `asset_row.land_rows`.
 - Sidecar test ghi case fixture vào notary.db dev (giống
   test_engine_adapters hiện có).
+
+## Trạng thái merge (post-review)
+
+- Review: Needs fixes → vá `f895461`: emit `land_rows` (JSON string)
+  + warning `intake.multi_parcel`, `intake.unsupported_target`.
+- Merged vào `consolidate/monorepo` (`9c943c0` — resolve append-conflict
+  notary_adapter.py giữ cả workspace+intake blocks).

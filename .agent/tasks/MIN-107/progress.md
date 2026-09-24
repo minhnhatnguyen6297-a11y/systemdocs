@@ -84,3 +84,11 @@ base `consolidate/monorepo` @6da4eb0.
   (test_docs_structure thiếu AGENTS.md/contracts path; test_zalo_inbox* /
   test_zalo_inbox_api batch async) — không liên quan diff này.
 - `python -m compileall` trên các file sửa → OK.
+
+## Trạng thái merge (post-review)
+
+- Review: Needs fixes (HIGH) → vá `5c1073e`: legacy projection đầy đủ
+  role/relationType/label/familyGroupId, guarded UPDATE chống race,
+  sync InheritanceParticipant trong transaction, next_action=retry.
+- Merged vào `consolidate/monorepo` (`059a9fe` + `b528b9e` drop literal
+  registry entries — gateway là đăng ký duy nhất).

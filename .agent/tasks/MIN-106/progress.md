@@ -69,3 +69,12 @@
   (giống real backend MIN-110 sẽ gặp).
 - Mock engine v2 chỉ tính estate đơn giản (1 chủ đất đã chết → chia đều
   willReceive); status invalid/incomplete/complete đủ shape cho UI.
+
+## Trạng thái merge (post-review)
+
+- Review: Needs fixes → đã vá (`fd6c33f` error-code alignment + `open("xb")`).
+- Merged vào `consolidate/monorepo` (`d8898d9` + merge `42c405a`).
+- Gateway `COMMANDS.update` là đăng ký duy nhất cho 7 command; packaged
+  strip `G1_DEV_NOTARY_MOCK`. Test `packaged_dispatch_goes_real` cập nhật
+  sau khi real backend merge (`42c405a`).
+- Platform gap ghi tại MIN-115 (canceled job không mang result).
