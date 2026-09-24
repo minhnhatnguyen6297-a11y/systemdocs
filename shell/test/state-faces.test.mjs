@@ -8,19 +8,27 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const L = require('../src/renderer/lib.js');
 
-test('nav spec co dung 7 muc theo thu tu MIN-32 §1', () => {
+test('nav spec co dung 5 muc theo taxonomy MIN-104 §1', () => {
   assert.deepEqual(L.NAV_SPEC.map((n) => n.id), [
-    'overview', 'upload', 'document-review', 'excel-word',
-    'office', 'search', 'status',
+    'notary_v2', 'upload', 'office', 'search', 'status',
   ]);
   // placeholder van hien trong nav — khong bi an
   assert.ok(L.NAV_SPEC.some((n) => n.id === 'office'));
+  // 'Excel → Word' khong con tren nav chinh (module registry van giu)
+  assert.ok(!L.NAV_SPEC.some((n) => n.id === 'excel-word'));
+  // 'Tổng quan' cu gop vao 'Trạng thái/Cài đặt'
+  assert.ok(!L.NAV_SPEC.some((n) => n.id === 'overview'));
 });
 
 test('navEntry: id trong allowlist tra entry, ngoai bi tu choi', () => {
-  assert.equal(L.navEntry('upload').title, 'Upload/Audit');
+  assert.equal(L.navEntry('upload').title, 'upload_lab');
   assert.equal(L.navEntry('__proto__'), null);
-  assert.equal(L.navEntry('notary_v2'), null);      // id cu khong hop le
+  // id ky thuat cu 'document-review' route sang notary_v2 qua alias
+  // (compat mot chu ky — registry giu nguyen id)
+  assert.equal(L.navEntry('document-review').id, 'notary_v2');
+  assert.equal(L.navEntry('notary_v2').registry, 'document-review');
+  assert.equal(L.navEntry('overview'), null);
+  assert.equal(L.navEntry('excel-word'), null);   // khong con tren nav
   assert.equal(L.navEntry(''), null);
   assert.equal(L.navEntry('../../etc/passwd'), null);
 });

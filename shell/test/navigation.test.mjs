@@ -21,7 +21,7 @@ test('moi muc nav engine/placeholder deu co module trong registry', () => {
   const mods = listModules();
   const ids = new Set(mods.map((m) => m.id));
   for (const n of L.NAV_SPEC) {
-    if (n.registry === null) continue;            // overview la view shell
+    if (n.registry === null) continue;            // muc view shell thuan tuy
     assert.ok(ids.has(n.registry),
       `nav ${n.id} tro toi module khong ton tai: ${n.registry}`);
   }
@@ -29,6 +29,26 @@ test('moi muc nav engine/placeholder deu co module trong registry', () => {
   const office = mods.find((m) => m.id === 'office');
   assert.equal(office.status, 'unavailable');
   assert.equal(office.reason, 'not_implemented');
+});
+
+test('taxonomy MIN-111: compat giu, zalo ra khoi registry/nav', () => {
+  const mods = listModules();
+  const ids = new Set(mods.map((m) => m.id));
+  // id ky thuat cu 'document-review' con — nav 'notary_v2' tro vao
+  assert.ok(ids.has('document-review'));
+  assert.equal(L.navEntry('document-review').id, 'notary_v2');
+  // module 'excel-word' con trong registry cho compat command word.*,
+  // nhung khong con muc nav nao tro toi
+  assert.ok(ids.has('excel-word'));
+  assert.ok(!L.NAV_SPEC.some((n) => n.registry === 'excel-word'));
+  // namespace zalo da tach khoi registry (MIN-103) — khong module nao giu
+  for (const m of mods) {
+    assert.ok(!m.namespaces.includes('zalo'),
+      `module ${m.id} con namespace zalo`);
+  }
+  // nav khong con muc overview/excel-word cu
+  assert.ok(!L.NAV_SPEC.some((n) => n.id === 'overview'));
+  assert.ok(!L.NAV_SPEC.some((n) => n.id === 'excel-word'));
 });
 
 test('module registry khong co muc nao "mo app legacy ben ngoai"', () => {
@@ -128,7 +148,7 @@ test('submitCommand van tu choi command ngoai module allowlist', async () => {
     logger: { error() {} },
   };
   for (const cmd of ['shell.exec', 'office.run', 'excel.macro',
-                     'legacy.launch']) {
+                     'legacy.launch', 'zalo.status']) {
     const r = await HANDLERS['desktop.v1.submitCommand'](
       deps, { command: cmd, payload: {} });
     assert.equal(r.ok, false, cmd);

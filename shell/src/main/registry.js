@@ -1,8 +1,12 @@
 'use strict';
 
-// Module registry theo spec §6 — 7 muc, office la placeholder.
+// Module registry theo spec §6 + taxonomy MIN-104/MIN-111.
 // capabilities = command namespace sidecar ma module dung; 'shell' = xu ly
 // trong Electron main (khong goi sidecar).
+// 'document-review' giu lam id ky thuat tuong thich mot chu ky — nav moi
+// goi 'notary_v2' (lib.NAV_SPEC alias). 'excel-word' giu cho compat command
+// word.*, khong con tren nav chinh. Namespace 'zalo' da tach (MIN-103) —
+// khong con trong registry.
 
 const MODULES = [
   {
@@ -15,7 +19,7 @@ const MODULES = [
   {
     id: 'document-review',
     title: 'notary_v2',
-    namespaces: ['notary', 'ocr', 'zalo', 'file', 'diag'],
+    namespaces: ['notary', 'ocr', 'file', 'diag'],
     kind: 'engine',
     status: 'available',
   },

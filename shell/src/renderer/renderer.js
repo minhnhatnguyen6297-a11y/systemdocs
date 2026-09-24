@@ -29,7 +29,7 @@ const moduleList = document.getElementById('module-list');
 let modules = [];
 let modulesById = {};
 let sidecarStatus = { state: 'starting' };
-let activeId = 'overview';
+let activeId = 'notary_v2';
 
 const views = new Map();       // nav id -> {el, refresh(), scroll}
 const jobs = new Map();        // job_id -> snapshot (desktopcommand.v1)
@@ -306,27 +306,6 @@ function healthTableEl() {
 
 // ---------- module views ----------
 
-function buildOverview() {
-  const s = el('section');
-  s.append(el('h2', '', 'Tổng quan'));
-  const conn = el('div', 'slot');
-  s.append(conn);
-  s.append(el('h3', '', 'Module'));
-  const health = el('div', 'slot');
-  s.append(health);
-  s.append(el('h3', '', 'Job'));
-  const jobsBox = el('div', 'slot');
-  s.append(jobsBox);
-  return {
-    el: s,
-    refresh() {
-      conn.innerHTML = ''; conn.append(connCardEl());
-      health.innerHTML = ''; health.append(healthTableEl());
-      renderJobs(jobsBox, null);
-    },
-  };
-}
-
 function buildEngineView(entry, mod) {
   const s = el('section');
   s.append(el('h2', '',
@@ -478,6 +457,34 @@ function resultData(jobMapEntry, command) {
       ['succeeded', 'partial'].includes(j.status) && j.result)
     .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
   return list.length ? list[0].result.data : null;
+}
+
+// ---------- command client seam cho case-drafting model (MIN-111) ----------
+// Model nhan client inject: run(command, payload) → cho job toi terminal,
+// tra {ok:true,data}|{ok:false,error}. Runtime noi that o MIN-112; seam
+// nay chay duoc ngay voi mock backend (G1_DEV_NOTARY_MOCK=1).
+function makeCommandRunner() {
+  return {
+    async run(command, payload) {
+      const job = await submit(command, payload, crypto.randomUUID());
+      if (!job) {
+        return { ok: false, error: { code: 'submit_failed',
+          message: 'không gửi được command', retryable: true } };
+      }
+      const final = await awaitJob(job.job_id, 300000);
+      if (!final) {
+        return { ok: false, error: { code: 'engine_unavailable',
+          message: 'job không phản hồi', retryable: true } };
+      }
+      if (final.status === 'succeeded' || final.status === 'partial') {
+        return { ok: true, data: (final.result && final.result.data) || {},
+                 partial: final.status === 'partial', job: final };
+      }
+      return { ok: false, job: final,
+               error: final.error || { code: final.status,
+                 message: `job ${final.status}`, retryable: false } };
+    },
+  };
 }
 
 function openPathBtn(path, label) {
@@ -707,349 +714,47 @@ function buildUploadView(entry, mod) {
   };
 }
 
-// ---------- notary_v2 view (MIN-68) ----------
+// ---------- notary_v2 view — tab Soạn hồ sơ (MIN-111) ----------
+// Local nav: Tổng quan hồ sơ / Soạn hồ sơ / Word (taxonomy spec §1).
+// Chi Soạn hồ sơ co noi dung task nay; model giu state, view render tu
+// model.state. Khong Zalo, khong input ID ky thuat trong production view.
 
-function buildDocReviewView(entry, mod) {
-  const s = el('section');
-  s.append(el('h2', '', `${entry.title} (${mod ? mod.title : entry.id})`));
+function buildNotaryView(entry, mod) {
+  const runner = makeCommandRunner();
+  const model = window.G1_NOTARY_MODEL.createModel({ client: runner });
+  const view = window.G1_NOTARY_VIEW.createNotaryModuleView({
+    model,
+    lib: L,
+    notify,
+    confirm: confirmModal,
+    pickFiles: (opts) => api.pickFiles(opts),
+    openPath: (p) => api.openPath(p),
+    runCommand: runner.run.bind(runner),
+  });
+  const s = el('section', 'cd-root-outer');
   const eng = el('div', 'slot');
   s.append(eng);
-  s.append(el('div', 'muted',
-    'Engine: notary_v2 @ codex/zalo-document-inbox-v2 — DB/Word/OCR/Zalo ' +
-    'do Python so huu. Du lieu chua confirm khong thanh truth.'));
-
-  const ctx = { caseId: null, images: [] };
-
-  // --- Ho so thua ke ---
-  const caseSec = el('details', 'biz-sec');
-  caseSec.open = true;
-  caseSec.append(el('summary', '', 'Hồ sơ thừa kế'));
-  const caseRow = el('div', 'tools');
-  const loadCases = el('button', 'primary', 'Tải danh sách');
-  const caseQ = inputEl('lọc theo từ khóa');
-  caseRow.append(loadCases, caseQ);
-  caseSec.append(caseRow);
-  const caseOut = el('div', 'slot');
-  caseSec.append(caseOut);
-  const detailOut = el('div', 'slot');
-  caseSec.append(detailOut);
-  s.append(caseSec);
-
-  loadCases.onclick = () =>
-    submit('notary.case_list', { query: caseQ.value.trim() },
-      crypto.randomUUID());
-
-  function caseDetailCard(d) {
-    const card = el('div', 'kv-card');
-    const kv = el('div', 'kv');
-    const row = (k, v) => {
-      kv.append(el('span', 'kv-k', k));
-      kv.append(el('span', 'kv-v', v));
-    };
-    row('Hồ sơ', `#${d.id} — ${d.loai_van_ban} (${d.trang_thai})`);
-    row('Người chết', d.nguoi_chet ? d.nguoi_chet.ho_ten : '—');
-    row('Tài sản', d.tai_san
-      ? `${d.tai_san.so_serial} — ${d.tai_san.dia_chi}` : '—');
-    row('Ngày lập', d.ngay_lap_ho_so || '—');
-    row('Nơi niêm yet', d.noi_niem_yet || '—');
-    row('Tổng tỷ lệ', `${d.tong_ty_le ?? 0}%`);
-    card.append(kv);
-    if (d.participants && d.participants.length) {
-      card.append(el('h4', '', `Đương sự (${d.participants.length})`));
-      card.append(tableEl([
-        { key: 'ho_ten', label: 'Họ tên',
-          fmt: (p) => p.customer ? p.customer.ho_ten : '—' },
-        { key: 'vai_tro', label: 'Vai trò' },
-        { key: 'hang_thua_ke', label: 'Hàng' },
-        { key: 'co_nhan_tai_san', label: 'Nhận TS',
-          fmt: (p) => p.co_nhan_tai_san ? 'có' : 'từ chối' },
-        { key: 'ty_le', label: 'Tỷ lệ %' },
-      ], d.participants));
-    }
-    const btnRow = el('div', 'tools');
-    const exportBtn = el('button', 'primary', 'Xuất Word');
-    exportBtn.onclick = () => submit('notary.export_word',
-      { case_id: d.id }, crypto.randomUUID());
-    btnRow.append(exportBtn);
-    const wd = resultData(jobs, 'notary.export_word');
-    if (wd && wd.output_file) {
-      btnRow.append(openPathBtn(wd.output_file.path,
-        `Mở ${wd.output_file.path.split(/[\\/]/).pop()}`));
-    }
-    card.append(btnRow);
-    return card;
-  }
-
-  function renderCases() {
-    caseOut.innerHTML = '';
-    detailOut.innerHTML = '';
-    const data = resultData(jobs, 'notary.case_list');
-    if (!data) {
-      caseOut.append(faceEl(L.faceEmpty(
-        'Chưa tải danh sách hồ sơ.'), [loadCases.cloneNode(true)]));
-      caseOut.querySelector('button').onclick = loadCases.onclick;
-      return;
-    }
-    const rows = data.cases || [];
-    caseOut.append(tableEl([
-      { key: 'id', label: 'ID' },
-      { key: 'nguoi_chet', label: 'Người chết',
-        fmt: (c) => c.nguoi_chet ? c.nguoi_chet.ho_ten : '—',
-        onClick: (c) => selectCase(c.id) },
-      { key: 'tai_san', label: 'Tài sản',
-        fmt: (c) => c.tai_san ? c.tai_san.so_serial : '—',
-        onClick: (c) => selectCase(c.id) },
-      { key: 'ngay_lap_ho_so', label: 'Ngày lập',
-        onClick: (c) => selectCase(c.id) },
-      { key: 'trang_thai', label: 'TT',
-        onClick: (c) => selectCase(c.id) },
-    ], rows));
-    const det = resultData(jobs, 'notary.case_get');
-    if (det && ctx.caseId === det.id) detailOut.append(caseDetailCard(det));
-    const wd = resultData(jobs, 'notary.export_word');
-    if (wd && wd.output_file && det && ctx.caseId === det.id) {
-      detailOut.append(el('div', 'muted',
-        `Word: ${wd.output_file.path}`));
-    }
-  }
-
-  async function selectCase(id) {
-    ctx.caseId = id;
-    await submit('notary.case_get', { case_id: id }, crypto.randomUUID());
-  }
-
-  // --- Tao du lieu (case/customer/property/participant) ---
-  const createSec = el('details', 'biz-sec');
-  createSec.append(el('summary', '', 'Tạo dữ liệu (ghi qua engine thật)'));
-
-  const cForm = el('div');
-  const cName = inputEl('họ tên *'), cCccd = inputEl('số giấy tờ (CCCD)'),
-    cBirth = inputEl('ngày sinh'), cDeath = inputEl('ngày chết'),
-    cAddr = inputEl('địa chỉ');
-  const cBtn = el('button', '', 'Tạo khách hàng');
-  cForm.append(formRow('Khách hàng', cName, cCccd, cBirth, cDeath, cAddr, cBtn));
-  cBtn.onclick = () => submit('notary.customer_create', {
-    ho_ten: cName.value.trim(), so_giay_to: cCccd.value.trim() || null,
-    ngay_sinh: cBirth.value.trim() || null,
-    ngay_chet: cDeath.value.trim() || null,
-    dia_chi: cAddr.value.trim() || null,
-  }, crypto.randomUUID());
-  createSec.append(cForm);
-
-  const pForm = el('div');
-  const pSerial = inputEl('số serial GCN *'), pAddr = inputEl('địa chỉ *'),
-    pThua = inputEl('thửa'), pTo = inputEl('tờ bản đồ'),
-    pLoai = inputEl('loại sổ');
-  const pBtn = el('button', '', 'Tạo tài sản');
-  pForm.append(formRow('Tài sản', pSerial, pAddr, pThua, pTo, pLoai, pBtn));
-  pBtn.onclick = () => submit('notary.property_create', {
-    so_serial: pSerial.value.trim(), dia_chi: pAddr.value.trim(),
-    so_thua_dat: pThua.value.trim() || null,
-    so_to_ban_do: pTo.value.trim() || null,
-    loai_so: pLoai.value.trim() || null,
-  }, crypto.randomUUID());
-  createSec.append(pForm);
-
-  const kForm = el('div');
-  const kNguoi = inputEl('id người chết *'), kTs = inputEl('id tài sản *'),
-    kNgay = inputEl('ngày lập yyyy-mm-dd'),
-    kNoi = inputEl('nơi niêm yết');
-  const kLoai = el('select');
-  for (const [v, t] of [['khai_nhan', 'Khai nhận di sản'],
-                        ['thoa_thuan', 'Thỏa thuận phân chia']]) {
-    const o = el('option', '', t); o.value = v; kLoai.append(o);
-  }
-  const kBtn = el('button', '', 'Tạo hồ sơ');
-  kForm.append(formRow('Hồ sơ', kNguoi, kTs, kLoai, kNgay, kNoi, kBtn));
-  kBtn.onclick = () => submit('notary.case_create', {
-    nguoi_chet_id: kNguoi.value.trim(), tai_san_id: kTs.value.trim(),
-    loai_van_ban: kLoai.value,
-    ngay_lap_ho_so: kNgay.value.trim() || null,
-    noi_niem_yet: kNoi.value.trim() || null,
-  }, crypto.randomUUID());
-  createSec.append(kForm);
-
-  const ptForm = el('div');
-  const ptCase = inputEl('id hồ sơ *'), ptCust = inputEl('id khách hàng *'),
-    ptRole = inputEl('vai trò *'), ptHang = inputEl('hàng (1)'),
-    ptTyLe = inputEl('tỷ lệ %');
-  const ptBtn = el('button', '', 'Thêm đương sự');
-  ptForm.append(formRow('Đương sự', ptCase, ptCust, ptRole, ptHang, ptTyLe, ptBtn));
-  ptBtn.onclick = () => submit('notary.participant_add', {
-    case_id: ptCase.value.trim(), customer_id: ptCust.value.trim(),
-    vai_tro: ptRole.value.trim(),
-    hang_thua_ke: ptHang.value.trim() || 1,
-    ty_le: ptTyLe.value.trim() || 0, co_nhan_tai_san: true,
-  }, crypto.randomUUID());
-  createSec.append(ptForm);
-  s.append(createSec);
-
-  // --- Khach hang / tai san list ---
-  const listSec = el('details', 'biz-sec');
-  listSec.append(el('summary', '', 'Khách hàng & Tài sản'));
-  const listRow = el('div', 'tools');
-  const loadCust = el('button', '', 'Tải khách hàng');
-  const loadProp = el('button', '', 'Tải tài sản');
-  listRow.append(loadCust, loadProp);
-  listSec.append(listRow);
-  const listOut = el('div', 'slot');
-  listSec.append(listOut);
-  s.append(listSec);
-
-  loadCust.onclick = () =>
-    submit('notary.customer_list', null, crypto.randomUUID());
-  loadProp.onclick = () =>
-    submit('notary.property_list', null, crypto.randomUUID());
-
-  function renderLists() {
-    listOut.innerHTML = '';
-    const cust = resultData(jobs, 'notary.customer_list');
-    if (cust) {
-      listOut.append(el('h4', '', `Khách hàng (${cust.total})`));
-      listOut.append(tableEl([
-        { key: 'id', label: 'ID' }, { key: 'ho_ten', label: 'Họ tên' },
-        { key: 'so_giay_to', label: 'Giấy tờ' },
-        { key: 'ngay_sinh', label: 'Ngày sinh' },
-        { key: 'ngay_chet', label: 'Ngày chết' },
-        { key: 'dia_chi', label: 'Địa chỉ' },
-      ], cust.customers || []));
-    }
-    const prop = resultData(jobs, 'notary.property_list');
-    if (prop) {
-      listOut.append(el('h4', '', `Tài sản (${prop.total})`));
-      listOut.append(tableEl([
-        { key: 'id', label: 'ID' }, { key: 'so_serial', label: 'Serial GCN' },
-        { key: 'so_thua_dat', label: 'Thửa' },
-        { key: 'so_to_ban_do', label: 'Tờ' },
-        { key: 'dia_chi', label: 'Địa chỉ' },
-        { key: 'dien_tich', label: 'Diện tích' },
-      ], prop.properties || []));
-    }
-    if (!cust && !prop) {
-      listOut.append(faceEl(L.faceEmpty('Chưa tải dữ liệu.')));
-    }
-  }
-
-  // --- OCR intake ---
-  const ocrSec = el('details', 'biz-sec');
-  ocrSec.append(el('summary', '', 'OCR giấy tờ (cloud Qwen — kết quả observed)'));
-  const ocrRow = el('div', 'tools');
-  const pickImg = el('button', '', 'Chọn ảnh…');
-  const ocrBtn = el('button', 'primary', 'OCR');
-  ocrBtn.disabled = true;
-  const imgLabel = el('span', 'muted', 'Chưa chọn ảnh');
-  ocrRow.append(pickImg, ocrBtn, imgLabel);
-  ocrSec.append(ocrRow);
-  const ocrOut = el('div', 'slot');
-  ocrSec.append(ocrOut);
-  s.append(ocrSec);
-
-  pickImg.onclick = async () => {
-    const r = await api.pickFiles({
-      multi: true,
-      filters: [{ name: 'Ảnh giấy tờ', extensions: ['jpg', 'jpeg', 'png'] }],
-    });
-    if (!r.ok) { notify(`${r.error.code}: ${r.error.message}`, true); return; }
-    ctx.images = r.data.files;
-    imgLabel.textContent = `${ctx.images.length} ảnh`;
-    ocrBtn.disabled = !ctx.images.length;
-  };
-  ocrBtn.onclick = () => submit('ocr.analyze', {
-    files: ctx.images.map((f) => ({ path: f.path, scope: f.scope })),
-  }, crypto.randomUUID());
-
-  function renderOcr() {
-    ocrOut.innerHTML = '';
-    const data = resultData(jobs, 'ocr.analyze');
-    if (!data) {
-      ocrOut.append(faceEl(L.faceEmpty(
-        'Chưa chạy OCR. Kết quả luôn là observed — cần người confirm.')));
-      return;
-    }
-    const sm = data.summary || {};
-    ocrOut.append(el('div', 'muted',
-      `model ${data.model || sm.model || '—'} · ${sm.total_images ?? '?'} ảnh · ` +
-      `${(data.persons || []).length} người · ${(data.properties || []).length} tài sản` +
-      (sm.total_ms ? ` · ${Math.round(sm.total_ms)}ms` : '')));
-    if ((data.persons || []).length) {
-      ocrOut.append(tableEl([
-        { key: 'ho_ten', label: 'Họ tên' },
-        { key: 'so_giay_to', label: 'Giấy tờ', fmt: (p) => p.so_giay_to || p.id12 || '—' },
-        { key: 'ngay_sinh', label: 'Ngày sinh' },
-        { key: 'dia_chi', label: 'Địa chỉ' },
-      ], data.persons));
-    }
-    if ((data.properties || []).length) {
-      ocrOut.append(tableEl([
-        { key: 'so_serial', label: 'Serial' },
-        { key: 'dia_chi', label: 'Địa chỉ' },
-      ], data.properties));
-    }
-    if ((data.errors || []).length) {
-      ocrOut.append(el('pre', '', JSON.stringify(data.errors, null, 2)));
-    }
-    ocrOut.append(el('div', 'muted warn-text',
-      'observed — chưa confirm, chưa ghi vào hồ sơ.'));
-  }
-
-  // --- Zalo ---
-  const zaloSec = el('details', 'biz-sec');
-  zaloSec.append(el('summary', '', 'Zalo Inbox (tài khoản văn phòng)'));
-  const zaloRow = el('div', 'tools');
-  const zaloBtn = el('button', '', 'Tải trạng thái');
-  zaloRow.append(zaloBtn);
-  zaloSec.append(zaloRow);
-  const zaloOut = el('div', 'slot');
-  zaloSec.append(zaloOut);
-  s.append(zaloSec);
-
-  zaloBtn.onclick = () => submit('zalo.status', null, crypto.randomUUID());
-
-  function renderZalo() {
-    zaloOut.innerHTML = '';
-    const data = resultData(jobs, 'zalo.status');
-    if (!data) {
-      zaloOut.append(faceEl(L.faceEmpty(
-        'Chưa tải. Connector Node zca-js chạy riêng trên server.')));
-      return;
-    }
-    const t = data.totals || {};
-    zaloOut.append(el('div', 'muted',
-      `${t.accounts ?? 0} tài khoản · ${t.sources ?? 0} nguồn · ` +
-      `${t.media ?? 0} media · ${t.message_texts ?? 0} text`));
-    if ((data.accounts || []).length) {
-      zaloOut.append(tableEl([
-        { key: 'bound_zalo_id', label: 'Zalo ID' },
-        { key: 'session_state', label: 'Session' },
-        { key: 'connector_state', label: 'Connector' },
-        { key: 'last_seen_at', label: 'Last seen' },
-      ], data.accounts));
-    }
-  }
-
-  s.append(el('h3', '', 'Job'));
-  const jobsBox = el('div', 'slot');
-  s.append(jobsBox);
-
+  s.append(view.el);
   return {
     el: s,
     refresh() {
       eng.innerHTML = '';
       const slot = engineSlotEl();
       if (slot) eng.append(slot);
-      renderCases(); renderLists(); renderOcr(); renderZalo();
-      renderJobs(jobsBox, mod);
+      view.refresh();
+    },
+    // Chan roi module khi con draft chua luu (spec UX §6).
+    async canLeave() {
+      if (!view.hasUnsaved()) return true;
+      return confirmModal({
+        title: 'Thay đổi chưa lưu',
+        body: 'Stage/Sơ đồ còn bản nháp chưa lưu — rời màn hình sẽ giữ ' +
+          'nháp trong phiên nhưng không ghi vào hồ sơ.',
+        confirmLabel: 'Rời màn hình',
+        cancelLabel: 'Ở lại',
+      });
     },
   };
-}
-
-function buildExcelWord(entry) {
-  const s = el('section');
-  s.append(el('h2', '', entry.title));
-  s.append(faceEl(L.faceEmpty(
-    'Module Excel → Word chưa có luồng nào trong G1.2 — ' +
-    'chuyển đổi ở lát cắt sau (MIN-68).')));
-  return { el: s, refresh() {} };
 }
 
 function buildOffice(entry) {
@@ -1081,6 +786,15 @@ function buildStatus(entry) {
   const conn = el('div', 'slot');
   s.append(conn);
 
+  // Suc khoe module + job (tru day 'Tổng quan' cu gop vao tien ich nay).
+  s.append(el('h3', '', 'Module'));
+  const health = el('div', 'slot');
+  s.append(health);
+
+  s.append(el('h3', '', 'Job'));
+  const jobsBox = el('div', 'slot');
+  s.append(jobsBox);
+
   s.append(el('h3', '', 'Môi trường engine'));
   const envBox = el('div', 'slot');
   s.append(envBox);
@@ -1104,6 +818,8 @@ function buildStatus(entry) {
     el: s,
     refresh() {
       conn.innerHTML = ''; conn.append(connCardEl());
+      health.innerHTML = ''; health.append(healthTableEl());
+      renderJobs(jobsBox, null);
       // giu disabled khi mot env check dang chay (job update goi refresh)
       envBtn.disabled = envBtn._busy ||
         sidecarStatus.state !== 'ready';
@@ -1179,10 +895,8 @@ async function loadDiagnostics(box, btn) {
 function buildView(entry) {
   const mod = entry.registry ? modulesById[entry.registry] : null;
   switch (entry.id) {
-    case 'overview': return buildOverview();
+    case 'notary_v2': return buildNotaryView(entry, mod);
     case 'upload': return buildUploadView(entry, mod);
-    case 'document-review': return buildDocReviewView(entry, mod);
-    case 'excel-word': return buildExcelWord(entry);
     case 'office': return buildOffice(entry);
     case 'search': return buildSearch(entry);
     case 'status': return buildStatus(entry);
@@ -1196,7 +910,7 @@ function buildView(entry) {
 
 // ---------- navigation ----------
 
-function showModule(id) {
+async function showModule(id) {
   const entry = L.navEntry(id);
   if (!entry) {
     // Nav ngoai allowlist bi tu choi (MIN-67 acceptance).
@@ -1204,12 +918,17 @@ function showModule(id) {
     return;
   }
   const cur = views.get(activeId);
-  if (cur) cur.scroll = view.scrollTop;
-  activeId = id;
-  let v = views.get(id);
+  if (cur) {
+    // Chan roi module khi view con nhap chua luu (MIN-111 UX spec).
+    if (entry.id !== activeId && cur.canLeave &&
+        !(await cur.canLeave())) return;
+    cur.scroll = view.scrollTop;
+  }
+  activeId = entry.id;
+  let v = views.get(entry.id);
   if (!v) {
     v = buildView(entry);
-    views.set(id, v);
+    views.set(entry.id, v);
   }
   view.innerHTML = '';
   view.append(v.el);
@@ -1267,7 +986,7 @@ api.onStatusUpdate((s) => {
     for (const j of lj.data.jobs) jobs.set(j.job_id, j);
   }
   renderSidebar();
-  showModule('overview');
+  showModule('notary_v2');
   setInterval(async () => {
     const r = await api.getStatus();
     if (r.ok) {
