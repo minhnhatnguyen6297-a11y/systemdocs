@@ -612,6 +612,122 @@ test('wordExportOptions + exportWord: options/result theo tung van ban', async (
   assert.equal(res.breakdown.failed.length, 1);
 });
 
+// ---------- locked: draft mutations bi chan (defense-in-depth) ----------
+
+test('locked case: moi mutation draft la no-op — addPerson/addAsset/update/remove/diagram', async () => {
+  const { model } = makeModel(seedCases('locked'));
+  await model.openCase(44);
+  const s = model.state;
+  assert.equal(s.status, 'locked');
+  assert.equal(model.canWrite(), false);
+
+  // Stage mutations — tra null, khong doi draft, khong dirty
+  assert.equal(model.addPerson({ ho_ten: 'X' }), null);
+  assert.equal(model.addAsset({ so_serial: 'S1' }), null);
+  assert.equal(s.stage.people.length, 2);
+  assert.equal(s.stage.assets.length, 1);
+  const pid = s.stage.people[0].row_id;
+  model.updatePersonField(pid, 'ho_ten', 'TEN MOI');
+  assert.equal(s.stage.people[0].ho_ten, 'Người Mẫu A');
+  model.updateAssetField(s.stage.assets[0].row_id, 'dia_chi', 'DC MOI');
+  assert.notEqual(s.stage.assets[0].dia_chi, 'DC MOI');
+  model.removeStageRow(pid);
+  assert.equal(s.stage.people.length, 2);
+  assert.equal(s.stageDirty, false);
+
+  // Diagram mutations — tra false/null, khong dirty
+  assert.equal(model.addSlot(), null);
+  assert.equal(model.assignPerson('owner', null), false);
+  assert.equal(model.setNodeFlag('owner', 'willReceive', true), false);
+  assert.equal(model.setNodeRelation('owner', { spouseSlotId: null }),
+    false);
+  assert.equal(model.removeNode('owner'), false);
+  const owner = s.diagram.nodes.find((n) => n.id === 'owner');
+  assert.equal(owner.deleted, false);
+  assert.equal(owner.personId, '11111111-1111-4111-8111-111111111111');
+  assert.equal(s.diagramDirty, false);
+});
+
+test('unsupported case: mutation draft cung la no-op', async () => {
+  const { model } = makeModel(seedCases('unsupported'));
+  await model.openCase(45);
+  assert.equal(model.state.unsupported, true);
+  assert.equal(model.addPerson({ ho_ten: 'X' }), null);
+  assert.equal(model.addAsset(), null);
+  assert.equal(model.addSlot(), null);
+  assert.equal(model.state.stageDirty, false);
+  assert.equal(model.state.diagramDirty, false);
+});
+
+// ---------- applyWorkspace reset aux state (khong leak giua case) ----------
+
+test('openCase(B) sau openCase(A) co aux state → moi aux state sach', async () => {
+  const { model, client } = makeModel(seedCases('empty', 'ready'));
+  await model.openCase(43);
+  // tao aux state tren case A: suggestion + wordOptions + renderModel
+  // (evaluatedRevision) + notice (commit ok) + error (commit bi locked).
+  await model.intakeAnalyze([
+    { source_id: crypto.randomUUID(), kind: 'text', text: 'abc' }]);
+  assert.equal(model.state.suggestions.length, 1);
+  await model.loadWordOptions();
+  assert.ok(model.state.wordOptions.length > 0);
+  await model.evaluateDiagram();
+  assert.equal(model.state.evaluatedRevision, 1);
+  model.addPerson({ ho_ten: 'Nháp A' });
+  const rc = await model.commitStage();
+  assert.equal(rc.ok, true);
+  assert.equal(model.state.notice, 'Đã cập nhật Stage');
+  // server khoa case → commit tiep nhan workspace_locked → state.error
+  client.cases[43].locked = true;
+  model.updatePersonField(
+    model.state.stage.people[0].row_id, 'ho_ten', 'Sửa lại');
+  const rl = await model.commitStage();
+  assert.equal(rl.ok, false);
+  assert.equal(model.state.error.code, 'workspace_locked');
+  assert.equal(model.state.status, 'locked');
+
+  // mo case khac → toan bo aux state phai sach
+  const r = await model.openCase(42);
+  assert.equal(r.ok, true);
+  const s = model.state;
+  assert.equal(s.status, 'ready');
+  assert.equal(s.locked, false);
+  assert.equal(s.caseId, 42);
+  assert.deepEqual(s.suggestions, []);
+  assert.deepEqual(s.intakeErrors, []);
+  assert.equal(s.intakePartial, false);
+  assert.equal(s.intakeBusy, false);
+  assert.equal(s.wordOptions, null);
+  assert.equal(s.wordResult, null);
+  assert.equal(s.wordBusy, false);
+  assert.equal(s.evaluatedRevision, null);
+  assert.equal(s.conflict, null);
+  assert.equal(s.notice, null);
+  assert.equal(s.error, null);
+  assert.equal(s.busy, null);
+  assert.equal(s.stageDirty, false);
+  assert.equal(s.diagramDirty, false);
+  assert.equal(s.stage.people.length, 4);   // stage cua case 42
+});
+
+test('acceptSuggestion tren case locked → null, suggestion van con cho review', async () => {
+  const { model, client } = makeModel(seedCases('empty', 'locked'));
+  await model.openCase(43);
+  await model.intakeAnalyze([
+    { source_id: crypto.randomUUID(), kind: 'text', text: 'abc' }]);
+  assert.equal(model.state.suggestions.length, 1);
+  client.cases[43].locked = true;
+  // day case sang locked qua mot write that bai
+  model.updatePersonField('x', 'ho_ten', 'y');   // no-op nhung khong loi
+  model.addPerson({ ho_ten: 'tmp' });
+  const r = await model.commitStage();
+  assert.equal(r.error.code, 'workspace_locked');
+  assert.equal(model.canWrite(), false);
+  const sugId = model.state.suggestions[0].suggestion_id;
+  assert.equal(model.acceptSuggestion(sugId), null);
+  assert.equal(model.state.suggestions.length, 1);
+});
+
 // ---------- misc ----------
 
 test('hasUnsaved = stageDirty || diagramDirty', async () => {

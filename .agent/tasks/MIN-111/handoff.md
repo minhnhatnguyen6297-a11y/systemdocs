@@ -27,10 +27,18 @@ demo qua mock `G1_DEV_NOTARY_MOCK=1`.
   `navigation.test.mjs` + `state-faces.test.mjs` cập nhật taxonomy.
 
 ## Cách verify
-- `cd D:\systemdocs-min-111\shell && npm test` → 75 pass / 0 fail (đã chạy).
-- Manual: `G1_DEV_NOTARY_MOCK=1` chạy app, nav `notary_v2` → tab
-  `Tổng quan hồ sơ` → Tải danh sách (mock case 42-46) hoặc bật
-  `window.G1_DEV` trong DevTools để có nút mở nhanh.
+- `cd D:\systemdocs-min-111\shell && npm test` → 79 pass / 0 fail (đã chạy
+  sau đợt vá review findings).
+- Manual: `G1_DEV_NOTARY_MOCK=1` chạy app, nav `notary_v2`, bật
+  `window.G1_DEV` trong DevTools → devQuickOpen mở fixture mock 42–46.
+- Lưu ý route: mock CHỈ phủ các command drafting (`workspace_get`,
+  `commit_stage`, `diagram_*`, `intake_analyze`, `word_export_*`) qua
+  `notary_gateway` (`command_registry.py:230-238`). `notary.case_list`
+  route vào **real adapter** `notary_adapter.case_list`
+  (`command_registry.py:193` — `_notary`, KHÔNG qua gateway) → cần engine
+  notary_v2 thật; trên máy thiếu engine, "Tải danh sách" trả lỗi
+  `engine_not_installed` và devQuickOpen (G1_DEV) là đường mở mock.
+  Mock parity cho `case_list` là việc của MIN-112 (M-5).
 
 ## Việc còn lại / rủi ro
 - MIN-112: nối backend thật — thay/bổ sung runner; `devQuickOpen` chỉ dev.
@@ -40,6 +48,23 @@ demo qua mock `G1_DEV_NOTARY_MOCK=1`.
   bản mới nhất" — UX auto-refresh (nếu muốn) để lát sau.
 - Hai tab `Tổng quan hồ sơ`/`Word` mới có khung + danh sách/options cơ bản;
   hoàn thiện nội dung ở MIN-112.
+
+## Deferred → MIN-112 (ghi nhận từ review findings)
+- **M-5 — `notary.case_list` mock parity**: case_list đi thẳng real
+  adapter; mock gateway không implement. MIN-112 quyết định: thêm
+  `case_list` vào mock/gateway hay để real-only.
+- **M-6 — app-close dirty guard**: `canLeave` chỉ chặn đổi module trong
+  shell; đóng cửa sổ/thoát app (main.js `close`/`before-quit`) chưa hỏi
+  khi `hasUnsaved()`. Cần IPC hỏi renderer hoặc `beforeunload`.
+- **M-7 — Word dialog: progress per-doc + cancel**: `word_export_batch`
+  chạy một job cho cả batch; dialog hiện chỉ show kết quả cuối, không
+  cancel giữa chừng, không progress từng văn bản — nằm trong scope
+  workflows MIN-112.
+- **Modal a11y**: đã có Escape-dismiss cho mọi `openModal` (conflict,
+  assign menu, intake, word); focus-trap đầy đủ vẫn defer.
+- **Rerender skip khi focus trong `.cd-row-detail`**: emit bị nuốt một
+  nhịp khi đang gõ — chấp nhận được (minimum viable); nếu cần render tức
+  thì mà giữ focus, làm diff/patch DOM ở lát cắt sau.
 
 ## File tạm đã dọn
 - Không có file tạm nào được tạo ngoài `.agent/tasks/MIN-111/`.

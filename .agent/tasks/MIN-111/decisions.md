@@ -48,3 +48,32 @@ chốt ở đây — đưa lên `docs/architecture/OPEN_DECISIONS.md`.
   `window.G1_DEV === true` (đặt tay trong DevTools).
 - **Lý do:** cần cách mở workspace demo/mock nhanh cho dev mà nghiệm thu
   cấm "nhập ID tay trong production view".
+
+## 2026-09-26 — Draft mutations no-op khi !canWrite() (vá review)
+- **Chọn:** mọi hàm mutate draft (`addPerson`/`addAsset`/`update*Field`/
+  `removeStageRow`/`addSlot`/`assignPerson`/`setNodeFlag`/
+  `setNodeRelation`/`removeNode`/`acceptSuggestion`) return sớm
+  (null/false/void) khi `!canWrite()` — defense-in-depth dưới lớp view
+  disable. `discardSuggestion` cố tình không chặn: suggestion tray là
+  session-local, phải dọn được cả khi case bị khóa giữa chừng.
+- **Lý do:** locked case không được mutate draft kể cả khi UI lỡ cho
+  nút write chạy; giữ evaluate/workspace_get read-only trên locked theo
+  contract §5.3/§7.4.
+- **Lưu ý:** `canWrite()` true cả ở status `conflict` — giữ semantics
+  "sửa tiếp draft trong lúc quyết định reload/keep".
+
+## 2026-09-26 — Rerender: giữ openRowIds + skip khi focus trong row detail
+- **Chọn:** minimum viable — view state `openRowIds` (Set row_id) re-apply
+  `.cd-row.open` sau rebuild; `rerender()` skip rebuild `panels.drafting`
+  khi `document.activeElement` nằm trong `.cd-row-detail`.
+- **Lý do:** emit nền (jobUpdate/poll → `view.refresh()`) không được đè
+  input đang gõ; diff/patch DOM đúng nghĩa là scope lớn hơn — defer.
+- **Trade-off chấp nhận:** emit trong lúc gõ bị nuốt một nhịp render (UI
+  cập nhật ở emit tiếp theo); openRowIds prune khi row bị xóa/đổi case.
+
+## 2026-09-26 — openCase qua confirm khi có draft
+- **Chọn:** `openCaseInDrafting` (+ nút Thử lại ở face unavailable) hỏi
+  `confirm()` khi `hasUnsaved()`; `resolveConflict('reload')` KHÔNG hỏi
+  thêm — user đã chọn "Tải bản mới" trong conflict dialog.
+- **Lý do:** `openCase` thay toàn bộ draft; hỏi một lần ở điểm vào,
+  không hỏi lại trong luồng conflict đã có dialog riêng.

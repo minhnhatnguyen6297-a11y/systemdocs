@@ -102,6 +102,7 @@ function createModel(deps) {
     committed: { people: [], assets: [] },   // Stage da commit (nguon Pool)
     stage: { people: [], assets: [] },       // draft Stage (UI edit)
     stageDirty: false,
+    diagramDirty: false,
     fieldErrors: [],             // [{row_id, field, code, message}]
     diagram: { version: DIAGRAM_VERSION, nodes: [] },  // draft
     committedDiagram: { version: DIAGRAM_VERSION, nodes: [] },
@@ -186,6 +187,18 @@ function createModel(deps) {
     state.conflict = null;
     state.stale = false;
     state.error = null;
+    // Aux state la per-case — reset het khi mo case khac, tranh leak
+    // suggestion/word result/notice cua case truoc sang case moi.
+    state.notice = null;
+    state.suggestions = [];
+    state.intakeErrors = [];
+    state.intakePartial = false;
+    state.intakeBusy = false;
+    state.wordOptions = null;
+    state.wordResult = null;
+    state.wordBusy = false;
+    state.evaluatedRevision = null;
+    state.busy = null;
     state.status = state.locked ? 'locked' : 'ready';
   }
 
@@ -219,12 +232,15 @@ function createModel(deps) {
 
   // ---------- Stage draft ----------
 
+  // Defense-in-depth: case locked/unsupported khong bao gio mutate draft,
+  // ke ca khi view lo de nut write chay (rule drafting-tab §4).
   function touchStage() {
     state.stageDirty = true;
     emit();
   }
 
   function addPerson(fields) {
+    if (!canWrite()) return null;
     const row = newPersonRow(uuid, fields);
     state.stage.people.push(row);
     touchStage();
@@ -232,6 +248,7 @@ function createModel(deps) {
   }
 
   function addAsset(fields) {
+    if (!canWrite()) return null;
     const row = newAssetRow(uuid, fields);
     // Tai san dau tien mac dinh la primary (contract: dung 1 primary).
     if (!state.stage.assets.length) row.is_primary = true;
@@ -247,6 +264,7 @@ function createModel(deps) {
   }
 
   function updatePersonField(rowId, field, value) {
+    if (!canWrite()) return;
     const row = state.stage.people.find((p) => p.row_id === rowId);
     if (!row || !PERSON_FIELDS.includes(field)) return;
     row[field] = value === '' ? null : value;
@@ -255,6 +273,7 @@ function createModel(deps) {
   }
 
   function updateAssetField(rowId, field, value) {
+    if (!canWrite()) return;
     const row = state.stage.assets.find((a) => a.row_id === rowId);
     if (!row) return;
     if (field === 'is_primary' && value === true) {
@@ -272,6 +291,7 @@ function createModel(deps) {
   }
 
   function removeStageRow(rowId) {
+    if (!canWrite()) return;
     const before = state.stage.people.length + state.stage.assets.length;
     state.stage.people = state.stage.people.filter((p) => p.row_id !== rowId);
     state.stage.assets = state.stage.assets.filter((a) => a.row_id !== rowId);
@@ -363,6 +383,7 @@ function createModel(deps) {
     state.stageDirty = false;
     state.fieldErrors = [];
     state.stale = false;
+    state.error = null;            // ghi thanh cong → loi cu khong con dung
     state.notice = 'Đã cập nhật Stage';
     emit();
     return r;
@@ -376,6 +397,7 @@ function createModel(deps) {
   }
 
   function addSlot(id) {
+    if (!canWrite()) return null;
     const nodes = state.diagram.nodes || (state.diagram.nodes = []);
     let nid = id;
     if (!nid) {
@@ -393,6 +415,7 @@ function createModel(deps) {
   // nguoi quay ve Pool. Mot nguoi chi nam tren mot node — gan moi se clear
   // node cu (tranh engine duplicate_person).
   function assignPerson(nodeId, rowId) {
+    if (!canWrite()) return false;
     const node = findNode(nodeId);
     if (!node) return false;
     if (rowId !== null && !committedPersonIds().has(rowId)) return false;
@@ -409,6 +432,7 @@ function createModel(deps) {
   }
 
   function setNodeFlag(nodeId, flag, value) {
+    if (!canWrite()) return false;
     if (!NODE_BOOL_FIELDS.includes(flag) || flag === 'deleted') return false;
     const node = findNode(nodeId);
     if (!node) return false;
@@ -418,6 +442,7 @@ function createModel(deps) {
   }
 
   function setNodeRelation(nodeId, rel) {
+    if (!canWrite()) return false;
     const node = findNode(nodeId);
     if (!node) return false;
     if (rel.parentSlotIds !== undefined) {
@@ -433,6 +458,7 @@ function createModel(deps) {
   }
 
   function removeNode(nodeId) {
+    if (!canWrite()) return false;
     const node = findNode(nodeId);
     if (!node) return false;
     node.deleted = true;             // engine bo qua node deleted (§7.1)
@@ -518,6 +544,7 @@ function createModel(deps) {
     state.diagramDirty = false;
     state.diagramErrors = [];
     state.stale = false;
+    state.error = null;
     state.notice = 'Đã lưu sơ đồ';
     emit();
     return r;
@@ -569,6 +596,7 @@ function createModel(deps) {
 
   // Dua suggestion vao Stage nhu draft — khong phai commit (§5).
   function acceptSuggestion(suggestionId) {
+    if (!canWrite()) return null;
     const i = state.suggestions.findIndex(
       (s) => s.suggestion_id === suggestionId);
     if (i < 0) return null;

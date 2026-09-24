@@ -82,11 +82,16 @@ function createNotaryModuleView(deps) {
     const box = h('div', 'cd-modal');
     box.setAttribute('role', 'dialog');
     box.setAttribute('aria-modal', 'true');
-    const close = () => wrap.remove();
+    const close = () => {
+      document.removeEventListener('keydown', onKey);
+      wrap.remove();
+    };
+    function onKey(e) { if (e.key === 'Escape') close(); }
     wrap.onclick = (e) => { if (e.target === wrap) close(); };
     build(box, close);
     wrap.append(box);
     document.body.append(wrap);
+    document.addEventListener('keydown', onKey);
     const first = box.querySelector('button, input, textarea, select');
     if (first) first.focus();
     return close;
@@ -200,15 +205,14 @@ function createNotaryModuleView(deps) {
   // ---------- Stage tier ----------
 
   function personRowEl(p) {
-    const s = model.state;
     const wrap = h('div', 'cd-row');
-    const head = btn('', 'cd-row-head', () => {
-      wrap.classList.toggle('open');
-    });
+    wrap.dataset.rowId = p.row_id;
+    const head = btn('', 'cd-row-head');
     head.setAttribute('aria-expanded', 'false');
     head.onclick = () => {
       const open = wrap.classList.toggle('open');
       head.setAttribute('aria-expanded', String(open));
+      if (open) openRowIds.add(p.row_id); else openRowIds.delete(p.row_id);
     };
     const main = h('span', 'cd-row-main', p.ho_ten || '(chưa đặt tên)');
     const meta = h('span', 'cd-row-meta muted',
@@ -257,13 +261,14 @@ function createNotaryModuleView(deps) {
   }
 
   function assetRowEl(a) {
-    const s = model.state;
     const wrap = h('div', 'cd-row');
-    const head = btn('', 'cd-row-head', () => {});
+    wrap.dataset.rowId = a.row_id;
+    const head = btn('', 'cd-row-head');
     head.setAttribute('aria-expanded', 'false');
     head.onclick = () => {
       const open = wrap.classList.toggle('open');
       head.setAttribute('aria-expanded', String(open));
+      if (open) openRowIds.add(a.row_id); else openRowIds.delete(a.row_id);
     };
     const main = h('span', 'cd-row-main',
       (a.is_primary ? '★ ' : '') + (a.so_serial || '(chưa có serial)'));
@@ -331,6 +336,8 @@ function createNotaryModuleView(deps) {
     const aTools = h('div', 'cd-card-tools');
     const intakeAsset = btn('Nhập dữ liệu', '', () => openIntakeDialog(null));
     const addA = btn('+ Tài sản', '', () => model.addAsset());
+    intakeAsset.disabled = !model.canWrite();
+    addA.disabled = !model.canWrite();
     aTools.append(intakeAsset, addA);
     aHead.append(aTools);
     ac.append(aHead);
@@ -355,6 +362,9 @@ function createNotaryModuleView(deps) {
     const intakeExcel = btn('Nhập Excel', '', () => openIntakeDialog('xlsx'));
     const intakeOcr = btn('OCR giấy tờ', '', () => openIntakeDialog('image'));
     const addP = btn('+ Người', '', () => model.addPerson());
+    intakeExcel.disabled = !model.canWrite();
+    intakeOcr.disabled = !model.canWrite();
+    addP.disabled = !model.canWrite();
     const commit = btn('Cập nhật', 'primary', async () => {
       const r = await model.commitStage();
       if (!r.ok && r.error && r.error.code !== 'stage_validation_error' &&
@@ -521,7 +531,6 @@ function createNotaryModuleView(deps) {
   }
 
   function diagramNodeEl(n) {
-    const s = model.state;
     const card = h('div', 'cd-node');
     if (n.deleted) card.classList.add('cd-node-deleted');
     const head = h('div', 'cd-node-head');
@@ -836,6 +845,7 @@ function createNotaryModuleView(deps) {
         }
         // Khong tu dong popup khi con loi (spec §7) — nguoi dung dong.
       });
+      go.disabled = !model.canWrite();   // export_batch la write (§5.3)
       const row = h('div', 'cd-toolbar');
       row.append(pickDir, go, btn('Đóng', '', close));
       box.append(row, destLabel, out);
@@ -870,6 +880,7 @@ function createNotaryModuleView(deps) {
   // ---------- workspace root ----------
 
   let calcOpen = false;
+  const openRowIds = new Set();   // row_id cac dong Stage dang mo (detail)
 
   function workspaceEl(onBack) {
     const s = model.state;
@@ -924,7 +935,18 @@ function createNotaryModuleView(deps) {
     { id: 'word', label: 'Word' },
   ];
 
-  const openCaseInDrafting = (id) => {
+  const openCaseInDrafting = async (id) => {
+    // Mo case khac se thay toan bo draft — hoi truoc khi mat nhap.
+    if (model.hasUnsaved()) {
+      const ok = await confirm({
+        title: 'Thay đổi chưa lưu',
+        body: 'Stage/Sơ đồ còn bản nháp chưa lưu — mở hồ sơ khác sẽ mất ' +
+          'bản nháp hiện tại.',
+        confirmLabel: 'Bỏ nháp và mở',
+        cancelLabel: 'Ở lại',
+      });
+      if (!ok) return;
+    }
     activeTab = 'drafting';
     model.openCase(id);
   };
@@ -958,6 +980,13 @@ function createNotaryModuleView(deps) {
       el.hidden = k !== activeTab;
     }
     const dp = panels.drafting;
+    // Emit nen (jobUpdate/status poll) trong luc dang go trong row detail:
+    // hoan rebuild de input khong mat focus/gia tri — render sau lan emit
+    // ke tiep (blur/change hoac action tiep theo cua nguoi dung).
+    const ae = document.activeElement;
+    if (ae && dp.contains(ae) && ae.closest('.cd-row-detail')) {
+      return;
+    }
     dp.innerHTML = '';
     if (s.status === 'idle') {
       dp.append(face(L.faceEmpty(
@@ -970,7 +999,7 @@ function createNotaryModuleView(deps) {
     } else if (s.status === 'loading') {
       dp.append(face(L.faceLoading('Đang tải workspace…')));
     } else if (s.status === 'unavailable') {
-      const retry = btn('Thử lại', '', () => model.openCase(s.caseId));
+      const retry = btn('Thử lại', '', () => openCaseInDrafting(s.caseId));
       const f = face(L.faceUnavailable(
         'Engine', 'engine_unavailable',
         'Workspace không tải được khi engine chưa sẵn sàng.'));
@@ -990,6 +1019,21 @@ function createNotaryModuleView(deps) {
         activeTab = 'overview';
         rerender();
       }));
+      // Re-apply cac dong dang mo sau full rebuild (row_id on dinh trong
+      // phien); prune id khong con trong draft (dong xoa / doi case).
+      const present = new Set();
+      for (const r of dp.querySelectorAll('.cd-row[data-row-id]')) {
+        const rid = r.dataset.rowId;
+        present.add(rid);
+        if (openRowIds.has(rid)) {
+          r.classList.add('open');
+          const hd = r.querySelector('.cd-row-head');
+          if (hd) hd.setAttribute('aria-expanded', 'true');
+        }
+      }
+      for (const rid of [...openRowIds]) {
+        if (!present.has(rid)) openRowIds.delete(rid);
+      }
       if (s.status === 'conflict' && s.conflict !== lastConflict) {
         lastConflict = s.conflict;
         conflictDialog();
