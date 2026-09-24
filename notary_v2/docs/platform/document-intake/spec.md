@@ -28,6 +28,10 @@ Batch input co the gom:
 
 Ket qua tra ve phai dung contract JSON hien tai.
 
+Endpoint hien trang chi nhan **anh**; dich Electron cua intake thu cong trong
+tab Soạn hồ sơ nhan nam loai nguon — xem muc
+`## Intake thu cong dich trong tab Soạn hồ sơ` ben duoi.
+
 ---
 
 ## Nguyen tac da chot
@@ -40,6 +44,16 @@ Ket qua tra ve phai dung contract JSON hien tai.
 - Khong keo triage/fallback/heuristic nghien cuu tu local OCR vao day neu chua co scope ro.
 - Muc tieu uu tien la dung nghiep vu cuoi cung, khong chi dep raw text.
 - Neu gap ca sai ma khong ro rule nghiep vu, phai log ro case sai va hoi lai user truoc khi quyet dinh logic.
+
+---
+
+## Intake thu cong dich trong tab Soạn hồ sơ (Electron)
+
+Đích Electron — DRAFT theo [MIN-104](https://linear.app/minhnotary/issue/MIN-104), chưa triển khai runtime. SOT hành vi/dữ liệu của tab là [drafting-tab.md](../case-workspace/drafting-tab.md); file này giữ vai trò platform/endpoint, không chép lại semantics của tab.
+
+- **Nguồn đầu vào:** năm loại `image`, `pdf`, `docx`, `xlsx`, `text` (ảnh/PDF qua OCR; DOCX/XLSX/text parse trực tiếp). Command đích `notary.intake_analyze` trên envelope `desktopcommand.v1`; wire contract publish ở MIN-105 (`contracts/notary-case-drafting.md`, chưa tồn tại). Hiện trạng chỉ nhận ảnh qua `POST /api/ocr/analyze` như các mục trên.
+- **Mọi kết quả là gợi ý:** `observation_state` ∈ `{observed, normalized, inferred}`, kèm `raw_value`/`normalized_value`/`confidence`/`source_refs`; không bao giờ mang `confirmed`. Xác nhận duy nhất = người dùng đưa gợi ý vào Stage rồi `Cập nhật` (semantics → `drafting-tab.md` §5).
+- **Không Zalo trong tab:** không nút/popup/command/trạng thái Zalo trong tab Soạn hồ sơ; Zalo là phần mềm riêng, chỉ trao đổi với máy chính qua contract riêng giữa hai phần mềm — spec giao tiếp ở [zalo-document-inbox](../zalo-document-inbox/spec.md).
 
 ---
 

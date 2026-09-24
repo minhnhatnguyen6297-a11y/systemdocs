@@ -6,12 +6,25 @@
 > loading/empty/error/unavailable, `waiting_user`, cancel, dữ liệu chưa lưu,
 > cửa sổ Chromium headed và focus. Không chọn framework renderer, không widget
 > PySide6, không code.
+>
+> Phân chia SOT (cập nhật 24/09/2026, MIN-104): file này giữ UX **chung của
+> shell**. Spec hiện hành cho tab `Soạn hồ sơ` của module `notary_v2` —
+> taxonomy module/tab, luồng, bố cục, nút, trạng thái UI, UX xuất Word — là
+> [2026-09-24-notary-v2-case-drafting-electron-ux.md](2026-09-24-notary-v2-case-drafting-electron-ux.md);
+> hành vi/dữ liệu tab (Stage/Pool/Diagram, revision/conflict, suggestion) là
+> SOT của `notary_v2/docs/platform/case-workspace/drafting-tab.md`.
 
 ## 1. Navigation và layout
 
-- Nav trái cố định, 7 mục theo module registry MIN-64: Tổng quan, Upload/Audit,
-  Hồ sơ (Document Review), Excel/Word, Văn phòng (placeholder "Chưa triển
-  khai"), Tìm kiếm, Trạng thái/Cài đặt. Placeholder vẫn hiển thị, không ẩn.
+- Nav trái cố định theo taxonomy đích (MIN-104): ba **module nghiệp vụ**
+  `notary_v2`, `upload_lab`, `notaryoffice` (placeholder "Chưa triển khai",
+  vẫn hiển thị không ẩn) + hai **tiện ích shell** `Tra cứu` và
+  `Trạng thái/Cài đặt`. Bên trong `notary_v2` có ba tab con `Tổng quan hồ
+  sơ` / `Soạn hồ sơ` / `Word`; Excel import là tính năng nhập **trong** tab
+  `Soạn hồ sơ`, không phải module/mục nav chính. Taxonomy đầy đủ → spec
+  `2026-09-24-notary-v2-case-drafting-electron-ux.md` §1. ID kỹ thuật cũ
+  `document-review`/`excel-word` giữ tương thích một chu kỳ chuyển đổi,
+  không còn là nhãn nav.
 - Window mặc định 1280×820; vẫn dùng được ở snap tối thiểu 760×520. Light
   theme trước; dark không bắt buộc trong G1-SM.
 - **Đổi module không mất state/job** (SM-07): rời module A sang B rồi quay lại
@@ -79,15 +92,26 @@ idle → checking → running → waiting_user → running → completed
 
 ### 5.2 notary_v2: case → intake/OCR → review/confirm → workspace → Word
 
+> UX cấp sản phẩm và hành vi chi tiết của tab `Soạn hồ sơ` (Stage/Pool/
+> Diagram, intake đa nguồn, commit/revision/conflict, xuất Word nhiều văn
+> bản) là SOT của `2026-09-24-notary-v2-case-drafting-electron-ux.md` +
+> `notary_v2/docs/platform/case-workspace/drafting-tab.md`. Bảng dưới chỉ
+> giữ acceptance theo vocabulary trạng thái chung của shell.
+
 | Bước | Trạng thái | UX bắt buộc |
 |---|---|---|
 | Danh sách/tạo case | idle/running | list rỗng → Empty state |
 | OCR intake | running→waiting_user | kết quả theo lớp RAW→…→INFERRED + source_ref |
 | Review/confirm | waiting_user | từng trường: raw vs normalized; confirm = hành động người; unconfirmed không vào business truth |
-| Case Workspace | idle | Stage/Pool/Diagram; lưu nháp không mất khi đổi module |
-| Zalo Inbox (trong scope G1-SM) | running/waiting_user | batch/media theo trạng thái; confirm-save là người |
-| Word export | running→completed | file sinh ra → mở/save dialog Electron |
+| Soạn hồ sơ (Case Workspace) | idle | Stage/Pool/Diagram; draft không mất khi đổi module — chi tiết → spec `2026-09-24` + `drafting-tab.md` |
+| Word export | running→completed/partial | Đích (spec `2026-09-24` §7): popup chọn **nhiều** văn bản → **một** folder đích qua native directory picker → mỗi văn bản một `.docx` độc lập; trùng tên tự thêm `_2`/`_3`; kết quả `Đã lưu`/`Lỗi` theo từng file |
 | Local OCR | **unavailable** | hiển thị "Không khả dụng (stack parked)" — D0-3 pending |
+
+- **Zalo (ngoài luồng tab — quyết định owner 24/09):** tab `Soạn hồ sơ`
+  **không có** nút/popup/command/trạng thái Zalo. Module Zalo là phần mềm
+  riêng, trao đổi với máy chính qua contract riêng — spec giao tiếp hiện ở
+  `notary_v2/docs/platform/zalo-document-inbox/` trong giai đoạn chuyển
+  tiếp; không tải hoặc xem trước ảnh Zalo trong app.
 
 ## 6. Diagnostics & error surface
 

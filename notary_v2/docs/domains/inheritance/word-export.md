@@ -1,6 +1,7 @@
 # Word Export UX và Flow
 
-Cập nhật: 22/07/2026
+Cập nhật: 24/09/2026 — phân biệt hiện trạng web / đích Electron ở §5 và §7
+(MIN-104). Bản gốc 22/07/2026 chỉ mô tả hiện trạng web.
 
 ## 1. Mục đích
 
@@ -69,7 +70,7 @@ Ví dụ:
 
 ## 5. UX xuất Word
 
-Điều kiện trước khi xuất:
+Điều kiện trước khi xuất (áp dụng cho cả hiện trạng và đích):
 
 - Stage đã có người.
 - Diagram đã lưu quan hệ.
@@ -77,20 +78,38 @@ Ví dụ:
 - Có ít nhất một người nhận.
 - Hồ sơ có tài sản.
 
-Luồng thao tác:
+### Hiện trạng web (`form.html`)
 
 1. User mở màn hình xuất Word.
 2. User chọn một template trong bảng mini `Mẫu Word`.
 3. App dùng toàn bộ tài sản đã liên kết với hồ sơ; không chọn lại người hoặc tài sản tại màn hình này.
 4. App lấy snapshot Stage, Diagram và danh sách tài sản.
 5. App dựng `WordExportContext`, resolver thay placeholder và tạo DOCX.
-6. App trả file để trình duyệt tải xuống. Thư mục lưu cuối cùng theo cấu hình
-   tải xuống của trình duyệt.
+6. App trả **một** file để trình duyệt tải xuống
+   (`routers/cases.py:1610-1663`, `form.html:3896-3903`). Thư mục lưu cuối
+   cùng theo cấu hình tải xuống của trình duyệt.
 
-Màn hình xuất Word chỉ có bảng chọn template và nút `Xuất`. Không có bảng chọn
-người nhận, người không nhận, người từ chối, người ký hoặc thư mục lưu. Người
-nhận/người không nhận được xác định từ Diagram; người từ chối chỉ lấy từ dữ liệu
-pháp lý riêng nếu có; danh sách tài sản lấy từ hồ sơ.
+Màn hình xuất Word hiện trạng chỉ có bảng chọn template và nút `Xuất`. Không
+có bảng chọn người nhận, người không nhận, người từ chối, người ký hoặc thư
+mục lưu. Người nhận/người không nhận được xác định từ Diagram; người từ chối
+chỉ lấy từ dữ liệu pháp lý riêng nếu có; danh sách tài sản lấy từ hồ sơ.
+
+### Đích Electron (tab `Soạn hồ sơ`)
+
+SOT hành vi đích: `../../platform/case-workspace/drafting-tab.md` §8; UX cấp
+sản phẩm đã khóa ở
+`docs/product/specs/2026-09-24-notary-v2-case-drafting-electron-ux.md` §7.
+File này chỉ chốt phần giao với nghiệp vụ văn bản:
+
+1. `Xuất Word` trong toolbar sơ đồ mở popup: user chọn **nhiều văn bản**
+   (checkbox `document_key`) và **một folder đích** qua native directory
+   picker.
+2. Mỗi văn bản đã chọn tạo **một `.docx` độc lập** trong folder đích.
+   **Không ZIP, không ghi đè** file có sẵn — trùng tên tự thêm `_2`, `_3`, …
+3. Kết quả báo **theo từng văn bản** (`Đã lưu`/`Lỗi` kèm lý do đúng văn bản
+   đó); file lỗi không làm mất các file đã thành công.
+4. Vẫn giữ: không chọn lại người/tài sản tại popup; người nhận/người không
+   nhận/người từ chối suy ra như §2; danh sách tài sản lấy từ hồ sơ.
 
 Khi có nhiều tài sản, `[Đoạn mô tả di sản]` bắt đầu bằng `Các quyền sử
 dụng đất như sau:`, sau đó đánh số tài sản `1`, `2`, ... Các dòng loại đất của
@@ -136,6 +155,9 @@ Chưa triển khai. Chỉ thêm khi cần đối chiếu nhiều đoạn trong c
 
 ## 7. Luồng xử lý kỹ thuật
 
+Pipeline nghiệp vụ giữ nguyên cho cả hiện trạng và đích — chỉ khác bước trả
+file cuối:
+
 ```text
 Stage
   -> Diagram state
@@ -144,11 +166,18 @@ Stage
   -> explicit resolver
   -> placeholder mapping
   -> DOCX
-  -> browser download
 ```
 
-Router chỉ nhận request, chọn template và trả file. Logic phân loại người,
-dựng câu và thay placeholder nằm trong service Word.
+- **Hiện trạng web:** `DOCX -> browser download` — router nhận request, chọn
+  một template và trả một file (`routers/cases.py:1610-1663`).
+- **Đích Electron:** `DOCX -> ghi vào folder user chọn` — qua hai command
+  `notary.word_export_options` (liệt kê văn bản sẵn sàng/bị chặn) và
+  `notary.word_export_batch` (tạo nhiều DOCX, kết quả theo từng file) trên
+  envelope `desktopcommand.v1`; wire shape chính thức thuộc MIN-105 — xem
+  `../../platform/case-workspace/drafting-tab.md` §8.
+
+Logic phân loại người, dựng câu và thay placeholder nằm trong service Word;
+router/command chỉ nhận request, chọn văn bản và trả/ghi file.
 
 ## 8. Kiểm tra trước khi trả file
 

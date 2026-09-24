@@ -1,6 +1,6 @@
 # Case user flow spec - Hồ sơ thừa kế
 
-This file is the current UX/business spec for the case screen. It describes one unified flow for the `Hồ sơ thừa kế` model.
+This file is the current UX/business spec for the **web** case screen (hiện trạng). It describes one unified flow for the `Hồ sơ thừa kế` model.
 
 Read this before changing:
 - `frontend/templates/cases/form.html`
@@ -8,8 +8,25 @@ Read this before changing:
 - Stage / Pool / Diagram interaction
 - preview/export behavior that depends on case state
 - Word export UX and flow: `word-export.md`
+- Đích Electron — tab `Soạn hồ sơ` (SOT hành vi): `../../platform/case-workspace/drafting-tab.md`
 
 Resolved bug notes are historical. Active issues live in `plan.md`.
+
+**Phạm vi SOT — hiện trạng web vs đích Electron (MIN-104, 24/09/2026):**
+
+- Mọi mô tả trong file này là **hiện trạng web** (`form.html`) — bản fallback
+  đến cutover, trừ khi ghi khác.
+- **Đích Electron:** tab `Soạn hồ sơ` có SOT hành vi riêng tại
+  `../../platform/case-workspace/drafting-tab.md`; quyết định UX cấp sản
+  phẩm ở `docs/product/specs/2026-09-24-notary-v2-case-drafting-electron-ux.md`.
+  Luồng đích khác hiện trạng: intake đa nguồn (`image/pdf/docx/xlsx/text`)
+  → mọi kết quả là gợi ý chờ người kiểm tra → `Cập nhật` commit Stage
+  atomic (Người + Tài sản, một transaction, kèm `base_revision`) → Pool
+  derive lại → Diagram chỉ gán quan hệ → `Lưu sơ đồ` → `Xuất Word` nhiều
+  văn bản vào một folder đích.
+- File này giữ vai trò domain workflow cho nghiệp vụ thừa kế; không chép
+  nội dung spec tab. Khi hành vi đích khác hiện trạng, đọc `drafting-tab.md`
+  — không sửa file này thành spec Electron.
 
 ## 1. Core principles
 
@@ -134,6 +151,13 @@ Người không nhận = Tất cả người trên Diagram - Chủ đất - Ngư
 - Existing refusal fields may be read only for legacy migration; they are not a source of truth after the new rule is implemented.
 - Stage remains the source of truth for person data. Marking a landowner or receiver changes Diagram state only.
 - Receiver selection is scoped to the current asset. Multi-asset assignment will reuse the same rule separately for each asset.
+- **Đã chốt (owner 24/09/2026):** công thức `Người không nhận` ở trên được
+  giữ nguyên. Tranh cãi với `spec.md` §11.3 (DRAFT — đánh dấu sai vì trừ
+  nhóm `Chủ đất` nên bỏ sót chủ đất còn sống đã tắt `Nhận` ở một vòng di sản
+  khác, và không phân biệt `chưa quyết` với `đã quyết không nhận`) đã được
+  owner quyết theo phương án giữ công thức hiện tại; `drafting-tab.md` §6
+  ghi cùng quyết định. Nếu spec.md §11.3 được duyệt sau này phải sửa lại
+  cho khớp.
 
 ## 7. Delete / clear permissions
 
@@ -159,5 +183,6 @@ Before editing this flow, answer:
 - If deleting/moving in Diagram, should the person return to Pool or disappear because Stage no longer contains them?
 - If touching inheritance engine, did you read `spec.md`?
 - If touching Diagram UI/UX or connectors, did you read `ux.md`?
+- If touching đích Electron tab `Soạn hồ sơ`, did you read `../../platform/case-workspace/drafting-tab.md`?
 
 If unclear, stop and ask user before changing business logic.
