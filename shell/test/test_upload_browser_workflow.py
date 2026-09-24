@@ -198,12 +198,12 @@ class BrowserWorkflowCase(unittest.TestCase):
         data = snap["result"]["data"]
         return data["run_id"], [r["record_id"] for r in data["records"]]
 
-    def run_audit(self, contract_nos, name="so.xlsx"):
+    def run_audit(self, contract_nos, name="so.xlsx", website_id=WEBSITE):
         excel = Path(self.tempdir.name) / name
         _write_excel(excel, contract_nos)
         job = self.submit("upload.audit_excel", {
             "workflow_version": V1,
-            "website_id": WEBSITE,
+            "website_id": website_id,
             "file_ref": {"path": str(excel), "scope": "machine_local"},
             "from_date": "2026-01-01",
             "to_date": "2026-12-31",
@@ -366,6 +366,27 @@ class SingleBrowserThreadTest(BrowserWorkflowCase):
             what="saved_record_ids cap nhat qua idle poll")
         self.assertEqual(pjob.snapshot()["status"], "waiting_user")
 
+    def test_login_latched_authenticated_across_idle_polls(self):
+        """Engine tra 'authenticated' MOT LAN (one-shot) roi 'idle' mai —
+        snapshot phai giu authenticated sau nhieu nhip idle poll, va
+        session_start khong the tieu thu nham one-shot do."""
+        bid = self.login()
+        # Nhieu nhip idle poll sau khi one-shot da bi tieu thu.
+        time.sleep(0.3)  # ~6 poll ticks o 0.05s
+        data = self.session_status(bid)
+        self.assertEqual(data["login"]["status"], "authenticated")
+        # Chung minh raw engine da la 'idle' — latch la thu giu status,
+        # khong phai poll lap lai authenticated.
+        self.assertEqual(
+            self.session.poll_manual_login()["status"], "idle")
+        time.sleep(0.15)
+        data = self.session_status(bid)
+        self.assertEqual(data["login"]["status"], "authenticated")
+        # Op can login van chay duoc sau hang chuc nhip poll 'idle'.
+        dl = self.submit("upload.download_export", self.v1(
+            browser_id=bid, from_date="2026-01-01", to_date="2026-09-30"))
+        self.assertEqual(self.wait_terminal(dl)["status"], "succeeded")
+
     def test_session_status_reads_snapshot_never_spawns_browser(self):
         # 1) Unknown browser before any session: no spawn, scope_violation.
         job = self.submit("upload.session_status", self.v1(
@@ -376,20 +397,26 @@ class SingleBrowserThreadTest(BrowserWorkflowCase):
         self.assertIsNone(self.browser._thread,
                           "status query must not spawn browser thread")
 
-        # 2) After login: status returns snapshot without engine calls.
+        # 2) After login: status returns snapshot without ANY browser
+        # work. Idle poll van ghi session.calls moi nhip → dong bang no
+        # bang _poll_interval lon roi snapshot tap call TRUOC/SAU: status
+        # impl nao enqueue op (ke ca op poll gian tiep) deu bi lo.
         run_id, ids = self.run_scan()
         bid = self.login()
         session = self.session
         self.prepare(bid, run_id, ids[:1])
         self.wait_until(lambda: "prepare_manifest" in session.calls,
                         what="prepare chay xong")
+        self.browser._poll_interval = 600
+        time.sleep(0.25)  # cho nhip poll dang cho ket thuc
         session.calls.clear()
+        before = list(session.calls)
         data = self.session_status(bid)
         self.assertEqual(data["login"]["status"], "authenticated")
-        non_poll = [c for c in session.calls
-                    if c not in ("poll_manual_login", "poll_prepared_pages")]
-        self.assertEqual(non_poll, [],
-                         f"session_status enqueued browser ops: {non_poll}")
+        self.assertEqual(
+            list(session.calls), before,
+            f"session_status cham vao browser thread: {session.calls}")
+        self.browser._poll_interval = 0.05
 
     def test_one_mutating_browser_op_at_a_time(self):
         run_id, ids = self.run_scan()
@@ -454,6 +481,43 @@ class WaitIdentityTest(BrowserWorkflowCase):
         fj = self.finish_review(bid, job_b.job_id)
         self.assertEqual(self.wait_terminal(fj)["status"], "succeeded")
         self.assertEqual(self.wait_terminal(job_b)["status"], "succeeded")
+
+    def test_legacy_confirm_never_releases_versioned_wait(self):
+        """confirm_login/finish_review LEGACY (payload khong
+        workflow_version → release_any_wait) chi giai phong wait khong
+        scope — job versioned dang cho KHONG bi danh thuc nham."""
+        run_id, ids = self.run_scan()
+        bid = self.login()
+        pjob = self.prepare(bid, run_id, ids[:1])
+        self.wait_status(pjob, "waiting_user")
+
+        # Legacy finish_review → release_any_wait("review") khong scope.
+        legacy = self.submit("upload.finish_review", {})
+        self.assertEqual(self.wait_terminal(legacy)["status"], "succeeded")
+        self.assertEqual(pjob.snapshot()["status"], "waiting_user")
+
+        # Legacy confirm_login → release_any_wait("login") khong scope.
+        legacy = self.submit("upload.confirm_login", {})
+        self.assertEqual(self.wait_terminal(legacy)["status"], "succeeded")
+        self.assertEqual(pjob.snapshot()["status"], "waiting_user")
+
+        # Confirm versioned dung scope van giai phong binh thuong.
+        fj = self.finish_review(bid, pjob.job_id)
+        self.assertEqual(self.wait_terminal(fj)["status"], "succeeded")
+        self.assertEqual(self.wait_terminal(pjob)["status"], "succeeded")
+
+    def test_release_any_wait_only_touches_legacy_scope(self):
+        """Unit-level: release_any_wait bo qua wait co scope day du."""
+        w = self.browser
+        ev_versioned = w.register_wait(
+            "j-versioned", waiting_on="login",
+            website_id=WEBSITE, browser_id="brw_x")
+        ev_legacy = w.register_wait(
+            "j-legacy", waiting_on="login",
+            website_id=None, browser_id=None)
+        w.release_any_wait("login")
+        self.assertFalse(ev_versioned.is_set())
+        self.assertTrue(ev_legacy.is_set())
 
     def test_confirm_early_and_late(self):
         """Bấm xác nhận sớm (job chưa vào waiting) -> wrong_job và KHÔNG
@@ -620,6 +684,38 @@ class PrepareTest(BrowserWorkflowCase):
         self.assertEqual(data["summary"]["open_record_ids"], [])
         self.assertEqual(self.session.tabs, {})
 
+    def test_zero_padded_contract_excluded_consistently(self):
+        """Record '0101/2026/CCGD' + Excel '101/2026': queue danh 'da co
+        trong Excel' bang canonical (cat so 0) thi prepare PHAI loai no
+        khoi batch — normalize tho giu so 0 o mot phia se bo sot va
+        upload trung len web."""
+        run_id, ids = self.run_scan(["0101/2026/CCGD", "0102/2026/CCGD"])
+        audit_id = self.run_audit(["101/2026"])
+        queue = self.queue_get(run_id, audit_id)
+        rows = {r["contract_no"]: r for r in queue["folder_rows"]}
+        self.assertEqual(
+            rows["0101/2026/CCGD"]["ghi_chu"], "da co trong Excel")
+        self.assertFalse(rows["0101/2026/CCGD"]["selected"])
+        self.assertTrue(rows["0102/2026/CCGD"]["selected"])
+
+        bid = self.login()
+        job = self.prepare(bid, run_id, ids, audit_id=audit_id,
+                           queue_revision=queue["queue_revision"])
+        self.wait_status(job, "waiting_user")
+        # Record dem so 0 KHONG mo tab — chi 0102 duoc chuan bi; exclude
+        # set gui cho engine mang dang zero-keeping no se tu tinh.
+        self.assertEqual(sorted(self.session.tabs), [ids[1]])
+        kwargs = self.session.last_prepare_kwargs
+        self.assertEqual(kwargs["selected_record_ids"], {ids[1]})
+        self.assertIn("0101/2026", kwargs["exclude_contract_nos"])
+        fj = self.finish_review(bid, job.job_id)
+        self.wait_terminal(fj)
+        snap = self.wait_terminal(job)
+        self.assertEqual(snap["status"], "succeeded", snap["error"])
+        data = snap["result"]["data"]
+        self.assertEqual(data["summary"]["excluded_duplicates"], 1)
+        self.assertEqual(data["summary"]["prepared_count"], 1)
+
     def test_one_item_fails_partial_breakdown(self):
         run_id, ids = self.run_scan()
         bid = self.login()
@@ -714,6 +810,110 @@ class PrepareTest(BrowserWorkflowCase):
 
 
 # =====================================================================
+# upload.reconcile (§6.15)
+# =====================================================================
+
+@unittest.skipUnless(_engines_available(),
+                     "upload_lab engine/openpyxl missing")
+class ReconcileTest(BrowserWorkflowCase):
+    def test_reconcile_verifies_closed_tab_on_fresh_audit(self):
+        """Tab dong truoc khi Luu → needs_reconcile; audit MOI chua so
+        do → verified + registry uploaded_success + mo khoa +
+        queue_revision tang."""
+        run_id, ids = self.run_scan(["301/2026/CCGD", "302/2026/CCGD"])
+        bid = self.login()
+        job = self.prepare(bid, run_id, ids)
+        self.wait_status(job, "waiting_user")
+        self.session.user_close_tab(ids[0])
+        self.wait_until(
+            lambda: ids[0] in self.store.needs_reconcile_ids(WEBSITE),
+            what="tab dong → needs_reconcile")
+        fj = self.finish_review(bid, job.job_id)
+        self.wait_terminal(fj)
+        self.wait_terminal(job)
+        self.assertNotEqual(
+            self.registry_status(ids[0]), "uploaded_success")
+
+        audit_id = self.run_audit(["301/2026"])
+        qrev = self.store.queue_revision(run_id)
+        rjob = self.submit("upload.reconcile", self.v1(
+            run_id=run_id, audit_id=audit_id))
+        snap = self.wait_terminal(rjob)
+        self.assertEqual(snap["status"], "succeeded", snap["error"])
+        data = snap["result"]["data"]
+        self.assertEqual(data["verified_record_ids"], [ids[0]])
+        self.assertEqual(data["needs_reconcile_record_ids"], [])
+        self.assertEqual(
+            self.registry_status(ids[0]), "uploaded_success")
+        self.assertNotIn(
+            ids[0], self.store.needs_reconcile_ids(WEBSITE))
+        self.assertGreater(self.store.queue_revision(run_id), qrev)
+        # Audit moi da gan vao run de dot sau dung.
+        self.assertEqual(
+            self.store.audit_for_run(run_id)["audit_id"], audit_id)
+
+    def test_reconcile_audit_without_number_keeps_flag(self):
+        """Audit moi KHONG chua so → giu needs_reconcile, khong ghi
+        uploaded_success."""
+        run_id, ids = self.run_scan(["303/2026/CCGD"])
+        rid = ids[0]
+        self.store.add_needs_reconcile(
+            WEBSITE, [rid], run_id=run_id, reason="test")
+        audit_id = self.run_audit(["999/2026"])
+        rjob = self.submit("upload.reconcile", self.v1(
+            run_id=run_id, audit_id=audit_id))
+        snap = self.wait_terminal(rjob)
+        self.assertEqual(snap["status"], "succeeded", snap["error"])
+        data = snap["result"]["data"]
+        self.assertEqual(data["verified_record_ids"], [])
+        self.assertEqual(data["needs_reconcile_record_ids"], [rid])
+        self.assertIn(rid, self.store.needs_reconcile_ids(WEBSITE))
+        self.assertNotEqual(self.registry_status(rid), "uploaded_success")
+
+    def test_reconcile_scope_violations(self):
+        """Sai scope → structured error, khong doi chieu boi."""
+        run_id, ids = self.run_scan(["304/2026/CCGD"])
+        self.store.add_needs_reconcile(
+            WEBSITE, ids, run_id=run_id, reason="test")
+        audit_id = self.run_audit(["304/2026"])
+
+        # run khong ton tai → scope_violation
+        job = self.submit("upload.reconcile", self.v1(
+            run_id="run_khong_co", audit_id=audit_id))
+        snap = self.wait_terminal(job)
+        self.assertEqual(snap["status"], "failed")
+        self.assertEqual(snap["error"]["code"], "scope_violation")
+
+        # audit khong ton tai → scope_violation
+        job = self.submit("upload.reconcile", self.v1(
+            run_id=run_id, audit_id="aud_khong_co"))
+        snap = self.wait_terminal(job)
+        self.assertEqual(snap["status"], "failed")
+        self.assertEqual(snap["error"]["code"], "scope_violation")
+
+        # audit cua website khac → website_mismatch
+        fixture.register_fake_portal_website(
+            self.portal, website_id="fake_other")
+        self.addCleanup(self._unregister_other)
+        audit_other = self.run_audit(
+            ["304/2026"], name="so-khac.xlsx", website_id="fake_other")
+        job = self.submit("upload.reconcile", self.v1(
+            run_id=run_id, audit_id=audit_other))
+        snap = self.wait_terminal(job)
+        self.assertEqual(snap["status"], "failed")
+        self.assertEqual(snap["error"]["code"], "website_mismatch")
+
+        # needs_reconcile con nguyen sau moi lan fail.
+        self.assertEqual(
+            sorted(self.store.needs_reconcile_ids(WEBSITE)), sorted(ids))
+
+    def _unregister_other(self):
+        providers = engine_roots.import_engine_module(
+            "upload_lab", "providers")
+        providers.DEFAULT_REGISTRY._providers.pop("fake_other", None)
+
+
+# =====================================================================
 # Session problems: expiry, browser lost, close semantics
 # =====================================================================
 
@@ -721,15 +921,22 @@ class PrepareTest(BrowserWorkflowCase):
                      "upload_lab engine/openpyxl missing")
 class SessionProblemTest(BrowserWorkflowCase):
     def test_expired_session_prepare_fails_structured(self):
+        """Session portal het han (engine RuntimeError 'Session da het
+        han') → upload.login_not_confirmed + login_required — UI dua
+        dang nhap lai thay vi retry mu."""
         run_id, ids = self.run_scan()
         bid = self.login()
         self.portal.expire()
         job = self.prepare(bid, run_id, ids)
         snap = self.wait_terminal(job)
         self.assertEqual(snap["status"], "failed")
-        self.assertEqual(snap["error"]["code"], "engine_unavailable")
+        self.assertEqual(snap["error"]["code"], "upload.login_not_confirmed")
         self.assertTrue(snap["error"]["retryable"])
+        self.assertEqual(snap["error"]["next_action"], "login_required")
         self.assertEqual(self.session.tabs, {})
+        # Latch da bi bo: status khong con bao authenticated.
+        self.assertEqual(self.browser.snapshot()["login"]["status"],
+                         "unknown")
 
     def test_download_requires_login(self):
         run_id, ids = self.run_scan()

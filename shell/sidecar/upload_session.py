@@ -55,6 +55,21 @@ _LOGIN_STATUS_MAP = {
     "navigation_error": "unknown",
 }
 
+# Engine tra "authenticated" MOT LAN duy nhat (poll_manual_login dat
+# login_page=None khi nhan dien xong → cac poll sau chi tra "idle").
+# Snapshot latch trang thai do cho live session: idle/navigation_error/
+# timeout sau mot lan authenticated KHONG duoc ha status xuong. Chi reset
+# khi _close_session/_session_lost/open_manual_login moi.
+_LATCH_SUPPRESS = frozenset({"idle", "navigation_error", "timeout"})
+
+
+def _engine_auth_expired(exc) -> bool:
+    """Engine bao phien dang nhap het han (RuntimeError 'Session da het
+    han' o prepare/download/staff) → can dang nhap lai, khong phai loi
+    engine thuong."""
+    msg = str(exc).lower()
+    return "het han" in msg or "hết hạn" in msg
+
 
 def _now_z() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace(
@@ -115,6 +130,12 @@ class _BrowserWorker:
         # Scope cua session hien tai: None = chua mo / legacy (engine root).
         self._website_id = None
         self.browser_id = None
+        # Latch authenticated (chi browser thread ghi): engine tra one-shot
+        # "authenticated" roi "idle" — snapshot phai giu authenticated.
+        self._login_latched = False
+        # Future cua op dang dispatch — loop exit phai fail no + moi op con
+        # xep hang, khong de caller treo vo han (thread chet giua op).
+        self._inflight = None
 
     # ------------------------------------------------------------ thread
     def _ensure_thread(self):
@@ -232,13 +253,18 @@ class _BrowserWorker:
             self._waits.pop(job_id, None)
 
     def release_any_wait(self, waiting_on):
-        """Legacy global-confirm: danh thuc moi wait dang `waiting_on` nay.
+        """Legacy global-confirm: danh thuc moi wait LEGACY dang
+        `waiting_on` nay.
 
-        Chi luong legacy (khong website/browser scope) dung — command
-        versioned di qua `confirm_wait` co kiem scope tung job."""
+        Chi giai phong wait khong scope (website_id=None va browser_id=None
+        — duong legacy). Wait versioned co scope day du: confirm legacy
+        khong bao gio danh thuc job versioned — di qua `confirm_wait` co
+        kiem scope tung job + wrong_job phia command."""
         with self._lock:
             recs = [rec for rec in self._waits.values()
-                    if rec.waiting_on == waiting_on]
+                    if rec.waiting_on == waiting_on
+                    and rec.website_id is None
+                    and rec.browser_id is None]
         for rec in recs:
             rec.event.set()
 
@@ -254,34 +280,64 @@ class _BrowserWorker:
 
     # ------------------------------------------------------------ loop
     def _loop(self):
-        while not self._stop.is_set():
-            try:
-                op, args, kwargs, website_id, fut = self._queue.get(
-                    timeout=self._poll_interval)
-            except queue.Empty:
+        try:
+            while not self._stop.is_set():
+                try:
+                    op, args, kwargs, website_id, fut = self._queue.get(
+                        timeout=self._poll_interval)
+                except queue.Empty:
+                    self._poll_browser()
+                    continue
+                with self._lock:
+                    self._inflight = fut
+                try:
+                    fut.set_result(
+                        self._dispatch(op, args, kwargs, website_id))
+                except Exception as exc:  # noqa: BLE001 — boundary
+                    fut.set_error(exc)
+                finally:
+                    with self._lock:
+                        self._inflight = None
+                # Sau moi op poll lai trang thai — engine op thuong thay
+                # doi login/tab (mau ui_qt/workers.py:_browser_loop).
                 self._poll_browser()
-                continue
+        finally:
             try:
-                fut.set_result(
-                    self._dispatch(op, args, kwargs, website_id))
-            except Exception as exc:  # noqa: BLE001 — boundary
-                fut.set_error(exc)
-            # Sau moi op poll lai trang thai — engine op thuong thay doi
-            # login/tab (mau ui_qt/workers.py:_browser_loop).
-            self._poll_browser()
-        self._close_session()
+                self._close_session()
+            finally:
+                # Thread dung (shutdown/crash): moi Future chua resolve —
+                # dang dispatch hoac con xep hang — phai that bai ro rang
+                # thay vi de caller cho vo han.
+                self._fail_pending()
+
+    def _fail_pending(self):
+        """Fail moi op dang dispatch/xep hang khi browser thread thoat."""
+        with self._lock:
+            inflight = self._inflight
+            self._inflight = None
+        exc = CommandError(
+            "engine_unavailable",
+            "browser thread da dung giua chung — thu lai",
+            retryable=True, next_action="retry")
+        if inflight is not None:
+            inflight.set_error(exc)
+        while True:
+            try:
+                _op, _a, _k, _w, queued = self._queue.get_nowait()
+            except queue.Empty:
+                return
+            try:
+                queued.set_error(exc)
+            except Exception:
+                pass
 
     def _dispatch(self, op, args, kwargs, website_id):
         import_engine_module("upload_lab", "playwright_uploader")
-        if op == "_poll_now":
-            # Reconcile dong bo: chay _poll_browser ngay trong dispatch de
-            # snapshot/store moi nhat khi call() tra ve (finish_review doc
-            # saved ngay sau do — khong dua vao nhip idle poll).
-            self._poll_browser()
-            return {"polled": True}
-        if op == "_close":
-            # Close van kiem scope — khong cho command cua website khac
-            # dong nham session dang phuc vu (loai tru legacy None↔None).
+        if op in ("_poll_now", "_close", "_poll_then_close"):
+            # Op noi bo van kiem scope — khong cho command cua website
+            # khac poll/dong nham session dang phuc vu (loai tru legacy
+            # None↔None). _poll_then_close la MOT op: poll reconcile roi
+            # dong ngay tren cung luot dispatch — khong op nao xen giua.
             if self._session is not None \
                     and self._website_id != website_id:
                 if self._website_id is None or website_id is None:
@@ -292,10 +348,41 @@ class _BrowserWorker:
                 raise CommandError(
                     "website_mismatch",
                     f"browser dang phuc vu website {self._website_id!r}")
+            if op == "_poll_now":
+                # Reconcile dong bo: chay _poll_browser ngay trong dispatch
+                # de snapshot/store moi nhat khi call() tra ve
+                # (finish_review doc saved ngay sau do — khong dua vao
+                # nhip idle poll).
+                self._poll_browser()
+                return {"polled": True}
+            if op == "_poll_then_close":
+                self._poll_browser()
             self._close_session()
             return {"closed": True}
         session = self._ensure_session(website_id)
-        return getattr(session, op)(*args, **kwargs)
+        if op == "open_manual_login":
+            # Login flow moi: one-shot authenticated cu het gia tri —
+            # latch phai reset de idle sau do khong bao authenticated gia.
+            self._login_latched = False
+            with self._lock:
+                self._snapshot["login"] = {
+                    "status": "unknown", "checked_at": _now_z()}
+        try:
+            return getattr(session, op)(*args, **kwargs)
+        except RuntimeError as exc:
+            if _engine_auth_expired(exc):
+                # Session portal het han: latch authenticated khong con
+                # dung — snapshot phai bao can dang nhap lai (UI dua
+                # login_required thay vi retry mu).
+                self._expire_login()
+            raise
+
+    def _expire_login(self):
+        """Bo latch khi engine bao session het han (chi browser thread)."""
+        self._login_latched = False
+        with self._lock:
+            self._snapshot["login"] = {
+                "status": "unknown", "checked_at": _now_z()}
 
     # ------------------------------------------------------------ polling
     def _poll_browser(self):
@@ -331,6 +418,13 @@ class _BrowserWorker:
           needs_reconcile (mat dau truoc khi xac dinh).
         """
         status = str((login_result or {}).get("status") or "unknown")
+        if status == "authenticated":
+            self._login_latched = True
+        elif self._login_latched and status in _LATCH_SUPPRESS:
+            # One-shot authenticated da bi mot poll truoc tieu thu — giu
+            # nguyen authenticated cho live session (engine tra "idle"
+            # mai sau do cho toi khi session/login page thay doi).
+            status = "authenticated"
         login = {"status": _LOGIN_STATUS_MAP.get(status, "unknown"),
                  "checked_at": _now_z()}
         saved = sorted({int(i) for i in
@@ -431,6 +525,7 @@ class _BrowserWorker:
         with self._lock:
             self._snapshot["login"] = {
                 "status": "unknown", "checked_at": _now_z()}
+        self._login_latched = False
         try:
             self._close_session()
         except Exception:
@@ -485,6 +580,7 @@ class _BrowserWorker:
                 self._session = session
                 self._website_id = website_id
                 self.browser_id = browser_id
+                self._login_latched = False
                 with self._lock:
                     self._snapshot = _new_snapshot()
                     self._tab_runs.clear()
@@ -494,6 +590,7 @@ class _BrowserWorker:
                 self._session = uploader.NamDinhUploaderSession(
                     uploader.load_uploader_settings(root),
                     working_dir=root)
+                self._login_latched = False
         return self._session
 
     def request_stop(self):
@@ -530,6 +627,7 @@ class _BrowserWorker:
                     pass
             self._website_id = None
             self.browser_id = None
+            self._login_latched = False
             self._register_active_stop(None)
             self._release_waits_for_browser(browser_id)
 
@@ -545,6 +643,8 @@ class _Future:
         self._done.set()
 
     def set_error(self, exc):
+        if self._done.is_set():
+            return  # da resolve — khong ghi de ket qua thanh loi
         self._error = exc
         self._done.set()
 

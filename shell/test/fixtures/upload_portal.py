@@ -348,7 +348,10 @@ class PortalBrowserSession:
             if self.closed or self.login_page_closed:
                 return {"status": "closed"}
             if not self.login_page_open:
-                return {"status": "authenticated" if self.authed_seen else "idle"}
+                # Real engine: login_page=None sau khi nhan dien → one-shot
+                # "authenticated" da bi tieu thu, cac poll sau tra "idle"
+                # mai (KHONG lap lai authenticated nhu ban cu).
+                return {"status": "idle"}
         if self.portal.is_authenticated():
             with self._state:
                 self.login_page_open = False
