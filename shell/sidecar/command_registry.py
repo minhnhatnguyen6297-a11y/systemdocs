@@ -214,3 +214,26 @@ COMMANDS = {
     "upload.prepare": _upload("prepare_upload"),
     "upload.finish_review": _upload("finish_review"),
 }
+
+
+# notary.* case-drafting v1 (MIN-106) — route qua gateway: mock khi
+# G1_DEV_NOTARY_MOCK=1 + khong packaged, con lai real backend
+# (notary_adapter, them o MIN-107..110). Import lazy — thieu backend chi
+# lam command loi engine_not_installed, khong sap sidecar.
+def _notary_drafting(fn_name):
+    def call(job, payload):
+        import notary_gateway
+        return notary_gateway.dispatch(fn_name, job, payload)
+    return call
+
+
+COMMANDS.update({
+    "notary.workspace_get": _notary_drafting("workspace_get"),
+    "notary.intake_analyze": _notary_drafting("intake_analyze"),
+    "notary.workspace_commit_stage":
+        _notary_drafting("workspace_commit_stage"),
+    "notary.diagram_evaluate": _notary_drafting("diagram_evaluate"),
+    "notary.diagram_save": _notary_drafting("diagram_save"),
+    "notary.word_export_options": _notary_drafting("word_export_options"),
+    "notary.word_export_batch": _notary_drafting("word_export_batch"),
+})

@@ -10,6 +10,20 @@ const HEALTHZ_POLL_MS = 250;
 const RESTART_BACKOFF_MS = [1_000, 3_000, 10_000]; // toi da 3 lan (contract §7)
 const SHUTDOWN_GRACE_MS = 3_000;
 const JOB_POLL_MS = 1_000;
+const NOTARY_MOCK_ENV = 'G1_DEV_NOTARY_MOCK'; // dev-only mock notary (MIN-106)
+
+function stripNotaryMockEnv(appIsPackaged, log) {
+  // Sidecar ke thua process.env (sidecar.js spawn env) — dev: flag =1 di
+  // thang xuong sidecar, gateway chon mock. Packaged: strip flag khoi env
+  // con + warning redact (chi ten bien, khong gia tri) — mock khong bao gio
+  // chay tren ban dong goi.
+  if (!appIsPackaged) return;
+  if (process.env[NOTARY_MOCK_ENV] === undefined) return;
+  delete process.env[NOTARY_MOCK_ENV];
+  if (log && typeof log.warn === 'function') {
+    log.warn(`${NOTARY_MOCK_ENV} bi bo qua tren ban packaged — backend real`);
+  }
+}
 
 function sidecarCommand(appIsPackaged, resourcesPath, shellRoot) {
   if (appIsPackaged) {
@@ -36,5 +50,7 @@ module.exports = {
   RESTART_BACKOFF_MS,
   SHUTDOWN_GRACE_MS,
   JOB_POLL_MS,
+  NOTARY_MOCK_ENV,
   sidecarCommand,
+  stripNotaryMockEnv,
 };

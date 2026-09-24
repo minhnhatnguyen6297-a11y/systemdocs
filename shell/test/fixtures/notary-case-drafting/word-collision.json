@@ -1,0 +1,22 @@
+{
+  "scenario": "word-collision",
+  "description": "Case 42 ready; destination da co 'Van_ban_khai_nhan_di_san_HS-42.docx' -> file moi la '..._HS-42_2.docx'. Test tao file trung truoc trong tmp dir; khong bao gio ghi de.",
+  "cases": {
+    "42": { "$ref_scenario": "ready" }
+  },
+  "request": {
+    "word_export_batch": {
+      "case_id": 42,
+      "document_keys": ["khai_nhan_di_san"],
+      "destination": {
+        "path": "<TMP_DEST>",
+        "scope": "machine_local",
+        "is_dir": true
+      }
+    }
+  },
+  "preexisting_files": [
+    "Van_ban_khai_nhan_di_san_HS-42.docx",
+    "Van_ban_khai_nhan_di_san_HS-42_2.docx"
+  ]
+}

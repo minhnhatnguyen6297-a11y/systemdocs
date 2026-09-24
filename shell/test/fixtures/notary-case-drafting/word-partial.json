@@ -1,0 +1,18 @@
+{
+  "scenario": "word-partial",
+  "description": "Case 42 ready; batch gom khai_nhan_di_san (ready -> saved) + niem_yet (khong co template -> failed word.template_missing) -> job partial + breakdown.",
+  "cases": {
+    "42": { "$ref_scenario": "ready" }
+  },
+  "request": {
+    "word_export_batch": {
+      "case_id": 42,
+      "document_keys": ["khai_nhan_di_san", "niem_yet"],
+      "destination": {
+        "path": "<TMP_DEST>",
+        "scope": "machine_local",
+        "is_dir": true
+      }
+    }
+  }
+}

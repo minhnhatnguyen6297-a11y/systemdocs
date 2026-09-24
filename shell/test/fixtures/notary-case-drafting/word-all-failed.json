@@ -1,0 +1,18 @@
+{
+  "scenario": "word-all-failed",
+  "description": "Case 43 empty (khong tai san -> word.no_assets); batch khai_nhan_di_san + niem_yet -> ca hai failed -> job failed{word_batch_failed, details.documents[]}. Khong file nao duoc tao.",
+  "cases": {
+    "43": { "$ref_scenario": "empty" }
+  },
+  "request": {
+    "word_export_batch": {
+      "case_id": 43,
+      "document_keys": ["khai_nhan_di_san", "niem_yet"],
+      "destination": {
+        "path": "<TMP_DEST>",
+        "scope": "machine_local",
+        "is_dir": true
+      }
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "scenario": "intake-partial",
+  "description": "Case 42 ready; intake 3 nguon: text + pdf thanh cong, text thu 3 co marker 'mock_fail' -> errors[] intake.parse_failed -> job partial + breakdown theo source_id.",
+  "cases": {
+    "42": {
+      "case_type": "inheritance",
+      "document_type": "khai_nhan",
+      "status": "draft",
+      "locked": false,
+      "revision": 7,
+      "stage": { "people": [], "assets": [] },
+      "diagram": {
+        "state": { "version": 2, "nodes": [] },
+        "render_model": null,
+        "warnings": []
+      }
+    }
+  },
+  "request": {
+    "intake_analyze": {
+      "case_id": 42,
+      "sources": [
+        {
+          "source_id": "aaaaaaaa-0000-4000-8000-000000000001",
+          "kind": "text",
+          "text": "Ông Người Mẫu I, sinh năm 1950, giấy tờ mẫu, địa chỉ mẫu intake."
+        },
+        {
+          "source_id": "aaaaaaaa-0000-4000-8000-000000000002",
+          "kind": "pdf",
+          "file_ref": {
+            "path": "D:/mock-intake/gcn-mau.pdf",
+            "scope": "machine_local",
+            "media_type": "application/pdf",
+            "size_bytes": 2048
+          }
+        },
+        {
+          "source_id": "aaaaaaaa-0000-4000-8000-000000000003",
+          "kind": "text",
+          "text": "mock_fail — đoạn text không trích được thực thể nào (mô phỏng)"
+        }
+      ]
+    }
+  }
+}

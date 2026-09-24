@@ -40,7 +40,9 @@ class SidecarContractTest(unittest.TestCase):
         cls.port = _free_port()
         cls.base = f"http://127.0.0.1:{cls.port}"
         env = dict(os.environ, SIDECAR_PORT=str(cls.port),
-                   SIDECAR_TOKEN=TOKEN)
+                   SIDECAR_TOKEN=TOKEN,
+                   # MIN-106: dev flag -> gateway chon mock cho notary.* v1
+                   G1_DEV_NOTARY_MOCK="1")
         cls.proc = subprocess.Popen(
             [sys.executable, str(SIDECAR_DIR / "app.py")],
             cwd=str(SIDECAR_DIR), env=env,
@@ -268,6 +270,74 @@ class SidecarContractTest(unittest.TestCase):
         final = self._wait_job(job["job_id"])
         self.assertEqual(final["status"], "canceled")
         self.assertEqual(final["error"]["code"], "user_canceled")
+
+    # ----- notary.* case-drafting v1 qua mock backend (G1_DEV_NOTARY_MOCK=1)
+
+    def test_notary_workspace_get_mock(self):
+        job = self.http.post("/v1/commands", json=_new_cmd(
+            "notary.workspace_get", {"case_id": 42})).json()
+        final = self._wait_job(job["job_id"])
+        self.assertEqual(final["status"], "succeeded")
+        res = final["result"]
+        self.assertEqual(res["kind"], "workspace_get")
+        data = res["data"]
+        self.assertEqual(data["schema_version"], "notary.case-drafting.v1")
+        self.assertEqual(data["backend_mode"], "mock")
+        self.assertEqual(data["case"]["id"], 42)
+        self.assertIn("capabilities", data)
+
+    def test_notary_case_not_found(self):
+        job = self.http.post("/v1/commands", json=_new_cmd(
+            "notary.workspace_get", {"case_id": 9999})).json()
+        final = self._wait_job(job["job_id"])
+        self.assertEqual(final["status"], "failed")
+        self.assertEqual(final["error"]["code"], "case_not_found")
+
+    def test_notary_intake_partial_breakdown(self):
+        sources = [
+            {"source_id": str(uuid.uuid4()), "kind": "text",
+             "text": "Người Mẫu I, sinh 1950"},
+            {"source_id": str(uuid.uuid4()), "kind": "text",
+             "text": "mock_fail — khong trich duoc (mo phong)"},
+        ]
+        job = self.http.post("/v1/commands", json=_new_cmd(
+            "notary.intake_analyze",
+            {"case_id": 43, "sources": sources})).json()
+        final = self._wait_job(job["job_id"])
+        self.assertEqual(final["status"], "partial")
+        bd = final["result"]["data"]["breakdown"]
+        self.assertEqual(len(bd["succeeded"]), 1)
+        self.assertEqual(bd["failed"], [sources[1]["source_id"]])
+
+    def test_notary_locked_write_rejected(self):
+        job = self.http.post("/v1/commands", json=_new_cmd(
+            "notary.workspace_commit_stage",
+            {"case_id": 44, "base_revision": 3,
+             "stage": {"people": [], "assets": []}})).json()
+        final = self._wait_job(job["job_id"])
+        self.assertEqual(final["status"], "failed")
+        self.assertEqual(final["error"]["code"], "workspace_locked")
+
+    def test_notary_word_export_idempotent_no_duplicate(self):
+        import docx
+        with tempfile.TemporaryDirectory() as td:
+            cid = str(uuid.uuid4())
+            cmd = _new_cmd("notary.word_export_batch", {
+                "case_id": 42, "document_keys": ["khai_nhan_di_san"],
+                "destination": {"path": td, "scope": "machine_local",
+                                "is_dir": True}}, command_id=cid)
+            j1 = self.http.post("/v1/commands", json=cmd).json()
+            final = self._wait_job(j1["job_id"])
+            self.assertEqual(final["status"], "succeeded")
+            doc = final["result"]["data"]["documents"][0]
+            self.assertEqual(doc["status"], "saved")
+            out = Path(doc["output_file"]["path"])
+            self.assertTrue(out.is_file())
+            docx.Document(str(out))        # DOCX hop le
+            # retry cung command_id -> cung job -> khong tao file moi
+            j2 = self.http.post("/v1/commands", json=cmd).json()
+            self.assertEqual(j2["job_id"], j1["job_id"])
+            self.assertEqual(len(list(Path(td).glob("*.docx"))), 1)
 
 
 if __name__ == "__main__":
