@@ -608,7 +608,13 @@ function createNotaryModuleView(deps) {
       if (!ok) return;
     }
     activeTab = 'drafting';
-    model.openCase(id);
+    try {
+      await model.openCase(id);
+    } catch (e) {
+      // client.run reject (bridge/engine loi khong bat duoc) — model da
+      // set state loi rieng; day chi chan unhandled rejection.
+      notify(`openCase lỗi: ${e && e.message || e}`, true);
+    }
   };
 
   panels.overview.append(buildCaseListPanel(openCaseInDrafting));
@@ -640,11 +646,15 @@ function createNotaryModuleView(deps) {
       el.hidden = k !== activeTab;
     }
     const dp = panels.drafting;
-    // Emit nen (jobUpdate/status poll) trong luc dang go trong row detail:
-    // hoan rebuild de input khong mat focus/gia tri — render sau lan emit
-    // ke tiep (blur/change hoac action tiep theo cua nguoi dung).
+    // Emit nen (jobUpdate/status poll) trong luc dang go trong drafting
+    // panel: hoan rebuild de input khong mat focus/gia tri — render sau
+    // lan emit ke tiep (blur/change hoac action tiep theo cua nguoi
+    // dung). Bat ky input/textarea/select nao trong panel (row detail,
+    // pool search, ...), khong chi .cd-row-detail.
     const ae = document.activeElement;
-    if (ae && dp.contains(ae) && ae.closest('.cd-row-detail')) {
+    if (ae && dp.contains(ae) &&
+        (ae.closest('.cd-row-detail') ||
+         /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName || ''))) {
       return;
     }
     dp.innerHTML = '';

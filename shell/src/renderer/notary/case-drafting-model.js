@@ -133,7 +133,12 @@ function createModel(deps) {
     if (u !== lastUnsaved) {
       lastUnsaved = u;
       if (typeof deps.onUnsavedChange === 'function') {
-        try { deps.onUnsavedChange(u); } catch (e) { /* bridge loi */ }
+        try {
+          const p = deps.onUnsavedChange(u);
+          // Bridge co the tra promise (IPC invoke) — nuot rejection de
+          // khong lam sap emit/unhandled rejection.
+          if (p && typeof p.catch === 'function') p.catch(() => {});
+        } catch (e) { /* bridge loi */ }
       }
     }
     for (const cb of subs) {
@@ -191,7 +196,11 @@ function createModel(deps) {
     state.diagram = clone(dg.state || { version: DIAGRAM_VERSION, nodes: [] });
     state.committedDiagram = clone(state.diagram);
     state.renderModel = dg.render_model || null;
-    state.diagramWarnings = dg.warnings || [];
+    // dg.warnings = warning compose stage (list[string], real backend);
+    // render_model.warnings = warning engine [{code,message}] — gop ca
+    // hai de canh bao pool/serial hien ngay khi mo, khong doi evaluate.
+    state.diagramWarnings = (dg.warnings || [])
+      .concat((dg.render_model && dg.render_model.warnings) || []);
     state.stageDirty = false;
     state.diagramDirty = false;
     state.fieldErrors = [];
@@ -385,12 +394,33 @@ function createModel(deps) {
     state.committed = clone(d.stage || state.stage);
     state.stage = clone(state.committed);
     if (d.diagram) {
-      // Commit prune + re-evaluate trong transaction (§6.1): draft
-      // diagram nap lai theo state server da prune, khong con dirty.
-      state.diagram = clone(d.diagram.state || state.diagram);
-      state.committedDiagram = clone(state.diagram);
+      // Commit prune + re-evaluate trong transaction (§6.1). Baseline
+      // committed luon nap theo state server da prune.
+      state.committedDiagram = clone(d.diagram.state ||
+                                     state.committedDiagram);
+      if (state.diagramDirty) {
+        // Draft diagram co thay doi chua luu — KHONG thay bang ban
+        // server (mat assignment chua persist). Mirror _prune_diagram
+        // phia client: bo gan personId khong con trong stage committed
+        // moi (giong removeStageRow), giu nguyen cac assignment khac.
+        const ids = new Set(state.committed.people.map((p) => p.row_id));
+        for (const n of state.diagram.nodes || []) {
+          if (n && n.personId && !ids.has(n.personId)) {
+            n.personId = null;
+          }
+        }
+        // diagramDirty giu true — user van phai "Lưu sơ đồ" de persist;
+        // evaluatedRevision giu nguyen de badge "Stage đã đổi kể từ lần
+        // đánh giá" bao khi rm hien thi chua mo ta draft hien tai.
+      } else {
+        state.diagram = clone(d.diagram.state || state.diagram);
+        // rm tu commit duoc evaluate tren stage@revision moi — danh dau
+        // de badge khong bao "stale" sai.
+        state.evaluatedRevision = d.revision;
+      }
       state.renderModel = d.diagram.render_model || state.renderModel;
-      state.diagramDirty = false;
+      state.diagramWarnings =
+        (d.diagram.render_model && d.diagram.render_model.warnings) || [];
     }
     state.stageDirty = false;
     state.fieldErrors = [];
@@ -513,6 +543,10 @@ function createModel(deps) {
     }
     state.renderModel = r.data.render_model || null;
     state.evaluatedRevision = r.data.evaluated_revision;
+    // Warnings engine gan nhat — diagram.warnings chi co tren
+    // workspace_get; evaluate/save tra warnings trong render_model (§7.2).
+    state.diagramWarnings =
+      (r.data.render_model && r.data.render_model.warnings) || [];
     state.diagramErrors = [];
     emit();
     return r;
@@ -552,6 +586,10 @@ function createModel(deps) {
       state.diagram = clone(d.diagram.state || state.diagram);
       state.committedDiagram = clone(state.diagram);
       state.renderModel = d.diagram.render_model || state.renderModel;
+      state.diagramWarnings =
+        (d.diagram.render_model && d.diagram.render_model.warnings) || [];
+      // rm evaluate tren state vua persist o revision moi.
+      state.evaluatedRevision = d.revision;
     }
     state.diagramDirty = false;
     state.diagramErrors = [];
@@ -613,7 +651,14 @@ function createModel(deps) {
     const d = r.data || {};
     // Ket qua moi them LEN TREN, khong xoa ngam suggestion cu (plan §13);
     // loi per-source tich luy theo source_id, khong lan sang nguon khac.
-    state.suggestions = (d.suggestions || []).concat(state.suggestions);
+    // Dedupe theo suggestion_id: backend co the emit lai id da co (re-
+    // analyze cung source) — ban moi thay ban cu, van nam dau danh sach.
+    const incoming = d.suggestions || [];
+    const newIds = new Set(
+      incoming.map((s) => s && s.suggestion_id).filter(Boolean));
+    state.suggestions = incoming.concat(
+      state.suggestions.filter(
+        (s) => !(s && newIds.has(s.suggestion_id))));
     state.intakeErrors = (d.errors || []).concat(state.intakeErrors);
     state.intakePartial = !!r.partial;
     emit();

@@ -15,6 +15,7 @@ const { SidecarManager } = require('./sidecar');
 const { JobTracker } = require('./job-tracker');
 const { registerIpc } = require('./ipc');
 const { makeFileTokenStore, pickedEntry } = require('./file-tokens');
+const { openPathBlockReason } = require('./open-path');
 
 const SHELL_ROOT = path.join(__dirname, '..', '..');
 const SMOKE = process.env.G1_SMOKE === '1'; // packaged smoke: chay probe roi thoat
@@ -72,6 +73,12 @@ async function openPath(opts = {}) {
   if (!fs.existsSync(p) || !fs.statSync(p).isFile()) {
     throw Object.assign(new Error('file khong ton tai'),
       { code: 'file_not_found' });
+  }
+  // Whitelist extension: chi mo tai lieu/san pham engine — khong cho
+  // renderer shell.openPath executable/script (.exe/.bat/.lnk...).
+  const block = openPathBlockReason(p);
+  if (block) {
+    throw Object.assign(new Error(block.message), { code: block.code });
   }
   const { shell } = require('electron');
   const err = await shell.openPath(p);

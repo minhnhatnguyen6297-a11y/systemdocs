@@ -63,7 +63,9 @@ function createDiagramPane(ctx) {
 
   function poolCardEl(row, kind) {
     const card = h('div', 'cd-pool-card');
-    card.draggable = model.canWrite();
+    // Wire v1 khong gan tai san len node — chi person card keo duoc
+    // (drop van reject asset, nhung draggable=false tranh goi y sai).
+    card.draggable = kind === 'person' && model.canWrite();
     const label = kind === 'person'
       ? (row.ho_ten || '(chưa đặt tên)')
       : (row.so_serial || '(chưa có serial)');
@@ -313,14 +315,40 @@ function createDiagramPane(ctx) {
       }
       box.append(list);
     }
-    // Breakdown engine verbatim (explanation) — render dung text engine
-    // gui, khong format lai so.
-    for (const ex of rm.explanations || rm.explanation || []) {
-      const t = typeof ex === 'string' ? ex : (ex && (ex.message || ex.text));
-      if (t) box.append(h('div', 'cd-explain muted', t));
+    // Breakdowns engine verbatim (contract §7.2): moi muc =
+    // {personId, total, terms[{kind, fraction, sourcePersonId?,
+    // viaBranchPersonIds?}]} — ai nhan fraction nao tu ai. JS chi doc
+    // field engine emit, KHONG tinh/format lai so.
+    const nameOf = (pid) => {
+      const n = personName(pid);
+      return n === '—' ? String(pid) : n;
+    };
+    const bds = rm.breakdowns || [];
+    if (bds.length) {
+      const bl = h('div', 'cd-breakdown-list');
+      for (const bd of bds) {
+        const item = h('div', 'cd-breakdown');
+        item.append(h('div', 'cd-breakdown-head',
+          `${nameOf(bd.personId)} — tổng ${bd.total ?? '—'}`));
+        for (const t of bd.terms || []) {
+          const bits = [`${t.kind ?? 'term'}: ${t.fraction ?? '—'}`];
+          if (t.sourcePersonId) {
+            bits.push(`từ ${nameOf(t.sourcePersonId)}`);
+          }
+          if (Array.isArray(t.viaBranchPersonIds) &&
+              t.viaBranchPersonIds.length) {
+            bits.push(
+              `qua ${t.viaBranchPersonIds.map(nameOf).join(', ')}`);
+          }
+          item.append(h('div', 'cd-explain muted', bits.join(' · ')));
+        }
+        bl.append(item);
+      }
+      box.append(bl);
     }
     for (const w of rm.warnings || []) {
-      box.append(h('div', 'muted warn-text', w.message || w.code));
+      box.append(h('div', 'muted warn-text',
+        typeof w === 'string' ? w : (w.message || w.code)));
     }
     for (const e of rm.errors || []) {
       box.append(h('div', 'error', e.message || e.code));
@@ -404,6 +432,15 @@ function createDiagramPane(ctx) {
     });
     evalBtn.disabled = !s.capabilities.diagram ||
       s.busy === 'notary.diagram_evaluate';
+    // Badge stale: stage revision da vuot lan evaluate cuoi cua draft
+    // (commit giu draft diagram — rm hien thi mo ta committed, chua mo
+    // ta draft). Evaluate lai de an badge.
+    const staleEval = s.evaluatedRevision != null &&
+      s.evaluatedRevision !== s.revision;
+    if (staleEval) {
+      evalBtn.setAttribute('aria-label',
+        'Đánh giá thử — Stage đã đổi kể từ lần đánh giá');
+    }
     const word = btn('Xuất Word', '', openWordDialog);
     word.disabled = !s.capabilities.word_export || s.wordBusy;
     const addSlotBtn = btn('+ Slot', '', () => {
@@ -411,6 +448,10 @@ function createDiagramPane(ctx) {
     });
     addSlotBtn.disabled = !model.canWrite() || !s.capabilities.diagram;
     tools.append(save, calc, evalBtn, word, addSlotBtn);
+    if (staleEval) {
+      tools.append(h('span', 'cd-badge cd-badge-warn',
+        'Stage đã đổi kể từ lần đánh giá'));
+    }
     dHead.append(tools);
     dc.append(dHead);
     const dBody = h('div', 'cd-diagram-body');
@@ -428,7 +469,10 @@ function createDiagramPane(ctx) {
       dBody.append(grid);
     }
     for (const w of s.diagramWarnings || []) {
-      dBody.append(h('div', 'muted warn-text', w.message || w.code));
+      // Shape hon hop: compose warnings la string, engine warnings la
+      // {code,message} — render ca hai.
+      dBody.append(h('div', 'muted warn-text',
+        typeof w === 'string' ? w : (w.message || w.code)));
     }
     for (const er of s.diagramErrors || []) {
       dBody.append(h('div', 'error', er.message || er.code));

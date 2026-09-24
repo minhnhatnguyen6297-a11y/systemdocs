@@ -176,6 +176,53 @@ test('submitCommand tu choi token la/het han — validation_error, khong forward
   assert.equal(captured.length, 0);             // khong forward len sidecar
 });
 
+test('submitCommand tu choi FileRef tho {path} khong co file_token — khong forward', async () => {
+  const captured = [];
+  const deps = depsReady(captured);
+  // Boundary cung (review MIN-112): renderer khong duoc tu khai raw path —
+  // moi FileRef bat buoc qua token tu picker/drop.
+  const r = await HANDLERS['desktop.v1.submitCommand'](deps, {
+    command: 'file.inspect',
+    payload: { file: { path: 'D:\\x', scope: 'machine_local' } } });
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, 'validation_error');
+  assert.equal(captured.length, 0);
+  // raw path o sau trong mang/nested cung bi chan
+  const r2 = await HANDLERS['desktop.v1.submitCommand'](deps, {
+    command: 'notary.intake_analyze',
+    payload: { case_id: 1, sources: [
+      { source_id: 's', kind: 'image',
+        file_ref: { path: 'D:\\evil.png', scope: 'machine_local' } } ] } });
+  assert.equal(r2.ok, false);
+  assert.equal(r2.error.code, 'validation_error');
+  assert.equal(captured.length, 0);
+});
+
+test('submitCommand: node {file_token hop le, path gia} — resolve token, sibling path bi bo qua', async () => {
+  const captured = [];
+  const deps = depsReady(captured);
+  const t = deps.fileTokens.issue({ path: 'D:\\real.png' });
+  const r = await HANDLERS['desktop.v1.submitCommand'](deps, {
+    command: 'file.inspect',
+    payload: { file: { file_token: t, path: 'D:\\evil.png' } } });
+  assert.equal(r.ok, true);
+  assert.equal(captured[0].payload.file.path, 'D:\\real.png');
+  assert.equal('file_token' in captured[0].payload.file, false);
+});
+
+test('resolveFileTokens: object co path string khong token → reject; path non-string qua duoc', () => {
+  const store = makeFileTokenStore();
+  assert.equal(
+    resolveFileTokens(store, { f: { path: 'D:\\a' } }).ok, false);
+  assert.equal(resolveFileTokens(store,
+    { list: [{ file_ref: { path: 'D:\\a', scope: 'machine_local' } }] })
+    .ok, false);
+  // path khong phai string → khong phai FileRef-like, giu nguyen
+  const ok = resolveFileTokens(store, { meta: { path: 5 } });
+  assert.equal(ok.ok, true);
+  assert.equal(ok.value.meta.path, 5);
+});
+
 test('submitCommand: payload thuong (khong file_token) nguyen ven', async () => {
   const captured = [];
   const deps = depsReady(captured);
@@ -225,6 +272,48 @@ test('registerDroppedFile handler: deps thieu → loi; deps co → tra token ent
   }, { path: 'D:\\none.png' });
   assert.equal(rErr.ok, false);
   assert.equal(rErr.error.code, 'file_not_found');
+});
+
+test('registerDroppedFile: relative/UNC path bi tu choi truoc khi stat', async () => {
+  let called = 0;
+  const deps = { registerDroppedFile: async () => { called++; return null; },
+                 logger: { error() {} } };
+  for (const p of ['x.png', 'in\\a.png', '.\\a.png',
+                   '\\\\server\\share\\a.png', '\\\\?\\UNC\\sv\\a.png',
+                   '\\\\?\\D:\\a.png', '']) {
+    const r = await HANDLERS['desktop.v1.registerDroppedFile'](
+      deps, { path: p });
+    assert.equal(r.ok, false, `path ${JSON.stringify(p)} phai bi tu choi`);
+    assert.equal(r.error.code, 'validation_error');
+  }
+  assert.equal(called, 0);   // khong cham stat cho path khong hop le
+  // path tuyet doi local hop le van qua
+  const ok = await HANDLERS['desktop.v1.registerDroppedFile']({
+    registerDroppedFile: async (p) =>
+      ({ file_token: 't9', name: p, size_bytes: 1, is_dir: false }),
+    logger: { error() {} },
+  }, { path: 'D:\\in\\a.png' });
+  assert.equal(ok.ok, true);
+  assert.equal(ok.data.file.file_token, 't9');
+});
+
+test('openPath handler: ext ngoai whitelist bi tu choi — khong goi shell', async () => {
+  let called = 0;
+  const deps = { openPath: async () => { called++; return { opened: 1 }; },
+                 logger: { error() {} } };
+  for (const p of ['D:\\x\\evil.exe', 'D:\\x\\s.bat', 'D:\\x\\a.lnk',
+                   'D:\\x\\run.ps1', 'D:\\x\\noext']) {
+    const r = await HANDLERS['desktop.v1.openPath'](deps, { path: p });
+    assert.equal(r.ok, false, `path ${p} phai bi chan`);
+    assert.equal(r.error.code, 'open_failed');
+  }
+  assert.equal(called, 0);
+  // ext tai lieu hop le van qua toi deps.openPath
+  const ok = await HANDLERS['desktop.v1.openPath'](deps,
+    { path: 'D:\\out\\a.DOCX' });
+  assert.equal(ok.ok, true);
+  assert.equal(ok.data.opened, 1);
+  assert.equal(called, 1);
 });
 
 test('setDirtyState handler: ghi flag renderer dirty len deps.setDirty', async () => {

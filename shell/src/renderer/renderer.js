@@ -106,12 +106,20 @@ function confirmModal({ title, body, confirmLabel, cancelLabel }) {
   return new Promise((resolve) => {
     const wrap = el('div', 'modal-backdrop');
     const box = el('div', 'modal');
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    if (title) box.setAttribute('aria-label', title);
     box.append(el('div', 'modal-title', title));
     if (body) box.append(el('div', 'modal-body', body));
     const row = el('div', 'modal-actions');
     const cancel = el('button', '', cancelLabel || 'Quay lại');
     const ok = el('button', 'primary danger', confirmLabel || 'Xác nhận');
-    const done = (v) => { wrap.remove(); resolve(v); };
+    const onKey = (e) => { if (e.key === 'Escape') done(false); };
+    const done = (v) => {
+      document.removeEventListener('keydown', onKey);
+      wrap.remove();
+      resolve(v);
+    };
     cancel.onclick = () => done(false);
     ok.onclick = () => done(true);
     wrap.onclick = (e) => { if (e.target === wrap) done(false); };
@@ -119,6 +127,7 @@ function confirmModal({ title, body, confirmLabel, cancelLabel }) {
     box.append(row);
     wrap.append(box);
     document.body.append(wrap);
+    document.addEventListener('keydown', onKey);
     ok.focus();
   });
 }
@@ -730,9 +739,13 @@ function buildNotaryView(entry, mod) {
   const model = window.G1_NOTARY_MODEL.createModel({
     client: runner,
     // Dirty flag → main window-close guard (MIN-112). Fire-and-forget;
-    // loi bridge khong lam sap draft.
+    // loi bridge khong lam sap draft. invoke() tra promise — .catch de
+    // tranh unhandled rejection khi channel loi.
     onUnsavedChange: (d) => {
-      try { api.setDirtyState(d); } catch (e) { /* bridge cu */ }
+      try {
+        const p = api.setDirtyState(d);
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      } catch (e) { /* bridge cu */ }
     },
   });
   const view = window.G1_NOTARY_VIEW.createNotaryModuleView({

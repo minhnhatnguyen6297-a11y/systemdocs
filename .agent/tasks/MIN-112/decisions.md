@@ -71,3 +71,40 @@
   word_batch_failed/canceled); normalize ở model để test model cover
   được và dialog giữ pure-render.
 - **Nguồn:** contract §8.4 + MIN-115 (jobstore giữ result khi cancel).
+
+## 2026-10 — Review r1: boundary `{path}` cứng ở main, không whitelist command
+
+- **Chọn:** `resolveFileTokens` reject mọi object có `path` string mà
+  không có `file_token` resolve được — bất kể command hay vị trí trong
+  payload. Walk chạy luôn (kể cả khi `deps.fileTokens` vắng).
+- **Lý do:** sidecar `_walk_file_refs` (app.py) coi mọi `{path:str}` là
+  file_ref — cùng semantics hai phía; whitelist theo command sẽ bỏ sót
+  command mới thêm sau này. Đã kiểm toàn bộ call site renderer: không
+  còn caller raw path (tất cả đã qua `file_token`).
+- **Nguồn:** review MIN-112 finding #1.
+
+## 2026-10 — Review r1: commit giữ draft diagram + prune mirror client-side
+
+- **Chọn:** `commitStage` khi `diagramDirty` KHÔNG gán `state.diagram =
+  d.diagram.state`; giữ draft, null `personId` không còn trong committed
+  stage (mirror `_prune_diagram`), `diagramDirty` giữ true;
+  `committedDiagram`/`renderModel`/`diagramWarnings` vẫn nhận từ
+  response. `evaluatedRevision = d.revision` chỉ khi draft sạch.
+- **Lý do:** rm trả về từ commit mô tả committed state — không mô tả
+  draft dirty; giữ `evaluatedRevision` cũ khi dirty để badge "Stage đã
+  đổi kể từ lần đánh giá" bao đúng (#5). Khi sạch, draft == committed →
+  rm khớp → `evaluatedRevision` = revision mới, badge tắt.
+- **Loại bỏ:** replace draft bằng server state (mất assignment chưa
+  lưu — bug review #2); giữ `committedDiagram` cũ khi dirty (sai
+  baseline cho `findNode(fromCommitted)`).
+- **Nguồn:** review MIN-112 findings #2/#5.
+
+## 2026-10 — Review r1: whitelist ext `openPath` ở module pure dùng chung
+
+- **Chọn:** `shell/src/main/open-path.js` export `OPEN_PATH_EXTS` +
+  `openPathBlockReason(p)`; ipc handler check sớm (test được, không cham
+  fs), `main.js` `openPath` check lại trước `shell.openPath`.
+- **Lý do:** `main.js` không require được trong `node --test` (electron
+  import) — tách pure module để có unit test thật cho boundary check,
+  đồng thời defense-in-depth nếu `openPath` bị gọi chỗ khác.
+- **Nguồn:** review MIN-112 finding #4.

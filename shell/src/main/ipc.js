@@ -4,7 +4,11 @@
 // Moi handler validate args; channel ngoai allowlist khong duoc dang ky
 // (Electron tra loi "No handler registered" → rejection phia renderer).
 
+const path = require('path');
+
 const { listModules, moduleForCommand } = require('./registry');
+const { redactString } = require('./redact');
+const { openPathBlockReason } = require('./open-path');
 
 const COMMAND_RE = /^[a-z0-9_]+(\.[a-z0-9_]+)+$/;
 const UUID_RE =
@@ -81,6 +85,10 @@ function resolveFileTokens(store, payload) {
         if (ref.is_dir) out.is_dir = true;
         return out;
       }
+      // Boundary cung: object co `path` string ma khong co file_token
+      // resolve duoc la FileRef tho do renderer tu khai — doc file tuy y
+      // qua sidecar. Moi file_ref bat buoc qua token tu picker/drop.
+      if (typeof v.path === 'string') return TOKEN_BAD;
       const out = {};
       for (const [k, x] of Object.entries(v)) {
         const w = walk(x);
@@ -94,7 +102,8 @@ function resolveFileTokens(store, payload) {
   const res = walk(payload);
   if (res === TOKEN_BAD) {
     return { ok: false, error: { code: 'validation_error',
-      message: 'file_token het han hoac khong hop le — chon lai file',
+      message: 'file phai chon qua hop thoai — file_token het han/khong ' +
+               'hop le hoac path tho bi tu choi',
       retryable: false, next_action: null, job_id: null, details: null } };
   }
   return { ok: true, value: res };
@@ -119,11 +128,18 @@ const HANDLERS = {
   },
 
   // Mo file san pham (Word export, export download) bang app mac dinh.
-  // main.js validate: tuyet doi + ton tai + khong UNC.
+  // main.js validate: tuyet doi + ton tai + khong UNC + ext whitelist
+  // (open-path.js). Handler check ext truoc de reject som, khong cham fs.
   'desktop.v1.openPath': async (deps, args) => {
     if (!deps.openPath) {
       return { ok: false, error: { code: 'engine_unavailable',
         message: 'openPath chua cau hinh', retryable: false,
+        next_action: null, job_id: null, details: null } };
+    }
+    const block = openPathBlockReason(args && args.path);
+    if (block) {
+      return { ok: false, error: { code: block.code,
+        message: block.message, retryable: false,
         next_action: null, job_id: null, details: null } };
     }
     try {
@@ -154,13 +170,13 @@ const HANDLERS = {
     }
     // Opaque file token → FileRef that (MIN-112). Bat ky node
     // {file_token} nao trong payload duoc resolve; token la/het han →
-    // validation_error, khong forward sidecar.
+    // validation_error, khong forward sidecar. Walk luon chay (ke ca khi
+    // thieu store): object {path:string} khong token bi reject — boundary
+    // cung, khong cho renderer tu khai FileRef.
     let payload = args.payload ?? null;
-    if (deps.fileTokens) {
-      const rr = resolveFileTokens(deps.fileTokens, payload);
-      if (!rr.ok) return { ok: false, error: rr.error };
-      payload = rr.value;
-    }
+    const rr = resolveFileTokens(deps.fileTokens, payload);
+    if (!rr.ok) return { ok: false, error: rr.error };
+    payload = rr.value;
     try {
       const job = await deps.sidecar.client.submitCommand(
         args.command, payload, mod.id, args.command_id);
@@ -244,7 +260,10 @@ const HANDLERS = {
   'desktop.v1.registerDroppedFile': async (deps, args) => {
     const p = args && typeof args.path === 'string' ? args.path : '';
     const unc = p.startsWith('\\\\') || /^\\\\\?\\UNC\\/i.test(p);
-    if (!p || unc || !deps.registerDroppedFile) {
+    // Validate truoc khi stat: UNC va relative path tu choi — chi path
+    // tuyet doi local (win32.isAbsolute vi payload la Windows path).
+    if (!p || unc || !path.win32.isAbsolute(p) ||
+        !deps.registerDroppedFile) {
       return { ok: false, error: { code: 'validation_error',
         message: 'file tha vao khong hop le', retryable: false,
         next_action: null, job_id: null, details: null } };
@@ -281,8 +300,11 @@ function registerIpc(ipcMain, deps) {
       try {
         return await handler(deps, args);
       } catch (err) {
+        // err.message co the chua path/username — redact truoc khi log
+        // (redact.js mask C:\Users\<user> + credential/token pattern).
         deps.logger.error('ipc handler loi', {
-          channel, err: String(err && err.message || err) });
+          channel,
+          err: redactString(String(err && err.message || err)) });
         return { ok: false, error: { code: 'shell_internal_error',
                                      message: 'loi noi bo shell',
                                      retryable: true, next_action: null,

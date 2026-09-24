@@ -208,3 +208,29 @@ test('MIN-112: debounce evaluate sau khi draft diagram doi', () => {
   assert.match(comb, /evaluateDiagram/);
   assert.match(comb, /setTimeout\(|debounce/i);
 });
+
+// ---------- MIN-112 review fixes ----------
+
+test('MIN-112r: Xem cach tinh render breakdowns[] (khong con explanations dead code)', () => {
+  const diag = stripComments(R(DIAGRAM));
+  assert.match(diag, /rm\.breakdowns/);           // field that §7.2
+  assert.match(diag, /bd\.terms|\.terms\b/);      // terms[] verbatim
+  assert.ok(!/rm\.explanations|rm\.explanation\b/.test(diag),
+    'con dead code doc rm.explanations — field khong ton tai');
+});
+
+test('MIN-112r: openPath co whitelist extension trong main.js', () => {
+  assert.match(mainSrc, /openPathBlockReason|OPEN_PATH_EXTS/);
+  assert.ok(
+    fs.existsSync(path.join(HERE, '..', 'src/main/open-path.js')),
+    'thieu open-path.js (whitelist ext dung chung main+ipc)');
+});
+
+test('MIN-112r: confirmModal co role dialog + aria-modal + Escape', () => {
+  const mm = rendererCode.match(
+    /function confirmModal[\s\S]*?\n\}/);
+  assert.ok(mm, 'thieu confirmModal');
+  assert.match(mm[0], /role', 'dialog'/);
+  assert.match(mm[0], /aria-modal/);
+  assert.match(mm[0], /Escape/);
+});

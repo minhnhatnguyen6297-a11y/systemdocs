@@ -7,6 +7,67 @@ MIN-104 + contract notary-case-drafting (READ-ONLY). Một component chung cho
 mock/real (swap qua `makeCommandRunner` seam), draft in-memory cho tới
 commit/save tường minh.
 
+## Review round 1 — đã vá (13 findings)
+
+- **#1 (CRITICAL) raw `{path}` pass-through** — `ipc.js` `walk()`: object có
+  `path` string mà không có `file_token` resolve được → `validation_error`,
+  KHÔNG forward sidecar (renderer không tự khai FileRef — đã grep mọi
+  `submitCommand` call site: engine/upload/intake/word đều dùng
+  `{file_token}`, không còn caller raw path). Walk chạy luôn cả khi thiếu
+  store. `desktop.v1.registerDroppedFile` thêm `path.win32.isAbsolute` +
+  reject UNC **trước** stat.
+- **#2 (IMPORTANT) `commitStage` xóa ngầm draft diagram** — khi
+  `diagramDirty`: giữ `state.diagram` draft, mirror `_prune_diagram`
+  client-side (null `personId` không còn trong committed stage mới),
+  `diagramDirty` giữ true; `committedDiagram`/`revision`/`renderModel`/
+  `diagramWarnings` vẫn cập nhật từ response. `evaluatedRevision` chỉ cập
+  nhật khi draft sạch (dirty → giữ cũ để badge stale bao đúng).
+- **#3** — `calcPanelEl` bỏ dead loop `rm.explanations` (field không tồn
+  tại); render `rm.breakdowns[]` verbatim: `${name} — tổng ${total}` +
+  từng term `kind: fraction · từ <source> · qua <via>` (đối chiếu
+  `inheritance_engine.py:418-425`, `notary_mock_adapter.py:486-491`).
+- **#4** — `openPath` whitelist ext (`shell/src/main/open-path.js` mới:
+  docx/doc/pdf/txt/xlsx/xls/png/jpg/jpeg/md/log/json); check ở ipc handler
+  (reject sớm, test được) + `main.js` `openPath` (defense-in-depth) —
+  `.exe/.bat/.lnk/.ps1` → `open_failed`.
+- **#5** — badge `cd-badge-warn` "Stage đã đổi kể từ lần đánh giá" cạnh
+  nút Đánh giá thử khi `evaluatedRevision != revision` (đủ nhỏ, không
+  defer).
+- **#6** — `confirmModal` thêm `role="dialog"` + `aria-modal` +
+  `aria-label` + Escape dismiss (gỡ listener khi đóng).
+- **#7** — rerender skip khi `activeElement` là `input/textarea/select`
+  BẤT KỲ trong drafting panel (không chỉ `.cd-row-detail`) — pool search
+  không mất focus khi jobUpdate poll.
+- **#8** — `intakeAnalyze` dedupe `suggestion_id` khi prepend: bản mới
+  thay bản cũ, vẫn lên đầu.
+- **#9** — log `err.message` trong `registerIpc` qua `redactString`
+  (mask `C:\Users\<user>` + credential/token — đủ, không thêm regex).
+- **#10** — `emit()` gọi `onUnsavedChange(u)` bọc `.catch(()=>{})` nếu
+  tra promise; renderer `api.setDirtyState` `.catch`; view
+  `await model.openCase(id)` + try/catch → hết unhandled rejection.
+- **#11** — pool card `draggable` chỉ khi `kind==='person' && canWrite()`
+  (asset không gán lên node trong v1).
+- **#12** — `diagramWarnings` cập nhật từ `render_model.warnings` sau
+  evaluate/save/commit; `applyWorkspace` gộp `dg.warnings` (list[str] —
+  compose warnings real backend) + `render_model.warnings`
+  ([{code,message}]) — render chịu cả hai shape.
+- **#13 tests** — 13 test mới: raw-path reject (flat+nested), token
+  hợp lệ+sibling path bị bỏ qua, resolveFileTokens path-string reject,
+  `registerDroppedFile` relative/UNC/empty reject + absolute pass,
+  `openPath` ext whitelist, commit giữ draft+prune personId, commit sạch
+  `evaluatedRevision=revision`, commit dirty sau `removeStageRow`,
+  `onUnsavedChange` transition+reject-safe, dedupe suggestion_id; static
+  test `breakdowns`/`openPathBlockReason`/`confirmModal` a11y.
+
+## Deferred sau review
+
+- `file.inspect` primitive dùng token — đúng thiết kế sau fix #1.
+- Smoke Electron thật → MIN-113 (task packaged).
+- DOM diff thay full rebuild — giữ minimum-viable.
+- `diagram.warnings` (workspace_get) là `list[str]` compose warnings ở
+  real backend — view render được nhưng chưa hiển thị trong Stage tier
+  (chỉ ở diagram body); theo dõi nếu cần surface riêng.
+
 ## Đã làm
 
 - **Opaque file token (bảo mật cốt lõi)**
@@ -89,16 +150,17 @@ commit/save tường minh.
 
 ## Check đã chạy (sau chỉnh cuối)
 
-- `cd shell && npm test` → 100/100 pass.
+- `cd shell && npm test` → 100/100 pass; **sau review fixes: 113/113
+  pass** (+13 test mới).
 - `node --test test/ipc.test.mjs test/notary-case-drafting-model.test.mjs
   test/notary-case-drafting-static.test.mjs` → 66/66 pass.
 - `pytest test/test_notary_mock_adapter.py
   test/test_notary_adapter_contract.py -q` → 100 pass (venv
-  `D:\systemdocs\notary_v2\venv`).
+  `D:\systemdocs\notary_v2\venv`) — chạy lại sau review: 100 pass.
 - `contracts/notary-case-drafting/validate_examples.py` → 34 files, 0
-  unexpected.
-- `node -e require()` 6 module renderer/main → load sạch (không DOM lúc
-  import).
+  unexpected — chạy lại sau review: PASS.
+- `node -e require()` 9 module renderer/main (gồm `open-path.js` mới) →
+  load sạch (không DOM lúc import).
 
 ## Fix trong phiên (sau khi test chính pass)
 
