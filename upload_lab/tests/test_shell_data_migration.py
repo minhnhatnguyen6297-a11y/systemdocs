@@ -14,7 +14,7 @@ import os
 import sqlite3
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 from batch_scan import connect_registry, upsert_registry_record
@@ -363,12 +363,68 @@ class CliTests(MigrationFixture):
             "--apply", "--source", str(self.source),
             "--target", str(self.target)]), 0)
         err = io.StringIO()
-        with redirect_stdout(err):
+        with redirect_stderr(err):
             code = migrate_main([
                 "--apply", "--source", str(self.source),
                 "--target", str(self.target)])
-        self.assertNotEqual(code, 0)
+        self.assertEqual(code, 2)
         self.assertIn("target_not_empty", err.getvalue())
+
+    def test_cli_bad_target_shape_is_clean_error(self):
+        """Target khong phai .../websites/nam_dinh → exit 2, stderr, khong
+        traceback ProviderDataDirError."""
+        self._make_source()
+        bad = self.root / "data" / "khong_dung_ten"
+        err = io.StringIO()
+        with redirect_stderr(err):
+            code = migrate_main([
+                "--apply", "--source", str(self.source),
+                "--target", str(bad)])
+        self.assertEqual(code, 2)
+        self.assertIn("invalid_target", err.getvalue())
+        self.assertNotIn("Traceback", err.getvalue())
+        self.assertFalse(bad.exists())
+
+    def test_cli_unexpected_exception_is_clean_exit2(self):
+        """Loi khong phai MigrationError (OSError/sqlite3.Error...) → exit 2
+        tren stderr, khong phai traceback exit 1."""
+        import tools.migrate_shell_data as mod
+        original = mod.apply_migration
+        mod.apply_migration = lambda *_a, **_k: 1 / 0
+        try:
+            err = io.StringIO()
+            with redirect_stderr(err):
+                code = migrate_main([
+                    "--apply", "--source", str(self.source),
+                    "--target", str(self.target)])
+        finally:
+            mod.apply_migration = original
+        self.assertEqual(code, 2)
+        self.assertIn("migration_failed", err.getvalue())
+        self.assertNotIn("Traceback", err.getvalue())
+
+    def test_cli_inspect_without_target(self):
+        """--inspect chi can --source (target la tuy chon tu fix)."""
+        self._make_source()
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            code = migrate_main(["--inspect", "--source", str(self.source)])
+        self.assertEqual(code, 0)
+        self.assertIn("nam_dinh", buf.getvalue())
+        self.assertNotIn("Target:", buf.getvalue())
+
+    def test_cli_inspect_with_target_prints_check(self):
+        """--inspect --target: in check san sang cua target thay vi bo qua."""
+        self._make_source()
+        self.target.mkdir(parents=True)  # thu muc rong → nhanh san sang
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            code = migrate_main([
+                "--inspect", "--source", str(self.source),
+                "--target", str(self.target)])
+        self.assertEqual(code, 0)
+        self.assertIn("shape: ok", buf.getvalue())
+        self.assertIn("san sang --apply", buf.getvalue())
 
 
 if __name__ == "__main__":

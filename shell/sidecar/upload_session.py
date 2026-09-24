@@ -123,14 +123,25 @@ class _BrowserWorker:
                 from upload_workspace import website_data_dir, open_store
                 data_dir = website_data_dir(website_id)
                 settings = uploader.load_uploader_settings(data_dir)
-                self._session = uploader.NamDinhUploaderSession(
+                session = uploader.NamDinhUploaderSession(
                     settings, working_dir=data_dir)
-                self._website_id = website_id
-                self.browser_id = "brw_" + uuid.uuid4().hex[:8]
+                browser_id = "brw_" + uuid.uuid4().hex[:8]
                 try:
-                    open_store().open_browser(website_id, self.browser_id)
-                except Exception:
-                    pass  # store loi khong chan session — browser van dung
+                    # Ghi so huu browser TRUOC khi session di vao dung —
+                    # fail thi dong session, khong cho chay "vo chu".
+                    open_store().open_browser(website_id, browser_id)
+                except Exception as exc:
+                    try:
+                        session.close()
+                    except Exception:
+                        pass
+                    raise CommandError(
+                        "engine_unavailable",
+                        f"khong ghi duoc browser vao workspace store: "
+                        f"{exc}") from exc
+                self._session = session
+                self._website_id = website_id
+                self.browser_id = browser_id
             else:
                 # Legacy path nguyen trang (contract §9.2).
                 root = engine_root("upload_lab")
@@ -140,23 +151,28 @@ class _BrowserWorker:
         return self._session
 
     def _close_session(self):
+        """Dong session + danh dau browser closed trong store.
+
+        finally bao dam: du session.close() raise thi browsers row van
+        duoc dong va state reset — khong de browser 'open' treo."""
         browser_id = self.browser_id
-        website_id = self._website_id
-        if self._session is not None:
-            try:
-                self._session.close()
-            finally:
-                self._session = None
-        if browser_id:
-            try:
-                from upload_workspace import open_store
-                open_store().close_browser(browser_id)
-            except Exception:
-                pass
-        self._website_id = None
-        self.browser_id = None
-        self.login_confirmed.clear()
-        self.review_finished.clear()
+        try:
+            if self._session is not None:
+                try:
+                    self._session.close()
+                finally:
+                    self._session = None
+        finally:
+            if browser_id:
+                try:
+                    from upload_workspace import open_store
+                    open_store().close_browser(browser_id)
+                except Exception:
+                    pass
+            self._website_id = None
+            self.browser_id = None
+            self.login_confirmed.clear()
+            self.review_finished.clear()
 
 
 class _Future:

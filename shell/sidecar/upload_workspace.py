@@ -20,6 +20,7 @@ import hashlib
 import json
 import os
 import re
+import threading
 import uuid
 from pathlib import Path
 
@@ -34,6 +35,7 @@ WEBSITE_ID_RE = re.compile(r"^[a-z][a-z0-9_]{1,31}$")
 
 _store = None
 _store_lock_path = None
+_store_lock = threading.Lock()
 
 
 # ---------- data root ----------
@@ -58,30 +60,37 @@ def workspace_db_path() -> Path:
 
 
 def open_store() -> UploadWorkspaceStore:
-    """Store dung chung trong process (reopen neu data root doi — test)."""
+    """Store dung chung trong process (reopen neu data root doi — test).
+
+    Lock tranh race hai thread cung mo lan dau — ket qua chi co mot
+    connection, khong leak connection thua tren cung file."""
     global _store, _store_lock_path
     db = workspace_db_path()
-    if _store is None or _store_lock_path != db:
-        if _store is not None:
-            try:
-                _store.close()
-            except Exception:
-                pass
-        _store = UploadWorkspaceStore(db)
-        _store_lock_path = db
+    if _store is not None and _store_lock_path == db:
+        return _store
+    with _store_lock:
+        if _store is None or _store_lock_path != db:
+            if _store is not None:
+                try:
+                    _store.close()
+                except Exception:
+                    pass
+            _store = UploadWorkspaceStore(db)
+            _store_lock_path = db
     return _store
 
 
 def reset_store_for_tests():
     """Dong store cache — test goi sau khi doi G1_UPLOAD_DATA_DIR."""
     global _store, _store_lock_path
-    if _store is not None:
-        try:
-            _store.close()
-        except Exception:
-            pass
-    _store = None
-    _store_lock_path = None
+    with _store_lock:
+        if _store is not None:
+            try:
+                _store.close()
+            except Exception:
+                pass
+        _store = None
+        _store_lock_path = None
 
 
 # ---------- website scope ----------
@@ -198,7 +207,7 @@ def resolve_run(website_id, run_id, *, store=None) -> Path:
             raise CommandError(
                 "file_not_found",
                 f"manifest cua run {run_id} khong con tren dia — quet lai",
-                retryable=True)
+                retryable=True, next_action="retry")
         expected = rec.get("manifest_sha256")
         if expected and sha256_file(path) != expected:
             raise CommandError(

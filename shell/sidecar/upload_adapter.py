@@ -368,7 +368,13 @@ _PREFERENCE_KEYS = ("chunk_size", "cong_chung_vien", "thu_ky")
 
 def _require_workflow(payload) -> dict:
     """Gate version: thieu/sai workflow_version → unsupported_workflow_version
-    (contract §2 — command chi-co-o-v1 khong duoc chay nhu legacy)."""
+    (contract §2 — command chi-co-o-v1 khong duoc chay nhu legacy).
+
+    Payload khong phai dict/null → validation_error (handler goi truc tiep
+    khong qua app.py cung khong AttributeError)."""
+    if payload is not None and not isinstance(payload, dict):
+        raise CommandError("validation_error",
+                           "payload phai la object/null")
     p = payload or {}
     version = p.get("workflow_version")
     if version != WORKFLOW_VERSION:
@@ -468,13 +474,24 @@ def upload_preferences(job, payload):
                     and not isinstance(values[key], str):
                 raise CommandError("validation_error",
                                    f"{key} phai la string/null")
-        store.save_preferences(wid, values)
-        # Dong bo chunk_size vao .env cua website (engine-native store) —
-        # prepare cua engine doc ND_MAX_PREPARED_TABS tu day.
+        # Thu tu ghi: .env (engine-native, de that bai) TRUOC store. Neu
+        # store fail sau do → revert .env ve gia tri cu de khong phan ky.
+        old_prefs = store.get_preferences(wid)
         if "chunk_size" in values:
             provider = upload_workspace.get_provider(wid)
-            provider.save_chunk_size(
-                upload_workspace.website_data_dir(wid), values["chunk_size"])
+            data_dir = upload_workspace.website_data_dir(wid)
+            provider.save_chunk_size(data_dir, values["chunk_size"])
+            try:
+                store.save_preferences(wid, values)
+            except Exception:
+                try:
+                    provider.save_chunk_size(
+                        data_dir, old_prefs["chunk_size"])
+                except Exception:
+                    pass  # best-effort revert — loi goc van raise len
+                raise
+        else:
+            store.save_preferences(wid, values)
     prefs = store.get_preferences(wid)
     return _result("preferences", {
         "workflow_version": WORKFLOW_VERSION,

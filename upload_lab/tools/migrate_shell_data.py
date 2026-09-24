@@ -400,6 +400,12 @@ def apply_migration(source, target) -> dict:
             details=inventory["missing"])
 
     provider = providers.get_provider(website_id)
+    try:
+        # Target phai co dang .../websites/<website_id> — loi shape la loi
+        # nguoi dung (exit 2), khong phai crash ProviderDataDirError.
+        provider.assert_data_dir(tgt)
+    except providers.ProviderDataDirError as exc:
+        raise MigrationError("invalid_target", str(exc)) from exc
     created_root = not tgt.exists()
     copied: list[tuple[Path, Path]] = []
     skipped: list[str] = []
@@ -532,6 +538,32 @@ def _print_inventory(report: dict, out):
         print(f"Problem: {problem}", file=out)
 
 
+def _print_target_check(report: dict, target: Path, out):
+    """--inspect co --target: bao target co san sang nhan du lieu khong
+    (dung shape websites/<website_id>, ton tai/rong)."""
+    tgt = Path(target).resolve()
+    print(f"Target: {tgt}", file=out)
+    website_id = report["website"].get("website_id")
+    if not website_id:
+        print("  shape: chua kiem — website nguon chua xac minh", file=out)
+        return
+    try:
+        provider = providers.get_provider(website_id)
+        provider.assert_data_dir(tgt)
+        print(f"  shape: ok (websites/{website_id})", file=out)
+    except providers.ProviderDataDirError as exc:
+        print(f"  shape: KHONG HOP LE — {exc}", file=out)
+        return
+    if not tgt.exists():
+        print("  trang thai: chua ton tai (se tao moi khi --apply)", file=out)
+    elif not tgt.is_dir():
+        print("  trang thai: LA FILE — --apply se tu choi", file=out)
+    elif any(tgt.iterdir()):
+        print("  trang thai: KHONG RONG — --apply se tu choi", file=out)
+    else:
+        print("  trang thai: thu muc rong — san sang --apply", file=out)
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="migrate_shell_data",
@@ -542,19 +574,25 @@ def main(argv=None) -> int:
     parser.add_argument("--apply", action="store_true",
                         help="copy sang target (chi khi target rong)")
     parser.add_argument("--source", required=True)
-    parser.add_argument("--target", required=True)
+    parser.add_argument("--target",
+                        help="bat buoc voi --apply; voi --inspect thi in "
+                             "check san sang cua target")
     args = parser.parse_args(argv)
 
     if not args.inspect and not args.apply:
         parser.error("can it nhat mot trong --inspect / --apply")
+    if args.apply and not args.target:
+        parser.error("--apply can --target")
 
     source = Path(args.source)
-    target = Path(args.target)
     try:
         if args.inspect:
-            _print_inventory(inspect_source(source), sys.stdout)
+            report = inspect_source(source)
+            _print_inventory(report, sys.stdout)
+            if args.target:
+                _print_target_check(report, Path(args.target), sys.stdout)
         if args.apply:
-            report = apply_migration(source, target)
+            report = apply_migration(source, Path(args.target))
             print(f"Da copy xong ({report['status']}): "
                   f"{report['copied']['files']} file, "
                   f"{report['copied']['registry_rows']} dong registry, "
@@ -565,7 +603,11 @@ def main(argv=None) -> int:
             for warning in report["warnings"]:
                 print("Canh bao: " + warning)
     except MigrationError as exc:
-        print(f"{exc.code}: {exc}", file=sys.stdout)
+        print(f"{exc.code}: {exc}", file=sys.stderr)
+        return 2
+    except Exception as exc:  # noqa: BLE001 — CLI boundary, khong traceback
+        print(f"migration_failed: {type(exc).__name__}: {exc}",
+              file=sys.stderr)
         return 2
     return 0
 
