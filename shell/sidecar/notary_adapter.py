@@ -710,3 +710,67 @@ def intake_analyze(job, payload):
     if outcome.status == "partial":
         result["partial"] = True
     return result
+
+
+# ---------- diagram evaluate/save (MIN-109, notary.case-drafting.v1 §7) ----------
+
+def _inheritance_workspace_module():
+    return _svc("inheritance_workspace")
+
+
+def _payload_diagram_state(payload):
+    """Lay diagram.state tu payload — thieu diagram/state key ->
+    validation_error (missing required field); state co mat nhung sai
+    shape -> service lo bang diagram_invalid_state."""
+    dg = (payload or {}).get("diagram")
+    if not isinstance(dg, dict) or "state" not in dg:
+        raise CommandError("validation_error",
+                           "payload.diagram.state bat buoc")
+    return dg["state"]
+
+
+def diagram_evaluate(job, payload):
+    """notary.diagram_evaluate — read-only theo DB; duoc phep tren case
+    locked (contract §7.4); khong persist draft state."""
+    if not isinstance(payload, dict):
+        payload = {}
+    case_id = _int_id(_require(payload.get("case_id"), "case_id"),
+                      "case_id")
+    state = _payload_diagram_state(payload)
+    sess = _db_session()
+    try:
+        module = _inheritance_workspace_module()
+        try:
+            data = module.InheritanceWorkspaceService(sess) \
+                .evaluate_diagram(case_id, state)
+        except module.WorkspaceError as err:
+            raise _workspace_command_error(err)
+        job.check_cancel()
+        return _result("diagram_evaluate", data)
+    finally:
+        sess.close()
+
+
+def diagram_save(job, payload):
+    """notary.diagram_save — validate lai bang DB moi nhat, persist
+    state + render_model, tang revision trong mot transaction (§7.5)."""
+    if not isinstance(payload, dict):
+        payload = {}
+    case_id = _int_id(_require(payload.get("case_id"), "case_id"),
+                      "case_id")
+    base_revision = _int_id(
+        _require(payload.get("base_revision"), "base_revision"),
+        "base_revision")
+    state = _payload_diagram_state(payload)
+    sess = _db_session()
+    try:
+        module = _inheritance_workspace_module()
+        try:
+            data = module.InheritanceWorkspaceService(sess) \
+                .save_diagram(case_id, base_revision, state)
+        except module.WorkspaceError as err:
+            raise _workspace_command_error(err)
+        job.check_cancel()
+        return _result("diagram_save", data)
+    finally:
+        sess.close()
