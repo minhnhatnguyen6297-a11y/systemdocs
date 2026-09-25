@@ -1,21 +1,32 @@
-"""MIN-69 task 7 — E2E Upload Lab tren app dev qua Electron + CDP.
+"""MIN-69 task 7+9 — E2E Upload Lab qua Electron + CDP.
 
-Chay app Electron that (dev mode: python sidecar + file:// renderer), sidecar
-con duoc gan test hook (`test/e2e_hook/sitecustomize.py` qua PYTHONPATH) dang
-ky hai portal gia lap `fake_portal`/`fake_portal_b` — khong cham sidecar,
-engine hay contract. File picker duoc stub boi `G1_E2E_PICK_FILES`
-(main.js) — doc JSON {"files": [...]} thay dialog that, van qua cung
-filter/validate.
+Hai che do app:
 
-    python test/test_upload_e2e.py --case audit
+* Dev (khong --app): Electron binary dev + python sidecar, test hook
+  `test/e2e_hook/sitecustomize.py` qua PYTHONPATH dang ky portal gia lap —
+  khong cham sidecar, engine hay contract.
+* Packaged (--app <exe>): goi electron-builder that — san pham tu spawn
+  sidecar exe + engine/browsers trong resources/. Fixture chi duoc bat
+  boi env `G1_E2E_FIXTURE=1` (trusted harness channel) va CHI hoat dong
+  trong test package (marker `resources/test-pkg/test-build.json`);
+  production khong ship hook → env la no-op.
 
-Ca `audit`: chon website gia lap -> kiem tra moi truong -> mo dang nhap ->
-user dang nhap tren portal gia -> xac nhan -> tai Excel -> audit tu dong ->
-4 KPI + 2 bang dung du lieu -> doi ngay danh dau chua cap nhat -> nap lai
-sach -> chon .xlsm tu nạp -> loi nap xoa ket qua -> doi website xoa scope.
+Cases:
 
-Fail RA (khong skip) khi thieu: Electron binary, fixture, python deps
-(fastapi/uvicorn/openpyxl cho sidecar; playwright cho driver CDP).
+    python test/test_upload_e2e.py --case audit           # dev
+    python test/test_upload_e2e.py --case upload          # dev
+    python test/test_upload_e2e.py --app dist-app/win-unpacked/g1-shell.exe --case offline
+    python test/test_upload_e2e.py --app dist-test/win-unpacked/g1-shell-test.exe --case all
+
+`offline` (production package, khong portal): websites catalog khong co
+fixture, diag.* khong ton tai, scan+audit_excel that qua engine trong
+resources, moi ghi nam duoi userData (--user-data-dir), install dir khong
+doi — ke ca khi bi chan ghi bang ACL deny.
+
+`audit`/`upload`/`all` can portal gia lap → CHI chap nhan dev hoac test
+package; production exe bi tu choi theo build label. `all` tren test
+package them diag.fixture_browser_launch (chromium that, headless, toi
+portal localhost) — chung minh playwright bundle khong can tai runtime.
 """
 
 from __future__ import annotations
@@ -63,31 +74,31 @@ def require(cond, msg):
         raise E2EFail(msg)
 
 
-def check_deps(python):
+def check_deps(python, app_exe=None):
     """Fail ro rang khi thieu Electron/fixture/python deps."""
-    require(ELECTRON_EXE.is_file(),
-            f"Thieu Electron dev binary: {ELECTRON_EXE} — chay "
-            f"'npm install' trong shell/")
+    if app_exe is None:
+        require(ELECTRON_EXE.is_file(),
+                f"Thieu Electron dev binary: {ELECTRON_EXE} — chay "
+                f"'npm install' trong shell/")
+        require((HOOK_DIR / "sitecustomize.py").is_file(),
+                f"Thieu e2e hook {HOOK_DIR / 'sitecustomize.py'}")
+        require((SIDECAR / "app.py").is_file(),
+                f"Thieu sidecar {SIDECAR / 'app.py'}")
+        # Sidecar con chay bang G1_PYTHON (mac dinh = interpreter nay).
+        probe = subprocess.run(
+            [python, "-c", "import fastapi, uvicorn, openpyxl"],
+            capture_output=True, text=True)
+        require(probe.returncode == 0,
+                f"Sidecar python '{python}' thieu fastapi/uvicorn/openpyxl: "
+                f"{probe.stderr.strip()[-400:]}")
     require((FIXTURES / "upload_portal.py").is_file(),
             f"Thieu fixture upload_portal.py trong {FIXTURES}")
-    require((HOOK_DIR / "sitecustomize.py").is_file(),
-            f"Thieu e2e hook {HOOK_DIR / 'sitecustomize.py'}")
-    require((SIDECAR / "app.py").is_file(),
-            f"Thieu sidecar {SIDECAR / 'app.py'}")
     for mod in ("openpyxl",):
         try:
             __import__(mod)
         except ImportError:
             raise E2EFail(
                 f"Thieu python dep '{mod}' cho runner — pip install {mod}")
-    # Sidecar con chay bang G1_PYTHON (mac dinh = interpreter nay) — can
-    # fastapi/uvicorn/openpyxl. Kiem bang mot process con cho dung.
-    probe = subprocess.run(
-        [python, "-c", "import fastapi, uvicorn, openpyxl"],
-        capture_output=True, text=True)
-    require(probe.returncode == 0,
-            f"Sidecar python '{python}' thieu fastapi/uvicorn/openpyxl: "
-            f"{probe.stderr.strip()[-400:]}")
     try:
         import playwright.sync_api  # noqa: F401
     except ImportError:
@@ -105,27 +116,47 @@ def http_json(url, method="GET", body=None, timeout=15):
         return json.loads(resp.read().decode("utf-8") or "{}")
 
 
-def launch_app(tmp: Path, port: int, python: str):
+def build_label(app_exe: Path) -> str:
+    """Nhan build cua goi — marker resources/test-pkg/test-build.json chi
+    co trong dist:test. Khong co marker = production (production khong
+    bao gio ship file nay)."""
+    marker = (app_exe.parent / "resources" / "test-pkg"
+              / "test-build.json")
+    return "test" if marker.is_file() else "production"
+
+
+def launch_app(tmp: Path, port: int, python: str, app_exe: Path = None):
     env = dict(os.environ)
-    env["G1_PYTHON"] = python
-    env["G1_UPLOAD_LAB_ROOT"] = str(REPO / "upload_lab")
-    env["G1_UPLOAD_DATA_DIR"] = str(tmp / "upload_lab")
-    env["G1_OUTPUT_DIR"] = str(tmp / "output")
     env["G1_E2E_STATE"] = str(tmp / "e2e-state.json")
     env["G1_E2E_PICK_FILES"] = str(tmp / "pick.json")
     # openPath seam: moi file duoc mo ghi mot dong vao log thay vi dep
-    # app that (Word) — cung pattern G1_E2E_PICK_FILES.
+    # app that (Word) — cung pattern G1_E2E_PICK_FILES. Chi dev/test
+    # build ton trong seam; production bo qua hoan toan.
     env["G1_E2E_OPEN_LOG"] = str(tmp / "opened.log")
-    env["PYTHONPATH"] = os.pathsep.join(
-        [str(HOOK_DIR), str(FIXTURES), str(SIDECAR),
-         env.get("PYTHONPATH", "")])
     env["ELECTRON_ENABLE_LOGGING"] = "1"
+    # Trusted harness channel: chi env cua app spawn duoc truyen vao
+    # sidecar. Production sidecar khong ship e2e_fixture_hook → no-op.
+    env["G1_E2E_FIXTURE"] = "1"
+    if app_exe is None:
+        env["G1_PYTHON"] = python
+        env["G1_UPLOAD_LAB_ROOT"] = str(REPO / "upload_lab")
+        env["G1_UPLOAD_DATA_DIR"] = str(tmp / "upload_lab")
+        env["G1_OUTPUT_DIR"] = str(tmp / "output")
+        env["PYTHONPATH"] = os.pathsep.join(
+            [str(HOOK_DIR), str(FIXTURES), str(SIDECAR),
+             env.get("PYTHONPATH", "")])
+        cmd = [str(ELECTRON_EXE), str(SHELL)]
+    else:
+        # Packaged: KHONG dat G1_UPLOAD_DATA_DIR/G1_OUTPUT_DIR — sidecar
+        # phai resolve vao <userData>/upload_lab + <userData>/output
+        # (Writable data root check; task 9). Engine/browser trong
+        # resources qua env do main.js truyen.
+        cmd = [str(app_exe)]
     stderr = open(tmp / "electron.stderr.log", "w", encoding="utf-8")
     proc = subprocess.Popen(
-        [str(ELECTRON_EXE), str(SHELL),
-         f"--remote-debugging-port={port}",
-         f"--user-data-dir={tmp / 'user-data'}",
-         "--no-first-run", "--no-default-browser-check"],
+        cmd + [f"--remote-debugging-port={port}",
+               f"--user-data-dir={tmp / 'user-data'}",
+               "--no-first-run", "--no-default-browser-check"],
         env=env, stdout=subprocess.DEVNULL, stderr=stderr)
     return proc, stderr
 
@@ -439,20 +470,43 @@ def case_audit(page, portals, tmp):
 class AppInstance:
     """Vong doi app Electron cho case can restart giua chung."""
 
-    def __init__(self, tmp: Path, port: int, python: str):
+    def __init__(self, tmp: Path, port: int, python: str,
+                 app_exe: Path = None, expect_portals: bool = True):
         self.tmp = tmp
         self.port = port
         self.python = python
+        self.app_exe = app_exe
+        self.expect_portals = expect_portals
         self.proc = None
         self.stderr_fh = None
         self.portals = {}
 
+    @property
+    def packaged(self) -> bool:
+        return self.app_exe is not None
+
+    @property
+    def user_data_dir(self) -> Path:
+        return self.tmp / "user-data"
+
+    @property
+    def data_dir(self) -> Path:
+        """G1_UPLOAD_DATA_DIR thuc te cua sidecar."""
+        if self.packaged:
+            # Default packaged: <userData>/upload_lab (sidecar.js
+            # _defaultUploadDataDir) — harness khong dat env override.
+            return self.user_data_dir / "upload_lab"
+        return self.tmp / "upload_lab"
+
     def start(self):
-        self.proc, self.stderr_fh = launch_app(self.tmp, self.port,
-                                               self.python)
+        self.proc, self.stderr_fh = launch_app(
+            self.tmp, self.port, self.python, app_exe=self.app_exe)
         wait_cdp(self.port, self.proc)
-        state = wait_state_file(self.tmp)
-        self.portals = state.get("portals") or {}
+        if self.expect_portals:
+            state = wait_state_file(self.tmp)
+            self.portals = state.get("portals") or {}
+        else:
+            self.portals = {}
         return self.portals
 
     def stop(self):
@@ -476,7 +530,8 @@ class AppInstance:
         self.stop()
         # e2e-state.json ghi lai khi sidecar con boot — xoa de cho file moi
         # (portal dang ky port ngau nhien moi moi lan).
-        (self.tmp / "e2e-state.json").unlink(missing_ok=True)
+        if self.expect_portals:
+            (self.tmp / "e2e-state.json").unlink(missing_ok=True)
         return self.start()
 
 
@@ -603,8 +658,8 @@ def wait_open_ids_gt(base, n, timeout=30000):
 
 
 def case_upload(app: AppInstance, pw, tmp: Path):
-    wsdb = tmp / "upload_lab" / "workspace.sqlite3"
-    regdb = (tmp / "upload_lab" / "websites" / "fake_portal_c"
+    wsdb = app.data_dir / "workspace.sqlite3"
+    regdb = (app.data_dir / "websites" / "fake_portal_c"
              / "registry.sqlite3")
     folder = tmp / "hs-scan"
     folder.mkdir(parents=True, exist_ok=True)
@@ -963,29 +1018,298 @@ def case_upload(app: AppInstance, pw, tmp: Path):
         browser.close()
 
 
+# ============= --case offline (MIN-69 task 9, production package) =============
+#
+# Chung minh goi production chay that engine ma:
+#   - KHONG co fixture provider/portal nao trong catalog;
+#   - KHONG co lenh diag.* (test-build surface);
+#   - scan + audit_excel ghi data HOAN TOAN duoi userData;
+#   - install dir khong bi ghi de — ke ca khi deny write bang ACL.
+
+def _tree_snapshot(root: Path) -> dict:
+    """{relpath: (size, mtime_ns)} — diff truoc/sau cho install dir."""
+    snap = {}
+    for p in root.rglob("*"):
+        if p.is_file() and not p.is_symlink():
+            try:
+                st = p.stat()
+                snap[str(p.relative_to(root))] = (st.st_size, st.st_mtime_ns)
+            except OSError:
+                pass
+    return snap
+
+
+def _acl_deny_writes(root: Path):
+    """Chan ghi vao `root` cho user hien tai (Windows icacls).
+
+    Mask hep (WD,AD,WA,WEA,DC): chan tao file moi/ghi/xoa con — nhu user
+    thuong tren Program Files — nhung VAN cho execute (generic W cung
+    deny SYNCHRONIZE → CreateProcess fail, khong phai dieu ta do).
+    Tra mark de restore; None neu moi truong khong ho tro."""
+    if os.name != "nt":
+        return None
+    domain = os.environ.get("USERDOMAIN") or ""
+    user = os.environ.get("USERNAME")
+    if not user:
+        return None
+    account = f"{domain}\\{user}" if domain else user
+    r = subprocess.run(
+        ["icacls", str(root), "/deny",
+         f"{account}:(OI)(CI)(WD,AD,WA,WEA,DC)", "/T", "/Q"],
+        capture_output=True, text=True, timeout=300)
+    if r.returncode != 0:
+        return None
+    return (root, account)
+
+
+def _acl_restore(mark):
+    if not mark:
+        return
+    root, account = mark
+    subprocess.run(
+        ["icacls", str(root), "/remove:d", account, "/T", "/Q"],
+        capture_output=True, text=True, timeout=300)
+
+
+def _submit_expect_error(page, command, payload, want_code):
+    """submit va doi loi dung ma — cho assert command_unknown/production."""
+    r = page.evaluate(
+        """async ({command, payload}) => {
+          const api = window.desktop.v1;
+          const res = await api.submitCommand(
+            command, payload, crypto.randomUUID());
+          if (!res.ok) return {submit_error: res.error};
+          const job = res.data;
+          const t0 = Date.now();
+          while (Date.now() - t0 < 30000) {
+            const jr = await api.getJob(job.job_id);
+            const j = jr && jr.ok ? jr.data : null;
+            if (j && ['succeeded','failed','canceled','partial']
+                .includes(j.status)) return j;
+            await new Promise(rs => setTimeout(rs, 300));
+          }
+          return {timeout: true};
+        }""",
+        {"command": command, "payload": payload})
+    err = (r.get("submit_error") or r.get("error") or {})
+    code = err.get("code") if isinstance(err, dict) else None
+    require(code == want_code,
+            f"{command}: muon loi {want_code}, nhan {r}")
+    return r
+
+
+def case_offline(app: AppInstance, pw, tmp: Path):
+    """Offline production package — khong portal, khong mang, khong Qt.
+
+    Assert: catalog khong fixture; diag khong ton tai; scan/audit_excel
+    that; du lieu chi duoi userData; install dir bat bien.
+    """
+    exe_dir = app.app_exe.parent
+    require(app.packaged, "case offline can --app <exe>")
+    require(app.data_dir == app.user_data_dir / "upload_lab",
+            "case offline phai khong dat G1_UPLOAD_DATA_DIR")
+
+    # -- Assert sidecar goi khong ship Qt + engine sach data ------------
+    sidecar_dir = exe_dir / "resources" / "sidecar" / "g1-shell-sidecar"
+    internal = sidecar_dir / "_internal"
+    require(sidecar_dir.is_dir(),
+            f"thieu sidecar packaged: {sidecar_dir}")
+    require((internal / "playwright" / "driver" / "node.exe").is_file(),
+            "thieu playwright driver trong _internal — spec chua bundle")
+    qt_markers = [p for p in internal.rglob("*")
+                  if p.name.lower().startswith(("pyside", "pyqt",
+                                                "shiboken"))]
+    require(not qt_markers,
+            f"Qt bi ship trong sidecar: {qt_markers[:5]}")
+    engine_dir = exe_dir / "resources" / "engine"
+    require((engine_dir / "upload_lab").is_dir() and
+            (engine_dir / "notary_v2").is_dir(),
+            f"thieu engine bundled: {engine_dir}")
+    forbidden = [p for p in engine_dir.rglob("*") if p.is_file() and (
+        p.name in (".env", "registry.sqlite3", "nd_storage_state.json",
+                   "notary.db") or "ui_qt" in str(p))]
+    require(not forbidden,
+            f"engine bundle chua file cam: {forbidden[:5]}")
+    pw_dir = exe_dir / "resources" / "playwright-browsers"
+    chromium = sorted(pw_dir.glob("chromium-*"))
+    require(chromium, f"thieu chromium bundle: {pw_dir}")
+
+    browser, page = connect_page(pw, app.port)
+    try:
+        # Frozen sidecar khoi dong cham hon dev — cho UI poll populate
+        # catalog (cung la chung minh renderer↔main↔sidecar hoat dong).
+        page.wait_for_function(
+            """() => [...document.querySelectorAll(
+                 '#ul-panel-audit select.ul-site option')]
+                 .some(o => o.value === 'nam_dinh')""",
+            timeout=120000)
+
+        # -- Catalog production: chi provider that, KHONG fixture --------
+        cat = submit_and_wait(page, "upload.websites", {})
+        require(cat.get("status") == "succeeded",
+                f"upload.websites loi: {cat}")
+        sites = ((cat.get("result") or {}).get("data") or {}) \
+            .get("websites") or []
+        ids = [s.get("website_id") for s in sites]
+        require("nam_dinh" in ids,
+                f"catalog thieu nam_dinh: {ids}")
+        fakes = [i for i in ids if str(i).startswith("fake_portal")]
+        require(not fakes,
+                f"PRODUCTION co fixture provider {fakes} — test hook bi "
+                f"ro vao ban production")
+
+        # -- diag.* khong ton tai trong production ----------------------
+        _submit_expect_error(page, "diag.fixture_browser_launch", {},
+                             "command_unknown")
+
+        # -- Scan that tren fixture docx (ghi vao data root userData) ---
+        ws = submit_and_wait(page, "upload.workspace_get", {
+            "website_id": "nam_dinh",
+        })
+        require(ws.get("status") == "succeeded",
+                f"upload.workspace_get loi: {ws}")
+        revision = ((ws.get("result") or {}).get("data") or {}) \
+            .get("revision")
+        require(isinstance(revision, int),
+                f"workspace revision thieu: {ws}")
+        folder = tmp / "hs-offline"
+        folder.mkdir(parents=True, exist_ok=True)
+        docx_path = folder / "HD-001.docx"
+        try:
+            from docx import Document
+        except ImportError:
+            Document = None
+        if Document is not None:
+            d = Document()
+            d.add_paragraph("Hop dong so 77/2026 ngay 10/05/2026")
+            d.save(str(docx_path))
+        else:
+            docx_path.write_bytes(b"offline fixture docx")
+        scan = submit_and_wait(page, "upload.scan", {
+            "website_id": "nam_dinh",
+            "folder": {"path": str(folder), "scope": "machine_local"},
+            "expected_revision": revision,
+            "full_rescan": True,
+        }, timeout_s=120)
+        require(scan.get("status") in ("succeeded", "partial"),
+                f"upload.scan loi: {scan}")
+        site_data = app.data_dir / "websites" / "nam_dinh"
+        require((site_data / "registry.sqlite3").is_file(),
+                f"registry khong nam duoi userData: {site_data}")
+
+        # -- Audit Excel that (openpyxl/engine doc .xlsx) ---------------
+        excel = tmp / "so-offline.xlsx"
+        write_xlsx(excel, [
+            ("Số công chứng", "Ngày công chứng"),
+            ("77/2026", "10/05/2026"),
+            ("78/2026", "11/05/2026"),
+            ("78/2026", "11/05/2026"),
+        ])
+        audit = submit_and_wait(page, "upload.audit_excel", {
+            "website_id": "nam_dinh",
+            "file_ref": {"path": str(excel), "scope": "machine_local"},
+            "from_date": "2026-05-01", "to_date": "2026-05-31",
+        }, timeout_s=60)
+        require(audit.get("status") == "succeeded",
+                f"upload.audit_excel loi: {audit}")
+        summary = ((audit.get("result") or {}).get("data") or {}) \
+            .get("summary") or {}
+        require(summary, f"audit thieu summary: {audit}")
+
+        # -- env_check engine that (playwright/chromium bundle) ---------
+        env = submit_and_wait(page, "upload.env_check", {
+            "website_id": "nam_dinh",
+        }, timeout_s=60)
+        require(env.get("status") == "succeeded",
+                f"upload.env_check loi: {env}")
+    except BaseException:
+        dump_debug(page)
+        raise
+    finally:
+        browser.close()
+
+    # -- Moi ghi phai nam duoi userData ---------------------------------
+    require((app.user_data_dir / "output").exists() or
+            (app.data_dir).exists(),
+            "khong thay data nao duoi userData — sidecar ghi cho khac?")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--case", default="audit",
-                    choices=["audit", "upload", "all"])
+                    choices=["audit", "upload", "all", "offline"])
+    ap.add_argument("--app", default=None,
+                    help="duong dan exe packaged (dist-app/dist-test); "
+                         "khong dat = dev mode")
     ap.add_argument("--python", default=sys.executable,
-                    help="interpreter cho sidecar con (G1_PYTHON)")
+                    help="interpreter cho sidecar con (G1_PYTHON, dev)")
     ap.add_argument("--port", type=int, default=9333,
                     help="cong CDP remote-debugging")
     ap.add_argument("--keep", action="store_true",
                     help="giu thu muc tmp khi xong")
+    ap.add_argument("--no-acl", action="store_true",
+                    help="bo ACL deny-write check cua case offline")
     args = ap.parse_args()
 
-    check_deps(args.python)
+    app_exe = Path(args.app).resolve() if args.app else None
+    label = "dev"
+    try:
+        if app_exe is not None:
+            require(app_exe.is_file(), f"khong tim thay --app: {app_exe}")
+            label = build_label(app_exe)
+            print(f"build label: {label} ({app_exe})")
+
+        # Build-label enforcement: case portal can fixture → production
+        # tu choi; offline chi tren production.
+        if args.case in ("audit", "upload", "all") and label == "production":
+            raise E2EFail(
+                f"--case {args.case} can TEST package (fixture portal) — "
+                f"production exe khong bao gio co fake_portal. Build bang "
+                f"'npm run dist:test' roi tro --app sang dist-test/")
+        if args.case == "offline" and app_exe is None:
+            raise E2EFail("--case offline can --app <exe> (packaged)")
+        if args.case == "offline" and label == "test":
+            raise E2EFail(
+                "--case offline chi chay tren production exe (dist-app) — "
+                "test build luon co fixture provider trong catalog")
+        check_deps(args.python, app_exe=app_exe)
+    except E2EFail as exc:
+        print(f"FAIL: {exc}", file=sys.stderr)
+        return 1
+
     tmp = Path(tempfile.mkdtemp(prefix="g1-upload-e2e-"))
-    app = AppInstance(tmp, args.port, args.python)
+    expect_portals = args.case != "offline"
+    app = AppInstance(tmp, args.port, args.python,
+                      app_exe=app_exe, expect_portals=expect_portals)
+    acl_mark = None
+    install_snap = None
+    if args.case == "offline":
+        install_snap = _tree_snapshot(app_exe.parent)
+        if not args.no_acl:
+            acl_mark = _acl_deny_writes(app_exe.parent)
+            if acl_mark:
+                print("ACL deny-write da bat tren install dir "
+                      "(install read-only check)")
+            else:
+                print("canh bao: khong deny-write duoc install dir "
+                      "(icacls?) — chi snapshot-diff")
     try:
         portals = app.start()
-        require("fake_portal" in portals and "fake_portal_b" in portals,
-                f"e2e-state thieu portal gia lap: {portals}")
+        if expect_portals:
+            require("fake_portal" in portals and "fake_portal_b" in portals,
+                    f"e2e-state thieu portal gia lap: {portals}")
 
         from playwright.sync_api import sync_playwright
 
         with sync_playwright() as pw:
+            if args.case == "offline":
+                case_offline(app, pw, tmp)
+                after = _tree_snapshot(app_exe.parent)
+                diff = [k for k in set(install_snap) | set(after)
+                        if install_snap.get(k) != after.get(k)]
+                require(not diff,
+                        f"install dir bi ghi de ({len(diff)} file): "
+                        f"{diff[:5]}")
             if args.case in ("audit", "all"):
                 browser, page = connect_page(pw, args.port)
                 try:
@@ -995,11 +1319,45 @@ def main():
                     raise
                 finally:
                     browser.close()
+            if args.case == "all":
+                # Session con sot tu case audit (login fake_portal) phai
+                # dong truoc case upload — sidecar chi cho mot browser/
+                # website (website_mismatch neu con treo).
+                browser, page = connect_page(pw, args.port)
+                try:
+                    for wid in app.portals:
+                        ws = submit_and_wait(
+                            page, "upload.workspace_get",
+                            {"website_id": wid})
+                        bid = ((ws.get("result") or {}).get("data")
+                               or {}).get("browser_id")
+                        if bid:
+                            sc = submit_and_wait(
+                                page, "upload.session_close",
+                                {"website_id": wid, "browser_id": bid})
+                            print(f"session_close {wid}: "
+                                  f"{sc.get('status')}")
+                    if app.packaged and label == "test":
+                        # Real-browser probe: chromium bundle trong
+                        # resources/playwright-browsers mo that toi portal
+                        # localhost — packaged khong can tai gi runtime.
+                        probe = submit_and_wait(
+                            page, "diag.fixture_browser_launch", {},
+                            timeout_s=90)
+                        require(probe.get("status") == "succeeded",
+                                f"fixture browser launch loi: {probe}")
+                        data = ((probe.get("result") or {})
+                                .get("data") or {})
+                        require("127.0.0.1" in str(data.get("url")),
+                                f"diag url khong loopback: {data}")
+                        print(f"diag.fixture_browser_launch OK: {data}")
+                finally:
+                    browser.close()
             if args.case in ("upload", "all"):
                 require("fake_portal_c" in app.portals,
                         f"e2e-state thieu fake_portal_c: {app.portals}")
                 case_upload(app, pw, tmp)
-        print(f"PASS --case {args.case}")
+        print(f"PASS --case {args.case} (label={label})")
         return 0
     except E2EFail as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
@@ -1021,6 +1379,7 @@ def main():
         return 1
     finally:
         app.stop()
+        _acl_restore(acl_mark)
         if not args.keep:
             import shutil
 

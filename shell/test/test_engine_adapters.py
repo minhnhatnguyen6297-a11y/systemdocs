@@ -4,6 +4,14 @@ Chay: python test/test_engine_adapters.py
 Can shell/engine-roots.json tro toi engine roots tren may nay; thieu thi skip.
 Khong dung OCR/browser session trong unit test nay (can API key/Chromium) —
 2 luong do duoc kiem chung qua smoke tay trong app Electron.
+
+MIN-69 T9 — test KHONG duoc ghi vao data that:
+  - Notary: G1_NOTARY_DATA_DIR → tempdir (notary_adapter._ensure_db rebind
+    notary.db sang data dir) + G1_OUTPUT_DIR → tempdir; test khong bao gio
+    tao record trong notary.db that hay xuat docx vao output that.
+  - Upload: G1_UPLOAD_DATA_DIR → tempdir (workspace.sqlite3 +
+    websites/<id>/registry.sqlite3 deu duoi do); DOCX/Excel fixture do test
+    tu tao — khong phu thuoc upload_lab/downloads/.
 """
 import json
 import sys
@@ -19,6 +27,26 @@ from jobstore import Job  # noqa: E402
 import command_registry as reg  # noqa: E402
 from errors import CommandError  # noqa: E402
 import engine_roots  # noqa: E402
+
+_WF = "upload.workflow.v1"
+
+
+def _write_docx(path: Path, lines):
+    """Tao file .docx that (python-docx) cho scan fixture."""
+    import docx
+    d = docx.Document()
+    for line in lines:
+        d.add_paragraph(line)
+    d.save(str(path))
+
+
+def _write_xlsx(path: Path, rows):
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    for r in rows:
+        ws.append(list(r))
+    wb.save(str(path))
 
 
 def _run(command, payload=None):
@@ -39,7 +67,29 @@ def _engines_available():
 @unittest.skipUnless(_engines_available(),
                      "chua cau hinh engine-roots.json")
 class TestNotaryAdapter(unittest.TestCase):
-    """MIN-68: case/customer/property/participant/Word/Zalo qua engine that."""
+    """MIN-68: case/customer/property/participant/Word/Zalo qua engine that.
+
+    DB that tuyet doi khong bi ghi: setUpClass tro G1_NOTARY_DATA_DIR ve
+    tempdir → notary_adapter rebind notary.db sang do (khong sua engine)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = tempfile.TemporaryDirectory(prefix="g1-notary-test-")
+        import os
+        os.environ["G1_NOTARY_DATA_DIR"] = cls._tmp.name
+        # Word export/output cung khong duoc roi vao output that.
+        cls._out = tempfile.TemporaryDirectory(prefix="g1-output-test-")
+        os.environ["G1_OUTPUT_DIR"] = cls._out.name
+
+    @classmethod
+    def tearDownClass(cls):
+        # Nha handle sqlite (Windows khong cho xoa file dang mo).
+        try:
+            database = engine_roots.import_engine_module(
+                "notary_v2", "database")
+            database.engine.dispose()
+        except Exception:
+            pass
 
     def test_case_list_empty_or_rows(self):
         res = _run("notary.case_list")
@@ -113,36 +163,88 @@ class TestNotaryAdapter(unittest.TestCase):
 @unittest.skipUnless(_engines_available(),
                      "chua cau hinh engine-roots.json")
 class TestUploadAdapter(unittest.TestCase):
-    """MIN-69: scan/audit/env_check qua engine that (khong can browser)."""
+    """MIN-69: scan/audit/env_check qua engine that (khong can browser).
+
+    Versioned commands (upload.workflow.v1) + G1_UPLOAD_DATA_DIR → tempdir:
+    registry/workspace/ghi deu nam trong temp, khong cham data that.
+    Fixture DOCX/Excel do test tu tao."""
+
+    @classmethod
+    def setUpClass(cls):
+        import os
+        cls._tmp = tempfile.TemporaryDirectory(prefix="g1-upload-test-")
+        os.environ["G1_UPLOAD_DATA_DIR"] = cls._tmp.name
+        cls._fixtures = Path(cls._tmp.name) / "fixtures"
+
+    @classmethod
+    def tearDownClass(cls):
+        # Nha handle workspace.sqlite3 truoc khi tempdir cleanup.
+        try:
+            import upload_workspace
+            upload_workspace.reset_store_for_tests()
+        except Exception:
+            pass
+
+    def _workspace_revision(self):
+        ws = _run("upload.workspace_get", {
+            "workflow_version": _WF, "website_id": "nam_dinh"})
+        return ws["data"]["revision"]
+
+    def test_websites_and_workspace(self):
+        cat = _run("upload.websites", {"workflow_version": _WF})
+        ids = [w["website_id"] for w in cat["data"]["websites"]]
+        self.assertIn("nam_dinh", ids)
 
     def test_env_check_real(self):
-        res = _run("upload.env_check")
+        res = _run("upload.env_check", {
+            "workflow_version": _WF, "website_id": "nam_dinh"})
         self.assertEqual(res["kind"], "env_check")
         self.assertIn("steps", res["data"])
 
     def test_scan_and_audit_fixture(self):
-        root = engine_roots.engine_root("upload_lab")
-        downloads = root / "downloads"
-        if not downloads.is_dir():
-            self.skipTest("khong co downloads/ fixtures")
-        res = _run("upload.scan",
-                   {"folder": {"path": str(downloads),
-                               "scope": "machine_local"}})
+        folder = self._fixtures / "hs-scan"
+        folder.mkdir(parents=True, exist_ok=True)
+        _write_docx(folder / "HD-001.docx", [
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG",
+            "Số công chứng: 77/2026 ngày 10/05/2026",
+        ])
+        res = _run("upload.scan", {
+            "workflow_version": _WF, "website_id": "nam_dinh",
+            "folder": {"path": str(folder), "scope": "machine_local"},
+            "expected_revision": self._workspace_revision(),
+            "full_rescan": True})
         self.assertEqual(res["kind"], "scan_report")
         self.assertTrue(res["data"]["run_id"])
         self.assertIn("records", res["data"])
+        # Data root la temp — registry nam duoi G1_UPLOAD_DATA_DIR.
+        regdb = (Path(self._tmp.name) / "websites" / "nam_dinh"
+                 / "registry.sqlite3")
+        self.assertTrue(regdb.is_file(),
+                        f"registry khong trong data root temp: {regdb}")
 
-        xlsx = sorted(downloads.glob("So_cong_chung_*.xlsx"))
-        if not xlsx:
-            self.skipTest("khong co so Excel fixture")
+        xlsx = self._fixtures / "so_cong_chung.xlsx"
+        _write_xlsx(xlsx, [
+            ("Số công chứng", "Ngày công chứng"),
+            ("77/2026", "10/05/2026"),
+            ("79/2026", "12/05/2026"),
+            ("79/2026", "12/05/2026"),
+        ])
         audit = _run("upload.audit_excel", {
-            "file": {"path": str(xlsx[-1]), "scope": "machine_local"},
-            "from_date": "2026-01-01", "to_date": "2026-12-31"})
+            "workflow_version": _WF, "website_id": "nam_dinh",
+            "file_ref": {"path": str(xlsx), "scope": "machine_local"},
+            "from_date": "2026-05-01", "to_date": "2026-05-31"})
         self.assertEqual(audit["kind"], "audit_report")
         self.assertIn("missing", audit["data"])
         self.assertIn("issues", audit["data"])
-        # Cot chuan MIN-77
-        for row in (audit["data"]["missing"] or [])[:3]:
+        self.assertTrue(audit["data"]["audit_id"])
+        # Engine that chay: 3 dong, 79/2026 trung → 2 issue trung_so.
+        self.assertEqual(
+            audit["data"]["summary"]["excel_total"], 3)
+        dupes = [i["so_cong_chung"]
+                 for i in audit["data"]["issues"] or []
+                 if "trung" in (i.get("ghi_chu") or "")]
+        self.assertEqual(dupes.count("79/2026"), 2)
+        for row in (audit["data"]["issues"] or [])[:3]:
             self.assertIn("so_cong_chung", row)
             self.assertIn("ghi_chu", row)
 

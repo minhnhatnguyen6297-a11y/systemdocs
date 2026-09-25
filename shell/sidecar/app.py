@@ -62,7 +62,24 @@ def _build_store():
         return JobStore()
 
 
+def _install_e2e_fixtures():
+    """MIN-69 T9 — chi TEST BUILD: module `e2e_fixture_hook` ton tai duy
+    nhat trong sidecar dist:test (spec cong them test/fixtures vao pathex).
+    Production KHONG ship module → G1_E2E_FIXTURE la no-op; renderer khong
+    bao gio dat duoc env nay (chi Electron main → env sidecar)."""
+    if os.environ.get("G1_E2E_FIXTURE") != "1":
+        return
+    try:
+        import e2e_fixture_hook
+    except ImportError:
+        print("G1_E2E_FIXTURE=1 nhung e2e_fixture_hook khong co trong goi "
+              "(production build) — bo qua", file=sys.stderr)
+        return
+    e2e_fixture_hook.install()
+
+
 store = _build_store()
+_install_e2e_fixtures()
 _server = None  # uvicorn.Server, set in main()
 
 
@@ -127,6 +144,9 @@ def healthz():
         "engine_instance_id": ENGINE_INSTANCE_ID,
         "supported_versions": SUPPORTED_VERSIONS,
         "accepting": store.accepting,
+        # Nhan build cho harness — dev khong dat = "dev"; packaged main
+        # truyen production|test (config.js G1_BUILD_LABEL).
+        "build_label": os.environ.get("G1_BUILD_LABEL", "dev"),
     }
 
 

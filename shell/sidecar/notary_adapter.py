@@ -7,6 +7,10 @@ business rule (locked case, dedup, unique serial).
 
 DB: notary.db cua engine root (database.py neo theo __file__). Sidecar la
 owner ghi duy nhat — renderer khong bao gio cham DB (g1-module-data §5).
+Khi engine root la bundled read-only (packaged: resources/engine) hoac
+G1_NOTARY_DATA_DIR duoc dat (test — khong ghi DB that), `_ensure_db`
+redirect DB sang `engine_roots.engine_data_dir("notary_v2")` bang patch
+muc adapter — khong sua engine internals.
 """
 import asyncio
 import io
@@ -15,18 +19,51 @@ from datetime import date, datetime
 from pathlib import Path
 
 from errors import CommandError
-from engine_roots import engine_root, import_engine_module, output_dir
+from engine_roots import (
+    engine_data_dir, engine_root, import_engine_module, output_dir)
 
 
 _db_ready = False
 
 
+def _rebind_db_path(database, db_path):
+    """Rebind notary.db sang data dir writable (packaged/test).
+
+    `database.py` neo DB_PATH/engine/SessionLocal canh __file__ luc import —
+    hop le trong dev (repo), nhung engine bundle trong resources la
+    read-only. Patch module-level o day: `models.Base` la declarative
+    chung (khong anh huong), migrate_* doc global `DB_PATH` luc goi,
+    `get_db`/adapter tao session qua `SessionLocal` global — tat ca theo
+    sau rebind. Test cung dung duong nay qua G1_NOTARY_DATA_DIR de khong
+    ghi DB that.
+    """
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    database.DB_PATH = db_path
+    database.DATABASE_URL = f"sqlite:///{db_path.as_posix()}"
+    database.engine = create_engine(
+        database.DATABASE_URL, connect_args={"check_same_thread": False})
+    database.enable_sqlite_foreign_keys(database.engine)
+    database.SessionLocal = sessionmaker(
+        autocommit=False, autoflush=False, bind=database.engine)
+
+
 def _ensure_db():
-    """Khoi tao schema notary.db lan dau — cung loat migrate nhu main.py."""
+    """Khoi tao schema notary.db — cung loat migrate nhu main.py.
+
+    Dev giu nguyen: DB canh engine root. Bundled/env override → rebind sang
+    engine_data_dir truoc khi migrate (idempotent — doi data dir giua
+    chay se rebind + migrate lai).
+    """
     global _db_ready
+    database = import_engine_module("notary_v2", "database")
+    db_path = Path(engine_data_dir("notary_v2")) / "notary.db"
+    if Path(database.DB_PATH).resolve() != db_path.resolve():
+        _rebind_db_path(database, db_path)
+        _db_ready = False
     if _db_ready:
         return
-    database = import_engine_module("notary_v2", "database")
     database.migrate_customers_nullable()
     database.migrate_inheritance_cases_schema()
     database.migrate_properties_schema()

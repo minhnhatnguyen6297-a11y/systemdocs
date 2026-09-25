@@ -1,0 +1,4 @@
+{
+  "build_label": "test",
+  "note": "MIN-69 T9 marker — CHI ton tai trong goi dist:test (dev.g1.shell.test). Production khong bao gio ship file nay."
+}

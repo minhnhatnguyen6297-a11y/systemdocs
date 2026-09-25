@@ -113,6 +113,9 @@ class SidecarManager extends EventEmitter {
         // — tach khoi engine root, khong bao gio install dir.
         G1_UPLOAD_DATA_DIR:
           process.env.G1_UPLOAD_DATA_DIR || _defaultUploadDataDir(),
+        // Env packaged-only tu sidecarCommand (engine dir, playwright
+        // browsers, build label) — dev khong dat.
+        ...(this.command.env || {}),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,

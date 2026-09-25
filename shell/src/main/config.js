@@ -18,13 +18,25 @@ const RESTART_BACKOFF_MS = [1_000, 3_000, 10_000]; // toi da 3 lan (contract §7
 const SHUTDOWN_GRACE_MS = 6_000;
 const JOB_POLL_MS = 1_000;
 
-function sidecarCommand(appIsPackaged, resourcesPath, shellRoot) {
+function sidecarCommand(appIsPackaged, resourcesPath, shellRoot, opts = {}) {
   if (appIsPackaged) {
     return {
       cmd: path.join(resourcesPath, 'sidecar', 'g1-shell-sidecar',
                      'g1-shell-sidecar.exe'),
       args: [],
       cwd: path.join(resourcesPath, 'sidecar', 'g1-shell-sidecar'),
+      env: {
+        // MIN-69 T9: engine code ship dang source trong
+        // resources/engine/<key> — engine_roots resolve qua env nay;
+        // khong con phu thuoc repo dev.
+        G1_ENGINE_DIR: path.join(resourcesPath, 'engine'),
+        // Chromium pinned theo playwright cua build — resources/
+        // playwright-browsers/chromium-<rev>; khong tai luc runtime.
+        PLAYWRIGHT_BROWSERS_PATH:
+          path.join(resourcesPath, 'playwright-browsers'),
+        // Nhan build production|test — healthz quang bao cho harness.
+        G1_BUILD_LABEL: opts.buildLabel || 'production',
+      },
     };
   }
   const python = process.env.G1_PYTHON || 'python';

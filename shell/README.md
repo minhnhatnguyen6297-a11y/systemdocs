@@ -72,20 +72,74 @@ npm start
 ## Test
 
 ```powershell
-npm test                                # redact, ipc allowlist, command client
+npm test                                # redact, ipc allowlist, command client, job tracker
 & $env:G1_PYTHON test/test_sidecar_contract.py   # contract conformance (uvicorn that)
 python test/test_jobstore.py            # jobstore cancel/drain
-python test/test_engine_adapters.py     # engine that: case→Word, scan, audit (can engine-roots.json)
+python test/test_upload_workflow.py     # v1 handlers scan/audit/queue
+python test/test_upload_browser_workflow.py    # browser session + fake portal
+python test/test_upload_recovery.py     # restart/reconcile/recovery
+python test/test_engine_adapters.py     # engine that: case→Word, scan, audit
+                                        #   (G1_NOTARY_DATA_DIR/G1_UPLOAD_DATA_DIR/G1_OUTPUT_DIR → tempdir)
 ```
 
-## Package
+## Package (MIN-69 T9)
 
 ```powershell
 $env:ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
 $env:ELECTRON_BUILDER_BINARIES_MIRROR="https://npmmirror.com/mirrors/electron-builder-binaries/"
-npm run build:sidecar   # -> sidecar/dist/g1-shell-sidecar/
-npm run dist            # -> dist-app/win-unpacked/g1-shell.exe
+$env:G1_PYTHON = "<venv>/Scripts/python.exe"   # venv can PyInstaller + deps engine
+npm run build:sidecar   # PyInstaller onedir + stage engine/browsers
+                      #   -> sidecar/dist/g1-shell-sidecar/
+                      #   -> build/engine/{upload_lab,notary_v2}
+                      #   -> build/playwright-browsers/chromium-*
+npm run dist            # electron-builder dir -> dist-app/win-unpacked/g1-shell.exe
 ```
+
+Layout trong goi:
+
+```text
+resources/sidecar/g1-shell-sidecar/     frozen Python sidecar (khong Qt)
+resources/engine/{upload_lab,notary_v2} source engine (read-only)
+resources/playwright-browsers/          Chromium pin revision
+```
+
+Runtime env do main.js dat: `G1_ENGINE_DIR=<resources>/engine`,
+`PLAYWRIGHT_BROWSERS_PATH=<resources>/playwright-browsers`,
+`G1_UPLOAD_DATA_DIR=<userData>/upload_lab`,
+`G1_NOTARY_DATA_DIR=<userData>/engine-data/notary_v2`,
+`G1_OUTPUT_DIR=<userData>/output`. Bundled engine root la read-only —
+data/output luon ghi duoi userData, khong bao gio ghi vao thu muc cai dat.
+
+Test build (fixture-only, tach userData):
+
+```powershell
+npm run dist:test   # -> dist-test/win-unpacked/g1-shell-test.exe
+                    #    appId dev.g1.shell.test, marker
+                    #    resources/test-pkg/test-build.json
+```
+
+Marker `test-pkg/test-build.json` → `G1_BUILD_LABEL=test`, app/userData
+ten rieng, seam E2E (`G1_E2E_PICK_FILES`, `G1_E2E_OPEN_LOG`,
+`G1_E2E_FIXTURE` → fixture portals) duoc phep. Production khong ship
+marker + `e2e_fixture_hook.py` → seam la no-op, chi `nam_dinh` trong
+catalog, `diag.fixture_browser_launch` = `command_unknown`.
+
+Verify goi (khong can portal that):
+
+```powershell
+# probe frozen sidecar truc tiep (healthz + engine command + prod guard)
+& $env:G1_PYTHON test/probe_frozen_sidecar.py `
+    dist-app/win-unpacked/resources/sidecar/g1-shell-sidecar/g1-shell-sidecar.exe
+
+# production offline: catalog that, khong fixture, ghi userData, ACL deny-write
+& $env:G1_PYTHON test/test_upload_e2e.py --app dist-app/win-unpacked/g1-shell.exe --case offline
+
+# test package full: audit + Chromium bundle + upload + recovery
+& $env:G1_PYTHON test/test_upload_e2e.py --app dist-test/win-unpacked/g1-shell-test.exe --case all
+```
+
+`--case offline` bat buoc goi production (tu choi test marker);
+`audit`/`upload`/`all` bat buoc build test (tu choi production).
 
 Packaged smoke (khong can terminal tuong tac):
 

@@ -17,6 +17,22 @@ const { registerIpc } = require('./ipc');
 const SHELL_ROOT = path.join(__dirname, '..', '..');
 const SMOKE = process.env.G1_SMOKE === '1'; // packaged smoke: chay probe roi thoat
 
+// MIN-69 T9: marker `resources/test-pkg/test-build.json` CHI ton tai trong
+// goi dist:test (electron-builder.test.json). Production khong ship file
+// nay — nhan build quyet dinh userData rieng + seam e2e + build label.
+function isTestBuild() {
+  try {
+    return app.isPackaged && fs.existsSync(path.join(
+      process.resourcesPath, 'test-pkg', 'test-build.json'));
+  } catch { return false; }
+}
+
+// Seam e2e (pick/open stub): dev luon cho; packaged CHI trong test build —
+// production khong bao gio doc file JSON thay dialog that.
+function e2eSeamsAllowed() {
+  return !app.isPackaged || isTestBuild();
+}
+
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
@@ -39,10 +55,10 @@ const OPEN_ALLOWED_EXTS = new Set([
 // {"files": ["D:/path/a.xlsx", ...]} — thay dialog that, chi hoat dong
 // khi env duoc dat. Ket qua van qua cung filter/validate nhu dialog.
 function e2ePickOverride(opts) {
-  // Master guard: ban packaged KHONG BAO GIO stub file dialog — env
+  // Master guard: production KHONG BAO GIO stub file dialog — env
   // G1_E2E_PICK_FILES con sot tren may user khong duoc bien moi picker
-  // thanh doc file JSON.
-  if (app.isPackaged) return null;
+  // thanh doc file JSON. Test build (marker) van dung seam duoc.
+  if (!e2eSeamsAllowed()) return null;
   const spec = process.env.G1_E2E_PICK_FILES;
   if (!spec) return null;
   let list;
@@ -131,8 +147,8 @@ async function openPath(opts = {}) {
   }
   // Test seam (MIN-69 e2e): G1_E2E_OPEN_LOG chi vao file text — moi lan
   // openPath hop le ghi mot dong path thay vi mo app that (tran dep Word
-  // trong test). Cung guard nhu pick seam: packaged khong bao gio stub.
-  const openLog = !app.isPackaged && process.env.G1_E2E_OPEN_LOG;
+  // trong test). Cung guard nhu pick seam: production khong bao gio stub.
+  const openLog = e2eSeamsAllowed() && process.env.G1_E2E_OPEN_LOG;
   if (openLog) {
     fs.appendFileSync(openLog, `${p}\n`, 'utf8');
     return { opened: p };
@@ -254,7 +270,10 @@ function collectDiagnostics() {
 }
 
 async function start() {
-  app.setName('g1-shell');
+  // userData tach biet cho test package (appId dev.g1.shell.test):
+  // %APPDATA%/g1-shell-test vs %APPDATA%/g1-shell — khong de test build
+  // ghi de data cua ban production tren cung may.
+  app.setName(isTestBuild() ? 'g1-shell-test' : 'g1-shell');
   // packaged app khong co terminal — ghi diagnostics ra file (da redact)
   const logDir = path.join(app.getPath('userData'), 'logs');
   fs.mkdirSync(logDir, { recursive: true });
@@ -263,7 +282,8 @@ async function start() {
   const stderr = process.stderr;
   log = makeLogger({ write: (s) => { fileStream.write(s); stderr.write(s); } });
   const cmd = sidecarCommand(
-    app.isPackaged, process.resourcesPath, SHELL_ROOT);
+    app.isPackaged, process.resourcesPath, SHELL_ROOT,
+    { buildLabel: isTestBuild() ? 'test' : 'production' });
   sidecar = new SidecarManager({ command: cmd, logger: log });
   tracker = new JobTracker({ sidecar, logger: log });
   tracker.on('job', (job) => {
