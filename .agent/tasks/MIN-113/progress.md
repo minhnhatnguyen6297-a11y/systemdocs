@@ -275,3 +275,27 @@ Pool + So do quan he + Word tab render day du → **0 console error,
 Bonus: `path.txt` cua electron npm package co trailing `\n` ma
 `index.js` khong trim → spawn ENOENT tren main checkout — da fix local
 (ghi file khong newline). Worktree khac gap loi tuong tu thi ap dung.
+
+## Owner review UI (2026-09-25) — ket qua
+
+**Dat (merge de):** tab "Soạn ho so" + "Tổng quan ho so" — layout, Stage,
+Pool, case list, mock banner deu duoc duyet.
+
+**Chua dat / defect moi:**
+
+1. **Tab Word chua dat — can spec lai.** Noi dung surface Word hien chi
+   la placeholder (spec §1); diem vao Xuat Word nam trong Soạn ho so.
+   Owner yeu cau spec rieng cho tab Word truoc khi lam tiep.
+2. **Diagram mat thao tac keo-tha.** Drag da implement
+   (`relationship-diagram.js` card.draggable person + drop tren node)
+   NHUNG: (a) pool person card chi draggable khi `canWrite`; (b) case
+   fixture da gan het nguoi → pool chi con asset (draggable=false) →
+   khong con gi keo duoc; (c) node DA GAN khong keo duoc de doi slot /
+   bo gan bang keo-tha. Owner thao tac khong thay keo-tha → can fix:
+   node draggable + drop giua nodes + pool person luon keo duoc.
+3. **Stage tai san phai render COT, khong phai hang** nhu hien tai
+   (hien asset la card-hang xep doc, owner muon layout cot).
+
+Verify evidence keo-tha: headless CDP tren case 47 —
+`[draggable]` chi 2 phan tu, ca hai `d:false` (asset card), khong co
+person card nao draggable.
