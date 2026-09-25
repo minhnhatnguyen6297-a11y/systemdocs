@@ -13,7 +13,12 @@ Sở hữu phần nghiệp vụ lớp catalog/orchestration cho
 - per-document status saved|failed|skipped + breakdown đủ ba list;
 - cancel giữa batch: `check_cancel(pending_data)` — caller (sidecar)
   bọc thành `job.check_cancel(result)` của MIN-115; doc chưa bắt đầu
-  đi vào breakdown.skipped, file đã lưu giữ nguyên.
+  đi vào breakdown.skipped, file đã lưu giữ nguyên;
+- MIN-116: probe writability destination MỘT lần đầu batch bằng file
+  tạo/xóa thật (`os.access` trên Windows misreport ACL deny-write) và
+  KHÔNG dùng `tempfile.mkstemp` — stdlib retry PermissionError
+  `TMP_MAX` = 2**31-1 lần trên nt → job hang vô hạn. Destination deny
+  → mọi doc per-file `file_locked`, job failed trong giây.
 
 Module này không import DB/FastAPI — `case` là ORM object duck-typed
 giống `word_engine.build_word_context`. Sidecar `notary_adapter` chịu
@@ -22,10 +27,9 @@ trách session, FileRef/destination validation và map CommandError.
 from __future__ import annotations
 
 import logging
-import os
 import re
 import shutil
-import tempfile
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -202,6 +206,17 @@ def _skipped_entry(spec: WordDocumentSpec) -> dict:
     }
 
 
+def _failed_entry(spec: WordDocumentSpec, code: str, message: str) -> dict:
+    return {
+        "document_key": spec.document_key,
+        "display_name": spec.display_name,
+        "status": "failed",
+        "actual_filename": None,
+        "output_file": None,
+        "error": {"code": code, "message": message},
+    }
+
+
 def _batch_data(dest_dir: Path, documents: list[dict], *,
                 succeeded: list[str], failed: list[str],
                 skipped: list[str]) -> dict:
@@ -231,18 +246,59 @@ def _doc_error_from(exc: BaseException,
         # luôn non-None khi đây là một trong các lỗi §8.1.
         reason = word_engine.word_block_reason(context)
         return (reason or "word.render_failed"), str(exc)
+    if isinstance(exc, FileNotFoundError):
+        return "file_not_found", f"không tìm thấy file/thư mục: {exc}"
     if isinstance(exc, PermissionError):
         return "file_locked", f"không ghi được file: {exc}"
     return "word.render_failed", f"{type(exc).__name__}: {exc}"
 
 
+_TEMP_CREATE_ATTEMPTS = 8
+
+
+def _temp_file_in(dest_dir: Path, *, prefix: str, suffix: str) -> Path:
+    """Tạo file rỗng exclusive trong `dest_dir` (uuid name + open "xb"),
+    trả path đã tạo.
+
+    MIN-116: KHÔNG dùng tempfile.mkstemp — `_mkstemp_inner` của stdlib
+    retry PermissionError trên Windows khi `os.access(dir, W_OK)` trả
+    True (ACL deny-write bị misreport), và TMP_MAX = 2**31-1 → vòng
+    lặp thực tế vô hạn, job hang không cancel được. open("xb") raise
+    PermissionError NGAY ở lần đầu — chỉ retry trên FileExistsError
+    (va chạm uuid, gần như không thể)."""
+    for _ in range(_TEMP_CREATE_ATTEMPTS):
+        candidate = dest_dir / f"{prefix}{uuid.uuid4().hex}{suffix}"
+        try:
+            with open(candidate, "xb"):
+                pass
+        except FileExistsError:
+            continue
+        return candidate
+    raise FileExistsError(
+        f"không tạo được file tạm trong destination {dest_dir}")
+
+
+def _probe_dest_writable(dest_dir: Path) -> None:
+    """MIN-116: verify destination THỰC SỰ ghi được bằng một lần tạo/xóa
+    file ở đầu batch — `os.access()` trên Windows không đáng tin với
+    ACL (chỉ đọc attribute read-only bit, không eval ACL thật)."""
+    probe = _temp_file_in(
+        dest_dir, prefix=".word_export_probe_", suffix=".tmp")
+    try:
+        probe.unlink()
+    except OSError:
+        pass
+
+
 def _render_temp(doc: Any, dest_dir: Path) -> Path:
     """Render docx ra file tạm NGAY TRONG destination (cùng filesystem —
-    publish sau chỉ là copy nội bộ). Lỗi → xóa file tạm."""
-    fd, tmp_name = tempfile.mkstemp(
-        prefix=".word_export_", suffix=".docx", dir=str(dest_dir))
-    os.close(fd)
-    tmp_path = Path(tmp_name)
+    publish sau chỉ là copy nội bộ). Lỗi → xóa file tạm.
+
+    MIN-116: `_temp_file_in` thay tempfile.mkstemp — PermissionError
+    propagate ngay thành per-doc `file_locked` thay vì hang trong
+    stdlib retry loop."""
+    tmp_path = _temp_file_in(
+        dest_dir, prefix=".word_export_", suffix=".docx")
     try:
         doc.save(str(tmp_path))
     except BaseException:
@@ -333,6 +389,7 @@ def _export_one_document(*, spec: WordDocumentSpec, case: Any,
                 f"Mẫu còn {len(unresolved)} trường chưa hỗ trợ: "
                 + ", ".join(unresolved))
 
+        check()                        # cancel trước khi render
         tmp_path = _render_temp(doc, dest_dir)
         try:
             check()                        # cancel trước khi publish
@@ -364,14 +421,7 @@ def _export_one_document(*, spec: WordDocumentSpec, case: Any,
         code, message = _doc_error_from(exc, context)
         _logger.info("word_doc_failed %s",
                      {"document_key": spec.document_key, "code": code})
-        return {
-            "document_key": spec.document_key,
-            "display_name": spec.display_name,
-            "status": "failed",
-            "actual_filename": None,
-            "output_file": None,
-            "error": {"code": code, "message": message},
-        }
+        return _failed_entry(spec, code, message)
 
 
 # ---------------------------------------------------------------- public
@@ -428,9 +478,6 @@ def export_batch(case: Any, *, case_id: int, document_keys: Any,
     docs: list[dict] = []
     saved: list[str] = []
     failed: list[str] = []
-    context = word_engine.build_word_context(case, today=today)
-    data_reason = word_engine.word_block_reason(context)
-    mapping_holder: dict = {}
     total = len(keys)
 
     def _pending_data() -> dict:
@@ -447,14 +494,39 @@ def export_batch(case: Any, *, case_id: int, document_keys: Any,
         if check_cancel is not None:
             check_cancel(_pending_data())
 
+    # MIN-116: probe writability destination MỘT lần đầu batch, trước khi
+    # build context/render — destination deny-write (ACL) thì mọi doc
+    # nhận per-file error chung, job kết thúc trong giây, KHÔNG hang.
+    _check()                                       # cancel trước khi probe
+    dest_error: Optional[tuple[str, str]] = None
+    try:
+        _probe_dest_writable(dest_dir)
+    except FileNotFoundError as exc:
+        dest_error = ("file_not_found",
+                      f"destination không còn tồn tại: {exc}")
+    except PermissionError as exc:
+        dest_error = ("file_locked",
+                      f"destination không ghi được: {exc}")
+    except OSError as exc:
+        dest_error = ("word.render_failed",
+                      f"destination không tạo được file: {exc}")
+
+    context = word_engine.build_word_context(case, today=today)
+    data_reason = word_engine.word_block_reason(context)
+    mapping_holder: dict = {}
+
     for key in keys:
         _check()                                   # cancel giữa batch
         spec = DOC_CATALOG_BY_KEY[key]
-        entry = _export_one_document(
-            spec=spec, case=case, context=context,
-            data_reason=data_reason, resolve_template=resolve_template,
-            mapping_holder=mapping_holder, dest_dir=dest_dir,
-            taken=taken, case_id=case_id, today=today, check=_check)
+        if dest_error is not None:
+            code, message = dest_error
+            entry = _failed_entry(spec, code, message)
+        else:
+            entry = _export_one_document(
+                spec=spec, case=case, context=context,
+                data_reason=data_reason, resolve_template=resolve_template,
+                mapping_holder=mapping_holder, dest_dir=dest_dir,
+                taken=taken, case_id=case_id, today=today, check=_check)
         docs.append(entry)
         (saved if entry["status"] == "saved" else failed).append(key)
         if report_progress is not None:

@@ -869,6 +869,37 @@ class TestWordExport:
                                 "scope": "machine_local", "is_dir": True}})
         assert exc.value.code == "file_not_found"
 
+    def test_batch_dest_write_denied_file_locked(
+            self, tmp_path, monkeypatch):
+        """MIN-116 parity engine that: dest ACL deny-write -> probe fail
+        -> MOI doc per-file file_locked (ke ca niem_yet co
+        template_missing), all-failed -> word_batch_failed kem
+        result.data.breakdown — khong hang, khong exception kho."""
+        real_open = open
+        root = str(tmp_path)
+
+        def _deny(file, mode="r", *a, **kw):
+            if str(file).startswith(root) and \
+                    any(c in mode for c in "wax+"):
+                raise PermissionError(13, "Access is denied", str(file))
+            return real_open(file, mode, *a, **kw)
+
+        monkeypatch.setattr("builtins.open", _deny)
+        mock.reset_backend(_load_fixture("ready.json"))
+        keys = ["khai_nhan_di_san", "thoa_thuan_phan_chia", "niem_yet"]
+        with pytest.raises(CommandError) as exc:
+            _call("word_export_batch", {
+                "case_id": 42, "document_keys": keys,
+                "destination": self._dest(tmp_path)})
+        assert exc.value.code == "word_batch_failed"
+        data = exc.value.result["data"]
+        assert data["breakdown"] == {
+            "succeeded": [], "failed": keys, "skipped": []}
+        for d in data["documents"]:
+            assert d["status"] == "failed"
+            assert d["error"]["code"] == "file_locked"
+        assert list(tmp_path.iterdir()) == []     # khong file nao sot lai
+
     def test_batch_locked_case(self, tmp_path):
         mock.reset_backend(_load_fixture("locked.json"))
         with pytest.raises(CommandError) as exc:

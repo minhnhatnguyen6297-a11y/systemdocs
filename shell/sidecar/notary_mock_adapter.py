@@ -35,6 +35,7 @@ import json
 import re
 import threading
 import time
+import uuid
 from pathlib import Path
 
 from errors import CommandError
@@ -1202,9 +1203,41 @@ def word_export_batch(job, payload):
                            "failed": list(failed),
                            "skipped": list(remaining)}})
 
+    # MIN-116 parity engine that: probe writability destination mot lan
+    # dau batch bang file tao/xoa that (os.access tren Windows misreport
+    # ACL deny-write) — deny thi MOI doc nhan cung per-file error, job
+    # ket thuc ngay, khong hang. Thu tu: cancel -> probe -> loop.
+    job.check_cancel(_pending_result())          # cancel truoc khi probe
+    dest_error = None
+    try:
+        probe = dest_dir / f".word_export_probe_{uuid.uuid4().hex}.tmp"
+        with open(probe, "xb"):
+            pass
+        probe.unlink()
+    except FileNotFoundError as exc:
+        dest_error = ("file_not_found",
+                      f"destination không còn tồn tại: {exc}")
+    except PermissionError as exc:
+        dest_error = ("file_locked",
+                      f"destination không ghi được: {exc}")
+    except OSError as exc:
+        dest_error = ("word.render_failed",
+                      f"destination không tạo được file: {exc}")
+
     for i, key in enumerate(keys):
         job.check_cancel(_pending_result())  # cancel giua batch
         meta = DOC_CATALOG[key]
+        if dest_error is not None:
+            docs.append({"document_key": key,
+                         "display_name": meta["display_name"],
+                         "status": "failed", "actual_filename": None,
+                         "output_file": None,
+                         "error": {"code": dest_error[0],
+                                   "message": dest_error[1]}})
+            failed.append(key)
+            job.report_progress(i + 1, len(keys),
+                                f"văn bản {i + 1}/{len(keys)}")
+            continue
         reason = _word_block_reason(case, key)
         if reason is not None:
             docs.append({"document_key": key,
@@ -1217,18 +1250,30 @@ def word_export_batch(job, payload):
         else:
             time.sleep(WORD_DOC_DELAY)       # mo phong render docx
             job.check_cancel(_pending_result())  # truoc khi ghi file
-            name = _reserve_and_write(
-                dest_dir, meta["filename_stem"],
-                int(payload["case_id"]), taken,
-                meta["display_name"], {"id": payload["case_id"]})
-            out_path = dest_dir / name
-            docs.append({"document_key": key,
-                         "display_name": meta["display_name"],
-                         "status": "saved", "actual_filename": name,
-                         "output_file": {"path": str(out_path),
-                                         "scope": "machine_local"},
-                         "error": None})
-            saved.append(key)
+            try:
+                name = _reserve_and_write(
+                    dest_dir, meta["filename_stem"],
+                    int(payload["case_id"]), taken,
+                    meta["display_name"], {"id": payload["case_id"]})
+            except PermissionError as exc:
+                # Parity engine that (MIN-116): dest deny-write -> per-doc
+                # file_locked; all-failed -> word_batch_failed kem result.
+                docs.append({"document_key": key,
+                             "display_name": meta["display_name"],
+                             "status": "failed", "actual_filename": None,
+                             "output_file": None,
+                             "error": {"code": "file_locked",
+                                       "message": f"không ghi được file: {exc}"}})
+                failed.append(key)
+            else:
+                out_path = dest_dir / name
+                docs.append({"document_key": key,
+                             "display_name": meta["display_name"],
+                             "status": "saved", "actual_filename": name,
+                             "output_file": {"path": str(out_path),
+                                             "scope": "machine_local"},
+                             "error": None})
+                saved.append(key)
         job.report_progress(i + 1, len(keys),
                             f"văn bản {i + 1}/{len(keys)}")
     breakdown = {"succeeded": saved, "failed": failed, "skipped": []}
