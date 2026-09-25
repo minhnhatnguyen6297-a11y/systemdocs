@@ -103,6 +103,16 @@
       manifestRef: null,
       remaining: 0,               // ho so con lai cho dot tiep theo
       uploadSessionActive: false,
+      sessionClosedAt: null,      // updated_at cua session_close gan nhat
+                                  // (MOI HON session_start hien tai) —
+                                  // non-null = "phien da dong ro rang":
+                                  // deadScope cho retry + mot nguon cua
+                                  // ranh gioi recency ben duoi
+      sessionStartedAt: null,     // updated_at cua session_start gan nhat —
+                                  // hai moc hop thanh ranh gioi phien:
+                                  // result prepare CU hon ranh gioi khong
+                                  // duoc hoi sinh truong session (chong
+                                  // stomp khi re-adopt moi refresh)
       prepareError: null,         // loi terminal/partial cua upload.prepare
       login: null,                // {status, checked_at}
       sessionTabs: null,          // {open, saved, closed, unknown}
@@ -205,7 +215,6 @@
     state.staffSource = null;
     state.chunkSize = DEFAULT_CHUNK_SIZE;
     state.revision = 0;
-    state.waitingBanner = null;
     state.scanProgress = null;
     state.prepareProgress = null;
     state.wsTried = false;
@@ -288,6 +297,13 @@
     state.scanStats = null;
     state.manifestRef = null;
     state.remaining = 0;
+    // Banner pin theo job waiting cua run cu (vd. review) — run doi thi
+    // job do het scope: banner phai tat thay vi treo "Xong kiem tra" len
+    // review cu (bam vao se release nham job). Moc session_close cung
+    // chi co nghia trong chuoi result cua run cu.
+    state.waitingBanner = null;
+    state.sessionClosedAt = null;
+    state.sessionStartedAt = null;
     state.queueJobId = null;
     state.prepareJobId = null;
     state.reconcileJobId = null;

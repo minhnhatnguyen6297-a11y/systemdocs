@@ -306,6 +306,9 @@ test('resetScanContext: run moi giu needsReconcileIds (website scope) '
   st.activeUploadIds = new Set([1, 2, 3]);
   st.savedIds = new Set([9]);
   st.openTabIds = new Set([1]);
+  st.waitingBanner = { on: 'review', jobId: 'job_p' };
+  st.sessionClosedAt = '2026-09-24T10:00:12Z';
+  st.sessionStartedAt = '2026-09-24T09:00:00Z';
   S.resetScanContext(st, 'run_moi');
   assert.equal(st.runId, 'run_moi');
   assert.equal(st.selectedIds.size, 0);
@@ -313,6 +316,12 @@ test('resetScanContext: run moi giu needsReconcileIds (website scope) '
     'tap goc dot upload thuoc run cu — khong theo sang run moi');
   assert.equal(st.savedIds.size, 0);
   assert.equal(st.openTabIds.size, 0);
+  assert.equal(st.waitingBanner, null,
+    'banner pin theo waiting job run cu phai tat — release nham review');
+  assert.equal(st.sessionClosedAt, null,
+    'moc session_close thuoc run cu — run moi tinh recency rieng');
+  assert.equal(st.sessionStartedAt, null,
+    'moc session_start thuoc run cu — cung phai reset theo ranh gioi');
   // needs_reconcile la website-scoped (§6.15): run moi KHONG duoc lam
   // mat canh bao — ho so chua ro da Luu phai con hien cho toi khi
   // doi chieu xong.

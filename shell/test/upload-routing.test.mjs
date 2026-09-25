@@ -1603,3 +1603,99 @@ test('derive: prepare stale_revision → auto-retry mot lan voi revision '
   assert.ok(prepErr && !prepErr.hidden,
     'loi stale cuoi cung phai hien tai cho cho user thay');
 });
+
+// ---------- task 8 fix1: review findings ----------
+
+test('adoptJobs: prepare partial CU khong hoi sinh session sau '
+     + 'session_close (recency, khong theo thu tu adopt)', () => {
+  const st = S.createUploadState();
+  st.websiteId = 'nam_dinh';
+  st.runId = 'r1';
+  st.browserId = 'br1';
+  st.uploadSessionActive = true;
+  st.prepareJobId = 'job_p1';
+  const jobs = new Map();
+  jobs.set('job_p1', job('upload.prepare', 'partial', {
+    workflow_version: V, website_id: 'nam_dinh', run_id: 'r1',
+    browser_id: 'br1',
+    summary: { prepared_count: 9, remaining: 19 },
+    saved_record_ids: [], needs_reconcile_record_ids: [],
+  }, { jobId: 'job_p1', at: '2026-09-24T10:00:08Z', error: {
+    code: 'upload.partial_failure', message: '1 ho so that bai',
+    retryable: true, next_action: 'retry' } }));
+  jobs.set('job_c1', job('upload.session_close', 'succeeded', {
+    workflow_version: V, website_id: 'nam_dinh', browser_id: 'br1',
+    closed: true, verified_record_ids: [],
+    needs_reconcile_record_ids: [],
+  }, { jobId: 'job_c1', at: '2026-09-24T10:00:12Z' }));
+  // Moi pass: session_close (idx 6) ap TRUOC prepare (idx 13). Prepare
+  // T8 < close T12 → truong session khong duoc hoi sinh ke ca khi
+  // prepare re-adopt (khong once-marker).
+  C.adoptJobs(st, jobs);
+  assert.equal(st.uploadSessionActive, false);
+  assert.equal(st.remaining, 0);
+  assert.equal(st.sessionClosedAt, '2026-09-24T10:00:12Z');
+  C.adoptJobs(st, jobs);
+  assert.equal(st.uploadSessionActive, false,
+    'result prepare cu khong duoc mo lai phien da dong');
+  assert.equal(st.remaining, 0,
+    'remaining cua dot cu khong duoc de len 0 sau dong phien');
+  // Result prepare MOI HON lan dong (dot cua phien ke) van ap binh thuong.
+  st.prepareJobId = 'job_p2';
+  jobs.set('job_p2', job('upload.prepare', 'succeeded', {
+    workflow_version: V, website_id: 'nam_dinh', run_id: 'r1',
+    summary: { prepared_count: 5, remaining: 3 },
+    saved_record_ids: [], needs_reconcile_record_ids: [],
+  }, { jobId: 'job_p2', at: '2026-09-24T10:00:20Z' }));
+  C.adoptJobs(st, jobs);
+  assert.equal(st.uploadSessionActive, true);
+  assert.equal(st.remaining, 3);
+  // session_start moi hon close → moc "da dong" bi xoa (phien song lai)
+  // nhung ranh gioi phien troi len T25 qua sessionStartedAt: result
+  // prepare cua phien TRUOC van bi chan, khong "hoi sinh" remaining/
+  // active tren phien moi. session_close cu (br1) bi reject scope sau
+  // khi browserId doi sang br2.
+  st.sessionJobId = 'job_s2';
+  jobs.set('job_s2', job('upload.session_start', 'succeeded', {
+    workflow_version: V, website_id: 'nam_dinh', browser_id: 'br2',
+    login: { status: 'authenticated' }, revision: 5,
+  }, { jobId: 'job_s2', at: '2026-09-24T10:00:25Z' }));
+  st.remaining = 0;
+  C.adoptJobs(st, jobs);
+  assert.equal(st.sessionClosedAt, null,
+    'start moi hon close → phien khong con tinh la da dong');
+  assert.equal(st.sessionStartedAt, '2026-09-24T10:00:25Z');
+  assert.equal(st.uploadSessionActive, true, 'phien moi van active');
+  assert.equal(st.remaining, 0,
+    'prepare truoc ranh gioi phien (T20 < T25) khong duoc de remaining');
+});
+
+test('adoptJobs: waitingBanner bi xoa khi rescan doi run '
+     + '(job waiting cu het scope)', () => {
+  const st = S.createUploadState();
+  st.websiteId = 'nam_dinh';
+  st.runId = 'run_a';
+  st.browserId = 'br1';
+  st.prepareJobId = 'job_p1';
+  const jobs = new Map();
+  const wait = job('upload.prepare', 'waiting_user', null,
+    { jobId: 'job_p1', at: '2026-09-24T10:00:05Z' });
+  wait.waiting_on = 'review';
+  jobs.set('job_p1', wait);
+  C.adoptJobs(st, jobs);
+  assert.deepEqual(st.waitingBanner, { on: 'review', jobId: 'job_p1' });
+  // Rescan → run moi: job waiting cua run_a het scope → banner phai tat
+  // (truoc day treo "Xong kiem tra" release nham review cu).
+  st.scanJobId = 'job_s2';
+  jobs.set('job_s2', job('upload.scan', 'succeeded', {
+    workflow_version: V, website_id: 'nam_dinh', run_id: 'run_b',
+    stats: {}, records: [], revision: 11,
+  }, { jobId: 'job_s2', at: '2026-09-24T10:00:20Z' }));
+  C.adoptJobs(st, jobs);
+  assert.equal(st.runId, 'run_b');
+  assert.equal(st.waitingBanner, null,
+    'banner cua waiting job ngoai scope phai bi xoa sau rescan');
+  // Pass tiep: job waiting cu van trong map nhung khong re-pin duoc.
+  C.adoptJobs(st, jobs);
+  assert.equal(st.waitingBanner, null);
+});

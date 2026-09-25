@@ -266,10 +266,14 @@
       // vi race, KHONG phai tu chay dot moi — prepareRetryOf nganh retry
       // chong retry, scope/queue khong con tuoi thi marker bi huy im lang.
       if (state.prepareRetryIds) {
+        // Phien chet = da co session_close ap (sessionClosedAt) hoac
+        // login/binding mat — KHONG dung uploadSessionActive: co nay van
+        // false cho toi dot prepare DAU TIEN ap xong, nen stale_revision
+        // ngay lan Upload dau se xoa im retry armed va user phai bam lai.
         const deadScope = !state.websiteId || !state.runId ||
           !state.browserId ||
           !(state.login && state.login.status === 'authenticated') ||
-          !state.uploadSessionActive;
+          state.sessionClosedAt != null;
         const queueReady = !!(state.queueFor &&
           state.queueFor.runId === state.runId &&
           state.queueFor.auditId === state.auditId);

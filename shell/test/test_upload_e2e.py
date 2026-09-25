@@ -787,7 +787,7 @@ def case_upload(app: AppInstance, pw, tmp: Path):
         # -- Tiep tuc co delay → Dung giua chung → KHONG tu chay dot moi --
         fctl(base, fail_record_ids=[], record_delay_s=1.0)
         page.click("#ul-panel-scan-upload button:has-text('Tiếp tục')")
-        open_mid = wait_open_ids_gt(base, 7, timeout=30000)
+        wait_open_ids_gt(base, 7, timeout=30000)
         page.click("#ul-panel-scan-upload button:has-text('Dừng')")
         page.wait_for_function(
             """() => {
@@ -801,6 +801,14 @@ def case_upload(app: AppInstance, pw, tmp: Path):
         st2 = fstate(base)["session"]
         require(st2["prepare_calls"] == calls,
                 "tu chay them dot sau khi Dung (prepare_calls tang)")
+        # Tiep tuc phai gui lai DUNG tap goc cua dot (activeUploadIds —
+        # gom ca 2/4 da Luu, engine tu loai), KHONG doc lai checkbox hien
+        # tai sau Save-awareness (26) — nhan nham se bo sot ho so dot.
+        require(
+            sorted(st2["last_prepare_kwargs"]["selected_record_ids"])
+            == sent,
+            f"record_ids dot Tiep tuc phai bang tap goc {sent}, "
+            f"nhan {st2['last_prepare_kwargs']['selected_record_ids']}")
         require(sorted(st2["open_record_ids"]) == sorted(open_after),
                 "tab mo thay doi sau khi Dung — co dot chay ngam")
 

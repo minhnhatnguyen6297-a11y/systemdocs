@@ -106,6 +106,26 @@
     state.queueFor = null;
   }
 
+  // Ranh gioi phien = thoi diem transition session_start/session_close
+  // MOI NHAT da ap — result prepare CU hon ranh gioi thuoc phien truoc,
+  // khong duoc cham truong session (uploadSessionActive/remaining).
+  // adoptJobs duyet TRACKED_COMMANDS theo thu tu co dinh — session_close
+  // (idx 6) luon ap TRUOC prepare (idx 13) tren moi refresh; neu chi dua
+  // vao thu tu do thi result prepare CU (xong truoc luc dong phien) hoi
+  // sinh lai phien da chet: contBtn mo lai → scope_violation, closeBtn
+  // fail vo hinh, sessLine render tren phien chet. Recency, khong order.
+  function sessionBoundaryAt(state) {
+    const a = String(state.sessionClosedAt || '');
+    const b = String(state.sessionStartedAt || '');
+    return a > b ? a : b;
+  }
+
+  function sessionFieldsFresh(state, job) {
+    const boundary = sessionBoundaryAt(state);
+    return !boundary ||
+      String(job.updated_at || '') > boundary;
+  }
+
   function trackProgress(state, job) {
     // Hai thanh tien do rieng: quet va chuan bi bieu mau (spec §3).
     if (job.job_id === state.scanJobId) {
@@ -121,7 +141,8 @@
       // ngay trong luc prepare chay/cho review de nut Tiep tuc phan anh dung
       // so dot sau truoc khi job terminal.
       if (!isTerminal(job) && job.progress &&
-          typeof job.progress.total === 'number') {
+          typeof job.progress.total === 'number' &&
+          sessionFieldsFresh(state, job)) {
         state.remaining = Math.max(
           0, job.progress.total - (job.progress.done || 0));
       }
@@ -313,6 +334,18 @@
         // Session vua tao → active tru khi result chinh no bao da dong.
         state.uploadSessionActive =
           !(d.login && d.login.status === 'closed');
+        const startAt = String(job.updated_at || '');
+        // Phien MOI HON lan close gan nhat → moc dong het hieu luc
+        // (session song lai). session_start CU HON close (result tre cua
+        // phien truoc) KHONG duoc xoa moc — phien van tinh la chet.
+        if (!state.sessionClosedAt || startAt > state.sessionClosedAt) {
+          state.sessionClosedAt = null;
+        }
+        // Ranh gioi phien troi len — session_start cu den muon khong duoc
+        // ha moc mo lo cho prepare stale cua phien truoc.
+        if (startAt > String(state.sessionStartedAt || '')) {
+          state.sessionStartedAt = job.updated_at;
+        }
         state.siteError = null;
         return true;
       }
@@ -364,21 +397,31 @@
         if (!d || !S.acceptScopedResult(state, {
           websiteId: d.website_id, browserId: d.browser_id,
         })) return false;
-        state.uploadSessionActive = false;
-        state.sessionTabs = null;
-        state.openTabIds = new Set();
         if (Array.isArray(d.verified_record_ids)) {
           markSaved(state, d.verified_record_ids);
         }
         if (Array.isArray(d.needs_reconcile_record_ids)) {
           addReconcile(state, d.needs_reconcile_record_ids);
         }
-        // Qt _handle_upload_closed: het phien → het dot tiep theo; tab con
-        // mo da chuyen needs_reconcile → queue doi → fetch lai MOT LAN de
-        // queue_revision gui dot sau luon tuoi (chong stale_revision).
-        state.remaining = 0;
-        state.prepareRetryIds = null;  // phien dong — retry dang cho chet theo
-        staleQueueOnce(state, job);
+        // Close MOI HON session_start gan nhat = phien hien tai da chet →
+        // ap truong "het phien" + ghi moc sessionClosedAt (deadScope cho
+        // retry + ranh gioi recency: result prepare CU hon khong duoc hoi
+        // sinh truong session khi re-adopt tren cac refresh sau).
+        // Close CU HON start (result tre cua phien truoc, cung browserId)
+        // khong duoc giet truong cua phien moi.
+        const closeAt = job.updated_at || new Date().toISOString();
+        if (String(closeAt) > String(state.sessionStartedAt || '')) {
+          state.uploadSessionActive = false;
+          state.sessionClosedAt = closeAt;
+          state.sessionTabs = null;
+          state.openTabIds = new Set();
+          // Qt _handle_upload_closed: het phien → het dot tiep theo; tab
+          // con mo da chuyen needs_reconcile → queue doi → fetch lai MOT
+          // LAN de queue_revision dot sau luon tuoi (chong stale_revision).
+          state.remaining = 0;
+          state.prepareRetryIds = null;  // retry dang cho chet theo phien
+          staleQueueOnce(state, job);
+        }
         return true;
       }
 
@@ -572,7 +615,13 @@
           websiteId: d.website_id, runId: d.run_id, jobId: job.job_id,
         })) return false;
         const sum = d.summary || {};
-        if (sum.remaining != null) state.remaining = sum.remaining;
+        // Truong session la snapshot cua DOT do — chi ap khi result moi
+        // hon lan dong phien gan nhat. Result cu re-adopt moi refresh
+        // (khong once-marker) nhung khong duoc thang session_close.
+        const sessionFresh = sessionFieldsFresh(state, job);
+        if (sessionFresh && sum.remaining != null) {
+          state.remaining = sum.remaining;
+        }
         if (Array.isArray(d.saved_record_ids)) {
           markSaved(state, d.saved_record_ids);
         }
@@ -580,7 +629,7 @@
           addReconcile(state, d.needs_reconcile_record_ids);
         }
         if (isSuccess(job)) {
-          state.uploadSessionActive = true;
+          if (sessionFresh) state.uploadSessionActive = true;
           // Partial = co muc loi trong dot — hien breakdown, khong nuot.
           state.prepareError =
             (job.error && job.error.code === 'upload.partial_failure')
