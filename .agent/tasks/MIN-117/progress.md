@@ -12,7 +12,7 @@ Module engine load runtime qua `engine_roots` (không bundle source):
 
 - `notary_adapter` → `database`, `models`, `services.{word_engine,
   zalo_inbox, case_workspace, document_intake.*, inheritance_workspace,
-  word_batch_export, fast_audit.* (qua zalo_inbox)}`,
+  word_batch_export}`,
   `routers.{customers, properties, participants, ocr_ai}`.
 - `upload_adapter`/`upload_session` → `batch_scan`, `extract_contract`,
   `ui.services.{contract_book_audit, environment_check_service}`,

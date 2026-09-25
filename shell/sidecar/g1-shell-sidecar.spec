@@ -31,6 +31,8 @@ hiddenimports += collect_submodules('fastapi')
 # participants/ocr_ai dang ky route Form/File.
 # fitz + pymupdf: PyMuPDF 1.24.x ca hai ten deu ton tai; engine dung
 # "import fitz", sidecar command_registry dung "import pymupdf".
+# rapidfuzz: hien chi fast_audit/tools CLI dung — khong reachable qua
+# adapter; bundle san (~2MB) de phong command tuong lai, re hon them sau.
 _ENGINE_DEP_PACKAGES = [
     'sqlalchemy',
     'docx',
