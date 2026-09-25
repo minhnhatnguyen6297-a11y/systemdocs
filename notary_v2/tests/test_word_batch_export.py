@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import os
 import re
+import time
 from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
@@ -453,6 +455,162 @@ class TestExportBatch:
                ["khai_nhan_di_san", "thoa_thuan_phan_chia"], tmp_path,
                report_progress=lambda d, t, label: calls.append((d, t)))
         assert calls == [(1, 2), (2, 2)]
+
+
+# ------------------------------------------- MIN-116 dest deny-write
+
+
+def _deny_writes_under(monkeypatch, root, *, name_filter=None):
+    """Giả lập destination bị ACL deny-write (Windows): mọi open/create
+    ghi dưới `root` raise PermissionError ngay lần đầu — deterministic
+    thay vì icacls thật.
+
+    Vá cả ba seam: builtins.open (probe/temp/publish), io.open (zipfile
+    của python-docx save) và os.open (tempfile.mkstemp — đường code cũ).
+    `name_filter` (tuỳ chọn) giới hạn deny theo basename — dùng cho
+    kịch bản TOCTOU (probe pass nhưng publish/render bị deny).
+    """
+    import builtins
+    import io as _io
+    root = str(root)
+    real_open = open
+    real_io_open = _io.open
+    real_os_open = os.open
+
+    def _is_write_mode(mode):
+        return any(c in mode for c in ("w", "a", "x", "+"))
+
+    def _hit(file):
+        s = str(file)
+        return s.startswith(root) and (
+            name_filter is None or name_filter(os.path.basename(s)))
+
+    def _open_guard(file, mode="r", *args, **kwargs):
+        if _hit(file) and _is_write_mode(mode):
+            raise PermissionError(13, "Access is denied", str(file))
+        return real_open(file, mode, *args, **kwargs)
+
+    def _io_open_guard(file, mode="r", *args, **kwargs):
+        if _hit(file) and _is_write_mode(mode):
+            raise PermissionError(13, "Access is denied", str(file))
+        return real_io_open(file, mode, *args, **kwargs)
+
+    def _os_open_guard(path, flags, *args, **kwargs):
+        if _hit(path) and (flags & (os.O_WRONLY | os.O_RDWR)):
+            raise PermissionError(13, "Access is denied", str(path))
+        return real_os_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "open", _open_guard)
+    monkeypatch.setattr(_io, "open", _io_open_guard)
+    monkeypatch.setattr(os, "open", _os_open_guard)
+
+
+class TestDestWriteDenied:
+    """MIN-116: destination ACL deny-write → job fail fast với per-doc
+    file_locked, KHÔNG hang trong tempfile.mkstemp retry loop."""
+
+    def test_denied_destination_fails_fast_all_docs_file_locked(
+            self, tmp_path, monkeypatch):
+        """Probe writability fail → mọi doc (kể cả template_missing)
+        nhận per-doc file_locked; all-failed → word_batch_failed kèm
+        result.data; hoàn tất <5s — trước fix path này hang >60s."""
+        _deny_writes_under(monkeypatch, tmp_path)
+        keys = ["khai_nhan_di_san", "thoa_thuan_phan_chia", "niem_yet"]
+        t0 = time.monotonic()
+        with pytest.raises(wbe.WordBatchError) as exc:
+            _batch(_ready_case(), keys, tmp_path)
+        assert time.monotonic() - t0 < 5
+        assert exc.value.code == "word_batch_failed"
+        rd = exc.value.result_data
+        assert rd["breakdown"] == {
+            "succeeded": [], "failed": keys, "skipped": []}
+        for d in rd["documents"]:
+            assert d["status"] == "failed"
+            assert d["error"]["code"] == "file_locked"
+            assert d["actual_filename"] is None
+            assert d["output_file"] is None
+        # không file output/probe/temp nào sót lại trong dest
+        assert list(tmp_path.iterdir()) == []
+
+    def test_denied_batch_cancel_marks_pending_skipped(
+            self, tmp_path, monkeypatch):
+        """Cancel giữa batch deny-write: doc đã xử lý giữ file_locked,
+        doc chưa bắt đầu → skipped (pending-data semantics MIN-115)."""
+        class _Cancel(Exception):
+            def __init__(self, data):
+                super().__init__("cancel")
+                self.data = data
+
+        _deny_writes_under(monkeypatch, tmp_path)
+        keys = ["khai_nhan_di_san", "thoa_thuan_phan_chia", "niem_yet"]
+
+        def _check(data):
+            # Cancel flag bật sau doc đầu: failed=[khai], còn pending.
+            if data["breakdown"]["failed"] \
+                    and data["breakdown"]["skipped"]:
+                raise _Cancel(data)
+
+        with pytest.raises(_Cancel) as exc:
+            _batch(_ready_case(), keys, tmp_path, check_cancel=_check)
+        docs = _docs_by_key(exc.value.data)
+        assert docs["khai_nhan_di_san"]["status"] == "failed"
+        assert docs["khai_nhan_di_san"]["error"]["code"] == "file_locked"
+        assert docs["thoa_thuan_phan_chia"]["status"] == "skipped"
+        assert docs["niem_yet"]["status"] == "skipped"
+        assert exc.value.data["breakdown"]["skipped"] == [
+            "thoa_thuan_phan_chia", "niem_yet"]
+        assert list(tmp_path.iterdir()) == []
+
+    def test_cancel_before_probe_skips_all(self, tmp_path):
+        """Cancel trước khi probe destination → mọi doc skipped, không
+        file nào được tạo."""
+        class _Cancel(Exception):
+            def __init__(self, data):
+                super().__init__("cancel")
+                self.data = data
+
+        def _check(data):
+            raise _Cancel(data)
+
+        with pytest.raises(_Cancel) as exc:
+            _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path,
+                   check_cancel=_check)
+        data = exc.value.data
+        assert data["breakdown"]["skipped"] == ["khai_nhan_di_san"]
+        assert data["documents"][0]["status"] == "skipped"
+        assert list(tmp_path.iterdir()) == []
+
+    def test_toctou_publish_denied_maps_file_locked(
+            self, tmp_path, monkeypatch):
+        """Probe + tạo temp OK nhưng quyền bị thu hồi trước lúc publish
+        (TOCTOU): chỉ file đích `*_HS-*.docx` bị deny → per-doc
+        file_locked, file tạm được dọn, không hang."""
+        _deny_writes_under(
+            monkeypatch, tmp_path,
+            name_filter=lambda name: "_HS-" in name)
+        with pytest.raises(wbe.WordBatchError) as exc:
+            _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path)
+        assert exc.value.code == "word_batch_failed"
+        doc = exc.value.result_data["documents"][0]
+        assert doc["status"] == "failed"
+        assert doc["error"]["code"] == "file_locked"
+        assert list(tmp_path.iterdir()) == []
+
+    def test_toctou_render_denied_maps_file_locked(
+            self, tmp_path, monkeypatch):
+        """Probe OK nhưng `_render_temp` gặp PermissionError (quyền thu
+        hồi sau probe) → per-doc file_locked, không propagate thành
+        lỗi job khô hay hang."""
+        def _denied(_doc, _dest):
+            raise PermissionError(13, "Access is denied")
+        monkeypatch.setattr(wbe, "_render_temp", _denied)
+        with pytest.raises(wbe.WordBatchError) as exc:
+            _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path)
+        assert exc.value.code == "word_batch_failed"
+        doc = exc.value.result_data["documents"][0]
+        assert doc["status"] == "failed"
+        assert doc["error"]["code"] == "file_locked"
+        assert list(tmp_path.iterdir()) == []
 
 
 # ---------------------------------------------------- payload validation
