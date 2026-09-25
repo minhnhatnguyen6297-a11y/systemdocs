@@ -1,6 +1,6 @@
 # Tab Soạn hồ sơ (Electron) — hành vi và mô hình dữ liệu
 
-**Spec đích cho tab `Soạn hồ sơ` trên Electron — owner đã duyệt qua [MIN-104](https://linear.app/minhnotary/issue/MIN-104) ngày 24/09/2026; chưa triển khai runtime.**
+**Spec đích cho tab `Soạn hồ sơ` trên Electron — owner đã duyệt qua [MIN-104](https://linear.app/minhnotary/issue/MIN-104) ngày 24/09/2026; runtime đã triển khai qua MIN-106…MIN-112, verify MIN-113 (chờ owner duyệt cutover).**
 Ngày: 24/09/2026 · Owner: platform/case-workspace · Spec: MIN-104 · Goal triển khai: MIN-107…MIN-112
 
 ## 1. Vai trò tài liệu và ranh giới SOT
@@ -163,13 +163,16 @@ Ngày: 24/09/2026 · Owner: platform/case-workspace · Spec: MIN-104 · Goal tri
   schema/examples — publish trong MIN-105 trước khi runtime nào implement.
   Namespace `notary.*` đã được module `document-review` claim
   (`shell/src/main/registry.js:18`) — giữ namespace này.
-- Hiện trạng shell: `shell/sidecar/notary_adapter.py` đã có 12 command
-  (`command_registry.py:187-216`: `notary.case_list/case_get/case_create/
-  customer_list/customer_create/property_list/property_create/
-  participant_add/word_templates/export_word`, `ocr.analyze`, `zalo.status`
-  — `zalo.status` là bằng chứng loại trừ: command tồn tại ở shell nhưng tab
-  này không dùng) nhưng **chưa có cả 7 command trên**; `notary_gateway.py`
-  và `notary_mock_adapter.py` chưa tồn tại.
+- Hiện trạng shell (đã cập nhật sau MIN-106…112): ngoài 12 command cũ
+  (`notary.case_get/case_create/customer_list/customer_create/
+  property_list/property_create/participant_add/word_templates/
+  export_word`, `ocr.analyze`, `zalo.status` — `zalo.status` là bằng chứng
+  loại trừ: command tồn tại ở shell nhưng tab này không dùng), 7 command
+  §8 **đã tồn tại** và route qua `notary_gateway.dispatch`
+  (`command_registry.py` `COMMANDS.update` cuối file); `case_list` cũng
+  qua gateway để mock parity. `notary_gateway.py` chọn
+  `notary_mock_adapter.py` chỉ khi `G1_DEV_NOTARY_MOCK=1` **và** không
+  packaged (`sys.frozen`) — packaged luôn real.
 
 ## 9. Hiện trạng web ↔ đích Electron (theo khối, có bằng chứng)
 
