@@ -17,10 +17,12 @@ shell/
   test/           node --test (main-side) + unittest (sidecar contract)
 ```
 
-## Navigation (MIN-67 / spec MIN-32)
+## Navigation (MIN-67 / spec MIN-32, taxonomy MIN-104)
 
-- Nav trai 7 muc: Tong quan, Upload/Audit, Ho so, Excel/Word, Van phong
-  (placeholder "Chua trien khai"), Tim kiem, Trang thai/Cai dat.
+- Nav trai 5 muc (taxonomy MIN-104): notary_v2, upload_lab, notaryoffice
+  (placeholder "Chua trien khai"), Tra cuu, Trang thai/Cai dat.
+  'Excel -> Word' khong con tren nav chinh (module con trong registry
+  cho compat); 'Tong quan' gop vao 'Trang thai/Cai dat'.
 - Moi module view la DOM subtree persistent: chuyen module khong mat
   file da chon/job/scroll (SM-07); job tiep tuc o sidecar + tracker.
 - 4 mat trang thai dung chung: loading / empty / error / unavailable;
@@ -59,6 +61,19 @@ khong port nghiep vu sang sidecar. Root resolve: env
 - IPC moi: `desktop.v1.openPath` (mo file san pham .docx bang app mac dinh,
   path validate tuyet doi + file ton tai + khong UNC) va `pickFiles` ho tro
   `directory: true` cho upload.scan.
+
+### Tab Soạn ho so (MIN-106…112, verify MIN-113)
+
+Module `notary_v2` co tab `Soạn hồ sơ` (case drafting inheritance):
+Overview list -> workspace 3 pane Stage / Intake+Pool / Diagram + Word
+export. Tam command `notary.workspace_get/intake_analyze/
+workspace_commit_stage/diagram_evaluate/diagram_save/
+word_export_options/word_export_batch` (+ `case_list`) route qua
+`notary_gateway.py`: mock (`notary_mock_adapter.py`, fixture
+`test/fixtures/notary-case-drafting/`) chi khi `G1_DEV_NOTARY_MOCK=1` va
+KHONG packaged; packaged luon real (`notary_adapter.py`). Wire contract
+`notary.case-drafting.v1` (`contracts/notary-case-drafting.md`), envelope
+`desktopcommand.v1`. Renderer nhan `file_token` opaque — khong path.
 
 ## Dev
 
