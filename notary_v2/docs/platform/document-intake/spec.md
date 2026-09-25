@@ -1,17 +1,26 @@
-# Cloud AI OCR — Platform specification
+# Cloud AI OCR — luồng upload hiện hành và nguồn Zalo
 
 Status: active
 Owner: platform/document-intake
-Source of truth: Cloud AI OCR flow, endpoints, response contracts, and QR exclusion
-**Cap nhat:** 2026-08-11
+Source of truth: OCR Qwen, endpoint hiện hành và ranh giới với Zalo Intake
+**Cập nhật:** quyết định owner mới nhất 2026-09-24 (MIN-89); phần Zalo là thiết kế DRAFT, chưa đổi runtime hoặc triển khai server.
 **Files lien quan:** `routers/ocr_ai.py`, `frontend/templates/cases/form.html`
 **API endpoint:** `POST /api/ocr/analyze`, `GET /api/ocr/config`
+
+Có hai ngữ cảnh khác nhau:
+
+1. **Upload OCR thủ công hiện hành:** UI gửi file ảnh đến POST /api/ocr/analyze; backend gọi Qwen, parse và trả JSON như trước. Luồng này vẫn nhận file và có thể cho xem ảnh nguồn trong giao diện hồ sơ.
+2. **Zalo Intake mới:** module độc lập được phát triển trong thư mục/repo local riêng trước (đề xuất `D:\zalo-intake`), chạy Windows server sau. Module nhận/giữ ảnh, chuẩn bị ảnh khi cần byte ảnh và gọi Qwen API OCR. Gói bàn giao cho máy công chứng gồm **chữ OCR thô, trạng thái, thời gian và provenance** (dấu vết nguồn), tuyệt đối không kèm ảnh, thumbnail, base64, đường dẫn hoặc link tải ảnh. Soạn hồ sơ/Document Intake trên máy chính chạy regex, phân loại, bóc trường, ghép mặt giấy/người/tài sản và gợi ý nhóm từ raw đã Sync. Người dùng kiểm tra/xác nhận thẻ rồi đưa vào đầu vào soạn thảo; mở Zalo thật để đối chiếu ảnh. Xem [spec Zalo chính](../zalo-document-inbox/spec.md).
+
+Vị trí thực thi đã chốt: Qwen OCR ảnh Zalo ở module độc lập; xử lý chữ OCR thành dữ liệu nghiệp vụ ở Document Intake trên máy chính. Quy tắc parser thuộc năng lực Soạn hồ sơ cho các nguồn đầu vào; không nhân bản thành parser riêng trong bot. Giai đoạn này chưa triển khai server; schema và transport của giao diện trao đổi còn là DRAFT. Lấy bù sự kiện bot chưa nhận thuộc MIN-90, giai đoạn sau. Endpoint upload hiện hành không bị đổi bởi đề xuất này.
+
+Đích mới của nguồn Zalo giữ cả **vị trí từng dòng chữ OCR khi đường Qwen được duyệt cung cấp**, kèm kích thước khung tọa độ và dấu vết ánh xạ xoay/cắt/đổi kích thước của từng lượt; code hiện tại mới lấy chuỗi chữ. Document Intake có thể dùng vị trí đã kiểm chứng để phân biệt hai cột CCCD, nhãn cạnh giá trị ở các dòng kề nhau và các hàng/dòng GCN; đây là bằng chứng bổ sung cho regex, không là mẫu ô pixel cố định trên ảnh điện thoại hoặc tọa độ riêng từng từ. Thiếu hoặc sai vị trí thì dùng chữ và hiện phần cần người kiểm tra. Parser dùng chung vẫn nhận nguồn chỉ có chữ; luồng OCR upload thủ công hiện tại và adapter MarkItDown chưa bị buộc cung cấp tọa độ. Bot chỉ giao raw OCR/bố cục kỹ thuật, không chọn trường hay ghép hồ sơ; máy chính vẫn không nhận ảnh Zalo. [Spec Zalo](../zalo-document-inbox/spec.md) CAP-05/CAP-11/T17 và contract MIN-92 quyết định shape; MIN-102/96 quyết định cách parser dùng bằng chứng này.
 
 ---
 
 ## Muc tieu
 
-OCR AI la pipeline cloud active cho person CCCD OCR.
+Cloud AI OCR hiện hành đọc ảnh giấy tờ qua Qwen; parser backend đang xử lý CCCD, sổ đỏ và giấy khai tử. Zalo Intake dùng Qwen lấy chữ thô trên module, sau đó Document Intake bóc trường và ghép/nhóm từ raw đã nhập. Kết quả đã xử lý vẫn là dữ liệu chờ kiểm tra, không tự trở thành dữ liệu nghiệp vụ đã xác nhận.
 
 Huong hien tai da chot:
 - OCR AI khong con dung QR path.
@@ -26,15 +35,15 @@ Batch input co the gom:
 - nhieu CCCD khac nhau
 - anh khong phai CCCD
 
-Ket qua tra ve phai dung contract JSON hien tai.
-
-Endpoint hien trang chi nhan **anh**; dich Electron cua intake thu cong trong
-tab Soạn hồ sơ nhan nam loai nguon — xem muc
-`## Intake thu cong dich trong tab Soạn hồ sơ` ben duoi.
+Kết quả của endpoint upload thủ công giữ contract JSON hiện tại. Gói Zalo không dùng response này làm định dạng bàn giao.
 
 ---
 
-## Nguyen tac da chot
+## Nguyên tắc theo luồng
+
+### Upload OCR thủ công đang chạy
+
+Những quy tắc dưới đây mô tả endpoint và UI hiện tại; chúng không giao quyền phân tích hoặc lưu ảnh Zalo cho máy chính:
 
 - Route AI giu nguyen de khong vo UI:
   - `POST /api/ocr/analyze`
@@ -47,17 +56,7 @@ tab Soạn hồ sơ nhan nam loai nguon — xem muc
 
 ---
 
-## Intake thu cong dich trong tab Soạn hồ sơ (Electron)
-
-Đích Electron — DRAFT theo [MIN-104](https://linear.app/minhnotary/issue/MIN-104), chưa triển khai runtime. SOT hành vi/dữ liệu của tab là [drafting-tab.md](../case-workspace/drafting-tab.md); file này giữ vai trò platform/endpoint, không chép lại semantics của tab.
-
-- **Nguồn đầu vào:** năm loại `image`, `pdf`, `docx`, `xlsx`, `text` (ảnh/PDF qua OCR; DOCX/XLSX/text parse trực tiếp). Command đích `notary.intake_analyze` trên envelope `desktopcommand.v1`; wire contract publish ở MIN-105 (`contracts/notary-case-drafting.md`, chưa tồn tại). Hiện trạng chỉ nhận ảnh qua `POST /api/ocr/analyze` như các mục trên.
-- **Mọi kết quả là gợi ý:** `observation_state` ∈ `{observed, normalized, inferred}`, kèm `raw_value`/`normalized_value`/`confidence`/`source_refs`; không bao giờ mang `confirmed`. Xác nhận duy nhất = người dùng đưa gợi ý vào Stage rồi `Cập nhật` (semantics → `drafting-tab.md` §5).
-- **Không Zalo trong tab:** không nút/popup/command/trạng thái Zalo trong tab Soạn hồ sơ; Zalo là phần mềm riêng, chỉ trao đổi với máy chính qua contract riêng giữa hai phần mềm — spec giao tiếp ở [zalo-document-inbox](../zalo-document-inbox/spec.md).
-
----
-
-## Flow hien tai / huong target
+## Flow upload OCR hiện hành
 
 ```text
 [AI button]
@@ -71,6 +70,28 @@ tab Soạn hồ sơ nhan nam loai nguon — xem muc
   -> backend normalize field text neu co rule an toan
   -> tra response JSON
 ```
+
+---
+
+## Flow Zalo Intake đích (MIN-89, chưa triển khai)
+
+Module được phát triển và kiểm chứng trong repo local riêng trước; chuyển lên
+Windows server là bước sau. Hai repo chỉ nối với nhau qua giao diện trao đổi
+chữ OCR và metadata, không import trực tiếp code nội bộ của nhau.
+
+```text
+Zalo -> module độc lập ghi sự kiện và captured_at
+     -> tải/chuẩn bị ảnh tạm trong module -> gọi Qwen API OCR
+     -> công bố gói chữ OCR thô/trạng thái/nguồn, không ảnh/link ảnh
+     -> máy chính tự kéo gói khi khởi động, nối lại mạng, định kỳ hoặc bấm Sync
+     -> kiểm file/hash, nhập raw và ACK
+     -> Document Intake regex/phân loại/bóc trường/ghép/nhóm thành thẻ ứng viên
+     -> người dùng mở Zalo thật để đối chiếu, xác nhận rồi đưa vào đầu vào soạn thảo
+```
+
+Module tự xóa ảnh gốc và ảnh dẫn xuất đúng 7 ngày từ captured_at, kể cả khi máy chính chưa ACK. Gói raw chưa ACK tiếp tục được giữ để truyền lại. captured_at (lúc bot bắt tin) là thời gian chính cho từng dòng, hiển thị và gợi ý nhóm; source_sent_at và imported_at là thời gian phụ. Nút Sync chỉ lấy gói OCR raw đã có, không quét lịch sử Zalo. Lấy bù/đối chiếu tin bot chưa từng bắt là MIN-90, chưa là chức năng giai đoạn này.
+
+Máy chính nhập gói raw OCR/trạng thái/nguồn an toàn rồi mới ACK. ACK chỉ xác nhận đã lưu raw, không có nghĩa parser chạy xong hoặc người dùng đã duyệt. Document Intake chạy regex, phân loại, ghép từ raw và có thể chạy lại khi nhận bản OCR mới; không dùng ảnh Zalo. Chi tiết endpoint, phân trang, xác thực và biên nhận thuộc contract liên repo MIN-92; [bản nháp giao tiếp](../../../../docs/product/specs/zalo-file-exchange-v1-draft.md) chỉ để soạn contract.
 
 ---
 
@@ -103,23 +124,23 @@ Neu co layer normalize text/field, log them:
 - `after`
 - `rule_source=prompt|backend_rule|dictionary`
 
-Khong log PII raw o muc qua rong trong production log; chi log mau/co che redact khi can.
+Khong log PII raw o muc qua rong trong production log; chi log mau/co che redact khi can. Với Zalo Intake, log không chứa nội dung tin nhắn, chữ OCR hoặc thông tin giấy tờ; dùng ID kỹ thuật đã che phù hợp. Quy tắc logging endpoint upload không cho phép chuyển ảnh Zalo sang máy chính.
 
 ---
 
-## Frontend policy cho AI button
+## Frontend policy cho AI button (upload thủ công)
 
 Trong `frontend/templates/cases/form.html`:
 - AI button chi goi server route.
 - Frontend khong duoc tu scan QR truoc khi goi server cho AI path.
 - UI khong duoc gia dinh source `QR`; source cua AI path la OCR/Qwen.
-- Preview `Xem anh` phai tiep tuc giu dung anh nguon tren tung person card.
+- Preview `Xem anh` phai tiep tuc giu dung anh nguon tren tung person card **trong luồng upload thủ công hiện hành**. Với Zalo, Document Intake trên máy chính xử lý raw đã Sync thành thẻ/nhóm kèm provenance để kiểm tra/xác nhận; UI không có preview ảnh, thumbnail hoặc link tải ảnh. Người dùng tự mở Zalo thật khi cần đối chiếu.
 
 ---
 
-## Response notes
+## Response notes cho endpoint upload hiện hành
 
-Response shape giu nguyen:
+Response shape của POST /api/ocr/analyze giữ nguyên:
 - `persons`
 - `properties`
 - `marriages`
@@ -128,13 +149,14 @@ Response shape giu nguyen:
 - `summary`
 
 Luu y:
-- `paired_persons` duoc tinh sau khi backend pair front/back.
+- `paired_persons` duoc tinh sau khi backend pair front/back; đây là đếm record/cờ của parser cũ, không là số người hoặc số CCCD đủ hai mặt đã được xác nhận.
+- Gói Zalo bàn giao raw text/OCR, trạng thái, thời gian và provenance; không có ảnh. Document Intake trên máy chính tạo dữ liệu người/tài sản đã bóc trường và ghép các mảnh liên quan, thẻ/nhóm gợi ý để người dùng kiểm tra/xác nhận rồi đưa vào đầu vào soạn thảo. Tên trường/schema cụ thể phải theo giao diện trao đổi được duyệt; không tự lấy response endpoint upload làm contract gói.
 - `summary` co telemetry cho native OCR path: `ocr_native_ms`, `backend_parse_ms`, `pair_ms`.
 - Neu them normalize layer, `summary` co the them `normalize_ms` va `normalized_fields`.
 
 ---
 
-## Vietnamese normalization direction
+## Vietnamese normalization direction (đề xuất cho OCR thủ công)
 
 OCR AI can xu ly 2 bai toan khac nhau:
 1. **OCR raw extraction**: doc text tu anh
@@ -157,7 +179,7 @@ Vi du mong muon:
 
 ### Design options (non-normative)
 
-This section records exploration, not the current runtime contract. The explicit current direction remains guidance until implemented and tested.
+This section records exploration, not the current runtime contract. The explicit current direction remains guidance until implemented and tested. Các phương án dưới đây bàn normalize cho luồng upload OCR thủ công; với nguồn Zalo, module chỉ gọi Qwen OCR, còn Document Intake chạy parser/ghép sau khi nhận raw theo quyết định mới nhất 24/09/2026. MarkItDown và plugin OCR mới là POC adapter trong TECH_STACK, chưa là đường production cho Zalo hoặc upload hiện hành.
 
 #### Huong A - Prompt-based normalization trong Qwen call
 
@@ -242,7 +264,7 @@ Hoac neu chua muon doi contract:
 
 - User confirmed the active Cloud AI OCR runtime must remove QR OCR completely.
 - Do not restore server/client QR scan, QR rescue/fallback, QR-first routing, or QR/source priority to resolve shared OCR failures.
-- The remaining shared runtime mismatch is tracked in `../zalo-document-inbox/open-issues.md` and requires a separate OCR implementation task.
+- Ghi chú OCR/Zalo cũ về QR hoặc shared runtime mismatch phải được đối chiếu với mã tại thời điểm triển khai; nó không thay thế [spec Zalo chính](../zalo-document-inbox/spec.md). Bản Zalo Intake mới chỉ đổi thiết kế dữ liệu bàn giao, chưa đổi endpoint OCR upload đang chạy.
 
 ---
 

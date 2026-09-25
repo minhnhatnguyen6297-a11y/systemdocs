@@ -6,13 +6,14 @@ chặn các giả định sai mà agent trước đã ghi vào folder này.
 Mọi thông tin dưới đây đã được đối chiếu với file thật trong repo. Chọn công nghệ
 mới → đọc [`TECH_STACK.md`](./TECH_STACK.md) trước.
 
-Cập nhật: 10/09/2026
+Cập nhật trạng thái module: 24/09/2026. Bằng chứng source lịch sử bên dưới giữ ngày kiểm tra riêng.
 
 | Repo | Đường dẫn | Git | Trạng thái |
 |---|---|---|---|
 | `notary_v2` | `D:\notary_v2` | `github.com/minhnhatnguyen6297-a11y/notary_v2` | Đang phát triển; chưa triển khai production |
 | `upload_lab` | `D:\upload_lab_repo` | `github.com/minhnhatnguyen6297-a11y/upload_lab` | Đang phát triển; chưa triển khai production |
 | `notaryoffice` | `D:\notaryoffice` | Git local đã init; chưa cấu hình remote | **Chỉ có tài liệu, chưa có code** (`notaryoffice/` chỉ chứa `intent.md`) |
+| `zalo` (đích) | `D:\zalo-intake` (đề xuất), snapshot monorepo `zalo/` | Repo riêng chưa tạo; chưa có remote | Module thứ tư, code hiện còn trong `notary_v2/`; migration ở [MIN-103](https://linear.app/minhnotary/issue/MIN-103/migrate-engine-zalo-thanh-module-thu-tu-trong-repo-rieng-va-zalo) |
 | `researchskill` | `D:\researchskill` | `github.com/minhnhatnguyen6297-a11y/researchskill` | **Ngoài phạm vi** |
 
 `excelTK` là dự án riêng, không phải sản phẩm con của hệ thống công chứng và
@@ -49,9 +50,23 @@ một số CCCD trong hợp đồng công chứng là lỗi nặng.
 - **Fast text audit** (`services/fast_audit/`) — CLI độc lập soát sai lệch giữa
   văn bản đã soạn và dữ liệu gốc bằng so khớp mờ. Không dính vào web OCR.
 - **Đọc QR trên giấy tờ** — CCCD gắn chip có QR, dữ liệu chính xác hơn OCR.
-- **Zalo Document Inbox** (spec APPROVED) — nhận text/media qua `zca-js`, chọn lô
-  ảnh, xuất JSON/Excel/PDF vào hồ sơ. Ranh giới quyền riêng tư:
-  `OPEN_DECISIONS.md` B2.
+- **Zalo Document Inbox** — code hiện tại nhận text/media qua `zca-js`, chọn lô
+  ảnh và xuất kết quả theo [spec v1 legacy](../../notary_v2/docs/platform/zalo-document-inbox/spec-v1-legacy.md).
+  Đích theo [spec chính](../../notary_v2/docs/platform/zalo-document-inbox/spec.md):
+  theo quyết định mới nhất 24/09/2026, module được làm trước trong thư mục/repo
+  local riêng (đề xuất `D:\zalo-intake`), chạy Windows server sau; chưa triển
+  khai server. Module sở hữu nhận ảnh, chuẩn bị ảnh cần byte ảnh và Qwen OCR
+  API; bàn giao chữ OCR thô, trạng thái và provenance qua giao diện trao đổi
+  giữa hai repo. Soạn hồ sơ/Document Intake trên máy chính chạy regex, phân
+  loại, bóc trường, ghép mặt giấy/người/tài sản và gợi ý nhóm từ raw đã Sync.
+  Người dùng kiểm tra/xác nhận thẻ rồi đưa vào đầu vào soạn thảo. Máy chính
+  không tải/lưu ảnh Zalo; người dùng xem ảnh trên Zalo thật. Module giữ ảnh 7
+  ngày từ `captured_at`, raw chưa ACK phải giữ.
+  HTTPS Sync là đề xuất cho giai đoạn server; fallback nguồn thuộc MIN-90,
+  giai đoạn sau. Code hiện tại chưa chuyển sang luồng này.
+  Ranh giới quyền riêng tư: `OPEN_DECISIONS.md` B2.
+  Đây là baseline legacy nằm trong `notary_v2`, không phải ownership đích của
+  connector/session/listener/journal/media/OCR Zalo. Xem module thứ tư bên dưới.
 - **Job OCR nền** — OCR nhiều trang chạy bất đồng bộ qua Celery, không chặn UI.
 
 ### Công nghệ gì
@@ -67,7 +82,7 @@ một số CCCD trong hợp đồng công chứng là lỗi nặng.
 | QR | `zxing-cpp` (tùy chọn) |
 | Word / Excel | `python-docx`, `openpyxl` |
 | So khớp mờ | `rapidfuzz` |
-| Zalo | `zca-js` (Node) như connector thay thế được |
+| Zalo | Hiện trạng: `zca-js` (Node) trong connector của `notary_v2`. Đích MIN-89: module độc lập ở repo local riêng trước, Windows server sau; sở hữu ảnh tạm và Qwen OCR. Máy chính nhập raw qua giao diện trao đổi rồi chạy parser/ghép/nhóm của Document Intake, cho người dùng kiểm tra/xác nhận; Sync HTTPS cho giai đoạn server vẫn là draft. |
 
 Cấu hình qua `.env` (mẫu ở `.env.example`). **Không bao giờ ghi giá trị key vào
 tài liệu.**
@@ -190,7 +205,7 @@ trong đầu, và **không ai có thời gian ghi chép** — nên mọi phần 
 cầu nhập liệu tay đều chết sau hai tuần.
 
 `notaryoffice` không mở form cho ai nhập. Nó **thu dấu vết thao tác hằng ngày**
-trên các máy trạm (lưu file Word, in, đổi tên, tải ảnh Zalo) rồi **tự gom thành
+trên các máy trạm (lưu file Word, in, đổi tên) rồi **tự gom thành
 một record hồ sơ**. Nhân viên chỉ xác nhận, không nhập liệu.
 
 Mục tiêu cụ thể: trả lời "hồ sơ bà Gái đang ở đâu?" dưới 1 giây.
@@ -215,8 +230,13 @@ Mục tiêu cụ thể: trả lời "hồ sơ bà Gái đang ở đâu?" dưới
 - **Timeline hồ sơ** — `DRAFT_PRINTED` / `FINAL_PRINTED` và các mốc khác.
   Lưu ý: **không** phân biệt bằng số bản in, vì Spooler không cho biết số bản in
   (`OPEN_DECISIONS.md` A2).
-- **Đọc Zalo của tài khoản chung văn phòng**, chỉ trên máy chủ, theo ranh giới đã
-  chốt ở `OPEN_DECISIONS.md` B2. **Làm, không hoãn.**
+- **Đọc Zalo của tài khoản chung văn phòng** theo ranh giới đã chốt ở
+  `OPEN_DECISIONS.md` B2. **Làm, không hoãn.** Đích MIN-89/MIN-91: module
+  độc lập chạy thử ở repo local riêng trước, chuyển Windows server sau. Module
+  giữ bot/ảnh tạm và sở hữu Qwen OCR; chỉ bàn giao chữ OCR thô/trạng thái/nguồn
+  sang máy chính. Soạn hồ sơ/Document Intake chạy regex, ghép người/tài sản và
+  gợi ý nhóm hồ sơ tạm sau Sync. Không dùng
+  việc tải ảnh Zalo trên máy trạm làm tín hiệu theo dõi.
 - **Lớp LLM (OpenClaw) giới hạn 10–15% ca mơ hồ**, và phải thay thế được — không
   để LLM thành đường dẫn chính.
 
@@ -262,7 +282,31 @@ A4 (A2 đã có câu trả lời = Không).
 
 ---
 
-## 4. `researchskill` — NGOÀI PHẠM VI
+## 4. `zalo` — module thứ tư (đích, chưa migrate)
+
+Repo Zalo độc lập và folder `zalo/` trong monorepo là **đích của
+[MIN-103](https://linear.app/minhnotary/issue/MIN-103/migrate-engine-zalo-thanh-module-thu-tu-trong-repo-rieng-va-zalo)**,
+chưa phải code đang chạy ở đó. `D:\zalo-intake` chỉ là đường dẫn local dự kiến;
+không khẳng định đã có repo/remote. Hiện engine Zalo legacy vẫn nằm trong
+`notary_v2/`. Task migration phải chốt nguồn Git chính thức, cách lấy snapshot
+và commit nguồn, tránh sửa đồng thời hai bản; không tự lồng `.git` hoặc tạo
+submodule.
+
+Module này sở hữu connector, phiên đăng nhập, listener, journal, media tạm,
+chuẩn bị ảnh cần byte ảnh, lời gọi Qwen OCR API, gói file raw và API yêu cầu OCR
+lại cho ảnh còn hạn. Ảnh xóa theo `captured_at + 168 giờ`; gói raw chưa được
+máy chính xác nhận nhận (ACK) phải giữ. Module giao chữ OCR thô, trạng thái và
+dấu vết nguồn; **không giao ảnh** sang máy `notary_v2`.
+
+`notary_v2` sở hữu Sync consumer, kho raw, regex, phân loại, bóc trường, ghép
+mặt giấy/người/tài sản, gợi ý nhóm hồ sơ, bước người dùng kiểm tra và đầu vào
+soạn thảo. Đây là năng lực xử lý chữ dùng chung cho nhiều nguồn, không chuyển
+vào bot. Zalo có thể có DB/session/runtime riêng; database nghiệp vụ chung
+của ba module còn lại không ép module thu nhận dùng chung DB.
+
+---
+
+## 5. `researchskill` — NGOÀI PHẠM VI
 
 Là **skill hỗ trợ AI agent làm việc coding** (`researching-solutions`,
 `review-skill.md`, `evaluation/`, `search/`).
@@ -273,7 +317,7 @@ thống công chứng.
 
 ---
 
-## 5. `systemdocs` — folder này, và thẩm quyền của nó
+## 6. `systemdocs` — folder này, và thẩm quyền của nó
 
 - **Đường dẫn:** `D:\systemdocs`. `main` không có code/runtime. Nhánh
   `electron-system-shell` là ngoại lệ owner chọn làm nhánh tích hợp cấp hệ thống;

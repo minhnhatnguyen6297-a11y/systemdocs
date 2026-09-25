@@ -10,6 +10,15 @@
 > Bằng chứng nền: `../G1_SINGLE_MACHINE_INVENTORY.md` (P0) và
 > `../G1_SINGLE_MACHINE_COMPATIBILITY_MATRIX.md` (P1). POC:
 > `upload_lab@f18a42f:poc/desktop_command/` — bằng chứng, không phải contract.
+>
+> Cập nhật phạm vi Zalo 24/09/2026: [spec chính](../../../notary_v2/docs/platform/zalo-document-inbox/spec.md)
+> thay đích Zalo của bản nháp G1-SM này. Process model/packaging P1 bên dưới
+> là bằng chứng cho helper legacy, không là yêu cầu đóng gói collector vào
+> Electron. Module mới chạy thử trong repo local riêng trước, Windows server là
+> bước sau; module sở hữu ảnh tạm và Qwen OCR. Máy chính Sync chữ thô/trạng thái
+> OCR kèm nguồn, không nhận ảnh Zalo. Document Intake của Soạn hồ sơ chạy regex,
+> ghép người-tài sản và nhóm hồ sơ tạm sau Sync để người dùng duyệt. Command
+> cụ thể vẫn cần contract riêng.
 
 ## 1. Process model (đã chứng minh ở P1)
 
@@ -24,8 +33,8 @@
 │   ├─ toàn bộ engine: extract/scan/audit/word_engine/inheritance_engine/
 │   │  OCR/DB SQLite; sở hữu Playwright thread duy nhất + Celery nếu cần
 │   └─ /healthz + /v1/commands + /v1/jobs/{id} + /shutdown
-├─ zalo_connector (helper) — chạy bằng ELECTRON_RUN_AS_NODE qua
-│   process.execPath; ai spawn (main hay sidecar) = mục mở §7
+├─ zalo_connector legacy trong phép thử P1 — ELECTRON_RUN_AS_NODE;
+│   không là process model đích của Zalo theo MIN-89
 └─ Playwright Chromium headed — con của Python sidecar; không nhúng
     web tỉnh vào Electron; không automate cửa sổ Electron
 ```
@@ -46,7 +55,7 @@ contract_version: "desktopcommand.v1"
 command_id: <uuid v4 do client sinh>     # idempotency key
 command: <namespaced, vd upload.prepare | upload.start_login |
           upload.confirm_login | upload.finalize | upload.cancel |
-          notary.ocr_analyze | notary.case_save | zalo.inbox_poll | ...>
+          notary.ocr_analyze | notary.case_save | ...>
 payload: <object theo command; CẤM key credential/cookie/token/password/
           secret/storage_state (kiểm tra đệ quy như POC registry)>
 client_meta: { shell_version: <semver>, module: <id> }
@@ -167,7 +176,7 @@ Port conflict → sidecar exit code ≠0, main detect + báo (đã chứng minh 
 | O1 | File-ref policy (D0-7): chấp §3 không? | Theo §3 — machine_local only |
 | O2 | Job events: poll `jobs/{id}` hay SSE? | Poll — đủ cho một máy, ít moving part |
 | O3 | Port: động + handshake file hay cố định? | Động + token trong handshake; tránh đụng port |
-| O4 | Ai spawn zalo_connector: main hay sidecar? | Sidecar spawn (business-owned); main chỉ giữ lifecycle app |
+| O4 | Ai spawn zalo_connector trong đề xuất G1-SM cũ? | Không còn áp dụng cho đích MIN-89: module chạy độc lập trong repo local riêng trước, server sau; Sync raw OCR/provenance, Document Intake xử lý chữ ở máy chính; command tương ứng cần contract riêng. |
 | O5 | Auto-update trong G1-SM? | Không — portable/nsis replace; update tool là G1-LAN |
 | O6 | OCR local parked trong package (D0-3)? | Đề xuất: route trả `engine_not_installed`; không bundle stack nặng |
 | O7 | Tên contract: `desktopcommand.v1` OK? | Giữ hậu tố version riêng khỏi `v0.experimental` của POC |

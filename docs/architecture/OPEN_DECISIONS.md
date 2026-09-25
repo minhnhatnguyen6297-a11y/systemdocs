@@ -77,7 +77,49 @@ Ba điều kiện này là **ranh giới quyền riêng tư**, không phải chi
 Agent không được nới ra để "tăng độ phủ dữ liệu". Muốn đổi → hỏi.
 
 Ghi chú: mục này gộp cả phần Zalo của `notaryoffice` và Zalo Document Inbox của
-`notary_v2` — cùng một ranh giới, cùng một tài khoản chung, cùng chạy trên server.
+`notary_v2` — cùng một ranh giới, cùng một tài khoản chung; đích vận hành là
+server, còn bước phát triển local được chốt bên dưới.
+
+**Quyết định mới nhất của owner 24/09/2026:** module nghiên cứu Zalo được phát
+triển trước trong **thư mục/repo local riêng** (đề xuất `D:\zalo-intake`), sau
+đó mới chạy độc lập trên Windows server; chưa triển khai server ở giai đoạn
+này. Dữ liệu công chứng ở một máy chính dùng chung, được phép tắt. Hai repo chỉ
+kết nối qua giao diện trao đổi dữ liệu. Xem [draft MIN-89](../product/specs/2026-09-24-zalo-independent-intake.md).
+Đích của [MIN-103](https://linear.app/minhnotary/issue/MIN-103/migrate-engine-zalo-thanh-module-thu-tu-trong-repo-rieng-va-zalo)
+là **module thứ tư** tại `zalo/` trong monorepo, lấy từ repo Zalo độc lập.
+Repo/folder này chưa có; engine hiện vẫn trong `notary_v2`. Task migration
+phải chốt repo nguồn chính thức, cách nhập snapshot/commit và chuyển tài liệu
+engine sang `zalo/docs/`; spec consumer/giao tiếp ở `notary_v2` giữ phần riêng.
+Không tạo `.git` lồng hoặc hai nguồn spec engine cùng quyền quyết định.
+Owner đã chốt **phương án A**: module Zalo nhận/giữ ảnh, thực hiện bước chuẩn
+bị ảnh cần byte ảnh và gọi Qwen OCR API; không build engine OCR riêng. Module
+bàn giao **chữ OCR thô, trạng thái xử lý, thời gian và dấu vết nguồn**, không
+gửi ảnh. **Soạn hồ sơ/Document Intake sở hữu và chạy** regex, phân loại, bóc
+trường, ghép mặt giấy tờ/người/tài sản và gợi ý nhóm hồ sơ từ chữ đã Sync.
+Đây là cùng năng lực xử lý đầu vào nghiệp vụ cho các nguồn, không tạo parser
+nghiệp vụ thứ hai trong bot. Kết quả máy phân tích chỉ là đề xuất; người dùng
+kiểm tra/xác nhận trước khi đưa vào đầu vào soạn thảo. MIN-92 chốt schema gói
+raw và nguồn đối chiếu, không yêu cầu bot xuất `results.json` đã xử lý.
+Owner đã chọn giữ **gói file raw trong folder máy chính** để kiểm tra sai sót;
+máy chính vẫn chủ động Sync và ACK sau khi lưu raw. Khi parser cần thêm chữ,
+Soạn hồ sơ được yêu cầu bot OCR một biến thể định sẵn theo ID ảnh trong hạn
+168 giờ; bot chỉ trả raw revision mới, không chuyển ảnh hoặc hiểu trường nghiệp
+vụ. Contract MIN-92 chốt enum, giới hạn lượt, quyền và chống lặp; kết quả nội
+bộ/DraftInput thuộc MIN-102.
+Máy chính không tải/lưu ảnh Zalo; người dùng đối chiếu ảnh trong Zalo thật ngoài
+hệ thống. Ảnh trong module xóa sau **7 ngày từ `captured_at`**, là lúc bot bắt
+tin; `source_sent_at` và `imported_at` chỉ là mốc phụ. Gói OCR raw chưa ACK phải
+giữ; raw trên bot sau ACK phải có hạn dọn hữu hạn trước khi dùng dữ liệu thật;
+kết quả xử lý trên máy chính theo chính sách dữ liệu hồ sơ.
+Giai đoạn đầu giả định bot thu đủ sự kiện, **chưa có bằng chứng xác minh đủ**;
+khôi phục khi nguồn không giao sự kiện thuộc MIN-90, để giai đoạn sau.
+
+Chi tiết giao tiếp chưa APPROVED. Còn mở trong MIN-89/MIN-92: schema/version
+của gói OCR raw, endpoint/xác thực, enum và mức giới hạn OCR lại, lưu lượng/
+dung lượng, số ngày giữ raw sau ACK và nơi nhận cảnh báo ban đêm. Vị trí chạy parser đã chốt là Document Intake trên
+máy chính; khả năng history/OA để lấy bù nguồn cần thử
+ở MIN-90. Không dùng quyết định một máy chính này để tự chốt A1/A3/A4 về Word,
+ổ mạng hoặc Windows user của `notaryoffice`.
 
 ---
 
@@ -116,8 +158,10 @@ Chi tiết ba phương án kiến trúc bị loại: `notaryoffice/intent.md` §
 
 ## E. Về việc gộp hệ thống — không còn là câu hỏi mở
 
-Định hướng đã rõ: **gộp thành một hệ thống thống nhất, dùng chung database.** Ba
-repo là các công cụ xử lý dữ liệu theo mục đích khác nhau trong cùng hệ thống đó.
+Định hướng đã rõ: **gộp thành một hệ thống thống nhất, dùng chung database
+nghiệp vụ** cho `notary_v2`, `upload_lab` và `notaryoffice`. Module Zalo thứ tư
+thu nhận nguồn, được giữ DB/session/runtime riêng và giao tiếp qua contract;
+`shell` là hạ tầng giao diện.
 
 Giai đoạn hiện tại: **làm tốt từng phần, chưa vội gộp.** Xem
 [`VISION.md`](./VISION.md) mục 4 và [`TECH_STACK.md`](./TECH_STACK.md) mục 3 cho

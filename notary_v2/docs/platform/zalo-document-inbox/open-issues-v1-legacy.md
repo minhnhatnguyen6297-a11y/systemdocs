@@ -1,9 +1,15 @@
+> **ARCHIVED — kết quả và việc còn mở của v1, không là gate v2.** Việc còn mở của v2 theo [MIN-92](https://linear.app/minhnotary/issue/MIN-92), [MIN-102](https://linear.app/minhnotary/issue/MIN-102) và [MIN-90](https://linear.app/minhnotary/issue/MIN-90).
+
 # Zalo Document Inbox — open issues
 
 Status: open acceptance and shared-platform blockers
-Updated: 2026-08-11
+Updated: 2026-09-24 (baseline notes clarified; no new live acceptance)
 
-This file records unresolved work only. It does not override `spec.md`.
+This file records unresolved work only. It does not override the archived `spec-v1-legacy.md` or the current `spec.md`.
+
+V2 redesign is tracked by MIN-89: [spec.md](spec.md) and
+[source audit](v2-current-state-audit.md). The historical v1 limits below are
+baseline evidence, not the target behavior for the new independent collector.
 
 ## ZALO-LIVE-001 — Realtime My Documents is not live-verified
 
@@ -34,7 +40,7 @@ This file records unresolved work only. It does not override `spec.md`.
 
 - Decision: approved by user on 2026-08-11.
 - Normative rule: `docs/platform/document-intake/spec.md` is Qwen-only. Active Cloud AI OCR must not use server QR decode, client QR scan, QR rescue/fallback, QR-first routing, or QR/source priority.
-- Current blocker: the integrated Zalo verifier still reaches a shared OCR mismatch where `routers.zalo_inbox._output_job` references missing `ocr_ai.shape_cached_ocr`.
+- Historical blocker (2026-08-11): the integrated verifier reported a missing `ocr_ai.shape_cached_ocr`. Source recheck on 2026-09-24 found `shape_cached_ocr` in `routers/ocr_ai.py:2584` and the active Qwen-only route at `:2641`. The old missing-symbol note no longer describes this snapshot; no test suite or live OCR was rerun in MIN-89.
 - Required task: a separate shared-OCR implementation/review must align `routers/ocr_ai.py`, its frontend callers, and tests with the normative Qwen-only contract.
 - Scope boundary: do not solve this by restoring QR helpers or silently changing the Zalo module contract.
 

@@ -16,6 +16,12 @@ Ba bài toán này khác nhau về bản chất, nên **hiện tại** được 
 riêng. Đích đến là **một hệ thống thống nhất dùng chung database**, trong đó ba
 công cụ này là ba đường xử lý dữ liệu cho ba mục đích khác nhau. Xem mục 4.
 
+Module thứ tư `zalo` phục vụ nguồn tin/ảnh đầu vào cho việc soạn hồ sơ. Nó có
+thể chạy trên máy riêng, giữ phiên Zalo, media tạm và OCR; máy chính nhận gói
+chữ thô để `notary_v2` phân tích và cho người dùng duyệt. Đích database chung
+ở đây là database **nghiệp vụ** của ba công cụ trên; Zalo được giữ DB/session
+vận hành riêng.
+
 ## 2. Nguyên tắc chung xuyên suốt
 
 Ba công cụ khác nhau về code nhưng cùng một triết lý:
@@ -66,9 +72,10 @@ ranh giới ở [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md) §7.
 
 ## 4. Lộ trình: làm tốt từng phần trước, gộp sau
 
-**Đích đến:** một hệ thống phần mềm thống nhất, **database chung, UI chung**,
-các chức năng chung dùng cùng thành phần và sẵn sàng gom vào một repo lớn.
-Ba repo trở thành các đường xử lý theo mục đích riêng trong hệ thống đó.
+**Đích đến:** một hệ thống phần mềm thống nhất, **database nghiệp vụ chung,
+UI chung**, các chức năng chung dùng cùng thành phần và sẵn sàng gom vào một
+monorepo. Ba module nghiệp vụ trở thành các đường xử lý theo mục đích riêng;
+`zalo` là module thu nhận có thể tách chạy, giao dữ liệu qua contract.
 
 **Ưu tiên hiện tại:** đồng bộ kiến trúc trước khi phát triển riêng thêm. Bản đồ
 [`COMPONENT_MAP.md`](./COMPONENT_MAP.md) đưa ra owner/reuse đề xuất để duyệt;
@@ -88,6 +95,9 @@ Ví dụ cụ thể phải tránh: `notary_v2` đang OCR bằng **API Qwen**. N�
 khác trong hệ thống lại chọn một công nghệ OCR khác vì "quen hơn", lúc gộp sẽ có
 hai đường OCR cho cùng một việc, hai định dạng kết quả, hai chỗ phải bảo trì. Đó
 là loại xung đột file `TECH_STACK.md` tồn tại để ngăn.
+Đích Zalo cũng dùng Qwen OCR API, nhưng module này chỉ sở hữu xử lý cần byte
+ảnh và giao chữ raw; regex, phân loại, ghép người/tài sản và nhóm hồ sơ vẫn là
+năng lực chung của Document Intake trong `notary_v2`.
 
 **Vì vậy: agent của bất kỳ repo nào phải đọc `systemdocs` TRƯỚC KHI ra quyết định
 kiến trúc hoặc chọn công nghệ mới.** Đây là nơi lưu tài liệu SOT.

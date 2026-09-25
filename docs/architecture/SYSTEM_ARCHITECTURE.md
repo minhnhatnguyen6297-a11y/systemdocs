@@ -2,9 +2,43 @@
 
 ## 0. Đọc mục này trước
 
-Đích đến của hệ thống: **một hệ thống thống nhất, database chung, UI chung và
-các thành phần chức năng chung được tái sử dụng.** Ba repo là ba đường xử lý
-cho ba mục đích khác nhau trong hệ thống đó, sẵn sàng gom thành một repo lớn.
+Cập nhật quyết định mới nhất của owner ngày 24/09/2026: module Zalo được phát
+triển trước trong **thư mục/repo local riêng** (đề xuất `D:\zalo-intake`),
+sau này chạy độc lập trên Windows server. Giai đoạn này chưa triển khai server.
+Hai repo chỉ kết nối qua giao diện trao đổi dữ liệu. Ranh giới và quy cách file
+đang ở [draft MIN-89](../product/specs/2026-09-24-zalo-independent-intake.md).
+Spec hành vi hiện hành nằm ở [Zalo Inbox spec](../../notary_v2/docs/platform/zalo-document-inbox/spec.md);
+[spec v1 legacy](../../notary_v2/docs/platform/zalo-document-inbox/spec-v1-legacy.md)
+chỉ dùng để đối chiếu code cũ.
+Module Zalo nhận tin/ảnh, làm bước chuẩn bị ảnh cần byte ảnh và gọi Qwen OCR
+API. Module bàn giao **chữ OCR thô, trạng thái và dấu vết nguồn (provenance)**;
+Soạn hồ sơ/Document Intake trên máy chính chạy regex, phân loại, bóc trường,
+ghép mặt giấy tờ/người/tài sản và gợi ý nhóm từ chữ đã Sync. Đây là xử lý dữ
+liệu đầu vào nghiệp vụ dùng cho nhiều nguồn; kết quả vẫn chờ người dùng xác
+nhận. Module không build engine OCR riêng và không bàn giao ảnh Zalo. Ảnh trong
+module xóa sau 7 ngày tính từ `captured_at` (lúc bot bắt tin); gói raw chưa có
+biên nhận (ACK) từ máy chính phải được giữ.
+Owner đã chọn gói file raw trong folder máy chính để đối chiếu sai sót. Nếu
+Document Intake thấy chữ thiếu, nó được yêu cầu bot OCR thêm một biến thể có
+giới hạn cho ảnh còn hạn, bằng ID nguồn; bot công bố gói raw revision mới và
+máy chính không nhận byte ảnh. Raw cá nhân ở bot sau ACK phải có hạn dọn hữu
+hạn trước thử dữ liệu thật. Schema/endpoint và hạn cụ thể còn chờ MIN-92.
+Máy chính không tải/lưu ảnh Zalo; người dùng đối chiếu ảnh trên Zalo thật ngoài
+hệ thống. Phân loại theo thời gian lấy `captured_at` làm mốc chính;
+`source_sent_at` và `imported_at` là mốc phụ. Máy chính nhập raw, xử lý thành
+thẻ/nhóm, cho người dùng kiểm tra/xác nhận rồi đưa vào đầu vào soạn thảo.
+Bản nháp kỹ thuật MIN-89 đề xuất máy chính chủ động tải gói OCR raw qua HTTPS
+khi mở, nối lại và theo chu kỳ hoặc khi người dùng bấm Sync
+ở giai đoạn server. Lấy bù tin bot chưa bắt thuộc MIN-90, để giai đoạn sau.
+Đây là đích thiết kế mới, không là mô tả luồng đã triển khai hoặc contract
+được duyệt.
+
+Đích đến của hệ thống: **một hệ thống thống nhất, database nghiệp vụ chung,
+UI chung và các thành phần chức năng chung được tái sử dụng.** Ba module
+nghiệp vụ là ba đường xử lý cho ba mục đích; `zalo` là module thứ tư phục vụ
+nguồn đầu vào, có DB/session/runtime riêng để chạy tách được. `shell` là hạ
+tầng giao diện. Repo Zalo và folder `zalo/` chưa được tạo; chuyển engine thuộc
+[MIN-103](https://linear.app/minhnotary/issue/MIN-103/migrate-engine-zalo-thanh-module-thu-tu-trong-repo-rieng-va-zalo).
 [`COMPONENT_MAP.md`](./COMPONENT_MAP.md) là bản đồ ownership/reuse **draft để duyệt**;
 không phải thiết kế vật lý hay quyền thực hiện migration.
 
@@ -26,7 +60,7 @@ dùng chung, chưa có luồng dữ liệu tự động nào giữa ba công c�
 flowchart TB
     subgraph NV2["notary_v2 — Soạn thảo hồ sơ mới"]
         direction TB
-        NV2IN["Ảnh giấy tờ / Zalo Inbox"]
+        NV2IN["Ảnh giấy tờ / Zalo Inbox legacy<br/>(snapshot code hiện tại)"]
         NV2OCR["Cloud AI OCR + parser regex<br/>(CCCD, sổ đỏ, giấy khai tử)"]
         NV2CASE["Case Workspace<br/>Stage / Pool / Diagram<br/>engine thừa kế"]
         NV2OUT["Word hợp đồng / văn bản<br/>(word_engine + template)"]
@@ -65,6 +99,18 @@ Mũi tên nét rời duy nhất giữa hai sản phẩm là **thao tác tay củ
 Word do `notary_v2` sinh ra được lưu vào ổ đĩa, và sau đó `upload_lab` quét ổ
 đĩa đó như quét bất kỳ Word nào khác. Không có tích hợp code.
 
+Đích Zalo mới theo MIN-89 tách khỏi sơ đồ **hiện trạng** trên: module ở repo local
+riêng trước, Windows server sau, sở hữu nhận tin/ảnh, chuẩn bị ảnh và Qwen OCR.
+Máy công chứng nhận chữ OCR thô/dấu vết nguồn qua giao diện trao đổi, chạy xử
+lý Document Intake thành thẻ/nhóm rồi cho người dùng kiểm tra/xác nhận để soạn
+thảo. Module giữ ảnh tối đa 7 ngày từ `captured_at`; raw chưa ACK tiếp tục được giữ. Không
+có byte ảnh Zalo ở máy chính; người dùng đối chiếu ảnh trong Zalo thật. HTTPS
+Sync là đề xuất cho giai đoạn server. Đây là thiết kế chưa có runtime mới.
+Task MIN-103 phải chuyển cả tài liệu engine sang `zalo/docs/` khi tạo folder và
+chốt một nguồn Git chính thức cùng cách lấy snapshot/commit. Spec consumer và
+giao tiếp trong `notary_v2` giữ phần thuộc máy chính; không có hai bản spec
+engine cùng quyền quyết định, không tạo submodule hoặc `.git` lồng.
+
 ## 2. Ai sở hữu dữ liệu gì
 
 Quy tắc chống chồng chéo: mỗi loại dữ liệu có **đúng một** công cụ chủ sở hữu.
@@ -74,7 +120,9 @@ cũng được ghi vào bảng của người khác.
 | Dữ liệu | Chủ sở hữu | Ghi chú |
 |---|---|---|
 | Hồ sơ đang soạn, các bên, tài sản, quan hệ thừa kế | `notary_v2` | `notary.db` |
-| Kết quả Cloud OCR giấy tờ + metadata Zalo | `notary_v2` | `notary.db`: bảng `ocr_jobs` và Zalo (`notary_v2/models.py:161-171,186-300`; `database.py:8-24`); file media ở storage backend. `ocr_jobs.db` là broker + result backend Celery mặc định (`celery_app.py:5-11`) |
+| Kết quả Cloud OCR giấy tờ + metadata Zalo trong code hiện tại (legacy) | `notary_v2` | `notary.db`: bảng `ocr_jobs` và Zalo (`notary_v2/models.py:161-171,186-300`; `database.py:8-24`); file media ở storage backend hiện tại. `ocr_jobs.db` là broker + result backend Celery mặc định (`celery_app.py:5-11`). Đây là hiện trạng trước khi tách MIN-89. |
+| Tin/ảnh Zalo và OCR ở đích MIN-89/MIN-103 | `zalo` (chưa migrate) | Repo/folder riêng; connector, session, listener, journal, media tạm, chuẩn bị ảnh, Qwen OCR, gói file raw và API OCR lại. Ảnh xóa tại `captured_at + 168 giờ`; raw chưa ACK phải giữ. Máy chính không nhận ảnh. |
+| Sync raw Zalo, regex, phân loại, bóc trường, ghép mặt giấy/người/tài sản, nhóm hồ sơ và review | Soạn hồ sơ/Document Intake (`notary_v2`) | Chạy trên máy chính từ raw + nguồn; lưu gói raw, xuất thẻ/nhóm ứng viên để người dùng kiểm tra rồi đưa vào đầu vào soạn thảo. Cùng năng lực xử lý đầu vào nghiệp vụ, không đặt parser riêng ở bot. |
 | Word/hợp đồng sinh ra từ template | `notary_v2` | |
 | Trường dữ liệu bóc từ kho Word cũ | `upload_lab` | `output/*.json`, `registry.sqlite3` |
 | Trạng thái quét/chuẩn bị/upload lên web tỉnh | `upload_lab` | Ví dụ thật: `matched`, `extracted`, `prepared_dry_run`, `uploaded_success` (`upload_lab_repo/batch_scan.py:364,713,786`; `playwright_uploader.py:81-83`). Snapshot enum và nguồn ở `PROJECTS.md` §2; không phải enum chung xuyên repo |
@@ -83,7 +131,8 @@ cũng được ghi vào bảng của người khác.
 | Trạng thái/giai đoạn/người đang giữ hồ sơ đang chạy | `notaryoffice` | chưa tồn tại |
 
 **Hôm nay: không công cụ nào đọc DB của công cụ khác.** Đây là trạng thái của
-giai đoạn hiện tại, không phải nguyên tắc vĩnh viễn — đích đến là DB dùng chung.
+giai đoạn hiện tại, không phải nguyên tắc vĩnh viễn — đích đến là DB nghiệp vụ
+dùng chung cho ba module nghiệp vụ. Zalo có DB/session vận hành riêng.
 
 Nhưng cho tới khi việc gộp được thiết kế và duyệt, mọi dữ liệu chéo phải đi qua
 một contract thống nhất trước (`contracts/README.md`). **Agent không được tự mở
@@ -278,7 +327,7 @@ SOURCE → RAW → NORMALIZED → INFERRED → CONFIRMED
 |---|---|---|
 | `SOURCE` | File, ảnh, message hoặc event gốc cùng hash/thời gian/nguồn | Repo thu nhận nguồn sở hữu; không sửa source để che lỗi downstream |
 | `RAW` | Text/OCR/event máy thực sự quan sát được cùng provenance | Adapter/provider chỉ tạo kết quả thô; không ghi thành sự thật nghiệp vụ |
-| `NORMALIZED` | Giá trị được chuẩn hóa tất định, ví dụ CCCD/GCN theo `contracts/entities.md` | Repo nghiệp vụ sở hữu rule; luôn truy ngược được về RAW |
+| `NORMALIZED` | Giá trị được chuẩn hóa tất định, ví dụ CCCD/GCN theo `contracts/entities.md` | Rule cần có owner và truy ngược được về RAW; với Zalo MIN-89, Soạn hồ sơ/Document Intake chạy parser từ raw đã nhập và giữ dấu vết nguồn |
 | `INFERRED` | Candidate, phân loại, confidence hoặc quan hệ do rule/AI suy ra | Không ghi đè RAW/NORMALIZED; phải nêu rule/model và bằng chứng |
 | `CONFIRMED` | Business fact được người có thẩm quyền xác nhận; trạng thái kỹ thuật có thể do system-of-record xác nhận | Chỉ repo chủ sở hữu loại dữ liệu đó được ghi; giữ liên kết về bằng chứng |
 
@@ -294,7 +343,9 @@ Các bất biến:
 
 | Phạm vi | Owner nghiệp vụ/quyền ghi | Consumer được phép |
 |---|---|---|
-| Ảnh/Zalo, OCR giấy tờ, Stage và Case Workspace hiện hành | `notary_v2` | Repo khác chỉ đọc sau contract production |
+| OCR giấy tờ, Stage, Case Workspace và Zalo Inbox trong code hiện hành (legacy) | `notary_v2` | Repo khác chỉ đọc sau contract production; luồng upload OCR thủ công giữ nguyên, còn Zalo MIN-89 chuyển sang ranh giới bên dưới |
+| Thu nhận và OCR Zalo ở đích MIN-89 | Module Zalo độc lập | Repo local riêng trước, server sau; sở hữu phiên bot, ảnh tạm, chuẩn bị ảnh cần byte ảnh, Qwen OCR và gói raw chưa ACK; `notary_v2` nhận chữ/trạng thái/nguồn, không nhận ảnh |
+| Xử lý raw OCR Zalo thành dữ liệu soạn hồ sơ | Soạn hồ sơ/Document Intake (`notary_v2`) | Regex, phân loại, bóc trường, ghép mặt giấy/người/tài sản và nhóm tạm chạy trên máy chính sau Sync; kết quả ứng viên cần người dùng duyệt trước khi áp dụng |
 | Kho Word cũ, extraction, registry và upload lifecycle | `upload_lab` | Repo khác chỉ đọc sau contract production |
 | Workstation event, Evidence Record, Draft Case và trạng thái công việc dự định | `notaryoffice` | Chưa có runtime; owner chỉ là thiết kế |
 | Vocabulary, shape xuyên sản phẩm và versioning | `systemdocs/main` | Chỉ quản trị tài liệu; không sở hữu runtime hoặc dữ liệu |

@@ -3,12 +3,20 @@
 Thư mục này chỉ chứa **những gì đã được cả hai bên đồng ý**. Nó không phải nơi
 đề xuất ý tưởng tích hợp.
 
-## Trạng thái: một contract kênh nội bộ đã publish; chưa có contract xuyên-sản-phẩm
+## Trạng thái: hai kênh đã publish — một nội bộ shell, một xuyên-sản-phẩm
 
 Ba công cụ nghiệp vụ vẫn **chạy độc lập** — chưa có API giữa chúng, chưa đọc DB
 của nhau, chưa có file trao đổi tự động. Đó là trạng thái của **giai đoạn hiện
 tại**, không phải đích đến: hệ thống sẽ gộp lại và dùng chung database
 ([`../docs/architecture/VISION.md`](../docs/architecture/VISION.md) mục 4).
+
+Contract xuyên-sản-phẩm đầu tiên — kênh Zalo intake → Document Intake (MIN-92,
+owner duyệt 25/09/2026):
+
+| File | Nội dung | Trạng thái |
+|---|---|---|
+| [`zalo-intake/zalo-intake.md`](./zalo-intake/zalo-intake.md) + 9 schema `*.schema.json` | `intake.*.v1` — gói raw (manifest/records.jsonl/READY), feed pending, receipt/ACK, service status, error envelope, raw record 5 kind (text/OCR/status/event/listener), OCR bổ sung có quota; Zalo giữ ảnh 168h, máy chính **không nhận ảnh** | APPROVED v1 |
+| [`zalo-intake/examples/`](./zalo-intake/examples/) + [`zalo-intake/validate_examples.py`](./zalo-intake/validate_examples.py) | 27 valid + 72 invalid fixtures + validator kiểm chứng được (byte-exact, `.gitattributes -text`) | kiểm: `python contracts/zalo-intake/validate_examples.py` |
 
 Đã publish theo lộ trình G1 một máy (owner duyệt 14/09/2026, spec P2):
 
@@ -18,9 +26,10 @@ tại**, không phải đích đến: hệ thống sẽ gộp lại và dùng ch
 | [`g1-module-data.md`](./g1-module-data.md) | `g1.module.v1` — shape dữ liệu trong payload/result/error (FileRef, JobResult, ErrorObject, IdentityEvidence, ownership) | APPROVED v1 |
 | [`g1/examples/`](./g1/examples/) + [`g1/validate_examples.py`](./g1/validate_examples.py) | valid/invalid JSON + validator kiểm chứng được | kiểm: `python contracts/g1/validate_examples.py` |
 
-Hai contract trên là **kênh nội bộ shell↔engine** — không phải contract giữa ba
-sản phẩm nghiệp vụ. ConversionEnvelope/Evidence/DraftCase dùng chung xuyên repo
-vẫn theo Gate A–D của `../docs/product/MIN62_DATA_CONTRACT_DRAFT.md` (branch
+Hai contract `desktopcommand.v1`/`g1.module.v1` là **kênh nội bộ shell↔engine** —
+không phải contract giữa ba sản phẩm nghiệp vụ.
+ConversionEnvelope/Evidence/DraftCase dùng chung xuyên repo vẫn theo Gate A–D
+của `../docs/product/MIN62_DATA_CONTRACT_DRAFT.md` (branch
 `min-62-data-contract-draft`) và chưa được publish tại đây.
 
 Các shape `v0.experimental` trong `SYSTEM_ARCHITECTURE.md` mục 6 chỉ dùng để

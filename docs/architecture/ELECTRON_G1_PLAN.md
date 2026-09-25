@@ -16,6 +16,11 @@ LAN, theo dõi job, xử lý lỗi và khôi phục kết nối thống nhất.
 - `excelTK` là dự án riêng, ngoài goal.
 - G1 chuẩn hóa model, identity, provenance và quyền ghi; chưa chốt/gộp database
   vật lý. Chọn DB là gate riêng sau khi model ổn định.
+- Đích monorepo có bốn module: `notary_v2`, `upload_lab`, `notaryoffice`,
+  `zalo`. `shell` là hạ tầng Electron. Engine Zalo hiện vẫn trong `notary_v2`;
+  chuyển sang repo độc lập và folder `zalo/` thuộc
+  [MIN-103](https://linear.app/minhnotary/issue/MIN-103/migrate-engine-zalo-thanh-module-thu-tu-trong-repo-rieng-va-zalo),
+  chưa thực hiện trong G1 này.
 - Giữ UX hiện có khi phù hợp; chuyển đủ chức năng trước, redesign sau.
 
 G1 không hoàn tất nếu Electron chỉ mở app cũ, chỉ chạy POC hoặc chưa chạy luồng
@@ -27,7 +32,24 @@ nghiệp vụ thật trên bản đóng gói qua LAN.
 - Renderer sandboxed, không Node integration; preload chỉ expose IPC allowlist
   có version.
 - Helper Python xử lý file cục bộ và Chromium upload có human review.
-- Backend LAN sở hữu dữ liệu nghiệp vụ, job dùng chung, OCR và Zalo.
+- Backend LAN sở hữu dữ liệu nghiệp vụ, job dùng chung và xử lý tài liệu.
+  Với Zalo, quyết định mới nhất ngày 24/09/2026 là làm module độc lập trong
+  thư mục/repo local riêng trước (đề xuất `D:\zalo-intake`), chạy Windows server
+  sau; chưa triển khai server ở giai đoạn này. Xem [Zalo Inbox spec](../../notary_v2/docs/platform/zalo-document-inbox/spec.md)
+  và [draft MIN-89](../product/specs/2026-09-24-zalo-independent-intake.md).
+  Module Zalo sở hữu connector/session/listener/journal, media tạm, nhận/chuẩn bị
+  ảnh, Qwen OCR API, gói file raw và API OCR lại cho ảnh còn hạn; bàn giao chữ OCR thô,
+  trạng thái và provenance qua giao diện trao đổi giữa hai repo. Soạn hồ sơ/
+  Document Intake trên máy chính chạy regex, phân loại, bóc trường, ghép mặt
+  giấy/người/tài sản và gợi ý nhóm, rồi cho người dùng kiểm tra/xác nhận trước
+  khi đưa vào đầu vào soạn thảo. Module không chuyển ảnh về máy chính; ảnh
+  xóa sau 168 giờ từ `captured_at`, raw chưa ACK phải giữ. Người dùng xem ảnh
+  trên Zalo thật.
+  Máy chính tự Sync khi mở, nối lại, theo chu kỳ hoặc bấm nút; HTTPS pull là đề
+  xuất cho giai đoạn server. Contract kỹ thuật còn chờ duyệt; fallback nguồn
+  thuộc MIN-90, giai đoạn sau. Runtime hiện tại chưa tách. Module có thể dùng
+  DB/session/runtime riêng; DB nghiệp vụ chung của ba module còn lại không áp
+  vào bot.
 - Client không mở SQLite qua share mạng; truy cập qua backend owner.
 - Module registry định nghĩa id, capability, version và health.
 - DesktopCommand định nghĩa request/result, progress, `waiting_user`, cancel,
@@ -81,7 +103,12 @@ Workspace/thừa kế→Word export; Zalo Inbox và chức năng được chọn
 dụng Jinja/static khi phù hợp, chỉ chỉnh integration cần thiết.
 
 **Gate:** hồ sơ mẫu sinh Word đúng; dữ liệu chưa confirm không thành truth; job
-OCR không mất khi đổi module; Zalo vẫn chỉ chạy server với tài khoản văn phòng.
+OCR không mất khi đổi module. Với Zalo ở đích MIN-89: module độc lập với tài
+khoản văn phòng sở hữu nhận ảnh và Qwen OCR; máy chính nhận raw/provenance rồi
+chạy parser/ghép/nhóm Document Intake để kiểm tra/xác nhận và soạn thảo,
+không tải/lưu ảnh Zalo. Module được làm trước ở repo local riêng; kiểm chứng
+chạy server là bước sau. Không tính kết quả Zalo đã đạt gate này từ runtime
+legacy chưa tách.
 
 ### G1.5 — LAN, model và đồng thời
 

@@ -1,5 +1,29 @@
 # Zalo receive connector
 
+**Implementation baseline v1.** The commands and environment variables below describe
+the code currently in this directory, not the new independent-server design.
+The connector, session, listener, journal, temporary media, Qwen OCR, raw file
+packages, and re-OCR API belong to the planned fourth `zalo` module. Migration
+to an independent repository and monorepo `zalo/` snapshot is tracked by
+[MIN-103](https://linear.app/minhnotary/issue/MIN-103/migrate-engine-zalo-thanh-module-thu-tu-trong-repo-rieng-va-zalo).
+Neither repository nor folder exists yet. The migration must settle the Git
+source of truth and snapshot method, and move engine documentation to `zalo/docs/`.
+The notary app retains Sync, raw storage, parsing, grouping, human review and
+draft input. Do not maintain two editable engine specs.
+The current product requirements are in [the main Zalo spec](../docs/platform/zalo-document-inbox/spec.md):
+The independent module receives media and calls Qwen OCR where image bytes live.
+It retains images for seven days and hands off raw text, OCR status and source
+provenance without images. Document Intake in the notary system parses fields,
+pairs document sides, combines person/property information and suggests case groups.
+Development starts in a separate local repository; Windows server deployment is
+a later step. The main notary system pulls packages for human review and drafting.
+That migration is not implemented here yet.
+
+For the old shared-storage/webhook behavior described below, see the
+[archived v1 spec](../docs/platform/zalo-document-inbox/spec-v1-legacy.md).
+
+## Current v1 behavior
+
 Receive-only `zca-js` process for the local/trusted-network Zalo Document Inbox.
 It never sends Zalo messages. Media is downloaded to the same storage root used by FastAPI, then a signed event is persisted in the local outbox before publication.
 

@@ -3,8 +3,9 @@
 **Đây là file agent phải đọc TRƯỚC KHI ra quyết định kiến trúc hoặc chọn công
 nghệ mới trong bất kỳ repo nào.**
 
-Lý do file này tồn tại: ba repo sẽ **gộp thành một hệ thống dùng chung database**
-ở giai đoạn sau. Nếu mỗi repo tự chọn công nghệ khác nhau cho cùng một việc (ví
+Lý do file này tồn tại: ba module nghiệp vụ sẽ **gộp thành một hệ thống dùng
+chung database nghiệp vụ** ở giai đoạn sau. Zalo là module thu nhận thứ tư có
+thể giữ DB/session/runtime riêng. Nếu mỗi repo tự chọn công nghệ khác nhau cho cùng một việc (ví
 dụ repo này OCR bằng Qwen, repo kia OCR bằng thứ khác), lúc gộp sẽ phải viết lại.
 Chọn khác là được — nhưng phải **có lý do và ghi vào đây**, không chọn theo quán
 tính.
@@ -34,13 +35,34 @@ Cập nhật trạng thái POC: 11/09/2026. Các lựa chọn công nghệ produ
 | **UI desktop legacy** | **PySide6 / Qt** | `upload_lab` (`ui_qt/`) | Baseline chuyển đổi; không tiếp tục là shell đích |
 | **Tự động hóa web nhà nước** | **Playwright** (Chromium) | `upload_lab` | Session lưu ở `nd_storage_state.json`; Chromium headed riêng do Python quản lý |
 | **Agent trên máy trạm** | **C# .NET 8** | `notaryoffice` (dự kiến) | Ràng buộc: <30MB RAM, <0.5% CPU |
-| **Nhận media từ Zalo** | `zca-js` (Node) như connector thay thế được | `notary_v2` (Zalo Document Inbox) | Xem mục 4 |
+| **Nhận media từ Zalo** | `zca-js` (Node) như connector thay thế được | Hiện trạng: `notary_v2` (Zalo Document Inbox); đích: `zalo/` sau MIN-103 | Xem mục 4 |
 | **Test** | `pytest`; `playwright` cho e2e | cả `notary_v2` và `upload_lab` | |
 
 **API key và secret:** đặt trong `.env` của từng repo, đã `.gitignore`. Không bao
 giờ ghi key vào tài liệu, không commit `.env`. Mẫu biến ở `.env.example`.
 
 ### 1.1. Candidate còn đang đánh giá
+
+**Zalo Intake v2 — MIN-89, quyết định mới nhất 24/09/2026:** phát triển module
+trong **thư mục/repo local riêng** trước (đề xuất `D:\zalo-intake`), chuyển lên
+Windows server sau; chưa triển khai server ở giai đoạn này. Node/zca-js vẫn là
+adapter nghiên cứu thay được. Module luôn gọi **Qwen OCR API** cho ảnh Zalo và
+sở hữu các bước chuẩn bị ảnh cần byte ảnh. Không build engine OCR riêng hoặc
+thêm OCR vendor mới. Soạn hồ sơ/Document Intake trên máy chính sở hữu và chạy
+regex, phân loại, bóc trường, ghép mặt giấy/người/tài sản và gợi ý nhóm từ raw
+OCR đã Sync. Đây là năng lực xử lý đầu vào nghiệp vụ dùng cho các nguồn; module
+bot không có parser nghiệp vụ riêng. Giao diện trao đổi giữa hai repo bàn giao
+**chữ OCR thô, trạng thái, thời gian và provenance**, không gửi ảnh về máy chính.
+Ảnh trong module xóa sau 7 ngày từ `captured_at` (lúc bot bắt tin); raw chưa ACK phải giữ, thời hạn giữ sau
+ACK chưa chốt. Contract truyền gói còn là thiết kế kỹ thuật chưa duyệt;
+HTTPS pull là đề xuất cho giai đoạn server. Xem [draft MIN-89](../product/specs/2026-09-24-zalo-independent-intake.md).
+Việc chuyển toàn engine và tài liệu engine sang repo độc lập cùng snapshot
+`zalo/` thuộc [MIN-103](https://linear.app/minhnotary/issue/MIN-103/migrate-engine-zalo-thanh-module-thu-tu-trong-repo-rieng-va-zalo).
+Repo/folder này chưa có; `D:\zalo-intake` là đường dẫn local dự kiến. Task đó
+phải chốt nguồn Git chính thức và cách nhập snapshot, không tạo `.git` lồng hoặc
+duy trì hai nơi sửa engine tự do. Giao diện và parser của `notary_v2` giữ phần
+consumer riêng. Module Zalo dùng DB/session riêng nếu cần, không phải bảng trong
+DB nghiệp vụ chung.
 
 Electron đã được owner chọn làm desktop shell đích ngày 14/09/2026 và đã chuyển
 vào bảng công nghệ chính. Đặc tả MIN-50 đã được **duyệt cho POC** theo
@@ -84,6 +106,10 @@ Ranh giới của POC conversion/OCR:
   plugin OCR rồi đưa mọi file vào mà không qua Document Router/OCR gate.
 - Qwen vẫn là OCR provider duy nhất. POC adapter không được thêm provider thứ
   hai hoặc hồi sinh local OCR đang parked.
+- MarkItDown/`markitdown-ocr` ở đây là ứng viên thử nghiệm, **chưa được tích hợp
+  production** vào đường upload OCR hiện hành hoặc luồng Zalo mới. Chúng là
+  adapter chuyển tài liệu thành chữ, không thay quyền sở hữu regex/ghép của
+  Soạn hồ sơ/Document Intake.
 - **Cổng kiểm chứng transport:** ngày 10/09/2026, tìm `chat.completions`,
   `chat/completions`, `OpenAI(`, `compatible` và đối chiếu các HTTP call trong
   `notary_v2/routers/ocr_ai.py` chưa thấy OpenAI-compatible OCR transport trong
@@ -123,8 +149,9 @@ queue thứ hai, hay một framework UI thứ ba mà không qua bước 3.
 
 ## 3. Ràng buộc thiết kế để lúc gộp không xung đột
 
-Định hướng: gộp thành **một hệ thống, một database dùng chung**; các repo trở
-thành công cụ xử lý dữ liệu theo mục đích riêng. Chưa làm bây giờ. Nhưng từ giờ,
+Định hướng: gộp thành **một hệ thống, một database nghiệp vụ dùng chung** cho
+`notary_v2`, `upload_lab`, `notaryoffice`; Zalo có DB/session vận hành riêng và
+trao đổi qua contract. Chưa làm bây giờ. Nhưng từ giờ,
 mỗi repo nên tuân theo mấy điều dưới đây để lúc gộp không phải viết lại:
 
 - **Định danh người/tài sản và tham chiếu hồ sơ chuẩn hóa giống nhau.** Xem
@@ -157,8 +184,9 @@ sách này; thêm điểm mới là quyết định kiến trúc, phải hỏi.
 | Điểm | Ra đâu | Gửi gì | Repo |
 |---|---|---|---|
 | Cloud OCR | DashScope (Alibaba) | ảnh giấy tờ khách hàng | `notary_v2` |
+| Cloud OCR cho Zalo (đích MIN-89, chưa triển khai) | DashScope (Alibaba), Qwen OCR API | ảnh Zalo của tài khoản văn phòng, chỉ module Zalo gọi | module Zalo ở repo local riêng trước, Windows server sau; máy chính nhập raw và chạy parser của Document Intake |
 | Upload CSDL công chứng | web tỉnh Nam Định | dữ liệu hồ sơ đã hoàn tất | `upload_lab` |
-| Zalo | server Zalo | tin nhắn/ảnh của tài khoản văn phòng | `notary_v2`; `notaryoffice` (dự kiến) |
+| Zalo | server Zalo | tin nhắn/ảnh của tài khoản văn phòng | Hiện trạng: connector trong `notary_v2`; đích MIN-89: module Zalo độc lập. `notaryoffice` mới là dự định, chưa có runtime. |
 
 `notaryoffice` Sentinel trên máy trạm: **không gọi Internet**, chỉ gửi JSON về
 Hub trong LAN.

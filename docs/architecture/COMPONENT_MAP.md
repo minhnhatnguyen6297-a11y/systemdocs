@@ -11,6 +11,11 @@ và tiến độ ở [MIN-56](https://linear.app/minhnotary/issue/MIN-56) và
 Đích đã được chủ dự án yêu cầu: **một hệ thống, database chung, UI chung; các
 chức năng chung có cùng nguồn implementation/version, sẵn sàng gom repo**.
 Chỉ cùng tên trường hoặc cùng thư viện chưa đạt đích này.
+Ở đích mới, database chung ở đây là database **nghiệp vụ** của ba module
+`notary_v2`, `upload_lab`, `notaryoffice`. `zalo` là module thứ tư, có thể giữ
+DB/session/runtime riêng; `shell` là hạ tầng giao diện. Code Zalo hiện vẫn ở
+`notary_v2`; repo độc lập và snapshot `zalo/` thuộc
+[MIN-103](https://linear.app/minhnotary/issue/MIN-103/migrate-engine-zalo-thanh-module-thu-tu-trong-repo-rieng-va-zalo).
 
 Bốn đề xuất của bản đồ:
 
@@ -19,11 +24,22 @@ Bốn đề xuất của bản đồ:
    regex nhận diện hoặc parser nghiệp vụ. Cụ thể ở §5.
 2. Đề xuất `notary_v2` bảo trì thành phần canonical/conversion/OCR dùng chung;
    `upload_lab` tiếp tục bảo trì phần đọc `.doc` và browser engine. Owner code
-   không trở thành owner mọi dữ liệu chạy qua component đó.
+   không trở thành owner mọi dữ liệu chạy qua component đó. Đề xuất này thuộc
+   luồng OCR tài liệu chung được khảo sát ngày 11/09; [Zalo Inbox spec hiện hành](../../notary_v2/docs/platform/zalo-document-inbox/spec.md)
+   theo quyết định mới nhất 24/09/2026 giao nhận ảnh, chuẩn bị ảnh và Qwen OCR
+   cho **module Zalo độc lập**. Regex/bóc trường, phân loại, ghép mặt giấy/
+   người/tài sản và gợi ý nhóm là năng lực của Soạn hồ sơ/Document Intake,
+   chạy trên máy chính sau Sync raw OCR. Module
+   được phát triển ở thư mục/repo local riêng trước (đề xuất `D:\zalo-intake`),
+   Windows server sau; chưa triển khai server. Hai repo chỉ kết nối qua giao
+   diện trao đổi: chữ OCR thô, trạng thái và provenance, không có ảnh.
+   `notary_v2` nhập raw, xử lý thành thẻ/nhóm, cho kiểm tra/xác nhận và đưa
+   vào đầu vào soạn thảo. Ảnh trong module giữ 7 ngày từ `captured_at`; raw
+   chưa ACK phải giữ. Lấy bù nguồn thuộc MIN-90 sau.
 3. Đề xuất `upload_lab` chủ trì shell/UI chung và cầu command; module nghiệp vụ
    vẫn thuộc owner hiện tại. Công nghệ shell và contract còn qua decision gate.
-4. Database chung có một đầu mối quản lý migration được duyệt riêng, **không**
-   cấp quyền ghi tự do cho ba module. Canonical Case ID, engine, schema và vị trí
+4. Database nghiệp vụ chung có một đầu mối quản lý migration được duyệt riêng, **không**
+   cấp quyền ghi tự do cho ba module nghiệp vụ. Canonical Case ID, engine, schema và vị trí
    package trong repo lớn chưa được quyết định tại đây.
 
 Các đề xuất owner ở trên chưa có hiệu lực production cho đến khi được duyệt.
@@ -69,10 +85,12 @@ là tiền tố đường dẫn, không phải tên package/import.
   production contract xuyên repo. Không gọi trạng thái đó là đã triển khai chỉ
   vì có shape experimental trong tài liệu.
 
-## 3. Ma trận hiện trạng — sáu lớp, ba repo
+## 3. Ma trận hiện trạng — sáu lớp, ba repo nghiệp vụ
 
 Chỉ giữ bằng chứng cần để xác định quan hệ và ranh giới; không mô tả lại thuật
 toán, schema chi tiết hay workflow nội bộ của các sản phẩm.
+Ma trận này là snapshot source đã kiểm tra ngày 11/09, trước quyết định module
+Zalo thứ tư. Nó không khẳng định code đã chuyển sang `zalo/`.
 
 | Lớp | `notary_v2` — source hiện hành | `upload_lab` — source hiện hành | `notaryoffice` — chỉ thiết kế |
 |---|---|---|---|
