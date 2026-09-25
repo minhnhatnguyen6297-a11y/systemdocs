@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zalo-intake:ocr-request:v1",
+  "title": "intake.ocr-request.v1",
+  "description": "Bounded OCR re-run request from an authenticated consumer. One request = one variant. The body carries identifiers and a closed parameter set only: no image bytes, paths, URLs, prompts, provider commands or secrets. Body limit: 16 KiB (enforced by the intake API, see rules_ocr_request).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "consumer_id",
+    "logical_id",
+    "variant",
+    "reason_code",
+    "observed_revision",
+    "submitted_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "intake.ocr-request.v1"
+    },
+    "request_id": {
+      "$ref": "common.schema.json#/$defs/uuid",
+      "description": "Consumer-generated UUID; idempotency key. Same request_id + same canonical body replays the stored decision; same request_id + different body is request_conflict."
+    },
+    "consumer_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "logical_id": {
+      "$ref": "common.schema.json#/$defs/uuid",
+      "description": "Stable id of the image/page already handed over in a raw package. Quota key: 2 supplementary jobs per logical_id inside the 168 h image lifetime."
+    },
+    "variant": {
+      "enum": ["rotate", "crop_bottom", "full_res"],
+      "x-error-code": "unsupported_variant"
+    },
+    "preset": {
+      "description": "Closed parameter of the variant. crop_bottom requires one of bottom_quarter|bottom_third|bottom_42pct; rotate accepts \"auto\" (provider enable_rotate) or null; full_res requires null or absent. Enforced by the if/then/else below."
+    },
+    "reason_code": {
+      "enum": [
+        "missing_issue_date",
+        "missing_identity_number",
+        "missing_parcel_info",
+        "suspected_rotation",
+        "insufficient_text",
+        "truncated_footer",
+        "other"
+      ]
+    },
+    "note": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Free text for the operator journal; scanned by the request_forbidden_field rule (no data URIs, image URLs/paths, base64 blobs)."
+    },
+    "observed_revision": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Raw revision of logical_id the consumer analyzed before asking. Lower than the producer's current_revision -> stale_revision."
+    },
+    "submitted_at": {
+      "$ref": "common.schema.json#/$defs/iso_datetime"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"variant": {"const": "crop_bottom"}},
+        "required": ["variant"]
+      },
+      "then": {
+        "x-error-code": "missing_preset",
+        "required": ["preset"],
+        "properties": {
+          "preset": {
+            "enum": ["bottom_quarter", "bottom_third", "bottom_42pct"],
+            "x-error-code": "unsupported_variant"
+          }
+        }
+      },
+      "else": {
+        "if": {
+          "properties": {"variant": {"const": "rotate"}},
+          "required": ["variant"]
+        },
+        "then": {
+          "x-error-code": "unsupported_variant",
+          "properties": {
+            "preset": {
+              "enum": ["auto", null],
+              "x-error-code": "unsupported_variant"
+            }
+          }
+        },
+        "else": {
+          "x-error-code": "unsupported_variant",
+          "properties": {
+            "preset": {
+              "const": null,
+              "x-error-code": "unsupported_variant"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

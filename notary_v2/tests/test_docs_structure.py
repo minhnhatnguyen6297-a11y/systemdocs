@@ -59,7 +59,15 @@ def test_module_readme_markdown_targets_exist():
             assert tracked, f"{path}: untracked {target}"
 
 def test_agents_routed_markdown_exists():
-    agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    agents_path = ROOT / "AGENTS.md"
+    if not agents_path.is_file():
+        # AGENTS.md is intentionally absent inside the monorepo snapshot —
+        # the monorepo rule removes per-repo agent files (commit be14999).
+        # The routed-SOT contract only applies when the file exists.
+        import pytest
+
+        pytest.skip("AGENTS.md absent by monorepo rule")
+    agents = agents_path.read_text(encoding="utf-8")
     section = re.search(
         r"^## 2\. Nguồn chuẩn và tài liệu tham chiếu[ \t]*\n(?P<body>.*?)(?=^## 3\. Tra cứu mã\b)",
         agents,

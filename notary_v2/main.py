@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from time import perf_counter
@@ -14,11 +15,12 @@ from database import (
     migrate_inheritance_case_properties_schema,
     migrate_inheritance_cases_schema,
     migrate_properties_schema,
+    migrate_zalo_exchange_schema,
     migrate_zalo_schema,
 )
 from observability import configure_process_logging
 from contextlib import asynccontextmanager
-from routers import cases, customers, ocr_ai, participants, properties, zalo_inbox
+from routers import cases, customers, ocr_ai, participants, properties, zalo_inbox, zalo_sync
 
 os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"), override=True)
@@ -33,21 +35,57 @@ migrate_inheritance_cases_schema()
 migrate_properties_schema()
 migrate_inheritance_case_properties_schema()
 migrate_zalo_schema()
+migrate_zalo_exchange_schema()
 Base.metadata.create_all(bind=engine)
+
+
+def _zalo_sync_interval_seconds() -> float:
+    """MIN-99: 0 hoac am = tat periodic sync; mac dinh 300s."""
+    try:
+        return float(os.getenv("ZALO_SYNC_INTERVAL_SECONDS", "300"))
+    except ValueError:
+        return 300.0
+
+
+async def _periodic_zalo_sync(interval_seconds: float) -> None:
+    """Vong lap sync dinh ky — loi mot luot khong giet task (MIN-99)."""
+    from database import SessionLocal
+
+    while True:
+        await asyncio.sleep(interval_seconds)
+        db = SessionLocal()
+        try:
+            await asyncio.to_thread(zalo_sync.run_sync_once, db)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            app_logger.exception("Periodic Zalo sync failed")
+        finally:
+            db.close()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    interval = _zalo_sync_interval_seconds()
+    sync_task = (
+        asyncio.create_task(_periodic_zalo_sync(interval)) if interval > 0 else None
+    )
     try:
         yield
     finally:
+        if sync_task is not None:
+            sync_task.cancel()
+            try:
+                await sync_task
+            except asyncio.CancelledError:
+                pass
         zalo_inbox._terminate_connector_process()
-
 
 
 app = FastAPI(
     title="He thong Quan ly Ho so Cong chung",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 
@@ -96,6 +134,7 @@ app.include_router(cases.router, prefix="/cases", tags=["Ho so thua ke"])
 app.include_router(participants.router, prefix="/participants", tags=["Nguoi tham gia"])
 app.include_router(ocr_ai.router, prefix="/api/ocr", tags=["OCR"])
 app.include_router(zalo_inbox.router)
+app.include_router(zalo_sync.router)
 
 
 @app.get("/")

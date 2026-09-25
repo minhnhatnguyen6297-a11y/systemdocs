@@ -301,3 +301,92 @@ class ZaloBatch(Base):
     created_at = Column(DateTime(timezone=True), nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+# =============================================================================
+# MIN-99 — Zalo raw-package consumer (contract intake.*.v1, repo doc lap Zalo)
+#
+# Bang nay thuoc exchange consumer moi — KHONG dung lai bang legacy
+# zalo_sources/zalo_batches (duong webhook cu, giu nguyen toi MIN-101).
+# Khong FK sang business tables: raw import khong cham nghiep vu truoc duyet.
+# =============================================================================
+
+
+class ZaloRawRecord(Base):
+    """Raw intake records da nhap nguyen ven tu goi (khong anh)."""
+
+    __tablename__ = "zalo_raw_records"
+
+    record_id       = Column(String(36), primary_key=True)
+    logical_id      = Column(String(36), nullable=False, index=True)
+    revision        = Column(Integer,    nullable=False)
+    kind            = Column(String(40), nullable=False, index=True)
+    package_id      = Column(String(36), nullable=False, index=True)
+    package_sequence = Column(Integer,   nullable=False)
+    captured_at     = Column(DateTime(timezone=True), nullable=False)
+    recorded_at     = Column(DateTime(timezone=True), nullable=False)
+    canonical_sha256 = Column(String(64), nullable=False)
+    payload_json    = Column(Text,       nullable=False)   # raw-record.v1 verbatim
+    imported_at     = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("logical_id", "revision", name="uq_zalo_raw_logical_rev"),
+    )
+
+
+class ZaloImportLedger(Base):
+    """So nhap goi: mot dong mot package_id — replay idempotent."""
+
+    __tablename__ = "zalo_import_ledger"
+
+    package_id      = Column(String(36), primary_key=True)
+    consumer_id     = Column(String(36), nullable=False)
+    sequence        = Column(Integer,    nullable=False, index=True)
+    manifest_sha256 = Column(String(64), nullable=False)
+    record_count    = Column(Integer,    nullable=False)
+    sealed_at       = Column(DateTime(timezone=True), nullable=True)
+    decision        = Column(String(20), nullable=False)   # imported | quarantined
+    quarantine_reason = Column(Text,     nullable=True)
+    receipt_status  = Column(String(20), nullable=True)    # accepted | rejected | null (chua gui)
+    receipt_id      = Column(String(36), nullable=True)
+    imported_at     = Column(DateTime(timezone=True), nullable=True)
+    created_at      = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at      = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class ZaloSyncState(Base):
+    """Cursor/kv cua sync loop (last_sequence, last_run_at, last_error...)."""
+
+    __tablename__ = "zalo_sync_state"
+
+    key   = Column(String(60), primary_key=True)
+    value = Column(Text,       nullable=False)
+
+
+class ZaloParseJob(Base):
+    """Hang parse ben vung: parser loi khong huy ACK raw, retry tu raw."""
+
+    __tablename__ = "zalo_parse_jobs"
+
+    job_id     = Column(String(36), primary_key=True)
+    package_id = Column(String(36), nullable=False, index=True)
+    state      = Column(String(20), nullable=False, default="pending")   # pending|running|succeeded|failed
+    attempts   = Column(Integer,    nullable=False, default=0)
+    error      = Column(Text,       nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class ZaloIntakeResult(Base):
+    """Ket qua parser local per package — revision tang dan, khong ghi de
+    du lieu nguoi dung da duyet (chi suggestion, chua apply)."""
+
+    __tablename__ = "zalo_intake_results"
+
+    result_id   = Column(String(36), primary_key=True)
+    package_id  = Column(String(36), nullable=False, index=True)
+    revision    = Column(Integer,    nullable=False)
+    parser_version = Column(String(40), nullable=False)
+    result_json = Column(Text,       nullable=False)   # {persons, properties, raw_results, warnings}
+    warnings_json = Column(Text,     nullable=False, server_default=text("'[]'"))
+    created_at  = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

@@ -29,3 +29,6 @@ rapidfuzz==3.9.0
 # ---------- Testing ----------
 playwright
 pytest
+
+# ---------- Runtime platform ----------
+tzdata ; sys_platform == "win32"   # IANA tz data for zoneinfo on Windows

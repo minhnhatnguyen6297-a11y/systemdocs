@@ -1,0 +1,552 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zalo-intake:raw-record:v1",
+  "title": "Zalo intake raw record v1",
+  "description": "One immutable raw record inside records.jsonl. Envelope fields apply to every record_kind; the body is per kind (message, ocr fields, status, event, listener). Cross-record and semantic rules live in _validator/rules_record.py.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "record_kind", "record_id", "logical_id", "revision", "recorded_at", "source"],
+  "properties": {
+    "schema_version": {
+      "const": "intake.raw-record.v1"
+    },
+    "record_kind": {
+      "enum": ["message_text", "ocr_page", "processing_status", "source_event", "listener_session"]
+    },
+    "record_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "logical_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "supersedes": {
+      "$ref": "#/$defs/supersedes"
+    },
+    "captured_at": {
+      "$ref": "common.schema.json#/$defs/iso_datetime"
+    },
+    "recorded_at": {
+      "$ref": "common.schema.json#/$defs/iso_datetime"
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "message": {
+      "$ref": "#/$defs/message_body"
+    },
+    "image_sha256": {
+      "$ref": "common.schema.json#/$defs/sha256_hex"
+    },
+    "image_expires_at": {
+      "$ref": "common.schema.json#/$defs/iso_datetime"
+    },
+    "image_state": {
+      "enum": ["captured", "retained", "expired", "missing"]
+    },
+    "ocr": {
+      "$ref": "#/$defs/ocr"
+    },
+    "status": {
+      "$ref": "#/$defs/status_body"
+    },
+    "event": {
+      "$ref": "#/$defs/event_body"
+    },
+    "listener": {
+      "$ref": "#/$defs/listener_body"
+    }
+  },
+  "allOf": [
+    {
+      "x-error-code": "missing_captured_at",
+      "required": ["captured_at"]
+    },
+    {
+      "x-error-code": "revision_chain_broken",
+      "if": {
+        "properties": {
+          "revision": {
+            "minimum": 2
+          }
+        },
+        "required": ["revision"]
+      },
+      "then": {
+        "required": ["supersedes"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "enum": ["message_text", "ocr_page", "processing_status", "source_event"]
+          }
+        },
+        "required": ["record_kind"]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "required": ["provider", "account_id", "conversation_id", "conversation_type"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "message_text"
+          }
+        },
+        "required": ["record_kind"]
+      },
+      "then": {
+        "required": ["message"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "ocr_page"
+          }
+        },
+        "required": ["record_kind"]
+      },
+      "then": {
+        "required": ["image_sha256", "image_expires_at", "image_state", "ocr"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "processing_status"
+          }
+        },
+        "required": ["record_kind"]
+      },
+      "then": {
+        "required": ["status"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "source_event"
+          }
+        },
+        "required": ["record_kind"]
+      },
+      "then": {
+        "required": ["event"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "listener_session"
+          }
+        },
+        "required": ["record_kind"]
+      },
+      "then": {
+        "required": ["listener"]
+      }
+    }
+  ],
+  "$defs": {
+    "supersedes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_id", "revision"],
+      "properties": {
+        "record_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "account_id"],
+      "properties": {
+        "provider": {
+          "const": "zalo_personal"
+        },
+        "account_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        },
+        "conversation_id": {
+          "$ref": "common.schema.json#/$defs/nonempty_string"
+        },
+        "conversation_type": {
+          "enum": ["user", "group"]
+        },
+        "provider_message_id": {
+          "$ref": "common.schema.json#/$defs/nonempty_string"
+        },
+        "client_message_id": {
+          "$ref": "common.schema.json#/$defs/nonempty_string"
+        },
+        "sender_id": {
+          "$ref": "common.schema.json#/$defs/nonempty_string"
+        },
+        "sender_display_name": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "source_sent_at": {
+          "$ref": "common.schema.json#/$defs/iso_datetime"
+        },
+        "attachment_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        },
+        "attachment_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "page_index": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "message_body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text"],
+      "properties": {
+        "text": {
+          "type": "string"
+        }
+      }
+    },
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "enum": ["full_image", "bottom_fraction"]
+        },
+        "fraction": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        }
+      },
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "bottom_fraction"
+          }
+        },
+        "required": ["kind"]
+      },
+      "then": {
+        "required": ["fraction"]
+      },
+      "else": {
+        "not": {
+          "required": ["fraction"]
+        }
+      }
+    },
+    "submitted_frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["frame_id", "width", "height"],
+      "properties": {
+        "frame_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "transform_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op"],
+      "properties": {
+        "op": {
+          "enum": ["exif_transpose", "resize", "crop", "rotate"]
+        },
+        "params": {
+          "type": "object",
+          "maxProperties": 24,
+          "$comment": "Free-form per-op parameter map: arbitrary keys, scalar values only, bounded property count. This is the one intentional exception to additionalProperties:false.",
+          "additionalProperties": {
+            "type": ["string", "number", "boolean", "null"]
+          }
+        }
+      }
+    },
+    "provider_line": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["element_index", "text"],
+      "properties": {
+        "element_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "text": {
+          "type": "string"
+        },
+        "location": {
+          "x-error-code": "geometry_invalid",
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "items": {
+            "type": "number"
+          }
+        },
+        "rotate_rect": {
+          "x-error-code": "geometry_invalid",
+          "type": ["array", "null"],
+          "minItems": 5,
+          "maxItems": 5,
+          "items": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ocr_pass_id", "provider", "model", "task", "image_operation", "region", "transform_chain", "geometry_status", "status", "config_version"],
+      "properties": {
+        "ocr_pass_id": {
+          "$ref": "common.schema.json#/$defs/nonempty_string"
+        },
+        "provider": {
+          "$ref": "common.schema.json#/$defs/nonempty_string"
+        },
+        "model": {
+          "$ref": "common.schema.json#/$defs/nonempty_string"
+        },
+        "task": {
+          "enum": ["text_recognition", "advanced_recognition"]
+        },
+        "image_operation": {
+          "enum": ["original", "rotate", "crop_bottom", "full_res"]
+        },
+        "region": {
+          "$ref": "#/$defs/region"
+        },
+        "submitted_frame": {
+          "$ref": "#/$defs/submitted_frame"
+        },
+        "transform_chain": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/transform_step"
+          }
+        },
+        "geometry_status": {
+          "enum": ["not_applicable", "absent", "present_unverified", "present_invalid"]
+        },
+        "provider_lines": {
+          "type": "array",
+          "maxItems": 5000,
+          "items": {
+            "$ref": "#/$defs/provider_line"
+          }
+        },
+        "status": {
+          "enum": ["succeeded", "retry_pending", "failed", "source_image_expired", "unsupported"]
+        },
+        "error": {
+          "$ref": "common.schema.json#/$defs/error_object"
+        },
+        "started_at": {
+          "$ref": "common.schema.json#/$defs/iso_datetime"
+        },
+        "completed_at": {
+          "$ref": "common.schema.json#/$defs/iso_datetime"
+        },
+        "config_version": {
+          "$ref": "common.schema.json#/$defs/nonempty_string"
+        },
+        "request_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        }
+      }
+    },
+    "text_line": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "page_index", "ocr_pass_id"],
+      "allOf": [
+        {
+          "x-error-code": "missing_line_id",
+          "required": ["line_id"]
+        },
+        {
+          "x-error-code": "missing_captured_at",
+          "required": ["captured_at"]
+        }
+      ],
+      "properties": {
+        "line_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "captured_at": {
+          "$ref": "common.schema.json#/$defs/iso_datetime"
+        },
+        "page_index": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "ocr_pass_id": {
+          "$ref": "common.schema.json#/$defs/nonempty_string"
+        },
+        "region": {
+          "$ref": "#/$defs/region"
+        },
+        "provider_refs": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "ocr": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "attempts"],
+      "properties": {
+        "status": {
+          "enum": ["succeeded", "retry_pending", "failed", "source_image_expired", "unsupported"]
+        },
+        "attempts": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/attempt"
+          }
+        },
+        "text_lines": {
+          "type": "array",
+          "maxItems": 2000,
+          "items": {
+            "$ref": "#/$defs/text_line"
+          }
+        },
+        "selected_pass_ids": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "common.schema.json#/$defs/nonempty_string"
+          }
+        }
+      }
+    },
+    "status_body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code"],
+      "properties": {
+        "code": {
+          "enum": ["captured", "media_missing", "image_expired", "ocr_partial", "ocr_requested", "note"]
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 500
+        }
+      }
+    },
+    "event_body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_type", "observed_at"],
+      "properties": {
+        "event_type": {
+          "enum": ["recall", "reaction"]
+        },
+        "target_provider_message_id": {
+          "$ref": "common.schema.json#/$defs/nonempty_string"
+        },
+        "target_client_message_id": {
+          "$ref": "common.schema.json#/$defs/nonempty_string"
+        },
+        "observed_at": {
+          "$ref": "common.schema.json#/$defs/iso_datetime"
+        },
+        "reaction_icon": {
+          "type": "string"
+        }
+      }
+    },
+    "listener_body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["session_id", "state", "observed_at"],
+      "properties": {
+        "session_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        },
+        "state": {
+          "enum": ["connected", "disconnected", "login_required"]
+        },
+        "observed_at": {
+          "$ref": "common.schema.json#/$defs/iso_datetime"
+        },
+        "last_heartbeat_at": {
+          "$ref": "common.schema.json#/$defs/iso_datetime"
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "uncertain_gap": {
+          "$ref": "#/$defs/uncertain_gap"
+        }
+      }
+    },
+    "uncertain_gap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["started_at", "ended_at", "start_is_estimate"],
+      "properties": {
+        "started_at": {
+          "$ref": "common.schema.json#/$defs/iso_datetime"
+        },
+        "ended_at": {
+          "$ref": "common.schema.json#/$defs/iso_datetime"
+        },
+        "start_is_estimate": {
+          "type": "boolean",
+          "$comment": "Must be true in v1 (a gap start after a crash is always an estimate); enforced by the listener_gap_invalid rule so the failure code is precise."
+        }
+      }
+    }
+  }
+}

@@ -212,3 +212,71 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def migrate_zalo_exchange_schema():
+    """Bang consumer goi raw Zalo (MIN-99) — cong them, khong cham legacy."""
+    con = sqlite3.connect(DB_PATH)
+    cur = con.cursor()
+    cur.executescript("""
+        CREATE TABLE IF NOT EXISTS zalo_raw_records (
+            record_id VARCHAR(36) PRIMARY KEY,
+            logical_id VARCHAR(36) NOT NULL,
+            revision INTEGER NOT NULL,
+            kind VARCHAR(40) NOT NULL,
+            package_id VARCHAR(36) NOT NULL,
+            package_sequence INTEGER NOT NULL,
+            captured_at DATETIME NOT NULL,
+            recorded_at DATETIME NOT NULL,
+            canonical_sha256 VARCHAR(64) NOT NULL,
+            payload_json TEXT NOT NULL,
+            imported_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT uq_zalo_raw_logical_rev UNIQUE (logical_id, revision)
+        );
+        CREATE INDEX IF NOT EXISTS ix_zalo_raw_logical ON zalo_raw_records(logical_id);
+        CREATE INDEX IF NOT EXISTS ix_zalo_raw_kind ON zalo_raw_records(kind);
+        CREATE INDEX IF NOT EXISTS ix_zalo_raw_package ON zalo_raw_records(package_id);
+        CREATE TABLE IF NOT EXISTS zalo_import_ledger (
+            package_id VARCHAR(36) PRIMARY KEY,
+            consumer_id VARCHAR(36) NOT NULL,
+            sequence INTEGER NOT NULL,
+            manifest_sha256 VARCHAR(64) NOT NULL,
+            record_count INTEGER NOT NULL,
+            sealed_at DATETIME,
+            decision VARCHAR(20) NOT NULL,
+            quarantine_reason TEXT,
+            receipt_status VARCHAR(20),
+            receipt_id VARCHAR(36),
+            imported_at DATETIME,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS ix_zalo_import_sequence ON zalo_import_ledger(sequence);
+        CREATE TABLE IF NOT EXISTS zalo_sync_state (
+            key VARCHAR(60) PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS zalo_parse_jobs (
+            job_id VARCHAR(36) PRIMARY KEY,
+            package_id VARCHAR(36) NOT NULL,
+            state VARCHAR(20) NOT NULL DEFAULT 'pending',
+            attempts INTEGER NOT NULL DEFAULT 0,
+            error TEXT,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS ix_zalo_parse_package ON zalo_parse_jobs(package_id);
+        CREATE TABLE IF NOT EXISTS zalo_intake_results (
+            result_id VARCHAR(36) PRIMARY KEY,
+            package_id VARCHAR(36) NOT NULL,
+            revision INTEGER NOT NULL,
+            parser_version VARCHAR(40) NOT NULL,
+            result_json TEXT NOT NULL,
+            warnings_json TEXT NOT NULL DEFAULT '[]',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS ix_zalo_results_package ON zalo_intake_results(package_id);
+    """)
+    con.commit()
+    con.close()
+    assert_foreign_key_check()
