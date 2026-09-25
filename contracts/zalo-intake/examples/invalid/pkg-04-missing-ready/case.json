@@ -1,0 +1,10 @@
+{
+  "kind": "package",
+  "description": "READY.json absent: the package is not sealed.",
+  "expected_errors": [
+    "file_missing"
+  ],
+  "context": {
+    "consumer_id": "c0000000-0000-4000-8000-000000000001"
+  }
+}

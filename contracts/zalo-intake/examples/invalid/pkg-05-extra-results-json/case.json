@@ -1,0 +1,10 @@
+{
+  "kind": "package",
+  "description": "Package carrying results.json — forbidden payload file.",
+  "expected_errors": [
+    "file_forbidden"
+  ],
+  "context": {
+    "consumer_id": "c0000000-0000-4000-8000-000000000001"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "kind": "package",
+  "description": "manifest.consumer_id belongs to a different consumer.",
+  "expected_errors": [
+    "consumer_mismatch"
+  ],
+  "context": {
+    "consumer_id": "c0000000-0000-4000-8000-000000000001"
+  }
+}

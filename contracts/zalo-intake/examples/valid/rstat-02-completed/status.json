@@ -1,0 +1,17 @@
+{
+  "schema_version": "intake.ocr-request-status.v1",
+  "request_id": "50000000-0000-4000-8000-000000000001",
+  "job_id": "70000000-0000-4000-8000-000000000001",
+  "state": "completed",
+  "attempt": 1,
+  "max_attempts": 3,
+  "accepted_at": "2026-09-24T08:01:05+07:00",
+  "deduplicated": false,
+  "started_at": "2026-09-24T08:01:20+07:00",
+  "finished_at": "2026-09-24T08:02:40+07:00",
+  "result": {
+    "package_id": "60000000-0000-4000-8000-000000000001",
+    "manifest_sha256": "6a0b5e14071d5340a1ac83086e79d3c7a184286a5d57090ed29b1ec5c00b3412",
+    "new_revision": 2
+  }
+}

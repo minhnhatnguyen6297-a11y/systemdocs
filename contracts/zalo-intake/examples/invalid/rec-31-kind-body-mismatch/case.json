@@ -1,0 +1,5 @@
+{
+  "kind": "record",
+  "description": "message_text record mang them body ocr non-null: body cua kind khac bi cam, phai absent hoac null.",
+  "expected_errors": ["kind_body_mismatch"]
+}

@@ -1,0 +1,4 @@
+{
+  "kind": "record",
+  "description": "source_event recall hop le (zca-js undo): tro tin dich qua target_provider_message_id + target_client_message_id."
+}

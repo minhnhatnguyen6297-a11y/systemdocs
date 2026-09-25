@@ -1,0 +1,17 @@
+{
+  "kind": "package",
+  "description": "same package_id already imported under a different manifest hash.",
+  "expected_errors": [
+    "package_conflict"
+  ],
+  "context": {
+    "consumer_id": "c0000000-0000-4000-8000-000000000001",
+    "previously_imported": [
+      {
+        "package_id": "a0000000-0000-4000-8000-000000000001",
+        "manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "record_count": 2
+      }
+    ]
+  }
+}

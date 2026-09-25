@@ -1,0 +1,17 @@
+{
+  "schema_version": "intake.ocr-request-status.v1",
+  "request_id": "50000000-0000-4000-8000-000000000001",
+  "job_id": "70000000-0000-4000-8000-000000000001",
+  "state": "failed",
+  "attempt": 4,
+  "max_attempts": 3,
+  "accepted_at": "2026-09-24T08:01:05+07:00",
+  "deduplicated": false,
+  "started_at": "2026-09-24T08:01:20+07:00",
+  "finished_at": "2026-09-24T08:04:00+07:00",
+  "error": {
+    "code": "provider_failed",
+    "message": "provider 5xx after retries",
+    "retryable": true
+  }
+}

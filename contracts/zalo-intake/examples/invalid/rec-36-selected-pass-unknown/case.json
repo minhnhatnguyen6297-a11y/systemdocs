@@ -1,0 +1,5 @@
+{
+  "kind": "record",
+  "description": "selected_pass_ids chua pass-ghost khong co trong attempts[].",
+  "expected_errors": ["line_pass_ref_unknown"]
+}

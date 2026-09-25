@@ -1,0 +1,14 @@
+{
+  "kind": "receipt",
+  "description": "Rejected receipt carrying a well-formed error object.",
+  "context": {
+    "consumer_id": "c0000000-0000-4000-8000-000000000001",
+    "existing_packages": [
+      {
+        "package_id": "a0000000-0000-4000-8000-000000000001",
+        "manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "record_count": 2
+      }
+    ]
+  }
+}

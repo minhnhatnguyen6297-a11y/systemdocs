@@ -1,0 +1,10 @@
+{
+  "kind": "package",
+  "description": "record_count says 5 but records.jsonl has 2 lines.",
+  "expected_errors": [
+    "record_count_mismatch"
+  ],
+  "context": {
+    "consumer_id": "c0000000-0000-4000-8000-000000000001"
+  }
+}

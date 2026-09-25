@@ -1,0 +1,4 @@
+{
+  "kind": "record",
+  "description": "ocr_page revision 1 co hai luot capture-time (original + full_res); ca hai pass cung dong gop transcript mac dinh (selected_pass_ids). Khong co request_id: yeu cau OCR bo sung chi xuat hien tu revision 2."
+}

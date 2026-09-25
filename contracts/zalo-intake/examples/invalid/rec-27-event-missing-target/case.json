@@ -1,0 +1,7 @@
+{
+  "kind": "record",
+  "description": "source_event recall thieu target_provider_message_id -> source_event_invalid.",
+  "expected_errors": [
+    "source_event_invalid"
+  ]
+}

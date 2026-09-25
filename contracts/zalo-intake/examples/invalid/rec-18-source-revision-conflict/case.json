@@ -1,0 +1,17 @@
+{
+  "kind": "record",
+  "description": "cung (logical_id, revision=1) nhung noi dung khac ban da import -> source_revision_conflict.",
+  "expected_errors": [
+    "source_revision_conflict"
+  ],
+  "context": {
+    "existing_revisions": [
+      {
+        "logical_id": "18000000-0000-4000-8000-000000000002",
+        "revision": 1,
+        "canonical_sha256": "0e076f1bc620c056886b4b910fe6ba63a8e06709480f0394809814dab85e26c5",
+        "captured_at": "2026-09-24T08:00:00+07:00"
+      }
+    ]
+  }
+}

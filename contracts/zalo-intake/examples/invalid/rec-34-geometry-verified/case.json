@@ -1,0 +1,5 @@
+{
+  "kind": "record",
+  "description": "geometry_status=present_mapping_verified bi cam o v1 (reserved, chi sau MIN-95/98 kiem chung) -> enum tu choi.",
+  "expected_errors": ["schema_invalid"]
+}

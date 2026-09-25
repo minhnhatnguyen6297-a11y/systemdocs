@@ -1,0 +1,7 @@
+{
+  "kind": "record",
+  "description": "task text_recognition ma van co provider_lines -> geometry_invalid.",
+  "expected_errors": [
+    "geometry_invalid"
+  ]
+}

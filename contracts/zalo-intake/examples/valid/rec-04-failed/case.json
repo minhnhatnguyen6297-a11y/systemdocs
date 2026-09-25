@@ -1,0 +1,4 @@
+{
+  "kind": "record",
+  "description": "ocr_page that bai: ocr.status=failed, attempt failed co error retryable, khong text_lines."
+}

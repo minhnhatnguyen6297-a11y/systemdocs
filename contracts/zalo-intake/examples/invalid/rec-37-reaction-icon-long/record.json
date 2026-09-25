@@ -1,0 +1,24 @@
+{
+  "schema_version": "intake.raw-record.v1",
+  "record_kind": "source_event",
+  "record_id": "37000000-0000-4000-8000-000000000001",
+  "logical_id": "37000000-0000-4000-8000-000000000002",
+  "revision": 1,
+  "captured_at": "2026-09-24T08:30:00+07:00",
+  "recorded_at": "2026-09-24T08:30:00+07:00",
+  "source": {
+    "provider": "zalo_personal",
+    "account_id": "aaaaaaaa-0000-4000-8000-000000000001",
+    "conversation_id": "conv-7001",
+    "conversation_type": "group",
+    "sender_id": "uid-1001",
+    "source_sent_at": "2026-09-24T08:30:00+07:00"
+  },
+  "event": {
+    "event_type": "reaction",
+    "target_provider_message_id": "gmsg-900001",
+    "target_client_message_id": "cmsg-900001",
+    "observed_at": "2026-09-24T08:30:00+07:00",
+    "reaction_icon": ":this-token-is-deliberately-made-far-too-long-for-any-plausible-zalo-reaction-bound-ever:"
+  }
+}

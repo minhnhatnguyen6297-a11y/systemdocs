@@ -1,0 +1,5 @@
+{
+  "kind": "record",
+  "description": "reaction icon dai hon 64 ky tu: vuot bound toi da cua token Zalo.",
+  "expected_errors": ["source_event_invalid"]
+}

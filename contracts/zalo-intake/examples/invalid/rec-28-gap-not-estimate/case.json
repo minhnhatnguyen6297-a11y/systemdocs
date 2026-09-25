@@ -1,0 +1,7 @@
+{
+  "kind": "record",
+  "description": "uncertain_gap co start_is_estimate=false -> listener_gap_invalid.",
+  "expected_errors": [
+    "listener_gap_invalid"
+  ]
+}

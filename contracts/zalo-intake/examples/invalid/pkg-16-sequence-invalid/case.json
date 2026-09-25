@@ -1,0 +1,11 @@
+{
+  "kind": "package",
+  "description": "consumer expected sequence 9, manifest says 4.",
+  "expected_errors": [
+    "sequence_invalid"
+  ],
+  "context": {
+    "consumer_id": "c0000000-0000-4000-8000-000000000001",
+    "expected_sequence": 9
+  }
+}

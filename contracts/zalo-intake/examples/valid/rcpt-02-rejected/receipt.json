@@ -1,0 +1,15 @@
+{
+  "schema_version": "intake.receipt.v1",
+  "receipt_id": "e0000000-0000-4000-8000-000000000001",
+  "package_id": "a0000000-0000-4000-8000-000000000001",
+  "consumer_id": "c0000000-0000-4000-8000-000000000001",
+  "status": "rejected",
+  "received_at": "2026-09-24T08:05:00+07:00",
+  "manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "record_count": 2,
+  "error": {
+    "code": "manifest_hash_mismatch",
+    "message": "declared sha256 does not match file bytes",
+    "retryable": true
+  }
+}

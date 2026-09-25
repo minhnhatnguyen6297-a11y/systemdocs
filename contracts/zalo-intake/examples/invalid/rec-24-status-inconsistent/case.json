@@ -1,0 +1,7 @@
+{
+  "kind": "record",
+  "description": "ocr.status=succeeded nhung moi attempt deu failed va khong co text_lines -> ocr_status_inconsistent.",
+  "expected_errors": [
+    "ocr_status_inconsistent"
+  ]
+}

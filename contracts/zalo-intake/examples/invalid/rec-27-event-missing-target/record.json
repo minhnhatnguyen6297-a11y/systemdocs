@@ -1,0 +1,20 @@
+{
+  "schema_version": "intake.raw-record.v1",
+  "record_kind": "source_event",
+  "record_id": "27000000-0000-4000-8000-000000000001",
+  "logical_id": "27000000-0000-4000-8000-000000000002",
+  "revision": 1,
+  "captured_at": "2026-09-24T08:10:00+07:00",
+  "recorded_at": "2026-09-24T08:10:01+07:00",
+  "source": {
+    "provider": "zalo_personal",
+    "account_id": "aaaaaaaa-0000-4000-8000-000000000001",
+    "conversation_id": "conv-7001",
+    "conversation_type": "group",
+    "sender_id": "uid-1001"
+  },
+  "event": {
+    "event_type": "recall",
+    "observed_at": "2026-09-24T08:10:00+07:00"
+  }
+}

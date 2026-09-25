@@ -1,0 +1,7 @@
+{
+  "kind": "record",
+  "description": "transform_chain[].params chua key provider_raw (vung schema tu do) -> provider_payload_forbidden.",
+  "expected_errors": [
+    "provider_payload_forbidden"
+  ]
+}

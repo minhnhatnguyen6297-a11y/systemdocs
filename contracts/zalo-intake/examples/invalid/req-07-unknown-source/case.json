@@ -1,0 +1,19 @@
+{
+  "kind": "ocr_request",
+  "description": "logical_id never delivered to this consumer -> unknown_source",
+  "context": {
+    "now": "2026-09-24T08:05:00+07:00",
+    "authenticated": true,
+    "config_version": "ocr-config-v1",
+    "sources": {},
+    "quota_used": {
+      "key_jobs": 0,
+      "day_calls": 0,
+      "concurrent": 0
+    },
+    "existing_requests": []
+  },
+  "expected_errors": [
+    "unknown_source"
+  ]
+}

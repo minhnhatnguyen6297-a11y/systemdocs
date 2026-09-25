@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zalo-intake:ready:v1",
+  "title": "intake.ready.v1 — READY.json, written last, binds the manifest bytes",
+  "description": "manifest_sha256 is the lowercase hex SHA-256 over the exact bytes of manifest.json as published. This file must be <= 64 KiB (rule-enforced).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "package_id",
+    "manifest_sha256",
+    "sealed_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "intake.ready.v1"
+    },
+    "package_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "manifest_sha256": {
+      "$ref": "common.schema.json#/$defs/sha256_hex"
+    },
+    "sealed_at": {
+      "$ref": "common.schema.json#/$defs/iso_datetime"
+    }
+  }
+}

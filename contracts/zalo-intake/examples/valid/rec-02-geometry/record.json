@@ -1,0 +1,128 @@
+{
+  "schema_version": "intake.raw-record.v1",
+  "record_kind": "ocr_page",
+  "record_id": "02000000-0000-4000-8000-000000000001",
+  "logical_id": "02000000-0000-4000-8000-000000000002",
+  "revision": 1,
+  "captured_at": "2026-09-24T08:00:00+07:00",
+  "recorded_at": "2026-09-24T08:05:00+07:00",
+  "source": {
+    "provider": "zalo_personal",
+    "account_id": "aaaaaaaa-0000-4000-8000-000000000001",
+    "conversation_id": "conv-7001",
+    "conversation_type": "group",
+    "provider_message_id": "gmsg-900001",
+    "client_message_id": "cmsg-900001",
+    "sender_id": "uid-1001",
+    "sender_display_name": "Nguoi Gui Demo",
+    "source_sent_at": "2026-09-24T07:59:58+07:00",
+    "attachment_id": "02000000-0000-4000-8000-0000000000a1",
+    "attachment_index": 0,
+    "page_index": 1
+  },
+  "image_sha256": "446cb38fdd8f8ba05b2590f162a045cca9d81672a4e68e52f0b7a5c94180aafc",
+  "image_expires_at": "2026-10-01T08:00:00+07:00",
+  "image_state": "captured",
+  "ocr": {
+    "status": "succeeded",
+    "attempts": [
+      {
+        "ocr_pass_id": "pass-adv",
+        "provider": "qwen",
+        "model": "qwen-vl-ocr-2025-11-20",
+        "task": "advanced_recognition",
+        "image_operation": "original",
+        "region": {
+          "kind": "full_image"
+        },
+        "transform_chain": [
+          {
+            "op": "exif_transpose"
+          },
+          {
+            "op": "resize",
+            "params": {
+              "max_side": 1000
+            }
+          }
+        ],
+        "geometry_status": "present_unverified",
+        "status": "succeeded",
+        "started_at": "2026-09-24T08:01:00+07:00",
+        "config_version": "ocr-config-v1",
+        "submitted_frame": {
+          "frame_id": "02000000-0000-4000-8000-0000000000f1",
+          "width": 1000,
+          "height": 600
+        },
+        "provider_lines": [
+          {
+            "element_index": 0,
+            "text": "CONG HOA XA HOI CHU NGHIA VIET NAM",
+            "location": [
+              100,
+              100,
+              300,
+              100,
+              300,
+              130,
+              100,
+              130
+            ],
+            "rotate_rect": [
+              200,
+              115,
+              200,
+              30,
+              0
+            ]
+          },
+          {
+            "element_index": 1,
+            "text": "GIAY CHUNG NHAN QUYEN SU DUNG DAT",
+            "location": [
+              110,
+              200,
+              480,
+              200,
+              480,
+              235,
+              110,
+              235
+            ],
+            "rotate_rect": null
+          }
+        ],
+        "completed_at": "2026-09-24T08:02:00+07:00"
+      }
+    ],
+    "selected_pass_ids": [
+      "pass-adv"
+    ],
+    "text_lines": [
+      {
+        "line_id": "02000000-0000-4000-8000-0000000000b1",
+        "text": "CONG HOA XA HOI CHU NGHIA VIET NAM",
+        "captured_at": "2026-09-24T08:00:00+07:00",
+        "page_index": 1,
+        "ocr_pass_id": "pass-adv",
+        "provider_refs": [
+          0
+        ]
+      },
+      {
+        "line_id": "02000000-0000-4000-8000-0000000000b2",
+        "text": "GIAY CHUNG NHAN QUYEN SU DUNG DAT",
+        "captured_at": "2026-09-24T08:00:00+07:00",
+        "page_index": 1,
+        "ocr_pass_id": "pass-adv",
+        "provider_refs": [
+          1
+        ],
+        "region": {
+          "kind": "full_image"
+        }
+      }
+    ]
+  }
+}

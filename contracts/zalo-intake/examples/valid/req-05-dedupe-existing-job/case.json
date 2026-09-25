@@ -1,0 +1,34 @@
+{
+  "kind": "ocr_request",
+  "description": "new request_id but same logical_id+variant+preset+config_version as a completed job -> answered with the existing job, no new quota",
+  "context": {
+    "now": "2026-09-24T08:05:00+07:00",
+    "authenticated": true,
+    "config_version": "ocr-config-v1",
+    "sources": {
+      "20000000-0000-4000-8000-000000000002": {
+        "captured_at": "2026-09-23T09:00:00+07:00",
+        "current_revision": 1,
+        "image_available": true,
+        "enabled": true
+      }
+    },
+    "quota_used": {
+      "key_jobs": 0,
+      "day_calls": 0,
+      "concurrent": 0
+    },
+    "existing_requests": [
+      {
+        "request_id": "50000000-0000-4000-8000-000000000099",
+        "body_canonical_sha256": "afb4d0ac488f3086b88682a8826ada0574cc45294d79b83037d3ea9217edae2f",
+        "job_id": "70000000-0000-4000-8000-000000000010",
+        "state": "completed",
+        "logical_id": "20000000-0000-4000-8000-000000000002",
+        "variant": "crop_bottom",
+        "preset": "bottom_42pct",
+        "config_version": "ocr-config-v1"
+      }
+    ]
+  }
+}

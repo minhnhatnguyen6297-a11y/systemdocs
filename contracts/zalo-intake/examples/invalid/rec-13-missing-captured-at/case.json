@@ -1,0 +1,7 @@
+{
+  "kind": "record",
+  "description": "record thieu captured_at o envelope -> missing_captured_at.",
+  "expected_errors": [
+    "missing_captured_at"
+  ]
+}

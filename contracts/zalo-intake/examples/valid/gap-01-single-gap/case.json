@@ -1,0 +1,13 @@
+{
+  "kind": "listener_gap",
+  "description": "records.jsonl: session cu disconnected roi session moi connected co uncertain_gap (session/logical_id khac nhau vi reconnect = phien moi); context.expected_gaps khop dung mot khoang.",
+  "context": {
+    "expected_gaps": [
+      {
+        "started_at": "2026-09-24T05:00:00+07:00",
+        "ended_at": "2026-09-24T08:00:00+07:00",
+        "start_is_estimate": true
+      }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "kind": "package",
+  "description": "records.jsonl exceeds the 16 MiB package limit.",
+  "expected_errors": [
+    "size_limit_exceeded"
+  ],
+  "context": {
+    "consumer_id": "c0000000-0000-4000-8000-000000000001"
+  }
+}

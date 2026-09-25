@@ -1,0 +1,5 @@
+{
+  "kind": "record",
+  "description": "revision 1 khong duoc mang supersedes (khong co gi de thay the).",
+  "expected_errors": ["revision_chain_broken"]
+}

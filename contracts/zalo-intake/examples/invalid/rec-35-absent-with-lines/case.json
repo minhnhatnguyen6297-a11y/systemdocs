@@ -1,0 +1,5 @@
+{
+  "kind": "record",
+  "description": "geometry_status=absent nhung attempt van mang provider_lines khong rong: mau thuan trang thai geometry.",
+  "expected_errors": ["geometry_invalid"]
+}

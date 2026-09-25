@@ -1,0 +1,7 @@
+{
+  "kind": "record",
+  "description": "text_line tro ocr_pass_id khong co trong attempts -> line_pass_ref_unknown.",
+  "expected_errors": [
+    "line_pass_ref_unknown"
+  ]
+}

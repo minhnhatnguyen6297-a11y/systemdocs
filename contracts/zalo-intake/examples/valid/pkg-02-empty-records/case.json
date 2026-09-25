@@ -1,0 +1,8 @@
+{
+  "kind": "package",
+  "description": "Package with an empty records.jsonl (0 records).",
+  "context": {
+    "consumer_id": "c0000000-0000-4000-8000-000000000001",
+    "expected_sequence": 2
+  }
+}

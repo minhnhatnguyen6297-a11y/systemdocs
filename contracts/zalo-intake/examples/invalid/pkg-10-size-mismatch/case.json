@@ -1,0 +1,10 @@
+{
+  "kind": "package",
+  "description": "manifest declares a wrong byte size for records.jsonl.",
+  "expected_errors": [
+    "size_mismatch"
+  ],
+  "context": {
+    "consumer_id": "c0000000-0000-4000-8000-000000000001"
+  }
+}

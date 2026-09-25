@@ -1,0 +1,15 @@
+{
+  "kind": "record",
+  "description": "record_id da import voi canonical_sha256 khac -> record_conflict.",
+  "expected_errors": [
+    "record_conflict"
+  ],
+  "context": {
+    "existing_records": [
+      {
+        "record_id": "17000000-0000-4000-8000-000000000001",
+        "canonical_sha256": "fbf22ec45a215e0d4711bfe2dde37292707edaf098c15bd5b204cb3ca72e6ca3"
+      }
+    ]
+  }
+}

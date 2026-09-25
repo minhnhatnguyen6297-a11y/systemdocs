@@ -1,0 +1,61 @@
+{
+  "schema_version": "intake.raw-record.v1",
+  "record_kind": "ocr_page",
+  "record_id": "35000000-0000-4000-8000-000000000001",
+  "logical_id": "35000000-0000-4000-8000-000000000002",
+  "revision": 1,
+  "captured_at": "2026-09-24T08:00:00+07:00",
+  "recorded_at": "2026-09-24T08:05:00+07:00",
+  "source": {
+    "provider": "zalo_personal",
+    "account_id": "aaaaaaaa-0000-4000-8000-000000000001",
+    "conversation_id": "conv-7001",
+    "conversation_type": "group",
+    "provider_message_id": "gmsg-900350",
+    "client_message_id": "cmsg-900350",
+    "sender_id": "uid-1001",
+    "source_sent_at": "2026-09-24T07:59:58+07:00",
+    "attachment_id": "35000000-0000-4000-8000-0000000000a1",
+    "attachment_index": 0,
+    "page_index": 1
+  },
+  "image_sha256": "35000000000000000000000000000000000000000000000000000000000000aa",
+  "image_expires_at": "2026-10-01T08:00:00+07:00",
+  "image_state": "captured",
+  "ocr": {
+    "status": "retry_pending",
+    "attempts": [
+      {
+        "ocr_pass_id": "pass-orig",
+        "provider": "qwen",
+        "model": "qwen-vl-ocr-2025-11-20",
+        "task": "advanced_recognition",
+        "image_operation": "original",
+        "region": {
+          "kind": "full_image"
+        },
+        "transform_chain": [
+          {
+            "op": "exif_transpose"
+          }
+        ],
+        "geometry_status": "absent",
+        "provider_lines": [
+          {
+            "element_index": 0,
+            "text": "GIAY CHUNG NHAN",
+            "location": [10, 20, 100, 20, 100, 40, 10, 40],
+            "rotate_rect": null
+          }
+        ],
+        "status": "succeeded",
+        "config_version": "ocr-config-v1",
+        "submitted_frame": {
+          "frame_id": "35000000-0000-4000-8000-0000000000f1",
+          "width": 1800,
+          "height": 1200
+        }
+      }
+    ]
+  }
+}

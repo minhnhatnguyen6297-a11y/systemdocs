@@ -1,0 +1,19 @@
+{
+  "kind": "record",
+  "description": "revision 3 nhung supersedes tro revision 1 (phai tro 2) -> revision_chain_broken.",
+  "expected_errors": [
+    "revision_chain_broken"
+  ],
+  "context": {
+    "supersedes_targets": [
+      {
+        "record_id": "15000000-0000-4000-8000-000000000001",
+        "revision": 1
+      },
+      {
+        "record_id": "15000000-0000-4000-8000-00000000000a",
+        "revision": 2
+      }
+    ]
+  }
+}

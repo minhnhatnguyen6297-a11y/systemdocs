@@ -1,0 +1,4 @@
+{
+  "kind": "record",
+  "description": "ocr_page advanced_recognition: provider_lines co location[8] + rotate_rect[5]/null, geometry_status present_unverified, submitted_frame, transform_chain exif_transpose+resize, text_lines co provider_refs hop le."
+}

@@ -1,0 +1,23 @@
+{
+  "kind": "record",
+  "description": "revision 2 doi captured_at so voi revision 1 da import -> immutable_field_changed.",
+  "expected_errors": [
+    "immutable_field_changed"
+  ],
+  "context": {
+    "supersedes_targets": [
+      {
+        "record_id": "19000000-0000-4000-8000-000000000001",
+        "revision": 1
+      }
+    ],
+    "existing_revisions": [
+      {
+        "logical_id": "19000000-0000-4000-8000-000000000002",
+        "revision": 1,
+        "canonical_sha256": "386706bf1f6ba515d60d6a3e5ab8e610177f518a162849c959431cd8535ec1df",
+        "captured_at": "2026-09-24T08:00:00+07:00"
+      }
+    ]
+  }
+}

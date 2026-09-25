@@ -1,0 +1,17 @@
+{
+  "kind": "receipt",
+  "description": "receipt record_count differs from the imported package.",
+  "context": {
+    "consumer_id": "c0000000-0000-4000-8000-000000000001",
+    "existing_packages": [
+      {
+        "package_id": "a0000000-0000-4000-8000-000000000001",
+        "manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "record_count": 2
+      }
+    ]
+  },
+  "expected_errors": [
+    "receipt_count_mismatch"
+  ]
+}

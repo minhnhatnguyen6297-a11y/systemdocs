@@ -1,0 +1,30 @@
+{
+  "kind": "ocr_request",
+  "description": "same request_id + same canonical body -> replay of the stored decision",
+  "context": {
+    "now": "2026-09-24T08:05:00+07:00",
+    "authenticated": true,
+    "config_version": "ocr-config-v1",
+    "sources": {
+      "20000000-0000-4000-8000-000000000002": {
+        "captured_at": "2026-09-23T09:00:00+07:00",
+        "current_revision": 1,
+        "image_available": true,
+        "enabled": true
+      }
+    },
+    "quota_used": {
+      "key_jobs": 0,
+      "day_calls": 0,
+      "concurrent": 0
+    },
+    "existing_requests": [
+      {
+        "request_id": "50000000-0000-4000-8000-000000000004",
+        "body_canonical_sha256": "457c11238c6711cb61afedf930d8e955687356c21b49046aba095e20696ef0b9",
+        "job_id": "70000000-0000-4000-8000-000000000009",
+        "state": "running"
+      }
+    ]
+  }
+}

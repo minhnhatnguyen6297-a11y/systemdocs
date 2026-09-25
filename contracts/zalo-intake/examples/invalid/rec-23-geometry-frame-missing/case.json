@@ -1,0 +1,7 @@
+{
+  "kind": "record",
+  "description": "geometry_status=present_unverified nhung thieu submitted_frame -> geometry_frame_mismatch.",
+  "expected_errors": [
+    "geometry_frame_mismatch"
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "kind": "record",
+  "description": "recall event mang reaction_icon: icon chi duoc phep tren reaction.",
+  "expected_errors": ["source_event_invalid"]
+}

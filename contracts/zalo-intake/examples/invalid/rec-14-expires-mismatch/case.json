@@ -1,0 +1,7 @@
+{
+  "kind": "record",
+  "description": "image_expires_at = captured_at + 167h (sai 168h) -> expires_mismatch.",
+  "expected_errors": [
+    "expires_mismatch"
+  ]
+}

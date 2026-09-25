@@ -1,0 +1,20 @@
+{
+  "kind": "record",
+  "description": "ocr_page revision 2 hop le: supersedes tro dung revision 1 (context.supersedes_targets), captured_at giu nguyen. Attempt bo sung (pass-crop, request_id) chi nam trong ocr.attempts; transcript mac dinh text_lines/selected_pass_ids giu luot pipeline goc (pass-orig) theo quyet dinh owner.",
+  "context": {
+    "supersedes_targets": [
+      {
+        "record_id": "05000000-0000-4000-8000-000000000001",
+        "revision": 1
+      }
+    ],
+    "existing_revisions": [
+      {
+        "logical_id": "05000000-0000-4000-8000-000000000002",
+        "revision": 1,
+        "canonical_sha256": "37297a601aeacbe38b217eea91cf602c01c89630b9851909714da6e9326e9b0a",
+        "captured_at": "2026-09-24T08:00:00+07:00"
+      }
+    ]
+  }
+}

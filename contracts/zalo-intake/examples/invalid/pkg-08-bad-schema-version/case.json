@@ -1,0 +1,10 @@
+{
+  "kind": "package",
+  "description": "manifest schema_version is not intake.raw-package.v1.",
+  "expected_errors": [
+    "schema_invalid"
+  ],
+  "context": {
+    "consumer_id": "c0000000-0000-4000-8000-000000000001"
+  }
+}

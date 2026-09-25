@@ -1,0 +1,10 @@
+{
+  "kind": "package",
+  "description": "Package carrying a stray non-whitelisted file.",
+  "expected_errors": [
+    "file_unexpected"
+  ],
+  "context": {
+    "consumer_id": "c0000000-0000-4000-8000-000000000001"
+  }
+}

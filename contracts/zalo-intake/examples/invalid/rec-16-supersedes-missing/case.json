@@ -1,0 +1,15 @@
+{
+  "kind": "record",
+  "description": "revision 2 nhung khong co supersedes -> revision_chain_broken (schema if/then).",
+  "expected_errors": [
+    "revision_chain_broken"
+  ],
+  "context": {
+    "supersedes_targets": [
+      {
+        "record_id": "16000000-0000-4000-8000-000000000001",
+        "revision": 1
+      }
+    ]
+  }
+}

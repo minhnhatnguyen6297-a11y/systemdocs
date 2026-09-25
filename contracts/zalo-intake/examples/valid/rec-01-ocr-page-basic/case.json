@@ -1,0 +1,12 @@
+{
+  "kind": "record",
+  "description": "ocr_page thanh cong: 1 attempt text_recognition, 2 text_lines; context.existing_records co cung record_id + canonical_sha256 khop (dedupe trung khong loi).",
+  "context": {
+    "existing_records": [
+      {
+        "record_id": "01000000-0000-4000-8000-000000000001",
+        "canonical_sha256": "6245e7a64b0429ee1490983ada58b0f85aa7f77b2469b6b39a1831bd06899c18"
+      }
+    ]
+  }
+}

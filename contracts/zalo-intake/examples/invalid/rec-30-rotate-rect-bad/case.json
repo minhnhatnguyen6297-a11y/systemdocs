@@ -1,0 +1,7 @@
+{
+  "kind": "record",
+  "description": "provider_lines[].rotate_rect co 4 so (can 5) -> geometry_invalid qua schema.",
+  "expected_errors": [
+    "geometry_invalid"
+  ]
+}

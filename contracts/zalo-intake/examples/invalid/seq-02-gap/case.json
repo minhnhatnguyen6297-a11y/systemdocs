@@ -1,0 +1,11 @@
+{
+  "kind": "package_sequence",
+  "description": "Sequences jump 1 -> 3; the expected next sequence was 2.",
+  "expected_errors": [
+    "sequence_invalid"
+  ],
+  "context": {
+    "consumer_id": "c0000000-0000-4000-8000-000000000001",
+    "expected_start": 1
+  }
+}

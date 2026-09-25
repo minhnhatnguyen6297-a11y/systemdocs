@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zalo-intake:receipt:v1",
+  "title": "intake.receipt.v1 — POST /intake/v1/receipts body and response",
+  "description": "The consumer's ACK: raw was stored durably (accepted) or the package failed intake checks (rejected, with error). A receipt is an API payload, never a file inside a package. Body <= 16 KiB (rule-enforced).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_id",
+    "package_id",
+    "consumer_id",
+    "status",
+    "received_at",
+    "manifest_sha256",
+    "record_count"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "intake.receipt.v1"
+    },
+    "receipt_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "package_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "consumer_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "status": {
+      "enum": ["accepted", "rejected"]
+    },
+    "received_at": {
+      "$ref": "common.schema.json#/$defs/iso_datetime"
+    },
+    "manifest_sha256": {
+      "$ref": "common.schema.json#/$defs/sha256_hex"
+    },
+    "record_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "error": {
+      "$ref": "common.schema.json#/$defs/error_object"
+    }
+  },
+  "if": {
+    "properties": {
+      "status": {"const": "rejected"}
+    },
+    "required": ["status"]
+  },
+  "then": {
+    "required": ["error"]
+  },
+  "else": {
+    "not": {"required": ["error"]}
+  }
+}

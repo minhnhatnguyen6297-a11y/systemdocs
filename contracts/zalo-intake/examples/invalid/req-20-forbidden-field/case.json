@@ -1,0 +1,27 @@
+{
+  "kind": "ocr_request",
+  "description": "smuggled image_base64 key: additionalProperties makes it a schema error AND the key scan flags request_forbidden_field",
+  "context": {
+    "now": "2026-09-24T08:05:00+07:00",
+    "authenticated": true,
+    "config_version": "ocr-config-v1",
+    "sources": {
+      "20000000-0000-4000-8000-000000000002": {
+        "captured_at": "2026-09-23T09:00:00+07:00",
+        "current_revision": 1,
+        "image_available": true,
+        "enabled": true
+      }
+    },
+    "quota_used": {
+      "key_jobs": 0,
+      "day_calls": 0,
+      "concurrent": 0
+    },
+    "existing_requests": []
+  },
+  "expected_errors": [
+    "schema_invalid",
+    "request_forbidden_field"
+  ]
+}

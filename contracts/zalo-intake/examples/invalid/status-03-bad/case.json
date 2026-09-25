@@ -1,0 +1,7 @@
+{
+  "kind": "service_status",
+  "description": "listener.state is not in the enum.",
+  "expected_errors": [
+    "schema_invalid"
+  ]
+}

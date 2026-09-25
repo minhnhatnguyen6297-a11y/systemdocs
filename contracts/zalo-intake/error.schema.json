@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zalo-intake:error:v1",
+  "title": "intake.error.v1 — HTTP error body for every /intake/v1 endpoint",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "error"],
+  "properties": {
+    "schema_version": {
+      "const": "intake.error.v1"
+    },
+    "error": {
+      "$ref": "common.schema.json#/$defs/error_object"
+    }
+  }
+}

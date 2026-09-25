@@ -1,0 +1,7 @@
+{
+  "kind": "service_status",
+  "description": "ack_bytes ~47% of cap but ack_warn is true.",
+  "expected_errors": [
+    "status_invalid"
+  ]
+}

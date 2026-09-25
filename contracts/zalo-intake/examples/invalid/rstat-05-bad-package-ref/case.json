@@ -1,0 +1,23 @@
+{
+  "kind": "ocr_request_status",
+  "description": "completed result points at a package never published to this consumer -> package_reference_invalid",
+  "context": {
+    "existing_packages": [
+      {
+        "package_id": "60000000-0000-4000-8000-000000000001",
+        "manifest_sha256": "6a0b5e14071d5340a1ac83086e79d3c7a184286a5d57090ed29b1ec5c00b3412",
+        "record_count": 2
+      }
+    ],
+    "existing_requests": [
+      {
+        "request_id": "50000000-0000-4000-8000-000000000001",
+        "job_id": "70000000-0000-4000-8000-000000000001",
+        "state": "running"
+      }
+    ]
+  },
+  "expected_errors": [
+    "package_reference_invalid"
+  ]
+}

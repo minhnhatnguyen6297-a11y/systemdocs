@@ -1,0 +1,16 @@
+{
+  "schema_version": "intake.ocr-request-status.v1",
+  "request_id": "50000000-0000-4000-8000-000000000001",
+  "job_id": "70000000-0000-4000-8000-000000000001",
+  "state": "rejected",
+  "attempt": 0,
+  "max_attempts": 3,
+  "accepted_at": "2026-09-24T08:01:05+07:00",
+  "deduplicated": false,
+  "finished_at": "2026-09-24T08:01:06+07:00",
+  "error": {
+    "code": "budget_exceeded",
+    "message": "2 supplementary jobs already used for this page in the image lifetime",
+    "retryable": false
+  }
+}

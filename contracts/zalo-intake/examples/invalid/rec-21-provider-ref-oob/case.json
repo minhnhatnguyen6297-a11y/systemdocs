@@ -1,0 +1,7 @@
+{
+  "kind": "record",
+  "description": "provider_refs tro element_index=5 trong khi provider_lines chi co 0..1 -> provider_ref_unknown.",
+  "expected_errors": [
+    "provider_ref_unknown"
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "kind": "record",
+  "description": "message.text chua chuoi data:image base64 -> image_payload_forbidden.",
+  "expected_errors": [
+    "image_payload_forbidden"
+  ]
+}

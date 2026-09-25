@@ -1,0 +1,9 @@
+{
+  "kind": "package",
+  "description": "Well-formed package: 3 files, 2 JSONL records, all hashes match.",
+  "context": {
+    "consumer_id": "c0000000-0000-4000-8000-000000000001",
+    "expected_sequence": 1,
+    "previously_imported": []
+  }
+}
