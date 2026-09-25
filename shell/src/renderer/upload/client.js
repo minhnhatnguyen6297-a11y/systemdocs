@@ -601,8 +601,16 @@
                 // queue_get": khi queue moi ap xong, derive() gui lai
                 // DUNG TAP ids da submit. prepareRetryOf chan re-arm tren
                 // chinh job retry — toi da mot lan tu dong cho moi click.
+                // sessionFieldsFresh: job stale_revision CU hon ranh gioi
+                // phien (close/open gan nhat) khong duoc re-arm — neu
+                // khong, session_close giet marker nhung job cu re-arm
+                // lai moi pass, va session_start moi TREN CUNG RUN xoa
+                // sessionClosedAt → deadScope het chan → ghost prepare
+                // ban lastPrepareIds len phien moi khong theo y nguoi
+                // dung (cung lop bug M1 da chan o truong session).
                 if (state.prepareRetryOf !== job.job_id &&
-                    Array.isArray(state.lastPrepareIds)) {
+                    Array.isArray(state.lastPrepareIds) &&
+                    sessionFieldsFresh(state, job)) {
                   state.prepareRetryIds = [...state.lastPrepareIds];
                 }
               }
@@ -639,9 +647,14 @@
           state.prepareError = null;
         } else if (job.error) {
           state.prepareError = job.error;
+          // Gate cung ranh gioi phien nhu nhanh !d: result kem loi
+          // stale_revision cua phien truoc khong duoc re-arm retry —
+          // session_start moi tren cung run mo lai deadScope, marker bi
+          // re-arm se ban ghost prepare len phien moi.
           if (job.error.code === 'stale_revision' &&
               state.prepareRetryOf !== job.job_id &&
-              Array.isArray(state.lastPrepareIds)) {
+              Array.isArray(state.lastPrepareIds) &&
+              sessionFresh) {
             state.prepareRetryIds = [...state.lastPrepareIds];
           }
         }

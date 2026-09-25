@@ -1699,3 +1699,120 @@ test('adoptJobs: waitingBanner bi xoa khi rescan doi run '
   C.adoptJobs(st, jobs);
   assert.equal(st.waitingBanner, null);
 });
+
+// ---------- task 8 fix2: re-review N1 ----------
+
+test('adoptJobs: stale_revision CU hon ranh gioi phien khong re-arm retry '
+     + '(chong ghost prepare sau re-login cung run)', () => {
+  // Trace N1: prepare fail stale_revision (T05) → armed → session_close
+  // (T12) giet marker, nhung job prepare CU re-adopt moi pass va re-arm
+  // lai — deadScope (sessionClosedAt) chan ban ra. Khi session_start moi
+  // (T25) TREN CUNG RUN xoa sessionClosedAt, marker bi re-arm se qua
+  // deadScope → queueReady → ghost upload.prepare ban lastPrepareIds len
+  // phien moi. Fix: gate arm bang sessionFieldsFresh — job CU hon ranh
+  // gioi phien khong duoc arm.
+  const st = S.createUploadState();
+  st.websiteId = 'nam_dinh';
+  st.runId = 'r1';
+  st.browserId = 'br1';
+  st.uploadSessionActive = true;
+  st.login = { status: 'authenticated',
+               checked_at: '2026-09-24T10:00:02Z' };
+  st.prepareJobId = 'job_p1';
+  st.lastPrepareIds = [1, 2, 3];
+  const jobs = new Map();
+  jobs.set('job_p1', job('upload.prepare', 'failed', null, {
+    jobId: 'job_p1', at: '2026-09-24T10:00:05Z',
+    error: { code: 'stale_revision', message: 'queue doi',
+             retryable: true, next_action: 'retry' },
+  }));
+  // Phien dang song, chua co ranh gioi → arm binh thuong.
+  C.adoptJobs(st, jobs);
+  assert.deepEqual(st.prepareRetryIds, [1, 2, 3],
+    'stale_revision trong phien song van arm retry');
+
+  // session_close T12 giet marker — va job CU khong duoc re-arm ngay
+  // trong cung pass (prepare idx 13 chay SAU session_close idx 6, ranh
+  // gioi da dat truoc khi prepare duoc danh gia).
+  jobs.set('job_c1', job('upload.session_close', 'succeeded', {
+    workflow_version: V, website_id: 'nam_dinh', browser_id: 'br1',
+    closed: true, verified_record_ids: [],
+    needs_reconcile_record_ids: [],
+  }, { jobId: 'job_c1', at: '2026-09-24T10:00:12Z' }));
+  C.adoptJobs(st, jobs);
+  assert.equal(st.sessionClosedAt, '2026-09-24T10:00:12Z');
+  assert.equal(st.prepareRetryIds, null,
+    'job stale CU hon lan close khong duoc re-arm trong cung pass');
+  C.adoptJobs(st, jobs);
+  assert.equal(st.prepareRetryIds, null,
+    're-adopt van khong re-arm khi phien da dong');
+
+  // Re-login TREN CUNG RUN (br2): sessionClosedAt bi xoa → deadScope het
+  // chan. Marker van phai nam im — neu re-arm, derive nhip sau ban ghost
+  // prepare (queueReady luc nay da co).
+  st.sessionJobId = 'job_s2';
+  jobs.set('job_s2', job('upload.session_start', 'succeeded', {
+    workflow_version: V, website_id: 'nam_dinh', browser_id: 'br2',
+    login: { status: 'authenticated' }, revision: 6,
+  }, { jobId: 'job_s2', at: '2026-09-24T10:00:25Z' }));
+  C.adoptJobs(st, jobs);
+  assert.equal(st.sessionClosedAt, null);
+  assert.equal(st.sessionStartedAt, '2026-09-24T10:00:25Z');
+  assert.equal(st.uploadSessionActive, true);
+  assert.equal(st.prepareRetryIds, null,
+    'job stale T05 < ranh gioi T25 — khong duoc arm tren phien moi');
+  C.adoptJobs(st, jobs);
+  assert.equal(st.prepareRetryIds, null,
+    'pass tiep theo van khong re-arm — ghost prepare bi chan');
+
+  // Retry hop le van hoat dong: prepare MOI hon ranh gioi fail stale → arm.
+  st.prepareJobId = 'job_p3';
+  jobs.set('job_p3', job('upload.prepare', 'failed', null, {
+    jobId: 'job_p3', at: '2026-09-24T10:00:30Z',
+    error: { code: 'stale_revision', message: 'queue lai doi',
+             retryable: true, next_action: 'retry' },
+  }));
+  C.adoptJobs(st, jobs);
+  assert.deepEqual(st.prepareRetryIds, [1, 2, 3],
+    'prepare moi hon ranh gioi phien van arm retry binh thuong');
+});
+
+test('adoptJobResult: prepare failed KEM RESULT cu hon ranh gioi phien '
+     + 'cung khong arm retry', () => {
+  // Nhanh thu hai cua N1: job prepare mang result data nhung kem loi
+  // stale_revision — cung gate sessionFresh nhu nhanh !d.
+  const st = S.createUploadState();
+  st.websiteId = 'nam_dinh';
+  st.runId = 'r1';
+  st.browserId = 'br2';
+  st.sessionStartedAt = '2026-09-24T10:00:25Z';  // ranh gioi phien moi
+  st.lastPrepareIds = [1, 2, 3];
+  st.prepareJobId = 'job_p1';
+  const stale = job('upload.prepare', 'failed', {
+    workflow_version: V, website_id: 'nam_dinh', run_id: 'r1',
+    summary: { prepared_count: 0, remaining: 9 },
+    saved_record_ids: [], needs_reconcile_record_ids: [],
+  }, {
+    jobId: 'job_p1', at: '2026-09-24T10:00:05Z',
+    error: { code: 'stale_revision', message: 'queue doi',
+             retryable: true, next_action: 'retry' },
+  });
+  assert.equal(C.adoptJobResult(st, stale), true);
+  assert.equal(st.prepareRetryIds, null,
+    'result kem stale_revision CU hon ranh gioi → khong arm');
+  assert.equal(st.remaining, 0,
+    'truong session cua result cu cung van bi chan (gate co san)');
+  // Job MOI hon ranh gioi van arm binh thuong.
+  st.prepareJobId = 'job_p2';
+  const fresh = job('upload.prepare', 'failed', {
+    workflow_version: V, website_id: 'nam_dinh', run_id: 'r1',
+    summary: { prepared_count: 0, remaining: 9 },
+    saved_record_ids: [], needs_reconcile_record_ids: [],
+  }, {
+    jobId: 'job_p2', at: '2026-09-24T10:00:30Z',
+    error: { code: 'stale_revision', message: 'queue lai doi',
+             retryable: true, next_action: 'retry' },
+  });
+  assert.equal(C.adoptJobResult(st, fresh), true);
+  assert.deepEqual(st.prepareRetryIds, [1, 2, 3]);
+});
