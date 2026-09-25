@@ -1,8 +1,10 @@
 # Progress — MIN-69
 
-## Trạng thái: T1–T9 xong + verify — 25/09/2026 (cập nhật; còn T10 launcher cutover ngoài phạm vi)
+## Trạng thái: T1–T9 xong + verify + **đã merge vào `consolidate/monorepo`** — 25/09/2026 (còn T10 launcher cutover ngoài phạm vi)
 
-Triển khai tại worktree riêng `D:/systemdocs-min-69`, nhánh `minhnhatnguyen6297/min-69-migrate-uploadaudit-vao-electron` (base `consolidate/monorepo` @ 1abbb20). Quy trình: subagent-driven development — mỗi task có implementer + reviewer + fix loop riêng. Owner duyệt contract khi review nhánh trước merge (user đã chọn "code hết T1–T9").
+**Merge record:** merge commit `26f9a3f` trên `consolidate/monorepo`, đã push origin. Union với MIN-104–117 (notary case-drafting, packaging, JobStore fixes) + MIN-92/103 (zalo-intake contract) — 12 conflict resolve union. Vá trong merge: `except CancelledByUser` thiếu `job._notify()` → repository giữ non-terminal → resync sai `failed{engine_restarted}` (test_upload_recovery bắt). Verify merged tree: npm 184/184, pytest shell 276/276, contract validators 0 unexpected. Linear comment 25/09 — giữ In Review, còn owner-gate: duyệt `upload.workflow.v1` (DRAFT), pilot portal thật, chốt KPI issue_count, clean-machine + NSIS, T10 cutover, migrate dữ liệu thật.
+
+Triển khai tại worktree riêng `D:/systemdocs-min-69` (đã gỡ sau merge), nhánh `minhnhatnguyen6297/min-69-migrate-uploadaudit-vao-electron` (base `consolidate/monorepo` @ 1abbb20; đã merge — nhánh local đã xóa). Quy trình: subagent-driven development — mỗi task có implementer + reviewer + fix loop riêng. Owner duyệt contract khi review nhánh trước merge (user đã chọn "code hết T1–T9").
 
 ## Tiến độ task (theo kế hoạch)
 
