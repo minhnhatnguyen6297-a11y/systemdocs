@@ -28,13 +28,14 @@ const DOC_TYPE_LABEL = {
   thoa_thuan: 'Thỏa thuận phân chia',
 };
 
-const INTAKE_KIND_LABEL = {
-  image: 'ảnh', pdf: 'PDF', docx: 'Word', xlsx: 'Excel', text: 'văn bản',
-};
-
-const OBS_STATE_LABEL = {
-  observed: 'đọc được', normalized: 'đã chuẩn hóa', inferred: 'suy luận',
-};
+// INTAKE_KIND_LABEL/OBS_STATE_LABEL khai bao trong intake-dialog.js
+// (load truoc file nay trong index.html) — script <script> thuong share
+// global scope nen khong duoc redeclare const trung ten. Ten rieng +
+// typeof fallback giu file require duoc doc lap trong node --test.
+const _OBS_STATE_LABEL =
+  (typeof OBS_STATE_LABEL !== 'undefined')
+    ? OBS_STATE_LABEL
+    : { observed: 'đọc được', normalized: 'đã chuẩn hóa', inferred: 'suy luận' };
 
 // Dev flag: dat window.G1_DEV = true trong DevTools de hien muc debug
 // (mo fixture mock nhanh). Production khong co input ID bang tay.
@@ -469,7 +470,7 @@ function createNotaryModuleView(deps) {
           ? f.normalized_value : f.raw_value);
         const st = f && f.observation_state;
         fieldBits.push(`${k}: ${v == null ? '—' : v}` +
-          (st ? ` (${OBS_STATE_LABEL[st] || st})` : ''));
+          (st ? ` (${_OBS_STATE_LABEL[st] || st})` : ''));
       }
       head.append(h('span', 'cd-suggest-text', fieldBits.join(' · ')));
       card.append(head);

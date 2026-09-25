@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('fs');
 const path = require('path');
 
 const CONTRACT_VERSION = 'desktopcommand.v1';
@@ -34,7 +35,15 @@ function sidecarCommand(appIsPackaged, resourcesPath, shellRoot) {
       cwd: path.join(resourcesPath, 'sidecar', 'g1-shell-sidecar'),
     };
   }
-  const python = process.env.G1_PYTHON || 'python';
+  // Dev: G1_PYTHON override; khong set thi thu venv engine cua monorepo
+  // (notary_v2/venv co san deps sidecar: fastapi/uvicorn/sqlalchemy...)
+  // truoc khi roi ve 'python' tren PATH.
+  let python = process.env.G1_PYTHON;
+  if (!python) {
+    const venv = path.join(shellRoot, '..', 'notary_v2', 'venv',
+                           'Scripts', 'python.exe');
+    python = fs.existsSync(venv) ? venv : 'python';
+  }
   return {
     cmd: python,
     args: [path.join(shellRoot, 'sidecar', 'app.py')],
