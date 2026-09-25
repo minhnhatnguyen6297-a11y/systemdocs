@@ -460,6 +460,13 @@ data (result cuối):
 - Backend loại trừ theo audit/registry thật; `record_ids` ngoài run →
   `scope_violation`; `queue_revision` cũ → `stale_revision`; browser đang bận
   → `browser_busy`; manifest thiếu/sai → `file_not_found`/`manifest_mismatch`.
+- **Prepare semantics (v1):** engine điền biểu mẫu rồi dừng — **không
+  bao giờ** click `Lưu`/Finalize, kể cả click "mồi" để ép client-side
+  validation của `ten_hop_dong`. Kiểm tra tên hợp đồng dựa vào
+  field-commit events (change/blur/Tab) — đường không-submit.
+  *NOTE:* portal thật chỉ hiện lỗi `ten_hop_dong` sau khi submit thử —
+  pilot real-portal phải xác nhận validation vẫn lộ ra khi không bấm
+  Lưu; nếu không, `prepared_partial` mất tín hiệu sớm trên field này.
 
 ### 6.15 `upload.reconcile` → kind `reconcile_report`
 
@@ -474,6 +481,16 @@ data:
   verified_record_ids: [142]          # xác minh đã có trên web
   needs_reconcile_record_ids: [143]   # vẫn cần người kiểm tra
 ```
+
+Đối chiếu theo **website**, không theo run: mọi flag `needs_reconcile` của
+`website_id` đều được kiểm với audit mới — kể cả flag mất provenance
+(`run_id=NULL`) hay stamp run khác. `needs_reconcile.run_id` chỉ là
+provenance (record thuộc đợt nào), không phải scope của lệnh đối chiếu —
+cơ chế chặn (workspace/prepare/retry-guard) đã đọc theo website, nên lệnh
+duy nhất có thể gỡ flag cũng phải đọc theo website để không wedge vĩnh
+viễn. `run_id` trong payload vẫn bắt buộc: audit mới được bind vào run đó
+và `queue_revision` của run được refresh (cùng mọi run còn stamp trên flag
+được xác minh).
 
 Không tự gửi lại: `verified` chỉ mở khóa hiển thị "đã có trên web";
 `needs_reconcile` giữ chặn cho tới khi người dùng/audit kế xác minh.
@@ -491,6 +508,12 @@ Không tự gửi lại: `verified` chỉ mở khóa hiển thị "đã có trê
 3. **Hủy:** `POST .../cancel` → `canceled`; cancel **không** hoàn tác Lưu đã
    xảy ra, không tự đóng tab người đang kiểm. Trước khi đóng browser backend
    reconcile các tab đọc được; không xác định → `needs_reconcile`.
+   **Bằng chứng Lưu (v1, strict):** chỉ `POST /api/hoso` HTTP 2xx đã xác
+   minh mới tính `saved`. Tab rời trang tạo mới mà không có POST đó là
+   kết quả chưa rõ → `closed`/uncertain → `needs_reconcile` — KHÔNG
+   `uploaded_success`. Tab uncertain vẫn được theo dõi: POST 2xx đến sau
+   tự khôi phục sang `saved`; chỉ đường legacy (không
+   `workflow_version`) mới coi điều hướng khỏi trang tạo là đã Lưu.
 4. **Restart:** sidecar restart → in-flight `failed{engine_restarted,
    retryable:true}`. Job store giữ tối thiểu `command_id`, hash request,
    website, run, job, browser, `record_ids`, kết quả đã xác minh — **không**

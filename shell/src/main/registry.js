@@ -1,14 +1,18 @@
 'use strict';
 
 // Module registry theo spec §6 — 7 muc, office la placeholder.
-// capabilities = command namespace sidecar ma module dung; 'shell' = xu ly
-// trong Electron main (khong goi sidecar).
+// namespaces = command namespace sidecar ma module dung; 'shell' = xu ly
+// trong Electron main (khong goi sidecar). capabilities = workflow
+// versions module cong bo (contract §9.1).
 
 const MODULES = [
   {
     id: 'upload',
     title: 'upload_lab',
     namespaces: ['upload', 'file', 'diag'],
+    // Contract §9.1: consumer kiem upload.workflow.v1 qua
+    // hasWorkflowCapability truoc khi gui payload versioned.
+    capabilities: ['upload.workflow.v1'],
     kind: 'engine',
     status: 'available',
   },

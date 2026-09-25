@@ -420,6 +420,7 @@ class PortalBrowserSession:
         self.prepare_gate: threading.Event | None = None
         self.last_prepare_kwargs: dict | None = None
         self.last_download_dates: tuple[str, str] | None = None
+        self.last_poll_strict: bool | None = None
         self.prepare_calls = 0
 
     # -- helpers ---------------------------------------------------------------
@@ -523,6 +524,7 @@ class PortalBrowserSession:
         cong_chung_vien=None,
         thu_ky=None,
         chunk_size=None,
+        prime_save_validation: bool = True,
     ) -> dict:
         self._mark("prepare_manifest")
         self.last_prepare_kwargs = {
@@ -532,6 +534,9 @@ class PortalBrowserSession:
             "cong_chung_vien": cong_chung_vien,
             "thu_ky": thu_ky,
             "chunk_size": chunk_size,
+            # v1 adapter truyen False: dry-run khong click nut Luu (F1).
+            # Fixture ghi lai de test assert kwarg di toi engine seam.
+            "prime_save_validation": prime_save_validation,
         }
         self.prepare_calls += 1
 
@@ -722,8 +727,12 @@ class PortalBrowserSession:
         emit({"event": "finished", **summary})
         return summary
 
-    def poll_prepared_pages(self) -> dict:
+    def poll_prepared_pages(self, strict_save_evidence: bool = False) -> dict:
         self._mark("poll_prepared_pages")
+        # v1 (_poll_browser truyen website_id != None): chi POST 2xx tinh
+        # la Luu — fake da strict san (chi save_evidence=POST 2xx moi
+        # finalize; 'navigated away' khong co trong model cua fixture).
+        self.last_poll_strict = strict_save_evidence
         from engine_roots import import_engine_module
 
         batch_scan = import_engine_module("upload_lab", "batch_scan")

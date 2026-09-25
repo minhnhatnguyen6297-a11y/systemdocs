@@ -465,16 +465,33 @@ class UploadWorkspaceStore:
 
     def add_needs_reconcile(self, website_id, record_ids, *, run_id=None,
                             reason=""):
+        # run_id la provenance (MIN-69 final review F3): re-stamp voi
+        # run_id=None (provenance bo nho da mat — tab uncertain dong lai
+        # sau, _mark_open_tabs sau restart) KHONG duoc xoa run_id cu —
+        # COALESCE giu gia tri da biet, chi ghi de khi stamp moi co
+        # run_id that (provenance moi thang cu).
         with self._lock:
             for rid in record_ids:
                 self._conn.execute(
                     "INSERT INTO needs_reconcile(website_id, run_id,"
                     " record_id, reason, created_at) VALUES(?,?,?,?,?)"
                     " ON CONFLICT(website_id, record_id) DO UPDATE SET"
-                    " run_id=excluded.run_id, reason=excluded.reason,"
+                    " run_id=COALESCE(excluded.run_id,"
+                    " needs_reconcile.run_id), reason=excluded.reason,"
                     " created_at=excluded.created_at",
                     (website_id, run_id, int(rid), reason, _now()))
             self._conn.commit()
+
+    def needs_reconcile_rows(self, website_id) -> list:
+        """Full needs_reconcile rows cua website (record_id + run_id
+        provenance + reason) — upload.reconcile doc website-wide de khong
+        bo sot row da mat provenance run_id (F3)."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT record_id, run_id, reason FROM needs_reconcile"
+                " WHERE website_id=? ORDER BY record_id",
+                (website_id,)).fetchall()
+            return [dict(r) for r in rows]
 
     def needs_reconcile_ids(self, website_id, *, run_id=None) -> list:
         with self._lock:

@@ -31,6 +31,7 @@ import time
 import unittest
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 _HERE = Path(__file__).resolve().parent
@@ -808,6 +809,122 @@ class PrepareTest(BrowserWorkflowCase):
         snap = self.wait_terminal(dl)
         self.assertEqual(snap["status"], "succeeded", snap["error"])
 
+    def test_v1_prepare_disables_save_prime(self):
+        """F1: duong v1 truyen prime_save_validation=False xuong engine —
+        dry-run versioned khong bao gio click nut Luu cua portal (ke ca
+        click 'moi' ep validation ten_hop_dong tren form con thieu)."""
+        run_id, ids = self.run_scan(CONTRACT_NOS[:1])
+        bid = self.login()
+        job = self.prepare(bid, run_id, ids)
+        self.wait_status(job, "waiting_user")
+        self.assertIs(
+            self.session.last_prepare_kwargs["prime_save_validation"],
+            False)
+        fj = self.finish_review(bid, job.job_id)
+        self.wait_terminal(fj)
+        self.wait_terminal(job)
+
+
+# =====================================================================
+# Final review F1–F4 — gates chi tren duong v1
+# =====================================================================
+
+@unittest.skipUnless(_engines_available(),
+                     "upload_lab engine/openpyxl missing")
+class FinalReviewV1Test(BrowserWorkflowCase):
+    def test_poll_browser_strict_save_evidence_by_scope(self):
+        """F2: _poll_browser truyen strict_save_evidence=True cho session
+        versioned (website_id != None), False cho legacy — nguyen tac
+        'chi POST /api/hoso 2xx la Luu' chi ap cho v1."""
+        stub_calls = []
+
+        class _StubSession:
+            def poll_manual_login(self):
+                return {"status": "idle"}
+
+            def poll_prepared_pages(self, strict_save_evidence=False):
+                stub_calls.append(strict_save_evidence)
+                return {"saved_record_ids": [], "closed_record_ids": [],
+                        "open_record_ids": []}
+
+        worker = upload_session._BrowserWorker()
+        worker._session = _StubSession()
+        worker._website_id = WEBSITE
+        worker._poll_browser()
+        worker._website_id = None
+        worker._poll_browser()
+        self.assertEqual(stub_calls, [True, False])
+
+        # Session fake that qua login cung duoc poll strict (v1).
+        self.login()
+        self.assertTrue(self.session.last_poll_strict)
+
+    def test_scan_cancel_stops_engine_mid_scan(self):
+        """F4: cancel giua scan phai cat engine ngay — CancelledByUser la
+        Exception bi emit_progress cua engine nuot; adapter doi sang
+        _ScanAbortRequested (BaseException) de thoat ra ngoai; job ket
+        thuc 'canceled' (khong 'failed'), engine khong chay het folder."""
+        emitted = []
+
+        def looping_scan(folder, data_dir, **kw):
+            cb = kw.get("progress_callback")
+            for i in range(50):
+                emitted.append(i)
+                if cb:
+                    cb({"total_files": 50,
+                        "processed_files": i + 1,
+                        "current_file": f"HD-{i}.docx"})
+                time.sleep(0.02)
+            raise AssertionError(
+                "scan khong bi cat — cancel khong thoat emit_progress")
+
+        self.provider.run_scan = looping_scan
+        job = self.submit("upload.scan", self.v1(
+            folder={"path": str(self.folder), "scope": "machine_local"},
+            expected_revision=self.store.revision(),
+            full_rescan=False, modified_since=None))
+        self.wait_until(
+            lambda: job.snapshot()["progress"] is not None,
+            what="scan da bat dau emit progress")
+        self.jobs.cancel(job.job_id)
+        snap = self.wait_terminal(job)
+        self.assertEqual(snap["status"], "canceled", snap["error"])
+        self.assertLess(len(emitted), 50)
+        self.assertEqual(
+            self.store.job_for(job.job_id)["status"], "canceled")
+
+    def test_reconcile_covers_flags_without_or_foreign_run(self):
+        """F3: upload.reconcile doc needs_reconcile THEO WEBSITE — flag
+        co run_id=None (mat provenance) hoac stamp run khac van duoc doi
+        chieu va verify, khong wedge vinh vien."""
+        run_id, ids = self.run_scan(["401/2026/CCGD", "402/2026/CCGD"])
+        rid_null, rid_other = ids[0], ids[1]
+        # Flag mat provenance run_id (vd tab uncertain dong lai sau).
+        self.store.add_needs_reconcile(
+            WEBSITE, [rid_null], run_id=None,
+            reason="roi trang khong xac minh")
+        # Flag stamp run khac (provenance sai/khong con ton tai).
+        self.store.add_needs_reconcile(
+            WEBSITE, [rid_other], run_id="run_khac",
+            reason="provenance lech")
+
+        audit_id = self.run_audit(["401/2026", "402/2026"])
+        rjob = self.submit("upload.reconcile", self.v1(
+            run_id=run_id, audit_id=audit_id))
+        snap = self.wait_terminal(rjob)
+        self.assertEqual(snap["status"], "succeeded", snap["error"])
+        data = snap["result"]["data"]
+        self.assertEqual(
+            sorted(data["verified_record_ids"]), sorted(ids))
+        self.assertEqual(data["needs_reconcile_record_ids"], [])
+        self.assertEqual(self.store.needs_reconcile_ids(WEBSITE), [])
+        for rid in ids:
+            self.assertEqual(
+                self.registry_status(rid), "uploaded_success")
+        # Queue cua run_id payload refresh; run_khac khong ton tai nen
+        # bump chi vao run trong payload.
+        self.assertGreater(self.store.queue_revision(run_id), 0)
+
 
 # =====================================================================
 # upload.reconcile (§6.15)
@@ -1129,6 +1246,303 @@ class FocusTest(BrowserWorkflowCase):
         fj = self.finish_review(bid, job.job_id)
         self.wait_terminal(fj)
         self.wait_terminal(job)
+
+
+# =====================================================================
+# Engine-level F1/F2 — real NamDinhUploaderSession + fake page
+# =====================================================================
+
+class _EmptyLoc:
+    """Locator count()==0 — get_by_role/get_by_text/locator miss."""
+
+    @property
+    def first(self):
+        return self
+
+    def count(self):
+        return 0
+
+    def nth(self, _index):
+        return self
+
+    def locator(self, *_a, **_k):
+        return self
+
+    def is_visible(self):
+        return False
+
+
+class _ComboLoc:
+    """Input combobox cua ten_hop_dong — gia tri doc qua input_value."""
+
+    def __init__(self):
+        self.value = ""
+        self.clicks = 0
+        self.presses = []
+        self.type_values = []
+
+    @property
+    def first(self):
+        return self
+
+    def count(self):
+        return 1
+
+    def evaluate(self, script):
+        if "tagName" in script:
+            return "input"
+        return None
+
+    def input_value(self):
+        return self.value
+
+    def click(self, **_kw):
+        self.clicks += 1
+
+    def fill(self, value):
+        self.value = value
+
+    def type(self, value, delay=0):
+        self.value += value
+        self.type_values.append(value)
+
+    def press(self, key):
+        self.presses.append(key)
+        if key == "Backspace" and "Control+A" in self.presses:
+            self.value = ""
+
+
+class _SaveLoc:
+    """Nut Luu cua portal — dem click de chung minh prime co/khong chay."""
+
+    def __init__(self):
+        self.clicks = []
+
+    @property
+    def first(self):
+        return self
+
+    def count(self):
+        return 1
+
+    def is_visible(self):
+        return True
+
+    def click(self, **kw):
+        self.clicks.append(kw)
+
+    def locator(self, *_a, **_k):
+        return _EmptyLoc()
+
+
+class _FormPage:
+    """Page Playwright toi thieu cho _fill_dropdown/poll_prepared_pages."""
+
+    def __init__(self, url="https://portal.test/ho-so-cong-chung/tao-moi-nhanh"):
+        self.url = url
+        self.keyboard = SimpleNamespace(press=lambda _k: None)
+        self.closed = False
+        self.handlers = {}
+
+    def wait_for_timeout(self, _ms):
+        return None
+
+    def locator(self, *_a, **_k):
+        return _EmptyLoc()
+
+    def get_by_text(self, *_a, **_k):
+        return _EmptyLoc()
+
+    def get_by_role(self, *_a, **_k):
+        return _EmptyLoc()
+
+    def evaluate(self, _script):
+        return "complete"
+
+    def on(self, event, callback):
+        self.handlers[event] = callback
+
+    def is_closed(self):
+        return self.closed
+
+    def close(self):
+        self.closed = True
+
+
+@unittest.skipUnless(_engines_available(), "upload_lab engine missing")
+class EngineSaveEvidenceTest(unittest.TestCase):
+    """F1/F2 tren NamDinhUploaderSession that + fake page/locator —
+    khong can Chromium: assert gate prime_save_validation (F1) va
+    strict_save_evidence (F2) chay dung o tang engine."""
+
+    def setUp(self):
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.workdir = Path(self.tempdir.name) / "wd"
+        self.workdir.mkdir()
+        self.uploader = engine_roots.import_engine_module(
+            "upload_lab", "playwright_uploader")
+        self.batch_scan = engine_roots.import_engine_module(
+            "upload_lab", "batch_scan")
+        self.settings = self.uploader.UploaderSettings(
+            base_url="https://portal.test",
+            login_url="https://portal.test/dang-nhap",
+            create_url="https://portal.test/ho-so-cong-chung/tao-moi-nhanh",
+            storage_state_path=self.workdir / "state.json")
+        self.logs = []
+        self.session = self.uploader.NamDinhUploaderSession(
+            self.settings, working_dir=self.workdir,
+            log_callback=self.logs.append)
+
+    def _seed_record(self, contract_no, *, file_key="k1",
+                     status="prepared_dry_run"):
+        src = self.workdir / f"{file_key}.docx"
+        src.write_text("dummy", encoding="utf-8")
+        conn = self.batch_scan.connect_registry(
+            self.workdir / "registry.sqlite3")
+        try:
+            self.batch_scan.upsert_registry_record(
+                conn, file_key=file_key, file_path=src,
+                stat_result=src.stat(), customer_folder="Khach",
+                contract_no=contract_no, status=status, run_id="r1")
+            row = conn.execute(
+                "SELECT id FROM file_registry WHERE file_key=?",
+                (file_key,)).fetchone()
+            return int(row[0])
+        finally:
+            conn.close()
+
+    def _registry_status(self, record_id):
+        conn = self.batch_scan.connect_registry(
+            self.workdir / "registry.sqlite3")
+        try:
+            row = conn.execute(
+                "SELECT status FROM file_registry WHERE id=?",
+                (record_id,)).fetchone()
+            return row[0] if row else None
+        finally:
+            conn.close()
+
+    def _register_page(self, record_id, url):
+        page = _FormPage(url)
+        artifact = self.workdir / "upload_runs" / f"r{record_id}"
+        artifact.mkdir(parents=True, exist_ok=True)
+        self.session._register_prepared_page(
+            SimpleNamespace(record_id=record_id,
+                            contract_no="101/2026/CCGD"),
+            page, artifact)
+        return page
+
+    # ------------------------------------------------------------ F2 strict
+    def test_strict_nav_away_uncertain_once_then_self_heals(self):
+        """Tab roi trang tao moi khong co POST Luu → closed/uncertain
+        MOT LAN, van con tracked, khong finalize; POST 2xx den sau van
+        finalize thanh uploaded_success (self-heal)."""
+        rid = self._seed_record("101/2026/CCGD")
+        page = self._register_page(
+            rid, "https://portal.test/ho-so-cong-chung")
+
+        result = self.session.poll_prepared_pages(strict_save_evidence=True)
+        self.assertEqual(result["closed_record_ids"], [rid])
+        self.assertEqual(result["saved_record_ids"], [])
+        self.assertEqual(result["open_record_ids"], [rid])
+        self.assertFalse(page.closed)
+        self.assertIn(rid, self.session.prepared_pages)
+        tab = self.session.prepared_pages[rid]
+        self.assertTrue(tab.reported_uncertain)
+        self.assertTrue(
+            any("roi trang tao moi nhung khong co POST Luu" in m
+                for m in self.logs),
+            f"log thieu loi uncertain: {self.logs}")
+        self.assertNotEqual(
+            self._registry_status(rid), "uploaded_success")
+
+        # Poll lai: uncertain KHONG bao lai, tab van duoc theo doi.
+        again = self.session.poll_prepared_pages(strict_save_evidence=True)
+        self.assertEqual(again["closed_record_ids"], [])
+        self.assertEqual(again["open_record_ids"], [rid])
+
+        # POST /api/hoso 2xx den sau → nhanh saved chay binh thuong du
+        # reported_uncertain — self-heal + finalize + bo tracking.
+        page.handlers["response"](SimpleNamespace(
+            request=SimpleNamespace(method="POST"),
+            url="https://portal.test/api/hoso", status=200))
+        healed = self.session.poll_prepared_pages(
+            strict_save_evidence=True)
+        self.assertEqual(healed["saved_record_ids"], [rid])
+        self.assertEqual(healed["closed_record_ids"], [])
+        self.assertNotIn(rid, self.session.prepared_pages)
+        self.assertTrue(page.closed)
+        self.assertEqual(
+            self._registry_status(rid), "uploaded_success")
+
+    def test_default_nav_away_still_finalizes_legacy(self):
+        """strict_save_evidence=False (legacy): dieu huong khoi trang
+        tao van duoc tin la da Luu — hanh vi cu khong doi."""
+        rid = self._seed_record("102/2026/CCGD")
+        page = self._register_page(
+            rid, "https://portal.test/ho-so-cong-chung")
+        result = self.session.poll_prepared_pages()
+        self.assertEqual(result["saved_record_ids"], [rid])
+        self.assertEqual(result["closed_record_ids"], [])
+        self.assertTrue(page.closed)
+        self.assertEqual(
+            self._registry_status(rid), "uploaded_success")
+
+    def test_strict_real_close_reports_closed_and_untracks(self):
+        """Tab dong that trong strict mode: bao closed + bo tracking
+        (khac uncertain — uncertain van giu tab)."""
+        rid = self._seed_record("103/2026/CCGD")
+        page = self._register_page(
+            rid, "https://portal.test/ho-so-cong-chung")
+        page.closed = True
+        result = self.session.poll_prepared_pages(strict_save_evidence=True)
+        self.assertEqual(result["closed_record_ids"], [rid])
+        self.assertEqual(result["open_record_ids"], [])
+        self.assertNotIn(rid, self.session.prepared_pages)
+
+    # ------------------------------------------------------------ F1 prime
+    def test_fill_dropdown_prime_gate_never_clicks_save_when_off(self):
+        """prime_save_validation=False → block prime+retype bi skip hoan
+        toan — khong locator nao cua SAVE_BUTTON_SELECTORS bi click;
+        default True van click nhu legacy."""
+        combo = _ComboLoc()
+        save = _SaveLoc()
+        self.session._resolve_control_locator = (
+            lambda page, field, **kw:
+            (combo, "test") if field == "ten_hop_dong"
+            else (_EmptyLoc(), "none"))
+        self.session._locator_from_strategy = (
+            lambda page, strategy, **kw: save)
+        page = _FormPage()
+
+        self.session._prime_save_validation = False
+        ok = self.session._fill_dropdown(page, "ten_hop_dong", "HD A")
+        self.assertTrue(ok)
+        self.assertEqual(save.clicks, [],
+                         "v1 khong duoc click nut Luu khi dien form")
+
+        self.session._prime_save_validation = True
+        combo.value = ""
+        ok = self.session._fill_dropdown(page, "ten_hop_dong", "HD A")
+        self.assertTrue(ok)
+        self.assertGreaterEqual(
+            len(save.clicks), 1,
+            "legacy prime van click Luu de ep validation")
+
+    def test_prepare_manifest_stores_prime_flag(self):
+        """Kwargs prime_save_validation di vao session instance — v1
+        adapter truyen False, default True (legacy/Qt)."""
+        with mock.patch.object(
+                self.uploader, "load_upload_queue",
+                return_value=({"run_id": "r1"}, [], 0)):
+            self.session.prepare_manifest(
+                "manifest.json", threading.Event(),
+                prime_save_validation=False)
+            self.assertFalse(self.session._prime_save_validation)
+            self.session.prepare_manifest(
+                "manifest.json", threading.Event())
+            self.assertTrue(self.session._prime_save_validation)
 
 
 if __name__ == "__main__":

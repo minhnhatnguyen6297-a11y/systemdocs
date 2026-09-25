@@ -872,6 +872,17 @@ def _queue_row(row):
     }
 
 
+class _ScanAbortRequested(BaseException):
+    """Abort noi bo de cat engine scan giua chung khi user cancel (F4).
+
+    `CancelledByUser` la `Exception` — engine `batch_scan.emit_progress`
+    (`except Exception: pass`) NUOT no va scan chay tiep het folder.
+    `BaseException` khong bi `except Exception` nao trong engine chan —
+    van cho finally-block cua `run_batch_scan` dong registry connection.
+    Da verify: batch_scan.py/nam_dinh.py/folder_workflow_service.py
+    khong co bare `except:`/`except BaseException` nao."""
+
+
 @_v1_boundary
 def upload_scan_v1(job, payload):
     """`upload.scan` versioned → kind scan_report (contract §6.10).
@@ -917,10 +928,15 @@ def upload_scan_v1(job, payload):
             total = snap.get("total_files") or 0
             done = snap.get("processed_files") or 0
             label = snap.get("current_file") or snap.get("step") or ""
-            job.report_progress(done, total or 1, label)
-            # Giong legacy scan_folder: cancel giua chung cat ngay, khong
-            # cho engine chay het folder moi thoat.
-            job.check_cancel()
+            try:
+                job.report_progress(done, total or 1, label)
+                # Cancel giua chung cat ngay, khong cho engine chay het
+                # folder moi thoat. CancelledByUser la Exception → bi
+                # emit_progress cua engine nuot; chuyen sang
+                # _ScanAbortRequested (BaseException) de thoat ra ngoai.
+                job.check_cancel()
+            except CancelledByUser:
+                raise _ScanAbortRequested()
 
         job.report_progress(0, 1, "indexing")
         manifest, manifest_path = _run_engine(
@@ -958,6 +974,12 @@ def upload_scan_v1(job, payload):
         job.check_cancel()
         revision = store.bump_revision()
         _finish_workflow_job(store, job.job_id, "succeeded", run_id=run_id)
+    except _ScanAbortRequested:
+        # Cancel bi nuot boi engine emit_progress da thoat ra day qua
+        # BaseException — doi lai CancelledByUser cho jobstore runner
+        # ket thuc job 'canceled' (khong phai 'failed').
+        _finish_workflow_job(store, job.job_id, "canceled")
+        raise CancelledByUser("scan bi huy giua chung")
     except CancelledByUser:
         _finish_workflow_job(store, job.job_id, "canceled")
         raise
@@ -1338,6 +1360,31 @@ def _run_record_rows(data_dir, run_id):
         _read,
         generic=("engine_unavailable", True, "retry",
                  f"khong doc duoc registry cua run {run_id}"))
+
+
+def _record_contract_nos(data_dir, record_ids):
+    """contract_no theo record_id tu registry cua website — KHONG scope
+    theo run: file_registry.id la khoa toan cuc trong website. Upload
+    reconcile doc website-wide (F3) nen lookup qua get_row_by_id cho ca
+    row thuoc run khac/mat provenance. Registry hu = LOI nhu _run_record_rows."""
+    batch_scan = import_engine_module("upload_lab", "batch_scan")
+
+    def _read():
+        conn = sqlite3.connect(str(data_dir / "registry.sqlite3"))
+        try:
+            conn.row_factory = sqlite3.Row
+            out = {}
+            for rid in record_ids:
+                row = batch_scan.get_row_by_id(conn, int(rid))
+                out[int(rid)] = str(row["contract_no"] or "") if row else ""
+            return out
+        finally:
+            conn.close()
+
+    return _run_engine(
+        _read,
+        generic=("engine_unavailable", True, "retry",
+                 "khong doc duoc registry cua website"))
 
 
 # ---------- dispatchers (legacy giu nguyen khi khong co workflow_version) --
@@ -1908,6 +1955,10 @@ def upload_prepare_v1(job, payload):
                 cong_chung_vien=cong_chung_vien,
                 thu_ky=thu_ky,
                 chunk_size=chunk_size,
+                # v1 dry-run KHONG BAO GIO click nut Luu cua portal —
+                # ke ca click "prime" ep client-side validation
+                # ten_hop_dong (F1). Legacy/Qt giu default True.
+                prime_save_validation=False,
                 progress_callback=on_progress),
             generic=("engine_unavailable", True, "retry",
                      "chuan bi ho so that bai"))
@@ -1998,9 +2049,12 @@ def _prepare_result_data(wid, bid, run_id, audit_id, record_ids,
         "code": "upload_failed",
         "message": str(e.get("error") or ""),
     } for e in errors]
+    # needs_reconcile cua WEBSITE (F3 — khong scope theo run: row co
+    # provenance run_id khac/None van can bao cho client) ∩ record_ids
+    # dot nay — co che chan prepare (dropped_needs) cung website-wide.
     needs_reconcile = sorted(
         (set(closed) | set(unknown)
-         | (set(store.needs_reconcile_ids(wid, run_id=run_id))
+         | (set(store.needs_reconcile_ids(wid))
             & requested)))
     return {
         "workflow_version": WORKFLOW_VERSION,
@@ -2086,9 +2140,16 @@ def _prepare_result(data, errors):
 def upload_reconcile_v1(job, payload):
     """`upload.reconcile` → kind reconcile_report.
 
-    Doi chieu ho so needs_reconcile cua run voi audit MOI (bat buoc):
+    Doi chieu ho so needs_reconcile cua WEBSITE voi audit MOI (bat buoc):
     so da thay tren web → verified (registry uploaded_success + mo khoa
-    needs_reconcile); con lai giu cho doi chieu sau. Khong tu gui lai."""
+    needs_reconcile); con lai giu cho doi chieu sau. Khong tu gui lai.
+
+    Scope WEBSITE (F3): needs_reconcile.run_id chi la provenance — co
+    the mat (None) khi tab roi trang khong xac dinh dong lai sau hoac
+    sau restart; co che chan (workspace_get/_guard_unclear_retry/
+    prepare exclusion) deu website-wide. Doc theo run se bo sot row va
+    wedge vinh vien. run_id trong payload van bat buoc: binding
+    audit→run + refresh queue cua run do."""
     p = _require_workflow(payload)
     _require_payload_keys(p, _RECONCILE_V1_KEYS)
     wid = _require_website(p)
@@ -2132,16 +2193,17 @@ def upload_reconcile_v1(job, payload):
         for row in analysis.display_rows}
     existing.discard("")
 
-    needs = store.needs_reconcile_ids(wid, run_id=run_id)
+    # Website-wide (F3): moi row needs_reconcile cua website duoc doi
+    # chieu — ca row mat provenance (run_id=None) hoac stamp run khac.
+    needs_rows = store.needs_reconcile_rows(wid)
+    needs = [int(r["record_id"]) for r in needs_rows]
     _begin_workflow_job(store, job, command="upload.reconcile",
                         website_id=wid, run_id=run_id,
                         audit_id=audit_id, record_ids=needs, payload=p)
     try:
         verified = []
         if needs:
-            rows = _run_record_rows(data_dir, run_id)
-            cn_by_id = {int(r["id"]): str(r["contract_no"] or "")
-                        for r in rows}
+            cn_by_id = _record_contract_nos(data_dir, needs)
             for rid in needs:
                 cn = _canonical_contract_no(cn_by_id.get(rid, ""))
                 if cn and cn in existing:
@@ -2154,13 +2216,22 @@ def upload_reconcile_v1(job, payload):
                          "khong ghi duoc uploaded_success"))
             store.clear_needs_reconcile(wid, verified)
             store.remove_open_tabs(wid, verified)
-            store.bump_queue_revision(run_id)
+            # Queue cua MOI run co record vua verified doi — bump run
+            # trong payload + moi run_id con luu tren row needs_reconcile.
+            verified_set = set(verified)
+            runs_to_bump = {run_id}
+            for row in needs_rows:
+                stamped_run = row.get("run_id")
+                if int(row["record_id"]) in verified_set and stamped_run:
+                    runs_to_bump.add(stamped_run)
+            for bumped_run in sorted(runs_to_bump):
+                store.bump_queue_revision(bumped_run)
         # Audit moi gan vao run (nhu queue_get) de dot sau dung so nay.
         bound = store.audit_for_run(run_id)
         if bound is None or bound["audit_id"] != audit_rec["audit_id"]:
             store.bind_run_audit(run_id, audit_rec["audit_id"])
             store.bump_queue_revision(run_id)
-        remaining = store.needs_reconcile_ids(wid, run_id=run_id)
+        remaining = store.needs_reconcile_ids(wid)
         _finish_workflow_job(store, job.job_id, "succeeded",
                              verified_record_ids=verified)
     except CancelledByUser:

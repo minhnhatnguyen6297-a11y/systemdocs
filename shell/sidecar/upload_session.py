@@ -444,7 +444,12 @@ class _BrowserWorker:
             return
         try:
             login_result = session.poll_manual_login()
-            pages = session.poll_prepared_pages()
+            # Session versioned (website_id != None): strict save
+            # evidence — chi POST /api/hoso 2xx tinh la Luu; roi trang
+            # tao moi khong co POST = closed/uncertain → needs_reconcile.
+            # Legacy (website_id=None): giu nguyen heuristic dieu huong.
+            pages = session.poll_prepared_pages(
+                strict_save_evidence=self._website_id is not None)
         except Exception:
             # Poll nem loi = browser/target mat — dong session, danh dau
             # tab con mo la can doi chieu va danh thuc cac job dang cho.

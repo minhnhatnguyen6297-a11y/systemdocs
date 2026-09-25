@@ -617,6 +617,41 @@ class ScanAuditQueueTest(UploadWorkflowCase):
         # Run khong duoc dang ky khi scan bi huy giua chung.
         self.assertEqual(self.store.revision(), 0)
 
+    def test_scan_v1_cancel_escapes_engine_emit_progress(self):
+        """F4 cot loi: emit_progress cua engine `except Exception: pass`
+        — CancelledByUser (Exception) gui truc tiep BI NUOT, abort phai
+        la _ScanAbortRequested (BaseException) moi thoat duoc. Chung
+        minh bang cach goi callback QUA emit_progress that."""
+        batch_scan = engine_roots.import_engine_module(
+            "upload_lab", "batch_scan")
+        provider = upload_workspace.get_provider(WEBSITE)
+        loop_iters = []
+
+        def fake_run_scan(folder, working_dir, **kw):
+            cb = kw["progress_callback"]
+            for i in range(50):
+                loop_iters.append(i)
+                if i == 2:
+                    self.last_job.request_cancel()
+                # Goi qua emit_progress THAT — neu abort la Exception
+                # thuong no bi nuot o day va loop chay het 50 lan.
+                batch_scan.emit_progress(
+                    cb,
+                    {"stats": {"processed_files": i + 1,
+                               "total_supported_files": 50}},
+                    stage="processing", step="scan")
+            raise AssertionError("emit_progress nuot ca abort")
+
+        with mock.patch.object(provider, "run_scan",
+                               side_effect=fake_run_scan):
+            with self.assertRaises(CancelledByUser):
+                self.run_scan_fixture()
+        self.assertLess(len(loop_iters), 50,
+                        "engine loop phai bi cat ngay sau cancel")
+        job_row = self.store.job_for(self.last_job.job_id)
+        self.assertEqual(job_row["status"], "canceled")
+        self.assertEqual(self.store.revision(), 0)
+
     def test_queue_get_scope_and_binding(self):
         scan = self.run_scan_fixture()["data"]
         with mock.patch.object(upload_adapter, "worker") as w:
