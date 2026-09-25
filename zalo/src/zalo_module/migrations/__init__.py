@@ -5,8 +5,8 @@ Add new modules here; ``MIGRATIONS`` stays sorted by ``version``.
 """
 from __future__ import annotations
 
-from zalo_module.migrations import m0001_initial, m0002_engine
+from zalo_module.migrations import m0001_initial, m0002_engine, m0003_record_packaged
 
-_MODULES = [m0001_initial, m0002_engine]
+_MODULES = [m0001_initial, m0002_engine, m0003_record_packaged]
 
 MIGRATIONS = sorted(_MODULES, key=lambda m: m.version)

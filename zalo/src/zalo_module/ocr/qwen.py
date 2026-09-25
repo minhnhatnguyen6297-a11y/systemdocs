@@ -209,9 +209,15 @@ def build_qwen_ocr_body(
     min_pixels: int,
     max_pixels: int,
     enable_rotate: bool,
+    task: str = "text_recognition",
 ) -> dict[str, Any]:
     """The exact legacy request body — kept as a separate builder so tests can
-    golden-diff the serialized shape against ocr_pipeline.py."""
+    golden-diff the serialized shape against ocr_pipeline.py.
+
+    ``task`` is the provider ``ocr_options.task`` selector
+    (``text_recognition`` default; ``advanced_recognition`` returns
+    ``words_info`` geometry — contract §6.4/§6.5).
+    """
     return {
         "model": model,
         "input": {
@@ -229,11 +235,74 @@ def build_qwen_ocr_body(
                 }
             ]
         },
-        "parameters": {"ocr_options": {"task": "text_recognition"}},
+        "parameters": {"ocr_options": {"task": task}},
     }
 
 
-async def call_qwen_ocr(
+def extract_words_info(payload: dict[str, Any]) -> list[Any] | None:
+    """Return the provider ``words_info`` element list, or ``None``.
+
+    ``advanced_recognition`` answers carry per-element geometry at
+    ``output.choices[].message.content[].ocr_result.words_info``. Elements
+    are returned verbatim (dict or whatever the provider emitted) — shape
+    validation is the caller's job so malformed entries still count as
+    "provider returned geometry" evidence (``present_invalid``).
+    """
+    output = payload.get("output")
+    if not isinstance(output, dict):
+        return None
+    choices = output.get("choices")
+    if not isinstance(choices, list):
+        return None
+    found: list[Any] = []
+    for choice in choices:
+        if not isinstance(choice, dict):
+            continue
+        message = choice.get("message")
+        if not isinstance(message, dict):
+            continue
+        content = message.get("content")
+        items = content if isinstance(content, list) else []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            ocr_result = item.get("ocr_result")
+            if not isinstance(ocr_result, dict):
+                continue
+            words_info = ocr_result.get("words_info")
+            if isinstance(words_info, list):
+                found.extend(words_info)
+        # Lenient fallback: some responses hoist ocr_result to message level.
+        ocr_result = message.get("ocr_result")
+        if isinstance(ocr_result, dict) and isinstance(
+            ocr_result.get("words_info"), list
+        ):
+            found.extend(ocr_result["words_info"])
+    return found or None
+
+
+# ---------------------------------------------------------------------------
+# DashScope call — port of ``_call_qwen_native_ocr_single`` (:377-449).
+# ---------------------------------------------------------------------------
+
+
+class QwenOcrResult:
+    """Parsed provider outcome of one OCR call (MIN-95).
+
+    ``lines`` are the cleaned transcript lines; ``words_info`` is the raw
+    provider geometry element list (``advanced_recognition`` only, else
+    ``None``); ``model`` is the resolved model actually sent.
+    """
+
+    __slots__ = ("lines", "words_info", "model")
+
+    def __init__(self, lines: list[str], words_info: list | None, model: str):
+        self.lines = lines
+        self.words_info = words_info
+        self.model = model
+
+
+async def _post_ocr_payload(
     image: bytes | str,
     *,
     api_key: str | None = None,
@@ -244,15 +313,15 @@ async def call_qwen_ocr(
     enable_rotate: bool | str | None = None,
     timeout: float | None = None,
     filename: str = "",
+    task: str = "text_recognition",
     settings: Any = None,
     client: httpx.AsyncClient | None = None,
-) -> list[str]:
-    """POST one image to DashScope native OCR, return cleaned text lines.
+) -> tuple[dict[str, Any], str]:
+    """Shared POST + parse; returns ``(payload_dict, resolved_model)``.
 
-    ``image`` is raw bytes (base64-encoded here) or a pre-encoded base64 str.
-    Per-parameter resolution: explicit kwarg > ``settings`` (module Settings
-    duck-typed: ``qwen_api_base``/``qwen_model``/``qwen_api_key``) > env/module
-    constants. No internal retry — same as legacy.
+    Error mapping (module taxonomy): ``httpx.RequestError``/timeout →
+    ``OcrTransportError``; non-2xx → ``OcrApiError``; invalid/non-object JSON
+    → ``OcrParseError``. ``client`` is injectable for offline tests.
     """
     key = resolve_api_key(api_key, settings)
     if not key:
@@ -273,6 +342,7 @@ async def call_qwen_ocr(
         min_pixels=resolved_min,
         max_pixels=resolved_max,
         enable_rotate=rotate_flag,
+        task=task,
     )
     headers = {
         "Authorization": f"Bearer {key}",
@@ -319,7 +389,46 @@ async def call_qwen_ocr(
         raise OcrParseError(f"Qwen OCR returned invalid JSON: {exc}") from exc
     if not isinstance(payload, dict):
         raise OcrParseError("Qwen OCR response is not a JSON object")
+    return payload, resolved_model
 
+
+async def call_qwen_ocr(
+    image: bytes | str,
+    *,
+    api_key: str | None = None,
+    model: str | None = None,
+    base_url: str | None = None,
+    min_pixels: int | None = None,
+    max_pixels: int | None = None,
+    enable_rotate: bool | str | None = None,
+    timeout: float | None = None,
+    filename: str = "",
+    settings: Any = None,
+    client: httpx.AsyncClient | None = None,
+    task: str = "text_recognition",
+) -> list[str]:
+    """POST one image to DashScope native OCR, return cleaned text lines.
+
+    ``image`` is raw bytes (base64-encoded here) or a pre-encoded base64 str.
+    Per-parameter resolution: explicit kwarg > ``settings`` (module Settings
+    duck-typed: ``qwen_api_base``/``qwen_model``/``qwen_api_key``) > env/module
+    constants. No internal retry — same as legacy.
+    """
+    t0 = perf_counter()
+    payload, resolved_model = await _post_ocr_payload(
+        image,
+        api_key=api_key,
+        model=model,
+        base_url=base_url,
+        min_pixels=min_pixels,
+        max_pixels=max_pixels,
+        enable_rotate=enable_rotate,
+        timeout=timeout,
+        filename=filename,
+        task=task,
+        settings=settings,
+        client=client,
+    )
     lines = extract_native_ocr_lines(payload)
     _logger.info(
         "[OCR] qwen_call ok filename=%s model=%s latency_ms=%s lines=%s",
@@ -329,6 +438,51 @@ async def call_qwen_ocr(
         len(lines),
     )
     return lines
+
+
+async def call_qwen_ocr_detailed(
+    image: bytes | str,
+    *,
+    api_key: str | None = None,
+    model: str | None = None,
+    base_url: str | None = None,
+    min_pixels: int | None = None,
+    max_pixels: int | None = None,
+    enable_rotate: bool | str | None = None,
+    timeout: float | None = None,
+    filename: str = "",
+    task: str = "text_recognition",
+    settings: Any = None,
+    client: httpx.AsyncClient | None = None,
+) -> QwenOcrResult:
+    """Like ``call_qwen_ocr`` but also returns ``words_info`` geometry
+    (``advanced_recognition``) and the resolved model — the MIN-95 record
+    writer needs both for attempt/provider_lines evidence."""
+    t0 = perf_counter()
+    payload, resolved_model = await _post_ocr_payload(
+        image,
+        api_key=api_key,
+        model=model,
+        base_url=base_url,
+        min_pixels=min_pixels,
+        max_pixels=max_pixels,
+        enable_rotate=enable_rotate,
+        timeout=timeout,
+        filename=filename,
+        task=task,
+        settings=settings,
+        client=client,
+    )
+    lines = extract_native_ocr_lines(payload)
+    words_info = extract_words_info(payload)
+    _logger.info(
+        "[OCR] qwen_call ok filename=%s model=%s latency_ms=%s lines=%s",
+        filename,
+        resolved_model,
+        _ms(perf_counter() - t0),
+        len(lines),
+    )
+    return QwenOcrResult(lines=lines, words_info=words_info, model=resolved_model)
 
 
 # Boundary kept for MIN-95 (was the original stub in this file).

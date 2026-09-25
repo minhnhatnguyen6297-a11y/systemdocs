@@ -311,6 +311,42 @@ def test_events_unknown_account_400(env):
     assert resp.json()["error"]["code"] == "validation_failed"
 
 
+def test_events_source_event_ack_and_replay(env):
+    """Connector ``source_event`` (undo/reaction) ACKs with the produced
+    record id; identical replay ACKs the same id without a second record."""
+    _, eng, client = env
+    account_id = _account_id(client)
+    event = {
+        "schema_version": 1,
+        "event_type": "source_event",
+        "connector_account_id": account_id,
+        "conversation_id": "c1",
+        "conversation_type": "user",
+        "event_subtype": "reaction",
+        "target_provider_message_id": "g-1",
+        "target_client_message_id": "c-1",
+        "reaction_icon": ":>",
+        "observed_at": _iso(utcnow()),
+        "sender_id": "u1",
+    }
+    resp = _post_event(client, event)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["ack"] is True
+    record_id = resp.json()["id"]
+    assert uuid.UUID(record_id)
+
+    replay = _post_event(client, event)
+    assert replay.status_code == 200
+    assert replay.json()["id"] == record_id
+
+    # Malformed (reaction missing icon) is a 400 — the outbox quarantines it.
+    bad = dict(event)
+    bad.pop("reaction_icon")
+    bad["target_provider_message_id"] = "g-2"
+    resp = _post_event(client, bad)
+    assert resp.status_code == 400
+
+
 # --- config / commands auth --------------------------------------------------------
 
 
@@ -516,16 +552,179 @@ def test_state_shape_excludes_batch_fields(env):
     resp = client.get("/connector/v1/state")
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body) == {
+    assert {
         "connector", "policy", "sources", "data_sync", "connector_error",
-    }
+    } <= set(body)
+    # MIN-94 additive blocks: gaps, internal job-queue metrics, media usage
+    # and advisory warnings.
+    assert {
+        "gaps", "queue", "media", "warnings",
+    } <= set(body)
     assert body["connector"]["state"] == "connected"
     assert body["connector"]["bound_zalo_id"] == "z1"
     assert body["policy"]["intake_consented"] is True
     assert len(body["sources"]) == 1
-    # No batch/media-grid vocabulary leaked into the ops snapshot.
-    for forbidden in ("batches", "media_grid", "queue", "exports"):
+    assert body["media"]["quota_bytes"] > 0
+    assert body["media"]["usage_bytes"] >= 0
+    assert isinstance(body["queue"]["pending_jobs"], int)
+    # No batch/media-grid consumer vocabulary leaked into the ops snapshot.
+    for forbidden in ("batches", "media_grid", "exports"):
         assert forbidden not in body
+
+
+def test_state_reports_listener_gap_and_warnings(env):
+    """MIN-94: a disconnect report opens a gap + gap_open warning on /state;
+    a stale heartbeat while 'usable' surfaces listener_heartbeat_stale."""
+    _, eng, client = env
+    account_id = _ready_pair(client, eng)
+    resp = _post_event(
+        client,
+        {
+            "schema_version": 1,
+            "event_type": "state",
+            "connector_account_id": account_id,
+            "state": "disconnected",
+            "listener_generation": 1,
+            "observed_at": _iso(utcnow()),
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    body = client.get("/connector/v1/state").json()
+    assert body["connector"]["state"] == "disconnected"
+    open_gaps = [g for g in body["gaps"] if g["ongoing"]]
+    assert len(open_gaps) == 1
+    assert open_gaps[0]["ended_at"] is None
+    assert {w["code"] for w in body["warnings"]} == {"gap_open"}
+
+    # Reconnect closes the gap (still present as a closed interval).
+    resp = _post_event(
+        client,
+        {
+            "schema_version": 1,
+            "event_type": "state",
+            "connector_account_id": account_id,
+            "state": "connected",
+            "listener_generation": 1,
+            "observed_at": _iso(utcnow()),
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    body = client.get("/connector/v1/state").json()
+    assert not any(g["ongoing"] for g in body["gaps"])
+    assert "gap_open" not in {w["code"] for w in body["warnings"]}
+
+    # Stale heartbeat while marked usable → heartbeat-stale warning.
+    with session_scope(eng) as s:
+        account = s.get(ConnectorAccount, account_id)
+        account.last_seen_at = _iso(utcnow() - timedelta(seconds=120))
+    body = client.get("/connector/v1/state").json()
+    assert body["connector"]["state"] == "disconnected"
+    assert "listener_heartbeat_stale" in {
+        w["code"] for w in body["warnings"]
+    }
+
+
+# --- I7: consumer bearer on ops/mutation routes -----------------------------------
+
+
+@pytest.fixture()
+def env_token(tmp_path):
+    """Same app but with ``api_token`` configured → ops/mutation routes
+    require ``Authorization: Bearer`` (I7 defense-in-depth)."""
+    runtime = tmp_path / "runtime"
+    (runtime / "media").mkdir(parents=True)
+    settings = _settings(runtime, api_token="ops-token-1")
+    app = create_app(settings)
+    with TestClient(app) as client:
+        yield settings, app.state.engine, client
+    app.state.engine.dispose()
+
+
+def test_ops_routes_require_bearer_when_token_set(env_token):
+    _, eng, client = env_token
+    account_id = _account_id(client)  # onboard stays bootstrap-only, no Bearer
+    _post_event(client, _discovery(account_id))
+    with session_scope(eng) as s:
+        source_id = s.execute(select(ConvSource)).scalar_one().conv_source_id
+
+    guarded = [
+        ("GET", "/connector/v1/state"),
+        ("GET", f"/connector/v1/media/{uuid.uuid4()}/content"),
+        ("POST", f"/connector/v1/connectors/{account_id}/consent"),
+        ("POST", f"/connector/v1/connectors/{account_id}/sources/refresh"),
+        ("POST", f"/connector/v1/connectors/{account_id}/data-sync"),
+        ("PATCH", f"/connector/v1/sources/{source_id}"),
+        ("POST", "/connector/v1/connectors/start"),
+    ]
+    for method, url in guarded:
+        resp = client.request(method, url, json={"enabled": True})
+        assert resp.status_code == 401, f"{method} {url} → {resp.status_code}"
+        payload = resp.json()
+        # IntakeRoute envelope — auth failures are intake.error.v1 401s.
+        assert payload["schema_version"] == "intake.error.v1"
+        assert payload["error"]["code"] == "unauthorized"
+        resp = client.request(
+            method, url, json={"enabled": True},
+            headers={"Authorization": "Bearer wrong"},
+        )
+        assert resp.status_code == 401
+
+
+def test_ops_routes_accept_correct_bearer(env_token):
+    _, eng, client = env_token
+    account_id = _account_id(client)
+    auth = {"Authorization": "Bearer ops-token-1"}
+    resp = client.get("/connector/v1/state", headers=auth)
+    assert resp.status_code == 200
+    resp = client.post(
+        f"/connector/v1/connectors/{account_id}/consent", headers=auth
+    )
+    assert resp.status_code == 200
+    assert resp.json()["policy_version"] == 1
+    resp = client.post(
+        f"/connector/v1/connectors/{account_id}/sources/refresh", headers=auth
+    )
+    assert resp.status_code == 200
+
+
+def test_signed_and_bootstrap_routes_unaffected_by_token(env_token):
+    """Events/config keep HMAC auth; onboard keeps the bootstrap secret —
+    the consumer Bearer token does not apply to them."""
+    _, _, client = env_token
+    # onboard: no Bearer needed, bootstrap secret still checked
+    account_id = _account_id(client)
+    # events: HMAC signature, no Bearer
+    resp = _post_event(client, _discovery(account_id))
+    assert resp.status_code == 200
+    ts = _ts()
+    resp = client.get(
+        f"/connector/v1/connectors/{account_id}/config",
+        headers={
+            "x-zalo-timestamp": ts,
+            "x-zalo-signature": sign_body(b"", ts, WEBHOOK_SECRET),
+        },
+    )
+    assert resp.status_code == 200
+
+
+def test_events_malformed_int_fields_400_not_500(env):
+    """M6: raw ``int()`` casts on payload fields raise TypeError/ValueError
+    in the engine — the API must answer 400 ``validation_failed``, never 500."""
+    _, eng, client = env
+    account_id = _ready_pair(client, eng)
+    resp = _post_event(
+        client,
+        {
+            "schema_version": 1,
+            "event_type": "state",
+            "connector_account_id": account_id,
+            "state": "connected",
+            "listener_generation": "not-an-int",  # int() cast → ValueError
+            "observed_at": _iso(utcnow()),
+        },
+    )
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "validation_failed"
 
 
 def test_media_content_serves_file(env):

@@ -76,6 +76,7 @@ class Record(Base):
     payload_json: Mapped[str] = mapped_column(Text, nullable=False)
     captured_at: Mapped[str] = mapped_column(Text, nullable=False)
     recorded_at: Mapped[str] = mapped_column(Text, nullable=False)
+    packaged_in: Mapped[str | None] = mapped_column(Text)
 
 
 class MediaAsset(Base):

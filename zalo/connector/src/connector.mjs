@@ -1,7 +1,7 @@
 import {mkdir, readFile, rename, unlink, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 
-import {FileOutbox, MediaStore, WebhookClient, mediaObjectKey, normalizeMessage} from './core.mjs';
+import {FileOutbox, MediaStore, WebhookClient, mediaObjectKey, normalizeMessage, sourceEventsFromReaction, sourceEventsFromUndo} from './core.mjs';
 
 const required = [
   'ZALO_INBOX_BACKEND_URL',
@@ -201,32 +201,109 @@ export async function syncSources({api, accountId, client, send2meId}) {
   return sources;
 }
 
-export async function processDownloadQueue({downloadQueue, store, outbox, client}) {
+// Bound how many times a failing attachment download is retried across
+// processDownloadQueue passes before the queue entry is dropped (the failed
+// marker in the published envelope stays as the durable record).
+const MAX_DOWNLOAD_ATTEMPTS = 3;
+
+// Classify a download failure into a fixed, non-sensitive error code. The
+// raw error message is never surfaced — it can embed signed URLs or upstream
+// payloads that must not reach the module, logs, or journal records.
+function downloadErrorCode(error) {
+  const message = String(error?.message || '');
+  if (/quota/i.test(message)) return 'storage_full';
+  if (error?.name === 'AbortError' || /abort/i.test(message)) return 'download_aborted';
+  if (/HTTP \d+/i.test(message)) return 'download_http_error';
+  return 'download_failed';
+}
+
+function failedAttachment(envelope, attachment, errorCode) {
+  return {
+    attachment_index: attachment.attachment_index,
+    mime_type: attachment.mime_type,
+    media_object_key: mediaObjectKey(
+      envelope.connector_account_id,
+      envelope.msg_id,
+      attachment.attachment_index,
+      attachment.mime_type,
+      envelope.sent_at,
+    ),
+    status: 'failed',
+    error_code: errorCode,
+  };
+}
+
+export async function processDownloadQueue({downloadQueue, store, outbox, client, maxAttempts = MAX_DOWNLOAD_ATTEMPTS}) {
   const entries = await downloadQueue.entries();
   const assemblies = new Map(entries
     .filter(({event}) => event.record_type === 'message')
     .map((entry) => [entry.event.message_key, entry]));
   for (const {name, event} of entries.filter(({event}) => event.record_type === 'attachment')) {
     const assembly = assemblies.get(event.message_key);
-    if (!assembly) continue;
+    // Attachment entries carry their own envelope so a retry that resolves
+    // after the message envelope already shipped can still emit a `media`
+    // supplement event for the previously-failed slot.
+    const envelope = event.envelope || assembly?.event.envelope;
+    if (!envelope) continue;
     const objectKey = mediaObjectKey(
-      assembly.event.envelope.connector_account_id,
-      assembly.event.envelope.msg_id,
+      envelope.connector_account_id,
+      envelope.msg_id,
       event.attachment.attachment_index,
       event.attachment.mime_type,
-      assembly.event.envelope.sent_at,
+      envelope.sent_at,
     );
-    const stored = await store.download(objectKey, event.attachment.download_url);
-    assembly.event.completed[event.attachment.attachment_index] = {
-      attachment_index: event.attachment.attachment_index,
-      mime_type: event.attachment.mime_type,
-      media_object_key: objectKey,
-      size_bytes: stored.sizeBytes,
-    };
-    await downloadQueue.enqueue(event.message_key, assembly.event);
-    await downloadQueue.remove(name);
+    try {
+      const stored = await store.download(objectKey, event.attachment.download_url);
+      if (assembly) {
+        assembly.event.completed[event.attachment.attachment_index] = {
+          attachment_index: event.attachment.attachment_index,
+          mime_type: event.attachment.mime_type,
+          media_object_key: objectKey,
+          size_bytes: stored.sizeBytes,
+        };
+        await downloadQueue.enqueue(event.message_key, assembly.event);
+      } else {
+        // The message envelope already shipped with this attachment marked
+        // failed — report the late-arriving bytes as a `media` event.
+        await outbox.enqueue(`${event.message_key}:${event.attachment.attachment_index}:media`, {
+          schema_version: 1,
+          event_type: 'media',
+          connector_account_id: envelope.connector_account_id,
+          conversation_id: envelope.conversation_id,
+          conversation_type: envelope.conversation_type,
+          source_type: envelope.source_type,
+          source_display_name: envelope.source_display_name,
+          msg_id: envelope.msg_id,
+          sender_id: envelope.sender_id,
+          sent_at: envelope.sent_at,
+          attachment_index: event.attachment.attachment_index,
+          mime_type: event.attachment.mime_type,
+          media_object_key: objectKey,
+          size_bytes: stored.sizeBytes,
+        });
+      }
+      await downloadQueue.remove(name);
+    } catch (error) {
+      const code = downloadErrorCode(error);
+      if (assembly) {
+        assembly.event.completed[event.attachment.attachment_index] = failedAttachment(envelope, event.attachment, code);
+        await downloadQueue.enqueue(event.message_key, assembly.event);
+      }
+      if (code === 'storage_full') {
+        // Quota errors still propagate so the caller flags storage_full and
+        // stops doing extra work; the queue entry is kept (not counted as a
+        // real attempt) so the download resumes once space frees up.
+        await downloadQueue.replace(name, {...event, error_code: code});
+        throw error;
+      }
+      const attempts = Number(event.attempts || 0) + 1;
+      if (attempts >= maxAttempts) await downloadQueue.remove(name);
+      else await downloadQueue.replace(name, {...event, attempts, error_code: code});
+    }
   }
   for (const {name, event} of assemblies.values()) {
+    // An assembly ships once every attachment slot is resolved — downloaded
+    // entries plus `failed` markers — instead of blocking on all downloads.
     if (event.completed.filter(Boolean).length !== event.envelope.attachments.length) continue;
     const published = {...event.envelope, attachments: event.completed};
     await outbox.enqueue(event.message_key, published);
@@ -251,7 +328,7 @@ export async function handleMessage({message, accountId, enabledIds, sourceNames
     return;
   }
   if (source.source_type === 'my_documents' && !MY_DOCUMENTS_REALTIME_VERIFIED) return;
-  let envelope = normalizeMessage(message, accountId, source, send2meId);
+  const envelope = normalizeMessage(message, accountId, source, send2meId);
   if (!envelope) {
     if (reportActivity) {
       const timestamp = Number(message?.data?.ts);
@@ -260,11 +337,28 @@ export async function handleMessage({message, accountId, enabledIds, sourceNames
     }
     return;
   }
-  if (storageFull) envelope = {...envelope, attachments: []};
   const messageKey = `${accountId}:${envelope.conversation_id}:${envelope.msg_id}`;
-  const existing = (await downloadQueue.entries()).find(({event}) => event.record_type === 'message' && event.message_key === messageKey)?.event;
+  const queuedEntries = await downloadQueue.entries();
+  const existing = queuedEntries.find(({event}) => event.record_type === 'message' && event.message_key === messageKey)?.event;
+  // Attachment queue entries can outlive their message assembly: once the
+  // envelope shipped, the pending retries emit `media` supplements instead
+  // of reassembling the whole message.
+  const pendingIndexes = new Set(queuedEntries
+    .filter(({event}) => event.record_type === 'attachment' && event.message_key === messageKey)
+    .map(({event}) => event.attachment?.attachment_index));
+  const publishedRetriesOnly = !existing && pendingIndexes.size > 0;
   const assembly = existing || {record_type: 'message', message_key: messageKey, envelope, completed: Array(envelope.attachments.length).fill(null)};
-  if (!existing) await downloadQueue.enqueue(messageKey, assembly);
+  if (!existing && !publishedRetriesOnly) {
+    if (storageFull) {
+      // Media-only degradation: the text keeps flowing and every attachment
+      // becomes a failed-download marker so the module records the missing
+      // media instead of dropping the slots silently.
+      for (const attachment of envelope.attachments) {
+        assembly.completed[attachment.attachment_index] = failedAttachment(envelope, attachment, 'storage_full');
+      }
+    }
+    await downloadQueue.enqueue(messageKey, assembly);
+  }
   const timestamp = Number(message?.data?.ts);
   if (reportActivity) {
     await client.sendEvent({
@@ -275,13 +369,17 @@ export async function handleMessage({message, accountId, enabledIds, sourceNames
       last_activity_at: Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : observedAt(),
     });
   }
-  for (const attachment of envelope.attachments) {
-    if (assembly.completed[attachment.attachment_index]) continue;
-    await downloadQueue.enqueue(`${messageKey}:${attachment.attachment_index}`, {
-      record_type: 'attachment',
-      message_key: messageKey,
-      attachment,
-    });
+  if (!publishedRetriesOnly && !storageFull) {
+    for (const attachment of envelope.attachments) {
+      if (assembly.completed[attachment.attachment_index]) continue;
+      if (pendingIndexes.has(attachment.attachment_index)) continue;
+      await downloadQueue.enqueue(`${messageKey}:${attachment.attachment_index}`, {
+        record_type: 'attachment',
+        message_key: messageKey,
+        attachment,
+        envelope,
+      });
+    }
   }
   await processDownloadQueue({downloadQueue, store, outbox, client});
 }
@@ -426,6 +524,16 @@ async function processHistoryMessage({envelope, accountId, runId, store, outbox,
   };
   const sameEnvelope = (event) => event.connector_account_id === accountId
     && event.conversation_id === envelope.conversation_id && event.msg_id === envelope.msg_id;
+  const replaceOwned = async (queue, name, event) => {
+    // guard() abandons a raced-out operation mid-flight; a replace that lands
+    // after the finally-cleanup would resurrect the file. Self-clean on abort
+    // the same way enqueueOwned does.
+    await queue.replace(name, event);
+    if (signal.aborted) {
+      await queue.remove(name).catch(() => {});
+      signal.throwIfAborted();
+    }
+  };
   if ((await guard(() => downloadQueue.entries())).some(({event}) => event.message_key === messageKey)
     || (outbox.entries && (await guard(() => outbox.entries())).some(({event}) => sameEnvelope(event)))) return;
   const assembly = {record_type: 'message', message_key: messageKey, owner: 'history', envelope, completed: Array(envelope.attachments.length).fill(null)};
@@ -443,10 +551,14 @@ async function processHistoryMessage({envelope, accountId, runId, store, outbox,
           attachment_index: attachment.attachment_index, mime_type: attachment.mime_type,
           media_object_key: objectKey, size_bytes: stored.sizeBytes,
         };
-        await guard(() => downloadQueue.replace([...ownedDownload][0], assembly));
+        await guard(() => replaceOwned(downloadQueue, [...ownedDownload][0], assembly));
       } catch (error) {
         if (error?.dataSyncFailure) throw error;
         counters.media_download_failures += 1;
+        // The failure ships as a marker: the history envelope still
+        // publishes so the module records the missing media row.
+        assembly.completed[attachment.attachment_index] = failedAttachment(envelope, attachment, downloadErrorCode(error));
+        await guard(() => replaceOwned(downloadQueue, [...ownedDownload][0], assembly));
       }
       await downloadQueue.remove(attachmentName);
       ownedDownload.delete(attachmentName);
@@ -696,6 +808,35 @@ export function listenerHeartbeatState(listenerConnected) {
   return listenerConnected ? 'connected' : 'disconnected';
 }
 
+// zca-js undo (recall) + reaction observations — forwarded through the same
+// durable webhook outbox / serialized operation queue as message events.
+// ``conversationTypeFor`` resolves the target thread's conversation_type at
+// emit time (the known-source map is rebound on every reconcile — the caller
+// supplies a live lookup, falling back to the event's ``isGroup`` flag).
+// Every observation is emitted — the module, not the connector, decides how
+// a recall/reaction relates to policy state.
+export function installSourceEventHandlers({listener, accountId, outbox, client, enqueueOperation, conversationTypeFor}) {
+  const typeFor = conversationTypeFor || ((threadId, isGroup) => (isGroup ? 'group' : 'user'));
+  const emit = async (pairs) => {
+    for (const {eventId, event} of pairs) await outbox.enqueue(eventId, event);
+    if (pairs.length) await outbox.flush(client);
+  };
+  listener.on('undo', (undo) => {
+    void enqueueOperation(async () => {
+      await emit(sourceEventsFromUndo(
+        undo, accountId, typeFor(undo?.threadId, undo?.isGroup),
+      ));
+    }).catch(() => {});
+  });
+  listener.on('reaction', (reaction) => {
+    void enqueueOperation(async () => {
+      await emit(sourceEventsFromReaction(
+        reaction, accountId, typeFor(reaction?.threadId, reaction?.isGroup),
+      ));
+    }).catch(() => {});
+  });
+}
+
 export function shouldRestoreSession(session, env) {
   return Boolean(session) && env.ZALO_CONNECTOR_FORCE_QR !== '1';
 }
@@ -918,6 +1059,18 @@ export async function startConnector({Zalo, LoginQRCallbackEventType, env = proc
   api.listener.on('error', () => {
     listenerConnected = false;
     void stateEvent('disconnected').catch(() => {});
+  });
+  installSourceEventHandlers({
+    listener: api.listener,
+    accountId,
+    outbox,
+    client,
+    enqueueOperation,
+    conversationTypeFor: (threadId, isGroup) => {
+      const source = sourceNames.get(String(threadId || ''));
+      if (source?.source_type === 'group') return 'group';
+      return isGroup ? 'group' : 'user';
+    },
   });
   const initialRuntime = await refresh();
   if (initialRuntime.sourceMap === undefined) await reconcileSources().catch(() => {});

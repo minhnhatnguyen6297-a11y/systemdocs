@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from zalo_module.models import Job
 
@@ -73,8 +73,11 @@ def claim_jobs(
     """Move claimable jobs to ``running`` under a 300s lease.
 
     Claimable = state in {queued, retry_wait} and (run_after NULL or
-    run_after <= now). Sets lease_owner=worker_id,
-    lease_expires_at=now+300s and increments attempts.
+    run_after <= now), selected oldest-first (idx_jobs_claim order). Each
+    candidate is claimed with an **atomic state-CAS UPDATE** — only the
+    transaction that actually flips ``state`` wins the lease; a candidate
+    already taken by a racing worker is skipped (rowcount 0), never
+    double-claimed.
     """
     now_iso = _iso(now)
     rows = (
@@ -89,13 +92,25 @@ def claim_jobs(
         .all()
     )
     lease_expires_at = _iso(now + timedelta(seconds=LEASE_SECONDS))
+    claimed: list[Job] = []
     for job in rows:
-        job.state = "running"
-        job.lease_owner = worker_id
-        job.lease_expires_at = lease_expires_at
-        job.attempts = (job.attempts or 0) + 1
-        job.updated_at = now_iso
-    return list(rows)
+        result = session.execute(
+            update(Job)
+            .where(Job.job_id == job.job_id)
+            .where(Job.state.in_(("queued", "retry_wait")))
+            .values(
+                state="running",
+                lease_owner=worker_id,
+                lease_expires_at=lease_expires_at,
+                attempts=Job.attempts + 1,
+                updated_at=now_iso,
+            )
+            .execution_options(synchronize_session="fetch")
+        )
+        if result.rowcount == 1:
+            claimed.append(job)
+        # rowcount == 0 → another worker claimed it first; skip.
+    return claimed
 
 
 def reclaim_expired_leases(now: datetime, session: "Session") -> int:
@@ -124,3 +139,118 @@ def reclaim_expired_leases(now: datetime, session: "Session") -> int:
         )
         job.updated_at = now_iso
     return len(rows)
+
+
+# --- Worker runner (MIN-103 §worker-contract) -------------------------------
+#
+# A job handler is ``fn(session, job, settings) -> dict | None``:
+# - returns a dict  -> job 'succeeded', dict stored in result_json
+# - raises JobExpired -> job 'expired' (e.g. media past image_expires_at)
+# - raises anything else -> 'retry_wait' with backoff run_after, or 'failed'
+#   once attempts >= max_attempts
+#
+# Handler kinds are registered in ``jobs/handlers.py`` (media/ocr/package).
+
+import logging
+import socket
+import time
+
+logger = logging.getLogger(__name__)
+
+JOB_BACKOFF_BASE_SECONDS = 30
+
+
+class JobExpired(Exception):
+    """Raised by a handler when the job's subject no longer exists/valid."""
+
+
+def _backoff_seconds(attempts: int) -> int:
+    # 30s, 60s, 120s, ... capped at 10 minutes.
+    return min(600, JOB_BACKOFF_BASE_SECONDS * (2 ** max(0, attempts - 1)))
+
+
+def run_once(
+    engine,
+    settings,
+    handlers: dict,
+    sweepers: list | None = None,
+    *,
+    worker_id: str | None = None,
+    limit: int = 2,
+    now: datetime | None = None,
+) -> int:
+    """Run registered sweeps, then claim+run up to ``limit`` jobs."""
+    from zalo_module.database import session_scope
+
+    now = now or datetime.now(timezone.utc)
+    worker_id = worker_id or f"{socket.gethostname()}-{uuid.uuid4().hex[:8]}"
+
+    with session_scope(engine) as session:
+        reclaim_expired_leases(now, session)
+        for sweep in sweepers or ():
+            try:
+                sweep(session, settings)
+            except Exception:  # noqa: BLE001 - a bad sweep must not starve jobs
+                logger.exception("sweep %s failed", getattr(sweep, "__name__", sweep))
+        claimed = claim_jobs(now, worker_id, session, limit)
+        payloads = [
+            (j.job_id, j.kind, json.loads(j.payload_json or "{}")) for j in claimed
+        ]
+
+    for job_id, kind, _payload in payloads:
+        handler = handlers.get(kind)
+        with session_scope(engine) as session:
+            job = session.get(Job, job_id)
+            if job is None:
+                continue
+            try:
+                if handler is None:
+                    raise RuntimeError(f"no handler registered for {kind}")
+                result = handler(session, job, settings)
+                job.state = "succeeded"
+                job.result_json = json.dumps(
+                    result or {}, ensure_ascii=False, sort_keys=True
+                )
+            except JobExpired as exc:
+                job.state = "expired"
+                job.result_json = json.dumps(
+                    {"error": str(exc)}, ensure_ascii=False
+                )
+            except Exception as exc:  # noqa: BLE001 - job isolation boundary
+                logger.exception("job %s (%s) failed", job_id, kind)
+                exhausted = (job.attempts or 0) >= (job.max_attempts or 3)
+                job.state = "failed" if exhausted else "retry_wait"
+                job.run_after = _iso(
+                    now + timedelta(seconds=_backoff_seconds(job.attempts or 1))
+                )
+                job.result_json = json.dumps(
+                    {"error": f"{type(exc).__name__}: {exc}"[:2000]},
+                    ensure_ascii=False,
+                )
+            finally:
+                job.lease_owner = None
+                job.lease_expires_at = None
+                job.updated_at = _iso(now)
+
+    return len(payloads)
+
+
+def run_forever(
+    engine,
+    settings,
+    handlers: dict,
+    sweepers: list | None = None,
+    *,
+    interval_seconds: float = 2.0,
+    limit: int = 2,
+    stop=None,
+) -> None:
+    """Loop ``run_once`` forever (or until ``stop()`` returns truthy)."""
+    while True:
+        if stop is not None and stop():
+            return
+        try:
+            run_once(engine, settings, handlers, sweepers, limit=limit)
+        except Exception:  # noqa: BLE001 - worker must survive DB hiccups
+            logger.exception("worker pass failed")
+        time.sleep(interval_seconds)

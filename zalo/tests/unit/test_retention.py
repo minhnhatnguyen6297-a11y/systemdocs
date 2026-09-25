@@ -219,6 +219,21 @@ def test_image_expires_at_is_exactly_168h():
     assert (expires - captured).total_seconds() == 168 * 3600
 
 
+def test_image_expires_at_honors_configured_hours():
+    """M4: retention hours are a parameter — never hardcoded 168."""
+    captured = datetime(2026, 9, 25, 1, 2, 3, tzinfo=timezone.utc)
+    assert image_expires_at(captured, 48) == captured + timedelta(hours=48)
+    assert image_expires_at(captured, 0.5) == captured + timedelta(minutes=30)
+
+
+def test_image_expires_at_falls_back_on_invalid_hours():
+    captured = datetime(2026, 9, 25, 1, 2, 3, tzinfo=timezone.utc)
+    for bad in (None, 0, -12, "abc"):
+        assert image_expires_at(captured, bad) == captured + timedelta(
+            hours=IMAGE_TTL_HOURS
+        )
+
+
 def test_media_path_under_runtime_media(env):
     settings, _engine = env
     p = media_path("att-1", "jpg", settings)
@@ -236,6 +251,43 @@ def test_register_media_sets_expires_168h(env):
         assert row.state == "captured"
         assert row.captured_at == captured.isoformat()
         assert row.expires_at == image_expires_at(captured).isoformat()
+
+
+def test_register_media_uses_settings_retention_hours(env, tmp_path):
+    """M4: ``expires_at`` comes from ``settings.connector_retention_hours``
+    — the same window ``expire_media`` enforces — not a hardcoded 168."""
+    _s, engine = env
+    settings = _settings(tmp_path / "rt48", connector_retention_hours=48)
+    captured = datetime(2026, 9, 25, 0, 0, 0, tzinfo=timezone.utc)
+    with session_scope(engine) as s:
+        register_media(
+            "att-48", "ab" * 32, "media/att-48.jpg", captured, s,
+            settings=settings,
+        )
+        row = s.execute(select(MediaAsset)).scalar_one()
+        assert row.expires_at == (captured + timedelta(hours=48)).isoformat()
+
+
+def test_register_media_env_fallback_when_no_settings(env, monkeypatch):
+    """M4: callers that cannot pass a Settings still honor the env var —
+    the same source ``settings.connector_retention_hours`` reads."""
+    _s, engine = env
+    monkeypatch.setenv("ZALO_CONNECTOR_RETENTION_HOURS", "24")
+    captured = datetime(2026, 9, 25, 0, 0, 0, tzinfo=timezone.utc)
+    with session_scope(engine) as s:
+        register_media("att-e1", "ab" * 32, "media/e1.jpg", captured, s)
+        row = s.execute(select(MediaAsset)).scalar_one()
+        assert row.expires_at == (captured + timedelta(hours=24)).isoformat()
+
+
+def test_register_media_invalid_env_falls_back_168(env, monkeypatch):
+    _s, engine = env
+    monkeypatch.setenv("ZALO_CONNECTOR_RETENTION_HOURS", "bogus")
+    captured = datetime(2026, 9, 25, 0, 0, 0, tzinfo=timezone.utc)
+    with session_scope(engine) as s:
+        register_media("att-e2", "ab" * 32, "media/e2.jpg", captured, s)
+        row = s.execute(select(MediaAsset)).scalar_one()
+        assert row.expires_at == (captured + timedelta(hours=168)).isoformat()
 
 
 def test_expire_media_flips_state_and_deletes_file(env):

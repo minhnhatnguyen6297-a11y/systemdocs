@@ -14,7 +14,9 @@ function exactAck(event, response) {
   if (event.event_type !== 'message') return true;
   const components = response.components;
   const textStatuses = event.raw_text == null ? new Set(['absent']) : new Set(['imported', 'duplicate', 'ignored']);
-  const mediaStatuses = new Set(['imported', 'duplicate', 'ignored']);
+  // 'missing' marks an attachment the module recorded as a missing-media
+  // placeholder (failed downloads are ingested, not dropped).
+  const mediaStatuses = new Set(['imported', 'duplicate', 'ignored', 'missing']);
   if (!components || !textStatuses.has(components.text) || !Array.isArray(components.media)) return false;
   const expected = (event.attachments || []).map(({attachment_index}) => attachment_index);
   return components.media.length === expected.length && components.media.every((item, index) => (
@@ -170,6 +172,9 @@ export function normalizeMessage(message, accountId, source, send2meId) {
   if (!messageId || !senderId || (rawText === null && attachments.length === 0)) return null;
   const timestamp = Number(message.data?.ts);
   const sentAt = Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : new Date().toISOString();
+  // cliMsgId is kept verbatim: recall/reaction events link back to the
+  // original message through cliMsgId/cMsgID (contract source block).
+  const clientMessageId = String(message.data?.cliMsgId || '').trim();
   return {
     schema_version: 1,
     event_type: 'message',
@@ -179,11 +184,116 @@ export function normalizeMessage(message, accountId, source, send2meId) {
     source_type: source.source_type,
     source_display_name: source.source_display_name,
     msg_id: messageId,
+    ...(clientMessageId ? {client_message_id: clientMessageId} : {}),
     sender_id: senderId,
     sent_at: sentAt,
     raw_text: rawText,
     attachments,
   };
+}
+
+// --- source events: zca-js undo (recall) + reaction → source_event ----------
+//
+// Every observation becomes an immutable record module-side; the connector
+// only normalizes payload ids and emits durable outbox envelopes. The event
+// id is derived from the event content so redelivery of the same zca event
+// writes the same outbox file (dedupe-safe), while two genuinely different
+// observations (other target, icon or actor) stay distinct entries.
+
+function sourceEventTimestamp(data) {
+  const timestamp = Number(data?.ts);
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : new Date().toISOString();
+}
+
+function sourceEventEnvelope({
+  accountId,
+  conversationId,
+  conversationType,
+  subtype,
+  targetProviderId,
+  targetClientId,
+  observedAt,
+  reactionIcon = null,
+  senderId = null,
+  senderName = null,
+}) {
+  const event = {
+    schema_version: 1,
+    event_type: 'source_event',
+    connector_account_id: accountId,
+    conversation_id: conversationId,
+    conversation_type: conversationType,
+    event_subtype: subtype,
+    target_provider_message_id: targetProviderId,
+    observed_at: observedAt,
+  };
+  if (targetClientId) event.target_client_message_id = targetClientId;
+  if (reactionIcon) event.reaction_icon = reactionIcon;
+  if (senderId) event.sender_id = senderId;
+  if (senderName) event.sender_display_name = senderName;
+  const eventId = [
+    'source-event', accountId, conversationId, subtype,
+    targetProviderId, targetClientId || '', reactionIcon || '', senderId || '',
+  ].join(':');
+  return {eventId, event};
+}
+
+// zca-js ``Undo``: ``data.content.globalMsgId``/``cliMsgId`` name the recalled
+// (target) message; the top-level ``msgId``/``cliMsgId`` belong to the undo
+// action itself and are only a fallback.
+export function sourceEventsFromUndo(undo, accountId, conversationType = 'user') {
+  const data = undo?.data;
+  const content = data?.content;
+  const conversationId = String(undo?.threadId || data?.threadId || '').trim();
+  const providerId = String(content?.globalMsgId || data?.msgId || content?.cliMsgId || data?.cliMsgId || '').trim();
+  if (!conversationId || !providerId) return [];
+  const clientId = String(content?.cliMsgId || data?.cliMsgId || '').trim();
+  return [sourceEventEnvelope({
+    accountId,
+    conversationId,
+    conversationType,
+    subtype: 'recall',
+    targetProviderId: providerId,
+    targetClientId: clientId || null,
+    observedAt: sourceEventTimestamp(data),
+    senderId: String(data?.uidFrom || '').trim() || null,
+    senderName: String(data?.dName || '').trim() || null,
+  })];
+}
+
+// zca-js ``Reaction``: ``data.content.rMsg[]`` lists the reacted-on messages
+// (``gMsgID`` provider id, ``cMsgID`` client id); ``rIcon`` is the reaction
+// token (empty string on reaction removal — not representable in v1, so the
+// observation is skipped rather than producing a contract-invalid record).
+export function sourceEventsFromReaction(reaction, accountId, conversationType = 'user') {
+  const data = reaction?.data;
+  const content = data?.content;
+  const conversationId = String(reaction?.threadId || data?.threadId || '').trim();
+  const icon = typeof content?.rIcon === 'string' ? content.rIcon : '';
+  const targets = Array.isArray(content?.rMsg) ? content.rMsg : [];
+  if (!conversationId || !icon || targets.length === 0) return [];
+  const senderId = String(data?.uidFrom || '').trim() || null;
+  const senderName = String(data?.dName || '').trim() || null;
+  const observedAt = sourceEventTimestamp(data);
+  const pairs = [];
+  for (const target of targets) {
+    const providerId = String(target?.gMsgID || data?.msgId || target?.cMsgID || '').trim();
+    if (!providerId) continue;
+    const clientId = String(target?.cMsgID || data?.cliMsgId || '').trim();
+    pairs.push(sourceEventEnvelope({
+      accountId,
+      conversationId,
+      conversationType,
+      subtype: 'reaction',
+      targetProviderId: providerId,
+      targetClientId: clientId || null,
+      observedAt,
+      reactionIcon: icon,
+      senderId,
+      senderName,
+    }));
+  }
+  return pairs;
 }
 
 function safeKey(key) {
@@ -212,6 +322,24 @@ async function walkFiles(root, directory = root) {
   return files;
 }
 
+// Send-failure bound for a durable outbox entry: after more than this many
+// failed flushes the entry is quarantined into ``<root>/dead/`` so one
+// poisoned/unreachable event can never wedge every entry behind it. The
+// entry is preserved (not deleted) — dead-letter files are audit data.
+const MAX_OUTBOX_FAILURES = 8;
+const DEAD_DIR = 'dead';
+
+// Render a failure without paths, URLs or provider payloads — only a
+// transport-level summary ever reaches connector logs.
+function sanitizeError(error) {
+  const message = String(error?.message || '');
+  const http = /HTTP (\d{3})/.exec(message);
+  if (http) return `HTTP ${http[1]}`;
+  if (/acknowledgement/i.test(message)) return 'ack-mismatch';
+  if (/quota/i.test(message)) return 'storage_full';
+  return error?.name && error.name !== 'Error' ? error.name : 'send-failure';
+}
+
 export class FileOutbox {
   constructor(root) {
     this.root = path.resolve(root);
@@ -224,7 +352,35 @@ export class FileOutbox {
     const temporary = `${target}.${process.pid}.tmp`;
     await writeFile(temporary, JSON.stringify(event), {encoding: 'utf8', mode: 0o600});
     await rename(temporary, target);
+    // Fresh content for this key resets the failure ledger.
+    await unlink(this.#attemptsPath(name)).catch(() => {});
     return name;
+  }
+
+  #attemptsPath(name) {
+    return path.join(this.root, `${name}.attempts`);
+  }
+
+  async #attemptCount(name) {
+    try {
+      const raw = await readFile(this.#attemptsPath(name), 'utf8');
+      return Number.parseInt(raw, 10) || 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  async #recordFailure(name) {
+    const attempts = (await this.#attemptCount(name)) + 1;
+    await writeFile(this.#attemptsPath(name), String(attempts), {encoding: 'utf8', mode: 0o600});
+    return attempts;
+  }
+
+  async #quarantine(name) {
+    const dead = path.join(this.root, DEAD_DIR);
+    await mkdir(dead, {recursive: true});
+    await rename(path.join(this.root, name), path.join(dead, name));
+    await unlink(this.#attemptsPath(name)).catch(() => {});
   }
 
   async pending() {
@@ -233,15 +389,58 @@ export class FileOutbox {
   }
 
   async entries() {
-    return Promise.all((await this.pending()).map(async (name) => ({
-      name,
-      event: JSON.parse(await readFile(path.join(this.root, name), 'utf8')),
-    })));
+    // readdir → readFile is racy: a file listed by pending() may already be
+    // consumed by a concurrent flush (e.g. runDataSync cleanup on Windows).
+    // Tolerate ENOENT by skipping the vanished entry — writes are atomic
+    // (temp file + rename), so any readable file is complete JSON. Windows
+    // AV/indexer locks also throw a *transient* EPERM/EACCES/EBUSY on a
+    // just-renamed file; a bounded retry still propagates persistent errors.
+    const transient = new Set(['EPERM', 'EACCES', 'EBUSY']);
+    const readEntry = async (name, attempt = 0) => {
+      try {
+        const raw = await readFile(path.join(this.root, name), 'utf8');
+        return {name, event: JSON.parse(raw)};
+      } catch (error) {
+        if (error.code === 'ENOENT') return null;
+        if (transient.has(error.code) && attempt < 3) {
+          await new Promise((resolve) => setTimeout(resolve, 25));
+          return readEntry(name, attempt + 1);
+        }
+        throw error;
+      }
+    };
+    const entries = await Promise.all((await this.pending()).map(readEntry));
+    return entries.filter((entry) => entry !== null);
   }
 
-  async remove(name) {
+  async remove(name, attempt = 0) {
     if (path.basename(name) !== name || !name.endsWith('.json')) throw new Error('invalid outbox entry');
-    await unlink(path.join(this.root, name));
+    try {
+      await unlink(path.join(this.root, name));
+    } catch (error) {
+      // Idempotent delete: a concurrent flush may already have consumed it.
+      if (error.code === 'ENOENT') {
+        this.#dropAttempts(name);
+        return;
+      }
+      // Windows AV/indexer may briefly lock a just-written file; a bounded
+      // retry still propagates persistent errors (same policy as entries()).
+      if (['EPERM', 'EACCES', 'EBUSY'].includes(error.code) && attempt < 3) {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        return this.remove(name, attempt + 1);
+      }
+      throw error;
+    }
+    this.#dropAttempts(name);
+  }
+
+  // Attempt-ledger cleanup is ancillary: ``pending()`` never lists the
+  // sidecar, and the next enqueue/remove of the same key re-cleans it.
+  // Fire-and-forget keeps ``remove()`` to a single awaited fs op — the
+  // path runs inside abort/cancel cleanup where every extra tick widens
+  // the window before a racing ``entries()`` sees the entry gone.
+  #dropAttempts(name) {
+    void unlink(this.#attemptsPath(name)).catch(() => {});
   }
 
   async replace(name, event) {
@@ -253,10 +452,39 @@ export class FileOutbox {
   }
 
   async flush(client) {
+    let firstFailure = null;
     for (const {name, event} of await this.entries()) {
-      requireExactAck(event, await client.sendEvent(event));
-      await this.remove(name);
+      try {
+        requireExactAck(event, await client.sendEvent(event));
+        await this.remove(name);
+      } catch (error) {
+        // Exact-ACK semantics are kept per entry: an un-ACKed event stays
+        // pending and gets retried on the next flush. A single failing
+        // entry must not starve the ones behind it — failures are counted
+        // (``<name>.attempts``) and past ``MAX_OUTBOX_FAILURES`` the entry
+        // is quarantined to ``dead/`` with a sanitized warning only.
+        if (firstFailure === null) firstFailure = error;
+        let attempts;
+        try {
+          attempts = await this.#recordFailure(name);
+        } catch (ledgerError) {
+          firstFailure = ledgerError;
+          break;
+        }
+        if (attempts > MAX_OUTBOX_FAILURES) {
+          try {
+            await this.#quarantine(name);
+          } catch (quarantineError) {
+            firstFailure = quarantineError;
+            break;
+          }
+          console.warn(
+            `outbox entry ${name} quarantined after ${attempts} failures (${sanitizeError(error)})`,
+          );
+        }
+      }
     }
+    if (firstFailure !== null) throw firstFailure;
   }
 }
 

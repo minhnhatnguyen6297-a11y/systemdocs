@@ -87,7 +87,7 @@ def _reset_audit(audit, monkeypatch) -> None:
 
 def test_run_migrations_fresh_creates_all_objects(tmp_path):
     engine = sa.create_engine(_tmp_url(tmp_path))
-    assert run_migrations(engine) == 2  # m0001 + m0002 (MIN-103 engine tables)
+    assert run_migrations(engine) == 3  # m0001+m0002+m0003 (packaged_in marker)
 
     inspector = sa.inspect(engine)
     assert EXPECTED_TABLES <= set(inspector.get_table_names())
@@ -110,7 +110,7 @@ def test_run_migrations_fresh_creates_all_objects(tmp_path):
 
 def test_run_migrations_idempotent(tmp_path):
     engine = sa.create_engine(_tmp_url(tmp_path))
-    assert run_migrations(engine) == 2
+    assert run_migrations(engine) == 3
     assert run_migrations(engine) == 0
     init_db(engine)  # must not explode / double-apply
     assert run_migrations(engine) == 0
@@ -120,11 +120,11 @@ def test_run_migrations_idempotent(tmp_path):
 
 
 def test_schema_version_and_marker_row(tmp_path):
-    assert SCHEMA_VERSION == 2
+    assert SCHEMA_VERSION == 3
     assert [m.version for m in MIGRATIONS] == sorted(
         m.version for m in MIGRATIONS
     )
-    assert {1, 2} <= {m.version for m in MIGRATIONS}
+    assert {1, 2, 3} <= {m.version for m in MIGRATIONS}
 
     engine = sa.create_engine(_tmp_url(tmp_path))
     run_migrations(engine)
@@ -132,9 +132,57 @@ def test_schema_version_and_marker_row(tmp_path):
         rows = conn.execute(
             sa.text("SELECT version, applied_at FROM schema_migrations")
         ).all()
-    assert [r[0] for r in rows] == [1, 2]
+    assert [r[0] for r in rows] == [1, 2, 3]
     for row in rows:
         datetime.fromisoformat(row[1])  # ISO-8601 per DDL
+
+
+# --- (e) m0003 is idempotent on a partially-patched schema --------------------
+
+
+def test_m0003_column_present_but_version_absent(tmp_path):
+    """M5: a db that already gained ``records.packaged_in`` (manual patch /
+    crash mid-migration) but has no version-3 row must still migrate — the
+    ALTER is guarded by PRAGMA table_info, not only by the version gate."""
+    from zalo_module.migrations import m0003_record_packaged as m0003
+
+    engine = sa.create_engine(_tmp_url(tmp_path))
+    with engine.begin() as conn:
+        conn.execute(
+            sa.text(
+                "CREATE TABLE records (record_id TEXT PRIMARY KEY)"
+            )
+        )
+        conn.execute(
+            sa.text(
+                "CREATE TABLE schema_migrations"
+                " (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"
+            )
+        )
+        # Simulate a partially-patched db: column exists, marker row does not.
+        conn.execute(
+            sa.text("ALTER TABLE records ADD COLUMN packaged_in TEXT")
+        )
+        conn.execute(
+            sa.text("INSERT INTO schema_migrations (version, applied_at)"
+                    " VALUES (1, '2026-09-25T00:00:00+00:00')")
+        )
+
+    m0003.upgrade(engine)
+
+    with engine.connect() as conn:
+        cols = [r[1] for r in conn.execute(
+            sa.text("PRAGMA table_info(records)")
+        ).all()]
+        assert cols.count("packaged_in") == 1  # no duplicate column
+        versions = [r[0] for r in conn.execute(
+            sa.text("SELECT version FROM schema_migrations ORDER BY version")
+        ).all()]
+        assert versions == [1, 3]
+        index_names = {
+            ix["name"] for ix in sa.inspect(conn).get_indexes("records")
+        }
+        assert "ix_records_packaged_in" in index_names
 
 
 # --- (d) audit hook in get_engine -------------------------------------------

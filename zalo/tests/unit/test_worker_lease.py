@@ -325,3 +325,77 @@ def test_claim_respects_limit(env):
             enqueue_job("ocr", {"i": i}, s)
         claimed = claim_jobs(NOW, "worker-1", s, limit=2)
         assert len(claimed) == 2
+
+
+# --- I6: atomic state-CAS claim -------------------------------------------------
+
+
+def test_claim_sets_updated_at_and_lease_fields(env):
+    """The CAS UPDATE stamps state/lease/attempts/updated_at in one shot."""
+    _s, engine = env
+    with session_scope(engine) as s:
+        job_id = enqueue_job("ocr", {}, s)
+        created = s.get(Job, job_id).updated_at
+        claim_jobs(NOW, "worker-1", s)
+        job = s.get(Job, job_id)
+        assert job.state == "running"
+        assert job.lease_owner == "worker-1"
+        assert job.attempts == 1
+        # updated_at is part of the same UPDATE, not a stale enqueue value
+        assert job.updated_at == NOW.isoformat()
+        assert job.updated_at != created
+
+
+def test_claim_never_reclaims_a_running_job(env):
+    """Second worker polling the queue gets nothing while a lease is held."""
+    _s, engine = env
+    with session_scope(engine) as s:
+        job_id = enqueue_job("ocr", {}, s)
+        assert claim_jobs(NOW, "worker-1", s)
+        assert claim_jobs(NOW, "worker-2", s) == []
+        job = s.get(Job, job_id)
+        assert job.lease_owner == "worker-1"
+        assert job.attempts == 1  # no double-increment
+
+
+def test_claim_cas_skips_job_flipped_mid_race(env):
+    """I6: if a racing worker flips the state between candidate SELECT and
+    the CAS UPDATE, rowcount==0 → the job is skipped, never claimed twice.
+
+    An ``after_cursor_execute`` hook performs the "other worker's" UPDATE
+    inside the same transaction the moment the claim SELECT lands — the
+    subsequent CAS UPDATE then genuinely evaluates a stale candidate.
+    """
+    from sqlalchemy import event, text
+
+    _s, engine = env
+    flipped = []
+
+    def _race_win(conn, cursor, statement, parameters, context, executemany):
+        if flipped:
+            return
+        head = statement.lstrip().upper()
+        if head.startswith("SELECT") and "FROM jobs" in statement:
+            flipped.append(True)
+            conn.execute(
+                text(
+                    "UPDATE jobs SET state = 'running',"
+                    " lease_owner = 'worker-9'"
+                )
+            )
+
+    event.listen(engine, "after_cursor_execute", _race_win)
+    try:
+        with session_scope(engine) as s:
+            job_id = enqueue_job("ocr", {}, s)
+            s.flush()
+            claimed = claim_jobs(NOW, "worker-1", s)
+            assert flipped, "race hook did not fire"
+            assert claimed == []  # rowcount 0 → skipped
+            job = s.get(Job, job_id)
+            s.refresh(job)  # identity map still holds the stale 'queued' row
+            assert job.state == "running"
+            assert job.lease_owner == "worker-9"  # the other worker won
+            assert job.attempts == 0  # CAS never ran attempts+1
+    finally:
+        event.remove(engine, "after_cursor_execute", _race_win)

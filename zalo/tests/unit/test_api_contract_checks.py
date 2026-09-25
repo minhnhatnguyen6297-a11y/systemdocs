@@ -125,7 +125,9 @@ def test_receipt_same_id_different_body_is_not_replay(tmp_path):
     assert replay.status_code == 200
     assert replay.json()["receipt_id"] == receipt_id
 
-    # Same receipt_id but different manifest hash → conflict, not a replay.
+    # Same receipt_id but different manifest hash → package_conflict, not a
+    # replay (I1: stored decisions are immutable; id reuse with different
+    # contents is always a conflict, never a re-validation).
     bad = client.post(
         "/intake/v1/receipts",
         content=json.dumps(
@@ -133,9 +135,9 @@ def test_receipt_same_id_different_body_is_not_replay(tmp_path):
         ),
     )
     assert bad.status_code == 409
-    assert bad.json()["error"]["code"] == "receipt_hash_mismatch"
+    assert bad.json()["error"]["code"] == "package_conflict"
 
-    # Same receipt_id but different record count → receipt_count_mismatch.
+    # Same receipt_id but different record count → package_conflict too.
     bad2 = client.post(
         "/intake/v1/receipts",
         content=json.dumps(
@@ -143,7 +145,7 @@ def test_receipt_same_id_different_body_is_not_replay(tmp_path):
         ),
     )
     assert bad2.status_code == 409
-    assert bad2.json()["error"]["code"] == "receipt_count_mismatch"
+    assert bad2.json()["error"]["code"] == "package_conflict"
 
 
 @pytest.mark.parametrize(

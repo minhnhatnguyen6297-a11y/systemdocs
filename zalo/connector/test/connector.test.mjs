@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {FileOutbox} from '../src/core.mjs';
-import {createZaloClient, finalizeQrLogin, handleMessage, handleQrLoginEvent, installCommandPoll, installSourceSyncTriggers, isParentAlive, listenerHeartbeatState, processUnknownSourceQueue, publishConnectedState, readSettings, refreshRuntimeState, resolveUnknownSource, runDataSync, shouldRestoreSession, sourceDescriptor, startConnector, startParentWatch, syncSources, verifyRestoredSession} from '../src/connector.mjs';
+import {createZaloClient, finalizeQrLogin, handleMessage, handleQrLoginEvent, installCommandPoll, installSourceEventHandlers, installSourceSyncTriggers, isParentAlive, listenerHeartbeatState, processUnknownSourceQueue, publishConnectedState, readSettings, refreshRuntimeState, resolveUnknownSource, runDataSync, shouldRestoreSession, sourceDescriptor, startConnector, startParentWatch, syncSources, verifyRestoredSession} from '../src/connector.mjs';
 
 test('readSettings requires deployment quota and retention instead of inventing defaults', () => {
   assert.throws(() => readSettings({}), /required/i);
@@ -385,7 +385,10 @@ test('runDataSync preserves history text and successful siblings while counting 
       return event.event_type === 'message'
         ? {ack: true, components: {
           text: event.raw_text == null ? 'absent' : 'imported',
-          media: event.attachments.map(({attachment_index}) => ({attachment_index, status: 'imported'})),
+          media: event.attachments.map((attachment) => ({
+            attachment_index: attachment.attachment_index,
+            status: attachment.status === 'failed' ? 'missing' : 'imported',
+          })),
         }}
         : {ack: true};
     };
@@ -402,11 +405,28 @@ test('runDataSync preserves history text and successful siblings while counting 
     emitHistory(testCase, 1);
     await running;
 
+    // Failed downloads ship as sanitized `failed` markers — every slot stays
+    // visible (including the media-only message), errors never leak upstream.
     const messages = testCase.events.filter(({event_type}) => event_type === 'message');
-    assert.deepEqual(messages.map(({msg_id, raw_text, attachments}) => ({msg_id, raw_text, indexes: attachments.map(({attachment_index}) => attachment_index)})), [
-      {msg_id: 'mixed', raw_text: 'keep text', indexes: [1]},
-      {msg_id: 'text-only-fallback', raw_text: 'also keep', indexes: []},
+    assert.deepEqual(messages.map(({msg_id, raw_text, attachments}) => ({
+      msg_id, raw_text,
+      attachments: attachments.map(({attachment_index, status, error_code}) => ({
+        attachment_index, status: status || 'downloaded', error_code: error_code || null,
+      })),
+    })), [
+      {msg_id: 'mixed', raw_text: 'keep text', attachments: [
+        {attachment_index: 0, status: 'failed', error_code: 'download_failed'},
+        {attachment_index: 1, status: 'downloaded', error_code: null},
+        {attachment_index: 2, status: 'failed', error_code: 'download_failed'},
+      ]},
+      {msg_id: 'text-only-fallback', raw_text: 'also keep', attachments: [
+        {attachment_index: 0, status: 'failed', error_code: 'download_failed'},
+      ]},
+      {msg_id: 'media-only-failure', raw_text: null, attachments: [
+        {attachment_index: 0, status: 'failed', error_code: 'download_failed'},
+      ]},
     ]);
+    assert.equal(JSON.stringify(messages).includes('PRIVATE_DOWNLOAD_ERROR'), false);
     assert.deepEqual((await downloadQueue.entries()).map(({event}) => event.message_key), ['account-1:u-live:live']);
     assert.deepEqual(testCase.events.at(-1).counters, {
       received: 3, duplicates: 0, imported_text: 2, imported_media: 1, media_download_failures: 4,
@@ -634,7 +654,17 @@ test('runDataSync disconnects an in-flight history download without completing a
       error_code: 'listener_disconnected',
       counters: {received: 1, duplicates: 0, imported_text: 0, imported_media: 0, media_download_failures: 0},
     }]);
-    assert.deepEqual((await downloadQueue.entries()).map(({event}) => event.message_key), ['account-1:u-live:live']);
+    // Aborted queue operations self-clean asynchronously (guard() abandons
+    // raced-out work); poll briefly for the durable postcondition instead of
+    // asserting at a fixed instant — this test was flaky on Windows where
+    // the abandoned enqueue/remove lands a tick after runDataSync resolves.
+    let remaining = [];
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      remaining = (await downloadQueue.entries()).map(({event}) => event.message_key);
+      if (remaining.length === 1) break;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    assert.deepEqual(remaining, ['account-1:u-live:live']);
   } finally {
     await rm(root, {recursive: true, force: true});
   }
@@ -1036,11 +1066,11 @@ test('handleMessage durably retries sibling attachments and publishes one privat
   const outbox = new FileOutbox(path.join(root, 'outbox'));
   const downloadQueue = new FileOutbox(path.join(root, 'download-queue'));
   const published = [];
-  let failSecond = true;
-  let downloadCalls = 0;
+  let failPng = true;
   const store = {download: async (key, url) => {
-    downloadCalls += 1;
-    if (downloadCalls === 2 && failSecond) throw new Error('crash');
+    // Queue entries are processed in hashed-name order, not index order —
+    // pin the failure to a specific URL instead of a call count.
+    if (url.endsWith('/a.png') && failPng) throw new Error('crash');
     return {path: `/data/${key}`, sizeBytes: url.endsWith('/a.png') ? 3 : 4};
   }};
   const message = {
@@ -1070,22 +1100,41 @@ test('handleMessage durably retries sibling attachments and publishes one privat
     client: {sendEvent: async (event) => {
       published.push(event);
       return event.event_type === 'message'
-        ? {ack: true, components: {text: 'imported', media: event.attachments.map(({attachment_index}) => ({attachment_index, status: 'imported'}))}}
+        ? {ack: true, components: {text: 'imported', media: event.attachments.map((attachment) => ({
+          attachment_index: attachment.attachment_index,
+          status: attachment.status === 'failed' ? 'missing' : 'imported',
+        }))}}
         : {ack: true};
     }},
   };
-  await assert.rejects(() => handleMessage(fixture), /crash/);
-  assert.equal((await downloadQueue.entries()).length, 2);
-
-  failSecond = false;
+  // Non-fatal: the envelope publishes immediately — a `failed` marker keeps
+  // the broken slot visible while the sibling bytes land normally.
   await handleMessage(fixture);
   const messageEvents = published.filter((event) => event.event_type === 'message');
   assert.equal(messageEvents.length, 1);
   assert.equal(messageEvents[0].raw_text, 'Nội dung');
   assert.deepEqual(messageEvents[0].attachments, [
-    {attachment_index: 0, mime_type: 'image/png', media_object_key: messageEvents[0].attachments[0].media_object_key, size_bytes: 3},
+    {attachment_index: 0, mime_type: 'image/png', media_object_key: messageEvents[0].attachments[0].media_object_key, status: 'failed', error_code: 'download_failed'},
     {attachment_index: 1, mime_type: 'application/pdf', media_object_key: messageEvents[0].attachments[1].media_object_key, size_bytes: 4},
   ]);
+  // The failed attachment stays durably queued for a later supplement.
+  const retries = (await downloadQueue.entries()).filter(({event}) => event.record_type === 'attachment');
+  assert.equal(retries.length, 1);
+  assert.equal(retries[0].event.attempts, 1);
+  assert.equal(retries[0].event.error_code, 'download_failed');
+
+  failPng = false;
+  await handleMessage(fixture);
+  // A replay while the retry entry exists emits no second envelope; once the
+  // bytes land they ship as a `media` supplement on the same object key.
+  assert.equal(published.filter((event) => event.event_type === 'message').length, 1);
+  const mediaEvents = published.filter((event) => event.event_type === 'media');
+  assert.equal(mediaEvents.length, 1);
+  assert.equal(mediaEvents[0].attachment_index, 0);
+  assert.equal(mediaEvents[0].mime_type, 'image/png');
+  assert.equal(mediaEvents[0].size_bytes, 3);
+  assert.equal(mediaEvents[0].msg_id, 'm-1');
+  assert.equal(mediaEvents[0].media_object_key, messageEvents[0].attachments[0].media_object_key);
   assert.equal(JSON.stringify(messageEvents[0]).includes('download_url'), false);
   assert.equal(JSON.stringify(messageEvents[0]).includes('original_filename'), false);
   assert.deepEqual(await downloadQueue.pending(), []);
@@ -1168,12 +1217,26 @@ test('handleMessage treats storage full as media-only and still publishes text',
       outbox: new FileOutbox(path.join(root, 'outbox')), downloadQueue: new FileOutbox(path.join(root, 'download-queue')),
       client: {sendEvent: async (event) => {
         if (event.event_type === 'message') published.push(event);
-        return event.event_type === 'message' ? {ack: true, components: {text: 'imported', media: []}} : {ack: true};
+        return event.event_type === 'message' ? {ack: true, components: {
+          text: 'imported',
+          media: event.attachments.map((attachment) => ({
+            attachment_index: attachment.attachment_index,
+            status: attachment.status === 'failed' ? 'missing' : 'imported',
+          })),
+        }} : {ack: true};
       }},
     });
     assert.equal(published.length, 1);
     assert.equal(published[0].raw_text, 'private');
-    assert.deepEqual(published[0].attachments, []);
+    // Storage-full keeps the text flowing; the attachment ships as a failed
+    // marker so the module records the slot as missing media.
+    assert.deepEqual(published[0].attachments, [{
+      attachment_index: 0,
+      mime_type: 'image/png',
+      media_object_key: published[0].attachments[0].media_object_key,
+      status: 'failed',
+      error_code: 'storage_full',
+    }]);
   } finally {
     await rm(root, {recursive: true, force: true});
   }
@@ -1217,7 +1280,11 @@ test('connector success and failure paths never log private sentinels', async ()
     await resolveUnknownSource({getUserInfo: async () => { throw new Error(sentinels[7]); }}, {
       type: 0, threadId: sentinels[2], data: {content: sentinels[0], uidFrom: sentinels[1]},
     }, 'my-docs');
-    await assert.rejects(() => handleMessage({
+    // A download failure is non-fatal now: the envelope ships a `failed`
+    // marker carrying only the sanitized code — the raw upstream error
+    // (sentinel) never reaches the wire or the logs.
+    const published = [];
+    await handleMessage({
       message: {type: 0, threadId: 'known', data: {msgId: 'm', uidFrom: 'sender-1', ts: '1785812400000', content: {
         href: sentinels[5], title: sentinels[4], type: 'image/png',
       }}},
@@ -1227,8 +1294,23 @@ test('connector success and failure paths never log private sentinels', async ()
       store: {download: async () => { throw new Error(sentinels[7]); }},
       outbox: new FileOutbox(path.join(outboxRoot, 'outbox')),
       downloadQueue: new FileOutbox(path.join(downloadRoot, 'download')),
-      client: {sendEvent: async () => ({ack: true})},
-    }), /UPSTREAM_ERROR_SENTINEL/);
+      client: {sendEvent: async (event) => {
+        published.push(event);
+        return event.event_type === 'message'
+          ? {ack: true, components: {text: 'absent', media: event.attachments.map((attachment) => ({
+            attachment_index: attachment.attachment_index,
+            status: attachment.status === 'failed' ? 'missing' : 'imported',
+          }))}}
+          : {ack: true};
+      }},
+    });
+    const failedMarkers = published
+      .filter((event) => event.event_type === 'message')
+      .flatMap((event) => event.attachments);
+    assert.deepEqual(failedMarkers.map(({status, error_code}) => ({status, error_code})), [
+      {status: 'failed', error_code: 'download_failed'},
+    ]);
+    assert.equal(JSON.stringify(failedMarkers).includes('UPSTREAM_ERROR_SENTINEL'), false);
     assert.throws(() => sourceDescriptor({conversationId: sentinels[2], sourceType: 'invalid', displayName: sentinels[3]}));
   } finally {
     Object.assign(console, originals);
@@ -2438,4 +2520,148 @@ test('login-required restart forces a new QR instead of restoring the stale sess
   assert.equal(shouldRestoreSession(session, {}), true);
   assert.equal(shouldRestoreSession(session, {ZALO_CONNECTOR_FORCE_QR: '1'}), false);
   assert.equal(shouldRestoreSession(null, {}), false);
+});
+
+test('FileOutbox entries tolerate a vanished file but propagate other errors', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'zalo-outbox-enoent-'));
+  try {
+    const outbox = new FileOutbox(path.join(root, 'outbox'));
+    await outbox.enqueue('first', {value: 1});
+    await outbox.enqueue('second', {value: 2});
+    // Race: pending() lists a file a concurrent flush already removed —
+    // readFile hits ENOENT and the entry is skipped, not fatal.
+    const pending = outbox.pending.bind(outbox);
+    outbox.pending = async () => [...await pending(), 'vanished.json'];
+    const entries = await outbox.entries();
+    assert.deepEqual(entries.map(({event}) => event.value).sort(), [1, 2]);
+    // remove() is idempotent when the file is already gone.
+    await outbox.remove('vanished.json');
+    // A non-ENOENT read failure must still surface: a directory named
+    // *.json makes readFile throw (EISDIR/EACCES depending on platform).
+    await mkdir(path.join(outbox.root, 'corrupt.json'));
+    await assert.rejects(() => outbox.entries());
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});
+
+test('failed attachment retries are bounded and the published marker is the durable record', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'zalo-message-max-attempts-'));
+  try {
+    const outbox = new FileOutbox(path.join(root, 'outbox'));
+    const downloadQueue = new FileOutbox(path.join(root, 'download-queue'));
+    const published = [];
+    const store = {download: async () => { throw new Error('permanent upstream outage'); }};
+    const fixture = {
+      message: {type: 0, threadId: 'u-1', data: {
+        msgId: 'm-2', uidFrom: 'sender-1', ts: '1785812400000', content: 'text', attachments: [
+          {href: 'https://cdn.example/x.png', title: 'x.png', type: 'image/png'},
+        ],
+      }},
+      accountId: 'account-1', enabledIds: new Set(['u-1']),
+      sourceNames: new Map([['u-1', sourceDescriptor({conversationId: 'u-1', sourceType: 'friend', displayName: 'Bạn A'})]]),
+      send2meId: '', store, outbox, downloadQueue,
+      client: {sendEvent: async (event) => {
+        published.push(event);
+        return event.event_type === 'message'
+          ? {ack: true, components: {text: 'imported', media: event.attachments.map((attachment) => ({
+            attachment_index: attachment.attachment_index,
+            status: attachment.status === 'failed' ? 'missing' : 'imported',
+          }))}}
+          : {ack: true};
+      }},
+    };
+    // Pass 1: marker ships; retry entry kept (attempts=1). Passes 2–3 retry;
+    // after the third failure the queue entry is dropped — the marker in the
+    // already-published envelope remains the durable record.
+    for (let pass = 0; pass < 3; pass += 1) await handleMessage(fixture);
+    const messageEvents = published.filter((event) => event.event_type === 'message');
+    assert.equal(messageEvents.length, 1);
+    assert.deepEqual(messageEvents[0].attachments.map(({status, error_code}) => ({status, error_code})), [
+      {status: 'failed', error_code: 'download_failed'},
+    ]);
+    assert.equal(published.filter((event) => event.event_type === 'media').length, 0);
+    assert.deepEqual(await downloadQueue.pending(), []);
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});
+
+test('installSourceEventHandlers routes undo/reaction through the serialized outbox path', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'zalo-source-events-'));
+  try {
+    const handlers = new Map();
+    const listener = {
+      on: (name, callback) => handlers.set(name, [...(handlers.get(name) || []), callback]),
+    };
+    const outbox = new FileOutbox(path.join(root, 'outbox'));
+    const sent = [];
+    const client = {
+      sendEvent: async (event) => { sent.push(event); return {ack: true}; },
+    };
+    const operations = [];
+    // Mirror the production serial queue — concurrent flushes would race.
+    let serial = Promise.resolve();
+    const enqueueOperation = (fn) => {
+      const pending = serial.then(fn);
+      serial = pending.catch(() => {});
+      operations.push(pending);
+      return pending;
+    };
+    // Live resolver: the source map is rebound on reconcile — lookups must
+    // happen at event time, not on a stale snapshot.
+    let sourceNames = new Map();
+    installSourceEventHandlers({
+      listener, accountId: 'account-1', outbox, client, enqueueOperation,
+      conversationTypeFor: (threadId, isGroup) => (
+        sourceNames.get(threadId)?.source_type === 'group' || (!sourceNames.has(threadId) && isGroup) ? 'group' : 'user'
+      ),
+    });
+    assert.deepEqual([...handlers.keys()].sort(), ['reaction', 'undo']);
+
+    const undo = {
+      threadId: 'g-1', isGroup: true,
+      data: {ts: '1785812400000', uidFrom: 'actor-1', content: {globalMsgId: 'g-9', cliMsgId: 'c-9'}},
+    };
+    const reaction = {
+      threadId: 'g-1', isGroup: true,
+      data: {ts: '1785812400000', uidFrom: 'reactor-1', content: {rIcon: ':>', rMsg: [{gMsgID: 'g-8', cMsgID: 'c-8'}]}},
+    };
+    // Map rebound before emit: a stale snapshot would report 'user'.
+    sourceNames = new Map([['g-1', {source_type: 'group'}]]);
+    for (const handler of handlers.get('undo')) handler(undo);
+    for (const handler of handlers.get('reaction')) handler(reaction);
+    await Promise.all(operations);
+
+    assert.equal(sent.length, 2);
+    assert.equal(sent[0].event_type, 'source_event');
+    assert.equal(sent[0].event_subtype, 'recall');
+    assert.equal(sent[0].conversation_type, 'group');
+    assert.equal(sent[0].target_provider_message_id, 'g-9');
+    assert.equal(sent[0].target_client_message_id, 'c-9');
+    assert.equal(sent[1].event_subtype, 'reaction');
+    assert.equal(sent[1].reaction_icon, ':>');
+    assert.deepEqual(await outbox.pending(), []);
+
+    // A failed send keeps the durable entry for the next flush.
+    const failing = {sendEvent: async () => { throw new Error('backend returned HTTP 500'); }};
+    const outbox2 = new FileOutbox(path.join(root, 'outbox2'));
+    const ops2 = [];
+    installSourceEventHandlers({
+      listener: {on: (name, cb) => handlers.set(`x-${name}`, cb)},
+      accountId: 'account-1', outbox: outbox2, client: failing,
+      // Mirror the handler's .catch(() => {}) so awaitable ops don't reject.
+      enqueueOperation: (fn) => {
+        const p = Promise.resolve().then(fn).then(() => true, () => false);
+        ops2.push(p);
+        return p;
+      },
+      conversationTypeFor: () => 'user',
+    });
+    handlers.get('x-undo')(undo);
+    await Promise.all(ops2);
+    assert.equal((await outbox2.pending()).length, 1);
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
 });

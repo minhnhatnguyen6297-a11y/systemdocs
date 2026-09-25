@@ -40,6 +40,17 @@ def command_secret(webhook_secret: str, account_id: str) -> str:
     ).hexdigest()
 
 
+def verify_bootstrap_secret(provided: str | None, secret: str | None) -> bool:
+    """Constant-time check of the ``x-zalo-bootstrap`` onboard header.
+
+    False when the secret is unconfigured or the header is absent — onboard
+    stays closed in both cases (legacy 403 parity).
+    """
+    if not secret or provided is None:
+        return False
+    return hmac.compare_digest(provided, secret)
+
+
 def verify_webhook_signature(
     body: bytes,
     timestamp: str,

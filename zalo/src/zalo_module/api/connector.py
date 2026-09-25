@@ -20,6 +20,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from zalo_module.api._auth import IntakeRoute, require_consumer_auth
 from zalo_module.api._json import StrictJsonError, parse_strict_body
 from zalo_module.connector_proc import (
     connector_runtime_error,
@@ -36,15 +37,21 @@ from zalo_module.intake.engine import (
     connector_state,
     data_sync_command,
     ingest_webhook_event,
+    job_queue_state,
+    listener_gaps,
+    media_usage_bytes,
+    ops_warnings,
     protected_media_object_keys,
     public_qr,
     request_source_sync,
     set_source_policy,
     source_ready,
     start_data_sync,
+    utcnow,
 )
 from zalo_module.intake.security import (
     command_secret,
+    verify_bootstrap_secret,
     verify_webhook_signature,
 )
 from zalo_module.models import (
@@ -55,7 +62,9 @@ from zalo_module.models import (
 )
 from zalo_module.settings import Settings
 
-router = APIRouter(prefix="/connector/v1")
+# IntakeRoute is reused so ``require_consumer_auth`` failures surface as the
+# 401 ``intake.error.v1`` envelope (auth boundary), not a bare 500.
+router = APIRouter(prefix="/connector/v1", route_class=IntakeRoute)
 
 
 def _asset_path(settings: Settings, rel_path: str) -> "Path | None":
@@ -79,6 +88,10 @@ def _error(code: str, message: str, status_code: int) -> JSONResponse:
 
 
 def _error_code(exc: Exception) -> str:
+    # The ``/connector/v1`` error vocabulary is the legacy internal wire —
+    # ``docs/connector-protocol.md`` does not pin a closed catalog (the §11
+    # contract catalog applies to ``/intake/v1``). ``conflict`` at HTTP 409
+    # is the legacy ``_raise_http`` parity code for ``InboxConflict``.
     if isinstance(exc, InboxValidationError):
         return "validation_failed"
     if isinstance(exc, InboxConflict):
@@ -137,9 +150,10 @@ def onboard_connector(
     request: Request,
     settings: Settings = Depends(_request_settings),
 ) -> Any:
-    if (
-        not settings.bootstrap_secret
-        or request.headers.get("x-zalo-bootstrap") != settings.bootstrap_secret
+    # Onboard keeps its dedicated bootstrap-secret check (constant-time —
+    # M9); the consumer bearer guard does not apply here.
+    if not verify_bootstrap_secret(
+        request.headers.get("x-zalo-bootstrap"), settings.bootstrap_secret
     ):
         # Legacy returns 403 here (routers/zalo_inbox.py:368).
         return _error("unauthorized", "Bootstrap secret không hợp lệ", 403)
@@ -180,6 +194,12 @@ async def receive_event(
         return _error("validation_failed", str(exc), 400)
     except InboxError as exc:
         return _mapped(exc)
+    except (TypeError, ValueError):
+        # Un-wrapped payload casts in the engine — ``int(...)`` on event
+        # fields raises raw ValueError/TypeError for malformed values
+        # (e.g. ``listener_generation: "abc"``). A malformed connector
+        # document is a 400 validation failure, never a 500.
+        return _error("validation_failed", "Payload không hợp lệ", 400)
     # ACK shape parity with legacy routers/zalo_inbox.py:420-426.
     event_type = payload.get("event_type")
     if event_type == "message":
@@ -192,10 +212,12 @@ async def receive_event(
         "data_sync_failed",
     }:
         return {"ack": True}
-    # discovery / heartbeat / state / media / ignored — legacy emits a
-    # single ``id`` key (None for dict results).
+    # discovery / heartbeat / state / media / source_event / ignored —
+    # legacy emits a single ``id`` key (None for dict results without a
+    # public object id). ``source_event`` surfaces its record_id so the
+    # connector dedupe log can correlate replayed observations.
     if isinstance(result, dict):
-        result = result.get("attachment_id")
+        result = result.get("attachment_id") or result.get("record_id")
     return {"ack": True, "id": result}
 
 
@@ -265,7 +287,17 @@ def next_command(
         return command
 
 
-@router.post("/connectors/{account_id}/consent")
+# The ops/mutation surface below (consent, sources refresh, data-sync,
+# PATCH sources, connectors/start, GET /state, GET media content) is
+# loopback-internal like the legacy port — when ``settings.api_token`` is
+# configured it additionally requires ``Authorization: Bearer <token>`` as
+# defense-in-depth (I7). Unset token → open, parity with the documented
+# loopback deployment. The signed routes (events/config/commands) keep
+# their HMAC auth; onboard keeps the bootstrap secret.
+@router.post(
+    "/connectors/{account_id}/consent",
+    dependencies=[Depends(require_consumer_auth)],
+)
 def apply_consent(
     account_id: str,
     request: Request,
@@ -279,7 +311,10 @@ def apply_consent(
         return {"policy_version": policy_version}
 
 
-@router.post("/connectors/{account_id}/sources/refresh")
+@router.post(
+    "/connectors/{account_id}/sources/refresh",
+    dependencies=[Depends(require_consumer_auth)],
+)
 def refresh_sources(
     account_id: str,
     request: Request,
@@ -293,7 +328,10 @@ def refresh_sources(
         return {"source_sync_request_version": version}
 
 
-@router.post("/connectors/{account_id}/data-sync")
+@router.post(
+    "/connectors/{account_id}/data-sync",
+    dependencies=[Depends(require_consumer_auth)],
+)
 def request_data_sync(
     account_id: str,
     request: Request,
@@ -309,7 +347,10 @@ def request_data_sync(
         return {"run_id": run.run_id, "status": run.status}
 
 
-@router.patch("/sources/{source_id}")
+@router.patch(
+    "/sources/{source_id}",
+    dependencies=[Depends(require_consumer_auth)],
+)
 def patch_source(
     source_id: str,
     request: Request,
@@ -340,7 +381,10 @@ def patch_source(
         }
 
 
-@router.get("/media/{attachment_id}/content")
+@router.get(
+    "/media/{attachment_id}/content",
+    dependencies=[Depends(require_consumer_auth)],
+)
 def media_content(
     attachment_id: str,
     request: Request,
@@ -364,19 +408,38 @@ def media_content(
         return FileResponse(path, media_type=media_type)
 
 
-@router.get("/state")
+@router.get("/state", dependencies=[Depends(require_consumer_auth)])
 def ops_state(
     request: Request,
     settings: Settings = Depends(_request_settings),
 ) -> Any:
-    """Ops snapshot: connector/policy/sources/data-sync only.
+    """Ops snapshot: connector/policy/sources/data-sync + MIN-94 extras.
 
-    Deliberately excludes batch/media-grid consumer state (no ``ZaloBatch``
-    in the module — MIN-95 territory).
+    The legacy shape is preserved verbatim; the additive blocks are:
+    ``gaps[]`` (open/closed listener coverage intervals),
+    ``queue{pending_jobs, oldest_age_s}`` (internal job backlog),
+    ``media{usage_bytes, quota_bytes, storage_full}`` and ``warnings[]``
+    (advisory codes — heartbeat stale, open gap, storage pressure).
     """
     with session_scope(request.app.state.engine) as session:
+        now = utcnow()
+        queue = job_queue_state(session, now=now)
+        usage_bytes = media_usage_bytes(settings)
         account = _first_account(session)
         if account is None:
+            media = {
+                "usage_bytes": usage_bytes,
+                "quota_bytes": settings.connector_quota_bytes,
+                "storage_full": usage_bytes >= settings.connector_quota_bytes,
+            }
+            warnings = []
+            if media["storage_full"]:
+                warnings.append(
+                    {
+                        "code": "storage_full",
+                        "message": "media storage quota reached",
+                    }
+                )
             return {
                 "connector": {
                     "state": "login_required",
@@ -393,6 +456,10 @@ def ops_state(
                 "sources": [],
                 "data_sync": None,
                 "connector_error": connector_runtime_error(),
+                "gaps": [],
+                "queue": queue,
+                "media": media,
+                "warnings": warnings,
             }
         sources = (
             session.execute(
@@ -411,6 +478,13 @@ def ops_state(
                 DataSyncRun.status == "running",
             )
         ).scalar_one_or_none()
+        gaps = listener_gaps(session, account, now=now)
+        media = {
+            "usage_bytes": usage_bytes,
+            "quota_bytes": settings.connector_quota_bytes,
+            "storage_full": bool(account.storage_full)
+            or usage_bytes >= settings.connector_quota_bytes,
+        }
         return {
             "connector": {
                 "connector_account_id": account.connector_account_id,
@@ -461,10 +535,17 @@ def ops_state(
                 else None
             ),
             "connector_error": connector_runtime_error(),
+            "gaps": gaps,
+            "queue": queue,
+            "media": media,
+            "warnings": ops_warnings(account, gaps, media, now=now),
         }
 
 
-@router.post("/connectors/start")
+@router.post(
+    "/connectors/start",
+    dependencies=[Depends(require_consumer_auth)],
+)
 async def start_connector(
     request: Request,
     settings: Settings = Depends(_request_settings),

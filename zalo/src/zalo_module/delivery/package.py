@@ -56,8 +56,9 @@ def build_package(records: list[dict], consumer_id: str, settings, session) -> s
     ``records`` are already intake.raw-record.v1 payload dicts produced by the
     domain layer; the session commits the ``packages`` ledger row.
     """
-    # TODO(MIN-97): validate records against vendored intake.raw-record.v1
-    # schema before packaging (schemas/raw-record.schema.json).
+    # Record-level schema validation happens in the caller (jobs/package_jobs
+    # validates each payload against vendored raw-record.schema.json before
+    # invoking this primitive); build_package stays a pure byte-writer.
     package_id = str(uuid.uuid4())
     max_seq = session.execute(
         select(func.max(Package.sequence)).where(
@@ -122,7 +123,10 @@ def build_package(records: list[dict], consumer_id: str, settings, session) -> s
             dir_rel_path=final.relative_to(settings.runtime_root).as_posix(),
             created_at=manifest["created_at"],
             sealed_at=ready["sealed_at"],
-            status="pending",
+            # Sealed = READY.json written + atomic rename done + ledger row in
+            # this same transaction; the row now enters the pending feed until
+            # a receipt `accepted` flips it to `acked` (contract §7.2/§8.3).
+            status="sealed",
         )
     )
     return package_id

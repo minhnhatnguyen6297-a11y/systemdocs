@@ -36,6 +36,7 @@ class Settings:
     # -- MIN-103 connector/engine fields (sheet §7) --------------------------
     # Defaults keep direct ``Settings(**kwargs)`` construction working for
     # tests that don't exercise the connector surface.
+    api_token: str | None = None          # ZALO_INTAKE_API_TOKEN — Bearer /intake/v1
     webhook_secret: str | None = None     # ZALO_INBOX_WEBHOOK_SECRET
     bootstrap_secret: str | None = None   # ZALO_INBOX_BOOTSTRAP_SECRET
     connector_state_root: Path | None = None  # ZALO_CONNECTOR_STATE_ROOT
@@ -111,6 +112,7 @@ def get_settings(env: dict[str, str] | None = None) -> Settings:
         qwen_api_key=e.get("QWEN_API_KEY") or None,
         account_id=e.get("ZALO_ACCOUNT_ID") or None,
         ocr_config_version=e.get("OCR_CONFIG_VERSION", "ocr-config-v1"),
+        api_token=e.get("ZALO_INTAKE_API_TOKEN") or None,
         access_log_path=runtime_root / "access.jsonl",
         webhook_secret=e.get("ZALO_INBOX_WEBHOOK_SECRET") or None,
         bootstrap_secret=e.get("ZALO_INBOX_BOOTSTRAP_SECRET") or None,

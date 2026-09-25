@@ -73,12 +73,15 @@ phải giữ parity hoặc ghi rõ trong `docs/migration-notes.md`.
   (ZALO-LIVE-001). Port nguyên gate; không bật ngầm.
 - **`error_code` trong state event bị backend drop** — connector gửi
   `error_code` trong event `state` nhưng `apply_connector_report` v1 không
-  lưu. Field chết trên wire — module giữ parity nhận-và-bỏ hoặc ghi
-  migration-note nếu quyết định lưu.
+  lưu. Field chết trên wire. **Đã quyết định ở MIN-94**: module lưu
+  `payload.reason`/`error_code` vào `listener_sessions.reason` (≤200 ký
+  tự, ops-only) — drift đóng, ghi ở `docs/migration-notes.md`.
 - **`heartbeat` và `media` event: backend chấp nhận, connector không bao giờ
   phát.** Dispatcher v1 có nhánh cho cả hai; connector không có call site
-  nào emit. Giữ nhánh accept cho parity; đừng giả định heartbeat tồn tại
-  trên wire.
+  nào emit. **Cập nhật MIN-94**: connector nay phát `media` như supplement
+  khi một attachment retry thành công sau khi envelope đã publish
+  (`docs/collector.md` §3); `heartbeat` vẫn không có call site — giữ nhánh
+  accept cho parity, đừng giả định heartbeat tồn tại trên wire.
 - **Cửa sổ history 7 ngày ≠ retention 168h.** `runDataSync` lọc history theo
   `cutoff_at − 7d` (source: `connector.mjs` ~:587); retention media là
   `captured_at + 168h` (`MediaStore.prune` theo mtime + `run.bat` provision).

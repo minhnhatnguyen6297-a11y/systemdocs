@@ -1,0 +1,29 @@
+{
+  "output": {
+    "choices": [
+      {
+        "message": {
+          "content": [
+            {
+              "text": "CONG CHUNG\nHANOI 2026",
+              "ocr_result": {
+                "words_info": [
+                  {
+                    "text": "CONG CHUNG",
+                    "location": [10, 20, 210, 20, 210, 60, 10, 60],
+                    "rotate_rect": [110, 40, 200, 40, 0.0]
+                  },
+                  {
+                    "text": "HANOI 2026",
+                    "location": [15, 80, 205, 80, 205, 115, 15, 115],
+                    "rotate_rect": null
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

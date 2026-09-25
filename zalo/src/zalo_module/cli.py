@@ -135,7 +135,43 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="override ZALO_INTAKE_PORT",
     )
+
+    worker = sub.add_parser(
+        "worker", help="run the durable job worker loop (jobs table)"
+    )
+    worker.add_argument(
+        "--once",
+        action="store_true",
+        help="run a single claim/dispatch pass then exit",
+    )
+    worker.add_argument(
+        "--interval",
+        type=float,
+        default=2.0,
+        help="seconds between passes (default 2.0)",
+    )
     return parser
+
+
+def _cmd_worker(args) -> int:
+    settings = get_settings()
+    audit.configure(settings.access_log_path)
+    engine = get_engine(settings)
+    init_db(engine)
+
+    from zalo_module.jobs.handlers import build_handlers, build_sweepers
+    from zalo_module.jobs.worker import run_forever, run_once
+
+    handlers = build_handlers()
+    sweepers = build_sweepers()
+    if args.once:
+        ran = run_once(engine, settings, handlers, sweepers)
+        print(json.dumps({"dispatched": ran}))
+        return 0
+    run_forever(
+        engine, settings, handlers, sweepers, interval_seconds=args.interval
+    )
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -145,6 +181,7 @@ def main(argv: list[str] | None = None) -> int:
         "replay": _cmd_replay,
         "status": _cmd_status,
         "serve": _cmd_serve,
+        "worker": _cmd_worker,
     }[args.command]
     return handler(args)
 

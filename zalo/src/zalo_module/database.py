@@ -13,7 +13,7 @@ from typing import Iterator
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def _sqlite_db_path(db_url: str) -> Path | None:

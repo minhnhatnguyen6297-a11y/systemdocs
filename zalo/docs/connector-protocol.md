@@ -24,7 +24,7 @@ parity.
 | `POST /connector/v1/connectors/{id}/data-sync` | `.../data-sync` | `start_data_sync` |
 | `PATCH /connector/v1/sources/{id}` | `.../api/sources/{id}` | `set_source_policy` |
 | `GET /connector/v1/media/{id}/content` | `.../api/media/{id}/content` | `FileResponse` media của module — chỉ ops/debug local |
-| `GET /connector/v1/state` | `.../api/state` | Ops snapshot của module — **chỉ** phần connector+policy+sources+data_sync (không có phần batch/media-grid của consumer) |
+| `GET /connector/v1/state` | `.../api/state` | Ops snapshot của module — connector+policy+sources+data_sync + additive `gaps[]`/`queue`/`media`/`warnings[]` (không có phần batch/media-grid của consumer; xem `docs/collector.md` §6) |
 | `POST /connector/v1/connectors/start` | `.../api/connectors/start` | Spawn connector subprocess (process manager `connector_proc.py`) |
 
 `protected_media_object_keys`: trong v1 derive từ `ZaloBatch.items_json`;
@@ -73,6 +73,17 @@ Response: `204` khi không có lệnh; nếu có → `{command_type: "data_sync"
 run_id, cutoff_at, deadline_at, source_ids[]}`. Connector validate đủ trường
 và `cutoff_at`/`deadline_at` parse được ISO trước khi chạy.
 
+### 2.4 Ops/mutation surface — consumer Bearer (defense-in-depth)
+
+Các route ops/mutation (consent, `sources/refresh`, `data-sync`,
+`PATCH /sources/{id}`, `GET /state`, `GET /media/{id}/content`,
+`connectors/start`) là loopback-internal như legacy. Khi module cấu hình
+`ZALO_INTAKE_API_TOKEN` các route này **bắt buộc** thêm
+`Authorization: Bearer <token>` — auth fail → 401 envelope
+`intake.error.v1` (`unauthorized`). Token unset → vẫn mở (parity loopback).
+Không áp cho onboard (bootstrap secret riêng) lẫn signed routes
+(events/config/commands — HMAC giữ nguyên).
+
 ## 3. Event JSON shapes
 
 Mọi event gửi qua `POST /connector/v1/events` đều có `schema_version: 1` và
@@ -108,6 +119,7 @@ listener reconnect, targeted lookup cho unknown thread và reconcile 60 phút.
   "source_type": "friend|group|stranger|my_documents",
   "source_display_name": "<tên>",
   "msg_id": "<msgId|cliMsgId>",
+  "client_message_id": "<cliMsgId — optional>",
   "sender_id": "<uidFrom>",
   "sent_at": "<ISO 8601>",
   "raw_text": "<string|null>",
@@ -116,20 +128,35 @@ listener reconnect, targeted lookup cho unknown thread và reconcile 60 phút.
       "attachment_index": 0,
       "mime_type": "image/jpeg|image/png|application/pdf",
       "media_object_key": "<accountId>/<YYYY-MM-DD>/<sha256(msgId:idx)>.<jpg|png|pdf>",
-      "size_bytes": 12345,
-      "original_filename": "<tên>"
+      "size_bytes": 12345
+    },
+    {
+      "attachment_index": 1,
+      "mime_type": "image/jpeg",
+      "media_object_key": "<accountId>/.../x.jpg",
+      "status": "failed",
+      "error_code": "download_failed|download_aborted|download_http_error|storage_full"
     }
   ]
 }
 ```
 
-- `download_url` **bị xóa** trước khi publish — URL CDN Zalo không đi qua
-  wire; module chỉ resolve `media_object_key` trong storage root chia sẻ.
+- `download_url`/`original_filename` **không rời connector** — chỉ sống
+  trong `download-queue` nội bộ; envelope publish chỉ chứa các field trên.
+  Module chỉ resolve `media_object_key` trong storage root chia sẻ.
+- `status` absent = `downloaded` (additive wire MIN-94; envelope legacy
+  vẫn hợp lệ). Failed marker giữ slot hiển thị thay vì drop attachment —
+  xem `docs/collector.md` §2-3.
+- `client_message_id` giữ `cliMsgId` verbatim khi zca-js cung cấp — field
+  optional, absent khi nguồn không có; recall/reaction link về tin gốc
+  qua `cliMsgId`/`cMsgID` (contract §5.2). Module lưu vào
+  `source.client_message_id` của `message_text` record.
 - Self-message bị drop trừ khi `threadId == session send2me_id` (My
   Documents). `raw_text == null` và `attachments == []` → không normalize.
 - Dedupe key: `(connector_account_id, conversation_id, msg_id)`; mỗi
   attachment thêm `:{attachment_index}`. Cùng key + payload khác → conflict,
-  không overwrite.
+  không overwrite — ngoại lệ duy nhất: stored `failed` + incoming
+  downloaded cùng `media_object_key` = upgrade missing→captured.
 
 ### 3.3 `state` — trạng thái listener/session
 
@@ -154,8 +181,10 @@ listener reconnect, targeted lookup cho unknown thread và reconcile 60 phút.
 - `qr_image`: data-URL PNG từ zca-js QR callback (TTL 100s); QR token không
   bao giờ forward. `qr_login_success` + `bound_zalo_id` đi khi login/session
   restore thành công (ACK trước khi `saveSession`).
-- **`error_code` bị backend v1 drop** — connector gửi, module không lưu
-  (drift đã ghi ở `baseline-open-issues.md`).
+- `reason`/`error_code` được lưu vào `listener_sessions.reason` của row
+  session tương ứng (tối đa 200 ký tự) — chỉ phục vụ ops `/state`, không
+  forward sang consumer. (v1 drop field này — ghi ở
+  `baseline-open-issues.md`; module đã đóng divergence đó ở MIN-94.)
 
 ### 3.4 `policy_ack` / `source_sync_ack`
 
@@ -188,25 +217,59 @@ thread-type toàn account; lọc cục bộ theo snapshot nguồn bật và cử
 **7 ngày** từ `cutoff_at` (≠ retention 168h của media — xem drift). Terminal
 event retry đến khi ACK; HTTP 409 coi như đã nhận.
 
-### 3.6 ACK response (module → connector)
+### 3.6 `source_event` — quan sát recall/reaction
+
+```json
+{
+  "schema_version": 1,
+  "event_type": "source_event",
+  "connector_account_id": "<uuid>",
+  "conversation_id": "<threadId>",
+  "conversation_type": "user|group",
+  "event_subtype": "recall|reaction",
+  "target_provider_message_id": "<globalMsgId|gMsgID>",
+  "target_client_message_id": "<cliMsgId|cMsgID — optional>",
+  "reaction_icon": "<rIcon — bắt buộc khi subtype=reaction>",
+  "observed_at": "<ISO 8601>",
+  "sender_id": "<uidFrom — optional>",
+  "sender_display_name": "<tên — optional>"
+}
+```
+
+- zca-js `undo` → `recall` (target từ `content.globalMsgId`/`cliMsgId`,
+  fallback `data.msgId`/`cliMsgId`); zca-js `reaction` → một event **mỗi
+  target** trong `content.rMsg[]` (`gMsgID`/`cMsgID`) với `content.rIcon`.
+- Reaction `rIcon` rỗng (gỡ reaction) không emit — v1 yêu cầu icon
+  non-empty. Target không resolve được id bị skip, không phát record sai.
+- Module validate theo record contract trước khi ghi `source_event`
+  record (icon bắt buộc/cấm theo subtype, `conversation_type` user|group,
+  target id bắt buộc) — payload sai bị reject 400 và sẽ quarantine sau
+  retry bound trong outbox.
+- Chi tiết normalize/dedupe: `docs/collector.md` §4.
+
+### 3.7 ACK response (module → connector)
 
 ```json
 {"ack": true,
  "components": {"text": "absent|imported|duplicate|ignored",
                 "media": [{"attachment_index": 0,
-                           "status": "imported|duplicate|ignored"}]}}
+                           "status": "imported|duplicate|ignored|missing"}]}}
 ```
 
 - `policy_ack`: response phải có `policy_version` khớp event.
 - `source_sync_ack`: phải có `source_sync_request_version` khớp.
-- `message`: `components.media` phải đúng thứ tự và đủ số attachment.
+- `message`: `components.media` phải đúng thứ tự và đủ số attachment;
+  `missing` = module đã ghi nhận slot media thiếu (không lỗi).
 - `data_sync_progress|complete|failed`: chỉ `{"ack": true}`.
-- Các event còn lại (`discovery`, `state`/`heartbeat`, `media`): trả
-  `{"ack": true, "id": <id đối tượng|null>}` — `id` là conv_source_id /
-  media attachment_id; `null` cho state/heartbeat và media bị ignore.
+- Các event còn lại (`discovery`, `state`/`heartbeat`, `media`,
+  `source_event`): trả `{"ack": true, "id": <id đối tượng|null>}` —
+  `id` là conv_source_id / media attachment_id / source_event record_id;
+  `null` cho state/heartbeat và media bị ignore.
 - Không khớp → connector throw, giữ event trong outbox và retry.
-- Event `heartbeat` và `media` (media-only) module v1 **chấp nhận** nhưng
-  connector **không bao giờ phát** — giữ parity, không loại bỏ ngầm.
+- Event `media` connector **phát** như supplement: retry attachment thành
+  công sau khi envelope đã publish → emit `media` (không publish lại
+  message; xem `docs/collector.md` §3). Event `heartbeat` module chấp nhận
+  như `state` (heartbeat in-place trên `listener_sessions`).
 
 ## 4. Env names (verbatim — đổi tên = đổi wire contract)
 
@@ -217,8 +280,8 @@ event retry đến khi ACK; HTTP 409 coi như đã nhận.
 | `ZALO_INBOX_WEBHOOK_SECRET` | connector + module | Khóa HMAC event/config + gốc derive command key |
 | `ZALO_INBOX_STORAGE_ROOT` | connector + module | Root media chia sẻ (`MediaStore` ghi, module đọc/resolve) |
 | `ZALO_CONNECTOR_STATE_ROOT` | connector | Root state file + outbox (default `{runtime_root}/connector`) |
-| `ZALO_CONNECTOR_QUOTA_BYTES` | connector (module settings cũng đọc, default 5GiB) | Quota đĩa `MediaStore.prune` |
-| `ZALO_CONNECTOR_RETENTION_HOURS` | connector (module default 168) | Retention mtime media |
+| `ZALO_CONNECTOR_QUOTA_BYTES` | connector (module settings cũng đọc, default 5GiB) | Quota đĩa `MediaStore.prune`; module phản ánh qua `/state.media` + `storage_full` flag |
+| `ZALO_CONNECTOR_RETENTION_HOURS` | connector (module default 168) | Retention mtime media; module dùng cho `expire_media` sweep (`captured_at + hours`) |
 | `ZALO_CONNECTOR_PARENT_PID` | connector | Process manager set; connector tự exit khi parent chết (watch 2s) |
 | `ZALO_CONNECTOR_FORCE_QR` | connector | `=1` bỏ session restore, bắt QR mới |
 | `ZALO_DATA_SYNC_TIMEOUT_SECONDS` | module | Deadline `data_sync` run (default 900) |
@@ -245,6 +308,11 @@ Dưới `ZALO_CONNECTOR_STATE_ROOT` (module default `{runtime_root}/connector`):
 `FileOutbox`: mỗi entry là file `sha256(key).json`, ghi `tmp` + `rename`
 (atomic), mode `0600`; flush tuần tự, xóa file chỉ sau exact-ACK. Outbox sống
 qua restart — đây là cơ chế "event đã nhận không mất" (CAP-03/R-023).
+`entries()` bỏ qua file biến mất giữa `readdir→readFile` (`ENOENT`) và retry
+transient `EPERM`/`EACCES`/`EBUSY` tối đa 3 lần trên Windows; `remove()`
+chịu được file đã xóa. `download-queue` giữ retry attachment bền (tối đa 3
+attempt, `storage_full` không tính attempt) — hành vi chi tiết ở
+`docs/collector.md` §1-3.
 
 **Secrets warning:** `session.json` chứa cookie/imei/userAgent = **chiếm
 tài khoản hoàn toàn** nếu lộ. `account.json`, `login-qr.png` và 3 thư mục

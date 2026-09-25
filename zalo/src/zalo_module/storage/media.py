@@ -10,7 +10,11 @@ from typing import TYPE_CHECKING
 
 from zalo_module.audit import record_access
 from zalo_module.models import MediaAsset
-from zalo_module.storage.retention import image_expires_at
+from zalo_module.storage.retention import (
+    _env_retention_hours,
+    _retention_hours,
+    image_expires_at,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -36,11 +40,23 @@ def register_media(
     rel_path: str,
     captured_at,
     session: "Session",
+    *,
+    state: str = "captured",
+    settings: "Settings | None" = None,
 ) -> None:
-    """Insert a ``media_assets`` row; ``expires_at`` = captured_at + 168h.
+    """Insert a ``media_assets`` row; ``expires_at`` = captured_at + retention.
 
     ``rel_path`` is the path relative to ``runtime_root`` (e.g.
     ``media/<id>.jpg``). ``captured_at`` accepts tz-aware datetime or ISO str.
+    ``state`` is the contract media_state — ``'captured'`` for real bytes,
+    ``'missing'`` for a failed-attachment placeholder (no bytes observed,
+    ``sha256`` empty).
+
+    When ``settings`` is given, ``expires_at`` uses
+    ``settings.connector_retention_hours`` (``ZALO_CONNECTOR_RETENTION_HOURS``)
+    — the same window ``expire_media`` enforces. Without ``settings`` the
+    env var itself is read (``_env_retention_hours``) so configured
+    retention still applies; the contract default is 168h.
     """
     if isinstance(captured_at, str):
         captured_dt = datetime.fromisoformat(captured_at)
@@ -53,8 +69,15 @@ def register_media(
             attachment_id=attachment_id,
             sha256=sha256,
             rel_path=str(rel_path),
-            state="captured",
+            state=state,
             captured_at=captured_dt.isoformat(),
-            expires_at=image_expires_at(captured_dt).isoformat(),
+            expires_at=image_expires_at(
+                captured_dt,
+                (
+                    _retention_hours(settings)
+                    if settings is not None
+                    else _env_retention_hours()
+                ),
+            ).isoformat(),
         )
     )

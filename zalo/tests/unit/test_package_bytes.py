@@ -152,7 +152,9 @@ def test_package_bytes(tmp_path):
             {"c": CONSUMER_ID},
         ).fetchall()
     assert [r[0] for r in rows] == [1, 2]
-    assert all(r[1] == "pending" for r in rows)
+    # Sealed = READY.json published + ledger row committed; the package then
+    # sits in the pending feed until a receipt ACK flips it to "acked".
+    assert all(r[1] == "sealed" for r in rows)
     assert all(r[2] == 2 for r in rows)
     # dir_rel_path is relative to runtime_root.
     assert rows[0][3] == f"packages/{pid1}"

@@ -12,6 +12,8 @@ import {
   normalizeMessage,
   mediaObjectKey,
   signBody,
+  sourceEventsFromReaction,
+  sourceEventsFromUndo,
 } from '../src/core.mjs';
 
 const jsonResponse = (body, status = 200) => new Response(JSON.stringify(body), {
@@ -312,4 +314,154 @@ test('MediaStore does not write media when an abort-ignoring fetch releases late
   } finally {
     await rm(root, {recursive: true, force: true});
   }
+});
+
+// --- source events (undo/reaction) + client_message_id -------------------------
+
+test('normalizeMessage carries cliMsgId as client_message_id for recall/reaction linkage', () => {
+  const base = {
+    type: 0, threadId: 'u-1', isSelf: false,
+    data: {msgId: 'm-1', cliMsgId: 'cli-7', uidFrom: 'sender-1', ts: '1785812400000', content: 'private'},
+  };
+  const source = {source_type: 'friend', source_display_name: 'Bạn A'};
+  const event = normalizeMessage(base, 'account-1', source, '');
+  assert.equal(event.client_message_id, 'cli-7');
+  // Missing/blank cliMsgId simply omits the field — never invents one.
+  const without = normalizeMessage({...base, data: {...base.data, cliMsgId: ' '}}, 'account-1', source, '');
+  assert.equal(without.client_message_id, undefined);
+  assert.equal('client_message_id' in without, false);
+});
+
+test('sourceEventsFromUndo normalizes a recall keeping provider and client ids', () => {
+  const undo = {
+    threadId: 'g-1', isGroup: true,
+    data: {
+      ts: '1785812400000', uidFrom: 'actor-1', dName: 'Người thu hồi',
+      msgId: 'undo-action', cliMsgId: 'undo-cli',
+      content: {globalMsgId: 'g-99', cliMsgId: 'c-99'},
+    },
+  };
+  const [pair] = sourceEventsFromUndo(undo, 'account-1', 'group');
+  assert.equal(pair.eventId, 'source-event:account-1:g-1:recall:g-99:c-99::actor-1');
+  assert.deepEqual(pair.event, {
+    schema_version: 1,
+    event_type: 'source_event',
+    connector_account_id: 'account-1',
+    conversation_id: 'g-1',
+    conversation_type: 'group',
+    event_subtype: 'recall',
+    target_provider_message_id: 'g-99',
+    target_client_message_id: 'c-99',
+    observed_at: '2026-08-04T03:00:00.000Z',
+    sender_id: 'actor-1',
+    sender_display_name: 'Người thu hồi',
+  });
+  // No target id → no event rather than a contract-invalid record.
+  assert.deepEqual(sourceEventsFromUndo({threadId: 'g-1', data: {content: {}}}, 'account-1'), []);
+  assert.deepEqual(sourceEventsFromUndo({data: {content: {globalMsgId: 'x'}}}, 'account-1'), []);
+});
+
+test('sourceEventsFromReaction emits one envelope per target and skips empty icons', () => {
+  const reaction = {
+    threadId: 'g-1', isGroup: true,
+    data: {
+      ts: '1785812400000', uidFrom: 'reactor-1',
+      content: {
+        rIcon: ':>',
+        rMsg: [
+          {gMsgID: 'g-1a', cMsgID: 'c-1a'},
+          {gMsgID: 'g-1b', cMsgID: 'c-1b'},
+          {cMsgID: 'only-client'},   // client id fallback as provider id
+          {},                        // no resolvable id → skipped
+        ],
+      },
+    },
+  };
+  const pairs = sourceEventsFromReaction(reaction, 'account-1', 'group');
+  assert.equal(pairs.length, 3);
+  assert.deepEqual(
+    pairs.map(({event}) => [event.target_provider_message_id, event.target_client_message_id]),
+    [['g-1a', 'c-1a'], ['g-1b', 'c-1b'], ['only-client', 'only-client']],
+  );
+  for (const {event} of pairs) {
+    assert.equal(event.event_subtype, 'reaction');
+    assert.equal(event.reaction_icon, ':>');
+    assert.equal(event.conversation_type, 'group');
+    assert.equal(event.sender_id, 'reactor-1');
+  }
+  // Event ids are content-derived and distinct per target.
+  assert.equal(new Set(pairs.map(({eventId}) => eventId)).size, 3);
+  // Reaction removal (empty icon) is not representable in v1 → skipped.
+  const removal = {...reaction, data: {...reaction.data, content: {...reaction.data.content, rIcon: ''}}};
+  assert.deepEqual(sourceEventsFromReaction(removal, 'account-1'), []);
+});
+
+test('FileOutbox continues past failures and quarantines after eight attempts', async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'zalo-outbox-quarantine-'));
+  t.after(() => rm(root, {recursive: true, force: true}));
+  const outbox = new FileOutbox(root);
+  const poisoned = {schema_version: 1, event_type: 'heartbeat', marker: 'bad'};
+  const good = {schema_version: 1, event_type: 'heartbeat', marker: 'good'};
+  const poisonedName = await outbox.enqueue('poisoned-1', poisoned);
+
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (line) => warnings.push(String(line));
+  t.after(() => { console.warn = originalWarn; });
+
+  const sent = [];
+  const flushOnce = () => outbox.flush({
+    sendEvent: async (event) => {
+      if (event.marker === 'bad') throw new Error('backend returned HTTP 500 from https://private.example/secret?token=abc');
+      sent.push(event.marker);
+      return {ack: true};
+    },
+  });
+  // A failing entry never starves the entries behind it: each flush still
+  // delivers a fresh trailing event while the poisoned one stays pending.
+  for (let i = 0; i < 8; i += 1) {
+    await outbox.enqueue(`good-${i}`, {...good, marker: `good-${i}`});
+    await assert.rejects(flushOnce(), /HTTP 500/);
+    assert.equal(sent.length, i + 1);
+    assert.equal(sent.at(-1), `good-${i}`);
+    assert.deepEqual(await outbox.pending(), [poisonedName]);
+  }
+  // Ninth failure quarantines the poisoned entry to dead/.
+  await outbox.enqueue('good-8', {...good, marker: 'good-8'});
+  await assert.rejects(flushOnce(), /HTTP 500/);
+  assert.equal(sent.length, 9);
+  assert.deepEqual(await outbox.pending(), []);
+  const dead = JSON.parse(await readFile(path.join(root, 'dead', poisonedName), 'utf8'));
+  assert.deepEqual(dead, poisoned);
+  // Warning is sanitized: no URL, path, or provider payload.
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /quarantined after 9 failures \(HTTP 500\)/);
+  assert.doesNotMatch(warnings[0], /private\.example|token=|:\//);
+});
+
+test('FileOutbox attempt ledger survives restart and resets on re-enqueue', async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'zalo-outbox-attempts-'));
+  t.after(() => rm(root, {recursive: true, force: true}));
+  const event = {schema_version: 1, event_type: 'heartbeat'};
+  const fail = {sendEvent: async () => { throw new Error('offline'); }};
+
+  const first = new FileOutbox(root);
+  const name = await first.enqueue('event-1', event);
+  for (let i = 0; i < 8; i += 1) await assert.rejects(first.flush(fail), /offline/);
+  assert.equal((await first.pending()).length, 1);
+
+  // "Restart": a fresh instance sees the durable attempt count — one more
+  // failure crosses the bound and quarantines.
+  const second = new FileOutbox(root);
+  await assert.rejects(second.flush(fail), /offline/);
+  assert.deepEqual(await second.pending(), []);
+  await stat(path.join(root, 'dead', name));
+
+  // Re-enqueue under the same id resets the ledger.
+  const third = new FileOutbox(root);
+  await third.enqueue('event-1', {...event, retry: true});
+  await assert.rejects(third.flush(fail), /offline/);
+  assert.equal((await third.pending()).length, 1);  // attempt 1, not quarantined
+  await third.flush({sendEvent: async () => ({ack: true})});
+  assert.deepEqual(await third.pending(), []);
 });

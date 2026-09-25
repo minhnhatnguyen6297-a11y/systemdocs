@@ -12,11 +12,12 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import func, select
 
 from zalo_module import __version__
+from zalo_module.api._auth import IntakeRoute, require_consumer_auth
 from zalo_module.api._json import StrictJsonError, parse_strict_body
 from zalo_module.audit import record_access
 from zalo_module.database import get_engine, session_scope
@@ -24,7 +25,15 @@ from zalo_module.delivery import ledger
 from zalo_module.models import ListenerSession, Package
 from zalo_module.settings import get_settings
 
-router = APIRouter(prefix="/intake/v1")
+# IntakeRoute translates ConsumerAuthError (raised by require_consumer_auth)
+# into the intake.error.v1 401 envelope — no app-factory wiring needed.
+router = APIRouter(prefix="/intake/v1", route_class=IntakeRoute)
+
+# Statuses: sealed = READY published + awaiting ACK (the pending feed);
+# acked = receipt accepted retained under §8.3 policy; expired = payload
+# bytes evicted post-ACK (ledger row kept). `pending` is a pre-seal state
+# nothing currently writes — never served as READY.
+_PKG_SEALED = "sealed"
 
 ACK_CAP_BYTES = 1 << 30  # 1 GiB post-ACK raw retention cap — contract §8.3
 
@@ -32,6 +41,7 @@ ACK_CAP_BYTES = 1 << 30  # 1 GiB post-ACK raw retention cap — contract §8.3
 _RECEIPT_ERROR_MAP = {
     "schema_invalid": (400, "schema_invalid"),
     "package_not_found": (404, "package_unknown"),
+    "package_conflict": (409, "package_conflict"),
     "consumer_mismatch": (409, "receipt_consumer_mismatch"),
     "manifest_mismatch": (409, "receipt_hash_mismatch"),
     "count_mismatch": (409, "receipt_count_mismatch"),
@@ -91,7 +101,7 @@ def service_status(request: Request) -> dict:
         ).first()
         pending_rows = session.execute(
             select(Package.sequence, Package.created_at)
-            .where(Package.status == "pending")
+            .where(Package.status == _PKG_SEALED)
             .order_by(Package.sequence)
         ).all()
         ack_dirs = session.execute(
@@ -118,7 +128,9 @@ def service_status(request: Request) -> dict:
     ack_bytes = 0
     for (rel,) in ack_dirs:
         pkg_dir = Path(settings.runtime_root) / rel
-        record_access(pkg_dir, "package")
+        # No record_access here: /status is polled — the audit trail only
+        # logs real byte serves (manifest/records/READY endpoints), not a
+        # stats pass over package dirs.
         if pkg_dir.is_dir():
             for f in pkg_dir.iterdir():
                 if f.is_file():
@@ -147,7 +159,7 @@ def service_status(request: Request) -> dict:
     }
 
 
-@router.get("/packages")
+@router.get("/packages", dependencies=[Depends(require_consumer_auth)])
 def list_packages(
     request: Request,
     after: int = 0,
@@ -170,7 +182,8 @@ def list_packages(
             until_sequence = (
                 session.execute(
                     select(func.max(Package.sequence)).where(
-                        Package.status == "pending"
+                        Package.status == _PKG_SEALED,
+                        Package.consumer_id == settings.consumer_id,
                     )
                 ).scalar()
                 or 0
@@ -179,7 +192,8 @@ def list_packages(
         rows = session.execute(
             select(Package.package_id, Package.sequence, Package.manifest_sha256)
             .where(
-                Package.status == "pending",
+                Package.status == _PKG_SEALED,
+                Package.consumer_id == settings.consumer_id,
                 Package.sequence > after,
                 Package.sequence <= until_sequence,
             )
@@ -205,7 +219,56 @@ def list_packages(
     }
 
 
-@router.post("/receipts")
+# --- package byte endpoints (contract §7.2) ---------------------------------
+#
+# Byte-exact re-serves of the three package files. Both the contract path
+# (…/manifest, …/records, …/ready) and the on-disk file name (…/manifest.json,
+# …/records.jsonl, …/READY.json) are routed to the same handler — the task
+# spec spells the file names, the contract spells the API names.
+_PACKAGE_FILE_ROUTES = {
+    "manifest": ("manifest.json", "application/json"),
+    "manifest.json": ("manifest.json", "application/json"),
+    "records": ("records.jsonl", "application/x-ndjson"),
+    "records.jsonl": ("records.jsonl", "application/x-ndjson"),
+    "ready": ("READY.json", "application/json"),
+    "READY.json": ("READY.json", "application/json"),
+}
+
+
+def _package_file(request: Request, package_id: str, name: str):
+    settings, engine = _deps(request)
+    file_name, media_type = _PACKAGE_FILE_ROUTES[name]
+    with session_scope(engine) as session:
+        pkg = session.get(Package, package_id)
+        rel = pkg.dir_rel_path if pkg is not None else None
+    if rel is None:
+        return _error(404, "package_unknown", f"unknown package_id {package_id}")
+    path = Path(settings.runtime_root) / rel / file_name
+    record_access(path, "package")
+    if not path.is_file():
+        # Expired (payload evicted) or manually removed — the consumer sees
+        # the package as unavailable.
+        return _error(404, "package_unknown", f"package {package_id} has no {file_name}")
+    return FileResponse(path, media_type=media_type)
+
+
+# routes.py-style registration: one handler per contract/file spelling.
+for _name in _PACKAGE_FILE_ROUTES:
+
+    def _make(name: str):
+        @router.get(
+            f"/packages/{{package_id}}/{name}",
+            dependencies=[Depends(require_consumer_auth)],
+        )
+        def _serve(package_id: str, request: Request):
+            return _package_file(request, package_id, name)
+
+        return _serve
+
+    _make(_name)
+
+
+@router.post("/receipts", dependencies=[Depends(require_consumer_auth)])
 async def post_receipt(request: Request):
     settings, engine = _deps(request)
     raw = await request.body()
