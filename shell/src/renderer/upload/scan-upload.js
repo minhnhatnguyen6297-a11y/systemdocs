@@ -18,6 +18,24 @@
     const C = NS.client;
     const panel = h.el('div', 'ul-panel');
 
+    function capOf(name) {
+      // Capability tu catalog backend (cung helper audit.js) — website
+      // thieu cap → nut tuong ung khoa, khong an, khong nhan.
+      const w = state.websites
+        .find((x) => x.website_id === state.websiteId);
+      return !!(w && Array.isArray(w.capabilities) &&
+        w.capabilities.includes(name));
+    }
+
+    function jobActive(id) {
+      const j = id && ctx.jobs && ctx.jobs.get(id);
+      return !!(j && !C.isTerminal(j));
+    }
+
+    function authed() {
+      return !!(state.login && state.login.status === 'authenticated');
+    }
+
     // ---------- Ngu canh ----------
     const ctxCard = h.el('div', 'ul-card ul-context');
     ctxCard.append(h.el('span', 'ul-label', 'Website:'));
@@ -106,6 +124,9 @@
     stopBtn.addEventListener('click', () => actions.stopRunning());
     pPrep.append(prepBar, prepLabel, stopBtn);
     prog.append(pPrep);
+    const sessLine = h.el('div', 'ul-summary muted', '');
+    sessLine.hidden = true;
+    prog.append(sessLine);
     const scanSummary = h.el('div', 'ul-summary muted', 'Chưa quét thư mục.');
     prog.append(scanSummary);
     panel.append(prog);
@@ -146,9 +167,25 @@
       upBtn, contBtn, closeBtn);
     qCard.append(bar);
 
-    const reconBanner = h.el('div', 'ul-reconcile', '');
+    // Canh bao can doi chieu + nut hanh dong (upload.reconcile — contract
+    // §6.15). Banner luon dem so ho so chua ro da Luu; hanh dong doi chieu
+    // nam ngay day, KHONG huong dan di qua trang log da bo.
+    const reconBanner = h.el('div', 'ul-reconcile');
     reconBanner.hidden = true;
+    const reconText = h.el('span', 'ul-reconcile-text');
+    const reconBtn = h.el('button', 'ul-reconcile-btn',
+      'Đối chiếu với sổ mới');
+    reconBtn.type = 'button';
+    reconBtn.addEventListener('click', () => actions.reconcile());
+    const reconHint = h.el('span', 'muted ul-reconcile-hint');
+    reconBanner.append(reconText, reconBtn, reconHint);
     qCard.append(reconBanner);
+
+    // Loi/partial cua dot prepare — hien ngay duoi thanh thao tac, khong
+    // nuot vao the Job (spec §4).
+    const prepErr = h.el('div', 'ul-error ul-prepare-error');
+    prepErr.hidden = true;
+    qCard.append(prepErr);
 
     // ---------- Bang 6 cot ----------
     const wrap = h.el('div', 'ul-table-wrap ul-queue-table');
@@ -182,6 +219,14 @@
         cbTd.append(cb);
         tr._c.cb = cb;
         tr.append(cbTd);
+        // Qt: double-click dong mo file nguon bang OS (openPath qua
+        // preload — main kiem scope/extension). Bo qua khi dblclick trung
+        // checkbox/nut Mo (handler rieng da xu ly).
+        tr.addEventListener('dblclick', (e) => {
+          if (e.target && e.target.closest &&
+              e.target.closest('button,input')) return;
+          if (tr._c.path && tr._c.path._p) actions.openFile(tr._c.path._p);
+        });
         for (const k of ['stt', 'ngay', 'so', 'chu', 'path']) {
           const td = h.el('td');
           tr._c[k] = td;
@@ -208,6 +253,8 @@
       let note = row.ghi_chu || '';
       if (state.needsReconcileIds.has(id)) {
         note = note ? `${note} — cần đối chiếu` : 'cần đối chiếu';
+      } else if (state.openTabIds.has(id)) {
+        note = note ? `${note} — đang mở trên web` : 'đang mở trên web';
       }
       c.chu.textContent = note;
       c.path._p = row.file_path || '';
@@ -216,6 +263,7 @@
       tr.classList.toggle('ul-row-selected', c.cb.checked);
       tr.classList.toggle('ul-row-reconcile',
         state.needsReconcileIds.has(id));
+      tr.classList.toggle('ul-row-open', state.openTabIds.has(id));
       tr.classList.toggle('ul-row-issue', !!row.has_issue);
       return tr;
     }
@@ -227,27 +275,73 @@
         : (state.websiteId || '—');
     }
 
-    function syncButtons(busy, hasRows) {
+    // Gating theo backend state + capability (spec §4): moi nut chi bat
+    // khi hanh dong do thuc su goi duoc ngay luc nay — Upload/Tiep tuc can
+    // dang nhap + queue cua DUNG run/audit dang hien thi; Tiep tuc can mot
+    // dot da submit (activeUploadIds) va con ho so dot sau; Dong can phien
+    // song va khong co prepare dang cho review.
+    function syncButtons(hasRows) {
       const selCount = state.selectedIds.size;
-      selAll.disabled = busy || !hasRows;
-      selNone.disabled = busy || !hasRows;
+      const prepJob = state.prepareJobId && ctx.jobs.get(state.prepareJobId);
+      const prepLive = !!(prepJob && !C.isTerminal(prepJob));
+      const prepRunning = !!(prepLive &&
+        prepJob.status !== 'waiting_user');
+      const scanLive = jobActive(state.scanJobId) || !!state.scanProgress;
+      const loginWait = jobActive(state.sessionJobId) &&
+        state.waitingBanner && state.waitingBanner.on === 'login';
+      const queueReady = !!(state.runId && state.queueFor &&
+        state.queueFor.runId === state.runId &&
+        state.queueFor.auditId === state.auditId);
+      const canPrep = capOf('prepare') && !!state.browserId && authed() &&
+        queueReady;
+      selAll.disabled = !hasRows;
+      selNone.disabled = !hasRows;
       const issues = S.issueRecordIds(state);
-      filterBtn.disabled = busy || !hasRows || !issues.size;
+      filterBtn.disabled = !hasRows || !issues.size;
       filterBtn.textContent = state.issueFilterBackup != null
         ? 'Hoàn tác lọc số lỗi' : 'Lọc số lỗi';
-      missBtn.disabled = busy || !hasRows;
-      upBtn.disabled = busy || !hasRows || !selCount;
+      missBtn.disabled = !hasRows;
+      upBtn.disabled = !hasRows || !selCount || !canPrep ||
+        prepLive || scanLive || !!loginWait;
       upBtn.textContent = `Upload file đã chọn (${selCount})`;
-      contBtn.disabled = busy || !state.uploadSessionActive ||
-        !(state.remaining > 0) || !hasRows;
-      contBtn.textContent = `Tiếp tục ${state.chunkSize} số tiếp theo`;
-      closeBtn.disabled = busy || !state.uploadSessionActive;
-      staffSel.disabled = busy;
-      secIn.disabled = busy;
-      refStaff.disabled = busy;
-      chunkIn.disabled = busy;
-      browseBtn.disabled = !!state.scanProgress;
-      scanBtn.disabled = busy || !state.websiteId;
+      upBtn.title = canPrep ? '' :
+        'Cần đăng nhập và queue của lượt quét hiện tại sẵn sàng';
+      contBtn.disabled = !canPrep || prepLive || scanLive ||
+        !!loginWait || !state.uploadSessionActive ||
+        !(state.remaining > 0) || !state.activeUploadIds.size;
+      // Gate breakdown cho debug/E2E — doc duoc ly do disable ma khong can
+      // moc state noi bo (mot dong, khong lo du lieu nhay).
+      const gate = [
+        ['cap', !canPrep], ['capOf', !capOf('prepare')],
+        ['bid', !state.browserId], ['auth', !authed()],
+        ['q', !queueReady], ['prep', prepLive], ['scan', scanLive],
+        ['loginWait', !!loginWait], ['sess', !state.uploadSessionActive],
+        ['rem', !(state.remaining > 0)], ['origin', !state.activeUploadIds.size],
+      ].filter(([, v]) => v).map(([k]) => k).join(',') || 'ok';
+      contBtn.dataset.gate = gate +
+        `|q=${state.queueFor ? state.queueFor.auditId : 'null'}` +
+        `/a=${state.auditId}` +
+        `/r=${state.queueFor ? state.queueFor.runId : 'null'}` +
+        `/${state.runId}`;
+      contBtn.textContent = state.remaining > 0
+        ? `Tiếp tục đợt sau — còn ${state.remaining}`
+        : 'Tiếp tục đợt sau';
+      closeBtn.disabled = !state.browserId || !state.uploadSessionActive ||
+        prepLive;
+      // Nhan su/chunk doc khi prepare tiep theo gui — khoa trong luc
+      // engine dang mo tab (accepted/running); luc cho review van sua duoc
+      // cho dot sau.
+      staffSel.disabled = prepRunning;
+      secIn.disabled = prepRunning;
+      refStaff.disabled = prepRunning || !authed() || !state.browserId;
+      chunkIn.disabled = prepRunning;
+      browseBtn.disabled = scanLive;
+      scanBtn.disabled = !state.websiteId || !capOf('scan') || scanLive;
+      // Doi chieu can audit MOI tu file hien tai (§6.15) — khoa khi chua
+      // nap so, dang audit/reconcile, hoac dang cho review.
+      reconBtn.disabled = !capOf('reconcile') || !state.runId ||
+        !state.excelFile || prepLive ||
+        jobActive(state.reconcileJobId) || jobActive(state.auditJobId);
     }
 
     let lastStaffKey = null;
@@ -300,6 +394,21 @@
           ? `Còn ${state.remaining} hồ sơ đợt sau.`
           : 'Chưa chuẩn bị.';
       }
+      // Dong tab portal theo snapshot phien (open/saved/closed/unknown) —
+      // hien ngay trong luc cho review de nguoi dung thay so da Lưu.
+      const tb = state.sessionTabs;
+      if (state.uploadSessionActive || tb) {
+        const n = (k) => (tb && Array.isArray(tb[k]) ? tb[k].length : 0);
+        sessLine.hidden = false;
+        sessLine.textContent =
+          `Tab portal: ${n('open_record_ids')} đang mở · ` +
+          `${n('saved_record_ids')} đã Lưu · ` +
+          `${n('closed_record_ids')} đã đóng · ` +
+          `${state.needsReconcileIds.size} chưa rõ`;
+      } else {
+        sessLine.hidden = true;
+        sessLine.textContent = '';
+      }
       const running = C.runningJobs(state, ctx.jobs)
         .filter((j) => ['upload.scan', 'upload.prepare',
                         'upload.session_start'].includes(j.command));
@@ -341,9 +450,9 @@
         chunkIn.value = String(state.chunkSize);
       }
 
-      const busy = syncProgress();
+      syncProgress();
       const rows = S.sortedQueueRows(state);
-      syncButtons(busy, state.rowIds.size > 0);
+      syncButtons(state.rowIds.size > 0);
 
       // Tom tat luot quet.
       const parts = [`folder=${state.rowIds.size}`];
@@ -356,13 +465,29 @@
       scanSummary.textContent = state.runId || state.rowIds.size
         ? parts.join(' | ') : 'Chưa quét thư mục.';
 
-      // Can doi chieu.
+      // Can doi chieu — dem so ho so chua ro da Lưu ngay tren bang, kem
+      // hanh dong upload.reconcile (audit moi → doi chieu → khong gui lai).
       const rec = state.needsReconcileIds.size;
       reconBanner.hidden = !rec;
       if (rec) {
-        reconBanner.textContent =
+        reconText.textContent =
           `${rec} hồ sơ có thể đã Lưu nhưng chưa xác minh — ` +
-          'cần đối chiếu (sổ mới / kiểm tra) trước khi gửi lại.';
+          'cần đối chiếu với sổ mới trước khi gửi lại.';
+        reconHint.textContent = !state.excelFile
+          ? ' Nạp sổ Excel mới ở tab Audit trước.' : '';
+      }
+      // Loi/partial cua dot prepare ngay tren bang (khong chi o the Job).
+      const pe = state.prepareError;
+      prepErr.hidden = !pe;
+      if (pe) {
+        const parts = [pe.message || 'Chuẩn bị hồ sơ không hoàn tất.'];
+        if (pe.code) parts.push(`[${pe.code}]`);
+        if (pe.retryable && !state.needsReconcileIds.size) {
+          parts.push('— có thể thử lại.');
+        } else if (state.needsReconcileIds.size) {
+          parts.push('— đối chiếu trước khi gửi lại.');
+        }
+        prepErr.textContent = parts.join(' ');
       }
 
       dom.syncTbody(tbody, rows,

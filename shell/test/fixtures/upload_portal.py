@@ -127,6 +127,17 @@ class FakePortal:
             ("Số công chứng", "Ngày công chứng"),
             ("999/2099/FIXTURE", "01/01/2099"),
         ]
+        # Live test control — set via ``POST /__fixture__/control`` so an
+        # out-of-process E2E driver can steer the fake portal/session:
+        #   fail_record_ids: list[int]  — record ids that raise in prepare
+        #   record_delay_s: float       — per-record delay in prepare
+        #   fail_next_export: bool      — next /api/export returns 500
+        #   block/release: [name,...]   — gate names: "scan","prepare","open"
+        # Gates live here (not on the session) so a control call mid-run can
+        # block or release the CURRENT session, and ``scan`` works before any
+        # browser exists.
+        self.control: dict = {}
+        self.provider = None  # wired by register_fake_portal_website
 
         portal = self
 
@@ -246,15 +257,121 @@ class FakePortal:
             to_date = (query.get("to") or [""])[0]
             with self._lock:
                 self.export_requests.append((from_date, to_date))
-                fail = self.fail_next_export
+                fail = self.fail_next_export or bool(
+                    self.control.get("fail_next_export"))
                 self.fail_next_export = False
+                self.control["fail_next_export"] = False
+                saved = list(self.saved_contract_nos)
             if fail:
                 return _json_response({"ok": False, "error": "interrupted"}, 500)
-            data = build_export_xlsx(self.export_rows)
+            # So da Lưu tren portal hien trong export moi nhat — giong so
+            # that, de audit/reconcile doi chieu duoc sau Save.
+            existing = {r[0] for r in self.export_rows}
+            rows = list(self.export_rows) + [
+                (cn, datetime.now().strftime("%d/%m/%Y"))
+                for cn in saved if cn not in existing]
+            data = build_export_xlsx(rows)
             return 200, {
                 "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 "Content-Disposition": 'attachment; filename="so_cong_chung.xlsx"',
             }, data
+        # -- E2E control channel (khong phai API portal that) ---------------
+        if route == "/__fixture__/control" and method == "POST":
+            try:
+                ctl = json.loads(body.decode("utf-8") or "{}")
+            except json.JSONDecodeError:
+                ctl = {}
+            with self._lock:
+                for key in ("fail_record_ids", "record_delay_s",
+                            "fail_next_export"):
+                    if key in ctl:
+                        self.control[key] = ctl[key]
+                for name in ctl.get("block") or []:
+                    ev = self.control.get(f"{name}_gate")
+                    if ev is None:
+                        ev = threading.Event()
+                        self.control[f"{name}_gate"] = ev
+                    ev.clear()
+                for name in ctl.get("release") or []:
+                    ev = self.control.get(f"{name}_gate")
+                    if ev is not None:
+                        ev.set()
+            return _json_response({"ok": True})
+        if route == "/__fixture__/user" and method == "POST":
+            # Mo phong nguoi dung bam trong Chromium: khong ghi thread_log.
+            try:
+                req = json.loads(body.decode("utf-8") or "{}")
+            except json.JSONDecodeError:
+                req = {}
+            action = str(req.get("action") or "")
+            rid = req.get("record_id")
+            try:
+                if action == "login":
+                    self.user_login()
+                elif action == "logout":
+                    self.expire()
+                elif action in ("save", "close_tab"):
+                    sess = self.provider and self.provider.last_session
+                    if sess is None:
+                        return _json_response(
+                            {"ok": False, "error": "no_session"}, 409)
+                    if action == "save":
+                        sess.user_save(int(rid))
+                    else:
+                        sess.user_close_tab(int(rid))
+                elif action == "close_browser":
+                    sess = self.provider and self.provider.last_session
+                    if sess is not None:
+                        sess.user_close_browser()
+                else:
+                    return _json_response(
+                        {"ok": False, "error": f"unknown action {action}"},
+                        400)
+            except Exception as exc:
+                return _json_response(
+                    {"ok": False, "error": str(exc)}, 409)
+            return _json_response({"ok": True})
+        if route == "/__fixture__/state" and method == "GET":
+            with self._lock:
+                saved = list(self.saved_contract_nos)
+                exports = list(self.export_requests)
+            sess = self.provider and self.provider.last_session
+            tabs = {}
+            open_ids: list[int] = []
+            if sess is not None:
+                with sess._state:
+                    tabs = {
+                        str(rid): {
+                            "closed": t["closed"],
+                            "save_evidence": t["save_evidence"],
+                            "contract_no": t["contract_no"],
+                        }
+                        for rid, t in sess.tabs.items()
+                    }
+                    open_ids = sorted(sess._prepared_record_ids)
+            kwargs = dict(sess.last_prepare_kwargs or {}) if sess else {}
+            if isinstance(kwargs.get("selected_record_ids"), set):
+                kwargs["selected_record_ids"] = sorted(
+                    kwargs["selected_record_ids"])
+            if isinstance(kwargs.get("exclude_contract_nos"), set):
+                kwargs["exclude_contract_nos"] = sorted(
+                    kwargs["exclude_contract_nos"])
+            return _json_response({
+                "ok": True,
+                "authenticated": self.is_authenticated(),
+                "saved_contract_nos": saved,
+                "export_requests": exports,
+                "session": {
+                    "exists": sess is not None,
+                    "closed": bool(sess and sess.closed),
+                    "login_page_open": bool(sess and sess.login_page_open),
+                    "prepare_calls": int(sess.prepare_calls if sess else 0),
+                    "open_record_ids": open_ids,
+                    "tabs": tabs,
+                    "last_prepare_kwargs": kwargs,
+                    "calls": list(sess.calls) if sess else [],
+                },
+            })
         if route == "/api/staff" and method == "GET":
             if not authed:
                 return _json_response({"ok": False, "error": "unauthenticated"}, 401)
@@ -333,10 +450,17 @@ class PortalBrowserSession:
             raise RuntimeError(f"portal HTTP {exc.code} for {url}") from exc
 
     # -- engine-facing API ------------------------------------------------------
+    def _ctl(self) -> dict:
+        """Live control dict on the portal — settable mid-run via the
+        ``/__fixture__/control`` endpoint (works even for a session that was
+        already created, unlike the armed next_session_* gates)."""
+        return getattr(self.portal, "control", {}) or {}
+
     def open_manual_login(self) -> dict:
         self._mark("open_manual_login")
-        if self.open_gate is not None:
-            self.open_gate.wait(timeout=30)
+        gate = self._ctl().get("open_gate") or self.open_gate
+        if gate is not None:
+            gate.wait(timeout=30)
         with self._state:
             self.login_page_open = True
             self.login_page_closed = False
@@ -427,8 +551,9 @@ class PortalBrowserSession:
                 pass
 
         self.ensure_authenticated(stop_event)
-        if self.prepare_gate is not None:
-            self.prepare_gate.wait(timeout=30)
+        gate = self._ctl().get("prepare_gate") or self.prepare_gate
+        if gate is not None:
+            gate.wait(timeout=30)
 
         manifest, records, total_pending = uploader.load_upload_queue(
             manifest_path,
@@ -513,12 +638,18 @@ class PortalBrowserSession:
                 # Mirror the real engine: the window is kept minimized instead
                 # of stealing focus while the dry-run fills the form.
                 self.focus_events.append("keep_minimized")
-                if record.record_id in self.fail_record_ids:
+                # Live control co the them fail_record_ids/delay giua chung
+                # dot — merge voi hook armed tren session.
+                ctl = self._ctl()
+                fail_ids = set(self.fail_record_ids) | set(
+                    ctl.get("fail_record_ids") or [])
+                delay_s = ctl.get("record_delay_s", self.record_delay_s)
+                if record.record_id in fail_ids:
                     raise RuntimeError(f"fake portal rejected record {record.record_id}")
-                if self.record_delay_s:
+                if delay_s:
                     import time as _time
 
-                    _time.sleep(self.record_delay_s)
+                    _time.sleep(float(delay_s))
                 self._prepared_record_ids.add(record.record_id)
                 with self._state:
                     self.tabs[record.record_id] = {
@@ -830,6 +961,7 @@ def register_fake_portal_website(
     providers = import_engine_module("upload_lab", "providers")
     provider = make_fake_provider(portal, website_id=website_id)
     providers.DEFAULT_REGISTRY.register(provider)
+    portal.provider = provider
     return provider
 
 
@@ -842,6 +974,13 @@ def _fake_run_scan(
 ):
     """Fabricate a real registry + manifest + output json for a fake run."""
     from engine_roots import import_engine_module
+
+    # Live scan gate — E2E blocks scan mid-run to assert tab switching
+    # preserves progress (``POST /__fixture__/control`` block/release).
+    ctl = getattr(getattr(provider, "portal", None), "control", {}) or {}
+    gate = ctl.get("scan_gate")
+    if gate is not None:
+        gate.wait(timeout=60)
 
     batch_scan = import_engine_module("upload_lab", "batch_scan")
 

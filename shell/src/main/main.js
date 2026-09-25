@@ -129,6 +129,14 @@ async function openPath(opts = {}) {
     throw Object.assign(new Error('file khong ton tai'),
       { code: 'file_not_found' });
   }
+  // Test seam (MIN-69 e2e): G1_E2E_OPEN_LOG chi vao file text — moi lan
+  // openPath hop le ghi mot dong path thay vi mo app that (tran dep Word
+  // trong test). Cung guard nhu pick seam: packaged khong bao gio stub.
+  const openLog = !app.isPackaged && process.env.G1_E2E_OPEN_LOG;
+  if (openLog) {
+    fs.appendFileSync(openLog, `${p}\n`, 'utf8');
+    return { opened: p };
+  }
   const { shell } = require('electron');
   const err = await shell.openPath(p);
   if (err) {

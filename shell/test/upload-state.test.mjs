@@ -293,6 +293,78 @@ test('markAuditStale + clampChunk + isoToDisplay', () => {
   assert.equal(S.displayToIso('khong phai ngay'), null);
 });
 
+test('resetScanContext: run moi giu needsReconcileIds (website scope) '
+     + 'nhung xoa selection/activeUploadIds/savedIds', () => {
+  const st = S.createUploadState();
+  st.websiteId = 'nam_dinh';
+  st.runId = 'run_cu';
+  S.applyQueue(st, {
+    website_id: 'nam_dinh', run_id: 'run_cu', queue_revision: 4,
+    folder_rows: [{ record_id: 1, selected: true }],
+  });
+  st.needsReconcileIds = new Set([6, 7]);
+  st.activeUploadIds = new Set([1, 2, 3]);
+  st.savedIds = new Set([9]);
+  st.openTabIds = new Set([1]);
+  S.resetScanContext(st, 'run_moi');
+  assert.equal(st.runId, 'run_moi');
+  assert.equal(st.selectedIds.size, 0);
+  assert.equal(st.activeUploadIds.size, 0,
+    'tap goc dot upload thuoc run cu — khong theo sang run moi');
+  assert.equal(st.savedIds.size, 0);
+  assert.equal(st.openTabIds.size, 0);
+  // needs_reconcile la website-scoped (§6.15): run moi KHONG duoc lam
+  // mat canh bao — ho so chua ro da Luu phai con hien cho toi khi
+  // doi chieu xong.
+  assert.deepEqual([...st.needsReconcileIds].sort((a, b) => a - b), [6, 7]);
+});
+
+test('clearWebsiteScope (qua setWebsite) xoa ca needsReconcileIds', () => {
+  const st = S.createUploadState();
+  st.websiteId = 'nam_dinh';
+  st.needsReconcileIds = new Set([6, 7]);
+  S.setWebsite(st, 'khac', {
+    website_id: 'khac', revision: 2, run_id: null, audit_id: null,
+    browser_id: null, active_job_ids: [],
+    needs_reconcile_record_ids: [], has_excel: false,
+    queue_revision: null,
+  });
+  assert.equal(st.needsReconcileIds.size, 0);
+  // Snapshot moi co needs → ap lai dung.
+  S.applyWorkspace(st, {
+    website_id: 'khac', revision: 3,
+    needs_reconcile_record_ids: [11],
+  });
+  assert.deepEqual([...st.needsReconcileIds], [11]);
+});
+
+test('applyQueue: dong can doi chieu VAN con trong bang (khong mat tich)', () => {
+  const st = S.createUploadState();
+  st.websiteId = 'nam_dinh';
+  S.applyQueue(st, {
+    website_id: 'nam_dinh', run_id: 'r', queue_revision: 1,
+    has_excel: true,
+    folder_rows: [
+      { record_id: 1, selected: true },
+      { record_id: 2, selected: true },
+    ],
+    missing_in_excel_record_ids: [1, 2],
+  });
+  st.needsReconcileIds = new Set([1]);
+  S.applyQueue(st, {
+    website_id: 'nam_dinh', run_id: 'r', queue_revision: 2,
+    has_excel: true,
+    folder_rows: [
+      { record_id: 1, selected: true },
+      { record_id: 2, selected: true },
+    ],
+    missing_in_excel_record_ids: [1, 2],
+  });
+  assert.equal(st.rowIds.has(1), true,
+    'dong can doi chieu khong duoc an khoi bang');
+  assert.equal(st.needsReconcileIds.has(1), true);
+});
+
 test('TABS/AUDIT_COLUMNS/QUEUE_COLUMNS la hang so chuan MIN-77', () => {
   assert.deepEqual(S.TABS.map((t) => t.id), ['audit', 'scan-upload']);
   assert.deepEqual(S.TABS.map((t) => t.label),

@@ -77,16 +77,33 @@
       // Queue (kind upload_queue, contract §6.11).
       queue: null,                // {queue_revision, folder_rows[], ...}
       queueFor: null,             // {runId, auditId} queue dang hien thi
+      queueStaleFor: null,        // job_id da lam queue stale — invalidate
+                                  // queueFor DUNG MOT LAN cho moi job; re-adopt
+                                  // cung job khong xoa lai (vong refetch vo han)
       rowIds: new Set(),
       selectedIds: new Set(),
       missingInExcelIds: new Set(),
       issueFilterBackup: null,    // Set — co gia tri = dang loc so loi
       savedIds: new Set(),        // da xac minh Luu tren portal → roi bang
       needsReconcileIds: new Set(),
+      activeUploadIds: new Set(), // tap record_ids GUI o dot prepare gan nhat
+                                  // (Qt: activeUploadSelectedRecordIds) —
+                                  // "Tiep tuc" gui lai dung tap nay, engine
+                                  // tu loai muc da mo/da Luu; khong bao gio
+                                  // them record ngoai tap goc.
+      openTabIds: new Set(),      // record_id dang mo tab tren portal
+      lastPrepareIds: null,       // record_ids vua gui o dot prepare gan
+                                  // nhat — nguon cho auto-retry stale_revision
+      prepareRetryIds: null,      // tap cho auto-retry DUNG MOT LAN sau khi
+                                  // queue_get moi da ap (backend bao
+                                  // "doc lai queue_get" tren stale_revision)
+      prepareRetryOf: null,       // job_id la auto-retry — job do fail tiep
+                                  // thi KHONG re-arm (khong retry chong retry)
       scanStats: null,
       manifestRef: null,
       remaining: 0,               // ho so con lai cho dot tiep theo
       uploadSessionActive: false,
+      prepareError: null,         // loi terminal/partial cua upload.prepare
       login: null,                // {status, checked_at}
       sessionTabs: null,          // {open, saved, closed, unknown}
 
@@ -104,7 +121,6 @@
       staffJobId: null,
       prefsJobId: null,
       reconcileJobId: null,
-      catalogTried: false,
       catalogLoaded: false,       // upload.websites da thanh cong (ke ca rong)
       engineInstanceId: null,     // sidecar instance da thay — doi → fetch lai
       wsTried: false,             // workspace_get lan dau da thanh cong
@@ -182,6 +198,9 @@
     state.remaining = 0;
     state.savedIds = new Set();
     state.needsReconcileIds = new Set();
+    state.activeUploadIds = new Set();
+    state.openTabIds = new Set();
+    state.prepareError = null;
     state.staff = { congChungVien: null, thuKy: '', options: [] };
     state.staffSource = null;
     state.chunkSize = DEFAULT_CHUNK_SIZE;
@@ -189,7 +208,6 @@
     state.waitingBanner = null;
     state.scanProgress = null;
     state.prepareProgress = null;
-    state.catalogTried = false;
     state.wsTried = false;
     state.wsAppliedFor = null;
     state.siteAppliedFor = null;
@@ -255,8 +273,18 @@
     state.selectedIds = new Set();
     state.missingInExcelIds = new Set();
     state.issueFilterBackup = null;
+    state.queueStaleFor = null;
     state.savedIds = new Set();
-    state.needsReconcileIds = new Set();
+    // needsReconcileIds la pham vi WEBSITE (snapshot/§6.15), khong phai
+    // run-scoped: quet run moi khong duoc xoa — ho so chua ro da Luu phai
+    // con hien canh bao cho toi khi doi chieu xong. Doi website moi xoa
+    // (clearWebsiteScope xu ly rieng).
+    state.activeUploadIds = new Set();
+    state.openTabIds = new Set();
+    state.lastPrepareIds = null;
+    state.prepareRetryIds = null;
+    state.prepareRetryOf = null;
+    state.prepareError = null;
     state.scanStats = null;
     state.manifestRef = null;
     state.remaining = 0;

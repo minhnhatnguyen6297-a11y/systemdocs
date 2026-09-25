@@ -63,6 +63,7 @@
     const inflight = {};
     let booted = false;
     let lastSessPoll = 0;
+    let sessPollTimer = null;
 
     const s = h.el('section', 'upload-lab');
     const head = h.el('div', 'ul-head');
@@ -122,6 +123,27 @@
       return false;
     }
 
+    // Submit upload.prepare cho mot tap ids — dung chung cho ca ba nguon:
+    // nut "Upload file da chon", "Tiep tuc" va auto-retry stale_revision.
+    // Ghi nhan lastPrepareIds de loi stale_revision con biet tap can gui lai.
+    async function submitPrepareIds(ids) {
+      const job = await loud('upload.prepare', {
+        website_id: state.websiteId, browser_id: state.browserId,
+        run_id: state.runId, audit_id: state.auditId,
+        queue_revision: state.queueRevision,
+        record_ids: ids,
+        chunk_size: state.chunkSize,
+        cong_chung_vien: state.staff.congChungVien || null,
+        thu_ky: state.staff.thuKy || null,
+      });
+      if (job) {
+        state.prepareJobId = job.job_id;
+        state.lastPrepareIds = [...ids];
+        state.prepareError = null;
+      }
+      return job;
+    }
+
     async function bootstrap() {
       try {
         const cap = C.hasWorkflowCapability(mod);
@@ -157,7 +179,6 @@
       if (!state.catalogLoaded && !inflight.catalog &&
           !liveJob('upload.websites')) {
         inflight.catalog = true;
-        state.catalogTried = true;
         // Submit fail tam thoi (sidecar chua ready khi module mo): hen
         // refresh lai bang timer vi refreshAll chi chay khi status doi —
         // khong co poll dinh ky nao goi lai derive. Giu inflight trong
@@ -216,20 +237,52 @@
           !inflight.queue && !liveJob('upload.queue_get') &&
           Date.now() > (inflight.queueRetryAt || 0)) {
         inflight.queue = true;
+        // Job terminal FAILED cung phai retry paced (4s) — khong release
+        // inflight ngay de derive nhip sau resubmit nong (cung pattern
+        // catalog/ws/prefs/staff). Thanh cong → release + refresh ngay.
+        const release = () => { inflight.queue = false; view.refresh(); };
+        const retry = () => {
+          inflight.queueRetryAt = Date.now() + 4000;
+          inflight.queue = false;
+          const t = setTimeout(() => view.refresh(), 4000);
+          if (t && typeof t.unref === 'function') t.unref();
+        };
         quiet('upload.queue_get', {
           website_id: state.websiteId, run_id: state.runId,
           audit_id: state.auditId,
         }).then((r) => {
           if (r.ok) {
             state.queueJobId = r.job.job_id;
-            return h.awaitJob(r.job.job_id, 30000);
+            return h.awaitJob(r.job.job_id, 30000)
+              .then((j) => !!(j && j.status === 'succeeded'));
           }
-          inflight.queueRetryAt = Date.now() + 15000;
-          return null;
-        }).then(() => {
-          inflight.queue = false;
-          view.refresh();
-        }).catch(() => { inflight.queue = false; });
+          return false;
+        }).then((done) => { if (done) release(); else retry(); })
+          .catch(retry);
+      }
+      // Auto-retry DUNG MOT LAN sau stale_revision (armed trong adoptJobs):
+      // queue vua duoc doc lai → gui lai dung tap ids user da submit voi
+      // revision tuoi. Day la hoan tat mot hanh dong nguoi dung bi tu choi
+      // vi race, KHONG phai tu chay dot moi — prepareRetryOf nganh retry
+      // chong retry, scope/queue khong con tuoi thi marker bi huy im lang.
+      if (state.prepareRetryIds) {
+        const deadScope = !state.websiteId || !state.runId ||
+          !state.browserId ||
+          !(state.login && state.login.status === 'authenticated') ||
+          !state.uploadSessionActive;
+        const queueReady = !!(state.queueFor &&
+          state.queueFor.runId === state.runId &&
+          state.queueFor.auditId === state.auditId);
+        if (deadScope) {
+          state.prepareRetryIds = null;
+        } else if (queueReady && !inflight.queue &&
+                   !liveJob('upload.prepare')) {
+          const ids = state.prepareRetryIds;
+          state.prepareRetryIds = null;
+          submitPrepareIds(ids).then((job) => {
+            if (job) state.prepareRetryOf = job.job_id;
+          }).catch(() => {});
+        }
       }
       // Lay browser_id trong luc session_start con waiting_user — nut
       // "Xac nhan da dang nhap" can scope website+browser (contract §7.2).
@@ -237,14 +290,24 @@
           state.waitingBanner && state.waitingBanner.on === 'login' &&
           !inflight.wsLogin && !liveJob('upload.workspace_get')) {
         inflight.wsLogin = true;
+        // Paced retry — failed/timeout khong release ngay (vong submit
+        // nong); cung pattern catalog/ws/prefs/staff.
+        const release = () => { inflight.wsLogin = false; view.refresh(); };
+        const retry = () => {
+          const t = setTimeout(release, 4000);
+          if (t && typeof t.unref === 'function') t.unref();
+        };
         quiet('upload.workspace_get', { website_id: state.websiteId })
-          .then((r) => (r && r.ok) ? h.awaitJob(r.job.job_id, 15000) : null)
-          .then(() => { inflight.wsLogin = false; view.refresh(); })
-          .catch(() => { inflight.wsLogin = false; });
+          .then((r) => (r && r.ok)
+            ? h.awaitJob(r.job.job_id, 15000)
+              .then((j) => !!(j && j.status === 'succeeded'))
+            : false)
+          .then((done) => { if (done) release(); else retry(); })
+          .catch(retry);
       }
       // prefsTried/staffTried chi len khi job SUCCEEDED — submit fail tam
       // thoi hoac job failed di qua retry paced 4s, khong khoa vinh vien
-      // (cung bug class voi catalogTried/wsTried da sua).
+      // (cung lop bug voi co catalogLoaded/wsTried da sua o tren).
       if (state.websiteId && !state.prefsTried && !inflight.prefs &&
           !liveJob('upload.preferences')) {
         inflight.prefs = true;
@@ -295,13 +358,29 @@
     }
 
     // Poll session_status gop khi co job waiting_user (contract §7.2) —
-    // throttle 4s, khong chong request.
+    // throttle 4s, khong chong request. Poll phai TU DUY TRI: refresh chi
+    // chay khi co push job/status — trong luc cho login/review khong con
+    // push nao khac, nen nhip throttle-skip ma khong hen lai se dung poll
+    // vinh vien (Save-awareness chet: hang da Luu khong bao gio roi bang).
+    // Mot timer cho duy nhat; tu chain lai qua refresh cho toi khi het
+    // job waiting (nhip sau waiting=false → return som, khong hen tiep).
+    function scheduleSessionTick() {
+      if (sessPollTimer) return;
+      const t = setTimeout(() => {
+        sessPollTimer = null;
+        view.refresh();
+      }, 1000);
+      sessPollTimer = t;
+      if (t && typeof t.unref === 'function') t.unref();
+    }
+
     function maybePollSession() {
       if (!state.browserId) return;
       const waiting = C.runningJobs(state, jobs).some(
         (j) => j.status === 'waiting_user' &&
                String(j.command || '').startsWith('upload.'));
       if (!waiting) return;
+      scheduleSessionTick();
       if (Date.now() - lastSessPoll < 4000) return;
       lastSessPoll = Date.now();
       quiet('upload.session_status', {
@@ -488,23 +567,84 @@
           notify('Chưa có lượt quét — quét thư mục trước.', true);
           return;
         }
+        if (!state.browserId ||
+            !(state.login && state.login.status === 'authenticated')) {
+          notify('Chưa đăng nhập — mở đăng nhập và xác nhận trước.', true);
+          return;
+        }
         if (!state.selectedIds.size) {
           notify('Chưa chọn hồ sơ nào trong bảng.', true);
           return;
         }
-        const job = await loud('upload.prepare', {
-          website_id: state.websiteId, browser_id: state.browserId,
-          run_id: state.runId, audit_id: state.auditId,
-          queue_revision: state.queueRevision,
-          record_ids: [...state.selectedIds],
-          chunk_size: state.chunkSize,
-          cong_chung_vien: state.staff.congChungVien || null,
-          thu_ky: state.staff.thuKy || null,
-        });
-        if (job) state.prepareJobId = job.job_id;
+        // Dot moi: gui dung tap dang chon va GHI NHAN lam tap goc cho
+        // cac lan Tiep tuc (Qt: activeUploadSelectedRecordIds = selected).
+        const ids = [...state.selectedIds];
+        state.activeUploadIds = new Set(ids);
+        await submitPrepareIds(ids);
       },
       continuePrepare: async () => {
-        await actions.prepare();
+        // Tiep tuc gui lai DUNG tap goc cua dot upload (khong them record
+        // ngoai tap, khong doc lai checkbox hien tai) — engine tu loai muc
+        // da mo/da Luu/needs_reconcile. Khong bao gio tu chay dot tiep sau
+        // cancel/failed: nguoi dung bam la moi submit.
+        if (!state.websiteId || !state.runId) {
+          notify('Chưa có lượt quét — quét thư mục trước.', true);
+          return;
+        }
+        if (!state.browserId ||
+            !(state.login && state.login.status === 'authenticated')) {
+          notify('Chưa đăng nhập — mở đăng nhập và xác nhận trước.', true);
+          return;
+        }
+        const ids = [...state.activeUploadIds];
+        if (!ids.length) {
+          notify('Chưa có đợt upload nào để tiếp tục.', true);
+          return;
+        }
+        await submitPrepareIds(ids);
+      },
+      reconcile: async () => {
+        if (!state.websiteId || !state.runId) {
+          notify('Chưa có lượt quét để đối chiếu.', true);
+          return;
+        }
+        if (!state.needsReconcileIds.size) {
+          notify('Không có hồ sơ nào cần đối chiếu.', true);
+          return;
+        }
+        if (!state.excelFile) {
+          notify(
+            'Nạp sổ Excel mới ở tab Audit trước khi đối chiếu.', true);
+          return;
+        }
+        // Contract §6.15: doi chieu BAT BUOC audit_id moi (so tai lai sau
+        // khi nguoi dung kiem tra tren web) — audit lai file hien tai roi
+        // moi goi upload.reconcile, tuyet doi khong dung lai audit_id cu.
+        state.auditError = null;
+        const aj = await loud('upload.audit_excel', {
+          website_id: state.websiteId, file_ref: state.excelFile,
+          from_date: state.fromDate, to_date: state.toDate,
+        });
+        if (!aj) return;
+        state.auditJobId = aj.job_id;
+        const done = await h.awaitJob(aj.job_id, 120000);
+        const ad = done && C.jobData(done);
+        if (!done || done.status !== 'succeeded' || !ad || !ad.audit_id) {
+          if (done && done.status !== 'succeeded' && !state.auditError) {
+            state.auditError = {
+              code: `job_${done.status}`,
+              message: 'Audit mới cho đối chiếu không hoàn tất.',
+              retryable: true, next_action: 'retry',
+            };
+            view.refresh();
+          }
+          return;
+        }
+        const job = await loud('upload.reconcile', {
+          website_id: state.websiteId, run_id: state.runId,
+          audit_id: ad.audit_id,
+        });
+        if (job) state.reconcileJobId = job.job_id;
       },
       closeSession: async () => {
         if (!state.browserId) return;

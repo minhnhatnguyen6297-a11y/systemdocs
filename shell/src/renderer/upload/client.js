@@ -95,6 +95,17 @@
     }
   }
 
+  // Danh dau queue cu sau mot job lam doi queue backend (saved/prepared/
+  // reconcile/close) → derive fetch lai DUNG MOT LAN cho moi job. adoptJobs
+  // chay lai tren MOI refresh — reset queueFor vo dieu kien o day se tao
+  // vong: queue_get ap queueFor roi chinh job cu xoa lai ngay trong cung
+  // nhip → queueReady khong bao gio len + queue_get bi resubmit vo han.
+  function staleQueueOnce(state, job) {
+    if (!job || state.queueStaleFor === job.job_id) return;
+    state.queueStaleFor = job.job_id;
+    state.queueFor = null;
+  }
+
   function trackProgress(state, job) {
     // Hai thanh tien do rieng: quet va chuan bi bieu mau (spec §3).
     if (job.job_id === state.scanJobId) {
@@ -106,6 +117,14 @@
       state.prepareProgress = isTerminal(job)
         ? null
         : (job.progress || { done: 0, total: null });
+      // Snapshot {done,total,current_label} (jobstore) — cap nhat "con lai"
+      // ngay trong luc prepare chay/cho review de nut Tiep tuc phan anh dung
+      // so dot sau truoc khi job terminal.
+      if (!isTerminal(job) && job.progress &&
+          typeof job.progress.total === 'number') {
+        state.remaining = Math.max(
+          0, job.progress.total - (job.progress.done || 0));
+      }
     }
     if (!isTerminal(job) && job.status === 'waiting_user' && job.waiting_on) {
       // Banner chi pin khi job thuoc scope hien tai — job waiting cua
@@ -318,7 +337,18 @@
             (!inAt || !curAt || inAt <= curAt);
           if (!regresses) state.login = d.login;
         }
-        if (d.tabs) state.sessionTabs = d.tabs;
+        if (d.tabs) {
+          state.sessionTabs = d.tabs;
+          state.openTabIds = new Set(d.tabs.open_record_ids || []);
+          // Save-awareness trong luc cho review: tab nguoi dung da bam Luu
+          // (POST da xac minh) roi bang ngay; tab dong/mat dau → can doi
+          // chieu — mirror store phia backend (_update_snapshot).
+          markSaved(state, d.tabs.saved_record_ids);
+          addReconcile(state, [
+            ...(d.tabs.closed_record_ids || []),
+            ...(d.tabs.unknown_record_ids || []),
+          ]);
+        }
         if (d.staff_options &&
             Array.isArray(d.staff_options.cong_chung_vien)) {
           state.staff.options = d.staff_options.cong_chung_vien;
@@ -335,12 +365,20 @@
           websiteId: d.website_id, browserId: d.browser_id,
         })) return false;
         state.uploadSessionActive = false;
+        state.sessionTabs = null;
+        state.openTabIds = new Set();
         if (Array.isArray(d.verified_record_ids)) {
           markSaved(state, d.verified_record_ids);
         }
         if (Array.isArray(d.needs_reconcile_record_ids)) {
           addReconcile(state, d.needs_reconcile_record_ids);
         }
+        // Qt _handle_upload_closed: het phien → het dot tiep theo; tab con
+        // mo da chuyen needs_reconcile → queue doi → fetch lai MOT LAN de
+        // queue_revision gui dot sau luon tuoi (chong stale_revision).
+        state.remaining = 0;
+        state.prepareRetryIds = null;  // phien dong — retry dang cho chet theo
+        staleQueueOnce(state, job);
         return true;
       }
 
@@ -500,7 +538,37 @@
       }
 
       case 'upload.prepare': {
-        if (!d || !S.acceptScopedResult(state, {
+        if (!d) {
+          // Terminal khong result (scope_violation/stale_revision/login...)
+          // → hien loi tai cho, KHONG nuot vao the Job duoi cung. Job
+          // canceled LUON mang error user_canceled → phai bat truoc nhanh
+          // error de "Dung" cua nguoi dung khong bi hien nhu dot that bai.
+          if (isTerminal(job) &&
+              S.acceptScopedResult(state, { jobId: job.job_id })) {
+            if (job.status === 'canceled') {
+              state.prepareError = null;
+            } else if (job.error) {
+              state.prepareError = job.error;
+              if (job.error.code === 'stale_revision') {
+                // Queue backend da doi — fetch lai MOT LAN/job de retry
+                // mang revision moi.
+                staleQueueOnce(state, job);
+                // Hanh dong nguoi dung bi tu choi chi vi race revision —
+                // khong phai loi du lieu. Backend chi dan "doc lai
+                // queue_get": khi queue moi ap xong, derive() gui lai
+                // DUNG TAP ids da submit. prepareRetryOf chan re-arm tren
+                // chinh job retry — toi da mot lan tu dong cho moi click.
+                if (state.prepareRetryOf !== job.job_id &&
+                    Array.isArray(state.lastPrepareIds)) {
+                  state.prepareRetryIds = [...state.lastPrepareIds];
+                }
+              }
+            }
+            return true;
+          }
+          return false;
+        }
+        if (!S.acceptScopedResult(state, {
           websiteId: d.website_id, runId: d.run_id, jobId: job.job_id,
         })) return false;
         const sum = d.summary || {};
@@ -511,7 +579,26 @@
         if (Array.isArray(d.needs_reconcile_record_ids)) {
           addReconcile(state, d.needs_reconcile_record_ids);
         }
-        state.uploadSessionActive = true;
+        if (isSuccess(job)) {
+          state.uploadSessionActive = true;
+          // Partial = co muc loi trong dot — hien breakdown, khong nuot.
+          state.prepareError =
+            (job.error && job.error.code === 'upload.partial_failure')
+              ? job.error : null;
+        } else if (job.status === 'canceled') {
+          // Nguoi dung tu Dung — khong phai loi; KHONG tu chay dot tiep.
+          state.prepareError = null;
+        } else if (job.error) {
+          state.prepareError = job.error;
+          if (job.error.code === 'stale_revision' &&
+              state.prepareRetryOf !== job.job_id &&
+              Array.isArray(state.lastPrepareIds)) {
+            state.prepareRetryIds = [...state.lastPrepareIds];
+          }
+        }
+        // Queue revision da doi (saved/prepared/needs_reconcile) → fetch lai
+        // queue MOT LAN/job de queue_revision gui dot tiep theo luon tuoi.
+        staleQueueOnce(state, job);
         return true;
       }
 
@@ -546,6 +633,8 @@
         if (Array.isArray(d.needs_reconcile_record_ids)) {
           addReconcile(state, d.needs_reconcile_record_ids);
         }
+        // Da xac minh them muc → queue doi → fetch lai MOT LAN/job.
+        staleQueueOnce(state, job);
         return true;
       }
 
