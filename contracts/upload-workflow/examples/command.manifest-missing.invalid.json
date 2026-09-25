@@ -1,0 +1,30 @@
+{
+  "fixture": {
+    "websites": [
+      "nam_dinh"
+    ],
+    "runs": {
+      "deadbeef": {
+        "website_id": "nam_dinh",
+        "record_ids": [
+          138
+        ],
+        "manifest_exists": false
+      }
+    }
+  },
+  "contract_version": "desktopcommand.v1",
+  "command_id": "9a1b2c3d-0042-4e5f-8a6b-7c8d9e0f1a2b",
+  "command": "upload.queue_get",
+  "payload": {
+    "workflow_version": "upload.workflow.v1",
+    "website_id": "nam_dinh",
+    "run_id": "deadbeef",
+    "audit_id": null
+  },
+  "client_meta": {
+    "shell_version": "0.2.0",
+    "module": "upload"
+  },
+  "expected_error": "file_not_found"
+}

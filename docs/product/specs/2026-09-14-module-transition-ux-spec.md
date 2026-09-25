@@ -76,19 +76,23 @@ idle → checking → running → waiting_user → running → completed
 
 ## 5. Hai luồng nghiệp vụ đầu tiên (acceptance per module)
 
-### 5.1 upload_lab: source → scan → review → audit/queue → preflight → dry-run → Finalize
+### 5.1 upload_lab: website → env/login → sổ Excel (tab Audit) → scan → queue → prepare từng đợt → người dùng Lưu
+
+Module Upload Lab có đúng hai tab (spec `upload_lab/docs/spec_UI.md`): *Audit
+Sổ Công Chứng* và *Quét & Upload Hồ Sơ*. Không có trang nhật ký/cấu hình riêng;
+kiểm tra môi trường hiển thị inline đầu tab Audit.
 
 | Bước | Trạng thái | UX bắt buộc |
 |---|---|---|
+| Chọn website | idle | dropdown `nam_dinh` dùng chung hai tab; không ô nhập URL; website chưa đăng ký bị từ chối |
+| Preflight env | checking | checklist pass/fail từng mục inline đầu tab Audit; fail → Error state + hướng dẫn |
+| Login portal | waiting_user (login) | đưa Chromium headed lên trước 1 lần; xác nhận gắn đúng job |
+| Tải/chọn + audit sổ Excel | running→completed | bốn KPI + hai bảng `STT|Ngày|Số công chứng|Ghi chú` (MIN-77); tự nạp sau tải/chọn |
 | Chọn folder/nguồn | idle | native file dialog qua Electron main |
 | Scan/extract | running | progress `done/total`, tên file đang xử; cancel được |
-| Review kết quả | idle (bảng) | cột status domain thật (matched/extracted/...) + lỗi per-file |
-| Audit sổ Excel | running→completed | kết quả đối chiếu, số hở |
-| Preflight env | checking | checklist pass/fail từng mục; fail → Error state + hướng dẫn |
-| Login portal | waiting_user | đưa Chromium headed lên trước 1 lần; nút "Tôi đã đăng nhập" |
-| Dry-run | running | progress từng hồ sơ; kết quả dry-run hiển thị trước Finalize |
-| **Finalize** | waiting_user | dialog xác nhận đếm số hồ sơ + cảnh báo ghi thật; **chỉ người bấm** |
-| Kết quả | completed/partial/failed | breakdown; retry chỉ retryable; không duplicate upload |
+| Queue hồ sơ | idle (bảng) | bảng `✓|STT|Ngày|Số công chứng|Ghi chú|Địa chỉ file`; chọn mặc định số thiếu khi có Excel |
+| Prepare từng đợt | running→waiting_user (review) | tối đa N tab/đợt; app chỉ điền sẵn — **người dùng tự bấm Lưu trong Chromium**, không có nút Finalize trong app |
+| Kết quả | completed/partial/failed | breakdown theo `record_id`+stage; retry chỉ retryable; không duplicate upload; chưa xác minh → Cần đối chiếu |
 
 ### 5.2 notary_v2: case → intake/OCR → review/confirm → workspace → Word
 

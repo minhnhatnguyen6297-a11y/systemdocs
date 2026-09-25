@@ -1,0 +1,28 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_01HZX0018",
+  "command_id": "9a1b2c3d-0019-4e5f-8a6b-7c8d9e0f1a2b",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "upload_workspace",
+    "data": {
+      "workflow_version": "upload.workflow.v1",
+      "website_id": "nam_dinh",
+      "revision": 4,
+      "run_id": "a1b2c3d4",
+      "audit_id": "aud_7",
+      "browser_id": "brw_1",
+      "active_job_ids": [],
+      "needs_reconcile_record_ids": [],
+      "has_excel": true,
+      "queue_revision": 7
+    },
+    "warnings": [],
+    "source_files": [],
+    "evidence": []
+  },
+  "error": null,
+  "updated_at": "2026-09-24T10:20:00Z"
+}

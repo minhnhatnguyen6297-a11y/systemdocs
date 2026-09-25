@@ -20,6 +20,22 @@ const { openPathBlockReason } = require('./open-path');
 const SHELL_ROOT = path.join(__dirname, '..', '..');
 const SMOKE = process.env.G1_SMOKE === '1'; // packaged smoke: chay probe roi thoat
 
+// MIN-69 T9: marker `resources/test-pkg/test-build.json` CHI ton tai trong
+// goi dist:test (electron-builder.test.json). Production khong ship file
+// nay — nhan build quyet dinh userData rieng + seam e2e + build label.
+function isTestBuild() {
+  try {
+    return app.isPackaged && fs.existsSync(path.join(
+      process.resourcesPath, 'test-pkg', 'test-build.json'));
+  } catch { return false; }
+}
+
+// Seam e2e (pick/open stub): dev luon cho; packaged CHI trong test build —
+// production khong bao gio doc file JSON thay dialog that.
+function e2eSeamsAllowed() {
+  return !app.isPackaged || isTestBuild();
+}
+
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
@@ -38,7 +54,63 @@ const fileTokens = makeFileTokenStore();
 // guard chan khi con nhap Stage/So do chua luu.
 let rendererDirty = false;
 
+// Duong mo file an toan — chi nhung loai tai lieu renderer can mo.
+const OPEN_ALLOWED_EXTS = new Set([
+  '.doc', '.docx', '.xls', '.xlsx', '.xlsm', '.pdf',
+  '.txt', '.log', '.md', '.json', '.csv',
+]);
+
+// Test seam (MIN-69 e2e): G1_E2E_PICK_FILES chi vao file JSON
+// {"files": ["D:/path/a.xlsx", ...]} — thay dialog that, chi hoat dong
+// khi env duoc dat. Ket qua van qua cung filter/validate nhu dialog.
+function e2ePickOverride(opts) {
+  // Master guard: production KHONG BAO GIO stub file dialog — env
+  // G1_E2E_PICK_FILES con sot tren may user khong duoc bien moi picker
+  // thanh doc file JSON. Test build (marker) van dung seam duoc.
+  if (!e2eSeamsAllowed()) return null;
+  const spec = process.env.G1_E2E_PICK_FILES;
+  if (!spec) return null;
+  let list;
+  try {
+    const raw = JSON.parse(fs.readFileSync(spec, 'utf8'));
+    list = Array.isArray(raw) ? raw : (raw && raw.files) || [];
+  } catch (e) {
+    log.warn('G1_E2E_PICK_FILES khong doc duoc', { err: String(e) });
+    return [];
+  }
+  // Ap filter extension nhu dialog that — file ngoai filter "khong chon
+  // duoc" (khong tra ve).
+  const allowed = [];
+  if (!opts.directory && Array.isArray(opts.filters)) {
+    for (const f of opts.filters) {
+      for (const ext of (f && f.extensions) || []) {
+        allowed.push(String(ext).toLowerCase());
+      }
+    }
+  }
+  const out = [];
+  for (const item of list) {
+    const p = typeof item === 'string' ? item : (item && item.path);
+    if (typeof p !== 'string' || !p) continue;
+    if (allowed.length &&
+        !allowed.includes(path.extname(p).slice(1).toLowerCase())) {
+      continue;
+    }
+    try {
+      const st = fs.statSync(p);
+      out.push({
+        path: p, scope: 'machine_local',
+        size_bytes: st.isFile() ? st.size : null,
+        is_dir: st.isDirectory(),
+      });
+    } catch (e) { /* bo qua path khong ton tai */ }
+  }
+  return out;
+}
+
 async function pickFiles(opts = {}) {
+  const stub = e2ePickOverride(opts);
+  if (stub !== null) return stub;
   const properties = opts.directory
     ? ['openDirectory']
     : opts.multi === false ? ['openFile'] : ['openFile', 'multiSelections'];
@@ -62,12 +134,24 @@ function registerDroppedFile(p) {
 
 async function openPath(opts = {}) {
   // Mo file san pham (docx da export, log, ...) bang app mac dinh.
-  // Validate boundary: tuyet doi, ton tai, khong UNC — file_ref §6.
+  // Validate boundary: scope machine_local, tuyet doi, ton tai, khong UNC,
+  // phan mo rong nam trong allowlist — file_ref §6.
+  if (opts.scope !== undefined && opts.scope !== 'machine_local') {
+    throw Object.assign(
+      new Error(`scope ${opts.scope} khong duoc mo`),
+      { code: 'file_scope_not_supported' });
+  }
   const p = typeof opts.path === 'string' ? opts.path : '';
   const unc = p.startsWith('\\\\') ||
     /^\\\\\?\\(UNC\\|\\\\)/i.test(p);
   if (!p || unc || !/^[A-Za-z]:[\\/]/.test(p) && !p.startsWith('\\\\?\\')) {
     throw Object.assign(new Error('path khong hop le'),
+      { code: 'file_scope_not_supported' });
+  }
+  const ext = path.extname(p).toLowerCase();
+  if (!OPEN_ALLOWED_EXTS.has(ext)) {
+    throw Object.assign(
+      new Error(`khong mo loai file ${ext || '(khong phan mo rong)'}`),
       { code: 'file_scope_not_supported' });
   }
   if (!fs.existsSync(p) || !fs.statSync(p).isFile()) {
@@ -79,6 +163,14 @@ async function openPath(opts = {}) {
   const block = openPathBlockReason(p);
   if (block) {
     throw Object.assign(new Error(block.message), { code: block.code });
+  }
+  // Test seam (MIN-69 e2e): G1_E2E_OPEN_LOG chi vao file text — moi lan
+  // openPath hop le ghi mot dong path thay vi mo app that (tran dep Word
+  // trong test). Cung guard nhu pick seam: production khong bao gio stub.
+  const openLog = e2eSeamsAllowed() && process.env.G1_E2E_OPEN_LOG;
+  if (openLog) {
+    fs.appendFileSync(openLog, `${p}\n`, 'utf8');
+    return { opened: p };
   }
   const { shell } = require('electron');
   const err = await shell.openPath(p);
@@ -215,7 +307,10 @@ function collectDiagnostics() {
 }
 
 async function start() {
-  app.setName('g1-shell');
+  // userData tach biet cho test package (appId dev.g1.shell.test):
+  // %APPDATA%/g1-shell-test vs %APPDATA%/g1-shell — khong de test build
+  // ghi de data cua ban production tren cung may.
+  app.setName(isTestBuild() ? 'g1-shell-test' : 'g1-shell');
   // packaged app khong co terminal — ghi diagnostics ra file (da redact)
   const logDir = path.join(app.getPath('userData'), 'logs');
   fs.mkdirSync(logDir, { recursive: true });
@@ -227,7 +322,8 @@ async function start() {
   // packaged luon strip truoc khi spawn — mock khong bao gio chay packaged.
   stripNotaryMockEnv(app.isPackaged, log);
   const cmd = sidecarCommand(
-    app.isPackaged, process.resourcesPath, SHELL_ROOT);
+    app.isPackaged, process.resourcesPath, SHELL_ROOT,
+    { buildLabel: isTestBuild() ? 'test' : 'production' });
   sidecar = new SidecarManager({ command: cmd, logger: log });
   tracker = new JobTracker({ sidecar, logger: log });
   tracker.on('job', (job) => {

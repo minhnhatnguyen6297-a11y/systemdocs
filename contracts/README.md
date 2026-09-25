@@ -3,7 +3,12 @@
 Thư mục này chỉ chứa **những gì đã được cả hai bên đồng ý**. Nó không phải nơi
 đề xuất ý tưởng tích hợp.
 
-## Trạng thái: hai kênh đã publish — một nội bộ shell, một xuyên-sản-phẩm
+## Trạng thái: hai kênh đã publish + một draft chờ duyệt
+
+Cột **Trạng thái** ghi rõ đã duyệt hay draft — không ngầm coi draft là đã
+publish. Đã publish: một kênh nội bộ shell (`desktopcommand.v1` +
+`g1.module.v1`, owner duyệt 14/09/2026, spec P2) và một contract
+xuyên-sản-phẩm (`intake.*.v1`, MIN-92). `upload.workflow.v1` đang DRAFT.
 
 Ba công cụ nghiệp vụ vẫn **chạy độc lập** — chưa có API giữa chúng, chưa đọc DB
 của nhau, chưa có file trao đổi tự động. Đó là trạng thái của **giai đoạn hiện
@@ -18,18 +23,21 @@ owner duyệt 25/09/2026):
 | [`zalo-intake/zalo-intake.md`](./zalo-intake/zalo-intake.md) + 9 schema `*.schema.json` | `intake.*.v1` — gói raw (manifest/records.jsonl/READY), feed pending, receipt/ACK, service status, error envelope, raw record 5 kind (text/OCR/status/event/listener), OCR bổ sung có quota; Zalo giữ ảnh 168h, máy chính **không nhận ảnh** | APPROVED v1 |
 | [`zalo-intake/examples/`](./zalo-intake/examples/) + [`zalo-intake/validate_examples.py`](./zalo-intake/validate_examples.py) | 27 valid + 72 invalid fixtures + validator kiểm chứng được (byte-exact, `.gitattributes -text`) | kiểm: `python contracts/zalo-intake/validate_examples.py` |
 
-Đã publish theo lộ trình G1 một máy (owner duyệt 14/09/2026, spec P2):
+Kênh nội bộ shell↔engine (owner duyệt 14/09/2026, spec P2; `upload.workflow.v1`
+đang DRAFT chờ owner duyệt — MIN-69):
 
 | File | Nội dung | Trạng thái |
 |---|---|---|
 | [`desktop-command.md`](./desktop-command.md) | `desktopcommand.v1` — kênh lệnh Electron main ↔ Python sidecar trên một máy: auth, lifecycle, idempotency, waiting_user, error, file_ref machine-scope | APPROVED v1 |
 | [`g1-module-data.md`](./g1-module-data.md) | `g1.module.v1` — shape dữ liệu trong payload/result/error (FileRef, JobResult, ErrorObject, IdentityEvidence, ownership) | APPROVED v1 |
 | [`g1/examples/`](./g1/examples/) + [`g1/validate_examples.py`](./g1/validate_examples.py) | valid/invalid JSON + validator kiểm chứng được | kiểm: `python contracts/g1/validate_examples.py` |
+| [`upload-workflow.md`](./upload-workflow.md) | `upload.workflow.v1` — 17 command `upload.*` giữa shell (module `upload`/Upload Lab) và sidecar: website registry, workspace/scope binding, revision, run→manifest, waiting_user login/review, partial breakdown, compatibility với payload legacy | **DRAFT** — chờ owner duyệt (MIN-69) |
+| [`upload-workflow/examples/`](./upload-workflow/examples/) + [`upload-workflow/validate_examples.py`](./upload-workflow/validate_examples.py) | valid/invalid JSON có `fixture` mô phỏng binding backend + validator kiểm chứng được | kiểm: `python contracts/upload-workflow/validate_examples.py` |
 
-Hai contract `desktopcommand.v1`/`g1.module.v1` là **kênh nội bộ shell↔engine** —
-không phải contract giữa ba sản phẩm nghiệp vụ.
-ConversionEnvelope/Evidence/DraftCase dùng chung xuyên repo vẫn theo Gate A–D
-của `../docs/product/MIN62_DATA_CONTRACT_DRAFT.md` (branch
+Ba contract `desktopcommand.v1`/`g1.module.v1`/`upload.workflow.v1` là
+**kênh nội bộ shell↔engine** — không phải contract giữa ba sản phẩm nghiệp
+vụ. ConversionEnvelope/Evidence/DraftCase dùng chung xuyên repo vẫn theo
+Gate A–D của `../docs/product/MIN62_DATA_CONTRACT_DRAFT.md` (branch
 `min-62-data-contract-draft`) và chưa được publish tại đây.
 
 Các shape `v0.experimental` trong `SYSTEM_ARCHITECTURE.md` mục 6 chỉ dùng để

@@ -6,6 +6,8 @@ import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import os from 'node:os';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
@@ -14,7 +16,17 @@ const { SidecarManager } = require('../src/main/sidecar.js');
 const FIXTURE = path.join(path.dirname(fileURLToPath(import.meta.url)),
                           'fixtures', 'fake_sidecar.mjs');
 
-afterEach(() => { delete process.env.FAKE_MODE; });
+const _SANITIZE_ENV = [
+  'FAKE_MODE', 'FAKE_DUMP',
+  'PYTHONPATH', 'PYTHONHOME', 'PYTHONSTARTUP', 'PYTHONUSERBASE',
+  // Bien the hoa/thuong — tren *nix la key rieng, tren Windows delete
+  // theo uppercase da phu nhung liet ke cho ro.
+  'PythonPath', 'PythonHome', 'pythonstartup', 'pythonhome',
+  'pythonuserbase',
+  'G1_NOTARY_DATA_DIR', 'G1_UPLOAD_DATA_DIR', 'G1_OUTPUT_DIR',
+  'G1_BUILD_LABEL',
+];
+afterEach(() => { for (const k of _SANITIZE_ENV) delete process.env[k]; });
 
 function makeLogger() {
   const counts = { spawn: 0, restart: 0 };
@@ -104,3 +116,98 @@ test('shutdown sau khi child da exit: clean', async () => {
   await startP;
   assert.equal(m.state, 'stopped');
 });
+
+test('config: SHUTDOWN_GRACE_MS bao phu worst-case _stop() cua sidecar', () => {
+  // app.py _stop(): timer 0.2s + store.drain(timeout=2) +
+  // worker().shutdown(timeout=2) — reconcile + join chia 2s do (xem
+  // upload_session._BrowserWorker.shutdown) — + uvicorn exit ~0.3s
+  // ≈ 4.5s. Grace nho hon bound nay → SIGKILL giet reconcile/close giua
+  // chung, dung luc do chac chan 'da Luu' can duoc ghi nhat.
+  const { SHUTDOWN_GRACE_MS } = require('../src/main/config.js');
+  assert.equal(SHUTDOWN_GRACE_MS, 6_000);
+  assert.ok(SHUTDOWN_GRACE_MS > 4_500,
+            'grace phai vuot worst-case _stop() ~4.5s voi headroom');
+});
+
+// ---- F3/F4 (T9 review): spawn env isolation ----
+
+test('packaged spawn: strip PYTHON* (ke ca case variant) + dat ' +
+     'G1_NOTARY_DATA_DIR ngoai output', async () => {
+  const dump = path.join(
+    os.tmpdir(), `g1-fake-dump-${process.pid}-${Date.now()}.json`);
+  process.env.FAKE_MODE = 'envdump';
+  process.env.FAKE_DUMP = dump;
+  // Bien the hoa/thuong: Windows env var case-insensitive voi child —
+  // `PythonPath` van chay vao frozen exe neu strip chi dung exact-case.
+  // (delete truoc de Windows tao key dung case variant, khong bi giu
+  // case cua var co san.)
+  delete process.env.PYTHONPATH;
+  process.env.PythonPath = 'C:/hook-dir';       // sitecustomize/fixture hook
+  delete process.env.PYTHONHOME;
+  process.env.PythonHome = 'C:/pyhome';
+  delete process.env.PYTHONSTARTUP;
+  process.env.pythonstartup = 'C:/startup.py';
+  process.env.PYTHONUSERBASE = 'C:/pybase';
+  const { logger } = makeLogger();
+  const m = new SidecarManager({
+    command: { cmd: process.execPath, args: [FIXTURE],
+               cwd: path.dirname(FIXTURE),
+               env: { G1_ENGINE_DIR: 'C:/engine',
+                      G1_BUILD_LABEL: 'production' } },
+    logger,
+  });
+  await m.start();
+  assert.equal(m.state, 'ready');
+  await m.shutdown();
+  const d = JSON.parse(fs.readFileSync(dump, 'utf8'));
+  fs.unlinkSync(dump);
+  // F3: env interpreter Python cua user KHONG duoc chay vao packaged —
+  // ke ca bien the hoa/thuong (PythonPath/pythonstartup/PythonHome) va
+  // PYTHONUSERBASE. python_keys rong = khong key denylist nao sot lai.
+  assert.equal(d.pythonpath, null);
+  assert.equal(d.pythonhome, null);
+  assert.equal(d.pythonstartup, null);
+  assert.equal(d.pythonuserbase, null);
+  assert.deepEqual(d.python_keys, []);
+  // F4: notary data duoi engine-data/ cua userData — KHONG duoi output/
+  // (output la cho file export), KHONG trong install dir.
+  assert.ok(d.notary_data, 'packaged phai dat G1_NOTARY_DATA_DIR');
+  const norm = d.notary_data.replace(/\//g, path.sep);
+  assert.ok(norm.endsWith(path.join('engine-data', 'notary_v2')),
+            `G1_NOTARY_DATA_DIR phai ket thuc bang engine-data/notary_v2: ` +
+            norm);
+  assert.ok(!norm.includes(path.join('output', 'engine-data')),
+            `notary data khong duoc nam duoi output/: ${norm}`);
+  assert.ok(d.upload_data, 'packaged phai dat G1_UPLOAD_DATA_DIR');
+  assert.ok(d.output, 'packaged phai dat G1_OUTPUT_DIR');
+  assert.equal(d.engine_dir, 'C:/engine');
+  assert.equal(d.build_label, 'production');
+}, { timeout: 15000 });
+
+test('dev spawn: giu PYTHONPATH, khong dat G1_NOTARY_DATA_DIR', async () => {
+  const dump = path.join(
+    os.tmpdir(), `g1-fake-dump-${process.pid}-${Date.now()}.json`);
+  process.env.FAKE_MODE = 'envdump';
+  process.env.FAKE_DUMP = dump;
+  process.env.PYTHONPATH = 'C:/hook-dir';
+  delete process.env.PYTHONHOME;
+  process.env.pythonhome = 'C:/pyhome-dev';  // case variant — dev giu lai
+  const { logger } = makeLogger();
+  const m = new SidecarManager({
+    command: { cmd: process.execPath, args: [FIXTURE],
+               cwd: path.dirname(FIXTURE) },   // khong env → dev spawn
+    logger,
+  });
+  await m.start();
+  await m.shutdown();
+  const d = JSON.parse(fs.readFileSync(dump, 'utf8'));
+  fs.unlinkSync(dump);
+  // Dev hook test_upload_e2e can PYTHONPATH — giu nguyen, ke ca bien the
+  // hoa/thuong cua cac bien denylist khac.
+  assert.equal(d.pythonpath, 'C:/hook-dir');
+  assert.equal(d.pythonhome, 'C:/pyhome-dev');
+  assert.ok(d.python_keys.includes('pythonhome'),
+            'dev spawn phai giu ca key denylist dang hoa/thuong khac');
+  // Dev: notary data dir = engine root (repo) nhu cu — KHONG dat env.
+  assert.equal(d.notary_data, null);
+}, { timeout: 15000 });

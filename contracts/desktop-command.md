@@ -103,7 +103,7 @@ file_ref:
 
 - Cold start: main poll `/healthz` tới 30s (PyInstaller cold ~3–6s, P1 đo).
 - Restart: tối đa 3 lần, backoff 1s/3s/10s; hết → `engine_unavailable`.
-- Shutdown: `/shutdown` rồi kill sau 3s nếu chưa thoát.
+- Shutdown: `/shutdown` rồi kill sau 6s nếu chưa thoát.
 - Port conflict: instance 2 thoát với exit ≠0 → main báo lỗi, không nuốt.
 
 ## 8. Compatibility & migration

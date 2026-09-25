@@ -1,8 +1,9 @@
 'use strict';
 
 // Module registry theo spec §6 + taxonomy MIN-104/MIN-111.
-// capabilities = command namespace sidecar ma module dung; 'shell' = xu ly
-// trong Electron main (khong goi sidecar).
+// namespaces = command namespace sidecar ma module dung; 'shell' = xu ly
+// trong Electron main (khong goi sidecar). capabilities = workflow
+// versions module cong bo (contract §9.1).
 // 'document-review' giu lam id ky thuat tuong thich mot chu ky — nav moi
 // goi 'notary_v2' (lib.NAV_SPEC alias). 'excel-word' giu cho compat command
 // word.*, khong con tren nav chinh. Namespace 'zalo' da tach (MIN-103) —
@@ -13,6 +14,9 @@ const MODULES = [
     id: 'upload',
     title: 'upload_lab',
     namespaces: ['upload', 'file', 'diag'],
+    // Contract §9.1: consumer kiem upload.workflow.v1 qua
+    // hasWorkflowCapability truoc khi gui payload versioned.
+    capabilities: ['upload.workflow.v1'],
     kind: 'engine',
     status: 'available',
   },

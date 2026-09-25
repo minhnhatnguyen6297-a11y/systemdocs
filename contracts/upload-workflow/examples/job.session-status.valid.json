@@ -1,0 +1,41 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_01HZX0020",
+  "command_id": "9a1b2c3d-0021-4e5f-8a6b-7c8d9e0f1a2b",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "session_state",
+    "data": {
+      "workflow_version": "upload.workflow.v1",
+      "website_id": "nam_dinh",
+      "browser_id": "brw_1",
+      "login": {
+        "status": "authenticated",
+        "checked_at": "2026-09-24T10:19:30Z"
+      },
+      "tabs": {
+        "open_record_ids": [
+          140,
+          141
+        ],
+        "saved_record_ids": [
+          138,
+          139
+        ],
+        "closed_record_ids": [
+          137
+        ],
+        "unknown_record_ids": [
+          142
+        ]
+      }
+    },
+    "warnings": [],
+    "source_files": [],
+    "evidence": []
+  },
+  "error": null,
+  "updated_at": "2026-09-24T10:20:00Z"
+}

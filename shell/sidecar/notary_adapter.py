@@ -7,6 +7,10 @@ business rule (locked case, dedup, unique serial).
 
 DB: notary.db cua engine root (database.py neo theo __file__). Sidecar la
 owner ghi duy nhat — renderer khong bao gio cham DB (g1-module-data §5).
+Khi engine root la bundled read-only (packaged: resources/engine) hoac
+G1_NOTARY_DATA_DIR duoc dat (test — khong ghi DB that), `_ensure_db`
+redirect DB sang `engine_roots.engine_data_dir("notary_v2")` bang patch
+muc adapter — khong sua engine internals.
 """
 import asyncio
 import io
@@ -15,18 +19,52 @@ from datetime import date, datetime
 from pathlib import Path
 
 from errors import CommandError
-from engine_roots import engine_root, import_engine_module, output_dir
+from engine_roots import (
+    engine_data_dir, engine_root, import_engine_module, is_bundled_root,
+    output_dir)
 
 
 _db_ready = False
 
 
+def _rebind_db_path(database, db_path):
+    """Rebind notary.db sang data dir writable (packaged/test).
+
+    `database.py` neo DB_PATH/engine/SessionLocal canh __file__ luc import —
+    hop le trong dev (repo), nhung engine bundle trong resources la
+    read-only. Patch module-level o day: `models.Base` la declarative
+    chung (khong anh huong), migrate_* doc global `DB_PATH` luc goi,
+    `get_db`/adapter tao session qua `SessionLocal` global — tat ca theo
+    sau rebind. Test cung dung duong nay qua G1_NOTARY_DATA_DIR de khong
+    ghi DB that.
+    """
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    database.DB_PATH = db_path
+    database.DATABASE_URL = f"sqlite:///{db_path.as_posix()}"
+    database.engine = create_engine(
+        database.DATABASE_URL, connect_args={"check_same_thread": False})
+    database.enable_sqlite_foreign_keys(database.engine)
+    database.SessionLocal = sessionmaker(
+        autocommit=False, autoflush=False, bind=database.engine)
+
+
 def _ensure_db():
-    """Khoi tao schema notary.db lan dau — cung loat migrate nhu main.py."""
+    """Khoi tao schema notary.db — cung loat migrate nhu main.py.
+
+    Dev giu nguyen: DB canh engine root. Bundled/env override → rebind sang
+    engine_data_dir truoc khi migrate (idempotent — doi data dir giua
+    chay se rebind + migrate lai).
+    """
     global _db_ready
+    database = import_engine_module("notary_v2", "database")
+    db_path = Path(engine_data_dir("notary_v2")) / "notary.db"
+    if Path(database.DB_PATH).resolve() != db_path.resolve():
+        _rebind_db_path(database, db_path)
+        _db_ready = False
     if _db_ready:
         return
-    database = import_engine_module("notary_v2", "database")
     database.migrate_customers_nullable()
     database.migrate_inheritance_cases_schema()
     database.migrate_properties_schema()
@@ -474,13 +512,22 @@ def ocr_analyze(job, payload):
     if len(refs) > 8:
         raise CommandError("validation_error", "toi da 8 anh/lan")
     ocr = _router("ocr_ai")
+    # Packaged (bundled root): `_ENV_PATH` mac dinh tro vao
+    # resources/engine/notary_v2/.env — install dir read-only va staging
+    # khong ship .env → guidance cu ("dat key vao <notary_v2>/.env") tro
+    # vao cho khong ghi duoc. Redirect ve engine data dir writable de
+    # user van cau hinh duoc key; dev giu nguyen .env canh repo.
+    if is_bundled_root("notary_v2"):
+        ocr._ENV_PATH = str(Path(engine_data_dir("notary_v2")) / ".env")
     model = ocr._get_model()
     if not ocr._get_api_key():
         raise CommandError(
             "ocr.engine_unavailable",
-            "thieu API key OCR (QWEN_API_KEY/DASHSCOPE_API_KEY trong "
-            "<notary_v2>/.env)", retryable=False,
-            next_action="dat key vao .env engine roi thu lai")
+            "thieu API key OCR — dat QWEN_API_KEY/DASHSCOPE_API_KEY vao "
+            f"bien moi truong hoac file {ocr._ENV_PATH}",
+            retryable=False,
+            next_action="dat API key vao .env cua engine data dir "
+                        "hoac bien moi truong roi thu lai")
     from fastapi import UploadFile
     from fileref import existing_file
     uploads = []

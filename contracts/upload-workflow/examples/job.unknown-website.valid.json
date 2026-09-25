@@ -1,0 +1,20 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_01HZX0034",
+  "command_id": "9a1b2c3d-0035-4e5f-8a6b-7c8d9e0f1a2b",
+  "status": "failed",
+  "waiting_on": null,
+  "progress": null,
+  "result": null,
+  "error": {
+    "code": "unknown_website",
+    "message": "website_id ha_noi chua dang ky",
+    "retryable": false,
+    "next_action": null,
+    "job_id": "j_01HZX0099",
+    "details": {
+      "website_id": "ha_noi"
+    }
+  },
+  "updated_at": "2026-09-24T10:20:00Z"
+}

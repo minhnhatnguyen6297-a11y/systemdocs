@@ -1,0 +1,39 @@
+# Deps ma g1-shell-sidecar.spec dong goi — PIN theo build venv da kiem
+# chung (D:/systemdocs/notary_v2/venv, pip freeze 25/09/2026 — MIN-69 T9).
+#
+# Build venv moi:  pip install -r requirements-package.txt
+# Kiem version truoc khi PyInstaller chay:
+#   python check_package_deps.py   (duoc build_sidecar.ps1 /
+#                                   build-upload-test.ps1 goi tu dong)
+#
+# Ly do tung dong:
+#   fastapi/uvicorn/pydantic        contract server desktopcommand.v1
+#   python-multipart                Form/File/UploadFile trong routers
+#                                   notary_v2 (import-time check cua
+#                                   FastAPI — thieu la sap luc import)
+#   sqlalchemy                      notary_v2 database/models
+#   openpyxl                        Excel audit/export
+#   python-docx                     scan/extract .docx + word export
+#   PyMuPDF(+PyMuPDFb)              PDF preview (fitz)
+#   playwright                      NamDinhUploaderSession / env_check
+#   httpx + certifi                 ocr_ai cloud call (TLS cacert)
+#   Pillow                          ocr_ai/zalo_inbox image
+#   Jinja2                          fastapi.templating khi import routers
+#   python-dotenv                   playwright_uploader/ocr_ai .env
+#   tzdata                          ZoneInfo Asia/Ho_Chi_Minh (zalo_inbox)
+fastapi==0.111.0
+uvicorn==0.30.1
+pydantic==2.13.5
+python-multipart==0.0.9
+SQLAlchemy==2.0.47
+openpyxl==3.1.2
+python-docx==1.1.2
+PyMuPDF==1.24.5
+PyMuPDFb==1.24.3
+playwright==1.63.0
+httpx==0.28.1
+certifi==2026.7.22
+Pillow==12.3.0
+Jinja2==3.1.4
+python-dotenv==1.2.3
+tzdata==2026.4

@@ -150,6 +150,10 @@ class PreparedBrowserTab:
     initial_url: str
     network_log_path: Path
     save_response_ok: bool = False
+    # strict_save_evidence (upload.workflow.v1): tab roi trang tao moi
+    # nhung chua co POST /api/hoso 2xx → bao closed/uncertain DUNG MOT
+    # LAN; tab van duoc theo doi — POST 2xx den sau van finalize duoc.
+    reported_uncertain: bool = False
 
 
 def _fold_value(text: str) -> str:
@@ -1705,7 +1709,12 @@ class NamDinhUploaderSession:
 
                 accepted, actual, validation_error = self._dropdown_acceptance_state(page, field_name, candidate)
                 if accepted:
-                    if field_name == "ten_hop_dong" and attempt == 0 and self._prime_contract_name_validation(page):
+                    if (
+                        field_name == "ten_hop_dong"
+                        and attempt == 0
+                        and getattr(self, "_prime_save_validation", True)
+                        and self._prime_contract_name_validation(page)
+                    ):
                         self._retype_contract_name_after_validation(page, locator, candidate)
                         accepted, actual, validation_error = self._dropdown_acceptance_state(
                             page,
@@ -1956,7 +1965,10 @@ class NamDinhUploaderSession:
             and current_path != LOGIN_PATH
         )
 
-    def poll_prepared_pages(self) -> dict[str, list[int]]:
+    def poll_prepared_pages(
+        self,
+        strict_save_evidence: bool = False,
+    ) -> dict[str, list[int]]:
         saved_ids: list[int] = []
         closed_ids: list[int] = []
         for record_id, tab in list(self.prepared_pages.items()):
@@ -1978,6 +1990,21 @@ class NamDinhUploaderSession:
                 continue
 
             if not tab.save_response_ok and not self._page_left_create_route(tab):
+                continue
+
+            if strict_save_evidence and not tab.save_response_ok:
+                # v1: chi POST /api/hoso 2xx la bang chung Luu. Roi trang
+                # tao moi khong co POST = ket qua chua ro → bao
+                # closed/uncertain MOT LAN (needs_reconcile) nhung VAN
+                # giu tab trong prepared_pages — neu POST 2xx den sau,
+                # nhanh saved ben duoi van finalize binh thuong.
+                if not tab.reported_uncertain:
+                    tab.reported_uncertain = True
+                    closed_ids.append(record_id)
+                    self.log(
+                        f"[UPLOAD] {tab.contract_no} roi trang tao moi "
+                        "nhung khong co POST Luu — can doi chieu"
+                    )
                 continue
 
             finalize_uploaded_records([record_id], working_dir=self.working_dir)
@@ -2070,7 +2097,15 @@ class NamDinhUploaderSession:
         cong_chung_vien: str | None = None,
         thu_ky: str | None = None,
         chunk_size: int | None = None,
+        prime_save_validation: bool = True,
     ) -> dict:
+        # prime_save_validation=False (luong upload.workflow.v1): khong
+        # click nut Luu de ep client-side validation cua ten_hop_dong —
+        # dry-run versioned khong bao gio cham nut Luu; validation dua
+        # vao field-commit events (non-submitting). Default True giu
+        # nguyen hanh vi legacy/Qt.
+        self._prime_save_validation = prime_save_validation
+
         def emit_progress(event: str, **payload: object) -> None:
             if progress_callback is None:
                 return

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "dev.g1.shell.test",
+  "productName": "g1-shell-test",
+  "directories": { "output": "dist-test" },
+  "files": [
+    "src/main/**",
+    "src/preload/**",
+    "src/renderer/**",
+    "package.json"
+  ],
+  "extraResources": [
+    { "from": "sidecar/dist-test/g1-shell-sidecar", "to": "sidecar/g1-shell-sidecar" },
+    { "from": "build/engine", "to": "engine" },
+    { "from": "build/playwright-browsers", "to": "playwright-browsers" },
+    { "from": "test/pkg", "to": "test-pkg" }
+  ],
+  "win": { "target": ["dir"] }
+}

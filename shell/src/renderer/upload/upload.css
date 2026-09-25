@@ -1,0 +1,217 @@
+/* Upload Lab module — MIN-69 task 6.
+   Moi rule gioi han trong .upload-lab; chi section cua module nay thoat cap
+   860px (specificity #view+section+class thang #view section). Cac module
+   khac (Notary...) giu nguyen layout cu.
+   Palette/metrics theo baseline upload_lab/ui_qt/theme.py (light theme). */
+
+#view section.upload-lab {
+  max-width: none;
+  width: 100%;
+  min-width: 0;
+}
+
+.upload-lab {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  color: #1e293b;
+}
+
+.ul-head { display: flex; align-items: baseline; gap: 10px;
+           flex-wrap: wrap; }
+.ul-title { margin: 0; font-size: 18px; }
+.ul-sub { font-size: 12px; }
+
+/* ---------- tablist (ARIA tabs) ---------- */
+.ul-tablist { display: flex; gap: 2px;
+              border-bottom: 1px solid #e2e8f0; }
+.ul-tab { min-height: 26px; padding: 7px 18px; margin-right: 3px;
+          color: #64748b; background: transparent; border: none;
+          border-bottom: 3px solid transparent; border-radius: 4px 4px 0 0;
+          font-weight: 500; font-size: 13px; }
+.ul-tab:hover { color: #0067c0; background: #eff6ff; }
+.ul-tab[aria-selected="true"] { color: #0067c0; background: #fff;
+          border-bottom-color: #0067c0; font-weight: 600; }
+
+/* focus ro rang cho ban phim */
+.upload-lab .ul-tab:focus-visible,
+.upload-lab button:focus-visible,
+.upload-lab input:focus-visible,
+.upload-lab select:focus-visible,
+.upload-lab [role="tabpanel"]:focus-visible {
+  outline: 2px solid #0067c0;
+  outline-offset: 1px;
+}
+
+.ul-panel { display: flex; flex-direction: column; gap: 10px;
+            padding-top: 10px; min-width: 0; }
+.ul-panel[hidden] { display: none; }
+
+/* ---------- cards ---------- */
+.ul-card { background: #fff; border: 1px solid #e2e8f0;
+           border-radius: 8px; padding: 12px 14px; min-width: 0; }
+.ul-card-title { font-weight: 600; font-size: 13px; color: #334155;
+                 margin-bottom: 8px; }
+.ul-context { display: flex; align-items: center; gap: 12px;
+              flex-wrap: wrap; }
+.ul-context-excel { font-size: 12px; }
+.ul-spacer { flex: 1; }
+
+.ul-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.ul-row + .ul-row { margin-top: 8px; }
+.ul-label { color: #475569; font-size: 12.5px; white-space: nowrap; }
+.ul-site-url { margin-top: 6px; font-size: 12px; }
+
+.upload-lab input[type="text"],
+.upload-lab input[type="date"],
+.upload-lab input[type="number"],
+.upload-lab select {
+  min-height: 30px; padding: 4px 10px; font-size: 12.5px;
+  color: #1e293b; background: #fff;
+  border: 1px solid #d1d5db; border-radius: 6px;
+}
+.upload-lab input[readonly] { background: #f8fafc; color: #475569; }
+.ul-input-grow { flex: 1; min-width: 160px; }
+.ul-site { min-width: 180px; }
+.ul-staff { min-width: 200px; }
+.ul-sec { width: 200px; }
+.ul-chunk { width: 74px; }
+.ul-date { width: 108px; }
+.ul-invalid { border-color: #dc2626 !important; background: #fef2f2; }
+
+/* buttons trong module: reset margin-right cua global, gap cua row lo */
+.upload-lab button { min-height: 30px; padding: 5px 12px; margin-right: 0;
+  border: 1px solid #d1d5db; border-radius: 6px; background: #fff;
+  color: #1e293b; font-weight: 500; }
+.upload-lab button:hover:not(:disabled) { color: #0369a1;
+  background: #f8fafc; border-color: #94a3b8; }
+.upload-lab button.primary { color: #fff; background: #0067c0;
+  border-color: #0067c0; font-weight: 600; }
+.upload-lab button.primary:hover:not(:disabled) { background: #1873d3;
+  border-color: #1873d3; color: #fff; }
+.upload-lab button.danger { border-color: #dc2626; color: #dc2626; }
+.upload-lab button.ul-stop:not(:disabled) { color: #fff;
+  background: #dc2626; border-color: #dc2626; font-weight: 600; }
+.upload-lab button:disabled { color: #94a3b8; background: #f1f5f9;
+  border-color: #e2e8f0; opacity: 1; }
+
+/* ---------- badges ---------- */
+.ul-badge { display: inline-block; padding: 2px 10px; border-radius: 10px;
+            font-size: 12px; font-weight: 600; }
+.ul-badge-ok { background: #f0fdf4; color: #16a34a;
+               border: 1px solid #bbf7d0; }
+.ul-badge-warn { background: #fffbeb; color: #b45309;
+                 border: 1px solid #fde68a; }
+.ul-badge-err { background: #fef2f2; color: #b91c1c;
+                border: 1px solid #fecaca; }
+.ul-badge-muted { background: #f1f5f9; color: #64748b;
+                  border: 1px solid #e2e8f0; }
+.ul-badge-slot { display: inline-flex; }
+
+.ul-notice { display: flex; flex-direction: column; gap: 6px; }
+.ul-notice-item { padding: 6px 12px; border-radius: 6px; font-size: 12.5px; }
+.ul-notice-item button { margin-left: 10px; }
+
+.ul-site-err { margin-top: 8px; }
+.ul-site-err .ul-error { margin-top: 0; }
+.ul-src-msg .ul-error { margin-top: 8px; }
+.ul-audit-head { font-size: 12.5px; margin-top: 2px; }
+
+.ul-env { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+.ul-env-line { font-size: 12.5px; display: flex; gap: 6px;
+               align-items: baseline; flex-wrap: wrap; }
+
+/* ---------- KPI ---------- */
+.ul-kpis { display: grid;
+           grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.ul-kpi { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+          padding: 10px 14px; min-width: 0; }
+.ul-kpi-t { font-size: 11px; font-weight: 700; letter-spacing: .02em; }
+.ul-kpi-v { font-size: 26px; font-weight: 700; line-height: 1.25; }
+.ul-kpi[data-tone="total"] .ul-kpi-t,
+.ul-kpi[data-tone="total"] .ul-kpi-v { color: #0067c0; }
+.ul-kpi[data-tone="valid"] .ul-kpi-t,
+.ul-kpi[data-tone="valid"] .ul-kpi-v { color: #107c41; }
+.ul-kpi[data-tone="missing"] .ul-kpi-t,
+.ul-kpi[data-tone="missing"] .ul-kpi-v { color: #d83b01; }
+.ul-kpi[data-tone="issue"] .ul-kpi-t,
+.ul-kpi[data-tone="issue"] .ul-kpi-v { color: #a80000; }
+@media (max-width: 900px) {
+  .ul-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.ul-stale { padding: 6px 10px; border-radius: 6px; font-size: 12.5px;
+            color: #b45309; background: #fffbeb;
+            border: 1px solid #fde68a; }
+.ul-error { border: 1px solid #fecaca; background: #fef2f2;
+            color: #b91c1c; border-radius: 6px; padding: 8px 10px;
+            font-size: 12.5px; margin-top: 8px; }
+.ul-error button { margin-top: 6px; }
+
+/* ---------- progress ---------- */
+.ul-progress-row { display: flex; gap: 10px; align-items: center; }
+.ul-progress-row + .ul-progress-row { margin-top: 8px; }
+.ul-progress { flex: 1; height: 16px; appearance: none; }
+.ul-progress::-webkit-progress-bar { background: #e2e8f0;
+  border-radius: 4px; }
+.ul-progress::-webkit-progress-value { background: #0067c0;
+  border-radius: 4px; }
+.ul-progress-label { font-size: 12px; color: #475569; min-width: 150px; }
+.ul-summary { margin-top: 8px; padding: 6px 10px; color: #0369a1;
+              background: #f0f9ff; border: 1px solid #bae6fd;
+              border-radius: 6px; font-weight: 600; font-size: 12px; }
+
+/* ---------- action bar (wrap o cua so hep) ---------- */
+.ul-actions { display: flex; gap: 8px; flex-wrap: wrap;
+              align-items: center; }
+
+.ul-reconcile { margin-top: 8px; padding: 6px 10px; border-radius: 6px;
+                font-size: 12.5px; color: #b45309; background: #fffbeb;
+                border: 1px solid #fde68a; display: flex; gap: 10px;
+                align-items: center; flex-wrap: wrap; }
+.ul-reconcile-text { flex: 1; min-width: 220px; }
+.ul-reconcile-btn { flex-shrink: 0; }
+.ul-prepare-error { display: block; }
+.ul-table tbody tr.ul-row-open { background: #eef4ff; }
+
+/* ---------- tables: vung cuon rieng + header dinh ---------- */
+.ul-table-wrap { display: flex; flex-direction: column; min-width: 0; }
+.ul-table-title { font-weight: 600; font-size: 13px; color: #334155;
+                  margin: 2px 0 6px; }
+.ul-scroll { overflow: auto; border: 1px solid #e2e8f0;
+             border-radius: 6px; background: #fff; min-height: 80px; }
+/* audit: hai bang chia chieu cao keo duoc (resize handle goc duoi) */
+.ul-scroll-resize { resize: vertical; height: 230px; }
+/* queue: chiem phan lon chieu cao con lai */
+.ul-scroll-fill { height: clamp(240px, 42vh, 720px); }
+.ul-table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+.ul-table th, .ul-table td { border-bottom: 1px solid #e2e8f0;
+  padding: 6px 8px; text-align: left; vertical-align: middle; }
+.ul-table thead th { position: sticky; top: 0; z-index: 1;
+  background: #f8fafc; color: #334155; font-weight: 600;
+  border-bottom: 2px solid #cbd5e1; white-space: nowrap; }
+.ul-table tbody tr:nth-child(even) { background: #f8fafc; }
+.ul-table tbody tr.ul-row-selected { background: #e0efff; }
+.ul-table tbody tr.ul-row-issue td { color: #7c2d12; }
+.ul-table tbody tr.ul-row-reconcile { background: #fffbeb; }
+.ul-table td.ul-cb { width: 28px; text-align: center; }
+
+/* duong dan dai: truncate giu ten file, tooltip xem du, nut mo file goc */
+.ul-table td.ul-path { max-width: 300px; }
+.ul-path-inner { display: flex; align-items: center; gap: 6px;
+                 min-width: 0; }
+.ul-path-text { flex: 1; min-width: 0; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+  direction: rtl; unicode-bidi: plaintext; text-align: left; }
+.ul-open { padding: 1px 8px; min-height: 22px; font-size: 11.5px; }
+
+.ul-queue { display: flex; flex-direction: column; min-height: 0; }
+
+/* ---------- responsive ---------- */
+@media (max-width: 800px) {
+  .ul-card { padding: 10px; }
+  .ul-kpis { gap: 8px; }
+  .ul-kpi-v { font-size: 20px; }
+  .ul-tab { padding: 6px 12px; }
+}

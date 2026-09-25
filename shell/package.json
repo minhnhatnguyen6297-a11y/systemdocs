@@ -10,7 +10,8 @@
     "test": "node --test test/*.test.mjs",
     "test:sidecar": "python test/test_sidecar_contract.py",
     "build:sidecar": "powershell -ExecutionPolicy Bypass -File sidecar/build_sidecar.ps1",
-    "dist": "electron-builder --dir"
+    "dist": "electron-builder --dir",
+    "dist:test": "powershell -ExecutionPolicy Bypass -File test/build-upload-test.ps1"
   },
   "devDependencies": {
     "electron": "^31.0.2",
@@ -27,7 +28,9 @@
       "package.json"
     ],
     "extraResources": [
-      { "from": "sidecar/dist/g1-shell-sidecar", "to": "sidecar/g1-shell-sidecar" }
+      { "from": "sidecar/dist/g1-shell-sidecar", "to": "sidecar/g1-shell-sidecar" },
+      { "from": "build/engine", "to": "engine" },
+      { "from": "build/playwright-browsers", "to": "playwright-browsers" }
     ],
     "win": { "target": ["dir"] }
   }

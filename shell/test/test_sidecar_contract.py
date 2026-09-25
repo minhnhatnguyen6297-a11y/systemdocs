@@ -207,6 +207,35 @@ class SidecarContractTest(unittest.TestCase):
         self.assertEqual(j1["job_id"], j2["job_id"])
         self._wait_job(j1["job_id"])
 
+    def test_command_id_conflict_different_payload_409(self):
+        """MIN-69 T5: cung command_id + noi dung khac → 409
+        command_id_conflict (khong ghi de identity, khong tao job moi);
+        cung noi dung → van idempotent tra dung job cu."""
+        cid = str(uuid.uuid4())
+        cmd = _new_cmd("diag.slow_task", {"steps": 2}, command_id=cid)
+        j1 = self.http.post("/v1/commands", json=cmd).json()
+        self.assertEqual(j1["command_id"], cid)
+
+        r = self.http.post("/v1/commands", json=_new_cmd(
+            "diag.slow_task", {"steps": 3}, command_id=cid))
+        self.assertEqual(r.status_code, 409)
+        err = r.json()["error"]
+        self.assertEqual(err["code"], "command_id_conflict")
+        self.assertFalse(err["retryable"])
+
+        # Command KHAC tren cung command_id cung conflict (hash gom
+        # command + payload, khong chi payload).
+        r2 = self.http.post("/v1/commands", json=_new_cmd(
+            "diag.env_check", None, command_id=cid))
+        self.assertEqual(r2.status_code, 409)
+        self.assertEqual(r2.json()["error"]["code"],
+                         "command_id_conflict")
+
+        # Cung noi dung → idempotent nguyen trang.
+        j2 = self.http.post("/v1/commands", json=cmd).json()
+        self.assertEqual(j2["job_id"], j1["job_id"])
+        self._wait_job(j1["job_id"])
+
     def test_cancel_running_and_terminal_409(self):
         job = self.http.post("/v1/commands", json=_new_cmd(
             "diag.slow_task", {"steps": 60})).json()
@@ -340,6 +369,65 @@ class SidecarContractTest(unittest.TestCase):
             j2 = self.http.post("/v1/commands", json=cmd).json()
             self.assertEqual(j2["job_id"], j1["job_id"])
             self.assertEqual(len(list(Path(td).glob("*.docx"))), 1)
+
+
+class FixtureGuardTest(unittest.TestCase):
+    """F3 (T9 review): `_install_e2e_fixtures` can CA
+    `G1_BUILD_LABEL=test` LAN `G1_E2E_FIXTURE=1`. Hook giai duoc tren
+    PYTHONPATH (injection vector that) chi la mot lop — production
+    spawn da strip PYTHON*, day la defense-in-depth: du hook importable,
+    label khac 'test' van phai chan."""
+
+    def test_install_requires_test_label_and_flag(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            hook_dir = tmp / "hookdir"
+            hook_dir.mkdir()
+            (hook_dir / "e2e_fixture_hook.py").write_text(
+                "import os\n"
+                "def install():\n"
+                "    open(os.environ['MARKER_PATH'], 'w').write('x')\n",
+                encoding="utf-8")
+            # Cac case: (label, fixture) — chi ('test','1') duoc install.
+            cases = [("test", "1"), ("production", "1"),
+                     (None, "1"), ("test", None)]
+            code = f"""\
+import sys, os, json
+sys.path.insert(0, {str(SIDECAR_DIR)!r})
+import app
+results = []
+for i, (label, fixture) in enumerate({cases!r}):
+    os.environ.pop('G1_BUILD_LABEL', None)
+    os.environ.pop('G1_E2E_FIXTURE', None)
+    if label is not None:
+        os.environ['G1_BUILD_LABEL'] = label
+    if fixture is not None:
+        os.environ['G1_E2E_FIXTURE'] = fixture
+    marker = {str(tmp / 'marker')!r} + '_%d' % i
+    os.environ['MARKER_PATH'] = marker
+    app._install_e2e_fixtures()
+    results.append(os.path.exists(marker))
+print('RESULTS ' + json.dumps(results))
+"""
+            env = dict(os.environ)
+            env["PYTHONPATH"] = str(hook_dir)   # hook importable trong moi case
+            env["G1_UPLOAD_DATA_DIR"] = str(tmp / "upload-data")
+            env["G1_OUTPUT_DIR"] = str(tmp / "output")
+            # app.py bat SIDECAR_TOKEN/PORT ngay luc import.
+            env["SIDECAR_TOKEN"] = "fixture-guard-test"
+            env["SIDECAR_PORT"] = "1"
+            env.pop("G1_BUILD_LABEL", None)
+            env.pop("G1_E2E_FIXTURE", None)
+            r = subprocess.run(
+                [sys.executable, "-c", code], env=env,
+                capture_output=True, text=True, timeout=90)
+            self.assertEqual(r.returncode, 0,
+                             f"app import fail: {r.stderr[-1500:]}")
+            line = [ln for ln in r.stdout.splitlines()
+                    if ln.startswith("RESULTS ")][-1]
+            results = json.loads(line[len("RESULTS "):])
+            self.assertEqual(results, [True, False, False, False],
+                             f"fixture guard sai: {results}")
 
 
 if __name__ == "__main__":

@@ -512,221 +512,27 @@ function openPathBtn(path, label) {
 }
 
 // ---------- upload_lab view (MIN-69) ----------
+// View Upload Lab tach thanh module rieng: upload/{index,state,client,
+// audit,scan-upload}.js + upload.css expose `window.G1_UPLOAD`. Renderer chi
+// uy quyen va truyen dependency qua tham so — khong giu logic nghiep vu.
 
 function buildUploadView(entry, mod) {
-  const s = el('section');
-  s.append(el('h2', '', `${entry.title} (${mod ? mod.title : entry.id})`));
-  const eng = el('div', 'slot');
-  s.append(eng);
-  s.append(el('div', 'muted',
-    'Engine: upload_lab (Python). Dry-run mặc định — shell không tự ' +
-    'Finalize, người dùng lưu trong Chromium.'));
-
-  const ctx = { folder: null, excel: null, scanJobId: null, auditJobId: null,
-                selected: new Set() };
-
-  // --- Quet thu muc ---
-  const scanSec = el('details', 'biz-sec');
-  scanSec.open = true;
-  scanSec.append(el('summary', '', 'Quét & trích xuất hồ sơ'));
-  const folderRow = el('div', 'tools');
-  const pickFolder = el('button', '', 'Chọn thư mục…');
-  const scanBtn = el('button', 'primary', 'Quét');
-  scanBtn.disabled = true;
-  const folderLabel = el('span', 'muted', 'Chưa chọn thư mục');
-  folderRow.append(pickFolder, scanBtn, folderLabel);
-  scanSec.append(folderRow);
-  const scanOut = el('div', 'slot');
-  scanSec.append(scanOut);
-  s.append(scanSec);
-
-  pickFolder.onclick = async () => {
-    const r = await api.pickFiles({ directory: true });
-    if (!r.ok) { notify(`${r.error.code}: ${r.error.message}`, true); return; }
-    if (!r.data.files.length) return;
-    ctx.folder = r.data.files[0];
-    folderLabel.textContent = ctx.folder.name;
-    scanBtn.disabled = false;
-  };
-  scanBtn.onclick = async () => {
-    ctx.scanJobId = crypto.randomUUID();
-    const job = await submit('upload.scan',
-      { folder: { file_token: ctx.folder.file_token } },
-      ctx.scanJobId);
-    if (job) ctx.scanJobId = job.job_id;
-  };
-
-  function renderScan() {
-    scanOut.innerHTML = '';
-    const data = resultData(jobs, 'upload.scan');
-    if (!data) {
-      scanOut.append(faceEl(L.faceEmpty('Chưa có kết quả quét.')));
-      return;
-    }
-    const stats = data.stats || {};
-    scanOut.append(el('div', 'muted',
-      `run ${data.run_id || '—'} · hỗ trợ ${stats.total_supported_files ?? '?'} · ` +
-      `xử lý ${stats.processed_files ?? '?'} · lỗi ${stats.error_files ?? 0}`));
-    const rows = data.records || [];
-    const cols = [
-      { key: 'record_id', label: 'ID' },
-      { key: 'contract_no', label: 'Số công chứng' },
-      { key: 'status', label: 'Trạng thái' },
-      { key: 'reason', label: 'Ghi chú', fmt: (r) => r.reason || r.last_error || '' },
-      { key: 'file_path', label: 'Địa chỉ file' },
-    ];
-    const t = tableEl(cols, rows);
-    // Tick chon record cho prepare dry-run (status hop le).
-    const theadRow = t.querySelector('thead tr');
-    theadRow.prepend(el('th', '', '✓'));
-    [...t.tBodies[0].rows].forEach((tr, i) => {
-      const r = rows[i];
-      const td = el('td');
-      if (r && r.record_id != null) {
-        const cb = el('input');
-        cb.type = 'checkbox';
-        cb.checked = ctx.selected.has(r.record_id);
-        cb.onchange = () => {
-          if (cb.checked) ctx.selected.add(r.record_id);
-          else ctx.selected.delete(r.record_id);
-        };
-        td.append(cb);
-      }
-      tr.prepend(td);
-    });
-    scanOut.append(t);
+  const U = window.G1_UPLOAD;
+  if (!U || typeof U.buildView !== 'function') {
+    const s = el('section');
+    s.append(el('h2', '', `${entry.title} (${mod ? mod.title : entry.id})`));
+    s.append(faceEl(L.faceUnavailable(entry.title, 'module_script_missing')));
+    return { el: s, refresh() {} };
   }
-
-  // --- Audit so Excel ---
-  const auditSec = el('details', 'biz-sec');
-  auditSec.append(el('summary', '', 'Audit sổ công chứng (Excel)'));
-  const auditRow = el('div', 'tools');
-  const pickExcel = el('button', '', 'Chọn file Excel…');
-  const excelLabel = el('span', 'muted', 'Chưa chọn file');
-  const yr = new Date().getFullYear();
-  const fromIn = inputEl('từ ngày', `${yr}-01-01`);
-  const toIn = inputEl('đến ngày', `${yr}-12-31`);
-  const auditBtn = el('button', 'primary', 'Audit');
-  auditBtn.disabled = true;
-  auditRow.append(pickExcel, excelLabel, fromIn, toIn, auditBtn);
-  auditSec.append(auditRow);
-  const auditOut = el('div', 'slot');
-  auditSec.append(auditOut);
-  s.append(auditSec);
-
-  pickExcel.onclick = async () => {
-    const r = await api.pickFiles({
-      multi: false,
-      filters: [{ name: 'Excel', extensions: ['xlsx', 'xls'] }],
-    });
-    if (!r.ok) { notify(`${r.error.code}: ${r.error.message}`, true); return; }
-    if (!r.data.files.length) return;
-    ctx.excel = r.data.files[0];
-    excelLabel.textContent = ctx.excel.name;
-    auditBtn.disabled = false;
-  };
-  auditBtn.onclick = async () => {
-    const job = await submit('upload.audit_excel', {
-      file: { file_token: ctx.excel.file_token },
-      from_date: fromIn.value.trim(), to_date: toIn.value.trim(),
-    }, crypto.randomUUID());
-    if (job) ctx.auditJobId = job.job_id;
-  };
-
-  function renderAudit() {
-    auditOut.innerHTML = '';
-    const data = resultData(jobs, 'upload.audit_excel');
-    if (!data) {
-      auditOut.append(faceEl(L.faceEmpty('Chưa chạy audit.')));
-      return;
-    }
-    // Cot chuan MIN-77: STT | Ngay | So cong chung | Ghi chu
-    const cols = [
-      { key: 'stt', label: 'STT' }, { key: 'ngay', label: 'Ngày' },
-      { key: 'so_cong_chung', label: 'Số công chứng' },
-      { key: 'ghi_chu', label: 'Ghi chú' },
-    ];
-    auditOut.append(el('h4', '', `Số thiếu (${(data.missing || []).length})`));
-    auditOut.append(tableEl(cols, data.missing || []));
-    auditOut.append(el('h4', '', `Vùng lỗi (${(data.issues || []).length})`));
-    auditOut.append(tableEl(cols, data.issues || []));
-  }
-
-  // --- Phien upload Chromium ---
-  const sessSec = el('details', 'biz-sec');
-  sessSec.append(el('summary', '', 'Phiên upload (Chromium — đăng nhập tay)'));
-  const sessRow = el('div', 'tools');
-  const startBtn = el('button', '', 'Bắt đầu đăng nhập');
-  const confirmBtn = el('button', 'primary', 'Xác nhận đã đăng nhập');
-  const statusBtn = el('button', '', 'Trạng thái phiên');
-  const prepBtn = el('button', '', 'Chuẩn bị upload (dry-run)');
-  const finishBtn = el('button', '', 'Xong kiểm tra');
-  const closeBtn = el('button', 'danger', 'Đóng phiên');
-  sessRow.append(startBtn, confirmBtn, statusBtn, prepBtn, finishBtn, closeBtn);
-  sessSec.append(sessRow);
-  const sessOut = el('div', 'slot');
-  sessSec.append(sessOut);
-  s.append(sessSec);
-
-  startBtn.onclick = () =>
-    submit('upload.session_start', null, crypto.randomUUID());
-  confirmBtn.onclick = () =>
-    submit('upload.confirm_login', null, crypto.randomUUID());
-  statusBtn.onclick = () =>
-    submit('upload.session_status', null, crypto.randomUUID());
-  closeBtn.onclick = () =>
-    submit('upload.session_close', null, crypto.randomUUID());
-  finishBtn.onclick = () =>
-    submit('upload.finish_review', null, crypto.randomUUID());
-  prepBtn.onclick = () => {
-    if (!ctx.selected.size) {
-      notify('Chưa tick record nào ở bảng quét — tick record để chuẩn bị.', true);
-      return;
-    }
-    submit('upload.prepare', { record_ids: [...ctx.selected] },
-      crypto.randomUUID());
-  };
-
-  function renderSession() {
-    sessOut.innerHTML = '';
-    const data = resultData(jobs, 'upload.session_status') ||
-      resultData(jobs, 'upload.session_start');
-    if (!data) {
-      sessOut.append(faceEl(L.faceEmpty('Chưa có phiên. Chromium mở khi ' +
-        'bấm "Bắt đầu đăng nhập".')));
-      return;
-    }
-    sessOut.append(el('pre', '', JSON.stringify(data, null, 2)));
-  }
-
-  // --- Tools nen (inspect + diag giu nguyen) ---
-  const toolsSec = el('details', 'biz-sec');
-  toolsSec.append(el('summary', '', 'Công cụ nền (file.inspect / diag)'));
-  const toolsRow = el('div', 'tools');
-  const slowBtn = el('button', '', 'Chẩn đoán: tác vụ chậm');
-  const waitBtn = el('button', '', 'Chẩn đoán: chờ người dùng');
-  toolsRow.append(slowBtn, waitBtn);
-  toolsSec.append(toolsRow);
-  s.append(toolsSec);
-  slowBtn.onclick = () =>
-    submit('diag.slow_task', { steps: 20 }, crypto.randomUUID());
-  waitBtn.onclick = () =>
-    submit('diag.waiting_task', { wait_seconds: 30 }, crypto.randomUUID());
-
-  s.append(el('h3', '', 'Job'));
-  const jobsBox = el('div', 'slot');
-  s.append(jobsBox);
-
-  return {
-    el: s,
-    refresh() {
-      eng.innerHTML = '';
-      const slot = engineSlotEl();
-      if (slot) eng.append(slot);
-      renderScan(); renderAudit(); renderSession();
-      renderJobs(jobsBox, mod);
-    },
-  };
+  return window.G1_UPLOAD.buildView({
+    api, L, jobs, notify, entry, module: mod, submit,
+    // Accessor (khong snapshot gia tri): upload view can biet instance
+    // sidecar hien tai de refetch catalog sau restart (contract §5).
+    engineInstanceId: () => sidecarStatus.engine_instance_id || null,
+    h: { el, sleep, faceEl, errorFaceEl, tableEl, inputEl, formRow,
+         engineSlotEl, renderJobs, resultData, openPathBtn, awaitJob,
+         confirmModal },
+  });
 }
 
 // ---------- notary_v2 view — tab Soạn hồ sơ (MIN-111) ----------

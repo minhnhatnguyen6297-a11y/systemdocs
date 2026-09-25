@@ -1,7 +1,10 @@
 node_modules/
 dist-app/
+dist-test/
+build/
 sidecar/build/
 sidecar/dist/
+sidecar/dist-test/
 sidecar/__pycache__/
 test/__pycache__/
 *.log

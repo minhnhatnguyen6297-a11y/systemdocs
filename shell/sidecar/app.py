@@ -18,10 +18,13 @@ from fastapi.responses import JSONResponse
 from command_registry import COMMANDS
 from errors import CommandError, error_object
 from fileref import validate_file_ref
+from job_repository import JobRepository
 from jobstore import JobStore
 
 CONTRACT_VERSION = "desktopcommand.v1"
-SUPPORTED_VERSIONS = ["desktopcommand.v1"]
+# desktopcommand.v1 = envelope transport; upload.workflow.v1 = workflow
+# Upload Lab da implement (MIN-69) — client kiem capability qua /health.
+SUPPORTED_VERSIONS = ["desktopcommand.v1", "upload.workflow.v1"]
 ENGINE_VERSION = "g1-shell-sidecar/0.1.0"
 ENGINE_INSTANCE_ID = uuid.uuid4().hex  # doi moi moi lan process start — §5 restart
 
@@ -39,7 +42,54 @@ SENSITIVE_KEY = re.compile(
     r"storage_state|api_key|bearer", re.I)
 
 app = FastAPI(title="g1-shell-sidecar", docs_url=None, redoc_url=None)
-store = JobStore()
+
+
+def _build_store():
+    """JobStore + journal ben trong workspace.sqlite3 (MIN-69 T5).
+
+    Repository mo cung file SQLite cua upload workspace — reconnect theo
+    job_id/command_id song xuyen restart, job non-terminal cua process
+    truoc thanh failed{engine_restarted} va handler khong chay lai.
+    Khong mo duoc db → chay degraded (in-memory nhu cu), khong che boot.
+    """
+    try:
+        import upload_workspace
+        return JobStore(
+            repository=JobRepository(upload_workspace.workspace_db_path()))
+    except Exception as exc:  # noqa: BLE001 — boot khong duoc chet vi journal
+        print(f"WARN: job repository khong mo duoc ({exc}) — "
+              "chay in-memory", file=sys.stderr)
+        return JobStore()
+
+
+def _install_e2e_fixtures():
+    """MIN-69 T9 — chi TEST BUILD. Ba lop guard:
+
+    1. `G1_BUILD_LABEL=test` — main.js force-set `production|test` qua env
+       sidecar (config.js); production packaged luon la `production` nen
+       `G1_E2E_FIXTURE` con sot tren may user la no-op ngay ca khi
+       `e2e_fixture_hook.py` giai duoc tu PYTHONPATH (F3 — spawn packaged
+       da strip PYTHON*, lop nay la defense-in-depth).
+    2. `G1_E2E_FIXTURE=1` — trusted harness channel qua env sidecar;
+       renderer khong bao gio dat duoc env nay.
+    3. Module `e2e_fixture_hook` chi ship trong dist:test — production
+       khong bundle → import fail cung la no-op.
+    """
+    if os.environ.get("G1_BUILD_LABEL") != "test":
+        return
+    if os.environ.get("G1_E2E_FIXTURE") != "1":
+        return
+    try:
+        import e2e_fixture_hook
+    except ImportError:
+        print("G1_E2E_FIXTURE=1 nhung e2e_fixture_hook khong co trong goi "
+              "(production build) — bo qua", file=sys.stderr)
+        return
+    e2e_fixture_hook.install()
+
+
+store = _build_store()
+_install_e2e_fixtures()
 _server = None  # uvicorn.Server, set in main()
 
 
@@ -104,6 +154,9 @@ def healthz():
         "engine_instance_id": ENGINE_INSTANCE_ID,
         "supported_versions": SUPPORTED_VERSIONS,
         "accepting": store.accepting,
+        # Nhan build cho harness — dev khong dat = "dev"; packaged main
+        # truyen production|test (config.js G1_BUILD_LABEL).
+        "build_label": os.environ.get("G1_BUILD_LABEL", "dev"),
     }
 
 
@@ -153,6 +206,10 @@ async def submit_command(request: Request):
     try:
         job = store.submit(command_id, command, handler, payload)
     except CommandError as exc:
+        if exc.code == "command_id_conflict":
+            # Cung command_id nhung noi dung request khac — xung dot
+            # identity, KHONG duoc ghi de job cu (contract §8).
+            return _err(409, exc.code, exc.message, exc.retryable)
         return _err(503, exc.code, exc.message, exc.retryable)
     return job.snapshot()
 
@@ -179,7 +236,18 @@ def cancel_job(job_id: str):
 @app.post("/shutdown")
 def shutdown():
     def _stop():
+        # Drain job truoc (cancel engine_shutdown + persist terminal),
+        # roi cho browser worker reconcile/dong an toan — tab chua xac
+        # minh Luu duoc giu dau needs_reconcile, khong coi la saved.
+        # Worst-case ≈ 0.2 (timer) + 2 (drain) + ~2 (worker shutdown —
+        # reconcile+join chia budget) + ~0.3 (uvicorn exit) ≈ 4.5s; phai
+        # nam trong SHUTDOWN_GRACE_MS (shell/src/main/config.js).
         store.drain(timeout=2)
+        try:
+            import upload_session
+            upload_session.worker().shutdown(timeout=2)
+        except Exception:
+            pass
         if _server is not None:
             _server.should_exit = True
     threading.Timer(0.2, _stop).start()

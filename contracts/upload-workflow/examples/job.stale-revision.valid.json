@@ -1,0 +1,21 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_01HZX0030",
+  "command_id": "9a1b2c3d-0031-4e5f-8a6b-7c8d9e0f1a2b",
+  "status": "failed",
+  "waiting_on": null,
+  "progress": null,
+  "result": null,
+  "error": {
+    "code": "stale_revision",
+    "message": "queue_revision 2 khong con dung (hien tai 7) - doc lai queue",
+    "retryable": true,
+    "next_action": "retry",
+    "job_id": "j_01HZX0099",
+    "details": {
+      "expected": 2,
+      "current": 7
+    }
+  },
+  "updated_at": "2026-09-24T10:20:00Z"
+}

@@ -1,0 +1,37 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_01HZX0017",
+  "command_id": "9a1b2c3d-0018-4e5f-8a6b-7c8d9e0f1a2b",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "website_catalog",
+    "data": {
+      "workflow_version": "upload.workflow.v1",
+      "websites": [
+        {
+          "website_id": "nam_dinh",
+          "label": "Nam Định",
+          "display_url": "https://congchungnamdinh.ninhbinh.gov.vn",
+          "capabilities": [
+            "login",
+            "download_export",
+            "audit_excel",
+            "scan",
+            "prepare",
+            "staff_options",
+            "reconcile"
+          ],
+          "status": "available"
+        }
+      ],
+      "selected_website_id": "nam_dinh"
+    },
+    "warnings": [],
+    "source_files": [],
+    "evidence": []
+  },
+  "error": null,
+  "updated_at": "2026-09-24T10:20:00Z"
+}

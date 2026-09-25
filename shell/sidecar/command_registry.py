@@ -204,16 +204,28 @@ COMMANDS = {
     "ocr.analyze": _notary("ocr_analyze"),
     "zalo.status": _notary("zalo_status"),
     # upload_lab — MIN-69
-    "upload.scan": _upload("scan_folder"),
-    "upload.audit_excel": _upload("audit_excel"),
-    "upload.env_check": _upload("env_check"),
-    "upload.session_start": _upload("session_start"),
-    "upload.session_status": _upload("session_status"),
-    "upload.confirm_login": _upload("confirm_login"),
-    "upload.session_close": _upload("session_close"),
-    "upload.download_export": _upload("download_export"),
-    "upload.prepare": _upload("prepare_upload"),
-    "upload.finish_review": _upload("finish_review"),
+    "upload.scan": _upload("scan_dispatch"),
+    "upload.audit_excel": _upload("audit_excel_dispatch"),
+    "upload.env_check": _upload("env_check_dispatch"),
+    # upload.workflow.v1 — website registry + workspace (MIN-69 task 2)
+    "upload.websites": _upload("upload_websites"),
+    # upload.workflow.v1 — scan/audit/queue gan dung luot (MIN-69 task 3)
+    "upload.queue_get": _upload("upload_queue_get"),
+    "upload.workspace_get": _upload("upload_workspace_get"),
+    "upload.website_select": _upload("upload_website_select"),
+    "upload.preferences": _upload("upload_preferences"),
+    # upload.workflow.v1 — phien browser/tai so/dot chuan bi (MIN-69 task 4)
+    # Dispatcher: payload co workflow_version → handler versioned; khong co
+    # → legacy path nguyen trang (contract §9.2).
+    "upload.session_start": _upload("session_start_dispatch"),
+    "upload.session_status": _upload("session_status_dispatch"),
+    "upload.confirm_login": _upload("confirm_login_dispatch"),
+    "upload.session_close": _upload("session_close_dispatch"),
+    "upload.download_export": _upload("download_export_dispatch"),
+    "upload.prepare": _upload("prepare_dispatch"),
+    "upload.finish_review": _upload("finish_review_dispatch"),
+    "upload.staff_options": _upload("upload_staff_options_v1"),
+    "upload.reconcile": _upload("upload_reconcile_v1"),
 }
 
 

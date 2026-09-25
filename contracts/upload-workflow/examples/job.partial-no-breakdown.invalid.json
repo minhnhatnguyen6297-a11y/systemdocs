@@ -1,0 +1,41 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_01HZX0052",
+  "command_id": "9a1b2c3d-0053-4e5f-8a6b-7c8d9e0f1a2b",
+  "status": "partial",
+  "waiting_on": null,
+  "progress": {
+    "done": 5,
+    "total": 5,
+    "current_label": "xong"
+  },
+  "result": {
+    "kind": "upload_prepare",
+    "data": {
+      "workflow_version": "upload.workflow.v1",
+      "website_id": "nam_dinh",
+      "browser_id": "brw_1",
+      "run_id": "a1b2c3d4",
+      "audit_id": "aud_7",
+      "summary": {
+        "total_requested": 5,
+        "prepared_count": 4,
+        "remaining": 0,
+        "open_record_ids": []
+      }
+    },
+    "warnings": [],
+    "source_files": [],
+    "evidence": []
+  },
+  "error": {
+    "code": "upload.partial_failure",
+    "message": "1 ho so loi",
+    "retryable": true,
+    "next_action": "retry",
+    "job_id": "j_01HZX0099",
+    "details": null
+  },
+  "updated_at": "2026-09-24T10:20:00Z",
+  "expected_error": "validation_error"
+}

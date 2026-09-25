@@ -1,0 +1,15 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_01HZX0019",
+  "command_id": "9a1b2c3d-0020-4e5f-8a6b-7c8d9e0f1a2b",
+  "status": "waiting_user",
+  "waiting_on": "login",
+  "progress": {
+    "done": 1,
+    "total": 3,
+    "current_label": "cho dang nhap tren Chromium"
+  },
+  "result": null,
+  "error": null,
+  "updated_at": "2026-09-24T10:20:00Z"
+}
