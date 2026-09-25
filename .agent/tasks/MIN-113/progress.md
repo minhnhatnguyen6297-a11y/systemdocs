@@ -250,3 +250,28 @@ Web cũ **giữ nguyên** làm fallback 1 chu kỳ — không sửa, không xóa
 ## Check đã chạy
 - Toàn bộ bảng §2 + §3 + §4 + §5 + §6 — output trích trong file này;
   raw JSON/log tại `.tmp/min113/`.
+
+## Owner review round — 2 bug runtime moi lo, da fix (`d0d93b1`)
+
+Phat hien khi owner chay `npm start` tren main checkout:
+
+1. **Renderer SyntaxError**: `case-drafting-view.js` redeclare
+   `INTAKE_KIND_LABEL`/`OBS_STATE_LABEL` trung `intake-dialog.js` —
+   script thuong share global scope → init chet → sidebar khong render,
+   module khong bam duoc. Sua: xoa duplicate, view dung
+   `_OBS_STATE_LABEL` + typeof fallback (UMD require doc lap van di).
+2. **Sidecar restart-loop**: `config.js` dev spawn `python` tren PATH —
+   system Python thieu uvicorn → sidecar exit 1 → 3 retry roi
+   unavailable. Sua: dev fallback auto-detect
+   `notary_v2/venv/Scripts/python.exe` khi `G1_PYTHON` khong set.
+
+**Verify headless (Playwright qua CDP, `--remote-debugging-port`)**:
+launch electron.exe mock mode → sidebar render 5 modules → click
+notary_v2 → case 47 mo duoc → Stage (2 tai san, 6 nguoi, rev 3) +
+Pool + So do quan he + Word tab render day du → **0 console error,
+0 page error**. Screenshots: `.tmp/ui_notary.png`,
+`.tmp/flow_overview.png`. npm test 113/113.
+
+Bonus: `path.txt` cua electron npm package co trailing `\n` ma
+`index.js` khong trim → spawn ENOENT tren main checkout — da fix local
+(ghi file khong newline). Worktree khac gap loi tuong tu thi ap dung.
