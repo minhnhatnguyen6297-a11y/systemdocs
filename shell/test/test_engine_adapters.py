@@ -14,6 +14,7 @@ MIN-69 T9 — test KHONG duoc ghi vao data that:
     tu tao — khong phu thuoc upload_lab/downloads/.
 """
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -27,6 +28,7 @@ from jobstore import Job  # noqa: E402
 import command_registry as reg  # noqa: E402
 from errors import CommandError  # noqa: E402
 import engine_roots  # noqa: E402
+import upload_workspace  # noqa: E402
 
 _WF = "upload.workflow.v1"
 
@@ -254,6 +256,115 @@ class TestUploadAdapter(unittest.TestCase):
                  {"folder": {"path": "\\\\server\\share",
                              "scope": "machine_local"}})
         self.assertEqual(ctx.exception.code, "file_scope_not_supported")
+
+
+def _tree_snapshot(root: Path):
+    """{relpath: mtime_ns} cho cac artifact legacy co the ghi duoi root —
+    bat thay doi nao deu la install-dir write."""
+    out = {}
+    if not root.is_dir():
+        return out
+    for p in root.rglob("*"):
+        if p.is_file():
+            try:
+                out[str(p.relative_to(root))] = p.stat().st_mtime_ns
+            except OSError:
+                pass
+    return out
+
+
+# Cac path ma legacy upload.* flow ghi/doc duoi working_dir (F1).
+_LEGACY_ARTIFACTS = (
+    "registry.sqlite3", "runs", "output", "downloads", "upload_runs",
+    "logs", "nd_storage_state.json", "uploader_staff_options.json",
+    ".env",
+)
+
+
+@unittest.skipUnless(_engines_available(),
+                     "chua cau hinh engine-roots.json")
+class TestLegacyBundledRedirect(unittest.TestCase):
+    """F1 (T9 review): khi engine root BUNDLED (packaged — read-only),
+    cac lenh upload.* LEGACY (payload khong workflow_version, contract
+    §9.2) phai redirect data root sang <G1_UPLOAD_DATA_DIR>/legacy —
+    khong ghi vao resources/engine (install dir).
+
+    Simulation: monkeypatch engine_roots.is_bundled_root — khong can goi
+    packaged that; engine code van import tu root that."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(prefix="g1-legacy-pkg-")
+        self.addCleanup(self._tmp.cleanup)
+        self._old_env = os.environ.get("G1_UPLOAD_DATA_DIR")
+        os.environ["G1_UPLOAD_DATA_DIR"] = self._tmp.name
+        self._orig_bundled = engine_roots.is_bundled_root
+        engine_roots.is_bundled_root = (
+            lambda key: key == "upload_lab" or self._orig_bundled(key))
+        self.addCleanup(self._restore)
+
+    def _restore(self):
+        engine_roots.is_bundled_root = self._orig_bundled
+        if self._old_env is None:
+            os.environ.pop("G1_UPLOAD_DATA_DIR", None)
+        else:
+            os.environ["G1_UPLOAD_DATA_DIR"] = self._old_env
+
+    def _engine_root_artifacts(self):
+        root = engine_roots.engine_root("upload_lab")
+        snap = {}
+        for rel in _LEGACY_ARTIFACTS:
+            snap[rel] = _tree_snapshot(root / rel)
+            f = root / rel
+            if f.is_file():
+                snap[rel + "@file"] = f.stat().st_mtime_ns
+        return root, snap
+
+    def test_legacy_data_dir_redirects_when_bundled(self):
+        legacy = upload_workspace.legacy_data_dir()
+        self.assertEqual(
+            legacy, (Path(self._tmp.name) / "legacy").resolve())
+        root = engine_roots.engine_root("upload_lab")
+        self.assertNotEqual(legacy.resolve(), root.resolve())
+
+    def test_legacy_scan_writes_under_data_root(self):
+        root, before = self._engine_root_artifacts()
+        folder = Path(self._tmp.name) / "hs"
+        folder.mkdir()
+        _write_docx(folder / "HD-001.docx", [
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG",
+            "Số công chứng: 77/2026 ngày 10/05/2026",
+        ])
+        res = _run("upload.scan", {
+            "folder": {"path": str(folder), "scope": "machine_local"},
+            "full_rescan": True})
+        self.assertEqual(res["kind"], "scan_report")
+        self.assertTrue(res["data"]["run_id"])
+        legacy = (Path(self._tmp.name) / "legacy").resolve()
+        # Artifact legacy nam duoi <data>/legacy — khong duoi engine root.
+        self.assertTrue((legacy / "registry.sqlite3").is_file(),
+                        f"registry khong trong {legacy}")
+        self.assertTrue(
+            str(res["data"]["manifest_path"]).startswith(str(legacy)),
+            f"manifest_path khong tro data root: "
+            f"{res['data']['manifest_path']}")
+        root2, after = self._engine_root_artifacts()
+        self.assertEqual(root, root2)
+        self.assertEqual(before, after,
+                         "engine root bi ghi boi legacy scan (F1)")
+
+    def test_legacy_env_check_writes_under_data_root(self):
+        root, before = self._engine_root_artifacts()
+        res = _run("upload.env_check", {})   # khong version → legacy
+        self.assertEqual(res["kind"], "env_check")
+        legacy = (Path(self._tmp.name) / "legacy").resolve()
+        # _check_workspace tao logs/ + downloads/ + probe file duoi
+        # working_dir — phai nam trong data root, khong install dir.
+        self.assertTrue((legacy / "logs").is_dir())
+        self.assertTrue((legacy / "downloads").is_dir())
+        root2, after = self._engine_root_artifacts()
+        self.assertEqual(root, root2)
+        self.assertEqual(before, after,
+                         "engine root bi ghi boi legacy env_check (F1)")
 
 
 class TestRegistryWiring(unittest.TestCase):

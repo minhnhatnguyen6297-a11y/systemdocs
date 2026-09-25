@@ -6,6 +6,8 @@ import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import os from 'node:os';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
@@ -14,7 +16,12 @@ const { SidecarManager } = require('../src/main/sidecar.js');
 const FIXTURE = path.join(path.dirname(fileURLToPath(import.meta.url)),
                           'fixtures', 'fake_sidecar.mjs');
 
-afterEach(() => { delete process.env.FAKE_MODE; });
+const _SANITIZE_ENV = [
+  'FAKE_MODE', 'FAKE_DUMP', 'PYTHONPATH', 'PYTHONHOME', 'PYTHONSTARTUP',
+  'G1_NOTARY_DATA_DIR', 'G1_UPLOAD_DATA_DIR', 'G1_OUTPUT_DIR',
+  'G1_BUILD_LABEL',
+];
+afterEach(() => { for (const k of _SANITIZE_ENV) delete process.env[k]; });
 
 function makeLogger() {
   const counts = { spawn: 0, restart: 0 };
@@ -116,3 +123,68 @@ test('config: SHUTDOWN_GRACE_MS bao phu worst-case _stop() cua sidecar', () => {
   assert.ok(SHUTDOWN_GRACE_MS > 4_500,
             'grace phai vuot worst-case _stop() ~4.5s voi headroom');
 });
+
+// ---- F3/F4 (T9 review): spawn env isolation ----
+
+test('packaged spawn: strip PYTHON* + dat G1_NOTARY_DATA_DIR ngoai output',
+     async () => {
+  const dump = path.join(
+    os.tmpdir(), `g1-fake-dump-${process.pid}-${Date.now()}.json`);
+  process.env.FAKE_MODE = 'envdump';
+  process.env.FAKE_DUMP = dump;
+  process.env.PYTHONPATH = 'C:/hook-dir';       // sitecustomize/fixture hook
+  process.env.PYTHONHOME = 'C:/pyhome';
+  process.env.PYTHONSTARTUP = 'C:/startup.py';
+  const { logger } = makeLogger();
+  const m = new SidecarManager({
+    command: { cmd: process.execPath, args: [FIXTURE],
+               cwd: path.dirname(FIXTURE),
+               env: { G1_ENGINE_DIR: 'C:/engine',
+                      G1_BUILD_LABEL: 'production' } },
+    logger,
+  });
+  await m.start();
+  assert.equal(m.state, 'ready');
+  await m.shutdown();
+  const d = JSON.parse(fs.readFileSync(dump, 'utf8'));
+  fs.unlinkSync(dump);
+  // F3: env interpreter Python cua user KHONG duoc chay vao packaged.
+  assert.equal(d.pythonpath, null);
+  assert.equal(d.pythonhome, null);
+  assert.equal(d.pythonstartup, null);
+  // F4: notary data duoi engine-data/ cua userData — KHONG duoi output/
+  // (output la cho file export), KHONG trong install dir.
+  assert.ok(d.notary_data, 'packaged phai dat G1_NOTARY_DATA_DIR');
+  const norm = d.notary_data.replace(/\//g, path.sep);
+  assert.ok(norm.endsWith(path.join('engine-data', 'notary_v2')),
+            `G1_NOTARY_DATA_DIR phai ket thuc bang engine-data/notary_v2: ` +
+            norm);
+  assert.ok(!norm.includes(path.join('output', 'engine-data')),
+            `notary data khong duoc nam duoi output/: ${norm}`);
+  assert.ok(d.upload_data, 'packaged phai dat G1_UPLOAD_DATA_DIR');
+  assert.ok(d.output, 'packaged phai dat G1_OUTPUT_DIR');
+  assert.equal(d.engine_dir, 'C:/engine');
+  assert.equal(d.build_label, 'production');
+}, { timeout: 15000 });
+
+test('dev spawn: giu PYTHONPATH, khong dat G1_NOTARY_DATA_DIR', async () => {
+  const dump = path.join(
+    os.tmpdir(), `g1-fake-dump-${process.pid}-${Date.now()}.json`);
+  process.env.FAKE_MODE = 'envdump';
+  process.env.FAKE_DUMP = dump;
+  process.env.PYTHONPATH = 'C:/hook-dir';
+  const { logger } = makeLogger();
+  const m = new SidecarManager({
+    command: { cmd: process.execPath, args: [FIXTURE],
+               cwd: path.dirname(FIXTURE) },   // khong env → dev spawn
+    logger,
+  });
+  await m.start();
+  await m.shutdown();
+  const d = JSON.parse(fs.readFileSync(dump, 'utf8'));
+  fs.unlinkSync(dump);
+  // Dev hook test_upload_e2e can PYTHONPATH — giu nguyen.
+  assert.equal(d.pythonpath, 'C:/hook-dir');
+  // Dev: notary data dir = engine root (repo) nhu cu — KHONG dat env.
+  assert.equal(d.notary_data, null);
+}, { timeout: 15000 });

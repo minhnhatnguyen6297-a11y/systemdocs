@@ -47,6 +47,13 @@ hiddenimports += [
     'fitz',
     'pymupdf',
     'playwright.sync_api',
+    # F2 (T9 review): FastAPI Form/File/UploadFile can python-multipart —
+    # check_file_field raise RuntimeError LUC IMPORT router khi thieu →
+    # engine_unavailable mo ho thay vi start sach. tzdata: ZoneInfo
+    # ("Asia/Ho_Chi_Minh") trong services/zalo_inbox.py — Windows khong
+    # co system tz database.
+    'multipart',
+    'tzdata',
 ]
 
 # collect_all: datas + binaries + submodules cho package co file khong-.py.

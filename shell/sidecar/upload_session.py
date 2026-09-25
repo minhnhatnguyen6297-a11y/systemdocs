@@ -9,8 +9,9 @@ Engine root vs data root (MIN-69 T2): `import_engine_module` chi de IMPORT
 code that tu engine root. Session versioned gan vao vung du lieu theo website:
 `call(op, ..., website_id="nam_dinh")` → browser do provider tao voi
 `working_dir = website_data_dir(website_id)` (duoi G1_UPLOAD_DATA_DIR).
-`website_id=None` giu legacy path nguyen trang (working_dir = engine root,
-contract §9.2).
+`website_id=None` giu legacy path (contract §9.2) voi data root rieng:
+`legacy_data_dir()` — engine root o dev, `<G1_UPLOAD_DATA_DIR>/legacy`
+khi bundled (khong bao gio ghi vao install dir).
 
 Mot thoi diem worker giu toi da mot session; session da bind website A ma
 nhan op cua website B → `website_mismatch` (caller dong session A truoc).
@@ -42,7 +43,7 @@ import uuid
 from datetime import datetime, timezone
 
 from errors import CommandError
-from engine_roots import engine_root, import_engine_module
+from engine_roots import import_engine_module
 
 LOGIN_WAIT_TIMEOUT_S = 15 * 60
 REVIEW_WAIT_TIMEOUT_S = 60 * 60
@@ -658,8 +659,13 @@ class _BrowserWorker:
                     self._snapshot = _new_snapshot()
                     self._tab_runs.clear()
             else:
-                # Legacy path nguyen trang (contract §9.2).
-                root = engine_root("upload_lab")
+                # Legacy path (contract §9.2): data root rieng — engine
+                # root o dev; <G1_UPLOAD_DATA_DIR>/legacy khi bundled
+                # (resources/engine read-only — nd_storage_state.json,
+                # downloads/, upload_runs/, logs/ khong duoc ghi vao
+                # install dir).
+                from upload_workspace import legacy_data_dir
+                root = legacy_data_dir()
                 self._session = uploader.NamDinhUploaderSession(
                     uploader.load_uploader_settings(root),
                     working_dir=root)

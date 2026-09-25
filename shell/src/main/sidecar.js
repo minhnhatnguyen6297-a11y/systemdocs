@@ -58,6 +58,27 @@ function _defaultUploadDataDir() {
   return path.join(_defaultOutputDir(), 'upload_lab');
 }
 
+function _defaultNotaryDataDir() {
+  // notary.db khi engine root bundled read-only (F4): sibling cua output
+  // (<userData>/engine-data/notary_v2) — KHONG nam trong output/ (output
+  // la file san pham export). Dev khong dat env — data dir la engine
+  // root (repo) nhu cu.
+  try {
+    const { app } = require('electron');
+    if (app && typeof app.getPath === 'function') {
+      return path.join(app.getPath('userData'), 'engine-data', 'notary_v2');
+    }
+  } catch { /* plain node */ }
+  return path.join(_defaultOutputDir(), '..', 'engine-data', 'notary_v2');
+}
+
+// Env cua interpreter Python ma packaged spawn phai loai bo (F3):
+// frozen exe ke thua PYTHONPATH/PYTHONHOME/PYTHONSTARTUP tu moi truong
+// user → sitecustomize/e2e fixture hook co the tu chay trong production
+// sidecar neu PYTHONPATH tro vao test harness dir. Dev spawn (python
+// that) giu lai — e2e dev hook dua vao PYTHONPATH (test_upload_e2e.py).
+const PYTHON_INHERIT_DENYLIST = ['PYTHONPATH', 'PYTHONHOME', 'PYTHONSTARTUP'];
+
 class VersionMismatchError extends Error {}
 
 class SidecarManager extends EventEmitter {
@@ -100,23 +121,40 @@ class SidecarManager extends EventEmitter {
     const port = await freePort();
     this.baseUrl = `http://127.0.0.1:${port}`;
     this.log.info('spawn sidecar', { port, cmd: this.command.cmd });
+    const env = {
+      ...process.env,
+      SIDECAR_PORT: String(port),
+      SIDECAR_TOKEN: this.token,
+      // Output sidecar so huu (word export, tai ve) — userData cho ban
+      // packaged; dev/test dung <shell>/output (gitignored).
+      G1_OUTPUT_DIR: process.env.G1_OUTPUT_DIR || _defaultOutputDir(),
+      // Data root upload.workflow.v1 (websites/<id>/ + workspace.sqlite3)
+      // — tach khoi engine root, khong bao gio install dir.
+      G1_UPLOAD_DATA_DIR:
+        process.env.G1_UPLOAD_DATA_DIR || _defaultUploadDataDir(),
+      // Packaged-only: notary.db redirect sang userData khi engine root
+      // bundled read-only (F4). Dev KHONG dat — data dir la engine root
+      // (repo) nhu cu, dung chung voi notary_v2 app.
+      ...(this.command.env
+        ? {
+            G1_NOTARY_DATA_DIR:
+              process.env.G1_NOTARY_DATA_DIR || _defaultNotaryDataDir(),
+          }
+        : {}),
+      // Env packaged-only tu sidecarCommand (engine dir, playwright
+      // browsers, build label) — dev khong dat.
+      ...(this.command.env || {}),
+    };
+    if (this.command.env) {
+      // Packaged spawn: chan env interpreter Python ke thua tu user —
+      // PYTHONPATH tro vao test hook dir se auto-import sitecustomize
+      // (fixture portals) hoac giai `import e2e_fixture_hook` trong
+      // production (F3). Dev spawn can PYTHONPATH → giu nguyen.
+      for (const key of PYTHON_INHERIT_DENYLIST) delete env[key];
+    }
     const child = spawn(this.command.cmd, this.command.args, {
       cwd: this.command.cwd,
-      env: {
-        ...process.env,
-        SIDECAR_PORT: String(port),
-        SIDECAR_TOKEN: this.token,
-        // Output sidecar so huu (word export, tai ve) — userData cho ban
-        // packaged; dev/test dung <shell>/output (gitignored).
-        G1_OUTPUT_DIR: process.env.G1_OUTPUT_DIR || _defaultOutputDir(),
-        // Data root upload.workflow.v1 (websites/<id>/ + workspace.sqlite3)
-        // — tach khoi engine root, khong bao gio install dir.
-        G1_UPLOAD_DATA_DIR:
-          process.env.G1_UPLOAD_DATA_DIR || _defaultUploadDataDir(),
-        // Env packaged-only tu sidecarCommand (engine dir, playwright
-        // browsers, build label) — dev khong dat.
-        ...(this.command.env || {}),
-      },
+      env,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
     });

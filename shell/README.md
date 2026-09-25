@@ -95,6 +95,12 @@ npm run build:sidecar   # PyInstaller onedir + stage engine/browsers
 npm run dist            # electron-builder dir -> dist-app/win-unpacked/g1-shell.exe
 ```
 
+Deps dong goi vao exe duoc PIN trong `sidecar/requirements-package.txt`
+(version theo build venv da kiem chung). `build_sidecar.ps1`/
+`test/build-upload-test.ps1` chay `sidecar/check_package_deps.py` truoc
+PyInstaller — venv sai version thi fail som (`pip install -r
+sidecar/requirements-package.txt` de tao venv dung pin).
+
 Layout trong goi:
 
 ```text

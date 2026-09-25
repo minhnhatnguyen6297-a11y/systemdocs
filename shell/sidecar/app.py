@@ -63,10 +63,20 @@ def _build_store():
 
 
 def _install_e2e_fixtures():
-    """MIN-69 T9 — chi TEST BUILD: module `e2e_fixture_hook` ton tai duy
-    nhat trong sidecar dist:test (spec cong them test/fixtures vao pathex).
-    Production KHONG ship module → G1_E2E_FIXTURE la no-op; renderer khong
-    bao gio dat duoc env nay (chi Electron main → env sidecar)."""
+    """MIN-69 T9 — chi TEST BUILD. Ba lop guard:
+
+    1. `G1_BUILD_LABEL=test` — main.js force-set `production|test` qua env
+       sidecar (config.js); production packaged luon la `production` nen
+       `G1_E2E_FIXTURE` con sot tren may user la no-op ngay ca khi
+       `e2e_fixture_hook.py` giai duoc tu PYTHONPATH (F3 — spawn packaged
+       da strip PYTHON*, lop nay la defense-in-depth).
+    2. `G1_E2E_FIXTURE=1` — trusted harness channel qua env sidecar;
+       renderer khong bao gio dat duoc env nay.
+    3. Module `e2e_fixture_hook` chi ship trong dist:test — production
+       khong bundle → import fail cung la no-op.
+    """
+    if os.environ.get("G1_BUILD_LABEL") != "test":
+        return
     if os.environ.get("G1_E2E_FIXTURE") != "1":
         return
     try:

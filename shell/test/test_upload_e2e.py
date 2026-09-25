@@ -142,6 +142,11 @@ def launch_app(tmp: Path, port: int, python: str, app_exe: Path = None):
         env["G1_UPLOAD_LAB_ROOT"] = str(REPO / "upload_lab")
         env["G1_UPLOAD_DATA_DIR"] = str(tmp / "upload_lab")
         env["G1_OUTPUT_DIR"] = str(tmp / "output")
+        # F3 (T9 review): _install_e2e_fixtures can CA G1_BUILD_LABEL=test
+        # LAN G1_E2E_FIXTURE=1 — dev harness la trusted channel nhu
+        # packaged test build (marker). Production packaged van force
+        # label qua config.js nen khong the bi env nay sua.
+        env["G1_BUILD_LABEL"] = "test"
         env["PYTHONPATH"] = os.pathsep.join(
             [str(HOOK_DIR), str(FIXTURES), str(SIDECAR),
              env.get("PYTHONPATH", "")])

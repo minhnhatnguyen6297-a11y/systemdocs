@@ -19,6 +19,10 @@ try {
     # Stage engine + browsers (chung voi production).
     & (Join-Path $shell "sidecar\stage_package_assets.ps1") -Python $Python
 
+    # F2: pin dep check nhu production (cung spec — requirements-package.txt).
+    & $Python (Join-Path $shell "sidecar\check_package_deps.py")
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
     # Sidecar test build — cung spec, them fixture pathex/hiddenimport.
     $env:G1_SIDECAR_TEST_BUILD = "1"
     Push-Location (Join-Path $shell "sidecar")
@@ -27,9 +31,6 @@ try {
             --distpath (Join-Path $shell "sidecar\dist-test") `
             g1-shell-sidecar.spec
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        $hook = Join-Path $shell (
-            "sidecar\dist-test\g1-shell-sidecar\_internal\" +
-            "e2e_fixture_hook*")
         $driver = Join-Path $shell (
             "sidecar\dist-test\g1-shell-sidecar\_internal\" +
             "playwright\driver\node.exe")

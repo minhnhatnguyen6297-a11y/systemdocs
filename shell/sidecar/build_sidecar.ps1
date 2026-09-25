@@ -11,6 +11,11 @@ try {
         & (Join-Path $PSScriptRoot "stage_package_assets.ps1") `
             -Python $Python
     }
+    # F2: khoa version deps ma spec dong goi (requirements-package.txt)
+    # truoc khi PyInstaller chay — mismatch → fail som, khong de spec
+    # freeze thieu module (vd python-multipart → FastAPI sap luc import).
+    & $Python (Join-Path $PSScriptRoot "check_package_deps.py")
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     & $Python -m PyInstaller --noconfirm --clean g1-shell-sidecar.spec
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

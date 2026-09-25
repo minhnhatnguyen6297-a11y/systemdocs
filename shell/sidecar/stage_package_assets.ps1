@@ -31,11 +31,21 @@ $allow = @{
                   "playwright_uploader.py", "uploader_selectors.py",
                   "__init__.py")
         dirs  = @("providers", "ui")
+        # Exclude la path tuong doi duoi thu muc staged cua key.
+        excludes = @()
     }
     "notary_v2" = @{
         files = @("database.py", "models.py")
         dirs  = @("services", "routers", "word_templates",
                   "frontend\templates")
+        excludes = @(
+            # F6: fast_audit can rapidfuzz (khong bundle, khong command
+            # nao goi — chi tests repo dung) → khong stage.
+            "services\fast_audit",
+            # F5: word_templates/custom/ la artifact dev-upload len —
+            # khong ship trong goi (template builtin + DB-picked van du).
+            "word_templates\custom"
+        )
     }
 }
 foreach ($key in $allow.Keys) {
@@ -51,6 +61,10 @@ foreach ($key in $allow.Keys) {
             -Path (Split-Path $target -Parent) | Out-Null
         Copy-Item -Recurse -Force (Join-Path $src $d) $target
     }
+    foreach ($e in $allow[$key].excludes) {
+        $hit = Join-Path $dst $e
+        if (Test-Path $hit) { Remove-Item -Recurse -Force $hit }
+    }
 }
 # Sach __pycache__ + chan file cam — code only, khong data/Qt.
 Get-ChildItem -Recurse -Force -Directory $engineStage |
@@ -60,7 +74,7 @@ $forbidden = Get-ChildItem -Recurse -Force -File $engineStage |
     Where-Object {
         $_.Name -in @(".env", "notary.db", "registry.sqlite3",
                       "nd_storage_state.json") -or
-        $_.FullName -match "ui_qt|tests|poc|tools" -or
+        $_.FullName -match "ui_qt|tests|poc|tools|fast_audit|word_templates[\\/]custom[\\/]" -or
         $_.Extension -in @(".db", ".sqlite", ".sqlite3")
     }
 if ($forbidden) {
@@ -81,6 +95,8 @@ if ($LASTEXITCODE -ne 0 -or -not $rev) {
 }
 $mspw = Join-Path $env:LOCALAPPDATA "ms-playwright"
 $pwStage = Join-Path $stageRoot "playwright-browsers"
+# N7: sach toan bo stage — revision cu con sot khong duoc di theo goi moi.
+if (Test-Path $pwStage) { Remove-Item -Recurse -Force $pwStage }
 foreach ($name in @("chromium-$rev",
                     "chromium_headless_shell-$rev")) {
     $srcDir = Join-Path $mspw $name

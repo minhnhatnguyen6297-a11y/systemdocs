@@ -9,8 +9,11 @@ Boundary (MIN-69):
   - Playwright sync API song tren upload_session worker thread.
   - Credential/session state (nd_storage_state.json) khong qua contract.
   - Engine root vs data root (T2): `engine_root("upload_lab")` chi de IMPORT
-    code + giu data root legacy; luong `upload.workflow.v1` doc/ghi qua
+    code; luong `upload.workflow.v1` doc/ghi qua
     `upload_workspace.website_data_dir(website_id)` duoi G1_UPLOAD_DATA_DIR.
+    Luong legacy (khong workflow_version) giu data root rieng qua
+    `upload_workspace.legacy_data_dir()` — engine root o dev, redirect
+    `<G1_UPLOAD_DATA_DIR>/legacy` khi bundled (khong ghi install dir).
 """
 import functools
 import hashlib
@@ -24,7 +27,7 @@ from datetime import date as _date, datetime as _datetime
 from pathlib import Path
 
 from errors import CommandError, error_object
-from engine_roots import engine_root, import_engine_module
+from engine_roots import import_engine_module
 from fileref import existing_file, validate_file_ref
 from jobstore import CancelledByUser
 from upload_session import (
@@ -85,10 +88,11 @@ def _dc(obj):
 
 def scan_folder(job, payload):
     """run_batch_scan that tren thu muc nguoi dung chon. Output/registry
-    ghi vao workspace engine (upload_lab root) — engine so huu."""
+    ghi vao legacy data root (engine root o dev; <data>/legacy khi
+    bundled — contract §9.2, khong ghi install dir)."""
     p = payload or {}
     folder = _existing_dir(p.get("folder"))
-    root = engine_root("upload_lab")
+    root = upload_workspace.legacy_data_dir()
     batch_scan = import_engine_module("upload_lab", "batch_scan")
 
     def on_progress(snap):
@@ -196,7 +200,7 @@ def env_check(job, payload):
     svc = import_engine_module(
         "upload_lab", "ui.services.environment_check_service")
     uploader = import_engine_module("upload_lab", "playwright_uploader")
-    root = engine_root("upload_lab")
+    root = upload_workspace.legacy_data_dir()
     job.report_progress(0, 1, "kiem tra moi truong")
     settings = uploader.load_uploader_settings(root)
     report = svc.run_environment_checks(root, settings.base_url)
@@ -336,7 +340,7 @@ def prepare_upload(job, payload):
     luu trong Chromium; job waiting_user('review') toi khi finish_review
     hoac cancel. Cancel KHONG dong tab da mo — nguoi quyet tren browser."""
     p = payload or {}
-    root = engine_root("upload_lab")
+    root = upload_workspace.legacy_data_dir()
     ids = p.get("record_ids")
     if not isinstance(ids, list) or not ids:
         raise CommandError("validation_error", "can record_ids: [int]")

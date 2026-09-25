@@ -22,11 +22,12 @@ Default <shell>/output (gitignored). Electron main co the dat env nay toi
 userData cho ban packaged. Khi frozen ma env thieu → fallback ve
 %LOCALAPPDATA%/g1-shell/output thay vi ghi vao thu muc cai dat.
 
-G1_ENGINE_DATA_DIR (tu buoc 3): data root cho engine root read-only
+G1_NOTARY_DATA_DIR (tu buoc 3): data root cho engine root read-only
 (bundle nam trong resources — khong duoc ghi). Hien chi can cho
 notary_v2 (database.py neo notary.db canh __file__); adapter redirect DB
-ve <data_dir>/notary.db khi root la bundled. Dev khong doi: data dir
-chinh la engine root (repo) nhu cu; co the override bang
+ve <data_dir>/notary.db khi root la bundled. Packaged main dat env nay
+toi <userData>/engine-data/notary_v2 (sidecar.js). Dev khong doi: data
+dir chinh la engine root (repo) nhu cu; co the override bang
 G1_NOTARY_DATA_DIR (test khong ghi DB that).
 """
 import importlib
@@ -139,8 +140,9 @@ def engine_data_dir(key):
 
     - env `_DATA_ENV_BY_KEY[key]` (vd G1_NOTARY_DATA_DIR) thang luon —
       test tro ve tempdir de khong ghi DB that.
-    - bundled root → <G1_OUTPUT_DIR>/engine-data/<key> (userData — song
-      qua app update; install dir khong bao gio bi ghi).
+    - bundled root → sibling cua output dir: `<output>/../engine-data/<key>`
+      (userData — song qua app update; DB engine KHONG nam trong output/
+      vi output/ la file san pham export; install dir khong bao gio bi ghi).
     - root thuong (dev) → chinh engine root: DB/file engine van nam canh
       code nhu truoc, khong doi hanh vi dev.
     """
@@ -149,7 +151,7 @@ def engine_data_dir(key):
     if raw:
         base = Path(raw).expanduser()
     elif is_bundled_root(key):
-        base = Path(output_dir()) / "engine-data" / key
+        base = Path(output_dir()).parent / "engine-data" / key
     else:
         return engine_root(key)
     base.mkdir(parents=True, exist_ok=True)

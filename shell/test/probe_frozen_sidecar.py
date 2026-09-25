@@ -55,9 +55,51 @@ def submit(base, command, payload):
     raise RuntimeError(f"job {job_id} timeout")
 
 
+# N4 (T9 review): sweep file tree cua goi PRODUCTION — fixture/test-only
+# module va Qt khong bao gio duoc ship. Neu bat ky pattern nay xuat hien
+# trong _internal (loose file) hay resources/engine thi goi production da
+# chua test surface → fail ngay. (Module nam trong PYZ zip khong rglob
+# duoc — lop do duoc chung minh bang diag.* = command_unknown + khong co
+# pathex fixture ben duoi.)
+_FORBIDDEN_NAME_PREFIXES = (
+    "e2e_fixture_hook", "upload_portal", "sitecustomize",
+    "pyside", "pyqt", "shiboken",
+)
+_FORBIDDEN_PATH_PARTS = (
+    "fast_audit", "ui_qt",
+    # sep cuoi: khong bat nham file ten 'custom*' ngay trong word_templates/.
+    os.path.join("word_templates", "custom") + os.sep,
+)
+
+
+def assert_production_tree():
+    """Tra danh sach file cam trong goi; [] = sach."""
+    roots = [EXE.parent / "_internal"]
+    for anc in EXE.parent.parents:
+        if anc.name == "resources":
+            roots.append(anc / "engine")
+            break
+    bad = []
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for p in root.rglob("*"):
+            name = p.name.lower()
+            rel = str(p).lower()
+            if name.startswith(_FORBIDDEN_NAME_PREFIXES) or any(
+                    part in rel for part in _FORBIDDEN_PATH_PARTS):
+                bad.append(str(p))
+    return bad
+
+
 def main():
     assert EXE.is_file(), f"thieu exe: {EXE}"
     assert ENGINE.is_dir(), f"chua stage engine: {ENGINE}"
+    # N4: production file tree phai sach fixture/Qt/test surface.
+    leaked = assert_production_tree()
+    assert not leaked, (
+        f"production tree chua {len(leaked)} file cam: {leaked[:10]}")
+    print("tree sweep: sach (khong fixture/Qt/sitecustomize/fast_audit)")
     tmp = Path(tempfile.mkdtemp(prefix="g1-frozen-probe-"))
     env = dict(os.environ)
     env.update({

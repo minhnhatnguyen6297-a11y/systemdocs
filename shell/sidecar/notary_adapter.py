@@ -20,7 +20,8 @@ from pathlib import Path
 
 from errors import CommandError
 from engine_roots import (
-    engine_data_dir, engine_root, import_engine_module, output_dir)
+    engine_data_dir, engine_root, import_engine_module, is_bundled_root,
+    output_dir)
 
 
 _db_ready = False
@@ -511,13 +512,22 @@ def ocr_analyze(job, payload):
     if len(refs) > 8:
         raise CommandError("validation_error", "toi da 8 anh/lan")
     ocr = _router("ocr_ai")
+    # Packaged (bundled root): `_ENV_PATH` mac dinh tro vao
+    # resources/engine/notary_v2/.env — install dir read-only va staging
+    # khong ship .env → guidance cu ("dat key vao <notary_v2>/.env") tro
+    # vao cho khong ghi duoc. Redirect ve engine data dir writable de
+    # user van cau hinh duoc key; dev giu nguyen .env canh repo.
+    if is_bundled_root("notary_v2"):
+        ocr._ENV_PATH = str(Path(engine_data_dir("notary_v2")) / ".env")
     model = ocr._get_model()
-    if not ocr._get_api_key(model):
+    if not ocr._get_api_key():
         raise CommandError(
             "ocr.engine_unavailable",
-            "thieu API key OCR (QWEN_API_KEY/DASHSCOPE_API_KEY trong "
-            "<notary_v2>/.env)", retryable=False,
-            next_action="dat key vao .env engine roi thu lai")
+            "thieu API key OCR — dat QWEN_API_KEY/DASHSCOPE_API_KEY vao "
+            f"bien moi truong hoac file {ocr._ENV_PATH}",
+            retryable=False,
+            next_action="dat API key vao .env cua engine data dir "
+                        "hoac bien moi truong roi thu lai")
     from fastapi import UploadFile
     from fileref import existing_file
     uploads = []

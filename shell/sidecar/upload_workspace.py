@@ -59,6 +59,27 @@ def workspace_db_path() -> Path:
     return upload_data_root() / WORKSPACE_DB_NAME
 
 
+def legacy_data_dir() -> Path:
+    """Data root cho cac lenh `upload.*` LEGACY (payload khong co
+    workflow_version — contract §9.2 "legacy keeps its own data root").
+
+    - Bundled root (packaged: resources/engine read-only) →
+      `<data_root>/legacy`: registry.sqlite3/runs/output/downloads/
+      upload_runs/logs/nd_storage_state.json/.env cua legacy flow ghi tai
+      day — KHONG BAO GIO ghi vao thu muc cai dat (F1 review T9).
+    - Dev/root thuong → chinh engine root nhu truoc (registry canh code,
+      hanh vi khong doi).
+
+    Import engine_roots CHAM trong ham de test monkeypatch duoc
+    `is_bundled_root` (packaged simulation khong can goi that)."""
+    from engine_roots import engine_root, is_bundled_root
+    if is_bundled_root("upload_lab"):
+        base = upload_data_root() / "legacy"
+        base.mkdir(parents=True, exist_ok=True)
+        return base
+    return engine_root("upload_lab")
+
+
 def open_store() -> UploadWorkspaceStore:
     """Store dung chung trong process (reopen neu data root doi — test).
 

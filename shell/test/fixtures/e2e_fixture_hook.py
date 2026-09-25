@@ -55,7 +55,25 @@ def _install_portals():
             f"{600 + i}/2026/CCGD" for i in range(1, 31)
         ] + ["631/1999/CCGD"],
     }
+    # Idempotent: dev harness con chay e2e_hook/sitecustomize.py (PYTHONPATH
+    # auto-import — F3 mitigation khong bat dev) truoc khi app.py goi ham
+    # nay — portal da register thi dung lai, khong double-register
+    # (registry.register raise ValueError → chet luc import app).
+    from engine_roots import import_engine_module
+    try:
+        reg = import_engine_module(
+            "upload_lab", "providers.registry").DEFAULT_REGISTRY
+    except Exception:  # noqa: BLE001 — registry khong san → register tu dau
+        reg = None
     for wid, rows in datasets.items():
+        if reg is not None and reg.is_known(wid):
+            provider = reg.get_provider(wid)
+            portal = getattr(provider, "portal", None)
+            if portal is not None:
+                PORTALS[wid] = portal
+                continue
+            # Provider la khong phai fixture → van dung no, khong ghi de.
+            continue
         portal = fixture.FakePortal()
         portal.export_rows = rows
         provider = fixture.register_fake_portal_website(
