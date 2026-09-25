@@ -212,6 +212,37 @@ class JobRepositoryTest(unittest.TestCase):
         gate.set()
         store1.drain(timeout=3)
 
+    def test_record_snapshot_cannot_regress_terminal_row(self):
+        """Terminal guard cua journal (T5 fix1): record_snapshot goi truc
+        tiep voi snapshot non-terminal 'tre' (listener cham/race) KHONG
+        duoc ghi de row da terminal — mirror terminal guard cua
+        workflow_jobs.upsert_job; terminal dau tien luon thang."""
+        repo = JobRepository(self.db)
+        self.addCleanup(repo.close)
+        store = JobStore(max_workers=2, repository=repo)
+        self._stores.append(store)
+        job = store.submit("c-term-guard", "diag.x", _quick, {"n": 1})
+        snap = _wait_terminal(store, job.job_id)
+        self.assertEqual(snap["status"], "succeeded")
+
+        # Snapshot 'running' den tre → status + snapshot_json giu
+        # nguyen terminal da persist.
+        repo.record_snapshot(
+            dict(snap, status="running", result=None, error=None))
+        row = repo.find_by_job_id(job.job_id)
+        self.assertEqual(row["status"], "succeeded")
+        self.assertEqual(row["snapshot"]["status"], "succeeded")
+        self.assertEqual(row["snapshot"]["result"]["data"]["echo"],
+                         {"n": 1})
+
+        # Terminal khac cung khong ghi de — cancel/finish dau tien thang.
+        repo.record_snapshot(
+            dict(snap, status="failed",
+                 error={"code": "engine_internal_error"}))
+        row = repo.find_by_job_id(job.job_id)
+        self.assertEqual(row["status"], "succeeded")
+        self.assertEqual(row["snapshot"]["status"], "succeeded")
+
 
 class WorkspaceSweepTest(unittest.TestCase):
     """_recover_interrupted: store instance moi = 'process moi' — don
@@ -451,6 +482,51 @@ class UploadRecoveryTest(tbw.BrowserWorkflowCase):
                               website_id=tbw.WEBSITE)
         self.assertEqual(ctx.exception.code, "engine_unavailable")
         self.assertIsNone(self.browser._session)
+
+    def test_shutdown_timeout_is_total_budget_not_per_phase(self):
+        """Regression T5 fix1: shutdown(timeout) CHIA budget giua
+        reconcile (_poll_then_close) va join — poll/close hang khong
+        lam shutdown chan qua ~timeout. Truoc day reconcile nhan
+        timeout-1 roi join nhan them timeout → ~2*timeout, vuot
+        SHUTDOWN_GRACE_MS cua Electron → SIGKILL giua reconcile."""
+        run_id, ids = self.run_scan(tbw.CONTRACT_NOS[:1])
+        bid = self.login()
+        job = self.prepare(bid, run_id, ids)
+        self.wait_status(job, "waiting_user")
+
+        # Lam browser hang ngay trong poll (giu 30s neu khong duoc nha)
+        # — _poll_then_close khong co stop_event nen khong bi ngat.
+        hang = threading.Event()
+        orig_poll = self.session.poll_prepared_pages
+
+        def blocked_poll():
+            hang.wait(timeout=30)
+            return orig_poll()
+
+        self.session.poll_prepared_pages = blocked_poll
+        try:
+            t0 = time.monotonic()
+            self.browser.shutdown(timeout=1.0)
+            elapsed = time.monotonic() - t0
+            # Code cu: reconcile 1.0s + join 1.0s ≈ 2.0s. Code moi:
+            # tong <= ~timeout + overhead → phai duoi 1.75s.
+            self.assertLess(
+                elapsed, 1.75,
+                f"shutdown chan {elapsed:.2f}s — budget khong duoc "
+                "chia giua reconcile va join")
+            # Sweep van chay sau join timeout: tab chua xac minh →
+            # needs_reconcile, khong bao gio 'da Luu'.
+            self.assertEqual(
+                sorted(self.store.needs_reconcile_ids(tbw.WEBSITE)),
+                sorted(ids))
+        finally:
+            # Nha gate de zombie thread (daemon) thoat — cleanup
+            # browser.shutdown tiep theo khong phai cho 30s.
+            hang.set()
+
+        snap = self.wait_terminal(job)
+        self.assertEqual(snap["status"], "failed")
+        self.assertEqual(snap["error"]["code"], "engine_unavailable")
 
     # ------------------------------------------------- cancel/finish race
     def test_cancel_while_waiting_then_finish_review_keeps_canceled(self):

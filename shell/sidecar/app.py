@@ -209,6 +209,9 @@ def shutdown():
         # Drain job truoc (cancel engine_shutdown + persist terminal),
         # roi cho browser worker reconcile/dong an toan — tab chua xac
         # minh Luu duoc giu dau needs_reconcile, khong coi la saved.
+        # Worst-case ≈ 0.2 (timer) + 2 (drain) + ~2 (worker shutdown —
+        # reconcile+join chia budget) + ~0.3 (uvicorn exit) ≈ 4.5s; phai
+        # nam trong SHUTDOWN_GRACE_MS (shell/src/main/config.js).
         store.drain(timeout=2)
         try:
             import upload_session

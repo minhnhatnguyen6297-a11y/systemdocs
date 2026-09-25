@@ -37,6 +37,7 @@ moi job dang cho tren browser do duoc danh thuc va that bai
 """
 import queue
 import threading
+import time
 import uuid
 from datetime import datetime, timezone
 
@@ -45,6 +46,14 @@ from engine_roots import engine_root, import_engine_module
 
 LOGIN_WAIT_TIMEOUT_S = 15 * 60
 REVIEW_WAIT_TIMEOUT_S = 60 * 60
+
+# Trong shutdown(timeout): reconcile (_poll_then_close) nhan phan lon
+# budget; reserve nay giu lai cho _stop.set() + thread.join de TONG chan
+# khong vuot `timeout`. Loop can toi da mot nhip poll (_poll_interval,
+# 0.5s production) sau khi _stop set de thoat. Electron main SIGKILL sau
+# SHUTDOWN_GRACE_MS — neu shutdown chan qua budget, reconcile/close bi
+# giet giua chung (MIN-69 T5 fix1).
+_SHUTDOWN_JOIN_RESERVE_S = 0.5
 
 _LOGIN_STATUS_MAP = {
     "authenticated": "authenticated",
@@ -152,25 +161,37 @@ class _BrowserWorker:
 
         Thu tu (MIN-69 T5): bao op mutating dang chay dung som → poll/
         reconcile + dong session TREN browser thread (Save da xac minh
-        ghi registry truoc khi dong) → stop loop → join toi da `timeout`.
-        Qua thoi han (browser hang): thread con lai la daemon — tab chua
-        xac minh van duoc giu dau needs_reconcile qua open_tabs sweep khi
-        process sau mo store, khong bao gio coi la 'da Luu'."""
+        ghi registry truoc khi dong) → stop loop → join.
+
+        `timeout` la TONG budget chia cho reconcile + join (MIN-69 T5
+        fix1): truoc day reconcile nhan timeout-1 roi join nhan timeout
+        day du → worst-case ~2*timeout, vuot grace cua Electron main va
+        bi SIGKILL dung luc reconcile/close dang chay. Gio reconcile duoc
+        cap `timeout - _SHUTDOWN_JOIN_RESERVE_S`; join chi lay phan CON
+        LAI toi deadline → chan khong qua ~`timeout`. Qua thoi han
+        (browser hang): thread con lai la daemon — tab chua xac minh van
+        duoc giu dau needs_reconcile qua open_tabs sweep khi process sau
+        mo store, khong bao gio coi la 'da Luu'."""
         thread = self._thread
         if thread is None:
             return
         self.request_stop()   # engine dung sau don vi dang xu ly
         wid = self._website_id
+        deadline = time.monotonic() + max(0.0, float(timeout))
         if self.browser_alive():
             try:
                 # Reconcile cac tab doc duoc ROI moi dong — mot op tren
                 # browser thread, bounded de shutdown khong treo vo han.
-                self.call("_poll_then_close", website_id=wid,
-                          timeout=max(1.0, float(timeout) - 1.0))
+                self.call(
+                    "_poll_then_close", website_id=wid,
+                    timeout=max(0.0, deadline - time.monotonic()
+                                - _SHUTDOWN_JOIN_RESERVE_S))
             except Exception:
                 pass
         self._stop.set()
-        thread.join(timeout=timeout)
+        # Join chi lay phan budget con lai toi deadline — khong cong
+        # them `timeout` day du vao sau reconcile nhu truoc.
+        thread.join(timeout=max(0.0, deadline - time.monotonic()))
         # Timeout/hang: danh dau phan con lai la can doi chieu (giu
         # run_id) de lan khoi dong sau hoac reconcile doi chieu lai.
         self._mark_open_tabs_needs_reconcile(wid)

@@ -92,19 +92,30 @@ class JobRepository:
             self._conn.commit()
 
     def record_snapshot(self, snapshot):
-        """Upsert snapshot sau moi transition (identity khong doi)."""
+        """Upsert snapshot sau moi transition (identity khong doi).
+
+        Terminal guard (mirror workflow_jobs.upsert_job): row da terminal
+        trong journal giu nguyen status + snapshot_json — mot persist tre
+        (listener cham, snapshot cu con in-flight) KHONG duoc mo lai job
+        da ket thuc; cancel da persist luon thang cuoc dua finish cua
+        handler. updated_at van cap nhat nhu upsert_job."""
+        marks = ",".join("?" for _ in TERMINAL_STATUSES)
         with self._lock:
             self._conn.execute(
                 "INSERT INTO sidecar_jobs(job_id, command_id, request_hash,"
                 " command, status, snapshot_json, updated_at)"
                 " VALUES(?,?,?,?,?,?,?)"
                 " ON CONFLICT(job_id) DO UPDATE SET"
-                " status=excluded.status,"
-                " snapshot_json=excluded.snapshot_json,"
+                f" status=CASE WHEN sidecar_jobs.status IN ({marks})"
+                "   THEN sidecar_jobs.status ELSE excluded.status END,"
+                f" snapshot_json=CASE WHEN sidecar_jobs.status IN ({marks})"
+                "   THEN sidecar_jobs.snapshot_json"
+                "   ELSE excluded.snapshot_json END,"
                 " updated_at=excluded.updated_at",
                 (snapshot["job_id"], snapshot["command_id"], "",
                  snapshot["command"], snapshot["status"],
-                 json.dumps(snapshot, ensure_ascii=False), _now()))
+                 json.dumps(snapshot, ensure_ascii=False), _now(),
+                 *TERMINAL_STATUSES, *TERMINAL_STATUSES))
             self._conn.commit()
 
     # ------------------------------------------------------------ reads

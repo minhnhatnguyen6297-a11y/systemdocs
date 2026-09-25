@@ -104,3 +104,15 @@ test('shutdown sau khi child da exit: clean', async () => {
   await startP;
   assert.equal(m.state, 'stopped');
 });
+
+test('config: SHUTDOWN_GRACE_MS bao phu worst-case _stop() cua sidecar', () => {
+  // app.py _stop(): timer 0.2s + store.drain(timeout=2) +
+  // worker().shutdown(timeout=2) — reconcile + join chia 2s do (xem
+  // upload_session._BrowserWorker.shutdown) — + uvicorn exit ~0.3s
+  // ≈ 4.5s. Grace nho hon bound nay → SIGKILL giet reconcile/close giua
+  // chung, dung luc do chac chan 'da Luu' can duoc ghi nhat.
+  const { SHUTDOWN_GRACE_MS } = require('../src/main/config.js');
+  assert.equal(SHUTDOWN_GRACE_MS, 6_000);
+  assert.ok(SHUTDOWN_GRACE_MS > 4_500,
+            'grace phai vuot worst-case _stop() ~4.5s voi headroom');
+});
