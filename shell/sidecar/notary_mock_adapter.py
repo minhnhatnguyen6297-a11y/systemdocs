@@ -1213,7 +1213,6 @@ def word_export_batch(job, payload):
         probe = dest_dir / f".word_export_probe_{uuid.uuid4().hex}.tmp"
         with open(probe, "xb"):
             pass
-        probe.unlink()
     except FileNotFoundError as exc:
         dest_error = ("file_not_found",
                       f"destination không còn tồn tại: {exc}")
@@ -1223,6 +1222,11 @@ def word_export_batch(job, payload):
     except OSError as exc:
         dest_error = ("word.render_failed",
                       f"destination không tạo được file: {exc}")
+    else:
+        try:
+            probe.unlink()      # parity real: unlink OSError nuot, khong
+        except OSError:         # lam fail batch (create-ok/delete-deny ACL)
+            pass
 
     for i, key in enumerate(keys):
         job.check_cancel(_pending_result())  # cancel giua batch
@@ -1255,14 +1259,22 @@ def word_export_batch(job, payload):
                     dest_dir, meta["filename_stem"],
                     int(payload["case_id"]), taken,
                     meta["display_name"], {"id": payload["case_id"]})
-            except PermissionError as exc:
-                # Parity engine that (MIN-116): dest deny-write -> per-doc
-                # file_locked; all-failed -> word_batch_failed kem result.
+            except OSError as exc:
+                # Parity engine that (MIN-116): OSError o write path ->
+                # per-doc error theo _doc_error_from (file_not_found /
+                # file_locked / word.render_failed); all-failed ->
+                # word_batch_failed kem result_data.
+                if isinstance(exc, FileNotFoundError):
+                    code = "file_not_found"
+                elif isinstance(exc, PermissionError):
+                    code = "file_locked"
+                else:
+                    code = "word.render_failed"
                 docs.append({"document_key": key,
                              "display_name": meta["display_name"],
                              "status": "failed", "actual_filename": None,
                              "output_file": None,
-                             "error": {"code": "file_locked",
+                             "error": {"code": code,
                                        "message": f"không ghi được file: {exc}"}})
                 failed.append(key)
             else:

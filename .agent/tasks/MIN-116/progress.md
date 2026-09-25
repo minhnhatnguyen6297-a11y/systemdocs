@@ -64,3 +64,16 @@ tiếp được mà không cần hỏi lại.
   và `contracts/` path nằm ở repo root) — không liên quan diff này.
 - Repro tay: `tempfile.mkstemp(dir=denied)` dưới `os.open` deny spin qua
   >1.18M lần trước khi kill — xác nhận hang vô hạn (TMP_MAX=2**31-1).
+
+## Post-merge review fix (reviewer `7aed2ab9` — LGTM + 2 Important mock-parity)
+
+- `notary_mock_adapter`: `probe.unlink()` tách khỏi guarded try — unlink OSError
+  nuốt (parity real `_probe_dest_writable`), trước đây create-ok/delete-deny ACL
+  làm mock fail cả batch trong khi real tiếp tục.
+- `notary_mock_adapter`: catch `_reserve_and_write` nới `PermissionError` →
+  `OSError` + map `file_not_found`/`file_locked`/`word.render_failed` theo
+  `_doc_error_from` — trước đây dest mất giữa batch → `engine_internal_error`
+  không breakdown, lệch real.
+- `word_batch_export`: `build_word_context`/`word_block_reason` chỉ chạy khi
+  `dest_error is None` — tránh work thừa + raw exception ngoài per-doc shape.
+- Re-verify merged tree: 53 word batch + 71 mock adapter pass.

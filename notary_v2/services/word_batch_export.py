@@ -511,8 +511,14 @@ def export_batch(case: Any, *, case_id: int, document_keys: Any,
         dest_error = ("word.render_failed",
                       f"destination không tạo được file: {exc}")
 
-    context = word_engine.build_word_context(case, today=today)
-    data_reason = word_engine.word_block_reason(context)
+    # Chỉ build context khi dest ghi được — dest_error set thì mọi doc
+    # nhận per-file error chung, context build vừa thừa vừa có thể ném
+    # raw exception ngoài shape per-doc (review MIN-116 minor).
+    context = None
+    data_reason = None
+    if dest_error is None:
+        context = word_engine.build_word_context(case, today=today)
+        data_reason = word_engine.word_block_reason(context)
     mapping_holder: dict = {}
 
     for key in keys:
