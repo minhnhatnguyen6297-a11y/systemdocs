@@ -15,10 +15,24 @@ const mode = process.env.FAKE_MODE || 'ok';
 
 if (mode === 'envdump') {
   // F3/F4: kiem env ma spawn packaged/dev thuc su truyen cho sidecar.
+  // Lookup theo uppercase — Windows env case-insensitive nhung *nix khong;
+  // bat duoc bien the hoa/thuong (PythonPath) tren ca hai.
+  const PY_DENY = [
+    'PYTHONPATH', 'PYTHONHOME', 'PYTHONSTARTUP', 'PYTHONUSERBASE',
+  ];
+  const pyEnv = (name) => {
+    const hit = Object.keys(process.env).find(
+      (k) => k.toUpperCase() === name);
+    return hit === undefined ? null : process.env[hit];
+  };
   fs.writeFileSync(process.env.FAKE_DUMP, JSON.stringify({
-    pythonpath: process.env.PYTHONPATH ?? null,
-    pythonhome: process.env.PYTHONHOME ?? null,
-    pythonstartup: process.env.PYTHONSTARTUP ?? null,
+    pythonpath: pyEnv('PYTHONPATH'),
+    pythonhome: pyEnv('PYTHONHOME'),
+    pythonstartup: pyEnv('PYTHONSTARTUP'),
+    pythonuserbase: pyEnv('PYTHONUSERBASE'),
+    // Key denylist con sot THEO CASE THAT — packaged phai la [].
+    python_keys: Object.keys(process.env)
+      .filter((k) => PY_DENY.includes(k.toUpperCase())),
     notary_data: process.env.G1_NOTARY_DATA_DIR ?? null,
     upload_data: process.env.G1_UPLOAD_DATA_DIR ?? null,
     output: process.env.G1_OUTPUT_DIR ?? null,

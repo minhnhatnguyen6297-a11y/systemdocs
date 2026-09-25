@@ -73,11 +73,15 @@ function _defaultNotaryDataDir() {
 }
 
 // Env cua interpreter Python ma packaged spawn phai loai bo (F3):
-// frozen exe ke thua PYTHONPATH/PYTHONHOME/PYTHONSTARTUP tu moi truong
-// user → sitecustomize/e2e fixture hook co the tu chay trong production
-// sidecar neu PYTHONPATH tro vao test harness dir. Dev spawn (python
-// that) giu lai — e2e dev hook dua vao PYTHONPATH (test_upload_e2e.py).
-const PYTHON_INHERIT_DENYLIST = ['PYTHONPATH', 'PYTHONHOME', 'PYTHONSTARTUP'];
+// frozen exe ke thua PYTHONPATH/PYTHONHOME/PYTHONSTARTUP/PYTHONUSERBASE
+// tu moi truong user → sitecustomize/e2e fixture hook co the tu chay
+// trong production sidecar neu PYTHONPATH tro vao test harness dir;
+// PYTHONUSERBASE redirect user site-packages (cung lop injection).
+// Dev spawn (python that) giu lai — e2e dev hook dua vao PYTHONPATH
+// (test_upload_e2e.py).
+const PYTHON_INHERIT_DENYLIST = [
+  'PYTHONPATH', 'PYTHONHOME', 'PYTHONSTARTUP', 'PYTHONUSERBASE',
+];
 
 class VersionMismatchError extends Error {}
 
@@ -150,7 +154,13 @@ class SidecarManager extends EventEmitter {
       // PYTHONPATH tro vao test hook dir se auto-import sitecustomize
       // (fixture portals) hoac giai `import e2e_fixture_hook` trong
       // production (F3). Dev spawn can PYTHONPATH → giu nguyen.
-      for (const key of PYTHON_INHERIT_DENYLIST) delete env[key];
+      // Windows env var case-insensitive voi tien trinh con — `PythonPath`
+      // van chay vao frozen exe → so khop theo uppercase tren key that.
+      for (const key of Object.keys(env)) {
+        if (PYTHON_INHERIT_DENYLIST.includes(key.toUpperCase())) {
+          delete env[key];
+        }
+      }
     }
     const child = spawn(this.command.cmd, this.command.args, {
       cwd: this.command.cwd,
