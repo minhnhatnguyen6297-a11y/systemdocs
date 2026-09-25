@@ -118,35 +118,6 @@
           state.workflowReady = false;
           return;
         }
-        if (!inflight.catalog && !state.catalogTried) {
-          inflight.catalog = true;
-          state.catalogTried = true;
-          try {
-            const r = await quiet('upload.websites', {});
-            if (r.ok) {
-              await h.awaitJob(r.job.job_id, 30000);
-            } else if (r.error && C.VERSION_ERRORS.has(r.error.code)) {
-              state.workflowReady = false;
-            }
-          } catch (e) {
-            // Loi bat ngo: khong khoa co — lan bootstrap sau duoc thu lai.
-            state.catalogTried = false;
-          } finally {
-            inflight.catalog = false;
-          }
-          view.refresh();
-        }
-        if (!inflight.ws) {
-          inflight.ws = true;
-          try {
-            const r = await quiet('upload.workspace_get',
-              { website_id: state.websiteId });
-            if (r.ok) await h.awaitJob(r.job.job_id, 30000);
-          } finally {
-            inflight.ws = false;
-          }
-          view.refresh();
-        }
       } catch (e) {
         // Bootstrap im lang — UI hien empty state, khong vo module.
       }
@@ -156,6 +127,56 @@
     // inflight flag + moc queueFor/prefsTried/staffTried de khong lap vo han.
     function derive() {
       if (state.workflowReady === false) return;
+      // Catalog bootstrap — chay trong derive (moi refresh) de tu thu lai
+      // khi submit fail luc sidecar chua ready; VERSION_ERRORS (backend
+      // qua cu, khong co workflow) la tat dinh → dung han.
+      if (!state.websites.length && !inflight.catalog) {
+        inflight.catalog = true;
+        state.catalogTried = true;
+        // Submit fail tam thoi (sidecar chua ready khi module mo): hen
+        // refresh lai bang timer vi refreshAll chi chay khi status doi —
+        // khong co poll dinh ky nao goi lai derive. Giu inflight trong
+        // thoi gian cho de tranh vong submit lap tuc.
+        const release = () => { inflight.catalog = false; view.refresh(); };
+        const retry = () => {
+          // unref khi co (node --test): timer retry khong duoc giu process
+          // song — trong browser setTimeout tra number, khong co unref.
+          const t = setTimeout(release, 4000);
+          if (t && typeof t.unref === 'function') t.unref();
+        };
+        quiet('upload.websites', {})
+          .then((r) => {
+            if (r.ok) return h.awaitJob(r.job.job_id, 30000).then(() => true);
+            if (r.error && C.VERSION_ERRORS.has(r.error.code)) {
+              state.workflowReady = false;
+              return true;
+            }
+            return false;
+          })
+          .then((done) => { if (done) release(); else retry(); })
+          .catch(retry);
+        return;
+      }
+      // Workspace ban dau (khoi phuc website/run/browser da luu) — cung
+      // pattern retry: submit fail khi sidecar chua ready phai duoc thu lai.
+      if (!inflight.ws && !state.wsTried && state.websites.length) {
+        inflight.ws = true;
+        const release = (ok) => {
+          if (ok) state.wsTried = true;
+          inflight.ws = false;
+          view.refresh();
+        };
+        const retry = () => {
+          const t = setTimeout(() => release(false), 4000);
+          if (t && typeof t.unref === 'function') t.unref();
+        };
+        quiet('upload.workspace_get', { website_id: state.websiteId })
+          .then((r) => (r.ok ? h.awaitJob(r.job.job_id, 30000)
+            .then(() => true) : false))
+          .then((done) => { if (done) release(true); else retry(); })
+          .catch(retry);
+        return;
+      }
       if (state.websiteId && state.runId &&
           (!state.queueFor || state.queueFor.runId !== state.runId ||
            state.queueFor.auditId !== state.auditId) &&
@@ -176,6 +197,17 @@
           inflight.queue = false;
           view.refresh();
         }).catch(() => { inflight.queue = false; });
+      }
+      // Lay browser_id trong luc session_start con waiting_user — nut
+      // "Xac nhan da dang nhap" can scope website+browser (contract §7.2).
+      if (state.websiteId && !state.browserId &&
+          state.waitingBanner && state.waitingBanner.on === 'login' &&
+          !inflight.wsLogin) {
+        inflight.wsLogin = true;
+        quiet('upload.workspace_get', { website_id: state.websiteId })
+          .then((r) => (r && r.ok) ? h.awaitJob(r.job.job_id, 15000) : null)
+          .then(() => { inflight.wsLogin = false; view.refresh(); })
+          .catch(() => { inflight.wsLogin = false; });
       }
       if (state.websiteId && !state.prefsTried && !inflight.prefs) {
         inflight.prefs = true;
@@ -238,6 +270,7 @@
       },
       changeWebsite: async (id) => {
         if (!id || id === state.websiteId || state.pendingWebsiteId) return;
+        state.siteError = null;
         state.pendingWebsiteId = id;
         view.refresh();
         const job = await loud('upload.website_select', {
@@ -263,15 +296,50 @@
           notify('Chọn website trước.', true);
           return;
         }
+        state.siteError = null;
         const job = await loud('upload.session_start', {
           website_id: state.websiteId, expected_revision: state.revision,
         });
         if (job) state.sessionJobId = job.job_id;
       },
+      confirmLogin: async () => {
+        // Xac nhan "toi da dang nhap" cho job session_start dang
+        // waiting_user — can scope website+browser+job dich (contract §7.2).
+        const target = (state.waitingBanner &&
+          state.waitingBanner.on === 'login')
+          ? state.waitingBanner.jobId : state.sessionJobId;
+        if (!state.websiteId || !state.browserId || !target) {
+          notify('Chưa có phiên đăng nhập đang chờ.', true);
+          return;
+        }
+        state.siteError = null;
+        const job = await loud('upload.confirm_login', {
+          website_id: state.websiteId, browser_id: state.browserId,
+          target_job_id: target,
+        });
+        if (job) state.confirmJobId = job.job_id;
+      },
+      finishReview: async () => {
+        const target = (state.waitingBanner &&
+          state.waitingBanner.on === 'review')
+          ? state.waitingBanner.jobId : state.prepareJobId;
+        if (!state.websiteId || !state.browserId || !target) {
+          notify('Chưa có đợt kiểm tra đang chờ.', true);
+          return;
+        }
+        const job = await loud('upload.finish_review', {
+          website_id: state.websiteId, browser_id: state.browserId,
+          target_job_id: target,
+        });
+        if (job) state.reviewJobId = job.job_id;
+      },
       pickExcel: async () => {
+        // Backend chi nhan .xlsx/.xlsm (contract §6.9) — .xls bi tu choi
+        // nen khong hien trong filter dialog.
         const r = await api.pickFiles({
           multi: false,
-          filters: [{ name: 'Excel', extensions: ['xlsx', 'xls', 'xlsm'] }],
+          filters: [{ name: 'Excel (.xlsx, .xlsm)',
+                      extensions: ['xlsx', 'xlsm'] }],
         });
         if (!r.ok) {
           notify(`${r.error.code}: ${r.error.message}`, true);
@@ -279,8 +347,13 @@
         }
         if (!r.data.files.length) return;
         const f = r.data.files[0];
+        if (f.is_dir) {
+          notify('Mục đã chọn là thư mục — chọn tệp Excel.', true);
+          return;
+        }
         state.excelFile = { path: f.path, scope: f.scope || 'machine_local' };
         state.auditError = null;
+        state.downloadError = null;
         S.markAuditStale(state);
         view.refresh();
         // Chon file tren may → tu nap va audit theo khoang ngay (spec §2).
@@ -291,10 +364,12 @@
           notify('Chọn website trước.', true);
           return;
         }
-        if (!state.browserId) {
+        if (!state.browserId ||
+            !(state.login && state.login.status === 'authenticated')) {
           notify('Chưa đăng nhập — mở đăng nhập trước.', true);
           return;
         }
+        state.downloadError = null;
         const job = await loud('upload.download_export', {
           website_id: state.websiteId, browser_id: state.browserId,
           from_date: state.fromDate, to_date: state.toDate,
@@ -302,6 +377,7 @@
         if (!job) return;
         state.downloadJobId = job.job_id;
         const done = await h.awaitJob(job.job_id, 120000);
+        if (done) C.adoptJobResult(state, done);
         // Tai xong → tu nap audit theo khoang ngay dang chon (spec §2).
         if (done && done.status === 'succeeded' && state.excelFile) {
           await actions.loadExcel();
@@ -316,6 +392,7 @@
           notify('Chọn tệp Excel trước.', true);
           return;
         }
+        state.auditError = null;
         const job = await loud('upload.audit_excel', {
           website_id: state.websiteId, file_ref: state.excelFile,
           from_date: state.fromDate, to_date: state.toDate,
@@ -403,7 +480,8 @@
       stopRunning: async () => {
         const running = C.runningJobs(state, jobs).filter(
           (j) => ['upload.scan', 'upload.prepare',
-                  'upload.session_start'].includes(j.command));
+                  'upload.session_start',
+                  'upload.download_export'].includes(j.command));
         if (!running.length) return;
         for (const j of running) {
           const r = await api.cancelJob(j.job_id);
@@ -412,9 +490,12 @@
           }
         }
       },
-      openFile: async (p) => {
+      openFile: async (ref) => {
+        // Nhan FileRef {path, scope:'machine_local'} hoac path thuan —
+        // preload/main kiem scope truoc khi mo bang OS.
+        const p = ref && typeof ref === 'object' ? ref.path : ref;
         if (!p) return;
-        const r = await api.openPath(p);
+        const r = await api.openPath(ref);
         if (!r.ok) notify(`${r.error.code}: ${r.error.message}`, true);
       },
       setFromDate: (v) => {
@@ -511,6 +592,23 @@
               'người dùng tự bấm Lưu.'
             : 'Chờ thao tác của người dùng.';
         tone = 'warn';
+        const item = h.el('div', `ul-notice-item ul-badge-${tone}`, msg);
+        // CTA xac nhan nam ngay tren banner — backend van tu kiem trang
+        // thai portal that sau khi nguoi dung xac nhan (contract §7.2).
+        if (on === 'login') {
+          const b = h.el('button', 'primary ul-login-confirm',
+            'Xác nhận đã đăng nhập');
+          b.disabled = !state.browserId;
+          b.addEventListener('click', () => actions.confirmLogin());
+          item.append(b);
+        } else if (on === 'review') {
+          const b = h.el('button', 'primary', 'Xong kiểm tra');
+          b.disabled = !state.browserId;
+          b.addEventListener('click', () => actions.finishReview());
+          item.append(b);
+        }
+        noticeBox.append(item);
+        return;
       } else if (state.workflowReady === false) {
         msg = 'Backend chưa hỗ trợ upload.workflow.v1 — ' +
           'khung UI sẵn sàng, chờ sidecar cập nhật contract.';

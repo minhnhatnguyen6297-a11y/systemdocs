@@ -29,7 +29,59 @@ let log = makeLogger();
 let logPath = null;
 let allowClose = false;
 
+// Duong mo file an toan — chi nhung loai tai lieu renderer can mo.
+const OPEN_ALLOWED_EXTS = new Set([
+  '.doc', '.docx', '.xls', '.xlsx', '.xlsm', '.pdf',
+  '.txt', '.log', '.md', '.json', '.csv',
+]);
+
+// Test seam (MIN-69 e2e): G1_E2E_PICK_FILES chi vao file JSON
+// {"files": ["D:/path/a.xlsx", ...]} — thay dialog that, chi hoat dong
+// khi env duoc dat. Ket qua van qua cung filter/validate nhu dialog.
+function e2ePickOverride(opts) {
+  const spec = process.env.G1_E2E_PICK_FILES;
+  if (!spec) return null;
+  let list;
+  try {
+    const raw = JSON.parse(fs.readFileSync(spec, 'utf8'));
+    list = Array.isArray(raw) ? raw : (raw && raw.files) || [];
+  } catch (e) {
+    log.warn('G1_E2E_PICK_FILES khong doc duoc', { err: String(e) });
+    return [];
+  }
+  // Ap filter extension nhu dialog that — file ngoai filter "khong chon
+  // duoc" (khong tra ve).
+  const allowed = [];
+  if (!opts.directory && Array.isArray(opts.filters)) {
+    for (const f of opts.filters) {
+      for (const ext of (f && f.extensions) || []) {
+        allowed.push(String(ext).toLowerCase());
+      }
+    }
+  }
+  const out = [];
+  for (const item of list) {
+    const p = typeof item === 'string' ? item : (item && item.path);
+    if (typeof p !== 'string' || !p) continue;
+    if (allowed.length &&
+        !allowed.includes(path.extname(p).slice(1).toLowerCase())) {
+      continue;
+    }
+    try {
+      const st = fs.statSync(p);
+      out.push({
+        path: p, scope: 'machine_local',
+        size_bytes: st.isFile() ? st.size : null,
+        is_dir: st.isDirectory(),
+      });
+    } catch (e) { /* bo qua path khong ton tai */ }
+  }
+  return out;
+}
+
 async function pickFiles(opts = {}) {
+  const stub = e2ePickOverride(opts);
+  if (stub !== null) return stub;
   const properties = opts.directory
     ? ['openDirectory']
     : opts.multi === false ? ['openFile'] : ['openFile', 'multiSelections'];
@@ -49,12 +101,24 @@ async function pickFiles(opts = {}) {
 
 async function openPath(opts = {}) {
   // Mo file san pham (docx da export, log, ...) bang app mac dinh.
-  // Validate boundary: tuyet doi, ton tai, khong UNC — file_ref §6.
+  // Validate boundary: scope machine_local, tuyet doi, ton tai, khong UNC,
+  // phan mo rong nam trong allowlist — file_ref §6.
+  if (opts.scope !== undefined && opts.scope !== 'machine_local') {
+    throw Object.assign(
+      new Error(`scope ${opts.scope} khong duoc mo`),
+      { code: 'file_scope_not_supported' });
+  }
   const p = typeof opts.path === 'string' ? opts.path : '';
   const unc = p.startsWith('\\\\') ||
     /^\\\\\?\\(UNC\\|\\\\)/i.test(p);
   if (!p || unc || !/^[A-Za-z]:[\\/]/.test(p) && !p.startsWith('\\\\?\\')) {
     throw Object.assign(new Error('path khong hop le'),
+      { code: 'file_scope_not_supported' });
+  }
+  const ext = path.extname(p).toLowerCase();
+  if (!OPEN_ALLOWED_EXTS.has(ext)) {
+    throw Object.assign(
+      new Error(`khong mo loai file ${ext || '(khong phan mo rong)'}`),
       { code: 'file_scope_not_supported' });
   }
   if (!fs.existsSync(p) || !fs.statSync(p).isFile()) {

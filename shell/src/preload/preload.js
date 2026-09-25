@@ -10,7 +10,12 @@ contextBridge.exposeInMainWorld('desktop', {
     getModules: () => ipcRenderer.invoke('desktop.v1.getModules'),
     getStatus: () => ipcRenderer.invoke('desktop.v1.getStatus'),
     pickFiles: (opts) => ipcRenderer.invoke('desktop.v1.pickFiles', opts),
-    openPath: (path) => ipcRenderer.invoke('desktop.v1.openPath', { path }),
+    // openPath nhan path thuan hoac FileRef {path, scope:'machine_local'}
+    // — main kiem scope/ext truoc khi mo bang OS.
+    openPath: (ref) => ipcRenderer.invoke('desktop.v1.openPath',
+      typeof ref === 'string'
+        ? { path: ref }
+        : { path: ref && ref.path, scope: ref && ref.scope }),
     submitCommand: (command, payload, commandId) =>
       ipcRenderer.invoke('desktop.v1.submitCommand',
                          { command, payload, command_id: commandId }),

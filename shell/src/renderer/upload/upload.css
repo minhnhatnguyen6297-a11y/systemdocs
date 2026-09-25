@@ -77,6 +77,8 @@
 .ul-staff { min-width: 200px; }
 .ul-sec { width: 200px; }
 .ul-chunk { width: 74px; }
+.ul-date { width: 108px; }
+.ul-invalid { border-color: #dc2626 !important; background: #fef2f2; }
 
 /* buttons trong module: reset margin-right cua global, gap cua row lo */
 .upload-lab button { min-height: 30px; padding: 5px 12px; margin-right: 0;
@@ -109,6 +111,12 @@
 
 .ul-notice { display: flex; flex-direction: column; gap: 6px; }
 .ul-notice-item { padding: 6px 12px; border-radius: 6px; font-size: 12.5px; }
+.ul-notice-item button { margin-left: 10px; }
+
+.ul-site-err { margin-top: 8px; }
+.ul-site-err .ul-error { margin-top: 0; }
+.ul-src-msg .ul-error { margin-top: 8px; }
+.ul-audit-head { font-size: 12.5px; margin-top: 2px; }
 
 .ul-env { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }
 .ul-env-line { font-size: 12.5px; display: flex; gap: 6px;

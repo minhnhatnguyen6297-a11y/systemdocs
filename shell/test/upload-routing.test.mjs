@@ -580,3 +580,386 @@ test('adoptJobResult: audit terminal khong error (canceled) xoa du lieu cu',
     assert.equal(st.auditStale, false);
     assert.equal(st.auditError.code, 'job_canceled');
   });
+
+// ---------- task 7: audit wiring ----------
+
+test('adoptJobResult: audit ap dung mot lan — re-adopt khong xoa stale/queueFor', () => {
+  const st = S.createUploadState();
+  st.websiteId = 'nam_dinh';
+  st.runId = 'r1';
+  st.excelFile = { path: 'D:/x/so.xlsx', scope: 'machine_local' };
+  st.auditJobId = 'job_a1';
+  const ok = job('upload.audit_excel', 'succeeded', {
+    workflow_version: V, website_id: 'nam_dinh', audit_id: 'aud_1',
+    from_date: st.fromDate, to_date: st.toDate,
+    summary: { excel_total: 5, valid_count: 3, missing_count: 1, issue_count: 1 },
+    missing: [], issues: [],
+  }, { jobId: 'job_a1' });
+  ok.result.source_files = [{ path: 'D:/x/so.xlsx', scope: 'machine_local' }];
+  assert.equal(C.adoptJobResult(st, ok), true);
+  assert.equal(st.auditAppliedFor, 'job_a1');
+  st.queueFor = { runId: 'r1', auditId: 'aud_1' };
+  S.markAuditStale(st);
+  assert.equal(st.auditStale, true);
+  // Cung job_id den lai tren nhip refresh sau → khong ap lai: nhan
+  // "chua cap nhat" va moc queueFor do nguoi dung tao phai giu nguyen.
+  assert.equal(C.adoptJobResult(st, ok), false);
+  assert.equal(st.auditStale, true);
+  assert.deepEqual(st.queueFor, { runId: 'r1', auditId: 'aud_1' });
+  // Job audit MOI ap binh thuong va lam sach nhan stale khi bo loc khop.
+  st.auditJobId = 'job_a2';
+  const ok2 = job('upload.audit_excel', 'succeeded', {
+    workflow_version: V, website_id: 'nam_dinh', audit_id: 'aud_2',
+    from_date: st.fromDate, to_date: st.toDate,
+    summary: { excel_total: 6 }, missing: [], issues: [],
+  }, { jobId: 'job_a2' });
+  assert.equal(C.adoptJobResult(st, ok2), true);
+  assert.equal(st.auditAppliedFor, 'job_a2');
+  assert.equal(st.auditStale, false);
+});
+
+test('adoptJobResult: audit cua bo loc/file cu ap len van danh dau chua cap nhat', () => {
+  // Audit chay theo bo loc A; nguoi dung doi ngay giua luc chay → result
+  // ve ap duoc nhung PHAI danh dau chua cap nhat (spec §2).
+  const st = S.createUploadState();
+  st.websiteId = 'nam_dinh';
+  st.auditJobId = 'job_a1';
+  st.fromDate = '2026-04-01';
+  st.toDate = '2026-04-30';
+  const j = job('upload.audit_excel', 'succeeded', {
+    workflow_version: V, website_id: 'nam_dinh', audit_id: 'aud_1',
+    from_date: '2026-03-01', to_date: '2026-03-31',
+    summary: { excel_total: 5 }, missing: [], issues: [],
+  }, { jobId: 'job_a1' });
+  assert.equal(C.adoptJobResult(st, j), true);
+  assert.equal(st.auditStale, true, 'result cua bo loc cu phai stale');
+
+  // Doi file giua luc chay → result ap nhung stale.
+  const st2 = S.createUploadState();
+  st2.websiteId = 'nam_dinh';
+  st2.auditJobId = 'job_b1';
+  st2.excelFile = { path: 'D:/x/moi.xlsx', scope: 'machine_local' };
+  const j2 = job('upload.audit_excel', 'succeeded', {
+    workflow_version: V, website_id: 'nam_dinh', audit_id: 'aud_2',
+    from_date: st2.fromDate, to_date: st2.toDate,
+    summary: { excel_total: 2 }, missing: [], issues: [],
+  }, { jobId: 'job_b1' });
+  j2.result.source_files = [{ path: 'D:/x/cu.xlsx', scope: 'machine_local' }];
+  assert.equal(C.adoptJobResult(st2, j2), true);
+  assert.equal(st2.auditStale, true, 'result cua file cu phai stale');
+});
+
+test('adoptJobResult: audit cua website khac bi tu choi', () => {
+  const st = S.createUploadState();
+  st.websiteId = 'nam_dinh';
+  st.auditJobId = 'job_a';
+  const j = job('upload.audit_excel', 'succeeded', {
+    workflow_version: V, website_id: 'khac', audit_id: 'aud_x',
+    summary: { excel_total: 9 }, missing: [], issues: [],
+  }, { jobId: 'job_a' });
+  assert.equal(C.adoptJobResult(st, j), false);
+  assert.equal(st.audit, null);
+  assert.equal(st.auditAppliedFor, null);
+});
+
+test('adoptJobResult: download ap file_ref mot lan; loi ra downloadError', () => {
+  const st = S.createUploadState();
+  st.websiteId = 'nam_dinh';
+  st.downloadJobId = 'job_d1';
+  const ok = job('upload.download_export', 'succeeded', {
+    workflow_version: V, website_id: 'nam_dinh', browser_id: 'br1',
+    file_ref: { path: 'D:/x/so.xlsx', scope: 'machine_local', sha256: 'x' },
+    from_date: st.fromDate, to_date: st.toDate,
+  }, { jobId: 'job_d1' });
+  assert.equal(C.adoptJobResult(st, ok), true);
+  assert.equal(st.excelFile.path, 'D:/x/so.xlsx');
+  assert.equal(st.downloadAppliedFor, 'job_d1');
+  // Nguoi dung chon file khac, roi job cu den lai → khong ghi de.
+  st.excelFile = { path: 'D:/x/picked.xlsx', scope: 'machine_local' };
+  assert.equal(C.adoptJobResult(st, ok), false);
+  assert.equal(st.excelFile.path, 'D:/x/picked.xlsx');
+  // Download cua bo loc ngay cu → file ap nhung danh dau chua cap nhat.
+  const st3 = S.createUploadState();
+  st3.websiteId = 'nam_dinh';
+  st3.downloadJobId = 'job_d3';
+  st3.audit = { audit_id: 'aud_cu', summary: { excel_total: 1 } };
+  const okLate = job('upload.download_export', 'succeeded', {
+    workflow_version: V, website_id: 'nam_dinh', browser_id: 'br1',
+    file_ref: { path: 'D:/x/old.xlsx', scope: 'machine_local' },
+    from_date: '2026-01-01', to_date: '2026-01-31',
+  }, { jobId: 'job_d3' });
+  assert.equal(C.adoptJobResult(st3, okLate), true);
+  assert.equal(st3.auditStale, true);
+  // Loi tai → downloadError rieng, khong dung vao auditError.
+  const st2 = S.createUploadState();
+  st2.websiteId = 'nam_dinh';
+  st2.downloadJobId = 'job_d2';
+  const bad = job('upload.download_export', 'failed', null, {
+    jobId: 'job_d2',
+    error: { code: 'login_required', message: 'chua dang nhap',
+             retryable: true, next_action: 'login_required' },
+  });
+  assert.equal(C.adoptJobResult(st2, bad), true);
+  assert.equal(st2.downloadError.code, 'login_required');
+  assert.equal(st2.excelFile, null);
+  assert.equal(st2.auditError, null);
+});
+
+test('adoptJobResult: loi select/session/confirm → siteError co retry hint', () => {
+  // website_select bi tu choi → siteError + _retry tro ve website dich.
+  const st = S.createUploadState();
+  st.websiteId = 'nam_dinh';
+  st.websiteJobId = 'job_w';
+  st.pendingWebsiteId = 'khac';
+  const bad = job('upload.website_select', 'failed', null, {
+    jobId: 'job_w',
+    error: { code: 'workflow_busy', message: 'con job dang chay',
+             retryable: true, next_action: 'retry' },
+  });
+  assert.equal(C.adoptJobResult(st, bad), true);
+  assert.equal(st.siteError.code, 'workflow_busy');
+  assert.equal(st.siteError._retry.kind, 'website');
+  assert.equal(st.siteError._retry.websiteId, 'khac');
+  assert.equal(st.pendingWebsiteId, null);
+
+  // session_start failed → siteError(_retry=session).
+  const st2 = S.createUploadState();
+  st2.websiteId = 'nam_dinh';
+  st2.sessionJobId = 'job_s';
+  const badS = job('upload.session_start', 'failed', null, {
+    jobId: 'job_s',
+    error: { code: 'engine_unavailable', message: 'khong mo duoc',
+             retryable: true, next_action: 'retry' },
+  });
+  assert.equal(C.adoptJobResult(st2, badS), true);
+  assert.equal(st2.siteError.code, 'engine_unavailable');
+  assert.equal(st2.siteError._retry.kind, 'session');
+  // session_start thanh cong → siteError sach + login ap.
+  st2.sessionJobId = 'job_s2';
+  const okS = job('upload.session_start', 'succeeded', {
+    workflow_version: V, website_id: 'nam_dinh', browser_id: 'br1',
+    login: { status: 'authenticated' },
+  }, { jobId: 'job_s2' });
+  assert.equal(C.adoptJobResult(st2, okS), true);
+  assert.equal(st2.siteError, null);
+  assert.equal(st2.login.status, 'authenticated');
+  assert.equal(st2.browserId, 'br1');
+
+  // confirm_login sai job → siteError(_retry=confirm), login khong doi.
+  st2.confirmJobId = 'job_c';
+  const badC = job('upload.confirm_login', 'failed', null, {
+    jobId: 'job_c',
+    error: { code: 'wrong_job', message: 'job khong cho login',
+             retryable: false, next_action: null },
+  });
+  assert.equal(C.adoptJobResult(st2, badC), true);
+  assert.equal(st2.siteError.code, 'wrong_job');
+  assert.equal(st2.siteError._retry.kind, 'confirm');
+  assert.equal(st2.login.status, 'authenticated');
+});
+
+test('picker Excel chi quang ba .xlsx/.xlsm — .xls khong trong filter', () => {
+  const src = read('upload/index.js');
+  assert.match(src, /extensions:\s*\[\s*'xlsx'\s*,\s*'xlsm'\s*\]/,
+    'filter pick Excel phai gom dung xlsx + xlsm');
+  assert.ok(!/extensions:[^\]]*'xls'/.test(src),
+    "'.xls' con trong filter — backend tu choi .xls");
+});
+
+test('view: nut Audit theo capability/dang nhap/busy; ngay DD/MM/YYYY; confirm dung luc cho', async () => {
+  const { document } = makeDom();
+  const U = loadModule(document);
+  const L = require('../src/renderer/lib.js');
+  const jobs = new Map();
+  const view = U.buildView({
+    api: fakeApi(), L, jobs, notify: () => {},
+    entry: { id: 'upload', title: 'Upload Lab' },
+    module: { id: 'upload', namespaces: ['upload'], status: 'available' },
+    h: fakeHelpers(document, L),
+    submit: async () => null,
+  });
+  view.refresh();
+  const auditPanel = findById(view.el, 'ul-panel-audit');
+  const btn = (t) => collect(auditPanel,
+    (e) => e.tagName === 'BUTTON' && e.textContent === t)[0];
+  const dl = btn('Tải Excel từ Web');
+  const pick = btn('Chọn tệp Excel...');
+  const load = btn('Nạp dữ liệu');
+  const login = btn('Mở đăng nhập');
+  const env = btn('Kiểm tra môi trường');
+  const confirmB = collect(auditPanel,
+    (e) => e.classList && e.classList.contains('ul-login-confirm'))[0];
+  const dates = collect(auditPanel,
+    (e) => e.classList && e.classList.contains('ul-date'));
+  assert.equal(dates.length, 2);
+  // Ngay nhap/hien DD/MM/YYYY (khong phai input type=date native).
+  for (const d of dates) {
+    assert.equal(d.type, 'text');
+    assert.match(d.value, /^\d{2}\/\d{2}\/\d{4}$/,
+      `o ngay phai hien DD/MM/YYYY, duoc '${d.value}'`);
+  }
+
+  // Chua co website → moi nut tac dong khoa.
+  assert.equal(pick.disabled, true);
+  assert.equal(dl.disabled, true);
+  assert.equal(load.disabled, true);
+  assert.equal(login.disabled, true);
+  assert.equal(env.disabled, true);
+  assert.equal(confirmB.hidden, true, 'confirm chi hien khi waiting login');
+
+  // Catalog co fake voi day du capability → select/en check mo.
+  jobs.set('cat', job('upload.websites', 'succeeded', {
+    workflow_version: V,
+    websites: [{ website_id: 'fake_portal', label: 'Gia lap',
+                 display_url: 'http://127.0.0.1:9',
+                 capabilities: ['login', 'download_export', 'audit_excel'],
+                 status: 'available' }],
+    selected_website_id: 'fake_portal',
+  }, { jobId: 'cat', at: '2026-09-24T10:00:01Z' }));
+  view.refresh();
+  assert.equal(pick.disabled, false);
+  assert.equal(env.disabled, false);
+  assert.equal(login.disabled, false);
+  assert.equal(dl.disabled, true, 'chua dang nhap → tai khoa');
+  assert.equal(load.disabled, true, 'chua chon file → nap khoa');
+
+  // Workspace dua browser_id + job ids → session_status adopt duoc
+  // (scope browserId khop) va waiting job nam trong activeJobIds.
+  jobs.set('ws', job('upload.workspace_get', 'succeeded', {
+    workflow_version: V, website_id: 'fake_portal', revision: 1,
+    run_id: null, audit_id: null, browser_id: 'br1', has_excel: false,
+    queue_revision: null, needs_reconcile_record_ids: [],
+    active_job_ids: ['job_sess'],
+  }, { jobId: 'ws', at: '2026-09-24T10:00:02Z' }));
+  // Dang nhap xong → tai mo; nap van khoa vi chua co file.
+  jobs.set('ss', job('upload.session_status', 'succeeded', {
+    workflow_version: V, website_id: 'fake_portal', browser_id: 'br1',
+    login: { status: 'authenticated' },
+  }, { jobId: 'ss', at: '2026-09-24T10:00:03Z' }));
+  view.refresh();
+  assert.equal(dl.disabled, false);
+  assert.equal(login.disabled, true, 'da dang nhap → khong mo lai');
+  assert.equal(load.disabled, true);
+
+  // Waiting login → confirm hien va enable khi da co browser_id.
+  const waiting = job('upload.session_start', 'waiting_user', null,
+    { jobId: 'job_sess', at: '2026-09-24T10:00:04Z' });
+  waiting.waiting_on = 'login';
+  jobs.set('job_sess', waiting);
+  // Job dang cho → website select khoa (busy), login khoa.
+  view.refresh();
+  assert.equal(confirmB.hidden, false, 'confirm phai hien luc cho login');
+  assert.equal(confirmB.disabled, false);
+  assert.equal(login.disabled, true, 'dang cho → khong mo phien khac');
+});
+
+test('view: audit head khop audit_id/website; KPI + bang tu state.audit', async () => {
+  const { document } = makeDom();
+  const U = loadModule(document);
+  const L = require('../src/renderer/lib.js');
+  const jobs = new Map();
+  const view = U.buildView({
+    api: fakeApi(), L, jobs, notify: () => {},
+    entry: { id: 'upload', title: 'Upload Lab' },
+    module: { id: 'upload', namespaces: ['upload'], status: 'available' },
+    h: fakeHelpers(document, L),
+    submit: async () => null,
+  });
+  jobs.set('cat', job('upload.websites', 'succeeded', {
+    workflow_version: V,
+    websites: [{ website_id: 'fake_portal', label: 'Gia lap',
+                 display_url: 'http://127.0.0.1:9',
+                 capabilities: ['audit_excel'], status: 'available' }],
+    selected_website_id: 'fake_portal',
+  }, { jobId: 'cat', at: '2026-09-24T10:00:01Z' }));
+  jobs.set('ws', job('upload.workspace_get', 'succeeded', {
+    workflow_version: V, website_id: 'fake_portal', revision: 1,
+    run_id: null, audit_id: null, browser_id: null, has_excel: false,
+    queue_revision: null, needs_reconcile_record_ids: [],
+    active_job_ids: ['job_a'],
+  }, { jobId: 'ws', at: '2026-09-24T10:00:01Z' }));
+  jobs.set('job_a', job('upload.audit_excel', 'succeeded', {
+    workflow_version: V, website_id: 'fake_portal', audit_id: 'aud_9',
+    from_date: '2026-04-01', to_date: '2026-04-30',
+    summary: { excel_total: 5, valid_count: 3, missing_count: 2,
+               issue_count: 2, duplicate_count: 2 },
+    missing: [
+      { stt: 1, ngay: null, so_cong_chung: '103/2026', ghi_chu: 'Thieu that' },
+      { stt: 2, ngay: null, so_cong_chung: '104/2026', ghi_chu: 'Co trong vung loi: trung_so' },
+    ],
+    issues: [
+      { stt: 1, ngay: '2026-04-18', so_cong_chung: '104/2026', ghi_chu: 'trung_so: dup' },
+      { stt: 2, ngay: '2026-04-18', so_cong_chung: '104/2026', ghi_chu: 'trung_so: dup' },
+    ],
+  }, { jobId: 'job_a', at: '2026-09-24T10:00:02Z' }));
+  view.refresh();
+  const auditPanel = findById(view.el, 'ul-panel-audit');
+  const head = collect(auditPanel,
+    (e) => e.classList && e.classList.contains('ul-audit-head'))[0];
+  assert.ok(head && !head.hidden, 'audit head phai hien khi co ket qua');
+  assert.match(head.textContent, /Gia lap/);
+  assert.match(head.textContent, /fake_portal/);
+  assert.match(head.textContent, /aud_9/);
+  assert.match(head.textContent, /01\/04\/2026/);
+
+  const kpis = {};
+  for (const c of collect(auditPanel,
+    (e) => e.dataset && e.dataset.kpi)) {
+    kpis[c.dataset.kpi] = collect(c,
+      (e) => e.classList && e.classList.contains('ul-kpi-v'))[0].textContent;
+  }
+  assert.deepEqual(kpis, { total: '5', valid: '3', missing: '2', issue: '2' });
+
+  const tbodies = collect(auditPanel, (e) => e.tagName === 'TBODY');
+  assert.equal(tbodies.length, 2);
+  assert.equal(tbodies[0].children.length, 2, 'bang thieu 2 dong');
+  assert.match(tbodies[0].children[0].textContent, /103\/2026/);
+  assert.equal(tbodies[1].children.length, 2, 'bang loi 2 dong');
+  assert.match(tbodies[1].children[0].textContent, /104\/2026/);
+  // Ngay trong bang loi hien DD/MM/YYYY (isoToDisplay).
+  assert.match(tbodies[1].children[0].textContent, /18\/04\/2026/);
+});
+
+test('view: loi nap hien tai cho voi huong dan; thanh cong xoa loi cu', async () => {
+  const { document } = makeDom();
+  const U = loadModule(document);
+  const L = require('../src/renderer/lib.js');
+  const jobs = new Map();
+  const view = U.buildView({
+    api: fakeApi(), L, jobs, notify: () => {},
+    entry: { id: 'upload', title: 'Upload Lab' },
+    module: { id: 'upload', namespaces: ['upload'], status: 'available' },
+    h: fakeHelpers(document, L),
+    submit: async () => null,
+  });
+  jobs.set('cat', job('upload.websites', 'succeeded', {
+    workflow_version: V,
+    websites: [{ website_id: 'fake_portal', label: 'Gia lap',
+                 display_url: 'http://127.0.0.1:9',
+                 capabilities: ['audit_excel'], status: 'available' }],
+    selected_website_id: 'fake_portal',
+  }, { jobId: 'cat', at: '2026-09-24T10:00:01Z' }));
+  jobs.set('ws', job('upload.workspace_get', 'succeeded', {
+    workflow_version: V, website_id: 'fake_portal', revision: 1,
+    run_id: null, audit_id: null, browser_id: null, has_excel: false,
+    queue_revision: null, needs_reconcile_record_ids: [],
+    active_job_ids: ['job_af'],
+  }, { jobId: 'ws', at: '2026-09-24T10:00:01Z' }));
+  jobs.set('job_af', job('upload.audit_excel', 'failed', null, {
+    jobId: 'job_af', at: '2026-09-24T10:00:02Z',
+    error: { code: 'file_locked', message: 'file dang mo o Excel',
+             retryable: true, next_action: 'retry' },
+  }));
+  view.refresh();
+  const auditPanel = findById(view.el, 'ul-panel-audit');
+  const srcMsg = collect(auditPanel,
+    (e) => e.classList && e.classList.contains('ul-src-msg'))[0];
+  assert.match(srcMsg.textContent, /file dang mo o Excel/);
+  assert.match(srcMsg.textContent, /file_locked/);
+  // KPI ve 0 — khong giu so lieu cu (spec §2).
+  const total = collect(auditPanel,
+    (e) => e.dataset && e.dataset.kpi === 'total')[0];
+  assert.equal(collect(total,
+    (e) => e.classList && e.classList.contains('ul-kpi-v'))[0].textContent,
+    '0');
+});

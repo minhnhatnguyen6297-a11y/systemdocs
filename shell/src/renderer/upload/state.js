@@ -68,6 +68,10 @@
       audit: null,                // {audit_id, summary, missing[], issues[]}
       auditStale: false,          // doi ngay/file sau lan nap cuoi
       auditError: null,
+      auditAppliedFor: null,      // job_id audit da ap — khong ap lai
+      downloadError: null,
+      downloadAppliedFor: null,   // job_id download da ap file_ref
+      siteError: null,            // loi website/session — hien canh nut
       envCheck: null,
 
       // Queue (kind upload_queue, contract §6.11).
@@ -95,10 +99,16 @@
       sessionJobId: null,
       websiteJobId: null,
       envJobId: null,
+      confirmJobId: null,
+      reviewJobId: null,
       staffJobId: null,
       prefsJobId: null,
       reconcileJobId: null,
       catalogTried: false,
+      wsTried: false,             // workspace_get lan dau da thanh cong
+      wsAppliedFor: null,         // job_id workspace_get da ap — khong ap lai
+      siteAppliedFor: null,       // job_id website_select da ap — khong ap lai
+      sessionAppliedFor: null,    // job_id session_start terminal da ap
       prefsTried: false,
       staffTried: false,
       knownJobIds: new Set(),     // khoi phuc tu workspace.active_job_ids
@@ -157,6 +167,10 @@
     state.auditId = null;
     state.auditStale = false;
     state.auditError = null;
+    state.auditAppliedFor = null;
+    state.downloadError = null;
+    state.downloadAppliedFor = null;
+    state.siteError = null;
     state.envCheck = null;
     state.browserId = null;
     state.login = null;
@@ -174,6 +188,10 @@
     state.scanProgress = null;
     state.prepareProgress = null;
     state.catalogTried = false;
+    state.wsTried = false;
+    state.wsAppliedFor = null;
+    state.siteAppliedFor = null;
+    state.sessionAppliedFor = null;
     state.prefsTried = false;
     state.staffTried = false;
     for (const k of Object.keys(state)) {
@@ -196,7 +214,12 @@
   function applyWorkspace(state, ws) {
     if (!ws || typeof ws !== 'object') return state;
     if (ws.website_id != null) state.websiteId = ws.website_id;
-    if (ws.revision != null) state.revision = ws.revision;
+    // revision la bo dem GLOBAL don dieu (store.bump_revision) — snapshot ws
+    // cu hon (workspace_get submit truoc cac audit/scan sau) khong duoc keo
+    // revision lui, keo expected_revision cua lenh ke tiep bi stale_revision.
+    if (ws.revision != null && Number(ws.revision) > state.revision) {
+      state.revision = Number(ws.revision);
+    }
     if (ws.run_id !== undefined) state.runId = ws.run_id;
     if (ws.audit_id !== undefined) state.auditId = ws.audit_id;
     if (ws.browser_id !== undefined) state.browserId = ws.browser_id;
