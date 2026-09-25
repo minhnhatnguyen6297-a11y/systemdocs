@@ -140,6 +140,10 @@
           if (!state.websiteId && d.selected_website_id) {
             state.websiteId = d.selected_website_id;
           }
+          // Catalog tai xong KE CA KHI rong — derive() gate tren co nay,
+          // khong tren websites.length (catalog rong la ket qua hop le,
+          // khong phai ly do submit lai).
+          state.catalogLoaded = true;
           state.workflowReady = true;
           return true;
         }
@@ -159,9 +163,13 @@
         // DIEM chay — re-adopt tren moi refresh se keo lui browser_id/run_id
         // /audit_id ve gia tri luc snapshot, de mat binding vua tao.
         if (state.wsAppliedFor === job.job_id) return false;
-        state.wsAppliedFor = job.job_id;
+        // Marker phai ghi SAU setWebsite: clearWebsiteScope (khi doi
+        // website) xoa wsAppliedFor — ghi truoc thi marker bi xoa ngay,
+        // nhip refresh sau ap lai snapshot mot lan nua.
         if (!state.websiteId) S.setWebsite(state, d.website_id, d);
         else S.applyWorkspace(state, d);
+        state.wsAppliedFor = job.job_id;
+        state.wsTried = true;  // co snapshot workspace — khoi restore job
         return true;
       }
 
@@ -171,14 +179,33 @@
         if (!S.acceptScopedResult(state, { jobId: job.job_id })) return false;
         if (isSuccess(job) && d && d.website_id) {
           if (state.pendingWebsiteId &&
-              d.website_id !== state.pendingWebsiteId) return false;
+              d.website_id !== state.pendingWebsiteId) {
+            // Job terminal nhung backend tra website KHAC website dich:
+            // phai mo khoa pending + bao loi — neu khong pendingWebsiteId
+            // ket mai, dropdown khoa va banner "Dang doi website" treo.
+            const retryTarget = state.pendingWebsiteId;
+            state.pendingWebsiteId = null;
+            state.siteError = {
+              code: 'website_mismatch',
+              message: `Backend trả website ${d.website_id}, không phải ` +
+                `${retryTarget} đã chọn.`,
+              retryable: true,
+              next_action: 'retry',
+              _retry: { kind: 'website', websiteId: retryTarget },
+            };
+            return true;
+          }
           // Snapshot workspace cua website moi — ap mot lan/job, re-adopt
           // tren moi refresh se keo lui browser/run/audit ve thoi diem select.
           if (state.siteAppliedFor === job.job_id) return false;
-          state.siteAppliedFor = job.job_id;
+          // Marker SAU setWebsite (clearWebsiteScope xoa siteAppliedFor —
+          // ghi truoc thi nhip sau ap lai). pendingWebsiteId/siteError cung
+          // phai xoa SAU vi setWebsite->clearWebsiteScope da reset chung.
           S.setWebsite(state, d.website_id, d);
+          state.siteAppliedFor = job.job_id;
           state.pendingWebsiteId = null;
           state.siteError = null;
+          state.wsTried = true;  // snapshot moi nhat da ap — khoi wsGet restore
           return true;
         }
         if (isTerminal(job)) {
@@ -264,7 +291,9 @@
         if (d.revision != null && Number(d.revision) > state.revision) {
           state.revision = Number(d.revision);
         }
-        state.uploadSessionActive = true;
+        // Session vua tao → active tru khi result chinh no bao da dong.
+        state.uploadSessionActive =
+          !(d.login && d.login.status === 'closed');
         state.siteError = null;
         return true;
       }
@@ -294,7 +323,10 @@
             Array.isArray(d.staff_options.cong_chung_vien)) {
           state.staff.options = d.staff_options.cong_chung_vien;
         }
-        state.uploadSessionActive = true;
+        // Active theo login hieu luc SAU merge (regresses guard o tren):
+        // snapshot 'closed' cu khong duoc ha phien dang authenticated.
+        state.uploadSessionActive =
+          !(state.login && state.login.status === 'closed');
         return true;
       }
 

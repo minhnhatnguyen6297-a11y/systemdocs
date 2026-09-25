@@ -55,6 +55,7 @@
   NS.buildView = function (deps) {
     const {
       api, L, jobs, notify, h, entry, module: mod, submit,
+      engineInstanceId,
     } = deps;
     const S = NS.state;
     const C = NS.client;
@@ -111,6 +112,16 @@
       return job || null;
     }
 
+    // Co job cung command con song (non-terminal: accepted/running/checking/
+    // waiting_user) trong jobs map → derive KHONG submit trung; cho ket qua
+    // hoac cho job chet han roi retry paced moi duoc tao job moi.
+    function liveJob(command) {
+      for (const j of jobs.values()) {
+        if (j && j.command === command && !C.isTerminal(j)) return true;
+      }
+      return false;
+    }
+
     async function bootstrap() {
       try {
         const cap = C.hasWorkflowCapability(mod);
@@ -127,16 +138,32 @@
     // inflight flag + moc queueFor/prefsTried/staffTried de khong lap vo han.
     function derive() {
       if (state.workflowReady === false) return;
+      // Sidecar restart = engine_instance_id moi: catalog co the da thay
+      // doi luc engine chet → refetch mot lan. Chi reset khi da tung thay
+      // instance (boot lan dau chi ghi nhan), va bo qua giai doan engine
+      // down (instance null) de khong flap.
+      const inst = typeof engineInstanceId === 'function'
+        ? engineInstanceId() : null;
+      if (inst && inst !== state.engineInstanceId) {
+        if (state.engineInstanceId) state.catalogLoaded = false;
+        state.engineInstanceId = inst;
+      }
       // Catalog bootstrap — chay trong derive (moi refresh) de tu thu lai
       // khi submit fail luc sidecar chua ready; VERSION_ERRORS (backend
-      // qua cu, khong co workflow) la tat dinh → dung han.
-      if (!state.websites.length && !inflight.catalog) {
+      // qua cu, khong co workflow) la tat dinh → dung han. Gate tren
+      // catalogLoaded (job upload.websites da succeeded), KHONG tren
+      // websites.length — catalog rong hay job failed deu khong duoc
+      // resubmit nong; job non-terminal con song cung khong bi chong.
+      if (!state.catalogLoaded && !inflight.catalog &&
+          !liveJob('upload.websites')) {
         inflight.catalog = true;
         state.catalogTried = true;
         // Submit fail tam thoi (sidecar chua ready khi module mo): hen
         // refresh lai bang timer vi refreshAll chi chay khi status doi —
         // khong co poll dinh ky nao goi lai derive. Giu inflight trong
-        // thoi gian cho de tranh vong submit lap tuc.
+        // thoi gian cho de tranh vong submit lap tuc. awaitJob chi tinh
+        // SUCCEEDED la xong — failed/timeout/waiting_user di qua retry
+        // paced 4s (khong resubmit nong tao vong lap job).
         const release = () => { inflight.catalog = false; view.refresh(); };
         const retry = () => {
           // unref khi co (node --test): timer retry khong duoc giu process
@@ -146,7 +173,10 @@
         };
         quiet('upload.websites', {})
           .then((r) => {
-            if (r.ok) return h.awaitJob(r.job.job_id, 30000).then(() => true);
+            if (r.ok) {
+              return h.awaitJob(r.job.job_id, 30000)
+                .then((j) => !!(j && j.status === 'succeeded'));
+            }
             if (r.error && C.VERSION_ERRORS.has(r.error.code)) {
               state.workflowReady = false;
               return true;
@@ -159,7 +189,10 @@
       }
       // Workspace ban dau (khoi phuc website/run/browser da luu) — cung
       // pattern retry: submit fail khi sidecar chua ready phai duoc thu lai.
-      if (!inflight.ws && !state.wsTried && state.websites.length) {
+      // wsTried chi len khi job SUCCEEDED — failed/timeout khong duoc
+      // khoa co che phuc hoi cho den lan doi website sau.
+      if (!inflight.ws && !state.wsTried && state.websiteId &&
+          !liveJob('upload.workspace_get')) {
         inflight.ws = true;
         const release = (ok) => {
           if (ok) state.wsTried = true;
@@ -172,7 +205,7 @@
         };
         quiet('upload.workspace_get', { website_id: state.websiteId })
           .then((r) => (r.ok ? h.awaitJob(r.job.job_id, 30000)
-            .then(() => true) : false))
+            .then((j) => !!(j && j.status === 'succeeded')) : false))
           .then((done) => { if (done) release(true); else retry(); })
           .catch(retry);
         return;
@@ -180,7 +213,7 @@
       if (state.websiteId && state.runId &&
           (!state.queueFor || state.queueFor.runId !== state.runId ||
            state.queueFor.auditId !== state.auditId) &&
-          !inflight.queue &&
+          !inflight.queue && !liveJob('upload.queue_get') &&
           Date.now() > (inflight.queueRetryAt || 0)) {
         inflight.queue = true;
         quiet('upload.queue_get', {
@@ -202,43 +235,62 @@
       // "Xac nhan da dang nhap" can scope website+browser (contract §7.2).
       if (state.websiteId && !state.browserId &&
           state.waitingBanner && state.waitingBanner.on === 'login' &&
-          !inflight.wsLogin) {
+          !inflight.wsLogin && !liveJob('upload.workspace_get')) {
         inflight.wsLogin = true;
         quiet('upload.workspace_get', { website_id: state.websiteId })
           .then((r) => (r && r.ok) ? h.awaitJob(r.job.job_id, 15000) : null)
           .then(() => { inflight.wsLogin = false; view.refresh(); })
           .catch(() => { inflight.wsLogin = false; });
       }
-      if (state.websiteId && !state.prefsTried && !inflight.prefs) {
+      // prefsTried/staffTried chi len khi job SUCCEEDED — submit fail tam
+      // thoi hoac job failed di qua retry paced 4s, khong khoa vinh vien
+      // (cung bug class voi catalogTried/wsTried da sua).
+      if (state.websiteId && !state.prefsTried && !inflight.prefs &&
+          !liveJob('upload.preferences')) {
         inflight.prefs = true;
-        state.prefsTried = true;
+        const release = (ok) => {
+          if (ok) state.prefsTried = true;
+          inflight.prefs = false;
+          view.refresh();
+        };
+        const retry = () => {
+          const t = setTimeout(() => release(false), 4000);
+          if (t && typeof t.unref === 'function') t.unref();
+        };
         quiet('upload.preferences', { website_id: state.websiteId })
           .then((r) => {
             if (r.ok) {
               state.prefsJobId = r.job.job_id;
-              return h.awaitJob(r.job.job_id, 30000);
+              return h.awaitJob(r.job.job_id, 30000)
+                .then((j) => !!(j && j.status === 'succeeded'));
             }
-            return null;
-          }).then(() => {
-            inflight.prefs = false;
-            view.refresh();
-          }).catch(() => { inflight.prefs = false; });
+            return false;
+          }).then((done) => { if (done) release(true); else retry(); })
+          .catch(retry);
       }
-      if (state.websiteId && !state.staffTried && !inflight.staff) {
+      if (state.websiteId && !state.staffTried && !inflight.staff &&
+          !liveJob('upload.staff_options')) {
         inflight.staff = true;
-        state.staffTried = true;
+        const release = (ok) => {
+          if (ok) state.staffTried = true;
+          inflight.staff = false;
+          view.refresh();
+        };
+        const retry = () => {
+          const t = setTimeout(() => release(false), 4000);
+          if (t && typeof t.unref === 'function') t.unref();
+        };
         quiet('upload.staff_options', {
           website_id: state.websiteId, browser_id: null, refresh: false,
         }).then((r) => {
           if (r.ok) {
             state.staffJobId = r.job.job_id;
-            return h.awaitJob(r.job.job_id, 30000);
+            return h.awaitJob(r.job.job_id, 30000)
+              .then((j) => !!(j && j.status === 'succeeded'));
           }
-          return null;
-        }).then(() => {
-          inflight.staff = false;
-          view.refresh();
-        }).catch(() => { inflight.staff = false; });
+          return false;
+        }).then((done) => { if (done) release(true); else retry(); })
+          .catch(retry);
       }
     }
 
@@ -351,7 +403,13 @@
           notify('Mục đã chọn là thư mục — chọn tệp Excel.', true);
           return;
         }
-        state.excelFile = { path: f.path, scope: f.scope || 'machine_local' };
+        // Giu nguyen metadata cua FileRef da chon (size_bytes/sha256 neu
+        // picker cung cap) — audit_excel nhan file_ref day du, khong cat bot.
+        state.excelFile = {
+          path: f.path, scope: f.scope || 'machine_local',
+          size_bytes: f.size_bytes ?? null,
+          sha256: f.sha256 ?? null,
+        };
         state.auditError = null;
         state.downloadError = null;
         S.markAuditStale(state);
@@ -615,7 +673,7 @@
         tone = 'warn';
       } else if (state.pendingWebsiteId) {
         msg = 'Đang đổi website…';
-      } else if (!state.websites.length && state.catalogTried) {
+      } else if (!state.websites.length && state.catalogLoaded) {
         msg = 'Chưa có danh sách website từ backend.';
       } else if (!state.websiteId) {
         msg = 'Chọn website ở tab Audit để bắt đầu.';

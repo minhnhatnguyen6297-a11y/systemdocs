@@ -504,6 +504,9 @@ function buildUploadView(entry, mod) {
   }
   return window.G1_UPLOAD.buildView({
     api, L, jobs, notify, entry, module: mod, submit,
+    // Accessor (khong snapshot gia tri): upload view can biet instance
+    // sidecar hien tai de refetch catalog sau restart (contract §5).
+    engineInstanceId: () => sidecarStatus.engine_instance_id || null,
     h: { el, sleep, faceEl, errorFaceEl, tableEl, inputEl, formRow,
          engineSlotEl, renderJobs, resultData, openPathBtn, awaitJob,
          confirmModal },

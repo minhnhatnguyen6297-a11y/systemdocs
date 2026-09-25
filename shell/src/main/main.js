@@ -39,6 +39,10 @@ const OPEN_ALLOWED_EXTS = new Set([
 // {"files": ["D:/path/a.xlsx", ...]} — thay dialog that, chi hoat dong
 // khi env duoc dat. Ket qua van qua cung filter/validate nhu dialog.
 function e2ePickOverride(opts) {
+  // Master guard: ban packaged KHONG BAO GIO stub file dialog — env
+  // G1_E2E_PICK_FILES con sot tren may user khong duoc bien moi picker
+  // thanh doc file JSON.
+  if (app.isPackaged) return null;
   const spec = process.env.G1_E2E_PICK_FILES;
   if (!spec) return null;
   let list;

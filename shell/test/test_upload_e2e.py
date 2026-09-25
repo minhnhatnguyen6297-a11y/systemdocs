@@ -461,7 +461,15 @@ def main():
         return 1
     finally:
         if proc is not None and proc.poll() is None:
-            proc.terminate()
+            if os.name == "nt":
+                # proc.terminate() tren Windows chi giet Electron cha —
+                # before-quit drain khong chay → sidecar con (python)
+                # sot lai orphan. taskkill /T giet ca cay process.
+                subprocess.run(
+                    ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                    capture_output=True)
+            else:
+                proc.terminate()
             try:
                 proc.wait(timeout=10)
             except subprocess.TimeoutExpired:

@@ -105,6 +105,8 @@
       prefsJobId: null,
       reconcileJobId: null,
       catalogTried: false,
+      catalogLoaded: false,       // upload.websites da thanh cong (ke ca rong)
+      engineInstanceId: null,     // sidecar instance da thay — doi → fetch lai
       wsTried: false,             // workspace_get lan dau da thanh cong
       wsAppliedFor: null,         // job_id workspace_get da ap — khong ap lai
       siteAppliedFor: null,       // job_id website_select da ap — khong ap lai
@@ -216,10 +218,13 @@
     if (ws.website_id != null) state.websiteId = ws.website_id;
     // revision la bo dem GLOBAL don dieu (store.bump_revision) — snapshot ws
     // cu hon (workspace_get submit truoc cac audit/scan sau) khong duoc keo
-    // revision lui, keo expected_revision cua lenh ke tiep bi stale_revision.
-    if (ws.revision != null && Number(ws.revision) > state.revision) {
-      state.revision = Number(ws.revision);
-    }
+    // revision lui, keo expected_revision cua lenh ke tiep bi stale_revision,
+    // va cung khong duoc keo run/audit/browser/queue ve thoi diem cu do.
+    // Snapshot CUNG revision van ap (wsLogin doc browser_id o revision hien
+    // tai); snapshot thieu revision khong du thong tin de xep thu tu → bo.
+    const wsRev = Number(ws.revision);
+    if (!Number.isFinite(wsRev) || wsRev < state.revision) return state;
+    if (wsRev > state.revision) state.revision = wsRev;
     if (ws.run_id !== undefined) state.runId = ws.run_id;
     if (ws.audit_id !== undefined) state.auditId = ws.audit_id;
     if (ws.browser_id !== undefined) state.browserId = ws.browser_id;

@@ -963,3 +963,202 @@ test('view: loi nap hien tai cho voi huong dan; thanh cong xoa loi cu', async ()
     (e) => e.classList && e.classList.contains('ul-kpi-v'))[0].textContent,
     '0');
 });
+
+// ---------- task 7 fix1: review findings ----------
+
+test('latestJob: cung updated_at → job chen SAU thang (pin >=)', () => {
+  const jobs = new Map();
+  jobs.set('a', { job_id: 'a', command: 'upload.websites',
+                  status: 'succeeded', updated_at: '2026-09-24T10:00:00Z' });
+  jobs.set('b', { job_id: 'b', command: 'upload.websites',
+                  status: 'failed', updated_at: '2026-09-24T10:00:00Z' });
+  jobs.set('c', { job_id: 'c', command: 'upload.scan',
+                  status: 'succeeded', updated_at: '2026-09-24T11:00:00Z' });
+  // updated_at chi co do phan giai giay — hai job cung giay hoa nhau; job
+  // submit sau (vao map muon = y dinh moi hon) phai thang.
+  assert.equal(C.latestJob(jobs, 'upload.websites').job_id, 'b');
+  // Job co updated_at CU hon chen sau cung khong duoc thang.
+  jobs.set('d', { job_id: 'd', command: 'upload.websites',
+                  status: 'succeeded', updated_at: '2026-09-24T09:00:00Z' });
+  assert.equal(C.latestJob(jobs, 'upload.websites').job_id, 'b');
+  // Command khac khong lien quan; command khong co → null.
+  assert.equal(C.latestJob(jobs, 'upload.scan').job_id, 'c');
+  assert.equal(C.latestJob(jobs, 'upload.prepare'), null);
+});
+
+test('adoptJobResult: catalog rong van danh catalogLoaded (gate derive)', () => {
+  const st = S.createUploadState();
+  const j = job('upload.websites', 'succeeded', {
+    workflow_version: V, websites: [], selected_website_id: null,
+  }, { jobId: 'job_cat' });
+  assert.equal(C.adoptJobResult(st, j), true);
+  assert.equal(st.catalogLoaded, true,
+    'catalog rong la ket qua hop le — derive khong duoc submit lai');
+  assert.equal(st.websites.length, 0);
+  assert.equal(st.workflowReady, true);
+});
+
+test('adoptJobResult: wsAppliedFor song sot setWebsite — khong ap lai', () => {
+  const st = S.createUploadState();   // websiteId null → setWebsite path
+  const j = job('upload.workspace_get', 'succeeded', {
+    workflow_version: V, website_id: 'nam_dinh', revision: 3,
+    run_id: 'r1', audit_id: null, browser_id: 'br1', has_excel: true,
+    queue_revision: 2, needs_reconcile_record_ids: [], active_job_ids: [],
+  }, { jobId: 'job_ws' });
+  assert.equal(C.adoptJobResult(st, j), true);
+  // Marker ghi SAU setWebsite → clearWebsiteScope (null→nam_dinh) khong
+  // xoa duoc; snapshot ap dung mot lan.
+  assert.equal(st.wsAppliedFor, 'job_ws');
+  assert.equal(st.wsTried, true);
+  assert.equal(st.runId, 'r1');
+  assert.equal(st.browserId, 'br1');
+  st.runId = 'run_khac';
+  assert.equal(C.adoptJobResult(st, j), false,
+    're-adopt cung job_id phai bi tu choi');
+  assert.equal(st.runId, 'run_khac', 'snapshot cu khong duoc keo runId lui');
+});
+
+test('adoptJobResult: select tra website khac dich → mo pending + siteError',
+  () => {
+    const st = S.createUploadState();
+    st.websiteId = 'nam_dinh';
+    st.websiteJobId = 'job_w';
+    st.pendingWebsiteId = 'khac';
+    const j = job('upload.website_select', 'succeeded', {
+      workflow_version: V, website_id: 'khac_hon', revision: 5,
+      run_id: null, audit_id: null, browser_id: null, has_excel: false,
+      queue_revision: null, needs_reconcile_record_ids: [],
+      active_job_ids: [],
+    }, { jobId: 'job_w' });
+    assert.equal(C.adoptJobResult(st, j), true);
+    assert.equal(st.pendingWebsiteId, null,
+      'terminal mismatch phai mo khoa pending — neu khong dropdown ket');
+    assert.equal(st.websiteId, 'nam_dinh', 'khong ap website khac dich');
+    assert.equal(st.siteError.code, 'website_mismatch');
+    assert.equal(st.siteError._retry.websiteId, 'khac');
+  });
+
+test('adoptJobResult: session_status theo login hieu luc — closed tat active',
+  () => {
+    const st = S.createUploadState();
+    st.websiteId = 'nam_dinh';
+    st.browserId = 'br1';
+    st.uploadSessionActive = true;
+    st.login = { status: 'authenticated', checked_at: '2026-09-24T10:00:00Z' };
+    // Snapshot closed MOI hon → ap + tat active.
+    const j = job('upload.session_status', 'succeeded', {
+      workflow_version: V, website_id: 'nam_dinh', browser_id: 'br1',
+      login: { status: 'closed', checked_at: '2026-09-24T10:05:00Z' },
+    });
+    assert.equal(C.adoptJobResult(st, j), true);
+    assert.equal(st.login.status, 'closed');
+    assert.equal(st.uploadSessionActive, false);
+
+    // Snapshot closed CU HON (regresses) → giu authenticated + active.
+    const st2 = S.createUploadState();
+    st2.websiteId = 'nam_dinh';
+    st2.browserId = 'br1';
+    st2.uploadSessionActive = true;
+    st2.login = { status: 'authenticated',
+                  checked_at: '2026-09-24T10:05:00Z' };
+    const stale = job('upload.session_status', 'succeeded', {
+      workflow_version: V, website_id: 'nam_dinh', browser_id: 'br1',
+      login: { status: 'closed', checked_at: '2026-09-24T10:00:00Z' },
+    });
+    assert.equal(C.adoptJobResult(st2, stale), true);
+    assert.equal(st2.login.status, 'authenticated');
+    assert.equal(st2.uploadSessionActive, true,
+      'snapshot closed cu khong duoc tat phien dang authenticated');
+  });
+
+test('derive: catalog khong resubmit nong — retry paced 4s + live-job guard',
+  async (t) => {
+    const { document } = makeDom();
+    const U = loadModule(document);
+    const L = require('../src/renderer/lib.js');
+    const jobs = new Map();
+    let submits = 0;
+    const api = fakeApi();
+    api.submitCommand = async (command) => {
+      submits += 1;
+      return { ok: true, data: {
+        job_id: `job_${submits}`, command, status: 'accepted',
+        result: null, error: null,
+        updated_at: '2026-09-24T10:00:00Z' } };
+    };
+    const h = fakeHelpers(document, L);
+    // awaitJob tra snapshot trong jobs map — job con 'accepted' (chua
+    // terminal) tuc chua xong → done=false.
+    h.awaitJob = async (jobId) => jobs.get(jobId);
+    const view = U.buildView({
+      api, L, jobs, notify: () => {},
+      entry: { id: 'upload', title: 'Upload Lab' },
+      module: { id: 'upload', namespaces: ['upload'], status: 'available' },
+      h, submit: async () => null,
+    });
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const flush = () => new Promise((r) => setImmediate(r));
+
+    view.refresh();
+    await flush();
+    assert.equal(submits, 1, 'lan dau submit catalog');
+    view.refresh();
+    view.refresh();
+    await flush();
+    assert.equal(submits, 1,
+      'inflight + retry timer chua het → khong submit nong');
+    // Het 4s → release → refresh; nhung job_1 VAN non-terminal → guard
+    // liveJob chan resubmit chong (tranh pile-up job >30s).
+    t.mock.timers.tick(4000);
+    await flush();
+    assert.equal(submits, 1,
+      'job non-terminal con trong map → khong chong job moi');
+    // Job terminal-failed → nhip derive sau moi duoc submit lai (retry
+    // da paced, khong phai vong lap nong).
+    jobs.get('job_1').status = 'failed';
+    view.refresh();
+    await flush();
+    assert.equal(submits, 2, 'job terminal → retry submit lai mot lan');
+  });
+
+test('derive: engine_instance_id doi → catalogLoaded reset, refetch mot lan',
+  async (t) => {
+    const { document } = makeDom();
+    const U = loadModule(document);
+    const L = require('../src/renderer/lib.js');
+    const jobs = new Map();
+    let inst = 'inst_a';
+    let submits = 0;
+    const api = fakeApi();
+    api.submitCommand = async (command) => {
+      submits += 1;
+      return { ok: true, data: {
+        job_id: `job_${submits}`, command, status: 'accepted',
+        result: null, error: null,
+        updated_at: '2026-09-24T10:00:01Z' } };
+    };
+    // Catalog cu da load xong (ke ca rong).
+    jobs.set('cat', job('upload.websites', 'succeeded', {
+      workflow_version: V, websites: [], selected_website_id: null,
+    }, { jobId: 'cat', at: '2026-09-24T10:00:00Z' }));
+    const view = U.buildView({
+      api, L, jobs, notify: () => {},
+      entry: { id: 'upload', title: 'Upload Lab' },
+      module: { id: 'upload', namespaces: ['upload'], status: 'available' },
+      h: fakeHelpers(document, L), submit: async () => null,
+      engineInstanceId: () => inst,
+    });
+    const flush = () => new Promise((r) => setImmediate(r));
+    view.refresh();
+    await flush();
+    assert.equal(submits, 0, 'catalog da load → khong submit them');
+    inst = 'inst_b';   // sidecar restart — instance moi
+    view.refresh();
+    await flush();
+    assert.equal(submits, 1,
+      'instance doi → catalog refetch dung mot lan');
+    // Job moi con non-terminal → refresh tiep khong chong.
+    view.refresh();
+    await flush();
+    assert.equal(submits, 1);
+  });

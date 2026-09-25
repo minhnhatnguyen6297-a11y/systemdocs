@@ -128,6 +128,44 @@ test('setWebsite cung website (idempotent) khong xoa state', () => {
   assert.deepEqual([...st.selectedIds], [7]);
 });
 
+test('applyWorkspace: snapshot cu hon revision khong keo scope lui', () => {
+  const st = S.createUploadState();
+  st.websiteId = 'nam_dinh';
+  st.revision = 8;
+  st.runId = 'run_moi';
+  st.browserId = 'br_moi';
+  // workspace_get submit TRUOC khi audit/scan bump revision → snapshot
+  // revision 3 den muon: khong duoc ghi de run/audit/browser/queue hien tai.
+  S.applyWorkspace(st, {
+    website_id: 'nam_dinh', revision: 3,
+    run_id: 'run_cu', audit_id: 'aud_cu', browser_id: 'br_cu',
+    has_excel: true, queue_revision: 9,
+    needs_reconcile_record_ids: [1], active_job_ids: ['j_x'],
+  });
+  assert.equal(st.revision, 8, 'revision khong duoc lui');
+  assert.equal(st.runId, 'run_moi');
+  assert.equal(st.browserId, 'br_moi');
+  assert.equal(st.auditId, null);
+  assert.equal(st.hasExcel, false);
+  assert.equal(st.queueRevision, null);
+  assert.equal(st.needsReconcileIds.size, 0);
+  assert.equal(st.knownJobIds.size, 0);
+  // Snapshot CUNG revision van ap — wsLogin doc browser_id o revision
+  // hien tai trong luc session_start con waiting_user.
+  S.applyWorkspace(st, {
+    website_id: 'nam_dinh', revision: 8, browser_id: 'br_live',
+  });
+  assert.equal(st.browserId, 'br_live');
+  // Snapshot moi hon ap day du.
+  S.applyWorkspace(st, {
+    website_id: 'nam_dinh', revision: 9, run_id: 'run_9',
+    needs_reconcile_record_ids: [4],
+  });
+  assert.equal(st.revision, 9);
+  assert.equal(st.runId, 'run_9');
+  assert.deepEqual([...st.needsReconcileIds], [4]);
+});
+
 test('applyQueue: chon mac dinh tu backend; refresh giu chon tay', () => {
   const st = S.createUploadState();
   st.websiteId = 'nam_dinh';
