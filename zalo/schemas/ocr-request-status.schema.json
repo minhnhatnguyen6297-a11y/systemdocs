@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zalo-intake:ocr-request-status:v1",
+  "title": "intake.ocr-request-status.v1",
+  "description": "Producer-side state of an OCR re-run request, returned by POST /intake/v1/ocr-requests and GET /intake/v1/ocr-requests/{request_id}. OCR text itself is never in this body: an accepted job publishes a new immutable raw-package revision; the status only points at it. Conditional fields (result only on completed, error only on rejected/failed, attempt <= max_attempts <= 3) are enforced by the ocr_request_status rule, not here, so violations carry the status_invalid code.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "job_id",
+    "state",
+    "attempt",
+    "max_attempts"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "intake.ocr-request-status.v1"
+    },
+    "request_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "job_id": {
+      "$ref": "common.schema.json#/$defs/uuid",
+      "description": "Producer-assigned id; also present for requests rejected before a job ran (ledger entry)."
+    },
+    "state": {
+      "enum": ["queued", "running", "completed", "rejected", "failed"]
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of the current/last provider attempt; 0 before the first run."
+    },
+    "max_attempts": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Provider-error retry cap for this job; contract maximum is 3 (rule-enforced)."
+    },
+    "accepted_at": {
+      "$ref": "common.schema.json#/$defs/iso_datetime"
+    },
+    "started_at": {
+      "$ref": "common.schema.json#/$defs/iso_datetime"
+    },
+    "finished_at": {
+      "$ref": "common.schema.json#/$defs/iso_datetime"
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package_id", "manifest_sha256", "new_revision"],
+      "description": "Required when state=completed: pointer to the published raw package carrying the new OCR revision.",
+      "properties": {
+        "package_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        },
+        "manifest_sha256": {
+          "$ref": "common.schema.json#/$defs/sha256_hex"
+        },
+        "new_revision": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "error": {
+      "$ref": "common.schema.json#/$defs/error_object",
+      "description": "Required when state=rejected or failed."
+    },
+    "deduplicated": {
+      "type": "boolean",
+      "description": "True when the producer answered with an existing job instead of spending new quota (idempotent replay or same logical_id+variant+preset+config_version)."
+    }
+  }
+}

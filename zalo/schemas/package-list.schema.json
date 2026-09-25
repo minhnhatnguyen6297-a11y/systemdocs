@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zalo-intake:package-list:v1",
+  "title": "intake.package-list.v1 — GET /intake/v1/packages?delivery=pending response",
+  "description": "One page of pending packages in ascending sequence. The first page of a sync run fixes until_sequence; later pages reuse it with after=next_after. limit is capped at 100, so a page never holds more than 100 entries.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "packages",
+    "next_after",
+    "until_sequence",
+    "has_more"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "intake.package-list.v1"
+    },
+    "packages": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["package_id", "sequence", "manifest_sha256"],
+        "properties": {
+          "package_id": {
+            "$ref": "common.schema.json#/$defs/uuid"
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "manifest_sha256": {
+            "$ref": "common.schema.json#/$defs/sha256_hex"
+          }
+        }
+      }
+    },
+    "next_after": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Value to pass as `after` for the next page; pagination only, not an ACK."
+    },
+    "until_sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "High-water sequence fixed when the sync run started; 0 when none."
+    },
+    "has_more": {
+      "type": "boolean"
+    }
+  }
+}

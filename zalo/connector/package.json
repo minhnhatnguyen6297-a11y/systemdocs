@@ -1,0 +1,18 @@
+{
+  "name": "zalo-intake-connector",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Zalo listener connector for zalo-intake module (zca-js)",
+  "type": "module",
+  "scripts": {
+    "start": "node bin/run.mjs",
+    "test": "node --test test/*.test.mjs",
+    "check": "node --check src/core.mjs && node --check src/connector.mjs && node --check bin/run.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "zca-js": "2.1.2"
+  }
+}

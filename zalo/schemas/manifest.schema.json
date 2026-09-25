@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zalo-intake:manifest:v1",
+  "title": "intake.raw-package.v1 — manifest.json of an immutable raw package",
+  "description": "A raw package is exactly manifest.json + records.jsonl + READY.json. files[] declares content files carried by the package; in v1 the only declarable file is records.jsonl (a manifest cannot hash itself or the READY.json written after it). Byte limits: this file <= 64 KiB, records.jsonl <= 16 MiB and <= 1000 records (enforced by rules, not schema).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "package_id",
+    "producer",
+    "consumer_id",
+    "created_at",
+    "sequence",
+    "files",
+    "record_count"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "intake.raw-package.v1"
+    },
+    "package_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["service", "build_id"],
+      "properties": {
+        "service": {
+          "$ref": "common.schema.json#/$defs/nonempty_string",
+          "description": "Must be \"zalo-intake\"; enforced by validator rule (producer_mismatch), not by const, so the code stays reachable."
+        },
+        "build_id": {
+          "$ref": "common.schema.json#/$defs/nonempty_string"
+        }
+      }
+    },
+    "consumer_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "created_at": {
+      "$ref": "common.schema.json#/$defs/iso_datetime"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Durable publish order of raw packages for this producer/consumer pair."
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "bytes"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^(?!\\.+$)(?!.*\\.\\.)[^/\\\\]+$",
+            "x-error-code": "path_escape",
+            "description": "Safe basename only: no '/', no '\\\\', no '..' and not an all-dots name. Violations report path_escape."
+          },
+          "sha256": {
+            "$ref": "common.schema.json#/$defs/sha256_hex"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "record_count": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

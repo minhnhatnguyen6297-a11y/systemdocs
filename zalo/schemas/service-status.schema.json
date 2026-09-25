@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zalo-intake:service-status:v1",
+  "title": "intake.service-status.v1 — GET /intake/v1/status response",
+  "description": "Producer health snapshot: listener state, pending package backlog and post-ACK raw storage usage. ack_warn must be true exactly when ack_bytes >= 80% of ack_cap_bytes (rule: status_invalid). packages == 0 forbids oldest_* (schema); packages > 0 requires them (rule: status_invalid).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "producer",
+    "observed_at",
+    "listener",
+    "pending",
+    "storage",
+    "capabilities"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "intake.service-status.v1"
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["service", "build_id"],
+      "properties": {
+        "service": {
+          "const": "zalo-intake"
+        },
+        "build_id": {
+          "$ref": "common.schema.json#/$defs/nonempty_string"
+        }
+      }
+    },
+    "observed_at": {
+      "$ref": "common.schema.json#/$defs/iso_datetime"
+    },
+    "listener": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state"],
+      "properties": {
+        "state": {
+          "enum": ["connected", "disconnected", "login_required"]
+        },
+        "last_heartbeat_at": {
+          "$ref": "common.schema.json#/$defs/iso_datetime"
+        },
+        "session_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        }
+      }
+    },
+    "pending": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["packages"],
+      "properties": {
+        "packages": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "oldest_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "oldest_age_seconds": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "dependentRequired": {
+        "oldest_sequence": ["oldest_age_seconds"],
+        "oldest_age_seconds": ["oldest_sequence"]
+      },
+      "if": {
+        "properties": {
+          "packages": {"const": 0}
+        },
+        "required": ["packages"]
+      },
+      "then": {
+        "allOf": [
+          {"not": {"required": ["oldest_sequence"]}},
+          {"not": {"required": ["oldest_age_seconds"]}}
+        ]
+      }
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ack_bytes", "ack_cap_bytes", "ack_warn"],
+      "properties": {
+        "ack_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Bytes of post-ACK raw packages currently retained by the producer."
+        },
+        "ack_cap_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Configured retention cap (v1 policy: 1 GiB)."
+        },
+        "ack_warn": {
+          "type": "boolean",
+          "description": "True iff ack_bytes >= 80% of ack_cap_bytes; checked by rule."
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_event_types"],
+      "properties": {
+        "source_event_types": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["recall", "reaction", "edit"],
+          "properties": {
+            "recall": {
+              "enum": ["supported", "unsupported"]
+            },
+            "reaction": {
+              "enum": ["supported", "unsupported"]
+            },
+            "edit": {
+              "enum": ["supported", "unsupported"],
+              "description": "v1 adapters emit no edit event; expected to stay unsupported."
+            }
+          }
+        }
+      }
+    }
+  }
+}

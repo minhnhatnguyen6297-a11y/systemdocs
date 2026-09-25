@@ -1,0 +1,9 @@
+runtime/
+*.db
+__pycache__/
+.env
+node_modules/
+.venv/
+.pytest_cache/
+media/
+connector/node_modules/
