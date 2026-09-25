@@ -51,6 +51,9 @@ function createNotaryModuleView(deps) {
   const confirm = deps.confirm ||
     (async () => true);
   const runCommand = deps.runCommand;
+  // MIN-112 seams: drop-zone token + cancel job cho dialogs.
+  const registerDroppedFile = deps.registerDroppedFile || null;
+  const cancelJob = deps.cancelJob || (async () => ({ ok: false }));
 
   function h(tag, cls, text) {
     const e = document.createElement(tag);
@@ -86,7 +89,23 @@ function createNotaryModuleView(deps) {
       document.removeEventListener('keydown', onKey);
       wrap.remove();
     };
-    function onKey(e) { if (e.key === 'Escape') close(); }
+    function onKey(e) {
+      if (e.key === 'Escape') { close(); return; }
+      if (e.key !== 'Tab') return;
+      // Focus trap: Tab cycle trong dialog (MIN-112 a11y).
+      const items = [...box.querySelectorAll(
+        'button, input, textarea, select, [tabindex]')]
+        .filter((x) => !x.disabled && !x.hidden);
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const ae = document.activeElement;
+      if (e.shiftKey && (ae === first || !box.contains(ae))) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && (ae === last || !box.contains(ae))) {
+        e.preventDefault(); first.focus();
+      }
+    }
     wrap.onclick = (e) => { if (e.target === wrap) close(); };
     build(box, close);
     wrap.append(box);
@@ -96,6 +115,25 @@ function createNotaryModuleView(deps) {
     if (first) first.focus();
     return close;
   }
+
+  // ---------- MIN-112: dialogs + relation pane (file rieng, cung helpers) ----------
+
+  const intakeDlg = window.G1_NOTARY_INTAKE
+    ? window.G1_NOTARY_INTAKE.createIntakeDialog({
+        model, lib: L, notify, h, btn, face, openModal,
+        pickFiles, registerDroppedFile, cancelJob })
+    : null;
+  const wordDlg = window.G1_NOTARY_WORD
+    ? window.G1_NOTARY_WORD.createWordDialog({
+        model, lib: L, notify, h, btn, face, openModal,
+        pickFiles, openPath, cancelJob })
+    : null;
+  const diagramPane = window.G1_NOTARY_DIAGRAM
+    ? window.G1_NOTARY_DIAGRAM.createDiagramPane({
+        model, lib: L, notify, h, btn, face, openModal,
+        openWordDialog: () => openWordDialog(),
+        rerender: () => rerender() })
+    : null;
 
   // ---------- Tổng quan hồ sơ (entry point: mo ho so) ----------
 
@@ -236,7 +274,9 @@ function createNotaryModuleView(deps) {
       del.setAttribute('aria-label', `Xóa dòng ${p.ho_ten || ''}`.trim());
       wrap.append(del);
     }
-    // Detail: cac truong chinh edit duoc (field-level, draft only)
+    // Detail: cac truong chinh edit duoc (field-level, draft only);
+    // field_errors map theo row_id + field → hien thi duoi dung input
+    // (contract §5.2).
     const det = h('div', 'cd-row-detail');
     const ro = !model.canWrite();
     const field = (label, key, val) => {
@@ -249,6 +289,9 @@ function createNotaryModuleView(deps) {
       inp.onchange = () => model.updatePersonField(
         p.row_id, key, inp.value);
       lab.append(inp);
+      for (const fe of errs.filter((e) => e.field === key)) {
+        lab.append(h('span', 'cd-field-err error', fe.message));
+      }
       return lab;
     };
     det.append(field('Họ tên', 'ho_ten', p.ho_ten));
@@ -305,6 +348,9 @@ function createNotaryModuleView(deps) {
       inp.onchange = () => model.updateAssetField(
         a.row_id, key, inp.value);
       lab.append(inp);
+      for (const fe of errs.filter((e) => e.field === key)) {
+        lab.append(h('span', 'cd-field-err error', fe.message));
+      }
       return lab;
     };
     det.append(field('Số serial', 'so_serial', a.so_serial));
@@ -444,412 +490,27 @@ function createNotaryModuleView(deps) {
     return tray;
   }
 
-  // ---------- Relation tier: Pool + Diagram ----------
-
-  function poolCardEl(row, kind) {
-    const card = h('div', 'cd-pool-card');
-    card.draggable = model.canWrite();
-    const label = kind === 'person'
-      ? (row.ho_ten || '(chưa đặt tên)')
-      : (row.so_serial || '(chưa có serial)');
-    card.append(h('span', 'cd-pool-label', label));
-    card.append(h('span', 'cd-badge', kind === 'person' ? 'Người' : 'Tài sản'));
-    // Keo tha (tien ich) — cung ket qua voi menu "Gán vị trí".
-    card.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('text/plain',
-        JSON.stringify({ kind, row_id: row.row_id }));
-    });
-    const assign = btn('Gán vị trí…', '', () =>
-      openAssignMenu(row, kind));
-    assign.disabled = !model.canWrite() || !model.state.capabilities.diagram;
-    card.append(assign);
-    return card;
-  }
-
-  // Menu "Gán vị trí" — cach thay the ban phim cho keo tha (spec §4).
-  function openAssignMenu(row, kind) {
-    const s = model.state;
-    openModal((box, close) => {
-      box.append(h('div', 'cd-modal-title', 'Gán vị trí trên sơ đồ'));
-      if (kind === 'asset') {
-        // Wire v1: tai san khong gan vao node — chi xem (§7.1).
-        box.append(h('div', 'muted',
-          'Tài sản chưa gán trực tiếp lên sơ đồ trong phiên bản này — ' +
-          'sơ đồ gán quan hệ giữa các người.'));
-        const ok = btn('Đóng', 'primary', close);
-        box.append(ok);
-        return;
-      }
-      const nodes = (s.diagram.nodes || []).filter(
-        (n) => !n.deleted);
-      const empty = nodes.filter((n) => !n.personId);
-      if (empty.length) {
-        box.append(h('div', 'muted', 'Slot đang trống:'));
-        for (const n of empty) {
-          const b = btn(`Gán vào “${n.id}”`, 'cd-menu-item', () => {
-            model.assignPerson(n.id, row.row_id);
-            close();
-          });
-          box.append(b);
-        }
-      }
-      box.append(h('div', 'muted', 'Hoặc tạo slot mới:'));
-      const occupied = nodes.filter((n) => n.personId);
-      for (const n of occupied) {
-        const who = personName(n.personId);
-        const child = btn(`Con của ${who}`, 'cd-menu-item', () => {
-          const node = model.addSlot();
-          model.setNodeRelation(node.id, { parentSlotIds: [n.id] });
-          model.assignPerson(node.id, row.row_id);
-          close();
-        });
-        const spouse = btn(`Vợ/chồng của ${who}`, 'cd-menu-item', () => {
-          const node = model.addSlot();
-          model.setNodeRelation(node.id, { spouseSlotId: n.id });
-          model.assignPerson(node.id, row.row_id);
-          close();
-        });
-        box.append(child, spouse);
-      }
-      if (!nodes.length) {
-        const b = btn('Tạo slot đầu tiên và gán', 'cd-menu-item', () => {
-          const node = model.addSlot('owner');
-          model.assignPerson(node.id, row.row_id);
-          close();
-        });
-        box.append(b);
-      }
-      const cancel = btn('Đóng', '', close);
-      box.append(cancel);
-    });
-  }
-
-  function personName(rowId) {
-    const p = model.state.committed.people
-      .find((x) => x.row_id === rowId);
-    return p ? (p.ho_ten || '(không tên)') : '—';
-  }
-
-  function diagramNodeEl(n) {
-    const card = h('div', 'cd-node');
-    if (n.deleted) card.classList.add('cd-node-deleted');
-    const head = h('div', 'cd-node-head');
-    head.append(h('span', 'cd-node-id muted', n.id));
-    head.append(h('span', 'cd-node-name',
-      n.personId ? personName(n.personId) : '(trống)'));
-    card.append(head);
-    // Drop target: nhan pool card keo vao (cung ket qua menu Gan vi tri)
-    card.addEventListener('dragover', (e) => e.preventDefault());
-    card.addEventListener('drop', (e) => {
-      e.preventDefault();
-      try {
-        const d = JSON.parse(e.dataTransfer.getData('text/plain'));
-        if (d.kind === 'person') model.assignPerson(n.id, d.row_id);
-      } catch (err) { /* payload rac — bo qua */ }
-    });
-    if (n.deleted) return card;
-    const flags = h('div', 'cd-node-flags');
-    const ro = !model.canWrite();
-    const land = btn(n.isLandOwner ? '★ Chủ đất' : 'Chủ đất',
-      n.isLandOwner ? 'primary' : '', () =>
-        model.setNodeFlag(n.id, 'isLandOwner', !n.isLandOwner));
-    land.disabled = ro;
-    land.setAttribute('aria-pressed', String(!!n.isLandOwner));
-    const recv = btn(n.willReceive ? '✓ Nhận' : 'Nhận',
-      n.willReceive ? 'primary' : '', () =>
-        model.setNodeFlag(n.id, 'willReceive', !n.willReceive));
-    recv.disabled = ro;
-    recv.setAttribute('aria-pressed', String(!!n.willReceive));
-    flags.append(land, recv);
-    if (n.personId) {
-      const un = btn('Bỏ gán', '', () => model.assignPerson(n.id, null));
-      un.disabled = ro;
-      flags.append(un);
-    }
-    const del = btn('✕', 'cd-del', () => model.removeNode(n.id));
-    del.disabled = ro;
-    del.setAttribute('aria-label', `Xóa slot ${n.id}`);
-    flags.append(del);
-    card.append(flags);
-    return card;
-  }
-
-  // "Xem cách tính" — chi DOC output engine, render dang doc duoc,
-  // khong render JSON tho, khong tu tinh ty le (contract §10 consumer).
-  function calcPanelEl() {
-    const rm = model.state.renderModel;
-    const box = h('div', 'cd-calc');
-    if (!rm) {
-      box.append(face(L.faceEmpty(
-        'Chưa có kết quả tính — bấm “Đánh giá thử” hoặc lưu sơ đồ.')));
-      return box;
-    }
-    const statusLabel = {
-      complete: 'Hoàn chỉnh', incomplete: 'Chưa đủ điều kiện',
-      invalid: 'Không hợp lệ', unsupported: 'Chưa hỗ trợ',
-    }[rm.status] || rm.status;
-    box.append(h('div', 'cd-calc-status',
-      `Trạng thái tính: ${statusLabel}`));
-    if (rm.status === 'unsupported') {
-      box.append(h('div', 'cd-badge cd-badge-warn',
-        'Chưa hỗ trợ — đây không phải kết quả đã tính'));
-    }
-    const allocs = rm.allocations || {};
-    const ids = Object.keys(allocs);
-    if (ids.length) {
-      const list = h('div', 'cd-alloc-list');
-      for (const pid of ids) {
-        const a = allocs[pid];
-        const row = h('div', 'cd-alloc-row');
-        row.append(h('span', 'cd-alloc-name', personName(pid)));
-        row.append(h('span', 'cd-badge',
-          `${a.displayPercent || '0.00'}%`));
-        row.append(h('span', 'muted',
-          `phần cuối ${a.finalShare ?? '—'}`));
-        list.append(row);
-      }
-      box.append(list);
-    }
-    for (const w of rm.warnings || []) {
-      box.append(h('div', 'muted warn-text', w.message || w.code));
-    }
-    for (const e of rm.errors || []) {
-      box.append(h('div', 'error', e.message || e.code));
-    }
-    for (const u of rm.unresolvedEstates || []) {
-      box.append(h('div', 'muted',
-        `Phần chưa phân (${personName(u.sourcePersonId)}): ` +
-        `${u.fraction} — ${u.reason === 'no_valid_heir'
-          ? 'không có người thừa kế hợp lệ' : u.reason}`));
-    }
-    return box;
-  }
+  // ---------- Relation tier: Pool + Diagram (MIN-112 — tach file) ----------
+  // Pane duy nhat cho ca phien: giu debounce timer + trang thai Xem cach
+  // tinh/loc pool qua cac lan rebuild (rerender tao subtree moi nhung pane
+  // instance giu nguyen state nay).
 
   function relationTierEl() {
-    const s = model.state;
-    const tier = h('div', 'cd-rel');
-
-    // Pool (~22%)
-    const pc = h('div', 'cd-card cd-pool');
-    const pHead = h('div', 'cd-card-head');
-    pHead.append(h('h3', 'cd-card-title', 'Pool'));
-    pc.append(pHead);
-    const pBody = h('div', 'cd-card-body');
-    const pool = model.pool();
-    if (!pool.people.length && !pool.assets.length) {
-      pBody.append(face(L.faceEmpty(
-        'Pool trống — mọi người đã được gán hoặc Stage chưa có dữ liệu.')));
-    } else {
-      for (const p of pool.people) pBody.append(poolCardEl(p, 'person'));
-      for (const a of pool.assets) pBody.append(poolCardEl(a, 'asset'));
-    }
-    pc.append(pBody);
-    tier.append(pc);
-
-    // Diagram (~78%)
-    const dc = h('div', 'cd-card cd-diagram');
-    const dHead = h('div', 'cd-card-head');
-    dHead.append(h('h3', 'cd-card-title', 'Sơ đồ quan hệ'));
-    const tools = h('div', 'cd-toolbar cd-card-tools');
-    const save = btn('Lưu sơ đồ', 'primary', async () => {
-      const r = await model.saveDiagram();
-      if (!r.ok && r.error && r.error.code !== 'workspace_conflict' &&
-          r.error.code !== 'diagram_invalid_state') {
-        notify(`${r.error.code}: ${r.error.message}`, true);
-      }
-    });
-    if (s.diagramDirty) save.append(h('span', 'cd-dirty-dot', ''));
-    save.disabled = !model.canWrite() || !s.diagramDirty ||
-      !s.capabilities.diagram;
-    const calc = btn('Xem cách tính', '', async () => {
-      calcOpen = !calcOpen;
-      if (calcOpen) await model.evaluateDiagram();
-      rerender();
-    });
-    const evalBtn = btn('Đánh giá thử', '', async () => {
-      const r = await model.evaluateDiagram();
-      if (!r.ok && r.error) notify(
-        `${r.error.code}: ${r.error.message}`, true);
-      calcOpen = true;
-    });
-    evalBtn.disabled = !s.capabilities.diagram ||
-      s.busy === 'notary.diagram_evaluate';
-    const word = btn('Xuất Word', '', openWordDialog);
-    word.disabled = !s.capabilities.word_export || s.wordBusy;
-    const addSlotBtn = btn('+ Slot', '', () => model.addSlot());
-    addSlotBtn.disabled = !model.canWrite() || !s.capabilities.diagram;
-    tools.append(save, calc, evalBtn, word, addSlotBtn);
-    dHead.append(tools);
-    dc.append(dHead);
-    const dBody = h('div', 'cd-diagram-body');
-    const nodes = (s.diagram.nodes || []).filter((n) => !n.deleted);
-    if (!nodes.length) {
-      dBody.append(face(L.faceEmpty(
-        'Sơ đồ chưa có slot — thêm slot hoặc gán người từ Pool.')));
-    } else {
-      const grid = h('div', 'cd-nodes');
-      for (const n of s.diagram.nodes || []) {
-        grid.append(diagramNodeEl(n));
-      }
-      dBody.append(grid);
-    }
-    for (const w of s.diagramWarnings || []) {
-      dBody.append(h('div', 'muted warn-text', w.message || w.code));
-    }
-    for (const e of s.diagramErrors || []) {
-      dBody.append(h('div', 'error', e.message || e.code));
-    }
-    if (calcOpen) dBody.append(calcPanelEl());
-    dc.append(dBody);
-    tier.append(dc);
-    return tier;
+    return diagramPane ? diagramPane.build()
+      : face(L.faceUnavailable('Sơ đồ', 'module_missing',
+        'relationship-diagram.js chua nap.'));
   }
 
-  // ---------- intake dialog (khung toi thieu — MIN-112 lam sau) ----------
+  // ---------- intake / word dialogs (MIN-112 — tach file) ----------
 
   function openIntakeDialog(presetKind) {
-    const picked = [];
-    openModal((box, close) => {
-      box.append(h('div', 'cd-modal-title', 'Nhập dữ liệu → gợi ý'));
-      box.append(h('div', 'muted',
-        'Mọi kết quả là gợi ý chờ kiểm tra — không tự ghi vào hồ sơ.'));
-      const pick = btn('Chọn file…', '', async () => {
-        const filters = presetKind === 'xlsx'
-          ? [{ name: 'Excel', extensions: ['xlsx'] }]
-          : presetKind === 'image'
-            ? [{ name: 'Giấy tờ', extensions: ['jpg', 'jpeg', 'png', 'pdf'] }]
-            : [{ name: 'Tài liệu',
-                 extensions: ['jpg', 'jpeg', 'png', 'pdf', 'docx', 'xlsx'] }];
-        const r = await pickFiles({ multi: true, filters });
-        if (!r.ok) { notify(`${r.error.code}: ${r.error.message}`, true); return; }
-        for (const f of r.data.files || []) picked.push(f);
-        list.innerHTML = '';
-        for (const f of picked) list.append(h('div', 'file-row', f.path));
-      });
-      const ta = h('textarea', 'cd-input cd-textarea');
-      ta.setAttribute('aria-label', 'Dán văn bản để phân tích');
-      ta.placeholder = 'Hoặc dán văn bản…';
-      const list = h('div', 'files');
-      const go = btn('Phân tích', 'primary', async () => {
-        const sources = [];
-        for (const f of picked) {
-          const ext = (f.path.split('.').pop() || '').toLowerCase();
-          const kind = { jpg: 'image', jpeg: 'image', png: 'image',
-                         pdf: 'pdf', docx: 'docx', xlsx: 'xlsx' }[ext];
-          if (!kind) continue;
-          sources.push({ source_id: crypto.randomUUID(), kind,
-                         file_ref: { path: f.path, scope: 'machine_local',
-                                     size_bytes: f.size_bytes ?? 0 } });
-        }
-        const text = ta.value.trim();
-        if (text) {
-          sources.push({ source_id: crypto.randomUUID(), kind: 'text',
-                         text });
-        }
-        if (!sources.length) {
-          notify('Chưa có nguồn nào — chọn file hoặc dán văn bản.', true);
-          return;
-        }
-        const r = await model.intakeAnalyze(sources);
-        if (!r.ok) notify(`${r.error.code}: ${r.error.message}`, true);
-        close();
-      });
-      go.disabled = !model.canWrite();
-      const cancel = btn('Đóng', '', close);
-      const row = h('div', 'cd-toolbar');
-      row.append(pick, go, cancel);
-      box.append(row, ta, list);
-    });
+    if (intakeDlg) intakeDlg.open(presetKind);
+    else notify('intake-dialog.js chua nap.', true);
   }
 
-  // ---------- word export dialog ----------
-
   function openWordDialog() {
-    openModal(async (box, close) => {
-      box.append(h('div', 'cd-modal-title', 'Xuất Word — nhiều văn bản'));
-      const body = h('div', 'cd-slot');
-      box.append(body);
-      body.append(face(L.faceLoading('Đang tải danh sách văn bản…')));
-      const r = await model.loadWordOptions();
-      body.innerHTML = '';
-      if (!r.ok) {
-        body.append(face(L.faceError(r.error)));
-        box.append(btn('Đóng', '', close));
-        return;
-      }
-      const checks = [];
-      for (const d of model.state.wordOptions || []) {
-        const lab = h('label', 'cd-check-row');
-        const cb = h('input');
-        cb.type = 'checkbox';
-        cb.disabled = !d.ready;
-        cb.setAttribute('aria-label', d.display_name);
-        lab.append(cb, h('span', '', d.display_name));
-        if (!d.ready) {
-          lab.append(h('span', 'muted',
-            ` — ${BLOCK_REASON_LABEL[d.block_reason] ||
-              'chưa sẵn sàng'}`));
-        }
-        box.append(lab);
-        checks.push({ key: d.document_key, cb });
-      }
-      const destLabel = h('span', 'muted', 'Chưa chọn thư mục');
-      let dest = null;
-      const pickDir = btn('Chọn thư mục…', '', async () => {
-        const r2 = await pickFiles({ directory: true });
-        if (!r2.ok) { notify(`${r2.error.code}: ${r2.error.message}`, true); return; }
-        if (!r2.data.files.length) return;
-        dest = r2.data.files[0];
-        destLabel.textContent = dest.path;
-      });
-      const out = h('div', 'cd-slot');
-      const go = btn('Xuất', 'primary', async () => {
-        const keys = checks.filter((c) => c.cb.checked).map((c) => c.key);
-        if (!keys.length) {
-          notify('Chưa chọn văn bản nào.', true);
-          return;
-        }
-        if (!dest) {
-          notify('Chưa chọn thư mục đích.', true);
-          return;
-        }
-        go.disabled = true;
-        const rr = await model.exportWord(keys, {
-          path: dest.path, scope: 'machine_local', is_dir: true });
-        go.disabled = false;
-        out.innerHTML = '';
-        const res = model.state.wordResult;
-        if (res && res.documents) {
-          for (const d of res.documents) {
-            const row = h('div', 'cd-word-row');
-            if (d.status === 'saved') {
-              row.append(h('span', 'cd-badge cd-badge-ok', 'Đã lưu'));
-              row.append(h('span', '', d.actual_filename || ''));
-              const op = btn('Mở', '', () =>
-                openPath(d.output_file && d.output_file.path));
-              row.append(op);
-            } else if (d.status === 'skipped') {
-              row.append(h('span', 'cd-badge', 'Bỏ qua'));
-              row.append(h('span', 'muted', d.display_name));
-            } else {
-              row.append(h('span', 'cd-badge cd-badge-err', 'Lỗi'));
-              row.append(h('span', '', d.display_name));
-              row.append(h('span', 'error',
-                (d.error && (BLOCK_REASON_LABEL[d.error.code] ||
-                             d.error.message)) || ''));
-            }
-            out.append(row);
-          }
-        } else if (!rr.ok) {
-          out.append(face(L.faceError(rr.error)));
-        }
-        // Khong tu dong popup khi con loi (spec §7) — nguoi dung dong.
-      });
-      go.disabled = !model.canWrite();   // export_batch la write (§5.3)
-      const row = h('div', 'cd-toolbar');
-      row.append(pickDir, go, btn('Đóng', '', close));
-      box.append(row, destLabel, out);
-    });
+    if (wordDlg) wordDlg.open();
+    else notify('word-export-dialog.js chua nap.', true);
   }
 
   // ---------- conflict dialog ----------
@@ -879,7 +540,6 @@ function createNotaryModuleView(deps) {
 
   // ---------- workspace root ----------
 
-  let calcOpen = false;
   const openRowIds = new Set();   // row_id cac dong Stage dang mo (detail)
 
   function workspaceEl(onBack) {
@@ -948,7 +608,13 @@ function createNotaryModuleView(deps) {
       if (!ok) return;
     }
     activeTab = 'drafting';
-    model.openCase(id);
+    try {
+      await model.openCase(id);
+    } catch (e) {
+      // client.run reject (bridge/engine loi khong bat duoc) — model da
+      // set state loi rieng; day chi chan unhandled rejection.
+      notify(`openCase lỗi: ${e && e.message || e}`, true);
+    }
   };
 
   panels.overview.append(buildCaseListPanel(openCaseInDrafting));
@@ -980,11 +646,15 @@ function createNotaryModuleView(deps) {
       el.hidden = k !== activeTab;
     }
     const dp = panels.drafting;
-    // Emit nen (jobUpdate/status poll) trong luc dang go trong row detail:
-    // hoan rebuild de input khong mat focus/gia tri — render sau lan emit
-    // ke tiep (blur/change hoac action tiep theo cua nguoi dung).
+    // Emit nen (jobUpdate/status poll) trong luc dang go trong drafting
+    // panel: hoan rebuild de input khong mat focus/gia tri — render sau
+    // lan emit ke tiep (blur/change hoac action tiep theo cua nguoi
+    // dung). Bat ky input/textarea/select nao trong panel (row detail,
+    // pool search, ...), khong chi .cd-row-detail.
     const ae = document.activeElement;
-    if (ae && dp.contains(ae) && ae.closest('.cd-row-detail')) {
+    if (ae && dp.contains(ae) &&
+        (ae.closest('.cd-row-detail') ||
+         /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName || ''))) {
       return;
     }
     dp.innerHTML = '';

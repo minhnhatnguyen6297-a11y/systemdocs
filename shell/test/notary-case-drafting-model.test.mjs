@@ -201,7 +201,7 @@ function fakeClient(seed) {
         return ok({
           schema_version: 'notary.case-drafting.v1',
           suggestions: [{
-            suggestion_id: '99999999-9999-4999-8999-999999999999',
+            suggestion_id: crypto.randomUUID(),   // moi lan mot id (backend sinh)
             source_id: sid,
             target: 'person',
             fields: {
@@ -419,6 +419,93 @@ test('commitStage: stage_validation_error → fieldErrors theo row_id, stage giu
   // sua field → loi cua field do duoc gỡ
   model.updatePersonField(row.row_id, 'ho_ten', 'Đã sửa');
   assert.equal(model.fieldErrorsFor(row.row_id).length, 0);
+});
+
+test('commitStage giu draft diagram dirty: khong mat assignment, prune personId ngoai stage moi', async () => {
+  // Review MIN-112: commit stage khong duoc xoa ngam draft diagram —
+  // assignment chua luu phai con, diagramDirty giu true.
+  const { model } = makeModel(seedCases('diagram-warning'));
+  await model.openCase(46);
+  const s = model.state;
+  assert.equal(s.diagram.nodes.length, 2);      // owner, spouse
+
+  // Draft dirty: gan E (dang o Pool) vao slot moi.
+  const node = model.addSlot();
+  const e = s.committed.people.find((p) => p.ho_ten === 'Người Mẫu E');
+  assert.ok(model.assignPerson(node.id, e.row_id));
+  assert.equal(s.diagramDirty, true);
+  // Gia lap tham chieu stale trong draft (personId khong con trong stage
+  // committed sau commit) — server _prune_diagram se bo no.
+  const staleNode = model.addSlot();
+  staleNode.personId = '99999999-9999-4999-8999-999999999999';
+  const beforeCount = s.diagram.nodes.length;
+
+  // Stage dirty bang edit field (khong xoa dong) → commit.
+  model.updatePersonField(s.stage.people[0].row_id, 'ho_ten',
+                          'Người Mẫu A đổi');
+  const r = await model.commitStage();
+  assert.equal(r.ok, true);
+  assert.equal(s.revision, 6);                    // 5 → 6
+  assert.equal(s.stageDirty, false);
+  assert.equal(s.diagramDirty, true);             // draft KHONG bi xoa
+  assert.equal(s.diagram.nodes.length, beforeCount); // node giu nguyen
+  // assignment hop le con nguyen
+  const kept = s.diagram.nodes.find((n) => n.id === node.id);
+  assert.equal(kept.personId, e.row_id);
+  // assignment cu tren owner/spouse con nguyen (khong bi reset bang
+  // server state — server state giong vi khong prune gi them)
+  assert.equal(
+    s.diagram.nodes.find((n) => n.id === 'owner').personId,
+    '11111111-1111-4111-8111-111111111111');
+  // tham chieu stale bi prune (mirror _prune_diagram client-side)
+  assert.equal(
+    s.diagram.nodes.find((n) => n.id === staleNode.id).personId, null);
+  // baseline committed nap theo server (2 node, khong co slot draft)
+  assert.equal(s.committedDiagram.nodes.length, 2);
+  // renderModel/ref moi tu commit van cap nhat
+  assert.ok(s.renderModel);
+  // evaluatedRevision giu nguyen (null — chua evaluate) de badge stale
+  // co the bao: rm hien thi mo ta committed, chua mo ta draft.
+  assert.equal(s.evaluatedRevision, null);
+});
+
+test('commitStage khi diagram sach: nap state server + evaluatedRevision = revision moi', async () => {
+  const { model } = makeModel(seedCases('diagram-warning'));
+  await model.openCase(46);
+  const s = model.state;
+  assert.equal(s.diagramDirty, false);
+  model.updatePersonField(s.stage.people[0].row_id, 'ho_ten', 'Đổi tên');
+  const r = await model.commitStage();
+  assert.equal(r.ok, true);
+  assert.equal(s.diagramDirty, false);
+  assert.equal(s.revision, 6);
+  // rm tu commit evaluate tren stage@6 → khong con "stale"
+  assert.equal(s.evaluatedRevision, 6);
+});
+
+test('commitStage voi draft dirty: xoa person khoi stage → draft prune personId do', async () => {
+  // removeStageRow da mirror prune ngay luc xoa; commit-time prune la
+  // lop thu hai khi server tra committed stage khac draft (dedupe/merge).
+  const { model } = makeModel(seedCases('diagram-warning'));
+  await model.openCase(46);
+  const s = model.state;
+  const b = s.committed.people.find((p) => p.ho_ten === 'Người Mẫu B');
+  // draft dirty bang flag doi tren node spouse
+  assert.ok(model.setNodeFlag('spouse', 'willReceive', false));
+  // xoa B khoi stage draft → mirror prune spouse.personId ngay
+  model.removeStageRow(b.row_id);
+  const r = await model.commitStage();
+  assert.equal(r.ok, true);
+  assert.equal(s.diagramDirty, true);             // draft van chua luu
+  assert.equal(
+    s.diagram.nodes.find((n) => n.id === 'spouse').personId, null);
+  // flag willReceive=false (thay doi draft) van giu — draft khong bi
+  // thay bang ban server
+  assert.equal(
+    s.diagram.nodes.find((n) => n.id === 'spouse').willReceive, false);
+  // B khong con trong committed stage moi
+  assert.equal(
+    s.committed.people.some((p) => p.row_id === b.row_id), false);
 });
 
 test('commitStage: workspace_conflict → status conflict + server_revision', async () => {
@@ -752,4 +839,178 @@ test('onChange: subscriber duoc goi sau mutation/load', async () => {
 test('model khong depend DOM: module load duoc trong node (khong window)', () => {
   assert.ok(M.createModel);
   assert.equal(typeof M.createModel, 'function');
+});
+
+// ---------- MIN-112: intake/word wiring day du ----------
+
+test('intakeAnalyze: lan chay sau them suggestion LEN DAU, khong xoa ngam cu', async () => {
+  const { model } = makeModel(seedCases('empty'));
+  await model.openCase(43);
+  await model.intakeAnalyze([
+    { source_id: crypto.randomUUID(), kind: 'text', text: 'lan 1' }]);
+  const firstId = model.state.suggestions[0].suggestion_id;
+  await model.intakeAnalyze([
+    { source_id: crypto.randomUUID(), kind: 'text', text: 'lan 2' }]);
+  assert.equal(model.state.suggestions.length, 2);
+  // ket qua moi nhat dung dau danh sach (plan §13 — them len tren)
+  assert.notEqual(model.state.suggestions[0].suggestion_id, firstId);
+  assert.equal(model.state.suggestions[1].suggestion_id, firstId);
+});
+
+test('intakeAnalyze: opts passthrough (onJob cho progress/cancel); user_canceled → notice khong phai error', async () => {
+  const { model, client } = makeModel(seedCases('empty'));
+  await model.openCase(43);
+  let gotJob = null;
+  const orig = client.run.bind(client);
+  client.run = async (cmd, payload, opts) => {
+    if (opts && opts.onJob) opts.onJob({ job_id: 'j_intake_9' });
+    return orig(cmd, payload);
+  };
+  await model.intakeAnalyze(
+    [{ source_id: crypto.randomUUID(), kind: 'text', text: 'x' }],
+    { onJob: (j) => { gotJob = j.job_id; } });
+  assert.equal(gotJob, 'j_intake_9');   // dialog can job_id de cancel
+  // user_canceled: khong phai loi — giu suggestion cu, hien notice
+  client.run = async () => ({ ok: false, error: {
+    code: 'user_canceled', message: 'nguoi dung huy', retryable: false } });
+  const before = model.state.suggestions.length;
+  const r = await model.intakeAnalyze(
+    [{ source_id: crypto.randomUUID(), kind: 'text', text: 'y' }]);
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, 'user_canceled');
+  assert.equal(model.state.error, null);
+  assert.equal(model.state.notice, 'Đã hủy phân tích');
+  assert.equal(model.state.suggestions.length, before);
+  assert.equal(model.state.intakeBusy, false);
+});
+
+test('intakeAnalyze: loi that → state.error; intakeErrors tich luy tu data.errors', async () => {
+  const { model, client } = makeModel(seedCases('empty'));
+  await model.openCase(43);
+  client.run = async () => ({ ok: false, error: {
+    code: 'engine_not_installed', message: 'thieu OCR', retryable: false } });
+  const r = await model.intakeAnalyze(
+    [{ source_id: crypto.randomUUID(), kind: 'image',
+       file_ref: { file_token: 't' } }]);
+  assert.equal(r.ok, false);
+  assert.equal(model.state.error.code, 'engine_not_installed');
+  assert.equal(model.state.intakeBusy, false);
+});
+
+test('exportWord: opts passthrough; word_batch_failed → wordResult normalized per-doc', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  let gotJob = null;
+  const orig = client.run.bind(client);
+  client.run = async (cmd, payload, opts) => {
+    if (opts && opts.onJob) opts.onJob({ job_id: 'j_word_1' });
+    return orig(cmd, payload);
+  };
+  await model.exportWord(['khai_nhan_di_san'],
+    { file_token: 't-dir' }, { onJob: (j) => { gotJob = j.job_id; } });
+  assert.equal(gotJob, 'j_word_1');
+
+  // all-failed: error.details.documents (dang compact) → normalize thanh
+  // document rows day du de UI render thong nhat.
+  client.run = async () => ({ ok: false,
+    job: { status: 'failed' },
+    error: { code: 'word_batch_failed', message: 'tat ca loi',
+             retryable: true, next_action: 'retry',
+             details: { documents: [
+               { document_key: 'niem_yet', code: 'word.template_missing',
+                 message: 'chua co template' } ] } } });
+  const r = await model.exportWord(['niem_yet'], { file_token: 't' });
+  assert.equal(r.ok, false);
+  const res = model.state.wordResult;
+  assert.ok(res && res.documents, 'wordResult.documents phai co');
+  assert.equal(res.documents[0].document_key, 'niem_yet');
+  assert.equal(res.documents[0].status, 'failed');
+  assert.equal(res.documents[0].error.code, 'word.template_missing');
+});
+
+// ---------- MIN-112 review: unsaved transition + dedupe suggestion ----------
+
+test('onUnsavedChange: emit dung transition dirty→clean, promise rejection khong sap emit', async () => {
+  const seen = [];
+  const client = fakeClient(seedCases('empty'));
+  const model = M.createModel({ client, uuid,
+    onUnsavedChange: (d) => { seen.push(d); } });
+  await model.openCase(43);
+  assert.deepEqual(seen, []);                     // load sach — khong phat
+  model.addPerson({ ho_ten: 'X' });
+  assert.deepEqual(seen, [true]);                 // idle → dirty
+  model.updatePersonField(
+    model.state.stage.people[0].row_id, 'ngay_sinh', '1990');
+  assert.deepEqual(seen, [true]);                 // van dirty — khong lap
+  const r = await model.commitStage();
+  assert.equal(r.ok, true);
+  assert.deepEqual(seen, [true, false]);          // dirty → clean
+
+  // Callback tra promise reject (bridge IPC chet) — emit khong sap,
+  // khong unhandled rejection.
+  const m2 = M.createModel({ client: fakeClient(seedCases('empty')),
+    uuid, onUnsavedChange: () => Promise.reject(new Error('bridge dead')) });
+  await m2.openCase(43);
+  m2.addPerson({ ho_ten: 'Z' });                  // khong throw
+  assert.equal(m2.state.stageDirty, true);
+});
+
+test('intakeAnalyze: suggestion_id trung → dedupe, ban moi thay ban cu o dau', async () => {
+  const { model, client } = makeModel(seedCases('empty'));
+  await model.openCase(43);
+  await model.intakeAnalyze([
+    { source_id: crypto.randomUUID(), kind: 'text', text: 'lan 1' }]);
+  const first = model.state.suggestions[0];
+  // Lan analyze sau emit lai suggestion_id da co (re-analyze cung nguon)
+  // → ban moi thay ban cu, khong nhan doi entry trong tray.
+  const orig = client.run.bind(client);
+  client.run = async (cmd, payload) => {
+    const r = await orig(cmd, payload);
+    if (cmd === 'notary.intake_analyze' && r.ok) {
+      r.data.suggestions[0].suggestion_id = first.suggestion_id;
+      r.data.suggestions[0].fields.ho_ten.normalized_value = 'Bản Mới';
+    }
+    return r;
+  };
+  await model.intakeAnalyze([
+    { source_id: crypto.randomUUID(), kind: 'text', text: 'lan 2' }]);
+  assert.equal(model.state.suggestions.length, 1);
+  assert.equal(model.state.suggestions[0].suggestion_id,
+               first.suggestion_id);
+  assert.equal(
+    model.state.suggestions[0].fields.ho_ten.normalized_value, 'Bản Mới');
+  // id khac van xep chong binh thuong
+  client.run = orig;
+  await model.intakeAnalyze([
+    { source_id: crypto.randomUUID(), kind: 'text', text: 'lan 3' }]);
+  assert.equal(model.state.suggestions.length, 2);
+});
+
+test('exportWord: canceled job giu result (breakdown.skipped len wire — MIN-115)', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  client.run = async () => ({ ok: false,
+    job: { status: 'canceled',
+      result: { data: {
+        schema_version: 'notary.case-drafting.v1',
+        documents: [
+          { document_key: 'khai_nhan_di_san', display_name: 'KN',
+            status: 'saved', actual_filename: 'a.docx',
+            output_file: { path: 'D:/o/a.docx', scope: 'machine_local' },
+            error: null },
+          { document_key: 'thoa_thuan_phan_chia', display_name: 'TT',
+            status: 'skipped', actual_filename: null,
+            output_file: null, error: null },
+        ],
+        breakdown: { succeeded: ['khai_nhan_di_san'], failed: [],
+                     skipped: ['thoa_thuan_phan_chia'] } } } },
+    error: { code: 'user_canceled', message: 'da huy', retryable: false } });
+  const r = await model.exportWord(
+    ['khai_nhan_di_san', 'thoa_thuan_phan_chia'], { file_token: 't' });
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, 'user_canceled');
+  const res = model.state.wordResult;
+  assert.equal(res.breakdown.skipped.length, 1);
+  assert.equal(res.documents[1].status, 'skipped');
+  assert.equal(model.state.wordBusy, false);
 });

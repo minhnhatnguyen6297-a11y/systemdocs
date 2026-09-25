@@ -14,6 +14,8 @@ const { makeLogger, redactString } = require('./redact');
 const { SidecarManager } = require('./sidecar');
 const { JobTracker } = require('./job-tracker');
 const { registerIpc } = require('./ipc');
+const { makeFileTokenStore, pickedEntry } = require('./file-tokens');
+const { openPathBlockReason } = require('./open-path');
 
 const SHELL_ROOT = path.join(__dirname, '..', '..');
 const SMOKE = process.env.G1_SMOKE === '1'; // packaged smoke: chay probe roi thoat
@@ -29,6 +31,12 @@ let tracker = null;
 let log = makeLogger();
 let logPath = null;
 let allowClose = false;
+// Opaque file tokens (MIN-112): renderer chi nhan {file_token,name,...};
+// map token->FileRef song trong main, xoa khi window dong/reload/quit.
+const fileTokens = makeFileTokenStore();
+// Dirty flag renderer bao qua desktop.v1.setDirtyState — window-close
+// guard chan khi con nhap Stage/So do chua luu.
+let rendererDirty = false;
 
 async function pickFiles(opts = {}) {
   const properties = opts.directory
@@ -36,16 +44,20 @@ async function pickFiles(opts = {}) {
     : opts.multi === false ? ['openFile'] : ['openFile', 'multiSelections'];
   const res = await dialog.showOpenDialog(win, { properties, filters: opts.filters });
   if (res.canceled) return [];
-  // file_ref machine_local theo contract §6 — path tuyet doi tu native dialog
-  return res.filePaths.map((p) => {
-    const st = fs.statSync(p);
-    return {
-      path: p,
-      scope: 'machine_local',
-      size_bytes: st.isFile() ? st.size : null,
-      is_dir: st.isDirectory(),
-    };
-  });
+  // file_ref machine_local theo contract §6 — path tuyet doi tu native
+  // dialog chi song trong main; renderer nhan opaque token + basename.
+  return res.filePaths.map(
+    (p) => pickedEntry(fileTokens, p, fs.statSync(p)));
+}
+
+function registerDroppedFile(p) {
+  // File keo-tha: path den tu webUtils.getPathForFile (preload) — stat o
+  // main roi cap token nhu picker. Tra null khi khong doc duoc.
+  try {
+    return pickedEntry(fileTokens, p, fs.statSync(p));
+  } catch (err) {
+    return null;
+  }
 }
 
 async function openPath(opts = {}) {
@@ -61,6 +73,12 @@ async function openPath(opts = {}) {
   if (!fs.existsSync(p) || !fs.statSync(p).isFile()) {
     throw Object.assign(new Error('file khong ton tai'),
       { code: 'file_not_found' });
+  }
+  // Whitelist extension: chi mo tai lieu/san pham engine — khong cho
+  // renderer shell.openPath executable/script (.exe/.bat/.lnk...).
+  const block = openPathBlockReason(p);
+  if (block) {
+    throw Object.assign(new Error(block.message), { code: block.code });
   }
   const { shell } = require('electron');
   const err = await shell.openPath(p);
@@ -90,27 +108,45 @@ function createWindow() {
   });
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   win.on('close', async (e) => {
-    // Quit giua luc job con chay se drain sidecar -> job chet engine_shutdown.
-    // Chan de user quyet dinh (spec §4 — khong mat job vi thao tac dong).
+    // Quit giua luc job con chay se drain sidecar -> job chet engine_shutdown;
+    // quit giua luc con nhap chua luu se mat draft (chi song trong phien).
+    // Chan de user quyet dinh (spec §4/§6 — khong mat du lieu vi thao tac
+    // dong).
     if (allowClose || SMOKE) return;
     const active = tracker ? tracker.listActive().length : 0;
-    if (active === 0) return;
+    if (active === 0 && !rendererDirty) return;
     e.preventDefault();
     const r = await dialog.showMessageBox(win, {
       type: 'warning',
       buttons: ['Hủy', 'Vẫn thoát'],
       defaultId: 0,
       cancelId: 0,
-      title: 'Còn job đang chạy',
-      message: `Còn ${active} job chưa kết thúc.`,
-      detail: 'Thoát sẽ dừng engine; các job chuyển canceled (engine_shutdown).',
+      title: active ? 'Còn job đang chạy' : 'Thay đổi chưa lưu',
+      message: [
+        active ? `Còn ${active} job chưa kết thúc.` : null,
+        rendererDirty ? 'Stage/Sơ đồ còn bản nháp chưa lưu.' : null,
+      ].filter(Boolean).join(' '),
+      detail: 'Thoát sẽ dừng engine (job chuyển canceled) và mất bản nháp ' +
+        'chưa lưu trong phiên.',
     });
     if (r.response === 1) {
       allowClose = true;
       win.close();
     }
   });
-  win.on('closed', () => { win = null; });
+  win.on('closed', () => {
+    win = null;
+    rendererDirty = false;
+    fileTokens.clear();      // token chet cung window — khong reuse cross-session
+  });
+  // Renderer reload (Ctrl+R/F5 trong dev) huy map token — entry cu khong
+  // resolve duoc nua (token map chi song trong main, khong persist).
+  // Draft Stage/So do cung mat theo renderer cu → reset dirty flag de
+  // close-guard khong canh bao bong ma.
+  win.webContents.on('did-start-navigation', () => {
+    fileTokens.clear();
+    rendererDirty = false;
+  });
   // tat ca content la local — chan cua so moi va dieu huong ra ngoai
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (e) => e.preventDefault());
@@ -203,6 +239,9 @@ async function start() {
 
   registerIpc(ipcMain, {
     sidecar, tracker, pickFiles, openPath, logger: log,
+    fileTokens,
+    registerDroppedFile,
+    setDirty: (d) => { rendererDirty = !!d; },
     diagnostics: () => collectDiagnostics(),
   });
   createWindow();
@@ -224,6 +263,7 @@ app.on('second-instance', () => {
 });
 
 app.on('before-quit', async (event) => {
+  fileTokens.clear();
   if (sidecar && sidecar.state !== 'stopped' && !sidecar.stopping) {
     event.preventDefault();
     tracker && tracker.stop();

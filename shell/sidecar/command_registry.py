@@ -190,7 +190,8 @@ COMMANDS = {
     "diag.waiting_task": waiting_task,
     "diag.env_check": env_check,
     # notary_v2 (document-review module) — MIN-68
-    "notary.case_list": _notary("case_list"),
+    # case_list route qua gateway o COMMANDS.update ben duoi (MIN-112:
+    # overview Soạn hồ sơ can danh sach case tu mock khi dev).
     "notary.case_get": _notary("case_get"),
     "notary.case_create": _notary("case_create"),
     "notary.customer_list": _notary("customer_list"),
@@ -228,6 +229,9 @@ def _notary_drafting(fn_name):
 
 
 COMMANDS.update({
+    # Overview list cua tab Soạn hồ sơ — qua gateway de mock dev tra
+    # fixture case 42–46 cung shape _case_row real adapter (MIN-112).
+    "notary.case_list": _notary_drafting("case_list"),
     "notary.workspace_get": _notary_drafting("workspace_get"),
     "notary.intake_analyze": _notary_drafting("intake_analyze"),
     "notary.workspace_commit_stage":
