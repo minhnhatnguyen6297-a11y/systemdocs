@@ -7,7 +7,7 @@ from pathlib import Path
 
 from docx import Document
 
-from review_regex_samples import run_review
+from tools.review_regex_samples import run_review
 
 
 def make_docx(path: Path, *paragraphs: str) -> Path:

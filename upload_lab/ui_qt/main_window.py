@@ -56,10 +56,10 @@ from playwright_uploader import (
     read_uploader_env,
     update_uploader_env,
 )
-from ui.services.contract_book_audit import analyze_contract_book
-from ui.services.environment_check_service import finalize_report, format_report
-from ui.services.scan_classification_service import FolderScanRow, classify_scan_records
-from ui.services.upload_selection_service import UploadSelection
+from upload_services.contract_book_audit import analyze_contract_book
+from upload_services.environment_check_service import finalize_report, format_report
+from upload_services.scan_classification_service import FolderScanRow, classify_scan_records
+from upload_services.upload_selection_service import UploadSelection
 from ui_qt.widgets import (
     checked_record_ids,
     configure_audit_table_scrollbars,

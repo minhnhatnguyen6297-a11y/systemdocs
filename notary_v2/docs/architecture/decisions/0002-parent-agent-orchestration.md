@@ -97,9 +97,10 @@ progress.
 Recovery context has three layers and no new database or dependency:
 
 1. Stable rules live in `AGENTS.md`, accepted ADRs, and routed documentation.
-2. `memory-bank/CURRENT.md` is a short dashboard linking current task records
+2. `.agent/tasks/<ID>/brief.md` and `progress.md` are the current task records;
+   there is no separate dashboard file
    and showing verified Git state, blockers, and the next action.
-3. `memory-bank/tasks/<task-id>.md` stores recovery-critical state for each
+3. Additional files under `.agent/tasks/<ID>/` store recovery-critical state for each
    substantial active task.
 
 A task record persists the approved goal and scope, user decisions, branch and

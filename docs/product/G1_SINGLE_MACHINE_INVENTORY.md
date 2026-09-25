@@ -58,7 +58,7 @@ Remote refs khác tồn tại nhưng **không cần cho G1-SM** (đã kiểm tra
 (`3339b27`, đã chứa trong main), `codex/ui-regex-rebuild` (`0318393`, đã chứa trong main),
 `legacy/old-main` (`0a9ca02`, chỉ +35 dòng docs cũ).
 
-Trạng thái checkout hiện có: `D:/notary_v2` (main, `M memory-bank/CURRENT.md` chưa
+Trạng thái checkout hiện có: `D:/notary_v2` (main, `M .agent/tasks/<ID>/progress.md` chưa
 commit — **không phải thay đổi của task này**); `D:/upload_lab_repo` (main, sạch);
 worktree audit riêng ở `C:/Users/MINH/orca/workspaces/{notary_v2/g1-notary-audit-devin,
 upload_lab_repo/g1-upload-audit-devin, systemdocs/g1-single-machine-roadmap}`.
@@ -140,7 +140,7 @@ Ba nhánh base `1192154` (`inheritance-diagram-v2`, `zalo-document-inbox-v2`,
 | `zalo_connector/` (Node `zca-js` service: `src/connector.mjs` 949 dòng bản zalo / 344 bản diagram; `bin/run.mjs`; tests) | cả 3 | `zalo_connector/` trên `d350048`/`14fb368` |
 | 6 bảng Zalo: `zalo_connector_accounts`, `zalo_sources`, `zalo_media`, `zalo_message_texts`, `zalo_data_sync_runs`, `zalo_batches` | cả 3 | `models.py:186-300` trên `d350048` |
 | `scripts/ensure_zalo_env.py` | zalo | `d350048` |
-| `tools/document_conversion_poc/` + `requirements-poc-markitdown.txt` + golden manifest | markitdown | `664edb4` |
+| `tools/document_conversion_poc/` + `tools/document_conversion_poc/requirements.txt` + golden manifest | markitdown | `664edb4` |
 | Test mới: `test_word_engine.py`, `test_inheritance_engine.py`, `test_inheritance_research_catalog.py`, `test_zalo_env_setup.py`, `test_zalo_inbox.py`, `test_zalo_inbox_api.py`, `cases_word_export_static.test.mjs`, `diagram_edges.test.mjs`, `zalo_inbox_ui_static.test.mjs`, `test_document_conversion_poc.py`; fixture `tests/fixtures/inheritance_research_cases.json` | theo nhánh | `git diff --name-status main...branch -- tests/` |
 | Xóa so với main: `preview.html`, `macros.html`, `_document_template.html`, `inheritance_engine.js`, vendor ReactFlow/dagre | cả 3 (luồng case cũ bị thay bởi v2) | `git diff main...branch` |
 
@@ -162,9 +162,9 @@ ngoài `.venv`/`tests`). UI↔engine đi in-process qua Qt signals + command que
 
 | Màn hình | Vai trò | Tag | Owner | Source | Baseline test | Issue nhận |
 |---|---|---|---|---|---|---|
-| "Audit Sổ Công Chứng" (excelTab) | Tải/nạp sổ Excel từ web tỉnh, đối chiếu, phát hiện số hở | CHUYỂN UI | upload_lab | `main_window.py:142-144,164-339`; `ui/services/contract_book_audit.py`, `web_list_service.py` | `test_contract_book_audit.py` (8), `test_web_list_service.py` (4) | MIN-69 |
-| "Quét & Upload Hồ Sơ" (folderTab) | Chọn folder → scan/extract → bảng kết quả → chọn → prefill | CHUYỂN UI | upload_lab | `main_window.py:148-150,340-520`; `ui/services/folder_workflow_service.py`, `scan_classification_service.py`, `upload_selection_service.py` | `test_upload_batch_scan.py` (14), `test_scan_classification_service.py` (6), `test_upload_selection_service.py` (6), `test_upload_lab_extract_contract.py` (18) | MIN-69 |
-| "Cấu Hình & Hệ Thống" (regexTab) | Cấu hình URL/session, kiểm tra môi trường, mở đăng nhập | CHUYỂN UI | upload_lab | `main_window.py:154-156,521-577`; `ui/services/environment_check_service.py` | `test_environment_check_service.py` (11) | MIN-69 |
+| "Audit Sổ Công Chứng" (excelTab) | Tải/nạp sổ Excel từ web tỉnh, đối chiếu, phát hiện số hở | CHUYỂN UI | upload_lab | `main_window.py:142-144,164-339`; `upload_lab/upload_services/contract_book_audit.py`, `web_list_service.py` | `test_contract_book_audit.py` (8), `test_web_list_service.py` (4) | MIN-69 |
+| "Quét & Upload Hồ Sơ" (folderTab) | Chọn folder → scan/extract → bảng kết quả → chọn → prefill | CHUYỂN UI | upload_lab | `main_window.py:148-150,340-520`; `upload_lab/upload_services/folder_workflow_service.py`, `scan_classification_service.py`, `upload_selection_service.py` | `test_upload_batch_scan.py` (14), `test_scan_classification_service.py` (6), `test_upload_selection_service.py` (6), `test_upload_lab_extract_contract.py` (18) | MIN-69 |
+| "Cấu Hình & Hệ Thống" (regexTab) | Cấu hình URL/session, kiểm tra môi trường, mở đăng nhập | CHUYỂN UI | upload_lab | `main_window.py:154-156,521-577`; `upload_lab/upload_services/environment_check_service.py` | `test_environment_check_service.py` (11) | MIN-69 |
 | "Nhật Ký Hệ Thống" (logsPage) | Log viewer | CHUYỂN UI | upload_lab | `main_window.py:160-162,578-606` | `test_qt_ui_structure.py` (19) | MIN-69 |
 
 ### 3.2 Engine / thao tác
@@ -173,13 +173,13 @@ ngoài `.venv`/`tests`). UI↔engine đi in-process qua Qt signals + command que
 |---|---|---|---|
 | Đọc `.docx` giữ thứ tự đoạn+bảng; đọc `.doc` qua Windows IFilter `query.dll` | GIỮ PYTHON ENGINE | `extract_contract.py:99-131,133-160,247-266` | `test_upload_lab_extract_contract.py` |
 | Phân loại văn bản + bóc trường (6 doc_kind, regex label-anchor) | GIỮ PYTHON ENGINE | `extract_contract.py:526-780+`; `docs/regex-rules.md` | `test_upload_lab_extract_contract.py`, `test_regex_lab.py` (7), `test_regex_review_samples.py` (3) |
-| Quét folder → manifest `runs/`, JSON `output/`, ghi `registry.sqlite3` | GIỮ PYTHON ENGINE | `batch_scan.py:106-282,353-371,432+`; `ui/services/folder_workflow_service.py` | `test_upload_batch_scan.py` |
+| Quét folder → manifest `runs/`, JSON `output/`, ghi `registry.sqlite3` | GIỮ PYTHON ENGINE | `batch_scan.py:106-282,353-371,432+`; `upload_lab/upload_services/folder_workflow_service.py` | `test_upload_batch_scan.py` |
 | Trạng thái registry: `matched`, `extracted`, `prepared_dry_run`, `prepared_partial`, `uploaded_success`, `extract_failed`, `upload_failed`, `skipped_*` | GIỮ PYTHON ENGINE | `batch_scan.py:353-365,575,627,687,713,744,786`; `playwright_uploader.py:81-83` | `test_upload_batch_scan.py`, `test_playwright_uploader.py` (24) |
-| Audit sổ Excel, chuẩn hóa `xxx/yyyy`, phát hiện số hở | GIỮ PYTHON ENGINE | `ui/services/contract_book_audit.py` | `test_contract_book_audit.py` |
+| Audit sổ Excel, chuẩn hóa `xxx/yyyy`, phát hiện số hở | GIỮ PYTHON ENGINE | `upload_lab/upload_services/contract_book_audit.py` | `test_contract_book_audit.py` |
 | Playwright session: preflight → login tay → storage state → mở N tab → dry-run → detect `POST /api/hoso` → `uploaded_success` | GIỮ PYTHON ENGINE | `playwright_uploader.py:816+` (`NamDinhUploaderSession`); handshake: `docs/handoff-login-handshake.md` | `test_playwright_uploader.py` |
 | Selectors web tỉnh | GIỮ PYTHON ENGINE | `uploader_selectors.py` (180 dòng) | — |
 | Command queue `UploadWorker` (một Python thread sở hữu Playwright sync) | GIỮ PYTHON ENGINE — **điểm bám DesktopCommand** | `ui_qt/workers.py:57-238` (slots: prepare/start_login/preflight/confirm_login/download/refresh_options/reload_options/close) | `test_qt_ui_structure.py` |
-| Env check (OS, quyền ghi, đĩa, deps, mạng/DNS, HTTPS, proxy) + redaction | GIỮ PYTHON ENGINE | `ui/services/environment_check_service.py:389-478` | `test_environment_check_service.py` |
+| Env check (OS, quyền ghi, đĩa, deps, mạng/DNS, HTTPS, proxy) + redaction | GIỮ PYTHON ENGINE | `upload_lab/upload_services/environment_check_service.py:389-478` | `test_environment_check_service.py` |
 | Regex lab CLI + review samples | ⚠ CẦN OWNER — công cụ dev, giữ CLI hay bỏ khỏi shell? | `regex_lab.py`, `review_regex_samples.py`, `regex_review_samples/` (input/reports rỗng trong repo) | `test_regex_lab.py`, `test_regex_review_samples.py` |
 | Bootstrap/packaging: `run.bat`, `run_ui.bat`, `bootstrap_ui.py`, `ui_runner.py`, `build_standalone_release.ps1` → `_release/` | NGOÀI PHẠM VI (thay bằng Electron packaging; giữ làm entrypoint rollback) | repo root | — |
 
@@ -266,7 +266,7 @@ riêng từng nhánh — làm khi P0 duyệt và task cụ thể cần); Electro
    tính năng parked — bootstrap nặng cho packaged app.
 7. `ID template/*.jpg` tracked trong git — kiểm tra độ nhạy cảm trước khi mang
    vào fixture/test G1-SM.
-8. `memory-bank/CURRENT.md` trên `D:/notary_v2` đang dirty (không phải của task
+8. `.agent/tasks/<ID>/progress.md` trên `D:/notary_v2` đang dirty (không phải của task
    này); nội dung memory-bank lạc hậu (main `8e0b5ab` vs thật `9a9bf9a`).
 9. Linear issues MIN-75/MIN-68/MIN-69 còn ghi "qua LAN" trong khi scope G1-SM là
    một máy — cần SM-00 đồng bộ Linear sau khi owner duyệt design spec.

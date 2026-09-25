@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import patch
 
 from playwright_uploader import NamDinhUploaderSession, UploaderSettings
-from ui.services.environment_check_service import (
+from upload_services.environment_check_service import (
     BLOCKED,
     PASSED,
     WARNING,
@@ -109,11 +109,11 @@ class EnvironmentCheckServiceTests(unittest.TestCase):
         self.assertNotIn("secret", json.dumps(network))
 
     def test_windows_10_is_compatibility_warning(self):
-        with patch("ui.services.environment_check_service.platform.system", return_value="Windows"), patch(
-            "ui.services.environment_check_service.platform.machine", return_value="AMD64"
+        with patch("upload_services.environment_check_service.platform.system", return_value="Windows"), patch(
+            "upload_services.environment_check_service.platform.machine", return_value="AMD64"
         ), patch(
-            "ui.services.environment_check_service.platform.release", return_value="10"
-        ), patch("ui.services.environment_check_service._memory_gib", return_value=8.0):
+            "upload_services.environment_check_service.platform.release", return_value="10"
+        ), patch("upload_services.environment_check_service._memory_gib", return_value=8.0):
             step = _check_operating_system()
 
         self.assertEqual(step.status, WARNING)
@@ -122,7 +122,7 @@ class EnvironmentCheckServiceTests(unittest.TestCase):
     def test_low_disk_space_is_blocked(self):
         usage = SimpleNamespace(free=400 * 1024 * 1024)
         with tempfile.TemporaryDirectory() as temp_dir, patch(
-            "ui.services.environment_check_service.shutil.disk_usage", return_value=usage
+            "upload_services.environment_check_service.shutil.disk_usage", return_value=usage
         ):
             step = _check_disk_space(Path(temp_dir))
 

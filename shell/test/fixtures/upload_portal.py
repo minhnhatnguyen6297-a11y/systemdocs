@@ -882,7 +882,7 @@ def make_fake_provider(portal: FakePortal, *, website_id: str = "fake_portal"):
                 from engine_roots import import_engine_module as _imp
 
                 audit_module = _imp(
-                    "upload_lab", "ui.services.contract_book_audit")
+                    "upload_lab", "upload_services.contract_book_audit")
                 return audit_module.analyze_contract_book(
                     Path(path), from_date=from_date, to_date=to_date)
 

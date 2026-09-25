@@ -7,8 +7,8 @@ from pathlib import Path
 from PySide6.QtCore import QObject, Signal, Slot
 
 from playwright_uploader import NamDinhUploaderSession, load_uploader_settings
-from ui.services.environment_check_service import run_environment_checks
-from ui.services.folder_workflow_service import run_folder_scan
+from upload_services.environment_check_service import run_environment_checks
+from upload_services.folder_workflow_service import run_folder_scan
 
 
 class FolderScanWorker(QObject):

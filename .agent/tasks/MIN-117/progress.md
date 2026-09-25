@@ -15,7 +15,7 @@ Module engine load runtime qua `engine_roots` (không bundle source):
   word_batch_export}`,
   `routers.{customers, properties, participants, ocr_ai}`.
 - `upload_adapter`/`upload_session` → `batch_scan`, `extract_contract`,
-  `ui.services.{contract_book_audit, environment_check_service}`,
+  `upload_services.{contract_book_audit, environment_check_service}`,
   `playwright_uploader`, `uploader_selectors`.
 - `command_registry` → `docx`, `pymupdf` (lazy, trong `_preview`).
 

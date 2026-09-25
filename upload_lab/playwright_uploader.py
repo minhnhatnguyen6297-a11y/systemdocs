@@ -48,9 +48,9 @@ except ImportError:  # pragma: no cover
     )
 
 try:
-    from ui.services.environment_check_service import redact_text, safe_url
+    from upload_services.environment_check_service import redact_text, safe_url
 except ImportError:  # pragma: no cover
-    from .ui.services.environment_check_service import redact_text, safe_url
+    from .upload_services.environment_check_service import redact_text, safe_url
 
 try:
     from uploader_selectors import (

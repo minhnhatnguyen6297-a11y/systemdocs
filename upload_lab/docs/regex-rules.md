@@ -101,7 +101,7 @@ Khi cần bổ sung thêm một loại văn bản mới vào hệ thống:
    - Nếu đương sự có cấu trúc mới $\rightarrow$ Bổ sung hàm parse đương sự và cập nhật `_fmt_duong_su_by_kind()`.
    - Nếu tài sản có marker đặc thù $\rightarrow$ Bổ sung `_find_tai_san_<kind>()` và tích hợp vào `_find_tai_san_by_kind()`.
 5. **Thêm Unit Test**: Bổ sung test case vào `tests/test_upload_lab_extract_contract.py`.
-6. **Chạy đối chiếu mẫu thực tế**: Đặt file vào `regex_review_samples/input/` và chạy `review_regex_samples.py`.
+6. **Chạy đối chiếu mẫu thực tế**: Đặt file vào `regex_review_samples/input/` và chạy `tools/review_regex_samples.py`.
 
 ## Future runtime LLM
 

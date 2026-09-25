@@ -136,7 +136,7 @@ class QtUIStructureTests(unittest.TestCase):
         from PySide6.QtCore import Qt
         from PySide6.QtWidgets import QApplication
 
-        from ui.services.scan_classification_service import FolderScanRow, ScanClassification
+        from upload_services.scan_classification_service import FolderScanRow, ScanClassification
         from ui_qt.main_window import UploadLabMainWindow
 
         app = QApplication.instance() or QApplication([])
@@ -192,7 +192,7 @@ class QtUIStructureTests(unittest.TestCase):
         from PySide6.QtCore import Qt
         from PySide6.QtWidgets import QApplication
 
-        from ui.services.scan_classification_service import FolderScanRow, ScanClassification
+        from upload_services.scan_classification_service import FolderScanRow, ScanClassification
         from ui_qt.main_window import UploadLabMainWindow
 
         app = QApplication.instance() or QApplication([])
@@ -336,7 +336,7 @@ class QtUIStructureTests(unittest.TestCase):
 
         from PySide6.QtWidgets import QApplication
 
-        from ui.services.scan_classification_service import FolderScanRow, ScanClassification
+        from upload_services.scan_classification_service import FolderScanRow, ScanClassification
         from ui_qt.main_window import UploadLabMainWindow
 
         app = QApplication.instance() or QApplication([])
@@ -435,7 +435,7 @@ class QtUIStructureTests(unittest.TestCase):
 
         from PySide6.QtWidgets import QApplication
 
-        from ui.services.scan_classification_service import FolderScanRow, ScanClassification
+        from upload_services.scan_classification_service import FolderScanRow, ScanClassification
         from ui_qt.main_window import UploadLabMainWindow
 
         app = QApplication.instance() or QApplication([])

@@ -30,7 +30,7 @@ decision. It writes measurement JSON and never writes the production DB.
 
 | File | Responsibility |
 |---|---|
-| `requirements-poc-markitdown.txt` | Optional POC dependencies; production requirements unchanged |
+| `tools/document_conversion_poc/requirements.txt` | Optional POC dependencies; production requirements unchanged |
 | `tools/document_conversion_poc/models.py` | Envelope, segment, OCR-call, warning/error models |
 | `tools/document_conversion_poc/policy.py` | Source router and cloud allow/deny decision |
 | `tools/document_conversion_poc/converter.py` | Local conversion and envelope construction |
@@ -43,7 +43,7 @@ decision. It writes measurement JSON and never writes the production DB.
 
 **Files:**
 
-- Create: `requirements-poc-markitdown.txt`
+- Create: `tools/document_conversion_poc/requirements.txt`
 - Create: `tools/document_conversion_poc/__init__.py`
 - Create: `tools/document_conversion_poc/models.py`
 - Test: `tests/test_document_conversion_poc.py`
@@ -83,7 +83,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```powershell
-git add requirements-poc-markitdown.txt tools/document_conversion_poc tests/test_document_conversion_poc.py
+git add tools/document_conversion_poc/requirements.txt tools/document_conversion_poc tests/test_document_conversion_poc.py
 git commit -m "test: add document conversion POC models"
 ```
 

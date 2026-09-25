@@ -1,7 +1,7 @@
 """Provider Nam Dinh — adapter mong toi engine upload_lab hien co.
 
 Khong viet lai business logic: moi ham goi thang vao playwright_uploader /
-batch_scan / ui.services.* voi `working_dir`/`base_dir` la data_dir cua
+batch_scan / upload_services.* voi `working_dir`/`base_dir` la data_dir cua
 website. Chi co mot provider that trong catalog production.
 """
 from __future__ import annotations
@@ -75,13 +75,13 @@ class NamDinhProvider(WebsiteProvider):
     def audit_excel(self, path, *, from_date, to_date):
         """analyze_contract_book that → ContractBookAnalysis (cau truc
         chung ma scan_classification_service/folder_workflow_service dung)."""
-        from ui.services.contract_book_audit import analyze_contract_book
+        from upload_services.contract_book_audit import analyze_contract_book
         return analyze_contract_book(
             Path(path), from_date=from_date, to_date=to_date)
 
     def env_check(self, data_dir):
         """Checklist moi truong that cua engine, scoped data_dir website."""
-        from ui.services.environment_check_service import (
+        from upload_services.environment_check_service import (
             run_environment_checks)
         resolved = self.assert_data_dir(data_dir)
         settings = self.load_settings(resolved)
@@ -90,7 +90,7 @@ class NamDinhProvider(WebsiteProvider):
     def run_scan(self, folder_path, data_dir, *, modified_since=None,
                  full_rescan=False, progress_callback=None):
         """run_folder_scan that — manifest ghi vao data_dir/runs."""
-        from ui.services.folder_workflow_service import run_folder_scan
+        from upload_services.folder_workflow_service import run_folder_scan
         resolved = self.ensure_data_layout(data_dir)
         return run_folder_scan(
             Path(folder_path),

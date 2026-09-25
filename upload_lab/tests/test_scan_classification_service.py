@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 import unittest
 
-from ui.services.contract_book_audit import ContractBookAnalysis, ContractBookRow
-from ui.services.scan_classification_service import classify_scan_records
+from upload_services.contract_book_audit import ContractBookAnalysis, ContractBookRow
+from upload_services.scan_classification_service import classify_scan_records
 
 
 @dataclass(frozen=True)

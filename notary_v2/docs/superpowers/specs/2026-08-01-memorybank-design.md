@@ -1,8 +1,12 @@
 # Memorybank kỹ thuật đồng bộ đa máy
 
-**Status:** IMPLEMENTED — người dùng chốt hướng `CURRENT.md`-first ngày 2026-08-06
+**Status:** HISTORICAL — thiết kế Memorybank cũ, đã được thay bằng task records trong `.agent/tasks/<ID>/`
 **Date:** 2026-08-01  
 **Scope:** Ngữ cảnh kỹ thuật và trạng thái làm việc của dự án `notary_v2`
+
+> Tài liệu này giữ lại để tham khảo lịch sử. Không dùng các hướng dẫn
+> `memory-bank/CURRENT.md` bên dưới cho phiên mới; nguồn hiện tại là
+> `AGENTS.md` và các task record dưới `.agent/tasks/<ID>/`.
 
 ## 1. Mục tiêu
 
@@ -56,7 +60,7 @@ Tóm tắt trạng thái theo milestone: đã hoàn tất, đang làm, còn lạ
 ### Bắt đầu trên một máy
 
 1. `git pull --rebase`.
-2. Đọc `memory-bank/CURRENT.md` trước.
+2. Đọc `AGENTS.md`, sau đó mở `brief.md` và `progress.md` của task đang làm trong `.agent/tasks/<ID>/`.
 3. Kiểm tra branch, commit, worktree và test claims trong file với Git hiện tại.
 4. Chỉ đọc tài liệu chuẩn hoặc file Memorybank mà `CURRENT.md` dẫn tới.
 5. Tiếp tục từ `Next exact action` nếu bằng chứng vẫn khớp.
@@ -78,7 +82,7 @@ Trạng thái chưa commit không được xem là đã đồng bộ. Với côn
 
 ## 5. Tích hợp với coding agent
 
-`AGENTS.md` có một route ngắn tới `memory-bank/CURRENT.md` chỉ cho trường hợp chuyển máy hoặc tiếp tục việc dở. Memorybank chỉ cung cấp ngữ cảnh vận hành; các hard rule trong `AGENTS.md` vẫn được ưu tiên.
+`AGENTS.md` có route tới task record trong `.agent/tasks/<ID>/` khi chuyển máy hoặc tiếp tục việc dở. Tài liệu này chỉ cung cấp ngữ cảnh lịch sử; các hard rule trong `AGENTS.md` vẫn được ưu tiên.
 
 Không bắt buộc agent đọc `README.md` hoặc `PROGRESS.md` ở mọi phiên. Chỉ mở khi `CURRENT.md` hoặc task hiện tại dẫn tới.
 

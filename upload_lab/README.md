@@ -30,7 +30,7 @@ flowchart LR
      thái bỏ qua tương ứng); không dùng tên trạng thái quét cũ.
    - Xuất file manifest chạy theo đợt vào `runs/<timestamp>.json`.
 
-### Giai đoạn 2: Đối chiếu & Phân loại hàng đợi (`ui/services/`)
+### Giai đoạn 2: Đối chiếu & Phân loại hàng đợi (`upload_services/`)
 1. **Kiểm toán Sổ Excel (`contract_book_audit.py`)**:
    - Đọc danh sách số công chứng đã có trên web (tải qua Playwright hoặc nạp file Excel có sẵn).
    - Chuẩn hóa số công chứng về định dạng `xxx/yyyy`.
@@ -93,8 +93,8 @@ upload_lab/
 |-- batch_scan.py                   # Quét folder, xuất manifest, ghi SQLite
 |-- playwright_uploader.py          # Script điều khiển trình duyệt Playwright
 |-- uploader_selectors.py           # Selectors định vị phần tử web form
-|-- regex_lab.py                    # CLI ingest/review/verify cho vòng lặp đánh giá regex
-|-- review_regex_samples.py         # Xuất báo cáo regex (CSV/JSON/XLSX) từ mẫu thực tế
+|-- tools/regex_lab.py                    # CLI ingest/review/verify cho vòng lặp đánh giá regex
+|-- tools/review_regex_samples.py         # Xuất báo cáo regex (CSV/JSON/XLSX) từ mẫu thực tế
 |-- build_standalone_release.ps1    # Script đóng gói bản phát hành độc lập
 |-- docs/
 |   |-- regex-rules.md              # Catalog quy tắc regex chuẩn cho các loại văn bản
@@ -106,7 +106,7 @@ upload_lab/
 |   |-- theme.py                    # Design token + QSS bổ sung trên nền qdarktheme
 |   |-- widgets.py                  # Widget dùng chung
 |   `-- workers.py                  # QThread worker cho scan / audit / upload
-|-- ui/services/                    # Nghiệp vụ kiểm toán Excel, phân loại scan & upload
+|-- upload_services/                    # Nghiệp vụ kiểm toán Excel, phân loại scan & upload
 |-- tools/inspect_ui_style.py       # Dump metric/màu widget để soi hồi quy giao diện
 |-- tests/                          # 109 unit tests bao phủ toàn bộ luồng
 `-- regex_review_samples/           # Thư mục chứa sample test và báo cáo đánh giá regex
@@ -150,6 +150,6 @@ theo contract [`../contracts/upload-workflow.md`](../contracts/upload-workflow.m
 - **Đánh giá Regex với mẫu thực tế**:
   Đặt file Word vào `regex_review_samples/input/` và chạy:
   ```powershell
-  .\.venv\Scripts\python.exe .\review_regex_samples.py
+  .\.venv\Scripts\python.exe .\tools\review_regex_samples.py
   ```
   *(Kết quả được ghi vào `regex_review_samples/reports/` dạng CSV, JSON và XLSX).*

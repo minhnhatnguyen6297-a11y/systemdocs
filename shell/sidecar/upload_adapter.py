@@ -156,7 +156,7 @@ def audit_excel(job, payload):
         raise CommandError("validation_error",
                            "can from_date + to_date (yyyy-mm-dd)")
     svc = import_engine_module(
-        "upload_lab", "ui.services.contract_book_audit")
+        "upload_lab", "upload_services.contract_book_audit")
     job.report_progress(0, 1, "doc so excel")
     analysis = svc.analyze_contract_book(
         excel, from_date=_ddmmyyyy(from_date), to_date=_ddmmyyyy(to_date))
@@ -198,7 +198,7 @@ def env_check(job, payload):
     """run_environment_checks that cua upload_lab (OS/quyen ghi/dia/deps/
     mang/DNS/HTTPS/proxy) — khong phai ban rut gon cua sidecar."""
     svc = import_engine_module(
-        "upload_lab", "ui.services.environment_check_service")
+        "upload_lab", "upload_services.environment_check_service")
     uploader = import_engine_module("upload_lab", "playwright_uploader")
     root = upload_workspace.legacy_data_dir()
     job.report_progress(0, 1, "kiem tra moi truong")
@@ -838,7 +838,7 @@ def _canonical_contract_no(value) -> str:
     `normalize_contract_no_for_compare` tho (giu so 0 → lech hai phia →
     upload trung)."""
     mod = import_engine_module(
-        "upload_lab", "ui.services.scan_classification_service")
+        "upload_lab", "upload_services.scan_classification_service")
     return mod._canonical_contract_no(value)
 
 
@@ -1159,7 +1159,7 @@ def upload_queue_get(job, payload):
             store.bump_queue_revision(run_id)
 
     classify_mod = import_engine_module(
-        "upload_lab", "ui.services.scan_classification_service")
+        "upload_lab", "upload_services.scan_classification_service")
     classification = classify_mod.classify_scan_records(records, analysis)
     job.check_cancel()
     return _result("upload_queue", {

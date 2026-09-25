@@ -6,7 +6,7 @@ from pathlib import Path
 
 from openpyxl import Workbook
 
-from ui.services.web_list_service import (
+from upload_services.web_list_service import (
     find_missing_contract_numbers,
     lookup_exported_contract_no,
     read_exported_contract_rows,

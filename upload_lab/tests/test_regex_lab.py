@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from docx import Document
 
-import regex_lab
+from tools import regex_lab
 
 
 def make_docx(path: Path, *lines: str) -> Path:

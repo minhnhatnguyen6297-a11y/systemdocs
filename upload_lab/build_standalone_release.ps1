@@ -20,7 +20,6 @@ $filesToCopy = @(
     "install_python_windows.ps1",
     "playwright_uploader.py",
     "README.md",
-    "review_regex_samples.py",
     "requirements.txt",
     "run.bat",
     "run_ui.bat",
@@ -30,7 +29,8 @@ $filesToCopy = @(
 
 $directoriesToCopy = @(
     "docs",
-    "ui",
+    "tools",
+    "upload_services",
     "ui_qt"
 )
 
@@ -57,6 +57,10 @@ foreach ($directoryName in $directoriesToCopy) {
     }
     Copy-Item -LiteralPath $source -Destination (Join-Path $releaseRoot $directoryName) -Recurse -Force
 }
+
+Get-ChildItem -LiteralPath (Join-Path $releaseRoot "tools") -Recurse -Force -Directory |
+    Where-Object { $_.Name -eq "__pycache__" } |
+    Remove-Item -Recurse -Force
 
 $regexReviewRoot = Join-Path $releaseRoot "regex_review_samples"
 New-Item -ItemType Directory -Path (Join-Path $regexReviewRoot "input") -Force | Out-Null

@@ -36,7 +36,7 @@ def _route(path: Path, data: bytes) -> str:
 
 def _markitdown(path: Path) -> str:
     if MarkItDown is None:
-        raise RuntimeError("markitdown is not installed; install requirements-poc-conversion-benchmark.txt")
+        raise RuntimeError("markitdown is not installed; install poc/conversion_benchmark/requirements.txt")
     return MarkItDown(enable_plugins=False).convert(str(path)).markdown
 
 

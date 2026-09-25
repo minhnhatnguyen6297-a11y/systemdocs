@@ -1,7 +1,7 @@
 """Engine roots — resolve duong dan repo con va import module engine that.
 
 P6 (MIN-68/69): sidecar khong port lai nghiep vu sang day — no import code
-that tu repo con (`services.*`, `batch_scan`, `ui.services.*`) qua sys.path
+that tu repo con (`services.*`, `batch_scan`, `upload_services.*`) qua sys.path
 theo engine root. Nguon migrate duoc owner khoa:
   - notary_v2: codex/zalo-document-inbox-v2 @ d350048 (D0-1, MIN-74)
   - upload_lab: main (da gom MIN-77/39-42 fixes)

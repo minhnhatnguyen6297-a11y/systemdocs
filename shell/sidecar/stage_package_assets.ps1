@@ -30,7 +30,7 @@ $allow = @{
         files = @("batch_scan.py", "extract_contract.py",
                   "playwright_uploader.py", "uploader_selectors.py",
                   "__init__.py")
-        dirs  = @("providers", "ui")
+        dirs  = @("providers", "upload_services")
         # Exclude la path tuong doi duoi thu muc staged cua key.
         excludes = @()
     }

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import unittest
 
-from ui.services.scan_classification_service import FolderScanRow
-from ui.services.upload_selection_service import UploadSelection
+from upload_services.scan_classification_service import FolderScanRow
+from upload_services.upload_selection_service import UploadSelection
 
 
 def row(record_id: int, *, selected: bool = False) -> FolderScanRow:

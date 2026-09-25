@@ -487,7 +487,8 @@ Những việc **không** làm trong spec này, cần scope riêng:
    ảnh hưởng hồ sơ khác. Vấn đề thật, **chưa** giải trong spec này.
 5. **Đường kết nối / mũi tên trên sơ đồ.** `DIAGRAM-3`/`DIAGRAM-R3` đã hoãn, cần tiêu chí nghiệm thu riêng.
 6. **Quy tắc nghiệp vụ thừa kế** (cách chia, thế vị, từ chối). Ở `spec.md`, vẫn là DRAFT.
-7. **Luồng OCR và ba file OCR đang sửa dở chưa được duyệt** (theo `memory-bank/CURRENT.md`).
+7. **Luồng OCR và ba file OCR đang sửa dở chưa được duyệt** (theo
+   `.agent/tasks/MIN-108/progress.md`).
    Spec này **không** chạm.
 8. **Tách Stage/Pool thành capability dùng chung.** `contract.md` nói rõ: hoãn tới khi có
    domain thứ hai xác nhận.

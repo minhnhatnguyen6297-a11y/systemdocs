@@ -7,7 +7,7 @@ from pathlib import Path
 
 from openpyxl import Workbook
 
-from ui.services.contract_book_audit import (
+from upload_services.contract_book_audit import (
     ContractBookIssueKind,
     analyze_contract_book,
     parse_contract_book_no,

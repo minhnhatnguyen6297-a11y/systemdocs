@@ -44,7 +44,7 @@ class QwenCompatibleOcr:
             )
         if OpenAI is None:
             raise RuntimeError(
-                "openai is not installed; install requirements-poc-markitdown.txt"
+                "openai is not installed; install tools/document_conversion_poc/requirements.txt"
             )
         return cls(
             client=OpenAI(

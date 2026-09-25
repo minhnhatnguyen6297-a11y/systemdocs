@@ -41,7 +41,7 @@ def _ocr_inputs(path: Path, source_bytes: bytes) -> list[tuple[bytes, str, dict[
 def _markitdown_convert(path: Path) -> str:
     if MarkItDown is None:
         raise RuntimeError(
-            "markitdown is not installed; install requirements-poc-markitdown.txt"
+            "markitdown is not installed; install tools/document_conversion_poc/requirements.txt"
         )
     result = MarkItDown(enable_plugins=False).convert(str(path))
     return result.markdown

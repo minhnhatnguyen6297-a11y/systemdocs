@@ -132,7 +132,7 @@ Ba giai đoạn:
      `generic`; phân loại tài sản `loai_tai_san`.
    - Ghi JSON + SQLite; quét khớp là `matched`, trích xuất thành công là
      `extracted` (`upload_lab_repo/batch_scan.py:713,786`).
-2. **Đối chiếu sổ công chứng** (`ui/services/contract_book_audit.py`,
+2. **Đối chiếu sổ công chứng** (`upload_lab/upload_services/contract_book_audit.py`,
    `scan_classification_service.py`)
    - So danh sách quét với sổ Excel, **chuẩn hóa số công chứng** về `xxx/yyyy`
      (`428.2026/CCGD` → `428/2026`; `2433.2025/PCDS/CCGD` → `2433/2025`).

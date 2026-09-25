@@ -25,7 +25,7 @@ Phần dưới là hướng dẫn chi tiết cho người triển khai. Đây l�
 
 **Tech Stack:** Dùng các công nghệ hiện có, theo `docs/architecture/TECH_STACK.md`: Electron, JavaScript/CSS thuần, Python/FastAPI, SQLite, Playwright, python-docx, Windows IFilter và openpyxl. Không thêm framework giao diện hoặc cơ sở dữ liệu mới.
 
-**Spec:** Quyết định của người dùng trong §1; hành vi hiện tại ở `upload_lab/README.md`, `upload_lab/ui_qt/main_window.py`, `upload_lab/ui/services/`; chuẩn bảng đã chốt trong MIN-77; ranh giới tại `contracts/desktop-command.md`, `contracts/g1-module-data.md` và `docs/architecture/ELECTRON_G1_PLAN.md`.
+**Spec:** Quyết định của người dùng trong §1; hành vi hiện tại ở `upload_lab/README.md`, `upload_lab/ui_qt/main_window.py`, `upload_lab/upload_services/`; chuẩn bảng đã chốt trong MIN-77; ranh giới tại `contracts/desktop-command.md`, `contracts/g1-module-data.md` và `docs/architecture/ELECTRON_G1_PLAN.md`.
 
 Ngày lập: **24/09/2026**. Đây là kế hoạch chuyển đổi để review và chia việc, chưa phải xác nhận runtime đã hoàn thành hay contract mới đã được duyệt.
 
@@ -130,8 +130,8 @@ Nguồn khảo sát: `D:/systemdocs`, nhánh `consolidate/monorepo`, commit `1ab
 |---|---|---|
 | UI chuẩn | Bốn trang Qt; Audit và Upload ở `upload_lab/ui_qt/main_window.py:137`, `:162`, `:321`. | Giữ hai trang nghiệp vụ thành hai tab, chuyển cấu hình lên Audit, bỏ trang nhật ký. |
 | UI Electron | `shell/src/renderer/renderer.js:494` gộp scan/audit/browser; `styles.css:18` giới hạn chiều rộng. | Tách module view và CSS theo Upload Lab; bỏ giới hạn 860px cho module này. |
-| Đúng lượt quét | `shell/sidecar/upload_adapter.py:87` gọi scan nhưng không lưu manifest; `:120` trả thư mục runs; `:290` có fallback chọn run mới nhất. Legacy ghi manifest tại `upload_lab/ui/services/folder_workflow_service.py:26`. | Tạo file manifest của chính lượt scan; chuẩn bị upload buộc dùng đúng run, không tự chọn run khác. |
-| Queue đối chiếu | `upload_lab/ui/services/scan_classification_service.py:79`; Qt dùng tại `main_window.py:1008`. Renderer mới chỉ hiển thị record scan thô ở `renderer.js:537`. | Gọi dịch vụ phân loại thật và trả đầy đủ dữ liệu cho bảng/chọn hồ sơ. |
+| Đúng lượt quét | `shell/sidecar/upload_adapter.py:87` gọi scan nhưng không lưu manifest; `:120` trả thư mục runs; `:290` có fallback chọn run mới nhất. Legacy ghi manifest tại `upload_lab/upload_services/folder_workflow_service.py:26`. | Tạo file manifest của chính lượt scan; chuẩn bị upload buộc dùng đúng run, không tự chọn run khác. |
+| Queue đối chiếu | `upload_lab/upload_services/scan_classification_service.py:79`; Qt dùng tại `main_window.py:1008`. Renderer mới chỉ hiển thị record scan thô ở `renderer.js:537`. | Gọi dịch vụ phân loại thật và trả đầy đủ dữ liệu cho bảng/chọn hồ sơ. |
 | Tải sổ | Backend có `upload.download_export` ở `upload_adapter.py:262`; UI chưa có nút. Qt tự nạp sau tải ở `main_window.py:1311`. | Nối tải → nạp → audit → cập nhật phân loại cùng website. |
 | Nhân sự và từng đợt | Qt gửi nhân sự, `chunk_size`, manifest và ID ở `main_window.py:1267`; shell chỉ gửi ID tại `renderer.js:664`. | Bổ sung đủ dữ liệu; truyền `chunk_size` xuống `prepare_manifest`. |
 | Nhận biết đã Lưu | Qt poll liên tục ở `workers.py:128`; engine cập nhật registry ở `playwright_uploader.py:1959`. Shell chỉ poll sau `finish_review` tại `upload_adapter.py:333`. | Theo dõi liên tục trong browser thread và phản ánh kết quả từng hồ sơ trong lúc chờ người dùng. |
