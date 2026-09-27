@@ -7,13 +7,11 @@ Viết khi kết thúc phiên hoặc chuyển giao cho agent/người khác.
 **Xong** phần bản mẫu P3 — chờ owner mở `index.html` duyệt và chốt các quyết
 định mở. Linear MIN-126 nên chuyển sang review sau khi owner xác nhận.
 
-Commit: `0939840` trên `consolidate/monorepo` — 40 file, chỉ
+Commit: `6bfb339` trên `consolidate/monorepo` — 40 file, chỉ
 `docs/product/ui/prototypes/` + `.agent/tasks/MIN-126/`. Không push.
-
-> Lưu ý lịch sử: commit đầu `422b8c8` bị race với worker P2 (đã lấy file họ
-> đang staged) — đã reset và commit lại sạch. Worker P2 sau đó amend
-> `78a557f` (MIN-124) thành `ae2ac2d` — nội dung MIN-124 còn nguyên, message
-> commit đổi sang MIN-125. Việc đó thuộc P2 xử lý, không đụng ở đây.
+(Lịch sử git: commit đầu `422b8c8` bị race với worker P2 — đã reset và
+commit lại sạch; P2 rồi sửa amend nhầm của họ bằng rebase nên hash task này
+đổi `0939840` → `6bfb339`, nội dung nguyên vẹn.)
 
 ## File đã đổi
 

@@ -5,14 +5,14 @@ tiếp được mà không cần hỏi lại.
 
 ## Trạng thái: xong — 2026-09-28 (chờ owner duyệt trên Linear)
 
-Commit: `0939840` `docs(MIN-126): bản mẫu tương tác duyệt bố cục Notary +
+Commit: `6bfb339` `docs(MIN-126): bản mẫu tương tác duyệt bố cục Notary +
 Upload (P3)` — 40 file, chỉ 2 đường dẫn sở hữu.
 
 > Sự cố git đã xử lý: commit đầu `422b8c8` dính file staged của worker P2
 > (race `git add`/`commit` song song). Đã `git reset HEAD~1` rồi commit lại
-> chỉ phạm vi sở hữu. P2 sau đó `--amend` commit `78a557f` (MIN-124) thành
-> `ae2ac2d` — nội dung MIN-124 vẫn nguyên trong commit đó, nhưng message giờ
-> nói MIN-125. Đó là quyết định của worker P2; không sửa ở task này.
+> chỉ phạm vi sở hữu (lúc đó là `0939840`). P2 sau đó sửa lại amend nhầm của
+> họ bằng rebase — commit của task này giờ là `6bfb339`, nội dung không đổi,
+> nằm trên `78a557f` (MIN-124) như đúng.
 
 ## Đã làm
 
