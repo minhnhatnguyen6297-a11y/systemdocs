@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bản mẫu UI — Notary &amp; Upload Lab (MIN-126)</title>
+<!--
+  BẢN MẪU TƯƠNG TÁC (prototype) — MIN-126 / P3 của MIN-123.
+  - Dữ liệu giả, KHÔNG gọi backend/website thật; mở trực tiếp bằng file://
+    hoặc static server đều được (không dùng ES module nên file:// chạy tốt).
+  - Token màu/kích thước lấy từ ../tokens.json (status: proposed) ánh xạ thủ
+    công vào biến CSS trong prototype.css — đây là bản đề xuất để duyệt.
+  - Các lựa chọn nghiệp vụ chưa chốt được liệt kê trong README.md của thư mục
+    này + .agent/tasks/MIN-126/decisions.md — cố tình KHÔNG chú thích trên UI.
+-->
+<link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+
+<!-- ============ THANH ĐIỀU KHIỂN BẢN MẪU (không phải UI sản phẩm) ========= -->
+<header class="demo-bar" id="demoBar">
+  <span class="demo-tag">BẢN MẪU MIN-126</span>
+
+  <label class="demo-ctl">Module
+    <select id="demoModule">
+      <option value="notary">Notary — Soạn hồ sơ</option>
+      <option value="upload">Upload Lab</option>
+    </select>
+  </label>
+
+  <label class="demo-ctl" data-for="notary">Loại việc / sơ đồ
+    <select id="demoDiagram">
+      <option value="thua-ke">Thừa kế (sơ đồ quan hệ)</option>
+      <option value="hai-ben">Hai bên (30 chỗ)</option>
+    </select>
+  </label>
+
+  <label class="demo-ctl" data-for="notary">Kịch bản
+    <select id="demoScenarioNotary">
+      <option value="std">3 tài sản · 7 người (gần ảnh duyệt)</option>
+      <option value="one-asset">1 tài sản · 7 người</option>
+      <option value="empty">Trống (0 người)</option>
+      <option value="n30">3 tài sản · 30 người</option>
+      <option value="n60">3 tài sản · 60 người (không chặn ở 30)</option>
+      <option value="longnames">Tên dài &amp; tên trùng</option>
+    </select>
+  </label>
+
+  <label class="demo-ctl" data-for="upload">Kịch bản
+    <select id="demoScenarioUpload">
+      <option value="std">Có dữ liệu (bảng dài, tên file dài)</option>
+      <option value="empty">Chưa nạp (rỗng)</option>
+      <option value="states">Nhiều trạng thái dòng</option>
+    </select>
+  </label>
+
+  <span class="demo-ctl demo-flags" data-for="notary">
+    Trạng thái:
+    <button type="button" class="demo-flag" data-flag="error">Lỗi trường</button>
+    <button type="button" class="demo-flag" data-flag="loading">Đang tải</button>
+    <button type="button" class="demo-flag" data-flag="stale">Đã cũ</button>
+    <button type="button" class="demo-flag" data-flag="conflict">Xung đột</button>
+    <button type="button" class="demo-flag" data-flag="locked">Đã khóa</button>
+    <button type="button" class="demo-flag" data-flag="mock">Mock</button>
+  </span>
+  <span class="demo-ctl demo-flags" data-for="upload">
+    Trạng thái:
+    <button type="button" class="demo-flag" data-flag="loading">Đang tải</button>
+    <button type="button" class="demo-flag" data-flag="waiting">waiting_user</button>
+    <button type="button" class="demo-flag" data-flag="reconcile">Cần đối chiếu</button>
+    <button type="button" class="demo-flag" data-flag="enverr">Lỗi môi trường</button>
+    <button type="button" class="demo-flag" data-flag="mock">Mock</button>
+  </span>
+
+  <label class="demo-ctl">Khung nhìn
+    <select id="demoViewport">
+      <option value="full">Theo cửa sổ</option>
+      <option value="1280x800">1280×800</option>
+      <option value="1366x768">1366×768</option>
+      <option value="1920x1080">1920×1080</option>
+      <option value="1536x864">1536×864 ≈ 1920 @125%</option>
+      <option value="1280x720">1280×720 ≈ 1920 @150%</option>
+    </select>
+  </label>
+</header>
+
+<!-- ============================ KHUNG APP =============================== -->
+<div class="vp-scroll">
+  <div class="vp" id="vp">
+    <div class="app" id="app">
+      <nav class="rail" id="rail" aria-label="Điều hướng chính"><!-- app.js --></nav>
+      <main class="main">
+        <section id="screen-notary" class="screen" aria-label="Module Notary"></section>
+        <section id="screen-upload" class="screen" aria-label="Module Upload Lab" hidden></section>
+      </main>
+    </div>
+  </div>
+</div>
+
+<div class="modal-root" id="modalRoot"></div>
+<div class="toast-root" id="toastRoot" aria-live="polite"></div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script src="notary.js"></script>
+<script src="upload.js"></script>
+<script>P.init();</script>
+</body>
+</html>
