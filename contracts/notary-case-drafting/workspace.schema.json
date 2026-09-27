@@ -24,7 +24,7 @@
           "type": "object",
           "required": [
             "id", "case_type", "document_type", "status", "locked",
-            "revision"
+            "revision", "ngay_lap_ho_so", "noi_niem_yet", "ghi_chu"
           ],
           "additionalProperties": false,
           "properties": {
@@ -36,7 +36,19 @@
             "document_type": { "enum": ["khai_nhan", "thoa_thuan"] },
             "status": { "enum": ["draft", "locked"] },
             "locked": { "type": "boolean" },
-            "revision": { "type": "integer", "minimum": 1 }
+            "revision": { "type": "integer", "minimum": 1 },
+            "ngay_lap_ho_so": {
+              "$ref": "common.schema.json#/definitions/date_full",
+              "description": "rev 1.1 — ngày lập hồ sơ; null khi chưa đặt"
+            },
+            "noi_niem_yet": {
+              "$ref": "common.schema.json#/definitions/nullable_string",
+              "description": "rev 1.1 — nơi niêm yết"
+            },
+            "ghi_chu": {
+              "$ref": "common.schema.json#/definitions/nullable_string",
+              "description": "rev 1.1 — ghi chú hồ sơ"
+            }
           }
         },
         "stage": {

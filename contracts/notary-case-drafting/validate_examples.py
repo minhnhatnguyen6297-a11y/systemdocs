@@ -22,6 +22,7 @@ ENVELOPE_VERSION = "desktopcommand.v1"
 SCHEMA_VERSION = "notary.case-drafting.v1"
 
 COMMANDS = {
+    "notary.workspace_create": "workspace_create",
     "notary.workspace_get": "workspace_get",
     "notary.intake_analyze": "intake_analyze",
     "notary.workspace_commit_stage": "workspace_commit_stage",
@@ -31,6 +32,23 @@ COMMANDS = {
     "notary.word_export_batch": "word_export_batch",
 }
 KINDS = set(COMMANDS.values())
+
+# §2.1a — case_id: bắt buộc / nháp được (absent ok, null lỗi) / cấm
+CASE_ID_REQUIRED = {
+    "notary.workspace_get", "notary.workspace_commit_stage",
+    "notary.diagram_save", "notary.word_export_options",
+    "notary.word_export_batch",
+}
+CASE_ID_DRAFTABLE = {"notary.intake_analyze", "notary.diagram_evaluate"}
+CASE_ID_FORBIDDEN = {"notary.workspace_create"}
+CASE_FIELDS = {
+    "id", "case_type", "document_type", "status", "locked", "revision",
+    "ngay_lap_ho_so", "noi_niem_yet", "ghi_chu",
+}
+CASE_META_FIELDS = {
+    "document_type", "ngay_lap_ho_so", "noi_niem_yet", "ghi_chu",
+}
+DOCUMENT_TYPES = {"khai_nhan", "thoa_thuan"}
 
 STATUSES = {"accepted", "running", "waiting_user", "partial",
             "succeeded", "failed", "canceled"}
@@ -73,6 +91,8 @@ NEVER_EMPTY = {
     "filename_stem", "text",
     # person_row nullable strings
     "so_giay_to", "noi_cap", "place_of_origin",
+    # case meta nullable (rev 1.1)
+    "noi_niem_yet", "ghi_chu", "ngay_lap_ho_so",
     # asset_row + land_rows nullable strings
     "so_vao_so", "so_thua_dat", "so_to_ban_do", "loai_so",
     "hinh_thuc_su_dung", "thoi_han", "nguon_goc", "co_quan_cap",
@@ -106,7 +126,8 @@ ERRORS = {
     "word_no_documents_selected", "word_duplicate_document_key",
     "word_unknown_document_key", "word_template_missing",
     "word_unresolved_placeholders", "word_batch_failed",
-    "word_path_traversal", "validation_error",
+    "word_path_traversal", "workspace_owner_required",
+    "validation_error",
     # reuse từ envelope / g1-module-data
     "file_scope_not_supported", "file_not_found", "file_locked",
     "payload_rejected_sensitive_key", "unsupported_contract_version",
@@ -420,6 +441,84 @@ def check_word_batch_payload(payload, v):
                   "destination is_dir must be true"))
 
 
+def check_case_object(case, where, v):
+    """case object trong result (workspace_get/commit/create) — §4."""
+    if not isinstance(case, dict):
+        v.append(("validation_error", f"{where} missing/not object"))
+        return
+    extra = set(case) - CASE_FIELDS
+    if extra:
+        v.append(("validation_error", f"{where} extra keys {sorted(extra)}"))
+    for rk in CASE_FIELDS:
+        if rk not in case:
+            v.append(("validation_error", f"{where} missing {rk}"))
+    d = case.get("document_type")
+    if d is not None and d not in DOCUMENT_TYPES:
+        v.append(("validation_error", f"{where} document_type={d!r}"))
+    nl = case.get("ngay_lap_ho_so")
+    if nl is not None and not (isinstance(nl, str)
+                               and DATE_FULL_RX.match(nl)):
+        v.append(("validation_error", f"{where} ngay_lap_ho_so={nl!r}"))
+
+
+def check_create_payload(payload, v):
+    """notary.workspace_create — §4.3."""
+    ik = payload.get("idempotency_key")
+    if not (isinstance(ik, str) and UUID4_RX.match(ik)):
+        v.append(("validation_error", f"idempotency_key={ik!r}"))
+    cm = payload.get("case")
+    if not isinstance(cm, dict):
+        v.append(("validation_error", "payload.case missing/not object"))
+    else:
+        extra = set(cm) - CASE_META_FIELDS
+        if extra:
+            v.append(("validation_error",
+                      f"payload.case extra keys {sorted(extra)}"))
+        if cm.get("document_type") not in DOCUMENT_TYPES:
+            v.append(("validation_error",
+                      f"payload.case.document_type="
+                      f"{cm.get('document_type')!r}"))
+        nl = cm.get("ngay_lap_ho_so")
+        if nl is not None and not (isinstance(nl, str)
+                                   and DATE_FULL_RX.match(nl)):
+            v.append(("validation_error",
+                      f"payload.case.ngay_lap_ho_so={nl!r}"))
+    st = payload.get("stage")
+    check_stage(st, "payload.stage", v)
+    people = st.get("people") if isinstance(st, dict) else None
+    assets = st.get("assets") if isinstance(st, dict) else None
+    row_ids = set()
+    if isinstance(people, list):
+        if not people:
+            v.append(("stage_validation_error", "payload.stage.people empty"))
+        for r in people:
+            if isinstance(r, dict):
+                if r.get("entity_id") is not None:
+                    v.append(("stage_validation_error",
+                              f"person row {r.get('row_id')!r} "
+                              "entity_id must be null"))
+                if isinstance(r.get("row_id"), str):
+                    row_ids.add(r["row_id"])
+    if isinstance(assets, list):
+        if not assets:
+            v.append(("stage_validation_error", "payload.stage.assets empty"))
+        for r in assets:
+            if isinstance(r, dict) and r.get("entity_id") is not None:
+                v.append(("stage_validation_error",
+                          f"asset row {r.get('row_id')!r} "
+                          "entity_id must be null"))
+    # owner: đúng một node id=owner không deleted, personId ∈ stage people
+    dg = payload.get("diagram")
+    state = dg.get("state") if isinstance(dg, dict) else None
+    if isinstance(state, dict) and isinstance(state.get("nodes"), list):
+        owners = [n for n in state["nodes"]
+                  if isinstance(n, dict) and n.get("id") == "owner"
+                  and n.get("deleted") is not True]
+        if len(owners) != 1 or owners[0].get("personId") not in row_ids:
+            v.append(("workspace_owner_required",
+                      "node 'owner' must reference one stage person"))
+
+
 def check_base_revision(payload, ctx, v):
     br = payload.get("base_revision")
     if not (isinstance(br, int) and br >= 1):
@@ -561,15 +660,12 @@ def check_result_data(kind, data, stage_ids, v):
     if data.get("schema_version") != SCHEMA_VERSION:
         v.append(("validation_error",
                   f"schema_version={data.get('schema_version')!r}"))
-    if kind == "workspace_get":
-        case = data.get("case")
-        if not isinstance(case, dict):
-            v.append(("validation_error", "data.case missing"))
-        else:
-            for rk in ("id", "case_type", "document_type", "status",
-                       "locked", "revision"):
-                if rk not in case:
-                    v.append(("validation_error", f"data.case missing {rk}"))
+    if kind == "workspace_get" or kind == "workspace_create":
+        if kind == "workspace_create" \
+                and not isinstance(data.get("created"), bool):
+            v.append(("validation_error",
+                      f"data.created={data.get('created')!r}"))
+        check_case_object(data.get("case"), "data.case", v)
         caps = data.get("capabilities")
         if not (isinstance(caps, dict)
                 and {"intake", "diagram", "word_export"} <= set(caps)):
@@ -612,11 +708,11 @@ def check_result_data(kind, data, stage_ids, v):
         else:
             v.append(("validation_error", "data.diagram missing"))
     elif kind == "diagram_evaluate":
-        if not (isinstance(data.get("evaluated_revision"), int)
-                and data["evaluated_revision"] >= 1):
+        er = data.get("evaluated_revision")
+        # rev 1.1: null = chế độ nháp; khi present phải int ≥ 1
+        if er is not None and not (isinstance(er, int) and er >= 1):
             v.append(("validation_error",
-                      f"evaluated_revision="
-                      f"{data.get('evaluated_revision')!r}"))
+                      f"evaluated_revision={er!r}"))
         check_render_model(data.get("render_model"),
                            "data.render_model", v)
     elif kind == "diagram_save":
@@ -753,13 +849,40 @@ def violations(doc):
             check_base_revision(payload, ctx, v)
         elif cmd == "notary.word_export_batch":
             check_word_batch_payload(payload, v)
-        # case_id bắt buộc trong mọi payload của 7 command
-        if cmd in COMMANDS and isinstance(payload, dict):
+        elif cmd == "notary.workspace_create":
+            check_create_payload(payload, v)
+        # case_id: bắt buộc / nháp được / cấm — §2.1a
+        if cmd in CASE_ID_REQUIRED and isinstance(payload, dict):
             if not (isinstance(payload.get("case_id"), int)
                     and payload["case_id"] >= 1):
                 v.append(("validation_error",
                           f"payload.case_id={payload.get('case_id')!r}"))
-        # diagram state trong payload (evaluate/save)
+        elif cmd in CASE_ID_DRAFTABLE and isinstance(payload, dict):
+            if "case_id" in payload and not (
+                    isinstance(payload["case_id"], int)
+                    and payload["case_id"] >= 1):
+                v.append(("validation_error",
+                          f"payload.case_id={payload.get('case_id')!r}"))
+            # chế độ nháp của diagram_evaluate cần stage payload (§7.4);
+            # stage cấm khi case_id present
+            if cmd == "notary.diagram_evaluate":
+                if "case_id" not in payload \
+                        and "stage" not in payload:
+                    v.append(("validation_error",
+                              "draft evaluate requires payload.stage"))
+                if "case_id" in payload and "stage" in payload:
+                    v.append(("validation_error",
+                              "payload.stage forbidden when case_id present"))
+        elif cmd in CASE_ID_FORBIDDEN and isinstance(payload, dict) \
+                and "case_id" in payload:
+            v.append(("validation_error",
+                      f"payload.case_id forbidden for {cmd}"))
+        # stage trong payload (draft evaluate / workspace_create)
+        if cmd in CASE_ID_DRAFTABLE or cmd in CASE_ID_FORBIDDEN:
+            st = payload.get("stage") if isinstance(payload, dict) else None
+            if st is not None and cmd == "notary.diagram_evaluate":
+                check_stage(st, "payload.stage", v)
+        # diagram state trong payload (evaluate/save/create)
         dg = payload.get("diagram") if isinstance(payload, dict) else None
         if isinstance(dg, dict) and "state" in dg:
             check_diagram_state(dg["state"], "payload.diagram.state",

@@ -245,6 +245,7 @@ COMMANDS.update({
     # fixture case 42–46 cung shape _case_row real adapter (MIN-112).
     "notary.case_list": _notary_drafting("case_list"),
     "notary.workspace_get": _notary_drafting("workspace_get"),
+    "notary.workspace_create": _notary_drafting("workspace_create"),
     "notary.intake_analyze": _notary_drafting("intake_analyze"),
     "notary.workspace_commit_stage":
         _notary_drafting("workspace_commit_stage"),

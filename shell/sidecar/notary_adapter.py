@@ -660,6 +660,35 @@ def workspace_get(job, payload):
         sess.close()
 
 
+def workspace_create(job, payload):
+    """notary.workspace_create — tao ho so tu nhap trong mot transaction
+    (contract §4.3): case + person + asset + link + diagram + revision=1.
+
+    Idempotent theo `idempotency_key` (uuid4, client sinh mot lan/nhap) —
+    retry cung key tra case da tao voi created:false, khong tao trung.
+    Sidecar chi boc envelope; toan bo validate/atomics trong
+    CaseWorkspaceService.create."""
+    if not isinstance(payload, dict):
+        payload = {}
+    stage = payload.get("stage")
+    if not isinstance(stage, dict):
+        raise CommandError("validation_error", "payload.stage phai la object")
+    state = _payload_diagram_state(payload)
+    sess = _db_session()
+    try:
+        module = _workspace_module()
+        try:
+            data = module.CaseWorkspaceService(sess).create(
+                payload.get("idempotency_key"), payload.get("case"),
+                stage.get("people"), stage.get("assets"), state)
+        except module.WorkspaceError as err:
+            raise _workspace_command_error(err)
+        job.check_cancel()
+        return _result("workspace_create", data)
+    finally:
+        sess.close()
+
+
 def workspace_commit_stage(job, payload):
     """notary.workspace_commit_stage — commit Stage nguyen tu + revision."""
     if not isinstance(payload, dict):
@@ -706,28 +735,34 @@ def intake_analyze(job, payload):
     if extra:
         raise CommandError("validation_error",
                            f"payload co key ngoai schema: {sorted(extra)}")
-    cid = _int_id(_require(p.get("case_id"), "case_id"), "case_id")
-    if cid < 1:
-        raise CommandError("validation_error", "case_id phai >= 1")
+    # case_id absent = che do nhap (§2.1a): bo qua kiem tra case —
+    # suggestion chi la review tren nhap phien. case_id:null -> loi
+    # client (phan biet "thieu=nhap" voi "null=sai").
+    cid = None
+    if "case_id" in p:
+        cid = _int_id(_require(p.get("case_id"), "case_id"), "case_id")
+        if cid < 1:
+            raise CommandError("validation_error", "case_id phai >= 1")
     sources = p.get("sources")
     if not isinstance(sources, list) or not sources:
         raise CommandError("validation_error", "can sources: [..]")
 
-    models = _models()
-    sess = _db_session()
-    try:
-        case = sess.get(models.InheritanceCase, cid)
-        if case is None:
-            raise CommandError("case_not_found",
-                               f"khong co ho so #{cid}")
-        # case_type: engine DB hien chi co InheritanceCase nen
-        # case_type_unsupported unreachable — khi case_type thanh column
-        # phai guard tai day (contract §5.3).
-        if case.is_locked:
-            raise CommandError("workspace_locked",
-                               f"ho so #{cid} da khoa")
-    finally:
-        sess.close()
+    if cid is not None:
+        models = _models()
+        sess = _db_session()
+        try:
+            case = sess.get(models.InheritanceCase, cid)
+            if case is None:
+                raise CommandError("case_not_found",
+                                   f"khong co ho so #{cid}")
+            # case_type: engine DB hien chi co InheritanceCase nen
+            # case_type_unsupported unreachable — khi case_type thanh
+            # column phai guard tai day (contract §5.3).
+            if case.is_locked:
+                raise CommandError("workspace_locked",
+                                   f"ho so #{cid} da khoa")
+        finally:
+            sess.close()
 
     def _progress(done, _total, label=""):
         job.report_progress(done, _total, label)
@@ -778,12 +813,36 @@ def _payload_diagram_state(payload):
 
 def diagram_evaluate(job, payload):
     """notary.diagram_evaluate — read-only theo DB; duoc phep tren case
-    locked (contract §7.4); khong persist draft state."""
+    locked (contract §7.4); khong persist draft state.
+
+    case_id absent = che do nhap: `stage` trong payload bat buoc va thay
+    Stage DB; personId kiem theo row_id cua stage payload;
+    evaluated_revision=null (§2.1a/§7.4). case_id:null -> validation_error
+    (phan biet "thieu=nhap" voi "null=loi client").
+    """
     if not isinstance(payload, dict):
         payload = {}
+    state = _payload_diagram_state(payload)
+    if "case_id" not in payload:
+        stage = payload.get("stage")
+        if not isinstance(stage, dict):
+            raise CommandError(
+                "validation_error",
+                "payload.stage bat buoc khi case_id absent (che do nhap)")
+        sess = _db_session()
+        try:
+            module = _inheritance_workspace_module()
+            try:
+                data = module.InheritanceWorkspaceService(sess) \
+                    .evaluate_draft(stage, state)
+            except module.WorkspaceError as err:
+                raise _workspace_command_error(err)
+            job.check_cancel()
+            return _result("diagram_evaluate", data)
+        finally:
+            sess.close()
     case_id = _int_id(_require(payload.get("case_id"), "case_id"),
                       "case_id")
-    state = _payload_diagram_state(payload)
     sess = _db_session()
     try:
         module = _inheritance_workspace_module()

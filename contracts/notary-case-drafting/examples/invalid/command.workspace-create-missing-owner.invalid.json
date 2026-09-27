@@ -1,0 +1,74 @@
+{
+  "expected_error": "workspace_owner_required",
+  "contract_version": "desktopcommand.v1",
+  "command_id": "b1b2c3d4-0024-4024-8024-000000000124",
+  "command": "notary.workspace_create",
+  "payload": {
+    "idempotency_key": "9a1b2c3d-4444-4444-8444-0000000000ab",
+    "case": { "document_type": "khai_nhan" },
+    "stage": {
+      "people": [
+        {
+          "row_id": "22222222-2222-4222-8222-222222222222",
+          "entity_id": null,
+          "ho_ten": "Trần Thị Bình",
+          "gioi_tinh": "Nữ",
+          "ngay_sinh": "1955",
+          "ngay_chet": null,
+          "so_giay_to": null,
+          "ngay_cap": null,
+          "noi_cap": null,
+          "dia_chi": null,
+          "place_of_origin": null
+        }
+      ],
+      "assets": [
+        {
+          "row_id": "55555555-5555-4555-8555-555555555555",
+          "entity_id": null,
+          "is_primary": true,
+          "so_serial": "DD123456",
+          "so_vao_so": null,
+          "so_thua_dat": null,
+          "so_to_ban_do": null,
+          "dia_chi": "Thửa 123, tờ 45, phường Bạch Mai, Hà Nội",
+          "loai_so": null,
+          "hinh_thuc_su_dung": null,
+          "thoi_han": null,
+          "nguon_goc": null,
+          "ngay_cap": null,
+          "co_quan_cap": null,
+          "land_rows": null
+        }
+      ]
+    },
+    "diagram": {
+      "state": {
+        "version": 2,
+        "nodes": [
+          {
+            "id": "owner",
+            "personId": null,
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "isLandOwner": false,
+            "willReceive": false,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "spouse",
+            "personId": "22222222-2222-4222-8222-222222222222",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "isLandOwner": false,
+            "willReceive": true,
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      }
+    }
+  },
+  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+}

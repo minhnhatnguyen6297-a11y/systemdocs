@@ -20,7 +20,9 @@
   "build": {
     "appId": "dev.g1.shell",
     "productName": "g1-shell",
-    "directories": { "output": "dist-app" },
+    "directories": {
+      "output": "dist-app"
+    },
     "files": [
       "src/main/**",
       "src/preload/**",
@@ -28,10 +30,26 @@
       "package.json"
     ],
     "extraResources": [
-      { "from": "sidecar/dist/g1-shell-sidecar", "to": "sidecar/g1-shell-sidecar" },
-      { "from": "build/engine", "to": "engine" },
-      { "from": "build/playwright-browsers", "to": "playwright-browsers" }
+      {
+        "from": "sidecar/dist/g1-shell-sidecar",
+        "to": "sidecar/g1-shell-sidecar"
+      },
+      {
+        "from": "build/engine",
+        "to": "engine"
+      },
+      {
+        "from": "build/playwright-browsers",
+        "to": "playwright-browsers"
+      }
     ],
-    "win": { "target": ["dir"] }
+    "win": {
+      "target": [
+        "dir"
+      ]
+    }
+  },
+  "allowScripts": {
+    "electron@31.7.7": true
   }
 }

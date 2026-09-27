@@ -5,10 +5,13 @@
   "definitions": {
     "payload": {
       "type": "object",
-      "required": ["case_id", "sources"],
+      "required": ["sources"],
       "additionalProperties": false,
       "properties": {
-        "case_id": { "type": "integer", "minimum": 1 },
+        "case_id": {
+          "type": "integer", "minimum": 1,
+          "description": "rev 1.1: absent = chế độ nháp; null → validation_error"
+        },
         "sources": {
           "type": "array",
           "minItems": 1,

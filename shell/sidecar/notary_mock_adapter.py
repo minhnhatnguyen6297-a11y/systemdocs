@@ -164,6 +164,8 @@ class _MockState:
     def __init__(self, seed=None):
         self._lock = threading.Lock()
         self._next_entity_id = 500
+        # idempotency_key -> case_id (workspace_create replay, §4.3)
+        self._idempotency = {}
         raw = (seed or {}).get("cases") or _load_default_cases()
         self.cases = {}
         for cid, c in raw.items():
@@ -178,6 +180,9 @@ class _MockState:
         case.setdefault("status", "draft")
         case.setdefault("locked", False)
         case.setdefault("revision", 1)
+        case.setdefault("ngay_lap_ho_so", None)
+        case.setdefault("noi_niem_yet", None)
+        case.setdefault("ghi_chu", None)
         case.setdefault("stage", {"people": [], "assets": []})
         dg = case.setdefault("diagram", {})
         dg.setdefault("domain", "inheritance")
@@ -769,19 +774,22 @@ def case_list(job, payload):
     return _result("case_list", {"cases": items, "total": len(items)})
 
 
-def workspace_get(job, payload):
-    case = _case(payload)
+def _workspace_data(cid, case):
+    """result.data cua workspace_get/workspace_create — §4 + §4.3."""
     caps = case.get("case_type") == SUPPORTED_CASE_TYPE
-    data = {
+    return {
         "schema_version": SCHEMA_VERSION,
         "backend_mode": "mock",          # contract §4 — nhan 'Dữ liệu mô phỏng'
         "case": {
-            "id": int(payload["case_id"]),
+            "id": cid,
             "case_type": case.get("case_type"),
             "document_type": case.get("document_type"),
             "status": case.get("status"),
             "locked": bool(case.get("locked")),
             "revision": case.get("revision"),
+            "ngay_lap_ho_so": case.get("ngay_lap_ho_so"),
+            "noi_niem_yet": case.get("noi_niem_yet"),
+            "ghi_chu": case.get("ghi_chu"),
         },
         "stage": copy.deepcopy(case["stage"]),
         "diagram": {
@@ -796,13 +804,148 @@ def workspace_get(job, payload):
             "word_export": caps,
         },
     }
+
+
+def workspace_get(job, payload):
+    case = _case(payload)
+    data = _workspace_data(int(payload["case_id"]), case)
     job.check_cancel()
     return _result("workspace_get", data)
 
 
+_CASE_META_FIELDS = ("document_type", "ngay_lap_ho_so",
+                     "noi_niem_yet", "ghi_chu")
+
+
+def workspace_create(job, payload):
+    """notary.workspace_create mock — §4.3: validate → tao case mot
+    transaction ao (assign entity_id + seed) → revision=1. Idempotent
+    theo `idempotency_key` da persist (replay tra created:false)."""
+    p = payload if isinstance(payload, dict) else {}
+    ik = p.get("idempotency_key")
+    if not (isinstance(ik, str) and UUID4_RX.match(ik)):
+        raise CommandError("validation_error",
+                           "idempotency_key phải là uuid4")
+    st = _state()
+    with st._lock:
+        replay_id = st._idempotency.get(ik)
+        if replay_id is not None:
+            data = _workspace_data(replay_id, st.cases[replay_id])
+            data["created"] = False
+            return _result("workspace_create", data)
+
+        cm = p.get("case")
+        if not isinstance(cm, dict):
+            raise CommandError("validation_error",
+                               "payload.case phải là object")
+        extra = set(cm) - set(_CASE_META_FIELDS)
+        if extra:
+            raise CommandError(
+                "validation_error",
+                f"payload.case key lạ: {sorted(extra)}")
+        dt = cm.get("document_type")
+        if dt not in ("khai_nhan", "thoa_thuan"):
+            raise CommandError("validation_error",
+                               f"document_type={dt!r} ngoài enum")
+        nl = cm.get("ngay_lap_ho_so")
+        if nl is not None and not (
+                isinstance(nl, str) and DATE_FULL_RX.match(nl)):
+            raise CommandError("validation_error",
+                               "ngay_lap_ho_so phải YYYY-MM-DD/null")
+        for f in ("noi_niem_yet", "ghi_chu"):
+            v = cm.get(f)
+            if v is not None and (
+                    not isinstance(v, str) or not v.strip()):
+                raise CommandError(
+                    "validation_error",
+                    f"{f} phải là chuỗi non-empty/null")
+
+        stage = p.get("stage")
+        errs, people_norm, assets_norm = _validate_stage(stage)
+        raw_people = stage.get("people") if isinstance(stage, dict) else []
+        raw_assets = stage.get("assets") if isinstance(stage, dict) else []
+        if not raw_people:
+            errs.append(_err(
+                _det_uuid4("field_error:people_empty"), "people",
+                "required", "stage.people phải có ít nhất một dòng"))
+        if not raw_assets:
+            errs.append(_err(
+                _det_uuid4("field_error:primary_count"), "is_primary",
+                "primary_count",
+                "assets phải có đúng một dòng is_primary=true"))
+        for i, r in enumerate(raw_people):
+            if isinstance(r, dict) and r.get("entity_id") is not None:
+                errs.append(_err(
+                    _err_row(r.get("row_id"), f"people[{i}]"),
+                    "entity_id", "invalid_format",
+                    "entity_id phải null — workspace_create tạo entity mới"))
+        for i, r in enumerate(raw_assets):
+            if isinstance(r, dict) and r.get("entity_id") is not None:
+                errs.append(_err(
+                    _err_row(r.get("row_id"), f"assets[{i}]"),
+                    "entity_id", "invalid_format",
+                    "entity_id phải null — workspace_create tạo entity mới"))
+        if errs:
+            raise CommandError("stage_validation_error",
+                               f"{len(errs)} lỗi field trong Stage",
+                               details={"field_errors": errs})
+
+        state = _payload_diagram_state(p)
+        draft_case = {"stage": {"people": people_norm}}
+        errors, outside_pid = _validate_diagram_state(state, draft_case)
+        if errors:
+            raise CommandError("diagram_invalid_state",
+                               "diagram state không hợp lệ",
+                               details={"errors": errors})
+        row_ids = {r["row_id"] for r in people_norm}
+        owners = [n for n in state["nodes"]
+                  if isinstance(n, dict) and n.get("id") == "owner"
+                  and n.get("deleted") is not True]
+        if len(owners) != 1 or owners[0].get("personId") not in row_ids:
+            raise CommandError(
+                "workspace_owner_required",
+                "Diagram phải có đúng một node 'owner' (không deleted) "
+                "gán một dòng Người trong stage")
+        if outside_pid is not None:
+            raise CommandError(
+                "diagram_reference_outside_stage",
+                f"personId {outside_pid} không thuộc Stage của payload",
+                details={"personId": outside_pid})
+
+        for row in people_norm + assets_norm:
+            row["entity_id"] = st.assign_entity_id()
+        new_id = (max(st.cases) + 1) if st.cases else 1
+        case = {
+            "id": new_id,
+            "case_type": SUPPORTED_CASE_TYPE,
+            "document_type": dt,
+            "status": "draft",
+            "locked": False,
+            "revision": 1,
+            "ngay_lap_ho_so": nl,
+            "noi_niem_yet": cm.get("noi_niem_yet"),
+            "ghi_chu": cm.get("ghi_chu"),
+            "stage": {"people": people_norm, "assets": assets_norm},
+            "diagram": {
+                "domain": "inheritance",
+                "state": copy.deepcopy(state),
+                "render_model": _render(state, {"people": people_norm}),
+                "warnings": [],
+            },
+        }
+        st.cases[new_id] = case
+        st._idempotency[ik] = new_id
+        data = _workspace_data(new_id, case)
+        data["created"] = True
+        job.check_cancel()
+        return _result("workspace_create", data)
+
+
 def intake_analyze(job, payload):
-    case = _case(payload)
-    _check_writable(case)          # §5.3: locked/type -> loi job-level
+    # case_id absent = che do nhap (§2.1a) — bo qua kiem tra case.
+    if "case_id" in (payload or {}):
+        case = _case(payload)
+        _check_writable(case)      # §5.3: locked/type -> loi job-level
     sources = (payload or {}).get("sources")
     if not isinstance(sources, list) or not sources:
         raise CommandError("validation_error", "sources phải là list 1..8")
@@ -981,10 +1124,39 @@ def workspace_commit_stage(job, payload):
 
 
 def diagram_evaluate(job, payload):
-    """Read-only — duoc phep tren case locked (§7.4); khong persist."""
-    case = _case(payload)
+    """Read-only — duoc phep tren case locked (§7.4); khong persist.
+
+    case_id absent = che do nhap: stage payload thay Stage DB,
+    evaluated_revision=null."""
+    p = payload if isinstance(payload, dict) else {}
+    state = _payload_diagram_state(p)
+    if "case_id" not in p:
+        stage = p.get("stage")
+        errs, people_norm, assets_norm = _validate_stage(stage)
+        if errs:
+            raise CommandError("stage_validation_error",
+                               f"{len(errs)} lỗi field trong Stage",
+                               details={"field_errors": errs})
+        draft_case = {"stage": {"people": people_norm,
+                                "assets": assets_norm}}
+        errors, outside_pid = _validate_diagram_state(state, draft_case)
+        if errors:
+            raise CommandError("diagram_invalid_state",
+                               "diagram state không hợp lệ",
+                               details={"errors": errors})
+        if outside_pid is not None:
+            raise CommandError(
+                "diagram_reference_outside_stage",
+                f"personId {outside_pid} không thuộc Stage của payload",
+                details={"personId": outside_pid})
+        job.check_cancel()
+        return _result("diagram_evaluate", {
+            "schema_version": SCHEMA_VERSION,
+            "evaluated_revision": None,
+            "render_model": _render(state, draft_case["stage"]),
+        })
+    case = _case(p)
     _check_supported(case)
-    state = _payload_diagram_state(payload)
     rm = _evaluate_state_or_raise(case, state)
     job.check_cancel()
     return _result("diagram_evaluate", {

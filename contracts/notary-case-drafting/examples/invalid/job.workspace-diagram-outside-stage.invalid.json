@@ -16,7 +16,10 @@
         "document_type": "khai_nhan",
         "status": "draft",
         "locked": false,
-        "revision": 4
+        "revision": 4,
+        "ngay_lap_ho_so": null,
+        "noi_niem_yet": null,
+        "ghi_chu": null
       },
       "stage": {
         "people": [

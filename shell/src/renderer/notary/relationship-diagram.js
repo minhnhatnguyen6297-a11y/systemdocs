@@ -54,8 +54,10 @@ function createDiagramPane(ctx) {
   }
 
   function personName(rowId) {
-    const p = model.state.committed.people
-      .find((x) => x.row_id === rowId);
+    // Draft (caseId=null): nguon la stage nhap; case that: committed.
+    const src = model.state.caseId == null
+      ? model.state.stage.people : model.state.committed.people;
+    const p = src.find((x) => x.row_id === rowId);
     return p ? (p.ho_ten || '(không tên)') : '—';
   }
 
@@ -194,6 +196,13 @@ function createDiagramPane(ctx) {
     if (n.personId) {
       const alloc = allocBadgeEl(n.personId);
       if (alloc) head.append(alloc);
+      // MIN-119: node da gan keo duoc — payload cung shape pool card;
+      // drop len node khac = move/swap, drop vao Pool = bo gan.
+      card.draggable = model.canWrite() && !n.deleted;
+      card.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain',
+          JSON.stringify({ kind: 'person', row_id: n.personId }));
+      });
     }
     card.append(head);
     // Quan he draft render bang chu (slot id → nhan doc duoc).
@@ -203,14 +212,15 @@ function createDiagramPane(ctx) {
     }
     if (n.spouseSlotId) rel.push(`vợ/chồng của ${n.spouseSlotId}`);
     if (rel.length) card.append(h('div', 'muted cd-node-rel', rel.join(' · ')));
-    // Drop target: nhan pool card keo vao (cung ket qua menu Gan vi tri)
+    // Drop target: nhan pool card hoac node khac keo vao — movePerson
+    // bao trum ca move/swap (MIN-122; node draggable o MIN-119).
     card.addEventListener('dragover', (e) => e.preventDefault());
     card.addEventListener('drop', (e) => {
       e.preventDefault();
       try {
         const d = JSON.parse(e.dataTransfer.getData('text/plain'));
         if (d.kind === 'person' &&
-            model.assignPerson(n.id, d.row_id)) scheduleEvaluate();
+            model.movePerson(d.row_id, n.id)) scheduleEvaluate();
       } catch (err) { /* payload rac — bo qua */ }
     });
     if (n.deleted) return card;
@@ -384,6 +394,18 @@ function createDiagramPane(ctx) {
     };
     pc.append(search);
     const pBody = h('div', 'cd-card-body');
+    // Drop target bo gan: keo node co nguoi vao Pool → ve Pool
+    // (movePerson(rowId, null)); san sang cho node drag cua MIN-119 —
+    // payload cung shape {kind:'person', row_id}.
+    pBody.addEventListener('dragover', (e) => e.preventDefault());
+    pBody.addEventListener('drop', (e) => {
+      e.preventDefault();
+      try {
+        const d = JSON.parse(e.dataTransfer.getData('text/plain'));
+        if (d.kind === 'person' && d.row_id &&
+            model.movePerson(d.row_id, null)) scheduleEvaluate();
+      } catch (err) { /* bo qua */ }
+    });
     pc.append(pBody);
     function renderPool() {
       pBody.innerHTML = '';
@@ -417,8 +439,10 @@ function createDiagramPane(ctx) {
       }
     });
     if (s.diagramDirty) save.append(h('span', 'cd-dirty-dot', ''));
-    save.disabled = !model.canWrite() || !s.diagramDirty ||
-      !s.capabilities.diagram;
+    // Nhap moi (caseId=null): chua co case de persist — so do duoc
+    // ghi cung "Lưu hồ sơ" (workspace_create), khong phai nut nay.
+    save.disabled = s.caseId == null || !model.canWrite() ||
+      !s.diagramDirty || !s.capabilities.diagram;
     const calc = btn('Xem cách tính', '', async () => {
       calcOpen = !calcOpen;
       if (calcOpen) await model.evaluateDiagram();

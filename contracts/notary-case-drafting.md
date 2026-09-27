@@ -1,15 +1,20 @@
-# Contract: Notary Case Drafting `v1`
+# Contract: Notary Case Drafting `v1` (doc rev 1.1)
 
 **Version:** `notary.case-drafting.v1` · **Status:** APPROVED — owner duyệt
-24/09/2026 (MIN-105) · **Owner:** `systemdocs` · **Published:** MIN-105 ·
+24/09/2026 (MIN-105); rev 1.1 mở rộng tương thích (MIN-121) ·
+**Owner:** `systemdocs` · **Published:** MIN-105 ·
 **Kênh mang:** `desktopcommand.v1` (`contracts/desktop-command.md`) ·
 **Domain data shape:** `g1.module.v1` (`contracts/g1-module-data.md`)
 
 Contract wire cho tab **Soạn hồ sơ** của module `notary_v2` trong shell
-Electron một máy: bảy command `notary.*` phục vụ tải workspace, intake
+Electron một máy: tám command `notary.*` phục vụ tạo/tải workspace, intake
 đa nguồn thành suggestion, commit Stage, đánh giá/lưu Diagram và xuất
 Word hàng loạt. Envelope `desktopcommand.v1` giữ nguyên — file này chỉ
 định nghĩa `payload`/`result.data`/error code của từng command.
+Rev 1.1 **additive** (MIN-121): thêm `notary.workspace_create` và chế độ
+nháp cho `intake_analyze`/`diagram_evaluate` — `schema_version` giữ
+`notary.case-drafting.v1`, mọi field mới tương thích ngược với consumer
+cũ (field `case` thêm key nullable; command mới chỉ client mới gọi).
 
 SOT hành vi nghiệp vụ:
 `notary_v2/docs/platform/case-workspace/drafting-tab.md` (đã duyệt qua
@@ -29,6 +34,7 @@ job-level. Quyết định giữ nguyên sau review round 1.
 
 | Command | Mục đích | Tính chất | `result.kind` |
 |---|---|---|---|
+| `notary.workspace_create` | Tạo hồ sơ mới từ nháp Stage + Diagram trong một transaction | atomic write, idempotent | `workspace_create` |
 | `notary.workspace_get` | Tải case + Stage (Người/Tài sản) + Diagram + revision + capabilities | read-only | `workspace_get` |
 | `notary.intake_analyze` | Phân tích file/text thành suggestion chờ review | long-running, không commit | `intake_analyze` |
 | `notary.workspace_commit_stage` | Commit toàn bộ Stage trong một transaction | atomic write | `workspace_commit_stage` |
@@ -40,7 +46,7 @@ job-level. Quyết định giữ nguyên sau review round 1.
 - `result.kind` = tên command bỏ namespace `notary.` (snake_case nguyên
   vẹn). `result` theo shape `g1-module-data.md` §2: `{kind, data,
   evidence?, warnings?, source_files?}`.
-- Mọi `result.data` của bảy command **bắt buộc** mang
+- Mọi `result.data` của tám command **bắt buộc** mang
   `schema_version: "notary.case-drafting.v1"` (literal). Đây là version
   của domain data shape; version kênh vẫn là `contract_version` của
   envelope — hai tầng độc lập.
@@ -67,7 +73,26 @@ job-level. Quyết định giữ nguyên sau review round 1.
 | `source_id`, `suggestion_id` | string UUID v4 | `source_id` do client sinh khi build request; `suggestion_id` do backend sinh |
 | `document_key` | string `^[a-z][a-z0-9_]*$` | Khóa ổn định của văn bản; không đổi khi đổi tên hiển thị/template; registry mở — backend được thêm key mới, không được đổi nghĩa key đã publish |
 | `node.id` (Diagram slot) | string non-empty | Định danh slot trên Diagram do UI đặt; khác namespace với `row_id`/`personId` |
-| `personId` (Diagram node) | string UUID v4 \| null | Tham chiếu `row_id` của một **dòng Người trong Stage đã commit**; `null` = slot trống |
+| `personId` (Diagram node) | string UUID v4 \| null | Tham chiếu `row_id` của một **dòng Người trong Stage đã commit**; `null` = slot trống. Trong `workspace_create` và `diagram_evaluate` chế độ nháp, tham chiếu `row_id` trong **`stage` của cùng payload** (chưa commit) |
+| `idempotency_key` | string UUID v4 | Bắt buộc trên `notary.workspace_create`; client sinh một lần cho mỗi nháp — retry gửi lại đúng key → backend trả cùng case (`created:false`), không tạo trùng |
+
+### 2.1a `case_id` — bắt buộc vs chế độ nháp
+
+- `case_id: <int ≥ 1>` **bắt buộc** trên `workspace_get`,
+  `workspace_commit_stage`, `diagram_save`, `word_export_options`,
+  `word_export_batch`.
+- **Chế độ nháp** (hồ sơ chưa từng lưu — spec UX §2, MIN-121):
+  `intake_analyze` và `diagram_evaluate` cho phép **absent** `case_id`
+  = phân tích/đánh giá trên nháp phiên, không đụng DB case.
+  - `case_id` absent + `diagram_evaluate` → payload PHẢI kèm `stage`
+    (§7.4); `personId` trong diagram được kiểm theo stage payload đó.
+  - `case_id` absent + `intake_analyze` → chỉ phân tích nguồn thành
+    suggestion; result shape không đổi.
+  - `case_id: null` **tường minh** → `validation_error` (phân biệt
+    "thiếu = nháp" với "null = lỗi client").
+  - `case_id` present nhưng không phải int ≥ 1 → `validation_error`.
+- `notary.workspace_create` **không nhận** `case_id` (server gán id);
+  payload có `case_id` → `validation_error`.
 
 Kiểu ID không được đổi giữa mock và real backend.
 
@@ -170,6 +195,9 @@ result.data:
     status: draft | locked
     locked: <bool>
     revision: <int ≥ 1>
+    ngay_lap_ho_so: <YYYY-MM-DD | null>   # ngày lập hồ sơ (rev 1.1)
+    noi_niem_yet: <string | null>        # nơi niêm yết (rev 1.1)
+    ghi_chu: <string | null>             # ghi chú hồ sơ (rev 1.1)
   stage:
     people: [<person_row>]         # §4.1
     assets: [<asset_row>]          # §4.2
@@ -249,13 +277,79 @@ asset_row:
   `stage_validation_error{code:primary_count}`.
 - `land_rows` null-safe: thiếu/`[]` hợp lệ; phần tử null-safe từng field.
 
+### 4.3 `notary.workspace_create` — tạo hồ sơ từ nháp (rev 1.1)
+
+```yaml
+payload:
+  idempotency_key: <uuid4>          # §2.1 — client sinh 1 lần/nháp
+  case:
+    document_type: khai_nhan | thoa_thuan    # bắt buộc
+    ngay_lap_ho_so: <YYYY-MM-DD | null>      # optional, default null
+    noi_niem_yet: <string | null>            # optional, default null
+    ghi_chu: <string | null>                 # optional, default null
+  stage:
+    people: [<person_row>]          # ≥1; entity_id phải null
+    assets: [<asset_row>]           # ≥1; đúng một is_primary:true;
+                                    # entity_id phải null
+  diagram:
+    state: <diagram_state>          # §7.1 — personId tham chiếu row_id
+                                    # trong stage của payload này
+```
+
+```yaml
+result.data:
+  schema_version: "notary.case-drafting.v1"
+  backend_mode: real | mock
+  created: <bool>                   # true = vừa tạo; false = idempotent
+                                    # replay trả case đã có
+  case: <case>                      # shape §4 — revision: 1
+  stage: {people, assets}           # snapshot sau tạo — entity_id đã gán
+  diagram:
+    domain: "inheritance"
+    state: <diagram_state>          # state đã persist
+    render_model: <render_model | null>   # kết quả evaluate tại thời
+                                          # điểm tạo (null nếu state
+                                          # không evaluate được — xem
+                                          # semantics)
+    warnings: [{code, message}]
+  capabilities: {intake, diagram, word_export}
+```
+
+Semantics:
+
+- **Một transaction:** validate → tạo case + person + asset + link +
+  persist stage/diagram + `revision=1` → commit. Một phần sai → rollback
+  trọn vẹn, không ghi nửa vời. Lỗi field Stage → `stage_validation_error`
+  (đủ `{row_id, field, code, message}`); diagram sai →
+  `diagram_invalid_state` / `diagram_reference_outside_stage`.
+- **Owner bắt buộc:** node `id == "owner"` (chính xác một, không
+  `deleted`) phải có `personId` trỏ tới đúng một `person_row` trong
+  payload → người để lại di sản của case. Thiếu/`null` →
+  `failed{code:workspace_owner_required}`. Cờ `isLandOwner` là nghiệp vụ
+  engine riêng — **không** thay thế được yêu cầu owner này.
+- **Đúng một `is_primary:true`** trong `assets` — rule `primary_count`
+  của §4.2 áp dụng và `assets` rỗng → `stage_validation_error`
+  (`primary_count=0`). `assets` rỗng/people rỗng → `stage_validation_error`.
+- **Idempotent:** `idempotency_key` được persist; request lặp cùng key —
+  kể cả sau retry mạng/timeout — trả cùng case với `created:false`,
+  không tạo bản ghi trùng. Key khác nhau = nháp khác nhau → case mới.
+  Không suy ra giống-nhau-về-nội-dung.
+- `case_type` luôn `"inheritance"` (V1); `status:draft`, `locked:false`,
+  `revision:1`.
+- `case` trong payload chỉ chứa meta cho phép: `document_type`,
+  `ngay_lap_ho_so`, `noi_niem_yet`, `ghi_chu` — field khác →
+  `validation_error` (additionalProperties false).
+- `notary.case_create` legacy giữ nguyên — command này là đường tạo hồ sơ
+  duy nhất của tab Soạn hồ sơ.
+
 ## 5. `notary.intake_analyze` — payload + result
 
 ### 5.1 Payload
 
 ```yaml
 payload:
-  case_id: <int>
+  case_id: <int>                    # §2.1a — absent = chế độ nháp;
+                                    # null → validation_error
   sources:                          # 1..8 phần tử
     - source_id: <uuid4, client sinh>
       kind: image | pdf | docx | xlsx | text
@@ -319,9 +413,11 @@ result.data:
   trên Diagram (`spouseSlotId`), không qua suggestion. Adapter gặp loại
   không map được có thể ghi `errors[]` với data-code
   `intake.unsupported_target`.
-- `case_id` không tồn tại/`locked`/case_type khác →
+- `case_id` present nhưng không tồn tại/`locked`/case_type khác →
   `case_not_found`/`workspace_locked`/`case_type_unsupported`. Engine
   OCR thiếu → `engine_not_installed` (reuse envelope §8).
+  Chế độ nháp (`case_id` absent) bỏ qua các kiểm tra case — suggestion
+  không gắn hồ sơ nào.
 
 ## 6. `notary.workspace_commit_stage` — payload + result
 
@@ -365,7 +461,9 @@ result.data:
 - Lỗi field → `failed{code:stage_validation_error,
   details.field_errors:[{row_id, field, code, message}]}`. `code` nội
   bộ gợi ý: `required, invalid_type, invalid_enum, invalid_date,
-  invalid_format, duplicate_row_id, primary_count`.
+  invalid_format, duplicate_row_id, primary_count, duplicate_entity`
+  (rev 1.1 — `duplicate_entity` khi row gắn `entity_id` trùng một entity
+  đã thuộc Stage/cùng payload).
 - `so_serial` không canonical `[A-Z]{2}\d{6,8}` →
   `invalid_format` (entities.md §2); `so_giay_to` không ép format.
 - Stage Người trùng tên/tài sản trùng là quyền người dùng — backend
@@ -479,7 +577,11 @@ Reserved cho `unsupported`: `second_order_required`,
 
 ```yaml
 payload:
-  case_id: <int>
+  case_id: <int>                    # §2.1a — absent = chế độ nháp;
+                                    # null → validation_error
+  stage:                            # BẮT BUỘC khi case_id absent; cấm
+    people: [<person_row>]          # khi case_id present
+    assets: [<asset_row>]
   diagram:
     state: <diagram_state>          # draft state — KHÔNG persist
 ```
@@ -487,17 +589,24 @@ payload:
 ```yaml
 result.data:
   schema_version: "notary.case-drafting.v1"
-  evaluated_revision: <int>         # revision Stage server dùng để
+  evaluated_revision: <int | null>  # revision Stage server dùng để
                                     # evaluate — client so với revision
-                                    # đang giữ để cảnh báo Stage đã đổi
+                                    # đang giữ để cảnh báo Stage đã đổi;
+                                    # null trong chế độ nháp
   render_model: <render_model>
 ```
 
 - Read-only theo DB: evaluate **không** ghi state, không đổi Stage,
   không đổi revision. Vì read-only, evaluate **được phép trên case
   `locked`** (chỉ các command ghi bị `workspace_locked`).
-- `personId` ngoài Stage đã commit → `diagram_reference_outside_stage`;
-  state sai cấu trúc → `diagram_invalid_state`.
+- `personId` ngoài Stage → `diagram_reference_outside_stage` — Stage của
+  case khi `case_id` present; Stage trong payload khi chế độ nháp.
+  State sai cấu trúc → `diagram_invalid_state`.
+- Chế độ nháp (`case_id` absent): `stage` trong payload thay thế Stage
+  DB; `diagram` được đánh giá trên đó; `evaluated_revision: null`;
+  `personId` trỏ `row_id` của stage payload (§2.1). `stage` vẫn phải qua
+  validation của `person_row`/`asset_row` (sai → `stage_validation_error`,
+  không phải `validation_error`).
 
 ### 7.5 `notary.diagram_save` — payload + result
 
@@ -650,6 +759,7 @@ Namespace `notary.*` (snake_case không chấm):
 | `case_type_unsupported` | `case_type` khác `inheritance` trên command ghi/evaluate/export | `{case_type}` |
 | `workspace_locked` | write trên case `locked` | — |
 | `workspace_conflict` | `base_revision` khác revision server (cả nhỏ hơn lẫn lớn hơn) | `{server_revision}` |
+| `workspace_owner_required` | `workspace_create` thiếu node `owner` đã gán person (rev 1.1) | — |
 | `stage_validation_error` | field Stage vi phạm | `{field_errors:[{row_id,field,code,message}]}` |
 | `intake_unsupported_source` | `kind` ngoài enum | `{source_id, kind}` |
 | `intake_source_too_large` | file > 20MB / PDF > 50 trang | `{source_id, limit}` |
@@ -698,7 +808,16 @@ Producer (sidecar/backend) PHẢI:
 - [ ] `word_export_batch`: tất cả lỗi → `word_batch_failed`; cancel →
       file chưa bắt đầu `status:skipped` + vào `breakdown.skipped`,
       giữ file đã lưu; `breakdown` luôn đủ ba list.
-- [ ] Mock backend trả `backend_mode:"mock"` trong `workspace_get`.
+- [ ] `workspace_create`: một transaction; owner bắt buộc (node `owner`
+      có personId ∈ payload stage); đúng một `is_primary`; idempotent
+      theo `idempotency_key` (`created:false` khi replay); result mang
+      workspace shape §4 + `created`.
+- [ ] `intake_analyze`/`diagram_evaluate`: chấp nhận `case_id` absent
+      (nháp); reject `case_id:null` và `case_id` present-not-int ≥1
+      bằng `validation_error`; evaluate nháp yêu cầu `stage` payload và
+      trả `evaluated_revision:null`.
+- [ ] Mock backend trả `backend_mode:"mock"` trong `workspace_get` và
+      `workspace_create`.
 
 Consumer (Electron main/renderer) PHẢI:
 
@@ -734,3 +853,4 @@ Consumer (Electron main/renderer) PHẢI:
 | v1 (DRAFT, fix r1) | 24/09/2026 | Review round 1: commit re-evaluate + `render_model` non-null; `breakdown.skipped`; conflict khi base_revision `<` hoặc `>`; evaluate được phép trên case locked; registry data-codes `<ns>.<snake>`; `word.no_deceased_landowner`/`word.too_many_signers`; schema nâng normative (if/then intake, status↔file link); `document_type`/`text` siết chặt |
 | v1 (fix r2) | 24/09/2026 | Residuals round 2: `breakdown.skipped` vào schema; `workspace_conflict` `!=` server đồng bộ §9/§7.5; fraction integer form trong doc |
 | v1 (APPROVED) | 24/09/2026 | Owner duyệt — contract trở thành SOT wire cho tab Soạn hồ sơ; mở cổng MIN-106+ |
+| v1.1 | 26/09/2026 | MIN-121 (additive, tương thích ngược): `notary.workspace_create` + `idempotency_key`; chế độ nháp (`case_id` absent) cho `intake_analyze`/`diagram_evaluate` (evaluate nháp kèm `stage` payload, `evaluated_revision:null`); `case` +`ngay_lap_ho_so`/`noi_niem_yet`/`ghi_chu`; field_error +`duplicate_entity`; error +`workspace_owner_required` |

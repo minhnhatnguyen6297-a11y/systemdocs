@@ -27,6 +27,11 @@ const ASSET_FIELDS = ['is_primary', 'so_serial', 'so_vao_so',
   'hinh_thuc_su_dung', 'thoi_han', 'nguon_goc', 'ngay_cap', 'co_quan_cap'];
 const NODE_BOOL_FIELDS = ['isLandOwner', 'willReceive', 'hidden', 'deleted'];
 
+// Meta cho phep sua tren nhap moi — khop payload.case §4.3.
+const CASE_META_FIELDS = ['document_type', 'ngay_lap_ho_so',
+                          'noi_niem_yet', 'ghi_chu'];
+const CASE_DOCUMENT_TYPES = ['khai_nhan', 'thoa_thuan'];
+
 function clone(v) {
   return v === undefined ? undefined : JSON.parse(JSON.stringify(v));
 }
@@ -79,6 +84,64 @@ function newNode(id) {
            hidden: false, deleted: false };
 }
 
+// Seed V2 toi thieu port tu ReactFlowApp.jsx (drafting-tab/MIN-122):
+// bay slot co dinh — cha/me nguoi de lai, cha/me vo-chong, owner, spouse,
+// child_1. KHONG port resolveSubRelations/engine JS/heuristic ngay chet.
+// Idempotent: chi them slot chua co (ke ca deleted = khong them lai).
+function seedDiagramSlots(nodes) {
+  const have = new Set((nodes || []).map((n) => n && n.id));
+  const add = (id, rel) => {
+    if (have.has(id)) return null;
+    const n = newNode(id);
+    if (rel) {
+      n.parentSlotIds = rel.parents || [];
+      n.spouseSlotId = rel.spouse || null;
+    }
+    nodes.push(n);
+    have.add(id);
+    return n;
+  };
+  add('father'); add('mother');
+  add('spouse_father'); add('spouse_mother');
+  const owner = findInNodes(nodes, 'owner') || add('owner');
+  const spouse = findInNodes(nodes, 'spouse') || add('spouse');
+  add('child_1', { parents: ['owner', 'spouse'] });
+  if (owner) {
+    owner.isLandOwner = true;
+    owner.spouseSlotId = 'spouse';
+    owner.parentSlotIds = ['father', 'mother'].filter(
+      (x) => have.has(x));
+  }
+  if (spouse) {
+    spouse.spouseSlotId = 'owner';
+    spouse.willReceive = true;
+    spouse.parentSlotIds = ['spouse_father', 'spouse_mother'].filter(
+      (x) => have.has(x));
+  }
+  return nodes;
+}
+
+function findInNodes(nodes, id) {
+  return (nodes || []).find((n) => n && n.id === id && !n.deleted) || null;
+}
+
+// Them mot slot child_N trong ke tiep khi moi child_* da gan nguoi —
+// giu "luon co mot o con trống" (MIN-122). Tra node moi hoac null.
+function ensureEmptyChildSlot(nodes) {
+  const kids = (nodes || []).filter(
+    (n) => n && !n.deleted && /^child_\d+$/.test(n.id));
+  if (kids.some((n) => !n.personId)) return null;
+  let i = 1;
+  const ids = new Set((nodes || []).map((n) => n && n.id));
+  while (ids.has(`child_${i}`)) i += 1;
+  const node = newNode(`child_${i}`);
+  node.parentSlotIds = ['owner', 'spouse'].filter(
+    (x) => findInNodes(nodes, x));
+  node.willReceive = true;
+  nodes.push(node);
+  return node;
+}
+
 function createModel(deps) {
   deps = deps || {};
   const client = deps.client;
@@ -103,6 +166,8 @@ function createModel(deps) {
     stage: { people: [], assets: [] },       // draft Stage (UI edit)
     stageDirty: false,
     diagramDirty: false,
+    metaDirty: false,            // meta nhap chua luu (chi co tren nhap)
+    draftId: null,               // idempotency_key cua phien nhap (uuid4)
     fieldErrors: [],             // [{row_id, field, code, message}]
     diagram: { version: DIAGRAM_VERSION, nodes: [] },  // draft
     committedDiagram: { version: DIAGRAM_VERSION, nodes: [] },
@@ -124,12 +189,16 @@ function createModel(deps) {
   };
 
   let lastUnsaved = false;
+  // Session guard: openCase/newDraft tang counter; response tro ve sau
+  // khi session da doi (user chuyen case/nhap khac) bi BO — khong ap
+  // vao state nua (MIN-122: "bo job response ve tre cua case cu").
+  let session = 0;
 
   function emit() {
     // Bao main biet hasUnsaved doi → window-close guard (MIN-112). Tinh o
     // day vi moi thay doi draft deu di qua emit (touchStage/touchDiagram/
     // commit/save/applyWorkspace).
-    const u = state.stageDirty || state.diagramDirty;
+    const u = state.stageDirty || state.diagramDirty || state.metaDirty;
     if (u !== lastUnsaved) {
       lastUnsaved = u;
       if (typeof deps.onUnsavedChange === 'function') {
@@ -161,6 +230,15 @@ function createModel(deps) {
     return new Set(state.committed.people.map((p) => p.row_id));
   }
 
+  // Che do nhap (caseId=null): diagram gan personId theo row_id cua
+  // stage NHAP — chua co gi committed. Case da tao: van theo committed
+  // (§2.1a — personId trong persisted state la row_id cua Stage).
+  function assignablePersonIds() {
+    return state.caseId == null
+      ? new Set(state.stage.people.map((p) => p.row_id))
+      : committedPersonIds();
+  }
+
   function diagramPersonIds() {
     const ids = new Set();
     for (const n of state.diagram.nodes || []) {
@@ -174,9 +252,10 @@ function createModel(deps) {
   // diagram → moi tai san committed luon con trong Pool.
   function pool() {
     const assigned = diagramPersonIds();
+    const src = state.caseId == null ? state.stage : state.committed;
     return {
-      people: state.committed.people.filter((p) => !assigned.has(p.row_id)),
-      assets: state.committed.assets.slice(),
+      people: src.people.filter((p) => !assigned.has(p.row_id)),
+      assets: src.assets.slice(),
     };
   }
 
@@ -203,6 +282,8 @@ function createModel(deps) {
       .concat((dg.render_model && dg.render_model.warnings) || []);
     state.stageDirty = false;
     state.diagramDirty = false;
+    state.metaDirty = false;
+    state.draftId = null;
     state.fieldErrors = [];
     state.diagramErrors = [];
     state.conflict = null;
@@ -229,19 +310,133 @@ function createModel(deps) {
   }
 
   async function openCase(caseId) {
+    const s = ++session;
     state.status = 'loading';
     state.caseId = caseId;
+    state.draftId = null;
     state.error = null;
     state.notice = null;
     emit();
     const r = await client.run('notary.workspace_get',
                                { case_id: caseId });
+    if (s !== session) return r;      // user da chuyen case/nhap — bo
     if (!r.ok) {
       setLoadError(r.error || errObj('unknown'));
       emit();
       return r;
     }
     applyWorkspace(r.data || {});
+    emit();
+    return r;
+  }
+
+  // ---------- nhap moi (case chua ton tai) ----------
+
+  function isDraft() {
+    return state.caseId == null &&
+      (state.status === 'ready' || state.status === 'conflict');
+  }
+
+  // Mo nhap trong — stage rong + diagram seed 7 slot V2. draftId =
+  // idempotency_key cua phien: retry saveDraft dung lai → khong tao
+  // trung (contract §4.3). newDraft lai → key moi = nhap khac.
+  function newDraft() {
+    ++session;                        // vo hieu response dang cho cua case cu
+    state.status = 'ready';
+    state.caseId = null;
+    state.draftId = uuid();
+    state.caseInfo = {
+      id: null, case_type: SUPPORTED_CASE_TYPE, document_type: 'khai_nhan',
+      status: 'draft', locked: false, revision: 0,
+      ngay_lap_ho_so: null, noi_niem_yet: null, ghi_chu: null,
+    };
+    state.backendMode = null;
+    state.revision = 0;
+    state.locked = false;
+    state.unsupported = false;
+    state.capabilities =
+      { intake: [], diagram: true, word_export: false };
+    state.committed = { people: [], assets: [] };
+    state.stage = { people: [], assets: [] };
+    state.stageDirty = false;
+    state.diagramDirty = true;        // seed la draft chua persist
+    state.metaDirty = false;
+    state.diagram = {
+      version: DIAGRAM_VERSION,
+      nodes: seedDiagramSlots([]),
+    };
+    state.committedDiagram = clone(state.diagram);
+    state.renderModel = null;
+    state.diagramWarnings = [];
+    state.diagramErrors = [];
+    state.evaluatedRevision = null;
+    state.conflict = null;
+    state.stale = false;
+    state.fieldErrors = [];
+    state.error = null;
+    state.notice = null;
+    state.suggestions = [];
+    state.intakeErrors = [];
+    state.intakePartial = false;
+    state.intakeBusy = false;
+    state.wordOptions = null;
+    state.wordResult = null;
+    state.wordBusy = false;
+    state.busy = null;
+    emit();
+  }
+
+  // Sua meta nhap (document_type/ngay_lap_ho_so/noi_niem_yet/ghi_chu).
+  // Chi co nghia tren nhap chua luu — case da tao sua qua commit Stage
+  // khong doi meta (contract khong co command update meta).
+  function updateCaseMeta(field, value) {
+    if (!isDraft() || !CASE_META_FIELDS.includes(field)) return false;
+    if (field === 'document_type' &&
+        !CASE_DOCUMENT_TYPES.includes(value)) return false;
+    const v = value === '' ? null : value;
+    if ((state.caseInfo[field] ?? null) === v) return true;
+    state.caseInfo[field] = v;
+    state.metaDirty = true;
+    emit();
+    return true;
+  }
+
+  async function saveDraft() {
+    if (!isDraft()) {
+      return { ok: false, error: errObj('validation_error',
+                                        'Khong phai nhap moi') };
+    }
+    state.busy = 'notary.workspace_create';
+    emit();
+    const s = session;
+    const meta = {};
+    for (const f of CASE_META_FIELDS) meta[f] = state.caseInfo[f] ?? null;
+    const r = await client.run('notary.workspace_create', {
+      idempotency_key: state.draftId,
+      case: meta,
+      stage: clone(state.stage),
+      diagram: { state: clone(state.diagram) },
+    });
+    state.busy = null;
+    if (s !== session) return r;      // nhap da bi thay — bo response
+    if (!r.ok) {
+      const err = r.error || errObj('unknown');
+      if (err.code === 'stage_validation_error') {
+        state.fieldErrors =
+          (err.details && err.details.field_errors) || [];
+      } else if (err.code === 'diagram_invalid_state') {
+        state.diagramErrors =
+          (err.details && err.details.errors) || [err];
+      }
+      state.error = err;
+      emit();
+      return r;
+    }
+    // thanh cong → nhap tro thanh case that (revision=1); draftId giai
+    // phong qua applyWorkspace — retry tiep theo dung luong revision.
+    applyWorkspace(r.data || {});
+    state.notice = r.data && r.data.created === false
+      ? 'Hồ sơ đã tồn tại (đã mở lại)' : 'Đã lưu hồ sơ';
     emit();
     return r;
   }
@@ -302,6 +497,14 @@ function createModel(deps) {
       // mirror cua rule primary_count — backend van la nguoi quyet).
       for (const a of state.stage.assets) a.is_primary = false;
       row.is_primary = true;
+    } else if (field === 'land_rows') {
+      // Form dọc: land_rows la list {loai_dat, dien_tich, thoi_han}.
+      row.land_rows = Array.isArray(value)
+        ? value.map((x) => ({
+            loai_dat: x && x.loai_dat != null ? String(x.loai_dat) : null,
+            dien_tich: x && x.dien_tich != null ? x.dien_tich : null,
+            thoi_han: x && x.thoi_han != null ? String(x.thoi_han) : null,
+          })) : [];
     } else if (ASSET_FIELDS.includes(field)) {
       row[field] = value === '' ? null : value;
     } else {
@@ -318,6 +521,12 @@ function createModel(deps) {
     state.stage.assets = state.stage.assets.filter((a) => a.row_id !== rowId);
     if (state.stage.people.length + state.stage.assets.length === before) {
       return;
+    }
+    // Contract: dung 1 primary khi assets con dong — xoa tai san chinh
+    // thi promote dong dau con lai (mirror phia client).
+    if (state.stage.assets.length &&
+        !state.stage.assets.some((a) => a.is_primary)) {
+      state.stage.assets[0].is_primary = true;
     }
     // Mirror _prune_diagram phia backend: draft diagram bo tham chieu
     // toi dong vua xoa de save sau khong bi reference_outside_stage.
@@ -371,12 +580,14 @@ function createModel(deps) {
     if (!state.stageDirty) return { ok: true, noop: true };
     state.busy = 'notary.workspace_commit_stage';
     emit();
+    const s = session;
     const r = await client.run('notary.workspace_commit_stage', {
       case_id: state.caseId,
       base_revision: state.revision,
       stage: clone(state.stage),
     });
     state.busy = null;
+    if (s !== session) return r;
     if (!r.ok) {
       const err = r.error || errObj('unknown');
       if (err.code === 'stage_validation_error') {
@@ -460,7 +671,7 @@ function createModel(deps) {
     if (!canWrite()) return false;
     const node = findNode(nodeId);
     if (!node) return false;
-    if (rowId !== null && !committedPersonIds().has(rowId)) return false;
+    if (rowId !== null && !assignablePersonIds().has(rowId)) return false;
     if (rowId) {
       for (const n of state.diagram.nodes) {
         if (n !== node && !n.deleted && n.personId === rowId) {
@@ -469,6 +680,39 @@ function createModel(deps) {
       }
     }
     node.personId = rowId;
+    ensureEmptyChildSlot(state.diagram.nodes);
+    touchDiagram();
+    return true;
+  }
+
+  // movePerson(rowId, targetNodeId|null) — nen MIN-119 drag/drop:
+  //   target node trong  → move (nguon ve Pool)
+  //   target co nguoi    → swap personId hai node
+  //   target = null      → bo gan, nguoi quay ve Pool
+  // rowId tu Pool (chua gan node nao) cung move duoc — tuong duong
+  // assignPerson nhung swap nguoi cu cua target ve Pool.
+  function movePerson(rowId, targetNodeId) {
+    if (!canWrite()) return false;
+    if (rowId == null) return false;
+    const sourceNode = (state.diagram.nodes || []).find(
+      (n) => n && !n.deleted && n.personId === rowId) || null;
+    if (targetNodeId == null) {
+      if (!sourceNode) return false;      // da o Pool roi
+      sourceNode.personId = null;
+      ensureEmptyChildSlot(state.diagram.nodes);
+      touchDiagram();
+      return true;
+    }
+    const target = findNode(targetNodeId);
+    if (!target || target === sourceNode) return false;
+    if (!assignablePersonIds().has(rowId)) return false;
+    const displaced = target.personId;
+    target.personId = rowId;
+    if (sourceNode) {
+      sourceNode.personId = displaced || null;   // swap (null = move)
+    }                                   // displaced khong co sourceNode
+                                        // → tu nhien ve Pool
+    ensureEmptyChildSlot(state.diagram.nodes);
     touchDiagram();
     return true;
   }
@@ -525,11 +769,16 @@ function createModel(deps) {
     }
     state.busy = 'notary.diagram_evaluate';
     emit();
-    const r = await client.run('notary.diagram_evaluate', {
-      case_id: state.caseId,
-      diagram: { state: clone(state.diagram) },
-    });
+    const s = session;
+    // §2.1a: nhap moi (caseId=null) → khong gui case_id, kem stage nhap.
+    const payload = state.caseId == null
+      ? { stage: clone(state.stage),
+          diagram: { state: clone(state.diagram) } }
+      : { case_id: state.caseId,
+          diagram: { state: clone(state.diagram) } };
+    const r = await client.run('notary.diagram_evaluate', payload);
     state.busy = null;
+    if (s !== session) return r;      // response tre — bo
     if (!r.ok) {
       const err = r.error || errObj('unknown');
       if (err.code === 'diagram_invalid_state') {
@@ -562,12 +811,14 @@ function createModel(deps) {
     if (!state.diagramDirty) return { ok: true, noop: true };
     state.busy = 'notary.diagram_save';
     emit();
+    const s = session;
     const r = await client.run('notary.diagram_save', {
       case_id: state.caseId,
       base_revision: state.revision,
       diagram: { state: clone(state.diagram) },
     });
     state.busy = null;
+    if (s !== session) return r;
     if (!r.ok) {
       const err = r.error || errObj('unknown');
       if (err.code === 'diagram_invalid_state') {
@@ -626,11 +877,14 @@ function createModel(deps) {
     }
     state.intakeBusy = true;
     emit();
-    const r = await client.run('notary.intake_analyze', {
-      case_id: state.caseId,
-      sources: clone(sources),
-    }, opts);
+    const s = session;
+    // §2.1a: nhap moi → khong gui case_id (case_id:null la loi client).
+    const payload = state.caseId == null
+      ? { sources: clone(sources) }
+      : { case_id: state.caseId, sources: clone(sources) };
+    const r = await client.run('notary.intake_analyze', payload, opts);
     state.intakeBusy = false;
+    if (s !== session) return r;      // response tre — bo
     if (!r.ok) {
       const err = r.error || errObj('unknown');
       if (err.code === 'user_canceled') {
@@ -695,8 +949,10 @@ function createModel(deps) {
   // ---------- word export (thin — dialog day du o MIN-112) ----------
 
   async function loadWordOptions() {
+    const s = session;
     const r = await client.run('notary.word_export_options',
                                { case_id: state.caseId });
+    if (s !== session) return r;
     if (!r.ok) {
       state.error = r.error || errObj('unknown');
       emit();
@@ -773,12 +1029,14 @@ function createModel(deps) {
     state.wordBusy = true;
     state.wordResult = null;
     emit();
+    const s = session;
     const r = await client.run('notary.word_export_batch', {
       case_id: state.caseId,
       document_keys: documentKeys,
       destination,
     }, opts);
     state.wordBusy = false;
+    if (s !== session) return r;
     if (!r.ok) {
       // Failed/canceled/partial job van co the mang result (breakdown)
       // tren wire: job.result.data (MIN-115) hoac error.details.documents.
@@ -818,11 +1076,13 @@ function createModel(deps) {
 
   return {
     state, subscribe,
-    openCase, canWrite, mockBanner, hasUnsaved, isStageEmpty,
+    openCase, newDraft, isDraft, saveDraft, updateCaseMeta,
+    canWrite, mockBanner, hasUnsaved, isStageEmpty,
     addPerson, addAsset, updatePersonField, updateAssetField,
     removeStageRow, fieldErrorsFor, commitStage,
     pool,
-    addSlot, assignPerson, setNodeFlag, setNodeRelation, removeNode,
+    addSlot, assignPerson, movePerson,
+    setNodeFlag, setNodeRelation, removeNode,
     evaluateDiagram, saveDiagram,
     resolveConflict,
     intakeAnalyze, acceptSuggestion, discardSuggestion,
@@ -837,6 +1097,9 @@ const G1_NOTARY_MODEL = {
   MOCK_BANNER,
   PERSON_FIELDS,
   ASSET_FIELDS,
+  CASE_META_FIELDS,
+  CASE_DOCUMENT_TYPES,
+  seedDiagramSlots,
 };
 
 if (typeof window !== 'undefined') window.G1_NOTARY_MODEL = G1_NOTARY_MODEL;

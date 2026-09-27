@@ -203,8 +203,10 @@ class TestIntakeAnalyze(unittest.TestCase):
                  {"case_id": self.case_id, "sources": [_text_source(1, "x")],
                   "bogus": 1})
         self.assertEqual(ctx.exception.code, "validation_error")
+        # case_id absent = che do nhap (hop le); case_id null -> loi
         with self.assertRaises(CommandError) as ctx:
-            _run("notary.intake_analyze", {"sources": [_text_source(1, "x")]})
+            _run("notary.intake_analyze",
+                 {"case_id": None, "sources": [_text_source(1, "x")]})
         self.assertEqual(ctx.exception.code, "validation_error")
         with self.assertRaises(CommandError) as ctx:
             _run("notary.intake_analyze",
