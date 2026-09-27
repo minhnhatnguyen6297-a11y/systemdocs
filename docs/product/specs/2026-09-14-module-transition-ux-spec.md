@@ -13,6 +13,12 @@
 > [2026-09-24-notary-v2-case-drafting-electron-ux.md](2026-09-24-notary-v2-case-drafting-electron-ux.md);
 > hành vi/dữ liệu tab (Stage/Pool/Diagram, revision/conflict, suggestion) là
 > SOT của `notary_v2/docs/platform/case-workspace/drafting-tab.md`.
+>
+> Cập nhật MIN-124 (28/09/2026): file này vẫn là **vocabulary trạng thái
+> shell** (draft chờ duyệt). Lớp **thị giác + thao tác chung cho hai module
+> nghiệp vụ** theo hướng trắng/xanh đã duyệt (27/09/2026) nằm ở
+> [`../ui/`](../ui/) — `DESIGN.md`/`EXPERIENCE.md`/`tokens.json` dẫn lại
+> vocabulary ở đây, không nhân bản; giá trị token đang proposed.
 
 ## 1. Navigation và layout
 

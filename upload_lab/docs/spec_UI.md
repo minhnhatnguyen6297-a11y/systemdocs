@@ -6,6 +6,14 @@ bảng/năm cột trước đây trong chính file này — cấu trúc bảng h
 [MIN-77](https://linear.app/minhnotary/issue/MIN-77/bug-chuan-hoa-cot-3-vung-audit-excel-va-rut-gon-cot-bang-upload)
 (đã Done) và khớp `ui_qt/main_window.py` hiện tại.
 
+> **Cập nhật MIN-124 (28/09/2026):** file này giữ nguyên vai trò SOT
+> **hành vi/bố cục vùng**. Lớp **thị giác** (màu, token, chiều cao control,
+> tông trạng thái, responsive chi tiết) nằm ở
+> [`visual-design.md`](visual-design.md) + [`../../docs/product/ui/`](../../docs/product/ui/) — hướng
+> trắng/xanh đã duyệt bằng ảnh (27/09/2026), giá trị token chờ duyệt. Hai
+> lớp không nhân bản: hành vi/đếm cột/scope lấy file này, thị giác lấy
+> `visual-design.md`.
+
 Hành vi nghiệp vụ giữ nguyên từ bản Fluent UI/Qt đang chạy (`run.bat` →
 `ui_runner.py` → `ui_qt/main_window.py`) trừ khi spec này nói khác. Giao tiếp
 UI ↔ backend theo contract `upload.workflow.v1`
@@ -164,6 +172,8 @@ Bảng hồ sơ dùng đúng **sáu cột** (chuẩn MIN-77):
 
 | Tài liệu | Vai trò |
 |---|---|
+| `visual-design.md` | Lớp thị giác/token của module (MIN-124) — bổ sung, không thay spec này |
+| [`../../docs/product/ui/`](../../docs/product/ui/) | SOT thị giác + thao tác chung của shell (`DESIGN.md`, `EXPERIENCE.md`, `tokens.json`) |
 | `contracts/upload-workflow.md` | Contract `upload.workflow.v1` — command, schema, lỗi, scope/revision giữa shell và sidecar |
 | `contracts/desktop-command.md` + `contracts/g1-module-data.md` | Envelope `desktopcommand.v1` và shape `g1.module.v1` mà workflow chạy bên trong |
 | `upload_lab/README.md` | Kiến trúc nghiệp vụ/engine và cấu trúc codebase hiện tại |

@@ -3,6 +3,17 @@
 **Spec đích cho tab `Soạn hồ sơ` trên Electron — owner đã duyệt qua [MIN-104](https://linear.app/minhnotary/issue/MIN-104) ngày 24/09/2026; runtime đã triển khai qua MIN-106…MIN-112, verify MIN-113 (chờ owner duyệt cutover).**
 Ngày: 24/09/2026 · Owner: platform/case-workspace · Spec: MIN-104 · Goal triển khai: MIN-107…MIN-112
 
+> **Cập nhật MIN-124 (28/09/2026):** file này giữ nguyên vai trò SOT
+> **hành vi/dữ liệu**. Lớp **thị giác/bố cục mới** (bảng chuyển vị Tài sản,
+> dialog loại đất, chip vị trí trên node, action bar) nằm ở
+> [`visual-design.md`](./visual-design.md) + `docs/product/ui/` — phần đó
+> là hướng đã duyệt bằng ảnh, giá trị chi tiết chờ duyệt. Khi nội dung hai
+> lớp trông mâu thuẫn (vd hình thức card Tài sản, nút `Chủ đất`/`Nhận` ↔
+> chip số), **hành vi/dữ liệu lấy file này làm chuẩn**, hình thức lấy
+> `visual-design.md`; chỗ nào là quyết định nghiệp vụ mới (chip vị trí ↔
+> tài sản, `Hủy thay đổi`, Apply loại đất) được liệt kê **chờ P2** — file
+> này chưa quyết định chúng.
+
 ## 1. Vai trò tài liệu và ranh giới SOT
 
 - File này là **SOT nội bộ cho hành vi/dữ liệu** của tab `Soạn hồ sơ`
@@ -13,10 +24,14 @@ Ngày: 24/09/2026 · Owner: platform/case-workspace · Spec: MIN-104 · Goal tri
   nút, danh mục trạng thái UI, UX xuất Word, loại trừ) là SOT của
   `docs/product/specs/2026-09-24-notary-v2-case-drafting-electron-ux.md` —
   file này tham chiếu, không chép lại.
-- **Wire contract** `desktopcommand.v1` cho bảy command đích sẽ publish tại
-  `contracts/notary-case-drafting.md` trong [MIN-105](https://linear.app/minhnotary/issue/MIN-105)
-  — **chưa tồn tại**. File `contract.md` cạnh file này là ghi chú cơ chế
-  domain *provisional, non-normative*, **không phải** wire contract; ba
+- **Thị giác/bố cục đích** (palette, token, bảng chuyển vị, dialog loại
+  đất, node chip, zoom sơ đồ) là SOT của `visual-design.md` cùng thư mục +
+  `docs/product/ui/` — file này không định nghĩa màu/kích thước.
+- **Wire contract** `desktopcommand.v1` cho các command đích đã publish tại
+  `contracts/notary-case-drafting.md` (`notary.case-drafting.v1`, owner
+  duyệt 24/09/2026 qua [MIN-105](https://linear.app/minhnotary/issue/MIN-105),
+  rev 1.1 additive MIN-121). File `contract.md` cạnh file này là ghi chú cơ
+  chế domain *provisional, non-normative*, **không phải** wire contract; ba
   invariant trong đó (Stage sở hữu người đã commit; Pool derived; Pool/Diagram
   không mutate Stage) trùng khớp spec này.
 - `../../domains/inheritance/workflow.md` giữ SOT **hiện trạng web**
@@ -35,7 +50,8 @@ Ngày: 24/09/2026 · Owner: platform/case-workspace · Spec: MIN-104 · Goal tri
 - **Stage** là nguồn chuẩn đã xác nhận của hồ sơ, gồm **Người và Tài sản**.
   Mỗi dòng Stage mang `row_id` (do UI tạo, ổn định qua commit/reload, dùng để
   gắn lỗi đúng dòng) và `entity_id` (ID DB, `null` trước lần commit đầu).
-  Kiểu/giá trị chính xác của các khóa này do MIN-105 chốt; spec này chỉ khóa
+  Kiểu/giá trị chính xác của các khóa này →
+  `contracts/notary-case-drafting.md` (đã publish, MIN-105); spec này chỉ khóa
   semantics.
 - **Pool** là projection, **không được lưu** như nguồn dữ liệu riêng:
 
@@ -118,7 +134,7 @@ Ngày: 24/09/2026 · Owner: platform/case-workspace · Spec: MIN-104 · Goal tri
   (đánh giá draft, không persist) và `diagram_save` (§8).
 - Persist đích: Diagram state lưu assignment/quan hệ/render metadata do người
   tạo; output tính toán (allocations/warnings) là dữ liệu engine trả về lúc
-  evaluate/save — shape persist chính xác thuộc contract MIN-105. Hiện trạng
+  evaluate/save — shape persist chính xác → `contracts/notary-case-drafting.md`. Hiện trạng
   web persist `engineState` lẫn trong `diagram` (`form.html:8474-8483`).
 - **Đã chốt (owner 24/09/2026):** giữ công thức `Người không nhận = Tất cả
   người trên Diagram − Chủ đất − Người nhận` (workflow.md L146). Tranh cãi với
@@ -136,7 +152,8 @@ Ngày: 24/09/2026 · Owner: platform/case-workspace · Spec: MIN-104 · Goal tri
   khác `unsupported` **cấp kết quả engine** trong spec.md §8 (DRAFT) — hai
   tầng riêng, spec này không gộp.
 - `capabilities` trong workspace response cho UI biết intake/diagram/
-  word_export phần nào bật cho hồ sơ hiện tại (shape → MIN-105).
+  word_export phần nào bật cho hồ sơ hiện tại (shape →
+  `contracts/notary-case-drafting.md`).
 
 ## 8. Map hành vi → command đích (envelope `desktopcommand.v1`)
 
@@ -163,10 +180,10 @@ Ngày: 24/09/2026 · Owner: platform/case-workspace · Spec: MIN-104 · Goal tri
   error `code/message/retryable/next_action/details`. File này chỉ viện dẫn,
   không định nghĩa lại.
 - Version theo domain đặt **trong** `result.data.schema_version` =
-  `notary.case-drafting.v1` (convention mới — envelope không quy định;
-  chốt chính thức ở MIN-105).
+  `notary.case-drafting.v1` (convention đã chốt ở MIN-105 — envelope không
+  quy định).
 - Wire contract chính thức = `contracts/notary-case-drafting.md` +
-  schema/examples — publish trong MIN-105 trước khi runtime nào implement.
+  schema/examples — **đã publish trong MIN-105** (rev 1.1 additive MIN-121).
   Namespace `notary.*` đã được module `document-review` claim
   (`shell/src/main/registry.js:18`) — giữ namespace này.
 - Hiện trạng shell (đã cập nhật sau MIN-106…112): ngoài 12 command cũ
@@ -194,17 +211,23 @@ Ngày: 24/09/2026 · Owner: platform/case-workspace · Spec: MIN-104 · Goal tri
 | Word export | 1 template → 1 DOCX browser download (`routers/cases.py:1610-1663`; `form.html:3896-3903`; `detail.html:29-31`); preview/export-draft cũng một file. | Batch nhiều văn bản → một folder, per-file result (UX → spec UX §7); `word_export_options`/`word_export_batch` |
 | Draft persist | OCR staging draft trong `localStorage` (`form.html:11084-11085`). | Bỏ — draft chỉ trong phiên (§4) |
 | Zalo trong màn hồ sơ | `form.html` có **0** tham chiếu Zalo (grep toàn file); `zalo.status` tồn tại ở shell command surface nhưng tab không gọi — bằng chứng loại trừ, không phải control của tab. | Giữ: không nút/popup/command/trạng thái Zalo trong tab (§5) |
-| Shell command surface | 12 command qua `notary_adapter.py` — 10 `notary.*` + `ocr.analyze` + `zalo.status` (bằng chứng loại trừ, tab không dùng — `command_registry.py:187-216`); directory picker `pickFiles({directory:true})` đã end-to-end (`shell/src/main/main.js:32-48`, `ipc.js:67-71`, dùng ở `renderer.js:522`); `is_dir` chưa nằm trong FileRef contract (`contracts/desktop-command.md` §6). | Thêm 7 command §8 sau khi MIN-105 publish; pin `is_dir` cho directory FileRef là việc của MIN-105 |
+| Shell command surface | 12 command qua `notary_adapter.py` — 10 `notary.*` + `ocr.analyze` + `zalo.status` (bằng chứng loại trừ, tab không dùng — `command_registry.py:187-216`); directory picker `pickFiles({directory:true})` đã end-to-end (`shell/src/main/main.js:32-48`, `ipc.js:67-71`, dùng ở `renderer.js:522`); `is_dir` chưa nằm trong FileRef contract (`contracts/desktop-command.md` §6). | 7 command §8 đã publish trong `contracts/notary-case-drafting.md` (MIN-105; `workspace_create` thêm ở rev 1.1/MIN-121); pin `is_dir` cho directory FileRef vẫn là điểm mở ở envelope |
 
 ## 10. Điểm mở và ngoài phạm vi
 
 Điểm mở (ghi nhận, **không** tự chốt):
 
-- Shape persist chính xác của diagram state/engine output — MIN-105.
+- Ngữ nghĩa **chip vị trí ↔ tài sản** trên node sơ đồ và mô hình **hai bên
+  30 vị trí** theo ảnh approved — quyết định nghiệp vụ của P2 (MIN-125),
+  cài đặt ở P7 (MIN-130); xem `visual-design.md` §5.
+- `Hủy thay đổi` trên action bar đích — semantics discard (Stage only hay
+  cả Diagram) chờ P2.
+- `Áp dụng` trong dialog loại đất — draft hay commit Stage — chờ P2.
 - Giới hạn intake (số file/trang/byte/độ dài text) và chính sách retry
-  từng adapter — MIN-105/backend.
+  từng adapter — backend; wire-level đã có ở contract, giới hạn số chưa
+  chốt.
 - `document_key` danh mục văn bản cụ thể cho từng `case_type`/`document_type`
-  — MIN-105 + spec nghiệp vụ.
+  — spec nghiệp vụ + contract.
 
 Ngoài phạm vi file này:
 

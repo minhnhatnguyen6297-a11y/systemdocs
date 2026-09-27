@@ -31,10 +31,13 @@ Kênh nội bộ shell↔engine (owner duyệt 14/09/2026, spec P2; `upload.work
 | [`desktop-command.md`](./desktop-command.md) | `desktopcommand.v1` — kênh lệnh Electron main ↔ Python sidecar trên một máy: auth, lifecycle, idempotency, waiting_user, error, file_ref machine-scope | APPROVED v1 |
 | [`g1-module-data.md`](./g1-module-data.md) | `g1.module.v1` — shape dữ liệu trong payload/result/error (FileRef, JobResult, ErrorObject, IdentityEvidence, ownership) | APPROVED v1 |
 | [`g1/examples/`](./g1/examples/) + [`g1/validate_examples.py`](./g1/validate_examples.py) | valid/invalid JSON + validator kiểm chứng được | kiểm: `python contracts/g1/validate_examples.py` |
+| [`notary-case-drafting.md`](./notary-case-drafting.md) | `notary.case-drafting.v1` — tám command `notary.*` cho tab Soạn hồ sơ: workspace get/create, intake → suggestion, stage commit, diagram evaluate/save, word export batch | APPROVED v1 (rev 1.1 additive MIN-121) |
+| [`notary-case-drafting/`](./notary-case-drafting/) + examples + `validate_examples.py` | JSON Schema draft-07 + examples kiểm chứng được | kiểm: `python contracts/notary-case-drafting/validate_examples.py` |
 | [`upload-workflow.md`](./upload-workflow.md) | `upload.workflow.v1` — 17 command `upload.*` giữa shell (module `upload`/Upload Lab) và sidecar: website registry, workspace/scope binding, revision, run→manifest, waiting_user login/review, partial breakdown, compatibility với payload legacy | **DRAFT** — chờ owner duyệt (MIN-69) |
 | [`upload-workflow/examples/`](./upload-workflow/examples/) + [`upload-workflow/validate_examples.py`](./upload-workflow/validate_examples.py) | valid/invalid JSON có `fixture` mô phỏng binding backend + validator kiểm chứng được | kiểm: `python contracts/upload-workflow/validate_examples.py` |
 
-Ba contract `desktopcommand.v1`/`g1.module.v1`/`upload.workflow.v1` là
+Bốn contract `desktopcommand.v1`/`g1.module.v1`/`notary.case-drafting.v1`/
+`upload.workflow.v1` là
 **kênh nội bộ shell↔engine** — không phải contract giữa ba sản phẩm nghiệp
 vụ. ConversionEnvelope/Evidence/DraftCase dùng chung xuyên repo vẫn theo
 Gate A–D của `../docs/product/MIN62_DATA_CONTRACT_DRAFT.md` (branch

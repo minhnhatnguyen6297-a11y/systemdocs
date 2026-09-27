@@ -120,7 +120,10 @@ upload_lab/
 đúng **hai tab** — *Audit Sổ Công Chứng* và *Quét & Upload Hồ Sơ*, mỗi tab toàn
 chiều rộng. Không còn tab Cấu hình (chuyển lên đầu tab Audit cùng dropdown
 website) và không còn trang Nhật ký (log chỉ là chẩn đoán backend đã lọc).
-Đặc tả đầy đủ: [`docs/spec_UI.md`](docs/spec_UI.md); giao tiếp shell ↔ Python
+Đặc tả đầy đủ: [`docs/spec_UI.md`](docs/spec_UI.md); lớp thị giác/token của
+module (MIN-124): [`docs/visual-design.md`](docs/visual-design.md) +
+[`../docs/product/ui/`](../docs/product/ui/) (hướng trắng/xanh đã duyệt,
+giá trị token proposed); giao tiếp shell ↔ Python
 theo contract [`../contracts/upload-workflow.md`](../contracts/upload-workflow.md)
 (`upload.workflow.v1`).
 
@@ -133,7 +136,7 @@ theo contract [`../contracts/upload-workflow.md`](../contracts/upload-workflow.m
 - **Kiểm tra hồi quy giao diện**: `./.venv/Scripts/python.exe ./tools/inspect_ui_style.py` để dump metric/màu thực tế của widget.
 
 > [!IMPORTANT]
-> Thiết kế UI đích (Electron shell) được đặc tả tại [`docs/spec_UI.md`](docs/spec_UI.md) — đó là file spec UI duy nhất của repo. Thay đổi giao diện Qt hiện trạng đi trực tiếp vào `ui_qt/main_window.py` và `ui_qt/theme.py`. Không tạo thêm file `spec`/`plan`/`issue` hoặc tài liệu yêu cầu song song; cập nhật nguồn sự thật trên Linear.
+> Thiết kế UI đích (Electron shell) được đặc tả tại [`docs/spec_UI.md`](docs/spec_UI.md) — đó là file spec UI duy nhất của repo cho **hành vi/bố cục**; lớp thị giác bổ sung ở [`docs/visual-design.md`](docs/visual-design.md) (MIN-124) là phụ lục token, không phải spec song song. Thay đổi giao diện Qt hiện trạng đi trực tiếp vào `ui_qt/main_window.py` và `ui_qt/theme.py`. Không tạo thêm file `spec`/`plan`/`issue` hoặc tài liệu yêu cầu song song; cập nhật nguồn sự thật trên Linear.
 
 ---
 

@@ -44,6 +44,7 @@ trên nhánh `electron-system-shell`; `main` tiếp tục chỉ chứa tài li�
 | Vocabulary & schema dùng chung giữa các sản phẩm | [`contracts/README.md`](./contracts/README.md) |
 | Cái gì đã chốt, cái gì chưa chốt — đừng tự quyết | [`OPEN_DECISIONS.md`](./docs/architecture/OPEN_DECISIONS.md) |
 | Spec/draft theo từng issue (MIN-*, G1-SM) | [`docs/product/`](./docs/product/) |
+| Hệ thống thiết kế UI chung shell Electron (trắng/xanh, token, thao tác) | [`docs/product/ui/`](./docs/product/ui/) |
 | Zalo Inbox — nguồn chuẩn, bản nháp và thứ tự đọc | [`Zalo Intake — bắt đầu tại đây`](./notary_v2/docs/platform/zalo-document-inbox/README.md) |
 | Review kết quả POC conversion/OCR của MIN-52 và MIN-59 | [`MIN61_CONVERSION_OCR_DECISION.md`](./docs/product/MIN61_CONVERSION_OCR_DECISION.md) |
 | Quy tắc khi sửa chính folder này + nơi agent được ghi file | [`AGENTS.md`](./AGENTS.md) |

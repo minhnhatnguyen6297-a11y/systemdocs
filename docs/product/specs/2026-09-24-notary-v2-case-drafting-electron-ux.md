@@ -15,7 +15,8 @@
 > [drafting-tab.md](../../../notary_v2/docs/platform/case-workspace/drafting-tab.md)
 > — file này link sang, không chép lại. Wire contract `desktopcommand.v1` cho
 > các command đích publish trong MIN-105 (`contracts/notary-case-drafting.md`,
-> chưa tồn tại); task này không viết contract.
+> **đã publish** — `notary.case-drafting.v1`, rev 1.1 MIN-121); task này
+> không viết contract.
 >
 > Nguồn: §1 + Global Constraints của [implementation plan](../plans/2026-09-24-notary-v2-case-drafting-tab-implementation-plan.md)
 > (quyết định owner 23–24/09/2026). Hiện trạng đối chiếu theo ba audit
@@ -109,7 +110,18 @@ Mở hồ sơ từ Tổng quan — hoặc — Hồ sơ mới (nháp)
   Pool và sơ đồ vẫn giữ cuộn ngang thay vì ép thẻ quá nhỏ.
 - **Design tokens:**
 
-  | Token | Giá trị |
+  > **SUPERSEDED (MIN-124, 28/09/2026):** bảng token dưới đây là hướng cũ
+  > (rail tối + accent lime). Hướng đã duyệt 27/09/2026 là **trắng/xanh**
+  > — token mới (proposed, chờ duyệt giá trị) ở
+  > [`../ui/DESIGN.md`](../ui/DESIGN.md) + [`../ui/tokens.json`](../ui/tokens.json).
+  > Tỉ lệ bố cục 36/64 và 22/78 + breakpoint 1.000 px ở trên **vẫn giữ**.
+  > Lưu ý thêm: ảnh approved 27/09 vẽ card Tài sản dạng **bảng chuyển vị**
+  > (thuộc tính = dòng, tài sản = cột), khác với "biểu mẫu nhóm trường xếp
+  > nối tiếp chiều dọc" ghi ở trên (diễn giải 26/09) — hình thức đích theo
+  > ảnh, xác nhận lại bằng prototype P3; chi tiết ở
+  > `notary_v2/docs/platform/case-workspace/visual-design.md` §2.
+
+  | Token | Giá trị (hướng cũ — superseded) |
   |---|---|
   | Nền | `#f3f4f8` |
   | Card | trắng, viền `#dfe3e9`, radius 16 px |
@@ -258,7 +270,8 @@ Bảng hiện trạng ↔ đích chi tiết theo khối hành vi (kèm file:line
 - Nghiệp vụ xuất Word (placeholder, điều kiện xuất):
   `notary_v2/docs/domains/inheritance/word-export.md`.
 - Envelope đã duyệt: `contracts/desktop-command.md` (`desktopcommand.v1`).
-- Wire contract đích: `contracts/notary-case-drafting.md` — MIN-105, chưa tồn tại.
+- Wire contract đích: `contracts/notary-case-drafting.md` — MIN-105, **đã
+  publish** (`notary.case-drafting.v1`, rev 1.1 MIN-121).
 
 Nghiệm thu (MIN-104):
 
