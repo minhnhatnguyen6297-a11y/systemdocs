@@ -1,0 +1,88 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "note": "Evaluate chế độ nháp v2 (case_id absent): payload.stage = stage_v2 — kể cả owner_row_id — snapshot buffer tại thời điểm gửi (§13.2); personId trỏ row_id trong stage payload (§2.1a)"
+  },
+  "contract_version": "desktopcommand.v1",
+  "command": "notary.diagram_evaluate",
+  "command_id": "a1b2c3d4-1008-4001-8001-000000000001",
+  "payload": {
+    "stage": {
+      "owner_row_id": "11111111-1111-4111-8111-111111111111",
+      "people": [
+        {
+          "row_id": "11111111-1111-4111-8111-111111111111",
+          "entity_id": null,
+          "ho_ten": "Nguyễn Văn An",
+          "gioi_tinh": "Nam",
+          "ngay_sinh": "1950",
+          "ngay_chet": "2011-05-15",
+          "so_giay_to": null,
+          "ngay_cap": null,
+          "noi_cap": null,
+          "dia_chi": "Hà Nội",
+          "place_of_origin": null
+        },
+        {
+          "row_id": "33333333-3333-4333-8333-333333333333",
+          "entity_id": null,
+          "ho_ten": "Nguyễn Văn Cường",
+          "gioi_tinh": "Nam",
+          "ngay_sinh": "1980",
+          "ngay_chet": null,
+          "so_giay_to": null,
+          "ngay_cap": null,
+          "noi_cap": null,
+          "dia_chi": "Hà Nội",
+          "place_of_origin": null
+        }
+      ],
+      "assets": [
+        {
+          "row_id": "55555555-5555-4555-8555-555555555555",
+          "entity_id": null,
+          "so_serial": "DD123456",
+          "so_vao_so": null,
+          "so_thua_dat": "123",
+          "so_to_ban_do": "45",
+          "dia_chi": "Thửa 123, tờ 45, Hà Nội",
+          "loai_so": null,
+          "hinh_thuc_su_dung": null,
+          "thoi_han": null,
+          "nguon_goc": null,
+          "ngay_cap": null,
+          "co_quan_cap": null,
+          "land_rows": []
+        }
+      ]
+    },
+    "diagram": {
+      "state": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "owner",
+            "personId": "11111111-1111-4111-8111-111111111111",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [1],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "child_1",
+            "personId": "33333333-3333-4333-8333-333333333333",
+            "parentSlotIds": ["owner"],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [1],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      }
+    }
+  }
+}

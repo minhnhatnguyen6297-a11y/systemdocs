@@ -1,7 +1,9 @@
-# Contract: Notary Case Drafting `v1` (doc rev 1.1)
+# Contract: Notary Case Drafting `v1` (doc rev 1.1) + DRAFT `v2` ở §13
 
 **Version:** `notary.case-drafting.v1` · **Status:** APPROVED — owner duyệt
 24/09/2026 (MIN-105); rev 1.1 mở rộng tương thích (MIN-121) ·
+**§13 chứa DRAFT `notary.case-drafting.v2` (MIN-125) — CHƯA duyệt, KHÔNG
+được implement cho tới khi owner chốt** ·
 **Owner:** `systemdocs` · **Published:** MIN-105 ·
 **Kênh mang:** `desktopcommand.v1` (`contracts/desktop-command.md`) ·
 **Domain data shape:** `g1.module.v1` (`contracts/g1-module-data.md`)
@@ -854,3 +856,484 @@ Consumer (Electron main/renderer) PHẢI:
 | v1 (fix r2) | 24/09/2026 | Residuals round 2: `breakdown.skipped` vào schema; `workspace_conflict` `!=` server đồng bộ §9/§7.5; fraction integer form trong doc |
 | v1 (APPROVED) | 24/09/2026 | Owner duyệt — contract trở thành SOT wire cho tab Soạn hồ sơ; mở cổng MIN-106+ |
 | v1.1 | 26/09/2026 | MIN-121 (additive, tương thích ngược): `notary.workspace_create` + `idempotency_key`; chế độ nháp (`case_id` absent) cho `intake_analyze`/`diagram_evaluate` (evaluate nháp kèm `stage` payload, `evaluated_revision:null`); `case` +`ngay_lap_ho_so`/`noi_niem_yet`/`ghi_chu`; field_error +`duplicate_entity`; error +`workspace_owner_required` |
+
+---
+
+# PHẦN II — DRAFT: `notary.case-drafting.v2` (MIN-125, CHỜ OWNER DUYỆT)
+
+> **TRẠNG THÁI: DRAFT — chưa publish.** Toàn bộ §13 là đề xuất hợp đồng
+> P2 của MIN-123. Không gì trong §13 được coi là wire contract hiện
+> hành; runtime implement ở **P5 (MIN-128)** sau khi owner duyệt. Phần I
+> (`v1`, §1–§12) vẫn là contract APPROVED duy nhất.
+>
+> Mọi mục dưới đây gắn mã `Q#` ↔ bảng quyết định tại
+> `.agent/tasks/MIN-125/decisions.md` (đề xuất + phương án thay thế).
+> Fixtures draft nằm ở `examples/draft-v2/` với
+> `fixture_context.draft_v2:true` — validator hiểu flag này (§13.15).
+
+## 13. DRAFT — `notary.case-drafting.v2`
+
+### 13.1 Vì sao bump version thay vì rev additive
+
+Rev 1.1 additive được vì chỉ thêm field nullable / command mới. §13
+**đổi nghĩa** các phần đã publish: bỏ `asset_row.is_primary`, thay
+`node.isLandOwner`/`willReceive` bằng dấu chọn theo vị trí, thêm
+`stage.owner_row_id`, thêm `domain` bắt buộc trong `diagram_state`, thêm
+`case_type` thứ hai. Consumer v1 đọc payload v2 sẽ hiểu sai → bắt buộc
+`schema_version` mới: `notary.case-drafting.v2`. Envelope vẫn
+`desktopcommand.v1`, giữ đúng 8 command `notary.*` — chỉ đổi shape
+`payload`/`result.data` và ngữ nghĩa vòng đời. Shell desktop ship
+sidecar + renderer trong cùng bản → không cần negotiate version trên
+wire; backend P5 emit `v2` thống nhất.
+
+| Điểm | v1 (APPROVED) | v2 (DRAFT §13) |
+|---|---|---|
+| `schema_version` | `notary.case-drafting.v1` | `notary.case-drafting.v2` |
+| `diagram_state.version` | `2` | `3` (+ `domain` bắt buộc) |
+| `case.case_type` | cam kết `inheritance` | `inheritance` \| `two_party` |
+| `asset_row.is_primary` | bắt buộc, đúng 1 `true` | **bỏ** — primary = vị trí 1 |
+| `stage.owner_row_id` | không có | bắt buộc với `inheritance`, cấm với `two_party` |
+| node cờ thừa kế | `isLandOwner`, `willReceive` bool | `ownPositions`, `receivePositions` ⊆ {1,2,3} |
+| `diagram` trong `workspace_create` | bắt buộc, phải có owner node | **optional** — server tự seed |
+| Pool của hồ sơ mới | đòi owner/primary trước khi gán | `Cập nhật` đầu = `workspace_create` (Q1) |
+
+### 13.2 Vòng đời Stage: draft / committed / Cập nhật / Hủy
+
+Contract chỉ định nghĩa trạng thái **committed** (server persist, trả
+qua `workspace_get`/result của write) và payload `stage` trên wire. Phần
+này chốt nghĩa vụ hai phía về **vòng đời** — buffer draft là khái niệm
+client nhưng contract phải nói rõ khi nào server thấy thay đổi.
+
+```text
+stage draft buffer (client, không wire)          committed stage (server)
+        │  Cập nhật ──► workspace_commit_stage ──►│  (hoặc workspace_create
+        │            payload.stage = snapshot      │   với hồ sơ mới — Q1)
+        │                                          │
+        │  Hủy (client-only, KHÔNG có command) ◄── │
+        ◄──────── restore buffer := snapshot ──────┘
+            committed mới nhất
+```
+
+- **`stage draft buffer`** — bản đang sửa trong phiên (thêm/xóa/sửa
+  row, reorder tài sản). Server **không** biết buffer này.
+- **`stage committed`** — snapshot sau lần `workspace_commit_stage` /
+  `workspace_create` thành công gần nhất; `workspace_get` trả đúng bản
+  này. Mọi `personId` trên diagram chỉ được trỏ row của stage committed
+  (hoặc `stage` trong cùng payload ở chế độ nháp — §2.1a).
+- **Cập nhật (Update) nguyên khối** — semantics §6.1 giữ nguyên: một
+  transaction, `base_revision` chống conflict, prune + re-evaluate trong
+  cùng transaction, `revision+1`.
+- **Xóa row trong draft KHÔNG prune diagram ngay** (sửa hành vi hiện
+  trạng `removeStageRow` — `case-drafting-model.js`): xóa dòng Người
+  hay Tài sản trong buffer chỉ đánh dấu pending; `personId`/dấu chọn
+  `ownPositions`/`receivePositions` trên diagram buffer giữ nguyên cho
+  tới khi `Cập nhật` thành công — lúc đó server prune theo §6.1 và trả
+  `diagram.state` đã prune. UI được đánh dấu "sẽ gỡ khi Cập nhật" trên
+  node (quyết định hiển thị của P6, không phải field wire).
+- **Hủy (Cancel)** — *client-only, không command mới*: discard buffer và
+  restore **cả** stage lẫn diagram buffer về committed snapshot mới
+  nhất (Q2). Sau Hủy: `row_id`, thứ tự asset, `personId`, positions —
+  tất cả đúng như bản committed; `revision` không đổi vì không có write.
+  Ví dụ "xóa asset rồi Hủy" ở §13.12.2.
+- **Pool** = `stage.people` **committed** trừ những `personId` đang gán
+  trên diagram committed (giữ nguyên nghĩa §7/SOT). Pool **không** đọc
+  draft buffer — tránh bug `caseId=null` hiện trạng (model đọc buffer
+  chưa commit làm Pool). Hồ sơ mới (chưa từng commit) ⇒ committed stage
+  rỗng ⇒ **Pool rỗng** → người dùng phải `Cập nhật` trước khi gán sơ
+  đồ, đúng yêu cầu MIN-125.
+- **Chu trình hồ sơ mới (Q1):** mở nháp → nhập Người/Tài sản + đánh dấu
+  `owner_row_id` → `Cập nhật` = **`workspace_create`** (một transaction,
+  case persist, `revision=1`) → Pool lấy từ stage vừa committed → gán sơ
+  đồ → `diagram_save` (mang `base_revision` như thường). Như vậy vòng
+  phụ thuộc "tạo hồ sơ đòi owner trên diagram trước khi có Pool" bị phá:
+  owner trở thành **con trỏ trong stage** (§13.6), không còn là điều
+  kiện của việc được gán diagram.
+- `diagram_evaluate` chế độ nháp (`case_id` absent) giữ semantics v1 —
+  evaluate trên `stage` payload (snapshot buffer tại thời điểm gửi).
+  Trong v2 payload stage của evaluate nháp là `stage_v2` (§13.3, kể cả
+  `owner_row_id` với inheritance).
+
+### 13.3 Tài sản: tối đa 3, vị trí = thứ tự mảng (Q3, Q4)
+
+```yaml
+asset_row_v2:               # giống §4.2, TRỪ is_primary (bị loại)
+  row_id: <uuid4>           # ổn định — KHÔNG phải vị trí
+  entity_id: <int | null>
+  so_serial: <string non-empty>   # canonical [A-Z]{2}\d{6,8} — entities.md §2
+  ...                       # mọi field còn lại giữ nguyên §4.2
+  land_rows:                # giữ nguyên shape v1 — hàng cấu trúc
+    - loai_dat: <string | null>   #   (mục đích sử dụng)
+      dien_tich: <number | null>  #   diện tích
+      thoi_han: <string | null>   #   thời hạn
+```
+
+- **Vị trí = index + 1.** `stage.assets[i]` là "tài sản ở vị trí
+  `i+1`"; không có field `position`, không hệ đánh số thứ hai. Vị trí 1
+  là primary theo nghĩa engine (`tai_san_id` của case — §13.6).
+- **`is_primary` bị loại khỏi wire v2** — producer không emit; consumer
+  thấy key này → `validation_error` (trường lạ, cùng rule strip-field
+  hiện trạng). `primary_count` không còn áp dụng ở v2.
+- **Tối đa 3 asset** trong `stage.assets` của payload
+  `workspace_create`/`workspace_commit_stage`/`diagram_evaluate` nháp;
+  phần tử thứ 4 trở lên → `stage_validation_error` với
+  `field_errors[].code:"asset_limit"` (gắn `row_id` của dòng thừa).
+- **Reorder đổi nghĩa vị trí, không đổi identity:** kéo asset từ vị trí
+  1 xuống 2 nghĩa là *dữ liệu tại vị trí 1 đổi*; `row_id` của asset đi
+  theo dòng. Dấu chọn `ownPositions`/`receivePositions` (§13.4) **không
+  tự chuyển theo `row_id`** — số vị trí giữ nguyên, nghĩa là "người đó
+  vẫn sở hữu/nhận *tài sản đang ở vị trí đó*". Đây là hành vi có chủ
+  đích của MIN-125 — xem ví dụ §13.12.1.
+- **Xóa asset:** xóa ở draft = pending (§13.2). Tại commit thành công,
+  vị trí đánh lại dày (dense): asset đứng sau dịch lên; mọi dấu chọn
+  giữ nguyên số vị trí (không bám `row_id` cũ); dấu chọn tới vị trí
+  `> len(assets)` mới bị server prune trong cùng transaction. UI PHẢI
+  cảnh báo khi xóa asset làm trôi nghĩa vị trí (ghi chú cho P6 —
+  không phải field wire).
+- **Hồ sơ cũ >3 asset:** `workspace_get` được emit đủ (không cắt dữ
+  liệu) kèm `result.data.warnings[]` data-code
+  `stage.legacy_asset_overflow`; `workspace_commit_stage` từ chối tới
+  khi người dùng giảm còn ≤3 (`asset_limit`). §13.8.
+- **`result.data.warnings`** (optional, array `{code, message}`) là mở
+  rộng v2 cho cảnh báo cấp-stage (không thuộc `diagram.warnings`).
+
+### 13.4 Node v3 — dấu chọn tài sản độc lập (Q4, Q5, Q10)
+
+```yaml
+diagram_state v3 (domain inheritance):
+  version: 3                        # literal — khác → diagram_invalid_state
+  domain: "inheritance"             # BẮT BUỘC trong state (§13.5)
+  nodes:
+    - id: <string non-empty>        # slot id — giữ namespace v1
+      personId: <uuid4 | null>      # row_id dòng Người stage committed
+      parentSlotIds: [<node.id>]    # giữ nguyên 0..2
+      spouseSlotId: <node.id | null>
+      ownPositions: [<int 1..3>]    # vị trí tài sản người này SỞ HỮU
+      receivePositions: [<int 1..3>]# vị trí tài sản người này ĐƯỢC NHẬN
+      hidden: <bool>
+      deleted: <bool>
+```
+
+- `isLandOwner`/`willReceive` **cấm** trên wire v2 →
+  `diagram_invalid_state` (`invalid_node` — trường lạ trên node).
+- `ownPositions`/`receivePositions`: array không trùng phần tử ⊆
+  {1,2,3}; phần tử ngoài khoảng / trùng / không phải int →
+  `diagram_invalid_state{errors:[{code:"invalid_position"}]}`.
+  `null`/thiếu → `diagram_invalid_state` (`invalid_node`).
+- Hai mảng **độc lập**: một người vừa sở hữu vừa nhận, vừa chọn nhiều
+  vị trí, đều hợp lệ. **Nhiều node cùng chọn một vị trí** = đồng sở
+  hữu / nhận chung — hợp lệ (Q10).
+- Dấu chọn tới vị trí `> len(stage.assets)` hiện tại (asset chưa tạo
+  hoặc vừa bị prune): cho phép tồn tại trong draft buffer; server prune
+  tại commit/save (cùng cơ chế prune `personId` §6.1) — ghi vào commit
+  result qua `diagram.warnings` data-code `diagram.selection_pruned`;
+  UI được disable chip tài sản chưa tồn tại (quyết định hiển thị của
+  P6). Không reject cả commit.
+- **Mặc định khi gán (Q5):** node `owner` → `ownPositions` mặc định =
+  tất cả vị trí đang có ({1..len(assets)}); person gán vào slot thừa
+  kế → `receivePositions` mặc định = tất cả vị trí đang có. Đây là
+  tiện ích **client-side** — wire luôn mang mảng explicit; thêm asset
+  sau đó **không** tự mở rộng mảng đã chọn.
+- **Slot `owner` (mirror):** node `id:"owner"` tồn tại như v1 nhưng
+  `personId` của nó do server căn theo `stage.owner_row_id` (§13.6).
+  `diagram_save` gửi `owner.personId` khác `owner_row_id` →
+  `failed{code:diagram_owner_mismatch}` — không tự sửa lặng.
+- **Engine Python giữ nguyên** (A4): backend project xuống boolean khi
+  gọi engine — `isLandOwner := ownPositions ≠ []`,
+  `willReceive := receivePositions ≠ []`. `missing_land_owner`,
+  `word.no_landowner`, `word.no_receiver` theo projection đó. *Giới hạn
+  đã biết:* engine coi di sản là một khối — ownership theo từng vị trí
+  được lưu cho văn bản/Word (tương lai) nhưng **chưa** ảnh hưởng công
+  thức chia; cần task engine riêng nếu muốn tính theo từng tài sản.
+- Quan hệ (`parentSlotIds`, `spouseSlotId`), `duplicate_person` (1
+  người / 1 node active — A3), `hidden`/`deleted`, auto-seed slot theo
+  `requiredSlots` — **giữ nguyên** semantics §7.1.
+
+### 13.5 Domain `two_party` — sơ đồ hai bên 30 vị trí (Q7, Q8)
+
+```yaml
+diagram_state v3 (domain two_party):
+  version: 3
+  domain: "two_party"
+  nodes:                            # ĐÚNG 30 phần tử, id cố định
+    - id: "p1".."p30"               # p1..p15 = bên A; p16..p30 = bên B
+      personId: <uuid4 | null>      # null = vị trí trống
+      hidden: <bool>
+      deleted: <bool>
+```
+
+- `case.case_type` nhận thêm `"two_party"` (Q8); `document_type` draft
+  enum `{chuyen_nhuong, tang_cho, cho_thue, dat_coc}` — **danh sách
+  chờ owner chốt** (Q11), hiện là placeholder trong schema draft.
+- **30 vị trí cố định, canonical:** state luôn đủ 30 node theo đúng thứ
+  tự `p1..p30`; thiếu node → `diagram_invalid_state` (`missing_position`);
+  `id` ngoài tập hoặc sai thứ tự → `invalid_position`. Bên = suy ra từ
+  số (`≤15` → A, `≥16` → B) — **không** field `side`, không hệ đánh số
+  thứ hai.
+- **Ô trống giữ nguyên:** `personId:null` = chỗ trống; xóa người khỏi
+  `p16` làm `p16` trống, `p17..p30` **không dồn**. Thứ tự nhập row
+  trong `stage.people` độc lập với thứ tự vị trí (cùng một `row_id`
+  được gán vào bất kỳ ô nào).
+- Cấm trường quan hệ/`ownPositions`/`receivePositions` trên node
+  two_party → `invalid_node`. `duplicate_person` áp dụng y như domain
+  inheritance (đề xuất giữ A3 — 1 người chỉ ngồi 1 ô).
+- **Stage:** `stage.people` ≤ 30 cho `case_type:two_party` → quá →
+  `stage_validation_error{code:"people_limit"}`; `owner_row_id` **cấm**
+  (absent — `validation_error` nếu có); assets ≤3 giữ nguyên.
+- **Không engine:** `diagram_evaluate` trên `two_party` trả `succeeded`
+  với `render_model{engineVersion:2, status:"unsupported",
+  allocations:{}, breakdowns:[], requiredSlots:[],
+  unresolvedEstates:[], conservation:{allocated:"0",unresolved:"0",
+  total:"0"}, warnings:[{code:"diagram.two_party_unsupported",...}]}` —
+  sơ đồ hai bên **không bao giờ** đi vào engine thừa kế (rào kiến
+  trúc: `InheritanceCase` hiện chỉ chở inheritance; persist hai bên cần
+  backend riêng ở P5).
+- `diagram_save`/`workspace_commit_stage` persist + structural validate
+  như thường (theo shape two_party). `workspace_get` trả domain
+  `two_party`, `capabilities:{intake:[…], diagram:true,
+  word_export:false}`; mọi `word_export_*` trên `two_party` →
+  `case_type_unsupported` (§2.4 mở rộng).
+- **Drop lên ô đã có người (Q9):** hoán đổi `personId` hai ô — áp dụng
+  cho cả hai domain (thống nhất với hành vi kéo-thả hiện trạng). Đây
+  là semantics client; wire chỉ thấy state sau hoán đổi.
+- `case_type` **immutable** sau khi tạo; đổi loại ở draft chưa tạo =
+  client reset diagram buffer theo domain mới (rule client, Q8).
+
+### 13.6 `workspace_create` v2 — owner trong Stage, diagram optional (Q1)
+
+```yaml
+payload:
+  idempotency_key: <uuid4>          # giữ nguyên §2.1
+  case:
+    case_type: inheritance | two_party   # optional — default "inheritance"
+    document_type: <enum theo case_type> # inheritance: khai_nhan|thoa_thuan
+                                         # two_party: §13.5 (Q11)
+    ngay_lap_ho_so, noi_niem_yet, ghi_chu  # giữ nguyên
+  stage:                            # stage_v2
+    owner_row_id: <uuid4>           # BẮT BUỘC khi inheritance; phải là
+                                    # row_id có trong stage.people;
+                                    # CẤM khi two_party
+    people: [<person_row>]          # ≥1 (giữ nguyên)
+    assets: [<asset_row_v2>]        # ≥1, ≤3 — §13.3
+  diagram:                          # OPTIONAL (đổi từ v1 bắt buộc)
+    state: <diagram_state v3>       # domain phải khớp case.case_type
+```
+
+- **`stage.owner_row_id`** là chỉ định "người để lại / bên chủ" ở cấp
+  Stage — phá vòng phụ thuộc: tạo hồ sơ không còn cần diagram. Server
+  suy `nguoi_chet_id` = entity của row đó; `tai_san_id` = entity của
+  `assets[0]` (vị trí 1) → **không cần sửa schema DB** (hai cột vẫn
+  NOT NULL, giá trị có sẵn).
+- `owner_row_id` thiếu/null/không thuộc `stage.people` →
+  `workspace_owner_required` (cùng nghĩa v1). `owner_row_id` mutable
+  qua commit: đổi giá trị = đổi người để lại → server sync node
+  `owner` (`personId := owner_row_id`) trong cùng transaction §6.1 và
+  cập nhật `nguoi_chet_id`.
+- `diagram` present: `state.domain` phải khớp `case.case_type` → sai →
+  `diagram_domain_mismatch`; với inheritance, node `owner` (nếu có
+  `personId`) phải bằng `owner_row_id` → sai → `diagram_owner_mismatch`.
+- `diagram` absent: server seed state mặc định — inheritance: node
+  `owner` gán `owner_row_id` + bộ slot rỗng chuẩn như hiện trạng;
+  two_party: 30 ô trống. `render_model` của create-result = null khi
+  chưa evaluate được (giữ §4.3).
+- `owner_row_id` trong `stage` result của `workspace_get` /
+  `workspace_commit_stage` / `workspace_create`: emit luôn với
+  inheritance (`null` cho hồ sơ legacy chưa có owner — commit kế tiếp
+  sẽ bắt buộc chọn); absent với `two_party`.
+
+### 13.7 Bảng chuyển trường v1 → v2
+
+| v1 | v2 (draft) | Quy tắc chuyển |
+|---|---|---|
+| `schema_version:"notary.case-drafting.v1"` | `"notary.case-drafting.v2"` | emit cứng theo version |
+| `diagram_state.version:2` | `3` | literal mới; state v2 trên wire v2 → `diagram_invalid_state` |
+| — (không có `state.domain`) | `state.domain` bắt buộc | `"inheritance"` cho hồ sơ cũ |
+| `node.isLandOwner:bool` | `node.ownPositions:int[]` | `true`→`[1..min(3,len(assets))]`; `false`→`[]` (Q6) |
+| `node.willReceive:bool` | `node.receivePositions:int[]` | `true`→`[1..min(3,len(assets))]`; `false`→`[]` (Q6) |
+| `asset.is_primary:bool` | — (bỏ) | asset `is_primary:true` → đứng vị trí 1; reorder mảng khi đọc hồ sơ cũ |
+| `stage` = `{people,assets}` | `{owner_row_id,people,assets}` | `owner_row_id := personId` của node `owner` persist; không có → `null` |
+| `payload.case` (create): meta-only | + `case_type` optional | default `"inheritance"` |
+| `diagram` (create): required | optional | server seed (§13.6) |
+| error: — | + `diagram_domain_mismatch`, `diagram_owner_mismatch` | §13.9 |
+| field_error: `primary_count` | thay bằng `asset_limit` / `people_limit` | `primary_count` không còn ở v2 |
+| engine codes: §7.3 | + `invalid_position`, `missing_position` | dùng trong `details.errors[]`/`render_model.errors[]` |
+| data-codes | + `stage.legacy_asset_overflow`, `stage.legacy_primary_ambiguous`, `diagram.two_party_unsupported`, `diagram.selection_pruned` | §13.3/13.4/13.5/13.8 |
+| `person_row`, `personId`, `row_id`, revision, `idempotency_key` | giữ nguyên | — |
+
+### 13.8 Tương thích hồ sơ cũ (persisted → v2)
+
+| Tình trạng persisted | Hành vi đọc v2 (đề xuất) |
+|---|---|
+| `case_state_json` schemaVersion 1/2 | migrate-on-read hiện trạng → tiếp tục nâng shape: node flags → mảng positions (Q6); emit `domain:"inheritance"` |
+| người không `row_id` | gán uuid4 khi migrate — giữ nguyên rule hiện trạng |
+| nhiều node `isLandOwner:true` | nhiều node `ownPositions` non-empty — bảo toàn (đa chủ sở hữu hợp lệ ở v2) |
+| không node `owner` / owner `personId:null` | `stage.owner_row_id:null` trong result; commit kế phải chọn (=`workspace_owner_required` nếu bỏ sót) |
+| >3 asset | emit đủ + `warnings:[stage.legacy_asset_overflow]`; commit từ chối >3 (`asset_limit`) tới khi người dùng giảm — không tự cắt |
+| `is_primary` bất thường (0 hoặc ≥2 `true`) | reorder ưu tiên dòng `is_primary:true` đầu tiên lên vị trí 1; còn lại giữ thứ tự; thêm warning `stage.legacy_primary_ambiguous` |
+| `co_nhan_tai_san`/participant cũ | projection `willReceive` của engine giữ nguyên; không suy ngược thành positions ngoài rule Q6 |
+| hồ sơ `two_party` | không tồn tại dữ liệu cũ — domain mới hoàn toàn |
+
+### 13.9 Error codes mới (DRAFT)
+
+Job-level (namespace `notary.*`):
+
+| Code | Khi nào | `details` |
+|---|---|---|
+| `diagram_domain_mismatch` | `state.domain` khác `case.case_type` (create/save/evaluate) | `{expected, got}` |
+| `diagram_owner_mismatch` | `owner` node `personId` ≠ `stage.owner_row_id` (create/save) | `{owner_row_id, node_personId}` |
+
+Field-error code mới trong `stage_validation_error.details.field_errors[]`:
+
+| Code | Nghĩa |
+|---|---|
+| `asset_limit` | `stage.assets` > 3 (v2) |
+| `people_limit` | `stage.people` > 30 với `case_type:two_party` |
+
+Engine/detail codes mới (`details.errors[]`, `render_model.errors[]`):
+`invalid_position` (phần tử ngoài {1..3} / `id` ngoài `p1..p30` / sai
+thứ tự), `missing_position` (state two_party thiếu slot canonical).
+Data-codes mới: `stage.legacy_asset_overflow`,
+`stage.legacy_primary_ambiguous`, `diagram.two_party_unsupported`,
+`diagram.selection_pruned`.
+
+`primary_count` (v1) không dùng trong v2 — asset không `is_primary`.
+
+### 13.10 Ranh giới Word — giữ nguyên giới hạn hiện hành
+
+- Engine Word **không đổi** trong scope P2/P5 contract này:
+  `MAX_WORD_ASSETS = 5`; `person`/`signer` > 20 →
+  `word.too_many_people`/`word.too_many_signers`; `[Tài sản N - field]`
+  đọc tài sản theo **thứ tự** 1..5; `[Người N]` theo thứ tự nhóm phụ
+  lục — semantics hiện hữu không bị draft này đụng vào.
+- Vì v2 chặn `stage.assets` ≤ 3 (inheritance), dữ liệu v2 luôn nằm
+  trong giới hạn 5 của Word; vị trí 1..3 trên Stage tương ứng
+  `[Tài sản 1..3 - *]` — **không đổi nghĩa placeholder**.
+- `two_party`: ý định là `[Người N]` = người tại **vị trí N** cố định
+  (`{{Người 16}}` = `p16` = ghế đầu bên B), kể cả ô trống → placeholder
+  đó render rỗng. **Đây là spec cho task exporter tương lai** — hiện
+  `word_export_*` trả `case_type_unsupported`, `word_export:false`;
+  draft này **không** tuyên bố Word đã export đúng dữ liệu mới.
+- Không đưa `two_party` vào engine thừa kế (§13.5); không đổi
+  template/popup/exporter trong scope P2.
+
+### 13.11 Revision / retry / late-response — giữ nguyên, nêu lại cho rõ
+
+- Mọi write mang `base_revision`; lệch (cả `<` lẫn `>`) →
+  `workspace_conflict{details:{server_revision}}`; không ép ghi — client
+  reload hoặc giữ draft (EXPERIENCE §6). Commit retry sau conflict phải
+  gửi `base_revision` mới.
+- `workspace_create`: retry dùng **cùng** `idempotency_key` →
+  `created:false`, trả case đã persist — không hồi sinh bản nháp đã
+  bỏ. Timeout giữa chừng không phân biệt được "đã commit chưa" → luôn
+  retry bằng key cũ.
+- `diagram_save`/`workspace_commit_stage` retry an toàn: gửi lại
+  request nguyên vẹn; nếu request đầu đã commit → `base_revision` cũ
+  sẽ `<` server → `workspace_conflict` (idempotent qua revision).
+- Late response: client tương quan `job_id`/`command_id` + `case_id` của
+  phiên hiện tại; result/job trễ từ phiên trước / case đã đổi / draft
+  đã Hủy PHẢI bị discard — không apply vào buffer (EXPERIENCE §6, giữ
+  nguyên).
+
+### 13.12 Ví dụ trước/sau (JSON rút gọn)
+
+#### 13.12.1 Reorder tài sản — dấu chọn giữ theo vị trí (Q4)
+
+```jsonc
+// TRƯỚC (stage committed)
+"assets": [
+  {"row_id": "aaaa-…-1", "so_serial": "DD100001"},   // vị trí 1
+  {"row_id": "bbbb-…-2", "so_serial": "EE200002"},   // vị trí 2
+  {"row_id": "cccc-…-3", "so_serial": "FF300003"}    // vị trí 3
+]
+// node: {"id":"owner","personId":"…p1","ownPositions":[1,2],"receivePositions":[]}
+
+// SAU khi user kéo aaaa xuống cuối + Cập nhật thành công
+"assets": [
+  {"row_id": "bbbb-…-2", "so_serial": "EE200002"},   // vị trí 1 (primary mới)
+  {"row_id": "cccc-…-3", "so_serial": "FF300003"},   // vị trí 2
+  {"row_id": "aaaa-…-1", "so_serial": "DD100001"}    // vị trí 3
+]
+// node owner vẫn "ownPositions":[1,2] → nghĩa mới: sở hữu EE200002 + FF300003.
+// row_id aaaa KHÔNG được "kéo dấu" theo — không remap số sang ID cũ.
+```
+
+#### 13.12.2 Xóa asset rồi Hủy — buffer vs committed (Q2, §13.2)
+
+```jsonc
+// committed: assets [A1,B2,C3]; node X.receivePositions=[2]
+// draft: user xóa B2  → buffer assets [A1,C3]; node X GIỮ [2] trong
+//        buffer (chưa prune ngay — khác hiện trạng)
+// Hủy:   buffer := committed → assets [A1,B2,C3], node X [2] — như
+//        chưa xóa. revision không đổi, không command nào lên wire.
+// (Nếu Cập nhật thay vì Hủy: server persist [A1,C3] → vị trí dồn:
+//  C3 = 2; X.receivePositions giữ [2] = giờ là C3.)
+```
+
+#### 13.12.3 Ô trống + vị trí 16 (Q7)
+
+```jsonc
+// two_party — nodes[4] và nodes[15] trích ra:
+{"id": "p5",  "personId": null,              "hidden": false, "deleted": false},
+{"id": "p16", "personId": "99999999-…-9999", "hidden": false, "deleted": false}
+// p16 = ghế đầu bên B; xóa personId khỏi p16 → p16 trống, p17..p30 đứng yên.
+```
+
+#### 13.12.4 Một tài sản được nhiều người chọn (Q10)
+
+```jsonc
+{"id": "child_1", "personId": "…p3", "ownPositions": [],    "receivePositions": [1,2]},
+{"id": "child_2", "personId": "…p4", "ownPositions": [],    "receivePositions": [1]},
+{"id": "owner",   "personId": "…p1", "ownPositions": [1,2], "receivePositions": []}
+// vị trí 1 vừa được child_1 + child_2 nhận và owner sở hữu — hợp lệ.
+```
+
+### 13.13 Câu hỏi chờ owner (tập trung)
+
+Đề xuất đã viết vào §13 (Q1–Q12) và câu hỏi chưa có đề xuất (C1–C4):
+xem bảng đầy đủ kèm phương án thay thế tại
+`.agent/tasks/MIN-125/decisions.md`. Quan trọng nhất:
+
+- **Q1** — phá vòng phụ thuộc bằng `stage.owner_row_id` + create không
+  cần diagram (thay vì "commit phiên" cục bộ hay nullable
+  `nguoi_chet_id`).
+- **Q4** — dấu chọn theo vị trí, không bám `row_id` khi reorder/xóa.
+- **Q6** — `willReceive:true` legacy → nhận tất cả vị trí hiện có.
+- **Q7** — `p1..p30` cố định, bên suy ra từ số.
+- **Q11** — danh mục `document_type` cho `two_party` chờ chốt với NV2.
+
+### 13.14 Checklist conformance bổ sung (DRAFT — chỉ áp dụng khi v2 duyệt)
+
+Producer v2 PHẢI (thêm vào §10):
+
+- [ ] Emit `schema_version:"notary.case-drafting.v2"`;
+      `diagram_state.version:3` + `domain` bắt buộc.
+- [ ] Không emit `is_primary`, `isLandOwner`, `willReceive`; stage
+      inheritance mang `owner_row_id` (result) — absent với `two_party`.
+- [ ] `stage.assets` ≤3 trên mọi payload; `two_party` people ≤30;
+      canonical 30 node `p1..p30` cho domain `two_party`.
+- [ ] `workspace_create` v2: cho phép `diagram` absent; seed owner theo
+      `owner_row_id`; `tai_san_id` = asset vị trí 1.
+- [ ] Prune `personId` + dấu chọn vị trí `> len(assets)` trong cùng
+      transaction commit/save — không prune tại thời điểm client sửa
+      draft.
+- [ ] `diagram_evaluate` two_party → `unsupported` render_model, không
+      chạy engine thừa kế; `word_export_*` → `case_type_unsupported`.
+
+Consumer v2 PHẢI (thêm vào §10):
+
+- [ ] Giữ buffer draft tách committed; Hủy restore cả stage lẫn diagram;
+      không prune diagram khi xóa row trong draft.
+- [ ] Map chip `[1][2][3]` ↔ positions; không theo `row_id`; disable
+      chip vị trí chưa có asset.
+- [ ] Reject state v2/v3 sai domain, `is_primary`/`isLandOwner` dư —
+      coi như `validation_error`/`diagram_invalid_state`.
+
+### 13.15 Examples & validator draft
+
+- Fixtures: `contracts/notary-case-drafting/examples/draft-v2/` —
+  `*.valid.json` / `*.invalid.json` đặt
+  `fixture_context.draft_v2:true` (+ `case_type` khi hai bên) để
+  validator áp rule v2; file draft không ảnh hưởng bộ v1.
+- Schema tham chiếu: `draft-v2.schema.json` (định nghĩa `stage_v2`,
+  `diagram_state_v3`, payload create/commit v2). Normative text là
+  §13 — file schema draft hỗ trợ đọc, không phải nguồn duy nhất cho
+  tới khi owner duyệt.

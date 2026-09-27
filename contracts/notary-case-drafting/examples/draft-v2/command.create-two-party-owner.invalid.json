@@ -1,0 +1,43 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "note": "create two_party mang owner_row_id → validation_error (trường cấm với domain này — §13.5/§13.6)"
+  },
+  "expected_error": "validation_error",
+  "contract_version": "desktopcommand.v1",
+  "command": "notary.workspace_create",
+  "command_id": "a1b2c3d4-2011-4001-8001-000000000001",
+  "payload": {
+    "idempotency_key": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    "case": {
+      "case_type": "two_party",
+      "document_type": "chuyen_nhuong",
+      "ngay_lap_ho_so": null,
+      "noi_niem_yet": null,
+      "ghi_chu": null
+    },
+    "stage": {
+      "owner_row_id": "11111111-1111-4111-8111-111111111111",
+      "people": [
+        {
+          "row_id": "11111111-1111-4111-8111-111111111111",
+          "entity_id": null,
+          "ho_ten": "Nguyễn Văn A"
+        },
+        {
+          "row_id": "99999999-9999-4999-8999-999999999999",
+          "entity_id": null,
+          "ho_ten": "Lê Văn B"
+        }
+      ],
+      "assets": [
+        {
+          "row_id": "55555555-5555-4555-8555-555555555555",
+          "entity_id": null,
+          "so_serial": "AB123456",
+          "dia_chi": "Thửa 88, Hà Nội"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,227 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://systemdocs/contracts/notary-case-drafting/draft-v2.schema.json",
+  "title": "DRAFT notary.case-drafting.v2 — MIN-125 (CHỜ OWNER DUYỆT)",
+  "description": "DRAFT — định nghĩa shape v2 cho §13 của contracts/notary-case-drafting.md. Chưa publish; không implement tới khi owner duyệt. Normative text là §13 trong file contract — file này là tham chiếu hỗ trợ.",
+  "definitions": {
+    "schema_version_v2": {
+      "type": "string",
+      "const": "notary.case-drafting.v2"
+    },
+    "position_1_3": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3
+    },
+    "asset_row_v2": {
+      "type": "object",
+      "description": "Giống v1 asset_row nhưng KHÔNG có is_primary — vị trí = index+1 (§13.3)",
+      "required": [
+        "row_id", "entity_id", "so_serial", "so_vao_so",
+        "so_thua_dat", "so_to_ban_do", "dia_chi", "loai_so",
+        "hinh_thuc_su_dung", "thoi_han", "nguon_goc", "ngay_cap",
+        "co_quan_cap", "land_rows"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "row_id": { "$ref": "common.schema.json#/definitions/uuid4" },
+        "entity_id": { "type": ["integer", "null"] },
+        "so_serial": { "type": "string", "pattern": "^[A-Z]{2}\\d{6,8}$" },
+        "so_vao_so": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "so_thua_dat": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "so_to_ban_do": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "dia_chi": { "$ref": "common.schema.json#/definitions/non_empty_string" },
+        "loai_so": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "hinh_thuc_su_dung": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "thoi_han": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "nguon_goc": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "ngay_cap": { "$ref": "common.schema.json#/definitions/date_full" },
+        "co_quan_cap": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "land_rows": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/definitions/land_row_v2" }
+        }
+      },
+      "not": { "required": ["is_primary"] }
+    },
+    "land_row_v2": {
+      "type": "object",
+      "description": "Hàng loại đất cấu trúc: mục đích sử dụng + diện tích + thời hạn (§13.3)",
+      "additionalProperties": false,
+      "properties": {
+        "loai_dat": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "dien_tich": { "type": ["number", "null"] },
+        "thoi_han": { "$ref": "common.schema.json#/definitions/nullable_string" }
+      }
+    },
+    "stage_v2": {
+      "type": "object",
+      "required": ["people", "assets"],
+      "additionalProperties": false,
+      "properties": {
+        "owner_row_id": {
+          "$ref": "common.schema.json#/definitions/uuid4",
+          "description": "BẮT BUỘC khi case_type=inheritance trong payload; CẤM khi two_party; result emit null cho legacy chưa có owner (§13.6)"
+        },
+        "people": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/definitions/person_row" },
+          "description": "≤30 phần tử khi case_type=two_party (people_limit)"
+        },
+        "assets": {
+          "type": "array",
+          "maxItems": 3,
+          "items": { "$ref": "#/definitions/asset_row_v2" },
+          "description": "vị trí = index+1; ≤3 → asset_limit (§13.3)"
+        }
+      }
+    },
+    "node_v3_inheritance": {
+      "type": "object",
+      "required": [
+        "id", "personId", "parentSlotIds", "spouseSlotId",
+        "ownPositions", "receivePositions", "hidden", "deleted"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "personId": {
+          "oneOf": [
+            { "$ref": "common.schema.json#/definitions/uuid4" },
+            { "type": "null" }
+          ]
+        },
+        "parentSlotIds": {
+          "type": "array",
+          "maxItems": 2,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "spouseSlotId": { "type": ["string", "null"], "minLength": 1 },
+        "ownPositions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/definitions/position_1_3" }
+        },
+        "receivePositions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/definitions/position_1_3" }
+        },
+        "hidden": { "type": "boolean" },
+        "deleted": { "type": "boolean" }
+      }
+    },
+    "node_v3_two_party": {
+      "type": "object",
+      "required": ["id", "personId", "hidden", "deleted"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^p([1-9]|[12][0-9]|30)$",
+          "description": "p1..p30 cố định; p≤15 = bên A, p≥16 = bên B (§13.5)"
+        },
+        "personId": {
+          "oneOf": [
+            { "$ref": "common.schema.json#/definitions/uuid4" },
+            { "type": "null" }
+          ]
+        },
+        "hidden": { "type": "boolean" },
+        "deleted": { "type": "boolean" }
+      }
+    },
+    "diagram_state_v3": {
+      "type": "object",
+      "required": ["version", "domain", "nodes"],
+      "additionalProperties": false,
+      "properties": {
+        "version": { "const": 3 },
+        "domain": { "enum": ["inheritance", "two_party"] },
+        "nodes": {
+          "type": "array",
+          "items": { "type": "object" }
+        }
+      },
+      "if": { "properties": { "domain": { "const": "two_party" } } },
+      "then": {
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "minItems": 30,
+            "maxItems": 30,
+            "items": { "$ref": "#/definitions/node_v3_two_party" },
+            "description": "Canonical: đủ 30 node p1..p30 theo đúng thứ tự (§13.5)"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": { "$ref": "#/definitions/node_v3_inheritance" }
+          }
+        }
+      }
+    },
+    "payload_workspace_create_v2": {
+      "type": "object",
+      "required": ["idempotency_key", "case", "stage"],
+      "additionalProperties": false,
+      "properties": {
+        "idempotency_key": { "$ref": "common.schema.json#/definitions/uuid4" },
+        "case": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "case_type": { "enum": ["inheritance", "two_party"] },
+            "document_type": {
+              "type": "string",
+              "description": "inheritance: khai_nhan|thoa_thuan; two_party: chuyen_nhuong|tang_cho|cho_thue|dat_coc (Q11 — chờ owner)"
+            },
+            "ngay_lap_ho_so": { "$ref": "common.schema.json#/definitions/date_full" },
+            "noi_niem_yet": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "ghi_chu": { "$ref": "common.schema.json#/definitions/nullable_string" }
+          }
+        },
+        "stage": { "$ref": "#/definitions/stage_v2" },
+        "diagram": {
+          "type": "object",
+          "description": "OPTIONAL ở v2 — absent thì server seed (§13.6)",
+          "required": ["state"],
+          "additionalProperties": false,
+          "properties": {
+            "state": { "$ref": "#/definitions/diagram_state_v3" }
+          }
+        }
+      }
+    },
+    "payload_commit_stage_v2": {
+      "type": "object",
+      "required": ["case_id", "base_revision", "stage"],
+      "additionalProperties": false,
+      "properties": {
+        "case_id": { "type": "integer", "minimum": 1 },
+        "base_revision": { "type": "integer", "minimum": 1 },
+        "stage": { "$ref": "#/definitions/stage_v2" }
+      }
+    },
+    "payload_diagram_save_v2": {
+      "type": "object",
+      "required": ["case_id", "base_revision", "diagram"],
+      "additionalProperties": false,
+      "properties": {
+        "case_id": { "type": "integer", "minimum": 1 },
+        "base_revision": { "type": "integer", "minimum": 1 },
+        "diagram": {
+          "type": "object",
+          "required": ["state"],
+          "additionalProperties": false,
+          "properties": {
+            "state": { "$ref": "#/definitions/diagram_state_v3" }
+          }
+        }
+      }
+    }
+  }
+}

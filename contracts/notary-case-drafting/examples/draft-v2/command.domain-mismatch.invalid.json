@@ -1,0 +1,27 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "case_type": "inheritance",
+    "server_revision": 8,
+    "note": "save state domain=two_party lên case inheritance → diagram_domain_mismatch (§13.5, §13.9)"
+  },
+  "expected_error": "diagram_domain_mismatch",
+  "contract_version": "desktopcommand.v1",
+  "command": "notary.diagram_save",
+  "command_id": "a1b2c3d4-2010-4001-8001-000000000001",
+  "payload": {
+    "case_id": 42,
+    "base_revision": 8,
+    "diagram": {
+      "state": {
+        "version": 3,
+        "domain": "two_party",
+        "nodes": [
+          { "id": "p1", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p2", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p3", "personId": null, "hidden": false, "deleted": false }
+        ]
+      }
+    }
+  }
+}

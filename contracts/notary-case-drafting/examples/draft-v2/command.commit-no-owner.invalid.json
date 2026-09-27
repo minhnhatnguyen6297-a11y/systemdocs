@@ -1,0 +1,33 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "case_type": "inheritance",
+    "server_revision": 7,
+    "note": "inheritance commit thiếu stage.owner_row_id → workspace_owner_required (§13.6)"
+  },
+  "expected_error": "workspace_owner_required",
+  "contract_version": "desktopcommand.v1",
+  "command": "notary.workspace_commit_stage",
+  "command_id": "a1b2c3d4-2002-4001-8001-000000000001",
+  "payload": {
+    "case_id": 42,
+    "base_revision": 7,
+    "stage": {
+      "people": [
+        {
+          "row_id": "11111111-1111-4111-8111-111111111111",
+          "entity_id": 101,
+          "ho_ten": "Nguyễn Văn An"
+        }
+      ],
+      "assets": [
+        {
+          "row_id": "55555555-5555-4555-8555-555555555555",
+          "entity_id": 201,
+          "so_serial": "DD123456",
+          "dia_chi": "Thửa 1, Hà Nội"
+        }
+      ]
+    }
+  }
+}

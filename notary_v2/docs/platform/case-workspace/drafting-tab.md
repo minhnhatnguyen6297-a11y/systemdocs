@@ -11,8 +11,9 @@ Ngày: 24/09/2026 · Owner: platform/case-workspace · Spec: MIN-104 · Goal tri
 > lớp trông mâu thuẫn (vd hình thức card Tài sản, nút `Chủ đất`/`Nhận` ↔
 > chip số), **hành vi/dữ liệu lấy file này làm chuẩn**, hình thức lấy
 > `visual-design.md`; chỗ nào là quyết định nghiệp vụ mới (chip vị trí ↔
-> tài sản, `Hủy thay đổi`, Apply loại đất) được liệt kê **chờ P2** — file
-> này chưa quyết định chúng.
+> tài sản, `Hủy thay đổi`, Apply loại đất) có **đề xuất DRAFT ở
+> `contracts/notary-case-drafting.md` §13 (MIN-125, chờ owner duyệt)** —
+> file này chưa coi chúng là chốt cho tới khi §13 được approve.
 
 ## 1. Vai trò tài liệu và ranh giới SOT
 
@@ -215,19 +216,35 @@ Ngày: 24/09/2026 · Owner: platform/case-workspace · Spec: MIN-104 · Goal tri
 
 ## 10. Điểm mở và ngoài phạm vi
 
-Điểm mở (ghi nhận, **không** tự chốt):
+Điểm mở (ghi nhận, **không** tự chốt). MIN-125 (P2) đã đưa đề xuất vào
+`contracts/notary-case-drafting.md` §13 — **DRAFT, chờ owner duyệt**; các
+đề xuất chưa duyệt KHÔNG thay đổi contract v1 đã publish:
 
-- Ngữ nghĩa **chip vị trí ↔ tài sản** trên node sơ đồ và mô hình **hai bên
-  30 vị trí** theo ảnh approved — quyết định nghiệp vụ của P2 (MIN-125),
-  cài đặt ở P7 (MIN-130); xem `visual-design.md` §5.
-- `Hủy thay đổi` trên action bar đích — semantics discard (Stage only hay
-  cả Diagram) chờ P2.
-- `Áp dụng` trong dialog loại đất — draft hay commit Stage — chờ P2.
+- Ngữ nghĩa **chip vị trí ↔ tài sản** trên node sơ đồ: đề xuất §13.4 —
+  `ownPositions`/`receivePositions` ⊆ {1,2,3} thay `isLandOwner`/
+  `willReceive`; dấu chọn bám **vị trí**, không bám `row_id` khi reorder/
+  xóa (Q4). Cài đặt ở P7 (MIN-130); xem `visual-design.md` §5.
+- Mô hình **hai bên 30 vị trí**: đề xuất §13.5 — domain `two_party`, node
+  cố định `p1..p30` (bên suy từ số, `p16` = ghế đầu bên B), ô trống giữ
+  nguyên không dồn; `word_export` = `case_type_unsupported`, `evaluate` =
+  `unsupported` (không đi vào engine thừa kế). Cài đặt P7.
+- `Hủy thay đổi`: đề xuất §13.2 — client-only, restore **cả** Stage lẫn
+  Diagram về committed (Q2); xóa row trong draft không prune diagram
+  ngay, prune chỉ ở `Cập nhật`.
+- `Áp dụng` trong dialog loại đất: theo đề xuất §13.2/§13.3 — apply ghi
+  vào `land_rows` của **draft buffer** (chỉ persist qua `Cập nhật`),
+  không commit riêng.
+- `stage.owner_row_id` (chỉ định người để lại trong Stage) + create
+  không cần diagram — đề xuất §13.6/Q1 phá vòng phụ thuộc Pool của hồ
+  sơ mới.
 - Giới hạn intake (số file/trang/byte/độ dài text) và chính sách retry
   từng adapter — backend; wire-level đã có ở contract, giới hạn số chưa
   chốt.
 - `document_key` danh mục văn bản cụ thể cho từng `case_type`/`document_type`
-  — spec nghiệp vụ + contract.
+  — spec nghiệp vụ + contract; với `two_party` xem Q11 tại §13.13
+  (danh mục `document_type` mới chờ chốt với NV2).
+- Tập đầy đủ câu hỏi chờ owner (Q1–Q12, C1–C4):
+  `.agent/tasks/MIN-125/decisions.md`.
 
 Ngoài phạm vi file này:
 

@@ -1,0 +1,58 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "case_type": "two_party",
+    "server_revision": 5,
+    "stage_row_ids": [
+      "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222",
+      "99999999-9999-4999-8999-999999999999"
+    ],
+    "note": "diagram_save two_party: canonical 30 node p1..p30; ô trống giữ chỗ (không dồn số); p16 = ghế đầu bên B đang có người (§13.5)"
+  },
+  "contract_version": "desktopcommand.v1",
+  "command": "notary.diagram_save",
+  "command_id": "a1b2c3d4-1004-4001-8001-000000000001",
+  "payload": {
+    "case_id": 77,
+    "base_revision": 5,
+    "diagram": {
+      "state": {
+        "version": 3,
+        "domain": "two_party",
+        "nodes": [
+          { "id": "p1", "personId": "11111111-1111-4111-8111-111111111111", "hidden": false, "deleted": false },
+          { "id": "p2", "personId": "22222222-2222-4222-8222-222222222222", "hidden": false, "deleted": false },
+          { "id": "p3", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p4", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p5", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p6", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p7", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p8", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p9", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p10", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p11", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p12", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p13", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p14", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p15", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p16", "personId": "99999999-9999-4999-8999-999999999999", "hidden": false, "deleted": false },
+          { "id": "p17", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p18", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p19", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p20", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p21", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p22", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p23", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p24", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p25", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p26", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p27", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p28", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p29", "personId": null, "hidden": false, "deleted": false },
+          { "id": "p30", "personId": null, "hidden": false, "deleted": false }
+        ]
+      }
+    }
+  }
+}

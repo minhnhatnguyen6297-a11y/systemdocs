@@ -85,7 +85,8 @@ thắng", đích là hai bảng; xác nhận lại bằng prototype P3.
   xóa thửa.
 - Footer: `Hủy` (ghost) trái — `Áp dụng` (primary) phải. `Áp dụng` đưa
   kết quả về ô `Loại đất` của cột tài sản (dạng chip `N loại`); **ngữ
-  nghĩa Apply (có phải commit Stage ngay không) chờ P2**.
+  nghĩa Apply — đề xuất P2: ghi vào draft buffer `land_rows`, persist
+  qua `Cập nhật` (contract §13.2 DRAFT, chờ owner)**.
 - Dialog rộng (`modalWideMaxWidth` ~1100 px tại 1496), cuộn ngang khi
   nhiều thửa; cuộn dọc khi thiếu chiều cao.
 - Đây là **file-intake-độc-lập-không**: dialog này chỉnh `land_rows` của
@@ -102,9 +103,11 @@ thắng", đích là hai bảng; xác nhận lại bằng prototype P3.
   hai hàng chip số: `Chủ đất` và `Nhận đất`, mỗi chip là một **vị trí tài
   sản** (số lượng chip = số tài sản trên Stage); chip selected =
   `accent.primary` + `✓`.
-  - **PENDING (P2)**: ánh xạ chip số ↔ tài sản/vị trí, quan hệ với
-    `land_owner`/`will_receive` boolean hiện hữu, và mô hình **hai bên 30
-    vị trí** — file này chỉ chốt hình thức, không chốt ngữ nghĩa.
+  - **PENDING (P2)**: ánh xạ chip số ↔ tài sản/vị trí — đề xuất DRAFT ở
+    contract §13.4 (`ownPositions`/`receivePositions` thay boolean
+    `isLandOwner`/`willReceive`); mô hình **hai bên 30 vị trí** — §13.5
+    (`p1..p30`, `p16` = ghế đầu bên B). File này chỉ chốt hình thức,
+    ngữ nghĩa chờ owner duyệt §13.
 - **Đường nối**: giữ và làm rõ quan hệ cha→con (`diagram.edge`, selected
   `edgeSelected`); đường nối mang ngữ nghĩa — không trang trí.
 - **Cụm zoom**: `−`, nhãn `%`, `+`, `Mở rộng` ở mép canvas (ảnh: trên cùng
@@ -112,8 +115,9 @@ thắng", đích là hai bảng; xác nhận lại bằng prototype P3.
 - **Action footer**: `Lưu sơ đồ` (secondary) + `Xuất Word` (primary)
   phải-dưới canvas; `Xem cách tính`/`+ Slot`/`⋯` giữ trong toolbar theo
   spec UX §3 — vị trí chính xác chốt ở P3.
-- **PENDING**: kéo lên vị trí đã có người (swap? push?) — theo danh sách
-  mở của MIN-123, chờ owner; `position 16` trong lưới 30 vị trí — P7.
+- **PENDING**: kéo lên vị trí đã có người — đề xuất P2: **swap** hai
+  `personId` (contract §13.5 Q9, chờ owner); `position 16` trong lưới
+  30 vị trí — `p16` cố định = ghế đầu bên B (§13.5), cài đặt P7.
 
 ## 6. Action bar trên cùng
 
@@ -121,7 +125,8 @@ thắng", đích là hai bảng; xác nhận lại bằng prototype P3.
   (`Thừa kế` — gating `case_type` giữ nguyên drafting-tab §7).
 - Phải: `Nhập file` (ghost — mở dialog intake chung, thay cho hai nút
   `Nhập dữ liệu` trên từng card), `Zalo` (**disabled**), `Hủy thay đổi`
-  (ghost — **chờ P2** cho ngữ nghĩa discard, tạm không render),
+  (ghost — đề xuất P2: client-only, restore cả Stage lẫn Diagram về
+  committed — contract §13.2 Q2 DRAFT, chờ owner; tạm không render),
   `Cập nhật` (primary — commit Stage; khi nháp mới là `Lưu hồ sơ`).
 - Dirty: nhãn/chấm cạnh `Cập nhật`/`Lưu sơ đồ` theo tầng dirty tương ứng
   (`stageDirty`/`diagramDirty`) — xem EXPERIENCE §5.
@@ -168,17 +173,20 @@ thắng", đích là hai bảng; xác nhận lại bằng prototype P3.
 |---|---|---|
 | Card Tài sản | Form nhóm trường dọc (`assetRowEl` + `landRowsEl` inline) | Bảng chuyển vị + dialog loại đất |
 | Intake | `Nhập dữ liệu` trên từng card | `Nhập file` một nút trên action bar |
-| Node flags | Toggle `Chủ đất`/`Nhận` boolean | Chip số per-tài-sản (ngữ nghĩa chờ P2) |
+| Node flags | Toggle `Chủ đất`/`Nhận` boolean | Chip số per-tài-sản (ngữ nghĩa = DRAFT §13.4, chờ owner) |
 | Đường nối | SVG edges liệt kê | Đường nối canvas trực quan + zoom |
 | Zoom sơ đồ | không có | cụm `−/%/+/Mở rộng` |
-| `Hủy thay đổi` | không có API | chờ P2, tạm không render |
+| `Hủy thay đổi` | không có API | DRAFT §13.2 client-only; tạm không render |
 | Zalo | không có | hiển thị **disabled** |
 
 ## 11. Quyết định mở cho Notary (đầy đủ ở EXPERIENCE §10 + DESIGN §9)
 
 - Ngữ nghĩa chip vị trí ↔ tài sản; hai bên 30 vị trí; `position 16`;
-  thả lên vị trí đã chiếm — **P2/P7**, không suy ra từ ảnh.
-- `Hủy thay đổi` phạm vi (Stage only hay cả Diagram) — **P2**.
-- `Apply` loại đất có commit Stage hay chỉ draft — **P2**.
+  thả lên vị trí đã chiếm — **đề xuất DRAFT ở contract §13.4–13.5
+  (MIN-125, chờ owner)**; cài đặt P7; không suy ra từ ảnh.
+- `Hủy thay đổi` phạm vi (Stage only hay cả Diagram) — đề xuất §13.2:
+  restore **cả hai** buffer về committed (Q2, chờ owner).
+- `Apply` loại đất có commit Stage hay chỉ draft — đề xuất §13.2: draft
+  buffer, persist qua `Cập nhật` (chờ owner).
 - `Mở rộng` = fullscreen canvas hay modal — **P3**.
 - Giới hạn cột tài sản trước khi cuộn ngang; thứ tự cột bảng Người — **P3**.

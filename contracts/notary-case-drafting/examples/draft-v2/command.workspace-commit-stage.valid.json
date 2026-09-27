@@ -1,0 +1,98 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "case_type": "inheritance",
+    "server_revision": 7,
+    "note": "Cập nhật Stage inheritance v2: owner_row_id chỉ định người để lại; assets không còn is_primary — vị trí = thứ tự mảng (§13.3, §13.6)"
+  },
+  "contract_version": "desktopcommand.v1",
+  "command": "notary.workspace_commit_stage",
+  "command_id": "a1b2c3d4-1001-4001-8001-000000000001",
+  "payload": {
+    "case_id": 42,
+    "base_revision": 7,
+    "stage": {
+      "owner_row_id": "11111111-1111-4111-8111-111111111111",
+      "people": [
+        {
+          "row_id": "11111111-1111-4111-8111-111111111111",
+          "entity_id": 101,
+          "ho_ten": "Nguyễn Văn An",
+          "gioi_tinh": "Nam",
+          "ngay_sinh": "1950",
+          "ngay_chet": "2011-05-15",
+          "so_giay_to": "012345678901",
+          "ngay_cap": "2010-06-15",
+          "noi_cap": "CA Hà Nội",
+          "dia_chi": "Số 1 phố Huế, Hà Nội",
+          "place_of_origin": "Hà Nam"
+        },
+        {
+          "row_id": "22222222-2222-4222-8222-222222222222",
+          "entity_id": 102,
+          "ho_ten": "Trần Thị Bình",
+          "gioi_tinh": "Nữ",
+          "ngay_sinh": "1955-03-02",
+          "ngay_chet": null,
+          "so_giay_to": null,
+          "ngay_cap": null,
+          "noi_cap": null,
+          "dia_chi": "Số 1 phố Huế, Hà Nội",
+          "place_of_origin": null
+        },
+        {
+          "row_id": "33333333-3333-4333-8333-333333333333",
+          "entity_id": 103,
+          "ho_ten": "Nguyễn Văn Cường",
+          "gioi_tinh": "Nam",
+          "ngay_sinh": "1980-07-20",
+          "ngay_chet": null,
+          "so_giay_to": "001080012345",
+          "ngay_cap": "2021-01-10",
+          "noi_cap": "Cục CSĐKQL cư trú và DLQG về dân cư",
+          "dia_chi": "Số 5 phố Bạch Mai, Hà Nội",
+          "place_of_origin": "Hà Nội"
+        }
+      ],
+      "assets": [
+        {
+          "row_id": "55555555-5555-4555-8555-555555555555",
+          "entity_id": 201,
+          "so_serial": "DD123456",
+          "so_vao_so": "CS 12345",
+          "so_thua_dat": "123",
+          "so_to_ban_do": "45",
+          "dia_chi": "Thửa 123, tờ 45, phường Bạch Mai, Hà Nội",
+          "loai_so": "GCN QSDĐ",
+          "hinh_thuc_su_dung": "Sử dụng riêng",
+          "thoi_han": "Lâu dài",
+          "nguon_goc": "Cấp đổi",
+          "ngay_cap": "2005-09-30",
+          "co_quan_cap": "UBND quận Hai Bà Trưng",
+          "land_rows": [
+            { "loai_dat": "ODT", "dien_tich": 85.5, "thoi_han": "Lâu dài" }
+          ]
+        },
+        {
+          "row_id": "66666666-6666-4666-8666-666666666666",
+          "entity_id": 202,
+          "so_serial": "EE654321",
+          "so_vao_so": null,
+          "so_thua_dat": "77",
+          "so_to_ban_do": "12",
+          "dia_chi": "Thửa 77, tờ 12, xã Yên Sở, Hà Nội",
+          "loai_so": null,
+          "hinh_thuc_su_dung": null,
+          "thoi_han": null,
+          "nguon_goc": null,
+          "ngay_cap": null,
+          "co_quan_cap": null,
+          "land_rows": [
+            { "loai_dat": "CLN", "dien_tich": 120.0, "thoi_han": null },
+            { "loai_dat": "ONT", "dien_tich": 60.0, "thoi_han": "Lâu dài" }
+          ]
+        }
+      ]
+    }
+  }
+}
