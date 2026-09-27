@@ -157,6 +157,9 @@ def test_get_derives_stage_for_legacy_case_without_case_state(db):
         "status": "draft",
         "locked": False,
         "revision": 1,
+        "ngay_lap_ho_so": "2026-09-01",
+        "noi_niem_yet": None,
+        "ghi_chu": None,
     }
     people = _workspace_people(data)
     assert [p["entity_id"] for p in people] == [deceased.id, heirs[0].id]
@@ -895,4 +898,228 @@ def test_model_declares_workspace_columns():
     cols = InheritanceCase.__table__.columns
     assert "workspace_revision" in cols
     assert "updated_at" in cols
+    assert "workspace_idempotency_key" in cols
     assert cols["workspace_revision"].nullable is False
+
+
+# ------------------------------------------------------------------ create()
+
+
+def _create_args():
+    """(people, assets, state) hợp lệ tối thiểu — owner đã chết + vợ nhận."""
+    owner = _person_row(
+        ho_ten="Nguyễn Văn An", ngay_sinh="1950", ngay_chet="2011-05-15",
+        so_giay_to="001234567890")
+    spouse = _person_row(
+        ho_ten="Trần Thị Bình", gioi_tinh="Nữ", ngay_sinh="1955-03-02",
+        so_giay_to="009876543210")
+    state = {"version": 2, "nodes": [
+        {"id": "owner", "personId": owner["row_id"], "parentSlotIds": [],
+         "spouseSlotId": "spouse", "isLandOwner": True,
+         "willReceive": False, "hidden": False, "deleted": False},
+        {"id": "spouse", "personId": spouse["row_id"], "parentSlotIds": [],
+         "spouseSlotId": "owner", "isLandOwner": False,
+         "willReceive": True, "hidden": False, "deleted": False},
+    ]}
+    return [owner, spouse], [_asset_row()], state
+
+
+_UNSET = object()
+
+
+def _create(db, people, assets, state, key=_UNSET, meta=_UNSET):
+    return _service(db).create(
+        str(uuid.uuid4()) if key is _UNSET else key,
+        {"document_type": "khai_nhan"} if meta is _UNSET else meta,
+        people, assets, state)
+
+
+def test_create_persists_case_stage_diagram_one_transaction(db):
+    people, assets, state = _create_args()
+    meta = {"document_type": "khai_nhan", "ngay_lap_ho_so": "2026-09-26",
+            "noi_niem_yet": "xã Yên Sở", "ghi_chu": "Hồ sơ nháp"}
+
+    data = _create(db, people, assets, state, meta=meta)
+
+    assert data["schema_version"] == SCHEMA_VERSION
+    assert data["backend_mode"] == "real"
+    assert data["created"] is True
+    case = data["case"]
+    assert case["case_type"] == "inheritance"
+    assert case["document_type"] == "khai_nhan"
+    assert case["status"] == "draft"
+    assert case["locked"] is False
+    assert case["revision"] == 1
+    assert case["ngay_lap_ho_so"] == "2026-09-26"
+    assert case["noi_niem_yet"] == "xã Yên Sở"
+    assert case["ghi_chu"] == "Hồ sơ nháp"
+
+    wire_people = data["stage"]["people"]
+    assert [p["ho_ten"] for p in wire_people] == [
+        "Nguyễn Văn An", "Trần Thị Bình"]
+    assert all(isinstance(p["entity_id"], int) for p in wire_people)
+    owner_entity = wire_people[0]["entity_id"]
+    spouse_entity = wire_people[1]["entity_id"]
+
+    db_case = db.get(InheritanceCase, case["id"])
+    assert db_case is not None
+    assert db_case.nguoi_chet_id == owner_entity     # owner -> người chết
+    primary = [a for a in data["stage"]["assets"] if a["is_primary"]][0]
+    assert db_case.tai_san_id == primary["entity_id"]
+    assert db_case.ngay_lap_ho_so == date(2026, 9, 26)
+    assert db_case.loai_van_ban == "khai_nhan"
+    assert db_case.noi_niem_yet == "xã Yên Sở"
+    assert db_case.ghi_chu == "Hồ sơ nháp"
+    assert db_case.workspace_idempotency_key
+
+    # Diagram persist + render_model + participant sync (vợ là Con?không —
+    # spouse role Vợ/Chồng → participant).
+    assert data["diagram"]["state"]["version"] == 2
+    assert data["diagram"]["render_model"] is not None
+    assert data["diagram"]["render_model"]["status"] in (
+        "incomplete", "complete")
+    parts = db.query(InheritanceParticipant).filter_by(
+        ho_so_id=case["id"]).all()
+    assert [p.customer_id for p in parts] == [spouse_entity]
+    assert parts[0].vai_tro == "Vợ/Chồng"
+
+    # workspace_get đọc lại đúng snapshot vừa tạo (row_id/entity_id giữ
+    # nguyên; field date emit dạng canonical YYYY-MM-DD)
+    again = _service(db).get(case["id"])
+    assert again["case"]["revision"] == 1
+    assert [(p["row_id"], p["entity_id"], p["ho_ten"])
+            for p in again["stage"]["people"]] == [
+        (p["row_id"], p["entity_id"], p["ho_ten"]) for p in wire_people]
+
+
+def test_create_idempotent_replay_same_key(db):
+    people, assets, state = _create_args()
+    key = str(uuid.uuid4())
+
+    first = _create(db, people, assets, state, key=key)
+    second = _create(db, people, assets, state, key=key)
+
+    assert first["created"] is True
+    assert second["created"] is False
+    assert second["case"]["id"] == first["case"]["id"]
+    assert db.query(InheritanceCase).count() == 1
+
+    # key khác = nháp khác → case mới (không suy giống-nhau-nội-dung)
+    third = _create(db, people, assets, state, key=str(uuid.uuid4()))
+    assert third["created"] is True
+    assert third["case"]["id"] != first["case"]["id"]
+    assert db.query(InheritanceCase).count() == 2
+
+
+def test_create_requires_uuid4_idempotency_key(db):
+    people, assets, state = _create_args()
+    for bad in (None, "not-a-uuid", 42, str(uuid.uuid1())):
+        with pytest.raises(WorkspaceError) as exc:
+            _create(db, people, assets, state, key=bad)
+        assert exc.value.code == "validation_error", bad
+    assert db.query(InheritanceCase).count() == 0
+
+
+def test_create_case_meta_validation(db):
+    people, assets, state = _create_args()
+    for bad_meta in (None, [], {"document_type": "khac"},
+                     {"document_type": None}, {"bogus": 1},
+                     {"document_type": "khai_nhan",
+                      "ngay_lap_ho_so": "2026"},
+                     {"document_type": "khai_nhan", "ghi_chu": "  "},
+                     {"document_type": "khai_nhan", "noi_niem_yet": 5}):
+        with pytest.raises(WorkspaceError) as exc:
+            _create(db, people, assets, state, meta=bad_meta)
+        assert exc.value.code == "validation_error", bad_meta
+    assert db.query(InheritanceCase).count() == 0
+
+
+def test_create_missing_owner_maps_workspace_owner_required(db):
+    people, assets, _state = _create_args()
+    variants = [
+        # không có node owner
+        {"version": 2, "nodes": []},
+        # owner personId null
+        {"version": 2, "nodes": [
+            {"id": "owner", "personId": None, "parentSlotIds": [],
+             "spouseSlotId": None, "isLandOwner": True,
+             "willReceive": False, "hidden": False, "deleted": False}]},
+        # owner bị deleted
+        {"version": 2, "nodes": [
+            {"id": "owner", "personId": people[0]["row_id"],
+             "parentSlotIds": [], "spouseSlotId": None, "isLandOwner": True,
+             "willReceive": False, "hidden": False, "deleted": True}]},
+        # owner personId trỏ ngoài stage → vẫn là owner_required
+        {"version": 2, "nodes": [
+            {"id": "owner", "personId": str(uuid.uuid4()),
+             "parentSlotIds": [], "spouseSlotId": None, "isLandOwner": True,
+             "willReceive": False, "hidden": False, "deleted": False}]},
+    ]
+    for bad_state in variants:
+        with pytest.raises(WorkspaceError) as exc:
+            _create(db, people, assets, bad_state)
+        assert exc.value.code == "workspace_owner_required", bad_state
+    assert db.query(InheritanceCase).count() == 0
+
+
+def test_create_stage_rules_apply(db):
+    people, assets, state = _create_args()
+
+    # entity_id phải null — hồ sơ mới tạo entity mới
+    bad_people = [dict(p) for p in people]
+    bad_people[0]["entity_id"] = 5
+    with pytest.raises(WorkspaceError) as exc:
+        _create(db, bad_people, assets, state)
+    assert exc.value.code == "stage_validation_error"
+    assert any(e["field"] == "entity_id"
+               for e in exc.value.details["field_errors"])
+
+    # assets rỗng / people rỗng
+    for ppl, ast in (([], assets), (people, [])):
+        with pytest.raises(WorkspaceError) as exc:
+            _create(db, ppl, ast, state)
+        assert exc.value.code == "stage_validation_error"
+
+    # 0 primary → primary_count
+    no_primary = [dict(a, is_primary=False) for a in assets]
+    with pytest.raises(WorkspaceError) as exc:
+        _create(db, people, no_primary, state)
+    assert exc.value.code == "stage_validation_error"
+    assert any(e["code"] == "primary_count"
+               for e in exc.value.details["field_errors"])
+
+    # field sai → rollback trọn vẹn, không ghi nửa vời
+    bad_name = [dict(people[0], ho_ten="  "), people[1]]
+    with pytest.raises(WorkspaceError) as exc:
+        _create(db, bad_name, assets, state)
+    assert exc.value.code == "stage_validation_error"
+    assert db.query(InheritanceCase).count() == 0
+    assert db.query(Customer).count() == 0
+    assert db.query(Property).count() == 0
+
+
+def test_create_diagram_invalid_and_outside_stage(db):
+    people, assets, _state = _create_args()
+
+    dangling = {"version": 2, "nodes": [
+        {"id": "owner", "personId": people[0]["row_id"],
+         "parentSlotIds": ["ghost"], "spouseSlotId": None,
+         "isLandOwner": True, "willReceive": False,
+         "hidden": False, "deleted": False}]}
+    with pytest.raises(WorkspaceError) as exc:
+        _create(db, people, assets, dangling)
+    assert exc.value.code == "diagram_invalid_state"
+
+    outside = {"version": 2, "nodes": [
+        {"id": "owner", "personId": people[0]["row_id"],
+         "parentSlotIds": [], "spouseSlotId": None,
+         "isLandOwner": True, "willReceive": False,
+         "hidden": False, "deleted": False},
+        {"id": "child_1", "personId": str(uuid.uuid4()),
+         "parentSlotIds": ["owner"], "spouseSlotId": None,
+         "isLandOwner": False, "willReceive": True,
+         "hidden": False, "deleted": False}]}
+    with pytest.raises(WorkspaceError) as exc:
+        _create(db, people, assets, outside)
+    assert exc.value.code == "diagram_reference_outside_stage"
+    assert db.query(InheritanceCase).count() == 0

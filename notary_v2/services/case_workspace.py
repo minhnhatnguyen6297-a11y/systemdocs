@@ -643,6 +643,9 @@ class CaseWorkspaceService:
                 "status": "locked" if case.is_locked else "draft",
                 "locked": bool(case.is_locked),
                 "revision": self._revision(case),
+                "ngay_lap_ho_so": _emit_date_or_year(case.ngay_lap_ho_so),
+                "noi_niem_yet": _nn(case.noi_niem_yet),
+                "ghi_chu": _nn(case.ghi_chu),
             },
             "stage": {"people": people, "assets": assets},
             "diagram": {
@@ -762,6 +765,148 @@ class CaseWorkspaceService:
                 "assets": [wire for _r, _e, wire in resolved_assets],
             },
             "diagram": {"state": state, "render_model": render_model},
+        }
+
+    def create(self, idempotency_key: Any, case_meta: Any,
+               people: Any, assets: Any, state: Any) -> dict:
+        """`notary.workspace_create` — tạo hồ sơ từ nháp (contract §4.3).
+
+        Một transaction: validate → tạo case + person + asset + link +
+        persist stage/diagram + revision=1 → commit; lỗi bất kỳ →
+        rollback trọn vẹn. Idempotent trên `idempotency_key` đã persist:
+        replay trả cùng case với `created:false`.
+        """
+        if not _is_uuid4(idempotency_key):
+            raise WorkspaceError(
+                "validation_error", "idempotency_key phải là UUID v4")
+
+        existing = self.db.query(InheritanceCase).filter(
+            InheritanceCase.workspace_idempotency_key
+            == str(idempotency_key)).first()
+        if existing is not None:
+            data = self.get(existing.id)
+            data["created"] = False
+            return data
+
+        meta = self._validate_case_meta(case_meta)
+        if not isinstance(people, list) or not isinstance(assets, list):
+            raise WorkspaceError(
+                "validation_error",
+                "stage.people/stage.assets phải là danh sách")
+        field_errors = self._validate_stage(people, assets)
+        field_errors += self._validate_create_stage(people, assets)
+        if field_errors:
+            raise WorkspaceError(
+                "stage_validation_error",
+                f"Stage có {len(field_errors)} lỗi field",
+                details={"field_errors": field_errors})
+
+        # Lazy import — inheritance_workspace đã import module này ở
+        # module level; import ngược ở đây sẽ circular.
+        from services.inheritance_workspace import (
+            InheritanceWorkspaceService,
+            _persisted_state,
+            _validate_diagram_wire,
+        )
+        errors = _validate_diagram_wire(state)
+        if errors:
+            raise WorkspaceError(
+                "diagram_invalid_state",
+                f"diagram state có {len(errors)} lỗi",
+                details={"errors": errors})
+        row_ids = {r["row_id"] for r in people}
+        owners = [n for n in state["nodes"]
+                  if n.get("id") == "owner" and n.get("deleted") is not True]
+        if (len(owners) != 1
+                or owners[0].get("personId") not in row_ids):
+            raise WorkspaceError(
+                "workspace_owner_required",
+                "Diagram phải có đúng một node 'owner' (không deleted) "
+                "gán một dòng Người trong stage")
+        render_model = InheritanceWorkspaceService(self.db)._evaluate_state(
+            state, valid_row_ids=row_ids, people=people)
+        clean_state = _persisted_state(state)
+
+        try:
+            resolved_people = self._upsert_people(people)
+            resolved_assets = self._upsert_assets(assets)
+            row_to_entity = {
+                rid: entity for rid, entity, _w in resolved_people}
+            case = InheritanceCase(
+                nguoi_chet_id=row_to_entity[owners[0]["personId"]],
+                tai_san_id=next(
+                    entity for _r, entity, wire in resolved_assets
+                    if wire["is_primary"]),
+                ngay_lap_ho_so=meta["ngay_lap_ho_so"] or date.today(),
+                loai_van_ban=meta["document_type"],
+                trang_thai="draft",
+                noi_niem_yet=meta["noi_niem_yet"],
+                ghi_chu=meta["ghi_chu"],
+                workspace_revision=1,
+                workspace_idempotency_key=str(idempotency_key))
+            self.db.add(case)
+            self.db.flush()
+            self._sync_links(case, resolved_assets)
+
+            people_map = _people_map(resolved_people)
+            legacy_nodes = _v2_to_legacy_nodes(
+                clean_state["nodes"], people_map)
+            now = _utc_now_iso()
+            self._sync_participants_and_owner(case, legacy_nodes)
+            case.case_state_json = json.dumps(
+                self._build_payload({}, resolved_people, resolved_assets,
+                                    clean_state, render_model,
+                                    legacy_nodes, now),
+                ensure_ascii=False)
+            case.engine_state_json = json.dumps(
+                {"version": 2, "updatedAt": now, "nodes": legacy_nodes},
+                ensure_ascii=False)
+            self.db.commit()
+        except WorkspaceError:
+            self.db.rollback()
+            raise
+        except IntegrityError as exc:
+            self.db.rollback()
+            raise WorkspaceError(
+                "stage_validation_error",
+                "Dữ liệu vi phạm ràng buộc integrity",
+                details={"field_errors": [_field_error(
+                    None, "entity_id", "invalid_format",
+                    "giá trị trùng/vi phạm ràng buộc duy nhất")]}) from exc
+        except Exception:
+            self.db.rollback()
+            raise
+
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "backend_mode": "real",
+            "created": True,
+            "case": {
+                "id": case.id,
+                "case_type": CASE_TYPE_INHERITANCE,
+                "document_type": meta["document_type"],
+                "status": "draft",
+                "locked": False,
+                "revision": 1,
+                "ngay_lap_ho_so": _emit_date_or_year(case.ngay_lap_ho_so),
+                "noi_niem_yet": meta["noi_niem_yet"],
+                "ghi_chu": meta["ghi_chu"],
+            },
+            "stage": {
+                "people": [wire for _r, _e, wire in resolved_people],
+                "assets": [wire for _r, _e, wire in resolved_assets],
+            },
+            "diagram": {
+                "domain": "inheritance",
+                "state": clean_state,
+                "render_model": render_model,
+                "warnings": [],
+            },
+            "capabilities": {
+                "intake": list(INTAKE_KINDS),
+                "diagram": True,
+                "word_export": True,
+            },
         }
 
     # ------------------------------------------------------------- internals
@@ -1054,6 +1199,72 @@ class CaseWorkspaceService:
         return "persisted" if result.rowcount == 1 else "moved"
 
     # ----- validation
+
+    @staticmethod
+    def _validate_case_meta(case_meta: Any) -> dict:
+        """Payload `case` của workspace_create (§4.3) → meta đã chuẩn hóa;
+        sai shape/enum/date → `validation_error`."""
+        if not isinstance(case_meta, Mapping):
+            raise WorkspaceError(
+                "validation_error", "payload.case phải là object")
+        extra = sorted(set(case_meta) - {
+            "document_type", "ngay_lap_ho_so",
+            "noi_niem_yet", "ghi_chu"})
+        if extra:
+            raise WorkspaceError(
+                "validation_error",
+                f"payload.case có field không hỗ trợ: {extra}")
+        document_type = case_meta.get("document_type")
+        if document_type not in DOCUMENT_TYPES:
+            raise WorkspaceError(
+                "validation_error",
+                f"document_type phải ∈ {list(DOCUMENT_TYPES)}")
+        ngay = case_meta.get("ngay_lap_ho_so")
+        if not _valid_date_full(ngay):
+            raise WorkspaceError(
+                "validation_error",
+                "ngay_lap_ho_so phải là YYYY-MM-DD hoặc null")
+        for field in ("noi_niem_yet", "ghi_chu"):
+            value = case_meta.get(field)
+            if value is not None and (
+                    not isinstance(value, str) or not value.strip()):
+                raise WorkspaceError(
+                    "validation_error",
+                    f"{field} phải là chuỗi non-empty hoặc null")
+        return {
+            "document_type": document_type,
+            "ngay_lap_ho_so": _parse_date_or_year(ngay),
+            "noi_niem_yet": _nn(case_meta.get("noi_niem_yet")),
+            "ghi_chu": _nn(case_meta.get("ghi_chu")),
+        }
+
+    @staticmethod
+    def _validate_create_stage(people: list, assets: list) -> list[dict]:
+        """Rule riêng của `workspace_create` (§4.3): stage non-empty và
+        mọi `entity_id` phải null — nháp chưa từng lưu tạo entity mới."""
+        errors: list[dict] = []
+        if not people:
+            errors.append(_field_error(
+                None, "people", "required",
+                "stage.people phải có ít nhất một dòng"))
+        if not assets:
+            errors.append(_field_error(
+                None, "is_primary", "primary_count",
+                "assets phải có đúng một dòng is_primary=true "
+                "(stage.assets rỗng)"))
+        for index, row in enumerate(people):
+            if isinstance(row, Mapping) and row.get("entity_id") is not None:
+                errors.append(_field_error(
+                    row.get("row_id"), "entity_id", "invalid_format",
+                    "entity_id phải null — workspace_create tạo entity mới",
+                    index))
+        for index, row in enumerate(assets):
+            if isinstance(row, Mapping) and row.get("entity_id") is not None:
+                errors.append(_field_error(
+                    row.get("row_id"), "entity_id", "invalid_format",
+                    "entity_id phải null — workspace_create tạo entity mới",
+                    index))
+        return errors
 
     def _validate_stage(self, people: list, assets: list) -> list[dict]:
         errors: list[dict] = []

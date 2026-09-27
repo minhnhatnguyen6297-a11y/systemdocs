@@ -149,6 +149,12 @@ Ngày: 24/09/2026 · Owner: platform/case-workspace · Spec: MIN-104 · Goal tri
 | `Lưu sơ đồ` (§6) | `notary.diagram_save` | atomic write, `base_revision` |
 | Liệt kê văn bản/mẫu sẵn sàng hoặc bị chặn khi mở popup Xuất Word | `notary.word_export_options` | read-only |
 | Tạo nhiều DOCX vào folder đích (UX → spec UX §7) | `notary.word_export_batch` | long-running, per-item result |
+| `Lưu hồ sơ` lần đầu của nháp mới (spec UX §2) | `notary.workspace_create` | atomic write, idempotent, `idempotency_key` |
+
+- `notary.intake_analyze` và `notary.diagram_evaluate` hỗ trợ **chế độ
+  nháp** (không `case_id`): intake trả suggestion không gắn hồ sơ;
+  evaluate nhận `stage` trong payload và trả `evaluated_revision: null`
+  — không ghi DB. `case_id: null` tường minh là lỗi validation.
 
 - Envelope `desktopcommand.v1` đã APPROVED (`contracts/desktop-command.md`):
   request `contract_version`/`command_id` (uuid v4)/`command`/`payload`/
@@ -205,7 +211,7 @@ Ngoài phạm vi file này:
 - Quyết định UX/layout/trạng thái màn hình → spec UX cấp sản phẩm.
 - Parser/ghép/nhóm hồ sơ từ nguồn Zalo — module Zalo riêng
   (`../zalo-document-inbox/spec.md`); tab này chỉ có câu loại trừ.
-- Luồng tạo hồ sơ mới; loại việc ngoài thừa kế ngoài việc hiện
-  `Chưa hỗ trợ`.
+- Loại việc ngoài thừa kế ngoài việc hiện `Chưa hỗ trợ`.
+  (Luồng "nháp mới" đã được chốt vào phạm vi qua MIN-121/122 — xem §8.)
 - Web cũ `form.html` giữ nguyên làm fallback; không đưa logic mới vào đó —
   nếu phải sửa để tương thích, chỉ gọi service mới (plan §3).

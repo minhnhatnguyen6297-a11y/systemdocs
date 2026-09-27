@@ -59,6 +59,8 @@ function fakeClient(seed) {
     cases[Number(cid)].id = Number(cid);
   }
   let nextEid = 900;
+  let nextCid = 1000;
+  const idem = {};                        // idempotency_key → case_id
   const calls = [];
 
   const ok = (data, extra = {}) => ({ ok: true, data, ...extra });
@@ -84,6 +86,9 @@ function fakeClient(seed) {
         id: c.id, case_type: c.case_type,
         document_type: c.document_type, status: c.status,
         locked: !!c.locked, revision: c.revision,
+        ngay_lap_ho_so: c.ngay_lap_ho_so ?? null,
+        noi_niem_yet: c.noi_niem_yet ?? null,
+        ghi_chu: c.ghi_chu ?? null,
       },
       stage: JSON.parse(JSON.stringify(c.stage)),
       diagram: {
@@ -155,7 +160,87 @@ function fakeClient(seed) {
           },
         });
       }
+      case 'notary.workspace_create': {
+        const key = payload.idempotency_key;
+        if (idem[key] != null) {
+          return ok({ ...workspaceData(cases[idem[key]]),
+                      created: false });
+        }
+        const fieldErrors = [];
+        for (const p of payload.stage.people || []) {
+          if (!p.ho_ten || !String(p.ho_ten).trim()) {
+            fieldErrors.push({ row_id: p.row_id, field: 'ho_ten',
+                               code: 'required', message: 'bat buoc' });
+          }
+          if (p.entity_id != null) {
+            fieldErrors.push({ row_id: p.row_id, field: 'entity_id',
+                               code: 'invalid_format',
+                               message: 'phai null' });
+          }
+        }
+        if (!(payload.stage.people || []).length) {
+          fieldErrors.push({ row_id: null, field: 'people',
+                             code: 'required', message: 'can it nhat 1' });
+        }
+        if (fieldErrors.length) {
+          return fail('stage_validation_error', 'loi field',
+                      { field_errors: fieldErrors });
+        }
+        const stage = JSON.parse(JSON.stringify(payload.stage));
+        for (const row of [...stage.people, ...stage.assets]) {
+          if (row.entity_id == null) row.entity_id = nextEid++;
+        }
+        const rowIds = new Set(stage.people.map((p) => p.row_id));
+        const owners = (payload.diagram.state.nodes || []).filter(
+          (n) => n.id === 'owner' && !n.deleted);
+        if (owners.length !== 1 || !rowIds.has(owners[0].personId)) {
+          return fail('workspace_owner_required', 'thieu owner');
+        }
+        for (const n of payload.diagram.state.nodes || []) {
+          if (n.personId && !rowIds.has(n.personId)) {
+            return fail('diagram_reference_outside_stage',
+                        'personId ngoai stage', { personId: n.personId });
+          }
+        }
+        const c = {
+          id: nextCid++, case_type: 'inheritance',
+          document_type: payload.case.document_type,
+          status: 'draft', locked: false, revision: 1,
+          ngay_lap_ho_so: payload.case.ngay_lap_ho_so ?? null,
+          noi_niem_yet: payload.case.noi_niem_yet ?? null,
+          ghi_chu: payload.case.ghi_chu ?? null,
+          stage,
+          diagram: {
+            state: JSON.parse(JSON.stringify(payload.diagram.state)),
+            render_model: 'auto', warnings: [],
+          },
+        };
+        cases[c.id] = c;
+        idem[key] = c.id;
+        return ok({ ...workspaceData(c), created: true });
+      }
       case 'notary.diagram_evaluate': {
+        if (payload.case_id == null) {
+          // Draft mode (§2.1a): stage trong payload, revision null.
+          if (payload.case_id === null) {
+            return fail('validation_error', 'case_id null');
+          }
+          const rowIds = new Set(
+            (payload.stage.people || []).map((p) => p.row_id));
+          for (const n of payload.diagram.state.nodes || []) {
+            if (n.personId && !rowIds.has(n.personId)) {
+              return fail('diagram_reference_outside_stage',
+                          'personId ngoai stage',
+                          { personId: n.personId });
+            }
+          }
+          return ok({
+            schema_version: 'notary.case-drafting.v1',
+            evaluated_revision: null,
+            render_model:
+              fakeRenderModel(payload.diagram.state, payload.stage),
+          });
+        }
         const { c, err } = getCase(payload);
         if (err) return err;
         return ok({
@@ -195,8 +280,13 @@ function fakeClient(seed) {
         });
       }
       case 'notary.intake_analyze': {
-        const { c, err } = getCase(payload);
-        if (err) return err;
+        if (payload.case_id !== undefined) {
+          if (payload.case_id === null) {
+            return fail('validation_error', 'case_id null');
+          }
+          const { err } = getCase(payload);
+          if (err) return err;
+        }
         const sid = payload.sources[0].source_id;
         return ok({
           schema_version: 'notary.case-drafting.v1',
@@ -1013,4 +1103,218 @@ test('exportWord: canceled job giu result (breakdown.skipped len wire — MIN-11
   assert.equal(res.breakdown.skipped.length, 1);
   assert.equal(res.documents[1].status, 'skipped');
   assert.equal(model.state.wordBusy, false);
+});
+
+// ---------- MIN-122: nhap moi / draft ----------
+
+test('newDraft: stage rong + seed 7 slot V2 + draftId uuid4', () => {
+  const { model } = makeModel(seedCases('empty'));
+  model.newDraft();
+  const s = model.state;
+  assert.equal(s.status, 'ready');
+  assert.equal(s.caseId, null);
+  assert.ok(model.isDraft());
+  assert.ok(s.canWrite !== undefined || model.canWrite());
+  const ids = s.diagram.nodes.map((n) => n.id);
+  for (const id of ['father', 'mother', 'spouse_father', 'spouse_mother',
+                    'owner', 'spouse', 'child_1']) {
+    assert.ok(ids.includes(id), `thieu slot ${id}`);
+  }
+  const owner = s.diagram.nodes.find((n) => n.id === 'owner');
+  assert.equal(owner.isLandOwner, true);
+  assert.deepEqual([...owner.parentSlotIds].sort(), ['father', 'mother']);
+  assert.equal(owner.spouseSlotId, 'spouse');
+  const spouse = s.diagram.nodes.find((n) => n.id === 'spouse');
+  assert.equal(spouse.spouseSlotId, 'owner');
+  assert.deepEqual([...spouse.parentSlotIds].sort(),
+                   ['spouse_father', 'spouse_mother']);
+  const child = s.diagram.nodes.find((n) => n.id === 'child_1');
+  assert.deepEqual(child.parentSlotIds, ['owner', 'spouse']);
+  assert.match(s.draftId,
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+});
+
+test('seedDiagramSlots: idempotent — goi lai khong nhan doi', () => {
+  const nodes = [];
+  M.seedDiagramSlots(nodes);
+  const n1 = nodes.length;
+  M.seedDiagramSlots(nodes);
+  assert.equal(nodes.length, n1);
+  // co san owner → khong ghi de personId
+  const nodes2 = [{ id: 'owner', personId: 'x', parentSlotIds: [],
+                    spouseSlotId: 'spouse', isLandOwner: true,
+                    willReceive: false, hidden: false, deleted: false }];
+  M.seedDiagramSlots(nodes2);
+  assert.equal(nodes2.find((n) => n.id === 'owner').personId, 'x');
+});
+
+test('newDraft: draft diagram dung stage nhap — assign tu stage, pool tu stage', () => {
+  const { model } = makeModel(seedCases('empty'));
+  model.newDraft();
+  const row = model.addPerson({ ho_ten: 'Người Nháp' });
+  assert.ok(row);
+  assert.equal(model.pool().people.length, 1);
+  assert.equal(model.assignPerson('owner', row.row_id), true);
+  assert.equal(model.pool().people.length, 0);
+});
+
+test('ensureEmptyChildSlot: het child trong → them child_N ke tiep', () => {
+  const { model } = makeModel(seedCases('empty'));
+  model.newDraft();
+  const p1 = model.addPerson({ ho_ten: 'A' });
+  model.assignPerson('child_1', p1.row_id);
+  const ids = model.state.diagram.nodes.map((n) => n.id);
+  assert.ok(ids.includes('child_2'), 'phai co child_2 trong');
+  // child_2 con trong → khong them nua
+  const p2 = model.addPerson({ ho_ten: 'B' });
+  model.assignPerson('child_2', p2.row_id);
+  const ids2 = model.state.diagram.nodes.map((n) => n.id);
+  assert.ok(ids2.includes('child_3'));
+});
+
+test('movePerson: move vao node trong / swap / unassign ve Pool', () => {
+  const { model } = makeModel(seedCases('empty'));
+  model.newDraft();
+  const a = model.addPerson({ ho_ten: 'A' });
+  const b = model.addPerson({ ho_ten: 'B' });
+  model.assignPerson('owner', a.row_id);
+  model.assignPerson('spouse', b.row_id);
+  // swap owner <-> spouse
+  assert.equal(model.movePerson(a.row_id, 'spouse'), true);
+  const nodes = model.state.diagram.nodes;
+  assert.equal(nodes.find((n) => n.id === 'spouse').personId, a.row_id);
+  assert.equal(nodes.find((n) => n.id === 'owner').personId, b.row_id);
+  // unassign → ve Pool
+  assert.equal(model.movePerson(b.row_id, null), true);
+  assert.equal(nodes.find((n) => n.id === 'owner').personId, null);
+  assert.equal(model.pool().people.length, 1);
+  // tu Pool → node co nguoi (swap: nguoi cu ve Pool)
+  assert.equal(model.movePerson(b.row_id, 'spouse'), true);
+  assert.equal(nodes.find((n) => n.id === 'spouse').personId, b.row_id);
+  assert.equal(model.pool().people.length, 1);   // a ve Pool
+});
+
+test('updateCaseMeta: chi draft; saveDraft gui meta + idempotency_key', async () => {
+  const { model, client } = makeModel(seedCases('empty'));
+  model.newDraft();
+  assert.equal(model.updateCaseMeta('document_type', 'thoa_thuan'), true);
+  assert.equal(model.updateCaseMeta('noi_niem_yet', 'xã Yên Sở'), true);
+  assert.equal(model.updateCaseMeta('bogus', 'x'), false);
+  const owner = model.addPerson({ ho_ten: 'Người Chết' });
+  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x' });
+  model.assignPerson('owner', owner.row_id);
+  const draftId = model.state.draftId;
+  const r = await model.saveDraft();
+  assert.equal(r.ok, true, JSON.stringify(r.error));
+  const call = client.calls.find(
+    (c) => c.command === 'notary.workspace_create');
+  assert.ok(call);
+  assert.equal(call.payload.idempotency_key, draftId);
+  assert.equal(call.payload.case.document_type, 'thoa_thuan');
+  assert.equal(call.payload.case.noi_niem_yet, 'xã Yên Sở');
+  // sau save → khong con draft; caseId gan; revision=1
+  assert.equal(model.isDraft(), false);
+  assert.ok(model.state.caseId >= 1000);
+  assert.equal(model.state.revision, 1);
+});
+
+test('saveDraft: retry cung draftId → created:false, khong tao trung', async () => {
+  const { model, client } = makeModel(seedCases('empty'));
+  model.newDraft();
+  const owner = model.addPerson({ ho_ten: 'Người Chết' });
+  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x' });
+  model.assignPerson('owner', owner.row_id);
+  const r1 = await model.saveDraft();
+  assert.equal(r1.ok && r1.data.created, true);
+  const cid = model.state.caseId;
+  // mo lai nhap khac roi quay lai goi workspace_create cung key qua client
+  const r2 = await client.run('notary.workspace_create', {
+    idempotency_key: client.calls.find(
+      (c) => c.command === 'notary.workspace_create')
+      .payload.idempotency_key,
+    case: { document_type: 'khai_nhan' },
+    stage: { people: [], assets: [] },
+    diagram: { state: { version: 2, nodes: [] } },
+  });
+  assert.equal(r2.ok, true);
+  assert.equal(r2.data.created, false);
+  assert.equal(r2.data.case.id, cid);
+});
+
+test('saveDraft: stage_validation_error giu nhap + fieldErrors', async () => {
+  const { model } = makeModel(seedCases('empty'));
+  model.newDraft();
+  model.addPerson({ ho_ten: '   ' });           // ho_ten trong → required
+  const r = await model.saveDraft();
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, 'stage_validation_error');
+  assert.ok(model.state.fieldErrors.length >= 1);
+  assert.equal(model.isDraft(), true);          // nhap nguyen ven
+});
+
+test('saveDraft: thieu owner → workspace_owner_required, nhap giu nguyen', async () => {
+  const { model } = makeModel(seedCases('empty'));
+  model.newDraft();
+  model.addPerson({ ho_ten: 'Ai Do' });
+  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x' });
+  const r = await model.saveDraft();
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, 'workspace_owner_required');
+  assert.equal(model.isDraft(), true);
+});
+
+test('evaluateDiagram tren nhap: gui stage, khong gui case_id', async () => {
+  const { model, client } = makeModel(seedCases('empty'));
+  model.newDraft();
+  const owner = model.addPerson({ ho_ten: 'Người Chết' });
+  model.assignPerson('owner', owner.row_id);
+  const r = await model.evaluateDiagram();
+  assert.equal(r.ok, true);
+  const call = client.calls.find(
+    (c) => c.command === 'notary.diagram_evaluate');
+  assert.equal('case_id' in call.payload, false);
+  assert.ok(call.payload.stage.people.length === 1);
+  assert.equal(model.state.evaluatedRevision, null);
+});
+
+test('intakeAnalyze tren nhap: khong gui case_id', async () => {
+  const { model, client } = makeModel(seedCases('empty'));
+  model.newDraft();
+  const r = await model.intakeAnalyze([
+    { source_id: crypto.randomUUID(), kind: 'text', text: 'x' }]);
+  assert.equal(r.ok, true);
+  const call = client.calls.find(
+    (c) => c.command === 'notary.intake_analyze');
+  assert.equal('case_id' in call.payload, false);
+});
+
+test('session guard: openCase(A) rồi newDraft trước khi response về → bo apply', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  const origRun = client.run;
+  let resolve;
+  client.run = (cmd, p) => new Promise((res) => {
+    resolve = () => origRun(cmd, p).then(res);
+  });
+  const p = model.openCase(42);
+  model.newDraft();                       // session doi truoc khi response
+  resolve();
+  await p;
+  // state van la nhap — response workspace_get cua case 42 bi bo
+  assert.equal(model.isDraft(), true);
+  assert.equal(model.state.caseId, null);
+});
+
+test('commitStage chi goi tren case that — draft khong co commitStage', async () => {
+  const { model, client } = makeModel(seedCases('empty'));
+  model.newDraft();
+  model.addPerson({ ho_ten: 'A' });
+  assert.equal(model.state.stageDirty, true);
+  // saveDraft la duong luu duy nhat cua nhap
+  const callsBefore = client.calls.length;
+  const owner = model.state.stage.people[0];
+  model.assignPerson('owner', owner.row_id);
+  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x' });
+  const r = await model.saveDraft();
+  assert.equal(r.ok, true);
+  assert.ok(client.calls.length > callsBefore);
 });

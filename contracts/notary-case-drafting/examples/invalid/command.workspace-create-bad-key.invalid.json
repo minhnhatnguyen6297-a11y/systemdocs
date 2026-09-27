@@ -1,0 +1,64 @@
+{
+  "expected_error": "validation_error",
+  "contract_version": "desktopcommand.v1",
+  "command_id": "b1b2c3d4-0025-4025-8025-000000000125",
+  "command": "notary.workspace_create",
+  "payload": {
+    "idempotency_key": "not-a-uuid",
+    "case": { "document_type": "khai_nhan" },
+    "stage": {
+      "people": [
+        {
+          "row_id": "11111111-1111-4111-8111-111111111111",
+          "entity_id": null,
+          "ho_ten": "Nguyễn Văn An",
+          "gioi_tinh": "Nam",
+          "ngay_sinh": "1950",
+          "ngay_chet": "2011-05-15",
+          "so_giay_to": null,
+          "ngay_cap": null,
+          "noi_cap": null,
+          "dia_chi": null,
+          "place_of_origin": null
+        }
+      ],
+      "assets": [
+        {
+          "row_id": "55555555-5555-4555-8555-555555555555",
+          "entity_id": null,
+          "is_primary": true,
+          "so_serial": "DD123456",
+          "so_vao_so": null,
+          "so_thua_dat": null,
+          "so_to_ban_do": null,
+          "dia_chi": "Thửa 123, tờ 45, phường Bạch Mai, Hà Nội",
+          "loai_so": null,
+          "hinh_thuc_su_dung": null,
+          "thoi_han": null,
+          "nguon_goc": null,
+          "ngay_cap": null,
+          "co_quan_cap": null,
+          "land_rows": null
+        }
+      ]
+    },
+    "diagram": {
+      "state": {
+        "version": 2,
+        "nodes": [
+          {
+            "id": "owner",
+            "personId": "11111111-1111-4111-8111-111111111111",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "isLandOwner": true,
+            "willReceive": false,
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      }
+    }
+  },
+  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+}

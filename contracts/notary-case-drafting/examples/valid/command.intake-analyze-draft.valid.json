@@ -1,0 +1,15 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-0022-4022-8022-000000000022",
+  "command": "notary.intake_analyze",
+  "payload": {
+    "sources": [
+      {
+        "source_id": "77777777-7777-4777-8777-777777777777",
+        "kind": "text",
+        "text": "Ông Nguyễn Văn An, sinh 1950, CCCD 012345678901"
+      }
+    ]
+  },
+  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+}

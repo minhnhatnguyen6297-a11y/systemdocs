@@ -472,3 +472,121 @@ def test_saved_state_reloads_identically_via_workspace_get(
     assert data["diagram"]["state"] == saved["diagram"]["state"]
     assert data["diagram"]["render_model"] == \
         saved["diagram"]["render_model"]
+
+
+# ----------------------------------------------------------- evaluate_draft
+
+
+def _draft_stage(rows):
+    """Stage payload (chưa commit) cho chế độ nháp — person_row wire shape
+    với row_id của `rows` map."""
+    return {
+        "people": [
+            {"row_id": rows["owner"], "entity_id": None,
+             "ho_ten": "Nguyễn Văn An", "gioi_tinh": "Nam",
+             "ngay_sinh": "1950-01-01", "ngay_chet": "2011-05-15",
+             "so_giay_to": None, "ngay_cap": None, "noi_cap": None,
+             "dia_chi": "xã A", "place_of_origin": None},
+            {"row_id": rows["spouse"], "entity_id": None,
+             "ho_ten": "Nguyễn Thị Bình", "gioi_tinh": "Nữ",
+             "ngay_sinh": "1955-03-02", "ngay_chet": None,
+             "so_giay_to": None, "ngay_cap": None, "noi_cap": None,
+             "dia_chi": "xã A", "place_of_origin": None},
+            {"row_id": rows["child"], "entity_id": None,
+             "ho_ten": "Nguyễn Văn Con", "gioi_tinh": "Nam",
+             "ngay_sinh": "1978-07-20", "ngay_chet": "2010-01-01",
+             "so_giay_to": None, "ngay_cap": None, "noi_cap": None,
+             "dia_chi": "xã A", "place_of_origin": None},
+            {"row_id": rows["gc"], "entity_id": None,
+             "ho_ten": "Nguyễn Văn Cháu", "gioi_tinh": "Nam",
+             "ngay_sinh": "2000-06-06", "ngay_chet": None,
+             "so_giay_to": None, "ngay_cap": None, "noi_cap": None,
+             "dia_chi": "xã A", "place_of_origin": None},
+        ],
+        "assets": [
+            {"row_id": str(uuid.uuid4()), "entity_id": None,
+             "is_primary": True, "so_serial": "DD123456",
+             "so_vao_so": None, "so_thua_dat": None, "so_to_ban_do": None,
+             "dia_chi": "Thửa 123", "loai_so": None,
+             "hinh_thuc_su_dung": None, "thoi_han": None,
+             "nguon_goc": None, "ngay_cap": None, "co_quan_cap": None,
+             "land_rows": None},
+        ],
+    }
+
+
+def test_evaluate_draft_evaluates_without_case(db):
+    """Chế độ nháp (case_id absent): stage từ payload, không persist,
+    evaluated_revision=null (contract §7.4 draft mode)."""
+    rows = {k: str(uuid.uuid4()) for k in ("owner", "spouse", "child", "gc")}
+
+    data = _svc(db).evaluate_draft(
+        _draft_stage(rows), _draft_state(rows))
+
+    assert data["schema_version"] == SCHEMA_VERSION
+    assert data["evaluated_revision"] is None        # không có case -> null
+    rm = data["render_model"]
+    assert rm["engineVersion"] == 2
+    assert rm["status"] == "complete"
+    assert rm["allocations"][rows["spouse"]]["finalShare"] == "1/2"
+    assert rm["allocations"][rows["gc"]]["finalShare"] == "1/2"
+    # không ghi gì vào DB — workspace nháp không tồn tại trên server
+    assert db.query(InheritanceCase).count() == 0
+    assert db.query(Customer).count() == 0
+
+
+def test_evaluate_draft_does_not_touch_existing_case(db):
+    """Draft evaluate trên session có case sẵn: không đụng revision,
+    không đổi stage/diagram đã persist của case."""
+    case, _people, rows, _prop = _seed_case(db)
+    before_json = case.case_state_json
+    before_rev = case.workspace_revision
+
+    draft_rows = {k: str(uuid.uuid4()) for k in rows}
+    _svc(db).evaluate_draft(_draft_stage(draft_rows),
+                            _draft_state(draft_rows))
+
+    db.refresh(case)
+    assert case.workspace_revision == before_rev
+    assert case.case_state_json == before_json
+
+
+def test_evaluate_draft_stage_invalid_maps_stage_error(db):
+    stage = {
+        "people": [
+            {"row_id": str(uuid.uuid4()), "entity_id": None,
+             "ho_ten": "  ",                        # sai: tên rỗng
+             "gioi_tinh": "Nam", "ngay_sinh": None, "ngay_chet": None,
+             "so_giay_to": None, "ngay_cap": None, "noi_cap": None,
+             "dia_chi": None, "place_of_origin": None},
+        ],
+        "assets": [],
+    }
+    with pytest.raises(WorkspaceError) as exc:
+        _svc(db).evaluate_draft(stage, {"version": 2, "nodes": []})
+    assert exc.value.code == "stage_validation_error"
+    assert exc.value.details["field_errors"]
+
+
+def test_evaluate_draft_requires_stage_object(db):
+    for bad in (None, [], "x"):
+        with pytest.raises(WorkspaceError) as exc:
+            _svc(db).evaluate_draft(bad, {"version": 2, "nodes": []})
+        assert exc.value.code == "validation_error", bad
+
+
+def test_evaluate_draft_outside_stage_and_invalid_wire(db):
+    rows = {k: str(uuid.uuid4()) for k in ("owner", "spouse", "child", "gc")}
+    stage = _draft_stage(rows)
+
+    state = _draft_state(rows)
+    state["nodes"][0]["personId"] = str(uuid.uuid4())
+    with pytest.raises(WorkspaceError) as exc:
+        _svc(db).evaluate_draft(stage, state)
+    assert exc.value.code == "diagram_reference_outside_stage"
+
+    bad = _draft_state(rows)
+    bad["nodes"][0]["willReceive"] = "false"
+    with pytest.raises(WorkspaceError) as exc:
+        _svc(db).evaluate_draft(stage, bad)
+    assert exc.value.code == "diagram_invalid_state"

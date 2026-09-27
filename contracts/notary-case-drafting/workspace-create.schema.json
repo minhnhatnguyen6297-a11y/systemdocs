@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://systemdocs/contracts/notary-case-drafting/workspace-create.schema.json",
+  "title": "notary.workspace_create — payload + result.data (rev 1.1, MIN-121)",
+  "definitions": {
+    "case_meta": {
+      "type": "object",
+      "required": ["document_type"],
+      "additionalProperties": false,
+      "properties": {
+        "document_type": { "enum": ["khai_nhan", "thoa_thuan"] },
+        "ngay_lap_ho_so": {
+          "$ref": "common.schema.json#/definitions/date_full"
+        },
+        "noi_niem_yet": {
+          "$ref": "common.schema.json#/definitions/nullable_string"
+        },
+        "ghi_chu": {
+          "$ref": "common.schema.json#/definitions/nullable_string"
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "required": ["idempotency_key", "case", "stage", "diagram"],
+      "additionalProperties": false,
+      "properties": {
+        "idempotency_key": {
+          "$ref": "common.schema.json#/definitions/uuid4"
+        },
+        "case": { "$ref": "#/definitions/case_meta" },
+        "stage": {
+          "type": "object",
+          "required": ["people", "assets"],
+          "additionalProperties": false,
+          "properties": {
+            "people": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "common.schema.json#/definitions/person_row"
+              },
+              "description": "entity_id phải null (dòng mới)"
+            },
+            "assets": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "common.schema.json#/definitions/asset_row"
+              },
+              "description": "đúng một is_primary:true; entity_id null"
+            }
+          }
+        },
+        "diagram": {
+          "type": "object",
+          "required": ["state"],
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "$ref": "common.schema.json#/definitions/diagram_state",
+              "description": "personId tham chiếu row_id trong stage của cùng payload; node 'owner' bắt buộc đã gán"
+            }
+          }
+        }
+      }
+    },
+    "result_data": {
+      "type": "object",
+      "required": [
+        "schema_version", "created", "case", "stage", "diagram",
+        "capabilities"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/definitions/schema_version" },
+        "backend_mode": { "enum": ["real", "mock"] },
+        "created": {
+          "type": "boolean",
+          "description": "true = vừa tạo; false = idempotent replay"
+        },
+        "case": {
+          "$ref": "workspace.schema.json#/definitions/result_data/properties/case"
+        },
+        "stage": {
+          "$ref": "workspace.schema.json#/definitions/result_data/properties/stage"
+        },
+        "diagram": {
+          "$ref": "workspace.schema.json#/definitions/result_data/properties/diagram"
+        },
+        "capabilities": {
+          "$ref": "workspace.schema.json#/definitions/result_data/properties/capabilities"
+        }
+      }
+    }
+  }
+}

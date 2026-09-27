@@ -267,6 +267,39 @@ class InheritanceWorkspaceService:
             "render_model": render_model,
         }
 
+    def evaluate_draft(self, stage: Any, state: Any) -> dict:
+        """`notary.diagram_evaluate` chế độ nháp — `case_id` absent
+        (contract §7.4).
+
+        `stage` trong payload thay thế Stage đã commit; personId kiểm
+        theo row_id của stage payload. Read-only hoàn toàn: không load
+        case, không persist, `evaluated_revision` = null. Stage sai
+        field → `stage_validation_error` (không phải `validation_error`).
+        """
+        if not isinstance(stage, Mapping):
+            raise WorkspaceError(
+                "validation_error", "payload.stage phải là object")
+        people = stage.get("people")
+        assets = stage.get("assets")
+        if not isinstance(people, list) or not isinstance(assets, list):
+            raise WorkspaceError(
+                "validation_error",
+                "stage.people/stage.assets phải là danh sách")
+        field_errors = self._ws._validate_stage(people, assets)
+        if field_errors:
+            raise WorkspaceError(
+                "stage_validation_error",
+                f"Stage có {len(field_errors)} lỗi field",
+                details={"field_errors": field_errors})
+        render_model = self._evaluate_state(
+            state, valid_row_ids={p["row_id"] for p in people},
+            people=people)
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "evaluated_revision": None,
+            "render_model": render_model,
+        }
+
     def save_diagram(self, case_id: Any, base_revision: Any,
                      state: Any) -> dict:
         """`notary.diagram_save` — atomic write (contract §7.5).

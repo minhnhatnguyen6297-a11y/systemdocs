@@ -16,7 +16,10 @@
         "document_type": "khai_nhan",
         "status": "draft",
         "locked": false,
-        "revision": 7
+        "revision": 7,
+        "ngay_lap_ho_so": "2026-09-20",
+        "noi_niem_yet": "UBND phường Bạch Mai",
+        "ghi_chu": null
       },
       "stage": {
         "people": [

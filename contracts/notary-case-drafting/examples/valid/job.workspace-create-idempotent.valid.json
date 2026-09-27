@@ -1,0 +1,119 @@
+{
+  "fixture_context": {
+    "comment": "Replay cùng idempotency_key sau timeout — backend trả case đã tạo, created:false, không tạo trùng"
+  },
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_ws_create_002",
+  "command_id": "a1b2c3d4-0021-4021-8021-000000000021",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "workspace_create",
+    "data": {
+      "schema_version": "notary.case-drafting.v1",
+      "backend_mode": "real",
+      "created": false,
+      "case": {
+        "id": 48,
+        "case_type": "inheritance",
+        "document_type": "khai_nhan",
+        "status": "draft",
+        "locked": false,
+        "revision": 2,
+        "ngay_lap_ho_so": "2026-09-26",
+        "noi_niem_yet": null,
+        "ghi_chu": "Hồ sơ nháp mẫu"
+      },
+      "stage": {
+        "people": [
+          {
+            "row_id": "11111111-1111-4111-8111-111111111111",
+            "entity_id": 301,
+            "ho_ten": "Nguyễn Văn An",
+            "gioi_tinh": "Nam",
+            "ngay_sinh": "1950",
+            "ngay_chet": "2011-05-15",
+            "so_giay_to": "012345678901",
+            "ngay_cap": null,
+            "noi_cap": null,
+            "dia_chi": "Số 1 phố Huế, Hà Nội",
+            "place_of_origin": null
+          },
+          {
+            "row_id": "22222222-2222-4222-8222-222222222222",
+            "entity_id": 302,
+            "ho_ten": "Trần Thị Bình",
+            "gioi_tinh": "Nữ",
+            "ngay_sinh": "1955-03-02",
+            "ngay_chet": null,
+            "so_giay_to": null,
+            "ngay_cap": null,
+            "noi_cap": null,
+            "dia_chi": "Số 1 phố Huế, Hà Nội",
+            "place_of_origin": null
+          }
+        ],
+        "assets": [
+          {
+            "row_id": "55555555-5555-4555-8555-555555555555",
+            "entity_id": 401,
+            "is_primary": true,
+            "so_serial": "DD123456",
+            "so_vao_so": "CS 12345",
+            "so_thua_dat": "123",
+            "so_to_ban_do": "45",
+            "dia_chi": "Thửa 123, tờ 45, phường Bạch Mai, Hà Nội",
+            "loai_so": "GCN QSDĐ",
+            "hinh_thuc_su_dung": null,
+            "thoi_han": null,
+            "nguon_goc": null,
+            "ngay_cap": "2005-09-30",
+            "co_quan_cap": null,
+            "land_rows": [
+              { "loai_dat": "ODT", "dien_tich": 85.5, "thoi_han": "Lâu dài" }
+            ]
+          }
+        ]
+      },
+      "diagram": {
+        "domain": "inheritance",
+        "state": {
+          "version": 2,
+          "nodes": [
+            {
+              "id": "owner",
+              "personId": "11111111-1111-4111-8111-111111111111",
+              "parentSlotIds": [],
+              "spouseSlotId": "spouse",
+              "isLandOwner": true,
+              "willReceive": false,
+              "hidden": false,
+              "deleted": false
+            },
+            {
+              "id": "spouse",
+              "personId": "22222222-2222-4222-8222-222222222222",
+              "parentSlotIds": [],
+              "spouseSlotId": "owner",
+              "isLandOwner": false,
+              "willReceive": true,
+              "hidden": false,
+              "deleted": false
+            }
+          ]
+        },
+        "render_model": null,
+        "warnings": []
+      },
+      "capabilities": {
+        "intake": ["image", "pdf", "docx", "xlsx", "text"],
+        "diagram": true,
+        "word_export": true
+      }
+    },
+    "warnings": []
+  },
+  "error": null,
+  "updated_at": "2026-09-26T09:01:00Z"
+}

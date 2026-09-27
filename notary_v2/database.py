@@ -88,6 +88,7 @@ def migrate_inheritance_cases_schema():
         "engine_state_json": "TEXT",
         "case_state_json": "TEXT",
         "workspace_revision": "INTEGER NOT NULL DEFAULT 1",
+        "workspace_idempotency_key": "VARCHAR(64)",
         "updated_at": "DATETIME",
     })
     _ensure_table_columns(cur, "inheritance_participants", {

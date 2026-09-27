@@ -138,7 +138,7 @@ function createNotaryModuleView(deps) {
 
   // ---------- Tổng quan hồ sơ (entry point: mo ho so) ----------
 
-  function buildCaseListPanel(onOpen) {
+  function buildCaseListPanel(onOpen, onNewDraft) {
     const s = h('section', 'cd-panel');
     s.append(h('p', 'muted',
       'Danh sách hồ sơ từ engine nghiệp vụ — bấm vào hồ sơ để mở ' +
@@ -148,7 +148,9 @@ function createNotaryModuleView(deps) {
     q.type = 'search';
     q.setAttribute('aria-label', 'Lọc hồ sơ theo từ khóa');
     q.placeholder = 'Lọc theo từ khóa…';
-    const load = btn('Tải danh sách', 'primary', async () => {
+    q.oninput = () => loadList();           // loc theo query truoc limit
+    const out = h('div', 'cd-slot');
+    async function loadList() {
       out.innerHTML = '';
       out.append(face(L.faceLoading('Đang tải danh sách hồ sơ…')));
       const r = await runCommand('notary.case_list',
@@ -160,6 +162,9 @@ function createNotaryModuleView(deps) {
         return;
       }
       const cases = (r.data && r.data.cases) || [];
+      const total = (r.data && r.data.total) ?? cases.length;
+      out.append(h('div', 'muted cd-caselist-count',
+        `${total} hồ sơ`));
       if (!cases.length) {
         out.append(face(L.faceEmpty('Chưa có hồ sơ nào.')));
       } else {
@@ -178,11 +183,28 @@ function createNotaryModuleView(deps) {
         out.append(list);
       }
       if (isDevMode()) out.append(devQuickOpen(onOpen));
+    }
+    const load = btn('Làm mới danh sách', 'primary', loadList);
+    const create = btn('+ Hồ sơ mới', '', async () => {
+      // Nhap moi thay toan bo draft hien tai — hoi khi co thay doi
+      // chua luu (case khac dang so / nhap khac dang do).
+      if (model.hasUnsaved()) {
+        const okGo = await confirm({
+          title: 'Thay đổi chưa lưu',
+          body: 'Bản nháp hiện tại còn thay đổi chưa lưu — tạo hồ sơ ' +
+            'mới sẽ mất bản nháp này.',
+          confirmLabel: 'Bỏ nháp, tạo mới',
+          cancelLabel: 'Ở lại',
+        });
+        if (!okGo) return;
+      }
+      onNewDraft();
     });
-    row.append(q, load);
+    row.append(create, q, load);
     s.append(row);
-    const out = h('div', 'cd-slot');
     s.append(out);
+    // Auto-load khi vao tab (MIN-122) — khong doi nguoi dung bam Tai.
+    loadList();
     return s;
   }
 
@@ -216,20 +238,30 @@ function createNotaryModuleView(deps) {
     const back = btn('← Tổng quan', 'cd-back', onBack);
     bar.append(back);
     const c = s.caseInfo || {};
+    const draft = s.caseId == null;
     const title = h('span', 'cd-case-title',
-      `Hồ sơ #${s.caseId} · ${DOC_TYPE_LABEL[c.document_type] ||
-        c.document_type || '—'}`);
+      draft ? `Hồ sơ mới (nháp) · ${DOC_TYPE_LABEL[c.document_type] ||
+              c.document_type || '—'}`
+            : `Hồ sơ #${s.caseId} · ${DOC_TYPE_LABEL[c.document_type] ||
+              c.document_type || '—'}`);
     bar.append(title);
     const typeBadge = h('span', 'cd-badge',
-      c.case_type === 'inheritance' ? 'Thừa kế' : `Loại: ${c.case_type}`);
+      c.case_type === 'inheritance' || draft ? 'Thừa kế'
+        : `Loại: ${c.case_type}`);
     bar.append(typeBadge);
+    if (draft) {
+      bar.append(h('span', 'cd-badge cd-badge-warn',
+        'Nháp mới — chưa lưu'));
+    }
     if (s.locked) bar.append(h('span', 'cd-badge cd-badge-lock', 'Đã khóa'));
     if (s.stale) {
       bar.append(h('span', 'cd-badge cd-badge-warn',
         'Bản nháp cũ — server đã thay đổi'));
     }
     const save = h('span', 'cd-save muted');
-    if (s.stageDirty || s.diagramDirty) {
+    if (draft) {
+      save.textContent = 'Chưa lưu hồ sơ';
+    } else if (s.stageDirty || s.diagramDirty) {
       const n = [];
       if (s.stageDirty) n.push('Stage');
       if (s.diagramDirty) n.push('Sơ đồ');
@@ -239,6 +271,48 @@ function createNotaryModuleView(deps) {
     }
     bar.append(save);
     return bar;
+  }
+
+  // Form meta cua nhap moi (document_type + 3 field optional §4.3) —
+  // chi render khi caseId=null; sau khi luu meta la read-only trong
+  // context bar (contract chua co update meta).
+  function draftMetaEl() {
+    const s = model.state;
+    if (s.caseId != null) return null;
+    const c = s.caseInfo || {};
+    const box = h('div', 'cd-card');
+    const head = h('div', 'cd-card-head');
+    head.append(h('h3', 'cd-card-title', 'Thông tin hồ sơ'));
+    box.append(head);
+    const body = h('div', 'cd-card-body cd-field-stack');
+    const dt = h('label', 'cd-field');
+    dt.append(h('span', 'muted', 'Loại văn bản'));
+    const sel = h('select', 'cd-input');
+    for (const [v, lbl] of Object.entries(DOC_TYPE_LABEL)) {
+      const o = h('option', '', lbl);
+      o.value = v;
+      if (c.document_type === v) o.selected = true;
+      sel.append(o);
+    }
+    sel.setAttribute('aria-label', 'Loại văn bản');
+    sel.onchange = () => model.updateCaseMeta('document_type', sel.value);
+    dt.append(sel);
+    body.append(dt);
+    const f = (label, key) => {
+      const lab = h('label', 'cd-field');
+      lab.append(h('span', 'muted', label));
+      const inp = h('input', 'cd-input');
+      inp.value = c[key] || '';
+      inp.setAttribute('aria-label', label);
+      inp.onchange = () => model.updateCaseMeta(key, inp.value);
+      lab.append(inp);
+      return lab;
+    };
+    body.append(f('Ngày lập hồ sơ', 'ngay_lap_ho_so'));
+    body.append(f('Nơi niêm yết', 'noi_niem_yet'));
+    body.append(f('Ghi chú', 'ghi_chu'));
+    box.append(body);
+    return box;
   }
 
   // ---------- Stage tier ----------
@@ -296,10 +370,34 @@ function createNotaryModuleView(deps) {
       return lab;
     };
     det.append(field('Họ tên', 'ho_ten', p.ho_ten));
+    // Gioi tinh: enum {Nam, Nữ, null} — select thay input tu do.
+    const gl = h('label', 'cd-field');
+    gl.append(h('span', 'muted', 'Giới tính'));
+    const gsel = h('select', 'cd-input');
+    for (const [v, lbl] of [['', '—'], ['Nam', 'Nam'], ['Nữ', 'Nữ']]) {
+      const o = h('option', '', lbl);
+      o.value = v;
+      if ((p.gioi_tinh || '') === v) o.selected = true;
+      gsel.append(o);
+    }
+    gsel.disabled = ro;
+    gsel.setAttribute('aria-label',
+      `Giới tính — ${p.ho_ten || 'người'}`);
+    gsel.onchange = () => model.updatePersonField(
+      p.row_id, 'gioi_tinh', gsel.value);
+    gl.append(gsel);
+    for (const fe of errs.filter((e) => e.field === 'gioi_tinh')) {
+      gl.append(h('span', 'cd-field-err error', fe.message));
+    }
+    det.append(gl);
     det.append(field('Ngày sinh', 'ngay_sinh', p.ngay_sinh));
     det.append(field('Ngày mất', 'ngay_chet', p.ngay_chet));
     det.append(field('Số giấy tờ', 'so_giay_to', p.so_giay_to));
+    det.append(field('Ngày cấp', 'ngay_cap', p.ngay_cap));
+    det.append(field('Nơi cấp', 'noi_cap', p.noi_cap));
     det.append(field('Địa chỉ', 'dia_chi', p.dia_chi));
+    det.append(field('Nguyên quán', 'place_of_origin',
+                     p.place_of_origin));
     wrap.append(det);
     return wrap;
   }
@@ -336,7 +434,9 @@ function createNotaryModuleView(deps) {
         `Xóa tài sản ${a.so_serial || ''}`.trim());
       wrap.append(del);
     }
-    const det = h('div', 'cd-row-detail');
+    // MIN-120/122: form NHOM TRUONG XEP DOC (khong phai bang/column) —
+    // du asset_row §4.2 + editor land_rows.
+    const det = h('div', 'cd-row-detail cd-field-stack');
     const ro = !model.canWrite();
     const field = (label, key, val) => {
       const lab = h('label', 'cd-field');
@@ -354,10 +454,6 @@ function createNotaryModuleView(deps) {
       }
       return lab;
     };
-    det.append(field('Số serial', 'so_serial', a.so_serial));
-    det.append(field('Địa chỉ', 'dia_chi', a.dia_chi));
-    det.append(field('Thửa đất', 'so_thua_dat', a.so_thua_dat));
-    det.append(field('Tờ bản đồ', 'so_to_ban_do', a.so_to_ban_do));
     const prim = h('label', 'cd-field cd-field-check');
     const cb = h('input');
     cb.type = 'checkbox';
@@ -368,8 +464,66 @@ function createNotaryModuleView(deps) {
       a.row_id, 'is_primary', cb.checked);
     prim.append(cb, h('span', '', 'Tài sản chính'));
     det.append(prim);
+    det.append(field('Số serial', 'so_serial', a.so_serial));
+    det.append(field('Số vào sổ', 'so_vao_so', a.so_vao_so));
+    det.append(field('Thửa đất', 'so_thua_dat', a.so_thua_dat));
+    det.append(field('Tờ bản đồ', 'so_to_ban_do', a.so_to_ban_do));
+    det.append(field('Địa chỉ', 'dia_chi', a.dia_chi));
+    det.append(field('Loại sổ', 'loai_so', a.loai_so));
+    det.append(field('Hình thức sử dụng', 'hinh_thuc_su_dung',
+                     a.hinh_thuc_su_dung));
+    det.append(field('Thời hạn', 'thoi_han', a.thoi_han));
+    det.append(field('Nguồn gốc', 'nguon_goc', a.nguon_goc));
+    det.append(field('Ngày cấp', 'ngay_cap', a.ngay_cap));
+    det.append(field('Cơ quan cấp', 'co_quan_cap', a.co_quan_cap));
+    det.append(landRowsEl(a, ro));
     wrap.append(det);
     return wrap;
+  }
+
+  // Editor land_rows[] — moi dong {loai_dat, dien_tich, thoi_han}.
+  function landRowsEl(a, ro) {
+    const rows = Array.isArray(a.land_rows) ? a.land_rows : [];
+    const box = h('div', 'cd-landrows');
+    box.append(h('div', 'muted', 'Thửa đất theo loại (land_rows)'));
+    const commit = (list) => model.updateAssetField(
+      a.row_id, 'land_rows', list);
+    rows.forEach((lr, i) => {
+      const rowEl = h('div', 'cd-landrow');
+      const mk = (key, label, val) => {
+        const inp = h('input', 'cd-input');
+        inp.value = val == null ? '' : String(val);
+        inp.placeholder = label;
+        inp.disabled = ro;
+        inp.setAttribute('aria-label',
+          `${label} — thửa ${i + 1} — ${a.so_serial || 'tài sản'}`);
+        inp.onchange = () => {
+          const next = rows.map((x, j) => j === i
+            ? { ...x, [key]: inp.value === '' ? null
+                : (key === 'dien_tich' ? Number(inp.value) : inp.value) }
+            : x);
+          commit(next);
+        };
+        return inp;
+      };
+      rowEl.append(mk('loai_dat', 'Loại đất', lr.loai_dat));
+      rowEl.append(mk('dien_tich', 'Diện tích', lr.dien_tich));
+      rowEl.append(mk('thoi_han', 'Thời hạn', lr.thoi_han));
+      const del = btn('✕', 'cd-del', () => {
+        commit(rows.filter((_, j) => j !== i));
+      });
+      del.disabled = ro;
+      del.setAttribute('aria-label', `Xóa thửa ${i + 1}`);
+      rowEl.append(del);
+      box.append(rowEl);
+    });
+    const add = btn('+ Thửa đất', '', () => {
+      commit(rows.concat([{ loai_dat: null, dien_tich: null,
+                            thoi_han: null }]));
+    });
+    add.disabled = ro;
+    box.append(add);
+    return box;
   }
 
   function stageTierEl() {
@@ -406,26 +560,48 @@ function createNotaryModuleView(deps) {
     const pHead = h('div', 'cd-card-head');
     pHead.append(h('h3', 'cd-card-title', 'Người'));
     const pTools = h('div', 'cd-card-tools');
-    const intakeExcel = btn('Nhập Excel', '', () => openIntakeDialog('xlsx'));
-    const intakeOcr = btn('OCR giấy tờ', '', () => openIntakeDialog('image'));
+    // MIN-122: mot nut Nhap du lieu chung — khong preset kind; cung
+    // dialog/pipeline cho ca Nguoi va Tai san (image/pdf/docx/xlsx/text).
+    const intakeP = btn('Nhập dữ liệu', '', () => openIntakeDialog(null));
     const addP = btn('+ Người', '', () => model.addPerson());
-    intakeExcel.disabled = !model.canWrite();
-    intakeOcr.disabled = !model.canWrite();
+    intakeP.disabled = !model.canWrite();
     addP.disabled = !model.canWrite();
-    const commit = btn('Cập nhật', 'primary', async () => {
-      const r = await model.commitStage();
-      if (!r.ok && r.error && r.error.code !== 'stage_validation_error' &&
-          r.error.code !== 'workspace_conflict') {
-        notify(`${r.error.code}: ${r.error.message}`, true);
+    let primary;
+    if (s.caseId == null) {
+      // Nhap moi: duong luu duy nhat la Lưu hồ sơ → workspace_create
+      // (draft-first §4.3); commit Stage/revision chay SAU khi tao.
+      primary = btn('Lưu hồ sơ', 'primary', async () => {
+        const r = await model.saveDraft();
+        if (!r.ok && r.error &&
+            r.error.code !== 'stage_validation_error' &&
+            r.error.code !== 'diagram_invalid_state' &&
+            r.error.code !== 'workspace_owner_required') {
+          notify(`${r.error.code}: ${r.error.message}`, true);
+        }
+      });
+      if (s.stageDirty || s.diagramDirty || s.metaDirty) {
+        primary.append(h('span', 'cd-dirty-dot', ''));
       }
-    });
-    if (s.stageDirty) {
-      commit.append(h('span', 'cd-dirty-dot', ''));
-      commit.setAttribute('aria-label', 'Cập nhật — có thay đổi chưa lưu');
+      primary.disabled = !model.canWrite() ||
+        s.busy === 'notary.workspace_create';
+    } else {
+      primary = btn('Cập nhật', 'primary', async () => {
+        const r = await model.commitStage();
+        if (!r.ok && r.error &&
+            r.error.code !== 'stage_validation_error' &&
+            r.error.code !== 'workspace_conflict') {
+          notify(`${r.error.code}: ${r.error.message}`, true);
+        }
+      });
+      if (s.stageDirty) {
+        primary.append(h('span', 'cd-dirty-dot', ''));
+        primary.setAttribute('aria-label',
+          'Cập nhật — có thay đổi chưa lưu');
+      }
+      primary.disabled = !model.canWrite() || !s.stageDirty ||
+        s.busy === 'notary.workspace_commit_stage';
     }
-    commit.disabled = !model.canWrite() || !s.stageDirty ||
-      s.busy === 'notary.workspace_commit_stage';
-    pTools.append(intakeExcel, intakeOcr, addP, commit);
+    pTools.append(intakeP, addP, primary);
     pHead.append(pTools);
     pc.append(pHead);
     const pBody = h('div', 'cd-card-body');
@@ -572,6 +748,8 @@ function createNotaryModuleView(deps) {
       eb.append(x);
       root.append(eb);
     }
+    const meta = draftMetaEl();
+    if (meta) root.append(meta);         // form meta nhap moi (§4.3)
     root.append(stageTierEl());
     root.append(relationTierEl());
     return root;
@@ -618,7 +796,8 @@ function createNotaryModuleView(deps) {
     }
   };
 
-  panels.overview.append(buildCaseListPanel(openCaseInDrafting));
+  panels.overview.append(buildCaseListPanel(openCaseInDrafting,
+    () => { model.newDraft(); activeTab = 'drafting'; rerender(); }));
   const wordPlaceholder = face(L.faceEmpty(
     'Tab Word — nội dung surface văn bản ở lát cắt sau (spec §1). ' +
     'Điểm vào xuất Word nằm trong Soạn hồ sơ → Xuất Word.'));

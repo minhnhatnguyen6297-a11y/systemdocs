@@ -563,3 +563,207 @@ def test_word_export_batch_locked_case(adapter_db, tmp_path):
             "case_id": case.id, "document_keys": ["khai_nhan_di_san"],
             "destination": _dest(tmp_path)})
     assert exc.value.code == "workspace_locked"
+
+
+# ------------------------------------------------------- workspace_create
+
+
+_UNSET = object()
+
+
+def _create_payload(people, assets, state, key=_UNSET, case_meta=_UNSET):
+    return {
+        "idempotency_key": key if key is not _UNSET else _uuid4(),
+        "case": (case_meta if case_meta is not _UNSET
+                 else {"document_type": "khai_nhan"}),
+        "stage": {"people": people, "assets": assets},
+        "diagram": {"state": state},
+    }
+
+
+def _create_args():
+    owner = _person_row(
+        ho_ten="Nguyen Van An", ngay_sinh="1950", ngay_chet="2011-05-15",
+        so_giay_to="001234567890")
+    spouse = _person_row(
+        ho_ten="Tran Thi Binh", gioi_tinh="Nữ", ngay_sinh="1955-03-02",
+        ngay_chet=None, so_giay_to="009876543210")
+    state = {"version": 2, "nodes": [
+        _diagram_node("owner", owner["row_id"], spouse="spouse",
+                      owner=True, receive=False),
+        _diagram_node("spouse", spouse["row_id"], spouse="owner"),
+    ]}
+    return [owner, spouse], [_asset_row()], state
+
+
+def test_registry_wires_workspace_create():
+    assert "notary.workspace_create" in reg.COMMANDS
+    assert callable(reg.COMMANDS["notary.workspace_create"])
+
+
+def test_workspace_create_contract_shape(adapter_db):
+    people, assets, state = _create_args()
+    res = notary_adapter.workspace_create(
+        _Job(), _create_payload(people, assets, state, case_meta={
+            "document_type": "khai_nhan", "ngay_lap_ho_so": "2026-09-26",
+            "noi_niem_yet": "xa Yen So", "ghi_chu": "Nhap"}))
+    assert res["kind"] == "workspace_create"
+    data = res["data"]
+    assert data["schema_version"] == "notary.case-drafting.v1"
+    assert data["backend_mode"] == "real"
+    assert data["created"] is True
+    c = data["case"]
+    assert c["case_type"] == "inheritance"
+    assert c["status"] == "draft" and c["locked"] is False
+    assert c["revision"] == 1
+    assert c["ngay_lap_ho_so"] == "2026-09-26"
+    assert c["noi_niem_yet"] == "xa Yen So"
+    assert c["ghi_chu"] == "Nhap"
+    assert all(p["entity_id"] for p in data["stage"]["people"])
+    assert data["diagram"]["state"]["version"] == 2
+    assert data["diagram"]["render_model"]["engineVersion"] == 2
+    assert data["capabilities"]["word_export"] is True
+    # doc lai bang workspace_get — case ton tai that
+    got = notary_adapter.workspace_get(_Job(), {"case_id": c["id"]})
+    assert got["data"]["case"]["revision"] == 1
+
+
+def test_workspace_create_idempotent_replay(adapter_db):
+    people, assets, state = _create_args()
+    key = _uuid4()
+    first = notary_adapter.workspace_create(
+        _Job(), _create_payload(people, assets, state, key=key))
+    second = notary_adapter.workspace_create(
+        _Job(), _create_payload(people, assets, state, key=key))
+    assert first["data"]["created"] is True
+    assert second["data"]["created"] is False
+    assert second["data"]["case"]["id"] == first["data"]["case"]["id"]
+    assert adapter_db.query(InheritanceCase).count() == 1
+    # key khac = case moi
+    third = notary_adapter.workspace_create(
+        _Job(), _create_payload(people, assets, state, key=_uuid4()))
+    assert third["data"]["created"] is True
+    assert third["data"]["case"]["id"] != first["data"]["case"]["id"]
+
+
+def test_workspace_create_bad_key_and_meta(adapter_db):
+    people, assets, state = _create_args()
+    for bad_key in (None, "nope", 42, str(uuid.uuid1())):
+        with pytest.raises(CommandError) as exc:
+            notary_adapter.workspace_create(
+                _Job(), _create_payload(people, assets, state, key=bad_key))
+        assert exc.value.code == "validation_error", bad_key
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.workspace_create(
+            _Job(), _create_payload(
+                people, assets, state, case_meta={"document_type": "khac"}))
+    assert exc.value.code == "validation_error"
+    assert adapter_db.query(InheritanceCase).count() == 0
+
+
+def test_workspace_create_owner_and_stage_errors(adapter_db):
+    people, assets, _state = _create_args()
+    # thieu owner -> workspace_owner_required
+    no_owner = {"version": 2, "nodes": [
+        _diagram_node("owner", None, owner=True, receive=False)]}
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.workspace_create(
+            _Job(), _create_payload(people, assets, no_owner))
+    assert exc.value.code == "workspace_owner_required"
+    # entity_id non-null tren nhap -> stage_validation_error
+    bad_people = [dict(people[0], entity_id=5), people[1]]
+    state = {"version": 2, "nodes": [
+        _diagram_node("owner", people[0]["row_id"], spouse="spouse",
+                      owner=True, receive=False),
+        _diagram_node("spouse", people[1]["row_id"], spouse="owner")]}
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.workspace_create(
+            _Job(), _create_payload(bad_people, assets, state))
+    assert exc.value.code == "stage_validation_error"
+    assert adapter_db.query(InheritanceCase).count() == 0
+
+
+def test_workspace_create_missing_stage_or_diagram(adapter_db):
+    people, assets, state = _create_args()
+    payload = _create_payload(people, assets, state)
+    del payload["stage"]
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.workspace_create(_Job(), payload)
+    assert exc.value.code == "validation_error"
+    payload = _create_payload(people, assets, state)
+    del payload["diagram"]
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.workspace_create(_Job(), payload)
+    assert exc.value.code == "validation_error"
+
+
+# --------------------------------------------- diagram_evaluate draft mode
+
+
+def _draft_stage():
+    return {
+        "people": [
+            _person_row(ho_ten="Nguyen Van An", ngay_sinh="1950",
+                        ngay_chet="2011-05-15"),
+            _person_row(ho_ten="Tran Thi Binh", gioi_tinh="Nữ",
+                        ngay_chet=None),
+        ],
+        "assets": [],
+    }
+
+
+def test_diagram_evaluate_draft_mode(adapter_db):
+    stage = _draft_stage()
+    rows = [p["row_id"] for p in stage["people"]]
+    state = {"version": 2, "nodes": [
+        _diagram_node("owner", rows[0], spouse="spouse",
+                      owner=True, receive=False),
+        _diagram_node("spouse", rows[1], spouse="owner")]}
+    res = notary_adapter.diagram_evaluate(_Job(), {
+        "stage": stage, "diagram": {"state": state}})
+    assert res["kind"] == "diagram_evaluate"
+    data = res["data"]
+    assert data["schema_version"] == "notary.case-drafting.v1"
+    assert data["evaluated_revision"] is None
+    assert data["render_model"]["engineVersion"] == 2
+    # read-only tuyet doi — khong ghi DB
+    assert adapter_db.query(InheritanceCase).count() == 0
+
+
+def test_diagram_evaluate_null_case_id_is_validation_error(adapter_db):
+    stage = _draft_stage()
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.diagram_evaluate(_Job(), {
+            "case_id": None, "stage": stage,
+            "diagram": {"state": {"version": 2, "nodes": []}}})
+    assert exc.value.code == "validation_error"
+
+
+def test_diagram_evaluate_draft_requires_stage(adapter_db):
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.diagram_evaluate(_Job(), {
+            "diagram": {"state": {"version": 2, "nodes": []}}})
+    assert exc.value.code == "validation_error"
+
+
+def test_diagram_evaluate_draft_stage_errors(adapter_db):
+    stage = _draft_stage()
+    stage["people"][0]["ho_ten"] = "   "
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.diagram_evaluate(_Job(), {
+            "stage": stage,
+            "diagram": {"state": {"version": 2, "nodes": []}}})
+    assert exc.value.code == "stage_validation_error"
+    assert exc.value.details["field_errors"]
+
+
+def test_diagram_evaluate_draft_outside_stage(adapter_db):
+    stage = _draft_stage()
+    state = {"version": 2, "nodes": [
+        _diagram_node("owner", stage["people"][0]["row_id"],
+                      owner=True, receive=False),
+        _diagram_node("child", str(uuid.uuid4()), parents=("owner",))]}
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.diagram_evaluate(_Job(), {
+            "stage": stage, "diagram": {"state": state}})
+    assert exc.value.code == "diagram_reference_outside_stage"

@@ -5,10 +5,29 @@
   "definitions": {
     "evaluate_payload": {
       "type": "object",
-      "required": ["case_id", "diagram"],
+      "required": ["diagram"],
       "additionalProperties": false,
       "properties": {
-        "case_id": { "type": "integer", "minimum": 1 },
+        "case_id": {
+          "type": "integer", "minimum": 1,
+          "description": "rev 1.1: absent = chế độ nháp (khi đó stage bắt buộc); null → validation_error"
+        },
+        "stage": {
+          "type": "object",
+          "required": ["people", "assets"],
+          "additionalProperties": false,
+          "description": "rev 1.1: bắt buộc khi case_id absent; cấm khi case_id present",
+          "properties": {
+            "people": {
+              "type": "array",
+              "items": { "$ref": "common.schema.json#/definitions/person_row" }
+            },
+            "assets": {
+              "type": "array",
+              "items": { "$ref": "common.schema.json#/definitions/asset_row" }
+            }
+          }
+        },
         "diagram": {
           "type": "object",
           "required": ["state"],
@@ -17,7 +36,17 @@
             "state": { "$ref": "common.schema.json#/definitions/diagram_state" }
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "not": { "required": ["case_id"] } },
+          "then": { "required": ["stage"] }
+        },
+        {
+          "if": { "required": ["case_id"] },
+          "then": { "not": { "required": ["stage"] } }
+        }
+      ]
     },
     "evaluate_result_data": {
       "type": "object",
@@ -25,7 +54,10 @@
       "additionalProperties": false,
       "properties": {
         "schema_version": { "$ref": "common.schema.json#/definitions/schema_version" },
-        "evaluated_revision": { "type": "integer", "minimum": 1 },
+        "evaluated_revision": {
+          "type": ["integer", "null"], "minimum": 1,
+          "description": "rev 1.1: null trong chế độ nháp"
+        },
         "render_model": { "$ref": "common.schema.json#/definitions/render_model" }
       }
     },

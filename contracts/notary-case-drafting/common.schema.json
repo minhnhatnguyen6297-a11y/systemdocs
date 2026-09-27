@@ -440,7 +440,8 @@
         "code": {
           "enum": [
             "required", "invalid_type", "invalid_enum", "invalid_date",
-            "invalid_format", "duplicate_row_id", "primary_count"
+            "invalid_format", "duplicate_row_id", "primary_count",
+            "duplicate_entity"
           ]
         },
         "message": { "type": "string" }

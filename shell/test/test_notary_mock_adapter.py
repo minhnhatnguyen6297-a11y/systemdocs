@@ -41,6 +41,7 @@ _spec.loader.exec_module(ncd)
 
 DRAFTING_COMMANDS = [
     "notary.workspace_get",
+    "notary.workspace_create",
     "notary.intake_analyze",
     "notary.workspace_commit_stage",
     "notary.diagram_evaluate",
@@ -286,6 +287,152 @@ class TestWorkspaceGet:
         with pytest.raises(CommandError) as exc:
             _call("workspace_get", {"case_id": 9999})
         assert exc.value.code == "case_not_found"
+
+
+# ---------- workspace_create (MIN-121/122 §4.3) ----------
+
+_NEW_UNSET = object()
+
+
+def _mk_person(**kw):
+    row = {
+        "row_id": str(uuid.uuid4()), "entity_id": None,
+        "ho_ten": "Người Mẫu A", "gioi_tinh": "Nam",
+        "ngay_sinh": "1950", "ngay_chet": "2020-01-15",
+        "so_giay_to": None, "ngay_cap": None, "noi_cap": None,
+        "dia_chi": None, "place_of_origin": None,
+    }
+    row.update(kw)
+    return row
+
+
+def _mk_asset(**kw):
+    row = {
+        "row_id": str(uuid.uuid4()), "entity_id": None, "is_primary": True,
+        "so_serial": "MM000001", "so_vao_so": None, "so_thua_dat": None,
+        "so_to_ban_do": None, "dia_chi": "Địa chỉ mẫu tài sản 1",
+        "loai_so": None, "hinh_thuc_su_dung": None, "thoi_han": None,
+        "nguon_goc": None, "ngay_cap": None, "co_quan_cap": None,
+        "land_rows": None,
+    }
+    row.update(kw)
+    return row
+
+
+def _create_payload(key=_NEW_UNSET, case_meta=_NEW_UNSET):
+    owner = _mk_person()
+    spouse = _mk_person(ho_ten="Người Mẫu B", gioi_tinh="Nữ",
+                        ngay_chet=None)
+    return {
+        "idempotency_key": (key if key is not _NEW_UNSET
+                            else str(uuid.uuid4())),
+        "case": (case_meta if case_meta is not _NEW_UNSET
+                 else {"document_type": "khai_nhan"}),
+        "stage": {"people": [owner, spouse], "assets": [_mk_asset()]},
+        "diagram": {"state": {"version": 2, "nodes": [
+            _node("owner", owner["row_id"], spouse="spouse", owner=True,
+                  receive=False),
+            _node("spouse", spouse["row_id"], spouse="owner"),
+        ]}},
+    }
+
+
+class TestWorkspaceCreate:
+    def test_create_success_shape(self):
+        res = _call("workspace_create", _create_payload(
+            case_meta={"document_type": "khai_nhan",
+                       "ngay_lap_ho_so": "2026-09-26",
+                       "noi_niem_yet": "xã Mẫu", "ghi_chu": "Nháp"}))
+        assert res["kind"] == "workspace_create"
+        data = res["data"]
+        assert data["schema_version"] == "notary.case-drafting.v1"
+        assert data["backend_mode"] == "mock"
+        assert data["created"] is True
+        c = data["case"]
+        assert c["case_type"] == "inheritance"
+        assert c["status"] == "draft" and c["locked"] is False
+        assert c["revision"] == 1
+        assert c["ngay_lap_ho_so"] == "2026-09-26"
+        assert c["noi_niem_yet"] == "xã Mẫu"
+        assert c["ghi_chu"] == "Nháp"
+        assert all(p["entity_id"] for p in data["stage"]["people"])
+        assert data["diagram"]["state"]["version"] == 2
+        assert data["diagram"]["render_model"]["engineVersion"] == 2
+        assert data["capabilities"]["word_export"] is True
+        # case ton tai — get lai duoc
+        got = _call("workspace_get", {"case_id": c["id"]})
+        assert got["data"]["case"]["revision"] == 1
+
+    def test_idempotent_replay(self):
+        key = str(uuid.uuid4())
+        first = _call("workspace_create", _create_payload(key=key))
+        second = _call("workspace_create", _create_payload(key=key))
+        assert first["data"]["created"] is True
+        assert second["data"]["created"] is False
+        assert second["data"]["case"]["id"] == first["data"]["case"]["id"]
+        third = _call("workspace_create", _create_payload())
+        assert third["data"]["created"] is True
+        assert third["data"]["case"]["id"] != first["data"]["case"]["id"]
+
+    def test_bad_idempotency_key(self):
+        for bad in (None, "nope", 42, str(uuid.uuid1())):
+            with pytest.raises(CommandError) as exc:
+                _call("workspace_create", _create_payload(key=bad))
+            assert exc.value.code == "validation_error", bad
+
+    def test_missing_owner(self):
+        p = _create_payload()
+        p["diagram"]["state"]["nodes"][0]["personId"] = None
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_create", p)
+        assert exc.value.code == "workspace_owner_required"
+
+    def test_entity_id_non_null_rejected(self):
+        p = _create_payload()
+        p["stage"]["people"][0]["entity_id"] = 5
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_create", p)
+        assert exc.value.code == "stage_validation_error"
+        assert exc.value.details["field_errors"]
+
+    def test_empty_stage(self):
+        p = _create_payload()
+        p["stage"]["people"] = []
+        p["stage"]["assets"] = []
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_create", p)
+        assert exc.value.code == "stage_validation_error"
+
+    def test_no_primary_asset(self):
+        p = _create_payload()
+        p["stage"]["assets"][0]["is_primary"] = False
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_create", p)
+        assert exc.value.code == "stage_validation_error"
+
+    def test_outside_stage_person(self):
+        p = _create_payload()
+        p["diagram"]["state"]["nodes"].append(
+            _node("child_1", str(uuid.uuid4()), parents=("owner",)))
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_create", p)
+        assert exc.value.code == "diagram_reference_outside_stage"
+
+    def test_case_meta_invalid(self):
+        for meta in ({"document_type": "khac"},
+                     {"document_type": "khai_nhan",
+                      "ngay_lap_ho_so": "26/09/2026"},
+                     {"document_type": "khai_nhan", "noi_niem_yet": "  "}):
+            with pytest.raises(CommandError) as exc:
+                _call("workspace_create",
+                      _create_payload(case_meta=meta))
+            assert exc.value.code == "validation_error", meta
+
+    def test_contract_shape_via_validator(self):
+        payload = _create_payload()
+        res = _call("workspace_create", payload)
+        _assert_contract(_job_doc(
+            "notary.workspace_create", payload, result=res))
 
 
 # ---------- workspace_commit_stage ----------
@@ -560,6 +707,21 @@ class TestIntakeAnalyze:
             _call("intake_analyze", {"case_id": 44, "sources": [s]})
         assert exc.value.code == "workspace_locked"
 
+    def test_draft_mode_no_case_id(self):
+        """§2.1a — case_id absent = nhap moi; bo qua kiem tra case."""
+        sid = "aaaaaaaa-0000-4000-8000-000000000009"
+        payload = {"sources": [self._text_src(sid, "Người Mẫu I, sinh 1950")]}
+        res = _call("intake_analyze", payload)
+        assert res["data"]["suggestions"][0]["source_id"] == sid
+        _assert_contract(_job_doc("notary.intake_analyze", payload,
+                                  result=res))
+
+    def test_null_case_id_is_validation_error(self):
+        s = self._text_src("aaaaaaaa-0000-4000-8000-000000000001", "x")
+        with pytest.raises(CommandError) as exc:
+            _call("intake_analyze", {"case_id": None, "sources": [s]})
+        assert exc.value.code == "validation_error"
+
 
 # ---------- diagram_evaluate / diagram_save ----------
 
@@ -610,6 +772,57 @@ class TestDiagram:
                   {"case_id": 42, "diagram": {"state": state}})
         assert exc.value.code == "diagram_invalid_state"
         assert exc.value.details["errors"]
+
+    def test_evaluate_draft_mode(self):
+        """§2.1a/§7.4 — case_id absent + stage payload; khong tao case."""
+        owner = _mk_person()
+        spouse = _mk_person(ho_ten="Người Mẫu B", gioi_tinh="Nữ",
+                            ngay_chet=None)
+        stage = {"people": [owner, spouse], "assets": [_mk_asset()]}
+        state = {"version": 2, "nodes": [
+            _node("owner", owner["row_id"], spouse="spouse", owner=True,
+                  receive=False),
+            _node("spouse", spouse["row_id"], spouse="owner"),
+        ]}
+        res = _call("diagram_evaluate",
+                    {"stage": stage, "diagram": {"state": state}})
+        data = res["data"]
+        assert data["schema_version"] == "notary.case-drafting.v1"
+        assert data["evaluated_revision"] is None
+        assert data["render_model"]["engineVersion"] == 2
+        # khong ghi gi vao state — case list khong thay doi
+        before = _call("case_list", {})["data"]["total"]
+        _call("diagram_evaluate",
+              {"stage": stage, "diagram": {"state": state}})
+        assert _call("case_list", {})["data"]["total"] == before
+
+    def test_evaluate_draft_outside_stage(self):
+        stage = {"people": [_mk_person()], "assets": [_mk_asset()]}
+        state = {"version": 2, "nodes": [
+            _node("owner", stage["people"][0]["row_id"], owner=True,
+                  receive=False),
+            _node("child", str(uuid.uuid4()), parents=("owner",)),
+        ]}
+        with pytest.raises(CommandError) as exc:
+            _call("diagram_evaluate",
+                  {"stage": stage, "diagram": {"state": state}})
+        assert exc.value.code == "diagram_reference_outside_stage"
+
+    def test_evaluate_draft_stage_errors(self):
+        stage = {"people": [_mk_person(ho_ten="   ")],
+                 "assets": [_mk_asset()]}
+        with pytest.raises(CommandError) as exc:
+            _call("diagram_evaluate", {
+                "stage": stage,
+                "diagram": {"state": {"version": 2, "nodes": []}}})
+        assert exc.value.code == "stage_validation_error"
+        assert exc.value.details["field_errors"]
+
+    def test_evaluate_draft_requires_stage(self):
+        with pytest.raises(CommandError) as exc:
+            _call("diagram_evaluate", {
+                "diagram": {"state": {"version": 2, "nodes": []}}})
+        assert exc.value.code == "validation_error"
 
     def test_evaluate_missing_diagram_is_validation_error(self):
         """diagram/diagram.state thieu -> validation_error; state co mat

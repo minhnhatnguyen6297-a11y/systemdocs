@@ -53,13 +53,14 @@ là **tiện ích shell**, không phải module nghiệp vụ.
 ## 2. Luồng sản phẩm đã khóa (đích Electron)
 
 ```text
-Mở hồ sơ từ Tổng quan
-  → tải Workspace
+Mở hồ sơ từ Tổng quan — hoặc — Hồ sơ mới (nháp)
+  → tải Workspace               → Stage/Diagram trống, nháp chỉ trong phiên
   → nhập file / dán text / nhập Excel / thêm tay
   → kiểm tra các gợi ý Người và Tài sản
   → đưa gợi ý đã chọn vào Stage (vẫn là draft UI)
-  → bấm Cập nhật Stage
-  → backend kiểm tra và commit toàn bộ Stage
+  → bấm Cập nhật Stage                       → bấm Lưu hồ sơ
+  → backend kiểm tra và commit toàn bộ Stage  → backend tạo hồ sơ + Stage +
+                                                Diagram trong một transaction
   → Pool tự tính lại
   → kéo thả hoặc chọn menu để gán quan hệ trên sơ đồ
   → backend đánh giá, báo thiếu/sai, trả kết quả tính
@@ -70,10 +71,13 @@ Mở hồ sơ từ Tổng quan
   → hiển thị Đã lưu/Lỗi cho từng văn bản
 ```
 
-- Điểm vào là **hồ sơ có sẵn** mở từ `Tổng quan hồ sơ`. V1 Electron không có
-  đường "hồ sơ mới qua hidden state" như web hiện hành
-  (`notary_v2/docs/domains/inheritance/workflow.md` L105); tạo hồ sơ là luồng
-  riêng, ngoài spec này.
+- Điểm vào là **hồ sơ có sẵn** mở từ `Tổng quan hồ sơ`, **hoặc nháp mới**
+  qua nút `Hồ sơ mới` trên Tổng quan (MIN-121/122). Nháp mới chỉ sống trong
+  phiên (§6); `Lưu hồ sơ` lần đầu gọi `notary.workspace_create` — bắt buộc
+  một node `owner` đã gán người và đúng một tài sản `is_primary`; sau lưu
+  hồ sơ trở thành hồ sơ thường theo luồng revision hiện có. V1 Electron
+  không có đường "hồ sơ mới qua hidden state" như web hiện hành
+  (`notary_v2/docs/domains/inheritance/workflow.md` L105).
 - Mọi kết quả nhập từ file/text/Excel/OCR là **gợi ý chờ người kiểm tra**;
   đưa vào Stage và bấm `Cập nhật` mới là xác nhận. Không có bước nào tự ghi
   vào hồ sơ (semantics suggestion → `drafting-tab.md` §5).
@@ -87,9 +91,15 @@ Mở hồ sơ từ Tổng quan
 - **Tầng Stage** ngay dưới thanh ngữ cảnh:
   - card `Tài sản` bên trái, rộng khoảng **36%**; đầu card có `Nhập dữ liệu`,
     `+ Tài sản`;
-  - card `Người` bên phải, rộng khoảng **64%**; đầu card có `Nhập Excel`,
-    `OCR giấy tờ`, `+ Người`, `Cập nhật`;
-  - chỉ hiện trường quan trọng trên dòng; bấm dòng mở phần chi tiết.
+  - card `Người` bên phải, rộng khoảng **64%**; đầu card có `Nhập dữ liệu`,
+    `+ Người`, `Cập nhật` (hoặc `Lưu hồ sơ` khi đang là nháp mới);
+  - **một nút `Nhập dữ liệu` duy nhất** trên mỗi card, cùng mở một dialog
+    intake chung nhận ảnh/PDF/Word/Excel/text — không còn `Nhập Excel` và
+    `OCR giấy tờ` tách riêng;
+  - mọi dòng hiện **ô nhập ngay** (inline edit, nhãn trường luôn thấy, lỗi
+    nằm ngay trường) — không còn bấm dòng mở phần chi tiết. Tài sản hiện
+    dạng **biểu mẫu nhóm trường xếp nối tiếp chiều dọc** (diễn giải
+    26/09/2026 — thay hướng "cột" từng đề xuất ở MIN-120).
 - **Tầng quan hệ** ngay dưới Stage:
   - `Pool` bên trái khoảng **22%** — danh sách thẻ Người/Tài sản chưa được
     gán trên sơ đồ (định nghĩa chuẩn của Pool → `drafting-tab.md` §2);
@@ -113,10 +123,11 @@ Mở hồ sơ từ Tổng quan
 
 | Vị trí | Nút/thao tác | Màn hình con/kết quả | Dữ liệu được phép đổi |
 |---|---|---|---|
-| Tài sản | `Nhập dữ liệu` | Popup nhận ảnh/PDF/Word/text | Chỉ tạo gợi ý; chưa đổi Stage |
-| Người | `Nhập Excel` | Cùng popup intake, lọc `.xlsx` | Chỉ tạo gợi ý; chưa đổi Stage |
-| Người | `OCR giấy tờ` | Chọn ảnh/PDF → review kết quả | Chỉ tạo gợi ý; chưa đổi Stage |
-| Stage | `+ Người`, `+ Tài sản` | Drawer/form ngắn | Thêm dòng draft UI |
+| Tổng quan | `Hồ sơ mới` | Vào `Soạn hồ sơ` ở trạng thái nháp | Chỉ tạo nháp phiên; chưa ghi DB |
+| Nháp mới | `Lưu hồ sơ` | Lỗi nằm ngay đúng dòng; thành công → hồ sơ thường | `workspace_create` trong một transaction |
+| Tài sản | `Nhập dữ liệu` | Popup intake chung ảnh/PDF/Word/Excel/text | Chỉ tạo gợi ý; chưa đổi Stage |
+| Người | `Nhập dữ liệu` | Cùng popup intake chung (không preset) | Chỉ tạo gợi ý; chưa đổi Stage |
+| Stage | `+ Người`, `+ Tài sản` | Dòng mới với ô nhập ngay | Thêm dòng draft UI |
 | Stage | `✕` trên dòng | Không mở popup | Xóa dòng draft; chỉ có hiệu lực sau `Cập nhật` |
 | Stage | `Cập nhật` | Lỗi nằm ngay đúng dòng; thành công cập nhật Pool | Commit Stage theo một transaction |
 | Pool | Kéo thả thẻ | Gợi ý slot trên Diagram | Chỉ đổi draft Diagram |
@@ -145,6 +156,7 @@ này không chế tên trạng thái riêng.
 | 3 | Hồ sơ đã khóa | Read-only | Toàn bộ trường chỉ đọc; vẫn xem/sao chép được; mọi nút ghi bị vô hiệu |
 | 4 | Stage rỗng / Pool rỗng / Diagram chưa gán | Empty | Mô tả trống + hành động đầu tiên (`Nhập dữ liệu`, `+ Người`, `+ Tài sản`) |
 | 5 | Có draft chưa cập nhật | Dirty indicator | Badge trên `Cập nhật`; rời màn → cảnh báo (§6) |
+| 5b | Nháp mới chưa từng lưu | Dirty + badge `Hồ sơ nháp` | Nút `Lưu hồ sơ` thay `Cập nhật`; rời màn → cùng cảnh báo (§6) |
 | 6 | OCR/import thành công một phần | `partial` theo từng nguồn | Nguồn lỗi báo đúng nguồn đó; gợi ý thành công vẫn hiển thị để review |
 | 7 | Stage validation lỗi | Error inline | Lỗi nằm ngay đúng dòng/trường; Stage không đổi nếu còn lỗi |
 | 8 | `workspace_conflict` (revision cũ) | Conflict dialog | Cho tải bản mới hoặc giữ bản nháp để sao chép; không nút "ghi đè cưỡng bức" |
