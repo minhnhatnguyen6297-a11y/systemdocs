@@ -17,18 +17,8 @@ của ba sản phẩm nghiệp vụ và shell. Đích mới dành `zalo/` cho mo
 | `notary_v2/` | `notary_v2` branch `consolidate/latest` | FastAPI nghiệp vụ công chứng (đã gộp 4 nhánh codex) |
 | `upload_lab/` | `upload_lab` branch `consolidate/latest` | Số hóa + upload (đã gộp 2 nhánh POC) |
 | `notaryoffice/` | `notaryoffice` `main` | Tài liệu intent, chưa có code |
-| `zalo/` | Repo Zalo độc lập (chưa tạo; `D:\zalo-intake` là đường dẫn local dự kiến) | Đích chuyển toàn engine Zalo; folder chưa có runtime |
 
-Các dòng hiện có là snapshot một chiều. Code Zalo hiện vẫn nằm trong
-`notary_v2/`; task migration mới phải chốt repo nào là nguồn chính thức và cách
-lấy snapshot/commit nguồn vào `zalo/`. Không tự tạo submodule hoặc `.git` lồng
-trong monorepo; không sửa tự do ở cả hai nơi.
-Task [MIN-103](https://linear.app/minhnotary/issue/MIN-103/migrate-engine-zalo-thanh-module-thu-tu-trong-repo-rieng-va-zalo)
-cũng phải chuyển tài liệu engine Zalo sang `zalo/docs/` khi folder được tạo;
-spec giao tiếp và consumer ở `notary_v2` giữ phần riêng. Trong lúc chưa chuyển,
-spec Zalo trong `notary_v2/docs/platform/zalo-document-inbox/` là nơi tạm được
-biết đến; không duy trì hai spec có cùng quyền quyết định song song.
-
+zalo đã được tách thành repo riêng D:\zalo-intake
 ## Cấu trúc thư mục
 
 ```
@@ -100,37 +90,6 @@ quyết định kiến trúc xuyên sản phẩm, câu hỏi mở.
 Không được mô tả: hành vi nội bộ của một sản phẩm. Đó là việc của docs trong
 repo đó. Khi xung đột, **repo con thắng** — và mâu thuẫn phải được sửa ở đây.
 
-## Quy tắc khi sửa folder này
-
-- Mọi mô tả repo con phải **kiểm chứng bằng file thật** (đường dẫn + số dòng),
-  không viết theo suy luận. Tài liệu cũ ở đây từng sai nhiều vì lý do này.
-- Ghi rõ **cái gì KHÔNG có** ngang với cái gì có. Phần lớn lỗi cũ là giả định
-  tồn tại một luồng dữ liệu không tồn tại.
-- Phân biệt rõ **hiện trạng** và **dự định**. `notaryoffice` chưa có code.
-- Không tự chốt mục nào đang mở (🔴) trong `docs/architecture/OPEN_DECISIONS.md`.
-- `excelTK` là dự án riêng, ngoài phạm vi hệ thống công chứng và G1 Electron.
-- Mọi lựa chọn công nghệ ghi ở `docs/architecture/TECH_STACK.md`, không rải
-  trong file khác. Thêm công nghệ mới cho một việc đã có công nghệ: phải qua 4
-  bước ở `TECH_STACK.md` §2.
-- Đích đến là **một database nghiệp vụ chung** cho `notary_v2`, `upload_lab`
-  và `notaryoffice`. Module Zalo là adapter có thể tách chạy riêng, được giữ
-  DB/session/runtime riêng cho việc thu nhận và OCR; trao đổi với máy chính qua
-  contract, không bị ép dùng DB nghiệp vụ chung. Phân biệt *hiện trạng* với
-  *đích đến*.
-- Không tạo contract tích hợp mới rồi tự implement trong cùng một task.
-
-## Rule riêng khi sửa repo con
-
-SOT nội bộ của mỗi repo con là spec/docs của repo đó, không phải file agent:
-
-| Repo | SOT nội bộ | Rule còn giữ |
-|---|---|---|
-| `notary_v2/` | `notary_v2/docs/` — domain spec đã duyệt, ADR, platform contract | Chạy `.\verify.bat` sau sửa code không đơn giản; chỉ tuyên bố xong khi có bằng chứng kiểm chứng |
-| `upload_lab/` | `upload_lab/README.md` + `upload_lab/docs/` (`regex-rules.md`, `spec_UI.md`) | Dry-run là mặc định — không tự đổi Finalize thành mặc định. Selector web tỉnh chỉ sửa ở `uploader_selectors.py`, không rải trong code. Thêm loại văn bản mới: cập nhật `docs/regex-rules.md` cùng lúc với code. Chạy test trước khi báo xong |
-| `notaryoffice/` | `notaryoffice/intent.md` (SOT duy nhất) | Trước khi viết code: A1/A3/A4 ở `docs/architecture/OPEN_DECISIONS.md` phải có câu trả lời thật (A2 đã chốt = Không). Không đề xuất lại phương án đã loại trong `intent.md` |
-| `shell/` | `shell/README.md` + `contracts/desktop-command.md` | POC tích hợp; runtime chỉ thêm theo `docs/architecture/ELECTRON_G1_PLAN.md` và contract đã duyệt |
-| `zalo/` (đích, chưa có code) | Spec Zalo hiện ở `notary_v2/docs/platform/zalo-document-inbox/`; repo riêng và SOT nội bộ sẽ chốt trong task migration | Sở hữu connector/session/listener/journal/media tạm, Qwen OCR, gói file raw và API OCR lại; không chứa parser/ghép/nhóm hồ sơ. Không tạo rule file riêng trong snapshot |
-
 ## Bản đồ file
 
 | File | Nội dung |
@@ -151,25 +110,9 @@ SOT nội bộ của mỗi repo con là spec/docs của repo đó, không phải
 
 ## Quy tắc chọn tool cho agent
 
-Các quy tắc này chỉ hướng dẫn cách agent đọc và kiểm chứng tài liệu/code của
-repo con; folder `systemdocs` vẫn là tài liệu, không có runtime và không chạy
-Graphify/context-mode tại đây.
-
 - Biết rõ file, symbol hoặc chuỗi lỗi: tìm kiếm có giới hạn rồi đọc đúng đoạn
   source; dùng LSP nếu client đã cung cấp.
 - Cần quan hệ qua nhiều file, caller/callee, dependency hoặc ownership: dùng
   truy vấn Graphify hiện có nếu client/tool đã cung cấp. Bắt đầu hẹp (depth
   1–2); nếu graph thiếu, cũ hoặc bị cắt thì đối chiếu source hiện tại và chỉ
   refresh khi task cần. Không rebuild toàn bộ graph cho sửa nhỏ.
-- Log, JSON/CSV, output build/test hoặc dữ liệu lớn: dùng context-mode khi
-  capability đã được đăng ký (`ctx_execute`, `ctx_execute_file`,
-  `ctx_batch_execute`, `ctx_index`/`ctx_fetch_and_index`, `ctx_search`) để lọc,
-  đếm hoặc tổng hợp trước khi đưa vào context. `ctx_search` chỉ tìm trong nội
-  dung đã index; giữ exit code, lỗi hữu ích và đường dẫn tới dữ liệu đầy đủ.
-- Kết quả tool đã nhỏ, kể cả truy vấn graph có giới hạn: đọc trực tiếp, không
-  bọc thêm qua context-mode.
-- Không tự cài tool, bật daemon, tạo watcher, full-index hoặc tạo contract mới
-  trong folder này. Nếu Graphify/context-mode không có trong client hiện tại,
-  dùng source/tìm kiếm thông thường và ghi rõ trong bàn giao.
-- Sau thay đổi code ở repo con, chạy check phù hợp với repo đó; thay đổi chỉ ở
-  Markdown thì kiểm tra diff và tính nhất quán tài liệu.

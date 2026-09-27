@@ -1,0 +1,22 @@
+# Pháp lý: nguồn sơ cấp và giới hạn suy luận
+
+Khảo sát 26/09/2026. Đây là danh mục rủi ro để ra quyết định kỹ thuật, không thay thế tư vấn pháp lý cho văn phòng. Nguồn luật là bản Công báo/Cổng Chính phủ; PDF Luật 91 là bản quét ảnh nên tra nội dung qua chỉ mục nguồn và đối chiếu thông tin ban hành. NĐ 356 và Luật Công chứng đã đối chiếu bản PDF/text trích trên máy.
+
+## Bốn lớp độc lập
+
+1. **Điều khoản dùng Zalo.** [Bản Zalo có hiệu lực 05/09/2026](https://zaloapp.com/mobile/zalo/dieukhoan/) mục 4.7 hạn chế đăng nhập/sử dụng qua phần mềm tương thích của bên thứ ba hoặc hệ thống chưa được Zalo phát triển, cấp quyền hay chấp thuận. [zca-js README](https://github.com/RFS-ADRENO/zca-js) tự ghi API không chính thức, mô phỏng Zalo Web và cảnh báo khóa tài khoản. Đây là rủi ro hợp đồng và vận hành. Không tự kết luận Chrome thông thường với người dùng tự thao tác vi phạm; cũng không kết luận Electron nhúng/tự bấm được chấp thuận. Cần hỏi Zalo use case cụ thể.
+2. **Dữ liệu cá nhân.** [Luật 91/2025/QH15](https://congbao.chinhphu.vn/van-ban/luat-so-91-2025-qh15-45578.htm) hiệu lực 01/01/2026. Điều 9 quy định nếu dựa vào sự đồng ý thì cần rõ loại dữ liệu, mục đích, bên kiểm soát, quyền; đồng ý cụ thể/kiểm chứng được. Các căn cứ không cần đồng ý phải đối chiếu luật, không mặc định rằng ảnh vào nhóm là đồng ý OCR, gửi cloud hay lưu. [NĐ 356/2025/NĐ-CP](https://congbao.chinhphu.vn/van-ban/nghi-dinh-so-356-2025-nd-cp-468371.htm) Điều 4(1)(i) nêu hình ảnh thẻ căn cước/CCCD/CMND là dữ liệu nhạy cảm, Điều 4(2) yêu cầu phân quyền/biện pháp bảo vệ. OCR text chứa số định danh, họ tên vẫn là dữ liệu cá nhân. Người cấp trên gửi ảnh của người khác không tự tạo căn cứ xử lý của từng chủ thể.
+3. **Bí mật nghề nghiệp.** [Luật Công chứng 46/2024/QH15](https://congbao.chinhphu.vn/van-ban/luat-so-46-2024-qh15-43574.htm) tại các nghĩa vụ công chứng viên và tổ chức nêu giữ bí mật nội dung công chứng trừ đồng ý bằng văn bản của người yêu cầu hoặc luật quy định khác. Chuyển ảnh tới OCR bên ngoài cần đánh giá nghĩa vụ này riêng với quyền dữ liệu của từng cá nhân.
+4. **Hình sự/truy cập trái phép.** [Bộ luật Hình sự Điều 289](https://vbpl.vn/FileData/TW/Lists/vbpq/Attachments/96122/VanBanGoc_100.2015.QH13.P3.pdf) quy định các yếu tố hành vi cụ thể. Vi phạm điều khoản nền tảng không tự động cấu thành tội; nhưng có tài khoản Zalo không cho quyền vượt biện pháp bảo vệ, trích xuất tài khoản khác hoặc giải mã kho riêng. [Luật An ninh mạng 116/2025/QH15](https://congbao.chinhphu.vn/van-ban/luat-so-116-2025-qh15-468678.htm) có hiệu lực 01/07/2026; không dựa máy móc vào luật mạng cũ khi tư vấn triển khai.
+
+## Cloud OCR và nơi xử lý
+
+[Alibaba Model Studio vùng](https://www.alibabacloud.com/help/en/model-studio/regions) nói vùng endpoint quyết định nơi lưu dữ liệu, phạm vi triển khai quyết định nơi suy luận. [Privacy notice](https://www.alibabacloud.com/help/en/model-studio/privacy-notice) nói không dùng dữ liệu cho huấn luyện nhưng vẫn lưu dữ liệu phát sinh từ các lời gọi theo điều khoản. “No training” không phải “no retention”. Đây là API chính thức của Alibaba, không liên quan tính chính thức của zca-js.
+
+[Luật 91 Điều 20](https://datafiles.chinhphu.vn/cpp/files/vbpq/2025/7/91qh.signed.pdf) và [NĐ 356 Điều 17–18](https://datafiles.chinhphu.vn/cpp/files/vbpq/2026/01/356-nd.signed.pdf) liên quan chuyển dữ liệu cá nhân xuyên biên giới và đánh giá tác động. Điều 17 NĐ 356 nêu rõ lưu trên cloud của nhà cung cấp ở nước ngoài và chuyển đến nền tảng ngoài lãnh thổ để tiếp tục xử lý. Cấu hình vùng, hợp đồng, nơi sao lưu, bên nhận và ngoại lệ thực tế phải được người phụ trách pháp lý xác nhận. Dùng OCR “nội địa” chỉ giảm rủi ro này nếu nơi chạy/lưu/backup/nhà thầu phụ phù hợp.
+
+NĐ 356 Điều 41 nêu điều kiện miễn/lựa chọn một số hồ sơ cho doanh nghiệp nhỏ, siêu nhỏ, **ngoại trừ** trường hợp trực tiếp xử lý dữ liệu nhạy cảm và các điều kiện khác. Điều 42(2) ghi NĐ 13/2023 hết hiệu lực từ 01/01/2026. Ảnh giữ 7 ngày là chính sách vòng đời dữ liệu cần ghi rõ, không phải “vùng an toàn” do luật tự cấp.
+
+## Điểm chưa kết luận
+
+Chính sách hiện hành của [OA GMF](https://oa.zalo.me/home/resources/news/_4601792943864106455) đối với CCCD/sổ đỏ cần xác nhận với Zalo. Bài OA 2023 công khai có hạn chế CMND, nhưng giá và phạm vi dịch vụ đã đổi; không tự áp bài đó cho Zalo Bot API. Chưa đánh giá căn cứ xử lý, hợp đồng với nhà OCR, thông báo/đồng ý, hồ sơ đánh giá tác động hay dữ liệu thực tế của văn phòng.
