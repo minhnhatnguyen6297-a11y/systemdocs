@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thành phần dùng chung — G1 shell (MIN-127 / P4)</title>
+<!--
+  TRANG THÀNH PHẦN DÙNG CHUNG — MIN-127 / P4 của MIN-123.
+  - Link THẬT vào shell/src/renderer/styles.css (đường dẫn tương đối): mọi
+    ví dụ ở đây là class thật mà P6/P7/P8 dùng — không phải bản sao.
+  - Chỉ HTML + chút JS inline cho modal/toast; file:// chạy được.
+  - Quy ước đặt tên: xem DESIGN.md §10. Class KHÔNG tiền tố ở trang này
+    (.btn .input .card .grid .pill .banner .face .modal .toast .actionbar
+    .toolbar …) thuộc sở hữu của styles.css — module KHÔNG định nghĩa lại.
+  - Class demo-*/c-* chỉ phục vụ trang trình bày, KHÔNG phải API dùng chung.
+-->
+<link rel="stylesheet" href="../../../../shell/src/renderer/styles.css">
+<style>
+  /* ---- chỉ phục vụ trang demo — không phải thành phần dùng chung ---- */
+  .demo-page { max-width: 920px; margin: 0 auto; padding: 24px 24px 96px; }
+  .demo-sec { margin: 28px 0 10px; }
+  .demo-sec > h2 { font-size: var(--fs-title); margin: 0 0 4px; }
+  .demo-sec > .demo-note { color: var(--text-muted); font-size: var(--fs-small);
+    margin: 0 0 10px; }
+  .demo-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    margin: 8px 0; }
+  .demo-tag { font-family: Consolas, monospace; font-size: 11.5px;
+    color: var(--text-muted); }
+  .demo-frames { display: flex; gap: 16px; flex-wrap: wrap; }
+  .demo-frame { flex: 1 1 300px; min-width: 260px; }
+  .demo-rail-frame { display: flex; height: 300px; border-radius: var(--r-card);
+    overflow: hidden; box-shadow: var(--sh-card); background: var(--bg-app);
+    width: 120px; }
+  .demo-kbd { border: 1px solid var(--border-strong); border-bottom-width: 2px;
+    border-radius: 4px; padding: 0 5px; font: 11.5px Consolas, monospace;
+    background: var(--surface-card); }
+  code { background: var(--surface-subtle); border-radius: 4px;
+    padding: 1px 5px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="demo-page">
+
+  <h2 style="margin-top:0">Thành phần dùng chung — G1 shell</h2>
+  <p class="muted small" style="margin-top:4px">
+    MIN-127 / P4 — trang này link trực tiếp
+    <code>shell/src/renderer/styles.css</code>. Token: approved
+    (<code>docs/product/ui/tokens.json</code>). Mọi nút/ô nhập đều có thể
+    <span class="demo-kbd">Tab</span> để kiểm tra vòng focus 2&nbsp;px.
+  </p>
+
+  <!-- ============================ RAIL ============================ -->
+  <section class="demo-sec">
+    <h2>1. Icon rail (điều hướng chính)</h2>
+    <p class="demo-note">Rail sáng 60&nbsp;px — nút icon 44×44, tooltip là
+      <code>title</code>, trạng thái <code>.active</code> / <code>.unavailable</code>.
+      Trong shell: <code>#rail &gt; .rail-logo + #module-list &gt; button.rail-btn</code>.</p>
+    <div class="demo-frames">
+      <div class="demo-rail-frame">
+        <nav id="rail" aria-label="Điều hướng chính (demo)">
+          <div class="rail-logo" aria-hidden="true">G1</div>
+          <div id="module-list" class="rail-items">
+            <button type="button" class="rail-btn active" title="notary_v2 — Soạn hồ sơ" aria-label="notary_v2 — Soạn hồ sơ" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l5 5v15H6z M14 2v6h6 M9 13h8M9 17h8M9 9h2"/></svg></button>
+            <button type="button" class="rail-btn" title="upload_lab" aria-label="upload_lab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5 M4 20h16"/></svg></button>
+            <button type="button" class="rail-btn unavailable" title="notaryoffice — chưa triển khai" aria-label="notaryoffice — chưa triển khai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18 M5 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16 M15 9h4a2 2 0 0 1 2 2v10 M9 7h2M9 11h2M9 15h2"/></svg></button>
+            <button type="button" class="rail-btn" title="Tra cứu" aria-label="Tra cứu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z M21 21l-4.3-4.3"/></svg></button>
+            <button type="button" class="rail-btn rail-bottom" title="Trạng thái/Cài đặt" aria-label="Trạng thái/Cài đặt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M4.2 4.2l2.8 2.8m10 10 2.8 2.8M1 12h4m14 0h4M4.2 19.8 7 17m10-10 2.8-2.8"/></svg></button>
+          </div>
+        </nav>
+      </div>
+      <div class="demo-frame">
+        <p class="small muted" style="margin-top:0">Icon SVG inline
+          (<code>viewBox 24</code>, <code>stroke currentColor 1.8</code>) —
+          màu theo trạng thái nút. <code>.rail-bottom</code> đẩy mục cài đặt
+          xuống đáy rail.</p>
+        <p class="small muted">Mục <code>.unavailable</code> (placeholder) vẫn
+          hiển thị + mở được — spec MIN-104 §1: không ẩn.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ BUTTONS =========================== -->
+  <section class="demo-sec">
+    <h2>2. Nút — <code>button</code> / <code>.btn</code></h2>
+    <p class="demo-note">button trần = nền trung tính; modifier
+      <code>.primary .secondary .ghost .danger .primary.danger .sm</code>.</p>
+    <div class="demo-row">
+      <button>Mặc định</button>
+      <button class="primary">Cập nhật</button>
+      <button class="secondary">Nhập file</button>
+      <button class="ghost">Quay lại</button>
+      <button class="danger">Đóng browser</button>
+      <button class="primary danger">Hủy job</button>
+      <button class="sm">Nhỏ (.sm)</button>
+    </div>
+    <div class="demo-row">
+      <button disabled>Disabled</button>
+      <button class="primary" disabled>Primary disabled</button>
+      <button class="primary">Cập nhật<span class="dirty-dot" title="Có thay đổi chưa lưu"></span></button>
+      <span class="demo-tag">.dirty-dot = dấu dirty trên nút commit</span>
+    </div>
+  </section>
+
+  <!-- ============================ INPUTS ============================ -->
+  <section class="demo-sec">
+    <h2>3. Ô nhập — <code>input</code> / <code>.input</code> / select / textarea</h2>
+    <div class="demo-row">
+      <input placeholder="input mặc định" style="width:200px">
+      <input class="input" placeholder=".input (cùng style)" style="width:180px">
+      <select><option>Thừa kế</option><option>Hai bên</option></select>
+      <input value="Ô lỗi" class="err" style="width:160px" aria-invalid="true">
+      <input disabled placeholder="disabled" style="width:120px">
+    </div>
+    <div class="demo-row">
+      <textarea placeholder="textarea" style="width:280px"></textarea>
+      <label class="small"><input type="checkbox" checked> checkbox</label>
+      <label class="small"><input type="radio" name="r" checked> radio A</label>
+      <label class="small"><input type="radio" name="r"> radio B</label>
+    </div>
+    <p class="demo-note">Input 38&nbsp;px · button 36&nbsp;px · lỗi trường:
+      class <code>.err</code> (viền đỏ + nền hồng nhạt) + <code>aria-invalid</code>.</p>
+  </section>
+
+  <!-- ============================ PILL / BANNER ===================== -->
+  <section class="demo-sec">
+    <h2>4. Pill trạng thái &amp; banner</h2>
+    <div class="demo-row">
+      <span class="pill ok">sẵn sàng</span>
+      <span class="pill warn">chờ người dùng</span>
+      <span class="pill err">lỗi</span>
+      <span class="pill info">thông tin</span>
+      <span class="pill accent">Hồ sơ #1234</span>
+      <span class="pill">mặc định</span>
+      <span class="demo-tag">renderer hiện hữu cũng dùng .badge.tone-* (alias)</span>
+    </div>
+    <div class="demo-row">
+      <span class="badge tone-ok">badge.tone-ok</span>
+      <span class="badge tone-warn">badge.tone-warn</span>
+      <span class="badge tone-error">badge.tone-error</span>
+      <span class="badge tone-muted">badge.tone-muted</span>
+      <span class="badge tone-info">badge.tone-info</span>
+    </div>
+    <div class="demo-row" style="align-items:stretch;flex-direction:column;gap:8px">
+      <div class="banner">Thông tin — nguồn sổ: Excel <span class="grow"></span><button class="sm">Đổi</button></div>
+      <div class="banner warn">Cảnh báo — waiting_user là chờ người, KHÔNG phải lỗi</div>
+      <div class="banner err">Lỗi retryable — toast ngắn + banner inline còn lại</div>
+      <div class="waiting-banner"><strong>Chờ người dùng (login):</strong> mở Chromium đăng nhập rồi quay lại <button class="sm">Đã xong</button></div>
+    </div>
+  </section>
+
+  <!-- ============================ CARD ============================== -->
+  <section class="demo-sec">
+    <h2>5. Khối nội dung — <code>.card</code></h2>
+    <div class="card" style="max-width:520px">
+      <div class="card-head">
+        <h3 class="card-title" style="margin:0">Stage — Người</h3>
+        <div class="card-tools">
+          <span class="pill warn">nháp</span>
+          <button class="sm">+ Người</button>
+        </div>
+      </div>
+      <div class="card-body small muted">
+        Card trắng, radius 10&nbsp;px, bóng mảnh — không viền trang trí quanh
+        vùng. <code>.card-head/.card-title/.card-tools/.card-body</code>.
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================== ACTIONBAR / TOOLBAR ===================== -->
+  <section class="demo-sec">
+    <h2>6. Action bar &amp; toolbar</h2>
+    <p class="demo-note"><code>.actionbar</code> = thanh trên cùng màn module
+      (nền card); <code>.toolbar</code> = hàng nút phẳng trong vùng.</p>
+    <div class="actionbar">
+      <button class="ab-back" aria-label="Quay lại">‹</button>
+      <h3 class="ab-title">Soạn hồ sơ</h3>
+      <select class="input"><option>Thừa kế</option></select>
+      <span class="pill accent">HS-00123</span>
+      <span class="save-state">Có thay đổi chưa cập nhật</span>
+      <span class="spacer"></span>
+      <button>Nhập file</button>
+      <button title="Zalo — chưa khả dụng" disabled>Zalo</button>
+      <button>Hủy thay đổi</button>
+      <button class="primary">Cập nhật<span class="dirty-dot"></span></button>
+    </div>
+    <div class="demo-row" style="margin-top:10px">
+      <div class="toolbar">
+        <button class="sm">Chọn tất cả</button>
+        <button class="sm">Bỏ chọn</button>
+        <button class="sm">Lọc lỗi</button>
+        <span class="muted small">.toolbar — hàng nút trong card</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ TABLE ============================= -->
+  <section class="demo-sec">
+    <h2>7. Bảng — <code>table.grid</code></h2>
+    <p class="demo-note">Header sticky, lưới hairline GIỮ LẠI, hàng 36&nbsp;px;
+      <code>tr.selected</code> = nền accent nhạt (khác vòng focus).</p>
+    <div class="card" style="max-width:640px">
+      <div class="card-body" style="max-height:180px;overflow:auto;padding:0 0 8px">
+        <table class="grid">
+          <thead><tr><th>#</th><th>Số</th><th>Trạng thái</th><th>File</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td class="num">001234</td><td><span class="pill ok">Đã lưu</span></td><td class="truncate-path" title="D:\Scan\HS_0012.pdf">D:\Scan\HS_0012.pdf</td></tr>
+            <tr class="selected"><td>2</td><td class="num">001235</td><td><span class="pill warn">Chờ</span></td><td class="truncate-path" title="D:\Scan\HS_0013.pdf">D:\Scan\HS_0013.pdf</td></tr>
+            <tr><td>3</td><td class="num">001236</td><td><span class="pill err">Lỗi</span></td><td class="truncate-path" title="D:\Scan\HS_0014.pdf">D:\Scan\HS_0014.pdf</td></tr>
+            <tr><td>4</td><td class="num">001237</td><td><span class="pill">Mới</span></td><td>…</td></tr>
+            <tr><td>5</td><td class="num">001238</td><td><span class="pill">Mới</span></td><td>…</td></tr>
+            <tr><td>6</td><td class="num">001239</td><td><span class="pill">Mới</span></td><td>…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ FACES ============================= -->
+  <section class="demo-sec">
+    <h2>8. Bốn mặt trạng thái — <code>.face</code></h2>
+    <div class="demo-frames">
+      <div class="demo-frame card"><div class="face face-loading">
+        <div class="skeleton" style="width:60%;height:14px"></div>
+        <div class="skeleton" style="width:40%;height:14px"></div>
+        <div class="face-title">Đang tải…</div>
+        <div class="muted small">loading — skeleton + nhãn, không giả progress</div>
+      </div></div>
+      <div class="demo-frame card"><div class="face face-empty">
+        <div class="face-title">Chưa có job.</div>
+        <div class="muted small">empty — gợi ý hành động tiếp theo</div>
+        <div class="face-actions"><button class="sm">Chọn file…</button></div>
+      </div></div>
+      <div class="demo-frame card"><div class="face face-error">
+        <div class="face-title">file_locked — file đang mở</div>
+        <div class="muted small">error — code + gợi ý + Thử lại (retryable)</div>
+        <div class="face-actions"><button class="sm">Thử lại</button></div>
+      </div></div>
+      <div class="demo-frame card"><div class="face face-unavailable">
+        <div class="face-title">notaryoffice — Chưa triển khai</div>
+        <div class="muted small">unavailable — placeholder vẫn hiển thị</div>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- ===================== MODAL + TOAST (live) ===================== -->
+  <section class="demo-sec">
+    <h2>9. Dialog &amp; toast (tương tác thật)</h2>
+    <p class="demo-note">Modal: <code>.modal-overlay &gt; .modal(.narrow|.wide)
+      &gt; .modal-head(title+×) / .modal-body / .modal-foot</code>.
+      Focus vào control đầu, <span class="demo-kbd">Tab</span> bị trap,
+      <span class="demo-kbd">Esc</span> đóng + trả focus về nút mở.</p>
+    <div class="demo-row">
+      <button class="primary" id="openModal">Mở confirm dialog (.narrow)</button>
+      <button id="openModalWide">Mở dialog .wide</button>
+      <button id="mkToast">Toast thường</button>
+      <button id="mkToastErr">Toast lỗi (err)</button>
+      <button id="mkToastWarn">Toast warn</button>
+    </div>
+  </section>
+
+  <!-- ===================== DRAG / SPLITTER / PROGRESS =============== -->
+  <section class="demo-sec">
+    <h2>10. Kéo-thả, splitter, progress</h2>
+    <div class="demo-row">
+      <span class="drag-handle" title="Kéo để đổi thứ tự">⋮⋮</span>
+      <span class="demo-tag">.drag-handle</span>
+      <span class="icon-x" title="Xóa">×</span>
+      <span class="demo-tag">.icon-x</span>
+      <span class="drop-hint small" style="padding:4px 10px">vùng thả (.drop-hint)</span>
+      <span class="dragging small" style="padding:4px 10px;background:var(--surface-card)">đang kéo (.dragging)</span>
+    </div>
+    <div class="demo-row">
+      <div class="splitter-v" title="Kéo đổi tỉ lệ (dọc)"></div>
+      <span class="demo-tag">.splitter-v</span>
+      <div class="splitter-h" style="flex:0 0 10px;margin:0" title="Kéo đổi chiều cao (ngang)"></div>
+      <span class="demo-tag">.splitter-h</span>
+      <div class="progress" style="max-width:220px"><i style="width:62%"></i></div>
+      <span class="progress-lbl">62/100 — .progress + .progress-lbl</span>
+    </div>
+  </section>
+
+  <!-- ============================ TEXT ============================== -->
+  <section class="demo-sec">
+    <h2>11. Text tiện ích</h2>
+    <p class="small">
+      <span class="muted">.muted</span> ·
+      <span class="error">.error</span> ·
+      <span class="warn-text">.warn-text</span> ·
+      <span class="num">.num 001234</span> ·
+      <span class="small">.small</span>
+    </p>
+    <p class="small truncate-path" style="max-width:420px"
+       title="D:\Users\MINH\Documents\Scan\HoSo\HS_0012\page-01.pdf">.truncate-path —
+      cắt đầu đường dẫn giữ tên file:
+      D:\Users\MINH\Documents\Scan\HoSo\HS_0012\page-01.pdf</p>
+  </section>
+
+  <section class="demo-sec">
+    <h2>Ghi chú sở hữu</h2>
+    <p class="small muted">Element selector (button/input/table…) ở file này là
+      nền trung tính. Module P6/P7/P8 dùng lại các class trên; style riêng của
+      module scope trong class gốc (<code>.cd-root</code>, <code>.upload-lab</code>)
+      và prefix <code>cd-*</code>/<code>ul-*</code> — không định nghĩa lại tên
+      dùng chung hay biến <code>:root</code>. Chi tiết: DESIGN.md §10.</p>
+  </section>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  function h(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  // ---- toast (giống notify() của renderer) ----
+  function toast(text, kind) {
+    let box = document.getElementById('toast');
+    if (!box) {
+      box = h('div', 'toast-root'); box.id = 'toast';
+      document.body.append(box);
+    }
+    const item = h('div', 'toast' + (kind ? ' ' + kind : ''), text);
+    item.setAttribute('role', 'status');
+    box.append(item);
+    setTimeout(() => item.remove(), 4000);
+  }
+  document.getElementById('mkToast').onclick =
+    () => toast('Đã lưu nháp Stage.');
+  document.getElementById('mkToastErr').onclick =
+    () => toast('file_locked — đóng file rồi thử lại.', 'err');
+  document.getElementById('mkToastWarn').onclick =
+    () => toast('waiting_user — chờ thao tác của bạn.', 'warn');
+
+  // ---- modal: focus trap + Esc + trả focus (giống confirmModal renderer) ----
+  function openModal(wide) {
+    const opener = document.activeElement;
+    const wrap = h('div', 'modal-overlay');
+    const box = h('div', 'modal ' + (wide ? 'wide' : 'narrow'));
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-label', 'Xác nhận thao tác');
+    const head = h('div', 'modal-head');
+    head.append(h('h2', 'modal-title', 'Hủy job đang chạy?'));
+    const x = h('button', 'modal-close', '×');
+    x.setAttribute('aria-label', 'Đóng');
+    head.append(x); box.append(head);
+    box.append(h('div', 'modal-body',
+      'Job upload.start (j_0123). Phần đã xử lý giữ nguyên ở draft; ' +
+      'hủy không thực hiện bước Finalize nào.'));
+    const foot = h('div', 'modal-foot');
+    const cancel = h('button', 'ghost', 'Quay lại');
+    const ok = h('button', 'primary danger', 'Hủy job');
+    foot.append(cancel, ok); box.append(foot);
+    function done() {
+      document.removeEventListener('keydown', onKey);
+      wrap.remove();
+      if (opener && opener.focus) opener.focus();
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') { done(); return; }
+      if (e.key !== 'Tab') return;
+      const els = [...box.querySelectorAll('button,input,select,textarea')]
+        .filter((x) => !x.disabled);
+      const first = els[0], last = els[els.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus();
+      }
+    }
+    x.onclick = done; cancel.onclick = done; ok.onclick = done;
+    wrap.onclick = (e) => { if (e.target === wrap) done(); };
+    wrap.append(box); document.body.append(wrap);
+    document.addEventListener('keydown', onKey);
+    ok.focus();
+  }
+  document.getElementById('openModal').onclick = () => openModal(false);
+  document.getElementById('openModalWide').onclick = () => openModal(true);
+})();
+</script>
+</body>
+</html>

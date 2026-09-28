@@ -6,8 +6,12 @@ owner duyệt **bố cục và tương tác** trước khi P4 implement vào Ele
 - **Dữ liệu giả hoàn toàn** (`data.js`) — deterministic, không random.
 - **Không gọi** backend, Electron IPC, FastAPI, website cổng công chứng, Excel
   thật, hay Chromium thật. Mọi hành động "chạy" chỉ mô phỏng trong trang.
-- Token màu/kích thước lấy từ `../tokens.json` **(status: proposed)** ánh xạ tay
-  vào biến CSS trong `prototype.css`. Bản mẫu **không chốt** token.
+- Token màu/kích thước lấy từ `../tokens.json` **(status: approved — owner
+  duyệt 27/09/2026)** ánh xạ tay vào biến CSS trong `prototype.css`.
+- Toàn bộ đề xuất ở mục "Quyết định CHỜ CHỐT" dưới đây **đã được chốt** (duyệt
+  hết qua `.agent/tasks/MIN-126/decisions.md`) — danh sách giữ lại làm record.
+- Trang thành phần dùng chung của P4: `components.html` (link thật
+  `shell/src/renderer/styles.css`).
 
 ## Mở / chạy
 

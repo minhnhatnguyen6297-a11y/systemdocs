@@ -41,7 +41,7 @@
   --edge-selected: #2563eb;
   --node-bg: #ffffff;
   --pool-bg: #f1f5fb;
-  /* --- rail (CHỜ DUYỆT: rail sáng theo ảnh approved) --- */
+  /* --- rail (ĐÃ DUYỆT: rail sáng 60px theo ảnh approved, 27/09/2026) --- */
   --rail-bg: #ffffff;
   --rail-icon: #334155;
   --rail-active: #2563eb;
@@ -132,7 +132,7 @@ body {
 /* ============================ APP SHELL ================================ */
 .app { display: flex; width: 100%; height: 100%; overflow: hidden; }
 
-/* Rail icon trái — theo ảnh approved (rail sáng). CHỜ DUYỆT vs sidebar nhãn. */
+/* Rail icon trái — theo ảnh approved (rail sáng). ĐÃ DUYỆT vs sidebar nhãn. */
 .rail {
   flex: 0 0 var(--rail-w);
   background: var(--rail-bg);
