@@ -3,7 +3,11 @@
 Ghi đến đâu khi làm đến đó. Agent/phiên khác đọc file này + `brief.md` là làm
 tiếp được mà không cần hỏi lại.
 
-## Trạng thái: phần chính xong, còn commit + handoff — 2026-09-28
+## Trạng thái: XONG — 2026-09-28
+
+Commit: `694be2b` task record · `0c8b3ed` styles+index+renderer · `db0d06c`
+tokens+DESIGN §10+EXPERIENCE+README · `a391f7f` components.html+prototypes
+marker · `8c2bb4e` progress+decisions · `65d42ab` handoff.
 
 ## Đã làm
 - Đọc toàn bộ nguồn: AGENTS.md, plan MIN-123, DESIGN/EXPERIENCE/tokens,
@@ -56,15 +60,13 @@ tiếp được mà không cần hỏi lại.
 - lib.js: không đổi (vocabulary/tone giữ nguyên — pill/banner tone đã map đúng).
 
 ## Đang làm dở
-- Commit theo nhóm file nhỏ + handoff.md + decisions.md.
+- (không còn — handoff.md có đầy đủ hash + class guide + rủi ro P6–P8)
 
-## Bước tiếp theo
-1. `git diff --check`; `git status` (chỉ file sở hữu, không đụng staged của P5).
-2. Commit nhóm: (a) styles.css+index.html+renderer.js, (b) components.html +
-   prototypes marker, (c) DESIGN §10 + task record.
-3. Viết decisions.md + handoff.md (commit hashes, class guide, test, giới
-   hạn: chưa DPI thật, chưa manual mouse/keyboard trong Electron).
-4. Đóng preview server + dọn scratch nếu có.
+## Bước tiếp theo (cho P6/P7/P8/P9 — không còn việc của P4)
+1. P6/P8 migrate module CSS theo DESIGN §10 (prefix cd-*/ul-*, scope
+   .cd-root/.upload-lab, không đụng class không-tiền-tố).
+2. P9 kiểm tay trong Electron thật: rail icon, focus 2px, modal trap/Esc,
+   toast, DPI 125/150%, giữ state khi đổi module/tab.
 
 ## Check đã chạy
 - `node --test test/*.test.mjs` @ baseline → 197 pass (27.4s).
