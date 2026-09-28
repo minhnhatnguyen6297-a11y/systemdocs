@@ -61,17 +61,19 @@ function notify(text, isError) {
   setTimeout(() => item.remove(), 6000);
 }
 
+// MIN-133 D3: #statusbar da bo — trang thai engine/version/contract hien o
+// tooltip logo G1 tren rail (chi tiet day du o module Trang thai). Ham phai
+// an toan khi element khong ton tai (khong crash polling sidecarStatus).
 function setStatus(s) {
-  const st = document.getElementById('engine-state');
-  st.textContent = `engine: ${L.engineStateLabel(s.state)}`;
-  // Pill theo tone state: ready=ok, starting/restarting=warn, loi=err.
-  st.className = 'pill ' + (
-    s.state === 'ready' ? 'ok'
-    : (s.state === 'starting' || s.state === 'restarting') ? 'warn'
-    : 'err');
-  document.getElementById('engine-version').textContent =
-    s.engine_version || '';
-  document.getElementById('contract').textContent = s.contract_version || '';
+  const st = s || {};
+  const parts = [`engine: ${L.engineStateLabel(st.state)}`];
+  if (st.engine_version) parts.push(`version: ${st.engine_version}`);
+  if (st.contract_version) parts.push(`contract: ${st.contract_version}`);
+  const logo = document.getElementById('rail-logo');
+  if (!logo) return;
+  logo.title = parts.join('\n');
+  logo.setAttribute('aria-label', `G1 — ${parts.join(', ')}`);
+  logo.dataset.engineState = st.state || 'stopped';
 }
 
 // ---------- faces (MIN-32 §3) ----------

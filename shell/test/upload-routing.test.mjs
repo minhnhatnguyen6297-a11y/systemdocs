@@ -1,7 +1,8 @@
 // Upload Lab — routing/wiring (MIN-69, task 6):
 // - index.html dang ky upload.css + cac script module truoc renderer.js
 // - renderer.js uy quyen view 'upload' cho window.G1_UPLOAD.buildView
-// - styles.css giu cap 860px cho module khac; upload.css mo rong rieng
+// - styles.css giu cap 860px cho section con truc tiep cua #view (MIN-133);
+//   upload.css mo rong rieng
 // - khong URL website cung trong renderer; khong API cam
 // - client.adoptJobResult: scope sai bo qua, scope dung ap vao state
 // - DOM thuc cua module: dung 2 tab ARIA, dung cot bang MIN-77, khong o URL
@@ -51,8 +52,12 @@ test('renderer.js uy quyen view upload cho G1_UPLOAD.buildView', () => {
 
 test('cap 860px giu nguyen cho module khac; upload.css mo rong rieng', () => {
   const styles = read('styles.css');
-  assert.match(styles, /#view section \{[^}]*max-width:\s*860px/,
-    'cap 860px bi thay doi — module Notary bi anh huong');
+  // MIN-133: cap chi ap cho section con TRUC TIEP cua #view (trang shell);
+  // `#view section` (hau due) cu cap ca section.cd-root long ben trong.
+  assert.match(styles, /#view > section \{[^}]*max-width:\s*860px/,
+    'cap 860px bi thay doi — trang shell khong con gioi han do rong');
+  assert.doesNotMatch(styles, /#view section \{/,
+    'cap 860px lai ap cho section long trong module (MIN-133)');
   const css = read('upload/upload.css');
   assert.match(css, /\.upload-lab/);
   assert.match(css, /max-width:\s*none/);

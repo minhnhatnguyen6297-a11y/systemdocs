@@ -1,10 +1,10 @@
 /* ==========================================================================
    styles.css — nền token + thành phần dùng chung của G1 shell (MIN-127 / P4)
    --------------------------------------------------------------------------
-   SOT giá trị: docs/product/ui/tokens.json (status: approved — owner duyệt
-   qua bản mẫu MIN-126, 27/09/2026). Giá trị dưới đây là ÁNH XẠ TAY; đổi
-   token phải sửa tokens.json trước rồi đồng bộ vào file này và
-   docs/product/ui/prototypes/prototype.css.
+   SOT giá trị: docs/product/ui/tokens.json v1.1.0 (status: approved — owner
+   duyệt qua bản mẫu MIN-126, 27/09/2026; cập nhật mật độ theo mockup
+   MIN-133, 28/09/2026). Giá trị dưới đây là ÁNH XẠ TAY; đổi token phải
+   sửa tokens.json trước rồi đồng bộ vào file này.
 
    PHẠM VI (owner: P4/MIN-127 — xem DESIGN.md §10):
    - File này sở hữu: biến :root, layout chrome (#app/#rail/#content/#view),
@@ -19,13 +19,14 @@
 /* ------------------------------ TOKENS --------------------------------- */
 :root {
   /* color.bg / color.surface */
-  --bg-app: #f4f6fa;
-  --bg-canvas: #eef2f8;
+  --bg-app: #e9edf2;
+  --bg-canvas: #f5f7fa;
   --surface-card: #ffffff;
   --surface-subtle: #f1f5fb;
   --surface-overlay: rgba(15, 23, 42, 0.32);
   /* color.border */
   --border-hairline: #e2e8f0;
+  --border-card: #dde3ea;   /* MIN-133: viền 1px card cấp ngoài + mép rail */
   --border-strong: #cbd5e1;
   /* color.text */
   --text-primary: #1e293b;
@@ -62,17 +63,25 @@
   /* font */
   --font: "Segoe UI", system-ui, -apple-system, sans-serif;
   --fs-base: 15px;
-  --fs-small: 13px;
+  --fs-data: 14px;          /* MIN-133: dữ liệu bảng/node/ô nhập tại chỗ */
+  --fs-small: 13px;         /* nhãn, header bảng, nút */
+  --fs-chip: 12px;          /* MIN-133: chip/pill/badge */
   --fs-title: 18px;
-  --fs-card: 14px;
+  --fs-card: 15px;          /* MIN-133: tiêu đề card 15px/700 */
   /* size */
   --input-h: 38px;
-  --btn-h: 36px;
-  --row-h: 36px;
+  --btn-h: 32px;            /* MIN-133 (cũ 36px) */
+  --btn-h-sm: 28px;
+  --row-h: 25px;            /* MIN-133 (cũ 36px) */
+  --card-head-h: 34px;
   --chip-pos: 24px;
   --rail-w: 60px;
   --modal-w: 720px;
   --modal-w-wide: 1100px;
+  /* space (MIN-133) */
+  --gap: 8px;               /* khoảng giữa vùng/card */
+  --view-pad: 8px;          /* padding #view */
+  --card-pad-x: 10px;       /* padding ngang card head/body */
   /* radius */
   --r-card: 10px;
   --r-ctl: 8px;
@@ -111,21 +120,24 @@ textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible,
 #rail {
   flex: 0 0 var(--rail-w);
   background: var(--rail-bg);
-  border-right: 1px solid var(--border-hairline);
+  border-right: 1px solid var(--border-card);
   display: flex; flex-direction: column; align-items: center;
-  padding: 10px 0; gap: 4px;
+  padding: 8px 0; gap: 4px;
 }
+/* Logo G1 — tooltip (title) mang trạng thái engine/version/contract
+   thay #statusbar đã bỏ (MIN-133 D3); renderer.js setStatus() cập nhật. */
 .rail-logo {
   width: 40px; height: 40px; border-radius: var(--r-card);
   background: var(--accent); color: var(--text-inverse);
   font-weight: 700; font-size: var(--fs-base);
-  display: grid; place-items: center; margin-bottom: 10px;
+  display: grid; place-items: center; margin-bottom: 8px;
+  cursor: default;
 }
 #module-list {
   display: flex; flex-direction: column; align-items: center;
   gap: 4px; width: 100%;
 }
-/* rail-btn 44x44: vùng bấm >=44px theo tapMin (nút trong màn = 36px token) */
+/* rail-btn 44x44: vùng bấm >=44px theo tapMin (nút trong màn = 32px token) */
 .rail-btn {
   width: 44px; height: 44px; min-height: 44px;
   border: 0; border-radius: var(--r-card); padding: 0; margin: 0;
@@ -144,19 +156,16 @@ textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible,
   flex: 1; min-width: 0;
   display: flex; flex-direction: column; overflow: hidden;
 }
-/* Statusbar: thông tin engine — một dòng gọn, không trộn action module */
-#statusbar {
-  display: flex; align-items: center; gap: 8px;
-  padding: 6px 16px;
-  background: var(--surface-card);
-  border-bottom: 1px solid var(--border-hairline);
-}
-#view { flex: 1; overflow: auto; padding: 20px 24px; }
-/* Cap 860px giữ cho trang shell (status/engine/placeholder); module
-   data-heavy thoát bằng class riêng — upload.css (.upload-lab) và
-   cd-root-outer. KHÔNG đổi cap này (test upload-routing). */
-#view section { max-width: 860px; }
-#view section.cd-root-outer { max-width: none; }
+/* #statusbar đã bỏ (MIN-133 D3) — engine xem ở tooltip .rail-logo và
+   module Trạng thái. */
+#view { flex: 1; min-height: 0; overflow: auto; padding: var(--view-pad); }
+/* Cap 860px CHỈ cho section con trực tiếp của #view (trang shell:
+   status/engine/placeholder). Module data-heavy thoát bằng class riêng —
+   upload.css (.upload-lab) và cd-root-outer. Section lồng trong module
+   (vd section.cd-root) không bị cap — MIN-133: `#view section` cũ cap cả
+   section lồng nên Soạn hồ sơ không giãn hết màn (test upload-routing). */
+#view > section { max-width: 860px; }
+#view > section.cd-root-outer { max-width: none; }
 
 h2 { margin: 0 0 12px; font-size: var(--fs-title); font-weight: 700; }
 h3 {
@@ -170,7 +179,7 @@ h3 {
    .ghost .danger .primary.danger .sm. Disabled: :disabled hoặc .disabled. */
 button, .btn {
   font: inherit; font-size: var(--fs-small); font-weight: 500;
-  min-height: var(--btn-h); padding: 0 14px; margin: 0;
+  min-height: var(--btn-h); padding: 0 12px; margin: 0;
   border: 1px solid var(--border-strong); border-radius: var(--r-ctl);
   background: var(--surface-card); color: var(--text-primary);
   cursor: pointer; white-space: nowrap;
@@ -221,7 +230,7 @@ button.primary.danger, .btn.primary.danger {
 button.primary.danger:hover:not(:disabled), .btn.primary.danger:hover {
   background: #991b1b; border-color: #991b1b;
 }
-button.sm, .btn.sm { min-height: 28px; padding: 0 10px; }
+button.sm, .btn.sm { min-height: var(--btn-h-sm); padding: 0 10px; }
 /* dấu dirty trên nút commit (chấm theo màu chữ nút) */
 .dirty-dot {
   display: inline-block; width: 7px; height: 7px; border-radius: 50%;
@@ -281,7 +290,7 @@ select { cursor: pointer; }
    (STATUS_TONE trong lib.js phát sinh tone-*). Tông = state.*  */
 .pill, .badge {
   display: inline-flex; align-items: center; gap: 4px;
-  font-size: 12px; font-weight: 600; line-height: 1;
+  font-size: var(--fs-chip); font-weight: 600; line-height: 1;
   padding: 4px 9px; border-radius: var(--r-chip);
   background: var(--muted-bg); color: var(--muted-text);
   white-space: nowrap;
@@ -313,22 +322,34 @@ select { cursor: pointer; }
 }
 
 /* --------------------- KHỐI NỘI DUNG (card) ---------------------------- */
+/* MIN-133: card cấp ngoài có viền 1px --border-card; head 34px, body
+   padding 0 10px 8px. Card chỉ có body (không head) thêm 8px phía trên để
+   nội dung không chạm viền (Upload Lab dùng dạng này). */
 .card {
   background: var(--surface-card);
+  border: 1px solid var(--border-card);
   border-radius: var(--r-card);
   box-shadow: var(--sh-card);
   min-width: 0;
 }
-.card-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px 6px; }
-.card-title { font-size: var(--fs-card); font-weight: 600; margin: 0; }
+.card-head {
+  display: flex; align-items: center; gap: 6px;
+  min-height: var(--card-head-h); padding: 0 var(--card-pad-x);
+}
+.card-title {
+  font-size: var(--fs-card); font-weight: 700; margin: 0;
+  white-space: nowrap;
+}
 .card-tools { margin-left: auto; display: flex; align-items: center; gap: 6px; }
-.card-body { padding: 8px 14px 14px; }
+.card-body { padding: 0 var(--card-pad-x) 8px; }
+.card > .card-body:first-child { padding-top: 8px; }
 
 /* ------------------------ ACTION BAR / TOOLBAR ------------------------- */
 .actionbar {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   padding: 10px 16px;
   background: var(--surface-card); border-radius: var(--r-card);
+  border: 1px solid var(--border-card);   /* MIN-133: cùng viền với .card */
   box-shadow: var(--sh-card);
 }
 .actionbar .ab-title { font-size: var(--fs-title); font-weight: 700; margin: 0; }
@@ -346,20 +367,25 @@ select { cursor: pointer; }
 
 /* ------------------------------- BẢNG ---------------------------------- */
 /* table.grid = bảng dữ liệu chuẩn: header sticky + lưới hairline.
-   .tbl là tên legacy của helper tableEl — giữ tông giống grid. */
+   MIN-133: hàng 25px (--row-h), chữ dữ liệu 14px, header 13px, padding
+   dọc 0 để giữ đúng chiều cao hàng; ô nhập tại chỗ do module tự scope.
+   .tbl là tên legacy của helper tableEl — giữ tông giống grid, chữ 13px. */
 table.grid, table.tbl {
   border-collapse: collapse; width: 100%;
   font-size: var(--fs-small); margin: 6px 0;
 }
+table.grid { font-size: var(--fs-data); }
 table.grid th, table.grid td,
 table.tbl th, table.tbl td {
   border-bottom: 1px solid var(--border-hairline);
-  padding: 4px 8px; text-align: left; vertical-align: middle;
+  padding: 2px 8px; text-align: left; vertical-align: middle;
   height: var(--row-h);
 }
+table.grid th, table.grid td { padding: 0 4px; }
 table.grid thead th, table.tbl thead th {
   background: var(--surface-subtle); font-weight: 600;
   color: var(--text-secondary); white-space: nowrap;
+  font-size: var(--fs-small);
 }
 table.grid thead th { position: sticky; top: 0; z-index: 2; }
 table.grid tbody tr:hover td { background: #f8fafd; }
@@ -500,9 +526,10 @@ table.tbl td[onclick], table.tbl td.clk { color: var(--text-link); cursor: point
 .progress-lbl { font-size: var(--fs-small); color: var(--text-secondary); white-space: nowrap; }
 
 /* --------------------------- MÀN HÌNH SHELL ---------------------------- */
-/* job-card / status page — khối trắng theo card, không viền trang trí */
+/* job-card / status page — khối trắng theo card (viền 1px như .card, MIN-133) */
 .job-card {
   background: var(--surface-card); border-radius: var(--r-card);
+  border: 1px solid var(--border-card);
   box-shadow: var(--sh-card); padding: 12px 14px;
   margin: 12px 0; max-width: 720px;
 }
@@ -532,6 +559,7 @@ table.tbl td[onclick], table.tbl td.clk { color: var(--text-link); cursor: point
 /* overview / status */
 .conn-card {
   background: var(--surface-card); border-radius: var(--r-card);
+  border: 1px solid var(--border-card);
   box-shadow: var(--sh-card); padding: 12px 14px; max-width: 640px;
 }
 .kv {
@@ -542,6 +570,7 @@ table.tbl td[onclick], table.tbl td.clk { color: var(--text-link); cursor: point
 .kv-v { word-break: break-all; }
 .health-table {
   background: var(--surface-card); border-radius: var(--r-card);
+  border: 1px solid var(--border-card);
   box-shadow: var(--sh-card); max-width: 640px; overflow: hidden;
 }
 .health-row {
@@ -563,8 +592,5 @@ pre {
 }
 
 /* ----------------------------- RESPONSIVE ------------------------------ */
-/* 800px compact — giữ rail icon (đã hẹp sẵn); co padding nội dung */
-@media (max-width: 800px) {
-  #view { padding: 12px 14px; }
-  #statusbar { padding: 6px 10px; }
-}
+/* 800px compact — giữ rail icon (đã hẹp sẵn). MIN-133: padding #view đã
+   8px ở mọi độ rộng nên không còn override riêng; #statusbar đã bỏ. */
