@@ -1,9 +1,10 @@
 # Notary System — Hub tầm nhìn & kiến trúc
 
 Nguồn tham chiếu cấp cha cho hệ sinh thái phần mềm công chứng.
-Repo con **không** cần đọc folder này để làm việc hằng ngày — chỉ đọc khi task
-đụng tới ranh giới giữa các sản phẩm, vocabulary dùng chung, hoặc quyết định
-kiến trúc xuyên sản phẩm.
+Khi sửa code nội bộ, đọc tài liệu của module sở hữu. **Trước khi tạo hoặc sửa
+tài liệu dài hạn**, mở [bản đồ tri thức](./docs/architecture/KNOWLEDGE.md);
+khi task đụng ranh giới giữa các sản phẩm thì đọc thêm kiến trúc và contract
+được bản đồ dẫn tới.
 
 Một ngoại lệ bắt buộc: **trước khi chọn một công nghệ mới** (OCR provider khác,
 ORM khác, queue khác, framework UI khác) thì phải đọc
@@ -17,12 +18,13 @@ tới database chung; Zalo là module thứ tư có thể chạy riêng với DB
 | `notary_v2` | `./notary_v2` (snapshot từ `D:\notary_v2`) | Soạn thảo hồ sơ tự động; nhận raw OCR Zalo rồi phân tích, cho người dùng duyệt | Đang phát triển; code Zalo legacy vẫn nằm ở đây |
 | `upload_lab` | `./upload_lab` (snapshot từ `D:\upload_lab_repo`) | Số hóa hồ sơ giấy: Word cũ → trường có cấu trúc → upload web CSDL công chứng tỉnh | Đang phát triển; chưa triển khai production |
 | `notaryoffice` | `./notaryoffice` (snapshot từ `D:\notaryoffice`) | Quản lý hồ sơ tại văn phòng: thu dấu vết từ máy con → tự dựng record hồ sơ | Tài liệu, chưa code |
-| `zalo` | `./zalo` (dành chỗ; repo độc lập chưa tạo, `D:\zalo-intake` là path dự kiến) | Thu nhận Zalo, giữ media tạm, gọi Qwen OCR và giao gói chữ raw | Chưa migrate code; chưa chạy độc lập |
+| `zalo` | `./zalo` (snapshot từ repo nguồn `D:\zalo-intake`) | Thu nhận Zalo, giữ media tạm, gọi Qwen OCR và giao gói chữ raw | Repo độc lập là SOT engine; snapshot một chiều trong monorepo |
 | `shell` | `./shell` | Vỏ Electron + Python sidecar FastAPI loopback | POC tích hợp; contract production chưa duyệt |
 
 `shell` là hạ tầng giao diện của hệ thống, không tính là module nghiệp vụ thứ năm.
-Task chuyển Zalo sẽ chốt repo nguồn chính thức và cách đưa snapshot vào
-monorepo; hiện không có hai nơi cùng được sửa tự do.
+Zalo là module đầu vào kỹ thuật, không phải một phần sản phẩm thứ năm trong
+[bản đồ tri thức](./docs/architecture/KNOWLEDGE.md). Chỉnh engine ở repo nguồn;
+`zalo/` trong monorepo là snapshot một chiều theo `zalo/README.md`.
 
 Ngoài phạm vi: `researchskill` (`D:\researchskill`) là skill hỗ trợ coding,
 không phải phân hệ công chứng.
@@ -32,33 +34,26 @@ nghiệp vụ thật sang Electron nằm ở
 [`ELECTRON_G1_PLAN.md`](./docs/architecture/ELECTRON_G1_PLAN.md)
 trên nhánh `electron-system-shell`; `main` tiếp tục chỉ chứa tài liệu.
 
-## Đọc gì khi nào
+## Bắt đầu đọc
 
-| Cần gì | File |
-|---|---|
-| Tại sao có hệ thống này, các module ghép lại thành gì | [`VISION.md`](./docs/architecture/VISION.md) |
-| Ranh giới sản phẩm, sản phẩm nào sở hữu dữ liệu nào | [`SYSTEM_ARCHITECTURE.md`](./docs/architecture/SYSTEM_ARCHITECTURE.md) |
-| Sáu lớp thành phần chung, owner đề xuất và mức reuse — draft MIN-57 | [`COMPONENT_MAP.md`](./docs/architecture/COMPONENT_MAP.md) |
-| Repo nào giải bài toán gì — feature gì — công nghệ gì | [`PROJECTS.md`](./docs/architecture/PROJECTS.md) |
-| **Trước khi chọn công nghệ mới hoặc ra quyết định kiến trúc** | [`TECH_STACK.md`](./docs/architecture/TECH_STACK.md) |
-| Vocabulary & schema dùng chung giữa các sản phẩm | [`contracts/README.md`](./contracts/README.md) |
-| Cái gì đã chốt, cái gì chưa chốt — đừng tự quyết | [`OPEN_DECISIONS.md`](./docs/architecture/OPEN_DECISIONS.md) |
-| Tìm quyết định, lý do và nguồn gốc; ghi lời giải thích mới | [`KNOWLEDGE.md`](./docs/architecture/KNOWLEDGE.md) |
-| Spec/draft theo từng issue (MIN-*, G1-SM) | [`docs/product/`](./docs/product/) |
-| Hệ thống thiết kế UI chung shell Electron (trắng/xanh, token, thao tác) | [`docs/product/ui/`](./docs/product/ui/) |
-| Zalo Inbox — nguồn chuẩn, bản nháp và thứ tự đọc | [`Zalo Intake — bắt đầu tại đây`](./notary_v2/docs/platform/zalo-document-inbox/README.md) |
-| Review kết quả POC conversion/OCR của MIN-52 và MIN-59 | [`MIN61_CONVERSION_OCR_DECISION.md`](./docs/product/MIN61_CONVERSION_OCR_DECISION.md) |
-| Quy tắc khi sửa chính folder này + nơi agent được ghi file | [`AGENTS.md`](./AGENTS.md) |
+Mở **[bản đồ tri thức](./docs/architecture/KNOWLEDGE.md)** để đi từ một trong
+bốn phần — tầm nhìn chung, soạn thảo tự động, số hóa tài liệu cũ, quản lý vận
+hành — tới đúng flow, spec và nơi giữ quyết định. Đây là chỉ mục tài liệu duy
+nhất; không tạo thêm chỉ mục quyết định theo issue hoặc theo tên file.
+
+Trước khi agent thêm/sửa tài liệu, đọc [quy tắc ghi file](./AGENTS.md). Task
+và trạng thái nghiệm thu nằm trên Linear; tài liệu trong module sở hữu hành vi
+nghiệp vụ của module đó.
 
 ## Cấu trúc folder
 
 | Chỗ | Dùng cho |
 |---|---|
-| `docs/architecture/` | Tài liệu SOT cấp hệ thống, giá trị dài hạn |
-| `docs/product/` | Spec theo feature/issue (`specs/` chứa spec có ngày) |
+| `docs/architecture/` | Bản đồ tri thức và tài liệu xuyên sản phẩm, giá trị dài hạn |
+| `docs/product/` | UI chung và artifact liên sản phẩm đã có; spec nghiệp vụ mới thuộc module sở hữu |
 | `contracts/` | Contract đã duyệt giữa các sản phẩm |
 | `code-graphs/` | Graphify snapshots các repo con |
-| `zalo/` | Dành cho snapshot module Zalo sau task migration; hiện chưa có code |
+| `zalo/` | Snapshot một chiều từ repo Zalo độc lập; xem `zalo/README.md` |
 | `.agent/tasks/` | Trạng thái thực thi theo Linear issue |
 | `.agent/scratch/`, `.tmp/`, `.cache/`, `logs/`, `artifacts/` | File tạm — gitignore |
 

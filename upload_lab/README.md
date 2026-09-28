@@ -2,6 +2,16 @@
 
 Hệ thống độc lập tự động hóa nghiệp vụ cho Văn phòng Công chứng: Đọc & phân tích hồ sơ Word (`.doc`/`.docx`) $\rightarrow$ Chuẩn hóa & trích xuất dữ liệu form công chứng $\rightarrow$ Đối chiếu sổ công chứng Excel từ web $\rightarrow$ Điền tự động & upload qua Playwright.
 
+**Vì sao sản phẩm đọc Word (quyết định B1):** Văn phòng đã có phần mềm quản lý
+hồ sơ công chứng nhưng phần mềm đó không có API để lấy dữ liệu ra. Vì thế không
+thể lấy dữ liệu từ phần mềm cũ cho luồng này; dữ liệu phải được trích từ chính
+file Word chuyên viên đã soạn. Các nguồn thật khác của hệ thống là ảnh giấy tờ
+khách hàng và dấu vết thao tác máy trạm, mỗi nguồn do phần tương ứng sở hữu.
+Không thiết kế Upload Lab dựa trên API/DB của phần mềm cũ khi chưa có bằng chứng
+nhà cung cấp đã mở cách truy cập. Nếu điều kiện đó thay đổi, hỏi lại owner.
+Nội dung này được chuyển từ `docs/architecture/OPEN_DECISIONS.md` §B1; tài liệu
+hiện có chưa dẫn tới lời giải thích nguyên văn của owner.
+
 ---
 
 ## 1. Kiến trúc luồng nghiệp vụ (End-to-End Workflow)

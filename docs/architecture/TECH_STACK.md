@@ -35,7 +35,7 @@ Cập nhật trạng thái POC: 11/09/2026. Các lựa chọn công nghệ produ
 | **UI desktop legacy** | **PySide6 / Qt** | `upload_lab` (`ui_qt/`) | Baseline chuyển đổi; không tiếp tục là shell đích |
 | **Tự động hóa web nhà nước** | **Playwright** (Chromium) | `upload_lab` | Session lưu ở `nd_storage_state.json`; Chromium headed riêng do Python quản lý |
 | **Agent trên máy trạm** | **C# .NET 8** | `notaryoffice` (dự kiến) | Ràng buộc: <30MB RAM, <0.5% CPU |
-| **Nhận media từ Zalo** | `zca-js` (Node) như connector thay thế được | Hiện trạng: `notary_v2` (Zalo Document Inbox); đích: `zalo/` sau MIN-103 | Xem mục 4 |
+| **Nhận media từ Zalo** | `zca-js` (Node) như connector thay thế được | Repo nguồn `D:\zalo-intake`; `zalo/` là snapshot; code v1 legacy còn ở `notary_v2` | Xem `zalo/README.md` và mục 4 |
 | **Test** | `pytest`; `playwright` cho e2e | cả `notary_v2` và `upload_lab` | |
 
 **API key và secret:** đặt trong `.env` của từng repo, đã `.gitignore`. Không bao
@@ -43,9 +43,9 @@ giờ ghi key vào tài liệu, không commit `.env`. Mẫu biến ở `.env.exa
 
 ### 1.1. Candidate còn đang đánh giá
 
-**Zalo Intake v2 — MIN-89, quyết định mới nhất 24/09/2026:** phát triển module
-trong **thư mục/repo local riêng** trước (đề xuất `D:\zalo-intake`), chuyển lên
-Windows server sau; chưa triển khai server ở giai đoạn này. Node/zca-js vẫn là
+**Zalo Intake v2 — MIN-89/MIN-103:** module đã có repo local riêng
+`D:\zalo-intake` và snapshot một chiều `zalo/`; chuyển lên Windows server sau,
+chưa có bằng chứng triển khai server ở giai đoạn này. Node/zca-js vẫn là
 adapter nghiên cứu thay được. Module luôn gọi **Qwen OCR API** cho ảnh Zalo và
 sở hữu các bước chuẩn bị ảnh cần byte ảnh. Không build engine OCR riêng hoặc
 thêm OCR vendor mới. Soạn hồ sơ/Document Intake trên máy chính sở hữu và chạy
@@ -56,13 +56,11 @@ bot không có parser nghiệp vụ riêng. Giao diện trao đổi giữa hai r
 Ảnh trong module xóa sau 7 ngày từ `captured_at` (lúc bot bắt tin); raw chưa ACK phải giữ, thời hạn giữ sau
 ACK chưa chốt. Contract truyền gói còn là thiết kế kỹ thuật chưa duyệt;
 HTTPS pull là đề xuất cho giai đoạn server. Xem [draft MIN-89](../product/specs/2026-09-24-zalo-independent-intake.md).
-Việc chuyển toàn engine và tài liệu engine sang repo độc lập cùng snapshot
-`zalo/` thuộc [MIN-103](https://linear.app/minhnotary/issue/MIN-103/migrate-engine-zalo-thanh-module-thu-tu-trong-repo-rieng-va-zalo).
-Repo/folder này chưa có; `D:\zalo-intake` là đường dẫn local dự kiến. Task đó
-phải chốt nguồn Git chính thức và cách nhập snapshot, không tạo `.git` lồng hoặc
+Việc tách engine và tài liệu producer theo [MIN-103](https://linear.app/minhnotary/issue/MIN-103/migrate-engine-zalo-thanh-module-thu-tu-trong-repo-rieng-va-zalo)
+đã có [repo nguồn và snapshot](../../zalo/README.md). Không tạo `.git` lồng hoặc
 duy trì hai nơi sửa engine tự do. Giao diện và parser của `notary_v2` giữ phần
-consumer riêng. Module Zalo dùng DB/session riêng nếu cần, không phải bảng trong
-DB nghiệp vụ chung.
+consumer riêng. Module Zalo có DB/session riêng, không phải bảng trong DB
+nghiệp vụ chung.
 
 Electron đã được owner chọn làm desktop shell đích ngày 14/09/2026 và đã chuyển
 vào bảng công nghệ chính. Đặc tả MIN-50 đã được **duyệt cho POC** theo

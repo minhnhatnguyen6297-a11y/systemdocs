@@ -4,7 +4,8 @@ Danh sách các câu hỏi **xuyên sản phẩm** hoặc **có thể thay đổ
 Nếu một task chạm vào mục còn 🔴, agent phải **dừng và hỏi**, không được chọn giúp.
 Mục 🟢 là đã chốt — giữ lại để không ai đề xuất lại.
 
-Cập nhật: 10/09/2026
+Cập nhật định tuyến SOT: 28/09/2026. Các quyết định gốc có ngày và phạm vi
+riêng trong file sở hữu; ngày này không có nghĩa chúng vừa được quyết định lại.
 
 Ký hiệu: 🔴 chưa có dữ liệu · 🟡 có khuyến nghị, chờ duyệt · 🟢 đã chốt
 
@@ -12,29 +13,10 @@ Ký hiệu: 🔴 chưa có dữ liệu · 🟡 có khuyến nghị, chờ duyệ
 
 ## A. Phải đi đo trên máy thật, không suy luận được trên giấy
 
-Nguồn: `notaryoffice/intent.md` §10.1. Mỗi câu 1–2 ngày kiểm tra, mỗi câu
-có thể thay đổi thiết kế `notaryoffice`.
-
-| # | Câu hỏi | Trạng thái | Hệ quả |
-|---|---|---|---|
-| A1 | Đọc được nội dung tài liệu khi Word đang giữ file không? | 🔴 chưa đo | Nếu không: phải đổi cách đọc, chậm hơn, vẫn khả thi |
-| A2 | Print Spooler có cho biết **số bản in** không? | 🟢 **KHÔNG** | Xem ràng buộc bên dưới |
-| A3 | Ổ mạng chung (Z:) có phát sự kiện đổi file đầy đủ không? | 🔴 chưa đo | Nếu không: thêm job quét đối chiếu định kỳ → tăng khối lượng |
-| A4 | 6 máy dùng tài khoản Windows **riêng** hay **chung**? | 🔴 chưa đi xem | Nếu chung: bỏ hẳn tính năng theo dõi bàn giao giữa chuyên viên |
-
-**A2 đã chốt = Không.** Print Spooler không cung cấp số bản in. Ràng buộc thiết kế
-kéo theo:
-
-- Số bản in **phải suy ra từ số trang** trong event (tổng trang ÷ số trang tài
-  liệu), và con số đó là **suy đoán, không phải sự thật**.
-- Vì vậy **không được** dùng số bản in làm điều kiện cứng để phân biệt
-  `DRAFT_PRINTED` vs `FINAL_PRINTED`. Phải dựa vào tín hiệu khác (thời điểm in so
-  với lần sửa cuối, có/không sửa file sau khi in, số lần in).
-- Nếu một tính năng chỉ chạy được khi biết chính xác số bản in → tính năng đó
-  không khả thi, đừng thiết kế quanh nó.
-
-**A4 vẫn là câu quan trọng nhất và không cần kỹ thuật để trả lời** — chỉ cần đi
-xem 6 máy. Agent không được giả định là tài khoản riêng.
+**A1–A4 thuộc `notaryoffice`.** Trạng thái, hệ quả và lý do của từng câu chỉ
+được cập nhật ở [notaryoffice/intent.md §10.1](../../notaryoffice/intent.md).
+Mục A này giữ tên mã cũ để các link hiện có vẫn dẫn người đọc tới nguồn sở hữu;
+không duy trì bảng trạng thái thứ hai tại đây.
 
 ---
 
@@ -42,25 +24,16 @@ xem 6 máy. Agent không được giả định là tài khoản riêng.
 
 | # | Câu hỏi | Trạng thái |
 |---|---|---|
-| B1 | Văn phòng có phần mềm quản lý hồ sơ đang dùng? Có đọc được dữ liệu ra? | 🟢 **Có phần mềm, NHƯNG không có API để đọc dữ liệu ra** |
+| B1 | Văn phòng có phần mềm quản lý hồ sơ đang dùng? Có đọc được dữ liệu ra? | ↗ [upload_lab/README.md](../../upload_lab/README.md) sở hữu kết luận và lý do |
 | B2 | Phạm vi đọc Zalo | 🟢 **Làm ngay, không hoãn** — theo ranh giới bên dưới |
-| B3 | Thông báo cho nhân viên + đưa vào nội quy lao động | 🟢 **Có**, phải xong **trước** khi triển khai |
-| B4 | Chọn 2 chuyên viên cho giai đoạn thử nghiệm | 🟢 Chủ dự án tự chọn |
+| B3 | Thông báo cho nhân viên + đưa vào nội quy lao động | ↗ [notaryoffice/intent.md §10.1](../../notaryoffice/intent.md) sở hữu kết luận |
+| B4 | Chọn 2 chuyên viên cho giai đoạn thử nghiệm | ↗ [notaryoffice/intent.md §10.1](../../notaryoffice/intent.md) sở hữu kết luận |
 
 ### B1 — vì sao `upload_lab` tồn tại
 
-Văn phòng **đã có** phần mềm quản lý hồ sơ công chứng, nhưng nó **không có API để
-lấy dữ liệu ra**. Đây chính là **lý do `upload_lab` ra đời**: không đọc được dữ
-liệu từ phần mềm đó, nên phải đi đường khác — trích xuất từ chính các file Word
-mà chuyên viên đã soạn.
-
-Hệ quả cho agent:
-
-- **Đóng phương án "đọc DB/API của phần mềm hiện có trước mọi thứ khác".** Không
-  khả thi. Đừng đề xuất lại, đừng thiết kế tính năng dựa trên nó.
-- Nguồn dữ liệu thật của hệ thống là: **file Word chuyên viên soạn**, **ảnh giấy
-  tờ khách hàng**, và **dấu vết thao tác trên máy trạm** — không phải phần mềm cũ.
-- Nếu sau này nhà cung cấp phần mềm cũ mở API, đó là thay đổi lớn → phải hỏi lại.
+Kết luận, lý do ngành và điều kiện hỏi lại thuộc [upload_lab/README.md](../../upload_lab/README.md).
+Mục B1 giữ mã cũ để các link lịch sử tiếp tục dẫn tới nơi sở hữu; không cập
+nhật một bản giải thích song song ở đây.
 
 ### B2 — ranh giới đọc Zalo (đã chốt)
 
@@ -75,6 +48,10 @@ Làm ngay, không hoãn. Nhưng đúng phạm vi sau, không rộng hơn:
 
 Ba điều kiện này là **ranh giới quyền riêng tư**, không phải chi tiết triển khai.
 Agent không được nới ra để "tăng độ phủ dữ liệu". Muốn đổi → hỏi.
+Lý do gốc ghi trong `notaryoffice/intent.md` trước khi định tuyến SOT: ranh giới
+này bảo vệ sự riêng tư của nhân viên, tuân thủ pháp luật và tránh nguy cơ tài
+khoản Zalo cá nhân của nhân viên bị khóa. Nguồn lời owner nguyên văn cho lý do
+này chưa được dẫn trong tài liệu hiện có.
 
 Ghi chú: mục này gộp cả phần Zalo của `notaryoffice` và Zalo Document Inbox của
 `notary_v2` — cùng một ranh giới, cùng một tài khoản chung; đích vận hành là
@@ -85,12 +62,12 @@ triển trước trong **thư mục/repo local riêng** (đề xuất `D:\zalo-i
 đó mới chạy độc lập trên Windows server; chưa triển khai server ở giai đoạn
 này. Dữ liệu công chứng ở một máy chính dùng chung, được phép tắt. Hai repo chỉ
 kết nối qua giao diện trao đổi dữ liệu. Xem [draft MIN-89](../product/specs/2026-09-24-zalo-independent-intake.md).
-Đích của [MIN-103](https://linear.app/minhnotary/issue/MIN-103/migrate-engine-zalo-thanh-module-thu-tu-trong-repo-rieng-va-zalo)
-là **module thứ tư** tại `zalo/` trong monorepo, lấy từ repo Zalo độc lập.
-Repo/folder này chưa có; engine hiện vẫn trong `notary_v2`. Task migration
-phải chốt repo nguồn chính thức, cách nhập snapshot/commit và chuyển tài liệu
-engine sang `zalo/docs/`; spec consumer/giao tiếp ở `notary_v2` giữ phần riêng.
-Không tạo `.git` lồng hoặc hai nguồn spec engine cùng quyền quyết định.
+Sau [MIN-103](https://linear.app/minhnotary/issue/MIN-103/migrate-engine-zalo-thanh-module-thu-tu-trong-repo-rieng-va-zalo),
+repo nguồn `D:\zalo-intake` **đã có** và `zalo/` trong monorepo là snapshot một
+chiều. Tài liệu producer đã chuyển sang repo nguồn và snapshot `zalo/docs/`;
+Notary giữ tài liệu consumer/Sync riêng. Xem [quyền sở hữu repo](../../zalo/docs/repo-ownership.md)
+và [cửa vào Notary](../../notary_v2/docs/platform/zalo-document-inbox/README.md)
+trước khi sửa engine; không tạo hai nguồn spec engine cùng quyền quyết định.
 Owner đã chốt **phương án A**: module Zalo nhận/giữ ảnh, thực hiện bước chuẩn
 bị ảnh cần byte ảnh và gọi Qwen OCR API; không build engine OCR riêng. Module
 bàn giao **chữ OCR thô, trạng thái xử lý, thời gian và dấu vết nguồn**, không
@@ -125,34 +102,24 @@ máy chính; khả năng history/OA để lấy bù nguồn cần thử
 
 ## C. Rủi ro lớn nhất — không phải rủi ro kỹ thuật
 
-**Nhân viên bấm "Đúng" theo phản xạ.**
-
-Nếu mỗi người phải xác nhận 20 thông báo/ngày, họ sẽ bấm Đúng hết mà không đọc.
-Dữ liệu trông đẹp nhưng sai, và hệ thống "học" theo cái sai đó.
-
-Biện pháp đã chốt 🟢 (`gioi-thieu-du-an.md` §7):
-- Giới hạn **cứng** tối đa **3 thông báo/người/ngày**; phần còn lại gom vào một
-  màn hình xem lại cuối ngày.
-- Đo thời gian bấm; bấm dưới **1,5 giây** liên tục = dấu hiệu bấm không đọc.
-
-Agent không được nới giới hạn này để "tăng độ phủ dữ liệu".
+Rủi ro bấm xác nhận theo phản xạ, lý do ngành và giới hạn thông báo thuộc
+[notaryoffice/intent.md §10.2](../../notaryoffice/intent.md). Mục C giữ tên cũ
+để các link lịch sử còn dẫn được tới nguồn sở hữu; không cập nhật con số tại đây.
 
 ---
 
 ## D. Đã chốt — đừng đề xuất lại
 
-| Phương án | Vì sao loại |
-|---|---|
-| Đọc API/DB của phần mềm quản lý hồ sơ hiện có | Không có API (B1) |
-| Server-centric FileWatcher: 1 server tự watch hết ổ mạng | Nghẽn băng thông LAN, bỏ sót sự kiện trên ổ local (~20% file) |
-| Full edge-processing: xử lý toàn bộ ngay trên máy con | Agent nặng, khó cập nhật logic trên 6 máy, ảnh hưởng máy nhân viên |
-| Auto-link chặt: chỉ ghép khi điểm ≥ 90, dưới ngưỡng thì bỏ | Mất quá nhiều dữ liệu. Đã đổi sang **xếp hạng ứng viên** rồi hỏi người 1 lần (`notaryoffice/intent.md` §8.1) |
-| Dùng số bản in từ Print Spooler | Spooler không cung cấp (A2) |
-| Đọc Zalo cá nhân của nhân viên | Ranh giới quyền riêng tư đã chốt (B2) |
-| Local OCR trong `notary_v2` | Đang **parked**, cần redesign được duyệt riêng mới mở lại |
-| Thêm OCR provider thứ hai song song với Qwen | Xem [`TECH_STACK.md`](./TECH_STACK.md) mục 2 |
+Mục này giữ đường vào lịch sử, **không còn là bảng quyết định riêng**:
 
-Chi tiết ba phương án kiến trúc bị loại: `notaryoffice/intent.md` §6.3.
+- Đọc API/DB phần mềm cũ → [Upload Lab README, B1](../../upload_lab/README.md).
+- FileWatcher tập trung, xử lý toàn bộ trên máy con, tự ghép hồ sơ bằng điểm →
+  [notaryoffice/intent.md §6.3](../../notaryoffice/intent.md).
+- Số bản in Print Spooler → [notaryoffice/intent.md §10.1, A2](../../notaryoffice/intent.md).
+- Zalo cá nhân của nhân viên → [B2 trong file này](#b2--ranh-giới-đọc-zalo-đã-chốt).
+- Local OCR của Notary đang để ngoài luồng hiện hành →
+  [Document Intake README](../../notary_v2/docs/platform/document-intake/README.md).
+- OCR provider thứ hai → [TECH_STACK.md §2](TECH_STACK.md).
 
 ---
 

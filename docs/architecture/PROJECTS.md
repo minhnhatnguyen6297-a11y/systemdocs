@@ -6,14 +6,16 @@ chặn các giả định sai mà agent trước đã ghi vào folder này.
 Mọi thông tin dưới đây đã được đối chiếu với file thật trong repo. Chọn công nghệ
 mới → đọc [`TECH_STACK.md`](./TECH_STACK.md) trước.
 
-Cập nhật trạng thái module: 24/09/2026. Bằng chứng source lịch sử bên dưới giữ ngày kiểm tra riêng.
+Cập nhật trạng thái module Zalo: 28/09/2026 theo `zalo/README.md` và
+`zalo/SNAPSHOT_MANIFEST.json`. Bằng chứng source lịch sử bên dưới giữ ngày kiểm
+tra riêng.
 
 | Repo | Đường dẫn | Git | Trạng thái |
 |---|---|---|---|
 | `notary_v2` | `D:\notary_v2` | `github.com/minhnhatnguyen6297-a11y/notary_v2` | Đang phát triển; chưa triển khai production |
 | `upload_lab` | `D:\upload_lab_repo` | `github.com/minhnhatnguyen6297-a11y/upload_lab` | Đang phát triển; chưa triển khai production |
 | `notaryoffice` | `D:\notaryoffice` | Git local đã init; chưa cấu hình remote | **Chỉ có tài liệu, chưa có code** (`notaryoffice/` chỉ chứa `intent.md`) |
-| `zalo` (đích) | `D:\zalo-intake` (đề xuất), snapshot monorepo `zalo/` | Repo riêng chưa tạo; chưa có remote | Module thứ tư, code hiện còn trong `notary_v2/`; migration ở [MIN-103](https://linear.app/minhnotary/issue/MIN-103/migrate-engine-zalo-thanh-module-thu-tu-trong-repo-rieng-va-zalo) |
+| `zalo` | `D:\zalo-intake`, snapshot monorepo `zalo/` | Repo độc lập là SOT engine; `zalo/` là snapshot một chiều | Module thu nhận đã tách; code Zalo v1 legacy còn trong `notary_v2/`. Xem [MIN-103](https://linear.app/minhnotary/issue/MIN-103/migrate-engine-zalo-thanh-module-thu-tu-trong-repo-rieng-va-zalo) |
 | `researchskill` | `D:\researchskill` | `github.com/minhnhatnguyen6297-a11y/researchskill` | **Ngoài phạm vi** |
 
 `excelTK` là dự án riêng, không phải sản phẩm con của hệ thống công chứng và
@@ -53,9 +55,9 @@ một số CCCD trong hợp đồng công chứng là lỗi nặng.
 - **Zalo Document Inbox** — code hiện tại nhận text/media qua `zca-js`, chọn lô
   ảnh và xuất kết quả theo [spec v1 legacy](../../notary_v2/docs/platform/zalo-document-inbox/spec-v1-legacy.md).
   Đích theo [spec chính](../../notary_v2/docs/platform/zalo-document-inbox/spec.md):
-  theo quyết định mới nhất 24/09/2026, module được làm trước trong thư mục/repo
-  local riêng (đề xuất `D:\zalo-intake`), chạy Windows server sau; chưa triển
-  khai server. Module sở hữu nhận ảnh, chuẩn bị ảnh cần byte ảnh và Qwen OCR
+  theo quyết định 24/09/2026, module được làm trước trong repo local riêng
+  `D:\zalo-intake` (nay đã có), đích chạy Windows server sau; chưa có bằng chứng
+  triển khai server. Module sở hữu nhận ảnh, chuẩn bị ảnh cần byte ảnh và Qwen OCR
   API; bàn giao chữ OCR thô, trạng thái và provenance qua giao diện trao đổi
   giữa hai repo. Soạn hồ sơ/Document Intake trên máy chính chạy regex, phân
   loại, bóc trường, ghép mặt giấy/người/tài sản và gợi ý nhóm từ raw đã Sync.
@@ -112,7 +114,8 @@ Hai vấn đề chồng lên nhau:
 1. Văn phòng **đã có** phần mềm quản lý hồ sơ công chứng, nhưng phần mềm đó
    **không có API để lấy dữ liệu ra**. Dữ liệu bị khóa bên trong. Muốn dùng lại
    dữ liệu cũ chỉ còn một đường: đọc từ chính **các file Word chuyên viên đã
-   soạn**. **Đó là lý do `upload_lab` ra đời** (`OPEN_DECISIONS.md` B1).
+   soạn**. **Đó là lý do `upload_lab` ra đời**; quyết định B1 thuộc
+   [upload_lab/README.md](../../upload_lab/README.md).
 2. Hàng nghìn hồ sơ Word cũ phải được **nhập tay lên web CSDL công chứng tỉnh** —
    mở từng file, đọc bằng mắt, gõ lại vào form web. Tốn hàng trăm giờ.
 
@@ -282,15 +285,13 @@ A4 (A2 đã có câu trả lời = Không).
 
 ---
 
-## 4. `zalo` — module thứ tư (đích, chưa migrate)
+## 4. `zalo` — module thu nhận độc lập
 
-Repo Zalo độc lập và folder `zalo/` trong monorepo là **đích của
-[MIN-103](https://linear.app/minhnotary/issue/MIN-103/migrate-engine-zalo-thanh-module-thu-tu-trong-repo-rieng-va-zalo)**,
-chưa phải code đang chạy ở đó. `D:\zalo-intake` chỉ là đường dẫn local dự kiến;
-không khẳng định đã có repo/remote. Hiện engine Zalo legacy vẫn nằm trong
-`notary_v2/`. Task migration phải chốt nguồn Git chính thức, cách lấy snapshot
-và commit nguồn, tránh sửa đồng thời hai bản; không tự lồng `.git` hoặc tạo
-submodule.
+Sau [MIN-103](https://linear.app/minhnotary/issue/MIN-103/migrate-engine-zalo-thanh-module-thu-tu-trong-repo-rieng-va-zalo),
+`D:\zalo-intake` là repo nguồn của engine; `zalo/` trong monorepo là snapshot một
+chiều. [zalo/README.md](../../zalo/README.md) nêu quyền sở hữu và cách chạy;
+code Zalo v1 legacy trong `notary_v2/` chỉ là hiện trạng cũ để đối chiếu. Không
+sửa engine ở hai nơi hoặc tạo `.git` lồng trong snapshot.
 
 Module này sở hữu connector, phiên đăng nhập, listener, journal, media tạm,
 chuẩn bị ảnh cần byte ảnh, lời gọi Qwen OCR API, gói file raw và API yêu cầu OCR

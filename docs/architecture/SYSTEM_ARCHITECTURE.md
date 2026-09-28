@@ -2,13 +2,16 @@
 
 ## 0. Đọc mục này trước
 
-Cập nhật quyết định mới nhất của owner ngày 24/09/2026: module Zalo được phát
-triển trước trong **thư mục/repo local riêng** (đề xuất `D:\zalo-intake`),
-sau này chạy độc lập trên Windows server. Giai đoạn này chưa triển khai server.
+Cập nhật hiện trạng repo ngày 28/09/2026: module Zalo đã có repo nguồn
+`D:\zalo-intake` và snapshot một chiều `zalo/` trong monorepo (xem
+[zalo/README.md](../../zalo/README.md)); đích vận hành vẫn là Windows server.
+Chưa có bằng chứng triển khai server trong tài liệu này.
 Hai repo chỉ kết nối qua giao diện trao đổi dữ liệu. Ranh giới và quy cách file
 đang ở [draft MIN-89](../product/specs/2026-09-24-zalo-independent-intake.md).
-Spec hành vi hiện hành nằm ở [Zalo Inbox spec](../../notary_v2/docs/platform/zalo-document-inbox/spec.md);
-[spec v1 legacy](../../notary_v2/docs/platform/zalo-document-inbox/spec-v1-legacy.md)
+Hành vi producer do [Zalo spec-producer](../../zalo/docs/spec-producer.md) sở hữu
+(bản gốc ở repo `D:\zalo-intake`); phía Notary nhận/Sync theo
+[Zalo Inbox README](../../notary_v2/docs/platform/zalo-document-inbox/README.md).
+[Spec v1 legacy](../../notary_v2/docs/platform/zalo-document-inbox/spec-v1-legacy.md)
 chỉ dùng để đối chiếu code cũ.
 Module Zalo nhận tin/ảnh, làm bước chuẩn bị ảnh cần byte ảnh và gọi Qwen OCR
 API. Module bàn giao **chữ OCR thô, trạng thái và dấu vết nguồn (provenance)**;
@@ -37,8 +40,8 @@ khi mở, nối lại và theo chu kỳ hoặc khi người dùng bấm Sync
 UI chung và các thành phần chức năng chung được tái sử dụng.** Ba module
 nghiệp vụ là ba đường xử lý cho ba mục đích; `zalo` là module thứ tư phục vụ
 nguồn đầu vào, có DB/session/runtime riêng để chạy tách được. `shell` là hạ
-tầng giao diện. Repo Zalo và folder `zalo/` chưa được tạo; chuyển engine thuộc
-[MIN-103](https://linear.app/minhnotary/issue/MIN-103/migrate-engine-zalo-thanh-module-thu-tu-trong-repo-rieng-va-zalo).
+tầng giao diện. Repo Zalo `D:\zalo-intake` đã có; folder `zalo/` là snapshot
+một chiều sau [MIN-103](https://linear.app/minhnotary/issue/MIN-103/migrate-engine-zalo-thanh-module-thu-tu-trong-repo-rieng-va-zalo).
 [`COMPONENT_MAP.md`](./COMPONENT_MAP.md) là bản đồ ownership/reuse **draft để duyệt**;
 không phải thiết kế vật lý hay quyền thực hiện migration.
 
@@ -121,7 +124,7 @@ cũng được ghi vào bảng của người khác.
 |---|---|---|
 | Hồ sơ đang soạn, các bên, tài sản, quan hệ thừa kế | `notary_v2` | `notary.db` |
 | Kết quả Cloud OCR giấy tờ + metadata Zalo trong code hiện tại (legacy) | `notary_v2` | `notary.db`: bảng `ocr_jobs` và Zalo (`notary_v2/models.py:161-171,186-300`; `database.py:8-24`); file media ở storage backend hiện tại. `ocr_jobs.db` là broker + result backend Celery mặc định (`celery_app.py:5-11`). Đây là hiện trạng trước khi tách MIN-89. |
-| Tin/ảnh Zalo và OCR ở đích MIN-89/MIN-103 | `zalo` (chưa migrate) | Repo/folder riêng; connector, session, listener, journal, media tạm, chuẩn bị ảnh, Qwen OCR, gói file raw và API OCR lại. Ảnh xóa tại `captured_at + 168 giờ`; raw chưa ACK phải giữ. Máy chính không nhận ảnh. |
+| Tin/ảnh Zalo và OCR theo MIN-89/MIN-103 | `D:\zalo-intake` (repo nguồn), `zalo/` (snapshot) | Connector, session, listener, journal, media tạm, chuẩn bị ảnh, Qwen OCR, gói file raw và API OCR lại. Ảnh xóa tại `captured_at + 168 giờ`; raw chưa ACK phải giữ. Máy chính không nhận ảnh. Trạng thái chạy production cần kiểm chứng riêng. |
 | Sync raw Zalo, regex, phân loại, bóc trường, ghép mặt giấy/người/tài sản, nhóm hồ sơ và review | Soạn hồ sơ/Document Intake (`notary_v2`) | Chạy trên máy chính từ raw + nguồn; lưu gói raw, xuất thẻ/nhóm ứng viên để người dùng kiểm tra rồi đưa vào đầu vào soạn thảo. Cùng năng lực xử lý đầu vào nghiệp vụ, không đặt parser riêng ở bot. |
 | Word/hợp đồng sinh ra từ template | `notary_v2` | |
 | Trường dữ liệu bóc từ kho Word cũ | `upload_lab` | `output/*.json`, `registry.sqlite3` |
@@ -190,24 +193,13 @@ Hai tín hiệu xương sống đã chốt:
 
 1. **Word text diff** → biến động thực thể (thêm/sửa CCCD, GCN, thửa/tờ, số
    tiền, diện tích) → cập nhật Case, phát hiện việc phát sinh.
-2. **Print spooler** → mức độ hoàn thiện tài liệu. Ý tưởng ban đầu là phân biệt
-   `DRAFT_PRINTED` / `FINAL_PRINTED` theo **số bản in** (in 1 bản = soát lỗi; in
-   ≥2 bản = bản chuẩn sẵn sàng ký, vì hợp đồng công chứng phải in 3–4 bản).
+2. **Print spooler** → tín hiệu về tiến trình tài liệu. Ý tưởng ban đầu dùng số
+   bản in để phân biệt nháp/bản cuối đã bị loại; quyết định A2, lý do và tín
+   hiệu được phép dùng chỉ thuộc [notaryoffice/intent.md §10.1](../../notaryoffice/intent.md).
 
-   ⚠️ **Cách này không dùng được.** Print Spooler **không cung cấp số bản in**
-   (`OPEN_DECISIONS.md` A2 — đã chốt = Không). Số bản chỉ suy ra được từ tổng số
-   trang, tức là **suy đoán**. Vì vậy phải phân biệt bằng tín hiệu khác: thời
-   điểm in so với lần sửa cuối, có sửa file sau khi in hay không, số lần in. Đừng
-   thiết kế tính năng nào cần biết chính xác số bản in.
-
-Ba phương án đã **loại bỏ** (đừng đề xuất lại):
-
-- ❌ FileWatcher tập trung trên máy chủ — SMB/NAS trễ, sinh event ảo, không
-  định danh được user nào trên máy nào, và bỏ sót 20% file nằm trên ổ máy con.
-- ❌ Full edge processing (máy trạm tự diff + tự chạy regex) — biến máy nhân
-  viên thành heavy client, và mỗi lần sửa regex phải đi cài lại 6 máy.
-- ❌ Tự động ghép cứng 100% theo điểm ≥90 không cần người xác nhận — trùng tên,
-  trùng số thửa giữa các xã dẫn tới ghép nhầm hồ sơ.
+Ba phương án kiến trúc bị loại và lý do của từng phương án chỉ thuộc
+[notaryoffice/intent.md §6.3](../../notaryoffice/intent.md): FileWatcher tập
+trung, xử lý toàn bộ trên máy con, và tự ghép hồ sơ bằng điểm.
 
 ## 5. Lộ trình đi tới hệ thống thống nhất
 

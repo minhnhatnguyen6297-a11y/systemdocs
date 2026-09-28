@@ -75,10 +75,10 @@ Chuyên viên vẫn giữ nguyên thói quen làm việc: vẫn mở Word soạn
 - **Quyết định B3 (ĐÃ CHỐT):** Hoàn thành văn bản thông báo cho toàn thể nhân viên và bổ sung nội dung giám sát hoạt động nghiệp vụ vào **Nội quy lao động của Văn phòng trước ngày triển khai thử nghiệm**, không để đến sau khi hệ thống đã vận hành.
 
 ### 2.3. Ranh giới Kết nối Zalo (Quyết định B2 đã chốt)
-Zalo là kênh nhận ảnh giấy tờ phổ biến nhưng nhạy cảm về quyền riêng tư. Ranh giới kỹ thuật được xác lập cứng:
-- **Chỉ sử dụng DUY NHẤT một tài khoản Zalo chung của Văn phòng** đặt listener trên máy chủ trung tâm để tiếp nhận giấy tờ khách gửi vào nhóm nghiệp vụ hoặc gửi trực tiếp tới văn phòng.
-- **Tuyệt đối KHÔNG đọc tài khoản Zalo cá nhân của nhân viên.** Không cài bất kỳ listener hay extension can thiệp Zalo trên máy trạm của chuyên viên.
-- Ranh giới này bảo vệ sự riêng tư của nhân viên, tuân thủ pháp luật và loại bỏ hoàn toàn nguy cơ bị Zalo khóa tài khoản cá nhân.
+Ranh giới dùng tài khoản Zalo chung, phạm vi tin nhắn và nơi chạy listener do
+[`OPEN_DECISIONS.md` §B2](../docs/architecture/OPEN_DECISIONS.md) sở hữu cho
+cả hệ thống. Module vận hành phải tuân theo nguồn đó; không chép thành một
+quyết định B2 riêng trong spec này.
 
 ### 2.4. Tính Cục bộ Mạng LAN (Local-First Data Residency)
 - 100% dữ liệu hồ sơ, văn bản, nhật ký hoạt động được lưu trữ và xử lý trên máy chủ LAN nội bộ của văn phòng.
@@ -371,8 +371,8 @@ Hệ thống áp dụng mô hình phân tán thông minh:
 | **❌ Server-Centric FileWatcher** | Đặt FileWatcher tại máy chủ tự động quét ổ NAS/SMB chung. | Trễ giao thức SMB, phát sinh sự kiện ảo, không định danh được Windows User nào vừa lưu file, và bỏ sót hoàn toàn 20% công việc trên máy con. |
 | **❌ Full Edge-Processing** | Máy trạm tự diff, tự chạy toàn bộ Regex, tự tính điểm. | Biến máy trạm thành client dày gây lag giật máy chuyên viên; khó bảo trì khi phải cập nhật rule/regex trên toàn bộ 6 máy trạm thay vì 1 nơi trên server. |
 | **❌ Auto-link Cứng Ma trận Điểm** | Điểm $\ge 90$ tự động ghép cứng vào Case, không cần hỏi. | Rủi ro pháp lý công chứng rất cao (trùng họ tên, ủy quyền nhiều việc, cùng thửa đất khác xã). Bị loại để chuyển sang **xếp hạng ứng viên + hỏi người 1 lần**. |
-| **❌ Đọc API/DB phần mềm cũ** | Kết nối trực tiếp vào phần mềm quản lý công chứng đang dùng. | **Quyết định B1 đã chốt:** Phần mềm cũ không có API/DB mở để kết nối. Nguồn thật là file Word và dấu vết máy trạm. |
-| **❌ Đọc Zalo cá nhân nhân viên** | Cài extension/tool đọc Zalo trên máy trạm của nhân viên. | **Quyết định B2 đã chốt:** Vi phạm quyền riêng tư và tiềm ẩn rủi ro khóa tài khoản nhân viên. Chỉ dùng tài khoản chung trên server. |
+| **❌ Đọc API/DB phần mềm cũ** | Kết nối trực tiếp vào phần mềm quản lý công chứng đang dùng. | Quyết định B1 thuộc [`upload_lab/README.md`](../upload_lab/README.md); đọc nguồn đó trước khi xem lại phương án. |
+| **❌ Đọc Zalo cá nhân nhân viên** | Cài extension/tool đọc Zalo trên máy trạm của nhân viên. | Ranh giới B2 thuộc [`OPEN_DECISIONS.md` §B2](../docs/architecture/OPEN_DECISIONS.md); đọc nguồn đó trước khi xem lại phương án. |
 | **❌ Dùng số bản in từ Spooler** | Đọc số bản copies từ Print Spooler để kết luận bản ký. | **Quyết định A2 đã chốt:** Windows Spooler không báo số bản in. Không thiết kế bất kỳ tính năng nào phụ thuộc vào số này. |
 
 ### 6.4. Vai trò của Lớp OpenClaw / AI Engine (10 – 15% Bất định)
@@ -565,16 +565,37 @@ Tài liệu liên kết:
 | **A2** | Print Spooler có báo số bản in (copies) không? | 🟢 **ĐÃ CHỐT: KHÔNG** | Spooler không báo số bản in. Cấm dùng số bản in làm điều kiện phân loại; dùng thời điểm in, việc sửa sau in và lịch sử in. |
 | **A3** | Ổ mạng chung (Z:) có báo sự kiện đầy đủ không? | 🔴 Cần đo máy thật | Kiểm tra xem giao thức SMB có bỏ sót event; nếu có sẽ bổ sung job quét đối chiếu định kỳ. |
 | **A4** | 6 máy trạm dùng tài khoản Windows riêng hay chung? | 🔴 Cần khảo sát | Nếu dùng tài khoản riêng: theo dõi bàn giao mượt mà. Nếu dùng chung: phải loại bỏ tính năng theo dõi người làm cụ thể. |
-| **B1** | Phần mềm cũ có API/DB để trích xuất không? | 🟢 **ĐÃ CHỐT: KHÔNG** | Không có API. Đóng vĩnh viễn hướng đọc API cũ. Nguồn thật là file Word và dấu vết máy con. |
-| **B2** | Phạm vi kết nối Zalo | 🟢 **ĐÃ CHỐT** | Chỉ dùng 1 tài khoản Zalo chung văn phòng trên server. Cấm đọc Zalo cá nhân nhân viên. |
+| **B1** | Phần mềm cũ có API/DB để trích xuất không? | ↗ Nguồn Upload Lab | Xem [`upload_lab/README.md` §B1](../upload_lab/README.md); không chốt lại tại đây. |
+| **B2** | Phạm vi kết nối Zalo | ↗ Nguồn liên sản phẩm | Xem [`OPEN_DECISIONS.md` §B2](../docs/architecture/OPEN_DECISIONS.md); không chốt lại tại đây. |
 | **B3** | Thông báo nhân viên & Nội quy lao động | 🟢 **ĐÃ CHỐT** | Bắt buộc hoàn thành văn bản thông báo và bổ sung nội quy trước khi triển khai thử nghiệm. |
 | **B4** | Chọn chuyên viên tham gia thử nghiệm | 🟢 **ĐÃ CHỐT** | Chủ dự án chọn 2 chuyên viên có tinh thần hợp tác tốt nhất. |
 
+**Lý do và hệ quả của A2 — không lấy số bản in làm sự thật:** Print Spooler không
+cung cấp chính xác số bản in. Số bản chỉ có thể suy ra từ số trang trong event
+(tổng trang ÷ số trang tài liệu), nên kết quả đó là **suy đoán**. Không dùng nó
+làm điều kiện cứng để phân biệt `DRAFT_PRINTED` với `FINAL_PRINTED`; phải xét
+thời điểm in so với lần sửa cuối, có/không sửa file sau in và số lần in. Tính
+năng nào bắt buộc biết chính xác số bản in thì không khả thi. Nội dung này được
+chuyển nguyên ý từ `docs/architecture/OPEN_DECISIONS.md` §A; nguồn phép đo gốc
+hoặc lời giải thích nguyên văn của owner chưa được dẫn trong tài liệu hiện có.
+
+**A4 vẫn phải khảo sát trên 6 máy thật.** Không được giả định tài khoản Windows
+riêng. Nếu dùng chung, loại bỏ tính năng theo dõi người làm cụ thể; câu hỏi này
+không cần suy luận kỹ thuật để trả lời.
+
 ### 10.2. Ma trận Quản trị Rủi ro Kỹ thuật & Vận hành
+
+**Vì sao phải giới hạn thông báo xác nhận:** nếu mỗi người phải xác nhận 20
+thông báo/ngày, họ có thể bấm “Đúng” theo phản xạ mà không đọc. Dữ liệu trông
+đẹp nhưng sai, và hệ thống sẽ học theo sai lệch đó. Đây là lý do giữ giới hạn
+3 thông báo/người/ngày, dồn phần còn lại vào màn hình xem cuối ngày và dùng
+thời gian bấm dưới 1,5 giây liên tục làm dấu hiệu cần kiểm tra. Lời giải thích
+này chuyển từ `docs/architecture/OPEN_DECISIONS.md` §C; chưa có link tới lời
+owner nguyên văn trong tài liệu hiện có.
 
 | Rủi ro tiềm ẩn | Mức độ | Biện pháp giảm thiểu đã thiết kế |
 | :--- | :---: | :--- |
-| **Nhân viên bấm "Đúng" theo phản xạ** | **Cao** | Giới hạn cứng tối đa 3 popup/ngày; phần còn lại xem xét cuối ngày; đo thời gian phản hồi (<1.5s là dấu hiệu bấm vô thức). |
+| **Nhân viên bấm "Đúng" theo phản xạ** | **Cao** | Giới hạn cứng tối đa 3 popup/người/ngày; phần còn lại xem xét cuối ngày; đo thời gian phản hồi (<1.5s là dấu hiệu bấm vô thức). |
 | **Mất kết nối mạng LAN cục bộ** | Trung bình | Sentinel tích hợp SQLite FIFO local cache, tự động lưu trữ và flush về máy chủ khi có mạng trở lại. |
 | **Nhân viên lưu file ngoài thư mục quy chuẩn** | Trung bình | Cấu hình Sentinel giám sát thêm thư mục Desktop và Downloads của user; phát hiện văn bản công chứng nằm sai chỗ để cảnh báo nhẹ. |
 | **Suy luận bàn giao sai (False Handoff)** | Thấp | Luôn gán nhãn trạng thái dự đoán (`Provisional State: B đang xử lý [Xác nhận]`), không tự ý đổi cứng quyền sở hữu hồ sơ. |
