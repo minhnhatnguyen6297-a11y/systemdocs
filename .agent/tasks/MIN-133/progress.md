@@ -34,3 +34,12 @@ Xem handoff câu hỏi trong phản hồi phiên 28/09 (node 144px, gộp tab+ac
 - Đo Electron (harness W2): page overflow 0×0 ở cả 1440×775 / 1366×768 / 1920×1080; tràn ngang hết; two_party 30 người → trang cuộn 648px, Stage không cuộn lồng.
 - Test: 280/280 đạt (+2 test D6/D7).
 - Chi tiết + hằng layout + hạn mức W4: `handoff-W3.md`. Ảnh: `w3-shots/`.
+
+## W4 — kiểm chứng cuối (2026-09-28) — XONG
+- Kiểm chứng trên **Electron thật + sidecar Python thật** (CDP 9666, DB/output scratch `.agent/scratch/w4/`, không đụng DB dev): 23/23 mục checklist ĐẠT — xem `handoff-W4.md` §3.
+- Test giữ xanh: node 280/280; validate_examples 68/0; pytest adapter 194, upload 109, workspace 87.
+- Đo app thật HS-11 (3 TS, 7 người): page/stage/h-overflow = 0/0/0 ở cả 1440×775, 1366×768, 1920×1080; stage 371px, topbar 42, row 25, pool 176, diag head 34, diag card flex 330/323/635.
+- Flow thật đã qua: nhập mới + lưu `HS-11`/`HS-12`, mở hồ sơ cũ, Cập nhật/Hủy, validation inline, **conflict→"Tải bản mới" reload** (revision 3→4), dialog Loại đất "Áp dụng" chỉ đổi draft, two_party 30 chỗ (p16 đầu B, không dồn, swap + bỏ gán về Pool), 33 người → trang cuộn không cuộn lồng, node trống nhận drop, chip Chủ/Nhận, ellipsis+tooltip, drag-drop 3 hướng (synthetic), gán bàn phím, zoom 90/110%, Mở rộng+Esc, dirty-dot, gate Stage, Word dialog chỉ mở không export, focus-within lộ nút hover-only, Upload Audit + Quét & Upload.
+- Phát hiện: **F-1** (khuyến nghị mở issue follow-up, không sửa trong W4) — defer rerender khi focus còn trong ô Stage có thể nuốt render `status='conflict'` cho tới emit kế; dùng chuột thật hầu như không gặp. Chi tiết `handoff-W4.md` §4.
+- Hạn chế môi trường: kéo native không có (`Input.startDragging` thiếu trên Electron 31); `Page.captureScreenshot` stall khi cửa sổ OS bị che → bắt bằng `Page.startScreencast`; **true Windows DPI 125/150% không kiểm được** (chỉ CSS-pixel emulation: DSF 1.25 → cuộn dọc +131px, không tràn ngang).
+- **Không sửa code** → không có `fix(MIN-133)`. Ảnh: `w4-shots/` (3 viewport + 2 tab Upload + flow).
