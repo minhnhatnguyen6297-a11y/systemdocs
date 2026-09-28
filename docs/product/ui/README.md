@@ -7,9 +7,10 @@
 
 Thư mục này là **nguồn sự thật duy nhất cho lớp thị giác và cách thao tác
 dùng chung** của hai module nghiệp vụ trong shell Electron một máy:
-Notary (`notary_v2`) và Upload Lab (`upload_lab`). Sau P4 (MIN-127): lớp
-CSS dùng chung trong `shell/src/renderer/styles.css` **là** đích đã ánh xạ
-token; CSS riêng từng module (`cd-*`, `ul-*`) vẫn là hiện trạng chờ P6–P8.
+Notary (`notary_v2`) và Upload Lab (`upload_lab`). Lớp CSS dùng chung trong
+`shell/src/renderer/styles.css` **là** đích đã ánh xạ token (P4/MIN-127);
+CSS riêng từng module (`cd-*` Notary, `ul-*` Upload) đã triển khai qua
+P6–P8 (MIN-129…MIN-131) và kiểm chứng end-to-end ở P9 (MIN-132).
 
 ## 1. File trong thư mục này
 
@@ -90,7 +91,7 @@ Tất cả đường dẫn cột hiện trạng nằm trong `shell/src/renderer/
 | Pool | `relationship-diagram.js` (pool card) | `visual-design.md` §5 |
 | Diagram node/edge/calc panel | `relationship-diagram.js` | `visual-design.md` §5 |
 | Dialog nhập file | `intake-dialog.js` | `DESIGN.md` §6 + `visual-design.md` §7 |
-| Dialog loại đất (theo ảnh approved) | *(chưa có — đích P3/P6)* | `visual-design.md` §4 |
+| Dialog loại đất (theo ảnh approved) | `case-drafting-view.js` `openLandDialog` (đã có — P6/MIN-129) | `visual-design.md` §4 |
 | Dialog xuất Word | `word-export-dialog.js` | `visual-design.md` §7 |
 | Dialog conflict (workspace_conflict) | `case-drafting-view.js` `conflictDialog` | `EXPERIENCE.md` §6 |
 | Menu "Gán vị trí" (thay thế kéo thả) | `relationship-diagram.js` `openAssignMenu` | `EXPERIENCE.md` §2 |

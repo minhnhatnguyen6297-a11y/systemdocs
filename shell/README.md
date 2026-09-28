@@ -75,7 +75,8 @@ word_export_options/word_export_batch` (+ `case_list`) route qua
 `notary_gateway.py`: mock (`notary_mock_adapter.py`, fixture
 `test/fixtures/notary-case-drafting/`) chi khi `G1_DEV_NOTARY_MOCK=1` va
 KHONG packaged; packaged luon real (`notary_adapter.py`). Wire contract
-`notary.case-drafting.v1` (`contracts/notary-case-drafting.md`), envelope
+`notary.case-drafting.v2` (§13, `contracts/notary-case-drafting.md`) cho
+workspace command; v1 (§1–12) giu cho consumer legacy. Envelope
 `desktopcommand.v1`. Renderer nhan `file_token` opaque — khong path.
 
 ## Dev

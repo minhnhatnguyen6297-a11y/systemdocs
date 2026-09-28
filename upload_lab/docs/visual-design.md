@@ -17,9 +17,9 @@
 - Palette hiện hữu của `upload.css` (`#0067c0` primary, nền `#f8fafc`,
   viền `#e2e8f0`, radius 8 px) **đã gần** hướng trắng/xanh — đây là module
   ít delta nhất. Đích: map sang token chung (`accent.primary`,
-  `surface.*`, `state.*`) thay vì màu cứng; giá trị hex cuối chờ duyệt
-  (`DESIGN.md` §9).
-- Radius card 8 px hiện hữu → chuẩn `radius.card` 10–12 px (chờ duyệt).
+  `surface.*`, `state.*`) thay vì màu cứng; giá trị hex đã chốt
+  (`DESIGN.md` §9, owner duyệt 27/09/2026).
+- Radius card 8 px hiện hữu → `radius.card` 10 px (đã chốt §9.4).
 - Chiều cao control ~30 px hiện hữu → đề xuất `size.input.height` 36–38,
   `size.button.height` ~36; **giữ compact** — Upload là màn data-dense.
 - KPI card (`ul-kpi`) giữ dạng 4 thẻ; chuyển tông sang `surface.card` +
@@ -90,7 +90,7 @@
 | Vùng | Hiện trạng (`upload.css` + `audit.js`/`scan-upload.js`) | Đích |
 |---|---|---|
 | Palette | `#0067c0`, `#f8fafc`, `#e2e8f0` — gần đích | map sang `accent.primary`/`surface.*` chung |
-| Radius/height | card 8 px, control ~30 px | `radius.card` 10–12, input 36–38 (chờ duyệt) |
+| Radius/height | card 8 px, control ~30 px | `radius.card` 10, input 38/button 36 (đã chốt §9) |
 | KPI cards | QSS-like style riêng | `surface.card` + token |
 | Notice/banner | `ul-notice` tùy biến | tông `state.*` chung |
 | Trạng thái dòng queue | text/badge hiện hữu | pill `state.*`; chi tiết P3 |

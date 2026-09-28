@@ -48,7 +48,7 @@ Bảng dưới là tên token và **khoảng/gợi ý giá trị**; số hex ch�
 | `color.state.info` | Thông tin | `#0369a1` chữ trên `#e0f2fe` |
 | `color.focus.ring` | Vòng focus | `color.accent.primary`, 2 px |
 | `color.diagram.edge` | Đường nối quan hệ | `#94a3b8`; selected `#2563eb` |
-| `color.rail` | Thanh nav trái | **CHỜ DUYỆT** — ảnh vẽ rail sáng trắng; hiện trạng rail tối `#121418`/`#201f1e`. Xem §9 |
+| `color.rail` | Thanh nav trái | rail sáng trắng `#ffffff`, icon `#334155`, active `#2563eb` — đã chốt §9.3; hiện trạng cũ rail tối `#121418`/`#201f1e` |
 
 **Ngữ nghĩa tông** (giữ nguyên từ `lib.js` JOB_DISPLAY): informational = tông
 xanh/trung tính; warning = `waiting_user`/`canceling`/`partial`; muted =
@@ -83,12 +83,12 @@ ghi nhận tùy chọn `font-variant-numeric: tabular-nums` cho cột số ở P
 | `radius.chip` | 999 px (pill) hoặc 6 px | Chip `3 loại` trong ảnh là pill nhỏ |
 | `shadow.dialog` | `0 8px 28px rgb(15 23 42 / .18)` | |
 | `shadow.card` | `0 1px 2px rgb(15 23 42 / .06)` — mảnh, hoặc **không bóng** | Ảnh: card gần phẳng |
-| `size.sidebar` | **CHỜ DUYỆT** — icon rail hẹp (~56–64 px) hay sidebar có nhãn như hiện trạng | Ảnh vẽ icon rail sáng |
+| `size.sidebar` | **60 px** — icon rail sáng (đã chốt §9.3, tokens `layout.sidebarWidth`/`color.rail`) | Ảnh vẽ icon rail sáng |
 
 ## 5. Layout chung (đích)
 
-- **Nav trái** theo taxonomy MIN-104 (5 mục) — hình thức rail icon sáng hay
-  sidebar có nhãn **chờ duyệt** (§9); không đổi thứ tự mục.
+- **Nav trái** theo taxonomy MIN-104 (5 mục) — đã chốt **rail icon sáng
+  60 px** (§9.3, owner duyệt 27/09/2026); không đổi thứ tự mục.
 - **Vùng nội dung module** chiếm hết phần còn lại; `max-width` 860 px hiện
   hữu của shell **bỏ** ở đích cho màn data-heavy (hai module đều cần bề
   ngang); trang trạng thái/setting có thể giữ max-width riêng.
@@ -150,12 +150,12 @@ Quy tắc chung:
 | Vùng | Hiện trạng (CSS đang chạy) | Đích |
 |---|---|---|
 | Palette shell | cream `#f3f2f1`, xanh `#0f6cbd`, viền `#e1dfdd` | trắng/xanh theo §2 |
-| Palette Notary | rail đen `#121418`, accent lime `#d9f76a`, nền `#f3f4f8` | cùng palette chung; rail **chờ duyệt** |
+| Palette Notary | rail đen `#121418`, accent lime `#d9f76a`, nền `#f3f4f8` | cùng palette chung; rail sáng 60 px đã chốt (§9.3) — đã triển khai |
 | Palette Upload | `#0067c0`, radius 8 px, control ~30 px | hợp nhất token; kiểm lại chiều cao 36–40 |
-| Stage Tài sản | form nhóm trường xếp dọc (`assetRowEl`) | **bảng chuyển vị** thuộc tính × cột tài sản theo ảnh — chờ P3 |
-| Dialog loại đất | chưa tồn tại (land_rows inline) | dialog riêng theo ảnh — chờ P3/P6 |
-| Diagram node | nút `Chủ đất`/`Nhận` boolean | chip số theo vị trí tài sản — ngữ nghĩa chờ P2 |
-| Sơ đồ toolbar | chưa có zoom | cụm zoom + `Mở rộng` — ngữ nghĩa `Mở rộng` chờ chốt |
+| Stage Tài sản | form nhóm trường xếp dọc (`assetRowEl`) | **bảng chuyển vị** thuộc tính × cột tài sản theo ảnh — đã triển khai (P6/MIN-129) |
+| Dialog loại đất | chưa tồn tại (land_rows inline) | dialog riêng theo ảnh — đã triển khai (P6/MIN-129) |
+| Diagram node | nút `Chủ đất`/`Nhận` boolean | chip số theo vị trí tài sản — ngữ nghĩa đã chốt §13 v2, triển khai P7/MIN-130 |
+| Sơ đồ toolbar | chưa có zoom | cụm zoom + `Mở rộng` overlay trong app — đã triển khai (P7/MIN-130) |
 
 ## 9. Quyết định thị giác — ĐÃ CHỐT qua bản mẫu MIN-126 (owner duyệt 27/09/2026)
 

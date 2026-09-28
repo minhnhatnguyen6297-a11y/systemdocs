@@ -7,8 +7,10 @@ Thư mục này chỉ chứa **những gì đã được cả hai bên đồng �
 
 Cột **Trạng thái** ghi rõ đã duyệt hay draft — không ngầm coi draft là đã
 publish. Đã publish: một kênh nội bộ shell (`desktopcommand.v1` +
-`g1.module.v1`, owner duyệt 14/09/2026, spec P2) và một contract
-xuyên-sản-phẩm (`intake.*.v1`, MIN-92). `upload.workflow.v1` đang DRAFT.
+`g1.module.v1` + `notary.case-drafting.v1`, owner duyệt 14/09–24/09/2026;
+`notary.case-drafting.v2` thêm ở §13, duyệt 27/09/2026 — MIN-125) và một
+contract xuyên-sản-phẩm (`intake.*.v1`, MIN-92). `upload.workflow.v1` đang
+DRAFT.
 
 Ba công cụ nghiệp vụ vẫn **chạy độc lập** — chưa có API giữa chúng, chưa đọc DB
 của nhau, chưa có file trao đổi tự động. Đó là trạng thái của **giai đoạn hiện
@@ -31,8 +33,8 @@ Kênh nội bộ shell↔engine (owner duyệt 14/09/2026, spec P2; `upload.work
 | [`desktop-command.md`](./desktop-command.md) | `desktopcommand.v1` — kênh lệnh Electron main ↔ Python sidecar trên một máy: auth, lifecycle, idempotency, waiting_user, error, file_ref machine-scope | APPROVED v1 |
 | [`g1-module-data.md`](./g1-module-data.md) | `g1.module.v1` — shape dữ liệu trong payload/result/error (FileRef, JobResult, ErrorObject, IdentityEvidence, ownership) | APPROVED v1 |
 | [`g1/examples/`](./g1/examples/) + [`g1/validate_examples.py`](./g1/validate_examples.py) | valid/invalid JSON + validator kiểm chứng được | kiểm: `python contracts/g1/validate_examples.py` |
-| [`notary-case-drafting.md`](./notary-case-drafting.md) | `notary.case-drafting.v1` — tám command `notary.*` cho tab Soạn hồ sơ: workspace get/create, intake → suggestion, stage commit, diagram evaluate/save, word export batch | APPROVED v1 (rev 1.1 additive MIN-121) |
-| [`notary-case-drafting/`](./notary-case-drafting/) + examples + `validate_examples.py` | JSON Schema draft-07 + examples kiểm chứng được | kiểm: `python contracts/notary-case-drafting/validate_examples.py` |
+| [`notary-case-drafting.md`](./notary-case-drafting.md) | `notary.case-drafting.v1` (§1–12) — tám command `notary.*` cho tab Soạn hồ sơ: workspace get/create, intake → suggestion, stage commit, diagram evaluate/save, word export batch. §13 là `notary.case-drafting.v2` — contract runtime của luồng Electron mới (Stage draft/commit, `owner_row_id`, assets position-based, diagram v3 + domain `two_party` 30 slot) | v1 APPROVED (rev 1.1 additive MIN-121) — giữ cho consumer legacy; **v2 APPROVED 27/09/2026 (MIN-125)**, triển khai MIN-128…MIN-130 |
+| [`notary-case-drafting/`](./notary-case-drafting/) + examples + `validate_examples.py` | JSON Schema draft-07 + examples kiểm chứng được — schema/examples mô tả shape v1 (contract v1 vẫn hợp lệ); `draft-v2.schema.json` + `examples/draft-v2/` là schema payload v2 MIN-125 | kiểm: `python contracts/notary-case-drafting/validate_examples.py` |
 | [`upload-workflow.md`](./upload-workflow.md) | `upload.workflow.v1` — 17 command `upload.*` giữa shell (module `upload`/Upload Lab) và sidecar: website registry, workspace/scope binding, revision, run→manifest, waiting_user login/review, partial breakdown, compatibility với payload legacy | **DRAFT** — chờ owner duyệt (MIN-69) |
 | [`upload-workflow/examples/`](./upload-workflow/examples/) + [`upload-workflow/validate_examples.py`](./upload-workflow/validate_examples.py) | valid/invalid JSON có `fixture` mô phỏng binding backend + validator kiểm chứng được | kiểm: `python contracts/upload-workflow/validate_examples.py` |
 

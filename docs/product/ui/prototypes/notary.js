@@ -3,9 +3,10 @@
    Người bảng dòng), tầng quan hệ (Pool + sơ đồ thừa kế / hai bên), dialog
    loại đất, intake, conflict, stub Xuất Word. Dữ liệu giả — xem data.js.
 
-   ĐỀ XUẤT chờ duyệt được ghi ở README.md + .agent/tasks/MIN-126/decisions.md
-   (không chú thích trên UI): semantics chip số, drop lên chỗ có người =
-   swap, `Hủy thay đổi` = revert Stage draft, `Mở rộng` = canvas toàn màn.
+   Đề xuất ban đầu ghi ở README.md + .agent/tasks/MIN-126/decisions.md —
+   ĐÃ ĐƯỢC owner chốt 27/09/2026 (DESIGN §9 + contract §13 v2): semantics
+   chip số, drop lên chỗ có người = swap, `Hủy thay đổi` = revert Stage
+   draft, `Mở rộng` = canvas toàn màn.
    ========================================================================== */
 'use strict';
 
@@ -639,7 +640,7 @@ function zoomCluster() {
   plus.setAttribute('aria-label', 'Phóng to sơ đồ');
   const lbl = h('span', 'zoom-label', `${Math.round(S.zoom * 100)}%`);
   const wide = btn('⛶ Mở rộng', 'sm', openExpanded);
-  // ĐỀ XUẤT chờ duyệt: "Mở rộng" = canvas toàn màn hình (overlay), không phải modal
+  // Đã chốt (DESIGN §9.6): "Mở rộng" = canvas toàn màn hình (overlay), không phải modal
   z.append(minus, lbl, plus, wide);
   return z;
 }
@@ -1039,7 +1040,7 @@ function slotEl(pos) {
 }
 
 /* ---------------------- Mở rộng (fullscreen) ------------------------- */
-// ĐỀ XUẤT chờ duyệt: canvas phủ toàn khung app, Esc/nút Đóng để thoát.
+// Đã chốt (DESIGN §9.6): canvas phủ toàn khung app, Esc/nút Đóng để thoát.
 // (Không đi qua P.openModal vì overlay này là "xem lớn", không phải dialog
 // quyết định — nhưng vẫn giữ: Esc đóng + trả focus về nút Mở rộng.)
 function openExpanded() {

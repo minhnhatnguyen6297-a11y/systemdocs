@@ -7,13 +7,14 @@ Ngày: 24/09/2026 · Owner: platform/case-workspace · Spec: MIN-104 · Goal tri
 > **hành vi/dữ liệu**. Lớp **thị giác/bố cục mới** (bảng chuyển vị Tài sản,
 > dialog loại đất, chip vị trí trên node, action bar) nằm ở
 > [`visual-design.md`](./visual-design.md) + `docs/product/ui/` — phần đó
-> là hướng đã duyệt bằng ảnh, giá trị chi tiết chờ duyệt. Khi nội dung hai
+> là hướng đã duyệt bằng ảnh và token đã chốt cùng đợt (DESIGN §9). Khi nội dung hai
 > lớp trông mâu thuẫn (vd hình thức card Tài sản, nút `Chủ đất`/`Nhận` ↔
 > chip số), **hành vi/dữ liệu lấy file này làm chuẩn**, hình thức lấy
-> `visual-design.md`; chỗ nào là quyết định nghiệp vụ mới (chip vị trí ↔
-> tài sản, `Hủy thay đổi`, Apply loại đất) có **đề xuất DRAFT ở
-> `contracts/notary-case-drafting.md` §13 (MIN-125, chờ owner duyệt)** —
-> file này chưa coi chúng là chốt cho tới khi §13 được approve.
+> `visual-design.md`. Các quyết định nghiệp vụ mới (chip vị trí ↔ tài sản,
+> `Hủy thay đổi`, Apply loại đất) đã được **owner duyệt tại
+> `contracts/notary-case-drafting.md` §13 (`notary.case-drafting.v2`,
+> APPROVED 27/09/2026, MIN-125)** và đã triển khai qua MIN-128/MIN-129/
+> MIN-130 — renderer Electron emit v2 theo §13.1.
 
 ## 1. Vai trò tài liệu và ranh giới SOT
 
@@ -29,9 +30,11 @@ Ngày: 24/09/2026 · Owner: platform/case-workspace · Spec: MIN-104 · Goal tri
   đất, node chip, zoom sơ đồ) là SOT của `visual-design.md` cùng thư mục +
   `docs/product/ui/` — file này không định nghĩa màu/kích thước.
 - **Wire contract** `desktopcommand.v1` cho các command đích đã publish tại
-  `contracts/notary-case-drafting.md` (`notary.case-drafting.v1`, owner
-  duyệt 24/09/2026 qua [MIN-105](https://linear.app/minhnotary/issue/MIN-105),
-  rev 1.1 additive MIN-121). File `contract.md` cạnh file này là ghi chú cơ
+  `contracts/notary-case-drafting.md`: §1–12 là `notary.case-drafting.v1`
+  (owner duyệt 24/09/2026 qua [MIN-105](https://linear.app/minhnotary/issue/MIN-105),
+  rev 1.1 additive MIN-121 — vẫn hợp lệ cho consumer legacy); §13 là
+  `notary.case-drafting.v2` (APPROVED 27/09/2026, MIN-125) — contract
+  runtime của luồng Electron mới (MIN-128 trở đi). File `contract.md` cạnh file này là ghi chú cơ
   chế domain *provisional, non-normative*, **không phải** wire contract; ba
   invariant trong đó (Stage sở hữu người đã commit; Pool derived; Pool/Diagram
   không mutate Stage) trùng khớp spec này.
@@ -216,9 +219,10 @@ Ngày: 24/09/2026 · Owner: platform/case-workspace · Spec: MIN-104 · Goal tri
 
 ## 10. Điểm mở và ngoài phạm vi
 
-Điểm mở (ghi nhận, **không** tự chốt). MIN-125 (P2) đã đưa đề xuất vào
-`contracts/notary-case-drafting.md` §13 — **DRAFT, chờ owner duyệt**; các
-đề xuất chưa duyệt KHÔNG thay đổi contract v1 đã publish:
+Điểm mở ban đầu đã được chốt: MIN-125 (P2) đưa đề xuất vào
+`contracts/notary-case-drafting.md` §13 và §13 đã **APPROVED 27/09/2026**
+(`notary.case-drafting.v2`), triển khai ở MIN-128…MIN-130; các quyết định
+đã duyệt:
 
 - Ngữ nghĩa **chip vị trí ↔ tài sản** trên node sơ đồ: đề xuất §13.4 —
   `ownPositions`/`receivePositions` ⊆ {1,2,3} thay `isLandOwner`/
@@ -243,8 +247,8 @@ Ngày: 24/09/2026 · Owner: platform/case-workspace · Spec: MIN-104 · Goal tri
 - `document_key` danh mục văn bản cụ thể cho từng `case_type`/`document_type`
   — spec nghiệp vụ + contract; với `two_party` xem Q11 tại §13.13
   (danh mục `document_type` mới chờ chốt với NV2).
-- Tập đầy đủ câu hỏi chờ owner (Q1–Q12, C1–C4):
-  `.agent/tasks/MIN-125/decisions.md`.
+- Tập đầy đủ câu hỏi và quyết định (Q1–Q12 đã duyệt; C1–C4 xử lý theo
+  §13.13): `.agent/tasks/MIN-125/decisions.md`.
 
 Ngoài phạm vi file này:
 

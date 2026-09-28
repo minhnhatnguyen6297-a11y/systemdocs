@@ -10,8 +10,9 @@ bảng/năm cột trước đây trong chính file này — cấu trúc bảng h
 > **hành vi/bố cục vùng**. Lớp **thị giác** (màu, token, chiều cao control,
 > tông trạng thái, responsive chi tiết) nằm ở
 > [`visual-design.md`](visual-design.md) + [`../../docs/product/ui/`](../../docs/product/ui/) — hướng
-> trắng/xanh đã duyệt bằng ảnh (27/09/2026), giá trị token chờ duyệt. Hai
-> lớp không nhân bản: hành vi/đếm cột/scope lấy file này, thị giác lấy
+> trắng/xanh đã duyệt bằng ảnh (27/09/2026) và token đã chốt cùng đợt
+> duyệt (`docs/product/ui/DESIGN.md` §9, `tokens.json` status approved).
+> Hai lớp không nhân bản: hành vi/đếm cột/scope lấy file này, thị giác lấy
 > `visual-design.md`.
 
 Hành vi nghiệp vụ giữ nguyên từ bản Fluent UI/Qt đang chạy (`run.bat` →

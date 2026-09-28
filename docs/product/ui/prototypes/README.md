@@ -133,6 +133,12 @@ thị giác; bản mẫu **giữ bố cục** nhưng:
 
 ## Quyết định CHỜ CHỐT (đề xuất hiển thị trong bản mẫu — KHÔNG phải SOT)
 
+> **Cập nhật MIN-132 (28/09/2026):** các mục dưới đây đã được chốt —
+> mục 3–8, 10–11 qua owner duyệt bản mẫu MIN-126 (27/09/2026,
+> `docs/product/ui/DESIGN.md` §9) và `notary.case-drafting.v2` §13;
+> mục 2 (swap khi thả lên ô đã có người) + mục 9 (token) cùng đợt duyệt.
+> Danh sách giữ nguyên làm lịch sử đề xuất.
+
 Chi tiết tại `.agent/tasks/MIN-126/decisions.md`. Tóm tắt:
 
 1. **Chip số 1/2/3** trên node: đề xuất = thứ tự cột tài sản Stage, nhóm

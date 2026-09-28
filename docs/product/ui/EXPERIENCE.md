@@ -73,9 +73,9 @@ toàn-màn chỉ khi cả workspace không tải được.
   tại đúng nút commit của tầng đó; không gom một banner chung mơ hồ.
 - Rời module/đóng cửa sổ khi dirty → confirm qua `confirmModal` chung;
   không auto-save, không im lặng mất dữ liệu.
-- `Hủy thay đổi` (discard) — **ngữ nghĩa chờ P2** (đã vẽ trên action bar
-  ảnh approved nhưng chưa có API revert): tạm thời không render nút này
-  ở bản thật cho tới khi P2 chốt semantics.
+- `Hủy thay đổi` (discard) — ngữ nghĩa đã chốt §13.2 Q2 (client-only,
+  restore cả Stage lẫn Diagram về committed): nút hiển thị trên action
+  bar, có confirm khi dirty; đã triển khai P6.
 
 ## 6. Conflict (revision)
 
@@ -118,15 +118,22 @@ toàn-màn chỉ khi cả workspace không tải được.
 - **Đường dẫn/tên dài**: cắt ellipsis + tooltip + mở file gốc; không kéo
   vỡ layout.
 
-## 10. Quyết định thao tác đang mở (chờ owner / pha sau)
+## 10. Quyết định thao tác — ĐÃ CHỐT (cập nhật MIN-132)
 
-1. Hình thức nút `Hủy thay đổi` ở action bar (revert draft Stage hay cả
-   Diagram? phạm vi nào) — P2.
-2. `Mở rộng` trong cụm zoom sơ đồ — fullscreen hay modal — P3/P7.
-3. Trình tự focus khi dialog mở (vào nút hay vào input đầu) — chốt theo
-   kết quả prototype P3.
-4. Phím tắt cho thao tác sơ đồ (xoay/đổi vị trí bằng phím mũi tên?) — P7.
-5. Ngưỡng đổi sang cuộn ngang cho bảng audit/queue khi hẹp (cùng nhóm
-   breakpoint với `DESIGN.md` §7).
-6. Toast có persist lỗi không (lỗi retryable hiện đang inline; cần chốt
-   toast lỗi tự tắt hay giữ).
+Các mục dưới đã được chốt qua duyệt bản mẫu MIN-126 (27/09/2026),
+`notary.case-drafting.v2` §13 và triển khai P4–P8:
+
+1. `Hủy thay đổi` ở action bar — chốt §13.2 Q2: revert **cả** draft Stage
+   lẫn Diagram về committed (client-only); đã triển khai P6.
+2. `Mở rộng` — chốt DESIGN §9.6: overlay gần toàn màn trong app (Esc/×
+   đóng, trả focus); đã triển khai P7.
+3. Trình tự focus khi dialog mở — chốt: focus vào control đầu trong
+   dialog, Esc/× trả focus về element mở; đã triển khai P4 (confirmModal/
+   modal focus-trap + return focus).
+4. Phím tắt thao tác sơ đồ — chốt theo P7: gán node bằng menu/phím qua
+   position chips (không bắt buộc drag); đã triển khai P7.
+5. Ngưỡng cuộn ngang bảng khi hẹp — chốt theo triển khai: bảng data-heavy
+   (Người, audit, queue) giữ `table-wrap` cuộn ngang nội bộ, không ép co
+   cột; breakpoint trang 1000/800 px theo `DESIGN.md` §7.
+6. Toast lỗi — chốt: toast lỗi retryable tự tắt ~4 s + banner/inline state
+   còn lại tại vùng liên quan, không modal; đã triển khai P4.
