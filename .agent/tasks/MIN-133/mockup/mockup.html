@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>MIN-133 mockup — Soạn hồ sơ (mật độ cao)</title>
+<link rel="stylesheet" href="mockup.css">
+</head>
+<body>
+<!-- Giả title/menu Windows để khớp ảnh cửa sổ owner (không thuộc UI app) -->
+<div class="win-chrome">
+  <div class="win-title"><span class="ico"></span>G1 Shell<span class="ctl"><span>—</span><span>❐</span><span>✕</span></span></div>
+  <div class="win-menu"><span>File</span><span>Edit</span><span>View</span><span>Window</span><span>Help</span></div>
+</div>
+
+<div id="app">
+  <nav id="rail">
+    <div class="rail-logo">G1</div>
+    <div class="rail-btn active" title="Công chứng"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg></div>
+    <div class="rail-btn" title="Số hóa + upload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 16V5M7.5 9.5 12 5l4.5 4.5M5 19h14"/></svg></div>
+    <div class="rail-btn" title="Văn phòng"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 21V4h9v17M14 9h5v12M8 8h3M8 12h3M8 16h3M3 21h18"/></svg></div>
+    <div class="rail-btn" title="Tra cứu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></svg></div>
+    <div class="rail-btn bottom" title="Cài đặt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></div>
+  </nav>
+
+  <div id="content">
+    <!-- #statusbar (engine/sidecar/desktopcommand) — BỎ (MIN-133 #4) -->
+    <main id="view">
+      <section class="cd-root">
+
+        <!-- Thanh trên: tab cục bộ + action bar trên CÙNG một card -->
+        <div class="card cd-topbar">
+          <div class="cd-localnav">
+            <button class="cd-tab">Tổng quan hồ sơ</button>
+            <button class="cd-tab active">Soạn hồ sơ</button>
+            <button class="cd-tab">Word</button>
+          </div>
+          <span class="vsep"></span>
+          <select class="cd-case-type" aria-label="Loại việc">
+            <option selected>Thừa kế</option>
+            <option>Hai bên</option>
+          </select>
+          <button><svg class="btn-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 1.5h5.5L13 5v9.5H4z"/><path d="M9.5 1.5V5H13"/></svg>Nhập file</button>
+          <button disabled title="Zalo — chưa bật trong phiên bản này">Zalo</button>
+          <span class="spacer"></span>
+          <button>Hủy thay đổi</button>
+          <button class="primary" aria-label="Lưu hồ sơ — có thay đổi chưa lưu">Lưu hồ sơ <span class="dirty-dot"></span></button>
+        </div>
+
+        <!-- Stage: Tài sản (chuyển vị) | Người — cùng hàng, không thanh cuộn -->
+        <div class="cd-stage">
+          <div class="card cd-assets">
+            <div class="card-head">
+              <h3 class="card-title">Tài sản <span class="count">(3)</span></h3>
+              <div class="card-tools"><button class="secondary sm" disabled title="Tối đa 3 tài sản">+ Tài sản</button></div>
+            </div>
+            <div class="card-body cd-stage-body"><div class="cd-table-wrap" id="asset-table"></div></div>
+          </div>
+          <div class="card cd-people">
+            <div class="card-head">
+              <h3 class="card-title">Người <span class="count">(7)</span></h3>
+              <div class="card-tools"><button class="secondary sm">+ Người</button></div>
+            </div>
+            <div class="card-body cd-stage-body"><div class="cd-table-wrap" id="people-table"></div></div>
+          </div>
+        </div>
+
+        <!-- Sơ đồ + Pool: phần còn lại. Lưu sơ đồ / Xuất Word dồn lên header -->
+        <div class="card cd-rel-card">
+          <div class="card-head">
+            <h3 class="card-title">Sơ đồ thừa kế</h3>
+            <button class="sm" style="margin-left:8px">+ Slot</button>
+            <button class="sm">Xem cách tính</button>
+            <button class="sm">Đánh giá thử</button>
+            <div class="card-tools">
+              <div class="cd-zoom"><button class="sm ghost">−</button><span class="cd-zoom-label">100%</span><button class="sm ghost">+</button></div>
+              <button class="sm">⛶ Mở rộng</button>
+              <span class="tool-sep"></span>
+              <button class="sm secondary" disabled title="Nháp mới: sơ đồ lưu cùng Lưu hồ sơ">Lưu sơ đồ</button>
+              <button class="sm primary">Xuất Word</button>
+            </div>
+          </div>
+          <div class="cd-rel-body">
+            <aside class="cd-pool">
+              <div class="cd-pool-head"><span>Pool (2)</span></div>
+              <input class="cd-pool-search" placeholder="Lọc pool…">
+              <div class="cd-pool-box" id="pool"></div>
+            </aside>
+            <div class="cd-diagram">
+              <div class="cd-canvas-wrap" id="canvas">
+                <svg class="cd-canvas-edges" id="edges"></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+    </main>
+  </div>
+</div>
+<pre id="metrics"></pre>
+<script src="mockup.js"></script>
+</body>
+</html>
