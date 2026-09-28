@@ -49,3 +49,8 @@ Ràng buộc đã tuân: không backend/IPC/website thật; không sửa contrac
 DESIGN/EXPERIENCE/tokens/runtime; Zalo không ẩn; Word giữ vị trí nút, không
 thiết kế popup mới; chú thích chờ duyệt nằm trong comment/README/task files —
 không rải text giải thích lên UI.
+
+> **Owner duyệt toàn bộ đề xuất bản mẫu ngày 27/09/2026** ("duyệt hết").
+> 12 lựa chọn trong bảng trên trở thành chuẩn để P4 (MIN-127) ánh xạ
+> tokens/CSS và P6–P8 implement; điểm trùng với contract v2 (Q2 Hủy,
+> Q4 dấu chọn theo vị trí, Q9 swap, Q7 30 slot) tuân theo §13 đã duyệt.

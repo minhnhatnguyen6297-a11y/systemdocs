@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://systemdocs/contracts/notary-case-drafting/draft-v2.schema.json",
-  "title": "DRAFT notary.case-drafting.v2 — MIN-125 (CHỜ OWNER DUYỆT)",
-  "description": "DRAFT — định nghĩa shape v2 cho §13 của contracts/notary-case-drafting.md. Chưa publish; không implement tới khi owner duyệt. Normative text là §13 trong file contract — file này là tham chiếu hỗ trợ.",
+  "title": "notary.case-drafting.v2 — MIN-125 (APPROVED 27/09/2026)",
+  "description": "Định nghĩa shape v2 cho §13 của contracts/notary-case-drafting.md. Đã được owner duyệt 27/09/2026; implement ở P5 (MIN-128). Normative text là §13 trong file contract — file này là tham chiếu hỗ trợ.",
   "definitions": {
     "schema_version_v2": {
       "type": "string",

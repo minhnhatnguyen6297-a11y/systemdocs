@@ -1,9 +1,9 @@
-# Contract: Notary Case Drafting `v1` (doc rev 1.1) + DRAFT `v2` ở §13
+# Contract: Notary Case Drafting `v1` (doc rev 1.1) + `v2` ở §13
 
 **Version:** `notary.case-drafting.v1` · **Status:** APPROVED — owner duyệt
 24/09/2026 (MIN-105); rev 1.1 mở rộng tương thích (MIN-121) ·
-**§13 chứa DRAFT `notary.case-drafting.v2` (MIN-125) — CHƯA duyệt, KHÔNG
-được implement cho tới khi owner chốt** ·
+**§13 chứa `notary.case-drafting.v2` (MIN-125) — APPROVED 27/09/2026,
+implement ở P5 (MIN-128)** ·
 **Owner:** `systemdocs` · **Published:** MIN-105 ·
 **Kênh mang:** `desktopcommand.v1` (`contracts/desktop-command.md`) ·
 **Domain data shape:** `g1.module.v1` (`contracts/g1-module-data.md`)
@@ -856,22 +856,26 @@ Consumer (Electron main/renderer) PHẢI:
 | v1 (fix r2) | 24/09/2026 | Residuals round 2: `breakdown.skipped` vào schema; `workspace_conflict` `!=` server đồng bộ §9/§7.5; fraction integer form trong doc |
 | v1 (APPROVED) | 24/09/2026 | Owner duyệt — contract trở thành SOT wire cho tab Soạn hồ sơ; mở cổng MIN-106+ |
 | v1.1 | 26/09/2026 | MIN-121 (additive, tương thích ngược): `notary.workspace_create` + `idempotency_key`; chế độ nháp (`case_id` absent) cho `intake_analyze`/`diagram_evaluate` (evaluate nháp kèm `stage` payload, `evaluated_revision:null`); `case` +`ngay_lap_ho_so`/`noi_niem_yet`/`ghi_chu`; field_error +`duplicate_entity`; error +`workspace_owner_required` |
+| v2 (APPROVED) | 27/09/2026 | Owner duyệt §13 (MIN-125, toàn bộ Q1–Q12): `schema_version` bump `notary.case-drafting.v2`; Stage draft/committed + create nguyên khối; `owner_row_id`; asset theo vị trí 1..3, bỏ `is_primary`; `ownPositions`/`receivePositions`; domain `two_party` 30 slot `p1..p30`; `case_type` immutable; error codes §13.9. Implement ở P5 (MIN-128). C1–C4 xử lý theo §13.13 |
 
 ---
 
-# PHẦN II — DRAFT: `notary.case-drafting.v2` (MIN-125, CHỜ OWNER DUYỆT)
+# PHẦN II — `notary.case-drafting.v2` (MIN-125, APPROVED 27/09/2026)
 
-> **TRẠNG THÁI: DRAFT — chưa publish.** Toàn bộ §13 là đề xuất hợp đồng
-> P2 của MIN-123. Không gì trong §13 được coi là wire contract hiện
-> hành; runtime implement ở **P5 (MIN-128)** sau khi owner duyệt. Phần I
-> (`v1`, §1–§12) vẫn là contract APPROVED duy nhất.
+> **TRẠNG THÁI: APPROVED — owner duyệt toàn bộ đề xuất Q1–Q12 ngày
+> 27/09/2026.** §13 là wire contract v2; runtime implement ở
+> **P5 (MIN-128)**. Phần I (`v1`, §1–§12) vẫn hiệu lực cho consumer v1;
+> backend emit `v2` thống nhất theo §13.1.
+>
+> Các câu hỏi C1–C4 (§13.13) vẫn mở — xử lý theo ghi chú từng mục,
+> không chặn implement phần đã duyệt.
 >
 > Mọi mục dưới đây gắn mã `Q#` ↔ bảng quyết định tại
 > `.agent/tasks/MIN-125/decisions.md` (đề xuất + phương án thay thế).
-> Fixtures draft nằm ở `examples/draft-v2/` với
+> Fixtures v2 nằm ở `examples/draft-v2/` với
 > `fixture_context.draft_v2:true` — validator hiểu flag này (§13.15).
 
-## 13. DRAFT — `notary.case-drafting.v2`
+## 13. `notary.case-drafting.v2`
 
 ### 13.1 Vì sao bump version thay vì rev additive
 
@@ -886,7 +890,7 @@ Rev 1.1 additive được vì chỉ thêm field nullable / command mới. §13
 sidecar + renderer trong cùng bản → không cần negotiate version trên
 wire; backend P5 emit `v2` thống nhất.
 
-| Điểm | v1 (APPROVED) | v2 (DRAFT §13) |
+| Điểm | v1 (APPROVED) | v2 (§13, APPROVED) |
 |---|---|---|
 | `schema_version` | `notary.case-drafting.v1` | `notary.case-drafting.v2` |
 | `diagram_state.version` | `2` | `3` (+ `domain` bắt buộc) |
@@ -1061,9 +1065,9 @@ diagram_state v3 (domain two_party):
       deleted: <bool>
 ```
 
-- `case.case_type` nhận thêm `"two_party"` (Q8); `document_type` draft
-  enum `{chuyen_nhuong, tang_cho, cho_thue, dat_coc}` — **danh sách
-  chờ owner chốt** (Q11), hiện là placeholder trong schema draft.
+- `case.case_type` nhận thêm `"two_party"` (Q8); `document_type` enum
+  `{chuyen_nhuong, tang_cho, cho_thue, dat_coc}` — **đã chốt** (Q11,
+  owner duyệt 27/09/2026; NV2 xác nhận khi implement).
 - **30 vị trí cố định, canonical:** state luôn đủ 30 node theo đúng thứ
   tự `p1..p30`; thiếu node → `diagram_invalid_state` (`missing_position`);
   `id` ngoài tập hoặc sai thứ tự → `invalid_position`. Bên = suy ra từ
@@ -1172,7 +1176,7 @@ payload:
 | `co_nhan_tai_san`/participant cũ | projection `willReceive` của engine giữ nguyên; không suy ngược thành positions ngoài rule Q6 |
 | hồ sơ `two_party` | không tồn tại dữ liệu cũ — domain mới hoàn toàn |
 
-### 13.9 Error codes mới (DRAFT)
+### 13.9 Error codes mới
 
 Job-level (namespace `notary.*`):
 
@@ -1286,11 +1290,11 @@ Data-codes mới: `stage.legacy_asset_overflow`,
 // vị trí 1 vừa được child_1 + child_2 nhận và owner sở hữu — hợp lệ.
 ```
 
-### 13.13 Câu hỏi chờ owner (tập trung)
+### 13.13 Quyết định owner (tập trung)
 
-Đề xuất đã viết vào §13 (Q1–Q12) và câu hỏi chưa có đề xuất (C1–C4):
-xem bảng đầy đủ kèm phương án thay thế tại
-`.agent/tasks/MIN-125/decisions.md`. Quan trọng nhất:
+Q1–Q12 **đã duyệt nguyên đề xuất** (owner, 27/09/2026); phương án thay
+thế bị loại giữ trong `.agent/tasks/MIN-125/decisions.md` làm record.
+Các quyết định then chốt:
 
 - **Q1** — phá vòng phụ thuộc bằng `stage.owner_row_id` + create không
   cần diagram (thay vì "commit phiên" cục bộ hay nullable
@@ -1298,9 +1302,14 @@ xem bảng đầy đủ kèm phương án thay thế tại
 - **Q4** — dấu chọn theo vị trí, không bám `row_id` khi reorder/xóa.
 - **Q6** — `willReceive:true` legacy → nhận tất cả vị trí hiện có.
 - **Q7** — `p1..p30` cố định, bên suy ra từ số.
-- **Q11** — danh mục `document_type` cho `two_party` chờ chốt với NV2.
+- **Q11** — `document_type` `two_party` = `{chuyen_nhuong, tang_cho,
+  cho_thue, dat_coc}`.
 
-### 13.14 Checklist conformance bổ sung (DRAFT — chỉ áp dụng khi v2 duyệt)
+C1–C4 vẫn mở và đã có hướng xử lý: C1/C2 chốt cùng NV2 trước khi P6
+cần; C3 quy ước tôn trọng `entity_id` (chi tiết persistence ở P5);
+C4 là task Word riêng — §13.10 chỉ ghi ý định đánh số.
+
+### 13.14 Checklist conformance bổ sung (áp dụng cho producer v2)
 
 Producer v2 PHẢI (thêm vào §10):
 

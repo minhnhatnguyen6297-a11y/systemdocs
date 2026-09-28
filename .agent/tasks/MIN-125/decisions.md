@@ -1,6 +1,11 @@
 # Decisions — MIN-125
 
-Bảng A = quyết định đã có trong contract publish / hồ sơ nguồn (giữ nguyên). Bảng B = đề xuất P2 đã viết vào `contracts/notary-case-drafting.md` §13 với nhãn **DRAFT — chờ owner duyệt** (Q-id tham chiếu trong văn bản §13.13).
+Bảng A = quyết định đã có trong contract publish / hồ sơ nguồn (giữ nguyên). Bảng B = đề xuất P2 đã viết vào `contracts/notary-case-drafting.md` §13 (Q-id tham chiếu trong văn bản §13.13).
+
+> **Owner duyệt toàn bộ Q1–Q12 ngày 27/09/2026** — §13 đã chuyển APPROVED
+> (xem header + §13.13 trong contract). C1–C4 giữ hướng xử lý đã ghi:
+> C1/C2 chốt cùng NV2 trước P6; C3 chi tiết persistence ở P5; C4 task
+> Word riêng.
 
 ## A. Đã chốt / không thay đổi
 
