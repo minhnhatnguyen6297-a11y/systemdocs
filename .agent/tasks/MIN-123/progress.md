@@ -30,7 +30,12 @@ Không coi verify.ps1 là toàn bộ test đã chạy. Chưa mở Electron để
 
 ## Bước tiếp theo
 
-Giao MIN-124/P1 theo mẫu trong plan.md. Sau đó P2/P3 theo dependency; chưa giao thẳng worker sửa CSS toàn bộ.
+~~Giao MIN-124/P1 theo mẫu trong plan.md.~~ **Đã hoàn tất 28/09/2026:**
+P1–P9 giao tuần tự theo dependency, toàn bộ commit trên consolidate/monorepo
+(không worktree riêng — chỉ đạo owner). Contract v2 §13 APPROVED 27/09
+(Q1–Q12; C1–C4 giữ hướng xử lý). Kết quả kiểm chứng + 57 ảnh Electron thật:
+`.agent/tasks/MIN-132/handoff.md` + `screenshots/`. Còn: nghiệm thu bằng mắt
+của owner trên app thật, DPI Windows thật, và task Word tách riêng (mục 9 plan).
 
 ## File local ngoài phạm vi
 

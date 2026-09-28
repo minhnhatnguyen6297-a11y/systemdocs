@@ -1,7 +1,9 @@
 # Kế hoạch giao worker — MIN-123
 
 Ngày: 2026-09-27. Nhánh tích hợp: `consolidate/monorepo`, checkout `D:\systemdocs`.
-Bản nền đã gộp: `e3ef8ad`. Trạng thái: **xong gộp code và lập kế hoạch; chưa thực thi UI mới**.
+Bản nền đã gộp: `e3ef8ad`. Trạng thái: **P1–P9 đã thực thi xong (MIN-124→MIN-132 đều Done, 28/09/2026);
+kiểm chứng đầy đủ + 57 ảnh thật ở `.agent/tasks/MIN-132/`; còn nghiệm thu bằng mắt của owner
+và phần Word tách riêng (mục 9)**.
 
 **Nguồn yêu cầu và điều kiện hoàn thành:** [MIN-123](https://linear.app/minhnotary/issue/MIN-123/plan-djong-nhat-ui-electron-notary-va-upload-lab-theo-mau-dja-duyet) và các issue con.
 File này là hướng dẫn thực thi: ai sửa file nào, thứ tự, bằng chứng, điểm dừng. Không thay mô tả yêu cầu ở Linear.
