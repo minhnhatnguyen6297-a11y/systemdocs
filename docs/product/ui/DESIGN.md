@@ -1,11 +1,12 @@
 # DESIGN — Ngôn ngữ thị giác chung cho shell Electron (MIN-124)
 
-> **Trạng thái: PROPOSED — chờ owner duyệt giá trị.** Hướng thiết kế đã được
-> chốt bằng hai ảnh approved (`references/approved-drafting.png`,
-> `references/approved-land-types.png`, owner duyệt 27/09/2026). Mọi con số
-> cụ thể (mã màu, px, radius) dưới đây là **đề xuất** ghi trong
-> [`tokens.json`](./tokens.json) với `status: proposed` — sẽ chốt qua
-> prototype P3 trước khi P4 wire vào CSS.
+> **Trạng thái: APPROVED — owner duyệt toàn bộ đề xuất trên bản mẫu P3
+> (MIN-126), 27/09/2026.** Hướng thiết kế đã được chốt bằng hai ảnh approved
+> (`references/approved-drafting.png`, `references/approved-land-types.png`)
+> và bản mẫu tương tác `prototypes/index.html`. Giá trị chuẩn ghi trong
+> [`tokens.json`](./tokens.json) (`status: approved`); P4 (MIN-127) đã ánh
+> xạ vào `shell/src/renderer/styles.css` — các mục "đang mở" ở §9 đã chốt
+> theo bản mẫu (xem §10 cho phạm vi file/tên lớp).
 >
 > Phạm vi: thị giác dùng chung cho hai module nghiệp vụ (Notary + Upload
 > Lab) và các mặt shell chung. Không định nghĩa hành vi/dữ liệu — đó là SOT
@@ -156,13 +157,58 @@ Quy tắc chung:
 | Diagram node | nút `Chủ đất`/`Nhận` boolean | chip số theo vị trí tài sản — ngữ nghĩa chờ P2 |
 | Sơ đồ toolbar | chưa có zoom | cụm zoom + `Mở rộng` — ngữ nghĩa `Mở rộng` chờ chốt |
 
-## 9. Quyết định thị giác đang mở (chờ owner — không tự chốt ở P4)
+## 9. Quyết định thị giác — ĐÃ CHỐT qua bản mẫu MIN-126 (owner duyệt 27/09/2026)
 
-1. Hex cuối của `accent.primary` (`#2563eb` vs giữ `#0067c0`) + các tông phụ.
-2. `font.size.base` 15 hay 16 px; `size.input.height` 36/38/40.
-3. Rail nav: icon rail sáng (ảnh) hay sidebar có nhãn (hiện trạng).
-4. Có bóng card hay không; `radius.card` 10 hay 12.
-5. Ngưỡng bật xếp dọc bảng audit/queue khi hẹp; nguỡng chuyển bảng tài sản
-   chuyển vị → cuộn ngang.
-6. `Mở rộng` sơ đồ = fullscreen canvas hay modal lớn.
-7. Trạng thái disabled của Zalo: ẩn hẳn hay hiển mờ (ảnh vẽ nút hiện hữu).
+Các mục mở trước đây đã được owner chốt khi duyệt bản mẫu
+(`.agent/tasks/MIN-126/decisions.md` — "duyệt hết"):
+
+1. `accent.primary` = `#2563eb` (bộ hover/pressed/soft theo `tokens.json`).
+2. `font.size.base` = 15 px; `size.input.height` = 38 px; `size.button.height` = 36 px.
+3. Rail nav = **icon rail sáng 60 px** theo ảnh approved (không sidebar nhãn).
+4. Card dùng `radius.card` 10 px + bóng mảnh `shadow.card`.
+5. Breakpoint = 1000 px (xếp dọc) / 800 px (compact) theo `layout.breakpoint`.
+6. `Mở rộng` sơ đồ = overlay gần toàn màn trong app (Esc/× đóng, trả focus).
+7. Zalo: **hiển thị disabled + tooltip**, không ẩn hẳn.
+
+## 10. Sở hữu CSS & quy ước đặt tên (P4 → P6/P7/P8)
+
+`shell/src/renderer/styles.css` (MIN-127) là nền duy nhất của shell. Module
+CSS load **sau** nó trong `index.html` (thứ tự: `styles.css` →
+`notary/case-drafting.css` → `upload/upload.css`).
+
+| Lớp | Sở hữu | Rule |
+|---|---|---|
+| Biến `:root` (`--bg-*`, `--surface-*`, `--accent*`, `--fs-*`, `--r-*`, `--sh-*`, `--rail-*`, state/`--dis-*`…) | `styles.css` | Module đọc thoải mái, **không ghi đè**; đổi giá trị phải qua `tokens.json` + đồng bộ 3 file (styles.css, prototype.css, tokens.json) |
+| Layout chrome: `#app #rail #module-list #content #statusbar #view`, `.rail-logo .rail-btn .rail-spacer .rail-bottom` | `styles.css` | Module không đụng |
+| Class chung **không tiền tố**: `.btn .input .card .card-head/.card-title/.card-tools/.card-body .pill .badge(.tone-*) .banner .waiting-banner .face(.face-*) .skeleton .modal(.narrow/.wide/.modal-head/.modal-body/.modal-foot) .modal-overlay .toast(-root) .actionbar(.ab-*) .toolbar .grid(.tbl) .slot .tools .form-row .progress .dirty-dot .drag-* .drop-* .splitter-* .muted .small .error .warn-text .num .truncate(-path) .icon-x .kv(-k/-v) .job-* .health-* .conn-card .file-row .files .breakdown` | `styles.css` | Module **dùng lại**, không định nghĩa lại tên này |
+| Class Notary `cd-*` | `notary/case-drafting.css` (P6) | Scope trong `.cd-root`; element override phải nằm dưới `.cd-root` |
+| Class Upload `ul-*` | `upload/upload.css` (P8) | Scope trong `.upload-lab`; thoát cap `#view section` bằng `.upload-lab` |
+
+Quy ước:
+
+- **Cap nội dung**: `#view section { max-width: 860px }` giữ cho trang
+  shell/placeholder. Module data-heavy thoát bằng class riêng trên `<section>`
+  gốc: `cd-root-outer` (Notary, đã có) / `.upload-lab` (Upload, đã có trong
+  upload.css).
+- **Element selector** (`button`, `input`, `table`…) trong styles.css là nền
+  trung tính theo token. Module cần kiểu khác phải scope:
+  `.cd-root button { … }` — tuyệt đối không viết `button { … }` trần trong
+  module CSS (sẽ phá module khác).
+- **Nút/ô nhập mới** dùng `button` + modifier (`.primary .secondary .ghost
+  .danger .primary.danger .sm`) và `input` / `.input`; lỗi trường = `.err` +
+  `aria-invalid`.
+- **Trạng thái**: pill tông `ok|warn|err|info|accent` (alias `.badge.tone-*`
+  cho code hiện hữu); banner `.banner(.warn/.err/.ok)` + `.waiting-banner`;
+  dirty = `.dirty-dot` trên nút commit + nhãn text; loading = `.face
+  .skeleton`; kéo-thả = `.drag-handle .dragging .drop-hint
+  .row-drop-above/.row-drop-below .col-drop-before`.
+- **Dialog** canonical: `.modal-overlay > .modal(.narrow|.wide) >
+  .modal-head(.modal-title+.modal-close) / .modal-body / .modal-foot`;
+  `confirmModal` của renderer đã implement focus trap + Esc + trả focus —
+  module nên tái dùng `h.confirmModal`/`deps.confirm` thay vì tự viết overlay.
+- **Toast**: `notify(text, isError)` của renderer → `#toast/.toast-root +
+  .toast(.err|.warn|.ok)` — module gọi `notify` qua deps, không tự render.
+- Tên mới nếu thiếu: thêm vào `styles.css` theo hướng không-tiền-tố
+  (dùng chung) hoặc prefix module (riêng) — ghi vào handoff P4→P6–P8.
+- Trang mẫu thành phần thật: `docs/product/ui/prototypes/components.html`
+  (link trực tiếp styles.css).

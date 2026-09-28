@@ -1,6 +1,7 @@
 # EXPERIENCE — Cách thao tác chung cho shell Electron (MIN-124)
 
-> **Trạng thái: PROPOSED — chờ owner duyệt.** File này gom cách người dùng
+> **Trạng thái: APPROVED — owner duyệt qua bản mẫu MIN-126, 27/09/2026.**
+> File này gom cách người dùng
 > tương tác **dùng chung cho mọi module** trong shell (Notary, Upload Lab,
 > các mặt shell). Nó không thay thế spec UX cấp sản phẩm hay SOT hành vi:
 >

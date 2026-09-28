@@ -1,21 +1,24 @@
 # G1 Electron — UI dùng chung (MIN-124)
 
-> **Trạng thái: ACTIVE — hướng thiết kế đã duyệt bằng hai ảnh tham chiếu
-> (owner duyệt 27/09/2026 trong phiên MIN-123); giá trị token cụ thể trong
-> `tokens.json` đang `proposed`, chốt sau prototype P3 (MIN-126).**
+> **Trạng thái: ACTIVE — hướng thiết kế + giá trị token đã duyệt qua bản mẫu
+> P3 (owner duyệt 27/09/2026, `tokens.json` = `approved`). P4 (MIN-127) đã
+> ánh xạ token vào `shell/src/renderer/styles.css` và nav shell sang icon
+> rail sáng 60 px; trang mẫu thành phần chung ở `prototypes/components.html`.**
 
 Thư mục này là **nguồn sự thật duy nhất cho lớp thị giác và cách thao tác
 dùng chung** của hai module nghiệp vụ trong shell Electron một máy:
-Notary (`notary_v2`) và Upload Lab (`upload_lab`). Pha P1 chỉ lập tài liệu —
-chưa đụng CSS/runtime; CSS hiện hữu là hiện trạng, **không phải** đích.
+Notary (`notary_v2`) và Upload Lab (`upload_lab`). Sau P4 (MIN-127): lớp
+CSS dùng chung trong `shell/src/renderer/styles.css` **là** đích đã ánh xạ
+token; CSS riêng từng module (`cd-*`, `ul-*`) vẫn là hiện trạng chờ P6–P8.
 
 ## 1. File trong thư mục này
 
 | File | Nội dung | Trạng thái |
 |---|---|---|
-| [`DESIGN.md`](./DESIGN.md) | Ngôn ngữ thị giác: màu, chữ, bóng, bo góc, kích thước, layout chung, component pattern | Proposed — chờ duyệt giá trị |
-| [`EXPERIENCE.md`](./EXPERIENCE.md) | Cách thao tác chung: focus/bàn phím, mặt trạng thái, dialog, busy/waiting/cancel/dirty/conflict, responsive | Proposed — chờ duyệt |
-| [`tokens.json`](./tokens.json) | Token đề xuất (đúp vai trò contract cho P4) | `status: proposed` |
+| [`DESIGN.md`](./DESIGN.md) | Ngôn ngữ thị giác: màu, chữ, bóng, bo góc, kích thước, layout chung, component pattern, phạm vi CSS (§10) | Approved — duyệt qua bản mẫu MIN-126 |
+| [`EXPERIENCE.md`](./EXPERIENCE.md) | Cách thao tác chung: focus/bàn phím, mặt trạng thái, dialog, busy/waiting/cancel/dirty/conflict, responsive | Approved — duyệt qua bản mẫu MIN-126 |
+| [`tokens.json`](./tokens.json) | Token chuẩn (SOT giá trị; đồng bộ tay sang `styles.css`/`prototype.css`) | `status: approved` |
+| [`prototypes/`](./prototypes/README.md) | Bản mẫu tương tác đã duyệt (chuẩn thị giác) + `components.html` mẫu thành phần chung | Approved |
 | [`references/`](./references/README.md) | Hai ảnh thiết kế đã duyệt + metadata nguồn/ngày duyệt | Approved — chỉ tham chiếu thị giác |
 
 ## 2. Phân chia SOT — đọc file nào cho việc gì
