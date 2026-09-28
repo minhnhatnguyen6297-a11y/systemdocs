@@ -70,7 +70,7 @@ const ASSET_FIELD_ROWS = [
   ['land', 'Loại đất'],            // chip mở dialog — không phải input
   ['dia_chi', 'Địa chỉ'],
   ['loai_so', 'Loại sổ'],
-  ['hinh_thuc_su_dung', 'Hình thức sử dụng'],
+  ['hinh_thuc_su_dung', 'Hình thức SD'],     // MIN-136: viet tat giam rong
   ['thoi_han', 'Thời hạn'],
   ['nguon_goc', 'Nguồn gốc'],
   ['ngay_cap', 'Ngày cấp'],
@@ -142,6 +142,45 @@ function cancelDraftState(state) {
 // Reorder 1 hàng people trên draft Stage — contract không cấm; thứ tự
 // là thứ tự phụ lục/người ([Người N]). Model chưa export movePersonRow
 // (ghi vào handoff) → view splice + đánh dấu dirty giống moveAsset.
+// ---------- MIN-136: nhap/hien thi ngay dd/mm/yyyy ----------
+// <input type=date> hien thi theo locale OS — may mm/dd/yyyy se sai
+// yeu cau. Dung text input: nhap dd/mm/yyyy (chap nhan d/m/yyyy,
+// ddmmyyyy 8 so, hoac yyyy cho truong nguoi — contract cho phep
+// year-only); wire van gui ISO YYYY-MM-DD.
+const PERSON_DATE_FIELDS = new Set(['ngay_sinh', 'ngay_chet', 'ngay_cap']);
+const ASSET_DATE_FIELDS = new Set(['ngay_cap']);
+
+// ISO 'YYYY-MM-DD'|'YYYY' → 'dd/mm/yyyy'|'yyyy'; dang khac (legacy)
+// hien nguyen van.
+function fmtDisplayDate(v) {
+  const t = (v == null ? '' : String(v)).trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  return t;
+}
+
+// 'dd/mm/yyyy' | 'd/m/yyyy' | 'ddmmyyyy' | 'yyyy'(allowYear) →
+// { iso } | { error:'invalid' }. Ngay that khong ton tai (31/02,
+// 29/02 khong nhuan) → invalid. '05/06/1990' LUON doc la dd/mm —
+// quy uoc VN, khong mo ho mm/dd.
+function parseDisplayDate(text, allowYear) {
+  const t = (text == null ? '' : String(text)).trim();
+  if (!t) return { iso: null };
+  if (allowYear && /^\d{4}$/.test(t)) return { iso: t };
+  const m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(t) ||
+            /^(\d{2})(\d{2})(\d{4})$/.exec(t);
+  if (!m) return { error: 'invalid' };
+  const d = +m[1], mo = +m[2], y = +m[3];
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return { error: 'invalid' };
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 ||
+      dt.getUTCDate() !== d) {
+    return { error: 'invalid' };
+  }
+  const pad = (n, w) => String(n).padStart(w, '0');
+  return { iso: `${pad(y, 4)}-${pad(mo, 2)}-${pad(d, 2)}` };
+}
+
 function movePersonRowState(state, rowId, toIndex) {
   const people = state.stage.people;
   const i = people.findIndex((p) => p.row_id === rowId);
@@ -162,6 +201,15 @@ function createNotaryModuleView(deps) {
   const model = deps.model;
   const L = deps.lib;
   const notify = deps.notify || (() => {});
+  // MIN-136: danh muc loi → thong diep than thien + rule an. Fallback
+  // raw khi error-catalog chua nap (node --test tung file).
+  const errCatalog = (typeof window !== 'undefined' &&
+    window.G1_NOTARY_ERRORS) || null;
+  const describeError = errCatalog ? errCatalog.describeError
+    : (e) => ({ code: (e && e.code) || 'unknown',
+                title: (e && e.message) || 'Lỗi', hint: null });
+  const errText = errCatalog ? errCatalog.errText
+    : (e) => `${e.code}: ${e.message}`;
   const pickFiles = deps.pickFiles || (async () => ({ ok: false }));
   const openPath = deps.openPath || (async () => ({ ok: false }));
   const confirm = deps.confirm ||
@@ -285,17 +333,42 @@ function createNotaryModuleView(deps) {
     q.placeholder = 'Lọc theo từ khóa…';
     q.oninput = () => loadList();           // lọc theo query trước limit
     const out = h('div', 'cd-slot');
+    // MIN-136: race khoi dong — case_list chay ngay khi mo tab co the
+    // gap luc sidecar chua ready → truoc day hien "submit_failed" tho
+    // va khong tu retry. Retry toi da 5 lan cach 1.5s khi loi la infra;
+    // loi khac hien danh muc than thien (khong con ma snake_case troi).
+    const isInfraErr = (c) =>
+      /^(engine_|file_scope|unsupported_contract|submit_failed)/.test(c || '');
+    let infraFails = 0;
+    let retryTimer = null;
     async function loadList() {
       out.innerHTML = '';
       out.append(face(L.faceLoading('Đang tải danh sách hồ sơ…')));
       const r = await runCommand('notary.case_list',
                                  { query: q.value.trim() });
-      out.innerHTML = '';
       if (!r.ok) {
-        out.append(face(L.faceError(r.error)));
+        out.innerHTML = '';
+        const d = describeError(r.error);
+        const f = face({
+          kind: 'error',
+          title: d.title,
+          detail: d.raw && d.raw !== d.title ? d.raw : '',
+          hint: (d.hint ? `${d.hint} ` : '') +
+            (isInfraErr(d.code) && infraFails < 5
+              ? `Tự thử lại… (${d.code})` : `[${d.code}]`),
+        });
+        out.append(f);
+        if (isInfraErr(d.code) && infraFails < 5) {
+          infraFails += 1;
+          retryTimer = setTimeout(() => { void loadList(); }, 1500);
+        } else {
+          infraFails = 0;
+        }
         if (isDevMode()) out.append(devQuickOpen(onOpen));
         return;
       }
+      infraFails = 0;
+      out.innerHTML = '';
       const cases = (r.data && r.data.cases) || [];
       const total = (r.data && r.data.total) ?? cases.length;
       out.append(h('div', 'muted cd-caselist-count',
@@ -320,21 +393,7 @@ function createNotaryModuleView(deps) {
       if (isDevMode()) out.append(devQuickOpen(onOpen));
     }
     const load = btn('Làm mới danh sách', 'primary', loadList);
-    const create = btn('+ Hồ sơ mới', '', async () => {
-      // Nháp mới thay toàn bộ draft hiện tại — hỏi khi có thay đổi
-      // chưa lưu (case khác đang so / nháp khác đang dở).
-      if (model.hasUnsaved()) {
-        const okGo = await confirm({
-          title: 'Thay đổi chưa lưu',
-          body: 'Bản nháp hiện tại còn thay đổi chưa lưu — tạo hồ sơ ' +
-            'mới sẽ mất bản nháp này.',
-          confirmLabel: 'Bỏ nháp, tạo mới',
-          cancelLabel: 'Ở lại',
-        });
-        if (!okGo) return;
-      }
-      onNewDraft();
-    });
+    const create = btn('+ Hồ sơ mới', '', onNewDraft);
     row.append(create, q, load);
     s.append(row);
     s.append(out);
@@ -395,14 +454,14 @@ function createNotaryModuleView(deps) {
           r.error.code !== 'stage_validation_error' &&
           r.error.code !== 'diagram_invalid_state' &&
           r.error.code !== 'workspace_owner_required') {
-        notify(`${r.error.code}: ${r.error.message}`, true);
+        notify(errText(r.error), true);
       }
     } else {
       const r = await model.commitStage();
       if (!r.ok && r.error &&
           r.error.code !== 'stage_validation_error' &&
           r.error.code !== 'workspace_conflict') {
-        notify(`${r.error.code}: ${r.error.message}`, true);
+        notify(errText(r.error), true);
       }
     }
   }
@@ -542,7 +601,7 @@ function createNotaryModuleView(deps) {
     if (!extra.length) return null;
     const box = h('div', 'cd-row-errors');
     for (const er of extra) {
-      box.append(h('div', 'error small', er.message || er.code));
+      box.append(h('div', 'error small', errLine(er)));
     }
     return box;
   }
@@ -552,7 +611,7 @@ function createNotaryModuleView(deps) {
       .filter((e) => e.field === field);
     for (const fe of errs) {
       td.classList.add('cd-cell-err');
-      td.append(h('div', 'cd-err-msg', fe.message || fe.code));
+      td.append(h('div', 'cd-err-msg', errLine(fe)));
     }
     return errs.length;
   }
@@ -560,6 +619,64 @@ function createNotaryModuleView(deps) {
   // Ô Stage cắt "…" khi dài (CSS) — tooltip = giá trị đầy đủ.
   function setCellTitle(inp) {
     inp.title = inp.value || '';
+  }
+
+  // Dong loi hien thi tu danh muc (MIN-136): catalog co entry →
+  // title+hint than thien; khong co → message backend (thuong da la
+  // tieng Viet, van tot hon snake_code troi).
+  function errLine(er) {
+    const d = describeError(er);
+    return d.hint ? `${d.title} — ${d.hint}` : d.title;
+  }
+
+  // Ô ngay dd/mm/yyyy (MIN-136): hien fmtDisplayDate(row[key]); go raw
+  // vao model de dirty live; blur/Enter parse → ISO len wire, repaint
+  // display chuan. Sai format → danh dau do + giu raw (backend van
+  // chan bang invalid_date khi luu — khong tham lang bo qua).
+  function dateCellInput(getVal, onSet, allowYear, aria) {
+    const inp = h('input', 'cd-cell cd-date');
+    inp.value = fmtDisplayDate(getVal());
+    inp.placeholder = allowYear ? 'dd/mm/yyyy hoặc năm' : 'dd/mm/yyyy';
+    inp.setAttribute('inputmode', 'numeric');
+    inp.maxLength = 10;
+    setCellTitle(inp);
+    inp.oninput = () => {
+      setCellTitle(inp);
+      inp.classList.remove('cd-input-bad');
+      onSet(inp.value.trim() === '' ? null : inp.value);
+    };
+    inp.onchange = () => {
+      const r = parseDisplayDate(inp.value, allowYear);
+      if (r.error) {
+        inp.classList.add('cd-input-bad');
+        inp.title = 'Nhập ngày dạng dd/mm/yyyy';
+        return;
+      }
+      inp.classList.remove('cd-input-bad');
+      inp.value = fmtDisplayDate(r.iso);
+      setCellTitle(inp);
+      onSet(r.iso);
+    };
+    if (aria) inp.setAttribute('aria-label', aria);
+    return inp;
+  }
+
+  // "+ Hồ sơ mới" — dung chung cho toolbar Tong quan va empty-state
+  // tab Soạn hồ sơ (MIN-136): hoi truoc khi mat nhap dang so.
+  async function newDraftFlow() {
+    if (model.hasUnsaved()) {
+      const okGo = await confirm({
+        title: 'Thay đổi chưa lưu',
+        body: 'Bản nháp hiện tại còn thay đổi chưa lưu — tạo hồ sơ ' +
+          'mới sẽ mất bản nháp này.',
+        confirmLabel: 'Bỏ nháp, tạo mới',
+        cancelLabel: 'Ở lại',
+      });
+      if (!okGo) return;
+    }
+    model.newDraft();
+    activeTab = 'drafting';
+    rerender();
   }
 
   function dragHandle(label) {
@@ -682,6 +799,17 @@ function createNotaryModuleView(deps) {
           chip.disabled = ro;
           chip.dataset.fid = `a:${a.row_id}:land`;
           td.append(chip);
+        } else if (ASSET_DATE_FIELDS.has(key)) {
+          // Ngay cap tren GCN: backend chi nhan full ISO (valid_date_full)
+          // — allowYear=false. Hien/nhap dd/mm/yyyy.
+          const inp = dateCellInput(
+            () => a[key],
+            (v) => model.updateAssetField(a.row_id, key, v),
+            false, `${label} — Tài sản ${i + 1}`);
+          inp.disabled = ro;
+          inp.dataset.fid = `a:${a.row_id}:${key}`;
+          td.append(inp);
+          cellErrs(a.row_id, key, td);
         } else {
           const inp = h('input', 'cd-cell');
           inp.value = a[key] || '';
@@ -846,18 +974,17 @@ function createNotaryModuleView(deps) {
       (s.caseInfo && s.caseInfo.case_type) !== 'two_party' &&
       'owner_row_id' in s.stage;
     const t = h('table', 'grid cd-ptbl cd-stage-tbl');
-    // colgroup cố định theo mockup MIN-133: kéo 20 · Để lại 44 · Họ tên
-    // · Giới tính 64 · ngày · Số giấy tờ · Địa chỉ (phần còn lại) · xóa 24.
+    // colgroup cố định theo mockup MIN-133 + MIN-136 (bo cot "Để lại" —
+    // chu dat chon qua so do): kéo 20 · Họ tên · Giới tính 64 · ngày ·
+    // Số giấy tờ · Địa chỉ (phần còn lại) · xóa 24.
     const cg = h('colgroup');
     cg.append(h('col', 'cd-pcol-drag'));
-    if (inheritance) cg.append(h('col', 'cd-pcol-owner'));
     for (const [key] of PERSON_COLS) cg.append(h('col', `cd-pcol-${key}`));
     cg.append(h('col', 'cd-pcol-del'));
     t.append(cg);
     const thead = h('thead');
     const trh = h('tr');
     trh.append(h('th', 'cd-drag-col', ''));
-    if (inheritance) trh.append(h('th', 'cd-owner-col', 'Để lại'));
     for (const [, label] of PERSON_COLS) trh.append(h('th', '', label));
     trh.append(h('th', 'cd-drag-col', ''));
     thead.append(trh);
@@ -892,24 +1019,9 @@ function createNotaryModuleView(deps) {
       });
       tdh.append(grip);
       tr.append(tdh);
-      if (inheritance) {
-        const tdo = h('td', 'cd-owner-cell');
-        const ob = h('input');
-        ob.type = 'radio';
-        ob.name = 'cd-owner-row';
-        ob.checked = s.stage.owner_row_id === p.row_id;
-        ob.disabled = ro;
-        ob.dataset.fid = `p:${p.row_id}:owner`;
-        ob.setAttribute('aria-label',
-          `Người để lại tài sản — ${p.ho_ten || `dòng ${ri + 1}`}`);
-        ob.title = 'Người để lại tài sản (bắt buộc khi Cập nhật)';
-        ob.onchange = () => model.setOwnerRow(p.row_id);
-        tdo.append(ob);
-        if (s.stage.owner_row_id === p.row_id) {
-          tdo.classList.add('cd-owner-on');
-        }
-        tr.append(tdo);
-      }
+      // MIN-136: bo cot "Để lại" — chu dat chi chon qua o 'owner' tren
+      // so do (owner_row_id sync san trong model). Hang cua chu dat
+      // van sang nen de nhan biet (cd-row-owner).
       for (const [key, label] of PERSON_COLS) {
         const td = h('td');
         let ctl;
@@ -923,11 +1035,16 @@ function createNotaryModuleView(deps) {
           }
           ctl.onchange = () => model.updatePersonField(
             p.row_id, key, ctl.value);
+        } else if (PERSON_DATE_FIELDS.has(key)) {
+          // Ngay nguoi: allowYear — contract nhan year-only ("1950").
+          ctl = dateCellInput(
+            () => p[key],
+            (v) => model.updatePersonField(p.row_id, key, v),
+            true, `${label} — ${p.ho_ten || `dòng ${ri + 1}`}`);
         } else {
           ctl = h('input', 'cd-cell');
           ctl.value = p[key] || '';
           setCellTitle(ctl);
-          if (key === 'ngay_chet') ctl.placeholder = '—';
           const inp = ctl;
           inp.oninput = () => {
             setCellTitle(inp);
@@ -1003,7 +1120,7 @@ function createNotaryModuleView(deps) {
     const box = h('div', 'cd-row-errors');
     for (const er of extra) {
       box.append(h('div', 'error small',
-        `${rows.get(er.row_id)} · ${er.field}: ${er.message || er.code}`));
+        `${rows.get(er.row_id)} · ${er.field}: ${errLine(er)}`));
     }
     return box;
   }
@@ -1096,7 +1213,7 @@ function createNotaryModuleView(deps) {
     tray.append(h('div', 'cd-suggest-title',
       'Gợi ý chờ kiểm tra — chưa ghi vào hồ sơ'));
     for (const er of s.intakeErrors || []) {
-      tray.append(h('div', 'error small', er.message || er.code));
+      tray.append(h('div', 'error small', errLine(er)));
     }
     for (const sug of s.suggestions) {
       const card = h('div', 'cd-suggest-card');
@@ -1211,8 +1328,10 @@ function createNotaryModuleView(deps) {
       ws.append(n);
     }
     if (s.error && s.status !== 'error' && s.status !== 'unavailable') {
+      const ed = describeError(s.error);
       const eb = h('div', 'banner err',
-        `${s.error.code}: ${s.error.message}`);
+        `${ed.title}${ed.hint ? ' — ' + ed.hint : ''} `);
+      eb.append(h('span', 'muted small', `(${ed.code})`));
       const x = btn('×', 'ghost sm', () => model.dismissNotice());
       eb.append(h('span', 'grow', ''));
       eb.append(x);
@@ -1266,12 +1385,14 @@ function createNotaryModuleView(deps) {
     } catch (e) {
       // client.run reject (bridge/engine lỗi không bắt được) — model đã
       // set state lỗi riêng; đây chỉ chặn unhandled rejection.
-      notify(`openCase lỗi: ${e && e.message || e}`, true);
+      notify(errText(e && e.code ? e
+        : { code: 'shell_internal_error',
+            message: (e && e.message) || String(e) }), true);
     }
   };
 
   panels.overview.append(buildCaseListPanel(openCaseInDrafting,
-    () => { model.newDraft(); activeTab = 'drafting'; rerender(); }));
+    newDraftFlow));
   const wordPlaceholder = face(L.faceEmpty(
     'Tab Word — nội dung surface văn bản ở lát cắt sau (spec §1). ' +
     'Điểm vào xuất Word nằm trong Soạn hồ sơ → Xuất Word.'));
@@ -1350,6 +1471,13 @@ function createNotaryModuleView(deps) {
     if (ae && dp.contains(ae) &&
         /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName || '')) {
       syncChromeUI();
+      // MIN-136 F-1: rebuild bi hoan khi dang go — nhung dialog
+      // conflict phai hien NGAY (server tu choi commit thi user can
+      // biet lieu ke, khong doi blur/emit sau).
+      if (s.status === 'conflict' && s.conflict !== lastConflict) {
+        lastConflict = s.conflict;
+        conflictDialog();
+      }
       return;
     }
     const cap = captureFocus(root);
@@ -1357,12 +1485,15 @@ function createNotaryModuleView(deps) {
     dp.innerHTML = '';
     if (s.status === 'idle') {
       dp.append(face(L.faceEmpty(
-        'Chưa mở hồ sơ — chọn hồ sơ ở tab Tổng quan hồ sơ.')));
-      const go = btn('Đi tới Tổng quan hồ sơ', '', () => {
-        activeTab = 'overview';
-        rerender();
-      });
-      dp.append(go);
+        'Chưa mở hồ sơ — tạo hồ sơ mới hoặc chọn hồ sơ ở tab Tổng quan.')));
+      const acts = h('div', 'toolbar');
+      acts.append(
+        btn('+ Hồ sơ mới', 'primary', newDraftFlow),
+        btn('Đi tới Tổng quan hồ sơ', '', () => {
+          activeTab = 'overview';
+          rerender();
+        }));
+      dp.append(acts);
     } else if (s.status === 'loading') {
       dp.append(face(L.faceLoading('Đang tải workspace…')));
     } else if (s.status === 'unavailable') {
@@ -1410,7 +1541,9 @@ const G1_NOTARY_VIEW = {
   // pure helpers export cho node --test (không cần DOM).
   _internals: { spliceMove, cancelDraftState, movePersonRowState,
                 LAND_TYPE_CODES, PERSON_COLS, ASSET_FIELD_ROWS,
-                DT_ASSET_COL, DT_PERSON_ROW },
+                DT_ASSET_COL, DT_PERSON_ROW,
+                PERSON_DATE_FIELDS, ASSET_DATE_FIELDS,
+                fmtDisplayDate, parseDisplayDate },
 };
 
 if (typeof window !== 'undefined') window.G1_NOTARY_VIEW = G1_NOTARY_VIEW;

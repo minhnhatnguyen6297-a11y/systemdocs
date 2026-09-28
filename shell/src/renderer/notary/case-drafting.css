@@ -255,9 +255,9 @@
 }
 /* colgroup — Tài sản: nhãn cố định, cột tài sản chia đều phần còn lại */
 .cd-stage-tbl col.cd-acol-label { width: var(--cd-asset-label-w); }
-/* colgroup — Người: Địa chỉ không đặt width = lấy phần còn lại */
+/* colgroup — Người: Địa chỉ không đặt width = lấy phần còn lại.
+ * MIN-136: cột "Để lại" đã bỏ — chủ đất chọn qua sơ đồ. */
 .cd-stage-tbl col.cd-pcol-drag { width: 20px; }
-.cd-stage-tbl col.cd-pcol-owner { width: 44px; }
 .cd-stage-tbl col.cd-pcol-ho_ten { width: var(--cd-col-name); }
 .cd-stage-tbl col.cd-pcol-gioi_tinh { width: 64px; }
 .cd-stage-tbl col.cd-pcol-ngay_sinh,
@@ -316,20 +316,15 @@
   padding: 0;
   text-align: center;
 }
-.cd-root .cd-stage-tbl .cd-owner-col,
-.cd-root .cd-stage-tbl .cd-owner-cell {
-  padding: 0;
-  text-align: center;
-}
-.cd-owner-cell input[type="radio"] {
-  width: 15px;
-  height: 15px;
-  margin: 0;
-  vertical-align: middle;
-  accent-color: var(--accent);
-}
+/* MIN-136: cột "Để lại" đã gỡ cùng selector cột/cell/radio của nó.
+ * Giữ .cd-row-owner — hàng chủ đất vẫn sáng nền (owner_row_id sync từ
+ * ô 'owner' trên sơ đồ). */
 .cd-root .cd-stage-tbl tr.cd-row-owner td { background: #f7faff; }
-.cd-root .cd-stage-tbl td.cd-owner-cell.cd-owner-on { background: var(--accent-soft); }
+/* Ô ngày sai định dạng dd/mm/yyyy (MIN-136) — đánh đỏ ngay khi blur. */
+.cd-root .cd-stage-tbl .cd-cell.cd-input-bad {
+  border-color: var(--err, #dc2626);
+  background: #fef2f2;
+}
 .cd-cell-err input,
 .cd-cell-err select,
 .cd-root .cd-stage-tbl .cd-cell-err .cd-cell {
@@ -490,7 +485,7 @@
 .cd-pool-card:focus-within .cd-pool-assign,
 .cd-pool-assign:focus-visible { opacity: 1; }
 .cd-pool-card[draggable="false"] { cursor: default; }
-/* drop-hint/dragging/row-drop-*/col-drop-* từ styles.css — không re-khai. */
+/* drop-hint/dragging/row-drop-* và col-drop-* từ styles.css — không re-khai. */
 .cd-diagram {
   flex: 1 1 0;
   min-width: 0;
@@ -503,6 +498,16 @@
   flex-direction: column;
   gap: 4px;
   padding: 4px 2px 0;
+}
+/* MIN-136: hint hanh dong ngay duoi canvas (vd chu dat chua co ngay
+ * mat) — nen vang nhe, ro hon muted text nhung khong phai loi. */
+.cd-hint {
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  font-size: var(--cd-fs-data);
 }
 .cd-alloc-list { display: flex; flex-direction: column; gap: 3px; }
 .cd-alloc-row { display: flex; gap: 8px; align-items: baseline; }
@@ -529,7 +534,10 @@
 }
 .cd-canvas-wrap.panning { cursor: grabbing; }
 .cd-canvas-wrap .face { margin: 24px auto; max-width: 420px; }
-.cd-canvas-world { position: relative; min-height: 100%; }
+/* MIN-136: margin 0 auto — world hep hon wrap thi can GIUA thay vi
+ * dinh goc trai (loi "so do nho, sat goc"). World rong hon wrap thi
+ * margin tinh 0 → scroll/pan giu nguyen. */
+.cd-canvas-world { position: relative; min-height: 100%; margin: 0 auto; }
 .cd-canvas-scale {
   position: relative;
   transform-origin: 0 0;

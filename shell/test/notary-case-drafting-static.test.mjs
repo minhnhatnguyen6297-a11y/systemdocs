@@ -330,7 +330,10 @@ test('MIN-133: bảng Stage table-layout fixed + colgroup theo mockup', () => {
   assert.match(cssSrc, /col\.cd-acol-label\s*\{\s*width:\s*var\(--cd-asset-label-w\)/);
   assert.match(cssSrc, /--cd-asset-label-w:\s*122px/);
   assert.match(cssSrc, /col\.cd-pcol-drag\s*\{\s*width:\s*20px/);
-  assert.match(cssSrc, /col\.cd-pcol-owner\s*\{\s*width:\s*44px/);
+  // MIN-136: cot "Đe lai" da bo — khong con col/rule owner tren bang
+  // Nguoi (chu dat chon qua so do; hang owner van to nen .cd-row-owner).
+  assert.ok(!/cd-pcol-owner|cd-owner-col/.test(cssSrc),
+    'còn CSS cột Để lại');
   assert.match(cssSrc, /--cd-col-name:\s*214px/);
   assert.match(cssSrc, /col\.cd-pcol-gioi_tinh\s*\{\s*width:\s*64px/);
   assert.match(cssSrc, /--cd-col-date:\s*86px/);
@@ -390,4 +393,54 @@ test('MIN-133 D1/D2/D4: view không còn cột noi_cap/place_of_origin, card met
   assert.match(modelSrc, /'noi_cap'/);
   assert.match(modelSrc, /'place_of_origin'/);
   assert.match(modelSrc, /'ngay_lap_ho_so'/);
+});
+
+// ---------- MIN-136: regression guards ----------
+
+test('MIN-136: khong trung top-level identifier giua cac script notary', () => {
+  // Classic <script> share global lexical scope — 2 file cung khai bao
+  // top-level `const X` / `function X` → file sau SyntaxError, ca module
+  // khong load (loi errText catalog × diagram pane da xay ra: Electron
+  // bao "module_missing"). node --check tung file khong bat duoc.
+  const FILES = ['src/renderer/lib.js',
+    'src/renderer/notary/error-catalog.js',
+    'src/renderer/notary/case-drafting-model.js',
+    'src/renderer/notary/intake-dialog.js',
+    'src/renderer/notary/relationship-diagram.js',
+    'src/renderer/notary/word-export-dialog.js',
+    'src/renderer/notary/case-drafting-view.js'];
+  const seen = new Map();      // name -> first file
+  const dup = [];
+  for (const f of FILES) {
+    const src = R(f);
+    for (const m of src.matchAll(
+      /^(?:const|let|var|function|class)\s+([A-Za-z_$][\w$]*)/gm)) {
+      if (seen.has(m[1])) dup.push(`${m[1]} (${seen.get(m[1])} × ${f})`);
+      else seen.set(m[1], f);
+    }
+  }
+  assert.deepEqual(dup, [], 'top-level identifiers trung nhau');
+});
+
+test('MIN-136: error-catalog load truoc cac module dung no', () => {
+  const iCat = htmlSrc.indexOf('notary/error-catalog.js');
+  assert.ok(iCat > -1, 'index.html thieu error-catalog.js');
+  for (const s of ['notary/case-drafting-model.js',
+                   'notary/relationship-diagram.js',
+                   'notary/case-drafting-view.js']) {
+    const i = htmlSrc.indexOf(s);
+    assert.ok(i > iCat, `${s} phai load SAU error-catalog.js`);
+  }
+});
+
+test('MIN-136: CSS khong co comment bi cat giua chung (*/ trong comment)', () => {
+  // `/* ... */ ... */` — comment dong som roi rac text nuot rule ke
+  // tiep (da xay ra: `.cd-diagram` bi nuot → canvas khong flex-fill,
+  // node dinh goc trai). So /* phai bang so */ trong ca 2 css.
+  for (const [name, src] of [['case-drafting.css', cssSrc],
+                             ['styles.css', stylesSrc]]) {
+    const open = (src.match(/\/\*/g) || []).length;
+    const close = (src.match(/\*\//g) || []).length;
+    assert.equal(open, close, `${name}: ${open} /* vs ${close} */`);
+  }
 });

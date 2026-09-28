@@ -6,9 +6,10 @@
  * bo cuc/thao tac: docs/product/ui/prototypes/notary.js (canvas pan/zoom/
  * "Mở rộng", card thua ke + 2 hang chip, hai ben 30 cho).
  *
- * - Pool = Stage DA COMMIT tru nguoi da gan tren draft Diagram — ke ca
- *   nhap moi (caseId=null): draft Stage dang so KHONG lo vao Pool
- *   (MIN-129). Search chi loc hien thi — khong doi draft.
+ * - Pool = nguoi CHUA GAN tren draft Diagram — nhap moi (caseId=null)
+ *   nguon la stage nhap, case that nguon la committed (MIN-136). Chi
+ *   nguoi — tai san khong xuong Pool (khong co flow gan len node).
+ *   Search chi loc hien thi — khong doi draft.
  * - Keo tha payload 'text/plain' JSON {kind:'person', row_id} — contract
  *   P6 giu nguyen: drop len node/slot = movePerson (move/swap), drop vao
  *   Pool = movePerson(row_id, null). Menu "Gán vị trí" = duong ban phim.
@@ -20,10 +21,12 @@
  *   = p16..p30 (p16 luon dau B, khong lay thu tu hang Stage lam so);
  *   khong mui ten/quan he thua ke, khong chip tai san, khong tu don lo
  *   trong. Card = "Chỗ N" + ten nguoi (khong ngay thang/vai tro).
- * - Slot tu sinh: base seed (nut "Tạo sơ đồ mẫu" khi canvas trong, qua
- *   model-level seedDiagramSlots) + requiredSlots cua engine sau
- *   evaluate — engine la SOT cho cho con thieu, view chi tao slot trong
- *   tuong ung, KHONG tu quyet dinh luat thua ke.
+ * - Luong don node (MIN-136): draft moi bat dau DUNG 1 o 'owner' trong.
+ *   Nguoi dau tien tha vao = chu dat (owner_row_id sync trong model).
+ *   Moi o sau CHI sinh tu engine requiredSlots sau evaluate — engine la
+ *   SOT, view chi tao o trong tuong ung. KHONG co duong them o thu cong
+ *   (+ Slot / so do mau / con-cua-X da bo). Chu dat chua co ngay mat →
+ *   engine khong spawn (dung nghiep vu) → hint dien Ngay mat.
  * - Zoom (−/%/+ trong 0.5–1.6) + pan (keo nen) + "Mở rộng" overlay
  *   ~toan man (Esc/x + tra focus — openModal xu ly). Khong auto-fit/ep
  *   nho chu — 60+ node van thao tac bang cuon/pan/zoom.
@@ -38,6 +41,12 @@
 
 const REL_EVALUATE_DEBOUNCE_MS = 500;   // spec: 400–600ms sau draft doi
 const TWO_PARTY = 'two_party';
+
+// Thong diep loi than thien tu error-catalog (MIN-136) — fallback raw
+// khi module chua nap (node --test nap tung file doc lap).
+const relErrText = (typeof window !== 'undefined' && window.G1_NOTARY_ERRORS)
+  ? window.G1_NOTARY_ERRORS.relErrText
+  : (e) => `${e.code}: ${e.message}`;
 
 // Kich thuoc layout canvas (px logic — scale boi zoom, khong co chu).
 // MIN-133 D7 (mockup duyet 28/09/2026): node DA THA 144×87 (ten 14px,
@@ -300,7 +309,7 @@ function createDiagramPane(ctx) {
     const r = await model.evaluateDiagram();
     if (!r.ok && r.error &&
         r.error.code !== 'diagram_invalid_state') {
-      notify(`${r.error.code}: ${r.error.message}`, true);
+      notify(relErrText(r.error), true);
     }
     if (r.ok) applyRequiredSlots();     // engine-required slots (SOT)
     return r;
@@ -385,18 +394,16 @@ function createDiagramPane(ctx) {
   // DOM P7 dung: .cd-pool, .cd-pool-box, .cd-pool-card, .cd-pool-nm,
   // .dragging, .drop-hint.
 
-  function poolCardEl(row, kind, sub) {
+  // MIN-136: Pool chi con nguoi — tai san khong xuong (khong co flow
+  // gan len node). Card = ten + grip keo + nut → menu gan vi tri.
+  function poolCardEl(row, sub) {
     const card = h('div', 'cd-pool-card');
-    // Tai san khong gan len node (chi tham chieu qua vi tri 1..3 tren
-    // node inheritance) — chi person card keo duoc.
-    const canDrag = kind === 'person' && model.canWrite();
+    const canDrag = model.canWrite();
     card.draggable = canDrag;
-    const label = kind === 'person'
-      ? (row.ho_ten || '(chưa đặt tên)')
-      : (row.so_serial || '(chưa có serial)');
+    const label = row.ho_ten || '(chưa đặt tên)';
     const setPayload = (e) => {
       e.dataTransfer.setData('text/plain',
-        JSON.stringify({ kind, row_id: row.row_id }));
+        JSON.stringify({ kind: 'person', row_id: row.row_id }));
       card.classList.add('dragging');
     };
     if (canDrag) {
@@ -416,7 +423,7 @@ function createDiagramPane(ctx) {
     // MIN-133: nut → noi tren mep phai, chi hien khi hover/focus (the
     // Pool 176px chi con ten) — van trong tab order.
     const assign = btn('→', 'sm cd-pool-assign',
-      () => openAssignMenu(row, kind));
+      () => openAssignMenu(row));
     assign.title = 'Gán vị trí (bàn phím — thay cho kéo thả)';
     assign.setAttribute('aria-label', `Gán vị trí cho ${label}`);
     assign.disabled = !model.canWrite() ||
@@ -428,22 +435,23 @@ function createDiagramPane(ctx) {
     return card;
   }
 
-  function poolMatch(row, kind, q) {
+  function poolMatch(row, q) {
     if (!q) return true;
-    const label = (kind === 'person'
-      ? [row.ho_ten, row.so_giay_to, row.ngay_sinh]
-      : [row.so_serial, row.dia_chi, row.so_thua_dat])
+    const label = [row.ho_ten, row.so_giay_to, row.ngay_sinh]
       .filter(Boolean).join(' ').toLowerCase();
     return label.includes(q);
   }
 
   // ---------- Menu "Gán vị trí" (ban phim thay cho keo-tha) ----------
 
-  function openAssignMenu(row, kind) {
+  // MIN-136: menu chi liet ke cac o HIEN CO (trong + doi cho) — khong
+  // con duong tao o thu cong ("Con của X"/"Vợ-chồng của X"/so do mau).
+  // O moi sinh tu engine requiredSlots sau evaluate.
+  function openAssignMenu(row) {
     openModal((box, close) => {
       const head = h('div', 'modal-head');
       head.append(h('h2', 'modal-title',
-        `Gán vị trí — ${row.ho_ten || row.so_serial || '(chưa tên)'}`));
+        `Gán vị trí — ${row.ho_ten || '(chưa tên)'}`));
       const x = h('button', 'modal-close', '×');
       x.type = 'button';
       x.setAttribute('aria-label', 'Đóng');
@@ -451,112 +459,69 @@ function createDiagramPane(ctx) {
       head.append(x);
       box.append(head);
       const body = h('div', 'modal-body cd-field-stack');
-      if (kind === 'asset') {
-        // Tai san khong gan vao node — so do chi ghi dau chon vi tri
-        // own/receive tren node nguoi (§13.4); khong co node tai san.
-        body.append(h('div', 'muted',
-          'Tài sản chưa gán trực tiếp lên sơ đồ trong phiên bản này — ' +
-          'sơ đồ gán quan hệ giữa các người.'));
+      const nodes = liveNodes();
+      const assign = (nodeId) => () => {
+        // movePerson bao trum ca move vao cho trong LAN swap khi cho
+        // da co nguoi — cung semantics voi keo-tha (§13.5 Q9).
+        if (model.movePerson(row.row_id, nodeId)) scheduleEvaluate();
+        close();
+      };
+      if (isTp()) {
+        // 30 cho canonical: trong = gan, co nguoi = doi cho — nhom
+        // theo Ben A (p1..p15) / Ben B (p16..p30).
+        for (const [label, lo, hi] of
+            [['Bên A', 1, 15], ['Bên B', 16, 30]]) {
+          const arr = nodes
+            .filter((n) => {
+              const k = slotNum(n.id);
+              return k >= lo && k <= hi;
+            })
+            .sort((a, b) => slotNum(a.id) - slotNum(b.id));
+          if (!arr.length) continue;
+          body.append(h('div', 'muted', label));
+          const grid = h('div', 'cd-assign-grid');
+          for (const n of arr) {
+            const num = slotNum(n.id);
+            const b = n.personId
+              ? btn(`${num} — ${personName(n.personId)}`, 'sm',
+                  assign(n.id))
+              : btn(`${num}`, 'secondary sm', assign(n.id));
+            b.title = n.personId
+              ? `Đổi chỗ ${num} với ${personName(n.personId)}`
+              : `Gán vào chỗ ${num}`;
+            grid.append(b);
+          }
+          body.append(grid);
+        }
       } else {
-        const nodes = liveNodes();
-        const assign = (nodeId) => () => {
-          // movePerson bao trum ca move vao cho trong LAN swap khi cho
-          // da co nguoi — cung semantics voi keo-tha (§13.5 Q9).
-          if (model.movePerson(row.row_id, nodeId)) scheduleEvaluate();
-          close();
-        };
-        if (isTp()) {
-          // 30 cho canonical: trong = gan, co nguoi = doi cho — nhom
-          // theo Ben A (p1..p15) / Ben B (p16..p30).
-          for (const [label, lo, hi] of
-              [['Bên A', 1, 15], ['Bên B', 16, 30]]) {
-            const arr = nodes
-              .filter((n) => {
-                const k = slotNum(n.id);
-                return k >= lo && k <= hi;
-              })
-              .sort((a, b) => slotNum(a.id) - slotNum(b.id));
-            if (!arr.length) continue;
-            body.append(h('div', 'muted', label));
-            const grid = h('div', 'cd-assign-grid');
-            for (const n of arr) {
-              const num = slotNum(n.id);
-              const b = n.personId
-                ? btn(`${num} — ${personName(n.personId)}`, 'sm',
-                    assign(n.id))
-                : btn(`${num}`, 'secondary sm', assign(n.id));
-              b.title = n.personId
-                ? `Đổi chỗ ${num} với ${personName(n.personId)}`
-                : `Gán vào chỗ ${num}`;
-              grid.append(b);
-            }
-            body.append(grid);
+        const empty = nodes.filter((n) => !n.personId);
+        if (empty.length) {
+          body.append(h('div', 'muted', 'Slot đang trống:'));
+          const grid = h('div', 'cd-tight');
+          for (const n of empty) {
+            grid.append(btn(`Gán vào “${refName(n)}”`, 'secondary sm',
+              assign(n.id)));
           }
-        } else {
-          const empty = nodes.filter((n) => !n.personId);
-          if (empty.length) {
-            body.append(h('div', 'muted', 'Slot đang trống:'));
-            const grid = h('div', 'cd-tight');
-            for (const n of empty) {
-              grid.append(btn(`Gán vào “${refName(n)}”`, 'secondary sm',
-                assign(n.id)));
-            }
-            body.append(grid);
+          body.append(grid);
+        }
+        // Doi cho voi slot da co nguoi (swap) — duong ban phim cho
+        // drop len node occupied.
+        const others = nodes.filter(
+          (n) => n.personId && n.personId !== row.row_id);
+        if (others.length) {
+          body.append(h('div', 'muted',
+            'Đổi chỗ với slot đã có người:'));
+          const grid = h('div', 'cd-tight');
+          for (const n of others) {
+            grid.append(btn(
+              `${slotTag(n)} — ${personName(n.personId)}`, 'sm',
+              assign(n.id)));
           }
-          // Doi cho voi slot da co nguoi (swap) — duong ban phim cho
-          // drop len node occupied.
-          const others = nodes.filter(
-            (n) => n.personId && n.personId !== row.row_id);
-          if (others.length) {
-            body.append(h('div', 'muted',
-              'Đổi chỗ với slot đã có người:'));
-            const grid = h('div', 'cd-tight');
-            for (const n of others) {
-              grid.append(btn(
-                `${slotTag(n)} — ${personName(n.personId)}`, 'sm',
-                assign(n.id)));
-            }
-            body.append(grid);
-          }
-          const filled = nodes.filter((x) => x.personId);
-          if (filled.length) {
-            body.append(h('div', 'muted',
-              'Hoặc tạo slot mới quan hệ với:'));
-            for (const n of filled) {
-              const who = personName(n.personId);
-              const rowBtns = h('div', 'cd-tight');
-              rowBtns.append(
-                btn(`Con của ${who}`, 'sm', () => {
-                  const node = model.addSlot();
-                  if (node) {
-                    model.setNodeRelation(node.id,
-                      { parentSlotIds: [n.id] });
-                    model.assignPerson(node.id, row.row_id);
-                    scheduleEvaluate();
-                  }
-                  close();
-                }),
-                btn(`Vợ/chồng của ${who}`, 'sm', () => {
-                  const node = model.addSlot();
-                  if (node) {
-                    model.setNodeRelation(node.id, { spouseSlotId: n.id });
-                    model.assignPerson(node.id, row.row_id);
-                    scheduleEvaluate();
-                  }
-                  close();
-                }));
-              body.append(rowBtns);
-            }
-          }
-          if (!nodes.length) {
-            body.append(btn('Tạo sơ đồ mẫu và gán', 'secondary', () => {
-              seedBase();
-              if (model.assignPerson('owner', row.row_id)) {
-                scheduleEvaluate();
-              }
-              close();
-            }));
-          }
+          body.append(grid);
+        }
+        if (!nodes.length) {
+          body.append(h('div', 'muted',
+            'Sơ đồ chưa có ô — khôi phục ô khởi tạo trên canvas trước.'));
         }
       }
       box.append(body);
@@ -566,49 +531,7 @@ function createDiagramPane(ctx) {
     }, { bare: true });
   }
 
-  // ---------- Seed + requiredSlots ----------
-
-  // Seed 7 slot canonical (cha/me hai ben + owner + spouse + child_1)
-  // khi canvas trong — qua helper model-level seedDiagramSlots. Helper
-  // mutate state truc tiep (khong qua touchDiagram) → ep dirty+emit
-  // bang mot setNodeRelation no-op (workaround: model khong expose
-  // touch-only/seed API tren instance — ghi handoff).
-  function seedBase() {
-    const seed = (typeof window !== 'undefined' &&
-                  window.G1_NOTARY_MODEL &&
-                  window.G1_NOTARY_MODEL.seedDiagramSlots) || null;
-    const nodes = model.state.diagram.nodes ||
-      (model.state.diagram.nodes = []);
-    if (seed) {
-      seed(nodes);
-      const any = nodes.find((n) => n && !n.deleted);
-      if (any) model.setNodeRelation(any.id, {});
-      else model.dismissNotice();
-      return true;
-    }
-    // Fallback qua public API khi helper model-level khong duoc nap.
-    const g = (id) => nodes.find((n) => n && n.id === id && !n.deleted);
-    const mk = (id) => { if (!g(id)) model.addSlot(id); };
-    mk('father'); mk('mother');
-    mk('spouse_father'); mk('spouse_mother');
-    mk('owner'); mk('spouse'); mk('child_1');
-    const has = (id) => !!g(id);
-    if (has('owner')) {
-      model.setNodeRelation('owner', {
-        parentSlotIds: ['father', 'mother'].filter(has),
-        spouseSlotId: has('spouse') ? 'spouse' : null });
-    }
-    if (has('spouse')) {
-      model.setNodeRelation('spouse', {
-        parentSlotIds: ['spouse_father', 'spouse_mother'].filter(has),
-        spouseSlotId: has('owner') ? 'owner' : null });
-    }
-    if (has('child_1')) {
-      model.setNodeRelation('child_1', {
-        parentSlotIds: ['owner', 'spouse'].filter(has) });
-    }
-    return true;
-  }
+  // ---------- requiredSlots (engine la SOT cho cho con thieu) ----------
 
   // Tu sinh slot thieu theo render_model.requiredSlots cua engine —
   // engine la SOT cho cho con thieu: view chi tao slot TRONG + noi quan
@@ -952,13 +875,15 @@ function createDiagramPane(ctx) {
     wrap.setAttribute('aria-label',
       tp ? 'Sơ đồ hai bên' : 'Sơ đồ thừa kế');
     if (!liveNodes().length && !tp) {
+      // Canvas rong chi xay ra khi user xoa het o — khoi phuc lai o
+      // 'owner' khoi tao (seed 1 node MIN-136), khong phai them moi.
       const e = face(L.faceEmpty(
-        'Sơ đồ chưa có slot.',
-        'Gán người từ Pool, dùng + Slot, hoặc tạo sơ đồ mẫu 7 slot cơ ' +
-        'bản (cha/mẹ hai bên, người để lại, vợ/chồng, con).'));
+        'Sơ đồ trống.',
+        'Khôi phục ô khởi tạo rồi thả người để lại tài sản vào — ' +
+        'các ô sau được sơ đồ sinh tự động theo quy tắc thừa kế.'));
       if (model.canWrite()) {
-        e.append(btn('Tạo sơ đồ mẫu', 'secondary', () => {
-          if (seedBase()) scheduleEvaluate();
+        e.append(btn('Khôi phục ô khởi tạo', 'secondary', () => {
+          if (model.addSlot('owner')) scheduleEvaluate();
         }));
       }
       wrap.append(e);
@@ -1062,7 +987,7 @@ function createDiagramPane(ctx) {
     const box = h('div', 'cd-calc');
     if (!rm) {
       box.append(face(L.faceEmpty(
-        'Chưa có kết quả tính — bấm “Đánh giá thử” hoặc lưu sơ đồ.')));
+        'Chưa có kết quả tính — gán người vào sơ đồ để engine đánh giá.')));
       return box;
     }
     const statusLabel = {
@@ -1245,25 +1170,25 @@ function createDiagramPane(ctx) {
     function renderPool() {
       box.innerHTML = '';
       const st = model.state;
-      // Committed-only KE CA nhap moi (caseId=null): draft Stage dang
-      // so khong bao gio lo vao Pool (MIN-129). model.pool() dung stage
-      // cho draft nen khong dung — P6 tinh tu state.committed; gap
-      // (model nen export committedPool()) ghi vao handoff.
+      // MIN-136: nhap moi (caseId=null) nguon la stage NHAP — truoc day
+      // committed-only nen nhap khong bao gio co gi de tha (chi khi case
+      // da ton tai committed moi co nguoi). Case that: committed. Tai
+      // san khong xuong Pool — khong co flow gan len node.
+      const src = st.caseId == null ? st.stage : st.committed;
       const assigned = new Set((st.diagram.nodes || [])
         .map((n) => n.personId).filter(Boolean));
-      const poolPeople = (st.committed.people || [])
+      const poolPeople = (src.people || [])
         .filter((p) => !assigned.has(p.row_id));
-      const poolAssets = (st.committed.assets || []).slice();
       title.textContent = `Pool (${poolPeople.length})`;
-      const pp = poolPeople.filter((r) => poolMatch(r, 'person', poolQuery));
-      const pa = poolAssets.filter((r) => poolMatch(r, 'asset', poolQuery));
-      if (!(st.committed.people || []).length &&
-          !(st.committed.assets || []).length) {
+      const pp = poolPeople.filter((r) => poolMatch(r, poolQuery));
+      if (!(src.people || []).length) {
         box.append(face(L.faceEmpty(
-          'Stage chưa có người đã xác nhận — Cập nhật Stage trước.')));
+          st.caseId == null
+            ? 'Chưa có người — thêm ở bảng Người rồi kéo vào sơ đồ.'
+            : 'Stage chưa có người đã xác nhận — Cập nhật Stage trước.')));
         return;
       }
-      if (!pp.length && !pa.length) {
+      if (!pp.length) {
         box.append(face(L.faceEmpty(
           poolQuery ? 'Không khớp bộ lọc — chỉ lọc hiển thị.'
                     : 'Pool trống — mọi người đã được gán.')));
@@ -1282,13 +1207,7 @@ function createDiagramPane(ctx) {
           sub = p.ngay_sinh ? `sinh ${p.ngay_sinh}`
             : (p.so_giay_to ? `GT ${p.so_giay_to}` : '—');
         }
-        box.append(poolCardEl(p, 'person', sub));
-      }
-      for (const a of pa) {
-        box.append(poolCardEl(a, 'asset',
-          ['Tài sản',
-           a.so_thua_dat && `thửa ${a.so_thua_dat}`]
-            .filter(Boolean).join(' · ')));
+        box.append(poolCardEl(p, sub));
       }
     }
     renderPool();
@@ -1327,6 +1246,20 @@ function createDiagramPane(ctx) {
     const dg = h('div', 'cd-diagram');
     dg.append(canvasEl());
     const extra = h('div', 'cd-diagram-extra');
+    // MIN-136: chu dat DA GAN nhung chua co ngay mat → engine khong
+    // spawn nhanh (dung nghiep vu — thua ke chi phat sinh khi co nguoi
+    // chet). Hint user dien Ngay mat o bang Nguoi; evaluate tu chay lai
+    // va requiredSlots sinh cac o (cha/me, vo/chong, con).
+    if (!isTp()) {
+      const owner = nodeById('owner');
+      const ownerPerson = owner && owner.personId
+        ? personRow(owner.personId) : null;
+      if (ownerPerson && !ownerPerson.ngay_chet) {
+        extra.append(h('div', 'cd-hint',
+          'Người để lại chưa có ngày mất — điền cột “Ngày mất” ở bảng ' +
+          'Người để sơ đồ sinh các nhánh thừa kế.'));
+      }
+    }
     const deletedCount = (s.diagram.nodes || [])
       .filter((n) => n && n.deleted).length;
     if (deletedCount) {
@@ -1342,7 +1275,7 @@ function createDiagramPane(ctx) {
         typeof w === 'string' ? w : (w.message || w.code)));
     }
     for (const er of s.diagramErrors || []) {
-      extra.append(h('div', 'error', er.message || er.code));
+      extra.append(h('div', 'error', relErrText(er)));
     }
     if (calcOpen) extra.append(calcPanelEl());
     if (extra.childElementCount) dg.append(extra);
@@ -1362,12 +1295,8 @@ function createDiagramPane(ctx) {
       tp ? 'Sơ đồ hai bên' : 'Sơ đồ thừa kế'));
     const tools = h('div', 'card-tools');
     if (!tp) {
-      const addSlotBtn = btn('+ Slot', 'sm', () => {
-        if (model.addSlot()) scheduleEvaluate();
-      });
-      addSlotBtn.disabled = !model.canWrite() ||
-        !s.capabilities.diagram;
-      tools.append(addSlotBtn);
+      // MIN-136: chi giu "Xem cach tinh" — bo + Slot va Danh gia thu
+      // (evaluate van tu chay qua scheduleEvaluate + khi mo panel).
       const calc = btn('Xem cách tính', 'sm', async () => {
         calcOpen = !calcOpen;
         if (calcOpen) await runEvaluate();
@@ -1375,24 +1304,13 @@ function createDiagramPane(ctx) {
       });
       calc.disabled = gate || !s.capabilities.diagram;
       tools.append(calc);
-      const evalBtn = btn('Đánh giá thử', 'sm', async () => {
-        await runEvaluate();
-        calcOpen = true;
-      });
-      evalBtn.disabled = gate || !s.capabilities.diagram ||
-        s.busy === 'notary.diagram_evaluate';
       // Badge stale: stage revision da vuot lan evaluate cuoi cua draft.
       const staleEval = s.evaluatedRevision != null &&
         s.evaluatedRevision !== s.revision;
-      if (staleEval) {
-        evalBtn.setAttribute('aria-label',
-          'Đánh giá thử — Stage đã đổi kể từ lần đánh giá');
-        if (!gate) {
-          tools.append(h('span', 'pill warn',
-            'Stage đã đổi kể từ lần đánh giá'));
-        }
+      if (staleEval && !gate) {
+        tools.append(h('span', 'pill warn',
+          'Stage đã đổi kể từ lần đánh giá'));
       }
-      tools.append(evalBtn);
     }
     if (gate) {
       const pill = h('span', 'pill warn', 'Cập nhật Stage trước');
@@ -1412,7 +1330,7 @@ function createDiagramPane(ctx) {
       const r = await model.saveDiagram();
       if (!r.ok && r.error && r.error.code !== 'workspace_conflict' &&
           r.error.code !== 'diagram_invalid_state') {
-        notify(`${r.error.code}: ${r.error.message}`, true);
+        notify(relErrText(r.error), true);
       }
     });
     if (s.diagramDirty) save.append(h('span', 'dirty-dot', ''));

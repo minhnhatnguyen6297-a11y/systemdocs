@@ -42,6 +42,10 @@ const CASE_DOCUMENT_TYPES = ['khai_nhan', 'thoa_thuan'];
 const CASE_DOCUMENT_TYPES_TWO_PARTY =
   ['chuyen_nhuong', 'tang_cho', 'cho_thue', 'dat_coc'];
 
+// 5 loai nguon intake — khop INTAKE_KINDS o sidecar (notary_adapter.py
+// §intake_analyze; missing case_id = che do nhap duoc ho tro §2.1a).
+const INTAKE_KINDS = ['image', 'pdf', 'docx', 'xlsx', 'text'];
+
 function documentTypesFor(caseType) {
   return caseType === CASE_TYPE_TWO_PARTY
     ? CASE_DOCUMENT_TYPES_TWO_PARTY : CASE_DOCUMENT_TYPES;
@@ -108,59 +112,8 @@ function newTwoPartyState() {
            nodes: TWO_PARTY_IDS.map((id) => newTwoPartyNode(id)) };
 }
 
-// Seed V2 toi thieu port tu ReactFlowApp.jsx (drafting-tab/MIN-122):
-// bay slot co dinh — cha/me nguoi de lai, cha/me vo-chong, owner, spouse,
-// child_1. KHONG port resolveSubRelations/engine JS/heuristic ngay chet.
-// Idempotent: chi them slot chua co (ke ca deleted = khong them lai).
-function seedDiagramSlots(nodes) {
-  const have = new Set((nodes || []).map((n) => n && n.id));
-  const add = (id, rel) => {
-    if (have.has(id)) return null;
-    const n = newNode(id);
-    if (rel) {
-      n.parentSlotIds = rel.parents || [];
-      n.spouseSlotId = rel.spouse || null;
-    }
-    nodes.push(n);
-    have.add(id);
-    return n;
-  };
-  add('father'); add('mother');
-  add('spouse_father'); add('spouse_mother');
-  const owner = findInNodes(nodes, 'owner') || add('owner');
-  const spouse = findInNodes(nodes, 'spouse') || add('spouse');
-  add('child_1', { parents: ['owner', 'spouse'] });
-  if (owner) {
-    owner.spouseSlotId = 'spouse';
-    owner.parentSlotIds = ['father', 'mother'].filter(
-      (x) => have.has(x));
-  }
-  if (spouse) {
-    spouse.spouseSlotId = 'owner';
-    spouse.parentSlotIds = ['spouse_father', 'spouse_mother'].filter(
-      (x) => have.has(x));
-  }
-  return nodes;
-}
-
 function findInNodes(nodes, id) {
   return (nodes || []).find((n) => n && n.id === id && !n.deleted) || null;
-}
-
-// Them mot slot child_N trong ke tiep khi moi child_* da gan nguoi —
-// giu "luon co mot o con trống" (MIN-122). Tra node moi hoac null.
-function ensureEmptyChildSlot(nodes) {
-  const kids = (nodes || []).filter(
-    (n) => n && !n.deleted && /^child_\d+$/.test(n.id));
-  if (kids.some((n) => !n.personId)) return null;
-  let i = 1;
-  const ids = new Set((nodes || []).map((n) => n && n.id));
-  while (ids.has(`child_${i}`)) i += 1;
-  const node = newNode(`child_${i}`);
-  node.parentSlotIds = ['owner', 'spouse'].filter(
-    (x) => findInNodes(nodes, x));
-  nodes.push(node);
-  return node;
 }
 
 function createModel(deps) {
@@ -270,16 +223,17 @@ function createModel(deps) {
     return ids;
   }
 
-  // Pool = Stage da commit − phan tu dang duoc gan tren draft Diagram
-  // (drafting-tab §2). Assets khong gan vao node — diagram chi tham
-  // chieu tai san qua ownPositions/receivePositions (vi tri 1..3) →
-  // moi tai san committed luon con trong Pool.
+  // Pool = nguoi chua gan tren draft Diagram. Nhap moi (caseId=null):
+  // nguon la stage NHAP (chua co committed) — MIN-136, truoc day
+  // committed-only khien nhap khong bao gio co gi de tha. Case that:
+  // committed (§2). Tai san khong xuong Pool — khong co flow gan tai
+  // san len node; diagram chi tham chieu qua ownPositions/
+  // receivePositions (vi tri 1..3).
   function pool() {
     const assigned = diagramPersonIds();
     const src = state.caseId == null ? state.stage : state.committed;
     return {
       people: src.people.filter((p) => !assigned.has(p.row_id)),
-      assets: src.assets.slice(),
     };
   }
 
@@ -374,11 +328,15 @@ function createModel(deps) {
       : { owner_row_id: null, people: [], assets: [] };
   }
 
+  // MIN-136: so do thua ke khoi tao DUNG 1 o 'owner' trong. Nguoi dau
+  // tien duoc tha vao mac dinh la chu dat (owner_row_id sync trong
+  // assignPerson). Moi o sau CHI sinh tu engine requiredSlots —
+  // khong co duong them thu cong (xem relationship-diagram.js).
   function newDiagramDraft(caseType) {
     return caseType === CASE_TYPE_TWO_PARTY
       ? newTwoPartyState()
       : { version: DIAGRAM_VERSION, domain: CASE_TYPE_INHERITANCE,
-          nodes: seedDiagramSlots([]) };
+          nodes: [newNode('owner')] };
   }
 
   // Mo nhap trong — stage rong + diagram seed theo caseType. draftId =
@@ -401,8 +359,10 @@ function createModel(deps) {
     state.revision = 0;
     state.locked = false;
     state.unsupported = false;
+    // MIN-136: adapter ho tro intake nhap khong case_id (contract §2.1a)
+    // — nhap moi cong bo du 5 loai nguon, khong khoa nut Nhap file nua.
     state.capabilities =
-      { intake: [], diagram: true, word_export: false };
+      { intake: INTAKE_KINDS.slice(), diagram: true, word_export: false };
     state.committed = { people: [], assets: [] };
     state.stage = newStageDraft(ct);
     state.stageDirty = false;
@@ -836,9 +796,6 @@ function createModel(deps) {
     }
     node.personId = rowId;
     applyAssignDefaults(node);
-    if (diagramDomain() !== CASE_TYPE_TWO_PARTY) {
-      ensureEmptyChildSlot(state.diagram.nodes);
-    }
     touchDiagram();
     return true;
   }
@@ -861,9 +818,6 @@ function createModel(deps) {
         return setOwnerRow(null);
       }
       sourceNode.personId = null;
-      if (diagramDomain() !== CASE_TYPE_TWO_PARTY) {
-        ensureEmptyChildSlot(state.diagram.nodes);
-      }
       touchDiagram();
       return true;
     }
@@ -876,7 +830,6 @@ function createModel(deps) {
       if (!setOwnerRow(rowId)) return false;
       if (sourceNode) sourceNode.personId = null;
       applyAssignDefaults(findInNodes(state.diagram.nodes, 'owner'));
-      ensureEmptyChildSlot(state.diagram.nodes);
       touchDiagram();
       return true;
     }
@@ -895,9 +848,6 @@ function createModel(deps) {
     }                                   // displaced khong co sourceNode
                                         // → tu nhien ve Pool
     applyAssignDefaults(target);
-    if (diagramDomain() !== CASE_TYPE_TWO_PARTY) {
-      ensureEmptyChildSlot(state.diagram.nodes);
-    }
     touchDiagram();
     return true;
   }
@@ -1322,7 +1272,7 @@ const G1_NOTARY_MODEL = {
   MAX_PEOPLE_TWO_PARTY,
   POSITIONS,
   TWO_PARTY_IDS,
-  seedDiagramSlots,
+  INTAKE_KINDS,
   newTwoPartyState,
 };
 

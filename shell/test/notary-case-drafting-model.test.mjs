@@ -970,8 +970,8 @@ test('pool = committed Stage − personId dang gan tren draft Diagram', async ()
   const pool = model.pool();
   assert.equal(pool.people.length, 1);
   assert.equal(pool.people[0].ho_ten, 'Người Mẫu E');
-  assert.equal(pool.assets.length, 1);           // asset luon o pool —
-                                                  // diagram chi giu vi tri
+  // MIN-136: tai san KHONG xuong pool (khong co flow gan tai san len
+  // node — diagram chi tham chieu vi tri own/receivePositions).
 
   // bo gan spouse → nguoi do quay ve pool
   model.assignPerson('spouse', null);
@@ -1092,7 +1092,7 @@ test('toggleNodePosition/setNodeRelation/addSlot: no-op tren two_party', async (
 
 test('applyAssignDefaults: owner → ownPositions het; node khac → receivePositions het', async () => {
   const { model } = makeModel(seedCases('empty'));
-  model.newDraft();                          // seed 7 slot inheritance
+  model.newDraft();                          // MIN-136: 1 node owner
   const a = model.addPerson({ ho_ten: 'Owner' });
   const b = model.addPerson({ ho_ten: 'Heir' });
   model.addAsset({ so_serial: 'MM000001' });
@@ -1103,14 +1103,17 @@ test('applyAssignDefaults: owner → ownPositions het; node khac → receivePosi
   assert.deepEqual(owner.ownPositions, [1, 2]);
   assert.deepEqual(owner.receivePositions, []);
   // Slot thua ke khac → receivePositions default [1,2]
-  model.assignPerson('spouse', b.row_id);
-  const spouse = model.state.diagram.nodes.find((n) => n.id === 'spouse');
+  const sp = model.addSlot();
+  model.assignPerson(sp.id, b.row_id);
+  const spouse = model.state.diagram.nodes.find((n) => n.id === sp.id);
   assert.deepEqual(spouse.receivePositions, [1, 2]);
   // Mang explicit khong bi ghi de: tat 1 chip roi gan lai → giu explicit
-  model.toggleNodePosition('spouse', 'receive', 2);
+  model.toggleNodePosition(sp.id, 'receive', 2);
   const c = model.addPerson({ ho_ten: 'C' });
-  model.assignPerson('child_1', c.row_id);
-  assert.deepEqual(spouse.receivePositions, [1]);
+  const kid = model.addSlot();
+  model.assignPerson(kid.id, c.row_id);
+  assert.deepEqual(model.state.diagram.nodes
+    .find((n) => n.id === sp.id).receivePositions, [1]);
 });
 
 test('saveDiagram: workspace_conflict → status conflict', async () => {
@@ -1562,7 +1565,7 @@ test('exportWord: canceled job giu result (breakdown.skipped len wire — MIN-11
 
 // ---------- MIN-122/128: nhap moi / draft / case_type ----------
 
-test('newDraft: inheritance — stage co owner_row_id null + seed 7 slot v3', () => {
+test('newDraft: inheritance — stage co owner_row_id null + seed DUNG 1 node owner (MIN-136)', () => {
   const { model } = makeModel(seedCases('empty'));
   model.newDraft();
   const s = model.state;
@@ -1573,27 +1576,24 @@ test('newDraft: inheritance — stage co owner_row_id null + seed 7 slot v3', ()
   // stage v3: owner_row_id co mat (bat buoc cho inheritance)
   assert.equal('owner_row_id' in s.stage, true);
   assert.equal(s.stage.owner_row_id, null);
-  // diagram v3 domain inheritance + 7 slot seed
+  // diagram v3 domain inheritance + DUNG 1 o owner — node sau chi sinh
+  // tu engine requiredSlots, khong con seed 7 slot (MIN-136).
   assert.equal(s.diagram.version, 3);
   assert.equal(s.diagram.domain, 'inheritance');
-  const ids = s.diagram.nodes.map((n) => n.id);
-  for (const id of ['father', 'mother', 'spouse_father', 'spouse_mother',
-                    'owner', 'spouse', 'child_1']) {
-    assert.ok(ids.includes(id), `thieu slot ${id}`);
-  }
-  const owner = s.diagram.nodes.find((n) => n.id === 'owner');
+  assert.equal(s.diagram.nodes.length, 1);
+  const owner = s.diagram.nodes[0];
+  assert.equal(owner.id, 'owner');
   assert.equal(owner.personId, null);            // chua chon owner
-  assert.deepEqual(owner.ownPositions, []);      // chua co asset → rong
+  assert.deepEqual(owner.ownPositions, []);
+  assert.deepEqual(owner.receivePositions, []);
   assert.equal('isLandOwner' in owner, false);   // v1 flag bi cam
   assert.equal('willReceive' in owner, false);
-  assert.deepEqual([...owner.parentSlotIds].sort(), ['father', 'mother']);
-  assert.equal(owner.spouseSlotId, 'spouse');
-  const spouse = s.diagram.nodes.find((n) => n.id === 'spouse');
-  assert.equal(spouse.spouseSlotId, 'owner');
-  assert.deepEqual([...spouse.parentSlotIds].sort(),
-                   ['spouse_father', 'spouse_mother']);
-  const child = s.diagram.nodes.find((n) => n.id === 'child_1');
-  assert.deepEqual(child.parentSlotIds, ['owner', 'spouse']);
+  // MIN-136: nhap moi cong bo du 5 loai intake → nut Nhap file mo duoc
+  // (sidecar ho tro intake_analyze khong case_id — contract §2.1a).
+  assert.deepEqual(s.capabilities.intake,
+    ['image', 'pdf', 'docx', 'xlsx', 'text']);
+  assert.equal(s.capabilities.diagram, true);
+  assert.equal(s.capabilities.word_export, false);
   assert.match(s.draftId,
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 });
@@ -1625,7 +1625,7 @@ test('updateCaseMeta case_type: doi loai → reset diagram buffer + stage key ow
   // thiet lap draft inheritance
   const p = model.addPerson({ ho_ten: 'X' });
   model.setOwnerRow(p.row_id);
-  assert.equal(s.diagram.nodes.length, 7);
+  assert.equal(s.diagram.nodes.length, 1);       // MIN-136: 1 node owner
   // doi sang two_party → owner_row_id bi go, diagram ve 30 slot
   assert.equal(model.updateCaseMeta('case_type', 'two_party'), true);
   assert.equal(model.caseType(), 'two_party');
@@ -1639,7 +1639,7 @@ test('updateCaseMeta case_type: doi loai → reset diagram buffer + stage key ow
   // doi lai ve inheritance → owner_row_id quay lai (null)
   assert.equal(model.updateCaseMeta('case_type', 'inheritance'), true);
   assert.equal(s.stage.owner_row_id, null);
-  assert.equal(s.diagram.nodes.length, 7);
+  assert.equal(s.diagram.nodes.length, 1);       // MIN-136: 1 node owner
   // gia tri la → reject
   assert.equal(model.updateCaseMeta('case_type', 'gift'), false);
 });
@@ -1668,18 +1668,11 @@ test('two_party draft: addSlot chan; addPerson toi da 30; assign unique', () => 
   assert.equal(model.setNodeFlag('p3', 'hidden', true), true);
 });
 
-test('seedDiagramSlots: idempotent — goi lai khong nhan doi', () => {
-  const nodes = [];
-  M.seedDiagramSlots(nodes);
-  const n1 = nodes.length;
-  M.seedDiagramSlots(nodes);
-  assert.equal(nodes.length, n1);
-  // co san owner → khong ghi de personId (node v3 shape)
-  const nodes2 = [{ id: 'owner', personId: 'x', parentSlotIds: [],
-                    spouseSlotId: 'spouse', ownPositions: [1],
-                    receivePositions: [], hidden: false, deleted: false }];
-  M.seedDiagramSlots(nodes2);
-  assert.equal(nodes2.find((n) => n.id === 'owner').personId, 'x');
+test('MIN-136: seedDiagramSlots/ensureEmptyChildSlot khong con export', () => {
+  // Sinh node chi qua engine requiredSlots — helper client-side seed
+  // 7 slot va auto-child da bi go khoi API cong khai.
+  assert.equal(typeof M.seedDiagramSlots, 'undefined');
+  assert.equal(typeof M.ensureEmptyChildSlot, 'undefined');
 });
 
 test('newTwoPartyState: canonical p1..p30 — export dung cho test/view', () => {
@@ -1701,32 +1694,19 @@ test('newDraft: draft diagram dung stage nhap — assign tu stage, pool tu stage
   assert.equal(model.state.stage.owner_row_id, row.row_id);
 });
 
-test('ensureEmptyChildSlot: het child trong → them child_N ke tiep', () => {
-  const { model } = makeModel(seedCases('empty'));
-  model.newDraft();
-  const p1 = model.addPerson({ ho_ten: 'A' });
-  model.assignPerson('child_1', p1.row_id);
-  const ids = model.state.diagram.nodes.map((n) => n.id);
-  assert.ok(ids.includes('child_2'), 'phai co child_2 trong');
-  // child_2 con trong → khong them nua
-  const p2 = model.addPerson({ ho_ten: 'B' });
-  model.assignPerson('child_2', p2.row_id);
-  const ids2 = model.state.diagram.nodes.map((n) => n.id);
-  assert.ok(ids2.includes('child_3'));
-});
-
 test('movePerson: move vao node trong / swap / unassign ve Pool — owner mirror theo pointer', () => {
   const { model } = makeModel(seedCases('empty'));
   model.newDraft();
   const a = model.addPerson({ ho_ten: 'A' });
   const b = model.addPerson({ ho_ten: 'B' });
+  const sp = model.addSlot();                    // slot thu cong (API noi bo)
   model.assignPerson('owner', a.row_id);
-  model.assignPerson('spouse', b.row_id);
+  model.assignPerson(sp.id, b.row_id);
   assert.equal(model.state.stage.owner_row_id, a.row_id);
-  // swap owner <-> spouse: a len spouse, b xuong owner → pointer = b
-  assert.equal(model.movePerson(a.row_id, 'spouse'), true);
+  // swap owner <-> slot phu: a len slot, b xuong owner → pointer = b
+  assert.equal(model.movePerson(a.row_id, sp.id), true);
   const nodes = model.state.diagram.nodes;
-  assert.equal(nodes.find((n) => n.id === 'spouse').personId, a.row_id);
+  assert.equal(nodes.find((n) => n.id === sp.id).personId, a.row_id);
   assert.equal(nodes.find((n) => n.id === 'owner').personId, b.row_id);
   assert.equal(model.state.stage.owner_row_id, b.row_id);
   // unassign owner → ve Pool, pointer ve null
@@ -1735,8 +1715,8 @@ test('movePerson: move vao node trong / swap / unassign ve Pool — owner mirror
   assert.equal(model.state.stage.owner_row_id, null);
   assert.equal(model.pool().people.length, 1);
   // tu Pool → node co nguoi (swap: nguoi cu ve Pool)
-  assert.equal(model.movePerson(b.row_id, 'spouse'), true);
-  assert.equal(nodes.find((n) => n.id === 'spouse').personId, b.row_id);
+  assert.equal(model.movePerson(b.row_id, sp.id), true);
+  assert.equal(nodes.find((n) => n.id === sp.id).personId, b.row_id);
   assert.equal(model.pool().people.length, 1);   // a ve Pool
   // tha len owner → pointer doi sang nguoi tha
   assert.equal(model.movePerson(b.row_id, 'owner'), true);

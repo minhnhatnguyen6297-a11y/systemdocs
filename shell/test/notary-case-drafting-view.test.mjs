@@ -11,6 +11,7 @@ import { makeDom, collect } from './dom-stub.mjs';
 
 const require = createRequire(import.meta.url);
 const L = require('../src/renderer/lib.js');
+const ERRORS = require('../src/renderer/notary/error-catalog.js');
 const M = require('../src/renderer/notary/case-drafting-model.js');
 const VIEW = require('../src/renderer/notary/case-drafting-view.js');
 const INTAKE = require('../src/renderer/notary/intake-dialog.js');
@@ -41,7 +42,7 @@ function build(t, { draft = true, confirm = true, respond = null } = {}) {
   global.window = {
     G1_NOTARY_MODEL: M, G1_NOTARY_VIEW: VIEW,
     G1_NOTARY_INTAKE: INTAKE, G1_NOTARY_DIAGRAM: DIAGRAM,
-    G1_NOTARY_WORD: WORD,
+    G1_NOTARY_WORD: WORD, G1_NOTARY_ERRORS: ERRORS,
   };
   const calls = [];
   const client = {
@@ -192,15 +193,24 @@ test('people table: add/remove row; Ctrl+↓ reorder giữ focus', () => {
   assert.equal(model.state.stage.people.length, 1);
 });
 
-test('people table: inheritance có cột Để lại radio → setOwnerRow', () => {
+test('MIN-136: bảng Người KHÔNG còn cột Để lại — owner chọn qua sơ đồ', () => {
   const { model, view } = build(test);
   model.addPerson(); model.addPerson();
   const [p1] = model.state.stage.people.map((x) => x.row_id);
-  const radio = fid(view.el, `p:${p1}:owner`);
-  assert.ok(radio, 'thiếu radio Để lại');
-  assert.equal(radio.type, 'radio');
-  radio.onchange();
+  // Khong con radio/input owner tren bang Nguoi.
+  assert.equal(fid(view.el, `p:${p1}:owner`), null,
+    'con radio/oi Để lại');
+  const t = collect(view.el, (e) => e.classList.contains('cd-ptbl'))[0];
+  assert.ok(!t.textContent.includes('Để lại'),
+    'con header/cell Để lại');
+  // owner_row_id van set duoc qua model (so do gan vao node owner) va
+  // hang owner van duoc to mau.
+  model.setOwnerRow(p1);
   assert.equal(model.state.stage.owner_row_id, p1);
+  let row = fid(view.el, `p:${p1}:ho_ten`);
+  while (row && row.tagName !== 'TR') row = row.parentElement;
+  assert.ok(row && row.classList.contains('cd-row-owner'),
+    'hang owner khong duoc highlight sau khi chon qua so do');
 });
 
 test('typing giữ focus+value: emit nền không rebuild input đang gõ', () => {
@@ -307,9 +317,10 @@ test('land dialog: Hủy không đụng draft Stage', () => {
 
 // ---------- Pool committed-only ----------
 
-test('Pool chỉ đọc committed — draft Stage mới không lộ vào Pool', () => {
+test('Pool case thật = committed − đã gán; KHÔNG có thẻ tài sản (MIN-136)', () => {
   const { model, view } = build(test, { draft: false });
-  // Draft stage co them nguoi MOI chua commit.
+  // Draft stage co them nguoi MOI chua commit → KHONG lo vao Pool
+  // (case that van lay committed lam nguon — §2).
   model.addPerson();
   model.state.stage.people[1].ho_ten = 'Nháp Chưa Cập Nhật';
   const names = collect(view.el,
@@ -319,21 +330,41 @@ test('Pool chỉ đọc committed — draft Stage mới không lộ vào Pool', 
     'thiếu người committed trong Pool');
   assert.ok(!names.some((n) => n.includes('Nháp Chưa Cập Nhật')),
     'Pool lộ draft Stage — vi phạm committed-only');
-  // Asset committed hien trong pool.
-  assert.ok(collect(view.el,
-    (e) => e.classList.contains('cd-pool-card')).length >= 2);
+  // MIN-136: Pool chi con nguoi — asset khong xuong Pool vi khong co
+  // flow keo-tha tai san (dead UI).
+  assert.equal(collect(view.el,
+    (e) => e.classList.contains('cd-pool-card')).length, 1);
+  const pane = collect(view.el, (e) => e.classList.contains('cd-pool'))[0];
+  assert.ok(!/Tài sản/.test(pane.textContent),
+    'Pool van hien the tai san');
 });
 
-test('Pool nháp mới: chưa commit → face hướng dẫn Cập nhật', () => {
+test('MIN-136: Pool nháp mới lấy stage.people — thả được ngay chưa lưu', () => {
   const { model, view } = build(test);
+  // Stage trong → huong dan them nguoi (khong phai "Cap nhat truoc"
+  // vi nhap moi khong co gi de cap nhat).
+  let pane = collect(view.el, (e) => e.classList.contains('cd-pool'))[0];
+  assert.match(pane.textContent, /Chưa có người — thêm ở bảng Người/);
+  // Them nguoi vao stage nhap → xuat hien trong Pool ngay.
   model.addPerson();
-  const pane = collect(view.el,
-    (e) => e.classList.contains('cd-pool'))[0];
-  assert.ok(pane);
-  assert.match(pane.textContent, /Cập nhật Stage trước/);
-  assert.equal(collect(pane,
-    (e) => e.classList.contains('cd-pool-card')).length, 0,
-    'nháp mới vẫn render pool card — lộ draft');
+  model.state.stage.people[0].ho_ten = 'Người Nháp Mới';
+  model.dismissNotice();
+  pane = collect(view.el, (e) => e.classList.contains('cd-pool'))[0];
+  const card = collect(pane, (e) =>
+    e.classList.contains('cd-pool-card') &&
+    /Người Nháp Mới/.test(e.textContent))[0];
+  assert.ok(card, 'nguoi nhap moi khong xuat hien trong Pool');
+  // Gan vao o owner → ra khoi Pool + owner_row_id sync.
+  const ownerNode = collect(view.el, (e) =>
+    e.dataset.nodeId === 'owner')[0];
+  card.dispatch('dragstart', {
+    dataTransfer: { setData() {} } });
+  const rid = model.state.stage.people[0].row_id;
+  model.assignPerson('owner', rid);
+  assert.equal(model.state.stage.owner_row_id, rid);
+  assert.equal(collect(view.el, (e) =>
+    e.classList.contains('cd-pool-card')).length, 0,
+    'nguoi da gan van con trong Pool');
 });
 
 test('Pool card payload giữ text/plain {kind,row_id} cho P7', () => {
@@ -354,15 +385,20 @@ test('Pool card payload giữ text/plain {kind,row_id} cho P7', () => {
 
 // ---------- stageDirty gate ----------
 
-test('stageDirty gate: Đánh giá/Lưu sơ đồ disabled khi Stage chưa cập nhật', () => {
+test('stageDirty gate: Xem cách tính/Lưu sơ đồ disabled khi Stage chưa cập nhật', () => {
   const { model, view } = build(test, { draft: false });
   model.addSlot('owner');            // diagramDirty → save enable được
   model.state.stageDirty = true;     // stage chưa cập nhật
   model.dismissNotice();
-  const evalBtn = findBtns(view.el, 'Đánh giá thử')[0];
+  // MIN-136: nut "Danh gia thu" da bo — gate nam tren "Xem cach tinh".
+  assert.equal(findBtns(view.el, 'Đánh giá thử').length, 0,
+    'con nút Đánh giá thử');
+  assert.equal(findBtns(view.el, '+ Slot').length, 0,
+    'con nút + Slot');
+  const evalBtn = findBtns(view.el, 'Xem cách tính')[0];
   const save = findBtns(view.el, 'Lưu sơ đồ')[0];
   assert.equal(evalBtn.disabled, true,
-    'Đánh giá vẫn bấm được khi stageDirty');
+    'Xem cách tính vẫn bấm được khi stageDirty');
   assert.equal(save.disabled, true,
     'Lưu sơ đồ vẫn bấm được khi stageDirty');
   assert.ok(collect(view.el, (e) =>
@@ -468,15 +504,14 @@ test('MIN-133: đổi Loại việc trên thanh trên → Stage dựng lại nga
   const sel = collect(topbar(view.el), (e) =>
     e.tagName === 'SELECT' && e.classList.contains('cd-case-type'))[0];
   assert.ok(sel, 'thiếu select cd-case-type');
-  const ownerCols = () => collect(view.el,
-    (e) => e.classList.contains('cd-owner-col')).length;
-  assert.equal(ownerCols(), 1);
   sel.focus();
   sel.value = 'two_party';
   sel.onchange();
   assert.equal(model.state.caseInfo.case_type, 'two_party');
-  // Stage KHÔNG bị hoãn dù select đang focus (select nằm ngoài panel).
-  assert.equal(ownerCols(), 0, 'đổi sang Hai bên mà cột Để lại vẫn còn');
+  // Stage dung lai ngay du select dang focus: canvas hai ben 30 cho.
+  assert.equal(collect(view.el,
+    (e) => e.classList.contains('cd-tp-slot')).length, 30,
+    'đổi sang Hai bên mà sơ đồ không dựng lại');
   // Select đang focus không bị thay node (dropdown không đóng).
   assert.ok(sel.isConnected);
   assert.equal(document.activeElement, sel);
@@ -530,10 +565,10 @@ test('MIN-133 D1: bảng Người 7 cột theo DB Customer + colgroup cố đị
   assert.ok(t.classList.contains('cd-stage-tbl'));
   const heads = collect(t, (e) => e.tagName === 'TH')
     .map((e) => e.textContent);
-  assert.deepEqual(heads, ['', 'Để lại', 'Họ tên', 'Giới tính', 'Ngày sinh',
+  assert.deepEqual(heads, ['', 'Họ tên', 'Giới tính', 'Ngày sinh',
     'Ngày mất', 'Số giấy tờ', 'Ngày cấp', 'Địa chỉ', '']);
   const cols = collect(t, (e) => e.tagName === 'COL').map((c) => c.className);
-  assert.deepEqual(cols, ['cd-pcol-drag', 'cd-pcol-owner', 'cd-pcol-ho_ten',
+  assert.deepEqual(cols, ['cd-pcol-drag', 'cd-pcol-ho_ten',
     'cd-pcol-gioi_tinh', 'cd-pcol-ngay_sinh', 'cd-pcol-ngay_chet',
     'cd-pcol-so_giay_to', 'cd-pcol-ngay_cap', 'cd-pcol-dia_chi',
     'cd-pcol-del']);
@@ -602,4 +637,185 @@ test('MIN-133: bảng Tài sản colgroup nhãn + mỗi tài sản một cột',
     .map((c) => c.className), ['cd-acol-label', 'cd-acol', 'cd-acol']);
   const a0 = model.state.stage.assets[0].row_id;
   assert.ok(fid(view.el, `a:${a0}:dia_chi`).classList.contains('cd-cell'));
+});
+
+// ---------- MIN-136: error catalog, dd/mm/yyyy, chrome ----------
+
+test('MIN-136 error catalog: code → thông điệp thân thiện + rule ẩn', () => {
+  const d = ERRORS.describeError({ code: 'workspace_owner_required',
+    message: 'stage.owner_row_id phải là row_id ...' });
+  assert.match(d.title, /Chưa chọn người để lại/);
+  assert.match(d.hint, /ô khởi tạo/);
+  assert.equal(d.code, 'workspace_owner_required');
+  // errText: title chính + code mờ trong ngoặc — khong troi snake_case.
+  const t = ERRORS.errText({ code: 'submit_failed' });
+  assert.match(t, /Không gửi được lệnh tới engine/);
+  assert.match(t, /\(submit_failed\)$/);
+  // Code khong co trong catalog → fallback message backend, khong troi
+  // code trang (title != code).
+  const u = ERRORS.describeError({ code: 'totally_new_code_xyz',
+    message: 'Backend said something odd' });
+  assert.equal(u.title, 'Backend said something odd');
+  // Toan bo ma backend/adapter da biet phai co title tieng Viet
+  // (khong fallback ve code).
+  const KNOWN = ['submit_failed', 'engine_unavailable', 'case_not_found',
+    'workspace_locked', 'workspace_conflict', 'workspace_owner_required',
+    'stage_validation_error', 'validation_error', 'diagram_invalid_state',
+    'diagram_owner_mismatch', 'diagram_domain_mismatch',
+    'diagram_reference_outside_stage', 'case_type_unsupported',
+    'missing_land_owner', 'no_valid_heir', 'duplicate_person',
+    'ancestry_cycle', 'spouse_conflict', 'self_parent', 'self_spouse',
+    'dangling_parent', 'dangling_spouse', 'too_many_parents',
+    'invalid_death_date', 'invalid_nodes', 'invalid_version',
+    'intake_unsupported_source', 'intake_too_many_sources',
+    'intake_text_too_long', 'intake_source_too_large',
+    'word_no_documents_selected', 'word_unknown_document_key',
+    'word_duplicate_document_key', 'file_not_found', 'file_locked',
+    'unconfirmed', 'ocr', 'engine_shutdown', 'command_unknown',
+    'engine_version_mismatch', 'invalid_boolean', 'invalid_domain',
+    'invalid_node_id', 'invalid_parent', 'invalid_spouse',
+    'invalid_position', 'missing_position', 'duplicate_node',
+    'duplicate_parent', 'missing_node_id', 'word_batch_failed',
+    'user_canceled', 'extraction_failed', 'unknown_website'];
+  for (const c of KNOWN) {
+    const dd = ERRORS.describeError({ code: c });
+    assert.notEqual(dd.title, c, `ma ${c} thieu title than thien`);
+    assert.ok(!/^[a-z_]+$/.test(dd.title) || dd.title === 'Lỗi không xác định',
+      `ma ${c} title van la snake_case`);
+  }
+});
+
+test('MIN-136 date: ISO ↔ dd/mm/yyyy; loai ngay khong ton tai', () => {
+  const { fmtDisplayDate, parseDisplayDate } = VIEW._internals;
+  assert.equal(fmtDisplayDate('1990-06-05'), '05/06/1990');
+  assert.equal(fmtDisplayDate('1990'), '1990');          // year-only
+  assert.equal(fmtDisplayDate(''), '');
+  assert.equal(fmtDisplayDate(null), '');
+  // Parse day-first: 05/06/1990 = 5 thang 6 — KHONG mo ho mm/dd.
+  assert.deepEqual(parseDisplayDate('05/06/1990', true),
+    { iso: '1990-06-05' });
+  assert.deepEqual(parseDisplayDate('5/6/1990', true),
+    { iso: '1990-06-05' });
+  assert.deepEqual(parseDisplayDate('05.06.1990', true),
+    { iso: '1990-06-05' });
+  assert.deepEqual(parseDisplayDate('05-06-1990', true),
+    { iso: '1990-06-05' });
+  assert.deepEqual(parseDisplayDate('05061990', true),
+    { iso: '1990-06-05' });
+  assert.deepEqual(parseDisplayDate('1990', true), { iso: '1990' });
+  assert.deepEqual(parseDisplayDate('', true), { iso: null });
+  // Ngay khong ton tai / sai format.
+  for (const bad of ['31/02/1990', '29/02/1990', '30/02/2024',
+                     '06/31/1990', '1990/06/05', '05-06-90']) {
+    assert.deepEqual(parseDisplayDate(bad, true), { error: 'invalid' },
+      `${bad} phai bi tu choi`);
+  }
+  assert.deepEqual(parseDisplayDate('29/02/2000', true),
+    { iso: '2000-02-29' });                              // nam nhuan hop le
+  // Asset (allowYear=false): year-only bi tu choi.
+  assert.deepEqual(parseDisplayDate('1990', false), { error: 'invalid' });
+});
+
+test('MIN-136: ô ngày Stage hiển dd/mm/yyyy, nhập dd/mm → wire ISO', () => {
+  const { model, view } = build(test);
+  const p = model.addPerson({ ho_ten: 'A' });
+  const rid = p.row_id;
+  const inp = fid(view.el, `p:${rid}:ngay_sinh`);
+  assert.ok(inp, 'thiếu ô ngày sinh');
+  assert.notEqual(inp.getAttribute('type'), 'date',
+    'ô ngày không được dùng type=date (format theo locale OS)');
+  // Nhap dd/mm/yyyy → onchange chuyen ISO vao model.
+  inp.value = '05/06/1990';
+  inp.onchange();
+  assert.equal(model.state.stage.people[0].ngay_sinh, '1990-06-05');
+  assert.equal(inp.value, '05/06/1990',
+    'hien thi lai phai la dd/mm/yyyy');
+  // ISO co san → hien dd/mm/yyyy.
+  model.state.stage.people[0].ngay_chet = '2020-05-10';
+  model.dismissNotice();
+  const chet = fid(view.el, `p:${rid}:ngay_chet`);
+  assert.equal(chet.value, '10/05/2020');
+  // Nhap sai → danh do inline, giu text cho user sua.
+  chet.value = '31/02/2020';
+  chet.onchange();
+  assert.ok(chet.classList.contains('cd-input-bad'));
+  assert.equal(chet.value, '31/02/2020');
+  assert.equal(model.state.stage.people[0].ngay_chet, '2020-05-10',
+    'ngay sai khong duoc ghi vao model');
+});
+
+test('MIN-136: empty-state Soạn hồ sơ có nút + Hồ sơ mới', async () => {
+  const { model, view } = build(test);
+  model.state.status = 'idle';
+  model.dismissNotice();
+  const btnNew = findBtns(view.el, '+ Hồ sơ mới')[0];
+  assert.ok(btnNew, 'thiếu nút + Hồ sơ mới ở empty-state');
+  await btnNew.onclick();
+  assert.equal(model.state.caseId, null);
+  assert.equal(model.state.status, 'ready');
+  // Sau tao moi → workspace drafting hien (khong con idle).
+  assert.ok(collect(view.el, (e) =>
+    e.classList.contains('cd-workspace')).length >= 1);
+});
+
+test('MIN-136: Nhập file mở được trên nháp mới (capabilities đủ 5 loại)', () => {
+  const { view } = build(test);
+  const intake = findBtns(view.el, 'Nhập file')[0];
+  assert.ok(intake, 'thiếu nút Nhập file');
+  assert.equal(intake.disabled, false,
+    'Nhập file bi disable trên nháp mới — capabilities.intake rỗng');
+});
+
+test('MIN-136: nhãn tài sản viết tắt Hình thức SD', () => {
+  const { model, view } = build(test);
+  model.addAsset();
+  const t = collect(view.el, (e) => e.classList.contains('cd-tbl'))[0];
+  assert.match(t.textContent, /Hình thức SD/);
+  assert.ok(!/Hình thức sử dụng/.test(t.textContent));
+});
+
+test('MIN-136 F-1: conflict hiện NGAY khi đang gõ trong Stage', () => {
+  const { model, view } = build(test, { draft: false });
+  const rid = model.state.stage.people[0].row_id;
+  const inp = fid(view.el, `p:${rid}:ho_ten`);
+  inp.focus();
+  // Server tu choi commit → status conflict trong luc input con focus.
+  model.state.status = 'conflict';
+  model.state.conflict = { server_revision: 9, client_revision: 3 };
+  model.dismissNotice();                  // emit nen → defer rebuild
+  const modal = collect(view.el, (e) => e.classList.contains('modal'))[0];
+  assert.ok(modal, 'dialog conflict bi emit-defer nuot khi dang go');
+  assert.match(modal.textContent, /đã thay đổi trên máy chủ/);
+});
+
+test('MIN-136: case_list retry khi infra error + message thân thiện', async (t) => {
+  // Lan dau submit_failed (sidecar chua ready) → tu retry sau 1.5s
+  // va hien message catalog, khong troi ma loi.
+  let n = 0;
+  const respond = (cmd) => {
+    if (cmd === 'notary.case_list') {
+      n += 1;
+      if (n === 1) {
+        return { ok: false, error: { code: 'submit_failed',
+          message: 'engine chua san sang' } };
+      }
+      return { ok: true, data: { cases: [], total: 0 } };
+    }
+    return null;
+  };
+  const { view, calls } = build(t, { respond });
+  await new Promise((r) => setTimeout(r, 40));
+  const faceBox = collect(view.el, (e) =>
+    e.classList.contains('face-error'))[0];
+  assert.ok(faceBox, 'lỗi infra không hiện face lỗi');
+  assert.match(faceBox.textContent, /Không gửi được lệnh tới engine/);
+  assert.ok(!/submit_failed/.test(faceBox.textContent.split('(')[0] || ''),
+    'mã submit_failed trồi lên làm nội dung chính');
+  // Sau ~1.5s retry tu dong → case_list lan 2 thanh cong.
+  await new Promise((r) => setTimeout(r, 1700));
+  const listCalls = calls.filter(([c]) => c === 'notary.case_list');
+  assert.ok(listCalls.length >= 2, 'khong tu retry case_list');
+  assert.ok(collect(view.el, (e) =>
+    e.classList.contains('face-error')).length === 0,
+    'face loi con sau khi retry thanh cong');
 });

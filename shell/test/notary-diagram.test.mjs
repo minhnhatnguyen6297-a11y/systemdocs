@@ -71,8 +71,21 @@ function tpNodes() {
     ({ id, personId: null, hidden: false, deleted: false }));
 }
 
+// Bo 7 slot LEGACY (MIN-133 era) — case cu da persist van con dang
+// nay; test giu de kiem render/layout/edges tren du lieu cu. Draft MOI
+// (MIN-136) chi seed 1 o 'owner' — xem test "draft moi: 1 o khoi tao".
 function seedSlots() {
-  return structuredClone(M.seedDiagramSlots([]));
+  const mk = (id, parents = [], spouse = null) =>
+    ({ id, personId: null, parentSlotIds: parents,
+       spouseSlotId: spouse, ownPositions: [], receivePositions: [],
+       hidden: false, deleted: false });
+  return structuredClone([
+    mk('father'), mk('mother'),
+    mk('spouse_father'), mk('spouse_mother'),
+    mk('owner', ['father', 'mother'], 'spouse'),
+    mk('spouse', ['spouse_father', 'spouse_mother'], 'owner'),
+    mk('child_1', ['owner', 'spouse']),
+  ]);
 }
 
 function build(t, { mode = 'draft-inh', seed = {}, client } = {}) {
@@ -120,10 +133,26 @@ const INH_PEOPLE = [
 
 // ---------- inheritance canvas: seed + card + edges ----------
 
-test('inheritance canvas: seed 7 slot → card + edges; node trống không chữ', () => {
+test('draft moi inheritance: DUNG 1 o owner trong (MIN-136)', () => {
   const { view } = build(test, { mode: 'draft-inh' });
   const cards = byCls(view.el, 'cd-node');
-  assert.equal(cards.length, 7, 'seed phai co 7 slot cards');
+  assert.equal(cards.length, 1, 'draft moi chi co 1 o khoi tao');
+  const owner = collect(view.el, (e) =>
+    e.dataset.nodeId === 'owner')[0];
+  assert.ok(owner, 'thieu o owner');
+  assert.ok(owner.classList.contains('cd-node-empty'),
+    'o khoi tao phai la node trong');
+  assert.match(owner.getAttribute('aria-label'), /Người để lại/);
+  // Khong co edges khi chi co 1 node.
+  assert.equal(collect(view.el, (e) =>
+    e.classList.contains('cd-edge')).length, 0);
+});
+
+test('legacy 7 slot (case cu): card + edges van render; node trống không chữ', () => {
+  const { view } = build(test, { mode: 'case',
+    seed: { people: INH_PEOPLE, nodes: seedSlots() } });
+  const cards = byCls(view.el, 'cd-node');
+  assert.equal(cards.length, 7, 'case cu 7 slot van render du');
   // Edges SVG (MIN-133): khong marker mui ten; cha/me→con =
   // cd-edge-parent (cap vo/chong ve 1 edge chung tu giua doan), vo/chong
   // = cd-edge-spouse net dut.
@@ -406,7 +435,9 @@ test('requiredSlots: engine yeu cau → tao father/mother/spouse/child', async (
   const { model, view } = build(test, {
     mode: 'case', client,
     seed: { people: INH_PEOPLE, nodes } });
-  const evalBtn = findBtns(view.el, 'Đánh giá thử')[0];
+  // MIN-136: khong con nut "Đánh giá thử" — "Xem cách tính" trigger
+  // evaluate + mo panel breakdown.
+  const evalBtn = findBtns(view.el, 'Xem cách tính')[0];
   await evalBtn.onclick();
   const after = model.state.diagram.nodes.filter((n) => !n.deleted);
   const ids = new Set(after.map((n) => n.id));
@@ -448,9 +479,27 @@ test('requiredSlots bo qua anchor trong (mock dev) — khong no canvas', async (
   const { model, view } = build(test, {
     mode: 'case', client,
     seed: { people: INH_PEOPLE, nodes: seedSlots() } });
-  await findBtns(view.el, 'Đánh giá thử')[0].onclick();
+  await findBtns(view.el, 'Xem cách tính')[0].onclick();
   assert.equal(model.state.diagram.nodes.length, 7,
     'anchor trong khong duoc sinh slot moi');
+});
+
+test('MIN-136: chủ đất sống → hint điền Ngày mất; đã mất → không hint', () => {
+  const { model, view } = build(test, { mode: 'case', seed: {
+    people: [{ row_id: 'c1', ho_ten: 'Chủ Sống', ngay_sinh: '1950' }],
+    nodes: [{ id: 'owner', personId: 'c1', parentSlotIds: [],
+              spouseSlotId: null, ownPositions: [], receivePositions: [],
+              hidden: false, deleted: false }] } });
+  const hint = collect(view.el, (e) => e.classList.contains('cd-hint'))[0];
+  assert.ok(hint, 'thiếu hint chủ đất còn sống');
+  assert.match(hint.textContent, /Ngày mất/);
+  // Chu dat da co ngay mat → engine co the spawn nhanh → khong hint.
+  model.state.stage.people[0].ngay_chet = '2020-01-01';
+  model.state.committed.people[0].ngay_chet = '2020-01-01';
+  model.dismissNotice();
+  assert.equal(collect(view.el, (e) =>
+    e.classList.contains('cd-hint')).length, 0,
+    'hint vẫn còn khi chủ đất đã có ngày mất');
 });
 
 // ---------- zoom / pan / Mo rong ----------
@@ -499,7 +548,8 @@ test('pan: keo nen canvas → scrollLeft/Top doi, mouseup ket thuc', () => {
 
 test('60 node thua ke: moi card render + layout khac nhau', () => {
   const { model, view } = build(test, { mode: 'draft-inh' });
-  for (let i = 0; i < 53; i += 1) model.addSlot();
+  // MIN-136: draft seed 1 node owner → them 59 slot de du 60.
+  for (let i = 0; i < 59; i += 1) model.addSlot();
   assert.equal(model.state.diagram.nodes.length, 60);
   const cards = byCls(view.el, 'cd-node');
   assert.equal(cards.length, 60, '60 node phai render du');
