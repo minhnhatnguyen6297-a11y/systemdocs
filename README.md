@@ -43,6 +43,7 @@ trên nhánh `electron-system-shell`; `main` tiếp tục chỉ chứa tài li�
 | **Trước khi chọn công nghệ mới hoặc ra quyết định kiến trúc** | [`TECH_STACK.md`](./docs/architecture/TECH_STACK.md) |
 | Vocabulary & schema dùng chung giữa các sản phẩm | [`contracts/README.md`](./contracts/README.md) |
 | Cái gì đã chốt, cái gì chưa chốt — đừng tự quyết | [`OPEN_DECISIONS.md`](./docs/architecture/OPEN_DECISIONS.md) |
+| Tìm quyết định, lý do và nguồn gốc; ghi lời giải thích mới | [`KNOWLEDGE.md`](./docs/architecture/KNOWLEDGE.md) |
 | Spec/draft theo từng issue (MIN-*, G1-SM) | [`docs/product/`](./docs/product/) |
 | Hệ thống thiết kế UI chung shell Electron (trắng/xanh, token, thao tác) | [`docs/product/ui/`](./docs/product/ui/) |
 | Zalo Inbox — nguồn chuẩn, bản nháp và thứ tự đọc | [`Zalo Intake — bắt đầu tại đây`](./notary_v2/docs/platform/zalo-document-inbox/README.md) |

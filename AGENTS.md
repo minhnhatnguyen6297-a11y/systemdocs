@@ -50,6 +50,10 @@ zalo đã được tách thành repo riêng D:\zalo-intake
   đúng và còn được tra cứu sau khi task kết thúc. Không task-log, không note
   tạm, không draft một lần.
 - `contracts/` giữ nguyên quy tắc contract-trước-code (`contracts/README.md`).
+- Khi owner giải thích **tại sao** chọn một quy tắc, giữ nguyên ý, ví dụ và ngoại
+  lệ cùng nguồn/ngày; bản diễn giải của agent phải tách riêng. Ghi đúng nơi sở
+  hữu lâu dài theo `docs/architecture/KNOWLEDGE.md`. Thiếu lý do thì đánh dấu
+  thiếu, không suy đoán từ code hoặc bản nháp.
 
 ### Trạng thái thực thi → `.agent/tasks/<LINEAR-ID>/`
 
@@ -100,6 +104,7 @@ repo đó. Khi xung đột, **repo con thắng** — và mâu thuẫn phải đ�
 | `docs/architecture/PROJECTS.md` | Từng repo: giải bài toán gì — feature gì — công nghệ gì |
 | `docs/architecture/TECH_STACK.md` | Công nghệ đã chọn + quy tắc thêm công nghệ mới + ràng buộc để gộp DB không xung đột |
 | `docs/architecture/OPEN_DECISIONS.md` | Câu hỏi chưa chốt + phương án đã loại |
+| `docs/architecture/KNOWLEDGE.md` | Bản đồ tra cứu và cách giữ lý do quyết định |
 | `docs/architecture/COMPONENT_MAP.md` | Bản đồ component/ownership đề xuất — draft MIN-57 |
 | `docs/architecture/ELECTRON_G1_PLAN.md` | Plan G1 chuyển nghiệp vụ sang Electron |
 | `docs/product/` | Spec/draft theo issue (`MIN*`, `G1_SINGLE_MACHINE_*`); `specs/` chứa spec có ngày |
