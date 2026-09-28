@@ -1,142 +1,570 @@
-* { box-sizing: border-box; }
-body { margin: 0; font-family: "Segoe UI", sans-serif; color: #1b1b1b; }
-#app { display: flex; height: 100vh; }
-#sidebar { width: 210px; background: #201f1e; color: #fff; padding: 12px 0;
-           flex-shrink: 0; overflow-y: auto; }
-#sidebar .brand { padding: 0 16px 12px; font-weight: 600; opacity: .8; }
-#module-list { list-style: none; margin: 0; padding: 0; }
-#module-list li { padding: 10px 16px; cursor: pointer; }
-#module-list li:hover { background: #323130; }
-#module-list li.active { background: #3b3a39; border-left: 3px solid #4cc2ff; }
-#module-list li.unavailable { opacity: .5; }
-#content { flex: 1; display: flex; flex-direction: column; overflow: hidden;
-           min-width: 0; }
-#statusbar { display: flex; gap: 8px; padding: 10px 16px;
-             border-bottom: 1px solid #e1dfdd; }
-.pill { background: #f3f2f1; border: 1px solid #e1dfdd; border-radius: 12px;
-        padding: 2px 10px; font-size: 12px; }
-#view { flex: 1; overflow: auto; padding: 20px 24px; }
-#view section { max-width: 860px; }
-h2 { margin-top: 0; font-size: 18px; }
-h3 { font-size: 14px; margin: 20px 0 8px; }
-button { padding: 6px 14px; margin-right: 8px; border: 1px solid #8a8886;
-         background: #fff; border-radius: 4px; cursor: pointer;
-         min-height: 44px; }
-button.primary { background: #0f6cbd; border-color: #0f6cbd; color: #fff; }
-button.primary.danger { background: #a4262c; border-color: #a4262c; }
-button:disabled { opacity: .5; cursor: default; }
-/* Focus state nhin thay ro (a11y — UX spec MIN-104) */
-button:focus-visible, input:focus-visible, select:focus-visible,
-textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible {
-  outline: 2px solid #0f6cbd; outline-offset: 2px; }
-input, select, textarea { min-height: 44px; box-sizing: border-box; }
-input[type="checkbox"], input[type="radio"] { min-height: 0; }
-/* Workspace Soạn hồ sơ can rong hon default 860px (layout 36/64 + 22/78) */
-#view section.cd-root-outer { max-width: none; }
-.file-row { padding: 6px 0; border-bottom: 1px solid #edebe9; font-size: 13px; }
-.tools { margin: 12px 0 6px; }
-.files { margin-top: 8px; }
+/* ==========================================================================
+   styles.css — nền token + thành phần dùng chung của G1 shell (MIN-127 / P4)
+   --------------------------------------------------------------------------
+   SOT giá trị: docs/product/ui/tokens.json (status: approved — owner duyệt
+   qua bản mẫu MIN-126, 27/09/2026). Giá trị dưới đây là ÁNH XẠ TAY; đổi
+   token phải sửa tokens.json trước rồi đồng bộ vào file này và
+   docs/product/ui/prototypes/prototype.css.
 
-/* badges theo tone (STATUS_TONE trong lib.js) */
-.badge { display: inline-block; border-radius: 10px; padding: 1px 9px;
-         font-size: 12px; font-weight: 600; }
-.tone-info { background: #deecf9; color: #0f6cbd; }
-.tone-ok { background: #dff6dd; color: #107c10; }
-.tone-warn { background: #fff4ce; color: #9d5d00; }
-.tone-error { background: #fde7e9; color: #a4262c; }
-.tone-muted { background: #f3f2f1; color: #605e5c; }
+   PHẠM VI (owner: P4/MIN-127 — xem DESIGN.md §10):
+   - File này sở hữu: biến :root, layout chrome (#app/#rail/#content/#view),
+     và class KHÔNG tiền tố (.btn, .input, .card, .grid, .pill, .banner,
+     .face, .modal, .toast, .actionbar, .toolbar, .slot, .muted, .error…).
+   - Module CSS (notary/case-drafting.css = cd-*, upload/upload.css = ul-*)
+     KHÔNG định nghĩa lại các tên trên và không ghi đè biến :root.
+   - Rule element (button, input…) là nền trung tính; override riêng của
+     module phải scope trong class gốc module (.cd-root, .upload-lab).
+   ========================================================================== */
 
-/* 4 mat trang thai (MIN-32 §3) */
-.face { border: 1px dashed #c8c6c4; border-radius: 6px; padding: 14px 16px;
-        margin: 12px 0; background: #faf9f8; max-width: 640px; }
-.face-title { font-weight: 600; margin-bottom: 4px; }
-.face-detail { font-size: 13px; }
-.face-hint { margin-top: 6px; }
-.face-actions { margin-top: 10px; }
-.face-loading .face-title::before { content: "… "; }
-.face-error { border-color: #a4262c; }
-.face-error .face-title { color: #a4262c; }
-.face-unavailable { border-color: #9d5d00; }
-.face-unavailable .face-title { color: #9d5d00; }
-
-/* waiting_user banner — noi bat trong module, khong chiem toan app */
-.waiting-banner { background: #fff4ce; border: 1px solid #e3b23c;
-                  border-radius: 6px; padding: 10px 12px; margin: 10px 0;
-                  font-size: 13px; }
-
-/* job card */
-.job-card { border: 1px solid #e1dfdd; border-radius: 6px; padding: 12px;
-            margin: 12px 0; max-width: 720px; }
-.job-head { display: flex; gap: 8px; align-items: baseline; }
-.job-card .status { font-weight: 600; }
-.job-card pre { background: #f3f2f1; padding: 8px; overflow: auto;
-                max-height: 260px; font-size: 12px; }
-.job-card button { margin-top: 8px; }
-.job-result summary { cursor: pointer; color: #0f6cbd; font-size: 13px;
-                      margin-top: 8px; }
-.job-error { margin-top: 8px; }
-.breakdown { margin-top: 6px; }
-.error { color: #a4262c; }
-.muted { color: #605e5c; font-size: 12px; }
-
-/* overview / status */
-.conn-card { border: 1px solid #e1dfdd; border-radius: 6px; padding: 12px;
-             max-width: 640px; }
-.kv { display: grid; grid-template-columns: 130px 1fr; gap: 4px 12px;
-      font-size: 13px; }
-.kv-k { color: #605e5c; }
-.kv-v { word-break: break-all; }
-.health-table { border: 1px solid #e1dfdd; border-radius: 6px;
-                max-width: 640px; }
-.health-row { display: flex; gap: 12px; align-items: center;
-              padding: 8px 12px; border-bottom: 1px solid #edebe9; }
-.health-row:last-child { border-bottom: none; }
-.health-title { flex: 1; font-size: 13px; }
-
-/* modal confirm (cancel job, quyet dinh nguy hiem) */
-.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.35);
-                  display: flex; align-items: center; justify-content: center;
-                  z-index: 10; }
-.modal { background: #fff; border-radius: 8px; padding: 18px 20px;
-         width: 420px; max-width: 90vw; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
-.modal-title { font-weight: 600; margin-bottom: 8px; }
-.modal-body { font-size: 13px; color: #44413e; }
-.modal-actions { margin-top: 16px; text-align: right; }
-
-/* toast */
-#toast { position: fixed; right: 16px; bottom: 16px; z-index: 20;
-         display: flex; flex-direction: column; gap: 8px; }
-.toast-item { background: #323130; color: #fff; border-radius: 6px;
-              padding: 10px 14px; font-size: 13px; max-width: 380px;
-              box-shadow: 0 4px 14px rgba(0,0,0,.25); }
-.toast-error { background: #a4262c; }
-
-/* usable o 760x520 (snap min) — sidebar co lai, view van doc duoc */
-@media (max-width: 800px) {
-  #sidebar { width: 150px; }
-  #view { padding: 12px 14px; }
+/* ------------------------------ TOKENS --------------------------------- */
+:root {
+  /* color.bg / color.surface */
+  --bg-app: #f4f6fa;
+  --bg-canvas: #eef2f8;
+  --surface-card: #ffffff;
+  --surface-subtle: #f1f5fb;
+  --surface-overlay: rgba(15, 23, 42, 0.32);
+  /* color.border */
+  --border-hairline: #e2e8f0;
+  --border-strong: #cbd5e1;
+  /* color.text */
+  --text-primary: #1e293b;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --text-inverse: #ffffff;
+  --text-link: #2563eb;
+  /* color.accent */
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-pressed: #1e40af;
+  --accent-soft: #e8f0fe;
+  --accent-soft-hover: #dbeafe;
+  /* color.state */
+  --ok-text: #15803d;   --ok-bg: #e7f6ec;
+  --warn-text: #b45309; --warn-bg: #fef3c7;
+  --err-text: #b91c1c;  --err-bg: #fee2e2;
+  --info-text: #0369a1; --info-bg: #e0f2fe;
+  --muted-text: #64748b; --muted-bg: #f1f5f9;
+  /* color.focus */
+  --focus-ring: #2563eb;
+  /* color.diagram */
+  --edge: #94a3b8;
+  --edge-selected: #2563eb;
+  --node-bg: #ffffff;
+  --pool-bg: #f1f5fb;
+  /* color.rail (icon rail sáng 60px — đã duyệt) */
+  --rail-bg: #ffffff;
+  --rail-icon: #334155;
+  --rail-active: #2563eb;
+  /* color.disabled */
+  --dis-text: #94a3b8;
+  --dis-bg: #e2e8f0;
+  /* font */
+  --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --fs-base: 15px;
+  --fs-small: 13px;
+  --fs-title: 18px;
+  --fs-card: 14px;
+  /* size */
+  --input-h: 38px;
+  --btn-h: 36px;
+  --row-h: 36px;
+  --chip-pos: 24px;
+  --rail-w: 60px;
+  --modal-w: 720px;
+  --modal-w-wide: 1100px;
+  /* radius */
+  --r-card: 10px;
+  --r-ctl: 8px;
+  --r-chip: 999px;
+  --r-dialog: 12px;
+  /* shadow */
+  --sh-card: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --sh-dialog: 0 8px 28px rgba(15, 23, 42, 0.18);
+  --sh-toast: 0 4px 16px rgba(15, 23, 42, 0.16);
 }
 
-/* business views (MIN-68/69) */
-.biz-sec { border: 1px solid #e1dfdd; border-radius: 6px; margin: 10px 0;
-           padding: 0 12px 12px; }
-.biz-sec > summary { font-weight: 600; padding: 10px 0; cursor: pointer; }
-.biz-sec h4 { margin: 12px 0 6px; }
-.tbl { border-collapse: collapse; width: 100%; font-size: 12.5px;
-       margin: 6px 0; }
-.tbl th, .tbl td { border: 1px solid #edebe9; padding: 5px 8px;
-                   text-align: left; vertical-align: top; }
-.tbl th { background: #faf9f8; font-weight: 600; color: #44413e; }
-.tbl td[onclick] { color: #0f6cbd; }
-.form-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-            margin: 8px 0; }
-.form-row label { min-width: 90px; font-size: 12.5px; }
-.form-row input, .form-row select { padding: 5px 8px; font-size: 12.5px;
-  border: 1px solid #d1d1d1; border-radius: 4px; min-width: 140px; }
-.kv-card { border: 1px solid #e1dfdd; border-radius: 6px; padding: 12px;
-           margin: 8px 0; }
-.warn-text { color: #8a5416; }
-button.danger { border-color: #a4262c; color: #a4262c; }
-pre { background: #faf9f8; border: 1px solid #edebe9; border-radius: 4px;
-      padding: 8px; font-size: 11.5px; overflow: auto; max-height: 300px; }
-.tbl td.clk { cursor: pointer; color: #0f6cbd; }
+/* ------------------------------- BASE ---------------------------------- */
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-size: var(--fs-base);
+  line-height: 1.4;
+  color: var(--text-primary);
+  background: var(--bg-app);
+}
+
+/* Dấu focus bàn phím — vòng 2px theo bản mẫu (a11y, MIN-104 + tokens) */
+button:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible,
+.btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* ---------------------------- LAYOUT SHELL ----------------------------- */
+#app { display: flex; height: 100vh; overflow: hidden; }
+
+/* Icon rail trái 60px — rail sáng theo bản mẫu approved (DESIGN §9.3) */
+#rail {
+  flex: 0 0 var(--rail-w);
+  background: var(--rail-bg);
+  border-right: 1px solid var(--border-hairline);
+  display: flex; flex-direction: column; align-items: center;
+  padding: 10px 0; gap: 4px;
+}
+.rail-logo {
+  width: 40px; height: 40px; border-radius: var(--r-card);
+  background: var(--accent); color: var(--text-inverse);
+  font-weight: 700; font-size: var(--fs-base);
+  display: grid; place-items: center; margin-bottom: 10px;
+}
+#module-list {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 4px; width: 100%;
+}
+/* rail-btn 44x44: vùng bấm >=44px theo tapMin (nút trong màn = 36px token) */
+.rail-btn {
+  width: 44px; height: 44px; min-height: 44px;
+  border: 0; border-radius: var(--r-card); padding: 0; margin: 0;
+  background: transparent; color: var(--rail-icon);
+  display: grid; place-items: center; cursor: pointer;
+}
+.rail-btn svg { width: 22px; height: 22px; }
+.rail-btn:hover { background: var(--surface-subtle); }
+.rail-btn.active { color: var(--rail-active); background: var(--accent-soft); }
+.rail-btn.unavailable { color: var(--dis-text); }
+.rail-btn.rail-bottom { margin-top: auto; }
+.rail-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.rail-spacer { flex: 1; }
+
+#content {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+/* Statusbar: thông tin engine — một dòng gọn, không trộn action module */
+#statusbar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 16px;
+  background: var(--surface-card);
+  border-bottom: 1px solid var(--border-hairline);
+}
+#view { flex: 1; overflow: auto; padding: 20px 24px; }
+/* Cap 860px giữ cho trang shell (status/engine/placeholder); module
+   data-heavy thoát bằng class riêng — upload.css (.upload-lab) và
+   cd-root-outer. KHÔNG đổi cap này (test upload-routing). */
+#view section { max-width: 860px; }
+#view section.cd-root-outer { max-width: none; }
+
+h2 { margin: 0 0 12px; font-size: var(--fs-title); font-weight: 700; }
+h3 {
+  font-size: var(--fs-card); font-weight: 600;
+  margin: 20px 0 8px; color: var(--text-secondary);
+}
+
+/* --------------------------- NÚT (button/.btn) -------------------------
+   button trần = nền trung tính (module scope-override trong .cd-/.ul-).
+   .btn là tên canonical cho code mới; modifier: .primary .secondary
+   .ghost .danger .primary.danger .sm. Disabled: :disabled hoặc .disabled. */
+button, .btn {
+  font: inherit; font-size: var(--fs-small); font-weight: 500;
+  min-height: var(--btn-h); padding: 0 14px; margin: 0;
+  border: 1px solid var(--border-strong); border-radius: var(--r-ctl);
+  background: var(--surface-card); color: var(--text-primary);
+  cursor: pointer; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 6px; justify-content: center;
+}
+button:hover:not(:disabled), .btn:hover:not(.disabled):not(:disabled) {
+  background: var(--surface-subtle); border-color: var(--dis-text);
+}
+button:disabled, .btn.disabled {
+  background: var(--dis-bg); border-color: var(--dis-bg);
+  color: var(--dis-text); cursor: default;
+}
+button.primary, .btn.primary {
+  background: var(--accent); border-color: var(--accent);
+  color: var(--text-inverse); font-weight: 600;
+}
+button.primary:hover:not(:disabled), .btn.primary:hover:not(.disabled) {
+  background: var(--accent-hover); border-color: var(--accent-hover);
+}
+button.primary:active:not(:disabled), .btn.primary:active:not(.disabled) {
+  background: var(--accent-pressed); border-color: var(--accent-pressed);
+}
+button.secondary, .btn.secondary {
+  background: var(--accent-soft); border-color: transparent;
+  color: var(--accent); font-weight: 600;
+}
+button.secondary:hover:not(:disabled), .btn.secondary:hover:not(.disabled) {
+  background: var(--accent-soft-hover);
+}
+button.ghost, .btn.ghost {
+  background: transparent; border-color: transparent;
+}
+button.ghost:hover:not(:disabled), .btn.ghost:hover:not(.disabled) {
+  background: var(--surface-subtle);
+}
+/* danger = outline đỏ (đóng browser…); primary.danger = nền đỏ (confirm hủy) */
+button.danger, .btn.danger {
+  border-color: var(--err-text); color: var(--err-text);
+  background: var(--surface-card);
+}
+button.danger:hover:not(:disabled), .btn.danger:hover:not(.disabled) {
+  background: var(--err-bg);
+}
+button.primary.danger, .btn.primary.danger {
+  background: var(--err-text); border-color: var(--err-text);
+  color: var(--text-inverse);
+}
+button.primary.danger:hover:not(:disabled), .btn.primary.danger:hover {
+  background: #991b1b; border-color: #991b1b;
+}
+button.sm, .btn.sm { min-height: 28px; padding: 0 10px; }
+/* dấu dirty trên nút commit (chấm theo màu chữ nút) */
+.dirty-dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: currentColor; margin-left: 2px; vertical-align: middle;
+}
+
+/* ----------------------------- Ô NHẬP ---------------------------------- */
+input, select, textarea, .input {
+  font: inherit; font-size: var(--fs-small);
+  color: var(--text-primary);
+  min-height: var(--input-h); padding: 0 10px; min-width: 0;
+  border: 1px solid var(--border-hairline); border-radius: var(--r-ctl);
+  background: var(--surface-subtle);
+}
+input:hover, select:hover, textarea:hover, .input:hover {
+  border-color: var(--border-strong);
+}
+input:focus, select:focus, textarea:focus, .input:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+  background: var(--surface-card);
+}
+input:disabled, select:disabled, textarea:disabled, .input:disabled {
+  color: var(--dis-text); background: var(--dis-bg);
+}
+input.err, .input.err { border-color: var(--err-text); background: #fff5f5; }
+input.err:focus, .input.err:focus {
+  box-shadow: 0 0 0 2px rgba(185, 28, 28, 0.25);
+}
+input[type="checkbox"], input[type="radio"] {
+  min-height: 0; width: 16px; height: 16px; padding: 0;
+  accent-color: var(--accent);
+}
+input[type="checkbox"].cb { width: 16px; height: 16px; }
+textarea { padding: 8px 10px; min-height: 96px; }
+select { cursor: pointer; }
+
+/* ------------------------------ TEXT ----------------------------------- */
+.muted { color: var(--text-muted); }
+.small { font-size: var(--fs-small); }
+.error { color: var(--err-text); }
+.warn-text { color: var(--warn-text); }
+.num { font-variant-numeric: tabular-nums; }
+.truncate {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  min-width: 0;
+}
+/* cắt ĐẦU đường dẫn file, giữ tên file (rtl ellipsis) */
+.truncate-path {
+  display: block; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; direction: rtl; text-align: left;
+  unicode-bidi: plaintext; min-width: 0;
+}
+
+/* --------------------------- PILL / BADGE ------------------------------ */
+/* .pill = tên canonical (bản mẫu); .badge.tone-* giữ cho renderer hiện hữu
+   (STATUS_TONE trong lib.js phát sinh tone-*). Tông = state.*  */
+.pill, .badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 600; line-height: 1;
+  padding: 4px 9px; border-radius: var(--r-chip);
+  background: var(--muted-bg); color: var(--muted-text);
+  white-space: nowrap;
+}
+.pill.ok, .badge.tone-ok { background: var(--ok-bg); color: var(--ok-text); }
+.pill.warn, .badge.tone-warn { background: var(--warn-bg); color: var(--warn-text); }
+.pill.err, .badge.tone-error { background: var(--err-bg); color: var(--err-text); }
+.pill.info, .badge.tone-info { background: var(--info-bg); color: var(--info-text); }
+.pill.accent { background: var(--accent-soft); color: var(--accent); }
+.badge.tone-muted { background: var(--muted-bg); color: var(--muted-text); }
+
+/* ----------------------------- BANNER ---------------------------------- */
+.banner {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px; border-radius: var(--r-ctl);
+  font-size: var(--fs-small);
+  background: var(--info-bg); color: var(--info-text);
+}
+.banner.warn { background: var(--warn-bg); color: var(--warn-text); }
+.banner.err { background: var(--err-bg); color: var(--err-text); }
+.banner.ok { background: var(--ok-bg); color: var(--ok-text); }
+.banner .grow { flex: 1; min-width: 0; }
+/* waiting_user banner trong job-card (tông warn — KHÔNG phải lỗi) */
+.waiting-banner {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--warn-bg); color: var(--warn-text);
+  border-radius: var(--r-ctl); padding: 8px 14px;
+  margin: 8px 0; font-size: var(--fs-small);
+}
+
+/* --------------------- KHỐI NỘI DUNG (card) ---------------------------- */
+.card {
+  background: var(--surface-card);
+  border-radius: var(--r-card);
+  box-shadow: var(--sh-card);
+  min-width: 0;
+}
+.card-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px 6px; }
+.card-title { font-size: var(--fs-card); font-weight: 600; margin: 0; }
+.card-tools { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.card-body { padding: 8px 14px 14px; }
+
+/* ------------------------ ACTION BAR / TOOLBAR ------------------------- */
+.actionbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 16px;
+  background: var(--surface-card); border-radius: var(--r-card);
+  box-shadow: var(--sh-card);
+}
+.actionbar .ab-title { font-size: var(--fs-title); font-weight: 700; margin: 0; }
+.actionbar .ab-back {
+  border: 0; background: transparent; font-size: 18px;
+  color: var(--text-secondary); width: 32px; height: 32px;
+  min-height: 32px; border-radius: var(--r-ctl); cursor: pointer;
+  display: inline-grid; place-items: center; padding: 0;
+}
+.actionbar .ab-back:hover { background: var(--surface-subtle); }
+.actionbar .spacer { flex: 1; }
+.actionbar .save-state { font-size: var(--fs-small); color: var(--text-muted); }
+/* toolbar = hàng nút phẳng trong card/vùng (không nền card) */
+.toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* ------------------------------- BẢNG ---------------------------------- */
+/* table.grid = bảng dữ liệu chuẩn: header sticky + lưới hairline.
+   .tbl là tên legacy của helper tableEl — giữ tông giống grid. */
+table.grid, table.tbl {
+  border-collapse: collapse; width: 100%;
+  font-size: var(--fs-small); margin: 6px 0;
+}
+table.grid th, table.grid td,
+table.tbl th, table.tbl td {
+  border-bottom: 1px solid var(--border-hairline);
+  padding: 4px 8px; text-align: left; vertical-align: middle;
+  height: var(--row-h);
+}
+table.grid thead th, table.tbl thead th {
+  background: var(--surface-subtle); font-weight: 600;
+  color: var(--text-secondary); white-space: nowrap;
+}
+table.grid thead th { position: sticky; top: 0; z-index: 2; }
+table.grid tbody tr:hover td { background: #f8fafd; }
+table.grid tbody tr.selected td { background: var(--accent-soft); }
+table.tbl td[onclick], table.tbl td.clk { color: var(--text-link); cursor: pointer; }
+
+/* ----------------------------- FACES ----------------------------------- */
+/* 4 mặt trạng thái (lib.js face* → class .face.face-{kind}):
+   face-loading (skeleton), face-empty, face-error (title đỏ),
+   face-unavailable (title warn). Không viền trang trí quanh vùng. */
+.face {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 8px;
+  padding: 28px 16px; margin: 12px 0;
+  text-align: center; color: var(--text-muted);
+  font-size: var(--fs-small); min-height: 90px; max-width: 640px;
+}
+.face .face-title {
+  font-weight: 600; color: var(--text-secondary); font-size: var(--fs-base);
+}
+.face-error .face-title { color: var(--err-text); }
+.face-unavailable .face-title { color: var(--warn-text); }
+.face-detail { color: var(--text-muted); }
+.face-actions {
+  display: flex; gap: 8px; justify-content: center;
+  flex-wrap: wrap; margin-top: 4px;
+}
+.skeleton {
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface-subtle) 25%,
+    #e6edf7 50%, var(--surface-subtle) 75%);
+  background-size: 200% 100%;
+  animation: g1sk 1.4s infinite;
+}
+@keyframes g1sk { to { background-position: -200% 0; } }
+
+/* --------------------------- MODAL / DIALOG ---------------------------- */
+/* .modal-overlay = tên canonical; .modal-backdrop giữ tương thích. */
+.modal-overlay, .modal-backdrop {
+  position: fixed; inset: 0; z-index: 100;
+  background: var(--surface-overlay);
+  display: grid; place-items: center; padding: 24px;
+}
+.modal {
+  background: var(--surface-card); border-radius: var(--r-dialog);
+  box-shadow: var(--sh-dialog);
+  width: 100%; max-width: var(--modal-w);
+  max-height: calc(100% - 48px);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.modal.narrow { max-width: 480px; }
+.modal.wide { max-width: var(--modal-w-wide); }
+.modal-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 16px 20px 8px;
+}
+.modal-title { font-size: var(--fs-title); font-weight: 700; margin: 0; }
+.modal-close {
+  margin-left: auto; border: 0; background: transparent; font-size: 20px;
+  width: 32px; height: 32px; min-height: 32px; border-radius: var(--r-ctl);
+  cursor: pointer; color: var(--text-secondary); padding: 0;
+}
+.modal-close:hover { background: var(--surface-subtle); }
+.modal-body { padding: 8px 20px; overflow: auto; color: var(--text-secondary); font-size: var(--fs-small); }
+/* .modal-actions = tên cũ của confirmModal — cùng hàng nút phải */
+.modal-foot, .modal-actions {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 12px 20px 18px;
+}
+
+/* ------------------------------- TOAST --------------------------------- */
+#toast, .toast-root {
+  position: fixed; right: 18px; bottom: 18px; z-index: 120;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.toast {
+  background: var(--surface-card); border-radius: var(--r-ctl);
+  box-shadow: var(--sh-toast); padding: 10px 14px;
+  font-size: var(--fs-small); display: flex; gap: 8px; align-items: center;
+  border-left: 3px solid var(--accent); max-width: 380px;
+  color: var(--text-primary);
+}
+.toast.err { border-left-color: var(--err-text); }
+.toast.ok { border-left-color: var(--ok-text); }
+.toast.warn { border-left-color: var(--warn-text); }
+/* tên cũ — renderer đã chuyển sang .toast; giữ alias nếu markup cũ sót */
+.toast-item { border-left: 3px solid var(--accent); }
+.toast-item.toast-error, .toast.toast-error { border-left-color: var(--err-text); }
+
+/* -------------------------- DRAG / SPLITTER ---------------------------- */
+.drag-handle {
+  display: inline-grid; place-items: center;
+  width: 20px; height: 24px; min-height: 24px;
+  border: 0; background: transparent; padding: 0;
+  color: var(--text-muted); cursor: grab; border-radius: 4px;
+  font-size: 13px; letter-spacing: -1px;
+}
+.drag-handle:active { cursor: grabbing; }
+.icon-x {
+  border: 0; background: transparent; color: var(--text-muted);
+  width: 22px; height: 22px; min-height: 22px; border-radius: 6px;
+  cursor: pointer; font-size: 14px; line-height: 1; padding: 0;
+}
+.icon-x:hover { background: var(--err-bg); color: var(--err-text); }
+.splitter-h {
+  flex: 0 0 10px; cursor: row-resize; border-radius: 6px;
+  display: grid; place-items: center; margin: 0 30%;
+}
+.splitter-h::after {
+  content: ""; width: 56px; height: 4px; border-radius: 2px;
+  background: var(--border-strong);
+}
+.splitter-v {
+  flex: 0 0 10px; cursor: col-resize; border-radius: 6px;
+  display: grid; place-items: center;
+}
+.splitter-v::after {
+  content: ""; width: 4px; height: 56px; border-radius: 2px;
+  background: var(--border-strong);
+}
+.splitter-h:hover::after, .splitter-h.active::after,
+.splitter-v:hover::after, .splitter-v.active::after {
+  background: var(--accent);
+}
+/* trạng thái kéo-thả dùng chung */
+.dragging { opacity: 0.45; }
+.drop-hint { outline: 2px dashed var(--accent); outline-offset: -2px; }
+.row-drop-above > * { box-shadow: 0 -2px 0 0 var(--accent) inset !important; }
+.row-drop-below > * { box-shadow: 0 2px 0 0 var(--accent) inset !important; }
+.col-drop-before { box-shadow: 2px 0 0 0 var(--accent) inset !important; }
+
+/* ------------------------------ PROGRESS ------------------------------- */
+.progress {
+  flex: 1; min-width: 140px; height: 10px; border-radius: 999px;
+  background: var(--surface-subtle); overflow: hidden;
+}
+.progress > i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.progress-lbl { font-size: var(--fs-small); color: var(--text-secondary); white-space: nowrap; }
+
+/* --------------------------- MÀN HÌNH SHELL ---------------------------- */
+/* job-card / status page — khối trắng theo card, không viền trang trí */
+.job-card {
+  background: var(--surface-card); border-radius: var(--r-card);
+  box-shadow: var(--sh-card); padding: 12px 14px;
+  margin: 12px 0; max-width: 720px;
+}
+.job-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.job-card .status { font-weight: 600; }
+.job-card pre {
+  background: var(--surface-subtle); padding: 8px; overflow: auto;
+  max-height: 260px; font-size: 12px; border-radius: var(--r-ctl);
+  border: 0;
+}
+.job-card button { margin-top: 8px; }
+.job-result summary {
+  cursor: pointer; color: var(--text-link);
+  font-size: var(--fs-small); margin-top: 8px;
+}
+.job-error { margin-top: 8px; }
+.job-error button { margin-top: 6px; }
+.breakdown { margin-top: 6px; }
+
+.tools { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 6px; }
+.files { margin-top: 8px; }
+.file-row {
+  padding: 6px 0; border-bottom: 1px solid var(--border-hairline);
+  font-size: var(--fs-small);
+}
+
+/* overview / status */
+.conn-card {
+  background: var(--surface-card); border-radius: var(--r-card);
+  box-shadow: var(--sh-card); padding: 12px 14px; max-width: 640px;
+}
+.kv {
+  display: grid; grid-template-columns: 130px 1fr;
+  gap: 4px 12px; font-size: var(--fs-small);
+}
+.kv-k { color: var(--text-muted); }
+.kv-v { word-break: break-all; }
+.health-table {
+  background: var(--surface-card); border-radius: var(--r-card);
+  box-shadow: var(--sh-card); max-width: 640px; overflow: hidden;
+}
+.health-row {
+  display: flex; gap: 12px; align-items: center;
+  padding: 8px 12px; border-bottom: 1px solid var(--border-hairline);
+}
+.health-row:last-child { border-bottom: none; }
+.health-title { flex: 1; font-size: var(--fs-small); }
+
+/* form-row = hàng label+control của helper renderer (legacy, h.formRow) */
+.form-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+.form-row label { min-width: 90px; font-size: var(--fs-small); color: var(--text-secondary); }
+.form-row input, .form-row select { min-width: 140px; }
+
+pre {
+  background: var(--surface-subtle); border-radius: var(--r-ctl);
+  padding: 8px; font-size: 11.5px; overflow: auto; max-height: 300px;
+  border: 0;
+}
+
+/* ----------------------------- RESPONSIVE ------------------------------ */
+/* 800px compact — giữ rail icon (đã hẹp sẵn); co padding nội dung */
+@media (max-width: 800px) {
+  #view { padding: 12px 14px; }
+  #statusbar { padding: 6px 10px; }
+}

@@ -52,17 +52,23 @@ function sleep(ms) {
 function notify(text, isError) {
   let box = document.getElementById('toast');
   if (!box) {
-    box = el('div', ''); box.id = 'toast';
+    box = el('div', 'toast-root'); box.id = 'toast';
     document.body.append(box);
   }
-  const item = el('div', `toast-item${isError ? ' toast-error' : ''}`, text);
+  const item = el('div', `toast${isError ? ' err' : ''}`, text);
+  item.setAttribute('role', 'status');
   box.append(item);
   setTimeout(() => item.remove(), 6000);
 }
 
 function setStatus(s) {
-  document.getElementById('engine-state').textContent =
-    `engine: ${L.engineStateLabel(s.state)}`;
+  const st = document.getElementById('engine-state');
+  st.textContent = `engine: ${L.engineStateLabel(s.state)}`;
+  // Pill theo tone state: ready=ok, starting/restarting=warn, loi=err.
+  st.className = 'pill ' + (
+    s.state === 'ready' ? 'ok'
+    : (s.state === 'starting' || s.state === 'restarting') ? 'warn'
+    : 'err');
   document.getElementById('engine-version').textContent =
     s.engine_version || '';
   document.getElementById('contract').textContent = s.contract_version || '';
@@ -72,6 +78,15 @@ function setStatus(s) {
 
 function faceEl(f, actions) {
   const box = el('div', `face face-${f.kind}`);
+  // Loading: skeleton bar + nhan viec dang lam (EXPERIENCE §3 — khong gia
+  // progress). Cac mat khac: title + detail + hint + actions.
+  if (f.kind === 'loading') {
+    for (const w of ['60%', '40%']) {
+      const bar = el('div', 'skeleton');
+      bar.style.width = w; bar.style.height = '14px';
+      box.append(bar);
+    }
+  }
   box.append(el('div', 'face-title', f.title));
   if (f.detail) box.append(el('div', 'face-detail', f.detail));
   if (f.hint) box.append(el('div', 'face-hint muted', f.hint));
@@ -104,21 +119,45 @@ function errorFaceEl(err, onRetry) {
 
 function confirmModal({ title, body, confirmLabel, cancelLabel }) {
   return new Promise((resolve) => {
-    const wrap = el('div', 'modal-backdrop');
-    const box = el('div', 'modal');
+    // Cau truc modal canonical (DESIGN §6): overlay > .modal.narrow >
+    // head(title + x) / body / foot(ghost trai — primary phai).
+    const opener = document.activeElement;
+    const wrap = el('div', 'modal-overlay');
+    const box = el('div', 'modal narrow');
     box.setAttribute('role', 'dialog');
     box.setAttribute('aria-modal', 'true');
     if (title) box.setAttribute('aria-label', title);
-    box.append(el('div', 'modal-title', title));
+    const head = el('div', 'modal-head');
+    head.append(el('h2', 'modal-title', title));
+    const close = el('button', 'modal-close', '×');
+    close.setAttribute('aria-label', 'Đóng');
+    close.onclick = () => done(false);
+    head.append(close);
+    box.append(head);
     if (body) box.append(el('div', 'modal-body', body));
-    const row = el('div', 'modal-actions');
-    const cancel = el('button', '', cancelLabel || 'Quay lại');
+    const row = el('div', 'modal-foot');
+    const cancel = el('button', 'ghost', cancelLabel || 'Quay lại');
     const ok = el('button', 'primary danger', confirmLabel || 'Xác nhận');
-    const onKey = (e) => { if (e.key === 'Escape') done(false); };
     const done = (v) => {
       document.removeEventListener('keydown', onKey);
       wrap.remove();
+      if (opener && opener.isConnected && opener.focus) opener.focus();
       resolve(v);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { done(false); return; }
+      if (e.key !== 'Tab') return;
+      // Focus trap trong modal (EXPERIENCE §7).
+      const els = [...box.querySelectorAll(
+        'button, input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+        .filter((x) => !x.disabled);
+      if (!els.length) return;
+      const first = els[0], last = els[els.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus();
+      }
     };
     cancel.onclick = () => done(false);
     ok.onclick = () => done(true);
@@ -773,18 +812,52 @@ async function showModule(id) {
   renderSidebar();
 }
 
+// Icon rail 60px theo ban mau approved (DESIGN §9.3): moi muc nav = nut icon
+// + tooltip nhan day du. Path SVG lay tu ban mau prototypes/app.js.
+const NAV_ICONS = {
+  notary_v2: 'M6 2h9l5 5v15H6z M14 2v6h6 M9 13h8M9 17h8M9 9h2',
+  upload: 'M12 16V4M7 9l5-5 5 5 M4 20h16',
+  office: 'M3 21h18 M5 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16 ' +
+    'M15 9h4a2 2 0 0 1 2 2v10 M9 7h2M9 11h2M9 15h2',
+  search: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z M21 21l-4.3-4.3',
+  status: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z',
+};
+
+function railIcon(d) {
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  s.setAttribute('viewBox', '0 0 24 24');
+  s.setAttribute('fill', 'none');
+  s.setAttribute('stroke', 'currentColor');
+  s.setAttribute('stroke-width', '1.8');
+  s.setAttribute('stroke-linecap', 'round');
+  s.setAttribute('stroke-linejoin', 'round');
+  s.setAttribute('aria-hidden', 'true');
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.setAttribute('d', d);
+  s.append(p);
+  return s;
+}
+
 function renderSidebar() {
   moduleList.innerHTML = '';
   for (const n of L.NAV_SPEC) {
     const mod = n.registry ? modulesById[n.registry] : null;
     const face = n.registry ? L.moduleFace(mod) : 'ready';
-    const li = el('li', '', n.title);
-    li.dataset.id = n.id;
+    const b = el('button', 'rail-btn');
+    b.type = 'button';
+    b.dataset.id = n.id;
+    b.title = n.title;
+    b.setAttribute('aria-label', n.title);
+    b.append(railIcon(NAV_ICONS[n.id] || NAV_ICONS.search));
     // Placeholder/unavailable van hien thi va mo duoc (spec §1 — khong an).
-    if (face !== 'ready') li.classList.add('unavailable');
-    if (n.id === activeId) li.classList.add('active');
-    li.onclick = () => showModule(n.id);
-    moduleList.append(li);
+    if (face !== 'ready') b.classList.add('unavailable');
+    if (n.id === activeId) {
+      b.classList.add('active');
+      b.setAttribute('aria-current', 'page');
+    }
+    if (n.id === 'status') b.classList.add('rail-bottom');
+    b.onclick = () => showModule(n.id);
+    moduleList.append(b);
   }
 }
 
