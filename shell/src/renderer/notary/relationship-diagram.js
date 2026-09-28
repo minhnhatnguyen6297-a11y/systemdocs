@@ -40,8 +40,18 @@ const REL_EVALUATE_DEBOUNCE_MS = 500;   // spec: 400–600ms sau draft doi
 const TWO_PARTY = 'two_party';
 
 // Kich thuoc layout canvas (px logic — scale boi zoom, khong co chu).
-const NODE_W = 200, NODE_H = 170, GAP_X = 44, ROW_H = 228, PAD = 28;
-const TP_W = 720, TP_H = 24 + 34 + 15 * 50 + 24;
+// MIN-133 D7 (mockup duyet 28/09/2026): node DA THA 144×87 (ten 14px,
+// nam 13px, 2 hang chip 22×19); node TRONG 88×24 vien dut, khong chu.
+// Le 6px, giua the he 14px (plan 12–16), giua node 14px, cap vo/chong
+// 28px. CSS .cd-node/.cd-node-empty phai khop cac hang nay.
+const NODE_W = 144, NODE_H = 87;
+const EMPTY_W = 88, EMPTY_H = 24;
+const PAD = 6, GAP_X = 14, SPOUSE_GAP = 28, GAP_Y = 14;
+const ROW_H = NODE_H + GAP_Y;          // buoc toi da giua 2 hang the he
+// Hai ben: 2 cot × 15 cho, cho cao 26px (CSS .cd-tp-slot khop).
+const TP_COL_W = 288, TP_SLOT_H = 26, TP_SLOT_GAP = 4, TP_TITLE_H = 26;
+const TP_W = PAD * 2 + TP_COL_W * 2 + 12;
+const TP_H = PAD * 2 + TP_TITLE_H + 15 * TP_SLOT_H + 14 * TP_SLOT_GAP;
 const ZOOM_MIN = 0.5, ZOOM_MAX = 1.6;
 
 // Nhan hien thi cho slot id canonical seed (chi label — khong luat).
@@ -50,8 +60,6 @@ const SLOT_LABEL = {
   spouse: 'Vợ/chồng', spouse_father: 'Cha vợ/chồng',
   spouse_mother: 'Mẹ vợ/chồng',
 };
-
-let edgeSeq = 0;   // marker id duy nhat moi svg (tranh trung id DOM)
 
 // So cho canonical cua node two_party (p16 = dau Ben B); null neu khong
 // phai id canonical.
@@ -65,7 +73,15 @@ function slotNum(id) {
 // max(gen cha/me) + 1. Chu ky draft (engine se bao loi) → gen 0.
 // Trong mot gen: giu thu tu mang nodes, nhung cap vo/chong (spouseSlotId
 // 2 chieu hop le 1 chieu) duoc don sat nhau de edge ngang ngan gon.
-// Tra {pos: {id:{x,y,gen}}, w, h} — vi tri TOP-LEFT tren world logic.
+// MIN-133: kich thuoc theo trang thai node (da tha 144×87 / trong 88×24);
+// hang rong nhat can giua, hang tren/duoi can theo tam con/cha-me da dat
+// (cap vo/chong la mot khoi 28px). Chi la vi tri hien thi.
+// Tra {pos: {id:{x,y,w,h,gen}}, w, h} — vi tri TOP-LEFT tren world logic.
+function nodeSize(n) {
+  return n && n.personId ? { w: NODE_W, h: NODE_H }
+                         : { w: EMPTY_W, h: EMPTY_H };
+}
+
 function layoutInheritance(nodes) {
   const live = (nodes || []).filter((n) => n && !n.deleted);
   const byId = new Map(live.map((n) => [n.id, n]));
@@ -90,13 +106,15 @@ function layoutInheritance(nodes) {
     if (!gens.has(g)) gens.set(g, []);
     gens.get(g).push(n);
   }
+  const spouseOf = (n) => (n.spouseSlotId && byId.get(n.spouseSlotId)) ||
+    live.find((k) => k.spouseSlotId === n.id) || null;
   for (const arr of gens.values()) {
     const seen = new Set();
     const out = [];
     for (const n of arr) {
       if (seen.has(n.id)) continue;
       out.push(n); seen.add(n.id);
-      const sp = n.spouseSlotId && byId.get(n.spouseSlotId);
+      const sp = spouseOf(n);
       if (sp && !seen.has(sp.id) &&
           memo.get(sp.id) === memo.get(n.id)) {
         out.push(sp); seen.add(sp.id);
@@ -104,18 +122,100 @@ function layoutInheritance(nodes) {
     }
     arr.splice(0, arr.length, ...out);
   }
-  const pos = {};
-  let maxX = 0, maxY = 0;
+  const size = new Map(live.map((n) => [n.id, nodeSize(n)]));
+  const isPair = (a, b) =>
+    a.spouseSlotId === b.id || b.spouseSlotId === a.id;
+  // Khoi: node don hoac cap vo/chong ke nhau (giu sat 28px).
+  const blocksOf = (row) => {
+    const out = [];
+    for (let i = 0; i < row.length; i += 1) {
+      if (i + 1 < row.length && isPair(row[i], row[i + 1])) {
+        out.push([row[i], row[i + 1]]); i += 1;
+      } else {
+        out.push([row[i]]);
+      }
+    }
+    return out.map((m) => ({
+      m, w: m.reduce((s, n) => s + size.get(n.id).w, 0) +
+        (m.length > 1 ? SPOUSE_GAP : 0) }));
+  };
   const gkeys = [...gens.keys()].sort((a, b) => a - b);
-  for (const [gi, g] of gkeys.entries()) {
-    gens.get(g).forEach((n, i) => {
-      pos[n.id] = { x: PAD + i * (NODE_W + GAP_X),
-                    y: PAD + gi * ROW_H, gen: g };
-      maxX = Math.max(maxX, pos[n.id].x + NODE_W);
-      maxY = Math.max(maxY, pos[n.id].y + NODE_H);
+  const rows = gkeys.map((g) => blocksOf(gens.get(g)));
+  const rowW = (bs) => bs.reduce((s, b) => s + b.w, 0) +
+    Math.max(0, bs.length - 1) * GAP_X;
+  const left = new Map();                    // id -> x trai (tuong doi)
+  const center = (id) => left.get(id) + size.get(id).w / 2;
+  // Dat mot hang: desired(block) = tam mong muon (hoac null). Quet trai
+  // → phai giu thu tu + khoang cach toi thieu, roi dich ca hang ve phia
+  // tam mong muon trung binh.
+  function placeRow(bs, desired) {
+    const xs = new Array(bs.length);
+    const want = bs.map(desired);
+    const k = want.findIndex((d) => d != null);
+    if (k < 0) {
+      let x = -rowW(bs) / 2;
+      bs.forEach((b, i) => { xs[i] = x; x += b.w + GAP_X; });
+    } else {
+      xs[k] = want[k] - bs[k].w / 2;
+      for (let i = k + 1; i < bs.length; i += 1) {
+        const min = xs[i - 1] + bs[i - 1].w + GAP_X;
+        xs[i] = want[i] != null ? Math.max(want[i] - bs[i].w / 2, min) : min;
+      }
+      for (let i = k - 1; i >= 0; i -= 1) {
+        xs[i] = xs[i + 1] - GAP_X - bs[i].w;
+      }
+      let sum = 0, cnt = 0;
+      bs.forEach((b, i) => {
+        if (want[i] != null) { sum += want[i] - (xs[i] + b.w / 2); cnt += 1; }
+      });
+      const shift = cnt ? sum / cnt : 0;
+      for (let i = 0; i < xs.length; i += 1) xs[i] += shift;
+    }
+    bs.forEach((b, i) => {
+      let x = xs[i];
+      for (const n of b.m) {
+        left.set(n.id, x);
+        x += size.get(n.id).w + SPOUSE_GAP;
+      }
     });
   }
-  return { pos, w: maxX + PAD, h: maxY + PAD };
+  const mean = (arr) => (arr.length
+    ? arr.reduce((s, v) => s + v, 0) / arr.length : null);
+  let anchor = 0;
+  rows.forEach((bs, i) => { if (rowW(bs) > rowW(rows[anchor])) anchor = i; });
+  if (rows.length) placeRow(rows[anchor], () => null);
+  // Hang duoi hang rong nhat: theo tam cha/me da dat.
+  for (let i = anchor + 1; i < rows.length; i += 1) {
+    placeRow(rows[i], (b) => mean(b.m.flatMap((n) =>
+      (n.parentSlotIds || []).filter((p) => left.has(p)).map(center))));
+  }
+  // Hang tren: theo tam con da dat.
+  for (let i = anchor - 1; i >= 0; i -= 1) {
+    placeRow(rows[i], (b) => mean(b.m.flatMap((n) => live
+      .filter((k) => left.has(k.id) &&
+        (k.parentSlotIds || []).includes(n.id))
+      .map((k) => center(k.id)))));
+  }
+  const pos = {};
+  let minX = Infinity;
+  for (const x of left.values()) minX = Math.min(minX, x);
+  const dx = Number.isFinite(minX) ? PAD - minX : PAD;
+  let maxX = 0, y = PAD;
+  for (const [gi, g] of gkeys.entries()) {
+    let rowH = 0;
+    for (const b of rows[gi]) {
+      for (const n of b.m) {
+        const s = size.get(n.id);
+        const x = Math.round(left.get(n.id) + dx);
+        pos[n.id] = { x, y, w: s.w, h: s.h, gen: g };
+        maxX = Math.max(maxX, x + s.w);
+        rowH = Math.max(rowH, s.h);
+      }
+    }
+    y += rowH + GAP_Y;
+  }
+  const h = rows.length ? y - GAP_Y + PAD : PAD * 2;
+  return { pos, w: Math.max(maxX, 0) + PAD, h };
 }
 
 function createDiagramPane(ctx) {
@@ -309,10 +409,14 @@ function createDiagramPane(ctx) {
       card.append(grip);
     }
     const nm = h('span', 'cd-pool-nm', label);
+    nm.title = sub ? `${label} — ${sub}` : label;
     if (sub) nm.append(h('span', 'cd-pool-sub', sub));
     card.append(nm);
     // Duong ban phim thay keo-tha (a11y) — menu chon vi tri gan.
-    const assign = btn('→', 'sm', () => openAssignMenu(row, kind));
+    // MIN-133: nut → noi tren mep phai, chi hien khi hover/focus (the
+    // Pool 176px chi con ten) — van trong tab order.
+    const assign = btn('→', 'sm cd-pool-assign',
+      () => openAssignMenu(row, kind));
     assign.title = 'Gán vị trí (bàn phím — thay cho kéo thả)';
     assign.setAttribute('aria-label', `Gán vị trí cho ${label}`);
     assign.disabled = !model.canWrite() ||
@@ -631,24 +735,13 @@ function createDiagramPane(ctx) {
     card.style.left = `${at.x}px`;
     card.style.top = `${at.y}px`;
     card.dataset.nodeId = n.id;
+    card.setAttribute('role', 'group');
     if (n.hidden) card.classList.add('cd-node-hidden');
-    if (!n.personId) card.classList.add('cd-node-empty');
     if (n.id === 'owner') card.classList.add('cd-node-owner');
 
-    const head = h('div', 'cd-node-head');
-    head.append(h('span', 'cd-node-name',
-      n.personId ? ((p && p.ho_ten) || '(chưa đặt tên)')
-                 : (role || slotTag(n))));
-    if (n.personId && !ro) {
-      // Ban phim: gan lai/doi cho cho nguoi dang o node (menu du nang
-      // luc nhu keo-tha — move/swap/bo gan).
-      const mv = btn('→', 'cd-mini-btn', () => openAssignMenu(p, 'person'));
-      mv.title = 'Gán lại/đổi chỗ (bàn phím — thay cho kéo thả)';
-      mv.setAttribute('aria-label',
-        `Gán lại ${p ? p.ho_ten : 'người này'}`);
-      mv.disabled = !model.state.capabilities.diagram;
-      head.append(mv);
-    }
+    // Nut hanh dong: chi hien khi hover/focus (CSS .cd-node-acts) —
+    // van nam trong tab order cho ban phim.
+    const acts = h('div', 'cd-node-acts');
     const del = btn('×', 'icon-x', () => {
       // Xoa slot = draft Diagram — dong Stage giu nguyen (§7.1).
       if (model.removeNode(n.id)) scheduleEvaluate();
@@ -656,36 +749,65 @@ function createDiagramPane(ctx) {
     del.title = `Xóa slot ${slotTag(n)} khỏi sơ đồ (draft — không xóa Stage)`;
     del.setAttribute('aria-label', `Xóa slot ${slotTag(n)}`);
     del.disabled = ro;
-    head.append(del);
-    card.append(head);
 
-    const meta = h('div', 'cd-node-meta muted');
-    const yrs = n.personId ? personYears(n.personId) : null;
-    meta.append(h('span', '', yrs || '—'));
-    const alloc = n.personId ? allocBadgeEl(n.personId) : null;
+    if (!n.personId) {
+      // MIN-133 D7: node TRONG 88×24 vien dut — khong nhan vai tro,
+      // khong hint, khong chip. Van la drop target; vai tro doc qua
+      // aria-label/tooltip (screen reader + ban phim qua menu Gán vị trí).
+      card.classList.add('cd-node-empty');
+      const what = role || slotTag(n);
+      const label = `Ô trống: ${what} — thả người từ Pool vào đây`;
+      card.setAttribute('aria-label', label);
+      card.title = label;
+      acts.append(del);
+      card.append(acts);
+      wirePersonDrop(card, n.id);
+      return card;
+    }
+
+    const name = (p && p.ho_ten) || '(chưa đặt tên)';
+    card.setAttribute('aria-label', role ? `${name} — ${role}` : name);
+    if (role) card.title = role;
+    const nm = h('span', 'cd-node-name', name);
+    nm.title = role ? `${name} — ${role}` : name;
+    card.append(nm);
+    if (!ro) {
+      // Ban phim: gan lai/doi cho cho nguoi dang o node (menu du nang
+      // luc nhu keo-tha — move/swap) + bo gan ve Pool.
+      const mv = btn('→', 'cd-mini-btn', () => openAssignMenu(p, 'person'));
+      mv.title = 'Gán lại/đổi chỗ (bàn phím — thay cho kéo thả)';
+      mv.setAttribute('aria-label', `Gán lại ${name}`);
+      mv.disabled = !model.state.capabilities.diagram;
+      const un = btn('↩', 'cd-mini-btn js-node-unassign', () => {
+        if (model.movePerson(n.personId, null)) scheduleEvaluate();
+      });
+      un.title = 'Bỏ gán — trả người về Pool';
+      un.setAttribute('aria-label', `Bỏ gán ${name} về Pool`);
+      acts.append(mv, un);
+    }
+    acts.append(del);
+    card.append(acts);
+
+    const meta = h('div', 'cd-node-meta');
+    meta.append(h('span', '', personYears(n.personId) || '—'));
+    const alloc = allocBadgeEl(n.personId);
     if (alloc) meta.append(alloc);
     card.append(meta);
 
-    if (n.personId && role) {
-      card.append(h('div', 'cd-node-role muted', role));
-    }
-    if (!n.personId) {
-      card.append(h('div', 'cd-node-hint muted',
-        'Trống — thả thẻ Pool vào đây'));
-    }
-
-    // 2 hang chip so (§13.4): "Chủ đất" = ownPositions, "Nhận đất" =
-    // receivePositions — doc lap, multi-select; chip vi tri chua co
-    // asset disable (server van prune > len(assets) tai commit/save).
+    // 2 hang chip so (§13.4): "Chủ" = ownPositions (chủ đất), "Nhận" =
+    // receivePositions (nhận đất) — doc lap, multi-select; chip vi tri
+    // chua co asset disable (server van prune > len(assets) tai commit).
     const assetCount = model.state.stage.assets.length;
-    for (const [label, kind, arr] of [
-        ['Chủ đất', 'own', n.ownPositions],
-        ['Nhận đất', 'receive', n.receivePositions]]) {
+    for (const [label, full, kind, arr] of [
+        ['Chủ', 'Chủ đất', 'own', n.ownPositions],
+        ['Nhận', 'Nhận đất', 'receive', n.receivePositions]]) {
       const wrap = h('div', 'cd-posrow');
-      wrap.append(h('span', 'cd-posrow-label muted', label));
+      const lb = h('span', 'cd-posrow-label', label);
+      lb.title = full;
+      wrap.append(lb);
       for (const pos of [1, 2, 3]) {
         const on = Array.isArray(arr) && arr.includes(pos);
-        const chip = btn(on ? `✓${pos}` : `${pos}`,
+        const chip = btn(`${pos}`,
           `cd-poschip${on ? ' on' : ''}`, () => {
             if (model.toggleNodePosition(n.id, kind, pos)) {
               scheduleEvaluate();
@@ -694,22 +816,11 @@ function createDiagramPane(ctx) {
         chip.disabled = ro || pos > assetCount;
         chip.setAttribute('aria-pressed', String(on));
         chip.setAttribute('aria-label',
-          `${label} tài sản ${pos} — ${slotTag(n)}`);
+          `${full} tài sản ${pos} — ${slotTag(n)}`);
+        chip.title = `${full} — tài sản ${pos}`;
         wrap.append(chip);
       }
       card.append(wrap);
-    }
-
-    if (n.personId) {
-      const foot = h('div', 'cd-node-foot');
-      const un = btn('Bỏ gán', 'sm ghost', () => {
-        if (model.movePerson(n.personId, null)) scheduleEvaluate();
-      });
-      un.disabled = ro;
-      un.setAttribute('aria-label',
-        `Bỏ gán ${p ? p.ho_ten : ''} về Pool`);
-      foot.append(un);
-      card.append(foot);
     }
 
     // Drag: nguoi tren node keo di — cung payload Pool card.
@@ -746,20 +857,24 @@ function createDiagramPane(ctx) {
     if (p) {
       // Design P7: card hai ben chi TEN + so cho — khong ngay thang/
       // vai tro/chip thua ke (§13.5).
-      slot.append(h('span', 'cd-tp-nm', p.ho_ten || '(chưa đặt tên)'));
+      const nm = h('span', 'cd-tp-nm', p.ho_ten || '(chưa đặt tên)');
+      nm.title = p.ho_ten || '';
+      slot.append(nm);
+      // Nut hien khi hover/focus (MIN-133) — van trong tab order.
+      const acts = h('div', 'cd-tp-acts');
       const mv = btn('→', 'cd-mini-btn',
         () => openAssignMenu(p, 'person'));
       mv.title = 'Đổi chỗ/gán lại (bàn phím — thay cho kéo thả)';
       mv.setAttribute('aria-label', `Đổi chỗ ${p.ho_ten || 'người này'}`);
       mv.disabled = ro || !model.state.capabilities.diagram;
-      slot.append(mv);
       const del = btn('×', 'icon-x', () => {
         if (model.movePerson(n.personId, null)) scheduleEvaluate();
       });
       del.title = `Bỏ ${p.ho_ten || ''} khỏi chỗ ${num} (về Pool)`;
       del.setAttribute('aria-label', `Bỏ khỏi chỗ ${num}`);
       del.disabled = ro;
-      slot.append(del);
+      acts.append(mv, del);
+      slot.append(acts);
       if (!ro) {
         slot.draggable = true;
         slot.addEventListener('dragstart', (e) => {
@@ -771,8 +886,12 @@ function createDiagramPane(ctx) {
           slot.classList.remove('dragging'));
       }
     } else {
-      slot.append(h('span', 'cd-tp-empty muted',
-        'Trống — thả thẻ Pool vào đây'));
+      // MIN-133 D7: cho trong gon — o viền dut nho, khong hint chu;
+      // mo ta cho screen reader/tooltip.
+      const label = `Chỗ ${num} trống — thả người từ Pool vào đây`;
+      slot.setAttribute('aria-label', label);
+      slot.title = label;
+      slot.append(h('span', 'cd-tp-empty', ''));
     }
     wirePersonDrop(slot, n.id);
     return slot;
@@ -867,8 +986,12 @@ function createDiagramPane(ctx) {
     return wrap;
   }
 
-  // Edges SVG: cha/me → con (elbow, co mui ten) + vo/chong (ngang,
-  // dashed). Doc tu parentSlotIds/spouseSlotId draft — khong suy luan.
+  // Edges SVG (MIN-133, theo mockup — khong mui ten): vo/chong = doan
+  // ngang net dut giua hai card cung hang; cha/me → con = elbow tu day
+  // card cha/me (hoac tu giua doan vo/chong khi ca hai la cha/me cua con)
+  // xuong thanh ngang o giua khe the he roi xuong dinh card con. Doc tu
+  // parentSlotIds/spouseSlotId draft — khong suy luan. Kich thuoc lay
+  // tu pos (w/h theo node da tha/trong) nen khop layout.
   function edgesSvgEl(nodes, pos, w, hgt) {
     const ns = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(ns, 'svg');
@@ -876,51 +999,57 @@ function createDiagramPane(ctx) {
     svg.setAttribute('width', String(w));
     svg.setAttribute('height', String(hgt));
     svg.setAttribute('aria-hidden', 'true');
-    const defs = document.createElementNS(ns, 'defs');
-    const mk = document.createElementNS(ns, 'marker');
-    const markerId = `cd-arr${++edgeSeq}`;
-    mk.setAttribute('id', markerId);
-    mk.setAttribute('viewBox', '0 0 10 10');
-    mk.setAttribute('refX', '9'); mk.setAttribute('refY', '5');
-    mk.setAttribute('markerWidth', '7');
-    mk.setAttribute('markerHeight', '7');
-    mk.setAttribute('orient', 'auto-start-reverse');
-    const tip = document.createElementNS(ns, 'path');
-    tip.setAttribute('d', 'M0 0L10 5L0 10z');
-    mk.append(tip); defs.append(mk); svg.append(defs);
     const edgePath = (d, cls) => {
       const pe = document.createElementNS(ns, 'path');
       pe.setAttribute('d', d);
-      if (cls) pe.setAttribute('class', cls);
-      pe.setAttribute('marker-end', `url(#${markerId})`);
+      pe.setAttribute('class', cls ? `cd-edge ${cls}` : 'cd-edge');
       svg.append(pe);
+    };
+    const byId = new Map(nodes.filter((n) => n && !n.deleted)
+      .map((n) => [n.id, n]));
+    const paired = (a, b) => !!(a && b &&
+      (a.spouseSlotId === b.id || b.spouseSlotId === a.id));
+    // Doan vo/chong giua hai card cung hang: {x1, x2, y} hoac null.
+    const spouseSeg = (a, b) => {
+      const pa = pos[a], pb = pos[b];
+      if (!pa || !pb || pa.y !== pb.y) return null;
+      const [l, r] = pa.x <= pb.x ? [pa, pb] : [pb, pa];
+      const x1 = l.x + l.w, x2 = r.x;
+      if (x2 <= x1) return null;
+      return { x1, x2, y: l.y + Math.min(l.h, r.h) / 2 };
     };
     const drawn = new Set();
     for (const n of nodes) {
       if (n.deleted || !pos[n.id]) continue;
       const c = pos[n.id];
-      // Vo/chong: ve mot lan cho moi cap, edge ngang giua hai card.
+      // Vo/chong: ve mot lan cho moi cap.
       if (n.spouseSlotId && pos[n.spouseSlotId]) {
         const key = [n.id, n.spouseSlotId].sort().join('|');
         if (!drawn.has(key)) {
           drawn.add(key);
-          const s = pos[n.spouseSlotId];
-          const y = Math.min(c.y, s.y) + 34;
-          const x1 = Math.min(c.x, s.x) + NODE_W;
-          const x2 = Math.max(c.x, s.x);
-          if (x2 > x1) edgePath(`M${x1} ${y} H${x2}`, 'cd-edge-spouse');
+          const seg = spouseSeg(n.id, n.spouseSlotId);
+          if (seg) {
+            edgePath(`M${seg.x1} ${seg.y} H${seg.x2}`, 'cd-edge-spouse');
+          }
         }
       }
-      // Cha/me → con: elbow tu day-card cha/me xuong dinh-card con.
-      for (const pid of n.parentSlotIds || []) {
+      // Cha/me → con. Khi cha me la mot cap vo/chong: ve MOT edge tu
+      // giua doan vo/chong (khong ve 2 edge trung nhau).
+      const ps = (n.parentSlotIds || []).filter((p) => pos[p]);
+      const busY = c.y - GAP_Y / 2;
+      const cx = c.x + c.w / 2;
+      const seenOrigin = new Set();
+      for (const pid of ps) {
         const pp = pos[pid];
-        if (!pp) continue;
-        const x1 = pp.x + NODE_W / 2;
-        const y1 = pp.y + NODE_H - 10;
-        const x2 = c.x + NODE_W / 2;
-        const y2 = c.y;
-        const midY = y1 + (y2 - y1) / 2;
-        edgePath(`M${x1} ${y1} V${midY} H${x2} V${y2 - 6}`);
+        let ox = pp.x + pp.w / 2, oy = pp.y + pp.h;
+        const mate = ps.find((q) => q !== pid &&
+          paired(byId.get(pid), byId.get(q)));
+        const seg = mate ? spouseSeg(pid, mate) : null;
+        if (seg) { ox = (seg.x1 + seg.x2) / 2; oy = seg.y; }
+        const key = `${ox},${oy}`;
+        if (seenOrigin.has(key)) continue;
+        seenOrigin.add(key);
+        edgePath(`M${ox} ${oy} V${busY} H${cx} V${c.y}`, 'cd-edge-parent');
       }
     }
     return svg;
@@ -1081,7 +1210,7 @@ function createDiagramPane(ctx) {
     const s = model.state;
     const pane = h('div', 'cd-pool');
     const head = h('div', 'cd-pool-head');
-    const title = h('h3', 'card-title', 'Pool');
+    const title = h('h3', 'cd-pool-title', 'Pool');
     head.append(title);
     const search = h('input', 'cd-pool-search');
     search.type = 'search';
@@ -1092,8 +1221,7 @@ function createDiagramPane(ctx) {
       poolQuery = search.value.trim().toLowerCase();
       renderPool();
     };
-    head.append(search);
-    pane.append(head);
+    pane.append(head, search);
     const box = h('div', 'cd-pool-box');
     // Drop target bo gan: keo node co nguoi vao Pool → ve Pool
     // (movePerson(rowId, null)) — payload cung shape {kind:'person',
@@ -1277,21 +1405,10 @@ function createDiagramPane(ctx) {
     expand.setAttribute('aria-label', 'Mở rộng sơ đồ toàn màn');
     expand.title = 'Xem sơ đồ ở cửa sổ lớn gần toàn màn hình';
     tools.append(expand);
-    head.append(tools);
-    card.append(head);
-
-    // Body: pool pane + splitter + vung diagram trong mot card
-    // (ban mau rel-card: Pool trai ~22%, so do phai).
-    const body = h('div', 'cd-rel-body');
-    const poolEl = poolPaneEl();
-    body.append(poolEl);
-    body.append(poolSplitterEl(poolEl));
-    body.append(diagramRegionEl());
-    card.append(body);
-
-    // Foot: save + word — ghi that ro, tach biet Cap nhat Stage.
-    const foot = h('div', 'cd-rel-foot');
-    const save = btn('Lưu sơ đồ', 'secondary js-save-diagram', async () => {
+    // MIN-133 D6: Luu so do + Xuat Word len head (mockup — bo footer
+    // .cd-rel-foot). Save giu dirty-dot + gate stageDirty nhu truoc.
+    tools.append(h('span', 'cd-vsep', ''));
+    const save = btn('Lưu sơ đồ', 'sm secondary js-save-diagram', async () => {
       const r = await model.saveDiagram();
       if (!r.ok && r.error && r.error.code !== 'workspace_conflict' &&
           r.error.code !== 'diagram_invalid_state') {
@@ -1303,10 +1420,20 @@ function createDiagramPane(ctx) {
     // ghi cung "Lưu hồ sơ" (workspace_create), khong phai nut nay.
     save.disabled = gate || s.caseId == null || !model.canWrite() ||
       !s.diagramDirty || !s.capabilities.diagram;
-    const word = btn('Xuất Word', 'primary', openWordDialog);
+    const word = btn('Xuất Word', 'sm primary', openWordDialog);
     word.disabled = !s.capabilities.word_export || s.wordBusy;
-    foot.append(save, word);
-    card.append(foot);
+    tools.append(save, word);
+    head.append(tools);
+    card.append(head);
+
+    // Body: pool pane + splitter + vung diagram trong mot card
+    // (ban mau rel-card: Pool trai ~22%, so do phai).
+    const body = h('div', 'cd-rel-body');
+    const poolEl = poolPaneEl();
+    body.append(poolEl);
+    body.append(poolSplitterEl(poolEl));
+    body.append(diagramRegionEl());
+    card.append(body);
     return card;
   }
 

@@ -146,8 +146,8 @@ Cửa sổ phải dùng được trọn vẹn ở ba viewport và hai mức scal
 
 | Viewport | Kỳ vọng |
 |---|---|
-| **1280×800** | Mặc định tối thiểu đẹp: không clip nút chính, bảng có cuộn riêng; card Stage vẫn cạnh nhau (bảng chuyển vị tài sản cuộn ngang nếu thiếu chỗ) |
-| **1366×768** | Phổ biến nhất: như 1280 với chiều cao hẹp hơn — vùng scroll của bảng/diagram co giãn, action bar không vỡ |
+| **1280×800** | Mặc định tối thiểu đẹp: không clip nút chính; Stage **không** có thanh cuộn riêng — dữ liệu vượt màn thì cả trang cuộn (MIN-133 D8); card Stage vẫn cạnh nhau (bảng chuyển vị tài sản cuộn ngang nếu thiếu chỗ) |
+| **1366×768** | Phổ biến nhất: như 1280 với chiều cao hẹp hơn — canvas sơ đồ co giãn theo flex (không height cố định), thanh trên không vỡ |
 | **1920×1080** | Mở rộng vùng data (bảng/diagram) lấp khoảng trống; không căn giữa trang giấy |
 | **DPI 125%** (logical 1280×800 → ~1024×640) | Font **không** thu nhỏ; thay vào đó vùng scroll co lại; bảng chuyển vị + queue 6 cột cuộn ngang; diagram pan/zoom vẫn đủ chỗ |
 | **DPI 150%** | Như 125%, chặt hơn: kiểm tra không tràn nhãn tiếng Việt có dấu; text truncate thay vì vỡ layout |

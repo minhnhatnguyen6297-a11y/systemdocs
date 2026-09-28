@@ -28,3 +28,9 @@ Xem handoff câu hỏi trong phản hồi phiên 28/09 (node 144px, gộp tab+ac
 - D5 thanh trên 42px (tab + hành động), D4 bỏ back/tiêu đề/pill Nháp/nhãn lưu, D2 bỏ card meta (dùng mặc định model), D1 bảng Người 7 cột (noi_cap/place_of_origin vẫn giữ trên wire), D8 Stage không cuộn, layout flex dọc.
 - Test shell: 278/278 đạt. Harness Electron đo Stage 371px, hàng 25px, cột đúng mockup, Stage tràn = 0; Hai bên 30 người thì cả trang cuộn.
 - Việc cho W3 (canvas còn cao cố định; tràn ngang ở .cd-diagram có sẵn từ trước): xem `handoff-W2.md`.
+
+## W3 — sơ đồ (2026-09-28) — XONG
+- Worker `7fdc44fa` viết xong phần JS (hằng layout, layout căn giữa, node trống, chip Chủ/Nhận, edges không mũi tên, Pool gọn) rồi chết do hết quota — coordinator hoàn thành: D6 nút lên head (bỏ `.cd-rel-foot`), toàn bộ CSS relation/canvas/node, sửa bug edge trùng từ midpoint cặp vợ/chồng, test + docs.
+- Đo Electron (harness W2): page overflow 0×0 ở cả 1440×775 / 1366×768 / 1920×1080; tràn ngang hết; two_party 30 người → trang cuộn 648px, Stage không cuộn lồng.
+- Test: 280/280 đạt (+2 test D6/D7).
+- Chi tiết + hằng layout + hạn mức W4: `handoff-W3.md`. Ảnh: `w3-shots/`.

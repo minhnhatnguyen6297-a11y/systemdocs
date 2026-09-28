@@ -120,36 +120,43 @@ const INH_PEOPLE = [
 
 // ---------- inheritance canvas: seed + card + edges ----------
 
-test('inheritance canvas: seed 7 slot → card + edges + hint + role', () => {
+test('inheritance canvas: seed 7 slot → card + edges; node trống không chữ', () => {
   const { view } = build(test, { mode: 'draft-inh' });
   const cards = byCls(view.el, 'cd-node');
   assert.equal(cards.length, 7, 'seed phai co 7 slot cards');
-  // Edges SVG: 6 cha-con + 1 vo-chong.
+  // Edges SVG (MIN-133): khong marker mui ten; cha/me→con =
+  // cd-edge-parent (cap vo/chong ve 1 edge chung tu giua doan), vo/chong
+  // = cd-edge-spouse net dut.
   const svg = collect(view.el, (e) =>
     e.classList.contains('cd-canvas-edges'))[0];
   assert.ok(svg, 'thieu svg edges');
-  // Path canh co marker-end; path mui ten nam trong <defs><marker>.
-  const paths = collect(svg, (e) =>
-    e.tagName === 'PATH' && e.getAttribute('marker-end'));
-  assert.equal(paths.length, 7,
-    `so edge path = 6 cha-con + 1 vo-chong, dang ${paths.length}`);
-  assert.ok(paths.some((p) =>
-    p.getAttribute('class') === 'cd-edge-spouse'), 'thieu edge vo/chong');
-  // Card trong: hint tha the + role label.
+  const paths = collect(svg, (e) => e.tagName === 'PATH');
+  const cls = (p) => p.getAttribute('class') || '';
+  // 5 cha-con (father→owner, mother→owner, sf→spouse, sm→spouse,
+  // owner+spouse→child_1 ve 1 edge) + 1 vo-chong.
+  assert.equal(paths.filter((p) => cls(p).includes('cd-edge-parent'))
+    .length, 5, `so edge cha-con = 5, dang ${paths.length}`);
+  assert.equal(paths.filter((p) => cls(p).includes('cd-edge-spouse'))
+    .length, 1, 'thieu edge vo/chong');
+  assert.ok(paths.every((p) => !p.getAttribute('marker-end')),
+    'edges khong con marker mui ten');
+  // Node TRONG (D7): khong nhan vai tro/hint/chip trong textContent —
+  // chi ô viền đứt; vai tro doc qua aria-label; van la drop target.
   const father = collect(view.el, (e) =>
     e.dataset.nodeId === 'father')[0];
   assert.ok(father, 'thieu node father');
-  assert.match(father.textContent, /Trống — thả thẻ Pool vào đây/);
-  assert.match(father.textContent, /cha\/mẹ của/);
-  // owner card: nhan "Người để lại" + 2 hang chip.
+  assert.ok(father.classList.contains('cd-node-empty'));
+  assert.ok(!/Trống — thả thẻ|cha\/mẹ của/.test(father.textContent),
+    'node trong khong duoc hien role/hint');
+  assert.equal(collect(father, (e) =>
+    e.classList.contains('cd-posrow')).length, 0,
+    'node trong khong co hang chip');
+  assert.match(father.getAttribute('aria-label'), /cha\/mẹ của/,
+    'aria-label node trong phai mo ta vai tro');
+  // owner trong: aria-label giu vai tro "Người để lại".
   const owner = collect(view.el, (e) =>
     e.dataset.nodeId === 'owner')[0];
-  assert.match(owner.textContent, /Người để lại/);
-  const rows = collect(owner, (e) =>
-    e.classList.contains('cd-posrow'));
-  assert.equal(rows.length, 2, 'phai co 2 hang chip');
-  assert.match(rows[0].textContent, /Chủ đất/);
-  assert.match(rows[1].textContent, /Nhận đất/);
+  assert.match(owner.getAttribute('aria-label'), /Người để lại/);
 });
 
 test('card truoc/sau gan: trong → day du ten+nam+role+chips+bo gan', () => {
@@ -164,20 +171,33 @@ test('card truoc/sau gan: trong → day du ten+nam+role+chips+bo gan', () => {
   assert.equal(
     model.state.diagram.nodes.find((n) => n.id === 'father').personId,
     'c1');
-  // Rebuild: card gio co ten + nam sinh–mat + vai tro + bo gan + →.
+  // Rebuild (MIN-133 D7): card gon — ten + nam + 2 hang chip
+  // "Chủ"/"Nhận"; hanh dong trong .cd-node-acts (→ gan lai, ↩ bo gan,
+  // × xoa slot); vai tro qua aria-label/title.
   const after = collect(view.el, (e) =>
     e.dataset.nodeId === 'father')[0];
   assert.match(after.textContent, /Người Đã Lưu/);
   assert.match(after.textContent, /1955 – 2020/);
-  assert.ok(findBtns(after, 'Bỏ gán').length === 1);
+  assert.match(after.getAttribute('aria-label'), /Người Đã Lưu — cha\/mẹ/);
+  const rows = collect(after, (e) => e.classList.contains('cd-posrow'));
+  assert.equal(rows.length, 2, 'node da gan co 2 hang chip');
+  assert.match(rows[0].textContent, /Chủ/);
+  assert.match(rows[1].textContent, /Nhận/);
+  assert.equal(byCls(after, 'js-node-unassign').length, 1,
+    'can nut ↩ bo gan ve Pool');
   assert.ok(findBtns(after, '→').length === 1,
     'can nut → cho duong ban phim');
-  assert.ok(!/Trống — thả thẻ/.test(after.textContent));
 });
 
 test('chip own/receive doc lap, multi-select, disable > so asset', () => {
-  const { model, view } = build(test, { mode: 'draft-inh' });
-  model.addAsset(); model.addAsset();         // positions 1,2 enabled
+  // MIN-133: chip chi hien tren node DA GAN nguoi (node trong la o
+  // trong) — seed case co father da gan c1 + 2 asset (pos 3 disabled).
+  const { model, view } = build(test, { mode: 'case', seed: {
+    people: INH_PEOPLE,
+    assets: [{ row_id: 'a1', so_serial: 'S1' },
+             { row_id: 'a2', so_serial: 'S2' }],
+    nodes: seedSlots().map((n) =>
+      n.id === 'father' ? { ...n, personId: 'c1' } : n) } });
   const node = collect(view.el, (e) =>
     e.dataset.nodeId === 'father')[0];
   const rows = collect(node, (e) => e.classList.contains('cd-posrow'));
@@ -228,6 +248,31 @@ test('layoutInheritance: gen tu parentSlotIds, spouse ke nhau', () => {
     DIAGRAM._internals.GAP_X + 1,
     'cap vo/chong phai dung canh nhau');
   assert.ok(lay.w > 0 && lay.h > 0);
+});
+
+// ---------- MIN-133: nut so do len head, kich thuoc mockup ----------
+
+test('MIN-133 D6: Lưu sơ đồ + Xuất Word trong card-head, không còn footer', () => {
+  const { view } = build(test, { mode: 'draft-inh' });
+  assert.equal(byCls(view.el, 'cd-rel-foot').length, 0,
+    'footer so do da bo theo mockup');
+  const head = collect(view.el, (e) =>
+    e.classList.contains('card-head') &&
+    /Sơ đồ thừa kế/.test(e.textContent))[0];
+  assert.ok(head, 'khong tim thay card-head vung so do');
+  assert.equal(findBtns(head, 'Lưu sơ đồ').length, 1);
+  assert.equal(findBtns(head, 'Xuất Word').length, 1);
+});
+
+test('MIN-133 D7: hang layout theo mockup (node 144 / trong 88x24)', () => {
+  const { NODE_W, NODE_H, GAP_X } = DIAGRAM._internals;
+  assert.equal(NODE_W, 144);
+  assert.equal(NODE_H, 87);
+  assert.equal(GAP_X, 14);
+  const lay = DIAGRAM._internals.layoutInheritance(seedSlots());
+  // pos gio mang w/h theo trang thai node.
+  assert.equal(lay.pos.owner.w, 88);
+  assert.equal(lay.pos.owner.h, 24);
 });
 
 // ---------- two_party canvas ----------

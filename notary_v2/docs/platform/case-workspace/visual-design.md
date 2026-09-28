@@ -20,29 +20,40 @@
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ Action bar: «quay lại» · Soạn văn bản · [Thừa kế ▾] ·        │
-│             [Nhập file] [Zalo*] [Hủy thay đổi] [Cập nhật]    │  ← một dòng, primary phải
+│ Thanh trên (tab cục bộ + hành động, MIN-133 D4/D5):          │
+│   [Tổng quan] [Soạn hồ sơ] │ [Thừa kế ▾] [Nhập file]        │
+│   [Zalo*] [Hủy thay đổi] [●Cập nhật]                        │  ← một dòng, primary phải
 ├───────────────────────────────┬──────────────────────────────┤
-│ TÀI SẢN  (~36%)               │ NGƯỜI  (~64%)                │
-│ bảng CHUYỂN VỊ:               │ bảng dòng:                   │
+│ TÀI SẢN  (~35%)               │ NGƯỜI  (~65%)                │
+│ bảng CHUYỂN VỊ:               │ bảng dòng 7 cột (Customer):  │
 │   dòng = thuộc tính           │   ⋮⋮ | Họ tên | Ngày sinh |  │
-│   cột = Tài sản 1 · 2 · 3     │        Ngày mất | Số giấy tờ │
-│   (+ Tài sản ở header/footer) │   (+ Người)                  │
-│   ô "Loại đất" → chip mở      │                              │
-│   dialog loại đất             │                              │
+│   cột = Tài sản 1 · 2 · 3     │   Giới tính | Ngày mất |      │
+│   (+ Tài sản ở header)        │   Số giấy tờ | Ngày cấp |     │
+│   ô "Loại đất" → chip mở      │   Địa chỉ · Để lại (+Người)   │
+│   dialog loại đất             │   KHÔNG thanh cuộn riêng —   │
+│                               │   nhiều dòng → trang cuộn    │
 ├──────────┬───────────────────────────────────────────────────┤
-│ POOL ~22%│ SƠ ĐỒ THỪA KẾ  ~78%                               │
+│ POOL     │ SƠ ĐỒ THỪA KẾ  — head: [+Slot][Cách tính][Đánh giá]│
+│ 176px    │   [−100%+][⛶ Mở rộng] | [Lưu sơ đồ][Xuất Word]    │
 │ thẻ người│ canvas: node cards + đường nối quan hệ            │
-│ kéo được │ mỗi node: tên · ngày sinh–mất · hàng chip         │
-│          │   Chủ đất [1][2][3]   Nhận đất [1][2][3]          │
-│          │ cụm zoom góc:  −  100%  +  Mở rộng                │
-│          │ footer phải:  [Lưu sơ đồ] [Xuất Word]             │
+│ kéo được │ node đã gán 144px: tên · năm sinh–mất · chip      │
+│          │   Chủ [1][2][3]   Nhận [1][2][3]                  │
+│          │ node trống 88×24 viền đứt — không chữ             │
 └──────────┴───────────────────────────────────────────────────┘
 ```
 
 \* Zalo giữ **disabled** trong bản thật (ràng buộc MIN-123).
 
-Tỉ lệ 36/64 và 22/78 giữ từ spec UX §3; thay đổi so với spec UX là **dạng
+Mật độ/tỉ lệ theo mockup MIN-133 đã duyệt (28/09/2026 —
+`docs/product/ui/references/approved-drafting-v2.png`): Stage 35:65
+(38:62 ở ≥1920), Pool 176px, một thanh trên gộp tab + hành động (bỏ «quay
+lại», tiêu đề, pill Nháp), `Lưu sơ đồ`/`Xuất Word` nằm trong header vùng
+sơ đồ (không còn footer), bảng Người 7 cột đúng cột DB `Customer` (bỏ ô
+`Nơi cấp`/`Nguyên quán` khỏi UI — trường vẫn giữ trên wire), bảng Stage
+không có thanh cuộn riêng (dữ liệu vượt màn → cả trang cuộn, D8).
+
+Tỉ lệ 36/64 và 22/78 giữ từ spec UX §3 đã được thay bằng tỉ lệ MIN-133 ở
+trên; thay đổi so với spec UX là **dạng
 bảng** của hai card Stage — spec UX ghi "form nhóm trường xếp dọc" (diễn
 giải 26/09), còn ảnh approved 27/09 vẽ **bảng chuyển vị cho Tài sản** và
 **bảng dòng cho Người** → theo nguyên tắc "nguồn mới hơn và đã duyệt
@@ -67,11 +78,14 @@ thắng", đích là hai bảng; xác nhận lại bằng prototype P3.
 
 ## 3. Stage — card Người (đích)
 
-- **Bảng dòng**: `⋮⋮` kéo thả | `Họ tên` | `Ngày sinh` | `Ngày mất` |
-  `Số giấy tờ` (+ các cột trường còn lại của PERSON_FIELDS — độ rộng và
-  thứ tự cột chốt ở P3; không được bỏ trường nghiệp vụ).
-- Header bảng `surface.subtle` + sticky khi danh sách dài; cuộn dọc trong
-  card, không cuộn cả màn.
+- **Bảng dòng**: `⋮⋮` kéo thả | `Để lại` (radio owner, chỉ inheritance) |
+  `Họ tên` | `Giới tính` | `Ngày sinh` | `Ngày mất` | `Số giấy tờ` |
+  `Ngày cấp` | `Địa chỉ` | `×` — **7 cột đúng các trường DB `Customer`**
+  (MIN-133 D1; `noi_cap`/`place_of_origin` bỏ khỏi UI nhưng giữ trên
+  wire).
+- Header bảng `surface.subtle`; **bảng không có thanh cuộn riêng** —
+  danh sách dài thì cả trang (`#view`) cuộn (MIN-133 D8, thay quyết định
+  "cuộn trong card" trước đây).
 - Drag handle `⋮⋮` chỉ sắp xếp draft; lỗi gắn đúng dòng (`row_id`).
 - `+ Người` thêm dòng cuối; `×` trên dòng xóa draft — hiệu lực chỉ sau
   `Cập nhật` (hành vi giữ nguyên drafting-tab).
@@ -94,43 +108,56 @@ thắng", đích là hai bảng; xác nhận lại bằng prototype P3.
 
 ## 5. Tầng quan hệ (đích)
 
-- **Pool (~22%)**: danh sách thẻ nhỏ trên nền `diagram.poolBg`; mỗi thẻ
-  = drag handle + tên (+ meta nhỏ). Pool = `Stage đã commit − đang gán trên
+- **Pool (176 px)**: danh sách thẻ nhỏ trên nền `diagram.poolBg`; mỗi
+  thẻ = tên (+ meta nhỏ khi trùng tên); nút gán `→` hiện khi
+  hover/focus. Pool = `Stage đã commit − đang gán trên
   Diagram` (định nghĩa giữ nguyên `drafting-tab.md` §2 — file này chỉ đổi
-  cách hiển thị).
-- **Diagram (~78%)**: canvas nền `bg.canvas`; node = card mini trắng
-  (`diagram.nodeBg`), header tên đậm + dòng meta (ngày sinh–mất) muted;
-  hai hàng chip số: `Chủ đất` và `Nhận đất`, mỗi chip là một **vị trí tài
-  sản** (số lượng chip = số tài sản trên Stage); chip selected =
-  `accent.primary` + `✓`.
+  cách hiển thị). Splitter kéo đổi rộng Pool giữ nguyên.
+- **Diagram (phần còn lại)**: canvas nền `bg.canvas` + lưới chấm;
+  **node đã gán người** = card mini trắng 144 px (`diagram.nodeBg`):
+  tên đậm + năm sinh–mất muted + hai hàng chip số `Chủ`/`Nhận`, mỗi chip
+  là một **vị trí tài sản** (1..3 theo số tài sản Stage); chip selected =
+  `accent.primary` nền đặc; **node trống** = ô 88×24 viền đứt, không
+  nhãn/hint/chip (vai trò đọc qua `aria-label`/tooltip; vẫn là drop
+  target). Nút hành động trên node (gán lại `→`, bỏ gán `↩`, xóa `×`)
+  chỉ hiện khi hover/focus — vẫn trong tab order.
   - Ánh xạ chip số ↔ tài sản/vị trí đã chốt ở contract §13.4 (APPROVED
     27/09/2026, triển khai P7): `ownPositions`/`receivePositions` thay
     boolean `isLandOwner`/`willReceive`; mô hình **hai bên 30 vị trí** —
     §13.5 (`p1..p30`, `p16` = ghế đầu bên B). File này chốt hình thức;
     ngữ nghĩa lấy §13 làm chuẩn.
 - **Đường nối**: giữ và làm rõ quan hệ cha→con (`diagram.edge`, selected
-  `edgeSelected`); đường nối mang ngữ nghĩa — không trang trí.
-- **Cụm zoom**: `−`, nhãn `%`, `+`, `Mở rộng` ở mép canvas (ảnh: trên cùng
-  phải); `Mở rộng` đã chốt = overlay gần toàn màn trong app (DESIGN §9.6).
-- **Action footer**: `Lưu sơ đồ` (secondary) + `Xuất Word` (primary)
-  phải-dưới canvas; `Xem cách tính`/`+ Slot`/`⋯` giữ trong toolbar theo
-  spec UX §3 — vị trí chính xác chốt ở P3.
+  `edgeSelected`); đường nối mang ngữ nghĩa — không trang trí. MIN-133:
+  không mũi tên; cha/me→con là elbow xuống thanh ngang giữa khe thế hệ,
+  vợ/chồng là đoạn ngang nét đứt; con của một cặp vợ/chồng kéo từ giữa
+  đoạn vợ/chồng.
+- **Header vùng sơ đồ** (MIN-133 D6 — gộp vào `card-head`, không còn
+  footer): `+ Slot`, `Xem cách tính`, `Đánh giá thử` (chỉ inheritance),
+  cụm zoom `− % +`, `⛶ Mở rộng` (overlay gần toàn màn, DESIGN §9.6), rồi
+  `Lưu sơ đồ` (secondary + chấm `diagramDirty`) và `Xuất Word` (primary).
 - Kéo lên vị trí đã có người — đã chốt: **swap** hai `personId`
   (contract §13.5 Q9 — APPROVED, cài đặt P7); `position 16` trong lưới
   30 vị trí — `p16` cố định = ghế đầu bên B (§13.5), cài đặt P7.
 
-## 6. Action bar trên cùng
+## 6. Thanh trên — tab cục bộ + hành động gộp một hàng (MIN-133 D4/D5)
 
-- Trái: quay lại + tên màn (`Soạn văn bản`) + dropdown loại việc
-  (`Thừa kế` — gating `case_type` giữ nguyên drafting-tab §7).
+- Tab cục bộ `Tổng quan`/`Soạn hồ sơ` nằm cùng hàng với hành động
+  (không còn action bar riêng, không nút «quay lại», không tiêu đề
+  `Soạn văn bản`, không pill `Nháp — chưa lưu`).
+- Dropdown loại việc `Thừa kế ▾`/`Hai bên ▾` đọc được (≥128 px — gating
+  `case_type` giữ nguyên drafting-tab §7; pill loại hồ sơ khi mở case
+  thật).
 - Phải: `Nhập file` (ghost — mở dialog intake chung, thay cho hai nút
   `Nhập dữ liệu` trên từng card), `Zalo` (**disabled**), `Hủy thay đổi`
   (ghost — đã chốt §13.2 Q2: client-only, restore cả Stage lẫn Diagram về
-  committed — đã triển khai ở action bar),
+  committed — đã triển khai),
   `Cập nhật` (primary — commit Stage; khi nháp mới là `Lưu hồ sơ`).
-- Dirty: nhãn/chấm cạnh `Cập nhật`/`Lưu sơ đồ` theo tầng dirty tương ứng
-  (`stageDirty`/`diagramDirty`) — xem EXPERIENCE §5.
-- Trạng thái lưu ("Đã lưu …/đã cũ") hiển thị trên thanh này, không toast.
+- Dirty: **chấm** cạnh `Cập nhật`/`Lưu sơ đồ` theo tầng dirty tương ứng
+  (`stageDirty`/`diagramDirty`) — không còn nhãn "Chưa lưu hồ sơ"; xem
+  EXPERIENCE §5.
+- Card `Thông tin hồ sơ` đã bỏ khỏi màn chính (MIN-133 D2 — meta
+  `document_type`/`ngay_lap_ho_so`/`noi_niem_yet`/`ghi_chu` vẫn persist
+  với mặc định vì Word đọc; chỗ nhập dành cho task Word riêng).
 
 ## 7. Dialog khác (đã có, giữ hành vi — chỉ restyle theo DESIGN)
 
@@ -149,7 +176,7 @@ thắng", đích là hai bảng; xác nhận lại bằng prototype P3.
 
 | Trạng thái | Hiển thị đích | Nguồn dữ liệu |
 |---|---|---|
-| `locked` | Toàn workspace chỉ đọc; action bar giữ `Xem cách tính`/`Xuất Word` đọc được, nút ghi mờ | `state.locked` — drafting-tab §3 |
+| `locked` | Toàn workspace chỉ đọc; `Xem cách tính`/`Xuất Word` trong header sơ đồ vẫn đọc được, nút ghi mờ | `state.locked` — drafting-tab §3 |
 | `case_type` không hỗ trợ | Mặt Unavailable của workspace + lý do | `state.unsupported` — drafting-tab §7 |
 | `conflict` | Dialog conflict; không ghi đè | `workspace_conflict` |
 | `stale` | Nhãn `đã cũ` cạnh dữ liệu; không khóa màn | `state.stale` |
@@ -158,12 +185,12 @@ thắng", đích là hai bảng; xác nhận lại bằng prototype P3.
 
 ## 9. Responsive riêng Notary
 
-- `≤1000 px` (đề xuất): hai card Stage xếp dọc, Tài sản trước; bảng
-  chuyển vị cuộn ngang; Pool/Diagram giữ cuộn ngang thay vì ép node nhỏ
-  (khớp spec UX §3).
-- 1280×800 & DPI 125%/150%: canvas sơ đồ ưu tiên giữ vùng nhìn tối thiểu;
-  pan/zoom là đường thoát khi node nhiều — **không** thu nhỏ node dưới
-  kích thước đọc được (~160–180 px ngang).
+- `≤900 px`: hai card Stage xếp dọc, Tài sản trước; Pool/Diagram xếp dọc;
+  bảng người giữ `table-layout: fixed` (cả trang cuộn ngang nếu thiếu
+  chỗ — không co chữ).
+- 1366×768 & DPI 125%/150%: canvas sơ đồ co giãn theo flex (không height
+  cố định — MIN-133); pan/zoom là đường thoát khi node nhiều — **không**
+  thu nhỏ node dưới kích thước đọc được (đã gán 144 px).
 - Bảng người: cột `Họ tên` co cuối cùng; cột ngày giữ `tabular-nums` căn
   phải.
 
