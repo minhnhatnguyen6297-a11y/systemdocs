@@ -1,5 +1,8 @@
 # Tri thức dự án: tìm quyết định và giữ lại “tại sao”
 
+**Tra cứu quyết định đã kiểm kê:** [DECISION_INDEX.md](DECISION_INDEX.md) — phân biệt
+kết luận, lý do đã viết và lời giải thích gốc của owner.
+
 **Trạng thái:** quy tắc tra cứu và ghi nhận đang áp dụng từ MIN-134 (28/09/2026).
 Trang này chỉ đường đến nguồn có thẩm quyền; nó không thay thế spec nghiệp vụ,
 contract hoặc issue Linear.
