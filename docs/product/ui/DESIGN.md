@@ -8,6 +8,13 @@
 > xạ vào `shell/src/renderer/styles.css` — các mục "đang mở" ở §9 đã chốt
 > theo bản mẫu (xem §10 cho phạm vi file/tên lớp).
 >
+> **Cập nhật MIN-133 (owner duyệt mockup 28/09/2026):** mật độ cao hơn cho
+> màn data-heavy — nền app `#e9edf2`, card viền 1px `#dde3ea`, khoảng cách
+> vùng 8 px, nút 32/28 px, hàng bảng 25 px, chữ dữ liệu 14 px, bỏ thanh
+> trạng thái engine, nội dung module giãn hết chiều ngang. Ảnh chuẩn:
+> `references/approved-drafting-v2.png`; token: `tokens.json` v1.1.0. Chi
+> tiết ở §9.1. Các giá trị trong §2–§6 đã sửa theo đợt này.
+>
 > Phạm vi: thị giác dùng chung cho hai module nghiệp vụ (Notary + Upload
 > Lab) và các mặt shell chung. Không định nghĩa hành vi/dữ liệu — đó là SOT
 > của `drafting-tab.md` (Notary) và `spec_UI.md` (Upload). Cách thao tác
@@ -20,7 +27,7 @@
 | V1 | **Trắng/xanh.** Nền app xám-xanh rất nhạt, card/surface trắng, điểm nhấn xanh primary. Không nền kem, không gam màu riêng theo vùng. | Ảnh approved + plan MIN-123 |
 | V2 | **Vùng sáng phân biệt nhẹ.** Vùng con trong card chỉ đậm/nhạt hơn nền một chút; phân biệt bằng độ sáng và khoảng trắng, không bằng viền trang trí. | Ảnh approved: bảng/chip trong card dùng nền xanh-nhạt/xám-nhạt |
 | V3 | **Bo góc, ít bóng.** Card/dialog bo 10–12 px; control bo 6–8 px; bóng chỉ cho lớp nổi (dialog, menu, toast). | Ảnh approved |
-| V4 | **Đường chỉ khi cần.** Không viền trang trí quanh vùng; giữ đường lưới trong bảng dữ liệu và đường nối quan hệ trong sơ đồ vì chúng mang ngữ nghĩa. | Plan MIN-123; ảnh: bảng người/tài sản có separator, sơ đồ có đường nối |
+| V4 | **Đường chỉ khi cần.** Không viền trang trí quanh vùng con trong card; giữ đường lưới trong bảng dữ liệu và đường nối quan hệ trong sơ đồ vì chúng mang ngữ nghĩa. Ngoại lệ MIN-133: **card cấp ngoài cùng** có viền 1px `border.card` để tách khỏi nền app `#e9edf2` | Plan MIN-123; ảnh: bảng người/tài sản có separator, sơ đồ có đường nối; `approved-drafting-v2.png` |
 | V5 | **Data-first, compact.** Chữ data đậm hơn nhãn; hành động gọn trên thanh riêng; không khối giải thích lâu dài trên màn chính. | Ảnh approved + plan |
 | V6 | **Focus rõ.** Mọi phần tử tương tác có focus ring nhìn thấy được; selected khác focus. | Plan MIN-123; contrast rule |
 | V7 | **Không sample-data hóa.** Lựa chọn trong ảnh approved là dữ liệu mẫu — không thành mặc định nghiệp vụ/fixture. | Ràng buộc MIN-123 |
@@ -34,10 +41,12 @@ Bảng dưới là tên token và **khoảng/gợi ý giá trị**; số hex ch�
 
 | Token | Vai trò | Đề xuất (khoảng) |
 |---|---|---|
-| `color.bg.app` | Nền cả app | Xám-xanh rất nhạt (`#f4f6fa`–`#eef2f8`) |
+| `color.bg.app` | Nền cả app | `#e9edf2` (MIN-133; trước đó `#f4f6fa` quá gần trắng) |
+| `color.bg.canvas` | Nền canvas sơ đồ, nằm trong card trắng | `#f5f7fa` + lưới chấm (MIN-133) |
 | `color.surface.card` | Card/panel | Trắng `#ffffff` |
 | `color.surface.subtle` | Vùng trong card, header bảng, input fill | Xám-xanh nhạt (`#f1f5fb`) |
 | `color.border.hairline` | Đường lưới bảng, separator, viền mảnh | `#e2e8f0` |
+| `color.border.card` | Viền 1px quanh card cấp ngoài cùng và mép rail | `#dde3ea` (MIN-133) |
 | `color.text.primary` | Chữ chính/data | `#1f2937`–`#0f172a` |
 | `color.text.muted` | Nhãn phụ, caption | `#64748b` |
 | `color.accent.primary` | Nút chính, chip selected, focus | Xanh (`#2563eb`–`#1d4ed8`; đối chiếu `#0067c0` hiện hữu và `#0f6cbd` shell — chốt 1 giá trị) |
@@ -60,9 +69,12 @@ cùng một nghĩa ở hai module.
 | Token | Đề xuất |
 |---|---|
 | `font.family` | `"Segoe UI", system-ui, sans-serif` (Windows-first, theo hiện trạng) |
-| `font.size.base` | 15–16 px — **chốt một**; data-heavy nghiêng 15 |
-| `font.size.small` | 13 px (caption, nhãn phụ) |
-| `font.size.title` | 17–20 px (tên màn/card lớn, vd "Soạn văn bản") |
+| `font.size.base` | 15 px (đã chốt §9) |
+| `font.size.data` | 14 px — chữ dữ liệu trong bảng, node, ô nhập tại chỗ (MIN-133) |
+| `font.size.small` | 13 px — nhãn, header bảng, nút, caption |
+| `font.size.chip` | 12 px — chip/pill/badge (MIN-133) |
+| `font.size.cardTitle` | 15 px đậm 700 (MIN-133; trước đó 14 px/600) |
+| `font.size.title` | 18 px (tên màn lớn) |
 | `font.weight.regular/medium/semibold` | 400 / 500 / 600 — data & nhãn bảng dùng 500–600, caption 400 |
 | `line.height` | 1.4 |
 
@@ -73,10 +85,12 @@ ghi nhận tùy chọn `font-variant-numeric: tabular-nums` cho cột số ở P
 
 | Token | Đề xuất | Căn cứ ảnh |
 |---|---|---|
-| `size.input.height` | 36–40 px | Ô nhập trong ảnh loại đất cao ~36–38 so với chữ 15 |
-| `size.button.height` | 34–38 px (compact), 40 px primary lớn | Thanh action bar trong ảnh |
-| `size.table.row` | 34–38 px | Bảng người/tài sản |
-| `size.tap.min` | ≥ 44 px vùng bấm logic (có thể đệm padding ngoài phần nhìn) | Giữ nguyên tắc accessibility hiện hữu |
+| `size.input.height` | 38 px cho ô nhập form rời; ô nhập trong ô bảng theo chiều cao hàng | Ô nhập trong ảnh loại đất cao ~36–38 so với chữ 15 |
+| `size.button.height` | 32 px; nút `sm` 28 px (MIN-133; trước đó 36 px) | `approved-drafting-v2.png` |
+| `size.table.row` | 25 px (MIN-133; trước đó 36 px); ô nhập không nền/viền tới khi hover/focus | `approved-drafting-v2.png` |
+| `size.card.head` | 34 px, padding `0 10px`; card body padding `0 10px 8px` | `approved-drafting-v2.png` |
+| `space.gap` vùng / padding `#view` | 8 px / 8 px (MIN-133; trước đó 16 px / 20–24 px) | `approved-drafting-v2.png` |
+| `size.tap.min` | ≥ 44 px vùng bấm logic — giữ cho nút rail | Giữ nguyên tắc accessibility hiện hữu |
 | `space.scale` | 4 / 8 / 12 / 16 / 20 / 24 px | |
 | `radius.card` | 10–12 px | |
 | `radius.control` | 6–8 px | |
@@ -89,13 +103,18 @@ ghi nhận tùy chọn `font-variant-numeric: tabular-nums` cho cột số ở P
 
 - **Nav trái** theo taxonomy MIN-104 (5 mục) — đã chốt **rail icon sáng
   60 px** (§9.3, owner duyệt 27/09/2026); không đổi thứ tự mục.
-- **Vùng nội dung module** chiếm hết phần còn lại; `max-width` 860 px hiện
-  hữu của shell **bỏ** ở đích cho màn data-heavy (hai module đều cần bề
-  ngang); trang trạng thái/setting có thể giữ max-width riêng.
+- **Vùng nội dung module** chiếm hết phần còn lại, giãn hết chiều ngang
+  (MIN-133). Cap 860 px chỉ còn cho `<section>` con trực tiếp của `#view` ở
+  trang shell (trạng thái/placeholder); section lồng trong module không bị
+  cap.
+- **Không có thanh trạng thái engine** trên đầu nội dung (bỏ `#statusbar`,
+  MIN-133). Trạng thái engine + version + contract xem ở tooltip logo `G1`
+  trên rail và module `Trạng thái`.
 - **Thanh ngữ cảnh/thanh hành động** nằm trên đầu vùng nội dung của module,
-  gọn một dòng, nút chính ở phải; không trộn hành động module vào statusbar.
-- **Card** là đơn vị nhóm duy nhất trong vùng nội dung; card trong card
-  không thêm viền — chỉ đổi nền subtle.
+  gọn một dòng, nút chính ở phải.
+- **Card** là đơn vị nhóm duy nhất trong vùng nội dung; card cấp ngoài cùng
+  có viền 1px `border.card`; card trong card không thêm viền — chỉ đổi nền
+  subtle. Khoảng cách giữa các card 8 px.
 - **Bảng** giữ đường lưới mảnh (`border.hairline`), header nền
   `surface.subtle`, sticky header khi bảng có vùng cuộn riêng.
 - **Sơ đồ** giữ đường nối quan hệ; node là card nhỏ trắng trên nền canvas
@@ -111,7 +130,7 @@ ghi nhận tùy chọn `font-variant-numeric: tabular-nums` cho cột số ở P
 | Nút disabled | mờ rõ (`opacity` hoặc màu muted), **không** tooltip giả lỗi; Zalo disable theo ràng buộc |
 | Input | nền `surface.subtle` hoặc trắng, viền mảnh `border.hairline` chỉ khi hover/focus, bo `radius.control`, cao `size.input.height` |
 | Bảng | header sticky + `surface.subtle`; dòng hover rất nhẹ; dòng selected `accent.soft`; đường lưới hairline |
-| Card | trắng, `radius.card`, padding 12–16, không viền trang trí |
+| Card | trắng, `radius.card`, viền 1px `border.card`, head 34 px (padding `0 10px`), body padding `0 10px 8px` (card chỉ có body: thêm 8 px phía trên) |
 | Dialog | trắng, `radius.card`, `shadow.dialog`, header có tiêu đề + `×`, footer nút phải-trái (primary phải), overlay mờ nhẹ |
 | Banner/notice | viền trái hoặc nền tông state, một dòng gọn + CTA; `waiting_user` tông warn và **không** đỏ |
 | Badge/pill | `accent.soft` nền, `accent.primary` chữ; số lượng (vd `3 loại`) |
@@ -170,6 +189,26 @@ Các mục mở trước đây đã được owner chốt khi duyệt bản mẫ
 6. `Mở rộng` sơ đồ = overlay gần toàn màn trong app (Esc/× đóng, trả focus).
 7. Zalo: **hiển thị disabled + tooltip**, không ẩn hẳn.
 
+### 9.1 Cập nhật mật độ — owner duyệt mockup MIN-133 (28/09/2026)
+
+Nguồn: `references/approved-drafting-v2.png` (gốc
+`.agent/tasks/MIN-133/mockup/`), `tokens.json` v1.1.0. Mục này thay các giá
+trị tương ứng ở §9 (2) và §9 (4):
+
+1. `color.bg.app` = `#e9edf2`; `color.bg.canvas` = `#f5f7fa`; thêm
+   `color.border.card` = `#dde3ea` (viền 1px card cấp ngoài cùng + mép rail).
+2. `size.button.height` = 32 px, nút `sm` = 28 px; `size.table.row` = 25 px;
+   card head 34 px; khoảng giữa vùng 8 px; padding `#view` 8 px.
+3. Cỡ chữ: dữ liệu 14 px (`font.size.data`), nhãn/header 13 px, chip 12 px,
+   tiêu đề card 15 px/700. `font.size.base` giữ 15 px; ô nhập form rời giữ
+   38 px.
+4. Bỏ `#statusbar` (engine/version/contract); thông tin chuyển vào tooltip
+   logo `G1` và module `Trạng thái`. Polling trạng thái sidecar giữ nguyên.
+5. `layout.contentMaxWidth` = không giới hạn cho nội dung module; cap 860 px
+   chỉ áp cho section con trực tiếp của `#view`.
+6. Tỷ lệ Stage Tài sản : Người = 35 : 65 (38 : 62 ở màn ≥ 1920 px); Pool
+   176 px. Chi tiết màn `Soạn hồ sơ` thuộc visual-design của Notary.
+
 ## 10. Sở hữu CSS & quy ước đặt tên (P4 → P6/P7/P8)
 
 `shell/src/renderer/styles.css` (MIN-127) là nền duy nhất của shell. Module
@@ -178,18 +217,20 @@ CSS load **sau** nó trong `index.html` (thứ tự: `styles.css` →
 
 | Lớp | Sở hữu | Rule |
 |---|---|---|
-| Biến `:root` (`--bg-*`, `--surface-*`, `--accent*`, `--fs-*`, `--r-*`, `--sh-*`, `--rail-*`, state/`--dis-*`…) | `styles.css` | Module đọc thoải mái, **không ghi đè**; đổi giá trị phải qua `tokens.json` + đồng bộ 3 file (styles.css, prototype.css, tokens.json) |
-| Layout chrome: `#app #rail #module-list #content #statusbar #view`, `.rail-logo .rail-btn .rail-spacer .rail-bottom` | `styles.css` | Module không đụng |
+| Biến `:root` (`--bg-*`, `--surface-*`, `--border-*`, `--accent*`, `--fs-*`, `--btn-h(-sm)`, `--row-h`, `--gap`, `--view-pad`, `--card-pad-x`, `--card-head-h`, `--r-*`, `--sh-*`, `--rail-*`, state/`--dis-*`…) | `styles.css` | Module đọc thoải mái, **không ghi đè**; đổi giá trị phải qua `tokens.json` rồi đồng bộ `styles.css` (`prototypes/prototype.css` giữ v1.0.0 làm bản ghi MIN-126) |
+| Layout chrome: `#app #rail #module-list #content #view`, `.rail-logo .rail-btn .rail-spacer .rail-bottom` (`#statusbar` đã bỏ ở MIN-133) | `styles.css` | Module không đụng |
 | Class chung **không tiền tố**: `.btn .input .card .card-head/.card-title/.card-tools/.card-body .pill .badge(.tone-*) .banner .waiting-banner .face(.face-*) .skeleton .modal(.narrow/.wide/.modal-head/.modal-body/.modal-foot) .modal-overlay .toast(-root) .actionbar(.ab-*) .toolbar .grid(.tbl) .slot .tools .form-row .progress .dirty-dot .drag-* .drop-* .splitter-* .muted .small .error .warn-text .num .truncate(-path) .icon-x .kv(-k/-v) .job-* .health-* .conn-card .file-row .files .breakdown` | `styles.css` | Module **dùng lại**, không định nghĩa lại tên này |
 | Class Notary `cd-*` | `notary/case-drafting.css` (P6) | Scope trong `.cd-root`; element override phải nằm dưới `.cd-root` |
-| Class Upload `ul-*` | `upload/upload.css` (P8) | Scope trong `.upload-lab`; thoát cap `#view section` bằng `.upload-lab` |
+| Class Upload `ul-*` | `upload/upload.css` (P8) | Scope trong `.upload-lab`; thoát cap `#view > section` bằng `.upload-lab` |
 
 Quy ước:
 
-- **Cap nội dung**: `#view section { max-width: 860px }` giữ cho trang
-  shell/placeholder. Module data-heavy thoát bằng class riêng trên `<section>`
-  gốc: `cd-root-outer` (Notary, đã có) / `.upload-lab` (Upload, đã có trong
-  upload.css).
+- **Cap nội dung**: `#view > section { max-width: 860px }` — chỉ section con
+  trực tiếp của `#view` (trang shell/placeholder). Module data-heavy thoát
+  bằng class riêng trên `<section>` gốc: `cd-root-outer` (Notary) /
+  `.upload-lab` (Upload, trong upload.css). Section lồng bên trong module
+  (vd `section.cd-root`) không bị cap (sửa ở MIN-133 — trước đó
+  `#view section` cap cả section lồng nên Soạn hồ sơ không giãn hết màn).
 - **Element selector** (`button`, `input`, `table`…) trong styles.css là nền
   trung tính theo token. Module cần kiểu khác phải scope:
   `.cd-root button { … }` — tuyệt đối không viết `button { … }` trần trong
