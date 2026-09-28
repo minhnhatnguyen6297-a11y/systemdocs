@@ -87,6 +87,7 @@ export function makeDom() {
       this.oninput = null;
       this.onchange = null;
       this.scrollTop = 0;
+      this.scrollLeft = 0;
       this.selectionStart = null;
       this.selectionEnd = null;
       this._classListInit();
@@ -168,10 +169,28 @@ export function makeDom() {
       while (n) { if (n === this) return true; n = n.parentElement; }
       return false;
     }
-    setAttribute(k, v) { this.attributes[k] = String(v); }
-    getAttribute(k) { return k in this.attributes ? this.attributes[k] : null; }
+    // DOM that: class/data-* la view dong bo len classList/dataset —
+    // can thiet cho SVG (className SVGAnimatedString read-only, renderer
+    // bat buoc setAttribute('class')).
+    setAttribute(k, v) {
+      v = String(v);
+      this.attributes[k] = v;
+      if (k === 'class') { this._cls = v; return; }
+      if (k.startsWith('data-')) {
+        const key = k.slice(5)
+          .replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+        this.dataset[key] = v;
+      }
+    }
+    getAttribute(k) {
+      if (k === 'class') return this._cls || null;
+      return k in this.attributes ? this.attributes[k] : null;
+    }
     hasAttribute(k) { return k in this.attributes; }
-    removeAttribute(k) { delete this.attributes[k]; }
+    removeAttribute(k) {
+      delete this.attributes[k];
+      if (k === 'class') this._cls = '';
+    }
     addEventListener(t, fn) { (this._ev[t] ||= []).push(fn); }
     removeEventListener(t, fn) {
       const a = this._ev[t];

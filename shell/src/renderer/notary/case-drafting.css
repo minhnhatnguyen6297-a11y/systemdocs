@@ -307,13 +307,11 @@
   display: flex;
   flex-direction: column;
 }
-.cd-diagram-body {
-  flex: 1;
-  overflow: auto;
-  padding: 10px;
+.cd-diagram-extra {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
+  padding: 6px 10px 8px;
 }
 .cd-rel-foot {
   display: flex;
@@ -323,35 +321,6 @@
   padding: 8px 12px;
   border-top: 1px solid var(--border-hairline);
 }
-.cd-nodes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  position: relative;
-}
-.cd-edge-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-size: var(--fs-small);
-}
-.cd-edge-svg { width: 40px; height: 12px; flex: 0 0 auto; }
-.cd-edge-svg line { stroke: var(--border-strong); stroke-width: 1.5; }
-.cd-edge-svg path { fill: var(--border-strong); }
-.cd-edge-parent line { stroke: var(--text-muted); }
-.cd-edge-spouse line { stroke-dasharray: 4 3; }
-.cd-group-label { margin-top: 4px; }
-.cd-node-flags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 0 8px 6px;
-  align-items: center;
-}
-.cd-node-rel { font-size: 11px; padding: 0 8px 4px; }
-.cd-posrow { display: flex; gap: 3px; align-items: center; }
-.cd-posrow-label { font-size: 11px; min-width: 44px; }
-.cd-node-deleted { opacity: .55; }
 .cd-alloc-list { display: flex; flex-direction: column; gap: 3px; }
 .cd-alloc-row { display: flex; gap: 8px; align-items: baseline; }
 .cd-alloc-name { flex: 1; min-width: 0; }
@@ -361,47 +330,119 @@
 .cd-badge-alloc { border-color: var(--accent); color: var(--accent); }
 .cd-badge-warn { border-color: #f59e0b; color: #b45309; background: #fef3c7; }
 
-/* ---------- canvas node (markup hiện hữu — P7 refine) ---------- */
+/* ---------- canvas diagram (P7 — bản mẫu prototypes/notary.js) ----------
+ * canvas-wrap cuộn/pan trên nền --bg-canvas (không viền trang trí);
+ * world nhận kích thước logic × zoom; scale transform scale(zoom) giữ
+ * node/edges ở tọa độ logic. Không auto-fit — node giữ cỡ đọc được. */
+.cd-canvas-wrap {
+  position: relative;
+  flex: 1;
+  height: min(52vh, 620px);
+  min-height: 300px;
+  overflow: auto;
+  border-radius: var(--r-ctl);
+  background: var(--bg-canvas);
+  cursor: grab;
+}
+.cd-canvas-wrap.panning { cursor: grabbing; }
+.cd-canvas-wrap .face { margin: 24px auto; max-width: 420px; }
+.cd-canvas-world { position: relative; min-height: 100%; }
+.cd-canvas-scale {
+  position: relative;
+  transform-origin: 0 0;
+}
+.cd-canvas-edges {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.cd-canvas-edges path {
+  fill: none;
+  stroke: var(--edge);
+  stroke-width: 1.6;
+}
+.cd-canvas-edges path.cd-edge-spouse { stroke-dasharray: 5 4; }
+.cd-canvas-edges marker path { fill: var(--edge); stroke: none; }
+
+/* ---------- card thừa kế trên canvas ---------- */
 .cd-node {
   position: absolute;
-  width: 150px;
-  min-height: 82px;
-  border: 1px solid var(--border-strong);
+  width: 200px;
+  padding: 6px 8px;
   border-radius: var(--r-ctl);
+  border: 1px solid var(--border-hairline);
   background: var(--surface-card);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, .07);
-  cursor: pointer;
+  box-shadow: var(--sh-card);
+  font-size: var(--fs-small);
 }
-.cd-node .cd-node-head { padding: 4px 8px 0; }
-.cd-node .cd-node-name {
-  display: block;
+.cd-node[draggable="true"] { cursor: grab; }
+.cd-node.dragging { opacity: .45; }
+.cd-node.drop-hint { outline: 2px dashed var(--accent); outline-offset: -2px; }
+.cd-node-empty {
+  border-style: dashed;
+  border-color: var(--border-strong);
+  background: transparent;
+  box-shadow: none;
+}
+.cd-node-owner { box-shadow: 0 0 0 2px var(--accent-soft), var(--sh-card); }
+.cd-node-hidden { opacity: .6; }
+.cd-node-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cd-node-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.cd-node .cd-node-meta { padding: 2px 8px 4px; }
-.cd-node .cd-node-chips {
+.cd-node-meta {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+.cd-node-role, .cd-node-hint { margin-top: 2px; font-size: 11px; }
+.cd-node-foot { display: flex; gap: 4px; margin-top: 4px; }
+.cd-mini-btn {
+  min-width: 26px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1;
+}
+.cd-posrow {
+  display: flex;
   gap: 3px;
-  padding: 0 8px 6px;
+  align-items: center;
+  margin-top: 5px;
 }
-.cd-node .cd-node-check {
-  position: absolute;
-  top: 4px;
-  right: 6px;
-  font-weight: 700;
-  color: #15803d;
+.cd-posrow-label { font-size: 11px; min-width: 46px; }
+.cd-poschip {
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-card);
+  font-size: 11px;
+  line-height: 1;
 }
-.cd-node-empty {
-  border-style: dashed;
-  background: var(--surface-subtle);
+.cd-poschip.on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
 }
-.cd-node-selected {
-  outline: 2px solid var(--accent);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, .18);
-}
-.cd-node-ghost { border-color: var(--warn, #d97706); }
+.cd-poschip:focus-visible { outline: 2px solid var(--focus-ring); }
+.cd-poschip:disabled { opacity: .45; }
 .cd-badge {
   display: inline-block;
   padding: 1px 6px;
@@ -416,39 +457,95 @@
   background: var(--accent-soft);
   color: var(--accent);
 }
-.cd-node-assigned { cursor: grab; }
-.cd-edge {
-  position: absolute;
-  transform-origin: 0 0;
-  height: 0;
-  border-top: 1.5px solid var(--border-strong);
-}
-.cd-edge-spouse { border-top-style: dashed; }
-.cd-diagram-canvas {
-  position: relative;
-  min-height: 240px;
-  border: 1px solid var(--border-hairline);
-  border-radius: var(--r-ctl);
-  background: var(--bg-canvas);
-}
-.cd-tp-slots {
+
+/* ---------- sơ đồ hai bên (30 chỗ canonical p1..p30) ---------- */
+.cd-sides {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 10px;
+  gap: 20px;
+  padding: 16px;
 }
-.cd-tp-slot {
-  width: 118px;
-  min-height: 58px;
-  padding: 5px 7px;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--r-ctl);
-  background: var(--surface-card);
+.cd-side-col { flex: 1 1 0; min-width: 0; }
+.cd-side-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 8px;
   font-size: var(--fs-small);
 }
-.cd-tp-slot.cd-node-selected { border-style: solid; }
-.cd-tp-slot .cd-badge { margin: 1px 2px 0 0; }
-.cd-slotidx { font-weight: 600; color: var(--text-muted); }
+.cd-tp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cd-tp-slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 4px 8px;
+  border-radius: var(--r-ctl);
+  border: 1px solid var(--border-hairline);
+  background: var(--surface-card);
+  box-shadow: var(--sh-card);
+  font-size: var(--fs-small);
+}
+.cd-tp-slot:not(.filled) {
+  border-style: dashed;
+  border-color: var(--border-strong);
+  background: transparent;
+  box-shadow: none;
+}
+.cd-tp-slot.cd-tp-off { opacity: .5; }
+.cd-tp-slot.filled[draggable="true"] { cursor: grab; }
+.cd-tp-slot.dragging { opacity: .45; }
+.cd-tp-slot.drop-hint { outline: 2px dashed var(--accent); outline-offset: -2px; }
+.cd-tp-idx {
+  flex: 0 0 auto;
+  min-width: 42px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--surface-subtle);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+.cd-tp-nm {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cd-tp-empty { flex: 1; font-size: 11px; }
+
+/* ---------- zoom cluster + "Mở rộng" overlay ---------- */
+.cd-zoom { display: flex; align-items: center; gap: 4px; }
+.cd-zoom-label {
+  min-width: 42px;
+  text-align: center;
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
+}
+.cd-root .modal.cd-expand {
+  max-width: none;
+  width: 96vw;
+  height: 92vh;
+}
+.cd-expand-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  padding: 0 12px 12px;
+}
+.cd-expand-body .cd-canvas-wrap { height: auto; min-height: 0; }
+.cd-assign-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
 .cd-calc-status { font-weight: 600; margin-bottom: 2px; }
 .cd-calc {
   margin-top: 8px;
@@ -534,8 +631,6 @@
   flex-wrap: wrap;
 }
 .cd-textarea { min-height: 64px; resize: vertical; }
-.cd-edges { display: flex; flex-direction: column; gap: 4px; }
-.cd-node-id { font-size: 11px; margin-right: 4px; }
 /* word-export dialog (P7 file — style dat o day de dung chung tokens). */
 .cd-modal-title { font-size: var(--fs-title); font-weight: 600; margin-bottom: 10px; }
 .cd-check-row { display: flex; gap: 8px; align-items: center; }
@@ -561,7 +656,9 @@
 @media (max-width: 900px) {
   .cd-stage { flex-direction: column; }
   .cd-assets { flex: none; }
-  .cd-rel { flex-direction: column; }
+  .cd-rel-body { flex-direction: column; }
+  .cd-pool { flex: none; }
+  .cd-pool-box { max-height: 32vh; }
 }
 @media (max-width: 860px) {
   .cd-root .actionbar { flex-wrap: wrap; height: auto; padding: 6px 8px; }
