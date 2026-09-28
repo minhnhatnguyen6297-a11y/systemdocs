@@ -54,12 +54,18 @@ test('model nhan client inject, khong goi desktop api truc tiep', () => {
   assert.ok(!/window\.desktop|desktop\.v1/.test(modelCode));
 });
 
-test('view khong co Zalo / React / ReactFlow / Bootstrap', () => {
-  for (const bad of ['zalo', 'Zalo', 'ZALO', 'React', 'react',
-                     'ReactFlow', 'reactflow', 'Bootstrap', 'bootstrap',
+test('view khong co Zalo engine / React / ReactFlow / Bootstrap', () => {
+  // MIN-129: nut "Zalo" placeholder duoc phep (visible + disabled) —
+  // cam la ENGINE/flow Zalo, khong phai label nut.
+  for (const bad of ['zaloEngine', 'ZALO', 'zalo-intake', 'zaloIntake',
+                     'zalo.status', 'zaloSec', 'openZalo', 'zaloDialog',
+                     'zalo_document', 'React', 'react', 'ReactFlow',
+                     'reactflow', 'Bootstrap', 'bootstrap',
                      'jsx', 'createElementNS']) {
     assert.ok(!viewCode.includes(bad), `view chua "${bad}"`);
   }
+  // Zalo placeholder phai ton tai + disabled (khong duoc an nut).
+  assert.match(viewCode, /zalo\.disabled\s*=\s*true/);
   // css cung khong import framework ngoai
   assert.ok(!/@import|bootstrap|tailwind/i.test(cssSrc));
 });
@@ -103,12 +109,21 @@ test('view co banner mock "Dữ liệu mô phỏng" + a11y attributes', () => {
   assert.match(viewCode, /role=|setAttribute\('role'/);
 });
 
-test('css: control >=44px va co focus-visible', () => {
-  assert.match(cssSrc, /--cd-tap:\s*44px/);
+test('css: token P4 + scope .cd-root/cd-*, khong re-khai shared', () => {
+  // MIN-129: module css dung tokens styles.css (P4) — khong tu :root moi.
+  assert.ok(!/(^|\n)\s*:root/.test(cssSrc), 'module redefine :root');
+  assert.match(cssSrc, /var\(--(accent|fs-base|border-hairline|surface-card|btn-h|row-h|text-muted)\)/);
+  assert.match(cssSrc, /\.cd-root/);
+  // focus ring van duoc override chu dong o local nav.
   assert.match(cssSrc, /:focus-visible/);
-  // khong con control nao nho hon 44px (tru checkbox/radio 20px mac dinh)
-  assert.ok(!/min-(height|width):\s*(1[0-9]|2[0-9]|3[0-9])px/.test(cssSrc),
-    'con control < 40px');
+  // Khong re-khai class shared khong prefix o top-level selector
+  // (.card/.btn/.input/.modal/.pill/.face/.drop-hint/.drag-handle...) —
+  // override phai nam duoi .cd-root hoac dung ten cd-*.
+  const bad = cssSrc.split('\n')
+    .map((l) => l.trim())
+    .filter((l) => /^\.(card|card-head|card-title|card-tools|card-body|btn|input|modal|modal-overlay|modal-head|modal-body|modal-foot|modal-title|modal-close|toolbar|actionbar|face|pill|banner|grid|drag-handle|dragging|drop-hint|row-drop-above|row-drop-below|col-drop-before|icon-x|dirty-dot|warn-text|muted|small|error|grow|spacer|save-state|pool-card|pool-box)\b/.test(l));
+  assert.deepEqual(bad, [],
+    `re-khai shared class khong prefix: ${bad.join(' | ')}`);
 });
 
 test('styles.css: focus-visible + control 44px toan cuc', () => {

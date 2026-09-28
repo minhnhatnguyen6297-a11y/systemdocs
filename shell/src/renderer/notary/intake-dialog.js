@@ -50,7 +50,7 @@ function createIntakeDialog(ctx) {
     let busy = false;
     let jobId = null;
     let lastResult = null;   // {suggestions, errors} cua lan chay gan nhat
-    const list = h('div', 'cd-src-list');
+    const list = h('div', 'cd-intake-list');
 
     function renderList() {
       list.innerHTML = '';
@@ -91,10 +91,10 @@ function createIntakeDialog(ctx) {
     }
 
     function srcRowEl(it) {
-      const row = h('div', 'cd-src-row');
-      row.append(h('span', 'cd-badge',
+      const row = h('div', 'cd-intake-row');
+      row.append(h('span', 'cd-kind pill',
         INTAKE_KIND_LABEL[it.kind] || it.kind || '—'));
-      row.append(h('span', 'cd-src-name', it.label));
+      row.append(h('span', 'grow', it.label));
       row.append(h('span', 'muted', it.status));
       if (it.error) row.append(h('span', 'error', it.error));
       if (!busy && it.status !== 'đang phân tích') {
@@ -128,13 +128,13 @@ function createIntakeDialog(ctx) {
       for (const w of sug.warnings || []) {
         card.append(h('div', 'muted warn-text', w.message || w.code));
       }
-      const actions = h('div', 'cd-toolbar');
-      const put = btn('Đưa vào Stage', 'primary', () => {
+      const actions = h('div', 'toolbar');
+      const put = btn('Đưa vào Stage', 'primary sm', () => {
         model.acceptSuggestion(sug.suggestion_id);
         card.remove();
       });
       put.disabled = !model.canWrite();
-      const drop = btn('Bỏ qua', '', () => {
+      const drop = btn('Bỏ qua', 'ghost sm', () => {
         model.discardSuggestion(sug.suggestion_id);
         card.remove();
       });
@@ -165,8 +165,17 @@ function createIntakeDialog(ctx) {
     }
 
     openModal((box, close) => {
-      box.append(h('div', 'cd-modal-title', 'Nhập dữ liệu → gợi ý'));
-      box.append(h('div', 'muted',
+      const head = h('div', 'modal-head');
+      head.append(h('h2', 'modal-title',
+        'Nhập file — phân tích thành gợi ý'));
+      const mx = h('button', 'modal-close', '×');
+      mx.type = 'button';
+      mx.setAttribute('aria-label', 'Đóng');
+      mx.onclick = close;
+      head.append(mx);
+      box.append(head);
+      const body = h('div', 'modal-body');
+      body.append(h('div', 'muted',
         'Mọi kết quả là gợi ý chờ kiểm tra — không tự ghi vào hồ sơ.'));
 
       // Drop-zone: file tha vao di qua registerDroppedFile (main cap token)
@@ -178,7 +187,7 @@ function createIntakeDialog(ctx) {
       const dropErr = h('div', 'cd-slot');
       const onDrop = async (e) => {
         e.preventDefault();
-        drop.classList.remove('cd-dropzone-on');
+        drop.classList.remove('drop-hint');
         if (!registerDroppedFile) {
           dropErr.innerHTML = '';
           dropErr.append(face(L.faceError({
@@ -201,25 +210,25 @@ function createIntakeDialog(ctx) {
       };
       drop.addEventListener('dragover', (e) => {
         e.preventDefault();
-        drop.classList.add('cd-dropzone-on');
+        drop.classList.add('drop-hint');
       });
       drop.addEventListener('dragleave', () =>
-        drop.classList.remove('cd-dropzone-on'));
+        drop.classList.remove('drop-hint'));
       drop.addEventListener('drop', onDrop);
-      box.append(drop, dropErr);
+      body.append(drop, dropErr);
 
-      const ta = h('textarea', 'cd-input cd-textarea');
+      const ta = h('textarea', 'cd-textarea');
       ta.setAttribute('aria-label', 'Dán văn bản để phân tích');
       ta.placeholder = 'Hoặc dán văn bản…';
-      box.append(ta);
+      body.append(ta);
 
-      box.append(list);
+      body.append(list);
 
       const prog = h('div', 'cd-slot muted');
-      const review = h('div', 'cd-slot');
-      box.append(prog, review);
+      const review = h('div', 'cd-slot cd-ireview');
+      body.append(prog, review);
 
-      const pickBtn = btn('Chọn file…', '', async () => {
+      const pickBtn = btn('Chọn file…', 'secondary', async () => {
         const r = await pickFiles({ multi: true, filters });
         if (!r.ok) {
           notify(`${r.error.code}: ${r.error.message}`, true);
@@ -329,10 +338,11 @@ function createIntakeDialog(ctx) {
       });
       go.disabled = !model.canWrite();
 
-      const row = h('div', 'cd-toolbar');
-      row.append(pickBtn, go, cancelBtn, btn('Đóng', '', close));
-      box.append(row);
-    });
+      box.append(body);
+      const foot = h('div', 'modal-foot');
+      foot.append(pickBtn, go, cancelBtn, btn('Đóng', 'ghost', close));
+      box.append(foot);
+    }, { bare: true });
   }
 
   return { open };

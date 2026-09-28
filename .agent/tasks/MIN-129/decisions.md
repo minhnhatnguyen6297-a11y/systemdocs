@@ -83,3 +83,36 @@
   gõ hay focus" — defer giữ value+focus khi gõ; data-fid giữ focus khi
   reorder bằng nút/keyboard.
 - **Nguồn:** issue MIN-129; pattern defer sẵn có trong view.
+
+## 2026-09-27 — Hủy trên nháp mới: reset qua model.newDraft()
+- **Chọn:** `caseId == null` → hủy = `model.newDraft(case_type hiện
+  tại)` (giữ loại việc, xóa toàn bộ stage/meta/diagram người dùng nhập);
+  `caseId != null` → `cancelDraftState()` restore committed như quyết
+  định trước.
+- **Lý do:** nháp chưa lưu không có baseline committed có nghĩa —
+  `committed` rỗng; `newDraft()` đi qua model API sẵn có (reset sạch +
+  session++ hủy response treo + emit), không cần móc state.
+- **Nguồn:** model `newDraft()` hiện hữu; contract §13.2 Q2.
+
+## 2026-09-27 — Pool đọc state.committed trực tiếp (không model.pool())
+- **Chọn:** `poolPaneEl` tự tính `committed.people − assigned` +
+  `committed.assets` thay vì `model.pool()` — vì `pool()` dùng
+  `state.stage` khi `caseId == null` → draft đang soạn sẽ lộ vào Pool,
+  vi phạm "Pool chỉ committed".
+- **Hệ quả:** nháp mới luôn hiện face "Cập nhật Stage trước" — đúng
+  bản mẫu.
+- **Gap:** model nên export `committedPool()` — ghi handoff.
+
+## 2026-09-27 — Pool vẫn liệt kê asset (card không kéo được)
+- **Chọn:** giữ asset cards trong Pool (như hiện hữu) — `draggable=false`,
+  nút `→` mở menu giải thích "tài sản gán qua vị trí trên node người".
+  Khác quyết định nháp "chỉ người" — giữ vì asset visibility vẫn hữu ích
+  và payload `kind:'asset'` cũ đã vậy (P7 không phụ thuộc).
+- **Nguồn:** hiện trạng `poolCardEl(row,'asset')`.
+
+## 2026-09-27 — Hai loại payload drag khác nhau, đều giữ
+- **Chọn:** Stage nội bộ dùng `application/x-assetcol` /
+  `application/x-personrow` (index, giống bản mẫu duyệt); Pool↔diagram
+  giữ `text/plain` = `{kind,row_id}` — contract P7 không đổi.
+- **Lý do:** đổi payload pool sẽ phá drop handler node/Pool của P7; hai
+  không gian kéo-thả không trộn (drop handlers lọc theo `types.includes`).
