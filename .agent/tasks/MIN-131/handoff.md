@@ -8,7 +8,7 @@ bộ giao diện chung đã duyệt (P4/MIN-127). Chỉ refactor renderer upload
 ## Commit
 - `f82443a` docs(MIN-131): mở task record P8 — brief + progress + decisions
 - `29295aa` feat(MIN-131): làm nhẹ 2 màn Upload Lab theo bộ giao diện chung
-- (commit docs cuối cùng: progress + handoff — hash điền sau khi commit)
+- `0fd4aa5` docs(MIN-131): progress + handoff P8
 
 ## File đã đổi
 - `shell/src/renderer/upload/index.js` — bỏ `.ul-head` (h2+mô tả); notice
