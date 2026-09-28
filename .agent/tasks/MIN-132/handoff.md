@@ -150,6 +150,8 @@ DRAFT; C1–C4 §13.13 mở; schema/examples v1 giữ (v1 còn hợp lệ).
 
 ## 9. Commit
 
-- `COMMIT_PENDING` — cập nhật hash sau khi commit (commit path sở hữu:
-  `.agent/tasks/MIN-132/` + 12 file docs ở §5). Không push, không nhánh mới.
-- Footer theo convention repo + Devin co-author.
+- `c4b90d3` — `docs(MIN-132): P9 — kiểm chứng toàn luồng UI + đối chiếu
+  docs v2` (task record + 57 ảnh + 12 file docs §5; commit `--only` theo
+  path sở hữu, không push, không nhánh mới).
+- Commit điền hash này là commit thứ hai (chỉ sửa `handoff.md` mục 9 —
+  convention như MIN-129 `d4cc242`).
