@@ -71,7 +71,7 @@
       if (guide) meta.push(guide);
       if (meta.length) box.append(h.el('div', 'muted', meta.join(' · ')));
       if (err && err.retryable && onRetry) {
-        const re = h.el('button', '', 'Thử lại');
+        const re = h.el('button', 'sm', 'Thử lại');
         re.addEventListener('click', onRetry);
         box.append(re);
       }
@@ -79,18 +79,21 @@
     }
 
     // ---------- Chon website ----------
-    const siteCard = h.el('div', 'ul-card');
-    siteCard.append(h.el('div', 'ul-card-title', 'Chọn website'));
+    // Mot card, mot hang: website + badge dang nhap + env/login — theo ban
+    // mau P8 (khong tieu de card, khong khoi giai thich).
+    const siteCard = h.el('div', 'card');
+    const siteBody = h.el('div', 'card-body');
     const row1 = h.el('div', 'ul-row');
-    row1.append(h.el('span', 'ul-label', 'Website:'));
+    row1.append(h.el('span', 'ul-label', 'Website'));
     const siteSel = h.el('select', 'ul-site');
     siteSel.setAttribute('aria-label', 'Website');
     siteSel.addEventListener('change',
       () => actions.changeWebsite(siteSel.value));
     const badgeSlot = h.el('span', 'ul-badge-slot');
+    const siteSpacer = h.el('span', 'ul-spacer');
     const envBtn = h.el('button', '', 'Kiểm tra môi trường');
     envBtn.addEventListener('click', () => actions.envCheck());
-    const loginBtn = h.el('button', '', 'Mở đăng nhập');
+    const loginBtn = h.el('button', 'secondary', 'Mở đăng nhập');
     loginBtn.addEventListener('click', () => actions.sessionStart());
     // Nut xac nhan chi hien trong luc job session_start waiting_user(login)
     // — backend van tu kiem trang thai portal that sau khi xac nhan.
@@ -98,23 +101,26 @@
       'Xác nhận đã đăng nhập');
     confirmBtn.hidden = true;
     confirmBtn.addEventListener('click', () => actions.confirmLogin());
-    row1.append(siteSel, badgeSlot, envBtn, loginBtn, confirmBtn);
-    siteCard.append(row1);
-    const siteUrl = h.el('div', 'ul-site-url muted', '');
-    siteCard.append(siteUrl);
+    row1.append(siteSel, badgeSlot, siteSpacer, envBtn, loginBtn, confirmBtn);
+    siteBody.append(row1);
+    // URL chi-doc nhan biet website (spec §2) — mot dong muted, khong o nhap.
+    const siteUrl = h.el('div', 'ul-site-url muted small', '');
+    siteBody.append(siteUrl);
     // Loi website/session — ngay canh cac nut thao tac.
     const siteErr = h.el('div', 'ul-site-err');
     siteErr.hidden = true;
-    siteCard.append(siteErr);
+    siteBody.append(siteErr);
     const envBox = h.el('div', 'ul-env');
-    siteCard.append(envBox);
+    siteBody.append(envBox);
+    siteCard.append(siteBody);
     panel.append(siteCard);
 
     // ---------- Nguon so ----------
-    const srcCard = h.el('div', 'ul-card');
-    srcCard.append(h.el('div', 'ul-card-title', 'Nguồn sổ'));
+    // Mot hang gom ngay + tai tu web + chon file/nap (ban mau P8).
+    const srcCard = h.el('div', 'card');
+    const srcBody = h.el('div', 'card-body');
     const dRow = h.el('div', 'ul-row');
-    dRow.append(h.el('span', 'ul-label', 'Từ ngày:'));
+    dRow.append(h.el('span', 'ul-label', 'Từ ngày'));
 
     // Ngay hien thi/nhap DD/MM/YYYY (spec §2); wire backend la ISO.
     function dateInput(which) {
@@ -130,12 +136,12 @@
     const fromIn = dateInput('from');
     const toIn = dateInput('to');
     dRow.append(fromIn);
-    dRow.append(h.el('span', 'ul-label', 'Đến ngày:'));
+    dRow.append(h.el('span', 'ul-label', 'Đến ngày'));
     dRow.append(toIn);
-    const dlBtn = h.el('button', 'primary', 'Tải Excel từ Web');
+    const dlBtn = h.el('button', 'secondary', 'Tải Excel từ Web');
     dlBtn.addEventListener('click', () => actions.downloadExcel());
     dRow.append(dlBtn);
-    srcCard.append(dRow);
+    dRow.append(h.el('span', 'muted', '|'));
 
     function validIso(iso) {
       const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
@@ -150,20 +156,21 @@
       if (!iso || !validIso(iso)) {
         // Sai dinh dang/ngay khong that: danh dau + tra ve gia tri dang
         // dung — khong cap nhat state, khong lam ket qua cu "che".
-        inp.classList.add('ul-invalid');
+        inp.classList.add('err');
+        inp.setAttribute('aria-invalid', 'true');
         inp.title = 'Nhập ngày dạng dd/mm/yyyy';
         inp.value = S.isoToDisplay(
           which === 'from' ? state.fromDate : state.toDate);
         return;
       }
-      inp.classList.remove('ul-invalid');
+      inp.classList.remove('err');
+      inp.removeAttribute('aria-invalid');
       inp.title = '';
       inp.value = S.isoToDisplay(iso);
       if (which === 'from') actions.setFromDate(iso);
       else actions.setToDate(iso);
     }
 
-    const fRow = h.el('div', 'ul-row');
     const pathIn = h.el('input', 'ul-input-grow');
     pathIn.type = 'text';
     pathIn.readOnly = true;
@@ -174,31 +181,40 @@
     const openBtn = h.el('button', 'ul-open', 'Mở');
     openBtn.addEventListener('click',
       () => actions.openFile(state.excelFile));
-    const loadBtn = h.el('button', '', 'Nạp dữ liệu');
+    const loadBtn = h.el('button', 'primary sm', 'Nạp dữ liệu');
     loadBtn.addEventListener('click', () => actions.loadExcel());
-    fRow.append(pathIn, pickBtn, openBtn, loadBtn);
-    srcCard.append(fRow);
+    dRow.append(pathIn, pickBtn, openBtn, loadBtn);
+    srcBody.append(dRow);
     // Loi tai/nap so — trong cung card Nguon so, kem huong dan hanh dong.
     const srcMsg = h.el('div', 'ul-src-msg');
-    srcCard.append(srcMsg);
+    srcBody.append(srcMsg);
+    srcCard.append(srcBody);
     panel.append(srcCard);
 
-    // ---------- Header ket qua audit: ten web khop audit_id dang hien ----------
-    const auditHead = h.el('div', 'ul-audit-head muted');
+    // ---------- Header ket qua audit + badge stale: mot hang meta ----------
+    const metaRow = h.el('div', 'ul-meta');
+    // Ten web khop audit_id dang hien — khong the hien nham website khac
+    // (spec §4).
+    const auditHead = h.el('div', 'ul-audit-head muted small');
     auditHead.hidden = true;
-    panel.append(auditHead);
+    metaRow.append(auditHead);
+    const staleBadge = h.el('div', 'ul-stale pill warn',
+      'Kết quả chưa cập nhật — đã đổi ngày/tệp.');
+    staleBadge.hidden = true;
+    metaRow.append(staleBadge);
+    metaRow.hidden = true;
+    panel.append(metaRow);
 
-    // ---------- KPI ----------
+    // ---------- KPI — 4 the nho, gia tri trung binh (khong khoi KPI to) ----------
     const kpis = h.el('div', 'ul-kpis');
     const kpiVals = {};
-    for (const [key, title, tone] of [
-      ['total', 'TỔNG SỐ ĐÃ NẠP', 'total'],
-      ['valid', 'HỢP LỆ TRONG SỔ', 'valid'],
-      ['missing', 'SỐ CÒN THIẾU', 'missing'],
-      ['issue', 'LỖI / TRÙNG LẶP', 'issue'],
+    for (const [key, title] of [
+      ['total', 'Tổng số đã nạp'],
+      ['valid', 'Hợp lệ trong sổ'],
+      ['missing', 'Số còn thiếu'],
+      ['issue', 'Lỗi / Trùng lặp'],
     ]) {
-      const c = h.el('div', 'ul-kpi');
-      c.dataset.tone = tone;
+      const c = h.el('div', 'card ul-kpi');
       c.dataset.kpi = key;
       c.append(h.el('div', 'ul-kpi-t', title));
       const v = h.el('div', 'ul-kpi-v', '0');
@@ -208,38 +224,86 @@
     }
     panel.append(kpis);
 
-    const staleBadge = h.el('div', 'ul-stale',
-      'Kết quả chưa cập nhật — bấm "Nạp dữ liệu" để audit lại theo bộ lọc mới.');
-    staleBadge.hidden = true;
-    panel.append(staleBadge);
-
-    // ---------- Hai bang 4 cot ----------
-    function mkTable(title) {
+    // ---------- Hai bang 4 cot + splitter chieu cao ----------
+    function mkPane(title) {
+      const pane = h.el('div', 'audit-pane');
+      const head = h.el('div', 'ul-tbl-head');
+      head.append(h.el('strong', '', title));
+      const count = h.el('span', 'pill ul-tbl-count', '0 dòng');
+      head.append(count);
+      pane.append(head);
       const wrap = h.el('div', 'ul-table-wrap');
-      const ttl = h.el('div', 'ul-table-title', `${title} (0)`);
-      const scroll = h.el('div', 'ul-scroll ul-scroll-resize');
-      const t = h.el('table', 'ul-table');
+      const t = h.el('table', 'ul-grid');
       const thead = h.el('thead');
       const tr = h.el('tr');
-      for (const c of S.AUDIT_COLUMNS) tr.append(h.el('th', '', c));
+      for (const c of S.AUDIT_COLUMNS) {
+        tr.append(h.el('th', c === 'STT' ? 'num' : '', c));
+      }
       thead.append(tr);
       t.append(thead);
       const tbody = h.el('tbody');
       t.append(tbody);
-      scroll.append(t);
-      wrap.append(ttl, scroll);
-      return { wrap, ttl, tbody };
+      wrap.append(t);
+      pane.append(wrap);
+      return { pane, count, tbody };
     }
-    const missT = mkTable('Số còn thiếu');
-    const issT = mkTable('Số lỗi, trùng');
-    panel.append(missT.wrap, issT.wrap);
+
+    // Splitter chia chieu cao hai bang — keo chuot hoac ↑/↓ (shared
+    // .splitter-h). window.addEventListener khong co trong node --test
+    // (window = {}) → guard truoc khi gan.
+    function mkSplitter() {
+      const sp = h.el('div', 'splitter-h');
+      sp.tabIndex = 0;
+      sp.setAttribute('role', 'separator');
+      sp.setAttribute('aria-label', 'Kéo đổi chiều cao hai bảng audit');
+      sp.title = 'Kéo để đổi chiều cao hai bảng (bàn phím: ↑/↓)';
+      let drag = null;
+      sp.addEventListener('mousedown', (e) => {
+        drag = { y: e.clientY };
+        sp.classList.add('active');
+        e.preventDefault();
+      });
+      if (typeof window !== 'undefined' &&
+          typeof window.addEventListener === 'function') {
+        window.addEventListener('mousemove', (e) => {
+          if (!drag) return;
+          const p1 = sp.previousElementSibling;
+          if (!p1 || typeof p1.getBoundingClientRect !== 'function') return;
+          const cur = p1.getBoundingClientRect().height;
+          const nx = Math.max(80, cur + (e.clientY - drag.y));
+          p1.style.flex = `0 0 ${nx}px`;
+          drag.y = e.clientY;
+        });
+        window.addEventListener('mouseup', () => {
+          drag = null;
+          sp.classList.remove('active');
+        });
+      }
+      sp.addEventListener('keydown', (e) => {
+        const p1 = sp.previousElementSibling;
+        if (!p1 || typeof p1.getBoundingClientRect !== 'function') return;
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          const cur = p1.getBoundingClientRect().height;
+          p1.style.flex =
+            `0 0 ${Math.max(80, cur + (e.key === 'ArrowDown' ? 24 : -24))}px`;
+        }
+      });
+      return sp;
+    }
+
+    const tablesBox = h.el('div', 'audit-tables');
+    const missT = mkPane('Số còn thiếu');
+    const issT = mkPane('Số lỗi, trùng');
+    tablesBox.append(missT.pane, mkSplitter(), issT.pane);
+    panel.append(tablesBox);
 
     function auditRow(row, tr, idx) {
       if (!tr) {
         tr = h.el('tr');
         tr._td = {};
         for (const k of ['stt', 'ngay', 'so', 'chu']) {
-          const td = h.el('td');
+          const td = h.el('td', k === 'chu' ? '' : 'num');
           tr._td[k] = td;
           tr.append(td);
         }
@@ -419,12 +483,16 @@
         srcMsg.append(errBox(state.auditError, () => actions.loadExcel()));
       }
 
+      // Hang meta (auditHead + stale) an khi ca hai con an — khong de
+      // khoang trong thua giua KPI va bang.
+      metaRow.hidden = auditHead.hidden && staleBadge.hidden;
+
       const missRows = (state.audit && state.audit.missing) || [];
       const issRows = (state.audit && state.audit.issues) || [];
-      missT.ttl.textContent =
-        `Số còn thiếu (${syncAuditTable(missT, missRows)})`;
-      issT.ttl.textContent =
-        `Số lỗi, trùng (${syncAuditTable(issT, issRows)})`;
+      missT.count.textContent =
+        `${syncAuditTable(missT, missRows)} dòng`;
+      issT.count.textContent =
+        `${syncAuditTable(issT, issRows)} dòng`;
     }
 
     return {

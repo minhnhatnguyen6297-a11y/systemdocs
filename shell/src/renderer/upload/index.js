@@ -65,13 +65,10 @@
     let lastSessPoll = 0;
     let sessPollTimer = null;
 
+    // MIN-131: bo tieu de module + mo ta — rail da chi ro module, tab la
+    // dieu huong chinh. Section chi giu: engine slot -> notice -> tablist ->
+    // 2 panel -> jobs.
     const s = h.el('section', 'upload-lab');
-    const head = h.el('div', 'ul-head');
-    head.append(h.el('h2', 'ul-title', 'Upload Lab'));
-    head.append(h.el('span', 'ul-sub muted',
-      'Số hóa hồ sơ Word, audit sổ công chứng, chuẩn bị biểu mẫu ' +
-      '(dry-run — người dùng tự Lưu trong Chromium).'));
-    s.append(head);
     const engSlot = h.el('div', 'ul-eng');
     s.append(engSlot);
     const noticeBox = h.el('div', 'ul-notice');
@@ -735,7 +732,9 @@
       s.append(p);
     }
 
-    s.append(h.el('h3', '', 'Job'));
+    // Danh sach job shell (renderJobs) — .slot la marker khong style,
+    // e2e dump_debug doc '.upload-lab .slot *' → giu nguyen class.
+    s.append(h.el('h3', '', 'Tác vụ'));
     const jobsBox = h.el('div', 'slot');
     s.append(jobsBox);
 
@@ -793,18 +792,19 @@
             ? 'Các tab đã điền sẵn đang chờ kiểm tra trên Chromium — ' +
               'người dùng tự bấm Lưu.'
             : 'Chờ thao tác của người dùng.';
-        tone = 'warn';
-        const item = h.el('div', `ul-notice-item ul-badge-${tone}`, msg);
-        // CTA xac nhan nam ngay tren banner — backend van tu kiem trang
-        // thai portal that sau khi nguoi dung xac nhan (contract §7.2).
+        // Banner dung chung: warn + CTA ngay trong banner — backend van
+        // tu kiem trang thai portal that sau khi nguoi dung xac nhan
+        // (contract §7.2). waiting_user la trang thai, khong phai loi.
+        const item = h.el('div', 'banner warn');
+        item.append(h.el('span', 'grow', msg));
         if (on === 'login') {
-          const b = h.el('button', 'primary ul-login-confirm',
+          const b = h.el('button', 'ul-login-confirm secondary sm',
             'Xác nhận đã đăng nhập');
           b.disabled = !state.browserId;
           b.addEventListener('click', () => actions.confirmLogin());
           item.append(b);
         } else if (on === 'review') {
-          const b = h.el('button', 'primary', 'Xong kiểm tra');
+          const b = h.el('button', 'secondary sm', 'Xong kiểm tra');
           b.disabled = !state.browserId;
           b.addEventListener('click', () => actions.finishReview());
           item.append(b);
@@ -823,7 +823,10 @@
         msg = 'Chọn website ở tab Audit để bắt đầu.';
       }
       if (msg) {
-        noticeBox.append(h.el('div', `ul-notice-item ul-badge-${tone}`, msg));
+        const item = h.el('div',
+          tone === 'warn' ? 'banner warn' : 'banner');
+        item.append(h.el('span', 'grow', msg));
+        noticeBox.append(item);
       }
     }
 

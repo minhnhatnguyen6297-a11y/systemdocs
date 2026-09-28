@@ -1,8 +1,13 @@
-/* Upload Lab module — MIN-69 task 6.
-   Moi rule gioi han trong .upload-lab; chi section cua module nay thoat cap
-   860px (specificity #view+section+class thang #view section). Cac module
-   khac (Notary...) giu nguyen layout cu.
-   Palette/metrics theo baseline upload_lab/ui_qt/theme.py (light theme). */
+/* Upload Lab — MIN-131 (MIN-123 P8): lam nhe 2 man hinh theo bo giao
+   dien chung da duyet (docs/product/ui/prototypes/upload.js + DESIGN.md).
+   So huu (DESIGN §10): file nay chi chua rule trong .upload-lab va class
+   ul-* — class khong tien to (card/pill/banner/button/progress/splitter/
+   muted/small/truncate-path/num/cb…) la cua styles.css, KHONG dinh nghia
+   lai. Mau/metric di qua bien :root, khong hard-code hex.
+
+   Bo cuc: module cot full-height — phan dau (engine/notice/tab) + panel
+   flex:1 → bang chiem phan con lai; khi tran thi #view cuon (vi tri cuon
+   va selection luu theo tab trong state.tabs). */
 
 #view section.upload-lab {
   max-width: none;
@@ -13,205 +18,238 @@
 .upload-lab {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
-  color: #1e293b;
+  min-height: 100%;
 }
 
-.ul-head { display: flex; align-items: baseline; gap: 10px;
-           flex-wrap: wrap; }
-.ul-title { margin: 0; font-size: 18px; }
-.ul-sub { font-size: 12px; }
+/* [hidden] phai thang display rule cua ul-* (.ul-reconcile/.ul-error/
+   .ul-meta/.ul-panel/.pill deu set display — [hidden] cua UA thua
+   specificity → element "an" van hien). Rule scope nay giu semantic an. */
+.upload-lab [hidden] { display: none; }
 
-/* ---------- tablist (ARIA tabs) ---------- */
-.ul-tablist { display: flex; gap: 2px;
-              border-bottom: 1px solid #e2e8f0; }
-.ul-tab { min-height: 26px; padding: 7px 18px; margin-right: 3px;
-          color: #64748b; background: transparent; border: none;
-          border-bottom: 3px solid transparent; border-radius: 4px 4px 0 0;
-          font-weight: 500; font-size: 13px; }
-.ul-tab:hover { color: #0067c0; background: #eff6ff; }
-.ul-tab[aria-selected="true"] { color: #0067c0; background: #fff;
-          border-bottom-color: #0067c0; font-weight: 600; }
+.ul-eng:empty, .ul-notice:empty { display: none; }
+.ul-notice { display: flex; flex-direction: column; gap: 8px; }
+.upload-lab > h3 { margin: 8px 0 -4px; }
 
-/* focus ro rang cho ban phim */
-.upload-lab .ul-tab:focus-visible,
-.upload-lab button:focus-visible,
-.upload-lab input:focus-visible,
-.upload-lab select:focus-visible,
-.upload-lab [role="tabpanel"]:focus-visible {
-  outline: 2px solid #0067c0;
-  outline-offset: 1px;
+/* ---------- tablist: thanh pill (ban mau approved) ---------- */
+.ul-tablist {
+  display: flex; gap: 4px; padding: 4px;
+  background: var(--surface-card); border-radius: var(--r-card);
+  box-shadow: var(--sh-card); align-self: flex-start;
+}
+.ul-tab {
+  font-size: var(--fs-small); font-weight: 600;
+  border: 0; border-radius: var(--r-ctl); padding: 8px 16px;
+  min-height: 0; background: transparent; color: var(--text-secondary);
+}
+.ul-tab:hover:not(:disabled) { background: var(--surface-subtle); }
+.ul-tab[aria-selected="true"] {
+  background: var(--accent-soft); color: var(--accent);
 }
 
-.ul-panel { display: flex; flex-direction: column; gap: 10px;
-            padding-top: 10px; min-width: 0; }
+/* ---------- panel: bang co gian, phan khac tu co ---------- */
+.ul-panel {
+  flex: 1 1 auto; min-height: 0; min-width: 0;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.ul-panel > * { flex: 0 0 auto; }
+.ul-panel > .audit-tables, .ul-panel > .card:last-child { flex: 1 1 auto; }
 .ul-panel[hidden] { display: none; }
 
-/* ---------- cards ---------- */
-.ul-card { background: #fff; border: 1px solid #e2e8f0;
-           border-radius: 8px; padding: 12px 14px; min-width: 0; }
-.ul-card-title { font-weight: 600; font-size: 13px; color: #334155;
-                 margin-bottom: 8px; }
-.ul-context { display: flex; align-items: center; gap: 12px;
-              flex-wrap: wrap; }
-.ul-context-excel { font-size: 12px; }
-.ul-spacer { flex: 1; }
-
-.ul-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.ul-row + .ul-row { margin-top: 8px; }
-.ul-label { color: #475569; font-size: 12.5px; white-space: nowrap; }
-.ul-site-url { margin-top: 6px; font-size: 12px; }
-
-.upload-lab input[type="text"],
-.upload-lab input[type="date"],
-.upload-lab input[type="number"],
-.upload-lab select {
-  min-height: 30px; padding: 4px 10px; font-size: 12.5px;
-  color: #1e293b; background: #fff;
-  border: 1px solid #d1d5db; border-radius: 6px;
+/* ---------- hang dieu khien gon ---------- */
+.ul-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ul-panel .card-body .ul-row + .ul-row { margin-top: 10px; }
+.ul-label {
+  font-size: var(--fs-small); font-weight: 600;
+  color: var(--text-secondary); white-space: nowrap;
 }
-.upload-lab input[readonly] { background: #f8fafc; color: #475569; }
-.ul-input-grow { flex: 1; min-width: 160px; }
-.ul-site { min-width: 180px; }
-.ul-staff { min-width: 200px; }
-.ul-sec { width: 200px; }
-.ul-chunk { width: 74px; }
-.ul-date { width: 108px; }
-.ul-invalid { border-color: #dc2626 !important; background: #fef2f2; }
-
-/* buttons trong module: reset margin-right cua global, gap cua row lo */
-.upload-lab button { min-height: 30px; padding: 5px 12px; margin-right: 0;
-  border: 1px solid #d1d5db; border-radius: 6px; background: #fff;
-  color: #1e293b; font-weight: 500; }
-.upload-lab button:hover:not(:disabled) { color: #0369a1;
-  background: #f8fafc; border-color: #94a3b8; }
-.upload-lab button.primary { color: #fff; background: #0067c0;
-  border-color: #0067c0; font-weight: 600; }
-.upload-lab button.primary:hover:not(:disabled) { background: #1873d3;
-  border-color: #1873d3; color: #fff; }
-.upload-lab button.danger { border-color: #dc2626; color: #dc2626; }
-.upload-lab button.ul-stop:not(:disabled) { color: #fff;
-  background: #dc2626; border-color: #dc2626; font-weight: 600; }
-.upload-lab button:disabled { color: #94a3b8; background: #f1f5f9;
-  border-color: #e2e8f0; opacity: 1; }
-
-/* ---------- badges ---------- */
-.ul-badge { display: inline-block; padding: 2px 10px; border-radius: 10px;
-            font-size: 12px; font-weight: 600; }
-.ul-badge-ok { background: #f0fdf4; color: #16a34a;
-               border: 1px solid #bbf7d0; }
-.ul-badge-warn { background: #fffbeb; color: #b45309;
-                 border: 1px solid #fde68a; }
-.ul-badge-err { background: #fef2f2; color: #b91c1c;
-                border: 1px solid #fecaca; }
-.ul-badge-muted { background: #f1f5f9; color: #64748b;
-                  border: 1px solid #e2e8f0; }
-.ul-badge-slot { display: inline-flex; }
-
-.ul-notice { display: flex; flex-direction: column; gap: 6px; }
-.ul-notice-item { padding: 6px 12px; border-radius: 6px; font-size: 12.5px; }
-.ul-notice-item button { margin-left: 10px; }
-
+.ul-spacer { flex: 1; min-width: 8px; }
+.ul-site-url { margin-top: 4px; }
 .ul-site-err { margin-top: 8px; }
 .ul-site-err .ul-error { margin-top: 0; }
 .ul-src-msg .ul-error { margin-top: 8px; }
-.ul-audit-head { font-size: 12.5px; margin-top: 2px; }
+.ul-note { margin-top: 8px; }
 
-.ul-env { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }
-.ul-env-line { font-size: 12.5px; display: flex; gap: 6px;
-               align-items: baseline; flex-wrap: wrap; }
+/* rong deu kien input/select — kieu (nhan/duong vien/nen) giu nguyen
+   theo styles.css. */
+.ul-input-grow { flex: 1; min-width: 160px; }
+.ul-site { min-width: 190px; }
+.ul-staff { min-width: 190px; }
+.ul-sec { width: 170px; }
+.ul-chunk { width: 72px; }
+.ul-date { width: 112px; }
+.upload-lab input[readonly] {
+  background: var(--surface-card); color: var(--text-secondary);
+}
 
-/* ---------- KPI ---------- */
-.ul-kpis { display: grid;
-           grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.ul-kpi { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
-          padding: 10px 14px; min-width: 0; }
-.ul-kpi-t { font-size: 11px; font-weight: 700; letter-spacing: .02em; }
-.ul-kpi-v { font-size: 26px; font-weight: 700; line-height: 1.25; }
-.ul-kpi[data-tone="total"] .ul-kpi-t,
-.ul-kpi[data-tone="total"] .ul-kpi-v { color: #0067c0; }
-.ul-kpi[data-tone="valid"] .ul-kpi-t,
-.ul-kpi[data-tone="valid"] .ul-kpi-v { color: #107c41; }
-.ul-kpi[data-tone="missing"] .ul-kpi-t,
-.ul-kpi[data-tone="missing"] .ul-kpi-v { color: #d83b01; }
-.ul-kpi[data-tone="issue"] .ul-kpi-t,
-.ul-kpi[data-tone="issue"] .ul-kpi-v { color: #a80000; }
-@media (max-width: 900px) {
+/* ---------- badge: hook ul-badge* (e2e) — hinh dang = .pill chung ---- */
+.ul-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 600; line-height: 1;
+  padding: 4px 9px; border-radius: var(--r-chip);
+  background: var(--muted-bg); color: var(--muted-text);
+  white-space: nowrap;
+}
+.ul-badge-ok { background: var(--ok-bg); color: var(--ok-text); }
+.ul-badge-warn { background: var(--warn-bg); color: var(--warn-text); }
+.ul-badge-err { background: var(--err-bg); color: var(--err-text); }
+.ul-badge-muted { background: var(--muted-bg); color: var(--muted-text); }
+.ul-badge-slot { display: inline-flex; align-items: center; }
+
+/* ---------- env / loi inline ---------- */
+.ul-env { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.ul-env-line {
+  font-size: var(--fs-small); display: flex; gap: 8px;
+  align-items: baseline; flex-wrap: wrap;
+}
+.ul-error {
+  display: flex; flex-direction: column; gap: 4px;
+  border-radius: var(--r-ctl); padding: 8px 12px;
+  background: var(--err-bg); color: var(--err-text);
+  font-size: var(--fs-small); margin-top: 8px;
+}
+.ul-error .muted { color: inherit; opacity: 0.8; }
+.ul-error button { align-self: flex-start; margin-top: 2px; }
+
+/* ---------- hang meta audit (header ket qua + stale) ---------- */
+.ul-meta {
+  display: flex; align-items: center; gap: 10px;
+  flex-wrap: wrap; padding: 0 2px;
+}
+.ul-audit-head { flex: 1; min-width: 0; }
+
+/* ---------- KPI nho (khong khoi lon) ---------- */
+.ul-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;
+}
+.ul-kpi { padding: 10px 14px; }
+.ul-kpi-t { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.ul-kpi-v {
+  font-size: 22px; font-weight: 700; line-height: 1.3;
+  font-variant-numeric: tabular-nums; color: var(--text-primary);
+}
+@media (max-width: 1000px) {
   .ul-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-.ul-stale { padding: 6px 10px; border-radius: 6px; font-size: 12.5px;
-            color: #b45309; background: #fffbeb;
-            border: 1px solid #fde68a; }
-.ul-error { border: 1px solid #fecaca; background: #fef2f2;
-            color: #b91c1c; border-radius: 6px; padding: 8px 10px;
-            font-size: 12.5px; margin-top: 8px; }
-.ul-error button { margin-top: 6px; }
+/* ---------- hai bang audit + splitter chieu cao ---------- */
+.audit-tables { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.audit-pane {
+  overflow: hidden; min-height: 110px;
+  display: flex; flex-direction: column;
+}
+.upload-lab .audit-tables > .splitter-h { margin: 0; }
+.ul-tbl-head {
+  display: flex; align-items: baseline; gap: 8px; padding: 2px 2px 6px;
+}
+.ul-tbl-head strong { font-size: var(--fs-small); }
 
-/* ---------- progress ---------- */
-.ul-progress-row { display: flex; gap: 10px; align-items: center; }
-.ul-progress-row + .ul-progress-row { margin-top: 8px; }
-.ul-progress { flex: 1; height: 16px; appearance: none; }
-.ul-progress::-webkit-progress-bar { background: #e2e8f0;
-  border-radius: 4px; }
-.ul-progress::-webkit-progress-value { background: #0067c0;
-  border-radius: 4px; }
-.ul-progress-label { font-size: 12px; color: #475569; min-width: 150px; }
-.ul-summary { margin-top: 8px; padding: 6px 10px; color: #0369a1;
-              background: #f0f9ff; border: 1px solid #bae6fd;
-              border-radius: 6px; font-weight: 600; font-size: 12px; }
+/* ---------- vung cuon bang rieng ---------- */
+.ul-table-wrap {
+  flex: 1; min-height: 0; overflow: auto;
+  border: 1px solid var(--border-hairline); border-radius: var(--r-ctl);
+  background: var(--surface-card);
+}
+.ul-queue-body .ul-table-wrap { min-height: 100px; }
 
-/* ---------- action bar (wrap o cua so hep) ---------- */
-.ul-actions { display: flex; gap: 8px; flex-wrap: wrap;
-              align-items: center; }
+/* ---------- bang du lieu ul-grid (mat bang .grid, cuon trong wrap) --- */
+table.ul-grid {
+  border-collapse: collapse; width: 100%; font-size: var(--fs-small);
+}
+table.ul-grid th, table.ul-grid td {
+  border-bottom: 1px solid var(--border-hairline);
+  padding: 4px 10px; text-align: left; vertical-align: middle;
+  height: var(--row-h);
+}
+table.ul-grid thead th {
+  background: var(--surface-subtle); font-weight: 600;
+  color: var(--text-secondary);
+  position: sticky; top: 0; z-index: 2; white-space: nowrap;
+}
+table.ul-grid tbody tr:hover td { background: #f8fafd; }
+table.ul-grid td.num, table.ul-grid th.num {
+  font-variant-numeric: tabular-nums;
+}
+table.ul-grid tbody tr.ul-row-selected td { background: var(--accent-soft); }
+table.ul-grid tbody tr.ul-row-reconcile td { background: var(--warn-bg); }
+/* "dang mo tren web" = danh dau canh, giu nen trung tinh de phan biet
+   voi dong da chon (accent-soft). */
+table.ul-grid tbody tr.ul-row-open td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+table.ul-grid tbody tr.ul-row-issue td { color: var(--warn-text); }
+table.ul-grid td.ul-cb { width: 30px; text-align: center; padding-right: 2px; }
 
-.ul-reconcile { margin-top: 8px; padding: 6px 10px; border-radius: 6px;
-                font-size: 12.5px; color: #b45309; background: #fffbeb;
-                border: 1px solid #fde68a; display: flex; gap: 10px;
-                align-items: center; flex-wrap: wrap; }
-.ul-reconcile-text { flex: 1; min-width: 220px; }
+/* queue 6 cot: cuon ngang thay vi ep cot Dia chi file (spec §5) */
+table.ul-grid.ul-queue-grid { min-width: 760px; }
+
+/* duong dan file dai: truncate giu ten file (span.truncate-path shared),
+   title hien day du, nut Mo nho mo file goc. */
+table.ul-grid td.ul-path { max-width: 1px; }
+.ul-path-inner { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ul-path-inner .ul-path-text { flex: 1; }
+
+/* nut "Mo" nho kieu ghost trong bang va hang nguon */
+.upload-lab .ul-open {
+  min-height: 24px; padding: 0 8px; font-size: 12px;
+  border-color: transparent; background: transparent;
+  color: var(--text-link); font-weight: 500;
+}
+.upload-lab .ul-open:hover:not(:disabled) {
+  background: var(--accent-soft); color: var(--accent);
+  border-color: transparent;
+}
+
+/* ---------- queue card fill phan con lai ---------- */
+.ul-queue-card {
+  display: flex; flex-direction: column; min-height: 0;
+}
+.ul-queue-body {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+/* ---------- thanh thao tac ---------- */
+.ul-actions {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+}
+
+/* ---------- banner doi chieu (ke duoi thanh thao tac, tren bang) ---- */
+.ul-reconcile {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 12px; border-radius: var(--r-ctl);
+  background: var(--warn-bg); color: var(--warn-text);
+  font-size: var(--fs-small);
+}
+.ul-reconcile-text { flex: 1; min-width: 200px; }
+.ul-reconcile-hint { font-size: var(--fs-small); opacity: 0.85; }
 .ul-reconcile-btn { flex-shrink: 0; }
-.ul-prepare-error { display: block; }
-.ul-table tbody tr.ul-row-open { background: #eef4ff; }
+.ul-prepare-error { margin-top: 0; }
 
-/* ---------- tables: vung cuon rieng + header dinh ---------- */
-.ul-table-wrap { display: flex; flex-direction: column; min-width: 0; }
-.ul-table-title { font-weight: 600; font-size: 13px; color: #334155;
-                  margin: 2px 0 6px; }
-.ul-scroll { overflow: auto; border: 1px solid #e2e8f0;
-             border-radius: 6px; background: #fff; min-height: 80px; }
-/* audit: hai bang chia chieu cao keo duoc (resize handle goc duoi) */
-.ul-scroll-resize { resize: vertical; height: 230px; }
-/* queue: chiem phan lon chieu cao con lai */
-.ul-scroll-fill { height: clamp(240px, 42vh, 720px); }
-.ul-table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
-.ul-table th, .ul-table td { border-bottom: 1px solid #e2e8f0;
-  padding: 6px 8px; text-align: left; vertical-align: middle; }
-.ul-table thead th { position: sticky; top: 0; z-index: 1;
-  background: #f8fafc; color: #334155; font-weight: 600;
-  border-bottom: 2px solid #cbd5e1; white-space: nowrap; }
-.ul-table tbody tr:nth-child(even) { background: #f8fafc; }
-.ul-table tbody tr.ul-row-selected { background: #e0efff; }
-.ul-table tbody tr.ul-row-issue td { color: #7c2d12; }
-.ul-table tbody tr.ul-row-reconcile { background: #fffbeb; }
-.ul-table td.ul-cb { width: 28px; text-align: center; }
-
-/* duong dan dai: truncate giu ten file, tooltip xem du, nut mo file goc */
-.ul-table td.ul-path { max-width: 300px; }
-.ul-path-inner { display: flex; align-items: center; gap: 6px;
-                 min-width: 0; }
-.ul-path-text { flex: 1; min-width: 0; overflow: hidden;
-  text-overflow: ellipsis; white-space: nowrap;
-  direction: rtl; unicode-bidi: plaintext; text-align: left; }
-.ul-open { padding: 1px 8px; min-height: 22px; font-size: 11.5px; }
-
-.ul-queue { display: flex; flex-direction: column; min-height: 0; }
+/* ---------- tien do: 2 thanh rieng, label khong day layout ---------- */
+.ul-progress-row { margin-top: 10px; }
+.ul-progress {
+  flex: 1; min-width: 120px; height: 10px; appearance: none;
+}
+.ul-progress::-webkit-progress-bar {
+  background: var(--surface-subtle); border-radius: 999px;
+}
+.ul-progress::-webkit-progress-value {
+  background: var(--accent); border-radius: 999px;
+}
+.ul-progress-label {
+  font-size: var(--fs-small); color: var(--text-secondary);
+  min-width: 150px; max-width: 320px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* ---------- responsive ---------- */
 @media (max-width: 800px) {
-  .ul-card { padding: 10px; }
   .ul-kpis { gap: 8px; }
+  .ul-kpi { padding: 8px 12px; }
   .ul-kpi-v { font-size: 20px; }
   .ul-tab { padding: 6px 12px; }
+  .ul-progress-label { min-width: 110px; }
 }

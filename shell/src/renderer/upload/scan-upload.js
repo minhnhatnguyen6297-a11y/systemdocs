@@ -36,45 +36,47 @@
       return !!(state.login && state.login.status === 'authenticated');
     }
 
-    // ---------- Ngu canh ----------
-    const ctxCard = h.el('div', 'ul-card ul-context');
-    ctxCard.append(h.el('span', 'ul-label', 'Website:'));
+    // ---------- Ngu canh — mot hang gon (ban mau P8) ----------
+    const ctxCard = h.el('div', 'card');
+    const ctxBody = h.el('div', 'card-body');
+    const ctxRow = h.el('div', 'ul-row');
+    ctxRow.append(h.el('span', 'ul-label', 'Website'));
     const ctxSite = h.el('strong', '', '—');
     const ctxBadge = h.el('span', 'ul-badge ul-badge-muted', 'Chưa đăng nhập');
-    const ctxExcel = h.el('span', 'muted ul-context-excel',
+    const ctxExcel = h.el('span', 'muted small ul-context-excel',
       'Chưa nạp sổ Excel');
     const spacer = h.el('span', 'ul-spacer');
-    const gotoAudit = h.el('button', '', 'Đổi website…');
+    const gotoAudit = h.el('button', 'sm', 'Sang tab Audit để đổi website');
     gotoAudit.addEventListener('click', () => actions.gotoAudit());
-    ctxCard.append(ctxSite, ctxBadge, ctxExcel, spacer, gotoAudit);
+    ctxRow.append(ctxSite, ctxBadge, ctxExcel, spacer, gotoAudit);
+    ctxBody.append(ctxRow);
+    ctxCard.append(ctxBody);
     panel.append(ctxCard);
 
-    // ---------- Nguon va nhan su ----------
-    const cfg = h.el('div', 'ul-card');
-    cfg.append(h.el('div', 'ul-card-title', 'Nguồn và nhân sự'));
+    // ---------- Nguon + nhan su + tien do — mot card, hai hang ----------
+    const cfg = h.el('div', 'card');
+    const cfgBody = h.el('div', 'card-body');
     const r1 = h.el('div', 'ul-row');
+    const browseBtn = h.el('button', '', 'Chọn thư mục');
+    browseBtn.addEventListener('click', () => actions.pickFolder());
     const folderIn = h.el('input', 'ul-input-grow');
     folderIn.type = 'text';
     folderIn.readOnly = true;
     folderIn.placeholder = 'Đường dẫn thư mục chứa hồ sơ Word công chứng...';
     folderIn.setAttribute('aria-label', 'Đường dẫn thư mục');
-    const browseBtn = h.el('button', '', 'Chọn thư mục');
-    browseBtn.addEventListener('click', () => actions.pickFolder());
-    const scanBtn = h.el('button', 'primary', 'Bắt đầu Quét');
+    const scanBtn = h.el('button', 'primary sm', 'Bắt đầu Quét');
     scanBtn.addEventListener('click', () => actions.scan());
-    r1.append(folderIn, browseBtn, scanBtn);
-    cfg.append(r1);
-
-    const r2 = h.el('div', 'ul-row');
-    r2.append(h.el('span', 'ul-label', 'Công chứng viên:'));
+    r1.append(browseBtn, folderIn, scanBtn);
+    r1.append(h.el('span', 'muted', '|'));
+    r1.append(h.el('span', 'ul-label', 'Công chứng viên'));
     const staffSel = h.el('select', 'ul-staff');
     staffSel.setAttribute('aria-label', 'Công chứng viên');
     staffSel.addEventListener('change', () => {
       state.staff.congChungVien = staffSel.value || null;
       actions.savePrefs();
     });
-    r2.append(staffSel);
-    r2.append(h.el('span', 'ul-label', 'Thư ký:'));
+    r1.append(staffSel);
+    r1.append(h.el('span', 'ul-label', 'Thư ký'));
     const secIn = h.el('input', 'ul-sec');
     secIn.type = 'text';
     secIn.placeholder = 'Nhập tên thư ký...';
@@ -83,11 +85,11 @@
       state.staff.thuKy = secIn.value.trim();
       actions.savePrefs();
     });
-    r2.append(secIn);
+    r1.append(secIn);
     const refStaff = h.el('button', '', 'Cập nhật danh sách');
     refStaff.addEventListener('click', () => actions.refreshStaff());
-    r2.append(refStaff);
-    r2.append(h.el('span', 'ul-label', 'Số tab mỗi đợt:'));
+    r1.append(refStaff);
+    r1.append(h.el('span', 'ul-label', 'Số tab mỗi đợt'));
     const chunkIn = h.el('input', 'ul-chunk');
     chunkIn.type = 'number';
     chunkIn.min = String(S.MIN_CHUNK);
@@ -99,57 +101,55 @@
       actions.savePrefs();
       syncButtons();
     });
-    r2.append(chunkIn);
-    cfg.append(r2);
-    panel.append(cfg);
+    r1.append(chunkIn);
+    cfgBody.append(r1);
 
-    // ---------- Tien do (2 thanh rieng) ----------
-    const prog = h.el('div', 'ul-card');
-    prog.append(h.el('div', 'ul-card-title', 'Tiến độ'));
-    const pScan = h.el('div', 'ul-progress-row');
-    pScan.append(h.el('span', 'ul-label', 'Quét:'));
+    // Tien do: quet va chuan bi/upload la HAI thanh rieng biet (spec §3),
+    // nam trong cung card nguon — khong tach card rieng.
+    const pRow = h.el('div', 'ul-row ul-progress-row');
+    pRow.append(h.el('span', 'ul-label', 'Quét'));
     const scanBar = h.el('progress', 'ul-progress');
     scanBar.max = 1;
     const scanLabel = h.el('span', 'ul-progress-label muted', 'Chưa quét.');
-    pScan.append(scanBar, scanLabel);
-    prog.append(pScan);
-    const pPrep = h.el('div', 'ul-progress-row');
-    pPrep.append(h.el('span', 'ul-label', 'Chuẩn bị:'));
+    pRow.append(scanBar, scanLabel);
+    pRow.append(h.el('span', 'ul-label', 'Chuẩn bị'));
     const prepBar = h.el('progress', 'ul-progress');
     prepBar.max = 1;
     const prepLabel = h.el('span', 'ul-progress-label muted',
       'Chưa chuẩn bị.');
-    const stopBtn = h.el('button', 'danger ul-stop', 'Dừng');
+    const stopBtn = h.el('button', 'danger sm', 'Dừng');
     stopBtn.disabled = true;
     stopBtn.addEventListener('click', () => actions.stopRunning());
-    pPrep.append(prepBar, prepLabel, stopBtn);
-    prog.append(pPrep);
-    const sessLine = h.el('div', 'ul-summary muted', '');
+    pRow.append(prepBar, prepLabel, stopBtn);
+    cfgBody.append(pRow);
+    const sessLine = h.el('div', 'muted small ul-note', '');
     sessLine.hidden = true;
-    prog.append(sessLine);
-    const scanSummary = h.el('div', 'ul-summary muted', 'Chưa quét thư mục.');
-    prog.append(scanSummary);
-    panel.append(prog);
+    cfgBody.append(sessLine);
+    const scanSummary = h.el('div', 'muted small ul-note', 'Chưa quét thư mục.');
+    cfgBody.append(scanSummary);
+    cfg.append(cfgBody);
+    panel.append(cfg);
 
-    // ---------- Thanh thao tac ----------
-    const qCard = h.el('div', 'ul-card ul-queue');
+    // ---------- Thanh thao tac — card rieng tren bang (spec §3) ----------
+    const actCard = h.el('div', 'card');
+    const actBody = h.el('div', 'card-body');
     const bar = h.el('div', 'ul-actions');
-    const selAll = h.el('button', '', 'Chọn tất cả');
+    const selAll = h.el('button', 'sm', 'Chọn tất cả');
     selAll.addEventListener('click', () => {
       S.selectAll(state);
       refresh();
     });
-    const selNone = h.el('button', '', 'Bỏ chọn tất cả');
+    const selNone = h.el('button', 'sm', 'Bỏ chọn tất cả');
     selNone.addEventListener('click', () => {
       S.clearSelection(state);
       refresh();
     });
-    const filterBtn = h.el('button', '', 'Lọc số lỗi');
+    const filterBtn = h.el('button', 'sm', 'Lọc số lỗi');
     filterBtn.addEventListener('click', () => {
       S.toggleIssueFilter(state);
       refresh();
     });
-    const missBtn = h.el('button', '', 'Số thiếu trong Excel');
+    const missBtn = h.el('button', 'sm', 'Số thiếu trong Excel');
     missBtn.addEventListener('click', () => {
       if (!S.selectMissingExcel(state)) {
         ctx.notify('Chưa có số thiếu trong Excel để chọn.', true);
@@ -157,15 +157,27 @@
       refresh();
     });
     const barSpacer = h.el('span', 'ul-spacer');
-    const upBtn = h.el('button', 'primary', 'Upload file đã chọn (0)');
+    const upBtn = h.el('button', 'primary sm', 'Upload file đã chọn (0)');
     upBtn.addEventListener('click', () => actions.prepare());
-    const contBtn = h.el('button', '', 'Tiếp tục 10 số tiếp theo');
+    const contBtn = h.el('button', 'secondary sm',
+      'Tiếp tục 10 số tiếp theo');
     contBtn.addEventListener('click', () => actions.continuePrepare());
-    const closeBtn = h.el('button', 'danger', 'Đóng browser upload');
+    const closeBtn = h.el('button', 'danger sm', 'Đóng browser upload');
     closeBtn.addEventListener('click', () => actions.closeSession());
     bar.append(selAll, selNone, filterBtn, missBtn, barSpacer,
       upBtn, contBtn, closeBtn);
-    qCard.append(bar);
+    actBody.append(bar);
+    actCard.append(actBody);
+    panel.append(actCard);
+
+    // ---------- Hang cho (queue) — card co tieu de dem so + bang ----------
+    const qCard = h.el('div', 'card ul-queue-card');
+    const qHead = h.el('div', 'card-head');
+    const queueTitle = h.el('h3', 'card-title',
+      'Hàng chờ (0 hồ sơ · đã chọn 0)');
+    qHead.append(queueTitle);
+    qCard.append(qHead);
+    const qBody = h.el('div', 'card-body ul-queue-body');
 
     // Canh bao can doi chieu + nut hanh dong (upload.reconcile — contract
     // §6.15). Banner luon dem so ho so chua ro da Luu; hanh dong doi chieu
@@ -173,34 +185,35 @@
     const reconBanner = h.el('div', 'ul-reconcile');
     reconBanner.hidden = true;
     const reconText = h.el('span', 'ul-reconcile-text');
-    const reconBtn = h.el('button', 'ul-reconcile-btn',
+    const reconBtn = h.el('button', 'ul-reconcile-btn secondary sm',
       'Đối chiếu với sổ mới');
     reconBtn.type = 'button';
     reconBtn.addEventListener('click', () => actions.reconcile());
-    const reconHint = h.el('span', 'muted ul-reconcile-hint');
+    const reconHint = h.el('span', 'ul-reconcile-hint');
     reconBanner.append(reconText, reconBtn, reconHint);
-    qCard.append(reconBanner);
+    qBody.append(reconBanner);
 
-    // Loi/partial cua dot prepare — hien ngay duoi thanh thao tac, khong
-    // nuot vao the Job (spec §4).
+    // Loi/partial cua dot prepare — hien ngay tren bang, khong nuot vao
+    // the Job (spec §4).
     const prepErr = h.el('div', 'ul-error ul-prepare-error');
     prepErr.hidden = true;
-    qCard.append(prepErr);
+    qBody.append(prepErr);
 
     // ---------- Bang 6 cot ----------
-    const wrap = h.el('div', 'ul-table-wrap ul-queue-table');
-    const scroll = h.el('div', 'ul-scroll ul-scroll-fill');
-    const t = h.el('table', 'ul-table');
+    const wrap = h.el('div', 'ul-table-wrap');
+    const t = h.el('table', 'ul-grid ul-queue-grid');
     const thead = h.el('thead');
     const htr = h.el('tr');
-    for (const c of S.QUEUE_COLUMNS) htr.append(h.el('th', '', c));
+    for (const c of S.QUEUE_COLUMNS) {
+      htr.append(h.el('th', c === 'STT' ? 'num' : '', c));
+    }
     thead.append(htr);
     t.append(thead);
     const tbody = h.el('tbody');
     t.append(tbody);
-    scroll.append(t);
-    wrap.append(scroll);
-    qCard.append(wrap);
+    wrap.append(t);
+    qBody.append(wrap);
+    qCard.append(qBody);
     panel.append(qCard);
 
     function queueRow(row, tr, idx) {
@@ -209,7 +222,7 @@
         tr = h.el('tr');
         tr._c = {};
         const cbTd = h.el('td', 'ul-cb');
-        const cb = h.el('input');
+        const cb = h.el('input', 'cb');
         cb.type = 'checkbox';
         cb.setAttribute('aria-label', `Chọn hồ sơ ${id}`);
         cb.addEventListener('change', () => {
@@ -228,13 +241,16 @@
           if (tr._c.path && tr._c.path._p) actions.openFile(tr._c.path._p);
         });
         for (const k of ['stt', 'ngay', 'so', 'chu', 'path']) {
-          const td = h.el('td');
+          const td = h.el('td',
+            (k === 'chu' || k === 'path') ? '' : 'num');
           tr._c[k] = td;
           tr.append(td);
         }
         tr._c.path.classList.add('ul-path');
         const inner = h.el('div', 'ul-path-inner');
-        const txt = h.el('span', 'ul-path-text');
+        // truncate-path (shared): cat dau duong dan, giu ten file; title
+        // hien duong dan day du khi hover.
+        const txt = h.el('span', 'ul-path-text truncate-path');
         const open = h.el('button', 'ul-open', 'Mở');
         open.type = 'button';
         open.addEventListener('click', () => {
@@ -453,6 +469,9 @@
       syncProgress();
       const rows = S.sortedQueueRows(state);
       syncButtons(state.rowIds.size > 0);
+      queueTitle.textContent =
+        `Hàng chờ (${state.rowIds.size} hồ sơ · ` +
+        `đã chọn ${state.selectedIds.size})`;
 
       // Tom tat luot quet.
       const parts = [`folder=${state.rowIds.size}`];
