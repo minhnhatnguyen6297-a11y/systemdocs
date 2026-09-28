@@ -35,7 +35,7 @@ function fid(root, v) {
 
 // Build view + model voi client stub ghi lai moi command call (de chung
 // minh apply/cancel KHONG goi command ra ngoai).
-function build(t, { draft = true, confirm = true } = {}) {
+function build(t, { draft = true, confirm = true, respond = null } = {}) {
   const { document } = makeDom();
   global.document = document;
   global.window = {
@@ -47,7 +47,8 @@ function build(t, { draft = true, confirm = true } = {}) {
   const client = {
     run: async (cmd, payload) => {
       calls.push([cmd, payload]);
-      return { ok: true, data: {} };
+      const r = respond && respond(cmd, payload);
+      return r || { ok: true, data: {} };
     },
   };
   const model = M.createModel({ client });
@@ -367,4 +368,238 @@ test('stageDirty gate: Đánh giá/Lưu sơ đồ disabled khi Stage chưa cập
   assert.ok(collect(view.el, (e) =>
     e.textContent === 'Cập nhật Stage trước').length >= 1,
     'thiếu pill báo gate');
+});
+
+
+// ---------- MIN-133 W2: thanh trên + Stage mật độ cao ----------
+
+function topbar(root) {
+  return collect(root, (e) => e.classList.contains('cd-topbar'))[0];
+}
+
+test('MIN-133 D5: một thanh trên = tab cục bộ + hành động (không actionbar riêng)', () => {
+  const { view } = build(test, { draft: true });
+  const bars = collect(view.el, (e) => e.classList.contains('cd-topbar'));
+  assert.equal(bars.length, 1, 'phải có đúng một .cd-topbar');
+  const bar = bars[0];
+  assert.equal(bar.parentElement, view.el,
+    'thanh trên nằm trực tiếp dưới .cd-root');
+  const nav = collect(bar, (e) => e.classList.contains('cd-localnav'))[0];
+  assert.ok(nav, 'tab cục bộ phải nằm trong thanh trên');
+  assert.deepEqual(collect(nav, (e) => e.classList.contains('cd-tab'))
+    .map((b) => b.textContent), ['Tổng quan hồ sơ', 'Soạn hồ sơ', 'Word']);
+  const actions = collect(bar,
+    (e) => e.classList.contains('cd-topbar-actions'))[0];
+  assert.ok(actions && !actions.hidden);
+  const labels = collect(actions, (e) =>
+    e.tagName === 'BUTTON' || e.tagName === 'SELECT')
+    .map((e) => e.tagName === 'SELECT' ? 'select' : e.textContent);
+  assert.deepEqual(labels,
+    ['select', 'Nhập file', 'Zalo', 'Hủy thay đổi', 'Lưu hồ sơ']);
+  assert.equal(collect(view.el,
+    (e) => e.classList.contains('actionbar')).length, 0,
+    'còn .actionbar riêng — phải gộp vào thanh trên');
+});
+
+test('MIN-133 D4: không nút ‹, tiêu đề, pill Nháp, nhãn trạng thái lưu', () => {
+  const { model, view } = build(test, { draft: true });
+  model.addPerson();                          // dirty
+  const all = collect(view.el, () => true);
+  assert.ok(!all.some((e) => e.classList.contains('ab-back')), 'còn nút back');
+  assert.ok(!all.some((e) => e.classList.contains('ab-title')), 'còn tiêu đề');
+  assert.ok(!all.some((e) => e.classList.contains('save-state')),
+    'còn nhãn trạng thái lưu');
+  const txt = view.el.textContent;
+  for (const bad of ['Soạn văn bản', 'Nháp — chưa lưu', 'Chưa lưu hồ sơ',
+                     'Chưa lưu:', 'Đã lưu · phiên bản']) {
+    assert.ok(!txt.includes(bad), `còn chuỗi "${bad}"`);
+  }
+  // Tín hiệu duy nhất: chấm dirty trên nút Lưu hồ sơ.
+  const save = findBtns(topbar(view.el), 'Lưu hồ sơ')[0];
+  assert.equal(collect(save,
+    (e) => e.classList.contains('dirty-dot')).length, 1);
+  assert.match(save.getAttribute('aria-label'), /có thay đổi chưa lưu/);
+});
+
+test('MIN-133 D4: case thật — chấm dirty theo stageDirty; pill loại · HS', () => {
+  const { model, view } = build(test, { draft: false });
+  const upd = () => findBtns(topbar(view.el), 'Cập nhật')[0];
+  const dots = (b) => collect(b, (e) => e.classList.contains('dirty-dot'));
+  assert.equal(dots(upd()).length, 0);
+  assert.equal(collect(topbar(view.el), (e) =>
+    e.classList.contains('cd-case-pill') &&
+    e.textContent === 'Thừa kế · HS-42').length, 1);
+  assert.equal(collect(topbar(view.el), (e) => e.tagName === 'SELECT').length,
+    0, 'case thật không cho đổi loại việc');
+  model.addPerson();
+  assert.equal(dots(upd()).length, 1);
+});
+
+test('MIN-133: đang gõ trong Stage — nút Cập nhật vẫn hiện chấm dirty (defer rebuild)', () => {
+  const { model, view } = build(test, { draft: false });
+  const rid = model.state.stage.people[0].row_id;
+  const inp = fid(view.el, `p:${rid}:ho_ten`);
+  inp.focus();
+  inp.value = 'Người Đã Sửa';
+  inp.oninput();
+  assert.ok(inp.isConnected, 'input đang gõ bị rebuild');
+  const upd = findBtns(topbar(view.el), 'Cập nhật')[0];
+  assert.equal(upd.disabled, false);
+  assert.equal(collect(upd,
+    (e) => e.classList.contains('dirty-dot')).length, 1);
+});
+
+test('MIN-133: tab Tổng quan — ẩn phần hành động của thanh trên', () => {
+  const { view } = build(test, { draft: true });
+  const bar = topbar(view.el);
+  const actions = collect(bar,
+    (e) => e.classList.contains('cd-topbar-actions'))[0];
+  findBtns(bar, 'Tổng quan hồ sơ')[0].onclick();
+  assert.equal(actions.hidden, true);
+  assert.equal(findBtns(bar, 'Lưu hồ sơ').length, 0);
+  findBtns(bar, 'Soạn hồ sơ')[0].onclick();
+  assert.equal(actions.hidden, false);
+  assert.equal(findBtns(bar, 'Lưu hồ sơ').length, 1);
+});
+
+test('MIN-133: đổi Loại việc trên thanh trên → Stage dựng lại ngay, select giữ focus', () => {
+  const { model, view, document } = build(test, { draft: true });
+  model.addPerson();
+  const sel = collect(topbar(view.el), (e) =>
+    e.tagName === 'SELECT' && e.classList.contains('cd-case-type'))[0];
+  assert.ok(sel, 'thiếu select cd-case-type');
+  const ownerCols = () => collect(view.el,
+    (e) => e.classList.contains('cd-owner-col')).length;
+  assert.equal(ownerCols(), 1);
+  sel.focus();
+  sel.value = 'two_party';
+  sel.onchange();
+  assert.equal(model.state.caseInfo.case_type, 'two_party');
+  // Stage KHÔNG bị hoãn dù select đang focus (select nằm ngoài panel).
+  assert.equal(ownerCols(), 0, 'đổi sang Hai bên mà cột Để lại vẫn còn');
+  // Select đang focus không bị thay node (dropdown không đóng).
+  assert.ok(sel.isConnected);
+  assert.equal(document.activeElement, sel);
+});
+
+test('MIN-133 D2: không card Thông tin hồ sơ; Lưu hồ sơ vẫn gửi meta mặc định đủ', async () => {
+  const respond = (cmd, p) => cmd === 'notary.workspace_create'
+    ? { ok: true, data: {
+        created: true, backend_mode: 'real',
+        case: { id: 77, case_type: p.case.case_type,
+                document_type: p.case.document_type, status: 'active',
+                locked: false, revision: 1 },
+        capabilities: { intake: [], diagram: true, word_export: true },
+        stage: p.stage, diagram: { state: p.diagram.state } } }
+    : null;
+  const { model, view, calls } = build(test, { draft: true, respond });
+  assert.ok(!view.el.textContent.includes('Thông tin hồ sơ'),
+    'còn card Thông tin hồ sơ');
+  for (const lbl of ['Loại văn bản', 'Ngày lập hồ sơ', 'Nơi niêm yết',
+                     'Ghi chú']) {
+    assert.equal(collect(view.el,
+      (e) => e.getAttribute('aria-label') === lbl).length, 0,
+      `còn ô "${lbl}"`);
+  }
+  const owner = model.addPerson({ ho_ten: 'Người Để Lại' });
+  model.setOwnerRow(owner.row_id);
+  model.addAsset({ so_serial: 'AA000001' });
+  calls.length = 0;
+  await findBtns(topbar(view.el), 'Lưu hồ sơ')[0].onclick();
+  const call = calls.find(([c]) => c === 'notary.workspace_create');
+  assert.ok(call, 'Lưu hồ sơ không gọi workspace_create');
+  const meta = call[1].case;
+  assert.deepEqual(Object.keys(meta).sort(), ['case_type', 'document_type',
+    'ghi_chu', 'ngay_lap_ho_so', 'noi_niem_yet']);
+  assert.equal(meta.case_type, 'inheritance');
+  assert.equal(meta.document_type, 'khai_nhan',
+    'document_type phải = mặc định model');
+  assert.equal(meta.ngay_lap_ho_so, null, 'ngay_lap_ho_so để backend tự điền');
+  assert.equal(meta.noi_niem_yet, null);
+  assert.equal(meta.ghi_chu, null);
+  assert.equal(call[1].stage.owner_row_id, owner.row_id);
+  assert.equal(model.state.caseId, 77, 'saveDraft không thành công');
+  assert.equal(findBtns(topbar(view.el), 'Cập nhật').length, 1,
+    'sau lưu nút chính phải chuyển sang Cập nhật');
+});
+
+test('MIN-133 D1: bảng Người 7 cột theo DB Customer + colgroup cố định', () => {
+  const { model, view } = build(test);
+  model.addPerson();
+  const t = collect(view.el, (e) => e.classList.contains('cd-ptbl'))[0];
+  assert.ok(t.classList.contains('cd-stage-tbl'));
+  const heads = collect(t, (e) => e.tagName === 'TH')
+    .map((e) => e.textContent);
+  assert.deepEqual(heads, ['', 'Để lại', 'Họ tên', 'Giới tính', 'Ngày sinh',
+    'Ngày mất', 'Số giấy tờ', 'Ngày cấp', 'Địa chỉ', '']);
+  const cols = collect(t, (e) => e.tagName === 'COL').map((c) => c.className);
+  assert.deepEqual(cols, ['cd-pcol-drag', 'cd-pcol-owner', 'cd-pcol-ho_ten',
+    'cd-pcol-gioi_tinh', 'cd-pcol-ngay_sinh', 'cd-pcol-ngay_chet',
+    'cd-pcol-so_giay_to', 'cd-pcol-ngay_cap', 'cd-pcol-dia_chi',
+    'cd-pcol-del']);
+  const rid = model.state.stage.people[0].row_id;
+  for (const k of ['noi_cap', 'place_of_origin']) {
+    assert.equal(fid(view.el, `p:${rid}:${k}`), null, `còn ô ${k}`);
+  }
+  assert.ok(!view.el.textContent.includes('Nơi cấp'));
+  assert.ok(!view.el.textContent.includes('Nguyên quán'));
+  // ô nhập dùng .cd-cell (nằm trong ô, không nền) + tooltip = giá trị.
+  const inp = fid(view.el, `p:${rid}:dia_chi`);
+  assert.ok(inp.classList.contains('cd-cell'));
+  inp.value = 'Ấp 3, xã Tân Phú, huyện Đức Hòa, tỉnh Long An';
+  inp.oninput();
+  assert.equal(inp.title, inp.value);
+});
+
+test('MIN-133 D1: two_party — colgroup khớp số cột (không Để lại)', () => {
+  const { model, view } = build(test);
+  model.updateCaseMeta('case_type', 'two_party');
+  model.addPerson();
+  const t = collect(view.el, (e) => e.classList.contains('cd-ptbl'))[0];
+  const cols = collect(t, (e) => e.tagName === 'COL');
+  const ths = collect(t, (e) => e.tagName === 'TH');
+  assert.equal(cols.length, ths.length, 'colgroup lệch số cột header');
+  assert.equal(cols.length, 9);
+});
+
+test('MIN-133 D1: noi_cap/place_of_origin cũ giữ nguyên trên row và lên wire khi Cập nhật', async () => {
+  const { model, view, calls, document } = build(test, { draft: false });
+  const row = model.state.stage.people[0];
+  row.noi_cap = 'Cục CS QLHC về TTXH';
+  row.place_of_origin = 'Hà Nội';
+  model.state.committed.people[0].noi_cap = row.noi_cap;
+  model.state.committed.people[0].place_of_origin = row.place_of_origin;
+  model.dismissNotice();                     // rerender
+  const inp = fid(view.el, `p:${row.row_id}:ho_ten`);
+  inp.value = 'Người Đã Sửa Tên';
+  inp.oninput();
+  document.activeElement = null;
+  calls.length = 0;
+  await findBtns(topbar(view.el), 'Cập nhật')[0].onclick();
+  const call = calls.find(([c]) => c === 'notary.workspace_commit_stage');
+  assert.ok(call, 'Cập nhật không gọi workspace_commit_stage');
+  const sent = call[1].stage.people[0];
+  assert.equal(sent.ho_ten, 'Người Đã Sửa Tên');
+  assert.equal(sent.noi_cap, 'Cục CS QLHC về TTXH', 'mất noi_cap trên wire');
+  assert.equal(sent.place_of_origin, 'Hà Nội', 'mất place_of_origin trên wire');
+});
+
+test('MIN-133: lỗi trường không có ô (noi_cap) vẫn hiện ở đầu card Người', () => {
+  const { model, view } = build(test, { draft: false });
+  model.state.fieldErrors = [{ row_id: 'c1', field: 'noi_cap',
+                               code: 'invalid', message: 'Nơi cấp sai' }];
+  model.dismissNotice();
+  const card = collect(view.el, (e) => e.classList.contains('cd-people'))[0];
+  assert.match(card.textContent, /Nơi cấp sai/);
+});
+
+test('MIN-133: bảng Tài sản colgroup nhãn + mỗi tài sản một cột', () => {
+  const { model, view } = build(test);
+  model.addAsset(); model.addAsset();
+  const t = collect(view.el, (e) => e.classList.contains('cd-tbl'))[0];
+  assert.ok(t.classList.contains('cd-stage-tbl'));
+  assert.deepEqual(collect(t, (e) => e.tagName === 'COL')
+    .map((c) => c.className), ['cd-acol-label', 'cd-acol', 'cd-acol']);
+  const a0 = model.state.stage.assets[0].row_id;
+  assert.ok(fid(view.el, `a:${a0}:dia_chi`).classList.contains('cd-cell'));
 });

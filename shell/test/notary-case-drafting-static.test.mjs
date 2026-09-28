@@ -291,3 +291,103 @@ test('MIN-128: view co owner selector + case type badge + position display', () 
   assert.match(v, /case_type/);
   assert.match(v, /two_party/);
 });
+
+// ---------- MIN-133 W2: thanh trên + Stage (mockup đã duyệt 28/09) ----------
+
+// Lấy khối rule theo selector đầu dòng (chỉ top-level, đủ cho CSS phẳng).
+function cssRule(src, selector) {
+  const esc = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = src.match(new RegExp(`(^|\\n)${esc}\\s*\\{([^}]*)\\}`));
+  return m ? m[2] : null;
+}
+
+test('MIN-133 D8: Stage không thanh cuộn — bỏ max-height/overflow cuộn/min-width cột', () => {
+  const body = cssRule(cssSrc, '.cd-stage-body');
+  assert.ok(body !== null, 'thiếu rule .cd-stage-body');
+  assert.ok(!/max-height/.test(body), '.cd-stage-body còn max-height');
+  assert.ok(!/overflow\s*:\s*(auto|scroll)/.test(body),
+    '.cd-stage-body còn overflow cuộn');
+  const wrap = cssRule(cssSrc, '.cd-table-wrap');
+  assert.ok(wrap !== null, 'thiếu rule .cd-table-wrap');
+  assert.ok(!/overflow\s*:\s*(auto|scroll)/.test(wrap),
+    '.cd-table-wrap còn cuộn');
+  // Phần Stage (layout tổng → hết Stage) không còn overflow cuộn, không
+  // min-width cho ô/cột, không sticky cột nhãn.
+  const start = cssSrc.indexOf('layout tổng (MIN-133 D8)');
+  const end = cssSrc.indexOf('land-types dialog');
+  assert.ok(start > -1 && end > start, 'không tìm thấy vùng CSS Stage');
+  const stage = cssSrc.slice(start, end)
+    .replace(/\.cd-caselist\s*\{[^}]*\}/, '');   // danh sách Tổng quan
+  assert.ok(!/overflow\s*:\s*(auto|scroll)/.test(stage),
+    'vùng Stage/thanh trên còn overflow cuộn');
+  assert.ok(!/min-width\s*:\s*(1[01]\d|17\d)px/.test(stage),
+    'còn min-width cột/ô cũ (110/118/176px)');
+  assert.ok(!/position\s*:\s*sticky/.test(stage), 'còn sticky cột nhãn');
+});
+
+test('MIN-133: bảng Stage table-layout fixed + colgroup theo mockup', () => {
+  assert.match(cssSrc, /table\.cd-stage-tbl\s*\{[^}]*table-layout\s*:\s*fixed/);
+  assert.match(cssSrc, /col\.cd-acol-label\s*\{\s*width:\s*var\(--cd-asset-label-w\)/);
+  assert.match(cssSrc, /--cd-asset-label-w:\s*122px/);
+  assert.match(cssSrc, /col\.cd-pcol-drag\s*\{\s*width:\s*20px/);
+  assert.match(cssSrc, /col\.cd-pcol-owner\s*\{\s*width:\s*44px/);
+  assert.match(cssSrc, /--cd-col-name:\s*214px/);
+  assert.match(cssSrc, /col\.cd-pcol-gioi_tinh\s*\{\s*width:\s*64px/);
+  assert.match(cssSrc, /--cd-col-date:\s*86px/);
+  assert.match(cssSrc, /--cd-col-id:\s*106px/);
+  assert.match(cssSrc, /col\.cd-pcol-del\s*\{\s*width:\s*24px/);
+  // Địa chỉ = phần còn lại: không có width cố định.
+  assert.ok(!/col\.cd-pcol-dia_chi\s*\{/.test(cssSrc));
+  // Tài sản : Người = 35 : 65 (38 : 62 ở màn ≥1800).
+  assert.match(cssSrc, /--cd-assets-w:\s*35%/);
+  assert.match(cssSrc, /min-width:\s*1800px\)[\s\S]*?--cd-assets-w:\s*38%/);
+  assert.match(cssSrc, /\.cd-assets\s*\{[^}]*flex:\s*0 0 var\(--cd-assets-w\)/);
+  // Hàng 25px, dữ liệu 14px, nhãn 13px; ô nhập không nền, cắt "…".
+  assert.match(cssSrc, /--cd-row-h:\s*25px/);
+  assert.match(cssSrc, /--cd-fs-data:\s*var\(--fs-data,\s*14px\)/);
+  const cell = cssSrc.match(/\.cd-stage-tbl \.cd-cell\s*\{([^}]*)\}/);
+  assert.ok(cell, 'thiếu rule .cd-cell');
+  assert.match(cell[1], /background:\s*transparent/);
+  assert.match(cell[1], /border:\s*1px solid transparent/);
+  assert.match(cell[1], /text-overflow:\s*ellipsis/);
+  assert.match(cssSrc, /\.cd-cell:focus\s*\{[^}]*border-color:\s*var\(--accent\)/);
+});
+
+test('MIN-133 D5: thanh trên 42px; select Loại việc rộng ≥128px', () => {
+  const bar = cssRule(cssSrc, '.cd-topbar');
+  assert.ok(bar, 'thiếu rule .cd-topbar');
+  assert.match(bar, /height:\s*42px/);
+  const sel = cssSrc.match(/\.cd-root \.cd-case-type\s*\{([^}]*)\}/);
+  assert.ok(sel, 'thiếu rule .cd-root .cd-case-type');
+  const mw = sel[1].match(/min-width:\s*(\d+)px/);
+  assert.ok(mw && Number(mw[1]) >= 128, 'select loại việc < 128px');
+  assert.ok(!/actionbar|ab-back|ab-title|save-state/.test(cssSrc),
+    'CSS còn rule actionbar/back/title/save-state cũ');
+});
+
+test('MIN-133 D8: layout flex dọc — vùng sơ đồ lấp phần còn lại, có min-height', () => {
+  assert.match(cssSrc, /\.cd-root-outer\s*\{[^}]*flex-direction:\s*column[^}]*min-height:\s*100%/);
+  const rel = cssSrc.match(/\.cd-workspace > \.cd-rel-card\s*\{([^}]*)\}/);
+  assert.ok(rel, 'thiếu rule lớp ngoài .cd-rel-card');
+  assert.match(rel[1], /flex:\s*1 0 auto/);
+  assert.match(rel[1], /min-height:\s*\d+px/);
+  // min-height (không height) để Stage cao thì cả trang cuộn.
+  assert.ok(!/\.cd-root\s*\{[^}]*[\s;]height:\s*100%/.test(cssSrc));
+});
+
+test('MIN-133 D1/D2/D4: view không còn cột noi_cap/place_of_origin, card meta, back/title', () => {
+  const cols = viewCode.match(/const PERSON_COLS = \[([\s\S]*?)\];/);
+  assert.ok(cols);
+  const keys = [...cols[1].matchAll(/\['(\w+)'/g)].map((m) => m[1]);
+  assert.deepEqual(keys, ['ho_ten', 'gioi_tinh', 'ngay_sinh', 'ngay_chet',
+    'so_giay_to', 'ngay_cap', 'dia_chi']);
+  for (const bad of ['draftMetaEl', 'Thông tin hồ sơ', 'ab-back', 'ab-title',
+                     'Soạn văn bản', 'Nháp — chưa lưu', 'saveStateText',
+                     'js-cd-save-state']) {
+    assert.ok(!viewCode.includes(bad), `view còn "${bad}"`);
+  }
+  // Model vẫn giữ trường wire (không đổi model/contract).
+  assert.match(modelSrc, /'noi_cap'/);
+  assert.match(modelSrc, /'place_of_origin'/);
+  assert.match(modelSrc, /'ngay_lap_ho_so'/);
+});

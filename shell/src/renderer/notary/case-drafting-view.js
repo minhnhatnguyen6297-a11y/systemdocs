@@ -1,13 +1,20 @@
 'use strict';
 
-/* Case-drafting view — khung UI tab Soạn hồ sơ (MIN-111 → MIN-129 P6).
+/* Case-drafting view — khung UI tab Soạn hồ sơ (MIN-111 → MIN-129 P6 →
+ * MIN-133 W2 mật độ cao).
  *
- * SOT bo cuc: bản mẫu đã duyệt (docs/product/ui/prototypes +
- * references/approved-{drafting,land-types}.png):
- *   - Action bar gọn một hàng: back, loại việc, trạng thái lưu,
- *     Nhập file, Zalo (disabled placeholder), Hủy thay đổi, Cập nhật.
+ * SOT bo cuc: mockup MIN-133 đã duyệt (.agent/tasks/MIN-133/mockup/
+ * mockup-1440x775.png) trên nền bản mẫu P6 (docs/product/ui/prototypes):
+ *   - Thanh trên DUY NHẤT (.cd-topbar, ~42px): tab cục bộ (Tổng quan /
+ *     Soạn / Word) | loại việc, Nhập file, Zalo (disabled placeholder)
+ *     ……… Hủy thay đổi, Lưu hồ sơ/Cập nhật (chấm dirty = tín hiệu chưa
+ *     lưu duy nhất). Không nút back, không tiêu đề, không pill Nháp,
+ *     không nhãn trạng thái lưu (MIN-133 D4/D5).
+ *   - Không card Thông tin hồ sơ (D2): document_type theo mặc định model,
+ *     ngay_lap_ho_so backend tự điền, noi_niem_yet/ghi_chu null.
  *   - Stage: Tài sản bảng chuyển vị (mỗi tài sản MỘT CỘT, tối đa 3) /
- *     Người bảng dòng (mỗi người MỘT HÀNG, trường trong ô).
+ *     Người bảng dòng (mỗi người MỘT HÀNG, 7 cột theo DB Customer — D1).
+ *     table-layout fixed + colgroup, KHÔNG thanh cuộn trong Stage (D8).
  *   - Kéo-thả đổi vị trí cột tài sản / hàng người + đường bàn phím
  *     (Ctrl+←/→ cho cột, Ctrl+↑/↓ cho hàng). Reorder/re-render KHÔNG
  *     mất giá trị đang gõ hay focus (defer + data-fid restore).
@@ -39,18 +46,18 @@ const CASE_TYPE_LABEL = {
   two_party: 'Hai bên',
 };
 
-// Person stage columns — toàn bộ PERSON_FIELDS contract §13.3 (không bỏ
-// trường nghiệp vụ). 4 cột đầu khớp bản mẫu; phần còn lại cuộn ngang.
+// Person stage columns — 7 cột đúng DB Customer (MIN-133 D1, owner chốt
+// 28/09/2026). `noi_cap` (backend suy từ ngày cấp) và `place_of_origin`
+// KHÔNG có ô nhập nhưng vẫn nằm trên row của model và đi nguyên vẹn lên
+// wire (view không xóa key nào khỏi row) — không mất dữ liệu cũ.
 const PERSON_COLS = [
   ['ho_ten', 'Họ tên'],
+  ['gioi_tinh', 'Giới tính'],
   ['ngay_sinh', 'Ngày sinh'],
   ['ngay_chet', 'Ngày mất'],
   ['so_giay_to', 'Số giấy tờ'],
-  ['dia_chi', 'Địa chỉ'],
-  ['gioi_tinh', 'Giới tính'],
   ['ngay_cap', 'Ngày cấp'],
-  ['noi_cap', 'Nơi cấp'],
-  ['place_of_origin', 'Nguyên quán'],
+  ['dia_chi', 'Địa chỉ'],
 ];
 
 // Asset stage rows — 4 hàng đầu khớp bản mẫu + 'land' chip + phần còn
@@ -358,18 +365,15 @@ function createNotaryModuleView(deps) {
     return box;
   }
 
-  // ---------- action bar (approved: một hàng gọn) ----------
+  // ---------- thanh trên: phần hành động (MIN-133 D4/D5) ----------
+  // Tín hiệu chưa lưu duy nhất = chấm dirty trên nút Lưu/Cập nhật
+  // (bỏ nhãn "Chưa lưu hồ sơ"/"Đã lưu · phiên bản N").
 
-  function saveStateText() {
+  function primaryDirty() {
     const s = model.state;
-    if (s.caseId == null) return 'Chưa lưu hồ sơ';
-    if (s.stageDirty || s.diagramDirty) {
-      const n = [];
-      if (s.stageDirty) n.push('Stage');
-      if (s.diagramDirty) n.push('Sơ đồ');
-      return `Chưa lưu: ${n.join(' + ')}`;
-    }
-    return `Đã lưu · phiên bản ${s.revision}`;
+    return s.caseId == null
+      ? (s.stageDirty || s.diagramDirty || s.metaDirty)
+      : s.stageDirty;
   }
 
   // Commit/Cập nhật — điểm ghi duy nhất của Stage (§13.2). Nháp mới:
@@ -429,20 +433,16 @@ function createNotaryModuleView(deps) {
     model.dismissNotice();
   }
 
-  function actionBarEl(onBack) {
+  // Điền phần hành động vào thanh trên (.cd-topbar-actions) — chỉ khi
+  // tab Soạn hồ sơ đang mở một workspace. Thứ tự theo mockup MIN-133:
+  // | loại việc · Nhập file · Zalo ……… [pill trạng thái] Hủy · Lưu •
+  function fillTopActions(bar) {
     const s = model.state;
     const c = s.caseInfo || {};
     const draft = s.caseId == null;
-    const bar = h('div', 'actionbar');
-    const back = h('button', 'ab-back', '‹');
-    back.type = 'button';
-    back.setAttribute('aria-label', 'Quay lại Tổng quan hồ sơ');
-    back.title = 'Quay lại Tổng quan hồ sơ';
-    back.onclick = onBack;
-    bar.append(back);
-    bar.append(h('h1', 'ab-title', 'Soạn văn bản'));
+    bar.append(h('span', 'cd-vsep', ''));
     // Loại việc: nháp → select (ghi updateCaseMeta, đổi loại reset
-    // diagram buffer §13.5); case thật → pill immutable.
+    // diagram buffer §13.5); case thật → pill immutable (loại · HS-id).
     if (draft) {
       const sel = h('select', 'cd-case-type');
       for (const [v, lbl] of Object.entries(CASE_TYPE_LABEL)) {
@@ -451,31 +451,20 @@ function createNotaryModuleView(deps) {
         if ((c.case_type || 'inheritance') === v) o.selected = true;
         sel.append(o);
       }
+      sel.value = c.case_type || 'inheritance';
       sel.setAttribute('aria-label', 'Loại việc');
+      sel.dataset.fid = 'top:case_type';
       sel.onchange = () => model.updateCaseMeta('case_type', sel.value);
       bar.append(sel);
     } else {
-      bar.append(h('span', 'pill accent',
-        CASE_TYPE_LABEL[c.case_type] || c.case_type || '—'));
-    }
-    if (draft) {
-      bar.append(h('span', 'pill warn', 'Nháp — chưa lưu'));
-    } else {
-      bar.append(h('span', 'pill accent', `HS-${s.caseId}`));
+      const pill = h('span', 'pill accent cd-case-pill',
+        `${CASE_TYPE_LABEL[c.case_type] || c.case_type || '—'} · ` +
+        `HS-${s.caseId}`);
       if (c.document_type) {
-        bar.append(h('span', 'muted small',
-          DOC_TYPE_LABEL[c.document_type] || c.document_type));
+        pill.title = DOC_TYPE_LABEL[c.document_type] || c.document_type;
       }
+      bar.append(pill);
     }
-    if (s.locked) bar.append(h('span', 'pill warn', 'Đã khóa'));
-    if (s.unsupported) {
-      bar.append(h('span', 'pill err', 'Loại việc chưa hỗ trợ'));
-    }
-    if (s.stale) {
-      bar.append(h('span', 'pill warn', 'Bản nháp cũ — server đã thay đổi'));
-    }
-    bar.append(h('span', 'spacer', ''));
-    bar.append(h('span', 'save-state js-cd-save-state', saveStateText()));
     // Intake duy nhất — mọi nguồn (file/ảnh/drop/text) qua dialog này.
     const intakeB = btn('Nhập file', '', () => openIntakeDialog(null));
     intakeB.disabled = !model.canWrite() ||
@@ -488,86 +477,59 @@ function createNotaryModuleView(deps) {
     zalo.disabled = true;
     zalo.title = 'Zalo — chưa bật trong phiên bản này';
     bar.append(zalo);
+    bar.append(h('span', 'cd-spacer', ''));
+    // Pill trạng thái chỉ khi thật sự có (locked/unsupported/stale) —
+    // conflict đã có dialog riêng.
+    if (s.locked) bar.append(h('span', 'pill warn', 'Đã khóa'));
+    if (s.unsupported) {
+      bar.append(h('span', 'pill err', 'Loại việc chưa hỗ trợ'));
+    }
+    if (s.stale) {
+      const st = h('span', 'pill warn', 'Bản cũ');
+      st.title = 'Bản nháp cũ — server đã thay đổi';
+      bar.append(st);
+    }
     const undo = btn('Hủy thay đổi', 'js-cd-undo', cancelDraft);
     undo.disabled = !model.canWrite() || !model.hasUnsaved();
     undo.title = 'Bỏ thay đổi Stage + Sơ đồ chưa cập nhật (về bản đã lưu)';
     bar.append(undo);
-    const primary = btn(draft ? 'Lưu hồ sơ' : 'Cập nhật',
-      'primary js-cd-update', runCommit);
-    if (draft ? (s.stageDirty || s.diagramDirty || s.metaDirty)
-              : s.stageDirty) {
-      primary.append(h('span', 'dirty-dot', ''));
-      primary.setAttribute('aria-label',
-        `${primary.textContent} — có thay đổi chưa lưu`);
-    }
+    const label = draft ? 'Lưu hồ sơ' : 'Cập nhật';
+    const primary = btn(label, 'primary js-cd-update', runCommit);
+    primary.dataset.label = label;
+    setPrimaryDirty(primary, primaryDirty());
     primary.disabled = commitDisabled();
     bar.append(primary);
-    return bar;
   }
 
-  // Cập nhật gọn nút commit/undo/nhãn save khi rebuild bị defer (đang
-  // gõ trong panel) — dirty state phải hiện ngay, không chờ blur.
+  function setPrimaryDirty(upd, dirty) {
+    const dot = upd.querySelector('.dirty-dot');
+    if (dirty && !dot) upd.append(h('span', 'dirty-dot', ''));
+    if (!dirty && dot) dot.remove();
+    const label = upd.dataset.label || upd.textContent;
+    if (dirty) {
+      upd.setAttribute('aria-label', `${label} — có thay đổi chưa lưu`);
+    } else {
+      upd.removeAttribute('aria-label');
+    }
+  }
+
+  // Cập nhật gọn nút commit/undo khi rebuild bị defer (đang gõ trong
+  // panel) — dirty state phải hiện ngay, không chờ blur.
   function syncChromeUI() {
-    const s = model.state;
     const upd = root.querySelector('.js-cd-update');
     if (upd) {
       upd.disabled = commitDisabled();
-      const dirty = s.caseId == null
-        ? (s.stageDirty || s.diagramDirty || s.metaDirty)
-        : s.stageDirty;
-      let dot = upd.querySelector('.dirty-dot');
-      if (dirty && !dot) upd.append(h('span', 'dirty-dot', ''));
-      if (!dirty && dot) dot.remove();
+      setPrimaryDirty(upd, primaryDirty());
     }
     const undo = root.querySelector('.js-cd-undo');
     if (undo) undo.disabled = !model.canWrite() || !model.hasUnsaved();
-    const lbl = root.querySelector('.js-cd-save-state');
-    if (lbl) lbl.textContent = saveStateText();
   }
 
-  // Form meta của nháp mới (document_type + 3 field optional §4.3) —
-  // chỉ render khi caseId=null; case_type nằm trên action bar.
-  function draftMetaEl() {
-    const s = model.state;
-    if (s.caseId != null) return null;
-    const c = s.caseInfo || {};
-    const box = h('div', 'card');
-    const head = h('div', 'card-head');
-    head.append(h('h3', 'card-title', 'Thông tin hồ sơ'));
-    box.append(head);
-    const body = h('div', 'card-body cd-field-stack');
-    const dt = h('label', 'cd-field');
-    dt.append(h('span', 'muted', 'Loại văn bản'));
-    const sel = h('select');
-    // Enum document_type phụ thuộc case_type (contract §13.6).
-    const docTypes = model.documentTypesFor
-      ? model.documentTypesFor(c.case_type) : Object.keys(DOC_TYPE_LABEL);
-    for (const v of docTypes) {
-      const o = h('option', '', DOC_TYPE_LABEL[v] || v);
-      o.value = v;
-      if (c.document_type === v) o.selected = true;
-      sel.append(o);
-    }
-    sel.setAttribute('aria-label', 'Loại văn bản');
-    sel.onchange = () => model.updateCaseMeta('document_type', sel.value);
-    dt.append(sel);
-    body.append(dt);
-    const f = (label, key) => {
-      const lab = h('label', 'cd-field');
-      lab.append(h('span', 'muted', label));
-      const inp = h('input');
-      inp.value = c[key] || '';
-      inp.setAttribute('aria-label', label);
-      inp.onchange = () => model.updateCaseMeta(key, inp.value);
-      lab.append(inp);
-      return lab;
-    };
-    body.append(f('Ngày lập hồ sơ', 'ngay_lap_ho_so'));
-    body.append(f('Nơi niêm yết', 'noi_niem_yet'));
-    body.append(f('Ghi chú', 'ghi_chu'));
-    box.append(body);
-    return box;
-  }
+  // MIN-133 D2: không còn card "Thông tin hồ sơ". Meta nháp mới đi lên
+  // workspace_create theo mặc định của model — document_type =
+  // documentTypesFor(case_type)[0], ngay_lap_ho_so null (backend tự điền
+  // ngày hiện tại), noi_niem_yet/ghi_chu null. Chỗ nhập lại 4 trường này
+  // do task Word quyết định; model.updateCaseMeta vẫn giữ nguyên.
 
   // ---------- Stage tier ----------
 
@@ -593,6 +555,11 @@ function createNotaryModuleView(deps) {
       td.append(h('div', 'cd-err-msg', fe.message || fe.code));
     }
     return errs.length;
+  }
+
+  // Ô Stage cắt "…" khi dài (CSS) — tooltip = giá trị đầy đủ.
+  function setCellTitle(inp) {
+    inp.title = inp.value || '';
   }
 
   function dragHandle(label) {
@@ -630,7 +597,13 @@ function createNotaryModuleView(deps) {
     const s = model.state;
     const ro = !model.canWrite();
     const assets = s.stage.assets;
-    const t = h('table', 'grid cd-tbl');
+    const t = h('table', 'grid cd-tbl cd-stage-tbl');
+    // colgroup cố định (table-layout: fixed): nhãn 122px, các cột tài
+    // sản chia đều phần còn lại — không min-width, không cuộn ngang.
+    const cg = h('colgroup');
+    cg.append(h('col', 'cd-acol-label'));
+    for (let i = 0; i < assets.length; i++) cg.append(h('col', 'cd-acol'));
+    t.append(cg);
     const thead = h('thead');
     const htr = h('tr');
     htr.append(h('th', 'cd-rowlabel', 'Thuộc tính'));
@@ -710,13 +683,16 @@ function createNotaryModuleView(deps) {
           chip.dataset.fid = `a:${a.row_id}:land`;
           td.append(chip);
         } else {
-          const inp = h('input');
+          const inp = h('input', 'cd-cell');
           inp.value = a[key] || '';
+          setCellTitle(inp);
           inp.disabled = ro;
           inp.setAttribute('aria-label', `${label} — Tài sản ${i + 1}`);
           inp.dataset.fid = `a:${a.row_id}:${key}`;
-          inp.oninput = () => model.updateAssetField(
-            a.row_id, key, inp.value);
+          inp.oninput = () => {
+            setCellTitle(inp);
+            model.updateAssetField(a.row_id, key, inp.value);
+          };
           td.append(inp);
           cellErrs(a.row_id, key, td);
         }
@@ -869,7 +845,15 @@ function createNotaryModuleView(deps) {
     const inheritance =
       (s.caseInfo && s.caseInfo.case_type) !== 'two_party' &&
       'owner_row_id' in s.stage;
-    const t = h('table', 'grid cd-ptbl');
+    const t = h('table', 'grid cd-ptbl cd-stage-tbl');
+    // colgroup cố định theo mockup MIN-133: kéo 20 · Để lại 44 · Họ tên
+    // · Giới tính 64 · ngày · Số giấy tờ · Địa chỉ (phần còn lại) · xóa 24.
+    const cg = h('colgroup');
+    cg.append(h('col', 'cd-pcol-drag'));
+    if (inheritance) cg.append(h('col', 'cd-pcol-owner'));
+    for (const [key] of PERSON_COLS) cg.append(h('col', `cd-pcol-${key}`));
+    cg.append(h('col', 'cd-pcol-del'));
+    t.append(cg);
     const thead = h('thead');
     const trh = h('tr');
     trh.append(h('th', 'cd-drag-col', ''));
@@ -882,6 +866,9 @@ function createNotaryModuleView(deps) {
     people.forEach((p, ri) => {
       const tr = h('tr');
       tr.dataset.rowIdx = String(ri);
+      if (inheritance && s.stage.owner_row_id === p.row_id) {
+        tr.classList.add('cd-row-owner');
+      }
       const tdh = h('td', 'cd-drag-col');
       const grip = dragHandle(
         `kéo đổi thứ tự dòng ${ri + 1} (${p.ho_ten || 'chưa tên'})`);
@@ -927,7 +914,7 @@ function createNotaryModuleView(deps) {
         const td = h('td');
         let ctl;
         if (key === 'gioi_tinh') {
-          ctl = h('select');
+          ctl = h('select', 'cd-cell');
           for (const [v, lbl] of GIOI_TINH_OPTS) {
             const o = h('option', '', lbl);
             o.value = v;
@@ -937,11 +924,15 @@ function createNotaryModuleView(deps) {
           ctl.onchange = () => model.updatePersonField(
             p.row_id, key, ctl.value);
         } else {
-          ctl = h('input');
+          ctl = h('input', 'cd-cell');
           ctl.value = p[key] || '';
-          if (key === 'dia_chi' && p[key]) ctl.title = p[key];
-          ctl.oninput = () => model.updatePersonField(
-            p.row_id, key, ctl.value);
+          setCellTitle(ctl);
+          if (key === 'ngay_chet') ctl.placeholder = '—';
+          const inp = ctl;
+          inp.oninput = () => {
+            setCellTitle(inp);
+            model.updatePersonField(p.row_id, key, inp.value);
+          };
         }
         ctl.disabled = ro;
         ctl.dataset.fid = `p:${p.row_id}:${key}`;
@@ -993,6 +984,30 @@ function createNotaryModuleView(deps) {
     return t;
   }
 
+  // "Tài sản (3)" — số đếm tông muted như mockup.
+  function cardTitle(label, n) {
+    const t = h('h3', 'card-title', `${label} `);
+    t.append(h('span', 'cd-count', `(${n})`));
+    return t;
+  }
+
+  // Lỗi trường người KHÔNG có ô trên Stage (noi_cap/place_of_origin sau
+  // D1, hoặc field lạ) — gom lên đầu card để không bị nuốt mất.
+  function hiddenPersonFieldErrors() {
+    const shown = new Set(PERSON_COLS.map(([k]) => k));
+    const rows = new Map(model.state.stage.people
+      .map((p, i) => [p.row_id, p.ho_ten || `dòng ${i + 1}`]));
+    const extra = (model.state.fieldErrors || []).filter((e) =>
+      e.row_id != null && rows.has(e.row_id) && !shown.has(e.field));
+    if (!extra.length) return null;
+    const box = h('div', 'cd-row-errors');
+    for (const er of extra) {
+      box.append(h('div', 'error small',
+        `${rows.get(er.row_id)} · ${er.field}: ${er.message || er.code}`));
+    }
+    return box;
+  }
+
   function stageTierEl() {
     const s = model.state;
     const wrap = h('div', 'cd-stage-wrap');
@@ -1001,12 +1016,13 @@ function createNotaryModuleView(deps) {
     // Card Tài sản (~36%)
     const ac = h('div', 'card cd-assets');
     const aHead = h('div', 'card-head');
-    aHead.append(h('h3', 'card-title', `Tài sản (${s.stage.assets.length})`));
+    aHead.append(cardTitle('Tài sản', s.stage.assets.length));
     const aTools = h('div', 'card-tools');
     const addA = btn('+ Tài sản', 'secondary sm', () => model.addAsset());
     // Tối đa 3 asset (§13.3) — hết slot thì disable nút thêm.
     const assetFull = s.stage.assets.length >= 3;
     addA.disabled = !model.canWrite() || assetFull;
+    if (assetFull) addA.title = 'Tối đa 3 tài sản';
     aTools.append(addA);
     aHead.append(aTools);
     ac.append(aHead);
@@ -1023,9 +1039,6 @@ function createNotaryModuleView(deps) {
       const twrap = h('div', 'cd-table-wrap');
       twrap.append(assetTableEl());
       aBody.append(twrap);
-      if (assetFull) {
-        aBody.append(h('div', 'muted small', 'Tối đa 3 tài sản.'));
-      }
     }
     ac.append(aBody);
     tier.append(ac);
@@ -1033,7 +1046,7 @@ function createNotaryModuleView(deps) {
     // Card Người (~64%)
     const pc = h('div', 'card cd-people');
     const pHead = h('div', 'card-head');
-    pHead.append(h('h3', 'card-title', `Người (${s.stage.people.length})`));
+    pHead.append(cardTitle('Người', s.stage.people.length));
     const pTools = h('div', 'card-tools');
     const addP = btn('+ Người', 'secondary sm', () => model.addPerson());
     // two_party: tối đa 30 người (§13.5) — hết slot thì disable.
@@ -1041,6 +1054,7 @@ function createNotaryModuleView(deps) {
       (s.caseInfo && s.caseInfo.case_type === 'two_party') &&
       s.stage.people.length >= 30;
     addP.disabled = !model.canWrite() || peopleFull;
+    if (peopleFull) addP.title = 'Tối đa 30 người';
     pTools.append(addP);
     pHead.append(pTools);
     pc.append(pHead);
@@ -1049,6 +1063,8 @@ function createNotaryModuleView(deps) {
       const e = cardLevelErrors(f);
       if (e) pBody.append(e);
     }
+    const hidden = hiddenPersonFieldErrors();
+    if (hidden) pBody.append(hidden);
     if (!s.stage.people.length) {
       const e = face(L.faceEmpty('Chưa có người nào trong Stage.'));
       const b = btn('+ Thêm người đầu tiên', '', () => model.addPerson());
@@ -1170,13 +1186,14 @@ function createNotaryModuleView(deps) {
 
   // ---------- workspace root ----------
 
-  function workspaceEl(onBack) {
+  // Thanh trên (tab + hành động) nằm ngoài panel — xem .cd-topbar bên
+  // dưới. Workspace = banner (nếu có) + Stage + vùng sơ đồ.
+  function workspaceEl() {
     const s = model.state;
     const ws = h('div', 'cd-workspace');
     if (s.backendMode === 'mock') {
       ws.append(h('div', 'banner ok', model.mockBanner()));
     }
-    ws.append(actionBarEl(onBack));
     if (s.unsupported) {
       ws.append(h('div', 'banner warn',
         `Loại việc “${s.caseInfo && s.caseInfo.case_type}” — Chưa hỗ trợ. ` +
@@ -1201,8 +1218,6 @@ function createNotaryModuleView(deps) {
       eb.append(x);
       ws.append(eb);
     }
-    const meta = draftMetaEl();
-    if (meta) ws.append(meta);         // form meta nháp mới (§4.3)
     ws.append(stageTierEl());
     ws.append(relationTierEl());
     return ws;
@@ -1211,8 +1226,14 @@ function createNotaryModuleView(deps) {
   // ---------- assembly: local nav + panels ----------
 
   const root = h('section', 'cd-root');
+  // MIN-133 D5: MỘT thanh cao ~42px = tab cục bộ + hành động workspace.
+  // Tab bar sống suốt phiên; .cd-topbar-actions dựng lại theo state và
+  // chỉ hiện khi tab Soạn hồ sơ đang có workspace.
+  const topBar = h('div', 'card cd-topbar');
   const tabBar = h('div', 'cd-localnav');
   tabBar.setAttribute('role', 'tablist');
+  const topActions = h('div', 'cd-topbar-actions');
+  topBar.append(tabBar, topActions);
   const panels = {
     overview: h('div', 'cd-tabpage'),
     drafting: h('div', 'cd-tabpage'),
@@ -1265,8 +1286,26 @@ function createNotaryModuleView(deps) {
     b.setAttribute('role', 'tab');
     tabBar.append(b);
   }
-  root.append(tabBar);
+  root.append(topBar);
   for (const k of Object.keys(panels)) root.append(panels[k]);
+
+  const NO_WORKSPACE = ['idle', 'loading', 'unavailable', 'error'];
+
+  function renderTopActions() {
+    const s = model.state;
+    const show = activeTab === 'drafting' && !NO_WORKSPACE.includes(s.status);
+    topActions.hidden = !show;
+    // Select loại việc đang focus (vừa đổi / đang mở bằng bàn phím):
+    // không thay node để không đóng dropdown — chỉ đồng bộ nút.
+    const ae = document.activeElement;
+    if (show && s.caseId == null && ae && ae.tagName === 'SELECT' &&
+        topActions.contains(ae)) {
+      syncChromeUI();
+      return;
+    }
+    topActions.innerHTML = '';
+    if (show) fillTopActions(topActions);
+  }
 
   // data-fid ổn định trên control → sau rebuild, focus quay về đúng
   // phần tử logic (row_id + field/handle), kể cả khi vị trí đã đổi.
@@ -1313,7 +1352,8 @@ function createNotaryModuleView(deps) {
       syncChromeUI();
       return;
     }
-    const cap = captureFocus(dp);
+    const cap = captureFocus(root);
+    renderTopActions();
     dp.innerHTML = '';
     if (s.status === 'idle') {
       dp.append(face(L.faceEmpty(
@@ -1342,11 +1382,8 @@ function createNotaryModuleView(deps) {
       dp.append(f);
     } else {
       // ready / locked / conflict — conflict vẫn render workspace + dialog
-      dp.append(workspaceEl(() => {
-        activeTab = 'overview';
-        rerender();
-      }));
-      restoreFocus(dp, cap);
+      dp.append(workspaceEl());
+      restoreFocus(root, cap);
       if (s.status === 'conflict' && s.conflict !== lastConflict) {
         lastConflict = s.conflict;
         conflictDialog();
