@@ -7,7 +7,7 @@ duyệt (`docs/product/ui/prototypes/` + `approved-drafting.png` +
 ## Commits
 
 - `848cb23` — task records (brief/progress/decisions khởi tạo).
-- **<sẽ điền>** — implementation P6 + tests (commit cuối của task này).
+- `9e6795d` — implementation P6 + tests (commit chính của task).
 
 ## Files đã đổi
 
