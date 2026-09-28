@@ -1,4 +1,4 @@
-"""MIN-106 — mock backend notary case-drafting (contract-faithful).
+"""MIN-128 — mock backend notary case-drafting v2 (contract-faithful).
 
 Chay:  python -m pytest shell/test/test_notary_mock_adapter.py -q
 
@@ -6,8 +6,9 @@ Gateway (`notary_gateway`) chon mock khi G1_DEV_NOTARY_MOCK=1 VA sidecar
 khong packaged (sys.frozen); mac dinh real. Scenario fixtures o
 `fixtures/notary-case-drafting/*.json` — ten/dia chi deu la mau gia.
 
-Contract SOT: contracts/notary-case-drafting.md — test reuse chinh validator
-cua contract (`validate_examples.violations`) de kiem chung wire shape.
+Contract SOT: contracts/notary-case-drafting.md §13 (notary.case-drafting.v2)
+— test reuse chinh validator cua contract (`validate_examples.violations`)
+de kiem chung wire shape.
 """
 import copy
 import importlib.util
@@ -39,6 +40,8 @@ _spec = importlib.util.spec_from_file_location("ncd_validate", VALIDATOR)
 ncd = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(ncd)
 
+SCHEMA = "notary.case-drafting.v2"
+
 DRAFTING_COMMANDS = [
     "notary.workspace_get",
     "notary.workspace_create",
@@ -55,6 +58,8 @@ P_SPOUSE = "22222222-2222-4222-8222-222222222222"
 P_CHILD1 = "33333333-3333-4333-8333-333333333333"
 P_CHILD2 = "44444444-4444-4444-8444-444444444444"
 P_POOL = "77777777-7777-4777-8777-777777777777"
+P_TP1 = "aaaaaaaa-0000-4000-8000-000000000101"
+P_TP2 = "bbbbbbbb-0000-4000-8000-000000000102"
 
 
 # ---------- helpers ----------
@@ -85,26 +90,39 @@ def _call(fn_name, payload):
 
 
 def _node(nid, person_id=None, parents=(), spouse=None,
-          owner=False, receive=True):
+          own=(), receive=(), hidden=False, deleted=False):
+    """diagram node v3 (§13.4) — ownPositions/receivePositions ⊆ {1,2,3}."""
     return {
         "id": nid, "personId": person_id,
         "parentSlotIds": list(parents), "spouseSlotId": spouse,
-        "isLandOwner": owner, "willReceive": receive,
-        "hidden": False, "deleted": False,
+        "ownPositions": list(own), "receivePositions": list(receive),
+        "hidden": hidden, "deleted": deleted,
     }
 
 
 def _ready_state():
+    """State v3 domain inheritance khop fixture ready.json (2 assets)."""
     return {
-        "version": 2,
+        "version": 3, "domain": "inheritance",
         "nodes": [
-            _node("owner", P_OWNER, spouse="spouse", owner=True,
-                  receive=False),
-            _node("spouse", P_SPOUSE, spouse="owner"),
-            _node("child_1", P_CHILD1, parents=("owner", "spouse")),
-            _node("child_2", P_CHILD2, parents=("owner", "spouse")),
+            _node("owner", P_OWNER, spouse="spouse", own=[1, 2]),
+            _node("spouse", P_SPOUSE, spouse="owner", receive=[1, 2]),
+            _node("child_1", P_CHILD1, parents=("owner", "spouse"),
+                  receive=[1, 2]),
+            _node("child_2", P_CHILD2, parents=("owner", "spouse"),
+                  receive=[1, 2]),
         ],
     }
+
+
+def _tp_state():
+    """State v3 domain two_party canonical 30 slot (p1/p2 da gan)."""
+    nodes = [{"id": f"p{i}", "personId": None,
+              "hidden": False, "deleted": False}
+             for i in range(1, 31)]
+    nodes[0]["personId"] = P_TP1
+    nodes[1]["personId"] = P_TP2
+    return {"version": 3, "domain": "two_party", "nodes": nodes}
 
 
 def _job_doc(command, payload, result=None, error=None,
@@ -122,8 +140,10 @@ def _job_doc(command, payload, result=None, error=None,
         "error": error,
         "updated_at": "2026-09-24T00:00:00Z",
     }
+    ctx = {"draft_v2": True}                     # §13 — flag ngoai wire
     if fixture_context:
-        doc["fixture_context"] = fixture_context
+        ctx.update(fixture_context)
+    doc["fixture_context"] = ctx
     return doc
 
 
@@ -141,6 +161,17 @@ def _no_confirmed_key(obj):
     elif isinstance(obj, list):
         for v in obj:
             _no_confirmed_key(v)
+
+
+def _no_legacy_keys(obj):
+    """v2 wire: is_primary/isLandOwner/willReceive bi cam o moi noi."""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            assert k not in ("is_primary", "isLandOwner", "willReceive"), k
+            _no_legacy_keys(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            _no_legacy_keys(v)
 
 
 def _wait_terminal(store, job_id, timeout=10):
@@ -174,7 +205,8 @@ class TestScaffolding:
     def test_fixtures_loadable_and_no_real_pii(self):
         names = ["empty", "ready", "locked", "conflict", "intake-partial",
                  "diagram-warning", "word-collision", "word-partial",
-                 "word-all-failed", "word-canceled", "unsupported"]
+                 "word-all-failed", "word-canceled", "unsupported",
+                 "ready-two-party"]
         for n in names:
             doc = _load_fixture(f"{n}.json")
             assert doc["scenario"] == n
@@ -183,10 +215,34 @@ class TestScaffolding:
             assert "Người Mẫu" in raw or n in (
                 "empty", "unsupported", "intake-partial",
                 "word-all-failed"), n   # word-all-failed ref -> empty
+            _no_legacy_keys(doc)
+
+    def test_fixture_invariant_v2(self):
+        """Moi fixture: diagram state version 3 + domain; asset khong
+        is_primary; inheritance stage co owner_row_id; two_party stage
+        KHONG co owner_row_id + diagram 30 slot canonical."""
+        for f in FIXTURES.glob("*.json"):
+            doc = _load_fixture(f.name)
+            for cid, c in doc["cases"].items():
+                st = (c.get("diagram") or {}).get("state") or {}
+                assert st.get("version") == 3, (f.name, cid)
+                assert st.get("domain") in ("inheritance", "two_party"), \
+                    (f.name, cid)
+                stage = c.get("stage") or {}
+                for a in stage.get("assets") or []:
+                    assert "is_primary" not in a, (f.name, cid)
+                ct = c.get("case_type")
+                if ct == "inheritance":
+                    assert "owner_row_id" in stage, (f.name, cid)
+                elif ct == "two_party":
+                    assert "owner_row_id" not in stage, (f.name, cid)
+                    ids = [n.get("id") for n in st.get("nodes") or []]
+                    assert ids == [f"p{i}" for i in range(1, 31)], \
+                        (f.name, cid)
 
     def test_default_backend_covers_scenarios(self):
         # Default seed (fixture files) phai co du case cho moi scenario.
-        for cid in (42, 43, 44, 45, 46):
+        for cid in (42, 43, 44, 45, 46, 47, 48):
             res = _call("workspace_get", {"case_id": cid})
             assert res["data"]["case"]["id"] == cid
 
@@ -241,12 +297,14 @@ class TestWorkspaceGet:
         res = _call("workspace_get", payload)
         assert res["kind"] == "workspace_get"
         data = res["data"]
-        assert data["schema_version"] == "notary.case-drafting.v1"
+        assert data["schema_version"] == SCHEMA
         assert data["backend_mode"] == "mock"
         assert data["case"]["revision"] == 1
         assert data["case"]["locked"] is False
-        assert data["stage"] == {"people": [], "assets": []}
+        assert data["stage"] == {"owner_row_id": None,
+                                 "people": [], "assets": []}
         assert data["diagram"]["render_model"] is None
+        assert data["diagram"]["domain"] == "inheritance"
         assert data["capabilities"]["diagram"] is True
         _assert_contract(_job_doc("notary.workspace_get", payload, result=res))
 
@@ -256,12 +314,16 @@ class TestWorkspaceGet:
         data = res["data"]
         assert len(data["stage"]["people"]) == 4
         assert len(data["stage"]["assets"]) == 2
+        assert data["stage"]["owner_row_id"] == P_OWNER
         rm = data["diagram"]["render_model"]
         assert rm is not None and rm["status"] == "complete"
         assert data["case"]["revision"] == 7
         # personId trong diagram deu thuoc stage da commit
         stage_ids = {p["row_id"] for p in data["stage"]["people"]}
         for n in data["diagram"]["state"]["nodes"]:
+            assert set(n) <= {"id", "personId", "parentSlotIds",
+                              "spouseSlotId", "ownPositions",
+                              "receivePositions", "hidden", "deleted"}
             if n["personId"] is not None:
                 assert n["personId"] in stage_ids
         _assert_contract(_job_doc(
@@ -283,13 +345,30 @@ class TestWorkspaceGet:
         assert data["capabilities"]["diagram"] is False
         assert data["capabilities"]["intake"] == []
 
+    def test_two_party_case(self):
+        mock.reset_backend(_load_fixture("ready-two-party.json"))
+        res = _call("workspace_get", {"case_id": 48})
+        data = res["data"]
+        assert data["case"]["case_type"] == "two_party"
+        assert data["case"]["document_type"] == "chuyen_nhuong"
+        assert "owner_row_id" not in data["stage"]
+        st = data["diagram"]["state"]
+        assert st["version"] == 3 and st["domain"] == "two_party"
+        assert [n["id"] for n in st["nodes"]] == \
+            [f"p{i}" for i in range(1, 31)]
+        rm = data["diagram"]["render_model"]
+        assert rm["status"] == "unsupported"
+        assert rm["allocations"] == {}
+        assert data["capabilities"]["word_export"] is False
+        assert data["capabilities"]["diagram"] is True
+
     def test_case_not_found(self):
         with pytest.raises(CommandError) as exc:
             _call("workspace_get", {"case_id": 9999})
         assert exc.value.code == "case_not_found"
 
 
-# ---------- workspace_create (MIN-121/122 §4.3) ----------
+# ---------- workspace_create (§13.6) ----------
 
 _NEW_UNSET = object()
 
@@ -308,7 +387,7 @@ def _mk_person(**kw):
 
 def _mk_asset(**kw):
     row = {
-        "row_id": str(uuid.uuid4()), "entity_id": None, "is_primary": True,
+        "row_id": str(uuid.uuid4()), "entity_id": None,
         "so_serial": "MM000001", "so_vao_so": None, "so_thua_dat": None,
         "so_to_ban_do": None, "dia_chi": "Địa chỉ mẫu tài sản 1",
         "loai_so": None, "hinh_thuc_su_dung": None, "thoi_han": None,
@@ -319,22 +398,26 @@ def _mk_asset(**kw):
     return row
 
 
-def _create_payload(key=_NEW_UNSET, case_meta=_NEW_UNSET):
+def _create_payload(key=_NEW_UNSET, case_meta=_NEW_UNSET,
+                    with_diagram=True):
     owner = _mk_person()
     spouse = _mk_person(ho_ten="Người Mẫu B", gioi_tinh="Nữ",
                         ngay_chet=None)
-    return {
+    p = {
         "idempotency_key": (key if key is not _NEW_UNSET
                             else str(uuid.uuid4())),
         "case": (case_meta if case_meta is not _NEW_UNSET
                  else {"document_type": "khai_nhan"}),
-        "stage": {"people": [owner, spouse], "assets": [_mk_asset()]},
-        "diagram": {"state": {"version": 2, "nodes": [
-            _node("owner", owner["row_id"], spouse="spouse", owner=True,
-                  receive=False),
-            _node("spouse", spouse["row_id"], spouse="owner"),
-        ]}},
+        "stage": {"owner_row_id": owner["row_id"],
+                  "people": [owner, spouse], "assets": [_mk_asset()]},
     }
+    if with_diagram:
+        p["diagram"] = {"state": {"version": 3, "domain": "inheritance",
+                                  "nodes": [
+            _node("owner", owner["row_id"], spouse="spouse", own=[1]),
+            _node("spouse", spouse["row_id"], spouse="owner", receive=[1]),
+        ]}}
+    return p
 
 
 class TestWorkspaceCreate:
@@ -345,7 +428,7 @@ class TestWorkspaceCreate:
                        "noi_niem_yet": "xã Mẫu", "ghi_chu": "Nháp"}))
         assert res["kind"] == "workspace_create"
         data = res["data"]
-        assert data["schema_version"] == "notary.case-drafting.v1"
+        assert data["schema_version"] == SCHEMA
         assert data["backend_mode"] == "mock"
         assert data["created"] is True
         c = data["case"]
@@ -356,12 +439,72 @@ class TestWorkspaceCreate:
         assert c["noi_niem_yet"] == "xã Mẫu"
         assert c["ghi_chu"] == "Nháp"
         assert all(p["entity_id"] for p in data["stage"]["people"])
-        assert data["diagram"]["state"]["version"] == 2
+        assert data["stage"]["owner_row_id"] == \
+            data["stage"]["people"][0]["row_id"]
+        assert data["diagram"]["state"]["version"] == 3
+        assert data["diagram"]["state"]["domain"] == "inheritance"
         assert data["diagram"]["render_model"]["engineVersion"] == 2
         assert data["capabilities"]["word_export"] is True
+        _no_legacy_keys(data)
         # case ton tai — get lai duoc
         got = _call("workspace_get", {"case_id": c["id"]})
         assert got["data"]["case"]["revision"] == 1
+
+    def test_create_without_diagram_seeds_owner(self):
+        """diagram absent -> server seed node 'owner' = owner_row_id,
+        render_model null (§13.6)."""
+        p = _create_payload(with_diagram=False)
+        res = _call("workspace_create", p)
+        data = res["data"]
+        st = data["diagram"]["state"]
+        assert st["version"] == 3 and st["domain"] == "inheritance"
+        owner = next((n for n in st["nodes"] if n["id"] == "owner"), None)
+        assert owner is not None
+        assert owner["personId"] == data["stage"]["owner_row_id"]
+        assert data["diagram"]["render_model"] is None
+
+    def test_create_two_party_seeds_30_slots(self):
+        tp1 = _mk_person(ho_ten="Bên A 1")
+        tp2 = _mk_person(ho_ten="Bên B 1", gioi_tinh="Nữ")
+        p = {
+            "idempotency_key": str(uuid.uuid4()),
+            "case": {"case_type": "two_party",
+                     "document_type": "chuyen_nhuong"},
+            "stage": {"people": [tp1, tp2], "assets": [_mk_asset()]},
+        }
+        res = _call("workspace_create", p)
+        data = res["data"]
+        assert data["case"]["case_type"] == "two_party"
+        assert "owner_row_id" not in data["stage"]
+        st = data["diagram"]["state"]
+        assert st["domain"] == "two_party"
+        assert [n["id"] for n in st["nodes"]] == \
+            [f"p{i}" for i in range(1, 31)]
+        assert data["diagram"]["render_model"] is None
+        assert data["capabilities"]["word_export"] is False
+
+    def test_two_party_stage_owner_row_id_rejected(self):
+        p = {
+            "idempotency_key": str(uuid.uuid4()),
+            "case": {"case_type": "two_party",
+                     "document_type": "chuyen_nhuong"},
+            "stage": {"owner_row_id": None,
+                      "people": [_mk_person()], "assets": [_mk_asset()]},
+        }
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_create", p)
+        assert exc.value.code == "validation_error"
+
+    def test_two_party_wrong_document_type(self):
+        p = {
+            "idempotency_key": str(uuid.uuid4()),
+            "case": {"case_type": "two_party",
+                     "document_type": "khai_nhan"},   # enum inheritance
+            "stage": {"people": [_mk_person()], "assets": [_mk_asset()]},
+        }
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_create", p)
+        assert exc.value.code == "validation_error"
 
     def test_idempotent_replay(self):
         key = str(uuid.uuid4())
@@ -380,12 +523,35 @@ class TestWorkspaceCreate:
                 _call("workspace_create", _create_payload(key=bad))
             assert exc.value.code == "validation_error", bad
 
-    def test_missing_owner(self):
+    def test_missing_owner_pointer(self):
+        """inheritance: owner_row_id null/missing/khong thuoc people ->
+        workspace_owner_required (§13.6)."""
+        for bad in (None, "khong-uuid", str(uuid.uuid4())):
+            p = _create_payload()
+            p["stage"]["owner_row_id"] = bad
+            with pytest.raises(CommandError) as exc:
+                _call("workspace_create", p)
+            assert exc.value.code == "workspace_owner_required", bad
         p = _create_payload()
-        p["diagram"]["state"]["nodes"][0]["personId"] = None
+        del p["stage"]["owner_row_id"]
         with pytest.raises(CommandError) as exc:
             _call("workspace_create", p)
         assert exc.value.code == "workspace_owner_required"
+
+    def test_owner_node_mismatch_rejected(self):
+        """Node owner personId != stage.owner_row_id ->
+        diagram_owner_mismatch — server KHONG tu sua (§13.6)."""
+        p = _create_payload()
+        # owner.personId -> spouse row; node spouse giai phong de khong
+        # bi duplicate_person (wire check chay truoc mirror check).
+        p["diagram"]["state"]["nodes"][0]["personId"] = \
+            p["stage"]["people"][1]["row_id"]
+        p["diagram"]["state"]["nodes"][1]["personId"] = None
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_create", p)
+        assert exc.value.code == "diagram_owner_mismatch"
+        assert exc.value.details["owner_row_id"] == \
+            p["stage"]["owner_row_id"]
 
     def test_entity_id_non_null_rejected(self):
         p = _create_payload()
@@ -396,30 +562,67 @@ class TestWorkspaceCreate:
         assert exc.value.details["field_errors"]
 
     def test_empty_stage(self):
+        """create stage rong: assets la required (stage_validation_error);
+        people rong + owner_row_id treo -> workspace_owner_required
+        (pointer check chay truoc field errors — real parity)."""
         p = _create_payload()
-        p["stage"]["people"] = []
         p["stage"]["assets"] = []
         with pytest.raises(CommandError) as exc:
             _call("workspace_create", p)
         assert exc.value.code == "stage_validation_error"
-
-    def test_no_primary_asset(self):
+        fe = exc.value.details["field_errors"]
+        assert any(e["code"] == "required" for e in fe)
+        # people rong -> owner pointer khong tro vao row nao
         p = _create_payload()
-        p["stage"]["assets"][0]["is_primary"] = False
+        p["stage"]["people"] = []
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_create", p)
+        assert exc.value.code == "workspace_owner_required"
+
+    def test_is_primary_rejected_as_unknown_field(self):
+        """v2: is_primary bi cam tren wire — truong la ->
+        validation_error (§13.3)."""
+        p = _create_payload()
+        p["stage"]["assets"][0]["is_primary"] = True
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_create", p)
+        assert exc.value.code == "validation_error"
+
+    def test_asset_limit_create(self):
+        p = _create_payload()
+        p["stage"]["assets"] += [
+            _mk_asset(so_serial=f"MM{i + 1:06d}") for i in range(3)]
         with pytest.raises(CommandError) as exc:
             _call("workspace_create", p)
         assert exc.value.code == "stage_validation_error"
+        fe = exc.value.details["field_errors"]
+        assert any(e["code"] == "asset_limit" for e in fe)
 
     def test_outside_stage_person(self):
         p = _create_payload()
         p["diagram"]["state"]["nodes"].append(
-            _node("child_1", str(uuid.uuid4()), parents=("owner",)))
+            _node("child_1", str(uuid.uuid4()), parents=("owner",),
+                  receive=[1]))
         with pytest.raises(CommandError) as exc:
             _call("workspace_create", p)
         assert exc.value.code == "diagram_reference_outside_stage"
 
+    def test_domain_mismatch(self):
+        """state.domain hop le nhung khac case.case_type ->
+        diagram_domain_mismatch (§13.5)."""
+        p = _create_payload()
+        p["diagram"]["state"]["domain"] = "two_party"
+        p["diagram"]["state"]["nodes"] = [
+            {"id": f"p{i}", "personId": None,
+             "hidden": False, "deleted": False} for i in range(1, 31)]
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_create", p)
+        assert exc.value.code == "diagram_domain_mismatch"
+        assert exc.value.details["expected"] == "inheritance"
+
     def test_case_meta_invalid(self):
         for meta in ({"document_type": "khac"},
+                     {"case_type": "gift"},
                      {"document_type": "khai_nhan",
                       "ngay_lap_ho_so": "26/09/2026"},
                      {"document_type": "khai_nhan", "noi_niem_yet": "  "}):
@@ -438,9 +641,11 @@ class TestWorkspaceCreate:
 # ---------- workspace_commit_stage ----------
 
 class TestCommitStage:
-    def _payload(self, base_revision=1, people=None, assets=None):
-        return {"case_id": 43, "base_revision": base_revision,
-                "stage": {"people": people or [], "assets": assets or []}}
+    def _payload(self, base_revision=1, people=None, assets=None,
+                 owner_row_id=None, case_id=43):
+        return {"case_id": case_id, "base_revision": base_revision,
+                "stage": {"owner_row_id": owner_row_id,
+                          "people": people or [], "assets": assets or []}}
 
     def _person(self, row_id, name="Người Mẫu X", entity_id=None):
         return {
@@ -451,9 +656,9 @@ class TestCommitStage:
             "dia_chi": "Địa chỉ mẫu", "place_of_origin": None,
         }
 
-    def _asset(self, row_id, primary=True, serial="MM000010"):
+    def _asset(self, row_id, serial="MM000010"):
         return {
-            "row_id": row_id, "entity_id": None, "is_primary": primary,
+            "row_id": row_id, "entity_id": None,
             "so_serial": serial, "so_vao_so": None, "so_thua_dat": "9",
             "so_to_ban_do": "1", "dia_chi": "Địa chỉ mẫu tài sản",
             "loai_so": None, "hinh_thuc_su_dung": None, "thoi_han": None,
@@ -464,14 +669,17 @@ class TestCommitStage:
     def test_commit_success_assigns_entity_and_bumps_revision(self):
         mock.reset_backend(_load_fixture("empty.json"))
         rid = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
-        payload = self._payload(people=[self._person(rid)])
+        payload = self._payload(people=[self._person(rid)],
+                                owner_row_id=rid)
         res = _call("workspace_commit_stage", payload)
         data = res["data"]
         assert data["revision"] == 2                     # 1 -> 2
         row = data["stage"]["people"][0]
         assert row["row_id"] == rid
         assert isinstance(row["entity_id"], int)         # backend gan
+        assert data["stage"]["owner_row_id"] == rid
         assert data["diagram"]["render_model"] is not None  # re-evaluate §6.1
+        _no_legacy_keys(data)
         _assert_contract(_job_doc(
             "notary.workspace_commit_stage", payload, result=res))
         # get lai thay stage da persist
@@ -479,9 +687,34 @@ class TestCommitStage:
         assert res2["data"]["case"]["revision"] == 2
         assert len(res2["data"]["stage"]["people"]) == 1
 
+    def test_commit_syncs_owner_node(self):
+        """§13.6: commit sync node 'owner' (neu co, chua deleted) :=
+        owner_row_id — SOT la stage pointer. Node khong ton tai thi
+        khong tu tao."""
+        mock.reset_backend(_load_fixture("ready.json"))
+        stage = copy.deepcopy(
+            _load_fixture("ready.json")["cases"]["42"]["stage"])
+        stage["owner_row_id"] = P_SPOUSE       # doi chu so huu
+        res = _call("workspace_commit_stage", {
+            "case_id": 42, "base_revision": 7, "stage": stage})
+        nodes = res["data"]["diagram"]["state"]["nodes"]
+        owner = next((n for n in nodes if n["id"] == "owner"), None)
+        assert owner is not None and owner["personId"] == P_SPOUSE
+        assert res["data"]["stage"]["owner_row_id"] == P_SPOUSE
+
+    def test_commit_empty_diagram_no_owner_created(self):
+        mock.reset_backend(_load_fixture("empty.json"))
+        rid = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+        res = _call("workspace_commit_stage",
+                    self._payload(people=[self._person(rid)],
+                                  owner_row_id=rid))
+        nodes = res["data"]["diagram"]["state"]["nodes"]
+        assert not [n for n in nodes if n.get("id") == "owner"]
+
     def test_revision_monotonic_two_commits(self):
         mock.reset_backend(_load_fixture("empty.json"))
-        p = self._payload()
+        rid = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+        p = self._payload(people=[self._person(rid)], owner_row_id=rid)
         assert _call("workspace_commit_stage", p)["data"]["revision"] == 2
         p["base_revision"] = 2
         assert _call("workspace_commit_stage", p)["data"]["revision"] == 3
@@ -507,7 +740,8 @@ class TestCommitStage:
         bad = self._person("ffffffff-ffff-4fff-8fff-ffffffffffff")
         bad["ho_ten"] = ""                                # vi pham required
         good = self._person("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")
-        payload = self._payload(people=[good, bad])
+        payload = self._payload(people=[good, bad], owner_row_id=good[
+            "row_id"])
         with pytest.raises(CommandError) as exc:
             _call("workspace_commit_stage", payload)
         assert exc.value.code == "stage_validation_error"
@@ -519,52 +753,138 @@ class TestCommitStage:
         assert res["data"]["stage"]["people"] == []
         assert res["data"]["case"]["revision"] == 1
 
+    def test_owner_pointer_required(self):
+        mock.reset_backend(_load_fixture("empty.json"))
+        rid = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+        for bad_owner in (None, str(uuid.uuid4())):
+            p = self._payload(people=[self._person(rid)],
+                              owner_row_id=bad_owner)
+            with pytest.raises(CommandError) as exc:
+                _call("workspace_commit_stage", p)
+            assert exc.value.code == "workspace_owner_required", bad_owner
+        # stage khong owner_row_id key -> cung workspace_owner_required
+        p = self._payload(people=[self._person(rid)])
+        del p["stage"]["owner_row_id"]
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_commit_stage", p)
+        assert exc.value.code == "workspace_owner_required"
+
     def test_duplicate_row_id(self):
         mock.reset_backend(_load_fixture("empty.json"))
         row = self._person("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")
-        payload = self._payload(people=[row, dict(row)])
+        payload = self._payload(people=[row, dict(row)],
+                                owner_row_id=row["row_id"])
         with pytest.raises(CommandError) as exc:
             _call("workspace_commit_stage", payload)
         assert exc.value.code == "stage_validation_error"
         assert any(e["code"] == "duplicate_row_id"
                    for e in exc.value.details["field_errors"])
 
-    def test_primary_count_rule(self):
+    def test_duplicate_entity_id(self):
         mock.reset_backend(_load_fixture("empty.json"))
-        a1 = self._asset("aaaaaaa1-1111-4111-8111-111111111111", primary=True)
-        a2 = self._asset("aaaaaaa2-2222-4222-8222-222222222222", primary=True)
+        a = self._person("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+                         entity_id=9)
+        b = self._person("ffffffff-ffff-4fff-8fff-ffffffffffff",
+                         entity_id=9)
+        payload = self._payload(people=[a, b], owner_row_id=a["row_id"])
         with pytest.raises(CommandError) as exc:
-            _call("workspace_commit_stage", self._payload(assets=[a1, a2]))
-        assert any(e["code"] == "primary_count"
+            _call("workspace_commit_stage", payload)
+        assert any(e["field"] == "entity_id"
                    for e in exc.value.details["field_errors"])
+
+    def test_duplicate_so_giay_to(self):
+        mock.reset_backend(_load_fixture("empty.json"))
+        a = self._person("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")
+        b = self._person("ffffffff-ffff-4fff-8fff-ffffffffffff")
+        a["so_giay_to"] = b["so_giay_to"] = "001122334455"
+        payload = self._payload(people=[a, b], owner_row_id=a["row_id"])
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_commit_stage", payload)
+        assert any(e["field"] == "so_giay_to"
+                   for e in exc.value.details["field_errors"])
+
+    def test_duplicate_serial(self):
+        mock.reset_backend(_load_fixture("empty.json"))
+        rid = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+        a1 = self._asset("aaaaaaa1-1111-4111-8111-111111111111")
+        a2 = self._asset("aaaaaaa2-2222-4222-8222-222222222222")
+        payload = self._payload(people=[self._person(rid)],
+                                owner_row_id=rid, assets=[a1, a2])
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_commit_stage", payload)
+        assert any(e["field"] == "so_serial"
+                   for e in exc.value.details["field_errors"])
+
+    def test_asset_limit(self):
+        """§13.3: toi da 3 asset — dong thu 4 -> asset_limit field error
+        gan row_id dong thua."""
+        mock.reset_backend(_load_fixture("empty.json"))
+        rid = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+        assets = [self._asset(f"aaaaaaa{i}-1111-4111-8111-11111111111{i}",
+                              serial=f"MM{i:06d}") for i in range(1, 5)]
+        payload = self._payload(people=[self._person(rid)],
+                                owner_row_id=rid, assets=assets)
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_commit_stage", payload)
+        fe = exc.value.details["field_errors"]
+        over = [e for e in fe if e["code"] == "asset_limit"]
+        assert over and over[0]["row_id"] == assets[3]["row_id"]
+
+    def test_is_primary_key_rejected(self):
+        mock.reset_backend(_load_fixture("empty.json"))
+        a = self._asset("aaaaaaa1-1111-4111-8111-111111111111")
+        a["is_primary"] = True                       # truong la tren v2
+        rid = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+        payload = self._payload(people=[self._person(rid)],
+                                owner_row_id=rid, assets=[a])
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_commit_stage", payload)
+        assert exc.value.code == "validation_error"
 
     def test_serial_must_be_canonical(self):
         mock.reset_backend(_load_fixture("empty.json"))
+        rid = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
         a = self._asset("aaaaaaa1-1111-4111-8111-111111111111",
                         serial="khong-canonical")
+        payload = self._payload(people=[self._person(rid)],
+                                owner_row_id=rid, assets=[a])
         with pytest.raises(CommandError) as exc:
-            _call("workspace_commit_stage", self._payload(assets=[a]))
+            _call("workspace_commit_stage", payload)
         assert any(e["field"] == "so_serial" and e["code"] == "invalid_format"
                    for e in exc.value.details["field_errors"])
 
     def test_commit_prunes_diagram_refs(self):
         """Xoa nguoi khoi stage -> node tham chieu bi prune trong cung
-        transaction, render_model khop state moi (§6.1)."""
+        transaction, render_model khop state moi (§6.1/§13.6)."""
         mock.reset_backend(_load_fixture("ready.json"))
-        # commit stage bo het nguoi tru owner (nguoi da chet)
-        keep = _load_fixture("ready.json")["cases"]["42"]["stage"]["people"][0]
+        keep = _load_fixture("ready.json")["cases"]["42"]["stage"][
+            "people"][0]
         payload = {"case_id": 42, "base_revision": 7,
-                   "stage": {"people": [keep],
+                   "stage": {"owner_row_id": keep["row_id"],
+                             "people": [keep],
                              "assets": _load_fixture("ready.json")
                              ["cases"]["42"]["stage"]["assets"]}}
         res = _call("workspace_commit_stage", payload)
         nodes = res["data"]["diagram"]["state"]["nodes"]
-        ids = {n["personId"] for n in nodes if n["personId"]}
-        assert ids <= {keep["row_id"], None} - {None} or ids == {
-            keep["row_id"]}
         for n in nodes:
             if n["personId"] is not None:
                 assert n["personId"] == keep["row_id"]
+
+    def test_commit_prunes_positions_above_asset_count(self):
+        """Giam assets 2 -> 1: dau chon vi tri 2 bi prune trong cung
+        transaction + warning diagram.selection_pruned (§13.4)."""
+        mock.reset_backend(_load_fixture("ready.json"))
+        stage = copy.deepcopy(
+            _load_fixture("ready.json")["cases"]["42"]["stage"])
+        stage["assets"] = stage["assets"][:1]           # con 1 vi tri
+        payload = {"case_id": 42, "base_revision": 7, "stage": stage}
+        res = _call("workspace_commit_stage", payload)
+        dg = res["data"]["diagram"]
+        codes = [w["code"] for w in dg.get("warnings") or []]
+        assert "diagram.selection_pruned" in codes
+        for n in dg["state"]["nodes"]:
+            assert all(p == 1 for p in n.get("ownPositions") or [])
+            assert all(p == 1 for p in n.get("receivePositions") or [])
 
     def test_container_shape_is_validation_error(self):
         """Oracle parity: stage khong dict / people|assets thieu hoac
@@ -586,7 +906,7 @@ class TestCommitStage:
     def test_locked_case_rejected(self):
         mock.reset_backend(_load_fixture("locked.json"))
         p = {"case_id": 44, "base_revision": 3,
-             "stage": {"people": [], "assets": []}}
+             "stage": {"owner_row_id": None, "people": [], "assets": []}}
         with pytest.raises(CommandError) as exc:
             _call("workspace_commit_stage", p)
         assert exc.value.code == "workspace_locked"
@@ -599,6 +919,48 @@ class TestCommitStage:
             _call("workspace_commit_stage", p)
         assert exc.value.code == "case_type_unsupported"
         assert exc.value.details["case_type"] == "gift"
+
+    def test_two_party_commit(self):
+        """two_party: commit stage khong owner_row_id; prune personId
+        ngoai stage nhung giu 30 slot; render_model unsupported."""
+        mock.reset_backend(_load_fixture("ready-two-party.json"))
+        people = copy.deepcopy(_load_fixture("ready-two-party.json")
+                               ["cases"]["48"]["stage"]["people"])
+        payload = {"case_id": 48, "base_revision": 2,
+                   "stage": {"people": people[:1],
+                             "assets": []}}
+        res = _call("workspace_commit_stage", payload)
+        data = res["data"]
+        assert data["revision"] == 3
+        assert "owner_row_id" not in data["stage"]
+        st = data["diagram"]["state"]
+        assert [n["id"] for n in st["nodes"]] == \
+            [f"p{i}" for i in range(1, 31)]
+        # p2 bi xoa khoi stage -> personId null nhung slot con
+        assert st["nodes"][1]["personId"] is None
+        assert st["nodes"][0]["personId"] == people[0]["row_id"]
+        assert data["diagram"]["render_model"]["status"] == "unsupported"
+
+    def test_two_party_owner_row_id_rejected(self):
+        mock.reset_backend(_load_fixture("ready-two-party.json"))
+        p = {"case_id": 48, "base_revision": 2,
+             "stage": {"owner_row_id": None, "people": [], "assets": []}}
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_commit_stage", p)
+        assert exc.value.code == "validation_error"
+
+    def test_two_party_people_limit(self):
+        """two_party: toi da 30 nguoi — dong 31 -> people_limit."""
+        mock.reset_backend(_load_fixture("ready-two-party.json"))
+        people = [self._person(
+            f"eeeeeeee-{i:04d}-4eee-8eee-eeeeeeeeeeee".replace("x", "0"))
+            for i in range(31)]
+        payload = {"case_id": 48, "base_revision": 2,
+                   "stage": {"people": people, "assets": []}}
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_commit_stage", payload)
+        fe = exc.value.details["field_errors"]
+        assert any(e["code"] == "people_limit" for e in fe)
 
 
 # ---------- intake_analyze ----------
@@ -614,7 +976,7 @@ class TestIntakeAnalyze:
                    "sources": [self._text_src(sid, "Người Mẫu I, sinh 1950")]}
         res = _call("intake_analyze", payload)
         assert res["kind"] == "intake_analyze"
-        assert res["data"]["schema_version"] == "notary.case-drafting.v1"
+        assert res["data"]["schema_version"] == SCHEMA
         sug = res["data"]["suggestions"][0]
         assert sug["source_id"] == sid
         assert sug["target"] in ("person", "asset")
@@ -741,7 +1103,8 @@ class TestDiagram:
         _assert_contract(_job_doc(
             "notary.diagram_evaluate", payload, result=res,
             fixture_context={"stage_row_ids": [
-                P_OWNER, P_SPOUSE, P_CHILD1, P_CHILD2]}))
+                P_OWNER, P_SPOUSE, P_CHILD1, P_CHILD2],
+                "stage_owner_row_id": P_OWNER}))
 
     def test_evaluate_unassigned_pool_warning(self):
         doc = _load_fixture("diagram-warning.json")
@@ -766,28 +1129,62 @@ class TestDiagram:
     def test_evaluate_invalid_state(self):
         mock.reset_backend(_load_fixture("ready.json"))
         state = _ready_state()
-        state["version"] = 1
+        state["version"] = 2                              # v3 bat buoc
         with pytest.raises(CommandError) as exc:
             _call("diagram_evaluate",
                   {"case_id": 42, "diagram": {"state": state}})
         assert exc.value.code == "diagram_invalid_state"
         assert exc.value.details["errors"]
 
+    def test_evaluate_legacy_node_flags_invalid(self):
+        """isLandOwner/willReceive tren node -> invalid_node (truong la)."""
+        mock.reset_backend(_load_fixture("ready.json"))
+        state = _ready_state()
+        state["nodes"][0]["isLandOwner"] = True
+        with pytest.raises(CommandError) as exc:
+            _call("diagram_evaluate",
+                  {"case_id": 42, "diagram": {"state": state}})
+        assert exc.value.code == "diagram_invalid_state"
+        codes = {e["code"] for e in exc.value.details["errors"]}
+        assert "invalid_node" in codes
+
+    def test_evaluate_position_out_of_range(self):
+        mock.reset_backend(_load_fixture("ready.json"))
+        state = _ready_state()
+        state["nodes"][1]["receivePositions"] = [4]
+        with pytest.raises(CommandError) as exc:
+            _call("diagram_evaluate",
+                  {"case_id": 42, "diagram": {"state": state}})
+        assert exc.value.code == "diagram_invalid_state"
+        codes = {e["code"] for e in exc.value.details["errors"]}
+        assert "invalid_position" in codes
+
+    def test_evaluate_domain_mismatch(self):
+        """state.domain hop le nhung khac case_type ->
+        diagram_domain_mismatch TRUOC wire check khac (§13.5)."""
+        mock.reset_backend(_load_fixture("ready.json"))
+        state = _tp_state()                     # domain two_party tren
+        with pytest.raises(CommandError) as exc:    # case inheritance
+            _call("diagram_evaluate",
+                  {"case_id": 42, "diagram": {"state": state}})
+        assert exc.value.code == "diagram_domain_mismatch"
+        assert exc.value.details["got"] == "two_party"
+
     def test_evaluate_draft_mode(self):
         """§2.1a/§7.4 — case_id absent + stage payload; khong tao case."""
         owner = _mk_person()
         spouse = _mk_person(ho_ten="Người Mẫu B", gioi_tinh="Nữ",
                             ngay_chet=None)
-        stage = {"people": [owner, spouse], "assets": [_mk_asset()]}
-        state = {"version": 2, "nodes": [
-            _node("owner", owner["row_id"], spouse="spouse", owner=True,
-                  receive=False),
-            _node("spouse", spouse["row_id"], spouse="owner"),
+        stage = {"owner_row_id": owner["row_id"],
+                 "people": [owner, spouse], "assets": [_mk_asset()]}
+        state = {"version": 3, "domain": "inheritance", "nodes": [
+            _node("owner", owner["row_id"], spouse="spouse", own=[1]),
+            _node("spouse", spouse["row_id"], spouse="owner", receive=[1]),
         ]}
         res = _call("diagram_evaluate",
                     {"stage": stage, "diagram": {"state": state}})
         data = res["data"]
-        assert data["schema_version"] == "notary.case-drafting.v1"
+        assert data["schema_version"] == SCHEMA
         assert data["evaluated_revision"] is None
         assert data["render_model"]["engineVersion"] == 2
         # khong ghi gi vao state — case list khong thay doi
@@ -796,12 +1193,42 @@ class TestDiagram:
               {"stage": stage, "diagram": {"state": state}})
         assert _call("case_list", {})["data"]["total"] == before
 
-    def test_evaluate_draft_outside_stage(self):
+    def test_evaluate_draft_two_party(self):
+        """Draft two_party: case.case_type hint + canonical 30 slot ->
+        unsupported render_model (§13.5)."""
+        stage = {"people": [_mk_person(), _mk_person()],
+                 "assets": [_mk_asset()]}
+        res = _call("diagram_evaluate", {
+            "case": {"case_type": "two_party"},
+            "stage": stage,
+            "diagram": {"state": {
+                "version": 3, "domain": "two_party",
+                "nodes": [{"id": f"p{i}", "personId": None,
+                           "hidden": False, "deleted": False}
+                          for i in range(1, 31)]}}})
+        rm = res["data"]["render_model"]
+        assert rm["status"] == "unsupported"
+        assert res["data"]["evaluated_revision"] is None
+
+    def test_evaluate_draft_owner_required(self):
+        """Draft inheritance thieu owner_row_id -> workspace_owner_required."""
         stage = {"people": [_mk_person()], "assets": [_mk_asset()]}
-        state = {"version": 2, "nodes": [
-            _node("owner", stage["people"][0]["row_id"], owner=True,
-                  receive=False),
-            _node("child", str(uuid.uuid4()), parents=("owner",)),
+        with pytest.raises(CommandError) as exc:
+            _call("diagram_evaluate", {
+                "stage": stage,
+                "diagram": {"state": {"version": 3,
+                                      "domain": "inheritance",
+                                      "nodes": []}}})
+        assert exc.value.code == "workspace_owner_required"
+
+    def test_evaluate_draft_outside_stage(self):
+        owner = _mk_person()
+        stage = {"owner_row_id": owner["row_id"],
+                 "people": [owner], "assets": [_mk_asset()]}
+        state = {"version": 3, "domain": "inheritance", "nodes": [
+            _node("owner", owner["row_id"], own=[1]),
+            _node("child", str(uuid.uuid4()), parents=("owner",),
+                  receive=[1]),
         ]}
         with pytest.raises(CommandError) as exc:
             _call("diagram_evaluate",
@@ -809,19 +1236,26 @@ class TestDiagram:
         assert exc.value.code == "diagram_reference_outside_stage"
 
     def test_evaluate_draft_stage_errors(self):
-        stage = {"people": [_mk_person(ho_ten="   ")],
+        owner = _mk_person()
+        stage = {"owner_row_id": owner["row_id"],
+                 "people": [_mk_person(ho_ten="   "),
+                            owner],
                  "assets": [_mk_asset()]}
         with pytest.raises(CommandError) as exc:
             _call("diagram_evaluate", {
                 "stage": stage,
-                "diagram": {"state": {"version": 2, "nodes": []}}})
+                "diagram": {"state": {"version": 3,
+                                      "domain": "inheritance",
+                                      "nodes": []}}})
         assert exc.value.code == "stage_validation_error"
         assert exc.value.details["field_errors"]
 
     def test_evaluate_draft_requires_stage(self):
         with pytest.raises(CommandError) as exc:
             _call("diagram_evaluate", {
-                "diagram": {"state": {"version": 2, "nodes": []}}})
+                "diagram": {"state": {"version": 3,
+                                      "domain": "inheritance",
+                                      "nodes": []}}})
         assert exc.value.code == "validation_error"
 
     def test_evaluate_missing_diagram_is_validation_error(self):
@@ -856,7 +1290,7 @@ class TestDiagram:
     def test_evaluate_string_bool_is_invalid(self):
         mock.reset_backend(_load_fixture("ready.json"))
         state = _ready_state()
-        state["nodes"][0]["willReceive"] = "false"     # chuoi, khong phai bool
+        state["nodes"][0]["hidden"] = "false"     # chuoi, khong phai bool
         with pytest.raises(CommandError) as exc:
             _call("diagram_evaluate",
                   {"case_id": 42, "diagram": {"state": state}})
@@ -870,6 +1304,22 @@ class TestDiagram:
             "diagram": {"state": _load_fixture("locked.json")
                         ["cases"]["44"]["diagram"]["state"]}})
         assert res["data"]["evaluated_revision"] == 3
+
+    def test_evaluate_two_party_unsupported(self):
+        """two_party committed: evaluate tra unsupported render, khong
+        chay engine thua ke (§13.5)."""
+        mock.reset_backend(_load_fixture("ready-two-party.json"))
+        res = _call("diagram_evaluate", {
+            "case_id": 48,
+            "diagram": {"state": _tp_state()}})
+        rm = res["data"]["render_model"]
+        assert rm["status"] == "unsupported"
+        assert rm["engineVersion"] == 2
+        assert rm["allocations"] == {}
+        assert rm["conservation"]["total"] == "0"
+        codes = [w["code"] for w in rm["warnings"]]
+        assert "diagram.two_party_unsupported" in codes
+        assert res["data"]["evaluated_revision"] == 2
 
     def test_evaluate_does_not_persist(self):
         mock.reset_backend(_load_fixture("ready.json"))
@@ -890,12 +1340,69 @@ class TestDiagram:
         data = res["data"]
         assert data["revision"] == 8
         assert data["diagram"]["render_model"]["status"] == "complete"
+        assert data["diagram"]["state"]["domain"] == "inheritance"
+        _no_legacy_keys(data)
         _assert_contract(_job_doc(
             "notary.diagram_save", payload, result=res,
             fixture_context={"stage_row_ids": [
-                P_OWNER, P_SPOUSE, P_CHILD1, P_CHILD2]}))
+                P_OWNER, P_SPOUSE, P_CHILD1, P_CHILD2],
+                "stage_owner_row_id": P_OWNER}))
         got = _call("workspace_get", {"case_id": 42})
         assert got["data"]["case"]["revision"] == 8
+
+    def test_save_owner_mismatch(self):
+        """Node owner personId != owner_row_id da commit ->
+        diagram_owner_mismatch (§13.4 mirror rule)."""
+        mock.reset_backend(_load_fixture("ready.json"))
+        state = _ready_state()
+        # owner.personId -> spouse row; giai phong node spouse de khong
+        # bi duplicate_person (wire check chay truoc mirror check).
+        state["nodes"][0]["personId"] = P_SPOUSE
+        state["nodes"][1]["personId"] = None
+        with pytest.raises(CommandError) as exc:
+            _call("diagram_save", {
+                "case_id": 42, "base_revision": 7,
+                "diagram": {"state": state}})
+        assert exc.value.code == "diagram_owner_mismatch"
+        assert exc.value.details["owner_row_id"] == P_OWNER
+
+    def test_save_prunes_positions(self):
+        """Dau chon vi tri > len(assets) bi prune + warning
+        diagram.selection_pruned (§13.4)."""
+        mock.reset_backend(_load_fixture("ready.json"))
+        state = _ready_state()
+        # 2 assets -> position 3 luon vuot
+        state["nodes"][1]["receivePositions"] = [1, 2, 3]
+        res = _call("diagram_save", {
+            "case_id": 42, "base_revision": 7,
+            "diagram": {"state": state}})
+        dg = res["data"]["diagram"]
+        codes = [w["code"] for w in dg.get("warnings") or []]
+        assert "diagram.selection_pruned" in codes
+        node = next(n for n in dg["state"]["nodes"] if n["id"] == "spouse")
+        assert node["receivePositions"] == [1, 2]
+
+    def test_save_two_party(self):
+        mock.reset_backend(_load_fixture("ready-two-party.json"))
+        res = _call("diagram_save", {
+            "case_id": 48, "base_revision": 2,
+            "diagram": {"state": _tp_state()}})
+        data = res["data"]
+        assert data["revision"] == 3
+        assert data["diagram"]["state"]["domain"] == "two_party"
+        assert data["diagram"]["render_model"]["status"] == "unsupported"
+
+    def test_save_two_party_missing_slot_invalid(self):
+        """29 slot -> diagram_invalid_state (missing_position) —
+        canonical 30 bat buoc (§13.5)."""
+        mock.reset_backend(_load_fixture("ready-two-party.json"))
+        state = _tp_state()
+        state["nodes"] = state["nodes"][:29]
+        with pytest.raises(CommandError) as exc:
+            _call("diagram_save", {
+                "case_id": 48, "base_revision": 2,
+                "diagram": {"state": state}})
+        assert exc.value.code == "diagram_invalid_state"
 
     def test_save_conflict(self):
         mock.reset_backend(_load_fixture("ready.json"))
@@ -911,7 +1418,9 @@ class TestDiagram:
         with pytest.raises(CommandError) as exc:
             _call("diagram_save", {
                 "case_id": 44, "base_revision": 3,
-                "diagram": {"state": {"version": 2, "nodes": []}}})
+                "diagram": {"state": {"version": 3,
+                                      "domain": "inheritance",
+                                      "nodes": []}}})
         assert exc.value.code == "workspace_locked"
 
     def test_save_invalid_state_not_persisted(self):
@@ -919,7 +1428,9 @@ class TestDiagram:
         with pytest.raises(CommandError):
             _call("diagram_save", {
                 "case_id": 42, "base_revision": 7,
-                "diagram": {"state": {"version": 1, "nodes": []}}})
+                "diagram": {"state": {"version": 2,
+                                      "domain": "inheritance",
+                                      "nodes": []}}})
         res = _call("workspace_get", {"case_id": 42})
         assert res["data"]["case"]["revision"] == 7
 
@@ -949,6 +1460,21 @@ class TestWordExport:
         assert docs["khai_nhan_di_san"]["ready"] is False
         assert docs["khai_nhan_di_san"]["block_reason"] == "word.no_assets"
         assert docs["niem_yet"]["block_reason"] == "word.template_missing"
+
+    def test_two_party_word_rejected(self):
+        """§13.10: word_export_* tren two_party -> case_type_unsupported."""
+        mock.reset_backend(_load_fixture("ready-two-party.json"))
+        for cmd, payload in (
+                ("word_export_options", {"case_id": 48}),
+                ("word_export_batch", {
+                    "case_id": 48,
+                    "document_keys": ["khai_nhan_di_san"],
+                    "destination": {"path": "x", "scope": "machine_local",
+                                    "is_dir": True}})):
+            with pytest.raises(CommandError) as exc:
+                _call(cmd, payload)
+            assert exc.value.code == "case_type_unsupported", cmd
+            assert exc.value.details["case_type"] == "two_party"
 
     def test_batch_writes_real_docx(self, tmp_path):
         mock.reset_backend(_load_fixture("ready.json"))
@@ -1279,8 +1805,18 @@ class TestContractInvariants:
         for name, payload in calls.items():
             res = _call(name, payload)
             assert res["kind"] == name
-            assert res["data"]["schema_version"] == (
-                "notary.case-drafting.v1"), name
+            assert res["data"]["schema_version"] == SCHEMA, name
+
+    def test_no_v1_fields_anywhere(self):
+        """workspace_get tra wire v2: khong is_primary/isLandOwner/
+        willReceive o bat ky level nao."""
+        for fixture in ("ready.json", "ready-two-party.json",
+                        "locked.json"):
+            mock.reset_backend(_load_fixture(fixture))
+            cid = 48 if fixture == "ready-two-party.json" else (
+                44 if fixture == "locked.json" else 42)
+            res = _call("workspace_get", {"case_id": cid})
+            _no_legacy_keys(res["data"])
 
     def test_no_confirmed_anywhere(self):
         mock.reset_backend(_load_fixture("intake-partial.json"))
@@ -1303,7 +1839,7 @@ class TestContractInvariants:
 
 class TestCaseListMock:
     """notary.case_list route qua gateway: mock tra danh sach fixture case
-    (42–46) dung shape _case_row cua real adapter de overview chay duoc
+    dung shape _case_row cua real adapter de overview chay duoc
     khong can engine that."""
 
     def test_registry_routes_case_list_via_gateway(self):
@@ -1311,7 +1847,7 @@ class TestCaseListMock:
         res = reg.COMMANDS["notary.case_list"](job, {})
         assert res["kind"] == "case_list"
         ids = {c["id"] for c in res["data"]["cases"]}
-        assert {42, 43, 44, 45, 46} <= ids
+        assert {42, 43, 44, 45, 46, 48} <= ids
         assert res["data"]["total"] == len(res["data"]["cases"])
 
     def test_case_list_row_shape_and_query(self):

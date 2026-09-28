@@ -1,4 +1,4 @@
-"""Field normalization for intake suggestions (notary.case-drafting.v1).
+"""Field normalization for intake suggestions (notary.case-drafting.v2).
 
 Rules (contract §2.2, §4):
 - raw_value giữ nguyên giá trị quan sát được; normalized_value là dạng chuẩn.

@@ -3,7 +3,7 @@
 /* Case-drafting model — state machine thuan cho tab Soạn hồ sơ (MIN-111).
  *
  * SOT hanh vi: notary_v2/docs/platform/case-workspace/drafting-tab.md
- * Wire shape: contracts/notary-case-drafting.md (notary.case-drafting.v1).
+ * Wire shape: contracts/notary-case-drafting.md §13 (notary.case-drafting.v2).
  *
  * - Khong DOM, khong Node API bat buoc: chay trong renderer (<script>) va
  *   node --test. Export UMD: window.G1_NOTARY_MODEL + module.exports.
@@ -15,22 +15,37 @@
  * - Khong bao gio tu commit: Cập nhật/Lưu sơ đồ la hanh dong nguoi dung.
  */
 
-const SUPPORTED_CASE_TYPE = 'inheritance';
+const CASE_TYPE_INHERITANCE = 'inheritance';
+const CASE_TYPE_TWO_PARTY = 'two_party';
+const CASE_TYPES = [CASE_TYPE_INHERITANCE, CASE_TYPE_TWO_PARTY];
 const MOCK_BANNER = 'Dữ liệu mô phỏng';
-const DIAGRAM_VERSION = 2;
+const DIAGRAM_VERSION = 3;
+const MAX_ASSETS = 3;
+const MAX_PEOPLE_TWO_PARTY = 30;
+const POSITIONS = [1, 2, 3];
+const TWO_PARTY_IDS = Array.from({ length: 30 }, (_, i) => `p${i + 1}`);
 
-// Field whitelist theo contract §4.1/§4.2 — strip field la truoc khi gui.
+// Field whitelist theo contract §13.3/§13.4 — strip field la truoc khi
+// gui. is_primary/isLandOwner/willReceive BI CAM tren wire v2.
 const PERSON_FIELDS = ['ho_ten', 'gioi_tinh', 'ngay_sinh', 'ngay_chet',
   'so_giay_to', 'ngay_cap', 'noi_cap', 'dia_chi', 'place_of_origin'];
-const ASSET_FIELDS = ['is_primary', 'so_serial', 'so_vao_so',
+const ASSET_FIELDS = ['so_serial', 'so_vao_so',
   'so_thua_dat', 'so_to_ban_do', 'dia_chi', 'loai_so',
   'hinh_thuc_su_dung', 'thoi_han', 'nguon_goc', 'ngay_cap', 'co_quan_cap'];
-const NODE_BOOL_FIELDS = ['isLandOwner', 'willReceive', 'hidden', 'deleted'];
+const NODE_BOOL_FIELDS = ['hidden', 'deleted'];
+const NODE_POSITION_FIELDS = ['ownPositions', 'receivePositions'];
 
-// Meta cho phep sua tren nhap moi — khop payload.case §4.3.
-const CASE_META_FIELDS = ['document_type', 'ngay_lap_ho_so',
+// Meta cho phep sua tren nhap moi — khop payload.case §13.6.
+const CASE_META_FIELDS = ['case_type', 'document_type', 'ngay_lap_ho_so',
                           'noi_niem_yet', 'ghi_chu'];
 const CASE_DOCUMENT_TYPES = ['khai_nhan', 'thoa_thuan'];
+const CASE_DOCUMENT_TYPES_TWO_PARTY =
+  ['chuyen_nhuong', 'tang_cho', 'cho_thue', 'dat_coc'];
+
+function documentTypesFor(caseType) {
+  return caseType === CASE_TYPE_TWO_PARTY
+    ? CASE_DOCUMENT_TYPES_TWO_PARTY : CASE_DOCUMENT_TYPES;
+}
 
 function clone(v) {
   return v === undefined ? undefined : JSON.parse(JSON.stringify(v));
@@ -67,7 +82,6 @@ function newPersonRow(uuid, fields) {
 function newAssetRow(uuid, fields) {
   const row = { row_id: uuid(), entity_id: null, land_rows: [] };
   for (const f of ASSET_FIELDS) row[f] = null;
-  row.is_primary = false;
   for (const [k, v] of Object.entries(fields || {})) {
     if (k === 'land_rows') {
       row.land_rows = Array.isArray(v) ? clone(v) : [];
@@ -80,8 +94,18 @@ function newAssetRow(uuid, fields) {
 
 function newNode(id) {
   return { id, personId: null, parentSlotIds: [], spouseSlotId: null,
-           isLandOwner: false, willReceive: false,
+           ownPositions: [], receivePositions: [],
            hidden: false, deleted: false };
+}
+
+function newTwoPartyNode(id) {
+  return { id, personId: null, hidden: false, deleted: false };
+}
+
+// State two_party canonical — dung 30 slot p1..p30, khong compact.
+function newTwoPartyState() {
+  return { version: DIAGRAM_VERSION, domain: CASE_TYPE_TWO_PARTY,
+           nodes: TWO_PARTY_IDS.map((id) => newTwoPartyNode(id)) };
 }
 
 // Seed V2 toi thieu port tu ReactFlowApp.jsx (drafting-tab/MIN-122):
@@ -107,14 +131,12 @@ function seedDiagramSlots(nodes) {
   const spouse = findInNodes(nodes, 'spouse') || add('spouse');
   add('child_1', { parents: ['owner', 'spouse'] });
   if (owner) {
-    owner.isLandOwner = true;
     owner.spouseSlotId = 'spouse';
     owner.parentSlotIds = ['father', 'mother'].filter(
       (x) => have.has(x));
   }
   if (spouse) {
     spouse.spouseSlotId = 'owner';
-    spouse.willReceive = true;
     spouse.parentSlotIds = ['spouse_father', 'spouse_mother'].filter(
       (x) => have.has(x));
   }
@@ -137,7 +159,6 @@ function ensureEmptyChildSlot(nodes) {
   const node = newNode(`child_${i}`);
   node.parentSlotIds = ['owner', 'spouse'].filter(
     (x) => findInNodes(nodes, x));
-  node.willReceive = true;
   nodes.push(node);
   return node;
 }
@@ -169,8 +190,10 @@ function createModel(deps) {
     metaDirty: false,            // meta nhap chua luu (chi co tren nhap)
     draftId: null,               // idempotency_key cua phien nhap (uuid4)
     fieldErrors: [],             // [{row_id, field, code, message}]
-    diagram: { version: DIAGRAM_VERSION, nodes: [] },  // draft
-    committedDiagram: { version: DIAGRAM_VERSION, nodes: [] },
+    diagram: { version: DIAGRAM_VERSION, domain: CASE_TYPE_INHERITANCE,
+               nodes: [] },                     // draft
+    committedDiagram: { version: DIAGRAM_VERSION,
+                        domain: CASE_TYPE_INHERITANCE, nodes: [] },
     renderModel: null,           // output engine gan nhat (evaluate/save)
     diagramWarnings: [],
     diagramErrors: [],
@@ -248,8 +271,9 @@ function createModel(deps) {
   }
 
   // Pool = Stage da commit − phan tu dang duoc gan tren draft Diagram
-  // (drafting-tab §2). Assets: wire v1 khong co co che gan tai san len
-  // diagram → moi tai san committed luon con trong Pool.
+  // (drafting-tab §2). Assets khong gan vao node — diagram chi tham
+  // chieu tai san qua ownPositions/receivePositions (vi tri 1..3) →
+  // moi tai san committed luon con trong Pool.
   function pool() {
     const assigned = diagramPersonIds();
     const src = state.caseId == null ? state.stage : state.committed;
@@ -266,13 +290,17 @@ function createModel(deps) {
     state.backendMode = data.backend_mode || 'real';
     state.revision = c.revision || 0;
     state.locked = !!c.locked;
-    state.unsupported = c.case_type !== SUPPORTED_CASE_TYPE;
+    state.unsupported = !CASE_TYPES.includes(c.case_type);
     state.capabilities = data.capabilities ||
       { intake: [], diagram: false, word_export: false };
     state.committed = clone(data.stage || { people: [], assets: [] });
     state.stage = clone(state.committed);
     const dg = data.diagram || {};
-    state.diagram = clone(dg.state || { version: DIAGRAM_VERSION, nodes: [] });
+    state.diagram = clone(dg.state ||
+      (c.case_type === CASE_TYPE_TWO_PARTY
+        ? newTwoPartyState()
+        : { version: DIAGRAM_VERSION, domain: CASE_TYPE_INHERITANCE,
+            nodes: [] }));
     state.committedDiagram = clone(state.diagram);
     state.renderModel = dg.render_model || null;
     // dg.warnings = warning compose stage (list[string], real backend);
@@ -337,16 +365,35 @@ function createModel(deps) {
       (state.status === 'ready' || state.status === 'conflict');
   }
 
-  // Mo nhap trong — stage rong + diagram seed 7 slot V2. draftId =
+  // Stage/diagram draft theo loai ho so (§13.1): inheritance mang
+  // owner_row_id (BẮT BUỘC) + seed 7 slot; two_party khong co owner_row_id,
+  // diagram la 30 slot canonical p1..p30.
+  function newStageDraft(caseType) {
+    return caseType === CASE_TYPE_TWO_PARTY
+      ? { people: [], assets: [] }
+      : { owner_row_id: null, people: [], assets: [] };
+  }
+
+  function newDiagramDraft(caseType) {
+    return caseType === CASE_TYPE_TWO_PARTY
+      ? newTwoPartyState()
+      : { version: DIAGRAM_VERSION, domain: CASE_TYPE_INHERITANCE,
+          nodes: seedDiagramSlots([]) };
+  }
+
+  // Mo nhap trong — stage rong + diagram seed theo caseType. draftId =
   // idempotency_key cua phien: retry saveDraft dung lai → khong tao
-  // trung (contract §4.3). newDraft lai → key moi = nhap khac.
-  function newDraft() {
+  // trung (contract §13.6). newDraft lai → key moi = nhap khac.
+  function newDraft(caseType) {
+    const ct = CASE_TYPES.includes(caseType)
+      ? caseType : CASE_TYPE_INHERITANCE;
     ++session;                        // vo hieu response dang cho cua case cu
     state.status = 'ready';
     state.caseId = null;
     state.draftId = uuid();
     state.caseInfo = {
-      id: null, case_type: SUPPORTED_CASE_TYPE, document_type: 'khai_nhan',
+      id: null, case_type: ct,
+      document_type: documentTypesFor(ct)[0],
       status: 'draft', locked: false, revision: 0,
       ngay_lap_ho_so: null, noi_niem_yet: null, ghi_chu: null,
     };
@@ -357,14 +404,11 @@ function createModel(deps) {
     state.capabilities =
       { intake: [], diagram: true, word_export: false };
     state.committed = { people: [], assets: [] };
-    state.stage = { people: [], assets: [] };
+    state.stage = newStageDraft(ct);
     state.stageDirty = false;
     state.diagramDirty = true;        // seed la draft chua persist
     state.metaDirty = false;
-    state.diagram = {
-      version: DIAGRAM_VERSION,
-      nodes: seedDiagramSlots([]),
-    };
+    state.diagram = newDiagramDraft(ct);
     state.committedDiagram = clone(state.diagram);
     state.renderModel = null;
     state.diagramWarnings = [];
@@ -391,8 +435,34 @@ function createModel(deps) {
   // khong doi meta (contract khong co command update meta).
   function updateCaseMeta(field, value) {
     if (!isDraft() || !CASE_META_FIELDS.includes(field)) return false;
+    if (field === 'case_type') {
+      // Doi loai ho so o nhap = reset diagram buffer theo domain moi
+      // (contract §13.5); stage moc owner_row_id doi theo loai.
+      if (!CASE_TYPES.includes(value)) return false;
+      if (state.caseInfo.case_type === value) return true;
+      state.caseInfo.case_type = value;
+      const docs = documentTypesFor(value);
+      if (!docs.includes(state.caseInfo.document_type)) {
+        state.caseInfo.document_type = docs[0];
+      }
+      if (value === CASE_TYPE_TWO_PARTY) {
+        delete state.stage.owner_row_id;
+      } else if (!('owner_row_id' in state.stage)) {
+        state.stage.owner_row_id = null;
+      }
+      state.diagram = newDiagramDraft(value);
+      state.committedDiagram = clone(state.diagram);
+      state.diagramDirty = true;
+      state.diagramErrors = [];
+      state.metaDirty = true;
+      state.stageDirty = true;
+      emit();
+      return true;
+    }
     if (field === 'document_type' &&
-        !CASE_DOCUMENT_TYPES.includes(value)) return false;
+        !documentTypesFor(state.caseInfo.case_type).includes(value)) {
+      return false;
+    }
     const v = value === '' ? null : value;
     if ((state.caseInfo[field] ?? null) === v) return true;
     state.caseInfo[field] = v;
@@ -455,8 +525,23 @@ function createModel(deps) {
     emit();
   }
 
+  // Loai ho so hien tai cua nhap/case (stage draft hay caseInfo).
+  function caseType() {
+    return (state.caseInfo && state.caseInfo.case_type) ||
+      CASE_TYPE_INHERITANCE;
+  }
+
+  function diagramDomain() {
+    return (state.diagram && state.diagram.domain) || caseType();
+  }
+
   function addPerson(fields) {
     if (!canWrite()) return null;
+    // two_party: toi da 30 nguoi (stage.people → slot p1..p30).
+    if (caseType() === CASE_TYPE_TWO_PARTY &&
+        state.stage.people.length >= MAX_PEOPLE_TWO_PARTY) {
+      return null;
+    }
     const row = newPersonRow(uuid, fields);
     state.stage.people.push(row);
     touchStage();
@@ -465,9 +550,9 @@ function createModel(deps) {
 
   function addAsset(fields) {
     if (!canWrite()) return null;
+    // Toi da 3 asset; vi tri = index+1 trong mang (contract §13.3).
+    if (state.stage.assets.length >= MAX_ASSETS) return null;
     const row = newAssetRow(uuid, fields);
-    // Tai san dau tien mac dinh la primary (contract: dung 1 primary).
-    if (!state.stage.assets.length) row.is_primary = true;
     state.stage.assets.push(row);
     touchStage();
     return row;
@@ -492,12 +577,7 @@ function createModel(deps) {
     if (!canWrite()) return;
     const row = state.stage.assets.find((a) => a.row_id === rowId);
     if (!row) return;
-    if (field === 'is_primary' && value === true) {
-      // Dung 1 primary: bat cai nay thi tat cac dong khac (client-side
-      // mirror cua rule primary_count — backend van la nguoi quyet).
-      for (const a of state.stage.assets) a.is_primary = false;
-      row.is_primary = true;
-    } else if (field === 'land_rows') {
+    if (field === 'land_rows') {
       // Form dọc: land_rows la list {loai_dat, dien_tich, thoi_han}.
       row.land_rows = Array.isArray(value)
         ? value.map((x) => ({
@@ -514,6 +594,43 @@ function createModel(deps) {
     touchStage();
   }
 
+  // Doi thu tu asset = doi nghia vi tri (contract §13.3): row_id di
+  // theo dong; dau chon ownPositions/receivePositions KHONG tu chuyen
+  // theo — server giu so vi tri nguyen, prune vi tri > len(assets).
+  function moveAsset(rowId, toIndex) {
+    if (!canWrite()) return false;
+    const i = state.stage.assets.findIndex((a) => a.row_id === rowId);
+    if (i < 0) return false;
+    const j = Math.max(0, Math.min(toIndex | 0, state.stage.assets.length - 1));
+    if (i === j) return true;
+    const [row] = state.stage.assets.splice(i, 1);
+    state.stage.assets.splice(j, 0, row);
+    clearRowFieldError(rowId);
+    touchStage();
+    return true;
+  }
+
+  // Owner cua case inheritance = stage.owner_row_id (contract §13.1).
+  // Node 'owner' tren draft diagram chi mirror — server sync luc
+  // commit/save; client cap nhat mirror de render dung ngay.
+  function setOwnerRow(rowId) {
+    if (!canWrite()) return false;
+    if (caseType() !== CASE_TYPE_INHERITANCE) return false;
+    if (rowId !== null &&
+        !state.stage.people.some((p) => p.row_id === rowId)) {
+      return false;
+    }
+    if (state.stage.owner_row_id === rowId) return true;
+    state.stage.owner_row_id = rowId;
+    const owner = findInNodes(state.diagram.nodes, 'owner');
+    if (owner) {
+      owner.personId = rowId;
+      state.diagramDirty = true;
+    }
+    touchStage();
+    return true;
+  }
+
   function removeStageRow(rowId) {
     if (!canWrite()) return;
     const before = state.stage.people.length + state.stage.assets.length;
@@ -522,11 +639,12 @@ function createModel(deps) {
     if (state.stage.people.length + state.stage.assets.length === before) {
       return;
     }
-    // Contract: dung 1 primary khi assets con dong — xoa tai san chinh
-    // thi promote dong dau con lai (mirror phia client).
-    if (state.stage.assets.length &&
-        !state.stage.assets.some((a) => a.is_primary)) {
-      state.stage.assets[0].is_primary = true;
+    // Xoa dong owner → pointer ve null (draft cho phep; commit se bat
+    // workspace_owner_required neu chua chon lai truoc khi Cap nhat).
+    if (state.stage.owner_row_id === rowId) {
+      state.stage.owner_row_id = null;
+      const owner = findInNodes(state.diagram.nodes, 'owner');
+      if (owner) owner.personId = null;
     }
     // Mirror _prune_diagram phia backend: draft diagram bo tham chieu
     // toi dong vua xoa de save sau khong bi reference_outside_stage.
@@ -651,6 +769,8 @@ function createModel(deps) {
 
   function addSlot(id) {
     if (!canWrite()) return null;
+    // two_party: 30 slot canonical co dinh — khong them slot tuy y.
+    if (diagramDomain() === CASE_TYPE_TWO_PARTY) return null;
     const nodes = state.diagram.nodes || (state.diagram.nodes = []);
     let nid = id;
     if (!nid) {
@@ -664,6 +784,23 @@ function createModel(deps) {
     return node;
   }
 
+  // Mac dinh khi gan (contract §13.4 Q5 — tien ich client): node owner
+  // → ownPositions = moi vi tri dang co; slot thua ke khac →
+  // receivePositions = moi vi tri dang co. Chi ap khi mang dang rong
+  // (khong ghi de lua chon user); wire luon mang mang explicit.
+  function applyAssignDefaults(node) {
+    if (!node || diagramDomain() !== CASE_TYPE_INHERITANCE) return;
+    if (!node.personId) return;
+    const all = state.stage.assets.map((_, i) => i + 1);
+    if (node.id === 'owner') {
+      if (!node.ownPositions || !node.ownPositions.length) {
+        node.ownPositions = all.slice();
+      }
+    } else if (!node.receivePositions || !node.receivePositions.length) {
+      node.receivePositions = all.slice();
+    }
+  }
+
   // Gan nguoi (row_id trong Stage DA COMMIT) vao slot; rowId=null → bo gan,
   // nguoi quay ve Pool. Mot nguoi chi nam tren mot node — gan moi se clear
   // node cu (tranh engine duplicate_person).
@@ -671,6 +808,24 @@ function createModel(deps) {
     if (!canWrite()) return false;
     const node = findNode(nodeId);
     if (!node) return false;
+    // Node 'owner' la mirror cua stage.owner_row_id — gan qua setter de
+    // pointer stage cap nhat cung (contract §13.4).
+    if (diagramDomain() === CASE_TYPE_INHERITANCE &&
+        nodeId === 'owner') {
+      if (!setOwnerRow(rowId)) return false;
+      // Mot nguoi chi nam tren mot node — rowId dang o node khac thi
+      // clear truoc (tranh duplicate_person nhu nhanh generic).
+      if (rowId) {
+        for (const n of state.diagram.nodes) {
+          if (n.id !== 'owner' && !n.deleted && n.personId === rowId) {
+            n.personId = null;
+          }
+        }
+      }
+      applyAssignDefaults(findInNodes(state.diagram.nodes, 'owner'));
+      touchDiagram();
+      return true;
+    }
     if (rowId !== null && !assignablePersonIds().has(rowId)) return false;
     if (rowId) {
       for (const n of state.diagram.nodes) {
@@ -680,7 +835,10 @@ function createModel(deps) {
       }
     }
     node.personId = rowId;
-    ensureEmptyChildSlot(state.diagram.nodes);
+    applyAssignDefaults(node);
+    if (diagramDomain() !== CASE_TYPE_TWO_PARTY) {
+      ensureEmptyChildSlot(state.diagram.nodes);
+    }
     touchDiagram();
     return true;
   }
@@ -698,21 +856,48 @@ function createModel(deps) {
       (n) => n && !n.deleted && n.personId === rowId) || null;
     if (targetNodeId == null) {
       if (!sourceNode) return false;      // da o Pool roi
+      if (diagramDomain() === CASE_TYPE_INHERITANCE &&
+          sourceNode.id === 'owner') {
+        return setOwnerRow(null);
+      }
       sourceNode.personId = null;
-      ensureEmptyChildSlot(state.diagram.nodes);
+      if (diagramDomain() !== CASE_TYPE_TWO_PARTY) {
+        ensureEmptyChildSlot(state.diagram.nodes);
+      }
       touchDiagram();
       return true;
     }
     const target = findNode(targetNodeId);
     if (!target || target === sourceNode) return false;
+    // Tha len slot 'owner' = chon owner moi — qua setOwnerRow de
+    // pointer stage theo cung; owner cu ve Pool (Q9 swap).
+    if (diagramDomain() === CASE_TYPE_INHERITANCE &&
+        target.id === 'owner') {
+      if (!setOwnerRow(rowId)) return false;
+      if (sourceNode) sourceNode.personId = null;
+      applyAssignDefaults(findInNodes(state.diagram.nodes, 'owner'));
+      ensureEmptyChildSlot(state.diagram.nodes);
+      touchDiagram();
+      return true;
+    }
     if (!assignablePersonIds().has(rowId)) return false;
     const displaced = target.personId;
     target.personId = rowId;
     if (sourceNode) {
-      sourceNode.personId = displaced || null;   // swap (null = move)
+      if (diagramDomain() === CASE_TYPE_INHERITANCE &&
+          sourceNode.id === 'owner') {
+        // Swap owner ra khoi slot owner = doi owner_row_id sang nguoi
+        // bi choan cho (hoac null) — mirror luon theo pointer stage.
+        setOwnerRow(displaced || null);
+      } else {
+        sourceNode.personId = displaced || null;   // swap (null = move)
+      }
     }                                   // displaced khong co sourceNode
                                         // → tu nhien ve Pool
-    ensureEmptyChildSlot(state.diagram.nodes);
+    applyAssignDefaults(target);
+    if (diagramDomain() !== CASE_TYPE_TWO_PARTY) {
+      ensureEmptyChildSlot(state.diagram.nodes);
+    }
     touchDiagram();
     return true;
   }
@@ -727,8 +912,30 @@ function createModel(deps) {
     return true;
   }
 
+  // Bat/tat dau chon tai san tren node inheritance (contract §13.4):
+  // kind = 'own'|'receive'; pos ∈ {1,2,3}; mang khong trung phan tu.
+  // View disable chip vi tri chua co asset (P6) — model van cho phep
+  // chon (server prune > len(assets) tai commit/save, khong reject).
+  function toggleNodePosition(nodeId, kind, pos) {
+    if (!canWrite()) return false;
+    if (diagramDomain() !== CASE_TYPE_INHERITANCE) return false;
+    const field = kind === 'own' ? 'ownPositions'
+      : kind === 'receive' ? 'receivePositions' : null;
+    if (!field || !POSITIONS.includes(pos)) return false;
+    const node = findNode(nodeId);
+    if (!node) return false;
+    const arr = Array.isArray(node[field]) ? node[field].slice() : [];
+    const i = arr.indexOf(pos);
+    if (i >= 0) arr.splice(i, 1); else arr.push(pos);
+    node[field] = arr;
+    touchDiagram();
+    return true;
+  }
+
   function setNodeRelation(nodeId, rel) {
     if (!canWrite()) return false;
+    // two_party: node khong co quan he cha/me/vo-chong (contract §13.5).
+    if (diagramDomain() === CASE_TYPE_TWO_PARTY) return false;
     const node = findNode(nodeId);
     if (!node) return false;
     if (rel.parentSlotIds !== undefined) {
@@ -770,9 +977,11 @@ function createModel(deps) {
     state.busy = 'notary.diagram_evaluate';
     emit();
     const s = session;
-    // §2.1a: nhap moi (caseId=null) → khong gui case_id, kem stage nhap.
+    // §2.1a: nhap moi (caseId=null) → khong gui case_id, kem stage nhap
+    // + hint case.case_type de server evaluate dung domain (§13.7).
     const payload = state.caseId == null
-      ? { stage: clone(state.stage),
+      ? { case: { case_type: caseType() },
+          stage: clone(state.stage),
           diagram: { state: clone(state.diagram) } }
       : { case_id: state.caseId,
           diagram: { state: clone(state.diagram) } };
@@ -1078,11 +1287,13 @@ function createModel(deps) {
     state, subscribe,
     openCase, newDraft, isDraft, saveDraft, updateCaseMeta,
     canWrite, mockBanner, hasUnsaved, isStageEmpty,
+    caseType, diagramDomain, documentTypesFor,
     addPerson, addAsset, updatePersonField, updateAssetField,
+    moveAsset, setOwnerRow,
     removeStageRow, fieldErrorsFor, commitStage,
     pool,
     addSlot, assignPerson, movePerson,
-    setNodeFlag, setNodeRelation, removeNode,
+    setNodeFlag, toggleNodePosition, setNodeRelation, removeNode,
     evaluateDiagram, saveDiagram,
     resolveConflict,
     intakeAnalyze, acceptSuggestion, discardSuggestion,
@@ -1093,13 +1304,26 @@ function createModel(deps) {
 
 const G1_NOTARY_MODEL = {
   createModel,
-  SUPPORTED_CASE_TYPE,
+  CASE_TYPE_INHERITANCE,
+  CASE_TYPE_TWO_PARTY,
+  CASE_TYPES,
+  SUPPORTED_CASE_TYPE: CASE_TYPE_INHERITANCE,   // back-compat alias
   MOCK_BANNER,
   PERSON_FIELDS,
   ASSET_FIELDS,
+  NODE_BOOL_FIELDS,
+  NODE_POSITION_FIELDS,
   CASE_META_FIELDS,
   CASE_DOCUMENT_TYPES,
+  CASE_DOCUMENT_TYPES_TWO_PARTY,
+  documentTypesFor,
+  DIAGRAM_VERSION,
+  MAX_ASSETS,
+  MAX_PEOPLE_TWO_PARTY,
+  POSITIONS,
+  TWO_PARTY_IDS,
   seedDiagramSlots,
+  newTwoPartyState,
 };
 
 if (typeof window !== 'undefined') window.G1_NOTARY_MODEL = G1_NOTARY_MODEL;

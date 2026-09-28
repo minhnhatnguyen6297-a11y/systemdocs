@@ -1,4 +1,4 @@
-"""Batch Word export theo contract notary.case-drafting.v1 §8 (MIN-110).
+"""Batch Word export theo contract notary.case-drafting.v2 §13.10 (MIN-110).
 
 Sở hữu phần nghiệp vụ lớp catalog/orchestration cho
 `notary.word_export_options` + `notary.word_export_batch`:
@@ -38,7 +38,7 @@ from services import word_engine
 
 _logger = logging.getLogger("word_batch_export")
 
-SCHEMA_VERSION = "notary.case-drafting.v1"
+SCHEMA_VERSION = "notary.case-drafting.v2"
 
 _DOC_KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 

@@ -310,7 +310,7 @@ class SidecarContractTest(unittest.TestCase):
         res = final["result"]
         self.assertEqual(res["kind"], "workspace_get")
         data = res["data"]
-        self.assertEqual(data["schema_version"], "notary.case-drafting.v1")
+        self.assertEqual(data["schema_version"], "notary.case-drafting.v2")
         self.assertEqual(data["backend_mode"], "mock")
         self.assertEqual(data["case"]["id"], 42)
         self.assertIn("capabilities", data)

@@ -26,6 +26,16 @@ const BLOCK_REASON_LABEL = {
 const DOC_TYPE_LABEL = {
   khai_nhan: 'Khai nhận di sản',
   thoa_thuan: 'Thỏa thuận phân chia',
+  // two_party document_type enum (contract §13.6).
+  chuyen_nhuong: 'Chuyển nhượng',
+  tang_cho: 'Tặng cho',
+  cho_thue: 'Cho thuê',
+  dat_coc: 'Đặt cọc',
+};
+
+const CASE_TYPE_LABEL = {
+  inheritance: 'Thừa kế',
+  two_party: 'Hai bên',
 };
 
 // INTAKE_KIND_LABEL/OBS_STATE_LABEL khai bao trong intake-dialog.js
@@ -246,8 +256,8 @@ function createNotaryModuleView(deps) {
               c.document_type || '—'}`);
     bar.append(title);
     const typeBadge = h('span', 'cd-badge',
-      c.case_type === 'inheritance' || draft ? 'Thừa kế'
-        : `Loại: ${c.case_type}`);
+      CASE_TYPE_LABEL[c.case_type] ||
+        `Loại: ${c.case_type || 'inheritance'}`);
     bar.append(typeBadge);
     if (draft) {
       bar.append(h('span', 'cd-badge cd-badge-warn',
@@ -285,11 +295,29 @@ function createNotaryModuleView(deps) {
     head.append(h('h3', 'cd-card-title', 'Thông tin hồ sơ'));
     box.append(head);
     const body = h('div', 'cd-card-body cd-field-stack');
+    // Loai ho so (case_type §13.1): inheritance | two_party — chon xong
+    // la immutable sau khi luu; doi o day reset diagram buffer.
+    const ctLab = h('label', 'cd-field');
+    ctLab.append(h('span', 'muted', 'Loại hồ sơ'));
+    const csel = h('select', 'cd-input');
+    for (const [v, lbl] of Object.entries(CASE_TYPE_LABEL)) {
+      const o = h('option', '', lbl);
+      o.value = v;
+      if (c.case_type === v) o.selected = true;
+      csel.append(o);
+    }
+    csel.setAttribute('aria-label', 'Loại hồ sơ');
+    csel.onchange = () => model.updateCaseMeta('case_type', csel.value);
+    ctLab.append(csel);
+    body.append(ctLab);
     const dt = h('label', 'cd-field');
     dt.append(h('span', 'muted', 'Loại văn bản'));
     const sel = h('select', 'cd-input');
-    for (const [v, lbl] of Object.entries(DOC_TYPE_LABEL)) {
-      const o = h('option', '', lbl);
+    // Enum document_type phu thuoc case_type (contract §13.6).
+    const docTypes = model.documentTypesFor
+      ? model.documentTypesFor(c.case_type) : Object.keys(DOC_TYPE_LABEL);
+    for (const v of docTypes) {
+      const o = h('option', '', DOC_TYPE_LABEL[v] || v);
       o.value = v;
       if (c.document_type === v) o.selected = true;
       sel.append(o);
@@ -332,6 +360,11 @@ function createNotaryModuleView(deps) {
       [p.ngay_sinh, p.ngay_chet ? `mất ${p.ngay_chet}` : 'còn sống',
        p.so_giay_to].filter(Boolean).join(' · '));
     head.append(main, meta);
+    // Badge owner (inheritance): nguoi de lai tai san = stage
+    // .owner_row_id tro toi dong nay (contract §13.1).
+    if (model.state.stage.owner_row_id === p.row_id) {
+      head.append(h('span', 'cd-badge', 'Người để lại'));
+    }
     wrap.append(head);
     const errs = model.fieldErrorsFor(p.row_id);
     if (errs.length) {
@@ -369,6 +402,23 @@ function createNotaryModuleView(deps) {
       }
       return lab;
     };
+    // Chon "nguoi de lai tai san" (chi inheritance): radio 1-lua-chon —
+    // click dong owner se unset (chi 1 owner, co the chua chon).
+    if (model.state.caseInfo &&
+        model.state.caseInfo.case_type === 'inheritance' &&
+        'owner_row_id' in model.state.stage) {
+      const ow = h('label', 'cd-field cd-field-check');
+      const ob = h('input');
+      ob.type = 'radio';
+      ob.name = 'cd-owner-row';
+      ob.checked = model.state.stage.owner_row_id === p.row_id;
+      ob.disabled = ro;
+      ob.setAttribute('aria-label', 'Người để lại tài sản');
+      ob.onchange = () => model.setOwnerRow(
+        model.state.stage.owner_row_id === p.row_id ? null : p.row_id);
+      ow.append(ob, h('span', '', 'Người để lại tài sản'));
+      det.append(ow);
+    }
     det.append(field('Họ tên', 'ho_ten', p.ho_ten));
     // Gioi tinh: enum {Nam, Nữ, null} — select thay input tu do.
     const gl = h('label', 'cd-field');
@@ -402,7 +452,7 @@ function createNotaryModuleView(deps) {
     return wrap;
   }
 
-  function assetRowEl(a) {
+  function assetRowEl(a, idx) {
     const wrap = h('div', 'cd-row');
     wrap.dataset.rowId = a.row_id;
     const head = btn('', 'cd-row-head');
@@ -412,8 +462,10 @@ function createNotaryModuleView(deps) {
       head.setAttribute('aria-expanded', String(open));
       if (open) openRowIds.add(a.row_id); else openRowIds.delete(a.row_id);
     };
+    // Vi tri = index+1 trong stage.assets (contract §13.3) — vi tri 1
+    // la "primary" theo nghia engine; khong con field is_primary.
     const main = h('span', 'cd-row-main',
-      (a.is_primary ? '★ ' : '') + (a.so_serial || '(chưa có serial)'));
+      `#${idx + 1} ` + (a.so_serial || '(chưa có serial)'));
     const meta = h('span', 'cd-row-meta muted',
       [a.dia_chi, a.so_thua_dat ? `thửa ${a.so_thua_dat}` : null]
         .filter(Boolean).join(' · '));
@@ -427,12 +479,41 @@ function createNotaryModuleView(deps) {
       wrap.append(e);
     }
     if (model.canWrite()) {
-      const del = btn('✕', 'cd-del', () => {
+      const tools = h('span', 'cd-row-tools');
+      // Reorder = doi nghia vi tri (§13.3) — dau chon tren diagram giu
+      // nguyen so vi tri, khong bam row_id.
+      const total = model.state.stage.assets.length;
+      const up = btn('↑', 'cd-move', () => {
+        model.moveAsset(a.row_id, idx - 1);
+      });
+      up.disabled = idx <= 0;
+      up.setAttribute('aria-label', `Lên vị trí ${idx}`);
+      const down = btn('↓', 'cd-move', () => {
+        model.moveAsset(a.row_id, idx + 1);
+      });
+      down.disabled = idx >= total - 1;
+      down.setAttribute('aria-label', `Xuống vị trí ${idx + 2}`);
+      tools.append(up, down);
+      const del = btn('✕', 'cd-del', async () => {
+        // Xoa asset o giua lam dịch vi tri cac dong sau — canh bao
+        // theo contract §13.3 (dau chon giu so vi tri, khong bam row).
+        if (idx < total - 1) {
+          const ok = await confirm({
+            title: 'Xóa tài sản',
+            body: `Tài sản ở vị trí ${idx + 1} bị xóa sẽ đẩy các tài ` +
+              'sản phía sau lên một vị trí — dấu chọn sở hữu/nhận trên ' +
+              'sơ đồ giữ nguyên số vị trí (nghĩa thay đổi).',
+            confirmLabel: 'Xóa tài sản',
+            cancelLabel: 'Ở lại',
+          });
+          if (!ok) return;
+        }
         model.removeStageRow(a.row_id);
       });
       del.setAttribute('aria-label',
         `Xóa tài sản ${a.so_serial || ''}`.trim());
-      wrap.append(del);
+      tools.append(del);
+      wrap.append(tools);
     }
     // MIN-120/122: form NHOM TRUONG XEP DOC (khong phai bang/column) —
     // du asset_row §4.2 + editor land_rows.
@@ -454,16 +535,9 @@ function createNotaryModuleView(deps) {
       }
       return lab;
     };
-    const prim = h('label', 'cd-field cd-field-check');
-    const cb = h('input');
-    cb.type = 'checkbox';
-    cb.checked = !!a.is_primary;
-    cb.disabled = ro;
-    cb.setAttribute('aria-label', 'Tài sản chính');
-    cb.onchange = () => model.updateAssetField(
-      a.row_id, 'is_primary', cb.checked);
-    prim.append(cb, h('span', '', 'Tài sản chính'));
-    det.append(prim);
+    det.append(h('div', 'muted',
+      `Vị trí ${idx + 1} — dùng nút ↑/↓ để đổi vị trí (thứ tự mảng ` +
+      'quyết định nghĩa sở hữu/nhận trên sơ đồ).'));
     det.append(field('Số serial', 'so_serial', a.so_serial));
     det.append(field('Số vào sổ', 'so_vao_so', a.so_vao_so));
     det.append(field('Thửa đất', 'so_thua_dat', a.so_thua_dat));
@@ -537,8 +611,10 @@ function createNotaryModuleView(deps) {
     const aTools = h('div', 'cd-card-tools');
     const intakeAsset = btn('Nhập dữ liệu', '', () => openIntakeDialog(null));
     const addA = btn('+ Tài sản', '', () => model.addAsset());
+    // Toi da 3 asset (§13.3) — het slot thi disable nut them.
+    const assetFull = s.stage.assets.length >= 3;
     intakeAsset.disabled = !model.canWrite();
-    addA.disabled = !model.canWrite();
+    addA.disabled = !model.canWrite() || assetFull;
     aTools.append(intakeAsset, addA);
     aHead.append(aTools);
     ac.append(aHead);
@@ -550,7 +626,10 @@ function createNotaryModuleView(deps) {
       e.append(b);
       aBody.append(e);
     } else {
-      for (const a of s.stage.assets) aBody.append(assetRowEl(a));
+      s.stage.assets.forEach((a, i) => aBody.append(assetRowEl(a, i)));
+      if (assetFull) {
+        aBody.append(h('div', 'muted', 'Tối đa 3 tài sản.'));
+      }
     }
     ac.append(aBody);
     tier.append(ac);
@@ -564,8 +643,11 @@ function createNotaryModuleView(deps) {
     // dialog/pipeline cho ca Nguoi va Tai san (image/pdf/docx/xlsx/text).
     const intakeP = btn('Nhập dữ liệu', '', () => openIntakeDialog(null));
     const addP = btn('+ Người', '', () => model.addPerson());
+    // two_party: toi da 30 nguoi (§13.5) — het slot thi disable.
+    const peopleFull = (s.caseInfo && s.caseInfo.case_type === 'two_party')
+      && s.stage.people.length >= 30;
     intakeP.disabled = !model.canWrite();
-    addP.disabled = !model.canWrite();
+    addP.disabled = !model.canWrite() || peopleFull;
     let primary;
     if (s.caseId == null) {
       // Nhap moi: duong luu duy nhat la Lưu hồ sơ → workspace_create

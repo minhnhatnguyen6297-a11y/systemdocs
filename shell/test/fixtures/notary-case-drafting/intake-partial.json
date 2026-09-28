@@ -8,11 +8,20 @@
       "status": "draft",
       "locked": false,
       "revision": 7,
-      "stage": { "people": [], "assets": [] },
+      "stage": {
+        "people": [],
+        "assets": [],
+        "owner_row_id": null
+      },
       "diagram": {
-        "state": { "version": 2, "nodes": [] },
+        "state": {
+          "version": 3,
+          "domain": "inheritance",
+          "nodes": []
+        },
         "render_model": null,
-        "warnings": []
+        "warnings": [],
+        "domain": "inheritance"
       }
     }
   },

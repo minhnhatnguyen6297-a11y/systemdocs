@@ -234,3 +234,45 @@ test('MIN-112r: confirmModal co role dialog + aria-modal + Escape', () => {
   assert.match(mm[0], /aria-modal/);
   assert.match(mm[0], /Escape/);
 });
+
+// ---------- MIN-128: v2 wire invariants ----------
+
+test('MIN-128: renderer KHONG emit field v1 bi cam (is_primary/isLandOwner/willReceive)', () => {
+  // §13.14: producer v2 khong emit cac field nay o bat ky level nao.
+  // Check sau khi strip comment — keyword trong comment thi khong sao.
+  for (const [name, code] of [
+      ['model', modelCode], ['view', viewCode],
+      ['diagram', stripComments(R(DIAGRAM))],
+      ['word-dialog', stripComments(R(WORD))],
+      ['intake-dialog', stripComments(R(INTAKE))]]) {
+    for (const bad of ['is_primary', 'isLandOwner', 'willReceive']) {
+      assert.ok(!code.includes(bad), `${name} con field v1 "${bad}"`);
+    }
+  }
+});
+
+test('MIN-128: model co v2 contracts — version 3, owner_row_id, positions, two_party', () => {
+  assert.match(modelSrc, /DIAGRAM_VERSION\s*=\s*3\b/);
+  assert.match(modelSrc, /owner_row_id/);
+  assert.match(modelSrc, /ownPositions/);
+  assert.match(modelSrc, /receivePositions/);
+  assert.match(modelSrc, /two_party/);
+  assert.match(modelSrc, /MAX_ASSETS\s*=\s*3\b/);
+  assert.match(modelSrc, /MAX_PEOPLE_TWO_PARTY\s*=\s*30\b/);
+  assert.match(modelSrc, /case_type/);
+});
+
+test('MIN-128: diagram co position chips + two_party groups; khong co +Slot arbitrary tren two_party', () => {
+  const diag = R(DIAGRAM);
+  assert.match(diag, /ownPositions|toggleNodePosition/);
+  assert.match(diag, /receivePositions/);
+  assert.match(diag, /two_party/);
+  assert.match(diag, /Bên A|Bên B|p1|p16/);
+});
+
+test('MIN-128: view co owner selector + case type badge + position display', () => {
+  const v = R(VIEW);
+  assert.match(v, /owner_row_id/);
+  assert.match(v, /case_type/);
+  assert.match(v, /two_party/);
+});

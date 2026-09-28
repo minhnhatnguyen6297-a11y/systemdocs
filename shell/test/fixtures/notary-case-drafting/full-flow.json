@@ -93,7 +93,6 @@
           {
             "row_id": "77777777-aaaa-4aaa-8aaa-aaaaaaaaaaa7",
             "entity_id": 401,
-            "is_primary": true,
             "so_serial": "MM000047",
             "so_vao_so": "CS 0047",
             "so_thua_dat": "47",
@@ -106,13 +105,16 @@
             "ngay_cap": "2006-03-15",
             "co_quan_cap": "UBND mẫu",
             "land_rows": [
-              { "loai_dat": "ODT", "dien_tich": 96.0, "thoi_han": "Lâu dài" }
+              {
+                "loai_dat": "ODT",
+                "dien_tich": 96.0,
+                "thoi_han": "Lâu dài"
+              }
             ]
           },
           {
             "row_id": "88888888-bbbb-4bbb-8bbb-bbbbbbbbbbb8",
             "entity_id": 402,
-            "is_primary": false,
             "so_serial": "MM000048",
             "so_vao_so": null,
             "so_thua_dat": "48",
@@ -125,22 +127,31 @@
             "ngay_cap": null,
             "co_quan_cap": null,
             "land_rows": [
-              { "loai_dat": "CLN", "dien_tich": 150.0, "thoi_han": null }
+              {
+                "loai_dat": "CLN",
+                "dien_tich": 150.0,
+                "thoi_han": null
+              }
             ]
           }
-        ]
+        ],
+        "owner_row_id": "11111111-aaaa-4aaa-8aaa-aaaaaaaaaaa1"
       },
       "diagram": {
         "state": {
-          "version": 2,
+          "version": 3,
+          "domain": "inheritance",
           "nodes": [
             {
               "id": "owner",
               "personId": "11111111-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
               "parentSlotIds": [],
               "spouseSlotId": "spouse",
-              "isLandOwner": true,
-              "willReceive": false,
+              "ownPositions": [
+                1,
+                2
+              ],
+              "receivePositions": [],
               "hidden": false,
               "deleted": false
             },
@@ -149,55 +160,83 @@
               "personId": "22222222-bbbb-4bbb-8bbb-bbbbbbbbbbb2",
               "parentSlotIds": [],
               "spouseSlotId": "owner",
-              "isLandOwner": false,
-              "willReceive": true,
+              "ownPositions": [],
+              "receivePositions": [
+                1,
+                2
+              ],
               "hidden": false,
               "deleted": false
             },
             {
               "id": "child_1",
               "personId": "33333333-cccc-4ccc-8ccc-ccccccccccc3",
-              "parentSlotIds": ["owner", "spouse"],
+              "parentSlotIds": [
+                "owner",
+                "spouse"
+              ],
               "spouseSlotId": null,
-              "isLandOwner": false,
-              "willReceive": true,
+              "ownPositions": [],
+              "receivePositions": [
+                1,
+                2
+              ],
               "hidden": false,
               "deleted": false
             },
             {
               "id": "child_2",
               "personId": "44444444-dddd-4ddd-8ddd-ddddddddddd4",
-              "parentSlotIds": ["owner", "spouse"],
+              "parentSlotIds": [
+                "owner",
+                "spouse"
+              ],
               "spouseSlotId": null,
-              "isLandOwner": false,
-              "willReceive": true,
+              "ownPositions": [],
+              "receivePositions": [
+                1,
+                2
+              ],
               "hidden": false,
               "deleted": false
             },
             {
               "id": "child_3",
               "personId": "55555555-eeee-4eee-8eee-eeeeeeeeeee5",
-              "parentSlotIds": ["owner", "spouse"],
+              "parentSlotIds": [
+                "owner",
+                "spouse"
+              ],
               "spouseSlotId": null,
-              "isLandOwner": false,
-              "willReceive": true,
+              "ownPositions": [],
+              "receivePositions": [
+                1,
+                2
+              ],
               "hidden": false,
               "deleted": false
             },
             {
               "id": "child_4",
               "personId": "66666666-ffff-4fff-8fff-fffffffffff6",
-              "parentSlotIds": ["owner", "spouse"],
+              "parentSlotIds": [
+                "owner",
+                "spouse"
+              ],
               "spouseSlotId": null,
-              "isLandOwner": false,
-              "willReceive": true,
+              "ownPositions": [],
+              "receivePositions": [
+                1,
+                2
+              ],
               "hidden": false,
               "deleted": false
             }
           ]
         },
         "render_model": "auto",
-        "warnings": []
+        "warnings": [],
+        "domain": "inheritance"
       }
     }
   }

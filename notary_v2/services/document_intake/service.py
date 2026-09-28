@@ -1,4 +1,4 @@
-"""Multi-source document intake orchestration (notary.case-drafting.v1).
+"""Multi-source document intake orchestration (notary.case-drafting.v2).
 
 Luồng: validate sources (shape + limits §5.2) → dispatch adapter theo kind →
 gom suggestions + per-source errors → status succeeded|partial|failed.

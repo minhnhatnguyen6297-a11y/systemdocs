@@ -1,0 +1,103 @@
+{
+  "scenario": "ready-two-party",
+  "description": "Case 48 — loai viec hai ben (chuyen_nhuong): stage 2 nguoi + 1 tai san, diagram domain two_party canonical 30 slot p1..p30 (p1/p2 da gan), render_model unsupported (khong qua engine). Word export -> case_type_unsupported. Tat ca du lieu la mau gia (khong PII).",
+  "cases": {
+    "48": {
+      "case_type": "two_party",
+      "document_type": "chuyen_nhuong",
+      "status": "draft",
+      "locked": false,
+      "revision": 2,
+      "stage": {
+        "people": [
+          {
+            "row_id": "aaaaaaaa-0000-4000-8000-000000000101",
+            "entity_id": 501,
+            "ho_ten": "Người Mẫu P1",
+            "gioi_tinh": "Nam",
+            "ngay_sinh": "1960",
+            "ngay_chet": null,
+            "so_giay_to": "000000000501",
+            "ngay_cap": "2000-01-01",
+            "noi_cap": "CA Mẫu",
+            "dia_chi": "Địa chỉ mẫu 10",
+            "place_of_origin": null
+          },
+          {
+            "row_id": "bbbbbbbb-0000-4000-8000-000000000102",
+            "entity_id": 502,
+            "ho_ten": "Người Mẫu P2",
+            "gioi_tinh": "Nữ",
+            "ngay_sinh": "1965-02-02",
+            "ngay_chet": null,
+            "so_giay_to": null,
+            "ngay_cap": null,
+            "noi_cap": null,
+            "dia_chi": "Địa chỉ mẫu 11",
+            "place_of_origin": null
+          }
+        ],
+        "assets": [
+          {
+            "row_id": "cccccccc-0000-4000-8000-000000000103",
+            "entity_id": 601,
+            "so_serial": "MM000048",
+            "so_vao_so": "CS 0048",
+            "so_thua_dat": "48",
+            "so_to_ban_do": "8",
+            "dia_chi": "Địa chỉ mẫu tài sản 5",
+            "loai_so": "GCN QSDĐ",
+            "hinh_thuc_su_dung": "Sử dụng riêng",
+            "thoi_han": "Lâu dài",
+            "nguon_goc": null,
+            "ngay_cap": "2010-01-01",
+            "co_quan_cap": "UBND mẫu",
+            "land_rows": [
+              { "loai_dat": "ODT", "dien_tich": 100.0, "thoi_han": "Lâu dài" }
+            ]
+          }
+        ]
+      },
+      "diagram": {
+        "state": {
+          "version": 3,
+          "domain": "two_party",
+          "nodes": [
+            { "id": "p1", "personId": "aaaaaaaa-0000-4000-8000-000000000101", "hidden": false, "deleted": false },
+            { "id": "p2", "personId": "bbbbbbbb-0000-4000-8000-000000000102", "hidden": false, "deleted": false },
+            { "id": "p3", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p4", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p5", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p6", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p7", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p8", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p9", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p10", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p11", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p12", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p13", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p14", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p15", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p16", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p17", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p18", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p19", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p20", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p21", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p22", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p23", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p24", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p25", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p26", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p27", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p28", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p29", "personId": null, "hidden": false, "deleted": false },
+            { "id": "p30", "personId": null, "hidden": false, "deleted": false }
+          ]
+        },
+        "render_model": "auto",
+        "warnings": []
+      }
+    }
+  }
+}

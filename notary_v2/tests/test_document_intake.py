@@ -1,6 +1,6 @@
 """Tests for services.document_intake (MIN-108 — multi-source intake).
 
-Contract: notary.case-drafting.v1 — suggestions carry observation metadata,
+Contract: notary.case-drafting.v2 — suggestions carry observation metadata,
 never `confirmed`; per-source failure isolation; hard limits §5.2.
 """
 import unittest
@@ -690,7 +690,7 @@ class AggregationTests(unittest.TestCase):
 
     def test_result_schema_version(self):
         outcome = analyze([_text_source(1, "\n".join(PROPERTY_LINES))], api_key="k")
-        self.assertEqual(outcome.result_data["schema_version"], "notary.case-drafting.v1")
+        self.assertEqual(outcome.result_data["schema_version"], "notary.case-drafting.v2")
 
 
 if __name__ == "__main__":

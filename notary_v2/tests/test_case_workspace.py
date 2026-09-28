@@ -1,7 +1,10 @@
-"""Tests for services.case_workspace — real backend of notary.case-drafting.v1.
+"""Tests for services.case_workspace — real backend of notary.case-drafting.v2.
 
 Uses a temporary SQLite DB per test (tmp_path) — never touches notary.db.
-Wire shapes follow contracts/notary-case-drafting/*.schema.json.
+Wire shapes follow contracts/notary-case-drafting/*.schema.json §13:
+stage `{owner_row_id?, people[], assets[]}`, diagram_state v3
+`{version:3, domain, nodes[]}` — is_primary/isLandOwner/willReceive bị cấm
+trên wire v2 (vị trí = index mảng; owner = stage.owner_row_id).
 """
 import json
 import re
@@ -33,6 +36,7 @@ UUID4_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}"
     r"-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
 )
+TP_IDS = [f"p{i}" for i in range(1, 31)]
 
 
 # ---------------------------------------------------------------- fixtures
@@ -110,10 +114,10 @@ def _person_row(**overrides):
 
 
 def _asset_row(**overrides):
+    """asset_row v2 — KHÔNG is_primary (vị trí = index mảng)."""
     row = {
         "row_id": str(uuid.uuid4()),
         "entity_id": None,
-        "is_primary": True,
         "so_serial": "EE123456",
         "so_vao_so": "CS 99999",
         "so_thua_dat": "99",
@@ -138,6 +142,38 @@ def _service(db):
 
 def _workspace_people(result):
     return result["stage"]["people"]
+
+
+def _stage(people, assets, owner_row_id="__omit__"):
+    """stage_v2 — inheritance cần owner_row_id; "__omit__" = không emit."""
+    st = {"people": people, "assets": assets}
+    if owner_row_id != "__omit__":
+        st["owner_row_id"] = owner_row_id
+    return st
+
+
+def _inheritance_stage(people, assets):
+    """Stage hợp lệ tối thiểu: owner = people[0]."""
+    return _stage(people, assets, owner_row_id=people[0]["row_id"])
+
+
+def _commit(db, case_id, base_revision, people, assets):
+    """Commit stage inheritance chuẩn — owner = people[0].row_id."""
+    return _service(db).commit_stage(
+        case_id, base_revision, _inheritance_stage(people, assets))
+
+
+def _node(nid, person_id=None, parents=(), spouse=None, own=(),
+          receive=(), hidden=False, deleted=False):
+    """diagram node v3 (§13.4) — ownPositions/receivePositions ⊆ {1,2,3}."""
+    return {"id": nid, "personId": person_id,
+            "parentSlotIds": list(parents), "spouseSlotId": spouse,
+            "ownPositions": list(own), "receivePositions": list(receive),
+            "hidden": hidden, "deleted": deleted}
+
+
+def _v3_state(nodes, domain="inheritance"):
+    return {"version": 3, "domain": domain, "nodes": nodes}
 
 
 # ------------------------------------------------------------------- get()
@@ -172,10 +208,15 @@ def test_get_derives_stage_for_legacy_case_without_case_state(db):
     assets = data["stage"]["assets"]
     assert len(assets) == 1
     assert assets[0]["entity_id"] == prop.id
-    assert assets[0]["is_primary"] is True
+    assert "is_primary" not in assets[0]           # v2: không emit
     assert assets[0]["so_serial"] == "DD123456"
+    # v2: stage inheritance emit owner_row_id (null — legacy chưa có
+    # pointer lẫn node owner để derive).
+    assert "owner_row_id" in data["stage"]
+    assert data["stage"]["owner_row_id"] is None
     assert data["diagram"]["domain"] == "inheritance"
-    assert data["diagram"]["state"] == {"version": 2, "nodes": []}
+    assert data["diagram"]["state"] == {
+        "version": 3, "domain": "inheritance", "nodes": []}
     assert data["diagram"]["render_model"] is None
     assert data["capabilities"] == {
         "intake": ["image", "pdf", "docx", "xlsx", "text"],
@@ -215,11 +256,14 @@ def test_get_multiple_people_and_assets(db):
 
     assets = {a["so_serial"]: a for a in data["stage"]["assets"]}
     assert set(assets) == {"DD123456", "EE654321"}
-    assert assets["DD123456"]["is_primary"] is True
-    assert assets["EE654321"]["is_primary"] is False
+    for a in assets.values():
+        assert "is_primary" not in a
 
 
-def test_get_migrates_legacy_engine_state_to_v2(db):
+def test_get_migrates_legacy_engine_state_to_v3(db):
+    """Legacy engineState (relationType/isLandOwner/willReceive) → node v3:
+    isLandOwner → ownPositions=1..asset_count; willReceive →
+    receivePositions; node owner persist → stage.owner_row_id."""
     case, deceased, prop, heirs = _make_case(db, with_participant=True)
     heir = heirs[0]
     owner_row_id = str(uuid.uuid4())
@@ -252,19 +296,44 @@ def test_get_migrates_legacy_engine_state_to_v2(db):
     db.commit()
 
     data = _service(db).get(case.id)
-    nodes = {n["id"]: n for n in data["diagram"]["state"]["nodes"]}
+    state = data["diagram"]["state"]
+    assert state["version"] == 3 and state["domain"] == "inheritance"
+    nodes = {n["id"]: n for n in state["nodes"]}
 
     assert set(nodes) == {"owner", "spouse"}
+    for n in nodes.values():          # v3: không còn flag v1 trên wire
+        assert "isLandOwner" not in n and "willReceive" not in n
     assert nodes["owner"]["personId"] == owner_row_id
     assert nodes["owner"]["spouseSlotId"] == "spouse"
-    assert nodes["owner"]["isLandOwner"] is True
+    assert nodes["owner"]["ownPositions"] == [1]     # isLandOwner → own
     assert nodes["spouse"]["personId"] == heir_row_id
     assert nodes["spouse"]["spouseSlotId"] == "owner"
     assert nodes["spouse"]["parentSlotIds"] == []
-    # migrated state must persist — reload shows the same V2 nodes
-    db2 = db
-    data2 = _service(db2).get(case.id)
+    assert nodes["spouse"]["receivePositions"] == [1]
+    # node owner persist → pointer stage derive được
+    assert data["stage"]["owner_row_id"] == owner_row_id
+    # migrated state must persist — reload shows the same V3 nodes
+    data2 = _service(db).get(case.id)
     assert data2["diagram"]["state"] == data["diagram"]["state"]
+
+
+def test_get_two_party_case_state_and_capabilities(db):
+    """two_party: stage không owner_row_id; state canonical 30 slot;
+    word_export=false; render_model null khi chưa commit."""
+    case, _d, _p, _h = _make_case(db, loai_van_ban="chuyen_nhuong")
+
+    data = _service(db).get(case.id)
+
+    assert data["case"]["case_type"] == "two_party"
+    assert data["case"]["document_type"] == "chuyen_nhuong"
+    assert "owner_row_id" not in data["stage"]
+    st = data["diagram"]["state"]
+    assert st["version"] == 3 and st["domain"] == "two_party"
+    assert [n["id"] for n in st["nodes"]] == TP_IDS
+    assert all(set(n) == {"id", "personId", "hidden", "deleted"}
+               for n in st["nodes"])
+    assert data["capabilities"]["word_export"] is False
+    assert data["capabilities"]["diagram"] is True
 
 
 def test_get_unsupported_case_type_disables_capabilities(db):
@@ -272,10 +341,12 @@ def test_get_unsupported_case_type_disables_capabilities(db):
 
     data = _service(db).get(case.id)
 
-    assert data["case"]["case_type"] != "inheritance"
+    assert data["case"]["case_type"] not in ("inheritance", "two_party")
     assert data["capabilities"]["intake"] == []
     assert data["capabilities"]["diagram"] is False
     assert data["capabilities"]["word_export"] is False
+    # fallback domain inheritance → stage emit owner_row_id (§13.5)
+    assert "owner_row_id" in data["stage"]
 
 
 def test_get_supports_thoa_thuan_document_type(db):
@@ -318,11 +389,12 @@ def test_commit_stage_increments_revision_and_returns_render_model(db):
     assets = [_asset_row(entity_id=prop.id, so_serial="DD123456",
                          dia_chi="Thửa 123, tờ 45, phường Bạch Mai")]
 
-    data = _service(db).commit_stage(case.id, 1, people, assets)
+    data = _commit(db, case.id, 1, people, assets)
 
     assert data["schema_version"] == SCHEMA_VERSION
     assert data["revision"] == 2
     assert db.get(InheritanceCase, case.id).workspace_revision == 2
+    assert data["stage"]["owner_row_id"] == people[0]["row_id"]
     assert data["diagram"]["render_model"] is not None
     assert data["diagram"]["render_model"]["engineVersion"] == 2
     committed_people = data["stage"]["people"]
@@ -330,8 +402,70 @@ def test_commit_stage_increments_revision_and_returns_render_model(db):
     assert committed_people[0]["row_id"] == people[0]["row_id"]
     assert committed_people[1]["entity_id"] is not None  # backend-assigned
     assert committed_people[1]["row_id"] == people[1]["row_id"]
+    assert "is_primary" not in data["stage"]["assets"][0]
     assert db.query(Customer).filter_by(
         so_giay_to="001080012345").one().ho_ten == "Nguyễn Văn Cường"
+
+
+def test_commit_stage_owner_pointer_required(db):
+    """§13.6: owner_row_id null/missing/dangling → workspace_owner_required
+    (check trước stage field errors)."""
+    case, deceased, prop, _h = _make_case(db)
+    people = [_person_row(entity_id=deceased.id)]
+    assets = [_asset_row(entity_id=prop.id, so_serial="DD123456")]
+
+    for bad in (None, str(uuid.uuid4()), "not-uuid"):
+        with pytest.raises(WorkspaceError) as exc:
+            _service(db).commit_stage(
+                case.id, 1, _stage(people, assets, owner_row_id=bad))
+        assert exc.value.code == "workspace_owner_required", bad
+    # thiếu key hoàn toàn
+    with pytest.raises(WorkspaceError) as exc:
+        _service(db).commit_stage(case.id, 1, _stage(people, assets))
+    assert exc.value.code == "workspace_owner_required"
+
+
+def test_commit_stage_owner_syncs_node(db):
+    """§13.6: node 'owner' đã persist được sync personId := owner_row_id
+    khi pointer stage đổi; node không tồn tại → không tự tạo."""
+    case, deceased, prop, heirs = _make_case(db, with_participant=True)
+    heir = heirs[0]
+    owner_row = str(uuid.uuid4())
+    heir_row = str(uuid.uuid4())
+    case.case_state_json = json.dumps({
+        "schemaVersion": 3,
+        "owner_row_id": owner_row,
+        "stage": [
+            {"id": str(deceased.id), "row_id": owner_row,
+             "ho_ten": deceased.ho_ten},
+            {"id": str(heir.id), "row_id": heir_row,
+             "ho_ten": heir.ho_ten},
+        ],
+        "assets": [{"id": str(prop.id), "row_id": str(uuid.uuid4()),
+                    "is_primary": True}],
+        "diagram": {"state": _v3_state([
+            _node("owner", owner_row, own=[1]),
+            _node("spouse", heir_row, receive=[1])]),
+                    "render_model": None},
+    }, ensure_ascii=False)
+    db.commit()
+
+    people = [
+        _person_row(row_id=owner_row, entity_id=deceased.id,
+                    ho_ten="Nguyễn Văn An", ngay_chet="2011-05-15"),
+        _person_row(row_id=heir_row, entity_id=heir.id,
+                    ho_ten="Nguyễn Thị Bình", gioi_tinh="Nữ",
+                    ngay_sinh="1980-03-02"),
+    ]
+    # pointer đổi sang heir → node owner.personId theo pointer mới
+    data = _service(db).commit_stage(
+        case.id, 1, _stage(
+            people, [_asset_row(entity_id=prop.id, so_serial="DD123456")],
+            owner_row_id=heir_row))
+    owner = next(n for n in data["diagram"]["state"]["nodes"]
+                 if n["id"] == "owner")
+    assert owner["personId"] == heir_row
+    assert data["stage"]["owner_row_id"] == heir_row
 
 
 def test_commit_stage_new_rows_persist_then_reload(db, session_factory):
@@ -340,7 +474,7 @@ def test_commit_stage_new_rows_persist_then_reload(db, session_factory):
               _person_row(ho_ten="Người Hoàn Toàn Mới")]
     assets = [_asset_row(entity_id=prop.id, so_serial="DD123456")]
 
-    committed = _service(db).commit_stage(case.id, 1, people, assets)
+    committed = _commit(db, case.id, 1, people, assets)
 
     db2 = session_factory()
     try:
@@ -349,6 +483,8 @@ def test_commit_stage_new_rows_persist_then_reload(db, session_factory):
         db2.close()
 
     assert reloaded["case"]["revision"] == 2
+    assert reloaded["stage"]["owner_row_id"] == \
+        committed["stage"]["owner_row_id"]
     assert [p["row_id"] for p in reloaded["stage"]["people"]] == [
         p["row_id"] for p in committed["stage"]["people"]]
     assert reloaded["stage"]["people"][1]["ho_ten"] == "Người Hoàn Toàn Mới"
@@ -370,7 +506,7 @@ def test_commit_stage_invalid_row_rolls_back_everything(db, session_factory):
     assets = [_asset_row(entity_id=prop.id, so_serial="DD123456")]
 
     with pytest.raises(WorkspaceError) as exc:
-        _service(db).commit_stage(case.id, 1, people, assets)
+        _commit(db, case.id, 1, people, assets)
 
     assert exc.value.code == "stage_validation_error"
     field_errors = exc.value.details["field_errors"]
@@ -396,7 +532,7 @@ def test_commit_stage_collects_multiple_field_errors(db):
                       ngay_sinh="15/05/2011")
 
     with pytest.raises(WorkspaceError) as exc:
-        _service(db).commit_stage(case.id, 1, [bad], [])
+        _commit(db, case.id, 1, [bad], [])
 
     errors = exc.value.details["field_errors"]
     by_field = {e["field"]: e for e in errors}
@@ -412,39 +548,40 @@ def test_commit_stage_rejects_duplicate_row_id(db):
               _person_row(row_id=shared, ho_ten="B")]
 
     with pytest.raises(WorkspaceError) as exc:
-        _service(db).commit_stage(case.id, 1, people, [])
+        _commit(db, case.id, 1, people, [])
 
     assert exc.value.code == "stage_validation_error"
     assert any(e["code"] == "duplicate_row_id" and e["row_id"] == shared
                for e in exc.value.details["field_errors"])
 
 
-def test_commit_stage_enforces_single_primary_asset(db):
-    case, _d, prop, _h = _make_case(db)
-    assets = [
-        _asset_row(entity_id=prop.id, so_serial="DD123456", is_primary=True),
-        _asset_row(so_serial="GG123456", is_primary=True),
-    ]
+def test_commit_stage_rejects_is_primary_and_asset_limit(db):
+    """v2: is_primary trên wire = trường lạ → validation_error;
+    assets > 3 → field_error asset_limit (§13.3)."""
+    case, deceased, prop, _h = _make_case(db)
+    people = [_person_row(entity_id=deceased.id)]
 
+    bad_asset = _asset_row(entity_id=prop.id, so_serial="DD123456")
+    bad_asset["is_primary"] = True
     with pytest.raises(WorkspaceError) as exc:
-        _service(db).commit_stage(case.id, 1, [], assets)
-    assert any(e["code"] == "primary_count"
-               for e in exc.value.details["field_errors"])
+        _commit(db, case.id, 1, people, [bad_asset])
+    assert exc.value.code == "validation_error"
 
-    assets[1]["is_primary"] = False
-    assets[0]["is_primary"] = False
+    assets = [_asset_row(entity_id=prop.id, so_serial="DD123456")] + [
+        _asset_row(so_serial=f"GG{i:06d}") for i in range(3)]
     with pytest.raises(WorkspaceError) as exc2:
-        _service(db).commit_stage(case.id, 1, [], assets)
-    assert any(e["code"] == "primary_count"
+        _commit(db, case.id, 1, people, assets)
+    assert any(e["code"] == "asset_limit"
                for e in exc2.value.details["field_errors"])
 
 
 def test_commit_stage_rejects_noncanonical_so_serial(db):
-    case, _d, _p, _h = _make_case(db)
+    case, deceased, _p, _h = _make_case(db)
     asset = _asset_row(so_serial="dd 12-34")
 
     with pytest.raises(WorkspaceError) as exc:
-        _service(db).commit_stage(case.id, 1, [], [asset])
+        _commit(db, case.id, 1, [_person_row(entity_id=deceased.id)],
+                [asset])
 
     assert any(e["field"] == "so_serial" and e["code"] == "invalid_format"
                for e in exc.value.details["field_errors"])
@@ -454,10 +591,8 @@ def test_commit_stage_locked_case(db):
     case, deceased, prop, _h = _make_case(db, trang_thai="locked")
 
     with pytest.raises(WorkspaceError) as exc:
-        _service(db).commit_stage(
-            case.id, 1,
-            [_person_row(entity_id=deceased.id)],
-            [_asset_row(entity_id=prop.id, so_serial="DD123456")])
+        _commit(db, case.id, 1, [_person_row(entity_id=deceased.id)],
+                [_asset_row(entity_id=prop.id, so_serial="DD123456")])
 
     assert exc.value.code == "workspace_locked"
 
@@ -467,17 +602,16 @@ def test_commit_stage_stale_and_ahead_base_revision(db):
 
     # revision 1: base_revision 99 (ahead) → workspace_conflict
     with pytest.raises(WorkspaceError) as ahead:
-        _service(db).commit_stage(case.id, 99, [], [])
+        _service(db).commit_stage(case.id, 99, {})
     assert ahead.value.code == "workspace_conflict"
     assert ahead.value.details["server_revision"] == 1
 
-    _service(db).commit_stage(
-        case.id, 1, [_person_row(entity_id=deceased.id)],
-        [_asset_row(entity_id=prop.id, so_serial="DD123456")])
+    _commit(db, case.id, 1, [_person_row(entity_id=deceased.id)],
+            [_asset_row(entity_id=prop.id, so_serial="DD123456")])
 
     # revision now 2: base_revision 1 (stale) → workspace_conflict
     with pytest.raises(WorkspaceError) as stale:
-        _service(db).commit_stage(case.id, 1, [], [])
+        _service(db).commit_stage(case.id, 1, {})
     assert stale.value.code == "workspace_conflict"
     assert stale.value.details["server_revision"] == 2
 
@@ -486,38 +620,61 @@ def test_commit_stage_unsupported_case_type(db):
     case, deceased, prop, _h = _make_case(db, loai_van_ban="khac")
 
     with pytest.raises(WorkspaceError) as exc:
-        _service(db).commit_stage(
-            case.id, 1, [_person_row(entity_id=deceased.id)],
-            [_asset_row(entity_id=prop.id, so_serial="DD123456")])
+        _commit(db, case.id, 1, [_person_row(entity_id=deceased.id)],
+                [_asset_row(entity_id=prop.id, so_serial="DD123456")])
 
     assert exc.value.code == "case_type_unsupported"
-    assert exc.value.details["case_type"] != "inheritance"
+    assert exc.value.details["case_type"] not in ("inheritance", "two_party")
+
+
+def test_commit_stage_two_party_canonical_and_unsupported(db):
+    """two_party commit: stage không owner_row_id; state canonical 30 ô;
+    render_model.status='unsupported' (§13.5); nguoi_chet neo people[0]."""
+    case, deceased, prop, _h = _make_case(db, loai_van_ban="chuyen_nhuong")
+    people = [_person_row(entity_id=deceased.id, ho_ten="Bên A",
+                          ngay_chet=None)]
+    data = _service(db).commit_stage(
+        case.id, 1, _stage(people, [_asset_row(entity_id=prop.id,
+                                              so_serial="DD123456")]))
+
+    assert data["revision"] == 2
+    assert "owner_row_id" not in data["stage"]
+    st = data["diagram"]["state"]
+    assert st["domain"] == "two_party"
+    assert [n["id"] for n in st["nodes"]] == TP_IDS
+    assert data["diagram"]["render_model"]["status"] == "unsupported"
+    assert data["diagram"]["render_model"]["allocations"] == {}
+    db.refresh(case)
+    assert case.nguoi_chet_id == deceased.id
+
+
+def test_commit_stage_two_party_owner_row_id_forbidden(db):
+    case, deceased, prop, _h = _make_case(db, loai_van_ban="tang_cho")
+    people = [_person_row(entity_id=deceased.id)]
+    stage = _stage(people, [_asset_row(entity_id=prop.id)],
+                   owner_row_id=None)          # key cấm với two_party
+
+    with pytest.raises(WorkspaceError) as exc:
+        _service(db).commit_stage(case.id, 1, stage)
+    assert exc.value.code == "validation_error"
 
 
 def test_commit_stage_missing_case(db):
     with pytest.raises(WorkspaceError) as exc:
-        _service(db).commit_stage(9999, 1, [], [])
+        _service(db).commit_stage(9999, 1, _stage([], []))
     assert exc.value.code == "case_not_found"
 
 
 def test_commit_stage_prunes_diagram_and_reevaluates(db):
+    """personId ngoài stage commit → node bị bỏ + link dangling scrub;
+    render_model re-evaluate không còn allocation cho node đã gỡ."""
     case, deceased, prop, heirs = _make_case(db, with_participant=True)
     heir = heirs[0]
     owner_row = str(uuid.uuid4())
     heir_row = str(uuid.uuid4())
-    state = {
-        "version": 2,
-        "nodes": [
-            {"id": "owner", "personId": owner_row, "parentSlotIds": [],
-             "spouseSlotId": "spouse", "isLandOwner": True,
-             "willReceive": False, "hidden": False, "deleted": False},
-            {"id": "spouse", "personId": heir_row, "parentSlotIds": [],
-             "spouseSlotId": "owner", "isLandOwner": False,
-             "willReceive": True, "hidden": False, "deleted": False},
-        ],
-    }
     case.case_state_json = json.dumps({
-        "schemaVersion": 2,
+        "schemaVersion": 3,
+        "owner_row_id": owner_row,
         "stage": [
             {"id": str(deceased.id), "row_id": owner_row,
              "ho_ten": deceased.ho_ten},
@@ -526,7 +683,10 @@ def test_commit_stage_prunes_diagram_and_reevaluates(db):
         ],
         "assets": [{"id": str(prop.id), "row_id": str(uuid.uuid4()),
                     "is_primary": True}],
-        "diagram": {"state": state, "render_model": None},
+        "diagram": {"state": _v3_state([
+            _node("owner", owner_row, spouse="spouse", own=[1]),
+            _node("spouse", heir_row, spouse="owner", receive=[1])]),
+                    "render_model": None},
     }, ensure_ascii=False)
     db.commit()
 
@@ -534,9 +694,8 @@ def test_commit_stage_prunes_diagram_and_reevaluates(db):
         _person_row(row_id=owner_row, entity_id=deceased.id,
                     ho_ten="Nguyễn Văn An", ngay_chet="2011-05-15"),
     ]
-    data = _service(db).commit_stage(
-        case.id, 1, people,
-        [_asset_row(entity_id=prop.id, so_serial="DD123456")])
+    data = _commit(db, case.id, 1, people,
+                   [_asset_row(entity_id=prop.id, so_serial="DD123456")])
 
     nodes = data["diagram"]["state"]["nodes"]
     assert [n["id"] for n in nodes] == ["owner"]
@@ -548,6 +707,7 @@ def test_commit_stage_prunes_diagram_and_reevaluates(db):
     # legacy projections keep entity ids (row_id → entity map)
     persisted = json.loads(
         db.get(InheritanceCase, case.id).case_state_json)
+    assert persisted["schemaVersion"] == 3
     assert persisted["diagram"]["assignments"] == {
         "owner": str(deceased.id)}
     assert persisted["diagram"]["engineState"]["nodes"][0][
@@ -557,29 +717,54 @@ def test_commit_stage_prunes_diagram_and_reevaluates(db):
     assert column_state["nodes"][0]["personId"] == str(deceased.id)
 
 
-def _diagram_nodes(owner_row, spouse_row, child_row, father_row,
-                   sib_row, gc_row):
-    """V2 state cho case gia đình đầy đủ: owner + cha + vợ + con + anh em
-    + cháu — dùng kiểm chứng legacy projection (H1) và participant sync (M2)."""
-    def node(nid, person, parents=(), spouse=None, **flags):
-        return {"id": nid, "personId": person,
-                "parentSlotIds": list(parents), "spouseSlotId": spouse,
-                "isLandOwner": flags.get("isLandOwner", False),
-                "willReceive": flags.get("willReceive", True),
-                "hidden": False, "deleted": False}
+def test_commit_stage_prunes_out_of_range_positions(db):
+    """§13.3: chọn vị trí > len(assets) → prune + warning
+    diagram.selection_pruned (không reject)."""
+    case, deceased, prop, _h = _make_case(db)
+    owner_row = str(uuid.uuid4())
+    case.case_state_json = json.dumps({
+        "schemaVersion": 3,
+        "owner_row_id": owner_row,
+        "stage": [{"id": str(deceased.id), "row_id": owner_row,
+                   "ho_ten": deceased.ho_ten}],
+        "assets": [{"id": str(prop.id), "row_id": str(uuid.uuid4()),
+                    "is_primary": True}],
+        "diagram": {"state": _v3_state([
+            _node("owner", owner_row, own=[1, 2, 3])]),
+                    "render_model": None},
+    }, ensure_ascii=False)
+    db.commit()
+
+    people = [_person_row(row_id=owner_row, entity_id=deceased.id,
+                          ho_ten="Nguyễn Văn An", ngay_chet="2011-05-15")]
+    data = _commit(db, case.id, 1, people,
+                   [_asset_row(entity_id=prop.id, so_serial="DD123456")])
+
+    owner = next(n for n in data["diagram"]["state"]["nodes"]
+                 if n["id"] == "owner")
+    assert owner["ownPositions"] == [1]
+    codes = [w["code"] for w in data["diagram"].get("warnings") or []]
+    assert "diagram.selection_pruned" in codes
+
+
+def _diagram_nodes_v3(owner_row, spouse_row, child_row, father_row,
+                      sib_row, gc_row):
+    """state v3 cho case gia đình đầy đủ: owner + cha + vợ + con + anh em
+    + cháu — dùng kiểm chứng legacy projection (H1) và participant sync."""
     return [
-        node("owner", owner_row, parents=("father",), spouse="spouse",
-             isLandOwner=True, willReceive=False),
-        node("father", father_row),
-        node("spouse", spouse_row, spouse="owner"),
-        node("child1", child_row, parents=("owner", "spouse")),
-        node("sib1", sib_row, parents=("father",)),
-        node("gc1", gc_row, parents=("child1",)),
+        _node("owner", owner_row, parents=("father",), spouse="spouse",
+              own=[1]),
+        _node("father", father_row, receive=[1]),
+        _node("spouse", spouse_row, spouse="owner", receive=[1]),
+        _node("child1", child_row, parents=("owner", "spouse"),
+              receive=[1]),
+        _node("sib1", sib_row, parents=("father",), receive=[1]),
+        _node("gc1", gc_row, parents=("child1",), receive=[1]),
     ]
 
 
 def _seed_diagram_case(db):
-    """Case với stage 6 người + diagram V2 gia đình đầy đủ (chưa commit)."""
+    """Case với stage 6 người + persisted diagram v3 (chưa commit lại)."""
     case, deceased, prop, heirs = _make_case(db, with_participant=True)
     spouse = heirs[0]
     extras = {}
@@ -598,12 +783,12 @@ def _seed_diagram_case(db):
         "child": extras["child"], "sib": extras["sib"], "gc": extras["gc"],
     }
     rows = {k: str(uuid.uuid4()) for k in people}
-    state = {"version": 2,
-             "nodes": _diagram_nodes(
-                 rows["owner"], rows["spouse"], rows["child"],
-                 rows["father"], rows["sib"], rows["gc"])}
+    state = _v3_state(_diagram_nodes_v3(
+        rows["owner"], rows["spouse"], rows["child"],
+        rows["father"], rows["sib"], rows["gc"]))
     case.case_state_json = json.dumps({
-        "schemaVersion": 2,
+        "schemaVersion": 3,
+        "owner_row_id": rows["owner"],
         "stage": [{"id": str(c.id), "row_id": rows[k],
                    "ho_ten": c.ho_ten} for k, c in people.items()],
         "assets": [{"id": str(prop.id), "row_id": str(uuid.uuid4()),
@@ -639,9 +824,8 @@ def test_committed_legacy_projection_consumable_by_web(db):
     from routers.cases import _extract_diagram_participants
 
     case, prop, people, rows = _seed_diagram_case(db)
-    _service(db).commit_stage(
-        case.id, 1, _commit_diagram_people(people, rows),
-        [_asset_row(entity_id=prop.id, so_serial="DD123456")])
+    _commit(db, case.id, 1, _commit_diagram_people(people, rows),
+            [_asset_row(entity_id=prop.id, so_serial="DD123456")])
 
     persisted = json.loads(db.get(InheritanceCase, case.id).case_state_json)
     engine_state = persisted["diagram"]["engineState"]
@@ -685,9 +869,8 @@ def test_committed_legacy_projection_consumable_by_web(db):
 def test_commit_stage_rebuilds_participants_and_owner(db):
     """M2: commit sync `case.participants` + `nguoi_chet_id` theo diagram."""
     case, prop, people, rows = _seed_diagram_case(db)
-    _service(db).commit_stage(
-        case.id, 1, _commit_diagram_people(people, rows),
-        [_asset_row(entity_id=prop.id, so_serial="DD123456")])
+    _commit(db, case.id, 1, _commit_diagram_people(people, rows),
+            [_asset_row(entity_id=prop.id, so_serial="DD123456")])
 
     db.refresh(case)
     assert case.nguoi_chet_id == people["owner"].id
@@ -717,13 +900,11 @@ def test_commit_stage_concurrent_same_base_conflicts(db, session_factory):
         # hai session đều giữ snapshot revision=1
         assert s1.get(InheritanceCase, case.id).workspace_revision == 1
         assert s2.get(InheritanceCase, case.id).workspace_revision == 1
-        _service(s1).commit_stage(
-            case.id, 1, [_person_row(entity_id=deceased.id)],
-            [_asset_row(entity_id=prop.id, so_serial="DD123456")])
-        with pytest.raises(WorkspaceError) as exc:
-            _service(s2).commit_stage(
-                case.id, 1, [_person_row(entity_id=deceased.id)],
+        _commit(s1, case.id, 1, [_person_row(entity_id=deceased.id)],
                 [_asset_row(entity_id=prop.id, so_serial="DD123456")])
+        with pytest.raises(WorkspaceError) as exc:
+            _commit(s2, case.id, 1, [_person_row(entity_id=deceased.id)],
+                    [_asset_row(entity_id=prop.id, so_serial="DD123456")])
         assert exc.value.code == "workspace_conflict"
         assert exc.value.details["server_revision"] == 2
     finally:
@@ -747,8 +928,8 @@ def test_get_migrate_on_read_does_not_overwrite_newer_commit(
     assert case.case_state_json is None
     s2 = session_factory()
     try:
-        committed = _service(s2).commit_stage(
-            case.id, 1, [_person_row(entity_id=deceased.id)],
+        committed = _commit(
+            s2, case.id, 1, [_person_row(entity_id=deceased.id)],
             [_asset_row(entity_id=prop.id, so_serial="DD123456")])
     finally:
         s2.close()
@@ -776,7 +957,7 @@ def test_get_normalizes_schema_invalid_legacy_values(db):
     assert any("so_serial" in w for w in data["diagram"]["warnings"])
 
     case.case_state_json = json.dumps({
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "stage": [{"id": "9999", "row_id": str(uuid.uuid4()),
                    "ho_ten": ""}],
         "assets": [], "diagram": {}}, ensure_ascii=False)
@@ -792,9 +973,8 @@ def test_commit_stage_does_not_merge_duplicate_names(db):
         _person_row(ho_ten="Trùng Tên"),
     ]
 
-    data = _service(db).commit_stage(
-        case.id, 1, people, [_asset_row(entity_id=prop.id,
-                                       so_serial="DD123456")])
+    data = _commit(db, case.id, 1, people,
+                   [_asset_row(entity_id=prop.id, so_serial="DD123456")])
 
     ids = {p["entity_id"] for p in data["stage"]["people"]}
     assert len(ids) == 2
@@ -807,8 +987,8 @@ def test_commit_stage_upserts_by_document_key(db):
     db.add(existing)
     db.commit()
 
-    data = _service(db).commit_stage(
-        case.id, 1,
+    data = _commit(
+        db, case.id, 1,
         [_person_row(ho_ten="Người Có Sẵn Đổi Tên",
                      so_giay_to="007777777777")],
         [_asset_row(entity_id=prop.id, so_serial="DD123456")])
@@ -819,27 +999,27 @@ def test_commit_stage_upserts_by_document_key(db):
         so_giay_to="007777777777").count() == 1
 
 
-def test_commit_stage_updates_links_and_is_primary(db, session_factory):
-    case, _d, prop, _h = _make_case(db)
+def test_commit_stage_updates_links_and_primary_position(db, session_factory):
+    """v2: vị trí 1 (index 0) = primary trong link projection + tai_san_id
+    (§13.3 — wire không còn is_primary; thứ tự mảng là SOT)."""
+    case, deceased, prop, _h = _make_case(db)
     other = Property(so_serial="HH654321", dia_chi="Thửa khác")
     db.add(other)
     db.commit()
 
-    data = _service(db).commit_stage(
-        case.id, 1, [],
-        [_asset_row(entity_id=prop.id, so_serial="DD123456",
-                    is_primary=False),
-         _asset_row(entity_id=other.id, so_serial="HH654321",
-                    is_primary=True)])
+    people = [_person_row(entity_id=deceased.id)]
+    data = _commit(
+        db, case.id, 1, people,
+        [_asset_row(entity_id=other.id, so_serial="HH654321"),
+         _asset_row(entity_id=prop.id, so_serial="DD123456")])
 
-    assert {a["so_serial"]: a["is_primary"]
-            for a in data["stage"]["assets"]} == {
-                "DD123456": False, "HH654321": True}
+    assert [a["so_serial"] for a in data["stage"]["assets"]] == [
+        "HH654321", "DD123456"]
     db2 = session_factory()
     try:
         links = {l.property_id: l.is_primary for l in db2.query(
             InheritanceCaseProperty).filter_by(case_id=case.id)}
-        assert links == {prop.id: False, other.id: True}
+        assert links == {other.id: True, prop.id: False}
         assert db2.get(InheritanceCase, case.id).tai_san_id == other.id
     finally:
         db2.close()
@@ -850,15 +1030,14 @@ def test_committed_case_state_still_normalizes_for_web(db):
     from routers.cases import _normalize_case_state_json
 
     case, deceased, prop, _h = _make_case(db)
-    _service(db).commit_stage(
-        case.id, 1, [_person_row(entity_id=deceased.id)],
-        [_asset_row(entity_id=prop.id, so_serial="DD123456")])
+    _commit(db, case.id, 1, [_person_row(entity_id=deceased.id)],
+            [_asset_row(entity_id=prop.id, so_serial="DD123456")])
 
     raw = db.get(InheritanceCase, case.id).case_state_json
     normalized = json.loads(_normalize_case_state_json(raw))
     assert normalized["stage"][0]["id"] == str(deceased.id)
     assert normalized["stage"][0]["row_id"]
-    assert normalized["diagram"]["state"]["version"] == 2
+    assert normalized["diagram"]["state"]["version"] == 3
 
 
 # -------------------------------------------------------------- migration
@@ -913,25 +1092,27 @@ def _create_args():
     spouse = _person_row(
         ho_ten="Trần Thị Bình", gioi_tinh="Nữ", ngay_sinh="1955-03-02",
         so_giay_to="009876543210")
-    state = {"version": 2, "nodes": [
-        {"id": "owner", "personId": owner["row_id"], "parentSlotIds": [],
-         "spouseSlotId": "spouse", "isLandOwner": True,
-         "willReceive": False, "hidden": False, "deleted": False},
-        {"id": "spouse", "personId": spouse["row_id"], "parentSlotIds": [],
-         "spouseSlotId": "owner", "isLandOwner": False,
-         "willReceive": True, "hidden": False, "deleted": False},
-    ]}
+    state = _v3_state([
+        _node("owner", owner["row_id"], spouse="spouse", own=[1]),
+        _node("spouse", spouse["row_id"], spouse="owner", receive=[1]),
+    ])
     return [owner, spouse], [_asset_row()], state
 
 
 _UNSET = object()
 
 
-def _create(db, people, assets, state, key=_UNSET, meta=_UNSET):
+def _create(db, people, assets, state, key=_UNSET, meta=_UNSET,
+            owner_row_id=_UNSET):
+    """create(key, meta, stage, state) — stage = {owner_row_id?, people,
+    assets}; owner_row_id mặc định = people[0].row_id (inheritance)."""
+    if owner_row_id is _UNSET:
+        owner_row_id = people[0]["row_id"] if people else None
+    stage = _stage(people, assets, owner_row_id=owner_row_id)
     return _service(db).create(
         str(uuid.uuid4()) if key is _UNSET else key,
         {"document_type": "khai_nhan"} if meta is _UNSET else meta,
-        people, assets, state)
+        stage, state)
 
 
 def test_create_persists_case_stage_diagram_one_transaction(db):
@@ -960,21 +1141,23 @@ def test_create_persists_case_stage_diagram_one_transaction(db):
     assert all(isinstance(p["entity_id"], int) for p in wire_people)
     owner_entity = wire_people[0]["entity_id"]
     spouse_entity = wire_people[1]["entity_id"]
+    assert data["stage"]["owner_row_id"] == people[0]["row_id"]
 
     db_case = db.get(InheritanceCase, case["id"])
     assert db_case is not None
     assert db_case.nguoi_chet_id == owner_entity     # owner -> người chết
-    primary = [a for a in data["stage"]["assets"] if a["is_primary"]][0]
-    assert db_case.tai_san_id == primary["entity_id"]
+    assert db_case.tai_san_id == \
+        data["stage"]["assets"][0]["entity_id"]      # vị trí 1 = primary
     assert db_case.ngay_lap_ho_so == date(2026, 9, 26)
     assert db_case.loai_van_ban == "khai_nhan"
     assert db_case.noi_niem_yet == "xã Yên Sở"
     assert db_case.ghi_chu == "Hồ sơ nháp"
     assert db_case.workspace_idempotency_key
 
-    # Diagram persist + render_model + participant sync (vợ là Con?không —
-    # spouse role Vợ/Chồng → participant).
-    assert data["diagram"]["state"]["version"] == 2
+    # Diagram persist + render_model + participant sync
+    assert data["diagram"]["state"]["version"] == 3
+    assert data["diagram"]["state"]["domain"] == "inheritance"
+    assert data["diagram"]["domain"] == "inheritance"
     assert data["diagram"]["render_model"] is not None
     assert data["diagram"]["render_model"]["status"] in (
         "incomplete", "complete")
@@ -987,9 +1170,45 @@ def test_create_persists_case_stage_diagram_one_transaction(db):
     # nguyên; field date emit dạng canonical YYYY-MM-DD)
     again = _service(db).get(case["id"])
     assert again["case"]["revision"] == 1
+    assert again["stage"]["owner_row_id"] == people[0]["row_id"]
     assert [(p["row_id"], p["entity_id"], p["ho_ten"])
             for p in again["stage"]["people"]] == [
         (p["row_id"], p["entity_id"], p["ho_ten"]) for p in wire_people]
+
+
+def test_create_without_diagram_seeds_owner(db):
+    """§13.6: diagram absent → server seed node 'owner' personId =
+    owner_row_id + ownPositions đủ vị trí; render_model null."""
+    people, assets, _state = _create_args()
+    data = _create(db, people, assets, None)
+
+    assert data["created"] is True
+    st = data["diagram"]["state"]
+    owner = next((n for n in st["nodes"] if n["id"] == "owner"), None)
+    assert owner is not None
+    assert owner["personId"] == people[0]["row_id"]
+    assert owner["ownPositions"] == [1]
+    assert data["diagram"]["render_model"] is None
+
+
+def test_create_two_party_seeds_canonical_slots(db):
+    """two_party create: stage cấm owner_row_id; diagram absent → seed
+    canonical p1..p30; case_type/document_type đúng."""
+    people = [_person_row(ho_ten="Bên A", ngay_chet=None),
+              _person_row(ho_ten="Bên B", gioi_tinh="Nữ",
+                          ngay_chet=None)]
+    meta = {"case_type": "two_party", "document_type": "chuyen_nhuong"}
+    data = _service(db).create(
+        str(uuid.uuid4()), meta, _stage(people, [_asset_row()]), None)
+
+    assert data["created"] is True
+    assert data["case"]["case_type"] == "two_party"
+    assert data["case"]["document_type"] == "chuyen_nhuong"
+    assert "owner_row_id" not in data["stage"]
+    st = data["diagram"]["state"]
+    assert st["domain"] == "two_party"
+    assert [n["id"] for n in st["nodes"]] == TP_IDS
+    assert data["capabilities"]["word_export"] is False
 
 
 def test_create_idempotent_replay_same_key(db):
@@ -1035,30 +1254,28 @@ def test_create_case_meta_validation(db):
 
 
 def test_create_missing_owner_maps_workspace_owner_required(db):
-    people, assets, _state = _create_args()
-    variants = [
-        # không có node owner
-        {"version": 2, "nodes": []},
-        # owner personId null
-        {"version": 2, "nodes": [
-            {"id": "owner", "personId": None, "parentSlotIds": [],
-             "spouseSlotId": None, "isLandOwner": True,
-             "willReceive": False, "hidden": False, "deleted": False}]},
-        # owner bị deleted
-        {"version": 2, "nodes": [
-            {"id": "owner", "personId": people[0]["row_id"],
-             "parentSlotIds": [], "spouseSlotId": None, "isLandOwner": True,
-             "willReceive": False, "hidden": False, "deleted": True}]},
-        # owner personId trỏ ngoài stage → vẫn là owner_required
-        {"version": 2, "nodes": [
-            {"id": "owner", "personId": str(uuid.uuid4()),
-             "parentSlotIds": [], "spouseSlotId": None, "isLandOwner": True,
-             "willReceive": False, "hidden": False, "deleted": False}]},
-    ]
-    for bad_state in variants:
+    """§13.6: pointer thiếu/null/không thuộc stage → owner_required.
+    (v2: owner KHÔNG suy từ node — stage.owner_row_id là SOT.)"""
+    people, assets, state = _create_args()
+    for bad_owner in (None, str(uuid.uuid4()), "not-uuid"):
         with pytest.raises(WorkspaceError) as exc:
-            _create(db, people, assets, bad_state)
-        assert exc.value.code == "workspace_owner_required", bad_state
+            _create(db, people, assets, state, owner_row_id=bad_owner)
+        assert exc.value.code == "workspace_owner_required", bad_owner
+    assert db.query(InheritanceCase).count() == 0
+
+
+def test_create_owner_node_mismatch_rejected(db):
+    """§13.6: node 'owner' personId khác stage.owner_row_id →
+    diagram_owner_mismatch — server không tự sửa nháp client."""
+    people, assets, _state = _create_args()
+    state = _v3_state([
+        _node("owner", people[1]["row_id"], spouse="spouse", own=[1]),
+        _node("spouse", None, spouse="owner", receive=[1]),
+    ])
+    with pytest.raises(WorkspaceError) as exc:
+        _create(db, people, assets, state)
+    assert exc.value.code == "diagram_owner_mismatch"
+    assert exc.value.details["owner_row_id"] == people[0]["row_id"]
     assert db.query(InheritanceCase).count() == 0
 
 
@@ -1074,19 +1291,14 @@ def test_create_stage_rules_apply(db):
     assert any(e["field"] == "entity_id"
                for e in exc.value.details["field_errors"])
 
-    # assets rỗng / people rỗng
-    for ppl, ast in (([], assets), (people, [])):
-        with pytest.raises(WorkspaceError) as exc:
-            _create(db, ppl, ast, state)
-        assert exc.value.code == "stage_validation_error"
-
-    # 0 primary → primary_count
-    no_primary = [dict(a, is_primary=False) for a in assets]
+    # assets rỗng → required; people rỗng → owner_required trước (owner
+    # pointer validation đi trước field errors §13.6)
     with pytest.raises(WorkspaceError) as exc:
-        _create(db, people, no_primary, state)
+        _create(db, people, [], state)
     assert exc.value.code == "stage_validation_error"
-    assert any(e["code"] == "primary_count"
-               for e in exc.value.details["field_errors"])
+    with pytest.raises(WorkspaceError) as exc:
+        _create(db, [], assets, state)
+    assert exc.value.code == "workspace_owner_required"
 
     # field sai → rollback trọn vẹn, không ghi nửa vời
     bad_name = [dict(people[0], ho_ten="  "), people[1]]
@@ -1098,27 +1310,44 @@ def test_create_stage_rules_apply(db):
     assert db.query(Property).count() == 0
 
 
+def test_create_is_primary_rejected(db):
+    """is_primary trên asset row = trường lạ → validation_error (§13.3)."""
+    people, assets, state = _create_args()
+    assets[0]["is_primary"] = True
+    with pytest.raises(WorkspaceError) as exc:
+        _create(db, people, assets, state)
+    assert exc.value.code == "validation_error"
+    assert db.query(InheritanceCase).count() == 0
+
+
+def test_create_domain_mismatch_rejected(db):
+    """state.domain hợp lệ nhưng khác case.case_type →
+    diagram_domain_mismatch (§13.5)."""
+    people, assets, _state = _create_args()
+    tp_state = {"version": 3, "domain": "two_party",
+                "nodes": [{"id": f"p{i}", "personId": None,
+                           "hidden": False, "deleted": False}
+                          for i in range(1, 31)]}
+    with pytest.raises(WorkspaceError) as exc:
+        _create(db, people, assets, tp_state)
+    assert exc.value.code == "diagram_domain_mismatch"
+    assert exc.value.details["expected"] == "inheritance"
+
+
 def test_create_diagram_invalid_and_outside_stage(db):
     people, assets, _state = _create_args()
 
-    dangling = {"version": 2, "nodes": [
-        {"id": "owner", "personId": people[0]["row_id"],
-         "parentSlotIds": ["ghost"], "spouseSlotId": None,
-         "isLandOwner": True, "willReceive": False,
-         "hidden": False, "deleted": False}]}
+    dangling = _v3_state([
+        _node("owner", people[0]["row_id"], parents=("ghost",),
+              own=[1])])
     with pytest.raises(WorkspaceError) as exc:
         _create(db, people, assets, dangling)
     assert exc.value.code == "diagram_invalid_state"
 
-    outside = {"version": 2, "nodes": [
-        {"id": "owner", "personId": people[0]["row_id"],
-         "parentSlotIds": [], "spouseSlotId": None,
-         "isLandOwner": True, "willReceive": False,
-         "hidden": False, "deleted": False},
-        {"id": "child_1", "personId": str(uuid.uuid4()),
-         "parentSlotIds": ["owner"], "spouseSlotId": None,
-         "isLandOwner": False, "willReceive": True,
-         "hidden": False, "deleted": False}]}
+    outside = _v3_state([
+        _node("owner", people[0]["row_id"], own=[1]),
+        _node("child_1", str(uuid.uuid4()), parents=("owner",),
+              receive=[1])])
     with pytest.raises(WorkspaceError) as exc:
         _create(db, people, assets, outside)
     assert exc.value.code == "diagram_reference_outside_stage"

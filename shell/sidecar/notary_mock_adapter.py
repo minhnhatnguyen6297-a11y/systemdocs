@@ -1,7 +1,7 @@
-"""Mock backend cho 7 command notary.* — notary.case-drafting.v1 (MIN-106).
+"""Mock backend cho 8 command notary.* — notary.case-drafting.v2 (MIN-128).
 
 Chi duoc goi qua notary_gateway khi G1_DEV_NOTARY_MOCK=1 + khong packaged.
-SOT wire: contracts/notary-case-drafting.md — mock tra dung shape/error
+SOT wire: contracts/notary-case-drafting.md §13 — mock tra dung shape/error
 code cua contract; khong chinh contract, khong phat minh code moi.
 
 Nguon du lieu: scenario fixtures JSON o
@@ -41,8 +41,19 @@ from pathlib import Path
 from errors import CommandError
 from fileref import validate_file_ref
 
-SCHEMA_VERSION = "notary.case-drafting.v1"
-SUPPORTED_CASE_TYPE = "inheritance"
+SCHEMA_VERSION = "notary.case-drafting.v2"
+DIAGRAM_STATE_VERSION = 3
+CASE_TYPE_INHERITANCE = "inheritance"
+CASE_TYPE_TWO_PARTY = "two_party"
+CASE_TYPES = (CASE_TYPE_INHERITANCE, CASE_TYPE_TWO_PARTY)
+DOCUMENT_TYPES = ("khai_nhan", "thoa_thuan")
+DOCUMENT_TYPES_TWO_PARTY = ("chuyen_nhuong", "tang_cho",
+                            "cho_thue", "dat_coc")
+MAX_ASSETS = 3
+MAX_PEOPLE_TWO_PARTY = 30
+POSITIONS = (1, 2, 3)
+TWO_PARTY_IDS = tuple(f"p{i}" for i in range(1, 31))
+TWO_PARTY_ID_SET = set(TWO_PARTY_IDS)
 
 # Gioi han contract §5.2 — mock giu nguyen, khong noi.
 MAX_SOURCES = 8
@@ -61,16 +72,18 @@ SERIAL_RX = re.compile(r"^[A-Z]{2}\d{6,8}$")
 DOC_KEY_RX = re.compile(r"^[a-z][a-z0-9_]*$")
 GENDERS = ("Nam", "Nữ", None)
 INTAKE_KINDS = ("image", "pdf", "docx", "xlsx", "text")
-NODE_BOOL_FIELDS = ("isLandOwner", "willReceive", "hidden", "deleted")
+NODE_BOOL_FIELDS = ("hidden", "deleted")
 NODE_FIELDS = {"id", "personId", "parentSlotIds", "spouseSlotId",
-               "isLandOwner", "willReceive", "hidden", "deleted"}
+               "ownPositions", "receivePositions", "hidden", "deleted"}
+NODE_FIELDS_TWO_PARTY = {"id", "personId", "hidden", "deleted"}
 PERSON_FIELDS = ("row_id", "entity_id", "ho_ten", "gioi_tinh", "ngay_sinh",
                  "ngay_chet", "so_giay_to", "ngay_cap", "noi_cap",
                  "dia_chi", "place_of_origin")
-ASSET_FIELDS = ("row_id", "entity_id", "is_primary", "so_serial",
+ASSET_FIELDS = ("row_id", "entity_id", "so_serial",
                 "so_vao_so", "so_thua_dat", "so_to_ban_do", "dia_chi",
                 "loai_so", "hinh_thuc_su_dung", "thoi_han", "nguon_goc",
-                "ngay_cap", "co_quan_cap")
+                "ngay_cap", "co_quan_cap", "land_rows")
+STAGE_FIELDS = {"owner_row_id", "people", "assets"}
 
 # Catalog van ban v1 (contract §8.1) + filename_stem ASCII do backend so huu.
 DOC_CATALOG = {
@@ -120,8 +133,10 @@ def _builtin_cases():
         "43": {
             "case_type": "inheritance", "document_type": "khai_nhan",
             "status": "draft", "locked": False, "revision": 1,
-            "stage": {"people": [], "assets": []},
-            "diagram": {"state": {"version": 2, "nodes": []},
+            "stage": {"owner_row_id": None, "people": [], "assets": []},
+            "diagram": {"domain": "inheritance",
+                        "state": {"version": 3, "domain": "inheritance",
+                                  "nodes": []},
                         "render_model": None, "warnings": []},
         },
     }
@@ -131,9 +146,9 @@ def _builtin_cases():
 # conflict/intake-partial la ban giam); seed mac dinh lay phien ban
 # "primary" truoc. Seed rieng trong test dung reset_backend(seed).
 _FIXTURE_PRIORITY = (
-    "ready", "empty", "locked", "unsupported", "diagram-warning",
-    "intake-partial", "conflict", "word-collision", "word-partial",
-    "word-all-failed", "word-canceled",
+    "ready", "ready-two-party", "empty", "locked", "unsupported",
+    "diagram-warning", "intake-partial", "conflict", "word-collision",
+    "word-partial", "word-all-failed", "word-canceled",
 )
 
 
@@ -183,14 +198,32 @@ class _MockState:
         case.setdefault("ngay_lap_ho_so", None)
         case.setdefault("noi_niem_yet", None)
         case.setdefault("ghi_chu", None)
-        case.setdefault("stage", {"people": [], "assets": []})
+        stage = case.setdefault("stage", {"people": [], "assets": []})
+        stage.setdefault("people", [])
+        stage.setdefault("assets", [])
+        if case["case_type"] == CASE_TYPE_INHERITANCE:
+            stage.setdefault("owner_row_id", None)
+        else:
+            stage.pop("owner_row_id", None)
         dg = case.setdefault("diagram", {})
-        dg.setdefault("domain", "inheritance")
-        dg.setdefault("state", {"version": 2, "nodes": []})
+        dom = (case["case_type"] if case["case_type"] in CASE_TYPES
+               else CASE_TYPE_INHERITANCE)
+        dg["domain"] = dom
+        state = dg.setdefault("state", {})
+        state["version"] = DIAGRAM_STATE_VERSION
+        state["domain"] = dom
+        if dom == CASE_TYPE_TWO_PARTY:
+            state["nodes"] = _canonical_two_party(
+                state.get("nodes") or [])
+        else:
+            state.setdefault("nodes", [])
         dg.setdefault("warnings", [])
         if dg.get("render_model") == "auto":
-            # render_model luon khop state hien tai (contract §4)
-            dg["render_model"] = _render(dg["state"], case["stage"])
+            # render_model luon khop state hien tai (contract §4);
+            # two_party khong qua engine -> unsupported (§13.5)
+            dg["render_model"] = (
+                _unsupported_render() if dom == CASE_TYPE_TWO_PARTY
+                else _render(state, stage))
         elif "render_model" not in dg:
             dg["render_model"] = None
         return case
@@ -247,17 +280,19 @@ def _case(payload):
 
 def _check_supported(case):
     ct = case.get("case_type")
-    if ct != SUPPORTED_CASE_TYPE:
+    if ct not in CASE_TYPES:
         raise CommandError("case_type_unsupported",
-                           f"loại việc {ct!r} chưa hỗ trợ trong v1",
+                           f"loại việc {ct!r} chưa hỗ trợ trong v2",
                            details={"case_type": ct})
 
 
 def _check_writable(case):
-    _check_supported(case)
+    # Real parity (commit_stage/save_diagram): locked TRUOC case_type —
+    # gift+locked -> workspace_locked, khong phai case_type_unsupported.
     if case.get("locked"):
         raise CommandError("workspace_locked",
                            f"hồ sơ #{case['id']} đã khóa")
+    _check_supported(case)
 
 
 def _check_base_revision(case, payload):
@@ -285,22 +320,59 @@ def _person_map(case):
             if isinstance(p, dict)}
 
 
-# ---------- diagram validation + render (mock engine v2) ----------
+# ---------- diagram validation + render (mock engine, contract v2 §13.4) ----------
 
-def _validate_diagram_state(state, case):
-    """Tra (errors, outside_pid). errors dung engine code contract §7.3."""
+def _canonical_two_party(nodes):
+    """state two_party canonical — đủ đúng 30 slot p1..p30 theo thứ tự."""
+    by_id = {n.get("id"): n for n in nodes if isinstance(n, dict)}
+    return [{
+        "id": pid,
+        "personId": (by_id.get(pid) or {}).get("personId"),
+        "hidden": bool((by_id.get(pid) or {}).get("hidden")),
+        "deleted": bool((by_id.get(pid) or {}).get("deleted")),
+    } for pid in TWO_PARTY_IDS]
+
+
+def _unsupported_render():
+    """render_model unsupported — sơ đồ hai bên KHÔNG qua engine (§13.5)."""
+    return {"engineVersion": 2, "status": "unsupported", "allocations": {},
+            "breakdowns": [], "requiredSlots": [],
+            "warnings": [{
+                "code": "diagram.two_party_unsupported",
+                "message": "Sơ đồ hai bên không chạy engine thừa kế"}],
+            "errors": [], "unresolvedEstates": [],
+            "conservation": {"allocated": "0", "unresolved": "0",
+                             "total": "0"}}
+
+
+def _validate_diagram_state(state):
+    """diagram_state_v3 → [errors] (engine codes §13.4/§13.9). Nhánh
+    theo state.domain (real parity: wire check doc domain tu state;
+    mismatch voi case_type do _check_domain bat truoc).
+
+    personId không phải uuid4 / ngoài stage KHÔNG nằm trong nhóm này —
+    caller map sang diagram_reference_outside_stage (nhất quán real)."""
     errors = []
     if not isinstance(state, dict):
-        return [{"code": "invalid_input", "message": "state không phải object"}], None
-    if state.get("version") != 2:
+        return [{"code": "invalid_input",
+                 "message": "state không phải object"}]
+    if state.get("version") != DIAGRAM_STATE_VERSION:
         errors.append({"code": "invalid_version",
-                       "message": f"version={state.get('version')!r}, cần 2"})
+                       "message": f"version={state.get('version')!r}, cần "
+                                  f"{DIAGRAM_STATE_VERSION}"})
+    dom = state.get("domain")
+    if dom not in CASE_TYPES:
+        errors.append({"code": "invalid_domain",
+                       "message": f"domain={dom!r} ∉ {list(CASE_TYPES)}"})
     nodes = state.get("nodes")
     if not isinstance(nodes, list):
-        errors.append({"code": "invalid_nodes", "message": "nodes không phải list"})
-        return errors, None
+        errors.append({"code": "invalid_nodes",
+                       "message": "nodes không phải list"})
+        return errors
+    two_party = dom == CASE_TYPE_TWO_PARTY
     ids = set()
-    persons = {}
+    node_by_id = {}
+    persons = set()
     for i, n in enumerate(nodes):
         w = f"nodes[{i}]"
         if not isinstance(n, dict):
@@ -308,113 +380,169 @@ def _validate_diagram_state(state, case):
                            "message": f"{w} không phải object"})
             continue
         nid = n.get("id")
-        if not (isinstance(nid, str) and nid.strip()):
-            errors.append({"code": "missing_node_id", "node": w,
-                           "message": f"{w} thiếu id"})
-            nid = None
-        elif nid in ids:
-            errors.append({"code": "duplicate_node_id", "node": nid,
-                           "message": f"trùng node id {nid!r}"})
+        extra = set(n) - (NODE_FIELDS_TWO_PARTY if two_party
+                          else NODE_FIELDS)
+        for k in extra:
+            errors.append({"code": "invalid_node", "node": nid or w,
+                           "message": f"{w} field lạ {k!r}"})
+        if two_party:
+            if not isinstance(nid, str):
+                errors.append({"code": "invalid_node_id", "node": w,
+                               "message": f"{w}.id phải là chuỗi"})
+            elif nid not in TWO_PARTY_ID_SET or i >= 30 \
+                    or nid != f"p{i + 1}":
+                errors.append({"code": "invalid_position", "node": nid or w,
+                               "message": f"{w}.id={nid!r} — kỳ vọng "
+                                          f"'p{i + 1}' theo canonical"})
+            elif nid in ids:
+                errors.append({"code": "duplicate_node", "node": nid,
+                               "message": f"trùng node id {nid!r}"})
+            else:
+                ids.add(nid)
+                node_by_id[nid] = n
         else:
+            if not (isinstance(nid, str) and nid.strip()):
+                errors.append({"code": "invalid_node_id", "node": w,
+                               "message": f"{w} thiếu id"})
+                continue
+            if nid in ids:
+                errors.append({"code": "duplicate_node", "node": nid,
+                               "message": f"trùng node id {nid!r}"})
+                continue
             ids.add(nid)
+            node_by_id[nid] = n
         for f in NODE_BOOL_FIELDS:
             if not isinstance(n.get(f), bool):
                 errors.append({"code": "invalid_boolean", "node": nid or w,
                                "message": f"{w}.{f} phải là boolean"})
         pid = n.get("personId")
-        if pid is not None:
-            if not (isinstance(pid, str) and UUID4_RX.match(pid)):
-                errors.append({"code": "invalid_node", "node": nid or w,
-                               "message": f"{w}.personId không phải uuid4"})
-            else:
-                persons.setdefault(pid, []).append(nid or w)
-        for k in set(n) - NODE_FIELDS:
-            errors.append({"code": "invalid_node", "node": nid or w,
-                           "message": f"{w} field lạ {k!r}"})
+        if pid is not None and n.get("deleted") is not True:
+            if pid in persons:
+                errors.append({"code": "duplicate_person", "node": nid or w,
+                               "message": f"personId {pid} gán trên "
+                                          "nhiều node"})
+            persons.add(pid)
+        if two_party or dom != CASE_TYPE_INHERITANCE:
+            continue
         ps = n.get("parentSlotIds")
-        if not (isinstance(ps, list)
+        if not (isinstance(ps, list) and len(ps) <= 2
                 and all(isinstance(x, str) and x.strip() for x in ps)):
-            errors.append({"code": "invalid_parent_slots", "node": nid or w,
+            errors.append({"code": "invalid_parent", "node": nid,
                            "message": f"{w}.parentSlotIds phải là "
-                                      "list[string non-empty]"})
+                                      "list ≤2 string non-empty"})
             ps = []
-        if len(ps) > 2:
-            errors.append({"code": "too_many_parents", "node": nid or w,
-                           "message": f"{w} quá 2 parent slots"})
-        if nid and nid in ps:
+        elif len(set(ps)) != len(ps):
+            errors.append({"code": "duplicate_parent", "node": nid,
+                           "message": f"{w}.parentSlotIds trùng"})
+        elif nid in ps:
             errors.append({"code": "self_parent", "node": nid,
                            "message": f"{nid} tự làm cha"})
         ss = n.get("spouseSlotId")
         if ss is not None and not (isinstance(ss, str) and ss.strip()):
-            errors.append({"code": "invalid_node", "node": nid or w,
+            errors.append({"code": "invalid_spouse", "node": nid,
                            "message": f"{w}.spouseSlotId phải là "
                                       "string non-empty/null"})
-        if nid and ss == nid:
+        elif ss == nid:
             errors.append({"code": "self_spouse", "node": nid,
                            "message": f"{nid} tự làm vợ/chồng"})
-    # dangling refs + spouse conflict
-    node_by_id = {n.get("id"): n for n in nodes
-                  if isinstance(n, dict) and n.get("id")}
-    for pid, slots in persons.items():
-        active = [s for s in slots
-                  if not (node_by_id.get(s) or {}).get("deleted")]
-        if len(active) > 1:
-            errors.append({"code": "duplicate_person",
-                           "message": f"personId {pid} gán trên nhiều node"})
-    for i, n in enumerate(nodes):
-        if not isinstance(n, dict):
-            continue
-        nid = n.get("id")
-        for p in n.get("parentSlotIds") or []:
-            if isinstance(p, str) and p not in ids:
-                errors.append({"code": "dangling_parent", "node": nid,
-                               "message": f"{nid} tham chiếu parent {p!r} "
-                                          "không tồn tại"})
-        ss = n.get("spouseSlotId")
-        if isinstance(ss, str):
-            if ss not in ids:
-                errors.append({"code": "dangling_spouse", "node": nid,
-                               "message": f"{nid} tham chiếu spouse {ss!r} "
-                                          "không tồn tại"})
-            else:
-                other = node_by_id.get(ss) or {}
-                if other.get("spouseSlotId") != nid:
-                    errors.append({"code": "spouse_conflict", "node": nid,
-                                   "message": f"{nid}↔{ss} spouse không đối xứng"})
-    # ancestry cycle qua parentSlotIds
-    for nid in ids:
-        # DFS don gian: di theo parent edges, quay lai chinh minh = cycle
-        seen = set()
-        frontier = list((node_by_id.get(nid) or {}).get("parentSlotIds") or [])
-        while frontier:
-            cur = frontier.pop()
-            if cur == nid:
-                errors.append({"code": "ancestry_cycle", "node": nid,
-                               "message": f"chu kỳ tổ tiên qua {nid}"})
-                frontier = []
-                break
-            if cur in seen:
+        for pf in ("ownPositions", "receivePositions"):
+            arr = n.get(pf)
+            if not isinstance(arr, list):
+                errors.append({"code": "invalid_position", "node": nid,
+                               "message": f"{w}.{pf} phải là list ⊆ "
+                                          "{1,2,3}"})
+            elif (any(isinstance(x, bool) or not isinstance(x, int)
+                      or x not in POSITIONS for x in arr)
+                    or len(set(arr)) != len(arr)):
+                errors.append({"code": "invalid_position", "node": nid,
+                               "message": f"{w}.{pf} phải ⊆ {{1,2,3}} "
+                                          "không trùng"})
+    if two_party and ids != TWO_PARTY_ID_SET:
+        missing = sorted(TWO_PARTY_ID_SET - ids, key=lambda s: int(s[1:]))
+        errors.append({"code": "missing_position",
+                       "message": f"state two_party thiếu slot {missing}"})
+    if dom == CASE_TYPE_INHERITANCE:
+        # dangling refs + spouse conflict + ancestry cycle (giữ §7.1).
+        for i, n in enumerate(nodes):
+            if not isinstance(n, dict):
                 continue
-            seen.add(cur)
-            frontier.extend(
-                (node_by_id.get(cur) or {}).get("parentSlotIds") or [])
-    # personId ngoai stage da commit -> job error rieng (contract §7.1)
-    stage_ids = set(_person_map(case))
-    for n in nodes:
+            nid = n.get("id")
+            for p in n.get("parentSlotIds") or []:
+                if isinstance(p, str) and p not in ids:
+                    errors.append({"code": "dangling_parent", "node": nid,
+                                   "message": f"{nid} tham chiếu parent "
+                                              f"{p!r} không tồn tại"})
+            ss = n.get("spouseSlotId")
+            if isinstance(ss, str):
+                if ss not in ids:
+                    errors.append({"code": "dangling_spouse", "node": nid,
+                                   "message": f"{nid} tham chiếu spouse "
+                                              f"{ss!r} không tồn tại"})
+                else:
+                    other = node_by_id.get(ss) or {}
+                    if other.get("spouseSlotId") != nid:
+                        errors.append({"code": "spouse_conflict",
+                                       "node": nid,
+                                       "message": f"{nid}↔{ss} spouse "
+                                                  "không đối xứng"})
+        for nid in ids:
+            seen = set()
+            frontier = list(
+                (node_by_id.get(nid) or {}).get("parentSlotIds") or [])
+            while frontier:
+                cur = frontier.pop()
+                if cur == nid:
+                    errors.append({"code": "ancestry_cycle", "node": nid,
+                                   "message": f"chu kỳ tổ tiên qua {nid}"})
+                    frontier = []
+                    break
+                if cur in seen:
+                    continue
+                seen.add(cur)
+                frontier.extend(
+                    (node_by_id.get(cur) or {}).get("parentSlotIds") or [])
+    return errors
+
+
+def _outside_person(state, stage_ids):
+    """personId sai định dạng uuid4 hoặc ngoài stage → trả pid đó."""
+    for n in (state.get("nodes") or []):
         if not isinstance(n, dict):
             continue
         pid = n.get("personId")
-        if isinstance(pid, str) and UUID4_RX.match(pid) \
-                and pid not in stage_ids:
-            return errors, pid
-    return errors, None
+        if pid is None:
+            continue
+        if not (isinstance(pid, str) and UUID4_RX.match(pid)) \
+                or pid not in stage_ids:
+            return pid
+    return None
+
+
+def _persisted_diagram_state(state):
+    """Normalize state đã validate về canonical persist shape."""
+    if state["domain"] == CASE_TYPE_TWO_PARTY:
+        return {"version": DIAGRAM_STATE_VERSION,
+                "domain": CASE_TYPE_TWO_PARTY,
+                "nodes": _canonical_two_party(state["nodes"])}
+    return {"version": DIAGRAM_STATE_VERSION,
+            "domain": CASE_TYPE_INHERITANCE,
+            "nodes": [{
+                "id": n["id"], "personId": n.get("personId"),
+                "parentSlotIds": list(n.get("parentSlotIds") or []),
+                "spouseSlotId": n.get("spouseSlotId"),
+                "ownPositions": list(n.get("ownPositions") or []),
+                "receivePositions": list(n.get("receivePositions") or []),
+                "hidden": n["hidden"], "deleted": n["deleted"]}
+                for n in state["nodes"]]}
 
 
 def _render(state, stage):
-    """Render_model deterministic cua mock engine (v2 shape, contract §7.2).
+    """Render_model deterministic cua mock engine (shape §7.2, §13.4 A4:
+    isLandOwner := ownPositions≠[]; willReceive := receivePositions≠[]).
 
+    Domain two_party khong bao gio vao day (caller tra _unsupported_render).
     Rule don gian mot estate: landowner da chet -> chia deu cho cac node
-    willReceive co personId. Khong co landowner -> invalid
+    receivePositions non-empty co personId. Khong co landowner -> invalid
     missing_land_owner. Pool person chua gan -> incomplete + warning.
     """
     stage_people = _person_map({"stage": stage})
@@ -428,7 +556,7 @@ def _render(state, stage):
              "conservation": {"allocated": "0", "unresolved": "0",
                               "total": "0"}}
     landowners = [n for n in nodes
-                  if n.get("isLandOwner") and n.get("personId")]
+                  if n.get("ownPositions") and n.get("personId")]
     if not landowners:
         if not nodes:
             return empty
@@ -445,7 +573,7 @@ def _render(state, stage):
             "code": "diagram.unassigned_pool_person",
             "message": "Còn người trong Pool chưa được gán trên sơ đồ"})
     receivers = [n for n in nodes
-                 if n.get("willReceive") and n.get("personId")]
+                 if n.get("receivePositions") and n.get("personId")]
     rm = {"engineVersion": 2, "status": "complete", "allocations": {},
           "breakdowns": [], "requiredSlots": _required_slots(nodes),
           "warnings": warnings, "errors": [], "unresolvedEstates": [],
@@ -486,7 +614,7 @@ def _render(state, stage):
             continue
         if n in landowners and pid == src_id:
             rm["allocations"][pid] = _alloc("1", "0", "1", "0")
-        elif n.get("willReceive"):
+        elif n.get("receivePositions"):
             rm["allocations"][pid] = _alloc("0", share, "0", share)
             rm["allocations"][pid]["displayPercent"] = pct
             rm["breakdowns"].append({
@@ -528,36 +656,136 @@ def _payload_diagram_state(payload):
     return dg["state"]
 
 
-def _evaluate_state_or_raise(case, state):
-    """Validate + render. Raise CommandError theo contract §7."""
-    errors, outside_pid = _validate_diagram_state(state, case)
+def _check_domain(state, case_type):
+    """state.domain hợp lệ nhưng khác case_type → diagram_domain_mismatch
+    — kiem TRUOC wire validation (real parity); domain khong thuoc enum
+    -> invalid_domain trong _validate_diagram_state."""
+    if isinstance(state, dict):
+        dom = state.get("domain")
+        if dom in CASE_TYPES and dom != case_type:
+            raise CommandError(
+                "diagram_domain_mismatch",
+                f"state.domain={dom!r} không khớp case_type={case_type!r}",
+                details={"expected": case_type, "got": dom})
+
+
+def _validate_case_state(case, state):
+    """domain + wire validation tren case da commit."""
+    _check_domain(state, case["case_type"])
+    errors = _validate_diagram_state(state)
     if errors:
         raise CommandError("diagram_invalid_state",
                            "diagram state không hợp lệ",
                            details={"errors": errors})
+
+
+def _check_owner_node(case, state):
+    """diagram_save owner mirror (§13.4): node 'owner' co personId phai
+    = owner_row_id da commit -> sai = diagram_owner_mismatch."""
+    if case["case_type"] != CASE_TYPE_INHERITANCE:
+        return
+    oid = (case.get("stage") or {}).get("owner_row_id")
+    owner_pid = next(
+        (n.get("personId") for n in state.get("nodes") or []
+         if isinstance(n, dict) and n.get("id") == "owner"
+         and n.get("deleted") is not True
+         and n.get("personId") is not None), None)
+    if owner_pid is not None and owner_pid != oid:
+        raise CommandError(
+            "diagram_owner_mismatch",
+            "node owner.personId phải khớp stage.owner_row_id đã commit",
+            details={"owner_row_id": oid, "node_personId": owner_pid})
+
+
+def _check_person_refs(state, stage_ids):
+    outside_pid = _outside_person(state, stage_ids)
     if outside_pid is not None:
         raise CommandError("diagram_reference_outside_stage",
                            f"personId {outside_pid} không thuộc Stage "
                            "đã commit", details={"personId": outside_pid})
+
+
+def _evaluate_state_or_raise(case, state):
+    """diagram_evaluate tren case committed: domain -> wire -> refs ->
+    render (real parity; KHONG kem owner-mismatch)."""
+    _validate_case_state(case, state)
+    _check_person_refs(state, set(_person_map(case)))
+    if case["case_type"] == CASE_TYPE_TWO_PARTY:
+        return _unsupported_render()
     return _render(state, case["stage"])
 
 
-def _prune_diagram(case):
-    """Sau commit stage: bo personId/slot tham chieu phan tu da xoa (§6.1)."""
-    stage_ids = set(_person_map(case))
-    nodes = (case["diagram"].get("state") or {}).get("nodes") or []
-    node_ids = {n.get("id") for n in nodes if isinstance(n, dict)}
+def _sync_owner_node(case):
+    """Server seed/refresh node 'owner' := stage.owner_row_id khi commit.
+
+    Được gọi sau _prune_diagram; owner_row_id đã được validate thuộc
+    stage.people. Node owner mới được append đuôi — client drag lại."""
+    if case.get("case_type") != CASE_TYPE_INHERITANCE:
+        return
+    oid = (case.get("stage") or {}).get("owner_row_id")
+    nodes = (case.get("diagram") or {}).get("state", {}).get("nodes") or []
     for n in nodes:
-        if not isinstance(n, dict):
-            continue
-        if n.get("personId") and n["personId"] not in stage_ids:
-            n["personId"] = None
+        if isinstance(n, dict) and n.get("id") == "owner":
+            n["personId"] = oid
+            return
+    nodes.append({
+        "id": "owner", "personId": oid, "parentSlotIds": [],
+        "spouseSlotId": None, "ownPositions": [], "receivePositions": [],
+        "hidden": False, "deleted": False})
+
+
+def _prune_diagram(case):
+    """Sau commit stage: prune refs + vị trí (§13.4 R6 + MAX_ASSETS).
+
+    - personId ngoài Stage: inheritance drop node (đã có link thì scrub);
+      two_party chỉ clear personId (canonical giữ đủ 30 slot).
+    - inheritance: node 'owner' sync := owner_row_id (server SOT).
+    - own/receivePositions: bỏ vị trí > len(assets) → pruned=True."""
+    ct = case.get("case_type")
+    stage_ids = set(_person_map(case))
+    two_party = ct == CASE_TYPE_TWO_PARTY
+    state = case["diagram"].get("state") or {}
+    nodes = state.get("nodes") or []
+    node_ids = {n.get("id") for n in nodes if isinstance(n, dict)}
+    dropped = set()
+    if two_party:
+        for n in nodes:
+            if isinstance(n, dict) and n.get("personId") \
+                    and n["personId"] not in stage_ids:
+                n["personId"] = None
+        # Real _canonical_two_party_nodes: giu dung 30 slot p1..p30
+        # theo thu tu, khong compact.
+        state["nodes"] = nodes = _canonical_two_party(nodes)
+    else:
+        kept = []
+        for n in nodes:
+            if not isinstance(n, dict):
+                continue
+            pid = n.get("personId")
+            if pid is not None and pid not in stage_ids:
+                dropped.add(n.get("id"))
+                continue
+            kept.append(n)
+        nodes = kept
+        state["nodes"] = nodes
+    pruned = False
+    for n in nodes:
         if isinstance(n.get("parentSlotIds"), list):
             n["parentSlotIds"] = [p for p in n["parentSlotIds"]
-                                  if p in node_ids]
+                                  if p in node_ids and p not in dropped]
         ss = n.get("spouseSlotId")
-        if ss is not None and ss not in node_ids:
+        if ss is not None and (ss not in node_ids or ss in dropped):
             n["spouseSlotId"] = None
+        if two_party:
+            continue
+        for k in ("ownPositions", "receivePositions"):
+            arr = n.get(k)
+            if isinstance(arr, list):
+                allowed = list(range(1, len(case["stage"]["assets"]) + 1))
+                pruned = pruned or any(x not in allowed for x in arr)
+                n[k] = [x for x in arr if x in allowed]
+    _sync_owner_node(case)
+    return pruned
 
 
 # ---------- stage validation ----------
@@ -575,26 +803,65 @@ def _err_row(rid, label):
     return _det_uuid4(f"field_error:{label}:{rid!r}")
 
 
-def _validate_stage(stage):
+def _validate_stage(stage, case_type):
     """Tra (field_errors, people_norm, assets_norm). Norm = strip field la
     + dien null cho nullable thieu (producer strip — contract §4.1).
 
-    Code parity voi validator oracle: loi CONTAINER shape (stage khong
-    dict / people|assets thieu hoac khong list) -> validation_error;
-    stage_validation_error chi cho loi ROW-level trong field_errors."""
+    Code parity voi validator oracle + case_workspace._validate_stage:
+    - loi CONTAINER/shape (stage khong dict / people|assets thieu hoac
+      khong list) + key la -> validation_error;
+    - owner_row_id: bat buoc + tro row co that voi inheritance ->
+      workspace_owner_required; CÂM voi two_party -> validation_error;
+    - field_errors chi cho loi ROW-level + limit (asset_limit/
+      people_limit — §13.9 field-error codes)."""
     if not isinstance(stage, dict):
         raise CommandError("validation_error",
                            "stage phải là object")
+    extra = set(stage) - STAGE_FIELDS
+    if extra:
+        raise CommandError("validation_error",
+                           f"stage key lạ: {sorted(extra)}")
     missing = [k for k in ("people", "assets")
                if not isinstance(stage.get(k), list)]
     if missing:
         raise CommandError(
             "validation_error",
             f"stage.{', stage.'.join(missing)} phải là list")
-    errs = []
     people = stage["people"]
     assets = stage["assets"]
+    if case_type == CASE_TYPE_TWO_PARTY:
+        if "owner_row_id" in stage:
+            raise CommandError(
+                "validation_error",
+                "stage.owner_row_id cấm với case_type two_party")
+    else:
+        oid = stage.get("owner_row_id")
+        people_ids = {r.get("row_id") for r in people
+                      if isinstance(r, dict)}
+        if not (isinstance(oid, str) and UUID4_RX.match(oid)
+                and oid in people_ids):
+            raise CommandError(
+                "workspace_owner_required",
+                "stage.owner_row_id phải là row_id của một dòng Người "
+                "trong stage (inheritance)")
+    errs = []
     seen = set()
+    seen_pkeys = set()
+    seen_pentities = set()
+    seen_serials = set()
+    seen_aentities = set()
+
+    def _nullable(r, field, w):
+        """Parity _check_nullable_str: non-string → invalid_type;
+        chuỗi rỗng → invalid_format."""
+        v = r.get(field)
+        if v is not None and not isinstance(v, str):
+            errs.append(_err(w, field, "invalid_type",
+                             f"{field} phải là chuỗi/null"))
+        elif isinstance(v, str) and not v.strip():
+            errs.append(_err(w, field, "invalid_format",
+                             f"{field} rỗng — dùng null"))
+
     people_norm = []
     for i, r in enumerate(people):
         rid = r.get("row_id") if isinstance(r, dict) else None
@@ -603,18 +870,30 @@ def _validate_stage(stage):
             errs.append(_err(w, "row", "invalid_type",
                              f"people[{i}] không phải object"))
             continue
+        extra = set(r) - set(PERSON_FIELDS)
+        if extra:
+            raise CommandError(
+                "validation_error",
+                f"people[{i}] key lạ: {sorted(extra)}")
         if not (isinstance(rid, str) and UUID4_RX.match(rid)):
             errs.append(_err(w, "row_id", "invalid_format",
                              f"row_id phải là uuid4 (nhận {rid!r})"))
         elif rid in seen:
             errs.append(_err(rid, "row_id", "duplicate_row_id",
                              "row_id trùng trong payload"))
-        seen.add(rid)
+        else:
+            seen.add(rid)
         eid = r.get("entity_id")
         if eid is not None and (not isinstance(eid, int)
-                                or isinstance(eid, bool)):
+                                or isinstance(eid, bool) or eid < 1):
             errs.append(_err(w, "entity_id", "invalid_type",
-                             "entity_id phải là int/null"))
+                             "entity_id phải là int >= 1/null"))
+        elif eid is not None:
+            if eid in seen_pentities:
+                errs.append(_err(w, "entity_id", "invalid_format",
+                                 "entity_id trùng với dòng khác"))
+            else:
+                seen_pentities.add(eid)
         ht = r.get("ho_ten")
         if not (isinstance(ht, str) and ht.strip()):
             errs.append(_err(w, "ho_ten", "required", "ho_ten bắt buộc"))
@@ -627,9 +906,19 @@ def _validate_stage(stage):
                                       and DATE_OR_YEAR_RX.match(v)):
                 errs.append(_err(w, f, "invalid_date",
                                  f"{f} phải YYYY-MM-DD/YYYY/null"))
+        for f in ("so_giay_to", "noi_cap", "dia_chi",
+                  "place_of_origin"):
+            _nullable(r, f, w)
+        sgt = r.get("so_giay_to")
+        if isinstance(sgt, str) and sgt.strip():
+            s = sgt.strip()
+            if s in seen_pkeys:
+                errs.append(_err(w, "so_giay_to", "invalid_format",
+                                 "so_giay_to trùng với dòng khác"))
+            else:
+                seen_pkeys.add(s)
         people_norm.append({f: r.get(f) for f in PERSON_FIELDS})
     assets_norm = []
-    primaries = 0
     for i, r in enumerate(assets):
         rid = r.get("row_id") if isinstance(r, dict) else None
         w = _err_row(rid, f"assets[{i}]")
@@ -637,30 +926,43 @@ def _validate_stage(stage):
             errs.append(_err(w, "row", "invalid_type",
                              f"assets[{i}] không phải object"))
             continue
+        extra = set(r) - set(ASSET_FIELDS)
+        if extra:
+            raise CommandError(
+                "validation_error",
+                f"assets[{i}] key lạ: {sorted(extra)}")
         if not (isinstance(rid, str) and UUID4_RX.match(rid)):
             errs.append(_err(w, "row_id", "invalid_format",
                              f"row_id phải là uuid4 (nhận {rid!r})"))
         elif rid in seen:
             errs.append(_err(rid, "row_id", "duplicate_row_id",
                              "row_id trùng trong payload"))
-        seen.add(rid)
+        else:
+            seen.add(rid)
         eid = r.get("entity_id")
         if eid is not None and (not isinstance(eid, int)
-                                or isinstance(eid, bool)):
+                                or isinstance(eid, bool) or eid < 1):
             errs.append(_err(w, "entity_id", "invalid_type",
-                             "entity_id phải là int/null"))
-        if not isinstance(r.get("is_primary"), bool):
-            errs.append(_err(w, "is_primary", "invalid_type",
-                             "is_primary phải là boolean"))
-        elif r["is_primary"]:
-            primaries += 1
+                             "entity_id phải là int >= 1/null"))
+        elif eid is not None:
+            if eid in seen_aentities:
+                errs.append(_err(w, "entity_id", "invalid_format",
+                                 "entity_id trùng với dòng khác"))
+            else:
+                seen_aentities.add(eid)
         serial = r.get("so_serial")
-        if not (isinstance(serial, str) and serial.strip()):
+        canon = serial.strip() if isinstance(serial, str) else serial
+        if not canon:
             errs.append(_err(w, "so_serial", "required",
                              "so_serial bắt buộc"))
-        elif not SERIAL_RX.match(serial):
+        elif not SERIAL_RX.match(canon):
             errs.append(_err(w, "so_serial", "invalid_format",
                              "so_serial phải canonical [A-Z]{2}\\d{6,8}"))
+        elif canon in seen_serials:
+            errs.append(_err(w, "so_serial", "invalid_format",
+                             "so_serial trùng với dòng khác"))
+        else:
+            seen_serials.add(canon)
         dc = r.get("dia_chi")
         if not (isinstance(dc, str) and dc.strip()):
             errs.append(_err(w, "dia_chi", "required", "dia_chi bắt buộc"))
@@ -669,6 +971,10 @@ def _validate_stage(stage):
                                    and DATE_FULL_RX.match(nc)):
             errs.append(_err(w, "ngay_cap", "invalid_date",
                              "ngay_cap tài sản chỉ nhận YYYY-MM-DD"))
+        for f in ("so_vao_so", "so_thua_dat", "so_to_ban_do",
+                  "loai_so", "hinh_thuc_su_dung", "thoi_han",
+                  "nguon_goc", "co_quan_cap"):
+            _nullable(r, f, w)
         lr = r.get("land_rows")
         if lr is not None and not isinstance(lr, list):
             errs.append(_err(w, "land_rows", "invalid_type",
@@ -676,24 +982,21 @@ def _validate_stage(stage):
         elif isinstance(lr, list):
             for j, x in enumerate(lr):
                 if not isinstance(x, dict):
-                    errs.append(_err(w, f"land_rows[{j}]", "invalid_type",
+                    errs.append(_err(w, "land_rows", "invalid_type",
                                      "land_row phải là object"))
                     continue
                 dt = x.get("dien_tich")
                 if dt is not None and (not isinstance(dt, (int, float))
                                        or isinstance(dt, bool)):
-                    errs.append(_err(w, f"land_rows[{j}].dien_tich",
-                                     "invalid_type",
+                    errs.append(_err(w, "land_rows", "invalid_type",
                                      "dien_tich phải là number/null"))
                 for lf in ("loai_dat", "thoi_han"):
-                    lv = x.get(lf)
-                    if lv is not None and not (
-                            isinstance(lv, str) and lv.strip()):
-                        errs.append(_err(w, f"land_rows[{j}].{lf}",
-                                         "invalid_type",
-                                         f"{lf} phải là string "
-                                         "non-empty/null"))
+                    if x.get(lf) is not None and not isinstance(
+                            x.get(lf), str):
+                        errs.append(_err(w, "land_rows", "invalid_type",
+                                         f"{lf} phải là chuỗi/null"))
         row = {f: r.get(f) for f in ASSET_FIELDS}
+        row["so_serial"] = canon or row["so_serial"]
         row["land_rows"] = [
             {"loai_dat": x.get("loai_dat"),
              "dien_tich": x.get("dien_tich"),
@@ -701,12 +1004,23 @@ def _validate_stage(stage):
             for x in lr if isinstance(x, dict)] \
             if isinstance(lr, list) else None
         assets_norm.append(row)
-    if assets and primaries != 1:
+    # Gioi han §13.3/§13.5 — field_errors, gan row_id dong thua (real
+    # parity: loi limit nam sau loi row-level trong field_errors[]).
+    for i, r in enumerate(assets[MAX_ASSETS:], start=MAX_ASSETS):
         errs.append(_err(
-            _err_row(assets_norm[0].get("row_id"), "assets[0]")
-            if assets_norm else _det_uuid4("field_error:primary_count"),
-            "is_primary", "primary_count",
-            f"cần đúng 1 tài sản chính, có {primaries}"))
+            _err_row(r.get("row_id") if isinstance(r, dict) else None,
+                     f"assets[{i}]"),
+            "assets", "asset_limit",
+            f"stage.assets tối đa {MAX_ASSETS} (v2)"))
+    if case_type == CASE_TYPE_TWO_PARTY:
+        for i, r in enumerate(people[MAX_PEOPLE_TWO_PARTY:],
+                              start=MAX_PEOPLE_TWO_PARTY):
+            errs.append(_err(
+                _err_row(r.get("row_id") if isinstance(r, dict) else None,
+                         f"people[{i}]"),
+                "people", "people_limit",
+                f"stage.people tối đa {MAX_PEOPLE_TWO_PARTY} "
+                "với two_party"))
     return errs, people_norm, assets_norm
 
 
@@ -714,13 +1028,12 @@ def _validate_stage(stage):
 
 def _mock_case_row(cid, case):
     """Row shape parity voi notary_adapter._case_row — nguoi_chet = person
-    co ngay_chet (chu the da mat), tai_san = asset primary/dau tien."""
+    co ngay_chet (chu the da mat), tai_san = asset position 1 (index 0)."""
     stage = case.get("stage") or {}
     deceased = next(
         (p for p in stage.get("people", []) if p.get("ngay_chet")), None)
     assets = stage.get("assets", [])
-    primary = next((a for a in assets if a.get("is_primary")), None) \
-        or (assets[0] if assets else None)
+    primary = assets[0] if assets else None
     return {
         "id": cid,
         "nguoi_chet": {
@@ -775,14 +1088,26 @@ def case_list(job, payload):
 
 
 def _workspace_data(cid, case):
-    """result.data cua workspace_get/workspace_create — §4 + §4.3."""
-    caps = case.get("case_type") == SUPPORTED_CASE_TYPE
-    return {
+    """result.data cua workspace_get/workspace_create — §4 + §4.3 + §13."""
+    ct = case.get("case_type")
+    caps = ct in CASE_TYPES
+    stage = case.get("stage") or {}
+    stage_out = {"people": copy.deepcopy(stage.get("people") or []),
+                 "assets": copy.deepcopy(stage.get("assets") or [])}
+    # Real get(): domain fallback inheritance cho case_type ngoai CASE_TYPES
+    # (gift) — owner_row_id emit khi DOMAIN la inheritance, khong phai
+    # chi khi case_type == inheritance.
+    dom = (case.get("diagram") or {}).get("domain") or (
+        ct if ct in CASE_TYPES else CASE_TYPE_INHERITANCE)
+    if dom == CASE_TYPE_INHERITANCE:
+        stage_out["owner_row_id"] = stage.get("owner_row_id")
+    dg = case.get("diagram") or {}
+    data = {
         "schema_version": SCHEMA_VERSION,
         "backend_mode": "mock",          # contract §4 — nhan 'Dữ liệu mô phỏng'
         "case": {
             "id": cid,
-            "case_type": case.get("case_type"),
+            "case_type": ct,
             "document_type": case.get("document_type"),
             "status": case.get("status"),
             "locked": bool(case.get("locked")),
@@ -791,19 +1116,22 @@ def _workspace_data(cid, case):
             "noi_niem_yet": case.get("noi_niem_yet"),
             "ghi_chu": case.get("ghi_chu"),
         },
-        "stage": copy.deepcopy(case["stage"]),
+        "stage": stage_out,
         "diagram": {
-            "domain": case["diagram"].get("domain", "inheritance"),
-            "state": copy.deepcopy(case["diagram"]["state"]),
-            "render_model": copy.deepcopy(case["diagram"]["render_model"]),
-            "warnings": copy.deepcopy(case["diagram"].get("warnings") or []),
+            "domain": dg.get("domain", ct),
+            "state": copy.deepcopy(dg.get("state")),
+            "render_model": copy.deepcopy(dg.get("render_model")),
+            "warnings": copy.deepcopy(dg.get("warnings") or []),
         },
         "capabilities": {
             "intake": list(INTAKE_KINDS) if caps else [],
             "diagram": caps,
-            "word_export": caps,
+            "word_export": ct == CASE_TYPE_INHERITANCE,
         },
     }
+    if case.get("warnings"):
+        data["warnings"] = copy.deepcopy(case["warnings"])
+    return data
 
 
 def workspace_get(job, payload):
@@ -814,13 +1142,17 @@ def workspace_get(job, payload):
 
 
 _CASE_META_FIELDS = ("document_type", "ngay_lap_ho_so",
-                     "noi_niem_yet", "ghi_chu")
+                     "noi_niem_yet", "ghi_chu", "case_type")
 
 
 def workspace_create(job, payload):
-    """notary.workspace_create mock — §4.3: validate → tao case mot
+    """notary.workspace_create mock — §4.3/§13.4: validate → tao case mot
     transaction ao (assign entity_id + seed) → revision=1. Idempotent
-    theo `idempotency_key` da persist (replay tra created:false)."""
+    theo `idempotency_key` da persist (replay tra created:false).
+
+    diagram la TUY CHON: payload co state thi validate + render; khong
+    co thi server seed (inheritance: node 'owner' = owner_row_id;
+    two_party: canonical 30 slot) va render_model=null."""
     p = payload if isinstance(payload, dict) else {}
     ik = p.get("idempotency_key")
     if not (isinstance(ik, str) and UUID4_RX.match(ik)):
@@ -843,10 +1175,17 @@ def workspace_create(job, payload):
             raise CommandError(
                 "validation_error",
                 f"payload.case key lạ: {sorted(extra)}")
-        dt = cm.get("document_type")
-        if dt not in ("khai_nhan", "thoa_thuan"):
+        ct = cm.get("case_type", CASE_TYPE_INHERITANCE)
+        if ct not in CASE_TYPES:
             raise CommandError("validation_error",
-                               f"document_type={dt!r} ngoài enum")
+                               f"case_type={ct!r} ngoài enum")
+        dt = cm.get("document_type")
+        doc_types = (DOCUMENT_TYPES if ct == CASE_TYPE_INHERITANCE
+                     else DOCUMENT_TYPES_TWO_PARTY)
+        if dt not in doc_types:
+            raise CommandError("validation_error",
+                               f"document_type={dt!r} ngoài enum "
+                               f"cho {ct}")
         nl = cm.get("ngay_lap_ho_so")
         if nl is not None and not (
                 isinstance(nl, str) and DATE_FULL_RX.match(nl)):
@@ -861,7 +1200,7 @@ def workspace_create(job, payload):
                     f"{f} phải là chuỗi non-empty/null")
 
         stage = p.get("stage")
-        errs, people_norm, assets_norm = _validate_stage(stage)
+        errs, people_norm, assets_norm = _validate_stage(stage, ct)
         raw_people = stage.get("people") if isinstance(stage, dict) else []
         raw_assets = stage.get("assets") if isinstance(stage, dict) else []
         if not raw_people:
@@ -870,9 +1209,8 @@ def workspace_create(job, payload):
                 "required", "stage.people phải có ít nhất một dòng"))
         if not raw_assets:
             errs.append(_err(
-                _det_uuid4("field_error:primary_count"), "is_primary",
-                "primary_count",
-                "assets phải có đúng một dòng is_primary=true"))
+                _det_uuid4("field_error:assets_empty"), "assets",
+                "required", "stage.assets phải có ít nhất một dòng"))
         for i, r in enumerate(raw_people):
             if isinstance(r, dict) and r.get("entity_id") is not None:
                 errs.append(_err(
@@ -890,34 +1228,79 @@ def workspace_create(job, payload):
                                f"{len(errs)} lỗi field trong Stage",
                                details={"field_errors": errs})
 
-        state = _payload_diagram_state(p)
-        draft_case = {"stage": {"people": people_norm}}
-        errors, outside_pid = _validate_diagram_state(state, draft_case)
-        if errors:
-            raise CommandError("diagram_invalid_state",
-                               "diagram state không hợp lệ",
-                               details={"errors": errors})
-        row_ids = {r["row_id"] for r in people_norm}
-        owners = [n for n in state["nodes"]
-                  if isinstance(n, dict) and n.get("id") == "owner"
-                  and n.get("deleted") is not True]
-        if len(owners) != 1 or owners[0].get("personId") not in row_ids:
-            raise CommandError(
-                "workspace_owner_required",
-                "Diagram phải có đúng một node 'owner' (không deleted) "
-                "gán một dòng Người trong stage")
-        if outside_pid is not None:
-            raise CommandError(
-                "diagram_reference_outside_stage",
-                f"personId {outside_pid} không thuộc Stage của payload",
-                details={"personId": outside_pid})
+        dg = p.get("diagram")
+        provided_state = None
+        if dg is not None:
+            if not isinstance(dg, dict) or set(dg) != {"state"}:
+                raise CommandError(
+                    "validation_error",
+                    "payload.diagram chỉ chứa 'state'")
+            provided_state = dg.get("state")
+        stage_ids = {r["row_id"] for r in people_norm}
+        if provided_state is not None:
+            errors = _validate_diagram_state(provided_state)
+            if errors:
+                raise CommandError("diagram_invalid_state",
+                                   "diagram state không hợp lệ",
+                                   details={"errors": errors})
+            if provided_state["domain"] != ct:
+                raise CommandError(
+                    "diagram_domain_mismatch",
+                    "state.domain không khớp case.case_type",
+                    details={"expected": ct,
+                             "got": provided_state["domain"]})
+            outside_pid = _outside_person(provided_state, stage_ids)
+            if outside_pid is not None:
+                raise CommandError(
+                    "diagram_reference_outside_stage",
+                    f"personId {outside_pid} không thuộc Stage của "
+                    "payload", details={"personId": outside_pid})
+            if ct == CASE_TYPE_INHERITANCE:
+                oid = stage.get("owner_row_id")
+                owner_pid = next(
+                    (n.get("personId") for n in provided_state["nodes"]
+                     if isinstance(n, dict) and n.get("id") == "owner"
+                     and n.get("deleted") is not True
+                     and n.get("personId") is not None), None)
+                if owner_pid is not None and owner_pid != oid:
+                    raise CommandError(
+                        "diagram_owner_mismatch",
+                        "node owner.personId phải khớp "
+                        "stage.owner_row_id",
+                        details={"owner_row_id": oid,
+                                 "node_personId": owner_pid})
 
         for row in people_norm + assets_norm:
             row["entity_id"] = st.assign_entity_id()
+        if provided_state is not None:
+            state = _persisted_diagram_state(provided_state)
+            render_model = (_unsupported_render()
+                            if ct == CASE_TYPE_TWO_PARTY
+                            else _render(
+                                state, {"people": people_norm,
+                                        "assets": assets_norm}))
+        elif ct == CASE_TYPE_TWO_PARTY:
+            state = {"version": DIAGRAM_STATE_VERSION,
+                     "domain": CASE_TYPE_TWO_PARTY,
+                     "nodes": _canonical_two_party([])}
+            render_model = None
+        else:
+            state = {"version": DIAGRAM_STATE_VERSION,
+                     "domain": CASE_TYPE_INHERITANCE,
+                     "nodes": [{
+                         "id": "owner",
+                         "personId": stage.get("owner_row_id"),
+                         "parentSlotIds": [], "spouseSlotId": None,
+                         "ownPositions": [], "receivePositions": [],
+                         "hidden": False, "deleted": False}]}
+            render_model = None
         new_id = (max(st.cases) + 1) if st.cases else 1
+        stage_store = {"people": people_norm, "assets": assets_norm}
+        if ct == CASE_TYPE_INHERITANCE:
+            stage_store["owner_row_id"] = stage.get("owner_row_id")
         case = {
             "id": new_id,
-            "case_type": SUPPORTED_CASE_TYPE,
+            "case_type": ct,
             "document_type": dt,
             "status": "draft",
             "locked": False,
@@ -925,11 +1308,11 @@ def workspace_create(job, payload):
             "ngay_lap_ho_so": nl,
             "noi_niem_yet": cm.get("noi_niem_yet"),
             "ghi_chu": cm.get("ghi_chu"),
-            "stage": {"people": people_norm, "assets": assets_norm},
+            "stage": stage_store,
             "diagram": {
-                "domain": "inheritance",
-                "state": copy.deepcopy(state),
-                "render_model": _render(state, {"people": people_norm}),
+                "domain": ct,
+                "state": state,
+                "render_model": render_model,
                 "warnings": [],
             },
         }
@@ -945,7 +1328,11 @@ def intake_analyze(job, payload):
     # case_id absent = che do nhap (§2.1a) — bo qua kiem tra case.
     if "case_id" in (payload or {}):
         case = _case(payload)
-        _check_writable(case)      # §5.3: locked/type -> loi job-level
+        # Real intake_analyze: case_type TRUOC locked (adapter §13.5).
+        _check_supported(case)
+        if case.get("locked"):
+            raise CommandError("workspace_locked",
+                               f"hồ sơ #{case['id']} đã khóa")
     sources = (payload or {}).get("sources")
     if not isinstance(sources, list) or not sources:
         raise CommandError("validation_error", "sources phải là list 1..8")
@@ -1095,8 +1482,9 @@ def workspace_commit_stage(job, payload):
     case = _case(payload)
     _check_writable(case)
     _check_base_revision(case, payload)
+    ct = case["case_type"]
     stage = (payload or {}).get("stage")
-    errs, people_norm, assets_norm = _validate_stage(stage)
+    errs, people_norm, assets_norm = _validate_stage(stage, ct)
     if errs:
         raise CommandError("stage_validation_error",
                            f"{len(errs)} lỗi field trong Stage",
@@ -1106,20 +1494,28 @@ def workspace_commit_stage(job, payload):
         if row.get("entity_id") is None:
             row["entity_id"] = _state().assign_entity_id()
     case["stage"] = {"people": people_norm, "assets": assets_norm}
-    _prune_diagram(case)
-    case["diagram"]["render_model"] = _render(
-        case["diagram"]["state"], case["stage"])
+    if ct == CASE_TYPE_INHERITANCE:
+        case["stage"]["owner_row_id"] = stage.get("owner_row_id")
+    pruned = _prune_diagram(case)
+    case["diagram"]["render_model"] = (
+        _unsupported_render() if ct == CASE_TYPE_TWO_PARTY
+        else _render(case["diagram"]["state"], case["stage"]))
     case["revision"] += 1
     job.check_cancel()
+    diagram_out = {
+        "state": copy.deepcopy(case["diagram"]["state"]),
+        "render_model": copy.deepcopy(
+            case["diagram"]["render_model"]),
+    }
+    if pruned:
+        diagram_out["warnings"] = [{
+            "code": "diagram.selection_pruned",
+            "message": "Các lựa chọn vị trí vượt số tài sản đã bị bỏ"}]
     return _result("workspace_commit_stage", {
         "schema_version": SCHEMA_VERSION,
         "revision": case["revision"],
         "stage": copy.deepcopy(case["stage"]),
-        "diagram": {
-            "state": copy.deepcopy(case["diagram"]["state"]),
-            "render_model": copy.deepcopy(
-                case["diagram"]["render_model"]),
-        },
+        "diagram": diagram_out,
     })
 
 
@@ -1127,33 +1523,46 @@ def diagram_evaluate(job, payload):
     """Read-only — duoc phep tren case locked (§7.4); khong persist.
 
     case_id absent = che do nhap: stage payload thay Stage DB,
-    evaluated_revision=null."""
+    evaluated_revision=null. case_id + stage cung luc -> validation_error
+    (adapter parity). two_party -> render_model unsupported."""
     p = payload if isinstance(payload, dict) else {}
+    if "case_id" in p and "stage" in p:
+        raise CommandError("validation_error",
+                           "payload.stage chỉ dùng khi không có case_id")
     state = _payload_diagram_state(p)
     if "case_id" not in p:
+        case_hint = p.get("case")
+        if case_hint is not None and not isinstance(case_hint, dict):
+            raise CommandError("validation_error",
+                               "payload.case phải là object/null")
+        ct = (case_hint or {}).get("case_type", CASE_TYPE_INHERITANCE)
+        if not isinstance(ct, str):
+            ct = CASE_TYPE_INHERITANCE
+        # ct tuy y: _check_domain bat domain-hop-le != ct truoc
+        # (real evaluate_draft parity) — khong pre-check enum.
         stage = p.get("stage")
-        errs, people_norm, assets_norm = _validate_stage(stage)
-        if errs:
-            raise CommandError("stage_validation_error",
-                               f"{len(errs)} lỗi field trong Stage",
-                               details={"field_errors": errs})
-        draft_case = {"stage": {"people": people_norm,
-                                "assets": assets_norm}}
-        errors, outside_pid = _validate_diagram_state(state, draft_case)
+        # Thu tu real evaluate_draft: domain -> wire -> owner pointer +
+        # stage field errors -> person refs -> render.
+        _check_domain(state, ct)
+        errors = _validate_diagram_state(state)
         if errors:
             raise CommandError("diagram_invalid_state",
                                "diagram state không hợp lệ",
                                details={"errors": errors})
-        if outside_pid is not None:
-            raise CommandError(
-                "diagram_reference_outside_stage",
-                f"personId {outside_pid} không thuộc Stage của payload",
-                details={"personId": outside_pid})
+        errs, people_norm, assets_norm = _validate_stage(stage, ct)
+        if errs:
+            raise CommandError("stage_validation_error",
+                               f"{len(errs)} lỗi field trong Stage",
+                               details={"field_errors": errs})
+        _check_person_refs(state, {r["row_id"] for r in people_norm})
+        rm = (_unsupported_render() if ct == CASE_TYPE_TWO_PARTY
+              else _render(state, {"people": people_norm,
+                                   "assets": assets_norm}))
         job.check_cancel()
         return _result("diagram_evaluate", {
             "schema_version": SCHEMA_VERSION,
             "evaluated_revision": None,
-            "render_model": _render(state, draft_case["stage"]),
+            "render_model": rm,
         })
     case = _case(p)
     _check_supported(case)
@@ -1167,27 +1576,53 @@ def diagram_evaluate(job, payload):
 
 
 def diagram_save(job, payload):
+    """Thu tu real save_diagram: domain -> wire -> owner mirror ->
+    person refs -> prune positions -> persist + render -> revision+1."""
     case = _case(payload)
     _check_writable(case)
     _check_base_revision(case, payload)
     state = _payload_diagram_state(payload)
-    rm = _evaluate_state_or_raise(case, state)
-    case["diagram"]["state"] = copy.deepcopy(state)
+    _validate_case_state(case, state)
+    _check_owner_node(case, state)
+    _check_person_refs(state, set(_person_map(case)))
+    ct = case["case_type"]
+    clean_state = _persisted_diagram_state(state)
+    warnings = []
+    if ct == CASE_TYPE_INHERITANCE:
+        pruned = False
+        allowed = list(range(1, len(case["stage"]["assets"]) + 1))
+        for n in clean_state["nodes"]:
+            for k in ("ownPositions", "receivePositions"):
+                arr = n.get(k) or []
+                pruned = pruned or any(x not in allowed for x in arr)
+                n[k] = [x for x in arr if x in allowed]
+        if pruned:
+            warnings.append({
+                "code": "diagram.selection_pruned",
+                "message": "Các lựa chọn vị trí vượt số tài sản đã bị bỏ"})
+        rm = _render(clean_state, case["stage"])
+    else:
+        rm = _unsupported_render()
+    case["diagram"]["state"] = clean_state
     case["diagram"]["render_model"] = rm
     case["revision"] += 1
     job.check_cancel()
+    diagram_out = {
+        "state": copy.deepcopy(clean_state),
+        "render_model": copy.deepcopy(rm),
+    }
+    if warnings:
+        diagram_out["warnings"] = warnings
     return _result("diagram_save", {
         "schema_version": SCHEMA_VERSION,
         "revision": case["revision"],
-        "diagram": {
-            "state": copy.deepcopy(case["diagram"]["state"]),
-            "render_model": copy.deepcopy(rm),
-        },
+        "diagram": diagram_out,
     })
 
 
 def _word_block_reason(case, document_key):
-    """Readiness theo validation that (contract §8.1 mapping)."""
+    """Readiness theo validation that (contract §8.1 mapping) — chi duoc
+    goi cho inheritance (caller reject two_party)."""
     if document_key in NO_TEMPLATE_KEYS:
         return "word.template_missing"
     assets = case["stage"]["assets"]
@@ -1199,7 +1634,7 @@ def _word_block_reason(case, document_key):
         return "word.too_many_assets"
     stage_people = _person_map(case)
     landowners = [n for n in nodes
-                  if n.get("isLandOwner") and n.get("personId")]
+                  if n.get("ownPositions") and n.get("personId")]
     if not landowners:
         return "word.no_landowner"
     deceased = [n for n in landowners
@@ -1207,7 +1642,7 @@ def _word_block_reason(case, document_key):
     if not deceased:
         return "word.no_deceased_landowner"
     receivers = [n for n in nodes
-                 if n.get("willReceive") and n.get("personId")]
+                 if n.get("receivePositions") and n.get("personId")]
     if not receivers:
         return "word.no_receiver"
     assigned = [n for n in nodes if n.get("personId")]
@@ -1225,9 +1660,14 @@ def _word_block_reason(case, document_key):
 
 
 def word_export_options(job, payload):
-    """Read-only — duoc phep tren locked/unsupported (chi workspace_get
-    quyet dinh capability); block_reason theo validation that."""
+    """Read-only — duoc phep tren locked (chi workspace_get quyet dinh
+    capability); block_reason theo validation that. two_party ->
+    case_type_unsupported (§13.8)."""
     case = _case(payload)
+    if case.get("case_type") == CASE_TYPE_TWO_PARTY:
+        raise CommandError("case_type_unsupported",
+                           "Word export chưa hỗ trợ loại việc two_party",
+                           details={"case_type": case.get("case_type")})
     docs = []
     for key, meta in DOC_CATALOG.items():
         reason = _word_block_reason(case, key)
@@ -1249,7 +1689,7 @@ def _write_docx(out, title, case):
         d.add_heading(title, level=1)
         d.add_paragraph(
             f"Dữ liệu mô phỏng — hồ sơ #{case['id']} "
-            f"(notary.case-drafting.v1 mock).")
+            f"(notary.case-drafting.v2 mock).")
         d.add_paragraph("Nội dung mẫu, không phải văn bản pháp lý.")
         d.save(out)
         return
@@ -1276,7 +1716,7 @@ def _write_docx(out, title, case):
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<w:document xmlns:w="http://schemas.openxmlformats.org/'
         'wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Dữ liệu mô '
-        'phỏng — mock notary.case-drafting.v1</w:t></w:r></w:p></w:body>'
+        'phỏng — mock notary.case-drafting.v2</w:t></w:r></w:p></w:body>'
         '</w:document>')
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("[Content_Types].xml", content_types)
@@ -1320,6 +1760,12 @@ def _reserve_and_write(dest_dir, stem, case_id, taken, title, case):
 
 def word_export_batch(job, payload):
     case = _case(payload)
+    # real parity _word_case: two_party -> case_type_unsupported TRUOC
+    # locked check.
+    if case.get("case_type") == CASE_TYPE_TWO_PARTY:
+        raise CommandError("case_type_unsupported",
+                           "Word export chưa hỗ trợ loại việc two_party",
+                           details={"case_type": case.get("case_type")})
     _check_writable(case)
     keys = (payload or {}).get("document_keys")
     # Oracle parity: thieu/null/khong list -> validation_error;

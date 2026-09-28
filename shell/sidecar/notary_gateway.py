@@ -1,7 +1,7 @@
 """Gateway chon backend cho command notary.* case-drafting (MIN-106) +
 notary.case_list dung cho tab Tong quan ho so (MIN-112 — mock parity).
 
-Contract SOT: contracts/notary-case-drafting.md (notary.case-drafting.v1).
+Contract SOT: contracts/notary-case-drafting.md (notary.case-drafting.v2).
 
 Chon mock khi env G1_DEV_NOTARY_MOCK=1 VA sidecar KHONG packaged
 (khong phai PyInstaller exe — sys.frozen). Mac dinh luon real.

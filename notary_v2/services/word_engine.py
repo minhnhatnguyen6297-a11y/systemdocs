@@ -809,7 +809,7 @@ def word_block_reason(context: WordExportContext) -> str | None:
     """Contract `word.*` block_reason đầu tiên cho một context đã build.
 
     Cùng thứ tự kiểm tra với `_add_block_placeholders` bên dưới (contract
-    notary.case-drafting.v1 §8.1 mapping). Trả None khi dữ liệu đủ để xuất.
+    notary.case-drafting.v2 §13.10 mapping). Trả None khi dữ liệu đủ để xuất.
     Dùng bởi `services.word_batch_export` cho word_export_options +
     per-document failure của word_export_batch (MIN-110)."""
     if not context.assets:

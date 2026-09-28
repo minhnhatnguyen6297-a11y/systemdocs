@@ -229,7 +229,7 @@ COMMANDS = {
 }
 
 
-# notary.* case-drafting v1 (MIN-106) — route qua gateway: mock khi
+# notary.* case-drafting v2 (MIN-106) — route qua gateway: mock khi
 # G1_DEV_NOTARY_MOCK=1 + khong packaged, con lai real backend
 # (notary_adapter, them o MIN-107..110). Import lazy — thieu backend chi
 # lam command loi engine_not_installed, khong sap sidecar.

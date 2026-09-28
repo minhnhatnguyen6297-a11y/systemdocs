@@ -613,7 +613,7 @@ def zalo_status(job, payload):
         sess.close()
 
 
-# ---------- Case workspace (MIN-107 — contract notary.case-drafting.v1) ----------
+# ---------- Case workspace (MIN-107 — contract notary.case-drafting.v2) ----------
 
 # next_action phai nam trong envelope enum
 # (login_required|pick_files|retry|contact_admin|null):
@@ -662,8 +662,10 @@ def workspace_get(job, payload):
 
 def workspace_create(job, payload):
     """notary.workspace_create — tao ho so tu nhap trong mot transaction
-    (contract §4.3): case + person + asset + link + diagram + revision=1.
+    (contract v2 §13.6): case + person + asset + link + diagram + revision=1.
 
+    `stage` truyen nguyen (stage_v2 — service validate owner_row_id/extra
+    keys); `diagram` OPTIONAL — absent thi server seed state (§13.6).
     Idempotent theo `idempotency_key` (uuid4, client sinh mot lan/nhap) —
     retry cung key tra case da tao voi created:false, khong tao trung.
     Sidecar chi boc envelope; toan bo validate/atomics trong
@@ -673,14 +675,19 @@ def workspace_create(job, payload):
     stage = payload.get("stage")
     if not isinstance(stage, dict):
         raise CommandError("validation_error", "payload.stage phai la object")
-    state = _payload_diagram_state(payload)
+    dg = payload.get("diagram")
+    if dg is not None and (not isinstance(dg, dict) or "state" not in dg):
+        raise CommandError("validation_error",
+                           "payload.diagram.state bat buoc khi diagram "
+                           "present")
+    state = dg.get("state") if isinstance(dg, dict) else None
     sess = _db_session()
     try:
         module = _workspace_module()
         try:
             data = module.CaseWorkspaceService(sess).create(
                 payload.get("idempotency_key"), payload.get("case"),
-                stage.get("people"), stage.get("assets"), state)
+                stage, state)
         except module.WorkspaceError as err:
             raise _workspace_command_error(err)
         job.check_cancel()
@@ -700,18 +707,12 @@ def workspace_commit_stage(job, payload):
     stage = payload.get("stage")
     if not isinstance(stage, dict):
         raise CommandError("validation_error", "stage phai la object")
-    people = stage.get("people")
-    assets = stage.get("assets")
-    if not isinstance(people, list) or not isinstance(assets, list):
-        raise CommandError(
-            "validation_error",
-            "stage.people/stage.assets phai la danh sach")
     sess = _db_session()
     try:
         module = _workspace_module()
         try:
             data = module.CaseWorkspaceService(sess).commit_stage(
-                case_id, base_revision, people, assets)
+                case_id, base_revision, stage)
         except module.WorkspaceError as err:
             raise _workspace_command_error(err)
         job.check_cancel()
@@ -720,7 +721,7 @@ def workspace_commit_stage(job, payload):
         sess.close()
 
 
-# ---------- document intake da nguon (MIN-108, notary.case-drafting.v1) ----------
+# ---------- document intake da nguon (MIN-108, notary.case-drafting.v2) ----------
 
 def intake_analyze(job, payload):
     """notary.intake_analyze: 5 source kinds → suggestions theo contract.
@@ -755,9 +756,15 @@ def intake_analyze(job, payload):
             if case is None:
                 raise CommandError("case_not_found",
                                    f"khong co ho so #{cid}")
-            # case_type: engine DB hien chi co InheritanceCase nen
-            # case_type_unsupported unreachable — khi case_type thanh
-            # column phai guard tai day (contract §5.3).
+            # §13.5: intake_analyze chi tren case_type da ho tro
+            # (two_party van intake duoc); loai viec khac -> unsupported.
+            ws = _svc("case_workspace")
+            case_type, _doc_type = ws._case_meta(case)
+            if case_type not in ws.CASE_TYPES:
+                raise CommandError(
+                    "case_type_unsupported",
+                    f"loai viec chua ho tro: {case_type}",
+                    details={"case_type": case_type})
             if case.is_locked:
                 raise CommandError("workspace_locked",
                                    f"ho so #{cid} da khoa")
@@ -794,7 +801,7 @@ def intake_analyze(job, payload):
     return result
 
 
-# ---------- diagram evaluate/save (MIN-109, notary.case-drafting.v1 §7) ----------
+# ---------- diagram evaluate/save (MIN-109, notary.case-drafting.v2 §13.7) ----------
 
 def _inheritance_workspace_module():
     return _svc("inheritance_workspace")
@@ -823,6 +830,10 @@ def diagram_evaluate(job, payload):
     if not isinstance(payload, dict):
         payload = {}
     state = _payload_diagram_state(payload)
+    if "case_id" in payload and "stage" in payload:
+        raise CommandError(
+            "validation_error",
+            "payload.stage khong duoc kem khi case_id present")
     if "case_id" not in payload:
         stage = payload.get("stage")
         if not isinstance(stage, dict):
@@ -834,7 +845,7 @@ def diagram_evaluate(job, payload):
             module = _inheritance_workspace_module()
             try:
                 data = module.InheritanceWorkspaceService(sess) \
-                    .evaluate_draft(stage, state)
+                    .evaluate_draft(payload.get("case"), stage, state)
             except module.WorkspaceError as err:
                 raise _workspace_command_error(err)
             job.check_cancel()
@@ -898,9 +909,15 @@ def _word_case(sess, models, cid, *, writable):
     if case is None:
         raise CommandError("case_not_found", f"khong co ho so #{cid}",
                            details={"case_id": cid})
-    # case_type_unsupported unreachable: engine DB hien chi co
-    # InheritanceCase (contract §5.3) — guard tai day khi case_type
-    # thanh column.
+    # §13.5/§13.10: moi word_export_* tren two_party →
+    # case_type_unsupported; case inheritance van di tiep flow cu.
+    ws = _svc("case_workspace")
+    case_type, _doc_type = ws._case_meta(case)
+    if case_type == ws.CASE_TYPE_TWO_PARTY:
+        raise CommandError(
+            "case_type_unsupported",
+            "word_export_* khong ho tro case_type two_party",
+            details={"case_type": case_type})
     if writable and case.is_locked:
         raise CommandError("workspace_locked", f"ho so #{cid} da khoa")
     return case

@@ -126,6 +126,7 @@ def _contract_violations(result, status):
         "result": result,
         "error": None,
         "updated_at": "2026-09-24T09:45:00Z",
+        "fixture_context": {"draft_v2": True},
     }
     return mod.violations(doc)
 
@@ -146,7 +147,7 @@ class TestIntakeAnalyze(unittest.TestCase):
         res = self._analyze([_text_source(1, "\n".join(PROPERTY_LINES))])
         self.assertEqual(res["kind"], "intake_analyze")
         data = res["data"]
-        self.assertEqual(data["schema_version"], "notary.case-drafting.v1")
+        self.assertEqual(data["schema_version"], "notary.case-drafting.v2")
         self.assertFalse(res.get("partial"))
         sugs = data["suggestions"]
         self.assertEqual(len(sugs), 1)

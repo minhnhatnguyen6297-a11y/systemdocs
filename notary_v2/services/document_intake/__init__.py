@@ -1,4 +1,4 @@
-"""Multi-source document intake service (notary.case-drafting.v1, MIN-108).
+"""Multi-source document intake service (notary.case-drafting.v2, MIN-108).
 
 Năm source kinds (image/pdf/docx/xlsx/text) → contract suggestions với
 provenance + observation metadata. Kết quả là *gợi ý* — user commit sau qua

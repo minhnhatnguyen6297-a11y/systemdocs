@@ -3,7 +3,7 @@
 /* Relationship diagram + Pool pane (MIN-112) — tier quan he trong
  * workspace Soạn hồ sơ.
  *
- * SOT hanh vi: spec UX §4 + contracts/notary-case-drafting.md §7.
+ * SOT hanh vi: spec UX §4 + contracts/notary-case-drafting.md §7 + §13.
  * - Pool = Stage DA COMMIT tru nguoi da gan tren draft Diagram (model
  *   tinh, khong phai view). Search chi loc hien thi — khong doi draft.
  * - Diagram render draft state (nodes) + ket qua engine render_model
@@ -20,6 +20,7 @@
  */
 
 const REL_EVALUATE_DEBOUNCE_MS = 500;   // spec: 400–600ms sau draft doi
+const TWO_PARTY = 'two_party';
 
 function createDiagramPane(ctx) {
   const model = ctx.model;
@@ -65,8 +66,9 @@ function createDiagramPane(ctx) {
 
   function poolCardEl(row, kind) {
     const card = h('div', 'cd-pool-card');
-    // Wire v1 khong gan tai san len node — chi person card keo duoc
-    // (drop van reject asset, nhung draggable=false tranh goi y sai).
+    // Tai san khong gan len node (chi tham chieu qua vi tri 1..3 tren
+    // node inheritance) — chi person card keo duoc; draggable=false
+    // tranh goi y sai (drop van reject asset).
     card.draggable = kind === 'person' && model.canWrite();
     const label = kind === 'person'
       ? (row.ho_ten || '(chưa đặt tên)')
@@ -101,7 +103,8 @@ function createDiagramPane(ctx) {
     openModal((box, close) => {
       box.append(h('div', 'cd-modal-title', 'Gán vị trí trên sơ đồ'));
       if (kind === 'asset') {
-        // Wire v1: tai san khong gan vao node — chi xem (§7.1).
+        // Tai san khong gan vao node — so do chi ghi dau chon vi tri
+        // own/receive tren node nguoi (§13.4); khong co node tai san.
         box.append(h('div', 'muted',
           'Tài sản chưa gán trực tiếp lên sơ đồ trong phiên bản này — ' +
           'sơ đồ gán quan hệ giữa các người.'));
@@ -109,17 +112,21 @@ function createDiagramPane(ctx) {
         return;
       }
       const nodes = (s.diagram.nodes || []).filter((n) => !n.deleted);
+      const tp = model.diagramDomain && model.diagramDomain() === TWO_PARTY;
       const empty = nodes.filter((n) => !n.personId);
       if (empty.length) {
         box.append(h('div', 'muted', 'Slot đang trống:'));
         for (const n of empty) {
-          box.append(btn(`Gán vào “${n.id}”`, 'cd-menu-item', () => {
+          const lbl = n.id === 'owner' ? `${n.id} (người để lại)` : n.id;
+          box.append(btn(`Gán vào “${lbl}”`, 'cd-menu-item', () => {
             if (model.assignPerson(n.id, row.row_id)) scheduleEvaluate();
             close();
           }));
         }
       }
-      box.append(h('div', 'muted', 'Hoặc tạo slot mới:'));
+      // two_party: slot canonical co dinh — khong tao slot quan he moi.
+      if (!tp) {
+        box.append(h('div', 'muted', 'Hoặc tạo slot mới:'));
       for (const n of nodes.filter((x) => x.personId)) {
         const who = personName(n.personId);
         box.append(
@@ -141,6 +148,7 @@ function createDiagramPane(ctx) {
             }
             close();
           }));
+      }
       }
       if (!nodes.length) {
         box.append(btn('Tạo slot đầu tiên và gán', 'cd-menu-item', () => {
@@ -226,23 +234,34 @@ function createDiagramPane(ctx) {
     if (n.deleted) return card;
     const flags = h('div', 'cd-node-flags');
     const ro = !model.canWrite();
-    const land = btn(n.isLandOwner ? '★ Chủ đất' : 'Chủ đất',
-      n.isLandOwner ? 'primary' : '', () => {
-        if (model.setNodeFlag(n.id, 'isLandOwner', !n.isLandOwner)) {
-          scheduleEvaluate();
+    const tp = model.diagramDomain &&
+      model.diagramDomain() === TWO_PARTY;
+    if (!tp) {
+      // Dau chon tai san doc lap (§13.4): own = vi tri so huu, recv =
+      // vi tri duoc nhan; chip vi tri chua co asset bi disable (server
+      // van prune tai commit/save neu mang vuot len(assets)).
+      const assetCount = model.state.stage.assets.length;
+      const posRow = (label, kind, arr) => {
+        const wrap = h('div', 'cd-posrow');
+        wrap.append(h('span', 'muted cd-posrow-label', label));
+        for (const pos of [1, 2, 3]) {
+          const on = Array.isArray(arr) && arr.includes(pos);
+          const chip = btn(on ? `✓ ${pos}` : `${pos}`,
+            `cd-chip ${on ? 'primary' : ''}`.trim(), () => {
+              if (model.toggleNodePosition(n.id, kind, pos)) {
+                scheduleEvaluate();
+              }
+            });
+          chip.disabled = ro || pos > assetCount;
+          chip.setAttribute('aria-pressed', String(on));
+          wrap.append(chip);
         }
-      });
-    land.disabled = ro;
-    land.setAttribute('aria-pressed', String(!!n.isLandOwner));
-    const recv = btn(n.willReceive ? '✓ Nhận' : 'Nhận',
-      n.willReceive ? 'primary' : '', () => {
-        if (model.setNodeFlag(n.id, 'willReceive', !n.willReceive)) {
-          scheduleEvaluate();
-        }
-      });
-    recv.disabled = ro;
-    recv.setAttribute('aria-pressed', String(!!n.willReceive));
-    flags.append(land, recv);
+        return wrap;
+      };
+      flags.append(
+        posRow('Sở hữu', 'own', n.ownPositions),
+        posRow('Nhận', 'receive', n.receivePositions));
+    }
     if (n.personId) {
       const un = btn('Bỏ gán', '', () => {
         if (model.assignPerson(n.id, null)) scheduleEvaluate();
@@ -427,9 +446,12 @@ function createDiagramPane(ctx) {
     tier.append(pc);
 
     // Diagram (~78%)
+    const tp = model.diagramDomain &&
+      model.diagramDomain() === TWO_PARTY;
     const dc = h('div', 'cd-card cd-diagram');
     const dHead = h('div', 'cd-card-head');
-    dHead.append(h('h3', 'cd-card-title', 'Sơ đồ quan hệ'));
+    dHead.append(h('h3', 'cd-card-title',
+      tp ? 'Sơ đồ hai bên' : 'Sơ đồ quan hệ'));
     const tools = h('div', 'cd-toolbar cd-card-tools');
     const save = btn('Lưu sơ đồ', 'primary', async () => {
       const r = await model.saveDiagram();
@@ -470,7 +492,8 @@ function createDiagramPane(ctx) {
     const addSlotBtn = btn('+ Slot', '', () => {
       if (model.addSlot()) scheduleEvaluate();
     });
-    addSlotBtn.disabled = !model.canWrite() || !s.capabilities.diagram;
+    addSlotBtn.disabled = !model.canWrite() || !s.capabilities.diagram ||
+      tp;                          // two_party: 30 slot canonical co dinh
     tools.append(save, calc, evalBtn, word, addSlotBtn);
     if (staleEval) {
       tools.append(h('span', 'cd-badge cd-badge-warn',
@@ -482,7 +505,23 @@ function createDiagramPane(ctx) {
     const nodes = (s.diagram.nodes || []).filter((n) => !n.deleted);
     if (!nodes.length) {
       dBody.append(face(L.faceEmpty(
-        'Sơ đồ chưa có slot — thêm slot hoặc gán người từ Pool.')));
+        tp ? 'Sơ đồ hai bên chưa có slot — kiểm tra dữ liệu.'
+           : 'Sơ đồ chưa có slot — thêm slot hoặc gán người từ Pool.')));
+    } else if (tp) {
+      // two_party: 30 slot canonical — p1..p15 ben A, p16..p30 ben B.
+      const groups = [
+        ['Bên A (p1–p15)', (n) => /^p([1-9]|1[0-5])$/.test(n.id)],
+        ['Bên B (p16–p30)', (n) => /^p(1[6-9]|2[0-9]|30)$/.test(n.id)],
+      ];
+      for (const [label, match] of groups) {
+        const groupNodes = (s.diagram.nodes || []).filter(
+          (n) => !n.deleted && match(n));
+        if (!groupNodes.length) continue;
+        dBody.append(h('div', 'cd-group-label muted', label));
+        const grid = h('div', 'cd-nodes');
+        for (const n of groupNodes) grid.append(diagramNodeEl(n));
+        dBody.append(grid);
+      }
     } else {
       const e = edgesEl(nodes);
       if (e.childElementCount) dBody.append(e);

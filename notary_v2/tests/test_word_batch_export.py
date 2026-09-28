@@ -1,5 +1,5 @@
 """Tests cho services.word_batch_export — batch Word export theo
-contract notary.case-drafting.v1 §8 (MIN-110).
+contract notary.case-drafting.v2 §8 (MIN-110).
 
 Case duck-typed như test_word_engine (SimpleNamespace + case_state_json
 theo persisted workspace shape). Chạy từ repo root notary_v2.
@@ -153,7 +153,7 @@ class TestExportOptions:
     def test_ready_case_all_documents_listed(self):
         data = wbe.export_options(
             _ready_case(), resolve_template=_resolve_builtin)
-        assert data["schema_version"] == "notary.case-drafting.v1"
+        assert data["schema_version"] == "notary.case-drafting.v2"
         docs = _docs_by_key(data)
         assert set(docs) == {"khai_nhan_di_san", "thoa_thuan_phan_chia",
                              "niem_yet"}
@@ -271,7 +271,7 @@ class TestExportBatch:
         data = _batch(_ready_case(),
                       ["khai_nhan_di_san", "thoa_thuan_phan_chia"],
                       tmp_path)
-        assert data["schema_version"] == "notary.case-drafting.v1"
+        assert data["schema_version"] == "notary.case-drafting.v2"
         assert data["destination"]["is_dir"] is True
         assert data["destination"]["scope"] == "machine_local"
         assert data["breakdown"] == {

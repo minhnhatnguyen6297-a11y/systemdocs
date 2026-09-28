@@ -1,4 +1,4 @@
-"""Contract-shaped models for notary.case-drafting.v1 document intake.
+"""Contract-shaped models for notary.case-drafting.v2 document intake.
 
 Wire-level shape is fixed by contracts/notary-case-drafting/intake.schema.json:
 - suggestions carry raw + normalized values with observation metadata;
@@ -12,7 +12,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
-SCHEMA_VERSION = "notary.case-drafting.v1"
+SCHEMA_VERSION = "notary.case-drafting.v2"
 
 SOURCE_KINDS = ("image", "pdf", "docx", "xlsx", "text")
 FILE_SOURCE_KINDS = ("image", "pdf", "docx", "xlsx")

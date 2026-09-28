@@ -24,12 +24,18 @@
             "place_of_origin": "Tỉnh Mẫu"
           }
         ],
-        "assets": []
+        "assets": [],
+        "owner_row_id": null
       },
       "diagram": {
-        "state": { "version": 2, "nodes": [] },
+        "state": {
+          "version": 3,
+          "domain": "inheritance",
+          "nodes": []
+        },
         "render_model": "auto",
-        "warnings": []
+        "warnings": [],
+        "domain": "inheritance"
       }
     }
   },
@@ -53,14 +59,19 @@
             "place_of_origin": null
           }
         ],
-        "assets": []
+        "assets": [],
+        "owner_row_id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
       }
     },
     "diagram_save": {
       "case_id": 42,
       "base_revision": 3,
       "diagram": {
-        "state": { "version": 2, "nodes": [] }
+        "state": {
+          "version": 3,
+          "domain": "inheritance",
+          "nodes": []
+        }
       }
     }
   }
