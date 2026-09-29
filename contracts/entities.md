@@ -54,7 +54,7 @@ số. Không so khớp một phần, không so khớp 9 số cuối.
 - Đây là khóa **phụ**, dùng để tăng độ tin cậy, không đủ để tự ghép hồ sơ một
   mình vì tiền tố trùng nhiều giữa các xã/huyện.
 - `notary_v2` gọi trường này `so_vao_so` (xem
-  `docs/platform/document-intake/property-rules.md`).
+  `docs/spec/notary_v2/input/property-rules.md`).
 
 ---
 

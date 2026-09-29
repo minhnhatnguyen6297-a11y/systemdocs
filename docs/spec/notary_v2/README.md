@@ -19,6 +19,9 @@ Input → gợi ý chờ duyệt → Stage → Pool → Diagram → Word
 | Diagram | [`diagram/`](./diagram/README.md) | Quan hệ, vai trò và đầu vào engine |
 | Word | [`word-output.md`](./word-output.md) | Dựng nhiều văn bản từ snapshot đã lưu |
 
+Ngoài flow chính, [`fast-text-audit.md`](./fast-text-audit.md) mô tả CLI độc
+lập để so Word với scan. Công cụ này không ghi Stage, Diagram hoặc database.
+
 ## 2. Bất biến của module
 
 - Input chỉ tạo gợi ý; người dùng phải xác nhận trước khi vào Stage.
@@ -80,13 +83,28 @@ Quy tắc màu, chữ, khoảng cách và thao tác dùng chung nằm tại
   placeholder nào dùng. Không suy ngược từ code hay template Word.
 - Quy tắc per-asset, contract A/B và owner scope chưa được suy từ các flag cũ.
 
-## 7. Nguồn chi tiết khi sửa code
+## 7. Nguồn khi sửa code
 
-- Intake hiện hành: `notary_v2/docs/platform/document-intake/`.
-- Workspace hiện hành: `notary_v2/docs/platform/case-workspace/`.
-- Thừa kế: `notary_v2/docs/domains/inheritance/`.
-- Word engine: `notary_v2/docs/platform/document-generation/`.
+Các phụ lục lớn lưu chi tiết có nguồn của một giai đoạn triển khai; quy tắc
+hiện hành vẫn nằm ở spec của feature và contract được dẫn từ đó:
 
-Các đường trên là bằng chứng chi tiết trong snapshot module. Spec trong cây này
-là cửa vào và nơi sở hữu quy tắc sản phẩm; nếu hai nơi mâu thuẫn, dừng và sửa
-mâu thuẫn trong cùng task.
+- [`workspace-detail.md`](./workspace-detail.md): bản chi tiết MIN-104 về
+  Stage/Pool/Diagram và lệnh Electron, kèm bảng so web cũ với đích.
+- [`visual-reference.md`](./visual-reference.md): bố cục Notary theo ảnh được
+  duyệt; giá trị chưa có nguồn duyệt vẫn là đề xuất.
+- [`diagram/inheritance/web-workflow.md`](./diagram/inheritance/web-workflow.md):
+  hành vi màn web thừa kế còn dùng để đối chiếu cho tới cutover.
+- [`word-output-detail.md`](./word-output-detail.md): placeholder và khác biệt
+  giữa web cũ với xuất nhiều file trên Electron.
+- [`input/ocr-detail.md`](./input/ocr-detail.md): endpoint OCR upload thủ công
+  và lịch sử lựa chọn Qwen; phần Zalo trong đó là ghi nhận thiết kế Draft.
+
+- Intake: [`input/`](./input/README.md).
+- Workspace: [`stage.md`](./stage.md), [`pool.md`](./pool.md) và
+  [`diagram/`](./diagram/README.md).
+- Thừa kế: [`diagram/inheritance/`](./diagram/inheritance/README.md).
+- Word: [`word-output.md`](./word-output.md).
+- Contract máy đọc: [`contracts/notary-case-drafting.md`](../../../contracts/notary-case-drafting.md).
+
+Source và test chỉ chứng minh hiện trạng. Nếu chúng mâu thuẫn với spec, dừng và
+sửa mâu thuẫn trong cùng task; không tạo lại một cây tài liệu dưới module.

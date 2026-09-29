@@ -11,8 +11,12 @@ kết quả và dựng render model.
 
 Spec theo domain:
 
-- Thừa kế: [`inheritance.md`](./inheritance.md).
+- Thừa kế: [`inheritance/`](./inheritance/README.md).
 - Hai bên A/B: [`two-party.md`](./two-party.md).
+
+[`stage-sync-draft.md`](./stage-sync-draft.md) là phụ lục đề xuất cũ về
+đồng bộ Stage/Pool/Diagram, chưa được duyệt. Các phần đã chốt được viết trong
+spec hiện hành ở trên; phần còn mở của phụ lục phải kiểm lại trước khi làm.
 
 ## 2. Input và output
 
@@ -91,6 +95,13 @@ và `contracts/notary-case-drafting/*.schema.json`.
 - Drag payload phải chứa đủ `row_id/personId`; không suy người từ vị trí DOM.
 - Slot trống cần thiết do backend trả trong `requiredSlots`.
 - Cảnh báo nằm gần node/slot liên quan; không chỉ báo chung ở đầu trang.
+- Pool rộng khoảng 176 px; node đã gán hiển thị tên, năm sinh–mất và chip vị
+  trí tài sản `Chủ`/`Nhận`. Node trống là drop target viền đứt và vẫn có
+  `aria-label`/đường thao tác bàn phím.
+- Quan hệ cha–con dùng đường vuông góc, vợ/chồng dùng nét ngang đứt; không vẽ
+  mũi tên tài sản vì một người có thể nhận từ nhiều nguồn.
+- Header Diagram giữ `+ Slot`, `Xem cách tính`, `Đánh giá thử`, zoom/mở rộng,
+  `Lưu sơ đồ`, `Xuất Word`; dirty Diagram tách khỏi dirty Stage.
 
 ## 8. Lỗi và ngoại lệ
 

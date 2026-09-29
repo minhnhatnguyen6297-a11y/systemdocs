@@ -32,7 +32,7 @@ thật phải **disable** và không tái giới thiệu UI/lệnh/trạng thái
   `../tokens.json` v1.1.0.
 - **Bảng tài sản chuyển vị** (thuộc tính = dòng, tài sản = cột) là hướng
   đích thay cho form dọc hiện hữu — diễn giải chi tiết ở
-  `notary_v2/docs/platform/case-workspace/visual-design.md`.
+  `docs/spec/notary_v2/visual-reference.md`.
 - **Chip số `1/2/3` trên node sơ đồ** (`Chủ đất`/`Nhận đất`) chỉ xác nhận
   hình thức tương tác; **ngữ nghĩa** (ánh xạ tới tài sản/vị trí, mô hình
   hai bên) là quyết định nghiệp vụ thuộc P2 (MIN-125) — đừng suy ra contract

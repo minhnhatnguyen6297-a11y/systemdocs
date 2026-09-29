@@ -76,7 +76,19 @@ phải báo `workspace_conflict`; không ghi đè cưỡng bức.
   đến khi còn tối đa 3.
 - Commit lỗi không được xóa draft hoặc local UI state.
 
-## 9. Kiến trúc, câu hỏi và lịch sử
+## 9. Giao diện
+
+- Tài sản dùng bảng chuyển vị: mỗi cột là Tài sản 1..3; mỗi dòng là một
+  thuộc tính. `Loại đất` mở dialog sửa `land_rows`; `Áp dụng` chỉ ghi draft,
+  `Cập nhật` mới persist.
+- Người dùng bảng dòng có kéo sắp xếp, radio `Để lại`, các field chính và nút
+  xóa. Danh sách dài cuộn cả trang, không tạo vùng cuộn riêng trong card.
+- Lỗi field tô đúng ô/dòng theo `row_id`. `+ Người`, `+ Tài sản` và xóa chỉ
+  thay draft cho tới khi commit.
+- Toolbar dùng `Nhập file`, `Hủy thay đổi`, `Cập nhật`; chấm dirty cho biết
+  Stage chưa commit. Quy tắc màu/kích thước chung thuộc `docs/spec/ui/`.
+
+## 10. Kiến trúc, câu hỏi và lịch sử
 
 Stage v2 thay mô hình flag phân tán bằng snapshot có revision. Owner chốt
 27/09/2026: vòng đời draft/committed, `owner_row_id`, tài sản theo vị trí và
@@ -84,7 +96,9 @@ commit nguyên khối thuộc `notary.case-drafting.v2`.
 
 Còn mở: từ điển dữ liệu Người đầy đủ và quyền hiển thị/sửa của từng field.
 
-## 10. Nguồn
+## 11. Nguồn
 
 - Contract: `contracts/notary-case-drafting.md` §13.
-- Chi tiết hiện hành: `notary_v2/docs/platform/case-workspace/drafting-tab.md`.
+- Ảnh bố cục đã duyệt: `docs/spec/ui/references/approved-drafting-v2.png`.
+- Source chính: `shell/src/renderer/notary/case-drafting-view.js` và
+  `notary_v2/routers/cases.py`.

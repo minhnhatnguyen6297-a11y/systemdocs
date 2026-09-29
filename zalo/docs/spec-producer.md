@@ -2,7 +2,8 @@
 
 **Producer SOT.** Nội dung chuẩn tắc trong file này được chuyển nguyên văn từ
 `notary_v2/docs/platform/zalo-document-inbox/spec.md` §2 (CAP-01..16) tại
-MIN-103; file đó giờ chỉ trỏ về đây cho phần producer. Ranh giới trao đổi với
+MIN-103 (xem Git baseline `5c58970`); file consumer hiện tại
+`docs/spec/notary_v2/input/zalo/acceptance.md` chỉ trỏ về đây cho phần producer. Ranh giới trao đổi với
 máy chính (gói file, feed pending, ACK, yêu cầu OCR lại, status) do contract
 `contracts/zalo-intake/` trong monorepo quy định — bản vendored read-only ở
 `schemas/` của repo này. Khi spec này và contract mâu thuẫn về **dây truyền**,

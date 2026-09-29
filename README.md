@@ -20,14 +20,15 @@ docs/spec/
 │   ├── README.md                   # Input → Stage → Pool → Diagram → Word
 │   ├── input/
 │   │   ├── README.md               # Nhập ảnh, PDF, Word, Excel, text
-│   │   └── zalo.md                 # Gói raw OCR từ module Zalo
+│   │   └── zalo/                  # Gói raw OCR và điều kiện nghiệm thu consumer Zalo
 │   ├── stage.md                    # Dữ liệu Người/Tài sản đã commit
 │   ├── pool.md                     # Người chưa được gán Diagram
 │   ├── diagram/
 │   │   ├── README.md               # Thao tác, state, lưu và contract Diagram
-│   │   ├── inheritance.md          # Nghiệp vụ thừa kế
+│   │   ├── inheritance/            # Nghiệp vụ, engine và ví dụ thừa kế
 │   │   └── two-party.md            # Hai bên A/B, 30 vị trí ổn định
-│   └── word-output.md              # Xuất nhiều văn bản Word
+│   ├── word-output.md              # Xuất nhiều văn bản Word
+│   └── fast-text-audit.md          # CLI soát nhanh Word với scan
 ├── upload_lab/
 │   └── README.md                   # Word → audit Excel → chuẩn bị upload
 ├── notaryoffice/

@@ -85,10 +85,9 @@ Lưu ý phân biệt: **gộp hệ thống ≠ gộp code.** Đích đến là c
 nghĩa**; thư viện code dùng chung là chuyện riêng, chỉ làm khi có domain thật thứ
 hai chứng minh được contract.
 
-Nguyên tắc đã chốt trong `notary_v2`
-(`docs/platform/case-workspace/README.md`): **không tách abstraction dùng chung
-cho tới khi có domain thật thứ hai chứng minh contract.** Áp dụng cho toàn hệ
-thống.
+Nguyên tắc cấp hệ thống: **không tách abstraction dùng chung cho tới khi có
+domain thật thứ hai chứng minh contract.** Quy tắc này nằm ngay tại đây vì
+ảnh hưởng nhiều module; spec hệ thống dẫn tới contract để tra chi tiết.
 
 ## Ba mục trong file cũ đã bị xóa vì sai
 

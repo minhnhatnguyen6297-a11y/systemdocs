@@ -45,5 +45,5 @@ hình hiện tại dùng projection từ Stage và Diagram để không có hai 
 
 ## 7. Nguồn
 
-- `notary_v2/docs/platform/case-workspace/contract.md`.
-- `notary_v2/docs/domains/inheritance/workflow.md`.
+- [`stage.md`](./stage.md) và [`diagram/`](./diagram/README.md).
+- Contract `contracts/notary-case-drafting.md` §13.

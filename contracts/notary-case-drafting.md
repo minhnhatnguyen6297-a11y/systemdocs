@@ -20,7 +20,7 @@ cũ (field `case` thêm key nullable; command mới chỉ client mới gọi).
 
 SOT hành vi nghiệp vụ: `docs/spec/notary_v2/`; chi tiết đã duyệt MIN-104 để
 đối chiếu implementation nằm tại
-`notary_v2/docs/platform/case-workspace/drafting-tab.md`. File này là wire
+`docs/spec/notary_v2/workspace-detail.md`. File này là wire
 contract, không định nghĩa lại hành vi.
 Schema chuẩn: `contracts/notary-case-drafting/*.schema.json`
 (JSON Schema draft-07). Examples kiểm chứng:

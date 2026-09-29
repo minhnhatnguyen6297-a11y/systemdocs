@@ -4,7 +4,7 @@
 duyệt trong MIN-92; sau duyệt publish sang `contracts/zalo-intake/` ·
 **Hai bên:** module Zalo độc lập `zalo-intake` (**producer**) ↔ máy công chứng —
 Document Intake trong Soạn hồ sơ (**consumer**) · **Linear:** MIN-92 ·
-**Spec hành vi:** `notary_v2/docs/platform/zalo-document-inbox/spec.md`
+**Spec hành vi:** `docs/spec/notary_v2/input/zalo/README.md`
 (CAP-11…CAP-16)
 
 Contract này mô tả **toàn bộ ranh giới trao đổi** giữa hai repo: gói file raw

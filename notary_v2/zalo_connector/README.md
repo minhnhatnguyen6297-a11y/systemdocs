@@ -6,11 +6,11 @@ The connector, session, listener, journal, temporary media, Qwen OCR, raw file
 packages, and re-OCR API belong to the planned fourth `zalo` module. Migration
 to an independent repository and monorepo `zalo/` snapshot is tracked by
 [MIN-103](https://linear.app/minhnotary/issue/MIN-103/migrate-engine-zalo-thanh-module-thu-tu-trong-repo-rieng-va-zalo).
-Neither repository nor folder exists yet. The migration must settle the Git
-source of truth and snapshot method, and move engine documentation to `zalo/docs/`.
+The `zalo/` snapshot exists; this directory documents the old connector still
+present in Notary. Engine documentation lives under `zalo/docs/`.
 The notary app retains Sync, raw storage, parsing, grouping, human review and
 draft input. Do not maintain two editable engine specs.
-The current product requirements are in [the main Zalo spec](../docs/platform/zalo-document-inbox/spec.md):
+The current product requirements are in [the main Zalo spec](../../docs/spec/notary_v2/input/zalo/README.md):
 The independent module receives media and calls Qwen OCR where image bytes live.
 It retains images for seven days and hands off raw text, OCR status and source
 provenance without images. Document Intake in the notary system parses fields,
@@ -19,8 +19,8 @@ Development starts in a separate local repository; Windows server deployment is
 a later step. The main notary system pulls packages for human review and drafting.
 That migration is not implemented here yet.
 
-For the old shared-storage/webhook behavior described below, see the
-[archived v1 spec](../docs/platform/zalo-document-inbox/spec-v1-legacy.md).
+For the old shared-storage/webhook behavior described below, see
+`notary_v2/docs/platform/zalo-document-inbox/spec-v1-legacy.md` in Git history.
 
 ## Current v1 behavior
 

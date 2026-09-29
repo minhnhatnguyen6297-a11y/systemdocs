@@ -15,7 +15,7 @@ có nguồn để người dùng kiểm tra trước khi đưa vào Stage.
 | DOCX | Chọn file | `python-docx` |
 | XLSX | Chọn file | `openpyxl` |
 | Text | Dán hoặc nhập | Parser tất định |
-| Zalo | Sync gói raw đã công bố | Xem [`zalo.md`](./zalo.md) |
+| Zalo | Sync gói raw đã công bố | Xem [`zalo/`](./zalo/README.md) |
 
 Contract `notary.intake_analyze` nhận tối đa 8 nguồn; mỗi file tối đa 20 MB,
 PDF tối đa 50 trang và text tối đa 100.000 ký tự. Backend được siết chặt hơn,
@@ -60,9 +60,9 @@ Lỗi một nguồn không làm mất kết quả nguồn khác. Job có thể `
 - Đếm riêng ảnh, giấy tờ, người ứng viên và người đã duyệt.
 - Parser tài sản phân biệt serial GCN với thửa/tờ; một GCN có thể có nhiều thửa.
 
-Danh mục regex tài sản chi tiết vẫn ở
-`notary_v2/docs/platform/document-intake/property-rules.md`; đây là phụ lục lớn,
-không phải spec flow thứ hai.
+Danh mục regex/scoring tài sản nằm tại
+[`property-rules.md`](./property-rules.md). Đây là phụ lục lớn của Input, không
+phải spec flow thứ hai.
 
 ## 6. Giao diện và thao tác
 
@@ -114,9 +114,15 @@ không field nào được đổi thành `confirmed`.
 
 - Cloud OCR hiện hành là Qwen-only. QR/local OCR đã rời active path; không tự
   khôi phục khi sửa lỗi chung.
+- Upload thủ công hiện hành đi qua `POST /api/ocr/analyze` và
+  `GET /api/ocr/config`; frontend không tự chạy QR trước khi gọi server.
+- Response legacy hiện có `persons`, `properties`, `marriages`, `raw_results`,
+  `errors`, `summary`. Đây không phải shape bàn giao của Zalo.
 - Hướng normalize hiện tại: Qwen đọc raw, backend normalize sau để dễ test và
   audit. Phần xác suất chỉ là gợi ý.
 - Adapter MarkItDown là POC, chưa là runtime production.
+- Log production chỉ giữ ID kỹ thuật/timing đã che; không ghi ảnh, raw OCR,
+  nội dung giấy tờ, prompt hoặc secret.
 
 ## 10. Câu hỏi mở
 
@@ -127,5 +133,7 @@ không field nào được đổi thành `confirmed`.
 ## 11. Nguồn
 
 - Contract: [`contracts/notary-case-drafting.md`](../../../../contracts/notary-case-drafting.md).
-- Hiện trạng chi tiết: `notary_v2/docs/platform/document-intake/`.
+- Quy tắc tài sản: [`property-rules.md`](./property-rules.md).
+- Endpoint OCR upload và quyết định kỹ thuật có nguồn:
+  [`ocr-detail.md`](./ocr-detail.md), phụ lục lớn để đối chiếu khi sửa parser.
 - Mã chính: `notary_v2/routers/ocr_ai.py`.

@@ -38,6 +38,24 @@ thực, path, trạng thái và lỗi; breakdown luôn có `succeeded`, `failed`
 Không lấy dữ liệu chưa commit hoặc kết quả frontend tự tính. Placeholder chưa
 giải quyết phải làm file đó thất bại, không âm thầm để sót trong văn bản.
 
+`incomplete`/`unsupported` ở cấp engine hiện chưa có cổng chặn xuất Word
+thống nhất trong contract hiện hành. Draft nghiệp vụ đề xuất cho xem/xuất
+`incomplete` với nhãn rõ, còn thiết kế engine đích đề xuất chặn lưu. Đây là
+câu hỏi cần owner chốt trước khi thay đổi hành vi xuất; không được xem việc
+lưu thành công là bằng chứng hồ sơ đã tính xong.
+
+### Placeholder và context
+
+- Placeholder mới dùng `[Tên danh sách N - Trường]`; alias cũ chỉ để mở
+  template cũ, không làm chuẩn đặt tên mới.
+- Context phân loại một lần thành `Người`, `Chủ đất sống`, `Chủ đất chết`,
+  `Người nhận`, `Người không nhận`; `Người từ chối` chỉ có khi có bằng chứng
+  pháp lý xác nhận riêng.
+- Tầng 1 lấy field trực tiếp. Tầng 2 dựng trọn câu/dòng và trả rỗng toàn bộ khi
+  không áp dụng, tránh để lại dấu câu rác. Chưa có block `if/for` cho template.
+- Resolver không được đoán nghiệp vụ từ tên placeholder. Catalog hiện hành nằm
+  cạnh template tại `notary_v2/word_templates/placeholder_mapping.md`.
+
 ## 5. File và an toàn
 
 - Tên: `<filename_stem>_HS-<case_id>[_n].docx`.
@@ -59,11 +77,17 @@ giải quyết phải làm file đó thất bại, không âm thầm để sót 
 Backend/Python sở hữu template catalog, mapping và tên file. Electron chỉ chọn
 thư mục, gửi command, hiển thị kết quả và mở file khi người dùng yêu cầu.
 
+Renderer phải xử lý placeholder trong paragraph, table, header/footer và khi
+Word tách một placeholder thành nhiều run. Router chỉ điều phối; logic dựng
+`WordExportContext` và thay placeholder thuộc service Word.
+
 Còn mở: bộ văn bản cho domain mới và mapping per-asset phải được duyệt; không
 nhân bản logic từ template hiện có.
 
 ## 8. Nguồn
 
 - `contracts/notary-case-drafting.md` §8.
-- `notary_v2/docs/domains/inheritance/word-export.md`.
 - `notary_v2/word_templates/placeholder_mapping.md`.
+- `notary_v2/services/word_engine.py` và tests Word.
+- [`word-output-detail.md`](./word-output-detail.md) giữ ví dụ placeholder,
+  flow web cũ và các kiểm tra renderer chi tiết.

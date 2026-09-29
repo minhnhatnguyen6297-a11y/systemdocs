@@ -2,7 +2,7 @@
 
 /* Case-drafting model — state machine thuan cho tab Soạn hồ sơ (MIN-111).
  *
- * SOT hanh vi: notary_v2/docs/platform/case-workspace/drafting-tab.md
+ * SOT hanh vi: docs/spec/notary_v2/README.md (chi tiet: workspace-detail.md)
  * Wire shape: contracts/notary-case-drafting.md §13 (notary.case-drafting.v2).
  *
  * - Khong DOM, khong Node API bat buoc: chay trong renderer (<script>) va

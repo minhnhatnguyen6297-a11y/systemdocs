@@ -1,10 +1,10 @@
 # Baseline open issues — module Zalo intake
 
 Danh sách rủi ro/việc còn mở mà module thừa kế từ baseline v1
-(`notary_v2/docs/platform/zalo-document-inbox/open-issues-v1-legacy.md`,
+(`notary_v2/docs/platform/zalo-document-inbox/open-issues-v1-legacy.md` trong Git trước đợt gom tài liệu,
 copy nguyên văn ở §1) **cộng drift phát hiện khi kiểm kê MIN-103** (§2).
 
-File gốc v1 vẫn nằm ở notary_v2 làm bằng chứng lịch sử; file này là danh sách
+File gốc v1 chỉ còn trong Git tại baseline `5c5897005e059507aae840c85d314696de3eb21c`; file này là danh sách
 rủi ro **đang sống** của module — cập nhật ở repo này, không cập nhật bản v1.
 
 ## 1. Open issues kế thừa từ v1 (copy nguyên văn)
@@ -40,7 +40,7 @@ rủi ro **đang sống** của module — cập nhật ở repo này, không c�
 ### OCR-SHARED-001 — Active OCR runtime must remove QR OCR
 
 - Decision: approved by user on 2026-08-11.
-- Normative rule: `docs/platform/document-intake/spec.md` is Qwen-only. Active Cloud AI OCR must not use server QR decode, client QR scan, QR rescue/fallback, QR-first routing, or QR/source priority.
+- Normative rule: `docs/spec/notary_v2/input/README.md` is Qwen-only. Active Cloud AI OCR must not use server QR decode, client QR scan, QR rescue/fallback, QR-first routing, or QR/source priority.
 - Historical blocker (2026-08-11): the integrated verifier reported a missing `ocr_ai.shape_cached_ocr`. Source recheck on 2026-09-24 found `shape_cached_ocr` in `routers/ocr_ai.py:2584` and the active Qwen-only route at `:2641`. The old missing-symbol note no longer describes this snapshot; no test suite or live OCR was rerun in MIN-89.
 - Required task: a separate shared-OCR implementation/review must align `routers/ocr_ai.py`, its frontend callers, and tests with the normative Qwen-only contract.
 - Scope boundary: do not solve this by restoring QR helpers or silently changing the Zalo module contract.

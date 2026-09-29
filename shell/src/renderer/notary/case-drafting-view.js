@@ -80,7 +80,7 @@ const ASSET_FIELD_ROWS = [
 const GIOI_TINH_OPTS = [['', '—'], ['Nam', 'Nam'], ['Nữ', 'Nữ']];
 
 // Mã loại đất canonical backend
-// (notary_v2/docs/platform/document-intake/property-rules.md §loai_dat).
+// (docs/spec/notary_v2/input/property-rules.md §loai_dat).
 // Giá trị ngoài danh sách được giữ làm option riêng — không mất dữ liệu.
 const LAND_TYPE_CODES = ['ONT', 'ODT', 'CLN', 'NTS', 'LUC', 'BHK',
                          'SKC', 'TMD', 'DV', 'DGT', 'DKV', 'DHT'];
