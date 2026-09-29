@@ -1,7 +1,7 @@
 # notaryoffice — Theo dõi hồ sơ trong văn phòng
 
 **Trạng thái:** Draft `[CONFIRM]`; chưa có runtime · **Nguồn:**
-`notaryoffice/intent.md` v1.0, 10/09/2026 · **Owner duyệt:** chưa thấy bằng
+[`intent-source.md`](./intent-source.md) v1.0, 10/09/2026 · **Owner duyệt:** chưa thấy bằng
 chứng duyệt toàn bộ thiết kế
 
 ## 1. Mục tiêu
@@ -90,5 +90,7 @@ phải bỏ tính năng theo dõi người làm cụ thể.
 
 ## 9. Nguồn
 
-- Thiết kế chi tiết và ví dụ ngành: `notaryoffice/intent.md`.
+- Lập luận, thiết kế chi tiết và ví dụ ngành gốc:
+  [`intent-source.md`](./intent-source.md). Đây là phụ lục Draft để tra nguồn,
+  không phải spec thứ hai hoặc quyền triển khai schema production.
 - Định danh chung: `contracts/entities.md`.

@@ -2,8 +2,11 @@
 
 **Dự án:** `notaryoffice` / Notary Work Intelligence  
 **Vai trò tài liệu:** Nguồn chi tiết và lời giải thích gốc ngày 10/09/2026.
-Spec dài hạn sở hữu tại [`../docs/spec/notaryoffice/README.md`](../docs/spec/notaryoffice/README.md);
-file này là phụ lục để đối chiếu, không phải SOT song song.  
+Spec dài hạn sở hữu tại [`README.md`](./README.md);
+file này là phụ lục lớn giữ nguyên lập luận và ví dụ gốc để đối chiếu, không
+phải SOT song song. Mọi chi tiết chưa có bằng chứng owner duyệt vẫn là Draft
+`[CONFIRM]`; khi trích quy tắc ra triển khai phải cập nhật README/feature
+tương ứng và nêu nguồn, không tự lấy đoạn trong phụ lục làm Approved.  
 **Phiên bản:** 1.0 (Consolidated Unified Intent)  
 **Ngày cập nhật:** 10/09/2026  
 **Môi trường triển khai:** Mạng cục bộ (LAN) văn phòng công chứng (~6 máy trạm Windows của chuyên viên, 1 máy chủ trung tâm / NAS nội bộ).  
@@ -78,14 +81,14 @@ Chuyên viên vẫn giữ nguyên thói quen làm việc: vẫn mở Word soạn
 
 ### 2.3. Ranh giới Kết nối Zalo (Quyết định B2 đã chốt)
 Ranh giới dùng tài khoản Zalo chung, phạm vi tin nhắn và nơi chạy listener do
-[`spec hệ thống` §7](../docs/spec/README.md) sở hữu cho
+[`spec hệ thống` §7](../README.md) sở hữu cho
 cả hệ thống. Module vận hành phải tuân theo nguồn đó; không chép thành một
 quyết định B2 riêng trong spec này.
 
 ### 2.4. Tính Cục bộ Mạng LAN (Local-First Data Residency)
 - 100% dữ liệu hồ sơ, văn bản, nhật ký hoạt động được lưu trữ và xử lý trên máy chủ LAN nội bộ của văn phòng.
 - Dữ liệu nghiệp vụ **không gửi ra Internet**, ngoại trừ dịch vụ Cloud OCR
-  được phép trong [`../docs/spec/README.md`](../docs/spec/README.md) mục 6
+  được phép trong [`../README.md`](../README.md) mục 6
   (Qwen-VL-OCR qua DashScope, phục vụ đọc ảnh giấy tờ phức tạp).
 
 ---
@@ -376,7 +379,7 @@ Hệ thống áp dụng mô hình phân tán thông minh:
 | **❌ Full Edge-Processing** | Máy trạm tự diff, tự chạy toàn bộ Regex, tự tính điểm. | Biến máy trạm thành client dày gây lag giật máy chuyên viên; khó bảo trì khi phải cập nhật rule/regex trên toàn bộ 6 máy trạm thay vì 1 nơi trên server. |
 | **❌ Auto-link Cứng Ma trận Điểm** | Điểm $\ge 90$ tự động ghép cứng vào Case, không cần hỏi. | Rủi ro pháp lý công chứng rất cao (trùng họ tên, ủy quyền nhiều việc, cùng thửa đất khác xã). Bị loại để chuyển sang **xếp hạng ứng viên + hỏi người 1 lần**. |
 | **❌ Đọc API/DB phần mềm cũ** | Kết nối trực tiếp vào phần mềm quản lý công chứng đang dùng. | Quyết định B1 thuộc [`upload_lab/README.md`](../upload_lab/README.md); đọc nguồn đó trước khi xem lại phương án. |
-| **❌ Đọc Zalo cá nhân nhân viên** | Cài extension/tool đọc Zalo trên máy trạm của nhân viên. | Ranh giới thuộc [`spec hệ thống` §7](../docs/spec/README.md); đọc nguồn đó trước khi xem lại phương án. |
+| **❌ Đọc Zalo cá nhân nhân viên** | Cài extension/tool đọc Zalo trên máy trạm của nhân viên. | Ranh giới thuộc [`spec hệ thống` §7](../README.md); đọc nguồn đó trước khi xem lại phương án. |
 | **❌ Dùng số bản in từ Spooler** | Đọc số bản copies từ Print Spooler để kết luận bản ký. | **Quyết định A2 đã chốt:** Windows Spooler không báo số bản in. Không thiết kế bất kỳ tính năng nào phụ thuộc vào số này. |
 
 ### 6.4. Vai trò của Lớp OpenClaw / AI Engine (10 – 15% Bất định)
@@ -570,7 +573,7 @@ Tài liệu liên kết:
 | **A3** | Ổ mạng chung (Z:) có báo sự kiện đầy đủ không? | 🔴 Cần đo máy thật | Kiểm tra xem giao thức SMB có bỏ sót event; nếu có sẽ bổ sung job quét đối chiếu định kỳ. |
 | **A4** | 6 máy trạm dùng tài khoản Windows riêng hay chung? | 🔴 Cần khảo sát | Nếu dùng tài khoản riêng: theo dõi bàn giao mượt mà. Nếu dùng chung: phải loại bỏ tính năng theo dõi người làm cụ thể. |
 | **B1** | Phần mềm cũ có API/DB để trích xuất không? | ↗ Nguồn Upload Lab | Xem [`upload_lab/README.md` §B1](../upload_lab/README.md); không chốt lại tại đây. |
-| **B2** | Phạm vi kết nối Zalo | ↗ Nguồn liên sản phẩm | Xem [`spec hệ thống` §7](../docs/spec/README.md); không chốt lại tại đây. |
+| **B2** | Phạm vi kết nối Zalo | ↗ Nguồn liên sản phẩm | Xem [`spec hệ thống` §7](../README.md); không chốt lại tại đây. |
 | **B3** | Thông báo nhân viên & Nội quy lao động | 🟢 **ĐÃ CHỐT** | Bắt buộc hoàn thành văn bản thông báo và bổ sung nội quy trước khi triển khai thử nghiệm. |
 | **B4** | Chọn chuyên viên tham gia thử nghiệm | 🟢 **ĐÃ CHỐT** | Chủ dự án chọn 2 chuyên viên có tinh thần hợp tác tốt nhất. |
 

@@ -1,4 +1,14 @@
-# Handoff — Đăng nhập thủ công và nhận diện Lưu hồ sơ
+# Phiên portal — đăng nhập thủ công và nhận diện Lưu hồ sơ
+
+**Trạng thái:** Quy tắc đăng nhập/Lưu hiện hành; mục **Cách dùng** mô tả UI Qt
+cũ, không phải bố cục đích Electron. Bố cục đích ở [`ui.md`](./ui.md) và
+[`README.md`](./README.md). **Nguồn:** `upload_lab/docs/handoff-login-handshake.md`
+trước đợt gom 29/09/2026; MIN-31.
+
+**Input:** website đã chọn, phiên Chromium do Python quản lý, mỗi tab gắn một
+`record_id`. **Output:** trạng thái đăng nhập/storage state cục bộ; sau tín
+hiệu Lưu thành công mới đổi record sang `uploaded_success`. Không lưu mật
+khẩu, không tự bấm Lưu, không suy thành công chỉ vì đã điền form.
 
 ## Mục tiêu đã chốt
 
@@ -9,6 +19,9 @@
 - Người dùng chọn số tab mở mỗi đợt ngay trên màn hình Folder Scan & Upload, từ 1 đến 30.
 
 ## Cách dùng
+
+Các bước dưới là đường thao tác trong UI Qt/Fluent cũ. Electron đích đặt
+chọn website và mở đăng nhập ở đầu tab Audit, không có trang Cấu hình riêng.
 
 1. Bấm **Cấu hình**.
 2. Nhập địa chỉ web nếu cần, rồi bấm **Mở trình duyệt đăng nhập**.

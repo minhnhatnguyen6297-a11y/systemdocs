@@ -67,7 +67,7 @@ flowchart LR
    - Bấm *Tiếp tục N số tiếp theo* để mở đợt mới; app không tự mở đợt kế tiếp.
 
 > [!NOTE]
-> Hợp đồng chi tiết của luồng đăng nhập và nhận diện Lưu xem tại [`docs/handoff-login-handshake.md`](docs/handoff-login-handshake.md). Đặc tả Fluent UI và kế hoạch kiểm tra môi trường được quản lý trên Linear tại [MIN-31](https://linear.app/minhnotary/issue/MIN-31/upload-lab-fluent-ui-redesign-specification-windows-11).
+> Đăng nhập và nhận diện Lưu xem tại [`portal-session.md`](../docs/spec/upload_lab/portal-session.md). Đặc tả Fluent UI và kế hoạch kiểm tra môi trường được quản lý trên Linear tại [MIN-31](https://linear.app/minhnotary/issue/MIN-31/upload-lab-fluent-ui-redesign-specification-windows-11).
 
 ---
 
@@ -87,7 +87,7 @@ flowchart LR
 | `tai_san` | Đoạn mô tả thửa đất, diện tích, GCN, dừng trước cam đoan | `Quyền sử dụng đất tại xã A... Thửa số 10...` |
 
 > [!NOTE]
-> Chi tiết toàn bộ quy tắc regex nhận diện và điểm bắt đầu/kết thúc của từng loại văn bản xem tại: [`docs/regex-rules.md`](docs/regex-rules.md).
+> Chi tiết regex nhận diện và điểm bắt đầu/kết thúc từng loại văn bản: [`regex-rules.md`](../docs/spec/upload_lab/regex-rules.md).
 
 ---
 
@@ -106,10 +106,6 @@ upload_lab/
 |-- tools/regex_lab.py                    # CLI ingest/review/verify cho vòng lặp đánh giá regex
 |-- tools/review_regex_samples.py         # Xuất báo cáo regex (CSV/JSON/XLSX) từ mẫu thực tế
 |-- build_standalone_release.ps1    # Script đóng gói bản phát hành độc lập
-|-- docs/
-|   |-- regex-rules.md              # Catalog quy tắc regex chuẩn cho các loại văn bản
-|   |-- handoff-login-handshake.md  # Hợp đồng luồng đăng nhập thủ công & nhận diện Lưu
-|   `-- fluent_ui_redesign/         # Ảnh mockup và asset tham chiếu giao diện Fluent UI
 |-- ui_qt/                          # Giao diện Fluent (PySide6-Fluent-Widgets)
 |   |-- app.py                      # Khởi tạo QApplication, áp theme
 |   |-- main_window.py              # FluentWindow: navigation, các trang, signal/slot
@@ -122,6 +118,9 @@ upload_lab/
 `-- regex_review_samples/           # Thư mục chứa sample test và báo cáo đánh giá regex
 ```
 
+Spec sản phẩm và ảnh tham chiếu nằm ngoài cây code này, tại
+[`docs/spec/upload_lab/`](../docs/spec/upload_lab/README.md).
+
 ---
 
 ## 4. Chuẩn Giao diện (UI Design Standard)
@@ -130,10 +129,9 @@ upload_lab/
 đúng **hai tab** — *Audit Sổ Công Chứng* và *Quét & Upload Hồ Sơ*, mỗi tab toàn
 chiều rộng. Không còn tab Cấu hình (chuyển lên đầu tab Audit cùng dropdown
 website) và không còn trang Nhật ký (log chỉ là chẩn đoán backend đã lọc).
-Đặc tả đầy đủ: [`docs/spec_UI.md`](docs/spec_UI.md); lớp thị giác/token của
-module (MIN-124): [`docs/visual-design.md`](docs/visual-design.md) +
-[`../docs/spec/ui/`](../docs/spec/ui/) (hướng trắng/xanh đã duyệt,
-giá trị token proposed); giao tiếp shell ↔ Python
+Đặc tả hành vi và thị giác riêng: [`ui.md`](../docs/spec/upload_lab/ui.md) +
+[`../docs/spec/ui/`](../docs/spec/ui/) (token chung đã duyệt, cách áp riêng
+cho Upload còn Proposed); giao tiếp shell ↔ Python
 theo contract [`../contracts/upload-workflow.md`](../contracts/upload-workflow.md)
 (`upload.workflow.v1`).
 
@@ -142,11 +140,11 @@ theo contract [`../contracts/upload-workflow.md`](../contracts/upload-workflow.m
 - **Cửa sổ chính**: kế thừa `FluentWindow`, điều hướng bằng `NavigationItemPosition` thay cho `QTabWidget` ngang kiểu cũ.
 - **Widget Fluent**: `CardWidget`/`ElevatedCardWidget` cho khối nội dung, `PrimaryPushButton`/`FluentPushButton` cho nút bấm, `FluentIcon` cho icon, `TitleLabel`/`BodyLabel`/`CaptionLabel` cho chữ.
 - **Theme**: `ui_qt/theme.py` set nền `qdarktheme` (light) rồi phủ thêm QSS tùy biến cho KPI card, sidebar, bảng — token khai báo tập trung ở đầu file (`PRIMARY_COLOR`, `CONTROL_MIN_HEIGHT`, `CORNER_RADIUS`, ...).
-- **Đặc tả đầy đủ & kế hoạch**: [Linear MIN-31](https://linear.app/minhnotary/issue/MIN-31/upload-lab-fluent-ui-redesign-specification-windows-11); ảnh mockup tham chiếu nằm trong `docs/fluent_ui_redesign/`.
+- **Đặc tả đầy đủ & kế hoạch**: [Linear MIN-31](https://linear.app/minhnotary/issue/MIN-31/upload-lab-fluent-ui-redesign-specification-windows-11); ảnh mockup tham chiếu ở [`references/`](../docs/spec/upload_lab/references/).
 - **Kiểm tra hồi quy giao diện**: `./.venv/Scripts/python.exe ./tools/inspect_ui_style.py` để dump metric/màu thực tế của widget.
 
 > [!IMPORTANT]
-> Thiết kế UI đích (Electron shell) được đặc tả tại [`docs/spec_UI.md`](docs/spec_UI.md) — đó là file spec UI duy nhất của repo cho **hành vi/bố cục**; lớp thị giác bổ sung ở [`docs/visual-design.md`](docs/visual-design.md) (MIN-124) là phụ lục token, không phải spec song song. Thay đổi giao diện Qt hiện trạng đi trực tiếp vào `ui_qt/main_window.py` và `ui_qt/theme.py`. Không tạo thêm file `spec`/`plan`/`issue` hoặc tài liệu yêu cầu song song; cập nhật nguồn sự thật trên Linear.
+> Thiết kế UI đích (Electron shell) nằm tại [`ui.md`](../docs/spec/upload_lab/ui.md), gồm hành vi/bố cục và lớp thị giác riêng. Thay đổi giao diện Qt hiện trạng đối chiếu `ui_qt/main_window.py` và `ui_qt/theme.py`; quy tắc sản phẩm dài hạn cập nhật ở cây spec chung.
 
 ---
 

@@ -1,5 +1,9 @@
 # Regex Rule Catalog — Quy chuẩn Trích xuất Văn bản Công chứng
 
+**Trạng thái:** Catalog quy tắc trích xuất; khi code và catalog lệch, đối chiếu
+fixture rồi cập nhật cùng thay đổi. **Nguồn:** `upload_lab/docs/regex-rules.md`
+trước đợt gom 29/09/2026. Flow và giới hạn ở [`README.md`](./README.md).
+
 Catalog này tập hợp và chuẩn hóa toàn bộ quy tắc trích xuất dữ liệu từ file Word (`.doc`, `.docx`) sang JSON web form trong `extract_contract.py`.
 
 ---

@@ -54,3 +54,21 @@ sau khi local commit được tạo.
 ## File tạm đã dọn
 
 - Script kiểm link tạm trong `.agent/scratch/` đã xóa.
+
+## Upload Lab — đợt gom tiếp theo 29/09/2026
+
+| Nguồn cũ `upload_lab/docs/` | Nơi hiện tại / cách giữ |
+|---|---|
+| `spec_UI.md` + `visual-design.md` | `docs/spec/upload_lab/ui.md`: hành vi/bố cục và lớp thị giác; phần áp riêng chưa duyệt vẫn Proposed |
+| `regex-rules.md` | `docs/spec/upload_lab/regex-rules.md`: catalog độc lập |
+| `handoff-login-handshake.md` | `docs/spec/upload_lab/portal-session.md`: đăng nhập và nhận diện Lưu; bước UI Qt cũ được gắn nhãn |
+| `fluent_ui_redesign/*` | `docs/spec/upload_lab/references/*`: ảnh tham khảo, không tự thành bản duyệt Electron |
+| `superpowers/{plans,specs}/2026-09-11-desktop-command-poc.md` | Kết luận và giới hạn POC ở spec module; bản đầy đủ trong Git baseline `072870e` |
+
+`notaryoffice/intent.md` v1.0 được chuyển nguyên nội dung tới
+`docs/spec/notaryoffice/intent-source.md` như phụ lục Draft lớn. README module
+giữ đường đọc chính, lý do và câu hỏi; contract định danh đã đổi link nguồn.
+Không nâng 14 bảng dự kiến thành schema production.
+
+`zalo/docs/` được giữ: đó là snapshot tài liệu kỹ thuật từ repo producer
+`D:\zalo-intake`, không phải cây spec sản phẩm thứ hai của `notary_v2`.

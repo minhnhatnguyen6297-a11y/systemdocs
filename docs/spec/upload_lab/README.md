@@ -34,8 +34,8 @@ Word .doc/.docx
   viên và nhóm hợp đồng.
 - Lưu JSON, registry SQLite và manifest của đúng lượt quét.
 
-Catalog regex lớn nằm tại `upload_lab/docs/regex-rules.md`; spec này sở hữu ý
-nghĩa flow, catalog chỉ sở hữu chi tiết pattern.
+Catalog regex lớn nằm tại [`regex-rules.md`](./regex-rules.md); trang này sở
+hữu ý nghĩa flow, catalog chỉ sở hữu chi tiết pattern.
 
 ## 4. Audit Excel
 
@@ -74,7 +74,8 @@ Audit dùng hai bảng 4 cột: `STT | Ngày | Số công chứng | Ghi chú`.
 Upload dùng bảng 6 cột: `✓ | STT | Ngày | Số công chứng | Ghi chú | Địa chỉ file`.
 
 Quy tắc nhìn chung ở [`../ui/`](../ui/README.md); hành vi chi tiết hiện hành
-được đối chiếu tại `upload_lab/docs/spec_UI.md`.
+được đối chiếu tại [`ui.md`](./ui.md). Ảnh mockup và UI cũ nằm trong
+[`references/`](./references/) để tham khảo, không tự thành bản duyệt Electron.
 
 ## 7. Kiến trúc và contract
 
@@ -83,6 +84,7 @@ Quy tắc nhìn chung ở [`../ui/`](../ui/README.md); hành vi chi tiết hiệ
 - Một Chromium headed dùng chung cho đăng nhập, tải Excel và chuẩn bị upload.
 - Không lưu username/password; session browser dùng storage state cục bộ.
 - Contract shell↔engine: [`contracts/upload-workflow.md`](../../../contracts/upload-workflow.md).
+- Đăng nhập thủ công và dấu hiệu nhận biết Lưu: [`portal-session.md`](./portal-session.md).
 
 ## 8. Lỗi và khôi phục
 
@@ -106,9 +108,18 @@ Quy tắc nhìn chung ở [`../ui/`](../ui/README.md); hành vi chi tiết hiệ
 - A1 về IFilter khi Word đang mở và A3 về ổ mạng phải đo trên máy thật khi
   chúng ảnh hưởng flow Upload.
 
+### POC DesktopCommand 11/09/2026 — chỉ là bằng chứng
+
+POC FastAPI loopback + Electron giả lập kết luận **ITERATE**, không phải quyết
+định đưa vào production. Smoke dùng fake worker, không mở portal, không có
+thông tin khách. Mẫu đo một máy: Electron + sidecar 2,6 giây tới cửa sổ,
+341,4 MiB idle; Qt 0,5 giây quan sát, 179,1 MiB idle. Chưa đo browser đang
+upload, restart/shutdown ổn định hoặc flow thật. Report và kế hoạch gốc ở Git
+baseline `072870e`; phải đo lại theo cùng quy trình trước quyết định áp dụng.
+
 ## 10. Nguồn
 
 - `upload_lab/README.md`.
-- `upload_lab/docs/spec_UI.md`.
-- `upload_lab/docs/handoff-login-handshake.md`.
-- `upload_lab/docs/regex-rules.md`.
+- [`ui.md`](./ui.md) — hành vi/bố cục và phần thị giác Proposed.
+- [`portal-session.md`](./portal-session.md) — đăng nhập và nhận diện Lưu.
+- [`regex-rules.md`](./regex-rules.md) — catalog trích xuất.

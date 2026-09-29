@@ -1,26 +1,26 @@
-# Đặc tả UI — Upload Lab trong Electron shell
+# Giao diện Upload Lab trong Electron shell
+
+**Trạng thái:** Hành vi/bố cục từ MIN-69 và MIN-77; token chung Approved
+27–28/09/2026; cách áp dụng thị giác riêng cho Upload chưa có nguồn duyệt là
+Proposed. **Nguồn:** `upload_lab/docs/spec_UI.md` và
+`upload_lab/docs/visual-design.md` trước đợt gom tài liệu 29/09/2026.
 
 Tài liệu này giữ **chi tiết bố cục và hành vi** của Upload Lab khi chuyển sang
-shell Electron (MIN-69). SOT dài hạn nằm tại
-[`../../docs/spec/upload_lab/README.md`](../../docs/spec/upload_lab/README.md).
+shell Electron (MIN-69). SOT module nằm tại [`README.md`](./README.md).
 Nó thay thế mô tả ba
 bảng/năm cột trước đây trong chính file này — cấu trúc bảng hiện hành là chuẩn
 [MIN-77](https://linear.app/minhnotary/issue/MIN-77/bug-chuan-hoa-cot-3-vung-audit-excel-va-rut-gon-cot-bang-upload)
 (đã Done) và khớp `ui_qt/main_window.py` hiện tại.
 
-> **Cập nhật MIN-138 (29/09/2026):** file này là nguồn chi tiết cho
-> **hành vi/bố cục vùng**. Lớp **thị giác** (màu, token, chiều cao control,
-> tông trạng thái, responsive chi tiết) nằm ở
-> [`visual-design.md`](visual-design.md) + [`../../docs/spec/ui/`](../../docs/spec/ui/) — hướng
-> trắng/xanh đã duyệt bằng ảnh (27/09/2026) và token đã chốt cùng đợt
-> duyệt (`docs/spec/ui/README.md`, `tokens.json` status approved).
-> Hai lớp không nhân bản: hành vi/đếm cột/scope lấy file này, thị giác lấy
-> `visual-design.md`.
+> **Cập nhật MIN-138 (29/09/2026):** File này giữ cả hành vi/bố cục vùng
+> lẫn cách áp token thị giác ở mục 6. Token chung ở
+> [`../ui/`](../ui/README.md) đã duyệt; chi tiết áp riêng cho Upload còn
+> Proposed, không tự nâng thành quy tắc đã duyệt.
 
 Hành vi nghiệp vụ giữ nguyên từ bản Fluent UI/Qt đang chạy (`run.bat` →
 `ui_runner.py` → `ui_qt/main_window.py`) trừ khi spec này nói khác. Giao tiếp
 UI ↔ backend theo contract `upload.workflow.v1`
-(`../../contracts/upload-workflow.md`).
+([`contracts/upload-workflow.md`](../../../contracts/upload-workflow.md)).
 
 ## 1. Điều hướng và không gian bảng
 
@@ -171,16 +171,57 @@ Bảng hồ sơ dùng đúng **sáu cột** (chuẩn MIN-77):
 - **Hủy**: có ở trạng thái đang chạy/chờ; hủy không hoàn tác một lần Lưu đã
   xảy ra và không tự đóng các tab người dùng đang kiểm tra.
 
-## 6. Tài liệu liên quan
+## 6. Thị giác và trạng thái giao diện
+
+**Phạm vi:** Phần này nhập từ `visual-design.md` (MIN-124). Token chung đã
+Approved; bố cục/chi tiết riêng cho Upload chưa có nguồn duyệt vẫn Proposed.
+Ảnh approved mới chỉ vẽ Notary; Upload có thể cần prototype riêng ở P3
+(MIN-126). Không thay quy tắc hai tab, bốn/sáu cột hoặc quyền tự bấm Lưu ở
+các mục 1–5.
+
+- `upload.css` hiện dùng `#0067c0`, nền `#f8fafc`, viền `#e2e8f0`, card
+  radius 8 px và control khoảng 30 px. Đích là token `accent.primary`,
+  `surface.*`, `state.*`, `radius.card` 10 px, input 38 px, button 32 px
+  (small 28 px). Giữ màn hình gọn vì nhiều dữ liệu.
+- Bốn KPI card giữ nguyên nội dung; dùng `surface.card`, số semibold, nhãn
+  muted, không gán một màu riêng cho từng KPI.
+- Tab Audit: thanh website/kiểm tra môi trường một dòng; trạng thái kết nối
+  dạng pill `ok`/`warn`/`error`, chưa đăng nhập không màu đỏ. Ngày có chiều
+  rộng vừa đủ; path cắt giữa, tooltip. Hai bảng full-width, header sticky,
+  lưới mảnh và hover nhẹ. Lỗi hiện inline, không modal.
+- Tab Upload: context bar hiện website, session và số hồ sơ còn lại. Progress
+  dùng `accent.primary`; `waiting_user` là banner warn có việc cần làm, không
+  là lỗi. Bảng sáu cột có cột tick hẹp, địa chỉ file lấy phần dư, truncate,
+  tooltip và mở file gốc. Dòng chọn dùng `accent.soft`; trạng thái dòng dùng
+  pill trong Ghi chú hoặc cách khác chờ P3, không tự thêm cột thứ bảy.
+- Action bar có một nút primary trong ngữ cảnh; `Đóng browser upload` là
+  ghost/danger-outline. Banner `Cần đối chiếu` nằm trên bảng, có hành động,
+  không modal.
+- Job đang chạy hiện ở shell và progress inline; `waiting_user` có CTA
+  xác nhận/mở lại browser. Lỗi env/audit/scan ở đúng vùng, retry theo contract;
+  `partial` hiện breakdown bền, không toast thoáng. Đổi tab giữ state; đổi
+  website phải bỏ dữ liệu website cũ; kết quả trễ sai scope bị bỏ qua.
+- Ở viewport ≤1000 px, bảng giữ full-width, queue cuộn ngang và KPI wrap
+  2×2. Ở ≤800 px, action bar wrap theo cụm. DPI 125–150% giữ cỡ chữ,
+  cho bảng cuộn và path truncate sớm; kiểm nhãn tiếng Việt không tràn.
+
+### Ảnh tham chiếu
+
+[`references/`](./references/) giữ mockup Fluent UI và ảnh UI thực tế trước
+đợt gom. Chúng là bằng chứng/tham khảo, **không phải bản duyệt riêng cho
+Upload Electron**. Bố cục và trạng thái có hiệu lực đọc trong file này;
+token dùng chung đọc tại [`../ui/`](../ui/README.md).
+
+## 7. Tài liệu liên quan
 
 | Tài liệu | Vai trò |
 |---|---|
-| `visual-design.md` | Lớp thị giác/token của module (MIN-124) — bổ sung, không thay spec này |
-| [`../../docs/spec/ui/`](../../docs/spec/ui/) | SOT thị giác + thao tác chung của shell (`README.md`, `tokens.json`) |
+| Mục 6 của file này | Lớp thị giác/token module (MIN-124), phần Proposed ghi riêng |
+| [`../ui/`](../ui/README.md) | SOT thị giác + thao tác chung của shell (`README.md`, `tokens.json`) |
 | `contracts/upload-workflow.md` | Contract `upload.workflow.v1` — command, schema, lỗi, scope/revision giữa shell và sidecar |
 | `contracts/desktop-command.md` + `contracts/g1-module-data.md` | Envelope `desktopcommand.v1` và shape `g1.module.v1` mà workflow chạy bên trong |
 | `upload_lab/README.md` | Kiến trúc nghiệp vụ/engine và cấu trúc codebase hiện tại |
-| `docs/handoff-login-handshake.md` | Hợp đồng luồng đăng nhập thủ công & nhận diện Lưu |
-| `docs/regex-rules.md` | Catalog quy tắc regex trích xuất |
-| [MIN-69](https://linear.app/minhnotary/issue/MIN-69/migrate-uploadaudit-vao-electron) | Task chuyển sang shell; lịch sử kế hoạch giữ trong Linear/Git, spec hiện hành ở [`../../docs/spec/upload_lab/README.md`](../../docs/spec/upload_lab/README.md) |
+| [`portal-session.md`](./portal-session.md) | Đăng nhập thủ công & nhận diện Lưu; lưu ý UI Qt cũ ở file đó |
+| [`regex-rules.md`](./regex-rules.md) | Catalog quy tắc regex trích xuất |
+| [MIN-69](https://linear.app/minhnotary/issue/MIN-69/migrate-uploadaudit-vao-electron) | Task chuyển sang shell; lịch sử kế hoạch giữ trong Linear/Git, spec module ở [`README.md`](./README.md) |
 | [MIN-77](https://linear.app/minhnotary/issue/MIN-77/bug-chuan-hoa-cot-3-vung-audit-excel-va-rut-gon-cot-bang-upload) | Chuẩn cột bảng đã chốt (đã Done) |

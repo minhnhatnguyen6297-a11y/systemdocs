@@ -30,9 +30,14 @@ docs/spec/
 │   ├── word-output.md              # Xuất nhiều văn bản Word
 │   └── fast-text-audit.md          # CLI soát nhanh Word với scan
 ├── upload_lab/
-│   └── README.md                   # Word → audit Excel → chuẩn bị upload
+│   ├── README.md                   # Word → audit Excel → chuẩn bị upload
+│   ├── regex-rules.md              # Catalog trích xuất Word
+│   ├── portal-session.md           # Đăng nhập, nhận diện Lưu
+│   ├── ui.md                       # Hai tab Electron và lớp thị giác
+│   └── references/                # Ảnh mockup/UI cũ, không là spec
 ├── notaryoffice/
-│   └── README.md                   # Evidence → Draft Case → xác nhận → tìm kiếm
+│   ├── README.md                   # Evidence → Draft Case → xác nhận → tìm kiếm
+│   └── intent-source.md            # Phụ lục Draft lớn, lập luận gốc
 └── ui/
     ├── README.md                   # UI dùng chung của Electron shell
     ├── tokens.json
