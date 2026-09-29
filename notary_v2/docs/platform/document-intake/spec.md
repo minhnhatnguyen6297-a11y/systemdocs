@@ -91,7 +91,12 @@ Zalo -> module độc lập ghi sự kiện và captured_at
 
 Module tự xóa ảnh gốc và ảnh dẫn xuất đúng 7 ngày từ captured_at, kể cả khi máy chính chưa ACK. Gói raw chưa ACK tiếp tục được giữ để truyền lại. captured_at (lúc bot bắt tin) là thời gian chính cho từng dòng, hiển thị và gợi ý nhóm; source_sent_at và imported_at là thời gian phụ. Nút Sync chỉ lấy gói OCR raw đã có, không quét lịch sử Zalo. Lấy bù/đối chiếu tin bot chưa từng bắt là MIN-90, chưa là chức năng giai đoạn này.
 
-Máy chính nhập gói raw OCR/trạng thái/nguồn an toàn rồi mới ACK. ACK chỉ xác nhận đã lưu raw, không có nghĩa parser chạy xong hoặc người dùng đã duyệt. Document Intake chạy regex, phân loại, ghép từ raw và có thể chạy lại khi nhận bản OCR mới; không dùng ảnh Zalo. Chi tiết endpoint, phân trang, xác thực và biên nhận thuộc contract liên repo MIN-92; [bản nháp giao tiếp](../../../../docs/product/specs/zalo-file-exchange-v1-draft.md) chỉ để soạn contract.
+Máy chính nhập gói raw OCR/trạng thái/nguồn an toàn rồi mới ACK. ACK chỉ xác
+nhận đã lưu raw, không có nghĩa parser chạy xong hoặc người dùng đã duyệt.
+Document Intake chạy regex, phân loại, ghép từ raw và có thể chạy lại khi nhận
+bản OCR mới; không dùng ảnh Zalo. Chi tiết endpoint, phân trang, xác thực và
+biên nhận thuộc [contract liên repo MIN-92 đang Draft](../../../../contracts/zalo-intake/zalo-intake.md);
+không dùng như contract production trước khi owner duyệt/publish.
 
 ---
 
@@ -179,7 +184,7 @@ Vi du mong muon:
 
 ### Design options (non-normative)
 
-This section records exploration, not the current runtime contract. The explicit current direction remains guidance until implemented and tested. Các phương án dưới đây bàn normalize cho luồng upload OCR thủ công; với nguồn Zalo, module chỉ gọi Qwen OCR, còn Document Intake chạy parser/ghép sau khi nhận raw theo quyết định mới nhất 24/09/2026. MarkItDown và plugin OCR mới là POC adapter trong TECH_STACK, chưa là đường production cho Zalo hoặc upload hiện hành.
+This section records exploration, not the current runtime contract. The explicit current direction remains guidance until implemented and tested. Các phương án dưới đây bàn normalize cho luồng upload OCR thủ công; với nguồn Zalo, module chỉ gọi Qwen OCR, còn Document Intake chạy parser/ghép sau khi nhận raw theo quyết định mới nhất 24/09/2026. MarkItDown và plugin OCR mới chỉ là POC adapter, chưa là đường production cho Zalo hoặc upload hiện hành.
 
 #### Huong A - Prompt-based normalization trong Qwen call
 

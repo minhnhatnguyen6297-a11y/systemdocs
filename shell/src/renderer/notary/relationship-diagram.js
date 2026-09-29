@@ -3,7 +3,7 @@
 /* Relationship diagram + Pool pane (MIN-112 → MIN-130 P7).
  *
  * SOT hanh vi: spec UX §4 + contracts/notary-case-drafting.md §7 + §13;
- * bo cuc/thao tac: docs/product/ui/prototypes/notary.js (canvas pan/zoom/
+ * bo cuc/thao tac: docs/spec/ui/prototypes/notary.js (canvas pan/zoom/
  * "Mở rộng", card thua ke + 2 hang chip, hai ben 30 cho).
  *
  * - Pool = nguoi CHUA GAN tren draft Diagram — nhap moi (caseId=null)

@@ -1,69 +1,91 @@
-# Notary System — Hub tầm nhìn & kiến trúc
+# Notary System
 
-Nguồn tham chiếu cấp cha cho hệ sinh thái phần mềm công chứng.
-Khi sửa code nội bộ, đọc tài liệu của module sở hữu. **Trước khi tạo hoặc sửa
-tài liệu dài hạn**, mở [bản đồ tri thức](./docs/architecture/KNOWLEDGE.md);
-khi task đụng ranh giới giữa các sản phẩm thì đọc thêm kiến trúc và contract
-được bản đồ dẫn tới.
-
-Một ngoại lệ bắt buộc: **trước khi chọn một công nghệ mới** (OCR provider khác,
-ORM khác, queue khác, framework UI khác) thì phải đọc
-[`TECH_STACK.md`](./docs/architecture/TECH_STACK.md). Ba module nghiệp vụ hướng
-tới database chung; Zalo là module thứ tư có thể chạy riêng với DB/session riêng.
-
-## Bốn module trong phạm vi đích
-
-| Sản phẩm | Đường dẫn (trên nhánh `consolidate/monorepo`) | Làm gì | Trạng thái |
-|---|---|---|---|
-| `notary_v2` | `./notary_v2` (snapshot từ `D:\notary_v2`) | Soạn thảo hồ sơ tự động; nhận raw OCR Zalo rồi phân tích, cho người dùng duyệt | Đang phát triển; code Zalo legacy vẫn nằm ở đây |
-| `upload_lab` | `./upload_lab` (snapshot từ `D:\upload_lab_repo`) | Số hóa hồ sơ giấy: Word cũ → trường có cấu trúc → upload web CSDL công chứng tỉnh | Đang phát triển; chưa triển khai production |
-| `notaryoffice` | `./notaryoffice` (snapshot từ `D:\notaryoffice`) | Quản lý hồ sơ tại văn phòng: thu dấu vết từ máy con → tự dựng record hồ sơ | Tài liệu, chưa code |
-| `zalo` | `./zalo` (snapshot từ repo nguồn `D:\zalo-intake`) | Thu nhận Zalo, giữ media tạm, gọi Qwen OCR và giao gói chữ raw | Repo độc lập là SOT engine; snapshot một chiều trong monorepo |
-| `shell` | `./shell` | Vỏ Electron + Python sidecar FastAPI loopback | POC tích hợp; contract production chưa duyệt |
-
-`shell` là hạ tầng giao diện của hệ thống, không tính là module nghiệp vụ thứ năm.
-Zalo là module đầu vào kỹ thuật, không phải một phần sản phẩm thứ năm trong
-[bản đồ tri thức](./docs/architecture/KNOWLEDGE.md). Chỉnh engine ở repo nguồn;
-`zalo/` trong monorepo là snapshot một chiều theo `zalo/README.md`.
-
-Ngoài phạm vi: `researchskill` (`D:\researchskill`) là skill hỗ trợ coding,
-không phải phân hệ công chứng.
-
-`excelTK` là dự án riêng, không thuộc phạm vi hệ thống này. Kế hoạch chuyển
-nghiệp vụ thật sang Electron nằm ở
-[`ELECTRON_G1_PLAN.md`](./docs/architecture/ELECTRON_G1_PLAN.md)
-trên nhánh `electron-system-shell`; `main` tiếp tục chỉ chứa tài liệu.
+Kho này chứa runtime tích hợp và nguồn tài liệu chung cho hệ thống công chứng.
+Tài liệu được tổ chức theo **phạm vi và flow**, không theo loại “nghiệp vụ”,
+“kiến trúc”, “UI” hay “quyết định”.
 
 ## Bắt đầu đọc
 
-Mở **[bản đồ tri thức](./docs/architecture/KNOWLEDGE.md)** để đi từ một trong
-bốn phần — tầm nhìn chung, soạn thảo tự động, số hóa tài liệu cũ, quản lý vận
-hành — tới đúng flow, spec và nơi giữ quyết định. Đây là chỉ mục tài liệu duy
-nhất; không tạo thêm chỉ mục quyết định theo issue hoặc theo tên file.
+1. Đọc [spec toàn hệ thống](./docs/spec/README.md).
+2. Chọn module trong cây dưới.
+3. Đi qua README của từng thư mục cha tới feature cần sửa.
+4. Đọc contract và source được spec lá dẫn tới.
 
-Trước khi agent thêm/sửa tài liệu, đọc [quy tắc ghi file](./AGENTS.md). Task
-và trạng thái nghiệm thu nằm trên Linear; tài liệu trong module sở hữu hành vi
-nghiệp vụ của module đó.
+## Cây tài liệu
 
-## Cấu trúc folder
+```text
+docs/spec/
+├── README.md                       # Tầm nhìn, ranh giới, kiến trúc và câu hỏi toàn hệ thống
+├── notary_v2/
+│   ├── README.md                   # Input → Stage → Pool → Diagram → Word
+│   ├── input/
+│   │   ├── README.md               # Nhập ảnh, PDF, Word, Excel, text
+│   │   └── zalo.md                 # Gói raw OCR từ module Zalo
+│   ├── stage.md                    # Dữ liệu Người/Tài sản đã commit
+│   ├── pool.md                     # Người chưa được gán Diagram
+│   ├── diagram/
+│   │   ├── README.md               # Thao tác, state, lưu và contract Diagram
+│   │   ├── inheritance.md          # Nghiệp vụ thừa kế
+│   │   └── two-party.md            # Hai bên A/B, 30 vị trí ổn định
+│   └── word-output.md              # Xuất nhiều văn bản Word
+├── upload_lab/
+│   └── README.md                   # Word → audit Excel → chuẩn bị upload
+├── notaryoffice/
+│   └── README.md                   # Evidence → Draft Case → xác nhận → tìm kiếm
+└── ui/
+    ├── README.md                   # UI dùng chung của Electron shell
+    ├── tokens.json
+    ├── prototypes/                 # Bản mẫu, không có backend thật
+    └── references/                 # Ảnh owner đã duyệt
+```
+
+Tên thư mục là bản đồ. README của một thư mục giữ điều dùng chung cho mọi file
+con. Một feature nhỏ dùng một file; chỉ tách thư mục khi chính feature có các
+chức năng con độc lập.
+
+## Cấu trúc một feature nhỏ
+
+Ví dụ feature **Nhập liệu**:
+
+| Mục | Câu hỏi cần trả lời |
+|---|---|
+| Công dụng | Giải quyết việc gì, không làm gì? |
+| Người dùng và thao tác | Ai dùng, bấm/kéo/nhập thế nào? |
+| Input | Nhận file, text hoặc dữ liệu nào; giới hạn gì? |
+| Output | Trả gì; trạng thái nào chỉ là gợi ý? |
+| Flow | Từng bước từ đầu vào tới kết quả |
+| Quy tắc và Tại sao | Điều kiện, công thức, lý do ngành, ngoại lệ |
+| Dữ liệu | Lưu ở đâu, shape gì, revision/owner nào? |
+| Contract | Feature/module khác gửi và nhận gì? |
+| Kiến trúc/công nghệ | Thành phần nào làm; công nghệ và lý do |
+| Giao diện | Trạng thái, nút, lỗi, accessibility |
+| Câu hỏi/lịch sử | Điều chưa chốt, quyết định cũ và nguồn |
+
+Không cần mục rỗng. Kiến trúc hay câu hỏi chỉ ảnh hưởng Nhập liệu nằm ngay trong
+spec Nhập liệu. Nếu ảnh hưởng cả Stage và Diagram, đặt ở README `notary_v2`.
+Nếu ảnh hưởng nhiều module, đặt ở `docs/spec/README.md`.
+
+## Module và runtime
+
+| Đường dẫn | Vai trò | Trạng thái |
+|---|---|---|
+| `shell/` | Electron shell + Python sidecar | Runtime tích hợp |
+| `notary_v2/` | Soạn hồ sơ | Đang phát triển |
+| `upload_lab/` | Số hóa và upload hồ sơ cũ | Đang phát triển |
+| `notaryoffice/` | Theo dõi vận hành văn phòng | Chỉ có thiết kế |
+| `zalo/` | Snapshot một chiều từ `D:\zalo-intake` | Repo nguồn sở hữu engine |
+
+`shell` là hạ tầng, không phải module nghiệp vụ. Zalo là nguồn đầu vào kỹ thuật,
+không tạo phần sản phẩm thứ tư.
+
+## Những nơi khác
 
 | Chỗ | Dùng cho |
 |---|---|
-| `docs/architecture/` | Bản đồ tri thức và tài liệu xuyên sản phẩm, giá trị dài hạn |
-| `docs/product/` | UI chung và artifact liên sản phẩm đã có; spec nghiệp vụ mới thuộc module sở hữu |
-| `contracts/` | Contract đã duyệt giữa các sản phẩm |
-| `code-graphs/` | Graphify snapshots các repo con |
-| `zalo/` | Snapshot một chiều từ repo Zalo độc lập; xem `zalo/README.md` |
-| `.agent/tasks/` | Trạng thái thực thi theo Linear issue |
-| `.agent/scratch/`, `.tmp/`, `.cache/`, `logs/`, `artifacts/` | File tạm — gitignore |
+| [`contracts/`](./contracts/README.md) | Contract đã duyệt và schema máy đọc |
+| `.agent/tasks/` | Tiến độ, quyết định trong task và handoff |
+| `code-graphs/` | Snapshot để tìm quan hệ code; không phải spec |
+| `_bmad-output/` | Artifact workflow BMAD |
+| `.agent/scratch/`, `.tmp/`, `.cache/`, `logs/`, `artifacts/` | File tạm, không commit |
 
-## Nguồn sự thật
-
-Folder này mô tả **quan hệ giữa các sản phẩm**. Hành vi bên trong một sản phẩm
-do docs của repo đó quyết định (`notary_v2/docs/`, `upload_lab/README.md` +
-`upload_lab/docs/`, `notaryoffice/intent.md`). Khi folder này xung đột với repo
-con, repo con thắng về hành vi nội bộ — và mâu thuẫn đó phải được báo lại để
-sửa ở đây.
-
-Linear là SOT của task/issue; `.agent/tasks/` chỉ lưu trạng thái thực thi.
-Quy ước chi tiết ở [`AGENTS.md`](./AGENTS.md).
+Linear là nguồn task. Trước khi sửa tài liệu, đọc [luật agent](./AGENTS.md).

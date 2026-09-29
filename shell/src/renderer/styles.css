@@ -1,12 +1,12 @@
 /* ==========================================================================
    styles.css — nền token + thành phần dùng chung của G1 shell (MIN-127 / P4)
    --------------------------------------------------------------------------
-   SOT giá trị: docs/product/ui/tokens.json v1.1.0 (status: approved — owner
+   SOT giá trị: docs/spec/ui/tokens.json v1.1.0 (status: approved — owner
    duyệt qua bản mẫu MIN-126, 27/09/2026; cập nhật mật độ theo mockup
    MIN-133, 28/09/2026). Giá trị dưới đây là ÁNH XẠ TAY; đổi token phải
    sửa tokens.json trước rồi đồng bộ vào file này.
 
-   PHẠM VI (owner: P4/MIN-127 — xem DESIGN.md §10):
+   PHẠM VI (owner: P4/MIN-127 — xem docs/spec/ui/README.md):
    - File này sở hữu: biến :root, layout chrome (#app/#rail/#content/#view),
      và class KHÔNG tiền tố (.btn, .input, .card, .grid, .pill, .banner,
      .face, .modal, .toast, .actionbar, .toolbar, .slot, .muted, .error…).
@@ -116,7 +116,7 @@ textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible,
 /* ---------------------------- LAYOUT SHELL ----------------------------- */
 #app { display: flex; height: 100vh; overflow: hidden; }
 
-/* Icon rail trái 60px — rail sáng theo bản mẫu approved (DESIGN §9.3) */
+/* Icon rail trái 60px — rail sáng theo docs/spec/ui/tokens.json */
 #rail {
   flex: 0 0 var(--rail-w);
   background: var(--rail-bg);

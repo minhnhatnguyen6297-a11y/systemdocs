@@ -6,19 +6,21 @@
 (`contracts/desktop-command.md`)
 
 Shape dữ liệu chung trong `payload`/`result`/`error` giữa Electron shell và
-Python sidecar trên một máy. **Đây không phải** contract xuyên-sản-phẩm
-(ConversionEnvelope giữa các repo vẫn theo Gate A–D của
-`MIN62_DATA_CONTRACT_DRAFT.md` trên branch `min-62-data-contract-draft` — file
-đó là normative reference, không bị tài liệu này thay thế).
+Python sidecar trên một máy. **Đây không phải** contract xuyên-sản-phẩm.
+ConversionEnvelope giữa các repo vẫn chưa được publish; lịch sử Gate A–D của
+MIN-62 được giữ trong Git/Linear và không bị tài liệu này thay thế.
 
 ## 1. Vocabulary dùng lại (không nhân bản)
 
-- `IdentityEvidence` — định nghĩa trường ở `MIN62_DATA_CONTRACT_DRAFT.md` §2.1.
+- `IdentityEvidence` — field set Draft tại
+  [`../docs/spec/README.md`](../docs/spec/README.md) mục 4.1. Contract G1 này
+  chỉ thêm binding ở mục 3; nó không publish shape xuyên sản phẩm.
 - Tiến trình trạng thái `SOURCE → RAW → NORMALIZED → INFERRED → CONFIRMED` —
-  MIN-62 draft §1. Unconfirmed không bao giờ thành business truth.
+  xem [`../docs/spec/README.md`](../docs/spec/README.md) mục 4. Dữ liệu chưa
+  xác nhận không bao giờ thành sự thật nghiệp vụ.
 - Chuẩn hóa định danh — `contracts/entities.md` (CCCD 12 số; serial GCN
   `[A-Z]{2}\d{6,8}`; số công chứng `xxx/yyyy`; thửa+tờ là cặp).
-- Nguyên tắc null/unknown — MIN-62 draft §4.
+- Nguyên tắc null/unknown — mục 6 của contract này.
 
 ## 2. JobResult (`result` của job)
 

@@ -5,7 +5,8 @@ How the engineering skills should consume this repo's domain documentation when 
 ## Before exploring, read these
 
 - **`AGENTS.md`** at the repo root — primary authority and review gates.
-- **`docs/architecture/decisions/`** — read ADRs that touch the area you are about to work in.
+- **`../../docs/spec/notary_v2/`** — read the module/flow/feature spec that
+  owns the area you are about to work in.
 - **Domain & Platform specs**:
   - `docs/domains/inheritance/README.md`
   - `docs/platform/document-intake/README.md`
@@ -24,8 +25,6 @@ Single-context repo with modular domain specs:
 /
 ├── AGENTS.md
 ├── docs/
-│   ├── architecture/
-│   │   └── decisions/          ← ADRs (e.g., 0001-*.md)
 │   ├── domains/                ← Domain specifications
 │   ├── platform/               ← Platform capabilities
 │   └── superpowers/            ← Implementation plans and specs
@@ -33,8 +32,11 @@ Single-context repo with modular domain specs:
 
 ## Use the glossary's vocabulary
 
-When naming domain concepts (in issue titles, refactor proposals, test names, or specs), use established terms from the routed domain specs and `docs/architecture/decisions/`.
+When naming domain concepts (in issue titles, refactor proposals, test names,
+or specs), use established terms from the routed domain specs and the nearest
+owning spec under `../../docs/spec/notary_v2/`.
 
-## Flag ADR conflicts
+## Flag spec conflicts
 
-If an analysis or proposal contradicts an existing ADR or approved spec, surface it explicitly rather than silently overriding.
+If an analysis or proposal contradicts an approved spec, surface it explicitly
+rather than silently overriding.

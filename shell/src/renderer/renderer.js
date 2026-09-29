@@ -80,7 +80,7 @@ function setStatus(s) {
 
 function faceEl(f, actions) {
   const box = el('div', `face face-${f.kind}`);
-  // Loading: skeleton bar + nhan viec dang lam (EXPERIENCE §3 — khong gia
+  // Loading: skeleton bar + nhan viec dang lam (docs/spec/ui/README.md — khong gia
   // progress). Cac mat khac: title + detail + hint + actions.
   if (f.kind === 'loading') {
     for (const w of ['60%', '40%']) {
@@ -121,7 +121,7 @@ function errorFaceEl(err, onRetry) {
 
 function confirmModal({ title, body, confirmLabel, cancelLabel }) {
   return new Promise((resolve) => {
-    // Cau truc modal canonical (DESIGN §6): overlay > .modal.narrow >
+    // Cau truc modal canonical (docs/spec/ui/README.md): overlay > .modal.narrow >
     // head(title + x) / body / foot(ghost trai — primary phai).
     const opener = document.activeElement;
     const wrap = el('div', 'modal-overlay');
@@ -149,7 +149,7 @@ function confirmModal({ title, body, confirmLabel, cancelLabel }) {
     const onKey = (e) => {
       if (e.key === 'Escape') { done(false); return; }
       if (e.key !== 'Tab') return;
-      // Focus trap trong modal (EXPERIENCE §7).
+      // Focus trap trong modal (docs/spec/ui/README.md).
       const els = [...box.querySelectorAll(
         'button, input, select, textarea, [tabindex]:not([tabindex="-1"])')]
         .filter((x) => !x.disabled);
@@ -814,7 +814,7 @@ async function showModule(id) {
   renderSidebar();
 }
 
-// Icon rail 60px theo ban mau approved (DESIGN §9.3): moi muc nav = nut icon
+// Icon rail 60px theo docs/spec/ui/tokens.json: moi muc nav = nut icon
 // + tooltip nhan day du. Path SVG lay tu ban mau prototypes/app.js.
 const NAV_ICONS = {
   notary_v2: 'M6 2h9l5 5v15H6z M14 2v6h6 M9 13h8M9 17h8M9 9h2',

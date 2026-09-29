@@ -3,11 +3,14 @@
 **Spec đích cho tab `Soạn hồ sơ` trên Electron — owner đã duyệt qua [MIN-104](https://linear.app/minhnotary/issue/MIN-104) ngày 24/09/2026; runtime đã triển khai qua MIN-106…MIN-112, verify MIN-113 (chờ owner duyệt cutover).**
 Ngày: 24/09/2026 · Owner: platform/case-workspace · Spec: MIN-104 · Goal triển khai: MIN-107…MIN-112
 
-> **Cập nhật MIN-124 (28/09/2026):** file này giữ nguyên vai trò SOT
-> **hành vi/dữ liệu**. Lớp **thị giác/bố cục mới** (bảng chuyển vị Tài sản,
+> **Cập nhật MIN-138 (29/09/2026):** file này là nguồn chi tiết để đối chiếu
+> **hành vi/dữ liệu**; SOT dài hạn nằm trong
+> [`docs/spec/notary_v2/`](../../../../docs/spec/notary_v2/). Lớp
+> **thị giác/bố cục mới** (bảng chuyển vị Tài sản,
 > dialog loại đất, chip vị trí trên node, action bar) nằm ở
-> [`visual-design.md`](./visual-design.md) + `docs/product/ui/` — phần đó
-> là hướng đã duyệt bằng ảnh và token đã chốt cùng đợt (DESIGN §9). Khi nội dung hai
+> [`visual-design.md`](./visual-design.md) +
+> [`docs/spec/ui/`](../../../../docs/spec/ui/) — phần đó
+> là hướng đã duyệt bằng ảnh và token trong `docs/spec/ui/`. Khi nội dung hai
 > lớp trông mâu thuẫn (vd hình thức card Tài sản, nút `Chủ đất`/`Nhận` ↔
 > chip số), **hành vi/dữ liệu lấy file này làm chuẩn**, hình thức lấy
 > `visual-design.md`. Các quyết định nghiệp vụ mới (chip vị trí ↔ tài sản,
@@ -16,19 +19,20 @@ Ngày: 24/09/2026 · Owner: platform/case-workspace · Spec: MIN-104 · Goal tri
 > APPROVED 27/09/2026, MIN-125)** và đã triển khai qua MIN-128/MIN-129/
 > MIN-130 — renderer Electron emit v2 theo §13.1.
 
-## 1. Vai trò tài liệu và ranh giới SOT
+## 1. Vai trò tài liệu và ranh giới
 
-- File này là **SOT nội bộ cho hành vi/dữ liệu** của tab `Soạn hồ sơ`
+- File này giữ **chi tiết đã duyệt để đối chiếu** của tab `Soạn hồ sơ`
   (đích Electron): mô hình Stage/Pool/Diagram, semantics commit và
   revision/conflict, draft trong phiên, suggestion, gating `case_type`, và
   map hành vi → command đích.
 - Quyết định **cấp sản phẩm/UX** (taxonomy module/tab, luồng, bố cục, bảng
-  nút, danh mục trạng thái UI, UX xuất Word, loại trừ) là SOT của
-  `docs/product/specs/2026-09-24-notary-v2-case-drafting-electron-ux.md` —
+  nút, danh mục trạng thái UI, UX xuất Word, loại trừ) thuộc
+[`docs/spec/notary_v2/README.md`](../../../../docs/spec/notary_v2/README.md) —
   file này tham chiếu, không chép lại.
 - **Thị giác/bố cục đích** (palette, token, bảng chuyển vị, dialog loại
-  đất, node chip, zoom sơ đồ) là SOT của `visual-design.md` cùng thư mục +
-  `docs/product/ui/` — file này không định nghĩa màu/kích thước.
+đất, node chip, zoom sơ đồ) nằm ở `visual-design.md` cùng thư mục +
+[`docs/spec/ui/`](../../../../docs/spec/ui/) — file này không định nghĩa
+màu/kích thước.
 - **Wire contract** `desktopcommand.v1` cho các command đích đã publish tại
   `contracts/notary-case-drafting.md`: §1–12 là `notary.case-drafting.v1`
   (owner duyệt 24/09/2026 qua [MIN-105](https://linear.app/minhnotary/issue/MIN-105),
@@ -38,7 +42,7 @@ Ngày: 24/09/2026 · Owner: platform/case-workspace · Spec: MIN-104 · Goal tri
   chế domain *provisional, non-normative*, **không phải** wire contract; ba
   invariant trong đó (Stage sở hữu người đã commit; Pool derived; Pool/Diagram
   không mutate Stage) trùng khớp spec này.
-- `../../domains/inheritance/workflow.md` giữ SOT **hiện trạng web**
+- `../../domains/inheritance/workflow.md` giữ bằng chứng **hiện trạng web**
   (`frontend/templates/cases/form.html`, bản fallback đến cutover). File này
   mô tả **đích Electron**; khác biệt liệt kê có bằng chứng ở §9. Không giả
   định backend đã có gì ngoài bằng chứng nêu tại §9.

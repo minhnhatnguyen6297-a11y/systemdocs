@@ -20,7 +20,7 @@ shell/
 ## Navigation (MIN-67 / spec MIN-32, taxonomy MIN-104)
 
 - Design dung chung cho hai module nghiep vu (MIN-124):
-  `../docs/product/ui/` (DESIGN/EXPERIENCE/tokens + anh approved). CSS trong
+  `../docs/spec/ui/` (spec/tokens + ảnh đã duyệt). CSS trong
   repo nay la hien trang; token chi wire khi P4 implement.
 - Nav trai 5 muc (taxonomy MIN-104): notary_v2, upload_lab, notaryoffice
   (placeholder "Chua trien khai"), Tra cuu, Trang thai/Cai dat.

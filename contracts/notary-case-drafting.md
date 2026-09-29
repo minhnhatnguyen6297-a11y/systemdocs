@@ -18,9 +18,10 @@ nháp cho `intake_analyze`/`diagram_evaluate` — `schema_version` giữ
 `notary.case-drafting.v1`, mọi field mới tương thích ngược với consumer
 cũ (field `case` thêm key nullable; command mới chỉ client mới gọi).
 
-SOT hành vi nghiệp vụ:
-`notary_v2/docs/platform/case-workspace/drafting-tab.md` (đã duyệt qua
-MIN-104) — file này là wire contract, không định nghĩa lại hành vi.
+SOT hành vi nghiệp vụ: `docs/spec/notary_v2/`; chi tiết đã duyệt MIN-104 để
+đối chiếu implementation nằm tại
+`notary_v2/docs/platform/case-workspace/drafting-tab.md`. File này là wire
+contract, không định nghĩa lại hành vi.
 Schema chuẩn: `contracts/notary-case-drafting/*.schema.json`
 (JSON Schema draft-07). Examples kiểm chứng:
 `contracts/notary-case-drafting/examples/`.
@@ -1223,7 +1224,7 @@ Data-codes mới: `stage.legacy_asset_overflow`,
 
 - Mọi write mang `base_revision`; lệch (cả `<` lẫn `>`) →
   `workspace_conflict{details:{server_revision}}`; không ép ghi — client
-  reload hoặc giữ draft (EXPERIENCE §6). Commit retry sau conflict phải
+  reload hoặc giữ draft (`docs/spec/ui/README.md`). Commit retry sau conflict phải
   gửi `base_revision` mới.
 - `workspace_create`: retry dùng **cùng** `idempotency_key` →
   `created:false`, trả case đã persist — không hồi sinh bản nháp đã
@@ -1234,7 +1235,7 @@ Data-codes mới: `stage.legacy_asset_overflow`,
   sẽ `<` server → `workspace_conflict` (idempotent qua revision).
 - Late response: client tương quan `job_id`/`command_id` + `case_id` của
   phiên hiện tại; result/job trễ từ phiên trước / case đã đổi / draft
-  đã Hủy PHẢI bị discard — không apply vào buffer (EXPERIENCE §6, giữ
+  đã Hủy PHẢI bị discard — không apply vào buffer (`docs/spec/ui/README.md`, giữ
   nguyên).
 
 ### 13.12 Ví dụ trước/sau (JSON rút gọn)

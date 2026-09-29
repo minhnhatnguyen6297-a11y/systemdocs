@@ -14,8 +14,8 @@ narrow context-isolated IPC. Chromium remains headed and Python-owned.
 **Tech Stack:** Python 3.10+, FastAPI/uvicorn in POC-only requirements, PySide6,
 pytest/httpx, Electron/Node in a POC-only package.
 
-**Spec:** `D:\systemdocs\docs\product\MIN50_IMPLEMENTATION_SPEC.md` W4 and
-`D:\systemdocs\docs\architecture\SYSTEM_ARCHITECTURE.md` §6.4.
+**Spec hiện hành:** `D:\systemdocs\docs\spec\upload_lab\README.md` và
+`D:\systemdocs\docs\spec\README.md`. Kế hoạch MIN-50 cũ được giữ trong Git/Linear.
 
 ## Global Constraints
 

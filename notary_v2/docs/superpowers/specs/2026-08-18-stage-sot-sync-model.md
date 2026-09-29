@@ -3,7 +3,7 @@
 Ngày: 2026-08-18
 Trạng thái: **ĐỀ XUẤT — chờ user duyệt**. Chưa normative. Không được implement trước khi user duyệt.
 Module: Hồ sơ thừa kế (case workspace)
-Nguồn liên quan: `docs/domains/inheritance/workflow.md` (SOT hành vi hiện tại),
+Nguồn liên quan: `docs/domains/inheritance/workflow.md` (bằng chứng hành vi),
 `docs/domains/inheritance/ux.md` (DRAFT), `docs/domains/inheritance/plan.md` (DIAGRAM-R1/R2),
 `docs/platform/case-workspace/contract.md` (provisional)
 
@@ -514,7 +514,9 @@ Ba điểm cần duyệt rõ:
 Quyết định **D3 + D10** (một bản gốc, ghi có phạm vi, phát hiện đè) đủ ba tiêu chí ADR:
 khó đảo, người đọc sau sẽ thắc mắc vì sao, và là kết quả đánh đổi thật.
 
-Đề xuất viết một ADR ngắn trong `docs/architecture/decisions/` **sau khi** user duyệt spec.
+Sau khi user duyệt, ghi quyết định này vào spec nhỏ nhất mà nó ảnh hưởng; nếu
+ảnh hưởng nhiều feature thì ghi vào README chung gần nhất trong
+`docs/spec/notary_v2/`.
 
 ### Thứ tự lát thực thi (đề xuất, chờ duyệt)
 

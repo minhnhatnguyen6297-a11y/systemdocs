@@ -96,9 +96,9 @@ chỉ lấy từ dữ liệu pháp lý riêng nếu có; danh sách tài sản l
 
 ### Đích Electron (tab `Soạn hồ sơ`)
 
-SOT hành vi đích: `../../platform/case-workspace/drafting-tab.md` §8; UX cấp
-sản phẩm đã khóa ở
-`docs/product/specs/2026-09-24-notary-v2-case-drafting-electron-ux.md` §7.
+Chi tiết hành vi đích: `../../platform/case-workspace/drafting-tab.md` §8;
+spec sở hữu cấp sản phẩm ở
+[`../../../../docs/spec/notary_v2/word-output.md`](../../../../docs/spec/notary_v2/word-output.md).
 File này chỉ chốt phần giao với nghiệp vụ văn bản:
 
 1. `Xuất Word` trong toolbar sơ đồ mở popup: user chọn **nhiều văn bản**

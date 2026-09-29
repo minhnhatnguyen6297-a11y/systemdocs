@@ -1,17 +1,19 @@
 # Đặc tả UI — Upload Lab trong Electron shell
 
-Tài liệu này là **nguồn sự thật duy nhất** về bố cục và hành vi giao diện của
-Upload Lab khi chuyển sang shell Electron (MIN-69). Nó thay thế mô tả ba
+Tài liệu này giữ **chi tiết bố cục và hành vi** của Upload Lab khi chuyển sang
+shell Electron (MIN-69). SOT dài hạn nằm tại
+[`../../docs/spec/upload_lab/README.md`](../../docs/spec/upload_lab/README.md).
+Nó thay thế mô tả ba
 bảng/năm cột trước đây trong chính file này — cấu trúc bảng hiện hành là chuẩn
 [MIN-77](https://linear.app/minhnotary/issue/MIN-77/bug-chuan-hoa-cot-3-vung-audit-excel-va-rut-gon-cot-bang-upload)
 (đã Done) và khớp `ui_qt/main_window.py` hiện tại.
 
-> **Cập nhật MIN-124 (28/09/2026):** file này giữ nguyên vai trò SOT
+> **Cập nhật MIN-138 (29/09/2026):** file này là nguồn chi tiết cho
 > **hành vi/bố cục vùng**. Lớp **thị giác** (màu, token, chiều cao control,
 > tông trạng thái, responsive chi tiết) nằm ở
-> [`visual-design.md`](visual-design.md) + [`../../docs/product/ui/`](../../docs/product/ui/) — hướng
+> [`visual-design.md`](visual-design.md) + [`../../docs/spec/ui/`](../../docs/spec/ui/) — hướng
 > trắng/xanh đã duyệt bằng ảnh (27/09/2026) và token đã chốt cùng đợt
-> duyệt (`docs/product/ui/DESIGN.md` §9, `tokens.json` status approved).
+> duyệt (`docs/spec/ui/README.md`, `tokens.json` status approved).
 > Hai lớp không nhân bản: hành vi/đếm cột/scope lấy file này, thị giác lấy
 > `visual-design.md`.
 
@@ -174,11 +176,11 @@ Bảng hồ sơ dùng đúng **sáu cột** (chuẩn MIN-77):
 | Tài liệu | Vai trò |
 |---|---|
 | `visual-design.md` | Lớp thị giác/token của module (MIN-124) — bổ sung, không thay spec này |
-| [`../../docs/product/ui/`](../../docs/product/ui/) | SOT thị giác + thao tác chung của shell (`DESIGN.md`, `EXPERIENCE.md`, `tokens.json`) |
+| [`../../docs/spec/ui/`](../../docs/spec/ui/) | SOT thị giác + thao tác chung của shell (`README.md`, `tokens.json`) |
 | `contracts/upload-workflow.md` | Contract `upload.workflow.v1` — command, schema, lỗi, scope/revision giữa shell và sidecar |
 | `contracts/desktop-command.md` + `contracts/g1-module-data.md` | Envelope `desktopcommand.v1` và shape `g1.module.v1` mà workflow chạy bên trong |
 | `upload_lab/README.md` | Kiến trúc nghiệp vụ/engine và cấu trúc codebase hiện tại |
 | `docs/handoff-login-handshake.md` | Hợp đồng luồng đăng nhập thủ công & nhận diện Lưu |
 | `docs/regex-rules.md` | Catalog quy tắc regex trích xuất |
-| [MIN-69](https://linear.app/minhnotary/issue/MIN-69/migrate-uploadaudit-vao-electron) | Task chuyển sang shell — kế hoạch ở `docs/product/plans/2026-09-24-upload-lab-shell-migration-plan.md` |
+| [MIN-69](https://linear.app/minhnotary/issue/MIN-69/migrate-uploadaudit-vao-electron) | Task chuyển sang shell; lịch sử kế hoạch giữ trong Linear/Git, spec hiện hành ở [`../../docs/spec/upload_lab/README.md`](../../docs/spec/upload_lab/README.md) |
 | [MIN-77](https://linear.app/minhnotary/issue/MIN-77/bug-chuan-hoa-cot-3-vung-audit-excel-va-rut-gon-cot-bang-upload) | Chuẩn cột bảng đã chốt (đã Done) |

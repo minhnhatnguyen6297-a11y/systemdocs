@@ -1,14 +1,15 @@
 # Visual design — Upload Lab trong Electron shell (MIN-124)
 
-> **Trạng thái: PROPOSED — chờ owner duyệt giá trị.** File này là **lớp
-> bổ sung thị giác** cho [`docs/spec_UI.md`](spec_UI.md) — SOT duy nhất về
+> **Trạng thái: hỗn hợp.** Token chung đã Approved 27–28/09/2026; cách áp
+> riêng cho Upload chưa có nguồn duyệt vẫn là Proposed. File này là **lớp
+> bổ sung thị giác** cho [`docs/spec_UI.md`](spec_UI.md) — nguồn chi tiết về
 > **hành vi và bố cục vùng** của Upload Lab. Nó **không** phải spec song
 > song: mọi quy tắc hai tab, bốn cột audit, giữ trạng thái, scope website
 > vẫn lấy `spec_UI.md` làm chuẩn. File này chỉ quy định thêm **màu, chữ,
 > kích thước, trạng thái thị giác** theo hướng trắng/xanh đã duyệt.
 >
-> Ngôn ngữ chung → [`../../docs/product/ui/DESIGN.md`](../../docs/product/ui/DESIGN.md) + `tokens.json`;
-> thao tác chung → [`../../docs/product/ui/EXPERIENCE.md`](../../docs/product/ui/EXPERIENCE.md). Ảnh approved hiện
+> Ngôn ngữ và thao tác chung → [`../../docs/spec/ui/README.md`](../../docs/spec/ui/README.md)
+> + `tokens.json`. Ảnh approved hiện
 > chỉ vẽ màn Notary — Upload Lab áp dụng cùng hệ token; chi tiết bố cục
 > của Upload sẽ có prototype riêng ở P3 (MIN-126) nếu cần.
 
@@ -18,12 +19,13 @@
   viền `#e2e8f0`, radius 8 px) **đã gần** hướng trắng/xanh — đây là module
   ít delta nhất. Đích: map sang token chung (`accent.primary`,
   `surface.*`, `state.*`) thay vì màu cứng; giá trị hex đã chốt
-  (`DESIGN.md` §9, owner duyệt 27/09/2026).
+  (`docs/spec/ui/README.md`, owner duyệt 27/09/2026).
 - Radius card 8 px hiện hữu → `radius.card` 10 px (đã chốt §9.4).
-- Chiều cao control ~30 px hiện hữu → đề xuất `size.input.height` 36–38,
-  `size.button.height` ~36; **giữ compact** — Upload là màn data-dense.
+- Chiều cao control ~30 px hiện hữu → `size.input.height` 38 px,
+  `size.button.height` 32 px và nút nhỏ 28 px theo token đã duyệt; **giữ
+  compact** — Upload là màn data-dense.
 - KPI card (`ul-kpi`) giữ dạng 4 thẻ; chuyển tông sang `surface.card` +
-  số `semibold` theo DESIGN §6, không gam màu riêng từng KPI.
+  số `semibold` theo spec UI chung, không gam màu riêng từng KPI.
 
 ## 2. Tab Audit Sổ Công Chứng — thị giác
 
@@ -49,7 +51,7 @@
   session/remaining rõ — số còn lại là con số data, không phải badge
   trang trí.
 - **Progress**: thanh tiến độ tông `accent.primary`; `waiting_user` của
-  login/review hiện **banner warn** với CTA rõ (EXPERIENCE §4), không
+  login/review hiện **banner warn** với CTA rõ (spec UI chung), không
   phải progress đỏ.
 - **Bảng queue 6 cột** `✓ | STT | Ngày | Số công chứng | Ghi chú | Địa chỉ
   file`: cột `✓` hẹp cố định; cột `Địa chỉ file` lấy phần dư và truncate
@@ -61,7 +63,7 @@
   primary chỉ một nút trong ngữ cảnh (Upload = primary khi có lựa chọn);
   nút phá hủy nhẹ (`Đóng trình duyệt`) là ghost/danger-outline.
 - **Banner reconcile**: tông `warn`, inline ngay trên bảng, kèm hành động
-  — không modal (spec_UI §5, EXPERIENCE §4).
+  — không modal (spec_UI §5 và spec UI chung).
 
 ## 4. Trạng thái dùng chung — map sang Upload
 
@@ -90,7 +92,7 @@
 | Vùng | Hiện trạng (`upload.css` + `audit.js`/`scan-upload.js`) | Đích |
 |---|---|---|
 | Palette | `#0067c0`, `#f8fafc`, `#e2e8f0` — gần đích | map sang `accent.primary`/`surface.*` chung |
-| Radius/height | card 8 px, control ~30 px | `radius.card` 10, input 38/button 36 (đã chốt §9) |
+| Radius/height | card 8 px, control ~30 px | `radius.card` 10, input 38/button 32 (small 28) |
 | KPI cards | QSS-like style riêng | `surface.card` + token |
 | Notice/banner | `ul-notice` tùy biến | tông `state.*` chung |
 | Trạng thái dòng queue | text/badge hiện hữu | pill `state.*`; chi tiết P3 |

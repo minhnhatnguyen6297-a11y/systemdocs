@@ -2,10 +2,10 @@
 
 Chỉ ghi quyết định **trong phạm vi task** đã được chốt (bởi user/owner hoặc
 theo spec đã duyệt). Giữ nguyên lời giải thích, ví dụ và ngoại lệ do owner nêu;
-đọc [`docs/architecture/KNOWLEDGE.md`](../../docs/architecture/KNOWLEDGE.md)
-để chuyển phần có giá trị lâu dài về đúng nguồn sự thật. Quyết định xuyên sản
-phẩm hoặc câu hỏi mở: **không** tự chốt ở đây — đưa lên
-`docs/architecture/OPEN_DECISIONS.md`.
+đọc [`README.md`](../../README.md), rồi đi từ [`docs/spec/README.md`](../../docs/spec/README.md)
+qua các README cha đến spec nhỏ nhất bị ảnh hưởng. Chuyển phần có giá trị lâu
+dài về đúng spec đó. Quyết định hoặc câu hỏi ảnh hưởng nhiều feature đặt ở
+README chung gần nhất; **không** tự chốt trong file task này.
 
 ## <YYYY-MM-DD> — <quyết định>
 - **Chọn:** <phương án>

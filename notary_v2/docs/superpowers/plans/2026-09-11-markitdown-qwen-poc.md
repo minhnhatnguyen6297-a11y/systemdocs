@@ -12,8 +12,8 @@ decision. It writes measurement JSON and never writes the production DB.
 
 **Tech Stack:** Python 3.10+, MarkItDown, markitdown-ocr, OpenAI SDK, pytest.
 
-**Spec:** `D:\systemdocs\MIN50_IMPLEMENTATION_SPEC.md` W2/W3 and
-`D:\systemdocs\SYSTEM_ARCHITECTURE.md` §6.5-6.8.
+**Spec hiện hành:** `D:\systemdocs\docs\spec\notary_v2\input\README.md` và
+`D:\systemdocs\docs\spec\README.md`. Kế hoạch MIN-50 cũ được giữ trong Git/Linear.
 
 ## Global Constraints
 

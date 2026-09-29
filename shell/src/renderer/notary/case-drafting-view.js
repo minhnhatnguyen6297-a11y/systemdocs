@@ -4,7 +4,7 @@
  * MIN-133 W2 mật độ cao).
  *
  * SOT bo cuc: mockup MIN-133 đã duyệt (.agent/tasks/MIN-133/mockup/
- * mockup-1440x775.png) trên nền bản mẫu P6 (docs/product/ui/prototypes):
+ * mockup-1440x775.png) trên nền bản mẫu P6 (docs/spec/ui/prototypes):
  *   - Thanh trên DUY NHẤT (.cd-topbar, ~42px): tab cục bộ (Tổng quan /
  *     Soạn / Word) | loại việc, Nhập file, Zalo (disabled placeholder)
  *     ……… Hủy thay đổi, Lưu hồ sơ/Cập nhật (chấm dirty = tín hiệu chưa
@@ -245,7 +245,7 @@ function createNotaryModuleView(deps) {
     return box;
   }
 
-  // ---------- modal canonical (DESIGN §6 / styles.css .modal-*) ----------
+  // ---------- modal canonical (docs/spec/ui/README.md / styles.css .modal-*) ----------
   // wrap gắn vào .cd-root (không phải body) để cd-* trong dialog vẫn nằm
   // dưới scope module; position:fixed vẫn phủ viewport.
   // opts: {wide} → .modal.wide (≤1100px); {bare} → builder tự thêm

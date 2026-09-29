@@ -3,10 +3,19 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+GIT_ROOT = Path(
+    subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+)
 TRACKED_PATHS = set(
     subprocess.run(
         ["git", "ls-files"],
-        cwd=ROOT,
+        cwd=GIT_ROOT,
         check=True,
         capture_output=True,
         text=True,
@@ -18,7 +27,6 @@ MODULE_READMES = (
     "docs/platform/case-workspace/README.md",
     "docs/platform/document-generation/README.md",
     "docs/platform/fast-text-audit/README.md",
-    "docs/architecture/README.md",
 )
 LEGACY_DOC_DIRS = (
     "docs/plans",
@@ -52,7 +60,7 @@ def test_module_readme_markdown_targets_exist():
         for target in targets:
             resolved = (ROOT / target if target.startswith(("docs/", "word_templates/")) else readme.parent / target).resolve()
             assert resolved.exists(), f"{path}: missing {target}"
-            relative = resolved.relative_to(ROOT).as_posix()
+            relative = resolved.relative_to(GIT_ROOT).as_posix()
             tracked = relative in TRACKED_PATHS or resolved.is_dir() and any(
                 path.startswith(f"{relative}/") for path in TRACKED_PATHS
             )

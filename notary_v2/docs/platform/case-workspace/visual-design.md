@@ -1,19 +1,20 @@
 # Thiết kế thị giác — tab Soạn hồ sơ (Notary, Electron)
 
-> **Trạng thái: PROPOSED — chờ owner duyệt giá trị; hướng đã duyệt qua ảnh
-> 27/09/2026.** File này chỉ quy định **thị giác và bố cục** của tab
+> **Trạng thái: hỗn hợp.** Token chung và các phần được ghi rõ “đã duyệt” đã
+> được owner duyệt 27–28/09/2026; chi tiết riêng không có nguồn duyệt vẫn là
+> Proposed. File này chỉ là nguồn chi tiết **thị giác và bố cục** của tab
 > `Soạn hồ sơ`. Hành vi/dữ liệu (Stage/Pool/Diagram, revision, suggestion,
-> `case_type`) là SOT của [`drafting-tab.md`](./drafting-tab.md); UX cấp
+> `case_type`) đối chiếu tại [`drafting-tab.md`](./drafting-tab.md); UX cấp
 > sản phẩm (taxonomy, luồng, bảng nút) là
-> `docs/product/specs/2026-09-24-notary-v2-case-drafting-electron-ux.md`;
+> [`docs/spec/notary_v2/README.md`](../../../../docs/spec/notary_v2/README.md);
 > wire contract là `contracts/notary-case-drafting.md`.
 >
-> Ngôn ngữ chung (màu, chữ, token, component, responsive) →
-> `docs/product/ui/DESIGN.md` + `tokens.json`; thao tác chung →
-> `docs/product/ui/EXPERIENCE.md`. File này **chỉ giữ phần riêng của
+> Ngôn ngữ chung (màu, chữ, token, component, responsive, thao tác) →
+> [`docs/spec/ui/README.md`](../../../../docs/spec/ui/README.md) +
+> `tokens.json`. File này **chỉ giữ phần riêng của
 > Notary**, không chép lại quy tắc chung.
 >
-> Ảnh chuẩn: `docs/product/ui/references/approved-drafting.png`
+> Ảnh chuẩn: `docs/spec/ui/references/approved-drafting.png`
 > (toàn màn) và `approved-land-types.png` (dialog loại đất).
 
 ## 1. Bố cục màn hình (đích, theo ảnh approved)
@@ -45,7 +46,7 @@
 \* Zalo giữ **disabled** trong bản thật (ràng buộc MIN-123).
 
 Mật độ/tỉ lệ theo mockup MIN-133 đã duyệt (28/09/2026 —
-`docs/product/ui/references/approved-drafting-v2.png`): Stage 35:65
+`docs/spec/ui/references/approved-drafting-v2.png`): Stage 35:65
 (38:62 ở ≥1920), Pool 176px, một thanh trên gộp tab + hành động (bỏ «quay
 lại», tiêu đề, pill Nháp), `Lưu sơ đồ`/`Xuất Word` nằm trong header vùng
 sơ đồ (không còn footer), bảng Người 7 cột đúng cột DB `Customer` (bỏ ô
@@ -65,7 +66,8 @@ thắng", đích là hai bảng; xác nhận lại bằng prototype P3.
   `Số vào sổ`, `Thửa đất`, `Tờ bản đồ`, `Loại đất`, `Địa chỉ`…); mỗi cột
   sau là một tài sản (`Tài sản 1`, `Tài sản 2`, …).
 - Cột tài sản có thể cuộn ngang khi nhiều tài sản; header cột có `×` xóa
-  (draft UI, xem EXPERIENCE §7) và nhãn `+ Tài sản` thêm cột.
+  (draft UI, xem quy tắc dialog trong `docs/spec/ui/README.md`) và nhãn
+  `+ Tài sản` thêm cột.
 - Ô `Loại đất` hiển thị **chip số lượng + `↗`** (vd `3 loại ↗`) — bấm mở
   **dialog loại đất** (§4); không nhập trực tiếp danh sách parcel trên
   bảng.
@@ -133,7 +135,7 @@ thắng", đích là hai bảng; xác nhận lại bằng prototype P3.
   đoạn vợ/chồng.
 - **Header vùng sơ đồ** (MIN-133 D6 — gộp vào `card-head`, không còn
   footer): `+ Slot`, `Xem cách tính`, `Đánh giá thử` (chỉ inheritance),
-  cụm zoom `− % +`, `⛶ Mở rộng` (overlay gần toàn màn, DESIGN §9.6), rồi
+  cụm zoom `− % +`, `⛶ Mở rộng` (overlay gần toàn màn theo spec UI chung), rồi
   `Lưu sơ đồ` (secondary + chấm `diagramDirty`) và `Xuất Word` (primary).
 - Kéo lên vị trí đã có người — đã chốt: **swap** hai `personId`
   (contract §13.5 Q9 — APPROVED, cài đặt P7); `position 16` trong lưới
@@ -154,7 +156,7 @@ thắng", đích là hai bảng; xác nhận lại bằng prototype P3.
   `Cập nhật` (primary — commit Stage; khi nháp mới là `Lưu hồ sơ`).
 - Dirty: **chấm** cạnh `Cập nhật`/`Lưu sơ đồ` theo tầng dirty tương ứng
   (`stageDirty`/`diagramDirty`) — không còn nhãn "Chưa lưu hồ sơ"; xem
-  EXPERIENCE §5.
+  mục dirty trong `docs/spec/ui/README.md`.
 - Card `Thông tin hồ sơ` đã bỏ khỏi màn chính (MIN-133 D2 — meta
   `document_type`/`ngay_lap_ho_so`/`noi_niem_yet`/`ghi_chu` vẫn persist
   với mặc định vì Word đọc; chỗ nhập dành cho task Word riêng).
@@ -169,7 +171,7 @@ thắng", đích là hai bảng; xác nhận lại bằng prototype P3.
 - **Xuất Word** (`word-export-dialog.js`): chọn nhiều văn bản, folder
   đích, breakdown kết quả từng văn bản — giữ ngữ nghĩa spec UX §7.
 - **Conflict** (`conflictDialog`): tải bản mới / giữ nháp — không nút
-  ghi đè (EXPERIENCE §6).
+  ghi đè (mục conflict trong `docs/spec/ui/README.md`).
 - **Gán vị trí** (`openAssignMenu`): đường bàn phím thay kéo-thả — giữ.
 
 ## 8. Trạng thái riêng của tab
@@ -206,7 +208,7 @@ thắng", đích là hai bảng; xác nhận lại bằng prototype P3.
 | `Hủy thay đổi` | không có API | §13.2 client-only — đã triển khai |
 | Zalo | không có | hiển thị **disabled** |
 
-## 11. Quyết định cho Notary — ĐÃ CHỐT (§13 v2 APPROVED 27/09/2026 + DESIGN §9)
+## 11. Quyết định cho Notary — ĐÃ CHỐT (§13 v2 + spec UI chung)
 
 - Ngữ nghĩa chip vị trí ↔ tài sản; hai bên 30 vị trí; `position 16`;
   thả lên vị trí đã chiếm — đã chốt ở contract §13.4–13.5 (MIN-125);
@@ -215,6 +217,6 @@ thắng", đích là hai bảng; xác nhận lại bằng prototype P3.
   committed; đã triển khai.
 - `Apply` loại đất — chốt §13.2: ghi vào draft buffer, persist qua
   `Cập nhật`; đã triển khai.
-- `Mở rộng` = overlay gần toàn màn trong app — chốt DESIGN §9.6; đã
+- `Mở rộng` = overlay gần toàn màn trong app — chốt qua prototype; đã
   triển khai P7.
 - Giới hạn cột tài sản trước khi cuộn ngang; thứ tự cột bảng Người — **P3**.

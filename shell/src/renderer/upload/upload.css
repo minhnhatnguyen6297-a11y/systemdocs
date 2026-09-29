@@ -1,6 +1,6 @@
 /* Upload Lab — MIN-131 (MIN-123 P8): lam nhe 2 man hinh theo bo giao
-   dien chung da duyet (docs/product/ui/prototypes/upload.js + DESIGN.md).
-   So huu (DESIGN §10): file nay chi chua rule trong .upload-lab va class
+   dien chung da duyet (docs/spec/ui/prototypes/upload.js + README.md).
+   So huu (docs/spec/ui/README.md): file nay chi chua rule trong .upload-lab va class
    ul-* — class khong tien to (card/pill/banner/button/progress/splitter/
    muted/small/truncate-path/num/cb…) la cua styles.css, KHONG dinh nghia
    lai. Mau/metric di qua bien :root, khong hard-code hex.

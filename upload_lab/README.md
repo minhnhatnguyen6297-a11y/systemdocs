@@ -9,7 +9,7 @@ file Word chuyên viên đã soạn. Các nguồn thật khác của hệ thốn
 khách hàng và dấu vết thao tác máy trạm, mỗi nguồn do phần tương ứng sở hữu.
 Không thiết kế Upload Lab dựa trên API/DB của phần mềm cũ khi chưa có bằng chứng
 nhà cung cấp đã mở cách truy cập. Nếu điều kiện đó thay đổi, hỏi lại owner.
-Nội dung này được chuyển từ `docs/architecture/OPEN_DECISIONS.md` §B1; tài liệu
+Nội dung hiện được sở hữu tại `docs/spec/upload_lab/README.md`; tài liệu
 hiện có chưa dẫn tới lời giải thích nguyên văn của owner.
 
 ---
@@ -132,7 +132,7 @@ chiều rộng. Không còn tab Cấu hình (chuyển lên đầu tab Audit cùn
 website) và không còn trang Nhật ký (log chỉ là chẩn đoán backend đã lọc).
 Đặc tả đầy đủ: [`docs/spec_UI.md`](docs/spec_UI.md); lớp thị giác/token của
 module (MIN-124): [`docs/visual-design.md`](docs/visual-design.md) +
-[`../docs/product/ui/`](../docs/product/ui/) (hướng trắng/xanh đã duyệt,
+[`../docs/spec/ui/`](../docs/spec/ui/) (hướng trắng/xanh đã duyệt,
 giá trị token proposed); giao tiếp shell ↔ Python
 theo contract [`../contracts/upload-workflow.md`](../contracts/upload-workflow.md)
 (`upload.workflow.v1`).

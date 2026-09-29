@@ -3,11 +3,17 @@
 **Spec chính hiện hành — ranh giới xử lý, gói file và quyền OCR lại có giới hạn đã chốt; API/chi tiết kỹ thuật còn DRAFT, chưa triển khai runtime.**
 Ngày: 24/09/2026 · Owner: platform/document-intake · Spec: MIN-89 · Goal triển khai: MIN-91
 
-**Nguồn chuẩn cho hành vi và nghiệm thu v2.** Đọc [trang chỉ đường](README.md) để biết thứ tự ưu tiên. [Thiết kế tổng thể](../../../../docs/product/specs/2026-09-24-zalo-independent-intake.md) giải thích ranh giới; [quy cách trao đổi nháp](../../../../docs/product/specs/zalo-file-exchange-v1-draft.md) là đầu vào của MIN-92, chưa được dùng như contract đã duyệt. [Kiểm kê hiện trạng](v2-current-state-audit.md) và spec v1 chỉ đối chiếu code cũ.
+**Phụ lục chi tiết cho hành vi và nghiệm thu v2.** SOT dài hạn là
+[spec Zalo cấp sản phẩm](../../../../docs/spec/notary_v2/input/zalo.md). Đọc
+[trang chỉ đường](README.md)
+để biết thứ tự ưu tiên. [Spec Zalo cấp sản phẩm](../../../../docs/spec/notary_v2/input/zalo.md)
+giải thích ranh giới; contract Draft chờ owner duyệt nằm trong
+[`contracts/zalo-intake/`](../../../../contracts/zalo-intake/). [Kiểm kê hiện
+trạng](v2-current-state-audit.md) và spec v1 chỉ đối chiếu code cũ.
 
 ## 1. Phạm vi giai đoạn đầu
 
-Module Zalo được tách thành **repo local độc lập trước** (đề xuất `D:/zalo-intake`), chưa deploy Windows server. Module nhận sự kiện, giữ ảnh tạm, gọi Qwen OCR và làm các bước xử lý cần byte ảnh như xoay/cắt để OCR lại. Nó bàn giao **raw OCR, trạng thái và dấu vết nguồn trong gói file/folder** có version, không bàn giao person/property/group đã bóc. **Document Intake của hệ thống công chứng chạy sau Sync** để phân loại, regex, bóc trường, ghép mặt giấy tờ/người/tài sản và gợi ý nhóm. Khi parser chỉ ra vùng chữ thiếu/chưa rõ, máy chính được yêu cầu bot thử một biến thể OCR **có loại định sẵn** cho ảnh còn hạn bằng ID ổn định, không chuyển ảnh. Người dùng duyệt trước khi đưa dữ liệu vào input soạn hồ sơ. Sau nghiệm thu local/dữ liệu thật mới tính chuyển bot sang server. [Plan giao agents MIN-91](../../../../docs/product/plans/2026-09-24-zalo-independent-implementation-plan.md).
+Module Zalo được tách thành **repo local độc lập trước** (`D:/zalo-intake`), chưa deploy Windows server. Module nhận sự kiện, giữ ảnh tạm, gọi Qwen OCR và làm các bước xử lý cần byte ảnh như xoay/cắt để OCR lại. Nó bàn giao **raw OCR, trạng thái và dấu vết nguồn trong gói file/folder** có version, không bàn giao person/property/group đã bóc. **Document Intake của hệ thống công chứng chạy sau Sync** để phân loại, regex, bóc trường, ghép mặt giấy tờ/người/tài sản và gợi ý nhóm. Khi parser chỉ ra vùng chữ thiếu/chưa rõ, máy chính được yêu cầu bot thử một biến thể OCR **có loại định sẵn** cho ảnh còn hạn bằng ID ổn định, không chuyển ảnh. Người dùng duyệt trước khi đưa dữ liệu vào input soạn hồ sơ. Sau nghiệm thu local/dữ liệu thật mới tính chuyển bot sang server. Thứ tự triển khai và trạng thái task theo Linear MIN-91.
 
 Bộ thu thập Zalo có vòng đời riêng, kể cả khi app công chứng tắt; giai đoạn triển khai server sau phải chạy khi máy công chứng tắt. “Server” trong spec chỉ vai trò module thu/OCR độc lập, ở bước đầu vẫn chạy thử trong repo local riêng. Giai đoạn đầu giả định bot bắt đúng toàn bộ tin/ảnh trong phạm vi nguồn đã bật, để tập trung vào luồng chuẩn: nhận tin và ảnh, gọi Qwen API đọc chữ, bàn giao raw/status/nguồn, sau đó Document Intake xử lý và người dùng duyệt. Đây là giả định thiết kế; chưa tuyên bố đã kiểm chứng toàn bộ tin đã gửi trên Zalo.
 
@@ -34,7 +40,7 @@ Thời gian chính của mỗi dòng là captured_at: lúc bot bắt được ti
 > Nội dung mục này nay do **`contracts/zalo-intake/`** chi phối ở mức wire
 > (schema gói, feed pending, biên nhận, OCR request, mã lỗi — vendored tại
 > `schemas/` của repo module). Phần dưới giữ vai trò mô tả ý định thiết kế;
-> nếu lệch contract đã duyệt, contract thắng.
+> sau khi contract được owner duyệt/publish, nếu lệch thì contract thắng.
 
 Máy công chứng chủ động lấy gói khi backend khởi động, khi kết nối trở lại, theo chu kỳ trong lúc chạy và khi người dùng bấm **Sync**. Bốn trigger dùng cùng một đường nhận; nút Sync chỉ tải gói đã công bố, không quét history Zalo, không tự phát lệnh OCR lại và không tải ảnh. Yêu cầu OCR lại là thao tác riêng do Document Intake phát sau khi phân tích raw.
 
@@ -47,7 +53,14 @@ Máy công chứng chủ động lấy gói khi backend khởi động, khi kế
 
 Cursor là vị trí phân trang trong lượt, **không phải ACK**. Chỉ chuyển trang sau khi danh sách ID/hash gói đã được ghi bền vững vào sổ nhập hoặc hàng chờ cục bộ. Gói chưa ACK trong sổ được thử lại theo ID sau crash, và lượt mới quét pending từ đầu để không bỏ gói cũ tải lỗi. Gói hỏng hoặc version chưa hỗ trợ được đánh dấu lỗi/giữ riêng, không biến thành đã nhập thành công và không chặn các gói độc lập khác. Module không xóa gói raw chờ ACK. Kênh truyền có xác thực kiểm tra danh tính hai bên; hash chỉ kiểm file hỏng, không chứng minh người gửi.
 
-Thư mục cục bộ có staging, ready, `imported/` và khu gói lỗi theo [quy cách trao đổi nháp](../../../../docs/product/specs/zalo-file-exchange-v1-draft.md). Bản gói trong `imported/` dùng để đối chiếu file, hash và trạng thái khi có lỗi; thời hạn cụ thể và cách dọn thuộc chính sách máy chính do MIN-102 chốt, MIN-99 thực hiện. Máy chính không tạo thư mục ảnh nhập, không mở ảnh từ module và không dùng link ảnh làm bằng chứng lâu dài. Gói dữ liệu có thể chứa trạng thái ảnh/OCR chưa đủ; ACK kỹ thuật chỉ xác nhận raw/status/nguồn và sổ nhập đã được giữ, không có nghĩa parser đã xong hoặc người dùng đã duyệt nghiệp vụ.
+Thư mục cục bộ có staging, ready, `imported/` và khu gói lỗi theo
+[contract Draft MIN-92](../../../../contracts/zalo-intake/zalo-intake.md). Bản gói
+trong `imported/` dùng để đối chiếu file, hash và trạng thái khi có lỗi; thời
+hạn cụ thể và cách dọn thuộc chính sách máy chính do MIN-102 chốt, MIN-99 thực
+hiện. Máy chính không tạo thư mục ảnh nhập, không mở ảnh từ module và không
+dùng link ảnh làm bằng chứng lâu dài. Gói dữ liệu có thể chứa trạng thái
+ảnh/OCR chưa đủ; ACK kỹ thuật chỉ xác nhận raw/status/nguồn và sổ nhập đã được
+giữ, không có nghĩa parser đã xong hoặc người dùng đã duyệt nghiệp vụ.
 
 ### Yêu cầu OCR lại có giới hạn
 

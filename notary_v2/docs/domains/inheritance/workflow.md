@@ -8,17 +8,17 @@ Read this before changing:
 - Stage / Pool / Diagram interaction
 - preview/export behavior that depends on case state
 - Word export UX and flow: `word-export.md`
-- Đích Electron — tab `Soạn hồ sơ` (SOT hành vi): `../../platform/case-workspace/drafting-tab.md`
+- Đích Electron — tab `Soạn hồ sơ` (nguồn chi tiết): `../../platform/case-workspace/drafting-tab.md`; SOT dài hạn ở `docs/spec/notary_v2/`
 
 Resolved bug notes are historical. Active issues live in `plan.md`.
 
-**Phạm vi SOT — hiện trạng web vs đích Electron (MIN-104, 24/09/2026):**
+**Phạm vi đối chiếu — hiện trạng web vs đích Electron (MIN-104, 24/09/2026):**
 
 - Mọi mô tả trong file này là **hiện trạng web** (`form.html`) — bản fallback
   đến cutover, trừ khi ghi khác.
-- **Đích Electron:** tab `Soạn hồ sơ` có SOT hành vi riêng tại
-  `../../platform/case-workspace/drafting-tab.md`; quyết định UX cấp sản
-  phẩm ở `docs/product/specs/2026-09-24-notary-v2-case-drafting-electron-ux.md`.
+- **Đích Electron:** tab `Soạn hồ sơ` có chi tiết hành vi tại
+`../../platform/case-workspace/drafting-tab.md`; spec cấp sản phẩm ở
+[`../../../../docs/spec/notary_v2/README.md`](../../../../docs/spec/notary_v2/README.md).
   Luồng đích khác hiện trạng: intake đa nguồn (`image/pdf/docx/xlsx/text`)
   → mọi kết quả là gợi ý chờ người kiểm tra → `Cập nhật` commit Stage
   atomic (Người + Tài sản, một transaction, kèm `base_revision`) → Pool

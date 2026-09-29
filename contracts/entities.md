@@ -7,8 +7,9 @@ tên biến, schema DB hay dùng định danh người/tài sản làm khóa ch�
 
 **Bắt buộc:** khi một repo trích xuất hoặc so khớp một trong các khóa dưới đây,
 nó phải chuẩn hóa về **dạng canonical** ghi ở đây trước khi so sánh hoặc trước
-khi ghi vào trường "khóa định danh". Giữ raw và provenance theo
-`SYSTEM_ARCHITECTURE.md` §6.2; chuẩn hóa không được ghi đè bằng chứng gốc.
+khi ghi vào trường "khóa định danh". Giữ raw và nguồn gốc theo
+[`../docs/spec/README.md`](../docs/spec/README.md) mục 4; chuẩn hóa không được
+ghi đè bằng chứng gốc.
 
 Cập nhật: 10/09/2026
 
@@ -124,5 +125,6 @@ công không tự nâng dữ liệu thành `CONFIRMED`.
 
 Điểm bám thiết kế: `notaryoffice/intent.md:365-373` phân biệt `entities`,
 `cases` và `case_entities` M:N; `:385-394` mô tả xếp hạng rồi xác nhận.
-Không suy ra cardinality giữa Case của hai repo từ quan hệ nội bộ này; xem
-`SYSTEM_ARCHITECTURE.md` §7. Không định nghĩa thêm shared ID/schema trong lần sửa này.
+Không suy ra số lượng quan hệ Case giữa hai repo từ quan hệ nội bộ này; xem
+[`../docs/spec/README.md`](../docs/spec/README.md) mục 5. Không định nghĩa thêm
+shared ID/schema trong lần sửa này.

@@ -4,7 +4,7 @@ Only the module-side interface is declared here. The notary-side functions
 (parse_records, assemble_result, replay_raw, propose_ocr_request,
 import_package, preview_apply, stage_review, commit_draft_input) belong to
 notary_v2 Document Intake and are NOT declared in this module — see
-systemdocs docs/product/plans/2026-09-24-zalo-independent-implementation-plan.md §3.1.
+systemdocs docs/spec/notary_v2/input/zalo.md.
 
 These are interface declarations for later tasks (MIN-94/95/97); nothing is
 implemented here.

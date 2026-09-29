@@ -1,29 +1,30 @@
 # Contracts giữa các sản phẩm
 
-Thư mục này chỉ chứa **những gì đã được cả hai bên đồng ý**. Nó không phải nơi
-đề xuất ý tưởng tích hợp.
+Thư mục này chứa contract đã publish và bản Draft đang review; trạng thái ở
+đầu từng file quyết định có được code tích hợp hay chưa. Ý tưởng chưa thành
+contract không đặt tại đây.
 
-## Trạng thái: hai kênh đã publish + một draft chờ duyệt
+## Trạng thái: kênh nội bộ đã publish; Zalo và Upload còn draft
 
 Cột **Trạng thái** ghi rõ đã duyệt hay draft — không ngầm coi draft là đã
 publish. Đã publish: một kênh nội bộ shell (`desktopcommand.v1` +
 `g1.module.v1` + `notary.case-drafting.v1`, owner duyệt 14/09–24/09/2026;
-`notary.case-drafting.v2` thêm ở §13, duyệt 27/09/2026 — MIN-125) và một
-contract xuyên-sản-phẩm (`intake.*.v1`, MIN-92). `upload.workflow.v1` đang
-DRAFT.
+`notary.case-drafting.v2` thêm ở §13, duyệt 27/09/2026 — MIN-125).
+`intake.*.v1` (MIN-92) và `upload.workflow.v1` vẫn DRAFT theo chính file
+contract; fixture/validator tồn tại không tự biến draft thành đã duyệt.
 
 Ba công cụ nghiệp vụ vẫn **chạy độc lập** — chưa có API giữa chúng, chưa đọc DB
 của nhau, chưa có file trao đổi tự động. Đó là trạng thái của **giai đoạn hiện
 tại**, không phải đích đến: hệ thống sẽ gộp lại và dùng chung database
-([`../docs/architecture/VISION.md`](../docs/architecture/VISION.md) mục 4).
+([spec hệ thống](../docs/spec/README.md) mục 5).
 
-Contract xuyên-sản-phẩm đầu tiên — kênh Zalo intake → Document Intake (MIN-92,
-owner duyệt 25/09/2026):
+Contract xuyên-sản-phẩm đang soạn — kênh Zalo intake → Document Intake
+(MIN-92, chờ owner duyệt):
 
 | File | Nội dung | Trạng thái |
 |---|---|---|
-| [`zalo-intake/zalo-intake.md`](./zalo-intake/zalo-intake.md) + 9 schema `*.schema.json` | `intake.*.v1` — gói raw (manifest/records.jsonl/READY), feed pending, receipt/ACK, service status, error envelope, raw record 5 kind (text/OCR/status/event/listener), OCR bổ sung có quota; Zalo giữ ảnh 168h, máy chính **không nhận ảnh** | APPROVED v1 |
-| [`zalo-intake/examples/`](./zalo-intake/examples/) + [`zalo-intake/validate_examples.py`](./zalo-intake/validate_examples.py) | 27 valid + 72 invalid fixtures + validator kiểm chứng được (byte-exact, `.gitattributes -text`) | kiểm: `python contracts/zalo-intake/validate_examples.py` |
+| [`zalo-intake/zalo-intake.md`](./zalo-intake/zalo-intake.md) + 9 schema `*.schema.json` | `intake.*.v1` — gói raw (manifest/records.jsonl/READY), feed pending, receipt/ACK, service status, error envelope, raw record 5 kind (text/OCR/status/event/listener), OCR bổ sung có quota; Zalo giữ ảnh 168h, máy chính **không nhận ảnh** | **DRAFT** — chờ owner duyệt MIN-92 |
+| [`zalo-intake/examples/`](./zalo-intake/examples/) + [`zalo-intake/validate_examples.py`](./zalo-intake/validate_examples.py) | 27 valid + 72 invalid fixtures + validator kiểm chứng được (byte-exact, `.gitattributes -text`) | kiểm draft: `python contracts/zalo-intake/validate_examples.py` |
 
 Kênh nội bộ shell↔engine (owner duyệt 14/09/2026, spec P2; `upload.workflow.v1`
 đang DRAFT chờ owner duyệt — MIN-69):
@@ -42,16 +43,16 @@ Bốn contract `desktopcommand.v1`/`g1.module.v1`/`notary.case-drafting.v1`/
 `upload.workflow.v1` là
 **kênh nội bộ shell↔engine** — không phải contract giữa ba sản phẩm nghiệp
 vụ. ConversionEnvelope/Evidence/DraftCase dùng chung xuyên repo vẫn theo
-Gate A–D của `../docs/product/MIN62_DATA_CONTRACT_DRAFT.md` (branch
+Gate A–D lịch sử của MIN-62 (xem Git/Linear; nội dung hiện hành đã chuyển vào spec và contract) (branch
 `min-62-data-contract-draft`) và chưa được publish tại đây.
 
-Các shape `v0.experimental` trong `SYSTEM_ARCHITECTURE.md` mục 6 chỉ dùng để
+Các shape `v0.experimental` từng nằm trong tài liệu kiến trúc cũ chỉ dùng để
 review/POC. Chúng **không phải contract đã duyệt**, không được dùng làm lý do tạo
 runtime integration và vì vậy chưa được đặt thành file riêng trong thư mục này.
 
 Nhưng "sau này sẽ gộp" **không phải giấy phép** để nối bừa bây giờ. Mỗi kết nối
 vẫn phải có contract được duyệt trước. Xem
-[`../docs/architecture/SYSTEM_ARCHITECTURE.md`](../docs/architecture/SYSTEM_ARCHITECTURE.md) mục 5.
+[`../docs/spec/README.md`](../docs/spec/README.md) mục 5.
 
 Ngoài hai contract kênh nội bộ G1 ở trên, thư mục này còn có chuẩn định danh
 dùng chung dưới đây. Hiện chưa có contract trao đổi dữ liệu xuyên sản phẩm:
@@ -59,7 +60,7 @@ dùng chung dưới đây. Hiện chưa có contract trao đổi dữ liệu xuy
 | File | Nội dung | Trạng thái |
 |---|---|---|
 | [`entities.md`](./entities.md) | Định nghĩa & chuẩn hóa các khóa định danh hồ sơ (CCCD, số GCN, thửa/tờ, số công chứng) | Bắt buộc tham chiếu, mỗi repo tự implement |
-| [`../docs/architecture/TECH_STACK.md`](../docs/architecture/TECH_STACK.md) | Công nghệ đã chọn cho từng việc + ràng buộc để lúc gộp DB không xung đột | Bắt buộc đọc trước khi chọn công nghệ mới |
+| [`../docs/spec/README.md`](../docs/spec/README.md) | Công nghệ dùng chung + ràng buộc để lúc gộp DB không xung đột | Đọc trước khi chọn công nghệ mới |
 
 ## Quy tắc: contract trước, code sau
 
