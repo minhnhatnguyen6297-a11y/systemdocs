@@ -17,9 +17,15 @@
   và 3 ADR rời trong `notary_v2/docs/architecture`; rule agent còn hiệu lực đã
   nhập vào `AGENTS.md`. Lịch sử vẫn khôi phục được từ Git/Linear.
 
+## Đã làm ngày 30/09/2026 (theo feedback owner)
+
+- Cập nhật `AGENTS.md` và `docs/spec/README.md`: loại bỏ tham chiếu `main` lỗi thời; xác định `consolidate/monorepo` là nhánh default duy nhất chứa runtime Electron và tài liệu.
+- Gỡ bỏ mục "Phối hợp và khôi phục công việc" trong `AGENTS.md`: tinh giản các quy tắc chia worktree/task record để tuân thủ cơ chế điều phối của Multica.
+
 ## Bước tiếp theo
 
-- Không còn việc triển khai hoặc review đã biết.
+- Đẩy commit lên remote `origin/consolidate/monorepo`.
+- Báo cáo kết quả và chuyển issue sang `in_review`.
 
 ## Check đã chạy
 

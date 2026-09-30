@@ -116,7 +116,7 @@ module này ghi vào bảng do module khác sở hữu. Engine DB vật lý cu�
 
 | Việc | Lựa chọn hiện tại | Lưu ý |
 |---|---|---|
-| Desktop shell | Electron | Runtime hệ thống không vào nhánh `main` tài liệu |
+| Desktop shell | Electron | Vỏ ứng dụng tích hợp trên nhánh default `consolidate/monorepo` |
 | Backend | Python + FastAPI sidecar | Loopback; shell không chứa nghiệp vụ |
 | DB hiện tại | SQLite theo module | DB chung và engine đích chưa duyệt |
 | OCR giấy tờ | Qwen-VL-OCR qua DashScope | Ảnh chỉ gửi cloud tại đường được phép |

@@ -3,9 +3,7 @@
 Nói với người dùng như học sinh cấp 3. Dùng từ dễ hiểu; thuật ngữ bắt buộc phải
 giải thích hoặc có ví dụ.
 
-`main` chỉ chứa tài liệu. Nhánh `electron-system-shell` và nhánh
-`consolidate/monorepo` dựa trên nó được phép chứa runtime Electron đã duyệt.
-Không merge runtime vào `main`.
+Nhánh default là `consolidate/monorepo`, chứa cả runtime Electron thật và toàn bộ tài liệu hệ thống.
 
 ## Trước khi đọc hoặc sửa
 
@@ -80,15 +78,3 @@ Không:
 Biết file/symbol thì dùng tìm kiếm hẹp và đọc đúng đoạn. Cần quan hệ nhiều file
 thì dùng graph có sẵn ở depth 1–2 rồi đối chiếu source.
 
-## Phối hợp và khôi phục công việc
-
-Quyết định owner ngày 14/08/2026, rút từ ADR cũ đã nhập vào đây:
-
-- Agent chính là đầu mối với người dùng; kết quả helper chỉ là bằng chứng, không
-  tự thành quyết định.
-- Chỉ một agent có quyền ghi trong một worktree tại một thời điểm. Việc song
-  song có ghi phải dùng phạm vi và worktree tách biệt đã được cho phép.
-- Sau resume, compaction hoặc handoff, kiểm lại branch, HEAD, `git status` và
-  trạng thái agent trước khi tin record cũ.
-- Trạng thái task nằm trong `.agent/tasks/<ID>/`; không tạo database/dashboard
-  hay rule phụ thuộc một công cụ agent cụ thể.
