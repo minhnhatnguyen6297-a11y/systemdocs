@@ -15,11 +15,11 @@
     },
     "asset_row_v2": {
       "type": "object",
-      "description": "Giống v1 asset_row nhưng KHÔNG có is_primary — vị trí = index+1 (§13.3)",
+      "description": "Giống v1 asset_row nhưng KHÔNG có is_primary — vị trí = index+1 (§13.3). MIN-141: `thoi_han` lẻ optional ở input (key vắng = giữ nguyên lịch sử master); emit vẫn mang key — như asset_row/asset_row_input của common.schema.json.",
       "required": [
         "row_id", "entity_id", "so_serial", "so_vao_so",
         "so_thua_dat", "so_to_ban_do", "dia_chi", "loai_so",
-        "hinh_thuc_su_dung", "thoi_han", "nguon_goc", "ngay_cap",
+        "hinh_thuc_su_dung", "nguon_goc", "ngay_cap",
         "co_quan_cap", "land_rows"
       ],
       "additionalProperties": false,
@@ -181,6 +181,9 @@
             },
             "ngay_lap_ho_so": { "$ref": "common.schema.json#/definitions/date_full" },
             "noi_niem_yet": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "nguoi_nhan_uy_quyen": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "nguoi_nhan_uy_quyen_id": { "type": ["integer", "null"], "minimum": 1 },
+            "noi_dung_viec": { "$ref": "common.schema.json#/definitions/nullable_string" },
             "ghi_chu": { "$ref": "common.schema.json#/definitions/nullable_string" }
           }
         },
@@ -203,6 +206,21 @@
       "properties": {
         "case_id": { "type": "integer", "minimum": 1 },
         "base_revision": { "type": "integer", "minimum": 1 },
+        "case": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "OPTIONAL — đợt 3 (MIN-141): metadata hồ sơ ghi cùng Stage trong một transaction; case_type/document_type kèm theo phải khớp giá trị đã lưu (immutable). Chấp nhận cả key canonical liền không dấu — §6.",
+          "properties": {
+            "case_type": { "enum": ["inheritance", "two_party", null] },
+            "document_type": { "type": ["string", "null"] },
+            "ngay_lap_ho_so": { "$ref": "common.schema.json#/definitions/date_full" },
+            "noi_niem_yet": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "nguoi_nhan_uy_quyen": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "nguoi_nhan_uy_quyen_id": { "type": ["integer", "null"], "minimum": 1 },
+            "noi_dung_viec": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "ghi_chu": { "$ref": "common.schema.json#/definitions/nullable_string" }
+          }
+        },
         "stage": { "$ref": "#/definitions/stage_v2" }
       }
     },

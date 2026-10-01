@@ -742,7 +742,8 @@ def test_inline_create_writes_land_rows_and_mirror_atomically(db):
         {"loai_dat": "ODT", "dien_tich": 80, "thoi_han": "Lâu dài"},
         {"loai_dat": "CLN", "dien_tich": 50.5, "thoi_han": None}]
     assert prop.dien_tich == 130.5            # tổng diện tích các cụm
-    assert prop.thoi_han == "Lâu dài"         # thời hạn cụm đầu
+    assert prop.thoi_han is None             # MIN-141: không còn ghi
+                                             # giá trị lẻ — chỉ cụm
     # Key canonical cũng nhận được (dual-key như Stage)
     resp2 = inline_create(
         so_serial="RT000002", so_vao_so=None, so_thua_dat=None,

@@ -137,14 +137,9 @@
         "thoi_han": { "$ref": "#/definitions/nullable_string" }
       }
     },
-    "asset_row": {
+    "asset_row_base": {
       "type": "object",
-      "required": [
-        "row_id", "entity_id", "is_primary", "so_serial", "so_vao_so",
-        "so_thua_dat", "so_to_ban_do", "dia_chi", "loai_so",
-        "hinh_thuc_su_dung", "thoi_han", "nguon_goc", "ngay_cap",
-        "co_quan_cap"
-      ],
+      "description": "Bộ field dùng chung của asset_row — tách required theo chiều wire (MIN-141): input → asset_row_input, emit/legacy → asset_row.",
       "additionalProperties": false,
       "properties": {
         "row_id": { "$ref": "#/definitions/uuid4" },
@@ -171,6 +166,25 @@
           "description": "null-safe: thiếu/null/[] đều hợp lệ"
         }
       }
+    },
+    "asset_row": {
+      "description": "asset_row phía EMIT/result (server → client): luôn mang đủ key kể cả `thoi_han` lẻ (nullable) — giá trị lịch sử trên master còn phục vụ đối chiếu và warning stage.orphan_thoi_han (§4.2).",
+      "allOf": [{ "$ref": "#/definitions/asset_row_base" }],
+      "required": [
+        "row_id", "entity_id", "is_primary", "so_serial", "so_vao_so",
+        "so_thua_dat", "so_to_ban_do", "dia_chi", "loai_so",
+        "hinh_thuc_su_dung", "thoi_han", "nguon_goc", "ngay_cap",
+        "co_quan_cap"
+      ]
+    },
+    "asset_row_input": {
+      "description": "asset_row phía INPUT/payload (client → server). MIN-141: `thoi_han` lẻ KHÔNG còn bắt buộc — client mới không gửi; key vắng = server giữ nguyên giá trị lịch sử trên master (không xóa); key còn được chấp nhận cho client legacy. Thời hạn mới chỉ thuộc land_rows[].thoihan.",
+      "allOf": [{ "$ref": "#/definitions/asset_row_base" }],
+      "required": [
+        "row_id", "entity_id", "is_primary", "so_serial", "so_vao_so",
+        "so_thua_dat", "so_to_ban_do", "dia_chi", "loai_so",
+        "hinh_thuc_su_dung", "nguon_goc", "ngay_cap", "co_quan_cap"
+      ]
     },
     "diagram_node": {
       "type": "object",

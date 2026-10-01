@@ -292,7 +292,8 @@ asset_row:
   dia_chi: <string non-empty>        # bắt buộc
   loai_so: <string | null>
   hinh_thuc_su_dung: <string | null>
-  thoi_han: <string | null>
+  thoi_han: <string | null>          # lẻ cấp tài sản — CHỈ còn nghĩa trên
+                                     # emit/legacy (xem ghi chú dưới)
   nguon_goc: <string | null>
   ngay_cap: <YYYY-MM-DD | null>      # asset chỉ nhận dạng đầy đủ
   co_quan_cap: <string | null>
@@ -305,6 +306,15 @@ asset_row:
 - `assets` non-empty → **đúng một** dòng `is_primary:true`; 0 hoặc ≥2 →
   `stage_validation_error{code:primary_count}`.
 - `land_rows` null-safe: thiếu/`[]` hợp lệ; phần tử null-safe từng field.
+- **`thoi_han` lẻ cấp tài sản (MIN-141):** phía input (payload
+  `workspace_create`/`workspace_commit_stage`/`diagram_evaluate` nháp) KHÔNG
+  còn bắt buộc — schema `asset_row_input`. Client mới không gửi key này;
+  key vắng nghĩa là "giữ nguyên giá trị lịch sử trên master", server không
+  xóa. Client legacy vẫn được phép gửi key (giá trị sẽ ghi như cũ). Phía
+  emit (`workspace_get`/result.data.stage) server vẫn luôn trả key
+  `thoi_han` (nullable) — schema `asset_row` — để đối chiếu lịch sử và báo
+  `stage.orphan_thoi_han` khi giá trị lẻ không gắn cụm nào. Thời hạn mới
+  chỉ thuộc `land_rows[].thoihan`; không tự đắp giá trị lẻ vào cụm.
 - **Key cụm đất (MIN-141 đợt 2):** tên nghiệp vụ canonical mới là
   `loaidat` / `dientich` / `thoihan` (trùng cột bảng con
   `property_land_rows` và tên placeholder Word `loaidat<M><N>`... —
@@ -1027,7 +1037,9 @@ asset_row_v2:               # giống §4.2, TRỪ is_primary (bị loại)
   row_id: <uuid4>           # ổn định — KHÔNG phải vị trí
   entity_id: <int | null>
   so_serial: <string non-empty>   # canonical [A-Z]{2}\d{6,8} — entities.md §2
-  ...                       # mọi field còn lại giữ nguyên §4.2
+  ...                       # mọi field còn lại giữ nguyên §4.2; `thoi_han`
+                            # lẻ OPTIONAL ở input (key vắng = giữ lịch sử
+                            # master) — quy tắc tách input/emit ở §4.2
   land_rows:                # giữ nguyên shape v1 — hàng cấu trúc
     - loai_dat: <string | null>   #   (mục đích sử dụng)
       dien_tich: <number | null>  #   diện tích

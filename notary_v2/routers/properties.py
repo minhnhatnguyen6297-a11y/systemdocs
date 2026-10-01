@@ -40,7 +40,7 @@ def create_form(request: Request):
     form = {
         "so_serial": "", "so_vao_so": "", "so_thua_dat": "", "so_to_ban_do": "",
         "dia_chi": "", "dien_tich": "", "loai_so": "", "loai_dat": "", "hinh_thuc_su_dung": "",
-        "thoi_han": "", "nguon_goc": "", "ngay_cap": "", "co_quan_cap": ""
+        "nguon_goc": "", "ngay_cap": "", "co_quan_cap": ""
     }
     return templates.TemplateResponse("properties/form.html", {
         "request": request, "obj": None, "errors": [], "field_errors": {}, "form": form
@@ -152,7 +152,6 @@ def inline_create(
                             status_code=400)
 
     loai_dat_val = ""
-    thoi_han_val = ""
     dien_tich_total = None
     land_rows_json_val = None
     if normalized_rows:
@@ -168,7 +167,6 @@ def inline_create(
             if r["dientich"]:
                 total += r["dientich"]
         loai_dat_val = "; ".join(parts)
-        thoi_han_val = normalized_rows[0]["thoihan"] or ""
         if total > 0:
             dien_tich_total = total
         # Mirror legacy keys — đúng shape migrate_property_land_rows ghi.
@@ -181,6 +179,9 @@ def inline_create(
              "thoi_han": r["thoihan"]}
             for r in normalized_rows], ensure_ascii=False)
 
+    # MIN-141: không còn ghi `thoi_han` lẻ cấp tài sản — thời hạn mới chỉ
+    # thuộc cụm property_land_rows[].thoihan; cột properties.thoi_han giữ
+    # nguyên cho dữ liệu lịch sử (cảnh báo orphan_thoi_han), không DROP.
     p = Property(
         so_serial=form["so_serial"], so_vao_so=form["so_vao_so"] or None,
         so_thua_dat=form["so_thua_dat"] or None, so_to_ban_do=form["so_to_ban_do"] or None,
@@ -188,7 +189,6 @@ def inline_create(
         dien_tich=dien_tich_total, loai_so=form["loai_so"] or None,
         land_rows_json=land_rows_json_val,
         hinh_thuc_su_dung=form["hinh_thuc_su_dung"] or None,
-        thoi_han=thoi_han_val or None,
         nguon_goc=form["nguon_goc"] or None, ngay_cap=parse_date(form["ngay_cap"]),
         co_quan_cap=form["co_quan_cap"] or None
     )
@@ -222,12 +222,13 @@ def create(
     loai_so: Optional[str] = Form(None),
     loai_dat: Optional[str] = Form(None),
     hinh_thuc_su_dung: Optional[str] = Form(None),
-    thoi_han: Optional[str] = Form(None),
     nguon_goc: Optional[str] = Form(None),
     ngay_cap: Optional[str] = Form(None),
     co_quan_cap: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
+    # `thoi_han` lẻ không còn là input (MIN-141): client cũ gửi kèm bị bỏ
+    # qua — giá trị mới chỉ lưu theo cụm property_land_rows.
     form = {
         "so_serial": (so_serial or "").strip(),
         "so_vao_so": (so_vao_so or "").strip(),
@@ -238,7 +239,6 @@ def create(
         "loai_so": (loai_so or "").strip(),
         "loai_dat": (loai_dat or "").strip(),
         "hinh_thuc_su_dung": (hinh_thuc_su_dung or "").strip(),
-        "thoi_han": (thoi_han or "").strip(),
         "nguon_goc": (nguon_goc or "").strip(),
         "ngay_cap": (ngay_cap or "").strip(),
         "co_quan_cap": (co_quan_cap or "").strip(),
@@ -273,7 +273,7 @@ def create(
         so_thua_dat=form["so_thua_dat"] or None, so_to_ban_do=form["so_to_ban_do"] or None,
         dia_chi=form["dia_chi"], dien_tich=dien_tich_val,
         loai_so=form["loai_so"] or None, loai_dat=form["loai_dat"] or None,
-        hinh_thuc_su_dung=form["hinh_thuc_su_dung"] or None, thoi_han=form["thoi_han"] or None,
+        hinh_thuc_su_dung=form["hinh_thuc_su_dung"] or None,
         nguon_goc=form["nguon_goc"] or None, ngay_cap=parse_date(form["ngay_cap"]),
         co_quan_cap=form["co_quan_cap"] or None
     )
@@ -302,7 +302,6 @@ def edit_form(pid: int, request: Request, db: Session = Depends(get_db)):
         "loai_so": p.loai_so or "",
         "loai_dat": p.loai_dat or "",
         "hinh_thuc_su_dung": p.hinh_thuc_su_dung or "",
-        "thoi_han": p.thoi_han or "",
         "nguon_goc": p.nguon_goc or "",
         "ngay_cap": p.ngay_cap.isoformat() if p.ngay_cap else "",
         "co_quan_cap": p.co_quan_cap or "",
@@ -319,13 +318,15 @@ def edit(
     so_thua_dat: Optional[str] = Form(None), so_to_ban_do: Optional[str] = Form(None),
     dia_chi: Optional[str] = Form(None), dien_tich: Optional[str] = Form(None),
     loai_so: Optional[str] = Form(None), loai_dat: Optional[str] = Form(None),
-    hinh_thuc_su_dung: Optional[str] = Form(None), thoi_han: Optional[str] = Form(None),
+    hinh_thuc_su_dung: Optional[str] = Form(None),
     nguon_goc: Optional[str] = Form(None), ngay_cap: Optional[str] = Form(None),
     co_quan_cap: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
     p = db.query(Property).filter(Property.id == pid).first()
     if not p: raise HTTPException(404)
+    # `thoi_han` lẻ không còn là input (MIN-141): form không gửi, client cũ
+    # gửi kèm bị bỏ qua — p.thoi_han giữ nguyên giá trị lịch sử.
     form = {
         "so_serial": (so_serial or "").strip(),
         "so_vao_so": (so_vao_so or "").strip(),
@@ -336,7 +337,6 @@ def edit(
         "loai_so": (loai_so or "").strip(),
         "loai_dat": (loai_dat or "").strip(),
         "hinh_thuc_su_dung": (hinh_thuc_su_dung or "").strip(),
-        "thoi_han": (thoi_han or "").strip(),
         "nguon_goc": (nguon_goc or "").strip(),
         "ngay_cap": (ngay_cap or "").strip(),
         "co_quan_cap": (co_quan_cap or "").strip(),
@@ -372,7 +372,7 @@ def edit(
     p.so_thua_dat = form["so_thua_dat"] or None; p.so_to_ban_do = form["so_to_ban_do"] or None
     p.dia_chi = form["dia_chi"]; p.dien_tich = dien_tich_val
     p.loai_so = form["loai_so"] or None; p.loai_dat = form["loai_dat"] or None
-    p.hinh_thuc_su_dung = form["hinh_thuc_su_dung"] or None; p.thoi_han = form["thoi_han"] or None
+    p.hinh_thuc_su_dung = form["hinh_thuc_su_dung"] or None
     p.nguon_goc = form["nguon_goc"] or None; p.ngay_cap = parse_date(form["ngay_cap"])
     p.co_quan_cap = form["co_quan_cap"] or None
     db.commit()

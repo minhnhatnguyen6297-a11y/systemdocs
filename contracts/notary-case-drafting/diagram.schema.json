@@ -24,7 +24,8 @@
             },
             "assets": {
               "type": "array",
-              "items": { "$ref": "common.schema.json#/definitions/asset_row" }
+              "items": { "$ref": "common.schema.json#/definitions/asset_row_input" },
+              "description": "MIN-141: input không bắt buộc thoi_han lẻ"
             }
           }
         },
