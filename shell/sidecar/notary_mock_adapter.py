@@ -68,9 +68,9 @@ UUID4_RX = re.compile(
     r"-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
 DATE_OR_YEAR_RX = re.compile(r"^\d{4}(-\d{2}-\d{2})?$")
 DATE_FULL_RX = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-SERIAL_RX = re.compile(r"^[A-Z]{2}\d{6,8}$")
 DOC_KEY_RX = re.compile(r"^[a-z][a-z0-9_]*$")
-GENDERS = ("Nam", "Nữ", None)
+# MIN-140: gioi_tinh bat buoc (khong cong None) — khong ep format giay to.
+GENDERS = ("Nam", "Nữ")
 INTAKE_KINDS = ("image", "pdf", "docx", "xlsx", "text")
 NODE_BOOL_FIELDS = ("hidden", "deleted")
 NODE_FIELDS = {"id", "personId", "parentSlotIds", "spouseSlotId",
@@ -803,6 +803,14 @@ def _err_row(rid, label):
     return _det_uuid4(f"field_error:{label}:{rid!r}")
 
 
+def _serial_match_key(v):
+    """MIN-140: khoa so khop serial — bo ky tu khong phai chu-so +
+    uppercase ('XX 123456' ≡ 'xx123456'). Khong ep canonical."""
+    if not isinstance(v, str):
+        return None
+    return re.sub(r"[^0-9A-Za-z]", "", v).upper() or None
+
+
 def _validate_stage(stage, case_type):
     """Tra (field_errors, people_norm, assets_norm). Norm = strip field la
     + dien null cho nullable thieu (producer strip — contract §4.1).
@@ -897,19 +905,36 @@ def _validate_stage(stage, case_type):
         ht = r.get("ho_ten")
         if not (isinstance(ht, str) and ht.strip()):
             errs.append(_err(w, "ho_ten", "required", "ho_ten bắt buộc"))
-        if r.get("gioi_tinh") not in GENDERS:
+        # MIN-140: Nguoi phai dien du moi truong co o nhap, tru ngay_chet
+        # (trong = con song); noi_cap/place_of_origin khong co o nhap.
+        gt = r.get("gioi_tinh")
+        if gt is None:
+            errs.append(_err(w, "gioi_tinh", "required",
+                             "gioi_tinh bắt buộc"))
+        elif gt not in GENDERS:
             errs.append(_err(w, "gioi_tinh", "invalid_enum",
-                             "gioi_tinh ∈ {Nam, Nữ, null}"))
-        for f in ("ngay_sinh", "ngay_chet", "ngay_cap"):
+                             "gioi_tinh chỉ nhận Nam|Nữ"))
+        for f in ("ngay_sinh", "ngay_cap"):
             v = r.get(f)
-            if v is not None and not (isinstance(v, str)
-                                      and DATE_OR_YEAR_RX.match(v)):
+            if v is None:
+                errs.append(_err(w, f, "required", f"{f} bắt buộc"))
+            elif not (isinstance(v, str) and DATE_OR_YEAR_RX.match(v)):
                 errs.append(_err(w, f, "invalid_date",
-                                 f"{f} phải YYYY-MM-DD/YYYY/null"))
-        for f in ("so_giay_to", "noi_cap", "dia_chi",
-                  "place_of_origin"):
-            _nullable(r, f, w)
+                                 f"{f} phải YYYY-MM-DD/YYYY"))
+        v = r.get("ngay_chet")
+        if v is not None and not (isinstance(v, str)
+                                  and DATE_OR_YEAR_RX.match(v)):
+            errs.append(_err(w, "ngay_chet", "invalid_date",
+                             "ngay_chet phải YYYY-MM-DD/YYYY/null"))
         sgt = r.get("so_giay_to")
+        if not (isinstance(sgt, str) and sgt.strip()):
+            errs.append(_err(w, "so_giay_to", "required",
+                             "so_giay_to bắt buộc"))
+        dc_p = r.get("dia_chi")
+        if not (isinstance(dc_p, str) and dc_p.strip()):
+            errs.append(_err(w, "dia_chi", "required", "dia_chi bắt buộc"))
+        for f in ("noi_cap", "place_of_origin"):
+            _nullable(r, f, w)
         if isinstance(sgt, str) and sgt.strip():
             s = sgt.strip()
             if s in seen_pkeys:
@@ -950,53 +975,77 @@ def _validate_stage(stage, case_type):
                                  "entity_id trùng với dòng khác"))
             else:
                 seen_aentities.add(eid)
+        # MIN-140: serial TUY CHON, luu nguyen van — so khop theo khoa
+        # chuan hoa de bat trung trong payload (mock khong co store
+        # property nen khong check "da thuoc ve tai san khac").
         serial = r.get("so_serial")
-        canon = serial.strip() if isinstance(serial, str) else serial
-        if not canon:
-            errs.append(_err(w, "so_serial", "required",
-                             "so_serial bắt buộc"))
-        elif not SERIAL_RX.match(canon):
-            errs.append(_err(w, "so_serial", "invalid_format",
-                             "so_serial phải canonical [A-Z]{2}\\d{6,8}"))
-        elif canon in seen_serials:
-            errs.append(_err(w, "so_serial", "invalid_format",
-                             "so_serial trùng với dòng khác"))
-        else:
-            seen_serials.add(canon)
-        dc = r.get("dia_chi")
-        if not (isinstance(dc, str) and dc.strip()):
-            errs.append(_err(w, "dia_chi", "required", "dia_chi bắt buộc"))
+        serial_norm = None
+        if serial is not None:
+            if not isinstance(serial, str):
+                errs.append(_err(w, "so_serial", "invalid_type",
+                                 "so_serial phải là chuỗi hoặc null"))
+            elif not serial.strip():
+                errs.append(_err(w, "so_serial", "invalid_format",
+                                 "so_serial rỗng — dùng null"))
+            else:
+                serial_norm = serial.strip()
+                key = _serial_match_key(serial)
+                if key is not None:
+                    if key in seen_serials:
+                        errs.append(_err(w, "so_serial", "invalid_format",
+                                         "so_serial trùng với dòng khác"))
+                    else:
+                        seen_serials.add(key)
+        # Bat buoc theo owner (MIN-140): so to, so thua, dia chi +
+        # land_rows co it nhat 1 dong loai_dat + dien_tich.
+        for f in ("so_to_ban_do", "so_thua_dat", "dia_chi"):
+            v = r.get(f)
+            if not (isinstance(v, str) and v.strip()):
+                errs.append(_err(w, f, "required", f"{f} bắt buộc"))
         nc = r.get("ngay_cap")
         if nc is not None and not (isinstance(nc, str)
                                    and DATE_FULL_RX.match(nc)):
             errs.append(_err(w, "ngay_cap", "invalid_date",
                              "ngay_cap tài sản chỉ nhận YYYY-MM-DD"))
-        for f in ("so_vao_so", "so_thua_dat", "so_to_ban_do",
-                  "loai_so", "hinh_thuc_su_dung", "thoi_han",
+        for f in ("so_vao_so", "loai_so", "hinh_thuc_su_dung", "thoi_han",
                   "nguon_goc", "co_quan_cap"):
             _nullable(r, f, w)
         lr = r.get("land_rows")
-        if lr is not None and not isinstance(lr, list):
+        if lr is None:
+            errs.append(_err(w, "land_rows", "required",
+                             "Tài sản phải có ít nhất một dòng loại "
+                             "đất/diện tích"))
+        elif not isinstance(lr, list):
             errs.append(_err(w, "land_rows", "invalid_type",
-                             "land_rows phải là list/null"))
-        elif isinstance(lr, list):
+                             "land_rows phải là list"))
+        elif not lr:
+            errs.append(_err(w, "land_rows", "required",
+                             "Tài sản phải có ít nhất một dòng loại "
+                             "đất/diện tích"))
+        else:
             for j, x in enumerate(lr):
                 if not isinstance(x, dict):
                     errs.append(_err(w, "land_rows", "invalid_type",
                                      "land_row phải là object"))
                     continue
+                ld = x.get("loai_dat")
+                if not (isinstance(ld, str) and ld.strip()):
+                    errs.append(_err(w, "land_rows", "required",
+                                     f"land_rows[{j}].loai_dat bắt buộc"))
                 dt = x.get("dien_tich")
-                if dt is not None and (not isinstance(dt, (int, float))
-                                       or isinstance(dt, bool)):
+                if dt is None:
+                    errs.append(_err(w, "land_rows", "required",
+                                     f"land_rows[{j}].dien_tich bắt buộc"))
+                elif not isinstance(dt, (int, float)) \
+                        or isinstance(dt, bool):
                     errs.append(_err(w, "land_rows", "invalid_type",
-                                     "dien_tich phải là number/null"))
-                for lf in ("loai_dat", "thoi_han"):
-                    if x.get(lf) is not None and not isinstance(
-                            x.get(lf), str):
-                        errs.append(_err(w, "land_rows", "invalid_type",
-                                         f"{lf} phải là chuỗi/null"))
+                                     "dien_tich phải là number"))
+                th = x.get("thoi_han")
+                if th is not None and not isinstance(th, str):
+                    errs.append(_err(w, "land_rows", "invalid_type",
+                                     "thoi_han phải là chuỗi/null"))
         row = {f: r.get(f) for f in ASSET_FIELDS}
-        row["so_serial"] = canon or row["so_serial"]
+        row["so_serial"] = serial_norm
         row["land_rows"] = [
             {"loai_dat": x.get("loai_dat"),
              "dien_tich": x.get("dien_tich"),

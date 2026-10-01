@@ -37,12 +37,24 @@ là ID database, có thể null trước commit.
 
 ## 5. Quy tắc dữ liệu
 
-- Người bắt buộc `ho_ten`; các trường ngày dùng `YYYY-MM-DD`, `YYYY` hoặc null.
-- CCCD/giấy tờ là free text, không dùng làm Case key.
-- Tài sản v2 tối đa 3; vị trí là thứ tự mảng, vị trí 1 là primary theo nghĩa
-  engine. Không dùng `is_primary` trong wire v2.
+Nguyên tắc (owner 29/09/2026, MIN-140): gần như không chặn — người dùng
+chịu trách nhiệm dữ liệu nhập; chỉ áp ràng buộc được duyệt rõ (chi tiết
+`contracts/notary-case-drafting.md` §13.16).
+
+- **Người** bắt buộc đủ các trường có ô nhập: `ho_ten`, `gioi_tinh`,
+  `ngay_sinh`, `so_giay_to`, `ngay_cap`, `dia_chi`. `ngay_chet` trống =
+  còn sống. CCCD/giấy tờ là free text — không ép format, không dùng làm
+  Case key.
+- **Tài sản** chỉ bắt buộc `so_to_ban_do`, `so_thua_dat`, `dia_chi` và
+  `land_rows` ≥1 dòng với `loai_dat` + `dien_tich`. `so_serial` **tùy
+  chọn**: `null` hợp lệ, giá trị lưu/emit nguyên văn — không ép canonical
+  `[A-Z]{2}\d{6,8}` (dạng đó chỉ dùng để so khớp trùng/gắn property cũ).
+- Tài sản v2 tối đa 3; vị trí là thứ tự mảng, vị trí 1 là primary theo
+  nghĩa engine. Không dùng `is_primary` trong wire v2.
 - Reorder đổi nghĩa vị trí nhưng không đổi `row_id`.
 - Hồ sơ thừa kế bắt buộc `owner_row_id`; hồ sơ `two_party` cấm trường này.
+- **Không chặn chuyển tab khi đang nhập** — draft sống trong model, chuyển
+  tab không mất gì; validation chỉ xảy ra khi `Cập nhật`.
 
 ## 6. Commit và lưu
 
@@ -92,9 +104,12 @@ phải báo `workspace_conflict`; không ghi đè cưỡng bức.
 
 Stage v2 thay mô hình flag phân tán bằng snapshot có revision. Owner chốt
 27/09/2026: vòng đời draft/committed, `owner_row_id`, tài sản theo vị trí và
-commit nguyên khối thuộc `notary.case-drafting.v2`.
+commit nguyên khối thuộc `notary.case-drafting.v2`. Owner chốt 29/09/2026
+(MIN-140): gỡ rule ẩn — serial tùy chọn nguyên văn, bộ trường bắt buộc
+tối thiểu ở §5, không chặn chuyển tab.
 
-Còn mở: từ điển dữ liệu Người đầy đủ và quyền hiển thị/sửa của từng field.
+Còn mở: ô nhập cho `noi_cap`/`place_of_origin` (hiện tùy chọn, chưa có trên
+UI bảng Người).
 
 ## 11. Nguồn
 

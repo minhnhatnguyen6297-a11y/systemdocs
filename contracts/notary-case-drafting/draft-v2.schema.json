@@ -15,7 +15,7 @@
     },
     "asset_row_v2": {
       "type": "object",
-      "description": "Giống v1 asset_row nhưng KHÔNG có is_primary — vị trí = index+1 (§13.3)",
+      "description": "Giống v1 asset_row nhưng KHÔNG có is_primary — vị trí = index+1 (§13.3). Quy tắc GIÁ TRỊ trên payload (bắt buộc so_to_ban_do/so_thua_dat/dia_chi/land_rows[].loai_dat/dien_tich) định nghĩa tại §13.16 — schema này chỉ mô tả shape wire (result đọc hồ sơ cũ có thể mang null).",
       "required": [
         "row_id", "entity_id", "so_serial", "so_vao_so",
         "so_thua_dat", "so_to_ban_do", "dia_chi", "loai_so",
@@ -26,7 +26,10 @@
       "properties": {
         "row_id": { "$ref": "common.schema.json#/definitions/uuid4" },
         "entity_id": { "type": ["integer", "null"] },
-        "so_serial": { "type": "string", "pattern": "^[A-Z]{2}\\d{6,8}$" },
+        "so_serial": {
+          "$ref": "common.schema.json#/definitions/nullable_string",
+          "description": "MIN-140 (§13.16): tùy chọn, nguyên văn — KHÔNG ép canonical [A-Z]{2}\\d{6,8}"
+        },
         "so_vao_so": { "$ref": "common.schema.json#/definitions/nullable_string" },
         "so_thua_dat": { "$ref": "common.schema.json#/definitions/nullable_string" },
         "so_to_ban_do": { "$ref": "common.schema.json#/definitions/nullable_string" },
@@ -39,14 +42,15 @@
         "co_quan_cap": { "$ref": "common.schema.json#/definitions/nullable_string" },
         "land_rows": {
           "type": ["array", "null"],
-          "items": { "$ref": "#/definitions/land_row_v2" }
+          "items": { "$ref": "#/definitions/land_row_v2" },
+          "description": "Payload (§13.16): bắt buộc list ≥1 dòng với loai_dat non-empty + dien_tich number; result đọc hồ sơ cũ có thể null/[] (§13.8)"
         }
       },
       "not": { "required": ["is_primary"] }
     },
     "land_row_v2": {
       "type": "object",
-      "description": "Hàng loại đất cấu trúc: mục đích sử dụng + diện tích + thời hạn (§13.3)",
+      "description": "Hàng loại đất cấu trúc: mục đích sử dụng + diện tích + thời hạn (§13.3). Payload (§13.16): loai_dat + dien_tich bắt buộc",
       "additionalProperties": false,
       "properties": {
         "loai_dat": { "$ref": "common.schema.json#/definitions/nullable_string" },
@@ -66,7 +70,7 @@
         "people": {
           "type": "array",
           "items": { "$ref": "common.schema.json#/definitions/person_row" },
-          "description": "≤30 phần tử khi case_type=two_party (people_limit)"
+          "description": "≤30 phần tử khi case_type=two_party (people_limit). Payload (§13.16, MIN-140): mọi trường có ô nhập bắt buộc non-null trừ ngay_chet/noi_cap/place_of_origin"
         },
         "assets": {
           "type": "array",

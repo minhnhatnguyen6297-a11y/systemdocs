@@ -378,8 +378,10 @@ def _mk_person(**kw):
         "row_id": str(uuid.uuid4()), "entity_id": None,
         "ho_ten": "Người Mẫu A", "gioi_tinh": "Nam",
         "ngay_sinh": "1950", "ngay_chet": "2020-01-15",
-        "so_giay_to": None, "ngay_cap": None, "noi_cap": None,
-        "dia_chi": None, "place_of_origin": None,
+        # MIN-140: mọi trường có ô nhập đều bắt buộc
+        "so_giay_to": "MK" + uuid.uuid4().hex[:10].upper(),
+        "ngay_cap": "2010-06-15", "noi_cap": None,
+        "dia_chi": "Địa chỉ mẫu", "place_of_origin": None,
     }
     row.update(kw)
     return row
@@ -388,11 +390,14 @@ def _mk_person(**kw):
 def _mk_asset(**kw):
     row = {
         "row_id": str(uuid.uuid4()), "entity_id": None,
-        "so_serial": "MM000001", "so_vao_so": None, "so_thua_dat": None,
-        "so_to_ban_do": None, "dia_chi": "Địa chỉ mẫu tài sản 1",
+        # MIN-140: serial tùy chọn; bắt buộc số tờ/số thửa/địa chỉ +
+        # >=1 land_row loại đất/diện tích
+        "so_serial": "MM000001", "so_vao_so": None, "so_thua_dat": "99",
+        "so_to_ban_do": "12", "dia_chi": "Địa chỉ mẫu tài sản 1",
         "loai_so": None, "hinh_thuc_su_dung": None, "thoi_han": None,
         "nguon_goc": None, "ngay_cap": None, "co_quan_cap": None,
-        "land_rows": None,
+        "land_rows": [{"loai_dat": "ODT", "dien_tich": 60.0,
+                       "thoi_han": None}],
     }
     row.update(kw)
     return row
@@ -652,7 +657,9 @@ class TestCommitStage:
             "row_id": row_id, "entity_id": entity_id,
             "ho_ten": name, "gioi_tinh": "Nam",
             "ngay_sinh": "1990-01-01", "ngay_chet": None,
-            "so_giay_to": None, "ngay_cap": None, "noi_cap": None,
+            # MIN-140: sgt/ngay_cap/dia_chi bắt buộc (sgt unique/row)
+            "so_giay_to": "MK" + uuid.uuid4().hex[:10].upper(),
+            "ngay_cap": "2010-01-01", "noi_cap": None,
             "dia_chi": "Địa chỉ mẫu", "place_of_origin": None,
         }
 
@@ -663,7 +670,7 @@ class TestCommitStage:
             "so_to_ban_do": "1", "dia_chi": "Địa chỉ mẫu tài sản",
             "loai_so": None, "hinh_thuc_su_dung": None, "thoi_han": None,
             "nguon_goc": None, "ngay_cap": None, "co_quan_cap": None,
-            "land_rows": [],
+            "land_rows": [{"loai_dat": "ODT", "dien_tich": 60.0}],
         }
 
     def test_commit_success_assigns_entity_and_bumps_revision(self):
@@ -841,16 +848,36 @@ class TestCommitStage:
             _call("workspace_commit_stage", payload)
         assert exc.value.code == "validation_error"
 
-    def test_serial_must_be_canonical(self):
+    def test_serial_free_form_and_null_accepted(self):
+        """MIN-140: serial khong con rule canonical — text tu do + null
+        deu hop le; emit nguyen van (khong surrogate, khong rewrite)."""
         mock.reset_backend(_load_fixture("empty.json"))
         rid = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
         a = self._asset("aaaaaaa1-1111-4111-8111-111111111111",
                         serial="khong-canonical")
+        b = self._asset("aaaaaaa2-2222-4222-8222-222222222222",
+                        serial=None)
         payload = self._payload(people=[self._person(rid)],
-                                owner_row_id=rid, assets=[a])
+                                owner_row_id=rid, assets=[a, b])
+        res = _call("workspace_commit_stage", payload)
+        assert [x["so_serial"] for x in res["data"]["stage"]["assets"]] == \
+            ["khong-canonical", None]
+
+    def test_serial_duplicate_match_key(self):
+        """MIN-140: dup serial so tren match key — 'MM 000010' trung
+        'mm000010' du chuoi goc khac nhau."""
+        mock.reset_backend(_load_fixture("empty.json"))
+        rid = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+        a1 = self._asset("aaaaaaa1-1111-4111-8111-111111111111",
+                         serial="MM 000010")
+        a2 = self._asset("aaaaaaa2-2222-4222-8222-222222222222",
+                         serial="mm000010")
+        payload = self._payload(people=[self._person(rid)],
+                                owner_row_id=rid, assets=[a1, a2])
         with pytest.raises(CommandError) as exc:
             _call("workspace_commit_stage", payload)
         assert any(e["field"] == "so_serial" and e["code"] == "invalid_format"
+                   and e["row_id"] == a2["row_id"]
                    for e in exc.value.details["field_errors"])
 
     def test_commit_prunes_diagram_refs(self):

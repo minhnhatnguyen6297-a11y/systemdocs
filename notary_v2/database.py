@@ -111,6 +111,57 @@ def migrate_properties_schema():
     con.close()
 
 
+def migrate_properties_serial_nullable():
+    """MIN-140: so_serial → nullable (Stage cho tài sản trống serial;
+    owner 29/09/2026). SQLite không ALTER column → rebuild bảng, giữ
+    UNIQUE (nhiều NULL hợp lệ) và toàn bộ cột hiện có."""
+    con = sqlite3.connect(DB_PATH)
+    cur = con.cursor()
+    cur.execute("PRAGMA table_info(properties)")
+    info = cur.fetchall()
+    if not info:
+        con.close()
+        return
+    col_names = [row[1] for row in info]
+    serial_notnull = any(
+        row[1] == "so_serial" and row[3] for row in info)
+    if not serial_notnull:
+        con.close()
+        return
+    cols = ", ".join(col_names)
+    cur.executescript(f"""
+        PRAGMA foreign_keys=off;
+        BEGIN;
+        CREATE TABLE properties_new (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            so_serial         VARCHAR(100) UNIQUE,
+            so_vao_so         VARCHAR(100),
+            so_thua_dat       VARCHAR(100),
+            so_to_ban_do      VARCHAR(100),
+            dia_chi           TEXT NOT NULL,
+            loai_dat          VARCHAR(100),
+            dien_tich         FLOAT,
+            loai_so           VARCHAR(200),
+            land_rows_json    TEXT,
+            hinh_thuc_su_dung VARCHAR(100),
+            thoi_han          VARCHAR(100),
+            nguon_goc         TEXT,
+            ngay_cap          DATE,
+            co_quan_cap       VARCHAR(200),
+            created_at        DATETIME DEFAULT (CURRENT_TIMESTAMP)
+        );
+        INSERT INTO properties_new ({cols})
+            SELECT {cols} FROM properties;
+        DROP TABLE properties;
+        ALTER TABLE properties_new RENAME TO properties;
+        CREATE INDEX IF NOT EXISTS ix_properties_id ON properties(id);
+        COMMIT;
+        PRAGMA foreign_keys=on;
+    """)
+    con.close()
+    assert_foreign_key_check()
+
+
 def migrate_zalo_schema():
     """Them cot va bang Zalo theo huong cong them, khong dien giai du lieu cu."""
     con = sqlite3.connect(DB_PATH)

@@ -189,7 +189,7 @@ def is_abs_local(p):
     return bool(re.match(r"^[A-Za-z]:[\\/]", p))
 
 
-def check_person_row(row, where, v):
+def check_person_row(row, where, v, strict_v2=False):
     if not isinstance(row, dict):
         v.append(("stage_validation_error", f"{where} not object"))
         return
@@ -204,18 +204,32 @@ def check_person_row(row, where, v):
         v.append(("stage_validation_error", f"{where} entity_id={eid!r}"))
     if not (isinstance(row.get("ho_ten"), str) and row["ho_ten"].strip()):
         v.append(("stage_validation_error", f"{where} ho_ten required"))
-    if row.get("gioi_tinh") not in GENDERS:
+    # MIN-140 (§13.16): payload v2 — cac truong co o nhap deu bat buoc,
+    # tru ngay_chet (null = con song). Result doc ho so cu giu nullable.
+    if strict_v2 and row.get("gioi_tinh") is None:
+        v.append(("stage_validation_error",
+                  f"{where} gioi_tinh required"))
+    elif row.get("gioi_tinh") not in GENDERS:
         v.append(("stage_validation_error",
                   f"{where} gioi_tinh={row.get('gioi_tinh')!r}"))
     for f in PERSON_DATE_FIELDS:
         val = row.get(f)
-        if val is not None and not (isinstance(val, str)
-                                    and DATE_OR_YEAR_RX.match(val)):
+        if strict_v2 and f in ("ngay_sinh", "ngay_cap") and val is None:
+            v.append(("stage_validation_error",
+                      f"{where} {f} required"))
+        elif val is not None and not (isinstance(val, str)
+                                      and DATE_OR_YEAR_RX.match(val)):
             v.append(("stage_validation_error",
                       f"{where} {f}={val!r} bad date"))
+    if strict_v2:
+        for f in ("so_giay_to", "dia_chi"):
+            val = row.get(f)
+            if not (isinstance(val, str) and val.strip()):
+                v.append(("stage_validation_error",
+                          f"{where} {f} required"))
 
 
-def check_asset_row(row, where, v, draft_v2=False):
+def check_asset_row(row, where, v, draft_v2=False, in_payload=False):
     if not isinstance(row, dict):
         v.append(("stage_validation_error", f"{where} not object"))
         return
@@ -228,18 +242,37 @@ def check_asset_row(row, where, v, draft_v2=False):
     if not draft_v2 and not isinstance(row.get("is_primary"), bool):
         v.append(("validation_error", f"{where} is_primary not bool"))
     serial = row.get("so_serial")
-    if not (isinstance(serial, str) and serial.strip()):
-        v.append(("stage_validation_error", f"{where} so_serial required"))
-    elif not SERIAL_RX.match(serial):
-        v.append(("stage_validation_error",
-                  f"{where} so_serial={serial!r} not canonical"))
+    if draft_v2:
+        # MIN-140 (§13.16): serial tuy chon, nguyen van — chi bat kieu
+        # chuoi/null; "" da bi NEVER_EMPTY chan. KHONG ep canonical.
+        if serial is not None and not isinstance(serial, str):
+            v.append(("stage_validation_error",
+                      f"{where} so_serial={serial!r} not string/null"))
+    else:
+        if not (isinstance(serial, str) and serial.strip()):
+            v.append(("stage_validation_error",
+                      f"{where} so_serial required"))
+        elif not SERIAL_RX.match(serial):
+            v.append(("stage_validation_error",
+                      f"{where} so_serial={serial!r} not canonical"))
     if not (isinstance(row.get("dia_chi"), str) and row["dia_chi"].strip()):
         v.append(("stage_validation_error", f"{where} dia_chi required"))
     nc = row.get("ngay_cap")
     if nc is not None and not (isinstance(nc, str) and DATE_FULL_RX.match(nc)):
         v.append(("stage_validation_error", f"{where} ngay_cap={nc!r}"))
+    strict = draft_v2 and in_payload
+    if strict:
+        for f in ("so_to_ban_do", "so_thua_dat"):
+            val = row.get(f)
+            if not (isinstance(val, str) and val.strip()):
+                v.append(("stage_validation_error",
+                          f"{where} {f} required"))
     lr = row.get("land_rows")
-    if lr is not None:
+    if strict and (lr is None or lr == []):
+        # §13.16: payload v2 bat buoc >=1 dong loai_dat + dien_tich
+        v.append(("stage_validation_error",
+                  f"{where} land_rows required (>=1 row)"))
+    elif lr is not None:
         if not isinstance(lr, list):
             v.append(("validation_error", f"{where} land_rows not list"))
         else:
@@ -247,6 +280,23 @@ def check_asset_row(row, where, v, draft_v2=False):
                 if not isinstance(r, dict):
                     v.append(("validation_error",
                               f"{where} land_rows[{i}] not object"))
+                    continue
+                if strict:
+                    ld = r.get("loai_dat")
+                    if not (isinstance(ld, str) and ld.strip()):
+                        v.append(("stage_validation_error",
+                                  f"{where} land_rows[{i}].loai_dat "
+                                  "required"))
+                    dt = r.get("dien_tich")
+                    if dt is None:
+                        v.append(("stage_validation_error",
+                                  f"{where} land_rows[{i}].dien_tich "
+                                  "required"))
+                    elif not isinstance(dt, (int, float)) \
+                            or isinstance(dt, bool):
+                        v.append(("stage_validation_error",
+                                  f"{where} land_rows[{i}].dien_tich "
+                                  "not number"))
 
 
 def check_stage(stage, where, v, draft_v2=False, case_type="inheritance",
@@ -293,14 +343,16 @@ def check_stage(stage, where, v, draft_v2=False, case_type="inheritance",
         assets = []
     seen = set()
     for i, r in enumerate(people):
-        check_person_row(r, f"{where}.people[{i}]", v)
+        check_person_row(r, f"{where}.people[{i}]", v,
+                         strict_v2=draft_v2 and in_payload)
         rid = r.get("row_id") if isinstance(r, dict) else None
         if rid in seen:
             v.append(("stage_validation_error",
                       f"{where} duplicate row_id {rid!r}"))
         seen.add(rid)
     for i, r in enumerate(assets):
-        check_asset_row(r, f"{where}.assets[{i}]", v, draft_v2=draft_v2)
+        check_asset_row(r, f"{where}.assets[{i}]", v, draft_v2=draft_v2,
+                        in_payload=in_payload)
         rid = r.get("row_id") if isinstance(r, dict) else None
         if rid in seen:
             v.append(("stage_validation_error",

@@ -799,6 +799,9 @@ function createNotaryModuleView(deps) {
           chip.disabled = ro;
           chip.dataset.fid = `a:${a.row_id}:land`;
           td.append(chip);
+          // MIN-140: land_rows la field bat buoc — loi required/invalid
+          // tu backend hien ngay duoi chip Loai dat.
+          cellErrs(a.row_id, 'land_rows', td);
         } else if (ASSET_DATE_FIELDS.has(key)) {
           // Ngay cap tren GCN: backend chi nhan full ISO (valid_date_full)
           // — allowYear=false. Hien/nhap dd/mm/yyyy.

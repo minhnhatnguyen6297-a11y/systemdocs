@@ -858,6 +858,7 @@ Consumer (Electron main/renderer) PHẢI:
 | v1 (APPROVED) | 24/09/2026 | Owner duyệt — contract trở thành SOT wire cho tab Soạn hồ sơ; mở cổng MIN-106+ |
 | v1.1 | 26/09/2026 | MIN-121 (additive, tương thích ngược): `notary.workspace_create` + `idempotency_key`; chế độ nháp (`case_id` absent) cho `intake_analyze`/`diagram_evaluate` (evaluate nháp kèm `stage` payload, `evaluated_revision:null`); `case` +`ngay_lap_ho_so`/`noi_niem_yet`/`ghi_chu`; field_error +`duplicate_entity`; error +`workspace_owner_required` |
 | v2 (APPROVED) | 27/09/2026 | Owner duyệt §13 (MIN-125, toàn bộ Q1–Q12): `schema_version` bump `notary.case-drafting.v2`; Stage draft/committed + create nguyên khối; `owner_row_id`; asset theo vị trí 1..3, bỏ `is_primary`; `ownPositions`/`receivePositions`; domain `two_party` 30 slot `p1..p30`; `case_type` immutable; error codes §13.9. Implement ở P5 (MIN-128). C1–C4 xử lý theo §13.13 |
+| v2 (rev 1.1) | 29/09/2026 | MIN-140 (owner duyệt): gỡ rule ẩn trên Stage — §13.16. `so_serial` tùy chọn nguyên văn (bỏ bắt buộc + canonical + surrogate); Tài sản bắt buộc số tờ/số thửa/địa chỉ/`land_rows[].loai_dat`/`dien_tich`; Người bắt buộc các trường có ô nhập trừ `ngay_chet`; `properties.so_serial` → nullable |
 
 ---
 
@@ -964,12 +965,13 @@ stage draft buffer (client, không wire)          committed stage (server)
 asset_row_v2:               # giống §4.2, TRỪ is_primary (bị loại)
   row_id: <uuid4>           # ổn định — KHÔNG phải vị trí
   entity_id: <int | null>
-  so_serial: <string non-empty>   # canonical [A-Z]{2}\d{6,8} — entities.md §2
+  so_serial: <string | null>      # MIN-140: TÙY CHỌN, nguyên văn — §13.16
   ...                       # mọi field còn lại giữ nguyên §4.2
-  land_rows:                # giữ nguyên shape v1 — hàng cấu trúc
-    - loai_dat: <string | null>   #   (mục đích sử dụng)
-      dien_tich: <number | null>  #   diện tích
-      thoi_han: <string | null>   #   thời hạn
+  land_rows:                # MIN-140: BẮT BUỘC ≥1 dòng trên payload (§13.16);
+                            # result đọc hồ sơ cũ có thể null/[] (§13.8)
+    - loai_dat: <string non-empty>  #   mục đích sử dụng — bắt buộc (§13.16)
+      dien_tich: <number>         #   diện tích — bắt buộc (§13.16)
+      thoi_han: <string | null>   #   thời hạn — tùy chọn
 ```
 
 - **Vị trí = index + 1.** `stage.assets[i]` là "tài sản ở vị trí
@@ -1310,6 +1312,13 @@ C1–C4 vẫn mở và đã có hướng xử lý: C1/C2 chốt cùng NV2 trư�
 cần; C3 quy ước tôn trọng `entity_id` (chi tiết persistence ở P5);
 C4 là task Word riêng — §13.10 chỉ ghi ý định đánh số.
 
+- **MIN-140** (owner, 29/09/2026) — gỡ rule ẩn trên Stage: `so_serial`
+  tùy chọn, lưu/emit nguyên văn (không canonical, không surrogate);
+  Tài sản chỉ bắt buộc số tờ, số thửa, địa chỉ, loại đất, diện tích;
+  Người điền đủ các trường có ô nhập trừ ngày mất (trống = còn sống);
+  không ép format số giấy tờ; KHÔNG chặn chuyển tab khi đang nhập —
+  buffer draft là client-side và vẫn giữ trong model. Chi tiết §13.16.
+
 ### 13.14 Checklist conformance bổ sung (áp dụng cho producer v2)
 
 Producer v2 PHẢI (thêm vào §10):
@@ -1327,6 +1336,10 @@ Producer v2 PHẢI (thêm vào §10):
       draft.
 - [ ] `diagram_evaluate` two_party → `unsupported` render_model, không
       chạy engine thừa kế; `word_export_*` → `case_type_unsupported`.
+- [ ] Chỉ áp ràng buộc trường theo §13.16 (MIN-140): serial tùy chọn
+      nguyên văn — KHÔNG ép canonical `[A-Z]{2}\d{6,8}`, không sinh
+      serial giả khi emit; `land_rows` payload ≥1 dòng với `loai_dat` +
+      `dien_tich`.
 
 Consumer v2 PHẢI (thêm vào §10):
 
@@ -1347,3 +1360,72 @@ Consumer v2 PHẢI (thêm vào §10):
   `diagram_state_v3`, payload create/commit v2). Normative text là
   §13 — file schema draft hỗ trợ đọc, không phải nguồn duy nhất cho
   tới khi owner duyệt.
+
+### 13.16 Quy tắc trường Stage v2 (MIN-140 — owner duyệt 29/09/2026)
+
+Nguyên tắc owner: **gần như không chặn** — người dùng chịu trách nhiệm
+với dữ liệu mình nhập; hệ thống chỉ chặn các trường hợp được duyệt rõ.
+Mục này là SOT cho field-level rules của `stage_v2` trên payload
+(`workspace_create`, `workspace_commit_stage`, `diagram_evaluate` nháp);
+stage trong result `workspace_get` đọc được hồ sơ cũ có thể thiếu —
+không áp ngược (§13.8). Trước MIN-140 code có các rule ẩn owner không
+đặt — tiêu biểu: `so_serial` bắt buộc + ép canonical `[A-Z]{2}\d{6,8}`,
+tự sinh serial giả `XX{id:06d}` khi đọc. Tất cả đã gỡ.
+
+**Người (`person_row`)** — mọi trường có ô nhập trên UI đều BẮT BUỘC;
+không ép format nghiệp vụ nào ngoài kiểu dữ liệu:
+
+| Trường | Rule |
+|---|---|
+| `ho_ten` | chuỗi non-empty (giữ nguyên §4.1) |
+| `gioi_tinh` | `"Nam"` \| `"Nữ"` — **bắt buộc** (`null` → `required`) |
+| `ngay_sinh` | `YYYY-MM-DD` \| `YYYY` — **bắt buộc** |
+| `ngay_chet` | `YYYY-MM-DD` \| `YYYY` \| `null` — tùy chọn (null = còn sống) |
+| `so_giay_to` | chuỗi non-empty — **bắt buộc**; KHÔNG ép format CCCD |
+| `ngay_cap` | `YYYY-MM-DD` \| `YYYY` — **bắt buộc** |
+| `dia_chi` | chuỗi non-empty — **bắt buộc** |
+| `noi_cap`, `place_of_origin` | chuỗi \| `null` — tùy chọn (chưa có ô nhập) |
+
+`so_giay_to` giữ hai check trùng (trong payload + "đã thuộc về người
+khác") — đó là ràng buộc toàn vẹn `UNIQUE` của DB và chống merge nhầm
+entity, không phải format rule.
+
+**Tài sản (`asset_row_v2`)** — đúng 5 trường bắt buộc theo lời owner;
+mọi trường khác, kể cả `so_serial`, để trống được:
+
+| Trường | Rule |
+|---|---|
+| `so_to_ban_do` | chuỗi non-empty — **bắt buộc** |
+| `so_thua_dat` | chuỗi non-empty — **bắt buộc** |
+| `dia_chi` | chuỗi non-empty — **bắt buộc** (giữ nguyên §4.2) |
+| `land_rows` | list **≥1 phần tử** — bắt buộc (`null`/`[]` → `required`) |
+| `land_rows[].loai_dat` | chuỗi non-empty — **bắt buộc** |
+| `land_rows[].dien_tich` | number — **bắt buộc** (`null` → `required`) |
+| `land_rows[].thoi_han` | chuỗi \| `null` — tùy chọn |
+| `so_serial` | chuỗi \| `null` — **tùy chọn, nguyên văn** |
+| `ngay_cap` | `YYYY-MM-DD` \| `null` — tùy chọn |
+| `so_vao_so`, `loai_so`, `hinh_thuc_su_dung`, `thoi_han`, `nguon_goc`, `co_quan_cap` | chuỗi \| `null` — tùy chọn |
+
+**Serial — hành vi sau MIN-140:**
+
+- Tùy chọn: `null` hợp lệ; `""` vẫn cấm theo quy ước §2.3 (dùng `null`
+  thay chuỗi rỗng). Giá trị lưu/emit **nguyên văn** (strip hai đầu) —
+  không canonical hóa, không sinh surrogate khi đọc.
+- So khớp vẫn chuẩn hóa nhẹ: bỏ mọi ký tự không phải chữ-số +
+  uppercase → `"XX 123456"` ≡ `"xx123456"`. Dùng để (a) bắt trùng
+  trong payload và (b) upsert gắn `Property` cũ — nghiệp vụ "cùng một
+  sổ đỏ", không phải ràng buộc nhập liệu.
+- `properties.so_serial` lưu `NULL` khi trống (UNIQUE giữ — SQLite cho
+  phép nhiều NULL); schema migration rebuild bảng trên DB cũ.
+- Dạng canonical `[A-Z]{2}\d{6,8}` chỉ còn là **định dạng tham chiếu**
+  của số serial sổ đỏ đời mới (entities.md §2) — không còn là điều
+  kiện hệ thống chấp nhận.
+
+**Các thứ chặn còn lại** (đúng nguyên tắc owner — không thêm gì):
+`workspace_locked`, `workspace_conflict`, `workspace_owner_required`,
+`case_type_unsupported`, lỗi shape/type/field-lạ (`validation_error`),
+`asset_limit`/`people_limit`, `duplicate_row_id`, trùng `entity_id`,
+trùng/`so_giay_to` thuộc người khác, `so_serial` trùng/đã thuộc tài sản
+khác, và các `required` ở bảng trên. **KHÔNG chặn chuyển tab** khi đang
+nhập — buffer draft là client-side, vẫn giữ trong model (§13.2);
+`Cập nhật` mới là lúc validate.

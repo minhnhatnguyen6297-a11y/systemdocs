@@ -41,10 +41,14 @@ số. Không so khớp một phần, không so khớp 9 số cuối.
 - **Canonical:** 2 chữ cái in hoa + **6–8 chữ số**, không dấu cách: `DD123456`.
 - Khi hiển thị cho người dùng có thể chèn dấu cách (`DD 123456`); khi so khớp thì
   không.
-- Dải được hệ thống chấp nhận là `[A-Z]{2}` + 6–8 số; chuẩn hóa bằng cách bỏ
-  khoảng trắng và viết hoa. Nguồn hiện hành:
-  `notary_v2/routers/ocr_ai.py:924-925,972`; thiết kế đã đồng bộ:
-  `docs/spec/notaryoffice/intent-source.md` v1.0 §7.2 (`[A-Z]{2}\s*\d{6,8}`).
+- **Dạng canonical chỉ là chuẩn để SO KHỚP, không phải điều kiện hệ thống chấp
+  nhận.** Từ MIN-140 (owner 29/09/2026): `so_serial` trên Stage là text tự do
+  hoặc `null` — lưu và emit nguyên văn; việc nhận diện "cùng một sổ đỏ" chuẩn hóa
+  bằng cách bỏ mọi ký tự không phải chữ-số và viết hoa (`"XX 123456"` ≡
+  `"xx123456"`), không ép đúng dải 6–8 số. Xem `notary-case-drafting.md` §13.16.
+- Nguồn nhận dạng OCR hiện hành: `notary_v2/routers/ocr_ai.py:924-925,972`;
+  thiết kế đã đồng bộ: `docs/spec/notaryoffice/intent-source.md` v1.0 §7.2
+  (`[A-Z]{2}\s*\d{6,8}` — gợi ý trích xuất, không phải rule chặn nhập).
 
 ---
 

@@ -78,7 +78,6 @@ _UUID4_RE = re.compile(
 )
 _DATE_OR_YEAR_RE = re.compile(r"^\d{4}(-\d{2}-\d{2})?$")
 _DATE_FULL_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-_SERIAL_RE = re.compile(r"^[A-Z]{2}\d{6,8}$")
 _GENDER_VALUES = ("Nam", "Nữ")
 _BIRTH_PARENT_IDS = ("father", "mother")
 _SPOUSE_PARENT_IDS = ("spouse_father", "spouse_mother")
@@ -221,12 +220,14 @@ def _emit_date_or_year(value: Any) -> Optional[str]:
     return None
 
 
-def _canonical_serial(value: Any) -> Optional[str]:
-    text = _clean(value)
-    if not text:
+def _serial_match_key(value: Any) -> Optional[str]:
+    """Khóa so khớp serial (MIN-140): bỏ mọi ký tự không phải chữ-số và
+    uppercase — 'XX 123456' ≡ 'xx123456'. KHÔNG ép dạng canonical: serial
+    nhập tự do, chỉ chuẩn hóa để nhận diện trùng/khớp property cũ."""
+    if not isinstance(value, str):
         return None
-    candidate = re.sub(r"[^0-9A-Za-z]", "", text).upper()
-    return candidate if _SERIAL_RE.match(candidate) else None
+    key = re.sub(r"[^0-9A-Za-z]", "", value).upper()
+    return key or None
 
 
 def _case_meta(case: InheritanceCase) -> tuple[str, str]:
@@ -891,8 +892,6 @@ class CaseWorkspaceService:
             "state": state,
             "render_model": render_model,
         }
-        if composed.legacy_notes:
-            diagram_out["warnings"] = list(composed.legacy_notes)
 
         data = {
             "schema_version": SCHEMA_VERSION,
@@ -1341,7 +1340,6 @@ class CaseWorkspaceService:
         >3 asset → `stage.legacy_asset_overflow` (emit đủ, không cắt)."""
         payload = self._load_payload(case) or {}
         data_warnings: list[dict] = []
-        legacy_notes: list[str] = []
         dirty = payload == {} or "stage" not in payload
 
         raw_people = payload.get("stage")
@@ -1417,8 +1415,7 @@ class CaseWorkspaceService:
         for index, snap in enumerate(snaps):
             entity = snap.get("_entity")
             assets.append(self._asset_wire(
-                snap["row_id"], entity, self._property(entity),
-                index=index, warnings=legacy_notes))
+                snap["row_id"], entity, self._property(entity)))
             persisted_assets.append({
                 "id": (str(entity) if entity is not None
                        else _clean(snap.get("id"))),
@@ -1431,7 +1428,7 @@ class CaseWorkspaceService:
             payload=payload, people=people, assets=assets,
             entity_to_row=entity_to_row, persisted_people=persisted_people,
             persisted_assets=persisted_assets,
-            data_warnings=data_warnings, legacy_notes=legacy_notes,
+            data_warnings=data_warnings,
             dirty=dirty)
 
     def _person_wire(self, row_id: str, entity: Optional[int],
@@ -1461,27 +1458,16 @@ class CaseWorkspaceService:
         }
 
     def _asset_wire(self, row_id: str, entity: Optional[int],
-                    prop: Optional[Property],
-                    index: int = 0,
-                    warnings: Optional[list] = None) -> dict:
-        """asset_row_v2 — KHÔNG emit `is_primary` (§13.3)."""
+                    prop: Optional[Property]) -> dict:
+        """asset_row_v2 — KHÔNG emit `is_primary` (§13.3). Serial emit
+        nguyên văn từ DB (MIN-140): không canonical hóa, không surrogate —
+        null khi DB trống."""
         land_rows = _parse_land_rows(
             prop.land_rows_json if prop is not None else None)
-        raw_serial = prop.so_serial if prop is not None else None
-        serial = _canonical_serial(raw_serial)
-        if serial is None:
-            # DB cũ có serial lạ → surrogate deterministic, giữ truy vết
-            # qua warnings (không sửa Property — serial là SOT của sổ đỏ).
-            serial = (f"XX{entity:06d}"[:8] if entity
-                      else f"XX{index + 1:06d}")
-            if raw_serial and warnings is not None:
-                warnings.append(
-                    f"asset {row_id}: so_serial '{raw_serial}' không "
-                    f"canonical — emit '{serial}'")
         return {
             "row_id": row_id,
             "entity_id": entity,
-            "so_serial": serial,
+            "so_serial": _nn(prop.so_serial if prop else None),
             "so_vao_so": _nn(prop.so_vao_so if prop else None),
             "so_thua_dat": _nn(prop.so_thua_dat if prop else None),
             "so_to_ban_do": _nn(prop.so_to_ban_do if prop else None),
@@ -1756,9 +1742,12 @@ class CaseWorkspaceService:
 
     def _validate_stage(self, people: list, assets: list,
                         case_type: str = CASE_TYPE_INHERITANCE) -> list[dict]:
-        """Field-level rules của stage_v2: `is_primary` KHÔNG còn trên wire
-        (field lạ → validation_error ở caller), assets ≤ 3 (`asset_limit`),
-        two_party people ≤ 30 (`people_limit`)."""
+        """Field-level rules của stage_v2 (§13.16, MIN-140 — owner
+        29/09/2026): `is_primary` KHÔNG còn trên wire, assets ≤ 3,
+        two_party people ≤ 30. Người: điền đủ mọi trường có ô nhập trừ
+        ngày mất (trống = còn sống); không ép format giấy tờ. Tài sản:
+        bắt buộc số tờ, số thửa, địa chỉ + mỗi land_row loại đất/diện
+        tích; serial tùy chọn, lưu nguyên văn."""
         errors: list[dict] = []
 
         def err(row_id, field, code, message, index=None):
@@ -1802,17 +1791,34 @@ class CaseWorkspaceService:
             ho_ten = row.get("ho_ten")
             if not isinstance(ho_ten, str) or not ho_ten.strip():
                 emit("ho_ten", "required", "ho_ten bắt buộc")
-            if row.get("gioi_tinh") not in (None, *_GENDER_VALUES):
+            # MIN-140 (owner 29/09/2026): Người phải điền đủ mọi trường có
+            # ô nhập, KHÔNG ép format — ngoại lệ: ngay_chet trống = còn
+            # sống; noi_cap/place_of_origin không có ô nhập → tùy chọn.
+            gender = row.get("gioi_tinh")
+            if gender is None:
+                emit("gioi_tinh", "required", "gioi_tinh bắt buộc")
+            elif gender not in _GENDER_VALUES:
                 emit("gioi_tinh", "invalid_enum",
-                     "gioi_tinh ∈ {Nam, Nữ, null}")
-            for field in ("ngay_sinh", "ngay_chet", "ngay_cap"):
-                if not _valid_date_or_year(row.get(field)):
+                     "gioi_tinh chỉ nhận Nam|Nữ")
+            for field in ("ngay_sinh", "ngay_cap"):
+                value = row.get(field)
+                if value is None:
+                    emit(field, "required", f"{field} bắt buộc")
+                elif not _valid_date_or_year(value):
                     emit(field, "invalid_date",
-                         f"{field} phải là YYYY-MM-DD | YYYY | null")
-            for field in ("so_giay_to", "noi_cap", "dia_chi",
-                          "place_of_origin"):
-                self._check_nullable_str(row, field, emit)
+                         f"{field} phải là YYYY-MM-DD hoặc YYYY")
+            if row.get("ngay_chet") is not None and not _valid_date_or_year(
+                    row.get("ngay_chet")):
+                emit("ngay_chet", "invalid_date",
+                     "ngay_chet phải là YYYY-MM-DD | YYYY | null")
             so_giay_to = row.get("so_giay_to")
+            if not isinstance(so_giay_to, str) or not so_giay_to.strip():
+                emit("so_giay_to", "required", "so_giay_to bắt buộc")
+            dia_chi_p = row.get("dia_chi")
+            if not isinstance(dia_chi_p, str) or not dia_chi_p.strip():
+                emit("dia_chi", "required", "dia_chi bắt buộc")
+            for field in ("noi_cap", "place_of_origin"):
+                self._check_nullable_str(row, field, emit)
             if isinstance(so_giay_to, str) and so_giay_to.strip():
                 sgt = so_giay_to.strip()
                 if sgt in seen_person_keys:
@@ -1848,58 +1854,78 @@ class CaseWorkspaceService:
                          "entity_id trùng với dòng khác trong payload")
                 else:
                     seen_asset_entities[entity] = row_id
+            # MIN-140 (owner 29/09/2026): serial TÙY CHỌN, lưu nguyên
+            # văn — không bắt buộc, không ép canonical. Vẫn so khớp theo
+            # khóa chuẩn hóa (bỏ ký tự lạ + hoa/thường) để bắt trùng
+            # trong payload và gắn vào Property cũ — tránh merge nhầm.
             serial = row.get("so_serial")
-            if not isinstance(serial, str) or not serial.strip():
-                emit("so_serial", "required", "so_serial bắt buộc")
-            elif not _SERIAL_RE.match(serial.strip()):
-                emit("so_serial", "invalid_format",
-                     "so_serial phải canonical [A-Z]{2} + 6-8 chữ số")
-            else:
-                canon = serial.strip()
-                if canon in seen_serials:
+            if serial is not None:
+                if not isinstance(serial, str):
+                    emit("so_serial", "invalid_type",
+                         "so_serial phải là chuỗi hoặc null")
+                elif not serial.strip():
                     emit("so_serial", "invalid_format",
-                         "so_serial trùng với dòng khác trong payload")
+                         "so_serial rỗng — dùng null thay chuỗi rỗng")
                 else:
-                    seen_serials[canon] = row_id
-                    owner = self.db.query(Property).filter(
-                        Property.so_serial == canon).first()
-                    if (owner is not None and isinstance(entity, int)
-                            and not isinstance(entity, bool)
-                            and entity != owner.id):
-                        emit("so_serial", "invalid_format",
-                             "so_serial đã thuộc về tài sản khác")
-            dia_chi = row.get("dia_chi")
-            if not isinstance(dia_chi, str) or not dia_chi.strip():
-                emit("dia_chi", "required", "dia_chi bắt buộc")
+                    key = _serial_match_key(serial)
+                    if key is not None:
+                        if key in seen_serials:
+                            emit("so_serial", "invalid_format",
+                                 "so_serial trùng với dòng khác trong payload")
+                        else:
+                            seen_serials[key] = row_id
+                            owner = self._find_property_by_serial(key)
+                            if (owner is not None
+                                    and isinstance(entity, int)
+                                    and not isinstance(entity, bool)
+                                    and entity != owner.id):
+                                emit("so_serial", "invalid_format",
+                                     "so_serial đã thuộc về tài sản khác")
+            # Bắt buộc theo owner (MIN-140): số tờ, số thửa, địa chỉ +
+            # loại đất/diện tích trong land_rows; mọi trường khác (kể cả
+            # serial) để trống được.
+            for field in ("so_to_ban_do", "so_thua_dat", "dia_chi"):
+                value = row.get(field)
+                if not isinstance(value, str) or not value.strip():
+                    emit(field, "required", f"{field} bắt buộc")
             if not _valid_date_full(row.get("ngay_cap")):
                 emit("ngay_cap", "invalid_date",
                      "ngay_cap phải là YYYY-MM-DD hoặc null")
-            for field in ("so_vao_so", "so_thua_dat", "so_to_ban_do",
-                          "loai_so", "hinh_thuc_su_dung", "thoi_han",
-                          "nguon_goc", "co_quan_cap"):
+            for field in ("so_vao_so", "loai_so", "hinh_thuc_su_dung",
+                          "thoi_han", "nguon_goc", "co_quan_cap"):
                 self._check_nullable_str(row, field, emit)
             land_rows = row.get("land_rows")
-            if land_rows is not None:
-                if not isinstance(land_rows, list):
-                    emit("land_rows", "invalid_type",
-                         "land_rows phải là danh sách hoặc null")
-                else:
-                    for lr_index, lr in enumerate(land_rows):
-                        if not isinstance(lr, Mapping):
-                            emit("land_rows", "invalid_type",
-                                 f"land_rows[{lr_index}] phải là object")
-                            continue
-                        for lf in ("loai_dat", "thoi_han"):
-                            value = lr.get(lf)
-                            if value is not None and not isinstance(value, str):
-                                emit("land_rows", "invalid_type",
-                                     f"land_rows[{lr_index}].{lf} phải là chuỗi hoặc null")
-                        dt = lr.get("dien_tich")
-                        if dt is not None and (
-                                not isinstance(dt, (int, float))
-                                or isinstance(dt, bool)):
-                            emit("land_rows", "invalid_type",
-                                 f"land_rows[{lr_index}].dien_tich phải là số hoặc null")
+            if land_rows is None:
+                emit("land_rows", "required",
+                     "Tài sản phải có ít nhất một dòng loại đất/diện tích")
+            elif not isinstance(land_rows, list):
+                emit("land_rows", "invalid_type",
+                     "land_rows phải là danh sách")
+            elif not land_rows:
+                emit("land_rows", "required",
+                     "Tài sản phải có ít nhất một dòng loại đất/diện tích")
+            else:
+                for lr_index, lr in enumerate(land_rows):
+                    if not isinstance(lr, Mapping):
+                        emit("land_rows", "invalid_type",
+                             f"land_rows[{lr_index}] phải là object")
+                        continue
+                    loai_dat = lr.get("loai_dat")
+                    if not isinstance(loai_dat, str) or not loai_dat.strip():
+                        emit("land_rows", "required",
+                             f"land_rows[{lr_index}].loai_dat bắt buộc")
+                    dien_tich = lr.get("dien_tich")
+                    if dien_tich is None:
+                        emit("land_rows", "required",
+                             f"land_rows[{lr_index}].dien_tich bắt buộc")
+                    elif not isinstance(dien_tich, (int, float)) \
+                            or isinstance(dien_tich, bool):
+                        emit("land_rows", "invalid_type",
+                             f"land_rows[{lr_index}].dien_tich phải là số")
+                    thoi_han = lr.get("thoi_han")
+                    if thoi_han is not None and not isinstance(thoi_han, str):
+                        emit("land_rows", "invalid_type",
+                             f"land_rows[{lr_index}].thoi_han phải là chuỗi hoặc null")
 
         # Giới hạn §13.3/§13.5 — gắn row_id của dòng thừa.
         for index, row in enumerate(assets[MAX_ASSETS:], start=MAX_ASSETS):
@@ -1980,22 +2006,33 @@ class CaseWorkspaceService:
             resolved.append((row["row_id"], customer.id, wire))
         return resolved
 
+    def _find_property_by_serial(self, match_key: Optional[str]
+                                 ) -> Optional[Property]:
+        """Tìm Property theo khóa serial chuẩn hóa (MIN-140): 'XX 123456'
+        ≡ 'xx123456' — so trên cả hai phía sau `_serial_match_key`."""
+        if not match_key:
+            return None
+        for prop in self.db.query(Property).filter(
+                Property.so_serial.isnot(None)):
+            if _serial_match_key(prop.so_serial) == match_key:
+                return prop
+        return None
+
     def _upsert_assets(self, rows: list) -> list:
         resolved = []
         resolved_entities: dict[int, str] = {}
         for row in rows:
             entity = row.get("entity_id")
             prop = self._property(entity) if isinstance(entity, int) else None
+            serial = _nn(row.get("so_serial"))
+            if prop is None and serial:
+                prop = self._find_property_by_serial(
+                    _serial_match_key(serial))
             if prop is None:
-                serial = _clean(row.get("so_serial"))
-                if serial:
-                    prop = self.db.query(Property).filter(
-                        Property.so_serial == serial).first()
-            if prop is None:
-                prop = Property(so_serial=row["so_serial"].strip(),
+                prop = Property(so_serial=serial,
                                 dia_chi=row["dia_chi"].strip())
                 self.db.add(prop)
-            prop.so_serial = row["so_serial"].strip()
+            prop.so_serial = serial
             prop.so_vao_so = _nn(row.get("so_vao_so"))
             prop.so_thua_dat = _nn(row.get("so_thua_dat"))
             prop.so_to_ban_do = _nn(row.get("so_to_ban_do"))
@@ -2028,6 +2065,10 @@ class CaseWorkspaceService:
             wire = {key: row.get(key) for key in _asset_contract_keys()}
             wire["row_id"] = row["row_id"]
             wire["entity_id"] = prop.id
+            # MIN-140: emit đúng giá trị đã persist (verbatim, trim 2 đầu
+            # ở boundary — không canonical hoá, không surrogate)
+            wire["so_serial"] = prop.so_serial
+            wire["dia_chi"] = prop.dia_chi
             wire["land_rows"] = _parse_land_rows(prop.land_rows_json)
             resolved.append((row["row_id"], prop.id, wire))
         return resolved
@@ -2182,11 +2223,11 @@ class _StageCompose:
 
     __slots__ = ("payload", "people", "assets", "entity_to_row",
                  "persisted_people", "persisted_assets", "data_warnings",
-                 "legacy_notes", "dirty")
+                 "dirty")
 
     def __init__(self, payload, people, assets, entity_to_row,
                  persisted_people, persisted_assets, data_warnings,
-                 legacy_notes, dirty):
+                 dirty):
         self.payload = payload
         self.people = people
         self.assets = assets
@@ -2194,7 +2235,6 @@ class _StageCompose:
         self.persisted_people = persisted_people
         self.persisted_assets = persisted_assets
         self.data_warnings = data_warnings      # [{code,message}] §13.3
-        self.legacy_notes = legacy_notes        # [str] → diagram.warnings
         self.dirty = dirty
 
 

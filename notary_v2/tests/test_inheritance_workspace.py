@@ -640,36 +640,38 @@ def _draft_stage(rows, owner_row_id="__owner__"):
     return {
         "owner_row_id": (rows["owner"]
                          if owner_row_id == "__owner__" else owner_row_id),
+        # MIN-140: Người phải điền đủ trường có ô nhập; Tài sản cần
+        # số tờ/số thửa/địa chỉ + ≥1 land_row — fixture bắt buộc hợp lệ.
         "people": [
             {"row_id": rows["owner"], "entity_id": None,
              "ho_ten": "Nguyễn Văn An", "gioi_tinh": "Nam",
              "ngay_sinh": "1950-01-01", "ngay_chet": "2011-05-15",
-             "so_giay_to": None, "ngay_cap": None, "noi_cap": None,
-             "dia_chi": "xã A", "place_of_origin": None},
+             "so_giay_to": "001111111111", "ngay_cap": "2009-01-01",
+             "noi_cap": None, "dia_chi": "xã A", "place_of_origin": None},
             {"row_id": rows["spouse"], "entity_id": None,
              "ho_ten": "Nguyễn Thị Bình", "gioi_tinh": "Nữ",
              "ngay_sinh": "1955-03-02", "ngay_chet": None,
-             "so_giay_to": None, "ngay_cap": None, "noi_cap": None,
-             "dia_chi": "xã A", "place_of_origin": None},
+             "so_giay_to": "002222222222", "ngay_cap": "2009-01-01",
+             "noi_cap": None, "dia_chi": "xã A", "place_of_origin": None},
             {"row_id": rows["child"], "entity_id": None,
              "ho_ten": "Nguyễn Văn Con", "gioi_tinh": "Nam",
              "ngay_sinh": "1978-07-20", "ngay_chet": "2010-01-01",
-             "so_giay_to": None, "ngay_cap": None, "noi_cap": None,
-             "dia_chi": "xã A", "place_of_origin": None},
+             "so_giay_to": "003333333333", "ngay_cap": "2009-01-01",
+             "noi_cap": None, "dia_chi": "xã A", "place_of_origin": None},
             {"row_id": rows["gc"], "entity_id": None,
              "ho_ten": "Nguyễn Văn Cháu", "gioi_tinh": "Nam",
              "ngay_sinh": "2000-06-06", "ngay_chet": None,
-             "so_giay_to": None, "ngay_cap": None, "noi_cap": None,
-             "dia_chi": "xã A", "place_of_origin": None},
+             "so_giay_to": "004444444444", "ngay_cap": "2018-01-01",
+             "noi_cap": None, "dia_chi": "xã A", "place_of_origin": None},
         ],
         "assets": [
             {"row_id": str(uuid.uuid4()), "entity_id": None,
              "so_serial": "DD123456",
-             "so_vao_so": None, "so_thua_dat": None, "so_to_ban_do": None,
+             "so_vao_so": None, "so_thua_dat": "123", "so_to_ban_do": "45",
              "dia_chi": "Thửa 123", "loai_so": None,
              "hinh_thuc_su_dung": None, "thoi_han": None,
              "nguon_goc": None, "ngay_cap": None, "co_quan_cap": None,
-             "land_rows": None},
+             "land_rows": [{"loai_dat": "ODT", "dien_tich": 60.0}]},
         ],
     }
 

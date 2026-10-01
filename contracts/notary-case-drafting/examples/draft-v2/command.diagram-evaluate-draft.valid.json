@@ -17,8 +17,8 @@
           "gioi_tinh": "Nam",
           "ngay_sinh": "1950",
           "ngay_chet": "2011-05-15",
-          "so_giay_to": null,
-          "ngay_cap": null,
+          "so_giay_to": "012345678901",
+          "ngay_cap": "2010-06-15",
           "noi_cap": null,
           "dia_chi": "Hà Nội",
           "place_of_origin": null
@@ -30,8 +30,8 @@
           "gioi_tinh": "Nam",
           "ngay_sinh": "1980",
           "ngay_chet": null,
-          "so_giay_to": null,
-          "ngay_cap": null,
+          "so_giay_to": "001080012345",
+          "ngay_cap": "2021-01-10",
           "noi_cap": null,
           "dia_chi": "Hà Nội",
           "place_of_origin": null
@@ -52,7 +52,9 @@
           "nguon_goc": null,
           "ngay_cap": null,
           "co_quan_cap": null,
-          "land_rows": []
+          "land_rows": [
+            { "loai_dat": "ODT", "dien_tich": 85.5, "thoi_han": null }
+          ]
         }
       ]
     },

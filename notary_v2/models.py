@@ -34,7 +34,7 @@ class Customer(Base):
 
     @property
     def _moc_cccd_moi(self):
-        """01/07/2024 — ngưỡng phân biệt CCCD cũ/mới."""
+        """01/10/2024 — ngưỡng phân biệt CCCD cũ/mới."""
         from datetime import date
         return self.ngay_cap and self.ngay_cap >= date(2024, 10, 1)
 
@@ -59,7 +59,10 @@ class Property(Base):
     __tablename__ = "properties"
 
     id                = Column(Integer, primary_key=True, index=True)
-    so_serial         = Column(String(100), nullable=False, unique=True)
+    # MIN-140 (owner 29/09/2026): serial tùy chọn — null khi trống; text
+    # nguyên văn khi có (không ép canonical). UNIQUE giữ — SQLite cho
+    # phép nhiều NULL.
+    so_serial         = Column(String(100), nullable=True, unique=True)
     so_vao_so         = Column(String(100), nullable=True)
     so_thua_dat       = Column(String(100), nullable=True)
     so_to_ban_do      = Column(String(100), nullable=True)
