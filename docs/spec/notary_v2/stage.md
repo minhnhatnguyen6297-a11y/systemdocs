@@ -44,12 +44,23 @@ là ID database, có thể null trước commit.
 - CCCD/giấy tờ là free text, không dùng làm Case key.
 - Tài sản v2 tối đa 3; vị trí là thứ tự mảng, vị trí 1 là primary theo nghĩa
   engine. Không dùng `is_primary` trong wire v2.
-  * Bỏ trường lẻ `thoi_han` ở cấp tài sản vì là trường mồ côi.
+  * Bỏ trường lẻ `thoi_han` ở cấp tài sản vì là trường mồ côi: không tự đắp
+    vào cụm khi xuất; giữ nguyên bản gốc và báo cần đối chiếu.
   * Thông tin loại đất lưu cụm 3 trường: `loaidat` - `dientich` - `thoihan`
-    (tối đa 20 loại đất: `loaidat1`..`loaidat20`).
+    (tối đa 20 cụm một tài sản). Mỗi cụm là một bản ghi trong bảng con
+    `property_land_rows` (UNIQUE `(property_id, vitri)`, `vitri` = vị trí
+    cụm 1..20, giữ nguyên vị trí trống); `properties.land_rows_json` chỉ
+    còn vai trò tương thích/chuyển đổi, không còn là nguồn lưu chính.
+  * Wire/snapshot chấp nhận cả key canonical (`loaidat`/`dientich`/`thoihan`)
+    lẫn key legacy (`loai_dat`/`dien_tich`/`thoi_han`); cùng trường mà hai
+    key mang giá trị mâu thuẫn → `stage_validation_error` code `conflict`,
+    không chọn ngầm.
   * Định danh phân biệt Loại đất thứ mấy trong Tài sản thứ mấy:
     Cú pháp `[trường][loại đất M][tài sản N]` viết liền không dấu, **không có dấu gạch dưới `_`**.
     Ví dụ: `loaidat12` = loại đất 1 của tài sản 2; `dientich12` = diện tích loại đất 1 của tài sản 2; `thoihan12` = thời hạn loại đất 1 của tài sản 2.
+    Review MIN-141 (29/09/2026) chốt: chỉ dùng dạng đầy đủ `loaidat<M><N>`,
+    không thêm alias rút gọn `loaidatM` vì `loaidat12` trùng nghĩa giữa
+    "cụm 1 tài sản 2" và "cụm 12 tài sản 1".
 - Reorder đổi nghĩa vị trí nhưng không đổi `row_id`.
 - Hồ sơ thừa kế bắt buộc `owner_row_id`; hồ sơ `two_party` cấm trường này.
 - Hồ sơ có 3 trường quản lý: `noiniemyet` (suy từ địa chỉ đất + bảng xã),

@@ -43,12 +43,14 @@ from typing import Any, Optional
 from sqlalchemy import text as sa_text
 from sqlalchemy.exc import IntegrityError, OperationalError
 
+from database import MAX_LAND_ROWS, _land_row_field
 from models import (
     Customer,
     InheritanceCase,
     InheritanceCaseProperty,
     InheritanceParticipant,
     Property,
+    PropertyLandRow,
 )
 from services.inheritance_engine import run_inheritance_case
 
@@ -289,6 +291,15 @@ def _asset_contract_keys() -> tuple[str, ...]:
 _STAGE_KEYS = {"owner_row_id", "people", "assets"}
 _PERSON_FIELD_SET = set(_person_contract_keys())
 _ASSET_FIELD_SET = set(_asset_contract_keys())
+
+# Key cụm đất: canonical mới (loaidat/dientich/thoihan — tên nghiệp vụ
+# MIN-141 đợt 2, cùng là cột bảng property_land_rows) ↔ legacy wire/JSON
+# (loai_dat/dien_tich/thoi_han — giữ shape contract §4.2 cho UI hiện hành).
+# Cả hai spelling đọc được; cùng mang giá trị mâu thuẫn → validation error.
+_LAND_ROW_KEY_SET = {"loaidat", "dientich", "thoihan",
+                     "loai_dat", "dien_tich", "thoi_han"}
+_LAND_ROW_STR_KEYS = ("loai_dat", "loaidat", "thoi_han", "thoihan")
+_LAND_ROW_NUM_KEYS = ("dien_tich", "dientich")
 
 
 # ------------------------------------------------------- legacy → V2 diagram
@@ -1416,16 +1427,20 @@ class CaseWorkspaceService:
         persisted_assets: list[dict] = []
         for index, snap in enumerate(snaps):
             entity = snap.get("_entity")
+            prop = self._property(entity)
             assets.append(self._asset_wire(
-                snap["row_id"], entity, self._property(entity),
+                snap["row_id"], entity, prop,
                 index=index, warnings=legacy_notes))
-            persisted_assets.append({
-                "id": (str(entity) if entity is not None
-                       else _clean(snap.get("id"))),
-                "row_id": snap["row_id"],
-                # Vị trí 1 = primary theo nghĩa đã normalize.
-                "is_primary": index == 0,
-            })
+            self._land_data_warnings(prop, snap["row_id"], data_warnings)
+            # Repersist giữ nguyên field snapshot đã commit (Word đọc từ
+            # đây — MIN-141 đợt 2); chỉ normalize id/row_id/is_primary.
+            persisted = {k: v for k, v in snap.items() if k != "_entity"}
+            persisted["id"] = (str(entity) if entity is not None
+                               else _clean(snap.get("id")))
+            persisted["row_id"] = snap["row_id"]
+            # Vị trí 1 = primary theo nghĩa đã normalize.
+            persisted["is_primary"] = index == 0
+            persisted_assets.append(persisted)
 
         return _StageCompose(
             payload=payload, people=people, assets=assets,
@@ -1464,9 +1479,10 @@ class CaseWorkspaceService:
                     prop: Optional[Property],
                     index: int = 0,
                     warnings: Optional[list] = None) -> dict:
-        """asset_row_v2 — KHÔNG emit `is_primary` (§13.3)."""
-        land_rows = _parse_land_rows(
-            prop.land_rows_json if prop is not None else None)
+        """asset_row_v2 — KHÔNG emit `is_primary` (§13.3). Cụm đất emit
+        theo key legacy của §4.2; nguồn đọc ưu tiên bảng con
+        property_land_rows, land_rows_json là fallback tương thích."""
+        land_rows = _land_rows_wire(_prop_land_rows(prop))
         raw_serial = prop.so_serial if prop is not None else None
         serial = _canonical_serial(raw_serial)
         if serial is None:
@@ -1494,6 +1510,45 @@ class CaseWorkspaceService:
             "co_quan_cap": _nn(prop.co_quan_cap if prop else None),
             "land_rows": land_rows,
         }
+
+    @staticmethod
+    def _land_data_warnings(prop: Optional[Property], row_id: str,
+                            warnings: list[dict]) -> None:
+        """Data warnings về cụm đất/thời hạn lẻ (MIN-141 đợt 2):
+        - land_rows_json lỗi/không phải mảng (bảng con trống) →
+          legacy_land_rows_invalid — đọc fallback trường lẻ, giữ nguyên.
+        - JSON > MAX_LAND_ROWS cụm → legacy_land_rows_overflow.
+        - properties.thoi_han lẻ không trùng thoihan cụm nào →
+          orphan_thoi_han — giữ nguyên, báo cần đối chiếu; không tự đoán
+          cụm tương ứng (AC4)."""
+        if prop is None:
+            return
+        table_rows = getattr(prop, "land_rows", None) or []
+        raw = _clean(getattr(prop, "land_rows_json", None))
+        if not table_rows and raw:
+            try:
+                data = json.loads(raw)
+            except (ValueError, TypeError):
+                data = None
+            if not isinstance(data, list):
+                warnings.append({
+                    "code": "stage.legacy_land_rows_invalid",
+                    "message": f"asset {row_id}: land_rows_json không "
+                               "parse được — đọc fallback trường lẻ"})
+            elif len(data) > MAX_LAND_ROWS:
+                warnings.append({
+                    "code": "stage.legacy_land_rows_overflow",
+                    "message": f"asset {row_id}: {len(data)} cụm đất "
+                               f"> {MAX_LAND_ROWS} — cần đối chiếu"})
+        term = _nn(getattr(prop, "thoi_han", None))
+        if term is not None:
+            rows = _prop_land_rows(prop) or []
+            if term not in {r["thoihan"] for r in rows}:
+                warnings.append({
+                    "code": "stage.orphan_thoi_han",
+                    "message": f"asset {row_id}: thoi_han lẻ '{term}' "
+                               "không gắn cụm nào — giữ nguyên, cần "
+                               "đối chiếu"})
 
     # ----- owner_row_id (§13.6)
 
@@ -1889,17 +1944,34 @@ class CaseWorkspaceService:
                             emit("land_rows", "invalid_type",
                                  f"land_rows[{lr_index}] phải là object")
                             continue
-                        for lf in ("loai_dat", "thoi_han"):
+                        _check_extra_keys(lr, _LAND_ROW_KEY_SET,
+                                          f"land_rows[{lr_index}]")
+                        for lf in _LAND_ROW_STR_KEYS:
                             value = lr.get(lf)
                             if value is not None and not isinstance(value, str):
                                 emit("land_rows", "invalid_type",
                                      f"land_rows[{lr_index}].{lf} phải là chuỗi hoặc null")
-                        dt = lr.get("dien_tich")
-                        if dt is not None and (
-                                not isinstance(dt, (int, float))
-                                or isinstance(dt, bool)):
-                            emit("land_rows", "invalid_type",
-                                 f"land_rows[{lr_index}].dien_tich phải là số hoặc null")
+                        for lf in _LAND_ROW_NUM_KEYS:
+                            dt = lr.get(lf)
+                            if dt is not None and (
+                                    not isinstance(dt, (int, float))
+                                    or isinstance(dt, bool)):
+                                emit("land_rows", "invalid_type",
+                                     f"land_rows[{lr_index}].{lf} phải là số hoặc null")
+                        for new_key, old_key in (
+                                ("loaidat", "loai_dat"),
+                                ("dientich", "dien_tich"),
+                                ("thoihan", "thoi_han")):
+                            _lv, conflict = _land_row_field(
+                                lr, new_key, old_key)
+                            if conflict:
+                                emit("land_rows", "conflict",
+                                     f"land_rows[{lr_index}] '{new_key}' "
+                                     f"và '{old_key}' có giá trị mâu thuẫn")
+                    for lr_index in range(MAX_LAND_ROWS, len(land_rows)):
+                        emit("land_rows", "land_row_limit",
+                             f"land_rows[{lr_index}] vượt giới hạn "
+                             f"{MAX_LAND_ROWS} cụm đất mỗi tài sản")
 
         # Giới hạn §13.3/§13.5 — gắn row_id của dòng thừa.
         for index, row in enumerate(assets[MAX_ASSETS:], start=MAX_ASSETS):
@@ -2001,15 +2073,26 @@ class CaseWorkspaceService:
             prop.so_to_ban_do = _nn(row.get("so_to_ban_do"))
             prop.dia_chi = row["dia_chi"].strip()
             prop.loai_so = _nn(row.get("loai_so"))
+            # Cụm đất → bảng con là nguồn lưu chính (MIN-141 đợt 2);
+            # land_rows_json giữ mirror tương thích cho đường đọc cũ.
+            # Replace-all: orphan-delete + flush TRƯỚC khi gán bộ mới —
+            # UNIQUE(property_id, vitri) (SQLAlchemy xếp INSERT trước
+            # DELETE trong cùng một flush nếu gán collection một lượt).
             land_rows = row.get("land_rows")
-            prop.land_rows_json = (
-                json.dumps([
-                    {"loai_dat": _nn(lr.get("loai_dat")),
-                     "dien_tich": lr.get("dien_tich"),
-                     "thoi_han": _nn(lr.get("thoi_han"))}
-                    for lr in land_rows if isinstance(lr, Mapping)
-                ], ensure_ascii=False)
+            normalized_rows = (
+                [_normalize_land_row(lr)
+                 for lr in land_rows if isinstance(lr, Mapping)]
                 if isinstance(land_rows, list) else None)
+            if prop.land_rows:
+                prop.land_rows = []
+                self.db.flush()
+            prop.land_rows = [
+                PropertyLandRow(vitri=i + 1, loaidat=r["loaidat"],
+                                dientich=r["dientich"], thoihan=r["thoihan"])
+                for i, r in enumerate(normalized_rows or [])]
+            prop.land_rows_json = (
+                _dump_land_rows_json(normalized_rows)
+                if normalized_rows is not None else None)
             prop.hinh_thuc_su_dung = _nn(row.get("hinh_thuc_su_dung"))
             prop.thoi_han = _nn(row.get("thoi_han"))
             prop.nguon_goc = _nn(row.get("nguon_goc"))
@@ -2028,7 +2111,7 @@ class CaseWorkspaceService:
             wire = {key: row.get(key) for key in _asset_contract_keys()}
             wire["row_id"] = row["row_id"]
             wire["entity_id"] = prop.id
-            wire["land_rows"] = _parse_land_rows(prop.land_rows_json)
+            wire["land_rows"] = _land_rows_wire(normalized_rows)
             resolved.append((row["row_id"], prop.id, wire))
         return resolved
 
@@ -2167,13 +2250,38 @@ class CaseWorkspaceService:
             for rid, entity, wire in resolved_people
         ]
         merged["assets"] = [
-            {"id": str(entity), "row_id": rid,
-             # vị trí = index; is_primary giữ projection cho web cũ.
-             "is_primary": index == 0}
+            self._asset_snapshot_item(rid, entity, wire, index)
             for index, (rid, entity, wire) in enumerate(resolved_assets)
         ]
         merged["diagram"] = diagram
         return merged
+
+    def _asset_snapshot_item(self, row_id: str, entity: Optional[int],
+                             wire: Mapping[str, Any], index: int) -> dict:
+        """Snapshot asset đầy đủ vào case_state_json (MIN-141 đợt 2):
+        Word đọc snapshot này thay vì master `properties` → mỗi hồ sơ
+        xuất đúng bản đã commit, không bị master của hồ sơ khác kéo đi
+        (hai hồ sơ dùng chung tài sản). `land_rows` emit key canonical
+        loaidat/dientich/thoihan; `loai_dat`/`dien_tich` tổng hợp giữ
+        lại cho đường đọc legacy."""
+        prop = (self.db.get(Property, entity)
+                if isinstance(entity, int) else None)
+        snap = {
+            "id": str(entity) if entity is not None else None,
+            "entity_id": entity,
+            "row_id": row_id,
+            # vị trí = index; is_primary giữ projection cho web cũ.
+            "is_primary": index == 0,
+        }
+        for key in _asset_contract_keys():
+            if key in ("row_id", "entity_id", "land_rows"):
+                continue
+            snap[key] = wire.get(key)
+        snap["loai_dat"] = _nn(prop.loai_dat) if prop is not None else None
+        snap["dien_tich"] = (prop.dien_tich if prop is not None else None)
+        rows = _prop_land_rows(prop)
+        snap["land_rows"] = rows if rows is not None else []
+        return snap
 
 
 class _StageCompose:
@@ -2246,6 +2354,10 @@ def _people_map(resolved_people: list) -> dict:
 
 
 def _parse_land_rows(raw: Any) -> Optional[list]:
+    """land_rows_json (hoặc list đã parse) → list[{loai_dat, dien_tich,
+    thoi_han}] — emit theo key legacy của contract §4.2. Đọc được cả key
+    canonical mới; mâu thuẫn cũ/mới trong JSON coi như key mới (nguồn
+    canonical) — JSON mirror do commit ghi luôn thống nhất."""
     if raw is None:
         return None
     try:
@@ -2258,14 +2370,76 @@ def _parse_land_rows(raw: Any) -> Optional[list]:
     for row in rows:
         if not isinstance(row, Mapping):
             continue
-        dien_tich = row.get("dien_tich")
+        loai_dat, _ = _land_row_field(row, "loaidat", "loai_dat")
+        dien_tich, _ = _land_row_field(row, "dientich", "dien_tich")
+        thoi_han, _ = _land_row_field(row, "thoihan", "thoi_han")
         out.append({
-            "loai_dat": _nn(row.get("loai_dat")),
+            "loai_dat": _nn(loai_dat),
             "dien_tich": dien_tich if isinstance(dien_tich, (int, float))
                          and not isinstance(dien_tich, bool) else None,
-            "thoi_han": _nn(row.get("thoi_han")),
+            "thoi_han": _nn(thoi_han),
         })
     return out
+
+
+def _normalize_land_row(row: Mapping[str, Any]) -> dict:
+    """land_row wire → canonical {loaidat, dientich, thoihan} (tên nghiệp
+    vụ mới = cột property_land_rows). Key mới ưu tiên, key cũ fallback —
+    mâu thuẫn hai spelling đã bị _validate_stage chặn nên pick ở đây
+    deterministic, không phải chọn ngầm."""
+    loaidat, _ = _land_row_field(row, "loaidat", "loai_dat")
+    dientich, _ = _land_row_field(row, "dientich", "dien_tich")
+    thoihan, _ = _land_row_field(row, "thoihan", "thoi_han")
+    return {
+        "loaidat": _nn(loaidat),
+        "dientich": (float(dientich)
+                     if isinstance(dientich, (int, float))
+                     and not isinstance(dientich, bool) else None),
+        "thoihan": _nn(thoihan),
+    }
+
+
+def _land_json_number(value: Any) -> Any:
+    """float nguyên → int cho JSON mirror gọn (80.0 → 80)."""
+    return (int(value)
+            if isinstance(value, float) and value.is_integer() else value)
+
+
+def _dump_land_rows_json(rows: list[dict]) -> str:
+    """Mirror tương thích: ghi land_rows_json theo key/shape legacy —
+    dòng rỗng = ba trường null, giữ đúng vị trí trống."""
+    return json.dumps([
+        {"loai_dat": r["loaidat"],
+         "dien_tich": _land_json_number(r["dientich"]),
+         "thoi_han": r["thoihan"]}
+        for r in rows], ensure_ascii=False)
+
+
+def _land_rows_wire(rows: Optional[list]) -> Optional[list]:
+    """Canonical {loaidat,dientich,thoihan} → key wire legacy
+    {loai_dat,dien_tich,thoi_han} (§4.2/§13.3 — UI đọc shape cũ)."""
+    if rows is None:
+        return None
+    return [{"loai_dat": r["loaidat"], "dien_tich": r["dientich"],
+             "thoi_han": r["thoihan"]} for r in rows]
+
+
+def _prop_land_rows(prop: Optional[Property]) -> Optional[list]:
+    """Nguồn cụm đất của tài sản → canonical [{loaidat, dientich,
+    thoihan}] | None. Bảng con là nguồn lưu chính (đã order theo vitri);
+    land_rows_json chỉ còn fallback cho dữ liệu chưa migrate / tài sản
+    tạo ngoài commit path."""
+    if prop is None:
+        return None
+    table_rows = getattr(prop, "land_rows", None) or []
+    if table_rows:
+        return [{"loaidat": _nn(r.loaidat), "dientich": r.dientich,
+                 "thoihan": _nn(r.thoihan)} for r in table_rows]
+    parsed = _parse_land_rows(prop.land_rows_json)
+    if parsed is None:
+        return None
+    return [{"loaidat": r["loai_dat"], "dientich": r["dien_tich"],
+             "thoihan": r["thoi_han"]} for r in parsed]
 
 
 def _utc_now_iso() -> str:

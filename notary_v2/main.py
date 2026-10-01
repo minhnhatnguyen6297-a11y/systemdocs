@@ -15,6 +15,7 @@ from database import (
     migrate_inheritance_case_properties_schema,
     migrate_inheritance_cases_schema,
     migrate_properties_schema,
+    migrate_property_land_rows,
     migrate_zalo_exchange_schema,
     migrate_zalo_schema,
 )
@@ -33,6 +34,7 @@ app_logger.info("Web logging initialized at %s", WEB_LOG_PATH)
 migrate_customers_nullable()
 migrate_inheritance_cases_schema()
 migrate_properties_schema()
+migrate_property_land_rows()
 migrate_inheritance_case_properties_schema()
 migrate_zalo_schema()
 migrate_zalo_exchange_schema()

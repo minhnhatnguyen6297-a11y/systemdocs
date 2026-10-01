@@ -28,3 +28,35 @@
 - **Rule chung về đặt tên trường:** Tiếng Việt không dấu, viết thường toàn bộ, **viết liền không dấu, tuyệt đối KHÔNG có dấu gạch dưới `_`** (ví dụ: `ten`, `ngaysinh`, `ngaychet`, `sogiayto`, `ngaycap`, `diachi`, `noicap`, `loaigiayto`, `loaicutru`, `noiniemyet`, `nguoinhanuyquyen`, `noidungviec`, `loaidat12`, `dientich12`, `thoihan12`).
 - **Nguồn:** Owner chỉ đạo trực tiếp tại comment issue NAIA-6 ngày 01/10/2026.
 - **Nơi lưu lâu dài:** `contracts/entities.md` §8–§9, `docs/spec/notary_v2/README.md`, `docs/spec/notary_v2/stage.md`, `docs/spec/notary_v2/input/property-rules.md`.
+
+---
+
+## 2026-10-0x — Đợt 2: cụm đất thành bản ghi DB
+
+- **Bảng con `property_land_rows`:** `(property_id, vitri, loaidat, dientich,
+  thoihan)`, UNIQUE `(property_id, vitri)`. `vitri` là vị trí cụm 1..20 trong
+  tài sản và giữ nguyên khe trống; N (vị trí tài sản trong hồ sơ) chỉ tồn tại
+  trong placeholder Word/snapshot, không ghi vào master dùng chung.
+- **`land_rows_json` hạ vai trò:** từ nguồn lưu chính xuống mirror tương
+  thích/đầu vào chuyển đổi. Đọc ưu tiên bảng con; JSON chỉ là fallback cho
+  tài sản chưa migrate. Không DROP/không ghi đè bản gốc trong bước này.
+- **Hai bộ key song song ở biên:** canonical `loaidat/dientich/thoihan`
+  (nghiệp vụ mới + snapshot `case_state_json`) và legacy
+  `loai_dat/dien_tich/thoi_han` (UI/wire hiện hành). Cùng trường mà hai key
+  mâu thuẫn → `stage_validation_error` code `conflict`, không chọn ngầm.
+- **`thoi_han` lẻ mồ côi:** không tự đắp vào cụm khi xuất Word; giữ nguyên
+  bản gốc, báo `stage.orphan_thoi_han` để đối chiếu. Chưa xóa cột vật lý.
+- **Word đọc snapshot đã commit:** `build_word_context`/`build_template_mapping`
+  lấy assets từ `case_state_json` trước — hai hồ sơ dùng chung tài sản không
+  cạnh tranh nguồn dữ liệu; master property chỉ là fallback cho hồ sơ cũ chưa
+  có snapshot assets.
+- **Commit nguyên khối:** master + cụm đất + mirror JSON + snapshot + revision
+  trong một transaction; upsert thay bộ cụm bằng clear → flush → insert để
+  không đâm UNIQUE khi reuse `(property_id, vitri)`.
+- **Migration khởi động song hành:** web `main.py` và sidecar
+  `notary_adapter._ensure_db` cùng gọi `migrate_property_land_rows()`; lời
+  gọi `migrate_zalo_exchange_schema()` thiếu ở sidecar được bổ sung.
+- **Tên placeholder:** giữ dạng đầy đủ `loaidat<M><N>` cho mọi hồ sơ (kể cả
+  1 tài sản), không thêm alias rút gọn — `loaidat12` trùng nghĩa
+  "cụm 1 tài sản 2" vs "cụm 12 tài sản 1".
+- **Nguồn:** review comment của Leader trên NAIA-6, 29/09/2026 (AC đợt 2).

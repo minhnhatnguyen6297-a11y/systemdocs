@@ -96,6 +96,11 @@ class Property(Base):
     # Quan hệ
     inheritance_cases = relationship("InheritanceCase", back_populates="tai_san")
     case_links = relationship("InheritanceCaseProperty", back_populates="property", cascade="all, delete-orphan")
+    # Cụm đất — bảng con là nguồn lưu chính (MIN-141 đợt 2);
+    # land_rows_json chỉ còn vai trò tương thích/chuyển đổi.
+    land_rows = relationship("PropertyLandRow", back_populates="property",
+                             cascade="all, delete-orphan",
+                             order_by="PropertyLandRow.vitri")
 
 
 class InheritanceCase(Base):
@@ -147,6 +152,36 @@ class InheritanceCaseProperty(Base):
 
     case = relationship("InheritanceCase", back_populates="property_links")
     property = relationship("Property", back_populates="case_links")
+
+
+class PropertyLandRow(Base):
+    """Một cụm đất của tài sản — nguồn lưu chính của cụm đất
+    (MIN-141 đợt 2). Unique (property_id, vitri); vitri là vị trí 1-based
+    trong mảng land_rows của Stage (giữ nguyên vị trí trống).
+
+    Ba cột nghiệp vụ dùng tên chuẩn mới: loaidat / dientich / thoihan
+    (tương đương key wire legacy loai_dat / dien_tich / thoi_han)."""
+
+    __tablename__ = "property_land_rows"
+
+    id = Column(Integer, primary_key=True, index=True)
+    property_id = Column(
+        Integer, ForeignKey("properties.id"), nullable=False, index=True)
+    vitri = Column(Integer, nullable=False)
+    loaidat = Column(String(200))
+    dientich = Column(Float)
+    thoihan = Column(String(200))
+
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(),
+                        onupdate=func.now())
+
+    property = relationship("Property", back_populates="land_rows")
+
+    __table_args__ = (
+        UniqueConstraint("property_id", "vitri",
+                         name="uq_property_land_row_vitri"),
+    )
 
 
 class InheritanceParticipant(Base):

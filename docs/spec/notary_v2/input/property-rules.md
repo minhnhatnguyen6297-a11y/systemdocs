@@ -27,9 +27,9 @@ Source of truth: phụ lục rule tài sản của [`README.md`](./README.md)
 | `ngay_cap` | Ngày cấp GCN |
 | `co_quan_cap` | Cơ quan cấp GCN |
 | `loai_dat` | Loại đất (mã hoặc tên) |
-| `thoi_han` | Thời hạn sử dụng đất *(trường lẻ mồ côi — MIN-141: bỏ ở cấp tài sản, chuyển hẳn vào cụm `(loai_dat, dien_tich, thoi_han)`)* |
+| `thoi_han` | Thời hạn sử dụng đất *(trường lẻ mồ côi — MIN-141: bỏ ở cấp tài sản, chuyển hẳn vào cụm `(loaidat, dientich, thoihan)`; không tự đắp vào cụm khi xuất, báo `stage.orphan_thoi_han` để đối chiếu)* |
 | `dien_tich` | Diện tích (m²) |
-| `land_rows` | Cụm Loại đất 1..20 gồm `(loaidat, dientich, thoihan)` |
+| `land_rows` | Cụm Loại đất 1..20 gồm `(loaidat, dientich, thoihan)`. **Lưu trữ (đợt 2):** mỗi cụm = 1 bản ghi `property_land_rows(property_id, vitri, loaidat, dientich, thoihan)`, UNIQUE `(property_id, vitri)`, `vitri` = index + 1, giữ nguyên vị trí trống. `properties.land_rows_json` chỉ là mirror tương thích. Payload chấp nhận cả key canonical lẫn key legacy (`loai_dat`/`dien_tich`/`thoi_han`); hai key mâu thuẫn → `stage_validation_error` code `conflict` |
 
 ---
 

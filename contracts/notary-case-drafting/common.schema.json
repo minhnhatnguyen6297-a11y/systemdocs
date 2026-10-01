@@ -109,9 +109,16 @@
     },
     "land_row": {
       "type": "object",
-      "required": ["loai_dat", "dien_tich", "thoi_han"],
+      "description": "Cụm đất — bộ key canonical mới loaidat/dientich/thoihan (MIN-141 đợt 2, khớp cột property_land_rows); bộ key legacy loai_dat/dien_tich/thoi_han vẫn đọc được để UI hiện hành không hỏng. Bắt buộc đủ một trong hai bộ; cùng mang giá trị mâu thuẫn → validation error.",
+      "anyOf": [
+        { "required": ["loaidat", "dientich", "thoihan"] },
+        { "required": ["loai_dat", "dien_tich", "thoi_han"] }
+      ],
       "additionalProperties": false,
       "properties": {
+        "loaidat": { "$ref": "#/definitions/nullable_string" },
+        "dientich": { "type": ["number", "null"] },
+        "thoihan": { "$ref": "#/definitions/nullable_string" },
         "loai_dat": { "$ref": "#/definitions/nullable_string" },
         "dien_tich": { "type": ["number", "null"] },
         "thoi_han": { "$ref": "#/definitions/nullable_string" }

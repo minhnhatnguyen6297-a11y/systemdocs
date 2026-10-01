@@ -279,6 +279,16 @@ asset_row:
 - `assets` non-empty → **đúng một** dòng `is_primary:true`; 0 hoặc ≥2 →
   `stage_validation_error{code:primary_count}`.
 - `land_rows` null-safe: thiếu/`[]` hợp lệ; phần tử null-safe từng field.
+- **Key cụm đất (MIN-141 đợt 2):** tên nghiệp vụ canonical mới là
+  `loaidat` / `dientich` / `thoihan` (trùng cột bảng con
+  `property_land_rows` và tên placeholder Word `loaidat<M><N>`... —
+  entities.md §9.2). Server đọc được cả bộ legacy
+  `loai_dat`/`dien_tich`/`thoi_han` để UI hiện hành không hỏng; wire
+  emit tiếp tục dùng bộ legacy (shape trên không đổi). Trong một phần
+  tử, cặp cũ-mới của cùng trường mang giá trị **mâu thuẫn** →
+  `stage_validation_error` (`code:"conflict"`), không âm thầm chọn một.
+  Vị trí cụm = index trong `land_rows` + 1 (cột `vitri`), kể cả dòng
+  trống hoàn toàn — giữ nguyên vị trí trống.
 
 ### 4.3 `notary.workspace_create` — tạo hồ sơ từ nháp (rev 1.1)
 
@@ -970,6 +980,7 @@ asset_row_v2:               # giống §4.2, TRỪ is_primary (bị loại)
     - loai_dat: <string | null>   #   (mục đích sử dụng)
       dien_tich: <number | null>  #   diện tích
       thoi_han: <string | null>   #   thời hạn
+      # key canonical loaidat/dientich/thoihan đọc được — §4.2 (MIN-141 đợt 2)
 ```
 
 - **Vị trí = index + 1.** `stage.assets[i]` là "tài sản ở vị trí
@@ -998,6 +1009,26 @@ asset_row_v2:               # giống §4.2, TRỪ is_primary (bị loại)
   liệu) kèm `result.data.warnings[]` data-code
   `stage.legacy_asset_overflow`; `workspace_commit_stage` từ chối tới
   khi người dùng giảm còn ≤3 (`asset_limit`). §13.8.
+- **Cụm đất tối đa 20/tài sản** (entities.md §9.2): phần tử
+  `land_rows[20]` trở đi → `stage_validation_error` với
+  `field_errors[].code:"land_row_limit"`. Persist là bảng con
+  `property_land_rows(property_id, vitri)` UNIQUE; commit ghi master +
+  cụm đất + `case_state_json` snapshot + revision trong **một**
+  transaction — rollback lỗi bất kỳ không để lại nửa ghi.
+- **Snapshot asset trong `case_state_json` (MIN-141 đợt 2):** mỗi phần
+  tử `assets[]` đã commit mang đủ field §4.2 + `land_rows` key canonical
+  + `loai_dat`/`dien_tich` tổng hợp. Word export đọc snapshot này → mỗi
+  hồ sơ xuất đúng bản đã commit, không đổi theo master `properties` khi
+  hai hồ sơ dùng chung tài sản. `properties.land_rows_json` giữ mirror
+  tương thích; data cũ được migrate-on-startup, JSON lỗi không bị ghi
+  đè.
+- **Thời hạn thuộc từng cụm** (MIN-141 đợt 2): xuất Word không tự lấy
+  `properties.thoi_han` lẻ đắp vào cụm. Dữ liệu cũ chỉ có thời hạn lẻ
+  không xác định được cụm tương ứng → `workspace_get` emit
+  `result.data.warnings[]` code `stage.orphan_thoi_han`, giữ nguyên bản
+  gốc, không tự đoán; `land_rows_json` lỗi/không parse được →
+  `stage.legacy_land_rows_invalid`; JSON >20 cụm →
+  `stage.legacy_land_rows_overflow`.
 - **`result.data.warnings`** (optional, array `{code, message}`) là mở
   rộng v2 cho cảnh báo cấp-stage (không thuộc `diagram.warnings`).
 

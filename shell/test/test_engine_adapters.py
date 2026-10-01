@@ -400,5 +400,78 @@ class TestRegistryWiring(unittest.TestCase):
                 os.environ["G1_NOTARY_V2_ROOT"] = old
 
 
+def _notary_available():
+    try:
+        engine_roots.engine_root("notary_v2")
+        return True
+    except CommandError:
+        return False
+
+
+@unittest.skipUnless(_notary_available(),
+                     "chua cau hinh engine root notary_v2")
+class TestNotarySchemaInit(unittest.TestCase):
+    """MIN-141 đợt 2: _ensure_db chạy đủ migration web-parity trên schema
+    THẬT trong sqlite tempdir (không mock việc gọi hàm):
+
+    - migrate_property_land_rows → bảng property_land_rows + UNIQUE
+      (property_id, vitri);
+    - migrate_zalo_schema / migrate_zalo_exchange_schema → đủ các bảng
+      Zalo (lời gọi exchange trước đây bị thiếu trong sidecar).
+    """
+
+    def test_ensure_db_creates_land_rows_and_zalo_tables(self):
+        import sqlite3
+        import notary_adapter
+
+        tmp = tempfile.TemporaryDirectory(prefix="g1-notary-schema-")
+        self.addCleanup(tmp.cleanup)
+        prev_data_dir = os.environ.get("G1_NOTARY_DATA_DIR")
+        prev_ready = notary_adapter._db_ready
+
+        def _restore():
+            if prev_data_dir is None:
+                os.environ.pop("G1_NOTARY_DATA_DIR", None)
+            else:
+                os.environ["G1_NOTARY_DATA_DIR"] = prev_data_dir
+            notary_adapter._db_ready = prev_ready
+            try:
+                database = engine_roots.import_engine_module(
+                    "notary_v2", "database")
+                database.engine.dispose()
+            except Exception:
+                pass
+        self.addCleanup(_restore)
+
+        os.environ["G1_NOTARY_DATA_DIR"] = tmp.name
+        notary_adapter._db_ready = False
+        notary_adapter._ensure_db()
+
+        db_path = Path(tmp.name) / "notary.db"
+        self.assertTrue(db_path.is_file())
+        con = sqlite3.connect(db_path)
+        try:
+            tables = {r[0] for r in con.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'")}
+            ddl = con.execute(
+                "SELECT sql FROM sqlite_master WHERE name=?",
+                ("property_land_rows",)).fetchone()[0]
+        finally:
+            con.close()
+
+        for table in ("property_land_rows",
+                      "zalo_message_texts", "zalo_data_sync_runs",
+                      "zalo_raw_records", "zalo_import_ledger",
+                      "zalo_sync_state", "zalo_parse_jobs",
+                      "zalo_intake_results"):
+            self.assertIn(table, tables, f"thieu bang {table}")
+        self.assertIn("property_id", ddl)
+        self.assertIn("vitri", ddl)
+        self.assertRegex(
+            ddl.replace("\n", " "),
+            r"UNIQUE\s*\(\s*property_id\s*,\s*vitri\s*\)",
+            "property_land_rows thieu UNIQUE (property_id, vitri)")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

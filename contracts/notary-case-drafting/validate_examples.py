@@ -43,6 +43,8 @@ DRAFT_ASSET_FIELDS = {
 DRAFT_STAGE_FIELDS = {"owner_row_id", "people", "assets"}
 DRAFT_DATA_CODES = {
     "stage.legacy_asset_overflow", "stage.legacy_primary_ambiguous",
+    "stage.legacy_land_rows_invalid", "stage.legacy_land_rows_overflow",
+    "stage.orphan_thoi_han",
     "diagram.two_party_unsupported", "diagram.selection_pruned",
 }
 

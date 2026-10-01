@@ -180,11 +180,12 @@ Các trường này được tính toán động qua công thức backend và k�
 
 - **Định dạng bắt buộc:** Tiếng Việt không dấu, viết thường toàn bộ, **viết liền không dấu, tuyệt đối KHÔNG có dấu gạch dưới `_` hay dấu cách**.
 - **Cấm:** Không dùng snake_case (`loai_dat`, `so_giay_to`), không dùng kebab-case (`loai-dat`), không dùng camelCase (`loaiDat`).
-- **Ví dụ đúng:** `ten`, `ngaysinh`, `ngaychet`, `sogiayto`, `ngaycap`, `diachi`, `noicap`, `loaigiayto`, `loaicutru`, `noiniemyet`, `nguoinhanuyquyen`, `noidungviec`, `loaidat1`, `dientich1`, `thoihan1`, `loaidat12`, `dientich12`, `thoihan12`.
+- **Ví dụ đúng:** `ten`, `ngaysinh`, `ngaychet`, `sogiayto`, `ngaycap`, `diachi`, `noicap`, `loaigiayto`, `loaicutru`, `noiniemyet`, `nguoinhanuyquyen`, `noidungviec`, `loaidat11`, `dientich11`, `thoihan11`, `loaidat12`, `dientich12`, `thoihan12`.
 
 ### 9.2. Bảng Tài sản (`properties`) — Phân biệt loại đất thứ mấy trong tài sản thứ mấy
 
-- **Loại bỏ trường lẻ:** Trường `thoi_han` ở cấp tài sản là trường mồ côi → loại bỏ, không dùng đơn lẻ.
+- **Lưu trữ (MIN-141 đợt 2):** mỗi cụm đất là một bản ghi trong bảng con `property_land_rows(property_id, vitri, loaidat, dientich, thoihan)`, UNIQUE `(property_id, vitri)`; `vitri` = vị trí cụm trong tài sản (1–20, giữ nguyên vị trí trống). `properties.land_rows_json` chỉ còn làm nguồn tương thích/chuyển đổi — không còn là nguồn lưu chính. `N` (vị trí tài sản trong hồ sơ) **không** được ghi cứng vào master — N chỉ xuất hiện trong tên placeholder Word/snapshot của từng hồ sơ.
+- **Loại bỏ trường lẻ:** Trường `thoi_han` ở cấp tài sản là trường mồ côi → loại bỏ khỏi đường xuất cụm; không tự đắp vào cụm khi không xác định được cụm tương ứng (báo cần đối chiếu, giữ nguyên bản gốc).
 - **Cụm thông tin loại đất:** Thông tin đất luôn đi liền theo bộ 3 trường: `loaidat` - `dientich` - `thoihan`.
 - **Cú pháp định danh phân biệt Loại đất thứ mấy trong Tài sản thứ mấy:**
   * Cấu trúc: `[tên_trường][chỉ_số_loại_đất][chỉ_số_tài_sản]` (viết liền, không có `_`).
@@ -195,10 +196,10 @@ Các trường này được tính toán động qua công thức backend và k�
 
 | Tên trường (Không có `_`) | Ý nghĩa nghiệp vụ | Ví dụ minh họa |
 |---|---|---|
-| `loaidat11` *(hoặc `loaidat1`)* | Loại đất **1** của Tài sản **1** | `ONT` / Đất ở |
-| `dientich11` *(hoặc `dientich1`)* | Diện tích loại đất **1** của Tài sản **1** | `120.5` |
-| `thoihan11` *(hoặc `thoihan1`)* | Thời hạn loại đất **1** của Tài sản **1** | `Lâu dài` |
-| `loaidat21` *(hoặc `loaidat2`)* | Loại đất **2** của Tài sản **1** | `CLN` |
+| `loaidat11` | Loại đất **1** của Tài sản **1** | `ONT` / Đất ở |
+| `dientich11` | Diện tích loại đất **1** của Tài sản **1** | `120.5` |
+| `thoihan11` | Thời hạn loại đất **1** của Tài sản **1** | `Lâu dài` |
+| `loaidat21` | Loại đất **2** của Tài sản **1** | `CLN` |
 | `loaidat12` | Loại đất **1** của Tài sản **2** | `LUC` |
 | `dientich12` | Diện tích loại đất **1** của Tài sản **2** | `500` |
 | `thoihan12` | Thời hạn loại đất **1** của Tài sản **2** | `2063` |
@@ -207,7 +208,7 @@ Các trường này được tính toán động qua công thức backend và k�
 | `loaidat23` | Loại đất **2** của Tài sản **3** | `RSX` |
 | `loaidat102` | Loại đất **10** của Tài sản **2** | `NTS` |
 
-*Ghi chú:* Khi hồ sơ chỉ có 1 tài sản duy nhất (trường hợp phổ biến), hệ thống chấp nhận dạng rút gọn `loaidat1`, `dientich1`, `thoihan1` (ngầm hiểu là tài sản 1). Khi có từ 2 đến 3 tài sản, bắt buộc áp dụng đầy đủ quy tắc `loaidat<M><N>` để tránh trùng lặp.
+*Ghi chú (quyết định MIN-141, review 29/09/2026):* chỉ dùng dạng đầy đủ `loaidat<M><N>` cho **mọi** hồ sơ, kể cả hồ sơ 1 tài sản — không cung cấp alias rút gọn `loaidatM`/`loaidat1`. Lý do: dạng rút gọn `loaidat12` đọc được thành "cụm 1 của tài sản 2" hoặc "cụm 12 của tài sản 1" → dễ trùng nghĩa khi template dùng lại giữa hồ sơ 1 và nhiều tài sản; một quy ước duy nhất loại trừ mập mờ.
 
 ### 9.3. Bảng Hồ sơ (`inheritance_cases`)
 

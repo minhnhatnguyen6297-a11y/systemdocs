@@ -1,7 +1,11 @@
+import json
+import logging
 import sqlite3
 from pathlib import Path
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import declarative_base, sessionmaker
+
+logger = logging.getLogger(__name__)
 
 # Dùng SQLite — file notary.db tự tạo trong thư mục dự án
 BASE_DIR = Path(__file__).resolve().parent
@@ -111,6 +115,252 @@ def migrate_properties_schema():
     })
     con.commit()
     con.close()
+
+
+# Bí danh key cụm đất: tên nghiệp vụ mới (canonical, MIN-141) → key JSON/wire
+# legacy. Giữ nguyên cả hai khi đọc; cả hai cùng có giá trị mâu thuẫn → lỗi.
+_LAND_FIELD_ALIASES = (
+    ("loaidat", "loai_dat"),
+    ("dientich", "dien_tich"),
+    ("thoihan", "thoi_han"),
+)
+# Giới hạn cụm đất/tài sản trên Stage (entities.md §9.2).
+MAX_LAND_ROWS = 20
+
+
+def _land_value_present(value) -> bool:
+    """Giá trị 'có' khi non-None và (chuỗi → khác rỗng sau strip)."""
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    return True
+
+
+def _land_row_field(row: dict, new_key: str, old_key: str):
+    """Đọc một trường cụm đất theo bí danh cũ/mới.
+
+    → (value, conflict). Mâu thuẫn = cả hai key đều có giá trị và giá trị
+    khác nhau (chuỗi so sau strip, số so theo giá trị) — caller báo lỗi,
+    không âm thầm chọn một (AC MIN-141 đợt 2)."""
+    new_v, old_v = row.get(new_key), row.get(old_key)
+    if not (_land_value_present(new_v) and _land_value_present(old_v)):
+        return (new_v if _land_value_present(new_v) else old_v), False
+
+    def _norm(v):
+        return v.strip() if isinstance(v, str) else v
+
+    return new_v, _norm(new_v) != _norm(old_v)
+
+
+def _land_area_to_float(value):
+    """dientich/dien_tich → float|None. bool và chuỗi không parse được →
+    raise ValueError (caller ghi anomaly, giữ nguyên bản gốc)."""
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        return float(text)  # ValueError → anomaly
+    raise ValueError(f"unsupported dien_tich type {type(value).__name__}")
+
+
+def migrate_property_land_rows(con=None):
+    """Tạo bảng con ``property_land_rows`` và backfill từ
+    ``properties.land_rows_json`` (MIN-141 đợt 2).
+
+    - Idempotent: tài sản đã có dòng trong bảng con → bỏ qua, không nhân đôi.
+    - Bảo toàn giá trị, thứ tự và vị trí trống: mọi phần tử mảng JSON thành
+      một dòng ``vitri`` = chỉ số mảng + 1; dòng rỗng → NULL cả ba cột.
+    - JSON lỗi / không phải mảng / dòng không phải object / key cũ-mới mâu
+      thuẫn / dien_tich không parse được → bỏ qua tài sản đó, giữ nguyên
+      land_rows_json, ghi anomaly trong report — không bỏ qua/cắt cụt rồi
+      báo thành công.
+    - Mảng vượt ``MAX_LAND_ROWS``: vẫn ghi đủ tất cả dòng để không mất dữ
+      liệu, đồng thời ghi anomaly ``over_limit`` cần đối chiếu.
+    - ``properties.thoi_han`` lẻ không trùng ``thoihan`` cụm nào → ghi
+      anomaly ``orphan_thoi_han``, giữ nguyên bản gốc, không tự đoán cụm.
+    - Không DROP/UPDATE ``land_rows_json`` trong bước chuyển đổi này.
+
+    ``con`` có thể truyền sqlite3.Connection tới DB khác (test/sidecar);
+    trả về report dict {table_created, scanned, backfilled, rows_inserted,
+    skipped_existing, empty, anomalies}.
+    """
+    own_con = con is None
+    if own_con:
+        con = sqlite3.connect(DB_PATH)
+    cur = con.cursor()
+    report = {
+        "table_created": False,
+        "scanned": 0,
+        "backfilled": 0,
+        "rows_inserted": 0,
+        "skipped_existing": 0,
+        "empty": 0,
+        "anomalies": [],
+    }
+
+    def anomaly(property_id, code, detail):
+        report["anomalies"].append(
+            {"property_id": property_id, "code": code, "detail": detail})
+        logger.warning(
+            "property_land_rows migration: property=%s %s — %s",
+            property_id, code, detail)
+
+    cur.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' "
+        "AND name='property_land_rows'")
+    if cur.fetchone() is None:
+        report["table_created"] = True
+    cur.executescript("""
+        CREATE TABLE IF NOT EXISTS property_land_rows (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            property_id INTEGER NOT NULL,
+            vitri INTEGER NOT NULL,
+            loaidat VARCHAR(200),
+            dientich FLOAT,
+            thoihan VARCHAR(200),
+            created_at DATETIME DEFAULT (CURRENT_TIMESTAMP),
+            updated_at DATETIME DEFAULT (CURRENT_TIMESTAMP),
+            FOREIGN KEY(property_id) REFERENCES properties(id),
+            CONSTRAINT uq_property_land_row_vitri
+                UNIQUE (property_id, vitri)
+        );
+        CREATE INDEX IF NOT EXISTS ix_property_land_rows_property_id
+        ON property_land_rows(property_id);
+    """)
+
+    cur.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' "
+        "AND name='properties'")
+    if cur.fetchone() is None:
+        # DB mới tinh — properties sẽ do create_all tạo sau; không có gì
+        # để backfill.
+        con.commit()
+        if own_con:
+            con.close()
+        return report
+
+    cur.execute("PRAGMA table_info(properties)")
+    prop_columns = {r[1] for r in cur.fetchall()}
+    if "land_rows_json" not in prop_columns:
+        # DB rất cũ chưa có cột JSON — gọi migrate_properties_schema
+        # trước; không có gì để backfill.
+        con.commit()
+        if own_con:
+            con.close()
+        return report
+
+    cur.execute(
+        "SELECT id, land_rows_json, thoi_han FROM properties ORDER BY id"
+        if "thoi_han" in prop_columns else
+        "SELECT id, land_rows_json, NULL FROM properties ORDER BY id")
+    for property_id, json_text, thoi_han in cur.fetchall():
+        report["scanned"] += 1
+        cur.execute(
+            "SELECT COUNT(*) FROM property_land_rows WHERE property_id=?",
+            (property_id,))
+        existing = cur.fetchone()[0]
+        cluster_terms = []
+        if existing:
+            report["skipped_existing"] += 1
+            cur.execute(
+                "SELECT thoihan FROM property_land_rows WHERE property_id=?",
+                (property_id,))
+            cluster_terms = [r[0] for r in cur.fetchall()]
+        else:
+            raw = (json_text or "").strip()
+            if not raw:
+                report["empty"] += 1
+            else:
+                try:
+                    data = json.loads(raw)
+                except (ValueError, TypeError):
+                    anomaly(property_id, "invalid_json",
+                            "land_rows_json không parse được")
+                    data = None
+                if data is not None:
+                    if not isinstance(data, list):
+                        anomaly(property_id, "invalid_shape",
+                                "land_rows_json không phải mảng")
+                    else:
+                        rows = []
+                        bad = False
+                        for index, item in enumerate(data):
+                            if not isinstance(item, dict):
+                                anomaly(property_id, "invalid_row",
+                                        f"land_rows[{index}] "
+                                        "không phải object")
+                                bad = True
+                                break
+                            values = {}
+                            for new_key, old_key in _LAND_FIELD_ALIASES:
+                                value, conflict = _land_row_field(
+                                    item, new_key, old_key)
+                                if conflict:
+                                    anomaly(
+                                        property_id, "conflict",
+                                        f"land_rows[{index}] '{new_key}' "
+                                        f"và '{old_key}' mâu thuẫn")
+                                    bad = True
+                                    break
+                                values[new_key] = value
+                            if bad:
+                                break
+                            try:
+                                values["dientich"] = _land_area_to_float(
+                                    values["dientich"])
+                            except ValueError:
+                                anomaly(
+                                    property_id, "invalid_dientich",
+                                    f"land_rows[{index}].dien_tich "
+                                    "không parse được")
+                                bad = True
+                                break
+                            values["loaidat"] = (
+                                values["loaidat"].strip()
+                                if isinstance(values["loaidat"], str)
+                                else values["loaidat"])
+                            values["thoihan"] = (
+                                values["thoihan"].strip()
+                                if isinstance(values["thoihan"], str)
+                                else values["thoihan"])
+                            rows.append(values)
+                        if not bad:
+                            for vitri, r in enumerate(rows, start=1):
+                                cur.execute(
+                                    "INSERT INTO property_land_rows "
+                                    "(property_id, vitri, loaidat, "
+                                    "dientich, thoihan) "
+                                    "VALUES (?,?,?,?,?)",
+                                    (property_id, vitri, r["loaidat"],
+                                     r["dientich"], r["thoihan"]))
+                            report["backfilled"] += 1
+                            report["rows_inserted"] += len(rows)
+                            if len(rows) > MAX_LAND_ROWS:
+                                anomaly(
+                                    property_id, "over_limit",
+                                    f"{len(rows)} cụm > {MAX_LAND_ROWS} "
+                                    "— đã ghi đủ, cần đối chiếu")
+                            cluster_terms = [r["thoihan"] for r in rows]
+        # Thời hạn lẻ không gắn được cụm → báo đối chiếu, giữ nguyên.
+        if isinstance(thoi_han, str) and thoi_han.strip():
+            term = thoi_han.strip()
+            matched = any(
+                isinstance(t, str) and t.strip() == term
+                for t in cluster_terms)
+            if not matched:
+                anomaly(property_id, "orphan_thoi_han",
+                        f"thoi_han lẻ '{term}' không trùng thoihan "
+                        "cụm nào — giữ nguyên, cần đối chiếu")
+    con.commit()
+    if own_con:
+        con.close()
+        assert_foreign_key_check()
+    return report
 
 
 def migrate_zalo_schema():

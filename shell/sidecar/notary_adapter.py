@@ -68,8 +68,10 @@ def _ensure_db():
     database.migrate_customers_nullable()
     database.migrate_inheritance_cases_schema()
     database.migrate_properties_schema()
+    database.migrate_property_land_rows()
     database.migrate_inheritance_case_properties_schema()
     database.migrate_zalo_schema()
+    database.migrate_zalo_exchange_schema()
     database.Base.metadata.create_all(bind=database.engine)
     _db_ready = True
 
