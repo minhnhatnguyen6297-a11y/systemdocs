@@ -853,12 +853,162 @@ def unlock(cid: int, db: Session = Depends(get_db)):
     return RedirectResponse(f"/cases/{cid}", status_code=302)
 
 
+def _snapshot_master_refs(db: Session) -> tuple[set[int], set[int]]:
+    """entity_id người/tài sản còn được snapshot case_state_json của các
+    hồ sơ đang tồn tại giữ lại (MIN-141 đợt 4) — tham chiếu sống chặn
+    dọn master dù bảng quan hệ không còn trỏ tới."""
+    customer_ids: set[int] = set()
+    property_ids: set[int] = set()
+
+    def _ent(row) -> Optional[int]:
+        if not isinstance(row, dict):
+            return None
+        for key in ("entity_id", "id"):
+            v = row.get(key)
+            if isinstance(v, bool):
+                continue
+            if isinstance(v, int):
+                return v
+            if isinstance(v, str) and v.strip().isdigit():
+                return int(v.strip())
+        return None
+
+    def _dig(v) -> Optional[int]:
+        """id kiểu int/str-digit; bỏ bool và uuid row_id."""
+        if isinstance(v, bool):
+            return None
+        if isinstance(v, int):
+            return v
+        if isinstance(v, str) and v.strip().isdigit():
+            return int(v.strip())
+        return None
+
+    for (raw,) in db.query(InheritanceCase.case_state_json):
+        if not raw:
+            continue
+        try:
+            doc = json.loads(raw)
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(doc, dict):
+            continue
+        # payload bọc ở đỉnh hoặc trong key "payload" tuỳ phiên bản
+        payload = doc.get("payload") if isinstance(doc.get("payload"), dict) else doc
+        for row in payload.get("stage") or []:
+            eid = _ent(row)
+            if eid is not None:
+                customer_ids.add(eid)
+        for row in payload.get("assets") or []:
+            eid = _ent(row)
+            if eid is not None:
+                property_ids.add(eid)
+        meta = payload.get("case") if isinstance(payload.get("case"), dict) else {}
+        uq = meta.get("nguoinhanuyquyen")
+        if isinstance(uq, dict):
+            v = _dig(uq.get("id"))
+            if v is not None:
+                customer_ids.add(v)
+        else:
+            v = _dig(uq)
+            if v is not None:
+                customer_ids.add(v)
+
+    # engine_state_json legacy (web cũ): node.personId/parentPersonId là
+    # customer id; node workspace mới dùng row_id uuid → _dig tự lọc.
+    for (raw,) in db.query(InheritanceCase.engine_state_json):
+        if not raw:
+            continue
+        try:
+            doc = json.loads(raw)
+        except (TypeError, ValueError):
+            continue
+        nodes = doc.get("nodes") if isinstance(doc, dict) else None
+        for node in nodes or []:
+            if not isinstance(node, dict):
+                continue
+            for key in ("personId", "parentPersonId"):
+                v = _dig(node.get(key))
+                if v is not None:
+                    customer_ids.add(v)
+    return customer_ids, property_ids
+
+
+def _live_master_refs(db: Session) -> tuple[set[int], set[int]]:
+    """Mọi tham chiếu sống tới master customers/properties từ dữ liệu
+    CÒN LẠI (sau khi hồ sơ đã flush-delete): case khác (người chết,
+    tài sản chính, người nhận ủy quyền), participant còn lại (kể cả
+    parent_customer_id), link tài sản phụ còn lại, snapshot còn lại."""
+    customer_ids = {
+        v for (v,) in db.query(InheritanceCase.nguoi_chet_id) if v is not None
+    }
+    customer_ids |= {
+        v for (v,) in db.query(InheritanceCase.nguoi_nhan_uy_quyen_id)
+        if v is not None
+    }
+    property_ids = {
+        v for (v,) in db.query(InheritanceCase.tai_san_id) if v is not None
+    }
+    for c_id, parent_id in db.query(
+        InheritanceParticipant.customer_id,
+        InheritanceParticipant.parent_customer_id,
+    ):
+        if c_id is not None:
+            customer_ids.add(c_id)
+        if parent_id is not None:
+            customer_ids.add(parent_id)
+    property_ids |= {
+        v for (v,) in db.query(InheritanceCaseProperty.property_id)
+        if v is not None
+    }
+    snap_customers, snap_properties = _snapshot_master_refs(db)
+    return customer_ids | snap_customers, property_ids | snap_properties
+
+
+def _delete_case_and_unreferenced_masters(db: Session,
+                                          case: InheritanceCase) -> None:
+    """MIN-141 đợt 4: xóa hồ sơ nháp + chỉ dọn master "thuộc hồ sơ" không
+    còn tham chiếu nào. Một transaction chung (caller commit).
+
+    Master thuộc hồ sơ = người chết, tài sản chính, người tham gia
+    (kể cả parent_customer_id) và tài sản liên kết phụ. Người nhận ủy
+    quyền là danh bạ tái dùng → không nằm trong danh sách dọn, nhưng
+    tham chiếu người nhận ủy quyền của hồ sơ KHÁC vẫn chặn dọn.
+    Không quét xóa danh bạ mồ côi ngoài phạm vi hồ sơ này.
+    """
+    customer_ids = {case.nguoi_chet_id}
+    property_ids = {case.tai_san_id}
+    for p in case.participants:
+        customer_ids.add(p.customer_id)
+        customer_ids.add(p.parent_customer_id)
+    for link in case.property_links:
+        property_ids.add(link.property_id)
+    customer_ids.discard(None)
+    property_ids.discard(None)
+
+    db.delete(case)
+    db.flush()  # participants/links của hồ sơ đã đi — không còn tính tham chiếu
+
+    live_customers, live_properties = _live_master_refs(db)
+    for cid_ in customer_ids - live_customers:
+        entity = db.get(Customer, cid_)
+        if entity is not None:
+            db.delete(entity)
+    for pid_ in property_ids - live_properties:
+        entity = db.get(Property, pid_)
+        if entity is not None:
+            db.delete(entity)  # land_rows cascade theo property
+
+
 @router.post("/{cid}/delete")
 def delete(cid: int, db: Session = Depends(get_db)):
     case = db.query(InheritanceCase).filter(InheritanceCase.id == cid).first()
     if case and not case.is_locked:
-        db.delete(case)
-        db.commit()
+        try:
+            _delete_case_and_unreferenced_masters(db, case)
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
     return RedirectResponse("/cases", status_code=302)
 
 
