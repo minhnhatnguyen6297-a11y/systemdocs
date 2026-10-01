@@ -102,3 +102,34 @@ bản ghi con thay vì JSON blob.
 - cwd: `<repo>/systemdocs`
 - `python contracts/notary-case-drafting/validate_examples.py` → **68 files,
   0 unexpected outcomes**.
+
+### Đợt 2 — sửa lỗi review Leader (commit `f464b59`)
+
+Leader review `7c43bef` chưa PASS; bốn sửa trong commit riêng:
+
+1. `_asset_wire` đọc snapshot `case_state_json` khi snapshot đủ field
+   nghiệp vụ (`_snapshot_has_asset_fields`, ngưỡng khớp word_engine) —
+   Stage mở lại khớp Word; snapshot con trỏ vẫn fallback master.
+2. `migrate_property_land_rows`: loaidat/thoihan sai kiểu (object/list/
+   bool) → anomaly `invalid_field`; `_land_area_to_float` strict (bool,
+   dict, inf/nan, chuỗi hỏng → `invalid_dientich`); giữ nguyên bản gốc,
+   tiếp tục property khác; lỗi bất ngờ → rollback + đóng connection.
+3. `_land_data_warnings` kiểm overflow trên nguồn thực đọc — bảng con
+   >20 dòng vẫn báo `stage.legacy_land_rows_overflow`, không truncate.
+4. `routers/properties.py inline_create`: validate land_rows theo luật
+   Stage (dual key, conflict/sai kiểu/quá 20 → 400), ghi master + bảng
+   con + mirror trong một transaction.
+
+Bằng chứng (cwd `notary_v2/`):
+- `pytest tests/test_property_land_rows.py tests/test_leader_review_probes.py -x -q` → **44 passed**
+  (probe Leader 3/3 green; +6 case sai kiểu, reopen-commit noop giữ
+  snapshot, pointer fallback, route create atomic + reject malformed).
+- `pytest tests/test_case_workspace.py tests/test_word_engine.py -q` → **77 passed**.
+- `pytest tests/ -q` (full) → **595 passed, 1 skipped, 8 failed** — 8 fail
+  giống hệt baseline `64f4544`/`7c43bef` (customers_excel jinja2,
+  doc_conversion_poc, zalo_*), không liên quan diff.
+- cwd `shell/`: `python test/test_engine_adapters.py` → **14 ran, 14 OK,
+  0 skipped** (môi trường local; review env của Leader báo 11 skipped —
+  khác nhau ở optional deps).
+- `python contracts/notary-case-drafting/validate_examples.py` → **68 files,
+  0 unexpected outcomes**.
