@@ -47,10 +47,14 @@ là ID database, có thể null trước commit.
   * Bỏ trường lẻ `thoi_han` ở cấp tài sản vì là trường mồ côi.
   * Thông tin loại đất lưu cụm 3 trường: `loaidat` - `dientich` - `thoihan`
     (tối đa 20 loại đất: `loaidat1`..`loaidat20`).
+  * Định danh phân biệt Loại đất thứ mấy trong Tài sản thứ mấy:
+    Cú pháp `[trường][loại đất M][tài sản N]` viết liền không dấu, **không có dấu gạch dưới `_`**.
+    Ví dụ: `loaidat12` = loại đất 1 của tài sản 2; `dientich12` = diện tích loại đất 1 của tài sản 2; `thoihan12` = thời hạn loại đất 1 của tài sản 2.
 - Reorder đổi nghĩa vị trí nhưng không đổi `row_id`.
 - Hồ sơ thừa kế bắt buộc `owner_row_id`; hồ sơ `two_party` cấm trường này.
 - Hồ sơ có 3 trường quản lý: `noiniemyet` (suy từ địa chỉ đất + bảng xã),
   `nguoinhanuyquyen` (danh mục quen/tạo mới), `noidungviec` (nhập tay).
+  Tất cả tuân thủ quy tắc viết liền không dấu, không có ký tự `_`.
 
 ## 6. Commit và lưu
 

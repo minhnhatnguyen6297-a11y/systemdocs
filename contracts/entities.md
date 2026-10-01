@@ -178,16 +178,36 @@ Các trường này được tính toán động qua công thức backend và k�
 
 ### 9.1. Quy tắc chung đặt tên trường (Rule chung)
 
-- Định dạng: **Tiếng Việt không dấu, viết thường, nếu có số thì viết liền vào**.
-- Ví dụ: `ten`, `ngaysinh`, `ngaychet`, `sogiayto`, `ngaycap`, `diachi`, `noicap`, `loaigiayto`, `loaicutru`, `loaidat1`, `dientich1`, `thoihan1`, `noiniemyet`, `nguoinhanuyquyen`, `noidungviec`.
+- **Định dạng bắt buộc:** Tiếng Việt không dấu, viết thường toàn bộ, **viết liền không dấu, tuyệt đối KHÔNG có dấu gạch dưới `_` hay dấu cách**.
+- **Cấm:** Không dùng snake_case (`loai_dat`, `so_giay_to`), không dùng kebab-case (`loai-dat`), không dùng camelCase (`loaiDat`).
+- **Ví dụ đúng:** `ten`, `ngaysinh`, `ngaychet`, `sogiayto`, `ngaycap`, `diachi`, `noicap`, `loaigiayto`, `loaicutru`, `noiniemyet`, `nguoinhanuyquyen`, `noidungviec`, `loaidat1`, `dientich1`, `thoihan1`, `loaidat12`, `dientich12`, `thoihan12`.
 
-### 9.2. Bảng Tài sản (`properties`)
+### 9.2. Bảng Tài sản (`properties`) — Phân biệt loại đất thứ mấy trong tài sản thứ mấy
 
 - **Loại bỏ trường lẻ:** Trường `thoi_han` ở cấp tài sản là trường mồ côi → loại bỏ, không dùng đơn lẻ.
-- **Cụm thông tin loại đất:** Thông tin đất phải đi liền theo bộ 3 trường: `Loại đất - Diện tích - Thời hạn`.
-  * Đặt tên theo thứ tự: `loaidat1` - `dientich1` - `thoihan1`, `loaidat2` - `dientich2` - `thoihan2`,...
-  * Số lượng trong 1 hồ sơ dao động từ 1 đến 5 là phổ biến, hỗ trợ tối đa 20 loại (`loaidat1` .. `loaidat20`).
-  * Định danh khi có nhiều tài sản (tối đa 3 tài sản): Đánh số kết hợp `[trường][chỉ số loại đất][chỉ số tài sản]`, ví dụ Loại đất 1 của Tài sản 2 là `loaidat12`.
+- **Cụm thông tin loại đất:** Thông tin đất luôn đi liền theo bộ 3 trường: `loaidat` - `dientich` - `thoihan`.
+- **Cú pháp định danh phân biệt Loại đất thứ mấy trong Tài sản thứ mấy:**
+  * Cấu trúc: `[tên_trường][chỉ_số_loại_đất][chỉ_số_tài_sản]` (viết liền, không có `_`).
+  * Trong đó:
+    - Ký tự chữ: `loaidat`, `dientich`, `thoihan`.
+    - Chữ số đầu: **Loại đất thứ mấy** trong tài sản (từ 1 đến 20).
+    - Chữ số sau: **Tài sản thứ mấy** trong hồ sơ (từ 1 đến 3).
+
+| Tên trường (Không có `_`) | Ý nghĩa nghiệp vụ | Ví dụ minh họa |
+|---|---|---|
+| `loaidat11` *(hoặc `loaidat1`)* | Loại đất **1** của Tài sản **1** | `ONT` / Đất ở |
+| `dientich11` *(hoặc `dientich1`)* | Diện tích loại đất **1** của Tài sản **1** | `120.5` |
+| `thoihan11` *(hoặc `thoihan1`)* | Thời hạn loại đất **1** của Tài sản **1** | `Lâu dài` |
+| `loaidat21` *(hoặc `loaidat2`)* | Loại đất **2** của Tài sản **1** | `CLN` |
+| `loaidat12` | Loại đất **1** của Tài sản **2** | `LUC` |
+| `dientich12` | Diện tích loại đất **1** của Tài sản **2** | `500` |
+| `thoihan12` | Thời hạn loại đất **1** của Tài sản **2** | `2063` |
+| `loaidat22` | Loại đất **2** của Tài sản **2** | `BHK` |
+| `loaidat13` | Loại đất **1** của Tài sản **3** | `HNK` |
+| `loaidat23` | Loại đất **2** của Tài sản **3** | `RSX` |
+| `loaidat102` | Loại đất **10** của Tài sản **2** | `NTS` |
+
+*Ghi chú:* Khi hồ sơ chỉ có 1 tài sản duy nhất (trường hợp phổ biến), hệ thống chấp nhận dạng rút gọn `loaidat1`, `dientich1`, `thoihan1` (ngầm hiểu là tài sản 1). Khi có từ 2 đến 3 tài sản, bắt buộc áp dụng đầy đủ quy tắc `loaidat<M><N>` để tránh trùng lặp.
 
 ### 9.3. Bảng Hồ sơ (`inheritance_cases`)
 
