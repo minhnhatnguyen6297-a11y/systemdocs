@@ -51,6 +51,7 @@ from models import (
     InheritanceParticipant,
     Property,
     PropertyLandRow,
+    derive_person_fields,
 )
 from services.inheritance_engine import run_inheritance_case
 
@@ -2266,11 +2267,6 @@ class CaseWorkspaceService:
             if customer is None:
                 customer = Customer()
                 self.db.add(customer)
-            # Giá trị suy ra theo master TRƯỚC khi ghi input mới — mốc
-            # đối chiếu cho `_resolve_derived_field` (echo cũ → tính
-            # lại; khác echo → bằng chứng xác nhận).
-            prev_derived = (customer.loai_giay_to, customer.noi_cap,
-                            customer.loai_dia_chi)
             customer.ho_ten = row["ho_ten"].strip()
             customer.gioi_tinh = row.get("gioi_tinh")
             customer.ngay_sinh = _parse_date_or_year(row.get("ngay_sinh"))
@@ -2299,6 +2295,17 @@ class CaseWorkspaceService:
             # ngay_cap; người chết không suy (thiếu → None).
             stored = prev_rows.get(row["row_id"])
             stored = stored if isinstance(stored, Mapping) else {}
+            # Giá trị suy ra của commit TRƯỚC tính lại từ INPUT NGUỒN đã
+            # lưu trong snapshot của chính hồ sơ này (ngay_chet/ngay_cap
+            # trong stored) — KHÔNG đọc master live: consumer khác có thể
+            # đã đổi master sau khi hồ sơ commit, làm echo bị nhận nhầm
+            # thành bằng chứng (MIN-141 review d7a8b4c). Snapshot cũ
+            # thiếu key nguồn → derive(None, None) → khác stored → giữ
+            # như bằng chứng đã xác nhận (tương thích snapshot cũ).
+            _prev = derive_person_fields(
+                _parse_date_or_year(stored.get("ngay_chet")),
+                _parse_date_or_year(stored.get("ngay_cap")))
+            prev_derived = (_prev[0], _prev[1], _prev[3])
             wire["loai_giay_to"] = _resolve_derived_field(
                 row.get("loai_giay_to"), stored.get("loai_giay_to"),
                 prev_derived[0],
@@ -2355,7 +2362,14 @@ class CaseWorkspaceService:
                 _dump_land_rows_json(normalized_rows)
                 if normalized_rows is not None else None)
             prop.hinh_thuc_su_dung = _nn(row.get("hinh_thuc_su_dung"))
-            prop.thoi_han = _nn(row.get("thoi_han"))
+            # `thoi_han` lẻ cấp tài sản đã rút khỏi form Stage (MIN-141
+            # review — thời hạn mới chỉ thuộc cụm land_rows). Client v2
+            # không gửi key → KHÔNG đụng cột master: dữ liệu lịch sử giữ
+            # nguyên để `_land_data_warnings` báo orphan_thoi_han đối
+            # chiếu (chưa DROP cột). Client cũ vẫn gửi key → ghi như
+            # trước (tương thích).
+            if "thoi_han" in row:
+                prop.thoi_han = _nn(row.get("thoi_han"))
             prop.nguon_goc = _nn(row.get("nguon_goc"))
             prop.ngay_cap = _parse_date_or_year(row.get("ngay_cap"))
             prop.co_quan_cap = _nn(row.get("co_quan_cap"))

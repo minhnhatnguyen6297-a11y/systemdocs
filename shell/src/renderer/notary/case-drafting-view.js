@@ -62,6 +62,9 @@ const PERSON_COLS = [
 
 // Asset stage rows — 4 hàng đầu khớp bản mẫu + 'land' chip + phần còn
 // lại của ASSET_FIELDS contract §13.3 (không bỏ trường).
+// KHÔNG có 'thoi_han' lẻ (MIN-141 owner chốt): thời hạn chỉ thuộc từng
+// cụm đất trong popup Loại đất; giá trị lẻ lịch sử giữ trong master,
+// báo qua warning orphan_thoi_han — không còn ô nhập.
 const ASSET_FIELD_ROWS = [
   ['so_serial', 'Số serial'],
   ['so_vao_so', 'Số vào sổ'],
@@ -71,7 +74,6 @@ const ASSET_FIELD_ROWS = [
   ['dia_chi', 'Địa chỉ'],
   ['loai_so', 'Loại sổ'],
   ['hinh_thuc_su_dung', 'Hình thức SD'],     // MIN-136: viet tat giam rong
-  ['thoi_han', 'Thời hạn'],
   ['nguon_goc', 'Nguồn gốc'],
   ['ngay_cap', 'Ngày cấp'],
   ['co_quan_cap', 'Cơ quan cấp'],

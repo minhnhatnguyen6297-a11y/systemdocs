@@ -32,9 +32,13 @@ const PERSON_FIELDS = ['ho_ten', 'gioi_tinh', 'ngay_sinh', 'ngay_chet',
   // MIN-141 đợt 3: gia trị xac nhan/suy ra — OCR/intake dien, commit
   // giu lai trong snapshot (contract §4.1).
   'loai_giay_to', 'loai_dia_chi'];
+// MIN-141 review: 'thoi_han' LE cap tai san da rut khoi whitelist —
+// thoi han moi chi thuoc land_rows[].thoi_han (popup Loại đất). Row
+// load tu server van co key (master giu lich su) → stageForWire()
+// strip truoc khi gui; backend giu nguyen master khi key vang.
 const ASSET_FIELDS = ['so_serial', 'so_vao_so',
   'so_thua_dat', 'so_to_ban_do', 'dia_chi', 'loai_so',
-  'hinh_thuc_su_dung', 'thoi_han', 'nguon_goc', 'ngay_cap', 'co_quan_cap'];
+  'hinh_thuc_su_dung', 'nguon_goc', 'ngay_cap', 'co_quan_cap'];
 const NODE_BOOL_FIELDS = ['hidden', 'deleted'];
 const NODE_POSITION_FIELDS = ['ownPositions', 'receivePositions'];
 
@@ -65,6 +69,20 @@ function documentTypesFor(caseType) {
 
 function clone(v) {
   return v === undefined ? undefined : JSON.parse(JSON.stringify(v));
+}
+
+// Stage payload gui len wire: strip key 'thoi_han' le cap tai san
+// (MIN-141 review — owner chot bo truong le; thoi han moi chi thuoc
+// cum dat land_rows[].thoi_han). Row load tu server van mang key tu
+// master → xoa o boundary de "ngung gui gia tri le nhu du lieu moi".
+// Backend doc key-presence: key vang = giu nguyen master (lich su con
+// can cho warning orphan_thoi_han), khong phai xoa.
+function stageForWire(stage) {
+  const s = clone(stage);
+  for (const a of (s && s.assets) || []) {
+    if (a && typeof a === 'object') delete a.thoi_han;
+  }
+  return s;
 }
 
 function defaultUuid() {
@@ -466,7 +484,7 @@ function createModel(deps) {
     const r = await client.run('notary.workspace_create', {
       idempotency_key: state.draftId,
       case: meta,
-      stage: clone(state.stage),
+      stage: stageForWire(state.stage),
       diagram: { state: clone(state.diagram) },
     });
     state.busy = null;
@@ -686,7 +704,7 @@ function createModel(deps) {
     const payload = {
       case_id: state.caseId,
       base_revision: state.revision,
-      stage: clone(state.stage),
+      stage: stageForWire(state.stage),
     };
     // đợt 3 (MIN-141): metadata hồ sơ ghi cung Stage trong mot
     // transaction — payload.case la block day du, chi gui khi meta
@@ -972,7 +990,7 @@ function createModel(deps) {
     // + hint case.case_type de server evaluate dung domain (§13.7).
     const payload = state.caseId == null
       ? { case: { case_type: caseType() },
-          stage: clone(state.stage),
+          stage: stageForWire(state.stage),
           diagram: { state: clone(state.diagram) } }
       : { case_id: state.caseId,
           diagram: { state: clone(state.diagram) } };

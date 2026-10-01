@@ -859,6 +859,61 @@ def _snapshot_asset_view(item: dict[str, Any]) -> Any:
     )
 
 
+def _snap_date_value(value: Any) -> Any:
+    """Ngày trong snapshot person (ISO 'YYYY-MM-DD' hoặc năm 'YYYY') →
+    `date` để _fmt_date/_fmt_birth_or_year render đồng nhất với đường
+    master. Không parse được → giữ chuỗi gốc (pass-through)."""
+    if not isinstance(value, str) or not value:
+        return value
+    text = value.strip()
+    try:
+        if re.fullmatch(r"\d{4}", text):
+            return date(int(text), 1, 1)
+        return date.fromisoformat(text[:10])
+    except ValueError:
+        return value
+
+
+def _snapshot_person_view(customer: Any, row: dict) -> Any:
+    """View Người cho slot `[Tên N]`…`[noicapN]` — đọc bằng chứng đã
+    commit trong snapshot `stage[]` của chính hồ sơ thay vì master
+    `customers` live (MIN-141 review: master dùng chung có thể bị hồ sơ
+    khác đổi sau commit; vd loai_giay_to/ngay_cap của người chết model
+    trả None nên đường live làm mất 'Giấy chứng tử' đã xác nhận).
+
+    Per-key presence như `_snap_meta`: key có trong snapshot → dùng giá
+    trị snapshot (kể cả null chủ ý → rỗng); key vắng (snapshot cũ) →
+    fallback master live."""
+
+    def pick(key: str) -> Any:
+        return row[key] if key in row else getattr(customer, key, None)
+
+    return SimpleNamespace(
+        id=getattr(customer, "id", None),
+        ho_ten=_safe_text(pick("ho_ten")),
+        gioi_tinh=_safe_text(pick("gioi_tinh")),
+        ngay_sinh=_snap_date_value(pick("ngay_sinh")),
+        ngay_chet=_snap_date_value(pick("ngay_chet")),
+        so_giay_to=_safe_text(pick("so_giay_to")),
+        ngay_cap=_snap_date_value(pick("ngay_cap")),
+        noi_cap=_safe_text(pick("noi_cap")),
+        dia_chi=_safe_text(pick("dia_chi")),
+        loai_giay_to=_safe_text(pick("loai_giay_to")),
+        loai_dia_chi=_safe_text(pick("loai_dia_chi")),
+    )
+
+
+def _snapshot_people_by_id(state: dict[str, Any]) -> dict[str, dict]:
+    """{entity_id str → row} từ snapshot `stage[]` — đối chiếu slot
+    Người legacy (Customer live) với bản đã commit của hồ sơ."""
+    out: dict[str, dict] = {}
+    stage = state.get("stage") if isinstance(state, dict) else None
+    for item in stage or []:
+        if isinstance(item, dict) and item.get("id") is not None:
+            out[str(item.get("id"))] = item
+    return out
+
+
 def _live_props_by_id(case: Any) -> dict[int, Any]:
     """{property_id: Property live} — fallback cho snapshot item chỉ có
     pointer (payload trước đợt 2)."""
@@ -1373,8 +1428,22 @@ def build_template_mapping(case: Any, today: date | None = None) -> dict[str, st
         "[SĐT]": "",
     }
 
+    # Slot Người: thứ tự giữ nguyên legacy (_pick_core_people trên
+    # participants live), nhưng FIELD đọc bằng chứng đã commit trong
+    # snapshot stage[] — đối chiếu theo entity id (MIN-141 review:
+    # master customers dùng chung đổi sau commit không được kéo giá trị
+    # slot đi; người chết có bằng chứng 'Giấy chứng tử' không bị model
+    # trả None xóa mất). Snapshot cũ thiếu key → fallback master.
+    _snap_people = _snapshot_people_by_id(_state_doc)
+
+    def _slot_person(c):
+        if c is None:
+            return None
+        row = _snap_people.get(str(getattr(c, "id", "")))
+        return _snapshot_person_view(c, row) if row is not None else c
+
     for i in range(1, 21):
-        c = people_slots[i]
+        c = _slot_person(people_slots[i])
         mapping[f"[Tên {i}]"] = _safe_text(getattr(c, "ho_ten", "") if c else "")
         mapping[f"[Năm sinh {i}]"] = _fmt_birth_or_year(getattr(c, "ngay_sinh", None) if c else None)
         mapping[f"[CCCD {i}]"] = _safe_text(getattr(c, "so_giay_to", "") if c else "")

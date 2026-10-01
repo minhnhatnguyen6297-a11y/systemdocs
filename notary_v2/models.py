@@ -5,6 +5,34 @@ from sqlalchemy.sql import func
 from database import Base
 
 
+def derive_person_fields(ngay_chet, ngay_cap):
+    """Trường suy ra của Người từ input nguồn → tuple
+    `(loai_giay_to, noi_cap, loaicutru, loai_dia_chi)`.
+
+    Mốc phân biệt giấy tờ cũ/mới = 01/10/2024 (owner chốt 29/09/2026).
+    Người chết (có `ngay_chet`) không suy loại giấy tờ/nơi cấp — đó là
+    bằng chứng người dùng xác nhận, sống trong snapshot hồ sơ; nhãn địa
+    chỉ = "Nơi chết". Người sống thiếu `ngay_cap` → None (chưa xác định,
+    không tự suy cơ quan cụ thể).
+
+    Đây là SOT của rule suy ra: property Customer.* gọi hàm này, và
+    case_workspace dùng nó để tính lại giá trị suy ra từ input nguồn
+    đã commit trong snapshot — không qua master live (MIN-141 review)."""
+    from datetime import date as _date
+    if ngay_chet is not None:
+        return None, None, "Nơi chết", "Nơi chết"
+    if not ngay_cap:
+        return None, None, None, None
+    moc_moi = ngay_cap >= _date(2024, 10, 1)
+    return (
+        "Căn cước" if moc_moi else "Căn cước công dân",
+        "Bộ Công an" if moc_moi
+        else "Cục cảnh sát quản lý hành chính về trật tự xã hội",
+        "Cư trú" if moc_moi else "Thường trú",
+        "Cư trú tại" if moc_moi else "Thường trú tại",
+    )
+
+
 class Customer(Base):
     """Bảng lưu thông tin người (sống hoặc đã chết)."""
     __tablename__ = "customers"
@@ -33,12 +61,6 @@ class Customer(Base):
         return self.ngay_chet is None
 
     @property
-    def _moc_cccd_moi(self):
-        """01/10/2024 — ngưỡng phân biệt CCCD cũ/mới."""
-        from datetime import date
-        return self.ngay_cap and self.ngay_cap >= date(2024, 10, 1)
-
-    @property
     def loai_giay_to(self):
         """Loại giấy tờ định danh.
         - Người sống: theo mốc `ngay_cap` 01/10/2024 → `Căn cước công dân`
@@ -48,11 +70,7 @@ class Customer(Base):
           OCR được xác nhận / lựa chọn lưu trong snapshot hồ sơ
           (`stage[].loai_giay_to`); model trả None khi chưa có bằng chứng.
         """
-        if not self.con_song:
-            return None
-        if not self.ngay_cap:
-            return None
-        return "Căn cước" if self._moc_cccd_moi else "Căn cước công dân"
+        return derive_person_fields(self.ngay_chet, self.ngay_cap)[0]
 
     @property
     def noi_cap(self):
@@ -62,33 +80,20 @@ class Customer(Base):
         - Người chết: chưa có bảng xã NAIA-9 nên KHÔNG suy tên xã cũ/mới
           — nơi cấp lấy từ snapshot/bằng chứng đã xác nhận; None khi
           chưa có."""
-        if not self.con_song:
-            return None
-        if not self.ngay_cap:
-            return None
-        return ("Bộ Công an" if self._moc_cccd_moi
-                else "Cục cảnh sát quản lý hành chính về trật tự xã hội")
+        return derive_person_fields(self.ngay_chet, self.ngay_cap)[1]
 
     @property
     def loaicutru(self):
         """'Cư trú' (từ 01/10/2024) / 'Thường trú' (trước); 'Nơi chết' với
         người chết (diachi = nơi chết/nơi thường trú cuối — entities.md
         §8.1); thiếu `ngay_cap` người sống → None (chưa xác định)."""
-        if not self.con_song:
-            return "Nơi chết"
-        if not self.ngay_cap:
-            return None
-        return "Cư trú" if self._moc_cccd_moi else "Thường trú"
+        return derive_person_fields(self.ngay_chet, self.ngay_cap)[2]
 
     @property
     def loai_dia_chi(self):
         """'Cư trú tại' / 'Thường trú tại' theo mốc 01/10/2024; 'Nơi chết'
         với người chết; thiếu `ngay_cap` người sống → None."""
-        if not self.con_song:
-            return "Nơi chết"
-        if not self.ngay_cap:
-            return None
-        return "Cư trú tại" if self._moc_cccd_moi else "Thường trú tại"
+        return derive_person_fields(self.ngay_chet, self.ngay_cap)[3]
 
 
 class Property(Base):

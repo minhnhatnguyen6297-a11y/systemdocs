@@ -325,6 +325,46 @@ test('land dialog: Hủy không đụng draft Stage', () => {
     'Hủy vẫn ghi land_rows vào Stage draft');
 });
 
+// ---------- MIN-141 review: bỏ thoi_han LẺ cấp tài sản ----------
+
+test('MIN-141: asset table KHÔNG còn ô Thời hạn lẻ; dialog cụm đất vẫn có', () => {
+  const { model, view } = build(test);
+  model.addAsset();
+  const rid = model.state.stage.assets[0].row_id;
+  assert.equal(fid(view.el, `a:${rid}:thoi_han`), null,
+    'còn input thoi_han lẻ cấp tài sản');
+  const tbl = collect(view.el, (e) => e.classList.contains('cd-tbl'))[0];
+  assert.equal(collect(tbl, (e) => e.tagName === 'TD' &&
+    e.textContent.trim() === 'Thời hạn').length, 0,
+    'còn hàng nhãn "Thời hạn" lẻ trong bảng tài sản');
+  // Thời hạn chỉ sống trong popup Loại đất theo từng cụm.
+  fid(view.el, `a:${rid}:land`).onclick();
+  const modal = collect(view.el,
+    (e) => e.classList.contains('modal'))[0];
+  findBtns(modal, '+ Loại đất')[0].onclick();
+  assert.ok(modal.textContent.includes('Thời hạn'),
+    'dialog cụm đất mất ô Thời hạn');
+});
+
+test('MIN-141: commit Stage KHÔNG gửi thoi_han lẻ; land_rows.thoi_han giữ', async () => {
+  const { model, view, calls } = build(test, { draft: false });
+  // Giả lập tài sản committed mang giá trị lẻ lịch sử + 1 cụm đất.
+  const asset = model.state.stage.assets[0];
+  asset.thoi_han = 'Lâu dài';
+  asset.land_rows = [{ loai_dat: 'ONT', dien_tich: '50',
+                       thoi_han: 'Lâu dài' }];
+  model.state.stageDirty = true;
+  calls.length = 0;
+  await findBtns(topbar(view.el), 'Cập nhật')[0].onclick();
+  const call = calls.find(([c]) => c === 'notary.workspace_commit_stage');
+  assert.ok(call, 'Cập nhật không gọi workspace_commit_stage');
+  const sent = call[1].stage.assets[0];
+  assert.equal('thoi_han' in sent, false,
+    'wire vẫn gửi thoi_han lẻ như dữ liệu mới');
+  assert.equal(sent.land_rows[0].thoi_han, 'Lâu dài',
+    'mất thoi_han của cụm đất trên wire');
+});
+
 // ---------- Pool committed-only ----------
 
 test('Pool case thật = committed − đã gán; KHÔNG có thẻ tài sản (MIN-136)', () => {

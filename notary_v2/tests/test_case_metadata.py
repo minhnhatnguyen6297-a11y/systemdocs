@@ -604,3 +604,93 @@ def test_legacy_snapshot_without_case_block_reads_master(db):
     mapping = word_engine.build_template_mapping(case)
     assert mapping["[Nơi niêm yết]"] == "UBND xã Master"
     assert mapping["[Nội dung việc]"] == "Việc master"
+
+
+# ============================================================ MIN-141
+# review d7a8b4c: slot Người đọc bằng chứng snapshot + prev_derived từ
+# input nguồn snapshot + thoi_han lẻ key-presence.
+
+
+def test_word_person_slots_use_snapshot_evidence_via_docx(db):
+    """Slot Người (thứ tự legacy, đối chiếu theo id) render bằng chứng
+    đã commit trong snapshot — cả token chuẩn lẫn alias cũ, qua
+    replace_in_doc thật (không chỉ dict)."""
+    from docx import Document
+
+    data = _create(db, with_state=True, people_overrides=(
+        {"loai_giay_to": "Giấy chứng tử", "noi_cap": "UBND X"},
+        {"ngay_cap": "2024-10-01"}))
+    case = db.get(InheritanceCase, data["case"]["id"])
+    mapping = word_engine.build_template_mapping(case)
+    doc = Document()
+    # Slot 1 = chủ đất chết: model Customer trả None cho loai_giay_to/
+    # noi_cap người chết → giá trị chỉ có trong snapshot.
+    doc.add_paragraph("[Loại CC 1]|[Nơi cấp CC 1]|[loaigiayto1]|"
+                      "[noicap1]|[Thường trú 1]|[loaicutru1]")
+    word_engine.replace_in_doc(doc, mapping)
+    assert doc.paragraphs[0].text == (
+        "Giấy chứng tử|UBND X|Giấy chứng tử|UBND X|Nơi chết|Nơi chết")
+
+
+def test_word_person_slots_isolated_from_master_edits_after_commit(db):
+    """Master customers (dùng chung nhiều hồ sơ) bị đổi SAU commit →
+    slot Người vẫn giữ giá trị đã commit trong snapshot của hồ sơ."""
+    data = _create(db, with_state=True,
+                   people_overrides=({}, {"ngay_cap": "2024-09-30"}))
+    case = db.get(InheritanceCase, data["case"]["id"])
+    snap = _snapshot(db, data["case"]["id"])
+    heir_entity = int(snap["stage"][1]["id"])
+    owner_entity = int(snap["stage"][0]["id"])
+    # Consumer khác sửa master: đổi tên chủ đất + ngay_cap người thừa
+    # kế qua mốc (live derive giờ trả "Căn cước").
+    db.get(Customer, owner_entity).ho_ten = "Tên Master Bị Đổi"
+    db.get(Customer, heir_entity).ngay_cap = date(2024, 10, 1)
+    db.flush()
+    mapping = word_engine.build_template_mapping(case)
+    assert mapping["[Tên 1]"] == "Nguyễn Văn Chết"
+    assert mapping["[loaigiayto3]"] == "Căn cước công dân"
+    assert mapping["[noicap3]"] == (
+        "Cục cảnh sát quản lý hành chính về trật tự xã hội")
+    assert mapping["[ngaycap3]"] == "30/09/2024"
+
+
+def test_derived_fields_legacy_snapshot_missing_source_keys(db):
+    """Snapshot cũ thiếu key nguồn (ngay_cap/ngay_chet) → giá trị đã
+    commit coi như bằng chứng xác nhận, KHÔNG bị tính lại thành None."""
+    data = _create(db, people_overrides=({}, {"ngay_cap": "2024-10-01"}))
+    heir = data["stage"]["people"][1]
+    assert heir["loai_giay_to"] == "Căn cước"
+    # Giả lập snapshot cũ: xoá key nguồn khỏi row đã commit.
+    case = db.get(InheritanceCase, data["case"]["id"])
+    payload = json.loads(case.case_state_json)
+    payload["stage"][1].pop("ngay_cap", None)
+    payload["stage"][1].pop("ngay_chet", None)
+    case.case_state_json = json.dumps(payload, ensure_ascii=False)
+    db.flush()
+    stage = _service(db).get(data["case"]["id"])["stage"]
+    updated = _commit(db, data["case"]["id"], data["case"]["revision"],
+                      stage)
+    assert updated["stage"]["people"][1]["loai_giay_to"] == "Căn cước"
+
+
+def test_asset_standalone_thoi_han_key_absent_preserves_master(db):
+    """Commit với asset KHÔNG có key thoi_han (form đã bỏ ô lẻ) → cột
+    master giữ nguyên giá trị lịch sử (còn để warning đối chiếu); asset
+    có key → ghi bình thường (tương thích client cũ)."""
+    data = _create(db)                      # _asset_row có thoi_han
+    case_id = data["case"]["id"]
+    prop_id = int(_snapshot(db, case_id)["assets"][0]["entity_id"])
+    assert db.get(Property, prop_id).thoi_han == "Lâu dài"
+    # Commit lại với key thoi_han bị bỏ khỏi row (UI mới không gửi).
+    stage = _service(db).get(case_id)["stage"]
+    stage["assets"][0].pop("thoi_han", None)
+    rev = data["case"]["revision"]
+    updated = _commit(db, case_id, rev, stage)
+    db.expire_all()
+    assert db.get(Property, prop_id).thoi_han == "Lâu dài", \
+        "key vắng không được phá giá trị lẻ lịch sử trong master"
+    # Client cũ vẫn gửi key → ghi như trước.
+    stage["assets"][0]["thoi_han"] = "50 năm"
+    _commit(db, case_id, updated["revision"], stage)
+    db.expire_all()
+    assert db.get(Property, prop_id).thoi_han == "50 năm"
