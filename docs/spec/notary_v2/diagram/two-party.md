@@ -30,7 +30,9 @@ Save dùng `case_id`, `base_revision` và state canonical đủ 30 slot. Slot ng
 chối. Không được tự đổi domain của Case.
 
 Word export hiện trả `case_type_unsupported`; không nhân bản template thừa kế
-để “chạy tạm”. Chi tiết wire và fixture:
+để “chạy tạm”. Phase Word tĩnh (Draft 29/09/2026) mở Word cho hai bên với
+`[Người N]` = ghế `pN`: [`../word-output.md`](../word-output.md) §4.1.
+Chi tiết wire và fixture:
 [`contracts/notary-case-drafting.md`](../../../../contracts/notary-case-drafting.md)
 mục 13.5 và `contracts/notary-case-drafting/examples/draft-v2/`.
 
