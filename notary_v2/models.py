@@ -34,19 +34,37 @@ class Customer(Base):
 
     @property
     def _moc_cccd_moi(self):
-        """01/07/2024 — ngưỡng phân biệt CCCD cũ/mới."""
+        """01/10/2024 — ngưỡng phân biệt CCCD cũ/mới."""
         from datetime import date
         return self.ngay_cap and self.ngay_cap >= date(2024, 10, 1)
 
     @property
     def loai_giay_to(self):
-        """Căn cước công dân (trước 01/10/2024) hoặc Căn cước (từ 01/10/2024)."""
+        """Loại giấy tờ định danh.
+        - Người sống: Căn cước công dân (trước 01/10/2024) hoặc Căn cước (từ 01/10/2024).
+        - Người chết: Trích lục khai tử (Bản sao), Trích lục khai tử, Giấy chứng tử...
+        """
+        if not self.con_song:
+            return "Trích lục khai tử (Bản sao)"
         return "Căn cước" if self._moc_cccd_moi else "Căn cước công dân"
 
     @property
     def noi_cap(self):
-        """Bộ Công an (từ 01/10/2024) hoặc Cục CSQLHC về TTXH (trước đó)."""
+        """Nơi cấp giấy tờ định danh.
+        - Người sống: Bộ Công an (từ 01/10/2024) hoặc Cục CSQLHC về TTXH (trước đó).
+        - Người chết: Mốc sáp nhập 01/07/2025 (UBND cấp xã trước/sau sáp nhập).
+        """
+        if not self.con_song:
+            from datetime import date
+            if self.ngay_cap and self.ngay_cap >= date(2025, 7, 1):
+                return "Ủy ban nhân dân cấp xã (sau sáp nhập)"
+            return "Ủy ban nhân dân cấp xã"
         return "Bộ Công an" if self._moc_cccd_moi else "Cục cảnh sát quản lý hành chính về trật tự xã hội"
+
+    @property
+    def loaicutru(self):
+        """'Cư trú' (từ 01/10/2024) hoặc 'Thường trú' (trước đó)."""
+        return "Cư trú" if self._moc_cccd_moi else "Thường trú"
 
     @property
     def loai_dia_chi(self):
@@ -90,7 +108,9 @@ class InheritanceCase(Base):
     ngay_lap_ho_so   = Column(Date,    nullable=False)
     loai_van_ban     = Column(String(50), default="khai_nhan")   # khai_nhan / thoa_thuan
     trang_thai       = Column(String(20), default="draft")       # draft / locked
-    noi_niem_yet     = Column(String(200), nullable=True)        # Tên xã/thị trấn nơi lập văn bản
+    noi_niem_yet     = Column(String(200), nullable=True)        # Tên xã/thị trấn nơi lập văn bản / nơi có đất
+    nguoi_nhan_uy_quyen = Column(String(200), nullable=True)     # Người nhận ủy quyền (danh mục quen/tạo mới)
+    noi_dung_viec       = Column(Text,        nullable=True)     # Cụm nội dung việc nhập thủ công
     ghi_chu          = Column(Text,    nullable=True)
     engine_state_json = Column(Text,   nullable=True)            # JSON state cua engine/sơ đồ thừa kế mới
     case_state_json   = Column(Text,   nullable=True)            # JSON SSoT V2 cho stage/pool/diagram

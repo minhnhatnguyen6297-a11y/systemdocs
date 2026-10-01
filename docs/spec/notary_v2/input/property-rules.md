@@ -27,8 +27,9 @@ Source of truth: phụ lục rule tài sản của [`README.md`](./README.md)
 | `ngay_cap` | Ngày cấp GCN |
 | `co_quan_cap` | Cơ quan cấp GCN |
 | `loai_dat` | Loại đất (mã hoặc tên) |
-| `thoi_han` | Thời hạn sử dụng đất |
+| `thoi_han` | Thời hạn sử dụng đất *(trường lẻ mồ côi — MIN-141: bỏ ở cấp tài sản, chuyển hẳn vào cụm `(loai_dat, dien_tich, thoi_han)`)* |
 | `dien_tich` | Diện tích (m²) |
+| `land_rows` | Cụm Loại đất 1..20 gồm `(loaidat, dientich, thoihan)` |
 
 ---
 

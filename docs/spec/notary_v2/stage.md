@@ -37,12 +37,20 @@ là ID database, có thể null trước commit.
 
 ## 5. Quy tắc dữ liệu
 
-- Người bắt buộc `ho_ten`; các trường ngày dùng `YYYY-MM-DD`, `YYYY` hoặc null.
+- Người: 6 trường nhập liệu lưu DB (`ten`, `ngaysinh`, `ngaychet`, `sogiayto`,
+  `ngaycap`, `diachi`). Bắt buộc `ten`/`ho_ten`; các trường ngày dùng
+  `YYYY-MM-DD`, `YYYY` hoặc null. Các trường `loaigiayto`, `noicap`, `loaicutru`
+  được backend suy ra theo mốc quy định (01/10/2024 và 01/07/2025).
 - CCCD/giấy tờ là free text, không dùng làm Case key.
 - Tài sản v2 tối đa 3; vị trí là thứ tự mảng, vị trí 1 là primary theo nghĩa
   engine. Không dùng `is_primary` trong wire v2.
+  * Bỏ trường lẻ `thoi_han` ở cấp tài sản vì là trường mồ côi.
+  * Thông tin loại đất lưu cụm 3 trường: `loaidat` - `dientich` - `thoihan`
+    (tối đa 20 loại đất: `loaidat1`..`loaidat20`).
 - Reorder đổi nghĩa vị trí nhưng không đổi `row_id`.
 - Hồ sơ thừa kế bắt buộc `owner_row_id`; hồ sơ `two_party` cấm trường này.
+- Hồ sơ có 3 trường quản lý: `noiniemyet` (suy từ địa chỉ đất + bảng xã),
+  `nguoinhanuyquyen` (danh mục quen/tạo mới), `noidungviec` (nhập tay).
 
 ## 6. Commit và lưu
 
@@ -79,8 +87,10 @@ phải báo `workspace_conflict`; không ghi đè cưỡng bức.
 ## 9. Giao diện
 
 - Tài sản dùng bảng chuyển vị: mỗi cột là Tài sản 1..3; mỗi dòng là một
-  thuộc tính. `Loại đất` mở dialog sửa `land_rows`; `Áp dụng` chỉ ghi draft,
-  `Cập nhật` mới persist.
+  thuộc tính. Cụm loại đất sửa các dòng `(Loại đất, Diện tích, Thời hạn)`.
+- Bảng hồ sơ: Bố trí thêm 3 dòng ngay dưới các dòng tài sản (`Nơi niêm yết`,
+  `Người nhận ủy quyền`, `Nội dung việc`), giảm 10% độ cao các ô để không
+  chiếm nhiều diện tích màn hình.
 - Người dùng bảng dòng có kéo sắp xếp, radio `Để lại`, các field chính và nút
   xóa. Danh sách dài cuộn cả trang, không tạo vùng cuộn riêng trong card.
 - Lỗi field tô đúng ô/dòng theo `row_id`. `+ Người`, `+ Tài sản` và xóa chỉ
@@ -93,8 +103,9 @@ phải báo `workspace_conflict`; không ghi đè cưỡng bức.
 Stage v2 thay mô hình flag phân tán bằng snapshot có revision. Owner chốt
 27/09/2026: vòng đời draft/committed, `owner_row_id`, tài sản theo vị trí và
 commit nguyên khối thuộc `notary.case-drafting.v2`.
-
-Còn mở: từ điển dữ liệu Người đầy đủ và quyền hiển thị/sửa của từng field.
+Owner chốt 01/10/2026 (MIN-141): Từ điển dữ liệu Người đầy đủ, chuẩn hóa cụm
+loại đất (1..20) bỏ `thoi_han` lẻ mồ côi, bổ sung 3 dòng hồ sơ dưới tài sản,
+và quy tắc đặt tên trường tiếng Việt không dấu viết liền số.
 
 ## 11. Nguồn
 

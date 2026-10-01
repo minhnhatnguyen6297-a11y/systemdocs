@@ -128,3 +128,71 @@ công không tự nâng dữ liệu thành `CONFIRMED`.
 Không suy ra số lượng quan hệ Case giữa hai repo từ quan hệ nội bộ này; xem
 [`../docs/spec/README.md`](../docs/spec/README.md) mục 5. Không định nghĩa thêm
 shared ID/schema trong lần sửa này.
+
+---
+
+## 8. Từ điển dữ liệu Người (`customers`) và các trường suy ra
+
+Cập nhật chốt từ Owner (01/10/2026): Bảng người chuẩn hóa gồm 6 trường lưu trữ cơ sở dữ liệu và 3 nhóm trường suy ra phục vụ hiển thị / soạn thảo văn bản.
+
+### 8.1. Các trường lưu CSDL (bảng `customers`)
+
+| Tên trường canonical | Tên thuộc tính DB | Kiểu dữ liệu | Mô tả |
+|---|---|---|---|
+| `ten` | `ho_ten` | String(200) | Họ và tên, người dùng nhập liệu hoặc OCR |
+| `ngaysinh` | `ngay_sinh` | Date | Ngày tháng năm sinh (hoặc năm sinh) |
+| `ngaychet` | `ngay_chet` | Date | Ngày chết (`NULL` nếu còn sống) |
+| `sogiayto` | `so_giay_to` | String(50) | Số giấy tờ định danh (người sống: số CCCD/CC; người chết: số giấy khai tử / trích lục khai tử) |
+| `ngaycap` | `ngay_cap` | Date | Ngày cấp giấy tờ định danh (ngày cấp CCCD hoặc ngày cấp trích lục khai tử) |
+| `diachi` | `dia_chi` | Text | Địa chỉ người sống; nơi chết / nơi thường trú cuối cùng trước khi chết của người chết |
+
+*Ghi chú về quê quán (`place_of_origin`):* Chỉ lưu snapshot trong từng hồ sơ (`case_state_json` / contract `person_row`), không đưa vào danh bạ `customers` master.
+
+### 8.2. Các trường suy ra backend (@property, KHÔNG lưu DB)
+
+Các trường này được tính toán động qua công thức backend và kết quả OCR, không tạo cột trong DB:
+
+1. **`loaigiayto` (`loai_giay_to`) — Loại giấy tờ:**
+   - **Người sống (`con_song == True`):** Lấy mốc **01/10/2024** làm chuẩn:
+     * Trước 01/10/2024: `Căn cước công dân`.
+     * Từ 01/10/2024 trở đi: `Căn cước`.
+   - **Người chết (`con_song == False`):** Suy ra từ loại giấy tờ khai tử (OCR hoặc lựa chọn): `Trích lục khai tử`, `Trích lục khai tử (Bản sao)`, `Giấy chứng tử`... Mặc định: `Trích lục khai tử (Bản sao)`.
+
+2. **`noicap` (`noi_cap`) — Nơi cấp giấy tờ định danh:**
+   - **Người sống (`con_song == True`):** Lấy mốc **01/10/2024** làm chuẩn:
+     * Trước 01/10/2024: `Cục cảnh sát quản lý hành chính về trật tự xã hội`.
+     * Từ 01/10/2024 trở đi: `Bộ Công an`.
+     * Trường hợp `ngaycap` trống: fallback cơ quan cấp theo quy định hoặc hiển thị theo OCR.
+   - **Người chết (`con_song == False`):** Lấy mốc **01/07/2025** (sáp nhập đơn vị hành chính) làm chuẩn:
+     * Trước 01/07/2025: `UBND xã/phường cũ cấp`.
+     * Từ 01/07/2025 trở đi: `UBND xã/phường mới cấp` (tra cứu qua bảng chuẩn hóa xã cũ - mới sau sáp nhập).
+
+3. **`loaicutru` (`loai_dia_chi`) — Loại cư trú / nhãn địa chỉ:**
+   - Lấy mốc **01/10/2024** làm chuẩn:
+     * Trước 01/10/2024: `Thường trú` (hoặc `Thường trú tại`).
+     * Từ 01/10/2024 trở đi: `Cư trú` (hoặc `Cư trú tại`).
+
+---
+
+## 9. Chuẩn hóa Bảng Tài sản, Bảng Hồ sơ & Quy tắc đặt tên trường
+
+### 9.1. Quy tắc chung đặt tên trường (Rule chung)
+
+- Định dạng: **Tiếng Việt không dấu, viết thường, nếu có số thì viết liền vào**.
+- Ví dụ: `ten`, `ngaysinh`, `ngaychet`, `sogiayto`, `ngaycap`, `diachi`, `noicap`, `loaigiayto`, `loaicutru`, `loaidat1`, `dientich1`, `thoihan1`, `noiniemyet`, `nguoinhanuyquyen`, `noidungviec`.
+
+### 9.2. Bảng Tài sản (`properties`)
+
+- **Loại bỏ trường lẻ:** Trường `thoi_han` ở cấp tài sản là trường mồ côi → loại bỏ, không dùng đơn lẻ.
+- **Cụm thông tin loại đất:** Thông tin đất phải đi liền theo bộ 3 trường: `Loại đất - Diện tích - Thời hạn`.
+  * Đặt tên theo thứ tự: `loaidat1` - `dientich1` - `thoihan1`, `loaidat2` - `dientich2` - `thoihan2`,...
+  * Số lượng trong 1 hồ sơ dao động từ 1 đến 5 là phổ biến, hỗ trợ tối đa 20 loại (`loaidat1` .. `loaidat20`).
+  * Định danh khi có nhiều tài sản (tối đa 3 tài sản): Đánh số kết hợp `[trường][chỉ số loại đất][chỉ số tài sản]`, ví dụ Loại đất 1 của Tài sản 2 là `loaidat12`.
+
+### 9.3. Bảng Hồ sơ (`inheritance_cases`)
+
+1. **`noiniemyet` (Nơi niêm yết):** UBND cấp xã nơi có đất → suy ra từ địa chỉ thửa đất và chuẩn hóa qua bảng tra cứu xã cũ - mới sau sáp nhập 01/07/2025.
+2. **`nguoinhanuyquyen` (Người nhận ủy quyền):** Người nhận ủy quyền giải quyết công việc — chọn từ danh mục người quen hay ủy quyền hoặc cho phép tạo mới.
+3. **`noidungviec` (Nội dung việc):** Cụm text nhập thủ công mô tả công việc (ví dụ: *"Đính chính hộ ông A thành ông A và bà B"*, *"Đính chính năm sinh ông A từ 1955 thành 1950"*...).
+4. **Bố cục giao diện (UI):** Thêm 3 dòng trường hồ sơ ngay dưới các dòng tài sản; giảm 10% chiều cao các ô nhập liệu để giữ giao diện tổng thể gọn gàng, không phải cuộn nhiều.
+

@@ -76,12 +76,16 @@ Quy tắc màu, chữ, khoảng cách và thao tác dùng chung nằm tại
 - Stage commit gồm Người + Tài sản trong một transaction.
 - Xóa phần tử Stage rồi commit phải prune tham chiếu Diagram trong cùng
   transaction.
+- **Từ điển dữ liệu Người, Tài sản, Hồ sơ và quy tắc suy ra (Owner chốt 01/10/2026):**
+  * **Người (`customers`):** 6 trường lưu DB (`ten`, `ngaysinh`, `ngaychet`, `sogiayto`, `ngaycap`, `diachi`). Các trường suy ra động: `loaigiayto` (mốc 01/10/2024: CCCD/CC; người chết: trích lục khai tử), `noicap` (mốc 01/10/2024: Cục CSQLHC về TTXH/Bộ Công an; người chết mốc 01/07/2025: UBND xã cũ/mới), `loaicutru` (mốc 01/10/2024: Thường trú/Cư trú). Quê quán chỉ lưu snapshot hồ sơ.
+  * **Tài sản (`properties`):** Bỏ trường lẻ `thoi_han` mồ côi; lưu theo cụm `(loaidat, dientich, thoihan)` 1..20; đa tài sản đánh số kết hợp như `loaidat12`.
+  * **Hồ sơ (`inheritance_cases`):** Bổ sung `noiniemyet` (suy từ địa chỉ đất + bảng xã), `nguoinhanuyquyen` (danh mục quen/tạo mới), `noidungviec` (cụm text thủ công); UI hiển thị 3 dòng dưới tài sản, giảm 10% chiều cao ô nhập.
+  * **Rule chung:** Đặt tên tiếng Việt không dấu, viết liền số nếu có (`loaidat1`). Xem chi tiết tại `contracts/entities.md` §8–§9.
 
 ### Còn mở
 
-- Từ điển dữ liệu Người đầy đủ: ai nhập/xem/sửa, nguồn, công thức, nơi lưu và
-  placeholder nào dùng. Không suy ngược từ code hay template Word.
 - Quy tắc per-asset, contract A/B và owner scope chưa được suy từ các flag cũ.
+- Triển khai chi tiết bảng tra cứu xã/phường cũ - mới sau sáp nhập 01/07/2025 (theo dõi tại issue NAIA-9).
 
 ## 7. Nguồn khi sửa code
 
