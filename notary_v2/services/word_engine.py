@@ -103,6 +103,18 @@ def _fmt_date(d: Any) -> str:
     return d.strftime("%d/%m/%Y")
 
 
+def _fmt_snapshot_date(value: Any) -> str:
+    """Ngày trong snapshot payload.case (ISO 'YYYY-MM-DD' hoặc năm
+    'YYYY' — `_emit_date_or_year`) → dd/mm/YYYY cho placeholder Word."""
+    text = _safe_text(value)
+    if not text:
+        return ""
+    m = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", text)
+    if m:
+        return f"{m.group(3)}/{m.group(2)}/{m.group(1)}"
+    return text
+
+
 def _fmt_birth_or_year(d: Any) -> str:
     if not d:
         return ""
@@ -1265,23 +1277,40 @@ def build_template_mapping(case: Any, today: date | None = None) -> dict[str, st
         people_slots[idx] = c
 
     # Metadata hồ sơ (MIN-141 đợt 3): snapshot `payload.case` đã commit
-    # là nguồn đọc chính — cột live chỉ fallback cho hồ sơ cũ chưa qua
-    # commit_stage sau khi nâng cấp. `[Nơi niêm yết]` KHÔNG còn đắp từ
-    # địa chỉ đất: chưa tra cứu được → để trống, không tự khẳng định.
-    snap_case = _load_case_state(case).get("case")
+    # là nguồn đọc chính — cột live chỉ fallback khi snapshot KHÔNG có
+    # key (hồ sơ legacy chưa qua commit_stage sau khi nâng cấp). Key đã
+    # commit mà null/rỗng là giá trị chủ ý → xuất rỗng, không đọc master.
+    # `[Nơi niêm yết]` KHÔNG còn đắp từ địa chỉ đất: chưa tra cứu được →
+    # để trống, không tự khẳng định.
+    _state_doc = _load_case_state(case)
+    snap_case = _state_doc.get("case")
+    if not isinstance(snap_case, dict):
+        # Phòng snapshot lồng `payload.case` (một số doc legacy/wire).
+        _inner = _state_doc.get("payload")
+        snap_case = (_inner.get("case") if isinstance(_inner, dict)
+                     else None)
     snap_case = snap_case if isinstance(snap_case, dict) else {}
-    noi_niem_yet = (
-        _safe_text(snap_case.get("noiniemyet"))
-        or _safe_text(getattr(case, "noi_niem_yet", "")))
-    _uq_snap = snap_case.get("nguoinhanuyquyen")
-    nguoi_nhan_uy_quyen = (
-        _safe_text((_uq_snap or {}).get("ten"))
-        if isinstance(_uq_snap, dict)
-        else _safe_text(_uq_snap)) or _safe_text(
+
+    def _snap_meta(key: str, live_attr: str) -> str:
+        if key in snap_case:
+            return _safe_text(snap_case.get(key))
+        return _safe_text(getattr(case, live_attr, ""))
+
+    noi_niem_yet = _snap_meta("noiniemyet", "noi_niem_yet")
+    noi_dung_viec = _snap_meta("noidungviec", "noi_dung_viec")
+    ghi_chu = _snap_meta("ghichu", "ghi_chu")
+    if "nguoinhanuyquyen" in snap_case:
+        _uq_snap = snap_case.get("nguoinhanuyquyen")
+        nguoi_nhan_uy_quyen = (
+            _safe_text(_uq_snap.get("ten"))
+            if isinstance(_uq_snap, dict) else _safe_text(_uq_snap))
+    else:
+        nguoi_nhan_uy_quyen = _safe_text(
             getattr(case, "nguoi_nhan_uy_quyen", ""))
-    noi_dung_viec = (
-        _safe_text(snap_case.get("noidungviec"))
-        or _safe_text(getattr(case, "noi_dung_viec", "")))
+    ngay_lap_ho_so = (
+        _fmt_snapshot_date(snap_case.get("ngaylaphoso"))
+        if "ngaylaphoso" in snap_case
+        else _fmt_date(getattr(case, "ngay_lap_ho_so", None)))
     land_rows = _committed_land_rows(ts)
     if land_rows:
         total = 0.0
@@ -1301,9 +1330,13 @@ def build_template_mapping(case: Any, today: date | None = None) -> dict[str, st
     mapping: dict[str, str] = {
         "[Tên file]": f"ho_so_thua_ke_{getattr(case, 'id', '')}",
         "[Loại văn bản]": loai_van_ban,
-        "[Ngày lập hồ sơ]": _fmt_date(getattr(case, "ngay_lap_ho_so", None)),
+        "[documenttype]": loai_van_ban,
+        "[Ngày lập hồ sơ]": ngay_lap_ho_so,
+        "[ngaylaphoso]": ngay_lap_ho_so,
         "[Nơi niêm yết]": noi_niem_yet,
-        "[Ghi chú]": _safe_text(getattr(case, "ghi_chu", "")),
+        "[noiniemyet]": noi_niem_yet,
+        "[Ghi chú]": ghi_chu,
+        "[ghichu]": ghi_chu,
         "[Niêm Yết]": noi_niem_yet,
         "[NIÊM YẾT]": noi_niem_yet.upper() if noi_niem_yet else "",
         "[Loại sổ]": loai_so_val,
@@ -1328,7 +1361,9 @@ def build_template_mapping(case: Any, today: date | None = None) -> dict[str, st
         "[Tháng chữ]": _so_thanh_chu(today.month),
         "[Ngườ ủy quyền]": nguoi_nhan_uy_quyen,
         "[Ngườ ủy quyền2]": nguoi_nhan_uy_quyen,
+        "[nguoinhanuyquyen]": nguoi_nhan_uy_quyen,
         "[Nội dung việc]": noi_dung_viec,
+        "[noidungviec]": noi_dung_viec,
         "[Số công chứng]": "",
         "[ONT]": "",
         "[CLN]": "",
@@ -1349,6 +1384,19 @@ def build_template_mapping(case: Any, today: date | None = None) -> dict[str, st
         mapping[f"[Nơi cấp CC {i}]"] = _safe_text(getattr(c, "noi_cap", "") if c else "")
         mapping[f"[Thường trú {i}]"] = _safe_text(getattr(c, "loai_dia_chi", "") if c else "")
         mapping[f"[Năm chết {i}]"] = _fmt_date(getattr(c, "ngay_chet", None) if c else None)
+        # Tên chuẩn Người — viết liền không dấu không "_" (entities.md
+        # §9.1): mirror đúng giá trị alias tiếng Việt cũ ở trên.
+        mapping[f"[ten{i}]"] = mapping[f"[Tên {i}]"]
+        mapping[f"[gioitinh{i}]"] = _safe_text(getattr(c, "gioi_tinh", "") if c else "")
+        mapping[f"[ngaysinh{i}]"] = mapping[f"[Năm sinh {i}]"]
+        mapping[f"[ngaychet{i}]"] = mapping[f"[Năm chết {i}]"]
+        mapping[f"[sogiayto{i}]"] = mapping[f"[CCCD {i}]"]
+        mapping[f"[ngaycap{i}]"] = mapping[f"[Ngày cấp {i}]"]
+        mapping[f"[diachi{i}]"] = mapping[f"[Địa chỉ {i}]"]
+        mapping[f"[loaigiayto{i}]"] = mapping[f"[Loại CC {i}]"]
+        mapping[f"[noicap{i}]"] = mapping[f"[Nơi cấp CC {i}]"]
+        mapping[f"[loaicutru{i}]"] = mapping[f"[Thường trú {i}]"]
+        mapping[f"[loaidiachi{i}]"] = mapping[f"[Thường trú {i}]"]
     mapping["[Năm chết]"] = mapping.get("[Năm chết 1]", "")
 
     for i, row in enumerate(land_rows[:10], start=1):

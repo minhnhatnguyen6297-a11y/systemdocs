@@ -66,6 +66,13 @@ Ví dụ:
 - `[Người nhận 1 - ...]`: `1` là thứ tự của người nhận trong danh sách.
 - Trường dùng chung: họ tên, xưng hô, giới tính, ngày sinh, ngày chết,
   giấy tờ, ngày/nơi cấp, địa chỉ, quan hệ, vai trò, tỷ lệ.
+- Tên chuẩn `entities.md` (viết liền, không dấu, không `_`) cũng được
+  thay: `[noiniemyet]`, `[nguoinhanuyquyen]`, `[noidungviec]`,
+  `[ngaylaphoso]`, `[ghichu]`, `[documenttype]` cho hồ sơ; `[ten1]`,
+  `[gioitinh1]`, `[ngaysinh1]`, `[ngaychet1]`, `[sogiayto1]`,
+  `[ngaycap1]`, `[diachi1]`, `[loaigiayto1]`, `[noicap1]`,
+  `[loaicutru1]`/`[loaidiachi1]` cho người số `N` (giá trị trùng alias
+  tiếng Việt tương ứng).
 - Alias cũ được giữ để mở template cũ nhưng không dùng làm mẫu mới.
 
 ## 5. UX xuất Word

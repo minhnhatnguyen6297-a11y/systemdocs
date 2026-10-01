@@ -405,3 +405,202 @@ def test_word_deceased_clause_uses_confirmed_evidence(db):
     assert "Trích lục" not in clause2
     assert "Ủy ban nhân dân xã" not in clause2
     assert "TLK 12/2011" in clause2  # số giấy tờ có → vẫn in
+
+
+# ============================================================ Review fix
+# (đổi input nguồn → tính lại trường suy ra; snapshot rỗng giữ nguyên;
+# token chuẩn Hồ sơ/Người xuất thật vào Word)
+
+
+def test_derived_fields_recompute_back_across_threshold(db):
+    """Đổi ngay_cap ngược qua mốc 01/10/2024 → loại giấy tờ/nơi cấp/
+    nhãn cư trú tính lại, không giữ giá trị suy ra cũ."""
+    data = _create(db, people_overrides=({}, {"ngay_cap": "2024-10-01"}))
+    heir = data["stage"]["people"][1]
+    assert heir["loai_giay_to"] == "Căn cước"
+
+    stage = data["stage"]
+    stage["people"][1]["ngay_cap"] = "2024-09-30"
+    updated = _commit(db, data["case"]["id"], data["case"]["revision"],
+                      stage)
+    heir = updated["stage"]["people"][1]
+    assert heir["loai_giay_to"] == "Căn cước công dân"
+    assert (heir["noi_cap"]
+            == "Cục cảnh sát quản lý hành chính về trật tự xã hội")
+    assert heir["loai_dia_chi"] == "Thường trú tại"
+
+
+def test_derived_fields_recompute_when_issue_date_cleared(db):
+    """Xóa ngay_cap → trường suy ra về None (chưa xác định), không giữ
+    giá trị suy ra của lần commit trước."""
+    data = _create(db, people_overrides=({}, {"ngay_cap": "2024-10-01"}))
+    stage = data["stage"]
+    stage["people"][1]["ngay_cap"] = None
+    updated = _commit(db, data["case"]["id"], data["case"]["revision"],
+                      stage)
+    heir = updated["stage"]["people"][1]
+    assert heir["loai_giay_to"] is None
+    assert heir["noi_cap"] is None
+    assert heir["loai_dia_chi"] is None
+
+
+def test_derived_fields_recompute_alive_to_deceased(db):
+    """Sống → chết: echo giá trị suy ra cũ không đè — người chết không
+    suy loại giấy tờ/nơi cấp (None), nhãn địa chỉ thành Nơi chết."""
+    data = _create(db, people_overrides=({}, {"ngay_cap": "2024-10-01"}))
+    stage = data["stage"]
+    stage["people"][1]["ngay_chet"] = "2025-02-10"
+    updated = _commit(db, data["case"]["id"], data["case"]["revision"],
+                      stage)
+    heir = updated["stage"]["people"][1]
+    assert heir["loai_giay_to"] is None
+    assert heir["noi_cap"] is None
+    assert heir["loai_dia_chi"] == "Nơi chết"
+
+
+def test_deceased_confirmed_evidence_survives_recommit(db):
+    """Bằng chứng khai tử đã xác nhận KHÔNG bị giá trị suy ra đè khi
+    commit lại dù đổi field khác."""
+    data = _create(db, people_overrides=(
+        {"loai_giay_to": "Giấy chứng tử", "noi_cap": "UBND xã Thật"},
+        {}))
+    stage = _service(db).get(data["case"]["id"])["stage"]
+    stage["people"][0]["dia_chi"] = "xã mới đổi"
+    updated = _commit(db, data["case"]["id"], data["case"]["revision"],
+                      stage)
+    owner = updated["stage"]["people"][0]
+    assert owner["loai_giay_to"] == "Giấy chứng tử"
+    assert owner["noi_cap"] == "UBND xã Thật"
+    assert owner["dia_chi"] == "xã mới đổi"
+
+
+def test_user_confirmed_value_survives_source_change(db):
+    """Người sống xác nhận giá trị khác suy ra → đổi ngay_cap vẫn giữ
+    xác nhận; field không chạm vẫn tính lại theo mốc mới."""
+    data = _create(db, people_overrides=(
+        {}, {"ngay_cap": "2024-09-30",
+             "loai_giay_to": "Chứng minh nhân dân"}))
+    heir = data["stage"]["people"][1]
+    assert heir["loai_giay_to"] == "Chứng minh nhân dân"
+
+    stage = data["stage"]
+    stage["people"][1]["ngay_cap"] = "2024-10-01"
+    updated = _commit(db, data["case"]["id"], data["case"]["revision"],
+                      stage)
+    heir = updated["stage"]["people"][1]
+    assert heir["loai_giay_to"] == "Chứng minh nhân dân"  # xác nhận giữ
+    assert heir["noi_cap"] == "Bộ Công an"                # echo → tính lại
+
+
+def test_commit_unchanged_keeps_derived_values_stable(db):
+    """Commit không đổi input → trường suy ra giữ nguyên (idempotent)."""
+    data = _create(db, people_overrides=({}, {"ngay_cap": "2024-10-01"}))
+    stage = _service(db).get(data["case"]["id"])["stage"]
+    updated = _commit(db, data["case"]["id"], data["case"]["revision"],
+                      stage)
+    heir = updated["stage"]["people"][1]
+    assert heir["loai_giay_to"] == "Căn cước"
+    assert heir["noi_cap"] == "Bộ Công an"
+    assert heir["loai_dia_chi"] == "Cư trú tại"
+
+
+def test_word_canonical_person_tokens_render(db):
+    """Tên chuẩn của Người (ten/ngaysinh/sogiayto/loaigiayto/noicap/
+    loaicutru/…) thay giá trị thật qua replace_in_doc, alias cũ giữ."""
+    from docx import Document
+
+    data = _create(db, with_state=True,
+                   people_overrides=({}, {"ngay_cap": "2024-10-01"}))
+    case = db.get(InheritanceCase, data["case"]["id"])
+    mapping = word_engine.build_template_mapping(case)
+    doc = Document()
+    doc.add_paragraph(
+        "[ten1]|[sogiayto1]|[ngaychet1]|[ten3]|[ngaysinh3]|[ngaycap3]"
+        "|[loaigiayto3]|[noicap3]|[loaicutru3]|[diachi3]")
+    word_engine.replace_in_doc(doc, mapping)
+    text = doc.paragraphs[0].text
+    assert text == ("Nguyễn Văn Chết|TLK 12/2011|15/05/2011|"
+                    "Trần Thị Sống|02/03/1980|01/10/2024|"
+                    "Căn cước|Bộ Công an|Cư trú tại|xã test")
+    # Alias cũ vẫn hoạt động cùng giá trị.
+    doc2 = Document()
+    doc2.add_paragraph("[Tên 3]|[Loại CC 3]|[Thường trú 3]")
+    word_engine.replace_in_doc(doc2, mapping)
+    assert doc2.paragraphs[0].text == "Trần Thị Sống|Căn cước|Cư trú tại"
+
+
+def test_word_canonical_case_meta_tokens_render(db):
+    """Tên chuẩn Hồ sơ ngaylaphoso/ghichu/documenttype ngoài 3 trường
+    đợt 3 — qua replace_in_doc thật."""
+    from docx import Document
+
+    uq = _catalog_person(db, "Bà Ủy Quyền")
+    data = _create(db, with_state=True, case_meta={
+        "document_type": "thoa_thuan", "ngay_lap_ho_so": "2026-09-05",
+        "noiniemyet": "UBND xã Y", "nguoinhanuyquyenid": uq.id,
+        "noidungviec": "Đính chính", "ghichu": "ghi chú A"})
+    case = db.get(InheritanceCase, data["case"]["id"])
+    doc = Document()
+    doc.add_paragraph(
+        "[ngaylaphoso]|[noiniemyet]|[nguoinhanuyquyen]|[noidungviec]"
+        "|[ghichu]|[documenttype]")
+    word_engine.replace_in_doc(
+        doc, word_engine.build_template_mapping(case))
+    assert doc.paragraphs[0].text == (
+        "05/09/2026|UBND xã Y|Bà Ủy Quyền|Đính chính|ghi chú A|"
+        "Thỏa thuận phân chia di sản")
+
+
+def test_snapshot_explicit_empty_meta_kept_for_all_fields(db):
+    """Snapshot commit null/rỗng chủ ý → Word xuất rỗng dù cột master
+    sau đó đổi — áp dụng noiniemyet/nguoinhanuyquyen/noidungviec."""
+    data = _create(db, with_state=True)  # meta để trống → snapshot null
+    case = db.get(InheritanceCase, data["case"]["id"])
+    case.noi_niem_yet = "UBND xã Đổi Sau"
+    case.nguoi_nhan_uy_quyen = "Người Đổi Sau"
+    case.noi_dung_viec = "Nội dung đổi sau"
+    db.flush()
+    mapping = word_engine.build_template_mapping(case)
+    assert mapping["[Nơi niêm yết]"] == ""
+    assert mapping["[Ngườ ủy quyền]"] == ""
+    assert mapping["[Nội dung việc]"] == ""
+    assert mapping["[noiniemyet]"] == ""
+    assert mapping["[nguoinhanuyquyen]"] == ""
+    assert mapping["[noidungviec]"] == ""
+
+
+def test_snapshot_cleared_meta_via_commit_kept_empty(db):
+    """Meta có giá trị → commit xóa (null) → master đổi sau → vẫn rỗng."""
+    data = _create(db, with_state=True, case_meta={
+        "document_type": "khai_nhan", "ngay_lap_ho_so": "2026-09-01",
+        "noiniemyet": "UBND xã Cũ", "noidungviec": "Việc cũ"})
+    case_id = data["case"]["id"]
+    stage = _service(db).get(case_id)["stage"]
+    _commit(db, case_id, data["case"]["revision"], stage,
+            case_meta={"noiniemyet": None, "noidungviec": None})
+    case = db.get(InheritanceCase, case_id)
+    case.noi_niem_yet = "UBND xã Sửa Ngoài"
+    case.noi_dung_viec = "Sửa ngoài"
+    db.flush()
+    mapping = word_engine.build_template_mapping(case)
+    assert mapping["[Nơi niêm yết]"] == ""
+    assert mapping["[Nội dung việc]"] == ""
+
+
+def test_legacy_snapshot_without_case_block_reads_master(db):
+    """Hồ sơ legacy: case_state_json không có block `case` → fallback
+    cột master như trước (không nuốt giá trị)."""
+    data = _create(db, with_state=True, case_meta={
+        "document_type": "khai_nhan", "ngay_lap_ho_so": "2026-09-01",
+        "noiniemyet": "UBND xã Snap", "noidungviec": "Việc snap"})
+    case = db.get(InheritanceCase, data["case"]["id"])
+    # Giả lập snapshot legacy: giữ stage/assets, bỏ block `case`.
+    payload = json.loads(case.case_state_json)
+    payload.pop("case", None)
+    case.case_state_json = json.dumps(payload, ensure_ascii=False)
+    case.noi_niem_yet = "UBND xã Master"
+    case.noi_dung_viec = "Việc master"
+    db.flush()
+    mapping = word_engine.build_template_mapping(case)
+    assert mapping["[Nơi niêm yết]"] == "UBND xã Master"
+    assert mapping["[Nội dung việc]"] == "Việc master"

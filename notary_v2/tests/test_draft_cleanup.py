@@ -194,6 +194,38 @@ def test_delete_keeps_uq_catalog_customer(db):
     assert db.get(Customer, uq.id) is not None   # danh bạ còn nguyên
 
 
+def test_delete_keeps_uq_who_is_also_participant(db):
+    """Người nhận UQ kiêm participant của chính hồ sơ bị xóa → vẫn GIỮ
+    (danh bạ tái dùng, không phụ thuộc vai trò trong hồ sơ)."""
+    dead = _customer(db, "Người chết", ngay_chet=date(2020, 1, 1))
+    uq = _customer(db, "UQ kiêm participant")
+    prop = _property(db, "AA0022")
+    case = _case(db, dead, prop, uq_id=uq.id,
+                 participants=[(uq, None)])
+
+    cases_router.delete(case.id, db=db)
+
+    assert db.get(InheritanceCase, case.id) is None
+    assert db.get(Customer, uq.id) is not None   # danh bạ được bảo vệ
+    assert db.query(InheritanceParticipant).count() == 0
+
+
+def test_delete_keeps_uq_who_is_parent_of_participant(db):
+    """Người nhận UQ là parent_customer_id của participant trong hồ sơ
+    bị xóa → vẫn GIỮ, không bị cuốn vào nhóm dọn parent."""
+    dead = _customer(db, "Người chết", ngay_chet=date(2020, 1, 1))
+    child = _customer(db, "Con của UQ")
+    uq = _customer(db, "UQ là parent")
+    prop = _property(db, "AA0023")
+    case = _case(db, dead, prop, uq_id=uq.id,
+                 participants=[(child, uq)])
+
+    cases_router.delete(case.id, db=db)
+
+    assert db.get(Customer, uq.id) is not None
+    assert db.get(Customer, child.id) is None    # participant thường vẫn dọn
+
+
 def test_delete_uq_reference_of_other_case_blocks_cleanup(db):
     """Customer của hồ sơ bị xóa nhưng là người nhận UQ của hồ sơ khác
     → vẫn giữ (tham chiếu từ danh mục ủy quyền)."""

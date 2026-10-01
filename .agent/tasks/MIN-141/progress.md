@@ -197,3 +197,29 @@ Bằng chứng đợt 4:
 - `pytest tests/ -q` (full) → **624 passed, 1 skipped, 8 failed** — 8 fail
   giống hệt baseline (customers_excel jinja2, doc_conversion_poc, zalo_*),
   không liên quan diff.
+
+## Review fix — 4 lỗi Leader gửi trên `ac10797`
+
+1. **Token chuẩn Word (`word_engine.py`):** thêm mapping tên chuẩn
+   `entities.md` cho hồ sơ (`noiniemyet`/`nguoinhanuyquyen`/`noidungviec`/
+   `ngaylaphoso`/`ghichu`/`documenttype`) và người `[tenN]`…`[loaicutruN]`/
+   `[loaidiachiN]` (mirror giá trị alias tiếng Việt); alias cũ giữ nguyên.
+2. **Trường suy ra (`case_workspace.py`):** `_resolve_derived_field`
+   phân biệt bằng chứng xác nhận với giá trị backend suy ra trước đó —
+   commit_stage truyền snapshot stage cũ (`prev_rows`) vào `_upsert_people`;
+   echo cũ → tính lại theo `ngay_cap`/`ngay_chet` mới, giá trị khác echo
+   (vd giấy khai tử) → giữ.
+3. **Snapshot rỗng (`word_engine.py`):** đọc meta theo presence key trong
+   `payload.case` — null/rỗng chủ ý giữ nguyên, chỉ fallback cột master
+   khi key thật sự vắng; áp dụng `nguoinhanuyquyen` (nested id/ten) và
+   `ngaylaphoso` (ISO→dd/mm/YYYY).
+4. **Giữ người nhận UQ (`routers/cases.py`):** `discard(nguoi_nhan_uy_quyen_id)`
+   khỏi candidate trước khi xóa — danh bạ tái dùng sống sót kể cả khi
+   kiêm participant/parent; transaction/rollback giữ nguyên.
+
+Bằng chứng:
+- `pytest tests/test_final_review_probes.py -q` → **4 passed**.
+- Suite review Leader (6 file + probes) → **167 passed**.
+- Full `pytest tests/ -q` → **641 passed, 1 skipped, 8 failed** = đúng
+  baseline (customers_excel jinja2, doc_conversion_poc, zalo_*).
+- Ảnh render UI 3 dòng meta: `artifacts/ui-casemeta.png` (workdir).

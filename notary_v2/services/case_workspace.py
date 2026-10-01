@@ -339,6 +339,29 @@ def _fold_key_aliases(row: Any, aliases: Mapping[str, str],
     return folded
 
 
+def _resolve_derived_field(incoming: Any, stored: Any,
+                           prev_derived: Any, new_derived: Any):
+    """Trường suy ra của Người (`loai_giay_to`/`noi_cap`/`loai_dia_chi`)
+    khi commit Stage (MIN-141 review): phân biệt bằng chứng người dùng
+    xác nhận với giá trị backend tự suy ra.
+
+    - `incoming` (stage gửi lên) khác `stored` (snapshot đã commit lần
+      trước) → người dùng vừa sửa field → giữ `incoming`.
+    - `stored` khác `prev_derived` (giá trị backend suy ra từ master
+      TRƯỚC commit này) → snapshot đang giữ bằng chứng đã xác nhận →
+      giữ, không đè (vd giấy khai tử của người chết).
+    - Còn lại — `stored` trống hoặc đúng bằng giá trị suy ra cũ (echo
+      của `get()` lần trước, không phải xác nhận) → tính lại
+      `new_derived` theo input nguồn mới (ngay_cap/ngay_chet).
+    """
+    inc, sto = _nn(incoming), _nn(stored)
+    if inc != sto:
+        return inc
+    if sto is not None and sto != prev_derived:
+        return inc
+    return new_derived
+
+
 def _case_meta_snapshot(case: Any) -> dict:
     """Block `payload.case` trong case_state_json — key canonical
     MIN-141. Word đọc meta từ đây (snapshot commit) thay vì cột live
@@ -1079,12 +1102,21 @@ class CaseWorkspaceService:
                     meta_edit["nguoi_nhan_uy_quyen_id"]
                 case.noi_dung_viec = meta_edit["noi_dung_viec"]
                 case.ghi_chu = meta_edit["ghi_chu"]
-            resolved_people = self._upsert_people(people)
+            # Snapshot đã commit lần trước — nguồn phân biệt giá trị
+            # suy ra cũ (echo) với bằng chứng đã xác nhận trong
+            # _upsert_people; load trước khi upsert vì upsert không đụng
+            # case_state_json.
+            payload = self._load_payload(case) or {}
+            prev_stage_rows = {
+                r["row_id"]: r
+                for r in (payload.get("stage") or [])
+                if isinstance(r, Mapping) and r.get("row_id")}
+            resolved_people = self._upsert_people(
+                people, prev_rows=prev_stage_rows)
             resolved_assets = self._upsert_assets(assets)
             self._sync_links(case, resolved_assets)
             self.db.flush()
 
-            payload = self._load_payload(case) or {}
             entity_to_row = {entity: rid
                              for rid, entity, _w in resolved_people}
             valid_rows = {rid for rid, _e, _w in resolved_people}
@@ -2210,10 +2242,17 @@ class CaseWorkspaceService:
 
     # ----- upsert + link
 
-    def _upsert_people(self, rows: list) -> list:
+    def _upsert_people(self, rows: list,
+                       prev_rows: Optional[Mapping[str, Any]] = None
+                       ) -> list:
         """→ [(row_id, entity_id, wire_row)]; upsert theo entity_id rồi
         khóa giấy tờ — không merge theo tên. Dedupe entity đã resolve —
-        hai rows resolve về cùng customer là lỗi (tránh silent merge)."""
+        hai rows resolve về cùng customer là lỗi (tránh silent merge).
+
+        `prev_rows`: snapshot `stage[]` đã commit lần trước, keyed theo
+        row_id — dùng để phân biệt giá trị echo (backend suy ra) với
+        bằng chứng người dùng xác nhận ở các trường suy ra."""
+        prev_rows = prev_rows or {}
         resolved = []
         resolved_entities: dict[int, str] = {}
         for row in rows:
@@ -2227,6 +2266,11 @@ class CaseWorkspaceService:
             if customer is None:
                 customer = Customer()
                 self.db.add(customer)
+            # Giá trị suy ra theo master TRƯỚC khi ghi input mới — mốc
+            # đối chiếu cho `_resolve_derived_field` (echo cũ → tính
+            # lại; khác echo → bằng chứng xác nhận).
+            prev_derived = (customer.loai_giay_to, customer.noi_cap,
+                            customer.loai_dia_chi)
             customer.ho_ten = row["ho_ten"].strip()
             customer.gioi_tinh = row.get("gioi_tinh")
             customer.ngay_sinh = _parse_date_or_year(row.get("ngay_sinh"))
@@ -2248,18 +2292,24 @@ class CaseWorkspaceService:
             wire["row_id"] = row["row_id"]
             wire["entity_id"] = customer.id
             wire["ho_ten"] = customer.ho_ten
-            # Giá trị hiệu lực ghi vào snapshot (MIN-141 đợt 3): bằng
-            # chứng người dùng xác nhận (`loai_giay_to`/`noi_cap` nhập)
-            # ưu tiên; người sống chưa có → suy theo mốc ngay_cap;
-            # người chết không suy (thiếu → None, "chưa xác định").
-            wire["loai_giay_to"] = (
-                _nn(row.get("loai_giay_to"))
-                or (customer.loai_giay_to if customer.con_song else None))
-            wire["noi_cap"] = (
-                _nn(row.get("noi_cap"))
-                or (customer.noi_cap if customer.con_song else None))
-            wire["loai_dia_chi"] = (
-                _nn(row.get("loai_dia_chi")) or customer.loai_dia_chi)
+            # Giá trị hiệu lực ghi vào snapshot (MIN-141 đợt 3 + fix
+            # review): giá trị echo đúng bằng suy ra cũ → tính lại theo
+            # input nguồn mới; giá trị khác (bằng chứng đã xác nhận,
+            # vd giấy khai tử) → giữ. Người sống chưa có → suy theo mốc
+            # ngay_cap; người chết không suy (thiếu → None).
+            stored = prev_rows.get(row["row_id"])
+            stored = stored if isinstance(stored, Mapping) else {}
+            wire["loai_giay_to"] = _resolve_derived_field(
+                row.get("loai_giay_to"), stored.get("loai_giay_to"),
+                prev_derived[0],
+                customer.loai_giay_to if customer.con_song else None)
+            wire["noi_cap"] = _resolve_derived_field(
+                row.get("noi_cap"), stored.get("noi_cap"),
+                prev_derived[1],
+                customer.noi_cap if customer.con_song else None)
+            wire["loai_dia_chi"] = _resolve_derived_field(
+                row.get("loai_dia_chi"), stored.get("loai_dia_chi"),
+                prev_derived[2], customer.loai_dia_chi)
             resolved.append((row["row_id"], customer.id, wire))
         return resolved
 

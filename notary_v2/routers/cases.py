@@ -971,8 +971,9 @@ def _delete_case_and_unreferenced_masters(db: Session,
 
     Master thuộc hồ sơ = người chết, tài sản chính, người tham gia
     (kể cả parent_customer_id) và tài sản liên kết phụ. Người nhận ủy
-    quyền là danh bạ tái dùng → không nằm trong danh sách dọn, nhưng
-    tham chiếu người nhận ủy quyền của hồ sơ KHÁC vẫn chặn dọn.
+    quyền là danh bạ tái dùng → KHÔNG bao giờ dọn theo hồ sơ, kể cả khi
+    kiêm participant/parent của chính hồ sơ bị xóa; tham chiếu người
+    nhận ủy quyền của hồ sơ KHÁC vẫn chặn dọn các master khác.
     Không quét xóa danh bạ mồ côi ngoài phạm vi hồ sơ này.
     """
     customer_ids = {case.nguoi_chet_id}
@@ -984,6 +985,7 @@ def _delete_case_and_unreferenced_masters(db: Session,
         property_ids.add(link.property_id)
     customer_ids.discard(None)
     property_ids.discard(None)
+    customer_ids.discard(case.nguoi_nhan_uy_quyen_id)
 
     db.delete(case)
     db.flush()  # participants/links của hồ sơ đã đi — không còn tính tham chiếu
