@@ -6,8 +6,9 @@ from sqlalchemy import or_
 from typing import Optional
 from datetime import date, datetime
 
-from database import get_db
-from models import Property
+from database import (get_db, MAX_LAND_ROWS, _land_area_to_float,
+                      _land_row_field)
+from models import Property, PropertyLandRow
 
 router = APIRouter()
 templates = Jinja2Templates(directory="frontend/templates")
@@ -85,36 +86,100 @@ def inline_create(
     if form["so_serial"] and db.query(Property).filter(Property.so_serial == form["so_serial"]).first():
         errors["so_serial"] = "So serial da ton tai"
 
+    # Cụm đất: parse + validate theo cùng luật Stage (dual key cũ/mới,
+    # chuỗi|số đúng kiểu, tối đa MAX_LAND_ROWS) — canonical hóa ngay để
+    # bảng con property_land_rows và mirror land_rows_json ghi cùng một
+    # transaction, không lệch nhau (MIN-141 đợt 2 fix).
+    normalized_rows = []
+    if form["land_rows"]:
+        try:
+            rows = _json.loads(form["land_rows"])
+        except Exception:
+            rows = None
+        if not isinstance(rows, list):
+            errors["land_rows"] = "Land_rows phai la mang JSON"
+        elif len(rows) > MAX_LAND_ROWS:
+            errors["land_rows"] = (
+                f"Land_rows toi da {MAX_LAND_ROWS} cum moi tai san")
+        else:
+            for index, r in enumerate(rows):
+                if not isinstance(r, dict):
+                    errors["land_rows"] = (
+                        f"land_rows[{index}] phai la object")
+                    break
+                vals, conflict_key = {}, None
+                for new_key, old_key in (("loaidat", "loai_dat"),
+                                         ("dientich", "dien_tich"),
+                                         ("thoihan", "thoi_han")):
+                    vals[new_key], c = _land_row_field(r, new_key, old_key)
+                    if c:
+                        conflict_key = (new_key, old_key)
+                if conflict_key:
+                    errors["land_rows"] = (
+                        f"land_rows[{index}] '{conflict_key[0]}' va "
+                        f"'{conflict_key[1]}' mau thuan")
+                    break
+                if (vals["loaidat"] is not None
+                        and not isinstance(vals["loaidat"], str)):
+                    errors["land_rows"] = (
+                        f"land_rows[{index}].loaidat phai la chuoi "
+                        "hoac null")
+                    break
+                if (vals["thoihan"] is not None
+                        and not isinstance(vals["thoihan"], str)):
+                    errors["land_rows"] = (
+                        f"land_rows[{index}].thoihan phai la chuoi "
+                        "hoac null")
+                    break
+                try:
+                    dien = _land_area_to_float(vals["dientich"])
+                except (ValueError, TypeError):
+                    errors["land_rows"] = (
+                        f"land_rows[{index}].dientich khong phai so")
+                    break
+                normalized_rows.append({
+                    "loaidat": (vals["loaidat"].strip() or None
+                                if isinstance(vals["loaidat"], str)
+                                else None),
+                    "dientich": dien,
+                    "thoihan": (vals["thoihan"].strip() or None
+                                if isinstance(vals["thoihan"], str)
+                                else None),
+                })
+
     if errors:
-        return JSONResponse({"ok": False, "errors": errors}, status_code=400)
+        return JSONResponse({"ok": False, "errors": errors},
+                            status_code=400)
 
     loai_dat_val = ""
     thoi_han_val = ""
     dien_tich_total = None
     land_rows_json_val = None
-    if form["land_rows"]:
-        try:
-            rows = _json.loads(form["land_rows"])
-            parts = []
-            total = 0.0
-            for r in rows:
-                loai = str(r.get("loai_dat", "")).strip()
-                dien = str(r.get("dien_tich", "")).strip()
-                thoi = str(r.get("thoi_han", "")).strip()
-                if loai or dien or thoi:
-                    parts.append(f"{loai} | {dien}m2 | {thoi}")
-                try:
-                    total += float(dien) if dien else 0
-                except (ValueError, TypeError):
-                    pass
-            loai_dat_val = "; ".join(parts)
-            if rows:
-                thoi_han_val = str(rows[0].get("thoi_han", "")).strip()
-            if total > 0:
-                dien_tich_total = total
-            land_rows_json_val = form["land_rows"]
-        except Exception:
-            loai_dat_val = form["land_rows"]
+    if normalized_rows:
+        parts = []
+        total = 0.0
+        for r in normalized_rows:
+            dien_s = ("" if r["dientich"] is None else
+                      ("%g" % r["dientich"]))
+            if r["loaidat"] or r["dientich"] is not None or r["thoihan"]:
+                parts.append(
+                    f"{r['loaidat'] or ''} | {dien_s}m2 | "
+                    f"{r['thoihan'] or ''}")
+            if r["dientich"]:
+                total += r["dientich"]
+        loai_dat_val = "; ".join(parts)
+        thoi_han_val = normalized_rows[0]["thoihan"] or ""
+        if total > 0:
+            dien_tich_total = total
+        # Mirror legacy keys — đúng shape migrate_property_land_rows ghi.
+        land_rows_json_val = _json.dumps([
+            {"loai_dat": r["loaidat"],
+             "dien_tich": (int(r["dientich"])
+                           if isinstance(r["dientich"], float)
+                           and r["dientich"].is_integer()
+                           else r["dientich"]),
+             "thoi_han": r["thoihan"]}
+            for r in normalized_rows], ensure_ascii=False)
 
     p = Property(
         so_serial=form["so_serial"], so_vao_so=form["so_vao_so"] or None,
@@ -127,6 +192,10 @@ def inline_create(
         nguon_goc=form["nguon_goc"] or None, ngay_cap=parse_date(form["ngay_cap"]),
         co_quan_cap=form["co_quan_cap"] or None
     )
+    p.land_rows = [
+        PropertyLandRow(vitri=i + 1, loaidat=r["loaidat"],
+                        dientich=r["dientich"], thoihan=r["thoihan"])
+        for i, r in enumerate(normalized_rows)]
     db.add(p); db.commit(); db.refresh(p)
     return JSONResponse({
         "ok": True,

@@ -1,5 +1,6 @@
 import json
 import logging
+import math
 import sqlite3
 from pathlib import Path
 from sqlalchemy import create_engine, event
@@ -154,18 +155,26 @@ def _land_row_field(row: dict, new_key: str, old_key: str):
 
 
 def _land_area_to_float(value):
-    """dientich/dien_tich → float|None. bool và chuỗi không parse được →
-    raise ValueError (caller ghi anomaly, giữ nguyên bản gốc)."""
-    if value is None or isinstance(value, bool):
+    """dientich/dien_tich → float|None. bool, chuỗi không parse được,
+    số/chuỗi không hữu hạn (inf/nan) và kiểu không hỗ trợ → raise
+    ValueError (caller ghi anomaly, giữ nguyên bản gốc — không âm thầm
+    ép giá trị sai về NULL)."""
+    if value is None:
         return None
+    if isinstance(value, bool):
+        raise ValueError("dien_tich bool không hợp lệ")
     if isinstance(value, (int, float)):
-        return float(value)
-    if isinstance(value, str):
+        result = float(value)
+    elif isinstance(value, str):
         text = value.strip()
         if not text:
             return None
-        return float(text)  # ValueError → anomaly
-    raise ValueError(f"unsupported dien_tich type {type(value).__name__}")
+        result = float(text)  # ValueError → anomaly
+    else:
+        raise ValueError(f"unsupported dien_tich type {type(value).__name__}")
+    if not math.isfinite(result):
+        raise ValueError("dien_tich không hữu hạn")
+    return result
 
 
 def migrate_property_land_rows(con=None):
@@ -254,6 +263,25 @@ def migrate_property_land_rows(con=None):
             con.close()
         return report
 
+    try:
+        _migrate_property_land_rows_scan(cur, prop_columns, report, anomaly)
+        con.commit()
+    except Exception:
+        # Lỗi bất ngờ (DB, FK, …): rollback sạch, đóng connection nếu
+        # hàm tự mở, rồi raise — không để transaction treo nửa chừng.
+        con.rollback()
+        raise
+    finally:
+        if own_con:
+            con.close()
+    if own_con:
+        assert_foreign_key_check()
+    return report
+
+
+def _migrate_property_land_rows_scan(cur, prop_columns, report, anomaly):
+    """Quét properties và backfill property_land_rows — phần thân của
+    migrate_property_land_rows, tách ra để caller bọc try/rollback."""
     cur.execute(
         "SELECT id, land_rows_json, thoi_han FROM properties ORDER BY id"
         if "thoi_han" in prop_columns else
@@ -310,6 +338,22 @@ def migrate_property_land_rows(con=None):
                                 values[new_key] = value
                             if bad:
                                 break
+                            # Kiểu sai (object/list/bool/…) → anomaly,
+                            # không để giá trị lạ chạy vào câu INSERT
+                            # (SQLite crash) và không ép về NULL.
+                            for tkey in ("loaidat", "thoihan"):
+                                tv = values[tkey]
+                                if (tv is not None
+                                        and not isinstance(tv, str)):
+                                    anomaly(
+                                        property_id, "invalid_field",
+                                        f"land_rows[{index}].{tkey} "
+                                        f"sai kiểu "
+                                        f"{type(tv).__name__}")
+                                    bad = True
+                                    break
+                            if bad:
+                                break
                             try:
                                 values["dientich"] = _land_area_to_float(
                                     values["dientich"])
@@ -317,7 +361,7 @@ def migrate_property_land_rows(con=None):
                                 anomaly(
                                     property_id, "invalid_dientich",
                                     f"land_rows[{index}].dien_tich "
-                                    "không parse được")
+                                    "không parse được / không hợp lệ")
                                 bad = True
                                 break
                             values["loaidat"] = (
@@ -356,11 +400,6 @@ def migrate_property_land_rows(con=None):
                 anomaly(property_id, "orphan_thoi_han",
                         f"thoi_han lẻ '{term}' không trùng thoihan "
                         "cụm nào — giữ nguyên, cần đối chiếu")
-    con.commit()
-    if own_con:
-        con.close()
-        assert_foreign_key_check()
-    return report
 
 
 def migrate_zalo_schema():

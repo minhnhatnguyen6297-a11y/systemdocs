@@ -1429,7 +1429,7 @@ class CaseWorkspaceService:
             entity = snap.get("_entity")
             prop = self._property(entity)
             assets.append(self._asset_wire(
-                snap["row_id"], entity, prop,
+                snap["row_id"], entity, prop, snap,
                 index=index, warnings=legacy_notes))
             self._land_data_warnings(prop, snap["row_id"], data_warnings)
             # Repersist giữ nguyên field snapshot đã commit (Word đọc từ
@@ -1477,13 +1477,33 @@ class CaseWorkspaceService:
 
     def _asset_wire(self, row_id: str, entity: Optional[int],
                     prop: Optional[Property],
+                    snap: Optional[Mapping[str, Any]] = None,
                     index: int = 0,
                     warnings: Optional[list] = None) -> dict:
         """asset_row_v2 — KHÔNG emit `is_primary` (§13.3). Cụm đất emit
-        theo key legacy của §4.2; nguồn đọc ưu tiên bảng con
-        property_land_rows, land_rows_json là fallback tương thích."""
-        land_rows = _land_rows_wire(_prop_land_rows(prop))
-        raw_serial = prop.so_serial if prop is not None else None
+        theo key legacy của §4.2.
+
+        Nguồn đọc (MIN-141 đợt 2 fix): snapshot đã commit trong
+        case_state_json mang đủ field nghiệp vụ → đọc snapshot — nhất
+        quán với Word (`_get_property_list`), hai hồ sơ dùng chung một
+        master property không kéo số liệu của nhau. Snapshot cũ chỉ có
+        con trỏ {id/row_id/is_primary} → fallback master: bảng con
+        property_land_rows trước, land_rows_json là fallback tương
+        thích."""
+        full = (isinstance(snap, Mapping)
+                and _snapshot_has_asset_fields(snap))
+
+        def _pick(key):
+            if full:
+                return snap.get(key)
+            return getattr(prop, key, None) if prop is not None else None
+
+        if full:
+            snap_rows = snap.get("land_rows")
+            land_rows = _land_rows_wire(_snap_land_rows(snap_rows))
+        else:
+            land_rows = _land_rows_wire(_prop_land_rows(prop))
+        raw_serial = _pick("so_serial")
         serial = _canonical_serial(raw_serial)
         if serial is None:
             # DB cũ có serial lạ → surrogate deterministic, giữ truy vết
@@ -1498,16 +1518,16 @@ class CaseWorkspaceService:
             "row_id": row_id,
             "entity_id": entity,
             "so_serial": serial,
-            "so_vao_so": _nn(prop.so_vao_so if prop else None),
-            "so_thua_dat": _nn(prop.so_thua_dat if prop else None),
-            "so_to_ban_do": _nn(prop.so_to_ban_do if prop else None),
-            "dia_chi": _nn(prop.dia_chi if prop else None),
-            "loai_so": _nn(prop.loai_so if prop else None),
-            "hinh_thuc_su_dung": _nn(prop.hinh_thuc_su_dung if prop else None),
-            "thoi_han": _nn(prop.thoi_han if prop else None),
-            "nguon_goc": _nn(prop.nguon_goc if prop else None),
-            "ngay_cap": _emit_date_or_year(prop.ngay_cap if prop else None),
-            "co_quan_cap": _nn(prop.co_quan_cap if prop else None),
+            "so_vao_so": _nn(_pick("so_vao_so")),
+            "so_thua_dat": _nn(_pick("so_thua_dat")),
+            "so_to_ban_do": _nn(_pick("so_to_ban_do")),
+            "dia_chi": _nn(_pick("dia_chi")),
+            "loai_so": _nn(_pick("loai_so")),
+            "hinh_thuc_su_dung": _nn(_pick("hinh_thuc_su_dung")),
+            "thoi_han": _nn(_pick("thoi_han")),
+            "nguon_goc": _nn(_pick("nguon_goc")),
+            "ngay_cap": _emit_date_or_year(_pick("ngay_cap")),
+            "co_quan_cap": _nn(_pick("co_quan_cap")),
             "land_rows": land_rows,
         }
 
@@ -1525,7 +1545,16 @@ class CaseWorkspaceService:
             return
         table_rows = getattr(prop, "land_rows", None) or []
         raw = _clean(getattr(prop, "land_rows_json", None))
-        if not table_rows and raw:
+        # Kiểm giới hạn trên nguồn thực được đọc: bảng con khi có dòng
+        # (kể cả sau khi backfill xong — vẫn báo để đối chiếu, không
+        # truncate), ngược lại fallback JSON.
+        if table_rows:
+            if len(table_rows) > MAX_LAND_ROWS:
+                warnings.append({
+                    "code": "stage.legacy_land_rows_overflow",
+                    "message": f"asset {row_id}: {len(table_rows)} cụm đất "
+                               f"> {MAX_LAND_ROWS} — cần đối chiếu"})
+        elif raw:
             try:
                 data = json.loads(raw)
             except (ValueError, TypeError):
@@ -2422,6 +2451,33 @@ def _land_rows_wire(rows: Optional[list]) -> Optional[list]:
         return None
     return [{"loai_dat": r["loaidat"], "dien_tich": r["dientich"],
              "thoi_han": r["thoihan"]} for r in rows]
+
+
+# Key meta/pointer của snapshot asset — không tính "field nghiệp vụ".
+# `_entity` là cờ nội bộ của `_compose_stage`. Ngưỡng này phải khớp
+# word_engine._snapshot_asset_fields để Stage mở lại và Word đọc cùng
+# một nguồn (MIN-141 đợt 2 fix).
+_SNAPSHOT_ASSET_META_KEYS = {"id", "entity_id", "row_id", "is_primary",
+                             "_entity"}
+
+
+def _snapshot_has_asset_fields(snap: Mapping[str, Any]) -> bool:
+    """Snapshot asset đợt 2 trở đi mang full field nghiệp vụ + land_rows
+    canonical; snapshot legacy chỉ có con trỏ → False (fallback master)."""
+    return any(k not in _SNAPSHOT_ASSET_META_KEYS for k in snap)
+
+
+def _snap_land_rows(rows: Any) -> list:
+    """land_rows trong snapshot asset → canonical [{loaidat, dientich,
+    thoihan}]. Snapshot đợt 2+ ghi key canonical; payload cũ có thể giữ
+    key wire legacy — `_normalize_land_row` đọc được cả hai. Dòng không
+    phải object → cụm trống giữ nguyên vị trí."""
+    if not isinstance(rows, list):
+        return []
+    return [
+        _normalize_land_row(r) if isinstance(r, Mapping)
+        else {"loaidat": None, "dientich": None, "thoihan": None}
+        for r in rows]
 
 
 def _prop_land_rows(prop: Optional[Property]) -> Optional[list]:

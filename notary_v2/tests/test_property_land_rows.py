@@ -241,6 +241,15 @@ def test_migration_does_not_overwrite_rows_written_by_commit(legacy_db):
     ('"chuỗi không phải mảng"', "invalid_shape"),
     ('[{"loai_dat": "ODT"}, "không phải object"]', "invalid_row"),
     ('[{"loai_dat": "ODT", "dien_tich": "abc"}]', "invalid_dientich"),
+    # MIN-141 đợt 2 fix: kiểu object/list/bool phải thành anomaly —
+    # không để SQLite crash, không ép về NULL; số/chuỗi không hữu hạn
+    # cũng bị chặn.
+    ('[{"loai_dat": {"bad": "type"}, "dien_tich": 5}]', "invalid_field"),
+    ('[{"loai_dat": ["ODT"]}]', "invalid_field"),
+    ('[{"loaidat": "ODT", "thoihan": true}]', "invalid_field"),
+    ('[{"dientich": true}]', "invalid_dientich"),
+    ('[{"dientich": {"a": 1}}]', "invalid_dientich"),
+    ('[{"dien_tich": 1e999}]', "invalid_dientich"),  # inf — không hữu hạn
 ])
 def test_migration_bad_json_reported_and_preserved(legacy_db,
                                                    json_text, code):
@@ -647,6 +656,128 @@ def test_get_warns_orphan_and_invalid_and_overflow(db):
                    CaseWorkspaceService(db).get(case.id)["warnings"]
                    if w["code"] == "stage.orphan_thoi_han"]
     assert len(orphan_msgs) == 1
+
+
+def test_reopen_commit_noop_preserves_own_snapshot(db):
+    """MIN-141 đợt 2 fix: mở lại Stage hồ sơ A (đọc snapshot A, không kéo
+    master mà hồ sơ B vừa đổi) rồi commit nguyên trạng → snapshot A giữ
+    nguyên giá trị, Word vẫn đúng."""
+    people, assets, state = _create_args()
+    data_a = _create(db, people, assets, state)
+    case_a = data_a["case"]["id"]
+    prop_id = data_a["stage"]["assets"][0]["entity_id"]
+
+    # Hồ sơ B trỏ cùng master property và đổi cụm đất thành CLN
+    people_b = [_person_row(ho_ten="Lê Văn C", ngay_chet="2020-01-01",
+                            so_giay_to="111222333444")]
+    state_b = _v3_state([_node("owner", people_b[0]["row_id"], own=[1])])
+    data_b = _create(db, people_b,
+                     [_asset_row(so_serial="FF123456")], state_b)
+    _commit(db, data_b["case"]["id"], 1, people_b, [_asset_row(
+        entity_id=prop_id, so_serial="EE123456",
+        land_rows=[{"loai_dat": "CLN", "dien_tich": 90,
+                    "thoi_han": "Đến 2043"}])])
+    assert db.query(PropertyLandRow).filter_by(
+        property_id=prop_id).one().loaidat == "CLN"
+
+    service = CaseWorkspaceService(db)
+    reopened = service.get(case_a)
+    # Stage A đọc snapshot A — ODT, không phải CLN của master
+    assert reopened["stage"]["assets"][0]["land_rows"][0][
+        "loai_dat"] == "ODT"
+    # Commit nguyên trạng payload vừa mở → snapshot A không đổi
+    result = service.commit_stage(
+        case_a, reopened["case"]["revision"],
+        reopened["stage"])
+    assert result["revision"] == 2
+    snap = _payload_assets(db, case_a)[0]
+    assert snap["land_rows"][0]["loaidat"] == "ODT"
+    assert word_engine.build_template_mapping(
+        db.get(InheritanceCase, case_a))["[loaidat11]"] == "ODT"
+
+
+def test_pointer_snapshot_falls_back_to_master_rows(db):
+    """Snapshot legacy chỉ có con trỏ {id,row_id,is_primary} → vẫn đọc
+    master (bảng con), không đọc nhầm snapshot rỗng."""
+    people, _assets, state = _create_args()
+    prop = Property(so_serial="DD777777", dia_chi="Thửa cũ")
+    prop.land_rows = [PropertyLandRow(
+        vitri=1, loaidat="BHK", dientich=33.0, thoihan="50 năm")]
+    db.add(prop)
+    db.flush()
+    data_a = _create(db, people, [_asset_row()], state)
+    case = db.get(InheritanceCase, data_a["case"]["id"])
+    payload = json.loads(case.case_state_json)
+    payload["assets"] = [{"id": str(prop.id),
+                          "row_id": str(uuid.uuid4()),
+                          "is_primary": True}]
+    case.case_state_json = json.dumps(payload)
+    db.commit()
+    result = CaseWorkspaceService(db).get(case.id)
+    assert result["stage"]["assets"][0]["land_rows"] == [
+        {"loai_dat": "BHK", "dien_tich": 33.0, "thoi_han": "50 năm"}]
+
+
+def test_inline_create_writes_land_rows_and_mirror_atomically(db):
+    """Route tạo nhanh ghi master + bảng con + mirror trong một commit —
+    query property_land_rows ngay sau route thấy đủ cụm, không chờ
+    migration (MIN-141 đợt 2 fix)."""
+    from routers.properties import inline_create
+    rows = [{"loai_dat": "ODT", "dien_tich": 80, "thoi_han": "Lâu dài"},
+            {"loai_dat": "CLN", "dien_tich": 50.5, "thoi_han": None}]
+    resp = inline_create(
+        so_serial="RT000001", so_vao_so=None, so_thua_dat=None,
+        so_to_ban_do=None, dia_chi="Thửa 1, xã A", loai_so=None,
+        hinh_thuc_su_dung=None, nguon_goc=None, ngay_cap=None,
+        co_quan_cap=None,
+        land_rows=json.dumps(rows, ensure_ascii=False), db=db)
+    payload = json.loads(resp.body)
+    assert payload["ok"] is True
+    prop = db.get(Property, payload["property"]["id"])
+    assert [(r.vitri, r.loaidat, r.dientich, r.thoihan)
+            for r in prop.land_rows] == [
+        (1, "ODT", 80.0, "Lâu dài"), (2, "CLN", 50.5, None)]
+    # Mirror cùng một transaction, shape legacy như migration ghi
+    assert json.loads(prop.land_rows_json) == [
+        {"loai_dat": "ODT", "dien_tich": 80, "thoi_han": "Lâu dài"},
+        {"loai_dat": "CLN", "dien_tich": 50.5, "thoi_han": None}]
+    assert prop.dien_tich == 130.5            # tổng diện tích các cụm
+    assert prop.thoi_han == "Lâu dài"         # thời hạn cụm đầu
+    # Key canonical cũng nhận được (dual-key như Stage)
+    resp2 = inline_create(
+        so_serial="RT000002", so_vao_so=None, so_thua_dat=None,
+        so_to_ban_do=None, dia_chi="Thửa 2", loai_so=None,
+        hinh_thuc_su_dung=None, nguon_goc=None, ngay_cap=None,
+        co_quan_cap=None,
+        land_rows=json.dumps([{"loaidat": "ONT", "dientich": 10,
+                               "thoihan": "x"}]), db=db)
+    assert json.loads(resp2.body)["ok"] is True
+    prop2 = db.get(Property, json.loads(resp2.body)["property"]["id"])
+    assert [(r.vitri, r.loaidat) for r in prop2.land_rows] == [(1, "ONT")]
+
+
+@pytest.mark.parametrize("rows_json", [
+    json.dumps([{"loai_dat": {"bad": 1}}]),        # object — sai kiểu
+    json.dumps([{"thoi_han": True}]),              # bool — sai kiểu
+    json.dumps([{"dien_tich": "abc"}]),            # không phải số
+    json.dumps({"loai_dat": "ODT"}),               # không phải mảng
+    "not-json{{{",                                  # JSON hỏng
+    json.dumps([{"loai_dat": "ODT", "loaidat": "CLN"}]),  # mâu thuẫn
+    json.dumps([{"loai_dat": "X"}] * 21),          # > MAX_LAND_ROWS
+])
+def test_inline_create_rejects_malformed_land_rows(db, rows_json):
+    """Land_rows sai → 400 + errors['land_rows'], không ghi master/bảng
+    con nửa chừng — route không đưa giá trị thô/sai kiểu vào DB."""
+    from routers.properties import inline_create
+    resp = inline_create(
+        so_serial="RT000009", so_vao_so=None, so_thua_dat=None,
+        so_to_ban_do=None, dia_chi="Thửa bad", loai_so=None,
+        hinh_thuc_su_dung=None, nguon_goc=None, ngay_cap=None,
+        co_quan_cap=None, land_rows=rows_json, db=db)
+    assert resp.status_code == 400
+    assert "land_rows" in json.loads(resp.body)["errors"]
+    assert db.query(Property).filter_by(
+        so_serial="RT000009").first() is None
 
 
 def test_main_and_sidecar_wire_land_row_migration():
