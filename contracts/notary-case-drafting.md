@@ -275,6 +275,23 @@ backend hiện strip ngoài 10 key). `ho_ten` rỗng/`""` →
   (chưa xác định, không suy). Người chết (`ngay_chet` ≠ null): server
   KHÔNG tự suy — chỉ giữ giá trị người dùng xác nhận; `loai_dia_chi`
   mặc định `"Nơi chết"`.
+- **Phân biệt bằng chứng xác nhận vs giá trị suy ra (MIN-141 fix
+  `eff4f12`):** giá trị suy ra đã ghi trong snapshot trước KHÔNG được
+  coi là bằng chứng người dùng xác nhận. Tại commit mới, server tính
+  lại giá trị suy ra trước đó từ input nguồn của **snapshot của chính
+  hồ sơ** (`ngay_chet`/`ngay_cap` đã lưu trong `case_state_json`), không
+  lấy master live — master dùng chung có thể đã bị hồ sơ khác sửa. Row
+  incoming echo đúng giá trị suy ra trước đó hoặc trống → tính lại theo
+  input nguồn mới; row incoming khác giá trị suy ra trước đó → đó là
+  bằng chứng đã xác nhận → giữ nguyên (kể cả giấy khai tử người chết).
+- **Word đọc bằng chứng Người từ snapshot (MIN-141 fix `eff4f12`):**
+  các slot Người trong Word (`[tenN]`…`[loaigiaytoN]`/`[noicapN]`/`[loaicutruN]`
+  và alias cũ) đọc từ phần tử `stage[]` đã commit trong
+  `case_state_json` của chính hồ sơ — đối chiếu theo `id` entity, giữ
+  nguyên thứ tự slot legacy. Ngữ nghĩa key-presence: key có trong
+  snapshot (kể cả `null`) → dùng snapshot; key vắng → fallback master
+  live cho hồ sơ cũ. Hai hồ sơ dùng chung một `Customer` xuất đúng
+  bằng chứng riêng đã commit, không bị sửa master kéo lệch nhau.
 
 ### 4.2 `asset_row` — dòng Tài sản Stage
 

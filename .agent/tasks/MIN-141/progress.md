@@ -223,3 +223,61 @@ Bằng chứng:
 - Full `pytest tests/ -q` → **641 passed, 1 skipped, 8 failed** = đúng
   baseline (customers_excel jinja2, doc_conversion_poc, zalo_*).
 - Ảnh render UI 3 dòng meta: `artifacts/ui-casemeta.png` (workdir).
+
+## Review fix — 3 lỗi Leader gửi trên `d7a8b4c` (commit `eff4f12`)
+
+1. **Slot Người trong Word đọc snapshot:** `_snapshot_person_view` (key
+   presence: key có trong snapshot kể cả null → dùng snapshot; key vắng
+   → fallback master), `_snapshot_people_by_id`, `_snap_date_value`;
+   vòng lặp slot bọc `_slot_person(c)` đối chiếu `Customer.id` ↔
+   `stage[].id`. Cả token chuẩn lẫn alias cũ đọc cùng view.
+2. **`prev_derived` từ snapshot:** `derive_person_fields(ngay_chet,
+   ngay_cap)` trong `models.py` làm SOT rule suy ra; 4 property
+   `Customer` delegate; xóa `_moc_cccd_moi` (dead). `commit_stage` tính
+   `prev_derived` từ input nguồn snapshot trước thay vì master live.
+3. **`thoi_han` lẻ rút khỏi Stage/form:** bỏ khỏi `ASSET_FIELD_ROWS`
+   (view) + `ASSET_FIELDS` (model); `stageForWire()` strip key `thoi_han`
+   lẻ tại 3 điểm gửi; server chỉ ghi master khi client thực gửi key.
+
+Bằng chứng:
+- Probe Leader `test_snapshot_person_review.py` → **2 passed**.
+- `pytest test_case_metadata + test_snapshot_person_review` → 32 passed;
+  focused suite 6 file → **141 passed**.
+- `node --test notary-case-drafting-view` 43/43; `model` 77/77.
+- Full suite @`eff4f12` → **647 passed, 1 skipped, 8 failed**; baseline
+  @`d7a8b4c` (worktree riêng) → 641 passed, 8 failed — cùng 8 lỗi
+  pre-existing ngoài phạm vi, +6 test mới xanh.
+
+## Review fix — 2 điểm cuối trên `eff4f12` (commit `c174cce`)
+
+1. **Schema/contract tách input vs emit:** `asset_row_base` +
+   `asset_row_input` (payload, không bắt buộc `thoi_han` lẻ) vs
+   `asset_row` (emit, vẫn bắt buộc key nullable để đối chiếu lịch sử +
+   warning `stage.orphan_thoi_han`); `$ref` phía input đổi ở
+   `stage`/`workspace-create`/`diagram`/`draft-v2`; doc §4.2/§13.3 ghi
+   ngữ nghĩa key vắng = giữ lịch sử master.
+2. **`routers/properties.py` + `properties/form.html`:** create/edit/
+   inline-create ngừng nhận/ghi `thoi_han` lẻ (client legacy gửi kèm bị
+   bỏ qua; edit không gửi trường → giữ nguyên giá trị lịch sử); bỏ ô
+   nhập, hiển thị read-only giá trị cũ; không DROP cột, không tự gán
+   lịch sử vào cụm.
+
+Bằng chứng:
+- `node --test test/notary-wire-payload-schema.test.mjs` → **4/4**
+  (payload thật từ renderer validate vs schema input/emit).
+- `pytest tests/test_properties_router.py` → **8/8** qua route thật;
+  focused 128 passed; JS suite 158 passed; adapter contract 71 passed;
+  contract examples 68 files 0 unexpected.
+
+## Kết quả nghiệm thu (Leader, 15:30 UTC 01/10/2026)
+
+**PASS phạm vi MIN-141 tại `c174cce`** — Leader chạy độc lập trên đúng
+SHA: backend 181 passed, renderer/model/view/payload-schema 158 passed,
+adapter contract 71 passed, contract examples 68 files 0 unexpected,
+`git diff --check` sạch. Không còn yêu cầu sửa chặn nghiệm thu trong
+phạm vi đã giao; issue chuyển `in_review` chờ Owner nghiệm thu.
+
+Giới hạn còn ghi nhận: full suite vẫn có 8 lỗi baseline ngoài phạm vi
+(customers_excel jinja2, doc_conversion_poc sha256, zalo_* tzdata/wire);
+test GET form properties dùng stub template do lệch FastAPI/Starlette
+môi trường dev — POST route chạy TestClient thật.
