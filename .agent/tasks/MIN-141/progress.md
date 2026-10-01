@@ -133,3 +133,67 @@ Bằng chứng (cwd `notary_v2/`):
   khác nhau ở optional deps).
 - `python contracts/notary-case-drafting/validate_examples.py` → **68 files,
   0 unexpected outcomes**.
+
+## Đợt 3 — người + hồ sơ xuyên backend–UI–Word (commit `ae5dd7a`)
+
+1. **Person derived fields:** `loai_giay_to`/`loai_dia_chi` vào PERSON_FIELDS,
+   wire + snapshot giá trị hiệu lực; người chết giữ evidence-only (không gán
+   cứng), người sống suy từ `ngay_cap` qua mốc 01/10/2024, thiếu ngày → null.
+   Canonical alias không dấu fold vào snake_case; hai alias khác nhau →
+   `validation_error`.
+2. **Case meta (6 trường):** `ngay_lap_ho_so`, `noi_niem_yet`,
+   `nguoi_nhan_uy_quyen`, `nguoi_nhan_uy_quyen_id`, `noi_dung_viec`, `ghi_chu`
+   nhận qua `payload.case` ở cả `workspace_create` lẫn `workspace_commit_stage`
+   (cùng transaction Stage); `case_type`/`document_type` immutable; `uq_id`
+   phải tồn tại trong `customers` + tên khớp master.
+3. **Cột `nguoi_nhan_uy_quyen_id` thật** (FK customers) để đối chiếu danh bạ
+   và phục vụ dọn dữ liệu đợt 4.
+4. **Word engine:** đọc meta từ snapshot trước, DB fallback cho hồ sơ cũ;
+   deceased clause xây từ trường đã xác nhận thay vì gán cứng.
+5. **Sidecar + mock parity:** adapter truyền `payload.case`; mock có
+   `_apply_case_meta`, canonical alias, danh bạ giả cho
+   `notary.customer_list`/`customer_create` (route qua gateway).
+6. **UI:** 3 dòng meta (Nơi niêm yết / Người nhận ủy quyền / Nội dung việc)
+   dưới bảng tài sản; catalog ủy quyền có tìm kiếm + `+ Danh bạ`; input meta
+   90% chiều cao input thường; defer `loadUqCatalog` sang microtask tránh
+   render lồng nhau.
+7. **Contracts:** doc + 4 schema JSON + validator + 68 ví dụ đồng bộ.
+
+Bằng chứng đợt 3:
+- focused backend 136 passed; sidecar/mock 190 passed; contract validator
+  68 files 0 unexpected; JS renderer 124 passed (1 fail baseline
+  `shell-chrome` thiếu `docs/product/ui/tokens.json`); full Python
+  610 passed, 8 failed = baseline (excel jinja2, poc, zalo_*).
+
+## Đợt 4 — dọn hồ sơ nháp reference-safe + thống kê gắn hồ sơ
+
+1. **Xóa draft (`routers/cases.py`):** `_delete_case_and_unreferenced_masters`
+   trong một transaction — xóa case (cascade participants/property_links),
+   flush, rồi chỉ xóa master "thuộc hồ sơ" (người chết, tài sản chính,
+   participant kể cả `parent_customer_id`, tài sản link phụ) khi KHÔNG còn
+   tham chiếu sống: case khác (`nguoi_chet_id`/`tai_san_id`/
+   `nguoi_nhan_uy_quyen_id`), participant còn lại (`customer_id`/
+   `parent_customer_id`), `InheritanceCaseProperty` còn lại, hoặc snapshot
+   `case_state_json`/`engine_state_json` của hồ sơ còn tồn tại
+   (`_snapshot_master_refs`, `_live_master_refs`). Người nhận ủy quyền của
+   chính hồ sơ = danh bạ tái dùng → không nằm trong danh sách dọn; không
+   quét xóa danh bạ mồ côi ngoài phạm vi. Hồ sơ khóa giữ nguyên từ chối;
+   lỗi giữa chừng → rollback toàn bộ.
+2. **`/api/stats` (`main.py`):** `customers`/`properties` = DISTINCT id qua
+   `_live_master_refs` (case + participant + link + snapshot còn lại) —
+   danh bạ trơ không tính, primary/link trùng đếm một lần; giữ nguyên
+   `cases`/`locked` và response keys.
+3. **Tests `tests/test_draft_cleanup.py`:** 14 case — xóa draft dọn master
+   không tham chiếu; khóa từ chối; master dùng chung/vai trò phụ/ủy quyền/
+   snapshot sống giữ lại; land_rows cascade theo property; danh bạ trơ
+   không bị quét; rollback nguyên vẹn; stats chỉ đếm thực thể gắn hồ sơ +
+   distinct primary/link + shape endpoint.
+
+Bằng chứng đợt 4:
+- `pytest tests/test_draft_cleanup.py -x -q` → **14 passed**.
+- `pytest tests/test_draft_cleanup.py tests/test_case_workspace.py
+  tests/test_case_metadata.py tests/test_property_land_rows.py -q` →
+  **119 passed**.
+- `pytest tests/ -q` (full) → **624 passed, 1 skipped, 8 failed** — 8 fail
+  giống hệt baseline (customers_excel jinja2, doc_conversion_poc, zalo_*),
+  không liên quan diff.
