@@ -5,16 +5,21 @@ không tự quyết định loại. Sau đó các zone (header -> parties -> ass
 clauses -> notary) được cắt tuần tự bằng marker trên văn bản đã fold.
 
 Mọi pattern trong profile viết ở dạng folded: chữ thường, không dấu, đ -> d.
+Pattern đi qua engine `regex` với timeout thật (TimeoutError ngay trong
+match) — kind_rules lẫn zone markers đều được guard, lỗi ghi vào `errors`
+kèm rule_id thay vì im lặng.
 """
 
 from __future__ import annotations
 
-import re
+import re  # chỉ cho _clean_title_text/fold_lines (không phải pattern profile)
 import unicodedata
 from typing import Any
 
-from .model import STATE_MATCHED, STATE_MISSING, make_span_result
-from .textnorm import map_span
+import regex
+
+from .extractor import _guarded_search
+from .model import STATE_ERROR, STATE_MATCHED, STATE_MISSING, make_span_result
 
 
 def _clean_title_text(text: str) -> str:
@@ -26,11 +31,14 @@ def detect_title(
     text: str,
     folded_lines: list[tuple[int, int, str]],
     profile: dict[str, Any],
+    timeout_ms: int,
+    errors: list[str],
 ) -> dict:
     """Tìm dòng tiêu đề và nhận loại văn bản.
 
-    folded_lines: list (orig_start, orig_end, folded_line_text) cho từng
-    dòng không rỗng của văn bản nguồn.
+    folded_lines: list (raw_start, raw_end, folded_line_text) cho từng dòng
+    không rỗng — offset đã quy về văn bản nguồn gốc nên span/raw_snippet trỏ
+    đúng input người dùng.
     """
     tcfg = profile.get("title", {})
     scan_lines = int(tcfg.get("scan_lines", 25))
@@ -78,13 +86,19 @@ def detect_title(
     kind = "generic"
     rule_id = "title.generic"
     for rule in kind_rules:
+        krule_id = str(rule.get("rule_id", "title.rule"))
         try:
-            pattern = re.compile(str(rule.get("pattern", "")))
-        except re.error:
+            pattern = regex.compile(str(rule.get("pattern", "")), regex.MULTILINE)
+        except regex.error as exc:
+            errors.append(f"{krule_id}: regex không hợp lệ — {exc}")
             continue
-        if pattern.search(title_folded):
+        match, timeout_err = _guarded_search(pattern, title_folded, timeout_ms)
+        if timeout_err:
+            errors.append(f"{krule_id}: {timeout_err}")
+            continue
+        if match:
             kind = str(rule.get("kind", "generic"))
-            rule_id = str(rule.get("rule_id", "title.rule"))
+            rule_id = krule_id
             break
 
     return {
@@ -98,10 +112,11 @@ def detect_title(
 
 
 def fold_lines(text: str) -> list[tuple[int, int, str]]:
-    """Trả về (orig_start, orig_end, folded_line) cho các dòng không rỗng.
+    """Trả về (start, end, folded_line) cho các dòng không rỗng.
 
-    orig_start/orig_end là offset trên văn bản gốc (bỏ qua whitespace đầu
-    dòng). folded_line là nội dung dòng đã fold và gom khoảng trắng.
+    start/end là offset TRÊN `text` đầu vào (bỏ qua whitespace đầu dòng);
+    caller chịu trách nhiệm quy về hệ tọa độ cần thiết. folded_line là nội
+    dung dòng đã fold và gom khoảng trắng.
     """
     from .textnorm import fold_with_index_map
 
@@ -120,38 +135,52 @@ def fold_lines(text: str) -> list[tuple[int, int, str]]:
 def find_zones(
     text: str,
     folded: str,
-    index_map: list[int],
+    span_of,
     profile: dict[str, Any],
+    timeout_ms: int,
+    errors: list[str],
 ) -> list[dict]:
     """Cắt vùng tuần tự theo start_markers của từng zone trong profile.
 
     Zone i kéo dài tới điểm bắt đầu của zone i+1 tìm thấy; zone cuối dùng
-    end_markers hoặc EOF. Zone không tìm thấy marker -> state missing và
-    không chặn các zone phía sau.
+    end_markers hoặc EOF. Marker hỏng/quá hạn ghi vào `errors` kèm rule_id:
+    zone không marker nào khớp vẫn `missing`, còn zone có marker bị ngắt giữa
+    chừng mà không marker nào khác chạy được báo `error` để không im lặng.
     """
     zone_defs = profile.get("zones", [])
     starts: list[tuple[int, int] | None] = []  # (start_fold, marker_end_fold)
+    zone_had_error: list[bool] = []
     cursor = 0
     for zone_def in zone_defs:
+        zone_id = str(zone_def.get("zone_id", "?"))
+        zrule_id = str(zone_def.get("rule_id", f"zone.{zone_id}"))
         if zone_def.get("implicit_start"):
             starts.append((0, 0))
+            zone_had_error.append(False)
             continue
         best = None
+        had_error = False
         for marker in zone_def.get("start_markers", []):
             try:
-                match = re.search(str(marker), folded[cursor:])
-            except re.error:
+                mre = regex.compile(str(marker), regex.MULTILINE)
+            except regex.error as exc:
+                errors.append(f"{zrule_id}: regex không hợp lệ — {exc}")
+                had_error = True
+                continue
+            match, timeout_err = _guarded_search(mre, folded[cursor:], timeout_ms)
+            if timeout_err:
+                errors.append(f"{zrule_id}: {timeout_err}")
+                had_error = True
                 continue
             if not match:
                 continue
             candidate = (cursor + match.start(), cursor + match.end())
             if best is None or candidate[0] < best[0]:
                 best = candidate
-        if best is None:
-            starts.append(None)
-            continue
         starts.append(best)
-        cursor = best[1]
+        zone_had_error.append(had_error)
+        if best is not None:
+            cursor = best[1]
 
     zones: list[dict] = []
     for idx, zone_def in enumerate(zone_defs):
@@ -159,8 +188,10 @@ def find_zones(
         rule_id = str(zone_def.get("rule_id", f"zone.{zone_id}"))
         found = starts[idx]
         if found is None:
+            state = STATE_ERROR if zone_had_error[idx] else STATE_MISSING
+            note = "marker khong danh gia duoc (xem errors)" if zone_had_error[idx] else None
             zones.append(
-                make_span_result(STATE_MISSING, text, None, rule_id=rule_id, name=zone_id)
+                make_span_result(state, text, None, rule_id=rule_id, name=zone_id, note=note)
             )
             continue
 
@@ -174,13 +205,18 @@ def find_zones(
             # Zone cuối cùng được tìm thấy: cắt tại end_markers nếu có.
             for marker in zone_def.get("end_markers", []):
                 try:
-                    end_match = re.search(str(marker), folded[start_fold:])
-                except re.error:
+                    mre = regex.compile(str(marker), regex.MULTILINE)
+                except regex.error as exc:
+                    errors.append(f"{rule_id}: regex không hợp lệ — {exc}")
+                    continue
+                end_match, timeout_err = _guarded_search(mre, folded[start_fold:], timeout_ms)
+                if timeout_err:
+                    errors.append(f"{rule_id}: {timeout_err}")
                     continue
                 if end_match and start_fold + end_match.start() < end_fold:
                     end_fold = start_fold + end_match.start()
 
-        span = map_span(index_map, start_fold, max(start_fold, end_fold))
+        span = span_of(start_fold, max(start_fold, end_fold))
         zone = make_span_result(STATE_MATCHED, text, span, rule_id=rule_id, name=zone_id)
         zone["fold_span"] = [start_fold, max(start_fold, end_fold)]
         zones.append(zone)

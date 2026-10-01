@@ -1,4 +1,11 @@
-"""Runner: nạp profile JSON và chạy pipeline zoning -> extraction."""
+"""Runner: nạp profile JSON và chạy pipeline zoning -> extraction.
+
+Pipeline: raw input -> normalize (kèm char_ranges) -> fold (kèm fold_map)
+-> span_of (folded -> raw) -> title/kind -> zones -> fields + parties.
+Mọi span trả về trỏ vào văn bản nguồn người dùng nhập; `regex_timeout_ms`
+áp cho MỌI regex do profile điều khiển (title kind_rules, zone markers,
+field rules, side markers, person delimiter/fields, validators).
+"""
 
 from __future__ import annotations
 
@@ -6,8 +13,17 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .extractor import extract_fields, extract_parties, lint_pattern
-from .textnorm import fold_with_index_map, normalize_text
+from .extractor import (
+    DEFAULT_REGEX_TIMEOUT_MS,
+    extract_fields,
+    extract_parties,
+    lint_pattern,
+)
+from .textnorm import (
+    fold_with_index_map,
+    make_span_mapper,
+    normalize_with_index_map,
+)
 from .zoner import detect_title, find_zones, fold_lines
 
 PROFILES_DIR = Path(__file__).resolve().parent / "profiles"
@@ -41,6 +57,13 @@ def lint_profile(profile: dict[str, Any]) -> list[str]:
         msg = lint_pattern(str(rule.get("rule_id", "field.?")), str(rule.get("pattern", "")))
         if msg:
             problems.append(msg)
+        for validator in rule.get("validators", []):
+            vmsg = lint_pattern(
+                str(validator.get("rule_id") or rule.get("rule_id", "field.?")),
+                str(validator.get("pattern", "")),
+            )
+            if vmsg:
+                problems.append(vmsg)
     pcfg = profile.get("parties") or {}
     for marker in pcfg.get("side_markers", []):
         msg = lint_pattern(str(marker.get("rule_id", "party.side")), str(marker.get("pattern", "")))
@@ -60,14 +83,25 @@ def lint_profile(profile: dict[str, Any]) -> list[str]:
 
 def run(text: str, profile: dict[str, Any]) -> dict[str, Any]:
     """Chạy pipeline đầy đủ: normalize -> title/kind -> zones -> fields+parties."""
-    normalized = normalize_text(text)
-    folded, index_map = fold_with_index_map(normalized)
-    folded_line_list = fold_lines(normalized)
+    raw = str(text or "")
+    timeout_ms = int(profile.get("regex_timeout_ms", DEFAULT_REGEX_TIMEOUT_MS))
 
-    title = detect_title(normalized, folded_line_list, profile)
-    zones = find_zones(normalized, folded, index_map, profile)
-    fields, errors = extract_fields(normalized, folded, index_map, zones, profile)
-    parties = extract_parties(normalized, folded, index_map, zones, profile)
+    normalized, char_ranges = normalize_with_index_map(raw)
+    folded, fold_map = fold_with_index_map(normalized)
+    span_of = make_span_mapper(fold_map, char_ranges)
+
+    # folded_lines cho detect_title: offset quy về raw ngay tại đây để
+    # title span/raw_snippet trỏ đúng văn bản nguồn người dùng nhập.
+    folded_lines_raw = [
+        (char_ranges[s][0], char_ranges[e - 1][1], folded_line)
+        for s, e, folded_line in fold_lines(normalized)
+    ]
+
+    errors: list[str] = []
+    title = detect_title(raw, folded_lines_raw, profile, timeout_ms, errors)
+    zones = find_zones(raw, folded, span_of, profile, timeout_ms, errors)
+    fields = extract_fields(raw, folded, span_of, zones, profile, timeout_ms, errors)
+    parties = extract_parties(raw, folded, span_of, zones, profile, timeout_ms, errors)
 
     return {
         "profile_id": profile.get("profile_id"),

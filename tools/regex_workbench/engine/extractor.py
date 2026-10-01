@@ -1,19 +1,25 @@
 """Field extraction second: khớp regex bên trong từng vùng cô lập.
 
 Mọi trường trích xuất trả về provenance đầy đủ: span [start, end] trên
-văn bản gốc, raw_snippet và rule_id. Pattern chạy trên văn bản đã fold
-(lowercase, không dấu) nên regex trong profile viết dạng folded; giá trị
-và snippet luôn cắt từ văn bản gốc theo index map.
+văn bản nguồn người dùng nhập (raw), raw_snippet và rule_id. Pattern chạy
+trên văn bản đã fold (lowercase, không dấu) nên regex trong profile viết
+dạng folded; giá trị và snippet luôn cắt từ văn bản gốc qua span mapper.
 
-Regex lỗi hoặc chạy quá timeout được báo rõ bằng state `error`, không
-nuốt lỗi lặng lẽ.
+Engine match là module `regex` (không phải `re`): mỗi lệnh match nhận
+`timeout` thực — quá hạn raise `TimeoutError` NGAY trong engine, kể cả khi
+đang backtracking. Không dùng ThreadPoolExecutor: `Future.cancel()` và
+`shutdown(cancel_futures=True)` không ngắt được match `re` đang chạy.
+
+Regex lỗi cú pháp hoặc quá timeout được báo rõ bằng state `error` kèm
+rule_id — kể cả trong trích đương sự — không nuốt lỗi rồi trả `missing`.
 """
 
 from __future__ import annotations
 
-import re
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+import re  # chỉ còn cho lint tĩnh _NESTED_QUANTIFIER
 from typing import Any
+
+import regex
 
 from .model import (
     STATE_AMBIGUOUS,
@@ -23,48 +29,60 @@ from .model import (
     STATE_WARNING,
     make_span_result,
 )
-from .textnorm import map_span
 
 DEFAULT_REGEX_TIMEOUT_MS = 1000
 
 # Heuristic ReDoS: nhóm chứa quantifier rồi lại được lặp — vd (a+)+, (.*)*.
+# CHÚ Ý: chỉ là cảnh báo sớm, KHÔNG bao phủ mọi pattern gây backtracking
+# (vd `(a|a)*b` lọt qua). Cơ chế bảo vệ thật là timeout của engine `regex`.
 _NESTED_QUANTIFIER = re.compile(r"\([^()]*[*+][^()]*\)\s*[*+{]")
 
 
 def lint_pattern(rule_id: str, pattern: str) -> str | None:
     """Kiểm tra tĩnh một pattern: lỗi cú pháp hoặc nguy cơ backtracking."""
     try:
-        re.compile(pattern)
-    except re.error as exc:
+        regex.compile(pattern)
+    except regex.error as exc:
         return f"{rule_id}: regex không hợp lệ — {exc}"
     if _NESTED_QUANTIFIER.search(pattern):
         return f"{rule_id}: nested quantifier, nguy cơ catastrophic backtracking"
     return None
 
 
+def _timeout_seconds(timeout_ms: int) -> float | None:
+    return None if timeout_ms <= 0 else timeout_ms / 1000.0
+
+
 def _guarded_finditer(
-    compiled: re.Pattern,
+    compiled: "regex.Pattern",
     folded_scope: str,
     timeout_ms: int,
-) -> tuple[list[re.Match] | None, str | None]:
-    """Chạy finditer với timeout best-effort.
+) -> tuple[list | None, str | None]:
+    """Chạy finditer với timeout thật của engine `regex`.
 
-    Python re không hủy được giữa chừng; khi quá hạn ta báo lỗi rõ cho rule
-    và bỏ qua kết quả (thread nền tự kết thúc). Đủ cho dev tool địa phương.
+    Quá hạn -> TimeoutError ngay trong match (engine tự ngắt, không phụ
+    thuộc thread/process ngoài). Trả (matches, error) — error kèm ngưỡng ms
+    để caller ghép với rule_id.
     """
-    if timeout_ms <= 0:
-        return list(compiled.finditer(folded_scope)), None
-    executor = ThreadPoolExecutor(max_workers=1)
-    future = executor.submit(lambda: list(compiled.finditer(folded_scope)))
     try:
-        return future.result(timeout=timeout_ms / 1000.0), None
-    except FuturesTimeout:
+        return list(compiled.finditer(folded_scope, timeout=_timeout_seconds(timeout_ms))), None
+    except TimeoutError:
         return None, f"timeout sau {timeout_ms}ms"
-    finally:
-        executor.shutdown(wait=False)
 
 
-def _match_value(match: re.Match, group) -> tuple[int, int] | None:
+def _guarded_search(
+    compiled: "regex.Pattern",
+    folded_scope: str,
+    timeout_ms: int,
+) -> tuple["regex.Match | None", str | None]:
+    """Như _guarded_finditer nhưng cho search (một lần khớp)."""
+    try:
+        return compiled.search(folded_scope, timeout=_timeout_seconds(timeout_ms)), None
+    except TimeoutError:
+        return None, f"timeout sau {timeout_ms}ms"
+
+
+def _match_value(match: "regex.Match", group) -> tuple[int, int] | None:
     try:
         span = match.span(group)
     except IndexError:
@@ -74,22 +92,44 @@ def _match_value(match: re.Match, group) -> tuple[int, int] | None:
     return span
 
 
-def _apply_validators(rule: dict, raw_value: str, state: str) -> tuple[str, list[dict]]:
-    """Chạy validators trên giá trị raw; trả về (state, warnings)."""
+def _apply_validators(
+    rule: dict,
+    raw_value: str,
+    state: str,
+    timeout_ms: int,
+) -> tuple[str, list[dict]]:
+    """Chạy validators trên giá trị raw; trả về (state, warnings).
+
+    Validator cũng là regex do profile điều khiển nên qua timeout thật;
+    validator lỗi cú pháp -> warning, validator quá hạn -> state `error`
+    (không thể kết luận giá trị đạt/lệch chuẩn).
+    """
     warnings: list[dict] = []
     final_state = state
     for validator in rule.get("validators", []):
         vpattern = str(validator.get("pattern", ""))
+        vrule = str(validator.get("rule_id") or rule.get("rule_id"))
         try:
-            ok = bool(re.search(vpattern, raw_value))
-        except re.error as exc:
-            warnings.append({"rule_id": rule.get("rule_id"), "message": f"validator lỗi: {exc}"})
+            vcompiled = regex.compile(vpattern)
+        except regex.error as exc:
+            warnings.append({"rule_id": vrule, "message": f"validator lỗi: {exc}"})
+            continue
+        try:
+            ok = bool(vcompiled.search(raw_value, timeout=_timeout_seconds(timeout_ms)))
+        except TimeoutError:
+            warnings.append(
+                {
+                    "rule_id": vrule,
+                    "message": f"validator timeout sau {timeout_ms}ms — chưa kiểm chứng chuẩn",
+                }
+            )
+            final_state = STATE_ERROR
             continue
         if not ok:
             on_fail = str(validator.get("on_fail", STATE_WARNING))
             warnings.append(
                 {
-                    "rule_id": rule.get("rule_id"),
+                    "rule_id": vrule,
                     "message": str(validator.get("message", "giá trị chưa đúng chuẩn")),
                     "on_fail": on_fail,
                 }
@@ -98,7 +138,7 @@ def _apply_validators(rule: dict, raw_value: str, state: str) -> tuple[str, list
     return final_state, warnings
 
 
-def _render_value(match: re.Match, index_map: list[int], fold_offset: int, source_text: str, rule: dict) -> str:
+def _render_value(match: "regex.Match", span_of, fold_offset: int, source_text: str, rule: dict) -> str:
     """Dựng value từ group hoặc value_template, cắt từ văn bản gốc."""
     template = rule.get("value_template")
     if template:
@@ -108,7 +148,7 @@ def _render_value(match: re.Match, index_map: list[int], fold_offset: int, sourc
             if gspan is None:
                 parts[gidx] = ""
                 continue
-            mapped = map_span(index_map, fold_offset + gspan[0], fold_offset + gspan[1])
+            mapped = span_of(fold_offset + gspan[0], fold_offset + gspan[1])
             parts[gidx] = source_text[mapped[0] : mapped[1]] if mapped else ""
         try:
             return str(template).format(*[parts.get(i, "") for i in range(len(match.groups()) + 1)])
@@ -118,22 +158,26 @@ def _render_value(match: re.Match, index_map: list[int], fold_offset: int, sourc
     gspan = _match_value(match, group)
     if gspan is None:
         return ""
-    mapped = map_span(index_map, fold_offset + gspan[0], fold_offset + gspan[1])
+    mapped = span_of(fold_offset + gspan[0], fold_offset + gspan[1])
     return source_text[mapped[0] : mapped[1]] if mapped else ""
 
 
 def extract_fields(
     text: str,
     folded: str,
-    index_map: list[int],
+    span_of,
     zones: list[dict],
     profile: dict[str, Any],
-) -> tuple[list[dict], list[str]]:
-    """Chạy toàn bộ field rules trong profile theo vùng cô lập."""
+    timeout_ms: int,
+    errors: list[str],
+) -> list[dict]:
+    """Chạy toàn bộ field rules trong profile theo vùng cô lập.
+
+    `span_of(fold_start, fold_end)` map span folded -> span trên `text`
+    (văn bản nguồn gốc). Lỗi runtime (timeout) ghi vào `errors` kèm rule_id.
+    """
     zones_by_id = {z.get("name"): z for z in zones}
-    timeout_ms = int(profile.get("regex_timeout_ms", DEFAULT_REGEX_TIMEOUT_MS))
     fields: list[dict] = []
-    errors: list[str] = []
 
     for rule in profile.get("fields", []):
         rule_id = str(rule.get("rule_id", "field.unknown"))
@@ -160,7 +204,7 @@ def extract_fields(
             )
             continue
 
-        compiled = re.compile(str(rule.get("pattern", "")), re.MULTILINE)
+        compiled = regex.compile(str(rule.get("pattern", "")), regex.MULTILINE)
         scope = folded[fold_start:fold_end]
         matches, timeout_err = _guarded_finditer(compiled, scope, timeout_ms)
         if timeout_err:
@@ -176,11 +220,11 @@ def extract_fields(
             gspan = _match_value(match, group)
             if gspan is None:
                 continue
-            mapped = map_span(index_map, fold_start + gspan[0], fold_start + gspan[1])
+            mapped = span_of(fold_start + gspan[0], fold_start + gspan[1])
             if not mapped:
                 continue
             raw = text[mapped[0] : mapped[1]].strip()
-            value = _render_value(match, index_map, fold_start, text, rule)
+            value = _render_value(match, span_of, fold_start, text, rule)
             hits.append((mapped, value if rule.get("value_template") else raw))
 
         expect = str(rule.get("expect", "one"))
@@ -213,20 +257,22 @@ def extract_fields(
             continue
 
         (span, value) = hits[0]
-        state, warnings = _apply_validators(rule, value, STATE_MATCHED)
+        state, warnings = _apply_validators(rule, value, STATE_MATCHED, timeout_ms)
         fields.append(
             make_span_result(state, text, span, rule_id=rule_id, name=name,
                              value=value, warnings=warnings or None)
         )
-    return fields, errors
+    return fields
 
 
 def extract_parties(
     text: str,
     folded: str,
-    index_map: list[int],
+    span_of,
     zones: list[dict],
     profile: dict[str, Any],
+    timeout_ms: int,
+    errors: list[str],
 ) -> dict:
     """Bóc đương sự trong vùng parties: side markers -> blocks -> persons.
 
@@ -234,6 +280,10 @@ def extract_parties(
     "Đồng sử dụng"). Person delimiter cắt từng người trong block; các trường
     con (họ tên, năm sinh, CCCD...) khớp trong chunk của riêng người đó nên
     không bao giờ lẫn sang người khác.
+
+    Mọi regex ở đây đều do profile điều khiển và đều qua timeout thật; lỗi
+    được truyền ra ngoài (`state=error` + errors[] kèm rule_id), không bao
+    giờ nuốt rồi trả `missing`.
     """
     pcfg = profile.get("parties") or {}
     zones_by_id = {z.get("name"): z for z in zones}
@@ -244,7 +294,10 @@ def extract_parties(
 
     fold_start, fold_end = zone["fold_span"]
     scope = folded[fold_start:fold_end]
-    timeout_ms = int(profile.get("regex_timeout_ms", DEFAULT_REGEX_TIMEOUT_MS))
+
+    def _fail(note: str) -> dict:
+        errors.append(note)
+        return {"state": STATE_ERROR, "blocks": [], "zone": zone_id, "note": note}
 
     markers: list[tuple[int, int, dict]] = []
     for marker_def in pcfg.get("side_markers", []):
@@ -252,9 +305,11 @@ def extract_parties(
         rule_id = str(marker_def.get("rule_id", "party.side"))
         lint_msg = lint_pattern(rule_id, pattern)
         if lint_msg:
-            return {"state": STATE_ERROR, "blocks": [], "zone": zone_id, "note": lint_msg}
-        compiled = re.compile(pattern, re.MULTILINE)
-        matches, _ = _guarded_finditer(compiled, scope, timeout_ms)
+            return _fail(lint_msg)
+        compiled = regex.compile(pattern, regex.MULTILINE)
+        matches, timeout_err = _guarded_finditer(compiled, scope, timeout_ms)
+        if timeout_err:
+            return _fail(f"{rule_id}: {timeout_err}")
         for m in matches or []:
             markers.append((m.start(), m.end(), marker_def))
     markers.sort(key=lambda item: item[0])
@@ -267,38 +322,46 @@ def extract_parties(
     delim_rule_id = str(delim_cfg.get("rule_id", "party.person"))
     lint_msg = lint_pattern(delim_rule_id, delim_pattern)
     if lint_msg:
-        return {"state": STATE_ERROR, "blocks": [], "zone": zone_id, "note": lint_msg}
-    delim_re = re.compile(delim_pattern, re.MULTILINE)
+        return _fail(lint_msg)
+    delim_re = regex.compile(delim_pattern, regex.MULTILINE)
 
     person_field_rules = pcfg.get("person_fields", [])
-    compiled_fields: list[tuple[dict, re.Pattern]] = []
+    compiled_fields: list[tuple[dict, "regex.Pattern"]] = []
     for frule in person_field_rules:
         frule_id = str(frule.get("rule_id", f"person.{frule.get('name', '?')}"))
         lint_msg = lint_pattern(frule_id, str(frule.get("pattern", "")))
         if lint_msg:
-            return {"state": STATE_ERROR, "blocks": [], "zone": zone_id, "note": lint_msg}
-        compiled_fields.append((frule, re.compile(str(frule.get("pattern", "")), re.MULTILINE)))
+            return _fail(lint_msg)
+        compiled_fields.append((frule, regex.compile(str(frule.get("pattern", "")), regex.MULTILINE)))
 
     blocks: list[dict] = []
     for idx, (m_start, m_end, marker_def) in enumerate(markers):
         block_end = markers[idx + 1][0] if idx + 1 < len(markers) else len(scope)
         block_scope = scope[m_start:block_end]
-        block_orig = map_span(index_map, fold_start + m_start, fold_start + block_end)
+        block_orig = span_of(fold_start + m_start, fold_start + block_end)
 
         persons: list[dict] = []
-        delimiters = list(delim_re.finditer(block_scope))
-        for pidx, dmatch in enumerate(delimiters):
+        delimiters, delim_err = _guarded_finditer(delim_re, block_scope, timeout_ms)
+        if delim_err:
+            return _fail(f"{delim_rule_id}: {delim_err}")
+        for pidx, dmatch in enumerate(delimiters or []):
             p_start = dmatch.start()
             p_end = delimiters[pidx + 1].start() if pidx + 1 < len(delimiters) else len(block_scope)
             chunk = block_scope[p_start:p_end]
             chunk_fold_abs = fold_start + m_start + p_start
-            person_orig = map_span(index_map, chunk_fold_abs, chunk_fold_abs + len(chunk))
+            person_orig = span_of(chunk_fold_abs, chunk_fold_abs + len(chunk))
 
             person_fields: dict[str, dict] = {}
             for frule, fcompiled in compiled_fields:
                 fname = str(frule.get("name", "field"))
                 frule_id = str(frule.get("rule_id", f"person.{fname}"))
-                fmatch = fcompiled.search(chunk)
+                fmatch, ferr = _guarded_search(fcompiled, chunk, timeout_ms)
+                if ferr:
+                    errors.append(f"{frule_id}: {ferr}")
+                    person_fields[fname] = make_span_result(
+                        STATE_ERROR, text, None, rule_id=frule_id, name=fname, note=ferr
+                    )
+                    continue
                 if not fmatch:
                     person_fields[fname] = make_span_result(
                         STATE_MISSING, text, None, rule_id=frule_id, name=fname
@@ -311,9 +374,9 @@ def extract_parties(
                         STATE_MISSING, text, None, rule_id=frule_id, name=fname
                     )
                     continue
-                mapped = map_span(index_map, chunk_fold_abs + gspan[0], chunk_fold_abs + gspan[1])
+                mapped = span_of(chunk_fold_abs + gspan[0], chunk_fold_abs + gspan[1])
                 raw = text[mapped[0] : mapped[1]] if mapped else ""
-                state, warnings = _apply_validators(frule, raw, STATE_MATCHED)
+                state, warnings = _apply_validators(frule, raw, STATE_MATCHED, timeout_ms)
                 person_fields[fname] = make_span_result(
                     state, text, mapped, rule_id=frule_id, name=fname,
                     value=raw.strip() if raw else "", warnings=warnings or None,

@@ -22,15 +22,33 @@
 
 - Pattern profile viết dạng folded; validator chạy trên raw (giữ hoa) —
   cần thiết để kiểm tra serial `[A-Z]{2}`.
-- Timeout regex = ThreadPoolExecutor + `result(timeout)`; lỗi rõ ràng nhưng
-  thread `re` không hủy được — kèm lint tĩnh nested-quantifier.
+- Timeout regex = engine `regex` (requirements.txt), `timeout=` trên mọi
+  match của profile — TimeoutError ngay trong match, ngắt thật. Đã loại bỏ
+  ThreadPoolExecutor (không hủy được match `re` đang chạy). Lint
+  `_NESTED_QUANTIFIER` giữ vai trò cảnh báo sớm, không phải cơ chế chặn.
+- Lỗi timeout truyền đầy đủ: field → `error` kèm rule_id; side_markers/
+  person_delimiter → `parties.state=error`; person_fields → field `error`;
+  validators timeout → `error` + warning; zone/kind marker → `errors[]`.
+- Provenance trỏ về raw input: `normalize_with_index_map` (char_ranges) +
+  `fold_with_index_map` (fold_map) + `make_span_mapper` hợp map folded→raw;
+  end span mở rộng phủ combining mark — input NFD/CRLF/ngoài BMP đều đúng.
+- UI `app.js` slice highlight theo code point (`Array.from`) vì span là
+  code-point index — JS UTF-16 slicing sẽ lệch với ký tự ngoài BMP.
 
 ## Kiểm chứng
 
-`python -m pytest tools/regex_workbench/tests -q` → 14 passed.
+`python -m pytest tools/regex_workbench/tests -q` → 20 passed
+(3 timeout qua subprocess probe `tests/_timeout_probe.py` có giới hạn ngoài
+tiến trình; 3 test NFD/CRLF/non-BMP; 14 test cũ giữ nguyên).
+
+Baseline 20 thư mục (results.json worktree notaryoffice-bmad-brainstorm):
+94 file, 86 đọc được, 8 bỏ qua (word lock) — khớp baseline. Engine: doc_kind
+transfer=13, generic=47, unknown=18, asset_commitment=6, correction=2;
+errors=0; runtime avg 5.6ms/file. Chi tiết: `baseline_eval.py` (chỉ tổng hợp).
 
 ## Mở
 
 - Người không danh xưng sau nhãn `Đồng sử dụng:` cần delimiter riêng.
-- Cần chạy profile trên 20 thư mục thật (baseline artifacts nằm ở worktree
-  `notaryoffice-bmad-brainstorm`, chưa có trong nhánh này).
+- Phần lớn baseline là giấy ủy quyền/loại khác nên coverage trường chuyển
+  nhượng thấp là đúng kỳ vọng; ground truth chưa có nhãn đúng tay — đối chiếu
+  mới ở mức phân bố, chưa phải độ chính xác tuyệt đối.

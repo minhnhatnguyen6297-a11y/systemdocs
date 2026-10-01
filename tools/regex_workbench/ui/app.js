@@ -80,15 +80,19 @@ function collectIntervals(result) {
 }
 
 function renderHighlight(text, result) {
+  // Spans từ engine là index theo CODE POINT trên text người dùng nhập.
+  // JS slice() đếm theo UTF-16 unit nên ký tự ngoài BMP (emoji...) làm lệch
+  // offset — phải slice qua Array.from (mỗi phần tử = 1 code point).
+  const cps = Array.from(text);
   const intervals = collectIntervals(result);
-  const bounds = new Set([0, text.length]);
+  const bounds = new Set([0, cps.length]);
   for (const iv of intervals) { bounds.add(iv.s); bounds.add(iv.e); }
   const pts = [...bounds].sort((a, b) => a - b);
 
   let html = "";
   for (let i = 0; i < pts.length - 1; i++) {
     const s = pts[i], e = pts[i + 1];
-    const seg = text.slice(s, e);
+    const seg = cps.slice(s, e).join("");
     const containing = intervals.filter((iv) => iv.s <= s && iv.e >= e);
     const innermost = (kind) =>
       containing.filter((iv) => iv.kind === kind).sort((a, b) => (a.e - a.s) - (b.e - b.s))[0];

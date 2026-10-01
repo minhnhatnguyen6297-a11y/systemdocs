@@ -2,8 +2,17 @@
 
 Công cụ độc lập cho dev: dán một văn bản công chứng hoàn chỉnh, chạy profile
 regex, xem cấu trúc vùng và các trường trích xuất kèm provenance. UI tham
-khảo Regex101. Không phụ thuộc `upload_lab`, `shell`, `notary_v2`; chỉ dùng
-thư viện chuẩn Python.
+khảo Regex101. Không phụ thuộc `upload_lab`, `shell`, `notary_v2`.
+
+## Cài đặt
+
+```bat
+pip install -r tools\regex_workbench\requirements.txt
+```
+
+Engine match dùng module `regex` (thay `re`) vì nó hỗ trợ `timeout=` thật:
+quá hạn raise `TimeoutError` ngay trong match. `re` + ThreadPoolExecutor
+không ngắt được match đang chạy nên đã bị loại bỏ.
 
 ## Chạy
 
@@ -50,13 +59,29 @@ dùng cho kiểm tra serial `[A-Z]{2}`).
   nên không lẫn năm sinh vào tên).
 - `fields`: `rule_id`, `name`, `zone` (`any` = toàn văn bản), `group`,
   `expect` (`one`/`many`), `value_template` (`{1}/{2}/{3}`), `validators`.
-- `regex_timeout_ms`: ngưỡng báo lỗi khi regex chạy quá lâu.
+- `regex_timeout_ms`: ngưỡng báo lỗi khi regex chạy quá lâu — áp cho MỌI
+  pattern trong profile (title `kind_rules`, zone `start_markers`/`end_markers`,
+  `fields`, `side_markers`, `person_delimiter`, `person_fields`, `validators`).
+  Quá hạn → `TimeoutError` trong engine → state `error` kèm `rule_id`, ghi
+  vào `errors[]`; không nuốt lỗi thành `missing`.
+
+## Span & Unicode
+
+Mọi `span`/`raw_snippet` trỏ vào **văn bản nguồn người dùng nhập** (raw),
+không phải bản đã chuẩn hóa: pipeline giữ map 2 tầng raw→normalized→folded
+(`textnorm.make_span_mapper`). Input NFD (combining mark) hay `\r\n` vẫn cắt
+đúng đoạn gốc; span end tự phủ hết combining mark của cluster cuối.
+Ký tự ngoài BMP = 1 code point trong span — UI tô highlight bằng slicing
+theo code point (`Array.from`), không dùng offset UTF-16 của JS.
 
 ## Test
 
 ```bat
 python -m pytest tools\regex_workbench\tests -q
 ```
+
+Test timeout chạy engine trong process con (`tests/_timeout_probe.py`) có
+`subprocess timeout` cứng — suite không thể treo kể cả khi cơ chế ngắt hỏng.
 
 Fixtures trong `tests/fixtures/` là dữ liệu giả lập (không PII khách thật),
 mô phỏng 4 ca lỗi baseline: Đồng sử dụng, Sinh năm lẫn họ tên, Đính chính,
@@ -66,5 +91,5 @@ Serial một chữ cái.
 
 - Người không có danh xưng Ông/Bà/Cụ đứng sau nhãn (vd `Đồng sử dụng:
   Nguyễn Thị X`) cần thêm delimiter trong profile.
-- Timeout regex là best-effort: engine báo `error` cho rule đó nhưng không
-  hủy được thread match của `re`.
+- Timeout của `regex` tính theo mỗi lần match-attempt; một rule sinh nhiều
+  match nhỏ nhanh không bị chặn theo tổng thời gian rule.
