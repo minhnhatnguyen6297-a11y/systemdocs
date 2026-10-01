@@ -1,0 +1,306 @@
+{
+  "profile_id": "transfer",
+  "version": "1.0.0",
+  "description": "Profile chuan cho hop dong chuyen nhuong quyen su dung dat. Tat ca pattern viet o dang folded: chu thuong, khong dau, 'd' thay 'đ'. Engine match tren van ban da fold roi map span ve van ban goc.",
+  "regex_timeout_ms": 1000,
+  "title": {
+    "scan_lines": 25,
+    "candidate_prefixes": [
+      "hop dong",
+      "van ban",
+      "thoa thuan",
+      "giay",
+      "don",
+      "to khai",
+      "di chuc",
+      "phu luc",
+      "danh sach",
+      "bien ban",
+      "thong bao",
+      "dinh chinh"
+    ],
+    "continuation_prefixes": [
+      "quyen",
+      "nha o",
+      "tai san",
+      "ve viec",
+      "phan chia",
+      "tu choi",
+      "dinh chinh",
+      "chuyen nhuong",
+      "tang cho",
+      "the chap",
+      "cam ket",
+      "hop dong"
+    ],
+    "stop_prefixes": [
+      "chung toi",
+      "toi la",
+      "dieu",
+      "ben",
+      "ong",
+      "ba"
+    ],
+    "kind_rules": [
+      {
+        "rule_id": "kind.correction",
+        "kind": "correction",
+        "priority": 100,
+        "pattern": "dinh\\s*chinh"
+      },
+      {
+        "rule_id": "kind.transfer_cancellation",
+        "kind": "transfer_cancellation",
+        "priority": 90,
+        "pattern": "(?:huy\\s*bo|cham\\s*dut)[\\s\\S]*chuyen\\s*nhuong"
+      },
+      {
+        "rule_id": "kind.inheritance_partition",
+        "kind": "inheritance_partition",
+        "priority": 85,
+        "pattern": "phan\\s*chia\\s*di\\s*san"
+      },
+      {
+        "rule_id": "kind.inheritance_refusal",
+        "kind": "inheritance_refusal",
+        "priority": 85,
+        "pattern": "tu\\s*choi\\s*nhan\\s*di\\s*san"
+      },
+      {
+        "rule_id": "kind.asset_commitment",
+        "kind": "asset_commitment",
+        "priority": 85,
+        "pattern": "cam\\s*ket\\s*tai\\s*san\\s*rieng"
+      },
+      {
+        "rule_id": "kind.mortgage",
+        "kind": "mortgage_contract",
+        "priority": 80,
+        "pattern": "hop\\s*dong\\s*the\\s*chap"
+      },
+      {
+        "rule_id": "kind.gift",
+        "kind": "gift_contract",
+        "priority": 80,
+        "pattern": "hop\\s*dong\\s*tang\\s*cho"
+      },
+      {
+        "rule_id": "kind.transfer",
+        "kind": "transfer",
+        "priority": 70,
+        "pattern": "hop\\s*dong\\s*chuyen\\s*nhuong"
+      }
+    ]
+  },
+  "zones": [
+    {
+      "zone_id": "header",
+      "rule_id": "zone.header",
+      "implicit_start": true
+    },
+    {
+      "zone_id": "parties",
+      "rule_id": "zone.parties",
+      "start_markers": [
+        "(?m)^\\s*(?:[ivx0-9]+[\\.):\\-]?\\s*)?ben\\s+(?:a\\b|chuyen\\s*nhuong)",
+        "(?m)^\\s*(?:[ivx0-9]+[\\.):\\-]?\\s*)?duong\\s+su\\b",
+        "(?m)^\\s*cac\\s+ben\\b"
+      ]
+    },
+    {
+      "zone_id": "asset",
+      "rule_id": "zone.asset",
+      "start_markers": [
+        "(?m)^\\s*dieu\\s*(?:1|i)\\b",
+        "(?m)^\\s*1\\.1\\b",
+        "doi\\s*tuong\\s*cua\\s*hop\\s*dong",
+        "quyen\\s*su\\s*dung\\s*dat[\\s\\S]{0,250}?co\\s*dia\\s*chi\\s*tai",
+        "(?m)^\\s*(?:mo\\s*ta\\s*)?tai\\s*san\\s*la\\b",
+        "(?m)^\\s*tai\\s*san\\s*chuyen\\s*nhuong\\b"
+      ]
+    },
+    {
+      "zone_id": "clauses",
+      "rule_id": "zone.clauses",
+      "start_markers": [
+        "(?m)^\\s*dieu\\s*(?:2|ii)\\b",
+        "(?m)^\\s*1\\.2\\b",
+        "(?m)^\\s*(?:\\d+\\.\\s*)?gia\\s*chuyen\\s*nhuong",
+        "phuong\\s*thuc\\s*thanh\\s*toan",
+        "(?m)^\\s*bang\\s*hop\\s*dong\\s*nay"
+      ]
+    },
+    {
+      "zone_id": "notary",
+      "rule_id": "zone.notary",
+      "start_markers": [
+        "(?m)^\\s*loi\\s*chung\\b",
+        "toi\\s*,\\s*[^,\\n]{2,60},\\s*cong\\s*chung\\s*vien",
+        "(?m)^\\s*(?:nguoi|cac\\s*ben|ben)\\s+(?:ky|diem\\s*chi|lap|yeu\\s*cau)"
+      ]
+    }
+  ],
+  "parties": {
+    "zone": "parties",
+    "side_markers": [
+      {
+        "rule_id": "party.side_a",
+        "side": "A",
+        "role": "Bên chuyển nhượng",
+        "pattern": "(?m)^\\s*(?:[ivx0-9]+[\\.):\\-]?\\s*)?ben\\s+(?:a\\b|chuyen\\s*nhuong)"
+      },
+      {
+        "rule_id": "party.side_a_co_user",
+        "side": "A",
+        "role": "Đồng sử dụng",
+        "pattern": "(?m)^\\s*dong\\s*su\\s*dung"
+      },
+      {
+        "rule_id": "party.side_b",
+        "side": "B",
+        "role": "Bên nhận chuyển nhượng",
+        "pattern": "(?m)^\\s*(?:[ivx0-9]+[\\.):\\-]?\\s*)?ben\\s+(?:b\\b|nhan\\s*chuyen\\s*nhuong)"
+      }
+    ],
+    "person_delimiter": {
+      "rule_id": "party.person",
+      "pattern": "(?<![^\\n;,:])\\s*(?:ong|ba|cu)\\b\\s*[:.]?|(?<![^\\n;])\\s*(?!(?:so|can|cccd|cmnd)\\b)[a-z][^\\n;:]{0,59}?(?=[,;:]?\\s*sinh\\s*(?:ngay|nam)?\\s*[:.]?\\s*\\d|[,;:]?\\s*(?:can\\s*cuoc|cccd|cmnd|so\\s*cmnd)\\b)",
+      "note": "Alt1: nguoi co danh xung ong/ba/cu dung sau dau dong/;/,/: — ':' cho phep 'Dong su dung: Ba: ...' tren cung dong. Lookbehind zero-width nen chunk nguoi bat dau ngay truoc danh xung, khong gom dau phan cach. Alt2: nguoi khong danh xung — dong moi bat dau bang mot ten (ky tu dau la chu [a-z] tren van ban da fold, khong mo dau bang nhan du lieu so/can/cccd/cmnd, toi da 60 ky tu, khong chua ':'/';') roi theo sau la bang chung nguoi ('sinh' + so, hoac nhan can cuoc/cccd/cmnd). Chi chap nhan o dau dong hoac sau ';' de tranh tach ao giua truong. Gioi han: nguoi khong danh xung va khong co sinh/cccd trong chunk van khong tach duoc."
+    },
+    "person_fields": [
+      {
+        "rule_id": "person.ho_ten",
+        "name": "ho_ten",
+        "group": 1,
+        "pattern": "^\\s*(?:(?:ong|ba|cu)\\s*[:.]?\\s*)?([^,;\\n]+?)\\s*(?=,|;|\\n|\\bsinh\\b|$)",
+        "note": "Danh xung ong/ba/cu la OPTIONAL — chunk do delimiter alt2 tao bat dau ngay bang ten khong danh xung. Neo '^' giup ten luon la phan dau chunk; dung truoc ',', ';', xuong dong hoac 'sinh'."
+      },
+      {
+        "rule_id": "person.gioi_tinh",
+        "name": "gioi_tinh",
+        "group": 1,
+        "pattern": "^\\s*(ong|ba|cu)\\b"
+      },
+      {
+        "rule_id": "person.ngay_sinh",
+        "name": "ngay_sinh",
+        "group": 1,
+        "pattern": "sinh\\s*(?:ngay|nam)?\\s*[:.]?\\s*(\\d{1,2}[/.\\-]\\d{1,2}[/.\\-]\\d{4}|\\d{4})"
+      },
+      {
+        "rule_id": "person.cccd",
+        "name": "cccd",
+        "group": 1,
+        "pattern": "(?:can\\s*cuoc(?:\\s*cong\\s*dan)?|cccd|cmnd|so\\s*cmnd)[^\\d\\n]{0,20}(\\d{9,12})"
+      },
+      {
+        "rule_id": "person.noi_cap",
+        "name": "noi_cap",
+        "group": 1,
+        "pattern": "do\\s+(.+?)\\s+cap(?:\\s*ngay|[,;.\\n]|$)"
+      },
+      {
+        "rule_id": "person.ngay_cap",
+        "name": "ngay_cap",
+        "group": 1,
+        "pattern": "cap\\s*ngay\\s*[:.]?\\s*(\\d{1,2}[/.\\-]\\d{1,2}[/.\\-]\\d{4})"
+      },
+      {
+        "rule_id": "person.dia_chi",
+        "name": "dia_chi",
+        "group": 1,
+        "pattern": "(?:thuong\\s*tru|cu\\s*tru|ho\\s*khau|dia\\s*chi)[^\\n:]{0,25}[:.]\\s*([^\\n;.]+)"
+      }
+    ]
+  },
+  "fields": [
+    {
+      "rule_id": "doc.so_cong_chung_labeled",
+      "name": "so_cong_chung",
+      "zone": "any",
+      "group": 1,
+      "expect": "one",
+      "pattern": "so\\s*cong\\s*chung[^\\d\\n]{0,12}(\\d+\\s*[./]\\s*\\d{4}[\\s/a-z0-9]*?/\\s*ccgd)"
+    },
+    {
+      "rule_id": "doc.ngay_cong_chung",
+      "name": "ngay_cong_chung",
+      "zone": "notary",
+      "group": 0,
+      "expect": "one",
+      "pattern": "ngay\\s+(\\d{1,2})\\s+thang\\s+(\\d{1,2})\\s+nam\\s+(\\d{4})",
+      "value_template": "{1}/{2}/{3}"
+    },
+    {
+      "rule_id": "doc.cong_chung_vien",
+      "name": "cong_chung_vien",
+      "zone": "notary",
+      "group": 1,
+      "expect": "one",
+      "pattern": "toi\\s*,\\s*([^,\\n]{2,60}),\\s*cong\\s*chung\\s*vien"
+    },
+    {
+      "rule_id": "asset.dia_chi_thua",
+      "name": "dia_chi_thua",
+      "zone": "asset",
+      "group": 1,
+      "expect": "one",
+      "pattern": "co\\s*dia\\s*chi\\s*tai\\s*[:.]?\\s*([^\\n;.]+)"
+    },
+    {
+      "rule_id": "asset.thua_dat",
+      "name": "thua_dat",
+      "zone": "asset",
+      "group": 1,
+      "expect": "one",
+      "pattern": "thua\\s*(?:dat|so)\\b[^0-9\\n]{0,24}(\\d{1,6})"
+    },
+    {
+      "rule_id": "asset.to_ban_do",
+      "name": "to_ban_do",
+      "zone": "asset",
+      "group": 1,
+      "expect": "one",
+      "pattern": "to\\s*(?:ban\\s*do|so)\\b[^0-9\\n]{0,24}(\\d{1,6})"
+    },
+    {
+      "rule_id": "asset.dien_tich",
+      "name": "dien_tich_m2",
+      "zone": "asset",
+      "group": 1,
+      "expect": "one",
+      "pattern": "dien\\s*tich[^0-9\\n]{0,20}(\\d+[.,]?\\d*)"
+    },
+    {
+      "rule_id": "asset.so_serial",
+      "name": "so_serial",
+      "zone": "asset",
+      "group": 1,
+      "expect": "one",
+      "pattern": "(?:so\\s*phat\\s*hanh|so\\s*serial|serial|so\\s*seri|ma\\s*phoi|so\\s*phoi|gcn\\s*so|giay\\s*chung\\s*nhan\\s*so)[^a-z0-9\\n]{0,12}([a-z]{1,2}\\s*\\.?\\s*\\d{4,8})",
+      "validators": [
+        {
+          "pattern": "^[A-Z]{2}\\s*\\.?\\s*\\d{6,8}$",
+          "on_fail": "warning_nonstandard",
+          "message": "Serial mot chu cai — chua dung chuan hien hanh ([A-Z]{2} + 6-8 so). Giu raw, khong tu nang cap."
+        }
+      ]
+    },
+    {
+      "rule_id": "asset.so_vao_so",
+      "name": "so_vao_so",
+      "zone": "asset",
+      "group": 1,
+      "expect": "one",
+      "pattern": "(?:so\\s*vao\\s*so|vao\\s*so\\s*cap\\s*gcn)[^a-z0-9\\n]{0,15}([a-z]{0,4}\\s*\\d{3,12}(?:/\\d{1,8})?)"
+    },
+    {
+      "rule_id": "asset.ngay_cap_gcn",
+      "name": "ngay_cap_gcn",
+      "zone": "asset",
+      "group": 1,
+      "expect": "one",
+      "pattern": "(?:cap\\s*ngay|cap\\s*vao\\s*ngay)\\s*[:.]?\\s*(\\d{1,2}[/.\\-]\\d{1,2}[/.\\-]\\d{4})"
+    }
+  ]
+}
