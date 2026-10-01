@@ -81,6 +81,8 @@ Quy tắc màu, chữ, khoảng cách và thao tác dùng chung nằm tại
   * **Tài sản (`properties`):** Bỏ trường lẻ `thoi_han` mồ côi; lưu theo cụm `(loaidat, dientich, thoihan)` 1..20; đa tài sản đánh số kết hợp như `loaidat12`.
   * **Hồ sơ (`inheritance_cases`):** Bổ sung `noiniemyet` (suy từ địa chỉ đất + bảng xã), `nguoinhanuyquyen` (danh mục quen/tạo mới), `noidungviec` (cụm text thủ công); UI hiển thị 3 dòng dưới tài sản, giảm 10% chiều cao ô nhập.
   * **Rule chung:** Đặt tên tiếng Việt không dấu, viết liền số nếu có (`loaidat1`). Xem chi tiết tại `contracts/entities.md` §8–§9.
+- **Xóa hồ sơ nháp (MIN-141 đợt 4):** chỉ hồ sơ `draft` được xóa; xóa kèm dọn master (`customers`/`properties`) "thuộc hồ sơ" — người chết, tài sản chính, participant kể cả `parent_customer_id`, tài sản link phụ — nhưng CHỈ khi master đó không còn tham chiếu từ hồ sơ khác (`nguoi_chet_id`/`tai_san_id`/`nguoi_nhan_uy_quyen_id`), participant còn lại, `inheritance_case_properties` còn lại, hoặc snapshot `case_state_json`/`engine_state_json` của hồ sơ còn tồn tại. Người nhận ủy quyền là danh bạ tái dùng — không bị xóa theo hồ sơ; không quét danh bạ mồ côi ngoài phạm vi hồ sơ. Toàn bộ trong một transaction, lỗi → rollback.
+- **Thống kê (`/api/stats`):** `customers`/`properties` đếm DISTINCT master thực sự gắn hồ sơ qua case/participant/link/snapshot — danh bạ trơ chưa gắn hồ sơ không tính; tài sản vừa primary vừa link đếm một lần. `cases`/`locked` đếm số hồ sơ như cũ.
 
 ### Còn mở
 
