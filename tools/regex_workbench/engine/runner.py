@@ -40,24 +40,100 @@ def load_profile(source: str | Path | dict) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def validate_profile(profile: Any) -> list[str]:
+    """Kiểm tra CẤU TRÚC profile (shape) trước khi lint/run.
+
+    Profile là JSON hợp lệ nhưng sai kiểu (vd `fields: null`, `zones` là
+    string, `title` là list) từng làm engine ném exception ngầm. Trả về
+    danh sách lỗi — rỗng nghĩa là shape đủ dùng. Đây là contract cho cả
+    `run()` lẫn HTTP layer (`serve.py` trả 400 khi problems không rỗng).
+    """
+    if not isinstance(profile, dict):
+        return ["profile phải là object JSON (dict)"]
+
+    problems: list[str] = []
+
+    def _check_list(owner: str, value: Any) -> None:
+        if not isinstance(value, list):
+            problems.append(f"'{owner}' phải là list, nhận {type(value).__name__}")
+
+    def _check_dict(owner: str, value: Any) -> None:
+        if not isinstance(value, dict):
+            problems.append(f"'{owner}' phải là object, nhận {type(value).__name__}")
+
+    if "title" in profile:
+        _check_dict("title", profile["title"])
+    title = profile.get("title")
+    if isinstance(title, dict):
+        if "kind_rules" in title:
+            _check_list("title.kind_rules", title["kind_rules"])
+        for i, kr in enumerate(title.get("kind_rules") or []):
+            _check_dict(f"title.kind_rules[{i}]", kr)
+
+    if "zones" in profile:
+        _check_list("zones", profile["zones"])
+    for i, zone in enumerate(profile.get("zones") or []):
+        if not isinstance(zone, dict):
+            problems.append(f"zones[{i}] phải là object, nhận {type(zone).__name__}")
+            continue
+        if "start_markers" in zone:
+            _check_list(f"zones[{i}].start_markers", zone["start_markers"])
+        if "end_markers" in zone:
+            _check_list(f"zones[{i}].end_markers", zone["end_markers"])
+
+    if "fields" in profile:
+        _check_list("fields", profile["fields"])
+    for i, rule in enumerate(profile.get("fields") or []):
+        if not isinstance(rule, dict):
+            problems.append(f"fields[{i}] phải là object, nhận {type(rule).__name__}")
+            continue
+        if "validators" in rule:
+            _check_list(f"fields[{i}].validators", rule["validators"])
+
+    if "parties" in profile:
+        _check_dict("parties", profile["parties"])
+    parties = profile.get("parties")
+    if isinstance(parties, dict):
+        if "side_markers" in parties:
+            _check_list("parties.side_markers", parties["side_markers"])
+        if "person_delimiter" in parties:
+            _check_dict("parties.person_delimiter", parties["person_delimiter"])
+        if "person_fields" in parties:
+            _check_list("parties.person_fields", parties["person_fields"])
+
+    if "regex_timeout_ms" in profile and not isinstance(
+        profile["regex_timeout_ms"], (int, float)
+    ):
+        problems.append("'regex_timeout_ms' phải là số (ms)")
+
+    return problems
+
+
 def lint_profile(profile: dict[str, Any]) -> list[str]:
     """Kiểm tra tĩnh toàn bộ pattern trong profile trước khi chạy."""
     problems: list[str] = []
-    for rule in (profile.get("title", {}) or {}).get("kind_rules", []):
+    title = profile.get("title")
+    for rule in ((title or {}).get("kind_rules") or []) if isinstance(title, dict) else []:
+        if not isinstance(rule, dict):
+            continue
         msg = lint_pattern(str(rule.get("rule_id", "title.rule")), str(rule.get("pattern", "")))
         if msg:
             problems.append(msg)
-    for zone in profile.get("zones", []):
+    for zone in profile.get("zones") or []:
+        if not isinstance(zone, dict):
+            continue
         zone_id = str(zone.get("zone_id", "?"))
-        for marker in (*zone.get("start_markers", []), *zone.get("end_markers", [])):
+        for marker in (*(zone.get("start_markers") or []), *(zone.get("end_markers") or [])):
             msg = lint_pattern(f"zone.{zone_id}", str(marker))
             if msg:
                 problems.append(msg)
-    for rule in profile.get("fields", []):
+    for rule in profile.get("fields") or []:
+        if not isinstance(rule, dict):
+            continue
         msg = lint_pattern(str(rule.get("rule_id", "field.?")), str(rule.get("pattern", "")))
         if msg:
             problems.append(msg)
-        for validator in rule.get("validators", []):
+        for validator in rule.get("validators") or []:
             vmsg = lint_pattern(
                 str(validator.get("rule_id") or rule.get("rule_id", "field.?")),
                 str(validator.get("pattern", "")),
@@ -65,7 +141,11 @@ def lint_profile(profile: dict[str, Any]) -> list[str]:
             if vmsg:
                 problems.append(vmsg)
     pcfg = profile.get("parties") or {}
-    for marker in pcfg.get("side_markers", []):
+    if not isinstance(pcfg, dict):
+        return problems
+    for marker in pcfg.get("side_markers") or []:
+        if not isinstance(marker, dict):
+            continue
         msg = lint_pattern(str(marker.get("rule_id", "party.side")), str(marker.get("pattern", "")))
         if msg:
             problems.append(msg)
@@ -74,7 +154,9 @@ def lint_profile(profile: dict[str, Any]) -> list[str]:
         msg = lint_pattern(str(delim.get("rule_id", "party.person")), str(delim.get("pattern", "")))
         if msg:
             problems.append(msg)
-    for frule in pcfg.get("person_fields", []):
+    for frule in pcfg.get("person_fields") or []:
+        if not isinstance(frule, dict):
+            continue
         msg = lint_pattern(str(frule.get("rule_id", "person.?")), str(frule.get("pattern", "")))
         if msg:
             problems.append(msg)
@@ -113,6 +195,7 @@ def run(text: str, profile: dict[str, Any]) -> dict[str, Any]:
             "span": title["span"],
             "raw_snippet": title["raw_snippet"],
             "rule_id": title["rule_id"],
+            "note": title.get("note"),
         },
         "zones": zones,
         "fields": fields,

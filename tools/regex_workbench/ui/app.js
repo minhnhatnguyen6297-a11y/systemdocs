@@ -2,7 +2,11 @@
 "use strict";
 
 const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+// Escape đầy đủ cho cả text node lẫn attribute (title="..."): rule_id hay
+// raw_snippet chứa dấu ngoặc kép phải không phá được markup.
+const esc = (s) => String(s)
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
 let defaultProfile = null;
 
@@ -29,19 +33,28 @@ function readProfile() {
 async function runEngine() {
   const profile = readProfile();
   if (!profile) return;
+  // Snapshot input lúc gửi request: nếu user sửa source trong lúc chờ,
+  // response thuộc về văn bản CŨ — không được render lên văn bản mới.
+  const sentText = $("source").value;
   $("btn-run").disabled = true;
   try {
     const res = await fetch("/api/run", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: $("source").value, profile }),
+      body: JSON.stringify({ text: sentText, profile }),
     });
     const data = await res.json();
     if (!res.ok) {
-      $("errors").textContent = data.error || "server error";
+      const detail = (data.problems || []).length ? " — " + data.problems.join("; ") : "";
+      $("errors").textContent = (data.error || "server error") + detail;
       return;
     }
-    render($("source").value, data.result);
+    if ($("source").value !== sentText) {
+      $("errors").textContent =
+        "Văn bản nguồn đã thay đổi trong lúc chạy — bỏ qua kết quả cũ, nhấn Run lại.";
+      return;
+    }
+    render(sentText, data.result);
   } finally {
     $("btn-run").disabled = false;
   }
@@ -204,9 +217,16 @@ $("btn-export").addEventListener("click", () => {
 $("btn-import").addEventListener("click", () => $("file-import").click());
 $("file-import").addEventListener("change", async (ev) => {
   const file = ev.target.files[0];
+  ev.target.value = ""; // cho phép chọn lại đúng file vừa lỗi
   if (!file) return;
-  $("profile").value = JSON.stringify(JSON.parse(await file.text()), null, 2);
-  readProfile();
+  try {
+    const obj = JSON.parse(await file.text());
+    $("profile").value = JSON.stringify(obj, null, 2);
+    readProfile();
+  } catch (err) {
+    $("profile-status").textContent = "import thất bại: " + err.message;
+    $("profile-status").className = "status bad";
+  }
 });
 $("source").addEventListener("input", () => renderHighlight($("source").value, { zones: [], fields: [] }));
 

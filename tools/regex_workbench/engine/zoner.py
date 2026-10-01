@@ -40,13 +40,15 @@ def detect_title(
     không rỗng — offset đã quy về văn bản nguồn gốc nên span/raw_snippet trỏ
     đúng input người dùng.
     """
-    tcfg = profile.get("title", {})
+    tcfg = profile.get("title") or {}
+    if not isinstance(tcfg, dict):
+        tcfg = {}
     scan_lines = int(tcfg.get("scan_lines", 25))
     candidate_prefixes = tuple(tcfg.get("candidate_prefixes", ()))
     continuation_prefixes = tuple(tcfg.get("continuation_prefixes", ()))
     stop_prefixes = tuple(tcfg.get("stop_prefixes", ()))
     kind_rules = sorted(
-        tcfg.get("kind_rules", []),
+        tcfg.get("kind_rules") or [],
         key=lambda r: int(r.get("priority", 0)),
         reverse=True,
     )
@@ -83,31 +85,49 @@ def detect_title(
     title_raw = _clean_title_text(" ".join(text[folded_lines[i][0] : folded_lines[i][1]] for i in range(title_line_idx, title_end_idx + 1)))
     title_folded = " ".join(folded_lines[i][2] for i in range(title_line_idx, title_end_idx + 1))
 
-    kind = "generic"
+    kind: str | None = None
     rule_id = "title.generic"
+    unresolved: list[str] = []
     for rule in kind_rules:
         krule_id = str(rule.get("rule_id", "title.rule"))
         try:
             pattern = regex.compile(str(rule.get("pattern", "")), regex.MULTILINE)
         except regex.error as exc:
             errors.append(f"{krule_id}: regex không hợp lệ — {exc}")
+            unresolved.append(krule_id)
             continue
         match, timeout_err = _guarded_search(pattern, title_folded, timeout_ms)
         if timeout_err:
             errors.append(f"{krule_id}: {timeout_err}")
+            unresolved.append(krule_id)
             continue
         if match:
             kind = str(rule.get("kind", "generic"))
             rule_id = krule_id
             break
 
+    note = None
+    if unresolved:
+        # Rule ưu tiên cao hơn không đánh giá được nên kết quả kind (kể cả
+        # khi một rule thấp hơn đã match) không đáng tin — báo `error` +
+        # kind `unknown`, không trả `matched` ngầm. Chi tiết trong errors[].
+        state = STATE_ERROR
+        kind = "unknown"
+        note = "kind_rules không đánh giá được: " + ", ".join(unresolved)
+    elif kind is None:
+        kind = "generic"
+        state = STATE_MATCHED
+    else:
+        state = STATE_MATCHED
+
     return {
         "kind": kind,
         "title": title_raw,
-        "state": STATE_MATCHED,
+        "state": state,
         "span": [orig_start, orig_end],
         "raw_snippet": text[orig_start:orig_end],
         "rule_id": rule_id,
+        "note": note,
     }
 
 
@@ -147,7 +167,7 @@ def find_zones(
     zone không marker nào khớp vẫn `missing`, còn zone có marker bị ngắt giữa
     chừng mà không marker nào khác chạy được báo `error` để không im lặng.
     """
-    zone_defs = profile.get("zones", [])
+    zone_defs = profile.get("zones") or []
     starts: list[tuple[int, int] | None] = []  # (start_fold, marker_end_fold)
     zone_had_error: list[bool] = []
     cursor = 0
@@ -160,7 +180,7 @@ def find_zones(
             continue
         best = None
         had_error = False
-        for marker in zone_def.get("start_markers", []):
+        for marker in zone_def.get("start_markers") or []:
             try:
                 mre = regex.compile(str(marker), regex.MULTILINE)
             except regex.error as exc:
@@ -203,7 +223,7 @@ def find_zones(
                 break
         else:
             # Zone cuối cùng được tìm thấy: cắt tại end_markers nếu có.
-            for marker in zone_def.get("end_markers", []):
+            for marker in zone_def.get("end_markers") or []:
                 try:
                     mre = regex.compile(str(marker), regex.MULTILINE)
                 except regex.error as exc:

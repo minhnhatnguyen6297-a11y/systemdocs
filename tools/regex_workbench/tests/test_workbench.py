@@ -107,6 +107,127 @@ class TransferProfileTests(unittest.TestCase):
         self.assertEqual(co_user["side"], "A")
         self.assertEqual(co_user["fields"]["cccd"]["value"], "001178000003")
 
+    def test_dong_su_dung_inline_label_keeps_person(self):
+        """Review f48a762: 'Dong su dung: Ba: ...' tren CUNG DONG con 2/3 nguoi."""
+        text = load_fixture("transfer_dong_su_dung.txt").replace(
+            "Đồng sử dụng:\nBà:", "Đồng sử dụng: Bà:"
+        )
+        result = run(text, self.profile)
+
+        persons = all_persons(result)
+        self.assertEqual(len(persons), 3)
+        cam = next(
+            p for p in persons
+            if p["fields"]["ho_ten"]["value"] == "Lê Thị Cẩm"
+        )
+        self.assertEqual(cam["role"], "Đồng sử dụng")
+        self.assertEqual(cam["fields"]["cccd"]["value"], "001178000003")
+
+    def test_person_without_honorific_not_dropped(self):
+        """Review f48a762: bo danh xung 'Ba:' sau nhan cung bo sot nguoi.
+
+        Nguoi khong danh xung van duoc tach khi dong ten co bang chung
+        (sinh + ngay); gioi_tinh la missing (khong bia).
+        """
+        text = load_fixture("transfer_dong_su_dung.txt").replace(
+            "Đồng sử dụng:\nBà:", "Đồng sử dụng:\n"
+        )
+        result = run(text, self.profile)
+
+        persons = all_persons(result)
+        self.assertEqual(len(persons), 3)
+        cam = next(
+            p for p in persons
+            if p["fields"]["ho_ten"]["value"] == "Lê Thị Cẩm"
+        )
+        self.assertEqual(cam["role"], "Đồng sử dụng")
+        self.assertEqual(cam["fields"]["gioi_tinh"]["state"], "missing")
+        self.assertEqual(cam["fields"]["ngay_sinh"]["value"], "03/03/1978")
+        self.assertEqual(cam["fields"]["cccd"]["value"], "001178000003")
+        # span/raw_snippet cua nguoi van tro dung input goc
+        s, e = cam["span"]
+        self.assertEqual(text[s:e], cam["raw_snippet"])
+
+    def test_two_cccd_one_person_is_ambiguous(self):
+        """Review f48a762: hai CCCD khac nhau trong mot nguoi phai ambiguous."""
+        text = load_fixture("transfer_dong_su_dung.txt").replace(
+            "Căn cước công dân số: 001075000001",
+            "CCCD: 001075000001; CCCD: 001075000009",
+        )
+        result = run(text, self.profile)
+
+        an = next(
+            p for p in all_persons(result)
+            if p["fields"]["ho_ten"]["value"] == "Nguyễn Văn An"
+        )
+        cccd = an["fields"]["cccd"]
+        self.assertEqual(cccd["state"], "ambiguous")
+        self.assertEqual(len(cccd["candidates"]), 2)
+        self.assertEqual(
+            {c["value"] for c in cccd["candidates"]},
+            {"001075000001", "001075000009"},
+        )
+        # So CCCD thu hai khong bi tach thanh nguoi ao
+        self.assertEqual(len(all_persons(result)), 3)
+
+    def test_bad_kind_rule_reports_error(self):
+        """Review f48a762: kind_rule sai regex phai tra error, khong matched ngam."""
+        profile = copy.deepcopy(self.profile)
+        profile["title"]["kind_rules"][0]["pattern"] = "("  # kind.correction
+        result = run(load_fixture("transfer_chuan.txt"), profile)
+
+        self.assertEqual(result["title"]["state"], "error")
+        # Rule uu tien cao hon khong danh gia duoc -> kind khong dang tin
+        self.assertEqual(result["doc_kind"], "unknown")
+        self.assertTrue(
+            any("kind.correction" in e for e in result["errors"]),
+            result["errors"],
+        )
+
+    def test_bad_zone_marker_regex_reports_error(self):
+        """Zone marker sai regex -> zone state error + errors kem rule_id."""
+        profile = copy.deepcopy(self.profile)
+        for zone in profile["zones"]:
+            if zone["zone_id"] == "parties":
+                zone["start_markers"] = ["("]
+        result = run(load_fixture("transfer_chuan.txt"), profile)
+
+        zones = {z["name"]: z for z in result["zones"]}
+        self.assertEqual(zones["parties"]["state"], "error")
+        self.assertTrue(
+            any("zone.parties" in e for e in result["errors"]),
+            result["errors"],
+        )
+
+    def test_bad_side_marker_regex_parties_error(self):
+        """side_markers sai regex -> parties error, khong im lang."""
+        profile = copy.deepcopy(self.profile)
+        profile["parties"]["side_markers"][0]["pattern"] = "("
+        result = run(load_fixture("transfer_chuan.txt"), profile)
+
+        self.assertEqual(result["parties"]["state"], "error")
+        self.assertTrue(
+            any("party.side" in e for e in result["errors"]),
+            result["errors"],
+        )
+
+    def test_bad_validator_regex_errors_field(self):
+        """Review: validator sai regex -> field error + errors[], khong matched."""
+        profile = copy.deepcopy(self.profile)
+        for rule in profile["fields"]:
+            if rule["name"] == "so_serial":
+                rule["validators"] = [
+                    {"pattern": "([A-Z]{2}", "on_fail": "warning_nonstandard"}
+                ]
+        result = run(load_fixture("transfer_chuan.txt"), profile)
+
+        field = fields_by_name(result, "so_serial")[0]
+        self.assertEqual(field["state"], "error")
+        self.assertTrue(
+            any("so_serial" in e and "validator" in e for e in result["errors"]),
+            result["errors"],
+        )
+
     def test_sinh_nam_not_mixed_into_name(self):
         """Bug baseline: 'sinh nam 1960' tung bi gom vao ho_ten."""
         text = load_fixture("transfer_sinh_nam.txt")
@@ -182,6 +303,23 @@ class TransferProfileTests(unittest.TestCase):
         )
         problems = lint_profile(profile)
         self.assertTrue(any("nested quantifier" in p for p in problems))
+
+    def test_validate_profile_shape(self):
+        """Profile JSON hop le nhung sai kieu -> validate_profile bao ro."""
+        from engine import validate_profile
+
+        self.assertEqual(validate_profile(self.profile), [])
+        self.assertTrue(validate_profile(None))
+        self.assertTrue(validate_profile("transfer"))
+        self.assertTrue(validate_profile({"fields": "x"}))
+        self.assertTrue(any("fields" in p for p in validate_profile({"fields": "abc"})))
+        self.assertTrue(validate_profile({"zones": "abc"}))
+        self.assertTrue(validate_profile({"title": []}))
+        self.assertTrue(validate_profile({"parties": {"side_markers": "x"}}))
+        self.assertTrue(validate_profile({"regex_timeout_ms": "nhanh"}))
+        # fields: null (key ton tai, gia tri null) khong con crash engine
+        result = run("HỢP ĐỒNG CHUYỂN NHƯỢNG\n", {"fields": None})
+        self.assertIn("doc_kind", result)
 
     def test_edited_rule_takes_effect_on_rerun(self):
         """Dev sua regex trong profile dict -> run() lai dung rule moi."""

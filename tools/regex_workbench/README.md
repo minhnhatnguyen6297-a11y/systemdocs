@@ -57,6 +57,16 @@ dùng cho kiểm tra serial `[A-Z]{2}`).
   side A — fix bug bỏ sót người đồng sử dụng), `person_delimiter`,
   `person_fields` (mỗi người một chunk riêng — `ho_ten` dừng trước `sinh`
   nên không lẫn năm sinh vào tên).
+  - `person_delimiter` gồm 2 nhánh: (1) người có danh xưng Ông/Bà/Cụ đứng
+    sau đầu dòng/`;`/`,`/`:` — `:` cho phép `Đồng sử dụng: Bà: ...` trên cùng
+    dòng; (2) người KHÔNG danh xưng — dòng mới bắt đầu bằng tên (chữ cái
+    đầu, không phải nhãn dữ liệu) rồi theo sau là bằng chứng người
+    (`sinh` + số, hoặc nhãn căn cước/CCCD/CMND), chỉ ở đầu dòng hoặc sau
+    `;`. Nhánh (2) giải quyết ca "bỏ danh xưng vẫn không bỏ người".
+  - `person_fields` khớp NHIỀU lần trong chunk: >1 kết quả khác nhau
+    (vd hai số CCCD trong một người) -> `ambiguous` kèm `candidates`,
+    không tự chọn số đầu.
+  - `ho_ten` có danh xưng optional để bóc tên trong chunk do nhánh (2) tạo.
 - `fields`: `rule_id`, `name`, `zone` (`any` = toàn văn bản), `group`,
   `expect` (`one`/`many`), `value_template` (`{1}/{2}/{3}`), `validators`.
 - `regex_timeout_ms`: ngưỡng báo lỗi khi regex chạy quá lâu — áp cho MỌI
@@ -64,6 +74,14 @@ dùng cho kiểm tra serial `[A-Z]{2}`).
   `fields`, `side_markers`, `person_delimiter`, `person_fields`, `validators`).
   Quá hạn → `TimeoutError` trong engine → state `error` kèm `rule_id`, ghi
   vào `errors[]`; không nuốt lỗi thành `missing`.
+- **Lỗi cấu hình báo rõ theo rule**: regex sai cú pháp trong `kind_rules`
+  → `title.state=error` + `doc_kind=unknown` (rule ưu tiên cao không đánh
+  giá được nên kết quả kind không đáng tin); sai trong zone marker → zone
+  `error`; sai trong field/validator/side marker/person rule → field/
+  parties `error` kèm `rule_id` trong `errors[]`.
+- **Contract HTTP** (`serve.py`): `validate_profile` kiểm tra shape trước —
+  sai kiểu (vd `fields: null`) → `400` + `problems[]`; body không phải JSON
+  → `400`; engine ném lỗi bất ngờ → `500` JSON (request không rơi).
 
 ## Span & Unicode
 
@@ -80,8 +98,17 @@ theo code point (`Array.from`), không dùng offset UTF-16 của JS.
 python -m pytest tools\regex_workbench\tests -q
 ```
 
-Test timeout chạy engine trong process con (`tests/_timeout_probe.py`) có
-`subprocess timeout` cứng — suite không thể treo kể cả khi cơ chế ngắt hỏng.
+Ba lớp test:
+
+- `test_workbench.py` — engine + profile + fixtures giả lập; test timeout
+  chạy qua process con (`tests/_timeout_probe.py`) có `subprocess timeout`
+  cứng — suite không thể treo kể cả khi cơ chế ngắt hỏng.
+- `test_serve.py` — server HTTP thật (`ThreadingHTTPServer` cổng ngẫu
+  nhiên): contract 400 shape/JSON lỗi, 200 + result, 404.
+- `test_ui_dom.py` + `tests/_ui_dom_probe.mjs` — chạy `ui/app.js` THẬT trong
+  DOM giả lập bằng Node (không cần trình duyệt): escape attribute, highlight
+  code-point sau emoji, bỏ qua response cũ khi sửa source giữa chừng, import
+  lỗi/đúng, export, hiển thị `problems`. Skip khi máy không có Node.
 
 Fixtures trong `tests/fixtures/` là dữ liệu giả lập (không PII khách thật),
 mô phỏng 4 ca lỗi baseline: Đồng sử dụng, Sinh năm lẫn họ tên, Đính chính,
@@ -89,7 +116,9 @@ Serial một chữ cái.
 
 ## Giới hạn đã biết
 
-- Người không có danh xưng Ông/Bà/Cụ đứng sau nhãn (vd `Đồng sử dụng:
-  Nguyễn Thị X`) cần thêm delimiter trong profile.
+- Người không danh xưng chỉ được tách khi dòng tên đứng đầu dòng/sau `;`
+  và đi kèm bằng chứng (`sinh` + số hoặc nhãn căn cước/CCCD); người không
+  danh xưng mà chunk cũng không có trường ngày sinh/CCCD vẫn chưa tách
+  được — cần thêm quy tắc trong profile.
 - Timeout của `regex` tính theo mỗi lần match-attempt; một rule sinh nhiều
   match nhỏ nhanh không bị chặn theo tổng thời gian rule.

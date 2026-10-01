@@ -97,32 +97,34 @@ def _apply_validators(
     raw_value: str,
     state: str,
     timeout_ms: int,
+    errors: list[str],
 ) -> tuple[str, list[dict]]:
     """Chạy validators trên giá trị raw; trả về (state, warnings).
 
-    Validator cũng là regex do profile điều khiển nên qua timeout thật;
-    validator lỗi cú pháp -> warning, validator quá hạn -> state `error`
-    (không thể kết luận giá trị đạt/lệch chuẩn).
+    Validator cũng là regex do profile điều khiển nên qua timeout thật.
+    Validator lỗi cú pháp hoặc quá hạn đều -> state `error` + ghi `errors`
+    kèm rule_id: không kết luận được giá trị đạt/lệch chuẩn thì không được
+    để trường `matched` như thể đã kiểm chứng.
     """
     warnings: list[dict] = []
     final_state = state
-    for validator in rule.get("validators", []):
+    for validator in rule.get("validators") or []:
         vpattern = str(validator.get("pattern", ""))
         vrule = str(validator.get("rule_id") or rule.get("rule_id"))
         try:
             vcompiled = regex.compile(vpattern)
         except regex.error as exc:
-            warnings.append({"rule_id": vrule, "message": f"validator lỗi: {exc}"})
+            msg = f"{vrule}: validator regex không hợp lệ — {exc}"
+            errors.append(msg)
+            warnings.append({"rule_id": vrule, "message": msg})
+            final_state = STATE_ERROR
             continue
         try:
             ok = bool(vcompiled.search(raw_value, timeout=_timeout_seconds(timeout_ms)))
         except TimeoutError:
-            warnings.append(
-                {
-                    "rule_id": vrule,
-                    "message": f"validator timeout sau {timeout_ms}ms — chưa kiểm chứng chuẩn",
-                }
-            )
+            msg = f"{vrule}: validator timeout sau {timeout_ms}ms — chưa kiểm chứng chuẩn"
+            errors.append(msg)
+            warnings.append({"rule_id": vrule, "message": msg})
             final_state = STATE_ERROR
             continue
         if not ok:
@@ -179,7 +181,7 @@ def extract_fields(
     zones_by_id = {z.get("name"): z for z in zones}
     fields: list[dict] = []
 
-    for rule in profile.get("fields", []):
+    for rule in profile.get("fields") or []:
         rule_id = str(rule.get("rule_id", "field.unknown"))
         name = str(rule.get("name", rule_id))
         zone_id = str(rule.get("zone", "any"))
@@ -257,7 +259,7 @@ def extract_fields(
             continue
 
         (span, value) = hits[0]
-        state, warnings = _apply_validators(rule, value, STATE_MATCHED, timeout_ms)
+        state, warnings = _apply_validators(rule, value, STATE_MATCHED, timeout_ms, errors)
         fields.append(
             make_span_result(state, text, span, rule_id=rule_id, name=name,
                              value=value, warnings=warnings or None)
@@ -286,6 +288,9 @@ def extract_parties(
     giờ nuốt rồi trả `missing`.
     """
     pcfg = profile.get("parties") or {}
+    if not isinstance(pcfg, dict):
+        return {"state": STATE_ERROR, "blocks": [], "zone": "parties",
+                "note": "parties config khong phai object"}
     zones_by_id = {z.get("name"): z for z in zones}
     zone_id = str(pcfg.get("zone", "parties"))
     zone = zones_by_id.get(zone_id)
@@ -300,7 +305,7 @@ def extract_parties(
         return {"state": STATE_ERROR, "blocks": [], "zone": zone_id, "note": note}
 
     markers: list[tuple[int, int, dict]] = []
-    for marker_def in pcfg.get("side_markers", []):
+    for marker_def in pcfg.get("side_markers") or []:
         pattern = str(marker_def.get("pattern", ""))
         rule_id = str(marker_def.get("rule_id", "party.side"))
         lint_msg = lint_pattern(rule_id, pattern)
@@ -317,7 +322,7 @@ def extract_parties(
     if not markers:
         return {"state": STATE_MISSING, "blocks": [], "zone": zone_id}
 
-    delim_cfg = pcfg.get("person_delimiter", {})
+    delim_cfg = pcfg.get("person_delimiter") or {}
     delim_pattern = str(delim_cfg.get("pattern", ""))
     delim_rule_id = str(delim_cfg.get("rule_id", "party.person"))
     lint_msg = lint_pattern(delim_rule_id, delim_pattern)
@@ -325,7 +330,7 @@ def extract_parties(
         return _fail(lint_msg)
     delim_re = regex.compile(delim_pattern, regex.MULTILINE)
 
-    person_field_rules = pcfg.get("person_fields", [])
+    person_field_rules = pcfg.get("person_fields") or []
     compiled_fields: list[tuple[dict, "regex.Pattern"]] = []
     for frule in person_field_rules:
         frule_id = str(frule.get("rule_id", f"person.{frule.get('name', '?')}"))
@@ -355,31 +360,45 @@ def extract_parties(
             for frule, fcompiled in compiled_fields:
                 fname = str(frule.get("name", "field"))
                 frule_id = str(frule.get("rule_id", f"person.{fname}"))
-                fmatch, ferr = _guarded_search(fcompiled, chunk, timeout_ms)
+                fmatches, ferr = _guarded_finditer(fcompiled, chunk, timeout_ms)
                 if ferr:
                     errors.append(f"{frule_id}: {ferr}")
                     person_fields[fname] = make_span_result(
                         STATE_ERROR, text, None, rule_id=frule_id, name=fname, note=ferr
                     )
                     continue
-                if not fmatch:
-                    person_fields[fname] = make_span_result(
-                        STATE_MISSING, text, None, rule_id=frule_id, name=fname
-                    )
-                    continue
                 group = frule.get("group", 1)
-                gspan = _match_value(fmatch, group)
-                if gspan is None:
+                hits: list[tuple[tuple[int, int], str]] = []
+                for fmatch in fmatches or []:
+                    gspan = _match_value(fmatch, group)
+                    if gspan is None:
+                        continue
+                    mapped = span_of(chunk_fold_abs + gspan[0], chunk_fold_abs + gspan[1])
+                    if not mapped:
+                        continue
+                    hits.append((mapped, text[mapped[0] : mapped[1]].strip()))
+                if not hits:
                     person_fields[fname] = make_span_result(
                         STATE_MISSING, text, None, rule_id=frule_id, name=fname
                     )
                     continue
-                mapped = span_of(chunk_fold_abs + gspan[0], chunk_fold_abs + gspan[1])
-                raw = text[mapped[0] : mapped[1]] if mapped else ""
-                state, warnings = _apply_validators(frule, raw, STATE_MATCHED, timeout_ms)
+                if len(hits) > 1:
+                    # Nhiều kết quả trong cùng một người (vd 2 số CCCD khác
+                    # nhau): không tự chọn số đầu — ambiguous kèm candidates.
+                    person_fields[fname] = make_span_result(
+                        STATE_AMBIGUOUS, text, hits[0][0], rule_id=frule_id,
+                        name=fname, value=hits[0][1],
+                        candidates=[{"span": list(s), "value": v} for s, v in hits],
+                        note=f"{len(hits)} ket qua kha di trong cung mot nguoi",
+                    )
+                    continue
+                (mapped, raw) = hits[0]
+                state, warnings = _apply_validators(
+                    frule, raw, STATE_MATCHED, timeout_ms, errors
+                )
                 person_fields[fname] = make_span_result(
                     state, text, mapped, rule_id=frule_id, name=fname,
-                    value=raw.strip() if raw else "", warnings=warnings or None,
+                    value=raw, warnings=warnings or None,
                 )
 
             persons.append(

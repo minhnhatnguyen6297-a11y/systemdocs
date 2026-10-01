@@ -164,14 +164,16 @@
     ],
     "person_delimiter": {
       "rule_id": "party.person",
-      "pattern": "(?:^|\\n|[;,])\\s*(?:ong|ba|cu)\\b\\s*[:.]?"
+      "pattern": "(?<![^\\n;,:])\\s*(?:ong|ba|cu)\\b\\s*[:.]?|(?<![^\\n;])\\s*(?!(?:so|can|cccd|cmnd)\\b)[a-z][^\\n;:]{0,59}?(?=[,;:]?\\s*sinh\\s*(?:ngay|nam)?\\s*[:.]?\\s*\\d|[,;:]?\\s*(?:can\\s*cuoc|cccd|cmnd|so\\s*cmnd)\\b)",
+      "note": "Alt1: nguoi co danh xung ong/ba/cu dung sau dau dong/;/,/: — ':' cho phep 'Dong su dung: Ba: ...' tren cung dong. Lookbehind zero-width nen chunk nguoi bat dau ngay truoc danh xung, khong gom dau phan cach. Alt2: nguoi khong danh xung — dong moi bat dau bang mot ten (ky tu dau la chu [a-z] tren van ban da fold, khong mo dau bang nhan du lieu so/can/cccd/cmnd, toi da 60 ky tu, khong chua ':'/';') roi theo sau la bang chung nguoi ('sinh' + so, hoac nhan can cuoc/cccd/cmnd). Chi chap nhan o dau dong hoac sau ';' de tranh tach ao giua truong. Gioi han: nguoi khong danh xung va khong co sinh/cccd trong chunk van khong tach duoc."
     },
     "person_fields": [
       {
         "rule_id": "person.ho_ten",
         "name": "ho_ten",
         "group": 1,
-        "pattern": "^\\s*(?:ong|ba|cu)\\s*[:.]?\\s*([^,;\\n]+?)\\s*(?=,|;|\\n|\\bsinh\\b|$)"
+        "pattern": "^\\s*(?:(?:ong|ba|cu)\\s*[:.]?\\s*)?([^,;\\n]+?)\\s*(?=,|;|\\n|\\bsinh\\b|$)",
+        "note": "Danh xung ong/ba/cu la OPTIONAL — chunk do delimiter alt2 tao bat dau ngay bang ten khong danh xung. Neo '^' giup ten luon la phan dau chunk; dung truoc ',', ';', xuong dong hoac 'sinh'."
       },
       {
         "rule_id": "person.gioi_tinh",

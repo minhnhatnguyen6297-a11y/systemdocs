@@ -22,7 +22,13 @@ ROOT = Path(__file__).resolve().parent
 UI_DIR = ROOT / "ui"
 sys.path.insert(0, str(ROOT))
 
-from engine import DEFAULT_PROFILE, lint_profile, load_profile, run  # noqa: E402
+from engine import (  # noqa: E402
+    DEFAULT_PROFILE,
+    lint_profile,
+    load_profile,
+    run,
+    validate_profile,
+)
 
 CONTENT_TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
                  ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8"}
@@ -81,8 +87,19 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"error": f"khong nap duoc profile: {exc}"}, 400)
                 return
 
+        shape_problems = validate_profile(profile)
+        if shape_problems:
+            self._send_json(
+                {"error": "profile sai cau truc", "problems": shape_problems}, 400
+            )
+            return
+
         lint_problems = lint_profile(profile)
-        result = run(text, profile)
+        try:
+            result = run(text, profile)
+        except Exception as exc:  # engine khong duoc lam roi request
+            self._send_json({"error": f"engine loi: {type(exc).__name__}: {exc}"}, 500)
+            return
         result["profile_warnings"] = lint_problems
         self._send_json({"result": result})
 
