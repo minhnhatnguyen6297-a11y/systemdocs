@@ -4,7 +4,11 @@
   "command_id": "a1b2c3d4-0013-4013-8013-000000000013",
   "status": "succeeded",
   "waiting_on": null,
-  "progress": { "done": 1, "total": 1, "current_label": "Hoàn tất" },
+  "progress": {
+    "done": 1,
+    "total": 1,
+    "current_label": "Hoàn tất"
+  },
   "result": {
     "kind": "intake_analyze",
     "data": {
@@ -20,14 +24,28 @@
               "normalized_value": "Nguyễn Văn An",
               "observation_state": "observed",
               "confidence": null,
-              "source_refs": [{ "span": [5, 18] }]
+              "source_refs": [
+                {
+                  "span": [
+                    5,
+                    18
+                  ]
+                }
+              ]
             },
             "ngay_sinh": {
               "raw_value": "1950",
               "normalized_value": "1950",
               "observation_state": "normalized",
               "confidence": null,
-              "source_refs": [{ "span": [28, 32] }]
+              "source_refs": [
+                {
+                  "span": [
+                    28,
+                    32
+                  ]
+                }
+              ]
             }
           },
           "warnings": []

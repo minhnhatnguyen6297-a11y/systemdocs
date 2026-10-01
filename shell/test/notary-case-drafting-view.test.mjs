@@ -82,7 +82,14 @@ function seedExistingCase(model) {
   s.caseId = 42;
   s.caseInfo = { id: 42, case_type: 'inheritance',
                  document_type: 'khai_nhan', status: 'active',
-                 locked: false, revision: 3 };
+                 locked: false, revision: 3,
+                 ngay_lap_ho_so: '2024-05-01', noi_niem_yet: 'xã Cũ',
+                 nguoi_nhan_uy_quyen: 'Người Nhận Gốc',
+                 nguoi_nhan_uy_quyen_id: 7, noi_dung_viec: 'Việc gốc',
+                 ghi_chu: null };
+  // đợt 3 (MIN-141): baseline de Huy khoi phuc meta — applyWorkspace
+  // that gan tu data.case; test seed truc tiep.
+  s.committedCaseInfo = structuredClone(s.caseInfo);
   s.backendMode = 'real';
   s.revision = 3;
   s.locked = false;
@@ -253,8 +260,11 @@ test('cancel: case thật restore Stage+Diagram về committed — không gọi 
   assert.equal(model.state.diagramDirty, false);
   assert.equal(model.state.diagram.nodes.length, 0,
     'diagram draft không về committed');
-  assert.equal(calls.length, 0,
-    'Hủy gọi command ra ngoài — phải client-only');
+  // đợt 3 (MIN-141): customer_list nap danh ba uy quyen luc render la
+  // hop le — "client-only" nghia la Hủy khong goi command ghi/workspace.
+  assert.equal(calls.filter(([c]) =>
+    /workspace|diagram|commit|intake|word/.test(c)).length, 0,
+    'Hủy gọi command workspace ra ngoài — phải client-only');
 });
 
 test('cancel: nháp mới reset về nháp trống cùng loại việc', async () => {
@@ -528,10 +538,13 @@ test('MIN-133 D2: không card Thông tin hồ sơ; Lưu hồ sơ vẫn gửi met
         stage: p.stage, diagram: { state: p.diagram.state } } }
     : null;
   const { model, view, calls } = build(test, { draft: true, respond });
-  assert.ok(!view.el.textContent.includes('Thông tin hồ sơ'),
-    'còn card Thông tin hồ sơ');
-  for (const lbl of ['Loại văn bản', 'Ngày lập hồ sơ', 'Nơi niêm yết',
-                     'Ghi chú']) {
+  // MIN-141 đợt 3: meta hồ sơ quay lại — 3 dòng trong card Tài sản
+  // (không phải card riêng). Chỉ Nơi niêm yết / Người nhận ủy quyền /
+  // Nội dung việc; Loại văn bản, Ngày lập hồ sơ, Ghi chú vẫn không ô.
+  const metaBox = collect(view.el,
+    (e) => e.classList.contains('cd-casemeta'))[0];
+  assert.ok(metaBox, 'thiếu block .cd-casemeta dưới card Tài sản');
+  for (const lbl of ['Loại văn bản', 'Ngày lập hồ sơ', 'Ghi chú']) {
     assert.equal(collect(view.el,
       (e) => e.getAttribute('aria-label') === lbl).length, 0,
       `còn ô "${lbl}"`);
@@ -545,13 +558,18 @@ test('MIN-133 D2: không card Thông tin hồ sơ; Lưu hồ sơ vẫn gửi met
   assert.ok(call, 'Lưu hồ sơ không gọi workspace_create');
   const meta = call[1].case;
   assert.deepEqual(Object.keys(meta).sort(), ['case_type', 'document_type',
-    'ghi_chu', 'ngay_lap_ho_so', 'noi_niem_yet']);
+    'ghi_chu', 'ngay_lap_ho_so', 'nguoi_nhan_uy_quyen',
+    'nguoi_nhan_uy_quyen_id', 'noi_dung_viec', 'noi_niem_yet']);
   assert.equal(meta.case_type, 'inheritance');
   assert.equal(meta.document_type, 'khai_nhan',
     'document_type phải = mặc định model');
   assert.equal(meta.ngay_lap_ho_so, null, 'ngay_lap_ho_so để backend tự điền');
   assert.equal(meta.noi_niem_yet, null);
   assert.equal(meta.ghi_chu, null);
+  // MIN-141 đợt 3: ba truong meta moi cung di trong payload.case.
+  assert.equal(meta.nguoi_nhan_uy_quyen, null);
+  assert.equal(meta.nguoi_nhan_uy_quyen_id, null);
+  assert.equal(meta.noi_dung_viec, null);
   assert.equal(call[1].stage.owner_row_id, owner.row_id);
   assert.equal(model.state.caseId, 77, 'saveDraft không thành công');
   assert.equal(findBtns(topbar(view.el), 'Cập nhật').length, 1,
@@ -818,4 +836,91 @@ test('MIN-136: case_list retry khi infra error + message thân thiện', async (
   assert.ok(collect(view.el, (e) =>
     e.classList.contains('face-error')).length === 0,
     'face loi con sau khi retry thanh cong');
+});
+
+// ---------- MIN-141 đợt 3: block meta hồ sơ dưới card Tài sản ----------
+
+test('đợt3: ba dòng meta nằm trong card Tài sản, nhập → updateCaseMeta', () => {
+  const { model, view } = build(test, { draft: true });
+  const assets = collect(view.el,
+    (e) => e.classList.contains('cd-assets'))[0];
+  const meta = collect(assets,
+    (e) => e.classList.contains('cd-casemeta'))[0];
+  assert.ok(meta, 'meta block phai nam TRONG card Tai san');
+  const labels = collect(meta,
+    (e) => e.classList.contains('cd-casemeta-label'))
+    .map((e) => e.textContent);
+  assert.deepEqual(labels,
+    ['Nơi niêm yết', 'Người nhận ủy quyền', 'Nội dung việc']);
+  // Nhap noi niem yet → caseInfo + metaDirty.
+  const ny = fid(view.el, 'meta:noi_niem_yet');
+  ny.value = 'xã Yên Sở';
+  ny.oninput();
+  assert.equal(model.state.caseInfo.noi_niem_yet, 'xã Yên Sở');
+  assert.equal(model.state.metaDirty, true);
+  // Rong → null (khong phai chuoi trong).
+  ny.value = '   ';
+  ny.oninput();
+  assert.equal(model.state.caseInfo.noi_niem_yet, null);
+  // Nguoi nhan UQ co datalist danh ba + nut + Danh ba.
+  const uq = fid(view.el, 'meta:nguoi_nhan_uy_quyen');
+  assert.ok(uq.getAttribute('list'), 'input UQ thieu datalist');
+  assert.ok(fid(view.el, 'meta:uq_add_catalog'), 'thieu nut + Danh bạ');
+});
+
+test('đợt3: meta-only dirty bat nut Cập nhật; Hủy khoi phuc baseline', async () => {
+  const { model, view } = build(test, { draft: false });
+  const upd = () => findBtns(topbar(view.el), 'Cập nhật')[0];
+  const dots = (b) => collect(b, (e) => e.classList.contains('dirty-dot'));
+  assert.equal(dots(upd()).length, 0);
+  // Chi sua meta → nut Cap nhat bat (dirty dot).
+  model.updateCaseMeta('noi_niem_yet', 'xã Khác');
+  model.updateCaseMeta('nguoi_nhan_uy_quyen', 'Người Khác');
+  model.dismissNotice();
+  assert.equal(model.state.metaDirty, true);
+  assert.equal(dots(upd()).length, 1,
+    'sua meta phai bat dirty tren nut Cap nhat');
+  // Huy → meta ve baseline committedCaseInfo (khong goi command ghi).
+  const undo = findBtns(view.el, 'Hủy thay đổi')[0];
+  await undo.onclick();
+  assert.equal(model.state.caseInfo.noi_niem_yet, 'xã Cũ',
+    'Huy phai khoi phuc noi_niem_yet baseline');
+  assert.equal(model.state.caseInfo.nguoi_nhan_uy_quyen,
+    'Người Nhận Gốc');
+  assert.equal(model.state.caseInfo.nguoi_nhan_uy_quyen_id, 7);
+  assert.equal(model.state.metaDirty, false);
+});
+
+test('đợt3: Cập nhật gui payload.case kem stage khi meta dirty', async () => {
+  const { model, view, calls } = build(test, { draft: false });
+  model.updateCaseMeta('noi_dung_viec', 'Khai nhận nhà đất');
+  model.updateCaseMeta('nguoi_nhan_uy_quyen', 'Người UQ Mới');
+  calls.length = 0;
+  await findBtns(topbar(view.el), 'Cập nhật')[0].onclick();
+  const call = calls.find(
+    ([c]) => c === 'notary.workspace_commit_stage');
+  assert.ok(call, 'Cập nhật khong goi workspace_commit_stage');
+  assert.ok(call[1].case, 'meta dirty ma payload thieu case');
+  assert.equal(call[1].case.noi_dung_viec, 'Khai nhận nhà đất');
+  assert.equal(call[1].case.nguoi_nhan_uy_quyen, 'Người UQ Mới');
+  // Baseline 2024-05-01/xã Cũ van day du trong block meta gui di.
+  assert.equal(call[1].case.noi_niem_yet, 'xã Cũ');
+});
+
+test('đợt3: case locked → 3 ô meta disabled, khong goi customer_list', async () => {
+  const { model, view, calls } = build(test, { draft: false });
+  model.state.locked = true;
+  model.state.status = 'locked';
+  model.state.uqCatalog = null;      // reset de test trigger lai
+  await new Promise((r) => setTimeout(r, 5));   // flush load cu (neu co)
+  calls.length = 0;
+  model.dismissNotice();
+  for (const f of ['meta:noi_niem_yet', 'meta:nguoi_nhan_uy_quyen',
+                   'meta:noi_dung_viec']) {
+    const inp = fid(view.el, f);
+    assert.ok(inp && inp.disabled, `${f} phai disabled khi locked`);
+  }
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal(calls.filter(([c]) => c === 'notary.customer_list')
+    .length, 0, 'locked ma van goi customer_list');
 });

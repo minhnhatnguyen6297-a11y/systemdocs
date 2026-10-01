@@ -71,9 +71,29 @@ CASE_ID_FORBIDDEN = {"notary.workspace_create"}
 CASE_FIELDS = {
     "id", "case_type", "document_type", "status", "locked", "revision",
     "ngay_lap_ho_so", "noi_niem_yet", "ghi_chu",
+    # đợt 3 (MIN-141): emit luôn có; legacy key trên wire
+    "nguoi_nhan_uy_quyen", "nguoi_nhan_uy_quyen_id", "noi_dung_viec",
 }
 CASE_META_FIELDS = {
     "document_type", "ngay_lap_ho_so", "noi_niem_yet", "ghi_chu",
+    # đợt 3: meta mới trong payload.case create/commit
+    "nguoi_nhan_uy_quyen", "nguoi_nhan_uy_quyen_id", "noi_dung_viec",
+}
+# đợt 3: commit payload.case — meta + cặp immutable gửi kèm kiểm tra
+COMMIT_CASE_FIELDS = CASE_META_FIELDS | {"case_type"}
+# canonical key server chấp nhận ở payload (contract §4.1/§6)
+CASE_META_CANON = {
+    "casetype": "case_type", "documenttype": "document_type",
+    "ngaylaphoso": "ngay_lap_ho_so", "noiniemyet": "noi_niem_yet",
+    "nguoinhanuyquyen": "nguoi_nhan_uy_quyen",
+    "nguoinhanuyquyenid": "nguoi_nhan_uy_quyen_id",
+    "noidungviec": "noi_dung_viec", "ghichu": "ghi_chu",
+}
+PERSON_CANON = {
+    "ten": "ho_ten", "gioitinh": "gioi_tinh", "ngaysinh": "ngay_sinh",
+    "ngaychet": "ngay_chet", "sogiayto": "so_giay_to",
+    "ngaycap": "ngay_cap", "noicap": "noi_cap", "diachi": "dia_chi",
+    "loaigiayto": "loai_giay_to", "loaidiachi": "loai_dia_chi",
 }
 DOCUMENT_TYPES = {"khai_nhan", "thoa_thuan"}
 
@@ -116,10 +136,16 @@ NEVER_EMPTY = {
     "display_name", "actual_filename", "path", "row_id", "personId",
     "source_id", "suggestion_id", "document_key", "id", "case_type",
     "filename_stem", "text",
-    # person_row nullable strings
+    # person_row nullable strings (+ đợt 3 derived/evidence)
     "so_giay_to", "noi_cap", "place_of_origin",
-    # case meta nullable (rev 1.1)
+    "loai_giay_to", "loai_dia_chi",
+    # case meta nullable (rev 1.1 + đợt 3)
     "noi_niem_yet", "ghi_chu", "ngay_lap_ho_so",
+    "nguoi_nhan_uy_quyen", "noi_dung_viec",
+    # canonical spellings cùng cấm ""
+    "ten", "gioitinh", "sogiayto", "ngaycap", "noicap", "diachi",
+    "loaigiayto", "loaidiachi", "noiniemyet", "nguoinhanuyquyen",
+    "noidungviec", "ghichu", "ngaylaphoso",
     # asset_row + land_rows nullable strings
     "so_vao_so", "so_thua_dat", "so_to_ban_do", "loai_so",
     "hinh_thuc_su_dung", "thoi_han", "nguon_goc", "co_quan_cap",
@@ -129,7 +155,9 @@ NEVER_EMPTY = {
 PERSON_FIELDS = {
     "row_id", "entity_id", "ho_ten", "gioi_tinh", "ngay_sinh", "ngay_chet",
     "so_giay_to", "ngay_cap", "noi_cap", "dia_chi", "place_of_origin",
-}
+    # đợt 3: emit luôn có; payload chấp nhận cả canonical (PERSON_CANON)
+    "loai_giay_to", "loai_dia_chi",
+} | set(PERSON_CANON)
 PERSON_DATE_FIELDS = {"ngay_sinh", "ngay_chet", "ngay_cap"}
 ASSET_FIELDS = {
     "row_id", "entity_id", "is_primary", "so_serial", "so_vao_so",
@@ -191,6 +219,14 @@ def is_abs_local(p):
     return bool(re.match(r"^[A-Za-z]:[\\/]", p))
 
 
+def _canon_conflicts(row, canon, where, v):
+    """canonical + legacy cùng mang mà giá trị lệch → validation_error."""
+    for ck, lk in canon.items():
+        if ck in row and lk in row and row[ck] != row[lk]:
+            v.append(("validation_error",
+                      f"{where} {ck}!={lk} conflict"))
+
+
 def check_person_row(row, where, v):
     if not isinstance(row, dict):
         v.append(("stage_validation_error", f"{where} not object"))
@@ -198,6 +234,7 @@ def check_person_row(row, where, v):
     extra = set(row) - PERSON_FIELDS
     if extra:
         v.append(("validation_error", f"{where} extra keys {sorted(extra)}"))
+    _canon_conflicts(row, PERSON_CANON, where, v)
     rid = row.get("row_id")
     if not (isinstance(rid, str) and UUID4_RX.match(rid)):
         v.append(("stage_validation_error", f"{where} row_id={rid!r}"))
@@ -684,7 +721,8 @@ def check_create_payload(payload, v, draft_v2=False):
         v.append(("validation_error", f"idempotency_key={ik!r}"))
     cm = payload.get("case")
     case_type = "inheritance"
-    meta_fields = CASE_META_FIELDS | ({"case_type"} if draft_v2 else set())
+    meta_fields = CASE_META_FIELDS | ({"case_type"} if draft_v2 else set()) \
+        | set(CASE_META_CANON)
     if not isinstance(cm, dict):
         v.append(("validation_error", "payload.case missing/not object"))
     else:
@@ -692,24 +730,26 @@ def check_create_payload(payload, v, draft_v2=False):
         if extra:
             v.append(("validation_error",
                       f"payload.case extra keys {sorted(extra)}"))
+        _canon_conflicts(cm, CASE_META_CANON, "payload.case", v)
         if draft_v2:
-            ct = cm.get("case_type", "inheritance")
+            ct = cm.get("case_type", cm.get("casetype", "inheritance"))
             if ct not in DRAFT_CASE_TYPES:
                 v.append(("validation_error",
                           f"payload.case.case_type={ct!r}"))
             else:
                 case_type = ct
-            d = cm.get("document_type")
+            d = cm.get("document_type", cm.get("documenttype"))
             ok = d in DRAFT_TWO_PARTY_DOC_TYPES if ct == "two_party" \
                 else d in DOCUMENT_TYPES
             if not ok:
                 v.append(("validation_error",
                           f"payload.case.document_type={d!r}"))
-        elif cm.get("document_type") not in DOCUMENT_TYPES:
+        elif cm.get("document_type", cm.get("documenttype")) \
+                not in DOCUMENT_TYPES:
             v.append(("validation_error",
                       f"payload.case.document_type="
-                      f"{cm.get('document_type')!r}"))
-        nl = cm.get("ngay_lap_ho_so")
+                      f"{cm.get('document_type', cm.get('documenttype'))!r}"))
+        nl = cm.get("ngay_lap_ho_so", cm.get("ngaylaphoso"))
         if nl is not None and not (isinstance(nl, str)
                                    and DATE_FULL_RX.match(nl)):
             v.append(("validation_error",
@@ -1142,6 +1182,33 @@ def violations(doc):
             check_intake_payload(payload, v)
         elif cmd == "notary.workspace_commit_stage":
             check_base_revision(payload, ctx, v)
+            # đợt 3: payload.case optional — meta hồ sơ cùng transaction
+            cm = payload.get("case")
+            if cm is not None:
+                if not isinstance(cm, dict):
+                    v.append(("validation_error",
+                              "payload.case not object"))
+                else:
+                    extra = set(cm) - COMMIT_CASE_FIELDS \
+                        - set(CASE_META_CANON)
+                    if extra:
+                        v.append(("validation_error",
+                                  f"payload.case extra keys "
+                                  f"{sorted(extra)}"))
+                    _canon_conflicts(cm, CASE_META_CANON,
+                                     "payload.case", v)
+                    nl = cm.get("ngay_lap_ho_so", cm.get("ngaylaphoso"))
+                    if nl is not None and not (
+                            isinstance(nl, str) and DATE_FULL_RX.match(nl)):
+                        v.append(("validation_error",
+                                  f"payload.case.ngay_lap_ho_so={nl!r}"))
+                    uq = cm.get("nguoi_nhan_uy_quyen_id",
+                                cm.get("nguoinhanuyquyenid"))
+                    if uq is not None and not (
+                            isinstance(uq, int) and uq >= 1):
+                        v.append(("validation_error",
+                                  "payload.case.nguoi_nhan_uy_quyen_id="
+                                  f"{uq!r}"))
             check_stage(payload.get("stage"), "payload.stage", v,
                         draft_v2=draft_v2, case_type=ct, in_payload=True)
         elif cmd == "notary.diagram_save":

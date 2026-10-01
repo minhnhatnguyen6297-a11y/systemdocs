@@ -87,10 +87,11 @@
     },
     "person_row": {
       "type": "object",
+      "description": "MIN-141 đợt 3: emit thêm loai_giay_to/loai_dia_chi (giá trị xác nhận hoặc suy theo mốc ngay_cap 01/10/2024; người chết server không tự suy). Payload input còn chấp nhận key canonical liền không dấu — ten/gioitinh/ngaysinh/ngaychet/sogiayto/ngaycap/noicap/diachi/loaigiayto/loaidiachi — tới cùng trường; mang cả hai spelling mà giá trị lệch → validation_error.",
       "required": [
         "row_id", "entity_id", "ho_ten", "gioi_tinh", "ngay_sinh",
         "ngay_chet", "so_giay_to", "ngay_cap", "noi_cap", "dia_chi",
-        "place_of_origin"
+        "place_of_origin", "loai_giay_to", "loai_dia_chi"
       ],
       "additionalProperties": false,
       "properties": {
@@ -104,7 +105,19 @@
         "ngay_cap": { "$ref": "#/definitions/date_or_year" },
         "noi_cap": { "$ref": "#/definitions/nullable_string" },
         "dia_chi": { "$ref": "#/definitions/nullable_string" },
-        "place_of_origin": { "$ref": "#/definitions/nullable_string" }
+        "place_of_origin": { "$ref": "#/definitions/nullable_string" },
+        "loai_giay_to": { "$ref": "#/definitions/nullable_string" },
+        "loai_dia_chi": { "$ref": "#/definitions/nullable_string" },
+        "ten": { "$ref": "#/definitions/non_empty_string" },
+        "gioitinh": { "enum": ["Nam", "Nữ", null] },
+        "ngaysinh": { "$ref": "#/definitions/date_or_year" },
+        "ngaychet": { "$ref": "#/definitions/date_or_year" },
+        "sogiayto": { "$ref": "#/definitions/nullable_string" },
+        "ngaycap": { "$ref": "#/definitions/date_or_year" },
+        "noicap": { "$ref": "#/definitions/nullable_string" },
+        "diachi": { "$ref": "#/definitions/nullable_string" },
+        "loaigiayto": { "$ref": "#/definitions/nullable_string" },
+        "loaidiachi": { "$ref": "#/definitions/nullable_string" }
       }
     },
     "land_row": {

@@ -450,6 +450,62 @@ def test_workspace_commit_stage_bad_payload_shape(adapter_db):
         assert exc2.value.code == "validation_error", bad_stage
 
 
+# ------------------------------------- payload.case qua commit (MIN-141 đợt 3)
+
+
+def test_workspace_commit_stage_case_meta_passes_through(adapter_db):
+    """payload.case di tu adapter → service → commit cung transaction:
+    ghi cot hồ so + snapshot payload.case canonical; get() emit lai."""
+    case, deceased, prop = _seed_case(adapter_db)
+    uq = Customer(ho_ten="Nguoi Uy Quyen", gioi_tinh="Nu")
+    adapter_db.add(uq)
+    adapter_db.commit()  # adapter mo session rieng — phai commit
+    stage = {"people": [_person_row(entity_id=deceased.id)],
+             "assets": [_asset_row(entity_id=prop.id)],
+             "owner_row_id": None}
+    stage["owner_row_id"] = stage["people"][0]["row_id"]
+    res = notary_adapter.workspace_commit_stage(_Job(), {
+        "case_id": case.id, "base_revision": 1, "stage": stage,
+        # canonical key — adapter khong doi ten, service fold ve snake.
+        "case": {"noiniemyet": "UBND xa Test",
+                 "nguoinhanuyquyenid": uq.id,
+                 "noidungviec": "Dinh chinh nam sinh",
+                 "ghichu": "ghi chu"}})
+    assert res["data"]["revision"] == 2
+    adapter_db.refresh(case)
+    assert case.noi_niem_yet == "UBND xa Test"
+    assert case.nguoi_nhan_uy_quyen == "Nguoi Uy Quyen"
+    assert case.nguoi_nhan_uy_quyen_id == uq.id
+    assert case.noi_dung_viec == "Dinh chinh nam sinh"
+
+    got = notary_adapter.workspace_get(_Job(), {"case_id": case.id})
+    c = got["data"]["case"]
+    assert c["noi_niem_yet"] == "UBND xa Test"
+    assert c["nguoi_nhan_uy_quyen_id"] == uq.id
+    assert c["noi_dung_viec"] == "Dinh chinh nam sinh"
+
+
+def test_workspace_commit_stage_case_meta_invalid_maps_error(adapter_db):
+    """payload.case sai shape/id → CommandError validation_error, khong
+    ghi Stage."""
+    case, deceased, prop = _seed_case(adapter_db)
+    stage = {"people": [_person_row(entity_id=deceased.id)],
+             "assets": [_asset_row(entity_id=prop.id)]}
+    stage["owner_row_id"] = stage["people"][0]["row_id"]
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.workspace_commit_stage(_Job(), {
+            "case_id": case.id, "base_revision": 1, "stage": stage,
+            "case": "khong-phai-object"})
+    assert exc.value.code == "validation_error"
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.workspace_commit_stage(_Job(), {
+            "case_id": case.id, "base_revision": 1, "stage": stage,
+            "case": {"nguoinhanuyquyenid": 999999}})
+    assert exc.value.code == "validation_error"
+    adapter_db.refresh(case)
+    assert case.workspace_revision == 1  # rollback tron ven
+
+
 # ------------------------------------------------- diagram_evaluate / save
 
 

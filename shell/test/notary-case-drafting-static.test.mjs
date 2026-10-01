@@ -384,10 +384,17 @@ test('MIN-133 D1/D2/D4: view không còn cột noi_cap/place_of_origin, card met
   const keys = [...cols[1].matchAll(/\['(\w+)'/g)].map((m) => m[1]);
   assert.deepEqual(keys, ['ho_ten', 'gioi_tinh', 'ngay_sinh', 'ngay_chet',
     'so_giay_to', 'ngay_cap', 'dia_chi']);
-  for (const bad of ['draftMetaEl', 'Thông tin hồ sơ', 'ab-back', 'ab-title',
+  for (const bad of ['draftMetaEl', 'ab-back', 'ab-title',
                      'Soạn văn bản', 'Nháp — chưa lưu', 'saveStateText',
                      'js-cd-save-state']) {
     assert.ok(!viewCode.includes(bad), `view còn "${bad}"`);
+  }
+  // MIN-141 đợt 3: meta hồ sơ quay lại như 3 dòng trong card Tài sản
+  // (.cd-casemeta) — KHÔNG phải card đứng riêng như draftMetaEl cũ.
+  assert.match(viewCode, /cd-casemeta/, 'thiếu block meta .cd-casemeta');
+  for (const f of ['meta:noi_niem_yet', 'meta:nguoi_nhan_uy_quyen',
+                   'meta:noi_dung_viec']) {
+    assert.ok(viewCode.includes(f), `view thiếu ${f}`);
   }
   // Model vẫn giữ trường wire (không đổi model/contract).
   assert.match(modelSrc, /'noi_cap'/);

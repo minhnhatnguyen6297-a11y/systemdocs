@@ -78,7 +78,25 @@ NODE_FIELDS = {"id", "personId", "parentSlotIds", "spouseSlotId",
 NODE_FIELDS_TWO_PARTY = {"id", "personId", "hidden", "deleted"}
 PERSON_FIELDS = ("row_id", "entity_id", "ho_ten", "gioi_tinh", "ngay_sinh",
                  "ngay_chet", "so_giay_to", "ngay_cap", "noi_cap",
-                 "dia_chi", "place_of_origin")
+                 "dia_chi", "place_of_origin",
+                 # đợt 3 (MIN-141): emit thêm; payload nhận cả canonical
+                 "loai_giay_to", "loai_dia_chi")
+# Canonical key → legacy (contract §4.1; parity case_workspace._PERSON_KEY_ALIASES)
+PERSON_CANON = {
+    "ten": "ho_ten", "gioitinh": "gioi_tinh", "ngaysinh": "ngay_sinh",
+    "ngaychet": "ngay_chet", "sogiayto": "so_giay_to",
+    "ngaycap": "ngay_cap", "noicap": "noi_cap", "diachi": "dia_chi",
+    "loaigiayto": "loai_giay_to", "loaidiachi": "loai_dia_chi",
+}
+# Canonical key → legacy cho payload.case (contract §6; parity
+# case_workspace._CASE_META_KEY_ALIASES)
+CASE_META_CANON = {
+    "casetype": "case_type", "documenttype": "document_type",
+    "ngaylaphoso": "ngay_lap_ho_so", "noiniemyet": "noi_niem_yet",
+    "nguoinhanuyquyen": "nguoi_nhan_uy_quyen",
+    "nguoinhanuyquyenid": "nguoi_nhan_uy_quyen_id",
+    "noidungviec": "noi_dung_viec", "ghichu": "ghi_chu",
+}
 ASSET_FIELDS = ("row_id", "entity_id", "so_serial",
                 "so_vao_so", "so_thua_dat", "so_to_ban_do", "dia_chi",
                 "loai_so", "hinh_thuc_su_dung", "thoi_han", "nguon_goc",
@@ -179,6 +197,13 @@ class _MockState:
     def __init__(self, seed=None):
         self._lock = threading.Lock()
         self._next_entity_id = 500
+        # đợt 3 (MIN-141): danh ba gia cho dropdown uy quyen — seed tu
+        # fixture key "customers" (list) neu co, mac dinh rong.
+        self._next_customer_id = 900
+        self.customers = {}
+        for c in (seed or {}).get("customers") or []:
+            if isinstance(c, dict) and c.get("id") is not None:
+                self.customers[int(c["id"])] = dict(c)
         # idempotency_key -> case_id (workspace_create replay, §4.3)
         self._idempotency = {}
         raw = (seed or {}).get("cases") or _load_default_cases()
@@ -197,6 +222,9 @@ class _MockState:
         case.setdefault("revision", 1)
         case.setdefault("ngay_lap_ho_so", None)
         case.setdefault("noi_niem_yet", None)
+        case.setdefault("nguoi_nhan_uy_quyen", None)
+        case.setdefault("nguoi_nhan_uy_quyen_id", None)
+        case.setdefault("noi_dung_viec", None)
         case.setdefault("ghi_chu", None)
         stage = case.setdefault("stage", {"people": [], "assets": []})
         stage.setdefault("people", [])
@@ -864,6 +892,10 @@ def _validate_stage(stage, case_type):
 
     people_norm = []
     for i, r in enumerate(people):
+        if isinstance(r, dict):
+            # đợt 3: fold key canonical -> legacy trước validate
+            # (parity case_workspace.commit_stage).
+            r = _fold_canon(r, PERSON_CANON, f"people[{i}]")
         rid = r.get("row_id") if isinstance(r, dict) else None
         w = _err_row(rid, f"people[{i}]")
         if not isinstance(r, dict):
@@ -907,7 +939,7 @@ def _validate_stage(stage, case_type):
                 errs.append(_err(w, f, "invalid_date",
                                  f"{f} phải YYYY-MM-DD/YYYY/null"))
         for f in ("so_giay_to", "noi_cap", "dia_chi",
-                  "place_of_origin"):
+                  "place_of_origin", "loai_giay_to", "loai_dia_chi"):
             _nullable(r, f, w)
         sgt = r.get("so_giay_to")
         if isinstance(sgt, str) and sgt.strip():
@@ -1087,6 +1119,62 @@ def case_list(job, payload):
     return _result("case_list", {"cases": items, "total": len(items)})
 
 
+def customer_list(job, payload):
+    """notary.customer_list mock (MIN-141 đợt 3): danh bạ người nhận ủy
+    quyền — lọc theo tên/số giấy tờ/địa chỉ như search_customers."""
+    st = _state()
+    q = str((payload or {}).get("query") or "").strip().lower()
+    limit = max(1, min(int((payload or {}).get("limit") or 50), 200))
+    rows = sorted(st.customers.values(), key=lambda c: c["ho_ten"])
+    if q:
+        rows = [c for c in rows if q in str(c.get("ho_ten") or "").lower()
+                or q in str(c.get("so_giay_to") or "").lower()
+                or q in str(c.get("dia_chi") or "").lower()]
+    rows = [copy.deepcopy(c) for c in rows[:limit]]
+    job.check_cancel()
+    return _result("customer_list", {"customers": rows,
+                                     "total": len(rows)})
+
+
+def customer_create(job, payload):
+    """notary.customer_create mock (MIN-141 đợt 3): upsert theo
+    so_giay_to; thieu → tao moi trong danh ba gia."""
+    p = payload or {}
+    name = str(p.get("ho_ten") or "").strip()
+    if not name:
+        raise CommandError("validation_error", "ho_ten bắt buộc")
+    st = _state()
+    with st._lock:
+        sgt = str(p.get("so_giay_to") or "").strip() or None
+        existing = None
+        if sgt:
+            existing = next(
+                (c for c in st.customers.values()
+                 if c.get("so_giay_to") == sgt), None)
+        if existing is not None:
+            existing["ho_ten"] = name
+            job.check_cancel()
+            return _result("customer_upsert",
+                           {"customer": copy.deepcopy(existing),
+                            "updated": True})
+        cid = st._next_customer_id
+        st._next_customer_id += 1
+        cust = {
+            "id": cid, "ho_ten": name,
+            "gioi_tinh": p.get("gioi_tinh") or None,
+            "ngay_sinh": p.get("ngay_sinh") or None,
+            "ngay_chet": p.get("ngay_chet") or None,
+            "so_giay_to": sgt,
+            "ngay_cap": p.get("ngay_cap") or None,
+            "dia_chi": str(p.get("dia_chi") or "").strip() or None,
+        }
+        st.customers[cid] = cust
+        job.check_cancel()
+        return _result("customer_upsert",
+                       {"customer": copy.deepcopy(cust),
+                        "updated": False})
+
+
 def _workspace_data(cid, case):
     """result.data cua workspace_get/workspace_create — §4 + §4.3 + §13."""
     ct = case.get("case_type")
@@ -1114,6 +1202,9 @@ def _workspace_data(cid, case):
             "revision": case.get("revision"),
             "ngay_lap_ho_so": case.get("ngay_lap_ho_so"),
             "noi_niem_yet": case.get("noi_niem_yet"),
+            "nguoi_nhan_uy_quyen": case.get("nguoi_nhan_uy_quyen"),
+            "nguoi_nhan_uy_quyen_id": case.get("nguoi_nhan_uy_quyen_id"),
+            "noi_dung_viec": case.get("noi_dung_viec"),
             "ghi_chu": case.get("ghi_chu"),
         },
         "stage": stage_out,
@@ -1142,7 +1233,88 @@ def workspace_get(job, payload):
 
 
 _CASE_META_FIELDS = ("document_type", "ngay_lap_ho_so",
-                     "noi_niem_yet", "ghi_chu", "case_type")
+                     "noi_niem_yet", "ghi_chu", "case_type",
+                     # đợt 3: meta moi trong payload.case create/commit
+                     "nguoi_nhan_uy_quyen", "nguoi_nhan_uy_quyen_id",
+                     "noi_dung_viec")
+
+
+def _fold_canon(obj, canon, where):
+    """Fold key canonical -> legacy; cùng mang mà giá trị lệch →
+    validation_error (parity _fold_key_aliases)."""
+    if not isinstance(obj, dict):
+        return obj
+    obj = dict(obj)
+    for ck, lk in canon.items():
+        if ck in obj:
+            cv = obj.pop(ck)
+            if lk in obj and obj[lk] != cv:
+                raise CommandError(
+                    "validation_error",
+                    f"{where}: {ck} và {lk} mang giá trị mâu thuẫn")
+            obj[lk] = cv
+    return obj
+
+
+def _apply_case_meta(case, cm, where="payload.case"):
+    """Validate + ghi meta đợt 3 (parity _validate_case_meta commit path):
+    case_type/document_type gửi kèm phải khớp giá trị đã lưu."""
+    cm = _fold_canon(cm, CASE_META_CANON, where)
+    extra = set(cm) - set(_CASE_META_FIELDS)
+    if extra:
+        raise CommandError("validation_error",
+                           f"{where} key lạ: {sorted(extra)}")
+    for f in ("case_type", "document_type"):
+        v = cm.get(f)
+        if v is not None and v != case.get(f):
+            raise CommandError(
+                "validation_error",
+                f"{where}.{f}={v!r} khác giá trị đã lưu "
+                f"{case.get(f)!r} (immutable)")
+    nl = cm.get("ngay_lap_ho_so")
+    if nl is not None and not (
+            isinstance(nl, str) and DATE_FULL_RX.match(nl)):
+        raise CommandError("validation_error",
+                           "ngay_lap_ho_so phải YYYY-MM-DD/null")
+    uq_id = cm.get("nguoi_nhan_uy_quyen_id")
+    uq_name = cm.get("nguoi_nhan_uy_quyen")
+    cust = None
+    if uq_id is not None:
+        if not (isinstance(uq_id, int) and not isinstance(uq_id, bool)
+                and uq_id >= 1):
+            raise CommandError(
+                "validation_error",
+                "nguoi_nhan_uy_quyen_id phải là int >= 1/null")
+        # Parity _resolve_auth_recipient: id phai ton tai trong danh ba
+        # gia; kem ten ma lech master → loi; id co → ten = master.
+        cust = _state().customers.get(uq_id)
+        if cust is None:
+            raise CommandError(
+                "validation_error",
+                f"nguoi_nhan_uy_quyen_id {uq_id} không tồn tại "
+                "trong danh bạ")
+        if uq_name is not None and uq_name != cust.get("ho_ten"):
+            raise CommandError(
+                "validation_error",
+                "nguoi_nhan_uy_quyen và nguoi_nhan_uy_quyen_id "
+                "mâu thuẫn nhau")
+        uq_name = cust.get("ho_ten")
+    for f in ("noi_niem_yet", "ghi_chu", "nguoi_nhan_uy_quyen",
+              "noi_dung_viec"):
+        v = cm.get(f)
+        if v is not None and (
+                not isinstance(v, str) or not v.strip()):
+            raise CommandError("validation_error",
+                               f"{f} phải là chuỗi non-empty/null")
+    # Real parity: payload.case là block meta đầy đủ — field vắng mặt
+    # ghi None; ngay_lap_ho_so null = giữ nguyên (cột NOT NULL).
+    if nl is not None:
+        case["ngay_lap_ho_so"] = nl
+    case["noi_niem_yet"] = cm.get("noi_niem_yet")
+    case["nguoi_nhan_uy_quyen"] = uq_name
+    case["nguoi_nhan_uy_quyen_id"] = cust["id"] if cust else uq_id
+    case["noi_dung_viec"] = cm.get("noi_dung_viec")
+    case["ghi_chu"] = cm.get("ghi_chu")
 
 
 def workspace_create(job, payload):
@@ -1170,6 +1342,7 @@ def workspace_create(job, payload):
         if not isinstance(cm, dict):
             raise CommandError("validation_error",
                                "payload.case phải là object")
+        cm = _fold_canon(cm, CASE_META_CANON, "payload.case")
         extra = set(cm) - set(_CASE_META_FIELDS)
         if extra:
             raise CommandError(
@@ -1191,13 +1364,38 @@ def workspace_create(job, payload):
                 isinstance(nl, str) and DATE_FULL_RX.match(nl)):
             raise CommandError("validation_error",
                                "ngay_lap_ho_so phải YYYY-MM-DD/null")
-        for f in ("noi_niem_yet", "ghi_chu"):
+        for f in ("noi_niem_yet", "ghi_chu", "nguoi_nhan_uy_quyen",
+                  "noi_dung_viec"):
             v = cm.get(f)
             if v is not None and (
                     not isinstance(v, str) or not v.strip()):
                 raise CommandError(
                     "validation_error",
                     f"{f} phải là chuỗi non-empty/null")
+        uq_id = cm.get("nguoi_nhan_uy_quyen_id")
+        uq_name = cm.get("nguoi_nhan_uy_quyen")
+        uq_cust = None
+        if uq_id is not None:
+            if not (isinstance(uq_id, int) and not isinstance(uq_id, bool)
+                    and uq_id >= 1):
+                raise CommandError(
+                    "validation_error",
+                    "nguoi_nhan_uy_quyen_id phải là int >= 1/null")
+            # Parity _resolve_auth_recipient: id ton tai trong danh ba
+            # gia; kem ten lech master → loi; id co → ten = master.
+            uq_cust = st.customers.get(uq_id)
+            if uq_cust is None:
+                raise CommandError(
+                    "validation_error",
+                    f"nguoi_nhan_uy_quyen_id {uq_id} không tồn tại "
+                    "trong danh bạ")
+            if uq_name is not None and \
+                    uq_name != uq_cust.get("ho_ten"):
+                raise CommandError(
+                    "validation_error",
+                    "nguoi_nhan_uy_quyen và nguoi_nhan_uy_quyen_id "
+                    "mâu thuẫn nhau")
+            uq_name = uq_cust.get("ho_ten")
 
         stage = p.get("stage")
         errs, people_norm, assets_norm = _validate_stage(stage, ct)
@@ -1307,6 +1505,9 @@ def workspace_create(job, payload):
             "revision": 1,
             "ngay_lap_ho_so": nl,
             "noi_niem_yet": cm.get("noi_niem_yet"),
+            "nguoi_nhan_uy_quyen": uq_name,
+            "nguoi_nhan_uy_quyen_id": uq_cust["id"] if uq_cust else uq_id,
+            "noi_dung_viec": cm.get("noi_dung_viec"),
             "ghi_chu": cm.get("ghi_chu"),
             "stage": stage_store,
             "diagram": {
@@ -1483,6 +1684,14 @@ def workspace_commit_stage(job, payload):
     _check_writable(case)
     _check_base_revision(case, payload)
     ct = case["case_type"]
+    # đợt 3: payload.case optional — meta ghi cùng transaction (validate
+    # trước stage để fail kịch bản nào cũng không ghi — parity real).
+    case_meta = (payload or {}).get("case")
+    if case_meta is not None:
+        if not isinstance(case_meta, dict):
+            raise CommandError("validation_error",
+                               "payload.case phải là object")
+        _apply_case_meta(case, case_meta)
     stage = (payload or {}).get("stage")
     errs, people_norm, assets_norm = _validate_stage(stage, ct)
     if errs:

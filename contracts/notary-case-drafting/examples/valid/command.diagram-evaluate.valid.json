@@ -38,7 +38,10 @@
           {
             "id": "child_1",
             "personId": "33333333-3333-4333-8333-333333333333",
-            "parentSlotIds": ["owner", "spouse"],
+            "parentSlotIds": [
+              "owner",
+              "spouse"
+            ],
             "spouseSlotId": null,
             "isLandOwner": false,
             "willReceive": true,
@@ -48,7 +51,10 @@
           {
             "id": "child_2",
             "personId": null,
-            "parentSlotIds": ["owner", "spouse"],
+            "parentSlotIds": [
+              "owner",
+              "spouse"
+            ],
             "spouseSlotId": null,
             "isLandOwner": false,
             "willReceive": true,
@@ -59,5 +65,8 @@
       }
     }
   },
-  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+  "client_meta": {
+    "shell_version": "0.1.0",
+    "module": "document-review"
+  }
 }

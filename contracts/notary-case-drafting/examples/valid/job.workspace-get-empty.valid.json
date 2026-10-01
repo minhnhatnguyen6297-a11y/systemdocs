@@ -19,17 +19,32 @@
         "revision": 1,
         "ngay_lap_ho_so": null,
         "noi_niem_yet": null,
-        "ghi_chu": null
+        "ghi_chu": null,
+        "nguoi_nhan_uy_quyen": null,
+        "nguoi_nhan_uy_quyen_id": null,
+        "noi_dung_viec": null
       },
-      "stage": { "people": [], "assets": [] },
+      "stage": {
+        "people": [],
+        "assets": []
+      },
       "diagram": {
         "domain": "inheritance",
-        "state": { "version": 2, "nodes": [] },
+        "state": {
+          "version": 2,
+          "nodes": []
+        },
         "render_model": null,
         "warnings": []
       },
       "capabilities": {
-        "intake": ["image", "pdf", "docx", "xlsx", "text"],
+        "intake": [
+          "image",
+          "pdf",
+          "docx",
+          "xlsx",
+          "text"
+        ],
         "diagram": true,
         "word_export": true
       }

@@ -4,7 +4,11 @@
   "command_id": "a1b2c3d4-0014-4014-8014-000000000014",
   "status": "canceled",
   "waiting_on": null,
-  "progress": { "done": 1, "total": 2, "current_label": "Đã hủy sau văn bản 1" },
+  "progress": {
+    "done": 1,
+    "total": 2,
+    "current_label": "Đã hủy sau văn bản 1"
+  },
   "result": {
     "kind": "word_export_batch",
     "data": {
@@ -36,9 +40,13 @@
         }
       ],
       "breakdown": {
-        "succeeded": ["khai_nhan_di_san"],
+        "succeeded": [
+          "khai_nhan_di_san"
+        ],
         "failed": [],
-        "skipped": ["thoa_thuan_phan_chia"]
+        "skipped": [
+          "thoa_thuan_phan_chia"
+        ]
       }
     },
     "warnings": []

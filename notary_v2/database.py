@@ -91,6 +91,7 @@ def migrate_inheritance_cases_schema():
     _ensure_table_columns(cur, "inheritance_cases", {
         "noi_niem_yet": "VARCHAR(200)",
         "nguoi_nhan_uy_quyen": "VARCHAR(200)",
+        "nguoi_nhan_uy_quyen_id": "INTEGER",
         "noi_dung_viec": "TEXT",
         "engine_state_json": "TEXT",
         "case_state_json": "TEXT",

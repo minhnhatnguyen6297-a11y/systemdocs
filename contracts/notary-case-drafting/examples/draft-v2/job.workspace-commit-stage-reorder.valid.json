@@ -29,7 +29,9 @@
             "ngay_cap": null,
             "noi_cap": null,
             "dia_chi": "Số 1 phố Huế, Hà Nội",
-            "place_of_origin": null
+            "place_of_origin": null,
+            "loai_giay_to": null,
+            "loai_dia_chi": null
           },
           {
             "row_id": "22222222-2222-4222-8222-222222222222",
@@ -42,7 +44,9 @@
             "ngay_cap": null,
             "noi_cap": null,
             "dia_chi": "Số 1 phố Huế, Hà Nội",
-            "place_of_origin": null
+            "place_of_origin": null,
+            "loai_giay_to": null,
+            "loai_dia_chi": null
           }
         ],
         "assets": [
@@ -93,7 +97,11 @@
             "ngay_cap": "2005-09-30",
             "co_quan_cap": "UBND quận Hai Bà Trưng",
             "land_rows": [
-              { "loai_dat": "ODT", "dien_tich": 85.5, "thoi_han": "Lâu dài" }
+              {
+                "loai_dat": "ODT",
+                "dien_tich": 85.5,
+                "thoi_han": "Lâu dài"
+              }
             ]
           }
         ]
@@ -108,7 +116,10 @@
               "personId": "11111111-1111-4111-8111-111111111111",
               "parentSlotIds": [],
               "spouseSlotId": "spouse",
-              "ownPositions": [1, 2],
+              "ownPositions": [
+                1,
+                2
+              ],
               "receivePositions": [],
               "hidden": false,
               "deleted": false
@@ -119,7 +130,9 @@
               "parentSlotIds": [],
               "spouseSlotId": "owner",
               "ownPositions": [],
-              "receivePositions": [1],
+              "receivePositions": [
+                1
+              ],
               "hidden": false,
               "deleted": false
             }
@@ -130,8 +143,10 @@
           "status": "complete",
           "allocations": {
             "22222222-2222-4222-8222-222222222222": {
-              "baseShare": "1", "inheritedShare": "0",
-              "distributedShare": "0", "finalShare": "1",
+              "baseShare": "1",
+              "inheritedShare": "0",
+              "distributedShare": "0",
+              "finalShare": "1",
               "displayPercent": "100.00"
             }
           },
@@ -141,7 +156,8 @@
               "total": "1",
               "terms": [
                 {
-                  "kind": "base", "fraction": "1",
+                  "kind": "base",
+                  "fraction": "1",
                   "sourcePersonId": "11111111-1111-4111-8111-111111111111",
                   "viaBranchPersonIds": []
                 }
@@ -152,7 +168,11 @@
           "warnings": [],
           "errors": [],
           "unresolvedEstates": [],
-          "conservation": { "allocated": "1", "unresolved": "0", "total": "1" }
+          "conservation": {
+            "allocated": "1",
+            "unresolved": "0",
+            "total": "1"
+          }
         }
       }
     }

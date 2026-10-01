@@ -726,18 +726,37 @@ def _add_word_person_group(
 
 
 def _deceased_landowner_clauses(people: list[WordPerson]) -> str:
+    """Dòng khai tử chủ đất chết — ghép từ field đã commit của người
+    (MIN-141 đợt 3): loại giấy tờ/nơi cấp lấy bằng chứng xác nhận trong
+    snapshot; phần nào chưa có thì lược bỏ, KHÔNG gán cứng "Trích lục
+    khai tử (Bản sao)" hay suy tên UBND xã."""
     lines = []
     for p in people:
         title = _title_for_person(p)
         born = _fmt_birth_or_year(p.ngay_sinh)
         died = _fmt_date(p.ngay_chet)
         doc_no = _safe_text(p.so_giay_to)
+        doc_type = _safe_text(p.loai_giay_to)
+        issuer = _safe_text(p.noi_cap)
         issued = _fmt_date(p.ngay_cap)
         address = _safe_text(p.dia_chi)
         line = f"{title} {p.ho_ten}"
         if born:
             line += f"; Sinh năm: {born}"
-        line += f"; chết ngày {died} theo Trích lục khai tử (Bản sao) số {doc_no} do Ủy ban nhân dân xã [Nơi niêm yết], tỉnh Ninh Bình ký ngày {issued}. Nơi chết: {address}."
+        line += f"; chết ngày {died}"
+        if doc_type or doc_no or issuer or issued:
+            tail = " theo"
+            tail += f" {doc_type}" if doc_type else " giấy tờ khai tử"
+            if doc_no:
+                tail += f" số {doc_no}"
+            if issuer:
+                tail += f" do {issuer}"
+            if issued:
+                tail += f" ký ngày {issued}"
+            line += tail
+        line += "."
+        if address:
+            line += f" Nơi chết: {address}."
         lines.append(line)
     return "\n".join(lines)
 
@@ -1245,7 +1264,24 @@ def build_template_mapping(case: Any, today: date | None = None) -> dict[str, st
     for idx, c in enumerate(people_4_plus[:17], start=4):
         people_slots[idx] = c
 
-    noi_niem_yet = _safe_text(getattr(case, "noi_niem_yet", "")) or _safe_text(getattr(ts, "dia_chi", ""))
+    # Metadata hồ sơ (MIN-141 đợt 3): snapshot `payload.case` đã commit
+    # là nguồn đọc chính — cột live chỉ fallback cho hồ sơ cũ chưa qua
+    # commit_stage sau khi nâng cấp. `[Nơi niêm yết]` KHÔNG còn đắp từ
+    # địa chỉ đất: chưa tra cứu được → để trống, không tự khẳng định.
+    snap_case = _load_case_state(case).get("case")
+    snap_case = snap_case if isinstance(snap_case, dict) else {}
+    noi_niem_yet = (
+        _safe_text(snap_case.get("noiniemyet"))
+        or _safe_text(getattr(case, "noi_niem_yet", "")))
+    _uq_snap = snap_case.get("nguoinhanuyquyen")
+    nguoi_nhan_uy_quyen = (
+        _safe_text((_uq_snap or {}).get("ten"))
+        if isinstance(_uq_snap, dict)
+        else _safe_text(_uq_snap)) or _safe_text(
+            getattr(case, "nguoi_nhan_uy_quyen", ""))
+    noi_dung_viec = (
+        _safe_text(snap_case.get("noidungviec"))
+        or _safe_text(getattr(case, "noi_dung_viec", "")))
     land_rows = _committed_land_rows(ts)
     if land_rows:
         total = 0.0
@@ -1290,8 +1326,9 @@ def build_template_mapping(case: Any, today: date | None = None) -> dict[str, st
         "[Tháng]": f"{today.month:02d}",
         "[Ngày chữ]": _so_thanh_chu(today.day),
         "[Tháng chữ]": _so_thanh_chu(today.month),
-        "[Ngườ ủy quyền]": "",
-        "[Ngườ ủy quyền2]": "",
+        "[Ngườ ủy quyền]": nguoi_nhan_uy_quyen,
+        "[Ngườ ủy quyền2]": nguoi_nhan_uy_quyen,
+        "[Nội dung việc]": noi_dung_viec,
         "[Số công chứng]": "",
         "[ONT]": "",
         "[CLN]": "",

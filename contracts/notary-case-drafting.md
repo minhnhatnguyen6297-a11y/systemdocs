@@ -200,6 +200,11 @@ result.data:
     revision: <int ≥ 1>
     ngay_lap_ho_so: <YYYY-MM-DD | null>   # ngày lập hồ sơ (rev 1.1)
     noi_niem_yet: <string | null>        # nơi niêm yết (rev 1.1)
+    nguoi_nhan_uy_quyen: <string | null>  # tên người nhận ủy quyền —
+                                        # denormalized từ danh bạ (đợt 3)
+    nguoi_nhan_uy_quyen_id: <int | null>  # tham chiếu ổn định tới
+                                        # customers.id (đợt 3)
+    noi_dung_viec: <string | null>       # cụm nội dung việc (đợt 3)
     ghi_chu: <string | null>             # ghi chú hồ sơ (rev 1.1)
   stage:
     people: [<person_row>]         # §4.1
@@ -244,11 +249,32 @@ person_row:
   noi_cap: <string | null>
   dia_chi: <string | null>
   place_of_origin: <string | null>
+  loai_giay_to: <string | null>      # (đợt 3) loại giấy tờ ĐÃ XÁC NHẬN —
+                                     # người chết: lựa chọn/OCR của user;
+                                     # người sống: server suy theo mốc
+                                     # ngay_cap 01/10/2024 khi trống
+  loai_dia_chi: <string | null>      # (đợt 3) nhãn địa chỉ — Thường trú
+                                     # tại/Cư trú tại/Nơi chết; server suy
+                                     # khi trống
 ```
 
 Không thêm field ngoài danh sách này — producer strip field lạ (tiền lệ
 backend hiện strip ngoài 10 key). `ho_ten` rỗng/`""` →
 `stage_validation_error{field:ho_ten, code:required}`.
+
+- **Key canonical (MIN-141 đợt 3):** server đọc được cả key wire legacy
+  trên và tên nghiệp vụ canonical liền không dấu (entities.md §9.1):
+  `ten`↔`ho_ten`, `gioitinh`↔`gioi_tinh`, `ngaysinh`↔`ngay_sinh`,
+  `ngaychet`↔`ngay_chet`, `sogiayto`↔`so_giay_to`, `ngaycap`↔`ngay_cap`,
+  `noicap`↔`noi_cap`, `diachi`↔`dia_chi`, `loaigiayto`↔`loai_giay_to`,
+  `loaidiachi`↔`loai_dia_chi`. Cùng trường ở cả hai spelling mà giá trị
+  mâu thuẫn → `validation_error`. Wire emit giữ bộ legacy.
+- **Giá trị suy ra (đợt 3):** người sống thiếu `loai_giay_to`/`noi_cap`/
+  `loai_dia_chi` → server derive theo mốc `ngay_cap` 01/10/2024 và ghi
+  giá trị hiệu lực vào snapshot commit; thiếu `ngay_cap` → `null`
+  (chưa xác định, không suy). Người chết (`ngay_chet` ≠ null): server
+  KHÔNG tự suy — chỉ giữ giá trị người dùng xác nhận; `loai_dia_chi`
+  mặc định `"Nơi chết"`.
 
 ### 4.2 `asset_row` — dòng Tài sản Stage
 
@@ -299,6 +325,14 @@ payload:
     document_type: khai_nhan | thoa_thuan    # bắt buộc
     ngay_lap_ho_so: <YYYY-MM-DD | null>      # optional, default null
     noi_niem_yet: <string | null>            # optional, default null
+    nguoi_nhan_uy_quyen: <string | null>     # (đợt 3) tên người được ủy
+                                           # quyền — optional
+    nguoi_nhan_uy_quyen_id: <int | null>     # (đợt 3) customers.id — tham
+                                           # chiếu ổn định; id có → tên
+                                           # resolve theo danh bạ, id sai →
+                                           # validation_error; name+id lệch
+                                           # nhau → validation_error
+    noi_dung_viec: <string | null>           # (đợt 3) cụm nội dung việc
     ghi_chu: <string | null>                 # optional, default null
   stage:
     people: [<person_row>]          # ≥1; entity_id phải null
@@ -438,6 +472,14 @@ result.data:
 payload:
   case_id: <int>
   base_revision: <int ≥ 1>
+  case:                             # (đợt 3) OPTIONAL — metadata hồ sơ
+                                    # ghi cùng Stage trong một transaction
+    ngay_lap_ho_so: <YYYY-MM-DD | null>    # null = giữ nguyên (NOT NULL)
+    noi_niem_yet: <string | null>          # canonical `noiniemyet` cũng OK
+    nguoi_nhan_uy_quyen: <string | null>   # `nguoinhanuyquyen`
+    nguoi_nhan_uy_quyen_id: <int | null>   # `nguoinhanuyquyenid`
+    noi_dung_viec: <string | null>         # `noidungviec`
+    ghi_chu: <string | null>               # `ghichu`
   stage:
     people: [<person_row>]
     assets: [<asset_row>]
@@ -462,6 +504,16 @@ result.data:
   Diagram đã prune** → `revision+1` → commit, trong **một
   transaction**. Một dòng sai → Stage không đổi. `render_model` mới được
   lưu cùng state để `workspace_get` luôn trả model khớp state hiện tại.
+- **`payload.case` (đợt 3):** metadata hồ sơ ghi cùng transaction —
+  validate fail hoặc stage fail → không cái nào ghi. `case_type`/
+  `document_type` gửi kèm phải khớp giá trị đã lưu (immutable qua
+  commit) — khác → `validation_error`. `nguoi_nhan_uy_quyen_id` phải
+  tồn tại trong `customers`; kèm `nguoi_nhan_uy_quyen` lệch tên master →
+  `validation_error`. Snapshot `case_state_json` đóng băng meta dưới
+  block `payload.case` với key **canonical**
+  (`noiniemyet`,`nguoinhanuyquyen:{id,ten}`,`noidungviec`,
+  `ngaylaphoso`,`ghichu`) — Word đọc meta từ block này trước, cột
+  `inheritance_cases` chỉ là fallback cho hồ sơ cũ.
 - `base_revision` khác `revision` hiện server — **nhỏ hơn HOẶC lớn
   hơn** — → `failed{code:workspace_conflict,
   details:{server_revision}}`. Không có ghi đè cưỡng bức — client tải
@@ -1188,6 +1240,9 @@ payload:
 | `asset.is_primary:bool` | — (bỏ) | asset `is_primary:true` → đứng vị trí 1; reorder mảng khi đọc hồ sơ cũ |
 | `stage` = `{people,assets}` | `{owner_row_id,people,assets}` | `owner_row_id := personId` của node `owner` persist; không có → `null` |
 | `payload.case` (create): meta-only | + `case_type` optional | default `"inheritance"` |
+| — | + `payload.case` (commit) optional | đợt 3: meta cùng Stage 1 transaction |
+| `case` emit: ngay_lap_ho_so/noi_niem_yet/ghi_chu | + `nguoi_nhan_uy_quyen(_id)`, `noi_dung_viec` | đợt 3 (canonical ↔ snake đọc được) |
+| `person_row` 10 key | + `loai_giay_to`, `loai_dia_chi` | đợt 3: bằng chứng xác nhận/suy theo mốc |
 | `diagram` (create): required | optional | server seed (§13.6) |
 | error: — | + `diagram_domain_mismatch`, `diagram_owner_mismatch` | §13.9 |
 | field_error: `primary_count` | thay bằng `asset_limit` / `people_limit` | `primary_count` không còn ở v2 |

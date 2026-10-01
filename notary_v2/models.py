@@ -41,34 +41,53 @@ class Customer(Base):
     @property
     def loai_giay_to(self):
         """Loại giấy tờ định danh.
-        - Người sống: Căn cước công dân (trước 01/10/2024) hoặc Căn cước (từ 01/10/2024).
-        - Người chết: Trích lục khai tử (Bản sao), Trích lục khai tử, Giấy chứng tử...
+        - Người sống: theo mốc `ngay_cap` 01/10/2024 → `Căn cước công dân`
+          (trước) / `Căn cước` (từ mốc); thiếu `ngay_cap` → None — chưa
+          xác định, không tự suy (MIN-141 đợt 3).
+        - Người chết: KHÔNG gán cứng — loại giấy khai tử lấy từ bằng chứng
+          OCR được xác nhận / lựa chọn lưu trong snapshot hồ sơ
+          (`stage[].loai_giay_to`); model trả None khi chưa có bằng chứng.
         """
         if not self.con_song:
-            return "Trích lục khai tử (Bản sao)"
+            return None
+        if not self.ngay_cap:
+            return None
         return "Căn cước" if self._moc_cccd_moi else "Căn cước công dân"
 
     @property
     def noi_cap(self):
         """Nơi cấp giấy tờ định danh.
-        - Người sống: Bộ Công an (từ 01/10/2024) hoặc Cục CSQLHC về TTXH (trước đó).
-        - Người chết: Mốc sáp nhập 01/07/2025 (UBND cấp xã trước/sau sáp nhập).
-        """
+        - Người sống: mốc `ngay_cap` 01/10/2024 → `Cục CSQLHC về TTXH`
+          (trước) / `Bộ Công an` (từ mốc); thiếu `ngay_cap` → None.
+        - Người chết: chưa có bảng xã NAIA-9 nên KHÔNG suy tên xã cũ/mới
+          — nơi cấp lấy từ snapshot/bằng chứng đã xác nhận; None khi
+          chưa có."""
         if not self.con_song:
-            from datetime import date
-            if self.ngay_cap and self.ngay_cap >= date(2025, 7, 1):
-                return "Ủy ban nhân dân cấp xã (sau sáp nhập)"
-            return "Ủy ban nhân dân cấp xã"
-        return "Bộ Công an" if self._moc_cccd_moi else "Cục cảnh sát quản lý hành chính về trật tự xã hội"
+            return None
+        if not self.ngay_cap:
+            return None
+        return ("Bộ Công an" if self._moc_cccd_moi
+                else "Cục cảnh sát quản lý hành chính về trật tự xã hội")
 
     @property
     def loaicutru(self):
-        """'Cư trú' (từ 01/10/2024) hoặc 'Thường trú' (trước đó)."""
+        """'Cư trú' (từ 01/10/2024) / 'Thường trú' (trước); 'Nơi chết' với
+        người chết (diachi = nơi chết/nơi thường trú cuối — entities.md
+        §8.1); thiếu `ngay_cap` người sống → None (chưa xác định)."""
+        if not self.con_song:
+            return "Nơi chết"
+        if not self.ngay_cap:
+            return None
         return "Cư trú" if self._moc_cccd_moi else "Thường trú"
 
     @property
     def loai_dia_chi(self):
-        """'Cư trú tại' (từ 01/10/2024) hoặc 'Thường trú tại' (trước đó)."""
+        """'Cư trú tại' / 'Thường trú tại' theo mốc 01/10/2024; 'Nơi chết'
+        với người chết; thiếu `ngay_cap` người sống → None."""
+        if not self.con_song:
+            return "Nơi chết"
+        if not self.ngay_cap:
+            return None
         return "Cư trú tại" if self._moc_cccd_moi else "Thường trú tại"
 
 
@@ -114,7 +133,8 @@ class InheritanceCase(Base):
     loai_van_ban     = Column(String(50), default="khai_nhan")   # khai_nhan / thoa_thuan
     trang_thai       = Column(String(20), default="draft")       # draft / locked
     noi_niem_yet     = Column(String(200), nullable=True)        # Tên xã/thị trấn nơi lập văn bản / nơi có đất
-    nguoi_nhan_uy_quyen = Column(String(200), nullable=True)     # Người nhận ủy quyền (danh mục quen/tạo mới)
+    nguoi_nhan_uy_quyen = Column(String(200), nullable=True)     # Người nhận ủy quyền (tên hiển thị — denormalized)
+    nguoi_nhan_uy_quyen_id = Column(Integer, ForeignKey("customers.id"), nullable=True)  # Tham chiếu ổn định tới danh bạ (MIN-141 đợt 3)
     noi_dung_viec       = Column(Text,        nullable=True)     # Cụm nội dung việc nhập thủ công
     ghi_chu          = Column(Text,    nullable=True)
     engine_state_json = Column(Text,   nullable=True)            # JSON state cua engine/sơ đồ thừa kế mới

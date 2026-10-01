@@ -195,6 +195,9 @@ def test_get_derives_stage_for_legacy_case_without_case_state(db):
         "revision": 1,
         "ngay_lap_ho_so": "2026-09-01",
         "noi_niem_yet": None,
+        "nguoi_nhan_uy_quyen": None,
+        "nguoi_nhan_uy_quyen_id": None,
+        "noi_dung_viec": None,
         "ghi_chu": None,
     }
     people = _workspace_people(data)

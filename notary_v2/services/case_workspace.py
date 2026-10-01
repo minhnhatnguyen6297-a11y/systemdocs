@@ -277,7 +277,7 @@ def _check_extra_keys(mapping: Any, allowed: set, where: str) -> None:
 def _person_contract_keys() -> tuple[str, ...]:
     return ("row_id", "entity_id", "ho_ten", "gioi_tinh", "ngay_sinh",
             "ngay_chet", "so_giay_to", "ngay_cap", "noi_cap", "dia_chi",
-            "place_of_origin")
+            "place_of_origin", "loai_giay_to", "loai_dia_chi")
 
 
 def _asset_contract_keys() -> tuple[str, ...]:
@@ -300,6 +300,60 @@ _LAND_ROW_KEY_SET = {"loaidat", "dientich", "thoihan",
                      "loai_dat", "dien_tich", "thoi_han"}
 _LAND_ROW_STR_KEYS = ("loai_dat", "loaidat", "thoi_han", "thoihan")
 _LAND_ROW_NUM_KEYS = ("dien_tich", "dientich")
+
+# Key người/hồ sơ canonical (MIN-141: viết thường, liền không dấu, không
+# `_` — entities.md §9.1) → key wire legacy snake_case (§4.1/§4.3). Cùng
+# pattern đợt 2: đọc được cả hai spelling, mâu thuẫn → validation error.
+_PERSON_KEY_ALIASES = {
+    "ten": "ho_ten", "gioitinh": "gioi_tinh", "ngaysinh": "ngay_sinh",
+    "ngaychet": "ngay_chet", "sogiayto": "so_giay_to",
+    "ngaycap": "ngay_cap", "noicap": "noi_cap", "diachi": "dia_chi",
+    "loaigiayto": "loai_giay_to", "loaidiachi": "loai_dia_chi",
+}
+_CASE_META_KEY_ALIASES = {
+    "casetype": "case_type", "documenttype": "document_type",
+    "ngaylaphoso": "ngay_lap_ho_so", "noiniemyet": "noi_niem_yet",
+    "nguoinhanuyquyen": "nguoi_nhan_uy_quyen",
+    "nguoinhanuyquyenid": "nguoi_nhan_uy_quyen_id",
+    "noidungviec": "noi_dung_viec", "ghichu": "ghi_chu",
+}
+
+
+def _fold_key_aliases(row: Any, aliases: Mapping[str, str],
+                      where: str) -> Any:
+    """Gộp key canonical về key wire legacy. Cả hai spelling cùng mang
+    giá trị khác nhau → validation_error (không âm thầm chọn một)."""
+    if not isinstance(row, Mapping):
+        return row
+    folded = dict(row)
+    for canon, legacy in aliases.items():
+        if canon not in folded:
+            continue
+        canon_v, legacy_v = folded.pop(canon), folded.get(legacy)
+        if (legacy_v is not None and canon_v is not None
+                and canon_v != legacy_v):
+            raise WorkspaceError(
+                "validation_error",
+                f"{where}: {canon} và {legacy} mang giá trị khác nhau")
+        folded[legacy] = canon_v if canon_v is not None else legacy_v
+    return folded
+
+
+def _case_meta_snapshot(case: Any) -> dict:
+    """Block `payload.case` trong case_state_json — key canonical
+    MIN-141. Word đọc meta từ đây (snapshot commit) thay vì cột live
+    khi block tồn tại."""
+    return {
+        "ngaylaphoso": _emit_date_or_year(
+            getattr(case, "ngay_lap_ho_so", None)),
+        "noiniemyet": _nn(getattr(case, "noi_niem_yet", None)),
+        "nguoinhanuyquyen": {
+            "id": getattr(case, "nguoi_nhan_uy_quyen_id", None),
+            "ten": _nn(getattr(case, "nguoi_nhan_uy_quyen", None)),
+        },
+        "noidungviec": _nn(getattr(case, "noi_dung_viec", None)),
+        "ghichu": _nn(getattr(case, "ghi_chu", None)),
+    }
 
 
 # ------------------------------------------------------- legacy → V2 diagram
@@ -917,6 +971,9 @@ class CaseWorkspaceService:
                 "revision": self._revision(case),
                 "ngay_lap_ho_so": _emit_date_or_year(case.ngay_lap_ho_so),
                 "noi_niem_yet": _nn(case.noi_niem_yet),
+                "nguoi_nhan_uy_quyen": _nn(case.nguoi_nhan_uy_quyen),
+                "nguoi_nhan_uy_quyen_id": case.nguoi_nhan_uy_quyen_id,
+                "noi_dung_viec": _nn(case.noi_dung_viec),
                 "ghi_chu": _nn(case.ghi_chu),
             },
         }
@@ -933,17 +990,43 @@ class CaseWorkspaceService:
         return data
 
     def commit_stage(self, case_id: int, base_revision: int,
-                     stage: Any) -> dict:
+                     stage: Any, case_meta: Any = None) -> dict:
         """`notary.workspace_commit_stage` — atomic: validate → upsert →
         prune Diagram → re-evaluate → persist → revision+1 (§6.1, §13).
 
         `stage` = stage_v2 trên wire: `{owner_row_id?, people[], assets[]}`
         — owner_row_id bắt buộc với inheritance, cấm với two_party.
-        """
+        `case_meta` (payload.case, MIN-141 đợt 3) optional — ghi metadata
+        hồ sơ cùng Stage trong MỘT transaction: ngay_lap_ho_so,
+        noi_niem_yet (canonical `noiniemyet`), nguoi_nhan_uy_quyen(_id)
+        (`nguoinhanuyquyen`/`nguoinhanuyquyenid`), noi_dung_viec
+        (`noidungviec`), ghi_chu (`ghichu`). case_type/document_type gửi
+        kèm mà khác giá trị đã lưu → validation_error (không đổi qua
+        commit)."""
         case = self._load_case(case_id)
         if case.is_locked:
             raise WorkspaceError(
                 "workspace_locked", f"Hồ sơ #{case_id} đang bị khóa")
+        meta_edit: Optional[dict] = None
+        if case_meta is not None:
+            meta_edit = self._validate_case_meta(
+                case_meta, require_type=False)
+            # case_type/document_type là thuộc tính tạo hồ sơ — commit
+            # chỉ nhận cùng giá trị; gửi khác → lỗi thay vì âm thầm đổi.
+            stored_type, stored_doc = _case_meta(case)
+            sent = _fold_key_aliases(
+                case_meta, _CASE_META_KEY_ALIASES, "payload.case")
+            if ("case_type" in sent and sent["case_type"] is not None
+                    and sent["case_type"] != stored_type):
+                raise WorkspaceError(
+                    "validation_error",
+                    "case_type không đổi qua commit")
+            if ("document_type" in sent
+                    and sent["document_type"] is not None
+                    and sent["document_type"] != stored_doc):
+                raise WorkspaceError(
+                    "validation_error",
+                    "document_type không đổi qua commit")
         case_type, _doc_type = _case_meta(case)
         if case_type not in CASE_TYPES:
             raise WorkspaceError(
@@ -971,6 +1054,10 @@ class CaseWorkspaceService:
             raise WorkspaceError(
                 "validation_error",
                 "stage.people/stage.assets phải là danh sách")
+        # Key canonical (ten/ngaysinh/loaigiayto/…) gộp về legacy trước
+        # khi validate — cùng pattern land_rows đợt 2.
+        people = [_fold_key_aliases(r, _PERSON_KEY_ALIASES,
+                                    "person_row") for r in people]
         owner_row_id = self._validate_owner_pointer(
             stage, people, case_type)
         field_errors = self._validate_stage(people, assets, case_type)
@@ -981,6 +1068,17 @@ class CaseWorkspaceService:
                 details={"field_errors": field_errors})
 
         try:
+            if meta_edit is not None:
+                # Metadata hồ sơ ghi cùng transaction với Stage — cột
+                # inheritance_cases + snapshot payload.case đóng băng.
+                case.ngay_lap_ho_so = (
+                    meta_edit["ngay_lap_ho_so"] or case.ngay_lap_ho_so)
+                case.noi_niem_yet = meta_edit["noi_niem_yet"]
+                case.nguoi_nhan_uy_quyen = meta_edit["nguoi_nhan_uy_quyen"]
+                case.nguoi_nhan_uy_quyen_id = \
+                    meta_edit["nguoi_nhan_uy_quyen_id"]
+                case.noi_dung_viec = meta_edit["noi_dung_viec"]
+                case.ghi_chu = meta_edit["ghi_chu"]
             resolved_people = self._upsert_people(people)
             resolved_assets = self._upsert_assets(assets)
             self._sync_links(case, resolved_assets)
@@ -1032,7 +1130,8 @@ class CaseWorkspaceService:
                 self._build_payload(
                     payload, resolved_people, resolved_assets,
                     state, render_model, legacy_nodes, now,
-                    domain=case_type, owner_row_id=owner_row_id),
+                    domain=case_type, owner_row_id=owner_row_id,
+                    case=case),
                 ensure_ascii=False)
             if case_type == CASE_TYPE_INHERITANCE:
                 case.engine_state_json = json.dumps(
@@ -1121,6 +1220,8 @@ class CaseWorkspaceService:
             raise WorkspaceError(
                 "validation_error",
                 "stage.people/stage.assets phải là danh sách")
+        people = [_fold_key_aliases(r, _PERSON_KEY_ALIASES,
+                                    "person_row") for r in people]
         owner_row_id = self._validate_owner_pointer(
             stage, people, case_type)
         field_errors = self._validate_stage(people, assets, case_type)
@@ -1202,6 +1303,9 @@ class CaseWorkspaceService:
                 loai_van_ban=meta["document_type"],
                 trang_thai="draft",
                 noi_niem_yet=meta["noi_niem_yet"],
+                nguoi_nhan_uy_quyen=meta["nguoi_nhan_uy_quyen"],
+                nguoi_nhan_uy_quyen_id=meta["nguoi_nhan_uy_quyen_id"],
+                noi_dung_viec=meta["noi_dung_viec"],
                 ghi_chu=meta["ghi_chu"],
                 workspace_revision=1,
                 workspace_idempotency_key=str(idempotency_key))
@@ -1221,7 +1325,8 @@ class CaseWorkspaceService:
                 self._build_payload(
                     {}, resolved_people, resolved_assets,
                     clean_state, render_model, legacy_nodes, now,
-                    domain=case_type, owner_row_id=owner_row_id),
+                    domain=case_type, owner_row_id=owner_row_id,
+                    case=case),
                 ensure_ascii=False)
             if case_type == CASE_TYPE_INHERITANCE:
                 case.engine_state_json = json.dumps(
@@ -1260,6 +1365,9 @@ class CaseWorkspaceService:
                 "revision": 1,
                 "ngay_lap_ho_so": _emit_date_or_year(case.ngay_lap_ho_so),
                 "noi_niem_yet": meta["noi_niem_yet"],
+                "nguoi_nhan_uy_quyen": meta["nguoi_nhan_uy_quyen"],
+                "nguoi_nhan_uy_quyen_id": meta["nguoi_nhan_uy_quyen_id"],
+                "noi_dung_viec": meta["noi_dung_viec"],
                 "ghi_chu": meta["ghi_chu"],
             },
             "stage": stage_out,
@@ -1384,6 +1492,8 @@ class CaseWorkspaceService:
                 "so_giay_to": wire["so_giay_to"], "ngay_cap": wire["ngay_cap"],
                 "noi_cap": wire["noi_cap"], "dia_chi": wire["dia_chi"],
                 "place_of_origin": wire["place_of_origin"],
+                "loai_giay_to": wire["loai_giay_to"],
+                "loai_dia_chi": wire["loai_dia_chi"],
             })
 
         raw_assets = payload.get("assets")
@@ -1452,9 +1562,21 @@ class CaseWorkspaceService:
     def _person_wire(self, row_id: str, entity: Optional[int],
                      customer: Optional[Customer],
                      snap: Mapping[str, Any]) -> dict:
+        # Bằng chứng đã xác nhận trong snapshot ưu tiên (MIN-141 đợt 3).
+        # Người chết: loại giấy tờ/nơi cấp KHÔNG suy từ master — chỉ đọc
+        # giá trị đã commit trong snapshot; thiếu → None (chưa xác định).
+        # Người sống: thiếu snapshot → derive theo mốc ngay_cap; thiếu
+        # ngày vẫn None (không tự suy cơ quan).
+        alive = customer.con_song if customer is not None else None
         noi_cap = _nn(snap.get("noi_cap"))
-        if noi_cap is None and customer is not None and customer.ngay_cap:
+        if noi_cap is None and customer is not None and alive:
             noi_cap = customer.noi_cap
+        loai_giay_to = _nn(snap.get("loai_giay_to"))
+        if loai_giay_to is None and customer is not None and alive:
+            loai_giay_to = customer.loai_giay_to
+        loai_dia_chi = _nn(snap.get("loai_dia_chi"))
+        if loai_dia_chi is None and customer is not None:
+            loai_dia_chi = customer.loai_dia_chi
         return {
             "row_id": row_id,
             "entity_id": entity,
@@ -1473,6 +1595,8 @@ class CaseWorkspaceService:
             "dia_chi": _nn(
                 customer.dia_chi if customer else snap.get("dia_chi")),
             "place_of_origin": _nn(snap.get("place_of_origin")),
+            "loai_giay_to": loai_giay_to,
+            "loai_dia_chi": loai_dia_chi,
         }
 
     def _asset_wire(self, row_id: str, entity: Optional[int],
@@ -1768,17 +1892,55 @@ class CaseWorkspaceService:
 
     # ----- validation
 
-    @staticmethod
-    def _validate_case_meta(case_meta: Any) -> dict:
-        """Payload `case` của workspace_create (§13.6) → meta đã chuẩn hóa;
-        `case_type` optional default "inheritance"; document_type theo
-        enum của từng case_type."""
+    def _resolve_auth_recipient(self, case_meta: Mapping[str, Any]) -> dict:
+        """`nguoi_nhan_uy_quyen` + `nguoi_nhan_uy_quyen_id` → (id, ten).
+
+        Tham chiếu ổn định (MIN-141 đợt 3): id → trỏ customer trong danh
+        bạ, tên lấy theo master. Chỉ nhập tự do (không id) → lưu text,
+        id null — vẫn tái sử dụng được qua snapshot nhưng không neo
+        customer. Gửi cả hai mà khác nhau → lỗi (không âm thầm chọn)."""
+        uq_id = case_meta.get("nguoi_nhan_uy_quyen_id")
+        uq_name = _nn(case_meta.get("nguoi_nhan_uy_quyen"))
+        customer = None
+        if uq_id is not None:
+            if (not isinstance(uq_id, int) or isinstance(uq_id, bool)
+                    or uq_id < 1):
+                raise WorkspaceError(
+                    "validation_error",
+                    "nguoi_nhan_uy_quyen_id phải là số nguyên ≥ 1 hoặc null")
+            customer = self.db.get(Customer, uq_id)
+            if customer is None:
+                raise WorkspaceError(
+                    "validation_error",
+                    f"nguoi_nhan_uy_quyen_id {uq_id} không tồn tại "
+                    "trong danh bạ")
+        if customer is not None:
+            if uq_name is not None and uq_name != customer.ho_ten:
+                raise WorkspaceError(
+                    "validation_error",
+                    "nguoi_nhan_uy_quyen và nguoi_nhan_uy_quyen_id "
+                    "mâu thuẫn nhau")
+            uq_name = customer.ho_ten
+        return {"id": customer.id if customer is not None else None,
+                "ten": uq_name}
+
+    def _validate_case_meta(self, case_meta: Any, *,
+                            require_type: bool = True) -> dict:
+        """Payload `case` của workspace_create / commit (§13.6) → meta đã
+        chuẩn hóa; `case_type` optional default "inheritance";
+        document_type theo enum của từng case_type (commit: absent =
+        không đổi — require_type=False). MIN-141 đợt 3:
+        `noiniemyet`/`nguoinhanuyquyen`/`noidungviec` (canonical ↔
+        snake)."""
         if not isinstance(case_meta, Mapping):
             raise WorkspaceError(
                 "validation_error", "payload.case phải là object")
+        case_meta = _fold_key_aliases(
+            case_meta, _CASE_META_KEY_ALIASES, "payload.case")
         _check_extra_keys(case_meta, {
             "case_type", "document_type", "ngay_lap_ho_so",
-            "noi_niem_yet", "ghi_chu"}, "payload.case")
+            "noi_niem_yet", "nguoi_nhan_uy_quyen", "nguoi_nhan_uy_quyen_id",
+            "noi_dung_viec", "ghi_chu"}, "payload.case")
         case_type = case_meta.get("case_type", CASE_TYPE_INHERITANCE)
         if case_type not in CASE_TYPES:
             raise WorkspaceError(
@@ -1787,7 +1949,9 @@ class CaseWorkspaceService:
         document_type = case_meta.get("document_type")
         allowed = (DOCUMENT_TYPES_TWO_PARTY
                    if case_type == CASE_TYPE_TWO_PARTY else DOCUMENT_TYPES)
-        if document_type not in allowed:
+        if document_type is None and not require_type:
+            pass
+        elif document_type not in allowed:
             raise WorkspaceError(
                 "validation_error",
                 f"document_type phải ∈ {list(allowed)}")
@@ -1796,18 +1960,23 @@ class CaseWorkspaceService:
             raise WorkspaceError(
                 "validation_error",
                 "ngay_lap_ho_so phải là YYYY-MM-DD hoặc null")
-        for field in ("noi_niem_yet", "ghi_chu"):
+        for field in ("noi_niem_yet", "nguoi_nhan_uy_quyen",
+                      "noi_dung_viec", "ghi_chu"):
             value = case_meta.get(field)
             if value is not None and (
                     not isinstance(value, str) or not value.strip()):
                 raise WorkspaceError(
                     "validation_error",
                     f"{field} phải là chuỗi non-empty hoặc null")
+        auth = self._resolve_auth_recipient(case_meta)
         return {
             "case_type": case_type,
             "document_type": document_type,
             "ngay_lap_ho_so": _parse_date_or_year(ngay),
             "noi_niem_yet": _nn(case_meta.get("noi_niem_yet")),
+            "nguoi_nhan_uy_quyen": auth["ten"],
+            "nguoi_nhan_uy_quyen_id": auth["id"],
+            "noi_dung_viec": _nn(case_meta.get("noi_dung_viec")),
             "ghi_chu": _nn(case_meta.get("ghi_chu")),
         }
 
@@ -1894,7 +2063,8 @@ class CaseWorkspaceService:
                     emit(field, "invalid_date",
                          f"{field} phải là YYYY-MM-DD | YYYY | null")
             for field in ("so_giay_to", "noi_cap", "dia_chi",
-                          "place_of_origin"):
+                          "place_of_origin", "loai_giay_to",
+                          "loai_dia_chi"):
                 self._check_nullable_str(row, field, emit)
             so_giay_to = row.get("so_giay_to")
             if isinstance(so_giay_to, str) and so_giay_to.strip():
@@ -2078,6 +2248,18 @@ class CaseWorkspaceService:
             wire["row_id"] = row["row_id"]
             wire["entity_id"] = customer.id
             wire["ho_ten"] = customer.ho_ten
+            # Giá trị hiệu lực ghi vào snapshot (MIN-141 đợt 3): bằng
+            # chứng người dùng xác nhận (`loai_giay_to`/`noi_cap` nhập)
+            # ưu tiên; người sống chưa có → suy theo mốc ngay_cap;
+            # người chết không suy (thiếu → None, "chưa xác định").
+            wire["loai_giay_to"] = (
+                _nn(row.get("loai_giay_to"))
+                or (customer.loai_giay_to if customer.con_song else None))
+            wire["noi_cap"] = (
+                _nn(row.get("noi_cap"))
+                or (customer.noi_cap if customer.con_song else None))
+            wire["loai_dia_chi"] = (
+                _nn(row.get("loai_dia_chi")) or customer.loai_dia_chi)
             resolved.append((row["row_id"], customer.id, wire))
         return resolved
 
@@ -2222,7 +2404,8 @@ class CaseWorkspaceService:
                        state: dict, render_model: Optional[dict],
                        legacy_nodes: Optional[list], now: str, *,
                        domain: str,
-                       owner_row_id: Optional[str]) -> dict:
+                       owner_row_id: Optional[str],
+                       case: Optional[InheritanceCase] = None) -> dict:
         """case_state_json schemaVersion 3 (§13). inheritance → đầy đủ
         legacy projections cho web cũ; two_party → chỉ state + render_model
         (không engine → không projections)."""
@@ -2275,7 +2458,9 @@ class CaseWorkspaceService:
              "so_giay_to": wire.get("so_giay_to"),
              "ngay_cap": wire.get("ngay_cap"),
              "noi_cap": wire.get("noi_cap"), "dia_chi": wire.get("dia_chi"),
-             "place_of_origin": wire.get("place_of_origin")}
+             "place_of_origin": wire.get("place_of_origin"),
+             "loai_giay_to": wire.get("loai_giay_to"),
+             "loai_dia_chi": wire.get("loai_dia_chi")}
             for rid, entity, wire in resolved_people
         ]
         merged["assets"] = [
@@ -2283,6 +2468,10 @@ class CaseWorkspaceService:
             for index, (rid, entity, wire) in enumerate(resolved_assets)
         ]
         merged["diagram"] = diagram
+        # §4.3/đợt 3: metadata hồ sơ đóng băng cùng commit — Word/UI đọc
+        # từ đây (key canonical noiniemyet/nguoinhanuyquyen/noidungviec).
+        if case is not None:
+            merged["case"] = _case_meta_snapshot(case)
         return merged
 
     def _asset_snapshot_item(self, row_id: str, entity: Optional[int],

@@ -28,16 +28,28 @@ const TWO_PARTY_IDS = Array.from({ length: 30 }, (_, i) => `p${i + 1}`);
 // Field whitelist theo contract §13.3/§13.4 — strip field la truoc khi
 // gui. is_primary/isLandOwner/willReceive BI CAM tren wire v2.
 const PERSON_FIELDS = ['ho_ten', 'gioi_tinh', 'ngay_sinh', 'ngay_chet',
-  'so_giay_to', 'ngay_cap', 'noi_cap', 'dia_chi', 'place_of_origin'];
+  'so_giay_to', 'ngay_cap', 'noi_cap', 'dia_chi', 'place_of_origin',
+  // MIN-141 đợt 3: gia trị xac nhan/suy ra — OCR/intake dien, commit
+  // giu lai trong snapshot (contract §4.1).
+  'loai_giay_to', 'loai_dia_chi'];
 const ASSET_FIELDS = ['so_serial', 'so_vao_so',
   'so_thua_dat', 'so_to_ban_do', 'dia_chi', 'loai_so',
   'hinh_thuc_su_dung', 'thoi_han', 'nguon_goc', 'ngay_cap', 'co_quan_cap'];
 const NODE_BOOL_FIELDS = ['hidden', 'deleted'];
 const NODE_POSITION_FIELDS = ['ownPositions', 'receivePositions'];
 
-// Meta cho phep sua tren nhap moi — khop payload.case §13.6.
+// Meta cho phep sua — khop payload.case §13.6 + đợt 3 (MIN-141).
+// case_type/document_type chi doi duoc tren NHAP (immutable sau create);
+// 5 truong con lai sua duoc ca tren case that — ghi qua commit Stage
+// cung transaction (contract §6).
 const CASE_META_FIELDS = ['case_type', 'document_type', 'ngay_lap_ho_so',
-                          'noi_niem_yet', 'ghi_chu'];
+                          'noi_niem_yet', 'ghi_chu',
+                          'nguoi_nhan_uy_quyen', 'nguoi_nhan_uy_quyen_id',
+                          'noi_dung_viec'];
+// Meta sua duoc tren case da tao (commit payload.case).
+const CASE_META_EDITABLE = ['ngay_lap_ho_so', 'noi_niem_yet', 'ghi_chu',
+                            'nguoi_nhan_uy_quyen',
+                            'nguoi_nhan_uy_quyen_id', 'noi_dung_viec'];
 const CASE_DOCUMENT_TYPES = ['khai_nhan', 'thoa_thuan'];
 const CASE_DOCUMENT_TYPES_TWO_PARTY =
   ['chuyen_nhuong', 'tang_cho', 'cho_thue', 'dat_coc'];
@@ -131,6 +143,9 @@ function createModel(deps) {
     caseId: null,
     backendMode: null,           // 'mock' → banner "Dữ liệu mô phỏng"
     caseInfo: null,              // {id, case_type, document_type, status...}
+    committedCaseInfo: null,     // baseline case de huy nhap meta (đợt 3)
+    uqCatalog: null,             // danh bạ người nhận ủy quyền [{id,ho_ten}]
+    uqCatalogBusy: false,
     unsupported: false,          // case_type ngoai 'inheritance'
     locked: false,
     stale: false,                // giu nhap sau conflict — server da doi
@@ -241,6 +256,7 @@ function createModel(deps) {
     const c = data.case || {};
     state.caseId = c.id;
     state.caseInfo = clone(c);
+    state.committedCaseInfo = clone(c);
     state.backendMode = data.backend_mode || 'real';
     state.revision = c.revision || 0;
     state.locked = !!c.locked;
@@ -354,6 +370,8 @@ function createModel(deps) {
       document_type: documentTypesFor(ct)[0],
       status: 'draft', locked: false, revision: 0,
       ngay_lap_ho_so: null, noi_niem_yet: null, ghi_chu: null,
+      nguoi_nhan_uy_quyen: null, nguoi_nhan_uy_quyen_id: null,
+      noi_dung_viec: null,
     };
     state.backendMode = null;
     state.revision = 0;
@@ -364,6 +382,7 @@ function createModel(deps) {
     state.capabilities =
       { intake: INTAKE_KINDS.slice(), diagram: true, word_export: false };
     state.committed = { people: [], assets: [] };
+    state.committedCaseInfo = null;   // nhap moi: khong co baseline case
     state.stage = newStageDraft(ct);
     state.stageDirty = false;
     state.diagramDirty = true;        // seed la draft chua persist
@@ -390,11 +409,14 @@ function createModel(deps) {
     emit();
   }
 
-  // Sua meta nhap (document_type/ngay_lap_ho_so/noi_niem_yet/ghi_chu).
-  // Chi co nghia tren nhap chua luu — case da tao sua qua commit Stage
-  // khong doi meta (contract khong co command update meta).
+  // Sua meta ho so. Tren nhap moi: du 8 truong (ghi qua
+  // workspace_create.payload.case). Tren case da tao: chi
+  // CASE_META_EDITABLE — ghi cung commit Stage trong mot transaction
+  // (đợt 3, contract §6); case_type/document_type immutable.
   function updateCaseMeta(field, value) {
-    if (!isDraft() || !CASE_META_FIELDS.includes(field)) return false;
+    if (!CASE_META_FIELDS.includes(field) || !canWrite()) return false;
+    const draftOnly = field === 'case_type' || field === 'document_type';
+    if (draftOnly && !isDraft()) return false;
     if (field === 'case_type') {
       // Doi loai ho so o nhap = reset diagram buffer theo domain moi
       // (contract §13.5); stage moc owner_row_id doi theo loai.
@@ -655,15 +677,28 @@ function createModel(deps) {
         state.locked ? 'Hồ sơ đã khóa — chỉ đọc'
                      : 'Loại việc chưa hỗ trợ') };
     }
-    if (!state.stageDirty) return { ok: true, noop: true };
+    if (!state.stageDirty && !state.metaDirty) {
+      return { ok: true, noop: true };
+    }
     state.busy = 'notary.workspace_commit_stage';
     emit();
     const s = session;
-    const r = await client.run('notary.workspace_commit_stage', {
+    const payload = {
       case_id: state.caseId,
       base_revision: state.revision,
       stage: clone(state.stage),
-    });
+    };
+    // đợt 3 (MIN-141): metadata hồ sơ ghi cung Stage trong mot
+    // transaction — payload.case la block day du, chi gui khi meta
+    // sua de khong ghi de meta cua client khac.
+    if (state.metaDirty) {
+      const meta = {};
+      for (const f of CASE_META_FIELDS) {
+        meta[f] = state.caseInfo[f] ?? null;
+      }
+      payload.case = meta;
+    }
+    const r = await client.run('notary.workspace_commit_stage', payload);
     state.busy = null;
     if (s !== session) return r;
     if (!r.ok) {
@@ -712,6 +747,12 @@ function createModel(deps) {
         (d.diagram.render_model && d.diagram.render_model.warnings) || [];
     }
     state.stageDirty = false;
+    if (state.metaDirty) {
+      // commit tra stage/diagram, khong tra case — meta da ghi cung
+      // transaction nen caseInfo cuc bo chinh la gia tri da luu.
+      state.metaDirty = false;
+      state.committedCaseInfo = clone(state.caseInfo);
+    }
     state.fieldErrors = [];
     state.stale = false;
     state.error = null;            // ghi thanh cong → loi cu khong con dung
@@ -1105,6 +1146,83 @@ function createModel(deps) {
     emit();
   }
 
+  // ---------- Danh ba nguoi nhan uy quyen (đợt 3, MIN-141) ----------
+  // Catalog = bang customers qua notary.customer_list (danh ba chung cua
+  // backend — AC "uu tien tai dung danh ba hien co"). Mock khong co danh
+  // ba that: tra danh sach rong, UI roi ve nhap tu do.
+
+  async function loadUqCatalog(query) {
+    if (state.uqCatalogBusy) return { ok: true, noop: true };
+    state.uqCatalogBusy = true;
+    emit();
+    const s = session;
+    const r = await client.run('notary.customer_list', {
+      query: query || '', limit: 200,
+    });
+    state.uqCatalogBusy = false;
+    if (s !== session) return r;
+    if (!r.ok) {
+      // Catalog khong bat buoc — nhap tu do van duoc; loi chi noi
+      // qua error state (khong chan Stage).
+      state.uqCatalog = [];
+      state.error = r.error || errObj('unknown');
+      emit();
+      return r;
+    }
+    state.uqCatalog = (r.data && r.data.customers) || [];
+    emit();
+    return r;
+  }
+
+  // "+ Them vao danh ba": tao customer moi toi thieu (ho_ten) roi gan
+  // lam nguoi nhan uy quyen — tham chieu on dinh customers.id di vao
+  // commit tiep theo (AC: khong chi mot chuoi ten).
+  async function createUqCustomer(hoTen) {
+    const name = (hoTen == null ? '' : String(hoTen)).trim();
+    if (!name) {
+      return { ok: false, error: errObj('validation_error',
+                                        'Tên người nhận ủy quyền trống') };
+    }
+    state.uqCatalogBusy = true;
+    emit();
+    const s = session;
+    const r = await client.run('notary.customer_create',
+                               { ho_ten: name });
+    state.uqCatalogBusy = false;
+    if (s !== session) return r;
+    if (!r.ok) {
+      state.error = r.error || errObj('unknown');
+      emit();
+      return r;
+    }
+    const cust = (r.data && r.data.customer) || {};
+    if (cust.id != null) {
+      if (Array.isArray(state.uqCatalog) &&
+          !state.uqCatalog.some((x) => x && x.id === cust.id)) {
+        state.uqCatalog.push(cust);
+      }
+      updateCaseMeta('nguoi_nhan_uy_quyen', cust.ho_ten || name);
+      updateCaseMeta('nguoi_nhan_uy_quyen_id', cust.id);
+    } else {
+      updateCaseMeta('nguoi_nhan_uy_quyen', cust.ho_ten || name);
+      updateCaseMeta('nguoi_nhan_uy_quyen_id', null);
+    }
+    emit();
+    return r;
+  }
+
+  // Giai name -> catalog id: go ten trung het mot entry → gan id (tham
+  // chieu on dinh); khong trung → free text (id null). Dung cho input
+  // nguoi nhan uy quyen ket hop datalist.
+  function resolveUqName(name) {
+    const t = (name == null ? '' : String(name)).trim();
+    const list = Array.isArray(state.uqCatalog) ? state.uqCatalog : [];
+    const hit = list.find((c) => c && c.ho_ten === t);
+    updateCaseMeta('nguoi_nhan_uy_quyen', t || null);
+    updateCaseMeta('nguoi_nhan_uy_quyen_id',
+                   hit && hit.id != null ? hit.id : null);
+  }
+
   // ---------- word export (thin — dialog day du o MIN-112) ----------
 
   async function loadWordOptions() {
@@ -1224,7 +1342,7 @@ function createModel(deps) {
   }
 
   function hasUnsaved() {
-    return state.stageDirty || state.diagramDirty;
+    return state.stageDirty || state.diagramDirty || state.metaDirty;
   }
 
   function dismissNotice() {
@@ -1236,6 +1354,7 @@ function createModel(deps) {
   return {
     state, subscribe,
     openCase, newDraft, isDraft, saveDraft, updateCaseMeta,
+    loadUqCatalog, createUqCustomer, resolveUqName,
     canWrite, mockBanner, hasUnsaved, isStageEmpty,
     caseType, diagramDomain, documentTypesFor,
     addPerson, addAsset, updatePersonField, updateAssetField,
@@ -1264,6 +1383,7 @@ const G1_NOTARY_MODEL = {
   NODE_BOOL_FIELDS,
   NODE_POSITION_FIELDS,
   CASE_META_FIELDS,
+  CASE_META_EDITABLE,
   CASE_DOCUMENT_TYPES,
   CASE_DOCUMENT_TYPES_TWO_PARTY,
   documentTypesFor,

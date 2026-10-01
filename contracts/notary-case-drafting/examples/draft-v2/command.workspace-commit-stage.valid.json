@@ -25,7 +25,9 @@
           "ngay_cap": "2010-06-15",
           "noi_cap": "CA Hà Nội",
           "dia_chi": "Số 1 phố Huế, Hà Nội",
-          "place_of_origin": "Hà Nam"
+          "place_of_origin": "Hà Nam",
+          "loai_giay_to": null,
+          "loai_dia_chi": null
         },
         {
           "row_id": "22222222-2222-4222-8222-222222222222",
@@ -38,7 +40,9 @@
           "ngay_cap": null,
           "noi_cap": null,
           "dia_chi": "Số 1 phố Huế, Hà Nội",
-          "place_of_origin": null
+          "place_of_origin": null,
+          "loai_giay_to": null,
+          "loai_dia_chi": null
         },
         {
           "row_id": "33333333-3333-4333-8333-333333333333",
@@ -51,7 +55,9 @@
           "ngay_cap": "2021-01-10",
           "noi_cap": "Cục CSĐKQL cư trú và DLQG về dân cư",
           "dia_chi": "Số 5 phố Bạch Mai, Hà Nội",
-          "place_of_origin": "Hà Nội"
+          "place_of_origin": "Hà Nội",
+          "loai_giay_to": null,
+          "loai_dia_chi": null
         }
       ],
       "assets": [
@@ -70,7 +76,11 @@
           "ngay_cap": "2005-09-30",
           "co_quan_cap": "UBND quận Hai Bà Trưng",
           "land_rows": [
-            { "loai_dat": "ODT", "dien_tich": 85.5, "thoi_han": "Lâu dài" }
+            {
+              "loai_dat": "ODT",
+              "dien_tich": 85.5,
+              "thoi_han": "Lâu dài"
+            }
           ]
         },
         {
@@ -88,8 +98,16 @@
           "ngay_cap": null,
           "co_quan_cap": null,
           "land_rows": [
-            { "loai_dat": "CLN", "dien_tich": 120.0, "thoi_han": null },
-            { "loai_dat": "ONT", "dien_tich": 60.0, "thoi_han": "Lâu dài" }
+            {
+              "loai_dat": "CLN",
+              "dien_tich": 120.0,
+              "thoi_han": null
+            },
+            {
+              "loai_dat": "ONT",
+              "dien_tich": 60.0,
+              "thoi_han": "Lâu dài"
+            }
           ]
         }
       ]

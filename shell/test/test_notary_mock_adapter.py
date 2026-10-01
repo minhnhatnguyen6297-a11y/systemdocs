@@ -1866,3 +1866,215 @@ class TestCaseListMock:
         assert {c["id"] for c in res2["data"]["cases"]} == {45}
         res3 = _call("case_list", {"query": "khong-co-gi"})
         assert res3["data"]["cases"] == []
+
+
+# ---------- MIN-141 đợt 3: case meta + danh bạ ủy quyền ----------
+
+class TestCaseMetaMock:
+    """Parity voi real backend (đợt 3): payload.case di qua create/commit,
+    canonical alias fold + conflict, uq id resolve qua danh ba gia."""
+
+    def _commit_payload(self, case_id=43, base_revision=1, meta=None):
+        rid = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+        p = {"case_id": case_id, "base_revision": base_revision,
+             "stage": {"owner_row_id": rid,
+                       "people": [{"row_id": rid, "entity_id": None,
+                                   "ho_ten": "Người Mẫu X"}],
+                       "assets": []}}
+        if meta is not None:
+            p["case"] = meta
+        return p
+
+    def test_create_meta_roundtrip(self):
+        res = _call("workspace_create", _create_payload(
+            case_meta={"document_type": "khai_nhan",
+                       "noi_niem_yet": "xã Yên Sở",
+                       "nguoi_nhan_uy_quyen": "Người UQ Tự Do",
+                       "noi_dung_viec": "Khai nhận thừa kế",
+                       "ghi_chu": "Ghi chú"}))
+        c = res["data"]["case"]
+        assert c["noi_niem_yet"] == "xã Yên Sở"
+        assert c["nguoi_nhan_uy_quyen"] == "Người UQ Tự Do"
+        assert c["nguoi_nhan_uy_quyen_id"] is None   # free text → id null
+        assert c["noi_dung_viec"] == "Khai nhận thừa kế"
+        assert c["ghi_chu"] == "Ghi chú"
+        # workspace_get tra lai dung cac field moi.
+        got = _call("workspace_get", {"case_id": c["id"]})
+        for k in ("noi_niem_yet", "nguoi_nhan_uy_quyen",
+                  "nguoi_nhan_uy_quyen_id", "noi_dung_viec"):
+            assert k in got["data"]["case"], f"thieu {k} tren wire"
+
+    def test_create_meta_canonical_alias(self):
+        res = _call("workspace_create", _create_payload(
+            case_meta={"document_type": "khai_nhan",
+                       "noiniemyet": "xã Canonical",
+                       "noidungviec": "Nội dung canonical"}))
+        c = res["data"]["case"]
+        assert c["noi_niem_yet"] == "xã Canonical"
+        assert c["noi_dung_viec"] == "Nội dung canonical"
+
+    def test_create_meta_alias_conflict_rejected(self):
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_create", _create_payload(
+                case_meta={"document_type": "khai_nhan",
+                           "noiniemyet": "xã A",
+                           "noi_niem_yet": "xã B"}))
+        assert exc.value.code == "validation_error"
+
+    def test_create_uq_id_unknown_rejected(self):
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_create", _create_payload(
+                case_meta={"document_type": "khai_nhan",
+                           "nguoi_nhan_uy_quyen_id": 777}))
+        assert exc.value.code == "validation_error"
+        assert "không tồn tại" in exc.value.message
+
+    def test_create_uq_id_resolves_name_from_catalog(self):
+        mock.reset_backend({"customers": [
+            {"id": 9, "ho_ten": "Người Danh Bạ", "so_giay_to": None}],
+            "cases": _load_fixture("empty.json")["cases"]})
+        res = _call("workspace_create", _create_payload(
+            case_meta={"document_type": "khai_nhan",
+                       "nguoi_nhan_uy_quyen_id": 9}))
+        c = res["data"]["case"]
+        assert c["nguoi_nhan_uy_quyen"] == "Người Danh Bạ"
+        assert c["nguoi_nhan_uy_quyen_id"] == 9
+
+    def test_create_uq_name_id_mismatch_rejected(self):
+        mock.reset_backend({"customers": [
+            {"id": 9, "ho_ten": "Người Danh Bạ", "so_giay_to": None}],
+            "cases": _load_fixture("empty.json")["cases"]})
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_create", _create_payload(
+                case_meta={"document_type": "khai_nhan",
+                           "nguoi_nhan_uy_quyen": "Tên Khác",
+                           "nguoi_nhan_uy_quyen_id": 9}))
+        assert exc.value.code == "validation_error"
+
+    def test_commit_meta_atomic(self):
+        mock.reset_backend(_load_fixture("empty.json"))
+        meta = {"noi_niem_yet": "xã Commit", "noi_dung_viec": "Việc",
+                "nguoi_nhan_uy_quyen": "Người UQ", "ghi_chu": None}
+        res = _call("workspace_commit_stage",
+                    self._commit_payload(meta=meta))
+        assert res["data"]["revision"] == 2
+        got = _call("workspace_get", {"case_id": 43})["data"]["case"]
+        assert got["noi_niem_yet"] == "xã Commit"
+        assert got["nguoi_nhan_uy_quyen"] == "Người UQ"
+        assert got["nguoi_nhan_uy_quyen_id"] is None
+        assert got["noi_dung_viec"] == "Việc"
+
+    def test_commit_meta_canonical_alias(self):
+        mock.reset_backend(_load_fixture("empty.json"))
+        res = _call("workspace_commit_stage", self._commit_payload(
+            meta={"noiniemyet": "xã Canonical", "noidungviec": "N"}))
+        assert res["data"]["revision"] == 2
+        got = _call("workspace_get", {"case_id": 43})["data"]["case"]
+        assert got["noi_niem_yet"] == "xã Canonical"
+
+    def test_commit_meta_invalid_rolls_back_stage(self):
+        """Meta loi → ca commit roll back (atomic): stage khong doi."""
+        mock.reset_backend(_load_fixture("empty.json"))
+        p = self._commit_payload(meta={"case_type": "two_party"})
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_commit_stage", p)
+        assert exc.value.code == "validation_error"
+        got = _call("workspace_get", {"case_id": 43})["data"]
+        assert got["case"]["revision"] == 1
+        assert got["stage"]["people"] == []
+
+    def test_commit_without_meta_keeps_case(self):
+        mock.reset_backend(_load_fixture("empty.json"))
+        res = _call("workspace_commit_stage", self._commit_payload())
+        assert res["data"]["revision"] == 2
+        got = _call("workspace_get", {"case_id": 43})["data"]["case"]
+        assert got["noi_niem_yet"] is None   # default, khong bi xoa
+
+    def test_person_canonical_alias_fold(self):
+        """Canonical person keys (ten/diachi/…) fold vao legacy snake."""
+        mock.reset_backend(_load_fixture("empty.json"))
+        rid = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+        p = {"case_id": 43, "base_revision": 1,
+             "stage": {"owner_row_id": rid,
+                       "people": [{"row_id": rid, "entity_id": None,
+                                   "ten": "Người Canonical",
+                                   "diachi": "Địa chỉ canonical",
+                                   "loaigiayto": "CCCD",
+                                   "loaidiachi": "Thường trú"}],
+                       "assets": []}}
+        res = _call("workspace_commit_stage", p)
+        row = res["data"]["stage"]["people"][0]
+        assert row["ho_ten"] == "Người Canonical"
+        assert row["dia_chi"] == "Địa chỉ canonical"
+        assert row["loai_giay_to"] == "CCCD"
+        assert row["loai_dia_chi"] == "Thường trú"
+
+    def test_person_alias_conflict_rejected(self):
+        mock.reset_backend(_load_fixture("empty.json"))
+        rid = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+        p = {"case_id": 43, "base_revision": 1,
+             "stage": {"owner_row_id": rid,
+                       "people": [{"row_id": rid, "entity_id": None,
+                                   "ten": "A", "ho_ten": "B"}],
+                       "assets": []}}
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_commit_stage", p)
+        assert exc.value.code == "validation_error"
+
+
+class TestCustomerCatalogMock:
+    """notary.customer_list/customer_create qua gateway (đợt 3)."""
+
+    def test_customer_list_empty_default(self):
+        res = _call("customer_list", {})
+        assert res["kind"] == "customer_list"
+        assert res["data"]["customers"] == []
+        assert res["data"]["total"] == 0
+
+    def test_customer_create_then_list(self):
+        r = _call("customer_create", {"ho_ten": "Người Danh Bạ A"})
+        assert r["kind"] == "customer_upsert"
+        cust = r["data"]["customer"]
+        assert cust["id"] >= 900
+        assert cust["ho_ten"] == "Người Danh Bạ A"
+        assert r["data"]["updated"] is False
+        res = _call("customer_list", {})
+        assert [c["id"] for c in res["data"]["customers"]] == [cust["id"]]
+
+    def test_customer_create_requires_name(self):
+        with pytest.raises(CommandError) as exc:
+            _call("customer_create", {"ho_ten": "  "})
+        assert exc.value.code == "validation_error"
+
+    def test_customer_upsert_same_sogiayto(self):
+        r1 = _call("customer_create",
+                   {"ho_ten": "Tên Cũ", "so_giay_to": "S001"})
+        r2 = _call("customer_create",
+                   {"ho_ten": "Tên Mới", "so_giay_to": "S001"})
+        assert r2["data"]["updated"] is True
+        assert r2["data"]["customer"]["id"] == r1["data"]["customer"]["id"]
+        assert r2["data"]["customer"]["ho_ten"] == "Tên Mới"
+
+    def test_customer_list_query_filter(self):
+        mock.reset_backend({"customers": [
+            {"id": 1, "ho_ten": "Nguyễn An", "so_giay_to": "A1",
+             "dia_chi": "Hà Nội"},
+            {"id": 2, "ho_ten": "Trần Bình", "so_giay_to": "B2",
+             "dia_chi": "Huế"}]})
+        res = _call("customer_list", {"query": "nguyễn"})
+        assert [c["id"] for c in res["data"]["customers"]] == [1]
+        res = _call("customer_list", {"query": "huế"})
+        assert [c["id"] for c in res["data"]["customers"]] == [2]
+
+    def test_case_commit_with_catalog_uq(self):
+        """UQ tu danh ba gia: commit id → get tra id + ten master."""
+        mock.reset_backend({"customers": [
+            {"id": 9, "ho_ten": "Người Danh Bạ", "so_giay_to": None}],
+            "cases": _load_fixture("empty.json")["cases"]})
+        p = TestCaseMetaMock()._commit_payload(
+            meta={"nguoi_nhan_uy_quyen_id": 9})
+        res = _call("workspace_commit_stage", p)
+        assert res["data"]["revision"] == 2
+        got = _call("workspace_get", {"case_id": 43})["data"]["case"]
+        assert got["nguoi_nhan_uy_quyen"] == "Người Danh Bạ"
+        assert got["nguoi_nhan_uy_quyen_id"] == 9

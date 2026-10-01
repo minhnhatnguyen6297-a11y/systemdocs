@@ -10,7 +10,9 @@
   "command_id": "a1b2c3d4-2009-4001-8001-000000000001",
   "payload": {
     "case_id": 77,
-    "document_keys": ["khai_nhan_di_san"],
+    "document_keys": [
+      "khai_nhan_di_san"
+    ],
     "destination": {
       "path": "D:\\out",
       "scope": "machine_local",

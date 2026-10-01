@@ -12,7 +12,9 @@
     "retryable": false,
     "next_action": null,
     "job_id": "j_ws_nf_016",
-    "details": { "case_id": 9999 }
+    "details": {
+      "case_id": 9999
+    }
   },
   "updated_at": "2026-09-24T10:00:00Z"
 }

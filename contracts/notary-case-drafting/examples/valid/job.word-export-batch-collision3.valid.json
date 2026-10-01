@@ -4,7 +4,11 @@
   "command_id": "a1b2c3d4-0015-4015-8015-000000000015",
   "status": "succeeded",
   "waiting_on": null,
-  "progress": { "done": 1, "total": 1, "current_label": "Xong 1/1 văn bản" },
+  "progress": {
+    "done": 1,
+    "total": 1,
+    "current_label": "Xong 1/1 văn bản"
+  },
   "result": {
     "kind": "word_export_batch",
     "data": {
@@ -28,7 +32,9 @@
         }
       ],
       "breakdown": {
-        "succeeded": ["khai_nhan_di_san"],
+        "succeeded": [
+          "khai_nhan_di_san"
+        ],
         "failed": [],
         "skipped": []
       }

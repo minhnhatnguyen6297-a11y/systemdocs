@@ -1,6 +1,8 @@
 {
   "expected_error": "workspace_conflict",
-  "fixture_context": { "server_revision": 7 },
+  "fixture_context": {
+    "server_revision": 7
+  },
   "contract_version": "desktopcommand.v1",
   "command_id": "b1b2c3d4-0001-4001-8001-000000000101",
   "command": "notary.workspace_commit_stage",
@@ -20,11 +22,16 @@
           "ngay_cap": null,
           "noi_cap": null,
           "dia_chi": "Số 1 phố Huế, Hà Nội",
-          "place_of_origin": null
+          "place_of_origin": null,
+          "loai_giay_to": null,
+          "loai_dia_chi": null
         }
       ],
       "assets": []
     }
   },
-  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+  "client_meta": {
+    "shell_version": "0.1.0",
+    "module": "document-review"
+  }
 }

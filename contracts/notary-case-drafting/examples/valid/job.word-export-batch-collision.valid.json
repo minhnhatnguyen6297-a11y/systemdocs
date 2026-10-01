@@ -4,7 +4,11 @@
   "command_id": "a1b2c3d4-0011-4011-8011-000000000011",
   "status": "succeeded",
   "waiting_on": null,
-  "progress": { "done": 2, "total": 2, "current_label": "Xong 2/2 văn bản" },
+  "progress": {
+    "done": 2,
+    "total": 2,
+    "current_label": "Xong 2/2 văn bản"
+  },
   "result": {
     "kind": "word_export_batch",
     "data": {
@@ -39,7 +43,10 @@
         }
       ],
       "breakdown": {
-        "succeeded": ["khai_nhan_di_san", "thoa_thuan_phan_chia"],
+        "succeeded": [
+          "khai_nhan_di_san",
+          "thoa_thuan_phan_chia"
+        ],
         "failed": [],
         "skipped": []
       }

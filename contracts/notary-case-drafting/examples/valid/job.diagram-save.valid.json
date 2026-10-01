@@ -44,7 +44,10 @@
             {
               "id": "child_1",
               "personId": "33333333-3333-4333-8333-333333333333",
-              "parentSlotIds": ["owner", "spouse"],
+              "parentSlotIds": [
+                "owner",
+                "spouse"
+              ],
               "spouseSlotId": null,
               "isLandOwner": false,
               "willReceive": true,

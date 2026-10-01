@@ -23,7 +23,9 @@
           "ngay_cap": null,
           "noi_cap": null,
           "dia_chi": "Số 1 phố Huế, Hà Nội",
-          "place_of_origin": null
+          "place_of_origin": null,
+          "loai_giay_to": null,
+          "loai_dia_chi": null
         },
         {
           "row_id": "22222222-2222-4222-8222-222222222222",
@@ -36,7 +38,9 @@
           "ngay_cap": null,
           "noi_cap": null,
           "dia_chi": "Số 1 phố Huế, Hà Nội",
-          "place_of_origin": null
+          "place_of_origin": null,
+          "loai_giay_to": null,
+          "loai_dia_chi": null
         }
       ],
       "assets": [
@@ -56,7 +60,11 @@
           "ngay_cap": "2005-09-30",
           "co_quan_cap": null,
           "land_rows": [
-            { "loai_dat": "ODT", "dien_tich": 85.5, "thoi_han": "Lâu dài" }
+            {
+              "loai_dat": "ODT",
+              "dien_tich": 85.5,
+              "thoi_han": "Lâu dài"
+            }
           ]
         }
       ]
@@ -89,5 +97,8 @@
       }
     }
   },
-  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+  "client_meta": {
+    "shell_version": "0.1.0",
+    "module": "document-review"
+  }
 }

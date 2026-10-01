@@ -15,6 +15,19 @@
         "noi_niem_yet": {
           "$ref": "common.schema.json#/definitions/nullable_string"
         },
+        "nguoi_nhan_uy_quyen": {
+          "$ref": "common.schema.json#/definitions/nullable_string",
+          "description": "đợt 3 — optional; khi kèm nguoi_nhan_uy_quyen_id phải khớp tên master"
+        },
+        "nguoi_nhan_uy_quyen_id": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "description": "đợt 3 — customers.id; id sai/không tồn tại → validation_error"
+        },
+        "noi_dung_viec": {
+          "$ref": "common.schema.json#/definitions/nullable_string",
+          "description": "đợt 3 — cụm nội dung việc"
+        },
         "ghi_chu": {
           "$ref": "common.schema.json#/definitions/nullable_string"
         }

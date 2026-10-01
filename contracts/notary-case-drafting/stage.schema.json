@@ -10,6 +10,34 @@
       "properties": {
         "case_id": { "type": "integer", "minimum": 1 },
         "base_revision": { "type": "integer", "minimum": 1 },
+        "case": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "đợt 3 (MIN-141) — OPTIONAL: metadata hồ sơ ghi cùng Stage trong một transaction; case_type/document_type gửi kèm phải khớp giá trị đã lưu (immutable). Server cũng chấp nhận key canonical liền không dấu: casetype/documenttype/ngaylaphoso/noiniemyet/nguoinhanuyquyen/nguoinhanuyquyenid/noidungviec/ghichu — mang cả hai spelling mà lệch → validation_error.",
+          "properties": {
+            "case_type": { "type": "string" },
+            "document_type": { "enum": ["khai_nhan", "thoa_thuan", null] },
+            "ngay_lap_ho_so": {
+              "$ref": "common.schema.json#/definitions/date_full"
+            },
+            "noi_niem_yet": {
+              "$ref": "common.schema.json#/definitions/nullable_string"
+            },
+            "nguoi_nhan_uy_quyen": {
+              "$ref": "common.schema.json#/definitions/nullable_string"
+            },
+            "nguoi_nhan_uy_quyen_id": {
+              "type": ["integer", "null"],
+              "minimum": 1
+            },
+            "noi_dung_viec": {
+              "$ref": "common.schema.json#/definitions/nullable_string"
+            },
+            "ghi_chu": {
+              "$ref": "common.schema.json#/definitions/nullable_string"
+            }
+          }
+        },
         "stage": {
           "type": "object",
           "required": ["people", "assets"],
