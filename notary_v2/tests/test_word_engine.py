@@ -643,3 +643,200 @@ def test_pcds_template_no_old_critical_placeholders():
     assert "[Dòng người 20]" in placeholders
     assert "[Dòng người từ chối 20]" in placeholders
     assert "[Đoạn phân chia di sản]" in placeholders
+
+
+# ---------------------------------------------------------------------------
+# Canonical land placeholders: [loaidatMN]/[dientichMN]/[thoihanMN] (§9.2)
+# ---------------------------------------------------------------------------
+
+
+def _dense_land_rows(asset_idx, count=20):
+    return [
+        {
+            "loai_dat": f"LD{m}-TS{asset_idx}",
+            "dien_tich": f"{asset_idx * 100 + m}.5",
+            "thoi_han": f"TH{m}-TS{asset_idx}",
+        }
+        for m in range(1, count + 1)
+    ]
+
+
+def _json_rows(rows):
+    import json
+    return json.dumps(rows, ensure_ascii=False)
+
+
+def _three_asset_case():
+    owner = _person(1, "Nguyễn Văn A", gender="Nam", dead=date(2024, 2, 3))
+    receiver = _person(2, "Nguyễn Văn B", gender="Nam")
+    props = [
+        _prop(dia_chi=f"Đất {n}", so_serial=f"S{n}", land_rows_json=_json_rows(_dense_land_rows(n)))
+        for n in range(1, 4)
+    ]
+    return _make_case(
+        owner,
+        properties=props,
+        case_state=_case_state(
+            owner, receiver,
+            nodes=[
+                _node(1, role="Owner", is_land_owner=True),
+                _node(2, role="Con", will_receive=True),
+            ],
+        ),
+    )
+
+
+def test_canonical_land_names_cover_three_assets_and_twenty_rows():
+    mapping = build_template_mapping(_three_asset_case())
+
+    for n in range(1, 4):
+        for m in range(1, 21):
+            assert mapping[f"[loaidat{m}{n}]"] == f"LD{m}-TS{n}"
+            assert mapping[f"[dientich{m}{n}]"] == f"{n * 100 + m}.5"
+            assert mapping[f"[thoihan{m}{n}]"] == f"TH{m}-TS{n}"
+
+    assert mapping["[loaidat12]"] == "LD1-TS2"
+    assert mapping["[loaidat102]"] == "LD10-TS2"
+    assert mapping["[loaidat203]"] == "LD20-TS3"
+
+    for m in range(1, 21):
+        assert mapping[f"[loaidat{m}4]"] == ""
+        assert mapping[f"[dientich{m}4]"] == ""
+        assert mapping[f"[thoihan{m}5]"] == ""
+
+
+def test_canonical_land_names_single_asset_use_full_form_without_short_aliases():
+    owner = _person(1, "Nguyễn Văn A", gender="Nam", dead=date(2024, 2, 3))
+    receiver = _person(2, "Nguyễn Văn B", gender="Nam")
+    case = _make_case(
+        owner,
+        properties=[_prop(land_rows_json=_json_rows(_dense_land_rows(1)))],
+        case_state=_case_state(
+            owner, receiver,
+            nodes=[
+                _node(1, role="Owner", is_land_owner=True),
+                _node(2, role="Con", will_receive=True),
+            ],
+        ),
+    )
+    mapping = build_template_mapping(case)
+
+    for m in range(1, 21):
+        assert mapping[f"[loaidat{m}1]"] == f"LD{m}-TS1"
+        assert mapping[f"[dientich{m}1]"] == f"{100 + m}.5"
+        assert mapping[f"[thoihan{m}1]"] == f"TH{m}-TS1"
+
+    # Không sinh alias rút gọn: [loaidat11] là tên đầy đủ loại đất 1/tài sản 1,
+    # KHÔNG phải rút gọn của loại đất 11.
+    assert mapping["[loaidat11]"] == "LD1-TS1"
+    assert mapping["[dientich11]"] == "101.5"
+    for m in (1, 2, 5, 9, 10, 16, 20):
+        assert f"[loaidat{m}]" not in mapping
+        assert f"[dientich{m}]" not in mapping
+        assert f"[thoihan{m}]" not in mapping
+
+
+def test_canonical_land_names_keep_position_when_a_row_is_empty():
+    owner = _person(1, "Nguyễn Văn A", gender="Nam", dead=date(2024, 2, 3))
+    receiver = _person(2, "Nguyễn Văn B", gender="Nam")
+    rows = [
+        {"loai_dat": "ONT", "dien_tich": "80", "thoi_han": "Lâu dài"},
+        {},
+        {"loai_dat": "CLN", "dien_tich": "30", "thoi_han": "Đến 2043"},
+    ]
+    case = _make_case(
+        owner,
+        properties=[_prop(land_rows_json=_json_rows(rows))],
+        case_state=_case_state(
+            owner, receiver,
+            nodes=[
+                _node(1, role="Owner", is_land_owner=True),
+                _node(2, role="Con", will_receive=True),
+            ],
+        ),
+    )
+    mapping = build_template_mapping(case)
+
+    assert mapping["[loaidat11]"] == "ONT"
+    assert mapping["[loaidat21]"] == ""
+    assert mapping["[dientich21]"] == ""
+    assert mapping["[thoihan21]"] == ""
+    assert mapping["[loaidat31]"] == "CLN"
+    assert mapping["[dientich31]"] == "30"
+    assert mapping["[thoihan31]"] == "Đến 2043"
+
+
+def test_canonical_land_names_zero_area_and_missing_term():
+    owner = _person(1, "Nguyễn Văn A", gender="Nam", dead=date(2024, 2, 3))
+    receiver = _person(2, "Nguyễn Văn B", gender="Nam")
+    rows = [
+        {"loai_dat": "ONT", "dien_tich": 0, "thoi_han": "Lâu dài"},
+        {"loai_dat": "CLN", "dien_tich": "25"},
+    ]
+    case = _make_case(
+        owner,
+        properties=[_prop(land_rows_json=_json_rows(rows))],
+        case_state=_case_state(
+            owner, receiver,
+            nodes=[
+                _node(1, role="Owner", is_land_owner=True),
+                _node(2, role="Con", will_receive=True),
+            ],
+        ),
+    )
+    mapping = build_template_mapping(case)
+
+    assert mapping["[dientich11]"] == "0"
+    assert mapping["[thoihan11]"] == "Lâu dài"
+    assert mapping["[loaidat21]"] == "CLN"
+    assert mapping["[dientich21]"] == "25"
+    assert mapping["[thoihan21]"] == ""
+
+
+def test_canonical_land_names_resolve_through_real_doc_replacement():
+    case = _three_asset_case()
+    doc = Document()
+    doc.add_paragraph("Đất: [loaidat12]; DT: [dientich102]; TH: [thoihan203].")
+    doc.add_paragraph("[LoaiDat31] / [THOIHAN11] / [dientich201]")
+
+    replace_in_doc(doc, build_template_mapping(case))
+
+    assert doc.paragraphs[0].text == "Đất: LD1-TS2; DT: 210.5; TH: TH20-TS3."
+    assert doc.paragraphs[1].text == "LD3-TS1 / TH1-TS1 / 120.5"
+    assert find_unresolved_placeholders(doc) == []
+
+
+def test_legacy_land_placeholders_unchanged_and_cover_assets_4_and_5():
+    owner = _person(1, "Nguyễn Văn A", gender="Nam", dead=date(2024, 2, 3))
+    receiver = _person(2, "Nguyễn Văn B", gender="Nam")
+    props = [
+        _prop(dia_chi=f"Đất {n}", so_serial=f"S{n}", land_rows_json=_json_rows(_dense_land_rows(n)))
+        for n in range(1, 6)
+    ]
+    case = _make_case(
+        owner,
+        properties=props,
+        case_state=_case_state(
+            owner, receiver,
+            nodes=[
+                _node(1, role="Owner", is_land_owner=True),
+                _node(2, role="Con", will_receive=True),
+            ],
+        ),
+    )
+    mapping = build_template_mapping(case)
+
+    # Legacy indexed keys (asset.row) unchanged, consistent values with canonical.
+    assert mapping["[Loại đất 2.1 - Loại đất]"] == "LD1-TS2"
+    assert mapping["[Loại đất tài sản 2.1]"] == "LD1-TS2"
+    assert mapping["[Diện tích loại đất tài sản 2.1]"] == "201.5"
+    assert mapping["[Dòng loại đất 1.2]"] == "1.2. LD2-TS1: 102.5 m2; Thời hạn: TH2-TS1."
+    # Legacy primary-asset block keeps its 10-row cap.
+    assert mapping["[Loại đất 1]"] == "LD1-TS1"
+    assert mapping["[Loại đất 10]"] == "LD10-TS1"
+    assert "[Loại đất 11]" not in mapping
+    # Canonical names exist for assets 4-5 as well.
+    assert mapping["[loaidat14]"] == "LD1-TS4"
+    assert mapping["[dientich205]"] == "520.5"
+    # Typo fix in rendered paragraph (consumer: [Đoạn mô tả di sản]).
+    assert "Thời hạn sử dụng:" in mapping["[Đoạn mô tả di sản]"]

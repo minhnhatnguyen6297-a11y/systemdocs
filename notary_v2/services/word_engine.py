@@ -29,6 +29,7 @@ ROLE_LABELS = {
 }
 
 MAX_WORD_ASSETS = 5
+MAX_WORD_LAND_ROWS = 20
 
 
 class WordExportValidationError(Exception):
@@ -308,6 +309,16 @@ def _parse_land_rows(raw: str) -> list[dict[str, Any]]:
     if not isinstance(rows, list):
         return []
     return [row for row in rows if isinstance(row, dict)]
+
+
+def _land_row_values(row: dict[str, Any] | None) -> tuple[str, str, str]:
+    if not row:
+        return "", "", ""
+    return (
+        _safe_text(row.get("loai_dat", "")),
+        _safe_text(row.get("dien_tích", row.get("dien_tich", ""))),
+        _safe_text(row.get("thoi_han", "")),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -762,7 +773,7 @@ def _property_description(properties: list[Any]) -> str:
         if land_type_lines:
             paragraphs.append("\n".join(land_type_lines))
 
-        paragraphs.append(f"Thờ hạn sử dụng: {_safe_text(getattr(prop, 'thoi_han', ''))}")
+        paragraphs.append(f"Thời hạn sử dụng: {_safe_text(getattr(prop, 'thoi_han', ''))}")
         paragraphs.append(f"Nguồn gốc sử dụng đất: {_safe_text(getattr(prop, 'nguon_goc', ''))}.")
     return "\n".join(paragraphs)
 
@@ -1046,9 +1057,7 @@ def _add_property_placeholders(mapping: dict[str, str], properties: list[Any]) -
 
         for m_idx in range(1, 11):
             row = land_rows[m_idx - 1] if m_idx <= len(land_rows) else None
-            land_type = _safe_text(row.get("loai_dat", "")) if row else ""
-            area = _safe_text(row.get("dien_tích", row.get("dien_tich", ""))) if row else ""
-            term = _safe_text(row.get("thoi_han", "")) if row else ""
+            land_type, area, term = _land_row_values(row)
             mapping[f"[Loại đất {idx}.{m_idx} - Loại đất]"] = land_type
             mapping[f"[Loại đất {idx}.{m_idx} - Diện tích]"] = area
             mapping[f"[Loại đất {idx}.{m_idx} - Thời hạn]"] = term
@@ -1060,6 +1069,15 @@ def _add_property_placeholders(mapping: dict[str, str], properties: list[Any]) -
                 f"{idx}.{m_idx}. {land_type}: {area} m2; Thời hạn: {term}." if row else ""
             )
             mapping[f"[Dòng loại đất tài sản {idx}.{m_idx}]"] = mapping[f"[Dòng loại đất {idx}.{m_idx}]"]
+
+        # Tên chuẩn (contracts/entities.md §9.2): [trường][loại đất M][tài sản N],
+        # viết liền không dấu, không "_". Không sinh alias rút gọn [loaidatM].
+        for m_idx in range(1, MAX_WORD_LAND_ROWS + 1):
+            row = land_rows[m_idx - 1] if m_idx <= len(land_rows) else None
+            land_type, area, term = _land_row_values(row)
+            mapping[f"[loaidat{m_idx}{idx}]"] = land_type
+            mapping[f"[dientich{m_idx}{idx}]"] = area
+            mapping[f"[thoihan{m_idx}{idx}]"] = term
 
 
 # ---------------------------------------------------------------------------
