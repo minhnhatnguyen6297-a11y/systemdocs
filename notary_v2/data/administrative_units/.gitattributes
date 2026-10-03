@@ -1,0 +1,2 @@
+snapshots/*.raw -text
+ledger.json text eol=lf

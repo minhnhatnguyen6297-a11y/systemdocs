@@ -22,6 +22,10 @@ Input → gợi ý chờ duyệt → Stage → Pool → Diagram → Word
 Ngoài flow chính, [`fast-text-audit.md`](./fast-text-audit.md) mô tả CLI độc
 lập để so Word với scan. Công cụ này không ghi Stage, Diagram hoặc database.
 
+[`administrative-timeline.md`](./administrative-timeline.md) giữ kho local tên
+xã/huyện/tỉnh và lịch sử nhiều bước; Bando là nguồn tên hiện hành, phần chưa rõ
+ngày/danh tính giữ chờ xác nhận. Chưa nối vào giao diện địa chỉ hay nhập DOCX.
+
 ## 2. Bất biến của module
 
 - Input chỉ tạo gợi ý; người dùng phải xác nhận trước khi vào Stage.
@@ -89,7 +93,9 @@ Quy tắc màu, chữ, khoảng cách và thao tác dùng chung nằm tại
 ### Còn mở
 
 - Quy tắc per-asset, contract A/B và owner scope chưa được suy từ các flag cũ.
-- Triển khai chi tiết bảng tra cứu xã/phường cũ - mới sau sáp nhập 01/07/2025 (theo dõi tại issue NAIA-9).
+- Tích hợp bảng tra địa chỉ vào hồ sơ (NAIA-9): kho lịch sử đã có tại
+  [`administrative-timeline.md`](./administrative-timeline.md); ngày hiệu lực và
+  danh tính cũ còn chờ nguồn, không gán chung 01/07/2025.
 
 ## 7. Nguồn khi sửa code
 
