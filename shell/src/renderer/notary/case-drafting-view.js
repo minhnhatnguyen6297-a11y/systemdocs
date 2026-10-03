@@ -127,6 +127,7 @@ function spliceMove(list, from, to) {
 // field public state + emit gián tiếp qua dismissNotice().
 function cancelDraftState(state) {
   state.stage = structuredClone(state.committed);
+  state.docxImport = structuredClone(state.committedDocxImport || { version: 1, sources: [] });
   // đợt 3 (MIN-141): meta tren case da tao cung ve baseline committed —
   // huy nhap khong giu gia tri meta dang sua (huy nhap moi thi
   // newDraft() da reset san o nhanh tren).

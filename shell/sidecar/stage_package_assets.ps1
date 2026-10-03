@@ -66,6 +66,10 @@ foreach ($key in $allow.Keys) {
         if (Test-Path $hit) { Remove-Item -Recurse -Force $hit }
     }
 }
+# Ship only the shared regex engine/profile source, never workbench corpora/UI.
+$sharedDst = Join-Path $engineStage "tools\regex_workbench\engine"
+New-Item -ItemType Directory -Force -Path (Split-Path $sharedDst -Parent) | Out-Null
+Copy-Item -Recurse -Force (Join-Path $repo "tools\regex_workbench\engine") $sharedDst
 # Sach __pycache__ + chan file cam — code only, khong data/Qt.
 Get-ChildItem -Recurse -Force -Directory $engineStage |
     Where-Object { $_.Name -eq "__pycache__" } |
@@ -74,7 +78,8 @@ $forbidden = Get-ChildItem -Recurse -Force -File $engineStage |
     Where-Object {
         $_.Name -in @(".env", "notary.db", "registry.sqlite3",
                       "nd_storage_state.json") -or
-        $_.FullName -match "ui_qt|tests|poc|tools|fast_audit|word_templates[\\/]custom[\\/]" -or
+        $_.FullName -match "ui_qt|tests|poc|fast_audit|word_templates[\\/]custom[\\/]" -or
+        ($_.FullName -match "[\\/]tools[\\/]" -and $_.FullName -notmatch "[\\/]tools[\\/]regex_workbench[\\/]engine[\\/]") -or
         $_.Extension -in @(".db", ".sqlite", ".sqlite3")
     }
 if ($forbidden) {

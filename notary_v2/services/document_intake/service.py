@@ -231,6 +231,7 @@ async def analyze_async(
     model: Optional[str] = None,
     ocr_call: Optional[Callable] = None,
     read_file: Optional[Callable[[SourceSpec], bytes]] = None,
+    store_docx: Optional[Callable] = None,
 ) -> IntakeOutcome:
     """Analyze một batch intake sources → IntakeOutcome (contract data).
 
@@ -262,6 +263,7 @@ async def analyze_async(
             ocr_call=ocr_call,
             check_cancel=check_cancel,
             read_file=reader,
+            store_docx=store_docx,
         )
         total = len(specs)
         try:

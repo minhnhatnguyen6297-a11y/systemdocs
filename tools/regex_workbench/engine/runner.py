@@ -25,6 +25,8 @@ from .textnorm import (
     normalize_with_index_map,
 )
 from .zoner import detect_title, find_zones, fold_lines
+from .extractor import _guarded_finditer
+import regex
 
 PROFILES_DIR = Path(__file__).resolve().parent / "profiles"
 DEFAULT_PROFILE = "transfer"
@@ -105,6 +107,14 @@ def validate_profile(profile: Any) -> list[str]:
         profile["regex_timeout_ms"], (int, float)
     ):
         problems.append("'regex_timeout_ms' phải là số (ms)")
+    if "asset_groups" in profile:
+        cfg = profile["asset_groups"]
+        if not isinstance(cfg, dict) or not isinstance(cfg.get("delimiter"), str):
+            problems.append("asset_groups phải là object có delimiter string")
+        elif "land_rows" in cfg:
+            rows = cfg["land_rows"]
+            if not isinstance(rows, dict) or not isinstance(rows.get("delimiter"), str) or not isinstance(rows.get("fields"), list):
+                problems.append("asset_groups.land_rows cần delimiter và fields")
 
     return problems
 
@@ -112,6 +122,17 @@ def validate_profile(profile: Any) -> list[str]:
 def lint_profile(profile: dict[str, Any]) -> list[str]:
     """Kiểm tra tĩnh toàn bộ pattern trong profile trước khi chạy."""
     problems: list[str] = []
+    cfg = profile.get("asset_groups") or {}
+    if isinstance(cfg, dict):
+        for owner, group in (("asset.groups", cfg), ("asset.land_rows", cfg.get("land_rows") or {})):
+            if group.get("delimiter"):
+                msg = lint_pattern(owner, group["delimiter"])
+                if msg:
+                    problems.append(msg)
+            for rule in group.get("fields", []):
+                msg = lint_pattern(rule.get("rule_id", owner), rule.get("pattern", ""))
+                if msg:
+                    problems.append(msg)
     title = profile.get("title")
     for rule in ((title or {}).get("kind_rules") or []) if isinstance(title, dict) else []:
         if not isinstance(rule, dict):
@@ -184,6 +205,51 @@ def run(text: str, profile: dict[str, Any]) -> dict[str, Any]:
     zones = find_zones(raw, folded, span_of, profile, timeout_ms, errors)
     fields = extract_fields(raw, folded, span_of, zones, profile, timeout_ms, errors)
     parties = extract_parties(raw, folded, span_of, zones, profile, timeout_ms, errors)
+    groups = []
+    cfg = profile.get("asset_groups") or {}
+    if cfg:
+        pattern = str(cfg.get("delimiter", ""))
+        problem = lint_pattern("asset.groups", pattern)
+        if problem:
+            errors.append(problem)
+        else:
+            matches, problem = _guarded_finditer(regex.compile(pattern, regex.MULTILINE), folded, timeout_ms)
+            if problem:
+                errors.append("asset.groups: " + problem)
+            else:
+                asset_zone = next((z for z in zones if z.get("name") == "asset" and z.get("fold_span")), None)
+                starts = [m.start() for m in matches or []]
+                if not starts and asset_zone:
+                    starts = [asset_zone["fold_span"][0]]
+                if not starts:
+                    starts = [0]  # A standalone certificate still uses the same field rules.
+                end = (asset_zone["fold_span"][1] if asset_zone else len(folded))
+                starts = [start for start in starts if start < end]
+                for i, start in enumerate(starts):
+                    stop = min(starts[i + 1], end) if i + 1 < len(starts) else end
+                    if stop <= start:
+                        continue
+                    group_zone = [{"name": "asset", "state": "matched", "fold_span": [start, stop]}]
+                    results = extract_fields(raw, folded, span_of, group_zone,
+                                             {"fields": [r for r in profile.get("fields", []) if r.get("zone") == "asset"]},
+                                             timeout_ms, errors)
+                    land_rows = []
+                    land_cfg = cfg.get("land_rows") or {}
+                    if land_cfg:
+                        row_pattern = str(land_cfg.get("delimiter", ""))
+                        problem = lint_pattern("asset.land_rows", row_pattern)
+                        if not problem:
+                            row_matches, problem = _guarded_finditer(regex.compile(row_pattern, regex.MULTILINE), folded[start:stop], timeout_ms)
+                            for j, row_match in enumerate(row_matches or []):
+                                row_start = start + row_match.start()
+                                row_stop = start + row_matches[j + 1].start() if j + 1 < len(row_matches) else stop
+                                land_rows.append(extract_fields(raw, folded, span_of,
+                                        [{"name": "land_row", "state": "matched", "fold_span": [row_start, row_stop]}],
+                                        {"fields": [{**r, "zone": "land_row"} for r in land_cfg.get("fields", [])]}, timeout_ms, errors))
+                        if problem:
+                            errors.append("asset.land_rows: " + problem)
+                    groups.append({"span": list(span_of(start, stop)), "fields": results,
+                                   "land_rows": land_rows, "state": "matched" if matches else "ambiguous_group"})
 
     return {
         "profile_id": profile.get("profile_id"),
@@ -200,5 +266,6 @@ def run(text: str, profile: dict[str, Any]) -> dict[str, Any]:
         "zones": zones,
         "fields": fields,
         "parties": parties,
+        "asset_groups": groups,
         "errors": errors,
     }

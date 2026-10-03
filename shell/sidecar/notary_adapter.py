@@ -644,6 +644,11 @@ def _workspace_module():
     return _svc("case_workspace")
 
 
+def _docx_store():
+    return _svc("document_intake.docx_store").DocxStore(
+        Path(engine_data_dir("notary_v2")) / "docx_sources")
+
+
 def workspace_get(job, payload):
     """notary.workspace_get — doc workspace + stage + diagram V2."""
     if not isinstance(payload, dict):
@@ -688,9 +693,9 @@ def workspace_create(job, payload):
     try:
         module = _workspace_module()
         try:
-            data = module.CaseWorkspaceService(sess).create(
+            data = module.CaseWorkspaceService(sess, _docx_store).create(
                 payload.get("idempotency_key"), payload.get("case"),
-                stage, state)
+                stage, state, payload.get("docx_import"))
         except module.WorkspaceError as err:
             raise _workspace_command_error(err)
         job.check_cancel()
@@ -718,8 +723,8 @@ def workspace_commit_stage(job, payload):
     try:
         module = _workspace_module()
         try:
-            data = module.CaseWorkspaceService(sess).commit_stage(
-                case_id, base_revision, stage, case_meta)
+            data = module.CaseWorkspaceService(sess, _docx_store).commit_stage(
+                case_id, base_revision, stage, case_meta, payload.get("docx_import"))
         except module.WorkspaceError as err:
             raise _workspace_command_error(err)
         job.check_cancel()
@@ -814,6 +819,7 @@ def intake_analyze(job, payload):
     try:
         outcome = svc.analyze(
             sources,
+            store_docx=_docx_store().save,
             check_cancel=job.check_cancel,
             report_progress=_progress)
     except svc.IntakeError as exc:
@@ -988,7 +994,7 @@ def word_export_options(job, payload):
     NAIA-8: `template_dir` (FileRef thu muc) → documents = file .docx
     quet duoc thay vi catalog co dinh."""
     p = payload if isinstance(payload, dict) else {}
-    extra = set(p) - {"case_id", "template_dir"}
+    extra = set(p) - {"case_id", "template_dir", "original_source_id"}
     if extra:
         raise CommandError("validation_error",
                            f"payload key la: {sorted(extra)}")
@@ -998,6 +1004,23 @@ def word_export_options(job, payload):
     sess = _db_session()
     try:
         case = _word_case(sess, models, cid, writable=False)
+        if p.get("original_source_id"):
+            if p.get("template_dir"):
+                raise CommandError("validation_error", "Chỉ chọn một nguồn mẫu Word")
+            original = _svc("word_original")
+            try:
+                proposals = original.binding_proposals(case, p["original_source_id"], _docx_store())
+            except (ValueError, OSError, KeyError, TypeError) as exc:
+                raise CommandError("word.original_mapping_invalid", str(exc)) from exc
+            reason = None
+            try:
+                original.reviewed_template(case, p["original_source_id"], _docx_store())
+            except (ValueError, OSError, KeyError, TypeError):
+                reason = "word.original_mapping_invalid"
+            return _result("word_export_options", {"schema_version": wbe.SCHEMA_VERSION,
+                "binding_proposals": proposals,
+                "documents": [{"document_key": "original.docx", "display_name": "Hợp đồng Word gốc",
+                               "ready": reason is None, "block_reason": reason}]})
         try:
             doc_specs, resolver = _word_template_source(
                 sess, wbe, p.get("template_dir"))
@@ -1028,7 +1051,7 @@ def word_export_batch(job, payload):
 
     p = payload if isinstance(payload, dict) else {}
     extra = set(p) - {"case_id", "document_keys", "destination",
-                      "template_dir", "create_case_subdir"}
+                      "template_dir", "create_case_subdir", "original_source_id", "base_revision"}
     if extra:
         raise CommandError("validation_error",
                            f"payload key la: {sorted(extra)}")
@@ -1042,6 +1065,26 @@ def word_export_batch(job, payload):
     sess = _db_session()
     try:
         case = _word_case(sess, models, cid, writable=True)
+        if p.get("original_source_id"):
+            if p.get("template_dir") or p.get("document_keys") != ["original.docx"]:
+                raise CommandError("validation_error", "Chọn đúng hợp đồng Word gốc")
+            if p.get("base_revision") != case.workspace_revision:
+                raise CommandError("workspace_conflict", "Hồ sơ đã đổi; hãy tải lại trước khi xuất")
+            destination = existing_dir(p.get("destination"))
+            if create_case_subdir:
+                child = destination / f"HS-{cid}"
+                child.mkdir(exist_ok=True)
+                if not wbe._contained_in(child, destination.resolve()):
+                    raise CommandError("word_path_traversal", "Thư mục con nằm ngoài thư mục đích")
+                destination = child
+            job.check_cancel()
+            try:
+                data = _svc("word_original").export_original(case, p["original_source_id"], _docx_store(),
+                                                             destination, check_cancel=job.check_cancel)
+            except wbe.WordBatchError as exc:
+                raise _word_batch_command_error(exc) from exc
+            job.check_cancel(_result("word_export_batch", data))
+            return _result("word_export_batch", data)
         try:
             doc_specs, resolver = _word_template_source(
                 sess, wbe, p.get("template_dir"))

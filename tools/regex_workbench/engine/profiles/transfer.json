@@ -1,6 +1,6 @@
 {
   "profile_id": "transfer",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Profile chuan cho hop dong chuyen nhuong quyen su dung dat. Tat ca pattern viet o dang folded: chu thuong, khong dau, 'd' thay 'đ'. Engine match tren van ban da fold roi map span ve van ban goc.",
   "regex_timeout_ms": 1000,
   "title": {
@@ -116,7 +116,8 @@
         "doi\\s*tuong\\s*cua\\s*hop\\s*dong",
         "quyen\\s*su\\s*dung\\s*dat[\\s\\S]{0,250}?co\\s*dia\\s*chi\\s*tai",
         "(?m)^\\s*(?:mo\\s*ta\\s*)?tai\\s*san\\s*la\\b",
-        "(?m)^\\s*tai\\s*san\\s*chuyen\\s*nhuong\\b"
+        "(?m)^\\s*tai\\s*san\\s*chuyen\\s*nhuong\\b",
+        "(?m)^\\s*tai\\s*san\\s*(?:thu\\s*)?\\d+\\s*[:.)-]"
       ]
     },
     {
@@ -302,5 +303,31 @@
       "expect": "one",
       "pattern": "(?:cap\\s*ngay|cap\\s*vao\\s*ngay)\\s*[:.]?\\s*(\\d{1,2}[/.\\-]\\d{1,2}[/.\\-]\\d{4})"
     }
-  ]
+  ],
+  "asset_groups": {
+    "delimiter": "(?m)^\\s*tai\\s*san\\s*(?:thu\\s*)?\\d+\\s*[:.)-]",
+    "land_rows": {
+      "delimiter": "(?m)^\\s*(?:\\d+[.)]\\s*)?loai\\s*dat\\s*[:.]",
+      "fields": [
+        {
+          "name": "loai_dat",
+          "rule_id": "land.loai_dat",
+          "pattern": "loai\\s*dat\\s*[:.]\\s*([^;\\n]+)",
+          "group": 1
+        },
+        {
+          "name": "dien_tich",
+          "rule_id": "land.dien_tich",
+          "pattern": "dien\\s*tich\\s*[:.]\\s*(\\d+[.,]?\\d*)",
+          "group": 1
+        },
+        {
+          "name": "thoi_han",
+          "rule_id": "land.thoi_han",
+          "pattern": "thoi\\s*han\\s*[:.]\\s*([^;\\n]+)",
+          "group": 1
+        }
+      ]
+    }
+  }
 }

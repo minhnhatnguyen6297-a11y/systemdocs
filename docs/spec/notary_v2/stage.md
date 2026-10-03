@@ -93,6 +93,12 @@ phải báo `workspace_conflict`; không ghi đè cưỡng bức.
 
 ## 7. Quan hệ với feature khác
 
+Nhập hợp đồng DOCX giữ optional `docx_import` bên cạnh Stage, không nhét
+nguồn vào field Người/Tài sản. Context ghi cùng transaction/revision khi
+create/commit, tải lại qua workspace_get; xóa dòng prune binding, đổi thứ tự
+không đổi row_id và buộc kiểm slot trước xuất. Chi tiết tại
+[`input/docx-import.md`](./input/docx-import.md).
+
 - Input thêm/sửa Stage draft, không commit thay người dùng.
 - Pool = người trong Stage committed chưa được gán Diagram.
 - Diagram chỉ tham chiếu `row_id` của Stage committed.

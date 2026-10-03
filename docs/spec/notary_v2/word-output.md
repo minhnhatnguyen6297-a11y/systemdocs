@@ -35,13 +35,21 @@ bản nháp đã có từ card Tài sản. Không hiển thị nơi mới rồi 
 
 Input: `case_id`, danh sách `document_keys` và thư mục đích local đã tồn tại;
 optional `template_dir` (thư mục chứa mẫu `.docx` người dùng chọn) và
-`create_case_subdir` (ghi vào `<đích>/HS-<case_id>/`). Command này không nhận
-`base_revision`. Output liệt kê từng document, tên file thực, path, trạng thái
+`create_case_subdir` (ghi vào `<đích>/HS-<case_id>/`). Nhánh mẫu thư mục/catalog
+không nhận `base_revision`; nhánh hợp đồng gốc cần revision đã lưu. Output liệt kê từng document, tên file thực, path, trạng thái
 và lỗi; breakdown luôn có `succeeded`, `failed`, `skipped`.
 
 ### Nguồn mẫu
 
-Giao diện hiện tại chỉ chọn mẫu từ thư mục. Catalog cố định còn được backend
+Luồng nhập hợp đồng DOCX có thêm **Dùng hợp đồng Word đã nhập** trong dialog
+này. Chọn riêng từng lần xuất hiện → dòng đã lưu → slot catalog rồi lưu đối
+chiếu trước khi xuất. `original_source_id` chỉ resolve nguồn backend thuộc
+hồ sơ, không nhận đường dẫn mẫu tùy ý; batch này cần `base_revision`. Mẫu gốc
+và mẫu dẫn xuất đều kiểm hash; đổi thứ tự/ô phải xác nhận lại. Không thay mọi
+chuỗi giống nhau. Quy tắc và giới hạn tại
+[`input/docx-import.md`](./input/docx-import.md).
+
+Nguồn mẫu thông thường chọn từ thư mục. Catalog cố định còn được backend
 giữ để tương thích với các lệnh cũ, không phải lựa chọn trong dialog.
 Không `template_dir` → catalog backend cố định (hành vi cũ). Có `template_dir`
 → backend quét file `.docx` ngay trong thư mục (bỏ `~$*` lock file, bỏ

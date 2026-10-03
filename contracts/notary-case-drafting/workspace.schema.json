@@ -113,6 +113,9 @@
             "diagram": { "type": "boolean" },
             "word_export": { "type": "boolean" }
           }
+        },
+        "docx_import": {
+          "$ref": "common.schema.json#/definitions/docx_import"
         }
       }
     }

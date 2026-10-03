@@ -70,6 +70,11 @@ Không có trang Cấu hình hoặc Nhật ký riêng. Website và kiểm tra m�
 đầu tab Audit; lỗi/kết quả hiển thị tại vùng liên quan. Chuyển tab/module phải
 giữ nguồn, bộ lọc, kết quả, lựa chọn và tiến độ tác vụ.
 
+NAIA-4 Word-first hiện dùng dialog Nhập file và Xuất Word của Soạn hồ sơ,
+không phát hành tab Upload thứ ba. Lõi regex NAIA-3 là nguồn quy tắc chung;
+parser DOCX và bằng chứng thuộc Document Intake, binding/xuất thuộc Word.
+Xem [`luồng DOCX`](../notary_v2/input/docx-import.md).
+
 Audit dùng hai bảng 4 cột: `STT | Ngày | Số công chứng | Ghi chú`.
 Upload dùng bảng 6 cột: `✓ | STT | Ngày | Số công chứng | Ghi chú | Địa chỉ file`.
 

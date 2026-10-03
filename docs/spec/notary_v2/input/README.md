@@ -112,6 +112,11 @@ không field nào được đổi thành `confirmed`.
 
 ## 9. Kiến trúc và lịch sử
 
+Luồng hợp đồng DOCX Word-first hiện hành và giới hạn vị trí nguồn nằm tại
+[`docx-import.md`](./docx-import.md). Adapter dùng lõi regex chung, nhiều
+gợi ý có bằng chứng từng trường; không dùng OCR parser để gom cả file thành
+một gợi ý. Review, lưu đối chiếu và xuất theo bản gốc đều cần người kiểm tra.
+
 - Cloud OCR hiện hành là Qwen-only. QR/local OCR đã rời active path; không tự
   khôi phục khi sửa lỗi chung.
 - Upload thủ công hiện hành đi qua `POST /api/ocr/analyze` và

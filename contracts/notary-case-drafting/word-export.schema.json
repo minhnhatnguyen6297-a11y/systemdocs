@@ -12,7 +12,17 @@
         "template_dir": {
           "$ref": "common.schema.json#/definitions/file_ref_dir",
           "description": "NAIA-8: thư mục mẫu người dùng chọn — documents = file .docx quét được thay vì catalog cố định"
+        },
+        "original_source_id": {
+          "type": "string",
+          "format": "uuid"
         }
+      },
+      "not": {
+        "required": [
+          "original_source_id",
+          "template_dir"
+        ]
       }
     },
     "options_result_data": {
@@ -24,6 +34,58 @@
         "documents": {
           "type": "array",
           "items": { "$ref": "common.schema.json#/definitions/document_option" }
+        },
+        "binding_proposals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "candidate_id",
+              "occurrence_id",
+              "field_key",
+              "slot",
+              "raw_snippet",
+              "row_id",
+              "row_label",
+              "value",
+              "supported"
+            ],
+            "properties": {
+              "candidate_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "occurrence_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "field_key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "slot": {
+                "type": "string",
+                "minLength": 1
+              },
+              "raw_snippet": {
+                "type": "string"
+              },
+              "row_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "row_label": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              },
+              "supported": {
+                "type": "boolean"
+              }
+            }
+          }
         }
       }
     },
@@ -47,6 +109,37 @@
         "create_case_subdir": {
           "type": "boolean",
           "description": "NAIA-8: true → ghi vào <destination>/HS-<case_id>/ (tạo nếu thiếu)"
+        },
+        "original_source_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "base_revision": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "not": {
+        "required": [
+          "original_source_id",
+          "template_dir"
+        ]
+      },
+      "if": {
+        "required": [
+          "original_source_id"
+        ]
+      },
+      "then": {
+        "required": [
+          "base_revision"
+        ],
+        "properties": {
+          "document_keys": {
+            "const": [
+              "original.docx"
+            ]
+          }
         }
       }
     },

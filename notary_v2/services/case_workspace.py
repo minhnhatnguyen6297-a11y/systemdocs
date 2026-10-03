@@ -930,8 +930,17 @@ def _v2_to_legacy_nodes(nodes: list[dict],
 class CaseWorkspaceService:
     """Compose/commit workspace cho một InheritanceCase trên session ORM."""
 
-    def __init__(self, db):
+    def __init__(self, db, docx_store=None):
         self.db = db
+        self.docx_store = docx_store
+
+    def _docx_context(self, context, stage):
+        from .word_original import validate_context
+        try:
+            store = self.docx_store() if callable(self.docx_store) else self.docx_store
+            return validate_context(context, stage, store)
+        except (ValueError, OSError, TypeError, KeyError) as exc:
+            raise WorkspaceError("validation_error", str(exc)) from exc
 
     # ------------------------------------------------------------- public
 
@@ -1008,6 +1017,8 @@ class CaseWorkspaceService:
             data["warnings"] = list(composed.data_warnings)
         data["stage"] = stage_out
         data["diagram"] = diagram_out
+        if "docx_import" in composed.payload:
+            data["docx_import"] = composed.payload["docx_import"]
         data["capabilities"] = {
             "intake": list(INTAKE_KINDS) if supported else [],
             "diagram": supported,
@@ -1018,7 +1029,7 @@ class CaseWorkspaceService:
         return data
 
     def commit_stage(self, case_id: int, base_revision: int,
-                     stage: Any, case_meta: Any = None) -> dict:
+                     stage: Any, case_meta: Any = None, docx_import: Any = None) -> dict:
         """`notary.workspace_commit_stage` — atomic: validate → upsert →
         prune Diagram → re-evaluate → persist → revision+1 (§6.1, §13).
 
@@ -1112,6 +1123,9 @@ class CaseWorkspaceService:
             # _upsert_people; load trước khi upsert vì upsert không đụng
             # case_state_json.
             payload = self._load_payload(case) or {}
+            import_context = docx_import if docx_import is not None else payload.get("docx_import")
+            if import_context is not None:
+                payload["docx_import"] = self._docx_context(import_context, stage)
             prev_stage_rows = {
                 r["row_id"]: r
                 for r in (payload.get("stage") or [])
@@ -1220,6 +1234,7 @@ class CaseWorkspaceService:
             "revision": new_revision,
             "stage": stage_out,
             "diagram": diagram_out,
+            **({"docx_import": payload["docx_import"]} if "docx_import" in payload else {}),
         }
 
     def update_meta(self, case_id: int, base_revision: int,
@@ -1328,7 +1343,7 @@ class CaseWorkspaceService:
         }
 
     def create(self, idempotency_key: Any, case_meta: Any,
-               stage: Any, state: Any) -> dict:
+               stage: Any, state: Any, docx_import: Any = None) -> dict:
         """`notary.workspace_create` — tạo hồ sơ từ nháp (§13.6).
 
         Một transaction: validate → tạo case + person + asset + link +
@@ -1465,7 +1480,7 @@ class CaseWorkspaceService:
                     case, legacy_nodes, owner_entity=nguoi_chet)
             case.case_state_json = json.dumps(
                 self._build_payload(
-                    {}, resolved_people, resolved_assets,
+                    ({"docx_import": self._docx_context(docx_import, stage)} if docx_import is not None else {}), resolved_people, resolved_assets,
                     clean_state, render_model, legacy_nodes, now,
                     domain=case_type, owner_row_id=owner_row_id,
                     case=case),
@@ -1498,6 +1513,7 @@ class CaseWorkspaceService:
             "schema_version": SCHEMA_VERSION,
             "backend_mode": "real",
             "created": True,
+            **({"docx_import": json.loads(case.case_state_json)["docx_import"]} if docx_import is not None else {}),
             "case": {
                 "id": case.id,
                 "case_type": case_type,

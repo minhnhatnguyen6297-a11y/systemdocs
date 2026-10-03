@@ -29,6 +29,12 @@ const INTAKE_FILTERS = [
   { name: 'Tài liệu/Giấy tờ',
     extensions: ['jpg', 'jpeg', 'png', 'pdf', 'docx', 'xlsx'] },
 ];
+const INTAKE_FIELD_LABEL = {
+  ho_ten: 'Họ tên', so_giay_to: 'Số giấy tờ', ngay_sinh: 'Ngày sinh', ngay_chet: 'Ngày chết',
+  ngay_cap: 'Ngày cấp', noi_cap: 'Nơi cấp', dia_chi: 'Địa chỉ', so_serial: 'Serial giấy chứng nhận',
+  so_vao_so: 'Số vào sổ', so_thua_dat: 'Số thửa đất', so_to_ban_do: 'Số tờ bản đồ',
+  dien_tich: 'Diện tích', co_quan_cap: 'Cơ quan cấp', land_rows: 'Cụm đất',
+};
 
 function createIntakeDialog(ctx) {
   const model = ctx.model;
@@ -120,18 +126,85 @@ function createIntakeDialog(ctx) {
         const v = f && (f.normalized_value != null
           ? f.normalized_value : f.raw_value);
         const st = f && f.observation_state;
-        bits.push(`${k}: ${v == null ? '—' : v}` +
+        bits.push(`${INTAKE_FIELD_LABEL[k] || k}: ${k === 'land_rows' ? 'xem từng dòng bên dưới' : v == null ? '—' : v}` +
           (st ? ` (${OBS_STATE_LABEL[st] || st})` : ''));
       }
       head.append(h('span', 'cd-suggest-text', bits.join(' · ')));
       card.append(head);
+      for (const [key, field] of Object.entries(sug.fields || {})) {
+        if (key === 'land_rows') {
+          const rowsBox = h('div', 'cd-slot');
+          let rows = [];
+          try { rows = JSON.parse(field.normalized_value || '[]'); } catch (_) { /* malformed stays editable */ }
+          if (!Array.isArray(rows)) rows = [];
+          const update = () => model.reviewSuggestion(sug.suggestion_id, key, JSON.stringify(rows));
+          function renderRows() {
+            rowsBox.innerHTML = '';
+            rowsBox.append(h('div', 'muted', 'Cụm đất: mỗi dòng giữ riêng loại đất, diện tích và thời hạn.'));
+            for (const row of rows) {
+              const rowEl = h('div', 'cd-check-row');
+              for (const [name, label] of [['loai_dat', 'Loại đất'], ['dien_tich', 'Diện tích'], ['thoi_han', 'Thời hạn']]) {
+                const input = h('input'); input.type = name === 'dien_tich' ? 'number' : 'text';
+                input.value = row[name] == null ? '' : String(row[name]);
+                input.setAttribute('aria-label', label); input.placeholder = label;
+                if (name === 'dien_tich') { input.min = '0'; input.step = 'any'; }
+                input.onchange = () => { row[name] = input.value === '' ? null : name === 'dien_tich' ? Number(input.value) : input.value; update(); };
+                rowEl.append(input);
+              }
+              rowEl.append(btn('Bỏ dòng', 'ghost sm', () => { rows.splice(rows.indexOf(row), 1); update(); renderRows(); }));
+              rowsBox.append(rowEl);
+            }
+            rowsBox.append(btn('Thêm cụm đất', 'secondary sm', () => {
+              if (rows.length >= 20) return;
+              rows.push({ loai_dat: null, dien_tich: null, thoi_han: null }); update(); renderRows();
+            }));
+          }
+          renderRows(); card.append(rowsBox);
+          const evidence = h('details'); evidence.append(h('summary', '', 'Xem chữ gốc của từng cụm đất'));
+          for (const ref of field.source_refs || []) {
+            evidence.append(h('div', 'muted', `Dòng ${ref.land_row || '?'} · ${ref.land_field || ''}: ${ref.raw_snippet || ''}`));
+            if (ref.core_state === 'ambiguous') evidence.append(btn('Chọn giá trị này', 'ghost sm', () => {
+              const row = rows[(ref.land_row || 1) - 1];
+              if (!row) return;
+              row[ref.land_field] = ref.land_field === 'dien_tich' ? Number(ref.raw_snippet.replace(',', '.')) : ref.raw_snippet;
+              update(); renderRows();
+            }));
+          }
+          card.append(evidence);
+          continue;
+        }
+        const label = h('label', 'cd-check-row');
+        const input = h('input');
+        input.type = 'text';
+        input.value = field.normalized_value == null ? '' : String(field.normalized_value);
+        input.setAttribute('aria-label', `Kiểm tra ${INTAKE_FIELD_LABEL[key] || key}`);
+        input.placeholder = 'Thiếu hoặc chưa chắc — nhập giá trị đã kiểm tra';
+        if (key.startsWith('ngay_')) input.placeholder = 'Năm hoặc ngày dạng 2026-10-04';
+        input.onchange = () => model.reviewSuggestion(sug.suggestion_id, key, input.value);
+        label.append(h('span', '', INTAKE_FIELD_LABEL[key] || key), input);
+        card.append(label);
+        const evidence = h('details');
+        evidence.append(h('summary', '', 'Xem chữ gốc và vị trí'));
+        for (const ref of field.source_refs || []) {
+          evidence.append(h('div', 'muted', `${ref.raw_snippet || field.raw_value || ''} · ` +
+            (ref.span ? `chữ ${ref.span[0]}–${ref.span[1]} · ${ref.rule_id || ''}` : 'nguồn nhập')));
+          if (ref.kind === 'docx' && key !== 'land_rows') {
+            evidence.append(btn('Chọn giá trị này', 'ghost sm', () => {
+              input.value = ref.raw_snippet;
+              model.reviewSuggestion(sug.suggestion_id, key, input.value);
+            }));
+          }
+        }
+        card.append(evidence);
+      }
       for (const w of sug.warnings || []) {
         card.append(h('div', 'muted warn-text', w.message || w.code));
       }
       const actions = h('div', 'toolbar');
       const put = btn('Đưa vào Stage', 'primary sm', () => {
-        model.acceptSuggestion(sug.suggestion_id);
-        card.remove();
+        const row = model.acceptSuggestion(sug.suggestion_id);
+        if (row) card.remove();
+        else notify(model.state.notice || 'Gợi ý chưa được đưa vào Stage', true);
       });
       put.disabled = !model.canWrite();
       const drop = btn('Bỏ qua', 'ghost sm', () => {
@@ -226,6 +299,7 @@ function createIntakeDialog(ctx) {
 
       const prog = h('div', 'cd-slot muted');
       const review = h('div', 'cd-slot cd-ireview');
+      for (const suggestion of model.state.suggestions || []) review.append(reviewCardEl(suggestion));
       body.append(prog, review);
 
       const pickBtn = btn('Chọn file…', 'secondary', async () => {
@@ -295,6 +369,7 @@ function createIntakeDialog(ctx) {
               : 'Đang phân tích…';
           },
         });
+        if (r.stale) return;
         busy = false;
         jobId = null;
         go.disabled = false;
@@ -311,6 +386,16 @@ function createIntakeDialog(ctx) {
               `${e.code}: ${e.message || ''}`));
           }
           if (news.length) {
+            review.append(btn('Tải JSON về máy', 'secondary sm', () => {
+              const json = JSON.stringify({ schema_version: lastResult.schema_version,
+                suggestions: news, errors: lastResult.errors || [] }, (key, value) => key === 'reviewed' ? undefined : value, 2);
+              const url = URL.createObjectURL(new Blob([json], { type: 'application/json;charset=utf-8' }));
+              const anchor = document.createElement('a');
+              anchor.href = url;
+              anchor.download = 'word-goi-y.json';
+              anchor.click();
+              URL.revokeObjectURL(url);
+            }));
             review.append(h('div', 'cd-suggest-title',
               `${news.length} gợi ý mới — xử lý tại đây hoặc đóng ` +
               'và xử lý trong khay gợi ý dưới Stage.'));

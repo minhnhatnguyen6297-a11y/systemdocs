@@ -75,6 +75,9 @@
               "description": "personId tham chiếu row_id trong stage của cùng payload; node 'owner' bắt buộc đã gán"
             }
           }
+        },
+        "docx_import": {
+          "$ref": "common.schema.json#/definitions/docx_import"
         }
       }
     },
@@ -103,6 +106,9 @@
         },
         "capabilities": {
           "$ref": "workspace.schema.json#/definitions/result_data/properties/capabilities"
+        },
+        "docx_import": {
+          "$ref": "common.schema.json#/definitions/docx_import"
         }
       }
     }

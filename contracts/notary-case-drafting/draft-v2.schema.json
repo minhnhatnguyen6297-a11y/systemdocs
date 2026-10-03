@@ -4,6 +4,16 @@
   "title": "notary.case-drafting.v2 — MIN-125 (APPROVED 27/09/2026)",
   "description": "Định nghĩa shape v2 cho §13 của contracts/notary-case-drafting.md. Đã được owner duyệt 27/09/2026; implement ở P5 (MIN-128). Normative text là §13 trong file contract — file này là tham chiếu hỗ trợ.",
   "definitions": {
+    "word_options_result_v2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "documents"],
+      "properties": {
+        "schema_version": { "$ref": "#/definitions/schema_version_v2" },
+        "documents": { "$ref": "word-export.schema.json#/definitions/options_result_data/properties/documents" },
+        "binding_proposals": { "$ref": "word-export.schema.json#/definitions/options_result_data/properties/binding_proposals" }
+      }
+    },
     "schema_version_v2": {
       "type": "string",
       "const": "notary.case-drafting.v2"
@@ -196,6 +206,9 @@
           "properties": {
             "state": { "$ref": "#/definitions/diagram_state_v3" }
           }
+        },
+        "docx_import": {
+          "$ref": "common.schema.json#/definitions/docx_import"
         }
       }
     },
@@ -221,7 +234,10 @@
             "ghi_chu": { "$ref": "common.schema.json#/definitions/nullable_string" }
           }
         },
-        "stage": { "$ref": "#/definitions/stage_v2" }
+        "stage": { "$ref": "#/definitions/stage_v2" },
+        "docx_import": {
+          "$ref": "common.schema.json#/definitions/docx_import"
+        }
       }
     },
     "payload_diagram_save_v2": {

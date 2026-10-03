@@ -53,6 +53,9 @@
               "description": "MIN-141: input không bắt buộc thoi_han lẻ — chỉ land_rows[].thoihan"
             }
           }
+        },
+        "docx_import": {
+          "$ref": "common.schema.json#/definitions/docx_import"
         }
       }
     },
@@ -89,6 +92,9 @@
               "description": "non-null — re-evaluate trong cùng transaction (contract §6.1)"
             }
           }
+        },
+        "docx_import": {
+          "$ref": "common.schema.json#/definitions/docx_import"
         }
       }
     }

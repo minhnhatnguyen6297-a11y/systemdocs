@@ -1,5 +1,20 @@
 # Decisions — MIN-139
 
+## 2026-10-04 — Triển khai Word-first đã được Owner yêu cầu
+
+- **Nguồn Owner:** NAIA-4 comments `01a0fd96-dc6d-77f5-a301-053b7eb6a651`,
+  `01a0fd9b-ff2e-7e8c-be10-bbf2bfe91391` (02/10),
+  `01a0ff5c-5cf6-7e55-a2e8-597143bfb0d3` (03/10), yêu cầu triển khai trong chat
+  04/10. Chọn Word trước, regex NAIA-3 chung, không tự suy quan hệ/sở hữu.
+- **Lựa chọn kỹ thuật của executor:** giữ parser/bản đồ DOCX trong Document
+  Intake, source/extraction và derivative tại engine-data, context ID/hash
+  trong workspace snapshot; Word service dùng catalog tích hợp. Ghi cùng
+  Stage transaction/revision, không thêm DB công nghệ khác.
+- **Thay cho hướng UI 29/09 trong đợt này:** giữ dialog Intake/Word và hai Upload
+  tabs; không tạo tab thứ ba. Không nối địa chỉ lịch sử từ ledger pending.
+- **Bằng chứng giới hạn:** fixture giả lập có nhãn; chưa có corpus văn phòng
+  hoặc kiểm trang Word thật. Tách/gộp tùy ý ứng viên chưa có UI riêng.
+
 ## 2026-09-29 — Định hình sản phẩm
 - **Chọn:** Đặt giao diện sản phẩm thành tab thứ ba trong Upload Lab; đầu ra
   chính là bản ghi người/tài sản đã nhóm và có bằng chứng nguồn.

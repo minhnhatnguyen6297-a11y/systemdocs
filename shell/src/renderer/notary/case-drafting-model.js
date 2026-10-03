@@ -291,6 +291,8 @@ function createModel(deps) {
     state.capabilities = data.capabilities ||
       { intake: [], diagram: false, word_export: false };
     state.committed = clone(data.stage || { people: [], assets: [] });
+    state.docxImport = clone(data.docx_import || { version: 1, sources: [] });
+    state.committedDocxImport = clone(state.docxImport);
     state.stage = clone(state.committed);
     const dg = data.diagram || {};
     state.diagram = clone(dg.state ||
@@ -411,6 +413,9 @@ function createModel(deps) {
     state.committed = { people: [], assets: [] };
     state.committedCaseInfo = null;   // nhap moi: khong co baseline case
     state.stage = newStageDraft(ct);
+    state.docxImport = { version: 1, sources: [] };
+    state.committedDocxImport = clone(state.docxImport);
+    state.wordBindingProposals = [];
     state.stageDirty = false;
     state.diagramDirty = true;        // seed la draft chua persist
     state.metaDirty = false;
@@ -560,6 +565,7 @@ function createModel(deps) {
       case: meta,
       stage: stageForWire(state.stage),
       diagram: { state: clone(state.diagram) },
+      ...(state.docxImport && state.docxImport.sources.length ? { docx_import: clone(state.docxImport) } : {}),
     });
     state.busy = null;
     if (s !== session) return r;      // nhap da bi thay — bo response
@@ -780,6 +786,7 @@ function createModel(deps) {
       base_revision: state.revision,
       stage: stageForWire(state.stage),
     };
+    if (state.docxImport && state.docxImport.sources.length) payload.docx_import = clone(state.docxImport);
     // đợt 3 (MIN-141): metadata hồ sơ ghi cung Stage trong mot
     // transaction — payload.case la block day du, chi gui khi meta
     // sua de khong ghi de meta cua client khac.
@@ -808,6 +815,8 @@ function createModel(deps) {
     const d = r.data || {};
     state.revision = d.revision;
     state.committed = clone(d.stage || state.stage);
+    if (d.docx_import) state.docxImport = clone(d.docx_import);
+    state.committedDocxImport = clone(state.docxImport || { version: 1, sources: [] });
     state.stage = clone(state.committed);
     if (d.diagram) {
       // Commit prune + re-evaluate trong transaction (§6.1). Baseline
@@ -1175,8 +1184,8 @@ function createModel(deps) {
       ? { sources: clone(sources) }
       : { case_id: state.caseId, sources: clone(sources) };
     const r = await client.run('notary.intake_analyze', payload, opts);
+    if (s !== session) return { ok: true, stale: true };
     state.intakeBusy = false;
-    if (s !== session) return r;      // response tre — bo
     if (!r.ok) {
       const err = r.error || errObj('unknown');
       if (err.code === 'user_canceled') {
@@ -1220,14 +1229,57 @@ function createModel(deps) {
     const sug = state.suggestions[i];
     const fields = {};
     for (const [k, f] of Object.entries(sug.fields || {})) {
-      fields[k] = f && f.normalized_value != null
+      if (f && (f.normalized_value == null || k === 'land_rows') && (f.source_refs || []).some((ref) =>
+          ['ambiguous', 'error', 'warning_nonstandard'].includes(ref.core_state)) && !f.reviewed) {
+        state.notice = `${k}: hãy chọn hoặc sửa giá trị trước khi đưa vào Stage`;
+        emit();
+        return null;
+      }
+      fields[k] = f && f.reviewed ? f.normalized_value : f && f.normalized_value != null
         ? f.normalized_value : (f && f.raw_value != null ? f.raw_value : null);
+    }
+    if (fields.land_rows) {
+      try {
+        fields.land_rows = JSON.parse(fields.land_rows);
+        if (!Array.isArray(fields.land_rows) || !fields.land_rows.length || fields.land_rows.length > 20 ||
+            fields.land_rows.some((r) => !r || typeof r !== 'object' || Array.isArray(r))) throw new Error();
+      } catch (_) { state.notice = 'Cụm đất cần là danh sách JSON hợp lệ'; emit(); return null; }
     }
     const row = sug.target === 'asset'
       ? addAsset(fields) : addPerson(fields);
+    if (!row) { state.notice = 'Stage đã đủ chỗ; gợi ý vẫn được giữ để xử lý sau'; emit(); return null; }
+    const ref = Object.values(sug.fields || {}).flatMap((f) => f.source_refs || []).find((r) => r.kind === 'docx');
+    if (ref) {
+      state.docxImport = state.docxImport || { version: 1, sources: [] };
+      let source = state.docxImport.sources.find((s) => s.source_id === ref.source_id);
+      if (!source) {
+        source = { source_id: ref.source_id, sha256: ref.source_sha256, records: [], bindings: [] };
+        state.docxImport.sources.push(source);
+      }
+      source.records.push({ candidate_id: sug.suggestion_id, row_id: row.row_id });
+    }
     state.suggestions.splice(i, 1);
     emit();
     return row;
+  }
+
+  function reviewSuggestion(suggestionId, fieldKey, value) {
+    const sug = state.suggestions.find((s) => s.suggestion_id === suggestionId);
+    if (!canWrite() || !sug || !sug.fields[fieldKey]) return false;
+    sug.fields[fieldKey].normalized_value = value === '' ? null : value;
+    sug.fields[fieldKey].reviewed = true;
+    emit();
+    return true;
+  }
+
+  function confirmOriginalBindings(sourceId, bindings) {
+    if (!canWrite() || state.stageDirty || state.diagramDirty) return false;
+    const source = state.docxImport.sources.find((s) => s.source_id === sourceId);
+    if (!source) return false;
+    source.bindings = bindings.map((b) => ({ candidate_id: b.candidate_id,
+      occurrence_id: b.occurrence_id, field_key: b.field_key, slot: b.slot }));
+    touchStage();
+    return true;
   }
 
   function discardSuggestion(suggestionId) {
@@ -1320,7 +1372,7 @@ function createModel(deps) {
   // NAIA-8: `templateDir` = {file_token} cua thu muc mau do nguoi dung
   // chon — main resolve thanh FileRef is_dir:true; backend quet .docx
   // trong thu muc do. Khong truyen → catalog/builtin cu.
-  async function loadWordOptions(templateDir) {
+  async function loadWordOptions(templateDir, originalSourceId) {
     const s = session;
     const seq = ++wordScanSeq;
     // Quet folder moi = nguon mau moi — xoa options ngay de khong ai
@@ -1329,6 +1381,7 @@ function createModel(deps) {
     emit();
     const payload = { case_id: state.caseId };
     if (templateDir) payload.template_dir = templateDir;
+    if (originalSourceId) payload.original_source_id = originalSourceId;
     const r = await client.run('notary.word_export_options', payload);
     if (s !== session || seq !== wordScanSeq) {
       // Response tre (case doi hoac folder moi hon dang scan) — BO ca
@@ -1341,6 +1394,7 @@ function createModel(deps) {
       return r;
     }
     state.wordOptions = (r.data && r.data.documents) || [];
+    state.wordBindingProposals = (r.data && r.data.binding_proposals) || [];
     emit();
     return r;
   }
@@ -1421,6 +1475,14 @@ function createModel(deps) {
       destination,
     };
     if (o.templateDir) payload.template_dir = o.templateDir;
+    if (o.originalSourceId) {
+      if (state.stageDirty || state.diagramDirty) {
+        state.wordBusy = false;
+        return { ok: false, error: errObj('word.original_mapping_invalid', 'Hãy Cập nhật Stage và Lưu sơ đồ trước khi xuất') };
+      }
+      payload.original_source_id = o.originalSourceId;
+      payload.base_revision = state.revision;
+    }
     if (o.createCaseSubdir) payload.create_case_subdir = true;
     const r = await client.run('notary.word_export_batch', payload, opts);
     state.wordBusy = false;
@@ -1477,7 +1539,7 @@ function createModel(deps) {
     setNodeFlag, toggleNodePosition, setNodeRelation, removeNode,
     evaluateDiagram, saveDiagram,
     resolveConflict,
-    intakeAnalyze, acceptSuggestion, discardSuggestion,
+    intakeAnalyze, acceptSuggestion, discardSuggestion, reviewSuggestion, confirmOriginalBindings,
     loadWordOptions, exportWord,
     dismissNotice,
   };

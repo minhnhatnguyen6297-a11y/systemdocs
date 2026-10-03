@@ -1568,3 +1568,42 @@ tắc MIN-140 ngày 29/09/2026 bị mâu thuẫn; không đổi envelope/schema 
   [`entities.md`](./entities.md) §8–§9.
 - Giữ nháp khi chuyển tab và khi commit lỗi; kiểm dữ liệu khi `Cập nhật`.
   Giữ kiểm revision, owner, khóa hồ sơ, giới hạn người/tài sản và trùng ID.
+
+### 13.17 Nhập hợp đồng DOCX và mẫu gốc — additive NAIA-4 / MIN-139
+
+**Nguồn:** Owner NAIA-4 chọn Word-first/lõi regex chung 02/10/2026, yêu cầu
+triển khai 03–04/10/2026. Đây là bổ sung kênh nội bộ hiện hành, không tạo
+contract trao đổi hồ sơ giữa Upload Lab và Soạn hồ sơ. Envelope vẫn v2.
+
+- Intake giữ shape suggestion/field_value; `source_refs` DOCX có opaque
+  `source_id` do backend tạo, `source_sha256`, `text_map_version:1`,
+  candidate/occurrence ID, raw code-point `span`, `raw_snippet`, rule/profile
+  version/state, `docx_refs` part/path/node_span/supported. Một trường có thể
+  nhiều refs. `land_rows` vẫn là JSON string của danh sách cụm (1..20),
+  refs từng trường con có `land_row` 1-based và `land_field`. Intake không
+  emit confirmed. Mơ hồ giữ normalized null và mọi alternative.
+- Create/commit/get và result có optional `docx_import`, schema tại
+  [`common.schema.json`](./notary-case-drafting/common.schema.json) definition
+  `docx_import`: version 1, tối đa 8 nguồn; mỗi nguồn có source_id/hash,
+  records candidate_id→row_id, bindings candidate_id/occurrence_id/field_key/
+  slot, optional template_sha256 do backend tạo. Context chỉ chứa ID/hash,
+  không chứa đường dẫn khách, chữ gốc hoặc field nghiệp vụ tùy ý.
+- Backend chỉ nhận ứng viên/vị trí từ extraction package đã lưu khi intake
+  được cấp quyền. Stage và context lưu cùng transaction và revision; omit
+  context giữ bản cũ, `sources:[]` là xóa đối chiếu. Xóa row prune record và
+  binding, không gắn sang row khác. Hủy nháp khôi phục context đã commit.
+- Word options/batch nhận optional `original_source_id`, không đi cùng
+  template_dir. Options trả thêm `binding_proposals` gồm chữ gốc, candidate/
+  occurrence/field/slot, row_id/row_label, giá trị đã lưu và supported.
+  Proposal không phải binding đã xác nhận. Batch gốc cần base_revision và
+  document_keys chính xác `["original.docx"]`; folder/catalog giữ hành vi cũ.
+- Người N theo Stage; Bên A/B theo ô Diagram; tài sản N theo thứ tự Stage.
+  Binding dùng row_id+field, slot phải khớp lại lúc xuất. N/seat đổi, source/
+  derivative hash đổi, row mất hoặc slot trống → `word.original_mapping_invalid`,
+  không thay ngầm. Span unsupported/chồng nhau từ chối khi lưu binding.
+- Bản derivative tạo riêng, hash/path backend cố định; xuất dùng mapping
+  Word tích hợp và sửa đúng w:t span. Giữ package part khác byte-exact;
+  không dùng paragraph.text/global replace để làm mất format/ảnh. Output
+  độc lập, exclusive create và tăng hậu tố khi trùng; cancellation dọn temp,
+  giữ file đã publish. Giới hạn và phạm vi đọc tại
+  [`spec DOCX`](../docs/spec/notary_v2/input/docx-import.md).

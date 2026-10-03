@@ -1,5 +1,12 @@
 # Brief — MIN-139
 
+**Cập nhật 04/10/2026:** mục tiêu hiện hành là một hợp đồng DOCX → gợi ý
+Người/Tài sản có nguồn → người kiểm tra → Stage đã lưu → xuất theo Word gốc.
+Owner NAIA-4 02–03/10 và chat 04/10 cho phép triển khai; giữ hai Upload tabs
+và dialog Intake hiện có. Nội dung 29/09 dưới đây là lịch sử, hướng tab thứ ba/
+đa nguồn đã được thay cho đợt Word-first. SOT hành vi:
+[`spec DOCX`](../../../docs/spec/notary_v2/input/docx-import.md).
+
 **Linear:** https://linear.app/minhnotary/issue/MIN-139/spec-document-field-studio-engine-nhan-dien-truong-dung-chung-trong · **Ngày bắt đầu:** 2026-09-29 · **Nhánh/worktree:** minhnhatnguyen6297-a11y/notaryoffice-bmad-brainstorm
 
 ## Mục tiêu

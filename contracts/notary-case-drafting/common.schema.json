@@ -574,6 +574,96 @@
           }
         }
       ]
+    },
+    "docx_import": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "sources"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "sources": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source_id",
+              "sha256",
+              "records",
+              "bindings"
+            ],
+            "properties": {
+              "source_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "records": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "candidate_id",
+                    "row_id"
+                  ],
+                  "properties": {
+                    "candidate_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "row_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  }
+                }
+              },
+              "template_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "bindings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "candidate_id",
+                    "occurrence_id",
+                    "field_key",
+                    "slot"
+                  ],
+                  "properties": {
+                    "candidate_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurrence_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "field_key": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "slot": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
