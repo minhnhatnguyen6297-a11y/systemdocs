@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 from datetime import date, datetime
 import hashlib
+import gzip
 import json
 import os
 from pathlib import Path
@@ -34,9 +35,13 @@ def empty_ledger() -> dict:
             "coverage": {}, **{key: [] for key in COLLECTIONS}}
 
 
-def read_ledger(folder: Path) -> dict:
+def read_ledger(folder: Path, *, initialize=False) -> dict:
     path = folder / "ledger.json"
-    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else empty_ledger()
+    if path.exists():
+        return json.loads(path.read_text(encoding="utf-8"))
+    if initialize:
+        return empty_ledger()
+    raise LedgerError(f"stored ledger missing: {path}; initialize with import-bando")
 
 
 def _shape(value, schema, definitions, path="ledger"):
@@ -189,6 +194,12 @@ def validate(ledger: dict, folder: Path | None = None) -> dict:
         kind = event["type"]
         if kind in ("rename", "reparent") and (len(incoming) != 1 or incoming != outgoing):
             raise LedgerError(f"{event['id']}: rename/reparent must preserve unit identity")
+        if kind == "rename":
+            uid = next(iter(incoming))
+            for name in ledger["names"]:
+                if name["unit_id"] == uid and name["status"] == "confirmed" and name["valid_from"] < event["effective_on"] and (
+                        name["valid_to"] is None or name["valid_to"] > event["effective_on"]):
+                    raise LedgerError(f"{name['id']}: name period spans confirmed rename {event['id']}")
         if kind == "merge" and (len(incoming) < 2 or len(outgoing) != 1):
             raise LedgerError(f"{event['id']}: invalid merge cardinality")
         if kind == "split" and (len(incoming) != 1 or len(outgoing) < 2):
@@ -201,9 +212,10 @@ def validate(ledger: dict, folder: Path | None = None) -> dict:
             if assertion["event_id"] == event["id"] and assertion["status"] == "confirmed":
                 if assertion["valid_from"] != event["effective_on"]:
                     raise LedgerError(f"{assertion['id']}: date contradicts event")
-        for origin in incoming:
-            for target in outgoing - {origin}:
-                graph.setdefault(origin, []).append((target, event["effective_on"]))
+        if event["territory"] != "partial":
+            for origin in incoming:
+                for target in outgoing - {origin}:
+                    graph.setdefault(origin, []).append((target, event["effective_on"]))
     def visit(node, ancestors, earliest=None):
         if node in ancestors:
             raise LedgerError(f"confirmed transition cycle at {node}")
@@ -215,7 +227,7 @@ def validate(ledger: dict, folder: Path | None = None) -> dict:
         visit(node, set())
     endings = {}
     for event in confirmed_events:
-        if event["type"] == "abolish" or event["type"] in ("merge", "split") and event["territory"] == "whole":
+        if event["type"] == "abolish" or event["type"] in ("merge", "split", "reported_transition") and event["territory"] == "whole":
             outgoing = {r["id"] for r in event["to"]}
             for ref in event["from"]:
                 if ref["id"] not in outgoing:
@@ -227,7 +239,7 @@ def validate(ledger: dict, folder: Path | None = None) -> dict:
             refers_to_unit = any(r["id"] == uid for r in event["from"] + event["to"])
             conflicts_at_end = event["id"] != ending["id"] and event["effective_on"] == end and (
                 event["type"] in ("rename", "reparent", "abolish") or
-                event["type"] in ("merge", "split") and event["territory"] == "whole" and
+                event["type"] in ("merge", "split", "reported_transition") and event["territory"] == "whole" and
                 any(r["id"] == uid for r in event["from"]))
             if refers_to_unit and (event["effective_on"] > end or conflicts_at_end):
                 raise LedgerError(f"{event['id']}: event uses abolished/consumed unit {uid}")
@@ -348,7 +360,7 @@ def import_bando(folder: Path, raw: bytes, retrieved_at: str, tables: dict[str, 
         payloads.append((f"table-{code}", table, "/p.co_bangbieu", f"ma={province['malk']}"))
     version = digest("".join(digest(item[1]) for item in payloads).encode())
     with locked(folder):
-        ledger = read_ledger(folder)
+        ledger = read_ledger(folder, initialize=True)
         validate(ledger, folder)
         if ledger["dataset_version"] == version:
             return validate(ledger, folder)
@@ -368,6 +380,11 @@ def import_bando(folder: Path, raw: bytes, retrieved_at: str, tables: dict[str, 
                     "protocol": "HTTPS POST", "request_body": request_body, "retrieved_at": retrieved_at,
                     "sha256": sha, "snapshot": f"snapshots/{sha}.raw", "description": "Public full catalog/table"})
         known = {u["source_key"]: u["id"] for u in result["units"] if u["source_key"] is not None}
+        known_levels = {u["source_key"]: u["level"] for u in result["units"] if u["source_key"] is not None}
+        for row in rows:
+            expected_level = "province" if row["magoc"] == "0" else "commune"
+            if row["malk"] in known_levels and known_levels[row["malk"]] != expected_level:
+                raise LedgerError(f"{row['malk']}: source key reused across administrative levels")
         ids = {r["malk"]: known.get(r["malk"], "unit:bando:" + digest(r["malk"].encode())[:24]) for r in rows}
         province_ids = {r["ma"]: ids[r["malk"]] for r in provinces}
         report = {"province": len(provinces), "commune": len(rows)-len(provinces), "district": 0,
@@ -419,7 +436,7 @@ def import_bando(folder: Path, raw: bytes, retrieved_at: str, tables: dict[str, 
 
 
 def manual_update(folder: Path, patch: dict) -> dict:
-    if set(patch) != {"base_revision", "upsert"} or not isinstance(patch["upsert"], dict):
+    if not isinstance(patch, dict) or set(patch) != {"base_revision", "upsert"} or not isinstance(patch["upsert"], dict):
         raise LedgerError("patch requires base_revision and upsert")
     if set(patch["upsert"]) - set(COLLECTIONS):
         raise LedgerError("unknown patch collection")
@@ -453,6 +470,14 @@ def manual_update(folder: Path, patch: dict) -> dict:
                     index[row["id"]] = len(result[key])
                     result[key].append(deepcopy(row))
         result["revision"] += 1
+        validate(result, folder)
+        # Retain exact prior bytes before replacing curator records. Archive failure
+        # aborts the update; this immutable recovery evidence is not a second ledger.
+        prior = (folder / "ledger.json").read_bytes()
+        revisions = folder / "revisions"
+        revisions.mkdir(exist_ok=True)
+        archive = revisions / f"revision-{ledger['revision']:08d}-{digest(prior)}.json.gz"
+        atomic_snapshot(archive, gzip.compress(prior, mtime=0))
         atomic_write(folder, result)
         return validate(result, folder)
 

@@ -54,6 +54,10 @@ lịch sử tự động.
 `confirmed` là bản ghi lịch sử có nguồn và ngày được curator xác nhận. Khoảng
 ngày dùng `[valid_from, valid_to)`: gồm ngày đầu, không gồm ngày cuối; ngày cuối
 `null` của bản ghi confirmed nghĩa là còn tiếp tục.
+Trạng thái của từng assertion (một khẳng định tên/mã/cha) độc lập với trạng thái
+sự kiện được dẫn tới. Có thể đã biết chắc tên và ngày bắt đầu, nhưng vẫn chưa
+biết danh tính nơi tiền thân: tên confirmed không tự làm sự kiện pending thành
+confirmed, cũng không cho phép nối lịch sử qua tiền thân ấy.
 
 ## Nguồn Bando và giới hạn
 
@@ -93,7 +97,25 @@ python -m notary_v2.administrative_timeline query owner:demo --as-on 2007-01-01
 cũ còn nguyên. Nội dung giống nhau không tăng revision hoặc viết lại dữ liệu.
 Nội dung mới thêm quan sát/tên/mã/sự kiện chờ, **không xóa lịch sử thủ công**.
 Có khóa ghi để hai CLI không ghi đồng thời. Nếu sau sự cố còn `.write.lock`,
-kiểm tra không có tiến trình ghi rồi mới xóa khóa.
+không tự xóa khóa. Khóa hiện không ghi PID (mã tiến trình); trước tiên kiểm các
+tiến trình Python có thể đang chạy CLI/helper:
+
+```powershell
+Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^python' } | Select-Object ProcessId, CreationDate, CommandLine
+```
+
+Đối chiếu command có `notary_v2.administrative_timeline` và `--folder` với kho
+đang sửa. Nếu dùng folder mặc định hoặc helper được gọi từ script khác, xác
+minh cửa sổ/command chạy nó thuộc checkout nào; chưa rõ thì giữ khóa và chờ
+hoặc kiểm với người mở tiến trình. Khi chắc chắn không còn writer của kho này,
+mới xóa đúng file `.write.lock` trong folder đó và chạy `validate`. Không dùng
+tuổi file làm bằng chứng rằng writer đã chết.
+
+`validate`, `query`, `update` báo lỗi nếu chưa có `ledger.json`; chỉ lần import
+đầu được khởi tạo kho mới. CLI hiện chặn catalog khác mốc **34/3.321** để tránh
+nhập nhầm một phần nguồn. Nếu danh mục thực tế đổi số lượng, phải tải/đối chiếu
+đủ catalog và tất cả bảng công khai, ghi nguồn và tổng số mới, rồi cập nhật
+baseline và tests trong cùng thay đổi có kiểm; không bỏ kiểm chỉ để nhập được.
 
 Patch JSON gồm `base_revision` bằng revision đang có và `upsert` chứa các nhóm
 cần thêm/sửa. Mỗi record ghi đầy đủ theo schema. ID cũ cập nhật record cùng ID;
@@ -102,6 +124,14 @@ nhận lịch sử thì thêm record curator, không sửa câu nguồn. Mention
 cập nhật riêng `resolved_unit_id`/`status`; trường nguồn khác giữ nguyên. Sự kiện
 Bando vẫn là bằng chứng chờ; thêm sự kiện confirmed tham chiếu `unit` và nguồn
 ngày. Nhờ vậy lời website tách khỏi kết luận của curator.
+
+Trước mỗi lần cập nhật thủ công hợp lệ, CLI lưu nguyên byte ledger cũ trong
+`revisions/revision-<revision>-<sha256>.json.gz` (JSON nén). Bản này bất biến,
+giúp xem/khôi phục dữ liệu trước một lần đính chính cùng ID; không là nguồn
+đọc thứ hai. Nếu không lưu được bản cũ thì toàn bộ update dừng, ledger hiện
+tại không đổi. Khi khôi phục cần giải nén bản chọn, đối chiếu hash trong tên,
+kiểm schema/nguồn và revision trước khi thay kho; không có tự động rollback
+hoặc xóa các bản phục hồi. Refresh vẫn thêm bằng chứng mới và giữ lịch sử cũ.
 
 Mention Bando hiện giữ cả câu, có thể chứa nhiều xã. Chỉ gán `resolved_unit_id`
 khi đã xác minh mention tương ứng **một** đơn vị. Với câu A+B, Owner tạo các
@@ -143,6 +173,9 @@ Query trả `chronological_events` (confirmed theo ngày) riêng với `pending_
 (bằng chứng chưa chắc). Chỉ tên confirmed có giai đoạn bao phủ ngày hỏi mới vào
 `confirmed_name_at_date`; thiếu lịch sử trả `insufficient_confirmed_history`,
 không suy từ tên hiện hành. Quan sát hiện tại ở `current_source_observations`.
+CLI query hiện trả lịch sử **tên**, sự kiện và quan sát nguồn; chưa trả truy vấn
+theo ngày cho `codes`/`parents` và chưa giải quyết địa chỉ đầy đủ. Các phiên bản
+mã/cha vẫn được lưu và validate trong ledger để consumer sau dùng đúng nguồn.
 Chỉ quan hệ confirmed nối lịch sử giữa các ID. Mention đã xác nhận danh tính
 giúp tìm bằng chứng pending liên quan; quan hệ đó vẫn pending và không đưa
 lịch sử của nơi bên kia vào kết quả confirmed.
@@ -158,6 +191,13 @@ thụ toàn bộ xung đột, hoặc đổi tên và bỏ đơn vị cùng ngày
 phải đúng `YYYY-MM-DD`. Revision cũ bị từ chối. Ledger và raw snapshot đều ghi
 file tạm rồi thay một lần; lỗi trước đó không để file đích bị ghi nửa chừng.
 
+Chuỗi kế thừa toàn đơn vị khác với chuyển một phần lãnh thổ. Chuyển partial
+A→B rồi B→A ở ngày khác có thể hợp lệ vì cả hai ID vẫn tồn tại; không đưa các
+movement partial vào phép kiểm cycle/ngược ngày của chuỗi kế thừa. Sự kiện
+`reported_transition` confirmed và whole cũng kết thúc input không còn trong
+outputs; bằng chứng Bando pending không áp quy tắc kết thúc ấy. Một giai đoạn
+tên confirmed không được trùm qua ngày rename confirmed, dù `event_id` để null.
+
 [Tests](../../../notary_v2/tests/test_administrative_timeline.py) dùng ví dụ giả
 lập có nhãn: chuỗi rename, merge/split, ba cấp, mã tái dùng, cùng tên khác nơi,
 ngày chờ, nguồn hỏng, refresh/giữ lịch sử, toàn bộ snapshot thật. Chạy:
@@ -168,6 +208,10 @@ lần chạy, phù hợp công cụ local/batch. Khi tích hợp UI, nạp và k
 dựng index (bảng giúp tìm nhanh) theo ID/tên/tỉnh/ngày và đồ thị sự kiện. Truy
 merge/split theo ID, không theo tên; không gọi CLI/quét ledger hoặc tải web mỗi
 lần gõ địa chỉ. Index/cache dựng lại từ ledger được và không là nguồn chính.
+Validator chuỗi hiện dùng lời gọi lặp sâu (recursion); lịch sử cực sâu khoảng
+1.000 bước có thể vượt giới hạn Python. Khi có dữ liệu dài như vậy, chuyển sang
+duyệt lặp bằng hàng đợi/stack cùng index và kiểm lại cycle/ngày; đợt này chưa
+đổi thuật toán cho trường hợp cực sâu.
 
 Chỉ chuyển database khi có nhu cầu thực và quyết định owner/contract; hiện
 chưa cần dịch vụ hoặc DB mới. Đổi schema phải tăng version, giữ bản trước,

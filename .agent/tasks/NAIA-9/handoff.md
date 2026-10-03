@@ -40,3 +40,12 @@ schema anchors/length, province header, lock/current-observation filtering có
 regression tests. Raw snapshot xuất bản qua file tạm rồi replace; retry sau lỗi
 không mắc file hash viết dở. Merge output không tự có formation date; composite
 mention không resolve thành một unit ID. Dữ liệu đã tải giữ nguyên byte và hash.
+
+Review loop 2: 64 timeline tests passed. Partial movement không làm identity
+kết thúc/false successor cycle; whole reported_transition confirmed áp end rules.
+Tên confirmed không span rename dù chưa gắn event_id. Guard patch type, missing
+store và source key reused across levels. Manual correction lưu ledger trước đó
+dạng immutable gzip revision; archive failure aborts update. Archive là recovery
+evidence, ledger hiện tại vẫn là SOT duy nhất. Có tests strict full import/reject,
+CLI subprocess và exact rename boundary. Name-only query và extreme-depth graph
+limit, baseline count revalidation, lock recovery được ghi rõ trong spec.

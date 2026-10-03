@@ -23,3 +23,11 @@ cùng ngày; exact ISO date/maximum date; province header đủ 5 trường; ato
 snapshot và schema pattern có anchor/length. Thêm tests lock/current observation.
 49 timeline tests passed. Giữ nguyên 35 snapshots, 3.355 IDs, observations và
 dataset hashes; chỉ sửa helper/schema/test/docs, không viết lại ledger.
+
+04/10/2026 — sửa review loop 2: partial reciprocal movements không là whole
+succession cycle; tên confirmed không span rename; whole reported_transition
+kết thúc input vắng khỏi output. Guard source-key level/missing-store/patch type.
+Trước curation lưu compressed previous-ledger revision bất biến; lỗi archive
+dừng update. 64 timeline tests passed, có strict full import/rejection, actual
+CLI subprocess và boundary ngày đổi tên. Docs nói rõ name-only query, lock
+recovery, confidence độc lập, baseline source counts và long-graph limits.

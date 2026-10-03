@@ -1,2 +1,3 @@
 snapshots/*.raw -text
 ledger.json text eol=lf
+revisions/*.json.gz -text

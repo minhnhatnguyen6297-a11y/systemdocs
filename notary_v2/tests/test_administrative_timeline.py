@@ -369,7 +369,8 @@ def test_rename_on_abolition_day_rejected_but_own_abolition_is_valid():
 def test_merge_output_can_be_existing_unit_without_invented_formation_date():
     ledger = fixture()
     ledger["units"] = [unit(u) for u in "ABC"]
-    ledger["names"] = [name("C", "Existing C", "2000-01-01")]
+    ledger["names"] = [name("C", "Existing C", "2000-01-01", "2005-01-01"),
+                       name("C", "Renamed C", "2005-01-01", event="before-merge")]
     ledger["events"] = [event("before-merge", "rename", ["C"], ["C"], "2005-01-01"),
                         event("merge", "merge", ["A", "B"], ["C"], "2010-01-01")]
     assert validate(ledger)["valid"]
@@ -510,3 +511,180 @@ def test_query_only_exposes_observations_of_current_dataset(tmp_path):
     assert answer["current_source_observations"][0]["details"]["ten"] == "Xã Changed"
     assert answer["current_source_observations"][0]["dataset_version"] != old_dataset
     assert any(o["dataset_version"] == old_dataset for o in ledger["observations"])
+
+
+def test_confirmed_partial_reciprocal_transfers_preserve_both_identities():
+    ledger = fixture()
+    ledger["units"] = [unit("A"), unit("B")]
+    ledger["names"] = [name("A", "A", "2000-01-01"), name("B", "B", "2000-01-01")]
+    ledger["events"] = [event("part-ab", "reported_transition", ["A"], ["B"], "2010-01-01"),
+                        event("part-ba", "reported_transition", ["B"], ["A"], "2020-01-01")]
+    for change in ledger["events"]:
+        change["territory"] = "partial"
+    assert validate(ledger)["valid"]
+    assert query(ledger, "A", "2021-01-01")["confirmed_name_at_date"][0]["value"] == "A"
+    assert query(ledger, "B", "2021-01-01")["confirmed_name_at_date"][0]["value"] == "B"
+    assert len(query(ledger, "A")["chronological_events"]) == 2
+    for change in ledger["events"]:
+        change["territory"] = "whole"
+    with pytest.raises(LedgerError, match="cycle"):
+        validate(ledger)
+
+
+def test_unlinked_name_period_spanning_confirmed_rename_is_rejected():
+    ledger = fixture()
+    ledger["units"] = [unit("A")]
+    ledger["names"] = [name("A", "Old", "2000-01-01")]
+    ledger["events"] = [event("renamed", "rename", ["A"], ["A"], "2010-01-01")]
+    with pytest.raises(LedgerError, match="spans confirmed rename"):
+        validate(ledger)
+    ledger["names"][0]["valid_to"] = "2010-01-01"
+    ledger["names"].append(name("A", "New", "2010-01-01"))
+    assert query(ledger, "A", "2009-12-31")["confirmed_name_at_date"][0]["value"] == "Old"
+    assert query(ledger, "A", "2010-01-01")["confirmed_name_at_date"][0]["value"] == "New"
+
+
+def test_whole_reported_transition_ends_absent_input_and_rejects_future_activity():
+    ledger = fixture()
+    ledger["units"] = [unit("A"), unit("B")]
+    ledger["events"] = [event("whole-ab", "reported_transition", ["A"], ["B"], "2010-01-01")]
+    ledger["names"] = [name("A", "Old", "2000-01-01")]
+    with pytest.raises(LedgerError, match="outlives"):
+        validate(ledger)
+    ledger["names"][0]["valid_to"] = "2010-01-01"
+    assert validate(ledger)["valid"]
+    ledger["events"].append(event("late", "rename", ["A"], ["A"], "2020-01-01"))
+    with pytest.raises(LedgerError, match="consumed"):
+        validate(ledger)
+
+
+def test_manual_same_id_corrections_retain_exact_prior_revisions(tmp_path):
+    import gzip
+    ledger = fixture()
+    ledger["units"] = [unit("A")]
+    ledger["names"] = [name("A", "Typo", "2000-01-01")]
+    atomic_write(tmp_path, ledger)
+    first_bytes = (tmp_path / "ledger.json").read_bytes()
+    corrected = dict(ledger["names"][0], value="Corrected")
+    manual_update(tmp_path, {"base_revision": 0, "upsert": {"names": [corrected]}})
+    archives = list((tmp_path / "revisions").glob("*.json.gz"))
+    assert len(archives) == 1
+    archive_bytes = archives[0].read_bytes()
+    assert gzip.decompress(archive_bytes) == first_bytes
+    assert json.loads(gzip.decompress(archive_bytes))["names"][0]["value"] == "Typo"
+    second_bytes = (tmp_path / "ledger.json").read_bytes()
+    manual_update(tmp_path, {"base_revision": 1, "upsert": {"names": [dict(corrected, value="Final correction")]}})
+    assert archives[0].read_bytes() == archive_bytes
+    assert {gzip.decompress(p.read_bytes()) for p in (tmp_path / "revisions").glob("*.json.gz")} == {first_bytes, second_bytes}
+    assert read_ledger(tmp_path)["names"][0]["value"] == "Final correction"
+
+
+def test_archive_failure_aborts_curation_and_retry_preserves_prior_bytes(tmp_path):
+    ledger = fixture()
+    ledger["units"] = [unit("A")]
+    ledger["names"] = [name("A", "Old", "2000-01-01")]
+    atomic_write(tmp_path, ledger)
+    before = (tmp_path / "ledger.json").read_bytes()
+    update = {"base_revision": 0, "upsert": {"names": [dict(ledger["names"][0], value="Correction")]}}
+    with patch("notary_v2.administrative_timeline.atomic_snapshot", side_effect=OSError("archive disk failure")):
+        with pytest.raises(OSError, match="archive"):
+            manual_update(tmp_path, update)
+    assert (tmp_path / "ledger.json").read_bytes() == before
+    assert not (tmp_path / ".write.lock").exists()
+    assert not list((tmp_path / "revisions").glob("*.json.gz"))
+    assert manual_update(tmp_path, update)["valid"]
+
+
+def test_source_key_cannot_move_across_levels_on_refresh(tmp_path):
+    raw, tables = bando_fixture()
+    import_bando(tmp_path, raw, "2026-10-04", tables, strict=False)
+    before = (tmp_path / "ledger.json").read_bytes()
+    rows = json.loads(raw)
+    rows[0]["malk"] = "commune:test"
+    rows[1]["malk"] = "commune:new"
+    altered_raw = json.dumps(rows).encode()
+    altered_tables = {"01": (json.dumps(rows[0])+".synt."+json.dumps(rows[1:])).encode()}
+    with pytest.raises(LedgerError, match="across administrative levels"):
+        import_bando(tmp_path, altered_raw, "2026-10-05", altered_tables, strict=False)
+    assert (tmp_path / "ledger.json").read_bytes() == before
+
+
+@pytest.mark.parametrize("value", [None, [], 1, "patch", ["base_revision", "upsert"]])
+def test_non_object_patch_gives_ledger_error_without_creating_store(tmp_path, value):
+    with pytest.raises(LedgerError, match="requires base_revision"):
+        manual_update(tmp_path, value)
+    assert not (tmp_path / "ledger.json").exists()
+
+
+def test_missing_stored_ledger_does_not_look_like_valid_empty_store(tmp_path):
+    with pytest.raises(LedgerError, match="stored ledger missing"):
+        read_ledger(tmp_path)
+    with pytest.raises(LedgerError, match="stored ledger missing"):
+        manual_update(tmp_path, {"base_revision": 0, "upsert": {}})
+    assert read_ledger(tmp_path, initialize=True) == empty_ledger()
+
+
+def test_default_strict_full_import_and_partial_rejection_preserve_store(tmp_path):
+    ledger = read_ledger(DEFAULT_FOLDER)
+    catalog_source = next(s for s in ledger["sources"] if s["request_body"] == "ma=0")
+    raw = (DEFAULT_FOLDER / catalog_source["snapshot"]).read_bytes()
+    sources = {s["request_body"]: s for s in ledger["sources"]}
+    tables = {r["ma"]: (DEFAULT_FOLDER / sources["ma="+r["malk"]]["snapshot"]).read_bytes()
+              for r in json.loads(raw) if r["magoc"] == "0"}
+    result = import_bando(tmp_path, raw, "2026-10-04", tables)
+    assert result["units"] == 3355
+    assert read_ledger(tmp_path)["units"] == ledger["units"]
+    assert read_ledger(tmp_path)["observations"] == ledger["observations"]
+    before = (tmp_path / "ledger.json").read_bytes()
+    partial_raw, partial_tables = bando_fixture()
+    with pytest.raises(LedgerError, match="full catalog"):
+        import_bando(tmp_path, partial_raw, "2026-10-04", partial_tables)
+    assert (tmp_path / "ledger.json").read_bytes() == before
+    assert len(list((tmp_path / "snapshots").glob("*.raw"))) == 35
+
+
+def test_assertion_confidence_does_not_promote_pending_event():
+    ledger = fixture()
+    ledger["units"] = [unit("A")]
+    ledger["mentions"] = [{"id": "unknown", "raw_phrase": "Unknown predecessor", "candidate_names": [],
+                           "resolved_unit_id": None, "status": "pending", "evidence": EVIDENCE}]
+    pending = event("pending", "reported_transition", [], ["A"], None)
+    pending.update(status="pending", **{"from": [{"kind": "mention", "id": "unknown"}]})
+    ledger["events"] = [pending]
+    ledger["names"] = [name("A", "Known name", "2000-01-01", event="pending")]
+    answer = query(ledger, "A", "2001-01-01")
+    assert answer["date_lookup"] == "confirmed"
+    assert answer["chronological_events"] == []
+    assert answer["pending_evidence"][0]["status"] == "pending"
+
+
+def test_actual_cli_update_query_date_boundary_and_errors(tmp_path):
+    import re
+    import subprocess
+    import sys
+    root = Path(__file__).resolve().parents[2]
+    text = (root / "docs/spec/notary_v2/administrative-timeline.md").read_text(encoding="utf8")
+    example = json.loads(re.search(r"```json\n(.*?)\n```", text, re.S).group(1))
+    ledger = empty_ledger()
+    ledger["revision"] = example["base_revision"]
+    atomic_write(tmp_path, ledger)
+    patch_file = tmp_path / "patch.json"
+    patch_file.write_text(json.dumps(example), encoding="utf8")
+    def cli(*args, folder=tmp_path):
+        return subprocess.run([sys.executable, "-X", "utf8", "-m", "notary_v2.administrative_timeline",
+                               "--folder", str(folder), *args], cwd=root, capture_output=True, text=True, encoding="utf8")
+    result = cli("update", str(patch_file))
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["valid"]
+    for day, expected in (("2004-12-31", "A"), ("2005-01-01", "B")):
+        result = cli("query", "owner:demo", "--as-on", day)
+        assert result.returncode == 0, result.stderr
+        assert json.loads(result.stdout)["confirmed_name_at_date"][0]["value"] == expected
+    bad_date = cli("query", "owner:demo", "--as-on", "20050101")
+    assert bad_date.returncode == 2 and "invalid date" in bad_date.stderr
+    missing = cli("validate", folder=tmp_path / "missing")
+    assert missing.returncode == 2 and "stored ledger missing" in missing.stderr
+    patch_file.write_text("null", encoding="utf8")
+    invalid = cli("update", str(patch_file))
+    assert invalid.returncode == 2 and "requires base_revision" in invalid.stderr
+    assert "Traceback" not in invalid.stderr
