@@ -194,27 +194,30 @@ def validate(ledger: dict, folder: Path | None = None) -> dict:
         kind = event["type"]
         if kind in ("rename", "reparent") and (len(incoming) != 1 or incoming != outgoing):
             raise LedgerError(f"{event['id']}: rename/reparent must preserve unit identity")
-        if kind == "rename":
+        if kind in ("rename", "reparent"):
             uid = next(iter(incoming))
-            for name in ledger["names"]:
-                if name["unit_id"] == uid and name["status"] == "confirmed" and name["valid_from"] < event["effective_on"] and (
-                        name["valid_to"] is None or name["valid_to"] > event["effective_on"]):
-                    raise LedgerError(f"{name['id']}: name period spans confirmed rename {event['id']}")
+            periods = ledger["names" if kind == "rename" else "parents"]
+            for period in periods:
+                if period["unit_id"] == uid and period["status"] == "confirmed" and period["valid_from"] < event["effective_on"] and (
+                        period["valid_to"] is None or period["valid_to"] > event["effective_on"]):
+                    raise LedgerError(f"{period['id']}: period spans confirmed {kind} {event['id']}")
         if kind == "merge" and (len(incoming) < 2 or len(outgoing) != 1):
             raise LedgerError(f"{event['id']}: invalid merge cardinality")
         if kind == "split" and (len(incoming) != 1 or len(outgoing) < 2):
             raise LedgerError(f"{event['id']}: invalid split cardinality")
-        if kind == "abolish" and (not incoming or outgoing):
+        if kind == "abolish" and (not incoming or outgoing or event["territory"] != "whole"):
             raise LedgerError(f"{event['id']}: invalid abolition")
+        if kind == "reported_transition" and (not incoming or not outgoing):
+            raise LedgerError(f"{event['id']}: confirmed reported_transition requires both sides")
         if event["valid_from"] and event["effective_on"] < event["valid_from"] or event["valid_to"] and event["effective_on"] >= event["valid_to"]:
             raise LedgerError(f"{event['id']}: effective date outside interval")
         for assertion in ledger["names"] + ledger["parents"] + ledger["codes"]:
             if assertion["event_id"] == event["id"] and assertion["status"] == "confirmed":
                 if assertion["valid_from"] != event["effective_on"]:
                     raise LedgerError(f"{assertion['id']}: date contradicts event")
-        if event["territory"] != "partial":
-            for origin in incoming:
-                for target in outgoing - {origin}:
+        if event["territory"] == "whole":
+            for origin in incoming - outgoing:
+                for target in outgoing:
                     graph.setdefault(origin, []).append((target, event["effective_on"]))
     def visit(node, ancestors, earliest=None):
         if node in ancestors:
@@ -440,13 +443,26 @@ def manual_update(folder: Path, patch: dict) -> dict:
         raise LedgerError("patch requires base_revision and upsert")
     if set(patch["upsert"]) - set(COLLECTIONS):
         raise LedgerError("unknown patch collection")
+    for rows in patch["upsert"].values():
+        if not isinstance(rows, list):
+            raise LedgerError("upsert collections must be arrays")
+        seen = set()
+        for row in rows:
+            if not isinstance(row, dict) or not isinstance(row.get("id"), str):
+                raise LedgerError("upsert row requires id")
+            if row["id"] in seen:
+                raise LedgerError(f"duplicate upsert id: {row['id']}")
+            seen.add(row["id"])
+    def importer_owned(key, row):
+        return (key == "observations" or row["id"].startswith(("bando:", "unit:bando:")) or
+                bool(re.match(r"^(name|code|parent|event|mention|observation):[0-9a-f]{16}:", row["id"])) or
+                key == "units" and row.get("source_key") is not None)
     with locked(folder):
         ledger = read_ledger(folder)
         validate(ledger, folder)
         if type(patch["base_revision"]) is not int or patch["base_revision"] != ledger["revision"]:
             raise LedgerError("stale base_revision; reload before updating")
         result = deepcopy(ledger)
-        bando_sources = {s["id"] for s in ledger["sources"] if s["provider"] == "Bando"}
         for key, rows in patch["upsert"].items():
             if not isinstance(rows, list):
                 raise LedgerError("upsert collections must be arrays")
@@ -456,8 +472,8 @@ def manual_update(folder: Path, patch: dict) -> dict:
                     raise LedgerError("upsert row requires id")
                 if row["id"] in index:
                     old = result[key][index[row["id"]]]
-                    protected = key == "sources" or any(e["source_id"] in bando_sources for e in old["evidence"])
-                    if key == "mentions":
+                    protected = key == "sources" or importer_owned(key, old)
+                    if key == "mentions" and importer_owned(key, old):
                         # Identity resolution is curator-owned; preserve every source field.
                         protected = any(row.get(field) != value for field, value in old.items()
                                         if field not in ("resolved_unit_id", "status"))
@@ -465,6 +481,8 @@ def manual_update(folder: Path, patch: dict) -> dict:
                         raise LedgerError("immutable source evidence; add separate curated records")
                     result[key][index[row["id"]]] = deepcopy(row)
                 else:
+                    if importer_owned(key, row):
+                        raise LedgerError("reserved importer record requires importer")
                     if key == "sources" and row.get("provider") == "Bando":
                         raise LedgerError("Bando sources require importer")
                     index[row["id"]] = len(result[key])
@@ -559,7 +577,9 @@ def main():
         elif args.command == "update":
             output = manual_update(args.folder, json.loads(args.patch.read_text(encoding="utf-8")))
         elif args.command == "query":
-            output = query(read_ledger(args.folder), args.unit_id, args.as_on)
+            ledger = read_ledger(args.folder)
+            validate(ledger, args.folder)
+            output = query(ledger, args.unit_id, args.as_on)
         else:
             output = validate(read_ledger(args.folder), args.folder)
         print(json.dumps(output, ensure_ascii=False, indent=2))

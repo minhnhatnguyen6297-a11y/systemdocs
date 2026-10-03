@@ -688,3 +688,179 @@ def test_actual_cli_update_query_date_boundary_and_errors(tmp_path):
     invalid = cli("update", str(patch_file))
     assert invalid.returncode == 2 and "requires base_revision" in invalid.stderr
     assert "Traceback" not in invalid.stderr
+
+
+def test_continuing_identity_split_then_merge_is_not_false_successor_chain():
+    ledger = fixture()
+    ledger["units"] = [unit(u) for u in "ABC"]
+    ledger["events"] = [event("retain-b-split", "split", ["B"], ["B", "C"], "2010-01-01"),
+                        event("retain-b-merge", "merge", ["A", "B"], ["B"], "2020-01-01")]
+    assert validate(ledger)["valid"]
+    assert len(query(ledger, "B")["chronological_events"]) == 2
+
+
+def test_unknown_territory_does_not_assert_whole_succession():
+    ledger = fixture()
+    ledger["units"] = [unit("A"), unit("B")]
+    ledger["events"] = [event("unknown-ab", "reported_transition", ["A"], ["B"], "2010-01-01"),
+                        event("unknown-ba", "reported_transition", ["B"], ["A"], "2020-01-01")]
+    for change in ledger["events"]:
+        change["territory"] = "unknown"
+    assert validate(ledger)["valid"]
+
+
+def test_reparent_rejects_old_parent_period_spanning_change_date():
+    ledger = fixture()
+    ledger["units"] = [unit("D", "district"), unit("P1", "province"), unit("P2", "province")]
+    ledger["events"] = [event("move", "reparent", ["D"], ["D"], "2010-01-01")]
+    ledger["parents"] = [{"id": "parent:old", "unit_id": "D", "parent_id": "P1", "valid_from": "2000-01-01",
+                          "valid_to": None, "status": "confirmed", "event_id": None, "evidence": EVIDENCE}]
+    with pytest.raises(LedgerError, match="spans confirmed reparent"):
+        validate(ledger)
+    ledger["parents"][0]["valid_to"] = "2010-01-01"
+    ledger["parents"].append(dict(ledger["parents"][0], id="parent:new", parent_id="P2", valid_from="2010-01-01",
+                                  valid_to=None, event_id="move"))
+    assert validate(ledger)["valid"]
+
+
+@pytest.mark.parametrize("territory", ["partial", "unknown"])
+def test_abolition_must_be_confirmed_whole_termination(territory):
+    ledger = fixture()
+    ledger["units"] = [unit("A")]
+    ledger["events"] = [dict(event("end", "abolish", ["A"], [], "2010-01-01"), territory=territory)]
+    with pytest.raises(LedgerError, match="invalid abolition"):
+        validate(ledger)
+    ledger["events"][0]["status"] = "pending"
+    assert validate(ledger)["valid"]
+
+
+def test_confirmed_reported_transition_requires_destination():
+    ledger = fixture()
+    ledger["units"] = [unit("A")]
+    ledger["events"] = [event("missing-to", "reported_transition", ["A"], [], "2010-01-01")]
+    with pytest.raises(LedgerError, match="requires both sides"):
+        validate(ledger)
+    ledger["events"][0]["status"] = "pending"
+    assert validate(ledger)["valid"]
+
+
+@pytest.mark.parametrize("damage", ["corrupt", "missing"])
+def test_actual_cli_query_checks_supporting_snapshots(tmp_path, damage):
+    import subprocess
+    import sys
+    raw, tables = bando_fixture()
+    import_bando(tmp_path, raw, "2026-10-04", tables, strict=False)
+    ledger = read_ledger(tmp_path)
+    snapshot = tmp_path / ledger["sources"][0]["snapshot"]
+    if damage == "corrupt":
+        snapshot.write_bytes(b"damaged")
+    else:
+        snapshot.unlink()
+    root = Path(__file__).resolve().parents[2]
+    result = subprocess.run([sys.executable, "-X", "utf8", "-m", "notary_v2.administrative_timeline",
+                             "--folder", str(tmp_path), "query", ledger["units"][0]["id"]],
+                            cwd=root, capture_output=True, text=True, encoding="utf8")
+    assert result.returncode == 2
+    assert "snapshot missing/hash mismatch" in result.stderr
+    assert result.stdout == ""
+
+
+def test_duplicate_ids_in_patch_rejected_before_mutation_or_archive(tmp_path):
+    ledger = fixture()
+    ledger["units"] = [unit("A")]
+    ledger["names"] = [name("A", "A", "2000-01-01")]
+    atomic_write(tmp_path, ledger)
+    prior = (tmp_path / "ledger.json").read_bytes()
+    original = ledger["names"][0]
+    with pytest.raises(LedgerError, match="duplicate upsert id"):
+        manual_update(tmp_path, {"base_revision": 0, "upsert": {"names": [dict(original, value="First"), dict(original, value="Last")]}})
+    assert (tmp_path / "ledger.json").read_bytes() == prior
+    assert not (tmp_path / "revisions").exists()
+
+
+def test_separate_curator_conclusion_citing_bando_can_be_corrected_with_archive(tmp_path):
+    import gzip
+    raw, tables = bando_fixture()
+    import_bando(tmp_path, raw, "2026-10-04", tables, strict=False)
+    ledger = read_ledger(tmp_path)
+    imported_name = deepcopy(ledger["names"][0])
+    curated = dict(imported_name, id="owner:separate-conclusion", value="Curator conclusion")
+    manual_update(tmp_path, {"base_revision": 1, "upsert": {"names": [curated]}})
+    before = (tmp_path / "ledger.json").read_bytes()
+    manual_update(tmp_path, {"base_revision": 2, "upsert": {"names": [dict(curated, value="Corrected curator conclusion")]}})
+    after = read_ledger(tmp_path)
+    assert next(r for r in after["names"] if r["id"] == imported_name["id"]) == imported_name
+    assert next(r for r in after["names"] if r["id"] == curated["id"])["value"] == "Corrected curator conclusion"
+    assert before in [gzip.decompress(p.read_bytes()) for p in (tmp_path / "revisions").glob("*.json.gz")]
+
+
+@pytest.mark.parametrize("counterfeit", ["observation", "generated-name", "source-key", "source-id"])
+def test_manual_counterfeit_importer_records_rejected(tmp_path, counterfeit):
+    raw, tables = bando_fixture()
+    import_bando(tmp_path, raw, "2026-10-04", tables, strict=False)
+    ledger = read_ledger(tmp_path)
+    prior = (tmp_path / "ledger.json").read_bytes()
+    if counterfeit == "observation":
+        key, row = "observations", dict(ledger["observations"][0], id="owner:fake-observation")
+    elif counterfeit == "generated-name":
+        key, row = "names", dict(ledger["names"][0], id="name:"+"0"*16+":unit:bando:fake")
+    elif counterfeit == "source-key":
+        key, row = "units", dict(ledger["units"][0], id="owner:fake-unit", source_key="new-source-key")
+    else:
+        key, row = "sources", dict(fixture()["sources"][0], id="bando:counterfeit")
+    with pytest.raises(LedgerError, match="reserved importer"):
+        manual_update(tmp_path, {"base_revision": 1, "upsert": {key: [row]}})
+    assert (tmp_path / "ledger.json").read_bytes() == prior
+
+
+def test_refresh_main_real_http_post_wiring_full_source_and_download_failure(tmp_path, capsys):
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from threading import Thread
+    from urllib.parse import parse_qs
+    from notary_v2 import administrative_timeline as module
+    ledger = read_ledger(DEFAULT_FOLDER)
+    catalog = next(s for s in ledger["sources"] if s["request_body"] == "ma=0")
+    responses = {("/p.co_dvhc", "0"): (DEFAULT_FOLDER / catalog["snapshot"]).read_bytes()}
+    for source in ledger["sources"]:
+        if source["request_body"] != "ma=0":
+            responses[("/p.co_bangbieu", source["request_body"][3:])] = (DEFAULT_FOLDER / source["snapshot"]).read_bytes()
+    requests, state = [], {"fail": False}
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            raw = self.rfile.read(int(self.headers["Content-Length"]))
+            form = parse_qs(raw.decode())
+            requests.append((self.path, form, self.headers["Content-Type"]))
+            if state["fail"] and self.path == "/p.co_bangbieu":
+                self.send_error(503)
+                return
+            content = responses[(self.path, form["ma"][0])]
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(content)
+        def log_message(self, *args):
+            pass
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    base_url = f"http://127.0.0.1:{server.server_port}"
+    try:
+        with patch.object(module, "BASE_URL", base_url), patch("sys.argv", ["timeline", "--folder", str(tmp_path), "refresh-bando"]):
+            module.main()
+            assert json.loads(capsys.readouterr().out)["units"] == 3355
+            assert {(path, form["ma"][0]) for path, form, _ in requests} == responses.keys()
+            assert len(requests) == 35
+            assert all(content_type == "application/x-www-form-urlencoded" for _, _, content_type in requests)
+            stored = read_ledger(tmp_path)
+            assert all(s["url"].startswith(base_url) and s["protocol"] == "HTTPS POST" for s in stored["sources"])
+            assert validate(stored, tmp_path)["valid"]
+            before = (tmp_path / "ledger.json").read_bytes()
+            state["fail"] = True
+            with pytest.raises(SystemExit) as exit_info:
+                module.main()
+            assert exit_info.value.code == 2
+            assert "503" in capsys.readouterr().err
+            assert (tmp_path / "ledger.json").read_bytes() == before
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=5)

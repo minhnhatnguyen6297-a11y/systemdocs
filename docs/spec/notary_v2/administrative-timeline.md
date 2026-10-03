@@ -125,6 +125,15 @@ cập nhật riêng `resolved_unit_id`/`status`; trường nguồn khác giữ n
 Bando vẫn là bằng chứng chờ; thêm sự kiện confirmed tham chiếu `unit` và nguồn
 ngày. Nhờ vậy lời website tách khỏi kết luận của curator.
 
+Quyền sửa dựa trên người tạo record, không dựa riêng vào nguồn được trích dẫn.
+`sources` đã lưu luôn bất biến; `observations`, ID `bando:`/`unit:bando:`, các ID
+phiên bản do importer sinh (`name|code|parent|event|mention|observation` + hash
+dataset) và `units.source_key` dành cho importer. Patch thủ công không được tạo
+giả các bản ghi đó. Record gốc chỉ có ngoại lệ resolve danh tính mention như
+trên. Kết luận curator dùng ID riêng, chẳng hạn `owner:...`, có thể trích nguồn
+Bando và được đính chính cùng ID; bản trước vẫn nằm trong archive. Mỗi nhóm
+upsert phải có ID không trùng, không áp dụng quy tắc “dòng cuối thắng”.
+
 Trước mỗi lần cập nhật thủ công hợp lệ, CLI lưu nguyên byte ledger cũ trong
 `revisions/revision-<revision>-<sha256>.json.gz` (JSON nén). Bản này bất biến,
 giúp xem/khôi phục dữ liệu trước một lần đính chính cùng ID; không là nguồn
@@ -176,6 +185,8 @@ không suy từ tên hiện hành. Quan sát hiện tại ở `current_source_ob
 CLI query hiện trả lịch sử **tên**, sự kiện và quan sát nguồn; chưa trả truy vấn
 theo ngày cho `codes`/`parents` và chưa giải quyết địa chỉ đầy đủ. Các phiên bản
 mã/cha vẫn được lưu và validate trong ledger để consumer sau dùng đúng nguồn.
+CLI query kiểm cả snapshot hỗ trợ trước khi trả kết quả: file nguồn mất hoặc
+hash sai phải báo lỗi, không tiếp tục trình bày như dữ liệu đã kiểm.
 Chỉ quan hệ confirmed nối lịch sử giữa các ID. Mention đã xác nhận danh tính
 giúp tìm bằng chứng pending liên quan; quan hệ đó vẫn pending và không đưa
 lịch sử của nơi bên kia vào kết quả confirmed.
@@ -197,6 +208,12 @@ movement partial vào phép kiểm cycle/ngược ngày của chuỗi kế thừ
 `reported_transition` confirmed và whole cũng kết thúc input không còn trong
 outputs; bằng chứng Bando pending không áp quy tắc kết thúc ấy. Một giai đoạn
 tên confirmed không được trùm qua ngày rename confirmed, dù `event_id` để null.
+Giai đoạn cha confirmed cũng không được trùm qua ngày reparent confirmed.
+Chỉ chuyển whole với input không còn trong output tạo cạnh kế thừa để kiểm
+cycle/ngày. Ví dụ B→B+C rồi A+B→B vẫn giữ ID B; không coi B kết thúc ở lần chia.
+Lãnh thổ unknown không khẳng định kế thừa toàn đơn vị. Abolish confirmed phải
+whole; `reported_transition` confirmed phải có cả nguồn và đích. Bản pending
+Bando giữ nguyên và không áp các kết luận về kết thúc đơn vị ấy.
 
 [Tests](../../../notary_v2/tests/test_administrative_timeline.py) dùng ví dụ giả
 lập có nhãn: chuỗi rename, merge/split, ba cấp, mã tái dùng, cùng tên khác nơi,
