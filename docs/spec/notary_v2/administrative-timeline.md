@@ -103,6 +103,11 @@ cập nhật riêng `resolved_unit_id`/`status`; trường nguồn khác giữ n
 Bando vẫn là bằng chứng chờ; thêm sự kiện confirmed tham chiếu `unit` và nguồn
 ngày. Nhờ vậy lời website tách khỏi kết luận của curator.
 
+Mention Bando hiện giữ cả câu, có thể chứa nhiều xã. Chỉ gán `resolved_unit_id`
+khi đã xác minh mention tương ứng **một** đơn vị. Với câu A+B, Owner tạo các
+unit và sự kiện curator có nhiều `from`/`to` cùng nguồn; giữ nguyên mention
+tổng hợp làm bằng chứng, không resolve cả câu thành một ID.
+
 Ví dụ **giả lập** A→B trên cùng ID, không phải lịch sử Việt Nam. Chỉ chạy trong
 bản sao thử; thay `base_revision` bằng revision bản sao. Khi cập nhật kho chính,
 thay nguồn/ngày bằng nguồn thật:
@@ -129,10 +134,18 @@ và ghi chú nếu chỉ chuyển một phần. Không biến mỗi tên cũ tro
 verified. Chưa đủ danh tính/ngày thì dùng mention, ngày `null`, trạng thái
 `pending`; curator bổ sung có nguồn sau.
 
+Đích C của merge có thể là đơn vị đã tồn tại rồi nhận thêm lãnh thổ. Việc C
+xuất hiện ở `to` không tự chứng minh ngày thành lập; muốn khẳng định thành lập
+cần nguồn riêng và cấu trúc assertion được duyệt sau. Hiện kho không tự suy
+ngày sinh của đơn vị từ sự kiện sáp nhập.
+
 Query trả `chronological_events` (confirmed theo ngày) riêng với `pending_evidence`
 (bằng chứng chưa chắc). Chỉ tên confirmed có giai đoạn bao phủ ngày hỏi mới vào
 `confirmed_name_at_date`; thiếu lịch sử trả `insufficient_confirmed_history`,
 không suy từ tên hiện hành. Quan sát hiện tại ở `current_source_observations`.
+Chỉ quan hệ confirmed nối lịch sử giữa các ID. Mention đã xác nhận danh tính
+giúp tìm bằng chứng pending liên quan; quan hệ đó vẫn pending và không đưa
+lịch sử của nơi bên kia vào kết quả confirmed.
 
 ## Kiểm tra và cách phát triển sau này
 
@@ -140,8 +153,10 @@ không suy từ tên hiện hành. Quan sát hiện tại ở `current_source_ob
 ngày sai/đảo, khoảng confirmed chồng nhau, mã tái dùng chồng thời gian, cha sai
 cấp/quay vòng, confirmed thiếu ngày/danh tính, rename đổi ID, merge/split sai
 số đầu vào/ra, chuỗi quay vòng/ngược ngày, dùng đơn vị sau khi bỏ/tiêu thụ toàn
-bộ. Revision cũ bị từ chối. Ghi file tạm rồi thay ledger một lần; lỗi trước đó
-không ghi nửa ledger.
+bộ; quan hệ con không được kéo dài quá ngày kết thúc của cha. Hai sự kiện tiêu
+thụ toàn bộ xung đột, hoặc đổi tên và bỏ đơn vị cùng ngày, bị từ chối. Ngày
+phải đúng `YYYY-MM-DD`. Revision cũ bị từ chối. Ledger và raw snapshot đều ghi
+file tạm rồi thay một lần; lỗi trước đó không để file đích bị ghi nửa chừng.
 
 [Tests](../../../notary_v2/tests/test_administrative_timeline.py) dùng ví dụ giả
 lập có nhãn: chuỗi rename, merge/split, ba cấp, mã tái dùng, cùng tên khác nơi,

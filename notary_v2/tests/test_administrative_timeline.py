@@ -8,7 +8,7 @@ import pytest
 
 from notary_v2.administrative_timeline import (
     LedgerError, DEFAULT_FOLDER, atomic_write, empty_ledger, import_bando,
-    manual_update, query, read_ledger, validate,
+    manual_update, query, read_ledger, validate, locked, SCHEMA,
 )
 
 
@@ -329,3 +329,184 @@ def test_schema_version_and_unsafe_snapshot_rejected():
     ledger["sources"][0]["snapshot"] = "../outside"
     with pytest.raises(LedgerError, match="unsafe snapshot"):
         validate(ledger)
+
+
+def test_confirmed_child_parent_period_cannot_outlive_ended_parent():
+    ledger = fixture()
+    ledger["units"] = [unit("P", "province"), unit("D", "district")]
+    ledger["events"] = [event("end-parent", "abolish", ["P"], [], "2010-01-01")]
+    parent = {"id": "parent", "unit_id": "D", "parent_id": "P", "valid_from": "2000-01-01", "valid_to": None,
+              "status": "confirmed", "event_id": None, "evidence": EVIDENCE}
+    ledger["parents"] = [parent]
+    with pytest.raises(LedgerError, match="outlives.*parent"):
+        validate(ledger)
+    parent["valid_to"] = "2011-01-01"
+    with pytest.raises(LedgerError, match="outlives.*parent"):
+        validate(ledger)
+    parent["valid_to"] = "2010-01-01"
+    assert validate(ledger)["valid"]
+
+
+def test_conflicting_same_day_whole_consumption_rejected():
+    ledger = fixture()
+    ledger["units"] = [unit(u) for u in "ABCDE"]
+    ledger["events"] = [event("one", "merge", ["A", "B"], ["C"], "2010-01-01"),
+                        event("two", "merge", ["A", "D"], ["E"], "2010-01-01")]
+    with pytest.raises(LedgerError, match="consumed"):
+        validate(ledger)
+
+
+def test_rename_on_abolition_day_rejected_but_own_abolition_is_valid():
+    ledger = fixture()
+    ledger["units"] = [unit("A")]
+    ledger["events"] = [event("gone", "abolish", ["A"], [], "2010-01-01")]
+    assert validate(ledger)["valid"]
+    ledger["events"].append(event("rename", "rename", ["A"], ["A"], "2010-01-01"))
+    with pytest.raises(LedgerError, match="abolished"):
+        validate(ledger)
+
+
+def test_merge_output_can_be_existing_unit_without_invented_formation_date():
+    ledger = fixture()
+    ledger["units"] = [unit(u) for u in "ABC"]
+    ledger["names"] = [name("C", "Existing C", "2000-01-01")]
+    ledger["events"] = [event("before-merge", "rename", ["C"], ["C"], "2005-01-01"),
+                        event("merge", "merge", ["A", "B"], ["C"], "2010-01-01")]
+    assert validate(ledger)["valid"]
+    assert query(ledger, "C", "2001-01-01")["confirmed_name_at_date"][0]["value"] == "Existing C"
+
+
+def test_pending_edge_cannot_transmit_unrelated_confirmed_history():
+    ledger = fixture()
+    ledger["units"] = [unit("A"), unit("B")]
+    pending = event("pending-ab", "reported_transition", ["A"], ["B"], None)
+    pending["status"] = "pending"
+    ledger["events"] = [pending, event("verified-b", "rename", ["B"], ["B"], "2000-01-01")]
+    assert query(ledger, "A")["chronological_events"] == []
+    assert [e["id"] for e in query(ledger, "A")["pending_evidence"]] == ["pending-ab"]
+    assert [e["id"] for e in query(ledger, "B")["chronological_events"]] == ["verified-b"]
+
+
+def test_resolved_mention_exposes_pending_evidence_without_confirming_event():
+    ledger = fixture()
+    ledger["units"] = [unit("A"), unit("B")]
+    mention = {"id": "old-a", "raw_phrase": "Old A", "candidate_names": [], "resolved_unit_id": "A",
+               "status": "pending", "evidence": EVIDENCE}
+    ledger["mentions"] = [mention]
+    pending = event("pending-ab", "reported_transition", [], ["B"], None)
+    pending.update(status="pending", **{"from": [{"kind": "mention", "id": "old-a"}]})
+    ledger["events"] = [pending, event("verified-b", "rename", ["B"], ["B"], "2000-01-01")]
+    assert query(ledger, "A")["pending_evidence"] == []
+    mention["status"] = "confirmed"
+    answer = query(ledger, "A")
+    assert [e["id"] for e in answer["pending_evidence"]] == ["pending-ab"]
+    assert answer["chronological_events"] == []
+    assert ledger["events"][0]["status"] == "pending"
+
+
+@pytest.mark.parametrize("day", ["20070101", "2007-W01-1", "2007-1-01", "2007-01-01\n", "２００７-０１-０１"])
+def test_query_rejects_noncanonical_date_formats(day):
+    ledger = fixture()
+    ledger["units"] = [unit("A")]
+    ledger["names"] = [name("A", "A", "2000-01-01", "2010-01-01")]
+    with pytest.raises(LedgerError, match="invalid date"):
+        query(ledger, "A", day)
+
+
+def test_maximum_legal_date_in_open_period_and_overlap_validation():
+    ledger = fixture()
+    ledger["units"] = [unit("A")]
+    ledger["names"] = [name("A", "A", "9999-12-31")]
+    assert query(ledger, "A", "9999-12-31")["date_lookup"] == "confirmed"
+    ledger["names"].append(name("A", "B", "9999-12-31"))
+    with pytest.raises(LedgerError, match="overlapping"):
+        validate(ledger)
+
+
+@pytest.mark.parametrize("field", ["ma", "ten", "magoc", "malk", "truocsapnhap"])
+def test_province_header_all_current_fields_checked_and_ledger_retained(tmp_path, field):
+    raw, tables = bando_fixture()
+    import_bando(tmp_path, raw, "2026-10-04", tables, strict=False)
+    before = (tmp_path / "ledger.json").read_bytes()
+    header, children = tables["01"].decode().split(".synt.", 1)
+    header = json.loads(header)
+    header[field] = "wrong"
+    corrupted = {"01": (json.dumps(header)+".synt."+children).encode()}
+    with pytest.raises(LedgerError, match="province"):
+        import_bando(tmp_path, raw, "2026-10-04", corrupted, strict=False)
+    assert (tmp_path / "ledger.json").read_bytes() == before
+
+
+def test_interrupted_snapshot_publication_can_retry_without_partial_hash_file(tmp_path):
+    raw, tables = bando_fixture()
+    with patch("notary_v2.administrative_timeline.os.fsync", side_effect=OSError("interrupted raw write")):
+        with pytest.raises(OSError):
+            import_bando(tmp_path, raw, "2026-10-04", tables, strict=False)
+    assert not (tmp_path / "ledger.json").exists()
+    assert not list((tmp_path / "snapshots").iterdir())
+    assert not (tmp_path / ".write.lock").exists()
+    assert import_bando(tmp_path, raw, "2026-10-04", tables, strict=False)["valid"]
+
+
+def test_empty_snapshot_path_gives_validation_error():
+    ledger = fixture()
+    ledger["sources"][0]["snapshot"] = ""
+    with pytest.raises(LedgerError, match="unsafe snapshot"):
+        validate(ledger)
+
+
+def test_machine_schema_patterns_are_anchored_and_match_whole_values():
+    import re
+    schema = json.loads(SCHEMA.read_text(encoding="utf8"))
+    def patterns(node):
+        if isinstance(node, dict):
+            if "pattern" in node:
+                yield node
+            for child in node.values():
+                yield from patterns(child)
+        elif isinstance(node, list):
+            for child in node:
+                yield from patterns(child)
+    constraints = list(patterns(schema))
+    assert constraints
+    for constraint in constraints:
+        pattern = constraint["pattern"]
+        valid = "a"*64 if constraint["maxLength"] == 64 else "2000-01-01"
+        assert pattern.startswith("^") and pattern.endswith("$")
+        assert re.search(pattern, valid)
+        assert not re.search(pattern, "x"+valid)
+        assert not re.search(pattern, valid+"x")
+        assert constraint["minLength"] == constraint["maxLength"]
+
+
+def test_exclusive_lock_rejects_both_writers_and_releases_after_owner(tmp_path):
+    raw, tables = bando_fixture()
+    import_bando(tmp_path, raw, "2026-10-04", tables, strict=False)
+    before = (tmp_path / "ledger.json").read_bytes()
+    with locked(tmp_path):
+        with pytest.raises(LedgerError, match="being written"):
+            import_bando(tmp_path, raw, "2026-10-04", tables, strict=False)
+        with pytest.raises(LedgerError, match="being written"):
+            manual_update(tmp_path, {"base_revision": 1, "upsert": {}})
+        assert (tmp_path / "ledger.json").read_bytes() == before
+    assert not (tmp_path / ".write.lock").exists()
+    assert manual_update(tmp_path, {"base_revision": 1, "upsert": {}})["valid"]
+
+
+def test_query_only_exposes_observations_of_current_dataset(tmp_path):
+    raw, tables = bando_fixture()
+    import_bando(tmp_path, raw, "2026-10-04", tables, strict=False)
+    ledger = read_ledger(tmp_path)
+    uid = next(u["id"] for u in ledger["units"] if u["source_key"] == "commune:test")
+    old_dataset = ledger["dataset_version"]
+    rows = json.loads(raw)
+    rows[1]["ten"] = "Xã Changed"
+    changed_raw = json.dumps(rows).encode()
+    changed_tables = {"01": (json.dumps(rows[0])+".synt."+json.dumps(rows[1:])).encode()}
+    import_bando(tmp_path, changed_raw, "2026-10-05", changed_tables, strict=False)
+    ledger = read_ledger(tmp_path)
+    answer = query(ledger, uid)
+    assert len(answer["current_source_observations"]) == 1
+    assert answer["current_source_observations"][0]["details"]["ten"] == "Xã Changed"
+    assert answer["current_source_observations"][0]["dataset_version"] != old_dataset
+    assert any(o["dataset_version"] == old_dataset for o in ledger["observations"])

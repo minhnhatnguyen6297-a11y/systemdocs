@@ -54,6 +54,8 @@ def _shape(value, schema, definitions, path="ledger"):
     if isinstance(value, str):
         if len(value) < schema.get("minLength", 0):
             raise LedgerError(f"{path}: empty string")
+        if len(value) > schema.get("maxLength", len(value)):
+            raise LedgerError(f"{path}: string too long")
         if "pattern" in schema and not re.fullmatch(schema["pattern"], value):
             raise LedgerError(f"{path}: invalid format")
     if type(value) is int and value < schema.get("minimum", value):
@@ -77,6 +79,8 @@ def _shape(value, schema, definitions, path="ledger"):
 
 def _day(value):
     if value is not None:
+        if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
+            raise LedgerError(f"invalid date {value}: use YYYY-MM-DD")
         try:
             date.fromisoformat(value)
         except ValueError as exc:
@@ -86,8 +90,8 @@ def _day(value):
 def _overlap(a, b):
     # Only bounded-start confirmed periods support confident overlap checking.
     return a["valid_from"] is not None and b["valid_from"] is not None and (
-        a["valid_from"] < (b["valid_to"] or "9999-12-31") and
-        b["valid_from"] < (a["valid_to"] or "9999-12-31"))
+        (b["valid_to"] is None or a["valid_from"] < b["valid_to"]) and
+        (a["valid_to"] is None or b["valid_from"] < a["valid_to"]))
 
 
 def validate(ledger: dict, folder: Path | None = None) -> dict:
@@ -115,7 +119,7 @@ def validate(ledger: dict, folder: Path | None = None) -> dict:
         snapshot = source["snapshot"]
         if snapshot is not None:
             relative = Path(snapshot)
-            if relative.is_absolute() or ".." in relative.parts or relative.parts[0] != "snapshots":
+            if relative.is_absolute() or ".." in relative.parts or not relative.parts or relative.parts[0] != "snapshots":
                 raise LedgerError("unsafe snapshot path")
             if folder is not None:
                 path = folder / relative
@@ -215,15 +219,24 @@ def validate(ledger: dict, folder: Path | None = None) -> dict:
             outgoing = {r["id"] for r in event["to"]}
             for ref in event["from"]:
                 if ref["id"] not in outgoing:
-                    endings.setdefault(ref["id"], []).append(event["effective_on"])
-    for uid, days in endings.items():
-        end = min(days)
+                    endings.setdefault(ref["id"], []).append(event)
+    for uid, ending_events in endings.items():
+        ending = min(ending_events, key=lambda e: (e["effective_on"], e["id"]))
+        end = ending["effective_on"]
         for event in confirmed_events:
-            if event["effective_on"] > end and any(r["id"] == uid for r in event["from"] + event["to"]):
+            refers_to_unit = any(r["id"] == uid for r in event["from"] + event["to"])
+            conflicts_at_end = event["id"] != ending["id"] and event["effective_on"] == end and (
+                event["type"] in ("rename", "reparent", "abolish") or
+                event["type"] in ("merge", "split") and event["territory"] == "whole" and
+                any(r["id"] == uid for r in event["from"]))
+            if refers_to_unit and (event["effective_on"] > end or conflicts_at_end):
                 raise LedgerError(f"{event['id']}: event uses abolished/consumed unit {uid}")
         for assertion in ledger["names"] + ledger["parents"] + ledger["codes"]:
             if assertion["unit_id"] == uid and assertion["status"] == "confirmed" and (assertion["valid_to"] is None or assertion["valid_to"] > end):
                 raise LedgerError(f"{assertion['id']}: period outlives abolished/consumed unit")
+        for parent in ledger["parents"]:
+            if parent["parent_id"] == uid and parent["status"] == "confirmed" and (parent["valid_to"] is None or parent["valid_to"] > end):
+                raise LedgerError(f"{parent['id']}: relationship outlives abolished/consumed parent")
     return {"valid": True, "units": len(units), "events": len(ledger["events"]),
             "pending_events": sum(e["status"] == "pending" for e in ledger["events"]),
             "coverage": ledger["coverage"]}
@@ -240,6 +253,24 @@ def atomic_write(folder: Path, ledger: dict):
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(name, folder / "ledger.json")
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
+
+
+def atomic_snapshot(target: Path, content: bytes):
+    """Publish a complete immutable snapshot, never a partially written hash path."""
+    if target.exists():
+        if target.read_bytes() != content:
+            raise LedgerError("immutable snapshot collision")
+        return
+    fd, name = tempfile.mkstemp(prefix=".snapshot-", suffix=".tmp", dir=target.parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(name, target)
     finally:
         if os.path.exists(name):
             os.unlink(name)
@@ -300,6 +331,9 @@ def import_bando(folder: Path, raw: bytes, retrieved_at: str, tables: dict[str, 
             children = json.loads(body)
             if not isinstance(header, dict) or header["ma"] != code:
                 raise ValueError("province header mismatch")
+            for key in ("ma", "ten", "magoc", "malk", "truocsapnhap"):
+                if header[key] != province[key]:
+                    raise ValueError(f"province table/catalog differ: {code} {key}")
             expected = {r["ma"]: r for r in rows if r["magoc"] == code}
             if len(children) != len(expected) or {r["ma"] for r in children} != expected.keys():
                 raise ValueError("commune code set mismatch")
@@ -379,10 +413,7 @@ def import_bando(folder: Path, raw: bytes, retrieved_at: str, tables: dict[str, 
         snapshot_folder.mkdir(exist_ok=True)
         for _, content, _, _ in payloads:
             target = snapshot_folder / (digest(content)+".raw")
-            if target.exists() and target.read_bytes() != content:
-                raise LedgerError("immutable snapshot collision")
-            if not target.exists():
-                target.write_bytes(content)
+            atomic_snapshot(target, content)
         atomic_write(folder, result)
         return validate(result, folder)
 
@@ -431,19 +462,32 @@ def query(ledger: dict, unit_id: str, as_on: str | None = None) -> dict:
     if unit_id not in {u["id"] for u in ledger["units"]}:
         raise LedgerError("unknown unit_id")
     _day(as_on)
+    mentions = {m["id"]: m for m in ledger["mentions"]}
+    def unit_refs(event, resolve_mentions=False):
+        refs = set()
+        for ref in event["from"] + event["to"]:
+            if ref["kind"] == "unit":
+                refs.add(ref["id"])
+            elif resolve_mentions:
+                mention = mentions[ref["id"]]
+                if mention["status"] == "confirmed":
+                    refs.add(mention["resolved_unit_id"])
+        return refs
     connected = {unit_id}
     while True:
         before = len(connected)
         for event in ledger["events"]:
-            refs = {r["id"] for r in event["from"] + event["to"] if r["kind"] == "unit"}
+            if event["status"] != "confirmed":
+                continue
+            refs = unit_refs(event)
             if refs & connected:
                 connected.update(refs)
         if len(connected) == before:
             break
-    events = [e for e in ledger["events"] if any(r["kind"] == "unit" and r["id"] in connected for r in e["from"] + e["to"])]
+    events = [e for e in ledger["events"] if unit_refs(e, resolve_mentions=True) & connected]
     names = [r for r in ledger["names"] if r["unit_id"] == unit_id]
     answer = [r for r in names if r["status"] == "confirmed" and as_on is not None and
-              r["valid_from"] <= as_on < (r["valid_to"] or "9999-12-31")]
+              r["valid_from"] <= as_on and (r["valid_to"] is None or as_on < r["valid_to"])]
     return {"unit_id": unit_id, "as_on": as_on, "confirmed_name_at_date": answer,
             "current_source_observations": [o for o in ledger["observations"] if o["unit_id"] == unit_id and o["dataset_version"] == ledger["dataset_version"]],
             "names": names, "chronological_events": sorted([e for e in events if e["status"] == "confirmed"], key=lambda e: (e["effective_on"], e["id"])),

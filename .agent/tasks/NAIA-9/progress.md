@@ -16,3 +16,10 @@
 
 Root sẽ review diff và theo dõi phần tích hợp địa chỉ sau; record này không
 thay trạng thái Linear hoặc tự xác nhận ngày/danh tính lịch sử.
+
+04/10/2026 — sửa review loop 1: pending edge không truyền confirmed history;
+resolved mention tìm pending evidence; kiểm parent kết thúc và xung đột toàn bộ
+cùng ngày; exact ISO date/maximum date; province header đủ 5 trường; atomic raw
+snapshot và schema pattern có anchor/length. Thêm tests lock/current observation.
+49 timeline tests passed. Giữ nguyên 35 snapshots, 3.355 IDs, observations và
+dataset hashes; chỉ sửa helper/schema/test/docs, không viết lại ledger.

@@ -31,3 +31,12 @@ xuôi, contract và UI consumer. CLI hiện load/validate/quét local theo lần
 chưa hứa tối ưu per-keystroke. API Bando chưa có cam kết version ổn định. Sau
 process crash có thể cần kiểm/xóa stale `.write.lock`; snapshot raw bị thừa sau
 lỗi ghi không làm đổi ledger. Không thay DB văn phòng, Word hay DOCX.
+
+Review loop 1 đã sửa validator/query/raw write: 49 focused timeline tests passed.
+Query nối confirmed events; resolved identity chỉ giúp tìm pending evidence,
+không biến quan hệ chờ thành confirmed. Parent period không vượt ngày cha kết
+thúc; chặn whole-consumption/rename-abolition xung đột cùng ngày. Exact dates,
+schema anchors/length, province header, lock/current-observation filtering có
+regression tests. Raw snapshot xuất bản qua file tạm rồi replace; retry sau lỗi
+không mắc file hash viết dở. Merge output không tự có formation date; composite
+mention không resolve thành một unit ID. Dữ liệu đã tải giữ nguyên byte và hash.

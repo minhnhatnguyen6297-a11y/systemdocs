@@ -159,7 +159,9 @@
             "string",
             "null"
           ],
-          "pattern": "[0-9a-f]{64}"
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
         },
         "snapshot": {
           "type": [
@@ -244,14 +246,18 @@
             "string",
             "null"
           ],
-          "pattern": "\\d{4}-\\d{2}-\\d{2}"
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "minLength": 10,
+          "maxLength": 10
         },
         "valid_to": {
           "type": [
             "string",
             "null"
           ],
-          "pattern": "\\d{4}-\\d{2}-\\d{2}"
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "minLength": 10,
+          "maxLength": 10
         },
         "status": {
           "enum": [
@@ -306,14 +312,18 @@
             "string",
             "null"
           ],
-          "pattern": "\\d{4}-\\d{2}-\\d{2}"
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "minLength": 10,
+          "maxLength": 10
         },
         "valid_to": {
           "type": [
             "string",
             "null"
           ],
-          "pattern": "\\d{4}-\\d{2}-\\d{2}"
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "minLength": 10,
+          "maxLength": 10
         },
         "status": {
           "enum": [
@@ -368,14 +378,18 @@
             "string",
             "null"
           ],
-          "pattern": "\\d{4}-\\d{2}-\\d{2}"
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "minLength": 10,
+          "maxLength": 10
         },
         "valid_to": {
           "type": [
             "string",
             "null"
           ],
-          "pattern": "\\d{4}-\\d{2}-\\d{2}"
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "minLength": 10,
+          "maxLength": 10
         },
         "status": {
           "enum": [
@@ -499,21 +513,27 @@
             "string",
             "null"
           ],
-          "pattern": "\\d{4}-\\d{2}-\\d{2}"
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "minLength": 10,
+          "maxLength": 10
         },
         "valid_from": {
           "type": [
             "string",
             "null"
           ],
-          "pattern": "\\d{4}-\\d{2}-\\d{2}"
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "minLength": 10,
+          "maxLength": 10
         },
         "valid_to": {
           "type": [
             "string",
             "null"
           ],
-          "pattern": "\\d{4}-\\d{2}-\\d{2}"
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "minLength": 10,
+          "maxLength": 10
         },
         "status": {
           "enum": [
