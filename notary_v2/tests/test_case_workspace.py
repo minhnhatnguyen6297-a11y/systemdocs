@@ -103,9 +103,8 @@ def _person_row(**overrides):
         "gioi_tinh": "Nam",
         "ngay_sinh": "1980-01-01",
         "ngay_chet": None,
-        # MIN-140: mọi field nhập được trên UI Người đều bắt buộc
-        "so_giay_to": "GT" + uuid.uuid4().hex[:10].upper(),
-        "ngay_cap": "2015-06-20",
+        "so_giay_to": None,
+        "ngay_cap": None,
         "noi_cap": None,
         "dia_chi": "xã test",
         "place_of_origin": None,
@@ -196,6 +195,9 @@ def test_get_derives_stage_for_legacy_case_without_case_state(db):
         "revision": 1,
         "ngay_lap_ho_so": "2026-09-01",
         "noi_niem_yet": None,
+        "nguoi_nhan_uy_quyen": None,
+        "nguoi_nhan_uy_quyen_id": None,
+        "noi_dung_viec": None,
         "ghi_chu": None,
     }
     people = _workspace_people(data)
@@ -576,125 +578,15 @@ def test_commit_stage_rejects_is_primary_and_asset_limit(db):
                for e in exc2.value.details["field_errors"])
 
 
-def test_commit_stage_accepts_free_form_and_null_so_serial(db):
-    """MIN-140: không có rule format serial — text tự do và NULL đều hợp
-    lệ; giá trị emit nguyên văn (không canonical hoá, không surrogate)."""
+def test_commit_stage_rejects_noncanonical_so_serial(db):
     case, deceased, _p, _h = _make_case(db)
-    people = [_person_row(entity_id=deceased.id)]
-    assets = [_asset_row(so_serial="dd 12-34 abc"),
-              _asset_row(so_serial=None)]
-
-    data = _commit(db, case.id, 1, people, assets)
-
-    assert [a["so_serial"] for a in data["stage"]["assets"]] == [
-        "dd 12-34 abc", None]
-    serials = [p.so_serial for p in db.query(Property).all()]
-    assert serials == ["DD123456", "dd 12-34 abc", None]
-
-
-def test_commit_stage_serial_match_key_is_comparison_only(db):
-    """MIN-140: serial khác format bề mặt vẫn nhận diện cùng property
-    ('DD 123456' ≡ 'DD123456' — bỏ non-alnum + uppercase) và được LƯU
-    nguyên văn giá trị user nhập (không rewrite canonical)."""
-    case, deceased, prop, _h = _make_case(db)
-
-    data = _commit(
-        db, case.id, 1, [_person_row(entity_id=deceased.id)],
-        [_asset_row(entity_id=None, so_serial=" dd-123456 ")])
-
-    asset = data["stage"]["assets"][0]
-    assert asset["entity_id"] == prop.id         # ghép vào prop cũ
-    assert asset["so_serial"] == "dd-123456"     # verbatim (đã trim)
-    assert db.get(Property, prop.id).so_serial == "dd-123456"
-    assert db.query(Property).count() == 1       # không tạo property mới
-
-
-def test_commit_stage_rejects_duplicate_serial_after_normalization(db):
-    """MIN-140: dup serial so sánh trên match key — 'XX 123456' trùng
-    'xx123456' dù chuỗi gốc khác nhau."""
-    case, deceased, _p, _h = _make_case(db)
-    assets = [_asset_row(so_serial="XX 123456"),
-              _asset_row(so_serial="xx123456")]
-
-    with pytest.raises(WorkspaceError) as exc:
-        _commit(db, case.id, 1, [_person_row(entity_id=deceased.id)],
-                assets)
-
-    assert any(e["field"] == "so_serial" and e["code"] == "invalid_format"
-               and e["row_id"] == assets[1]["row_id"]
-               for e in exc.value.details["field_errors"])
-
-
-def test_commit_stage_requires_all_person_fields(db):
-    """MIN-140: mọi field nhập được của Người đều bắt buộc —
-    ho_ten/gioi_tinh/ngay_sinh/so_giay_to/ngay_cap/dia_chi.
-    ngay_chet vẫn tùy chọn (null = còn sống)."""
-    case, _d, prop, _h = _make_case(db)
-    person = _person_row(
-        ho_ten="Thiếu Trường", gioi_tinh=None, ngay_sinh=None,
-        so_giay_to=None, ngay_cap=None, dia_chi=None, ngay_chet=None)
-
-    with pytest.raises(WorkspaceError) as exc:
-        _commit(db, case.id, 1, [person],
-                [_asset_row(entity_id=prop.id, so_serial="DD123456")])
-
-    errors = exc.value.details["field_errors"]
-    missing = {e["field"] for e in errors
-               if e["row_id"] == person["row_id"] and e["code"] == "required"}
-    assert missing == {"gioi_tinh", "ngay_sinh", "so_giay_to",
-                       "ngay_cap", "dia_chi"}
-
-
-def test_commit_stage_requires_asset_min_fields_and_land_rows(db):
-    """MIN-140: Tài sản bắt buộc so_to_ban_do + so_thua_dat + dia_chi +
-    ≥1 land_rows có loai_dat + dien_tich; mọi field khác tùy chọn."""
-    case, deceased, _p, _h = _make_case(db)
-    people = [_person_row(entity_id=deceased.id)]
-
-    asset = _asset_row(so_to_ban_do=None, so_thua_dat=None, dia_chi=None,
-                       land_rows=None)
-    with pytest.raises(WorkspaceError) as exc:
-        _commit(db, case.id, 1, people, [asset])
-    missing = {e["field"] for e in exc.value.details["field_errors"]
-               if e["row_id"] == asset["row_id"] and e["code"] == "required"}
-    assert missing == {"so_to_ban_do", "so_thua_dat", "dia_chi", "land_rows"}
-
-    # land_rows tồn tại nhưng row thiếu loai_dat/dien_tich → required
-    bad_land = _asset_row(land_rows=[{"loai_dat": "", "dien_tich": None}])
-    with pytest.raises(WorkspaceError) as exc2:
-        _commit(db, case.id, 1, people, [bad_land])
-    errs2 = [(e["field"], e["code"])
-             for e in exc2.value.details["field_errors"]
-             if e["row_id"] == bad_land["row_id"]]
-    assert errs2.count(("land_rows", "required")) == 2
-
-    # diện tích không phải số → invalid_type
-    bad_area = _asset_row(land_rows=[{"loai_dat": "ODT",
-                                      "dien_tich": "abc"}])
-    with pytest.raises(WorkspaceError) as exc3:
-        _commit(db, case.id, 1, people, [bad_area])
-    assert any(e["field"] == "land_rows" and e["row_id"] == bad_area["row_id"]
-               for e in exc3.value.details["field_errors"])
-
-    # các field còn lại hoàn toàn tùy chọn
-    sparse = _asset_row(so_serial=None, so_vao_so=None, loai_so=None,
-                        hinh_thuc_su_dung=None, thoi_han=None,
-                        nguon_goc=None, ngay_cap=None, co_quan_cap=None)
-    data = _commit(db, case.id, 1, people, [sparse])
-    assert data["stage"]["assets"][0]["so_serial"] is None
-
-
-def test_commit_stage_serial_empty_string_rejected(db):
-    """MIN-140: serial '' (chuỗi rỗng) vẫn vi phạm contract nullable —
-    phải gửi null thay ''."""
-    case, deceased, _p, _h = _make_case(db)
-    asset = _asset_row(so_serial="   ")
+    asset = _asset_row(so_serial="dd 12-34")
 
     with pytest.raises(WorkspaceError) as exc:
         _commit(db, case.id, 1, [_person_row(entity_id=deceased.id)],
                 [asset])
 
-    assert any(e["field"] == "so_serial"
+    assert any(e["field"] == "so_serial" and e["code"] == "invalid_format"
                for e in exc.value.details["field_errors"])
 
 
@@ -1052,10 +944,9 @@ def test_get_migrate_on_read_does_not_overwrite_newer_commit(
         p["row_id"] for p in committed["stage"]["people"]]
 
 
-def test_get_emits_legacy_serial_verbatim_without_surrogate(db):
-    """MIN-140: serial lạ/trống emit nguyên văn (NULL khi trống), KHÔNG
-    surrogate 'XX%06d' nữa; dia_chi rỗng → null; ho_ten rỗng →
-    '(Chưa rõ)'."""
+def test_get_normalizes_schema_invalid_legacy_values(db):
+    """M4: serial lạ → surrogate + warnings; dia_chi rỗng → null;
+    ho_ten rỗng → '(Chưa rõ)'."""
     case, _d, prop, _h = _make_case(db)
     prop.so_serial = "dd-12 34"
     prop.dia_chi = ""
@@ -1064,13 +955,9 @@ def test_get_emits_legacy_serial_verbatim_without_surrogate(db):
     data = _service(db).get(case.id)
 
     asset = data["stage"]["assets"][0]
-    assert asset["so_serial"] == "dd-12 34"      # verbatim, không surrogate
+    assert asset["so_serial"] == f"XX{prop.id:06d}"[:8]
     assert asset["dia_chi"] is None
-
-    prop.so_serial = None                        # serial NULL → emit null
-    db.commit()
-    data_null = _service(db).get(case.id)
-    assert data_null["stage"]["assets"][0]["so_serial"] is None
+    assert any("so_serial" in w for w in data["diagram"]["warnings"])
 
     case.case_state_json = json.dumps({
         "schemaVersion": 3,
@@ -1189,57 +1076,12 @@ def test_migration_adds_workspace_columns_to_legacy_db(tmp_path):
     assert "updated_at" in info
 
 
-def test_migrate_properties_serial_nullable(tmp_path):
-    """MIN-140: DB cũ có properties.so_serial NOT NULL → migration rebuild
-    bảng thành nullable, giữ data + unique, cho phép nhiều NULL."""
-    db_path = Path(tmp_path) / "legacy_props.db"
-    con = sqlite3.connect(db_path)
-    con.execute(
-        """CREATE TABLE properties (
-               id INTEGER PRIMARY KEY AUTOINCREMENT,
-               so_serial VARCHAR(100) NOT NULL UNIQUE,
-               dia_chi TEXT NOT NULL)""")
-    con.execute("INSERT INTO properties (so_serial, dia_chi) "
-                "VALUES ('DD123456', 'Thửa 1'), ('EE654321', 'Thửa 2')")
-    con.commit()
-    con.close()
-
-    original = database.DB_PATH
-    try:
-        database.DB_PATH = db_path
-        database.migrate_properties_serial_nullable()
-        database.migrate_properties_serial_nullable()  # idempotent
-    finally:
-        database.DB_PATH = original
-
-    con = sqlite3.connect(db_path)
-    info = {row[1]: row for row in con.execute(
-        "PRAGMA table_info(properties)")}
-    assert info["so_serial"][3] == 0            # notnull flag tắt
-    # data cũ giữ nguyên + NULL insert được nhiều dòng
-    rows = con.execute(
-        "SELECT so_serial, dia_chi FROM properties ORDER BY id").fetchall()
-    assert rows == [("DD123456", "Thửa 1"), ("EE654321", "Thửa 2")]
-    con.execute("INSERT INTO properties (so_serial, dia_chi) "
-                "VALUES (NULL, 'Không serial 1')")
-    con.execute("INSERT INTO properties (so_serial, dia_chi) "
-                "VALUES (NULL, 'Không serial 2')")
-    # unique vẫn còn trên giá trị không null
-    with pytest.raises(sqlite3.IntegrityError):
-        con.execute("INSERT INTO properties (so_serial, dia_chi) "
-                    "VALUES ('DD123456', 'Trùng')")
-    con.commit()
-    con.close()
-
-
 def test_model_declares_workspace_columns():
     cols = InheritanceCase.__table__.columns
     assert "workspace_revision" in cols
     assert "updated_at" in cols
     assert "workspace_idempotency_key" in cols
     assert cols["workspace_revision"].nullable is False
-    # MIN-140: serial nullable trong model
-    assert Property.__table__.columns["so_serial"].nullable is True
 
 
 # ------------------------------------------------------------------ create()

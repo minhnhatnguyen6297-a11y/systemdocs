@@ -28,7 +28,10 @@
             "personId": "11111111-1111-4111-8111-111111111111",
             "parentSlotIds": [],
             "spouseSlotId": "spouse",
-            "ownPositions": [1, 2],
+            "ownPositions": [
+              1,
+              2
+            ],
             "receivePositions": [],
             "hidden": false,
             "deleted": false
@@ -39,27 +42,41 @@
             "parentSlotIds": [],
             "spouseSlotId": "owner",
             "ownPositions": [],
-            "receivePositions": [1, 2],
+            "receivePositions": [
+              1,
+              2
+            ],
             "hidden": false,
             "deleted": false
           },
           {
             "id": "child_1",
             "personId": "33333333-3333-4333-8333-333333333333",
-            "parentSlotIds": ["owner", "spouse"],
+            "parentSlotIds": [
+              "owner",
+              "spouse"
+            ],
             "spouseSlotId": null,
             "ownPositions": [],
-            "receivePositions": [1, 2],
+            "receivePositions": [
+              1,
+              2
+            ],
             "hidden": false,
             "deleted": false
           },
           {
             "id": "child_2",
             "personId": "44444444-4444-4444-8444-444444444444",
-            "parentSlotIds": ["owner", "spouse"],
+            "parentSlotIds": [
+              "owner",
+              "spouse"
+            ],
             "spouseSlotId": null,
             "ownPositions": [],
-            "receivePositions": [1],
+            "receivePositions": [
+              1
+            ],
             "hidden": false,
             "deleted": false
           }

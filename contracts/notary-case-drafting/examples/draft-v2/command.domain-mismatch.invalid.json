@@ -17,9 +17,24 @@
         "version": 3,
         "domain": "two_party",
         "nodes": [
-          { "id": "p1", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p2", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p3", "personId": null, "hidden": false, "deleted": false }
+          {
+            "id": "p1",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p2",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p3",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          }
         ]
       }
     }

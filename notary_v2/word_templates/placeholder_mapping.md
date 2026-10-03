@@ -2,6 +2,22 @@
 
 Quy ước: `N` là số thứ tự người/tài sản; `M` là số thứ tự loại đất trong tài sản. Slot không có dữ liệu trả về rỗng toàn bộ.
 
+**Vai trò:** catalog tham chiếu mẫu Word đang chạy; spec hiện hành ở
+[`word-output.md`](../../docs/spec/notary_v2/word-output.md) §11.
+Phase engine tĩnh §1–§10 của spec vẫn Draft.
+
+### Token chuẩn bổ sung MIN-141 (03/10/2026)
+
+| Nhóm | Token | Nguồn |
+|---|---|---|
+| Hồ sơ | `[noiniemyet]`, `[nguoinhanuyquyen]`, `[noidungviec]`, `[ngaylaphoso]`, `[ghichu]`, `[documenttype]` | Snapshot hồ sơ đã commit; key thiếu mới fallback master |
+| Người | `[tenN]`, `[gioitinhN]`, `[ngaysinhN]`, `[ngaychetN]`, `[sogiaytoN]`, `[ngaycapN]`, `[diachiN]`, `[loaigiaytoN]`, `[noicapN]`, `[loaicutruN]`, `[loaidiachiN]` | Slot 1–20 legacy, tương ứng alias `[Tên N]` và các alias cũ; field ưu tiên snapshot Người |
+| Cụm đất | `[loaidatMN]`, `[dientichMN]`, `[thoihanMN]` | M = cụm 1–20, N = vị trí tài sản; ví dụ `[loaidat12]` = cụm 1 tài sản 2 |
+
+Không có alias rút gọn `[loaidatM]`. Null/rỗng đã commit được giữ nguyên;
+không tự điền nơi niêm yết từ địa chỉ đất hoặc thời hạn lẻ vào cụm.
+Thứ tự người hiện vẫn là slot legacy, chưa đổi sang thứ tự Stage của phase Draft.
+
 ## 1. Hồ sơ
 
 | Placeholder | Chú thích | Hàm bên trong |

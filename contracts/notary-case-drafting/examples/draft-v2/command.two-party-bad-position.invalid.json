@@ -17,36 +17,186 @@
         "version": 3,
         "domain": "two_party",
         "nodes": [
-          { "id": "p1", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p2", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p3", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p4", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p5", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p6", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p7", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p8", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p9", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p10", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p11", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p12", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p13", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p14", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p15", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p16", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p17", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p18", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p19", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p20", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p21", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p22", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p23", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p24", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p25", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p26", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p27", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p28", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p29", "personId": null, "hidden": false, "deleted": false },
-          { "id": "p31", "personId": null, "hidden": false, "deleted": false }
+          {
+            "id": "p1",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p2",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p3",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p4",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p5",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p6",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p7",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p8",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p9",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p10",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p11",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p12",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p13",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p14",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p15",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p16",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p17",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p18",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p19",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p20",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p21",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p22",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p23",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p24",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p25",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p26",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p27",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p28",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p29",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "p31",
+            "personId": null,
+            "hidden": false,
+            "deleted": false
+          }
         ]
       }
     }

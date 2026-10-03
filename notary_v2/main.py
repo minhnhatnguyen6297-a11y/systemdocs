@@ -15,7 +15,7 @@ from database import (
     migrate_inheritance_case_properties_schema,
     migrate_inheritance_cases_schema,
     migrate_properties_schema,
-    migrate_properties_serial_nullable,
+    migrate_property_land_rows,
     migrate_zalo_exchange_schema,
     migrate_zalo_schema,
 )
@@ -34,7 +34,7 @@ app_logger.info("Web logging initialized at %s", WEB_LOG_PATH)
 migrate_customers_nullable()
 migrate_inheritance_cases_schema()
 migrate_properties_schema()
-migrate_properties_serial_nullable()
+migrate_property_land_rows()
 migrate_inheritance_case_properties_schema()
 migrate_zalo_schema()
 migrate_zalo_exchange_schema()
@@ -147,13 +147,19 @@ async def home(request: Request):
 @app.get("/api/stats")
 async def stats():
     from database import SessionLocal
-    from models import Customer, InheritanceCase, Property
+    from models import InheritanceCase
+    from routers.cases import _live_master_refs
 
     db = SessionLocal()
     try:
+        # MIN-141 đợt 4: đếm người/tài sản THỰC SỰ gắn hồ sơ — DISTINCT qua
+        # case (người chết/tài sản chính/người nhận ủy quyền) + participant
+        # (kể cả parent_customer_id) + link tài sản phụ. Danh bạ trơ (chưa
+        # gắn hồ sơ nào) không tính; primary/link trùng nhau đếm một lần.
+        customer_ids, property_ids = _live_master_refs(db)
         return {
-            "customers": db.query(Customer).count(),
-            "properties": db.query(Property).count(),
+            "customers": len(customer_ids),
+            "properties": len(property_ids),
             "cases": db.query(InheritanceCase).count(),
             "locked": db.query(InheritanceCase).filter(InheritanceCase.trang_thai == "locked").count(),
         }

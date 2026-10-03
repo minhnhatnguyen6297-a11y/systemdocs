@@ -279,7 +279,22 @@ Họ tên], sinh [Người 2 - Ngày sinh]` → `Bà Trần Thị B, sinh 03/04/
   phải cập nhật theo §4 cùng lúc triển khai.
 - Chi tiết web cũ và tầng placeholder cũ: [`word-output-detail.md`](./word-output-detail.md).
 
-## 11. Hiện trạng đang chạy (bằng chứng, 29/09/2026)
+## 11. Hiện trạng đang chạy (cập nhật MIN-141, 03/10/2026)
+
+- MIN-141 bổ sung token viết liền: `[noiniemyet]`, `[nguoinhanuyquyen]`,
+  `[noidungviec]`, `[ngaylaphoso]`, `[ghichu]`, `[documenttype]`;
+  `[tenN]`…`[loaicutruN]`/`[loaidiachiN]` dùng slot người legacy,
+  không phải thứ tự Stage dự kiến ở §4.1.
+- Cụm đất: `[loaidatMN]`, `[dientichMN]`, `[thoihanMN]`, M = 1..20,
+  N = vị trí tài sản; không có alias rút gọn. Ví dụ `[loaidat12]` =
+  cụm đất 1 của tài sản 2.
+- Tài sản và metadata hồ sơ ưu tiên snapshot đã commit; slot người đọc
+  field snapshot, chỉ fallback master khi key thiếu. Null/rỗng đã lưu
+  giữ nguyên. Không đắp thời hạn lẻ vào cụm; nơi niêm yết chưa nhập để
+  trống, chưa tra bảng xã. Chi tiết [`word-output-detail.md`](./word-output-detail.md).
+- §1–§10 vẫn là Draft; gộp MIN-141 không tự triển khai phase engine tĩnh.
+
+Các giới hạn trước MIN-141 dưới đây vẫn còn:
 
 - Catalog văn bản cố định 3 key `khai_nhan_di_san`, `thoa_thuan_phan_chia`,
   `niem_yet` (chưa có mẫu) — `notary_v2/services/word_batch_export.py:87-101`.

@@ -86,7 +86,10 @@ function canonicalTwoParty(nodes) {
 // position > len(assets), canonical 30 slot cho two_party.
 function fakeClient(seed) {
   const cases = {};
+  const catalog = JSON.parse(
+    JSON.stringify((seed && seed.__customers) || []));
   for (const [cid, c] of Object.entries(seed)) {
+    if (cid === '__customers') continue;
     cases[Number(cid)] = JSON.parse(JSON.stringify(c));
     cases[Number(cid)].id = Number(cid);
   }
@@ -135,6 +138,9 @@ function fakeClient(seed) {
         locked: !!c.locked, revision: c.revision,
         ngay_lap_ho_so: c.ngay_lap_ho_so ?? null,
         noi_niem_yet: c.noi_niem_yet ?? null,
+        nguoi_nhan_uy_quyen: c.nguoi_nhan_uy_quyen ?? null,
+        nguoi_nhan_uy_quyen_id: c.nguoi_nhan_uy_quyen_id ?? null,
+        noi_dung_viec: c.noi_dung_viec ?? null,
         ghi_chu: c.ghi_chu ?? null,
       },
       stage: JSON.parse(JSON.stringify(c.stage)),
@@ -257,6 +263,55 @@ function fakeClient(seed) {
           return fail('stage_validation_error', 'loi field',
                       { field_errors: fieldErrors });
         }
+        // MIN-141 đợt 3: payload.case (neu co) ap cung transaction —
+        // validate immutable type + uq id/name nhu mock adapter.
+        const cm = payload.case;
+        if (cm != null) {
+          if (typeof cm !== 'object' || Array.isArray(cm)) {
+            return fail('validation_error', 'payload.case phai la object');
+          }
+          if (cm.case_type !== undefined && cm.case_type !== c.case_type) {
+            return fail('validation_error',
+                        'case_type immutable', { expected: c.case_type });
+          }
+          if (cm.document_type !== undefined &&
+              cm.document_type !== c.document_type) {
+            return fail('validation_error',
+                        'document_type immutable',
+                        { expected: c.document_type });
+          }
+          const uid = cm.nguoi_nhan_uy_quyen_id;
+          if (uid !== undefined && uid !== null &&
+              (!Number.isInteger(uid) || uid < 1)) {
+            return fail('validation_error',
+                        'nguoi_nhan_uy_quyen_id phai la int >= 1/null');
+          }
+          if (uid != null) {
+            const cust = catalog.find((x) => x.id === uid);
+            if (!cust) {
+              return fail('validation_error',
+                          `nguoi_nhan_uy_quyen_id ${uid} khong ton tai`);
+            }
+            if (cm.nguoi_nhan_uy_quyen !== undefined &&
+                cm.nguoi_nhan_uy_quyen !== null &&
+                cm.nguoi_nhan_uy_quyen !== cust.ho_ten) {
+              return fail('validation_error',
+                          'nguoi_nhan_uy_quyen vs id mau thuan');
+            }
+            c.nguoi_nhan_uy_quyen = cust.ho_ten;
+            c.nguoi_nhan_uy_quyen_id = cust.id;
+          } else if ('nguoi_nhan_uy_quyen' in cm) {
+            c.nguoi_nhan_uy_quyen = cm.nguoi_nhan_uy_quyen;
+            c.nguoi_nhan_uy_quyen_id = null;
+          }
+          for (const f of ['noi_niem_yet', 'noi_dung_viec', 'ghi_chu']) {
+            if (f in cm) c[f] = cm[f];
+          }
+          if (cm.ngay_lap_ho_so !== undefined &&
+              cm.ngay_lap_ho_so !== null) {
+            c.ngay_lap_ho_so = cm.ngay_lap_ho_so;
+          }
+        }
         c.stage = JSON.parse(JSON.stringify(stage));
         for (const row of [...c.stage.people, ...c.stage.assets]) {
           if (row.entity_id == null) row.entity_id = nextEid++;
@@ -369,6 +424,11 @@ function fakeClient(seed) {
           status: 'draft', locked: false, revision: 1,
           ngay_lap_ho_so: payload.case.ngay_lap_ho_so ?? null,
           noi_niem_yet: payload.case.noi_niem_yet ?? null,
+          nguoi_nhan_uy_quyen:
+            payload.case.nguoi_nhan_uy_quyen ?? null,
+          nguoi_nhan_uy_quyen_id:
+            payload.case.nguoi_nhan_uy_quyen_id ?? null,
+          noi_dung_viec: payload.case.noi_dung_viec ?? null,
           ghi_chu: payload.case.ghi_chu ?? null,
           stage: stored,
           diagram: {
@@ -380,6 +440,46 @@ function fakeClient(seed) {
         cases[c.id] = c;
         idem[key] = c.id;
         return ok({ ...workspaceData(c), created: true });
+      }
+      case 'notary.customer_list': {
+        // MIN-141 đợt 3: danh ba gia — loc theo ten/so giay to/dia chi.
+        const q = String((payload && payload.query) || '').toLowerCase();
+        let rows = catalog.slice();
+        if (q) {
+          rows = rows.filter((x) =>
+            String(x.ho_ten || '').toLowerCase().includes(q) ||
+            String(x.so_giay_to || '').toLowerCase().includes(q) ||
+            String(x.dia_chi || '').toLowerCase().includes(q));
+        }
+        return ok({ customers: rows, total: rows.length },
+                  { type: 'customer_list' });
+      }
+      case 'notary.customer_create': {
+        const name = String((payload && payload.ho_ten) || '').trim();
+        if (!name) {
+          return fail('validation_error', 'ho_ten bat buoc');
+        }
+        const sgt = String((payload && payload.so_giay_to) || '')
+          .trim() || null;
+        let cust = sgt &&
+          catalog.find((x) => x.so_giay_to === sgt);
+        if (cust) {
+          cust.ho_ten = name;
+          return ok({ customer: cust, updated: true },
+                    { type: 'customer_upsert' });
+        }
+        cust = {
+          id: nextEid++, ho_ten: name,
+          gioi_tinh: payload.gioi_tinh ?? null,
+          ngay_sinh: payload.ngay_sinh ?? null,
+          ngay_chet: payload.ngay_chet ?? null,
+          so_giay_to: sgt,
+          ngay_cap: payload.ngay_cap ?? null,
+          dia_chi: payload.dia_chi ?? null,
+        };
+        catalog.push(cust);
+        return ok({ customer: cust, updated: false },
+                  { type: 'customer_upsert' });
       }
       case 'notary.diagram_evaluate': {
         if (payload.case_id == null) {
@@ -1922,4 +2022,141 @@ test('commitStage chi goi tren case that — draft khong co commitStage', async 
   const r = await model.saveDraft();
   assert.equal(r.ok, true);
   assert.ok(client.calls.length > callsBefore);
+});
+
+// ---------- MIN-141 đợt 3: case metadata + danh bạ ủy quyền ----------
+
+test('đợt3 openCase: meta mới vào caseInfo + baseline committedCaseInfo', async () => {
+  const seed = seedCases('ready');
+  seed[42].noi_niem_yet = 'xã Niêm Yết';
+  seed[42].nguoi_nhan_uy_quyen = 'Người Nhận UQ';
+  seed[42].nguoi_nhan_uy_quyen_id = 7;
+  seed[42].noi_dung_viec = 'Khai nhận thừa kế';
+  const { model } = makeModel(seed);
+  await model.openCase(42);
+  const ci = model.state.caseInfo;
+  assert.equal(ci.noi_niem_yet, 'xã Niêm Yết');
+  assert.equal(ci.nguoi_nhan_uy_quyen, 'Người Nhận UQ');
+  assert.equal(ci.nguoi_nhan_uy_quyen_id, 7);
+  assert.equal(ci.noi_dung_viec, 'Khai nhận thừa kế');
+  assert.deepEqual(model.state.committedCaseInfo.noi_niem_yet,
+    'xã Niêm Yết');
+  assert.equal(model.state.metaDirty, false);
+  assert.equal(model.hasUnsaved(), false);
+});
+
+test('đợt3 commitStage meta-only: payload.case đi kèm stage, metaDirty clear', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  model.updateCaseMeta('noi_niem_yet', 'xã Mới');
+  model.updateCaseMeta('noi_dung_viec', 'Việc mới');
+  assert.equal(model.state.metaDirty, true);
+  assert.equal(model.hasUnsaved(), true);
+  const rev = model.state.revision;
+  const r = await model.commitStage();
+  assert.equal(r.ok, true, JSON.stringify(r.error));
+  const call = client.calls.find(
+    (c) => c.command === 'notary.workspace_commit_stage');
+  assert.ok(call.payload.case, 'commit meta-only phải gửi payload.case');
+  assert.equal(call.payload.case.noi_niem_yet, 'xã Mới');
+  assert.equal(call.payload.case.noi_dung_viec, 'Việc mới');
+  assert.equal(call.payload.case.case_type, 'inheritance');
+  assert.equal(call.payload.base_revision, rev);
+  assert.equal(model.state.metaDirty, false);
+  assert.equal(model.state.revision, rev + 1);
+  assert.equal(model.state.committedCaseInfo.noi_niem_yet, 'xã Mới');
+  // Reopen: meta da luu quay ve tu server.
+  await model.openCase(42);
+  assert.equal(model.state.caseInfo.noi_niem_yet, 'xã Mới');
+  assert.equal(model.state.caseInfo.noi_dung_viec, 'Việc mới');
+});
+
+test('đợt3 commitStage: khong sua meta → payload khong kem case', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  model.addPerson({ ho_ten: 'Người Mới' });       // stageDirty only
+  const r = await model.commitStage();
+  assert.equal(r.ok, true, JSON.stringify(r.error));
+  const call = client.calls.find(
+    (c) => c.command === 'notary.workspace_commit_stage');
+  assert.equal(call.payload.case, undefined,
+    'stage-only commit khong duoc dinh kem payload.case');
+});
+
+test('đợt3 commit meta: uq_id danh ba hop le → server resolve ten master', async () => {
+  const seed = seedCases('ready');
+  seed.__customers = [{ id: 5, ho_ten: 'Người Danh Bạ' }];
+  const { model, client } = makeModel(seed);
+  await model.openCase(42);
+  model.updateCaseMeta('nguoi_nhan_uy_quyen', 'Người Danh Bạ');
+  model.updateCaseMeta('nguoi_nhan_uy_quyen_id', 5);
+  const r = await model.commitStage();
+  assert.equal(r.ok, true, JSON.stringify(r.error));
+  assert.equal(model.state.caseInfo.nguoi_nhan_uy_quyen,
+    'Người Danh Bạ');
+  assert.equal(model.state.caseInfo.nguoi_nhan_uy_quyen_id, 5);
+  // Id khong ton tai → validation_error, meta giu nguyen de sua lai.
+  model.updateCaseMeta('nguoi_nhan_uy_quyen_id', 999);
+  const r2 = await model.commitStage();
+  assert.equal(r2.ok, false);
+  assert.equal(r2.error.code, 'validation_error');
+  assert.equal(model.state.metaDirty, true,
+    'commit loi phai giu metaDirty de khong mat noi dung');
+});
+
+test('đợt3 commit meta: immutable case_type mismatch → validation_error', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  model.updateCaseMeta('noi_niem_yet', 'x');
+  // Gia lap client lo gui kem case_type khac — server phai tu choi.
+  const orig = client.run;
+  client.run = (cmd, p) => {
+    if (cmd === 'notary.workspace_commit_stage' && p.case) {
+      p = { ...p, case: { ...p.case, case_type: 'two_party' } };
+    }
+    return orig(cmd, p);
+  };
+  const r = await model.commitStage();
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, 'validation_error');
+  assert.equal(model.state.caseInfo.case_type, 'inheritance');
+});
+
+test('đợt3 loadUqCatalog: nap danh ba mot lan; resolveUqName gan/xoa id', async () => {
+  const seed = seedCases('ready');
+  seed.__customers = [
+    { id: 5, ho_ten: 'Người Danh Bạ', so_giay_to: '001' },
+    { id: 6, ho_ten: 'Người Khác', so_giay_to: '002' },
+  ];
+  const { model, client } = makeModel(seed);
+  await model.openCase(42);
+  const r = await model.loadUqCatalog();
+  assert.equal(r.ok, true);
+  assert.equal(model.state.uqCatalog.length, 2);
+  // Trung danh ba → gan id on dinh; nhap tu do → id null.
+  model.resolveUqName('Người Danh Bạ');
+  assert.equal(model.state.caseInfo.nguoi_nhan_uy_quyen_id, 5);
+  model.resolveUqName('Tên Tự Do');
+  assert.equal(model.state.caseInfo.nguoi_nhan_uy_quyen, 'Tên Tự Do');
+  assert.equal(model.state.caseInfo.nguoi_nhan_uy_quyen_id, null);
+});
+
+test('đợt3 createUqCustomer: tao danh ba moi → chon lam nguoi nhan UQ', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const r = await model.createUqCustomer('Người Mới Thêm');
+  assert.equal(r.ok, true, JSON.stringify(r.error));
+  const call = client.calls.find(
+    (c) => c.command === 'notary.customer_create');
+  assert.equal(call.payload.ho_ten, 'Người Mới Thêm');
+  assert.equal(model.state.caseInfo.nguoi_nhan_uy_quyen,
+    'Người Mới Thêm');
+  assert.ok(model.state.caseInfo.nguoi_nhan_uy_quyen_id >= 900,
+    'id danh ba moi phai di vao meta de commit giu tham chieu');
+  assert.equal(model.state.metaDirty, true);
+  // Ten trong → tu choi cuc bo, khong goi command.
+  const before = client.calls.length;
+  const r2 = await model.createUqCustomer('   ');
+  assert.equal(r2.ok, false);
+  assert.equal(client.calls.length, before);
 });

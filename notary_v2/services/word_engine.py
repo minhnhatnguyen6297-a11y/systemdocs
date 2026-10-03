@@ -6,6 +6,7 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 
@@ -29,6 +30,7 @@ ROLE_LABELS = {
 }
 
 MAX_WORD_ASSETS = 5
+MAX_WORD_LAND_ROWS = 20
 
 
 class WordExportValidationError(Exception):
@@ -99,6 +101,18 @@ def _fmt_date(d: Any) -> str:
     if isinstance(d, str):
         return d
     return d.strftime("%d/%m/%Y")
+
+
+def _fmt_snapshot_date(value: Any) -> str:
+    """Ngày trong snapshot payload.case (ISO 'YYYY-MM-DD' hoặc năm
+    'YYYY' — `_emit_date_or_year`) → dd/mm/YYYY cho placeholder Word."""
+    text = _safe_text(value)
+    if not text:
+        return ""
+    m = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", text)
+    if m:
+        return f"{m.group(3)}/{m.group(2)}/{m.group(1)}"
+    return text
 
 
 def _fmt_birth_or_year(d: Any) -> str:
@@ -308,6 +322,76 @@ def _parse_land_rows(raw: str) -> list[dict[str, Any]]:
     if not isinstance(rows, list):
         return []
     return [row for row in rows if isinstance(row, dict)]
+
+
+def _fmt_area(v: Any) -> str:
+    """Diện tích → text; số nguyên bỏ phần thập phân thừa (80.0 → '80')."""
+    if v is None or v == "" or isinstance(v, bool):
+        return ""
+    if isinstance(v, (int, float)):
+        return f"{v:g}"
+    return _safe_text(v)
+
+
+def _land_row_values(row: Any) -> tuple[str, str, str]:
+    """Một cụm đất → (loai_dat, dien_tich, thoi_han) dạng text.
+
+    Đọc được dict snapshot/JSON — key canonical loaidat/dientich/thoihan
+    hoặc key wire legacy loai_dat/dien_tich/thoi_han (kể cả lỗi chính tả
+    'dien_tích' của data cũ) — và object bảng con PropertyLandRow."""
+    if not row:
+        return "", "", ""
+    if isinstance(row, dict):
+        loai = row.get("loaidat")
+        if loai is None:
+            loai = row.get("loai_dat")
+        area = row.get("dientich")
+        if area is None:
+            area = row.get("dien_tích", row.get("dien_tich"))
+        term = row.get("thoihan")
+        if term is None:
+            term = row.get("thoi_han")
+    else:
+        loai = getattr(row, "loaidat", getattr(row, "loai_dat", ""))
+        area = getattr(row, "dientich", getattr(row, "dien_tich", ""))
+        term = getattr(row, "thoihan", getattr(row, "thoi_han", ""))
+    return _safe_text(loai), _fmt_area(area), _safe_text(term)
+
+
+def _norm_land_dict(row: Any) -> dict[str, str]:
+    loai, area, term = _land_row_values(row)
+    return {"loai_dat": loai, "dien_tich": area, "thoi_han": term}
+
+
+def _committed_land_rows(prop: Any) -> list[dict[str, str]]:
+    """Cụm đất đã commit của một asset view → list dict đã normalize
+    {loai_dat, dien_tich, thoi_han}. Nguồn theo thứ tự: `.land_rows`
+    (bảng con ORM / snapshot view) → `land_rows_json` legacy → [].
+    KHÔNG fallback trường lẻ — dùng _land_rows_for khi cần pseudo-row."""
+    if prop is None:
+        return []
+    rows = getattr(prop, "land_rows", None)
+    if rows:
+        return [_norm_land_dict(r) for r in rows]
+    parsed = _parse_land_rows(_safe_text(getattr(prop, "land_rows_json", "")))
+    return [_norm_land_dict(r) for r in parsed]
+
+
+def _land_rows_for(prop: Any) -> list[dict[str, str]]:
+    """Cụm đất để render: committed rows, hoặc pseudo-row từ trường tổng
+    hợp loai_dat/dien_tich khi chưa có cụm nào.
+
+    Thời hạn lẻ (properties.thoi_han) KHÔNG được đắp vào cụm — thời hạn
+    thuộc từng cụm (MIN-141 đợt 2); dữ liệu cũ chỉ có thời hạn lẻ được
+    workspace_get báo orphan_thoi_han để đối chiếu, không tự đoán."""
+    rows = _committed_land_rows(prop)
+    if rows:
+        return rows
+    return [{
+        "loai_dat": _safe_text(getattr(prop, "loai_dat", "")),
+        "dien_tich": _fmt_area(getattr(prop, "dien_tich", "")),
+        "thoi_han": "",
+    }]
 
 
 # ---------------------------------------------------------------------------
@@ -654,18 +738,37 @@ def _add_word_person_group(
 
 
 def _deceased_landowner_clauses(people: list[WordPerson]) -> str:
+    """Dòng khai tử chủ đất chết — ghép từ field đã commit của người
+    (MIN-141 đợt 3): loại giấy tờ/nơi cấp lấy bằng chứng xác nhận trong
+    snapshot; phần nào chưa có thì lược bỏ, KHÔNG gán cứng "Trích lục
+    khai tử (Bản sao)" hay suy tên UBND xã."""
     lines = []
     for p in people:
         title = _title_for_person(p)
         born = _fmt_birth_or_year(p.ngay_sinh)
         died = _fmt_date(p.ngay_chet)
         doc_no = _safe_text(p.so_giay_to)
+        doc_type = _safe_text(p.loai_giay_to)
+        issuer = _safe_text(p.noi_cap)
         issued = _fmt_date(p.ngay_cap)
         address = _safe_text(p.dia_chi)
         line = f"{title} {p.ho_ten}"
         if born:
             line += f"; Sinh năm: {born}"
-        line += f"; chết ngày {died} theo Trích lục khai tử (Bản sao) số {doc_no} do Ủy ban nhân dân xã [Nơi niêm yết], tỉnh Ninh Bình ký ngày {issued}. Nơi chết: {address}."
+        line += f"; chết ngày {died}"
+        if doc_type or doc_no or issuer or issued:
+            tail = " theo"
+            tail += f" {doc_type}" if doc_type else " giấy tờ khai tử"
+            if doc_no:
+                tail += f" số {doc_no}"
+            if issuer:
+                tail += f" do {issuer}"
+            if issued:
+                tail += f" ký ngày {issued}"
+            line += tail
+        line += "."
+        if address:
+            line += f" Nơi chết: {address}."
         lines.append(line)
     return "\n".join(lines)
 
@@ -699,7 +802,158 @@ def _family_relation_clauses(
     return "\n".join(paragraphs)
 
 
+_SNAPSHOT_ASSET_META_KEYS = {"id", "entity_id", "row_id", "is_primary"}
+
+
+def _safe_int(v: Any) -> int | None:
+    if v is None or isinstance(v, bool):
+        return None
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _snapshot_asset_fields(item: Any) -> bool:
+    """Snapshot asset đợt 2 trở đi mang full field + land_rows canonical;
+    snapshot cũ chỉ có {id, entity_id, row_id, is_primary} → fieldless."""
+    return isinstance(item, dict) and any(
+        key not in _SNAPSHOT_ASSET_META_KEYS for key in item)
+
+
+def _snapshot_asset_view(item: dict[str, Any]) -> Any:
+    """Asset snapshot trong case_state_json → view giống ORM Property cho
+    các hàm placeholder (MIN-141 đợt 2 — Word đọc đúng bản đã commit của
+    hồ sơ, không đổi theo master properties của hồ sơ khác).
+
+    `land_rows` giữ nguyên dict canonical (loaidat/dientich/thoihan) —
+    _land_row_values đọc được cả hai spelling; `land_rows_json` = None vì
+    snapshot đã là nguồn committed."""
+    ngay_cap = item.get("ngay_cap")
+    if isinstance(ngay_cap, str) and ngay_cap:
+        try:
+            ngay_cap = date.fromisoformat(ngay_cap[:10])
+        except ValueError:
+            pass  # giữ chuỗi gốc — _fmt_date pass-through chuỗi
+    entity_id = item.get("entity_id")
+    return SimpleNamespace(
+        id=entity_id if isinstance(entity_id, int)
+            else _safe_int(item.get("id")),
+        entity_id=entity_id,
+        so_serial=item.get("so_serial"),
+        so_vao_so=item.get("so_vao_so"),
+        so_thua_dat=item.get("so_thua_dat"),
+        so_to_ban_do=item.get("so_to_ban_do"),
+        dia_chi=item.get("dia_chi"),
+        loai_so=item.get("loai_so"),
+        hinh_thuc_su_dung=item.get("hinh_thuc_su_dung"),
+        thoi_han=item.get("thoi_han"),
+        nguon_goc=item.get("nguon_goc"),
+        ngay_cap=ngay_cap,
+        co_quan_cap=item.get("co_quan_cap"),
+        loai_dat=item.get("loai_dat"),
+        dien_tich=item.get("dien_tich"),
+        land_rows=(item.get("land_rows")
+                   if isinstance(item.get("land_rows"), list) else []),
+        land_rows_json=None,
+    )
+
+
+def _snap_date_value(value: Any) -> Any:
+    """Ngày trong snapshot person (ISO 'YYYY-MM-DD' hoặc năm 'YYYY') →
+    `date` để _fmt_date/_fmt_birth_or_year render đồng nhất với đường
+    master. Không parse được → giữ chuỗi gốc (pass-through)."""
+    if not isinstance(value, str) or not value:
+        return value
+    text = value.strip()
+    try:
+        if re.fullmatch(r"\d{4}", text):
+            return date(int(text), 1, 1)
+        return date.fromisoformat(text[:10])
+    except ValueError:
+        return value
+
+
+def _snapshot_person_view(customer: Any, row: dict) -> Any:
+    """View Người cho slot `[Tên N]`…`[noicapN]` — đọc bằng chứng đã
+    commit trong snapshot `stage[]` của chính hồ sơ thay vì master
+    `customers` live (MIN-141 review: master dùng chung có thể bị hồ sơ
+    khác đổi sau commit; vd loai_giay_to/ngay_cap của người chết model
+    trả None nên đường live làm mất 'Giấy chứng tử' đã xác nhận).
+
+    Per-key presence như `_snap_meta`: key có trong snapshot → dùng giá
+    trị snapshot (kể cả null chủ ý → rỗng); key vắng (snapshot cũ) →
+    fallback master live."""
+
+    def pick(key: str) -> Any:
+        return row[key] if key in row else getattr(customer, key, None)
+
+    return SimpleNamespace(
+        id=getattr(customer, "id", None),
+        ho_ten=_safe_text(pick("ho_ten")),
+        gioi_tinh=_safe_text(pick("gioi_tinh")),
+        ngay_sinh=_snap_date_value(pick("ngay_sinh")),
+        ngay_chet=_snap_date_value(pick("ngay_chet")),
+        so_giay_to=_safe_text(pick("so_giay_to")),
+        ngay_cap=_snap_date_value(pick("ngay_cap")),
+        noi_cap=_safe_text(pick("noi_cap")),
+        dia_chi=_safe_text(pick("dia_chi")),
+        loai_giay_to=_safe_text(pick("loai_giay_to")),
+        loai_dia_chi=_safe_text(pick("loai_dia_chi")),
+    )
+
+
+def _snapshot_people_by_id(state: dict[str, Any]) -> dict[str, dict]:
+    """{entity_id str → row} từ snapshot `stage[]` — đối chiếu slot
+    Người legacy (Customer live) với bản đã commit của hồ sơ."""
+    out: dict[str, dict] = {}
+    stage = state.get("stage") if isinstance(state, dict) else None
+    for item in stage or []:
+        if isinstance(item, dict) and item.get("id") is not None:
+            out[str(item.get("id"))] = item
+    return out
+
+
+def _live_props_by_id(case: Any) -> dict[int, Any]:
+    """{property_id: Property live} — fallback cho snapshot item chỉ có
+    pointer (payload trước đợt 2)."""
+    out: dict[int, Any] = {}
+    for link in getattr(case, "property_links", None) or []:
+        prop = getattr(link, "property", None)
+        pid = getattr(link, "property_id", None)
+        if prop is not None and isinstance(pid, int):
+            out[pid] = prop
+    ts = getattr(case, "tai_san", None)
+    ts_id = getattr(ts, "id", None)
+    if ts is not None and isinstance(ts_id, int):
+        out.setdefault(ts_id, ts)
+    return out
+
+
 def _get_property_list(case: Any) -> list[Any]:
+    """Tài sản để render — snapshot đã commit trong case_state_json trước
+    (MIN-141 đợt 2): mỗi hồ sơ xuất đúng bản commit của mình, kể cả khi
+    master properties bị hồ sơ khác dùng chung sửa. Item snapshot chỉ có
+    pointer (payload cũ) → tra master live theo entity_id; không có
+    snapshot assets → đường live cũ (links/tai_san)."""
+    snap_assets = _load_case_state(case).get("assets")
+    if isinstance(snap_assets, list) and snap_assets:
+        live = _live_props_by_id(case)
+        views = []
+        for item in snap_assets:
+            if _snapshot_asset_fields(item):
+                views.append(_snapshot_asset_view(item))
+                continue
+            pid = None
+            if isinstance(item, dict):
+                pid = item.get("entity_id")
+                if not isinstance(pid, int) or isinstance(pid, bool):
+                    pid = _safe_int(item.get("id"))
+            prop = live.get(pid) if isinstance(pid, int) else None
+            if prop is not None:
+                views.append(prop)
+        if views:
+            return views
     links = getattr(case, "property_links", None)
     if links:
         ordered = sorted(links, key=lambda x: (not bool(getattr(x, "is_primary", False)), getattr(x, "id", 0)))
@@ -733,13 +987,7 @@ def _property_description(properties: list[Any]) -> str:
         detail = f"Thửa đất số: {so_thua}, tờ bản đồ số: {so_to}."
         paragraphs.append(detail)
 
-        land_rows = _parse_land_rows(_safe_text(getattr(prop, "land_rows_json", "")))
-        if not land_rows:
-            land_rows = [{
-                "loai_dat": _safe_text(getattr(prop, "loai_dat", "")),
-                "dien_tich": _safe_text(getattr(prop, "dien_tich", "")),
-                "thoi_han": _safe_text(getattr(prop, "thoi_han", "")),
-            }]
+        land_rows = _land_rows_for(prop)
 
         total_area = 0.0
         for row in land_rows:
@@ -762,7 +1010,7 @@ def _property_description(properties: list[Any]) -> str:
         if land_type_lines:
             paragraphs.append("\n".join(land_type_lines))
 
-        paragraphs.append(f"Thờ hạn sử dụng: {_safe_text(getattr(prop, 'thoi_han', ''))}")
+        paragraphs.append(f"Thời hạn sử dụng: {_safe_text(getattr(prop, 'thoi_han', ''))}")
         paragraphs.append(f"Nguồn gốc sử dụng đất: {_safe_text(getattr(prop, 'nguon_goc', ''))}.")
     return "\n".join(paragraphs)
 
@@ -968,13 +1216,7 @@ def _add_property_placeholders(mapping: dict[str, str], properties: list[Any]) -
         land_rows: list[dict[str, Any]] = []
         values = {field: "" for field in asset_fields}
         if prop is not None:
-            land_rows = _parse_land_rows(_safe_text(getattr(prop, "land_rows_json", "")))
-            if not land_rows:
-                land_rows = [{
-                    "loai_dat": _safe_text(getattr(prop, "loai_dat", "")),
-                    "dien_tich": _safe_text(getattr(prop, "dien_tich", "")),
-                    "thoi_han": _safe_text(getattr(prop, "thoi_han", "")),
-                }]
+            land_rows = _land_rows_for(prop)
             total_area = 0.0
             for row in land_rows:
                 try:
@@ -1046,9 +1288,7 @@ def _add_property_placeholders(mapping: dict[str, str], properties: list[Any]) -
 
         for m_idx in range(1, 11):
             row = land_rows[m_idx - 1] if m_idx <= len(land_rows) else None
-            land_type = _safe_text(row.get("loai_dat", "")) if row else ""
-            area = _safe_text(row.get("dien_tích", row.get("dien_tich", ""))) if row else ""
-            term = _safe_text(row.get("thoi_han", "")) if row else ""
+            land_type, area, term = _land_row_values(row)
             mapping[f"[Loại đất {idx}.{m_idx} - Loại đất]"] = land_type
             mapping[f"[Loại đất {idx}.{m_idx} - Diện tích]"] = area
             mapping[f"[Loại đất {idx}.{m_idx} - Thời hạn]"] = term
@@ -1061,6 +1301,15 @@ def _add_property_placeholders(mapping: dict[str, str], properties: list[Any]) -
             )
             mapping[f"[Dòng loại đất tài sản {idx}.{m_idx}]"] = mapping[f"[Dòng loại đất {idx}.{m_idx}]"]
 
+        # Tên chuẩn (contracts/entities.md §9.2): [trường][loại đất M][tài sản N],
+        # viết liền không dấu, không "_". Không sinh alias rút gọn [loaidatM].
+        for m_idx in range(1, MAX_WORD_LAND_ROWS + 1):
+            row = land_rows[m_idx - 1] if m_idx <= len(land_rows) else None
+            land_type, area, term = _land_row_values(row)
+            mapping[f"[loaidat{m_idx}{idx}]"] = land_type
+            mapping[f"[dientich{m_idx}{idx}]"] = area
+            mapping[f"[thoihan{m_idx}{idx}]"] = term
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -1068,8 +1317,10 @@ def _add_property_placeholders(mapping: dict[str, str], properties: list[Any]) -
 
 
 def build_template_mapping(case: Any, today: date | None = None) -> dict[str, str]:
-    ts = getattr(case, "tai_san", None)
     context = build_word_context(case, today=today)
+    # Tài sản vị trí 1 (primary) — snapshot đã commit nếu có, không thì
+    # master live case.tai_san (đường cũ, hồ sơ chưa qua commit_stage).
+    ts = context.assets[0] if context.assets else getattr(case, "tai_san", None)
     today = context.today
     person1, person2, person3, people_4_plus = _pick_core_people(case)
 
@@ -1080,8 +1331,42 @@ def build_template_mapping(case: Any, today: date | None = None) -> dict[str, st
     for idx, c in enumerate(people_4_plus[:17], start=4):
         people_slots[idx] = c
 
-    noi_niem_yet = _safe_text(getattr(case, "noi_niem_yet", "")) or _safe_text(getattr(ts, "dia_chi", ""))
-    land_rows = _parse_land_rows(_safe_text(getattr(ts, "land_rows_json", "")))
+    # Metadata hồ sơ (MIN-141 đợt 3): snapshot `payload.case` đã commit
+    # là nguồn đọc chính — cột live chỉ fallback khi snapshot KHÔNG có
+    # key (hồ sơ legacy chưa qua commit_stage sau khi nâng cấp). Key đã
+    # commit mà null/rỗng là giá trị chủ ý → xuất rỗng, không đọc master.
+    # `[Nơi niêm yết]` KHÔNG còn đắp từ địa chỉ đất: chưa tra cứu được →
+    # để trống, không tự khẳng định.
+    _state_doc = _load_case_state(case)
+    snap_case = _state_doc.get("case")
+    if not isinstance(snap_case, dict):
+        # Phòng snapshot lồng `payload.case` (một số doc legacy/wire).
+        _inner = _state_doc.get("payload")
+        snap_case = (_inner.get("case") if isinstance(_inner, dict)
+                     else None)
+    snap_case = snap_case if isinstance(snap_case, dict) else {}
+
+    def _snap_meta(key: str, live_attr: str) -> str:
+        if key in snap_case:
+            return _safe_text(snap_case.get(key))
+        return _safe_text(getattr(case, live_attr, ""))
+
+    noi_niem_yet = _snap_meta("noiniemyet", "noi_niem_yet")
+    noi_dung_viec = _snap_meta("noidungviec", "noi_dung_viec")
+    ghi_chu = _snap_meta("ghichu", "ghi_chu")
+    if "nguoinhanuyquyen" in snap_case:
+        _uq_snap = snap_case.get("nguoinhanuyquyen")
+        nguoi_nhan_uy_quyen = (
+            _safe_text(_uq_snap.get("ten"))
+            if isinstance(_uq_snap, dict) else _safe_text(_uq_snap))
+    else:
+        nguoi_nhan_uy_quyen = _safe_text(
+            getattr(case, "nguoi_nhan_uy_quyen", ""))
+    ngay_lap_ho_so = (
+        _fmt_snapshot_date(snap_case.get("ngaylaphoso"))
+        if "ngaylaphoso" in snap_case
+        else _fmt_date(getattr(case, "ngay_lap_ho_so", None)))
+    land_rows = _committed_land_rows(ts)
     if land_rows:
         total = 0.0
         for row in land_rows:
@@ -1100,9 +1385,13 @@ def build_template_mapping(case: Any, today: date | None = None) -> dict[str, st
     mapping: dict[str, str] = {
         "[Tên file]": f"ho_so_thua_ke_{getattr(case, 'id', '')}",
         "[Loại văn bản]": loai_van_ban,
-        "[Ngày lập hồ sơ]": _fmt_date(getattr(case, "ngay_lap_ho_so", None)),
+        "[documenttype]": loai_van_ban,
+        "[Ngày lập hồ sơ]": ngay_lap_ho_so,
+        "[ngaylaphoso]": ngay_lap_ho_so,
         "[Nơi niêm yết]": noi_niem_yet,
-        "[Ghi chú]": _safe_text(getattr(case, "ghi_chu", "")),
+        "[noiniemyet]": noi_niem_yet,
+        "[Ghi chú]": ghi_chu,
+        "[ghichu]": ghi_chu,
         "[Niêm Yết]": noi_niem_yet,
         "[NIÊM YẾT]": noi_niem_yet.upper() if noi_niem_yet else "",
         "[Loại sổ]": loai_so_val,
@@ -1125,8 +1414,11 @@ def build_template_mapping(case: Any, today: date | None = None) -> dict[str, st
         "[Tháng]": f"{today.month:02d}",
         "[Ngày chữ]": _so_thanh_chu(today.day),
         "[Tháng chữ]": _so_thanh_chu(today.month),
-        "[Ngườ ủy quyền]": "",
-        "[Ngườ ủy quyền2]": "",
+        "[Ngườ ủy quyền]": nguoi_nhan_uy_quyen,
+        "[Ngườ ủy quyền2]": nguoi_nhan_uy_quyen,
+        "[nguoinhanuyquyen]": nguoi_nhan_uy_quyen,
+        "[Nội dung việc]": noi_dung_viec,
+        "[noidungviec]": noi_dung_viec,
         "[Số công chứng]": "",
         "[ONT]": "",
         "[CLN]": "",
@@ -1136,8 +1428,22 @@ def build_template_mapping(case: Any, today: date | None = None) -> dict[str, st
         "[SĐT]": "",
     }
 
+    # Slot Người: thứ tự giữ nguyên legacy (_pick_core_people trên
+    # participants live), nhưng FIELD đọc bằng chứng đã commit trong
+    # snapshot stage[] — đối chiếu theo entity id (MIN-141 review:
+    # master customers dùng chung đổi sau commit không được kéo giá trị
+    # slot đi; người chết có bằng chứng 'Giấy chứng tử' không bị model
+    # trả None xóa mất). Snapshot cũ thiếu key → fallback master.
+    _snap_people = _snapshot_people_by_id(_state_doc)
+
+    def _slot_person(c):
+        if c is None:
+            return None
+        row = _snap_people.get(str(getattr(c, "id", "")))
+        return _snapshot_person_view(c, row) if row is not None else c
+
     for i in range(1, 21):
-        c = people_slots[i]
+        c = _slot_person(people_slots[i])
         mapping[f"[Tên {i}]"] = _safe_text(getattr(c, "ho_ten", "") if c else "")
         mapping[f"[Năm sinh {i}]"] = _fmt_birth_or_year(getattr(c, "ngay_sinh", None) if c else None)
         mapping[f"[CCCD {i}]"] = _safe_text(getattr(c, "so_giay_to", "") if c else "")
@@ -1147,6 +1453,19 @@ def build_template_mapping(case: Any, today: date | None = None) -> dict[str, st
         mapping[f"[Nơi cấp CC {i}]"] = _safe_text(getattr(c, "noi_cap", "") if c else "")
         mapping[f"[Thường trú {i}]"] = _safe_text(getattr(c, "loai_dia_chi", "") if c else "")
         mapping[f"[Năm chết {i}]"] = _fmt_date(getattr(c, "ngay_chet", None) if c else None)
+        # Tên chuẩn Người — viết liền không dấu không "_" (entities.md
+        # §9.1): mirror đúng giá trị alias tiếng Việt cũ ở trên.
+        mapping[f"[ten{i}]"] = mapping[f"[Tên {i}]"]
+        mapping[f"[gioitinh{i}]"] = _safe_text(getattr(c, "gioi_tinh", "") if c else "")
+        mapping[f"[ngaysinh{i}]"] = mapping[f"[Năm sinh {i}]"]
+        mapping[f"[ngaychet{i}]"] = mapping[f"[Năm chết {i}]"]
+        mapping[f"[sogiayto{i}]"] = mapping[f"[CCCD {i}]"]
+        mapping[f"[ngaycap{i}]"] = mapping[f"[Ngày cấp {i}]"]
+        mapping[f"[diachi{i}]"] = mapping[f"[Địa chỉ {i}]"]
+        mapping[f"[loaigiayto{i}]"] = mapping[f"[Loại CC {i}]"]
+        mapping[f"[noicap{i}]"] = mapping[f"[Nơi cấp CC {i}]"]
+        mapping[f"[loaicutru{i}]"] = mapping[f"[Thường trú {i}]"]
+        mapping[f"[loaidiachi{i}]"] = mapping[f"[Thường trú {i}]"]
     mapping["[Năm chết]"] = mapping.get("[Năm chết 1]", "")
 
     for i, row in enumerate(land_rows[:10], start=1):
@@ -1157,8 +1476,9 @@ def build_template_mapping(case: Any, today: date | None = None) -> dict[str, st
         mapping[f"[Loại đất {i}]"] = ""
         mapping[f"[Diện tích {i}]"] = ""
         mapping[f"[Thờ hạn {i}]"] = ""
-    if not mapping.get("[Thờ hạn 1]") and getattr(ts, "thoi_han", None):
-        mapping["[Thờ hạn 1]"] = _safe_text(getattr(ts, "thoi_han", ""))
+    # Không còn đắp thời hạn lẻ (properties.thoi_han) vào [Thờ hạn 1] —
+    # thời hạn thuộc từng cụm (MIN-141 đợt 2); thời hạn lẻ không gắn được
+    # cụm được workspace_get báo orphan_thoi_han để đối chiếu.
 
     role_groups: dict[str, list[WordPerson]] = {key: [] for key in ROLE_LABELS}
     for person in context.all_people:

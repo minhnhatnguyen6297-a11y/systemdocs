@@ -200,6 +200,11 @@ result.data:
     revision: <int ≥ 1>
     ngay_lap_ho_so: <YYYY-MM-DD | null>   # ngày lập hồ sơ (rev 1.1)
     noi_niem_yet: <string | null>        # nơi niêm yết (rev 1.1)
+    nguoi_nhan_uy_quyen: <string | null>  # tên người nhận ủy quyền —
+                                        # denormalized từ danh bạ (đợt 3)
+    nguoi_nhan_uy_quyen_id: <int | null>  # tham chiếu ổn định tới
+                                        # customers.id (đợt 3)
+    noi_dung_viec: <string | null>       # cụm nội dung việc (đợt 3)
     ghi_chu: <string | null>             # ghi chú hồ sơ (rev 1.1)
   stage:
     people: [<person_row>]         # §4.1
@@ -244,11 +249,49 @@ person_row:
   noi_cap: <string | null>
   dia_chi: <string | null>
   place_of_origin: <string | null>
+  loai_giay_to: <string | null>      # (đợt 3) loại giấy tờ ĐÃ XÁC NHẬN —
+                                     # người chết: lựa chọn/OCR của user;
+                                     # người sống: server suy theo mốc
+                                     # ngay_cap 01/10/2024 khi trống
+  loai_dia_chi: <string | null>      # (đợt 3) nhãn địa chỉ — Thường trú
+                                     # tại/Cư trú tại/Nơi chết; server suy
+                                     # khi trống
 ```
 
 Không thêm field ngoài danh sách này — producer strip field lạ (tiền lệ
 backend hiện strip ngoài 10 key). `ho_ten` rỗng/`""` →
 `stage_validation_error{field:ho_ten, code:required}`.
+
+- **Key canonical (MIN-141 đợt 3):** server đọc được cả key wire legacy
+  trên và tên nghiệp vụ canonical liền không dấu (entities.md §9.1):
+  `ten`↔`ho_ten`, `gioitinh`↔`gioi_tinh`, `ngaysinh`↔`ngay_sinh`,
+  `ngaychet`↔`ngay_chet`, `sogiayto`↔`so_giay_to`, `ngaycap`↔`ngay_cap`,
+  `noicap`↔`noi_cap`, `diachi`↔`dia_chi`, `loaigiayto`↔`loai_giay_to`,
+  `loaidiachi`↔`loai_dia_chi`. Cùng trường ở cả hai spelling mà giá trị
+  mâu thuẫn → `validation_error`. Wire emit giữ bộ legacy.
+- **Giá trị suy ra (đợt 3):** người sống thiếu `loai_giay_to`/`noi_cap`/
+  `loai_dia_chi` → server derive theo mốc `ngay_cap` 01/10/2024 và ghi
+  giá trị hiệu lực vào snapshot commit; thiếu `ngay_cap` → `null`
+  (chưa xác định, không suy). Người chết (`ngay_chet` ≠ null): server
+  KHÔNG tự suy — chỉ giữ giá trị người dùng xác nhận; `loai_dia_chi`
+  mặc định `"Nơi chết"`.
+- **Phân biệt bằng chứng xác nhận vs giá trị suy ra (MIN-141 fix
+  `eff4f12`):** giá trị suy ra đã ghi trong snapshot trước KHÔNG được
+  coi là bằng chứng người dùng xác nhận. Tại commit mới, server tính
+  lại giá trị suy ra trước đó từ input nguồn của **snapshot của chính
+  hồ sơ** (`ngay_chet`/`ngay_cap` đã lưu trong `case_state_json`), không
+  lấy master live — master dùng chung có thể đã bị hồ sơ khác sửa. Row
+  incoming echo đúng giá trị suy ra trước đó hoặc trống → tính lại theo
+  input nguồn mới; row incoming khác giá trị suy ra trước đó → đó là
+  bằng chứng đã xác nhận → giữ nguyên (kể cả giấy khai tử người chết).
+- **Word đọc bằng chứng Người từ snapshot (MIN-141 fix `eff4f12`):**
+  các slot Người trong Word (`[tenN]`…`[loaigiaytoN]`/`[noicapN]`/`[loaicutruN]`
+  và alias cũ) đọc từ phần tử `stage[]` đã commit trong
+  `case_state_json` của chính hồ sơ — đối chiếu theo `id` entity, giữ
+  nguyên thứ tự slot legacy. Ngữ nghĩa key-presence: key có trong
+  snapshot (kể cả `null`) → dùng snapshot; key vắng → fallback master
+  live cho hồ sơ cũ. Hai hồ sơ dùng chung một `Customer` xuất đúng
+  bằng chứng riêng đã commit, không bị sửa master kéo lệch nhau.
 
 ### 4.2 `asset_row` — dòng Tài sản Stage
 
@@ -266,7 +309,8 @@ asset_row:
   dia_chi: <string non-empty>        # bắt buộc
   loai_so: <string | null>
   hinh_thuc_su_dung: <string | null>
-  thoi_han: <string | null>
+  thoi_han: <string | null>          # lẻ cấp tài sản — CHỈ còn nghĩa trên
+                                     # emit/legacy (xem ghi chú dưới)
   nguon_goc: <string | null>
   ngay_cap: <YYYY-MM-DD | null>      # asset chỉ nhận dạng đầy đủ
   co_quan_cap: <string | null>
@@ -279,6 +323,25 @@ asset_row:
 - `assets` non-empty → **đúng một** dòng `is_primary:true`; 0 hoặc ≥2 →
   `stage_validation_error{code:primary_count}`.
 - `land_rows` null-safe: thiếu/`[]` hợp lệ; phần tử null-safe từng field.
+- **`thoi_han` lẻ cấp tài sản (MIN-141):** phía input (payload
+  `workspace_create`/`workspace_commit_stage`/`diagram_evaluate` nháp) KHÔNG
+  còn bắt buộc — schema `asset_row_input`. Client mới không gửi key này;
+  key vắng nghĩa là "giữ nguyên giá trị lịch sử trên master", server không
+  xóa. Client legacy vẫn được phép gửi key (giá trị sẽ ghi như cũ). Phía
+  emit (`workspace_get`/result.data.stage) server vẫn luôn trả key
+  `thoi_han` (nullable) — schema `asset_row` — để đối chiếu lịch sử và báo
+  `stage.orphan_thoi_han` khi giá trị lẻ không gắn cụm nào. Thời hạn mới
+  chỉ thuộc `land_rows[].thoihan`; không tự đắp giá trị lẻ vào cụm.
+- **Key cụm đất (MIN-141 đợt 2):** tên nghiệp vụ canonical mới là
+  `loaidat` / `dientich` / `thoihan` (trùng cột bảng con
+  `property_land_rows` và tên placeholder Word `loaidat<M><N>`... —
+  entities.md §9.2). Server đọc được cả bộ legacy
+  `loai_dat`/`dien_tich`/`thoi_han` để UI hiện hành không hỏng; wire
+  emit tiếp tục dùng bộ legacy (shape trên không đổi). Trong một phần
+  tử, cặp cũ-mới của cùng trường mang giá trị **mâu thuẫn** →
+  `stage_validation_error` (`code:"conflict"`), không âm thầm chọn một.
+  Vị trí cụm = index trong `land_rows` + 1 (cột `vitri`), kể cả dòng
+  trống hoàn toàn — giữ nguyên vị trí trống.
 
 ### 4.3 `notary.workspace_create` — tạo hồ sơ từ nháp (rev 1.1)
 
@@ -289,6 +352,14 @@ payload:
     document_type: khai_nhan | thoa_thuan    # bắt buộc
     ngay_lap_ho_so: <YYYY-MM-DD | null>      # optional, default null
     noi_niem_yet: <string | null>            # optional, default null
+    nguoi_nhan_uy_quyen: <string | null>     # (đợt 3) tên người được ủy
+                                           # quyền — optional
+    nguoi_nhan_uy_quyen_id: <int | null>     # (đợt 3) customers.id — tham
+                                           # chiếu ổn định; id có → tên
+                                           # resolve theo danh bạ, id sai →
+                                           # validation_error; name+id lệch
+                                           # nhau → validation_error
+    noi_dung_viec: <string | null>           # (đợt 3) cụm nội dung việc
     ghi_chu: <string | null>                 # optional, default null
   stage:
     people: [<person_row>]          # ≥1; entity_id phải null
@@ -428,6 +499,14 @@ result.data:
 payload:
   case_id: <int>
   base_revision: <int ≥ 1>
+  case:                             # (đợt 3) OPTIONAL — metadata hồ sơ
+                                    # ghi cùng Stage trong một transaction
+    ngay_lap_ho_so: <YYYY-MM-DD | null>    # null = giữ nguyên (NOT NULL)
+    noi_niem_yet: <string | null>          # canonical `noiniemyet` cũng OK
+    nguoi_nhan_uy_quyen: <string | null>   # `nguoinhanuyquyen`
+    nguoi_nhan_uy_quyen_id: <int | null>   # `nguoinhanuyquyenid`
+    noi_dung_viec: <string | null>         # `noidungviec`
+    ghi_chu: <string | null>               # `ghichu`
   stage:
     people: [<person_row>]
     assets: [<asset_row>]
@@ -452,6 +531,16 @@ result.data:
   Diagram đã prune** → `revision+1` → commit, trong **một
   transaction**. Một dòng sai → Stage không đổi. `render_model` mới được
   lưu cùng state để `workspace_get` luôn trả model khớp state hiện tại.
+- **`payload.case` (đợt 3):** metadata hồ sơ ghi cùng transaction —
+  validate fail hoặc stage fail → không cái nào ghi. `case_type`/
+  `document_type` gửi kèm phải khớp giá trị đã lưu (immutable qua
+  commit) — khác → `validation_error`. `nguoi_nhan_uy_quyen_id` phải
+  tồn tại trong `customers`; kèm `nguoi_nhan_uy_quyen` lệch tên master →
+  `validation_error`. Snapshot `case_state_json` đóng băng meta dưới
+  block `payload.case` với key **canonical**
+  (`noiniemyet`,`nguoinhanuyquyen:{id,ten}`,`noidungviec`,
+  `ngaylaphoso`,`ghichu`) — Word đọc meta từ block này trước, cột
+  `inheritance_cases` chỉ là fallback cho hồ sơ cũ.
 - `base_revision` khác `revision` hiện server — **nhỏ hơn HOẶC lớn
   hơn** — → `failed{code:workspace_conflict,
   details:{server_revision}}`. Không có ghi đè cưỡng bức — client tải
@@ -857,8 +946,8 @@ Consumer (Electron main/renderer) PHẢI:
 | v1 (fix r2) | 24/09/2026 | Residuals round 2: `breakdown.skipped` vào schema; `workspace_conflict` `!=` server đồng bộ §9/§7.5; fraction integer form trong doc |
 | v1 (APPROVED) | 24/09/2026 | Owner duyệt — contract trở thành SOT wire cho tab Soạn hồ sơ; mở cổng MIN-106+ |
 | v1.1 | 26/09/2026 | MIN-121 (additive, tương thích ngược): `notary.workspace_create` + `idempotency_key`; chế độ nháp (`case_id` absent) cho `intake_analyze`/`diagram_evaluate` (evaluate nháp kèm `stage` payload, `evaluated_revision:null`); `case` +`ngay_lap_ho_so`/`noi_niem_yet`/`ghi_chu`; field_error +`duplicate_entity`; error +`workspace_owner_required` |
+| v2 MIN-141 | 03/10/2026 | Owner xác nhận hành vi cuối 14 commit worker và yêu cầu gộp vào nhánh chính; thay các quy tắc MIN-140 mâu thuẫn, đồng bộ dữ liệu Người/cụm đất/Hồ sơ. Xem §13.16 |
 | v2 (APPROVED) | 27/09/2026 | Owner duyệt §13 (MIN-125, toàn bộ Q1–Q12): `schema_version` bump `notary.case-drafting.v2`; Stage draft/committed + create nguyên khối; `owner_row_id`; asset theo vị trí 1..3, bỏ `is_primary`; `ownPositions`/`receivePositions`; domain `two_party` 30 slot `p1..p30`; `case_type` immutable; error codes §13.9. Implement ở P5 (MIN-128). C1–C4 xử lý theo §13.13 |
-| v2 (rev 1.1) | 29/09/2026 | MIN-140 (owner duyệt): gỡ rule ẩn trên Stage — §13.16. `so_serial` tùy chọn nguyên văn (bỏ bắt buộc + canonical + surrogate); Tài sản bắt buộc số tờ/số thửa/địa chỉ/`land_rows[].loai_dat`/`dien_tich`; Người bắt buộc các trường có ô nhập trừ `ngay_chet`; `properties.so_serial` → nullable |
 
 ---
 
@@ -965,13 +1054,15 @@ stage draft buffer (client, không wire)          committed stage (server)
 asset_row_v2:               # giống §4.2, TRỪ is_primary (bị loại)
   row_id: <uuid4>           # ổn định — KHÔNG phải vị trí
   entity_id: <int | null>
-  so_serial: <string | null>      # MIN-140: TÙY CHỌN, nguyên văn — §13.16
-  ...                       # mọi field còn lại giữ nguyên §4.2
-  land_rows:                # MIN-140: BẮT BUỘC ≥1 dòng trên payload (§13.16);
-                            # result đọc hồ sơ cũ có thể null/[] (§13.8)
-    - loai_dat: <string non-empty>  #   mục đích sử dụng — bắt buộc (§13.16)
-      dien_tich: <number>         #   diện tích — bắt buộc (§13.16)
-      thoi_han: <string | null>   #   thời hạn — tùy chọn
+  so_serial: <string non-empty>   # canonical [A-Z]{2}\d{6,8} — entities.md §2
+  ...                       # mọi field còn lại giữ nguyên §4.2; `thoi_han`
+                            # lẻ OPTIONAL ở input (key vắng = giữ lịch sử
+                            # master) — quy tắc tách input/emit ở §4.2
+  land_rows:                # giữ nguyên shape v1 — hàng cấu trúc
+    - loai_dat: <string | null>   #   (mục đích sử dụng)
+      dien_tich: <number | null>  #   diện tích
+      thoi_han: <string | null>   #   thời hạn
+      # key canonical loaidat/dientich/thoihan đọc được — §4.2 (MIN-141 đợt 2)
 ```
 
 - **Vị trí = index + 1.** `stage.assets[i]` là "tài sản ở vị trí
@@ -1000,6 +1091,26 @@ asset_row_v2:               # giống §4.2, TRỪ is_primary (bị loại)
   liệu) kèm `result.data.warnings[]` data-code
   `stage.legacy_asset_overflow`; `workspace_commit_stage` từ chối tới
   khi người dùng giảm còn ≤3 (`asset_limit`). §13.8.
+- **Cụm đất tối đa 20/tài sản** (entities.md §9.2): phần tử
+  `land_rows[20]` trở đi → `stage_validation_error` với
+  `field_errors[].code:"land_row_limit"`. Persist là bảng con
+  `property_land_rows(property_id, vitri)` UNIQUE; commit ghi master +
+  cụm đất + `case_state_json` snapshot + revision trong **một**
+  transaction — rollback lỗi bất kỳ không để lại nửa ghi.
+- **Snapshot asset trong `case_state_json` (MIN-141 đợt 2):** mỗi phần
+  tử `assets[]` đã commit mang đủ field §4.2 + `land_rows` key canonical
+  + `loai_dat`/`dien_tich` tổng hợp. Word export đọc snapshot này → mỗi
+  hồ sơ xuất đúng bản đã commit, không đổi theo master `properties` khi
+  hai hồ sơ dùng chung tài sản. `properties.land_rows_json` giữ mirror
+  tương thích; data cũ được migrate-on-startup, JSON lỗi không bị ghi
+  đè.
+- **Thời hạn thuộc từng cụm** (MIN-141 đợt 2): xuất Word không tự lấy
+  `properties.thoi_han` lẻ đắp vào cụm. Dữ liệu cũ chỉ có thời hạn lẻ
+  không xác định được cụm tương ứng → `workspace_get` emit
+  `result.data.warnings[]` code `stage.orphan_thoi_han`, giữ nguyên bản
+  gốc, không tự đoán; `land_rows_json` lỗi/không parse được →
+  `stage.legacy_land_rows_invalid`; JSON >20 cụm →
+  `stage.legacy_land_rows_overflow`.
 - **`result.data.warnings`** (optional, array `{code, message}`) là mở
   rộng v2 cho cảnh báo cấp-stage (không thuộc `diagram.warnings`).
 
@@ -1159,6 +1270,9 @@ payload:
 | `asset.is_primary:bool` | — (bỏ) | asset `is_primary:true` → đứng vị trí 1; reorder mảng khi đọc hồ sơ cũ |
 | `stage` = `{people,assets}` | `{owner_row_id,people,assets}` | `owner_row_id := personId` của node `owner` persist; không có → `null` |
 | `payload.case` (create): meta-only | + `case_type` optional | default `"inheritance"` |
+| — | + `payload.case` (commit) optional | đợt 3: meta cùng Stage 1 transaction |
+| `case` emit: ngay_lap_ho_so/noi_niem_yet/ghi_chu | + `nguoi_nhan_uy_quyen(_id)`, `noi_dung_viec` | đợt 3 (canonical ↔ snake đọc được) |
+| `person_row` 10 key | + `loai_giay_to`, `loai_dia_chi` | đợt 3: bằng chứng xác nhận/suy theo mốc |
 | `diagram` (create): required | optional | server seed (§13.6) |
 | error: — | + `diagram_domain_mismatch`, `diagram_owner_mismatch` | §13.9 |
 | field_error: `primary_count` | thay bằng `asset_limit` / `people_limit` | `primary_count` không còn ở v2 |
@@ -1312,13 +1426,6 @@ C1–C4 vẫn mở và đã có hướng xử lý: C1/C2 chốt cùng NV2 trư�
 cần; C3 quy ước tôn trọng `entity_id` (chi tiết persistence ở P5);
 C4 là task Word riêng — §13.10 chỉ ghi ý định đánh số.
 
-- **MIN-140** (owner, 29/09/2026) — gỡ rule ẩn trên Stage: `so_serial`
-  tùy chọn, lưu/emit nguyên văn (không canonical, không surrogate);
-  Tài sản chỉ bắt buộc số tờ, số thửa, địa chỉ, loại đất, diện tích;
-  Người điền đủ các trường có ô nhập trừ ngày mất (trống = còn sống);
-  không ép format số giấy tờ; KHÔNG chặn chuyển tab khi đang nhập —
-  buffer draft là client-side và vẫn giữ trong model. Chi tiết §13.16.
-
 ### 13.14 Checklist conformance bổ sung (áp dụng cho producer v2)
 
 Producer v2 PHẢI (thêm vào §10):
@@ -1336,10 +1443,6 @@ Producer v2 PHẢI (thêm vào §10):
       draft.
 - [ ] `diagram_evaluate` two_party → `unsupported` render_model, không
       chạy engine thừa kế; `word_export_*` → `case_type_unsupported`.
-- [ ] Chỉ áp ràng buộc trường theo §13.16 (MIN-140): serial tùy chọn
-      nguyên văn — KHÔNG ép canonical `[A-Z]{2}\d{6,8}`, không sinh
-      serial giả khi emit; `land_rows` payload ≥1 dòng với `loai_dat` +
-      `dien_tich`.
 
 Consumer v2 PHẢI (thêm vào §10):
 
@@ -1361,71 +1464,23 @@ Consumer v2 PHẢI (thêm vào §10):
   §13 — file schema draft hỗ trợ đọc, không phải nguồn duy nhất cho
   tới khi owner duyệt.
 
-### 13.16 Quy tắc trường Stage v2 (MIN-140 — owner duyệt 29/09/2026)
+### 13.16 Quy tắc Stage hiện hành sau gộp MIN-141
 
-Nguyên tắc owner: **gần như không chặn** — người dùng chịu trách nhiệm
-với dữ liệu mình nhập; hệ thống chỉ chặn các trường hợp được duyệt rõ.
-Mục này là SOT cho field-level rules của `stage_v2` trên payload
-(`workspace_create`, `workspace_commit_stage`, `diagram_evaluate` nháp);
-stage trong result `workspace_get` đọc được hồ sơ cũ có thể thiếu —
-không áp ngược (§13.8). Trước MIN-140 code có các rule ẩn owner không
-đặt — tiêu biểu: `so_serial` bắt buộc + ép canonical `[A-Z]{2}\d{6,8}`,
-tự sinh serial giả `XX{id:06d}` khi đọc. Tất cả đã gỡ.
+**Nguồn:** Owner xác nhận 03/10/2026 rằng 14 commit worker là cập nhật đúng,
+yêu cầu đưa vào nhánh chính và đồng bộ tài liệu/code. Mục này thay các quy
+tắc MIN-140 ngày 29/09/2026 bị mâu thuẫn; không đổi envelope/schema version.
 
-**Người (`person_row`)** — mọi trường có ô nhập trên UI đều BẮT BUỘC;
-không ép format nghiệp vụ nào ngoài kiểu dữ liệu:
-
-| Trường | Rule |
-|---|---|
-| `ho_ten` | chuỗi non-empty (giữ nguyên §4.1) |
-| `gioi_tinh` | `"Nam"` \| `"Nữ"` — **bắt buộc** (`null` → `required`) |
-| `ngay_sinh` | `YYYY-MM-DD` \| `YYYY` — **bắt buộc** |
-| `ngay_chet` | `YYYY-MM-DD` \| `YYYY` \| `null` — tùy chọn (null = còn sống) |
-| `so_giay_to` | chuỗi non-empty — **bắt buộc**; KHÔNG ép format CCCD |
-| `ngay_cap` | `YYYY-MM-DD` \| `YYYY` — **bắt buộc** |
-| `dia_chi` | chuỗi non-empty — **bắt buộc** |
-| `noi_cap`, `place_of_origin` | chuỗi \| `null` — tùy chọn (chưa có ô nhập) |
-
-`so_giay_to` giữ hai check trùng (trong payload + "đã thuộc về người
-khác") — đó là ràng buộc toàn vẹn `UNIQUE` của DB và chống merge nhầm
-entity, không phải format rule.
-
-**Tài sản (`asset_row_v2`)** — đúng 5 trường bắt buộc theo lời owner;
-mọi trường khác, kể cả `so_serial`, để trống được:
-
-| Trường | Rule |
-|---|---|
-| `so_to_ban_do` | chuỗi non-empty — **bắt buộc** |
-| `so_thua_dat` | chuỗi non-empty — **bắt buộc** |
-| `dia_chi` | chuỗi non-empty — **bắt buộc** (giữ nguyên §4.2) |
-| `land_rows` | list **≥1 phần tử** — bắt buộc (`null`/`[]` → `required`) |
-| `land_rows[].loai_dat` | chuỗi non-empty — **bắt buộc** |
-| `land_rows[].dien_tich` | number — **bắt buộc** (`null` → `required`) |
-| `land_rows[].thoi_han` | chuỗi \| `null` — tùy chọn |
-| `so_serial` | chuỗi \| `null` — **tùy chọn, nguyên văn** |
-| `ngay_cap` | `YYYY-MM-DD` \| `null` — tùy chọn |
-| `so_vao_so`, `loai_so`, `hinh_thuc_su_dung`, `thoi_han`, `nguon_goc`, `co_quan_cap` | chuỗi \| `null` — tùy chọn |
-
-**Serial — hành vi sau MIN-140:**
-
-- Tùy chọn: `null` hợp lệ; `""` vẫn cấm theo quy ước §2.3 (dùng `null`
-  thay chuỗi rỗng). Giá trị lưu/emit **nguyên văn** (strip hai đầu) —
-  không canonical hóa, không sinh surrogate khi đọc.
-- So khớp vẫn chuẩn hóa nhẹ: bỏ mọi ký tự không phải chữ-số +
-  uppercase → `"XX 123456"` ≡ `"xx123456"`. Dùng để (a) bắt trùng
-  trong payload và (b) upsert gắn `Property` cũ — nghiệp vụ "cùng một
-  sổ đỏ", không phải ràng buộc nhập liệu.
-- `properties.so_serial` lưu `NULL` khi trống (UNIQUE giữ — SQLite cho
-  phép nhiều NULL); schema migration rebuild bảng trên DB cũ.
-- Dạng canonical `[A-Z]{2}\d{6,8}` chỉ còn là **định dạng tham chiếu**
-  của số serial sổ đỏ đời mới (entities.md §2) — không còn là điều
-  kiện hệ thống chấp nhận.
-
-**Các thứ chặn còn lại** (đúng nguyên tắc owner — không thêm gì):
-`workspace_locked`, `workspace_conflict`, `workspace_owner_required`,
-`case_type_unsupported`, lỗi shape/type/field-lạ (`validation_error`),
-`asset_limit`/`people_limit`, `duplicate_row_id`, trùng `entity_id`,
-trùng/`so_giay_to` thuộc người khác, `so_serial` trùng/đã thuộc tài sản
-khác, và các `required` ở bảng trên. **KHÔNG chặn chuyển tab** khi đang
-nhập — buffer draft là client-side, vẫn giữ trong model (§13.2);
-`Cập nhật` mới là lúc validate.
+- Người: họ tên bắt buộc; giới tính Nam/Nữ/null; ngày sinh/chết/cấp nhận
+  YYYY-MM-DD, YYYY hoặc null; số giấy tờ/nơi cấp/địa chỉ/quê quán/loại giấy
+  tờ/nhãn địa chỉ nhận chuỗi hoặc null. Số giấy tờ có giá trị vẫn kiểm trùng.
+- Tài sản: serial bắt buộc đúng `[A-Z]{2}\d{6,8}`, địa chỉ không rỗng;
+  số thửa/số tờ và các trường còn lại nullable. Cụm đất có thể null/[];
+  mỗi cụm kiểm kiểu, không cho alias khác giá trị, tối đa 20 cụm.
+- Đọc hồ sơ cũ: serial được chuẩn hóa; serial không chuẩn nhận mã thay thế
+  `XX` theo ID/vị trí cùng cảnh báo trên kết quả, không sửa master gốc.
+- `thoi_han` lẻ bỏ khỏi form và payload renderer; dữ liệu lịch sử vẫn giữ
+  để đối chiếu/cảnh báo. Không tự gán vào thời hạn từng cụm.
+- Quy tắc suy trường Người, nguồn snapshot và phần tra cứu xã chưa có:
+  [`entities.md`](./entities.md) §8–§9.
+- Giữ nháp khi chuyển tab và khi commit lỗi; kiểm dữ liệu khi `Cập nhật`.
+  Giữ kiểm revision, owner, khóa hồ sơ, giới hạn người/tài sản và trùng ID.

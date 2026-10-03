@@ -12,5 +12,8 @@
       "is_dir": true
     }
   },
-  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+  "client_meta": {
+    "shell_version": "0.1.0",
+    "module": "document-review"
+  }
 }

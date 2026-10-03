@@ -11,7 +11,7 @@ khi ghi vào trường "khóa định danh". Giữ raw và nguồn gốc theo
 [`../docs/spec/README.md`](../docs/spec/README.md) mục 4; chuẩn hóa không được
 ghi đè bằng chứng gốc.
 
-Cập nhật: 10/09/2026
+Cập nhật: 03/10/2026 — Owner xác nhận lấy hành vi cuối MIN-141 khi gộp nhánh.
 
 ---
 
@@ -41,11 +41,12 @@ số. Không so khớp một phần, không so khớp 9 số cuối.
 - **Canonical:** 2 chữ cái in hoa + **6–8 chữ số**, không dấu cách: `DD123456`.
 - Khi hiển thị cho người dùng có thể chèn dấu cách (`DD 123456`); khi so khớp thì
   không.
-- **Dạng canonical chỉ là chuẩn để SO KHỚP, không phải điều kiện hệ thống chấp
-  nhận.** Từ MIN-140 (owner 29/09/2026): `so_serial` trên Stage là text tự do
-  hoặc `null` — lưu và emit nguyên văn; việc nhận diện "cùng một sổ đỏ" chuẩn hóa
-  bằng cách bỏ mọi ký tự không phải chữ-số và viết hoa (`"XX 123456"` ≡
-  `"xx123456"`), không ép đúng dải 6–8 số. Xem `notary-case-drafting.md` §13.16.
+- **Stage hiện hành (MIN-141, Owner xác nhận 03/10/2026):** serial bắt buộc
+  đúng dạng `[A-Z]{2}\d{6,8}`. Khi đọc hồ sơ cũ, hệ thống chuẩn hóa serial;
+  giá trị không chuẩn được thay trên dữ liệu trả về bằng mã `XX` theo ID/vị trí
+  kèm cảnh báo, không sửa bằng chứng gốc trong DB.
+- Quy tắc serial tùy chọn/nguyên văn của MIN-140 ngày 29/09/2026 là lịch sử,
+  được thay thế trong lần gộp này theo xác nhận mới của Owner.
 - Nguồn nhận dạng OCR hiện hành: `notary_v2/routers/ocr_ai.py:924-925,972`;
   thiết kế đã đồng bộ: `docs/spec/notaryoffice/intent-source.md` v1.0 §7.2
   (`[A-Z]{2}\s*\d{6,8}` — gợi ý trích xuất, không phải rule chặn nhập).
@@ -132,3 +133,92 @@ công không tự nâng dữ liệu thành `CONFIRMED`.
 Không suy ra số lượng quan hệ Case giữa hai repo từ quan hệ nội bộ này; xem
 [`../docs/spec/README.md`](../docs/spec/README.md) mục 5. Không định nghĩa thêm
 shared ID/schema trong lần sửa này.
+
+---
+
+## 8. Từ điển dữ liệu Người (`customers`) và các trường suy ra
+
+Cập nhật chốt từ Owner (01/10/2026): Từ điển người chuẩn hóa gồm 6 trường nghiệp vụ chính lưu cơ sở dữ liệu và 3 nhóm trường suy ra phục vụ hiển thị / soạn thảo văn bản.
+
+### 8.1. Các trường lưu CSDL (bảng `customers`)
+
+| Tên trường canonical | Tên thuộc tính DB | Kiểu dữ liệu | Mô tả |
+|---|---|---|---|
+| `ten` | `ho_ten` | String(200) | Họ và tên, người dùng nhập liệu hoặc OCR |
+| `ngaysinh` | `ngay_sinh` | Date | Ngày tháng năm sinh (hoặc năm sinh) |
+| `ngaychet` | `ngay_chet` | Date | Ngày chết (`NULL` nếu còn sống) |
+| `sogiayto` | `so_giay_to` | String(50) | Số giấy tờ định danh (người sống: số CCCD/CC; người chết: số giấy khai tử / trích lục khai tử) |
+| `ngaycap` | `ngay_cap` | Date | Ngày cấp giấy tờ định danh (ngày cấp CCCD hoặc ngày cấp trích lục khai tử) |
+| `diachi` | `dia_chi` | Text | Địa chỉ người sống; nơi chết / nơi thường trú cuối cùng trước khi chết của người chết |
+
+Ngoài 6 trường nghiệp vụ chính, DB hiện vẫn giữ `gioi_tinh`, ID và thời gian tạo; không xóa các cột này.
+
+*Ghi chú về quê quán (`place_of_origin`):* Chỉ lưu snapshot trong từng hồ sơ (`case_state_json` / contract `person_row`), không đưa vào danh bạ `customers` master.
+
+### 8.2. Trường suy ra và bằng chứng được xác nhận
+
+Hành vi cuối MIN-141, Owner xác nhận 03/10/2026:
+
+- Người sống có ngày cấp: trước 01/10/2024 dùng `Căn cước công dân`,
+  `Cục cảnh sát quản lý hành chính về trật tự xã hội`, `Thường trú` /
+  `Thường trú tại`; từ mốc dùng `Căn cước`, `Bộ Công an`, `Cư trú` /
+  `Cư trú tại`. Thiếu ngày cấp → để trống, không đoán cơ quan.
+- Người đã chết: loại giấy tờ và nơi cấp chỉ lấy từ bằng chứng người dùng
+  xác nhận trong snapshot hồ sơ. Chưa có → để trống; không mặc định
+  `Trích lục khai tử (Bản sao)` và không tự suy UBND xã cũ/mới.
+  Nhãn địa chỉ suy ra là `Nơi chết`.
+- Khi người dùng sửa ngày cấp/ngày chết, hệ thống tính lại giá trị từng tự
+  suy ra; giá trị người dùng đã sửa khác giá trị suy ra được giữ lại.
+- Word đọc giá trị đã commit trong snapshot của chính hồ sơ, kể cả null;
+  chỉ dùng dữ liệu master nếu snapshot cũ thiếu key đó.
+
+**Tại sao:** không để thay đổi danh bạ dùng chung làm đổi văn bản của hồ sơ
+đã lưu, không biến dữ liệu thiếu thành bằng chứng pháp lý.
+
+Ý định ban đầu suy UBND theo mốc 01/07/2025 được giữ làm lịch sử; bảng tra
+xã/phường cũ–mới còn ở NAIA-9, chưa có đường suy tự động trong runtime.
+
+---
+
+## 9. Chuẩn hóa Bảng Tài sản, Bảng Hồ sơ & Quy tắc đặt tên trường
+
+### 9.1. Quy tắc chung đặt tên trường (Rule chung)
+
+- **Định dạng bắt buộc:** Tiếng Việt không dấu, viết thường toàn bộ, **viết liền không dấu, tuyệt đối KHÔNG có dấu gạch dưới `_` hay dấu cách**.
+- Tên nghiệp vụ mới và placeholder dùng quy ước trên. Tên cột DB và dữ liệu giao tiếp cũ như `loai_dat`, `so_giay_to` vẫn được giữ để tương thích; không đổi toàn bộ cột/schema. Các alias được hỗ trợ cụ thể ghi tại `notary-case-drafting.md`, không mặc định mọi tên chuẩn đều là key gửi được.
+- **Ví dụ đúng:** `ten`, `ngaysinh`, `ngaychet`, `sogiayto`, `ngaycap`, `diachi`, `noicap`, `loaigiayto`, `loaicutru`, `noiniemyet`, `nguoinhanuyquyen`, `noidungviec`, `loaidat11`, `dientich11`, `thoihan11`, `loaidat12`, `dientich12`, `thoihan12`.
+
+### 9.2. Bảng Tài sản (`properties`) — Phân biệt loại đất thứ mấy trong tài sản thứ mấy
+
+- **Lưu trữ (MIN-141 đợt 2):** mỗi cụm đất là một bản ghi trong bảng con `property_land_rows(property_id, vitri, loaidat, dientich, thoihan)`, UNIQUE `(property_id, vitri)`; `vitri` = vị trí cụm trong tài sản (1–20, giữ nguyên vị trí trống). `properties.land_rows_json` chỉ còn làm nguồn tương thích/chuyển đổi — không còn là nguồn lưu chính. `N` (vị trí tài sản trong hồ sơ) **không** được ghi cứng vào master — N chỉ xuất hiện trong tên placeholder Word/snapshot của từng hồ sơ.
+- **Loại bỏ trường lẻ:** Trường `thoi_han` ở cấp tài sản là trường mồ côi → loại bỏ khỏi đường xuất cụm; không tự đắp vào cụm khi không xác định được cụm tương ứng (báo cần đối chiếu, giữ nguyên bản gốc).
+- **Cụm thông tin loại đất:** Thông tin đất luôn đi liền theo bộ 3 trường: `loaidat` - `dientich` - `thoihan`.
+- **Cú pháp định danh phân biệt Loại đất thứ mấy trong Tài sản thứ mấy:**
+  * Cấu trúc: `[tên_trường][chỉ_số_loại_đất][chỉ_số_tài_sản]` (viết liền, không có `_`).
+  * Trong đó:
+    - Ký tự chữ: `loaidat`, `dientich`, `thoihan`.
+    - Chữ số đầu: **Loại đất thứ mấy** trong tài sản (từ 1 đến 20).
+    - Chữ số sau: **Tài sản thứ mấy** trong hồ sơ (từ 1 đến 3).
+
+| Tên trường (Không có `_`) | Ý nghĩa nghiệp vụ | Ví dụ minh họa |
+|---|---|---|
+| `loaidat11` | Loại đất **1** của Tài sản **1** | `ONT` / Đất ở |
+| `dientich11` | Diện tích loại đất **1** của Tài sản **1** | `120.5` |
+| `thoihan11` | Thời hạn loại đất **1** của Tài sản **1** | `Lâu dài` |
+| `loaidat21` | Loại đất **2** của Tài sản **1** | `CLN` |
+| `loaidat12` | Loại đất **1** của Tài sản **2** | `LUC` |
+| `dientich12` | Diện tích loại đất **1** của Tài sản **2** | `500` |
+| `thoihan12` | Thời hạn loại đất **1** của Tài sản **2** | `2063` |
+| `loaidat22` | Loại đất **2** của Tài sản **2** | `BHK` |
+| `loaidat13` | Loại đất **1** của Tài sản **3** | `HNK` |
+| `loaidat23` | Loại đất **2** của Tài sản **3** | `RSX` |
+| `loaidat102` | Loại đất **10** của Tài sản **2** | `NTS` |
+
+*Ghi chú (quyết định MIN-141, review 29/09/2026):* chỉ dùng dạng đầy đủ `loaidat<M><N>` cho **mọi** hồ sơ, kể cả hồ sơ 1 tài sản — không cung cấp alias rút gọn `loaidatM`/`loaidat1`. Lý do: dạng rút gọn `loaidat12` đọc được thành "cụm 1 của tài sản 2" hoặc "cụm 12 của tài sản 1" → dễ trùng nghĩa khi template dùng lại giữa hồ sơ 1 và nhiều tài sản; một quy ước duy nhất loại trừ mập mờ.
+
+### 9.3. Bảng Hồ sơ (`inheritance_cases`)
+
+1. **`noiniemyet` (Nơi niêm yết):** hiện người dùng nhập và lưu theo hồ sơ; thiếu thì để trống khi xuất Word, không lấy địa chỉ đất thay thế. Tra cứu UBND từ địa chỉ đất + bảng xã cũ/mới là hướng còn mở tại NAIA-9.
+2. **`nguoinhanuyquyen` (Người nhận ủy quyền):** Người nhận ủy quyền giải quyết công việc — chọn từ danh mục người quen hay ủy quyền hoặc cho phép tạo mới.
+3. **`noidungviec` (Nội dung việc):** Cụm text nhập thủ công mô tả công việc (ví dụ: *"Đính chính hộ ông A thành ông A và bà B"*, *"Đính chính năm sinh ông A từ 1955 thành 1950"*...).
+4. **Bố cục giao diện (UI):** Thêm 3 dòng trường hồ sơ ngay dưới các dòng tài sản; giảm 10% chiều cao các ô nhập liệu để giữ giao diện tổng thể gọn gàng, không phải cuộn nhiều.

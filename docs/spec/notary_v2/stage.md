@@ -37,24 +37,43 @@ là ID database, có thể null trước commit.
 
 ## 5. Quy tắc dữ liệu
 
-Nguyên tắc (owner 29/09/2026, MIN-140): gần như không chặn — người dùng
-chịu trách nhiệm dữ liệu nhập; chỉ áp ràng buộc được duyệt rõ (chi tiết
-`contracts/notary-case-drafting.md` §13.16).
-
-- **Người** bắt buộc đủ các trường có ô nhập: `ho_ten`, `gioi_tinh`,
-  `ngay_sinh`, `so_giay_to`, `ngay_cap`, `dia_chi`. `ngay_chet` trống =
-  còn sống. CCCD/giấy tờ là free text — không ép format, không dùng làm
-  Case key.
-- **Tài sản** chỉ bắt buộc `so_to_ban_do`, `so_thua_dat`, `dia_chi` và
-  `land_rows` ≥1 dòng với `loai_dat` + `dien_tich`. `so_serial` **tùy
-  chọn**: `null` hợp lệ, giá trị lưu/emit nguyên văn — không ép canonical
-  `[A-Z]{2}\d{6,8}` (dạng đó chỉ dùng để so khớp trùng/gắn property cũ).
-- Tài sản v2 tối đa 3; vị trí là thứ tự mảng, vị trí 1 là primary theo
-  nghĩa engine. Không dùng `is_primary` trong wire v2.
+- Người: 6 trường nghiệp vụ chính (`ten`, `ngaysinh`, `ngaychet`, `sogiayto`,
+  `ngaycap`, `diachi`); DB còn giữ giới tính và ID/thời gian tạo. Chỉ họ tên
+  bắt buộc; giới tính nhận Nam/Nữ/null, ngày nhận `YYYY-MM-DD`, `YYYY` hoặc
+  null; số giấy tờ/địa chỉ có thể null. Người sống có ngày cấp được suy loại
+  giấy tờ/nơi cấp/nhãn cư trú theo mốc 01/10/2024; thiếu ngày để trống.
+  Người chết giữ loại giấy tờ/nơi cấp theo bằng chứng đã xác nhận trong
+  snapshot, không gán mặc định; nhãn địa chỉ là `Nơi chết`.
+- Tài sản: serial bắt buộc `[A-Z]{2}\d{6,8}` và địa chỉ không rỗng;
+  số thửa/số tờ tùy chọn. Cụm đất có thể null/rỗng; nếu có, kiểm kiểu và
+  alias mâu thuẫn, tối đa 20 cụm. Quy tắc hiện hành thay bộ bắt buộc và
+  serial tự do của MIN-140 theo Owner xác nhận 03/10/2026.
+- Không chặn chuyển tab khi nhập; chỉ `Cập nhật` mới kiểm dữ liệu.
+- CCCD/giấy tờ là free text, không dùng làm Case key.
+- Tài sản v2 tối đa 3; vị trí là thứ tự mảng, vị trí 1 là primary theo nghĩa
+  engine. Không dùng `is_primary` trong wire v2.
+  * Bỏ trường lẻ `thoi_han` ở cấp tài sản vì là trường mồ côi: không tự đắp
+    vào cụm khi xuất; giữ nguyên bản gốc và báo cần đối chiếu.
+  * Thông tin loại đất lưu cụm 3 trường: `loaidat` - `dientich` - `thoihan`
+    (tối đa 20 cụm một tài sản). Mỗi cụm là một bản ghi trong bảng con
+    `property_land_rows` (UNIQUE `(property_id, vitri)`, `vitri` = vị trí
+    cụm 1..20, giữ nguyên vị trí trống); `properties.land_rows_json` chỉ
+    còn vai trò tương thích/chuyển đổi, không còn là nguồn lưu chính.
+  * Wire/snapshot chấp nhận cả key canonical (`loaidat`/`dientich`/`thoihan`)
+    lẫn key legacy (`loai_dat`/`dien_tich`/`thoi_han`); cùng trường mà hai
+    key mang giá trị mâu thuẫn → `stage_validation_error` code `conflict`,
+    không chọn ngầm.
+  * Định danh phân biệt Loại đất thứ mấy trong Tài sản thứ mấy:
+    Cú pháp `[trường][loại đất M][tài sản N]` viết liền không dấu, **không có dấu gạch dưới `_`**.
+    Ví dụ: `loaidat12` = loại đất 1 của tài sản 2; `dientich12` = diện tích loại đất 1 của tài sản 2; `thoihan12` = thời hạn loại đất 1 của tài sản 2.
+    Review MIN-141 (29/09/2026) chốt: chỉ dùng dạng đầy đủ `loaidat<M><N>`,
+    không thêm alias rút gọn `loaidatM` vì `loaidat12` trùng nghĩa giữa
+    "cụm 1 tài sản 2" và "cụm 12 tài sản 1".
 - Reorder đổi nghĩa vị trí nhưng không đổi `row_id`.
 - Hồ sơ thừa kế bắt buộc `owner_row_id`; hồ sơ `two_party` cấm trường này.
-- **Không chặn chuyển tab khi đang nhập** — draft sống trong model, chuyển
-  tab không mất gì; validation chỉ xảy ra khi `Cập nhật`.
+- Hồ sơ có 3 trường quản lý: `noiniemyet` (nhập tay; tra cứu bảng xã còn mở NAIA-9),
+  `nguoinhanuyquyen` (danh mục quen/tạo mới), `noidungviec` (nhập tay).
+  Tất cả tuân thủ quy tắc viết liền không dấu, không có ký tự `_`.
 
 ## 6. Commit và lưu
 
@@ -91,8 +110,10 @@ phải báo `workspace_conflict`; không ghi đè cưỡng bức.
 ## 9. Giao diện
 
 - Tài sản dùng bảng chuyển vị: mỗi cột là Tài sản 1..3; mỗi dòng là một
-  thuộc tính. `Loại đất` mở dialog sửa `land_rows`; `Áp dụng` chỉ ghi draft,
-  `Cập nhật` mới persist.
+  thuộc tính. Cụm loại đất sửa các dòng `(Loại đất, Diện tích, Thời hạn)`.
+- Bảng hồ sơ: Bố trí thêm 3 dòng ngay dưới các dòng tài sản (`Nơi niêm yết`,
+  `Người nhận ủy quyền`, `Nội dung việc`), giảm 10% độ cao các ô để không
+  chiếm nhiều diện tích màn hình.
 - Người dùng bảng dòng có kéo sắp xếp, radio `Để lại`, các field chính và nút
   xóa. Danh sách dài cuộn cả trang, không tạo vùng cuộn riêng trong card.
 - Lỗi field tô đúng ô/dòng theo `row_id`. `+ Người`, `+ Tài sản` và xóa chỉ
@@ -104,12 +125,14 @@ phải báo `workspace_conflict`; không ghi đè cưỡng bức.
 
 Stage v2 thay mô hình flag phân tán bằng snapshot có revision. Owner chốt
 27/09/2026: vòng đời draft/committed, `owner_row_id`, tài sản theo vị trí và
-commit nguyên khối thuộc `notary.case-drafting.v2`. Owner chốt 29/09/2026
-(MIN-140): gỡ rule ẩn — serial tùy chọn nguyên văn, bộ trường bắt buộc
-tối thiểu ở §5, không chặn chuyển tab.
+commit nguyên khối thuộc `notary.case-drafting.v2`.
+Owner chốt 01/10/2026 (MIN-141): Từ điển dữ liệu Người đầy đủ, chuẩn hóa cụm
+loại đất (1..20) bỏ `thoi_han` lẻ mồ côi, bổ sung 3 dòng hồ sơ dưới tài sản,
+và quy tắc đặt tên trường tiếng Việt không dấu viết liền số.
 
-Còn mở: ô nhập cho `noi_cap`/`place_of_origin` (hiện tùy chọn, chưa có trên
-UI bảng Người).
+Ngày 03/10/2026, Owner xác nhận 14 commit MIN-141 là cập nhật đúng và yêu cầu
+gộp vào nhánh chính. Quy tắc hiện hành ở §5 thay phần MIN-140 mâu thuẫn;
+không thay các quy tắc revision, owner và giữ nháp.
 
 ## 11. Nguồn
 

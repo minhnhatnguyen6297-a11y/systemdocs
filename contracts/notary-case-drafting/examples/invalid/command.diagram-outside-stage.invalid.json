@@ -28,7 +28,9 @@
           {
             "id": "child_1",
             "personId": "ffffffff-ffff-4fff-8fff-ffffffffffff",
-            "parentSlotIds": ["owner"],
+            "parentSlotIds": [
+              "owner"
+            ],
             "spouseSlotId": null,
             "isLandOwner": false,
             "willReceive": true,
@@ -39,5 +41,8 @@
       }
     }
   },
-  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+  "client_meta": {
+    "shell_version": "0.1.0",
+    "module": "document-review"
+  }
 }

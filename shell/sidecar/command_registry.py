@@ -194,8 +194,6 @@ COMMANDS = {
     # overview Soạn hồ sơ can danh sach case tu mock khi dev).
     "notary.case_get": _notary("case_get"),
     "notary.case_create": _notary("case_create"),
-    "notary.customer_list": _notary("customer_list"),
-    "notary.customer_create": _notary("customer_create"),
     "notary.property_list": _notary("property_list"),
     "notary.property_create": _notary("property_create"),
     "notary.participant_add": _notary("participant_add"),
@@ -244,6 +242,11 @@ COMMANDS.update({
     # Overview list cua tab Soạn hồ sơ — qua gateway de mock dev tra
     # fixture case 42–46 cung shape _case_row real adapter (MIN-112).
     "notary.case_list": _notary_drafting("case_list"),
+    # customer_list/customer_create qua gateway (MIN-141 đợt 3) — mock
+    # dev can danh ba gia cho dropdown Nguoi nhan uy quyen; khong mock
+    # van dispatch ve notary_adapter nguyen trang.
+    "notary.customer_list": _notary_drafting("customer_list"),
+    "notary.customer_create": _notary_drafting("customer_create"),
     "notary.workspace_get": _notary_drafting("workspace_get"),
     "notary.workspace_create": _notary_drafting("workspace_create"),
     "notary.intake_analyze": _notary_drafting("intake_analyze"),

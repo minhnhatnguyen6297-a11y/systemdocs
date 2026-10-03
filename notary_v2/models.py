@@ -5,6 +5,34 @@ from sqlalchemy.sql import func
 from database import Base
 
 
+def derive_person_fields(ngay_chet, ngay_cap):
+    """Trường suy ra của Người từ input nguồn → tuple
+    `(loai_giay_to, noi_cap, loaicutru, loai_dia_chi)`.
+
+    Mốc phân biệt giấy tờ cũ/mới = 01/10/2024 (owner chốt 29/09/2026).
+    Người chết (có `ngay_chet`) không suy loại giấy tờ/nơi cấp — đó là
+    bằng chứng người dùng xác nhận, sống trong snapshot hồ sơ; nhãn địa
+    chỉ = "Nơi chết". Người sống thiếu `ngay_cap` → None (chưa xác định,
+    không tự suy cơ quan cụ thể).
+
+    Đây là SOT của rule suy ra: property Customer.* gọi hàm này, và
+    case_workspace dùng nó để tính lại giá trị suy ra từ input nguồn
+    đã commit trong snapshot — không qua master live (MIN-141 review)."""
+    from datetime import date as _date
+    if ngay_chet is not None:
+        return None, None, "Nơi chết", "Nơi chết"
+    if not ngay_cap:
+        return None, None, None, None
+    moc_moi = ngay_cap >= _date(2024, 10, 1)
+    return (
+        "Căn cước" if moc_moi else "Căn cước công dân",
+        "Bộ Công an" if moc_moi
+        else "Cục cảnh sát quản lý hành chính về trật tự xã hội",
+        "Cư trú" if moc_moi else "Thường trú",
+        "Cư trú tại" if moc_moi else "Thường trú tại",
+    )
+
+
 class Customer(Base):
     """Bảng lưu thông tin người (sống hoặc đã chết)."""
     __tablename__ = "customers"
@@ -33,25 +61,39 @@ class Customer(Base):
         return self.ngay_chet is None
 
     @property
-    def _moc_cccd_moi(self):
-        """01/10/2024 — ngưỡng phân biệt CCCD cũ/mới."""
-        from datetime import date
-        return self.ngay_cap and self.ngay_cap >= date(2024, 10, 1)
-
-    @property
     def loai_giay_to(self):
-        """Căn cước công dân (trước 01/10/2024) hoặc Căn cước (từ 01/10/2024)."""
-        return "Căn cước" if self._moc_cccd_moi else "Căn cước công dân"
+        """Loại giấy tờ định danh.
+        - Người sống: theo mốc `ngay_cap` 01/10/2024 → `Căn cước công dân`
+          (trước) / `Căn cước` (từ mốc); thiếu `ngay_cap` → None — chưa
+          xác định, không tự suy (MIN-141 đợt 3).
+        - Người chết: KHÔNG gán cứng — loại giấy khai tử lấy từ bằng chứng
+          OCR được xác nhận / lựa chọn lưu trong snapshot hồ sơ
+          (`stage[].loai_giay_to`); model trả None khi chưa có bằng chứng.
+        """
+        return derive_person_fields(self.ngay_chet, self.ngay_cap)[0]
 
     @property
     def noi_cap(self):
-        """Bộ Công an (từ 01/10/2024) hoặc Cục CSQLHC về TTXH (trước đó)."""
-        return "Bộ Công an" if self._moc_cccd_moi else "Cục cảnh sát quản lý hành chính về trật tự xã hội"
+        """Nơi cấp giấy tờ định danh.
+        - Người sống: mốc `ngay_cap` 01/10/2024 → `Cục CSQLHC về TTXH`
+          (trước) / `Bộ Công an` (từ mốc); thiếu `ngay_cap` → None.
+        - Người chết: chưa có bảng xã NAIA-9 nên KHÔNG suy tên xã cũ/mới
+          — nơi cấp lấy từ snapshot/bằng chứng đã xác nhận; None khi
+          chưa có."""
+        return derive_person_fields(self.ngay_chet, self.ngay_cap)[1]
+
+    @property
+    def loaicutru(self):
+        """'Cư trú' (từ 01/10/2024) / 'Thường trú' (trước); 'Nơi chết' với
+        người chết (diachi = nơi chết/nơi thường trú cuối — entities.md
+        §8.1); thiếu `ngay_cap` người sống → None (chưa xác định)."""
+        return derive_person_fields(self.ngay_chet, self.ngay_cap)[2]
 
     @property
     def loai_dia_chi(self):
-        """'Cư trú tại' (từ 01/10/2024) hoặc 'Thường trú tại' (trước đó)."""
-        return "Cư trú tại" if self._moc_cccd_moi else "Thường trú tại"
+        """'Cư trú tại' / 'Thường trú tại' theo mốc 01/10/2024; 'Nơi chết'
+        với người chết; thiếu `ngay_cap` người sống → None."""
+        return derive_person_fields(self.ngay_chet, self.ngay_cap)[3]
 
 
 class Property(Base):
@@ -59,10 +101,7 @@ class Property(Base):
     __tablename__ = "properties"
 
     id                = Column(Integer, primary_key=True, index=True)
-    # MIN-140 (owner 29/09/2026): serial tùy chọn — null khi trống; text
-    # nguyên văn khi có (không ép canonical). UNIQUE giữ — SQLite cho
-    # phép nhiều NULL.
-    so_serial         = Column(String(100), nullable=True, unique=True)
+    so_serial         = Column(String(100), nullable=False, unique=True)
     so_vao_so         = Column(String(100), nullable=True)
     so_thua_dat       = Column(String(100), nullable=True)
     so_to_ban_do      = Column(String(100), nullable=True)
@@ -81,6 +120,11 @@ class Property(Base):
     # Quan hệ
     inheritance_cases = relationship("InheritanceCase", back_populates="tai_san")
     case_links = relationship("InheritanceCaseProperty", back_populates="property", cascade="all, delete-orphan")
+    # Cụm đất — bảng con là nguồn lưu chính (MIN-141 đợt 2);
+    # land_rows_json chỉ còn vai trò tương thích/chuyển đổi.
+    land_rows = relationship("PropertyLandRow", back_populates="property",
+                             cascade="all, delete-orphan",
+                             order_by="PropertyLandRow.vitri")
 
 
 class InheritanceCase(Base):
@@ -93,7 +137,10 @@ class InheritanceCase(Base):
     ngay_lap_ho_so   = Column(Date,    nullable=False)
     loai_van_ban     = Column(String(50), default="khai_nhan")   # khai_nhan / thoa_thuan
     trang_thai       = Column(String(20), default="draft")       # draft / locked
-    noi_niem_yet     = Column(String(200), nullable=True)        # Tên xã/thị trấn nơi lập văn bản
+    noi_niem_yet     = Column(String(200), nullable=True)        # Tên xã/thị trấn nơi lập văn bản / nơi có đất
+    nguoi_nhan_uy_quyen = Column(String(200), nullable=True)     # Người nhận ủy quyền (tên hiển thị — denormalized)
+    nguoi_nhan_uy_quyen_id = Column(Integer, ForeignKey("customers.id"), nullable=True)  # Tham chiếu ổn định tới danh bạ (MIN-141 đợt 3)
+    noi_dung_viec       = Column(Text,        nullable=True)     # Cụm nội dung việc nhập thủ công
     ghi_chu          = Column(Text,    nullable=True)
     engine_state_json = Column(Text,   nullable=True)            # JSON state cua engine/sơ đồ thừa kế mới
     case_state_json   = Column(Text,   nullable=True)            # JSON SSoT V2 cho stage/pool/diagram
@@ -130,6 +177,36 @@ class InheritanceCaseProperty(Base):
 
     case = relationship("InheritanceCase", back_populates="property_links")
     property = relationship("Property", back_populates="case_links")
+
+
+class PropertyLandRow(Base):
+    """Một cụm đất của tài sản — nguồn lưu chính của cụm đất
+    (MIN-141 đợt 2). Unique (property_id, vitri); vitri là vị trí 1-based
+    trong mảng land_rows của Stage (giữ nguyên vị trí trống).
+
+    Ba cột nghiệp vụ dùng tên chuẩn mới: loaidat / dientich / thoihan
+    (tương đương key wire legacy loai_dat / dien_tich / thoi_han)."""
+
+    __tablename__ = "property_land_rows"
+
+    id = Column(Integer, primary_key=True, index=True)
+    property_id = Column(
+        Integer, ForeignKey("properties.id"), nullable=False, index=True)
+    vitri = Column(Integer, nullable=False)
+    loaidat = Column(String(200))
+    dientich = Column(Float)
+    thoihan = Column(String(200))
+
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(),
+                        onupdate=func.now())
+
+    property = relationship("Property", back_populates="land_rows")
+
+    __table_args__ = (
+        UniqueConstraint("property_id", "vitri",
+                         name="uq_property_land_row_vitri"),
+    )
 
 
 class InheritanceParticipant(Base):

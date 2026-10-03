@@ -29,7 +29,9 @@
             "ngay_cap": "2010-06-15",
             "noi_cap": "CA Hà Nội",
             "dia_chi": "Số 1 phố Huế, Hà Nội",
-            "place_of_origin": "Hà Nam"
+            "place_of_origin": "Hà Nam",
+            "loai_giay_to": null,
+            "loai_dia_chi": null
           },
           {
             "row_id": "22222222-2222-4222-8222-222222222222",
@@ -42,7 +44,9 @@
             "ngay_cap": null,
             "noi_cap": null,
             "dia_chi": "Số 1 phố Huế, Hà Nội",
-            "place_of_origin": null
+            "place_of_origin": null,
+            "loai_giay_to": null,
+            "loai_dia_chi": null
           },
           {
             "row_id": "33333333-3333-4333-8333-333333333333",
@@ -55,7 +59,9 @@
             "ngay_cap": "2021-01-10",
             "noi_cap": "Cục CSĐKQL cư trú và DLQG về dân cư",
             "dia_chi": "Số 5 phố Bạch Mai, Hà Nội",
-            "place_of_origin": "Hà Nội"
+            "place_of_origin": "Hà Nội",
+            "loai_giay_to": null,
+            "loai_dia_chi": null
           }
         ],
         "assets": [
@@ -74,7 +80,11 @@
             "ngay_cap": "2005-09-30",
             "co_quan_cap": "UBND quận Hai Bà Trưng",
             "land_rows": [
-              { "loai_dat": "ODT", "dien_tich": 85.5, "thoi_han": "Lâu dài" }
+              {
+                "loai_dat": "ODT",
+                "dien_tich": 85.5,
+                "thoi_han": "Lâu dài"
+              }
             ]
           },
           {
@@ -92,7 +102,11 @@
             "ngay_cap": null,
             "co_quan_cap": null,
             "land_rows": [
-              { "loai_dat": "CLN", "dien_tich": 120.0, "thoi_han": null }
+              {
+                "loai_dat": "CLN",
+                "dien_tich": 120.0,
+                "thoi_han": null
+              }
             ]
           }
         ]
@@ -107,7 +121,10 @@
               "personId": "11111111-1111-4111-8111-111111111111",
               "parentSlotIds": [],
               "spouseSlotId": "spouse",
-              "ownPositions": [1, 2],
+              "ownPositions": [
+                1,
+                2
+              ],
               "receivePositions": [],
               "hidden": false,
               "deleted": false
@@ -118,17 +135,25 @@
               "parentSlotIds": [],
               "spouseSlotId": "owner",
               "ownPositions": [],
-              "receivePositions": [1, 2],
+              "receivePositions": [
+                1,
+                2
+              ],
               "hidden": false,
               "deleted": false
             },
             {
               "id": "child_1",
               "personId": "33333333-3333-4333-8333-333333333333",
-              "parentSlotIds": ["owner", "spouse"],
+              "parentSlotIds": [
+                "owner",
+                "spouse"
+              ],
               "spouseSlotId": null,
               "ownPositions": [],
-              "receivePositions": [1],
+              "receivePositions": [
+                1
+              ],
               "hidden": false,
               "deleted": false
             }
@@ -139,13 +164,17 @@
           "status": "complete",
           "allocations": {
             "22222222-2222-4222-8222-222222222222": {
-              "baseShare": "1/2", "inheritedShare": "0",
-              "distributedShare": "0", "finalShare": "1/2",
+              "baseShare": "1/2",
+              "inheritedShare": "0",
+              "distributedShare": "0",
+              "finalShare": "1/2",
               "displayPercent": "50.00"
             },
             "33333333-3333-4333-8333-333333333333": {
-              "baseShare": "1/2", "inheritedShare": "0",
-              "distributedShare": "0", "finalShare": "1/2",
+              "baseShare": "1/2",
+              "inheritedShare": "0",
+              "distributedShare": "0",
+              "finalShare": "1/2",
               "displayPercent": "50.00"
             }
           },
@@ -155,7 +184,8 @@
               "total": "1/2",
               "terms": [
                 {
-                  "kind": "base", "fraction": "1/2",
+                  "kind": "base",
+                  "fraction": "1/2",
                   "sourcePersonId": "11111111-1111-4111-8111-111111111111",
                   "viaBranchPersonIds": []
                 }
@@ -166,7 +196,8 @@
               "total": "1/2",
               "terms": [
                 {
-                  "kind": "base", "fraction": "1/2",
+                  "kind": "base",
+                  "fraction": "1/2",
                   "sourcePersonId": "11111111-1111-4111-8111-111111111111",
                   "viaBranchPersonIds": []
                 }
@@ -178,7 +209,9 @@
           "errors": [],
           "unresolvedEstates": [],
           "conservation": {
-            "allocated": "1", "unresolved": "0", "total": "1"
+            "allocated": "1",
+            "unresolved": "0",
+            "total": "1"
           }
         }
       }

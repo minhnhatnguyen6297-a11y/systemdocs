@@ -66,7 +66,23 @@ Ví dụ:
 - `[Người nhận 1 - ...]`: `1` là thứ tự của người nhận trong danh sách.
 - Trường dùng chung: họ tên, xưng hô, giới tính, ngày sinh, ngày chết,
   giấy tờ, ngày/nơi cấp, địa chỉ, quan hệ, vai trò, tỷ lệ.
+- Tên chuẩn `entities.md` (viết liền, không dấu, không `_`) cũng được
+  thay: `[noiniemyet]`, `[nguoinhanuyquyen]`, `[noidungviec]`,
+  `[ngaylaphoso]`, `[ghichu]`, `[documenttype]` cho hồ sơ; `[ten1]`,
+  `[gioitinh1]`, `[ngaysinh1]`, `[ngaychet1]`, `[sogiayto1]`,
+  `[ngaycap1]`, `[diachi1]`, `[loaigiayto1]`, `[noicap1]`,
+  `[loaicutru1]`/`[loaidiachi1]` cho người số `N` (giá trị trùng alias
+  tiếng Việt tương ứng).
 - Alias cũ được giữ để mở template cũ nhưng không dùng làm mẫu mới.
+
+### Cập nhật MIN-141 (Owner xác nhận 03/10/2026)
+
+Tài sản và thông tin hồ sơ đọc snapshot đã commit; field người trong slot
+legacy cũng đọc snapshot, fallback master chỉ khi key thiếu. Null đã lưu
+không bị thay bằng dữ liệu dùng chung mới. Không đắp thời hạn lẻ vào cụm.
+Token `[loaidatMN]`/`[dientichMN]`/`[thoihanMN]` hỗ trợ 20 cụm mỗi tài sản;
+M là cụm, N là tài sản. Nơi niêm yết chưa nhập để trống, không lấy địa chỉ đất.
+Đây là runtime hiện tại; phase engine tĩnh trong `word-output.md` vẫn Draft.
 
 ## 5. UX xuất Word
 

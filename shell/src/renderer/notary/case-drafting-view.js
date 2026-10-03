@@ -62,6 +62,9 @@ const PERSON_COLS = [
 
 // Asset stage rows — 4 hàng đầu khớp bản mẫu + 'land' chip + phần còn
 // lại của ASSET_FIELDS contract §13.3 (không bỏ trường).
+// KHÔNG có 'thoi_han' lẻ (MIN-141 owner chốt): thời hạn chỉ thuộc từng
+// cụm đất trong popup Loại đất; giá trị lẻ lịch sử giữ trong master,
+// báo qua warning orphan_thoi_han — không còn ô nhập.
 const ASSET_FIELD_ROWS = [
   ['so_serial', 'Số serial'],
   ['so_vao_so', 'Số vào sổ'],
@@ -71,7 +74,6 @@ const ASSET_FIELD_ROWS = [
   ['dia_chi', 'Địa chỉ'],
   ['loai_so', 'Loại sổ'],
   ['hinh_thuc_su_dung', 'Hình thức SD'],     // MIN-136: viet tat giam rong
-  ['thoi_han', 'Thời hạn'],
   ['nguon_goc', 'Nguồn gốc'],
   ['ngay_cap', 'Ngày cấp'],
   ['co_quan_cap', 'Cơ quan cấp'],
@@ -125,6 +127,13 @@ function spliceMove(list, from, to) {
 // field public state + emit gián tiếp qua dismissNotice().
 function cancelDraftState(state) {
   state.stage = structuredClone(state.committed);
+  // đợt 3 (MIN-141): meta tren case da tao cung ve baseline committed —
+  // huy nhap khong giu gia tri meta dang sua (huy nhap moi thi
+  // newDraft() da reset san o nhanh tren).
+  if (state.caseId != null && state.committedCaseInfo) {
+    state.caseInfo = structuredClone(state.committedCaseInfo);
+    state.metaDirty = false;
+  }
   // Inheritance draft mới: committed rỗng thiếu key owner_row_id —
   // thêm lại để cột "Để lại" render được (§13.1 stage shape).
   if (state.caseId == null && state.caseInfo &&
@@ -430,20 +439,20 @@ function createNotaryModuleView(deps) {
 
   function primaryDirty() {
     const s = model.state;
-    return s.caseId == null
-      ? (s.stageDirty || s.diagramDirty || s.metaDirty)
-      : s.stageDirty;
+    return s.stageDirty || s.diagramDirty || s.metaDirty;
   }
 
-  // Commit/Cập nhật — điểm ghi duy nhất của Stage (§13.2). Nháp mới:
-  // Lưu hồ sơ = workspace_create (ghi meta + stage + diagram cùng lúc).
+  // Commit/Cập nhật — điểm ghi duy nhất của Stage + meta (§13.2, đợt 3:
+  // payload.case đi cùng transaction). Nháp mới: Lưu hồ sơ =
+  // workspace_create (ghi meta + stage + diagram cùng lúc).
   function commitDisabled() {
     const s = model.state;
     if (!model.canWrite()) return true;
     if (s.caseId == null) {
       return s.busy === 'notary.workspace_create';
     }
-    return !s.stageDirty || s.busy === 'notary.workspace_commit_stage';
+    return !(s.stageDirty || s.metaDirty) ||
+      s.busy === 'notary.workspace_commit_stage';
   }
 
   async function runCommit() {
@@ -799,8 +808,7 @@ function createNotaryModuleView(deps) {
           chip.disabled = ro;
           chip.dataset.fid = `a:${a.row_id}:land`;
           td.append(chip);
-          // MIN-140: land_rows la field bat buoc — loi required/invalid
-          // tu backend hien ngay duoi chip Loai dat.
+          // Hien loi cum dat tu backend ngay duoi chip Loai dat.
           cellErrs(a.row_id, 'land_rows', td);
         } else if (ASSET_DATE_FIELDS.has(key)) {
           // Ngay cap tren GCN: backend chi nhan full ISO (valid_date_full)
@@ -1104,6 +1112,107 @@ function createNotaryModuleView(deps) {
     return t;
   }
 
+  // --- Ba dòng meta hồ sơ dưới Tài sản (MIN-141 đợt 3) ---
+  // Nơi niêm yết / Người nhận ủy quyền / Nội dung việc — cùng đi qua
+  // model.updateCaseMeta → payload.case trong workspace_create (nháp)
+  // hoặc workspace_commit_stage (case thật, cùng transaction Stage).
+  // Danh bạ ủy quyền = notary.customer_list — chọn tên khớp danh bạ sẽ
+  // neo customers.id ổn định; gõ tên ngoài danh bạ = free text (id null).
+  const UQ_DATALIST_ID = 'cd-uq-catalog';
+
+  function caseMetaEl() {
+    const s = model.state;
+    const c = s.caseInfo || {};
+    const ro = !model.canWrite();
+    const box = h('div', 'cd-casemeta');
+    box.append(h('div', 'cd-casemeta-title', 'Thông tin hồ sơ'));
+
+    // Dong 1 — Nơi niêm yết: chua xac dinh hien ro rang (placeholder),
+    // KHONG tu dien tu dia chi tai san (AC: khong tu khang dinh).
+    const r1 = h('div', 'cd-casemeta-row');
+    r1.append(h('label', 'cd-casemeta-label', 'Nơi niêm yết'));
+    const ny = h('input', 'cd-cell cd-meta-input');
+    ny.value = c.noi_niem_yet || '';
+    ny.placeholder = 'Chưa xác định';
+    ny.disabled = ro;
+    ny.setAttribute('aria-label', 'Nơi niêm yết');
+    ny.dataset.fid = 'meta:noi_niem_yet';
+    setCellTitle(ny);
+    ny.oninput = () => {
+      setCellTitle(ny);
+      model.updateCaseMeta('noi_niem_yet',
+                           ny.value.trim() === '' ? null : ny.value);
+    };
+    r1.append(ny);
+    box.append(r1);
+
+    // Dong 2 — Người nhận ủy quyền: datalist danh bạ + free text.
+    // Load danh bạ mot lan khi soan duoc (mock/offline: rong, van nhap
+    // tu do duoc). Len lich microtask — emit giua render se kich
+    // rerender re-entrant → workspace bi append 2 lan.
+    if (!ro && s.uqCatalog === null && !s.uqCatalogBusy) {
+      Promise.resolve().then(() => model.loadUqCatalog());
+    }
+    const r2 = h('div', 'cd-casemeta-row');
+    r2.append(h('label', 'cd-casemeta-label', 'Người nhận ủy quyền'));
+    const uq = h('input', 'cd-cell cd-meta-input');
+    uq.value = c.nguoi_nhan_uy_quyen || '';
+    uq.setAttribute('list', UQ_DATALIST_ID);
+    uq.placeholder = 'Chọn từ danh bạ hoặc nhập tên';
+    uq.disabled = ro;
+    uq.setAttribute('aria-label', 'Người nhận ủy quyền');
+    uq.dataset.fid = 'meta:nguoi_nhan_uy_quyen';
+    setCellTitle(uq);
+    uq.oninput = () => {
+      setCellTitle(uq);
+      model.updateCaseMeta('nguoi_nhan_uy_quyen',
+                           uq.value.trim() === '' ? null : uq.value);
+    };
+    // Blur/Enter: giai ten -> customers.id khi trung danh ba.
+    uq.onchange = () => model.resolveUqName(uq.value);
+    r2.append(uq);
+    const dl = h('datalist');
+    dl.id = UQ_DATALIST_ID;
+    for (const cust of s.uqCatalog || []) {
+      if (!cust || cust.ho_ten == null) continue;
+      const o = h('option');
+      o.value = cust.ho_ten;
+      dl.append(o);
+    }
+    r2.append(dl);
+    if (!ro) {
+      const addCat = btn('+ Danh bạ', 'secondary sm', async () => {
+        const r = await model.createUqCustomer(uq.value);
+        if (!r.ok && r.error) notify(errText(r.error), true);
+      });
+      addCat.disabled = s.uqCatalogBusy || !(uq.value || '').trim();
+      addCat.title = 'Lưu tên đang nhập vào danh bạ và chọn làm ' +
+        'người nhận ủy quyền';
+      addCat.dataset.fid = 'meta:uq_add_catalog';
+      r2.append(addCat);
+    }
+    box.append(r2);
+
+    // Dong 3 — Nội dung việc.
+    const r3 = h('div', 'cd-casemeta-row');
+    r3.append(h('label', 'cd-casemeta-label', 'Nội dung việc'));
+    const nd = h('input', 'cd-cell cd-meta-input');
+    nd.value = c.noi_dung_viec || '';
+    nd.placeholder = 'VD: Khai nhận di sản thừa kế…';
+    nd.disabled = ro;
+    nd.setAttribute('aria-label', 'Nội dung việc');
+    nd.dataset.fid = 'meta:noi_dung_viec';
+    setCellTitle(nd);
+    nd.oninput = () => {
+      setCellTitle(nd);
+      model.updateCaseMeta('noi_dung_viec',
+                           nd.value.trim() === '' ? null : nd.value);
+    };
+    r3.append(nd);
+    box.append(r3);
+    return box;
+  }
+
   // "Tài sản (3)" — số đếm tông muted như mockup.
   function cardTitle(label, n) {
     const t = h('h3', 'card-title', `${label} `);
@@ -1160,6 +1269,9 @@ function createNotaryModuleView(deps) {
       twrap.append(assetTableEl());
       aBody.append(twrap);
     }
+    // đợt 3 (MIN-141): ba dong meta hồ sơ duoi tai san — ghi qua
+    // payload.case cung transaction commit/create (contract §6/§4.3).
+    aBody.append(caseMetaEl());
     ac.append(aBody);
     tier.append(ac);
 

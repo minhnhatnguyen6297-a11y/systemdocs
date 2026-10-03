@@ -68,8 +68,10 @@ def _ensure_db():
     database.migrate_customers_nullable()
     database.migrate_inheritance_cases_schema()
     database.migrate_properties_schema()
+    database.migrate_property_land_rows()
     database.migrate_inheritance_case_properties_schema()
     database.migrate_zalo_schema()
+    database.migrate_zalo_exchange_schema()
     database.Base.metadata.create_all(bind=database.engine)
     _db_ready = True
 
@@ -707,12 +709,16 @@ def workspace_commit_stage(job, payload):
     stage = payload.get("stage")
     if not isinstance(stage, dict):
         raise CommandError("validation_error", "stage phai la object")
+    case_meta = payload.get("case")
+    if case_meta is not None and not isinstance(case_meta, dict):
+        raise CommandError("validation_error",
+                           "payload.case phai la object")
     sess = _db_session()
     try:
         module = _workspace_module()
         try:
             data = module.CaseWorkspaceService(sess).commit_stage(
-                case_id, base_revision, stage)
+                case_id, base_revision, stage, case_meta)
         except module.WorkspaceError as err:
             raise _workspace_command_error(err)
         job.check_cancel()
