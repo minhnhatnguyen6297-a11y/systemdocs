@@ -321,6 +321,25 @@ def test_nam_sinh_and_nam_chet_print_year_only():
     assert mapping["[Ngày chết người 1]"] == "03/02/2024"
 
 
+def test_year_tokens_extract_iso_dates_from_saved_snapshot():
+    owner = _person(1, "Chủ", born=date(1950, 4, 5), dead=date(2024, 2, 3))
+    heir = _person(2, "Con", born=date(1980, 8, 9))
+    saved = _case_state(owner, heir, nodes=[
+        _node(1, role="Owner", is_land_owner=True),
+        _node(2, role="Con", will_receive=True)])
+    # Master changes later: Word must keep the persisted ISO dates.
+    owner.ngay_sinh = date(1960, 6, 7)
+    owner.ngay_chet = date(2025, 6, 7)
+    case = _make_case(owner, participants=[_participant(heir, "Con")],
+                      properties=[_prop()], case_state=saved)
+    mapping = build_template_mapping(case)
+    assert mapping["[Năm sinh 1]"] == "1950"
+    assert mapping["[Năm sinh 3]"] == "1980"
+    assert mapping["[Năm chết 1]"] == "2024"
+    assert mapping["[Người 1 - Năm sinh]"] == "1950"
+    assert mapping["[Ngày chết người 1]"] == "03/02/2024"
+
+
 def test_replace_in_doc_returns_replacement_count():
     doc = Document()
     doc.add_paragraph("[Tên 1] và [Tên 1] lần nữa")
@@ -728,6 +747,37 @@ def test_replace_in_doc_resolves_placeholder_nested_in_replacement_value():
     assert find_unresolved_placeholders(doc) == []
 
 
+def test_split_nested_replacement_uses_word_breaks_and_preserves_spaces(tmp_path):
+    from docx.oxml.ns import qn
+
+    doc = Document()
+    para = doc.add_paragraph()
+    sibling = para.add_run("Không sửa")
+    sibling.italic = True
+    sibling_xml = sibling._r.xml
+    first = para.add_run("[Đoạn")
+    first.bold = True
+    last = para.add_run(" dài]")
+    last.underline = True
+    first_properties = first._r.rPr.xml
+    last_properties = last._r.rPr.xml
+    replace_in_doc(doc, {"[Đoạn dài]": " [Tên]\r\n dòng hai \n", "[Tên]": "An "})
+    path = tmp_path / "multiline.docx"
+    doc.save(path)
+    result = Document(path).paragraphs[0]
+    assert result.text == "Không sửa An \n dòng hai \n"
+    assert len(list(result._p.iter(qn("w:br")))) == 2
+    texts = list(result.runs[1]._r.iter(qn("w:t")))
+    assert [t.text or "" for t in texts] == [" An ", " dòng hai ", ""]
+    assert all(t.get(qn("xml:space")) == "preserve" for t in texts[:2])
+    assert all("\n" not in (t.text or "") for t in result._p.iter(qn("w:t")))
+    assert result.runs[0]._r.xml == sibling_xml
+    assert result.runs[1]._r.rPr.xml == first_properties
+    assert result.runs[2]._r.rPr.xml == last_properties
+    assert result.runs[2].text == ""
+    assert find_unresolved_placeholders(Document(path)) == []
+
+
 _W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 
 
@@ -830,6 +880,36 @@ def test_unresolved_placeholder_in_real_footnote_blocks_export(tmp_path):
 
     doc = Document(str(path))
     assert find_unresolved_placeholders(doc) == ["[Chưa map]"]
+
+
+@pytest.mark.parametrize("part", ["footnotes", "endnotes"])
+def test_malformed_real_note_xml_blocks_export(tmp_path, part):
+    import zipfile
+    from services import word_batch_export as wbe
+
+    path = tmp_path / "malformed.docx"
+    _write_docx_with_notes(path)
+    with zipfile.ZipFile(path) as archive:
+        entries = {n: archive.read(n) for n in archive.namelist()}
+    entries[f"word/{part}.xml"] = b'<w:broken xmlns:w="urn:broken">'
+    with zipfile.ZipFile(path, "w") as archive:
+        for name, content in entries.items():
+            archive.writestr(name, content)
+    with pytest.raises(WordExportValidationError, match=part + r"\.xml"):
+        replace_in_doc(Document(path), {})
+    with pytest.raises(WordExportValidationError, match=part + r"\.xml"):
+        find_unresolved_placeholders(Document(path))
+    dest = tmp_path / "out"
+    dest.mkdir()
+    with pytest.raises(wbe.WordBatchError) as failure:
+        wbe.export_batch(_summary_export_case(), case_id=99,
+            document_keys=["khai_nhan_di_san"], dest_dir=dest,
+            resolve_template=lambda _key: path)
+    assert failure.value.code == "word_batch_failed"
+    result = failure.value.result_data
+    assert result["documents"][0]["status"] == "failed"
+    assert part + ".xml" in result["documents"][0]["error"]["message"]
+    assert list(dest.iterdir()) == []
 
 
 def _field_paragraph_xml():
@@ -1708,6 +1788,27 @@ def test_removing_diagram_node_does_not_renumber_nguoi():
     assert mapping["[Người 1 - Họ tên]"] == "An Stage 1"
     assert mapping["[Người 2 - Họ tên]"] == "Bích Stage 2"
     assert mapping["[Người 3 - Họ tên]"] == "Cường Stage 3"
+
+
+def test_two_party_side_names_include_every_person_across_empty_seats():
+    a1, a2, b1, b2, unassigned = [_rid() for _ in range(5)]
+    rows = [_stage_row_v3(b2, 14, "B Hai"),
+            _stage_row_v3(a2, 12, "A Hai"),
+            _stage_row_v3(unassigned, 15, "Chưa gán"),
+            _stage_row_v3(a1, 11, "A Một"),
+            _stage_row_v3(b1, 13, "B Một")]
+    mapping = build_template_mapping(_two_party_case(
+        rows, {2: a1, 5: a2, 17: b1, 20: b2}))
+    assert mapping["[Tên bên A]"] == "A Một và A Hai"
+    assert mapping["[Tên bên B]"] == "B Một và B Hai"
+    assert mapping["[Bên A 1 - Họ tên]"] == ""
+    assert mapping["[Bên A 2 - Họ tên]"] == "A Một"
+    assert mapping["[Bên A 3 - Họ tên]"] == ""
+    assert mapping["[Bên A 5 - Họ tên]"] == "A Hai"
+    assert mapping["[Bên B 1 - Họ tên]"] == ""
+    assert mapping["[Bên B 2 - Họ tên]"] == "B Một"
+    assert mapping["[Bên B 5 - Họ tên]"] == "B Hai"
+    assert mapping["[Người 3 - Họ tên]"] == "Chưa gán"
 
 
 def test_two_party_ben_a_b_slots_and_names():

@@ -1558,6 +1558,31 @@ test('saveCaseMeta preserves other metadata drafts and refreshes cancel baseline
   assert.equal(model.state.committedCaseInfo.noi_niem_yet, 'xã Đã Lưu');
 });
 
+test('saveCaseMeta keeps edits made to a clean field while response is pending', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const revision = model.state.revision;
+  const committedContent = model.state.committedCaseInfo.noi_dung_viec;
+  assert.equal(model.state.caseInfo.noi_dung_viec, committedContent);
+  const run = client.run;
+  let finish;
+  client.run = (command, payload) => command === 'notary.workspace_update'
+    ? new Promise((resolve) => { finish = async () => resolve(await run(command, payload)); })
+    : run(command, payload);
+  const pending = model.saveCaseMeta({ noi_niem_yet: 'xã Đã Lưu' });
+  assert.equal(typeof finish, 'function');
+  model.updateCaseMeta('noi_dung_viec', 'Sửa khi đang chờ');
+  await finish();
+  const result = await pending;
+  assert.equal(result.ok, true);
+  assert.equal(model.state.caseInfo.noi_dung_viec, 'Sửa khi đang chờ');
+  assert.equal(model.state.committedCaseInfo.noi_dung_viec, committedContent);
+  assert.equal(model.state.committedCaseInfo.noi_niem_yet, 'xã Đã Lưu');
+  assert.equal(model.state.caseInfo.noi_niem_yet, 'xã Đã Lưu');
+  assert.equal(model.state.revision, revision + 1);
+  assert.equal(model.state.metaDirty, true);
+});
+
 test('saveCaseMeta: conflict → ok:false, error ro rang, khong ghi de state', async () => {
   const { model, client } = makeModel(seedCases('ready'));
   await model.openCase(42);

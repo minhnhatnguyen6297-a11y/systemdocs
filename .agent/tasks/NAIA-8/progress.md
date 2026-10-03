@@ -4,6 +4,17 @@ Trạng thái: đã triển khai local, chờ root review; không đổi issue b
 Nguồn: plan-multica-word-integration.md, owner takeover 03/10/2026.
 Kiểm chứng: 04/10/2026.
 
+Sau root review 04/10: sửa năm ISO snapshot, xuống dòng Word thật/khoảng trắng,
+đủ tên A/B, chặn xuất Nơi niêm yết chưa lưu, báo XML note hỏng, mock readiness
+và loại DOCM chưa hỗ trợ. Thêm test sửa metadata trong lúc save đang chờ;
+oracle đọc đúng xuống dòng/tab nhưng vẫn bắt sai người/năm sinh.
+Root chạy: 409 backend Word/workspace/MIN-141, 102 migration-export oracle,
+240 adapter, 190 renderer/schema/wire và 78 ví dụ contract đều qua.
+Chạy mới 22 mẫu: 22 saved, 0 failed, negative passed, source unchanged;
+17 DOCX structural passed, 5 DOC structural not_verified; Word COM available.
+Report: `artifacts/word-integration-review-fixes-final-20261004/e2e_report.json`.
+Native picker và nhìn từng trang chưa chạy; không nâng thành nghiệm thu desktop.
+
 - Áp dụng đúng diff fbd3c9f → 6889c7b; giữ MIN-141 thay vì lấy source cũ.
 - Ghép snapshot/null của người, tài sản/cụm đất 1..20 và metadata hồ sơ.
 - Thư mục mẫu, 2-party, renderer XML parts, metadata update, schema/UI và

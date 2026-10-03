@@ -167,6 +167,9 @@ def _fmt_year(d: Any) -> str:
         return ""
     if isinstance(d, str):
         text = d.strip()
+        iso = re.fullmatch(r"(\d{4})-\d{2}-\d{2}", text)
+        if iso:
+            return iso.group(1)
         # "2024" -> "2024"; "03/02/2024" -> "2024"; chuỗi khác giữ nguyên.
         match = re.search(r"(\d{4})\s*$", text)
         return match.group(1) if match else text
@@ -1426,10 +1429,8 @@ def _add_two_party_placeholders(mapping: dict[str, str],
 
     mapping["[Bên A - Họ tên]"] = _format_name_list(context.party_a)
     mapping["[Bên B - Họ tên]"] = _format_name_list(context.party_b)
-    mapping["[Tên bên A]"] = (
-        context.party_a[0].ho_ten if context.party_a else "")
-    mapping["[Tên bên B]"] = (
-        context.party_b[0].ho_ten if context.party_b else "")
+    mapping["[Tên bên A]"] = _format_simple_name_list(context.party_a)
+    mapping["[Tên bên B]"] = _format_simple_name_list(context.party_b)
 
     # Block/đoạn riêng thừa kế → rỗng toàn bộ (spec word-output: tầng 2
     # trả rỗng khi không áp dụng, tránh dấu câu rác).
@@ -2125,12 +2126,11 @@ def _iter_word_part_roots(doc: Any):
         blob_part = None
         if element is None:
             blob = getattr(part, "blob", None)
-            if not blob:
-                continue
             try:
                 element = parse_xml(blob)
-            except Exception:
-                continue
+            except Exception as exc:
+                raise WordExportValidationError(
+                    f"Mẫu Word có XML không hợp lệ tại {name}.") from exc
             blob_part = part
         if id(element) in seen:
             continue
@@ -2213,6 +2213,30 @@ def _replace_pass_in_text_nodes(nodes: list[Any], mapping: dict[str, str], norma
 _MAX_REPLACE_PASSES = 8
 
 
+def _write_word_text(node: Any) -> None:
+    """Encode edited text inside its existing run: real breaks and edge spaces."""
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    lines = re.split(r"\r\n|\r|\n", node.text or "")
+    node.text = lines[0]
+    current = node
+    text_nodes = [node]
+    for line in lines[1:]:
+        br = OxmlElement("w:br")
+        current.addnext(br)
+        text = OxmlElement("w:t")
+        text.attrib.update(node.attrib)
+        text.text = line
+        br.addnext(text)
+        current = text
+        text_nodes.append(text)
+    for text_node in text_nodes:
+        text = text_node.text or ""
+        if text and (text[0].isspace() or text[-1].isspace()):
+            text_node.set(qn("xml:space"), "preserve")
+
+
 def _replace_in_text_nodes(nodes: list[Any], mapping: dict[str, str], normalized_mapping: dict[str, str]) -> int:
     """Thay placeholder trên chuỗi w:t, giữ nguyên định dạng của từng run.
 
@@ -2224,12 +2248,17 @@ def _replace_in_text_nodes(nodes: list[Any], mapping: dict[str, str], normalized
     """
     if not nodes:
         return 0
+    before = [node.text for node in nodes]
     replaced = 0
     for _ in range(_MAX_REPLACE_PASSES):
         count = _replace_pass_in_text_nodes(nodes, mapping, normalized_mapping)
         if not count:
             break
         replaced += count
+    # Resolve nested tokens before splitting w:t so all passes see the same text.
+    for node, original in zip(nodes, before):
+        if node.text != original:
+            _write_word_text(node)
     return replaced
 
 

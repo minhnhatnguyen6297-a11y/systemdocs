@@ -220,6 +220,12 @@ function createWordDialog(ctx) {
 
       const go = btn('Xuất', 'primary', async () => {
         if (exporting || scanning || savingMeta) return;
+        if (postingChanged()) {
+          niemYetMsg.textContent = 'Nơi niêm yết đã thay đổi. Hãy bấm “Lưu nơi niêm yết” trước khi xuất.';
+          niemYetMsg.className = 'error';
+          niemYetInput.focus();
+          return;
+        }
         const keys = checks.filter((c) => c.cb.checked).map((c) => c.key);
         if (!tplToken) {
           notify('Chưa chọn thư mục chứa file mẫu.', true);
@@ -301,6 +307,17 @@ function createWordDialog(ctx) {
       niemYetInput.value =
         (model.state.caseInfo && model.state.caseInfo.noi_niem_yet) || '';
       const niemYetMsg = h('span', 'muted', '');
+      function postingChanged() {
+        const committed = model.state.committedCaseInfo || {};
+        return niemYetInput.value.trim() !== (committed.noi_niem_yet || '').trim();
+      }
+      function showPostingDraft() {
+        niemYetMsg.textContent = postingChanged()
+          ? 'Nơi niêm yết đã thay đổi. Hãy bấm “Lưu nơi niêm yết” trước khi xuất.' : '';
+        niemYetMsg.className = postingChanged() ? 'error' : 'muted';
+      }
+      niemYetInput.oninput = showPostingDraft;
+      showPostingDraft();
       const niemYetSave = btn('Lưu nơi niêm yết', 'sm', async () => {
         if (exporting || scanning || savingMeta || !metaCanEdit) return;
         // Khoa Xuat + input + Luu lap trong luc save pending — batch phai

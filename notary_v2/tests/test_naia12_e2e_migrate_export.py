@@ -229,6 +229,78 @@ def test_wrong_area_value_rejected_by_pattern(tmp_path):
     assert not all(re.search(p, bad_label) for _i, p in patterns)
 
 
+def test_visible_paragraph_reader_keeps_word_controls_and_nested_ownership(tmp_path):
+    from docx.oxml import parse_xml
+    from docx.oxml.ns import qn
+    from docx.opc.part import Part
+    from docx.opc.packuri import PackURI
+    from docx.opc.constants import RELATIONSHIP_TYPE as RT
+
+    doc = Document()
+    ns = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+    doc.element.body.append(parse_xml(
+        f'<w:p {ns}><w:r><w:t>cha</w:t><w:br/><w:t>dòng</w:t>'
+        '<w:cr/><w:tab/><w:t>cuối</w:t></w:r>'
+        '<w:r><w:drawing><w:txbxContent><w:p><w:r><w:t>con</w:t>'
+        '<w:br/><w:t>riêng</w:t></w:r></w:p></w:txbxContent></w:drawing></w:r></w:p>'))
+    for part_name, rel_type, root, singular in (
+        ('footnotes', RT.FOOTNOTES, 'footnotes', 'footnote'),
+        ('endnotes', RT.ENDNOTES, 'endnotes', 'endnote'),
+    ):
+        blob = (f'<w:{root} {ns}><w:{singular} w:id="1"><w:p><w:r>'
+                f'<w:t>{part_name}</w:t><w:br/><w:tab/><w:t>text</w:t>'
+                f'</w:r></w:p></w:{singular}></w:{root}>').encode()
+        part = Part(PackURI(f'/word/{part_name}.xml'),
+            f'application/vnd.openxmlformats-officedocument.wordprocessingml.{part_name}+xml',
+            blob, doc.part.package)
+        doc.part.relate_to(part, rel_type)
+    doc.sections[0].header.paragraphs[0].text = 'header\nline\tvalue'
+    doc.sections[0].footer.paragraphs[0].text = 'footer\nline\tvalue'
+    table = doc.add_table(rows=1, cols=1)
+    table.cell(0, 0).add_table(rows=1, cols=1).cell(0, 0).text = 'nested\nline\tvalue'
+    path = tmp_path / 'visible.docx'
+    doc.save(path)
+    texts = e2e._doc_paragraph_texts(Document(path))
+    assert 'cha\ndòng\n\tcuối' in texts
+    assert 'con\nriêng' in texts
+    assert not any('cha' in t and 'con' in t for t in texts)
+    for name in ('header', 'footer', 'nested', 'footnotes', 'endnotes'):
+        assert (f'{name}\n\ttext' if name.endswith('notes') else f'{name}\nline\tvalue') in texts
+    assert len(list(Document(path).element.body.iter(qn('w:cr')))) == 1
+
+
+@pytest.mark.parametrize('mutation', [None, 'person', 'value'])
+def test_authorized_block_with_word_breaks_keeps_exact_oracle(tmp_path, monkeypatch, mutation):
+    import json
+    from docx.oxml.ns import qn
+
+    _fast_com(monkeypatch)
+    src = tmp_path / 'src'
+    _docx(src / 'uq.docx', ['Đại diện: [Dòng người được ủy quyền 1]'])
+    if mutation:
+        real_mapping = e2e.word_engine.build_template_mapping
+
+        def mutant_mapping(case, **kwargs):
+            mapping = dict(real_mapping(case, **kwargs))
+            token = '[Dòng người được ủy quyền 1]'
+            old = e2e.PROXY_NAME if mutation == 'person' else '1975'
+            new = 'Người Sai' if mutation == 'person' else '1999'
+            assert old in mapping[token]
+            mapping[token] = mapping[token].replace(old, new)
+            return mapping
+
+        monkeypatch.setattr(e2e.word_engine, 'build_template_mapping', mutant_mapping)
+    out = tmp_path / 'out'
+    assert e2e.main([str(src), str(out)]) == (1 if mutation else 0)
+    report = json.loads((out / 'e2e_report.json').read_text(encoding='utf-8'))
+    output = next((out / 'exports').glob('*.docx'))
+    assert list(Document(output).element.body.iter(qn('w:br')))
+    failures = report['failures']
+    assert bool([f for f in failures if f.startswith('batch.content[')]) == bool(mutation)
+    assert bool([f for f in failures if f.startswith('batch.authorized[')]) == bool(mutation)
+    assert report['negative']['status'] == 'passed'
+
+
 def test_uq_block_validated_at_required_slot(tmp_path):
     """`[Dòng người được ủy quyền 1]` phải in đúng block đại diện đã lưu —
     tên người khác hoặc thiếu chi tiết đều phải trượt (bản cũ chỉ tìm tên

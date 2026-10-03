@@ -1894,18 +1894,30 @@ def diagram_save(job, payload):
     })
 
 
-def _word_block_reason(case, document_key=None):
+def _word_block_reason(case, document_key=None, *, static=False):
     """Readiness theo validation that (contract §8.1 mapping).
 
-    NAIA-8: two_party khong con bi chan — readiness theo nhanh case_type
-    (khong ap dieu kien thua ke); catalog document_key bi bo qua o
-    folder mode (document_key=None)."""
+    Folder mode static=True chi kiem dieu kien ky thuat; catalog cu giu
+    dieu kien chu dat/người nhan. Two_party khong ap dieu kien thua ke."""
     if document_key is not None and document_key in NO_TEMPLATE_KEYS:
         return "word.template_missing"
     assets = case["stage"]["assets"]
     nodes = [n for n in (case["diagram"].get("state") or {}).get("nodes")
              or [] if isinstance(n, dict) and not n.get("deleted")]
     stage_people = _person_map(case)
+    if static:
+        if not stage_people:
+            return "word.no_people"
+        if not assets:
+            return "word.no_assets"
+        if len(assets) > 5:
+            return "word.too_many_assets"
+        if len(stage_people) > (30 if case.get("case_type") == CASE_TYPE_TWO_PARTY else 20):
+            return "word.too_many_people"
+        state_nodes = (case["diagram"].get("state") or {}).get("nodes")
+        if case.get("case_type") == CASE_TYPE_TWO_PARTY and not state_nodes:
+            return "word.no_diagram"
+        return None
     if case.get("case_type") == CASE_TYPE_TWO_PARTY:
         if not stage_people:
             return "word.no_people"
@@ -2028,7 +2040,7 @@ def word_export_options(job, payload):
         scanned = _scan_template_dir(template_root)
         docs = []
         for item in scanned:
-            reason = _word_block_reason(case)
+            reason = _word_block_reason(case, static=True)
             docs.append({"document_key": item["document_key"],
                          "display_name": item["display_name"],
                          "ready": reason is None,
@@ -2273,7 +2285,7 @@ def word_export_batch(job, payload):
             job.report_progress(i + 1, len(keys),
                                 f"văn bản {i + 1}/{len(keys)}")
             continue
-        reason = _word_block_reason(case, key)
+        reason = _word_block_reason(case, key, static=folder_docs is not None)
         # Folder mode: file mat giua scan va export -> template_missing
         # (parity template_path_resolver cua real) — ke ca bi doi thanh
         # symlink/junction tro ra ngoai thu muc mau sau khi scan.

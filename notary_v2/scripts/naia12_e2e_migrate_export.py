@@ -167,15 +167,27 @@ def _qn():
 
 def _doc_paragraph_texts(doc) -> list[str]:
     """Text từng đoạn trên MỌI part (body, bảng lồng, header/footer,
-    textbox, footnotes/endnotes) — cùng phạm vi replace_in_doc quét."""
+    textbox, footnotes/endnotes), gồm xuống dòng và tab Word thật.
+
+    Đọc trực tiếp XML để oracle không phụ thuộc cách engine thay token;
+    nội dung paragraph lồng thuộc riêng paragraph đó, không ghép vào cha."""
     qn = _qn()
+    text_tag, paragraph_tag = qn("w:t"), qn("w:p")
+    controls = {qn("w:br"): "\n", qn("w:cr"): "\n", qn("w:tab"): "\t"}
     texts: list[str] = []
     for part_root in word_engine._iter_word_part_roots(doc):
         for paragraph in word_engine._iter_part_paragraphs(
                 part_root.element, qn):
-            texts.append("".join(
-                node.text or ""
-                for node in word_engine._paragraph_text_nodes(paragraph, qn)))
+            values = []
+            for node in paragraph.iter():
+                if node.tag != text_tag and node.tag not in controls:
+                    continue
+                owner = next((parent for parent in node.iterancestors()
+                              if parent.tag == paragraph_tag), None)
+                if owner is paragraph:
+                    values.append(node.text or "" if node.tag == text_tag
+                                  else controls[node.tag])
+            texts.append("".join(values))
     return texts
 
 

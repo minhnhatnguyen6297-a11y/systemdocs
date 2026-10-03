@@ -1548,6 +1548,54 @@ class TestWordExport:
         return {"path": str(tmp_path), "scope": "machine_local",
                 "is_dir": True}
 
+    @pytest.mark.parametrize("case_type,people,assets,has_diagram,expected", [
+        ("inheritance", 1, 1, False, None),
+        ("inheritance", 0, 0, False, "word.no_people"),
+        ("inheritance", 1, 0, False, "word.no_assets"),
+        ("inheritance", 1, 6, False, "word.too_many_assets"),
+        ("inheritance", 21, 1, False, "word.too_many_people"),
+        ("two_party", 1, 1, False, "word.no_diagram"),
+        ("two_party", 1, 1, True, None),
+        ("two_party", 31, 1, True, "word.too_many_people"),
+        ("two_party", 1, 0, False, "word.no_assets"),
+    ])
+    def test_folder_readiness_matches_real_technical_checks(
+            self, case_type, people, assets, has_diagram, expected, monkeypatch):
+        from types import SimpleNamespace
+        monkeypatch.syspath_prepend(str(_REPO / "notary_v2"))
+        from services.word_engine import word_block_reason
+
+        case = {"case_type": case_type,
+                "stage": {"people": [{"row_id": str(i)} for i in range(people)],
+                          "assets": [{} for _ in range(assets)]},
+                "diagram": {"state": {"nodes": [{}] if has_diagram else []}}}
+        context = SimpleNamespace(case_type=case_type,
+            persons=case["stage"]["people"], assets=case["stage"]["assets"],
+            has_diagram_state=has_diagram)
+        assert mock._word_block_reason(case, static=True) == expected
+        assert word_block_reason(context, static=True) == expected
+
+    def test_folder_options_and_export_allow_no_inheritance_owner_or_receiver(self, tmp_path):
+        import docx
+
+        seed = _load_fixture("ready.json")
+        seed["cases"]["42"]["diagram"]["state"]["nodes"] = []
+        mock.reset_backend(seed)
+        templates, dest = tmp_path / "templates", tmp_path / "out"
+        templates.mkdir()
+        dest.mkdir()
+        docx.Document().save(templates / "static.docx")
+        payload = {"case_id": 42, "template_dir": self._dest(templates)}
+        options = _call("word_export_options", payload)
+        assert options["data"]["documents"][0]["ready"] is True
+        batch = _call("word_export_batch", {**payload,
+            "document_keys": ["static.docx"], "destination": self._dest(dest)})
+        assert batch["data"]["documents"][0]["status"] == "saved"
+        # Catalog callers still use the legacy checks.
+        legacy = _call("word_export_options", {"case_id": 42})
+        docs = {d["document_key"]: d for d in legacy["data"]["documents"]}
+        assert docs["khai_nhan_di_san"]["block_reason"] == "word.no_landowner"
+
     def test_options_ready_case(self):
         mock.reset_backend(_load_fixture("ready.json"))
         res = _call("word_export_options", {"case_id": 42})

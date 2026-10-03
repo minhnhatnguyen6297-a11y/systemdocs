@@ -10,6 +10,7 @@ import json
 import re
 import unicodedata
 import uuid
+import warnings
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
@@ -29,7 +30,7 @@ from .word_engine import (
 # Chỉ loại file khoá/tạm/workbook theo AC1 NAIA-12 — KHÔNG loại theo tên
 # (" - Copy.docx", "_old"... vẫn là mẫu thật phải chuyển).
 EXCLUDED_SUFFIXES = (".tmp", ".wbk", ".asd", ".xls", ".xlsx", ".xlsm", ".xlsb", ".pdf")
-TEMPLATE_SUFFIXES = (".docx", ".docm", ".doc")
+TEMPLATE_SUFFIXES = (".docx", ".doc")
 
 def _normalize(token: str) -> str:
     text = unicodedata.normalize("NFC", token).lower()
@@ -1132,6 +1133,12 @@ def migrate_templates(
     """
     src_dir, out_dir = Path(src_dir), Path(out_dir)
     plan = _plan_migration(src_dir, out_dir)  # mọi kiểm chứng trước mọi ghi
+    _kept, excluded = scan_source_templates(src_dir)
+    for name in excluded:
+        if Path(name).suffix.lower() == ".docm":
+            warnings.warn(
+                f"Bỏ qua {name}: chưa hỗ trợ DOCM; chỉ nhận DOCX và DOC.",
+                UserWarning, stacklevel=2)
     out_dir.mkdir(parents=True, exist_ok=True)
     converter = convert or convert_doc_to_docx
     guard = _WriteGuard(out_dir)
@@ -1140,7 +1147,6 @@ def migrate_templates(
     # (review NAIA-12: `.conv.docx` sót cạnh output từng lọt vào scan).
     scratch_dir = out_dir / f".naia12-scratch-{uuid.uuid4().hex[:12]}"
 
-    _kept, excluded = scan_source_templates(src_dir)
     files: list[FileMigration] = []
     for src, out_path, rel_posix in plan:
         # Phòng thủ sâu: re-check containment TẠI THỜI ĐIỂM GHI — junction

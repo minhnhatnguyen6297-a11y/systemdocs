@@ -51,6 +51,56 @@ def test_scan_source_templates_reports_excluded_files(tmp_path):
     assert "xlsx/data.xlsx" in excluded
 
 
+def test_real_docm_is_excluded_and_reported_before_any_write(tmp_path, monkeypatch):
+    import zipfile
+
+    src, out = tmp_path / "src", tmp_path / "out"
+    macro = _docx(src / "macro.docm", ["macro template"])
+    with zipfile.ZipFile(macro) as archive:
+        entries = {n: archive.read(n) for n in archive.namelist()}
+    entries["[Content_Types].xml"] = entries["[Content_Types].xml"].replace(
+        b"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+        b"application/vnd.ms-word.document.macroEnabled.main+xml")
+    with zipfile.ZipFile(macro, "w") as archive:
+        for name, content in entries.items():
+            archive.writestr(name, content)
+    # Genuine macro-enabled main content, not DOCX with a changed suffix.
+    with pytest.raises(ValueError):
+        Document(macro)
+    _docx(src / "supported.docx", ["DOCX"])
+    (src / "legacy.doc").write_bytes(b"legacy-doc")
+    before = _bytes(src)
+    kept, excluded = wtm.scan_source_templates(src)
+    assert {p.name for p in kept} == {"supported.docx", "legacy.doc"}
+    assert excluded == ["macro.docm"]
+    assert not wtm.is_template_candidate(macro)
+    warn = wtm.warnings.warn
+    warned = []
+
+    def before_write_warning(message, *args, **kwargs):
+        assert not out.exists()
+        warned.append(str(message))
+        warn(message, *args, **kwargs)
+
+    monkeypatch.setattr(wtm.warnings, "warn", before_write_warning)
+    converted = []
+
+    def convert(source, target):
+        converted.append(source.name)
+        _docx(target, ["converted DOC"])
+
+    with pytest.warns(UserWarning, match="macro.docm.*DOCM.*DOCX.*DOC"):
+        manifest = wtm.migrate_templates(src, out, convert=convert)
+    assert len(warned) == 1
+    assert converted == ["legacy.doc"]
+    assert manifest["excluded_files"] == ["macro.docm"]
+    assert manifest["file_count"] == 2
+    assert not (out / "macro.docx").exists()
+    assert Document(out / "supported.docx").paragraphs[0].text == "DOCX"
+    assert Document(out / "legacy.docx").paragraphs[0].text == "converted DOC"
+    assert _bytes(src) == before
+
+
 def test_diff_tokens_classifies_renamed_kept_fixed_no_source_and_unmapped():
     tokens = [
         "[Niêm Yết]",

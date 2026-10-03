@@ -11,7 +11,7 @@ văn bản đã lưu. Word chỉ trình bày; không tự quyết quan hệ ho�
 ## 2. Flow
 
 ```text
-Chọn thư mục mẫu (hoặc dùng catalog backend) + chọn văn bản + thư mục đích
+Chọn thư mục mẫu + chọn văn bản + thư mục đích
 → kiểm workspace và loại hồ sơ
 → đọc Stage và Diagram đã lưu
 → backend dựng placeholder
@@ -28,6 +28,8 @@ qua `notary.workspace_update`. Lệnh cập nhật cả cột hồ sơ và đún
 snapshot đã lưu trong một lần ghi; không đổi Stage, tài sản hoặc sơ đồ.
 Lưu lỗi giữ nội dung đang nhập; revision cũ phải báo xung đột. Bản nháp metadata
 khác trong card Tài sản không bị mất khi lưu riêng Nơi niêm yết.
+Nếu ô Nơi niêm yết khác bản đã lưu, dialog yêu cầu lưu trước khi xuất, kể cả
+bản nháp đã có từ card Tài sản. Không hiển thị nơi mới rồi xuất theo nơi cũ.
 
 ## 3. Input và output
 
@@ -39,6 +41,8 @@ và lỗi; breakdown luôn có `succeeded`, `failed`, `skipped`.
 
 ### Nguồn mẫu
 
+Giao diện hiện tại chỉ chọn mẫu từ thư mục. Catalog cố định còn được backend
+giữ để tương thích với các lệnh cũ, không phải lựa chọn trong dialog.
 Không `template_dir` → catalog backend cố định (hành vi cũ). Có `template_dir`
 → backend quét file `.docx` ngay trong thư mục (bỏ `~$*` lock file, bỏ
 non-DOCX, không vào thư mục con, thứ tự theo tên). `document_key` = basename

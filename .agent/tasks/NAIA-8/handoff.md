@@ -1,5 +1,14 @@
 # Bàn giao Word NAIA-8/12
 
+Root review và sửa bổ sung 04/10/2026: năm ISO, xuống dòng/khoảng trắng Word,
+đủ tên A/B, Nơi niêm yết chưa lưu, XML note hỏng, mock parity, DOCM exclusion,
+pending-save edit và oracle độc lập đọc control Word. Root kiểm 409 backend,
+102 oracle, 240 adapter, 190 renderer/schema/wire và 78 ví dụ contract đều qua.
+Report mới thay bằng chứng trước: `artifacts/word-integration-review-fixes-final-20261004/e2e_report.json`
+với 22/22 saved, 0 failed, negative passed, originals unchanged; 17 DOCX
+structural passed và 5 DOC structural not_verified. Native UI/visual pages
+vẫn chưa thực hiện, ghi trong deferred-work; không tự đổi trạng thái issue.
+
 Đã ghép tip Word 6889c7b vào source MIN-141 của branch tích hợp. Giữ nguyên
 database/model MIN-141, thêm Word engine/batch/UI/schema/migration và sửa các
 lỗi ghép snapshot metadata, giữ draft, ngày đầy đủ và ghế trống hai bên.

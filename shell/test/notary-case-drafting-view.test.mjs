@@ -1021,6 +1021,7 @@ function wordModelStub(overrides = {}) {
   const state = {
     wordOptions: null, wordResult: null, wordBusy: false,
     caseInfo: { id: 42, noi_niem_yet: 'xã Yên Sở', locked: false },
+    committedCaseInfo: { id: 42, noi_niem_yet: 'xã Yên Sở', locked: false },
   };
   return {
     calls, state,
@@ -1028,6 +1029,7 @@ function wordModelStub(overrides = {}) {
     saveCaseMeta: async (patch) => {
       calls.push(['update', patch]);
       state.caseInfo.noi_niem_yet = patch.noi_niem_yet;
+      state.committedCaseInfo.noi_niem_yet = patch.noi_niem_yet;
       return { ok: true };
     },
     loadWordOptions: async (templateDir) => {
@@ -1252,6 +1254,35 @@ test('NAIA-8 word dialog: folder trung basename — token phan biet, response cu
   assert.match(box.textContent, /Thư mục mẫu: mau/);
 });
 
+for (const initialDraft of [true, false]) {
+  test(`Word posting ${initialDraft ? 'initial draft' : 'dialog edit'} must be saved before export`, async (t) => {
+    const model = wordModelStub();
+    if (initialDraft) model.state.caseInfo.noi_niem_yet = 'xã Chưa Lưu';
+    const pickFiles = async () => ({ ok: true, data: { files: [
+      { file_token: 'tok-folder', name: 'folder', is_dir: true }] } });
+    const { ctx, cap } = wordDialogCtx(t, { model, pickFiles });
+    WORD.createWordDialog(ctx).open();
+    const box = cap.box;
+    await findBtns(box, 'Chọn thư mục mẫu')[0].onclick();
+    await findBtns(box, 'Chọn thư mục đích')[0].onclick();
+    const input = collect(box, (e) => e.tagName === 'INPUT' &&
+      e.getAttribute('aria-label') === 'Nơi niêm yết')[0];
+    assert.equal(input.value, initialDraft ? 'xã Chưa Lưu' : 'xã Yên Sở');
+    if (!initialDraft) {
+      input.value = 'xã Chưa Lưu';
+      input.oninput();
+    }
+    assert.match(box.textContent, /Hãy bấm “Lưu nơi niêm yết” trước khi xuất/);
+    await findBtns(box, 'Xuất')[0].onclick();
+    assert.equal(model.calls.filter(([k]) => k === 'batch').length, 0);
+    assert.equal(model.state.committedCaseInfo.noi_niem_yet, 'xã Yên Sở');
+    await findBtns(box, 'Lưu nơi niêm yết')[0].onclick();
+    assert.equal(model.state.committedCaseInfo.noi_niem_yet, 'xã Chưa Lưu');
+    await findBtns(box, 'Xuất')[0].onclick();
+    assert.equal(model.calls.filter(([k]) => k === 'batch').length, 1);
+  });
+}
+
 test('NAIA-8 word dialog: Noi niem yet — nap gia tri da luu, luu ok/loi ro', async (t) => {
   const model = wordModelStub();
   const pickFiles = async () => ({ ok: true, data: { files: [] } });
@@ -1302,6 +1333,7 @@ test('NAIA-8 word dialog: dang luu Noi niem yet → Xuat/input/Luu khoa (pending
       return new Promise((res) => {
         finishSave = () => {
           model.state.caseInfo.noi_niem_yet = patch.noi_niem_yet;
+          model.state.committedCaseInfo.noi_niem_yet = patch.noi_niem_yet;
           res({ ok: true });
         };
       });
