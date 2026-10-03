@@ -13,3 +13,11 @@
 - source_plan: `D:/systemdocs/_bmad-output/implementation-artifacts/plan-notary-v2-docs-consolidation.md`
   summary: Owner rà nội dung 38 file notary_v2 cũ với spec đã gom trước khi phê duyệt các Draft thừa kế.
   evidence: Mapping nguồn-đích và trạng thái đã ghi trong handoff; test chỉ xác nhận cấu trúc/liên kết, không thể chứng minh tương đương nghiệp vụ từng đoạn.
+
+- source_plan: `plan-multica-word-integration.md`
+  summary: Verify the real Electron native-picker workflow and visually inspect representative Word output pages.
+  evidence: Component tests and Word COM checks passed, but native picker operation and page-by-page visual acceptance remain unrun. End-user defects at that surface are medium unverified; an isolated desktop run and inspected output settle the question.
+
+- source_plan: `plan-multica-administrative-timeline.md`
+  summary: Confirm coordinated same-day partial transfers and abolition against Owner-provided historical acts before adding more temporal rules.
+  evidence: Same-day partial movement can be part of the act abolishing an identity; the ledger has no intra-day ordering or act grouping. A universally rejected same-day transfer would also reject legitimate coordinated changes. Medium unverified until historical sources establish the intended relationship.

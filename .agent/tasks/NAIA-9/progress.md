@@ -1,5 +1,12 @@
 # NAIA-9 — tiến độ
 
+Root kết thúc review 04/10/2026: 79 timeline + 5 docs checks passed, 1 docs skip
+vốn có; validate toàn kho hợp lệ, 28 links module/feature kiểm riêng. Sửa cuối
+tại a3b33dc: ID continuing/unknown không thành kế thừa toàn phần, reparent span,
+abolition semantics, query source hashes, duplicate patch IDs, curator/source
+ownership và HTTP refresh thật qua fixture local. Spec có hướng phát triển và
+khôi phục, không có SOT song song. Data gốc/35 snapshots/3355IDs vẫn nguyên.
+
 04/10/2026: hoàn thành kho timeline local theo plan administrative-timeline.
 
 - Ledger version 1.0: 3.355 units, 34 tỉnh, 3.321 xã, 0 huyện; 35 nguồn/snapshot

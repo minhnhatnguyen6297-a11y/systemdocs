@@ -1,5 +1,12 @@
 # NAIA-9 — bàn giao kho timeline
 
+Kiểm chứng cuối root 04/10/2026: 79 timeline và 5 docs checks passed, 1 docs skip;
+full validate hợp lệ. Commit cuối a3b33dc, nguồn/ID nguyên vẹn. Các con số 27/49/64
+dưới đây là bằng chứng của lượt trước; tổng hiện tại là 79 timeline tests.
+HTTP refresh fixture kiểm POST catalog/table và lỗi tải giữ ledger; CLI query
+kiểm hash nguồn, curator correction được lưu revision trước. Docs giải thích
+cách mở rộng cùng giới hạn thực tế, không hứa đã nối vào ứng dụng.
+
 **Hoàn thành 04/10/2026:** kho và CLI local; chưa tích hợp runtime giao diện.
 
 Nguồn chính: `notary_v2/data/administrative_units/ledger.json` và snapshots.
