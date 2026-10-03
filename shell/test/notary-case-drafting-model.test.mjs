@@ -148,7 +148,7 @@ function fakeClient(seed) {
       capabilities: {
         intake: sup ? ['image', 'pdf', 'docx', 'xlsx', 'text'] : [],
         diagram: sup,
-        word_export: c.case_type === 'inheritance',
+        word_export: sup,
       },
     };
   }
@@ -596,6 +596,34 @@ function fakeClient(seed) {
           },
         });
       }
+      case 'notary.workspace_update': {
+        // §6.2: cap nhat meta case da luu (khong cham stage/diagram),
+        // revision+1; workspace_conflict/locked nhu moi write.
+        const { c, err } = getCase(payload);
+        if (err) return err;
+        if (c.locked) return fail('workspace_locked', 'da khoa');
+        if (payload.base_revision !== c.revision) {
+          return fail('workspace_conflict', 'revision khac',
+                      { server_revision: c.revision });
+        }
+        const cm = payload.case;
+        if (!cm || typeof cm !== 'object' || Array.isArray(cm) ||
+            !Object.keys(cm).length) {
+          return fail('validation_error', 'case meta rong');
+        }
+        for (const k of Object.keys(cm)) {
+          if (!['ngay_lap_ho_so', 'noi_niem_yet', 'ghi_chu'].includes(k)) {
+            return fail('validation_error', `key la: ${k}`);
+          }
+          c[k] = cm[k];
+        }
+        c.revision += 1;
+        return ok({
+          schema_version: SCHEMA,
+          revision: c.revision,
+          case: workspaceData(c).case,
+        });
+      }
       case 'notary.intake_analyze': {
         if (payload.case_id !== undefined) {
           if (payload.case_id === null) {
@@ -627,8 +655,23 @@ function fakeClient(seed) {
       case 'notary.word_export_options': {
         const { c, err } = getCase(payload);
         if (err) return err;
-        if (isTp(c)) {
-          return fail('case_type_unsupported', 'two_party khong word');
+        if (!supported(c)) {
+          return fail('case_type_unsupported', 'case type khong ho tro');
+        }
+        // NAIA-8 folder mode: template_dir co mat → nguon mau la cac
+        // .docx trong thu muc (fake tra tap co dinh, key = basename).
+        if (payload.template_dir) {
+          return ok({
+            schema_version: SCHEMA,
+            documents: [
+              { document_key: 'Mau thue nha.docx',
+                display_name: 'Mau thue nha',
+                ready: true, block_reason: null },
+              { document_key: 'To cam ket.docx',
+                display_name: 'To cam ket',
+                ready: true, block_reason: null },
+            ],
+          });
         }
         return ok({
           schema_version: SCHEMA,
@@ -644,13 +687,14 @@ function fakeClient(seed) {
       case 'notary.word_export_batch': {
         const { c, err } = getCase(payload);
         if (err) return err;
-        if (isTp(c)) {
-          return fail('case_type_unsupported', 'two_party khong word');
+        if (!supported(c)) {
+          return fail('case_type_unsupported', 'case type khong ho tro');
         }
         const docs = payload.document_keys.map((k) => ({
           document_key: k, display_name: k,
           status: k === 'niem_yet' ? 'failed' : 'saved',
-          actual_filename: k === 'niem_yet' ? null : `${k}_HS-42.docx`,
+          actual_filename: k === 'niem_yet' ? null
+            : `${k.replace(/\.docx$/i, '')}_HS-42.docx`,
           output_file: null,
           error: k === 'niem_yet'
             ? { code: 'word.template_missing', message: 'no template' }
@@ -719,7 +763,7 @@ test('openCase: tai workspace ready — stage/diagram/revision/mock banner', asy
   assert.equal(raw.includes('is_primary'), false);
 });
 
-test('openCase: two_party — domain/state 30 slot canonical, word_export off', async () => {
+test('openCase: two_party — domain/state 30 slot canonical, word_export on (NAIA-8)', async () => {
   const { model } = makeModel(seedCases('ready-two-party'));
   const r = await model.openCase(48);
   assert.equal(r.ok, true);
@@ -732,7 +776,7 @@ test('openCase: two_party — domain/state 30 slot canonical, word_export off', 
   assert.deepEqual(s.diagram.nodes.map((n) => n.id), TP_IDS);
   assert.equal(s.renderModel.status, 'unsupported');
   assert.equal(s.capabilities.diagram, true);
-  assert.equal(s.capabilities.word_export, false);
+  assert.equal(s.capabilities.word_export, true);
 });
 
 test('openCase: backend_mode real thi khong co banner mo phong', async () => {
@@ -1334,12 +1378,218 @@ test('wordExportOptions + exportWord: options/result theo tung van ban', async (
   assert.equal(res.breakdown.failed.length, 1);
 });
 
-test('word tren two_party: server tu choi case_type_unsupported', async () => {
+test('word tren two_party: duoc phep (NAIA-8) — options + batch', async () => {
   const { model } = makeModel(seedCases('ready-two-party'));
   await model.openCase(48);
   const o = await model.loadWordOptions();
-  assert.equal(o.ok, false);
-  assert.equal(o.error.code, 'case_type_unsupported');
+  assert.equal(o.ok, true);
+  assert.equal(model.state.wordOptions.length, 2);
+
+  const r = await model.exportWord(
+    ['khai_nhan_di_san'],
+    { path: 'D:/out', scope: 'machine_local', is_dir: true });
+  assert.equal(r.ok, true);
+  assert.deepEqual(
+    model.state.wordResult.breakdown.succeeded, ['khai_nhan_di_san']);
+});
+
+test('word folder mode (NAIA-8): template_dir + create_case_subdir len wire', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const dirToken = { file_token: 'tok-tpl-dir' };
+
+  const o = await model.loadWordOptions(dirToken);
+  assert.equal(o.ok, true);
+  // Folder mode: documents la file .docx quet duoc (key = basename).
+  assert.deepEqual(
+    model.state.wordOptions.map((d) => d.document_key),
+    ['Mau thue nha.docx', 'To cam ket.docx']);
+  const optCall = client.calls.find(
+    (c) => c.command === 'notary.word_export_options');
+  assert.deepEqual(optCall.payload.template_dir, dirToken);
+
+  const r = await model.exportWord(
+    ['Mau thue nha.docx'],
+    { path: 'D:/out', scope: 'machine_local', is_dir: true },
+    { templateDir: dirToken, createCaseSubdir: true });
+  assert.equal(r.ok, true);
+  const call = client.calls.find(
+    (c) => c.command === 'notary.word_export_batch');
+  assert.deepEqual(call.payload.template_dir, dirToken);
+  assert.equal(call.payload.create_case_subdir, true);
+  assert.equal(call.payload.destination.is_dir, true);
+  assert.deepEqual(
+    model.state.wordResult.breakdown.succeeded, ['Mau thue nha.docx']);
+});
+
+// NAIA-8 review: doi folder giua chung — chi response MOI NHAT duoc ap
+// vao state; thanh cong/loi cua scan cu deu phai bi bo.
+function scanClient(seed, handlers) {
+  const base = fakeClient(seed);
+  return {
+    calls: base.calls, cases: base.cases,
+    run: async (cmd, payload) => {
+      if (cmd === 'notary.word_export_options' && payload.template_dir) {
+        const h = handlers[payload.template_dir.file_token];
+        return h ? h() : { ok: false, error: {
+          code: 'file_not_found', message: 'khong thay thu muc',
+          retryable: false, next_action: null, details: null } };
+      }
+      return base.run(cmd, payload);
+    },
+  };
+}
+const docsOf = (keys) => ({ ok: true, data: {
+  schema_version: SCHEMA,
+  documents: keys.map((k) => ({
+    document_key: k, display_name: k.replace(/\.docx$/i, ''),
+    ready: true, block_reason: null })) } });
+const deferred = () => {
+  let resolve;
+  const promise = new Promise((res) => { resolve = res; });
+  return { promise, resolve };
+};
+
+test('loadWordOptions: doi folder — xoa options ngay + chi response moi nhat thang (response dao)', async () => {
+  // Hai folder TRUNG basename "mau" nhung token khac nhau — dinh danh
+  // scan la file_token, khong phai ten hien thi (NAIA-8 review).
+  const dA = deferred();
+  const dB = deferred();
+  const client = scanClient(seedCases('ready'), {
+    'tok-A-mau': () => dA.promise,
+    'tok-B-mau': () => dB.promise,
+  });
+  const model = M.createModel({ client, uuid });
+  await model.openCase(42);
+  const pA = model.loadWordOptions({ file_token: 'tok-A-mau' });
+  // Cho A quet xong de co options roi doi folder.
+  dA.resolve(docsOf(['a1.docx', 'a2.docx']));
+  assert.equal((await pA).ok, true);
+  assert.deepEqual(
+    model.state.wordOptions.map((d) => d.document_key),
+    ['a1.docx', 'a2.docx']);
+
+  const dA2 = deferred();
+  // Scan lai folder A (re-scan) roi ngay lap tuc doi sang B.
+  const pA2 = model.loadWordOptions({ file_token: 'tok-A-mau' });
+  // Lai nay van cho — nhung phai xoa options cu NGAY.
+  assert.equal(model.state.wordOptions, null);
+  const pB = model.loadWordOptions({ file_token: 'tok-B-mau' });
+  // B ve truoc → state la danh sach cua B.
+  dB.resolve(docsOf(['b.docx']));
+  assert.equal((await pB).ok, true);
+  assert.deepEqual(
+    model.state.wordOptions.map((d) => d.document_key), ['b.docx']);
+  // A tre ve sau — KHONG duoc de len options cua B.
+  dA2.resolve(docsOf(['a-late.docx']));
+  const rA2 = await pA2;
+  assert.equal(rA2.stale, true);
+  assert.deepEqual(
+    model.state.wordOptions.map((d) => d.document_key), ['b.docx']);
+});
+
+test('loadWordOptions: loi cua scan cu ve muon → khong set state.error', async () => {
+  const dA = deferred();
+  const client = scanClient(seedCases('ready'), {
+    'tok-A': () => dA.promise,
+    'tok-B': async () => docsOf(['b.docx']),
+  });
+  const model = M.createModel({ client, uuid });
+  await model.openCase(42);
+  const pA = model.loadWordOptions({ file_token: 'tok-A' });
+  const pB = model.loadWordOptions({ file_token: 'tok-B' });
+  assert.equal((await pB).ok, true);
+  // A fail tre — bi bo, state.error khong bi set boi scan cu.
+  dA.resolve({ ok: false, error: {
+    code: 'file_not_found', message: 'A khong doc duoc',
+    retryable: false, next_action: null, details: null } });
+  const rA = await pA;
+  assert.equal(rA.stale, true);
+  assert.equal(model.state.error, null);
+  assert.deepEqual(
+    model.state.wordOptions.map((d) => d.document_key), ['b.docx']);
+});
+
+test('loadWordOptions: scan moi nhat fail → state.error co code loi quet', async () => {
+  const client = scanClient(seedCases('ready'), {
+    'tok-x': async () => docsOf(['x.docx']),
+    'tok-missing': async () => ({ ok: false, error: {
+      code: 'file_not_found', message: 'khong thay thu muc',
+      retryable: false, next_action: null, details: null } }),
+  });
+  const model = M.createModel({ client, uuid });
+  await model.openCase(42);
+  await model.loadWordOptions({ file_token: 'tok-x' });
+  const r = await model.loadWordOptions({ file_token: 'tok-missing' });
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, 'file_not_found');
+  assert.equal(model.state.error.code, 'file_not_found');
+  assert.equal(model.state.wordOptions, null);
+});
+
+test('saveCaseMeta: case da luu → wire workspace_update, revision+1, caseInfo cap nhat', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const rev = model.state.revision;
+  const r = await model.saveCaseMeta({ noi_niem_yet: 'xã Yên Sở' });
+  assert.equal(r.ok, true, JSON.stringify(r.error));
+  const call = client.calls.find(
+    (c) => c.command === 'notary.workspace_update');
+  assert.ok(call);
+  assert.equal(call.payload.case_id, 42);
+  assert.equal(call.payload.base_revision, rev);
+  assert.deepEqual(call.payload.case, { noi_niem_yet: 'xã Yên Sở' });
+  assert.equal(model.state.revision, rev + 1);
+  assert.equal(model.state.caseInfo.noi_niem_yet, 'xã Yên Sở');
+  assert.equal(model.state.notice, 'Đã lưu thông tin hồ sơ');
+  // Reload qua workspace_get thay gia tri da luu (mot nguon du lieu).
+  await model.openCase(42);
+  assert.equal(model.state.caseInfo.noi_niem_yet, 'xã Yên Sở');
+});
+
+test('saveCaseMeta preserves other metadata drafts and refreshes cancel baseline', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  model.updateCaseMeta('noi_dung_viec', 'Nội dung đang sửa');
+  const result = await model.saveCaseMeta({ noi_niem_yet: 'xã Đã Lưu' });
+  assert.equal(result.ok, true);
+  assert.equal(model.state.caseInfo.noi_dung_viec, 'Nội dung đang sửa');
+  assert.equal(model.state.metaDirty, true);
+  assert.equal(model.state.committedCaseInfo.noi_niem_yet, 'xã Đã Lưu');
+});
+
+test('saveCaseMeta: conflict → ok:false, error ro rang, khong ghi de state', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  client.cases[42].revision += 5;   // ben thu ba da ghi truoc
+  const r = await model.saveCaseMeta({ noi_niem_yet: 'xã X' });
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, 'workspace_conflict');
+  assert.equal(model.state.conflict != null, true);
+  assert.equal(model.state.caseInfo.noi_niem_yet ?? null, null);
+});
+
+test('saveCaseMeta: case locked → khong goi wire, tra workspace_locked', async () => {
+  const { model, client } = makeModel(seedCases('locked'));
+  await model.openCase(44);
+  const r = await model.saveCaseMeta({ noi_niem_yet: 'xã Y' });
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, 'workspace_locked');
+  assert.equal(client.calls.filter(
+    (c) => c.command === 'notary.workspace_update').length, 0);
+});
+
+test('saveCaseMeta: draft → cap nhat nhap local, khong goi wire; key la → validation_error', async () => {
+  const { model, client } = makeModel(seedCases('empty'));
+  model.newDraft();
+  const r = await model.saveCaseMeta({ noi_niem_yet: 'phường A' });
+  assert.equal(r.ok, true);
+  assert.equal(model.state.caseInfo.noi_niem_yet, 'phường A');
+  assert.equal(client.calls.filter(
+    (c) => c.command === 'notary.workspace_update').length, 0);
+  const bad = await model.saveCaseMeta({ case_type: 'gift' });
+  assert.equal(bad.ok, false);
+  assert.equal(bad.error.code, 'validation_error');
 });
 
 // ---------- locked: draft mutations bi chan (defense-in-depth) ----------

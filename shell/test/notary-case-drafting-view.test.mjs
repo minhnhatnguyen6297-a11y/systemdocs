@@ -964,3 +964,456 @@ test('đợt3: case locked → 3 ô meta disabled, khong goi customer_list', asy
   assert.equal(calls.filter(([c]) => c === 'notary.customer_list')
     .length, 0, 'locked ma van goi customer_list');
 });
+
+
+// ---------- NAIA-8: Word export dialog — folder templates ----------
+
+// openModal stub theo shape view: build(box, close), box append vao body.
+function modalCapture(document) {
+  let lastBox = null;
+  const openModal = (build) => {
+    const box = document.createElement('div');
+    box.className = 'modal';
+    document.body.append(box);
+    lastBox = box;
+    build(box, () => box.remove());
+  };
+  return { openModal, get box() { return lastBox; } };
+}
+
+function wordDialogCtx(t, { model, pickFiles, notify }) {
+  const { document } = makeDom();
+  global.document = document;
+  global.window = {};
+  t.after(() => { delete global.document; delete global.window; });
+  const h = (tag, cls, text) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined && text !== null) e.textContent = text;
+    return e;
+  };
+  const btn = (label, cls, onClick) => {
+    const b = h('button', (cls || '').trim(), label);
+    b.type = 'button';
+    if (onClick) b.onclick = onClick;
+    return b;
+  };
+  const face = (f) => {
+    const e = h('div', `face face-${f.kind}`, f.title);
+    if (f.detail) e.append(h('span', 'muted', f.detail));
+    return e;
+  };
+  const cap = modalCapture(document);
+  const notes = [];
+  const ctx = {
+    model, lib: L,
+    notify: notify || ((msg, isErr) => notes.push({ msg, isErr })),
+    h, btn, face,
+    openModal: cap.openModal, pickFiles,
+    openPath: async () => ({ ok: true }),
+    cancelJob: async () => ({ ok: true }),
+  };
+  return { ctx, document, cap, notes };
+}
+
+function wordModelStub(overrides = {}) {
+  const calls = [];
+  const state = {
+    wordOptions: null, wordResult: null, wordBusy: false,
+    caseInfo: { id: 42, noi_niem_yet: 'xã Yên Sở', locked: false },
+  };
+  return {
+    calls, state,
+    canWrite: () => true,
+    saveCaseMeta: async (patch) => {
+      calls.push(['update', patch]);
+      state.caseInfo.noi_niem_yet = patch.noi_niem_yet;
+      return { ok: true };
+    },
+    loadWordOptions: async (templateDir) => {
+      calls.push(['options', templateDir]);
+      state.wordOptions = [
+        { document_key: 'Mau thue nha.docx', display_name: 'Mau thue nha',
+          ready: true, block_reason: null },
+        { document_key: 'To cam ket.docx', display_name: 'To cam ket',
+          ready: true, block_reason: null },
+        { document_key: 'Huy.docx', display_name: 'Huy',
+          ready: false, block_reason: 'word.template_missing' },
+      ];
+      return { ok: true };
+    },
+    exportWord: async (keys, dest, opts) => {
+      calls.push(['batch', { keys, dest, opts }]);
+      state.wordResult = {
+        schema_version: 'v1', destination: { path: 'D:/out' },
+        documents: keys.map((k) => ({
+          document_key: k, display_name: k, status: 'saved',
+          actual_filename: `${k}_HS-42.docx`,
+          output_file: { path: `D:/out/${k}_HS-42.docx` },
+          error: null })),
+        breakdown: { succeeded: keys, failed: [], skipped: [] },
+      };
+      return { ok: true };
+    },
+    ...overrides,
+  };
+}
+
+test('NAIA-8 word dialog: chon folder → list → select all/none → export', async (t) => {
+  const model = wordModelStub();
+  const picks = [];
+  // Hai token KHAC NHAU cho thu muc mau/dich — test bat duoc loi noi
+  // nham day (wiring) gui template token lam destination (review B4).
+  const pickFiles = async (opts) => {
+    picks.push(opts);
+    const tok = picks.length === 1 ? 'tok-tpl' : 'tok-dest';
+    const nm = picks.length === 1 ? 'templates' : 'output';
+    return { ok: true, data: { files: [
+      { file_token: tok, name: nm, is_dir: true }] } };
+  };
+  const { ctx, cap } = wordDialogCtx(t, { model, pickFiles });
+  const dlg = WORD.createWordDialog(ctx);
+  dlg.open();
+  const box = cap.box;
+  assert.ok(box, 'dialog khong mo');
+
+  // Chon thu muc mau → pickFiles({directory:true}) → options co 3 file.
+  const pickTpl = findBtns(box, 'Chọn thư mục mẫu')[0];
+  assert.ok(pickTpl, 'thieu nut chon thu muc mau');
+  await pickTpl.onclick();
+  assert.equal(picks.length, 1);
+  assert.equal(picks[0].directory, true);
+  assert.deepEqual(model.calls[0], ['options', { file_token: 'tok-tpl' }]);
+
+  const isDocCb = (e) => e.tagName === 'INPUT' && e.type === 'checkbox' &&
+    !(e.getAttribute('aria-label') || '').includes('thư mục con');
+  const checkboxes = collect(box, isDocCb);
+  // 2 file ready + 1 blocked (disabled, khong check).
+  assert.equal(checkboxes.length, 3);
+  assert.equal(checkboxes[0].checked, true);
+  assert.equal(checkboxes[1].checked, true);
+  assert.equal(checkboxes[2].disabled, true);
+  assert.equal(checkboxes[2].checked, false);
+  assert.match(box.textContent, /Văn bản không còn mẫu/);
+
+  // Bo chon → tat ca off; Chon tat ca → chi file ready on.
+  await findBtns(box, 'Bỏ chọn')[0].onclick();
+  assert.ok(checkboxes.every((c) => !c.checked));
+  await findBtns(box, 'Chọn tất cả')[0].onclick();
+  assert.equal(checkboxes[0].checked, true);
+  assert.equal(checkboxes[2].checked, false,
+    'file blocked khong duoc tick boi Chon tat ca');
+
+  // Chon dich + subdir → Xuat: keys dung, payload co templateDir+subdir.
+  await findBtns(box, 'Chọn thư mục đích')[0].onclick();
+  const subdir = collect(box, (e) => e.tagName === 'INPUT' &&
+    e.type === 'checkbox' && e.getAttribute('aria-label') &&
+    e.getAttribute('aria-label').includes('thư mục con'))[0];
+  assert.ok(subdir, 'thieu checkbox tao thu muc con');
+  subdir.checked = true;
+  await findBtns(box, 'Xuất')[0].onclick();
+  const [, batch] = model.calls.find(([k]) => k === 'batch');
+  assert.deepEqual(batch.keys, ['Mau thue nha.docx', 'To cam ket.docx']);
+  assert.deepEqual(batch.dest, { file_token: 'tok-dest' });
+  assert.deepEqual(batch.opts.templateDir, { file_token: 'tok-tpl' });
+  assert.equal(batch.opts.createCaseSubdir, true);
+  // Ket qua per-doc hien thi: 2 saved + mo file.
+  assert.match(box.textContent, /Thành công 2/);
+  assert.ok(findBtns(box, 'Mở file').length >= 2);
+});
+
+test('NAIA-8 word dialog: doi folder mau → selection cu bi xoa', async (t) => {
+  const model = wordModelStub();
+  const pickFiles = async () => ({ ok: true, data: { files: [
+    { file_token: 'tok-2', name: 'other', is_dir: true }] } });
+  const { ctx, cap } = wordDialogCtx(t, { model, pickFiles });
+  WORD.createWordDialog(ctx).open();
+  const box = cap.box;
+  await findBtns(box, 'Chọn thư mục mẫu')[0].onclick();
+  await findBtns(box, 'Bỏ chọn')[0].onclick();
+  // Doi folder → loadWordOptions lan 2 → checkbox rebuilt, ready-mac-dinh on.
+  await findBtns(box, 'Chọn thư mục mẫu')[0].onclick();
+  const cbs = collect(box, (e) => e.tagName === 'INPUT' &&
+    e.type === 'checkbox' &&
+    !(e.getAttribute('aria-label') || '').includes('thư mục con'));
+  assert.equal(cbs[0].checked, true);
+  assert.equal(model.calls.filter(([k]) => k === 'options').length, 2);
+});
+
+test('NAIA-8 word dialog: huy picker giu im; xuat thieu chon bao loi', async (t) => {
+  const model = wordModelStub();
+  let n = 0;
+  const pickFiles = async () => {
+    n += 1;
+    if (n === 1) return { ok: true, data: { files: [] } };  // cancel
+    return { ok: true, data: { files: [
+      { file_token: 'tok-3', name: 'd', is_dir: true }] } };
+  };
+  const { ctx, cap } = wordDialogCtx(t, { model, pickFiles });
+  WORD.createWordDialog(ctx).open();
+  const box = cap.box;
+  // Cancel picker mau → khong goi options, list giu placeholder.
+  await findBtns(box, 'Chọn thư mục mẫu')[0].onclick();
+  assert.equal(model.calls.length, 0);
+  assert.match(box.textContent, /Chọn thư mục chứa file mẫu/);
+  // Xuat khi chua chon gi → khong goi batch.
+  await findBtns(box, 'Xuất')[0].onclick();
+  assert.equal(model.calls.filter(([k]) => k === 'batch').length, 0);
+});
+
+// Flush mot macrotask — onclick async (await pickFiles → loadWordOptions)
+// can vai tick truoc khi DOM/state hieu ung hien ra.
+const tick = () => new Promise((r) => setImmediate(r));
+
+test('NAIA-8 word dialog: dang quet → list rong ngay + Xuat/Chon khoa', async (t) => {
+  // Scan treo: selection phai mat NGAY + nut bi khoa, khong cho xuat
+  // voi danh sach cua folder cu (review B1/B3).
+  let resolveScan;
+  const model = wordModelStub({ loadWordOptions: (td) => {
+    model.calls.push(['options', td]);
+    return new Promise((res) => { resolveScan = res; });
+  } });
+  const pickFiles = async () => ({ ok: true, data: { files: [
+    { file_token: 'tok-a', name: 'mau', is_dir: true }] } });
+  const { ctx, cap } = wordDialogCtx(t, { model, pickFiles });
+  WORD.createWordDialog(ctx).open();
+  const box = cap.box;
+  const scan1 = findBtns(box, 'Chọn thư mục mẫu')[0].onclick();
+  await tick();
+  await tick();
+  // Dang quet: khong con checkbox nao, Xuat/Chon tat ca/Bo chon disabled.
+  const goBtn = findBtns(box, 'Xuất')[0];
+  const allBtn = findBtns(box, 'Chọn tất cả')[0];
+  const noneBtn = findBtns(box, 'Bỏ chọn')[0];
+  assert.equal(goBtn.disabled, true);
+  assert.equal(allBtn.disabled, true);
+  assert.equal(noneBtn.disabled, true);
+  const cbs = collect(box, (e) => e.tagName === 'INPUT' &&
+    e.type === 'checkbox' &&
+    !(e.getAttribute('aria-label') || '').includes('thư mục con'));
+  assert.equal(cbs.length, 0, 'selection cu phai bi xoa ngay khi quet');
+  assert.match(box.textContent, /Đang quét thư mục mẫu/);
+  // Scan xong → mo khoa + list moi hien.
+  model.state.wordOptions = [
+    { document_key: 'new.docx', display_name: 'new',
+      ready: true, block_reason: null }];
+  resolveScan({ ok: true });
+  await scan1;
+  assert.equal(goBtn.disabled, false);
+  assert.equal(allBtn.disabled, false);
+  assert.equal(noneBtn.disabled, false);
+});
+
+test('NAIA-8 word dialog: folder trung basename — token phan biet, response cu khong de list moi', async (t) => {
+  // Hai folder cung ten "mau", token khac nhau. Scan A treo; doi sang B
+  // (cung basename) → B ve truoc hien list B; A ve sau (stale) KHONG duoc
+  // de lai list — neu khong co scan guard thi UI chi thay "mau" nhu nhau.
+  const dA = {};
+  const dB = {};
+  dA.p = new Promise((res) => { dA.res = res; });
+  dB.p = new Promise((res) => { dB.res = res; });
+  const scans = [];
+  const model = wordModelStub({ loadWordOptions: (td) => {
+    model.calls.push(['options', td]);
+    return td.file_token === 'tok-A' ? dA.p : dB.p;
+  } });
+  let n = 0;
+  const pickFiles = async () => {
+    n += 1;
+    return { ok: true, data: { files: [
+      { file_token: n === 1 ? 'tok-A' : 'tok-B',
+        name: 'mau', is_dir: true }] } };   // TRUNG basename
+  };
+  const { ctx, cap } = wordDialogCtx(t, { model, pickFiles });
+  WORD.createWordDialog(ctx).open();
+  const box = cap.box;
+  const sA = findBtns(box, 'Chọn thư mục mẫu')[0].onclick();
+  await tick();
+  const sB = findBtns(box, 'Chọn thư mục mẫu')[0].onclick();
+  await tick();
+  scans.push(...model.calls.filter(([k]) => k === 'options'));
+  assert.equal(scans.length, 2);
+  assert.equal(scans[0][1].file_token, 'tok-A');
+  assert.equal(scans[1][1].file_token, 'tok-B');
+  // B ve truoc → list B.
+  model.state.wordOptions = [
+    { document_key: 'B.docx', display_name: 'B',
+      ready: true, block_reason: null }];
+  dB.res({ ok: true });
+  await sB;
+  // A tre ve sau (stale — model da danh dau) → list giu nguyen B.
+  dA.res({ ok: true, stale: true });
+  await sA;
+  const cbs = collect(box, (e) => e.tagName === 'INPUT' &&
+    e.type === 'checkbox' &&
+    !(e.getAttribute('aria-label') || '').includes('thư mục con'));
+  assert.equal(cbs.length, 1);
+  assert.equal(cbs[0].getAttribute('aria-label'), 'B');
+  assert.match(box.textContent, /Thư mục mẫu: mau/);
+});
+
+test('NAIA-8 word dialog: Noi niem yet — nap gia tri da luu, luu ok/loi ro', async (t) => {
+  const model = wordModelStub();
+  const pickFiles = async () => ({ ok: true, data: { files: [] } });
+  const { ctx, cap, notes } = wordDialogCtx(t, { model, pickFiles });
+  WORD.createWordDialog(ctx).open();
+  const box = cap.box;
+  const input = collect(box, (e) => e.tagName === 'INPUT' &&
+    e.type === 'text' &&
+    e.getAttribute('aria-label') === 'Nơi niêm yết')[0];
+  assert.ok(input, 'thieu input Noi niem yet');
+  // Gia tri hien tai cua ho so nap san (workspace_get).
+  assert.equal(input.value, 'xã Yên Sở');
+  input.value = 'phường Mới  ';
+  await findBtns(box, 'Lưu nơi niêm yết')[0].onclick();
+  const upd = model.calls.find(([k]) => k === 'update');
+  assert.deepEqual(upd[1], { noi_niem_yet: 'phường Mới' });
+  assert.match(box.textContent, /Đã lưu\./);
+
+  // Loi luu → thong bao ro rang tai cho + notify loi.
+  model.saveCaseMeta = async () => ({ ok: false, error: {
+    code: 'workspace_conflict', message: 'revision khac server',
+    retryable: false } });
+  input.value = 'xã Khác';
+  await findBtns(box, 'Lưu nơi niêm yết')[0].onclick();
+  assert.match(box.textContent, /Lưu thất bại: revision khac server/);
+  assert.ok(notes.some((m) => m.isErr &&
+    /workspace_conflict/.test(m.msg)));
+
+  // Case locked → input + nut luu bi khoa.
+  model.state.caseInfo.locked = true;
+  model.canWrite = () => false;
+  WORD.createWordDialog(ctx).open();
+  const box2 = cap.box;
+  const input2 = collect(box2, (e) => e.tagName === 'INPUT' &&
+    e.getAttribute('aria-label') === 'Nơi niêm yết')[0];
+  assert.equal(input2.disabled, true);
+  assert.equal(findBtns(box2, 'Lưu nơi niêm yết')[0].disabled, true);
+});
+
+test('NAIA-8 word dialog: dang luu Noi niem yet → Xuat/input/Luu khoa (pending-save)', async (t) => {
+  // Review NAIA-8 (cao): bam Luu roi Xuat khi save con pending → batch
+  // chay voi gia tri cu. Phai khoa Xuat + input + Luu lap den khi save
+  // xong; mo lai theo quyen hien tai ca success lan error.
+  let finishSave;
+  const model = wordModelStub({
+    saveCaseMeta: (patch) => {
+      model.calls.push(['update', patch]);
+      return new Promise((res) => {
+        finishSave = () => {
+          model.state.caseInfo.noi_niem_yet = patch.noi_niem_yet;
+          res({ ok: true });
+        };
+      });
+    },
+  });
+  const pickFiles = async () => ({ ok: true, data: { files: [
+    { file_token: 'tok-m', name: 'mau', is_dir: true }] } });
+  const { ctx, cap } = wordDialogCtx(t, { model, pickFiles });
+  WORD.createWordDialog(ctx).open();
+  const box = cap.box;
+  await findBtns(box, 'Chọn thư mục mẫu')[0].onclick();
+  await findBtns(box, 'Chọn thư mục đích')[0].onclick();
+  const goBtn = findBtns(box, 'Xuất')[0];
+  const input = collect(box, (e) => e.tagName === 'INPUT' &&
+    e.getAttribute('aria-label') === 'Nơi niêm yết')[0];
+  const saveBtn = findBtns(box, 'Lưu nơi niêm yết')[0];
+  assert.equal(goBtn.disabled, false);
+  input.value = 'phường Mới';
+  const save = saveBtn.onclick();
+  await tick();
+  // Pending-save: Xuat + input + Luu lap deu khoa; goi onclick truc tiep
+  // (stub bo qua disabled) cung khong dispatch batch nho guard trong go.
+  assert.equal(goBtn.disabled, true, 'Xuat phai khoa khi meta dang luu');
+  assert.equal(input.disabled, true, 'input phai khoa khi meta dang luu');
+  assert.equal(saveBtn.disabled, true, 'Luu lap phai khoa khi dang luu');
+  await goBtn.onclick();
+  assert.equal(model.calls.filter(([k]) => k === 'batch').length, 0,
+    'khong duoc dispatch batch khi meta save con pending');
+  // Save xong → mo lai dung quyen; Xuat gio moi duoc phep.
+  finishSave();
+  await save;
+  assert.equal(goBtn.disabled, false);
+  assert.equal(input.disabled, false);
+  assert.equal(saveBtn.disabled, false);
+  assert.match(box.textContent, /Đã lưu\./);
+  await goBtn.onclick();
+  assert.ok(model.calls.some(([k]) => k === 'batch'),
+    'batch phai chay sau khi save hoan tat');
+});
+
+test('NAIA-8 word dialog: pending-save loi → mo lai theo quyen hien tai', async (t) => {
+  // Loi thuong (validation) → mo lai input/Luu/Xuat vi canWrite giu
+  // nguyen; loi lam case locked (canWrite → false) → giu khoa.
+  for (const locked of [false, true]) {
+    let finishSave;
+    const model = wordModelStub({
+      saveCaseMeta: () => new Promise((res) => {
+        finishSave = () => {
+          if (locked) model.canWrite = () => false;
+          res({ ok: false, error: {
+            code: locked ? 'workspace_locked' : 'validation_error',
+            message: 'loi luu', retryable: false } });
+        };
+      }),
+    });
+    const pickFiles = async () => ({ ok: true, data: { files: [
+      { file_token: 'tok-m', name: 'mau', is_dir: true }] } });
+    const { ctx, cap } = wordDialogCtx(t, { model, pickFiles });
+    WORD.createWordDialog(ctx).open();
+    const box = cap.box;
+    await findBtns(box, 'Chọn thư mục mẫu')[0].onclick();
+    const goBtn = findBtns(box, 'Xuất')[0];
+    const input = collect(box, (e) => e.tagName === 'INPUT' &&
+      e.getAttribute('aria-label') === 'Nơi niêm yết')[0];
+    const saveBtn = findBtns(box, 'Lưu nơi niêm yết')[0];
+    const save = saveBtn.onclick();
+    await tick();
+    finishSave();
+    await save;
+    assert.equal(input.disabled, locked,
+      `locked=${locked}: input.disabled`);
+    assert.equal(saveBtn.disabled, locked,
+      `locked=${locked}: save.disabled`);
+    assert.equal(goBtn.disabled, locked,
+      `locked=${locked}: Xuat.disabled`);
+    assert.match(box.textContent, /Lưu thất bại/);
+  }
+});
+
+test('NAIA-8 word dialog: Huy xuat an/hien theo batch + scope cd-word-modal', async (t) => {
+  // Review NAIA-8 (nhe): `button{display:inline-flex}` thang [hidden] →
+  // Huy xuat van hien sau khi xong. Dialog phai mang .cd-word-modal de
+  // rule `.cd-word-modal [hidden]` ap dung — test state transition tren
+  // DOM + class scope; visibility computed that kiem qua E2E Electron.
+  let finishExport;
+  const model = wordModelStub({ exportWord: (keys, dest, opts) => {
+    model.calls.push(['batch', { keys, dest, opts }]);
+    return new Promise((res) => {
+      finishExport = () => {
+        model.state.wordResult = {
+          destination: { path: 'D:/out' }, documents: [],
+          breakdown: { succeeded: [], failed: [], skipped: [] } };
+        res({ ok: true });
+      };
+    });
+  } });
+  const pickFiles = async () => ({ ok: true, data: { files: [
+    { file_token: 'tok-w', name: 'mau', is_dir: true }] } });
+  const { ctx, cap } = wordDialogCtx(t, { model, pickFiles });
+  WORD.createWordDialog(ctx).open();
+  const box = cap.box;
+  assert.ok(box.classList.contains('cd-word-modal'),
+    'dialog phai mang scope cd-word-modal cho rule an [hidden]');
+  const cancel = findBtns(box, 'Hủy xuất')[0];
+  assert.equal(cancel.hidden, true, 'cancel an truoc khi xuat');
+  await findBtns(box, 'Chọn thư mục mẫu')[0].onclick();
+  await findBtns(box, 'Chọn thư mục đích')[0].onclick();
+  const exp = findBtns(box, 'Xuất')[0].onclick();
+  await tick();
+  assert.equal(cancel.hidden, false, 'cancel hien khi dang xuat');
+  finishExport();
+  await exp;
+  assert.equal(cancel.hidden, true, 'cancel an lai sau khi batch xong');
+
+});

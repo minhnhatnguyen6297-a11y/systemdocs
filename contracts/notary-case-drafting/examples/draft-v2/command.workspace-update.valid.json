@@ -1,0 +1,20 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "case_type": "inheritance",
+    "server_revision": 7,
+    "note": "§6.2 — workspace_update trên schema v2: patch meta không đụng stage/diagram; meta độc lập case_type (two_party cũng cập nhật được)"
+  },
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-1062-4006-8006-000000000062",
+  "command": "notary.workspace_update",
+  "payload": {
+    "case_id": 42,
+    "base_revision": 7,
+    "case": {
+      "noi_niem_yet": "UBND phường Trần Hưng Đạo",
+      "ghi_chu": null
+    }
+  },
+  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+}

@@ -6,10 +6,13 @@ import pytest
 from docx import Document
 
 from services.word_engine import (
+    NO_SOURCE_PLACEHOLDERS,
     WordExportValidationError,
+    _collect_placeholders,
     build_word_context,
     build_template_mapping,
     find_unresolved_placeholders,
+    is_fixed_form_code,
     list_public_builtin_templates,
     replace_in_doc,
 )
@@ -25,6 +28,7 @@ def _person(
     doc_no="",
     issued=None,
     address="",
+    role="",
 ):
     return SimpleNamespace(
         id=cid,
@@ -35,6 +39,7 @@ def _person(
         so_giay_to=doc_no,
         ngay_cap=issued,
         dia_chi=address,
+        vai_tro=role,
         loai_giay_to="Căn cước công dân",
         noi_cap="Cục cảnh sát quản lý hành chính về trật tự xã hội",
         loai_dia_chi="Thường trú tại",
@@ -165,7 +170,9 @@ def test_build_template_mapping_exposes_standard_vietnamese_placeholders_and_leg
     assert mapping["[Số serial]"] == "BM 1451111"
     assert mapping["[Ngày lập hồ sơ]"] == "03/07/2026"
     assert mapping["[Tên 1]"] == "Nguyễn Văn Chủ"
-    assert mapping["[Năm chết]"] == "03/02/2024"
+    # Owner NAIA-12: [Năm chết] giữ định dạng NĂM (= ngaychet1), không in ngày đầy đủ.
+    assert mapping["[Năm chết]"] == "2024"
+    assert mapping["[Năm chết 1]"] == "2024"
     assert "[ho_ten_1_chu_dat]" not in mapping
 
 
@@ -210,6 +217,408 @@ def test_replace_in_doc_replaces_split_runs_tables_headers_and_footers():
     assert doc.sections[0].footer.paragraphs[0].text == "Nguyễn Văn Chủ"
 
 
+from docx.oxml.ns import qn
+
+TEXT_TAG = qn("w:t")
+
+
+def _simple_export_case(properties=None):
+    owner = _person(1, "Nguyễn Văn Chủ", gender="Nam", born=date(1950, 1, 1), dead=date(2024, 2, 3), doc_no="001050000001")
+    receiver = _person(2, "Nguyễn Văn Con", gender="Nam", born=date(1980, 8, 9), doc_no="001080000003")
+    if properties is None:
+        properties = [_prop()]
+    return _make_case(owner, participants=[_participant(receiver, "Con")], properties=properties)
+
+
+def test_correct_spelling_thoi_han_alias_shares_the_same_source():
+    case = _simple_export_case()
+    mapping = build_template_mapping(case)
+
+    assert mapping["[Thời hạn 1]"] == mapping["[Thờ hạn 1]"]
+
+    doc = Document()
+    doc.add_paragraph("Thời hạn sử dụng đất: [Thời hạn 1]")
+    replace_in_doc(doc, mapping)
+    assert find_unresolved_placeholders(doc) == []
+
+
+def test_no_source_placeholders_are_reported_not_silently_emptied():
+    mapping = build_template_mapping(_simple_export_case())
+
+    for token in NO_SOURCE_PLACEHOLDERS:
+        assert token not in mapping, f"{token} không được map về rỗng"
+
+    doc = Document()
+    doc.add_paragraph("[Số công chứng] [Giá chuyển nhượng] [SĐT]")
+    replace_in_doc(doc, mapping)
+    assert find_unresolved_placeholders(doc) == [
+        "[Giá chuyển nhượng]",
+        "[SĐT]",
+        "[Số công chứng]",
+    ]
+
+
+def _summary_export_case(properties=None, *, role=""):
+    """Ca đã có Diagram: 1 chủ đất đã chết + 1 người nhận — dùng cho test chuỗi/mở rộng."""
+    owner = _person(1, "Nguyễn Văn Chủ", gender="Nam", born=date(1950, 1, 1), dead=date(2024, 2, 3), doc_no="001050000001", role=role)
+    receiver = _person(2, "Nguyễn Văn Con", gender="Nam", born=date(1980, 8, 9), doc_no="001080000003")
+    case = _make_case(
+        owner,
+        participants=[_participant(receiver, "Con")],
+        properties=properties if properties is not None else [_prop()],
+        case_state=_case_state(
+            owner, receiver,
+            nodes=[
+                _node(1, role="Owner", is_land_owner=True),
+                _node(2, role="Con", will_receive=True),
+            ],
+        ),
+    )
+    return case
+
+
+def test_so_thanh_chu_reads_vietnamese_numbers_correctly():
+    """Bộ mẫu cần "Diện tích chữ" đúng tiếng Việt (mười hai, không phải "mườ hai")."""
+    from services.word_engine import _so_thanh_chu
+
+    assert _so_thanh_chu(12) == "mười hai"
+    assert _so_thanh_chu(15) == "mười lăm"
+    assert _so_thanh_chu(21) == "hai mươi mốt"
+    assert _so_thanh_chu(25) == "hai mươi lăm"
+    assert _so_thanh_chu(101) == "một trăm linh một"
+    assert _so_thanh_chu(1005) == "một nghìn không trăm linh năm"
+    assert _so_thanh_chu(1500) == "một nghìn năm trăm"
+
+
+def test_export_date_tokens_pad_digits_and_read_mung():
+    """Catalog §2: [Ngày] pad 2 số, [Ngày chữ] thêm "mùng" cho ngày < 10, [Năm] tồn tại."""
+    mapping = build_template_mapping(_simple_export_case(), today=date(2026, 7, 3))
+    assert mapping["[Ngày]"] == "03"
+    assert mapping["[Tháng]"] == "07"
+    assert mapping["[Năm]"] == "2026"
+    assert mapping["[Ngày chữ]"] == "mùng ba"
+    assert mapping["[Tháng chữ]"] == "bảy"
+
+    mapping = build_template_mapping(_simple_export_case(), today=date(2026, 12, 15))
+    assert mapping["[Ngày]"] == "15"
+    assert mapping["[Ngày chữ]"] == "mười lăm"
+    assert mapping["[Tháng chữ]"] == "mười hai"
+
+
+def test_nam_sinh_and_nam_chet_print_year_only():
+    """Token `[Năm sinh N]`/`[Năm chết N]` luôn in năm (YYYY), kể cả khi DB là ngày đủ."""
+    owner = _person(1, "Nguyễn Văn Chủ", gender="Nam", born=date(1950, 1, 1), dead=date(2024, 2, 3), doc_no="001050000001")
+    receiver = _person(2, "Nguyễn Văn Con", gender="Nam", born=date(1980, 8, 9), doc_no="001080000003")
+    case = _make_case(owner, participants=[_participant(receiver, "Con")], properties=[_prop()])
+    mapping = build_template_mapping(case)
+
+    assert mapping["[Năm sinh 1]"] == "1950"
+    # Người nhận rơi vào slot 3 theo layout hồ sơ thừa kế.
+    assert mapping["[Năm sinh 3]"] == "1980"
+    assert mapping["[Năm chết 1]"] == "2024"
+    assert mapping["[Năm chết người 1]"] == "2024"
+    # Ngày đầy đủ vẫn in đủ dd/mm/yyyy qua trường "Ngày ...".
+    assert mapping["[Ngày chết người 1]"] == "03/02/2024"
+
+
+def test_replace_in_doc_returns_replacement_count():
+    doc = Document()
+    doc.add_paragraph("[Tên 1] và [Tên 1] lần nữa")
+    doc.add_paragraph("[Chưa map]")
+    assert replace_in_doc(doc, {"[Tên 1]": "X"}) == 2
+
+
+def test_dien_tich_chu_exposes_asset_one_total_area_in_words_and_legacy_alias():
+    """[Diện tích chữ] / [Diện tích chữ tài sản 1] = tổng diện tích đọc thành chữ."""
+    case = _summary_export_case(
+        properties=[_prop(land_rows_json='[{"loai_dat":"ONT","dien_tich":"80"}]')]
+    )
+    mapping = build_template_mapping(case)
+    assert mapping["[Diện tích]"] == "80"
+    assert mapping["[Diện tích chữ]"] == "Tám mươi"
+    assert mapping["[Diện tích chữ tài sản 1]"] == "Tám mươi"
+
+
+def test_dien_tich_chu_is_empty_when_asset_has_no_area_instead_of_zero():
+    """Không có diện tích -> rỗng, không được ghi "Không" vào văn bản thật."""
+    case = _summary_export_case(
+        properties=[_prop(dien_tich=None, land_rows_json="[]", so_thua_dat="", so_to_ban_do="")]
+    )
+    assert build_template_mapping(case)["[Diện tích chữ]"] == ""
+
+
+def test_authorized_person_group_only_uses_confirmed_diagram_role():
+    """"Người được ủy quyền" chỉ lấy từ vai trò đã xác nhận, không suy từ vị trí dòng."""
+    owner = _person(1, "Nguyễn Văn Chủ", gender="Nam", born=date(1950, 1, 1), dead=date(2024, 2, 3), doc_no="001050000001")
+    proxy = _person(2, "Nguyễn Văn Ủy", gender="Nam", born=date(1980, 8, 9), doc_no="001080000003")
+    case = _make_case(
+        owner,
+        participants=[_participant(proxy, "Khác")],
+        properties=[_prop()],
+        case_state=_case_state(
+            owner, proxy,
+            nodes=[
+                _node(1, role="Owner", is_land_owner=True),
+                _node(2, role="Người được ủy quyền", will_receive=True),
+            ],
+        ),
+    )
+    mapping = build_template_mapping(case)
+    assert mapping["[Họ tên người được ủy quyền 1]"] == "Nguyễn Văn Ủy"
+    assert mapping["[Danh sách người được ủy quyền]"] == "Nguyễn Văn Ủy"
+
+
+def test_authorized_person_group_stays_empty_without_confirmed_role():
+    """Không có vai trò được ủy quyền -> rỗng, tuyệt đối không mượn người nhận tài sản."""
+    mapping = build_template_mapping(_summary_export_case())
+    assert mapping["[Họ tên người được ủy quyền 1]"] == ""
+    assert mapping["[Danh sách người được ủy quyền]"] == ""
+
+
+def test_authorized_person_group_orders_suffixed_roles():
+    """Role "Người được ủy quyền2" phải được nhận diện và thay bằng người đầu tiên."""
+    owner = _person(1, "Nguyễn Văn Chủ", gender="Nam", born=date(1950, 1, 1), dead=date(2024, 2, 3), doc_no="001050000001")
+    first = _person(2, "Nguyễn Văn Một", gender="Nam", born=date(1975, 1, 1), doc_no="001070000002")
+    case = _make_case(
+        owner,
+        participants=[_participant(first, "Khác")],
+        properties=[_prop()],
+        case_state=_case_state(
+            owner, first,
+            nodes=[
+                _node(1, role="Owner", is_land_owner=True),
+                _node(2, role="Người được ủy quyền2", will_receive=True),
+            ],
+        ),
+    )
+    assert build_template_mapping(case)["[Họ tên người được ủy quyền 1]"] == "Nguyễn Văn Một"
+
+
+def test_authorized_role_merged_from_persisted_participant_vai_tro():
+    """Node diagram v3 KHÔNG lưu role tự do — vai trò "người được ủy quyền" đã gán
+    trên participant (cột vai_tro, lưu DB) phải được merge lại vào Stage person."""
+    owner = _person(1, "Nguyễn Văn Chủ", gender="Nam", born=date(1950, 1, 1), dead=date(2024, 2, 3), doc_no="001050000001")
+    proxy = _person(2, "Nguyễn Văn Ủy", gender="Nam", born=date(1980, 8, 9), doc_no="001080000003")
+    case = _make_case(
+        owner,
+        participants=[_participant(proxy, "Người được ủy quyền")],
+        properties=[_prop()],
+        case_state=_case_state(
+            owner, proxy,
+            nodes=[
+                _node(1, role="Owner", is_land_owner=True),
+                # Node không mang role ủy quyền — chỉ participant lưu vai_tro.
+                _node(2, role="Khac", will_receive=True),
+            ],
+        ),
+    )
+    context = build_word_context(case)
+    assert [p.ho_ten for p in context.authorized_people] == ["Nguyễn Văn Ủy"]
+    mapping = build_template_mapping(case)
+    assert mapping["[Họ tên người được ủy quyền 1]"] == "Nguyễn Văn Ủy"
+
+
+def test_authorized_person_resolves_from_saved_role_without_diagram_node():
+    """Đại diện ủy quyền hợp lệ có thể KHÔNG có node trên sơ đồ thừa kế —
+    vai trò lưu ở participants.vai_tro vẫn phải resolve, không bị lọc mất
+    khỏi _active_persons (lỗi Leader tái hiện trên _synthetic_case NAIA-12)."""
+    owner = _person(1, "Nguyễn Văn Chủ", gender="Nam", born=date(1950, 1, 1), dead=date(2024, 2, 3), doc_no="001050000001")
+    receiver = _person(2, "Nguyễn Văn Con", gender="Nam", born=date(1980, 8, 9), doc_no="001080000003")
+    proxy = _person(3, "Trần Thị Ủy", gender="Nữ", born=date(1975, 5, 5), doc_no="001075000005")
+    case = _make_case(
+        owner,
+        participants=[
+            _participant(receiver, "Con"),
+            _participant(proxy, "Người được ủy quyền", receive=False),
+        ],
+        properties=[_prop()],
+        case_state=_case_state(
+            owner, receiver, proxy,
+            nodes=[
+                _node(1, role="Owner", is_land_owner=True),
+                _node(2, role="Con", will_receive=True),
+                # proxy cố tình KHÔNG có node — chỉ participant lưu vai_tro.
+            ],
+        ),
+    )
+    context = build_word_context(case)
+    assert [p.ho_ten for p in context.authorized_people] == ["Trần Thị Ủy"]
+    mapping = build_template_mapping(case)
+    assert mapping["[Họ tên người được ủy quyền 1]"] == "Trần Thị Ủy"
+    assert mapping["[Danh sách người được ủy quyền]"] == "Trần Thị Ủy"
+    assert "Trần Thị Ủy" in mapping["[Dòng người được ủy quyền 1]"]
+    assert "001075000005" in mapping["[Dòng người được ủy quyền 1]"]
+
+
+def test_authorized_person_hidden_or_deleted_node_stays_excluded():
+    """Participant có vai_tro ủy quyền nhưng node đã bị ẩn/xoá khỏi Diagram ->
+    không tính (đã bị gỡ khỏi sơ đồ)."""
+    owner = _person(1, "Nguyễn Văn Chủ", gender="Nam", born=date(1950, 1, 1), dead=date(2024, 2, 3), doc_no="001050000001")
+    receiver = _person(2, "Nguyễn Văn Con", gender="Nam", born=date(1980, 8, 9), doc_no="001080000003")
+    proxy = _person(3, "Trần Thị Ủy", gender="Nữ", doc_no="001075000005")
+    case = _make_case(
+        owner,
+        participants=[
+            _participant(receiver, "Con"),
+            _participant(proxy, "Người được ủy quyền", receive=False),
+        ],
+        properties=[_prop()],
+        case_state=_case_state(
+            owner, receiver, proxy,
+            nodes=[
+                _node(1, role="Owner", is_land_owner=True),
+                _node(2, role="Con", will_receive=True),
+                {**_node(3, role="Khac"), "deleted": True},
+            ],
+        ),
+    )
+    assert build_word_context(case).authorized_people == []
+    assert build_template_mapping(case)["[Họ tên người được ủy quyền 1]"] == ""
+
+
+def test_required_authorized_slots_reads_template_demand():
+    """Mẫu dùng slot N nào của nhóm ủy quyền thì báo đúng slot đó."""
+    from services.word_engine import required_authorized_slots
+
+    doc = Document()
+    doc.add_paragraph("tôi uỷ quyền cho: [Dòng người được ủy quyền 1]")
+    doc.add_paragraph("và [Họ tên người được ủy quyền 2]")
+    assert required_authorized_slots(doc) == {1, 2}
+
+    doc = Document()
+    doc.add_paragraph("danh sách: [Danh sách người được ủy quyền]")
+    assert required_authorized_slots(doc) == {1}
+
+    doc = Document()
+    doc.add_paragraph("không liên quan [Người nhận 1 - Họ tên]")
+    assert required_authorized_slots(doc) == set()
+
+
+def test_required_authorized_slots_inline_and_every_registry_form():
+    """Phản ví dụ review NAIA-12: [Người được ủy quyền inline 2] phải ra slot
+    2, KHÔNG trôi thành slot 1. Mọi dạng registry đều đọc đúng slot."""
+    from services.word_engine import required_authorized_slots
+
+    doc = Document()
+    doc.add_paragraph("đại diện: [Người được ủy quyền inline 2]")
+    assert required_authorized_slots(doc) == {2}
+
+    doc = Document()
+    doc.add_paragraph("[Người được ủy quyền 2 - Họ tên]")
+    doc.add_paragraph("[Người được ủy quyền inline 3]")
+    doc.add_paragraph("[Dòng người được ủy quyền 4]")
+    doc.add_paragraph("[Địa chỉ người được ủy quyền 5]")
+    assert required_authorized_slots(doc) == {2, 3, 4, 5}
+
+    # Không hậu tố -> chỉ cần người 1; "inline" không số cũng vậy.
+    doc = Document()
+    doc.add_paragraph("[Danh sách người được ủy quyền]")
+    doc.add_paragraph("[Danh sách người được ủy quyền inline]")
+    doc.add_paragraph("[Họ tên người được ủy quyền]")
+    assert required_authorized_slots(doc) == {1}
+
+    # Token khác nhóm (người nhận/chủ đất có cụm 'uy quyen' ở field) không tính.
+    doc = Document()
+    doc.add_paragraph("[Người ủy quyền] và [Người nhận 2 - Họ tên]")
+    assert required_authorized_slots(doc) == set()
+
+
+def test_noi_niem_yet_uses_saved_value_only_no_property_address_fallback():
+    """[Nơi niêm yết] chỉ lấy trường người dùng nhập — thiếu thì rỗng,
+    TUYỆT ĐỐI không mượn địa chỉ tài sản để biến ca thiếu dữ liệu thành PASS."""
+    case = _summary_export_case()
+    case.noi_niem_yet = None  # người dùng chưa nhập nơi niêm yết
+
+    mapping = build_template_mapping(case)
+    assert mapping["[Nơi niêm yết]"] == ""
+    assert mapping["[Niêm Yết]"] == ""
+    assert mapping["[NIÊM YẾT]"] == ""
+    # Bằng chứng ngược: địa chỉ tài sản có sẵn nhưng không bị dùng làm fallback.
+    assert mapping["[Địa chỉ đất]"] == "Thửa đất tại xã Minh Tân"
+
+    case.noi_niem_yet = "Trụ sở UBND xã Đại An"
+    mapping = build_template_mapping(case)
+    assert mapping["[Nơi niêm yết]"] == "Trụ sở UBND xã Đại An"
+    assert mapping["[Niêm Yết]"] == "Trụ sở UBND xã Đại An"
+    assert mapping["[NIÊM YẾT]"] == "TRỤ SỞ UBND XÃ ĐẠI AN"
+
+
+def test_land_type_tokens_follow_row_position_not_land_code():
+    """[ONT]/[CLN]/[NTS]/[LUC] là diện tích DÒNG 1..4, không tra theo mã loại đất.
+
+    Quyết định Owner (review NAIA-12): mẫu DK18 in cứng nhãn "Loại đất 1: ONT"
+    rồi đặt "[ONT]" làm diện tích dòng đó — nên dòng 1 lưu CLN/120 thì "[ONT]"
+    phải ra "120", không phải rỗng vì "không có dòng ONT".
+    """
+    case = _summary_export_case(
+        properties=[
+            _prop(land_rows_json='[{"loai_dat":"CLN","dien_tich":"120"},'
+                                 '{"loai_dat":"ONT","dien_tich":"80"},'
+                                 '{"loai_dat":"LUC","dien_tich":"30"}]'),
+            _prop(land_rows_json='[{"loai_dat":"NTS","dien_tich":"55"}]'),
+        ]
+    )
+    mapping = build_template_mapping(case)
+    # Tài sản 1: token = vị trí dòng, kể cả khi mã khớp dòng khác.
+    assert mapping["[ONT]"] == "120"   # dòng 1 (CLN)
+    assert mapping["[CLN]"] == "80"    # dòng 2 (ONT)
+    assert mapping["[NTS]"] == "30"    # dòng 3 (LUC)
+    assert mapping["[LUC]"] == ""      # dòng 4 vắng
+    # Tài sản 2: hậu tố " 2" là chỉ số tài sản, vẫn theo vị trí dòng.
+    assert mapping["[ONT 2]"] == "55"  # tài sản 2, dòng 1 (NTS)
+    assert mapping["[CLN 2]"] == ""    # tài sản 2, dòng 2 vắng
+
+
+def test_land_type_row_position_absent_stays_empty_without_blocking_export():
+    """Vị trí dòng không có trong land_rows -> rỗng, vẫn không còn placeholder sót."""
+    case = _summary_export_case(
+        properties=[_prop(land_rows_json='[{"loai_dat":"CLN","dien_tich":"900"}]')]
+    )
+    mapping = build_template_mapping(case)
+    assert mapping["[ONT]"] == "900"   # dòng 1 (CLN)
+    assert mapping["[CLN]"] == ""      # dòng 2 vắng
+
+    doc = Document()
+    doc.add_paragraph("Diện tích: [ONT] m2; [CLN] m2")
+    replace_in_doc(doc, mapping)
+
+    assert find_unresolved_placeholders(doc) == []
+    assert doc.paragraphs[0].text == "Diện tích: 900 m2;  m2"
+
+
+def test_asset_two_token_fails_loudly_when_case_has_one_asset():
+    """Mẫu của tài sản 2 chỉ xuất được khi hồ sơ có tài sản 2 (không im lặng bỏ qua)."""
+    doc = Document()
+    doc.add_paragraph("Diện tích: [ONT 2] m2")
+    replace_in_doc(doc, build_template_mapping(_summary_export_case()))
+
+    assert find_unresolved_placeholders(doc) == ["[ONT 2]"]
+
+
+def _all_text(doc):
+    parts = [p.text for p in doc.paragraphs]
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                parts.extend(p.text for p in cell.paragraphs)
+    for section in doc.sections:
+        parts.extend(p.text for p in section.header.paragraphs)
+        parts.extend(p.text for p in section.footer.paragraphs)
+    return "\n".join(parts)
+
+
+def _textbox_paragraph_xml():
+    from docx.oxml import parse_xml
+
+    return parse_xml(
+        '<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+        ' xmlns:v="urn:schemas-microsoft-com:vml">'
+        "<w:r><w:pict><v:shape><v:textbox><w:txbxContent>"
+        "<w:p><w:r><w:t>[Trong textbox]</w:t></w:r></w:p>"
+        "</w:txbxContent></v:textbox></v:shape></w:pict></w:r></w:p>"
+    )
+
+
 def test_find_unresolved_placeholders_reports_only_unknown_tokens():
     doc = Document()
     doc.add_paragraph("[Đã map] [Chưa map]")
@@ -217,6 +626,349 @@ def test_find_unresolved_placeholders_reports_only_unknown_tokens():
     replace_in_doc(doc, {"[Đã map]": "x"})
 
     assert find_unresolved_placeholders(doc) == ["[Chưa map]"]
+
+
+def test_replace_in_doc_keeps_run_formatting_and_only_touches_token_runs():
+    doc = Document()
+    para = doc.add_paragraph()
+    para.add_run("Kính gửi: ").bold = True
+    para.add_run("[Họ tên chủ đất]")
+    para.add_run(" - nơi cư trú:").bold = True
+
+    doc.add_paragraph().add_run("[Chưa map]")
+
+    replace_in_doc(
+        doc,
+        {
+            "[Họ tên chủ đất]": "Nguyễn Văn Chủ",
+            "[Chưa map]": "x",
+        },
+    )
+
+    assert doc.paragraphs[0].text == "Kính gửi: Nguyễn Văn Chủ - nơi cư trú:"
+    # Ba run vẫn còn: không hợp nhất text vào run đầu rồi xóa các run sau.
+    assert [run.text for run in doc.paragraphs[0].runs] == [
+        "Kính gửi: ",
+        "Nguyễn Văn Chủ",
+        " - nơi cư trú:",
+    ]
+    assert doc.paragraphs[0].runs[0].bold is True
+    assert doc.paragraphs[0].runs[1].bold is not True
+
+
+def test_replace_in_doc_handles_token_split_across_runs_without_clobbering_siblings():
+    doc = Document()
+    para = doc.add_paragraph()
+    para.add_run("[Họ tên")
+    para.add_run(" chủ đất]")
+
+    replace_in_doc(doc, {"[Họ tên chủ đất]": "Nguyễn Văn Chủ"})
+
+    assert doc.paragraphs[0].text == "Nguyễn Văn Chủ"
+
+    # Sibling runs nằm ngoài vùng token phải còn nguyên vẹn.
+    doc2 = Document()
+    para2 = doc2.add_paragraph()
+    para2.add_run("A")
+    para2.add_run("[Tên")
+    para2.add_run(" 1]")
+    para2.add_run("B")
+    replace_in_doc(doc2, {"[Tên 1]": "X"})
+    assert [run.text for run in doc2.paragraphs[0].runs] == ["A", "X", "", "B"]
+    assert doc2.paragraphs[0].text == "AXB"
+
+
+def test_find_unresolved_placeholders_scans_nested_tables_headers_textboxes():
+    doc = Document()
+    header_para = doc.sections[0].header.paragraphs[0]
+    header_para.add_run("[Tháng] ")
+    header_para.add_run("[Năm]")
+
+    first_page = doc.sections[0].first_page_header.paragraphs[0]
+    first_page.add_run("[Số trang đầu]")
+
+    table = doc.add_table(rows=1, cols=1)
+    nested = table.cell(0, 0).add_table(rows=1, cols=1)
+    nested.cell(0, 0).text = "[Số vào sổ]"
+
+    doc.element.body.append(_textbox_paragraph_xml())
+
+    assert find_unresolved_placeholders(doc) == [
+        "[Năm]",
+        "[Số trang đầu]",
+        "[Số vào sổ]",
+        "[Tháng]",
+        "[Trong textbox]",
+    ]
+
+
+def test_replace_in_doc_reaches_nested_tables_and_textboxes():
+    doc = Document()
+    table = doc.add_table(rows=1, cols=1)
+    nested = table.cell(0, 0).add_table(rows=1, cols=1)
+    nested.cell(0, 0).text = "[Số vào sổ]"
+    doc.element.body.append(_textbox_paragraph_xml())
+
+    replace_in_doc(doc, {"[Số vào sổ]": "123", "[Trong textbox]": "đã thay"})
+
+    assert find_unresolved_placeholders(doc) == []
+    assert "đã thay" in "".join(t.text for t in doc.element.body.iter(TEXT_TAG))
+
+
+def test_replace_in_doc_resolves_placeholder_nested_in_replacement_value():
+    doc = Document()
+    doc.add_paragraph("[Dòng khai tử]")
+
+    replace_in_doc(
+        doc,
+        {"[Dòng khai tử]": "do xã [Nơi niêm yết] ký", "[Nơi niêm yết]": "Minh Tân"},
+    )
+
+    assert doc.paragraphs[0].text == "do xã Minh Tân ký"
+    assert find_unresolved_placeholders(doc) == []
+
+
+_W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+
+
+def _write_docx_with_notes(path, *, footnote_token=None, endnote_token=None):
+    """Tạo DOCX THẬT có footnotes.xml/endnotes.xml, save + reopen qua python-docx.
+
+    python-docx không model hai part này (part chỉ có ``blob``, không có
+    ``.element``) — test này chứng minh engine đọc/ghi ngược blob được, và file
+    sau thay vẫn mở lại được như DOCX hợp lệ.
+    """
+    import zipfile
+    from xml.sax.saxutils import escape
+
+    doc = Document()
+    doc.add_paragraph("Thân văn bản chính.")
+    doc.save(str(path))
+
+    def note_xml(root, marker_type, token):
+        return (
+            f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            f'<w:{root} xmlns:w="{_W_NS}">'
+            f'<w:{marker_type} w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:{marker_type}>'
+            f'<w:{marker_type} w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:{marker_type}>'
+            f'<w:{marker_type} w:id="1"><w:p><w:pPr><w:pStyle w:val="{"Foot" if marker_type == "footnote" else "End"}noteText"/></w:pPr>'
+            f'<w:r><w:rPr><w:rStyle w:val="{"Foot" if marker_type == "footnote" else "End"}noteReference"/></w:rPr><w:{marker_type}Ref/></w:r>'
+            f'<w:r><w:t xml:space="preserve"> {escape(token)}</w:t></w:r></w:p></w:{marker_type}>'
+            f'</w:{root}>'
+        )
+
+    with zipfile.ZipFile(path, "r") as zin:
+        entries = {item.filename: zin.read(item.filename) for item in zin.infolist()}
+
+    overrides = entries["[Content_Types].xml"].decode("utf-8")
+    for part, ctype in (
+        ("footnotes", "wordprocessingml.footnotes+xml"),
+        ("endnotes", "wordprocessingml.endnotes+xml"),
+    ):
+        overrides = overrides.replace(
+            "</Types>",
+            f'<Override PartName="/word/{part}.xml" '
+            f'ContentType="application/vnd.openxmlformats-officedocument.{ctype}"/></Types>',
+        )
+    entries["[Content_Types].xml"] = overrides.encode("utf-8")
+
+    rels = entries["word/_rels/document.xml.rels"].decode("utf-8")
+    rel_add = (
+        '<Relationship Id="rIdFt" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/>'
+        '<Relationship Id="rIdEn" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes" Target="endnotes.xml"/>'
+    )
+    rels = rels.replace("</Relationships>", rel_add + "</Relationships>")
+    entries["word/_rels/document.xml.rels"] = rels.encode("utf-8")
+
+    entries["word/footnotes.xml"] = note_xml("footnotes", "footnote", footnote_token or "").encode("utf-8")
+    entries["word/endnotes.xml"] = note_xml("endnotes", "endnote", endnote_token or "").encode("utf-8")
+
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zout:
+        for name, data in entries.items():
+            zout.writestr(name, data)
+
+
+def _part_blob(doc, part_name):
+    for part in doc.part.package.iter_parts():
+        if str(part.partname) == part_name:
+            return part.blob
+    return None
+
+
+def test_replace_in_doc_reaches_real_footnote_and_endnote_parts(tmp_path):
+    """DOCX thật có footnote/endnote: token trong hai part đó phải được thay,
+    file save + mở lại vẫn giữ kết quả (python-docx chỉ đọc blob của chúng)."""
+    path = tmp_path / "notes.docx"
+    _write_docx_with_notes(
+        path, footnote_token="ghi chú chân [Họ tên chủ đất]",
+        endnote_token="ghi chú cuối [Số vào sổ]")
+
+    doc = Document(str(path))
+    # Tiền đề: python-docx không gắn .element cho footnotes/endnotes của file thật.
+    note_parts = [
+        p for p in doc.part.package.iter_parts()
+        if str(p.partname) in ("/word/footnotes.xml", "/word/endnotes.xml")]
+    assert len(note_parts) == 2
+    assert all(getattr(p, "element", None) is None for p in note_parts)
+    assert "[Họ tên chủ đất]" in find_unresolved_placeholders(doc)
+
+    replace_in_doc(doc, {"[Họ tên chủ đất]": "Nguyễn Văn Chủ", "[Số vào sổ]": "CS123"})
+    doc.save(str(path))
+
+    # Mở lại file đã save: kết quả phải sống trong blob part, không chỉ trong RAM.
+    reloaded = Document(str(path))
+    assert "Nguyễn Văn Chủ" in _part_blob(reloaded, "/word/footnotes.xml").decode("utf-8")
+    assert "CS123" in _part_blob(reloaded, "/word/endnotes.xml").decode("utf-8")
+    assert find_unresolved_placeholders(reloaded) == []
+
+
+def test_unresolved_placeholder_in_real_footnote_blocks_export(tmp_path):
+    """Token sót nằm trong footnote của file thật phải vẫn bị báo — không bị
+    bỏ qua chỉ vì part đó không có .element."""
+    path = tmp_path / "only_note.docx"
+    _write_docx_with_notes(path, footnote_token="xem [Chưa map]")
+
+    doc = Document(str(path))
+    assert find_unresolved_placeholders(doc) == ["[Chưa map]"]
+
+
+def _field_paragraph_xml():
+    from docx.oxml import parse_xml
+
+    return parse_xml(
+        f'<w:p xmlns:w="{_W_NS}">'
+        '<w:fldSimple w:instr=" DOCVARIABLE  ho_ten  \\* MERGEFORMAT ">'
+        "<w:r><w:rPr><w:b/></w:rPr><w:t>[Họ tên chủ đất]</w:t></w:r>"
+        "</w:fldSimple>"
+        '<w:r><w:fldChar w:fldCharType="begin"/></w:r>'
+        "<w:r><w:instrText xml:space=\"preserve\"> DOCVARIABLE so </w:instrText></w:r>"
+        '<w:r><w:fldChar w:fldCharType="separate"/></w:r>'
+        "<w:r><w:t>[Số vào sổ]</w:t></w:r>"
+        '<w:r><w:fldChar w:fldCharType="end"/></w:r>'
+        "</w:p>"
+    )
+
+
+def test_replace_in_doc_reaches_field_result_runs(tmp_path):
+    """Token nằm trong kết quả field (fldSimple + fldChar complex) phải được thay;
+    cấu trúc field (instr) và định dạng run giữ nguyên."""
+    from docx.oxml.ns import qn
+
+    doc = Document()
+    doc.element.body.append(_field_paragraph_xml())
+
+    assert find_unresolved_placeholders(doc) == ["[Họ tên chủ đất]", "[Số vào sổ]"]
+
+    replace_in_doc(doc, {"[Họ tên chủ đất]": "Nguyễn Văn Chủ", "[Số vào sổ]": "CS123"})
+
+    assert find_unresolved_placeholders(doc) == []
+    para = doc.paragraphs[0]
+    # fldSimple bọc run con — ghép mọi w:t để kiểm cả kết quả field.
+    all_text = "".join(t.text or "" for t in para._element.iter(TEXT_TAG))
+    assert "Nguyễn Văn Chủ" in all_text and "CS123" in all_text
+    # Cấu trúc field còn nguyên sau khi thay.
+    assert para._element.find(qn("w:fldSimple")) is not None
+    assert b"DOCVARIABLE" in etree_tostring(para._element)
+
+    path = tmp_path / "field.docx"
+    doc.save(str(path))
+    reloaded = Document(str(path))
+    assert find_unresolved_placeholders(reloaded) == []
+
+
+def _nested_textbox_paragraph_xml():
+    from docx.oxml import parse_xml
+
+    return parse_xml(
+        f'<w:p xmlns:w="{_W_NS}" xmlns:v="urn:schemas-microsoft-com:vml">'
+        "<w:r><w:pict><v:shape><v:textbox><w:txbxContent>"
+        "<w:p><w:r><w:t>[Textbox ngoài]</w:t></w:r>"
+        "<w:r><w:pict><v:shape><v:textbox><w:txbxContent>"
+        "<w:p><w:r><w:t>[Textbox trong]</w:t></w:r></w:p>"
+        "</w:txbxContent></v:textbox></v:shape></w:pict></w:r>"
+        "</w:p>"
+        "</w:txbxContent></v:textbox></v:shape></w:pict></w:r></w:p>"
+    )
+
+
+def test_replace_in_doc_reaches_textbox_nested_inside_textbox(tmp_path):
+    """Textbox LỒNG trong textbox: token tầng sâu nhất vẫn được thay/đếm đúng."""
+    doc = Document()
+    doc.element.body.append(_nested_textbox_paragraph_xml())
+
+    assert find_unresolved_placeholders(doc) == ["[Textbox ngoài]", "[Textbox trong]"]
+
+    replace_in_doc(doc, {"[Textbox ngoài]": "NGOÀI", "[Textbox trong]": "TRONG"})
+
+    assert find_unresolved_placeholders(doc) == []
+    text = "".join(t.text for t in doc.element.body.iter(TEXT_TAG))
+    assert "NGOÀI" in text and "TRONG" in text
+
+    path = tmp_path / "nested_txbx.docx"
+    doc.save(str(path))
+    assert find_unresolved_placeholders(Document(str(path))) == []
+
+
+def etree_tostring(element):
+    from lxml import etree
+
+    return etree.tostring(element)
+
+
+def test_fixed_codes_on_unverified_template_are_unresolved():
+    """Mẫu KHÔNG nằm trong danh sách xác minh: "[01]"/"[54.99]" vẫn là token sót.
+
+    Quy tắc mã số KHÔNG còn toàn cục (review NAIA-12): file giả bất kỳ chứa
+    token dạng mã biểu phải bị chặn, không được miễn ngầm.
+    """
+    doc = Document()
+    doc.add_paragraph("[01] [02] [06.1] [10] [54.99] [Đã map]")
+
+    replace_in_doc(doc, {"[Đã map]": "x"})
+
+    assert find_unresolved_placeholders(doc) == [
+        "[01]", "[02]", "[06.1]", "[10]", "[54.99]"]
+    # Không truyền template_ref tương đương mẫu chưa xác minh.
+    assert find_unresolved_placeholders(doc, template_ref=None) == [
+        "[01]", "[02]", "[06.1]", "[10]", "[54.99]"]
+    assert find_unresolved_placeholders(doc, template_ref="mau khac.docx") == [
+        "[01]", "[02]", "[06.1]", "[10]", "[54.99]"]
+
+
+def test_fixed_form_code_shape_is_narrow_but_still_template_scoped():
+    """Dạng không khớp mã biểu luôn là sót; dạng khớp nhưng mẫu chưa xác minh cũng sót."""
+    doc = Document()
+    doc.add_paragraph("[6] [N6] [Tên 6] [Ngườ 6] [99]")
+
+    replace_in_doc(doc, {"x": "y"})
+
+    assert find_unresolved_placeholders(doc) == ["[6]", "[99]", "[N6]", "[Ngườ 6]", "[Tên 6]"]
+    # "[99]" có dạng mã biểu: được miễn chỉ trên mẫu DK18 đã xác minh chứa nó?
+    # [99] không nằm trong bộ mã DK18 nên vẫn sót kể cả trên mẫu DK18.
+    assert "[99]" in find_unresolved_placeholders(
+        doc, template_ref="2. DK18, thuế  1.docx")
+
+
+def test_verified_template_keeps_fixed_codes_and_still_flags_real_placeholders():
+    doc = Document()
+    doc.add_paragraph("Mục [01] Họ tên: [Họ tên chủ đất]")
+    doc.add_paragraph("Mục [06.1] Diện tích: [Diện tích đất]")
+
+    replace_in_doc(doc, {"[Họ tên chủ đất]": "Nguyễn Văn A", "[Diện tích đất]": "100 m2"})
+
+    # Mẫu DK18 đã xác minh: [01]/[06.1] là nhãn in cứng, không báo sót.
+    assert find_unresolved_placeholders(
+        doc, template_ref="2. DK18, thuế  1.docx") == []
+    # Mã NGOÀI danh sách xác minh của mẫu vẫn bị chặn.
+    doc2 = Document()
+    doc2.add_paragraph("Mục [54.99] ngoài bộ DK18")
+    assert find_unresolved_placeholders(
+        doc2, template_ref="2. DK18, thuế  1.docx") == ["[54.99]"]
+
+    full_text = _all_text(doc)
+    assert "[01]" in full_text and "[06.1]" in full_text
+
+
 
 
 def test_list_public_builtin_templates_hides_reference_and_snake_case_templates(tmp_path):
@@ -840,3 +1592,188 @@ def test_legacy_land_placeholders_unchanged_and_cover_assets_4_and_5():
     assert mapping["[dientich205]"] == "520.5"
     # Typo fix in rendered paragraph (consumer: [Đoạn mô tả di sản]).
     assert "Thời hạn sử dụng:" in mapping["[Đoạn mô tả di sản]"]
+
+# ================================================================ NAIA-8
+# `[Người N]` = thứ tự Stage đã lưu (ổn định khi đảo/xóa node Diagram);
+# hồ sơ hai bên map Bên A/B theo slot p1..p30 (personId = row_id Stage).
+
+import json
+import uuid as _uuid
+
+from services.word_engine import word_block_reason
+
+
+def _stage_row_v3(row_id, entity_id, name, *, gender="Nam", dead=None):
+    return {
+        "row_id": row_id,
+        "entity_id": entity_id,
+        "id": str(entity_id) if entity_id is not None else row_id,
+        "ho_ten": name,
+        "gioi_tinh": gender,
+        "ngay_sinh": None,
+        "ngay_chet": dead.isoformat() if dead else None,
+        "so_giay_to": "",
+        "ngay_cap": None,
+        "noi_cap": "",
+        "dia_chi": "",
+        "place_of_origin": "",
+    }
+
+
+def _case_state_v3(rows, *, domain="inheritance", nodes=None,
+                   extra_diagram=None):
+    diagram = {"state": {"version": 3, "domain": domain,
+                         "nodes": nodes or []}}
+    if extra_diagram:
+        diagram.update(extra_diagram)
+    return json.dumps(
+        {"schemaVersion": 3, "case_type": domain, "stage": rows,
+         "assets": [], "diagram": diagram},
+        ensure_ascii=False)
+
+
+def _two_party_state(rows, slots):
+    """slots: {slot_number: row_id} — build canonical p1..p30 nodes."""
+    nodes = []
+    for i in range(1, 31):
+        nodes.append({
+            "id": f"p{i}",
+            "personId": slots.get(i),
+            "hidden": False,
+            "deleted": False,
+        })
+    return _case_state_v3(rows, domain="two_party", nodes=nodes)
+
+
+def _two_party_case(rows, slots, *, properties=None):
+    case = _make_case(
+        None,
+        properties=properties if properties is not None else [_prop()],
+        case_state=_two_party_state(rows, slots))
+    case.loai_van_ban = "chuyen_nhuong"
+    return case
+
+
+def _rid():
+    return str(_uuid.uuid4())
+
+
+def test_nguoi_numbers_follow_stage_order_not_node_order():
+    a = _person(1, "An Stage 1", dead=date(2024, 1, 1))
+    b = _person(2, "Bích Stage 2")
+    c = _person(3, "Cường Stage 3")
+    rows = [_stage_row_v3(_rid(), 1, a.ho_ten, dead=date(2024, 1, 1)),
+            _stage_row_v3(_rid(), 2, b.ho_ten),
+            _stage_row_v3(_rid(), 3, c.ho_ten)]
+    # Node order ngược Stage: C trước B trước A.
+    nodes = [
+        _node(3, role="Con", will_receive=True),
+        _node(2, role="Con", will_receive=True),
+        _node(1, role="Owner", is_land_owner=True),
+    ]
+    case = _make_case(
+        a, properties=[_prop()],
+        case_state=_case_state_v3(
+            rows, nodes=nodes,
+            extra_diagram={"engineInput": {"version": 2, "nodes": nodes},
+                           "engineResult": {"status": "complete",
+                                            "allocations": {}}}))
+    mapping = build_template_mapping(case)
+    assert mapping["[Người 1 - Họ tên]"] == "An Stage 1"
+    assert mapping["[Người 2 - Họ tên]"] == "Bích Stage 2"
+    assert mapping["[Người 3 - Họ tên]"] == "Cường Stage 3"
+
+
+def test_removing_diagram_node_does_not_renumber_nguoi():
+    a = _person(1, "An Stage 1", dead=date(2024, 1, 1))
+    b = _person(2, "Bích Stage 2")
+    c = _person(3, "Cường Stage 3")
+    r1, r2, r3 = _rid(), _rid(), _rid()
+    rows = [_stage_row_v3(r1, 1, a.ho_ten, dead=date(2024, 1, 1)),
+            _stage_row_v3(r2, 2, b.ho_ten),
+            _stage_row_v3(r3, 3, c.ho_ten)]
+    # B không có node — số Người vẫn giữ theo Stage.
+    nodes = [
+        _node(1, role="Owner", is_land_owner=True),
+        _node(3, role="Con", will_receive=True),
+    ]
+    case = _make_case(
+        a, properties=[_prop()],
+        case_state=_case_state_v3(
+            rows, nodes=nodes,
+            extra_diagram={"engineInput": {"version": 2, "nodes": nodes},
+                           "engineResult": {"status": "complete",
+                                            "allocations": {}}}))
+    mapping = build_template_mapping(case)
+    assert mapping["[Người 1 - Họ tên]"] == "An Stage 1"
+    assert mapping["[Người 2 - Họ tên]"] == "Bích Stage 2"
+    assert mapping["[Người 3 - Họ tên]"] == "Cường Stage 3"
+
+
+def test_two_party_ben_a_b_slots_and_names():
+    ra, rb, rc = _rid(), _rid(), _rid()
+    rows = [
+        _stage_row_v3(ra, 11, "Nguyễn Bên A"),
+        _stage_row_v3(rb, 12, "Trần Bên B"),
+        _stage_row_v3(rc, 13, "Lê Không Slot"),
+    ]
+    # p2 = bên A (thứ tự slot ≠ thứ tự stage), p16 = bên B; rc không slot.
+    case = _two_party_case(rows, {2: ra, 16: rb})
+    mapping = build_template_mapping(case)
+
+    assert mapping["[Người 1 - Họ tên]"] == "Nguyễn Bên A"
+    assert mapping["[Người 2 - Họ tên]"] == "Trần Bên B"
+    assert mapping["[Người 3 - Họ tên]"] == "Lê Không Slot"
+    assert mapping["[Bên A 1 - Họ tên]"] == ""       # p1 trống, không dồn p2 lên
+    assert mapping["[Bên A 2 - Họ tên]"] == "Nguyễn Bên A"
+    assert mapping["[Bên B 1 - Họ tên]"] == "Trần Bên B"
+    assert mapping["[Bên B 2 - Họ tên]"] == ""
+    assert mapping["[Tên bên A]"] == "Nguyễn Bên A"
+    assert mapping["[Tên bên B]"] == "Trần Bên B"
+    assert mapping["[Bên A - Họ tên]"].endswith("Nguyễn Bên A")
+    assert mapping["[Bên B - Họ tên]"].endswith("Trần Bên B")
+    # Người Stage không có slot: không vào Bên A/B nhưng vẫn trong
+    # nhóm Người và alias ký giữ hoạt động.
+    assert "Nguyễn Bên A" in mapping["[Danh sách bên a]"]
+    assert "Lê Không Slot" not in mapping["[Danh sách bên a]"]
+    assert mapping["[Danh sách ngườ ký]"] == mapping["[Danh sách người ký]"]
+    assert mapping["[Họ tên ngườ ký 1]"] == mapping["[Họ tên người ký 1]"]
+    # Placeholder riêng thừa kế render rỗng trên hồ sơ hai bên.
+    assert mapping["[Đoạn phân chia di sản]"] == ""
+    assert mapping["[Cụm chủ đất chết]"] == ""
+    assert mapping["[Người nhận 1 - Họ tên]"] == ""
+
+
+def test_two_party_word_block_reasons():
+    ra = _rid()
+    rows = [_stage_row_v3(ra, 11, "Nguyễn Bên A")]
+
+    # Stage rỗng → word.no_people
+    empty = _two_party_case([], {})
+    ctx = build_word_context(empty)
+    assert word_block_reason(ctx) == "word.no_people"
+
+    # Có người nhưng chưa lưu diagram.state → word.no_diagram
+    no_diagram = _make_case(
+        None, properties=[_prop()],
+        case_state=json.dumps(
+            {"schemaVersion": 3, "case_type": "two_party",
+             "stage": rows, "assets": [], "diagram": {"state": {}}},
+            ensure_ascii=False))
+    no_diagram.loai_van_ban = "chuyen_nhuong"
+    ctx = build_word_context(no_diagram)
+    assert word_block_reason(ctx) == "word.no_diagram"
+
+    # Không áp điều kiện thừa kế: đủ người + slot + tài sản → ready.
+    ok = _two_party_case(rows, {1: ra})
+    ctx = build_word_context(ok)
+    assert word_block_reason(ctx) is None
+
+
+def test_two_party_no_assets_blocked():
+    ra = _rid()
+    rows = [_stage_row_v3(ra, 11, "Nguyễn Bên A")]
+    case = _two_party_case(rows, {1: ra}, properties=[])
+    case.tai_san = None
+    ctx = build_word_context(case)
+    assert word_block_reason(ctx) == "word.no_assets"

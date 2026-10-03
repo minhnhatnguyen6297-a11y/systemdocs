@@ -1,28 +1,38 @@
 'use strict';
 
-/* Word export dialog (MIN-112) — "Xuất Word — nhiều văn bản".
+/* Word export dialog (MIN-112 + NAIA-8) — "Xuất Word — nhiều văn bản".
  *
  * SOT hanh vi: spec UX §5 + contracts/notary-case-drafting.md §8.
- * - Options qua notary.word_export_options; checkbox theo document ready.
- * - Destination qua pickFiles({directory:true}) → {file_token,is_dir:true}
- *   — renderer khong thay path; main resolve token truoc khi forward.
+ * - Nguon mau: folder nguoi dung chon qua pickFiles({directory:true}) →
+ *   {file_token,is_dir:true}; backend quet .docx ngay trong thu muc.
+ *   Doi folder → xoa NGAY selection cu + khoa Xuat/chon trong luc quet;
+ *   chi response cua lan quet moi nhat duoc ap (model scan guard).
+ * - Checkbox tung file + Chon tat ca / Bo chon; file blocked (ready:false)
+ *   hien ly do, khong cho tich.
+ * - Destination qua pickFiles({directory:true}) → token is_dir:true;
+ *   renderer khong thay path; main resolve token truoc khi forward.
+ * - Tuy chon "Tao thu muc con cho ho so" → create_case_subdir.
  * - Mot lan notary.word_export_batch; progress + cancel theo job seam.
  * - Ket qua per-document: Đã lưu (+Mở file qua openPath) / Lỗi (+ly do) /
  *   Bỏ qua (breakdown.skipped — canceled giua batch, MIN-115).
+ * - "Nơi niêm yết" la meta hồ sơ: hien gia tri da luu, Luu qua
+ *   model.saveCaseMeta → notary.workspace_update (§6.2); loi luu bao ro.
  * - partial/all-failed/canceled deu render; KHONG tu dong khi con loi.
  *
  * Export UMD: window.G1_NOTARY_WORD + module.exports. DOM chi trong open().
  */
 
 const WORD_BLOCK_LABEL = {
+  'word.no_people': 'Stage chưa có người nào',
+  'word.no_diagram': 'Chưa có sơ đồ hai bên đã lưu',
   'word.no_assets': 'Hồ sơ chưa có tài sản',
   'word.no_landowner': 'Chưa có chủ đất trên sơ đồ',
   'word.no_deceased_landowner': 'Chưa có chủ đất đã mất',
   'word.no_receiver': 'Chưa có người nhận',
   'word.too_many_assets': 'Quá nhiều tài sản (tối đa 5)',
-  'word.too_many_people': 'Quá nhiều người trên sơ đồ (tối đa 20)',
-  'word.too_many_signers': 'Quá nhiều người ký (tối đa 20)',
-  'word.template_missing': 'Văn bản chưa có mẫu',
+  'word.too_many_people': 'Quá nhiều người trong Stage',
+  'word.too_many_signers': 'Quá nhiều người ký',
+  'word.template_missing': 'Văn bản không còn mẫu trong thư mục',
 };
 
 function createWordDialog(ctx) {
@@ -67,65 +77,154 @@ function createWordDialog(ctx) {
     return row;
   }
 
+  // Chon folder qua picker; tra {file_token,is_dir} hoac null khi nguoi
+  // dung huy picker / chon sai — KHONG bao loi cho cancel.
+  async function pickDirToken() {
+    const r = await pickFiles({ directory: true });
+    if (!r.ok) {
+      notify(`${r.error.code}: ${r.error.message}`, true);
+      return null;
+    }
+    const f = (r.data.files || [])[0];
+    if (!f) return null;                     // cancel picker — giu im
+    if (f.is_dir !== true) {
+      notify('Mục đã chọn không phải thư mục.', true);
+      return null;
+    }
+    return f;
+  }
+
   function open() {
     let jobId = null;
     openModal(async (box, close) => {
+      // Scope rieng dialog Word — rule `.cd-word-modal [hidden]` trong
+      // case-drafting.css restore an cho [hidden] (author `button`
+      // display:inline-flex thang thuoc tinh hidden cua UA).
+      box.classList.add('cd-word-modal');
       box.append(h('div', 'cd-modal-title', 'Xuất Word — nhiều văn bản'));
-      const body = h('div', 'cd-slot');
-      box.append(body);
-      body.append(face(L.faceLoading('Đang tải danh sách văn bản…')));
-      const r = await model.loadWordOptions();
-      body.innerHTML = '';
-      if (!r.ok) {
-        body.append(face(L.faceError(r.error)));
-        box.append(btn('Đóng', '', close));
-        return;
-      }
-      const checks = [];
-      for (const d of model.state.wordOptions || []) {
-        const lab = h('label', 'cd-check-row');
-        const cb = h('input');
-        cb.type = 'checkbox';
-        cb.disabled = !d.ready;
-        cb.checked = !!d.ready;
-        cb.setAttribute('aria-label', d.display_name || d.document_key);
-        lab.append(cb, h('span', '', d.display_name || d.document_key));
-        if (!d.ready) {
-          lab.append(h('span', 'muted',
-            ` — ${WORD_BLOCK_LABEL[d.block_reason] || d.block_reason ||
-              'chưa sẵn sàng'}`));
-        }
-        body.append(lab);
-        checks.push({ key: d.document_key, cb });
-      }
 
-      // Destination: directory picker → opaque token is_dir:true (§8.3).
-      const destLabel = h('span', 'muted', 'Chưa chọn thư mục');
-      let destToken = null;
-      const pickDir = btn('Chọn thư mục…', '', async () => {
-        const r2 = await pickFiles({ directory: true });
-        if (!r2.ok) {
-          notify(`${r2.error.code}: ${r2.error.message}`, true);
-          return;
-        }
-        const f = (r2.data.files || [])[0];
-        if (!f || f.is_dir !== true) {
-          notify('Mục đã chọn không phải thư mục.', true);
-          return;
-        }
-        destToken = f.file_token;
-        destLabel.textContent = `Thư mục: ${f.name || '(đã chọn)'}`;
-      });
+      // ---- state nội bộ dialog ----
+      let tplToken = null;                   // {file_token} thu muc mau
+      let destToken = null;                  // {file_token} thu muc dich
+      let checks = [];                       // [{key, cb}]
+      let exporting = false;
+      let scanning = false;                  // dang quet thu muc mau
+      let savingMeta = false;                // dang luu meta (workspace_update)
 
+      const tplLabel = h('span', 'muted', 'Chưa chọn thư mục mẫu');
+      const destLabel = h('span', 'muted', 'Chưa chọn thư mục đích');
+      const listBox = h('div', 'cd-slot');
+      listBox.append(h('div', 'muted',
+        'Chọn thư mục chứa file mẫu .docx để xem danh sách văn bản.'));
       const prog = h('div', 'cd-slot muted');
       const out = h('div', 'cd-slot');
+
+      const subdirLab = h('label', 'cd-check-row');
+      const subdirCb = h('input');
+      subdirCb.type = 'checkbox';
+      subdirCb.setAttribute('aria-label',
+        'Tạo thư mục con cho hồ sơ trong thư mục đích');
+      subdirLab.append(subdirCb,
+        h('span', '', 'Tạo thư mục con cho hồ sơ'));
+
+      const selAll = btn('Chọn tất cả', 'sm', () => {
+        for (const c of checks) if (!c.cb.disabled) c.cb.checked = true;
+      });
+      const selNone = btn('Bỏ chọn', 'sm', () => {
+        for (const c of checks) c.cb.checked = false;
+      });
+      // Toolbar chon luon nam trong DOM (ke ca luc dang quet) — chi bi
+      // khoa, khong bien mat, de nguoi dung thay ro trang thai.
+      const selBar = h('div', 'cd-toolbar');
+      selBar.append(selAll, selNone);
+
+      // Khoa Xuat + nut chon khi dang quet folder mau, dang xuat hoac
+      // dang luu meta — options/selection/noi_niem_yet dang doi, khong
+      // cho nguoi dung xuat luc do.
+      function refreshScanLock() {
+        go.disabled = scanning || exporting || savingMeta ||
+          !model.canWrite();
+        selAll.disabled = scanning || exporting || !checks.length;
+        selNone.disabled = scanning || exporting || !checks.length;
+      }
+
+      function renderDocs() {
+        // Doi folder → selection cu mat (checkbox rebuilt tu options moi).
+        checks = [];
+        listBox.innerHTML = '';
+        const docs = model.state.wordOptions || [];
+        if (!docs.length) {
+          listBox.append(h('div', 'muted',
+            'Thư mục không có file .docx nào.'));
+          return;
+        }
+        for (const d of docs) {
+          const lab = h('label', 'cd-check-row');
+          const cb = h('input');
+          cb.type = 'checkbox';
+          cb.disabled = !d.ready;
+          cb.checked = !!d.ready;
+          cb.setAttribute('aria-label', d.display_name || d.document_key);
+          lab.append(cb, h('span', '', d.display_name || d.document_key));
+          if (!d.ready) {
+            lab.append(h('span', 'muted',
+              ` — ${WORD_BLOCK_LABEL[d.block_reason] || d.block_reason ||
+                'chưa sẵn sàng'}`));
+          }
+          listBox.append(lab);
+          checks.push({ key: d.document_key, cb });
+        }
+      }
+
+      const pickTpl = btn('Chọn thư mục mẫu…', '', async () => {
+        if (exporting) return;
+        const f = await pickDirToken();
+        if (!f) return;
+        tplToken = { file_token: f.file_token };
+        tplLabel.textContent = `Thư mục mẫu: ${f.name || '(đã chọn)'}`;
+        // Doi folder → xoa NGAY selection cu; khoa Xuat/chon cho toi khi
+        // scan xong de khong xuat nham mau cua folder truoc (review B1).
+        checks = [];
+        scanning = true;
+        refreshScanLock();   // xoa selection → selAll/selNone cung khoa
+        listBox.innerHTML = '';
+        listBox.append(face(L.faceLoading('Đang quét thư mục mẫu…')));
+        const r = await model.loadWordOptions(tplToken);
+        if (r && r.stale) return;            // scan moi hon dang tu render
+        scanning = false;
+        refreshScanLock();
+        if (!r.ok) {
+          // Thu muc hong/mat doc duoc → giai phong token, xoa selection.
+          tplToken = null;
+          checks = [];
+          listBox.innerHTML = '';
+          listBox.append(face(L.faceError(r.error)));
+          return;
+        }
+        renderDocs();
+        refreshScanLock();   // checks da rebuild — mo lai nut chon
+      });
+
+      const pickDest = btn('Chọn thư mục đích…', '', async () => {
+        if (exporting) return;
+        const f = await pickDirToken();
+        if (!f) return;
+        destToken = { file_token: f.file_token };
+        destLabel.textContent = `Thư mục đích: ${f.name || '(đã chọn)'}`;
+      });
+
       const cancelBtn = btn('Hủy xuất', '', async () => {
         if (jobId) await cancelJob(jobId);
       });
       cancelBtn.hidden = true;
 
       const go = btn('Xuất', 'primary', async () => {
+        if (exporting || scanning || savingMeta) return;
         const keys = checks.filter((c) => c.cb.checked).map((c) => c.key);
+        if (!tplToken) {
+          notify('Chưa chọn thư mục chứa file mẫu.', true);
+          return;
+        }
         if (!keys.length) {
           notify('Chưa chọn văn bản nào.', true);
           return;
@@ -134,13 +233,17 @@ function createWordDialog(ctx) {
           notify('Chưa chọn thư mục đích.', true);
           return;
         }
-        go.disabled = true;
-        pickDir.disabled = true;
+        exporting = true;
+        refreshScanLock();
+        pickTpl.disabled = true;
+        pickDest.disabled = true;
         cancelBtn.hidden = false;
         out.innerHTML = '';
         prog.textContent = 'Đang gửi…';
         const rr = await model.exportWord(
-          keys, { file_token: destToken }, {
+          keys, destToken, {
+            templateDir: tplToken,
+            createCaseSubdir: subdirCb.checked,
             onJob: (job) => {
               if (job && job.job_id) jobId = job.job_id;
               const p = job && job.progress;
@@ -151,8 +254,10 @@ function createWordDialog(ctx) {
             },
           });
         jobId = null;
-        go.disabled = false;
-        pickDir.disabled = false;
+        exporting = false;
+        refreshScanLock();
+        pickTpl.disabled = false;
+        pickDest.disabled = false;
         cancelBtn.hidden = true;
         prog.textContent = '';
         const res = model.state.wordResult;
@@ -182,10 +287,68 @@ function createWordDialog(ctx) {
         // dung doc ket qua roi tu dong.
       });
       go.disabled = !model.canWrite();   // export_batch la write (§5.3)
+      refreshScanLock();                 // checks rong → nut chon khoa
 
+      // ---- Nơi niêm yết (meta hồ sơ — §6.2 workspace_update) ----
+      // Gia tri khoi tao tu caseInfo da tai qua workspace_get; mo lai
+      // dialog doc lai state moi nhat. Luu loi → hien ro tai cho + notify.
+      const niemYetInput = h('input');
+      niemYetInput.type = 'text';
+      niemYetInput.setAttribute('aria-label', 'Nơi niêm yết');
+      const metaCanEdit = model.canWrite() &&
+        typeof model.saveCaseMeta === 'function';
+      niemYetInput.disabled = !metaCanEdit;
+      niemYetInput.value =
+        (model.state.caseInfo && model.state.caseInfo.noi_niem_yet) || '';
+      const niemYetMsg = h('span', 'muted', '');
+      const niemYetSave = btn('Lưu nơi niêm yết', 'sm', async () => {
+        if (exporting || scanning || savingMeta || !metaCanEdit) return;
+        // Khoa Xuat + input + Luu lap trong luc save pending — batch phai
+        // chay voi gia tri da persist xong, khong phai ban cu (review:
+        // bam Luu roi Xuat ngay truoc day van xuat voi noi cu).
+        savingMeta = true;
+        niemYetInput.disabled = true;
+        niemYetSave.disabled = true;
+        refreshScanLock();
+        niemYetMsg.textContent = '';
+        niemYetMsg.className = 'muted';
+        const v = niemYetInput.value.trim();
+        let r;
+        try {
+          r = await model.saveCaseMeta({ noi_niem_yet: v || null });
+        } finally {
+          savingMeta = false;
+          // Mo lai theo quyen hien tai — save loi locked/conflict co
+          // the doi canWrite (locked → giu khoa luon).
+          const canEdit = metaCanEdit && model.canWrite();
+          niemYetInput.disabled = !canEdit;
+          niemYetSave.disabled = !canEdit;
+          refreshScanLock();
+        }
+        if (!r || !r.ok) {
+          const e = (r && r.error) || {};
+          niemYetMsg.textContent =
+            `Lưu thất bại: ${e.message || e.code || 'lỗi'}`;
+          niemYetMsg.className = 'error';
+          notify(
+            `Lưu nơi niêm yết thất bại: ${e.code || 'lỗi'}`, true);
+          return;
+        }
+        niemYetMsg.textContent = 'Đã lưu.';
+      });
+      niemYetSave.disabled = !metaCanEdit;
+      const niemYetRow = h('div', 'cd-toolbar');
+      niemYetRow.append(h('span', '', 'Nơi niêm yết:'),
+                        niemYetInput, niemYetSave, niemYetMsg);
+
+      const tplRow = h('div', 'cd-toolbar');
+      tplRow.append(pickTpl, tplLabel);
+      const destRow = h('div', 'cd-toolbar');
+      destRow.append(pickDest, destLabel);
       const row = h('div', 'cd-toolbar');
-      row.append(pickDir, go, cancelBtn, btn('Đóng', '', close));
-      box.append(row, destLabel, prog, out);
+      row.append(go, cancelBtn, btn('Đóng', '', close));
+      box.append(tplRow, selBar, listBox, destRow, subdirLab, niemYetRow,
+                 row, prog, out);
     });
   }
 

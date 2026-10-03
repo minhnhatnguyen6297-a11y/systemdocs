@@ -234,7 +234,8 @@ màu/kích thước.
   xóa (Q4). Cài đặt ở P7 (MIN-130); xem `visual-reference.md` §5.
 - Mô hình **hai bên 30 vị trí**: đề xuất §13.5 — domain `two_party`, node
   cố định `p1..p30` (bên suy từ số, `p16` = ghế đầu bên B), ô trống giữ
-  nguyên không dồn; `word_export` = `case_type_unsupported`, `evaluate` =
+  nguyên không dồn; `word_export_*` trên `two_party` chạy bình thường
+  (NAIA-8 — xem `word-output.md`), `evaluate` =
   `unsupported` (không đi vào engine thừa kế). Cài đặt P7.
 - `Hủy thay đổi`: đề xuất §13.2 — client-only, restore **cả** Stage lẫn
   Diagram về committed (Q2); xóa row trong draft không prune diagram

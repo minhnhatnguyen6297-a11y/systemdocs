@@ -1,0 +1,37 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "case_type": "two_party",
+    "note": "§6.2/§13 — workspace_update thành công trên case two_party: schema_version v2, revision tăng đúng 1, case mang meta mới; document_type thuộc bộ hợp đồng hai bên"
+  },
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_ws_update_2p_062",
+  "command_id": "a1b2c3d4-1162-4006-8006-000000000062",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "workspace_update",
+    "data": {
+      "schema_version": "notary.case-drafting.v2",
+      "revision": 6,
+      "case": {
+        "id": 77,
+        "case_type": "two_party",
+        "document_type": "chuyen_nhuong",
+        "status": "draft",
+        "locked": false,
+        "revision": 6,
+        "ngay_lap_ho_so": "2026-09-28",
+        "noi_niem_yet": "UBND phường Trần Hưng Đạo",
+        "ghi_chu": null,
+        "nguoi_nhan_uy_quyen": null,
+        "nguoi_nhan_uy_quyen_id": null,
+        "noi_dung_viec": null
+      }
+    },
+    "warnings": []
+  },
+  "error": null,
+  "updated_at": "2026-10-03T05:30:00Z"
+}

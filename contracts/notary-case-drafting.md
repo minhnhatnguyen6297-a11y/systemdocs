@@ -9,8 +9,9 @@ implement ở P5 (MIN-128)** ·
 **Domain data shape:** `g1.module.v1` (`contracts/g1-module-data.md`)
 
 Contract wire cho tab **Soạn hồ sơ** của module `notary_v2` trong shell
-Electron một máy: tám command `notary.*` phục vụ tạo/tải workspace, intake
-đa nguồn thành suggestion, commit Stage, đánh giá/lưu Diagram và xuất
+Electron một máy: chín command `notary.*` phục vụ tạo/tải workspace, intake
+đa nguồn thành suggestion, commit Stage, cập nhật meta, đánh giá/lưu
+Diagram và xuất
 Word hàng loạt. Envelope `desktopcommand.v1` giữ nguyên — file này chỉ
 định nghĩa `payload`/`result.data`/error code của từng command.
 Rev 1.1 **additive** (MIN-121): thêm `notary.workspace_create` và chế độ
@@ -41,6 +42,7 @@ job-level. Quyết định giữ nguyên sau review round 1.
 | `notary.workspace_get` | Tải case + Stage (Người/Tài sản) + Diagram + revision + capabilities | read-only | `workspace_get` |
 | `notary.intake_analyze` | Phân tích file/text thành suggestion chờ review | long-running, không commit | `intake_analyze` |
 | `notary.workspace_commit_stage` | Commit toàn bộ Stage trong một transaction | atomic write | `workspace_commit_stage` |
+| `notary.workspace_update` | Cập nhật meta hồ sơ đã lưu (`ngay_lap_ho_so`, `noi_niem_yet`, `ghi_chu`) — không đụng Stage/Diagram | atomic write | `workspace_update` |
 | `notary.diagram_evaluate` | Đánh giá/tính thử draft Diagram | read-only theo DB, không persist draft | `diagram_evaluate` |
 | `notary.diagram_save` | Lưu Diagram đã hợp lệ | atomic write | `diagram_save` |
 | `notary.word_export_options` | Liệt kê văn bản sẵn sàng/bị chặn | read-only | `word_export_options` |
@@ -49,7 +51,7 @@ job-level. Quyết định giữ nguyên sau review round 1.
 - `result.kind` = tên command bỏ namespace `notary.` (snake_case nguyên
   vẹn). `result` theo shape `g1-module-data.md` §2: `{kind, data,
   evidence?, warnings?, source_files?}`.
-- Mọi `result.data` của tám command **bắt buộc** mang
+- Mọi `result.data` của chín command **bắt buộc** mang
   `schema_version: "notary.case-drafting.v1"` (literal). Đây là version
   của domain data shape; version kênh vẫn là `contract_version` của
   envelope — hai tầng độc lập.
@@ -71,8 +73,8 @@ job-level. Quyết định giữ nguyên sau review round 1.
 | `case.id` (`case_id`) | integer | ID hồ sơ trong DB |
 | `row_id` | string UUID v4 | Do UI tạo khi thêm dòng Stage; ổn định qua commit/reload; dùng gắn lỗi đúng dòng (`field_errors[].row_id`) |
 | `entity_id` | integer \| null | ID DB thật; `null` trước lần commit đầu của dòng; backend gán khi commit |
-| `revision` | integer ≥ 1 | Số phiên bản workspace của case; mọi write thành công (`workspace_commit_stage`, `diagram_save`) tăng đúng 1 |
-| `base_revision` | integer ≥ 1 | Revision client đang giữ khi ghi; bắt buộc trên mọi command **ghi** (`workspace_commit_stage`, `diagram_save`); khác server (`<` **hoặc** `>`) → `workspace_conflict` |
+| `revision` | integer ≥ 1 | Số phiên bản workspace của case; mọi write thành công (`workspace_commit_stage`, `workspace_update`, `diagram_save`) tăng đúng 1 |
+| `base_revision` | integer ≥ 1 | Revision client đang giữ khi ghi; bắt buộc trên mọi command **ghi** (`workspace_commit_stage`, `workspace_update`, `diagram_save`); khác server (`<` **hoặc** `>`) → `workspace_conflict` |
 | `source_id`, `suggestion_id` | string UUID v4 | `source_id` do client sinh khi build request; `suggestion_id` do backend sinh |
 | `document_key` | string `^[a-z][a-z0-9_]*$` | Khóa ổn định của văn bản; không đổi khi đổi tên hiển thị/template; registry mở — backend được thêm key mới, không được đổi nghĩa key đã publish |
 | `node.id` (Diagram slot) | string non-empty | Định danh slot trên Diagram do UI đặt; khác namespace với `row_id`/`personId` |
@@ -82,8 +84,8 @@ job-level. Quyết định giữ nguyên sau review round 1.
 ### 2.1a `case_id` — bắt buộc vs chế độ nháp
 
 - `case_id: <int ≥ 1>` **bắt buộc** trên `workspace_get`,
-  `workspace_commit_stage`, `diagram_save`, `word_export_options`,
-  `word_export_batch`.
+  `workspace_commit_stage`, `workspace_update`, `diagram_save`,
+  `word_export_options`, `word_export_batch`.
 - **Chế độ nháp** (hồ sơ chưa từng lưu — spec UX §2, MIN-121):
   `intake_analyze` và `diagram_evaluate` cho phép **absent** `case_id`
   = phân tích/đánh giá trên nháp phiên, không đụng DB case.
@@ -226,7 +228,7 @@ result.data:
   re-evaluate sau khi prune (§6.1) nên không có render_model cũ lệch
   state; `null` chỉ khi hồ sơ chưa từng được evaluate.
 - `case.locked:true` → mọi command **ghi** (`workspace_commit_stage`,
-  `diagram_save`, `word_export_batch`) →
+  `workspace_update`, `diagram_save`, `word_export_batch`) →
   `failed{code:workspace_locked}`; các command read-only — kể cả
   `diagram_evaluate` — vẫn được phép (§7.4).
 - `case_id` không tồn tại → `failed{code:case_not_found}`.
@@ -561,6 +563,45 @@ result.data:
 - Stage Người trùng tên/tài sản trùng là quyền người dùng — backend
   không tự merge.
 
+### 6.2 `notary.workspace_update` — cập nhật meta hồ sơ đã lưu (NAIA-8)
+
+```yaml
+payload:
+  case_id: <int>
+  base_revision: <int ≥ 1>
+  case:
+    ngay_lap_ho_so: <YYYY-MM-DD | null>   # optional
+    noi_niem_yet: <string | null>          # optional
+    ghi_chu: <string | null>               # optional
+```
+
+```yaml
+result.data:
+  schema_version: "notary.case-drafting.v1"
+  revision: <int>                  # revision mới sau update
+  case: <case>                     # shape §4 — meta mới
+```
+
+- `payload.case` chỉ chứa meta cập nhật được: `ngay_lap_ho_so`,
+  `noi_niem_yet`, `ghi_chu` — key lạ (kể cả `case_type`,
+  `document_type` — định danh nghiệp vụ không đổi sau create) →
+  `validation_error`; `case` rỗng/không phải object →
+  `validation_error`. Chỉ key nào có mặt mới được cập nhật.
+- Validate giá trị theo §4.3 (`noi_niem_yet`/`ghi_chu`: chuỗi non-empty
+  hoặc `null`; `ngay_lap_ho_so`: `YYYY-MM-DD` hoặc `null`).
+- **Không** đụng Stage/Diagram: `people`/`assets`/`state` giữ nguyên;
+  `revision` tăng đúng 1 như mọi write khác; `base_revision` khác server
+  → `workspace_conflict`; case locked → `workspace_locked`; `case_id`
+  không tồn tại → `case_not_found`.
+- Dùng cho ô meta trong dialog Xuất Word (Nơi niêm yết) và các chỉnh sửa
+  meta tương lai — không tạo nguồn lưu meta thứ hai ngoài case DB.
+- Tích hợp MIN-141 (04/10/2026): cập nhật đúng key canonical trong
+  `case_state_json.case` cùng cột hồ sơ, trong cùng transaction/revision.
+  Không thay các key metadata khác, Stage, tài sản hoặc Diagram. Hồ sơ legacy
+  chưa có snapshot giữ đường đọc legacy, không tạo snapshot thiếu Stage.
+  Result giữ đủ `nguoi_nhan_uy_quyen`, `nguoi_nhan_uy_quyen_id`, `noi_dung_viec`
+  theo case shape MIN-141; schema `workspace-update.schema.json` đã đối chiếu.
+
 ## 7. `notary.diagram_evaluate` + `notary.diagram_save`
 
 ### 7.1 `diagram_state` — wire ENGINE V2 (không legacy JS)
@@ -733,13 +774,14 @@ result.data:
 ```yaml
 payload:
   case_id: <int>
+  template_dir: <file_ref is_dir:true>   # optional (NAIA-8) — folder mode
 ```
 
 ```yaml
 result.data:
   schema_version: "notary.case-drafting.v1"
   documents:
-    - document_key: <snake_case>
+    - document_key: <snake_case | basename .docx>
       display_name: <string>
       ready: <bool>
       block_reason: <null | code>   # chỉ khi ready:false
@@ -748,21 +790,37 @@ result.data:
 `block_reason` code hóa (v1 — data-code dạng `word.*`, §2.5):
 
 ```
+word.no_people              # Stage chưa có người nào (NAIA-8)
+word.no_diagram             # hồ sơ chưa lưu diagram state (NAIA-8)
 word.no_assets              # hồ sơ chưa có tài sản
-word.no_landowner           # chưa có chủ đất trên Diagram
-word.no_deceased_landowner  # không có chủ đất đã chết
-word.no_receiver            # chưa có người nhận
+word.no_landowner           # chưa có chủ đất trên Diagram (inheritance)
+word.no_deceased_landowner  # không có chủ đất đã chết (inheritance)
+word.no_receiver            # chưa có người nhận (inheritance)
 word.too_many_assets        # > 5 tài sản
-word.too_many_people        # > 20 người trên Diagram
-word.too_many_signers       # > 20 người ký
+word.too_many_people        # Stage: > 20 người (inheritance) / > 30 (two_party)
+word.too_many_signers       # > 20 người ký (inheritance)
 word.template_missing       # văn bản chưa có template
 ```
 
-Mapping từ validation thật của `word_engine` (audit `services/word_engine.py`
-:809-910): không tài sản → `no_assets`; >5 tài sản → `too_many_assets`;
-không chủ đất → `no_landowner`; không chủ đất đã chết →
-`no_deceased_landowner`; không người nhận → `no_receiver`; >20 người trên
-Diagram → `too_many_people`; >20 người ký → `too_many_signers`.
+Mapping từ validation thật của `word_engine`: Stage rỗng → `no_people`;
+chưa có diagram state → `no_diagram`; không tài sản → `no_assets`; >5 tài
+sản → `too_many_assets`. Riêng `inheritance`: không chủ đất →
+`no_landowner`; không chủ đất đã chết → `no_deceased_landowner`; không
+người nhận → `no_receiver`; >20 người trên **Stage** → `too_many_people`
+(`[Người N]` lấy theo Stage đã lưu, không phải node Diagram); >20 người
+ký → `too_many_signers`. `two_party` **không** áp điều kiện chủ đất/người
+nhận; >30 người trên Stage → `too_many_people` (placeholder `[Người
+N]`/`[Bên A N]`/`[Bên B N]` phủ 30 slot); >30 người ký → lỗi render
+per-file (§8.4), `block_reason` không liệt kê riêng.
+Các code này là kiểm tra **kỹ thuật** xuất file — không phải kiểm định
+pháp lý (§13.5).
+
+NAIA-8 phase thư mục mẫu (owner 02–03/10/2026): khi có `template_dir`,
+readiness chỉ chặn thiếu Stage/tài sản, giới hạn số lượng, thiếu sơ đồ hai bên
+và lỗi mẫu/đường dẫn. Không chặn inheritance vì thiếu dấu chủ đất/chủ đất đã
+chết/người nhận; nhóm chưa có dữ liệu render rỗng. Các lý do ba điều kiện này
+chỉ giữ trên catalog legacy không có `template_dir`. Token không hỗ trợ hoặc
+thiếu slot đại diện mẫu yêu cầu vẫn làm riêng file đó lỗi.
 
 Catalog `document_key` v1 (registry mở — backend được thêm):
 
@@ -772,6 +830,13 @@ Catalog `document_key` v1 (registry mở — backend được thêm):
 | `thoa_thuan_phan_chia` | Thỏa thuận phân chia di sản | map `document_type=thoa_thuan` |
 | `niem_yet` | Thông báo niêm yết | chưa có template → `ready:false, block_reason:word.template_missing` là hợp lệ |
 
+**Folder mode (NAIA-8):** khi `template_dir` có mặt (FileRef thư mục
+hợp lệ — §3, chỉ path local), nguồn mẫu là **các file `.docx` ngay
+trong thư mục đó**: bỏ file khóa `~$*`, bỏ non-DOCX và thư mục con,
+sắp xếp ổn định theo tên. `document_key` = **basename gốc** của file,
+`display_name` = stem (tên bỏ `.docx`). Catalog cố định chỉ dùng khi
+`template_dir` absent. Thư mục trống → `documents:[]` hợp lệ.
+
 ### 8.2 `notary.word_export_batch` — payload
 
 ```yaml
@@ -779,15 +844,24 @@ payload:
   case_id: <int>
   document_keys: [<document_key>]   # 1..n, unique
   destination: <file_ref>           # PHẢI is_dir:true — §3
+  template_dir: <file_ref>          # optional — PHẢI is_dir:true (NAIA-8)
+  create_case_subdir: <bool>        # optional — default false (NAIA-8)
 ```
 
 - `document_keys` rỗng → `word_no_documents_selected`; trùng →
-  `word_duplicate_document_key`; key ngoài catalog →
-  `word_unknown_document_key`; key sai pattern →
-  `word_unknown_document_key`.
+  `word_duplicate_document_key`; key ngoài tập mẫu đã quét (catalog
+  hoặc đúng `template_dir`) → `word_unknown_document_key`; key sai
+  pattern → `word_unknown_document_key`. Folder mode chỉ chấp nhận
+  basename `.docx` — key chứa separator/`..` là sai pattern; engine
+  resolve file **chỉ trong thư mục đã cấp quyền**, không theo path
+  tùy ý.
+- `create_case_subdir:true` → ghi vào `<destination>/HS-<case_id>/`
+  (tạo nếu thiếu); `data.destination` trong result vẫn là thư mục
+  người dùng chọn.
 - Validate **trước khi tạo file đầu tiên**: mọi lỗi trên + destination
-  + `case_type_unsupported`/`workspace_locked` → `failed`, không file
-  nào được tạo.
+  + `workspace_locked` → `failed`, không file nào được tạo. File mẫu
+  biến mất sau khi quét → per-file `failed{code:word.template_missing}`
+  (§8.4).
 
 ### 8.3 Naming và không-ghi-đè
 
@@ -795,10 +869,11 @@ payload:
 <filename_stem>_HS-<case_id>[_{n}].docx      n ≥ 2
 ```
 
-- `filename_stem`: chuỗi ASCII do **catalog backend** sở hữu cho mỗi
-  `document_key` (không phải transform cơ học của `display_name`);
-  pattern `^[A-Za-z0-9_-]+$`. Backend quyết `actual_filename`, UI chỉ
-  hiển thị.
+- `filename_stem`: catalog mode = chuỗi ASCII do **catalog backend**
+  sở hữu cho mỗi `document_key` (không phải transform cơ học của
+  `display_name`); folder mode = stem tên file rút về ASCII an toàn
+  (`^[A-Za-z0-9_-]+$`, rỗng → `Mau`). Backend quyết
+  `actual_filename`, UI chỉ hiển thị.
 - Trùng tên với file **đã tồn tại** trong destination hoặc với tên đã
   dùng **trong cùng batch** (reservation nội batch) → tăng `n` từ 2.
 - **KHÔNG BAO GIỜ ghi đè** file có sẵn. Không ZIP.
@@ -848,7 +923,7 @@ Namespace `notary.*` (snake_case không chấm):
 | Code | Khi nào | `details` |
 |---|---|---|
 | `case_not_found` | `case_id` không tồn tại | — |
-| `case_type_unsupported` | `case_type` khác `inheritance` trên command ghi/evaluate/export | `{case_type}` |
+| `case_type_unsupported` | `case_type` engine chưa hỗ trợ trên command ghi/evaluate/export; word_export chấp nhận `inheritance` + `two_party` (NAIA-8) | `{case_type}` |
 | `workspace_locked` | write trên case `locked` | — |
 | `workspace_conflict` | `base_revision` khác revision server (cả nhỏ hơn lẫn lớn hơn) | `{server_revision}` |
 | `workspace_owner_required` | `workspace_create` thiếu node `owner` đã gán person (rev 1.1) | — |
@@ -1208,8 +1283,11 @@ diagram_state v3 (domain two_party):
 - `diagram_save`/`workspace_commit_stage` persist + structural validate
   như thường (theo shape two_party). `workspace_get` trả domain
   `two_party`, `capabilities:{intake:[…], diagram:true,
-  word_export:false}`; mọi `word_export_*` trên `two_party` →
-  `case_type_unsupported` (§2.4 mở rộng).
+  word_export:true}` (NAIA-8: Word engine đã hỗ trợ context hai bên —
+  §13.10); `word_export_*` trên `two_party` chạy bình thường, readiness
+  riêng qua `block_reason` (§8.1) — **không** còn
+  `case_type_unsupported`. `word_export:false` chỉ còn cho case_type
+  engine chưa hỗ trợ (ngoài `inheritance`/`two_party`).
 - **Drop lên ô đã có người (Q9):** hoán đổi `personId` hai ô — áp dụng
   cho cả hai domain (thống nhất với hành vi kéo-thả hiện trạng). Đây
   là semantics client; wire chỉ thấy state sau hoán đổi.
@@ -1318,23 +1396,28 @@ Data-codes mới: `stage.legacy_asset_overflow`,
 
 `primary_count` (v1) không dùng trong v2 — asset không `is_primary`.
 
-### 13.10 Ranh giới Word — giữ nguyên giới hạn hiện hành
+### 13.10 Ranh giới Word — giới hạn + mapping theo Stage (NAIA-8)
 
-- Engine Word **không đổi** trong scope P2/P5 contract này:
-  `MAX_WORD_ASSETS = 5`; `person`/`signer` > 20 →
+- Giới hạn giữ nguyên: `MAX_WORD_ASSETS = 5`; `person`/`signer` > 20 →
   `word.too_many_people`/`word.too_many_signers`; `[Tài sản N - field]`
-  đọc tài sản theo **thứ tự** 1..5; `[Người N]` theo thứ tự nhóm phụ
-  lục — semantics hiện hữu không bị draft này đụng vào.
+  đọc tài sản theo **thứ tự** 1..5.
+- **`[Người N]` = thứ tự danh sách Stage** (NAIA-8 — quyết định Leader
+  trên NAIA-8): gồm cả người chưa có node; đảo thứ tự/xóa node Diagram
+  **không** đổi số Người. Vai trò (Bên A/B, chủ đất, người nhận) lấy từ
+  dữ liệu nghiệp vụ đã lưu, không suy từ vị trí node. Mọi alias
+  placeholder cũ (`ngườ`, `ngườ ký`, `ngườ nhận`, …) giữ nguyên.
 - Vì v2 chặn `stage.assets` ≤ 3 (inheritance), dữ liệu v2 luôn nằm
   trong giới hạn 5 của Word; vị trí 1..3 trên Stage tương ứng
   `[Tài sản 1..3 - *]` — **không đổi nghĩa placeholder**.
-- `two_party`: ý định là `[Người N]` = người tại **vị trí N** cố định
-  (`{{Người 16}}` = `p16` = ghế đầu bên B), kể cả ô trống → placeholder
-  đó render rỗng. **Đây là spec cho task exporter tương lai** — hiện
-  `word_export_*` trả `case_type_unsupported`, `word_export:false`;
-  draft này **không** tuyên bố Word đã export đúng dữ liệu mới.
-- Không đưa `two_party` vào engine thừa kế (§13.5); không đổi
-  template/popup/exporter trong scope P2.
+- `two_party` (NAIA-8 — đã hỗ trợ): `word_export:true`,
+  `word_export_*` chạy bình thường. `[Người N - *]` = toàn bộ dòng
+  Stage theo thứ tự; `[Bên A N - *]`/`[Bên B N - *]` = người gán vào
+  slot `p1..p15`/`p16..p30` (ô trống → render rỗng, không dồn);
+  `[Bên A - Họ tên]`/`[Bên B - Họ tên]`/`[Tên bên A]`/`[Tên bên B]`
+  = danh sách họ tên từng bên; placeholder riêng thừa kế (chủ đất,
+  người nhận, phụ lục di sản) render rỗng trên văn bản hai bên.
+- Không đưa `two_party` vào engine thừa kế (§13.5 — `diagram_evaluate`
+  vẫn `unsupported`, không chạy allocation).
 
 ### 13.11 Revision / retry / late-response — giữ nguyên, nêu lại cho rõ
 
@@ -1442,7 +1525,8 @@ Producer v2 PHẢI (thêm vào §10):
       transaction commit/save — không prune tại thời điểm client sửa
       draft.
 - [ ] `diagram_evaluate` two_party → `unsupported` render_model, không
-      chạy engine thừa kế; `word_export_*` → `case_type_unsupported`.
+      chạy engine thừa kế; `word_export_*` trên two_party được hỗ trợ
+      (NAIA-8) — readiness qua `block_reason` §8.1.
 
 Consumer v2 PHẢI (thêm vào §10):
 

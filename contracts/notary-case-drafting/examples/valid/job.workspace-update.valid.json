@@ -1,0 +1,35 @@
+{
+  "fixture_context": {
+    "note": "§6.2 — workspace_update thành công: revision tăng đúng 1, case mang meta mới"
+  },
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_ws_update_062",
+  "command_id": "a1b2c3d4-0062-4006-8006-000000000062",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "workspace_update",
+    "data": {
+      "schema_version": "notary.case-drafting.v1",
+      "revision": 8,
+      "case": {
+        "id": 42,
+        "case_type": "inheritance",
+        "document_type": "khai_nhan",
+        "status": "draft",
+        "locked": false,
+        "revision": 8,
+        "ngay_lap_ho_so": null,
+        "noi_niem_yet": "UBND xã Minh Tân, huyện Ý Yên, tỉnh Nam Định",
+        "ghi_chu": null,
+        "nguoi_nhan_uy_quyen": null,
+        "nguoi_nhan_uy_quyen_id": null,
+        "noi_dung_viec": null
+      }
+    },
+    "warnings": []
+  },
+  "error": null,
+  "updated_at": "2026-10-03T04:30:00Z"
+}

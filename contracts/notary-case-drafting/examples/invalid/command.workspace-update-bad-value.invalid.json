@@ -1,0 +1,18 @@
+{
+  "expected_error": "validation_error",
+  "fixture_context": {
+    "server_revision": 7,
+    "note": "§6.2 — noi_niem_yet/ghi_chu phải chuỗi non-empty hoặc null (theo §4.3); số → validation_error"
+  },
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-0062-4006-8006-000000000065",
+  "command": "notary.workspace_update",
+  "payload": {
+    "case_id": 42,
+    "base_revision": 7,
+    "case": {
+      "ghi_chu": 123
+    }
+  },
+  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+}

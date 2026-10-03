@@ -1217,7 +1217,7 @@ def _workspace_data(cid, case):
         "capabilities": {
             "intake": list(INTAKE_KINDS) if caps else [],
             "diagram": caps,
-            "word_export": ct == CASE_TYPE_INHERITANCE,
+            "word_export": caps,
         },
     }
     if case.get("warnings"):
@@ -1728,6 +1728,71 @@ def workspace_commit_stage(job, payload):
     })
 
 
+_WORKSPACE_UPDATE_META = ("ngay_lap_ho_so", "noi_niem_yet", "ghi_chu")
+
+
+def workspace_update(job, payload):
+    """notary.workspace_update mock (§6.2) — parity real: cap nhat meta
+    case da luu (khong cham stage/diagram), revision+1. case_type/
+    document_type la dinh danh — key la → validation_error.
+    Meta doc lap case_type: chi chan locked + conflict (real
+    update_meta khong _check_supported)."""
+    case = _case(payload)
+    if case.get("locked"):
+        raise CommandError("workspace_locked",
+                           f"hồ sơ #{case['id']} đã khóa")
+    _check_base_revision(case, payload)
+    cm = (payload or {}).get("case")
+    if not isinstance(cm, dict) or not cm:
+        raise CommandError("validation_error",
+                           "payload.case phải là object non-empty")
+    extra = set(cm) - set(_WORKSPACE_UPDATE_META)
+    if extra:
+        raise CommandError("validation_error",
+                           f"payload.case key lạ: {sorted(extra)}")
+    # Validate TOAN patch truoc khi mutate (parity real update_meta §6.2
+    # atomic): patch nua dung nua sai → loi, khong luu mot phan.
+    updates = {}
+    if "ngay_lap_ho_so" in cm:
+        nl = cm.get("ngay_lap_ho_so")
+        if nl is not None and not (
+                isinstance(nl, str) and DATE_FULL_RX.match(nl)):
+            raise CommandError("validation_error",
+                               "ngay_lap_ho_so phải YYYY-MM-DD/null")
+        updates["ngay_lap_ho_so"] = nl
+    for f in ("noi_niem_yet", "ghi_chu"):
+        if f not in cm:
+            continue
+        v = cm.get(f)
+        if v is not None and (
+                not isinstance(v, str) or not v.strip()):
+            raise CommandError("validation_error",
+                               f"{f} phải là chuỗi non-empty/null")
+        updates[f] = v
+    for f, v in updates.items():
+        case[f] = v
+    case["revision"] += 1
+    job.check_cancel()
+    return _result("workspace_update", {
+        "schema_version": SCHEMA_VERSION,
+        "revision": case["revision"],
+        "case": {
+            "id": case["id"],
+            "case_type": case.get("case_type"),
+            "document_type": case.get("document_type"),
+            "status": case.get("status"),
+            "locked": bool(case.get("locked")),
+            "revision": case["revision"],
+            "ngay_lap_ho_so": case.get("ngay_lap_ho_so"),
+            "noi_niem_yet": case.get("noi_niem_yet"),
+            "ghi_chu": case.get("ghi_chu"),
+            "nguoi_nhan_uy_quyen": case.get("nguoi_nhan_uy_quyen"),
+            "nguoi_nhan_uy_quyen_id": case.get("nguoi_nhan_uy_quyen_id"),
+            "noi_dung_viec": case.get("noi_dung_viec"),
+        },
+    })
+
+
 def diagram_evaluate(job, payload):
     """Read-only — duoc phep tren case locked (§7.4); khong persist.
 
@@ -1829,19 +1894,34 @@ def diagram_save(job, payload):
     })
 
 
-def _word_block_reason(case, document_key):
-    """Readiness theo validation that (contract §8.1 mapping) — chi duoc
-    goi cho inheritance (caller reject two_party)."""
-    if document_key in NO_TEMPLATE_KEYS:
+def _word_block_reason(case, document_key=None):
+    """Readiness theo validation that (contract §8.1 mapping).
+
+    NAIA-8: two_party khong con bi chan — readiness theo nhanh case_type
+    (khong ap dieu kien thua ke); catalog document_key bi bo qua o
+    folder mode (document_key=None)."""
+    if document_key is not None and document_key in NO_TEMPLATE_KEYS:
         return "word.template_missing"
     assets = case["stage"]["assets"]
     nodes = [n for n in (case["diagram"].get("state") or {}).get("nodes")
              or [] if isinstance(n, dict) and not n.get("deleted")]
+    stage_people = _person_map(case)
+    if case.get("case_type") == CASE_TYPE_TWO_PARTY:
+        if not stage_people:
+            return "word.no_people"
+        if not nodes:
+            return "word.no_diagram"
+        if not assets:
+            return "word.no_assets"
+        if len(assets) > 5:
+            return "word.too_many_assets"
+        if len(stage_people) > 30:
+            return "word.too_many_people"
+        return None
     if not assets:
         return "word.no_assets"
     if len(assets) > 5:
         return "word.too_many_assets"
-    stage_people = _person_map(case)
     landowners = [n for n in nodes
                   if n.get("ownPositions") and n.get("personId")]
     if not landowners:
@@ -1854,8 +1934,7 @@ def _word_block_reason(case, document_key):
                  if n.get("receivePositions") and n.get("personId")]
     if not receivers:
         return "word.no_receiver"
-    assigned = [n for n in nodes if n.get("personId")]
-    if len(assigned) > 20:
+    if len(stage_people) > 20:
         return "word.too_many_people"
     # signers = living landowners + receivers, dedupe personId — parity
     # voi word_engine.word_block_reason (real, MIN-110 review).
@@ -1868,15 +1947,96 @@ def _word_block_reason(case, document_key):
     return None
 
 
+_DOCX_SUFFIX = ".docx"
+
+
+def _contained_in(path, real_root):
+    """Parity services.word_batch_export._contained_in: real path cua
+    `path` con nam trong `real_root` (da resolve) sau khi duoi theo
+    symlink/junction moi cap? Windows junction KHONG phai is_symlink —
+    chi resolve() moi lo dich that. Loi resolve -> False (fail-closed)."""
+    try:
+        return path.resolve().is_relative_to(real_root)
+    except (OSError, RuntimeError):
+        return False
+
+
+def _scan_template_dir(template_dir):
+    """Quet .docx ngay trong thu muc mau (NAIA-8 folder mode) — parity
+    services.word_batch_export.scan_template_dir: bo ~$*, sort on dinh
+    (casefold, ten goc), document_key = ten file, display_name = stem.
+    Entry la symlink/junction tro ra NGOAI thu muc mau bi loai —
+    is_file() duoi theo link nen phai kiem containment sau resolve."""
+    root = Path(template_dir)
+    if not root.is_dir():
+        raise CommandError(
+            "file_not_found",
+            "thư mục mẫu không tồn tại hoặc không đọc được")
+    try:
+        root_real = root.resolve()
+        entries = sorted(
+            root.iterdir(), key=lambda p: (p.name.casefold(), p.name))
+    except (OSError, RuntimeError) as exc:
+        raise CommandError(
+            "file_not_found", f"không đọc được thư mục mẫu: {exc}")
+    out = []
+    for path in entries:
+        name = path.name
+        if name.startswith("~$") or not name.lower().endswith(_DOCX_SUFFIX):
+            continue
+        if not path.is_file() or not _contained_in(path, root_real):
+            continue
+        out.append({"document_key": name, "display_name": path.stem})
+    return out
+
+
+def _ascii_stem(filename):
+    """filename → stem ASCII — parity services.word_batch_export."""
+    import unicodedata as _ud
+    stem = _ud.normalize("NFD", Path(filename).stem)
+    stem = "".join(ch for ch in stem if _ud.category(ch) != "Mn")
+    stem = stem.replace("đ", "d").replace("Đ", "D")
+    stem = re.sub(r"[^A-Za-z0-9_-]+", "_", stem).strip("_") or "Mau"
+    return stem[:80]
+
+
+def _word_template_dir(payload):
+    """payload.template_dir → Path thu muc mau (file_ref is_dir:true
+    qua token resolve) hoac None. Parity _word_template_source."""
+    ref = (payload or {}).get("template_dir")
+    if ref is None:
+        return None
+    if not isinstance(ref, dict) or ref.get("is_dir") is not True:
+        raise CommandError("validation_error",
+                           "template_dir phải là file_ref is_dir:true")
+    root = validate_file_ref(ref)
+    if not root.is_dir():
+        raise CommandError("file_not_found",
+                           "thư mục mẫu không tồn tại hoặc không đọc được")
+    return root
+
+
 def word_export_options(job, payload):
     """Read-only — duoc phep tren locked (chi workspace_get quyet dinh
-    capability); block_reason theo validation that. two_party ->
-    case_type_unsupported (§13.8)."""
+    capability); block_reason theo validation that.
+
+    NAIA-8: two_party mo (readiness word.no_people/no_diagram/...);
+    template_dir → documents = .docx quet duoc thay vi catalog co dinh."""
     case = _case(payload)
-    if case.get("case_type") == CASE_TYPE_TWO_PARTY:
-        raise CommandError("case_type_unsupported",
-                           "Word export chưa hỗ trợ loại việc two_party",
-                           details={"case_type": case.get("case_type")})
+    template_root = _word_template_dir(payload)
+    if template_root is not None:
+        scanned = _scan_template_dir(template_root)
+        docs = []
+        for item in scanned:
+            reason = _word_block_reason(case)
+            docs.append({"document_key": item["document_key"],
+                         "display_name": item["display_name"],
+                         "ready": reason is None,
+                         "block_reason": reason})
+        job.check_cancel()
+        return _result("word_export_options",
+                       {"schema_version": SCHEMA_VERSION,
+                        "documents": docs})
     docs = []
     for key, meta in DOC_CATALOG.items():
         reason = _word_block_reason(case, key)
@@ -1969,13 +2129,20 @@ def _reserve_and_write(dest_dir, stem, case_id, taken, title, case):
 
 def word_export_batch(job, payload):
     case = _case(payload)
-    # real parity _word_case: two_party -> case_type_unsupported TRUOC
-    # locked check.
-    if case.get("case_type") == CASE_TYPE_TWO_PARTY:
-        raise CommandError("case_type_unsupported",
-                           "Word export chưa hỗ trợ loại việc two_party",
-                           details={"case_type": case.get("case_type")})
+    # NAIA-8: bo chan case_type_unsupported rieng luong Word — readiness
+    # chi tiet qua _word_block_reason (word.no_people/no_diagram/...).
     _check_writable(case)
+    create_case_subdir = (payload or {}).get("create_case_subdir", False)
+    if not isinstance(create_case_subdir, bool):
+        raise CommandError("validation_error",
+                           "create_case_subdir phải là bool")
+    template_root = _word_template_dir(payload)
+    folder_docs = None
+    template_root_real = None
+    if template_root is not None:
+        folder_docs = {item["document_key"]: item
+                       for item in _scan_template_dir(template_root)}
+        template_root_real = template_root.resolve()
     keys = (payload or {}).get("document_keys")
     # Oracle parity: thieu/null/khong list -> validation_error;
     # word_no_documents_selected CHI cho list rong [].
@@ -1991,7 +2158,13 @@ def word_export_batch(job, payload):
                            f"document_key lặp: {dup}",
                            details={"document_key": dup})
     for k in keys:
-        if not (isinstance(k, str) and DOC_KEY_RX.match(k)) \
+        if folder_docs is not None:
+            if not (isinstance(k, str) and k in folder_docs):
+                raise CommandError(
+                    "word_unknown_document_key",
+                    f"document_key ngoài thư mục mẫu: {k!r}",
+                    details={"document_key": k})
+        elif not (isinstance(k, str) and DOC_KEY_RX.match(k)) \
                 or k not in DOC_CATALOG:
             raise CommandError("word_unknown_document_key",
                                f"document_key ngoài catalog: {k!r}",
@@ -2000,10 +2173,41 @@ def word_export_batch(job, payload):
     if not isinstance(dest, dict) or dest.get("is_dir") is not True:
         raise CommandError("validation_error",
                            "destination phải là file_ref is_dir:true")
-    dest_dir = validate_file_ref(dest)      # scope/UNC/abs — envelope §6
+    granted_dir = validate_file_ref(dest)   # scope/UNC/abs — envelope §6
+    dest_dir = granted_dir
+    if create_case_subdir:
+        dest_dir = granted_dir / f"HS-{payload['case_id']}"
+        try:
+            dest_dir.mkdir(exist_ok=True)
+        except OSError as exc:
+            raise CommandError(
+                "file_locked",
+                f"không tạo được thư mục con hồ sơ: {exc}") from exc
+        # Parity engine that: HS-<id> la junction/symlink tro ra ngoai ->
+        # mkdir(exist_ok=True) van pass, ghi thoat khoi thu muc duoc cap
+        # quyen. Kiem tra dich THAT truoc probe/ghi.
+        try:
+            granted_real = granted_dir.resolve()
+        except (OSError, RuntimeError) as exc:
+            raise CommandError(
+                "file_not_found",
+                f"không xác định được destination: {exc}") from exc
+        if not _contained_in(dest_dir, granted_real):
+            raise CommandError(
+                "word_path_traversal",
+                "thư mục con hồ sơ trỏ ra ngoài thư mục đích được chọn")
     if not dest_dir.is_dir():
         raise CommandError("file_not_found",
                            "destination không phải thư mục đang tồn tại")
+
+    def _meta(key):
+        """(display_name, filename_stem) — folder mode derive tu file."""
+        if folder_docs is not None:
+            item = folder_docs[key]
+            return item["display_name"], _ascii_stem(item["document_key"])
+        meta = DOC_CATALOG[key]
+        return meta["display_name"], meta["filename_stem"]
+
     docs = []
     taken = set()
     failed = []
@@ -2015,15 +2219,15 @@ def word_export_batch(job, payload):
         entries = list(docs)
         remaining = keys[len(entries):]
         for key in remaining:
-            meta = DOC_CATALOG[key]
+            display_name, _stem = _meta(key)
             entries.append({"document_key": key,
-                            "display_name": meta["display_name"],
+                            "display_name": display_name,
                             "status": "skipped", "actual_filename": None,
                             "output_file": None, "error": None})
         return _result(
             "word_export_batch",
             {"schema_version": SCHEMA_VERSION,
-             "destination": {"path": str(dest_dir),
+             "destination": {"path": str(granted_dir),
                              "scope": "machine_local", "is_dir": True},
              "documents": entries,
              "breakdown": {"succeeded": list(saved),
@@ -2057,10 +2261,10 @@ def word_export_batch(job, payload):
 
     for i, key in enumerate(keys):
         job.check_cancel(_pending_result())  # cancel giua batch
-        meta = DOC_CATALOG[key]
+        display_name, stem = _meta(key)
         if dest_error is not None:
             docs.append({"document_key": key,
-                         "display_name": meta["display_name"],
+                         "display_name": display_name,
                          "status": "failed", "actual_filename": None,
                          "output_file": None,
                          "error": {"code": dest_error[0],
@@ -2070,9 +2274,17 @@ def word_export_batch(job, payload):
                                 f"văn bản {i + 1}/{len(keys)}")
             continue
         reason = _word_block_reason(case, key)
+        # Folder mode: file mat giua scan va export -> template_missing
+        # (parity template_path_resolver cua real) — ke ca bi doi thanh
+        # symlink/junction tro ra ngoai thu muc mau sau khi scan.
+        if (reason is None and folder_docs is not None
+                and not ((template_root / key).is_file()
+                         and _contained_in(
+                             template_root / key, template_root_real))):
+            reason = "word.template_missing"
         if reason is not None:
             docs.append({"document_key": key,
-                         "display_name": meta["display_name"],
+                         "display_name": display_name,
                          "status": "failed", "actual_filename": None,
                          "output_file": None,
                          "error": {"code": reason,
@@ -2083,9 +2295,9 @@ def word_export_batch(job, payload):
             job.check_cancel(_pending_result())  # truoc khi ghi file
             try:
                 name = _reserve_and_write(
-                    dest_dir, meta["filename_stem"],
+                    dest_dir, stem,
                     int(payload["case_id"]), taken,
-                    meta["display_name"], {"id": payload["case_id"]})
+                    display_name, {"id": payload["case_id"]})
             except OSError as exc:
                 # Parity engine that (MIN-116): OSError o write path ->
                 # per-doc error theo _doc_error_from (file_not_found /
@@ -2098,7 +2310,7 @@ def word_export_batch(job, payload):
                 else:
                     code = "word.render_failed"
                 docs.append({"document_key": key,
-                             "display_name": meta["display_name"],
+                             "display_name": display_name,
                              "status": "failed", "actual_filename": None,
                              "output_file": None,
                              "error": {"code": code,
@@ -2107,7 +2319,7 @@ def word_export_batch(job, payload):
             else:
                 out_path = dest_dir / name
                 docs.append({"document_key": key,
-                             "display_name": meta["display_name"],
+                             "display_name": display_name,
                              "status": "saved", "actual_filename": name,
                              "output_file": {"path": str(out_path),
                                              "scope": "machine_local"},
@@ -2117,8 +2329,8 @@ def word_export_batch(job, payload):
                             f"văn bản {i + 1}/{len(keys)}")
     breakdown = {"succeeded": saved, "failed": failed, "skipped": []}
     data = {"schema_version": SCHEMA_VERSION,
-            "destination": {"path": str(dest_dir), "scope": "machine_local",
-                            "is_dir": True},
+            "destination": {"path": str(granted_dir),
+                            "scope": "machine_local", "is_dir": True},
             "documents": docs, "breakdown": breakdown}
     if len(failed) == len(keys):
         raise CommandError(                  # all failed -> job failed §8.4
@@ -2137,12 +2349,14 @@ def word_export_batch(job, payload):
 
 def _block_message(code):
     return {
+        "word.no_people": "Stage chưa có người nào",
+        "word.no_diagram": "Chưa có sơ đồ hai bên đã lưu",
         "word.no_assets": "Hồ sơ chưa có tài sản",
         "word.no_landowner": "Chưa có chủ đất trên Diagram",
         "word.no_deceased_landowner": "Không có chủ đất đã chết",
         "word.no_receiver": "Chưa có người nhận",
         "word.too_many_assets": "Quá 5 tài sản",
-        "word.too_many_people": "Quá 20 người trên Diagram",
+        "word.too_many_people": "Quá 20 người trong Stage",
         "word.too_many_signers": "Quá 20 người ký",
         "word.template_missing": "Văn bản chưa có template",
     }.get(code, code)

@@ -2,9 +2,8 @@
   "fixture_context": {
     "draft_v2": true,
     "case_type": "two_party",
-    "note": "word_export_batch trên case two_party → case_type_unsupported (§13.5/§13.10 — Word engine hiện hành không nhận domain này)"
+    "note": "NAIA-8: word_export_batch trên case two_party hợp lệ — engine hỗ trợ context Bên A/B; readiness đi qua block_reason"
   },
-  "expected_error": "case_type_unsupported",
   "contract_version": "desktopcommand.v1",
   "command": "notary.word_export_batch",
   "command_id": "a1b2c3d4-2009-4001-8001-000000000001",

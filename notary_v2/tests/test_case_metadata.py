@@ -366,7 +366,9 @@ def test_word_case_meta_from_committed_snapshot(db):
     assert mapping["[Nơi niêm yết]"] == "xã Nơi Niêm Yết"
     assert mapping["[Niêm Yết]"] == "xã Nơi Niêm Yết"
     assert mapping["[Ngườ ủy quyền]"] == "Người Quyền"
-    assert mapping["[Ngườ ủy quyền2]"] == "Người Quyền"
+    # Owner removed this obsolete slot on 02/10 (NAIA-8/12).
+    # It must no longer silently duplicate the first authorized recipient.
+    assert "[Ngườ ủy quyền2]" not in mapping
     assert mapping["[Nội dung việc]"] == "Đính chính sai chính tả"
 
 

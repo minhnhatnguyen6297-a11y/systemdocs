@@ -292,6 +292,9 @@ def _asset_contract_keys() -> tuple[str, ...]:
 _STAGE_KEYS = {"owner_row_id", "people", "assets"}
 _PERSON_FIELD_SET = set(_person_contract_keys())
 _ASSET_FIELD_SET = set(_asset_contract_keys())
+# Meta cap nhat duoc tren case da luu qua workspace_update (§6.2) —
+# case_type/document_type la dinh danh nghiep vu, khong doi sau create.
+_CASE_META_UPDATE_KEYS = {"ngay_lap_ho_so", "noi_niem_yet", "ghi_chu"}
 
 # Key cụm đất: canonical mới (loaidat/dientich/thoihan — tên nghiệp vụ
 # MIN-141 đợt 2, cùng là cột bảng property_land_rows) ↔ legacy wire/JSON
@@ -1008,8 +1011,9 @@ class CaseWorkspaceService:
         data["capabilities"] = {
             "intake": list(INTAKE_KINDS) if supported else [],
             "diagram": supported,
-            # §13.5: word_export chỉ mở cho inheritance.
-            "word_export": case_type == CASE_TYPE_INHERITANCE,
+            # NAIA-8: word_export mở cho cả inheritance lẫn two_party —
+            # readiness chi tiết qua word_export_options.block_reason.
+            "word_export": case_type in CASE_TYPES,
         }
         return data
 
@@ -1218,6 +1222,111 @@ class CaseWorkspaceService:
             "diagram": diagram_out,
         }
 
+    def update_meta(self, case_id: int, base_revision: int,
+                    meta: Any) -> dict:
+        """`notary.workspace_update` — cap nhat meta cua case da luu
+        (§6.2): `ngay_lap_ho_so`/`noi_niem_yet`/`ghi_chu`. Khong cham
+        stage/diagram; guarded revision bump nhu commit_stage."""
+        case = self._load_case(case_id)
+        if case.is_locked:
+            raise WorkspaceError(
+                "workspace_locked", f"Hồ sơ #{case_id} đang bị khóa")
+        if (not isinstance(base_revision, int)
+                or isinstance(base_revision, bool) or base_revision < 1):
+            raise WorkspaceError(
+                "validation_error", "base_revision phải là số nguyên ≥ 1")
+        server_revision = self._revision(case)
+        if base_revision != server_revision:
+            raise WorkspaceError(
+                "workspace_conflict",
+                f"Revision server hiện là {server_revision}, "
+                f"base_revision={base_revision}",
+                details={"server_revision": server_revision})
+        if not isinstance(meta, Mapping) or not meta:
+            raise WorkspaceError(
+                "validation_error", "payload.case phải là object non-empty")
+        _check_extra_keys(meta, _CASE_META_UPDATE_KEYS, "payload.case")
+        updates: dict = {}
+        if "ngay_lap_ho_so" in meta:
+            ngay = meta.get("ngay_lap_ho_so")
+            if not _valid_date_full(ngay):
+                raise WorkspaceError(
+                    "validation_error",
+                    "ngay_lap_ho_so phải là YYYY-MM-DD hoặc null")
+            updates["ngay_lap_ho_so"] = _parse_date_or_year(ngay)
+        for field in ("noi_niem_yet", "ghi_chu"):
+            if field not in meta:
+                continue
+            value = meta.get(field)
+            if value is not None and (
+                    not isinstance(value, str) or not value.strip()):
+                raise WorkspaceError(
+                    "validation_error",
+                    f"{field} phải là chuỗi non-empty hoặc null")
+            updates[field] = _nn(value)
+        try:
+            for field, value in updates.items():
+                setattr(case, field, value)
+            # Update only submitted metadata keys in the committed snapshot.
+            # Stage/assets/diagram and unrelated confirmed metadata stay frozen.
+            payload = self._load_payload(case) or {}
+            snapshot = dict(payload.get("case") or {})
+            canonical_keys = {"ngay_lap_ho_so": "ngaylaphoso",
+                              "noi_niem_yet": "noiniemyet",
+                              "ghi_chu": "ghichu"}
+            for field, value in updates.items():
+                snapshot[canonical_keys[field]] = (
+                    _emit_date_or_year(value) if field == "ngay_lap_ho_so"
+                    else value)
+            if payload:
+                payload["case"] = snapshot
+                case.case_state_json = json.dumps(payload, ensure_ascii=False)
+            self.db.flush()
+            # Guarded atomic revision bump — 2 update cung base chi 1 thang.
+            new_revision = server_revision + 1
+            updated = self.db.execute(sa_text(
+                "UPDATE inheritance_cases "
+                "SET workspace_revision = :rev, updated_at = :now "
+                "WHERE id = :cid AND workspace_revision = :base"),
+                {"rev": new_revision,
+                 "now": datetime.now(timezone.utc).replace(tzinfo=None),
+                 "cid": case.id, "base": server_revision})
+            if updated.rowcount != 1:
+                self.db.rollback()
+                fresh = self._fresh_revision(case.id, server_revision)
+                raise WorkspaceError(
+                    "workspace_conflict",
+                    f"Revision server hiện là {fresh}",
+                    details={"server_revision": fresh})
+            self.db.commit()
+        except WorkspaceError:
+            self.db.rollback()
+            raise
+        except Exception:
+            self.db.rollback()
+            raise
+
+        self.db.refresh(case)
+        case_type, document_type = _case_meta(case)
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "revision": new_revision,
+            "case": {
+                "id": case.id,
+                "case_type": case_type,
+                "document_type": document_type,
+                "status": "locked" if case.is_locked else "draft",
+                "locked": bool(case.is_locked),
+                "revision": new_revision,
+                "ngay_lap_ho_so": _emit_date_or_year(case.ngay_lap_ho_so),
+                "noi_niem_yet": _nn(case.noi_niem_yet),
+                "ghi_chu": _nn(case.ghi_chu),
+                "nguoi_nhan_uy_quyen": _nn(case.nguoi_nhan_uy_quyen),
+                "nguoi_nhan_uy_quyen_id": case.nguoi_nhan_uy_quyen_id,
+                "noi_dung_viec": _nn(case.noi_dung_viec),
+            },
+        }
+
     def create(self, idempotency_key: Any, case_meta: Any,
                stage: Any, state: Any) -> dict:
         """`notary.workspace_create` — tạo hồ sơ từ nháp (§13.6).
@@ -1412,7 +1521,7 @@ class CaseWorkspaceService:
             "capabilities": {
                 "intake": list(INTAKE_KINDS),
                 "diagram": True,
-                "word_export": case_type == CASE_TYPE_INHERITANCE,
+                "word_export": case_type in CASE_TYPES,
             },
         }
 

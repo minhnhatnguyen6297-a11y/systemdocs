@@ -8,7 +8,11 @@
       "required": ["case_id"],
       "additionalProperties": false,
       "properties": {
-        "case_id": { "type": "integer", "minimum": 1 }
+        "case_id": { "type": "integer", "minimum": 1 },
+        "template_dir": {
+          "$ref": "common.schema.json#/definitions/file_ref_dir",
+          "description": "NAIA-8: thư mục mẫu người dùng chọn — documents = file .docx quét được thay vì catalog cố định"
+        }
       }
     },
     "options_result_data": {
@@ -35,7 +39,15 @@
           "items": { "$ref": "common.schema.json#/definitions/document_key" },
           "uniqueItems": true
         },
-        "destination": { "$ref": "common.schema.json#/definitions/file_ref_dir" }
+        "destination": { "$ref": "common.schema.json#/definitions/file_ref_dir" },
+        "template_dir": {
+          "$ref": "common.schema.json#/definitions/file_ref_dir",
+          "description": "NAIA-8: thư mục mẫu — document_keys được đối chiếu lại với đúng tập .docx của thư mục này"
+        },
+        "create_case_subdir": {
+          "type": "boolean",
+          "description": "NAIA-8: true → ghi vào <destination>/HS-<case_id>/ (tạo nếu thiếu)"
+        }
       }
     },
     "batch_result_data": {

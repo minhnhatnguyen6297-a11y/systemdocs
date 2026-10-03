@@ -483,7 +483,8 @@
     },
     "document_key": {
       "type": "string",
-      "pattern": "^[a-z][a-z0-9_]*$"
+      "pattern": "^([a-z][a-z0-9_]*|[^<>:\"/\\\\|?*]{1,180}\\.[dD][oO][cC][xX])$",
+      "description": "Catalog mode: key snake_case. Folder mode (NAIA-8): chính tên file .docx đã quét trong thư mục mẫu (basename — không separator/traversal)."
     },
     "document_option": {
       "type": "object",
@@ -495,6 +496,7 @@
         "ready": { "type": "boolean" },
         "block_reason": {
           "enum": [
+            "word.no_people", "word.no_diagram",
             "word.no_assets", "word.no_landowner",
             "word.no_deceased_landowner", "word.no_receiver",
             "word.too_many_assets", "word.too_many_people",

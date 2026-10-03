@@ -52,7 +52,7 @@
     --cd-col-id: 120px;
   }
 }
-.cd-root input,
+.cd-root input:not([type="checkbox"]):not([type="radio"]),
 .cd-root select,
 .cd-root textarea {
   width: 100%;
@@ -915,6 +915,10 @@
 .cd-check-row { display: flex; gap: 8px; align-items: center; }
 .cd-word-row { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; }
 .cd-word-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* NAIA-8 review: author `button{display:inline-flex}` (styles.css) thắng
+   [hidden] của UA → "Hủy xuất" vẫn hiện sau khi batch xong. Scoped cho
+   dialog Word — không đụng rule button chung của shell. */
+.cd-word-modal [hidden] { display: none; }
 .cd-badge-ok { border-color: #16a34a; color: #15803d; background: #dcfce7; }
 .cd-badge-err { border-color: var(--err); color: var(--err); background: #fef2f2; }
 .cd-menu-item { min-width: 44px; }

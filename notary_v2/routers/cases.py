@@ -1357,7 +1357,9 @@ def _build_template_mapping(case: InheritanceCase) -> dict:
     from datetime import date as _date_cls
     today = _date_cls.today()
 
-    noi_niem_yet = _safe_text(case.noi_niem_yet) if case.noi_niem_yet else _safe_text(ts.dia_chi)
+    # [Nơi niêm yết] chỉ lấy trường người dùng nhập/lưu trên hồ sơ — không
+    # fallback sang địa chỉ đất (quyết định Owner, review NAIA-12).
+    noi_niem_yet = _safe_text(case.noi_niem_yet) if case.noi_niem_yet else ""
 
     # Phân tích land_rows_json để lấy dữ liệu từng loại đất
     land_rows = []

@@ -3,8 +3,8 @@
 Quy ước: `N` là số thứ tự người/tài sản; `M` là số thứ tự loại đất trong tài sản. Slot không có dữ liệu trả về rỗng toàn bộ.
 
 **Vai trò:** catalog tham chiếu mẫu Word đang chạy; spec hiện hành ở
-[`word-output.md`](../../docs/spec/notary_v2/word-output.md) §11.
-Phase engine tĩnh §1–§10 của spec vẫn Draft.
+[`word-output.md`](../../docs/spec/notary_v2/word-output.md).
+Phase thư mục mẫu Active sau tích hợp NAIA-8/12 (04/10/2026).
 
 ### Token chuẩn bổ sung MIN-141 (03/10/2026)
 
@@ -16,7 +16,8 @@ Phase engine tĩnh §1–§10 của spec vẫn Draft.
 
 Không có alias rút gọn `[loaidatM]`. Null/rỗng đã commit được giữ nguyên;
 không tự điền nơi niêm yết từ địa chỉ đất hoặc thời hạn lẻ vào cụm.
-Thứ tự người hiện vẫn là slot legacy, chưa đổi sang thứ tự Stage của phase Draft.
+Token viết liền giữ slot legacy. Nhóm `[Người N - ...]` dùng thứ tự Stage đã lưu;
+`[Bên A N - ...]` và `[Bên B N - ...]` giữ ghế cố định 1..15 mỗi bên.
 
 ## 1. Hồ sơ
 
@@ -25,7 +26,8 @@ Thứ tự người hiện vẫn là slot legacy, chưa đổi sang thứ tự S
 | `[Loại văn bản]` | Tên loại văn bản | - |
 | `[Tên file]` | Tên file xuất | - |
 | `[Ngày lập hồ sơ]` | Ngày lập hồ sơ | - |
-| `[Niêm Yết]` | Nơi lập/niêm yết | - |
+| `[Nơi niêm yết]` | Nơi niêm yết người dùng nhập trên hồ sơ | Cột `InheritanceCase.noi_niem_yet`; KHÔNG fallback địa chỉ tài sản — thiếu dữ liệu thì rỗng |
+| `[Niêm Yết]`, `[NIÊM YẾT]` | Alias cũ của nơi niêm yết | Cùng nguồn `noi_niem_yet` (bản HOA cho `[NIÊM YẾT]`) |
 | `[Ghi chú]` | Ghi chú hồ sơ | - |
 | `[Ngày]` | Ngày xuất Word | - |
 | `[Tháng]` | Tháng xuất Word | - |
@@ -38,13 +40,13 @@ Thứ tự người hiện vẫn là slot legacy, chưa đổi sang thứ tự S
 
 | Placeholder | Chú thích | Hàm bên trong |
 |---|---|---|
-| `[Người N - Xưng hô]` | Ông/Bà của người N trên Diagram | Theo giới tính |
-| `[Người N - Họ tên]` | Họ tên người N trên Diagram | - |
+| `[Người N - Xưng hô]` | Ông/Bà của dòng Stage N | Theo giới tính |
+| `[Người N - Họ tên]` | Họ tên dòng Stage N đã lưu | - |
 | `[Người N - Giới tính]` | Giới tính | - |
 | `[Người N - Ngày sinh]` | Ngày sinh | - |
-| `[Người N - Năm sinh]` | Ngày sinh hoặc chỉ năm sinh | Ngày `01/01/yyyy` hiển thị `yyyy` |
+| `[Người N - Năm sinh]` | Năm của ngày sinh hoặc chỉ năm sinh | Chỉ năm `yyyy` |
 | `[Người N - Ngày chết]` | Ngày chết | - |
-| `[Người N - Năm chết]` | Ngày chết hoặc chỉ năm chết | Ngày `01/01/yyyy` hiển thị `yyyy` |
+| `[Người N - Năm chết]` | Năm của ngày chết hoặc chỉ năm chết | Chỉ năm `yyyy` |
 | `[Người N - Loại giấy tờ]` | Loại giấy tờ | - |
 | `[Người N - Số giấy tờ]` | Số giấy tờ | - |
 | `[Người N - Ngày cấp]` | Ngày cấp giấy tờ | - |
@@ -68,7 +70,7 @@ Các trường còn lại dùng cùng mẫu: `[Tên danh sách N - Tên trườn
 |---|---|---|
 | `[Cụm chủ đất chết]` | Tên một hoặc hai người để lại di sản | `[Chủ đất chết 1 - Xưng hô] [Chủ đất chết 1 - Họ tên]` + ` và ` + `[Chủ đất chết 2 - Xưng hô] [Chủ đất chết 2 - Họ tên]`; người thứ hai rỗng thì bỏ cả người và từ nối |
 | `[Nối chủ đất chết 2]` | Từ nối tương thích cho template ghép trường | ` và ` nếu có chủ đất chết 2; ngược lại rỗng |
-| `[Dòng người N]` | Một block thông tin người N trên Diagram | `N. [Người N - Xưng hô] [Người N - Họ tên]; Sinh ngày: [Người N - Năm sinh].`<br>`[Người N - Loại giấy tờ] số: [Người N - Số giấy tờ] do [Người N - Nơi cấp] cấp ngày [Người N - Ngày cấp].`<br>`[Người N - Nhãn địa chỉ]: [Người N - Địa chỉ].`<br>`Là [Người N - Quan hệ].` |
+| `[Dòng người N]` | Một block thông tin dòng Stage N | `N. [Người N - Xưng hô] [Người N - Họ tên]; Sinh ngày: [Người N - Ngày sinh].`<br>`[Người N - Loại giấy tờ] số: [Người N - Số giấy tờ] do [Người N - Nơi cấp] cấp ngày [Người N - Ngày cấp].`<br>`[Người N - Nhãn địa chỉ]: [Người N - Địa chỉ].`<br>`Là [Người N - Quan hệ].` |
 | `[Dòng người nhận N]` | Một block thông tin người nhận N | Cùng cấu trúc `[Dòng người N]`, dùng trường của danh sách `Người nhận` |
 | `[Dòng người từ chối N]` | Một block thông tin người từ chối N | Cùng cấu trúc `[Dòng người N]`, cuối block thêm: `[Người từ chối N - Xưng hô] [Người từ chối N - Họ tên] đã từ chối di sản theo Văn bản từ chối nhận di sản số ......................... .` |
 | `[Dòng khai tử chủ đất chết N]` | Một block thông tin chủ đất chết N | Xưng hô, họ tên, sinh, chết, giấy tờ khai tử, nơi chết |
@@ -111,9 +113,12 @@ Các trường còn lại dùng cùng mẫu: `[Tên danh sách N - Tên trườn
 | `[Tài sản N - Nguồn gốc]` | Nguồn gốc sử dụng | - |
 | `[Tài sản N - Ngày cấp sổ]` | Ngày cấp giấy chứng nhận | - |
 | `[Tài sản N - Cơ quan cấp sổ]` | Cơ quan cấp giấy chứng nhận | - |
+| `[Tài sản N - Loại đất]` | Loại đất cấp tài sản (`prop.loai_dat`) | Giá trị đơn người dùng nhập cho cả thửa; KHÔNG phải dòng loại đất M |
+| `[Loại đất tài sản N]` | Alias của `[Tài sản N - Loại đất]` | Cùng nguồn; thêm cho review NAIA-12 (nhãn động cấp tài sản) |
 | `[Loại đất N.M - Loại đất]` | Loại đất M của tài sản N | - |
 | `[Loại đất N.M - Diện tích]` | Diện tích loại đất M | - |
 | `[Loại đất N.M - Thời hạn]` | Thời hạn loại đất M | - |
+| `[Loại đất tài sản N.M]` | Loại đất THẬT của dòng M, tài sản N | Dùng cho nhãn động thay chữ ONT/CLN/NTS/LUC in cứng trong mẫu |
 
 ## 6. Tài sản - tầng 2
 
@@ -137,10 +142,82 @@ Các trường còn lại dùng cùng mẫu: `[Tên danh sách N - Tên trườn
 | `[Ngày cấp N]`, `[Nơi cấp CC N]`, `[Địa chỉ N]` | Giấy tờ, địa chỉ của slot cũ | Mapping tương thích cũ |
 | `[Địa chỉ đất]`, `[Loại sổ]`, `[Serial]`, `[Số vào sổ]` | Tài sản chính của template cũ | Alias tài sản 1 |
 | `[Số thửa]`, `[Số tờ]`, `[Diện tích]`, `[Nguồn gốc]` | Tài sản chính của template cũ | Alias tài sản 1 |
-| `[ONT]`, `[CLN]`, `[NTS]`, `[LUC]` | Alias loại đất cũ | Để rỗng; template mới dùng `[Loại đất N.M - ...]` |
+| `[ONT]`, `[CLN]`, `[NTS]`, `[LUC]` | Diện tích theo VỊ TRÍ dòng loại đất 1/2/3/4 của tài sản 1 (mẫu cũ in cứng nhãn "Loại đất 1: ONT" rồi `[ONT]` là diện tích dòng đó — KHÔNG tra theo mã loại đất; quyết định Owner 02/10/2026, NAIA-8 comment `01a0fd42-5cbe-7076-976e-ef907c8ca086`) | Dòng ở vị trí đó vắng → rỗng; tài sản không tồn tại → không map (export báo sót) |
+| `[ONT N]`, `[CLN N]`, `[NTS N]`, `[LUC N]` | Như trên nhưng của tài sản N | `N` là chỉ số tài sản, không phải vị trí dòng |
 
 ## 8. Tầng 3
 
 | Placeholder | Chú thích | Hàm bên trong |
 |---|---|---|
 | Chưa dùng | Cụm phải đối chiếu nhiều phần của văn bản | - |
+
+## 9. Nhãn mục in cứng của biểu mẫu hành chính
+
+Ba mẫu thuế `2. DK18, thuế 1..3` in cứng nhãn mục `[01]`..`[54]` và `[NN.M]`.
+Đây là CHỮ của biểu mẫu, không phải placeholder — chỉ được miễn khỏi kiểm tra
+placeholder sót khi thuộc danh sách đã xác minh của ĐÚNG mẫu đó
+(`VERIFIED_FIXED_CODES` trong `services/word_engine.py`). Mẫu khác chứa token
+dạng `[01]`/`[54.99]` vẫn bị báo thiếu và chặn export.
+
+## 10. Sửa ngữ cảnh khi migrate (review NAIA-12)
+
+Một số mẫu cũ in CỨNG dữ liệu hồ sơ thay vì placeholder — migrate đổi đúng
+đoạn đó thành placeholder động, ghi `context_fix` trong manifest
+(`_apply_context_fixes` trong `services/word_template_migration.py`):
+
+- Ba mẫu `2. DK18, thuế 1..3`: nhãn `Loại đất <vị trí>: ONT/CLN/NTS/LUC` in
+  cứng → `[Loại đất tài sản N.<vị trí>]` để in loại đất THẬT của từng dòng
+  (trước đó nhãn cứng làm sai khi hồ sơ xếp dòng khác thứ tự mẫu). Token
+  diện tích theo vị trí `[ONT N]`/`[CLN N]`/... giữ nguyên.
+- `2. DK18, thuế 2` và `thuế 3` là tờ khai của TÀI SẢN 2/3: token đất không
+  hậu tố `[Diện tích]`, `[Diện tích 2]`, `[Loại đất 2]`, `[Địa chỉ đất]`
+  trong những mẫu này được đổi thành `... tài sản 2/3` cho đúng đối tượng
+  (ngoài các mẫu đó token giữ alias tài sản 1 như cũ).
+- `1. Khai nhận di sản Vũ Dương` và `1. PCDS`: liệt kê in cứng
+  `Mục đích sử dụng: ONT: [ONT] m2; CLN: [CLN] m2; ...` →
+  `[Mục đích sử dụng 1]` — chỉ in các dòng đất thật của hồ sơ, không còn
+  nhãn cứng hay đuôi `: m2` thừa.
+
+Mọi sửa ngữ cảnh chỉ áp trên đúng stem mẫu đã đối chiếu; mẫu khác có cùng
+chuỗi vẫn giữ nguyên (kiểm thử `test_migrate_context_fix_leaves_other_-
+files_untouched`).
+
+## 11. Người được ủy quyền (slot)
+
+| Placeholder | Chú thích | Hàm bên trong |
+|---|---|---|
+| `[Danh sách người được ủy quyền]` | Block nhiều dòng tất cả đại diện | Ghép `[Dòng người được ủy quyền 1]` đến hết danh sách |
+| `[Danh sách người được ủy quyền inline]` | Tất cả đại diện trong câu ngang | Ghép `[Người được ủy quyền inline N]` |
+| `[Dòng người được ủy quyền N]` | Block thông tin đại diện N | Cùng cấu trúc `[Dòng người N]` |
+| `[Người được ủy quyền inline N]` | Đại diện N trong câu ngang | Tự thêm `, `/` và ` theo vị trí |
+| `[Người được ủy quyền N - <trường>]` | Một trường của đại diện N | Ví dụ `[Người được ủy quyền 1 - Họ tên]` |
+| `[<Trường> người được ủy quyền N]` | Dạng tiền tố | Ví dụ `[Họ tên người được ủy quyền 2]` |
+
+Nguồn: participants đã LƯU vai trò `Người được ủy quyền` — không yêu cầu node
+Diagram (NAIA-8). Engine đọc slot `N` từ mọi dạng token trên (kể cả
+`inline N`); token không hậu tố tính slot 1. Mẫu yêu cầu slot N lớn hơn số
+đại diện đã lưu → export trả `word.missing_authorized_person` và KHÔNG tạo
+file (review NAIA-12: `[Người được ủy quyền inline 2]` từng bị nhận nhầm
+slot 1 nên slot 2 trống vẫn xuất).
+
+## 12. Quyết định Owner 02/10/2026 và tương thích MIN-141
+
+- Tổng diện tích bằng chữ: `[Diện tích chữ tài sản N]`; alias `[Diện tích chữ]`
+  dùng tài sản 1. Token chỉ chứa giá trị; mẫu tự ghi đơn vị `m²`.
+- `[Năm chết]` dùng người 1 và chỉ xuất năm; `[ngaychetN]` giữ ngày đầy đủ
+  như MIN-141. Ngày đầy đủ hiển thị `dd/mm/yyyy`, chỉ năm giữ `yyyy`.
+- Bỏ `[Số công chứng]`, `[Giá chuyển nhượng]`, `[Người ủy quyền2]` và alias
+  sai chính tả tương ứng. Mẫu chưa migrate còn các token này phải báo lỗi,
+  không tự điền hay đăng ký alias rỗng. Manifest ghi tên/số lần bỏ; giữ nhãn
+  biểu mẫu hành chính cần người dùng điền tay.
+- `[Người ủy quyền]` cũ chuyển theo ngữ cảnh sang thông tin **người được ủy quyền**.
+  Alias MIN-141 `[Ngườ ủy quyền]` đọc metadata `nguoinhanuyquyen` đã xác nhận
+  nếu key có trong snapshot, kể cả null. Nhóm đại diện đầy đủ vẫn đọc vai trò
+  đã lưu, không suy từ vị trí dòng.
+- Nơi niêm yết nhập tay là đường chính. `workspace_update` cập nhật snapshot
+  metadata cùng revision. Cơ quan niêm yết theo ngày lập hồ sơ; ngày cấp giấy
+  tờ chỉ chọn dạng địa chỉ nguồn. Giấy chứng tử giữ nơi cấp xác nhận độc lập.
+  Quy tắc chuyển địa chỉ thuộc feature địa chỉ, không tự suy trong Word.
+
+Nguồn: owner comments NAIA-8/12 ngày 02/10/2026, yêu cầu tích hợp 03/10/2026;
+snapshot MIN-141 theo [entities](../../contracts/entities.md) §8–§9.

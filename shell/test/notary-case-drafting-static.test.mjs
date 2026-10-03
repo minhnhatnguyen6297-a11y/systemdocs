@@ -440,6 +440,33 @@ test('MIN-136: error-catalog load truoc cac module dung no', () => {
   }
 });
 
+// ---------- NAIA-8 review fixes ----------
+
+test('NAIA-8r: dialog Word co scope cd-word-modal + rule an [hidden] rieng', () => {
+  // Review NAIA-8: author `button{display:inline-flex}` (styles.css)
+  // thang [hidden] cua UA → "Huy xuat" van hien sau khi batch xong.
+  // Dialog danh dau container .cd-word-modal; rule scoped restore an —
+  // khong doi rule button chung cua shell.
+  const wordSrc = R(WORD);
+  assert.match(wordSrc, /cd-word-modal/);
+  assert.match(cssSrc,
+    /\.cd-word-modal \[hidden\]\s*\{[^}]*display:\s*none/);
+  // Khong sua rong: styles.css giu nguyen button{display:inline-flex}.
+  assert.match(stylesSrc, /button, \.btn\s*\{[^}]*display:\s*inline-flex/);
+});
+
+test('NAIA-8r: dialog Word khoa Xuat/input/Luu khi meta save pending', () => {
+  const wordSrc = R(WORD);
+  assert.match(wordSrc, /savingMeta/);
+  // go.disabled phu thuoc savingMeta + guard trong handler Xuat.
+  assert.match(wordSrc,
+    /go\.disabled = scanning \|\| exporting \|\| savingMeta/);
+  // Mo lai theo quyen hien tai (metaCanEdit && canWrite), khong
+  // hard-code true — locked sau loi van giu khoa.
+  assert.match(wordSrc,
+    /metaCanEdit && model\.canWrite\(\)/);
+});
+
 test('MIN-136: CSS khong co comment bi cat giua chung (*/ trong comment)', () => {
   // `/* ... */ ... */` — comment dong som roi rac text nuot rule ke
   // tiep (da xay ra: `.cd-diagram` bi nuot → canvas khong flex-fill,

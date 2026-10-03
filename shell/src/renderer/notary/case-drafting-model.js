@@ -54,6 +54,11 @@ const CASE_META_FIELDS = ['case_type', 'document_type', 'ngay_lap_ho_so',
 const CASE_META_EDITABLE = ['ngay_lap_ho_so', 'noi_niem_yet', 'ghi_chu',
                             'nguoi_nhan_uy_quyen',
                             'nguoi_nhan_uy_quyen_id', 'noi_dung_viec'];
+// Meta cap nhat duoc tren case da luu qua notary.workspace_update (§6.2) —
+// case_type/document_type la dinh danh nghiep vu, khong doi sau create.
+const CASE_META_UPDATE_FIELDS = ['ngay_lap_ho_so', 'noi_niem_yet',
+                                 'ghi_chu'];
+
 const CASE_DOCUMENT_TYPES = ['khai_nhan', 'thoa_thuan'];
 const CASE_DOCUMENT_TYPES_TWO_PARTY =
   ['chuyen_nhuong', 'tang_cho', 'cho_thue', 'dat_coc'];
@@ -202,6 +207,10 @@ function createModel(deps) {
   // khi session da doi (user chuyen case/nhap khac) bi BO — khong ap
   // vao state nua (MIN-122: "bo job response ve tre cua case cu").
   let session = 0;
+  // Scan guard rieng cho word options (NAIA-8 review): hai lan quet
+  // folder lien tiep trong cung session van phai "response moi nhat
+  // thang" — session chi bat duoc chuyen case, khong bat duoc doi folder.
+  let wordScanSeq = 0;
 
   function emit() {
     // Bao main biet hasUnsaved doi → window-close guard (MIN-112). Tinh o
@@ -469,6 +478,71 @@ function createModel(deps) {
     state.metaDirty = true;
     emit();
     return true;
+  }
+
+  // Luu meta cho case DA TAO qua notary.workspace_update (§6.2) — mot
+  // nguon du lieu duy nhat la DB backend; khong localStorage. Nhap chua
+  // luu (caseId null) → cap nhat nhap qua updateCaseMeta, persist kem
+  // "Lưu hồ sơ" (workspace_create). Caller tu hien thi r.error.
+  async function saveCaseMeta(patch) {
+    const meta = (patch && typeof patch === 'object') ? patch : {};
+    const keys = Object.keys(meta);
+    if (!keys.length ||
+        keys.some((k) => !CASE_META_UPDATE_FIELDS.includes(k))) {
+      return { ok: false, error: errObj(
+        'validation_error', 'Meta khong hop le') };
+    }
+    if (isDraft()) {
+      for (const k of keys) updateCaseMeta(k, meta[k]);
+      return { ok: true };
+    }
+    if (!canWrite()) {
+      return { ok: false, error: errObj(
+        state.locked ? 'workspace_locked' : 'case_type_unsupported',
+        state.locked ? 'Hồ sơ đã khóa — chỉ đọc'
+                     : 'Loại việc chưa hỗ trợ') };
+    }
+    state.busy = 'notary.workspace_update';
+    emit();
+    const s = session;
+    const before = clone(state.caseInfo);
+    const committedBefore = clone(state.committedCaseInfo);
+    const r = await client.run('notary.workspace_update', {
+      case_id: state.caseId,
+      base_revision: state.revision,
+      case: meta,
+    });
+    state.busy = null;
+    if (s !== session) return r;
+    if (!r.ok) {
+      // Conflict/locked map vao state nhu moi write khac — caller van
+      // nhan r de hien thi loi luu ro rang tai cho (dialog).
+      applyWriteResult(r, 'workspace_update');
+      emit();
+      return r;
+    }
+    const d = r.data || {};
+    if (d.case) {
+      const saved = clone(d.case);
+      state.committedCaseInfo = { ...state.committedCaseInfo, ...saved };
+      // A metadata-only save must preserve other edits in the Stage card,
+      // including values typed while the command was still pending.
+      for (const [key, value] of Object.entries(saved)) {
+        const unchanged = (state.caseInfo[key] ?? null) === (before[key] ?? null);
+        const locallyClean = (before[key] ?? null) === (committedBefore[key] ?? null);
+        if (unchanged && (keys.includes(key) ||
+            !CASE_META_EDITABLE.includes(key) || locallyClean)) {
+          state.caseInfo[key] = value;
+        }
+      }
+      state.metaDirty = CASE_META_EDITABLE.some((key) =>
+        (state.caseInfo[key] ?? null) !==
+        (state.committedCaseInfo[key] ?? null));
+    }
+    if (typeof d.revision === 'number') state.revision = d.revision;
+    state.notice = 'Đã lưu thông tin hồ sơ';
+    emit();
+    return r;
   }
 
   async function saveDraft() {
@@ -1243,11 +1317,24 @@ function createModel(deps) {
 
   // ---------- word export (thin — dialog day du o MIN-112) ----------
 
-  async function loadWordOptions() {
+  // NAIA-8: `templateDir` = {file_token} cua thu muc mau do nguoi dung
+  // chon — main resolve thanh FileRef is_dir:true; backend quet .docx
+  // trong thu muc do. Khong truyen → catalog/builtin cu.
+  async function loadWordOptions(templateDir) {
     const s = session;
-    const r = await client.run('notary.word_export_options',
-                               { case_id: state.caseId });
-    if (s !== session) return r;
+    const seq = ++wordScanSeq;
+    // Quet folder moi = nguon mau moi — xoa options ngay de khong ai
+    // doc danh sach cua folder truoc khi dang cho scan.
+    state.wordOptions = null;
+    emit();
+    const payload = { case_id: state.caseId };
+    if (templateDir) payload.template_dir = templateDir;
+    const r = await client.run('notary.word_export_options', payload);
+    if (s !== session || seq !== wordScanSeq) {
+      // Response tre (case doi hoac folder moi hon dang scan) — BO ca
+      // success lan error; scan moi nhat tu render/error state cua no.
+      return { ok: true, stale: true };
+    }
     if (!r.ok) {
       state.error = r.error || errObj('unknown');
       emit();
@@ -1314,7 +1401,9 @@ function createModel(deps) {
     };
   }
 
-  // opts: {onJob} — dialog hien thi progress + cancel theo job_id.
+  // opts: {onJob, templateDir, createCaseSubdir} — dialog hien thi
+  // progress + cancel theo job_id. `templateDir` = {file_token} thu muc
+  // mau; `createCaseSubdir` = tao thu muc con HS-<case_id> trong dich.
   async function exportWord(documentKeys, destination, opts) {
     if (!canWrite()) {
       return { ok: false, error: errObj(
@@ -1325,11 +1414,15 @@ function createModel(deps) {
     state.wordResult = null;
     emit();
     const s = session;
-    const r = await client.run('notary.word_export_batch', {
+    const o = (opts && typeof opts === 'object') ? opts : {};
+    const payload = {
       case_id: state.caseId,
       document_keys: documentKeys,
       destination,
-    }, opts);
+    };
+    if (o.templateDir) payload.template_dir = o.templateDir;
+    if (o.createCaseSubdir) payload.create_case_subdir = true;
+    const r = await client.run('notary.word_export_batch', payload, opts);
     state.wordBusy = false;
     if (s !== session) return r;
     if (!r.ok) {
@@ -1371,8 +1464,9 @@ function createModel(deps) {
 
   return {
     state, subscribe,
-    openCase, newDraft, isDraft, saveDraft, updateCaseMeta,
+    openCase, newDraft, isDraft, saveDraft, updateCaseMeta, saveCaseMeta,
     loadUqCatalog, createUqCustomer, resolveUqName,
+
     canWrite, mockBanner, hasUnsaved, isStageEmpty,
     caseType, diagramDomain, documentTypesFor,
     addPerson, addAsset, updatePersonField, updateAssetField,

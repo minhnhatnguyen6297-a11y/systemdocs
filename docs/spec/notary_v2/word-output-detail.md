@@ -1,7 +1,9 @@
 # Word Export UX và Flow
 
-Cập nhật: 24/09/2026 — phân biệt hiện trạng web / đích Electron ở §5 và §7
-(MIN-104). Bản gốc 22/07/2026 chỉ mô tả hiện trạng web.
+Cập nhật: 04/10/2026 — tích hợp NAIA-8/12 và giữ snapshot MIN-141.
+Bản gốc 22/07/2026 mô tả web; quy tắc hiện hành ở
+[`word-output.md`](./word-output.md). Các điều kiện pháp lý dưới đây dành cho
+catalog web/legacy; phase thư mục mẫu chỉ chặn lỗi kỹ thuật.
 
 ## 1. Mục đích
 
@@ -62,7 +64,9 @@ Ví dụ:
 [Chủ đất chết 1 - Ngày chết]
 ```
 
-- `[Người 3 - ...]`: `3` là số người trên Diagram.
+- `[Người 3 - ...]`: `3` là thứ tự dòng Stage đã lưu, kể cả chưa có node.
+  Hai bên dùng cùng thứ tự Stage cho Người; `[Bên A N - ...]`/`[Bên B N - ...]`
+  theo ghế cố định, ghế trống giữ nguyên vị trí.
 - `[Người nhận 1 - ...]`: `1` là thứ tự của người nhận trong danh sách.
 - Trường dùng chung: họ tên, xưng hô, giới tính, ngày sinh, ngày chết,
   giấy tờ, ngày/nơi cấp, địa chỉ, quan hệ, vai trò, tỷ lệ.
