@@ -326,7 +326,10 @@ function createWordDialog(ctx) {
           ? 'Nơi niêm yết đã thay đổi. Hãy bấm “Lưu nơi niêm yết” trước khi xuất.' : '';
         niemYetMsg.className = postingChanged() ? 'error' : 'muted';
       }
-      niemYetInput.oninput = showPostingDraft;
+      niemYetInput.oninput = () => {
+        if (typeof model.updateCaseMeta === 'function') model.updateCaseMeta('noi_niem_yet', niemYetInput.value || null);
+        showPostingDraft();
+      };
       showPostingDraft();
       const niemYetSave = btn('Lưu nơi niêm yết', 'sm', async () => {
         if (exporting || scanning || savingMeta || !metaCanEdit) return;
@@ -367,6 +370,25 @@ function createWordDialog(ctx) {
       const niemYetRow = h('div', 'cd-toolbar');
       niemYetRow.append(h('span', '', 'Nơi niêm yết:'),
                         niemYetInput, niemYetSave, niemYetMsg);
+      if (ctx.postingSuggestionEl) {
+        const postingSuggestions = h('div', 'cd-slot');
+        function refreshPostingSuggestions() {
+          postingSuggestions.replaceChildren(ctx.postingSuggestionEl(candidate => {
+            niemYetInput.value = candidate.address;
+            showPostingDraft();
+          }));
+        }
+        refreshPostingSuggestions();
+        niemYetRow.append(postingSuggestions);
+        const dialogCase = model.state.caseId;
+        const unsubscribePosting = model.subscribe(() => {
+          if (!box.isConnected || model.state.caseId !== dialogCase) { unsubscribePosting(); return; }
+          // Bo qua rebuild khi focus dang trong box (select tai san dang
+          // mo) — rebuild se tao lai select va dong dropdown giua chung.
+          if (postingSuggestions.contains(document.activeElement)) return;
+          refreshPostingSuggestions();
+        });
+      }
 
       const tplRow = h('div', 'cd-toolbar');
       tplRow.append(pickTpl, tplLabel);

@@ -320,7 +320,10 @@ function createNotaryModuleView(deps) {
   const wordDlg = window.G1_NOTARY_WORD
     ? window.G1_NOTARY_WORD.createWordDialog({
         model, lib: L, notify, h, btn, face, openModal,
-        pickFiles, openPath, cancelJob })
+        pickFiles, openPath, cancelJob,
+        // Prefix rieng cho box trong dialog — id address-posting-* o
+        // casemeta va dialog khong duoc trung nhau trong cung document.
+        postingSuggestionEl: (cb) => postingSuggestionEl(cb, 'address-dlg') })
     : null;
   const diagramPane = window.G1_NOTARY_DIAGRAM
     ? window.G1_NOTARY_DIAGRAM.createDiagramPane({
@@ -640,7 +643,7 @@ function createNotaryModuleView(deps) {
   }
 
   // Ô ngay dd/mm/yyyy (MIN-136): hien fmtDisplayDate(row[key]); go raw
-  // vao model de dirty live; blur/Enter parse → ISO len wire, repaint
+  // vao model de dirty live; change/blur parse → ISO len wire, repaint
   // display chuan. Sai format → danh dau do + giu raw (backend van
   // chan bang invalid_date khi luu — khong tham lang bo qua).
   function dateCellInput(getVal, onSet, allowYear, aria) {
@@ -655,7 +658,12 @@ function createNotaryModuleView(deps) {
       inp.classList.remove('cd-input-bad');
       onSet(inp.value.trim() === '' ? null : inp.value);
     };
-    inp.onchange = () => {
+    // Chuan hoa o ca 'change' LAN 'blur': go lai dung chuoi dang hien
+    // (hoac fill() programmatic cung gia tri) → value khong doi →
+    // 'change' khong ban → neu chi nghe 'change' thi raw con lai trong
+    // model va backend tu choi luc luu. 'blur' luon ban nen commit van
+    // chay; onSet voi gia tri cu → early-equal return, khong emit.
+    const commit = () => {
       const r = parseDisplayDate(inp.value, allowYear);
       if (r.error) {
         inp.classList.add('cd-input-bad');
@@ -667,6 +675,8 @@ function createNotaryModuleView(deps) {
       setCellTitle(inp);
       onSet(r.iso);
     };
+    inp.onchange = commit;
+    inp.onblur = commit;
     if (aria) inp.setAttribute('aria-label', aria);
     return inp;
   }
@@ -718,6 +728,70 @@ function createNotaryModuleView(deps) {
       model.removeStageRow(a.row_id);
     };
     return doRemove();
+  }
+
+  function addressSuggestionEl(kind, rowId, afterApply, idPrefix) {
+    const box = h('div', 'cd-address-suggestion');
+    box.id = `${idPrefix || 'address'}-${kind}-${rowId}`;
+    box._afterApply = afterApply;
+    box.setAttribute('aria-live', 'polite');
+    if (typeof model.ensureAddressSuggestion !== 'function') return box;
+    model.ensureAddressSuggestion(kind, rowId);
+    const value = model.state.addressSuggestions[kind + ':' + rowId];
+    if (!value || value.ignored) return box;
+    if (value.loading) { box.append(h('span', 'muted small', 'Đang tra cứu địa chỉ…')); return box; }
+    if (value.message) { box.append(h('span', 'muted small', value.message)); return box; }
+    const result = value.result || {};
+    const historical = result.coverage?.historical;
+    const label = historical ? 'Đã có lịch sử được xác nhận theo ngày.'
+      : result.coverage?.kind === 'reload_failed' ? 'Không đọc được bảng địa chỉ cục bộ. Hãy kiểm tra nguồn dữ liệu.'
+      : 'Danh mục hiện tại; chưa đủ lịch sử để xác nhận theo ngày đã chọn.';
+    box.append(h('div', 'muted small', label));
+    if (!(result.candidates || []).length) box.append(h('div', 'muted small', 'Chưa tìm được địa chỉ phù hợp; có thể nhập tay.'));
+    for (const candidate of result.candidates || []) {
+      const line = h('div', 'cd-address-choice');
+      const label = candidate.address + (candidate.partial ? ' — liên quan một phần địa bàn' : '');
+      line.append(h('span', 'small', label));
+      const apply = btn((result.candidates.length > 1 ? 'Chọn: ' : 'Áp dụng: ') + candidate.address, 'ghost sm', () => {
+        if (model.applyAddressSuggestion(kind, rowId, candidate.unit_id) && afterApply) afterApply(candidate);
+      });
+      apply.disabled = !model.canWrite() || (kind === 'issuer' && !candidate.historical);
+      apply.dataset.fid = `address-apply:${kind}:${rowId}:${candidate.unit_id}`;
+      line.append(apply);
+      box.append(line);
+    }
+    const ignore = btn('Bỏ qua gợi ý địa chỉ', 'ghost sm', () => model.ignoreAddressSuggestion(kind, rowId));
+    ignore.dataset.fid = `address-ignore:${kind}:${rowId}`;
+    box.append(ignore);
+    return box;
+  }
+
+  function postingSuggestionEl(afterApply, idPrefix) {
+    const box = h('div', 'cd-address-suggestion');
+    const assets = model.state.stage.assets;
+    const selected = assets.length === 1 ? assets[0].row_id : model.state.postingAssetId;
+    if (assets.length > 1) {
+      const choose = h('select', 'cd-cell');
+      choose.setAttribute('aria-label', 'Chọn tài sản để tra cứu nơi niêm yết');
+      choose.dataset.fid = 'address-posting-asset';
+      const empty = h('option', '', 'Chọn tài sản để tra nơi niêm yết'); empty.value = ''; choose.append(empty);
+      assets.forEach((a, i) => { const opt = h('option', '', `Tài sản ${i + 1}: ${a.dia_chi || 'Chưa có địa chỉ'}`); opt.value = a.row_id; opt.selected = a.row_id === selected; choose.append(opt); });
+      choose.onchange = () => { model.state.postingAssetId = choose.value || null; box.replaceWith(postingSuggestionEl(afterApply, idPrefix)); };
+      box.append(choose);
+    }
+    if (selected && assets.some(a => a.row_id === selected)) box.append(addressSuggestionEl('posting', selected, afterApply, idPrefix));
+    return box;
+  }
+
+  // Rebuild bi hoan khi focus con trong input (MIN-136) — van phai lam
+  // moi cac o goi y vi chung khong chua input, khong anh huong focus.
+  // Neu bo qua, ensureAddressSuggestion khong chay lai va response ve
+  // cung khong bao gio hien thi cho toi emit ke tiep ngoai form.
+  function refreshAddressBoxes(scope) {
+    for (const box of scope.querySelectorAll('[id^="address-"]')) {
+      const m = /^address-(person|asset|issuer|posting)-(.+)$/.exec(box.id || '');
+      if (m) box.replaceWith(addressSuggestionEl(m[1], m[2], box._afterApply));
+    }
   }
 
   function assetTableEl() {
@@ -835,6 +909,10 @@ function createNotaryModuleView(deps) {
           };
           td.append(inp);
           cellErrs(a.row_id, key, td);
+          if (key === 'dia_chi') {
+            inp.setAttribute('aria-describedby', `address-asset-${a.row_id}`);
+            td.append(addressSuggestionEl('asset', a.row_id));
+          }
         }
         r.append(td);
       }
@@ -1069,6 +1147,23 @@ function createNotaryModuleView(deps) {
         ctl.setAttribute('aria-label',
           `${label} — ${p.ho_ten || `dòng ${ri + 1}`}`);
         td.append(ctl);
+        if (key === 'dia_chi') {
+          ctl.setAttribute('aria-describedby', `address-person-${p.row_id}`);
+          td.append(addressSuggestionEl('person', p.row_id));
+          // Hien ca khi ngay_chet rong ma noi_cap con du lieu — tranh
+          // gia tri cu "vo hinh" khong noi nao de xem/sua.
+          if (p.ngay_chet || p.noi_cap) {
+            const issuer = h('input', 'cd-cell');
+            issuer.value = p.noi_cap || '';
+            issuer.placeholder = 'UBND trên giấy khai tử';
+            issuer.disabled = ro;
+            issuer.dataset.fid = `p:${p.row_id}:noi_cap`;
+            issuer.setAttribute('aria-label', `Nơi cấp giấy khai tử — ${p.ho_ten || 'người đã mất'}`);
+            issuer.setAttribute('aria-describedby', `address-issuer-${p.row_id}`);
+            issuer.oninput = () => model.updatePersonField(p.row_id, 'noi_cap', issuer.value);
+            td.append(issuer, addressSuggestionEl('issuer', p.row_id));
+          }
+        }
         cellErrs(p.row_id, key, td);
         tr.append(td);
       }
@@ -1147,6 +1242,12 @@ function createNotaryModuleView(deps) {
     };
     r1.append(ny);
     box.append(r1);
+    box.append(postingSuggestionEl());
+    const dateRow = h('div', 'cd-casemeta-row');
+    dateRow.append(h('label', 'cd-casemeta-label', 'Ngày lập hồ sơ'));
+    const caseDate = dateCellInput(() => c.ngay_lap_ho_so, v => model.updateCaseMeta('ngay_lap_ho_so', v), false, 'Ngày lập hồ sơ');
+    caseDate.disabled = ro; caseDate.dataset.fid = 'meta:ngay_lap_ho_so';
+    dateRow.append(caseDate); box.append(dateRow);
 
     // Dong 2 — Người nhận ủy quyền: datalist danh bạ + free text.
     // Load danh bạ mot lan khi soan duoc (mock/offline: rong, van nhap
@@ -1588,6 +1689,7 @@ function createNotaryModuleView(deps) {
     if (ae && dp.contains(ae) &&
         /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName || '')) {
       syncChromeUI();
+      refreshAddressBoxes(dp);
       // MIN-136 F-1: rebuild bi hoan khi dang go — nhung dialog
       // conflict phai hien NGAY (server tu choi commit thi user can
       // biet lieu ke, khong doi blur/emit sau).

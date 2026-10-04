@@ -2,7 +2,10 @@
 
 **Trạng thái:** Active cho kho và CLI cục bộ · **Nguồn quyết định:** Owner trong
 chat 03–04/10/2026, ghi tại [quyết định NAIA-9](../../../.agent/tasks/NAIA-9/decisions.md).
-Tra cứu trên giao diện, nhập DOCX và tự điền nơi niêm yết vẫn chưa triển khai.
+Luồng dùng kho để gợi ý địa chỉ và nơi niêm yết đang được nối vào ứng dụng tại
+[`administrative-address.md`](./administrative-address.md). Nhập DOCX là luồng
+độc lập tại [`input/docx-import.md`](./input/docx-import.md). Tra cứu không tự
+ghi đè địa chỉ; người dùng phải chọn áp dụng.
 
 ## Công dụng và Tại sao?
 
@@ -220,9 +223,11 @@ lập có nhãn: chuỗi rename, merge/split, ba cấp, mã tái dùng, cùng t�
 ngày chờ, nguồn hỏng, refresh/giữ lịch sử, toàn bộ snapshot thật. Chạy:
 `python -m pytest notary_v2/tests/test_administrative_timeline.py -q`.
 
-Hướng mở rộng **chưa triển khai**: CLI hiện validate và quét toàn ledger theo
-lần chạy, phù hợp công cụ local/batch. Khi tích hợp UI, nạp và kiểm một lần rồi
-dựng index (bảng giúp tìm nhanh) theo ID/tên/tỉnh/ngày và đồ thị sự kiện. Truy
+CLI hiện validate và quét toàn ledger theo lần chạy, phù hợp công cụ local/batch.
+Phần dùng kho trong UI tại [tra cứu địa chỉ](./administrative-address.md) nạp
+và kiểm khi bản kho đổi rồi dựng index (bảng giúp tìm nhanh) theo ID/tên/tỉnh/ngày
+và đồ thị sự kiện. Chỉ mục phải nhận cả revision khi Owner bổ sung lịch sử;
+dataset_version của Bando có thể chưa đổi. Truy
 merge/split theo ID, không theo tên; không gọi CLI/quét ledger hoặc tải web mỗi
 lần gõ địa chỉ. Index/cache dựng lại từ ledger được và không là nguồn chính.
 Validator chuỗi hiện dùng lời gọi lặp sâu (recursion); lịch sử cực sâu khoảng

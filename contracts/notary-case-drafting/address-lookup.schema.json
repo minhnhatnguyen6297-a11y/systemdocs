@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://systemdocs/contracts/notary-case-drafting/address-lookup.schema.json",
+  "title": "notary.address_lookup — local reference request and result",
+  "definitions": {
+    "date": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$", "format": "date"},
+    "text": {"type": "string", "minLength": 1, "maxLength": 4000},
+    "payload": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_date", "target_date"],
+      "properties": {
+        "address": {"$ref": "#/definitions/text"},
+        "province": {"$ref": "#/definitions/text"},
+        "commune": {"$ref": "#/definitions/text"},
+        "district": {"$ref": "#/definitions/text"},
+        "source_date": {"$ref": "#/definitions/date"},
+        "target_date": {"$ref": "#/definitions/date"}
+      },
+      "anyOf": [{"required": ["address"]}, {"required": ["province", "commune"]}]
+    },
+    "evidence": {
+      "type": "object", "additionalProperties": false, "required": ["source_id", "row_key"],
+      "properties": {"source_id": {"type": "string"}, "row_key": {"type": "string"}}
+    },
+    "candidate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["unit_id", "commune", "province", "address", "historical", "evidence"],
+      "properties": {
+        "unit_id": {"type": "string"}, "commune": {"type": "string"}, "province": {"type": "string"}, "address": {"type": "string"},
+        "historical": {"type": "boolean"}, "partial": {"type": "boolean"}, "old_parent_unconfirmed": {"type": "boolean"},
+        "observation_id": {"type": "string"}, "raw_phrase": {"type": "string"},
+        "event_ids": {"type": "array", "items": {"type": "string"}},
+        "evidence": {"type": "array", "items": {"$ref": "#/definitions/evidence"}}
+      }
+    },
+    "result_data": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "status", "candidates", "provenance", "dataset_version", "revision", "coverage"],
+      "properties": {
+        "schema_version": {"const": "notary.address-lookup.v1"},
+        "status": {"enum": ["match", "ambiguous", "not_found", "invalid_input"]},
+        "candidates": {"type": "array", "items": {"$ref": "#/definitions/candidate"}},
+        "provenance": {"type": "array", "items": {"$ref": "#/definitions/evidence"}},
+        "dataset_version": {"type": ["string", "null"]}, "revision": {"type": ["integer", "null"], "minimum": 0},
+        "parsed": {"type": "object"},
+        "coverage": {
+          "type": "object", "additionalProperties": false, "required": ["kind", "historical", "reason"],
+          "properties": {
+            "kind": {"enum": ["confirmed_history", "current_catalog_candidates", "insufficient_confirmed_history", "invalid_input", "reload_failed"]},
+            "historical": {"type": "boolean"}, "reason": {"type": ["string", "null"]}
+          }
+        }
+      }
+    }
+  }
+}

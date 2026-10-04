@@ -35,7 +35,7 @@ $allow = @{
         excludes = @()
     }
     "notary_v2" = @{
-        files = @("database.py", "models.py")
+        files = @("database.py", "models.py", "administrative_timeline.py")
         dirs  = @("services", "routers", "word_templates",
                   "frontend\templates")
         excludes = @(
@@ -48,6 +48,9 @@ $allow = @{
         )
     }
 }
+# Public reference data only. Never copy the enclosing data directory (office
+# databases/configuration), curator locks, or revision archives.
+& (Join-Path $sidecar "stage_administrative_reference.ps1") -Repository $repo -EngineStage $engineStage
 foreach ($key in $allow.Keys) {
     $src = Join-Path $repo $key
     $dst = Join-Path $engineStage $key

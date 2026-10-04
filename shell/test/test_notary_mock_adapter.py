@@ -54,6 +54,7 @@ DRAFTING_COMMANDS = [
     "notary.diagram_save",
     "notary.word_export_options",
     "notary.word_export_batch",
+    "notary.address_lookup",
 ]
 
 P_OWNER = "11111111-1111-4111-8111-111111111111"
@@ -230,6 +231,30 @@ class TestScaffolding:
     def test_commands_registered(self):
         for cmd in DRAFTING_COMMANDS:
             assert cmd in reg.COMMANDS, f"thieu {cmd} trong COMMANDS"
+
+    def test_address_lookup_dispatch_envelope(self):
+        """registry → gateway → adapter → service → _result envelope.
+
+        Mock delegate sang adapter that → doc ledger local that
+        (`notary_v2/data/administrative_units`), khong can fixture.
+        """
+        res = _call("address_lookup", {
+            "address": "xã Gia Tân, huyện Gia Viễn, tỉnh Ninh Bình",
+            "source_date": "2024-06-01",
+            "target_date": "2026-10-04",
+        })
+        assert res["kind"] == "address_lookup"
+        assert res["data"]["schema_version"] == "notary.address-lookup.v1"
+        assert res["data"]["status"] in (
+            "match", "ambiguous", "not_found", "invalid_input")
+        assert res["data"]["coverage"]["kind"] in (
+            "confirmed_history", "current_catalog_candidates",
+            "insufficient_confirmed_history", "invalid_input",
+            "reload_failed")
+        bad = _call("address_lookup", {
+            "address": "xã A", "source_date": "2024",
+            "target_date": "2026-10-04"})
+        assert bad["data"]["status"] == "invalid_input"
 
     def test_fixtures_loadable_and_no_real_pii(self):
         names = ["empty", "ready", "locked", "conflict", "intake-partial",

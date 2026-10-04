@@ -1,0 +1,8 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-0001-4001-8001-000000000022",
+  "command": "notary.address_lookup",
+  "payload": {"province": "Ninh Bình", "commune": "Gia Tân", "source_date": "2020", "target_date": "2026-10-04"},
+  "client_meta": {"shell_version": "0.1.0", "module": "document-review"},
+  "expected_error": "validation_error"
+}

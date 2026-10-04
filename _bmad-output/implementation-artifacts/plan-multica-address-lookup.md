@@ -3,14 +3,14 @@ title: 'NAIA-9/14-21: Bando administrative-address lookup'
 type: feature
 ticket: 'NAIA-9'
 created: '2026-10-04'
-status: ready-for-dev
+status: in-review
 route: full
 route_source: auto
 review: thorough
 review_source: auto
 lenses_ran: []
 review_loop_iteration: 0
-baseline_revision: PENDING_DOCX_INTEGRATION
+baseline_revision: 4665e65c56f96a4fc00d2a51c4707b6c588da7ef
 context: ['AGENTS.md', 'docs/spec/notary_v2/README.md', 'docs/spec/notary_v2/administrative-timeline.md', '.agent/tasks/NAIA-9/decisions.md']
 ---
 
@@ -130,6 +130,20 @@ Preserve the full phrase and evidence; only conservative parsed names become edg
   DOCX regressions. Link/diff checks; local scope commit, no external status writes.
 
 ## Implementation Notes
+
+Root owns docs/spec/notary_v2/administrative-address.md and related module/
+Stage/Word/input/timeline spec links, plus NAIA9/14-21 execution records.
+Coder owns product source, contract prose/schema and tests only, sending actual
+service/command/result/UI details to root for documentation. Do not edit root
+spec/task files concurrently. Root completes docs before matrix/review.
+
+UI guidance: root used ui-ux-pro-max local UX queries for keyboard focus and
+inline validation. Keep visible focus ring; never rely on hover alone, hide
+focused controls, or move focus on every input change. Every suggestion action
+is a real labeled button; loading/error/coverage messages stay beside its field,
+aria-describedby/live feedback when relevant. Existing Electron vanilla JS/CSS
+is the detected stack; preserve current visual tokens, no new page/design SOT.
+Read current shared UI README before modifying CSS. Root handles final UI check.
 
 Existing checks use
 `C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/multica-intake/schema-venv/Scripts/python.exe`

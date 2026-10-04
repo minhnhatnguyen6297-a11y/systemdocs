@@ -580,11 +580,11 @@ test('MIN-133 D2: không card Thông tin hồ sơ; Lưu hồ sơ vẫn gửi met
   const { model, view, calls } = build(test, { draft: true, respond });
   // MIN-141 đợt 3: meta hồ sơ quay lại — 3 dòng trong card Tài sản
   // (không phải card riêng). Chỉ Nơi niêm yết / Người nhận ủy quyền /
-  // Nội dung việc; Loại văn bản, Ngày lập hồ sơ, Ghi chú vẫn không ô.
+  // Nội dung việc; NAIA-9 thêm Ngày lập hồ sơ để chọn ngày tra cứu.
   const metaBox = collect(view.el,
     (e) => e.classList.contains('cd-casemeta'))[0];
   assert.ok(metaBox, 'thiếu block .cd-casemeta dưới card Tài sản');
-  for (const lbl of ['Loại văn bản', 'Ngày lập hồ sơ', 'Ghi chú']) {
+  for (const lbl of ['Loại văn bản', 'Ghi chú']) {
     assert.equal(collect(view.el,
       (e) => e.getAttribute('aria-label') === lbl).length, 0,
       `còn ô "${lbl}"`);
@@ -800,6 +800,18 @@ test('MIN-136: ô ngày Stage hiển dd/mm/yyyy, nhập dd/mm → wire ISO', () 
   assert.equal(chet.value, '31/02/2020');
   assert.equal(model.state.stage.people[0].ngay_chet, '2020-05-10',
     'ngay sai khong duoc ghi vao model');
+  // Go lai DUNG chuoi dang hien: 'change' khong ban (value khong doi)
+  // nhung 'blur' van chuan hoa — raw khong duoc con lai trong model.
+  model.state.stage.people[0].ngay_chet = '2020-05-10';
+  model.dismissNotice();
+  const chet2 = fid(view.el, `p:${rid}:ngay_chet`);
+  chet2.value = '10/05/2020';
+  chet2.oninput();
+  assert.equal(model.state.stage.people[0].ngay_chet, '10/05/2020',
+    'oninput ghi raw vao model (dirty live)');
+  chet2.onblur();
+  assert.equal(model.state.stage.people[0].ngay_chet, '2020-05-10',
+    'blur chuan hoa raw → ISO ke ca khi change khong ban');
 });
 
 test('MIN-136: empty-state Soạn hồ sơ có nút + Hồ sơ mới', async () => {
@@ -891,7 +903,7 @@ test('đợt3: ba dòng meta nằm trong card Tài sản, nhập → updateCaseM
     (e) => e.classList.contains('cd-casemeta-label'))
     .map((e) => e.textContent);
   assert.deepEqual(labels,
-    ['Nơi niêm yết', 'Người nhận ủy quyền', 'Nội dung việc']);
+    ['Nơi niêm yết', 'Ngày lập hồ sơ', 'Người nhận ủy quyền', 'Nội dung việc']);
   // Nhap noi niem yet → caseInfo + metaDirty.
   const ny = fid(view.el, 'meta:noi_niem_yet');
   ny.value = 'xã Yên Sở';
@@ -1448,4 +1460,53 @@ test('NAIA-8 word dialog: Huy xuat an/hien theo batch + scope cd-word-modal', as
   await exp;
   assert.equal(cancel.hidden, true, 'cancel an lai sau khi batch xong');
 
+});
+
+// ---------- NAIA-9: address suggestion wiring ----------
+
+test('NAIA-9: suggestion box render candidates + apply ghi dia_chi qua model', async () => {
+  const answer = { ok: true, data: {
+    schema_version: 'notary.address-lookup.v1', status: 'ambiguous',
+    coverage: { kind: 'current_catalog_candidates', historical: false,
+                reason: null },
+    parsed: { hamlet: '', commune: 'Xã A', district: null,
+              province: 'Tỉnh P' },
+    candidates: [
+      { unit_id: 'B', commune: 'Xã B', province: 'Tỉnh P',
+        address: 'Xã B, Tỉnh P', historical: false },
+      { unit_id: 'C', commune: 'Xã C', province: 'Tỉnh P',
+        address: 'Xã C, Tỉnh P', historical: false }],
+    provenance: [], dataset_version: 'v1', revision: 1 }};
+  const { model, view, calls } = build(test, {
+    respond: (cmd) => cmd === 'notary.address_lookup' ? answer : null });
+  model.updateCaseMeta('ngay_lap_ho_so', '2026-10-04');
+  const p = model.addPerson({ ho_ten: 'A', dia_chi: 'Xã A, Tỉnh P',
+                              ngay_cap: '2020-01-01' });
+  await new Promise(r => setTimeout(r, 450));
+  const box = collect(view.el,
+    (e) => e.id === `address-person-${p.row_id}`)[0];
+  assert.ok(box, 'thiếu ô gợi ý địa chỉ person');
+  assert.ok(box.textContent.includes('Danh mục hiện tại'),
+    'coverage label phải phân biệt current catalog vs confirmed');
+  assert.ok(calls.some(([c]) => c === 'notary.address_lookup'),
+    'chưa gọi command notary.address_lookup');
+  const applyB = fid(view.el, `address-apply:person:${p.row_id}:B`);
+  assert.ok(applyB, 'thiếu nút Chọn ứng viên B');
+  applyB.onclick();
+  assert.equal(model.state.stage.people[0].dia_chi,
+    'Xã A, Tỉnh P (nay là Xã B, Tỉnh P)');
+});
+
+test('NAIA-9: issuer input + suggestion box chỉ hiện khi ngay_chet có', async () => {
+  const { model, view } = build(test);
+  const alive = model.addPerson({ ho_ten: 'Sống' });
+  const dead = model.addPerson({ ho_ten: 'Chết', ngay_chet: '2020-01-01' });
+  assert.ok(!collect(view.el,
+    (e) => e.id === `address-issuer-${alive.row_id}`).length,
+    'người còn sống không được có ô nơi cấp khai tử');
+  assert.ok(collect(view.el,
+    (e) => e.id === `address-issuer-${dead.row_id}`).length,
+    'người chết phải có ô gợi ý nơi cấp khai tử');
+  assert.ok(fid(view.el, `p:${dead.row_id}:noi_cap`),
+    'thiếu input nhập địa chỉ UBND trên giấy khai tử');
 });

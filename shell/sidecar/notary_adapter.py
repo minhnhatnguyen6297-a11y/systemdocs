@@ -90,6 +90,12 @@ def _svc(name):
     return import_engine_module("notary_v2", f"services.{name}")
 
 
+def address_lookup(job, payload):
+    """Local reference lookup only; deliberately does not initialize office DB."""
+    job.check_cancel()
+    return _result("address_lookup", _svc("administrative_address").lookup_address(payload))
+
+
 def _router(name):
     return import_engine_module("notary_v2", f"routers.{name}")
 

@@ -1,0 +1,61 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_addr_001",
+  "command_id": "a1b2c3d4-0001-4001-8001-000000000021",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "address_lookup",
+    "data": {
+      "schema_version": "notary.address-lookup.v1",
+      "status": "ambiguous",
+      "parsed": {
+        "hamlet": "",
+        "commune": "Xã Gia Tân",
+        "district": "huyện Gia Viễn",
+        "province": "tỉnh Ninh Bình"
+      },
+      "candidates": [
+        {
+          "unit_id": "u_example_1",
+          "commune": "Phường Tây Hoa Lư",
+          "province": "Tỉnh Ninh Bình",
+          "address": "Phường Tây Hoa Lư, Tỉnh Ninh Bình",
+          "historical": false,
+          "observation_id": "obs_example_1",
+          "raw_phrase": "Xã Gia Tân (huyện Gia Viễn) sáp nhập vào Phường Tây Hoa Lư",
+          "partial": false,
+          "old_parent_unconfirmed": false,
+          "evidence": [{"source_id": "bando_bangbieu_36", "row_key": "row_example_1"}]
+        },
+        {
+          "unit_id": "u_example_2",
+          "commune": "Xã Gia Vân",
+          "province": "Tỉnh Ninh Bình",
+          "address": "Xã Gia Vân, Tỉnh Ninh Bình",
+          "historical": false,
+          "observation_id": "obs_example_2",
+          "raw_phrase": "Một phần Xã Gia Tân sáp nhập vào Xã Gia Vân",
+          "partial": true,
+          "old_parent_unconfirmed": false,
+          "evidence": [{"source_id": "bando_bangbieu_36", "row_key": "row_example_2"}]
+        }
+      ],
+      "provenance": [
+        {"source_id": "bando_bangbieu_36", "row_key": "row_example_1"},
+        {"source_id": "bando_bangbieu_36", "row_key": "row_example_2"}
+      ],
+      "dataset_version": "bando-2026-10-04",
+      "revision": 1,
+      "coverage": {
+        "kind": "current_catalog_candidates",
+        "historical": false,
+        "reason": "missing_confirmed_identity_or_dates"
+      }
+    },
+    "warnings": []
+  },
+  "error": null,
+  "updated_at": "2026-10-04T09:00:00Z"
+}

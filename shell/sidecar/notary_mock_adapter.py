@@ -1731,6 +1731,12 @@ def workspace_commit_stage(job, payload):
 _WORKSPACE_UPDATE_META = ("ngay_lap_ho_so", "noi_niem_yet", "ghi_chu")
 
 
+def address_lookup(job, payload):
+    """Mock uses the same public reference service, never customer databases."""
+    from notary_adapter import address_lookup as local_lookup
+    return local_lookup(job, payload)
+
+
 def workspace_update(job, payload):
     """notary.workspace_update mock (§6.2) — parity real: cap nhat meta
     case da luu (khong cham stage/diagram), revision+1. case_type/

@@ -239,6 +239,7 @@ def _notary_drafting(fn_name):
 
 
 COMMANDS.update({
+    "notary.address_lookup": _notary_drafting("address_lookup"),
     # Overview list cua tab Soạn hồ sơ — qua gateway de mock dev tra
     # fixture case 42–46 cung shape _case_row real adapter (MIN-112).
     "notary.case_list": _notary_drafting("case_list"),

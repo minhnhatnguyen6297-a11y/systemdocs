@@ -71,7 +71,8 @@ là ID database, có thể null trước commit.
     "cụm 1 tài sản 2" và "cụm 12 tài sản 1".
 - Reorder đổi nghĩa vị trí nhưng không đổi `row_id`.
 - Hồ sơ thừa kế bắt buộc `owner_row_id`; hồ sơ `two_party` cấm trường này.
-- Hồ sơ có 3 trường quản lý: `noiniemyet` (nhập tay; tra cứu bảng xã còn mở NAIA-9),
+- Hồ sơ có 3 trường quản lý: `noiniemyet` (nhập tay; gợi ý địa chỉ đang triển khai
+  theo [quy tắc tra cứu](./administrative-address.md)),
   `nguoinhanuyquyen` (danh mục quen/tạo mới), `noidungviec` (nhập tay).
   Tất cả tuân thủ quy tắc viết liền không dấu, không có ký tự `_`.
 
@@ -92,6 +93,13 @@ Một dòng sai làm toàn bộ commit thất bại. `base_revision` khác serve
 phải báo `workspace_conflict`; không ghi đè cưỡng bức.
 
 ## 7. Quan hệ với feature khác
+
+Gợi ý tên xã/tỉnh dùng kho lịch sử cục bộ, không gửi địa chỉ khách hàng lên
+website. Ngày giấy của từng Người/Tài sản giúp đọc địa chỉ nguồn; ngày cần đối
+chiếu là `ngay_lap_ho_so`. Nơi cấp giấy khai tử dùng chính ngày cấp giấy ấy và
+nguồn nhập rõ, không suy từ nơi chết hoặc nơi niêm yết. Máy không tự ghi gợi ý
+vào Stage: người dùng chọn rồi lưu như sửa tay. Giới hạn nguồn/ngày và cách
+bổ sung lịch sử nằm tại [tra cứu địa chỉ](./administrative-address.md).
 
 Nhập hợp đồng DOCX giữ optional `docx_import` bên cạnh Stage, không nhét
 nguồn vào field Người/Tài sản. Context ghi cùng transaction/revision khi

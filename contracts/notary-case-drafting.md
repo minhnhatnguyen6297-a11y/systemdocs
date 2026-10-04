@@ -9,10 +9,10 @@ implement ở P5 (MIN-128)** ·
 **Domain data shape:** `g1.module.v1` (`contracts/g1-module-data.md`)
 
 Contract wire cho tab **Soạn hồ sơ** của module `notary_v2` trong shell
-Electron một máy: chín command `notary.*` phục vụ tạo/tải workspace, intake
+Electron một máy: mười command `notary.*` phục vụ tạo/tải workspace, intake
 đa nguồn thành suggestion, commit Stage, cập nhật meta, đánh giá/lưu
-Diagram và xuất
-Word hàng loạt. Envelope `desktopcommand.v1` giữ nguyên — file này chỉ
+Diagram, xuất
+Word hàng loạt và tra cứu địa chỉ hành chính local (§14). Envelope `desktopcommand.v1` giữ nguyên — file này chỉ
 định nghĩa `payload`/`result.data`/error code của từng command.
 Rev 1.1 **additive** (MIN-121): thêm `notary.workspace_create` và chế độ
 nháp cho `intake_analyze`/`diagram_evaluate` — `schema_version` giữ
@@ -47,6 +47,7 @@ job-level. Quyết định giữ nguyên sau review round 1.
 | `notary.diagram_save` | Lưu Diagram đã hợp lệ | atomic write | `diagram_save` |
 | `notary.word_export_options` | Liệt kê văn bản sẵn sàng/bị chặn | read-only | `word_export_options` |
 | `notary.word_export_batch` | Tạo nhiều DOCX vào một folder đích | long-running, per-item result | `word_export_batch` |
+| `notary.address_lookup` | Tra cứu đơn vị hành chính đích theo địa chỉ nguồn + hai mốc ngày (ledger local) | read-only, local-only | `address_lookup` |
 
 - `result.kind` = tên command bỏ namespace `notary.` (snake_case nguyên
   vẹn). `result` theo shape `g1-module-data.md` §2: `{kind, data,
@@ -54,7 +55,8 @@ job-level. Quyết định giữ nguyên sau review round 1.
 - Mọi `result.data` của chín command **bắt buộc** mang
   `schema_version: "notary.case-drafting.v1"` (literal). Đây là version
   của domain data shape; version kênh vẫn là `contract_version` của
-  envelope — hai tầng độc lập.
+  envelope — hai tầng độc lập. `notary.address_lookup` (§14) là ngoại
+  lệ có chủ đích: domain data riêng — `notary.address-lookup.v1`.
 - Request envelope theo `desktop-command.md` §3; `client_meta.module` =
   `document-review` (module id đã claim namespace `notary.*` trong
   `shell/src/main/registry.js:16-21`).
@@ -1023,6 +1025,7 @@ Consumer (Electron main/renderer) PHẢI:
 | v1.1 | 26/09/2026 | MIN-121 (additive, tương thích ngược): `notary.workspace_create` + `idempotency_key`; chế độ nháp (`case_id` absent) cho `intake_analyze`/`diagram_evaluate` (evaluate nháp kèm `stage` payload, `evaluated_revision:null`); `case` +`ngay_lap_ho_so`/`noi_niem_yet`/`ghi_chu`; field_error +`duplicate_entity`; error +`workspace_owner_required` |
 | v2 MIN-141 | 03/10/2026 | Owner xác nhận hành vi cuối 14 commit worker và yêu cầu gộp vào nhánh chính; thay các quy tắc MIN-140 mâu thuẫn, đồng bộ dữ liệu Người/cụm đất/Hồ sơ. Xem §13.16 |
 | v2 (APPROVED) | 27/09/2026 | Owner duyệt §13 (MIN-125, toàn bộ Q1–Q12): `schema_version` bump `notary.case-drafting.v2`; Stage draft/committed + create nguyên khối; `owner_row_id`; asset theo vị trí 1..3, bỏ `is_primary`; `ownPositions`/`receivePositions`; domain `two_party` 30 slot `p1..p30`; `case_type` immutable; error codes §13.9. Implement ở P5 (MIN-128). C1–C4 xử lý theo §13.13 |
+| additive NAIA-9 | 04/10/2026 | Thêm command thứ mười `notary.address_lookup` (§14): tra cứu đơn vị hành chính đích theo địa chỉ nguồn + `source_date`/`target_date` đầy đủ; read-only, local-only trên ledger Bando đóng gói; `result.data.schema_version` = `notary.address-lookup.v1` — ngoại lệ rule §1 |
 
 ---
 
@@ -1629,3 +1632,97 @@ contract trao đổi hồ sơ giữa Upload Lab và Soạn hồ sơ. Envelope v�
   độc lập, exclusive create và tăng hậu tố khi trùng; cancellation dọn temp,
   giữ file đã publish. Giới hạn và phạm vi đọc tại
   [`spec DOCX`](../docs/spec/notary_v2/input/docx-import.md).
+
+---
+
+## 14. `notary.address_lookup` — tra cứu đơn vị hành chính theo mốc ngày (NAIA-9)
+
+**Nguồn:** Owner chọn nguồn `sapnhap.bando.com.vn` cho danh mục hiện hành
+(NAIA-9); SOT hành vi nghiệp vụ:
+[`docs/spec/notary_v2/administrative-address.md`](../docs/spec/notary_v2/administrative-address.md).
+Command thứ mười của nhóm `notary.*`; `result.data.schema_version` =
+`notary.address-lookup.v1` (literal) — domain data shape riêng, ngoại lệ
+của rule §1. Tính chất **read-only, local-only**: chỉ đọc ledger đơn vị
+hành chính đóng gói cùng app (timeline + snapshot sha256 của nguồn
+Bando); **không** gọi Bando hay bất kỳ dịch vụ ngoài nào, không ghi DB,
+không khởi tạo office DB, không cần `case_id`/`base_revision` — chạy
+được cả trên nháp chưa lưu. Địa chỉ khách hàng không rời máy.
+
+### 14.1 Payload
+
+```yaml
+payload:
+  address: <string | absent>     # địa chỉ nguồn nguyên văn — tách phải→trái
+  province: <string | absent>    # bắt buộc cặp với commune khi không có address
+  commune: <string | absent>
+  district: <string | absent>    # optional — chỉ phân biệt alias huyện cũ
+  source_date: <YYYY-MM-DD>      # bắt buộc — ngày ĐẦY ĐỦ, không year-only
+  target_date: <YYYY-MM-DD>      # bắt buộc — ngày ĐẦY ĐỦ
+```
+
+- Bắt buộc `address` HOẶC cặp `province`+`commune`. Key ngoài danh sách,
+  ngày thiếu/không đúng `YYYY-MM-DD`, value non-string/>4000 ký tự →
+  `invalid_input`. `target_date < source_date` → `invalid_input` với
+  `coverage.reason:"target_before_source"`.
+- Ngày chỉ nhận đầy đủ — khác rule §2.2 của Stage row (vốn cho year-only).
+  `source_date < 2025-07-01` → địa chỉ đọc theo cấu trúc cũ (xã/huyện/
+  tỉnh); `>= 2025-07-01` → cấu trúc mới (xã/tỉnh, `district` bị bỏ qua
+  trong parse nhưng vẫn được phép gửi).
+
+### 14.2 Result
+
+```yaml
+result.data:
+  schema_version: "notary.address-lookup.v1"
+  status: match | ambiguous | not_found | invalid_input
+  parsed: {hamlet, commune, district, province}   # luôn có — từ parse
+                                                 # address hoặc input trực tiếp
+  candidates:
+    - unit_id: <string>
+      commune: <string>
+      province: <string>
+      address: "<commune>, <province>"            # cụm đích để hiển thị
+      historical: <bool>                          # true = chuỗi confirmed
+                                                  # có effective date
+      event_ids: [<id>]                           # chỉ khi historical
+      observation_id: <id>                        # chỉ khi current-catalog
+      raw_phrase: <string>                        # nguyên văn nguồn Bando
+      partial: <bool>                             # raw chứa "một phần"
+      old_parent_unconfirmed: <bool>              # alias trỏ huyện cũ
+                                                  # chưa xác nhận
+      evidence: [{source_id, row_key}]            # bằng chứng theo ứng viên
+  provenance: [<evidence gộp của mọi candidates>]
+  dataset_version: <string | null>
+  revision: <int | null>
+  coverage:
+    kind: confirmed_history | current_catalog_candidates |
+          insufficient_confirmed_history | invalid_input | reload_failed
+    historical: <bool>
+    reason: <string | null>
+```
+
+- `status:"match"` chỉ khi đúng một ứng viên; chia tách/mơ hồ →
+  `ambiguous` với đầy đủ ứng viên — command **không bao giờ** tự chọn
+  một phương án thay client.
+- `coverage.kind` phân biệt bản chất bằng chứng: `confirmed_history` =
+  chuỗi sự kiện confirmed có `effective_on` phủ đủ source→target;
+  `current_catalog_candidates` = chỉ có catalog Bando hiện tại (undated);
+  `insufficient_confirmed_history` = không đủ lịch sử xác nhận để kết
+  luận; `reload_failed` = ledger/snapshot cục bộ lỗi — giữ index hợp lệ
+  cuối nếu có, status trả `not_found`.
+- Client **bắt buộc** phân biệt hiển thị hai lớp trên: cấm trình
+  ứng viên undated như kết quả đã xác nhận theo ngày
+  (`candidate.historical`/`coverage.historical` là cờ máy đọc).
+- Mọi `invalid_input` trả trong `result.data.status` (job thành công),
+  KHÔNG `error.code` job-level — consumer đọc `status`/`coverage`.
+- Ledger reload có chữ ký file (path+mtime+size) và validate toàn phần
+  trước khi đổi index — không đọc ledger theo từng lần gọi.
+
+### 14.3 Schema & examples
+
+- Schema máy đọc:
+  [`address-lookup.schema.json`](./notary-case-drafting/address-lookup.schema.json).
+- Examples:
+  `examples/valid/command.address-lookup.valid.json` (payload),
+  `examples/invalid/command.address-lookup-year.invalid.json`
+  (year-only bị `invalid_input`).

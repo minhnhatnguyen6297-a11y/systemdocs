@@ -212,6 +212,125 @@ function createModel(deps) {
   // folder lien tiep trong cung session van phai "response moi nhat
   // thang" — session chi bat duoc chuyen case, khong bat duoc doi folder.
   let wordScanSeq = 0;
+  const addressRequests = new Map();
+  const addressTimers = new Map();
+  state.addressSuggestions = {};
+  state.postingAssetId = null;
+
+  // dateCellInput luu raw dd/mm/yyyy vao model trong luc go (MIN-136,
+  // chu y thiet ke) — payload IPC phai gui ISO, nen chuan hoa o day
+  // thay vi doi blur/change chuan hoa truoc.
+  function isoDate(value) {
+    const t = String(value || '').trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+    const m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(t) ||
+              /^(\d{2})(\d{2})(\d{4})$/.exec(t);
+    if (!m) return '';
+    const d = +m[1], mo = +m[2], y = +m[3];
+    const dt = new Date(Date.UTC(y, mo - 1, d));
+    if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 ||
+        dt.getUTCDate() !== d) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${m[3]}-${pad(mo)}-${pad(d)}`;
+  }
+
+  function addressContext(kind, rowId) {
+    const person = kind === 'person' || kind === 'issuer';
+    const row = (person ? state.stage.people : state.stage.assets).find(r => r.row_id === rowId);
+    if (!row) return null;
+    const address = kind === 'issuer' ? row.noi_cap : row.dia_chi;
+    const target = kind === 'issuer' ? row.ngay_cap : (state.caseInfo || {}).ngay_lap_ho_so;
+    return { address: address || '', source_date: isoDate(row.ngay_cap), target_date: isoDate(target) };
+  }
+
+  // Chuyen case/nhap moi: huy debounce dang cho + quen moi identity da
+  // request — session guard da lo response, nhung timer cu con ban mot
+  // client.run thua neu khong clear.
+  function clearAddressLookups() {
+    for (const t of addressTimers.values()) clearTimeout(t);
+    addressTimers.clear();
+    addressRequests.clear();
+    state.addressSuggestions = {};
+    state.postingAssetId = null;
+  }
+
+  function ensureAddressSuggestion(kind, rowId) {
+    const key = kind + ':' + rowId;
+    const payload = addressContext(kind, rowId);
+    const identity = JSON.stringify([session, state.caseId, kind, rowId, payload,
+      kind === 'posting' ? (state.caseInfo || {}).noi_niem_yet : null]);
+    if (addressRequests.get(key) === identity) return;
+    addressRequests.set(key, identity);
+    clearTimeout(addressTimers.get(key));
+    delete state.addressSuggestions[key];
+    if (!payload) return;
+    // Gate UBND phai bo dau giong normalize() phia service — "uy ban
+    // nhan dan" khong dau van la dia chi co quan hop le.
+    const addrAscii = (payload.address || '').normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
+    if (kind === 'issuer' && !/^(?:ubnd|uy ban nhan dan)\s/i.test(addrAscii)) {
+      state.addressSuggestions[key] = { message: 'Nhập đúng địa chỉ UBND trên giấy khai tử; không lấy địa chỉ cư trú.' };
+      return;
+    }
+    if (!payload.address || !/^\d{4}-\d{2}-\d{2}$/.test(payload.source_date) || !/^\d{4}-\d{2}-\d{2}$/.test(payload.target_date)) {
+      state.addressSuggestions[key] = { message: 'Cần địa chỉ, ngày cấp đầy đủ và ngày lập hồ sơ (ngày cấp cho khai tử).' };
+      return;
+    }
+    state.addressSuggestions[key] = { loading: true };
+    const capturedSession = session;
+    addressTimers.set(key, setTimeout(async () => {
+      let response;
+      try { response = await client.run('notary.address_lookup', payload); }
+      catch (error) { response = { ok: false, error: { message: 'Không đọc được bảng địa chỉ cục bộ.' } }; }
+      if (capturedSession !== session || addressRequests.get(key) !== identity ||
+          JSON.stringify(addressContext(kind, rowId)) !== JSON.stringify(payload)) return;
+      // User da bam "Bo qua" trong luc response dang bay — ignored thang.
+      if (state.addressSuggestions[key] && state.addressSuggestions[key].ignored) return;
+      // Kiem shape truoc khi tin — du lieu thieu schema_version/fields ma ap
+      // vao dia chi se ghi "undefined, undefined" vao ho so.
+      const data = response.ok ? response.data : null;
+      const valid = !!data && data.schema_version === 'notary.address-lookup.v1' &&
+        typeof data.status === 'string' && Array.isArray(data.candidates);
+      state.addressSuggestions[key] = valid ? { result: data, identity }
+        : { message: (response.error || {}).message || 'Tra cứu thất bại.' };
+      emit();
+    }, deps.addressDebounceMs ?? 350));
+  }
+
+  function applyAddressSuggestion(kind, rowId, unitId) {
+    if (!canWrite()) return false;
+    ensureAddressSuggestion(kind, rowId);
+    const key = kind + ':' + rowId;
+    const suggestion = state.addressSuggestions[key];
+    const candidate = suggestion?.result?.candidates?.find(c => c.unit_id === unitId);
+    if (!candidate || suggestion.identity !== addressRequests.get(key)) return false;
+    if (typeof candidate.address !== 'string' || typeof candidate.commune !== 'string' ||
+        typeof candidate.province !== 'string') return false;
+    // An undated current catalog can never prove the office on a death record.
+    if (kind === 'issuer' && !candidate.historical) return false;
+    if (kind === 'posting') return updateCaseMeta('noi_niem_yet', candidate.commune + ', ' + candidate.province);
+    const row = (kind === 'person' || kind === 'issuer' ? state.stage.people : state.stage.assets).find(r => r.row_id === rowId);
+    if (!row) return false;
+    if (kind === 'issuer') updatePersonField(rowId, 'noi_cap', 'UBND ' + candidate.address);
+    else {
+      const original = (row.dia_chi || '').replace(/ \(nay là .*\)\s*$/i, '');
+      const value = original + ' (nay là ' + candidate.address + ')';
+      if (kind === 'person') updatePersonField(rowId, 'dia_chi', value);
+      else updateAssetField(rowId, 'dia_chi', value);
+    }
+    return true;
+  }
+
+  function ignoreAddressSuggestion(kind, rowId) {
+    const key = kind + ':' + rowId;
+    // Huy debounce dang cho — response da bay bi chan boi co ignored
+    // trong handler. Giu addressRequests[key]=identity de ensure lan
+    // sau early-return (ignored ben); doi input → identity doi → fresh.
+    clearTimeout(addressTimers.get(key));
+    addressTimers.delete(key);
+    state.addressSuggestions[key] = { ignored: true };
+    emit();
+  }
 
   function emit() {
     // Bao main biet hasUnsaved doi → window-close guard (MIN-112). Tinh o
@@ -340,6 +459,7 @@ function createModel(deps) {
 
   async function openCase(caseId) {
     const s = ++session;
+    clearAddressLookups();
     state.status = 'loading';
     state.caseId = caseId;
     state.draftId = null;
@@ -393,6 +513,7 @@ function createModel(deps) {
     const ct = CASE_TYPES.includes(caseType)
       ? caseType : CASE_TYPE_INHERITANCE;
     ++session;                        // vo hieu response dang cho cua case cu
+    clearAddressLookups();
     state.status = 'ready';
     state.caseId = null;
     state.draftId = uuid();
@@ -1618,6 +1739,7 @@ function createModel(deps) {
 
   return {
     state, subscribe,
+    ensureAddressSuggestion, applyAddressSuggestion, ignoreAddressSuggestion,
     openCase, newDraft, isDraft, saveDraft, updateCaseMeta, saveCaseMeta,
     loadUqCatalog, createUqCustomer, resolveUqName,
 

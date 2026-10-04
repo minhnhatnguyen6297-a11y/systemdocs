@@ -947,3 +947,7 @@
   .cd-topbar { flex-wrap: wrap; height: auto; min-height: 42px; padding: 4px 8px 4px 4px; }
   .cd-topbar-actions { flex-wrap: wrap; }
 }
+.cd-root .cd-address-suggestion { padding: 4px 0; color: var(--text-muted); white-space: normal; }
+.cd-root .cd-address-choice { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.cd-root .cd-address-suggestion button { height: auto; min-height: 28px; white-space: normal; text-align: left; }
+.cd-root .cd-address-suggestion button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }

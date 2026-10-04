@@ -31,6 +31,12 @@ khác trong card Tài sản không bị mất khi lưu riêng Nơi niêm yết.
 Nếu ô Nơi niêm yết khác bản đã lưu, dialog yêu cầu lưu trước khi xuất, kể cả
 bản nháp đã có từ card Tài sản. Không hiển thị nơi mới rồi xuất theo nơi cũ.
 
+Gợi ý nơi niêm yết đang triển khai theo
+[tra cứu địa chỉ](./administrative-address.md): chọn rõ tài sản nguồn, dùng ngày
+cấp giấy của tài sản để đọc địa chỉ và `ngay_lap_ho_so` để đối chiếu tên đích.
+Nhiều tài sản không lấy ngầm dòng đầu; gợi ý không tự lưu hoặc thay giá trị
+đang nhập. Thiếu lịch sử có ngày phải hiện giới hạn, dù tìm được tên hiện tại.
+
 ## 3. Input và output
 
 Input: `case_id`, danh sách `document_keys` và thư mục đích local đã tồn tại;
