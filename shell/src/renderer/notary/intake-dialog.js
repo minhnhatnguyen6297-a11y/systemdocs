@@ -161,10 +161,10 @@ function createIntakeDialog(ctx) {
             for (const row of rows) {
               const rowEl = h('div', 'cd-check-row');
               for (const [name, label] of [['loai_dat', 'Loại đất'], ['dien_tich', 'Diện tích'], ['thoi_han', 'Thời hạn']]) {
-                const input = h('input'); input.type = name === 'dien_tich' ? 'number' : 'text';
+                const input = h('input'); input.type = 'text';
                 input.value = row[name] == null ? '' : String(row[name]);
                 input.setAttribute('aria-label', label); input.placeholder = label;
-                if (name === 'dien_tich') { input.min = '0'; input.step = 'any'; }
+                if (name === 'dien_tich') input.setAttribute('inputmode', 'decimal');
                 input.onchange = () => {
                   row[name] = input.value === '' ? null : name === 'dien_tich' ? (reviewedArea(input.value) ?? input.value) : input.value;
                   input.setAttribute('aria-invalid', update(`${identity[rows.indexOf(row)]}:${name}`) ? 'false' : 'true');

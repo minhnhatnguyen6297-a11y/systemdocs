@@ -1,6 +1,15 @@
 # Handoff — MIN-139, 2026-10-04
 
 Luồng Word-first đã triển khai cục bộ, chờ root review và commit đúng phạm vi.
+Iteration 5: ngày nguồn sai lịch phải sửa trước khi nhận, gồm ISO đầy đủ;
+ngày/năm hợp lệ vẫn giữ nguyên. Lưu vị trí thành công rồi tải lại lỗi giữ
+đối chiếu/revision, báo rõ và cho thử tải nguồn lại; bỏ danh sách cũ ngay.
+Diện tích nhập `1.234,5` giữ đúng số; bỏ hết đất vẫn lưu/xuất trường còn đúng.
+44 DOCX Python; bộ backend 397 pass/2 COM skip; 115 adapter/Intake/lõi regex;
+233 Node (24 DOCX); 78 ví dụ contract không có kết quả ngoài dự kiến.
+Guard giới hạn chữ được thử bỏ tạm, bài kiểm thất bại đúng; mã đã khôi phục nguyên byte.
+Root Electron HS-8 đạt 4 bản ghi/25 binding, lưu/mở lại/xuất; nguồn/ZIP/DB không đổi.
+Giới hạn native picker giả lập, corpus/trang Word/bản cài sạch/phục hồi vẫn giữ.
 Spec hiện hành: [Nhập DOCX](../../../docs/spec/notary_v2/input/docx-import.md).
 Các phép thử và giới hạn được ghi trong [progress](progress.md).
 Iteration 4 sửa số âm/không hữu hạn ngay trong bằng chứng nguồn; giữ bản ghi

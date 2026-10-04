@@ -60,6 +60,10 @@ async def extract(spec, ctx):
                 for ref in refs:
                     ref["core_state"] = "error"
                 warnings.append({"code": "intake.invalid_number", "message": "Diện tích cần là số hữu hạn từ 0 trở lên; hãy sửa giá trị"})
+            if key in ("ngay_sinh", "ngay_cap", "ngay_het_han", "ngay_chet") and normalized is None:
+                for ref in refs:
+                    ref["core_state"] = "error"
+                warnings.append({"code": "intake.invalid_date", "message": f"{key}: ngày không hợp lệ; hãy sửa trước khi đưa vào Stage"})
             if match["state"] in ("ambiguous", "error", "warning_nonstandard"):
                 normalized, state, confidence = None, "observed", None
                 warnings.append({"code": "intake." + match["state"], "message": f"{key}: cần chọn hoặc sửa giá trị"})

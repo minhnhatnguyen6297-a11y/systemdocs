@@ -408,11 +408,21 @@ function createWordDialog(ctx) {
           tplToken = null;
           scanning = true;
           checks = [];
+          mappingChoices = [];
+          listBox.innerHTML = '';
+          listBox.append(h('div', 'muted', 'Đang tải các vị trí của nguồn Word…'));
           refreshScanLock();
-          const r = await model.loadWordOptions(null, originalSourceId);
-          if (r.stale) return;
+          const selectionCase = model.state.caseId;
+          let r;
+          try { r = await model.loadWordOptions(null, originalSourceId); }
+          catch (error) { r = { ok: false, error: { message: error.message || 'Không tải được vị trí Word' } }; }
+          if (r.stale || model.state.caseId !== selectionCase) return;
           scanning = false;
-          if (!r.ok) { notify(r.error.message || r.error.code, true); refreshScanLock(); return; }
+          if (!r.ok) {
+            listBox.innerHTML = '';
+            listBox.append(h('div', 'error', 'Không tải được các vị trí Word; chọn lại nguồn để thử lại.'));
+            notify(r.error.message || r.error.code, true); refreshScanLock(); return;
+          }
           tplLabel.textContent = 'Mẫu: hợp đồng Word gốc đã lưu trong hồ sơ';
           renderDocs();
           const mappingBox = h('div', 'cd-slot');
@@ -449,9 +459,17 @@ function createWordDialog(ctx) {
                 notify(saved.error.message || saved.error.code, true); return;
               }
               committed = true;
-              const loaded = await model.loadWordOptions(null, source.source_id);
-              if (!loaded.ok || loaded.stale) return;
+              if (saved.stale || model.state.caseId !== previousCase) return;
               mappingDirty = false;
+              const loaded = await model.loadWordOptions(null, source.source_id);
+              if (loaded.stale || model.state.caseId !== previousCase) return;
+              if (!loaded.ok) {
+                checks = []; mappingChoices = [];
+                listBox.innerHTML = '';
+                listBox.append(h('div', 'error', 'Đã lưu vị trí Word, nhưng chưa tải lại được danh sách. Chọn lại nguồn Word để thử lại.'));
+                notify('Đã lưu vị trí Word, nhưng tải lại thất bại; chọn lại nguồn để thử lại', true);
+                return;
+              }
               renderDocs();
               for (const choice of choices) {
                 const current = (model.state.wordBindingProposals || []).find((p) => p.occurrence_id === choice.proposal.occurrence_id);
@@ -461,6 +479,16 @@ function createWordDialog(ctx) {
               }
               listBox.append(mappingBox);
               notify('Đã lưu vị trí Word; có thể xuất vào thư mục đích');
+            } catch (error) {
+              if (model.state.caseId !== previousCase) return;
+              if (committed) {
+                checks = []; mappingChoices = []; mappingDirty = false;
+                model.state.wordOptions = null;
+                model.state.wordBindingProposals = [];
+                listBox.innerHTML = '';
+                listBox.append(h('div', 'error', 'Đã lưu vị trí Word, nhưng chưa tải lại được danh sách. Chọn lại nguồn Word để thử lại.'));
+                notify('Đã lưu vị trí Word, nhưng tải lại thất bại; chọn lại nguồn để thử lại', true);
+              } else notify(error.message || 'Không lưu được vị trí Word', true);
             } finally {
               if (!committed && model.state.caseId === previousCase) {
                 model.state.docxImport = previousContext;

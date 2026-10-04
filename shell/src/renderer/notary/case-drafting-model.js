@@ -1270,7 +1270,7 @@ function createModel(deps) {
         if (Array.isArray(fields.land_rows) && fields.land_rows.length > 20) {
           state.notice = 'Stage giữ tối đa 20 cụm đất; hãy bỏ bớt dòng trước khi đưa vào Stage'; emit(); return null;
         }
-        if (!Array.isArray(fields.land_rows) || !fields.land_rows.length ||
+        if (!Array.isArray(fields.land_rows) ||
             fields.land_rows.some((r) => !r || typeof r !== 'object' || Array.isArray(r))) throw new Error();
         const identity = sug.fields.land_rows.land_identity || fields.land_rows.map((_, n) => n + 1);
         fields.land_rows.forEach((r, n) => { r._source_land_row = identity[n] || null; });
@@ -1469,6 +1469,7 @@ function createModel(deps) {
     // Quet folder moi = nguon mau moi — xoa options ngay de khong ai
     // doc danh sach cua folder truoc khi dang cho scan.
     state.wordOptions = null;
+    state.wordBindingProposals = [];
     emit();
     const payload = { case_id: state.caseId };
     if (templateDir) payload.template_dir = templateDir;

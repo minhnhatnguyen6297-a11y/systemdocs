@@ -162,3 +162,22 @@ hồi chung database/nguồn chưa kiểm; không tuyên bố nghiệm thu các 
 - Review văn phong addendum: đã chạy; làm rõ quan hệ `duplicate_of` và các
   bước triển khai. Định nghĩa sản phẩm đã hoàn tất ở mức đề xuất; thuật toán
   nhóm dữ liệu và quyền sở hữu engine vẫn là câu hỏi mở.
+
+## Kiểm chứng iteration 5 — 04/10/2026
+
+KEEP vòng 5 áp dụng đúng một lần. Ngày đầy đủ sai lịch được đánh dấu lỗi trong
+bằng chứng DOCX, gồm ISO; regex giữ nguyên toàn bộ ngày, không rút thành năm.
+Ngày/năm hợp lệ vẫn giữ được. Lưu đối chiếu thành công rồi tải lại lỗi giữ
+mapping/revision đã lưu, báo rõ và bỏ danh sách cũ để chọn nguồn thử lại.
+Ô diện tích nhận chữ số địa phương; bỏ hết dòng đất vẫn nhận/lưu/xuất được các
+trường tài sản còn đúng. Đổi hồ sơ không nhận kết quả tải lại cũ.
+
+Kiểm giới hạn chữ dùng hợp đồng nhận dạng được cộng phần đệm và bản dưới giới
+hạn làm đối chứng. Tạm bỏ đúng guard giới hạn làm bài kiểm tra thất bại tại
+`succeeded` thay vì `partial`; đã khôi phục nguyên byte adapter ngay sau đó.
+Root Electron HS-8: `ok:true`, 4 bản ghi/25 vị trí, lưu/mở lại/xuất mẫu gốc;
+byte nguồn, ZIP ngoài vị trí thay và DB làm việc không đổi. Native picker dùng
+bộ giả lập; corpus văn phòng/trang Word/bản cài sạch/phục hồi chung vẫn chưa kiểm.
+Kiểm cuối: 44 DOCX Python; backend 397 pass/2 COM skip; adapter/Intake/lõi regex
+115 pass; Node 233 pass (24 DOCX); 78 ví dụ contract đúng kết quả dự kiến.
+Link local 7 lượt đối chiếu không thiếu; kiểm khoảng trắng diff đạt.

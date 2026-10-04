@@ -22,9 +22,14 @@ Cụm đất được sửa theo từng dòng loại đất/diện tích/thời 
 dùng nhập mã JSON. Cả một dòng lẫn nhiều dòng đều giữ được.
 Mỗi ô mơ hồ phải được chọn hoặc sửa riêng. Chọn ngày từ chữ gốc đổi về dạng
 `YYYY-MM-DD` theo quy tắc ngày hiện có trước khi nhận vào Stage.
+Ngày đầy đủ trong nguồn phải đúng lịch, kể cả dạng ISO như `1980-02-31`.
+Ngày sai giữ nguyên chữ/vị trí nguồn, hiện cảnh báo và phải sửa trước khi nhận;
+không lấy riêng `1980` để che phần tháng/ngày sai. Năm sinh đứng riêng vẫn được giữ.
 Diện tích âm hoặc không phải số hữu hạn bị chặn ngay khi kiểm tra; giữ chữ
 đang sửa và các ô đã duyệt khác. Phân tích thêm nguồn không làm mất thẻ hay
 nội dung đang sửa của các gợi ý trước, kể cả khi lần mới lỗi hoặc bị hủy.
+Ô diện tích nhận cả `1.234,5`. Có thể bỏ toàn bộ dòng đất đọc sai và giữ các
+trường tài sản còn đúng; danh sách đất rỗng không gắn lại vị trí nguồn đã bỏ.
 
 ## Bóc trường, nhóm và Tại sao?
 
@@ -81,6 +86,9 @@ slot và giá trị sẽ xuất; checkbox hiển thị đúng lựa chọn đã 
 chọn. Bỏ chọn hết rồi lưu sẽ xóa toàn bộ vị trí đã gắn.
 Lúc đang lưu, khóa chọn vị trí; nếu lưu lỗi thì giữ lựa chọn và khôi phục
 đối chiếu cục bộ trước lần xác nhận để người dùng thử lưu lại.
+Nếu lưu thành công nhưng tải lại danh sách lỗi, đối chiếu và revision đã lưu
+vẫn giữ nguyên. Màn báo rõ đã lưu, xóa lựa chọn cũ và cho chọn lại nguồn để thử
+tải lại; không dùng danh sách cũ để xuất. Chọn nguồn khác cũng xóa ngay bảng cũ.
 Người N theo Stage đã lưu, Bên A/B theo ô `p1..p30` đã lưu, tài sản N theo thứ tự Stage. Đổi thứ tự
 hoặc ô làm slot khác phải xác nhận lại. Xóa dòng làm mất binding của dòng ấy,
 không chuyển sang người kế tiếp. Slot trống/không hỗ trợ thì báo lỗi.

@@ -56,6 +56,52 @@ def extraction(content, store=None):
     return asyncio.run(extract(spec, ctx))
 
 
+@pytest.mark.parametrize('raw', ['31/02/1980', '1980-02-31'])
+def test_invalid_source_date_requires_correction_and_commits_exact_original_evidence(db, tmp_path, raw):
+    doc = Document(io.BytesIO(fixture_bytes()))
+    for p in doc.paragraphs:
+        if '01/02/1980' in p.text:
+            for run in p.runs:
+                run.text = run.text.replace('01/02/1980', raw)
+    stream = io.BytesIO(); doc.save(stream); content = stream.getvalue()
+    store = DocxStore(tmp_path / 'sources')
+    suggestions = extraction(content, store)
+    person = next(s for s in suggestions if s['target'] == 'person')
+    field = person['fields']['ngay_sinh']; ref = field['source_refs'][0]
+    assert field['normalized_value'] is None
+    assert ref['core_state'] == 'error' and ref['raw_snippet'] == raw
+    assert read_docx(content).text[slice(*ref['span'])] == raw
+    assert any(w['code'] == 'intake.invalid_date' for w in person['warnings'])
+    _, _, service, data = reviewed_case(db, tmp_path / 'case', content)
+    data['stage']['people'][0]['ngay_sinh'] = raw
+    with pytest.raises(WorkspaceError):
+        service.commit_stage(data['case']['id'], data['case']['revision'], data['stage'], docx_import=data['docx_import'])
+    data['stage']['people'][0]['ngay_sinh'] = '1980-02-29'
+    saved = service.commit_stage(data['case']['id'], data['case']['revision'], data['stage'], docx_import=data['docx_import'])
+    assert service.get(data['case']['id'])['stage']['people'][0]['ngay_sinh'] == '1980-02-29'
+    assert saved['revision'] == data['case']['revision'] + 1
+    assert store.load(ref['source_id'])[0] == content
+
+
+@pytest.mark.parametrize('raw,expected', [('1980-02-29', '1980-02-29'), ('1980', '1980')])
+def test_valid_iso_and_year_only_source_dates_remain_accepted(raw, expected):
+    doc = Document(io.BytesIO(fixture_bytes()))
+    for p in doc.paragraphs:
+        for run in p.runs:
+            run.text = run.text.replace('01/02/1980', raw)
+    stream = io.BytesIO(); doc.save(stream)
+    field = extraction(stream.getvalue())[0]['fields']['ngay_sinh']
+    assert field['normalized_value'] == expected
+    assert field['source_refs'][0]['raw_snippet'] == raw
+    assert field['source_refs'][0]['core_state'] == 'matched'
+
+
+@pytest.mark.parametrize('raw', ['1980-02-31','31/02/1980','31.02.1980','1980/2/31'])
+def test_all_recognized_complete_dates_validate_calendar(raw):
+    from services.document_intake.normalization import norm_date
+    assert norm_date(raw)[0] is None
+
+
 @pytest.mark.parametrize('raw', ['-50', '-' + '9' * 400, '9' * 400])
 @pytest.mark.parametrize('land', [False, True])
 def test_invalid_source_area_keeps_complete_evidence_and_corrected_span(raw, land):
@@ -111,8 +157,11 @@ def test_actual_docx_analyze_limits_keep_valid_batch_source_and_reject_storage(t
     from zipfile import ZIP_DEFLATED
     valid = fixture_bytes()
     if limit == 'text':
-        doc = Document(); doc.add_paragraph('X' * 100001)
+        doc = Document(io.BytesIO(valid)); doc.add_paragraph('X' * 100001)
         stream = io.BytesIO(); doc.save(stream); invalid = stream.getvalue()
+        control = Document(io.BytesIO(valid)); control.add_paragraph('X' * 1000)
+        stream = io.BytesIO(); control.save(stream)
+        assert len(extraction(stream.getvalue())) == 4
     else:
         stream = io.BytesIO()
         with ZipFile(io.BytesIO(valid)) as src, ZipFile(stream, 'w', compression=ZIP_DEFLATED) as dst:
@@ -322,6 +371,29 @@ def reviewed_case(db, tmp_path, content=None):
     data = service.create(str(uuid.uuid4()), {'case_type': 'inheritance', 'document_type': 'khai_nhan'},
         {'owner_row_id': people[0]['row_id'], 'people': people, 'assets': assets}, None, context)
     return content, store, service, data
+
+
+def test_intentionally_empty_land_roundtrip_exports_remaining_asset_fields_without_rebinding(db, tmp_path):
+    original, store, service, data = reviewed_case(db, tmp_path)
+    cid = data['case']['id']; source_id = data['docx_import']['sources'][0]['source_id']
+    data['stage']['assets'][0]['land_rows'] = []
+    data['stage']['assets'][0]['so_serial'] = 'AA654321'
+    data['docx_import']['sources'][0]['records'][2]['land_rows'] = []
+    saved = service.commit_stage(cid, data['case']['revision'], data['stage'], docx_import=data['docx_import'])
+    assert service.get(cid)['stage']['assets'][0]['land_rows'] == []
+    proposals = binding_proposals(db.get(InheritanceCase,cid),source_id,store)
+    first_candidate = saved['docx_import']['sources'][0]['records'][2]['candidate_id']
+    assert all(not p['supported'] for p in proposals if p['candidate_id'] == first_candidate and p['field_key'] == 'land_rows')
+    serial = next(p for p in proposals if p['raw_snippet'] == 'ZZ123456')
+    context = saved['docx_import']; context['sources'][0]['bindings'] = [
+        {k:serial[k] for k in ('candidate_id','occurrence_id','field_key','slot')}]
+    service.commit_stage(cid,saved['revision'],saved['stage'],docx_import=context)
+    result = export_original(db.get(InheritanceCase,cid),source_id,store,tmp_path)
+    text = read_docx(Path(result['documents'][0]['output_file']['path']).read_bytes()).text
+    assert 'AA654321' in text and 'ZZ123456' not in text
+    assert 'Loại đất: ONT; Diện tích: 50; Thời hạn: Lâu dài' in text
+    assert 'Loại đất: CLN; Diện tích: 20; Thời hạn: 2050' in text
+    assert store.load(source_id)[0] == original
 
 
 @pytest.mark.parametrize('land', [False, True])

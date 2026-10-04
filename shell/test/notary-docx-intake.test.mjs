@@ -405,6 +405,82 @@ test('localized area evidence uses complete number normalization', () => {
   assert.equal(model.acceptSuggestion(sug.suggestion_id).land_rows[0].dien_tich,1234.5);
 });
 
+test('localized typed area survives text input and deleting all land rows commits empty identity', async () => {
+  const calls=[];
+  const model=M.createModel({client:{run:async(command,payload)=>{
+    calls.push(payload);return {ok:true,data:{revision:3,stage:payload.stage,docx_import:payload.docx_import}};
+  }}});model.newDraft();
+  const sug=suggestion();model.state.suggestions.push(sug);
+  const {ctx,box}=dialogContext(model);INTAKE.createIntakeDialog(ctx).open();
+  const area=collect(box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')==='Diện tích')[0];
+  assert.equal(area.type,'text');assert.equal(area.getAttribute('inputmode'),'decimal');
+  area.value='1.234,5';area.onchange();
+  assert.equal(JSON.parse(sug.fields.land_rows.normalized_value)[0].dien_tich,1234.5);
+  button(box,'Bỏ dòng').onclick();
+  const row=model.acceptSuggestion(sug.suggestion_id);
+  assert.ok(row);assert.deepEqual(row.land_rows,[]);
+  assert.deepEqual(model.state.docxImport.sources[0].records[0].land_rows,[]);
+  model.state.caseId=1;model.state.revision=2;await model.commitStage();
+  assert.deepEqual(calls[0].stage.assets[0].land_rows,[]);
+  assert.deepEqual(calls[0].docx_import.sources[0].records[0].land_rows,[]);
+});
+
+test('invalid source dates block accept until correction then commit canonical date with original evidence', async () => {
+  for(const raw of ['31/02/1980','1980-02-31']) {
+    let saved;
+    const model=M.createModel({client:{run:async(_command,payload)=>{
+      saved=payload;return {ok:true,data:{revision:3,stage:payload.stage,docx_import:payload.docx_import}};
+    }}});model.newDraft();
+    const sug=suggestion('person');sug.fields.ngay_sinh={raw_value:raw,normalized_value:null,
+      source_refs:[{kind:'docx',core_state:'error',raw_snippet:raw}]};model.state.suggestions.push(sug);
+    assert.equal(model.acceptSuggestion(sug.suggestion_id),null);
+    const {ctx,box}=dialogContext(model);INTAKE.createIntakeDialog(ctx).open();
+    const date=collect(box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')==='Kiểm tra Ngày sinh')[0];
+    date.value='1980-02-29';date.onchange();
+    assert.equal(model.acceptSuggestion(sug.suggestion_id).ngay_sinh,'1980-02-29');
+    assert.equal(sug.fields.ngay_sinh.raw_value,raw);
+    model.state.caseId=1;model.state.revision=2;await model.commitStage();
+    assert.equal(saved.stage.people[0].ngay_sinh,'1980-02-29');
+  }
+});
+
+test('saved bindings survive options reload failure and source retry; stale source proposals disappear immediately', async () => {
+  for(const failure of ['result','throw']) {
+    let loads=0, finish;
+    const id=uuid(), proposal={candidate_id:uuid(),occurrence_id:uuid(),field_key:'ho_ten',slot:'[Người 1 - Họ tên]',
+      raw_snippet:'Tên gốc',row_id:uuid(),row_label:'Tên đã lưu',value:'Tên đã lưu',supported:true,selected:false};
+    const model=M.createModel({client:{run:async(command,payload)=>{
+      if(command==='notary.word_export_options') {
+        loads++;
+        if(loads===2) {if(failure==='throw') throw new Error('reload failed');return {ok:false,error:{code:'reload_failed'}};}
+        if(loads===3) return new Promise((resolve,reject)=>{finish=()=>failure==='throw'
+          ? reject(new Error('retry failed')) : resolve({ok:false,error:{code:'retry_failed'}});});
+        return {ok:true,data:{documents:[{document_key:'original.docx',ready:true}],binding_proposals:[{...proposal,selected:loads>3}]}};
+      }
+      return {ok:true,data:{revision:3,stage:payload.stage,docx_import:payload.docx_import}};
+    }}});model.newDraft();model.state.caseId=1;model.state.revision=2;
+    model.state.stageDirty=false;model.state.diagramDirty=false;model.state.metaDirty=false;
+    model.state.docxImport={version:1,sources:[{source_id:id,label:'A.docx',records:[],bindings:[]}]};
+    const {ctx,box}=dialogContext(model);const notices=[];ctx.notify=t=>notices.push(t);WORD.createWordDialog(ctx).open();
+    await button(box,'Dùng hợp đồng Word đã nhập').onclick();
+    const choice=collect(box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')?.includes('Tên gốc'))[0];
+    choice.checked=true;choice.onchange();await button(box,'Xác nhận và lưu').onclick();
+    assert.equal(model.state.revision,3);assert.equal(model.state.stageDirty,false);
+    assert.equal(model.state.docxImport.sources[0].bindings.length,1);
+    assert.match(box.textContent,/Đã lưu vị trí Word, nhưng chưa tải lại/);
+    assert.ok(notices.some(t=>/Đã lưu.*thất bại/.test(t)));
+    assert.equal(button(box,'Xác nhận và lưu'),undefined);
+    assert.deepEqual(model.state.wordBindingProposals,[]);
+    const pending=button(box,'Dùng hợp đồng Word đã nhập').onclick();
+    assert.match(box.textContent,/Đang tải/);assert.doesNotMatch(box.textContent,/Tên gốc →/);
+    assert.equal(button(box,'Xuất').disabled,true);finish();await pending;
+    assert.doesNotMatch(box.textContent,/Tên gốc →/);assert.match(box.textContent,/chọn lại nguồn để thử lại/);
+    await button(box,'Dùng hợp đồng Word đã nhập').onclick();
+    assert.ok(button(box,'Xác nhận và lưu'));
+    assert.equal(collect(box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')?.includes('Tên gốc'))[0].checked,true);
+  }
+});
+
 test('real model commit and get restore original land identity after server removes UI-only keys', async () => {
   let saved, revision=1;const calls=[];
   const model=M.createModel({client:{run:async(command,payload)=>{
@@ -427,4 +503,29 @@ test('real model commit and get restore original land identity after server remo
   assert.deepEqual(saved.docx_import.sources[0].records[0].land_rows,[21]);
   assert.equal(saved.stage.assets[0].land_rows[0].dien_tich,77);
   assert.deepEqual(calls.map(c=>c[0]),['notary.workspace_commit_stage','notary.workspace_get','notary.workspace_commit_stage']);
+});
+
+test('case switch during saved mapping reload never updates the new case dialog state', async () => {
+  let finish,loads=0;
+  const id=uuid(),proposal={candidate_id:uuid(),occurrence_id:uuid(),field_key:'ho_ten',slot:'[Người 1 - Họ tên]',
+    raw_snippet:'Tên gốc',row_id:uuid(),row_label:'Tên đã lưu',value:'Tên đã lưu',supported:true};
+  const model=M.createModel({client:{run:async(command,payload)=>{
+    if(command==='notary.word_export_options') {
+      if(++loads===2) return new Promise(resolve=>{finish=resolve;});
+      return {ok:true,data:{documents:[],binding_proposals:[proposal]}};
+    }
+    return {ok:true,data:{revision:3,stage:payload.stage,docx_import:payload.docx_import}};
+  }}});model.newDraft();model.state.caseId=1;model.state.revision=2;
+  model.state.stageDirty=false;model.state.diagramDirty=false;model.state.metaDirty=false;
+  model.state.docxImport={version:1,sources:[{source_id:id,label:'A.docx',records:[],bindings:[]}]};
+  const {ctx,box}=dialogContext(model);const notices=[];ctx.notify=t=>notices.push(t);WORD.createWordDialog(ctx).open();
+  await button(box,'Dùng hợp đồng Word đã nhập').onclick();
+  const pending=button(box,'Xác nhận và lưu').onclick();
+  await Promise.resolve();await Promise.resolve();
+  model.newDraft();model.state.caseId=2;model.state.revision=7;
+  model.state.wordOptions=[{document_key:'new-case.docx',ready:true}];
+  finish({ok:false,error:{code:'reload_failed'}});await pending;
+  assert.equal(model.state.revision,7);assert.deepEqual(model.state.docxImport.sources,[]);
+  assert.equal(model.state.wordOptions[0].document_key,'new-case.docx');
+  assert.deepEqual(notices,[]);assert.doesNotMatch(box.textContent,/Đã lưu vị trí Word, nhưng/);
 });

@@ -83,6 +83,10 @@ def norm_date(raw: str, *, allow_year: bool = True):
 
     m = _DATE_PATTERNS[0].match(cleaned)
     if m:
+        try:
+            datetime(*(int(part) for part in m.groups()))
+        except ValueError:
+            return None, "observed", None
         return cleaned, "normalized", None
     for pat in _DATE_PATTERNS[1:4]:
         m = pat.match(cleaned)
