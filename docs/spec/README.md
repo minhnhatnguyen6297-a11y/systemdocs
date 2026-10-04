@@ -159,6 +159,12 @@ Mặc định hệ thống chạy trong LAN. Chỉ các đường dưới đư�
 | DashScope/Qwen OCR cho ảnh Zalo | Ảnh do module Zalo đang giữ tạm | `zalo` |
 | Portal CSDL công chứng | Dữ liệu hồ sơ người dùng đã kiểm tra | `upload_lab` |
 | Server Zalo | Tin/ảnh của tài khoản chung văn phòng | `zalo` |
+| Bando — tải danh mục/bảng xã và tỉnh | Dữ liệu hành chính công khai; không gửi hồ sơ hoặc địa chỉ khách hàng | `notary_v2` |
+
+Owner cho phép lấy Bando trong chat 03–04/10/2026. Đường này chỉ phục vụ
+cập nhật kho hành chính bằng CLI; tra cứu hồ sơ dùng kho cục bộ, không gọi
+website mỗi lần gõ. Cách lưu nguồn, bổ sung lịch sử và mở rộng nằm tại
+[`administrative-timeline.md`](./notary_v2/administrative-timeline.md).
 
 Agent máy trạm `notaryoffice` không được gọi Internet, chỉ gửi về Hub trong
 LAN. Ảnh CCCD gửi tới OCR nước ngoài thuộc phạm vi bảo vệ dữ liệu cá nhân theo
