@@ -60,9 +60,11 @@ foreach ($key in $allow.Keys) {
     }
     foreach ($d in $allow[$key].dirs) {
         $target = Join-Path $dst $d
-        New-Item -ItemType Directory -Force `
-            -Path (Split-Path $target -Parent) | Out-Null
-        Copy-Item -Recurse -Force (Join-Path $src $d) $target
+        # Copy NO I DUNG cua thu muc — Copy-Item ca thu muc vao target da
+        # ton tai se long thanh services\services (NAIA-9: reference
+        # staging tao truoc notary_v2\services).
+        New-Item -ItemType Directory -Force -Path $target | Out-Null
+        Copy-Item -Recurse -Force (Join-Path $src (Join-Path $d "*")) $target
     }
     foreach ($e in $allow[$key].excludes) {
         $hit = Join-Path $dst $e

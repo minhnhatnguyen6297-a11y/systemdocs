@@ -89,3 +89,19 @@ Trước curation lưu compressed previous-ledger revision bất biến; lỗi a
 dừng update. 64 timeline tests passed, có strict full import/rejection, actual
 CLI subprocess và boundary ngày đổi tên. Docs nói rõ name-only query, lock
 recovery, confidence độc lập, baseline source counts và long-graph limits.
+
+## 04/10/2026 — Kiểm đóng gói thật (Multica, sau compact)
+
+- `stage_package_assets.ps1` lỗi copy: tạo `notary_v2/services/services` khi
+  target dir đã tồn tại → vá copy nội dung dir thay vì copy dir.
+- Build full: staging → `check_package_deps` OK → PyInstaller 6.22.3 →
+  `sidecar/dist/g1-shell-sidecar/g1-shell-sidecar.exe` → `electron-builder
+  --dir` → `dist-app/win-unpacked/g1-shell.exe`.
+- Smoke packaged qua CDP (`.agent/scratch/probe-packaged-app.py`, report tại
+  `artifacts/packaged-smoke-20261004/`): sidecar `ready`, job
+  `notary.address_lookup` succeeded, `schema_version` đúng, ứng viên
+  `Xã Ý Yên, Tỉnh Ninh Bình` + `coverage.kind=current_catalog_candidates`.
+- Đây là bằng chứng artifact đóng gói chạy end-to-end trên máy này (sidecar
+  exe + engine staged + ledger staged). KHÔNG phải kiểm clean-machine:
+  vẫn thiếu máy sạch không dev-env, upgrade/restore, native picker tay,
+  Word page-by-page tay.

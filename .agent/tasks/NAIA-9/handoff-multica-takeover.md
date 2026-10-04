@@ -260,7 +260,9 @@ cùng agent từng giúp resume; không reset code đã có.
 - NAIA-21 chưa nghiệm thu consumer; tests địa chỉ và UI đang hoàn thiện.
 - NAIA-6 Owner acceptance và issue status bên ngoài chưa cập nhật.
 - Word page-by-page/native picker, packaged clean-machine/upgrade/restore
-  chưa được chứng minh; DOCX backup steps là hướng dẫn, không phải phép thử restore.
+  chưa được chứng minh (đã có smoke packaged trên máy dev — xem §8.1; còn
+  thiếu máy sạch không dev-env và đường upgrade/restore); DOCX backup steps
+  là hướng dẫn, không phải phép thử restore.
 - DOCX deferred log có pre-existing reanalyse batch queue, filesystem hardlink
   compatibility chưa kiểm trên filesystem khác,corpus accuracy ngoài fixture.
   Xem `_bmad-output/implementation-artifacts/deferred-work.md`; không lặp lại
@@ -294,8 +296,16 @@ Lượt này hoàn tất kiểm chứng + vá sau review; chi tiết tại
   completeness — findings đã triage; phần lớn vá ngay (contract §14, seam
   test, validator tighten, partial-history, issuer gate, ignore in-flight,
   prune state đổi case, idPrefix dialog, CSS token). Còn lại ghi deferred:
-  DOM-level test phủ rộng, parent `stage_package_assets.ps1` flow test.
+  DOM-level test phủ rộng (parent `stage_package_assets.ps1` flow test đã
+  chạy ở lượt đóng gói 04/10 — xem dưới).
 - **Contract/spec đồng bộ**: §14 + command thứ 10 + changelog; spec có mục
   lỗi/ngoại lệ và ghi kết quả probe thật.
-- **Chưa làm**: chưa commit (chờ Owner xác nhận phạm vi); chưa cập nhật
-  Linear/NAIA-*; chưa gộp sang `consolidate/monorepo`.
+- **04/10/2026 — kiểm đóng gói thật**: `stage_package_assets.ps1` có lỗi copy
+  dir lồng (`services/services`) → đã vá; build full `electron-builder --dir`
+  → `dist-app/win-unpacked`; smoke packaged qua CDP: sidecar `ready`,
+  `notary.address_lookup` succeeded với coverage đúng (report:
+  `artifacts/packaged-smoke-20261004/`). Chứng minh artifact chạy được trên
+  máy dev — KHÔNG phải clean-machine.
+- **Đã commit** `a83f993` + commit vá staging/records sau đó. **Chưa làm**:
+  chưa push, chưa cập nhật Linear/NAIA-*; chưa gộp sang
+  `consolidate/monorepo` — chờ Owner.

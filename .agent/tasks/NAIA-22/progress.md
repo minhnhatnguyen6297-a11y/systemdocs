@@ -27,3 +27,9 @@ chính sách khóa tài khoản. Hạn mức model trước đó là nguyên nh�
 - Đây là bằng chứng hai đường hiện chạy được; chưa xác định ứng dụng đã dùng
   mật khẩu cũ trong các sự kiện ngày03/10. Không sửa mật khẩu/chính sách và
   không coi một lượt chạy thành bằng chứng ổn định lâu dài.
+
+## 04/10/2026 — Bổ sung (Multica)
+
+- Thử đọc lại Security 4625: phiên hiện tại không có quyền đọc log Security
+  ("unauthorized operation"). Không kết luận gì thêm từ lượt này; việc kiểm
+  chứng cần Owner/admin chạy với quyền đủ.

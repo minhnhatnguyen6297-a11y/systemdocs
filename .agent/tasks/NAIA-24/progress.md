@@ -28,3 +28,9 @@ lặp lại chỉ để kiểm môi trường, vì workflow yêu cầu một b�
 Cập nhật binary: cập nhật gói WinGet, sao chép binary mới vào thư mục dùng
 chung và kiểm hash/version/phiên sandbox mới. Không thay PATH bằng một chuỗi
 rút gọn; giữ các mục cũ. Bản PATH trước thay đổi lưu tạm tại scratch host.
+
+## 04/10/2026 — Bổ sung (Multica, phiên mới)
+
+- Kiểm lại trong tiến trình mới: `uv 0.12.19` vẫn resolve từ đường dùng chung
+  `C:\Program Files\Systemdocs Tools\uv\uv.exe` và `uv run --no-cache python`
+  chạy được. 3/4 bước AC đạt; chưa xác nhận agent Multica mới kế thừa PATH.
