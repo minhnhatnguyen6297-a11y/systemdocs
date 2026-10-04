@@ -2,6 +2,9 @@
 import hashlib
 import json
 import uuid
+import os
+import tempfile
+import shutil
 from pathlib import Path
 from .models import MAX_FILE_BYTES
 
@@ -13,8 +16,8 @@ class DocxStore:
     def save(self, content, suggestions, filename='Hợp đồng Word'):
         self.root.mkdir(parents=True, exist_ok=True)
         source_id = str(uuid.uuid4())
-        folder = self.root / source_id
-        folder.mkdir()
+        destination = self.root / source_id
+        folder = Path(tempfile.mkdtemp(prefix='.source-', dir=self.root))
         digest = hashlib.sha256(content).hexdigest()
         label = ''.join(c for c in str(filename).replace('\\', '/').split('/')[-1] if c.isprintable())[:180] or 'Hợp đồng Word'
         for suggestion in suggestions:
@@ -28,10 +31,9 @@ class DocxStore:
                 "suggestions": suggestions}, ensure_ascii=False).encode("utf-8")
             (folder / "extraction.json").write_bytes(extraction)
             (folder / "extraction.sha256").write_text(hashlib.sha256(extraction).hexdigest(), encoding="ascii")
+            folder.rename(destination)
         except BaseException:
-            for name in ("original.docx", "extraction.json", "extraction.sha256"):
-                (folder / name).unlink(missing_ok=True)
-            folder.rmdir()
+            shutil.rmtree(folder, ignore_errors=True)
             raise
         return source_id
 
@@ -67,15 +69,21 @@ class DocxStore:
         folder = self.root / source_id / "templates"
         folder.mkdir(exist_ok=True)
         path = folder / (digest + ".docx")
+        temp = None
         try:
-            with path.open("xb") as handle:
+            with tempfile.NamedTemporaryFile(prefix='.template-', dir=folder, delete=False) as handle:
+                temp = Path(handle.name)
                 handle.write(content)
-        except FileExistsError:
-            if path.read_bytes() != content:
-                raise ValueError("Mẫu lưu bị đổi nội dung") from None
-        except BaseException:
-            path.unlink(missing_ok=True)
-            raise
+                handle.flush()
+                os.fsync(handle.fileno())
+            try:
+                os.link(temp, path)  # Atomic publication, never replace an existing immutable file.
+            except FileExistsError:
+                if path.read_bytes() != content:
+                    raise ValueError("Mẫu lưu bị đổi nội dung") from None
+        finally:
+            if temp is not None:
+                temp.unlink(missing_ok=True)
         return digest
 
     def load_template(self, source_id, digest):

@@ -111,6 +111,25 @@ def test_original_docx_two_party_adapter_lifecycle_stale_guard_and_subfolder(ada
     text = read_docx(output.read_bytes()).text
     assert 'Tên B đã kiểm tra' in text and 'Trần Thị Mẫu' in text and 'Nội dung tĩnh giữ nguyên' in text
     assert hashlib.sha256(path.read_bytes()).hexdigest() == hashlib.sha256(original).hexdigest()
+    # A file occupying the child-folder name must produce a Word error, not a raw OS exception.
+    blocked_dest = tmp_path / 'blocked-exports'; blocked_dest.mkdir()
+    (blocked_dest / f'HS-{cid}').write_text('existing file', encoding='utf-8')
+    payload['destination'] = _dest(blocked_dest)
+    with pytest.raises(CommandError) as err:
+        notary_adapter.word_export_batch(_Job(), payload)
+    assert err.value.code == 'word.render_failed'
+    assert (blocked_dest / f'HS-{cid}').read_text(encoding='utf-8') == 'existing file'
+    mkdir = Path.mkdir
+    def locked_child(folder, *args, **kwargs):
+        if folder.name == f'HS-{cid}': raise PermissionError('locked folder')
+        return mkdir(folder, *args, **kwargs)
+    payload['destination'] = _dest(dest)
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, 'mkdir', locked_child)
+        with pytest.raises(CommandError) as err:
+            notary_adapter.word_export_batch(_Job(), payload)
+        assert err.value.code == 'file_locked'
+    assert list(output.parent.iterdir()) == [output]
 
 
 class _Job:

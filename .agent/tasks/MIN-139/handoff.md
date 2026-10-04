@@ -3,6 +3,13 @@
 Luồng Word-first đã triển khai cục bộ, chờ root review và commit đúng phạm vi.
 Spec hiện hành: [Nhập DOCX](../../../docs/spec/notary_v2/input/docx-import.md).
 Các phép thử và giới hạn được ghi trong [progress](progress.md).
+Iteration 3 đã sửa 8 nhóm xác minh: retry/khóa chọn vị trí, ranh giới tài sản,
+diện tích sai, giữ review cũ, công bố nguồn/mẫu bằng file tạm và hủy xuất,
+đất thiếu bằng chứng, lỗi thư mục đích, response xuất cũ. 24 DOCX, 353 backend
+regression (2 ca COM skip), 109 sidecar/lõi regex, 6 sidecar Intake, 226 Node
+và 78 ví dụ contract đều qua. Root chạy lại Electron iteration 3 `ok: true`
+với 4 bản ghi/25 vị trí; picker dùng bộ giả lập. Chưa kiểm native picker,
+trang Word/corpus văn phòng/bản cài sạch hay phục hồi chung database+nguồn.
 Đã sửa các nhóm lỗi được xác minh ở review iteration 1: danh tính dòng đất,
 duyệt từng ô, ngày evidence, slot/định dạng không dùng được, lựa chọn đã lưu/
 xóa hết, giới hạn/gỡ/tên nguồn, kiểm slot trong transaction và đích thư mục con.

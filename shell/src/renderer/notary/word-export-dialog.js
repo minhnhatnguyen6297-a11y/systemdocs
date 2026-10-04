@@ -113,6 +113,7 @@ function createWordDialog(ctx) {
       let scanning = false;                  // dang quet thu muc mau
       let savingMeta = false;                // dang luu meta (workspace_update)
       let mappingDirty = false;
+      let mappingChoices = [];
 
       const tplLabel = h('span', 'muted', 'Chưa chọn thư mục mẫu');
       const destLabel = h('span', 'muted', 'Chưa chọn thư mục đích');
@@ -149,6 +150,7 @@ function createWordDialog(ctx) {
           !model.canWrite();
         selAll.disabled = scanning || exporting || !checks.length;
         selNone.disabled = scanning || exporting || !checks.length;
+        for (const choice of mappingChoices) choice.cb.disabled = scanning || exporting || savingMeta || !choice.proposal.supported;
       }
 
       function renderDocs() {
@@ -402,13 +404,14 @@ function createWordDialog(ctx) {
           const mappingBox = h('div', 'cd-slot');
           mappingBox.append(h('div', 'muted', 'Chọn từng vị trí sẽ thay. Chữ gốc → dòng đã lưu → giá trị xuất. Các chỗ không chọn giữ nguyên.'));
           const choices = [];
+          mappingChoices = choices;
           for (const proposal of model.state.wordBindingProposals || []) {
             const lab = h('label', 'cd-check-row');
             const cb = h('input');
             cb.type = 'checkbox';
             cb.disabled = !proposal.supported;
             cb.checked = !!proposal.selected;
-            cb.onchange = () => { mappingDirty = true; refreshScanLock(); };
+            cb.onchange = () => { if (savingMeta || exporting || scanning) return; mappingDirty = true; refreshScanLock(); };
             cb.setAttribute('aria-label', `${proposal.raw_snippet} thành ${proposal.slot}`);
             lab.append(cb, h('span', '', `${proposal.raw_snippet} → ${proposal.row_label} (${proposal.row_id}) · ${proposal.slot} → ${proposal.value}`));
             if (!proposal.supported) lab.append(h('span', 'error', proposal.reason || 'Vùng Word chưa hỗ trợ sửa'));
@@ -418,25 +421,39 @@ function createWordDialog(ctx) {
           mappingBox.append(btn('Xác nhận và lưu các vị trí đã chọn', 'primary sm', async () => {
             if (exporting || scanning || savingMeta || originalSourceId !== source.source_id) return;
             const bindings = choices.filter((c) => c.cb.checked && !c.cb.disabled).map((c) => c.proposal);
+            const previousContext = JSON.parse(JSON.stringify(model.state.docxImport));
+            const previousDirty = model.state.stageDirty;
+            const previousCase = model.state.caseId;
             if (!model.confirmOriginalBindings(originalSourceId, bindings)) { notify('Hồ sơ đã đổi; hãy tải lại', true); return; }
             savingMeta = true;
+            for (const choice of choices) choice.cb.disabled = true;
             refreshScanLock();
+            let committed = false;
             try {
               const saved = await model.commitStage();
-              if (!saved.ok) { notify(saved.error.message || saved.error.code, true); return; }
+              if (!saved.ok) {
+                notify(saved.error.message || saved.error.code, true); return;
+              }
+              committed = true;
               const loaded = await model.loadWordOptions(null, source.source_id);
               if (!loaded.ok || loaded.stale) return;
               mappingDirty = false;
               renderDocs();
               for (const choice of choices) {
                 const current = (model.state.wordBindingProposals || []).find((p) => p.occurrence_id === choice.proposal.occurrence_id);
+                choice.proposal = current || { ...choice.proposal, supported: false };
                 choice.cb.checked = !!current?.selected;
                 choice.cb.disabled = !current?.supported;
               }
               listBox.append(mappingBox);
               notify('Đã lưu vị trí Word; có thể xuất vào thư mục đích');
             } finally {
+              if (!committed && model.state.caseId === previousCase) {
+                model.state.docxImport = previousContext;
+                model.state.stageDirty = previousDirty;
+              }
               savingMeta = false;
+              for (const choice of choices) choice.cb.disabled = !choice.proposal.supported;
               refreshScanLock();
             }
           }));

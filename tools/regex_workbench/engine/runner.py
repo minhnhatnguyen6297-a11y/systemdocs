@@ -231,13 +231,14 @@ def run(text: str, profile: dict[str, Any]) -> dict[str, Any]:
                 errors.append("asset.groups: " + problem)
             else:
                 asset_zone = next((z for z in zones if z.get("name") == "asset" and z.get("fold_span")), None)
-                starts = [m.start() for m in matches or []]
+                lower = asset_zone["fold_span"][0] if asset_zone else 0
+                end = (asset_zone["fold_span"][1] if asset_zone else len(folded))
+                starts = [m.start() for m in matches or [] if lower <= m.start() < end]
+                bounded_matches = bool(starts)
                 if not starts and asset_zone:
                     starts = [asset_zone["fold_span"][0]]
                 if not starts:
                     starts = [0]  # A standalone certificate still uses the same field rules.
-                end = (asset_zone["fold_span"][1] if asset_zone else len(folded))
-                starts = [start for start in starts if start < end]
                 for i, start in enumerate(starts):
                     stop = min(starts[i + 1], end) if i + 1 < len(starts) else end
                     if stop <= start:
@@ -262,7 +263,7 @@ def run(text: str, profile: dict[str, Any]) -> dict[str, Any]:
                         if problem:
                             errors.append("asset.land_rows: " + problem)
                     groups.append({"span": list(span_of(start, stop)), "fields": results,
-                                   "land_rows": land_rows, "state": "matched" if matches else "ambiguous_group"})
+                                   "land_rows": land_rows, "state": "matched" if bounded_matches else "ambiguous_group"})
 
     return {
         "profile_id": profile.get("profile_id"),

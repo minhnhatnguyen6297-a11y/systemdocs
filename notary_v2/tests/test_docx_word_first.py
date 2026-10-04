@@ -56,6 +56,94 @@ def extraction(content, store=None):
     return asyncio.run(extract(spec, ctx))
 
 
+def test_asset_heading_before_parties_never_becomes_an_asset_group():
+    content = fixture_bytes()
+    doc = Document(io.BytesIO(content))
+    doc.paragraphs[0].insert_paragraph_before('Tài sản 99: bản mô tả ở đầu hợp đồng')
+    stream = io.BytesIO(); doc.save(stream)
+    suggestions = extraction(stream.getvalue())
+    assets = [s for s in suggestions if s['target'] == 'asset']
+    assert len(assets) == 2
+    assert [s['fields']['so_serial']['normalized_value'] for s in assets] == ['ZZ123456', 'YY123456']
+    source = read_docx(stream.getvalue())
+    for asset in assets:
+        assert all(ref['span'][0] > source.text.index('Bên B:') for f in asset['fields'].values() for ref in f['source_refs'])
+
+
+def test_blank_land_row_does_not_drop_valid_people_or_assets(tmp_path):
+    doc = Document(io.BytesIO(fixture_bytes()))
+    for p in doc.paragraphs:
+        if p.text.startswith('Loại đất:'):
+            p.text = 'Loại đất:'
+    stream = io.BytesIO(); doc.save(stream)
+    store = DocxStore(tmp_path / 'sources')
+    suggestions = extraction(stream.getvalue(), store)
+    assert len(suggestions) == 4
+    assert len([s for s in suggestions if s['target'] == 'person']) == 2
+    assets = [s for s in suggestions if s['target'] == 'asset']
+    assert [s['fields']['so_serial']['normalized_value'] for s in assets] == ['ZZ123456', 'YY123456']
+    for asset in assets:
+        assert 'land_rows' not in asset['fields']
+        assert any('Cụm đất' in w['message'] and 'thiếu dữ liệu' in w['message'] for w in asset['warnings'])
+    ref = suggestions[0]['fields']['ho_ten']['source_refs'][0]
+    assert store.load(ref['source_id'])[0] == stream.getvalue()
+
+
+def test_source_publication_failure_exposes_no_partial_source_and_retry_succeeds(tmp_path, monkeypatch):
+    store = DocxStore(tmp_path / 'sources'); write_bytes = Path.write_bytes
+    def fail_extraction(path, content):
+        if path.name == 'extraction.json':
+            write_bytes(path, content[:20])
+            raise OSError('interrupted')
+        return write_bytes(path, content)
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, 'write_bytes', fail_extraction)
+        with pytest.raises(OSError, match='interrupted'):
+            extraction(fixture_bytes(), store)
+        assert list(store.root.iterdir()) == []
+    content = fixture_bytes(); candidates = extraction(content, store)
+    ref = candidates[0]['fields']['ho_ten']['source_refs'][0]
+    assert store.load(ref['source_id'])[0] == content
+
+
+def test_template_publication_failure_retry_and_existing_immutable_file(tmp_path, monkeypatch):
+    import services.document_intake.docx_store as storage
+    store = DocxStore(tmp_path / 'sources'); content = fixture_bytes()
+    candidates = extraction(content, store); sid = candidates[0]['fields']['ho_ten']['source_refs'][0]['source_id']
+    template = b'synthetic template bytes'; digest = hashlib.sha256(template).hexdigest()
+    folder = store.root / sid / 'templates'
+    def fail_link(source, dest):
+        assert Path(source).read_bytes() == template
+        assert not Path(dest).exists()
+        raise PermissionError('interrupted publication')
+    with monkeypatch.context() as patch:
+        patch.setattr(storage.os, 'link', fail_link)
+        with pytest.raises(PermissionError): store.save_template(sid, template)
+    assert list(folder.iterdir()) == []
+    assert store.save_template(sid, template) == digest
+    path = folder / (digest + '.docx'); before = path.stat().st_mtime_ns
+    assert store.save_template(sid, template) == digest
+    assert path.stat().st_mtime_ns == before and path.read_bytes() == template
+    assert store.load(sid)[0] == content
+
+
+def test_original_export_cancel_after_temp_write_leaves_no_output_and_preserves_source(db, tmp_path):
+    original, store, service, data = reviewed_case(db, tmp_path)
+    cid = data['case']['id']; source = data['docx_import']['sources'][0]
+    proposals = binding_proposals(db.get(InheritanceCase, cid), source['source_id'], store)
+    source['bindings'] = [{k:p[k] for k in ('candidate_id','occurrence_id','field_key','slot')} for p in proposals if p['supported']]
+    service.commit_stage(cid, data['case']['revision'], data['stage'], docx_import=data['docx_import'])
+    dest = tmp_path / 'exports'; dest.mkdir(); seen = []
+    def cancel():
+        files = list(dest.iterdir()); assert len(files) == 1
+        assert files[0].name.startswith('.word_export_') and read_docx(files[0].read_bytes()).text
+        seen.append(files[0]); raise RuntimeError('user_canceled')
+    with pytest.raises(RuntimeError, match='user_canceled'):
+        export_original(db.get(InheritanceCase, cid), source['source_id'], store, dest, check_cancel=cancel)
+    assert seen and list(dest.iterdir()) == []
+    assert store.load(source['source_id'])[0] == original
+
+
 def test_labeled_group_ownership_and_raw_refs():
     content = fixture_bytes()
     source = read_docx(content)

@@ -1317,6 +1317,14 @@ function createModel(deps) {
         value = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       }
     }
+    if (fieldKey === 'land_rows') {
+      let rows;
+      try { rows = JSON.parse(value); } catch (_) { return invalid('Cụm đất cần là danh sách JSON hợp lệ'); }
+      if (!Array.isArray(rows) || rows.some((r) => !r || (r.dien_tich != null &&
+          (typeof r.dien_tich !== 'number' || !Number.isFinite(r.dien_tich) || r.dien_tich < 0)))) {
+        return invalid('Diện tích cần là số hữu hạn từ 0 trở lên');
+      }
+    }
     field.normalized_value = value === '' ? null : value;
     delete field.review_error;
     delete field.review_input;
@@ -1557,8 +1565,8 @@ function createModel(deps) {
     }
     if (o.createCaseSubdir) payload.create_case_subdir = true;
     const r = await client.run('notary.word_export_batch', payload, opts);
+    if (s !== session) return { ok: true, stale: true };
     state.wordBusy = false;
-    if (s !== session) return r;
     if (!r.ok) {
       // Failed/canceled/partial job van co the mang result (breakdown)
       // tren wire: job.result.data (MIN-115) hoac error.details.documents.

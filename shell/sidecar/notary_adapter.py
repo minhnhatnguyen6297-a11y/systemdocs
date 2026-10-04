@@ -1072,16 +1072,20 @@ def word_export_batch(job, payload):
                 raise CommandError("workspace_conflict", "Hồ sơ đã đổi; hãy tải lại trước khi xuất")
             destination = existing_dir(p.get("destination"))
             parent_destination = destination
-            if create_case_subdir:
-                child = destination / f"HS-{cid}"
-                child.mkdir(exist_ok=True)
-                if not wbe._contained_in(child, destination.resolve()):
-                    raise CommandError("word_path_traversal", "Thư mục con nằm ngoài thư mục đích")
-                destination = child
             job.check_cancel()
             try:
+                if create_case_subdir:
+                    child = destination / f"HS-{cid}"
+                    child.mkdir(exist_ok=True)
+                    if not wbe._contained_in(child, destination.resolve()):
+                        raise CommandError("word_path_traversal", "Thư mục con nằm ngoài thư mục đích")
+                    destination = child
                 data = _svc("word_original").export_original(case, p["original_source_id"], _docx_store(),
                                                              destination, check_cancel=job.check_cancel)
+            except PermissionError as exc:
+                raise CommandError("file_locked", "Không ghi được thư mục Word đích") from exc
+            except OSError as exc:
+                raise CommandError("word.render_failed", "Không tạo được thư mục Word đích") from exc
             except wbe.WordBatchError as exc:
                 raise _word_batch_command_error(exc) from exc
             data['destination'] = {'path': str(parent_destination), 'scope': 'machine_local', 'is_dir': True}

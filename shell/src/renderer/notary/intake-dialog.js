@@ -61,6 +61,7 @@ function createIntakeDialog(ctx) {
     // item: {source_id, kind, label, token?, text?, status, error}
     // status: 'chờ' | 'đang phân tích' | 'xong' | 'lỗi' | 'bỏ qua'
     const items = [];
+    const reviewCards = new Map();
     let busy = false;
     let jobId = null;
     let lastResult = null;   // {suggestions, errors} cua lan chay gan nhat
@@ -126,6 +127,7 @@ function createIntakeDialog(ctx) {
     // tray ngoai workspace; tray giu lai khi dong dialog.
     function reviewCardEl(sug) {
       const card = h('div', 'cd-suggest-card');
+      reviewCards.set(sug.suggestion_id, card);
       const head = h('div', 'cd-suggest-head');
       head.append(h('span', 'cd-badge',
         sug.target === 'asset' ? 'Tài sản' : 'Người'));
@@ -143,10 +145,16 @@ function createIntakeDialog(ctx) {
         if (key === 'land_rows') {
           const rowsBox = h('div', 'cd-slot');
           let rows = [];
-          try { rows = JSON.parse(field.normalized_value || '[]'); } catch (_) { /* malformed stays editable */ }
+          try { rows = JSON.parse(field.review_input || field.normalized_value || '[]'); } catch (_) { /* malformed stays editable */ }
           if (!Array.isArray(rows)) rows = [];
           let identity = field.land_identity || rows.map((_, n) => n + 1);
-          const update = (cell) => model.reviewSuggestion(sug.suggestion_id, key, JSON.stringify(rows), { identity, cell });
+          const landError = h('span', 'error', field.review_error || '');
+          const update = (cell) => {
+            field.land_identity = [...identity];
+            const valid = model.reviewSuggestion(sug.suggestion_id, key, JSON.stringify(rows), { identity, cell });
+            landError.textContent = field.review_error || '';
+            return valid;
+          };
           function renderRows() {
             rowsBox.innerHTML = '';
             rowsBox.append(h('div', 'muted', 'Cụm đất: mỗi dòng giữ riêng loại đất, diện tích và thời hạn.'));
@@ -157,7 +165,10 @@ function createIntakeDialog(ctx) {
                 input.value = row[name] == null ? '' : String(row[name]);
                 input.setAttribute('aria-label', label); input.placeholder = label;
                 if (name === 'dien_tich') { input.min = '0'; input.step = 'any'; }
-                input.onchange = () => { row[name] = input.value === '' ? null : name === 'dien_tich' ? Number(input.value) : input.value; update(`${identity[rows.indexOf(row)]}:${name}`); };
+                input.onchange = () => {
+                  row[name] = input.value === '' ? null : name === 'dien_tich' ? (reviewedArea(input.value) ?? input.value) : input.value;
+                  input.setAttribute('aria-invalid', update(`${identity[rows.indexOf(row)]}:${name}`) ? 'false' : 'true');
+                };
                 rowEl.append(input);
               }
               rowEl.append(btn('Bỏ dòng', 'ghost sm', () => { const n = rows.indexOf(row); rows.splice(n, 1); identity.splice(n, 1); update(); renderRows(); }));
@@ -168,7 +179,7 @@ function createIntakeDialog(ctx) {
               rows.push({ loai_dat: null, dien_tich: null, thoi_han: null }); identity.push(null); update(); renderRows();
             }));
           }
-          renderRows(); card.append(rowsBox);
+          renderRows(); card.append(rowsBox, landError);
           const evidence = h('details'); evidence.append(h('summary', '', 'Xem chữ gốc của từng cụm đất'));
           for (const ref of field.source_refs || []) {
             evidence.append(h('div', 'muted', `Dòng ${ref.land_row || '?'} · ${ref.land_field || ''}: ${ref.raw_snippet || ''}`));
@@ -375,7 +386,6 @@ function createIntakeDialog(ctx) {
         go.disabled = true;
         pickBtn.disabled = true;
         cancelBtn.hidden = false;
-        review.innerHTML = '';
         renderList();
         prog.textContent = 'Đang gửi…';
         const r = await model.intakeAnalyze(sources, {
@@ -418,7 +428,10 @@ function createIntakeDialog(ctx) {
             review.append(h('div', 'cd-suggest-title',
               `${news.length} gợi ý mới — xử lý tại đây hoặc đóng ` +
               'và xử lý trong khay gợi ý dưới Stage.'));
-            for (const s2 of news) review.append(reviewCardEl(s2));
+            const pendingIds = new Set(reviewCards.keys());
+            for (const s2 of model.state.suggestions || []) {
+              if (!pendingIds.has(s2.suggestion_id)) review.append(reviewCardEl(s2));
+            }
           } else if (!(lastResult.errors || []).length) {
             review.append(face(L.faceEmpty(
               'Không trích được gợi ý nào từ các nguồn.')));

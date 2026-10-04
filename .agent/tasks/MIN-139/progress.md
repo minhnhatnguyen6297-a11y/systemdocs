@@ -16,6 +16,32 @@ Lịch sử ngày 29/09 phía dưới là đề xuất cũ, không còn trạng 
 
 ## Kiểm chứng đã chạy
 
+### Re-derivation iteration 3 — 04/10/2026
+
+- Lưu vị trí Word lỗi khôi phục đối chiếu/trạng thái nháp trước lần xác nhận,
+  giữ checkbox để thử lại; khóa lựa chọn trong lúc lưu và mở lại đúng quyền.
+- Nhãn tài sản trước vùng tài sản không gom dữ liệu đương sự. Đất trống giữ
+  cảnh báo thiếu dữ liệu và các người/tài sản hợp lệ, không tạo bằng chứng giả.
+- Diện tích âm/không hữu hạn bị chặn khi review; giữ chữ đang sửa và các ô
+  đã duyệt khác. Phân tích thêm/lỗi/hủy giữ các thẻ và nội dung sửa trước đó;
+  đóng/mở lại dialog vẫn sửa được gợi ý mơ hồ và chữ review chưa hợp lệ,
+  không cần nhập lại hay phân tích thành công lần nữa.
+- Nguồn và mẫu ghi tạm xong mới công bố, không ghi đè mẫu hợp lệ; kiểm lỗi
+  giữa chừng và thử lại. Hủy xuất sau khi ghi file tạm không còn output/temp,
+  bản gốc giữ nguyên. Lỗi tạo thư mục con trả lỗi Word hiện hành.
+- Response xuất cũ trả `stale`, không xóa busy/kết quả của lần xuất hồ sơ mới.
+- 24/24 Python DOCX (19 ca cũ + 5 ca mới); 353 backend regression qua,
+  2 ca Word COM bị skip theo điều kiện môi trường; 109 sidecar adapter/lõi
+  regex + 6 sidecar Intake qua; 226/226 Node; 78 ví dụ contract, 0 kết quả
+  ngoài dự kiến. Dùng schema-venv đã có, không cài dependency. Cảnh báo
+  datetime adapter Python vẫn là cảnh báo cũ.
+  4 link cục bộ trong các tài liệu cập nhật và `git diff --check` đều qua.
+- Root chạy lại Electron thật trên iteration 3: 4 bản ghi, 25 vị trí, sửa/lưu/
+  tải lại/xuất qua; artifact `artifacts/docx-electron-20261004/startup-report.json`
+  ghi `ok: true` (HS-5). Nguồn, các phần ZIP không sửa và DB ban đầu giữ nguyên.
+  Cửa sổ chọn file vẫn là bộ trả đường dẫn giả; chưa kiểm native picker,
+  trang Word, corpus văn phòng, bản cài sạch hay sao lưu/khôi phục chung DB+nguồn.
+
 ### Re-derivation iteration 2 — 04/10/2026
 
 - Giữ đủ diện tích `1.234,5` trong bằng chứng và khi xuất; dùng profile 1.1.1.

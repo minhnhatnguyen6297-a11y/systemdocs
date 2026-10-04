@@ -83,6 +83,7 @@ async def extract(spec, ctx):
             rows, refs = [], []
             for index, row_matches in enumerate(group["land_rows"], 1):
                 row = {"loai_dat": None, "dien_tich": None, "thoi_han": None}
+                refs_before = len(refs)
                 for match in row_matches:
                     if not match.get("span"):
                         continue
@@ -101,8 +102,13 @@ async def extract(spec, ctx):
                                      "occurrence_id": str(uuid.uuid4()), "span": span, "raw_snippet": raw,
                                      "land_row": index, "land_field": match["name"], "core_state": match["state"],
                                      "docx_refs": source.refs(span), "rule_id": match["rule_id"]})
+                if len(refs) == refs_before:
+                    suggestion["warnings"].append({"code": "intake.fragment", "message": f"Cụm đất {index} thiếu dữ liệu; hãy bổ sung trước khi lưu hồ sơ"})
                 rows.append(row)
             value = json.dumps(rows, ensure_ascii=False)
+            if not refs:
+                suggestion["warnings"].append({"code": "intake.fragment", "message": "Cụm đất thiếu dữ liệu; hãy bổ sung trước khi lưu hồ sơ"})
+                continue
             suggestion["fields"]["land_rows"] = field_value(value, value, "normalized", None, refs)
             # Total area is derived from confirmed rows; repeated row areas are not ambiguity of ownership.
             suggestion["fields"].pop("dien_tich", None)

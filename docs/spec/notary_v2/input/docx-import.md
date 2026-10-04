@@ -21,6 +21,9 @@ Cụm đất được sửa theo từng dòng loại đất/diện tích/thời 
 dùng nhập mã JSON. Cả một dòng lẫn nhiều dòng đều giữ được.
 Mỗi ô mơ hồ phải được chọn hoặc sửa riêng. Chọn ngày từ chữ gốc đổi về dạng
 `YYYY-MM-DD` theo quy tắc ngày hiện có trước khi nhận vào Stage.
+Diện tích âm hoặc không phải số hữu hạn bị chặn ngay khi kiểm tra; giữ chữ
+đang sửa và các ô đã duyệt khác. Phân tích thêm nguồn không làm mất thẻ hay
+nội dung đang sửa của các gợi ý trước, kể cả khi lần mới lỗi hoặc bị hủy.
 
 ## Bóc trường, nhóm và Tại sao?
 
@@ -34,6 +37,9 @@ không sao chép regex sang adapter. Profile `transfer` 1.1.1 chia người tron
 vùng đương sự và tài sản có nhãn `Tài sản [thứ] N:`. Dòng `Loại đất:` mở một
 cụm đất riêng. Một GCN có nhiều cụm vẫn là một tài sản. Đây là phạm vi mẫu đã
 kiểm tra, chưa phải lời hứa nhận đúng mọi loại hợp đồng.
+Nhãn tài sản ở tiêu đề trước vùng tài sản không mở nhóm chứa dữ liệu đương
+sự. Dòng đất không có giá trị đọc được tạo cảnh báo thiếu dữ liệu; không
+tạo bằng chứng giả và không làm mất người/tài sản hợp lệ của cả nguồn.
 
 Không có ranh giới chắc thì giữ `ambiguous_group`; nhiều giá trị giữ mọi lần
 thấy và `normalized_value=null`. Phải chọn/sửa trường mơ hồ trước khi nhận.
@@ -67,8 +73,10 @@ mất đối chiếu. Hủy thay đổi khôi phục cả context đã lưu.
 Đối chiếu Word là **một lần xuất hiện → ID dòng + trường + slot catalog**,
 không phải “thay mọi chuỗi giống nhau”. Màn Word hiện chữ gốc, tên/ID dòng,
 slot và giá trị sẽ xuất; checkbox hiển thị đúng lựa chọn đã lưu, nguồn mới chưa
-chọn. Bỏ chọn hết rồi lưu sẽ xóa toàn bộ vị trí đã gắn. Người N theo Stage đã
-lưu, Bên A/B theo ô `p1..p30` đã lưu, tài sản N theo thứ tự Stage. Đổi thứ tự
+chọn. Bỏ chọn hết rồi lưu sẽ xóa toàn bộ vị trí đã gắn.
+Lúc đang lưu, khóa chọn vị trí; nếu lưu lỗi thì giữ lựa chọn và khôi phục
+đối chiếu cục bộ trước lần xác nhận để người dùng thử lưu lại.
+Người N theo Stage đã lưu, Bên A/B theo ô `p1..p30` đã lưu, tài sản N theo thứ tự Stage. Đổi thứ tự
 hoặc ô làm slot khác phải xác nhận lại. Xóa dòng làm mất binding của dòng ấy,
 không chuyển sang người kế tiếp. Slot trống/không hỗ trợ thì báo lỗi.
 Mỗi dòng đất giữ số dòng trong bản nguồn riêng với vị trí hiện tại.
@@ -85,7 +93,11 @@ Stage. Thao tác này không đọc file gốc nên dùng được khi nguồn �
 Binding được xác nhận tạo bản mẫu riêng tại
 `docx_sources/<source_id>/templates/<template_sha256>.docx`; context giữ hash
 đó. Source và mẫu không bị ghi đè. Xuất đọc dữ liệu đã commit qua catalog Word
-tích hợp, thay đúng các span `w:t`, giữ run/kiểu chữ/bảng/ảnh/section và nguyên
+tích hợp. Nguồn/mẫu mới được ghi xong ở vị trí tạm rồi mới công bố (cho phép
+đọc bằng ID/hash); lỗi giữa chừng không để lại bản đích ghi dở, có thể thử lại.
+Mẫu hợp lệ đã có không bị thay. File tạm xuất Word được dọn nếu hủy trước
+khi công bố đầu ra; bản gốc còn nguyên. Khi xuất, chỉ thay đúng các span
+`w:t`, giữ run/kiểu chữ/bảng/ảnh/section và nguyên
 byte của mọi package part khác. Span chồng nhau hoặc qua hyperlink, tracked
 change, textbox, field code, tab/ngắt/separator bị từ chối. Đầu/chân trang giữ
 nguyên và có cảnh báo phạm vi đọc. Không hứa giống từng pixel khi chưa đối

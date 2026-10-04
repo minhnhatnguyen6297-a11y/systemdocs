@@ -66,6 +66,113 @@ function dialogContext(model) {
 }
 const button = (box, label) => collect(box, (e) => e.tagName === 'BUTTON' && e.textContent.includes(label))[0];
 
+test('binding save failure restores clean context, retains choices and allows retry; selection locks during save', async () => {
+  let finish, commits = 0;
+  const sourceId = uuid();
+  const proposal = {candidate_id:uuid(), occurrence_id:uuid(), field_key:'ho_ten', slot:'[Người 1 - Họ tên]',
+    raw_snippet:'Tên gốc', row_id:uuid(), row_label:'Tên đã lưu', value:'Tên đã lưu', supported:true, selected:false};
+  const model = M.createModel({client:{run:async(command,payload)=>{
+    if(command === 'notary.word_export_options') return {ok:true,data:{documents:[{document_key:'original.docx',ready:true}], binding_proposals:[{...proposal,selected:commits > 1}]}};
+    commits++;
+    if(commits === 1) return new Promise(resolve=>{finish=resolve;});
+    return {ok:true,data:{revision:3,stage:payload.stage,docx_import:payload.docx_import}};
+  }}});
+  model.newDraft(); model.state.caseId=1; model.state.revision=2;
+  model.state.stageDirty=false;model.state.diagramDirty=false;model.state.metaDirty=false;
+  model.state.docxImport={version:1,sources:[{source_id:sourceId,label:'A.docx',records:[],bindings:[]}]};
+  const before=structuredClone(model.state.docxImport);
+  const {ctx,box}=dialogContext(model);WORD.createWordDialog(ctx).open();
+  await button(box,'Dùng hợp đồng Word đã nhập').onclick();
+  const choice=collect(box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')?.includes('Tên gốc'))[0];
+  choice.checked=true;choice.onchange();
+  const pending=button(box,'Xác nhận và lưu').onclick();
+  assert.equal(choice.disabled,true);
+  finish({ok:false,error:{code:'file_locked',message:'Thử lại'}});await pending;
+  assert.equal(model.state.stageDirty,false);
+  assert.deepEqual(model.state.docxImport,before);
+  assert.equal(choice.checked,true);assert.equal(choice.disabled,false);
+  await button(box,'Xác nhận và lưu').onclick();
+  assert.equal(commits,2);assert.equal(model.state.docxImport.sources[0].bindings.length,1);
+  assert.equal(choice.checked,true);assert.equal(choice.disabled,false);
+});
+
+test('invalid numeric land edits block acceptance until corrected and preserve other reviewed cells', () => {
+  const model=M.createModel({client:{run:async()=>({ok:true})}});model.newDraft();
+  const sug=suggestion();model.state.suggestions.push(sug);
+  const {ctx,box}=dialogContext(model);INTAKE.createIntakeDialog(ctx).open();
+  const type=collect(box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')==='Loại đất')[0];
+  type.value='CLN';type.onchange();
+  const area=collect(box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')==='Diện tích')[0];
+  for(const invalid of ['-1','Infinity','NaN','1e309']) {
+    area.value=invalid;area.onchange();
+    assert.equal(model.acceptSuggestion(sug.suggestion_id),null);
+    assert.equal(area.value,invalid);
+    assert.equal(area.getAttribute('aria-invalid'),'true');
+    assert.match(box.textContent,/Diện tích cần/);
+  }
+  area.value='25.5';area.onchange();
+  assert.deepEqual(sug.fields.land_rows.reviewed_cells,['1:loai_dat','1:dien_tich']);
+  assert.equal(model.acceptSuggestion(sug.suggestion_id).land_rows[0].dien_tich,25.5);
+});
+
+test('later intake success, failure and cancel retain earlier cards and pending typed reviews', async () => {
+  const first=suggestion('person'), second=suggestion('person');let calls=0;
+  const model=M.createModel({client:{run:async()=>{
+    calls++;
+    if(calls<3) return {ok:true,data:{suggestions:[calls===1?first:second],errors:[]}};
+    return {ok:false,error:{code:calls===3?'intake.parse_failed':'user_canceled',message:'Nguồn lỗi'}};
+  }}});model.newDraft();
+  const {ctx,box}=dialogContext(model);ctx.lib.faceEmpty=x=>x;ctx.face=x=>ctx.h('div','error',x);INTAKE.createIntakeDialog(ctx).open();
+  const ta=collect(box,e=>e.tagName==='TEXTAREA')[0];
+  ta.value='Lần một';await button(box,'Phân tích').onclick();
+  const input=collect(box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')==='Kiểm tra Họ tên')[0];
+  input.value='Đang sửa chưa rời ô';
+  for(let n=2;n<=4;n++) {
+    ta.value=`Lần ${n}`;await button(box,'Phân tích').onclick();
+    assert.equal(collect(box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')==='Kiểm tra Họ tên')[0],input);
+    assert.equal(input.value,'Đang sửa chưa rời ô');
+    assert.equal(collect(box,e=>e.className==='cd-suggest-card').length,2);
+  }
+});
+
+test('reopening Intake exposes pending ambiguity for correction without another analysis', () => {
+  let backendCalls=0;
+  const model=M.createModel({client:{run:async()=>{backendCalls++;return {ok:true};}}});model.newDraft();
+  const sug=suggestion('asset',true);model.state.suggestions.push(sug);
+  const first=dialogContext(model);INTAKE.createIntakeDialog(first.ctx).open();
+  const badArea=collect(first.box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')==='Diện tích')[0];
+  badArea.value='-5';badArea.onchange();
+  // Leave the original dialog without accepting, then reopen using the same workspace tray.
+  button(first.box,'Đóng').onclick();
+  const reopened=dialogContext(model);INTAKE.createIntakeDialog(reopened.ctx).open();
+  assert.equal(collect(reopened.box,e=>e.className==='cd-suggest-card').length,1);
+  assert.equal(model.acceptSuggestion(sug.suggestion_id),null);
+  const area=collect(reopened.box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')==='Diện tích')[0];
+  assert.equal(area.value,'-5');assert.match(reopened.box.textContent,/Diện tích cần/);
+  area.value='10';area.onchange();
+  const serial=collect(reopened.box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')==='Kiểm tra Serial giấy chứng nhận')[0];
+  serial.value='YY123456';serial.onchange();
+  button(reopened.box,'Đưa vào Stage').onclick();
+  assert.equal(model.state.stage.assets[0].so_serial,'YY123456');
+  assert.equal(model.state.suggestions.length,0);assert.equal(backendCalls,0);
+});
+
+test('old original export returns stale and cannot clear busy or results of new case export', async () => {
+  const resolves=[];
+  const model=M.createModel({client:{run:()=>new Promise(resolve=>resolves.push(resolve))}});
+  model.newDraft();model.state.caseId=1;
+  model.state.stageDirty=false;model.state.diagramDirty=false;
+  const old=model.exportWord(['original.docx'],{}, {originalSourceId:uuid()});
+  model.newDraft();model.state.caseId=2;
+  model.state.stageDirty=false;model.state.diagramDirty=false;
+  const current=model.exportWord(['original.docx'],{}, {originalSourceId:uuid()});
+  resolves[0]({ok:true,data:{documents:[{document_key:'old',status:'saved'}]}});
+  assert.equal((await old).stale,true);
+  assert.equal(model.state.wordBusy,true);assert.equal(model.state.wordResult,null);
+  resolves[1]({ok:true,data:{documents:[{document_key:'current',status:'saved'}]}});await current;
+  assert.equal(model.state.wordBusy,false);assert.equal(model.state.wordResult.documents[0].document_key,'current');
+});
+
 test('review dialog displays evidence and capacity rejection keeps the visible card', () => {
   const model = M.createModel({ client: { run: async () => ({ ok: true }) } }); model.newDraft();
   for (let i = 0; i < 3; i++) model.addAsset({ so_serial: 'AA123456' });
