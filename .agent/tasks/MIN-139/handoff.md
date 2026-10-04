@@ -7,6 +7,14 @@ Các phép thử và giới hạn được ghi trong [progress](progress.md).
 duyệt từng ô, ngày evidence, slot/định dạng không dùng được, lựa chọn đã lưu/
 xóa hết, giới hạn/gỡ/tên nguồn, kiểm slot trong transaction và đích thư mục con.
 Kiểm chứng gồm luồng DOCX hai bên qua adapter thật và stale export không ghi file.
+Iteration 2 đã sửa đủ nhóm được xác minh: diện tích đầy đủ, ngày sai bị chặn,
+khóa gỡ nguồn, giữ bảng chọn vị trí, số dòng nguồn/schema, rule đất sai kiểu,
+trường Word lồng nhiều đoạn, dấu kiểm bằng chứng và thông tin nguồn từng ô đất.
+Kiểm lưu/mở lại bằng model thật giữ dòng nguồn số 21, không đổi thành dòng 1.
+Nguồn/mẫu chưa dùng vẫn giữ local; không tự xóa hoặc đặt thời hạn lưu.
+Kiểm thử: 19 DOCX + 280 backend regression, 86 sidecar, 221 Node, 38 lõi regex,
+78 ví dụ contract đều qua. Root chạy lại Electron iteration 2 thành công;
+native picker dùng bộ trả đường dẫn giả, chưa kiểm trang Word/bản cài/corpus thật.
 
 Đọc file gốc → review/sửa → nhận từng bản ghi → lưu Stage → chọn từng vị trí
 Word → xác nhận/lưu → xuất vào thư mục đã cấp quyền. Mọi lần xuất dùng dữ liệu

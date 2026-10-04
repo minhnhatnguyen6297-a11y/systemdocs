@@ -65,8 +65,7 @@
                 "minLength": 1
               },
               "slot": {
-                "type": "string",
-                "minLength": 1
+                "type": "string"
               },
               "raw_snippet": {
                 "type": "string"
@@ -93,7 +92,9 @@
               "selected": {
                 "type": "boolean"
               }
-            }
+            },
+            "if": { "properties": { "supported": { "const": true } }, "required": ["supported"] },
+            "then": { "properties": { "slot": { "minLength": 1 } } }
           }
         }
       }

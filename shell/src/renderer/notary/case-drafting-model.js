@@ -1245,6 +1245,7 @@ function createModel(deps) {
     }
     const fields = {};
     for (const [k, f] of Object.entries(sug.fields || {})) {
+      if (f?.review_error) { state.notice = f.review_error; emit(); return null; }
       if (k === 'land_rows' && !f.land_identity) {
         try { f.land_identity = JSON.parse(f.normalized_value || '[]').map((_, n) => n + 1); } catch (_) { f.land_identity = []; }
       }
@@ -1293,6 +1294,13 @@ function createModel(deps) {
     const sug = state.suggestions.find((s) => s.suggestion_id === suggestionId);
     if (!canWrite() || !sug || !sug.fields[fieldKey]) return false;
     const field = sug.fields[fieldKey];
+    const invalid = (message) => {
+      field.reviewed = false;
+      field.review_error = message;
+      field.review_input = value;
+      field.normalized_value = null;
+      state.notice = message; emit(); return false;
+    };
     if (fieldKey.startsWith('ngay_') && value) {
       const t = String(value).trim();
       let y, m, d;
@@ -1300,16 +1308,18 @@ function createModel(deps) {
       if (match) [, d, m, y] = match;
       else if ((match = t.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/))) [, y, m, d] = match;
       else if (/^(19|20)\d{2}$/.test(t)) value = t;
-      else { state.notice = 'Ngày cần là năm hoặc ngày/tháng/năm hợp lệ'; emit(); return false; }
+      else return invalid('Ngày cần là năm hoặc ngày/tháng/năm hợp lệ');
       if (y) {
         const date = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
         if (date.getUTCFullYear() !== Number(y) || date.getUTCMonth() + 1 !== Number(m) || date.getUTCDate() !== Number(d)) {
-          state.notice = 'Ngày không hợp lệ'; emit(); return false;
+          return invalid('Ngày không hợp lệ');
         }
         value = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       }
     }
     field.normalized_value = value === '' ? null : value;
+    delete field.review_error;
+    delete field.review_input;
     field.reviewed = true;
     if (fieldKey === 'land_rows' && landReview) {
       field.land_identity = clone(landReview.identity);

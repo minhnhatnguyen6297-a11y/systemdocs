@@ -36,6 +36,14 @@ const INTAKE_FIELD_LABEL = {
   dien_tich: 'Diện tích', co_quan_cap: 'Cơ quan cấp', land_rows: 'Cụm đất',
 };
 
+// Same numeric rule as Intake normalization: 1.234,5 → 1234.5.
+function reviewedArea(raw) {
+  let text = String(raw || '').trim();
+  if (text.includes(',') && text.includes('.')) text = text.replace(/\./g, '').replace(/,/g, '.');
+  else if (text.includes(',')) text = text.replace(/,/g, '.');
+  return /^\d+(\.\d+)?$/.test(text) && Number.isFinite(Number(text)) ? Number(text) : null;
+}
+
 function createIntakeDialog(ctx) {
   const model = ctx.model;
   const L = ctx.lib;
@@ -167,7 +175,10 @@ function createIntakeDialog(ctx) {
             if (ref.core_state === 'ambiguous') evidence.append(btn('Chọn giá trị này', 'ghost sm', () => {
               const row = rows[identity.indexOf(ref.land_row)];
               if (!row) return;
-              row[ref.land_field] = ref.land_field === 'dien_tich' ? Number(ref.raw_snippet.replace(',', '.')) : ref.raw_snippet;
+              row[ref.land_field] = ref.land_field === 'dien_tich' ? reviewedArea(ref.raw_snippet) : ref.raw_snippet;
+              if (ref.land_field === 'dien_tich' && row[ref.land_field] == null) {
+                notify('Diện tích không hợp lệ; hãy nhập số đã kiểm tra', true); return;
+              }
               update(`${ref.land_row}:${ref.land_field}`); renderRows();
             }));
           }
@@ -177,12 +188,18 @@ function createIntakeDialog(ctx) {
         const label = h('label', 'cd-check-row');
         const input = h('input');
         input.type = 'text';
-        input.value = field.normalized_value == null ? '' : String(field.normalized_value);
+        input.value = field.review_input != null ? String(field.review_input) : field.normalized_value == null ? '' : String(field.normalized_value);
         input.setAttribute('aria-label', `Kiểm tra ${INTAKE_FIELD_LABEL[key] || key}`);
         input.placeholder = 'Thiếu hoặc chưa chắc — nhập giá trị đã kiểm tra';
         if (key.startsWith('ngay_')) input.placeholder = 'Năm hoặc ngày dạng 2026-10-04';
-        input.onchange = () => model.reviewSuggestion(sug.suggestion_id, key, input.value);
-        label.append(h('span', '', INTAKE_FIELD_LABEL[key] || key), input);
+        const reviewError = h('span', 'error', field.review_error || '');
+        const review = () => {
+          const valid = model.reviewSuggestion(sug.suggestion_id, key, input.value);
+          reviewError.textContent = field.review_error || '';
+          input.setAttribute('aria-invalid', valid ? 'false' : 'true');
+        };
+        input.onchange = review;
+        label.append(h('span', '', INTAKE_FIELD_LABEL[key] || key), input, reviewError);
         card.append(label);
         const evidence = h('details');
         evidence.append(h('summary', '', 'Xem chữ gốc và vị trí'));
@@ -192,7 +209,7 @@ function createIntakeDialog(ctx) {
           if (ref.kind === 'docx' && key !== 'land_rows') {
             evidence.append(btn('Chọn giá trị này', 'ghost sm', () => {
               input.value = ref.raw_snippet;
-              model.reviewSuggestion(sug.suggestion_id, key, input.value);
+              review();
               input.value = field.normalized_value == null ? '' : String(field.normalized_value);
             }));
           }

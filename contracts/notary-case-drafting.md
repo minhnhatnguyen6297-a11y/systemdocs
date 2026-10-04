@@ -1579,7 +1579,8 @@ contract trao đổi hồ sơ giữa Upload Lab và Soạn hồ sơ. Envelope v�
   `source_id` do backend tạo, `source_sha256`, `text_map_version:1`,
   candidate/occurrence ID, backend-produced `source_label`, raw code-point `span`, `raw_snippet`, rule/profile
   version/state, `docx_refs` part/path/node_span/supported. Một trường có thể
-  nhiều refs. `land_rows` vẫn là JSON string của danh sách cụm (1..20),
+  nhiều refs. `land_rows` vẫn là JSON string của danh sách cụm trong nguồn;
+  người dùng chọn tối đa 20 cụm cho mỗi tài sản Stage,
   refs từng trường con có `land_row` 1-based và `land_field`. Intake không
   emit confirmed. Mơ hồ giữ normalized null và mọi alternative.
 - Create/commit/get và result có optional `docx_import`, schema tại
@@ -1588,7 +1589,8 @@ contract trao đổi hồ sơ giữa Upload Lab và Soạn hồ sơ. Envelope v�
   records candidate_id→row_id, bindings candidate_id/occurrence_id/field_key/
   slot, optional template_sha256 và label do backend tạo. Mỗi record tài sản
   có optional `land_rows`: danh sách số dòng nguồn theo vị trí cụm hiện tại;
-  số nguyên 1..20 không lặp, `null` cho cụm thêm tay. Record cũ thiếu khóa này
+  số nguyên dương không lặp, có thể lớn hơn 20, `null` cho cụm thêm tay.
+  Danh sách đã chọn tối đa 20 phần tử. Record cũ thiếu khóa này
   được nâng từ thứ tự extraction; số cụm phải khớp Stage. Context chỉ chứa
   định danh/mã băm/tên file an toàn, không chứa đường dẫn khách, chữ gốc hay
   field nghiệp vụ tùy ý. `label` client gửi không được tin; backend lấy từ kho.
@@ -1602,7 +1604,9 @@ contract trao đổi hồ sơ giữa Upload Lab và Soạn hồ sơ. Envelope v�
 - Word options/batch nhận optional `original_source_id`, không đi cùng
   template_dir. Options trả thêm `binding_proposals` gồm chữ gốc, candidate/
   occurrence/field/slot, row_id/row_label, giá trị đã lưu, supported, reason
-  (null khi hợp lệ) và selected (lựa chọn đã lưu còn khớp). Slot trống hoặc
+  (null khi hợp lệ) và selected (lựa chọn đã lưu còn khớp). Proposal không
+  hỗ trợ có thể có slot rỗng; proposal hỗ trợ và binding đã lưu phải có slot.
+  Slot trống hoặc
   định dạng hỗn hợp không cho chọn; lưu bindings rỗng xóa mẫu đối chiếu.
   Proposal không phải binding đã xác nhận. Batch gốc cần base_revision và
   document_keys chính xác `["original.docx"]`; folder/catalog giữ hành vi cũ.
@@ -1614,6 +1618,11 @@ contract trao đổi hồ sơ giữa Upload Lab và Soạn hồ sơ. Envelope v�
   trong transaction; sai slot hủy cả lần lưu. Đổi thứ tự của binding cũ
   vẫn cần xác nhận lại trước khi xuất. Nhận giá trị ngày từ evidence dùng
   quy tắc chuẩn hóa ngày hiện có; mơ hồ đất kiểm từng ô, không cả field.
+  Ngày sửa sai chặn Đưa vào Stage cho tới khi sửa đúng, không dùng giá trị cũ.
+- Kho nguồn kiểm hash byte `extraction.json` qua `extraction.sha256`; dấu kiểm
+  thiếu/hỏng hoặc nội dung đổi phải nhập và kiểm tra lại. Không tự tin dữ liệu cũ.
+  Nguồn/mẫu chưa dùng vẫn giữ local; chưa duyệt thời hạn giữ hay dọn tự động.
+  Sao lưu/dọn thủ công phải giữ tất cả nguồn/mẫu còn được hồ sơ tham chiếu.
 - Bản derivative tạo riêng, hash/path backend cố định; xuất dùng mapping
   Word tích hợp và sửa đúng w:t span. Giữ package part khác byte-exact;
   không dùng paragraph.text/global replace để làm mất format/ảnh. Output

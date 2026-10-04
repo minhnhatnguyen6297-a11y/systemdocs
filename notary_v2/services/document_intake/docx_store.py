@@ -24,10 +24,12 @@ class DocxStore:
                     ref['source_label'] = label
         try:
             (folder / "original.docx").write_bytes(content)
-            (folder / "extraction.json").write_text(json.dumps({"sha256": digest, "text_map_version": 1, 'label': label,
-                "suggestions": suggestions}, ensure_ascii=False), encoding="utf-8")
+            extraction = json.dumps({"sha256": digest, "text_map_version": 1, 'label': label,
+                "suggestions": suggestions}, ensure_ascii=False).encode("utf-8")
+            (folder / "extraction.json").write_bytes(extraction)
+            (folder / "extraction.sha256").write_text(hashlib.sha256(extraction).hexdigest(), encoding="ascii")
         except BaseException:
-            for name in ("original.docx", "extraction.json"):
+            for name in ("original.docx", "extraction.json", "extraction.sha256"):
                 (folder / name).unlink(missing_ok=True)
             folder.rmdir()
             raise
@@ -44,7 +46,16 @@ class DocxStore:
         if original.stat().st_size > MAX_FILE_BYTES:
             raise ValueError("Nguồn Word vượt giới hạn")
         content = original.read_bytes()
-        package = json.loads((folder / "extraction.json").read_text(encoding="utf-8"))
+        try:
+            extraction = (folder / "extraction.json").read_bytes()
+            checksum = (folder / "extraction.sha256").read_text(encoding="ascii")
+            if len(checksum) != 64 or any(c not in '0123456789abcdef' for c in checksum) or hashlib.sha256(extraction).hexdigest() != checksum:
+                raise ValueError()
+            package = json.loads(extraction)
+            if not isinstance(package, dict):
+                raise ValueError()
+        except (OSError, UnicodeError, ValueError):
+            raise ValueError("Bằng chứng Word thiếu hoặc sai dấu kiểm; hãy nhập và kiểm tra lại") from None
         digest = hashlib.sha256(content).hexdigest()
         if digest != package["sha256"] or (sha256 is not None and digest != sha256) or package.get("text_map_version") != 1:
             raise ValueError("Nguồn Word đã đổi; hãy nhập và kiểm tra lại")

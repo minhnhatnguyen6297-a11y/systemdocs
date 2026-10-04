@@ -115,13 +115,26 @@ def validate_profile(profile: Any) -> list[str]:
             rows = cfg["land_rows"]
             if not isinstance(rows, dict) or not isinstance(rows.get("delimiter"), str) or not isinstance(rows.get("fields"), list):
                 problems.append("asset_groups.land_rows cần delimiter và fields")
+            else:
+                for i, rule in enumerate(rows["fields"]):
+                    owner = f"asset_groups.land_rows.fields[{i}]"
+                    if not isinstance(rule, dict):
+                        problems.append(f"{owner} phải là object")
+                        continue
+                    for key in ("name", "rule_id", "pattern"):
+                        if not isinstance(rule.get(key), str) or not rule[key]:
+                            problems.append(f"{owner}.{key} phải là string không rỗng")
+                    if "group" in rule and (isinstance(rule["group"], bool) or not isinstance(rule["group"], (int, str))):
+                        problems.append(f"{owner}.group phải là số hoặc tên nhóm")
 
     return problems
 
 
 def lint_profile(profile: dict[str, Any]) -> list[str]:
     """Kiểm tra tĩnh toàn bộ pattern trong profile trước khi chạy."""
-    problems: list[str] = []
+    problems = validate_profile(profile)
+    if problems:
+        return problems
     cfg = profile.get("asset_groups") or {}
     if isinstance(cfg, dict):
         for owner, group in (("asset.groups", cfg), ("asset.land_rows", cfg.get("land_rows") or {})):

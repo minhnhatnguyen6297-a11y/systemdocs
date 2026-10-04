@@ -53,6 +53,7 @@ def read_docx(content: bytes) -> DocxSource:
         raise ValueError("DOCX thiếu phần nội dung")
     chunks, segments, warnings = [], [], []
     pos = 0
+    field_depth = 0
 
     def emit(value, path, supported, style=''):
         nonlocal pos
@@ -63,13 +64,21 @@ def read_docx(content: bytes) -> DocxSource:
             pos += len(value)
 
     def walk(node, path, safe=True):
+        nonlocal field_depth
         tag = node.tag
+        if tag == W + "fldChar":
+            kind = node.get(W + "fldCharType")
+            if kind == "begin":
+                field_depth += 1
+            elif kind == "end":
+                field_depth = max(0, field_depth - 1)
+            return
         if tag == W + "p" and node.find(".//" + W + "fldChar") is not None:
             safe = False
         allowed = {W + s for s in ("body", "p", "r", "tbl", "tr", "tc")}
         if tag == W + "t":
             props = node.getparent().find(W + 'rPr')
-            emit(node.text or "", path, safe, etree.tostring(props).decode() if props is not None else '')
+            emit(node.text or "", path, safe and field_depth == 0, etree.tostring(props).decode() if props is not None else '')
             return
         if tag in (W + "tab", W + "br", W + "cr"):
             emit("\t" if tag == W + "tab" else "\n", path, False)
@@ -90,7 +99,7 @@ def read_docx(content: bytes) -> DocxSource:
     walk(body, [])
     if other_text:
         warnings.append("Chỉ đọc thân văn bản và bảng; đầu/chân trang được giữ nguyên")
-    if root.find(".//" + W + "instrText") is not None:
+    if root.find(".//" + W + "instrText") is not None or root.find(".//" + W + "fldChar") is not None:
         warnings.append("Mã trường Word được giữ nguyên, chưa hỗ trợ gắn vị trí")
     return DocxSource(hashlib.sha256(content).hexdigest(), "".join(chunks), segments, warnings)
 

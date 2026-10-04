@@ -96,6 +96,8 @@ async def extract(spec, ctx):
                             row[match["name"]] = norm_number(raw)[0] if match["name"] == "dien_tich" else raw.strip()
                         refs.append({"kind": "docx", "source_id": spec.source_id, "source_sha256": source.sha256,
                                      "text_map_version": 1, "candidate_id": suggestion["suggestion_id"],
+                                     "candidate_state": group["state"], "profile_id": result["profile_id"],
+                                     "profile_version": result["profile_version"],
                                      "occurrence_id": str(uuid.uuid4()), "span": span, "raw_snippet": raw,
                                      "land_row": index, "land_field": match["name"], "core_state": match["state"],
                                      "docx_refs": source.refs(span), "rule_id": match["rule_id"]})

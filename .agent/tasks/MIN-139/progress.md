@@ -16,6 +16,28 @@ Lịch sử ngày 29/09 phía dưới là đề xuất cũ, không còn trạng 
 
 ## Kiểm chứng đã chạy
 
+### Re-derivation iteration 2 — 04/10/2026
+
+- Giữ đủ diện tích `1.234,5` trong bằng chứng và khi xuất; dùng profile 1.1.1.
+- Ngày sửa sai chặn nhận vào Stage và hiện lỗi cho tới khi sửa đúng; không lấy ngày cũ.
+- Gỡ nguồn khóa trong lúc lưu; bảng chọn vị trí vẫn còn sau khi lưu.
+- Số dòng nguồn có thể lớn hơn 20; lưu/mở lại vẫn giữ đúng dòng 21 trong
+  danh sách tối đa 20 dòng Stage. Schema cho proposal không hỗ trợ có slot rỗng,
+  nhưng proposal hỗ trợ và binding đã lưu vẫn cần slot thật.
+- Kiểm cấu trúc mỗi rule đất trước lint; giữ trạng thái trường Word lồng nhau
+  qua nhiều đoạn và chặn mọi chữ kết quả trong trường. Kiểm byte bằng chứng
+  bằng `extraction.sha256`, từ chối dấu kiểm thiếu/hỏng hoặc nội dung bị đổi.
+- Bằng chứng từng ô đất có profile/version/candidate state. Nguồn/mẫu chưa
+  dùng giữ local; chưa duyệt dọn tự động hoặc thời hạn giữ.
+- 19/19 Python DOCX, 280/280 regression Intake/Workspace/Word ở đúng cwd
+  `notary_v2`; 86/86 sidecar adapter/Intake; 221/221 Node; 38/38 shared-core;
+  78 ví dụ contract với 0 kết quả ngoài dự kiến. DOCX đã chạy lại sau khi sửa
+  test đọc output_file.path; các regression khác đã qua trong cùng bộ kiểm.
+- Root chạy lại Electron thật trên code iteration 2: nhập/sửa/lưu Stage/sơ đồ/
+  tải lại/25 vị trí/xuất thành công. Báo cáo và giới hạn native picker ở dưới.
+- Lần gọi regression đầu từ root cwd không tìm được mẫu Word tương đối;
+  gọi lại trong `notary_v2` đã giải quyết. Cảnh báo datetime adapter Python là cũ.
+
 ### Re-derivation sau root review — 04/10/2026
 
 - Giữ danh tính dòng đất từ review đến Stage/reload; xóa dòng đầu không gắn
@@ -44,8 +66,16 @@ Lịch sử ngày 29/09 phía dưới là đề xuất cũ, không còn trạng 
 
 ## Giới hạn cần kiểm tra tiếp
 
+Ngày 04/10/2026 root chạy Electron thật với dữ liệu tổng hợp: nhập hai người,
+hai tài sản, sửa tên, lưu hồ sơ và sơ đồ, mở lại, xác nhận 25 vị trí rồi xuất
+bằng hợp đồng gốc. Báo cáo `artifacts/docx-electron-20261004/startup-report.json`
+ghi `ok: true`; Word gốc, các phần ZIP ngoài document.xml và database ban đầu
+không đổi. Backend chạy trên bản sao code riêng, không dùng dữ liệu văn phòng.
+Cửa sổ chọn file được thay bằng bộ trả đường dẫn giả lập; token, IPC và backend
+vẫn đi qua code thật. Đây chưa phải phép thử cửa sổ chọn file native.
+
 Chỉ dùng tài liệu mẫu tổng hợp, chưa đo độ chính xác trên hồ sơ văn phòng. Chưa chạy
-Electron bằng mắt, bộ dựng trang Word hay bản đóng gói. Chưa có UI tách/gộp ứng viên
+bộ dựng trang Word hay bản đóng gói. Chưa có UI tách/gộp ứng viên
 tùy ý; ranh giới không rõ giữ cảnh báo và cần người sửa. Không suy luận vai trò pháp lý.
 
 ## Lịch sử đề xuất 29/09/2026

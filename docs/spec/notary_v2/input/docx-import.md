@@ -30,7 +30,7 @@ Mỗi vị trí là `[start,end)` theo ký tự Unicode, không theo byte. Chữ
 dòng/ngắt/tab cũng có vị trí nhưng không được thay như chữ bình thường.
 
 Lõi regex chung `tools/regex_workbench/engine` sở hữu quy tắc có phiên bản;
-không sao chép regex sang adapter. Profile `transfer` 1.1.0 chia người trong
+không sao chép regex sang adapter. Profile `transfer` 1.1.1 chia người trong
 vùng đương sự và tài sản có nhãn `Tài sản [thứ] N:`. Dòng `Loại đất:` mở một
 cụm đất riêng. Một GCN có nhiều cụm vẫn là một tài sản. Đây là phạm vi mẫu đã
 kiểm tra, chưa phải lời hứa nhận đúng mọi loại hợp đồng.
@@ -50,6 +50,11 @@ Sidecar lưu byte Word gốc và `extraction.json` ở
 tạo, không phải đường dẫn do renderer chọn. `sha256` là dấu kiểm nội dung;
 nguồn được kiểm lại trước mỗi lần lưu đối chiếu/xuất. Không ghi hồ sơ thật
 vào Git, log rộng hoặc localStorage.
+`extraction.sha256` giữ dấu kiểm byte của `extraction.json`. Thiếu, hỏng hoặc
+không khớp thì phải nhập và kiểm tra lại; không tin bản đồ vị trí cũ.
+Nguồn và mẫu chưa dùng vẫn được giữ cục bộ, kể cả khi hủy lần lưu hồ sơ.
+Chưa có thời hạn giữ hoặc cách tự dọn được duyệt. Sao lưu/dọn thủ công phải
+giữ mọi nguồn và mẫu còn được hồ sơ tham chiếu; **Gỡ nguồn** không xóa file.
 
 `case_state_json.docx_import` version 1 chỉ giữ ID/hash nguồn,
 `candidate_id→row_id`, danh tính từng dòng đất và vị trí đã duyệt. Nguồn có tên
@@ -66,8 +71,10 @@ chọn. Bỏ chọn hết rồi lưu sẽ xóa toàn bộ vị trí đã gắn. 
 lưu, Bên A/B theo ô `p1..p30` đã lưu, tài sản N theo thứ tự Stage. Đổi thứ tự
 hoặc ô làm slot khác phải xác nhận lại. Xóa dòng làm mất binding của dòng ấy,
 không chuyển sang người kế tiếp. Slot trống/không hỗ trợ thì báo lỗi.
-Mỗi dòng đất giữ số dòng trong bản nguồn riêng với vị trí hiện tại. Xóa dòng
-đầu không chuyển bằng chứng của dòng ấy sang dòng kế tiếp; sửa danh sách đất
+Mỗi dòng đất giữ số dòng trong bản nguồn riêng với vị trí hiện tại.
+Nguồn có thể có dòng số 21 trở lên; giới hạn 20 áp dụng cho số dòng chọn vào
+Stage, không áp dụng cho số thứ tự trong bản nguồn.
+Xóa dòng đầu không chuyển bằng chứng của dòng ấy sang dòng kế tiếp; sửa danh sách đất
 gỡ vị trí đất cũ và yêu cầu xác nhận lại. Vị trí mới chỉ được lưu khi khớp
 dòng/ô và giá trị của bản Stage/sơ đồ được ghi trong cùng lần lưu.
 

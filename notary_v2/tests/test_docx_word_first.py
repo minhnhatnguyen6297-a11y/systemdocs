@@ -138,9 +138,9 @@ def test_unsupported_hyperlink_and_overlap_rejected():
         replace_spans(content, source, [([0, 1], 'X'), ([0, 2], 'Y')])
 
 
-def reviewed_case(db, tmp_path):
+def reviewed_case(db, tmp_path, content=None):
     store = DocxStore(tmp_path / 'sources')
-    content = fixture_bytes(); suggestions = extraction(content, store)
+    content = content or fixture_bytes(); suggestions = extraction(content, store)
     people, assets, records = [], [], []
     source_ref = next(iter(suggestions[0]['fields'].values()))['source_refs'][0]
     for suggestion in suggestions:
@@ -246,6 +246,123 @@ def test_actual_context_and_proposals_match_contract_schema(db, tmp_path):
     validate('common.schema.json', 'docx_import', committed['docx_import'])
     validate('draft-v2.schema.json', 'payload_commit_stage_v2', {'case_id': cid,
         'base_revision': committed['revision'], 'stage': committed['stage'], 'docx_import': committed['docx_import']})
+    # Removed source land row produces unsupported proposals without a slot.
+    asset = committed['stage']['assets'][0]
+    asset['land_rows'].pop(0)
+    record = next(r for r in committed['docx_import']['sources'][0]['records'] if r['row_id'] == asset['row_id'])
+    record['land_rows'] = [2]
+    committed['docx_import']['sources'][0]['bindings'] = [b for b in committed['docx_import']['sources'][0]['bindings']
+        if b['candidate_id'] != record['candidate_id'] or b['field_key'] != 'land_rows']
+    saved = service.commit_stage(cid, committed['revision'], committed['stage'], docx_import=committed['docx_import'])
+    proposals = binding_proposals(db.get(InheritanceCase, cid), saved['docx_import']['sources'][0]['source_id'], store)
+    assert any(not p['supported'] and p['slot'] == '' for p in proposals)
+    validate('draft-v2.schema.json', 'word_options_result_v2', {'schema_version': data['schema_version'],
+        'documents': [], 'binding_proposals': proposals})
+    supported = next(p for p in proposals if p['supported'])
+    from jsonschema import ValidationError
+    with pytest.raises(ValidationError):
+        validate('draft-v2.schema.json', 'word_options_result_v2', {'schema_version': data['schema_version'],
+            'documents': [], 'binding_proposals': [{**supported, 'slot': ''}]})
+    bad = json.loads(json.dumps(saved['docx_import']))
+    bad['sources'][0]['bindings'] = [{k: supported[k] for k in ('candidate_id', 'occurrence_id', 'field_key', 'slot')}]
+    bad['sources'][0]['bindings'][0]['slot'] = ''
+    with pytest.raises(ValidationError):
+        validate('common.schema.json', 'docx_import', bad)
+
+
+def test_localized_area_complete_span_provenance_and_export(db, tmp_path):
+    doc = Document(io.BytesIO(fixture_bytes()))
+    next(p for p in doc.paragraphs if p.text.startswith('Loại đất:')).text = 'Loại đất: ONT; Diện tích: 1.234,5; Thời hạn: Lâu dài'
+    stream = io.BytesIO(); doc.save(stream); content = stream.getvalue()
+    _, store, service, data = reviewed_case(db, tmp_path, content)
+    source = data['docx_import']['sources'][0]
+    suggestions = store.load(source['source_id'])[1]['suggestions']
+    asset = next(s for s in suggestions if s['target'] == 'asset')
+    rows = json.loads(asset['fields']['land_rows']['normalized_value'])
+    assert rows[0]['dien_tich'] == 1234.5
+    ref = next(r for r in asset['fields']['land_rows']['source_refs'] if r['land_field'] == 'dien_tich')
+    assert ref['raw_snippet'] == '1.234,5'
+    assert ref['profile_id'] == 'transfer' and ref['profile_version'] and ref['candidate_state'] == 'matched'
+    rendered = replace_spans(content, read_docx(content), [(ref['span'], '2000')])
+    assert 'Diện tích: 2000;' in read_docx(rendered).text
+    assert '2000,5' not in read_docx(rendered).text
+    cid = data['case']['id']
+    data['stage']['assets'][0]['land_rows'][0]['dien_tich'] = 2000
+    committed = service.commit_stage(cid, data['case']['revision'], data['stage'])
+    proposals = binding_proposals(db.get(InheritanceCase, cid), source['source_id'], store)
+    p = next(p for p in proposals if p['occurrence_id'] == ref['occurrence_id'])
+    committed['docx_import']['sources'][0]['bindings'] = [{k: p[k] for k in ('candidate_id', 'occurrence_id', 'field_key', 'slot')}]
+    service.commit_stage(cid, committed['revision'], committed['stage'], docx_import=committed['docx_import'])
+    result = export_original(db.get(InheritanceCase, cid), source['source_id'], store, tmp_path)
+    output = Path(result['documents'][0]['output_file']['path']).read_bytes()
+    assert 'Diện tích: 2000;' in read_docx(output).text
+    assert store.load(source['source_id'])[0] == content
+
+
+@pytest.mark.parametrize('damage', ['tamper', 'missing', 'corrupt'])
+def test_extraction_integrity_rejects_tamper_or_missing_checksum(tmp_path, damage):
+    store = DocxStore(tmp_path / 'sources'); suggestions = extraction(fixture_bytes(), store)
+    ref = suggestions[0]['fields']['ho_ten']['source_refs'][0]
+    folder = store.root / ref['source_id']
+    before = (folder / 'original.docx').read_bytes()
+    if damage == 'tamper':
+        package = json.loads((folder / 'extraction.json').read_text(encoding='utf-8'))
+        package['suggestions'][0]['fields']['ho_ten']['source_refs'][0]['span'] = [0, 5]
+        (folder / 'extraction.json').write_text(json.dumps(package), encoding='utf-8')
+    elif damage == 'missing':
+        (folder / 'extraction.sha256').unlink()
+    else:
+        (folder / 'extraction.sha256').write_text('broken', encoding='ascii')
+    with pytest.raises(ValueError, match='dấu kiểm'):
+        store.load(ref['source_id'], ref['source_sha256'])
+    assert (folder / 'original.docx').read_bytes() == before
+
+
+def test_nested_fields_across_paragraphs_reject_results_and_preserve_package():
+    doc = Document()
+    def marker(kind):
+        p = doc.add_paragraph(); char = OxmlElement('w:fldChar')
+        char.set('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}fldCharType', kind)
+        p.add_run()._r.append(char)
+    marker('begin'); marker('separate'); doc.add_paragraph('Outer result')
+    marker('begin'); marker('separate'); doc.add_paragraph('Inner result'); marker('end')
+    doc.add_paragraph('Remaining outer result'); marker('end'); doc.add_paragraph('Safe text')
+    stream = io.BytesIO(); doc.save(stream); content = stream.getvalue(); source = read_docx(content)
+    for text in ('Outer result', 'Inner result', 'Remaining outer result'):
+        lo = source.text.index(text)
+        with pytest.raises(ValueError, match='chưa hỗ trợ'):
+            replace_spans(content, source, [([lo, lo + len(text)], 'Changed')])
+    lo = source.text.index('Safe text')
+    result = replace_spans(content, source, [([lo, lo + 9], 'Reviewed')])
+    assert all(t in read_docx(result).text for t in ('Outer result', 'Inner result', 'Remaining outer result'))
+    with ZipFile(io.BytesIO(content)) as a, ZipFile(io.BytesIO(result)) as b:
+        for name in a.namelist():
+            if name != 'word/document.xml': assert a.read(name) == b.read(name)
+
+
+def test_source_row_21_survives_saved_stage_and_schema(db, tmp_path):
+    doc = Document(); doc.add_paragraph('Tài sản 1:')
+    doc.add_paragraph('Số serial: ZZ123456; có địa chỉ tại: Nhà đất A')
+    for n in range(1, 22): doc.add_paragraph(f'Loại đất: ONT; Diện tích: {n}; Thời hạn: Lâu dài')
+    doc.add_paragraph('Điều 2: Giữ nguyên')
+    stream = io.BytesIO(); doc.save(stream); store = DocxStore(tmp_path / 'sources')
+    candidate = next(s for s in extraction(stream.getvalue(), store) if s['target'] == 'asset')
+    rows = json.loads(candidate['fields']['land_rows']['normalized_value'])
+    assert len(rows) == 21
+    person = _person_row(); asset = _asset_row(land_rows=rows[1:])
+    ref = candidate['fields']['so_serial']['source_refs'][0]
+    context = {'version': 1, 'sources': [{'source_id': ref['source_id'], 'sha256': ref['source_sha256'],
+        'records': [{'candidate_id': candidate['suggestion_id'], 'row_id': asset['row_id'], 'land_rows': list(range(2, 22))}], 'bindings': []}]}
+    service = CaseWorkspaceService(db, store)
+    data = service.create(str(uuid.uuid4()), {'case_type': 'inheritance', 'document_type': 'khai_nhan'},
+        {'owner_row_id': person['row_id'], 'people': [person], 'assets': [asset]}, None, context)
+    saved = service.commit_stage(data['case']['id'], data['case']['revision'], data['stage'], docx_import=data['docx_import'])
+    db.expire_all(); loaded = service.get(data['case']['id'])
+    assert loaded['docx_import']['sources'][0]['records'][0]['land_rows'][-1] == 21
+    assert len(loaded['stage']['assets'][0]['land_rows']) == 20
+    from jsonschema import Draft7Validator
+    schema = json.loads((Path(__file__).resolve().parents[2] / 'contracts/notary-case-drafting/common.schema.json').read_text(encoding='utf-8'))
+    Draft7Validator(schema['definitions']['docx_import']).validate(loaded['docx_import'])
 
 
 def test_mixed_styles_rejected_and_original_runs_preserved(db, tmp_path):

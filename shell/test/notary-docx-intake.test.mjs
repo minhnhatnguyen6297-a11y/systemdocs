@@ -133,8 +133,17 @@ test('raw selected dates normalize before Stage and invalid dates stay unreviewe
   const {ctx,box}=dialogContext(model); INTAKE.createIntakeDialog(ctx).open();
   collect(box,e=>e.tagName==='BUTTON' && e.textContent==='Chọn giá trị này')[1].onclick();
   assert.equal(sug.fields.ngay_sinh.normalized_value,'1980-02-01');
-  assert.equal(model.reviewSuggestion(sug.suggestion_id,'ngay_sinh','31/02/1980'),false);
-  assert.equal(model.acceptSuggestion(sug.suggestion_id).ngay_sinh,'1980-02-01');
+  const dateInput=collect(box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')==='Kiểm tra Ngày sinh')[0];
+  dateInput.value='31/02/1980'; dateInput.onchange();
+  assert.equal(sug.fields.ngay_sinh.normalized_value,null);
+  assert.equal(model.acceptSuggestion(sug.suggestion_id),null);
+  assert.equal(model.state.stage.people.length,0);
+  assert.equal(model.state.suggestions.length,1);
+  assert.match(box.textContent,/Ngày không hợp lệ/);
+  assert.equal(dateInput.getAttribute('aria-invalid'),'true');
+  dateInput.value='2/3/1980'; dateInput.onchange();
+  assert.equal(dateInput.getAttribute('aria-invalid'),'false');
+  assert.equal(model.acceptSuggestion(sug.suggestion_id).ngay_sinh,'1980-03-02');
 });
 
 test('ninth source cannot mutate Stage and explicit detach allows recovery with empty context on commit', async () => {
@@ -193,7 +202,55 @@ test('mapping reopens saved choices, disables empty slot with reason, clears all
   assert.equal(button(box,'Xuất').disabled,true,'unsaved choices cannot misdescribe the export');
   await button(box,'Xác nhận và lưu').onclick();
   assert.deepEqual(calls[0],[]);
+  assert.ok(button(box,'Xác nhận và lưu'),'mapping remains available after save');
+  assert.equal(collect(box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')?.includes('Tên gốc')).length,1);
   await button(box,'Gỡ nguồn Word: Mẫu B.docx').onclick();
   assert.equal(calls.length,2);
   assert.match(box.textContent,/Dùng hợp đồng Word đã nhập: Mẫu A.docx/);
+});
+
+test('detach holds the save lock until commit finishes', async () => {
+  let finish; let detachCount=0, commitCount=0;
+  const model={state:{docxImport:{sources:[{source_id:uuid(),label:'A.docx'},{source_id:uuid(),label:'B.docx'}]},
+    committedCaseInfo:{},caseInfo:{},wordOptions:[]},canWrite:()=>true,hasUnsaved:()=>false,
+    detachOriginalSource:()=>{detachCount++;return true;},
+    commitStage:()=>{commitCount++;return new Promise(resolve=>{finish=resolve;});}};
+  const {ctx,box}=dialogContext(model);WORD.createWordDialog(ctx).open();
+  const pending=button(box,'Gỡ nguồn Word: A.docx').onclick();
+  await button(box,'Gỡ nguồn Word: B.docx').onclick();
+  assert.equal(detachCount,1);assert.equal(commitCount,1);
+  finish({ok:true});await pending;
+  assert.match(box.textContent,/B.docx/);
+});
+
+test('localized area evidence uses complete number normalization', () => {
+  const model=M.createModel({client:{run:async()=>({ok:true})}});model.newDraft();
+  const sug=suggestion();sug.fields.land_rows.source_refs=[{core_state:'ambiguous',land_row:1,land_field:'dien_tich',raw_snippet:'1.234,5'}];
+  model.state.suggestions.push(sug);const {ctx,box}=dialogContext(model);INTAKE.createIntakeDialog(ctx).open();
+  collect(box,e=>e.tagName==='BUTTON' && e.textContent==='Chọn giá trị này').at(-1).onclick();
+  assert.equal(model.acceptSuggestion(sug.suggestion_id).land_rows[0].dien_tich,1234.5);
+});
+
+test('real model commit and get restore original land identity after server removes UI-only keys', async () => {
+  let saved, revision=1;const calls=[];
+  const model=M.createModel({client:{run:async(command,payload)=>{
+    calls.push([command,payload]);
+    if(command==='notary.workspace_commit_stage'){
+      assert.equal(payload.stage.assets[0].land_rows[0]._source_land_row,undefined);
+      saved=structuredClone({stage:payload.stage,docx_import:payload.docx_import});revision++;
+      return {ok:true,data:{...saved,revision}};
+    }
+    return {ok:true,data:{...structuredClone(saved),case:{id:1,revision,case_type:'inheritance',locked:false}}};
+  }}});model.newDraft();
+  const sug=suggestion();sug.fields.land_rows.land_identity=[21];model.state.suggestions.push(sug);
+  const row=model.acceptSuggestion(sug.suggestion_id);model.state.caseId=1;model.state.revision=1;
+  await model.commitStage();
+  assert.equal(model.state.stage.assets[0].land_rows[0]._source_land_row,21);
+  await model.openCase(1);
+  assert.equal(model.state.stage.assets[0].land_rows[0]._source_land_row,21);
+  model.updateAssetField(row.row_id,'land_rows',[{...model.state.stage.assets[0].land_rows[0],dien_tich:77}]);
+  await model.commitStage();
+  assert.deepEqual(saved.docx_import.sources[0].records[0].land_rows,[21]);
+  assert.equal(saved.stage.assets[0].land_rows[0].dien_tich,77);
+  assert.deepEqual(calls.map(c=>c[0]),['notary.workspace_commit_stage','notary.workspace_get','notary.workspace_commit_stage']);
 });

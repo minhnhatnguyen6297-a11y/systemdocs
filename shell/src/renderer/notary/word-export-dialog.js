@@ -374,11 +374,15 @@ function createWordDialog(ctx) {
         sourceRow.append(btn('Gỡ nguồn Word: ' + sourceLabel, 'ghost sm', async () => {
           if (exporting || scanning || savingMeta) return;
           if (!model.detachOriginalSource(source.source_id)) return;
-          const saved = await model.commitStage();
-          if (!saved.ok) { notify(saved.error.message || saved.error.code, true); return; }
-          if (originalSourceId === source.source_id) { originalSourceId = null; mappingDirty = false; checks = []; listBox.innerHTML = ''; }
-          sourceRow.remove();
-          notify('Đã gỡ nguồn Word; dữ liệu Stage vẫn được giữ'); refreshScanLock();
+          savingMeta = true;
+          refreshScanLock();
+          try {
+            const saved = await model.commitStage();
+            if (!saved.ok) { notify(saved.error.message || saved.error.code, true); return; }
+            if (originalSourceId === source.source_id) { originalSourceId = null; mappingDirty = false; checks = []; listBox.innerHTML = ''; }
+            sourceRow.remove();
+            notify('Đã gỡ nguồn Word; dữ liệu Stage vẫn được giữ');
+          } finally { savingMeta = false; refreshScanLock(); }
         }));
         sourceRow.append(btn('Dùng hợp đồng Word đã nhập: ' + sourceLabel, 'secondary', async () => {
           if (exporting || scanning || savingMeta) return;
@@ -424,6 +428,12 @@ function createWordDialog(ctx) {
               if (!loaded.ok || loaded.stale) return;
               mappingDirty = false;
               renderDocs();
+              for (const choice of choices) {
+                const current = (model.state.wordBindingProposals || []).find((p) => p.occurrence_id === choice.proposal.occurrence_id);
+                choice.cb.checked = !!current?.selected;
+                choice.cb.disabled = !current?.supported;
+              }
+              listBox.append(mappingBox);
               notify('Đã lưu vị trí Word; có thể xuất vào thư mục đích');
             } finally {
               savingMeta = false;

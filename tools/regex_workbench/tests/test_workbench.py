@@ -37,6 +37,15 @@ class TransferProfileTests(unittest.TestCase):
     def test_profile_lint_clean(self):
         self.assertEqual(lint_profile(self.profile), [])
 
+    def test_custom_land_rule_shapes_rejected_before_lint(self):
+        from engine.runner import validate_profile
+        for malformed in (None, 7, 'rule', [], {'name': 'dien_tich', 'pattern': 5},
+                          {'name': 'dien_tich', 'rule_id': 'x', 'pattern': 'x', 'group': []}):
+            profile = copy.deepcopy(self.profile)
+            profile['asset_groups']['land_rows']['fields'] = [malformed]
+            self.assertTrue(validate_profile(profile))
+            self.assertTrue(lint_profile(profile))
+
     def test_standard_transfer_zones_and_kind(self):
         text = load_fixture("transfer_chuan.txt")
         result = run(text, self.profile)
