@@ -1071,6 +1071,7 @@ def word_export_batch(job, payload):
             if p.get("base_revision") != case.workspace_revision:
                 raise CommandError("workspace_conflict", "Hồ sơ đã đổi; hãy tải lại trước khi xuất")
             destination = existing_dir(p.get("destination"))
+            parent_destination = destination
             if create_case_subdir:
                 child = destination / f"HS-{cid}"
                 child.mkdir(exist_ok=True)
@@ -1083,6 +1084,7 @@ def word_export_batch(job, payload):
                                                              destination, check_cancel=job.check_cancel)
             except wbe.WordBatchError as exc:
                 raise _word_batch_command_error(exc) from exc
+            data['destination'] = {'path': str(parent_destination), 'scope': 'machine_local', 'is_dir': True}
             job.check_cancel(_result("word_export_batch", data))
             return _result("word_export_batch", data)
         try:

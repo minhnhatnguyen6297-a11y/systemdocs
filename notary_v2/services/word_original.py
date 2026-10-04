@@ -13,14 +13,20 @@ ASSET_LABELS = {"so_serial": "Serial", "so_vao_so": "Số vào sổ", "so_thua_d
                 "co_quan_cap": "Cơ quan cấp sổ", "dien_tich": "Diện tích", "loai_dat": "Loại đất"}
 
 
-def slot_for(snapshot, target, row_id, field_key, ref=None):
+def slot_for(snapshot, target, row_id, field_key, ref=None, record=None):
     rows = snapshot.get("stage" if target == "person" else "assets", [])
     index = next((i + 1 for i, row in enumerate(rows) if row.get("row_id") == row_id), None)
     if index is None:
         raise ValueError("Dòng đã bị xóa; hãy kiểm tra lại vị trí")
     if field_key == "land_rows" and ref:
         labels = {"loai_dat": "Loại đất", "dien_tich": "Diện tích", "thoi_han": "Thời hạn"}
-        return f"[Loại đất {index}.{ref['land_row']} - {labels[ref['land_field']]}]"
+        identity = (record or {}).get('land_rows')
+        land_index = ref['land_row']
+        if identity is not None:
+            if land_index not in identity:
+                raise ValueError('Dòng đất nguồn đã bị xóa; bỏ vị trí cũ và kiểm tra lại')
+            land_index = identity.index(land_index) + 1
+        return f"[Loại đất {index}.{land_index} - {labels[ref['land_field']]}]"
     label = (PERSON_LABELS if target == "person" else ASSET_LABELS).get(field_key)
     if label is None:
         raise ValueError("Trường chưa có vị trí Word hỗ trợ")
@@ -45,7 +51,7 @@ def validate_context(context, stage, store):
     rows = {row["row_id"]: target for target, name in (("person", "people"), ("asset", "assets")) for row in stage[name]}
     seen_sources = set()
     for source in result["sources"]:
-        if not isinstance(source, dict) or not {"source_id", "sha256", "records", "bindings"} <= set(source) or set(source) - {"source_id", "sha256", "records", "bindings", "template_sha256"}:
+        if not isinstance(source, dict) or not {"source_id", "sha256", "records", "bindings"} <= set(source) or set(source) - {"source_id", "sha256", "records", "bindings", "template_sha256", 'label'}:
             raise ValueError("Nguồn Word có trường không hợp lệ")
         if source["source_id"] in seen_sources:
             raise ValueError("Nguồn Word bị lặp")
@@ -55,10 +61,11 @@ def validate_context(context, stage, store):
         if store is None:
             raise ValueError("Kho nguồn Word chưa sẵn sàng")
         content, package = store.load(source["source_id"], source["sha256"])
+        source['label'] = package.get('label', 'Hợp đồng Word')
         candidates = {s["suggestion_id"]: s for s in package["suggestions"]}
         retained, seen = [], set()
         for record in source["records"]:
-            if not isinstance(record, dict) or set(record) != {"candidate_id", "row_id"}:
+            if not isinstance(record, dict) or not {'candidate_id', 'row_id'} <= set(record) or set(record) - {'candidate_id', 'row_id', 'land_rows'}:
                 raise ValueError("Dòng đối chiếu Word không hợp lệ")
             candidate = candidates.get(record["candidate_id"])
             if candidate is None or record["candidate_id"] in seen:
@@ -68,6 +75,14 @@ def validate_context(context, stage, store):
                 continue
             if rows[record["row_id"]] != candidate["target"]:
                 raise ValueError("Không thể gắn người với dòng tài sản")
+            if candidate['target'] == 'asset' and 'land_rows' in candidate['fields']:
+                original_rows = json.loads(candidate['fields']['land_rows']['normalized_value'])
+                current = next(r for r in stage['assets'] if r['row_id'] == record['row_id'])
+                identity = record.setdefault('land_rows', list(range(1, len(original_rows) + 1)))
+                if (not isinstance(identity, list) or len(identity) != len(current.get('land_rows', [])) or
+                    any(n is not None and (type(n) is not int or not 1 <= n <= len(original_rows)) for n in identity) or
+                    len([n for n in identity if n is not None]) != len(set(n for n in identity if n is not None))):
+                    raise ValueError('Danh tính dòng đất không khớp; hãy kiểm tra lại nguồn')
             retained.append(record)
         source["records"] = retained
         valid = {r["candidate_id"] for r in retained}
@@ -79,6 +94,9 @@ def validate_context(context, stage, store):
                 continue
             candidate = candidates[binding["candidate_id"]]
             refs = candidate["fields"].get(binding["field_key"], {}).get("source_refs", [])
+            record = next(r for r in retained if r['candidate_id'] == binding['candidate_id'])
+            if binding['field_key'] == 'land_rows' and not any(r['occurrence_id'] == binding['occurrence_id'] and r['land_row'] in record.get('land_rows', []) for r in refs):
+                continue  # Deleted source row cannot transfer its occurrence to a surviving row.
             if not any(ref["occurrence_id"] == binding["occurrence_id"] for ref in refs):
                 raise ValueError("Vị trí không thuộc trường của ứng viên")
             if binding["occurrence_id"] in occurrences:
@@ -99,6 +117,26 @@ def validate_context(context, stage, store):
     return result
 
 
+def validate_new_bindings(case, context, previous, store):
+    """Check new confirmations against the composed committed rows/seats before DB commit."""
+    snapshot = json.loads(case.case_state_json or '{}')
+    values = word_engine.build_template_mapping(case, static=True)
+    old = {(s['source_id'], json.dumps(b, sort_keys=True), json.dumps(next((r for r in s['records'] if r['candidate_id'] == b['candidate_id']), {}), sort_keys=True))
+           for s in (previous or {}).get('sources', []) for b in s['bindings']}
+    for source in context.get('sources', []):
+        _, package = store.load(source['source_id'], source['sha256'])
+        candidates = {s['suggestion_id']: s for s in package['suggestions']}
+        for binding in source['bindings']:
+            record = next(r for r in source['records'] if r['candidate_id'] == binding['candidate_id'])
+            if (source['source_id'], json.dumps(binding, sort_keys=True), json.dumps(record, sort_keys=True)) in old:
+                continue
+            candidate = candidates[binding['candidate_id']]
+            ref = next(r for r in candidate['fields'][binding['field_key']]['source_refs'] if r['occurrence_id'] == binding['occurrence_id'])
+            slot = slot_for(snapshot, candidate['target'], record['row_id'], binding['field_key'], ref, record)
+            if slot != binding['slot'] or values.get(slot) in (None, ''):
+                raise ValueError('Vị trí Word không khớp dòng/ô đã lưu hoặc chưa có giá trị: ' + slot)
+
+
 def reviewed_template(case, source_id, store):
     snapshot = json.loads(case.case_state_json or "{}")
     source = next((s for s in snapshot.get("docx_import", {}).get("sources", []) if s["source_id"] == source_id), None)
@@ -107,13 +145,14 @@ def reviewed_template(case, source_id, store):
     content, package = store.load(source_id, source["sha256"])
     reader = read_docx(content)
     candidates = {s["suggestion_id"]: s for s in package["suggestions"]}
-    records = {r["candidate_id"]: r["row_id"] for r in source["records"]}
+    records = {r["candidate_id"]: r for r in source["records"]}
     values = word_engine.build_template_mapping(case, static=True)
     tokens, replacements = [], []
     for binding in source["bindings"]:
         candidate = candidates[binding["candidate_id"]]
         ref = next(r for r in candidate["fields"][binding["field_key"]]["source_refs"] if r["occurrence_id"] == binding["occurrence_id"])
-        slot = slot_for(snapshot, candidate["target"], records[binding["candidate_id"]], binding["field_key"], ref)
+        record = records[binding['candidate_id']]
+        slot = slot_for(snapshot, candidate["target"], record['row_id'], binding["field_key"], ref, record)
         if slot != binding["slot"]:
             raise ValueError("Thứ tự người/tài sản hoặc ô Bên A/B đã đổi; xác nhận lại vị trí")
         if slot not in values or values[slot] in (None, ""):
@@ -136,7 +175,8 @@ def binding_proposals(case, source_id, store):
     source = next((s for s in snapshot.get("docx_import", {}).get("sources", []) if s["source_id"] == source_id), None)
     if source is None:
         raise ValueError("Nguồn Word không thuộc hồ sơ")
-    _, package = store.load(source_id, source["sha256"])
+    content, package = store.load(source_id, source["sha256"])
+    reader = read_docx(content)
     candidates = {s["suggestion_id"]: s for s in package["suggestions"]}
     values = word_engine.build_template_mapping(case, static=True)
     proposals = []
@@ -147,14 +187,18 @@ def binding_proposals(case, source_id, store):
         for field_key, field in candidate["fields"].items():
             for ref in field["source_refs"]:
                 try:
-                    slot = slot_for(snapshot, candidate["target"], record["row_id"], field_key, ref)
-                except ValueError:
-                    continue
+                    slot = slot_for(snapshot, candidate["target"], record["row_id"], field_key, ref, record)
+                    reason = reader.replacement_reason(ref['span'])
+                    if slot not in values or values[slot] in (None, ''):
+                        reason = reason or 'Vị trí chưa có giá trị đã lưu'
+                except ValueError as exc:
+                    slot, reason = '', str(exc)
                 proposals.append({"candidate_id": record["candidate_id"], "occurrence_id": ref["occurrence_id"],
                     "field_key": field_key, "slot": slot, "raw_snippet": ref["raw_snippet"],
                     "row_id": record["row_id"], "row_label": row.get("ho_ten") or row.get("so_serial") or record["row_id"],
                     "value": str(values.get(slot, "")),
-                    "supported": bool(ref["docx_refs"]) and all(r["supported"] for r in ref["docx_refs"])})
+                    "supported": reason is None, 'reason': reason,
+                    'selected': reason is None and any(b['occurrence_id'] == ref['occurrence_id'] and b['slot'] == slot for b in source['bindings'])})
     return proposals
 
 

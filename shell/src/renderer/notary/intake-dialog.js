@@ -137,7 +137,8 @@ function createIntakeDialog(ctx) {
           let rows = [];
           try { rows = JSON.parse(field.normalized_value || '[]'); } catch (_) { /* malformed stays editable */ }
           if (!Array.isArray(rows)) rows = [];
-          const update = () => model.reviewSuggestion(sug.suggestion_id, key, JSON.stringify(rows));
+          let identity = field.land_identity || rows.map((_, n) => n + 1);
+          const update = (cell) => model.reviewSuggestion(sug.suggestion_id, key, JSON.stringify(rows), { identity, cell });
           function renderRows() {
             rowsBox.innerHTML = '';
             rowsBox.append(h('div', 'muted', 'Cụm đất: mỗi dòng giữ riêng loại đất, diện tích và thời hạn.'));
@@ -148,15 +149,15 @@ function createIntakeDialog(ctx) {
                 input.value = row[name] == null ? '' : String(row[name]);
                 input.setAttribute('aria-label', label); input.placeholder = label;
                 if (name === 'dien_tich') { input.min = '0'; input.step = 'any'; }
-                input.onchange = () => { row[name] = input.value === '' ? null : name === 'dien_tich' ? Number(input.value) : input.value; update(); };
+                input.onchange = () => { row[name] = input.value === '' ? null : name === 'dien_tich' ? Number(input.value) : input.value; update(`${identity[rows.indexOf(row)]}:${name}`); };
                 rowEl.append(input);
               }
-              rowEl.append(btn('Bỏ dòng', 'ghost sm', () => { rows.splice(rows.indexOf(row), 1); update(); renderRows(); }));
+              rowEl.append(btn('Bỏ dòng', 'ghost sm', () => { const n = rows.indexOf(row); rows.splice(n, 1); identity.splice(n, 1); update(); renderRows(); }));
               rowsBox.append(rowEl);
             }
             rowsBox.append(btn('Thêm cụm đất', 'secondary sm', () => {
               if (rows.length >= 20) return;
-              rows.push({ loai_dat: null, dien_tich: null, thoi_han: null }); update(); renderRows();
+              rows.push({ loai_dat: null, dien_tich: null, thoi_han: null }); identity.push(null); update(); renderRows();
             }));
           }
           renderRows(); card.append(rowsBox);
@@ -164,10 +165,10 @@ function createIntakeDialog(ctx) {
           for (const ref of field.source_refs || []) {
             evidence.append(h('div', 'muted', `Dòng ${ref.land_row || '?'} · ${ref.land_field || ''}: ${ref.raw_snippet || ''}`));
             if (ref.core_state === 'ambiguous') evidence.append(btn('Chọn giá trị này', 'ghost sm', () => {
-              const row = rows[(ref.land_row || 1) - 1];
+              const row = rows[identity.indexOf(ref.land_row)];
               if (!row) return;
               row[ref.land_field] = ref.land_field === 'dien_tich' ? Number(ref.raw_snippet.replace(',', '.')) : ref.raw_snippet;
-              update(); renderRows();
+              update(`${ref.land_row}:${ref.land_field}`); renderRows();
             }));
           }
           card.append(evidence);
@@ -192,6 +193,7 @@ function createIntakeDialog(ctx) {
             evidence.append(btn('Chọn giá trị này', 'ghost sm', () => {
               input.value = ref.raw_snippet;
               model.reviewSuggestion(sug.suggestion_id, key, input.value);
+              input.value = field.normalized_value == null ? '' : String(field.normalized_value);
             }));
           }
         }

@@ -83,6 +83,15 @@
               },
               "supported": {
                 "type": "boolean"
+              },
+              "reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "selected": {
+                "type": "boolean"
               }
             }
           }

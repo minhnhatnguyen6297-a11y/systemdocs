@@ -16,6 +16,26 @@ Lịch sử ngày 29/09 phía dưới là đề xuất cũ, không còn trạng 
 
 ## Kiểm chứng đã chạy
 
+### Re-derivation sau root review — 04/10/2026
+
+- Giữ danh tính dòng đất từ review đến Stage/reload; xóa dòng đầu không gắn
+  nhầm bằng chứng/vị trí sang dòng kế. Mỗi ô đất mơ hồ phải được duyệt riêng.
+- Ngày chọn từ evidence đổi về dạng ngày chuẩn; slot trống/không hỗ trợ và
+  span nhiều kiểu chữ bị chặn, có lý do. Run gốc và phần chưa chọn giữ nguyên.
+- Checkbox mở lại đúng vị trí đã lưu; bỏ chọn hết và lưu được. Lựa chọn chưa
+  lưu khóa xuất. Tên nguồn do backend tạo; nguồn thứ 9 bị chặn trước Stage;
+  gỡ nguồn hỏng được mà không đọc file ấy, dữ liệu Stage vẫn còn.
+- Binding mới được kiểm slot/giá trị trên snapshot vừa dựng trong transaction;
+  sai slot hủy cả dữ liệu/revision. Kết quả xuất thư mục con trả đích cha đã chọn.
+- 13 Python DOCX tests; 355 regression Intake/Workspace/Word; 80 sidecar adapter
+  tests gồm full DOCX hai bên nhập→lưu→mở lại→xuất, stale export không tạo file;
+  218 Node tests; 43 shared-regex/sidecar Intake tests; 78 contract examples
+  không có kết quả ngoài dự kiến. Python datetime adapter vẫn có cảnh báo cũ.
+- Lệnh/schema dùng môi trường schema-venv đã có; Node dùng NODE_PATH hiện có
+  tại D:/systemdocs/shell/node_modules, không cài phụ thuộc mới.
+
+### Lần triển khai trước review (giữ làm lịch sử)
+
 - 8 tests Word-first: hai người/hai tài sản, 2+1 dòng đất, sửa rồi lưu/mở lại/xuất;
   nội dung tĩnh, kiểu chữ, ảnh, nguồn gốc và phần ZIP không sửa giữ nguyên.
 - 242 tests Intake/Workspace/Word engine/batch; 37 shared-regex tests.

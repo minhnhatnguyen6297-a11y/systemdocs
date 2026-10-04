@@ -3,6 +3,10 @@
 Luồng Word-first đã triển khai cục bộ, chờ root review và commit đúng phạm vi.
 Spec hiện hành: [Nhập DOCX](../../../docs/spec/notary_v2/input/docx-import.md).
 Các phép thử và giới hạn được ghi trong [progress](progress.md).
+Đã sửa các nhóm lỗi được xác minh ở review iteration 1: danh tính dòng đất,
+duyệt từng ô, ngày evidence, slot/định dạng không dùng được, lựa chọn đã lưu/
+xóa hết, giới hạn/gỡ/tên nguồn, kiểm slot trong transaction và đích thư mục con.
+Kiểm chứng gồm luồng DOCX hai bên qua adapter thật và stale export không ghi file.
 
 Đọc file gốc → review/sửa → nhận từng bản ghi → lưu Stage → chọn từng vị trí
 Word → xác nhận/lưu → xuất vào thư mục đã cấp quyền. Mọi lần xuất dùng dữ liệu

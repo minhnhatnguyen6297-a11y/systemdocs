@@ -118,5 +118,5 @@ async def extract(spec, ctx):
     if not suggestions:
         raise SourceFailed("intake.parse_failed", "Lõi trích xuất chưa nhận được người hoặc tài sản; hãy kiểm tra mẫu")
     if ctx.store_docx:
-        ctx.store_docx(content, suggestions)
+        ctx.store_docx(content, suggestions, spec.filename or 'Hợp đồng Word')
     return suggestions

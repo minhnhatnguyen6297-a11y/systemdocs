@@ -98,6 +98,10 @@ nguồn vào field Người/Tài sản. Context ghi cùng transaction/revision k
 create/commit, tải lại qua workspace_get; xóa dòng prune binding, đổi thứ tự
 không đổi row_id và buộc kiểm slot trước xuất. Chi tiết tại
 [`input/docx-import.md`](./input/docx-import.md).
+Danh tính cụm đất nguồn được giữ riêng với vị trí cụm trong danh sách đã lưu;
+xóa cụm không chuyển đối chiếu sang cụm kế tiếp. Gỡ nguồn Word chỉ bỏ đối
+chiếu, giữ dòng Stage và không đọc lại file đã hỏng. Binding mới sai ô/slot
+hoặc chưa có giá trị khiến cả transaction bị hủy.
 
 - Input thêm/sửa Stage draft, không commit thay người dùng.
 - Pool = người trong Stage committed chưa được gán Diagram.

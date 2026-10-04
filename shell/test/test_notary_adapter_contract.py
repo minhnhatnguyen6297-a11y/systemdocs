@@ -44,6 +44,75 @@ SCHEMA = "notary.case-drafting.v2"
 TP_IDS = [f"p{i}" for i in range(1, 31)]
 
 
+def test_original_docx_two_party_adapter_lifecycle_stale_guard_and_subfolder(adapter_db, tmp_path, monkeypatch):
+    """Real intake → saved two-party rows/seats → exact original export, with stale no-write."""
+    import json
+    import hashlib
+    from docx import Document
+    from services.document_intake import service as intake_service
+    from services.document_intake.docx_store import DocxStore
+    from services.document_intake.docx_source import read_docx
+    from services import word_original
+    store = DocxStore(tmp_path / 'sources')
+    modules = {'document_intake.service':intake_service, 'word_original':word_original,
+               'word_batch_export':word_batch_export, 'case_workspace':case_workspace}
+    monkeypatch.setattr(notary_adapter, '_svc', lambda name: modules[name])
+    monkeypatch.setattr(notary_adapter, '_docx_store', lambda: store)
+    document = Document()
+    for line in ['HỢP ĐỒNG CHUYỂN NHƯỢNG', 'Bên A:',
+        'Ông: Nguyễn Văn Mẫu, sinh ngày 1/2/1980; CCCD: 001234567890; thường trú: Nhà A',
+        'Bên B:', 'Bà: Trần Thị Mẫu, sinh ngày 3/4/1985; CCCD: 001234567891; thường trú: Nhà B',
+        'Tài sản 1:', 'Serial: ZZ123456; có địa chỉ tại: Nhà đất A',
+        'Loại đất: ONT; Diện tích: 50; Thời hạn: Lâu dài',
+        'Tài sản 2:', 'Serial: YY123456; có địa chỉ tại: Nhà đất B',
+        'Loại đất: CLN; Diện tích: 90; Thời hạn: 2050', 'Điều 2: Nội dung tĩnh giữ nguyên']:
+        document.add_paragraph(line)
+    path = tmp_path / 'Hợp đồng mẫu.docx'; document.save(path)
+    original = path.read_bytes()
+    analyzed = notary_adapter.intake_analyze(_Job(), {'sources':[{'source_id':_uuid4(),'kind':'docx',
+        'file_ref':{'path':str(path),'scope':'machine_local','size_bytes':len(original)}}]})['data']
+    assert len(analyzed['suggestions']) == 4
+    people, assets, records = [], [], []
+    ref = analyzed['suggestions'][0]['fields']['ho_ten']['source_refs'][0]
+    for candidate in analyzed['suggestions']:
+        values = {k:f['normalized_value'] for k,f in candidate['fields'].items()}
+        if 'land_rows' in values: values['land_rows'] = json.loads(values['land_rows'])
+        row = _person_row(ngay_chet=None, **values) if candidate['target']=='person' else _asset_row(**values)
+        (people if candidate['target']=='person' else assets).append(row)
+        records.append({'candidate_id':candidate['suggestion_id'],'row_id':row['row_id']})
+    context = {'version':1,'sources':[{'source_id':ref['source_id'],'sha256':ref['source_sha256'],'records':records,'bindings':[]}]}
+    created = notary_adapter.workspace_create(_Job(), {'idempotency_key':_uuid4(),
+        'case':{'case_type':'two_party','document_type':'chuyen_nhuong'},'stage':{'people':people,'assets':assets},
+        'diagram':{'state':_tp_state(assign={'p17':people[0]['row_id'],'p2':people[1]['row_id']})},'docx_import':context})['data']
+    cid = created['case']['id']; source_id = ref['source_id']
+    options = notary_adapter.word_export_options(_Job(),{'case_id':cid,'original_source_id':source_id})['data']
+    names = [p for p in options['binding_proposals'] if p['field_key']=='ho_ten']
+    assert [p['slot'] for p in names] == ['[Bên B 2 - Họ tên]','[Bên A 2 - Họ tên]']
+    assert created['docx_import']['sources'][0]['label'] == path.name
+    created['stage']['people'][0]['ho_ten'] = 'Tên B đã kiểm tra'
+    context = created['docx_import']; context['sources'][0]['bindings'] = [
+        {k:p[k] for k in ('candidate_id','occurrence_id','field_key','slot')} for p in options['binding_proposals'] if p['supported']]
+    committed = notary_adapter.workspace_commit_stage(_Job(),{'case_id':cid,'base_revision':1,
+        'stage':created['stage'],'docx_import':context})['data']
+    loaded = notary_adapter.workspace_get(_Job(),{'case_id':cid})['data']
+    assert loaded['docx_import'] == committed['docx_import']
+    dest = tmp_path / 'exports'; dest.mkdir()
+    payload = {'case_id':cid,'document_keys':['original.docx'],'original_source_id':source_id,
+        'base_revision':1,'destination':_dest(dest),'create_case_subdir':True}
+    with pytest.raises(CommandError) as err:
+        notary_adapter.word_export_batch(_Job(),payload)
+    assert err.value.code == 'workspace_conflict'
+    assert list(dest.iterdir()) == []
+    payload['base_revision'] = committed['revision']
+    exported = notary_adapter.word_export_batch(_Job(),payload)['data']
+    assert exported['destination'] == _dest(dest)
+    output = Path(exported['documents'][0]['output_file']['path'])
+    assert output.parent == dest / f'HS-{cid}' and output.is_file()
+    text = read_docx(output.read_bytes()).text
+    assert 'Tên B đã kiểm tra' in text and 'Trần Thị Mẫu' in text and 'Nội dung tĩnh giữ nguyên' in text
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == hashlib.sha256(original).hexdigest()
+
+
 class _Job:
     """Stub Job — check_cancel (co the mang result) + report_progress."""
 

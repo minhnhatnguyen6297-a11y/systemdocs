@@ -29,7 +29,7 @@ def fixture_bytes():
     doc.add_paragraph('Bên A:')
     p = doc.add_paragraph('Ông: ')
     p.add_run('Nguyễn Văn ').bold = True
-    p.add_run('Mẫu').italic = True
+    p.add_run('Mẫu').bold = True
     p.add_run(', sinh ngày 01/02/1980; CCCD: 001234567890; thường trú: Nhà A')
     doc.add_paragraph('Bên B:')
     doc.add_paragraph('Bà: Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891; thường trú: Nhà B')
@@ -108,7 +108,7 @@ def test_physical_merged_nested_tables_unicode_and_repeated_occurrences():
     nested = cell.add_table(rows=1, cols=1)
     nested.cell(0, 0).text = 'LỒNG'
     text = unicodedata.normalize('NFD', 'Tên Đặng')
-    p = doc.add_paragraph(); p.add_run(text[:4]).bold = True; p.add_run(text[4:])
+    p = doc.add_paragraph(); p.add_run(text[:4]).bold = True; p.add_run(text[4:]).bold = True
     doc.add_paragraph(text)
     stream = io.BytesIO(); doc.save(stream); content = stream.getvalue()
     source = read_docx(content)
@@ -246,3 +246,107 @@ def test_actual_context_and_proposals_match_contract_schema(db, tmp_path):
     validate('common.schema.json', 'docx_import', committed['docx_import'])
     validate('draft-v2.schema.json', 'payload_commit_stage_v2', {'case_id': cid,
         'base_revision': committed['revision'], 'stage': committed['stage'], 'docx_import': committed['docx_import']})
+
+
+def test_mixed_styles_rejected_and_original_runs_preserved(db, tmp_path):
+    doc = Document(io.BytesIO(fixture_bytes()))
+    doc.paragraphs[2].runs[2].bold = False
+    doc.paragraphs[2].runs[2].italic = True
+    stream = io.BytesIO(); doc.save(stream); original = stream.getvalue()
+    source = read_docx(original); lo = source.text.index('Nguyễn Văn Mẫu')
+    with pytest.raises(ValueError, match='nhiều kiểu chữ'):
+        replace_spans(original, source, [([lo, lo + len('Nguyễn Văn Mẫu')], 'Tên khác')])
+    # An unrelated supported replacement must preserve both original styled runs.
+    at = source.text.index('Nhà B')
+    result = replace_spans(original, source, [([at, at + 5], 'Nhà C')])
+    parsed = Document(io.BytesIO(result))
+    assert parsed.paragraphs[2].runs[1].bold is True
+    assert parsed.paragraphs[2].runs[2].italic is True
+    assert parsed.paragraphs[2].text == doc.paragraphs[2].text
+
+
+def test_land_deletion_does_not_rebind_earlier_occurrence(db, tmp_path):
+    _, store, service, data = reviewed_case(db, tmp_path)
+    cid = data['case']['id']; context = data['docx_import']; source = context['sources'][0]
+    asset = data['stage']['assets'][0]
+    record = next(r for r in source['records'] if r['row_id'] == asset['row_id'])
+    assert record['land_rows'] == [1, 2]
+    asset['land_rows'].pop(0); asset['land_rows'][0]['dien_tich'] = 77
+    record['land_rows'] = [2]
+    service.commit_stage(cid, data['case']['revision'], data['stage'], docx_import=context)
+    loaded = service.get(cid); case = db.get(InheritanceCase, cid)
+    proposals = binding_proposals(case, source['source_id'], store)
+    deleted = [p for p in proposals if p['field_key'] == 'land_rows' and p['raw_snippet'] in ('ONT', '50') and p['row_id'] == asset['row_id']]
+    assert deleted and all(not p['supported'] for p in deleted)
+    surviving = [p for p in proposals if p['field_key'] == 'land_rows' and p['row_id'] == asset['row_id'] and p['supported']]
+    assert next(p for p in surviving if p['raw_snippet'] == '20')['slot'] == '[Loại đất 1.1 - Diện tích]'
+    loaded['docx_import']['sources'][0]['bindings'] = [{k:p[k] for k in ('candidate_id','occurrence_id','field_key','slot')} for p in surviving]
+    service.commit_stage(cid, loaded['case']['revision'], loaded['stage'], docx_import=loaded['docx_import'])
+    db.expire_all(); rendered, _ = reviewed_template(db.get(InheritanceCase, cid), source['source_id'], store)
+    text = read_docx(rendered).text
+    assert 'Loại đất: ONT; Diện tích: 50; Thời hạn: Lâu dài' in text
+    assert 'Loại đất: CLN; Diện tích: 77; Thời hạn: 2050' in text
+    reloaded = service.get(cid)
+    assert next(r for r in reloaded['docx_import']['sources'][0]['records'] if r['row_id'] == asset['row_id'])['land_rows'] == [2]
+
+
+def test_empty_catalog_wrong_slot_rollback_and_corrupt_source_detach(db, tmp_path):
+    _, store, service, data = reviewed_case(db, tmp_path)
+    cid = data['case']['id']; source = data['docx_import']['sources'][0]
+    data['stage']['people'][0]['dia_chi'] = None
+    saved = service.commit_stage(cid, data['case']['revision'], data['stage'])
+    proposals = binding_proposals(db.get(InheritanceCase, cid), source['source_id'], store)
+    blank = next(p for p in proposals if p['row_id'] == data['stage']['people'][0]['row_id'] and p['field_key'] == 'dia_chi')
+    assert not blank['supported'] and 'giá trị' in blank['reason']
+    p = next(p for p in proposals if p['supported'] and p['field_key'] == 'ho_ten')
+    bad = json.loads(json.dumps(saved['docx_import']))
+    bad['sources'][0]['bindings'] = [{k:p[k] for k in ('candidate_id','occurrence_id','field_key','slot')}]
+    bad['sources'][0]['bindings'][0]['slot'] = '[Người 2 - Họ tên]'
+    saved['stage']['people'][0]['ho_ten'] = 'Không lưu tên này'
+    with pytest.raises(WorkspaceError, match='Vị trí Word'):
+        service.commit_stage(cid, saved['revision'], saved['stage'], docx_import=bad)
+    unchanged = service.get(cid)
+    assert unchanged['case']['revision'] == saved['revision']
+    assert unchanged['stage']['people'][0]['ho_ten'] != 'Không lưu tên này'
+    (store.root / source['source_id'] / 'original.docx').write_bytes(b'corrupt')
+    detached = service.commit_stage(cid, unchanged['case']['revision'], unchanged['stage'], docx_import={'version':1,'sources':[]})
+    assert detached['docx_import']['sources'] == []
+    assert len(detached['stage']['people']) == 2
+
+
+def test_binding_save_reopen_and_clear(db, tmp_path):
+    _, store, service, data = reviewed_case(db, tmp_path)
+    cid = data['case']['id']; source = data['docx_import']['sources'][0]
+    proposals = binding_proposals(db.get(InheritanceCase, cid), source['source_id'], store)
+    p = next(p for p in proposals if p['supported'])
+    source['bindings'] = [{k:p[k] for k in ('candidate_id','occurrence_id','field_key','slot')}]
+    saved = service.commit_stage(cid, data['case']['revision'], data['stage'], docx_import=data['docx_import'])
+    db.expire_all(); case = db.get(InheritanceCase, cid)
+    reopened = binding_proposals(case, source['source_id'], store)
+    assert [p['occurrence_id'] for p in reopened if p['selected']] == [p['occurrence_id']]
+    source = saved['docx_import']['sources'][0]; source['bindings'] = []
+    service.commit_stage(cid, saved['revision'], saved['stage'], docx_import=saved['docx_import'])
+    loaded = service.get(cid)
+    assert loaded['docx_import']['sources'][0]['bindings'] == []
+    assert 'template_sha256' not in loaded['docx_import']['sources'][0]
+    assert not any(p['selected'] for p in binding_proposals(db.get(InheritanceCase, cid), source['source_id'], store))
+
+
+def test_eight_sources_persist_ninth_rejects_transaction(db, tmp_path):
+    content, store, service, data = reviewed_case(db, tmp_path)
+    context = data['docx_import']; cid = data['case']['id']
+    for _ in range(8):
+        candidates = extraction(content, store)
+        ref = candidates[0]['fields']['ho_ten']['source_refs'][0]
+        context['sources'].append({'source_id':ref['source_id'],'sha256':ref['source_sha256'],
+            'records':[{'candidate_id':candidates[0]['suggestion_id'],'row_id':data['stage']['people'][0]['row_id']}],'bindings':[]})
+    ninth = context['sources'].pop()
+    saved = service.commit_stage(cid, data['case']['revision'], data['stage'], docx_import=context)
+    assert len(service.get(cid)['docx_import']['sources']) == 8
+    context['sources'].append(ninth)
+    data['stage']['people'][0]['ho_ten'] = 'Ninth must not save'
+    with pytest.raises(WorkspaceError, match='8 nguồn'):
+        service.commit_stage(cid, saved['revision'], data['stage'], docx_import=context)
+    loaded = service.get(cid)
+    assert loaded['case']['revision'] == saved['revision']
+    assert loaded['stage']['people'][0]['ho_ten'] != 'Ninth must not save'

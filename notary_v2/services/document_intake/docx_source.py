@@ -19,6 +19,16 @@ class DocxSource:
     segments: list[dict]
     warnings: list[str]
 
+    def replacement_reason(self, span):
+        refs = self.refs(span)
+        if not refs or any(not ref['supported'] for ref in refs):
+            return 'Vị trí đi qua vùng Word chưa hỗ trợ sửa'
+        styles = {seg.get('style', '') for seg in self.segments
+                  if max(span[0], seg['start']) < min(span[1], seg['end'])}
+        if len(styles) > 1:
+            return 'Vị trí có nhiều kiểu chữ; chưa hỗ trợ thay mà giữ đúng định dạng'
+        return None
+
     def refs(self, span: list[int]) -> list[dict]:
         start, end = span
         result = []
@@ -44,11 +54,11 @@ def read_docx(content: bytes) -> DocxSource:
     chunks, segments, warnings = [], [], []
     pos = 0
 
-    def emit(value, path, supported):
+    def emit(value, path, supported, style=''):
         nonlocal pos
         if value:
             segments.append({"start": pos, "end": pos + len(value),
-                             "path": path, "supported": supported})
+                             "path": path, "supported": supported, "style": style})
             chunks.append(value)
             pos += len(value)
 
@@ -58,7 +68,8 @@ def read_docx(content: bytes) -> DocxSource:
             safe = False
         allowed = {W + s for s in ("body", "p", "r", "tbl", "tr", "tc")}
         if tag == W + "t":
-            emit(node.text or "", path, safe)
+            props = node.getparent().find(W + 'rPr')
+            emit(node.text or "", path, safe, etree.tostring(props).decode() if props is not None else '')
             return
         if tag in (W + "tab", W + "br", W + "cr"):
             emit("\t" if tag == W + "tab" else "\n", path, False)
@@ -96,8 +107,9 @@ def replace_spans(content: bytes, source: DocxSource, replacements: list[tuple[l
             raise ValueError("Vị trí chồng nhau hoặc không hợp lệ")
         previous_end = end
         refs = source.refs(span)
-        if not refs or any(not ref["supported"] for ref in refs):
-            raise ValueError("Vị trí đi qua vùng Word chưa hỗ trợ sửa")
+        reason = source.replacement_reason(span)
+        if reason:
+            raise ValueError(reason)
         for i, ref in enumerate(refs):
             edits.setdefault(tuple(ref["path"]), []).append((ref["node_span"], str(value) if i == 0 else ""))
     output = io.BytesIO()

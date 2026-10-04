@@ -942,6 +942,14 @@ class CaseWorkspaceService:
         except (ValueError, OSError, TypeError, KeyError) as exc:
             raise WorkspaceError("validation_error", str(exc)) from exc
 
+    def _validate_docx_bindings(self, case, context, previous=None):
+        from .word_original import validate_new_bindings
+        try:
+            store = self.docx_store() if callable(self.docx_store) else self.docx_store
+            validate_new_bindings(case, context, previous, store)
+        except (ValueError, OSError, TypeError, KeyError) as exc:
+            raise WorkspaceError('validation_error', str(exc)) from exc
+
     # ------------------------------------------------------------- public
 
     def get(self, case_id: int) -> dict:
@@ -1123,6 +1131,7 @@ class CaseWorkspaceService:
             # _upsert_people; load trước khi upsert vì upsert không đụng
             # case_state_json.
             payload = self._load_payload(case) or {}
+            previous_import = payload.get('docx_import')
             import_context = docx_import if docx_import is not None else payload.get("docx_import")
             if import_context is not None:
                 payload["docx_import"] = self._docx_context(import_context, stage)
@@ -1191,6 +1200,8 @@ class CaseWorkspaceService:
             self.db.flush()
 
             # Guarded atomic revision bump — 2 commit cùng base chỉ 1 cái thắng.
+            if 'docx_import' in payload:
+                self._validate_docx_bindings(case, payload['docx_import'], previous_import)
             new_revision = server_revision + 1
             updated = self.db.execute(sa_text(
                 "UPDATE inheritance_cases "
@@ -1489,6 +1500,8 @@ class CaseWorkspaceService:
                 case.engine_state_json = json.dumps(
                     {"version": 2, "updatedAt": now, "nodes": legacy_nodes},
                     ensure_ascii=False)
+            if docx_import is not None:
+                self._validate_docx_bindings(case, json.loads(case.case_state_json)['docx_import'])
             self.db.commit()
         except WorkspaceError:
             self.db.rollback()

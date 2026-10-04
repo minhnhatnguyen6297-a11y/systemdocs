@@ -2,6 +2,18 @@
 
 ## 2026-10-04 — Triển khai Word-first đã được Owner yêu cầu
 
+### Sửa theo review, không mở thêm nghiệp vụ
+
+- Dòng đất giữ danh tính nguồn riêng vì số thứ tự thay đổi khi xóa. Review
+  từng ô mơ hồ; chỉ ô được chọn/sửa mới hết chờ xác nhận.
+- Mẫu gốc có nhiều kiểu chữ trong một span bị từ chối với lý do; chưa có
+  quyết định cách chia định dạng cho chữ mới nên không tự dùng kiểu run đầu.
+- Gỡ nguồn bỏ context, giữ dữ liệu Stage; không đọc nguồn được gỡ để khôi phục
+  được từ file hỏng. Tên file an toàn do backend cung cấp, tối đa 8 nguồn/hồ sơ.
+- Xác nhận binding mới kiểm trong cùng transaction sau khi dựng snapshot
+  Stage/Diagram; không để lưu slot sai rồi chỉ phát hiện lúc xuất.
+- **Nguồn:** plan-multica-docx-intake.md, review iteration 1 ngày 04/10/2026.
+
 - **Nguồn Owner:** NAIA-4 comments `01a0fd96-dc6d-77f5-a301-053b7eb6a651`,
   `01a0fd9b-ff2e-7e8c-be10-bbf2bfe91391` (02/10),
   `01a0ff5c-5cf6-7e55-a2e8-597143bfb0d3` (03/10), yêu cầu triển khai trong chat

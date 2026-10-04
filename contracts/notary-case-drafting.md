@@ -1577,7 +1577,7 @@ contract trao đổi hồ sơ giữa Upload Lab và Soạn hồ sơ. Envelope v�
 
 - Intake giữ shape suggestion/field_value; `source_refs` DOCX có opaque
   `source_id` do backend tạo, `source_sha256`, `text_map_version:1`,
-  candidate/occurrence ID, raw code-point `span`, `raw_snippet`, rule/profile
+  candidate/occurrence ID, backend-produced `source_label`, raw code-point `span`, `raw_snippet`, rule/profile
   version/state, `docx_refs` part/path/node_span/supported. Một trường có thể
   nhiều refs. `land_rows` vẫn là JSON string của danh sách cụm (1..20),
   refs từng trường con có `land_row` 1-based và `land_field`. Intake không
@@ -1586,21 +1586,34 @@ contract trao đổi hồ sơ giữa Upload Lab và Soạn hồ sơ. Envelope v�
   [`common.schema.json`](./notary-case-drafting/common.schema.json) definition
   `docx_import`: version 1, tối đa 8 nguồn; mỗi nguồn có source_id/hash,
   records candidate_id→row_id, bindings candidate_id/occurrence_id/field_key/
-  slot, optional template_sha256 do backend tạo. Context chỉ chứa ID/hash,
-  không chứa đường dẫn khách, chữ gốc hoặc field nghiệp vụ tùy ý.
+  slot, optional template_sha256 và label do backend tạo. Mỗi record tài sản
+  có optional `land_rows`: danh sách số dòng nguồn theo vị trí cụm hiện tại;
+  số nguyên 1..20 không lặp, `null` cho cụm thêm tay. Record cũ thiếu khóa này
+  được nâng từ thứ tự extraction; số cụm phải khớp Stage. Context chỉ chứa
+  định danh/mã băm/tên file an toàn, không chứa đường dẫn khách, chữ gốc hay
+  field nghiệp vụ tùy ý. `label` client gửi không được tin; backend lấy từ kho.
 - Backend chỉ nhận ứng viên/vị trí từ extraction package đã lưu khi intake
   được cấp quyền. Stage và context lưu cùng transaction và revision; omit
   context giữ bản cũ, `sources:[]` là xóa đối chiếu. Xóa row prune record và
   binding, không gắn sang row khác. Hủy nháp khôi phục context đã commit.
+  Client kiểm giới hạn 8 nguồn trước khi thêm row. Gỡ nguồn gửi context còn
+  lại (kể cả sources rỗng); không đọc file của nguồn được gỡ. Xóa cụm đất
+  loại binding của chính cụm nguồn ấy; không lấy vị trí mảng mới làm danh tính.
 - Word options/batch nhận optional `original_source_id`, không đi cùng
   template_dir. Options trả thêm `binding_proposals` gồm chữ gốc, candidate/
-  occurrence/field/slot, row_id/row_label, giá trị đã lưu và supported.
+  occurrence/field/slot, row_id/row_label, giá trị đã lưu, supported, reason
+  (null khi hợp lệ) và selected (lựa chọn đã lưu còn khớp). Slot trống hoặc
+  định dạng hỗn hợp không cho chọn; lưu bindings rỗng xóa mẫu đối chiếu.
   Proposal không phải binding đã xác nhận. Batch gốc cần base_revision và
   document_keys chính xác `["original.docx"]`; folder/catalog giữ hành vi cũ.
 - Người N theo Stage; Bên A/B theo ô Diagram; tài sản N theo thứ tự Stage.
   Binding dùng row_id+field, slot phải khớp lại lúc xuất. N/seat đổi, source/
   derivative hash đổi, row mất hoặc slot trống → `word.original_mapping_invalid`,
   không thay ngầm. Span unsupported/chồng nhau từ chối khi lưu binding.
+  Binding mới phải khớp catalog và giá trị bản Stage/sơ đồ vừa được dựng
+  trong transaction; sai slot hủy cả lần lưu. Đổi thứ tự của binding cũ
+  vẫn cần xác nhận lại trước khi xuất. Nhận giá trị ngày từ evidence dùng
+  quy tắc chuẩn hóa ngày hiện có; mơ hồ đất kiểm từng ô, không cả field.
 - Bản derivative tạo riêng, hash/path backend cố định; xuất dùng mapping
   Word tích hợp và sửa đúng w:t span. Giữ package part khác byte-exact;
   không dùng paragraph.text/global replace để làm mất format/ảnh. Output

@@ -19,6 +19,8 @@ Excel không dùng bản đồ vị trí DOCX trong đợt này. Mỗi trường
 sửa là giá trị người dùng kiểm tra, không sửa bằng chứng ban đầu.
 Cụm đất được sửa theo từng dòng loại đất/diện tích/thời hạn, không buộc người
 dùng nhập mã JSON. Cả một dòng lẫn nhiều dòng đều giữ được.
+Mỗi ô mơ hồ phải được chọn hoặc sửa riêng. Chọn ngày từ chữ gốc đổi về dạng
+`YYYY-MM-DD` theo quy tắc ngày hiện có trước khi nhận vào Stage.
 
 ## Bóc trường, nhóm và Tại sao?
 
@@ -50,7 +52,8 @@ nguồn được kiểm lại trước mỗi lần lưu đối chiếu/xuất. K
 vào Git, log rộng hoặc localStorage.
 
 `case_state_json.docx_import` version 1 chỉ giữ ID/hash nguồn,
-`candidate_id→row_id`, và vị trí đã duyệt. Chữ gốc/quan sát ở package backend;
+`candidate_id→row_id`, danh tính từng dòng đất và vị trí đã duyệt. Nguồn có tên
+file an toàn do backend tạo để phân biệt nhiều hợp đồng. Chữ gốc/quan sát ở package backend;
 giá trị người dùng sửa ở Stage đã lưu. Context và Stage ghi trong cùng
 transaction (một lần ghi trọn vẹn), dùng `base_revision` cũ thì từ chối cả
 lần ghi. Create/get/commit trả lại context để mở hồ sơ khác hoặc tải lại không
@@ -58,10 +61,19 @@ mất đối chiếu. Hủy thay đổi khôi phục cả context đã lưu.
 
 Đối chiếu Word là **một lần xuất hiện → ID dòng + trường + slot catalog**,
 không phải “thay mọi chuỗi giống nhau”. Màn Word hiện chữ gốc, tên/ID dòng,
-slot và giá trị sẽ xuất; checkbox ban đầu không chọn. Người N theo Stage đã
+slot và giá trị sẽ xuất; checkbox hiển thị đúng lựa chọn đã lưu, nguồn mới chưa
+chọn. Bỏ chọn hết rồi lưu sẽ xóa toàn bộ vị trí đã gắn. Người N theo Stage đã
 lưu, Bên A/B theo ô `p1..p30` đã lưu, tài sản N theo thứ tự Stage. Đổi thứ tự
 hoặc ô làm slot khác phải xác nhận lại. Xóa dòng làm mất binding của dòng ấy,
 không chuyển sang người kế tiếp. Slot trống/không hỗ trợ thì báo lỗi.
+Mỗi dòng đất giữ số dòng trong bản nguồn riêng với vị trí hiện tại. Xóa dòng
+đầu không chuyển bằng chứng của dòng ấy sang dòng kế tiếp; sửa danh sách đất
+gỡ vị trí đất cũ và yêu cầu xác nhận lại. Vị trí mới chỉ được lưu khi khớp
+dòng/ô và giá trị của bản Stage/sơ đồ được ghi trong cùng lần lưu.
+
+Mỗi hồ sơ giữ tối đa 8 nguồn Word; nguồn thứ 9 bị chặn trước khi thêm dòng
+Stage và gợi ý vẫn còn. Nút **Gỡ nguồn Word** bỏ đối chiếu nguồn, giữ dữ liệu
+Stage. Thao tác này không đọc file gốc nên dùng được khi nguồn đã hỏng.
 
 Binding được xác nhận tạo bản mẫu riêng tại
 `docx_sources/<source_id>/templates/<template_sha256>.docx`; context giữ hash
@@ -71,6 +83,9 @@ byte của mọi package part khác. Span chồng nhau hoặc qua hyperlink, tra
 change, textbox, field code, tab/ngắt/separator bị từ chối. Đầu/chân trang giữ
 nguyên và có cảnh báo phạm vi đọc. Không hứa giống từng pixel khi chưa đối
 chiếu bằng Word thật.
+Một vị trí trải qua các run (đoạn chữ nhỏ trong Word) có kiểu chữ khác nhau
+cũng bị từ chối, kèm lý do trên màn chọn; chưa có quy tắc tự chia định dạng
+cho chữ mới. Các run gốc và vị trí chưa chọn vẫn được giữ nguyên.
 
 ## Contract, lỗi và phần chưa có bằng chứng
 

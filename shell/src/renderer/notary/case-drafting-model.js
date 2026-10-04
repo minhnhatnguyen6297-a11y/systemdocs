@@ -86,6 +86,7 @@ function stageForWire(stage) {
   const s = clone(stage);
   for (const a of (s && s.assets) || []) {
     if (a && typeof a === 'object') delete a.thoi_han;
+    for (const row of a.land_rows || []) delete row._source_land_row;
   }
   return s;
 }
@@ -294,6 +295,7 @@ function createModel(deps) {
     state.docxImport = clone(data.docx_import || { version: 1, sources: [] });
     state.committedDocxImport = clone(state.docxImport);
     state.stage = clone(state.committed);
+    restoreLandIdentity();
     const dg = data.diagram || {};
     state.diagram = clone(dg.state ||
       (c.case_type === CASE_TYPE_TWO_PARTY
@@ -664,7 +666,16 @@ function createModel(deps) {
             loai_dat: x && x.loai_dat != null ? String(x.loai_dat) : null,
             dien_tich: x && x.dien_tich != null ? x.dien_tich : null,
             thoi_han: x && x.thoi_han != null ? String(x.thoi_han) : null,
+            _source_land_row: x && x._source_land_row || null,
           })) : [];
+      for (const source of state.docxImport?.sources || []) {
+        const record = source.records.find((r) => r.row_id === rowId);
+        if (record) {
+          record.land_rows = row.land_rows.map((r) => r._source_land_row);
+          source.bindings = source.bindings.filter((b) => b.candidate_id !== record.candidate_id || b.field_key !== 'land_rows');
+          delete source.template_sha256;
+        }
+      }
     } else if (ASSET_FIELDS.includes(field)) {
       row[field] = value === '' ? null : value;
     } else {
@@ -786,7 +797,7 @@ function createModel(deps) {
       base_revision: state.revision,
       stage: stageForWire(state.stage),
     };
-    if (state.docxImport && state.docxImport.sources.length) payload.docx_import = clone(state.docxImport);
+    if (state.docxImport) payload.docx_import = clone(state.docxImport);
     // đợt 3 (MIN-141): metadata hồ sơ ghi cung Stage trong mot
     // transaction — payload.case la block day du, chi gui khi meta
     // sua de khong ghi de meta cua client khac.
@@ -818,6 +829,7 @@ function createModel(deps) {
     if (d.docx_import) state.docxImport = clone(d.docx_import);
     state.committedDocxImport = clone(state.docxImport || { version: 1, sources: [] });
     state.stage = clone(state.committed);
+    restoreLandIdentity();
     if (d.diagram) {
       // Commit prune + re-evaluate trong transaction (§6.1). Baseline
       // committed luon nap theo state server da prune.
@@ -1227,9 +1239,21 @@ function createModel(deps) {
       (s) => s.suggestion_id === suggestionId);
     if (i < 0) return null;
     const sug = state.suggestions[i];
+    const ref = Object.values(sug.fields || {}).flatMap((f) => f.source_refs || []).find((r) => r.kind === 'docx');
+    if (ref && !state.docxImport.sources.some((s) => s.source_id === ref.source_id) && state.docxImport.sources.length >= 8) {
+      state.notice = 'Hồ sơ đã có 8 nguồn Word; hãy gỡ một nguồn trước khi thêm nguồn mới'; emit(); return null;
+    }
     const fields = {};
     for (const [k, f] of Object.entries(sug.fields || {})) {
-      if (f && (f.normalized_value == null || k === 'land_rows') && (f.source_refs || []).some((ref) =>
+      if (k === 'land_rows' && !f.land_identity) {
+        try { f.land_identity = JSON.parse(f.normalized_value || '[]').map((_, n) => n + 1); } catch (_) { f.land_identity = []; }
+      }
+      if (k === 'land_rows' && (f.source_refs || []).some((r) =>
+        ['ambiguous', 'error', 'warning_nonstandard'].includes(r.core_state) &&
+        (f.land_identity || []).includes(r.land_row) && !f.reviewed_cells?.includes(`${r.land_row}:${r.land_field}`))) {
+        state.notice = 'Cụm đất: hãy kiểm tra từng ô còn mơ hồ'; emit(); return null;
+      }
+      if (k !== 'land_rows' && f && f.normalized_value == null && (f.source_refs || []).some((ref) =>
           ['ambiguous', 'error', 'warning_nonstandard'].includes(ref.core_state)) && !f.reviewed) {
         state.notice = `${k}: hãy chọn hoặc sửa giá trị trước khi đưa vào Stage`;
         emit();
@@ -1243,33 +1267,71 @@ function createModel(deps) {
         fields.land_rows = JSON.parse(fields.land_rows);
         if (!Array.isArray(fields.land_rows) || !fields.land_rows.length || fields.land_rows.length > 20 ||
             fields.land_rows.some((r) => !r || typeof r !== 'object' || Array.isArray(r))) throw new Error();
+        const identity = sug.fields.land_rows.land_identity || fields.land_rows.map((_, n) => n + 1);
+        fields.land_rows.forEach((r, n) => { r._source_land_row = identity[n] || null; });
       } catch (_) { state.notice = 'Cụm đất cần là danh sách JSON hợp lệ'; emit(); return null; }
     }
     const row = sug.target === 'asset'
       ? addAsset(fields) : addPerson(fields);
     if (!row) { state.notice = 'Stage đã đủ chỗ; gợi ý vẫn được giữ để xử lý sau'; emit(); return null; }
-    const ref = Object.values(sug.fields || {}).flatMap((f) => f.source_refs || []).find((r) => r.kind === 'docx');
     if (ref) {
       state.docxImport = state.docxImport || { version: 1, sources: [] };
       let source = state.docxImport.sources.find((s) => s.source_id === ref.source_id);
       if (!source) {
-        source = { source_id: ref.source_id, sha256: ref.source_sha256, records: [], bindings: [] };
+        source = { source_id: ref.source_id, sha256: ref.source_sha256, label: ref.source_label || 'Hợp đồng Word', records: [], bindings: [] };
         state.docxImport.sources.push(source);
       }
-      source.records.push({ candidate_id: sug.suggestion_id, row_id: row.row_id });
+      source.records.push({ candidate_id: sug.suggestion_id, row_id: row.row_id,
+        ...(sug.target === 'asset' && fields.land_rows ? { land_rows: fields.land_rows.map((r) => r._source_land_row) } : {}) });
     }
     state.suggestions.splice(i, 1);
     emit();
     return row;
   }
 
-  function reviewSuggestion(suggestionId, fieldKey, value) {
+  function reviewSuggestion(suggestionId, fieldKey, value, landReview) {
     const sug = state.suggestions.find((s) => s.suggestion_id === suggestionId);
     if (!canWrite() || !sug || !sug.fields[fieldKey]) return false;
-    sug.fields[fieldKey].normalized_value = value === '' ? null : value;
-    sug.fields[fieldKey].reviewed = true;
+    const field = sug.fields[fieldKey];
+    if (fieldKey.startsWith('ngay_') && value) {
+      const t = String(value).trim();
+      let y, m, d;
+      let match = t.match(/^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{4})$/);
+      if (match) [, d, m, y] = match;
+      else if ((match = t.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/))) [, y, m, d] = match;
+      else if (/^(19|20)\d{2}$/.test(t)) value = t;
+      else { state.notice = 'Ngày cần là năm hoặc ngày/tháng/năm hợp lệ'; emit(); return false; }
+      if (y) {
+        const date = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
+        if (date.getUTCFullYear() !== Number(y) || date.getUTCMonth() + 1 !== Number(m) || date.getUTCDate() !== Number(d)) {
+          state.notice = 'Ngày không hợp lệ'; emit(); return false;
+        }
+        value = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      }
+    }
+    field.normalized_value = value === '' ? null : value;
+    field.reviewed = true;
+    if (fieldKey === 'land_rows' && landReview) {
+      field.land_identity = clone(landReview.identity);
+      field.reviewed_cells = [...new Set([...(field.reviewed_cells || []), ...(landReview.cell ? [landReview.cell] : [])])];
+    }
     emit();
     return true;
+  }
+
+  function restoreLandIdentity() {
+    for (const source of state.docxImport?.sources || []) for (const record of source.records) {
+      for (const stage of [state.stage, state.committed]) {
+        const asset = stage.assets.find((a) => a.row_id === record.row_id);
+        if (asset) (asset.land_rows || []).forEach((r, n) => { r._source_land_row = record.land_rows ? record.land_rows[n] : n + 1; });
+      }
+    }
+  }
+
+  function detachOriginalSource(sourceId) {
+    if (!canWrite()) return false;
+    state.docxImport.sources = state.docxImport.sources.filter((s) => s.source_id !== sourceId);
+    touchStage(); return true;
   }
 
   function confirmOriginalBindings(sourceId, bindings) {
@@ -1539,7 +1601,7 @@ function createModel(deps) {
     setNodeFlag, toggleNodePosition, setNodeRelation, removeNode,
     evaluateDiagram, saveDiagram,
     resolveConflict,
-    intakeAnalyze, acceptSuggestion, discardSuggestion, reviewSuggestion, confirmOriginalBindings,
+    intakeAnalyze, acceptSuggestion, discardSuggestion, reviewSuggestion, confirmOriginalBindings, detachOriginalSource,
     loadWordOptions, exportWord,
     dismissNotice,
   };

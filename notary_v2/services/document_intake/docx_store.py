@@ -10,19 +10,21 @@ class DocxStore:
     def __init__(self, root):
         self.root = Path(root)
 
-    def save(self, content, suggestions):
+    def save(self, content, suggestions, filename='Hợp đồng Word'):
         self.root.mkdir(parents=True, exist_ok=True)
         source_id = str(uuid.uuid4())
         folder = self.root / source_id
         folder.mkdir()
         digest = hashlib.sha256(content).hexdigest()
+        label = ''.join(c for c in str(filename).replace('\\', '/').split('/')[-1] if c.isprintable())[:180] or 'Hợp đồng Word'
         for suggestion in suggestions:
             for field in suggestion["fields"].values():
                 for ref in field["source_refs"]:
                     ref["source_id"] = source_id
+                    ref['source_label'] = label
         try:
             (folder / "original.docx").write_bytes(content)
-            (folder / "extraction.json").write_text(json.dumps({"sha256": digest, "text_map_version": 1,
+            (folder / "extraction.json").write_text(json.dumps({"sha256": digest, "text_map_version": 1, 'label': label,
                 "suggestions": suggestions}, ensure_ascii=False), encoding="utf-8")
         except BaseException:
             for name in ("original.docx", "extraction.json"):

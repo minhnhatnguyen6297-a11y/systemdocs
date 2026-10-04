@@ -873,6 +873,7 @@ function createNotaryModuleView(deps) {
         // Chỉ ghi draft Stage (touchStage → dirty) — không gọi command
         // ra ngoài; Cập nhật ở action bar mới commit.
         const rows = draft.map((d) => ({
+          _source_land_row: d._source_land_row || null,
           loai_dat: d.loai_dat || null,
           dien_tich: d.dien_tich === '' || d.dien_tich == null ? null
             : (Number.isNaN(Number(d.dien_tich))
