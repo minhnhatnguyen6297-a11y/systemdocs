@@ -41,7 +41,7 @@ function reviewedArea(raw) {
   let text = String(raw || '').trim();
   if (text.includes(',') && text.includes('.')) text = text.replace(/\./g, '').replace(/,/g, '.');
   else if (text.includes(',')) text = text.replace(/,/g, '.');
-  return /^\d+(\.\d+)?$/.test(text) && Number.isFinite(Number(text)) ? Number(text) : null;
+  return /^\+?\d+(\.\d+)?$/.test(text) && Number.isFinite(Number(text)) ? Number(text) : null;
 }
 
 function createIntakeDialog(ctx) {
@@ -182,7 +182,7 @@ function createIntakeDialog(ctx) {
           renderRows(); card.append(rowsBox, landError);
           const evidence = h('details'); evidence.append(h('summary', '', 'Xem chữ gốc của từng cụm đất'));
           for (const ref of field.source_refs || []) {
-            evidence.append(h('div', 'muted', `Dòng ${ref.land_row || '?'} · ${ref.land_field || ''}: ${ref.raw_snippet || ''}`));
+            evidence.append(h('div', 'muted', `Dòng ${ref.land_row || '?'} · ${ref.land_field || ''} · vị trí ${(ref.span || []).join('–')}: ${ref.raw_snippet || ''}`));
             if (ref.core_state === 'ambiguous') evidence.append(btn('Chọn giá trị này', 'ghost sm', () => {
               const row = rows[identity.indexOf(ref.land_row)];
               if (!row) return;
@@ -407,6 +407,7 @@ function createIntakeDialog(ctx) {
         prog.textContent = '';
         if (r.ok) {
           lastResult = r.data || {};
+          const jsonSnapshot = JSON.stringify(r.intakeSnapshot || lastResult, null, 2);
           markResults(lastResult);
           renderList();
           const news = lastResult.suggestions || [];
@@ -416,15 +417,14 @@ function createIntakeDialog(ctx) {
           }
           if (news.length) {
             review.append(btn('Tải JSON về máy', 'secondary sm', () => {
-              const json = JSON.stringify({ schema_version: lastResult.schema_version,
-                suggestions: news, errors: lastResult.errors || [] }, (key, value) => key === 'reviewed' ? undefined : value, 2);
-              const url = URL.createObjectURL(new Blob([json], { type: 'application/json;charset=utf-8' }));
+              const url = URL.createObjectURL(new Blob([jsonSnapshot], { type: 'application/json;charset=utf-8' }));
               const anchor = document.createElement('a');
               anchor.href = url;
               anchor.download = 'word-goi-y.json';
               anchor.click();
               URL.revokeObjectURL(url);
             }));
+            review.append(h('div', 'muted', 'JSON giữ kết quả phân tích ban đầu; các sửa đổi được lưu vào Stage.'));
             review.append(h('div', 'cd-suggest-title',
               `${news.length} gợi ý mới — xử lý tại đây hoặc đóng ` +
               'và xử lý trong khay gợi ý dưới Stage.'));

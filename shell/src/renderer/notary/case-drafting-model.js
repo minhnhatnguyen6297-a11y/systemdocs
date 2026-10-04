@@ -1217,6 +1217,7 @@ function createModel(deps) {
     }
     const d = r.data || {};
     // Ket qua moi them LEN TREN, khong xoa ngam suggestion cu (plan §13);
+    const intakeSnapshot = clone(d);
     // loi per-source tich luy theo source_id, khong lan sang nguon khac.
     // Dedupe theo suggestion_id: backend co the emit lai id da co (re-
     // analyze cung source) — ban moi thay ban cu, van nam dau danh sach.
@@ -1229,7 +1230,7 @@ function createModel(deps) {
     state.intakeErrors = (d.errors || []).concat(state.intakeErrors);
     state.intakePartial = !!r.partial;
     emit();
-    return r;
+    return { ...r, intakeSnapshot };
   }
 
   // Dua suggestion vao Stage nhu draft — khong phai commit (§5).
@@ -1266,7 +1267,10 @@ function createModel(deps) {
     if (fields.land_rows) {
       try {
         fields.land_rows = JSON.parse(fields.land_rows);
-        if (!Array.isArray(fields.land_rows) || !fields.land_rows.length || fields.land_rows.length > 20 ||
+        if (Array.isArray(fields.land_rows) && fields.land_rows.length > 20) {
+          state.notice = 'Stage giữ tối đa 20 cụm đất; hãy bỏ bớt dòng trước khi đưa vào Stage'; emit(); return null;
+        }
+        if (!Array.isArray(fields.land_rows) || !fields.land_rows.length ||
             fields.land_rows.some((r) => !r || typeof r !== 'object' || Array.isArray(r))) throw new Error();
         const identity = sug.fields.land_rows.land_identity || fields.land_rows.map((_, n) => n + 1);
         fields.land_rows.forEach((r, n) => { r._source_land_row = identity[n] || null; });
@@ -1316,6 +1320,13 @@ function createModel(deps) {
         }
         value = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       }
+    }
+    if (fieldKey === 'dien_tich' && value !== '' && value != null) {
+      let text = String(value).trim();
+      if (text.includes(',') && text.includes('.')) text = text.replace(/\./g, '').replace(/,/g, '.');
+      else if (text.includes(',')) text = text.replace(/,/g, '.');
+      if (!/^\+?\d+(\.\d+)?$/.test(text) || !Number.isFinite(Number(text))) return invalid('Diện tích cần là số hữu hạn từ 0 trở lên');
+      value = Number(text);
     }
     if (fieldKey === 'land_rows') {
       let rows;

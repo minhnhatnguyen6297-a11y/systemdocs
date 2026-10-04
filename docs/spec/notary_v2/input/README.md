@@ -12,7 +12,7 @@ có nguồn để người dùng kiểm tra trước khi đưa vào Stage.
 | Nguồn | Cách nhận | Công nghệ |
 |---|---|---|
 | Ảnh/PDF giấy tờ | Chọn file | PyMuPDF + Qwen-VL-OCR |
-| DOCX | Chọn file | `python-docx` |
+| DOCX | Chọn file | Đọc ZIP/XML theo thứ tự thật bằng `lxml`, rồi dùng lõi regex chung |
 | XLSX | Chọn file | `openpyxl` |
 | Text | Dán hoặc nhập | Parser tất định |
 | Zalo | Sync gói raw đã công bố | Xem [`zalo/`](./zalo/README.md) |

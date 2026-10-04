@@ -104,6 +104,29 @@ Chỉ dùng tài liệu mẫu tổng hợp, chưa đo độ chính xác trên h�
 bộ dựng trang Word hay bản đóng gói. Chưa có UI tách/gộp ứng viên
 tùy ý; ranh giới không rõ giữ cảnh báo và cần người sửa. Không suy luận vai trò pháp lý.
 
+## Kiểm chứng iteration 4 — 04/10/2026
+
+Đã áp dụng KEEP đúng một lần và sửa đủ nhóm được plan xác nhận: giữ toàn bộ
+dấu/số diện tích, chặn giá trị không hữu hạn, giữ tài sản có nhãn và bằng chứng
+địa chỉ/đất dù thiếu mã, khôi phục gỡ nguồn thất bại, JSON tải xuống bất biến.
+Thông báo quá 20 cụm đất nói rõ giới hạn; bằng chứng ô đất hiện vị trí ký tự.
+Profile chung `transfer` tăng 1.1.2; không tạo parser hay dữ liệu hành chính mới.
+
+Kiểm đã chạy: 35 DOCX Python; bộ backend 386 pass/2 COM skip; 115 sidecar,
+Intake và lõi regex; 229 Node; 78 ví dụ contract, không kết quả ngoài dự kiến.
+Hai ca xuất diện tích sửa dùng Stage và binding đã lưu rồi xuất file thật,
+chứng minh không để lại dấu âm. Hai ca limit gọi analyze DOCX với nguồn quá
+100 MB giải nén/100.000 ký tự cùng nguồn hợp lệ, nguồn từ chối không được lưu.
+JSON sau sửa/ngày sai được kiểm bằng schema Intake thật. Node test này dùng
+Python có `jsonschema`/`referencing`; chọn qua `NOTARY_TEST_PYTHON` khi PATH
+khác môi trường kiểm. Lần cuối chạy lại 35 DOCX và 20 Node DOCX đều đạt.
+`git diff --check` đạt; warning SQLite datetime là warning hiện có.
+
+Root báo Electron HS-7 iteration 4 `ok: true`: 4 bản ghi, 25 binding, lưu/mở
+lại/xuất theo Word gốc; hash nguồn, ZIP không sửa và DB gốc không đổi. Native
+picker vẫn là bộ giả lập. Corpus văn phòng, trang Word thật, cài sạch và phục
+hồi chung database/nguồn chưa kiểm; không tuyên bố nghiệm thu các phần này.
+
 ## Lịch sử đề xuất 29/09/2026
 
 # Progress — MIN-139

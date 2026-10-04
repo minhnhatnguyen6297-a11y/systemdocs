@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { webcrypto } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { makeDom, collect } from './dom-stub.mjs';
 const require = createRequire(import.meta.url);
 const M = require('../src/renderer/notary/case-drafting-model.js');
@@ -65,6 +67,71 @@ function dialogContext(model) {
   return { ctx, box };
 }
 const button = (box, label) => collect(box, (e) => e.tagName === 'BUTTON' && e.textContent.includes(label))[0];
+
+test('failed and throwing detach restores source and dirty state for retry without restoring another case', async () => {
+  for (const failure of ['result', 'exception', 'switch']) {
+    let calls = 0;
+    const model = M.createModel({client:{run:async(command,payload)=>{
+      calls++;
+      if (calls === 1) {
+        if (failure === 'switch') { model.newDraft(); return {ok:false,error:{code:'conflict'}}; }
+        if (failure === 'exception') throw new Error('interrupted');
+        return {ok:false,error:{code:'conflict',message:'Thử lại'}};
+      }
+      return {ok:true,data:{revision:3,stage:payload.stage,docx_import:payload.docx_import}};
+    }}});
+    model.newDraft(); model.state.caseId = 1; model.state.revision = 2;
+    model.state.stageDirty = false; model.state.diagramDirty = false; model.state.metaDirty = false;
+    model.state.docxImport = {version:1,sources:[{source_id:uuid(),label:'A.docx',records:[],bindings:[]}]};
+    const before = structuredClone(model.state.docxImport);
+    const {ctx,box} = dialogContext(model); WORD.createWordDialog(ctx).open();
+    await button(box,'Gỡ nguồn Word').onclick();
+    if (failure === 'switch') { assert.deepEqual(model.state.docxImport.sources,[]); continue; }
+    assert.deepEqual(model.state.docxImport,before); assert.equal(model.state.stageDirty,false);
+    assert.ok(button(box,'Gỡ nguồn Word'));
+    await button(box,'Gỡ nguồn Word').onclick();
+    assert.deepEqual(model.state.docxImport.sources,[]); assert.equal(button(box,'Gỡ nguồn Word'),undefined);
+  }
+});
+
+test('JSON download keeps original schema-valid result after review and invalid pending edits', async () => {
+  const candidate = suggestion('person');
+  candidate.fields.ngay_sinh = {raw_value:'1/2/1980',normalized_value:'1980-02-01',observation_state:'normalized',confidence:null,source_refs:[{kind:'docx',span:[20,30]}]};
+  const result = {schema_version:'notary.case-drafting.v1',suggestions:[candidate],errors:[]};
+  const original = structuredClone(result);
+  const model = M.createModel({client:{run:async()=>({ok:true,data:result})}}); model.newDraft();
+  const {ctx,box}=dialogContext(model);ctx.lib.faceEmpty=x=>x;
+  INTAKE.createIntakeDialog(ctx).open();
+  collect(box,e=>e.tagName==='TEXTAREA')[0].value='Phân tích'; await button(box,'Phân tích').onclick();
+  model.reviewSuggestion(candidate.suggestion_id,'ho_ten','Tên mới');
+  model.reviewSuggestion(candidate.suggestion_id,'ngay_sinh','31/02/1980');
+  let blob;
+  const create = URL.createObjectURL, revoke = URL.revokeObjectURL;
+  URL.createObjectURL = b => {blob=b;return 'blob:synthetic';}; URL.revokeObjectURL=()=>{};
+  try { button(box,'Tải JSON').onclick(); } finally { URL.createObjectURL=create;URL.revokeObjectURL=revoke; }
+  const downloaded = await blob.text(); assert.deepEqual(JSON.parse(downloaded),original);
+  assert.match(box.textContent,/sửa đổi được lưu vào Stage/);
+  const root = fileURLToPath(new URL('../../',import.meta.url));
+  execFileSync(process.env.NOTARY_TEST_PYTHON || 'python',['-c',
+    "import json,sys; from pathlib import Path; from jsonschema import Draft7Validator; from referencing import Registry,Resource; p=Path(sys.argv[1])/'contracts/notary-case-drafting'; ss=[json.loads(f.read_text(encoding='utf-8')) for f in p.glob('*.schema.json')]; reg=Registry().with_resources([(s['$id'],Resource.from_contents(s)) for s in ss]); s=next(s for s in ss if s['$id'].endswith('/intake.schema.json')); Draft7Validator({'$ref':s['$id']+'#/definitions/result_data'},registry=reg).validate(json.load(sys.stdin))",root],{input:downloaded});
+});
+
+test('invalid source scalar and each land cell require correction; evidence shows span; over20 is capacity', () => {
+  const model=M.createModel({client:{run:async()=>({ok:true})}});model.newDraft();
+  const sug=suggestion();sug.fields.dien_tich={raw_value:'-50',normalized_value:null,source_refs:[{kind:'docx',core_state:'error',span:[10,13],raw_snippet:'-50'}]};
+  sug.fields.land_rows.source_refs=[{core_state:'error',land_row:1,land_field:'dien_tich',span:[40,43],raw_snippet:'-50'}];
+  sug.fields.land_rows.normalized_value='[{"loai_dat":"ONT","dien_tich":null}]';model.state.suggestions.push(sug);
+  assert.equal(model.acceptSuggestion(sug.suggestion_id),null);
+  assert.equal(model.reviewSuggestion(sug.suggestion_id,'dien_tich','-50'),false);
+  assert.equal(model.reviewSuggestion(sug.suggestion_id,'dien_tich','1.234,5'),true);
+  assert.equal(model.acceptSuggestion(sug.suggestion_id),null);
+  const {ctx,box}=dialogContext(model);INTAKE.createIntakeDialog(ctx).open();assert.match(box.textContent,/vị trí 40–43/);
+  assert.equal(model.reviewSuggestion(sug.suggestion_id,'land_rows','[{"loai_dat":"ONT","dien_tich":25}]',{identity:[1],cell:'1:dien_tich'}),true);
+  assert.equal(sug.fields.dien_tich.normalized_value,1234.5);
+  assert.equal(model.acceptSuggestion(sug.suggestion_id).land_rows[0].dien_tich,25);
+  const many=suggestion();many.fields.land_rows.normalized_value=JSON.stringify(Array.from({length:21},()=>({loai_dat:'ONT',dien_tich:1})));
+  model.state.suggestions.push(many);assert.equal(model.acceptSuggestion(many.suggestion_id),null);assert.match(model.state.notice,/tối đa 20/);
+});
 
 test('binding save failure restores clean context, retains choices and allows retry; selection locks during save', async () => {
   let finish, commits = 0;

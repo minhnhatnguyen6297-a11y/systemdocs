@@ -31,7 +31,7 @@ async def extract(spec, ctx):
     source.warnings.extend("Một quy tắc trích xuất lỗi; cần kiểm tra lại dữ liệu" for _ in result["errors"])
     suggestions = []
 
-    def candidate(target, matches, group_state="matched"):
+    def candidate(target, matches, group_state="matched", allow_empty=False):
         fields, warnings = {}, [{"code": "intake.docx_coverage", "message": w} for w in source.warnings]
         candidate_id = str(uuid.uuid4())
         normalizers = _PERSON_FIELD_NORMALIZERS if target == "person" else _PROPERTY_FIELD_NORMALIZERS
@@ -56,11 +56,15 @@ async def extract(spec, ctx):
                              "docx_refs": source.refs(span)})
             raw = refs[0]["raw_snippet"]
             normalized, state, confidence = normalizers.get(key, norm_text)(raw)
+            if key == "dien_tich" and normalized is None:
+                for ref in refs:
+                    ref["core_state"] = "error"
+                warnings.append({"code": "intake.invalid_number", "message": "Diện tích cần là số hữu hạn từ 0 trở lên; hãy sửa giá trị"})
             if match["state"] in ("ambiguous", "error", "warning_nonstandard"):
                 normalized, state, confidence = None, "observed", None
                 warnings.append({"code": "intake." + match["state"], "message": f"{key}: cần chọn hoặc sửa giá trị"})
             fields[key] = field_value(raw, normalized, state, confidence, refs)
-        if not fields:
+        if not fields and not allow_empty:
             return
         if group_state == "ambiguous_group":
             warnings.append({"code": "intake.ambiguous_group", "message": "Chưa có nhãn phân chia tài sản; kiểm tra các trường thuộc cùng tài sản"})
@@ -76,9 +80,12 @@ async def extract(spec, ctx):
         for person in block.get("persons", []):
             candidate("person", person["fields"].values())
     for group in result.get("asset_groups", []):
-        if not any(match.get("span") and match["name"] in ("so_serial", "thua_dat", "so_vao_so") for match in group["fields"]):
+        has_identifier = any(match.get("span") and match["name"] in ("so_serial", "thua_dat", "so_vao_so") for match in group["fields"])
+        has_address = any(match.get("span") and match["name"] == "dia_chi_thua" for match in group["fields"])
+        has_land = any(match.get("span") for row in group.get("land_rows", []) for match in row)
+        if not has_identifier and not (group["state"] == "matched" and (has_address or has_land)):
             continue
-        suggestion = candidate("asset", group["fields"], group["state"])
+        suggestion = candidate("asset", group["fields"], group["state"], allow_empty=has_land)
         if suggestion and group.get("land_rows"):
             rows, refs = [], []
             for index, row_matches in enumerate(group["land_rows"], 1):
@@ -93,19 +100,23 @@ async def extract(spec, ctx):
                     for hit in hits:
                         span = hit["span"]
                         raw = source.text[span[0]:span[1]]
+                        core_state = match["state"]
                         if match["state"] == "matched":
                             row[match["name"]] = norm_number(raw)[0] if match["name"] == "dien_tich" else raw.strip()
+                            if match["name"] == "dien_tich" and row[match["name"]] is None:
+                                core_state = "error"
+                                suggestion["warnings"].append({"code": "intake.invalid_number", "message": f"Cụm đất {index}: diện tích cần là số hữu hạn từ 0 trở lên; hãy sửa"})
                         refs.append({"kind": "docx", "source_id": spec.source_id, "source_sha256": source.sha256,
                                      "text_map_version": 1, "candidate_id": suggestion["suggestion_id"],
                                      "candidate_state": group["state"], "profile_id": result["profile_id"],
                                      "profile_version": result["profile_version"],
                                      "occurrence_id": str(uuid.uuid4()), "span": span, "raw_snippet": raw,
-                                     "land_row": index, "land_field": match["name"], "core_state": match["state"],
+                                     "land_row": index, "land_field": match["name"], "core_state": core_state,
                                      "docx_refs": source.refs(span), "rule_id": match["rule_id"]})
                 if len(refs) == refs_before:
                     suggestion["warnings"].append({"code": "intake.fragment", "message": f"Cụm đất {index} thiếu dữ liệu; hãy bổ sung trước khi lưu hồ sơ"})
                 rows.append(row)
-            value = json.dumps(rows, ensure_ascii=False)
+            value = json.dumps(rows, ensure_ascii=False, allow_nan=False)
             if not refs:
                 suggestion["warnings"].append({"code": "intake.fragment", "message": "Cụm đất thiếu dữ liệu; hãy bổ sung trước khi lưu hồ sơ"})
                 continue

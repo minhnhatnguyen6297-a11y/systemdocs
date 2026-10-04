@@ -1,6 +1,6 @@
 {
   "profile_id": "transfer",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Profile chuan cho hop dong chuyen nhuong quyen su dung dat. Tat ca pattern viet o dang folded: chu thuong, khong dau, 'd' thay 'đ'. Engine match tren van ban da fold roi map span ve van ban goc.",
   "regex_timeout_ms": 1000,
   "title": {
@@ -270,7 +270,7 @@
       "zone": "asset",
       "group": 1,
       "expect": "one",
-      "pattern": "dien\\s*tich[^0-9\\n]{0,20}(\\d[\\d.,]*\\d|\\d)"
+      "pattern": "dien\\s*tich[^+\\-0-9\\n]{0,20}([+-]?\\d[\\d.,]*\\d|[+-]?\\d)"
     },
     {
       "rule_id": "asset.so_serial",
@@ -318,7 +318,7 @@
         {
           "name": "dien_tich",
           "rule_id": "land.dien_tich",
-          "pattern": "dien\\s*tich\\s*[:.]\\s*(\\d[\\d.,]*\\d|\\d)",
+          "pattern": "dien\\s*tich\\s*[:.]\\s*([+-]?\\d[\\d.,]*\\d|[+-]?\\d)",
           "group": 1
         },
         {

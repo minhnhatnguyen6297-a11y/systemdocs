@@ -375,16 +375,30 @@ function createWordDialog(ctx) {
         const sourceLabel = source.label || `Nguồn ${source.source_id.slice(0, 8)}`;
         sourceRow.append(btn('Gỡ nguồn Word: ' + sourceLabel, 'ghost sm', async () => {
           if (exporting || scanning || savingMeta) return;
+          const previousContext = JSON.parse(JSON.stringify(model.state.docxImport));
+          const previousDirty = model.state.stageDirty;
+          const previousCase = model.state.caseId;
           if (!model.detachOriginalSource(source.source_id)) return;
           savingMeta = true;
           refreshScanLock();
+          let committed = false;
           try {
             const saved = await model.commitStage();
             if (!saved.ok) { notify(saved.error.message || saved.error.code, true); return; }
+            committed = true;
+            if (model.state.caseId !== previousCase || saved.stale) return;
             if (originalSourceId === source.source_id) { originalSourceId = null; mappingDirty = false; checks = []; listBox.innerHTML = ''; }
             sourceRow.remove();
             notify('Đã gỡ nguồn Word; dữ liệu Stage vẫn được giữ');
-          } finally { savingMeta = false; refreshScanLock(); }
+          } catch (error) {
+            notify(error.message || 'Không lưu được việc gỡ nguồn Word', true);
+          } finally {
+            if (!committed && model.state.caseId === previousCase) {
+              model.state.docxImport = previousContext;
+              model.state.stageDirty = previousDirty;
+            }
+            savingMeta = false; refreshScanLock();
+          }
         }));
         sourceRow.append(btn('Dùng hợp đồng Word đã nhập: ' + sourceLabel, 'secondary', async () => {
           if (exporting || scanning || savingMeta) return;

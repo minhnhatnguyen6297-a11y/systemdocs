@@ -56,6 +56,83 @@ def extraction(content, store=None):
     return asyncio.run(extract(spec, ctx))
 
 
+@pytest.mark.parametrize('raw', ['-50', '-' + '9' * 400, '9' * 400])
+@pytest.mark.parametrize('land', [False, True])
+def test_invalid_source_area_keeps_complete_evidence_and_corrected_span(raw, land):
+    doc = Document()
+    for line in ['Bên A:', 'Ông: Nguyễn Văn Mẫu, CCCD: 001234567890', 'Tài sản 1:',
+                 'Serial: ZZ123456; có địa chỉ tại: Nhà A',
+                 ('Loại đất: ONT; ' if land else '') + f'Diện tích: {raw}; Thời hạn: Lâu dài',
+                 'Điều 2: giữ nguyên']:
+        doc.add_paragraph(line)
+    stream = io.BytesIO(); doc.save(stream); content = stream.getvalue()
+    suggestions = extraction(content)
+    asset = next(s for s in suggestions if s['target'] == 'asset')
+    field = asset['fields']['land_rows' if land else 'dien_tich']
+    if land:
+        assert json.loads(field['normalized_value'])[0]['dien_tich'] is None
+        ref = next(r for r in field['source_refs'] if r['land_field'] == 'dien_tich')
+    else:
+        assert field['normalized_value'] is None
+        ref = field['source_refs'][0]
+    assert ref['raw_snippet'] == raw and ref['core_state'] == 'error'
+    assert any(w['code'] == 'intake.invalid_number' for w in asset['warnings'])
+    json.dumps(suggestions, allow_nan=False)
+    source = read_docx(content)
+    corrected = replace_spans(content, source, [(ref['span'], '1234.5')])
+    assert 'Diện tích: 1234.5;' in read_docx(corrected).text
+    assert raw not in read_docx(corrected).text
+
+
+def test_identifier_missing_assets_retain_address_and_land_but_not_empty_noise():
+    doc = Document()
+    for line in ['Bên A:', 'Ông: Nguyễn Văn Mẫu, CCCD: 001234567890',
+                 'Tài sản 1:', 'có địa chỉ tại: Nhà A',
+                 'Tài sản 2:', 'Loại đất: ONT; Diện tích: 50; Thời hạn: Lâu dài',
+                 'Tài sản 3:', 'chỉ là nhãn trống', 'Điều 2: giữ nguyên']:
+        doc.add_paragraph(line)
+    stream = io.BytesIO(); doc.save(stream)
+    assets = [s for s in extraction(stream.getvalue()) if s['target'] == 'asset']
+    assert len(assets) == 2
+    assert assets[0]['fields']['dia_chi']['normalized_value'] == 'Nhà A'
+    assert json.loads(assets[1]['fields']['land_rows']['normalized_value'])[0]['dien_tich'] == 50
+    assert all(any(w['code'] == 'intake.fragment' for w in a['warnings']) for a in assets)
+    assert all('so_serial' not in a['fields'] for a in assets)
+    # An unlabelled address in prose does not create another asset.
+    doc = Document(); doc.add_paragraph('Bên A:'); doc.add_paragraph('Ông: Nguyễn Văn Mẫu, CCCD: 001234567890')
+    doc.add_paragraph('có địa chỉ tại: ghi chú rời không có nhãn tài sản')
+    stream = io.BytesIO(); doc.save(stream)
+    assert not any(s['target'] == 'asset' for s in extraction(stream.getvalue()))
+
+
+@pytest.mark.parametrize('limit', ['expanded', 'text'])
+def test_actual_docx_analyze_limits_keep_valid_batch_source_and_reject_storage(tmp_path, limit):
+    from services.document_intake.service import analyze
+    from zipfile import ZIP_DEFLATED
+    valid = fixture_bytes()
+    if limit == 'text':
+        doc = Document(); doc.add_paragraph('X' * 100001)
+        stream = io.BytesIO(); doc.save(stream); invalid = stream.getvalue()
+    else:
+        stream = io.BytesIO()
+        with ZipFile(io.BytesIO(valid)) as src, ZipFile(stream, 'w', compression=ZIP_DEFLATED) as dst:
+            for item in src.infolist(): dst.writestr(item, src.read(item.filename))
+            dst.writestr('word/oversize.bin', b'0' * (100 * 1024 * 1024))
+        invalid = stream.getvalue()
+    bad_id, good_id = str(uuid.uuid4()), str(uuid.uuid4())
+    sources = [{'source_id': sid, 'kind': 'docx', 'file_ref': {'path': f'C:/synthetic/{sid}.docx', 'scope': 'machine_local', 'is_dir': False,
+                'size_bytes': len(invalid if sid == bad_id else valid)}}
+               for sid in [bad_id, good_id]]
+    store = DocxStore(tmp_path / 'sources'); stored = []
+    def save(content, suggestions, label):
+        stored.append(content); return store.save(content, suggestions, label)
+    outcome = analyze(sources, read_file=lambda s: invalid if s.source_id == bad_id else valid, store_docx=save)
+    assert outcome.status == 'partial' and outcome.failed == [bad_id] and outcome.succeeded == [good_id]
+    assert len(outcome.suggestions) == 4 and len(outcome.errors) == 1
+    assert outcome.errors[0]['source_id'] == bad_id and outcome.errors[0]['code'] == 'intake.parse_failed'
+    assert stored == [valid] and len(list(store.root.iterdir())) == 1
+
+
 def test_asset_heading_before_parties_never_becomes_an_asset_group():
     content = fixture_bytes()
     doc = Document(io.BytesIO(content))
@@ -233,6 +310,8 @@ def reviewed_case(db, tmp_path, content=None):
     source_ref = next(iter(suggestions[0]['fields'].values()))['source_refs'][0]
     for suggestion in suggestions:
         values = {key: field['normalized_value'] for key, field in suggestion['fields'].items()}
+        # Stage stores areas in land rows; scalar source evidence maps to the saved total.
+        values.pop('dien_tich', None)
         if 'land_rows' in values:
             values['land_rows'] = json.loads(values['land_rows'])
         row = _person_row(**values) if suggestion['target'] == 'person' else _asset_row(**values)
@@ -243,6 +322,34 @@ def reviewed_case(db, tmp_path, content=None):
     data = service.create(str(uuid.uuid4()), {'case_type': 'inheritance', 'document_type': 'khai_nhan'},
         {'owner_row_id': people[0]['row_id'], 'people': people, 'assets': assets}, None, context)
     return content, store, service, data
+
+
+@pytest.mark.parametrize('land', [False, True])
+def test_corrected_negative_area_exports_saved_value_over_whole_signed_occurrence(db, tmp_path, land):
+    doc = Document(io.BytesIO(fixture_bytes()))
+    for p in list(doc.paragraphs):
+        if p.text.startswith('Loại đất: ONT; Diện tích: 50'):
+            p.text = 'Loại đất: ONT; Diện tích: -50; Thời hạn: Lâu dài' if land else 'Diện tích: -50'
+        elif not land and p.text.startswith('Loại đất: CLN;'):
+            p._p.getparent().remove(p._p)
+    stream = io.BytesIO(); doc.save(stream)
+    original, store, service, data = reviewed_case(db, tmp_path, stream.getvalue())
+    cid = data['case']['id']; source_id = data['docx_import']['sources'][0]['source_id']
+    data['stage']['assets'][0]['land_rows'] = [{'loai_dat':'ONT','dien_tich':1234.5,'thoi_han':'Lâu dài'}]
+    if land:
+        data['docx_import']['sources'][0]['records'][2]['land_rows'] = [1]
+    saved = service.commit_stage(cid, data['case']['revision'], data['stage'], docx_import=data['docx_import'])
+    proposals = binding_proposals(db.get(InheritanceCase,cid), source_id, store)
+    selected = next(p for p in proposals if p['raw_snippet'] == '-50')
+    assert selected['supported']
+    context = saved['docx_import']; context['sources'][0]['bindings'] = [
+        {k:selected[k] for k in ('candidate_id','occurrence_id','field_key','slot')}]
+    service.commit_stage(cid,saved['revision'],saved['stage'],docx_import=context)
+    exported = export_original(db.get(InheritanceCase,cid),source_id,store,tmp_path)
+    path = Path(exported['documents'][0]['output_file']['path'])
+    text = read_docx(path.read_bytes()).text
+    assert '-50' not in text and 'Diện tích: 1234.5' in text
+    assert store.load(source_id)[0] == original
 
 
 def test_end_to_end_review_commit_reload_original_preservation_and_edit(db, tmp_path):

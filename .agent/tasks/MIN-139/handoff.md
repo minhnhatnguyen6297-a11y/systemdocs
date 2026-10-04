@@ -3,6 +3,12 @@
 Luồng Word-first đã triển khai cục bộ, chờ root review và commit đúng phạm vi.
 Spec hiện hành: [Nhập DOCX](../../../docs/spec/notary_v2/input/docx-import.md).
 Các phép thử và giới hạn được ghi trong [progress](progress.md).
+Iteration 4 sửa số âm/không hữu hạn ngay trong bằng chứng nguồn; giữ bản ghi
+tài sản thiếu mã nhưng có nhãn/địa chỉ/đất; gỡ nguồn lỗi khôi phục để thử lại;
+JSON tải xuống giữ kết quả chuẩn ban đầu. 35 DOCX Python, 20 Node DOCX đạt;
+bộ regression 386 backend pass/2 COM skip, 115 sidecar/Intake/lõi regex,
+229 Node và 78 ví dụ contract đạt. Root Electron HS-7 đạt 4 bản ghi/25 binding,
+lưu/mở lại/xuất và kiểm nguồn/ZIP/DB không đổi; native picker vẫn giả lập.
 Iteration 3 đã sửa 8 nhóm xác minh: retry/khóa chọn vị trí, ranh giới tài sản,
 diện tích sai, giữ review cũ, công bố nguồn/mẫu bằng file tạm và hủy xuất,
 đất thiếu bằng chứng, lỗi thư mục đích, response xuất cũ. 24 DOCX, 353 backend

@@ -12,7 +12,8 @@ Word-first; hướng nhiều nguồn/tab thứ ba cũ không thuộc đợt này
 Một hợp đồng `.docx` có chữ → các gợi ý Người/Tài sản → chuyên viên xem chữ
 gốc, chọn/sửa giá trị → Đưa vào Stage → Cập nhật/Lưu hồ sơ → Xuất Word →
 Dùng hợp đồng Word đã nhập → chọn từng vị trí → Xác nhận và lưu → xuất vào
-thư mục đích. Nút Tải JSON chỉ tải kết quả về máy; không gửi ra ngoài.
+thư mục đích. Nút Tải JSON giữ bản kết quả phân tích ban đầu, trước mọi sửa đổi;
+chỉ tải về máy. Các sửa đổi được lưu vào Stage, không ghi vào JSON ban đầu.
 
 Giữ dialog Nhập file hiện có và đúng hai tab Upload Lab. `.doc`, ảnh/OCR,
 Excel không dùng bản đồ vị trí DOCX trong đợt này. Mỗi trường giữ chữ gốc;
@@ -33,7 +34,7 @@ Mỗi vị trí là `[start,end)` theo ký tự Unicode, không theo byte. Chữ
 dòng/ngắt/tab cũng có vị trí nhưng không được thay như chữ bình thường.
 
 Lõi regex chung `tools/regex_workbench/engine` sở hữu quy tắc có phiên bản;
-không sao chép regex sang adapter. Profile `transfer` 1.1.1 chia người trong
+không sao chép regex sang adapter. Profile `transfer` 1.1.2 chia người trong
 vùng đương sự và tài sản có nhãn `Tài sản [thứ] N:`. Dòng `Loại đất:` mở một
 cụm đất riêng. Một GCN có nhiều cụm vẫn là một tài sản. Đây là phạm vi mẫu đã
 kiểm tra, chưa phải lời hứa nhận đúng mọi loại hợp đồng.
@@ -48,6 +49,10 @@ cảnh báo, không gộp. Không suy giới tính, vai trò, quan hệ hoặc s
 hợp đồng. Lời chứng ngoài vùng đương sự giữ nguyên, không tự thành người mới.
 Thiếu trường vẫn cho kiểm tra và bổ sung ở Stage; quy tắc commit MIN-141 giữ
 nguyên. Đủ 3 tài sản thì gợi ý tiếp theo vẫn còn, kèm lời báo hết chỗ.
+Tài sản có bằng chứng địa chỉ hoặc cụm đất vẫn được giữ khi thiếu mọi mã
+định danh; nhãn trống không tạo tài sản rỗng. Diện tích âm/không hữu hạn trong
+nguồn giữ nguyên chữ và dấu trong bằng chứng, giá trị chuẩn là null và phải sửa
+trước khi nhận. Bằng chứng mỗi ô đất hiển thị vị trí ký tự trong nguồn.
 
 ## Nguồn, dữ liệu và đối chiếu
 
@@ -89,6 +94,8 @@ dòng/ô và giá trị của bản Stage/sơ đồ được ghi trong cùng l�
 Mỗi hồ sơ giữ tối đa 8 nguồn Word; nguồn thứ 9 bị chặn trước khi thêm dòng
 Stage và gợi ý vẫn còn. Nút **Gỡ nguồn Word** bỏ đối chiếu nguồn, giữ dữ liệu
 Stage. Thao tác này không đọc file gốc nên dùng được khi nguồn đã hỏng.
+Nếu lưu việc gỡ nguồn thất bại thì khôi phục đối chiếu và trạng thái bản nháp
+trước thao tác, giữ nguồn hiện trên màn để thử lại. Không khôi phục sang hồ sơ khác.
 
 Binding được xác nhận tạo bản mẫu riêng tại
 `docx_sources/<source_id>/templates/<template_sha256>.docx`; context giữ hash
