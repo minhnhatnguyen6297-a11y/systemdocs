@@ -18,6 +18,10 @@ chỉ tải về máy. Các sửa đổi được lưu vào Stage, không ghi v�
 Giữ dialog Nhập file hiện có và đúng hai tab Upload Lab. `.doc`, ảnh/OCR,
 Excel không dùng bản đồ vị trí DOCX trong đợt này. Mỗi trường giữ chữ gốc;
 sửa là giá trị người dùng kiểm tra, không sửa bằng chứng ban đầu.
+Hỗ trợ DOCX Word thông thường dùng namespace
+`http://schemas.openxmlformats.org/wordprocessingml/2006/main`.
+DOCX Strict dùng namespace khác chưa được hỗ trợ; cần lưu lại bằng Word theo
+định dạng DOCX thông thường trước khi nhập, không coi file Strict là đã đọc đủ.
 Cụm đất được sửa theo từng dòng loại đất/diện tích/thời hạn, không buộc người
 dùng nhập mã JSON. Cả một dòng lẫn nhiều dòng đều giữ được.
 Mỗi ô mơ hồ phải được chọn hoặc sửa riêng. Chọn ngày từ chữ gốc đổi về dạng
@@ -71,6 +75,15 @@ không khớp thì phải nhập và kiểm tra lại; không tin bản đồ v�
 Nguồn và mẫu chưa dùng vẫn được giữ cục bộ, kể cả khi hủy lần lưu hồ sơ.
 Chưa có thời hạn giữ hoặc cách tự dọn được duyệt. Sao lưu/dọn thủ công phải
 giữ mọi nguồn và mẫu còn được hồ sơ tham chiếu; **Gỡ nguồn** không xóa file.
+
+Sao lưu chung: đóng ứng dụng và chờ sidecar dừng; xác định đúng thư mục
+engine-data `notary_v2` mà phiên này đang dùng. Sao chép `notary.db` thực tế
+cùng toàn bộ `docx_sources/` (gồm bằng chứng và mẫu) vào cùng một bản sao lưu,
+không lấy DB trong source checkout thay cho DB engine-data. Khôi phục cả hai
+từ cùng bản sao khi ứng dụng vẫn đóng. Thử trước trong môi trường bản sao:
+mở hồ sơ đã nhập, kiểm hash nguồn/bằng chứng/mẫu và thử xuất theo bản gốc để
+phát hiện thiếu hoặc lệch dữ liệu. Đây là cách thao tác đề nghị; chưa kiểm
+phục hồi thực tế và chưa thay đổi giới hạn sao lưu/phục hồi đã ghi bên dưới.
 
 `case_state_json.docx_import` version 1 chỉ giữ ID/hash nguồn,
 `candidate_id→row_id`, danh tính từng dòng đất và vị trí đã duyệt. Nguồn có tên

@@ -268,6 +268,7 @@ function createWordDialog(ctx) {
                 : 'Đang xuất…';
             },
           });
+        if (rr.stale) return;
         jobId = null;
         exporting = false;
         refreshScanLock();

@@ -68,6 +68,42 @@ function dialogContext(model) {
 }
 const button = (box, label) => collect(box, (e) => e.tagName === 'BUTTON' && e.textContent.includes(label))[0];
 
+test('retained review cards identify each source label in header and scalar or land evidence', () => {
+  const model=M.createModel({client:{run:async()=>({ok:true})}});model.newDraft();
+  const person=suggestion('person'),asset=suggestion();
+  person.fields.ho_ten.source_refs[0].source_label='Người từ A.docx';
+  asset.fields.so_serial.source_refs[0].source_label='Đất từ B.docx';
+  asset.fields.land_rows.source_refs=[{source_label:'Đất từ B.docx',land_row:1,land_field:'dien_tich',raw_snippet:'10',span:[12,14]}];
+  model.state.suggestions.push(person,asset);
+  const {ctx,box}=dialogContext(model);INTAKE.createIntakeDialog(ctx).open();
+  const cards=collect(box,e=>e.className==='cd-suggest-card');
+  assert.match(cards[0].textContent,/Nguồn: Người từ A.docx/);
+  assert.match(cards[1].textContent,/Nguồn: Đất từ B.docx/);
+  assert.match(collect(cards[0],e=>e.tagName==='DETAILS')[0].textContent,/Người từ A.docx · ZZ123456/);
+  assert.ok(collect(cards[1],e=>e.tagName==='DETAILS').some(e=>/Đất từ B.docx · Dòng 1/.test(e.textContent)));
+});
+
+test('stale export response leaves old dialog untouched even when new case has wordResult', async () => {
+  let finish;
+  const model={state:{caseId:1,committedCaseInfo:{},caseInfo:{},wordOptions:[],docxImport:{sources:[{source_id:uuid()}]}},
+    canWrite:()=>true,hasUnsaved:()=>false,
+    loadWordOptions:async()=>{model.state.wordOptions=[{document_key:'original.docx',ready:true}];return {ok:true};},
+    exportWord:()=>new Promise(resolve=>{finish=resolve;})};
+  const {ctx,box}=dialogContext(model);
+  ctx.pickFiles=async()=>({ok:true,data:{files:[{file_token:uuid(),is_dir:true,name:'Đích'}]}});
+  WORD.createWordDialog(ctx).open();
+  await button(box,'Dùng hợp đồng Word đã nhập').onclick();
+  await button(box,'Chọn thư mục đích').onclick();
+  button(box,'Chọn tất cả').onclick();
+  const pending=button(box,'Xuất').onclick();
+  const before=box.textContent;
+  model.state.caseId=2;model.state.wordResult={documents:[{status:'saved',document_key:'new-case-result.docx'}]};
+  finish({ok:true,stale:true});await pending;
+  assert.equal(box.textContent,before);
+  assert.doesNotMatch(box.textContent,/new-case-result.docx/);
+  assert.equal(button(box,'Chọn thư mục đích').disabled,true);
+});
+
 test('failed and throwing detach restores source and dirty state for retry without restoring another case', async () => {
   for (const failure of ['result', 'exception', 'switch']) {
     let calls = 0;

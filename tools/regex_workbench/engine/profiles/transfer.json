@@ -186,7 +186,7 @@
         "rule_id": "person.ngay_sinh",
         "name": "ngay_sinh",
         "group": 1,
-        "pattern": "sinh\\s*(?:ngay|nam)?\\s*[:.]?\\s*(\\d{4}-\\d{2}-\\d{2}|\\d{1,2}[/.\\-]\\d{1,2}[/.\\-]\\d{4}|\\d{4})"
+        "pattern": "sinh\\s*(?:ngay|nam)?\\s*[:.]?\\s*(\\d{4}-\\d{1,2}-\\d{1,2}|\\d{1,2}[/.\\-]\\d{1,2}[/.\\-]\\d{4}|\\d{4})"
       },
       {
         "rule_id": "person.cccd",
@@ -204,7 +204,7 @@
         "rule_id": "person.ngay_cap",
         "name": "ngay_cap",
         "group": 1,
-        "pattern": "cap\\s*ngay\\s*[:.]?\\s*(\\d{4}-\\d{2}-\\d{2}|\\d{1,2}[/.\\-]\\d{1,2}[/.\\-]\\d{4})"
+        "pattern": "cap\\s*ngay\\s*[:.]?\\s*(\\d{4}-\\d{1,2}-\\d{1,2}|\\d{1,2}[/.\\-]\\d{1,2}[/.\\-]\\d{4})"
       },
       {
         "rule_id": "person.dia_chi",
@@ -270,7 +270,7 @@
       "zone": "asset",
       "group": 1,
       "expect": "one",
-      "pattern": "dien\\s*tich[^+\\-0-9\\n]{0,20}([+-]?\\d[\\d.,]*\\d|[+-]?\\d)"
+      "pattern": "dien\\s*tich[^+−\\-0-9\\n]{0,20}([+−-]?\\d(?:[\\d.,]*\\d)?(?:e[+−-]?\\d+)?)"
     },
     {
       "rule_id": "asset.so_serial",
@@ -301,7 +301,7 @@
       "zone": "asset",
       "group": 1,
       "expect": "one",
-      "pattern": "(?:cap\\s*ngay|cap\\s*vao\\s*ngay)\\s*[:.]?\\s*(\\d{4}-\\d{2}-\\d{2}|\\d{1,2}[/.\\-]\\d{1,2}[/.\\-]\\d{4})"
+      "pattern": "(?:cap\\s*ngay|cap\\s*vao\\s*ngay)\\s*[:.]?\\s*(\\d{4}-\\d{1,2}-\\d{1,2}|\\d{1,2}[/.\\-]\\d{1,2}[/.\\-]\\d{4})"
     }
   ],
   "asset_groups": {
@@ -318,7 +318,7 @@
         {
           "name": "dien_tich",
           "rule_id": "land.dien_tich",
-          "pattern": "dien\\s*tich\\s*[:.]\\s*([+-]?\\d[\\d.,]*\\d|[+-]?\\d)",
+          "pattern": "dien\\s*tich\\s*[:.]\\s*([+−-]?\\d(?:[\\d.,]*\\d)?(?:e[+−-]?\\d+)?)",
           "group": 1
         },
         {

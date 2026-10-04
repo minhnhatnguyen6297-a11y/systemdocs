@@ -141,6 +141,9 @@ function createIntakeDialog(ctx) {
       }
       head.append(h('span', 'cd-suggest-text', bits.join(' · ')));
       card.append(head);
+      const sourceLabels = [...new Set(Object.values(sug.fields || {}).flatMap(f =>
+        (f.source_refs || []).map(ref => ref.source_label).filter(Boolean)))];
+      if (sourceLabels.length) card.append(h('div', 'muted', 'Nguồn: ' + sourceLabels.join(' · ')));
       for (const [key, field] of Object.entries(sug.fields || {})) {
         if (key === 'land_rows') {
           const rowsBox = h('div', 'cd-slot');
@@ -182,7 +185,7 @@ function createIntakeDialog(ctx) {
           renderRows(); card.append(rowsBox, landError);
           const evidence = h('details'); evidence.append(h('summary', '', 'Xem chữ gốc của từng cụm đất'));
           for (const ref of field.source_refs || []) {
-            evidence.append(h('div', 'muted', `Dòng ${ref.land_row || '?'} · ${ref.land_field || ''} · vị trí ${(ref.span || []).join('–')}: ${ref.raw_snippet || ''}`));
+            evidence.append(h('div', 'muted', `${ref.source_label ? ref.source_label + ' · ' : ''}Dòng ${ref.land_row || '?'} · ${ref.land_field || ''} · vị trí ${(ref.span || []).join('–')}: ${ref.raw_snippet || ''}`));
             if (ref.core_state === 'ambiguous') evidence.append(btn('Chọn giá trị này', 'ghost sm', () => {
               const row = rows[identity.indexOf(ref.land_row)];
               if (!row) return;
@@ -215,7 +218,7 @@ function createIntakeDialog(ctx) {
         const evidence = h('details');
         evidence.append(h('summary', '', 'Xem chữ gốc và vị trí'));
         for (const ref of field.source_refs || []) {
-          evidence.append(h('div', 'muted', `${ref.raw_snippet || field.raw_value || ''} · ` +
+          evidence.append(h('div', 'muted', `${ref.source_label ? ref.source_label + ' · ' : ''}${ref.raw_snippet || field.raw_value || ''} · ` +
             (ref.span ? `chữ ${ref.span[0]}–${ref.span[1]} · ${ref.rule_id || ''}` : 'nguồn nhập')));
           if (ref.kind === 'docx' && key !== 'land_rows') {
             evidence.append(btn('Chọn giá trị này', 'ghost sm', () => {

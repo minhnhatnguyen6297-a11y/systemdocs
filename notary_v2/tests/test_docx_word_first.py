@@ -56,7 +56,7 @@ def extraction(content, store=None):
     return asyncio.run(extract(spec, ctx))
 
 
-@pytest.mark.parametrize('raw', ['31/02/1980', '1980-02-31'])
+@pytest.mark.parametrize('raw', ['31/02/1980', '1980-02-31', '1980-2-31'])
 def test_invalid_source_date_requires_correction_and_commits_exact_original_evidence(db, tmp_path, raw):
     doc = Document(io.BytesIO(fixture_bytes()))
     for p in doc.paragraphs:
@@ -83,7 +83,7 @@ def test_invalid_source_date_requires_correction_and_commits_exact_original_evid
     assert store.load(ref['source_id'])[0] == content
 
 
-@pytest.mark.parametrize('raw,expected', [('1980-02-29', '1980-02-29'), ('1980', '1980')])
+@pytest.mark.parametrize('raw,expected', [('1980-02-29', '1980-02-29'), ('1980-2-9', '1980-02-09'), ('1980', '1980')])
 def test_valid_iso_and_year_only_source_dates_remain_accepted(raw, expected):
     doc = Document(io.BytesIO(fixture_bytes()))
     for p in doc.paragraphs:
@@ -102,7 +102,7 @@ def test_all_recognized_complete_dates_validate_calendar(raw):
     assert norm_date(raw)[0] is None
 
 
-@pytest.mark.parametrize('raw', ['-50', '-' + '9' * 400, '9' * 400])
+@pytest.mark.parametrize('raw', ['-50', '−50', '1e3', '1E-3', '−1.234,5e+3', '-' + '9' * 400, '9' * 400])
 @pytest.mark.parametrize('land', [False, True])
 def test_invalid_source_area_keeps_complete_evidence_and_corrected_span(raw, land):
     doc = Document()
@@ -128,6 +128,27 @@ def test_invalid_source_area_keeps_complete_evidence_and_corrected_span(raw, lan
     corrected = replace_spans(content, source, [(ref['span'], '1234.5')])
     assert 'Diện tích: 1234.5;' in read_docx(corrected).text
     assert raw not in read_docx(corrected).text
+
+
+@pytest.mark.parametrize('raw,expected', [('1.234,5', 1234.5), ('+50', 50), ('5', 5)])
+@pytest.mark.parametrize('land', [False, True])
+def test_supported_source_area_keeps_whole_raw_span(raw, expected, land):
+    doc = Document()
+    for line in ['Bên A:', 'Ông: Nguyễn Văn Mẫu, CCCD: 001234567890', 'Tài sản 1:',
+                 'Serial: ZZ123456; có địa chỉ tại: Nhà A',
+                 ('Loại đất: ONT; ' if land else '') + f'Diện tích: {raw}; Thời hạn: Lâu dài',
+                 'Điều 2: giữ nguyên']:
+        doc.add_paragraph(line)
+    stream = io.BytesIO(); doc.save(stream); content = stream.getvalue()
+    asset = next(s for s in extraction(content) if s['target'] == 'asset')
+    field = asset['fields']['land_rows' if land else 'dien_tich']
+    value = json.loads(field['normalized_value'])[0]['dien_tich'] if land else field['normalized_value']
+    assert value == expected
+    ref = next(r for r in field['source_refs'] if not land or r.get('land_field') == 'dien_tich')
+    assert ref['raw_snippet'] == raw and ref['core_state'] == 'matched'
+    assert read_docx(content).text[slice(*ref['span'])] == raw
+    changed = replace_spans(content,read_docx(content),[(ref['span'],'25')])
+    assert 'Diện tích: 25; Thời hạn: Lâu dài' in read_docx(changed).text
 
 
 def test_identifier_missing_assets_retain_address_and_land_but_not_empty_noise():
