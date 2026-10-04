@@ -1,11 +1,23 @@
 # Handoff — MIN-139, 2026-10-04
 
+## Root kết thúc kiểm chứng — 04/10/2026
+
+Code cuối17b5672; root chạy413backend pass/2file-symlink skip,115adapter/Intake/
+lõi regex,235Node,78contract examples zero unexpected. 60DOCX nằm trong bộ
+backend đã chạy. Hai skip là nhánh tạo file symlink thiếu quyền Windows
+(test_word_batch_export.py1096/1128), không phải Word COM; các ghi chú trước
+đã sửa tên lý do, giữ nguyên số lượng lịch sử. Root Electron HS-9 ok:true:
+4bản ghi/25vị trí, lưu/mở lại/xuất; nguồn/các part ZIP/DB nguyên vẹn. Native
+picker là bộ giả lập; corpus, trang Word, bản cài sạch và phục hồi chung chưa
+kiểm. Review6 không còn intent_gap/bad_plan; patch nhỏ đã sửa và kiểm lại.
+
+
 Luồng Word-first đã triển khai cục bộ, chờ root review và commit đúng phạm vi.
 Iteration 5: ngày nguồn sai lịch phải sửa trước khi nhận, gồm ISO đầy đủ;
 ngày/năm hợp lệ vẫn giữ nguyên. Lưu vị trí thành công rồi tải lại lỗi giữ
 đối chiếu/revision, báo rõ và cho thử tải nguồn lại; bỏ danh sách cũ ngay.
 Diện tích nhập `1.234,5` giữ đúng số; bỏ hết đất vẫn lưu/xuất trường còn đúng.
-44 DOCX Python; bộ backend 397 pass/2 COM skip; 115 adapter/Intake/lõi regex;
+44 DOCX Python; bộ backend 397 pass/2 file-symlink skip; 115 adapter/Intake/lõi regex;
 233 Node (24 DOCX); 78 ví dụ contract không có kết quả ngoài dự kiến.
 Guard giới hạn chữ được thử bỏ tạm, bài kiểm thất bại đúng; mã đã khôi phục nguyên byte.
 Root Electron HS-8 đạt 4 bản ghi/25 binding, lưu/mở lại/xuất; nguồn/ZIP/DB không đổi.
@@ -15,13 +27,13 @@ Các phép thử và giới hạn được ghi trong [progress](progress.md).
 Iteration 4 sửa số âm/không hữu hạn ngay trong bằng chứng nguồn; giữ bản ghi
 tài sản thiếu mã nhưng có nhãn/địa chỉ/đất; gỡ nguồn lỗi khôi phục để thử lại;
 JSON tải xuống giữ kết quả chuẩn ban đầu. 35 DOCX Python, 20 Node DOCX đạt;
-bộ regression 386 backend pass/2 COM skip, 115 sidecar/Intake/lõi regex,
+bộ regression 386 backend pass/2 file-symlink skip, 115 sidecar/Intake/lõi regex,
 229 Node và 78 ví dụ contract đạt. Root Electron HS-7 đạt 4 bản ghi/25 binding,
 lưu/mở lại/xuất và kiểm nguồn/ZIP/DB không đổi; native picker vẫn giả lập.
 Iteration 3 đã sửa 8 nhóm xác minh: retry/khóa chọn vị trí, ranh giới tài sản,
 diện tích sai, giữ review cũ, công bố nguồn/mẫu bằng file tạm và hủy xuất,
 đất thiếu bằng chứng, lỗi thư mục đích, response xuất cũ. 24 DOCX, 353 backend
-regression (2 ca COM skip), 109 sidecar/lõi regex, 6 sidecar Intake, 226 Node
+regression (2 ca file-symlink skip), 109 sidecar/lõi regex, 6 sidecar Intake, 226 Node
 và 78 ví dụ contract đều qua. Root chạy lại Electron iteration 3 `ok: true`
 với 4 bản ghi/25 vị trí; picker dùng bộ giả lập. Chưa kiểm native picker,
 trang Word/corpus văn phòng/bản cài sạch hay phục hồi chung database+nguồn.

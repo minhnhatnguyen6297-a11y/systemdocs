@@ -1,5 +1,17 @@
 # Progress — MIN-139
 
+## Root kết thúc kiểm chứng — 04/10/2026
+
+Code cuối17b5672; root chạy413backend pass/2file-symlink skip,115adapter/Intake/
+lõi regex,235Node,78contract examples zero unexpected. 60DOCX nằm trong bộ
+backend đã chạy. Hai skip là nhánh tạo file symlink thiếu quyền Windows
+(test_word_batch_export.py1096/1128), không phải Word COM; các ghi chú trước
+đã sửa tên lý do, giữ nguyên số lượng lịch sử. Root Electron HS-9 ok:true:
+4bản ghi/25vị trí, lưu/mở lại/xuất; nguồn/các part ZIP/DB nguyên vẹn. Native
+picker là bộ giả lập; corpus, trang Word, bản cài sạch và phục hồi chung chưa
+kiểm. Review6 không còn intent_gap/bad_plan; patch nhỏ đã sửa và kiểm lại.
+
+
 ## Trạng thái: triển khai cục bộ, chờ root review — 2026-10-04
 
 Owner đã duyệt Word-first theo các comment NAIA-4 ghi trong brief/decisions.
@@ -31,7 +43,7 @@ Lịch sử ngày 29/09 phía dưới là đề xuất cũ, không còn trạng 
   bản gốc giữ nguyên. Lỗi tạo thư mục con trả lỗi Word hiện hành.
 - Response xuất cũ trả `stale`, không xóa busy/kết quả của lần xuất hồ sơ mới.
 - 24/24 Python DOCX (19 ca cũ + 5 ca mới); 353 backend regression qua,
-  2 ca Word COM bị skip theo điều kiện môi trường; 109 sidecar adapter/lõi
+  2 ca file-symlink bị skip do quyền Windows; 109 sidecar adapter/lõi
   regex + 6 sidecar Intake qua; 226/226 Node; 78 ví dụ contract, 0 kết quả
   ngoài dự kiến. Dùng schema-venv đã có, không cài dependency. Cảnh báo
   datetime adapter Python vẫn là cảnh báo cũ.
@@ -112,7 +124,7 @@ dấu/số diện tích, chặn giá trị không hữu hạn, giữ tài sản 
 Thông báo quá 20 cụm đất nói rõ giới hạn; bằng chứng ô đất hiện vị trí ký tự.
 Profile chung `transfer` tăng 1.1.2; không tạo parser hay dữ liệu hành chính mới.
 
-Kiểm đã chạy: 35 DOCX Python; bộ backend 386 pass/2 COM skip; 115 sidecar,
+Kiểm đã chạy: 35 DOCX Python; bộ backend 386 pass/2 file-symlink skip; 115 sidecar,
 Intake và lõi regex; 229 Node; 78 ví dụ contract, không kết quả ngoài dự kiến.
 Hai ca xuất diện tích sửa dùng Stage và binding đã lưu rồi xuất file thật,
 chứng minh không để lại dấu âm. Hai ca limit gọi analyze DOCX với nguồn quá
@@ -178,6 +190,6 @@ hạn làm đối chứng. Tạm bỏ đúng guard giới hạn làm bài kiểm
 Root Electron HS-8: `ok:true`, 4 bản ghi/25 vị trí, lưu/mở lại/xuất mẫu gốc;
 byte nguồn, ZIP ngoài vị trí thay và DB làm việc không đổi. Native picker dùng
 bộ giả lập; corpus văn phòng/trang Word/bản cài sạch/phục hồi chung vẫn chưa kiểm.
-Kiểm cuối: 44 DOCX Python; backend 397 pass/2 COM skip; adapter/Intake/lõi regex
+Kiểm cuối: 44 DOCX Python; backend 397 pass/2 file-symlink skip; adapter/Intake/lõi regex
 115 pass; Node 233 pass (24 DOCX); 78 ví dụ contract đúng kết quả dự kiến.
 Link local 7 lượt đối chiếu không thiếu; kiểm khoảng trắng diff đạt.

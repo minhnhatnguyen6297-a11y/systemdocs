@@ -72,8 +72,14 @@ Preserve the full phrase and evidence; only conservative parsed names become edg
   and explicit local loader consume the existing administrative timeline ledger.
   Reuse notary_v2/administrative_timeline.py and its schema; do not create another
   data SOT or refresh script. Shared service is callable by Intake and Workspace.
-  Load/validate once per dataset version and build rebuildable search/event indexes,
+  Load/validate once per ledger version and build rebuildable search/event indexes,
   not a full ledger scan per keystroke. Exact file names follow existing style.
+  Cache identity includes dataset_version and revision/content signature: manual
+  history updates can increase revision without changing Bando dataset_version.
+  Detect changed ledger and validate before replacing cache; return actual loaded
+  version/revision. Failed reload reports failure/old version explicitly, never
+  presents an old result as from the new ledger. Test a manual-history update
+  with the same dataset_version.
 - Existing ledger refresh owns version/hash/URL/retrieval time and preserves raw
   observations/history. Runtime search can offer conservative predecessor names
   backed by row evidence, but parsing prose must not promote identity, parent or
@@ -87,6 +93,14 @@ Preserve the full phrase and evidence; only conservative parsed names become edg
 - IPC registry, real/mock adapter, command/result schema and validator examples:
   documented source_date/target_date, address or explicit province/commune, statuses
   match/ambiguous/not_found/invalid_input plus candidates/provenance/coverage.
+- Package asset staging must include the existing `administrative_timeline.py`,
+  its exact ledger/snapshots and `contracts/administrative-timeline` schema at
+  the relative paths the loader validates. Current notary allowlist only stages
+  database.py/models.py and services/routers/templates, so importing the helper
+  from dev source is insufficient. Add narrow allowlist entries for public
+  administrative reference data only; keep office databases/configuration,
+  curator temp locks and revision archives out of the installed package. Verify
+  lookup from an isolated staged tree without falling back to this checkout.
 - case-drafting-model/view: reusable debounced suggestion helper for person and land
   address; source date from that row only, case date target; keep direct edits.
 - word-export-dialog: posting suggestion from chosen land address and case date,
@@ -116,6 +130,14 @@ Preserve the full phrase and evidence; only conservative parsed names become edg
   DOCX regressions. Link/diff checks; local scope commit, no external status writes.
 
 ## Implementation Notes
+
+Existing checks use
+`C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/multica-intake/schema-venv/Scripts/python.exe`
+(jsonschema available), notary regression cwd `notary_v2`, and
+`NODE_PATH=D:/systemdocs/shell/node_modules`. No dependency install needed.
+Scratch basetemp must be a fresh path under `.agent/scratch/`; do not reuse
+another test process's temporary directory. Root Electron harness uses the
+existing D:/systemdocs notary Python for Playwright and isolated copied engine.
 
 Use the actual editable field `caseInfo.ngay_lap_ho_so` as the posting/address
 target date; never substitute created_at, today or document issue date. A year
