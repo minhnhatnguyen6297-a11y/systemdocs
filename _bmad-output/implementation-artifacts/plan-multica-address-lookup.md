@@ -80,6 +80,10 @@ Preserve the full phrase and evidence; only conservative parsed names become edg
   date into confirmed history. Keep partial/split uncertainty. Never hardcode all
   current units effective2025 when Bando includes2026 updates. Only confirmed
   sourced dates permit historical answers; Owner supplies older events later.
+  Predecessor strings parsed from observations are rebuildable search indexes
+  pointing back to observation/source row IDs, not new historical unit identities
+  or confirmed transitions. Runtime never mutates ledger names/parents/events.
+  Keep this distinction explicit in the consumer spec and returned coverage.
 - IPC registry, real/mock adapter, command/result schema and validator examples:
   documented source_date/target_date, address or explicit province/commune, statuses
   match/ambiguous/not_found/invalid_input plus candidates/provenance/coverage.
@@ -113,6 +117,18 @@ Preserve the full phrase and evidence; only conservative parsed names become edg
 
 ## Implementation Notes
 
+Use the actual editable field `caseInfo.ngay_lap_ho_so` as the posting/address
+target date; never substitute created_at, today or document issue date. A year
+alone is insufficient for a dated lookup. Death-certificate issuer describes
+the office named on that certificate at its issue date: its target date is the
+person's `ngay_cap`, independently of the case date. An undated current-source
+candidate cannot be presented as proof of that historical issuer. Keep the
+explicit entered issuer and show missing historical coverage when necessary.
+Person/land source date is that row's document date. Pending Bando rows may
+support labeled current-catalog candidates, never a guaranteed historical result.
+The 01/07/2025 rule controls expected address format, not effective dates for
+every ledger transition. No confirmed manual value is changed by background lookup.
+
 Sequential coding executor after Word and DOCX commits. Root supplies final
 baseline then reviews. API endpoint is publicly used by the site, not necessarily
 a documented supported third-party API; cache version locally and fail visibly.
@@ -132,6 +148,16 @@ case date. Preserve previous exact-address, manual application and issuer bounda
 ## Review Triage Log
 
 ## Verification
+
+Use separate assertions for (a) real undated Bando candidates and (b) synthetic
+confirmed dated history. The former must return insufficient dated coverage,
+including case dates before catalog retrieval, even when the name match is unique.
+The latter must prove 30/06 versus 01/07 boundary traversal and A→B→C/splits.
+Never make a test fixture date become production effective_on for Bando rows.
+Actual UI checks must edit each source/date after a response is pending, switch
+cases, and preserve an already entered issuer/posting address until explicit apply.
+Use synthetic documents and isolated DB/code copies for Electron runs; never
+start legacy backend imports against office or current source-worktree databases.
 
 Source-count/hash/duplicates/cycle/orphan/effective-date validation and live public
 API sample; labeled real cases and synthetic chain/split boundary tests; actual

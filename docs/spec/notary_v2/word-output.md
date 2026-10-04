@@ -161,8 +161,11 @@ Kiểm chứng 04/10/2026: 17 DOCX + 5 DOC chuyển mới và batch 22/22 saved;
 22 nguồn giữ nguyên hash. Word COM đọc được nguồn/đầu ra, số trang nguồn và
 mẫu chuyển khớp cả 22. So cấu trúc XML trực tiếp đạt 17 DOCX; 5 DOC vẫn
 `not_verified` ở tầng này vì không có XML nguồn. Chưa kiểm trực quan từng trang
-hoặc thao tác Electron/native dialog thật. Bằng chứng ở
-`artifacts/word-integration-20261004-final/` (không commit).
+hoặc chọn thư mục mẫu bằng cửa sổ chọn file native. Bằng chứng sau sửa ở
+`artifacts/word-integration-review-fixes-final-20261004/e2e_report.json`
+(không commit); kiểm trên bản sao, không sửa file nguồn. DOCX nhập vào hồ sơ
+có phép thử Electron thật riêng trong [spec nhập Word](./input/docx-import.md),
+cửa sổ chọn file của phép thử ấy vẫn là bộ giả lập trả đường dẫn.
 
 Còn mở: bộ văn bản cho domain mới và mapping per-asset phải được duyệt; không
 nhân bản logic từ template hiện có.
