@@ -2,7 +2,9 @@
 
 **Đích:** một nhánh `consolidate/monorepo`. **Tại sao:** Owner cần tiếp tục từ cùng
 spec, task, plan và bằng chứng; tránh nhầm file chưa commit với việc đã bàn giao.
-Không xóa/đổi thư mục nguồn, không force/reset nhánh và không triển khai runtime.
+TASK-6 chỉ gom tài liệu. TASK-7 tiếp tục theo yêu cầu Owner: đưa nhánh chính về
+thư mục gốc, sao lưu và kiểm tra trước khi dọn worktree phụ. Không force/reset
+nhánh và không triển khai runtime.
 
 ## Nguồn tìm thấy
 
@@ -41,8 +43,8 @@ Orca, repo gốc và refs local. Không khẳng định tìm hết mọi thư m�
 
 ## Chỗ tiếp tục
 
-Checkout sạch của nhánh chính:
-`C:\Users\MINH\.codex\worktrees\consolidate-20261005\systemdocs`.
+Checkout duy nhất để tiếp tục: `D:\systemdocs`, nhánh `consolidate/monorepo`.
+Thư mục `consolidate-20261005` chỉ là điểm gom trung gian của TASK-6.
 Đọc [bàn giao theo từng việc](../notary-20261005/README.md) trước khi giao agent.
 TASK-3 In Progress, TASK-4/TASK-5 To Do; lượt gom không tự đánh dấu các chức năng
 đã hoàn tất. Các quyết định đã duyệt và các bản nháp được giữ phân biệt.
@@ -51,3 +53,26 @@ Commit và kết quả kiểm cuối được ghi qua CLI trong TASK-6. Các ghi
 từ repo gốc được nhận như tài liệu trước đây; không xem chúng là xác nhận
 nghiệm thu mới. Các file snapshot trong `withdrawn-20261004` giữ liên kết theo
 vị trí nguồn lịch sử, không phải cây spec đang dùng.
+
+## Đưa về root và dọn — TASK-7
+
+Quyết định Owner: dùng một thư mục gốc; giữ mọi công việc và dữ liệu trước khi
+xóa các checkout phụ. Các trạng thái ở bảng trên là kiểm kê **trước khi gom**.
+Kết quả hiện tại xem [báo cáo root](root-verification.md).
+
+Bản sao của worktree 1aae: 33.850 file đọc được, 4.241.032.743 byte nguồn;
+file ZIP đã kiểm CRC, rồi đối chiếu SHA-256 từng file với nguồn. Nằm ở
+`D:\systemdocs\.agents\local-only\root-consolidation-20261005\orphan-complete.zip`.
+Bao gồm file bị Git bỏ qua, thư viện/build, repo tham khảo và các bản thử Word.
+31 file ở các thư mục cache/workflow bị chặn quyền được giữ trong ZIP bổ sung
+trước khi xóa. Chi tiết và vỏ thư mục còn bị khóa được ghi trong báo cáo root.
+Các tài liệu/dữ liệu cần tiếp tục đã được đặt ở root; bản sao này giữ phần còn
+lại để phục hồi khi cần. Các backup TASK-6 cũng đã copy sang root.
+
+Các thay đổi cũ chưa commit ở root được giữ trong Git stash có nhãn
+`TASK-7 root before consolidate 20261005`; không áp lại bản README/AGENTS cũ
+đè tài liệu mới. Giữ nguyên các nhánh local và bundle lịch sử. Chưa push remote.
+
+Windows từng chặn quyền đọc `_bmad` và một thư mục workflow bên dưới. Đã lưu
+quyền cũ và sửa quyền đúng hai phạm vi đó; không xóa nội dung `_bmad`.
+Log và kết quả sửa quyền nằm cùng thư mục backup root, không đưa vào Git.

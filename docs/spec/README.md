@@ -212,7 +212,12 @@ thêm cloud.
 - Contract máy đọc: [`contracts/`](../../contracts/README.md).
 - Định danh chung: [`contracts/entities.md`](../../contracts/entities.md).
 - Code là bằng chứng về hiện trạng chạy thật; spec quyết định hành vi phải có.
-- Linear giữ task và acceptance criteria; `.agent/tasks/` giữ tiến độ thực thi.
+- Backlog giữ task, tiêu chí hoàn thành và quyết định; `.agent/tasks/` là tiến độ
+  lịch sử. Không dùng ghi chép Linear cũ thay task đang có hiệu lực.
+- **Owner 05/10/2026, TASK-7:** tiếp tục từ `D:\systemdocs`, nhánh
+  `consolidate/monorepo`. *Tại sao:* một bộ spec/task chung sau khi gom các
+  worktree. [Bàn giao và kiểm tra](../../.agents/handoff/worktree-consolidation-20261005/root-verification.md).
+  Việc gom không đổi yêu cầu sản phẩm hoặc duyệt các quy tắc regex còn Draft.
 
 Khi thay đổi chỉ ảnh hưởng một module hoặc feature, cập nhật spec con. Chỉ sửa
 trang này khi nhiều module cùng bị ảnh hưởng.

@@ -2,7 +2,7 @@
 
 **Trạng thái:** Draft; chưa được Owner duyệt, chưa chạy chấm engine.
 
-Bản đầy đủ chứa dữ liệu cá nhân của mẫu, được giữ cục bộ tại `.agents/local-only/notary-20261005/answers-draft.md`; không đưa vào Git. Nguồn gốc còn ở worktree 1aae và bộ Word bên ngoài repo. Dùng [manifest](selected-samples.json) và [bộ bảng quy tắc](../../../review/sample-rules-20261005/README.md) để tiếp tục duyệt.
+Bản đầy đủ chứa dữ liệu cá nhân của mẫu, được giữ cục bộ tại `D:\systemdocs\.agents\local-only\notary-20261005\answers-draft.md`; không đưa vào Git. Worktree 1aae được sao lưu đầy đủ trong ZIP của TASK-7 trước khi dọn; bộ Word nguồn vẫn ở thư mục mẫu tại root. Dùng [manifest](selected-samples.json) và [bộ bảng quy tắc](../../../review/sample-rules-20261005/README.md) để tiếp tục duyệt.
 
 ## Bảng xem nhanh
 
