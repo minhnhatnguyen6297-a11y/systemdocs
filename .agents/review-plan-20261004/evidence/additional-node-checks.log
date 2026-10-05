@@ -1,0 +1,44 @@
+✔ model pure: khong DOM API, UMD export ca window + module (1.2176ms)
+✔ model nhan client inject, khong goi desktop api truc tiep (0.2292ms)
+✔ view khong co Zalo engine / React / ReactFlow / Bootstrap (0.4464ms)
+✔ view khong render raw JSON cho user (0.1114ms)
+✔ production view khong co input ID ky thuat — chi o devQuickOpen (0.3796ms)
+✔ view co keyboard/menu alternative cho gan vi tri tren so do (0.6476ms)
+✔ view co banner mock "Dữ liệu mô phỏng" + a11y attributes (0.2152ms)
+✔ css: token P4 + scope .cd-root/cd-*, khong re-khai shared (1.2576ms)
+✔ styles.css: focus-visible + control 44px toan cuc (0.1649ms)
+✔ index.html nap model + view + css cua case drafting (0.1726ms)
+✔ renderer co dirty-leave guard cho module notary (0.1094ms)
+✔ renderer khong con view Zalo / id input cu (0.0878ms)
+✔ MIN-112: intake/diagram/word dialog files ton tai + load truoc renderer.js (0.2768ms)
+✔ MIN-112: renderer khong gui path trong command payload — chi file_token (1.5803ms)
+✔ MIN-112: main.js pickFiles cap opaque token, khong tra path cho renderer (0.1738ms)
+✔ MIN-112: preload expose registerDroppedFile + setDirtyState; drop qua webUtils (0.1128ms)
+✔ MIN-112: ipc co token resolution + handler moi (0.0562ms)
+✔ MIN-112: window close guard doc dirty flag renderer (main.js) (0.0632ms)
+✔ MIN-112: debounce evaluate sau khi draft diagram doi (0.4225ms)
+✔ MIN-112r: Xem cach tinh render breakdowns[] (khong con explanations dead code) (0.6194ms)
+✔ MIN-112r: openPath co whitelist extension trong main.js (0.1704ms)
+✔ MIN-112r: confirmModal co role dialog + aria-modal + Escape (0.1099ms)
+✔ MIN-128: renderer KHONG emit field v1 bi cam (is_primary/isLandOwner/willReceive) (0.712ms)
+✔ MIN-128: model co v2 contracts — version 3, owner_row_id, positions, two_party (0.2155ms)
+✔ MIN-128: diagram co position chips + two_party groups; khong co +Slot arbitrary tren two_party (0.2642ms)
+✔ MIN-128: view co owner selector + case type badge + position display (0.2771ms)
+✔ MIN-133 D8: Stage không thanh cuộn — bỏ max-height/overflow cuộn/min-width cột (0.4606ms)
+✔ MIN-133: bảng Stage table-layout fixed + colgroup theo mockup (0.8599ms)
+✔ MIN-133 D5: thanh trên 42px; select Loại việc rộng ≥128px (0.2842ms)
+✔ MIN-133 D8: layout flex dọc — vùng sơ đồ lấp phần còn lại, có min-height (0.3132ms)
+✔ MIN-133 D1/D2/D4: view không còn cột noi_cap/place_of_origin, card meta, back/title (0.4362ms)
+✔ MIN-136: khong trung top-level identifier giua cac script notary (1.7516ms)
+✔ MIN-136: error-catalog load truoc cac module dung no (0.0964ms)
+✔ NAIA-8r: dialog Word co scope cd-word-modal + rule an [hidden] rieng (0.3841ms)
+✔ NAIA-8r: dialog Word khoa Xuat/input/Luu khi meta save pending (0.1995ms)
+✔ MIN-136: CSS khong co comment bi cat giua chung (*/ trong comment) (0.1598ms)
+ℹ tests 36
+ℹ suites 0
+ℹ pass 36
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 107.9297

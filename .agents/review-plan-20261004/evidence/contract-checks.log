@@ -1,0 +1,83 @@
+[invalid] command.commit-4-assets.invalid.json: expected=stage_validation_error got=['stage_validation_error'] -> REJECTED-CORRECTLY
+[invalid] command.commit-future-revision.invalid.json: expected=workspace_conflict got=['workspace_conflict'] -> REJECTED-CORRECTLY
+[invalid] command.commit-no-owner.invalid.json: expected=workspace_owner_required got=['workspace_owner_required'] -> REJECTED-CORRECTLY
+[invalid] command.create-owner-mismatch.invalid.json: expected=diagram_owner_mismatch got=['diagram_owner_mismatch'] -> REJECTED-CORRECTLY
+[invalid] command.create-two-party-owner.invalid.json: expected=validation_error got=['validation_error'] -> REJECTED-CORRECTLY
+[valid]   command.diagram-evaluate-draft.valid.json: violations=[] -> PASS
+[valid]   command.diagram-save-inheritance.valid.json: violations=[] -> PASS
+[valid]   command.diagram-save-two-party.valid.json: violations=[] -> PASS
+[invalid] command.domain-mismatch.invalid.json: expected=diagram_domain_mismatch got=['diagram_domain_mismatch', 'diagram_invalid_state'] -> REJECTED-CORRECTLY
+[invalid] command.inheritance-bad-position.invalid.json: expected=diagram_invalid_state got=['diagram_invalid_state'] -> REJECTED-CORRECTLY
+[invalid] command.two-party-31-people.invalid.json: expected=stage_validation_error got=['stage_validation_error'] -> REJECTED-CORRECTLY
+[invalid] command.two-party-bad-position.invalid.json: expected=diagram_invalid_state got=['diagram_invalid_state', 'diagram_invalid_state'] -> REJECTED-CORRECTLY
+[invalid] command.two-party-relation.invalid.json: expected=diagram_invalid_state got=['diagram_invalid_state'] -> REJECTED-CORRECTLY
+[invalid] command.v3-legacy-flags.invalid.json: expected=diagram_invalid_state got=['diagram_invalid_state'] -> REJECTED-CORRECTLY
+[valid]   command.word-export-two-party.valid.json: violations=[] -> PASS
+[valid]   command.workspace-commit-stage.valid.json: violations=[] -> PASS
+[valid]   command.workspace-create-no-diagram.valid.json: violations=[] -> PASS
+[valid]   command.workspace-create.valid.json: violations=[] -> PASS
+[valid]   command.workspace-update.valid.json: violations=[] -> PASS
+[valid]   job.diagram-evaluate-inheritance.valid.json: violations=[] -> PASS
+[valid]   job.diagram-evaluate-two-party.valid.json: violations=[] -> PASS
+[valid]   job.workspace-commit-stage-reorder.valid.json: violations=[] -> PASS
+[valid]   job.workspace-commit-stage.valid.json: violations=[] -> PASS
+[valid]   job.workspace-get-legacy-overflow.valid.json: violations=[] -> PASS
+[valid]   job.workspace-get-two-party.valid.json: violations=[] -> PASS
+[valid]   job.workspace-update-two-party.valid.json: violations=[] -> PASS
+[invalid] command.address-lookup-year.invalid.json: expected=validation_error got=['validation_error'] -> REJECTED-CORRECTLY
+[invalid] command.commit-bad-gender.invalid.json: expected=stage_validation_error got=['stage_validation_error'] -> REJECTED-CORRECTLY
+[invalid] command.commit-stale-revision.invalid.json: expected=workspace_conflict got=['workspace_conflict'] -> REJECTED-CORRECTLY
+[invalid] command.diagram-evaluate-null-case.invalid.json: expected=validation_error got=['validation_error'] -> REJECTED-CORRECTLY
+[invalid] command.diagram-outside-stage.invalid.json: expected=diagram_reference_outside_stage got=['diagram_reference_outside_stage'] -> REJECTED-CORRECTLY
+[invalid] command.intake-source-too-large.invalid.json: expected=intake_source_too_large got=['intake_source_too_large'] -> REJECTED-CORRECTLY
+[invalid] command.intake-too-many-sources.invalid.json: expected=intake_too_many_sources got=['intake_too_many_sources'] -> REJECTED-CORRECTLY
+[invalid] command.intake-unsupported-kind.invalid.json: expected=intake_unsupported_source got=['intake_unsupported_source'] -> REJECTED-CORRECTLY
+[invalid] command.word-batch-destination-file.invalid.json: expected=validation_error got=['validation_error'] -> REJECTED-CORRECTLY
+[invalid] command.word-batch-destination-unc.invalid.json: expected=file_scope_not_supported got=['file_scope_not_supported'] -> REJECTED-CORRECTLY
+[invalid] command.word-batch-duplicate-key.invalid.json: expected=word_duplicate_document_key got=['word_duplicate_document_key'] -> REJECTED-CORRECTLY
+[invalid] command.word-batch-empty-keys.invalid.json: expected=word_no_documents_selected got=['word_no_documents_selected'] -> REJECTED-CORRECTLY
+[invalid] command.workspace-create-bad-key.invalid.json: expected=validation_error got=['validation_error'] -> REJECTED-CORRECTLY
+[invalid] command.workspace-create-missing-owner.invalid.json: expected=workspace_owner_required got=['workspace_owner_required'] -> REJECTED-CORRECTLY
+[invalid] command.workspace-create-no-primary.invalid.json: expected=stage_validation_error got=['stage_validation_error'] -> REJECTED-CORRECTLY
+[invalid] command.workspace-update-bad-key.invalid.json: expected=validation_error got=['validation_error'] -> REJECTED-CORRECTLY
+[invalid] command.workspace-update-bad-value.invalid.json: expected=validation_error got=['validation_error'] -> REJECTED-CORRECTLY
+[invalid] command.workspace-update-empty-case.invalid.json: expected=validation_error got=['validation_error'] -> REJECTED-CORRECTLY
+[invalid] command.workspace-update-missing-case-id.invalid.json: expected=validation_error got=['validation_error'] -> REJECTED-CORRECTLY
+[invalid] command.workspace-update-stale-revision.invalid.json: expected=workspace_conflict got=['workspace_conflict'] -> REJECTED-CORRECTLY
+[invalid] job.intake-confirmed.invalid.json: expected=validation_error got=['validation_error'] -> REJECTED-CORRECTLY
+[invalid] job.word-batch-traversal.invalid.json: expected=word_path_traversal got=['word_path_traversal', 'word_path_traversal'] -> REJECTED-CORRECTLY
+[invalid] job.workspace-diagram-outside-stage.invalid.json: expected=diagram_reference_outside_stage got=['diagram_reference_outside_stage'] -> REJECTED-CORRECTLY
+[valid]   command.address-lookup.valid.json: violations=[] -> PASS
+[valid]   command.diagram-evaluate-draft.valid.json: violations=[] -> PASS
+[valid]   command.diagram-evaluate.valid.json: violations=[] -> PASS
+[valid]   command.diagram-save.valid.json: violations=[] -> PASS
+[valid]   command.intake-analyze-draft.valid.json: violations=[] -> PASS
+[valid]   command.intake-analyze.valid.json: violations=[] -> PASS
+[valid]   command.word-export-batch-folder.valid.json: violations=[] -> PASS
+[valid]   command.word-export-batch.valid.json: violations=[] -> PASS
+[valid]   command.word-export-options.valid.json: violations=[] -> PASS
+[valid]   command.workspace-commit-stage.valid.json: violations=[] -> PASS
+[valid]   command.workspace-create.valid.json: violations=[] -> PASS
+[valid]   command.workspace-get.valid.json: violations=[] -> PASS
+[valid]   command.workspace-update.valid.json: violations=[] -> PASS
+[valid]   job.address-lookup.valid.json: violations=[] -> PASS
+[valid]   job.diagram-evaluate-draft.valid.json: violations=[] -> PASS
+[valid]   job.diagram-evaluate.valid.json: violations=[] -> PASS
+[valid]   job.diagram-save.valid.json: violations=[] -> PASS
+[valid]   job.intake-analyze-partial.valid.json: violations=[] -> PASS
+[valid]   job.intake-analyze-succeeded.valid.json: violations=[] -> PASS
+[valid]   job.word-export-batch-all-failed.valid.json: violations=[] -> PASS
+[valid]   job.word-export-batch-canceled.valid.json: violations=[] -> PASS
+[valid]   job.word-export-batch-collision.valid.json: violations=[] -> PASS
+[valid]   job.word-export-batch-collision3.valid.json: violations=[] -> PASS
+[valid]   job.word-export-batch-partial.valid.json: violations=[] -> PASS
+[valid]   job.word-export-options.valid.json: violations=[] -> PASS
+[valid]   job.workspace-commit-stage.valid.json: violations=[] -> PASS
+[valid]   job.workspace-create-idempotent.valid.json: violations=[] -> PASS
+[valid]   job.workspace-create.valid.json: violations=[] -> PASS
+[valid]   job.workspace-get-empty.valid.json: violations=[] -> PASS
+[valid]   job.workspace-get-not-found.valid.json: violations=[] -> PASS
+[valid]   job.workspace-get-stage.valid.json: violations=[] -> PASS
+[valid]   job.workspace-update.valid.json: violations=[] -> PASS
+
+81 files, 0 unexpected outcomes

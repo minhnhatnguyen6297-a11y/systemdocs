@@ -1,0 +1,33 @@
+{
+  "living_person": {
+    "data": {
+      "row_id": "f5a0c7e7-c6cd-4813-933c-b39136111206",
+      "entity_id": null,
+      "ho_ten": "Người sống mẫu",
+      "gioi_tinh": null,
+      "ngay_sinh": null,
+      "ngay_chet": null,
+      "so_giay_to": null,
+      "ngay_cap": "2024-12-13",
+      "noi_cap": "Bộ Công an",
+      "dia_chi": null,
+      "place_of_origin": null,
+      "loai_giay_to": null,
+      "loai_dia_chi": null
+    },
+    "address_value": "",
+    "issuer_value": "Bộ Công an",
+    "issuer_label": "Nơi cấp giấy khai tử — Người sống mẫu"
+  },
+  "catalog": {
+    "initial_disabled": true,
+    "after_typing_disabled": true,
+    "after_change_disabled": true,
+    "after_focus_lost_disabled": true,
+    "after_unrelated_emit_disabled": false,
+    "calls": [
+      "notary.case_list",
+      "notary.customer_list"
+    ]
+  }
+}
