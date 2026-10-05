@@ -122,6 +122,13 @@ Luồng hợp đồng DOCX Word-first hiện hành và giới hạn vị trí ng
 gợi ý có bằng chứng từng trường; không dùng OCR parser để gom cả file thành
 một gợi ý. Review, lưu đối chiếu và xuất theo bản gốc đều cần người kiểm tra.
 
+**Đợt quy tắc mới — TASK-5, 05/10/2026:**
+[bảng dấu hiệu/vùng/ranh giới từ 20 mẫu](../../../../.agents/review/sample-rules-20261005/README.md)
+và [bàn giao task/plan/spec](../../../../.agents/handoff/notary-20261005/README.md)
+được gom để tiếp tục duyệt. Các bảng chưa là spec triển khai; không dùng plan
+đã rút trong `withdrawn-20261004` hoặc mặc định của Upload Lab thay quyết định
+Owner. Runtime hiện hành ở DOCX spec chưa chứng minh đáp ứng đích mới.
+
 - Cloud OCR hiện hành là Qwen-only. QR/local OCR đã rời active path; không tự
   khôi phục khi sửa lỗi chung.
 - Upload thủ công hiện hành đi qua `POST /api/ocr/analyze` và
