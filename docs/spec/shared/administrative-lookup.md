@@ -44,7 +44,7 @@ consumer" tại [spec hệ thống](../README.md#đã-chốt).
 |---|---|---|
 | Xã/phường/thị trấn, cũ và mới | Có | Trục chính, khó tra nhất |
 | Tỉnh, cũ và mới | Có | Cùng dạng kết quả với xã |
-| Huyện | Không, luôn "không có" | Kho không có danh mục huyện; Bando chỉ ghi huyện trong ngoặc |
+| Huyện | Không có đơn vị cấp huyện trong kết quả | Kho không có danh mục huyện; Bando chỉ ghi huyện trong ngoặc — nhưng cụm `quận Hà Đông` vẫn khớp đoạn gốc của xã/tỉnh và in ra các xã đó (mục 7) |
 | Thôn/xóm | Không | Chưa có dữ liệu tổng hợp |
 
 ## 4. Dữ liệu dùng
@@ -97,25 +97,27 @@ Cụm sau chuẩn hóa phải **nằm nguyên vẹn, liên tiếp, đúng thứ 
 Tên thật có `-` (`Bà Rịa - Vũng Tàu`) bị tách thành hai cụm; `Vũng Tàu` vẫn khớp
 tên đầy đủ. Mảnh còn lại nếu khớp đơn vị khác thì thêm dòng, người dùng tự chọn.
 
-## 7. Flow — đọc từ phải sang trái
+## 7. Flow — mọi cụm tra độc lập
 
-1. **Cụm cuối** so với các dòng **tỉnh** bằng đúng luật khớp mục 6. Khớp →
-   phạm vi = mọi tỉnh khớp (một hay nhiều, không luật riêng). Không khớp →
-   phạm vi = toàn quốc, cụm cuối được xét như cụm còn lại ở bước 2. Cụm ngắn
-   như `Hà` khớp nhiều tỉnh → nhiều kết quả → luật >10 của mục 8 (popup hỏi
-   chuyển sang tool). *Tại sao:* một luật nhất quán, không thêm ngoại lệ (Owner 05/10).
-2. **Mỗi cụm còn lại** so với các dòng **xã trong phạm vi**; gom mọi dòng khớp,
-   bỏ trùng.
-   - Cụm có tiền tố cấp huyện (`Huyện`, `Quận`, `Thị xã`; `Thành phố` khi không
-     là cụm cuối) → bỏ qua có chủ đích, không là lỗi. *Tại sao:* giấy cũ (ca A)
-     gần như luôn có huyện; huyện không tra được nhưng không được làm hỏng ca.
-   - Cụm không khớp (thôn, số nhà, rác) → không góp kết quả; **không dừng**.
-3. Không còn cụm nào ngoài cụm tỉnh → kết quả cấp tỉnh.
+Engine không phân biệt vị trí hay vai trò của cụm. Dán một đoạn địa chỉ cũ
+(thôn, xã, huyện, tỉnh) hay gõ một tên lẻ đều chạy cùng một luật:
+
+1. **Mỗi cụm** so với các dòng **xã** (tên + đoạn chữ gốc) trên **toàn quốc**
+   bằng đúng luật khớp mục 6; gom mọi dòng khớp, bỏ trùng theo đơn vị.
+2. **Mỗi cụm** cũng so với các dòng **tỉnh** (tên + đoạn chữ gốc); mọi tỉnh
+   khớp in một dòng riêng, **kể cả** khi tỉnh đó đã là tỉnh cha của một xã
+   trong kết quả.
+3. **Không có luật bỏ qua theo tiền tố, không có phạm vi tỉnh.** Cụm
+   `huyện Ý Yên` được tra như mọi cụm — khớp đoạn gốc chứa `(huyện Ý Yên)`
+   thì in các xã từng thuộc huyện đó. `quận Hà Đông` → các phường Hà Đông,
+   Kiến Hưng… *Tại sao:* engine chỉ phản ánh kho; một luật nhất quán ít lỗi
+   hơn ngoại lệ; nhiễu đã có luật >10 của mục 8 lo (Owner 05/10, thay luật
+   "đọc phải→trái, cụm cuối khoanh phạm vi tỉnh, bỏ qua cụm huyện").
 4. 0 kết quả → **sai**.
 
-Engine không có chế độ "đảo thứ tự" riêng; chỉ chạy các bước trên.
-Không có tiền tố, máy có thể ra cả xã mới lẫn xã cũ cùng chữ: `Yên Bình, Ý Yên,
-Nam Định` → dòng xã Ý Yên và dòng chứa Xã Yên Bình; người dùng chọn.
+Thứ tự hiển thị: các dòng xã trước, các dòng tỉnh sau; trong mỗi nhóm theo
+thứ tự kho. Gõ `Yên Bình, Ý Yên, Nam Định` → xã Ý Yên + dòng chứa Xã Yên
+Bình + `tỉnh Ninh Bình`; người dùng chọn.
 
 ## 8. Kết quả
 
@@ -158,15 +160,16 @@ Ví dụ minh họa luật; kết quả thật phụ thuộc dữ liệu kho.
 
 | Gõ | Máy hiểu | Trả |
 |---|---|---|
-| `xã YÊn Bình` | 1 cụm, không phải tỉnh → toàn quốc | Mọi đơn vị hiện hành có tên/đoạn gốc chứa `xã yên bình`; mỗi tỉnh một dòng |
+| `xã YÊn Bình` | 1 cụm → toàn quốc | Mọi đơn vị hiện hành có tên/đoạn gốc chứa `xã yên bình`; mỗi tỉnh một dòng |
 | `Yên Bình` | Không tiền tố → cả xã, phường, `Yên Bình Đông`… | Nhiều dòng; `drafting` >10 → popup "Nhiều kết quả khớp. Xem đầy đủ?" |
 | `yen binh` | Không dấu → so bỏ dấu | Thêm `Yến Bình`… |
 | `P. Yên Bình` | `P.` → `Phường` | Chỉ dòng chứa `phường yên bình` |
-| `tỉnh Nam Định` | Khớp đoạn gốc tỉnh Ninh Bình; không còn cụm | `tỉnh Ninh Bình` |
-| `huyện Ý Yên` | Cấp huyện, bỏ qua; 0 kết quả | Sai |
-| `xã Yên Bình, tỉnh Nam Định` | Phạm vi Ninh Bình | Dòng xã hiện hành chứa Xã Yên Bình trong Ninh Bình |
-| `Thôn A, xã Yên Bình, huyện Ý Yên, tỉnh Nam Định` | Tỉnh → Ninh Bình; huyện bỏ qua; `Thôn A` không khớp | Như dòng trên |
-| `Yên Bình, Ý Yên, Nam Định` | Ninh Bình; cả hai cụm đều khớp | Xã Ý Yên + dòng chứa Xã Yên Bình |
+| `tỉnh Nam Định` | Khớp đoạn gốc tỉnh Ninh Bình | `tỉnh Ninh Bình` |
+| `huyện Ý Yên` | Cụm thường → khớp `(huyện Ý Yên)` trong đoạn gốc | Các xã từng thuộc huyện Ý Yên |
+| `quận Hà Đông` | Như trên | Các phường từng thuộc quận Hà Đông |
+| `xã Yên Bình, tỉnh Nam Định` | Hai cụm tra độc lập | Mọi Xã Yên Bình toàn quốc + dòng `tỉnh Ninh Bình` |
+| `Thôn A, xã Yên Bình, huyện Ý Yên, tỉnh Nam Định` | Bốn cụm tra độc lập; `Thôn A` không khớp | Như dòng trên + các xã thuộc huyện Ý Yên (có thể >10 → popup) |
+| `Yên Bình, Ý Yên, Nam Định` | Ba cụm độc lập | Xã Ý Yên + dòng chứa Xã Yên Bình + `tỉnh Ninh Bình` |
 | `Phường 01` | Không quy đổi | Chỉ khớp nếu DB ghi `01` |
 | `abc, xyz` | Không cụm nào khớp | Sai |
 
@@ -192,7 +195,9 @@ Code là hiện trạng, không là hành vi đích. Khi triển khai phải s�
 - [`administrative_address.py`](../../../notary_v2/services/administrative_address.py):
   bỏ tiền tố khi so (DC-02), đoán cấp theo mốc 01/07/2025 (DC-04), tách tên cũ
   bằng regex `predecessor_names`, `apply_address` nối `(nay là …)` (DC-03),
-  chọn tên theo bản observed cuối (DC-08).
+  chọn tên theo bản observed cuối (DC-08). Cụm được phân vai trò theo vị trí
+  (xã so với cụm đầu, tỉnh cụm cuối) — luật mới: mọi cụm so độc lập vào cả
+  xã lẫn tỉnh.
 - [`administrative_timeline.py`](../../../notary_v2/administrative_timeline.py):
   cờ "một phần" gắn cho cả dòng — MVP không dùng, đoạn gốc tự hiện ghi chú.
 - Renderer chỉ gửi khi đủ địa chỉ + hai ngày; nơi niêm yết lấy địa chỉ tài sản
@@ -204,8 +209,16 @@ Code là hiện trạng, không là hành vi đích. Khi triển khai phải s�
 - Vị trí nút Tra và bố cục bên trong popup tool tra cứu.
 - Contract cho module ngoài `notary_v2` gọi lõi.
 - Nguồn dữ liệu huyện (Won't hiện tại).
+- `drafting` >10: vì kết quả giờ gồm cả các cụm huyện khớp, ca dán địa chỉ cũ
+  đầy đủ dễ vượt 10 → popup/tool phải đọc được số lượng lớn.
 
 ## 14. Lịch sử
+
+Owner 05/10/2026, sau khi quan sát hành vi Bando (`quận hà đông` ra các xã
+từng thuộc quận; `phường linh đàm, tỉnh nam định` trả xã và tỉnh độc lập),
+thay mục 7: bỏ luật đọc phải→trái, bỏ phạm vi tỉnh và luật bỏ qua cụm huyện;
+mọi cụm tra độc lập vào xã lẫn tỉnh, tỉnh khớp luôn in dòng riêng. Lý do:
+luật nhất quán, ít lỗi hơn; tiền tố huyện chỉ là chữ trong đoạn gốc.
 
 Owner 05/10/2026 thay các quy tắc Draft cũ tại
 [`notary_v2/administrative-address.md`](../notary_v2/administrative-address.md):
