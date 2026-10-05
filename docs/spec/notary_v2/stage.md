@@ -94,12 +94,11 @@ phải báo `workspace_conflict`; không ghi đè cưỡng bức.
 
 ## 7. Quan hệ với feature khác
 
-Gợi ý tên xã/tỉnh dùng kho lịch sử cục bộ, không gửi địa chỉ khách hàng lên
-website. Ngày giấy của từng Người/Tài sản giúp đọc địa chỉ nguồn; ngày cần đối
-chiếu là `ngay_lap_ho_so`. Nơi cấp giấy khai tử dùng chính ngày cấp giấy ấy và
-nguồn nhập rõ, không suy từ nơi chết hoặc nơi niêm yết. Máy không tự ghi gợi ý
-vào Stage: người dùng chọn rồi lưu như sửa tay. Giới hạn nguồn/ngày và cách
-bổ sung lịch sử nằm tại [tra cứu địa chỉ](./administrative-address.md).
+Tra tên xã/tỉnh dùng kho cục bộ, không gửi địa chỉ khách hàng lên website,
+không cần ngày giấy. Nơi cấp giấy khai tử tra xã mới từ địa chỉ của chính người
+đã chết. Máy không tự ghi kết quả vào Stage: người
+dùng copy rồi lưu như sửa tay. Cách gọi nằm tại
+[tra cứu địa chỉ](./administrative-address.md).
 
 Nhập hợp đồng DOCX giữ optional `docx_import` bên cạnh Stage, không nhét
 nguồn vào field Người/Tài sản. Context ghi cùng transaction/revision khi

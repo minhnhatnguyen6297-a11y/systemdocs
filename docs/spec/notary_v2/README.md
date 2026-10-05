@@ -25,8 +25,9 @@ lập để so Word với scan. Công cụ này không ghi Stage, Diagram hoặc
 [`administrative-timeline.md`](./administrative-timeline.md) giữ kho local tên
 xã/huyện/tỉnh và lịch sử nhiều bước; Bando là nguồn tên hiện hành, phần chưa rõ
 ngày/danh tính giữ chờ xác nhận.
-[administrative-address.md](./administrative-address.md) là Draft cho phần
-tra cứu địa chỉ dùng kho này, đang triển khai; nhập DOCX là luồng độc lập tại
+Luật tra trên kho là [lõi dùng chung](../shared/administrative-lookup.md);
+[administrative-address.md](./administrative-address.md) là Draft cách hồ sơ gọi
+lõi, runtime chưa đáp ứng; nhập DOCX là luồng độc lập tại
 [input/docx-import.md](./input/docx-import.md).
 
 ## 2. Bất biến của module
@@ -98,7 +99,8 @@ Quy tắc màu, chữ, khoảng cách và thao tác dùng chung nằm tại
 - Quy tắc per-asset, contract A/B và owner scope chưa được suy từ các flag cũ.
 - Tích hợp bảng tra địa chỉ vào hồ sơ (NAIA-9): kho lịch sử đã có tại
   [`administrative-timeline.md`](./administrative-timeline.md), luồng sử dụng tại
-  [`administrative-address.md`](./administrative-address.md); ngày hiệu lực và
+  [`administrative-address.md`](./administrative-address.md), luật tra tại
+  [lõi dùng chung](../shared/administrative-lookup.md); ngày hiệu lực và
   danh tính cũ còn chờ nguồn, không gán chung 01/07/2025.
 
 ## 7. Nguồn khi sửa code

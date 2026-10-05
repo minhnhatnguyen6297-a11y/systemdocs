@@ -1020,24 +1020,33 @@ def check_result_data(kind, data, stage_ids, v, draft_v2=False, ctx=None):
         v.append(("validation_error", "result.data not object"))
         return
     if kind == "address_lookup":
-        if data.get("schema_version") != "notary.address-lookup.v1" or data.get("status") not in {"match", "ambiguous", "not_found", "invalid_input"}:
+        status, pres = data.get("status"), data.get("presentation")
+        results, total = data.get("results"), data.get("total")
+        if data.get("schema_version") != "notary.address-lookup.v2" or status not in {"found", "not_found", "too_many", "invalid_input", "reload_failed"}:
             v.append(("validation_error", "address_lookup version/status invalid"))
-        for key in ("candidates", "provenance"):
-            if not isinstance(data.get(key), list):
-                v.append(("validation_error", f"address_lookup {key} missing"))
+        if pres not in ("drafting", "full", None):
+            v.append(("validation_error", "address_lookup presentation invalid"))
+        if not isinstance(results, list) or not isinstance(total, int) or total < 0:
+            v.append(("validation_error", "address_lookup results/total missing"))
+            return
         for key in ("dataset_version", "revision"):
             if key not in data:
                 v.append(("validation_error", f"address_lookup {key} missing"))
-        cov = data.get("coverage")
-        if not isinstance(cov, dict):
-            v.append(("validation_error", "address_lookup coverage missing"))
-        else:
-            if cov.get("kind") not in ("confirmed_history", "current_catalog_candidates",
-                                       "insufficient_confirmed_history", "invalid_input",
-                                       "reload_failed"):
-                v.append(("validation_error", "address_lookup coverage.kind invalid"))
-            if not isinstance(cov.get("historical"), bool) or "reason" not in cov:
-                v.append(("validation_error", "address_lookup coverage fields missing"))
+        if status == "found":
+            if not results or total != len(results) or (pres == "drafting" and total > 10):
+                v.append(("validation_error", "address_lookup found count invalid"))
+        elif results:
+            v.append(("validation_error", "address_lookup results must be empty"))
+        if status == "too_many" and (pres != "drafting" or total <= 10):
+            v.append(("validation_error", "address_lookup too_many only for drafting > 10"))
+        if status in ("not_found", "invalid_input", "reload_failed") and total != 0:
+            v.append(("validation_error", "address_lookup total must be 0"))
+        for r in results:
+            if not isinstance(r, dict) or r.get("level") not in ("commune", "province") \
+                    or not r.get("display") or "source_text" not in r or not isinstance(r.get("evidence"), list):
+                v.append(("validation_error", "address_lookup result fields invalid"))
+            elif (r["level"] == "province") != (r.get("province") is None):
+                v.append(("validation_error", "address_lookup province ref invalid"))
         return
     want_sv = DRAFT_SCHEMA_VERSION if draft_v2 else SCHEMA_VERSION
     if data.get("schema_version") != want_sv:
@@ -1267,23 +1276,13 @@ def violations(doc):
         elif not isinstance(payload, dict):
             v.append(("validation_error", "payload missing/not object"))
         elif cmd == "notary.address_lookup":
-            from datetime import date
-            if set(payload) - {"address", "province", "commune", "district", "source_date", "target_date"}:
+            if set(payload) - {"query", "presentation"}:
                 v.append(("validation_error", "address_lookup extra fields"))
-            for key in ("address", "province", "commune", "district"):
-                value = payload.get(key)
-                if value is not None and (not isinstance(value, str) or not (1 <= len(value) <= 4000)):
-                    v.append(("validation_error", f"address_lookup {key} must be text 1..4000"))
-            for key in ("source_date", "target_date"):
-                try:
-                    value = payload.get(key)
-                    if not isinstance(value, str) or not DATE_FULL_RX.fullmatch(value):
-                        raise ValueError()
-                    date.fromisoformat(value)
-                except (ValueError, TypeError):
-                    v.append(("validation_error", f"address_lookup {key} must be full date"))
-            if not payload.get("address") and not (payload.get("province") and payload.get("commune")):
-                v.append(("validation_error", "address_lookup location missing"))
+            query = payload.get("query")
+            if not isinstance(query, str) or not (1 <= len(query) <= 4000):
+                v.append(("validation_error", "address_lookup query must be text 1..4000"))
+            if payload.get("presentation") not in ("drafting", "full"):
+                v.append(("validation_error", "address_lookup presentation invalid"))
         elif cmd == "notary.intake_analyze":
             check_intake_payload(payload, v)
         elif cmd == "notary.workspace_commit_stage":

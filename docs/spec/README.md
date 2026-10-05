@@ -162,9 +162,10 @@ Mặc định hệ thống chạy trong LAN. Chỉ các đường dưới đư�
 | Bando — tải danh mục/bảng xã và tỉnh | Dữ liệu hành chính công khai; không gửi hồ sơ hoặc địa chỉ khách hàng | `notary_v2` |
 
 Owner cho phép lấy Bando trong chat 03–04/10/2026. Đường này chỉ phục vụ
-cập nhật kho hành chính bằng CLI; tra cứu hồ sơ dùng kho cục bộ, không gọi
-website mỗi lần gõ. Cách lưu nguồn, bổ sung lịch sử và mở rộng nằm tại
-[`administrative-timeline.md`](./notary_v2/administrative-timeline.md).
+cập nhật kho hành chính bằng CLI; tra cứu dùng kho cục bộ, không gọi website.
+Cách lưu nguồn, bổ sung lịch sử và mở rộng nằm tại
+[`administrative-timeline.md`](./notary_v2/administrative-timeline.md); luật tra
+tại [`shared/administrative-lookup.md`](./shared/administrative-lookup.md).
 
 Agent máy trạm `notaryoffice` không được gọi Internet, chỉ gửi về Hub trong
 LAN. Ảnh CCCD gửi tới OCR nước ngoài thuộc phạm vi bảo vệ dữ liệu cá nhân theo
@@ -181,6 +182,11 @@ thêm cloud.
 - Zalo giữ ảnh và gọi Qwen tại nơi có ảnh; máy chính chỉ nhận raw OCR, trạng
   thái và nguồn, không nhận ảnh.
 - Không tạo shared core trước khi ít nhất hai consumer chứng minh cùng contract.
+  **Ngoại lệ (Owner 05/10/2026, TASK-2):**
+  [lõi tra cứu tên đơn vị hành chính](./shared/administrative-lookup.md) là
+  shared core ngay từ đầu. *Tại sao:* mọi ô địa chỉ, tool tra cứu và module
+  sau này cần cùng một câu trả lời từ cùng một kho; tách riêng từng nơi sẽ lệch.
+  Module ngoài `notary_v2` chỉ gọi khi có contract được duyệt.
 
 ### Còn mở
 

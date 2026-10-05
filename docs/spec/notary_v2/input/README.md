@@ -61,10 +61,9 @@ Lỗi một nguồn không làm mất kết quả nguồn khác. Job có thể `
 - Parser tài sản phân biệt serial GCN với thửa/tờ; một GCN có thể có nhiều thửa.
 
 Địa chỉ đọc từ giấy vẫn giữ nguyên nguồn. Tra cứu tên xã/tỉnh không tự nâng
-kết quả thành dữ liệu đã xác nhận hoặc thay nguyên văn OCR. Luồng gợi ý dùng
-kho cục bộ và ngày riêng của từng giấy tại
-[`administrative-address.md`](../administrative-address.md); người dùng chọn
-áp dụng trong hồ sơ, không gửi địa chỉ khách hàng ra Bando.
+kết quả thành dữ liệu đã xác nhận hoặc thay nguyên văn OCR. Tra cứu dùng kho
+cục bộ tại [`administrative-address.md`](../administrative-address.md); người
+dùng tự copy kết quả vào hồ sơ, không gửi địa chỉ khách hàng ra Bando.
 
 Danh mục regex/scoring tài sản nằm tại
 [`property-rules.md`](./property-rules.md). Đây là phụ lục lớn của Input, không

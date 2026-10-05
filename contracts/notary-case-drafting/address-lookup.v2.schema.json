@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://systemdocs/contracts/notary-case-drafting/address-lookup.v2.schema.json",
+  "title": "notary.address_lookup v2 — shared administrative lookup request and result",
+  "definitions": {
+    "text": {"type": "string", "minLength": 1, "maxLength": 4000},
+    "presentation": {"enum": ["drafting", "full"]},
+    "payload": {
+      "type": "object", "additionalProperties": false,
+      "required": ["query", "presentation"],
+      "properties": {
+        "query": {"$ref": "#/definitions/text"},
+        "presentation": {"$ref": "#/definitions/presentation"}
+      }
+    },
+    "evidence": {
+      "type": "object", "additionalProperties": false, "required": ["source_id", "row_key"],
+      "properties": {"source_id": {"type": "string"}, "row_key": {"type": "string"}}
+    },
+    "unit_ref": {
+      "type": "object", "additionalProperties": false, "required": ["unit_id", "name"],
+      "properties": {"unit_id": {"type": "string"}, "name": {"type": "string"}}
+    },
+    "result": {
+      "type": "object", "additionalProperties": false,
+      "required": ["unit_id", "level", "name", "province", "source_text", "display", "evidence"],
+      "properties": {
+        "unit_id": {"type": "string"},
+        "level": {"enum": ["commune", "province"]},
+        "name": {"type": "string"},
+        "province": {"oneOf": [{"$ref": "#/definitions/unit_ref"}, {"type": "null"}]},
+        "source_text": {"type": ["string", "null"]},
+        "display": {"type": "string", "minLength": 1},
+        "observation_id": {"type": "string"},
+        "evidence": {"type": "array", "items": {"$ref": "#/definitions/evidence"}}
+      },
+      "if": {"properties": {"level": {"const": "province"}}},
+      "then": {"properties": {"province": {"type": "null"}}},
+      "else": {"properties": {"province": {"$ref": "#/definitions/unit_ref"}}}
+    },
+    "result_data": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "status", "presentation", "total", "results", "dataset_version", "revision"],
+      "properties": {
+        "schema_version": {"const": "notary.address-lookup.v2"},
+        "status": {"enum": ["found", "not_found", "too_many", "invalid_input", "reload_failed"]},
+        "presentation": {"oneOf": [{"$ref": "#/definitions/presentation"}, {"type": "null"}]},
+        "total": {"type": "integer", "minimum": 0},
+        "results": {"type": "array", "items": {"$ref": "#/definitions/result"}},
+        "dataset_version": {"type": ["string", "null"]},
+        "revision": {"type": ["integer", "null"], "minimum": 0}
+      },
+      "allOf": [
+        {"if": {"properties": {"status": {"const": "found"}}},
+         "then": {"properties": {"total": {"minimum": 1}, "results": {"minItems": 1}}},
+         "else": {"properties": {"results": {"maxItems": 0}}}},
+        {"if": {"properties": {"status": {"const": "too_many"}}},
+         "then": {"properties": {"presentation": {"const": "drafting"}, "total": {"minimum": 11}}}},
+        {"if": {"properties": {"status": {"const": "found"}, "presentation": {"const": "drafting"}}, "required": ["status", "presentation"]},
+         "then": {"properties": {"total": {"maximum": 10}}}},
+        {"if": {"properties": {"status": {"enum": ["not_found", "invalid_input", "reload_failed"]}}},
+         "then": {"properties": {"total": {"const": 0}}}}
+      ]
+    }
+  }
+}

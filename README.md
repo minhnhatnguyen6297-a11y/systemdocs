@@ -16,6 +16,8 @@ Tài liệu được tổ chức theo **phạm vi và flow**, không theo loại
 ```text
 docs/spec/
 ├── README.md                       # Tầm nhìn, ranh giới, kiến trúc và câu hỏi toàn hệ thống
+├── shared/
+│   └── administrative-lookup.md    # Lõi tra cứu tên xã/tỉnh dùng chung
 ├── notary_v2/
 │   ├── README.md                   # Input → Stage → Pool → Diagram → Word
 │   ├── input/

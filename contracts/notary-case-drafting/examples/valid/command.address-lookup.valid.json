@@ -2,6 +2,6 @@
   "contract_version": "desktopcommand.v1",
   "command_id": "a1b2c3d4-0001-4001-8001-000000000021",
   "command": "notary.address_lookup",
-  "payload": {"address": "Xã Gia Tân, huyện Gia Viễn, tỉnh Ninh Bình", "source_date": "2020-01-01", "target_date": "2026-10-04"},
+  "payload": {"query": "Thị trấn Lâm, huyện Ý Yên, tỉnh Nam Định", "presentation": "drafting"},
   "client_meta": {"shell_version": "0.1.0", "module": "document-review"}
 }
