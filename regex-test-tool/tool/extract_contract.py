@@ -1948,7 +1948,7 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
                 )[0].strip()
                 # Gia tri van xuoi kem so ("duoc cap de lam nha o 288 m2")
                 # — chi lay cum so, khong giu ca cau.
-                if re.search(r"[A-Za-z\u00c0-\u1ef9]", value):
+                if re.search(r"[A-Za-z\u00c0-\u1ef9]", re.sub(r"(?i)m2|m\u00b2|ha", "", value)):
                     _num = re.search(r"\d[\d.,]*", value)
                     value = _num.group(0) if _num else ""
                 # Dien tich khong co so nao la text van xuoi
