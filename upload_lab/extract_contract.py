@@ -2135,6 +2135,7 @@ _NAME_BOUNDARY_RE = re.compile(
     r"|\s+\d"
     r"|\s+(?i:cccd|cmnd|cc\b|c\u0103n c\u01b0\u1edbc|c\u0103n c\u1ee9|gi\u1ea5y\b|\u0111\u1ecba ch\u1ec9|th\u01b0\u1eddng tr\u00fa|c\u01b0 tr\u00fa"
     r"|h\u1ed9 kh\u1ea9u|qu\u00ea qu\u00e1n|ch\u1ee9c v\u1ee5|hi\u1ec7n\b|l\u00e0\b|thu\u1ed9c\b|theo\b|\u0111\u01b0\u1ee3c\b|n\u01a1i\b|v\u1ee3\b|ch\u1ed3ng\b|kh\u00f4ng\b|con\s+(?:\u0111\u1ebb|ru\u1ed9t))"
+    r"|\s+mang\s+(?=c\u0103n|cccd|cmnd|gi\u1ea5y|h\u1ed9 chi\u1ebfu|s\u1ed5|theo)"
     r"|\s+(?:sinh\b|ng\u00e0y\b|n\u0103m\s*[:\d]|s\u1ed1\s*[:\d]|c\u1ea5p\s*(?:ng\u00e0y|t\u1ea1i|:))"
 )
 
@@ -2229,7 +2230,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # "Toi ten la: Tran Gia Huy; Sinh ngay: ..." — ten tran khong
     # Ông/Bà, nhan ngay sinh cung dong de chac la nguoi.
     intro_bare_re = re.compile(
-        r"(?i)^\s*Tôi (?:tên )?là\s*:?\s*(?P<name>[^;|\-\u2013\n]+?)(?:\s*[;|\-\u2013]|\s+)[\s|]*"
+        r"(?i)^\s*(?:Tôi (?:tên )?là|Tên tôi là)\s*:?\s*(?P<name>[^;|\-\u2013\n]+?)(?:\s*[;|\-\u2013]|\s+)[\s|]*"
         r"(?:Sinh ngày|Ngày sinh|Sinh ngay|Ngay sinh|Sinh năm|Năm sinh|Sinh nam|Nam sinh)"
     )
     # Don hanh chinh co nhan nguoi danh so: "1. Người xin gia hạn sử dụng
@@ -2238,7 +2239,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     labeled_name_re = re.compile(
         r"(?i)^\s*(?:\[\d+\]\s*|\d+(?:\.\d+)*[.)]?\s*)?"
         r"(?:t\u00ean\s+)?(?:ng\u01b0\u1eddi|nguoi)\s+"
-        r"(?:xin|n\u1ed9p|nop|l\u1eadp|lap|\u0111\u1ec1 ngh\u1ecb|de nghi|y\u00eau c\u1ea7u|yeu cau|\u0111\u0103ng k\u00fd|dang ky|k\u00fd|ky)"
+        r"(?:xin|n\u1ed9p|nop|l\u1eadp|lap|\u0111\u1ec1 ngh\u1ecb|de nghi|y\u00eau c\u1ea7u|yeu cau|\u0111\u0103ng k\u00fd|dang ky|k\u00fd|ky|nh\u1eadn|nhan|giao)"
         r"[^:\n]{0,60}:\s*(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?)\s*$"
     )
     _ADDR_LABEL = _DIA_CHI_LABEL
@@ -2288,7 +2289,12 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             ngoac_nguoi_khac = bool(
                 re.search(r"\(\s*(?:Sinh|Ng\u00e0y|CCCD|CMND|C\u0103n c\u01b0\u1edbc)", line)
             )
-            if not la_pha_he and not ngoac_nguoi_khac:
+            # "CHI NHÁNH SÓC SƠN" — danh xung "Chị" an chu "Chi" cua to
+            # chuc, khong phai nguoi (cong van ngan hang).
+            title_fold = _fold_text((match.groupdict().get("title") or ""))
+            name_fold = _fold_text(match.groupdict().get("name") or "")
+            la_chi_nhanh = title_fold == "chi" and name_fold.startswith("nhanh")
+            if not la_pha_he and not ngoac_nguoi_khac and not la_chi_nhanh:
                 headers.append((idx, match))
         else:
             bare_match = bare_header_re.search(line)
@@ -2518,20 +2524,33 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         person.pop("_line_idx", None)
     # Form lap lai nguyen trang (DK18 in 2 mat): cung nguoi xuat hien 2 lan.
     # Dedupe khi trung ho_ten + cccd (uu tien), hoac ho_ten + ngay_sinh.
-    seen_person: dict[tuple[str, str], dict] = {}
+    seen_person: dict[str, dict] = {}
     deduped: list[dict] = []
     for person in persons:
         name_key = _fold_text(person.get("ho_ten") or "")
-        id_key = str(person.get("cccd") or person.get("ngay_sinh") or "").strip()
-        key = (name_key, id_key)
-        if name_key and id_key and key in seen_person:
-            # Gop thong tin: ban ghi sau co the bo sung truong con thieu.
-            base = seen_person[key]
+        base = seen_person.get(name_key) if name_key else None
+        # Gop khi trung ten va (a) co it nhat 1 truong phan biet khop
+        # khong-rong (cung cccd/ngay sinh), hoac (b) ca 2 deu trong het
+        # truong phan biet (nguoi chi co ten, form lap trang). Hai nguoi
+        # khac nhau cung ten thuong co du giay to mau thuan -> giu rieng.
+        mergeable = False
+        if base is not None:
+            a_vals = {f: str(base.get(f) or "").strip() for f in ("cccd", "ngay_sinh")}
+            b_vals = {f: str(person.get(f) or "").strip() for f in ("cccd", "ngay_sinh")}
+            conflict = any(
+                a_vals[f] and b_vals[f] and a_vals[f] != b_vals[f]
+                for f in ("cccd", "ngay_sinh")
+            )
+            shared = any(a_vals[f] and a_vals[f] == b_vals[f] for f in ("cccd", "ngay_sinh"))
+            both_empty = not any((*a_vals.values(), *b_vals.values()))
+            mergeable = not conflict and (shared or both_empty)
+        if mergeable:
             for field in ("ngay_sinh", "cccd", "noi_cap", "ngay_cap_cccd", "dia_chi"):
                 if not str(base.get(field) or "").strip() and str(person.get(field) or "").strip():
                     base[field] = person[field]
             continue
-        seen_person.setdefault(key, person)
+        if name_key:
+            seen_person[name_key] = person
         deduped.append(person)
     return deduped
 

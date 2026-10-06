@@ -1876,6 +1876,73 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual([q["ho_ten"] for q in ben_a["nguoi"]], ["Bùi Thị H"])
         self.assertEqual(ben_a["nguoi"][0]["dia_chi"], "Thôn A, xã B, tỉnh C")
 
+    def test_chi_nhanh_to_chuc_khong_phai_nguoi_va_ten_cat_mang(self):
+        # "CHI NHÁNH SÓC SƠN" khong phai nguoi ("Chị" an chu Chi cua to
+        # chuc); "Ông Trần Trí Thắng mang căn cước" -> ten "Trần Trí Thắng".
+        from extract_contract import _extract_parties_generic
+        text = (
+            "CÔNG VĂN\n"
+            "CHI NHÁNH SÓC SƠN\n"
+            "1. BÊN NHẬN THẾ CHẤP: (Bên A)\n"
+            "- Người đại diện là: Ông Trần Trí Thắng mang căn cước công dân "
+            "số 001076029367 do Cục cảnh sát cấp ngày 14/04/2021;\n"
+            "2. BÊN THẾ CHẤP: (Bên B)\n"
+            "Bà Ngô Thị B, ngày sinh: 20/09/1973;\n"
+            "Căn cước công dân số: 001173002114 do Cục cảnh sát cấp ngày 10/08/2022;\n"
+            "Lời chứng.\n"
+        )
+        ben_a, ben_b = _extract_parties_generic(text, "generic")
+        nguoi = ben_a["nguoi"] + ben_b["nguoi"]
+        self.assertNotIn("NHÁNH SÓC SƠN", [q["ho_ten"] for q in nguoi])
+        self.assertIn("Trần Trí Thắng", [q["ho_ten"] for q in nguoi])
+
+    def test_ten_toi_la_va_nguoi_nhan_giao_bien_ban(self):
+        # "Tên tôi là: X; Sinh ngày" (don xac nhan sai ten) va "NGƯỜI
+        # NHẬN:/NGƯỜI GIAO:" (bien ban giao nhan) deu la nguoi.
+        from extract_contract import _extract_parties_generic
+        text = (
+            "ĐƠN ĐỀ NGHỊ\n"
+            "Tên tôi là: Hoàng Thị Tuyết; Sinh ngày: 19/03/1966;\n"
+            "Căn cước số: 036166013146 do Bộ Công an cấp ngày 02/02/2026;\n"
+            "Thường trú tại: Thôn C, xã Y, tỉnh N.\n"
+            "Lời chứng.\n"
+        )
+        ben_a, _ = _extract_parties_generic(text, "generic")
+        self.assertEqual([q["ho_ten"] for q in ben_a["nguoi"]], ["Hoàng Thị Tuyết"])
+        self.assertEqual(ben_a["nguoi"][0]["cccd"], "036166013146")
+
+        text2 = (
+            "BIÊN BẢN GIAO NHẬN TÀI LIỆU\n"
+            "NGƯỜI NHẬN: Trịnh Minh Giang\n"
+            "NGƯỜI GIAO: Trịnh Quang Trung\n"
+            "Lời chứng.\n"
+        )
+        ben_a2, _ = _extract_parties_generic(text2, "generic")
+        self.assertEqual(
+            [q["ho_ten"] for q in ben_a2["nguoi"]],
+            ["Trịnh Minh Giang", "Trịnh Quang Trung"],
+        )
+
+    def test_dedupe_nguoi_chi_co_ten_qua_form_lap(self):
+        # Bien ban in 2 lan: nguoi chi co ten (khong cccd/ngay sinh) van
+        # gop thanh 1 ban ghi.
+        from extract_contract import _extract_parties_generic
+        text = (
+            "BIÊN BẢN GIAO NHẬN\n"
+            "NGƯỜI NHẬN: Trịnh Minh Giang\n"
+            "NGƯỜI GIAO: Trịnh Quang Trung\n"
+            "BÊN GIAO BÊN NHẬN\n"
+            "BIÊN BẢN GIAO NHẬN\n"
+            "NGƯỜI NHẬN: Trịnh Minh Giang\n"
+            "NGƯỜI GIAO: Trịnh Quang Trung\n"
+            "Lời chứng.\n"
+        )
+        ben_a, _ = _extract_parties_generic(text, "generic")
+        self.assertEqual(
+            [q["ho_ten"] for q in ben_a["nguoi"]],
+            ["Trịnh Minh Giang", "Trịnh Quang Trung"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
