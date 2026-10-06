@@ -2150,7 +2150,7 @@ _DIA_CHI_LABEL = (
     r"(?:N\u01a1i\s+)?(?:th\u01b0\u1eddng tr\u00fa|c\u01b0 tr\u00fa)\s+t\u1ea1i"
     r"|N\u01a1i\s+th\u01b0\u1eddng\s+tr\u00fa|N\u01a1i\s+c\u01b0\s+tr\u00fa"
     r"|H\u1ed9\s+kh\u1ea9u\s*(?:th\u01b0\u1eddng\s+tr\u00fa)?\s*:"
-    r"|\u0110\u1ecba ch\u1ec9\s+n\u01a1i\s+c\u01b0\s+tr\u00fa|\u0110\u1ecba ch\u1ec9\s+\u0111\u0103ng\s+k\u00fd"
+    r"|\u0110\u1ecba ch\u1ec9\s+n\u01a1i\s+c\u01b0\s+tr\u00fa|\u0110\u1ecba ch\u1ec9\s+c\u01b0\s+tr\u00fa|\u0110\u1ecba ch\u1ec9\s+\u0111\u0103ng\s+k\u00fd"
     r"|\u0110\u1ecba ch\u1ec9\s+th\u01b0\u1eddng\s+tr\u00fa|Tr\u00fa\s+t\u1ea1i"
     r"|\u0110\u0103ng\s+k\u00fd\s+(?:th\u01b0\u1eddng\s+tr\u00fa|h\u1ed9\s+kh\u1ea5u)|HKTT"
     r"|\u0110\u1ecba ch\u1ec9\s+ch\u1ed7 \u1edf(?:\s+hi\u1ec7n t\u1ea1i)?|\u0110\u1ecba ch\u1ec9\s+n\u01a1i \u1edf(?:\s+hi\u1ec7n t\u1ea1i)?"
@@ -2259,7 +2259,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?:v\u00e0\s+)?(?P<title>\u00f4ng/b\u00e0|ong/ba|\u00f4ng|ong|b\u00e0|ba|anh|ch\u1ecb|chi)\s*:?\s*"
         r"(?P<name>.+?)(?=[\s|]+\s*(?:[\-\u2013]\s*)?(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|sinh n\u0103m|sinh ng\u00e0y)\s*[:\u2013-]?\s*(?:(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})|\s+(?:[\-\u2013]\s+)?(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:|\s+c\u00f3\s+(?:(?:m\u1eb9|b\u1ed1|cha|con|v\u1ee3|ch\u1ed3ng)(?:\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i))?|\d)\b|\s*\(\s*(?:Sinh|Ng\u00e0y)|[;]|$)"
     )
-    birth_re = re.compile(r"(?i)(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)\s*[:\u2013-]?\s*(\d{1,2}/\d{1,2}/\d{4})")
+    birth_re = re.compile(r"(?i)(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Ng\u00e0y/th\u00e1ng/n\u0103m\s+sinh)\s*[:\u2013-]?\s*(\d{1,2}/\d{1,2}/\d{4})")
     # Nguoi lon tuoi thuong chi ghi "Sinh nam 1965" — database chap nhan YYYY
     # (docs/spec/notary_v2/stage.md muc 5) nen giu nam lam ngay_sinh.
     # Gia tri chi co nam van nhan du nhan viet "Sinh ngay: 1982" (loi mau thuc te).
@@ -2299,8 +2299,9 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # co giay to, nen danh dau de vuot cong loc "phai co ngay sinh/ID".
     labeled_name_re = re.compile(
         r"(?i)^\s*(?:\[\d+\]\s*|\d+(?:\.\d+)*[.)]?\s*)?"
-        r"(?:t\u00ean\s+)?(?:ng\u01b0\u1eddi|nguoi)\s+"
+        r"(?:(?:t\u00ean\s+)?(?:ng\u01b0\u1eddi|nguoi)\s+"
         r"(?:xin|n\u1ed9p|nop|l\u1eadp|lap|\u0111\u1ec1 ngh\u1ecb|de nghi|y\u00eau c\u1ea7u|yeu cau|\u0111\u0103ng k\u00fd|dang ky|k\u00fd|ky|nh\u1eadn|nhan|giao)"
+        r"|H\u1ecd\s+v\u00e0\s+t\u00ean)"
         r"[^:\n]{0,60}:\s*(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?)\s*$"
     )
     _ADDR_LABEL = _DIA_CHI_LABEL
@@ -2397,7 +2398,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         else:
             bare_match = bare_header_re.search(line)
             if bare_match:
-                bare_name = re.sub(r"\s+", " ", bare_match.group("name")).strip(" ;,.")
+                bare_name = re.sub(r"\s+", " ", bare_match.groupdict().get("name") or "").strip(" ;,.")
                 if len(bare_name.split()) >= 2 and not re.search(r"\d", bare_name):
                     bare_fold = _fold_text(bare_name)
                     if bare_fold and not bare_name_noise_re.search(bare_fold):
@@ -2405,7 +2406,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             else:
                 intro_match = intro_bare_re.search(line)
                 if intro_match:
-                    intro_name = re.sub(r"\s+", " ", intro_match.group("name")).strip(" ;,.")
+                    intro_name = re.sub(r"\s+", " ", intro_match.groupdict().get("name") or "").strip(" ;,.")
                     if len(intro_name.split()) >= 2 and not re.search(r"\d", intro_name):
                         intro_fold = _fold_text(intro_name)
                         if intro_fold and not bare_name_noise_re.search(intro_fold):
@@ -2413,14 +2414,14 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                 elif re.search(r"\d", line):
                     lead_match = lead_role_re.search(line)
                     if lead_match:
-                        lead_name = _cat_ho_ten(lead_match.group("name"))
+                        lead_name = _cat_ho_ten(lead_match.groupdict().get("name") or "")
                         if len(lead_name.split()) >= 2 and not re.search(r"\d", lead_name):
                             lead_fold = _fold_text(lead_name)
                             if lead_fold and not bare_name_noise_re.search(lead_fold):
                                 headers.append((idx, lead_match))
         labeled_match = labeled_name_re.search(line)
         if labeled_match:
-            labeled_name = _cat_ho_ten(labeled_match.group("name"))
+            labeled_name = _cat_ho_ten(labeled_match.groupdict().get("name") or "")
             if len(labeled_name.split()) >= 2 and not bare_name_noise_re.search(_fold_text(labeled_name)):
                 headers.append((idx, labeled_match))
                 labeled_person_idx.add(idx)
@@ -2485,7 +2486,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                 gioi_tinh = ""
             else:
                 gioi_tinh = "B\u00e0"
-            ho_ten = re.sub(r"\s+", " ", match.group("name")).split("|")[0].strip(" ;,.-\u2013\u2014")
+            ho_ten = re.sub(r"\s+", " ", match.groupdict().get("name") or "").split("|")[0].strip(" ;,.-\u2013\u2014")
             ho_ten = re.split(r"(?i)\s*[-\u2013\u2014]\s+(?:con\b|ch\u00e1u\b|chau\b|v\u1ee3\b|ch\u1ed3ng\b|l\u00e0\b|b\u1ed1\b|m\u1eb9\b|cha\b|b\u00ean\b|ch\u1ecb\b|chi\b|anh\b|em\b|c\u00f4\b|co\b|ch\u00fa\b|chu\b|b\u00e1c\b|bac\b|d\u00ec\b|di\b|c\u1eadu\b|cau\b|m\u1ee3\b|mo\b|\u00f4ng\b|b\u00e0\b)", ho_ten, maxsplit=1)[0].strip(" ;,.-\u2013\u2014")
             ho_ten = _cat_ho_ten(ho_ten)
             person = {
@@ -2569,6 +2570,28 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             person["ngay_cap_cccd"] = _doi_ngay_excel(chunk_scan)
         address_match = next((item for item in address_lines if line_idx <= item[0] < next_idx), None)
         person["dia_chi"] = address_match[2] if address_match else ""
+        if not person["dia_chi"]:
+            # To khai thue: "[10] Dia chi cu tru:" chia o con "[10.3] To/thon:",
+            # "[10.5] Quan/huyen:"... — chi gop o con cung so voi nhan cha
+            # (tranh [17.x] dia chi thua dat) va bo phan da chua san (11/10/2026).
+            parent = re.search(
+                r"\[(\d+)\]\s*(?:\u0110\u1ecba ch\u1ec9|\u0110\u1ecba ch\u1edd)[^\n:]{0,40}:",
+                chunk_scan,
+            )
+            if parent:
+                sub_re = re.compile(
+                    r"\[" + re.escape(parent.group(1)) + r"\.\d+\]\s*"
+                    r"(?:S\u1ed1\s+nh\u00e0|\u0110\u01b0\u1eddng/ph\u1ed1|T\u1ed5/th\u00f4n|Ph\u01b0\u1eddng/x\u00e3/th\u1ecb tr\u1ea5n|Qu\u1eadn/huy\u1ec7n|T\u1ec9nh/Th\u00e0nh ph\u1ed1)"
+                    r"\s*:\s*([^\[\n]+?)(?=\s*\[\d|\s*$)"
+                )
+                sub_parts: list[str] = []
+                for sm in sub_re.finditer(chunk_scan):
+                    val = sm.group(1).strip(" ;,.|\t")
+                    val = re.sub(r"^[.\u2026\s]+|[.\u2026\s]+$", "", val)
+                    if val and all(val not in p for p in sub_parts):
+                        sub_parts.append(val)
+                if sub_parts:
+                    person["dia_chi"] = ", ".join(sub_parts)
         dia_chi_line = address_match[1] if address_match else ""
         if dia_chi_line and re.search(
             r"(?i)sinh\s+ng|c\u0103n\s+c\u01b0\u1edbc|l\u00e0\s+(?:v\u1ee3|con|ch\u1ed3ng)",
@@ -2910,9 +2933,23 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
         r"|n\u0103m\s*[:\u2013-]?\s*(?P<death_y>(?:19|20)\d{2})"
         + death_y_evidence + r")"
     )
-    matches = list(death_re.finditer(source))
+    # Dang ngoac gop: "ong X (sinh nam 1956, da chet ngay 16/01/2025)" —
+    # cum sinh+chet nam trong ngoac bi nhom alias nuot o death_re (11/10/2026).
+    death_paren_re = re.compile(
+        r"(?i)(?P<title>\u00d4ng|B\u00e0|Anh|Ch\u1ecb)\s*:?\s*(?P<name>[^;(\n.,]+?)"
+        r"\s*\(\s*(?:Sinh\s+n\u0103m|N\u0103m\s+sinh|Sinh\s+ng\u00e0y|Ng\u00e0y\s+sinh)"
+        r"\s*[:\u2013-]?\s*(?P<birth>(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})"
+        r"\s*[,;]?\s*(?:\u0111\u00e3\s+)?ch\u1ebft\s+"
+        r"(?:ng\u00e0y\s*[:\u2013-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
+        r"|n\u0103m\s*[:\u2013-]?\s*(?P<death_y>(?:19|20)\d{2})"
+        + death_y_evidence + r")\s*\)"
+    )
+    matches = sorted(
+        list(death_re.finditer(source)) + list(death_paren_re.finditer(source)),
+        key=lambda m: m.start(),
+    )
     for match_idx, match in enumerate(matches):
-        raw_name = re.sub(r"\s+", " ", match.group("name")).strip(" ;,.-")
+        raw_name = re.sub(r"\s+", " ", match.groupdict().get("name") or "").strip(" ;,.-")
         raw_name = re.sub(r"(?i)^\d+\.\s*", "", raw_name)
         raw_name = re.sub(r"(?i)^(?:l\u00e0|bao g\u1ed3m)\s+", "", raw_name)
         # Ten chi gom toi da 6 tu va moi tu phai viet hoa — cau van ke
@@ -2943,12 +2980,12 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
             raw_name = inner_name
             match_title = inner.group(1)
         else:
-            match_title = match.group("title")
+            match_title = match.groupdict().get("title")
         title_fold = _fold_text(match_title)
-        death_val = match.group("death") or match.group("death_y") or ""
+        death_val = match.groupdict().get("death") or match.groupdict().get("death_y") or ""
         # Tu choi: "chet nam" khong trich luc chi nhan khi truoc ten co
         # tu quan he (bo/me/vo/chong...) — tranh nhan ten ghep thoang.
-        if is_refusal and match.group("death_y") and not match.group("death"):
+        if is_refusal and match.groupdict().get("death_y") and not match.groupdict().get("death"):
             tail_after = source[match.end():match.end() + 80]
             if not re.search(r"(?i)tr\u00edch\s+l\u1ee5c|khai\s+t\u1eed|\u0111\u01a1n\s+xin\s+x\u00e1c\s+nh\u1eadn", tail_after):
                 head_before = source[max(0, match.start() - 100):match.start()]
@@ -2959,14 +2996,14 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
                     continue
         # Nguoi thu 2 cung dong ("... và bà B; chết ngày ...") — tach thanh
         # ban ghi rieng, dung chung truong ngay/giay to cua cap.
-        name2 = re.sub(r"\s+", " ", match.group("name2") or "").strip(" ;,.-")
+        name2 = re.sub(r"\s+", " ", match.groupdict().get("name2") or "").strip(" ;,.-")
         if name2:
             t2 = name2.split()
             key2 = f"{_fold_text(name2)}|{death_val}"
             if t2 and len(t2) <= 6 and all(tok[0].isupper() for tok in t2) and key2 not in seen:
                 seen.add(key2)
                 found.append({
-                    "gioi_tinh": "\u00d4ng" if _fold_text(match.group("title2") or "") in ("ong", "anh") else "B\u00e0",
+                    "gioi_tinh": "\u00d4ng" if _fold_text(match.groupdict().get("title2") or "") in ("ong", "anh") else "B\u00e0",
                     "ho_ten": name2,
                     "ten_goi_khac": "",
                     "ngay_sinh": "",
@@ -2978,7 +3015,7 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
                     "loai_giay_to": "",
                     "dia_chi": "",
                 })
-        alias = re.sub(r"\s+", " ", match.group("alias") or "").strip()
+        alias = re.sub(r"\s+", " ", match.groupdict().get("alias") or "").strip()
         alias = re.sub(r"(?i)^t\u00ean g\u1ecdi kh\u00e1c l\u00e0\s+", "", alias)
         tail_end = min(match.end() + 400, len(source))
         if match_idx + 1 < len(matches):
@@ -3011,7 +3048,7 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
         if not raw_name or key in seen:
             continue
         seen.add(key)
-        _birth = match.group("birth") or ""
+        _birth = match.groupdict().get("birth") or ""
         ngay_sinh, chi_co_nam = _chuan_hoa_ngay_sinh(
             _birth if "/" in _birth else "", _birth if "/" not in _birth else ""
         )

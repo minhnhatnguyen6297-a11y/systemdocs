@@ -2162,6 +2162,45 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # Van ban phan chia: cung cau do phai bi loai (can trich luc).
         self.assertEqual(_extract_nguoi_chet(text, "inheritance_partition"), [])
 
+    def test_nguoi_chet_ngoac_gop_sinh_va_chet(self):
+        # "Bố chúng tôi là ông X (sinh năm 1956, đã chết ngày 16/01/2025)
+        # theo Trích lục khai tử" — cum sinh+chết trong ngoặc (11/10/2026).
+        from extract_contract import _extract_nguoi_chet
+        text = (
+            "Bố chúng tôi là ông Đỗ Đình Thắm (sinh năm 1956, đã chết ngày 16/01/2025) "
+            "theo Trích lục khai tử (Bản sao) số 04/TLKT-BS của Uỷ ban nhân dân."
+        )
+        chet = _extract_nguoi_chet(text, "inheritance_refusal")
+        self.assertEqual(len(chet), 1)
+        self.assertEqual(chet[0]["ho_ten"], "Đỗ Đình Thắm")
+        self.assertEqual(chet[0]["ngay_sinh"], "1956")
+        self.assertEqual(chet[0]["ngay_chet"], "16/01/2025")
+        self.assertEqual(_extract_nguoi_chet(text, "inheritance_partition"), chet)
+
+    def test_to_khai_thue_ho_va_ten_nhan_nguoi(self):
+        # Tờ khai thuế điền sẵn: "[04] Họ và tên:", "[05] Ngày/tháng/năm sinh:",
+        # "[10.x]" ô địa chỉ con — người phải ra đủ trường (11/10/2026).
+        from extract_contract import _extract_parties_generic
+        text = (
+            "TỜ KHAI THUẾ SỬ DỤNG ĐẤT PHI NÔNG NGHIỆP\n"
+            "1. Người nộp thuế:\n"
+            "[04] Họ và tên: Ngô Xuân Ninh\n"
+            "[05] Ngày/tháng/năm sinh: 11/3/1987\n"
+            "[07] Số CMND/Hộ chiếu/CCCD: 036087006087\n"
+            "[08] Ngày cấp: 08/05/2021 [09] Nơi cấp: Cục cảnh sát\n"
+            "[10] Địa chỉ cư trú:\n"
+            "[10.3] Tổ/thôn: Tổ 8, Thị trấn Lâm, huyện Ý Yên, tỉnh Nam Định\n"
+            "[10.5] Quận/huyện: huyện Ý Yên\n"
+            "[17.3] Tổ/thôn: tỉnh lộ 485, Thôn An Lạc\n"
+        )
+        ben_a, ben_b = _extract_parties_generic(text, "generic")
+        self.assertEqual(len(ben_a["nguoi"]), 1)
+        ninh = ben_a["nguoi"][0]
+        self.assertEqual(ninh["ho_ten"], "Ngô Xuân Ninh")
+        self.assertEqual(ninh["ngay_sinh"], "11/3/1987")
+        self.assertEqual(ninh["cccd"], "036087006087")
+        self.assertEqual(ninh["dia_chi"], "Tổ 8, Thị trấn Lâm, huyện Ý Yên, tỉnh Nam Định")
+
 
 if __name__ == "__main__":
     unittest.main()
