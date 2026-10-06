@@ -750,9 +750,9 @@ def _find_tai_san_inheritance_partition(text: str) -> str:
     return _extract_block_by_folded_patterns(
         text,
         (
-            r"quyen su dung dat(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:co dia chi(?: tai)?|tai dia chi)\s*:?",
-            r"nha o va quyen su dung dat o(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:co dia chi(?: tai)?|tai dia chi)\s*:?",
-            r"phan quyen su dung dat(?: cua[^\n]{0,200})?[^\n]{0,300}?(?:co dia chi(?: tai)?|tai dia chi)\s*:?",
+            r"quyen su dung dat(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:)",
+            r"nha o va quyen su dung dat o(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:)",
+            r"phan quyen su dung dat(?: cua[^\n]{0,200})?[^\n]{0,300}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:)",
             r"quyen su dung dat[^\n]{0,300}?theo giay chung nhan",
             r"thua dat so[^\n]{0,200}?(?:co dia chi tai|tai dia chi|theo giay chung nhan|theo ban do)",
         ),
@@ -774,8 +774,8 @@ def _find_tai_san_inheritance_refusal(text: str) -> str:
         text,
         (
             r"(?m)^\s*(?:1\.\s*)?tai san(?: thu nhat)?\s*:",
-            r"quyen su dung dat(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:co dia chi(?: tai)?|tai dia chi)\s*:?",
-            r"phan quyen su dung dat(?: cua[^\n]{0,200})?[^\n]{0,300}?(?:co dia chi(?: tai)?|tai dia chi)\s*:?",
+            r"quyen su dung dat(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:)",
+            r"phan quyen su dung dat(?: cua[^\n]{0,200})?[^\n]{0,300}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:)",
         ),
         (
             r"(?m)^\s*bang van ban nay\b",
