@@ -1384,6 +1384,41 @@ def _tach_thua_cell_stream(cells: list[str], context: dict, parcels: list[dict])
             continue
         if re.match(r"^\d+\.\d+", data[pos].strip()):
             break
+        # Bo 3 so lien tiep (to, thua, tong DT) sau "Trong do" = thua moi
+        # ("...155|Dat o|Lau dai|23|32|160|Ao nuoi ca|12/2043...").
+        if (
+            pos + 2 < len(data)
+            and _is_pure_number_cell(data[pos])
+            and _is_pure_number_cell(data[pos + 1])
+            and _is_pure_number_cell(data[pos + 2])
+        ):
+            current = _new_thua_dat(context)
+            to_head, to_note = _tach_nay_la(data[pos])
+            thua_head, thua_note = _tach_nay_la(data[pos + 1])
+            current["so_to_ban_do"] = _clean_so_to_ban_do(to_head)
+            current["so_thua_dat"] = thua_head
+            current["dien_tich"] = data[pos + 2]
+            _ghi_nay = "; ".join(n for n in (to_note, thua_note) if n)
+            if _ghi_nay:
+                current["phan_ghi_them"] = _ghi_nay
+            parcels.append(current)
+            pos += 3
+            # O chu tiep theo thuoc thua moi ("Ao nuoi ca", "12/2043
+            # (nay la 31/12/2063)") — dung khi gap so (thua/chi tiet ke).
+            while pos < len(data) and _cell_has_letters(data[pos]) and len(data[pos]) <= 100:
+                cell_txt = data[pos]
+                head_txt, note_txt = _tach_nay_la(cell_txt)
+                if note_txt:
+                    current["phan_ghi_them"] = (current["phan_ghi_them"] + "; " + note_txt).lstrip("; ")
+                    cell_txt = head_txt
+                if not current["muc_dich_su_dung"]:
+                    current["muc_dich_su_dung"] = cell_txt
+                elif not current["thoi_han_su_dung"]:
+                    current["thoi_han_su_dung"] = cell_txt
+                else:
+                    break
+                pos += 1
+            continue
         if (
             pos + 2 < len(data)
             and _is_pure_number_cell(data[pos])
@@ -1403,7 +1438,10 @@ def _tach_thua_cell_stream(cells: list[str], context: dict, parcels: list[dict])
                     break
                 if re.match(r"^\d+\.\d+", peek.strip()):
                     break
-                if _is_pure_number_cell(peek) and pos + 1 < len(data) and _cell_has_letters(data[pos + 1]):
+                if _is_pure_number_cell(peek) and pos + 1 < len(data) and (
+                    _cell_has_letters(data[pos + 1])
+                    or _is_pure_number_cell(data[pos + 1])
+                ):
                     break
                 extras.append(peek)
                 pos += 1

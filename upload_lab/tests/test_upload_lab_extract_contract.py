@@ -2125,6 +2125,27 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertIn("180 m2", cts)
         self.assertIn("20 m2", cts)
 
+    def test_bang_2_thua_lien_sau_trong_do(self):
+        # Dong bang .doc: "...|23|34|425|Trong do|270|Dat vuon tap|12/2043|
+        # 155|Dat o|Lau dai|23|32|160|Ao nuoi ca|12/2043 (nay la...)" — bo
+        # 3 so sau "Trong do" la thua MOI, khong gop vao chi tiet thua truoc.
+        from extract_contract import _tach_thua_cell_stream, _new_thua_dat
+        cells = [c.strip() for c in (
+            "Số tờ bản đồ|Số thửa|Diện tích (m2)|Mục đích sử dụng|Thời hạn sử dụng||"
+            "23|34|425||||||Trong đó|||||||270|Đất vườn tạp|12/2043|||155|Đất ở|Lâu dài||"
+            "23|32|160|Ao nuôi cá|12/2043 (nay là 31/12/2063)"
+        ).split("|")]
+        parcels: list[dict] = []
+        self.assertTrue(_tach_thua_cell_stream(cells, {}, parcels))
+        self.assertEqual([p["so_thua_dat"] for p in parcels], ["34", "32"])
+        self.assertEqual(parcels[0]["dien_tich"], "425")
+        self.assertEqual(
+            [(c["dien_tich"], c["muc_dich_su_dung"]) for c in parcels[0]["chi_tiet_dien_tich"]],
+            [("270", "Đất vườn tạp"), ("155", "Đất ở")],
+        )
+        self.assertEqual(parcels[1]["dien_tich"], "160")
+        self.assertEqual(parcels[1]["muc_dich_su_dung"], "Ao nuôi cá")
+
 
 if __name__ == "__main__":
     unittest.main()
