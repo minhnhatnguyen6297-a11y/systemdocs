@@ -541,6 +541,7 @@ def _find_title_line(text: str) -> str:
                 "bien ban ",
                 "thong bao ",
                 "giao dich ",
+                "danh muc ",
             )
         ):
             return line
@@ -2092,7 +2093,8 @@ _DIA_CHI_LABEL = (
     r"|\u0110\u1ecba ch\u1ec9\s+n\u01a1i\s+c\u01b0\s+tr\u00fa|\u0110\u1ecba ch\u1ec9\s+\u0111\u0103ng\s+k\u00fd"
     r"|\u0110\u1ecba ch\u1ec9\s+th\u01b0\u1eddng\s+tr\u00fa|Tr\u00fa\s+t\u1ea1i"
     r"|\u0110\u0103ng\s+k\u00fd\s+(?:th\u01b0\u1eddng\s+tr\u00fa|h\u1ed9\s+kh\u1ea5u)|HKTT"
-    r"|\u0110\u1ecba ch\u1ec9(?!\s+(?:th\u1eeda|nh\u00e0|\u0111\u1ea5t|li\u00ean h\u1ec7|giao d\u1ecbch))"
+    r"|\u0110\u1ecba ch\u1ec9\s+ch\u1ed7 \u1edf(?:\s+hi\u1ec7n t\u1ea1i)?|\u0110\u1ecba ch\u1ec9\s+n\u01a1i \u1edf(?:\s+hi\u1ec7n t\u1ea1i)?"
+    r"|\u0110\u1ecba ch\u1ec9(?:\s*/\s*(?:tr\u1ee5 s\u1edf ch\u00ednh|li\u00ean h\u1ec7))?(?!\s*(?:/\s*tr\u1ee5|th\u1eeda|nh\u00e0|\u0111\u1ea5t|li\u00ean h\u1ec7|giao d\u1ecbch|ch\u1ed7|n\u01a1i))"
 )
 
 
@@ -2101,12 +2103,28 @@ def _cat_duoi_dia_chi(value: str) -> str:
     chi: cum quan he "Là vợ/con của..." hoac dau nguoi tiep theo
     ("... Xã Y  Ông: Nguyễn Bá Văn", "... Ninh Bình  2. Ông ...")."""
     addr_val = re.sub(r"\s+", " ", str(value or "")).strip(" .;")
+    # Danh sach dia chi theo nguoi: "Địa chỉ: - Bùi Thị Hường: Thôn X ..."
+    # — cat nhan "- <Tên>:" o dau (toi da 5 tu viet hoa, khong chua tu khoa
+    # dia gioi nhu xa/phuong/thon).
+    head_name = re.match(
+        r"^-\s*([A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,40}?)\s*:\s*",
+        addr_val,
+    )
+    if head_name and not re.search(
+        r"(?i)\b(x\u00e3|xa|ph\u01b0\u1eddng|phuong|th\u00f4n|thon|huy\u1ec7n|huyen|t\u1ec9nh|tinh|ng\u00f5|ngo|s\u1ed1|so|th\u1eeda|thua)\b",
+        head_name.group(1),
+    ):
+        addr_val = addr_val[head_name.end():]
     addr_val = re.split(
         r"(?i)\s+(?:l\u00e0|la)\s+(?:v\u1ee3|ch\u1ed3ng|con|cha|m\u1eb9|ch\u00e1u|anh|ch\u1ecb)\b"
         r"|\s+\d+[.)]\s+(?=\u00d4ng|B\u00e0|Anh|Ch\u1ecb|[A-Z\u00c0-\u1ef9][a-z\u00e0-\u1ef9]*\s+[A-Z\u00c0-\u1ef9])"
         r"|\s+(?:\u00d4ng|B\u00e0|Anh|Ch\u1ecb)\s*:",
         addr_val, maxsplit=1,
     )[0].strip(" .;,")
+    # Nhan trong ("2. Địa chỉ/trụ sở chính:") de lai dau ":" — khong phai
+    # dia chi, tra rong thay vi day rac len form.
+    if not re.search(r"[0-9A-Za-z\u00c0-\u1ef9]", addr_val):
+        return ""
     return addr_val
 
 
@@ -2186,7 +2204,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     birth_year_re = re.compile(r"(?i)(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh)\s*[:\u2013-]?\s*((?:19|20)\d{2})(?!\d)")
     id_re = re.compile(r"(?i)(?:C\u0103n c\u01b0\u1edbc(?:\s+c\u00f4ng(?:\s+d\u00e2n)?)?(?:\s+m\u1edbi)?|Can cuoc(?:\s+cong(?:\s+dan)?)?|CCCD|CMND|\bCC)\s*(?:[A-Z\u00c0-\u1ef9\u0110][^\d:;\n]{0,40}?)?\s*(?:s\u1ed1|so)\s*:?\s*(\d{6,12})")
     issue_place_re = re.compile(r"(?i)\bdo\s+([^\n]+?)\s+(?:c\u1ea5p ng\u00e0y|cap ngay)")
-    issue_date_re = re.compile(r"(?i)(?:c\u1ea5p ng\u00e0y|cap ngay|c\u1ea5p v\u00e0o ng\u00e0y)\s*:?\s*(\d{1,2}/\d{1,2}/\d{4})")
+    issue_date_re = re.compile(r"(?i)(?:c\u1ea5p ng\u00e0y|cap ngay|c\u1ea5p v\u00e0o ng\u00e0y|ng\u00e0y c\u1ea5p|ngay cap)\s*:?\s*(\d{1,2}/\d{1,2}/\d{4})")
     # Nguoi tham gia thua ke ghi ten tran khong kem "Ong/Ba", vi du:
     # "Nguyen Van A - Vo ong X Sinh ngay: 01/01/1933;" — chi nhan khi cung
     # dong co ngay sinh (han che nhan nham cau van mo ta nhu "Di san").
@@ -2214,9 +2232,18 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         r"(?i)^\s*Tôi (?:tên )?là\s*:?\s*(?P<name>[^;|\-\u2013\n]+?)(?:\s*[;|\-\u2013]|\s+)[\s|]*"
         r"(?:Sinh ngày|Ngày sinh|Sinh ngay|Ngay sinh|Sinh năm|Năm sinh|Sinh nam|Nam sinh)"
     )
+    # Don hanh chinh co nhan nguoi danh so: "1. Người xin gia hạn sử dụng
+    # đất: Nguyễn Thị Chúc" — ten khong kem danh xung Ong/Ba va thuong khong
+    # co giay to, nen danh dau de vuot cong loc "phai co ngay sinh/ID".
+    labeled_name_re = re.compile(
+        r"(?i)^\s*(?:\[\d+\]\s*|\d+(?:\.\d+)*[.)]?\s*)?"
+        r"(?:t\u00ean\s+)?(?:ng\u01b0\u1eddi|nguoi)\s+"
+        r"(?:xin|n\u1ed9p|nop|l\u1eadp|lap|\u0111\u1ec1 ngh\u1ecb|de nghi|y\u00eau c\u1ea7u|yeu cau|\u0111\u0103ng k\u00fd|dang ky|k\u00fd|ky)"
+        r"[^:\n]{0,60}:\s*(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?)\s*$"
+    )
     _ADDR_LABEL = _DIA_CHI_LABEL
     address_re = re.compile(
-        r"(?im)^\s*(?:\d+(?:\.\d+)*[.)]?\s*)?(?:C\u1ea3 hai(?:\s+\u00f4ng b\u00e0|\s+v\u1ee3 ch\u1ed3ng)?|C\u00f9ng|Hai v\u1ee3 ch\u1ed3ng)?\s*(?:"
+        r"(?im)^\s*(?:\[\d+\]\s*|\d+(?:\.\d+)*[.)]?\s*)?(?:C\u1ea3 hai(?:\s+\u00f4ng b\u00e0|\s+v\u1ee3 ch\u1ed3ng)?|C\u00f9ng|Hai v\u1ee3 ch\u1ed3ng)?\s*(?:"
         + _ADDR_LABEL + r")\s*:?\s*(.+)$"
     )
     shared_addr_re = re.compile(
@@ -2232,6 +2259,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     lines = _split_section_lines(section)
     headers: list[tuple[int, re.Match[str]]] = []
     address_lines: list[tuple[int, str, str]] = []
+    labeled_person_idx: set[int] = set()
     prev_intro_bare = False
     for idx, line in enumerate(lines):
         # "Toi la:" dung rieng 1 dong -> ten tran o dong ke tiep
@@ -2286,11 +2314,23 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                             lead_fold = _fold_text(lead_name)
                             if lead_fold and not bare_name_noise_re.search(lead_fold):
                                 headers.append((idx, lead_match))
+        labeled_match = labeled_name_re.search(line)
+        if labeled_match:
+            labeled_name = _cat_ho_ten(labeled_match.group("name"))
+            if len(labeled_name.split()) >= 2 and not bare_name_noise_re.search(_fold_text(labeled_name)):
+                headers.append((idx, labeled_match))
+                labeled_person_idx.add(idx)
         # Khong "continue" sau header: dia chi co the nam chung dong
         # voi ten ("...; Nơi thường trú: X").
         address_match = address_re.search(line)
         if not address_match:
             address_match = address_fallback_re.search(line)
+            if address_match:
+                # Nhan dia chi nam TRONG ngoac "(...Thuong tru tai: X)" thuoc
+                # ve nguoi khac (vo/chong ghi kem) — bo qua.
+                before = line[: address_match.start(1)]
+                if before.count("(") > before.count(")"):
+                    address_match = None
         if address_match:
             addr_val = _cat_duoi_dia_chi(address_match.group(1))
             address_lines.append(
@@ -2319,6 +2359,16 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             )
         chunk_lines = [line for line in chunk_lines if line]
         chunk = "\n".join(chunk_lines)
+        # Ngoac "(Sinh ngay/CCCD/Thuong tru...)" trong chunk thuoc ve NGUOI
+        # KHAC (vo/chong ghi kem trong ngoac) — header line chua ngoac da bi
+        # loc tu truoc, nen moi ngoac con lai trong chunk deu khong phai
+        # du lieu cua nguoi nay. Cat khoi vung soi truong de tranh "doi"
+        # giay to cua vo/chong (ong da chet lay CCCD cua vo).
+        chunk_scan = re.sub(
+            r"\([^)]*(?:Sinh|Ng\u00e0y|CCCD|CMND|C\u0103n c\u01b0\u1edbc|Th\u01b0\u1eddng tr\u00fa|N\u01a1i)[^)]*\)",
+            " ",
+            chunk,
+        )
         groups = match.groupdict()
         if groups.get("title"):
             title = str(groups.get("title") or "").strip().lower()
@@ -2361,8 +2411,8 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                 "_line_idx": line_idx,
                 "raw_text": chunk,
             }
-        birth_match = birth_re.search(chunk)
-        birth_year_match = birth_year_re.search(chunk) if not birth_match else None
+        birth_match = birth_re.search(chunk_scan)
+        birth_year_match = birth_year_re.search(chunk_scan) if not birth_match else None
         has_birth = bool(birth_match or birth_year_match)
         ngay_sinh, chi_co_nam = _chuan_hoa_ngay_sinh(
             birth_match.group(1) if birth_match else "",
@@ -2370,17 +2420,24 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         )
         person["ngay_sinh"] = ngay_sinh
         person["chi_co_nam_sinh"] = chi_co_nam
-        id_match = id_re.search(chunk)
+        id_match = id_re.search(chunk_scan)
         if not id_match:
             # Form viet tat "Ông Vũ Văn Thạnh số: 036070006771 Cấp ngày ..."
             # — "số:" tran khong nhan CCCD; so 9-12 chu so van la giay to.
-            id_match = re.search(r"\bs\u1ed1\s*:\s*(\d{9,12})(?!\d)", chunk)
+            id_match = re.search(r"\bs\u1ed1\s*:\s*(\d{9,12})(?!\d)", chunk_scan)
+        if not id_match:
+            # To khai thue "[06] Số CMND/CCCD/Hộ chiếu ...:\n 036158024616"
+            # — nhan bat dau bang "Số <loai giay to>", so o dong sau.
+            id_match = re.search(
+                r"(?i)\bS\u1ed1\s+(?:CMND|CCCD|C\u0103n c\u01b0\u1edbc|H\u1ed9 chi\u1ebfu)[^\n:]{0,60}:\s*(\d{9,12})",
+                chunk_scan,
+            )
         person["cccd"] = id_match.group(1) if id_match else ""
-        issue_place_match = issue_place_re.search(chunk)
+        issue_place_match = issue_place_re.search(chunk_scan)
         if not issue_place_match:
             cap_tai = re.search(
                 r"(?i)c\u1ea5p\s+t\u1ea1i\s+([^\n,;.]{2,80}?)\s+ng\u00e0y\s*(\d{1,2}/\d{1,2}/\d{4})",
-                chunk,
+                chunk_scan,
             )
             if cap_tai:
                 issue_place_match = cap_tai
@@ -2391,21 +2448,21 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             # — chi nhan cum dung sau so giay to, tranh vo nham ca menh de.
             issue_place_match = re.search(
                 r"(?i)(?:\d{9,12}\s+|\bCCCD\s+|\bCMND\s+)([^\n,;]{2,60}?)\s+(?:c\u1ea5p ng\u00e0y|cap ngay)",
-                chunk,
+                chunk_scan,
             )
         if not issue_place_match:
             # Form "Nơi cấp Cục cảnh sát ..." (don xac nhan thoi han dat).
             issue_place_match = re.search(
                 r"(?i)\bN\u01a1i\s+c\u1ea5p\s*[:;,]?\s*([^\n,;.]+?)(?=\s*[,;.]|\s*$)",
-                chunk,
+                chunk_scan,
             )
         person["noi_cap"] = re.sub(r"\s+", " ", issue_place_match.group(1)).strip(" ;,.") if issue_place_match else ""
-        issue_date_match = issue_date_re.search(chunk)
+        issue_date_match = issue_date_re.search(chunk_scan)
         if issue_date_match:
             person["ngay_cap_cccd"] = issue_date_match.group(1)
         else:
             # So Excel ("cap ngay 44546") — doi sang ngay that.
-            person["ngay_cap_cccd"] = _doi_ngay_excel(chunk)
+            person["ngay_cap_cccd"] = _doi_ngay_excel(chunk_scan)
         address_match = next((item for item in address_lines if line_idx <= item[0] < next_idx), None)
         person["dia_chi"] = address_match[2] if address_match else ""
         dia_chi_line = address_match[1] if address_match else ""
@@ -2423,10 +2480,15 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         # Loai nguoi da chet: chi khi co "chet ngay + ngay thang" cu the
         # (dong mo ta thua ke luon co; chu "chet" dung mot minh nhu
         # "ngay chet" trong checklist khong du de loai).
-        if re.search(r"\bchet\s+ngay\s*[:.-]?\s*\d", _fold_text(chunk)):
+        if re.search(r"\bchet\s+ngay\s*[:.-]?\s*\d", _fold_text(chunk_scan)):
             continue
-        role_match = re.search(r"(?i)(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:", chunk)
-        if not has_birth and not id_match and not role_match:
+        role_match = re.search(r"(?i)(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:", chunk_scan)
+        if (
+            not has_birth
+            and not id_match
+            and not role_match
+            and line_idx not in labeled_person_idx
+        ):
             continue
         if not _ho_ten_hop_le(person["ho_ten"]):
             continue
@@ -2442,7 +2504,24 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     for person in persons:
         person["source_start_line_idx"] = person["_line_idx"]
         person.pop("_line_idx", None)
-    return persons
+    # Form lap lai nguyen trang (DK18 in 2 mat): cung nguoi xuat hien 2 lan.
+    # Dedupe khi trung ho_ten + cccd (uu tien), hoac ho_ten + ngay_sinh.
+    seen_person: dict[tuple[str, str], dict] = {}
+    deduped: list[dict] = []
+    for person in persons:
+        name_key = _fold_text(person.get("ho_ten") or "")
+        id_key = str(person.get("cccd") or person.get("ngay_sinh") or "").strip()
+        key = (name_key, id_key)
+        if name_key and id_key and key in seen_person:
+            # Gop thong tin: ban ghi sau co the bo sung truong con thieu.
+            base = seen_person[key]
+            for field in ("ngay_sinh", "cccd", "noi_cap", "ngay_cap_cccd", "dia_chi"):
+                if not str(base.get(field) or "").strip() and str(person.get(field) or "").strip():
+                    base[field] = person[field]
+            continue
+        seen_person.setdefault(key, person)
+        deduped.append(person)
+    return deduped
 
 
 def _extract_plain_text_address(section: str) -> str:

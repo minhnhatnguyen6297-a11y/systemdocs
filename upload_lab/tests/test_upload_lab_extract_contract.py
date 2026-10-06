@@ -1789,6 +1789,93 @@ class UploadLabExtractContractTests(unittest.TestCase):
         from extract_contract import _cat_ho_ten
         self.assertEqual(_cat_ho_ten("Phùng Xuân Tính: phường Thành Nam, tỉnh Ninh Bình"), "Phùng Xuân Tính")
 
+    def test_heading_ben_sau_gach_doc_cua_doc(self):
+        # .doc IFilter: tab sau so muc thanh "|" — "I. | BÊN CHUYỂN NHƯỢNG"
+        # phai van mo duoc ranh ben (sweep12: Bưởi/Ký - Hợp/Bình).
+        from extract_contract import _extract_parties_generic
+        text = (
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG\n"
+            "I. | BÊN CHUYỂN NHƯỢNG: (Bên A).\n"
+            "1. Ông Tạ Văn A; | | | Sinh ngày 01/01/1962;\n"
+            "Căn cước công dân số 036062000001 do Cục cảnh sát cấp ngày 01/01/2021;\n"
+            "II. | BÊN NHẬN CHUYỂN NHƯỢNG: (Bên B).\n"
+            "1. Ông Đinh Duy B; Sinh ngày 02/02/1962;\n"
+            "Căn cước công dân số 036062000002 do Cục cảnh sát cấp ngày 02/02/2021;\n"
+        )
+        ben_a, ben_b = _extract_parties_generic(text, "transfer_contract")
+        self.assertEqual([q["ho_ten"] for q in ben_a["nguoi"]], ["Tạ Văn A"])
+        self.assertEqual([q["ho_ten"] for q in ben_b["nguoi"]], ["Đinh Duy B"])
+
+    def test_ngoac_phu_cua_nguoi_khac_khong_doi_giay_to(self):
+        # Ong da chet nhung chunk chua "(Sinh/CCCD/Thường trú ...)" cua vo —
+        # khong duoc doi giay to cua vo thanh nguoi song (Thong bao Giới).
+        from extract_contract import _extract_parties_generic
+        text = (
+            "THÔNG BÁO THỪA KẾ\n"
+            "Ông Nguyễn Văn G không có ai là bố nuôi, mẹ nuôi.\n"
+            "Về vợ, con của ông Nguyễn Văn G:\n"
+            "Khi còn sống, ông Nguyễn Văn G có vợ là bà Trịnh Thị N (Sinh ngày: "
+            "10/06/1958; Căn cước công dân số 036158024616 do Cục cảnh sát cấp "
+            "ngày 05/01/2023; Thường trú tại: Xóm T, xã M, tỉnh P).\n"
+            "Lời chứng.\n"
+        )
+        ben_a, ben_b = _extract_parties_generic(text, "generic")
+        nguoi = ben_a["nguoi"] + ben_b["nguoi"]
+        self.assertFalse(
+            any(q["ho_ten"] == "Nguyễn Văn G" and q.get("cccd") == "036158024616" for q in nguoi)
+        )
+
+    def test_nhan_nguoi_xin_gia_han_va_ten_nguoi_nop_thue(self):
+        # Don hanh chinh: "1. Người xin gia hạn sử dụng đất: Nguyễn Thị C"
+        # va to khai thue "[04] Tên người nộp thuế: ..." deu la nguoi that
+        # (khong can ngay sinh/ID de duoc giu).
+        from extract_contract import _extract_parties_generic
+        text = (
+            "ĐƠN XIN GIA HẠN SỬ DỤNG ĐẤT\n"
+            "1. Người xin gia hạn sử dụng đất: Nguyễn Thị Chúc\n"
+            "2. Địa chỉ/trụ sở chính:\n"
+            "Lời chứng.\n"
+        )
+        ben_a, _ = _extract_parties_generic(text, "generic")
+        self.assertEqual([q["ho_ten"] for q in ben_a["nguoi"]], ["Nguyễn Thị Chúc"])
+        self.assertEqual(ben_a["nguoi"][0]["dia_chi"], "")
+
+        text2 = (
+            "TỜ KHAI THUẾ THU NHẬP CÁ NHÂN\n"
+            "[04] Tên người nộp thuế: Trịnh Thị Nhung\n"
+            "[06] Số CMND/CCCD/Hộ chiếu (trường hợp cá nhân quốc tịch Việt Nam):\n"
+            "036158024616\n"
+            "[06.1] Ngày cấp: 05/01/2023 [06.2] Nơi cấp: Cục cảnh sát QLHC về TTXH\n"
+            "[08] Địa chỉ chỗ ở hiện tại: Xóm T, xã M, tỉnh P\n"
+            "Lời chứng.\n"
+        )
+        ben_a2, _ = _extract_parties_generic(text2, "generic")
+        self.assertEqual(len(ben_a2["nguoi"]), 1)
+        self.assertEqual(ben_a2["nguoi"][0]["cccd"], "036158024616")
+        self.assertEqual(ben_a2["nguoi"][0]["ngay_cap_cccd"], "05/01/2023")
+
+    def test_dedupe_nguoi_trung_qua_form_lap_trang(self):
+        # Form DK18 in 2 mat: cung nguoi (trung ten + CCCD) xuat hien 2 lan —
+        # gop thanh 1, bo sung truong con thieu.
+        from extract_contract import _extract_parties_generic
+        text = (
+            "ĐƠN ĐĂNG KÝ BIẾN ĐỘNG\n"
+            "a. Tên: Bùi Thị H; Sinh ngày: 27/05/1989;\n"
+            "b. Giấy tờ nhân thân:\n"
+            "Bà Bùi Thị H; Sinh ngày: 27/05/1989;\n"
+            "Căn cước công dân số: 036189007072 do Cục cảnh sát cấp ngày 02/07/2021;\n"
+            "c. Địa chỉ: - Bùi Thị H: Thôn A, xã B, tỉnh C\n"
+            "a. Tên: Bùi Thị H; Sinh ngày: 27/05/1989;\n"
+            "b. Giấy tờ nhân thân:\n"
+            "Bà Bùi Thị H; Sinh ngày: 27/05/1989;\n"
+            "Căn cước công dân số: 036189007072 do Cục cảnh sát cấp ngày 02/07/2021;\n"
+            "c. Địa chỉ: - Bùi Thị H: Thôn A, xã B, tỉnh C\n"
+            "Lời chứng.\n"
+        )
+        ben_a, _ = _extract_parties_generic(text, "generic")
+        self.assertEqual([q["ho_ten"] for q in ben_a["nguoi"]], ["Bùi Thị H"])
+        self.assertEqual(ben_a["nguoi"][0]["dia_chi"], "Thôn A, xã B, tỉnh C")
+
 
 if __name__ == "__main__":
     unittest.main()

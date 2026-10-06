@@ -87,7 +87,10 @@ python tools/regex_lab.py approve --cluster <id>   # chi khi owner da duyet ket 
    10/10/2026: `dk11`/`dk 11`, `ho so luu` (danh mục hồ sơ lưu không
    tiền tố `danh muc`), và `raw.text_rong` — file không đọc được chữ
    nào (docx chỉ chứa ảnh scan, giấy tờ đính kèm chụp) thì bỏ qua,
-   không chấm lỗi —
+   không chấm lỗi; thêm 10/10/2026: R00 cũng nhìn **tiêu đề nội dung** —
+   `ten_hop_dong` bắt đầu `danh muc`/`ho so luu` mà không có nội dung
+   hợp đồng thì bỏ qua (ca `HS thế chấp.docx`: danh mục hồ sơ lưu có
+   dòng `Loại: Hợp đồng thế chấp` bị nhận nhầm kind) —
    R01 sai loại,
    R02 0 người (lỗi ở thừa kế; cảnh báo ở loại non-generic khác và
    generic có `ten_hop_dong` — 09/10/2026), R03 thiếu trường người, R04 tên bẩn (gồm tên đương

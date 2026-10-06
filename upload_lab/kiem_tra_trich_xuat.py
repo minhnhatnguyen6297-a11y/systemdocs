@@ -109,6 +109,14 @@ def _ly_do_ngoai_le(payload: dict) -> str:
         return "file kh\u00f4ng c\u00f3 n\u1ed9i dung text"
     name = _ten_file_folded(payload)
     raw_name = str(payload.get("raw", {}).get("file_goc") or "").lower()
+    # Tieu de noi dung cung la dau hieu danh muc ("DANH MỤC HỒ SƠ LƯU") —
+    # ten file "HS thế chấp.docx" khong bat duoc key ten file.
+    title_fold = _fold_name(payload.get("web_form", {}).get("ten_hop_dong") or "")
+    if (
+        title_fold.startswith(("danh muc", "ho so luu"))
+        and not _co_noi_dung_hop_dong(payload)
+    ):
+        return "danh mục hồ sơ lưu"
     for key, label in TEN_FILE_NGOAI_LE:
         if key not in name:
             continue
