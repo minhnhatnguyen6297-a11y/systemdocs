@@ -567,6 +567,12 @@ def _detect_document_kind_and_title(text: str) -> tuple[str, str]:
         l.strip().startswith("trang sua loi ky thuat") for l in head_lines
     ):
         return DOC_KIND_GENERIC, title_line
+    # Trang "ĐÍNH CHÍNH <văn bản gốc>" chi sua loi van ban da cong chung —
+    # khong co khoi duong su/nguoi chet/tai san rieng (11/10/2026).
+    if title_fold.startswith("dinh chinh") or any(
+        l.strip().startswith("dinh chinh") for l in head_lines
+    ):
+        return DOC_KIND_GENERIC, title_line
 
     if "cam ket tai san rieng" in title_fold:
         return DOC_KIND_ASSET_COMMITMENT, title_line
@@ -2248,8 +2254,8 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     issue_place_re = re.compile(r"(?i)\bdo\s+([^\n]+?)\s+c\u1ea5p ng\u00e0y")
     issue_date_re = re.compile(r"(?i)c\u1ea5p ng\u00e0y\s*(\d{1,2}/\d{1,2}/\d{4})")
     header_re = re.compile(
-        r"(?i)^\s*(?:(?:[-*:]|\||\+)\s*)*(?:(?:\u0110\u1ea1i di\u1ec7n|Dai dien|Ng\u01b0\u1eddi \u0111\u1ea1i di\u1ec7n|Nguoi dai dien)(?:\s+[^:]{0,80})?:|(?:Người|Nguoi)\s+đại\s+diện\s+(?:là|la)\s*)?"
-        r"(?:\d+\.\s*)?"
+        r"(?i)^\s*(?:(?:[-*:|\u201c\u201d\"]|\+|\|)\s*)*(?:(?:\u0110\u1ea1i di\u1ec7n|Dai dien|Ng\u01b0\u1eddi \u0111\u1ea1i di\u1ec7n|Nguoi dai dien)(?:\s+[^:]{0,80})?:|(?:Người|Nguoi)\s+đại\s+diện\s+(?:là|la)\s*)?"
+        r"(?:\d+\.\s*)?[\u201c\u201d\"']?\s*"
         r"(?:T\u00f4i (?:t\u00ean )?l\u00e0\s*:?|Ch\u00fang t\u00f4i l\u00e0\s*:?)?\s*"
         r"(?:(?:ng\u01b0\u1eddi\s+)?(?:v\u1ee3|ch\u1ed3ng)\s*[\-\u2013]\s*)?"
         r"(?:(?:em|anh|ch\u1ecb|c\u00f4|ch\u00fa|b\u00e1c|d\u00ec|c\u1eadu|m\u1ee3)\s+(?:trai|g\u00e1i|d\u00e2u|r\u1ec3|\u0111\u1ebb|ru\u1ed9t)\s*[-\u2013:]\s*)?"
@@ -2686,6 +2692,18 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             for field in ("ngay_sinh", "cccd", "noi_cap", "ngay_cap_cccd", "dia_chi"):
                 if not str(base.get(field) or "").strip() and str(person.get(field) or "").strip():
                     base[field] = person[field]
+            # Nang "ngay_sinh" chi-co-nam len ngay day du cung nam — ban
+            # "Sinh ngay: 25/12/1958" day du hon "Sinh nam 1958" (11/10/2026).
+            base_ns = str(base.get("ngay_sinh") or "").strip()
+            new_ns = str(person.get("ngay_sinh") or "").strip()
+            if (
+                base_ns
+                and "/" not in base_ns
+                and "/" in new_ns
+                and new_ns.endswith(base_ns)
+            ):
+                base["ngay_sinh"] = new_ns
+                base["chi_co_nam_sinh"] = False
             continue
         if name_key:
             seen_person[name_key] = person

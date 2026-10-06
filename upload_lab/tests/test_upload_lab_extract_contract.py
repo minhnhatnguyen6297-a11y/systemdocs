@@ -2219,6 +2219,24 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertIn("Vũ Văn Khoan", names)
         self.assertIn("Nguyễn Thị Chiến", names)
 
+    def test_trang_dinh_chinh_nhan_nguoi_trong_ngoac_kep(self):
+        # "ĐÍNH CHÍNH VĂN BẢN ..." -> generic; tên trích dẫn “Bà X – Sinh năm”
+        # / “Bà X – Sinh ngày” gộp 1 người, giữ ngày đầy đủ (11/10/2026).
+        from extract_contract import _detect_document_kind_and_title, _extract_parties_generic
+        text = (
+            "ĐÍNH CHÍNH\n"
+            "VĂN BẢN THOẢ THUẬN PHÂN CHIA DI SẢN\n"
+            "Nội dung cũ:\n"
+            "1. \u201cBà Nguyễn Thị Năm – Sinh năm 1958\u201d\n"
+            "Nay đổi thành:\n"
+            "1. \u201cBà Nguyễn Thị Năm – Sinh ngày: 25/12/1958\u201d\n"
+        )
+        kind, _ = _detect_document_kind_and_title(text)
+        self.assertEqual(kind, "generic")
+        ben_a, ben_b = _extract_parties_generic(text, kind)
+        names = [(p["ho_ten"], p["ngay_sinh"]) for s in (ben_a, ben_b) for p in s["nguoi"]]
+        self.assertEqual(names, [("Nguyễn Thị Năm", "25/12/1958")])
+
 
 if __name__ == "__main__":
     unittest.main()
