@@ -37,18 +37,40 @@ không còn là tiêu chí đủ/thiếu của core.
 ## 3. Cách làm việc (vòng lặp bắt buộc)
 
 ```text
-mẫu thật → đáp án (comment/field-list) → chạy engine → đối chiếu
-→ sửa code → test giữ hành vi → quét hàng loạt → báo cáo vòng
+mẫu thật → agent đọc MÙ source → viết đáp án expected.json (chưa nhìn output máy)
+→ chạy engine → compare diff từng trường → sửa code → test giữ hành vi
+→ quét hàng loạt → báo cáo vòng
 ```
 
 1. Mỗi vòng làm **1 loại văn bản** (thừa kế trước, thế chấp tiếp).
-2. Đáp án lấy từ file mẫu của owner (comment Word với `.docx`,
-   danh sách trường cuối file với `.doc`).
+2. Đáp án viết **trước khi nhìn output máy** — hai lượt tách rõ,
+   vì nhìn trước sẽ làm agent chép lỗi của máy. Không dùng số ô
+   được điền hay số cảnh báo làm thước đo đúng.
 3. Không commit khi test đỏ. Không đoán số liệu trôi nổi: pattern
    nào cũng phải có nhãn neo (`Sinh năm`, `Số thửa`, ...).
 4. Số liệu giữ nguyên chữ trong văn bản (diện tích tuyệt đối chính
    xác, không làm tròn). Thiếu căn cứ thì để trống + gắn cờ, không
    tự bịa, không tự suy mã.
+5. Golden đổi kết quả ≠ tự động tách phiên bản rule: trước hết xác
+   định đáp án cũ sai, code cũ sai, hay biểu mẫu thật sự khác.
+
+### Lệnh của vòng (engine hiện hành `upload_lab`)
+
+```bash
+# quet hang loat + tong hop theo luat
+python tools/quet_kiem_tra.py "D:\thu-muc-mau" --full --ra ket-qua.json
+
+# tao goi doc mu: *.source.txt + *.expected.json (khong lo output)
+python tools/regex_lab.py ingest --input "D:\thu-muc-mau" --cache .cache/rl
+python tools/regex_lab.py review --blind --input "D:\thu-muc-mau" --cache .cache/rl --packets .cache/pk
+
+# agent doc .source.txt, dien .expected.json, roi so
+python tools/regex_lab.py compare --answers .cache/pk/<run> --cache .cache/rl
+
+# sau khi sua code: golden hoi quy
+python tools/regex_lab.py verify --input "D:\thu-muc-mau" --cache .cache/rl --golden regex_review_samples/golden
+python tools/regex_lab.py approve --cluster <id>   # chi khi owner da duyet ket qua moi
+```
 
 ## 4. Cách sửa lỗi
 
@@ -81,8 +103,9 @@ mẫu thật → đáp án (comment/field-list) → chạy engine → đối chi
 |---|---|
 | Lõi regex dùng chung (SOT, Owner 06/10/2026) | `tools/regex_workbench/engine/` + profile JSON — trích xuất + đề xuất placeholder |
 | Engine thừa kế đang chạy (nguồn kiến thức trường để port) | `upload_lab/extract_contract.py` (`ENGINE_VERSION`) |
-| Luật kiểm tra R00..R11 | `upload_lab/kiem_tra_trich_xuat.py` |
-| Quét hàng loạt chuẩn | `upload_lab/tools/quet_kiem_tra.py` |
+| Luật kiểm tra R00..R10, R12 | `upload_lab/kiem_tra_trich_xuat.py` |
+| Quét hàng loạt chuẩn | `upload_lab/tools/quet_kiem_tra.py` (có summary theo luật/loại) |
+| Gói đọc mù + so đáp án + golden | `upload_lab/tools/regex_lab.py` (`ingest`/`review --blind`/`compare`/`verify`/`approve`) |
 | Test giữ hành vi | `upload_lab/tests/test_upload_lab_extract_contract.py` + `test_kiem_tra_trich_xuat.py` |
 | Catalog tra nhanh | `docs/spec/upload_lab/regex-rules.md` |
 | Chi tiết từng loại (SOT theo loại) | `docs/spec/upload_lab/regex-<loai>.md` |

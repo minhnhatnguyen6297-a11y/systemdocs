@@ -16,6 +16,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import extract_contract
+import kiem_tra_trich_xuat
 
 
 DEFAULT_INPUT = ROOT / "regex_review_samples" / "input"
@@ -28,6 +29,10 @@ EXTRACTION_FIELDS = (
     "nguoi_yeu_cau",
     "duong_su",
     "tai_san",
+    "nguoi",
+    "nguoi_chet",
+    "thua_dat",
+    "tai_san_chua_ho_tro",
     "missing_fields",
     "error",
 )
@@ -102,6 +107,10 @@ def _json_write(path: Path, payload: Any) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _names(persons: Any) -> list[str]:
+    return [str(p.get("ho_ten") or "") for p in persons or []]
+
+
 def _snapshot(payload: dict[str, Any] | None, error: str = "") -> dict[str, Any]:
     payload = payload or {}
     web = payload.get("web_form") or {}
@@ -112,6 +121,10 @@ def _snapshot(payload: dict[str, Any] | None, error: str = "") -> dict[str, Any]
         "nguoi_yeu_cau": str(web.get("nguoi_yeu_cau") or ""),
         "duong_su": str(web.get("duong_su") or ""),
         "tai_san": str(web.get("tai_san") or ""),
+        "nguoi": _names(raw.get("ben_a", {}).get("nguoi")) + _names(raw.get("ben_b", {}).get("nguoi")),
+        "nguoi_chet": _names(raw.get("nguoi_chet")),
+        "thua_dat": [str(t.get("so_thua_dat") or "") for t in raw.get("danh_sach_thua_dat") or []],
+        "tai_san_chua_ho_tro": list(raw.get("tai_san_chua_ho_tro") or []),
         "missing_fields": list(raw.get("missing_web_form_fields") or []),
         "error": error,
     }
@@ -201,6 +214,12 @@ def ingest_corpus(input_dir: Path | str = DEFAULT_INPUT, cache_dir: Path | str =
             extraction = _snapshot(payload, error)
             kind_label = str(extraction.get("document_kind") or "unknown").upper()
             signature = f"{layout_signature(text)}>KIND_{kind_label}"
+            kiem_tra = []
+            if payload and not error:
+                try:
+                    kiem_tra = kiem_tra_trich_xuat.kiem_tra_payload(payload)
+                except Exception:  # noqa: BLE001 - luat kiem khong duoc lam chet ingest
+                    kiem_tra = []
             record = {
                 "content_hash": content_hash,
                 "extractor_fingerprint": fingerprint,
@@ -209,6 +228,7 @@ def ingest_corpus(input_dir: Path | str = DEFAULT_INPUT, cache_dir: Path | str =
                 "cluster_id": cluster_id_for(signature),
                 "extraction": extraction,
                 "flags": suspicion_flags(extraction),
+                "kiem_tra": kiem_tra,
                 "source_lines": str(text or "").splitlines(),
             }
             _json_write(cache_path, record)
@@ -273,11 +293,27 @@ def _excerpt(lines: list[str], limit: int = 45) -> str:
     return body
 
 
+_ANSWER_FIELDS = (
+    "document_kind",
+    "ten_hop_dong",
+    "nguoi",
+    "nguoi_chet",
+    "thua_dat",
+    "tai_san_chua_ho_tro",
+)
+
+
+def _expected_template() -> dict[str, Any]:
+    return {field: ([] if field != "document_kind" and field != "ten_hop_dong" else "") for field in _ANSWER_FIELDS}
+
+
 def review_corpus(
     input_dir: Path | str = DEFAULT_INPUT,
     cache_dir: Path | str = DEFAULT_CACHE,
     golden_dir: Path | str = DEFAULT_GOLDEN,
     packets_dir: Path | str = DEFAULT_PACKETS,
+    *,
+    blind: bool = False,
 ) -> dict[str, Any]:
     index = ingest_corpus(input_dir, cache_dir)
     golden = _golden_records(Path(golden_dir))
@@ -316,13 +352,76 @@ def review_corpus(
         ]
         for content_hash in hashes:
             record = index["records"][content_hash]
+            if blind:
+                (run_dir / f"{content_hash}.source.txt").write_text(
+                    "\n".join(record.get("source_lines") or []), encoding="utf-8"
+                )
+                answer = _expected_template()
+                answer["relative_path"] = record["relative_path"]
+                _json_write(run_dir / f"{content_hash}.expected.json", answer)
+                lines.extend([
+                    f"## {record['relative_path']}", "",
+                    f"Hash: `{content_hash}`", "",
+                    f"BLIND: doc `{content_hash}.source.txt` roi dien `{content_hash}.expected.json`. Ket qua may khong hien o day — chay `compare --answers` sau khi dien xong.", "",
+                ])
+                continue
             lines.extend([f"## {record['relative_path']}", "", f"Hash: `{content_hash}`", "", f"Flags: {', '.join(record.get('flags') or ['NONE'])}", "", "### Extraction", ""])
             for field in EXTRACTION_FIELDS:
                 lines.extend([f"- `{field}`: {_short(record['extraction'].get(field))}", ""])
+            kiem_tra = [f"{f.get('id')}({f.get('muc')}): {f.get('noi_dung')}" for f in record.get("kiem_tra") or []]
+            if kiem_tra:
+                lines.extend(["### Kiem tra (R)", ""] + [f"- {item}" for item in kiem_tra] + [""])
             lines.extend(["### Source excerpt", "", "```text", _excerpt(record.get("source_lines", [])), "```", ""])
         (run_dir / packet_name).write_text("\n".join(lines), encoding="utf-8")
     (run_dir / "index.md").write_text("\n".join(index_lines), encoding="utf-8")
     return {"packet_dir": str(run_dir), "selected_cluster_count": len(selected), "packets": packet_paths, "index": index}
+
+
+def compare_answers(
+    answers_dir: Path | str,
+    cache_dir: Path | str = DEFAULT_CACHE,
+) -> dict[str, Any]:
+    """So dap an agent viet (expected.json trong packet blind) voi extraction.
+
+    Moi file <hash>.expected.json duoc diff tung field trong _ANSWER_FIELDS.
+    expected=None/""/[] nghia la agent khong tra loi field do -> bo qua field do.
+    """
+    answers_dir = Path(answers_dir)
+    index = _json_read(Path(cache_dir) / "index.json", {})
+    records = index.get("records", {})
+    diffs: list[dict[str, Any]] = []
+    files_checked = 0
+    for answer_path in sorted(answers_dir.glob("*.expected.json")):
+        content_hash = answer_path.name[: -len(".expected.json")]
+        expected = _json_read(answer_path, {})
+        record = records.get(content_hash)
+        if record is None:
+            diffs.append({"file": answer_path.name, "error": "hash khong co trong cache — chay ingest truoc"})
+            continue
+        files_checked += 1
+        actual = record.get("extraction", {})
+        for field in _ANSWER_FIELDS:
+            want = expected.get(field)
+            if want in (None, "", []):
+                continue
+            got = actual.get(field)
+            if got != want:
+                diffs.append({
+                    "file": record.get("relative_path", answer_path.name),
+                    "field": field,
+                    "expected": want,
+                    "actual": got,
+                })
+    report = {
+        "files_checked": files_checked,
+        "diff_count": len(diffs),
+        "diffs": diffs,
+        "exit_code": 1 if diffs else 0,
+    }
+    report_path = answers_dir / "compare-report.json"
+    _json_write(report_path, report)
+    report["report_path"] = str(report_path)
+    return report
 
 
 def approve_corpus(
@@ -398,7 +497,7 @@ def verify_corpus(
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Agent-driven regex extraction review lab")
     subparsers = parser.add_subparsers(dest="command", required=True)
-    for name in ("ingest", "review", "verify", "approve"):
+    for name in ("ingest", "review", "verify", "approve", "compare"):
         command = subparsers.add_parser(name)
         command.add_argument("--input", type=Path, default=DEFAULT_INPUT)
         command.add_argument("--cache", type=Path, default=DEFAULT_CACHE)
@@ -406,6 +505,11 @@ def _parser() -> argparse.ArgumentParser:
             command.add_argument("--golden", type=Path, default=DEFAULT_GOLDEN)
         if name == "review":
             command.add_argument("--packets", type=Path, default=DEFAULT_PACKETS)
+            command.add_argument("--blind", action="store_true",
+                                 help="chi xuat source.txt + expected.json (khong lo dap an may)")
+        if name == "compare":
+            command.add_argument("--answers", type=Path, required=True,
+                                 help="thu muc chua *.expected.json (thuong la packet dir cua review --blind)")
         if name == "approve":
             group = command.add_mutually_exclusive_group(required=True)
             group.add_argument("--all", action="store_true", dest="approve_all")
@@ -414,13 +518,19 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, OSError):
+        pass
     args = _parser().parse_args(argv)
     if args.command == "ingest":
         result = ingest_corpus(args.input, args.cache)
         output = result["summary"]
     elif args.command == "review":
-        result = review_corpus(args.input, args.cache, args.golden, args.packets)
+        result = review_corpus(args.input, args.cache, args.golden, args.packets, blind=args.blind)
         output = {key: value for key, value in result.items() if key != "index"}
+    elif args.command == "compare":
+        output = compare_answers(args.answers, args.cache)
     elif args.command == "approve":
         output = approve_corpus(args.input, args.cache, args.golden, approve_all=args.approve_all, cluster_id=args.cluster)
     else:
