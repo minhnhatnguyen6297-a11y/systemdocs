@@ -2108,6 +2108,23 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual([p["ho_ten"] for p in ben_a["nguoi"]], ["Nguyễn Văn Nam"])
         self.assertEqual([p["ho_ten"] for p in ben_b["nguoi"]], ["Phạm Quốc Vinh"])
 
+    def test_khai_nhan_thua_ke_nhieu_chi_tiet_mot_ve(self):
+        # "Thửa đất số 187, tờ bản đồ số 01; diện tích 200 m2; Trong đó:
+        # Đất ở là 180 m2 Đất vườn: 20 m2" — 1 vế 2 cặp; "theo “Giấy chứng
+        # nhận" có ngoặc kép; nhãn "Địa chỉ thửa đất:".
+        block = (
+            "Di sản của bà X để lại là phần quyền sử dụng đất căn cứ theo “Giấy chứng nhận quyền sử dụng đất” Đ 835496.\n"
+            "-Thửa đất số 187, tờ bản đồ số 01; diện tích 200 m2; Trong đó: Đất ở là 180 m2 Đất vườn: 20 m2\n"
+            "Địa chỉ thửa đất: xã Yên Mỹ, huyện Ý Yên, tỉnh Nam Định\n"
+        )
+        thua = tach_danh_sach_thua_dat(block)
+        self.assertEqual(len(thua), 1)
+        self.assertEqual(thua[0]["so_thua_dat"], "187")
+        self.assertEqual(thua[0]["dia_chi"], "xã Yên Mỹ, huyện Ý Yên, tỉnh Nam Định")
+        cts = {d["dien_tich"]: d["muc_dich_su_dung"] for d in thua[0]["chi_tiet_dien_tich"]}
+        self.assertIn("180 m2", cts)
+        self.assertIn("20 m2", cts)
+
 
 if __name__ == "__main__":
     unittest.main()

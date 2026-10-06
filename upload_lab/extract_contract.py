@@ -765,14 +765,17 @@ def _find_tai_san_inheritance_partition(text: str) -> str:
             r"quyen su dung dat(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:)",
             r"nha o va quyen su dung dat o(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:)",
             r"phan quyen su dung dat(?: cua[^\n]{0,200})?[^\n]{0,300}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:)",
-            r"quyen su dung dat[^\n]{0,300}?theo giay chung nhan",
-            r"thua dat so[^\n]{0,200}?(?:co dia chi tai|tai dia chi|theo giay chung nhan|theo ban do)",
+            r"quyen su dung dat[^\n]{0,300}?theo\s*[\"'“”‘’]?\s*giay chung nhan",
+            r"thua dat so[^\n]{0,200}?(?:co dia chi tai|tai dia chi|theo\s*[\"'“”‘’]?\s*giay chung nhan|theo ban do)",
+            r"(?m)^\s*[-–—•]?\s*thua dat so\s*[:.]?\s*\d",
         ),
         (
             r"(?m)^\s*(?:[IVX]+\.[\s|]*)?(?:\|\s*)?nguoi thua ke\s*:",
             r"(?m)^\s*(?:[IVX]+\.[\s|]*)?(?:\|\s*)?nhung nguoi thua ke\b",
             r"(?m)^\s*(?:[IVX]+\.[\s|]*)?(?:\|\s*)?nhung nguoi nhan thua ke\b",
+            r"(?m)^\s*(?:[IVX]+\.[\s|]*)?(?:\|\s*)?nhung nguoi thuoc hang thua ke\b",
             r"(?m)^\s*noi dung phan chia di san\b",
+            r"(?m)^\s*(?:[IVX]+\.[\s|]*)?(?:\|\s*)?noi dung khai nhan\b",
             r"(?m)^\s*thong nhat phan chia\b",
             r"(?m)^\s*bang van ban nay\b",
             r"(?m)^\s*nhung nguoi huong di san\b",
@@ -1524,6 +1527,35 @@ def thua_dat_sang_land_rows(parcel: dict) -> list[dict]:
     return rows
 
 
+def _append_trong_do_details(current: dict, line: str) -> None:
+    """Them cac chi tiet dien tich sau 'trong do' tren cung dong vao thua.
+
+    Ho tro ca "Trong do: ONT: 190,0 m2; NTS: 75,0 m2" lan ve khong nhan
+    ("dien tich chua duoc cap 89,4 m2 ONT") va ve nhieu cap
+    ("Dat o la 180 m2 Dat vuon: 20 m2"). Dau "," kep giua 2 chu so la
+    phan thap phan — khong tach ve.
+    """
+    if not re.search(r"(?i)trong\s+đ[oó]", line):
+        return
+    detail_tail = re.split(r"(?i)trong\s+đ[oó]\s*:?", line)[-1]
+    for seg in re.split(r";|(?<!\d),(?!\d)", detail_tail):
+        matches = list(re.finditer(r"(\d[\d.,]*)\s*m2", seg))
+        for j, dm in enumerate(matches):
+            start = matches[j - 1].end() if j else 0
+            tail_txt = seg[dm.end():] if j == len(matches) - 1 else ""
+            tail_txt = re.split(
+                r"(?i)\s+(?:theo|tại|có|bản|giấy|năm)\b", tail_txt, maxsplit=1,
+            )[0]
+            label = (seg[start: dm.start()] + " " + tail_txt).strip(" :.,-")
+            if not label:
+                continue
+            current["chi_tiet_dien_tich"].append({
+                "dien_tich": _clean_asset_cell(dm.group(0)),
+                "muc_dich_su_dung": _clean_asset_cell(label),
+                "thoi_han_su_dung": "",
+            })
+
+
 def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
     """Tach khoi text tai san thanh list moi thua 1 dong (gop context GCN)."""
     block = unicodedata.normalize("NFC", str(tai_san or ""))
@@ -1543,7 +1575,7 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
         ("muc_dich_su_dung", r"M\u1ee5c \u0111\u00edch s\u1eed d\u1ee5ng"),
         ("thoi_han_su_dung", r"Th\u1eddi h\u1ea1n s\u1eed d\u1ee5ng"),
         ("nguon_goc", r"Ngu\u1ed3n g\u1ed1c(?:\s+s\u1eed d\u1ee5ng(?:\s+\u0111\u1ea5t)?)?"),
-        ("dia_chi", r"\u0110\u1ecba ch\u1ec9"),
+        ("dia_chi", r"\u0110\u1ecba ch\u1ec9(?:\s+th\u1eeda \u0111\u1ea5t)?"),
         ("phan_ghi_them", r"Ghi ch\u00fa|H\u00ecnh th\u1ee9c s\u1eed d\u1ee5ng"),
         ("muc_dich_su_dung", r"Lo\u1ea1i \u0111\u1ea5t"),
     )
@@ -1865,17 +1897,7 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
             if _nay_la:
                 current["phan_ghi_them"] = (current["phan_ghi_them"] + "; " + _nay_la).lstrip("; ")
             parcels.append(current)
-            # Chi tiet viet lien ("trong do: CLN 70m2").
-            inline = re.search(
-                r"(?i)trong đ[oó]:\s*([A-Za-z\u00c0-\u1ef9./]+)\s*([\d.,]+\s*m2?)",
-                line,
-            )
-            if inline:
-                current["chi_tiet_dien_tich"].append({
-                    "dien_tich": _clean_asset_cell(inline.group(2)),
-                    "muc_dich_su_dung": _clean_asset_cell(inline.group(1)),
-                    "thoi_han_su_dung": "",
-                })
+            _append_trong_do_details(current, line)
         elif current is not None:
             if _nay_la:
                 current["phan_ghi_them"] = (current["phan_ghi_them"] + "; " + _nay_la).lstrip("; ")
@@ -1900,19 +1922,7 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
                 # Chi tiet viet lien ngay tren dong dien tich:
                 # "Dien tich: 265,0 m2; Trong do: ONT: 190,0 m2; NTS: 75,0 m2".
                 if "dien_tich" in values and "trong do" in folded:
-                    detail_tail = re.split(r"(?i)trong\s+đ[oó]\s*:?", line)[-1]
-                    for seg in re.split(r";|(?<!\d),(?!\d)", detail_tail):
-                        dm = re.search(r"(\d[\d.,]*)\s*m2", seg)
-                        if not dm:
-                            continue
-                        label = (seg[: dm.start()] + " " + seg[dm.end():]).strip(" :.,-")
-                        if not label:
-                            continue
-                        current["chi_tiet_dien_tich"].append({
-                            "dien_tich": _clean_asset_cell(dm.group(0)),
-                            "muc_dich_su_dung": _clean_asset_cell(label),
-                            "thoi_han_su_dung": "",
-                        })
+                    _append_trong_do_details(current, line)
         else:
             current = _new_thua_dat(context)
             for field, value in values.items():
