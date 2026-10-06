@@ -2190,16 +2190,16 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     issue_place_re = re.compile(r"(?i)\bdo\s+([^\n]+?)\s+c\u1ea5p ng\u00e0y")
     issue_date_re = re.compile(r"(?i)c\u1ea5p ng\u00e0y\s*(\d{1,2}/\d{1,2}/\d{4})")
     header_re = re.compile(
-        r"(?i)^\s*(?:(?:[-*:]|\|)\s*)*(?:(?:\u0110\u1ea1i di\u1ec7n|Dai dien|Ng\u01b0\u1eddi \u0111\u1ea1i di\u1ec7n|Nguoi dai dien)(?:\s+[^:]{0,80})?:\s*)?"
+        r"(?i)^\s*(?:(?:[-*:]|\||\+)\s*)*(?:(?:\u0110\u1ea1i di\u1ec7n|Dai dien|Ng\u01b0\u1eddi \u0111\u1ea1i di\u1ec7n|Nguoi dai dien)(?:\s+[^:]{0,80})?:\s*)?"
         r"(?:\d+\.\s*)?"
         r"(?:T\u00f4i (?:t\u00ean )?l\u00e0\s*:?|Ch\u00fang t\u00f4i l\u00e0\s*:?)?\s*"
         r"(?:(?:ng\u01b0\u1eddi\s+)?(?:v\u1ee3|ch\u1ed3ng)\s*[\-\u2013]\s*)?"
         r"(?:(?:em|anh|ch\u1ecb|c\u00f4|ch\u00fa|b\u00e1c|d\u00ec|c\u1eadu|m\u1ee3)\s+(?:trai|g\u00e1i|d\u00e2u|r\u1ec3|\u0111\u1ebb|ru\u1ed9t)\s*[-\u2013:]\s*)?"
         r"(?:v\u00e0\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\s+)?"
         r"(?:(?:b\u00ean|ben)\s+[A-Za-z\u00c0-\u1ef9]\s*[:.,]?\s*)?"
-        r"(?:(?:con|m\u1eb9|b\u1ed1|cha|v\u1ee3|ch\u1ed3ng)\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i)\s*[-\u2013\u2014:]\s*)?"
+        r"(?:(?:con|m\u1eb9|b\u1ed1|cha|v\u1ee3|ch\u1ed3ng)\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i)(?:\s+(?:t\u00f4i|c\u1ee7a\s+t\u00f4i))?(?:\s+\u00f4ng\s+[^\d;:]{2,50}?)?\s*(?:[-\u2013\u2014:]|l\u00e0)\s*)?"
         r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?:v\u00e0\s+)?(?P<title>\u00f4ng/b\u00e0|ong/ba|\u00f4ng|ong|b\u00e0|ba|anh|ch\u1ecb|chi)\s*:?\s*"
-        r"(?P<name>.+?)(?=\s+(?:[\-\u2013]\s+)?(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)\s*[:\u2013-]?\s*(?:(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})|\s+(?:[\-\u2013]\s+)?(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:|\s+c\u00f3\s+(?:(?:m\u1eb9|b\u1ed1|cha|con|v\u1ee3|ch\u1ed3ng)(?:\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i))?)\b|\s*\(\s*(?:Sinh|Ng\u00e0y)|[;]|$)"
+        r"(?P<name>.+?)(?=\s+(?:[\-\u2013]\s*)?(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|sinh n\u0103m|sinh ng\u00e0y)\s*[:\u2013-]?\s*(?:(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})|\s+(?:[\-\u2013]\s+)?(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:|\s+c\u00f3\s+(?:(?:m\u1eb9|b\u1ed1|cha|con|v\u1ee3|ch\u1ed3ng)(?:\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i))?|\d)\b|\s*\(\s*(?:Sinh|Ng\u00e0y)|[;]|$)"
     )
     birth_re = re.compile(r"(?i)(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)\s*[:\u2013-]?\s*(\d{1,2}/\d{1,2}/\d{4})")
     # Nguoi lon tuoi thuong chi ghi "Sinh nam 1965" — database chap nhan YYYY
@@ -2278,10 +2278,16 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             else [ln]
         )
         for part in parts:
-            # O trong "| |" la ranh hang trong bang nguoi (mau ngan hang:
-            # "Ông: X | | Năm sinh: ... | | Bà: Y") — tach thanh dong ao
-            # de moi cap nhan/gia tri thanh dong rieng.
-            _split_lines.extend(part.split(" | | "))
+            # O trong "| |" truoc nhan danh xung ("| | Bà: Y") la ranh
+            # nguoi moi trong bang ngan hang — tach dong ao. Chi tach
+            # truoc "Ông:/Bà:..." de khong be "Tên ...; | | Sinh ngày"
+            # (truong van doc tren cung dong ao).
+            _split_lines.extend(
+                re.split(
+                    r" \| +\| (?=(?:\u00d4ng|B\u00e0|Anh|Ch\u1ecb|C\u00f4|Ch\u00fa|B\u00e1c|D\u00ec|C\u1eadu|M\u1ee3)\s*:)",
+                    part,
+                )
+            )
     lines = _split_lines
     # Dong dau section thuong la "I. Bên thế chấp: Ông X | Năm sinh: ..."
     # (mau ngan hang viet lien tieu de voi nguoi) — bo tieu de bên de ten
@@ -2571,11 +2577,28 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         if base is not None:
             a_vals = {f: str(base.get(f) or "").strip() for f in ("cccd", "ngay_sinh")}
             b_vals = {f: str(person.get(f) or "").strip() for f in ("cccd", "ngay_sinh")}
-            conflict = any(
-                a_vals[f] and b_vals[f] and a_vals[f] != b_vals[f]
-                for f in ("cccd", "ngay_sinh")
+
+            def _ns_conflict(a: str, b: str) -> bool:
+                if not (a and b) or a == b:
+                    return False
+                a_year = re.search(r"(\d{4})\s*$", a)
+                b_year = re.search(r"(\d{4})\s*$", b)
+                a_full = "/" in a
+                b_full = "/" in b
+                if a_year and b_year and a_year.group(1) != b_year.group(1):
+                    return True
+                # Hai ngay day du khac nhau -> khac nguoi; chi-nam trung
+                # nam voi ngay-du thi la cung nguoi (form tom tat).
+                return a_full and b_full
+
+            conflict = bool(
+                a_vals["cccd"] and b_vals["cccd"] and a_vals["cccd"] != b_vals["cccd"]
+            ) or _ns_conflict(a_vals["ngay_sinh"], b_vals["ngay_sinh"])
+            shared = (a_vals["cccd"] and a_vals["cccd"] == b_vals["cccd"]) or (
+                a_vals["ngay_sinh"]
+                and not _ns_conflict(a_vals["ngay_sinh"], b_vals["ngay_sinh"])
+                and b_vals["ngay_sinh"]
             )
-            shared = any(a_vals[f] and a_vals[f] == b_vals[f] for f in ("cccd", "ngay_sinh"))
             both_empty = not any((*a_vals.values(), *b_vals.values()))
             mergeable = not conflict and (shared or both_empty)
         if mergeable:

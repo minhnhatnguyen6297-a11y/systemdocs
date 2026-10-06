@@ -1977,6 +1977,51 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertIn("Nguyễn Thị Khánh", names)
         self.assertNotIn("Nguyễn Huy Nghĩa có mẹ đẻ", names)
 
+    def test_tien_to_bo_me_de_toi_va_ong_x_la(self):
+        # "Mẹ đẻ tôi: Bà Y" va "Bố đẻ ông X là bà Y" — tien to quan he
+        # + ten nguoi than chet, nguoi song la Y.
+        from extract_contract import _extract_plain_text_person_entries
+        section = (
+            "- | Mẹ đẻ tôi: Bà Nguyễn Thị Vân; Sinh ngày: 01/01/1960; "
+            "Căn cước công dân số 036160003674\n"
+            "- | Mẹ đẻ ông Nguyễn Văn Hạnh là bà Nguyễn Thị Nhiễu; "
+            "Sinh ngày: 01/01/1932; Căn cước công dân số 036132000298\n"
+            "+ Bà: Trần Thị Thái Sinh ngày: 09/10/1949\n"
+            "- Ông Trần Hữu Thăng có 01 người con riêng\n"
+        )
+        persons = _extract_plain_text_person_entries(section)
+        names = [q["ho_ten"] for q in persons]
+        self.assertIn("Nguyễn Thị Vân", names)
+        self.assertIn("Nguyễn Thị Nhiễu", names)
+        self.assertIn("Trần Thị Thái", names)
+        self.assertNotIn("Trần Hữu Thăng có", names)
+
+    def test_toi_ten_la_voi_o_trong_bang(self):
+        # "Tôi tên là: X; | | Sinh ngày" — khong tach "| |" truoc nhan
+        # thuong (Sinh ngày), chi tach truoc nhan danh xung Ong/Ba.
+        from extract_contract import _extract_plain_text_person_entries
+        section = (
+            "Tôi tên là: Nguyễn Văn Cường; | | Sinh ngày: 20/08/1989;\n"
+            "Căn cước công dân số 036089022676 do X cấp ngày 04/05/2021;\n"
+            "Nơi thường trú tại: Xã Ý Yên."
+        )
+        persons = _extract_plain_text_person_entries(section)
+        self.assertEqual([q["ho_ten"] for q in persons], ["Nguyễn Văn Cường"])
+        self.assertEqual(persons[0]["cccd"], "036089022676")
+
+    def test_dedupe_nam_tron_vs_ngay_day_du(self):
+        # Danh sach nguoi lap 2 lan: 1 lan "Sinh ngày: 01/01/1932", 1 lan
+        # "Sinh năm 1932" — cung nguoi, gop 1 ban ghi.
+        from extract_contract import _extract_plain_text_person_entries
+        section = (
+            "Bà Hoàng Thị Hanh; Sinh ngày: 01/01/1932; "
+            "Căn cước công dân số 036132002879\n"
+            "Bà Hoàng Thị Hanh -sinh năm: 1932\n"
+        )
+        persons = _extract_plain_text_person_entries(section)
+        self.assertEqual([q["ho_ten"] for q in persons], ["Hoàng Thị Hanh"])
+        self.assertEqual(persons[0]["cccd"], "036132002879")
+
 
 if __name__ == "__main__":
     unittest.main()
