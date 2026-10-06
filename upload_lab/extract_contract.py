@@ -1901,15 +1901,16 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
                 # "Dien tich: 265,0 m2; Trong do: ONT: 190,0 m2; NTS: 75,0 m2".
                 if "dien_tich" in values and "trong do" in folded:
                     detail_tail = re.split(r"(?i)trong\s+đ[oó]\s*:?", line)[-1]
-                    for dm in re.finditer(
-                        r"([A-Z\u00c0-\u1ef9\u0110][\w\u00c0-\u1ef9]{1,10}"
-                        r"(?:\s+[a-z\u00e0-\u1ef9]{1,10})?)"
-                        r"\s*:\s*([\d.,]+\s*m2)",
-                        detail_tail,
-                    ):
+                    for seg in re.split(r";|(?<!\d),(?!\d)", detail_tail):
+                        dm = re.search(r"(\d[\d.,]*)\s*m2", seg)
+                        if not dm:
+                            continue
+                        label = (seg[: dm.start()] + " " + seg[dm.end():]).strip(" :.,-")
+                        if not label:
+                            continue
                         current["chi_tiet_dien_tich"].append({
-                            "dien_tich": _clean_asset_cell(dm.group(2)),
-                            "muc_dich_su_dung": _clean_asset_cell(dm.group(1)),
+                            "dien_tich": _clean_asset_cell(dm.group(0)),
+                            "muc_dich_su_dung": _clean_asset_cell(label),
                             "thoi_han_su_dung": "",
                         })
         else:

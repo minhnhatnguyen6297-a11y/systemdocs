@@ -2075,6 +2075,21 @@ class UploadLabExtractContractTests(unittest.TestCase):
         kind, _ = ec._detect_document_kind_and_title(text)
         self.assertEqual(kind, "generic")
 
+    def test_trong_do_nhan_mo_ta_khong_hai_cham(self):
+        # "trong đó diện tích được cấp GCN: 130,1 m2 ONT, diện tích chưa
+        # được cấp 89,4 m2 ONT" — ve 2 khong co "Nhan:" van la chi tiet;
+        # dau "," thap phan (130,1) khong duoc tach ve.
+        from extract_contract import tach_danh_sach_thua_dat
+        block = (
+            "Thửa đất số: 28 , tờ bản đồ số: 4\n"
+            "Diện tích: 219,5 m2 trong đó diện tích được cấp GCN: 130,1 m2  ONT, diện tích chưa được cấp 89,4 m2 ONT."
+        )
+        thua = tach_danh_sach_thua_dat(block)
+        self.assertEqual(len(thua), 1)
+        cts = {d["dien_tich"]: d["muc_dich_su_dung"] for d in thua[0]["chi_tiet_dien_tich"]}
+        self.assertIn("130,1 m2", cts)
+        self.assertIn("89,4 m2", cts)
+
 
 if __name__ == "__main__":
     unittest.main()
