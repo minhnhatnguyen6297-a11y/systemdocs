@@ -28,7 +28,7 @@ lại di sản:`, `Di sản:`, `Khi còn sống`, `Trước khi chết`,
 |---|---|
 | `gioi_tinh` | `Ông`/`Anh`/`Ngài` → Ông; `Bà`/`Chị`/`Bà mụ` → Bà; `Ông/bà:` hoặc mơ hồ → **để trống** + cờ R13 (không suy qua `Thị`, decision-46) |
 | `ho_ten` | Sau danh xưng, cắt trước `\|`, nhãn ngày sinh (bắt buộc kèm giá trị vì `Năm` là âm tiết tên), `có vợ/chồng là`, ngoặc ngày sinh người khác; **vai trò không vào tên** — cắt cả đuôi ` - Con đẻ ông X` lẫn dòng riêng `Là vợ/con của...` (Owner 07/10/2026: `ho_ten` chỉ giữ họ tên) |
-| `ngay_sinh` | `Sinh ngày[:/-] DD/MM/YYYY`, hoặc `Sinh năm[:/-] YYYY` → giữ đúng `YYYY` + cờ `chi_co_nam_sinh` |
+| `ngay_sinh` | `Sinh ngày[:/-] DD/MM/YYYY`, hoặc `Sinh năm[:/-] YYYY` → giữ đúng `YYYY` + cờ `chi_co_nam_sinh`; văn bản viết nhầm nhãn `Sinh năm: DD/MM/YYYY` (ngày đủ) vẫn lấy ngày đủ, không nuốt `Sinh` vào tên (10/10/2026) |
 | `cccd` | Sau `Căn cước (công dân) số` / `CCCD số` / `CMND` (`số:` dính hai chấm cũng nhận) |
 | `noi_cap` | Giữa `do` và `cấp/ký ngày`; thiếu `do` thì lấy cụm sau số giấy tờ |
 | `ngay_cap_cccd` | Sau `cấp/ký ngày`; số Excel 5 chữ số (`cấp ngày 44546`) đổi ra ngày thật |
@@ -58,12 +58,19 @@ thừa kế` (kể cả `III.`, `III. |`), `Nội dung/Thống nhất phân chia
 
 | Trường thửa | Cách nhận |
 |---|---|
-| `so_thua_dat`, `so_to_ban_do` | Nhãn `Thửa đất số`/`Số thửa`, `Tờ bản đồ số`/`Số tờ` (kể cả ngược thứ tự, chung dòng, cắt nhau bằng `;`); `so_to_ban_do` chỉ giữ số/ký hiệu — cắt đuôi mô tả `Bản đồ địa chính năm 1991` (Owner 07/10/2026) |
+| `so_thua_dat`, `so_to_ban_do` | Nhãn `Thửa đất số`/`Số thửa`, `Tờ bản đồ số`/`Số tờ` (kể cả ngược thứ tự, chung dòng, cắt nhau bằng `;`, kể cả lỗi chính tả `Tờ bản đổ số` 10/10/2026); `so_to_ban_do` chỉ giữ số/ký hiệu — cắt đuôi mô tả `Bản đồ địa chính năm 1991` (Owner 07/10/2026) |
 | `dien_tich` | Giữ chữ gốc (`285.0 m2`), bỏ `(bằng chữ:...)`, cắt phần thừa sau `,`/`;`/`trong`/`theo`; giá trị không chứa chữ số (`diện tích thửa đất nêu trên`) bị loại + R13 |
 | `muc_dich_su_dung`, `thoi_han_su_dung`, `phan_ghi_them` | Ô bảng / nhãn dòng; `Trong đó` gộp vào thửa đang mở, không ghi đè; chi tiết viết liền `Trong đó: ONT: 190,0 m2; NTS: 75,0 m2` tách vào `chi_tiet_dien_tich`; dòng `Hiện nay là thửa đất số X; Tờ Y` là đánh số lại của **cùng thửa** → ghi vào `phan_ghi_them`, không mở thửa mới; thửa `(so_thua_dat, so_to_ban_do)` lặp lại trong văn bản chỉ giữ bản ghi đầu |
 | `nguon_goc` | Nhãn `Nguồn gốc (sử dụng đất)` — có trường sẵn, trống khi văn bản không ghi |
 | `dia_chi`, `loai_gcn`, `so_gcn`, `so_vao_so`, `ngay_cap_gcn`, `co_quan_cap` | Từ câu GCN chung, copy vào từng thửa; serial nhận cả `Đ` (`Đ 364866`); số vào sổ cắt từ thừa |
 | `land_rows[]` | Đổi từng chi tiết sang `{loai_dat (giữ chữ gốc: ONT/CLN hay Đất ở), dien_tich (số), thoi_han}` đúng shape DB `asset_row.land_rows` |
+
+Hai luật chống nhiễu (10/10/2026): **bảng liệt kê người** (ô chứa
+`Sinh ngày/năm`, `CCCD`, `Hộ khẩu`, hoặc ô đầu dạng `1. Ông/Bà ...`)
+không được nhập vào `chi_tiet_dien_tich`; **thửa chỉ có GCN** — văn bản
+mô tả đất bằng `theo Giấy chứng nhận ... Số X do ... cấp ngày` nhưng
+không có số thửa/tờ — vẫn tạo 1 bản ghi giữ `so_gcn`/`dia_chi`/
+`co_quan_cap`/`ngay_cap_gcn` thay vì trả về rỗng (R09 hết báo sai).
 
 Bảng `.doc` (IFilter giữ ô bằng TAB → code đổi thành `|`,
 cắt `|` thừa đầu/cuối, tên cắt trước `|`): bảng dồn 1 dòng thì tách

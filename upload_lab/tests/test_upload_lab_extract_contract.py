@@ -1566,6 +1566,68 @@ class UploadLabExtractContractTests(unittest.TestCase):
         chet = [q["ho_ten"] for q in payload["raw"]["nguoi_chet"]]
         self.assertIn("Hoàng Thị Phao", chet)
 
+    def test_sinh_nam_kem_ngay_day_du_khong_nuot_vao_ten(self):
+        # Van ban viet nham nhan "Sinh nam: 10/01/1938" (ngay day du):
+        # lay ngay du, khong de "Sinh" lot vao ho_ten.
+        docx_path = make_docx(
+            self.root / "sinh_nam_nham_nhan.docx",
+            "GI\u1ea4Y U\u1ef6 QUY\u1ec0N",
+            "T\u00f4i l\u00e0 b\u00e0: Ph\u1ea1m Th\u1ecb S\u00e1u\t\t\tSinh n\u0103m: 10/01/1938.",
+            "C\u0103n c\u01b0\u1edbc c\u00f4ng d\u00e2n s\u1ed1: 037138003727",
+            "Nay b\u1eb1ng gi\u1ea5y n\u00e0y t\u00f4i u\u1ef7 quy\u1ec1n cho:",
+            "B\u00e0: Tr\u1ea7n Th\u1ecb B; Sinh ng\u00e0y: 01/01/1980",
+            "L\u1edcI CH\u1ee8NG C\u1ee6A C\u00d4NG CH\u1ee8NG VI\u00caN",
+        )
+
+        payload = extract(docx_path)
+
+        nguoi_a = payload["raw"]["ben_a"]["nguoi"]
+        self.assertEqual(nguoi_a[0]["ho_ten"], "Ph\u1ea1m Th\u1ecb S\u00e1u")
+        self.assertEqual(nguoi_a[0]["ngay_sinh"], "10/01/1938")
+
+    def test_bang_liet_ke_nguoi_khong_vao_chi_tiet_thua(self):
+        # Bang "1. Ong X | Sinh ngay ..." sau khoi thua khong duoc nhap
+        # vao chi_tiet_dien_tich (thong bao nguoi thua ke).
+        docx_path = make_docx(
+            self.root / "bang_nguoi_khong_phai_thua.docx",
+            "TH\u00d4NG B\u00c1O",
+            "Quy\u1ec1n s\u1eed d\u1ee5ng \u0111\u1ea5t c\u00f3 \u0111\u1ecba ch\u1ec9 t\u1ea1i: x\u00e3 G",
+            "- Th\u1eeda \u0111\u1ea5t s\u1ed1: 130",
+            "- T\u1edd b\u1ea3n \u0111\u1ed5 s\u1ed1: 23",
+            "- Di\u1ec7n t\u00edch: 204,0 m2",
+            "1. \u00d4ng B\u00f9i \u0110\u01b0\u1eddng Nghi\u00eau | Sinh ng\u00e0y: 11/05/1961",
+            "2. \u00d4ng B\u00f9i Qu\u00fd \u0110\u00f4n | Sinh ng\u00e0y: 10/10/1963",
+        )
+
+        payload = extract(docx_path)
+
+        thua = payload["raw"]["danh_sach_thua_dat"]
+        self.assertEqual(len(thua), 1)
+        self.assertEqual(thua[0]["so_thua_dat"], "130")
+        self.assertEqual(thua[0]["so_to_ban_do"], "23")
+        for detail in thua[0]["chi_tiet_dien_tich"]:
+            self.assertNotIn("B\u00f9i", str(detail))
+
+    def test_thua_chi_co_gcn_van_tao_ban_ghi(self):
+        # Van ban mo ta dat o muc GCN, khong co so thua/to: van tao
+        # 1 ban ghi giu so_gcn + dia_chi + co_quan_cap.
+        docx_path = make_docx(
+            self.root / "thua_chi_gcn.docx",
+            "V\u0102N B\u1ea2N T\u1eea CH\u1ed0I NH\u1eacN DI S\u1ea2N",
+            "T\u00f4i l\u00e0: B\u00e0 Nguy\u1ec5n Th\u1ecb Y; Sinh ng\u00e0y: 02/02/1945;",
+            "C\u0103n c\u01b0\u1edbc c\u00f4ng d\u00e2n s\u1ed1 037145004692",
+            "Nay, t\u00f4i t\u1ef1 nguy\u1ec7n l\u1eadp V\u0103n b\u1ea3n n\u00e0y.",
+            "K\u1ef7 ph\u1ea7n th\u1eeba k\u1ebf c\u1ee7a \u00f4ng X \u0111\u1ec3 l\u1ea1i \u0111\u00f3 l\u00e0: Ph\u1ea7n quy\u1ec1n s\u1eed d\u1ee5ng \u0111\u1ea5t c\u00f3 \u0111\u1ecba ch\u1ec9 t\u1ea1i: x\u00e3 G theo Gi\u1ea5y ch\u1ee9ng nh\u1eadn quy\u1ec1n s\u1eed d\u1ee5ng \u0111\u1ea5t s\u1ed1: A 957504 do huy\u1ec7n H c\u1ea5p ng\u00e0y 20/02/1992.",
+            "L\u1edcI CH\u1ee8NG C\u1ee6A C\u00d4NG CH\u1ee8NG VI\u00caN",
+        )
+
+        payload = extract(docx_path)
+
+        thua = payload["raw"]["danh_sach_thua_dat"]
+        self.assertEqual(len(thua), 1)
+        self.assertEqual(thua[0]["so_gcn"], "A957504")
+        self.assertIn("x\u00e3 G", thua[0]["dia_chi"])
+
     def test_nhom_hop_dong_uy_quyen_cach_viet_cu(self):
         # "uỷ quyền" (chu viet u+1EF7) cung ra nhom "Uy quyen".
         from extract_contract import guess_nhom_hd

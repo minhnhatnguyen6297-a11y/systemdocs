@@ -50,6 +50,8 @@ TEN_FILE_NGOAI_LE = (
     ("danh muc", "danh mục hồ sơ"),
     ("danh sach", "danh sách"),
     ("11dk", "mẫu đăng ký biến động"),
+    ("dk11", "mẫu đăng ký biến động"),
+    ("dk 11", "mẫu đăng ký biến động"),
     ("truoc ba", "lệ phí trước bạ"),
     ("tncn", "thuế TNCN"),
     ("thu nhap", "thu nhập cá nhân"),
