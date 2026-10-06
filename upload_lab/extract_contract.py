@@ -1677,6 +1677,14 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
             # tiet thua — bo qua de khong bi nhat ten nguoi vao dien_tich.
             if re.search(r"sinh (ngay|nam)|ngay sinh|nam sinh|can cuoc|cccd|cmnd|ho chieu|ho khau", cells_fold):
                 continue
+            # Bang liet ke nguoi thua ke khong cot ngay sinh ("STT|HỌ VÀ TÊN|
+            # QUAN HỆ|THUỘC HÀNG THỪA KẾ", "1|Hoàng Thị X|Vợ|Thứ nhất").
+            if re.search(r"\bstt\b|ho va ten|quan he|thuoc hang thua ke|hang thua ke|nguoi thua ke", cells_fold):
+                continue
+            if re.match(r"^\s*\d{1,2}\s*$", cells[0].strip()) and re.search(
+                r"\b(?:vo|chong|con(?:\s+de|\s+ruot)?|chau|dau|re|me|bo|cha)\b|thu (nhat|hai|ba|tu)", cells_fold
+            ):
+                continue
             if re.match(r"^\s*\d+[.)]?\s*(?:\u00d4ng|\u00f4ng|\u00f4ng/b\u00e0|B\u00e0|Anh|Ch\u1ecb|C\u00f4|Ch\u00e1u)\b", cells[0]):
                 continue
             mid_head, _mid_note = _tach_nay_la(mid)
