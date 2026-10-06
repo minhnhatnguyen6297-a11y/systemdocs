@@ -16,13 +16,14 @@ Core regex chỉ làm đúng 1 việc: **đọc văn bản Word, xuất dữ li�
 người + tài sản** (regex, tất định, không AI).
 
 Core **không** làm: so sánh, đối chiếu, gộp hồ sơ, phán quyết pháp
-lý. Quy tắc của owner: **có người nào xuất dữ liệu người đó** —
-kể cả người trong Lời chứng khác đầu văn bản. Việc đối chiếu đúng
-sai là của tầng khác (người kiểm tra + validator).
+lý. Việc đối chiếu đúng sai là của tầng khác (người kiểm tra +
+validator). Người trong **Lời chứng không được trích** (decision-46)
+vì không đối chiếu được với đầu văn bản.
 
-Core chịu trách nhiệm đúng 2 nhóm: **người** (sống, đã chết, lời
-chứng) và **tài sản** (đất từng thửa, sổ tiết kiệm/tài khoản, bảo
-hiểm). Số công chứng vẫn được đọc để phục vụ upload/audit nhưng
+Core chịu trách nhiệm đúng 2 nhóm: **người** (sống, đã chết — người
+chết là person_row có `ngay_chet`) và **tài sản** (đất từng thửa;
+sổ tiết kiệm/bảo hiểm **tạm dừng**, chỉ gắn cờ `tai_san_chua_ho_tro`
++ R12). Số công chứng vẫn được đọc để phục vụ upload/audit nhưng
 không còn là tiêu chí đủ/thiếu của core.
 
 ## 2. Hai flow (không lẫn nhau)
@@ -32,7 +33,7 @@ không còn là tiêu chí đủ/thiếu của core.
 | Ai | Nhân viên văn phòng | Agent + owner |
 | Làm gì | Mở tool → import file/thư mục → xem bảng → gửi log | Đọc mẫu → viết/sửa regex → test → báo cáo |
 | Ra gì | Log `.jsonl` gửi về | Code + test xanh + báo cáo vòng |
-| Chuẩn đúng sai | Bảng trong tool (ô vàng = thiếu) | Mã luật R00..R11 trong code |
+| Chuẩn đúng sai | Bảng trong tool (ô vàng = thiếu) | Mã luật R00..R13 trong code (bỏ qua R11 đã xóa) |
 
 ## 3. Cách làm việc (vòng lặp bắt buộc)
 

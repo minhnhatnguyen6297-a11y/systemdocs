@@ -110,15 +110,22 @@ def _json_write(path: Path, payload: Any) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-_NGUOI_FIELDS = ("ho_ten", "gioi_tinh", "ngay_sinh", "cccd", "ngay_cap_cccd", "dia_chi")
-_CHET_FIELDS = ("ho_ten", "ngay_sinh", "ngay_chet", "so_giay_to", "ngay_cap", "noi_cap", "dia_chi")
-_THUA_FIELDS = ("so_thua_dat", "so_to_ban_do", "dien_tich", "dia_chi", "so_gcn", "ngay_cap_gcn")
+_NGUOI_FIELDS = ("ho_ten", "ten_goi_khac", "gioi_tinh", "ngay_sinh", "cccd", "noi_cap", "ngay_cap_cccd", "dia_chi")
+_CHET_FIELDS = ("ho_ten", "ten_goi_khac", "ngay_sinh", "ngay_chet", "loai_giay_to", "so_giay_to", "ngay_cap", "noi_cap", "dia_chi")
+_THUA_FIELDS = ("so_thua_dat", "so_to_ban_do", "dien_tich", "chi_tiet_dien_tich", "land_rows",
+                "muc_dich_su_dung", "thoi_han_su_dung", "phan_ghi_them",
+                "dia_chi", "loai_gcn", "so_gcn", "so_gcn_raw", "so_vao_so", "ngay_cap_gcn", "co_quan_cap")
 
 
-def _rows(records: Any, fields: tuple[str, ...]) -> list[dict[str, str]]:
+def _cell(value: Any) -> Any:
+    """Scalar -> str; list/dict (chi tiet dien tich, land_rows...) giu nguyen de so sau."""
+    return value if isinstance(value, (list, dict)) else str(value or "")
+
+
+def _rows(records: Any, fields: tuple[str, ...]) -> list[dict[str, Any]]:
     """Giu tap truong con cua moi ban ghi — du de so tung truong, khong chi ten."""
     return [
-        {k: str(r.get(k) or "") for k in fields}
+        {k: _cell(r.get(k)) for k in fields}
         for r in records or []
         if isinstance(r, dict)
     ]
@@ -228,12 +235,12 @@ def ingest_corpus(input_dir: Path | str = DEFAULT_INPUT, cache_dir: Path | str =
             extraction = _snapshot(payload, error)
             kind_label = str(extraction.get("document_kind") or "unknown").upper()
             signature = f"{layout_signature(text)}>KIND_{kind_label}"
-            kiem_tra: list | None = []
+            kiem_tra: list | None = None  # None = chua/khong kiem duoc; [] = da kiem, sach
             if payload and not error:
                 try:
                     kiem_tra = kiem_tra_trich_xuat.kiem_tra_payload(payload)
                 except Exception:  # noqa: BLE001 - luat kiem khong duoc lam chet ingest
-                    kiem_tra = None  # khac voi []: khong kiem duoc, khong phai sach
+                    kiem_tra = None
             record = {
                 "content_hash": content_hash,
                 "extractor_fingerprint": fingerprint,
@@ -317,6 +324,22 @@ _ANSWER_FIELDS = (
 )
 
 
+def _pick_priority(record: dict[str, Any]) -> int:
+    """File gay finding phai nam trong goi review: loi kiem tra -> 0,
+    co finding -> 1, co flags -> 2, sach -> 3."""
+    kiem_tra = record.get("kiem_tra")
+    if kiem_tra is None:
+        return 0
+    if any(
+        isinstance(f, dict) and f.get("muc") in (kiem_tra_trich_xuat.MUC_LOI, kiem_tra_trich_xuat.MUC_CANH_BAO)
+        for f in kiem_tra
+    ):
+        return 1
+    if record.get("flags"):
+        return 2
+    return 3
+
+
 def _expected_template() -> dict[str, Any]:
     # null = chua tra loi. [] = DA xac nhan khong co. compare phai phan biet 2 thu nay.
     return {field: None for field in _ANSWER_FIELDS}
@@ -345,8 +368,8 @@ def review_corpus(
             reasons.append("HAS_FLAGS")
         if any(index["records"][item].get("kiem_tra") is None for item in hashes):
             reasons.append("KIEM_TRA_ERROR")
-        elif any(
-            f.get("muc") in (kiem_tra_trich_xuat.MUC_LOI, kiem_tra_trich_xuat.MUC_CANH_BAO)
+        if any(
+            isinstance(f, dict) and f.get("muc") in (kiem_tra_trich_xuat.MUC_LOI, kiem_tra_trich_xuat.MUC_CANH_BAO)
             for item in hashes
             for f in (index["records"][item].get("kiem_tra") or [])
         ):
@@ -364,7 +387,10 @@ def review_corpus(
         cluster = index["clusters"][cluster_id]
         hashes = sorted(
             cluster["hashes"],
-            key=lambda item: (not bool(index["records"][item].get("flags")), index["records"][item]["relative_path"]),
+            key=lambda item: (
+                _pick_priority(index["records"][item]),
+                index["records"][item]["relative_path"],
+            ),
         )[:3]
         packet_name = f"cluster-{cluster_id}.md"
         packet_paths.append(packet_name)
@@ -385,6 +411,8 @@ def review_corpus(
                 )
                 answer = _expected_template()
                 answer["relative_path"] = record["relative_path"]
+                # Bang enum de agent tra loi document_kind (khong phai dap an may).
+                answer["_document_kind_options"] = sorted(KIND_TITLE_TERMS) + ["inheritance_declaration", "generic", "unknown"]
                 _json_write(run_dir / f"{content_hash}.expected.json", answer)
                 lines.extend([
                     f"## {record['relative_path']}", "",
@@ -395,13 +423,43 @@ def review_corpus(
             lines.extend([f"## {record['relative_path']}", "", f"Hash: `{content_hash}`", "", f"Flags: {', '.join(record.get('flags') or ['NONE'])}", "", "### Extraction", ""])
             for field in EXTRACTION_FIELDS:
                 lines.extend([f"- `{field}`: {_short(record['extraction'].get(field))}", ""])
-            kiem_tra = [f"{f.get('id')}({f.get('muc')}): {f.get('noi_dung')}" for f in record.get("kiem_tra") or []]
-            if kiem_tra:
-                lines.extend(["### Kiem tra (R)", ""] + [f"- {item}" for item in kiem_tra] + [""])
+            kiem_tra_raw = record.get("kiem_tra")
+            if kiem_tra_raw is None:
+                lines.extend(["### Kiem tra (R)", "", "- (khong kiem duoc — validator loi, xem KIEM_TRA_ERROR)", ""])
+            else:
+                kiem_tra = [f"{f.get('id')}({f.get('muc')}): {f.get('noi_dung')}" for f in kiem_tra_raw if isinstance(f, dict)]
+                if kiem_tra:
+                    lines.extend(["### Kiem tra (R)", ""] + [f"- {item}" for item in kiem_tra] + [""])
             lines.extend(["### Source excerpt", "", "```text", _excerpt(record.get("source_lines", [])), "```", ""])
         (run_dir / packet_name).write_text("\n".join(lines), encoding="utf-8")
     (run_dir / "index.md").write_text("\n".join(index_lines), encoding="utf-8")
     return {"packet_dir": str(run_dir), "selected_cluster_count": len(selected), "packets": packet_paths, "index": index}
+
+
+def _scalar_eq(want: Any, got: Any) -> bool:
+    """Scalar so bang theo so khi doc duoc ('450' == 450), nguoc lai theo chuoi."""
+    if want == got:
+        return True
+    try:
+        return float(str(want).strip().replace(",", ".")) == float(str(got).strip().replace(",", "."))
+    except (TypeError, ValueError):
+        return str(want) == str(got)
+
+
+def _match(want: Any, got: Any) -> bool:
+    """Expected la SPEC CON: dict khop neu moi key non-null khop de quy;
+    list khop neu cung do dai va tung cap khop; scalar so theo _scalar_eq."""
+    if want is None:
+        return True
+    if isinstance(want, dict):
+        return isinstance(got, dict) and all(
+            _match(v, got.get(k)) for k, v in want.items() if v is not None
+        )
+    if isinstance(want, list):
+        return isinstance(got, list) and len(want) == len(got) and all(
+            _match(w, g) for w, g in zip(want, got)
+        )
+    return _scalar_eq(want, got)
 
 
 def _diff_list(field: str, want: list, got: list, label: str) -> list[dict[str, Any]]:
@@ -412,15 +470,20 @@ def _diff_list(field: str, want: list, got: list, label: str) -> list[dict[str, 
         diffs.append({"file": label, "field": f"{field}.len", "expected": len(want), "actual": len(got)})
     for i, (w, g) in enumerate(zip(want, got)):
         if isinstance(w, dict):
+            if not any(v is not None for v in w.values()):
+                diffs.append({"file": label, "field": f"{field}[{i}]",
+                              "expected": "it nhat 1 truong co gia tri",
+                              "actual": "ban ghi dap an rong — chi kiem duoc so luong"})
+                continue
             for k, v in w.items():
                 if v is None:
                     continue  # null trong item = khong tra loi truong nay
                 gv = g.get(k) if isinstance(g, dict) else None
-                if gv != v:
+                if not _match(v, gv):
                     diffs.append({"file": label, "field": f"{field}[{i}].{k}", "expected": v, "actual": gv})
         else:
             gv = g.get(id_key) if isinstance(g, dict) else g
-            if gv != w:
+            if not _scalar_eq(w, gv):
                 diffs.append({"file": label, "field": f"{field}[{i}]", "expected": w, "actual": gv})
     return diffs
 
@@ -469,7 +532,7 @@ def compare_answers(
             want, got = expected[field], actual.get(field)
             if isinstance(want, list) and isinstance(got, list):
                 diffs.extend(_diff_list(field, want, got, record.get("relative_path", content_hash)))
-            elif got != want:
+            elif not _match(want, got):
                 diffs.append({
                     "file": record.get("relative_path", answer_path.name),
                     "field": field,
