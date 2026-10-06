@@ -46,10 +46,12 @@ def mo_thu_muc_log(log_path: str | Path = LOG_PATH) -> Path:
     return folder
 
 PERSON_CAN_THIEU = ("ho_ten", "ngay_sinh", "cccd", "ngay_cap_cccd", "dia_chi")
-DECEASED_CAN_THIEU = ("ho_ten", "ngay_sinh", "ngay_chet", "dia_chi_cuoi")
+DECEASED_CAN_THIEU = ("ho_ten", "ngay_sinh", "ngay_chet", "dia_chi")
 THUA_CAN_THIEU = ("so_thua_dat", "dien_tich")
 STK_CAN_THIEU = ("so_hieu",)
 BAO_HIEM_CAN_THIEU = ("so_hop_dong",)
+
+TEN_TS_CHUA_HO_TRO = {"so_tiet_kiem": "sổ tiết kiệm", "bao_hiem": "bảo hiểm"}
 
 
 def truong_trong(record: dict, fields: tuple[str, ...]) -> list[str]:
@@ -67,13 +69,11 @@ def payload_thanh_ban_ghi(payload: dict, filepath: str | Path, engine_version: s
         "ten_file": Path(str(filepath)).name,
         "kind": raw.get("document_kind", ""),
         "ten_hd": web.get("ten_hop_dong", ""),
-        "tai_san": str(web.get("tai_san", ""))[:3000],
+        "tai_san": str(web.get("tai_san", "")),
         "nguoi": raw.get("ben_a", {}).get("nguoi", []) + raw.get("ben_b", {}).get("nguoi", []),
         "nguoi_chet": raw.get("nguoi_chet", []),
         "thua": raw.get("danh_sach_thua_dat", []),
-        "so_tiet_kiem": raw.get("danh_sach_so_tiet_kiem", []),
-        "bao_hiem": raw.get("danh_sach_bao_hiem", []),
-        "loi_chung": raw.get("loi_chung_nguoi", []),
+        "tai_san_chua_ho_tro": raw.get("tai_san_chua_ho_tro", []),
         "thieu": raw.get("missing_web_form_fields", []),
         "loi": payload.get("error"),
     }
@@ -112,14 +112,15 @@ def tom_tat_ban_ghi(record: dict) -> str:
     kiem_tra = [f for f in (record.get("kiem_tra") or []) if isinstance(f, dict)]
     if any(f.get("muc") == "bo-qua" for f in kiem_tra):
         return "BỎ QUA (không phải văn bản đích)"
+    chua_ho_tro = record.get("tai_san_chua_ho_tro") or []
     parts = [
         f"Loại: {record.get('kind', '?')}",
         f"Người: {len(record.get('nguoi', []))}",
         f"Chết: {len(record.get('nguoi_chet', []))}",
         f"Thửa: {len(record.get('thua', []))}",
-        f"STK: {len(record.get('so_tiet_kiem', []))}",
-        f"BH: {len(record.get('bao_hiem', []))}",
     ]
+    if chua_ho_tro:
+        parts.append("Chưa hỗ trợ: " + ", ".join(TEN_TS_CHUA_HO_TRO.get(k, k) for k in chua_ho_tro))
     flags = [f for f in kiem_tra if f.get("muc") in ("loi", "canh-bao")]
     if flags:
         parts.append("CỜ: " + ", ".join(f"{f.get('id')}" for f in flags))

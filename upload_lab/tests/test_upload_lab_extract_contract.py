@@ -829,9 +829,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
 
         self.assertEqual(len(payload["raw"]["ben_a"]["nguoi"]), 1)
         self.assertEqual(payload["raw"]["ben_a"]["nguoi"][0]["ho_ten"], "Nguyễn Thị A")
-        loi_chung = payload["raw"]["loi_chung_nguoi"]
-        self.assertEqual(len(loi_chung), 1)
-        self.assertEqual(loi_chung[0]["ho_ten"], "Phạm Thị Z")
+        self.assertNotIn("loi_chung_nguoi", payload["raw"])
 
     def test_so_cong_chung_khong_con_tieu_chi_du_thieu_cua_core(self):
         # Khong co so cong chung van khong bi danh "thieu" neu nguoi +
@@ -910,8 +908,8 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(chet[0]["ngay_sinh"], "1920")
         self.assertTrue(chet[0]["chi_co_nam_sinh"])
         self.assertEqual(chet[0]["ngay_chet"], "12/06/2010")
-        self.assertEqual(chet[0]["so_trich_luc"], "866/2025/TLKT-BS")
-        self.assertIn("thôn A", chet[0]["dia_chi_cuoi"])
+        self.assertEqual(chet[0]["so_giay_to"], "866/2025/TLKT-BS")
+        self.assertIn("thôn A", chet[0]["dia_chi"])
         self.assertEqual(chet[1]["ho_ten"], "Lê Thị Y")
         self.assertEqual(chet[1]["ngay_chet"], "18/09/2010")
 
@@ -1052,10 +1050,8 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertIn("xóm 06", persons[0]["dia_chi"])
         self.assertEqual(len(payload["raw"]["nguoi_chet"]), 2)
         self.assertEqual(payload["web_form"]["loai_tai_san"], "Sổ tiết kiệm")
-        stk = payload["raw"]["danh_sach_so_tiet_kiem"]
-        self.assertEqual(len(stk), 1)
-        self.assertEqual(stk[0]["so_hieu"], "AC 000000003")
-        self.assertEqual(stk[0]["chu_so"], "Trần Văn X")
+        self.assertEqual(payload["raw"]["tai_san_chua_ho_tro"], ["so_tiet_kiem"])
+        self.assertNotIn("danh_sach_so_tiet_kiem", payload["raw"])
 
     def test_dia_chi_chung_dong_voi_ten_nguoi(self):
         # Dia chi nam chung dong voi ten ("...; Nơi thường trú: X").
@@ -1148,10 +1144,11 @@ class UploadLabExtractContractTests(unittest.TestCase):
 
         self.assertEqual(payload["raw"]["document_kind"], "inheritance_partition")
         self.assertEqual(len(persons), 2)
-        self.assertEqual(persons[0]["gioi_tinh"], "Bà")
+        # "Ông/bà:" la nhan mo ho — khong suy gioi tinh (decision-46).
+        self.assertEqual(persons[0]["gioi_tinh"], "")
         self.assertIn("Phạm Thị A", persons[0]["ho_ten"])
         self.assertIn("Con đẻ", persons[0]["ho_ten"])
-        self.assertEqual(persons[1]["gioi_tinh"], "Ông")
+        self.assertEqual(persons[1]["gioi_tinh"], "")
         self.assertIn("xã C", persons[0]["dia_chi"])
         chet = payload["raw"]["nguoi_chet"]
         self.assertEqual(len(chet), 1)
@@ -1214,7 +1211,8 @@ class UploadLabExtractContractTests(unittest.TestCase):
 
         self.assertEqual(len(persons), 1)
         self.assertEqual(persons[0]["ho_ten"], "Trần Gia H")
-        self.assertEqual(persons[0]["gioi_tinh"], "Ông")
+        # "Tôi tên là:" khong co danh xung — khong suy gioi tinh (decision-46).
+        self.assertEqual(persons[0]["gioi_tinh"], "")
         self.assertEqual(persons[0]["ngay_cap_cccd"], "16/12/2021")
         thua = payload["raw"]["danh_sach_thua_dat"]
         self.assertEqual(len(thua), 1)
@@ -1254,13 +1252,8 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(payload["raw"]["document_kind"], "inheritance_partition")
         self.assertEqual([p["ho_ten"] for p in payload["raw"]["ben_a"]["nguoi"]], ["Trương Văn H"])
         self.assertEqual([p["ho_ten"] for p in payload["raw"]["nguoi_chet"]], ["Tạ Thị H"])
-        bh = payload["raw"]["danh_sach_bao_hiem"]
-        self.assertEqual(len(bh), 1)
-        self.assertEqual(bh[0]["so_hop_dong"], "25CN.SK.01.03B02700002")
-        self.assertEqual(bh[0]["ben_bao_hiem"], "Tổng công ty BH Sài Gòn")
-        self.assertEqual(bh[0]["ben_mua"], "Công ty TNHH Phú Thái")
-        self.assertIn("Tạ Thị H", bh[0]["doi_tuong"])
-        self.assertEqual(bh[0]["ngay_ky"], "15/08/2025")
+        self.assertEqual(payload["raw"]["tai_san_chua_ho_tro"], ["bao_hiem"])
+        self.assertNotIn("danh_sach_bao_hiem", payload["raw"])
 
 
 if __name__ == "__main__":

@@ -40,10 +40,10 @@ Không phải cài lại gì thêm (trừ khi được dặn riêng).
 - File `mo-phong-may-trang.bat`: giả lập máy chưa cài Python
   (chạy `run.bat` như trên máy trắng) để kiểm tra nhanh đường
   cài đặt. Chỉ dùng để test, nhân viên không cần.
-- Engine: `engine/extract_contract.py` (bản chụp, có
-  `ENGINE_VERSION`). Mỗi dòng log đóng dấu phiên bản engine.
-- Đổi engine: copy file mới vào `engine/`, tăng
-  `ENGINE_VERSION` (ví dụ ngày + tên vòng).
+- Engine: `extract_contract.py` ngay trong `tool/` (bản chụp từ
+  `upload_lab`, có `ENGINE_VERSION`). Mỗi dòng log đóng dấu phiên bản engine.
+- Đổi engine: copy file mới ghi đè `extract_contract.py` +
+  `kiem_tra_trich_xuat.py`, tăng `ENGINE_VERSION` (ví dụ ngày + tên vòng).
 - Đọc log: tab **Xem log** trong tool (lọc theo loại văn bản,
   ô thiếu tô vàng) hoặc đọc trực tiếp file `.jsonl`
   (1 dòng = 1 file đã test).

@@ -50,16 +50,16 @@ def summarize(payload: dict) -> str:
     raw = payload.get("raw", {})
     web = payload.get("web_form", {})
     n_party = len(raw.get("ben_a", {}).get("nguoi", [])) + len(raw.get("ben_b", {}).get("nguoi", []))
-    n_loi_chung = len(raw.get("loi_chung_nguoi", []))
     n_chet = len(raw.get("nguoi_chet", []))
     n_thua = len(raw.get("danh_sach_thua_dat", []))
-    n_stk = len(raw.get("danh_sach_so_tiet_kiem", []))
-    n_bh = len(raw.get("danh_sach_bao_hiem", []))
+    chua_ho_tro = ", ".join(raw.get("tai_san_chua_ho_tro") or [])
     missing = ", ".join(raw.get("missing_web_form_fields", [])) or "không thiếu"
     return (
         f"Loại: {raw.get('document_kind', '?')} | Tên: {web.get('ten_hop_dong', '')} | "
-        f"Người (đầu văn bản): {n_party} | Người (lời chứng): {n_loi_chung} | "
-        f"Người đã chết: {n_chet} | Thửa đất: {n_thua} | Sổ TK: {n_stk} | Bảo hiểm: {n_bh} | Thiếu: {missing}"
+        f"Người (đầu văn bản): {n_party} | "
+        f"Người đã chết: {n_chet} | Thửa đất: {n_thua}"
+        + (f" | Chưa hỗ trợ: {chua_ho_tro}" if chua_ho_tro else "")
+        + f" | Thiếu: {missing}"
     )
 
 
@@ -85,26 +85,15 @@ def person_rows(payload: dict) -> list[tuple]:
                 person.get("ngay_cap_cccd", ""),
                 person.get("dia_chi", ""),
             ))
-    for person in raw.get("loi_chung_nguoi", []):
-        rows.append((
-            len(rows) + 1,
-            "Lời chứng",
-            person.get("gioi_tinh", ""),
-            person.get("ho_ten", ""),
-            _ngay_sinh_hien_thi(person),
-            person.get("cccd", ""),
-            person.get("ngay_cap_cccd", ""),
-            person.get("dia_chi", ""),
-        ))
     return rows
 
 
 def deceased_rows(payload: dict) -> list[tuple]:
     rows: list[tuple] = []
     for idx, person in enumerate(payload.get("raw", {}).get("nguoi_chet", []), start=1):
-        trich_luc = person.get("so_trich_luc", "")
-        if person.get("ngay_trich_luc"):
-            trich_luc = f"{trich_luc} ({person['ngay_trich_luc']})".strip(" ()")
+        trich_luc = person.get("so_giay_to", "")
+        if person.get("ngay_cap"):
+            trich_luc = f"{trich_luc} ({person['ngay_cap']})".strip(" ()")
         rows.append((
             idx,
             person.get("gioi_tinh", ""),
@@ -113,7 +102,7 @@ def deceased_rows(payload: dict) -> list[tuple]:
             _ngay_sinh_hien_thi(person),
             person.get("ngay_chet", ""),
             trich_luc,
-            person.get("dia_chi_cuoi", ""),
+            person.get("dia_chi", ""),
         ))
     return rows
 
@@ -137,32 +126,15 @@ def parcel_rows(payload: dict) -> list[tuple]:
 
 
 def savings_rows(payload: dict) -> list[tuple]:
-    rows: list[tuple] = []
-    for idx, so in enumerate(payload.get("raw", {}).get("danh_sach_so_tiet_kiem", []), start=1):
-        rows.append((
-            idx,
-            so.get("loai_so", ""),
-            so.get("so_hieu", ""),
-            so.get("ngan_hang", ""),
-            so.get("chi_nhanh", ""),
-            so.get("ngay_phat_hanh", ""),
-            so.get("chu_so", ""),
-        ))
-    return rows
+    if "so_tiet_kiem" not in (payload.get("raw", {}).get("tai_san_chua_ho_tro") or []):
+        return []
+    return [(1, "Phát hiện sổ tiết kiệm", "— chưa bóc dòng (tạm dừng)", "", "", "", "")]
 
 
 def insurance_rows(payload: dict) -> list[tuple]:
-    rows: list[tuple] = []
-    for idx, bh in enumerate(payload.get("raw", {}).get("danh_sach_bao_hiem", []), start=1):
-        rows.append((
-            idx,
-            bh.get("so_hop_dong", ""),
-            bh.get("ben_bao_hiem", ""),
-            bh.get("ben_mua", ""),
-            bh.get("doi_tuong", ""),
-            bh.get("ngay_ky", ""),
-        ))
-    return rows
+    if "bao_hiem" not in (payload.get("raw", {}).get("tai_san_chua_ho_tro") or []):
+        return []
+    return [(1, "Phát hiện bảo hiểm — chưa bóc dòng (tạm dừng)", "", "", "", "")]
 
 
 def payload_to_json(payload: dict) -> str:

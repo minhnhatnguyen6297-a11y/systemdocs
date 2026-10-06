@@ -130,7 +130,6 @@ UUID4_RX = re.compile(
     r"-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
 DATE_OR_YEAR_RX = re.compile(r"^\d{4}(-\d{2}-\d{2})?$")
 DATE_FULL_RX = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-SERIAL_RX = re.compile(r"^[A-Z]{2}\d{6,8}$")
 DOC_KEY_RX = re.compile(r"^[a-z][a-z0-9_]*$")
 DOCX_NAME_RX = re.compile(r'^[^<>:"/\\|?*]{1,180}\.[dD][oO][cC][xX]$')
 FILENAME_RX = re.compile(r"^[A-Za-z0-9_-]+_HS-\d+(_\d+)?\.docx$")

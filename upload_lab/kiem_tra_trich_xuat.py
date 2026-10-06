@@ -7,19 +7,22 @@ ra cung ma loi. LLM/agent chi doc ma loi, khong tu dat ten loi.
 Muc do:
 - "loi": bat buoc sua code hoac sua van ban; chua xong khong qua.
 - "canh-bao": may lam dung theo van ban nhung nguoi can xem lai
-  (vi du tong dien tich vênh, loi chung thieu nguoi ky).
+  (vi du tong dien tich vênh, co tai san chua ho tro).
 - "bo-qua": khong phai van ban dich (mau trang, phieu thue...).
 
 Truong hop acceptable (ghi nhan, khong sua code):
-- Loi chung it nguoi hon dau van ban: chap nhan neu chi nguoi dai
-  dien ky (owner xac nhan tung dot).
 - Dien tich: KHONG lam tron, so sanh tuyet doi chinh xac. So lieu
   trong van ban vech bao nhieu bao bay nhieu (muc canh-bao, nguoi
   kiem tra); epsilon 1e-9 chi tru sai so float cua may.
+
+Quyet dinh Owner 06/10/2026 (decision-46): khong trich/doi chieu loi chung
+(bo R11); nguoi chet mang truong person_row (so_giay_to/ngay_cap/noi_cap/
+dia_chi); so TK/bao hiem chi gan co "chua ho tro" (R12).
 """
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Any
 
 MUC_LOI = "loi"
@@ -50,28 +53,41 @@ KIND_THUA_KE = (
 )
 
 TRUONG_NGUOI_BAT_BUOC = ("ho_ten", "ngay_sinh", "cccd", "ngay_cap_cccd", "dia_chi")
-TRUONG_CHET_BAT_BUOC = ("ho_ten", "ngay_sinh", "ngay_chet", "dia_chi_cuoi")
+TRUONG_CHET_BAT_BUOC = ("ho_ten", "ngay_sinh", "ngay_chet", "dia_chi")
 TRUONG_THUA_BAT_BUOC = ("so_thua_dat", "dien_tich")
 
 
 def _so_thuc(text: Any) -> float | None:
+    """Cung quy tac dien tich voi engine: "1.234,5"/"1234,5"/"1234.0" doc
+    duoc; chi dau cham voi 3 so le ("1.234") la mo ho -> None."""
     match = re.match(r"\s*(\d+(?:[.,]\d+)*)", str(text or ""))
     if not match:
         return None
     cleaned = match.group(1)
-    if cleaned.count(".") > 1:
-        cleaned = cleaned.replace(".", "")
+    if "." in cleaned and "," in cleaned:
+        cleaned = cleaned.replace(".", "").replace(",", ".")
+    elif "," in cleaned:
+        cleaned = cleaned.replace(",", ".")
+    elif "." in cleaned and len(cleaned.rsplit(".", 1)[1]) == 3:
+        return None
     try:
-        return float(cleaned.replace(",", "."))
+        return float(cleaned)
     except ValueError:
         return None
+
+
+def _fold_name(text: str) -> str:
+    """Bo dau + thuong hoa ten file de match key khong dau."""
+    folded = unicodedata.normalize("NFD", str(text or ""))
+    folded = folded.replace("đ", "d").replace("Đ", "d")
+    return "".join(c for c in folded if unicodedata.category(c) != "Mn").lower()
 
 
 def _ten_file_folded(payload: dict) -> str:
     raw = payload.get("raw", {})
     name = str(raw.get("file_goc") or "")
-    name = name.rsplit("/", 1)[-1].rsplit("\\", 1)[-1].lower()
-    return name
+    name = name.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+    return _fold_name(name)
 
 
 def _ly_do_ngoai_le(payload: dict) -> str:
@@ -98,7 +114,11 @@ def luat_ngoai_le(payload: dict) -> list[dict]:
 def luat_loai_van_ban(payload: dict) -> list[dict]:
     """R01: ten file goi y phan chia nhung engine nhan loai khac."""
     name = _ten_file_folded(payload)
-    goi_y = "phan chia" in name or "vbpc" in name or "pc" in name.replace(" ", "")
+    goi_y = (
+        "phan chia" in name
+        or "vbpc" in name
+        or re.search(r"(?:^|[^a-z0-9])pc(?:[^a-z0-9]|$)", name) is not None
+    )
     kind = str(payload.get("raw", {}).get("document_kind", ""))
     if goi_y and kind not in (*KIND_THUA_KE,):
         return [{"id": "R01", "muc": MUC_CANH_BAO, "noi_dung": f"tên file gợi ý phân chia nhưng nhận diện: {kind}"}]
@@ -159,7 +179,7 @@ def luat_thieu_nguoi_chet(payload: dict) -> list[dict]:
 def luat_thieu_truong_chet(payload: dict) -> list[dict]:
     """R07: nguoi chet thieu truong (ten/ngay sinh/ngay chet/dia chi cuoi)."""
     findings = []
-    for field in ("ngay_sinh", "ngay_chet", "dia_chi_cuoi"):
+    for field in ("ngay_sinh", "ngay_chet", "dia_chi"):
         thieu = [p.get("ho_ten", "?") for p in payload.get("raw", {}).get("nguoi_chet", []) if not str(p.get(field) or "").strip()]
         if thieu:
             findings.append({
@@ -183,13 +203,27 @@ def luat_khong_tach_tai_san(payload: dict) -> list[dict]:
     kind = str(payload.get("raw", {}).get("document_kind", ""))
     raw = payload.get("raw", {})
     if kind in KIND_THUA_KE and str(payload.get("web_form", {}).get("tai_san", "")).strip():
-        if not raw.get("danh_sach_thua_dat") and not raw.get("danh_sach_so_tiet_kiem") and not raw.get("danh_sach_bao_hiem"):
+        if not raw.get("danh_sach_thua_dat") and not raw.get("tai_san_chua_ho_tro"):
             return [{"id": "R09", "muc": MUC_LOI, "noi_dung": "không tách được tài sản"}]
     return []
 
 
+def luat_tai_san_chua_ho_tro(payload: dict) -> list[dict]:
+    """R12: co so tiet kiem/bao hiem nhung tam dung boc dong (decision-46)."""
+    kinds = payload.get("raw", {}).get("tai_san_chua_ho_tro") or []
+    if kinds:
+        ten = {"so_tiet_kiem": "sổ tiết kiệm", "bao_hiem": "bảo hiểm"}
+        return [{
+            "id": "R12",
+            "muc": MUC_CANH_BAO,
+            "noi_dung": "tài sản chưa hỗ trợ (không bóc dòng): "
+                        + ", ".join(ten.get(k, k) for k in kinds),
+        }]
+    return []
+
+
 def luat_lech_dien_tich(payload: dict) -> list[dict]:
-    """R10: tong chi tiet lech tong thua vuot nguong (mac dinh 1m2)."""
+    """R10: tong chi tiet khac tong thua (so sanh tuyet doi, epsilon float)."""
     findings = []
     for thua in payload.get("raw", {}).get("danh_sach_thua_dat", []):
         tong = _so_thuc(thua.get("dien_tich", ""))
@@ -207,20 +241,6 @@ def luat_lech_dien_tich(payload: dict) -> list[dict]:
     return findings
 
 
-def luat_loi_chung_khac(payload: dict) -> list[dict]:
-    """R11: loi chung it/dong nguoi hon dau van ban (de nguoi kiem tra)."""
-    raw = payload.get("raw", {})
-    n_dau = len(_nguoi_1_ben(payload))
-    n_chung = len(raw.get("loi_chung_nguoi", []))
-    if n_chung and n_chung != n_dau:
-        return [{
-            "id": "R11",
-            "muc": MUC_CANH_BAO,
-            "noi_dung": f"lời chứng khác đầu văn bản ({n_chung} so với {n_dau})",
-        }]
-    return []
-
-
 LUAT = (
     luat_ngoai_le,
     luat_loai_van_ban,
@@ -233,7 +253,7 @@ LUAT = (
     luat_mat_khoi_tai_san,
     luat_khong_tach_tai_san,
     luat_lech_dien_tich,
-    luat_loi_chung_khac,
+    luat_tai_san_chua_ho_tro,
 )
 
 

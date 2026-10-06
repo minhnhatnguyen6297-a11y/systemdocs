@@ -1417,16 +1417,26 @@ def _tach_thua_bang_don_dong(text: str, context: dict, parcels: list[dict]) -> b
 
 def _so_thuc_dien_tich(value: str) -> float | None:
     """So dau tien trong o dien tich -> float (phuc vu land_rows).
+    Quy tac Owner 06/10/2026: "1.234,5"/"1234,5"/"1234.0" doc duoc; chi dau
+    cham ("1.234") la mo ho -> None, giu nguyen van + co o tang khac.
     Khong parse duoc thi None (giu text goc o muc_dich/dien_tich raw).
     """
     match = re.match(r"\s*(\d+(?:[.,]\d+)*)", str(value or ""))
     if not match:
         return None
     cleaned = match.group(1)
-    if cleaned.count(".") > 1:
-        cleaned = cleaned.replace(".", "")
+    if "." in cleaned and "," in cleaned:
+        cleaned = cleaned.replace(".", "").replace(",", ".")
+    elif "," in cleaned:
+        cleaned = cleaned.replace(",", ".")
+    elif "." in cleaned:
+        frac = cleaned.rsplit(".", 1)[1]
+        if len(frac) == 3:
+            # "1.234" mo ho: hang nghin (1234) hay thap phan (1,234)?
+            # -> giu nguyen van, tang khac gan co; khong doan.
+            return None
     try:
-        return float(cleaned.replace(",", "."))
+        return float(cleaned)
     except ValueError:
         return None
 
@@ -1944,8 +1954,10 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             title_fold = _fold_text(title)
             if title_fold in ("ong", "anh"):
                 gioi_tinh = "\u00d4ng"
-            elif title_fold in ("ong/ba", "ong / ba"):
-                gioi_tinh = "B\u00e0" if re.search(r"\bthi\b", _fold_text(groups.get("name") or "")) else "\u00d4ng"
+            elif title_fold in ("ong/ba", "ong / ba", ""):
+                # Khong suy gioi tinh (Owner 06/10/2026): nhan "Ông/bà"
+                # hoac thieu chuc danh -> de trong, nguoi dung chon o Stage.
+                gioi_tinh = ""
             else:
                 gioi_tinh = "B\u00e0"
             ho_ten = re.sub(r"\s+", " ", match.group("name")).split("|")[0].strip(" ;,.-\u2013\u2014")
@@ -1973,10 +1985,9 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                 gioi_tinh = "B\u00e0"
             elif re.search(r"\bchong\b", role_fold):
                 gioi_tinh = "\u00d4ng"
-            elif re.search(r"\bthi\b", _fold_text(base_name)):
-                gioi_tinh = "B\u00e0"
             else:
-                gioi_tinh = "\u00d4ng"
+                # Khong suy tu chu "Thi" trong ten (Owner 06/10/2026).
+                gioi_tinh = ""
             person = {
                 "gioi_tinh": gioi_tinh,
                 "ho_ten": f"{base_name} - {role_phrase}" if role_phrase else base_name,
@@ -2018,7 +2029,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         # Loai nguoi da chet: chi khi co "chet ngay + ngay thang" cu the
         # (dong mo ta thua ke luon co; chu "chet" dung mot minh nhu
         # "ngay chet" trong checklist khong du de loai).
-        if re.search(r"\bchet\s+ngay\b", _fold_text(chunk)):
+        if re.search(r"\bchet\s+ngay\s*[:.-]?\s*\d", _fold_text(chunk)):
             continue
         role_match = re.search(r"(?i)(?:Ch\u1ee9c v\u1ee5|Chuc vu)\s*:", chunk)
         if not has_birth and not id_match and not role_match:
@@ -2241,8 +2252,9 @@ def _doi_ngay_excel(chunk: str) -> str:
 
 
 def _extract_nguoi_chet(text: str) -> list[dict]:
-    """Trich NGUOI DA CHET (nguoi de lai di san): ten, ten goi khac,
-    nam sinh, NGAY CHET, trich luc khai tu, noi thuong tru cuoi.
+    """Trich NGUOI DA CHET (nguoi de lai di san) theo shape person_row
+    (decision-46 06/10/2026): trich luc khai tu la giay to cua nguoi chet,
+    dien vao so_giay_to/ngay_cap/noi_cap/loai_giay_to; dia chi cuoi -> dia_chi.
     Dau hieu bat buoc: co "chet ngay DD/MM/YYYY". Khong co ngay chet
     thi khong nhan (tranh vo nhan bo/me de chi ghi "chet nam...").
     """
@@ -2257,14 +2269,18 @@ def _extract_nguoi_chet(text: str) -> list[dict]:
         r"|Sinh ng\u00e0y\s*[:\u2013-]?\s*(?P<birth_full>\d{1,2}/\d{1,2}/\d{4}))?"
         r"\s*[;,]?\s*(?:\u0111\u00e3\s+)?ch\u1ebft ng\u00e0y\s*[:\u2013-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
     )
-    for match in death_re.finditer(source):
+    matches = list(death_re.finditer(source))
+    for match_idx, match in enumerate(matches):
         raw_name = re.sub(r"\s+", " ", match.group("name")).strip(" ;,.-")
         raw_name = re.sub(r"(?i)^\d+\.\s*", "", raw_name)
         raw_name = re.sub(r"(?i)^(?:l\u00e0|bao g\u1ed3m)\s+", "", raw_name)
         title_fold = _fold_text(match.group("title"))
         alias = re.sub(r"\s+", " ", match.group("alias") or "").strip()
         alias = re.sub(r"(?i)^t\u00ean g\u1ecdi kh\u00e1c l\u00e0\s+", "", alias)
-        tail = source[match.end():match.end() + 400]
+        tail_end = min(match.end() + 400, len(source))
+        if match_idx + 1 < len(matches):
+            tail_end = min(tail_end, matches[match_idx + 1].start())
+        tail = source[match.end():tail_end]
         tlkt_no = ""
         tlkt_match = re.search(
             r"(?i)Tr\u00edch l\u1ee5c khai t\u1eed[^\n]{0,60}?s\u1ed1:?\s*([A-Za-z0-9/.-]+)",
@@ -2302,27 +2318,13 @@ def _extract_nguoi_chet(text: str) -> list[dict]:
             "ngay_sinh": ngay_sinh,
             "chi_co_nam_sinh": chi_co_nam,
             "ngay_chet": match.group("death"),
-            "so_trich_luc": tlkt_no,
-            "co_quan_trich_luc": tlkt_by,
-            "ngay_trich_luc": tlkt_date,
-            "dia_chi_cuoi": last_addr,
+            "so_giay_to": tlkt_no,
+            "ngay_cap": tlkt_date,
+            "noi_cap": tlkt_by,
+            "loai_giay_to": "Trích lục khai tử" if tlkt_no else "",
+            "dia_chi": last_addr,
         })
     return found
-
-
-def _extract_loi_chung_persons(text: str) -> list[dict]:
-    """Lay MOI nguoi co khoi CCCD trong phan Loi chung (nguoi lam chung,
-    nguoi lap van ban ky lai...). Core regex xuat het, khong doi chieu
-    voi phan dau van ban — viec so sanh la cua tang khac.
-    """
-    section = _extract_section_between_patterns(
-        text,
-        (r"(?im)^\s*LỜI CHỨNG\b",),
-        (),
-    )
-    if not section:
-        return []
-    return _extract_plain_text_persons(section)
 
 
 def _extract_parties_generic(text: str, doc_kind: str) -> tuple[dict, dict]:
@@ -2429,6 +2431,19 @@ def _fmt_duong_su_by_kind(doc_kind: str, ben_a: dict, ben_b: dict) -> str:
     return _fmt_duong_su_with_labels(ben_a, ben_b, label_a="BÊN A", label_b="BÊN B")
 
 
+def _phat_hien_tai_san_chua_ho_tro(text: str) -> list[str]:
+    """Nhan dien so tiet kiem / bao hiem co mat trong van ban nhung khong
+    boc dong (decision-46 06/10/2026: tam dung). Tra ve ma loai de log/canh
+    bao — thong tin van nam nguyen trong web_form.tai_san.
+    """
+    found = []
+    if _find_tai_san_savings(text):
+        found.append("so_tiet_kiem")
+    if _find_tai_san_insurance(text):
+        found.append("bao_hiem")
+    return found
+
+
 def _build_payload_generic(filepath, text: str, scan_result: dict, *, extract_mode: str) -> dict:
     doc_kind, ten_hd = _detect_document_kind_and_title(text)
     ben_a, ben_b = _extract_parties_generic(text, doc_kind)
@@ -2457,11 +2472,11 @@ def _build_payload_generic(filepath, text: str, scan_result: dict, *, extract_mo
         "raw": {
             "ben_a": ben_a,
             "ben_b": ben_b,
-            "loi_chung_nguoi": _extract_loi_chung_persons(text),
+            # decision-46 (06/10/2026): khong trich loi chung; so TK/bao hiem
+            # tam dung — chi nhan dien va gan co "chua ho tro".
+            "tai_san_chua_ho_tro": _phat_hien_tai_san_chua_ho_tro(text),
             "nguoi_chet": _extract_nguoi_chet(text),
             "danh_sach_thua_dat": tach_danh_sach_thua_dat(tai_san),
-            "danh_sach_so_tiet_kiem": tach_danh_sach_so_tiet_kiem(tai_san),
-            "danh_sach_bao_hiem": tach_danh_sach_bao_hiem(tai_san),
             "file_goc": file_goc,
             "scan_contract_no": scan_result.get("contract_no", ""),
             "scan_reason": scan_result.get("reason", ""),

@@ -25,15 +25,6 @@ def make_payload() -> dict:
                 ]
             },
             "ben_b": {"nguoi": []},
-            "loi_chung_nguoi": [
-                {
-                    "gioi_tinh": "Ông",
-                    "ho_ten": "Trần Văn Z",
-                    "ngay_sinh": "02/02/1970",
-                    "cccd": "036170000002",
-                    "dia_chi": "Thôn C, xã D",
-                }
-            ],
             "nguoi_chet": [
                 {
                     "gioi_tinh": "Ông",
@@ -41,9 +32,9 @@ def make_payload() -> dict:
                     "ten_goi_khac": "Trần Văn W",
                     "ngay_sinh": "1920",
                     "ngay_chet": "12/06/2010",
-                    "so_trich_luc": "866/2025/TLKT-BS",
-                    "ngay_trich_luc": "27/11/2025",
-                    "dia_chi_cuoi": "thôn A, xã B",
+                    "so_giay_to": "866/2025/TLKT-BS",
+                    "ngay_cap": "27/11/2025",
+                    "dia_chi": "thôn A, xã B",
                 }
             ],
             "danh_sach_thua_dat": [
@@ -59,16 +50,7 @@ def make_payload() -> dict:
                     "dia_chi": "xã B, huyện C",
                 }
             ],
-            "danh_sach_so_tiet_kiem": [
-                {
-                    "loai_so": "sổ tiết kiệm (có kỳ hạn)",
-                    "so_hieu": "AC 000000001",
-                    "ngan_hang": "ngân hàng NN",
-                    "chi_nhanh": "huyện C",
-                    "ngay_phat_hanh": "05/01/2023",
-                    "chu_so": "Trần Văn X",
-                }
-            ],
+            "tai_san_chua_ho_tro": ["so_tiet_kiem"],
             "missing_web_form_fields": [],
         },
     }
@@ -80,47 +62,30 @@ class RegexTestToolTests(unittest.TestCase):
 
         self.assertIn("inheritance_partition", summary)
         self.assertIn("Người (đầu văn bản): 1", summary)
-        self.assertIn("Người (lời chứng): 1", summary)
         self.assertIn("Thửa đất: 1", summary)
-        self.assertIn("Sổ TK: 1", summary)
+        self.assertIn("Chưa hỗ trợ: so_tiet_kiem", summary)
 
-    def test_savings_rows_follow_savings_table_order(self):
+    def test_savings_rows_chi_la_placeholder_chua_ho_tro(self):
         rows = savings_rows(make_payload())
 
         self.assertEqual(len(rows), 1)
-        self.assertEqual(
-            rows[0][1:],
-            ("sổ tiết kiệm (có kỳ hạn)", "AC 000000001", "ngân hàng NN", "huyện C", "05/01/2023", "Trần Văn X"),
-        )
+        self.assertIn("chưa bóc dòng", rows[0][2])
 
-    def test_insurance_rows_follow_insurance_table_order(self):
-        payload = {
-            "raw": {
-                "danh_sach_bao_hiem": [
-                    {
-                        "so_hop_dong": "25CN.SK.01.03B02700002",
-                        "ben_bao_hiem": "Tổng công ty BH",
-                        "ben_mua": "Công ty Phú Thái",
-                        "doi_tuong": "bà Tạ Thị H",
-                        "ngay_ky": "15/08/2025",
-                    }
-                ]
-            }
-        }
+    def test_insurance_rows_chi_la_placeholder_chua_ho_tro(self):
+        payload = {"raw": {"tai_san_chua_ho_tro": ["bao_hiem"]}}
         rows = insurance_rows(payload)
 
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0][1], "25CN.SK.01.03B02700002")
-        self.assertEqual(rows[0][3], "Công ty Phú Thái")
+        self.assertIn("bảo hiểm", rows[0][1])
 
-    def test_person_rows_keep_source_labels(self):
-        rows = person_rows(make_payload())
+    def test_person_rows_khong_gom_loi_chung(self):
+        payload = make_payload()
+        payload["raw"]["loi_chung_nguoi"] = [{"ho_ten": "Trần Văn Z"}]
+        rows = person_rows(payload)
 
-        self.assertEqual(len(rows), 2)
+        self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0][1], "Đầu văn bản")
         self.assertEqual(rows[0][3], "Nguyễn Thị A")
-        self.assertEqual(rows[1][1], "Lời chứng")
-        self.assertEqual(rows[1][3], "Trần Văn Z")
 
     def test_deceased_rows_show_death_fields(self):
         rows = deceased_rows(make_payload())
@@ -144,7 +109,6 @@ class RegexTestToolTests(unittest.TestCase):
                     ]
                 },
                 "ben_b": {"nguoi": []},
-                "loi_chung_nguoi": [],
             }
         }
         rows = person_rows(payload)

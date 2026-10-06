@@ -98,13 +98,12 @@ def ban_ghi_thanh_payload(record: dict) -> dict:
         "raw": {
             "ben_a": {"nguoi": record.get("nguoi", [])},
             "ben_b": {"nguoi": []},
-            "loi_chung_nguoi": record.get("loi_chung", []),
             "nguoi_chet": record.get("nguoi_chet", []),
             "danh_sach_thua_dat": record.get("thua", []),
-            "danh_sach_so_tiet_kiem": record.get("so_tiet_kiem", []),
-            "danh_sach_bao_hiem": record.get("bao_hiem", []),
+            "tai_san_chua_ho_tro": record.get("tai_san_chua_ho_tro", []),
+            "document_kind": record.get("kind", ""),
         },
-        "web_form": {"ten_hop_dong": record.get("ten_hd", "")},
+        "web_form": {"ten_hop_dong": record.get("ten_hd", ""), "tai_san": record.get("tai_san", "")},
     }
 
 
@@ -119,26 +118,19 @@ def person_rows(payload: dict) -> list[tuple]:
                 _ngay_sinh_hien_thi(person), person.get("cccd", ""),
                 person.get("ngay_cap_cccd", ""), person.get("dia_chi", ""),
             ))
-    for person in raw.get("loi_chung_nguoi", []):
-        rows.append((
-            len(rows) + 1, "Lời chứng",
-            person.get("gioi_tinh", ""), person.get("ho_ten", ""),
-            _ngay_sinh_hien_thi(person), person.get("cccd", ""),
-            person.get("ngay_cap_cccd", ""), person.get("dia_chi", ""),
-        ))
     return rows
 
 
 def deceased_rows(payload: dict) -> list[tuple]:
     rows: list[tuple] = []
     for idx, person in enumerate(payload.get("raw", {}).get("nguoi_chet", []), start=1):
-        trich_luc = person.get("so_trich_luc", "")
-        if person.get("ngay_trich_luc"):
-            trich_luc = f"{trich_luc} ({person['ngay_trich_luc']})".strip(" ()")
+        trich_luc = person.get("so_giay_to", "")
+        if person.get("ngay_cap"):
+            trich_luc = f"{trich_luc} ({person['ngay_cap']})".strip(" ()")
         rows.append((
             idx, person.get("gioi_tinh", ""), person.get("ho_ten", ""),
             person.get("ten_goi_khac", ""), _ngay_sinh_hien_thi(person),
-            person.get("ngay_chet", ""), trich_luc, person.get("dia_chi_cuoi", ""),
+            person.get("ngay_chet", ""), trich_luc, person.get("dia_chi", ""),
         ))
     return rows
 
@@ -155,24 +147,20 @@ def parcel_rows(payload: dict) -> list[tuple]:
     return rows
 
 
+def _ts_chua_ho_tro(payload: dict, key: str) -> bool:
+    return key in (payload.get("raw", {}).get("tai_san_chua_ho_tro") or [])
+
+
 def savings_rows(payload: dict) -> list[tuple]:
-    rows: list[tuple] = []
-    for idx, so in enumerate(payload.get("raw", {}).get("danh_sach_so_tiet_kiem", []), start=1):
-        rows.append((
-            idx, so.get("loai_so", ""), so.get("so_hieu", ""), so.get("ngan_hang", ""),
-            so.get("chi_nhanh", ""), so.get("ngay_phat_hanh", ""), so.get("chu_so", ""),
-        ))
-    return rows
+    if not _ts_chua_ho_tro(payload, "so_tiet_kiem"):
+        return []
+    return [(1, "Phát hiện sổ tiết kiệm", "— chưa bóc dòng (tạm dừng)", "", "", "", "")]
 
 
 def insurance_rows(payload: dict) -> list[tuple]:
-    rows: list[tuple] = []
-    for idx, bh in enumerate(payload.get("raw", {}).get("danh_sach_bao_hiem", []), start=1):
-        rows.append((
-            idx, bh.get("so_hop_dong", ""), bh.get("ben_bao_hiem", ""),
-            bh.get("ben_mua", ""), bh.get("doi_tuong", ""), bh.get("ngay_ky", ""),
-        ))
-    return rows
+    if not _ts_chua_ho_tro(payload, "bao_hiem"):
+        return []
+    return [(1, "Phát hiện bảo hiểm — chưa bóc dòng (tạm dừng)", "", "", "", "")]
 
 
 def summarize(payload: dict) -> str:
@@ -180,14 +168,18 @@ def summarize(payload: dict) -> str:
         return f"Lỗi: {payload['error']}"
     raw = payload.get("raw", {})
     web = payload.get("web_form", {})
+    kind = str(raw.get("document_kind", ""))
     n_party = len(raw.get("ben_a", {}).get("nguoi", [])) + len(raw.get("ben_b", {}).get("nguoi", []))
+    chua_ho_tro = raw.get("tai_san_chua_ho_tro") or []
+    note = ""
+    if kind not in kiem_tra_trich_xuat.KIND_THUA_KE:
+        note = " | loại này chưa có luật kiểm tra"
     return (
-        f"Loại: {raw.get('document_kind', '?')} (tự nhận diện, không cần chọn) | "
+        f"Loại: {kind} (tự nhận diện, không cần chọn){note} | "
         f"Tên: {web.get('ten_hop_dong', '')} | "
         f"Người: {n_party} | Chết: {len(raw.get('nguoi_chet', []))} | "
-        f"Thửa: {len(raw.get('danh_sach_thua_dat', []))} | "
-        f"STK: {len(raw.get('danh_sach_so_tiet_kiem', []))} | "
-        f"BH: {len(raw.get('danh_sach_bao_hiem', []))}"
+        f"Thửa: {len(raw.get('danh_sach_thua_dat', []))}"
+        + (f" | Chưa hỗ trợ: {', '.join(chua_ho_tro)}" if chua_ho_tro else "")
     )
 
 
@@ -360,7 +352,8 @@ class StaffTestWindow(tk.Tk):
         self.folder_var = tk.StringVar()
         ttk.Entry(top, textvariable=self.folder_var).pack(side=tk.LEFT, fill=tk.X, expand=True)
         ttk.Button(top, text="Chọn thư mục...", command=self.pick_folder).pack(side=tk.LEFT, padx=(8, 0))
-        ttk.Button(top, text="Chạy tất cả", command=self.run_batch).pack(side=tk.LEFT, padx=(8, 0))
+        self.batch_run_btn = ttk.Button(top, text="Chạy tất cả", command=self.run_batch)
+        self.batch_run_btn.pack(side=tk.LEFT, padx=(8, 0))
 
         self.batch_summary = tk.StringVar(value="Chọn thư mục chứa file Word rồi bấm Chạy tất cả. Mỗi file ghi 1 dòng vào log.")
         ttk.Label(tab, textvariable=self.batch_summary, wraplength=1080, padding=(10, 4)).pack(fill=tk.X)
@@ -410,6 +403,7 @@ class StaffTestWindow(tk.Tk):
             return
         self.batch_tree.delete(*self.batch_tree.get_children())
         self._batch_dung = False
+        self.batch_run_btn.config(state=tk.DISABLED)
         self.batch_stop_btn.config(state=tk.NORMAL)
         self.batch_progress.config(maximum=max(len(files), 1), value=0)
         done = 0
@@ -446,11 +440,9 @@ class StaffTestWindow(tk.Tk):
                 tag = "thieu"
             else:
                 n_person = len(raw.get("ben_a", {}).get("nguoi", [])) + len(raw.get("ben_b", {}).get("nguoi", []))
-                n_asset = (
-                    len(raw.get("danh_sach_thua_dat", []))
-                    + len(raw.get("danh_sach_so_tiet_kiem", []))
-                    + len(raw.get("danh_sach_bao_hiem", []))
-                )
+                n_asset = len(raw.get("danh_sach_thua_dat", []))
+                if raw.get("tai_san_chua_ho_tro"):
+                    n_asset = f"{n_asset} (+{','.join(raw['tai_san_chua_ho_tro'])} chưa hỗ trợ)"
                 canh_bao += 1 if flags else 0
                 ghi_chu = ("cảnh báo " + ", ".join(f["id"] for f in flags)) if flags else "đủ"
                 tag = "thieu" if flags else ""
@@ -464,6 +456,7 @@ class StaffTestWindow(tk.Tk):
             self.batch_progress.config(value=done)
             self.update()
         self.batch_stop_btn.config(state=tk.DISABLED)
+        self.batch_run_btn.config(state=tk.NORMAL)
         ket_qua = "; ".join(f"{loai}: {sl}" for loai, sl in sorted(theo_loai.items()))
         het = "" if done >= len(files) else f" (dừng giữa chừng ở {done}/{len(files)})"
         self.batch_summary.set(
@@ -542,7 +535,9 @@ class StaffTestWindow(tk.Tk):
         self._records = records
         self.file_list.delete(0, tk.END)
         for record in records:
-            mark = "(!) " if record.get("loi") or "THIẾU" in tom_tat_ban_ghi(record) else ""
+            flags = [f for f in (record.get("kiem_tra") or [])
+                     if isinstance(f, dict) and f.get("muc") in ("loi", "canh-bao")]
+            mark = "(!) " if record.get("loi") or flags or "THIẾU" in tom_tat_ban_ghi(record) else ""
             self.file_list.insert(
                 tk.END,
                 f"{mark}{record.get('ten_file', '?')} [{record.get('thoi_gian', '?')}]",

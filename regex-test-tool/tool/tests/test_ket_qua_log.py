@@ -32,7 +32,6 @@ def make_payload() -> dict:
                 ]
             },
             "ben_b": {"nguoi": []},
-            "loi_chung_nguoi": [],
             "nguoi_chet": [],
             "danh_sach_thua_dat": [
                 {
@@ -41,8 +40,6 @@ def make_payload() -> dict:
                     "dien_tich": "",
                 }
             ],
-            "danh_sach_so_tiet_kiem": [],
-            "danh_sach_bao_hiem": [],
             "missing_web_form_fields": [],
         },
     }

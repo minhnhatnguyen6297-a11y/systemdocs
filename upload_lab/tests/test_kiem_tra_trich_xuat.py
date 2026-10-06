@@ -32,13 +32,12 @@ def make_payload(**over) -> dict:
                 "entity_lines": [],
             },
             "ben_b": {"nguoi": [], "dia_chi": "", "entity_lines": []},
-            "loi_chung_nguoi": [],
             "nguoi_chet": [
                 {
                     "ho_ten": "Trần Văn X",
                     "ngay_sinh": "1920",
                     "ngay_chet": "11/06/2004",
-                    "dia_chi_cuoi": "Thôn A",
+                    "dia_chi": "Thôn A",
                 }
             ],
             "danh_sach_thua_dat": [
@@ -51,8 +50,6 @@ def make_payload(**over) -> dict:
                     ],
                 }
             ],
-            "danh_sach_so_tiet_kiem": [],
-            "danh_sach_bao_hiem": [],
             "missing_web_form_fields": [],
         },
         "web_form": {
@@ -122,12 +119,14 @@ class KiemTraTrichXuatTests(unittest.TestCase):
         ]
         self.assertFalse([f for f in kiem_tra_payload(payload) if f["id"] == "R10"])
 
-    def test_loi_chung_khac_bao_thong_tin(self):
+    def test_tai_san_chua_ho_tro_bao_canh_bao(self):
         payload = make_payload()
-        payload["raw"]["loi_chung_nguoi"] = [{"ho_ten": "X"}, {"ho_ten": "Y"}]
+        payload["raw"]["tai_san_chua_ho_tro"] = ["so_tiet_kiem", "bao_hiem"]
         findings = kiem_tra_payload(payload)
 
-        self.assertTrue(any(f["id"] == "R11" for f in findings))
+        r12 = [f for f in findings if f["id"] == "R12"]
+        self.assertEqual(len(r12), 1)
+        self.assertEqual(r12[0]["muc"], MUC_CANH_BAO)
 
 
 if __name__ == "__main__":

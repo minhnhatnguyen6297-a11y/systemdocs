@@ -66,8 +66,7 @@ def quet_file(path: str) -> dict:
         "so_nguoi": len(raw.get("ben_a", {}).get("nguoi", [])) + len(raw.get("ben_b", {}).get("nguoi", [])),
         "so_chet": len(raw.get("nguoi_chet", [])),
         "so_thua": len(raw.get("danh_sach_thua_dat", [])),
-        "so_stk": len(raw.get("danh_sach_so_tiet_kiem", [])),
-        "so_bh": len(raw.get("danh_sach_bao_hiem", [])),
+        "ts_chua_ho_tro": list(raw.get("tai_san_chua_ho_tro") or []),
         "phat_hien": findings,
     }
 
