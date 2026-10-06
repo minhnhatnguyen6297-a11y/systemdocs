@@ -2941,7 +2941,7 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
         else r"(?=\s*(?:theo\s+)?tr\u00edch\s+l\u1ee5c|[^.\n]{0,60}?(?:khai\s+t\u1eed|\u0111\u01a1n\s+xin\s+x\u00e1c\s+nh\u1eadn))"
     )
     death_re = re.compile(
-        r"(?i)(?P<title>\u00d4ng|B\u00e0|Anh|Ch\u1ecb)\s*:?\s*(?P<name>[^;(\n.,]+?)"
+        r"(?i)(?P<title>\u00d4ng|B\u00e0|Anh|Ch\u1ecb|l\u00e0)\s*:?\s*(?P<name>[^;(\n.,]+?)"
         r"(?:\s+v\u00e0\s+(?P<title2>\u00f4ng|b\u00e0|anh|ch\u1ecb)\s*:?\s*(?P<name2>[^;(\n.,]+?))?"
         r"\s*(?:\((?P<alias>[^)]+)\))?"
         r"\s*[-\u2013;,]?\s*"
@@ -2954,7 +2954,7 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
     # Dang ngoac gop: "ong X (sinh nam 1956, da chet ngay 16/01/2025)" —
     # cum sinh+chet nam trong ngoac bi nhom alias nuot o death_re (11/10/2026).
     death_paren_re = re.compile(
-        r"(?i)(?P<title>\u00d4ng|B\u00e0|Anh|Ch\u1ecb)\s*:?\s*(?P<name>[^;(\n.,]+?)"
+        r"(?i)(?P<title>\u00d4ng|B\u00e0|Anh|Ch\u1ecb|l\u00e0)\s*:?\s*(?P<name>[^;(\n.,]+?)"
         r"\s*\(\s*(?:Sinh\s+n\u0103m|N\u0103m\s+sinh|Sinh\s+ng\u00e0y|Ng\u00e0y\s+sinh)"
         r"\s*[:\u2013-]?\s*(?P<birth>(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})"
         r"\s*[,;]?\s*(?:\u0111\u00e3\s+)?ch\u1ebft\s+"
@@ -3071,7 +3071,7 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
             _birth if "/" in _birth else "", _birth if "/" not in _birth else ""
         )
         found.append({
-            "gioi_tinh": "\u00d4ng" if title_fold in ("ong", "anh") else "B\u00e0",
+            "gioi_tinh": "\u00d4ng" if title_fold in ("ong", "anh") else ("B\u00e0" if title_fold in ("ba", "chi") else ""),
             "ho_ten": raw_name,
             "ten_goi_khac": alias,
             "ngay_sinh": ngay_sinh,

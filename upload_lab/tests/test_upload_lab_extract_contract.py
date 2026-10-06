@@ -2237,6 +2237,21 @@ class UploadLabExtractContractTests(unittest.TestCase):
         names = [(p["ho_ten"], p["ngay_sinh"]) for s in (ben_a, ben_b) for p in s["nguoi"]]
         self.assertEqual(names, [("Nguyễn Thị Năm", "25/12/1958")])
 
+    def test_nguoi_chet_ten_tran_sau_la(self):
+        # "Bố đẻ của tôi là Trần Văn Phúc, sinh năm 1910, đã chết ngày
+        # 19/04/1998 theo trích lục khai tử" — ten tran khong danh xung
+        # sau "là"; gioi_tinh de trong khong suy (11/10/2026).
+        from extract_contract import _extract_nguoi_chet
+        text = (
+            "Bố đẻ của tôi là Trần Văn Phúc, sinh năm 1910, đã chết ngày 19/04/1998 "
+            "theo trích lục khai tử (bản sao) số 17/2025/TLKT-BS do UBND xã Yên Thắng."
+        )
+        chet = _extract_nguoi_chet(text, "inheritance_refusal")
+        self.assertEqual(len(chet), 1)
+        self.assertEqual(chet[0]["ho_ten"], "Trần Văn Phúc")
+        self.assertEqual(chet[0]["gioi_tinh"], "")
+        self.assertEqual(chet[0]["ngay_chet"], "19/04/1998")
+
 
 if __name__ == "__main__":
     unittest.main()
