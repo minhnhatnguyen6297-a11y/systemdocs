@@ -26,8 +26,9 @@ lập để so Word với scan. Công cụ này không ghi Stage, Diagram hoặc
 xã/huyện/tỉnh và lịch sử nhiều bước; Bando là nguồn tên hiện hành, phần chưa rõ
 ngày/danh tính giữ chờ xác nhận.
 Luật tra trên kho là [lõi dùng chung](../shared/administrative-lookup.md);
-[administrative-address.md](./administrative-address.md) là Draft cách hồ sơ gọi
-lõi, runtime chưa đáp ứng; nhập DOCX là luồng độc lập tại
+[administrative-address.md](./administrative-address.md) mô tả cách hồ sơ gọi
+lõi; TASK-3/TASK-4 đã nghiệm thu 06/10/2026, gồm Word và producer đóng gói.
+Nhập DOCX là luồng độc lập tại
 [input/docx-import.md](./input/docx-import.md).
 
 ## 2. Bất biến của module
