@@ -2252,6 +2252,22 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(chet[0]["gioi_tinh"], "")
         self.assertEqual(chet[0]["ngay_chet"], "19/04/1998")
 
+    def test_vai_tro_hai_cham_nguoi_vo_chong(self):
+        # "Người vợ:  bà X; Sinh ngày:..." — vai trò dùng ":" thay "-" vẫn
+        # nhận người kèm danh xưng (11/10/2026).
+        from extract_contract import _extract_parties_generic
+        text = (
+            "Chúng tôi gồm có:\n"
+            "Người vợ:  bà Phạm Thị Nụ;\t\t\tSinh ngày: 05/08/1975;\n"
+            "Căn cước số 036175006208 do Bộ Công an cấp ngày 11/10/2024;\n"
+            "Người chồng: ông Lê Ngọc Trình;\t\tSinh ngày: 20/10/1970;\n"
+            "Căn cước số 036070022165 do Bộ Công an cấp ngày 11/10/2024;\n"
+        )
+        ben_a, ben_b = _extract_parties_generic(text, "asset_commitment")
+        names = [p["ho_ten"] for s in (ben_a, ben_b) for p in s["nguoi"]]
+        self.assertIn("Phạm Thị Nụ", names)
+        self.assertIn("Lê Ngọc Trình", names)
+
 
 if __name__ == "__main__":
     unittest.main()
