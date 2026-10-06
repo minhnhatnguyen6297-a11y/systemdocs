@@ -36,7 +36,7 @@
       "properties": {
         "row_id": { "$ref": "common.schema.json#/definitions/uuid4" },
         "entity_id": { "type": ["integer", "null"] },
-        "so_serial": { "type": "string", "pattern": "^[A-Z]{2}\\d{6,8}$" },
+        "so_serial": { "type": "string" },
         "so_vao_so": { "$ref": "common.schema.json#/definitions/nullable_string" },
         "so_thua_dat": { "$ref": "common.schema.json#/definitions/nullable_string" },
         "so_to_ban_do": { "$ref": "common.schema.json#/definitions/nullable_string" },

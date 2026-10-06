@@ -147,8 +147,7 @@
         "is_primary": { "type": "boolean" },
         "so_serial": {
           "type": "string",
-          "pattern": "^[A-Z]{2}\\d{6,8}$",
-          "description": "Canonical serial GCN theo entities.md §2"
+          "description": "Serial GCN nguyên văn tùy nguồn, có thể rỗng/trùng — entities.md §2 (Owner 06/10/2026: bỏ ép format)"
         },
         "so_vao_so": { "$ref": "#/definitions/nullable_string" },
         "so_thua_dat": { "$ref": "#/definitions/nullable_string" },

@@ -38,15 +38,15 @@ số. Không so khớp một phần, không so khớp 9 số cuối.
 
 ## 2. Số serial GCN (sổ đỏ)
 
-- **Canonical:** 2 chữ cái in hoa + **6–8 chữ số**, không dấu cách: `DD123456`.
-- Khi hiển thị cho người dùng có thể chèn dấu cách (`DD 123456`); khi so khớp thì
-  không.
-- **Stage hiện hành (MIN-141, Owner xác nhận 03/10/2026):** serial bắt buộc
-  đúng dạng `[A-Z]{2}\d{6,8}`. Khi đọc hồ sơ cũ, hệ thống chuẩn hóa serial;
-  giá trị không chuẩn được thay trên dữ liệu trả về bằng mã `XX` theo ID/vị trí
-  kèm cảnh báo, không sửa bằng chứng gốc trong DB.
-- Quy tắc serial tùy chọn/nguyên văn của MIN-140 ngày 29/09/2026 là lịch sử,
-  được thay thế trong lần gộp này theo xác nhận mới của Owner.
+- **Hiện hành (Owner 06/10/2026, mở rộng decision-2 ngày 04/10/2026):** serial
+  là **chuỗi nguyên văn tùy nguồn**, không bắt buộc định dạng nào, có thể
+  trống, có thể trùng giữa các thửa (cùng sổ cùng serial). Quy tắc này áp ở
+  mọi tầng: trích xuất, Stage, DB — **không chuẩn hóa, không thay thế**.
+- Tại sao: serial trên giấy tờ thật không có định dạng chung; ép
+  `[A-Z]{2}\d{6,8}` biến serial ngoài chuẩn thành số giả.
+- Lịch sử: MIN-140 (29/09/2026) nguyên văn/tùy chọn → MIN-141 (03/10/2026)
+  bắt buộc canonical → Owner 04–06/10/2026 quay lại nguyên văn/tùy chọn ở
+  mọi nơi. Đọc hồ sơ cũ giữ serial nguyên văn, không thay bằng mã `XX`.
 - Nguồn nhận dạng OCR hiện hành: `notary_v2/routers/ocr_ai.py:924-925,972`;
   thiết kế đã đồng bộ: `docs/spec/notaryoffice/intent-source.md` v1.0 §7.2
   (`[A-Z]{2}\s*\d{6,8}` — gợi ý trích xuất, không phải rule chặn nhập).

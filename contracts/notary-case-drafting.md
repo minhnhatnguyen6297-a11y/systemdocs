@@ -252,7 +252,9 @@ person_row:
   ngay_cap: <YYYY-MM-DD | YYYY | null>
   noi_cap: <string | null>
   dia_chi: <string | null>
-  place_of_origin: <string | null>
+  place_of_origin: <string | null>   # giữ để đọc snapshot cũ; intake/UI
+                                     # hiện hành không dùng — engine không
+                                     # điền (Owner 06/10/2026)
   loai_giay_to: <string | null>      # (đợt 3) loại giấy tờ ĐÃ XÁC NHẬN —
                                      # người chết: lựa chọn/OCR của user;
                                      # người sống: server suy theo mốc
@@ -304,9 +306,9 @@ asset_row:
   row_id: <uuid4>
   entity_id: <int | null>
   is_primary: <bool>
-  so_serial: <string non-empty>      # bắt buộc; canonical [A-Z]{2}\d{6,8}
-                                     # theo entities.md §2 (producer
-                                     # chuẩn hóa trước khi emit)
+  so_serial: <string>                # nguyên văn tùy nguồn, có thể rỗng,
+                                     # có thể trùng — entities.md §2
+                                     # (Owner 06/10/2026: không ép format)
   so_vao_so: <string | null>
   so_thua_dat: <string | null>
   so_to_ban_do: <string | null>
@@ -560,8 +562,8 @@ result.data:
   invalid_format, duplicate_row_id, primary_count, duplicate_entity`
   (rev 1.1 — `duplicate_entity` khi row gắn `entity_id` trùng một entity
   đã thuộc Stage/cùng payload).
-- `so_serial` không canonical `[A-Z]{2}\d{6,8}` →
-  `invalid_format` (entities.md §2); `so_giay_to` không ép format.
+- `so_serial` nhận chuỗi bất kỳ kể cả rỗng — không ép format
+  (entities.md §2, Owner 06/10/2026); `so_giay_to` không ép format.
 - Stage Người trùng tên/tài sản trùng là quyền người dùng — backend
   không tự merge.
 
@@ -1133,7 +1135,7 @@ stage draft buffer (client, không wire)          committed stage (server)
 asset_row_v2:               # giống §4.2, TRỪ is_primary (bị loại)
   row_id: <uuid4>           # ổn định — KHÔNG phải vị trí
   entity_id: <int | null>
-  so_serial: <string non-empty>   # canonical [A-Z]{2}\d{6,8} — entities.md §2
+  so_serial: <string>   # nguyên văn tùy nguồn — entities.md §2
   ...                       # mọi field còn lại giữ nguyên §4.2; `thoi_han`
                             # lẻ OPTIONAL ở input (key vắng = giữ lịch sử
                             # master) — quy tắc tách input/emit ở §4.2
@@ -1561,11 +1563,12 @@ tắc MIN-140 ngày 29/09/2026 bị mâu thuẫn; không đổi envelope/schema 
 - Người: họ tên bắt buộc; giới tính Nam/Nữ/null; ngày sinh/chết/cấp nhận
   YYYY-MM-DD, YYYY hoặc null; số giấy tờ/nơi cấp/địa chỉ/quê quán/loại giấy
   tờ/nhãn địa chỉ nhận chuỗi hoặc null. Số giấy tờ có giá trị vẫn kiểm trùng.
-- Tài sản: serial bắt buộc đúng `[A-Z]{2}\d{6,8}`, địa chỉ không rỗng;
+- Tài sản: serial là chuỗi nguyên văn tùy nguồn (Owner 06/10/2026 bỏ
+  bắt buộc `[A-Z]{2}\d{6,8}` ở mọi tầng), địa chỉ không rỗng;
   số thửa/số tờ và các trường còn lại nullable. Cụm đất có thể null/[];
   mỗi cụm kiểm kiểu, không cho alias khác giá trị, tối đa 20 cụm.
-- Đọc hồ sơ cũ: serial được chuẩn hóa; serial không chuẩn nhận mã thay thế
-  `XX` theo ID/vị trí cùng cảnh báo trên kết quả, không sửa master gốc.
+- Đọc hồ sơ cũ: serial giữ nguyên văn trong master, không chuẩn hóa,
+  không thay mã `XX`.
 - `thoi_han` lẻ bỏ khỏi form và payload renderer; dữ liệu lịch sử vẫn giữ
   để đối chiếu/cảnh báo. Không tự gán vào thời hạn từng cụm.
 - Quy tắc suy trường Người, nguồn snapshot và phần tra cứu xã chưa có:

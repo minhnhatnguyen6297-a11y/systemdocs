@@ -43,7 +43,11 @@ Mỗi vị trí là `[start,end)` theo ký tự Unicode, không theo byte. Chữ
 dòng/ngắt/tab cũng có vị trí nhưng không được thay như chữ bình thường.
 
 Lõi regex chung `tools/regex_workbench/engine` sở hữu quy tắc có phiên bản;
-không sao chép regex sang adapter. Profile `transfer` 1.1.2 chia người trong
+không sao chép regex sang adapter (Owner NAIA-4 02/10/2026, khẳng định lại
+06/10/2026). Lõi nhận input là file Word hoặc đoạn text thô dán vào; ngoài
+trích xuất còn dùng kết quả chia vùng để đề xuất placeholder cho mẫu Word
+chưa gắn template ở chức năng soạn hồ sơ (Owner 06/10/2026). Profile
+`transfer` 1.1.2 chia người trong
 vùng đương sự và tài sản có nhãn `Tài sản [thứ] N:`. Dòng `Loại đất:` mở một
 cụm đất riêng. Một GCN có nhiều cụm vẫn là một tài sản. Đây là phạm vi mẫu đã
 kiểm tra, chưa phải lời hứa nhận đúng mọi loại hợp đồng.
@@ -53,15 +57,25 @@ tạo bằng chứng giả và không làm mất người/tài sản hợp lệ 
 
 Không có ranh giới chắc thì giữ `ambiguous_group`; nhiều giá trị giữ mọi lần
 thấy và `normalized_value=null`. Phải chọn/sửa trường mơ hồ trước khi nhận.
-Serial ngoài chuẩn không được biến thành số giả. Trùng giấy tờ/serial chỉ
-cảnh báo, không gộp. Không suy giới tính, vai trò, quan hệ hoặc sở hữu từ lời
-hợp đồng. Lời chứng ngoài vùng đương sự giữ nguyên, không tự thành người mới.
+Serial là chuỗi nguyên văn tùy nguồn — không ép format, có thể trống,
+có thể trùng giữa thửa (Owner 06/10/2026, `entities.md` §2). Trùng giấy
+tờ/serial chỉ cảnh báo, không gộp. Không suy giới tính, vai trò, quan hệ
+hoặc sở hữu từ lời hợp đồng. Lời chứng ngoài vùng đương sự giữ nguyên,
+không tự thành người mới và không dùng để đối chiếu/đếm lại đương sự
+(TASK-5). Người chết là một `person_row` có `ngay_chet`; giấy tờ của họ
+(trích lục khai tử...) điền vào `so_giay_to`/`ngay_cap`/`noi_cap`/
+`loai_giay_to` cùng format với người sống — không tạo entity riêng.
+Sổ tiết kiệm và bảo hiểm **tạm dừng**: nhận diện sự hiện diện và gắn cờ
+"loại tài sản chưa hỗ trợ", không bóc dòng (Owner 06/10/2026).
 Thiếu trường vẫn cho kiểm tra và bổ sung ở Stage; quy tắc commit MIN-141 giữ
 nguyên. Đủ 3 tài sản thì gợi ý tiếp theo vẫn còn, kèm lời báo hết chỗ.
 Tài sản có bằng chứng địa chỉ hoặc cụm đất vẫn được giữ khi thiếu mọi mã
 định danh; nhãn trống không tạo tài sản rỗng. Diện tích âm/không hữu hạn trong
 nguồn giữ nguyên chữ và dấu trong bằng chứng, giá trị chuẩn là null và phải sửa
-trước khi nhận. Bằng chứng mỗi ô đất hiển thị vị trí ký tự trong nguồn.
+trước khi nhận. Diện tích lấy số đứng trước `m2`/`m²` làm mốc: `1234,5`,
+`1.234,5`, `1234.0` đều đọc được; số chỉ có dấu chấm (`1.234`) là mơ hồ —
+giữ nguyên văn, `normalized_value=null` + cờ (Owner 06/10/2026).
+Bằng chứng mỗi ô đất hiển thị vị trí ký tự trong nguồn.
 
 ## Nguồn, dữ liệu và đối chiếu
 

@@ -6,18 +6,25 @@ trước đợt gom 29/09/2026. Flow và giới hạn ở [`README.md`](./README
 
 ## 0. Core nằm ở đâu (đọc trước khi sửa)
 
-Core regex dùng chung (người + tài sản) hiện sống trong `upload_lab`:
+**Owner 06/10/2026:** lõi regex dùng chung là
+`tools/regex_workbench/engine` (zoning-first, provenance, trạng thái
+matched/ambiguous/missing — Owner NAIA-4 02/10/2026 chọn). Lõi phục vụ cả
+trích xuất và đề xuất placeholder cho mẫu Word chưa gắn template.
+`upload_lab/extract_contract.py` là **engine thừa kế đang chạy**, giữ vai
+trò nguồn kiến thức trường để port sang profile workbench — không còn
+là bản gốc của core dùng chung.
 
 | Thứ | File |
 |---|---|
-| Engine (code duy nhất cần sửa) | `upload_lab/extract_contract.py` (docstring đầu file dẫn tiếp) |
+| Lõi regex dùng chung | `tools/regex_workbench/engine/` + profile JSON |
+| Engine thừa kế đang chạy (nguồn port sang profile) | `upload_lab/extract_contract.py` (docstring đầu file dẫn tiếp) |
 | Test giữ hành vi | `upload_lab/tests/test_upload_lab_extract_contract.py` |
 | Tool test giao diện (chọn 1 file Word → xem Người/Thửa/JSON) | `upload_lab/tools/regex_test_tool.py` (chạy bằng `upload_lab/run_regex_test.bat`) |
-| Luật kiểm tra kết quả (CHUẨN duy nhất, mã R00..R11) | `upload_lab/kiem_tra_trich_xuat.py` + test `tests/test_kiem_tra_trich_xuat.py` |
+| Luật kiểm tra kết quả (mã R00..R11, cần rà lại với quyết định 06/10) | `upload_lab/kiem_tra_trich_xuat.py` + test `tests/test_kiem_tra_trich_xuat.py` |
 | Quét hàng loạt bằng luật trên | `upload_lab/tools/quet_kiem_tra.py` (`--loc`, `--offset/--limit`, `--ca-doc`) |
 | Repo test cho nhân viên (Test 1 file + Test cả thư mục + Xem log, log cố định) | `regex-test-tool/tool/` tất cả trong 1 folder (chạy bằng `tool/run.bat`) |
 | Catalog quy tắc này | `docs/spec/upload_lab/regex-rules.md` |
-| Báo cáo từng loại văn bản (kết quả test + nguyên tắc bằng lời) | `.agent/scratch/regex-core/bao-cao-NN-*.md` (file tạm, không commit) |
+| Báo cáo từng loại văn bản (kết quả test + nguyên tắc bằng lời) | `.agents/` (file tạm, không commit) |
 
 Phạm vi core (quyết định owner 05/10/2026): core chỉ trích **xuất**
 người + tài sản bằng regex, **không** so sánh/đối chiếu/gộp —

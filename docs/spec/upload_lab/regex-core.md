@@ -79,7 +79,8 @@ mẫu thật → đáp án (comment/field-list) → chạy engine → đối chi
 
 | Thứ | File |
 |---|---|
-| Engine (code duy nhất) | `upload_lab/extract_contract.py` (`ENGINE_VERSION`) |
+| Lõi regex dùng chung (SOT, Owner 06/10/2026) | `tools/regex_workbench/engine/` + profile JSON — trích xuất + đề xuất placeholder |
+| Engine thừa kế đang chạy (nguồn kiến thức trường để port) | `upload_lab/extract_contract.py` (`ENGINE_VERSION`) |
 | Luật kiểm tra R00..R11 | `upload_lab/kiem_tra_trich_xuat.py` |
 | Quét hàng loạt chuẩn | `upload_lab/tools/quet_kiem_tra.py` |
 | Test giữ hành vi | `upload_lab/tests/test_upload_lab_extract_contract.py` + `test_kiem_tra_trich_xuat.py` |
@@ -88,8 +89,9 @@ mẫu thật → đáp án (comment/field-list) → chạy engine → đối chi
 | Báo cáo từng vòng (tạm, không commit) | `.agent/scratch/regex-core/bao-cao-NN-*.md` |
 | Repo test cho nhân viên | `regex-test-tool/tool/` tất cả trong 1 folder (engine snapshot + `ENGINE_VERSION`, log đóng dấu bản) |
 
-Mỗi lần đổi engine: sửa ở `upload_lab`, tăng `ENGINE_VERSION`,
-copy snapshot sang `regex-test-tool/tool/` (ghi đè `extract_contract.py` + `kiem_tra_trich_xuat.py`).
+Lưu ý (Owner 06/10/2026): flow "sửa ở `upload_lab` rồi chép snapshot" chỉ áp
+cho engine thừa kế hiện hành. Khi port sang `tools/regex_workbench/engine`,
+cả `upload_lab` và `regex-test-tool` gọi lõi chung — không chép tay.
 
 ## 7. Quyết định của owner (nguồn sự thật cho code)
 
@@ -104,6 +106,12 @@ copy snapshot sang `regex-test-tool/tool/` (ghi đè `extract_contract.py` + `ki
 | 06/10/2026 | Quét thư mục không cần phân loại trước; lỗi 1 file không dừng đợt; log là bản giao |
 | 06/10/2026 | Diện tích tuyệt đối chính xác, không làm tròn (epsilon 1e-9 chỉ trừ sai số máy) |
 | 06/10/2026 | `loai_dat` giữ chữ gốc trong văn bản, không tự suy mã khi thiếu căn cứ |
+| 06/10/2026 | Lõi regex dùng chung = `tools/regex_workbench/engine`; `upload_lab/extract_contract.py` là nguồn kiến thức để port profile; lõi cũng phục vụ đề xuất placeholder và nhận text thô |
+| 06/10/2026 | Serial là chuỗi nguyên văn tùy nguồn ở mọi tầng (trích xuất, Stage, DB) — bỏ bắt buộc `[A-Z]{2}\d{6,8}`; có thể trống/trùng |
+| 06/10/2026 | `place_of_origin` (quê quán) giữ trong contract để đọc snapshot cũ; engine không điền |
+| 06/10/2026 | Sổ tiết kiệm + bảo hiểm tạm dừng: chỉ nhận diện và gắn cờ "chưa hỗ trợ", không bóc dòng |
+| 06/10/2026 | Người chết = một person_row có `ngay_chet`; trích lục khai tử điền vào trường giấy tờ người, không entity riêng |
+| 06/10/2026 | Không suy giới tính; thiếu căn cứ → để trống + cờ; không đếm/ngang hàng đương sự qua vùng lời chứng (theo TASK-5) |
 
 ## 8. Câu hỏi mở và cảnh báo
 
