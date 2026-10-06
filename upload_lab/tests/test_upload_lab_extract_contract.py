@@ -2090,6 +2090,24 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertIn("130,1 m2", cts)
         self.assertIn("89,4 m2", cts)
 
+    def test_nguoi_dai_dien_la_ong_preamble_mortgage(self):
+        # "Người đại diện là Ông: <tên>" — danh xưng trước hai chấm; và thế
+        # chấp không heading "BÊN NHẬN THẾ CHẤP" thì preamble là bên nhận
+        # (mẫu Lời chứng Agribank).
+        from extract_contract import _extract_parties_generic
+        lines = [
+            "NGÂN HÀNG AGRIBANK – CHI NHÁNH Ý YÊN",
+            "Đại diện: Ông Phạm Quốc Vinh \t\t\tChức vụ: Giám đốc",
+            "Căn cước công dân số: 036067010069 do Cục Cảnh sát cấp ngày 01/01/2020",
+            "BÊN THẾ CHẤP:",
+            "Công ty TNHH Vận Tải Minh Đông",
+            "Người đại diện là Ông: Nguyễn Văn Nam - Chức vụ: Giám đốc;",
+            "Căn cước công dân số 036082010023 ngày cấp 10/08/2021 nơi cấp Cục cảnh sát",
+        ]
+        ben_a, ben_b = _extract_parties_generic("\n".join(lines), "mortgage_contract")
+        self.assertEqual([p["ho_ten"] for p in ben_a["nguoi"]], ["Nguyễn Văn Nam"])
+        self.assertEqual([p["ho_ten"] for p in ben_b["nguoi"]], ["Phạm Quốc Vinh"])
+
 
 if __name__ == "__main__":
     unittest.main()

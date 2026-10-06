@@ -2199,7 +2199,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     issue_place_re = re.compile(r"(?i)\bdo\s+([^\n]+?)\s+c\u1ea5p ng\u00e0y")
     issue_date_re = re.compile(r"(?i)c\u1ea5p ng\u00e0y\s*(\d{1,2}/\d{1,2}/\d{4})")
     header_re = re.compile(
-        r"(?i)^\s*(?:(?:[-*:]|\||\+)\s*)*(?:(?:\u0110\u1ea1i di\u1ec7n|Dai dien|Ng\u01b0\u1eddi \u0111\u1ea1i di\u1ec7n|Nguoi dai dien)(?:\s+[^:]{0,80})?:\s*)?"
+        r"(?i)^\s*(?:(?:[-*:]|\||\+)\s*)*(?:(?:\u0110\u1ea1i di\u1ec7n|Dai dien|Ng\u01b0\u1eddi \u0111\u1ea1i di\u1ec7n|Nguoi dai dien)(?:\s+[^:]{0,80})?:|(?:Người|Nguoi)\s+đại\s+diện\s+(?:là|la)\s*)?"
         r"(?:\d+\.\s*)?"
         r"(?:T\u00f4i (?:t\u00ean )?l\u00e0\s*:?|Ch\u00fang t\u00f4i l\u00e0\s*:?)?\s*"
         r"(?:(?:ng\u01b0\u1eddi\s+)?(?:v\u1ee3|ch\u1ed3ng)\s*[\-\u2013]\s*)?"
@@ -3046,7 +3046,14 @@ def _extract_parties_generic(text: str, doc_kind: str) -> tuple[dict, dict]:
         ben_b_section = text[idx_b_start:idx_end] if idx_end > idx_b_start else text[idx_b_start:]
     else:
         ben_a_section = text[idx_a_start:idx_end] if idx_end > idx_a_start else text[idx_a_start:]
-        ben_b_section = ""
+        # The chap khong heading "BÊN NHẬN THẾ CHẤP": ngan hang + dai dien
+        # thuong nam trong phan mo dau truoc "BÊN THẾ CHẤP" (mau Agribank
+        # trong Loi chung) — preamble chinh la ben nhan the chap.
+        ben_b_section = (
+            text[:idx_a_start]
+            if doc_kind == DOC_KIND_MORTGAGE and idx_a_start > 0
+            else ""
+        )
 
     return _extract_party_data(ben_a_section), _extract_party_data(ben_b_section)
 
