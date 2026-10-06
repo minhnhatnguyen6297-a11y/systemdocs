@@ -1621,6 +1621,10 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
             if any(len(cell) > 100 for cell in cells):
                 continue
             if col_order and len(cells) >= len(order):
+                # Dong van xuoi troi vao bang ("15/10/2063 | | | 2. Thống nhất
+                # phân chia...") — o tieu de muc "2. ..." khong phai du lieu.
+                if any(re.match(r"^\s*\d{1,2}\.\s+\S", c) for c in cells if c):
+                    continue
                 row = {
                     "so_to_ban_do": "",
                     "so_thua_dat": "",
@@ -1691,6 +1695,10 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
             ):
                 continue
             if re.match(r"^\s*\d+[.)]?\s*(?:\u00d4ng|\u00f4ng|\u00f4ng/b\u00e0|B\u00e0|Anh|Ch\u1ecb|C\u00f4|Ch\u00e1u)\b", cells[0]):
+                continue
+            # Dong van xuoi co o la tieu de muc "2. Thống nhất ..." khong phai
+            # du lieu bang — bo truoc khi vao chi tiet/thua "ma".
+            if any(re.match(r"^\s*\d{1,2}\.\s+\S", c) for c in cells if c):
                 continue
             mid_head, _mid_note = _tach_nay_la(mid)
             if (
