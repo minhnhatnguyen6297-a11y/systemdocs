@@ -2501,6 +2501,18 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         if not person["dia_chi"] and shared_addrs:
             person["dia_chi"] = shared_addrs[0]
 
+    # Cap vo chong viet "1. Ong X ... 2. Va vo la ba Y ... Nơi thường trú: Z"
+    # — chi co 1 dong dia chi cuoi khoi, ap cho ca hai (khong co tu khoa
+    # "cả hai/cùng"). Nguoi lien truoc con thieu dia chi nhan dia chi cua
+    # nguoi ke duoc mo bang "Và vợ/chồng là".
+    for idx, person in enumerate(persons[:-1]):
+        if person["dia_chi"]:
+            continue
+        nxt = persons[idx + 1]
+        nxt_head = _fold_text(lines[nxt["_line_idx"]]) if nxt.get("_line_idx") is not None else ""
+        if nxt["dia_chi"] and re.search(r"\bva\s+(vo|chong)\s+la\b", nxt_head):
+            person["dia_chi"] = nxt["dia_chi"]
+
     for person in persons:
         person["source_start_line_idx"] = person["_line_idx"]
         person.pop("_line_idx", None)
