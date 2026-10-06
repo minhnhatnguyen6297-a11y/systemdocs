@@ -2335,6 +2335,49 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertIn("Phạm Thị Hà", names)
         self.assertIn("Phạm Thị Oanh", names)
 
+    def test_nhan_danh_xung_dung_mot_minh_ong_hai_cham(self):
+        # "Ông: Triệu Tuấn Anh" dung rieng 1 dong khong giay to — nhan danh
+        # xung la du hieu nguoi (to dinh gia ngan hang — 11/10/2026).
+        from extract_contract import _extract_plain_text_person_entries
+        text = (
+            "Thành phần Tổ định giá gồm:\n"
+            "Ông: Triệu Tuấn Anh\n"
+            "Ông: Nguyễn Văn Chí | Chức vụ: Phó Giám đốc\n"
+        )
+        persons = _extract_plain_text_person_entries(text)
+        names = [p["ho_ten"] for p in persons]
+        self.assertIn("Triệu Tuấn Anh", names)
+        self.assertIn("Nguyễn Văn Chí", names)
+
+    def test_nhan_chuc_vu_truoc_danh_xung(self):
+        # "Chức vụ: Ông Nguyễn Hữu Công" — ten sau nhan chuc vu giua dong
+        # (bang thanh phan to dinh gia — 11/10/2026).
+        from extract_contract import _extract_plain_text_person_entries
+        text = "Đại diện hợp pháp\nChức vụ: Ông Nguyễn Hữu Công\nGiám đốc\n"
+        persons = _extract_plain_text_person_entries(text)
+        self.assertTrue(
+            any(p["ho_ten"] == "Nguyễn Hữu Công" and p["gioi_tinh"] == "Ông" for p in persons)
+        )
+
+    def test_chi_tiet_o_nhieu_so_tach_thanh_nhieu_dong(self):
+        # Bang GCN 2 dong gop 1 o: "Trong đó 324,9 46,8 | Đất ở Vườn |
+        # Lâu dài 2043" — o dien tich nhieu so tron tach thanh chi tiet
+        # rieng de tong khop 371,7 (11/10/2026).
+        from extract_contract import tach_danh_sach_thua_dat
+        text = (
+            "Số tờ bản đồ | Số thửa | Diện tích (m2) | Mục đích sử dụng | Thời hạn\n"
+            "18 | 207 | 371,7\n"
+            "Trong đó 324,9 46,8 | Đất ở Vườn | Lâu dài 2043"
+        )
+        parcels = tach_danh_sach_thua_dat(text)
+        self.assertTrue(parcels)
+        chi_tiet = parcels[0].get("chi_tiet_dien_tich", [])
+        self.assertEqual(len(chi_tiet), 2)
+        tong_ct = sum(
+            float(str(c["dien_tich"]).replace(",", ".")) for c in chi_tiet
+        )
+        self.assertAlmostEqual(tong_ct, 371.7, places=1)
+
 
 if __name__ == "__main__":
     unittest.main()

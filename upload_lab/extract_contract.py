@@ -2051,6 +2051,24 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
             dedup.append(_new_thua_dat(context))
 
     for parcel in dedup:
+        # Bang GCN gop 2 dong chi tiet vao 1 o ("Trong đó 324,9 46,8 |
+        # Đất ở Vườn | Lâu dài 2043") — o dien tich chua nhieu so tron:
+        # tach so dau giu muc dich goc, so sau thanh chi tiet rieng de
+        # R10 cong dung tong (11/10/2026).
+        if parcel.get("chi_tiet_dien_tich"):
+            mo_rong: list[dict] = []
+            for detail in parcel["chi_tiet_dien_tich"]:
+                dt = str(detail.get("dien_tich") or "")
+                so_list = re.findall(r"\d[\d.,]*", dt)
+                if len(so_list) > 1 and not re.search(r"[A-Za-z\u00c0-\u1ef9\u0110]", dt):
+                    mo_rong.append({**detail, "dien_tich": so_list[0]})
+                    for so in so_list[1:]:
+                        mo_rong.append(
+                            {"dien_tich": so, "muc_dich_su_dung": "", "thoi_han_su_dung": ""}
+                        )
+                else:
+                    mo_rong.append(detail)
+            parcel["chi_tiet_dien_tich"] = mo_rong
         parcel["land_rows"] = thua_dat_sang_land_rows(parcel)
 
     return dedup
@@ -2401,6 +2419,11 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             la_chi_nhanh = title_fold == "chi" and name_fold.startswith("nhanh")
             if not la_pha_he and not ngoac_nguoi_khac and not la_chi_nhanh:
                 headers.append((idx, match))
+                # O nhan "Ông: <ten>" / "Bà: <ten>" dung mot minh (danh
+                # sach thanh vien to dinh gia) — nhan danh xung la du
+                # hieu nguoi, vuot cong "phai co sinh/ID/chuc vu".
+                if re.match(r"^\s*(?:[ÔO]ng|[Bb]\u00e0)\s*:", line):
+                    labeled_person_idx.add(idx)
         else:
             bare_match = bare_header_re.search(line)
             if bare_match:
@@ -2425,7 +2448,14 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                             lead_fold = _fold_text(lead_name)
                             if lead_fold and not bare_name_noise_re.search(lead_fold):
                                 headers.append((idx, lead_match))
-        labeled_match = labeled_name_re.search(line)
+        # "Chức vụ: Ông Nguyễn Hữu Công" — nhan chuc vu di truoc danh
+        # xung giua dong (bang thanh phan to dinh gia ngan hang).
+        labeled_match = labeled_name_re.search(line) or re.search(
+            r"(?i)^\s*(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:?\s*"
+            r"(?P<title>\u00f4ng|b\u00e0)\s+"
+            r"(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?)\s*$",
+            line,
+        )
         if labeled_match:
             labeled_name = _cat_ho_ten(labeled_match.groupdict().get("name") or "")
             if len(labeled_name.split()) >= 2 and not bare_name_noise_re.search(_fold_text(labeled_name)):
