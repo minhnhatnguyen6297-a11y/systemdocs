@@ -2897,7 +2897,7 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
     death_y_evidence = (
         r""
         if is_refusal
-        else r"(?=\s*(?:theo\s+)?tr\u00edch\s+l\u1ee5c|[^.\n]{0,60}?khai\s+t\u1eed)"
+        else r"(?=\s*(?:theo\s+)?tr\u00edch\s+l\u1ee5c|[^.\n]{0,60}?(?:khai\s+t\u1eed|\u0111\u01a1n\s+xin\s+x\u00e1c\s+nh\u1eadn))"
     )
     death_re = re.compile(
         r"(?i)(?P<title>\u00d4ng|B\u00e0|Anh|Ch\u1ecb)\s*:?\s*(?P<name>[^;(\n.,]+?)"
@@ -2950,7 +2950,7 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
         # tu quan he (bo/me/vo/chong...) — tranh nhan ten ghep thoang.
         if is_refusal and match.group("death_y") and not match.group("death"):
             tail_after = source[match.end():match.end() + 80]
-            if not re.search(r"(?i)tr\u00edch\s+l\u1ee5c|khai\s+t\u1eed", tail_after):
+            if not re.search(r"(?i)tr\u00edch\s+l\u1ee5c|khai\s+t\u1eed|\u0111\u01a1n\s+xin\s+x\u00e1c\s+nh\u1eadn", tail_after):
                 head_before = source[max(0, match.start() - 100):match.start()]
                 if not re.search(
                     r"(?i)b\u1ed1|m\u1eb9|cha|ba|v\u1ee3|ch\u1ed3ng|anh|ch\u1ecb|em\b|con\b|ch\u00e1u",
