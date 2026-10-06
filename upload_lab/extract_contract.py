@@ -320,6 +320,9 @@ def _normalize_plain_text_for_extract(text: str) -> str:
     for raw in normalized.split("\n"):
         line = re.sub(r"[ \xa0]+", " ", raw).strip()
         line = re.sub(r"\s*\|\s*", " | ", line)
+        # O bang kieu "nhan<TAB>:<TAB>gia tri" (mau the chap ngan hang)
+        # -> "nhan: gia tri" de parser truong doc duoc.
+        line = re.sub(r"\s*\|\s*:\s*(?:\|\s*)?", ": ", line)
         # Dau/cuoi dong con "| " la do TAB thu dau dong cua .doc —
         # cat de pattern ^...$ khong bi lech (o trong bang van giu).
         line = re.sub(r"^(?:\s*\|\s*)+", "", line)
@@ -2187,7 +2190,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     issue_place_re = re.compile(r"(?i)\bdo\s+([^\n]+?)\s+c\u1ea5p ng\u00e0y")
     issue_date_re = re.compile(r"(?i)c\u1ea5p ng\u00e0y\s*(\d{1,2}/\d{1,2}/\d{4})")
     header_re = re.compile(
-        r"(?i)^\s*(?:[-*]\s*)?(?:(?:\u0110\u1ea1i di\u1ec7n|Dai dien|Ng\u01b0\u1eddi \u0111\u1ea1i di\u1ec7n|Nguoi dai dien)(?:\s+[^:]{0,80})?:\s*)?"
+        r"(?i)^\s*(?:(?:[-*:]|\|)\s*)*(?:(?:\u0110\u1ea1i di\u1ec7n|Dai dien|Ng\u01b0\u1eddi \u0111\u1ea1i di\u1ec7n|Nguoi dai dien)(?:\s+[^:]{0,80})?:\s*)?"
         r"(?:\d+\.\s*)?"
         r"(?:T\u00f4i (?:t\u00ean )?l\u00e0\s*:?|Ch\u00fang t\u00f4i l\u00e0\s*:?)?\s*"
         r"(?:(?:ng\u01b0\u1eddi\s+)?(?:v\u1ee3|ch\u1ed3ng)\s*[\-\u2013]\s*)?"
@@ -2196,7 +2199,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         r"(?:(?:b\u00ean|ben)\s+[A-Za-z\u00c0-\u1ef9]\s*[:.,]?\s*)?"
         r"(?:(?:con|m\u1eb9|b\u1ed1|cha|v\u1ee3|ch\u1ed3ng)\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i)\s*[-\u2013\u2014:]\s*)?"
         r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?:v\u00e0\s+)?(?P<title>\u00f4ng/b\u00e0|ong/ba|\u00f4ng|ong|b\u00e0|ba|anh|ch\u1ecb|chi)\s*:?\s*"
-        r"(?P<name>.+?)(?=\s+(?:[\-\u2013]\s+)?(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)\s*[:\u2013-]?\s*(?:(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})|\s+(?:[\-\u2013]\s+)?(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:|\s+c\u00f3\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\b|\s*\(\s*(?:Sinh|Ng\u00e0y)|[;]|$)"
+        r"(?P<name>.+?)(?=\s+(?:[\-\u2013]\s+)?(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)\s*[:\u2013-]?\s*(?:(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})|\s+(?:[\-\u2013]\s+)?(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:|\s+c\u00f3\s+(?:(?:m\u1eb9|b\u1ed1|cha|con|v\u1ee3|ch\u1ed3ng)(?:\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i))?)\b|\s*\(\s*(?:Sinh|Ng\u00e0y)|[;]|$)"
     )
     birth_re = re.compile(r"(?i)(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)\s*[:\u2013-]?\s*(\d{1,2}/\d{1,2}/\d{4})")
     # Nguoi lon tuoi thuong chi ghi "Sinh nam 1965" — database chap nhan YYYY
@@ -2258,6 +2261,37 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     )
 
     lines = _split_section_lines(section)
+    # Dong "2. Ông X có mẹ đẻ là bà Y; Sinh ngày..." — "bà Y" la nguoi
+    # rieng bi nuot vao khoi X; tach "là bà/ông <tên>" thanh dong ao de
+    # parser chuan nhan ca hai (10/10/2026 — don xac nhan nhan than).
+    _kinship_la_re = re.compile(
+        r"\s+c\u00f3\s+(?:m\u1eb9|b\u1ed1|cha|con|v\u1ee3|ch\u1ed3ng)"
+        r"(?:\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i))?\s+l\u00e0\s+"
+        r"(?=(?:\u00f4ng|b\u00e0)\s+[A-Z\u00c0-\u1ef9\u0110])"
+    )
+    _split_lines: list[str] = []
+    for ln in lines:
+        kinship_match = _kinship_la_re.search(ln)
+        parts = (
+            [ln[: kinship_match.start()], ln[kinship_match.end():]]
+            if kinship_match
+            else [ln]
+        )
+        for part in parts:
+            # O trong "| |" la ranh hang trong bang nguoi (mau ngan hang:
+            # "Ông: X | | Năm sinh: ... | | Bà: Y") — tach thanh dong ao
+            # de moi cap nhan/gia tri thanh dong rieng.
+            _split_lines.extend(part.split(" | | "))
+    lines = _split_lines
+    # Dong dau section thuong la "I. Bên thế chấp: Ông X | Năm sinh: ..."
+    # (mau ngan hang viet lien tieu de voi nguoi) — bo tieu de bên de ten
+    # nguoi thanh dau dong.
+    if lines:
+        lines[0] = re.sub(
+            r"(?i)^\s*(?:(?:I{1,3}|IV|V|VI{0,3})\.\s*(?:\|\s*)?)?B\u00caN\b[^:\n]{0,60}:\s*",
+            "",
+            lines[0],
+        )
     headers: list[tuple[int, re.Match[str]]] = []
     address_lines: list[tuple[int, str, str]] = []
     labeled_person_idx: set[int] = set()
@@ -2907,39 +2941,39 @@ def _extract_parties_generic(text: str, doc_kind: str) -> tuple[dict, dict]:
             return ben_a, ben_b
 
     ben_a_patterns = (
-        r"(?m)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN CHUY\u1ec2N NH\u01af\u1ee2NG\b",
-        r"(?m)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN TH\u1ebe CH\u1ea4P\b",
-        r"(?m)^\s*\(?A\)?\s*B\u00caN TH\u1ebe CH\u1ea4P\b",
-        r"(?m)^\s*(?:I\.\s*(?:\|\s*)?)?BEN THE CHAP\b",
-        r"(?m)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN CHO VAY\b",
-        r"(?m)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN CHO THU\u00ca\b",
-        r"(?m)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN (?:UY|U\u1ef6|\u1ee6Y) QUY\u1ec0N\b",
-        r"(?m)^\s*(?:I\.\s*(?:\|\s*)?)?NG\u01af\u1edcI (?:UY|U\u1ef6|\u1ee6Y) QUY\u1ec0N\b(?=\s*[:(])(?![^\n]*\bNG\u01af\u1edcI\b)",
-        r"(?m)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN \u0110\u1eb6T C\u1eccC\b",
-        r"(?m)^\s*(?:I\.\s*(?:\|\s*)?)?NG\u01af\u1edcI DI CH\u00daC\b(?=\s*[:(])(?![^\n]*\bNG\u01af\u1edcI\b)",
-        r"(?m)^\s*(?:I\.\s*(?:\|\s*)?)?NG\u01af\u1edcI CAM K\u1ebeT\b(?=\s*[:(])(?![^\n]*\bNG\u01af\u1edcI\b)",
-        r"(?m)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN G\u00d3P V\u1ed0N\b",
-        r"(?m)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN T\u1eb6NG CHO\b",
-        r"(?m)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN B\u00c1N\b",
-        r"(?m)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN TH\u1ee8 NH\u1ea4T\b",
-        r"(?m)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN A\b",
+        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN CHUY\u1ec2N NH\u01af\u1ee2NG\b",
+        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN TH\u1ebe CH\u1ea4P\b",
+        r"(?im)^\s*\(?A\)?\s*B\u00caN TH\u1ebe CH\u1ea4P\b",
+        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?BEN THE CHAP\b",
+        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN CHO VAY\b",
+        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN CHO THU\u00ca\b",
+        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN (?:UY|U\u1ef6|\u1ee6Y) QUY\u1ec0N\b",
+        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?NG\u01af\u1edcI (?:UY|U\u1ef6|\u1ee6Y) QUY\u1ec0N\b(?=\s*[:(])(?![^\n]*\bNG\u01af\u1edcI\b)",
+        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN \u0110\u1eb6T C\u1eccC\b",
+        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?NG\u01af\u1edcI DI CH\u00daC\b(?=\s*[:(])(?![^\n]*\bNG\u01af\u1edcI\b)",
+        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?NG\u01af\u1edcI CAM K\u1ebeT\b(?=\s*[:(])(?![^\n]*\bNG\u01af\u1edcI\b)",
+        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN G\u00d3P V\u1ed0N\b",
+        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN T\u1eb6NG CHO\b",
+        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN B\u00c1N\b",
+        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN TH\u1ee8 NH\u1ea4T\b",
+        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN A\b",
     )
     ben_b_patterns = (
-        r"(?m)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN NH\u1eacN CHUY\u1ec2N NH\u01af\u1ee2NG\b",
-        r"(?m)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN NH\u1eacN TH\u1ebe CH\u1ea4P\b",
-        r"(?m)^\s*\(?B\)?\s*B\u00caN NH\u1eacN TH\u1ebe CH\u1ea4P\b",
-        r"(?m)^\s*(?:II\.\s*(?:\|\s*)?)?BEN NHAN THE CHAP\b",
-        r"(?m)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN VAY\b",
-        r"(?m)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN THU\u00ca\b",
-        r"(?m)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN \u0110\u01af\u1ee2C (?:UY|U\u1ef6|\u1ee6Y) QUY\u1ec0N\b",
-        r"(?m)^\s*(?:II\.\s*(?:\|\s*)?)?NG\u01af\u1edcI \u0110\u01af\u1ee2C (?:UY|U\u1ef6|\u1ee6Y) QUY\u1ec0N\b(?=\s*[:(])(?![^\n]*\bNG\u01af\u1edcI\b)",
+        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN NH\u1eacN CHUY\u1ec2N NH\u01af\u1ee2NG\b",
+        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN NH\u1eacN TH\u1ebe CH\u1ea4P\b",
+        r"(?im)^\s*\(?B\)?\s*B\u00caN NH\u1eacN TH\u1ebe CH\u1ea4P\b",
+        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?BEN NHAN THE CHAP\b",
+        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN VAY\b",
+        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN THU\u00ca\b",
+        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN \u0110\u01af\u1ee2C (?:UY|U\u1ef6|\u1ee6Y) QUY\u1ec0N\b",
+        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?NG\u01af\u1edcI \u0110\u01af\u1ee2C (?:UY|U\u1ef6|\u1ee6Y) QUY\u1ec0N\b(?=\s*[:(])(?![^\n]*\bNG\u01af\u1edcI\b)",
         r"(?i)uỷ\s+quyền\s+cho\s*:",
-        r"(?m)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN NH\u1eacN \u0110\u1eb6T C\u1eccC\b",
-        r"(?m)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN NH\u1eacN T\u1eb6NG CHO\b",
-        r"(?m)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN \u0110\u01af\u1ee2C T\u1eb6NG CHO\b",
-        r"(?m)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN MUA\b",
-        r"(?m)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN TH\u1ee8 HAI\b",
-        r"(?m)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN B\b",
+        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN NH\u1eacN \u0110\u1eb6T C\u1eccC\b",
+        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN NH\u1eacN T\u1eb6NG CHO\b",
+        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN \u0110\u01af\u1ee2C T\u1eb6NG CHO\b",
+        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN MUA\b",
+        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN TH\u1ee8 HAI\b",
+        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN B\b",
     )
     preamble_patterns = (
         r"\bCh\u00fang t\u00f4i g\u1ed3m c\u00f3\s*:\s*",

@@ -1943,6 +1943,40 @@ class UploadLabExtractContractTests(unittest.TestCase):
             ["Trịnh Minh Giang", "Trịnh Quang Trung"],
         )
 
+    def test_bang_ngan_hang_nhan_gia_tri_o_tab(self):
+        # Mau the chap ngan hang: "I. Bên thế chấp: Ông X | Ông: X |
+        # Năm sinh: 1962 | Căn cước ... số: ... | Bà: Y | ..." — nguoi
+        # trong o "Ông:/Bà:" tach bang o trong "| |".
+        from extract_contract import _extract_plain_text_person_entries
+        section = (
+            "I. Bên thế chấp: Ông Nguyễn Văn Trinh |  | Ông: Nguyễn Văn Trinh |  | "
+            "Năm sinh: 1962 |  | Căn cước công dân số: 036062009669 do Cục cảnh sát "
+            "cấp ngày 20/04/2021 |  | Bà: Nguyễn Thị Tươi |  | Năm sinh: 1964 |  | "
+            "Căn cước công dân số: 036164015397 do Cục cảnh sát cấp ngày 10/05/2021 |  | "
+            "Địa chỉ: Thôn Cao Bồ, xã Yên Hồng |  | và"
+        )
+        persons = _extract_plain_text_person_entries(section)
+        names = [q["ho_ten"] for q in persons]
+        self.assertIn("Nguyễn Văn Trinh", names)
+        self.assertIn("Nguyễn Thị Tươi", names)
+        trinh = next(q for q in persons if q["ho_ten"] == "Nguyễn Văn Trinh")
+        self.assertEqual(trinh["cccd"], "036062009669")
+
+    def test_co_quan_he_la_tach_nguoi_thu_hai(self):
+        # "2. Ông X có mẹ đẻ là bà Y; Sinh ngày..." — "bà Y" la nguoi
+        # rieng, khong nuot vao khoi X (don xac nhan nhan than).
+        from extract_contract import _extract_plain_text_person_entries
+        section = (
+            "1. Ông Nguyễn Huy Nghĩa có bố đẻ là ông Nguyễn Huy Tình; "
+            "Sinh năm 1923, đã chết ngày 05/06/2016\n"
+            "2. Ông Nguyễn Huy Nghĩa có mẹ đẻ là bà Nguyễn Thị Khánh; "
+            "Sinh ngày 01/01/1950; Căn cước công dân số 036150013678\n"
+        )
+        persons = _extract_plain_text_person_entries(section)
+        names = [q["ho_ten"] for q in persons]
+        self.assertIn("Nguyễn Thị Khánh", names)
+        self.assertNotIn("Nguyễn Huy Nghĩa có mẹ đẻ", names)
+
 
 if __name__ == "__main__":
     unittest.main()
