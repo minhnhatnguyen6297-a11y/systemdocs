@@ -745,9 +745,9 @@ def _find_tai_san_inheritance_partition(text: str) -> str:
     return _extract_block_by_folded_patterns(
         text,
         (
-            r"quyen su dung dat(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:co dia chi tai|tai dia chi)\s*:?",
-            r"nha o va quyen su dung dat o(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:co dia chi tai|tai dia chi)\s*:?",
-            r"phan quyen su dung dat(?: cua[^\n]{0,200})?[^\n]{0,300}?(?:co dia chi tai|tai dia chi)\s*:?",
+            r"quyen su dung dat(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:co dia chi(?: tai)?|tai dia chi)\s*:?",
+            r"nha o va quyen su dung dat o(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:co dia chi(?: tai)?|tai dia chi)\s*:?",
+            r"phan quyen su dung dat(?: cua[^\n]{0,200})?[^\n]{0,300}?(?:co dia chi(?: tai)?|tai dia chi)\s*:?",
             r"quyen su dung dat[^\n]{0,300}?theo giay chung nhan",
             r"thua dat so[^\n]{0,200}?(?:co dia chi tai|tai dia chi|theo giay chung nhan|theo ban do)",
         ),
@@ -769,8 +769,8 @@ def _find_tai_san_inheritance_refusal(text: str) -> str:
         text,
         (
             r"(?m)^\s*(?:1\.\s*)?tai san(?: thu nhat)?\s*:",
-            r"quyen su dung dat(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:co dia chi tai|tai dia chi)\s*:?",
-            r"phan quyen su dung dat(?: cua[^\n]{0,200})?[^\n]{0,300}?(?:co dia chi tai|tai dia chi)\s*:?",
+            r"quyen su dung dat(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:co dia chi(?: tai)?|tai dia chi)\s*:?",
+            r"phan quyen su dung dat(?: cua[^\n]{0,200})?[^\n]{0,300}?(?:co dia chi(?: tai)?|tai dia chi)\s*:?",
         ),
         (
             r"(?m)^\s*bang van ban nay\b",
@@ -1588,7 +1588,7 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
             _label_alt = "|".join(lbl for _f, lbl in bullet_labels)
             _o_co_nhan = [c.strip() for c in line.split("|") if c.strip("-*_ ")]
             if _o_co_nhan and any(
-                re.match(r"(?i)(?:" + _label_alt + r")\s*:", c) for c in _o_co_nhan
+                re.match(r"(?i)(?:" + _label_alt + r")\s*:", c.lstrip("-*_ ")) for c in _o_co_nhan
             ):
                 line = "- " + "; ".join(c.lstrip("-*_ ").rstrip(" ;") for c in _o_co_nhan)
                 folded = _fold_text(line)
@@ -1601,9 +1601,9 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
             def _la_marker(c: str) -> bool:
                 return bool(re.match(r"^(?:[a-z\u0110]{1,2}|\d{1,3})[.)-]?$", c, re.IGNORECASE))
             if _o_ko_trong and all(
-                re.match(r"(?i)(?:" + _label_alt + r")\s*:", c) or _la_marker(c)
+                re.match(r"(?i)(?:" + _label_alt + r")\s*:", c.lstrip("-*_ ")) or _la_marker(c)
                 for c in _o_ko_trong
-            ) and any(re.match(r"(?i)(?:" + _label_alt + r")\s*:", c) for c in _o_ko_trong):
+            ) and any(re.match(r"(?i)(?:" + _label_alt + r")\s*:", c.lstrip("-*_ ")) for c in _o_ko_trong):
                 line = "- " + "; ".join(
                     c.rstrip(" ;") for c in _o_ko_trong if not _la_marker(c)
                 )
@@ -2147,7 +2147,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     issue_place_re = re.compile(r"(?i)\bdo\s+([^\n]+?)\s+c\u1ea5p ng\u00e0y")
     issue_date_re = re.compile(r"(?i)c\u1ea5p ng\u00e0y\s*(\d{1,2}/\d{1,2}/\d{4})")
     header_re = re.compile(
-        r"(?i)^\s*(?:[-*]\s*)?(?:(?:\u0110\u1ea1i di\u1ec7n|Dai dien)(?:\s+[^:]{0,80})?:\s*)?"
+        r"(?i)^\s*(?:[-*]\s*)?(?:(?:\u0110\u1ea1i di\u1ec7n|Dai dien|Ng\u01b0\u1eddi \u0111\u1ea1i di\u1ec7n|Nguoi dai dien)(?:\s+[^:]{0,80})?:\s*)?"
         r"(?:\d+\.\s*)?"
         r"(?:T\u00f4i (?:t\u00ean )?l\u00e0\s*:?|Ch\u00fang t\u00f4i l\u00e0\s*:?)?\s*"
         r"(?:(?:ng\u01b0\u1eddi\s+)?(?:v\u1ee3|ch\u1ed3ng)\s*[\-\u2013]\s*)?"
@@ -2156,7 +2156,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         r"(?:(?:b\u00ean|ben)\s+[A-Za-z\u00c0-\u1ef9]\s*[:.,]?\s*)?"
         r"(?:(?:con|m\u1eb9|b\u1ed1|cha|v\u1ee3|ch\u1ed3ng)\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i)\s*[-\u2013\u2014:]\s*)?"
         r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?:v\u00e0\s+)?(?P<title>\u00f4ng/b\u00e0|ong/ba|\u00f4ng|ong|b\u00e0|ba|anh|ch\u1ecb|chi)\s*:?\s*"
-        r"(?P<name>.+?)(?=\s+(?:[\-\u2013]\s+)?(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)\s*[:\u2013-]?\s*(?:(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})|\s+(?:[\-\u2013]\s+)?(?:Ch\u1ee9c v\u1ee5|Chuc vu)\s*:|\s+c\u00f3\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\b|\s*\(\s*(?:Sinh|Ng\u00e0y)|[;]|$)"
+        r"(?P<name>.+?)(?=\s+(?:[\-\u2013]\s+)?(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)\s*[:\u2013-]?\s*(?:(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})|\s+(?:[\-\u2013]\s+)?(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:|\s+c\u00f3\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\b|\s*\(\s*(?:Sinh|Ng\u00e0y)|[;]|$)"
     )
     birth_re = re.compile(r"(?i)(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)\s*[:\u2013-]?\s*(\d{1,2}/\d{1,2}/\d{4})")
     # Nguoi lon tuoi thuong chi ghi "Sinh nam 1965" — database chap nhan YYYY
@@ -2404,7 +2404,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         # "ngay chet" trong checklist khong du de loai).
         if re.search(r"\bchet\s+ngay\s*[:.-]?\s*\d", _fold_text(chunk)):
             continue
-        role_match = re.search(r"(?i)(?:Ch\u1ee9c v\u1ee5|Chuc vu)\s*:", chunk)
+        role_match = re.search(r"(?i)(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:", chunk)
         if not has_birth and not id_match and not role_match:
             continue
         if not _ho_ten_hop_le(person["ho_ten"]):

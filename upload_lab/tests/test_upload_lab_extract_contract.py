@@ -1735,6 +1735,38 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(ben_a[0]["cccd"], "036070006771")
         self.assertIn("Cục cảnh sát", ben_a[0]["noi_cap"])
 
+    def test_nguoi_dai_dien_phap_luat_va_o_gach_dau(self):
+        # Dai dien phap luat cong ty la nguoi ky that; o bang .doc dang
+        # "- Thửa đất số: 73 | | - Tờ bản đồ số: 9" van tach duoc nhan.
+        from extract_contract import tach_danh_sach_thua_dat
+        ds = tach_danh_sach_thua_dat(
+            "Phần quyền sử dụng đất có địa chỉ: xã Y theo Giấy chứng nhận số: AK 732800 "
+            "do huyện H cấp năm 2008. Cụ thể:\n"
+            "- Thửa đất số: 73 | | - Tờ bản đồ số: 9 (nay là tờ bản đồ số 68)\n"
+            "- Diện tích: 1009,0 m2"
+        )
+        self.assertEqual(ds[0]["so_thua_dat"], "73")
+        self.assertEqual(ds[0]["so_to_ban_do"], "9")
+        self.assertIn("nay là tờ bản đồ số 68", ds[0]["phan_ghi_them"])
+
+        docx_path = make_docx(
+            self.root / "cong_ty.docx",
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+            "Chúng tôi gồm có:",
+            "I. BÊN CHUYỂN NHƯỢNG: (Bên A).",
+            "CÔNG TY TNHH X",
+            "Người đại diện theo pháp luật: Ông Nguyễn Văn Tự – Chức danh: Giám đốc",
+            "Căn cước công dân số 036081015497 do Cục cảnh sát cấp ngày 05/07/2021;",
+            "Nơi thường trú tại: xã A, huyện B.",
+            "II. BÊN NHẬN CHUYỂN NHƯỢNG: (Bên B).",
+            "Người đại diện theo pháp luật: Ông Ngô Tuấn Minh – Chức danh: Giám đốc",
+            "Căn cước công dân số 036081015498 do Cục cảnh sát cấp ngày 05/07/2021;",
+            "Hai bên thỏa thuận chuyển nhượng thửa đất số 1, tờ bản đồ số 2.",
+        )
+        payload = extract(docx_path)
+        self.assertEqual([q["ho_ten"] for q in payload["raw"]["ben_a"]["nguoi"]], ["Nguyễn Văn Tự"])
+        self.assertEqual([q["ho_ten"] for q in payload["raw"]["ben_b"]["nguoi"]], ["Ngô Tuấn Minh"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -208,7 +208,11 @@ def _ten_la_cau(ten: str) -> bool:
 
 
 _TU_KHOA_TEN_RAC = re.compile(
-    r"(?i)(?:\d|cccd|cmnd|c\u0103n c\u01b0\u1edbc|sinh\b|ng\u00e0y|n\u0103m|c\u1ea5p\b|\u0111\u1ecba ch\u1ec9|th\u01b0\u1eddng tr\u00fa|h\u1ed9 kh\u1ea9u|chi nh\u00e1nh|v\u0103n ph\u00f2ng|c\u00f4ng ty|ng\u00e2n h\u00e0ng|chi c\u1ee5c|\bubnd\b|b\u1ec7nh vi\u1ec7n)"
+    r"(?i)(?:\d|cccd|cmnd|c\u0103n c\u01b0\u1edbc|\u0111\u1ecba ch\u1ec9|th\u01b0\u1eddng tr\u00fa|h\u1ed9 kh\u1ea9u"
+    r"|chi nh\u00e1nh|v\u0103n ph\u00f2ng|c\u00f4ng ty|ng\u00e2n h\u00e0ng|chi c\u1ee5c|\bubnd\b|b\u1ec7nh vi\u1ec7n"
+    # Cum nhan bi ro ("Sinh ngay", "cap ngay") — "Sinh/Nam/Cap" dung mot
+    # minh la am tiet ten that ("Phạm Văn Sinh", 10/10/2026).
+    r"|sinh\s+ng[\u00e0a]y|sinh\s+n[\u0103a]m|ng\u00e0y\s+sinh|n\u0103m\s+sinh|c\u1ea5p\s+ng[\u00e0a]y)"
 )
 
 
