@@ -368,7 +368,18 @@ def luat_lech_dien_tich(payload: dict) -> list[dict]:
         tong = _so_thuc(thua.get("dien_tich", ""))
         chi_tiet = [_so_thuc(c.get("dien_tich", "")) for c in thua.get("chi_tiet_dien_tich", [])]
         chi_tiet = [v for v in chi_tiet if v is not None]
-        if tong is not None and chi_tiet and abs(sum(chi_tiet) - tong) > TOLERANCE_DIEN_TICH_M2:
+        tong_chi_tiet = sum(chi_tiet)
+        # bang GCN 2 dong: dong chinh ghi muc dich chinh (VD "Dat o"), dong phu
+        # chi ghi phan dien tich con lai (VD "160 Dat vuon") -> chi tiet < tong
+        # la hop le, phan du ngam la muc dich chinh (decision-63, 11/10/2026).
+        lech_du = tong_chi_tiet - tong if tong is not None else 0
+        muc_dich_chinh = (thua.get("muc_dich_su_dung") or "").strip()
+        if (
+            tong is not None
+            and chi_tiet
+            and abs(tong_chi_tiet - tong) > TOLERANCE_DIEN_TICH_M2
+            and (lech_du > 0 or not muc_dich_chinh)
+        ):
             findings.append({
                 "id": "R10",
                 "muc": MUC_CANH_BAO,

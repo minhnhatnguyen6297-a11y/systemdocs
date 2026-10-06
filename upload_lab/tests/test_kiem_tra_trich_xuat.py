@@ -126,6 +126,23 @@ class KiemTraTrichXuatTests(unittest.TestCase):
         ]
         self.assertFalse([f for f in kiem_tra_payload(payload) if f["id"] == "R10"])
 
+    def test_lech_dien_tich_bang_gcn_hai_dong_khong_bao(self):
+        # sweep33: thua 143 tong 200 "Dat o" lau dai + dong phu "160 Dat vuon"
+        # -> phan dat o 40 ngam, chi tiet < tong la hop le (decision-63).
+        payload = make_payload()
+        thua = payload["raw"]["danh_sach_thua_dat"][0]
+        thua["dien_tich"] = "200"
+        thua["muc_dich_su_dung"] = "Đất ở"
+        thua["chi_tiet_dien_tich"] = [{"dien_tich": "160", "muc_dich_su_dung": "Đất vườn"}]
+        self.assertFalse([f for f in kiem_tra_payload(payload) if f["id"] == "R10"])
+
+        thua["chi_tiet_dien_tich"] = [{"dien_tich": "250", "muc_dich_su_dung": "Đất vườn"}]
+        self.assertTrue([f for f in kiem_tra_payload(payload) if f["id"] == "R10"])
+
+        thua["muc_dich_su_dung"] = ""
+        thua["chi_tiet_dien_tich"] = [{"dien_tich": "160", "muc_dich_su_dung": "Đất vườn"}]
+        self.assertTrue([f for f in kiem_tra_payload(payload) if f["id"] == "R10"])
+
     def test_tai_san_chua_ho_tro_bao_canh_bao(self):
         payload = make_payload()
         payload["raw"]["tai_san_chua_ho_tro"] = ["so_tiet_kiem", "bao_hiem"]
