@@ -11,6 +11,7 @@ Rules (contract §2.2, §4):
 from __future__ import annotations
 
 import json
+import math
 import re
 import unicodedata
 import uuid
@@ -82,6 +83,10 @@ def norm_date(raw: str, *, allow_year: bool = True):
 
     m = _DATE_PATTERNS[0].match(cleaned)
     if m:
+        try:
+            datetime(*(int(part) for part in m.groups()))
+        except ValueError:
+            return None, "observed", None
         return cleaned, "normalized", None
     for pat in _DATE_PATTERNS[1:4]:
         m = pat.match(cleaned)
@@ -155,8 +160,10 @@ def norm_number(raw: str):
         candidate = candidate.replace(".", "").replace(",", ".")
     elif "," in candidate:
         candidate = candidate.replace(",", ".")
-    if re.fullmatch(r"\d+(\.\d+)?", candidate):
+    if re.fullmatch(r"\+?\d+(\.\d+)?", candidate):
         num = float(candidate)
+        if not math.isfinite(num):
+            return None, "observed", None
         normalized: Any = int(num) if num.is_integer() else num
         return normalized, "normalized", None
     return None, "observed", None

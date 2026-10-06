@@ -1,0 +1,17 @@
+{
+  "expected_error": "validation_error",
+  "fixture_context": {
+    "server_revision": 7,
+    "note": "§2.1a — case_id bắt buộc cho workspace_update (command ghi trên hồ sơ đã lưu); thiếu → validation_error"
+  },
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-0062-4006-8006-000000000067",
+  "command": "notary.workspace_update",
+  "payload": {
+    "base_revision": 7,
+    "case": {
+      "noi_niem_yet": "UBND xã Minh Tân"
+    }
+  },
+  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+}

@@ -35,7 +35,7 @@ $allow = @{
         excludes = @()
     }
     "notary_v2" = @{
-        files = @("database.py", "models.py")
+        files = @("database.py", "models.py", "administrative_timeline.py")
         dirs  = @("services", "routers", "word_templates",
                   "frontend\templates")
         excludes = @(
@@ -48,6 +48,9 @@ $allow = @{
         )
     }
 }
+# Public reference data only. Never copy the enclosing data directory (office
+# databases/configuration), curator locks, or revision archives.
+& (Join-Path $sidecar "stage_administrative_reference.ps1") -Repository $repo -EngineStage $engineStage
 foreach ($key in $allow.Keys) {
     $src = Join-Path $repo $key
     $dst = Join-Path $engineStage $key
@@ -57,15 +60,21 @@ foreach ($key in $allow.Keys) {
     }
     foreach ($d in $allow[$key].dirs) {
         $target = Join-Path $dst $d
-        New-Item -ItemType Directory -Force `
-            -Path (Split-Path $target -Parent) | Out-Null
-        Copy-Item -Recurse -Force (Join-Path $src $d) $target
+        # Copy NO I DUNG cua thu muc — Copy-Item ca thu muc vao target da
+        # ton tai se long thanh services\services (NAIA-9: reference
+        # staging tao truoc notary_v2\services).
+        New-Item -ItemType Directory -Force -Path $target | Out-Null
+        Copy-Item -Recurse -Force (Join-Path $src (Join-Path $d "*")) $target
     }
     foreach ($e in $allow[$key].excludes) {
         $hit = Join-Path $dst $e
         if (Test-Path $hit) { Remove-Item -Recurse -Force $hit }
     }
 }
+# Ship only the shared regex engine/profile source, never workbench corpora/UI.
+$sharedDst = Join-Path $engineStage "tools\regex_workbench\engine"
+New-Item -ItemType Directory -Force -Path (Split-Path $sharedDst -Parent) | Out-Null
+Copy-Item -Recurse -Force (Join-Path $repo "tools\regex_workbench\engine") $sharedDst
 # Sach __pycache__ + chan file cam — code only, khong data/Qt.
 Get-ChildItem -Recurse -Force -Directory $engineStage |
     Where-Object { $_.Name -eq "__pycache__" } |
@@ -74,7 +83,8 @@ $forbidden = Get-ChildItem -Recurse -Force -File $engineStage |
     Where-Object {
         $_.Name -in @(".env", "notary.db", "registry.sqlite3",
                       "nd_storage_state.json") -or
-        $_.FullName -match "ui_qt|tests|poc|tools|fast_audit|word_templates[\\/]custom[\\/]" -or
+        $_.FullName -match "ui_qt|tests|poc|fast_audit|word_templates[\\/]custom[\\/]" -or
+        ($_.FullName -match "[\\/]tools[\\/]" -and $_.FullName -notmatch "[\\/]tools[\\/]regex_workbench[\\/]engine[\\/]") -or
         $_.Extension -in @(".db", ".sqlite", ".sqlite3")
     }
 if ($forbidden) {

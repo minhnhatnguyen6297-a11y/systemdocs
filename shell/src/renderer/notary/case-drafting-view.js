@@ -62,6 +62,9 @@ const PERSON_COLS = [
 
 // Asset stage rows — 4 hàng đầu khớp bản mẫu + 'land' chip + phần còn
 // lại của ASSET_FIELDS contract §13.3 (không bỏ trường).
+// KHÔNG có 'thoi_han' lẻ (MIN-141 owner chốt): thời hạn chỉ thuộc từng
+// cụm đất trong popup Loại đất; giá trị lẻ lịch sử giữ trong master,
+// báo qua warning orphan_thoi_han — không còn ô nhập.
 const ASSET_FIELD_ROWS = [
   ['so_serial', 'Số serial'],
   ['so_vao_so', 'Số vào sổ'],
@@ -71,7 +74,6 @@ const ASSET_FIELD_ROWS = [
   ['dia_chi', 'Địa chỉ'],
   ['loai_so', 'Loại sổ'],
   ['hinh_thuc_su_dung', 'Hình thức SD'],     // MIN-136: viet tat giam rong
-  ['thoi_han', 'Thời hạn'],
   ['nguon_goc', 'Nguồn gốc'],
   ['ngay_cap', 'Ngày cấp'],
   ['co_quan_cap', 'Cơ quan cấp'],
@@ -125,6 +127,14 @@ function spliceMove(list, from, to) {
 // field public state + emit gián tiếp qua dismissNotice().
 function cancelDraftState(state) {
   state.stage = structuredClone(state.committed);
+  state.docxImport = structuredClone(state.committedDocxImport || { version: 1, sources: [] });
+  // đợt 3 (MIN-141): meta tren case da tao cung ve baseline committed —
+  // huy nhap khong giu gia tri meta dang sua (huy nhap moi thi
+  // newDraft() da reset san o nhanh tren).
+  if (state.caseId != null && state.committedCaseInfo) {
+    state.caseInfo = structuredClone(state.committedCaseInfo);
+    state.metaDirty = false;
+  }
   // Inheritance draft mới: committed rỗng thiếu key owner_row_id —
   // thêm lại để cột "Để lại" render được (§13.1 stage shape).
   if (state.caseId == null && state.caseInfo &&
@@ -265,6 +275,7 @@ function createNotaryModuleView(deps) {
       if (opener && opener.isConnected && opener.focus) opener.focus();
     };
     function onKey(e) {
+      if (wrap.hidden) return;
       if (e.key === 'Escape') { close(); return; }
       if (e.key !== 'Tab') return;
       // Focus trap: Tab cycle trong dialog (MIN-112 a11y).
@@ -282,6 +293,15 @@ function createNotaryModuleView(deps) {
       }
     }
     wrap.onclick = (e) => { if (e.target === wrap) close(); };
+    box._suspendLookup = () => {
+      wrap.hidden = true;
+      wrap.style.display = 'none';
+      box.removeAttribute('role');
+      return () => {
+        wrap.hidden = false; wrap.style.display = '';
+        box.setAttribute('role', 'dialog');
+      };
+    };
     build(box, close);
     wrap.append(box);
     root.append(wrap);
@@ -310,7 +330,14 @@ function createNotaryModuleView(deps) {
   const wordDlg = window.G1_NOTARY_WORD
     ? window.G1_NOTARY_WORD.createWordDialog({
         model, lib: L, notify, h, btn, face, openModal,
-        pickFiles, openPath, cancelJob })
+        pickFiles, openPath, cancelJob,
+        // Prefix rieng cho box trong dialog — id address-posting-* o
+        // casemeta va dialog khong duoc trung nhau trong cung document.
+        postingSuggestionEl: (cb) => postingSuggestionEl(cb, 'address-dlg'),
+        postingTraButton: (input) => {
+          input.dataset.fid = 'word-posting-input';
+          return lookupTraButton('posting', 'posting', input.dataset.fid, 'word-');
+        } })
     : null;
   const diagramPane = window.G1_NOTARY_DIAGRAM
     ? window.G1_NOTARY_DIAGRAM.createDiagramPane({
@@ -430,20 +457,20 @@ function createNotaryModuleView(deps) {
 
   function primaryDirty() {
     const s = model.state;
-    return s.caseId == null
-      ? (s.stageDirty || s.diagramDirty || s.metaDirty)
-      : s.stageDirty;
+    return s.stageDirty || s.diagramDirty || s.metaDirty;
   }
 
-  // Commit/Cập nhật — điểm ghi duy nhất của Stage (§13.2). Nháp mới:
-  // Lưu hồ sơ = workspace_create (ghi meta + stage + diagram cùng lúc).
+  // Commit/Cập nhật — điểm ghi duy nhất của Stage + meta (§13.2, đợt 3:
+  // payload.case đi cùng transaction). Nháp mới: Lưu hồ sơ =
+  // workspace_create (ghi meta + stage + diagram cùng lúc).
   function commitDisabled() {
     const s = model.state;
     if (!model.canWrite()) return true;
     if (s.caseId == null) {
       return s.busy === 'notary.workspace_create';
     }
-    return !s.stageDirty || s.busy === 'notary.workspace_commit_stage';
+    return !(s.stageDirty || s.metaDirty) ||
+      s.busy === 'notary.workspace_commit_stage';
   }
 
   async function runCommit() {
@@ -630,7 +657,7 @@ function createNotaryModuleView(deps) {
   }
 
   // Ô ngay dd/mm/yyyy (MIN-136): hien fmtDisplayDate(row[key]); go raw
-  // vao model de dirty live; blur/Enter parse → ISO len wire, repaint
+  // vao model de dirty live; change/blur parse → ISO len wire, repaint
   // display chuan. Sai format → danh dau do + giu raw (backend van
   // chan bang invalid_date khi luu — khong tham lang bo qua).
   function dateCellInput(getVal, onSet, allowYear, aria) {
@@ -645,7 +672,12 @@ function createNotaryModuleView(deps) {
       inp.classList.remove('cd-input-bad');
       onSet(inp.value.trim() === '' ? null : inp.value);
     };
-    inp.onchange = () => {
+    // Chuan hoa o ca 'change' LAN 'blur': go lai dung chuoi dang hien
+    // (hoac fill() programmatic cung gia tri) → value khong doi →
+    // 'change' khong ban → neu chi nghe 'change' thi raw con lai trong
+    // model va backend tu choi luc luu. 'blur' luon ban nen commit van
+    // chay; onSet voi gia tri cu → early-equal return, khong emit.
+    const commit = () => {
       const r = parseDisplayDate(inp.value, allowYear);
       if (r.error) {
         inp.classList.add('cd-input-bad');
@@ -657,6 +689,8 @@ function createNotaryModuleView(deps) {
       setCellTitle(inp);
       onSet(r.iso);
     };
+    inp.onchange = commit;
+    inp.onblur = commit;
     if (aria) inp.setAttribute('aria-label', aria);
     return inp;
   }
@@ -708,6 +742,364 @@ function createNotaryModuleView(deps) {
       model.removeStageRow(a.row_id);
     };
     return doRemove();
+  }
+
+  // ---------- Tra cuu dia chi thu cong (TASK-4) ----------
+  // Nut Tra nam ben phai o nhap; ket qua hien ngay duoi o tuong ung.
+  // May khong bao gio tu ghi vao o/Stage — nguoi dung Copy roi tu dan.
+  // O "dang sua" la o that su co focus truoc khi nut Tra lay focus (co the
+  // khac o dich, vd dang sua Ho ten roi bam Tra dia chi): theo doi qua
+  // focusin (ban phim) + mousedown tren nut Tra (chuot, chay truoc khi
+  // focus doi). Huy cau hoi/dong full phuc hoi dung o nay.
+
+  let lastEditFid = null;
+  let pendingMouseCtx = null;
+
+  function noteEditInput(el) {
+    if (!el || !/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName || '')) return null;
+    if (!el.dataset || !el.dataset.fid) return null;
+    if (!root.contains(el)) return null;
+    let sel = null;
+    if (typeof el.selectionStart === 'number') {
+      sel = [el.selectionStart, el.selectionEnd,
+        (typeof el.selectionDirection === 'string' && el.selectionDirection) || null];
+    }
+    return { fid: el.dataset.fid, sel };
+  }
+
+  function trackEditFocus() {
+    if (typeof root.addEventListener === 'function') {
+      root.addEventListener('focusin', (e) => {
+        const noted = noteEditInput(e && e.target);
+        if (noted) lastEditFid = noted.fid;
+      });
+    }
+  }
+
+  function restoreLookupFocus(focusCtx) {
+    if (!focusCtx || !focusCtx.fid) return;
+    const dp = focusCtx.scope || panels.drafting;
+    const el = dp.querySelector(`[data-fid="${focusCtx.fid}"]`);
+    if (!el || !el.focus) return;
+    el.focus();
+    if (focusCtx.sel && typeof el.setSelectionRange === 'function') {
+      try {
+        const sel = focusCtx.sel;
+        if (sel[2]) el.setSelectionRange(sel[0], sel[1], sel[2]);
+        else el.setSelectionRange(sel[0], sel[1]);
+      } catch (e) { /* giu focus, bo caret */ }
+    }
+  }
+
+  function lookupStatusMessage(status) {
+    if (status === 'not_found') {
+      return 'Không tìm thấy địa chỉ phù hợp. Kiểm tra lại chữ đã nhập rồi bấm Tra.';
+    }
+    if (status === 'invalid_input') {
+      return 'Chuỗi tra chưa hợp lệ. Sửa lại rồi bấm Tra.';
+    }
+    if (status === 'reload_failed') {
+      return 'Không đọc được bảng địa chỉ cục bộ. Kiểm tra nguồn dữ liệu rồi bấm Tra lại.';
+    }
+    return 'Tra cứu thất bại. Bấm Tra lại.';
+  }
+
+  async function copyLookupText(display) {
+    try {
+      const clip = (typeof navigator !== 'undefined' && navigator.clipboard) || null;
+      if (!clip || typeof clip.writeText !== 'function') return { ok: false };
+      await clip.writeText(display);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false };
+    }
+  }
+
+  function captureLookupFocus(targetFid) {
+    const target = root.querySelector(`[data-fid="${targetFid}"]`);
+    const dp = target && target.closest('.cd-word-modal') || panels.drafting;
+    const noted = pendingMouseCtx;
+    pendingMouseCtx = null;
+    let fid = targetFid;
+    if (noted && noted.fid) {
+      fid = noted.fid;
+    } else if (lastEditFid &&
+        dp.querySelector(`[data-fid="${lastEditFid}"]`)) {
+      fid = lastEditFid;
+    }
+    const el = fid ? dp.querySelector(`[data-fid="${fid}"]`) : null;
+    let sel = null;
+    if (el && typeof el.selectionStart === 'number') {
+      sel = [el.selectionStart, el.selectionEnd,
+        (typeof el.selectionDirection === 'string' && el.selectionDirection) || null];
+    }
+    return { fid, sel, scope: dp,
+      top: dp ? dp.scrollTop || 0 : 0, left: dp ? dp.scrollLeft || 0 : 0 };
+  }
+
+  async function onTraLookup(kind, rowId, targetFid) {
+    const slotKey = kind + ':' + rowId;
+    const focusCtx = captureLookupFocus(targetFid);
+    const pending = model.requestLookup(kind, rowId);
+    const requestedSlot = model.state.addressSlots[slotKey];
+    await pending;
+    if (!focusCtx.scope.isConnected) return;
+    // Ket qua tu cap nhat qua emit/rerender; KHONG keo focus ve nut Tra —
+    // nguoi dung co the dang sua o khac.
+    const slot = model.state.addressSlots[slotKey];
+    if (!slot || !requestedSlot || slot.callId !== requestedSlot.callId ||
+        slot.phase !== 'ready' || !slot.result ||
+        slot.result.status !== 'too_many') {
+      return;
+    }
+    const resume = focusCtx.scope._suspendLookup && focusCtx.scope._suspendLookup();
+    const ok = await confirm({
+      title: 'Nhiều kết quả khớp. Xem đầy đủ?',
+      body: 'Danh sách quá dài để hiện dưới ô. Mở công cụ tra cứu đầy đủ?',
+      confirmLabel: 'Xem đầy đủ',
+      cancelLabel: 'Hủy',
+    });
+    if (!focusCtx.scope.isConnected) return;
+    if (model.state.addressSlots[slotKey] !== slot) {
+      if (resume) resume();
+      restoreLookupFocus(focusCtx);
+      return;
+    }
+    if (!ok) {
+      model.dismissLookupSlot(kind, rowId);
+      if (resume) resume();
+      restoreLookupFocus(focusCtx);
+      return;
+    }
+    const opened = model.openFullFromSlot(kind, rowId);
+    if (!opened.ok) {
+      model.markLookupStale(kind, rowId);
+      if (resume) resume();
+      restoreLookupFocus(focusCtx);
+      return;
+    }
+    openLookupOverlay({ ...focusCtx, resume });
+  }
+
+  function lookupTraButton(kind, rowId, targetFid, prefix = '') {
+    const tra = btn('Tra', 'secondary sm',
+      () => { onTraLookup(kind, rowId, targetFid); });
+    tra.dataset.fid = `${prefix}lookup-tra:${kind}:${rowId}`;
+    tra.setAttribute('aria-label', 'Tra cứu địa chỉ');
+    if (typeof tra.addEventListener === 'function') {
+      tra.addEventListener('mousedown', () => {
+        pendingMouseCtx = noteEditInput(document.activeElement);
+      });
+    }
+    return tra;
+  }
+
+  function lookupCopyButton(row, fid) {
+    const copy = btn('Copy', 'ghost sm', async () => {
+      const originalBox = copy.parentElement && copy.parentElement.parentElement;
+      const ownerId = originalBox && originalBox.id;
+      const originScope = originalBox && originalBox.closest('.modal') || panels.drafting;
+      const r = await copyLookupText(row.display);
+      if (r.ok) {
+        copy.textContent = 'Đã copy';
+      } else {
+        copy.textContent = 'Copy';
+        const warn = originalBox && originalBox.isConnected ? originalBox :
+          originScope.isConnected && ownerId && [...originScope.querySelectorAll('.cd-address-suggestion')]
+            .find((box) => box.id === ownerId);
+        if (warn) {
+          warn.append(h('div', 'muted small',
+            'Copy thất bại — hãy copy thủ công.'));
+        } else notify('Copy thất bại — hãy copy thủ công.', true);
+      }
+    });
+    copy.dataset.fid = fid;
+    return copy;
+  }
+
+  function lookupResultRows(box, kind, rowId, results) {
+    (results || []).forEach((row, i) => {
+      const line = h('div', 'cd-lookup-item');
+      line.append(h('span', 'small', row.display));
+      const prefix = box.id.startsWith('address-dlg-') ? 'word-' : '';
+      line.append(lookupCopyButton(row, `${prefix}lookup-copy:${kind}:${rowId}:${i}`));
+      box.append(line);
+    });
+  }
+
+  function addressSuggestionEl(kind, rowId, afterApply, idPrefix) {
+    const box = h('div', 'cd-address-suggestion');
+    box.id = `${idPrefix || 'address'}-${kind}-${rowId}`;
+    box._afterApply = afterApply;
+    box.setAttribute('aria-live', 'polite');
+    const slot = model.state.addressSlots[kind + ':' + rowId];
+    if (!slot) return box;
+    if (slot.phase === 'loading') {
+      box.append(h('span', 'muted small', 'Đang tra cứu địa chỉ…'));
+      return box;
+    }
+    if (slot.phase === 'error') {
+      box.append(h('span', 'muted small',
+        slot.message || 'Tra cứu thất bại.'));
+      return box;
+    }
+    const res = slot.result;
+    if (!res) return box;
+    if (res.status === 'found') {
+      box.append(h('div', 'muted small',
+        `Tìm thấy ${res.total} dòng — Copy dòng phù hợp rồi dán vào ô.`));
+      lookupResultRows(box, kind, rowId, res.results);
+      return box;
+    }
+    if (res.status === 'too_many') {
+      box.append(h('span', 'muted small',
+        'Nhiều kết quả khớp. Bấm Tra rồi chọn Xem đầy đủ.'));
+      return box;
+    }
+    box.append(h('span', 'muted small', lookupStatusMessage(res.status)));
+    return box;
+  }
+
+  function postingSuggestionEl(afterApply, idPrefix) {
+    void afterApply;
+    void idPrefix;
+    return addressSuggestionEl('posting', 'posting', afterApply, idPrefix);
+  }
+
+  // Lam moi rieng cac o ket qua (khong chua input nen an toan ngay ca
+  // khi nguoi dung dang go): render lai tai cho, khong goi lookup, khong
+  // doi focus.
+  function refreshAddressBoxes(scope) {
+    if (!scope || typeof scope.querySelectorAll !== 'function') return;
+    let boxes = [];
+    try {
+      // Tim theo class (id gan qua property khong hien trong selector
+      // attribute o mot so moi truong kiem thu), loc id bang regex.
+      boxes = [...scope.querySelectorAll('.cd-address-suggestion')];
+    } catch (e) {
+      return;
+    }
+    for (const box of boxes) {
+      const m = /^address-(person|asset|issuer|posting)-(.+)$/
+        .exec(box.id || '');
+      if (m) box.replaceWith(addressSuggestionEl(m[1], m[2], box._afterApply));
+    }
+  }
+
+  // ---------- Cua so full (overlay) ----------
+  let lookupOverlay = null;
+
+  function openLookupOverlay(focusCtx) {
+    if (lookupOverlay) lookupOverlay.destroy();
+    const full0 = model.state.addressFull;
+    const wrap = h('div', 'modal-overlay');
+    const box = h('div', 'modal wide');
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-label', 'Tra cứu địa chỉ đầy đủ');
+    const head = h('div', 'modal-head');
+    head.append(h('div', 'modal-title', 'Tra cứu địa chỉ'));
+    const queryInput = h('input', 'cd-cell');
+    queryInput.value = (full0 && full0.query) || '';
+    queryInput.setAttribute('aria-label', 'Chuỗi tra cứu đầy đủ');
+    queryInput.dataset.fid = 'lookup-full-query';
+    const traBtn = btn('Tra', 'secondary sm', () => {
+      model.requestFull(queryInput.value);
+    });
+    traBtn.dataset.fid = 'lookup-full-tra';
+    const queryRow = h('div', 'cd-lookup-row');
+    queryRow.append(queryInput, traBtn);
+    const listEl = h('div', 'cd-lookup-list');
+    listEl.dataset.fid = 'lookup-full-list';
+    const noteEl = h('div', 'muted small');
+    noteEl.dataset.fid = 'lookup-full-note';
+
+    let renderedFull = null;
+    function refresh() {
+      const full = model.state.addressFull;
+      if (!full || full === renderedFull) return;
+      renderedFull = full;
+      listEl.innerHTML = '';
+      noteEl.textContent = '';
+      if (full.phase === 'loading') {
+        listEl.append(h('div', 'muted small', 'Đang tra cứu…'));
+        return;
+      }
+      if (full.phase === 'error' || !full.result) {
+        noteEl.textContent = (full && full.message) || 'Tra cứu thất bại.';
+        return;
+      }
+      const res = full.result;
+      if (res.status === 'found') {
+        listEl.append(h('div', 'muted small',
+          `Tìm thấy ${res.total} dòng — mỗi dòng là một nguồn riêng, Copy dòng phù hợp rồi dán vào hồ sơ.`));
+        (res.results || []).forEach((row, i) => {
+          const line = h('div', 'cd-lookup-item');
+          line.append(h('span', 'small', row.display));
+          line.append(lookupCopyButton(row, `lookup-full-copy:${i}`));
+          listEl.append(line);
+        });
+        return;
+      }
+      noteEl.textContent = lookupStatusMessage(res.status);
+    }
+
+    function close(restore) {
+      document.removeEventListener('keydown', onKey);
+      if (lookupOverlay && lookupOverlay.wrap === wrap) lookupOverlay = null;
+      model.closeFull();
+      wrap.remove();
+      if (!restore) return;
+      if (focusCtx.resume && focusCtx.scope.isConnected) focusCtx.resume();
+      const dp = focusCtx.scope || panels.drafting;
+      try {
+        dp.scrollTop = focusCtx.top;
+        dp.scrollLeft = focusCtx.left;
+      } catch (e) { /* giu nguyen neu khong cuon duoc */ }
+      restoreLookupFocus(focusCtx);
+    }
+
+    function destroy() {
+      document.removeEventListener('keydown', onKey);
+      if (lookupOverlay && lookupOverlay.wrap === wrap) lookupOverlay = null;
+      wrap.remove();
+    }
+
+    function onKey(e) {
+      if (e.key === 'Escape') { close(true); return; }
+      if (e.key !== 'Tab') return;
+      const items = [...box.querySelectorAll(
+        'button, input, textarea, select, [tabindex]')]
+        .filter((x) => !x.disabled && !x.hidden);
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const ae = document.activeElement;
+      if (e.shiftKey && (ae === first || !box.contains(ae))) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && (ae === last || !box.contains(ae))) {
+        e.preventDefault(); first.focus();
+      }
+    }
+
+    const xBtn = h('button', 'modal-close', '\u00d7');
+    xBtn.type = 'button';
+    xBtn.setAttribute('aria-label', 'Đóng');
+    xBtn.onclick = () => close(true);
+    head.append(xBtn);
+    const closeBtn = btn('Đóng', 'secondary sm', () => close(true));
+    closeBtn.dataset.fid = 'lookup-full-close';
+    const foot = h('div', 'modal-foot');
+    foot.append(closeBtn);
+    box.append(head, queryRow, listEl, noteEl, foot);
+    wrap.onclick = (e) => { if (e.target === wrap) close(true); };
+    wrap.append(box);
+    root.append(wrap);
+    document.addEventListener('keydown', onKey);
+    if (queryInput.focus) queryInput.focus();
+    lookupOverlay = { wrap, refresh, close, destroy,
+      savedScroll: focusCtx };
+    refresh();
   }
 
   function assetTableEl() {
@@ -799,6 +1191,8 @@ function createNotaryModuleView(deps) {
           chip.disabled = ro;
           chip.dataset.fid = `a:${a.row_id}:land`;
           td.append(chip);
+          // Hien loi cum dat tu backend ngay duoi chip Loai dat.
+          cellErrs(a.row_id, 'land_rows', td);
         } else if (ASSET_DATE_FIELDS.has(key)) {
           // Ngay cap tren GCN: backend chi nhan full ISO (valid_date_full)
           // — allowYear=false. Hien/nhap dd/mm/yyyy.
@@ -821,8 +1215,19 @@ function createNotaryModuleView(deps) {
             setCellTitle(inp);
             model.updateAssetField(a.row_id, key, inp.value);
           };
-          td.append(inp);
+          if (key === 'dia_chi') {
+            inp.setAttribute('aria-describedby', `address-asset-${a.row_id}`);
+            const trow = h('div', 'cd-lookup-row');
+            trow.append(inp,
+              lookupTraButton('asset', a.row_id, `a:${a.row_id}:dia_chi`));
+            td.append(trow);
+          } else {
+            td.append(inp);
+          }
           cellErrs(a.row_id, key, td);
+          if (key === 'dia_chi') {
+            td.append(addressSuggestionEl('asset', a.row_id));
+          }
         }
         r.append(td);
       }
@@ -861,6 +1266,7 @@ function createNotaryModuleView(deps) {
         // Chỉ ghi draft Stage (touchStage → dirty) — không gọi command
         // ra ngoài; Cập nhật ở action bar mới commit.
         const rows = draft.map((d) => ({
+          _source_land_row: d._source_land_row || null,
           loai_dat: d.loai_dat || null,
           dien_tich: d.dien_tich === '' || d.dien_tich == null ? null
             : (Number.isNaN(Number(d.dien_tich))
@@ -1055,7 +1461,32 @@ function createNotaryModuleView(deps) {
         ctl.dataset.fid = `p:${p.row_id}:${key}`;
         ctl.setAttribute('aria-label',
           `${label} — ${p.ho_ten || `dòng ${ri + 1}`}`);
-        td.append(ctl);
+        if (key === 'dia_chi') {
+          ctl.setAttribute('aria-describedby', `address-person-${p.row_id}`);
+          const trow = h('div', 'cd-lookup-row');
+          trow.append(ctl,
+            lookupTraButton('person', p.row_id, `p:${p.row_id}:dia_chi`));
+          td.append(trow);
+          td.append(addressSuggestionEl('person', p.row_id));
+          // Hien ca khi ngay_chet rong ma noi_cap con du lieu — tranh
+          // gia tri cu "vo hinh" khong noi nao de xem/sua.
+          if (p.ngay_chet || p.noi_cap) {
+            const issuer = h('input', 'cd-cell');
+            issuer.value = p.noi_cap || '';
+            issuer.placeholder = 'UBND trên giấy khai tử';
+            issuer.disabled = ro;
+            issuer.dataset.fid = `p:${p.row_id}:noi_cap`;
+            issuer.setAttribute('aria-label', `Nơi cấp giấy khai tử — ${p.ho_ten || 'người đã mất'}`);
+            issuer.setAttribute('aria-describedby', `address-issuer-${p.row_id}`);
+            issuer.oninput = () => model.updatePersonField(p.row_id, 'noi_cap', issuer.value);
+            const irow = h('div', 'cd-lookup-row');
+            irow.append(issuer,
+              lookupTraButton('issuer', p.row_id, `p:${p.row_id}:noi_cap`));
+            td.append(irow, addressSuggestionEl('issuer', p.row_id));
+          }
+        } else {
+          td.append(ctl);
+        }
         cellErrs(p.row_id, key, td);
         tr.append(td);
       }
@@ -1099,6 +1530,115 @@ function createNotaryModuleView(deps) {
     });
     t.append(tb);
     return t;
+  }
+
+  // --- Ba dòng meta hồ sơ dưới Tài sản (MIN-141 đợt 3) ---
+  // Nơi niêm yết / Người nhận ủy quyền / Nội dung việc — cùng đi qua
+  // model.updateCaseMeta → payload.case trong workspace_create (nháp)
+  // hoặc workspace_commit_stage (case thật, cùng transaction Stage).
+  // Danh bạ ủy quyền = notary.customer_list — chọn tên khớp danh bạ sẽ
+  // neo customers.id ổn định; gõ tên ngoài danh bạ = free text (id null).
+  const UQ_DATALIST_ID = 'cd-uq-catalog';
+
+  function caseMetaEl() {
+    const s = model.state;
+    const c = s.caseInfo || {};
+    const ro = !model.canWrite();
+    const box = h('div', 'cd-casemeta');
+    box.append(h('div', 'cd-casemeta-title', 'Thông tin hồ sơ'));
+
+    // Dong 1 — Nơi niêm yết: chua xac dinh hien ro rang (placeholder),
+    // KHONG tu dien tu dia chi tai san (AC: khong tu khang dinh).
+    const r1 = h('div', 'cd-casemeta-row');
+    r1.append(h('label', 'cd-casemeta-label', 'Nơi niêm yết'));
+    const ny = h('input', 'cd-cell cd-meta-input');
+    ny.value = c.noi_niem_yet || '';
+    ny.placeholder = 'Chưa xác định';
+    ny.disabled = ro;
+    ny.setAttribute('aria-label', 'Nơi niêm yết');
+    ny.dataset.fid = 'meta:noi_niem_yet';
+    setCellTitle(ny);
+    ny.oninput = () => {
+      setCellTitle(ny);
+      model.updateCaseMeta('noi_niem_yet',
+                           ny.value.trim() === '' ? null : ny.value);
+    };
+    const nyrow = h('div', 'cd-lookup-row');
+    nyrow.append(ny, lookupTraButton('posting', 'posting', 'meta:noi_niem_yet'));
+    r1.append(nyrow);
+    box.append(r1);
+    box.append(postingSuggestionEl());
+    const dateRow = h('div', 'cd-casemeta-row');
+    dateRow.append(h('label', 'cd-casemeta-label', 'Ngày lập hồ sơ'));
+    const caseDate = dateCellInput(() => c.ngay_lap_ho_so, v => model.updateCaseMeta('ngay_lap_ho_so', v), false, 'Ngày lập hồ sơ');
+    caseDate.disabled = ro; caseDate.dataset.fid = 'meta:ngay_lap_ho_so';
+    dateRow.append(caseDate); box.append(dateRow);
+
+    // Dong 2 — Người nhận ủy quyền: datalist danh bạ + free text.
+    // Load danh bạ mot lan khi soan duoc (mock/offline: rong, van nhap
+    // tu do duoc). Len lich microtask — emit giua render se kich
+    // rerender re-entrant → workspace bi append 2 lan.
+    if (!ro && s.uqCatalog === null && !s.uqCatalogBusy) {
+      Promise.resolve().then(() => model.loadUqCatalog());
+    }
+    const r2 = h('div', 'cd-casemeta-row');
+    r2.append(h('label', 'cd-casemeta-label', 'Người nhận ủy quyền'));
+    const uq = h('input', 'cd-cell cd-meta-input');
+    uq.value = c.nguoi_nhan_uy_quyen || '';
+    uq.setAttribute('list', UQ_DATALIST_ID);
+    uq.placeholder = 'Chọn từ danh bạ hoặc nhập tên';
+    uq.disabled = ro;
+    uq.setAttribute('aria-label', 'Người nhận ủy quyền');
+    uq.dataset.fid = 'meta:nguoi_nhan_uy_quyen';
+    setCellTitle(uq);
+    uq.oninput = () => {
+      setCellTitle(uq);
+      model.updateCaseMeta('nguoi_nhan_uy_quyen',
+                           uq.value.trim() === '' ? null : uq.value);
+    };
+    // Blur/Enter: giai ten -> customers.id khi trung danh ba.
+    uq.onchange = () => model.resolveUqName(uq.value);
+    r2.append(uq);
+    const dl = h('datalist');
+    dl.id = UQ_DATALIST_ID;
+    for (const cust of s.uqCatalog || []) {
+      if (!cust || cust.ho_ten == null) continue;
+      const o = h('option');
+      o.value = cust.ho_ten;
+      dl.append(o);
+    }
+    r2.append(dl);
+    if (!ro) {
+      const addCat = btn('+ Danh bạ', 'secondary sm', async () => {
+        const r = await model.createUqCustomer(uq.value);
+        if (!r.ok && r.error) notify(errText(r.error), true);
+      });
+      addCat.disabled = s.uqCatalogBusy || !(uq.value || '').trim();
+      addCat.title = 'Lưu tên đang nhập vào danh bạ và chọn làm ' +
+        'người nhận ủy quyền';
+      addCat.dataset.fid = 'meta:uq_add_catalog';
+      r2.append(addCat);
+    }
+    box.append(r2);
+
+    // Dong 3 — Nội dung việc.
+    const r3 = h('div', 'cd-casemeta-row');
+    r3.append(h('label', 'cd-casemeta-label', 'Nội dung việc'));
+    const nd = h('input', 'cd-cell cd-meta-input');
+    nd.value = c.noi_dung_viec || '';
+    nd.placeholder = 'VD: Khai nhận di sản thừa kế…';
+    nd.disabled = ro;
+    nd.setAttribute('aria-label', 'Nội dung việc');
+    nd.dataset.fid = 'meta:noi_dung_viec';
+    setCellTitle(nd);
+    nd.oninput = () => {
+      setCellTitle(nd);
+      model.updateCaseMeta('noi_dung_viec',
+                           nd.value.trim() === '' ? null : nd.value);
+    };
+    r3.append(nd);
+    box.append(r3);
+    return box;
   }
 
   // "Tài sản (3)" — số đếm tông muted như mockup.
@@ -1157,6 +1697,9 @@ function createNotaryModuleView(deps) {
       twrap.append(assetTableEl());
       aBody.append(twrap);
     }
+    // đợt 3 (MIN-141): ba dong meta hồ sơ duoi tai san — ghi qua
+    // payload.case cung transaction commit/create (contract §6/§4.3).
+    aBody.append(caseMetaEl());
     ac.append(aBody);
     tier.append(ac);
 
@@ -1471,6 +2014,7 @@ function createNotaryModuleView(deps) {
     if (ae && dp.contains(ae) &&
         /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName || '')) {
       syncChromeUI();
+      refreshAddressBoxes(dp);
       // MIN-136 F-1: rebuild bi hoan khi dang go — nhung dialog
       // conflict phai hien NGAY (server tu choi commit thi user can
       // biet lieu ke, khong doi blur/emit sau).
@@ -1522,9 +2066,20 @@ function createNotaryModuleView(deps) {
         lastConflict = null;
       }
     }
+    if (lookupOverlay) {
+      const st = lookupOverlay.savedScroll;
+      if (st) {
+        try {
+          dp.scrollTop = st.top;
+          dp.scrollLeft = st.left;
+        } catch (e) { /* giu nguyen neu khong cuon duoc */ }
+      }
+      lookupOverlay.refresh();
+    }
   }
 
   model.subscribe(rerender);
+  trackEditFocus();
   rerender();
 
   return {

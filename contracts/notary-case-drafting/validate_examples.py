@@ -43,12 +43,16 @@ DRAFT_ASSET_FIELDS = {
 DRAFT_STAGE_FIELDS = {"owner_row_id", "people", "assets"}
 DRAFT_DATA_CODES = {
     "stage.legacy_asset_overflow", "stage.legacy_primary_ambiguous",
+    "stage.legacy_land_rows_invalid", "stage.legacy_land_rows_overflow",
+    "stage.orphan_thoi_han",
     "diagram.two_party_unsupported", "diagram.selection_pruned",
 }
 
 COMMANDS = {
+    "notary.address_lookup": "address_lookup",
     "notary.workspace_create": "workspace_create",
     "notary.workspace_get": "workspace_get",
+    "notary.workspace_update": "workspace_update",
     "notary.intake_analyze": "intake_analyze",
     "notary.workspace_commit_stage": "workspace_commit_stage",
     "notary.diagram_evaluate": "diagram_evaluate",
@@ -60,18 +64,43 @@ KINDS = set(COMMANDS.values())
 
 # §2.1a — case_id: bắt buộc / nháp được (absent ok, null lỗi) / cấm
 CASE_ID_REQUIRED = {
-    "notary.workspace_get", "notary.workspace_commit_stage",
-    "notary.diagram_save", "notary.word_export_options",
-    "notary.word_export_batch",
+    "notary.workspace_get", "notary.workspace_update",
+    "notary.workspace_commit_stage", "notary.diagram_save",
+    "notary.word_export_options", "notary.word_export_batch",
 }
 CASE_ID_DRAFTABLE = {"notary.intake_analyze", "notary.diagram_evaluate"}
 CASE_ID_FORBIDDEN = {"notary.workspace_create"}
 CASE_FIELDS = {
     "id", "case_type", "document_type", "status", "locked", "revision",
     "ngay_lap_ho_so", "noi_niem_yet", "ghi_chu",
+    # đợt 3 (MIN-141): emit luôn có; legacy key trên wire
+    "nguoi_nhan_uy_quyen", "nguoi_nhan_uy_quyen_id", "noi_dung_viec",
 }
 CASE_META_FIELDS = {
     "document_type", "ngay_lap_ho_so", "noi_niem_yet", "ghi_chu",
+    # đợt 3: meta mới trong payload.case create/commit
+    "nguoi_nhan_uy_quyen", "nguoi_nhan_uy_quyen_id", "noi_dung_viec",
+}
+# đợt 3: commit payload.case — meta + cặp immutable gửi kèm kiểm tra
+COMMIT_CASE_FIELDS = CASE_META_FIELDS | {"case_type"}
+# canonical key server chấp nhận ở payload (contract §4.1/§6)
+CASE_META_CANON = {
+    "casetype": "case_type", "documenttype": "document_type",
+    "ngaylaphoso": "ngay_lap_ho_so", "noiniemyet": "noi_niem_yet",
+    "nguoinhanuyquyen": "nguoi_nhan_uy_quyen",
+    "nguoinhanuyquyenid": "nguoi_nhan_uy_quyen_id",
+    "noidungviec": "noi_dung_viec", "ghichu": "ghi_chu",
+}
+PERSON_CANON = {
+    "ten": "ho_ten", "gioitinh": "gioi_tinh", "ngaysinh": "ngay_sinh",
+    "ngaychet": "ngay_chet", "sogiayto": "so_giay_to",
+    "ngaycap": "ngay_cap", "noicap": "noi_cap", "diachi": "dia_chi",
+    "loaigiayto": "loai_giay_to", "loaidiachi": "loai_dia_chi",
+}
+# §6.2 workspace_update — chi meta nay cap nhat duoc tren case da luu;
+# case_type/document_type la dinh danh, khong doi sau create.
+CASE_META_UPDATE_FIELDS = {
+    "ngay_lap_ho_so", "noi_niem_yet", "ghi_chu",
 }
 DOCUMENT_TYPES = {"khai_nhan", "thoa_thuan"}
 
@@ -83,6 +112,7 @@ GENDERS = {"Nam", "Nữ", None}
 # registry mở — khi backend thêm document_key phải cập nhật set này
 DOC_CATALOG = {"khai_nhan_di_san", "thoa_thuan_phan_chia", "niem_yet"}
 BLOCK_REASONS = {
+    "word.no_people", "word.no_diagram",
     "word.no_assets", "word.no_landowner", "word.no_deceased_landowner",
     "word.no_receiver", "word.too_many_assets", "word.too_many_people",
     "word.too_many_signers", "word.template_missing",
@@ -102,6 +132,7 @@ DATE_OR_YEAR_RX = re.compile(r"^\d{4}(-\d{2}-\d{2})?$")
 DATE_FULL_RX = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 SERIAL_RX = re.compile(r"^[A-Z]{2}\d{6,8}$")
 DOC_KEY_RX = re.compile(r"^[a-z][a-z0-9_]*$")
+DOCX_NAME_RX = re.compile(r'^[^<>:"/\\|?*]{1,180}\.[dD][oO][cC][xX]$')
 FILENAME_RX = re.compile(r"^[A-Za-z0-9_-]+_HS-\d+(_\d+)?\.docx$")
 
 SENSITIVE_KEY = re.compile(
@@ -114,10 +145,16 @@ NEVER_EMPTY = {
     "display_name", "actual_filename", "path", "row_id", "personId",
     "source_id", "suggestion_id", "document_key", "id", "case_type",
     "filename_stem", "text",
-    # person_row nullable strings
+    # person_row nullable strings (+ đợt 3 derived/evidence)
     "so_giay_to", "noi_cap", "place_of_origin",
-    # case meta nullable (rev 1.1)
+    "loai_giay_to", "loai_dia_chi",
+    # case meta nullable (rev 1.1 + đợt 3)
     "noi_niem_yet", "ghi_chu", "ngay_lap_ho_so",
+    "nguoi_nhan_uy_quyen", "noi_dung_viec",
+    # canonical spellings cùng cấm ""
+    "ten", "gioitinh", "sogiayto", "ngaycap", "noicap", "diachi",
+    "loaigiayto", "loaidiachi", "noiniemyet", "nguoinhanuyquyen",
+    "noidungviec", "ghichu", "ngaylaphoso",
     # asset_row + land_rows nullable strings
     "so_vao_so", "so_thua_dat", "so_to_ban_do", "loai_so",
     "hinh_thuc_su_dung", "thoi_han", "nguon_goc", "co_quan_cap",
@@ -127,7 +164,9 @@ NEVER_EMPTY = {
 PERSON_FIELDS = {
     "row_id", "entity_id", "ho_ten", "gioi_tinh", "ngay_sinh", "ngay_chet",
     "so_giay_to", "ngay_cap", "noi_cap", "dia_chi", "place_of_origin",
-}
+    # đợt 3: emit luôn có; payload chấp nhận cả canonical (PERSON_CANON)
+    "loai_giay_to", "loai_dia_chi",
+} | set(PERSON_CANON)
 PERSON_DATE_FIELDS = {"ngay_sinh", "ngay_chet", "ngay_cap"}
 ASSET_FIELDS = {
     "row_id", "entity_id", "is_primary", "so_serial", "so_vao_so",
@@ -189,6 +228,14 @@ def is_abs_local(p):
     return bool(re.match(r"^[A-Za-z]:[\\/]", p))
 
 
+def _canon_conflicts(row, canon, where, v):
+    """canonical + legacy cùng mang mà giá trị lệch → validation_error."""
+    for ck, lk in canon.items():
+        if ck in row and lk in row and row[ck] != row[lk]:
+            v.append(("validation_error",
+                      f"{where} {ck}!={lk} conflict"))
+
+
 def check_person_row(row, where, v):
     if not isinstance(row, dict):
         v.append(("stage_validation_error", f"{where} not object"))
@@ -196,6 +243,7 @@ def check_person_row(row, where, v):
     extra = set(row) - PERSON_FIELDS
     if extra:
         v.append(("validation_error", f"{where} extra keys {sorted(extra)}"))
+    _canon_conflicts(row, PERSON_CANON, where, v)
     rid = row.get("row_id")
     if not (isinstance(rid, str) and UUID4_RX.match(rid)):
         v.append(("stage_validation_error", f"{where} row_id={rid!r}"))
@@ -619,7 +667,27 @@ def check_intake_payload(payload, v):
                               f"{w} size_bytes={sb} > {MAX_FILE_BYTES}"))
 
 
+def _word_doc_key_ok(k, folder_mode):
+    """document_key: catalog snake_case, hoặc basename .docx khi folder mode."""
+    if not isinstance(k, str) or not k:
+        return False
+    if DOC_KEY_RX.match(k):
+        return True
+    return folder_mode and bool(DOCX_NAME_RX.match(k))
+
+
 def check_word_batch_payload(payload, v):
+    folder_mode = isinstance(payload.get("template_dir"), dict)
+    if "template_dir" in payload and not folder_mode:
+        v.append(("validation_error",
+                  "template_dir missing/not object"))
+    elif folder_mode:
+        if payload["template_dir"].get("is_dir") is not True:
+            v.append(("validation_error",
+                      "template_dir is_dir must be true"))
+    if "create_case_subdir" in payload and \
+            not isinstance(payload["create_case_subdir"], bool):
+        v.append(("validation_error", "create_case_subdir not bool"))
     keys = payload.get("document_keys")
     if not isinstance(keys, list):
         v.append(("validation_error", "document_keys missing/not list"))
@@ -630,8 +698,9 @@ def check_word_batch_payload(payload, v):
             v.append(("word_duplicate_document_key",
                       "duplicate document_key"))
         for k in keys:
-            if not (isinstance(k, str) and DOC_KEY_RX.match(k)) \
-                    or k not in DOC_CATALOG:
+            if not _word_doc_key_ok(k, folder_mode):
+                v.append(("word_unknown_document_key", f"key={k!r}"))
+            elif not folder_mode and k not in DOC_CATALOG:
                 v.append(("word_unknown_document_key", f"key={k!r}"))
     dest = payload.get("destination")
     if not isinstance(dest, dict):
@@ -682,7 +751,8 @@ def check_create_payload(payload, v, draft_v2=False):
         v.append(("validation_error", f"idempotency_key={ik!r}"))
     cm = payload.get("case")
     case_type = "inheritance"
-    meta_fields = CASE_META_FIELDS | ({"case_type"} if draft_v2 else set())
+    meta_fields = CASE_META_FIELDS | ({"case_type"} if draft_v2 else set()) \
+        | set(CASE_META_CANON)
     if not isinstance(cm, dict):
         v.append(("validation_error", "payload.case missing/not object"))
     else:
@@ -690,24 +760,26 @@ def check_create_payload(payload, v, draft_v2=False):
         if extra:
             v.append(("validation_error",
                       f"payload.case extra keys {sorted(extra)}"))
+        _canon_conflicts(cm, CASE_META_CANON, "payload.case", v)
         if draft_v2:
-            ct = cm.get("case_type", "inheritance")
+            ct = cm.get("case_type", cm.get("casetype", "inheritance"))
             if ct not in DRAFT_CASE_TYPES:
                 v.append(("validation_error",
                           f"payload.case.case_type={ct!r}"))
             else:
                 case_type = ct
-            d = cm.get("document_type")
+            d = cm.get("document_type", cm.get("documenttype"))
             ok = d in DRAFT_TWO_PARTY_DOC_TYPES if ct == "two_party" \
                 else d in DOCUMENT_TYPES
             if not ok:
                 v.append(("validation_error",
                           f"payload.case.document_type={d!r}"))
-        elif cm.get("document_type") not in DOCUMENT_TYPES:
+        elif cm.get("document_type", cm.get("documenttype")) \
+                not in DOCUMENT_TYPES:
             v.append(("validation_error",
                       f"payload.case.document_type="
-                      f"{cm.get('document_type')!r}"))
-        nl = cm.get("ngay_lap_ho_so")
+                      f"{cm.get('document_type', cm.get('documenttype'))!r}"))
+        nl = cm.get("ngay_lap_ho_so", cm.get("ngaylaphoso"))
         if nl is not None and not (isinstance(nl, str)
                                    and DATE_FULL_RX.match(nl)):
             v.append(("validation_error",
@@ -762,6 +834,36 @@ def check_create_payload(payload, v, draft_v2=False):
         if len(owners) != 1 or owners[0].get("personId") not in row_ids:
             v.append(("workspace_owner_required",
                       "node 'owner' must reference one stage person"))
+
+
+def check_update_payload(payload, ctx, v):
+    """notary.workspace_update — §6.2: case_id + base_revision + patch
+    meta {ngay_lap_ho_so, noi_niem_yet, ghi_chu}; khong cham stage/
+    diagram. Key la (ke ca case_type/document_type) → validation_error;
+    case rong/khong object → validation_error."""
+    check_base_revision(payload, ctx, v)
+    cm = payload.get("case")
+    if not isinstance(cm, dict) or not cm:
+        v.append(("validation_error",
+                  "payload.case missing/not object or empty"))
+        return
+    extra = set(cm) - CASE_META_UPDATE_FIELDS
+    if extra:
+        v.append(("validation_error",
+                  f"payload.case extra keys {sorted(extra)}"))
+    nl = cm.get("ngay_lap_ho_so")
+    if nl is not None and not (isinstance(nl, str)
+                               and DATE_FULL_RX.match(nl)):
+        v.append(("validation_error",
+                  f"payload.case.ngay_lap_ho_so={nl!r}"))
+    for f in ("noi_niem_yet", "ghi_chu"):
+        if f not in cm:
+            continue
+        val = cm.get(f)
+        if val is not None and (
+                not isinstance(val, str) or not val.strip()):
+            v.append(("validation_error",
+                      f"payload.case.{f}={val!r} not non-empty str/null"))
 
 
 def check_base_revision(payload, ctx, v):
@@ -917,6 +1019,35 @@ def check_result_data(kind, data, stage_ids, v, draft_v2=False, ctx=None):
     if not isinstance(data, dict):
         v.append(("validation_error", "result.data not object"))
         return
+    if kind == "address_lookup":
+        status, pres = data.get("status"), data.get("presentation")
+        results, total = data.get("results"), data.get("total")
+        if data.get("schema_version") != "notary.address-lookup.v2" or status not in {"found", "not_found", "too_many", "invalid_input", "reload_failed"}:
+            v.append(("validation_error", "address_lookup version/status invalid"))
+        if pres not in ("drafting", "full", None):
+            v.append(("validation_error", "address_lookup presentation invalid"))
+        if not isinstance(results, list) or not isinstance(total, int) or total < 0:
+            v.append(("validation_error", "address_lookup results/total missing"))
+            return
+        for key in ("dataset_version", "revision"):
+            if key not in data:
+                v.append(("validation_error", f"address_lookup {key} missing"))
+        if status == "found":
+            if not results or total != len(results) or (pres == "drafting" and total > 10):
+                v.append(("validation_error", "address_lookup found count invalid"))
+        elif results:
+            v.append(("validation_error", "address_lookup results must be empty"))
+        if status == "too_many" and (pres != "drafting" or total <= 10):
+            v.append(("validation_error", "address_lookup too_many only for drafting > 10"))
+        if status in ("not_found", "invalid_input", "reload_failed") and total != 0:
+            v.append(("validation_error", "address_lookup total must be 0"))
+        for r in results:
+            if not isinstance(r, dict) or r.get("level") not in ("commune", "province") \
+                    or not r.get("display") or "source_text" not in r or not isinstance(r.get("evidence"), list):
+                v.append(("validation_error", "address_lookup result fields invalid"))
+            elif (r["level"] == "province") != (r.get("province") is None):
+                v.append(("validation_error", "address_lookup province ref invalid"))
+        return
     want_sv = DRAFT_SCHEMA_VERSION if draft_v2 else SCHEMA_VERSION
     if data.get("schema_version") != want_sv:
         v.append(("validation_error",
@@ -1016,6 +1147,13 @@ def check_result_data(kind, data, stage_ids, v, draft_v2=False, ctx=None):
                                    "data.diagram.render_model", v)
         else:
             v.append(("validation_error", "data.diagram missing"))
+    elif kind == "workspace_update":
+        if not (isinstance(data.get("revision"), int)
+                and data["revision"] >= 1):
+            v.append(("validation_error",
+                      f"revision={data.get('revision')!r}"))
+        check_case_object(data.get("case"), "data.case", v,
+                          draft_v2=draft_v2)
     elif kind == "word_export_options":
         docs = data.get("documents")
         if not isinstance(docs, list):
@@ -1032,7 +1170,7 @@ def check_result_data(kind, data, stage_ids, v, draft_v2=False, ctx=None):
                         v.append(("validation_error",
                                   f"{w} missing {rk}"))
                 k = d.get("document_key")
-                if not (isinstance(k, str) and DOC_KEY_RX.match(k)):
+                if not _word_doc_key_ok(k, folder_mode=True):
                     v.append(("validation_error",
                               f"{w} document_key={k!r}"))
                 if not (isinstance(d.get("display_name"), str)
@@ -1103,9 +1241,10 @@ def violations(doc):
                       f"{w} path={val.get('path')!r}"))
         if "is_dir" in val and not isinstance(val["is_dir"], bool):
             v.append(("validation_error", f"{w} is_dir not bool"))
-        if k != "destination" and val.get("is_dir") is True:
+        if k not in ("destination", "template_dir") \
+                and val.get("is_dir") is True:
             v.append(("validation_error",
-                      f"{w} is_dir=true on non-destination ref"))
+                      f"{w} is_dir=true on non-dir ref"))
 
     # --- command_id uuid (request + job echo)
     cid = doc.get("command_id")
@@ -1136,10 +1275,45 @@ def violations(doc):
             v.append(("validation_error", f"command={cmd!r}"))
         elif not isinstance(payload, dict):
             v.append(("validation_error", "payload missing/not object"))
+        elif cmd == "notary.address_lookup":
+            if set(payload) - {"query", "presentation"}:
+                v.append(("validation_error", "address_lookup extra fields"))
+            query = payload.get("query")
+            if not isinstance(query, str) or not (1 <= len(query) <= 4000):
+                v.append(("validation_error", "address_lookup query must be text 1..4000"))
+            if payload.get("presentation") not in ("drafting", "full"):
+                v.append(("validation_error", "address_lookup presentation invalid"))
         elif cmd == "notary.intake_analyze":
             check_intake_payload(payload, v)
         elif cmd == "notary.workspace_commit_stage":
             check_base_revision(payload, ctx, v)
+            # đợt 3: payload.case optional — meta hồ sơ cùng transaction
+            cm = payload.get("case")
+            if cm is not None:
+                if not isinstance(cm, dict):
+                    v.append(("validation_error",
+                              "payload.case not object"))
+                else:
+                    extra = set(cm) - COMMIT_CASE_FIELDS \
+                        - set(CASE_META_CANON)
+                    if extra:
+                        v.append(("validation_error",
+                                  f"payload.case extra keys "
+                                  f"{sorted(extra)}"))
+                    _canon_conflicts(cm, CASE_META_CANON,
+                                     "payload.case", v)
+                    nl = cm.get("ngay_lap_ho_so", cm.get("ngaylaphoso"))
+                    if nl is not None and not (
+                            isinstance(nl, str) and DATE_FULL_RX.match(nl)):
+                        v.append(("validation_error",
+                                  f"payload.case.ngay_lap_ho_so={nl!r}"))
+                    uq = cm.get("nguoi_nhan_uy_quyen_id",
+                                cm.get("nguoinhanuyquyenid"))
+                    if uq is not None and not (
+                            isinstance(uq, int) and uq >= 1):
+                        v.append(("validation_error",
+                                  "payload.case.nguoi_nhan_uy_quyen_id="
+                                  f"{uq!r}"))
             check_stage(payload.get("stage"), "payload.stage", v,
                         draft_v2=draft_v2, case_type=ct, in_payload=True)
         elif cmd == "notary.diagram_save":
@@ -1163,13 +1337,12 @@ def violations(doc):
                                       f"!= owner_row_id={oid!r}"))
         elif cmd == "notary.word_export_batch":
             check_word_batch_payload(payload, v)
+        elif cmd == "notary.workspace_update":
+            check_update_payload(payload, ctx, v)
         elif cmd == "notary.workspace_create":
             check_create_payload(payload, v, draft_v2=draft_v2)
-        # word_export_* trên two_party → case_type_unsupported (§13.5)
-        if draft_v2 and ct == "two_party" and cmd in (
-                "notary.word_export_options", "notary.word_export_batch"):
-            v.append(("case_type_unsupported",
-                      f"{cmd} on two_party"))
+        # NAIA-8: word_export_* trên two_party KHÔNG còn bị chặn
+        # case_type_unsupported — engine hỗ trợ context/mapping hai bên.
         # case_id: bắt buộc / nháp được / cấm — §2.1a
         if cmd in CASE_ID_REQUIRED and isinstance(payload, dict):
             if not (isinstance(payload.get("case_id"), int)

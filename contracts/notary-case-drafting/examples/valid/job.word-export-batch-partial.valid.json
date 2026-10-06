@@ -4,7 +4,11 @@
   "command_id": "a1b2c3d4-0010-4010-8010-000000000010",
   "status": "partial",
   "waiting_on": null,
-  "progress": { "done": 2, "total": 2, "current_label": "Xong 1/2 văn bản" },
+  "progress": {
+    "done": 2,
+    "total": 2,
+    "current_label": "Xong 1/2 văn bản"
+  },
   "result": {
     "kind": "word_export_batch",
     "data": {
@@ -39,8 +43,12 @@
         }
       ],
       "breakdown": {
-        "succeeded": ["khai_nhan_di_san"],
-        "failed": ["niem_yet"],
+        "succeeded": [
+          "khai_nhan_di_san"
+        ],
+        "failed": [
+          "niem_yet"
+        ],
         "skipped": []
       }
     },

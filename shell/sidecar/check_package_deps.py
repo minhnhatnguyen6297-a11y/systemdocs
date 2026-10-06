@@ -25,6 +25,7 @@ _MODULE_BY_DIST = {
     "sqlalchemy": "sqlalchemy",
     "openpyxl": "openpyxl",
     "python-docx": "docx",
+    "regex": "regex",
     "pymupdf": "pymupdf",
     "playwright": "playwright.sync_api",
     "httpx": "httpx",

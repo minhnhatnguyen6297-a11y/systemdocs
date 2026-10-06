@@ -28,16 +28,37 @@ const TWO_PARTY_IDS = Array.from({ length: 30 }, (_, i) => `p${i + 1}`);
 // Field whitelist theo contract §13.3/§13.4 — strip field la truoc khi
 // gui. is_primary/isLandOwner/willReceive BI CAM tren wire v2.
 const PERSON_FIELDS = ['ho_ten', 'gioi_tinh', 'ngay_sinh', 'ngay_chet',
-  'so_giay_to', 'ngay_cap', 'noi_cap', 'dia_chi', 'place_of_origin'];
+  'so_giay_to', 'ngay_cap', 'noi_cap', 'dia_chi', 'place_of_origin',
+  // MIN-141 đợt 3: gia trị xac nhan/suy ra — OCR/intake dien, commit
+  // giu lai trong snapshot (contract §4.1).
+  'loai_giay_to', 'loai_dia_chi'];
+// MIN-141 review: 'thoi_han' LE cap tai san da rut khoi whitelist —
+// thoi han moi chi thuoc land_rows[].thoi_han (popup Loại đất). Row
+// load tu server van co key (master giu lich su) → stageForWire()
+// strip truoc khi gui; backend giu nguyen master khi key vang.
 const ASSET_FIELDS = ['so_serial', 'so_vao_so',
   'so_thua_dat', 'so_to_ban_do', 'dia_chi', 'loai_so',
-  'hinh_thuc_su_dung', 'thoi_han', 'nguon_goc', 'ngay_cap', 'co_quan_cap'];
+  'hinh_thuc_su_dung', 'nguon_goc', 'ngay_cap', 'co_quan_cap'];
 const NODE_BOOL_FIELDS = ['hidden', 'deleted'];
 const NODE_POSITION_FIELDS = ['ownPositions', 'receivePositions'];
 
-// Meta cho phep sua tren nhap moi — khop payload.case §13.6.
+// Meta cho phep sua — khop payload.case §13.6 + đợt 3 (MIN-141).
+// case_type/document_type chi doi duoc tren NHAP (immutable sau create);
+// 5 truong con lai sua duoc ca tren case that — ghi qua commit Stage
+// cung transaction (contract §6).
 const CASE_META_FIELDS = ['case_type', 'document_type', 'ngay_lap_ho_so',
-                          'noi_niem_yet', 'ghi_chu'];
+                          'noi_niem_yet', 'ghi_chu',
+                          'nguoi_nhan_uy_quyen', 'nguoi_nhan_uy_quyen_id',
+                          'noi_dung_viec'];
+// Meta sua duoc tren case da tao (commit payload.case).
+const CASE_META_EDITABLE = ['ngay_lap_ho_so', 'noi_niem_yet', 'ghi_chu',
+                            'nguoi_nhan_uy_quyen',
+                            'nguoi_nhan_uy_quyen_id', 'noi_dung_viec'];
+// Meta cap nhat duoc tren case da luu qua notary.workspace_update (§6.2) —
+// case_type/document_type la dinh danh nghiep vu, khong doi sau create.
+const CASE_META_UPDATE_FIELDS = ['ngay_lap_ho_so', 'noi_niem_yet',
+                                 'ghi_chu'];
+
 const CASE_DOCUMENT_TYPES = ['khai_nhan', 'thoa_thuan'];
 const CASE_DOCUMENT_TYPES_TWO_PARTY =
   ['chuyen_nhuong', 'tang_cho', 'cho_thue', 'dat_coc'];
@@ -53,6 +74,21 @@ function documentTypesFor(caseType) {
 
 function clone(v) {
   return v === undefined ? undefined : JSON.parse(JSON.stringify(v));
+}
+
+// Stage payload gui len wire: strip key 'thoi_han' le cap tai san
+// (MIN-141 review — owner chot bo truong le; thoi han moi chi thuoc
+// cum dat land_rows[].thoi_han). Row load tu server van mang key tu
+// master → xoa o boundary de "ngung gui gia tri le nhu du lieu moi".
+// Backend doc key-presence: key vang = giu nguyen master (lich su con
+// can cho warning orphan_thoi_han), khong phai xoa.
+function stageForWire(stage) {
+  const s = clone(stage);
+  for (const a of (s && s.assets) || []) {
+    if (a && typeof a === 'object') delete a.thoi_han;
+    for (const row of a.land_rows || []) delete row._source_land_row;
+  }
+  return s;
 }
 
 function defaultUuid() {
@@ -131,6 +167,9 @@ function createModel(deps) {
     caseId: null,
     backendMode: null,           // 'mock' → banner "Dữ liệu mô phỏng"
     caseInfo: null,              // {id, case_type, document_type, status...}
+    committedCaseInfo: null,     // baseline case de huy nhap meta (đợt 3)
+    uqCatalog: null,             // danh bạ người nhận ủy quyền [{id,ho_ten}]
+    uqCatalogBusy: false,
     unsupported: false,          // case_type ngoai 'inheritance'
     locked: false,
     stale: false,                // giu nhap sau conflict — server da doi
@@ -169,6 +208,245 @@ function createModel(deps) {
   // khi session da doi (user chuyen case/nhap khac) bi BO — khong ap
   // vao state nua (MIN-122: "bo job response ve tre cua case cu").
   let session = 0;
+  // Scan guard rieng cho word options (NAIA-8 review): hai lan quet
+  // folder lien tiep trong cung session van phai "response moi nhat
+  // thang" — session chi bat duoc chuyen case, khong bat duoc doi folder.
+  let wordScanSeq = 0;
+  // Tra cuu dia chi thu cong (TASK-4): chi nut Tra moi gui lenh, khong
+  // tu tra khi render/go, khong ghi Stage/o. lookupSeq don dieu tang moi
+  // khi du lieu nguon doi hoac co lan Tra moi — response chi hien khi seq
+  // van nguyen (bat ca A->B->A). lookupCallId phan biet cac lan Tra.
+  let lookupSeq = 0;
+  let lookupCallId = 0;
+  state.addressSlots = {};
+  state.addressFull = null;
+  state.addressSuggestions = {};
+  state.postingAssetId = null;
+
+  // dateCellInput luu raw dd/mm/yyyy vao model trong luc go (MIN-136,
+  // chu y thiet ke) — payload IPC phai gui ISO, nen chuan hoa o day
+  // thay vi doi blur/change chuan hoa truoc.
+  function isoDate(value) {
+    const t = String(value || '').trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+    const m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(t) ||
+              /^(\d{2})(\d{2})(\d{4})$/.exec(t);
+    if (!m) return '';
+    const d = +m[1], mo = +m[2], y = +m[3];
+    const dt = new Date(Date.UTC(y, mo - 1, d));
+    if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 ||
+        dt.getUTCDate() !== d) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${m[3]}-${pad(mo)}-${pad(d)}`;
+  }
+
+  // Nguon chuoi tra cuu theo spec: dia chi Nguoi/Tai san lay o dia chi
+  // cua chinh dong do; Noi niem yet lay noi dung chinh o niem yet; Noi cap
+  // giay khai tu lay dia chi cua chinh nguoi da chet (o dich van la noi_cap
+  // cua nguoi do — hai o co the khac nhau). Doc tu state model (input nao
+  // cung dong bo vao model ngay khi go) nen la chu chua luu moi nhat.
+  function lookupSlotKey(kind, rowId) {
+    return kind + ':' + rowId;
+  }
+
+  function addressContext(kind, rowId) {
+    if (kind === 'posting') {
+      const query = (state.caseInfo || {}).noi_niem_yet;
+      if (typeof query !== 'string' || !query.trim()) return null;
+      return { query, presentation: 'drafting' };
+    }
+    const person = kind === 'person' || kind === 'issuer';
+    const row = (person ? state.stage.people : state.stage.assets)
+      .find(r => r.row_id === rowId);
+    if (!row) return null;
+    // issuer tra dia chi nguoi chet, khong tra chu trong o noi_cap.
+    const query = row.dia_chi;
+    if (typeof query !== 'string' || !query.trim()) return null;
+    return { query, presentation: 'drafting' };
+  }
+
+  // Chuyen case/nhap moi: xoa ket qua tra cuu cu — session guard loai
+  // response tre cua case cu.
+  function clearAddressLookups() {
+    lookupSeq += 1;
+    state.addressSlots = {};
+    state.addressFull = null;
+    state.addressSuggestions = {};
+    state.postingAssetId = null;
+  }
+
+  function lookupShapeValid(data, presentation) {
+    const text = (v) => typeof v === 'string';
+    const ref = (v) => v && text(v.unit_id) && text(v.name);
+    if (!data || data.schema_version !== 'notary.address-lookup.v2' ||
+        !['found', 'not_found', 'too_many', 'invalid_input', 'reload_failed'].includes(data.status) ||
+        !(data.presentation === presentation ||
+          (data.status === 'invalid_input' && data.presentation === null)) ||
+        !Number.isInteger(data.total) || data.total < 0 || !Array.isArray(data.results) ||
+        !(data.dataset_version === null || text(data.dataset_version)) ||
+        !(data.revision === null || (Number.isInteger(data.revision) && data.revision >= 0))) return false;
+    if (data.status !== 'found') return data.results.length === 0 &&
+      (data.status === 'too_many' ? presentation === 'drafting' && data.total > 10 : data.total === 0);
+    return data.total === data.results.length && data.total > 0 &&
+      (presentation !== 'drafting' || data.total <= 10) && data.results.every((row) =>
+        row && ref(row) && ['commune', 'province'].includes(row.level) &&
+        (row.level === 'commune' ? ref(row.province) : row.province === null) &&
+        (row.source_text === null || text(row.source_text)) &&
+        text(row.display) && row.display.length > 0 &&
+        (row.observation_id === undefined || text(row.observation_id)) &&
+        Array.isArray(row.evidence) && row.evidence.every((e) =>
+          e && text(e.source_id) && text(e.row_key)));
+  }
+
+  function lookupFailure(response) {
+    return { ok: false,
+      error: { message: 'Không đọc được bảng địa chỉ cục bộ.' } };
+  }
+
+  // Nut Tra cua o drafting: gui {query, presentation:'drafting'} voi
+  // chu dang thay trong o nguon. Bam lai cung chuoi van gui (khong chan).
+  // Moi lan bam la mot callId moi; response cu (sai callId, doi seq, doi
+  // session, query hien tai khac luc bam) deu bi bo.
+  async function requestLookup(kind, rowId) {
+    const key = lookupSlotKey(kind, rowId);
+    const payload = addressContext(kind, rowId);
+    lookupSeq += 1;
+    const callId = ++lookupCallId;
+    if (!payload) {
+      state.addressSlots[key] = { phase: 'error', query: '', callId,
+        message: 'Nhập địa chỉ cần tra rồi bấm Tra.' };
+      emit();
+      return;
+    }
+    state.addressSlots[key] = { phase: 'loading', query: payload.query,
+      callId, gen: lookupSeq };
+    emit();
+    const capturedSession = session;
+    const capturedSeq = lookupSeq;
+    let response;
+    try { response = await client.run('notary.address_lookup', payload); }
+    catch (error) { response = lookupFailure(error); }
+    if (capturedSession !== session) return;
+    const slot = state.addressSlots[key];
+    if (!slot || slot.callId !== callId) return;
+    if (lookupSeq !== capturedSeq ||
+        JSON.stringify(addressContext(kind, rowId)) !== JSON.stringify(payload)) {
+      // Nguon doi khi request dang bay ma chua co lan Tra moi hon: don
+      // loading treo, bao nguoi dung bam Tra lai thay vi treo mai.
+      state.addressSlots[key] = { phase: 'error', query: payload.query,
+        callId, gen: capturedSeq,
+        message: 'Nội dung đã đổi sau khi bấm Tra. Bấm Tra lại.' };
+      emit();
+      return;
+    }
+    const data = response.ok ? response.data : null;
+    state.addressSlots[key] = lookupShapeValid(data, 'drafting')
+      ? { phase: 'ready', query: payload.query, callId, gen: capturedSeq,
+        result: data }
+      : { phase: 'error', query: payload.query, callId, gen: capturedSeq,
+        message: (response.error || {}).message || 'Tra cứu thất bại.' };
+    emit();
+  }
+
+  // Xoa ghi chu/ket qua cua mot o (sau khi huy xac nhan too_many).
+  function dismissLookupSlot(kind, rowId) {
+    delete state.addressSlots[lookupSlotKey(kind, rowId)];
+    emit();
+  }
+
+  // Bao ket qua cua o da cu (nguoi dung doi du lieu sau khi xac nhan).
+  function markLookupStale(kind, rowId) {
+    const key = lookupSlotKey(kind, rowId);
+    state.addressSlots[key] = { phase: 'error',
+      query: (state.addressSlots[key] || {}).query || '',
+      callId: (state.addressSlots[key] || {}).callId || 0,
+      message: 'Nội dung đã đổi sau lần Tra trước. Bấm Tra lại.' };
+    emit();
+  }
+
+  // Mo overlay full sau khi nguoi dung dong y cau hoi too_many: gui ngay
+  // yeu cau full DAU TIEN bang dung query da chup tu lan Tra do. Tra ve
+  // {ok:false, stale:true} khi slot hoac chu nguon da doi — view bao
+  // nguoi dung bam Tra lai, khong mo overlay.
+  function openFullFromSlot(kind, rowId) {
+    const key = lookupSlotKey(kind, rowId);
+    const slot = state.addressSlots[key];
+    const current = addressContext(kind, rowId);
+    if (!slot || slot.phase !== 'ready' || !slot.result ||
+        slot.result.status !== 'too_many' ||
+        slot.result.presentation !== 'drafting' ||
+        !current || current.query !== slot.query ||
+        slot.gen !== lookupSeq) {
+      return { ok: false, stale: true };
+    }
+    lookupSeq += 1;
+    const callId = ++lookupCallId;
+    state.addressFull = { slotKey: key, query: slot.query, callId,
+      phase: 'loading', result: null, message: null };
+    emit();
+    const capturedSession = session;
+    const capturedSeq = lookupSeq;
+    const payload = { query: slot.query, presentation: 'full' };
+    (async () => {
+      let response;
+      try { response = await client.run('notary.address_lookup', payload); }
+      catch (error) { response = lookupFailure(error); }
+      if (capturedSession !== session) return;
+      const full = state.addressFull;
+      if (!full || full.callId !== callId) return;
+      if (lookupSeq !== capturedSeq) return;
+      const data = response.ok ? response.data : null;
+      state.addressFull = lookupShapeValid(data, 'full')
+        ? { slotKey: key, query: full.query, callId, phase: 'ready',
+          result: data, message: null }
+        : { slotKey: key, query: full.query, callId, phase: 'error',
+          result: null,
+          message: (response.error || {}).message || 'Tra cứu thất bại.' };
+      emit();
+    })();
+    return { ok: true };
+  }
+
+  // Nut Tra trong overlay: gui query dang thay voi presentation full.
+  // Sua chu khong tu gui — chi nut nay gui.
+  function requestFull(queryText) {
+    const full = state.addressFull;
+    if (!full) return;
+    lookupSeq += 1;
+    const callId = ++lookupCallId;
+    state.addressFull = { slotKey: full.slotKey, query: queryText, callId,
+      phase: 'loading', result: null, message: null };
+    emit();
+    const capturedSession = session;
+    const capturedSeq = lookupSeq;
+    const payload = { query: queryText, presentation: 'full' };
+    (async () => {
+      let response;
+      try { response = await client.run('notary.address_lookup', payload); }
+      catch (error) { response = lookupFailure(error); }
+      if (capturedSession !== session) return;
+      const current = state.addressFull;
+      if (!current || current.callId !== callId) return;
+      if (lookupSeq !== capturedSeq) return;
+      const data = response.ok ? response.data : null;
+      state.addressFull = lookupShapeValid(data, 'full')
+        ? { slotKey: current.slotKey, query: queryText, callId,
+          phase: 'ready', result: data, message: null }
+        : { slotKey: current.slotKey, query: queryText, callId,
+          phase: 'error', result: null,
+          message: (response.error || {}).message || 'Tra cứu thất bại.' };
+      emit();
+    })();
+  }
+
+  // Dong overlay: huy phien full; response ve muon bi bo (khong mo lai
+  // cua so, khong doi focus, khong hien ket qua).
+  function closeFull() {
+    if (!state.addressFull) return;
+    state.addressFull = null;
+    lookupSeq += 1;
+    emit();
+  }
 
   function emit() {
     // Bao main biet hasUnsaved doi → window-close guard (MIN-112). Tinh o
@@ -241,6 +519,7 @@ function createModel(deps) {
     const c = data.case || {};
     state.caseId = c.id;
     state.caseInfo = clone(c);
+    state.committedCaseInfo = clone(c);
     state.backendMode = data.backend_mode || 'real';
     state.revision = c.revision || 0;
     state.locked = !!c.locked;
@@ -248,7 +527,10 @@ function createModel(deps) {
     state.capabilities = data.capabilities ||
       { intake: [], diagram: false, word_export: false };
     state.committed = clone(data.stage || { people: [], assets: [] });
+    state.docxImport = clone(data.docx_import || { version: 1, sources: [] });
+    state.committedDocxImport = clone(state.docxImport);
     state.stage = clone(state.committed);
+    restoreLandIdentity();
     const dg = data.diagram || {};
     state.diagram = clone(dg.state ||
       (c.case_type === CASE_TYPE_TWO_PARTY
@@ -293,6 +575,7 @@ function createModel(deps) {
 
   async function openCase(caseId) {
     const s = ++session;
+    clearAddressLookups();
     state.status = 'loading';
     state.caseId = caseId;
     state.draftId = null;
@@ -346,6 +629,7 @@ function createModel(deps) {
     const ct = CASE_TYPES.includes(caseType)
       ? caseType : CASE_TYPE_INHERITANCE;
     ++session;                        // vo hieu response dang cho cua case cu
+    clearAddressLookups();
     state.status = 'ready';
     state.caseId = null;
     state.draftId = uuid();
@@ -354,6 +638,8 @@ function createModel(deps) {
       document_type: documentTypesFor(ct)[0],
       status: 'draft', locked: false, revision: 0,
       ngay_lap_ho_so: null, noi_niem_yet: null, ghi_chu: null,
+      nguoi_nhan_uy_quyen: null, nguoi_nhan_uy_quyen_id: null,
+      noi_dung_viec: null,
     };
     state.backendMode = null;
     state.revision = 0;
@@ -364,7 +650,11 @@ function createModel(deps) {
     state.capabilities =
       { intake: INTAKE_KINDS.slice(), diagram: true, word_export: false };
     state.committed = { people: [], assets: [] };
+    state.committedCaseInfo = null;   // nhap moi: khong co baseline case
     state.stage = newStageDraft(ct);
+    state.docxImport = { version: 1, sources: [] };
+    state.committedDocxImport = clone(state.docxImport);
+    state.wordBindingProposals = [];
     state.stageDirty = false;
     state.diagramDirty = true;        // seed la draft chua persist
     state.metaDirty = false;
@@ -390,11 +680,14 @@ function createModel(deps) {
     emit();
   }
 
-  // Sua meta nhap (document_type/ngay_lap_ho_so/noi_niem_yet/ghi_chu).
-  // Chi co nghia tren nhap chua luu — case da tao sua qua commit Stage
-  // khong doi meta (contract khong co command update meta).
+  // Sua meta ho so. Tren nhap moi: du 8 truong (ghi qua
+  // workspace_create.payload.case). Tren case da tao: chi
+  // CASE_META_EDITABLE — ghi cung commit Stage trong mot transaction
+  // (đợt 3, contract §6); case_type/document_type immutable.
   function updateCaseMeta(field, value) {
-    if (!isDraft() || !CASE_META_FIELDS.includes(field)) return false;
+    if (!CASE_META_FIELDS.includes(field) || !canWrite()) return false;
+    const draftOnly = field === 'case_type' || field === 'document_type';
+    if (draftOnly && !isDraft()) return false;
     if (field === 'case_type') {
       // Doi loai ho so o nhap = reset diagram buffer theo domain moi
       // (contract §13.5); stage moc owner_row_id doi theo loai.
@@ -416,6 +709,7 @@ function createModel(deps) {
       state.diagramErrors = [];
       state.metaDirty = true;
       state.stageDirty = true;
+      noteLookupSourceChanged();
       emit();
       return true;
     }
@@ -427,8 +721,74 @@ function createModel(deps) {
     if ((state.caseInfo[field] ?? null) === v) return true;
     state.caseInfo[field] = v;
     state.metaDirty = true;
+    if (field === 'noi_niem_yet') noteLookupSourceChanged();
     emit();
     return true;
+  }
+
+  // Luu meta cho case DA TAO qua notary.workspace_update (§6.2) — mot
+  // nguon du lieu duy nhat la DB backend; khong localStorage. Nhap chua
+  // luu (caseId null) → cap nhat nhap qua updateCaseMeta, persist kem
+  // "Lưu hồ sơ" (workspace_create). Caller tu hien thi r.error.
+  async function saveCaseMeta(patch) {
+    const meta = (patch && typeof patch === 'object') ? patch : {};
+    const keys = Object.keys(meta);
+    if (!keys.length ||
+        keys.some((k) => !CASE_META_UPDATE_FIELDS.includes(k))) {
+      return { ok: false, error: errObj(
+        'validation_error', 'Meta khong hop le') };
+    }
+    if (isDraft()) {
+      for (const k of keys) updateCaseMeta(k, meta[k]);
+      return { ok: true };
+    }
+    if (!canWrite()) {
+      return { ok: false, error: errObj(
+        state.locked ? 'workspace_locked' : 'case_type_unsupported',
+        state.locked ? 'Hồ sơ đã khóa — chỉ đọc'
+                     : 'Loại việc chưa hỗ trợ') };
+    }
+    state.busy = 'notary.workspace_update';
+    emit();
+    const s = session;
+    const before = clone(state.caseInfo);
+    const committedBefore = clone(state.committedCaseInfo);
+    const r = await client.run('notary.workspace_update', {
+      case_id: state.caseId,
+      base_revision: state.revision,
+      case: meta,
+    });
+    state.busy = null;
+    if (s !== session) return r;
+    if (!r.ok) {
+      // Conflict/locked map vao state nhu moi write khac — caller van
+      // nhan r de hien thi loi luu ro rang tai cho (dialog).
+      applyWriteResult(r, 'workspace_update');
+      emit();
+      return r;
+    }
+    const d = r.data || {};
+    if (d.case) {
+      const saved = clone(d.case);
+      state.committedCaseInfo = { ...state.committedCaseInfo, ...saved };
+      // A metadata-only save must preserve other edits in the Stage card,
+      // including values typed while the command was still pending.
+      for (const [key, value] of Object.entries(saved)) {
+        const unchanged = (state.caseInfo[key] ?? null) === (before[key] ?? null);
+        const locallyClean = (before[key] ?? null) === (committedBefore[key] ?? null);
+        if (unchanged && (keys.includes(key) ||
+            !CASE_META_EDITABLE.includes(key) || locallyClean)) {
+          state.caseInfo[key] = value;
+        }
+      }
+      state.metaDirty = CASE_META_EDITABLE.some((key) =>
+        (state.caseInfo[key] ?? null) !==
+        (state.committedCaseInfo[key] ?? null));
+    }
+    if (typeof d.revision === 'number') state.revision = d.revision;
+    state.notice = 'Đã lưu thông tin hồ sơ';
+    emit();
+    return r;
   }
 
   async function saveDraft() {
@@ -444,8 +804,9 @@ function createModel(deps) {
     const r = await client.run('notary.workspace_create', {
       idempotency_key: state.draftId,
       case: meta,
-      stage: clone(state.stage),
+      stage: stageForWire(state.stage),
       diagram: { state: clone(state.diagram) },
+      ...(state.docxImport && state.docxImport.sources.length ? { docx_import: clone(state.docxImport) } : {}),
     });
     state.busy = null;
     if (s !== session) return r;      // nhap da bi thay — bo response
@@ -485,6 +846,21 @@ function createModel(deps) {
     emit();
   }
 
+  // Dau thay doi cho tra cuu: chi dia chi/noi cap/noi niem yet, them/xoa
+  // dong Nguoi/Tai san, doi case. Sua ho ten/ngay thang/sap xep khong lam
+  // request dang bay het hieu luc.
+  function noteLookupSourceChanged() {
+    lookupSeq += 1;
+    for (const [key, slot] of Object.entries(state.addressSlots)) {
+      const separator = key.indexOf(':');
+      const context = addressContext(key.slice(0, separator), key.slice(separator + 1));
+      if (!context || context.query !== slot.query) {
+        state.addressSlots[key] = { ...slot, phase: 'error', result: null,
+          message: 'Nội dung đã đổi sau khi bấm Tra. Bấm Tra lại.' };
+      }
+    }
+  }
+
   // Loai ho so hien tai cua nhap/case (stage draft hay caseInfo).
   function caseType() {
     return (state.caseInfo && state.caseInfo.case_type) ||
@@ -504,6 +880,7 @@ function createModel(deps) {
     }
     const row = newPersonRow(uuid, fields);
     state.stage.people.push(row);
+    noteLookupSourceChanged();
     touchStage();
     return row;
   }
@@ -514,6 +891,7 @@ function createModel(deps) {
     if (state.stage.assets.length >= MAX_ASSETS) return null;
     const row = newAssetRow(uuid, fields);
     state.stage.assets.push(row);
+    noteLookupSourceChanged();
     touchStage();
     return row;
   }
@@ -530,6 +908,7 @@ function createModel(deps) {
     if (!row || !PERSON_FIELDS.includes(field)) return;
     row[field] = value === '' ? null : value;
     clearRowFieldError(rowId, field);
+    if (field === 'dia_chi' || field === 'noi_cap') noteLookupSourceChanged();
     touchStage();
   }
 
@@ -544,13 +923,23 @@ function createModel(deps) {
             loai_dat: x && x.loai_dat != null ? String(x.loai_dat) : null,
             dien_tich: x && x.dien_tich != null ? x.dien_tich : null,
             thoi_han: x && x.thoi_han != null ? String(x.thoi_han) : null,
+            _source_land_row: x && x._source_land_row || null,
           })) : [];
+      for (const source of state.docxImport?.sources || []) {
+        const record = source.records.find((r) => r.row_id === rowId);
+        if (record) {
+          record.land_rows = row.land_rows.map((r) => r._source_land_row);
+          source.bindings = source.bindings.filter((b) => b.candidate_id !== record.candidate_id || b.field_key !== 'land_rows');
+          delete source.template_sha256;
+        }
+      }
     } else if (ASSET_FIELDS.includes(field)) {
       row[field] = value === '' ? null : value;
     } else {
       return;
     }
     clearRowFieldError(rowId, field);
+    if (field === 'dia_chi') noteLookupSourceChanged();
     touchStage();
   }
 
@@ -599,6 +988,7 @@ function createModel(deps) {
     if (state.stage.people.length + state.stage.assets.length === before) {
       return;
     }
+    noteLookupSourceChanged();
     // Xoa dong owner → pointer ve null (draft cho phep; commit se bat
     // workspace_owner_required neu chua chon lai truoc khi Cap nhat).
     if (state.stage.owner_row_id === rowId) {
@@ -655,15 +1045,29 @@ function createModel(deps) {
         state.locked ? 'Hồ sơ đã khóa — chỉ đọc'
                      : 'Loại việc chưa hỗ trợ') };
     }
-    if (!state.stageDirty) return { ok: true, noop: true };
+    if (!state.stageDirty && !state.metaDirty) {
+      return { ok: true, noop: true };
+    }
     state.busy = 'notary.workspace_commit_stage';
     emit();
     const s = session;
-    const r = await client.run('notary.workspace_commit_stage', {
+    const payload = {
       case_id: state.caseId,
       base_revision: state.revision,
-      stage: clone(state.stage),
-    });
+      stage: stageForWire(state.stage),
+    };
+    if (state.docxImport) payload.docx_import = clone(state.docxImport);
+    // đợt 3 (MIN-141): metadata hồ sơ ghi cung Stage trong mot
+    // transaction — payload.case la block day du, chi gui khi meta
+    // sua de khong ghi de meta cua client khac.
+    if (state.metaDirty) {
+      const meta = {};
+      for (const f of CASE_META_FIELDS) {
+        meta[f] = state.caseInfo[f] ?? null;
+      }
+      payload.case = meta;
+    }
+    const r = await client.run('notary.workspace_commit_stage', payload);
     state.busy = null;
     if (s !== session) return r;
     if (!r.ok) {
@@ -681,7 +1085,10 @@ function createModel(deps) {
     const d = r.data || {};
     state.revision = d.revision;
     state.committed = clone(d.stage || state.stage);
+    if (d.docx_import) state.docxImport = clone(d.docx_import);
+    state.committedDocxImport = clone(state.docxImport || { version: 1, sources: [] });
     state.stage = clone(state.committed);
+    restoreLandIdentity();
     if (d.diagram) {
       // Commit prune + re-evaluate trong transaction (§6.1). Baseline
       // committed luon nap theo state server da prune.
@@ -712,6 +1119,12 @@ function createModel(deps) {
         (d.diagram.render_model && d.diagram.render_model.warnings) || [];
     }
     state.stageDirty = false;
+    if (state.metaDirty) {
+      // commit tra stage/diagram, khong tra case — meta da ghi cung
+      // transaction nen caseInfo cuc bo chinh la gia tri da luu.
+      state.metaDirty = false;
+      state.committedCaseInfo = clone(state.caseInfo);
+    }
     state.fieldErrors = [];
     state.stale = false;
     state.error = null;            // ghi thanh cong → loi cu khong con dung
@@ -931,7 +1344,7 @@ function createModel(deps) {
     // + hint case.case_type de server evaluate dung domain (§13.7).
     const payload = state.caseId == null
       ? { case: { case_type: caseType() },
-          stage: clone(state.stage),
+          stage: stageForWire(state.stage),
           diagram: { state: clone(state.diagram) } }
       : { case_id: state.caseId,
           diagram: { state: clone(state.diagram) } };
@@ -1042,8 +1455,8 @@ function createModel(deps) {
       ? { sources: clone(sources) }
       : { case_id: state.caseId, sources: clone(sources) };
     const r = await client.run('notary.intake_analyze', payload, opts);
+    if (s !== session) return { ok: true, stale: true };
     state.intakeBusy = false;
-    if (s !== session) return r;      // response tre — bo
     if (!r.ok) {
       const err = r.error || errObj('unknown');
       if (err.code === 'user_canceled') {
@@ -1063,6 +1476,7 @@ function createModel(deps) {
     }
     const d = r.data || {};
     // Ket qua moi them LEN TREN, khong xoa ngam suggestion cu (plan §13);
+    const intakeSnapshot = clone(d);
     // loi per-source tich luy theo source_id, khong lan sang nguon khac.
     // Dedupe theo suggestion_id: backend co the emit lai id da co (re-
     // analyze cung source) — ban moi thay ban cu, van nam dau danh sach.
@@ -1075,7 +1489,7 @@ function createModel(deps) {
     state.intakeErrors = (d.errors || []).concat(state.intakeErrors);
     state.intakePartial = !!r.partial;
     emit();
-    return r;
+    return { ...r, intakeSnapshot };
   }
 
   // Dua suggestion vao Stage nhu draft — khong phai commit (§5).
@@ -1085,16 +1499,137 @@ function createModel(deps) {
       (s) => s.suggestion_id === suggestionId);
     if (i < 0) return null;
     const sug = state.suggestions[i];
+    const ref = Object.values(sug.fields || {}).flatMap((f) => f.source_refs || []).find((r) => r.kind === 'docx');
+    if (ref && !state.docxImport.sources.some((s) => s.source_id === ref.source_id) && state.docxImport.sources.length >= 8) {
+      state.notice = 'Hồ sơ đã có 8 nguồn Word; hãy gỡ một nguồn trước khi thêm nguồn mới'; emit(); return null;
+    }
     const fields = {};
     for (const [k, f] of Object.entries(sug.fields || {})) {
-      fields[k] = f && f.normalized_value != null
+      if (f?.review_error) { state.notice = f.review_error; emit(); return null; }
+      if (k === 'land_rows' && !f.land_identity) {
+        try { f.land_identity = JSON.parse(f.normalized_value || '[]').map((_, n) => n + 1); } catch (_) { f.land_identity = []; }
+      }
+      if (k === 'land_rows' && (f.source_refs || []).some((r) =>
+        ['ambiguous', 'error', 'warning_nonstandard'].includes(r.core_state) &&
+        (f.land_identity || []).includes(r.land_row) && !f.reviewed_cells?.includes(`${r.land_row}:${r.land_field}`))) {
+        state.notice = 'Cụm đất: hãy kiểm tra từng ô còn mơ hồ'; emit(); return null;
+      }
+      if (k !== 'land_rows' && f && f.normalized_value == null && (f.source_refs || []).some((ref) =>
+          ['ambiguous', 'error', 'warning_nonstandard'].includes(ref.core_state)) && !f.reviewed) {
+        state.notice = `${k}: hãy chọn hoặc sửa giá trị trước khi đưa vào Stage`;
+        emit();
+        return null;
+      }
+      fields[k] = f && f.reviewed ? f.normalized_value : f && f.normalized_value != null
         ? f.normalized_value : (f && f.raw_value != null ? f.raw_value : null);
+    }
+    if (fields.land_rows) {
+      try {
+        fields.land_rows = JSON.parse(fields.land_rows);
+        if (Array.isArray(fields.land_rows) && fields.land_rows.length > 20) {
+          state.notice = 'Stage giữ tối đa 20 cụm đất; hãy bỏ bớt dòng trước khi đưa vào Stage'; emit(); return null;
+        }
+        if (!Array.isArray(fields.land_rows) ||
+            fields.land_rows.some((r) => !r || typeof r !== 'object' || Array.isArray(r))) throw new Error();
+        const identity = sug.fields.land_rows.land_identity || fields.land_rows.map((_, n) => n + 1);
+        fields.land_rows.forEach((r, n) => { r._source_land_row = identity[n] || null; });
+      } catch (_) { state.notice = 'Cụm đất cần là danh sách JSON hợp lệ'; emit(); return null; }
     }
     const row = sug.target === 'asset'
       ? addAsset(fields) : addPerson(fields);
+    if (!row) { state.notice = 'Stage đã đủ chỗ; gợi ý vẫn được giữ để xử lý sau'; emit(); return null; }
+    if (ref) {
+      state.docxImport = state.docxImport || { version: 1, sources: [] };
+      let source = state.docxImport.sources.find((s) => s.source_id === ref.source_id);
+      if (!source) {
+        source = { source_id: ref.source_id, sha256: ref.source_sha256, label: ref.source_label || 'Hợp đồng Word', records: [], bindings: [] };
+        state.docxImport.sources.push(source);
+      }
+      source.records.push({ candidate_id: sug.suggestion_id, row_id: row.row_id,
+        ...(sug.target === 'asset' && fields.land_rows ? { land_rows: fields.land_rows.map((r) => r._source_land_row) } : {}) });
+    }
     state.suggestions.splice(i, 1);
     emit();
     return row;
+  }
+
+  function reviewSuggestion(suggestionId, fieldKey, value, landReview) {
+    const sug = state.suggestions.find((s) => s.suggestion_id === suggestionId);
+    if (!canWrite() || !sug || !sug.fields[fieldKey]) return false;
+    const field = sug.fields[fieldKey];
+    const invalid = (message) => {
+      field.reviewed = false;
+      field.review_error = message;
+      field.review_input = value;
+      field.normalized_value = null;
+      state.notice = message; emit(); return false;
+    };
+    if (fieldKey.startsWith('ngay_') && value) {
+      const t = String(value).trim();
+      let y, m, d;
+      let match = t.match(/^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{4})$/);
+      if (match) [, d, m, y] = match;
+      else if ((match = t.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/))) [, y, m, d] = match;
+      else if (/^(19|20)\d{2}$/.test(t)) value = t;
+      else return invalid('Ngày cần là năm hoặc ngày/tháng/năm hợp lệ');
+      if (y) {
+        const date = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
+        if (date.getUTCFullYear() !== Number(y) || date.getUTCMonth() + 1 !== Number(m) || date.getUTCDate() !== Number(d)) {
+          return invalid('Ngày không hợp lệ');
+        }
+        value = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      }
+    }
+    if (fieldKey === 'dien_tich' && value !== '' && value != null) {
+      let text = String(value).trim();
+      if (text.includes(',') && text.includes('.')) text = text.replace(/\./g, '').replace(/,/g, '.');
+      else if (text.includes(',')) text = text.replace(/,/g, '.');
+      if (!/^\+?\d+(\.\d+)?$/.test(text) || !Number.isFinite(Number(text))) return invalid('Diện tích cần là số hữu hạn từ 0 trở lên');
+      value = Number(text);
+    }
+    if (fieldKey === 'land_rows') {
+      let rows;
+      try { rows = JSON.parse(value); } catch (_) { return invalid('Cụm đất cần là danh sách JSON hợp lệ'); }
+      if (!Array.isArray(rows) || rows.some((r) => !r || (r.dien_tich != null &&
+          (typeof r.dien_tich !== 'number' || !Number.isFinite(r.dien_tich) || r.dien_tich < 0)))) {
+        return invalid('Diện tích cần là số hữu hạn từ 0 trở lên');
+      }
+    }
+    field.normalized_value = value === '' ? null : value;
+    delete field.review_error;
+    delete field.review_input;
+    field.reviewed = true;
+    if (fieldKey === 'land_rows' && landReview) {
+      field.land_identity = clone(landReview.identity);
+      field.reviewed_cells = [...new Set([...(field.reviewed_cells || []), ...(landReview.cell ? [landReview.cell] : [])])];
+    }
+    emit();
+    return true;
+  }
+
+  function restoreLandIdentity() {
+    for (const source of state.docxImport?.sources || []) for (const record of source.records) {
+      for (const stage of [state.stage, state.committed]) {
+        const asset = stage.assets.find((a) => a.row_id === record.row_id);
+        if (asset) (asset.land_rows || []).forEach((r, n) => { r._source_land_row = record.land_rows ? record.land_rows[n] : n + 1; });
+      }
+    }
+  }
+
+  function detachOriginalSource(sourceId) {
+    if (!canWrite()) return false;
+    state.docxImport.sources = state.docxImport.sources.filter((s) => s.source_id !== sourceId);
+    touchStage(); return true;
+  }
+
+  function confirmOriginalBindings(sourceId, bindings) {
+    if (!canWrite() || state.stageDirty || state.diagramDirty) return false;
+    const source = state.docxImport.sources.find((s) => s.source_id === sourceId);
+    if (!source) return false;
+    source.bindings = bindings.map((b) => ({ candidate_id: b.candidate_id,
+      occurrence_id: b.occurrence_id, field_key: b.field_key, slot: b.slot }));
+    touchStage();
+    return true;
   }
 
   function discardSuggestion(suggestionId) {
@@ -1105,19 +1640,112 @@ function createModel(deps) {
     emit();
   }
 
-  // ---------- word export (thin — dialog day du o MIN-112) ----------
+  // ---------- Danh ba nguoi nhan uy quyen (đợt 3, MIN-141) ----------
+  // Catalog = bang customers qua notary.customer_list (danh ba chung cua
+  // backend — AC "uu tien tai dung danh ba hien co"). Mock khong co danh
+  // ba that: tra danh sach rong, UI roi ve nhap tu do.
 
-  async function loadWordOptions() {
+  async function loadUqCatalog(query) {
+    if (state.uqCatalogBusy) return { ok: true, noop: true };
+    state.uqCatalogBusy = true;
+    emit();
     const s = session;
-    const r = await client.run('notary.word_export_options',
-                               { case_id: state.caseId });
+    const r = await client.run('notary.customer_list', {
+      query: query || '', limit: 200,
+    });
+    state.uqCatalogBusy = false;
+    if (s !== session) return r;
+    if (!r.ok) {
+      // Catalog khong bat buoc — nhap tu do van duoc; loi chi noi
+      // qua error state (khong chan Stage).
+      state.uqCatalog = [];
+      state.error = r.error || errObj('unknown');
+      emit();
+      return r;
+    }
+    state.uqCatalog = (r.data && r.data.customers) || [];
+    emit();
+    return r;
+  }
+
+  // "+ Them vao danh ba": tao customer moi toi thieu (ho_ten) roi gan
+  // lam nguoi nhan uy quyen — tham chieu on dinh customers.id di vao
+  // commit tiep theo (AC: khong chi mot chuoi ten).
+  async function createUqCustomer(hoTen) {
+    const name = (hoTen == null ? '' : String(hoTen)).trim();
+    if (!name) {
+      return { ok: false, error: errObj('validation_error',
+                                        'Tên người nhận ủy quyền trống') };
+    }
+    state.uqCatalogBusy = true;
+    emit();
+    const s = session;
+    const r = await client.run('notary.customer_create',
+                               { ho_ten: name });
+    state.uqCatalogBusy = false;
     if (s !== session) return r;
     if (!r.ok) {
       state.error = r.error || errObj('unknown');
       emit();
       return r;
     }
+    const cust = (r.data && r.data.customer) || {};
+    if (cust.id != null) {
+      if (Array.isArray(state.uqCatalog) &&
+          !state.uqCatalog.some((x) => x && x.id === cust.id)) {
+        state.uqCatalog.push(cust);
+      }
+      updateCaseMeta('nguoi_nhan_uy_quyen', cust.ho_ten || name);
+      updateCaseMeta('nguoi_nhan_uy_quyen_id', cust.id);
+    } else {
+      updateCaseMeta('nguoi_nhan_uy_quyen', cust.ho_ten || name);
+      updateCaseMeta('nguoi_nhan_uy_quyen_id', null);
+    }
+    emit();
+    return r;
+  }
+
+  // Giai name -> catalog id: go ten trung het mot entry → gan id (tham
+  // chieu on dinh); khong trung → free text (id null). Dung cho input
+  // nguoi nhan uy quyen ket hop datalist.
+  function resolveUqName(name) {
+    const t = (name == null ? '' : String(name)).trim();
+    const list = Array.isArray(state.uqCatalog) ? state.uqCatalog : [];
+    const hit = list.find((c) => c && c.ho_ten === t);
+    updateCaseMeta('nguoi_nhan_uy_quyen', t || null);
+    updateCaseMeta('nguoi_nhan_uy_quyen_id',
+                   hit && hit.id != null ? hit.id : null);
+  }
+
+  // ---------- word export (thin — dialog day du o MIN-112) ----------
+
+  // NAIA-8: `templateDir` = {file_token} cua thu muc mau do nguoi dung
+  // chon — main resolve thanh FileRef is_dir:true; backend quet .docx
+  // trong thu muc do. Khong truyen → catalog/builtin cu.
+  async function loadWordOptions(templateDir, originalSourceId) {
+    const s = session;
+    const seq = ++wordScanSeq;
+    // Quet folder moi = nguon mau moi — xoa options ngay de khong ai
+    // doc danh sach cua folder truoc khi dang cho scan.
+    state.wordOptions = null;
+    state.wordBindingProposals = [];
+    emit();
+    const payload = { case_id: state.caseId };
+    if (templateDir) payload.template_dir = templateDir;
+    if (originalSourceId) payload.original_source_id = originalSourceId;
+    const r = await client.run('notary.word_export_options', payload);
+    if (s !== session || seq !== wordScanSeq) {
+      // Response tre (case doi hoac folder moi hon dang scan) — BO ca
+      // success lan error; scan moi nhat tu render/error state cua no.
+      return { ok: true, stale: true };
+    }
+    if (!r.ok) {
+      state.error = r.error || errObj('unknown');
+      emit();
+      return r;
+    }
     state.wordOptions = (r.data && r.data.documents) || [];
+    state.wordBindingProposals = (r.data && r.data.binding_proposals) || [];
     emit();
     return r;
   }
@@ -1178,7 +1806,9 @@ function createModel(deps) {
     };
   }
 
-  // opts: {onJob} — dialog hien thi progress + cancel theo job_id.
+  // opts: {onJob, templateDir, createCaseSubdir} — dialog hien thi
+  // progress + cancel theo job_id. `templateDir` = {file_token} thu muc
+  // mau; `createCaseSubdir` = tao thu muc con HS-<case_id> trong dich.
   async function exportWord(documentKeys, destination, opts) {
     if (!canWrite()) {
       return { ok: false, error: errObj(
@@ -1189,13 +1819,25 @@ function createModel(deps) {
     state.wordResult = null;
     emit();
     const s = session;
-    const r = await client.run('notary.word_export_batch', {
+    const o = (opts && typeof opts === 'object') ? opts : {};
+    const payload = {
       case_id: state.caseId,
       document_keys: documentKeys,
       destination,
-    }, opts);
+    };
+    if (o.templateDir) payload.template_dir = o.templateDir;
+    if (o.originalSourceId) {
+      if (state.stageDirty || state.diagramDirty) {
+        state.wordBusy = false;
+        return { ok: false, error: errObj('word.original_mapping_invalid', 'Hãy Cập nhật Stage và Lưu sơ đồ trước khi xuất') };
+      }
+      payload.original_source_id = o.originalSourceId;
+      payload.base_revision = state.revision;
+    }
+    if (o.createCaseSubdir) payload.create_case_subdir = true;
+    const r = await client.run('notary.word_export_batch', payload, opts);
+    if (s !== session) return { ok: true, stale: true };
     state.wordBusy = false;
-    if (s !== session) return r;
     if (!r.ok) {
       // Failed/canceled/partial job van co the mang result (breakdown)
       // tren wire: job.result.data (MIN-115) hoac error.details.documents.
@@ -1224,7 +1866,7 @@ function createModel(deps) {
   }
 
   function hasUnsaved() {
-    return state.stageDirty || state.diagramDirty;
+    return state.stageDirty || state.diagramDirty || state.metaDirty;
   }
 
   function dismissNotice() {
@@ -1235,7 +1877,11 @@ function createModel(deps) {
 
   return {
     state, subscribe,
-    openCase, newDraft, isDraft, saveDraft, updateCaseMeta,
+    addressContext, requestLookup, dismissLookupSlot, markLookupStale,
+    openFullFromSlot, requestFull, closeFull,
+    openCase, newDraft, isDraft, saveDraft, updateCaseMeta, saveCaseMeta,
+    loadUqCatalog, createUqCustomer, resolveUqName,
+
     canWrite, mockBanner, hasUnsaved, isStageEmpty,
     caseType, diagramDomain, documentTypesFor,
     addPerson, addAsset, updatePersonField, updateAssetField,
@@ -1246,7 +1892,7 @@ function createModel(deps) {
     setNodeFlag, toggleNodePosition, setNodeRelation, removeNode,
     evaluateDiagram, saveDiagram,
     resolveConflict,
-    intakeAnalyze, acceptSuggestion, discardSuggestion,
+    intakeAnalyze, acceptSuggestion, discardSuggestion, reviewSuggestion, confirmOriginalBindings, detachOriginalSource,
     loadWordOptions, exportWord,
     dismissNotice,
   };
@@ -1264,6 +1910,7 @@ const G1_NOTARY_MODEL = {
   NODE_BOOL_FIELDS,
   NODE_POSITION_FIELDS,
   CASE_META_FIELDS,
+  CASE_META_EDITABLE,
   CASE_DOCUMENT_TYPES,
   CASE_DOCUMENT_TYPES_TWO_PARTY,
   documentTypesFor,

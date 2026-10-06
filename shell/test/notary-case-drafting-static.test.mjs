@@ -384,10 +384,17 @@ test('MIN-133 D1/D2/D4: view không còn cột noi_cap/place_of_origin, card met
   const keys = [...cols[1].matchAll(/\['(\w+)'/g)].map((m) => m[1]);
   assert.deepEqual(keys, ['ho_ten', 'gioi_tinh', 'ngay_sinh', 'ngay_chet',
     'so_giay_to', 'ngay_cap', 'dia_chi']);
-  for (const bad of ['draftMetaEl', 'Thông tin hồ sơ', 'ab-back', 'ab-title',
+  for (const bad of ['draftMetaEl', 'ab-back', 'ab-title',
                      'Soạn văn bản', 'Nháp — chưa lưu', 'saveStateText',
                      'js-cd-save-state']) {
     assert.ok(!viewCode.includes(bad), `view còn "${bad}"`);
+  }
+  // MIN-141 đợt 3: meta hồ sơ quay lại như 3 dòng trong card Tài sản
+  // (.cd-casemeta) — KHÔNG phải card đứng riêng như draftMetaEl cũ.
+  assert.match(viewCode, /cd-casemeta/, 'thiếu block meta .cd-casemeta');
+  for (const f of ['meta:noi_niem_yet', 'meta:nguoi_nhan_uy_quyen',
+                   'meta:noi_dung_viec']) {
+    assert.ok(viewCode.includes(f), `view thiếu ${f}`);
   }
   // Model vẫn giữ trường wire (không đổi model/contract).
   assert.match(modelSrc, /'noi_cap'/);
@@ -431,6 +438,33 @@ test('MIN-136: error-catalog load truoc cac module dung no', () => {
     const i = htmlSrc.indexOf(s);
     assert.ok(i > iCat, `${s} phai load SAU error-catalog.js`);
   }
+});
+
+// ---------- NAIA-8 review fixes ----------
+
+test('NAIA-8r: dialog Word co scope cd-word-modal + rule an [hidden] rieng', () => {
+  // Review NAIA-8: author `button{display:inline-flex}` (styles.css)
+  // thang [hidden] cua UA → "Huy xuat" van hien sau khi batch xong.
+  // Dialog danh dau container .cd-word-modal; rule scoped restore an —
+  // khong doi rule button chung cua shell.
+  const wordSrc = R(WORD);
+  assert.match(wordSrc, /cd-word-modal/);
+  assert.match(cssSrc,
+    /\.cd-word-modal \[hidden\]\s*\{[^}]*display:\s*none/);
+  // Khong sua rong: styles.css giu nguyen button{display:inline-flex}.
+  assert.match(stylesSrc, /button, \.btn\s*\{[^}]*display:\s*inline-flex/);
+});
+
+test('NAIA-8r: dialog Word khoa Xuat/input/Luu khi meta save pending', () => {
+  const wordSrc = R(WORD);
+  assert.match(wordSrc, /savingMeta/);
+  // go.disabled phu thuoc savingMeta + guard trong handler Xuat.
+  assert.match(wordSrc,
+    /go\.disabled = scanning \|\| exporting \|\| savingMeta/);
+  // Mo lai theo quyen hien tai (metaCanEdit && canWrite), khong
+  // hard-code true — locked sau loi van giu khoa.
+  assert.match(wordSrc,
+    /metaCanEdit && model\.canWrite\(\)/);
 });
 
 test('MIN-136: CSS khong co comment bi cat giua chung (*/ trong comment)', () => {

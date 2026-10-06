@@ -1,0 +1,19 @@
+{
+  "expected_error": "validation_error",
+  "fixture_context": {
+    "server_revision": 7,
+    "note": "§6.2 — payload.case chỉ nhận ngay_lap_ho_so/noi_niem_yet/ghi_chu; document_type là định danh nghiệp vụ, cấm đổi sau create"
+  },
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-0062-4006-8006-000000000064",
+  "command": "notary.workspace_update",
+  "payload": {
+    "case_id": 42,
+    "base_revision": 7,
+    "case": {
+      "noi_niem_yet": "UBND xã Mới",
+      "document_type": "thoa_thuan"
+    }
+  },
+  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+}

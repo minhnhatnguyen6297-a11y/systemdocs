@@ -68,8 +68,10 @@ def _ensure_db():
     database.migrate_customers_nullable()
     database.migrate_inheritance_cases_schema()
     database.migrate_properties_schema()
+    database.migrate_property_land_rows()
     database.migrate_inheritance_case_properties_schema()
     database.migrate_zalo_schema()
+    database.migrate_zalo_exchange_schema()
     database.Base.metadata.create_all(bind=database.engine)
     _db_ready = True
 
@@ -86,6 +88,12 @@ def _models():
 
 def _svc(name):
     return import_engine_module("notary_v2", f"services.{name}")
+
+
+def address_lookup(job, payload):
+    """Local reference lookup only; deliberately does not initialize office DB."""
+    job.check_cancel()
+    return _result("address_lookup", _svc("administrative_address").lookup_address(payload))
 
 
 def _router(name):
@@ -476,7 +484,8 @@ def export_word(job, payload):
         except we.WordExportValidationError as exc:
             raise CommandError("validation_error", str(exc)) from exc
         we.replace_in_doc(doc, mapping)
-        unresolved = we.find_unresolved_placeholders(doc)
+        unresolved = we.find_unresolved_placeholders(
+            doc, template_ref=template_path)
         if unresolved:
             raise CommandError(
                 "validation_error",
@@ -641,6 +650,11 @@ def _workspace_module():
     return _svc("case_workspace")
 
 
+def _docx_store():
+    return _svc("document_intake.docx_store").DocxStore(
+        Path(engine_data_dir("notary_v2")) / "docx_sources")
+
+
 def workspace_get(job, payload):
     """notary.workspace_get — doc workspace + stage + diagram V2."""
     if not isinstance(payload, dict):
@@ -685,9 +699,9 @@ def workspace_create(job, payload):
     try:
         module = _workspace_module()
         try:
-            data = module.CaseWorkspaceService(sess).create(
+            data = module.CaseWorkspaceService(sess, _docx_store).create(
                 payload.get("idempotency_key"), payload.get("case"),
-                stage, state)
+                stage, state, payload.get("docx_import"))
         except module.WorkspaceError as err:
             raise _workspace_command_error(err)
         job.check_cancel()
@@ -707,16 +721,50 @@ def workspace_commit_stage(job, payload):
     stage = payload.get("stage")
     if not isinstance(stage, dict):
         raise CommandError("validation_error", "stage phai la object")
+    case_meta = payload.get("case")
+    if case_meta is not None and not isinstance(case_meta, dict):
+        raise CommandError("validation_error",
+                           "payload.case phai la object")
     sess = _db_session()
     try:
         module = _workspace_module()
         try:
-            data = module.CaseWorkspaceService(sess).commit_stage(
-                case_id, base_revision, stage)
+            data = module.CaseWorkspaceService(sess, _docx_store).commit_stage(
+                case_id, base_revision, stage, case_meta, payload.get("docx_import"))
         except module.WorkspaceError as err:
             raise _workspace_command_error(err)
         job.check_cancel()
         return _result("workspace_commit_stage", data)
+    finally:
+        sess.close()
+
+
+def workspace_update(job, payload):
+    """notary.workspace_update — cap nhat meta case da luu
+    (ngay_lap_ho_so/noi_niem_yet/ghi_chu; §6.2). case_type/document_type
+    la dinh danh nghiep vu — khong doi sau create. base_revision bat
+    buoc, conflict → workspace_conflict."""
+    if not isinstance(payload, dict):
+        payload = {}
+    case_id = _int_id(_require(payload.get("case_id"), "case_id"),
+                      "case_id")
+    base_revision = _int_id(
+        _require(payload.get("base_revision"), "base_revision"),
+        "base_revision")
+    meta = payload.get("case")
+    if not isinstance(meta, dict) or not meta:
+        raise CommandError("validation_error",
+                           "payload.case phai la object non-empty")
+    sess = _db_session()
+    try:
+        module = _workspace_module()
+        try:
+            data = module.CaseWorkspaceService(sess).update_meta(
+                case_id, base_revision, meta)
+        except module.WorkspaceError as err:
+            raise _workspace_command_error(err)
+        job.check_cancel()
+        return _result("workspace_update", data)
     finally:
         sess.close()
 
@@ -777,6 +825,7 @@ def intake_analyze(job, payload):
     try:
         outcome = svc.analyze(
             sources,
+            store_docx=_docx_store().save,
             check_cancel=job.check_cancel,
             report_progress=_progress)
     except svc.IntakeError as exc:
@@ -909,15 +958,9 @@ def _word_case(sess, models, cid, *, writable):
     if case is None:
         raise CommandError("case_not_found", f"khong co ho so #{cid}",
                            details={"case_id": cid})
-    # §13.5/§13.10: moi word_export_* tren two_party →
-    # case_type_unsupported; case inheritance van di tiep flow cu.
-    ws = _svc("case_workspace")
-    case_type, _doc_type = ws._case_meta(case)
-    if case_type == ws.CASE_TYPE_TWO_PARTY:
-        raise CommandError(
-            "case_type_unsupported",
-            "word_export_* khong ho tro case_type two_party",
-            details={"case_type": case_type})
+    # NAIA-8: bo chan case_type_unsupported rieng luong Word —
+    # engine da co context/mapping two_party; readiness chi tiet qua
+    # word_export_options.block_reason (word.no_people/no_diagram/...).
     if writable and case.is_locked:
         raise CommandError("workspace_locked", f"ho so #{cid} da khoa")
     return case
@@ -935,13 +978,29 @@ def _word_batch_command_error(err):
         details=err.details, result=result)
 
 
+def _word_template_source(sess, wbe, template_dir_ref):
+    """Nguon mau cho word_export_*: `template_dir` FileRef (token da
+    resolve) → quet .docx trong thu muc nguoi dung chon (NAIA-8);
+    None → catalog/builtin cu (backward compat).
+
+    Tra (doc_specs|None, resolve_template)."""
+    if template_dir_ref is None:
+        return None, (lambda _key: _resolve_template(sess, None))
+    from fileref import existing_dir
+    template_root = existing_dir(template_dir_ref)
+    doc_specs = wbe.scan_template_dir(template_root)
+    return doc_specs, wbe.template_path_resolver(template_root)
+
+
 def word_export_options(job, payload):
     """notary.word_export_options — catalog + readiness theo case that.
 
     Read-only: duoc phep tren locked/unsupported (§5.3 chi workspace_get
-    quyet dinh capability) — mock oracle khong _check_writable."""
+    quyet dinh capability) — mock oracle khong _check_writable.
+    NAIA-8: `template_dir` (FileRef thu muc) → documents = file .docx
+    quet duoc thay vi catalog co dinh."""
     p = payload if isinstance(payload, dict) else {}
-    extra = set(p) - {"case_id"}
+    extra = set(p) - {"case_id", "template_dir", "original_source_id"}
     if extra:
         raise CommandError("validation_error",
                            f"payload key la: {sorted(extra)}")
@@ -951,9 +1010,33 @@ def word_export_options(job, payload):
     sess = _db_session()
     try:
         case = _word_case(sess, models, cid, writable=False)
-        data = wbe.export_options(
-            case,
-            resolve_template=lambda _key: _resolve_template(sess, None))
+        if p.get("original_source_id"):
+            if p.get("template_dir"):
+                raise CommandError("validation_error", "Chỉ chọn một nguồn mẫu Word")
+            original = _svc("word_original")
+            try:
+                proposals = original.binding_proposals(case, p["original_source_id"], _docx_store())
+            except (ValueError, OSError, KeyError, TypeError) as exc:
+                raise CommandError("word.original_mapping_invalid", str(exc)) from exc
+            reason = None
+            try:
+                original.reviewed_template(case, p["original_source_id"], _docx_store())
+            except (ValueError, OSError, KeyError, TypeError):
+                reason = "word.original_mapping_invalid"
+            return _result("word_export_options", {"schema_version": wbe.SCHEMA_VERSION,
+                "binding_proposals": proposals,
+                "documents": [{"document_key": "original.docx", "display_name": "Hợp đồng Word gốc",
+                               "ready": reason is None, "block_reason": reason}]})
+        try:
+            doc_specs, resolver = _word_template_source(
+                sess, wbe, p.get("template_dir"))
+            data = wbe.export_options(
+                case, resolve_template=resolver, doc_specs=doc_specs)
+        except wbe.WordBatchError as exc:
+            # Loi quet folder mau (khong ton tai/khong doc duoc) la loi
+            # contract file_not_found — khong de roi engine_internal_error
+            # (review NAIA-8 B3).
+            raise _word_batch_command_error(exc) from exc
         job.check_cancel()
         return _result("word_export_options", data)
     finally:
@@ -973,22 +1056,60 @@ def word_export_batch(job, payload):
     from fileref import existing_dir
 
     p = payload if isinstance(payload, dict) else {}
-    extra = set(p) - {"case_id", "document_keys", "destination"}
+    extra = set(p) - {"case_id", "document_keys", "destination",
+                      "template_dir", "create_case_subdir", "original_source_id", "base_revision"}
     if extra:
         raise CommandError("validation_error",
                            f"payload key la: {sorted(extra)}")
+    create_case_subdir = p.get("create_case_subdir", False)
+    if not isinstance(create_case_subdir, bool):
+        raise CommandError(
+            "validation_error", "create_case_subdir phai la bool")
     cid = _word_case_id(payload)
     wbe = _svc("word_batch_export")
     models = _models()
     sess = _db_session()
     try:
         case = _word_case(sess, models, cid, writable=True)
+        if p.get("original_source_id"):
+            if p.get("template_dir") or p.get("document_keys") != ["original.docx"]:
+                raise CommandError("validation_error", "Chọn đúng hợp đồng Word gốc")
+            if p.get("base_revision") != case.workspace_revision:
+                raise CommandError("workspace_conflict", "Hồ sơ đã đổi; hãy tải lại trước khi xuất")
+            destination = existing_dir(p.get("destination"))
+            parent_destination = destination
+            job.check_cancel()
+            try:
+                if create_case_subdir:
+                    child = destination / f"HS-{cid}"
+                    child.mkdir(exist_ok=True)
+                    if not wbe._contained_in(child, destination.resolve()):
+                        raise CommandError("word_path_traversal", "Thư mục con nằm ngoài thư mục đích")
+                    destination = child
+                data = _svc("word_original").export_original(case, p["original_source_id"], _docx_store(),
+                                                             destination, check_cancel=job.check_cancel)
+            except PermissionError as exc:
+                raise CommandError("file_locked", "Không ghi được thư mục Word đích") from exc
+            except OSError as exc:
+                raise CommandError("word.render_failed", "Không tạo được thư mục Word đích") from exc
+            except wbe.WordBatchError as exc:
+                raise _word_batch_command_error(exc) from exc
+            data['destination'] = {'path': str(parent_destination), 'scope': 'machine_local', 'is_dir': True}
+            job.check_cancel(_result("word_export_batch", data))
+            return _result("word_export_batch", data)
         try:
-            keys = wbe.validate_document_keys(p.get("document_keys"))
+            doc_specs, resolver = _word_template_source(
+                sess, wbe, p.get("template_dir"))
+            keys = wbe.validate_document_keys(
+                p.get("document_keys"),
+                allowed_keys=(set(s.document_key for s in doc_specs)
+                              if doc_specs is not None else None))
             dest_dir = existing_dir(p.get("destination"))
             data = wbe.export_batch(
                 case, case_id=cid, document_keys=keys, dest_dir=dest_dir,
-                resolve_template=lambda _key: _resolve_template(sess, None),
+                resolve_template=resolver,
+                doc_specs=doc_specs,
+                create_case_subdir=create_case_subdir,
                 # Cancel giua batch: pending docs -> skipped trong result
                 # di len wire (contract §8.4 canceled example, MIN-115).
                 check_cancel=lambda d: job.check_cancel(

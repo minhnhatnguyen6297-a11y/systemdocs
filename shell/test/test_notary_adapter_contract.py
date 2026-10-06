@@ -11,6 +11,8 @@ domain, nodes}; node inheritance {id, personId, parentSlotIds, spouseSlotId,
 ownPositions, receivePositions, hidden, deleted}; two_party canonical
 30 slot p1..p30. is_primary/isLandOwner/willReceive bi cam tren wire.
 """
+import os
+import subprocess
 import sys
 import uuid
 from datetime import date
@@ -40,6 +42,94 @@ from sqlalchemy.orm import sessionmaker  # noqa: E402
 
 SCHEMA = "notary.case-drafting.v2"
 TP_IDS = [f"p{i}" for i in range(1, 31)]
+
+
+def test_original_docx_two_party_adapter_lifecycle_stale_guard_and_subfolder(adapter_db, tmp_path, monkeypatch):
+    """Real intake → saved two-party rows/seats → exact original export, with stale no-write."""
+    import json
+    import hashlib
+    from docx import Document
+    from services.document_intake import service as intake_service
+    from services.document_intake.docx_store import DocxStore
+    from services.document_intake.docx_source import read_docx
+    from services import word_original
+    store = DocxStore(tmp_path / 'sources')
+    modules = {'document_intake.service':intake_service, 'word_original':word_original,
+               'word_batch_export':word_batch_export, 'case_workspace':case_workspace}
+    monkeypatch.setattr(notary_adapter, '_svc', lambda name: modules[name])
+    monkeypatch.setattr(notary_adapter, '_docx_store', lambda: store)
+    document = Document()
+    for line in ['HỢP ĐỒNG CHUYỂN NHƯỢNG', 'Bên A:',
+        'Ông: Nguyễn Văn Mẫu, sinh ngày 1/2/1980; CCCD: 001234567890; thường trú: Nhà A',
+        'Bên B:', 'Bà: Trần Thị Mẫu, sinh ngày 3/4/1985; CCCD: 001234567891; thường trú: Nhà B',
+        'Tài sản 1:', 'Serial: ZZ123456; có địa chỉ tại: Nhà đất A',
+        'Loại đất: ONT; Diện tích: 50; Thời hạn: Lâu dài',
+        'Tài sản 2:', 'Serial: YY123456; có địa chỉ tại: Nhà đất B',
+        'Loại đất: CLN; Diện tích: 90; Thời hạn: 2050', 'Điều 2: Nội dung tĩnh giữ nguyên']:
+        document.add_paragraph(line)
+    path = tmp_path / 'Hợp đồng mẫu.docx'; document.save(path)
+    original = path.read_bytes()
+    analyzed = notary_adapter.intake_analyze(_Job(), {'sources':[{'source_id':_uuid4(),'kind':'docx',
+        'file_ref':{'path':str(path),'scope':'machine_local','size_bytes':len(original)}}]})['data']
+    assert len(analyzed['suggestions']) == 4
+    people, assets, records = [], [], []
+    ref = analyzed['suggestions'][0]['fields']['ho_ten']['source_refs'][0]
+    for candidate in analyzed['suggestions']:
+        values = {k:f['normalized_value'] for k,f in candidate['fields'].items()}
+        if 'land_rows' in values: values['land_rows'] = json.loads(values['land_rows'])
+        row = _person_row(ngay_chet=None, **values) if candidate['target']=='person' else _asset_row(**values)
+        (people if candidate['target']=='person' else assets).append(row)
+        records.append({'candidate_id':candidate['suggestion_id'],'row_id':row['row_id']})
+    context = {'version':1,'sources':[{'source_id':ref['source_id'],'sha256':ref['source_sha256'],'records':records,'bindings':[]}]}
+    created = notary_adapter.workspace_create(_Job(), {'idempotency_key':_uuid4(),
+        'case':{'case_type':'two_party','document_type':'chuyen_nhuong'},'stage':{'people':people,'assets':assets},
+        'diagram':{'state':_tp_state(assign={'p17':people[0]['row_id'],'p2':people[1]['row_id']})},'docx_import':context})['data']
+    cid = created['case']['id']; source_id = ref['source_id']
+    options = notary_adapter.word_export_options(_Job(),{'case_id':cid,'original_source_id':source_id})['data']
+    names = [p for p in options['binding_proposals'] if p['field_key']=='ho_ten']
+    assert [p['slot'] for p in names] == ['[Bên B 2 - Họ tên]','[Bên A 2 - Họ tên]']
+    assert created['docx_import']['sources'][0]['label'] == path.name
+    created['stage']['people'][0]['ho_ten'] = 'Tên B đã kiểm tra'
+    context = created['docx_import']; context['sources'][0]['bindings'] = [
+        {k:p[k] for k in ('candidate_id','occurrence_id','field_key','slot')} for p in options['binding_proposals'] if p['supported']]
+    committed = notary_adapter.workspace_commit_stage(_Job(),{'case_id':cid,'base_revision':1,
+        'stage':created['stage'],'docx_import':context})['data']
+    loaded = notary_adapter.workspace_get(_Job(),{'case_id':cid})['data']
+    assert loaded['docx_import'] == committed['docx_import']
+    dest = tmp_path / 'exports'; dest.mkdir()
+    payload = {'case_id':cid,'document_keys':['original.docx'],'original_source_id':source_id,
+        'base_revision':1,'destination':_dest(dest),'create_case_subdir':True}
+    with pytest.raises(CommandError) as err:
+        notary_adapter.word_export_batch(_Job(),payload)
+    assert err.value.code == 'workspace_conflict'
+    assert list(dest.iterdir()) == []
+    payload['base_revision'] = committed['revision']
+    exported = notary_adapter.word_export_batch(_Job(),payload)['data']
+    assert exported['destination'] == _dest(dest)
+    output = Path(exported['documents'][0]['output_file']['path'])
+    assert output.parent == dest / f'HS-{cid}' and output.is_file()
+    text = read_docx(output.read_bytes()).text
+    assert 'Tên B đã kiểm tra' in text and 'Trần Thị Mẫu' in text and 'Nội dung tĩnh giữ nguyên' in text
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == hashlib.sha256(original).hexdigest()
+    # A file occupying the child-folder name must produce a Word error, not a raw OS exception.
+    blocked_dest = tmp_path / 'blocked-exports'; blocked_dest.mkdir()
+    (blocked_dest / f'HS-{cid}').write_text('existing file', encoding='utf-8')
+    payload['destination'] = _dest(blocked_dest)
+    with pytest.raises(CommandError) as err:
+        notary_adapter.word_export_batch(_Job(), payload)
+    assert err.value.code == 'word.render_failed'
+    assert (blocked_dest / f'HS-{cid}').read_text(encoding='utf-8') == 'existing file'
+    mkdir = Path.mkdir
+    def locked_child(folder, *args, **kwargs):
+        if folder.name == f'HS-{cid}': raise PermissionError('locked folder')
+        return mkdir(folder, *args, **kwargs)
+    payload['destination'] = _dest(dest)
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, 'mkdir', locked_child)
+        with pytest.raises(CommandError) as err:
+            notary_adapter.word_export_batch(_Job(), payload)
+        assert err.value.code == 'file_locked'
+    assert list(output.parent.iterdir()) == [output]
 
 
 class _Job:
@@ -200,7 +290,8 @@ def test_workspace_get_contract_shape(adapter_db):
 
 def test_workspace_get_two_party(adapter_db):
     """two_party: stage khong owner_row_id; diagram canonical 30 slot;
-    render_model unsupported sau commit (§13.5); word_export false."""
+    render_model unsupported sau commit (§13.5); word_export mo
+    (NAIA-8) — readiness chi tiet qua word_export_options."""
     case, deceased, prop = _seed_case(
         adapter_db, loai_van_ban="chuyen_nhuong")
     res = notary_adapter.workspace_get(_Job(), {"case_id": case.id})
@@ -213,7 +304,7 @@ def test_workspace_get_two_party(adapter_db):
     assert [n["id"] for n in st["nodes"]] == TP_IDS
     # Chua commit → chua co render (giong inheritance).
     assert data["diagram"]["render_model"] is None
-    assert data["capabilities"]["word_export"] is False
+    assert data["capabilities"]["word_export"] is True
     assert data["capabilities"]["diagram"] is True
     # Commit xong → render_model unsupported (engine khong tinh).
     notary_adapter.workspace_commit_stage(
@@ -448,6 +539,62 @@ def test_workspace_commit_stage_bad_payload_shape(adapter_db):
                 _Job(), {"case_id": case.id, "base_revision": 1,
                          "stage": bad_stage})
         assert exc2.value.code == "validation_error", bad_stage
+
+
+# ------------------------------------- payload.case qua commit (MIN-141 đợt 3)
+
+
+def test_workspace_commit_stage_case_meta_passes_through(adapter_db):
+    """payload.case di tu adapter → service → commit cung transaction:
+    ghi cot hồ so + snapshot payload.case canonical; get() emit lai."""
+    case, deceased, prop = _seed_case(adapter_db)
+    uq = Customer(ho_ten="Nguoi Uy Quyen", gioi_tinh="Nu")
+    adapter_db.add(uq)
+    adapter_db.commit()  # adapter mo session rieng — phai commit
+    stage = {"people": [_person_row(entity_id=deceased.id)],
+             "assets": [_asset_row(entity_id=prop.id)],
+             "owner_row_id": None}
+    stage["owner_row_id"] = stage["people"][0]["row_id"]
+    res = notary_adapter.workspace_commit_stage(_Job(), {
+        "case_id": case.id, "base_revision": 1, "stage": stage,
+        # canonical key — adapter khong doi ten, service fold ve snake.
+        "case": {"noiniemyet": "UBND xa Test",
+                 "nguoinhanuyquyenid": uq.id,
+                 "noidungviec": "Dinh chinh nam sinh",
+                 "ghichu": "ghi chu"}})
+    assert res["data"]["revision"] == 2
+    adapter_db.refresh(case)
+    assert case.noi_niem_yet == "UBND xa Test"
+    assert case.nguoi_nhan_uy_quyen == "Nguoi Uy Quyen"
+    assert case.nguoi_nhan_uy_quyen_id == uq.id
+    assert case.noi_dung_viec == "Dinh chinh nam sinh"
+
+    got = notary_adapter.workspace_get(_Job(), {"case_id": case.id})
+    c = got["data"]["case"]
+    assert c["noi_niem_yet"] == "UBND xa Test"
+    assert c["nguoi_nhan_uy_quyen_id"] == uq.id
+    assert c["noi_dung_viec"] == "Dinh chinh nam sinh"
+
+
+def test_workspace_commit_stage_case_meta_invalid_maps_error(adapter_db):
+    """payload.case sai shape/id → CommandError validation_error, khong
+    ghi Stage."""
+    case, deceased, prop = _seed_case(adapter_db)
+    stage = {"people": [_person_row(entity_id=deceased.id)],
+             "assets": [_asset_row(entity_id=prop.id)]}
+    stage["owner_row_id"] = stage["people"][0]["row_id"]
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.workspace_commit_stage(_Job(), {
+            "case_id": case.id, "base_revision": 1, "stage": stage,
+            "case": "khong-phai-object"})
+    assert exc.value.code == "validation_error"
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.workspace_commit_stage(_Job(), {
+            "case_id": case.id, "base_revision": 1, "stage": stage,
+            "case": {"nguoinhanuyquyenid": 999999}})
+    assert exc.value.code == "validation_error"
+    adapter_db.refresh(case)
+    assert case.workspace_revision == 1  # rollback tron ven
 
 
 # ------------------------------------------------- diagram_evaluate / save
@@ -718,6 +865,23 @@ def _dest(tmp_path):
     return {"path": str(tmp_path), "scope": "machine_local", "is_dir": True}
 
 
+def _dir_link(link, target):
+    """Directory link `link` → `target`: os.symlink trước, fallback
+    junction `mklink /J` trên Windows (không cần quyền admin)."""
+    try:
+        os.symlink(target, link, target_is_directory=True)
+        return
+    except OSError:
+        pass
+    if os.name == "nt":
+        r = subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(link), str(target)],
+            capture_output=True)
+        if r.returncode == 0:
+            return
+    pytest.skip("không tạo được directory link (thiếu quyền)")
+
+
 def test_registry_wires_word_commands():
     assert "notary.word_export_options" in reg.COMMANDS
     assert "notary.word_export_batch" in reg.COMMANDS
@@ -753,20 +917,28 @@ def test_word_export_options_missing_case(adapter_db):
     assert exc.value.code == "case_not_found"
 
 
-def test_word_export_two_party_rejected(adapter_db):
-    """§13.10: word_export_* tren two_party -> case_type_unsupported."""
+def test_word_export_two_party_allowed(adapter_db, tmp_path):
+    """NAIA-8: word_export_* tren two_party khong con
+    case_type_unsupported — readiness per-file qua block_reason
+    (case seed chua commit Stage → word.no_people)."""
     case, _d, _p = _seed_case(adapter_db, loai_van_ban="tang_cho")
+    res = notary_adapter.word_export_options(_Job(), {"case_id": case.id})
+    docs = {d["document_key"]: d for d in res["data"]["documents"]}
+    assert docs["khai_nhan_di_san"]["block_reason"] == "word.no_people"
+    assert docs["niem_yet"]["block_reason"] == "word.template_missing"
+    # Batch: moi doc failed word.no_people → all-failed word_batch_failed
+    # kem result_data (khong phai case_type_unsupported).
     with pytest.raises(CommandError) as exc:
-        notary_adapter.word_export_options(_Job(), {"case_id": case.id})
-    assert exc.value.code == "case_type_unsupported"
-    assert exc.value.details["case_type"] == "two_party"
-    with pytest.raises(CommandError) as exc2:
         notary_adapter.word_export_batch(_Job(), {
             "case_id": case.id,
             "document_keys": ["khai_nhan_di_san"],
-            "destination": {"path": "x", "scope": "machine_local",
-                            "is_dir": True}})
-    assert exc2.value.code == "case_type_unsupported"
+            "destination": _dest(tmp_path)})
+    err = exc.value
+    assert err.code == "word_batch_failed"
+    assert err.result["data"]["breakdown"]["failed"] == [
+        "khai_nhan_di_san"]
+    assert err.result["data"]["documents"][0]["error"]["code"] == (
+        "word.no_people")
 
 
 def test_word_export_batch_writes_docx(adapter_db, tmp_path):
@@ -899,6 +1071,211 @@ def test_word_export_batch_locked_case(adapter_db, tmp_path):
     assert exc.value.code == "workspace_locked"
 
 
+def test_word_export_batch_subdir_link_escape(adapter_db, tmp_path):
+    """Review NAIA-8: destination/HS-<case_id> là junction/symlink trỏ
+    ra ngoài — mkdir(exist_ok=True) chấp nhận; phải từ chối
+    word_path_traversal TRƯỚC khi probe/ghi, không file nào bên ngoài."""
+    case = _seed_word_ready_case(adapter_db)
+    dest = tmp_path / "selected"
+    dest.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    _dir_link(dest / f"HS-{case.id}", outside)
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.word_export_batch(_Job(), {
+            "case_id": case.id, "document_keys": ["khai_nhan_di_san"],
+            "destination": _dest(dest),
+            "create_case_subdir": True})
+    assert exc.value.code == "word_path_traversal"
+    assert list(outside.iterdir()) == []
+    assert [p.name for p in dest.iterdir()] == [f"HS-{case.id}"]
+
+
+def test_word_export_batch_subdir_destination_is_granted_dir(
+        adapter_db, tmp_path):
+    """Contract §8.2: create_case_subdir → ghi vào <dest>/HS-<id>/ nhưng
+    data.destination trong result vẫn là thư mục người dùng chọn."""
+    case = _seed_word_ready_case(adapter_db)
+    res = notary_adapter.word_export_batch(_Job(), {
+        "case_id": case.id, "document_keys": ["khai_nhan_di_san"],
+        "destination": _dest(tmp_path),
+        "create_case_subdir": True})
+    data = res["data"]
+    assert data["destination"]["path"] == str(tmp_path)
+    out = Path(data["documents"][0]["output_file"]["path"])
+    assert out.parent == tmp_path / f"HS-{case.id}"
+    assert out.is_file()
+
+
+# --------------------------------------- folder mode + workspace_update (NAIA-8)
+
+
+def _write_docx(path, *lines):
+    import docx
+    d = docx.Document()
+    for line in lines:
+        d.add_paragraph(line)
+    d.save(str(path))
+    return path
+
+
+def _tpl_dir(tmp_path, name="mau"):
+    d = tmp_path / name
+    d.mkdir()
+    return d
+
+
+def test_registry_wires_workspace_update():
+    assert "notary.workspace_update" in reg.COMMANDS
+    assert callable(reg.COMMANDS["notary.workspace_update"])
+
+
+def test_workspace_update_meta_persists_and_reloads(adapter_db):
+    """NAIA-8: Noi niem yet luu qua workspace_update → revision+1 →
+    workspace_get doc lai DUNG gia tri (mot nguon du lieu = case DB)."""
+    case = _seed_word_ready_case(adapter_db)
+    res = notary_adapter.workspace_update(_Job(), {
+        "case_id": case.id, "base_revision": case.workspace_revision,
+        "case": {"noi_niem_yet": "xã Yên Sở"}})
+    assert res["kind"] == "workspace_update"
+    data = res["data"]
+    assert data["schema_version"] == SCHEMA
+    assert data["revision"] == case.workspace_revision + 1
+    assert data["case"]["noi_niem_yet"] == "xã Yên Sở"
+    # Reload qua workspace_get — du lieu da persist vao case record.
+    got = notary_adapter.workspace_get(_Job(), {"case_id": case.id})
+    assert got["data"]["case"]["noi_niem_yet"] == "xã Yên Sở"
+    assert got["data"]["case"]["revision"] == case.workspace_revision + 1
+
+
+def test_workspace_update_conflict_locked_and_shape(adapter_db):
+    case = _seed_word_ready_case(adapter_db)
+    rev = case.workspace_revision
+    # base_revision cu → workspace_conflict
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.workspace_update(_Job(), {
+            "case_id": case.id, "base_revision": rev + 3,
+            "case": {"noi_niem_yet": "xã X"}})
+    assert exc.value.code == "workspace_conflict"
+    # case.id khong ton tai
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.workspace_update(_Job(), {
+            "case_id": 9999, "base_revision": 1,
+            "case": {"noi_niem_yet": "x"}})
+    assert exc.value.code == "case_not_found"
+    # key la (ke ca dinh danh case_type) + case rong → validation_error
+    for bad in ({"case_type": "gift"}, {}, "chuoi"):
+        with pytest.raises(CommandError) as exc:
+            notary_adapter.workspace_update(_Job(), {
+                "case_id": case.id, "base_revision": rev, "case": bad})
+        assert exc.value.code == "validation_error", bad
+    # case khoa → workspace_locked
+    case.trang_thai = "locked"
+    adapter_db.commit()
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.workspace_update(_Job(), {
+            "case_id": case.id, "base_revision": case.workspace_revision,
+            "case": {"noi_niem_yet": "xã Y"}})
+    assert exc.value.code == "workspace_locked"
+
+
+def test_word_export_options_folder_mode(adapter_db, tmp_path):
+    """template_dir (FileRef da resolve) → documents = .docx quet duoc,
+    document_key = basename; lock file ~$ + non-docx + subdir bi loai."""
+    case = _seed_word_ready_case(adapter_db)
+    tpl = _tpl_dir(tmp_path)
+    _write_docx(tpl / "B mau.docx", "SENTINEL_B")
+    _write_docx(tpl / "a mau.docx", "SENTINEL_A")
+    (tpl / "~$khoa.docx").write_bytes(b"lock")
+    (tpl / "ghi_chu.txt").write_text("x")
+    (tpl / "sub").mkdir()
+    res = notary_adapter.word_export_options(_Job(), {
+        "case_id": case.id,
+        "template_dir": {"path": str(tpl), "scope": "machine_local",
+                         "is_dir": True}})
+    docs = res["data"]["documents"]
+    # Sort case-insensitive: 'a mau.docx' truoc 'B mau.docx'.
+    assert [d["document_key"] for d in docs] == [
+        "a mau.docx", "B mau.docx"]
+    assert [d["display_name"] for d in docs] == ["a mau", "B mau"]
+    assert all(d["ready"] for d in docs)
+
+
+def test_word_export_options_template_dir_missing(adapter_db, tmp_path):
+    """Review B3: loi doc folder mau phai la contract file_not_found,
+    khong roi engine_internal_error."""
+    case = _seed_word_ready_case(adapter_db)
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.word_export_options(_Job(), {
+            "case_id": case.id,
+            "template_dir": {"path": str(tmp_path / "khong-co"),
+                             "scope": "machine_local", "is_dir": True}})
+    assert exc.value.code == "file_not_found"
+    f = tmp_path / "la-file"
+    f.write_text("x")
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.word_export_options(_Job(), {
+            "case_id": case.id,
+            "template_dir": {"path": str(f),
+                             "scope": "machine_local", "is_dir": True}})
+    assert exc.value.code == "file_not_found"
+
+
+def test_word_export_batch_folder_mode_real_docx(adapter_db, tmp_path):
+    """Integration that: folder mau that → options → batch chi xuat
+    mau duoc CHON; output la DOCX that chua noi dung mau do (khong phai
+    mau khac), [Nơi niêm yết] thay bang gia tri da luu qua
+    workspace_update; chay lai → suffix _2, khong ghi de."""
+    case = _seed_word_ready_case(adapter_db)
+    # Luu meta qua duong contract (khong set thuoc tinh truc tiep).
+    notary_adapter.workspace_update(_Job(), {
+        "case_id": case.id, "base_revision": case.workspace_revision,
+        "case": {"noi_niem_yet": "xã Yên Sở"}})
+    tpl = _tpl_dir(tmp_path, "mau")
+    _write_docx(tpl / "mau_a.docx",
+                "SENTINEL_MAU_A niem yet tai [Nơi niêm yết].")
+    _write_docx(tpl / "mau_b.docx", "SENTINEL_MAU_B doc lap")
+    dest = tmp_path / "dich"
+    dest.mkdir()
+    tpl_ref = {"path": str(tpl), "scope": "machine_local", "is_dir": True}
+
+    opts = notary_adapter.word_export_options(_Job(), {
+        "case_id": case.id, "template_dir": tpl_ref})
+    keys = [d["document_key"] for d in opts["data"]["documents"]]
+    assert keys == ["mau_a.docx", "mau_b.docx"]
+
+    # Chi xuat mau_b — file phai chua noi dung MAU B, khong lan A.
+    res = notary_adapter.word_export_batch(_Job(), {
+        "case_id": case.id, "document_keys": ["mau_b.docx"],
+        "template_dir": tpl_ref, "destination": _dest(dest)})
+    data = res["data"]
+    assert data["breakdown"]["succeeded"] == ["mau_b.docx"]
+    out = Path(data["documents"][0]["output_file"]["path"])
+    assert out.parent == dest
+    import docx
+    text = "\n".join(p.text for p in docx.Document(str(out)).paragraphs)
+    assert "SENTINEL_MAU_B" in text
+    assert "SENTINEL_MAU_A" not in text
+
+    # Mau A: placeholder [Nơi niêm yết] → gia tri DA LUU trong case.
+    res_a = notary_adapter.word_export_batch(_Job(), {
+        "case_id": case.id, "document_keys": ["mau_a.docx"],
+        "template_dir": tpl_ref, "destination": _dest(dest)})
+    out_a = Path(res_a["data"]["documents"][0]["output_file"]["path"])
+    text_a = "\n".join(p.text for p in docx.Document(str(out_a)).paragraphs)
+    assert "SENTINEL_MAU_A" in text_a
+    assert "xã Yên Sở" in text_a
+    assert "[Nơi niêm yết]" not in text_a
+    # Chay lai mau A → collision suffix, file cu giu nguyen.
+    res_a2 = notary_adapter.word_export_batch(_Job(), {
+        "case_id": case.id, "document_keys": ["mau_a.docx"],
+        "template_dir": tpl_ref, "destination": _dest(dest)})
+    d2 = res_a2["data"]["documents"][0]
+    assert d2["actual_filename"].endswith("_2.docx")
+    assert Path(out_a).is_file()
+    assert len(list(dest.glob("*.docx"))) == 3
+
+
 # ------------------------------------------------------- workspace_create
 
 
@@ -1008,7 +1385,7 @@ def test_workspace_create_two_party(adapter_db):
     st = data["diagram"]["state"]
     assert st["domain"] == "two_party"
     assert [n["id"] for n in st["nodes"]] == TP_IDS
-    assert data["capabilities"]["word_export"] is False
+    assert data["capabilities"]["word_export"] is True   # NAIA-8
 
 
 def test_workspace_create_idempotent_replay(adapter_db):

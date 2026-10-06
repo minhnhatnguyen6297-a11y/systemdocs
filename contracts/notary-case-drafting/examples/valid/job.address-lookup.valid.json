@@ -1,0 +1,34 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_addr_001",
+  "command_id": "a1b2c3d4-0001-4001-8001-000000000021",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "address_lookup",
+    "data": {
+      "schema_version": "notary.address-lookup.v2",
+      "status": "found",
+      "presentation": "drafting",
+      "total": 1,
+      "results": [
+        {
+          "unit_id": "u_example_1",
+          "level": "commune",
+          "name": "Xã Ý Yên",
+          "province": {"unit_id": "u_example_province", "name": "Tỉnh Ninh Bình"},
+          "source_text": "Xã Yên Phong, Xã Hồng Quang (huyện Ý Yên), Xã Yên Khánh, Thị trấn Lâm",
+          "display": "xã Ý Yên, tỉnh Ninh Bình",
+          "observation_id": "obs_example_1",
+          "evidence": [{"source_id": "bando_bangbieu_example", "row_key": "row_example_1"}]
+        }
+      ],
+      "dataset_version": "bando-2026-10-04",
+      "revision": 1
+    },
+    "warnings": []
+  },
+  "error": null,
+  "updated_at": "2026-10-05T09:00:00Z"
+}

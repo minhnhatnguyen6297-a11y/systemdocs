@@ -87,10 +87,11 @@
     },
     "person_row": {
       "type": "object",
+      "description": "MIN-141 đợt 3: emit thêm loai_giay_to/loai_dia_chi (giá trị xác nhận hoặc suy theo mốc ngay_cap 01/10/2024; người chết server không tự suy). Payload input còn chấp nhận key canonical liền không dấu — ten/gioitinh/ngaysinh/ngaychet/sogiayto/ngaycap/noicap/diachi/loaigiayto/loaidiachi — tới cùng trường; mang cả hai spelling mà giá trị lệch → validation_error.",
       "required": [
         "row_id", "entity_id", "ho_ten", "gioi_tinh", "ngay_sinh",
         "ngay_chet", "so_giay_to", "ngay_cap", "noi_cap", "dia_chi",
-        "place_of_origin"
+        "place_of_origin", "loai_giay_to", "loai_dia_chi"
       ],
       "additionalProperties": false,
       "properties": {
@@ -104,27 +105,41 @@
         "ngay_cap": { "$ref": "#/definitions/date_or_year" },
         "noi_cap": { "$ref": "#/definitions/nullable_string" },
         "dia_chi": { "$ref": "#/definitions/nullable_string" },
-        "place_of_origin": { "$ref": "#/definitions/nullable_string" }
+        "place_of_origin": { "$ref": "#/definitions/nullable_string" },
+        "loai_giay_to": { "$ref": "#/definitions/nullable_string" },
+        "loai_dia_chi": { "$ref": "#/definitions/nullable_string" },
+        "ten": { "$ref": "#/definitions/non_empty_string" },
+        "gioitinh": { "enum": ["Nam", "Nữ", null] },
+        "ngaysinh": { "$ref": "#/definitions/date_or_year" },
+        "ngaychet": { "$ref": "#/definitions/date_or_year" },
+        "sogiayto": { "$ref": "#/definitions/nullable_string" },
+        "ngaycap": { "$ref": "#/definitions/date_or_year" },
+        "noicap": { "$ref": "#/definitions/nullable_string" },
+        "diachi": { "$ref": "#/definitions/nullable_string" },
+        "loaigiayto": { "$ref": "#/definitions/nullable_string" },
+        "loaidiachi": { "$ref": "#/definitions/nullable_string" }
       }
     },
     "land_row": {
       "type": "object",
-      "required": ["loai_dat", "dien_tich", "thoi_han"],
+      "description": "Cụm đất — bộ key canonical mới loaidat/dientich/thoihan (MIN-141 đợt 2, khớp cột property_land_rows); bộ key legacy loai_dat/dien_tich/thoi_han vẫn đọc được để UI hiện hành không hỏng. Bắt buộc đủ một trong hai bộ; cùng mang giá trị mâu thuẫn → validation error.",
+      "anyOf": [
+        { "required": ["loaidat", "dientich", "thoihan"] },
+        { "required": ["loai_dat", "dien_tich", "thoi_han"] }
+      ],
       "additionalProperties": false,
       "properties": {
+        "loaidat": { "$ref": "#/definitions/nullable_string" },
+        "dientich": { "type": ["number", "null"] },
+        "thoihan": { "$ref": "#/definitions/nullable_string" },
         "loai_dat": { "$ref": "#/definitions/nullable_string" },
         "dien_tich": { "type": ["number", "null"] },
         "thoi_han": { "$ref": "#/definitions/nullable_string" }
       }
     },
-    "asset_row": {
+    "asset_row_base": {
       "type": "object",
-      "required": [
-        "row_id", "entity_id", "is_primary", "so_serial", "so_vao_so",
-        "so_thua_dat", "so_to_ban_do", "dia_chi", "loai_so",
-        "hinh_thuc_su_dung", "thoi_han", "nguon_goc", "ngay_cap",
-        "co_quan_cap"
-      ],
+      "description": "Bộ field dùng chung của asset_row — tách required theo chiều wire (MIN-141): input → asset_row_input, emit/legacy → asset_row.",
       "additionalProperties": false,
       "properties": {
         "row_id": { "$ref": "#/definitions/uuid4" },
@@ -151,6 +166,25 @@
           "description": "null-safe: thiếu/null/[] đều hợp lệ"
         }
       }
+    },
+    "asset_row": {
+      "description": "asset_row phía EMIT/result (server → client): luôn mang đủ key kể cả `thoi_han` lẻ (nullable) — giá trị lịch sử trên master còn phục vụ đối chiếu và warning stage.orphan_thoi_han (§4.2).",
+      "allOf": [{ "$ref": "#/definitions/asset_row_base" }],
+      "required": [
+        "row_id", "entity_id", "is_primary", "so_serial", "so_vao_so",
+        "so_thua_dat", "so_to_ban_do", "dia_chi", "loai_so",
+        "hinh_thuc_su_dung", "thoi_han", "nguon_goc", "ngay_cap",
+        "co_quan_cap"
+      ]
+    },
+    "asset_row_input": {
+      "description": "asset_row phía INPUT/payload (client → server). MIN-141: `thoi_han` lẻ KHÔNG còn bắt buộc — client mới không gửi; key vắng = server giữ nguyên giá trị lịch sử trên master (không xóa); key còn được chấp nhận cho client legacy. Thời hạn mới chỉ thuộc land_rows[].thoihan.",
+      "allOf": [{ "$ref": "#/definitions/asset_row_base" }],
+      "required": [
+        "row_id", "entity_id", "is_primary", "so_serial", "so_vao_so",
+        "so_thua_dat", "so_to_ban_do", "dia_chi", "loai_so",
+        "hinh_thuc_su_dung", "nguon_goc", "ngay_cap", "co_quan_cap"
+      ]
     },
     "diagram_node": {
       "type": "object",
@@ -449,7 +483,8 @@
     },
     "document_key": {
       "type": "string",
-      "pattern": "^[a-z][a-z0-9_]*$"
+      "pattern": "^([a-z][a-z0-9_]*|[^<>:\"/\\\\|?*]{1,180}\\.[dD][oO][cC][xX])$",
+      "description": "Catalog mode: key snake_case. Folder mode (NAIA-8): chính tên file .docx đã quét trong thư mục mẫu (basename — không separator/traversal)."
     },
     "document_option": {
       "type": "object",
@@ -461,6 +496,7 @@
         "ready": { "type": "boolean" },
         "block_reason": {
           "enum": [
+            "word.no_people", "word.no_diagram",
             "word.no_assets", "word.no_landowner",
             "word.no_deceased_landowner", "word.no_receiver",
             "word.too_many_assets", "word.too_many_people",
@@ -538,6 +574,112 @@
           }
         }
       ]
+    },
+    "docx_import": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "sources"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "sources": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source_id",
+              "sha256",
+              "records",
+              "bindings"
+            ],
+            "properties": {
+              "source_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "records": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "candidate_id",
+                    "row_id"
+                  ],
+                  "properties": {
+                    "candidate_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "row_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "land_rows": {
+                      "type": "array",
+                      "maxItems": 20,
+                      "items": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "minimum": 1,
+                        "description": "Số dòng trong nguồn Word; không bị giới hạn bởi 20 dòng Stage đã chọn."
+                      }
+                    }
+                  }
+                }
+              },
+              "template_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "bindings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "candidate_id",
+                    "occurrence_id",
+                    "field_key",
+                    "slot"
+                  ],
+                  "properties": {
+                    "candidate_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurrence_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "field_key": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "slot": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              },
+              "label": {
+                "type": "string",
+                "maxLength": 180
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

@@ -5,6 +5,15 @@
 Trang này giữ phần dùng chung cho nhiều module. Chi tiết thuộc một module hoặc
 feature phải ghi ở thư mục con gần nhất, không chép lại tại đây.
 
+Bản giới thiệu dành cho dev: [Tổng quan sản phẩm](./product-overview.md).
+Đây là phụ lục tóm tắt, không thay thế spec hoặc contract.
+
+**Gom nhánh 05/10/2026 — TASK-6:** tài liệu regex và địa chỉ cùng nằm trên
+`consolidate/monorepo`; xem [bàn giao từng việc](../../.agents/handoff/notary-20261005/README.md).
+Quyết định: giữ trạng thái duyệt của từng tài liệu, không coi thao tác gom/commit
+là nghiệm thu tính năng. Tại sao: spec địa chỉ đã duyệt nhưng runtime chưa theo
+v2; bộ quy tắc regex từ 20 mẫu còn chờ duyệt và chưa là spec triển khai mới.
+
 ## 1. Tầm nhìn và mục tiêu
 
 Hệ thống giảm ba việc nhập lại dữ liệu:
@@ -159,6 +168,13 @@ Mặc định hệ thống chạy trong LAN. Chỉ các đường dưới đư�
 | DashScope/Qwen OCR cho ảnh Zalo | Ảnh do module Zalo đang giữ tạm | `zalo` |
 | Portal CSDL công chứng | Dữ liệu hồ sơ người dùng đã kiểm tra | `upload_lab` |
 | Server Zalo | Tin/ảnh của tài khoản chung văn phòng | `zalo` |
+| Bando — tải danh mục/bảng xã và tỉnh | Dữ liệu hành chính công khai; không gửi hồ sơ hoặc địa chỉ khách hàng | `notary_v2` |
+
+Owner cho phép lấy Bando trong chat 03–04/10/2026. Đường này chỉ phục vụ
+cập nhật kho hành chính bằng CLI; tra cứu dùng kho cục bộ, không gọi website.
+Cách lưu nguồn, bổ sung lịch sử và mở rộng nằm tại
+[`administrative-timeline.md`](./notary_v2/administrative-timeline.md); luật tra
+tại [`shared/administrative-lookup.md`](./shared/administrative-lookup.md).
 
 Agent máy trạm `notaryoffice` không được gọi Internet, chỉ gửi về Hub trong
 LAN. Ảnh CCCD gửi tới OCR nước ngoài thuộc phạm vi bảo vệ dữ liệu cá nhân theo
@@ -175,6 +191,11 @@ thêm cloud.
 - Zalo giữ ảnh và gọi Qwen tại nơi có ảnh; máy chính chỉ nhận raw OCR, trạng
   thái và nguồn, không nhận ảnh.
 - Không tạo shared core trước khi ít nhất hai consumer chứng minh cùng contract.
+  **Ngoại lệ (Owner 05/10/2026, TASK-2):**
+  [lõi tra cứu tên đơn vị hành chính](./shared/administrative-lookup.md) là
+  shared core ngay từ đầu. *Tại sao:* mọi ô địa chỉ, tool tra cứu và module
+  sau này cần cùng một câu trả lời từ cùng một kho; tách riêng từng nơi sẽ lệch.
+  Module ngoài `notary_v2` chỉ gọi khi có contract được duyệt.
 
 ### Còn mở
 
@@ -191,7 +212,15 @@ thêm cloud.
 - Contract máy đọc: [`contracts/`](../../contracts/README.md).
 - Định danh chung: [`contracts/entities.md`](../../contracts/entities.md).
 - Code là bằng chứng về hiện trạng chạy thật; spec quyết định hành vi phải có.
-- Linear giữ task và acceptance criteria; `.agent/tasks/` giữ tiến độ thực thi.
+- Backlog giữ task, tiêu chí hoàn thành và quyết định; `.agent/tasks/` là tiến độ
+  lịch sử. Không dùng ghi chép Linear cũ thay task đang có hiệu lực.
+- **TASK-1 (05/10/2026):** `backlog/docs/` chỉ chứa con trỏ tới file trong
+  `docs/spec/` (xem doc-39 inventory); nội dung SOT vẫn ở file gốc. Quyết định
+  kiến trúc trích từ spec đã ghi thành `backlog/decisions/` decision-22…39.
+- **Owner 05/10/2026, TASK-7:** tiếp tục từ `D:\systemdocs`, nhánh
+  `consolidate/monorepo`. *Tại sao:* một bộ spec/task chung sau khi gom các
+  worktree. [Bàn giao và kiểm tra](../../.agents/handoff/worktree-consolidation-20261005/root-verification.md).
+  Việc gom không đổi yêu cầu sản phẩm hoặc duyệt các quy tắc regex còn Draft.
 
 Khi thay đổi chỉ ảnh hưởng một module hoặc feature, cập nhật spec con. Chỉ sửa
 trang này khi nhiều module cùng bị ảnh hưởng.

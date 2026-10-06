@@ -164,6 +164,19 @@ export function makeDom() {
     remove() {
       if (this.parentElement) this.parentElement.removeChild(this);
     }
+    replaceWith(...nodes) {
+      const parent = this.parentElement;
+      if (!parent) return;
+      const i = parent.children.indexOf(this);
+      this.remove();
+      let at = i < 0 ? parent.children.length : i;
+      for (const n of nodes) {
+        if (n == null) continue;
+        if (n.parentElement) n.parentElement.removeChild(n);
+        parent.children.splice(at++, 0, n);
+        n.parentElement = parent;
+      }
+    }
     contains(other) {
       let n = other;
       while (n) { if (n === this) return true; n = n.parentElement; }
@@ -204,7 +217,11 @@ export function makeDom() {
       if (this.onclick) return this.onclick({ target: this });
       this.dispatch('click', { target: this });
     }
-    focus() { doc.activeElement = this; }
+    focus() {
+      doc.activeElement = this;
+      const event = { target: this, preventDefault() {} };
+      for (let el = this; el; el = el.parentElement) el.dispatch('focusin', event);
+    }
     blur() { if (doc.activeElement === this) doc.activeElement = null; }
     setSelectionRange(a, b) {
       this.selectionStart = a; this.selectionEnd = b;
@@ -215,6 +232,10 @@ export function makeDom() {
     }
     querySelector(sel) {
       return this.querySelectorAll(sel)[0] || null;
+    }
+    closest(sel) {
+      for (let el = this; el; el = el.parentElement) if (matches(el, sel)) return el;
+      return null;
     }
     querySelectorAll(sel) {
       const out = [];

@@ -1,0 +1,37 @@
+{
+  "alternate_content": {
+    "physical_variants": 2,
+    "displayed_variants": 1,
+    "reader_text": "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT\nBÊN A:\nÔng: Nguyễn Văn An, sinh ngày 01/01/1980; CCCD số: 012345678901; thường trú: xã Yên Bình, tỉnh Ninh Bình.\nÔng: Nguyễn Văn An, sinh ngày 01/01/1980; CCCD số: 012345678901; thường trú: xã Yên Bình, tỉnh Ninh Bình.\nĐiều 1. TÀI SẢN CHUYỂN NHƯỢNG\n",
+    "reader_warnings": [
+      "Vùng chưa hỗ trợ sửa: AlternateContent",
+      "Vùng chưa hỗ trợ sửa: Choice",
+      "Vùng chưa hỗ trợ sửa: p",
+      "Vùng chưa hỗ trợ sửa: r",
+      "Vùng chưa hỗ trợ sửa: Fallback"
+    ],
+    "extracted_people": 2,
+    "names": [
+      "Nguyễn Văn An",
+      "Nguyễn Văn An"
+    ]
+  },
+  "original_reason_schema": {
+    "block_reason_definition": {
+      "enum": [
+        "word.no_people",
+        "word.no_diagram",
+        "word.no_assets",
+        "word.no_landowner",
+        "word.no_deceased_landowner",
+        "word.no_receiver",
+        "word.too_many_assets",
+        "word.too_many_people",
+        "word.too_many_signers",
+        "word.template_missing",
+        null
+      ]
+    },
+    "emitted_code": "word.original_mapping_invalid"
+  }
+}

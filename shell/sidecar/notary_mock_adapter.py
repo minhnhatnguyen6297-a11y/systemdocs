@@ -78,7 +78,25 @@ NODE_FIELDS = {"id", "personId", "parentSlotIds", "spouseSlotId",
 NODE_FIELDS_TWO_PARTY = {"id", "personId", "hidden", "deleted"}
 PERSON_FIELDS = ("row_id", "entity_id", "ho_ten", "gioi_tinh", "ngay_sinh",
                  "ngay_chet", "so_giay_to", "ngay_cap", "noi_cap",
-                 "dia_chi", "place_of_origin")
+                 "dia_chi", "place_of_origin",
+                 # đợt 3 (MIN-141): emit thêm; payload nhận cả canonical
+                 "loai_giay_to", "loai_dia_chi")
+# Canonical key → legacy (contract §4.1; parity case_workspace._PERSON_KEY_ALIASES)
+PERSON_CANON = {
+    "ten": "ho_ten", "gioitinh": "gioi_tinh", "ngaysinh": "ngay_sinh",
+    "ngaychet": "ngay_chet", "sogiayto": "so_giay_to",
+    "ngaycap": "ngay_cap", "noicap": "noi_cap", "diachi": "dia_chi",
+    "loaigiayto": "loai_giay_to", "loaidiachi": "loai_dia_chi",
+}
+# Canonical key → legacy cho payload.case (contract §6; parity
+# case_workspace._CASE_META_KEY_ALIASES)
+CASE_META_CANON = {
+    "casetype": "case_type", "documenttype": "document_type",
+    "ngaylaphoso": "ngay_lap_ho_so", "noiniemyet": "noi_niem_yet",
+    "nguoinhanuyquyen": "nguoi_nhan_uy_quyen",
+    "nguoinhanuyquyenid": "nguoi_nhan_uy_quyen_id",
+    "noidungviec": "noi_dung_viec", "ghichu": "ghi_chu",
+}
 ASSET_FIELDS = ("row_id", "entity_id", "so_serial",
                 "so_vao_so", "so_thua_dat", "so_to_ban_do", "dia_chi",
                 "loai_so", "hinh_thuc_su_dung", "thoi_han", "nguon_goc",
@@ -179,6 +197,13 @@ class _MockState:
     def __init__(self, seed=None):
         self._lock = threading.Lock()
         self._next_entity_id = 500
+        # đợt 3 (MIN-141): danh ba gia cho dropdown uy quyen — seed tu
+        # fixture key "customers" (list) neu co, mac dinh rong.
+        self._next_customer_id = 900
+        self.customers = {}
+        for c in (seed or {}).get("customers") or []:
+            if isinstance(c, dict) and c.get("id") is not None:
+                self.customers[int(c["id"])] = dict(c)
         # idempotency_key -> case_id (workspace_create replay, §4.3)
         self._idempotency = {}
         raw = (seed or {}).get("cases") or _load_default_cases()
@@ -197,6 +222,9 @@ class _MockState:
         case.setdefault("revision", 1)
         case.setdefault("ngay_lap_ho_so", None)
         case.setdefault("noi_niem_yet", None)
+        case.setdefault("nguoi_nhan_uy_quyen", None)
+        case.setdefault("nguoi_nhan_uy_quyen_id", None)
+        case.setdefault("noi_dung_viec", None)
         case.setdefault("ghi_chu", None)
         stage = case.setdefault("stage", {"people": [], "assets": []})
         stage.setdefault("people", [])
@@ -864,6 +892,10 @@ def _validate_stage(stage, case_type):
 
     people_norm = []
     for i, r in enumerate(people):
+        if isinstance(r, dict):
+            # đợt 3: fold key canonical -> legacy trước validate
+            # (parity case_workspace.commit_stage).
+            r = _fold_canon(r, PERSON_CANON, f"people[{i}]")
         rid = r.get("row_id") if isinstance(r, dict) else None
         w = _err_row(rid, f"people[{i}]")
         if not isinstance(r, dict):
@@ -907,7 +939,7 @@ def _validate_stage(stage, case_type):
                 errs.append(_err(w, f, "invalid_date",
                                  f"{f} phải YYYY-MM-DD/YYYY/null"))
         for f in ("so_giay_to", "noi_cap", "dia_chi",
-                  "place_of_origin"):
+                  "place_of_origin", "loai_giay_to", "loai_dia_chi"):
             _nullable(r, f, w)
         sgt = r.get("so_giay_to")
         if isinstance(sgt, str) and sgt.strip():
@@ -1087,6 +1119,62 @@ def case_list(job, payload):
     return _result("case_list", {"cases": items, "total": len(items)})
 
 
+def customer_list(job, payload):
+    """notary.customer_list mock (MIN-141 đợt 3): danh bạ người nhận ủy
+    quyền — lọc theo tên/số giấy tờ/địa chỉ như search_customers."""
+    st = _state()
+    q = str((payload or {}).get("query") or "").strip().lower()
+    limit = max(1, min(int((payload or {}).get("limit") or 50), 200))
+    rows = sorted(st.customers.values(), key=lambda c: c["ho_ten"])
+    if q:
+        rows = [c for c in rows if q in str(c.get("ho_ten") or "").lower()
+                or q in str(c.get("so_giay_to") or "").lower()
+                or q in str(c.get("dia_chi") or "").lower()]
+    rows = [copy.deepcopy(c) for c in rows[:limit]]
+    job.check_cancel()
+    return _result("customer_list", {"customers": rows,
+                                     "total": len(rows)})
+
+
+def customer_create(job, payload):
+    """notary.customer_create mock (MIN-141 đợt 3): upsert theo
+    so_giay_to; thieu → tao moi trong danh ba gia."""
+    p = payload or {}
+    name = str(p.get("ho_ten") or "").strip()
+    if not name:
+        raise CommandError("validation_error", "ho_ten bắt buộc")
+    st = _state()
+    with st._lock:
+        sgt = str(p.get("so_giay_to") or "").strip() or None
+        existing = None
+        if sgt:
+            existing = next(
+                (c for c in st.customers.values()
+                 if c.get("so_giay_to") == sgt), None)
+        if existing is not None:
+            existing["ho_ten"] = name
+            job.check_cancel()
+            return _result("customer_upsert",
+                           {"customer": copy.deepcopy(existing),
+                            "updated": True})
+        cid = st._next_customer_id
+        st._next_customer_id += 1
+        cust = {
+            "id": cid, "ho_ten": name,
+            "gioi_tinh": p.get("gioi_tinh") or None,
+            "ngay_sinh": p.get("ngay_sinh") or None,
+            "ngay_chet": p.get("ngay_chet") or None,
+            "so_giay_to": sgt,
+            "ngay_cap": p.get("ngay_cap") or None,
+            "dia_chi": str(p.get("dia_chi") or "").strip() or None,
+        }
+        st.customers[cid] = cust
+        job.check_cancel()
+        return _result("customer_upsert",
+                       {"customer": copy.deepcopy(cust),
+                        "updated": False})
+
+
 def _workspace_data(cid, case):
     """result.data cua workspace_get/workspace_create — §4 + §4.3 + §13."""
     ct = case.get("case_type")
@@ -1114,6 +1202,9 @@ def _workspace_data(cid, case):
             "revision": case.get("revision"),
             "ngay_lap_ho_so": case.get("ngay_lap_ho_so"),
             "noi_niem_yet": case.get("noi_niem_yet"),
+            "nguoi_nhan_uy_quyen": case.get("nguoi_nhan_uy_quyen"),
+            "nguoi_nhan_uy_quyen_id": case.get("nguoi_nhan_uy_quyen_id"),
+            "noi_dung_viec": case.get("noi_dung_viec"),
             "ghi_chu": case.get("ghi_chu"),
         },
         "stage": stage_out,
@@ -1126,7 +1217,7 @@ def _workspace_data(cid, case):
         "capabilities": {
             "intake": list(INTAKE_KINDS) if caps else [],
             "diagram": caps,
-            "word_export": ct == CASE_TYPE_INHERITANCE,
+            "word_export": caps,
         },
     }
     if case.get("warnings"):
@@ -1142,7 +1233,88 @@ def workspace_get(job, payload):
 
 
 _CASE_META_FIELDS = ("document_type", "ngay_lap_ho_so",
-                     "noi_niem_yet", "ghi_chu", "case_type")
+                     "noi_niem_yet", "ghi_chu", "case_type",
+                     # đợt 3: meta moi trong payload.case create/commit
+                     "nguoi_nhan_uy_quyen", "nguoi_nhan_uy_quyen_id",
+                     "noi_dung_viec")
+
+
+def _fold_canon(obj, canon, where):
+    """Fold key canonical -> legacy; cùng mang mà giá trị lệch →
+    validation_error (parity _fold_key_aliases)."""
+    if not isinstance(obj, dict):
+        return obj
+    obj = dict(obj)
+    for ck, lk in canon.items():
+        if ck in obj:
+            cv = obj.pop(ck)
+            if lk in obj and obj[lk] != cv:
+                raise CommandError(
+                    "validation_error",
+                    f"{where}: {ck} và {lk} mang giá trị mâu thuẫn")
+            obj[lk] = cv
+    return obj
+
+
+def _apply_case_meta(case, cm, where="payload.case"):
+    """Validate + ghi meta đợt 3 (parity _validate_case_meta commit path):
+    case_type/document_type gửi kèm phải khớp giá trị đã lưu."""
+    cm = _fold_canon(cm, CASE_META_CANON, where)
+    extra = set(cm) - set(_CASE_META_FIELDS)
+    if extra:
+        raise CommandError("validation_error",
+                           f"{where} key lạ: {sorted(extra)}")
+    for f in ("case_type", "document_type"):
+        v = cm.get(f)
+        if v is not None and v != case.get(f):
+            raise CommandError(
+                "validation_error",
+                f"{where}.{f}={v!r} khác giá trị đã lưu "
+                f"{case.get(f)!r} (immutable)")
+    nl = cm.get("ngay_lap_ho_so")
+    if nl is not None and not (
+            isinstance(nl, str) and DATE_FULL_RX.match(nl)):
+        raise CommandError("validation_error",
+                           "ngay_lap_ho_so phải YYYY-MM-DD/null")
+    uq_id = cm.get("nguoi_nhan_uy_quyen_id")
+    uq_name = cm.get("nguoi_nhan_uy_quyen")
+    cust = None
+    if uq_id is not None:
+        if not (isinstance(uq_id, int) and not isinstance(uq_id, bool)
+                and uq_id >= 1):
+            raise CommandError(
+                "validation_error",
+                "nguoi_nhan_uy_quyen_id phải là int >= 1/null")
+        # Parity _resolve_auth_recipient: id phai ton tai trong danh ba
+        # gia; kem ten ma lech master → loi; id co → ten = master.
+        cust = _state().customers.get(uq_id)
+        if cust is None:
+            raise CommandError(
+                "validation_error",
+                f"nguoi_nhan_uy_quyen_id {uq_id} không tồn tại "
+                "trong danh bạ")
+        if uq_name is not None and uq_name != cust.get("ho_ten"):
+            raise CommandError(
+                "validation_error",
+                "nguoi_nhan_uy_quyen và nguoi_nhan_uy_quyen_id "
+                "mâu thuẫn nhau")
+        uq_name = cust.get("ho_ten")
+    for f in ("noi_niem_yet", "ghi_chu", "nguoi_nhan_uy_quyen",
+              "noi_dung_viec"):
+        v = cm.get(f)
+        if v is not None and (
+                not isinstance(v, str) or not v.strip()):
+            raise CommandError("validation_error",
+                               f"{f} phải là chuỗi non-empty/null")
+    # Real parity: payload.case là block meta đầy đủ — field vắng mặt
+    # ghi None; ngay_lap_ho_so null = giữ nguyên (cột NOT NULL).
+    if nl is not None:
+        case["ngay_lap_ho_so"] = nl
+    case["noi_niem_yet"] = cm.get("noi_niem_yet")
+    case["nguoi_nhan_uy_quyen"] = uq_name
+    case["nguoi_nhan_uy_quyen_id"] = cust["id"] if cust else uq_id
+    case["noi_dung_viec"] = cm.get("noi_dung_viec")
+    case["ghi_chu"] = cm.get("ghi_chu")
 
 
 def workspace_create(job, payload):
@@ -1170,6 +1342,7 @@ def workspace_create(job, payload):
         if not isinstance(cm, dict):
             raise CommandError("validation_error",
                                "payload.case phải là object")
+        cm = _fold_canon(cm, CASE_META_CANON, "payload.case")
         extra = set(cm) - set(_CASE_META_FIELDS)
         if extra:
             raise CommandError(
@@ -1191,13 +1364,38 @@ def workspace_create(job, payload):
                 isinstance(nl, str) and DATE_FULL_RX.match(nl)):
             raise CommandError("validation_error",
                                "ngay_lap_ho_so phải YYYY-MM-DD/null")
-        for f in ("noi_niem_yet", "ghi_chu"):
+        for f in ("noi_niem_yet", "ghi_chu", "nguoi_nhan_uy_quyen",
+                  "noi_dung_viec"):
             v = cm.get(f)
             if v is not None and (
                     not isinstance(v, str) or not v.strip()):
                 raise CommandError(
                     "validation_error",
                     f"{f} phải là chuỗi non-empty/null")
+        uq_id = cm.get("nguoi_nhan_uy_quyen_id")
+        uq_name = cm.get("nguoi_nhan_uy_quyen")
+        uq_cust = None
+        if uq_id is not None:
+            if not (isinstance(uq_id, int) and not isinstance(uq_id, bool)
+                    and uq_id >= 1):
+                raise CommandError(
+                    "validation_error",
+                    "nguoi_nhan_uy_quyen_id phải là int >= 1/null")
+            # Parity _resolve_auth_recipient: id ton tai trong danh ba
+            # gia; kem ten lech master → loi; id co → ten = master.
+            uq_cust = st.customers.get(uq_id)
+            if uq_cust is None:
+                raise CommandError(
+                    "validation_error",
+                    f"nguoi_nhan_uy_quyen_id {uq_id} không tồn tại "
+                    "trong danh bạ")
+            if uq_name is not None and \
+                    uq_name != uq_cust.get("ho_ten"):
+                raise CommandError(
+                    "validation_error",
+                    "nguoi_nhan_uy_quyen và nguoi_nhan_uy_quyen_id "
+                    "mâu thuẫn nhau")
+            uq_name = uq_cust.get("ho_ten")
 
         stage = p.get("stage")
         errs, people_norm, assets_norm = _validate_stage(stage, ct)
@@ -1307,6 +1505,9 @@ def workspace_create(job, payload):
             "revision": 1,
             "ngay_lap_ho_so": nl,
             "noi_niem_yet": cm.get("noi_niem_yet"),
+            "nguoi_nhan_uy_quyen": uq_name,
+            "nguoi_nhan_uy_quyen_id": uq_cust["id"] if uq_cust else uq_id,
+            "noi_dung_viec": cm.get("noi_dung_viec"),
             "ghi_chu": cm.get("ghi_chu"),
             "stage": stage_store,
             "diagram": {
@@ -1483,6 +1684,14 @@ def workspace_commit_stage(job, payload):
     _check_writable(case)
     _check_base_revision(case, payload)
     ct = case["case_type"]
+    # đợt 3: payload.case optional — meta ghi cùng transaction (validate
+    # trước stage để fail kịch bản nào cũng không ghi — parity real).
+    case_meta = (payload or {}).get("case")
+    if case_meta is not None:
+        if not isinstance(case_meta, dict):
+            raise CommandError("validation_error",
+                               "payload.case phải là object")
+        _apply_case_meta(case, case_meta)
     stage = (payload or {}).get("stage")
     errs, people_norm, assets_norm = _validate_stage(stage, ct)
     if errs:
@@ -1516,6 +1725,77 @@ def workspace_commit_stage(job, payload):
         "revision": case["revision"],
         "stage": copy.deepcopy(case["stage"]),
         "diagram": diagram_out,
+    })
+
+
+_WORKSPACE_UPDATE_META = ("ngay_lap_ho_so", "noi_niem_yet", "ghi_chu")
+
+
+def address_lookup(job, payload):
+    """Mock uses the same public reference service, never customer databases."""
+    from notary_adapter import address_lookup as local_lookup
+    return local_lookup(job, payload)
+
+
+def workspace_update(job, payload):
+    """notary.workspace_update mock (§6.2) — parity real: cap nhat meta
+    case da luu (khong cham stage/diagram), revision+1. case_type/
+    document_type la dinh danh — key la → validation_error.
+    Meta doc lap case_type: chi chan locked + conflict (real
+    update_meta khong _check_supported)."""
+    case = _case(payload)
+    if case.get("locked"):
+        raise CommandError("workspace_locked",
+                           f"hồ sơ #{case['id']} đã khóa")
+    _check_base_revision(case, payload)
+    cm = (payload or {}).get("case")
+    if not isinstance(cm, dict) or not cm:
+        raise CommandError("validation_error",
+                           "payload.case phải là object non-empty")
+    extra = set(cm) - set(_WORKSPACE_UPDATE_META)
+    if extra:
+        raise CommandError("validation_error",
+                           f"payload.case key lạ: {sorted(extra)}")
+    # Validate TOAN patch truoc khi mutate (parity real update_meta §6.2
+    # atomic): patch nua dung nua sai → loi, khong luu mot phan.
+    updates = {}
+    if "ngay_lap_ho_so" in cm:
+        nl = cm.get("ngay_lap_ho_so")
+        if nl is not None and not (
+                isinstance(nl, str) and DATE_FULL_RX.match(nl)):
+            raise CommandError("validation_error",
+                               "ngay_lap_ho_so phải YYYY-MM-DD/null")
+        updates["ngay_lap_ho_so"] = nl
+    for f in ("noi_niem_yet", "ghi_chu"):
+        if f not in cm:
+            continue
+        v = cm.get(f)
+        if v is not None and (
+                not isinstance(v, str) or not v.strip()):
+            raise CommandError("validation_error",
+                               f"{f} phải là chuỗi non-empty/null")
+        updates[f] = v
+    for f, v in updates.items():
+        case[f] = v
+    case["revision"] += 1
+    job.check_cancel()
+    return _result("workspace_update", {
+        "schema_version": SCHEMA_VERSION,
+        "revision": case["revision"],
+        "case": {
+            "id": case["id"],
+            "case_type": case.get("case_type"),
+            "document_type": case.get("document_type"),
+            "status": case.get("status"),
+            "locked": bool(case.get("locked")),
+            "revision": case["revision"],
+            "ngay_lap_ho_so": case.get("ngay_lap_ho_so"),
+            "noi_niem_yet": case.get("noi_niem_yet"),
+            "ghi_chu": case.get("ghi_chu"),
+            "nguoi_nhan_uy_quyen": case.get("nguoi_nhan_uy_quyen"),
+            "nguoi_nhan_uy_quyen_id": case.get("nguoi_nhan_uy_quyen_id"),
+            "noi_dung_viec": case.get("noi_dung_viec"),
+        },
     })
 
 
@@ -1620,19 +1900,46 @@ def diagram_save(job, payload):
     })
 
 
-def _word_block_reason(case, document_key):
-    """Readiness theo validation that (contract §8.1 mapping) — chi duoc
-    goi cho inheritance (caller reject two_party)."""
-    if document_key in NO_TEMPLATE_KEYS:
+def _word_block_reason(case, document_key=None, *, static=False):
+    """Readiness theo validation that (contract §8.1 mapping).
+
+    Folder mode static=True chi kiem dieu kien ky thuat; catalog cu giu
+    dieu kien chu dat/người nhan. Two_party khong ap dieu kien thua ke."""
+    if document_key is not None and document_key in NO_TEMPLATE_KEYS:
         return "word.template_missing"
     assets = case["stage"]["assets"]
     nodes = [n for n in (case["diagram"].get("state") or {}).get("nodes")
              or [] if isinstance(n, dict) and not n.get("deleted")]
+    stage_people = _person_map(case)
+    if static:
+        if not stage_people:
+            return "word.no_people"
+        if not assets:
+            return "word.no_assets"
+        if len(assets) > 5:
+            return "word.too_many_assets"
+        if len(stage_people) > (30 if case.get("case_type") == CASE_TYPE_TWO_PARTY else 20):
+            return "word.too_many_people"
+        state_nodes = (case["diagram"].get("state") or {}).get("nodes")
+        if case.get("case_type") == CASE_TYPE_TWO_PARTY and not state_nodes:
+            return "word.no_diagram"
+        return None
+    if case.get("case_type") == CASE_TYPE_TWO_PARTY:
+        if not stage_people:
+            return "word.no_people"
+        if not nodes:
+            return "word.no_diagram"
+        if not assets:
+            return "word.no_assets"
+        if len(assets) > 5:
+            return "word.too_many_assets"
+        if len(stage_people) > 30:
+            return "word.too_many_people"
+        return None
     if not assets:
         return "word.no_assets"
     if len(assets) > 5:
         return "word.too_many_assets"
-    stage_people = _person_map(case)
     landowners = [n for n in nodes
                   if n.get("ownPositions") and n.get("personId")]
     if not landowners:
@@ -1645,8 +1952,7 @@ def _word_block_reason(case, document_key):
                  if n.get("receivePositions") and n.get("personId")]
     if not receivers:
         return "word.no_receiver"
-    assigned = [n for n in nodes if n.get("personId")]
-    if len(assigned) > 20:
+    if len(stage_people) > 20:
         return "word.too_many_people"
     # signers = living landowners + receivers, dedupe personId — parity
     # voi word_engine.word_block_reason (real, MIN-110 review).
@@ -1659,15 +1965,96 @@ def _word_block_reason(case, document_key):
     return None
 
 
+_DOCX_SUFFIX = ".docx"
+
+
+def _contained_in(path, real_root):
+    """Parity services.word_batch_export._contained_in: real path cua
+    `path` con nam trong `real_root` (da resolve) sau khi duoi theo
+    symlink/junction moi cap? Windows junction KHONG phai is_symlink —
+    chi resolve() moi lo dich that. Loi resolve -> False (fail-closed)."""
+    try:
+        return path.resolve().is_relative_to(real_root)
+    except (OSError, RuntimeError):
+        return False
+
+
+def _scan_template_dir(template_dir):
+    """Quet .docx ngay trong thu muc mau (NAIA-8 folder mode) — parity
+    services.word_batch_export.scan_template_dir: bo ~$*, sort on dinh
+    (casefold, ten goc), document_key = ten file, display_name = stem.
+    Entry la symlink/junction tro ra NGOAI thu muc mau bi loai —
+    is_file() duoi theo link nen phai kiem containment sau resolve."""
+    root = Path(template_dir)
+    if not root.is_dir():
+        raise CommandError(
+            "file_not_found",
+            "thư mục mẫu không tồn tại hoặc không đọc được")
+    try:
+        root_real = root.resolve()
+        entries = sorted(
+            root.iterdir(), key=lambda p: (p.name.casefold(), p.name))
+    except (OSError, RuntimeError) as exc:
+        raise CommandError(
+            "file_not_found", f"không đọc được thư mục mẫu: {exc}")
+    out = []
+    for path in entries:
+        name = path.name
+        if name.startswith("~$") or not name.lower().endswith(_DOCX_SUFFIX):
+            continue
+        if not path.is_file() or not _contained_in(path, root_real):
+            continue
+        out.append({"document_key": name, "display_name": path.stem})
+    return out
+
+
+def _ascii_stem(filename):
+    """filename → stem ASCII — parity services.word_batch_export."""
+    import unicodedata as _ud
+    stem = _ud.normalize("NFD", Path(filename).stem)
+    stem = "".join(ch for ch in stem if _ud.category(ch) != "Mn")
+    stem = stem.replace("đ", "d").replace("Đ", "D")
+    stem = re.sub(r"[^A-Za-z0-9_-]+", "_", stem).strip("_") or "Mau"
+    return stem[:80]
+
+
+def _word_template_dir(payload):
+    """payload.template_dir → Path thu muc mau (file_ref is_dir:true
+    qua token resolve) hoac None. Parity _word_template_source."""
+    ref = (payload or {}).get("template_dir")
+    if ref is None:
+        return None
+    if not isinstance(ref, dict) or ref.get("is_dir") is not True:
+        raise CommandError("validation_error",
+                           "template_dir phải là file_ref is_dir:true")
+    root = validate_file_ref(ref)
+    if not root.is_dir():
+        raise CommandError("file_not_found",
+                           "thư mục mẫu không tồn tại hoặc không đọc được")
+    return root
+
+
 def word_export_options(job, payload):
     """Read-only — duoc phep tren locked (chi workspace_get quyet dinh
-    capability); block_reason theo validation that. two_party ->
-    case_type_unsupported (§13.8)."""
+    capability); block_reason theo validation that.
+
+    NAIA-8: two_party mo (readiness word.no_people/no_diagram/...);
+    template_dir → documents = .docx quet duoc thay vi catalog co dinh."""
     case = _case(payload)
-    if case.get("case_type") == CASE_TYPE_TWO_PARTY:
-        raise CommandError("case_type_unsupported",
-                           "Word export chưa hỗ trợ loại việc two_party",
-                           details={"case_type": case.get("case_type")})
+    template_root = _word_template_dir(payload)
+    if template_root is not None:
+        scanned = _scan_template_dir(template_root)
+        docs = []
+        for item in scanned:
+            reason = _word_block_reason(case, static=True)
+            docs.append({"document_key": item["document_key"],
+                         "display_name": item["display_name"],
+                         "ready": reason is None,
+                         "block_reason": reason})
+        job.check_cancel()
+        return _result("word_export_options",
+                       {"schema_version": SCHEMA_VERSION,
+                        "documents": docs})
     docs = []
     for key, meta in DOC_CATALOG.items():
         reason = _word_block_reason(case, key)
@@ -1760,13 +2147,20 @@ def _reserve_and_write(dest_dir, stem, case_id, taken, title, case):
 
 def word_export_batch(job, payload):
     case = _case(payload)
-    # real parity _word_case: two_party -> case_type_unsupported TRUOC
-    # locked check.
-    if case.get("case_type") == CASE_TYPE_TWO_PARTY:
-        raise CommandError("case_type_unsupported",
-                           "Word export chưa hỗ trợ loại việc two_party",
-                           details={"case_type": case.get("case_type")})
+    # NAIA-8: bo chan case_type_unsupported rieng luong Word — readiness
+    # chi tiet qua _word_block_reason (word.no_people/no_diagram/...).
     _check_writable(case)
+    create_case_subdir = (payload or {}).get("create_case_subdir", False)
+    if not isinstance(create_case_subdir, bool):
+        raise CommandError("validation_error",
+                           "create_case_subdir phải là bool")
+    template_root = _word_template_dir(payload)
+    folder_docs = None
+    template_root_real = None
+    if template_root is not None:
+        folder_docs = {item["document_key"]: item
+                       for item in _scan_template_dir(template_root)}
+        template_root_real = template_root.resolve()
     keys = (payload or {}).get("document_keys")
     # Oracle parity: thieu/null/khong list -> validation_error;
     # word_no_documents_selected CHI cho list rong [].
@@ -1782,7 +2176,13 @@ def word_export_batch(job, payload):
                            f"document_key lặp: {dup}",
                            details={"document_key": dup})
     for k in keys:
-        if not (isinstance(k, str) and DOC_KEY_RX.match(k)) \
+        if folder_docs is not None:
+            if not (isinstance(k, str) and k in folder_docs):
+                raise CommandError(
+                    "word_unknown_document_key",
+                    f"document_key ngoài thư mục mẫu: {k!r}",
+                    details={"document_key": k})
+        elif not (isinstance(k, str) and DOC_KEY_RX.match(k)) \
                 or k not in DOC_CATALOG:
             raise CommandError("word_unknown_document_key",
                                f"document_key ngoài catalog: {k!r}",
@@ -1791,10 +2191,41 @@ def word_export_batch(job, payload):
     if not isinstance(dest, dict) or dest.get("is_dir") is not True:
         raise CommandError("validation_error",
                            "destination phải là file_ref is_dir:true")
-    dest_dir = validate_file_ref(dest)      # scope/UNC/abs — envelope §6
+    granted_dir = validate_file_ref(dest)   # scope/UNC/abs — envelope §6
+    dest_dir = granted_dir
+    if create_case_subdir:
+        dest_dir = granted_dir / f"HS-{payload['case_id']}"
+        try:
+            dest_dir.mkdir(exist_ok=True)
+        except OSError as exc:
+            raise CommandError(
+                "file_locked",
+                f"không tạo được thư mục con hồ sơ: {exc}") from exc
+        # Parity engine that: HS-<id> la junction/symlink tro ra ngoai ->
+        # mkdir(exist_ok=True) van pass, ghi thoat khoi thu muc duoc cap
+        # quyen. Kiem tra dich THAT truoc probe/ghi.
+        try:
+            granted_real = granted_dir.resolve()
+        except (OSError, RuntimeError) as exc:
+            raise CommandError(
+                "file_not_found",
+                f"không xác định được destination: {exc}") from exc
+        if not _contained_in(dest_dir, granted_real):
+            raise CommandError(
+                "word_path_traversal",
+                "thư mục con hồ sơ trỏ ra ngoài thư mục đích được chọn")
     if not dest_dir.is_dir():
         raise CommandError("file_not_found",
                            "destination không phải thư mục đang tồn tại")
+
+    def _meta(key):
+        """(display_name, filename_stem) — folder mode derive tu file."""
+        if folder_docs is not None:
+            item = folder_docs[key]
+            return item["display_name"], _ascii_stem(item["document_key"])
+        meta = DOC_CATALOG[key]
+        return meta["display_name"], meta["filename_stem"]
+
     docs = []
     taken = set()
     failed = []
@@ -1806,15 +2237,15 @@ def word_export_batch(job, payload):
         entries = list(docs)
         remaining = keys[len(entries):]
         for key in remaining:
-            meta = DOC_CATALOG[key]
+            display_name, _stem = _meta(key)
             entries.append({"document_key": key,
-                            "display_name": meta["display_name"],
+                            "display_name": display_name,
                             "status": "skipped", "actual_filename": None,
                             "output_file": None, "error": None})
         return _result(
             "word_export_batch",
             {"schema_version": SCHEMA_VERSION,
-             "destination": {"path": str(dest_dir),
+             "destination": {"path": str(granted_dir),
                              "scope": "machine_local", "is_dir": True},
              "documents": entries,
              "breakdown": {"succeeded": list(saved),
@@ -1848,10 +2279,10 @@ def word_export_batch(job, payload):
 
     for i, key in enumerate(keys):
         job.check_cancel(_pending_result())  # cancel giua batch
-        meta = DOC_CATALOG[key]
+        display_name, stem = _meta(key)
         if dest_error is not None:
             docs.append({"document_key": key,
-                         "display_name": meta["display_name"],
+                         "display_name": display_name,
                          "status": "failed", "actual_filename": None,
                          "output_file": None,
                          "error": {"code": dest_error[0],
@@ -1860,10 +2291,18 @@ def word_export_batch(job, payload):
             job.report_progress(i + 1, len(keys),
                                 f"văn bản {i + 1}/{len(keys)}")
             continue
-        reason = _word_block_reason(case, key)
+        reason = _word_block_reason(case, key, static=folder_docs is not None)
+        # Folder mode: file mat giua scan va export -> template_missing
+        # (parity template_path_resolver cua real) — ke ca bi doi thanh
+        # symlink/junction tro ra ngoai thu muc mau sau khi scan.
+        if (reason is None and folder_docs is not None
+                and not ((template_root / key).is_file()
+                         and _contained_in(
+                             template_root / key, template_root_real))):
+            reason = "word.template_missing"
         if reason is not None:
             docs.append({"document_key": key,
-                         "display_name": meta["display_name"],
+                         "display_name": display_name,
                          "status": "failed", "actual_filename": None,
                          "output_file": None,
                          "error": {"code": reason,
@@ -1874,9 +2313,9 @@ def word_export_batch(job, payload):
             job.check_cancel(_pending_result())  # truoc khi ghi file
             try:
                 name = _reserve_and_write(
-                    dest_dir, meta["filename_stem"],
+                    dest_dir, stem,
                     int(payload["case_id"]), taken,
-                    meta["display_name"], {"id": payload["case_id"]})
+                    display_name, {"id": payload["case_id"]})
             except OSError as exc:
                 # Parity engine that (MIN-116): OSError o write path ->
                 # per-doc error theo _doc_error_from (file_not_found /
@@ -1889,7 +2328,7 @@ def word_export_batch(job, payload):
                 else:
                     code = "word.render_failed"
                 docs.append({"document_key": key,
-                             "display_name": meta["display_name"],
+                             "display_name": display_name,
                              "status": "failed", "actual_filename": None,
                              "output_file": None,
                              "error": {"code": code,
@@ -1898,7 +2337,7 @@ def word_export_batch(job, payload):
             else:
                 out_path = dest_dir / name
                 docs.append({"document_key": key,
-                             "display_name": meta["display_name"],
+                             "display_name": display_name,
                              "status": "saved", "actual_filename": name,
                              "output_file": {"path": str(out_path),
                                              "scope": "machine_local"},
@@ -1908,8 +2347,8 @@ def word_export_batch(job, payload):
                             f"văn bản {i + 1}/{len(keys)}")
     breakdown = {"succeeded": saved, "failed": failed, "skipped": []}
     data = {"schema_version": SCHEMA_VERSION,
-            "destination": {"path": str(dest_dir), "scope": "machine_local",
-                            "is_dir": True},
+            "destination": {"path": str(granted_dir),
+                            "scope": "machine_local", "is_dir": True},
             "documents": docs, "breakdown": breakdown}
     if len(failed) == len(keys):
         raise CommandError(                  # all failed -> job failed §8.4
@@ -1928,12 +2367,14 @@ def word_export_batch(job, payload):
 
 def _block_message(code):
     return {
+        "word.no_people": "Stage chưa có người nào",
+        "word.no_diagram": "Chưa có sơ đồ hai bên đã lưu",
         "word.no_assets": "Hồ sơ chưa có tài sản",
         "word.no_landowner": "Chưa có chủ đất trên Diagram",
         "word.no_deceased_landowner": "Không có chủ đất đã chết",
         "word.no_receiver": "Chưa có người nhận",
         "word.too_many_assets": "Quá 5 tài sản",
-        "word.too_many_people": "Quá 20 người trên Diagram",
+        "word.too_many_people": "Quá 20 người trong Stage",
         "word.too_many_signers": "Quá 20 người ký",
         "word.template_missing": "Văn bản chưa có template",
     }.get(code, code)

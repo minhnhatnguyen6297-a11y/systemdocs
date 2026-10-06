@@ -5,12 +5,18 @@
   "command": "notary.word_export_batch",
   "payload": {
     "case_id": 42,
-    "document_keys": ["khai_nhan_di_san", "khai_nhan_di_san"],
+    "document_keys": [
+      "khai_nhan_di_san",
+      "khai_nhan_di_san"
+    ],
     "destination": {
       "path": "D:/Ho-so/HS-42",
       "scope": "machine_local",
       "is_dir": true
     }
   },
-  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+  "client_meta": {
+    "shell_version": "0.1.0",
+    "module": "document-review"
+  }
 }

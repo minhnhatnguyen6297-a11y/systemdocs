@@ -1,0 +1,197 @@
+# Plan sửa Notary — bản chờ xác nhận 04/10/2026
+
+**Owner:** MINH. **Thực hiện:** agent được Owner giao sau. **Review cuối:** parent của phiên review này. Chưa sửa runtime. Plan chính được quản lý bằng Backlog CLI trong TASK-2; không là spec mới.
+
+## 1. Đích và thứ tự
+
+Sửa luồng dữ liệu trước khi sửa đầu ra: **DOCX → bản ghi Người/Tài sản → Stage → lưu → Word**. Tra địa chỉ là gợi ý riêng, chỉ đổi trường khi người dùng chọn.
+
+| Gói | Task | Phụ thuộc | Kết quả phải bàn giao |
+|---|---|---|---|
+| A | {{assets}} | Không | Stage đúng 5 trường bắt buộc; serial nguồn an toàn; diện tích tổng riêng |
+| B | {{sources}} | Không | Nguồn hành chính phân loại rõ, bản dữ liệu hiện hành nhất quán |
+| C | {{lookup}} | B; áp dụng địa chỉ chờ Q3 | Tìm cụm tên ở Người/Đất/Niêm yết không cần ngày/tỉnh |
+| D1 | {{engine}} | Danh mục/mẫu Owner; không đợi DB | Engine theo loại/nhóm cấu trúc, chia vùng và quy tắc dùng chung, có đáp án |
+| D2 | {{intake}} | A, D1 | Đọc DOCX, giữ bằng chứng, nối engine mới vào Stage và lưu/mở lại |
+| E | {{contacts}} | Không cho sửa nút/chọn ID; liên kết Word chờ Q2 | Chọn đúng người danh bạ, giữ ID qua lưu/mở lại |
+| F | {{word}} | A, E; Q1/Q2 | Engine Word mới có nghĩa placeholder rõ, đúng người/tài sản |
+| G | {{migration}} | F; Q1 | Chuyển và kiểm đủ bộ mẫu gốc sang catalog mới |
+| H | {{integration}} | C, D, E, F, G | Kiểm ứng dụng thật, bản đóng gói, từng đầu ra và review cuối |
+
+Có thể đọc nguồn cho B và chuẩn bị đáp án DOCX/Word song song với A. Không để nhiều agent cùng sửa `case_workspace.py`, schema chung hoặc Word engine. Nếu dùng sub-agent đọc code thì dùng Luna theo yêu cầu Owner; parent quyết định.
+
+## 2. Quyết định mới và ba câu hỏi còn mở
+
+**Đã chốt Q4:** mỗi thửa một tài sản riêng, các thửa cùng sổ được dùng cùng serial. **Đã chốt Q5:** mẫu chỉ kiểm dữ liệu thực sự cần, mẫu chỉ có Người được xuất khi chưa có tài sản/sơ đồ. Nguồn: câu trả lời trực tiếp của Owner trong phiên này. Phải sửa DB và đường lưu để đáp ứng, không chỉ bỏ điều kiện UI.
+
+| Mã | Owner cần chọn | Khuyến nghị để xem xét, chưa được duyệt | Phần phải chờ |
+|---|---|---|---|
+| Q1 | Chỗ `[Tên1]` cũ đang là chủ tài sản: giữ đúng vai trò đó hay đổi sang người ở dòng 1 Stage? | Giữ ý nghĩa của từng chỗ trong mẫu; chuyển sang token mới chỉ rõ vai trò. | F/G: mapping và nội dung mẫu |
+| Q2 | Người nhận UQ chọn ở card hồ sơ có phải người được ghi trong mẫu UQ? | Nếu là cùng một người, dùng cùng ID; không duy trì hai nguồn khác nhau. | E/F: nguồn nhóm UQ |
+| Q3 | Áp dụng địa chỉ mới: thay phần xã/tỉnh hay giữ gốc và nối `(nay là …)`? | Thay phần hành chính, giữ thôn/số nhà; vẫn lưu nguyên văn nguồn nhập. | C: hành vi nút Áp dụng |
+
+Q1/Q2 quyết định ai được ghi vào văn bản; Q3 quyết định chữ địa chỉ được lưu. Chưa có câu trả lời thì ghi phần phụ thuộc là chờ, không tự lựa chọn theo khuyến nghị. Khi Owner trả lời: tạo backlog decision, ghi “quyết định gì / tại sao / nguồn” vào spec rồi cập nhật AC của task liên quan trước code. Q5 đã chốt còn đụng DB hồ sơ đang bắt `tai_san_id`; không chỉ bỏ một điều kiện trong Word.
+
+## 3. Chuẩn bị trước mỗi gói
+
+1. Đọc TASK-2, báo cáo `.agents/review-plan-20261004/investigation-report.md`, spec được chỉ ra và task con; đọc guide `backlog instructions task-execution` trước đổi trạng thái/thêm plan.
+2. Xác nhận HEAD và file bẩn. Code được review đến `53c7804`; HEAD lúc bàn giao `fe71917`. Giữ sửa có sẵn `.agent/tasks/NAIA-15/progress.md`. Không dùng symbolic base thay cho mốc `6c07d89a` nếu nhánh nền đã tiến thêm.
+3. Chốt phần spec cần cho gói; cập nhật contract/schema/validator/examples cùng một thay đổi. Không đổi trạng thái Draft/Active thành nghiệm thu chỉ vì code chạy.
+4. Chuyển phản ví dụ của báo cáo thành ca hồi quy được theo dõi trong Git trước/sát lúc sửa. Script tạm chỉ là bằng chứng, không thay test sản phẩm.
+5. Dùng DB/file/thư mục đầu ra riêng; không thử migration lên DB thật hoặc ghi đè mẫu nguồn. File tạm/handoff vào `.agents` theo AGENTS hiện tại.
+
+Graphify hiện thiếu trong môi trường, code map cũ không dựng lại được ở phiên review. Nếu môi trường implement có công cụ thì cập nhật map theo luật repo; nếu chưa có, ghi giới hạn và tiếp tục bằng đường gọi/file đã được kiểm, không tuyên bố map mới.
+
+## A. Stage tài sản và giữ dữ liệu nguồn — {{assets}}
+
+**Lý do:** TS-01/02/03. Serial giả có thể ghi đè nguồn; thiếu diện tích tổng độc lập làm Word lấy tổng loại đất thay số ghi trên giấy.
+
+**File chính:** `docs/spec/notary_v2/stage.md`, `contracts/entities.md`, `contracts/notary-case-drafting.md`, `contracts/notary-case-drafting/common.schema.json`, schema Stage/create/workspace và validator/examples; `notary_v2/models.py`, đường migration DB theo README; `notary_v2/services/case_workspace.py`; `shell/src/renderer/notary/case-drafting-model.js`, `case-drafting-view.js`, schema kiểm payload của shell.
+
+**Thực hiện:**
+
+- Thêm trường **Diện tích (tổng)** trong mỗi cột tài sản. Dùng cột `Property.dien_tich` hiện có; wire, snapshot, import và Word đều có cùng nghĩa. Chốt tên canonical/alias trong contract theo quy tắc repo, không thêm cột trùng nghĩa.
+- Chỉ 5 mục bắt buộc: địa chỉ, số thửa, số tờ, diện tích tổng, loại đất. Serial optional/free text; bỏ regex định dạng ở client, server, schema và đường compatibility liên quan. Engine/workbench thuộc D1, chuẩn hóa từ DOCX thuộc D2; tránh hai agent sửa cùng rule. Vẫn kiểm kiểu/độ dài theo contract.
+- Bỏ `XX000001` và mọi serial thay thế. Đọc → lưu không đổi serial gốc; giữ null khi chưa có. DB `so_serial` đang NOT NULL/UNIQUE: migration phải cho null và bỏ unique/index tương ứng, giữ toàn bộ dữ liệu. Serial nhận diện sổ, không là khóa riêng của tài sản.
+- Tổng diện tích và từng dòng loại đất lưu riêng. Ca tổng 300, dòng ONT 100 phải giữ 300 và 100. Hiển thị để đối chiếu khi chênh; không tự cân bằng bằng sửa nguồn. Nếu muốn chặn chênh lệch, cần thêm quyết định Owner; hiện chưa có.
+- Hồ sơ cũ thiếu 5 trường vẫn mở được và báo thiếu, không tự điền giả. Draft nhập chưa đủ vẫn sửa được; chỉ commit kiểm yêu cầu mới. Không làm lỗi một hồ sơ thay đổi số liệu hồ sơ khác dùng chung master.
+- Áp Q4 đã chốt: hai thửa cùng GCN tạo hai dòng với cùng serial, khác `row_id`/`entity_id`. Rà mọi query/link/upsert/tạo tài sản theo serial, bỏ `.first()` chọn tài sản ngầm khi có nhiều thửa. Dòng đã có entity_id giữ định danh; dòng mới không tự ghép vào một tài sản chỉ dựa trên serial. Không thay hai dòng cùng serial bằng cùng entity.
+
+**Nghiệm thu:** mỗi mục bắt buộc thiếu riêng lẻ trả lỗi đúng dòng/ô; serial trống hoặc `1234/X-2020` lưu/mở lại đúng; hai thửa cùng serial lưu thành hai entity riêng và reload đúng; DB cũ migrate không mất serial/ID/liên kết; diện tích tổng giữ xuyên suốt Stage/save/reload; đổi thứ tự không đổi định danh bản ghi. Điền diện tích vào Word kiểm ở F/H để không tạo phụ thuộc vòng với engine Word.
+
+## B. Nguồn và kho hành chính — {{sources}}
+
+**Lý do:** DC-06/08. 3.219 sự kiện hiện đều pending, chưa có `effective_on`; đây chưa phải kho lịch sử confirmed toàn quốc.
+
+**File chính:** `docs/spec/notary_v2/administrative-timeline.md`, `administrative-address.md`; `notary_v2/administrative_timeline.py`, `notary_v2/services/administrative_address.py`; `notary_v2/data/administrative_units/`, `contracts/administrative-timeline/`.
+
+**Thực hiện:**
+
+- Giữ schema ledger/snapshot hiện có nếu đủ biểu diễn; không viết thêm một hệ kho song song. Kiểm bảng đơn vị, tên, cha, quan hệ gộp/tách/đổi tên, ngày hiệu lực và nguồn.
+- Lập danh sách nguồn chính thức cho các đợt thay đổi đang phục vụ, ưu tiên nghị quyết/văn bản cơ quan nhà nước và danh mục mã đơn vị chính thức. Nguồn Bando/câu mô tả dùng hỗ trợ tìm kiếm; hash chỉ chứng minh file không đổi, không chứng minh thẩm quyền hay ngày hiệu lực.
+- Ghi phạm vi từng nguồn, văn bản, ngày hiệu lực, đơn vị trước/sau và phần lãnh thổ nếu có. Chỉ confirmed khi có chứng cứ đủ theo spec; không nâng đồng loạt 3.219 câu nguồn thành lịch sử xác nhận. Quan hệ chưa đủ nguồn vẫn trả ứng viên có nhãn.
+- Import thử vào bản sao, kiểm schema/mã băm/số lượng/tính đầy đủ, giữ lịch sử curator. Nếu baseline 34/3.321 thay đổi, cập nhật mốc có nguồn trong cùng thay đổi; không bỏ kiểm để nhập một phần.
+- Sửa DC-08: tên, cha và chứng cứ hiển thị cùng phiên bản dữ liệu được chọn. Hồi quy A→B→A, tên tỉnh lẫn xã, sửa cả parent nếu cũng lấy across-version.
+- Bàn giao bảng phạm vi đã xác nhận và khoảng trống còn lại. “Toàn quốc có danh mục” và “toàn quốc đã xác nhận lịch sử” phải là hai chỉ số riêng.
+
+**Nghiệm thu:** truy vấn không trộn phiên bản; có quan hệ mẫu từ nguồn chính thức đủ ngày, gồm gộp và chia một phần; bản không đủ chứng cứ không mang nhãn confirmed; import hỏng không đổi kho; có báo cáo phạm vi toàn bộ dữ liệu theo nguồn. Chưa đủ phủ toàn quốc thì giữ trạng thái chưa hoàn tất mục tiêu đó.
+
+## C. Tìm địa chỉ đơn giản và áp dụng — {{lookup}}
+
+**Lý do:** DC-01…05, NG-02; mục tiêu Owner gõ `xã Yên Bình` và lựa chọn.
+
+**File chính:** `administrative-address.md`, spec input/Stage liên quan; service address, sidecar adapter; `contracts/notary-case-drafting/address-lookup.schema.json`, validator/examples; renderer model/view/css.
+
+**Thực hiện:**
+
+- Tách hai thao tác: tìm danh mục theo cụm tên không cần ngày; tra lịch sử theo ngày dùng ngày/nguồn thật nếu người dùng cần. Cập nhật contract cho dữ liệu tùy chọn đúng nghĩa, không lấy ngày máy thay ngày giấy tờ.
+- Giữ cấp `xã/phường/tỉnh` khi nhập. Tìm cụm tên trong tên hiện hành và tên/câu nguồn cũ; hỗ trợ chữ có/không dấu theo quy tắc nhất quán. Có tiền tố thì lọc đúng cấp; không có thì trả các cấp phù hợp và ghi rõ.
+- `xã Yên Bình` chưa có tỉnh trả danh sách có tỉnh/đơn vị đích/nguồn. Trùng tên hoặc quan hệ một phần giữ các ứng viên; không chọn một kết quả theo ngày hay theo vị trí đầu tiên.
+- Địa chỉ hiện hành hiển thị “hiện hành”; không sinh `nay là` chính nó. Giữ thôn/số nhà nguyên văn. Q3 quyết định kết quả ghi vào trường; trước đó chỉ hoàn thiện tìm/hiển thị.
+- Cả Người, Đất, Niêm yết tìm chữ đang gõ trong chính ô. Chọn tài sản ở Niêm yết là lựa chọn bổ sung, không là điều kiện để tìm.
+- Phân biệt nơi cấp giấy tờ người sống với nơi cấp khai tử. Có `noi_cap` chưa đủ để bật nhãn/trợ giúp giấy khai tử; không hiện lời nhắc UBND cho người sống có “Bộ Công an”. Giữ giá trị nơi cấp đã có, không sửa ánh xạ địa chỉ/nơi cấp đã được Owner đính chính.
+- Tra cứu nền khi nhập, gom các lần gõ gần nhau; bỏ response cũ khi chữ/hồ sơ đã đổi. Chỉ nút Áp dụng đổi draft; không auto-save. Lỗi/không có kết quả không khóa nhập hoặc commit.
+
+**Nghiệm thu:** `xã Yên Bình`, `Yên Bình`, chuỗi không dấu, tỉnh đơn lẻ, địa chỉ hiện hành, địa chỉ cũ có huyện, một phần lãnh thổ, nhiều tỉnh trùng tên và nhập nhanh/đổi hồ sơ. Kết quả đúng cấp, có nhãn chứng cứ; không cần ngày; Niêm yết không cần tài sản; áp dụng đúng Q3 và không đổi thôn/số nhà. Người sống có nơi cấp không nhận nhãn/lời nhắc giấy khai tử; trường người chết vẫn theo bằng chứng đúng ngữ cảnh.
+
+## D1. Xây lại engine theo cấu trúc — {{engine}}
+
+**Quyết định Owner mới:** liệt kê khoảng 30 loại văn bản; dự kiến khoảng 10 nhóm cấu trúc. Nhận loại/cấu trúc → chia vùng → gọi bộ quy tắc theo vùng, có biến thể và đường dự phòng rõ. Số nhóm phải được kiểm từ mẫu, không khóa cứng 10. Spec chính: `docs/spec/notary_v2/input/document-extraction.md`.
+
+**Phạm vi:** lõi chung `tools/regex_workbench/engine/`, cấu hình nhận loại/nhóm/vùng/trường, tests và bộ chấm. Không đọc ZIP/XML, không ghi DB, không tạo engine thứ hai trong adapter. Giữ những phần normalize/map vị trí/timeout đã có bằng chứng đúng.
+
+**Các bước và đầu ra trước khi mở rộng:**
+
+1. **Danh mục + mẫu:** nhận danh sách Owner; kiểm mẫu thực tế sẵn có. Bảng loại → mẫu → nhóm cấu trúc → vùng → trường hệ thống. Thiếu mẫu đánh dấu thiếu; không đoán từ filename hoặc từ tên loại gần nhau. Đáp án gồm số bản ghi, từng giá trị và vị trí nguồn.
+2. **Catalog quy tắc:** phân biệt loại nghiệp vụ với bố cục. Một registry dữ liệu nêu dấu hiệu chọn/loại trừ, cấu trúc vùng, bộ rule dùng chung, phiên bản và phạm vi. Từng rule có tín hiệu bắt đầu/dừng, cách lấy giá trị và ca đúng/sai. Không chép 30 profile đầy đủ hoặc tạo ngôn ngữ/plugin riêng.
+3. **Lát cắt đầu:** chọn ít nhất hai loại thực tế có vùng tương đồng từ danh mục đã kiểm. Chạy trọn nhận loại → chia vùng → tách bản ghi → trích trường; chứng minh cùng một rule vùng dùng được ở cả hai. Những ví dụ chọn cụ thể chỉ được chốt sau khi có mẫu.
+4. **Nhận diện/định tuyến/dự phòng:** dùng dấu hiệu tiêu đề cùng nhãn/bố cục, không tìm một từ trong toàn file rồi chọn loại. Nhiều profile phù hợp phải có điều kiện phân biệt, chưa rõ thì báo mơ hồ. Dự phòng chỉ các rule được phép trong vùng rõ; không chạy mọi regex toàn văn hoặc lấy kết quả đầu. Giữ trace cho vì sao chọn rule/dự phòng, lỗi và timeout.
+5. **Biến thể/ca âm:** `ông A`, `ông: A`, `ông/bà A`, `ông/bà: A`, đánh số, xuống dòng/bảng; `P.`/`TP.`; ngày chết và địa chỉ không mở người giả; người trong lời chứng không thành đương sự. Không suy giới tính hoặc quyền từ danh xưng. Mỗi thửa riêng, cùng sổ cùng serial, tổng diện tích riêng với từng loại đất.
+6. **Chấm trước mở rộng:** giữ một bộ có đáp án mà người sửa chưa dùng; không tách hai bản gần giống của cùng mẫu sang hai bộ. Chấm đúng loại/vùng/bản ghi/trường và trường gắn đúng người/thửa. Báo số đúng/sai/bỏ sót/mơ hồ theo loại/nhóm, tổng thời gian/lỗi; “partial” không tính đạt đầy đủ. Chưa đạt thì sửa nguyên nhân và chạy hồi quy, không hạ tiêu chí.
+7. **Mở rộng và bàn giao:** thêm các nhóm còn lại theo ma trận đã kiểm, không nhân số engine. Bàn giao dữ liệu cấu hình, hợp đồng đầu ra, fixture/đáp án và kết quả bộ giữ lại để D2 tích hợp. Danh mục 30 loại chưa được cung cấp thì chưa được báo hoàn tất bao phủ 30 loại.
+
+**Tham khảo:** invoice2data cho chọn mẫu/quy tắc trường/vùng dòng; Dedoc cho nhận cấu trúc bằng đoạn và pattern. Link và giới hạn tại spec; không chọn/cài chúng như thư viện sản phẩm trong phiên này. Đánh giá quy mô dựa vào mẫu/ngoại lệ và lượng rule trùng, không ước lượng dòng code từ con số 30.
+
+## D2. Nối engine mới vào DOCX/Stage — {{intake}}
+
+**Lý do:** RE-05, TS-03 và đường đưa gợi ý vào Stage. **Phụ thuộc:** A và D1. RE-01…04 về rules do D1 sở hữu; D2 kiểm chúng qua adapter thật, không tự vá bản regex khác.
+
+**File chính:** `input/docx-import.md`, schemas intake; `notary_v2/services/document_intake/{docx_source.py,adapters/docx.py}`; `intake-dialog.js`, model đưa gợi ý vào Stage và tests liên quan.
+
+- Reader giữ thứ tự đoạn/bảng lồng, vị trí nguồn và một nhánh hiển thị của AlternateContent; không dedup người theo tên/chữ giống nhau. Đầu ra chữ/layout cho D1 có hợp đồng rõ; nếu làm phẳng gây mất ranh giới phải sửa reader, không thêm regex để che.
+- Adapter gọi bộ nhận diện/định tuyến của D1, không luôn load `transfer`. Giữ mã rule/profile/vùng/nguồn khi tạo gợi ý; cập nhật contract đầu ra nếu cần trước khi wire UI. Normalizer giữ serial free text và tổng diện tích độc lập, không xóa người rõ tên chỉ vì thiếu giấy tờ.
+- Chạy adapter → dialog kiểm/sửa → Stage → commit → reload trên bộ đã chấm. Mỗi thửa một dòng, cùng sổ giữ cùng serial; kiểm alias theo A. Lỗi/không nhận loại/mơ hồ hiện rõ, không bịa để vượt Stage.
+- Nguồn/hash/context/binding giữ đúng qua đổi thứ tự/xóa/sửa; đánh giá riêng lỗi reader, engine và adapter/UI. Bộ engine đạt chưa thay nghiệm thu chuỗi DOCX thực tế.
+
+**Nghiệm thu D2:** mẫu đáp án 3 người/1 tài sản giữ đúng 3/1 và mọi trường qua lưu/mở lại; không lặp AlternateContent; source_refs đúng; lỗi/partial không che mất trường; tổng diện tích/serial đúng quy tắc mới. D1 và D2 đều cần parent review bộ giữ lại.
+
+## E. Danh bạ và người nhận UQ — {{contacts}}
+
+**File chính:** Stage spec và contract customer list/create/metadata; renderer model/view; sidecar/customer service nếu cần truy vấn. DB-01 có từ nền nhưng thuộc lỗi Owner đang gặp.
+
+**Thực hiện:** cập nhật trạng thái nút khi input/change/blur mà không mất con trỏ. Cho chọn danh bạ có sẵn theo ID, hiển thị tên + thông tin phân biệt có sẵn; tạo người mới là thao tác riêng rõ nghĩa. Không tự `.find` lấy người đầu theo họ tên. Danh sách tìm phải vượt giới hạn 200 ban đầu bằng truy vấn/phân trang đơn giản; khi chỉ gõ tên chưa chọn thì giữ free text/ID null. Sau Q2, thống nhất nguồn UQ cho mẫu Word hoặc tách hai vai trò bằng nhãn rõ nếu Owner chọn khác nhau.
+
+**Nghiệm thu:** gõ xong nút dùng được ngay; chọn ID 22 trong hai người trùng tên lưu/mở lại vẫn là 22; không có tên thì không tạo người rỗng; người ngoài 200 tìm được; hủy picker không đổi draft; tên tự do không bị gắn ID tùy tiện; mẫu UQ lấy đúng người theo Q2.
+
+## F. Engine Word mới — {{word}}
+
+**File chính:** `word-output.md`, `word-output-detail.md`, `diagram/two-party.md`, catalog `notary_v2/word_templates/placeholder_mapping.md`; `word_engine.py`, `word_batch_export.py`, `word_original.py`; `models.py`, `case_workspace.py` và migration cho đường lưu hồ sơ chỉ có Người; sidecar options/export; `word-export-dialog.js`; schemas common/create/workspace/word-export, validator/examples.
+
+**Thực hiện:**
+
+- Viết lại phần xác định dữ liệu và điền token theo catalog mới với một nghĩa rõ cho mỗi token; không chỉ thêm alias vào resolver cũ. Giữ helper sửa chữ/định dạng đã chứng minh an toàn nếu còn phù hợp. Không viết thêm nền tảng/plugin riêng cho MVP.
+- Phân biệt Người theo dòng Stage, Bên A/B theo ghế cố định, vai trò chủ/người nhận/người được UQ theo lựa chọn đã lưu. Không dồn người vào ghế trống; không lấy tên dựa vào vị trí node hoặc suy vai trò từ tên token cũ.
+- Q1 chốt nghĩa vị trí mẫu cũ; Q2 chốt nguồn UQ. Dùng ID/row_id để nối dữ liệu, có quy tắc rõ khi sửa/xóa/thay người. Tổng diện tích lấy trường tổng của A, không tổng các dòng đất thay nguồn.
+- Điều kiện xuất theo Q5 đã chốt: chỉ kiểm dữ liệu mẫu cần. Mẫu chỉ có Người xuất được không có tài sản/sơ đồ. Giải quyết cả đường tạo/lưu hồ sơ và nguồn snapshot: DB `tai_san_id` hiện không nullable và các reader/create/link có giả định tài sản. Chọn thay đổi nhỏ nhất phù hợp mô hình saved Stage, ghi rõ thiết kế trong spec trước code; không truyền asset giả hoặc tự cho export draft chưa lưu. Mẫu dùng tài sản/quan hệ/kết quả vẫn kiểm đủ nguồn tương ứng.
+- Sửa W-05 đồng bộ schema/validator/response options của mẫu gốc; kiểm mọi block_reason phát ra. Các mẫu thiếu dữ liệu báo rõ token/nhóm cần bổ sung. Không đổi quy tắc “giữ token trống hay chặn” của mẫu pháp lý nếu chưa có quyết định.
+- Giữ nguyên file nguồn, bản đồ bằng chứng và transaction context; batch hỗ trợ kết quả từng file, hủy trước publish, không ghi đè file đích ngoài luật hiện có. Giữ tests bảo vệ cũ có ý nghĩa khi thay engine.
+
+**Nghiệm thu:** hồ sơ thừa kế/hai bên, người sống/chết, ghế trống, trùng tên, UQ theo Q2, tổng 300/dòng 100, đổi thứ tự/xóa người/tài sản, thiếu dữ liệu, original mapping sai và batch hủy. So nội dung mong đợi từ đáp án độc lập; không dùng chính resolver để tạo expected. Không coi file xuất thành công là đã điền đúng.
+
+## G. Chuyển toàn bộ mẫu cũ — {{migration}}
+
+**File chính:** `word_template_migration.py`, catalog/spec Word; `scripts/naia12_e2e_migrate_export.py`; tests migration/E2E. Nguồn bộ mẫu lấy từ manifest cũ sau khi xác minh file tồn tại và đúng mẫu Owner; không dùng bản migrated cũ làm nguồn duy nhất.
+
+**Thực hiện:** kiểm inventory 22 mẫu đã được bàn giao và phần mẫu nào còn thiếu; lập bảng từng occurrence token cũ → nghĩa/vai trò → token mới theo Q1. Token chung như `[Tên1]` không được đổi máy móc bằng số 1. Chỗ không hiểu nghĩa phải đánh dấu cần duyệt, chưa được báo chuyển xong. Chuyển trên bản sao, xử lý token tách qua nhiều run, bảng, header/footer và `.doc` bằng Word đã cài theo workflow có kiểm. Manifest ghi nguồn/hash/token đã đổi/còn sót/lý do.
+
+Loại bỏ alias legacy khỏi **bộ mẫu mới** sau khi đã ánh xạ đầy đủ; nếu engine vẫn giữ compatibility với mẫu chưa chuyển, ghi rõ ranh giới và không gọi đó là bộ mẫu đã hoàn tất. Đưa mẫu được duyệt vào nơi runtime thực sự dùng theo README; artifact ignored không phải tính năng đã phát hành.
+
+**Nghiệm thu:** tất cả mẫu trong inventory đã chuyển/được duyệt theo từng chỗ; không còn token legacy ngoài danh sách Owner chủ ý cho phép; hash nguồn không đổi; Word mới điền đúng chủ/người nhận/UQ dù Stage reorder. Mỗi file có kiểm nội dung + xem trang/khung bảng/header/footer. 5 file `.doc` phải có bằng chứng chuyển/xem trực quan, không dùng kiểm XML không chạy hoặc chỉ số trang làm thay thế.
+
+## H. Tích hợp, đóng gói và parent review — {{integration}}
+
+**File chính:** test suites liên quan; `shell/sidecar/stage_administrative_reference.ps1`, `stage_package_assets.ps1`, build/package assets theo README; spec entrypoints và module README.
+
+1. Chạy quy trình người dùng trên Electron: nhập DOCX có đáp án → kiểm đủ Người/Tài sản → sửa/đưa Stage → lưu/mở lại → chọn người UQ trùng tên đúng ID → gõ `xã Yên Bình` tại ba loại ô → chọn địa chỉ → xuất bộ mẫu mới và mẫu gốc ra thư mục Windows.
+2. Chạy ca hỏng: Stage thiếu từng trường, kho địa chỉ thiếu/hỏng, không có kết quả, đổi hồ sơ lúc truy vấn, UQ thiếu, mapping cũ sau reorder/xóa, hủy chọn thư mục/hủy export, file đầu ra trùng tên, nguồn/mẫu bị đổi hash. Lỗi phải được giải thích đúng, không để file dở hoặc thay nguồn.
+3. Bản đóng gói phải chứa đúng kho/snapshot/catalog và engine thực tế, không lồng thư mục sai. Thử trên thư mục chạy mới với app data riêng; nguồn địa chỉ mới ghi phiên bản trong bằng chứng.
+4. Rà lại docs/contract/catalog theo sản phẩm cuối; xóa mâu thuẫn quy tắc cũ được thay thế, giữ lý do/lịch sử cần thiết. Chỉ đổi trạng thái hoàn thành khi có bằng chứng.
+
+**Checks cho agent implement** (PowerShell, dùng Python/test dependencies của repo; cwd đúng, không sửa product chỉ để che lỗi môi trường):
+
+- Từ `notary_v2`: `rtk proxy python -m pytest --import-mode=importlib tests/test_case_workspace.py tests/test_case_metadata.py tests/test_document_intake.py tests/test_docx_word_first.py tests/test_administrative_timeline.py tests/test_administrative_address.py tests/test_word_engine.py tests/test_word_batch_export.py tests/test_word_template_migration.py tests/test_naia12_e2e_migrate_export.py -q`.
+- Từ root: `rtk proxy python -m pytest --import-mode=importlib tools/regex_workbench/tests shell/test/test_notary_mock_adapter.py shell/test/test_notary_intake_adapter.py shell/test/test_notary_adapter_contract.py -q`.
+- Từ root: `rtk proxy node --test shell/test/notary-address-lookup.test.mjs shell/test/notary-docx-intake.test.mjs shell/test/notary-case-drafting-model.test.mjs shell/test/notary-case-drafting-view.test.mjs shell/test/notary-wire-payload-schema.test.mjs shell/test/notary-workspace-update-schema.test.mjs` và các test regression mới.
+- Từ root: validator examples `contracts/notary-case-drafting/validate_examples.py`, checks ledger và test schema thật. Kiểm cả response lỗi, không chỉ fixtures valid.
+- E2E migrate/export qua script hiện có trên nguồn và thư mục output khác nhau; xem Word thật. `rtk git diff --check`, kiểm link tài liệu thay đổi, status file. Chạy lại chỉ các check liên quan đến thay đổi/failure mới; không cộng số lượt chạy lặp làm bằng chứng độ đúng.
+
+**Gói bàn giao parent:** commit/diff/hash, task AC/decision/spec cập nhật; inventory mẫu và nguồn; các fixture/đáp án độc lập; log test có skip/lỗi môi trường; kết quả từng file Word + ảnh trang; transcript/UI evidence; kho và phạm vi nguồn; DB migration trước/sau; danh sách hạn chế. Bằng chứng cần được lưu ở đường mà parent truy cập được, không chỉ đường tạm riêng của agent.
+
+**Checklist parent trước chấp nhận:**
+
+- Đối chiếu diff với quyết định Owner đã chốt và Q1/Q2/Q3 được trả lời sau; không có thay đổi vai trò/địa chỉ ngoài spec; mỗi thửa một tài sản cùng sổ cùng serial và Word chỉ kiểm dữ liệu mẫu cần.
+- Đọc các đường read/normalize/save/reload/export, nhất là dữ liệu legacy và transaction; kiểm ảnh hưởng qua hai hồ sơ dùng chung entity.
+- Tự chạy phản ví dụ TS/RE/DC/DB/W của báo cáo trên code mới; thêm biến thể không trùng fixture agent dùng sửa.
+- Chấm bộ hợp đồng giữ lại: đủ số người/tài sản, đúng giá trị, giữ vị trí nguồn; không đánh tráo field và không bịa giá trị thiếu.
+- Kiểm địa chỉ theo nguồn chính thức, đúng cấp và phiên bản; không nâng pending thành confirmed; chỉ áp dụng khi user chọn.
+- Mở mẫu/Word đầu ra và so đúng người ở từng chỗ với đáp án độc lập; kiểm định dạng thực tế, không chỉ số trang/XML.
+- Thử quy trình trên Electron và gói cài. Nếu chưa chạy tầng này, giữ trạng thái chưa nghiệm thu tầng đó.
+- Rà schema response lỗi, examples valid/invalid và docs links; mọi task chỉ Done sau guide finalization và bằng chứng AC. Nếu còn lỗi, trả lại theo task cụ thể; parent không chấp nhận dựa vào báo cáo “test xanh”.
+
+## Code Review — 04/10/2026
+
+- [ ] [Review][Decision] Q1/Q2/Q3 — giữ nguyên trạng thái chờ trong mục 2; câu “tiếp tục” không thay câu trả lời. Q4/Q5 đã chốt bằng câu trả lời trực tiếp.
+- [ ] [Review][Patch] TS-02/03, RE-01/02/04/05, DC-02/03/04/08, NG-02, DB-01/02, W-05 — bằng chứng ở báo cáo; gói A…H xử lý theo spec sau quyết định liên quan.
+- [ ] [Review][Target] TS-01, DC-01/05/06, RE-03, W-01/02/03/04 — thay đổi đích hoặc thiếu nghiệm thu, không quy toàn bộ thành lỗi do hai commit cuối.
+
+**Đã rút/không nhận:** NG-01 (Owner nhìn nhầm); DC-07 chưa đủ bằng chứng là lỗi vì spec đã ghi giới hạn; không nhận lỗi hủy Word chưa tái hiện. Không có mục nào được tự đánh dấu sửa xong trong plan này.

@@ -31,3 +31,6 @@ Thumbs.db
 .cache/
 logs/
 artifacts/
+
+# Local samples and worktree recovery; never commit personal sample data.
+/.agents/local-only/

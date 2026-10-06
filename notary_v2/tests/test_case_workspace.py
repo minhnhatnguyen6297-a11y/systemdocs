@@ -195,6 +195,9 @@ def test_get_derives_stage_for_legacy_case_without_case_state(db):
         "revision": 1,
         "ngay_lap_ho_so": "2026-09-01",
         "noi_niem_yet": None,
+        "nguoi_nhan_uy_quyen": None,
+        "nguoi_nhan_uy_quyen_id": None,
+        "noi_dung_viec": None,
         "ghi_chu": None,
     }
     people = _workspace_people(data)
@@ -319,7 +322,7 @@ def test_get_migrates_legacy_engine_state_to_v3(db):
 
 def test_get_two_party_case_state_and_capabilities(db):
     """two_party: stage không owner_row_id; state canonical 30 slot;
-    word_export=false; render_model null khi chưa commit."""
+    word_export=true (NAIA-8); render_model null khi chưa commit."""
     case, _d, _p, _h = _make_case(db, loai_van_ban="chuyen_nhuong")
 
     data = _service(db).get(case.id)
@@ -332,7 +335,7 @@ def test_get_two_party_case_state_and_capabilities(db):
     assert [n["id"] for n in st["nodes"]] == TP_IDS
     assert all(set(n) == {"id", "personId", "hidden", "deleted"}
                for n in st["nodes"])
-    assert data["capabilities"]["word_export"] is False
+    assert data["capabilities"]["word_export"] is True
     assert data["capabilities"]["diagram"] is True
 
 
@@ -1176,6 +1179,76 @@ def test_create_persists_case_stage_diagram_one_transaction(db):
         (p["row_id"], p["entity_id"], p["ho_ten"]) for p in wire_people]
 
 
+def test_noi_niem_yet_saved_value_flows_into_word_export(db, session_factory,
+                                                       tmp_path):
+    """Chuỗi đầy đủ theo yêu cầu Owner (NAIA-12): người dùng NHẬP nơi niêm yết
+    -> LƯU xuống InheritanceCase.noi_niem_yet -> TẢI LẠI hồ sơ từ DB -> XUẤT
+    Word phải in đúng giá trị đó; không mượn địa chỉ tài sản làm fallback.
+    """
+    from docx import Document
+
+    from services import word_engine
+
+    people, assets, state = _create_args()
+    typed = "Trụ sở UBND xã Đại An, huyện Vụ Bản"
+    data = _create(db, people, assets, state, meta={
+        "document_type": "khai_nhan",
+        "noi_niem_yet": typed,
+    })
+
+    # Tải lại bằng session MỚI — chứng minh giá trị đã ghi DB, không chỉ RAM.
+    fresh = session_factory()
+    try:
+        db_case = fresh.get(InheritanceCase, data["case"]["id"])
+        assert db_case is not None
+        assert db_case.noi_niem_yet == typed
+
+        template = tmp_path / "mau_niem_yet.docx"
+        doc = Document()
+        doc.add_paragraph("Niêm yết tại: [Nơi niêm yết]")
+        doc.save(str(template))
+
+        out = Document(str(template))
+        mapping = word_engine.build_template_mapping(db_case)
+        word_engine.replace_in_doc(out, mapping)
+        assert word_engine.find_unresolved_placeholders(
+            out, template_ref=template) == []
+        out_path = tmp_path / "out.docx"
+        out.save(str(out_path))
+
+        exported = Document(str(out_path))
+        assert exported.paragraphs[0].text == \
+            f"Niêm yết tại: {typed}"
+        # Phản chứng: địa chỉ tài sản khác hẳn, không bị lẫn vào.
+        assert "Thửa 99" not in exported.paragraphs[0].text
+    finally:
+        fresh.close()
+
+
+def test_noi_niem_yet_missing_stays_empty_no_property_fallback(db,
+                                                             session_factory):
+    """Hồ sơ chưa nhập nơi niêm yết -> token rỗng (dữ liệu thiếu), KHÔNG được
+    đổ địa chỉ tài sản vào để vụ việc "thiếu" trông như "đủ"."""
+    from services import word_engine
+
+    people, assets, state = _create_args()
+    data = _create(db, people, assets, state, meta={
+        "document_type": "khai_nhan"})  # không truyền noi_niem_yet
+
+    fresh = session_factory()
+    try:
+        db_case = fresh.get(InheritanceCase, data["case"]["id"])
+        assert db_case is not None
+        assert db_case.noi_niem_yet is None
+
+        mapping = word_engine.build_template_mapping(db_case)
+        assert mapping["[Nơi niêm yết]"] == ""
+        assert mapping["[Niêm Yết]"] == ""
+        assert mapping["[Địa chỉ đất]"] == "Thửa 99, xã Yên Sở"  # nguồn riêng, không fallback
+    finally:
+        fresh.close()
+
+
 def test_create_without_diagram_seeds_owner(db):
     """§13.6: diagram absent → server seed node 'owner' personId =
     owner_row_id + ownPositions đủ vị trí; render_model null."""
@@ -1208,7 +1281,7 @@ def test_create_two_party_seeds_canonical_slots(db):
     st = data["diagram"]["state"]
     assert st["domain"] == "two_party"
     assert [n["id"] for n in st["nodes"]] == TP_IDS
-    assert data["capabilities"]["word_export"] is False
+    assert data["capabilities"]["word_export"] is True
 
 
 def test_create_idempotent_replay_same_key(db):
@@ -1352,3 +1425,27 @@ def test_create_diagram_invalid_and_outside_stage(db):
         _create(db, people, assets, outside)
     assert exc.value.code == "diagram_reference_outside_stage"
     assert db.query(InheritanceCase).count() == 0
+
+
+def test_update_meta_keeps_committed_stage_and_word_snapshot(db):
+    from services.word_engine import build_template_mapping
+    people, assets, state = _create_args()
+    created = _create(db, people, assets, state)
+    service = _service(db)
+    case = db.get(InheritanceCase, created["case"]["id"])
+    original = json.loads(case.case_state_json)
+    result = service.update_meta(case.id, created["case"]["revision"],
+                                 {"noi_niem_yet": "xã Snapshot Mới"})
+    fresh = json.loads(case.case_state_json)
+    assert fresh["stage"] == original["stage"]
+    assert fresh["assets"] == original["assets"]
+    assert fresh["diagram"] == original["diagram"]
+    assert fresh["case"]["noiniemyet"] == "xã Snapshot Mới"
+    assert build_template_mapping(case)["[Nơi niêm yết]"] == "xã Snapshot Mới"
+    service.update_meta(case.id, result["revision"], {"noi_niem_yet": None})
+    assert build_template_mapping(case)["[Nơi niêm yết]"] == ""
+    with pytest.raises(WorkspaceError) as exc:
+        service.update_meta(case.id, result["revision"],
+                            {"noi_niem_yet": "stale"})
+    assert exc.value.code == "workspace_conflict"
+    assert build_template_mapping(case)["[Nơi niêm yết]"] == ""

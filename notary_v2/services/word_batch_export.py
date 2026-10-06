@@ -29,6 +29,7 @@ from __future__ import annotations
 import logging
 import re
 import shutil
+import unicodedata
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -103,24 +104,35 @@ DOC_CATALOG_BY_KEY: dict[str, WordDocumentSpec] = {
     spec.document_key: spec for spec in DOC_CATALOG}
 
 _BLOCK_MESSAGES = {
+    "word.no_people": "Stage chưa có người nào",
+    "word.no_diagram": "Chưa có sơ đồ hai bên đã lưu",
     "word.no_assets": "Hồ sơ chưa có tài sản",
     "word.no_landowner": "Chưa có chủ đất trên Diagram",
     "word.no_deceased_landowner": "Không có chủ đất đã chết",
     "word.no_receiver": "Chưa có người nhận",
     "word.too_many_assets": "Quá 5 tài sản",
-    "word.too_many_people": "Quá 20 người trên Diagram",
+    "word.too_many_people": "Quá 20 người trong Stage",
     "word.too_many_signers": "Quá 20 người ký",
     "word.template_missing": "Văn bản chưa có template",
+    "word.missing_authorized_person": (
+        "Mẫu yêu cầu người được ủy quyền nhưng hồ sơ chưa gán vai trò đó"),
 }
 
 # ------------------------------------------------------------- validation
 
 
-def validate_document_keys(document_keys: Any) -> list[str]:
+def validate_document_keys(document_keys: Any,
+                           allowed_keys: Optional[set[str]] = None
+                           ) -> list[str]:
     """Contract §8.2 — validate TRƯỚC khi tạo file đầu tiên.
 
     Thiếu/null/không list → validation_error (word_no_documents_selected
-    CHỈ cho list rỗng — parity với mock oracle)."""
+    CHỈ cho list rỗng — parity với mock oracle).
+
+    `allowed_keys` (NAIA-8 folder mode): tập key được phép = các `.docx`
+    vừa quét từ thư mục mẫu người dùng chọn — key ngoài tập này (kể cả
+    path traversal giả dạng filename) → word_unknown_document_key. Không
+    truyền → catalog mode cũ: key phải là snake_case trong DOC_CATALOG."""
     if not isinstance(document_keys, list):
         raise WordBatchError(
             "validation_error", "document_keys phải là danh sách")
@@ -136,13 +148,117 @@ def validate_document_keys(document_keys: Any) -> list[str]:
                 details={"document_key": key})
         seen.append(key)
     for key in document_keys:
-        if not (isinstance(key, str) and _DOC_KEY_RE.match(key)
-                and key in DOC_CATALOG_BY_KEY):
+        if allowed_keys is not None:
+            if not (isinstance(key, str) and key in allowed_keys):
+                raise WordBatchError(
+                    "word_unknown_document_key",
+                    f"document_key ngoài thư mục mẫu: {key!r}",
+                    details={"document_key": key})
+        elif not (isinstance(key, str) and _DOC_KEY_RE.match(key)
+                  and key in DOC_CATALOG_BY_KEY):
             raise WordBatchError(
                 "word_unknown_document_key",
                 f"document_key ngoài catalog: {key!r}",
                 details={"document_key": key})
     return list(document_keys)
+
+
+# ------------------------------------------------- template folder (NAIA-8)
+
+_DOCX_SUFFIX = ".docx"
+
+
+def _contained_in(path: Path, real_root: Path) -> bool:
+    """`path` còn nằm trong `real_root` (đã resolve) sau khi đuổi theo
+    symlink/JUNCTION mọi cấp?
+
+    Windows: junction KHÔNG phải `is_symlink()` — chỉ `resolve()` mới lộ
+    đích thật. Entry trỏ ra ngoài thư mục được cấp quyền → False.
+    Lỗi resolve (vòng lặp, reparse hỏng) → False (fail-closed)."""
+    try:
+        return path.resolve().is_relative_to(real_root)
+    except (OSError, RuntimeError):
+        return False
+
+
+def _ascii_stem(filename: str) -> str:
+    """Tên file → filename_stem ASCII-safe cho output `<stem>_HS-<id>.docx`.
+
+    Bỏ dấu tiếng Việt (NFD + strip Mn), đ→d/Đ→D, ký tự lạ → `_`.
+    Stem rỗng/reserved Windows → "Mau"."""
+    stem = unicodedata.normalize("NFD", Path(filename).stem)
+    stem = "".join(
+        ch for ch in stem if unicodedata.category(ch) != "Mn")
+    stem = stem.replace("đ", "d").replace("Đ", "D")
+    stem = re.sub(r"[^A-Za-z0-9_-]+", "_", stem).strip("_")
+    if not stem or stem.upper() in _WIN_RESERVED_NAMES:
+        stem = "Mau"
+    return stem[:80]
+
+
+def scan_template_dir(template_dir: Any) -> list[WordDocumentSpec]:
+    """Quét `.docx` NGAY trong thư mục người dùng chọn (không đệ quy).
+
+    Bỏ file khóa `~$*` và entry không phải file; sort ổn định
+    (casefold + tên gốc) — §AC thư mục mẫu. `document_key` = tên file
+    gốc (basename — không bao giờ chứa separator nên key lookup chặn
+    traversal tự nhiên); `display_name` = stem gốc.
+
+    Entry là symlink/junction trỏ ra NGOÀI thư mục mẫu bị loại —
+    `is_file()` đuổi theo link nên phải kiểm containment sau resolve
+    (đọc mẫu từ ngoài thư mục được cấp quyền là vi phạm scope)."""
+    root = Path(template_dir)
+    if not root.is_dir():
+        raise WordBatchError(
+            "file_not_found",
+            "thư mục mẫu không tồn tại hoặc không đọc được")
+    try:
+        root_real = root.resolve()
+        entries = sorted(
+            root.iterdir(), key=lambda p: (p.name.casefold(), p.name))
+    except (OSError, RuntimeError) as exc:
+        raise WordBatchError(
+            "file_not_found", f"không đọc được thư mục mẫu: {exc}")
+    specs: list[WordDocumentSpec] = []
+    for path in entries:
+        name = path.name
+        if name.startswith("~$") or not name.lower().endswith(_DOCX_SUFFIX):
+            continue
+        if not path.is_file() or not _contained_in(path, root_real):
+            continue
+        specs.append(WordDocumentSpec(
+            document_key=name,
+            display_name=path.stem,
+            filename_stem=_ascii_stem(name)))
+    return specs
+
+
+def template_path_resolver(template_dir: Any
+                           ) -> Callable[[str], Optional[Path]]:
+    """Resolver `document_key → Path` gắn chặt với thư mục mẫu đã quét:
+    chỉ đúng filename đã scan (không nhận đường dẫn tùy ý, không join
+    path — key không khớp scan map trả None → word.template_missing).
+
+    Kiểm tra lại containment TẠI THỜI ĐIỂM MỞ: mẫu bị xóa hoặc bị đổi
+    thành symlink/junction trỏ ra ngoài sau khi scan → None (per-file
+    word.template_missing), không bao giờ đọc file ngoài thư mục mẫu."""
+    root = Path(template_dir)
+    scanned = {spec.document_key for spec in scan_template_dir(root)}
+    try:
+        root_real = root.resolve()
+    except (OSError, RuntimeError) as exc:
+        raise WordBatchError(
+            "file_not_found", f"không đọc được thư mục mẫu: {exc}")
+
+    def _resolve(document_key: str) -> Optional[Path]:
+        if document_key not in scanned:
+            return None
+        path = root / document_key
+        if not path.is_file() or not _contained_in(path, root_real):
+            return None
+        return path
+
+    return _resolve
 
 
 # ------------------------------------------------------- filename safety
@@ -356,7 +472,7 @@ def _export_one_document(*, spec: WordDocumentSpec, case: Any,
                          resolve_template: Callable[[str], Any],
                          mapping_holder: dict, dest_dir: Path,
                          taken: set[str], case_id: int, today: Any,
-                         check: Callable[[], None]) -> dict:
+                         check: Callable[[], None], static: bool = False) -> dict:
     """Xuất một văn bản — trả word_document_result entry.
 
     Mọi exception trong try → status:failed với data-code; exception
@@ -377,12 +493,26 @@ def _export_one_document(*, spec: WordDocumentSpec, case: Any,
 
         import docx  # lazy — giữ module import được khi thiếu python-docx
         doc = docx.Document(str(template_path))
+        # NAIA-12: mẫu dùng token "[... người được ủy quyền N]" mà hồ sơ không
+        # có đủ người gán vai trò đó -> FAIL, không xuất thầm văn bản khuyết
+        # dữ liệu bắt buộc (token rỗng trông giống "đã điền").
+        missing_auth = sorted(
+            slot for slot in word_engine.required_authorized_slots(doc)
+            if slot > len(context.authorized_people))
+        if missing_auth:
+            raise _DocFailed(
+                "word.missing_authorized_person",
+                "Mẫu yêu cầu người được ủy quyền "
+                + ", ".join(str(slot) for slot in missing_auth)
+                + " nhưng hồ sơ chưa gán đủ vai trò đó")
         mapping = mapping_holder.get("mapping")
         if mapping is None:
-            mapping = word_engine.build_template_mapping(case, today=today)
+            mapping = (word_engine.build_template_mapping(case, today=today, static=True)
+                       if static else word_engine.build_template_mapping(case, today=today))
             mapping_holder["mapping"] = mapping
         word_engine.replace_in_doc(doc, mapping)
-        unresolved = word_engine.find_unresolved_placeholders(doc)
+        unresolved = word_engine.find_unresolved_placeholders(
+            doc, template_ref=template_path)
         if unresolved:
             raise _DocFailed(
                 "word.unresolved_placeholders",
@@ -428,16 +558,20 @@ def _export_one_document(*, spec: WordDocumentSpec, case: Any,
 
 
 def export_options(case: Any, *, resolve_template: Callable[[str], Any],
-                   today: Any = None) -> dict:
+                   today: Any = None,
+                   doc_specs: Optional[list[WordDocumentSpec]] = None
+                   ) -> dict:
     """`result.data` của notary.word_export_options — read-only.
 
     Liệt kê TOÀN BỘ catalog (không chỉ template active); block_reason
     theo `word_engine.word_block_reason` — cùng semantics với render.
-    """
+
+    `doc_specs` (NAIA-8): danh sách spec động từ `scan_template_dir` —
+    thay DOC_CATALOG khi nguồn mẫu là thư mục người dùng chọn."""
     context = word_engine.build_word_context(case, today=today)
-    data_reason = word_engine.word_block_reason(context)
+    data_reason = word_engine.word_block_reason(context, static=doc_specs is not None)
     documents = []
-    for spec in DOC_CATALOG:
+    for spec in (doc_specs if doc_specs is not None else DOC_CATALOG):
         block = None
         if not spec.has_template:
             block = "word.template_missing"
@@ -458,17 +592,61 @@ def export_batch(case: Any, *, case_id: int, document_keys: Any,
                  dest_dir: Any, resolve_template: Callable[[str], Any],
                  check_cancel: Optional[Callable[[dict], None]] = None,
                  report_progress: Optional[Callable] = None,
-                 today: Any = None) -> dict:
+                 today: Any = None,
+                 doc_specs: Optional[list[WordDocumentSpec]] = None,
+                 create_case_subdir: bool = False) -> dict:
     """`result.data` của notary.word_export_batch — read snapshot + ghi file.
 
     `check_cancel(data)` được gọi GIỮA các văn bản với result.data hiện
     tại (doc chưa bắt đầu → skipped) — caller bọc job.check_cancel(result)
     của jobstore để canceled job vẫn mang breakdown (MIN-115).
 
+    `doc_specs` (NAIA-8): spec động từ `scan_template_dir` — khi truyền,
+    `document_keys` được đối chiếu lại với ĐÚNG tập file của thư mục
+    được cấp quyền (folder-authorized), không phải catalog cố định.
+    `create_case_subdir=True` → ghi vào `<dest>/HS-<case_id>/`
+    (tạo nếu thiếu; file bên trong vẫn không bao giờ ghi đè);
+    `data.destination` trong result vẫn là thư mục người dùng chọn
+    (contract §8.2).
+
     Tất cả failed → WordBatchError("word_batch_failed", result_data=...).
     """
-    keys = validate_document_keys(document_keys)
-    dest_dir = Path(dest_dir)
+    # Catalog map (không phải tuple) — test/caller có thể patch entry
+    # theo key; folder mode override bằng doc_specs của thư mục mẫu.
+    specs = ({spec.document_key: spec for spec in doc_specs}
+             if doc_specs is not None else DOC_CATALOG_BY_KEY)
+    keys = validate_document_keys(
+        document_keys,
+        allowed_keys=set(specs) if doc_specs is not None else None)
+    granted_dir = Path(dest_dir)     # thư mục người dùng chọn (result)
+    dest_dir = granted_dir
+    if create_case_subdir:
+        dest_dir = granted_dir / f"HS-{case_id}"
+        try:
+            dest_dir.mkdir(exist_ok=True)
+        except FileExistsError:
+            raise WordBatchError(
+                "file_locked",
+                "thư mục con hồ sơ bị chặn bởi file cùng tên") from None
+        except OSError as exc:
+            raise WordBatchError(
+                "file_locked",
+                f"không tạo được thư mục con hồ sơ: {exc}") from exc
+        # `HS-<case_id>` tồn tại sẵn dạng junction/symlink trỏ ra ngoài:
+        # mkdir(exist_ok=True) chấp nhận vì "đã có dir" và mọi ghi sau đó
+        # thoát khỏi thư mục được cấp quyền. Kiểm tra đích THẬT (đuổi
+        # theo reparse point mọi cấp) phải nằm trong granted dir —
+        # TRƯỚC probe/ghi/publish.
+        try:
+            granted_real = granted_dir.resolve()
+        except (OSError, RuntimeError) as exc:
+            raise WordBatchError(
+                "file_not_found",
+                f"không xác định được destination: {exc}") from exc
+        if not _contained_in(dest_dir, granted_real):
+            raise WordBatchError(
+                "word_path_traversal",
+                "thư mục con hồ sơ trỏ ra ngoài thư mục đích được chọn")
     if not dest_dir.is_dir():
         raise WordBatchError(
             "file_not_found",
@@ -485,9 +663,9 @@ def export_batch(case: Any, *, case_id: int, document_keys: Any,
         entries = list(docs)
         remaining = keys[len(entries):]
         for key in remaining:
-            entries.append(_skipped_entry(DOC_CATALOG_BY_KEY[key]))
+            entries.append(_skipped_entry(specs[key]))
         return _batch_data(
-            dest_dir, entries, succeeded=list(saved),
+            granted_dir, entries, succeeded=list(saved),
             failed=list(failed), skipped=list(remaining))
 
     def _check() -> None:
@@ -518,12 +696,12 @@ def export_batch(case: Any, *, case_id: int, document_keys: Any,
     data_reason = None
     if dest_error is None:
         context = word_engine.build_word_context(case, today=today)
-        data_reason = word_engine.word_block_reason(context)
+        data_reason = word_engine.word_block_reason(context, static=doc_specs is not None)
     mapping_holder: dict = {}
 
     for key in keys:
         _check()                                   # cancel giữa batch
-        spec = DOC_CATALOG_BY_KEY[key]
+        spec = specs[key]
         if dest_error is not None:
             code, message = dest_error
             entry = _failed_entry(spec, code, message)
@@ -532,14 +710,24 @@ def export_batch(case: Any, *, case_id: int, document_keys: Any,
                 spec=spec, case=case, context=context,
                 data_reason=data_reason, resolve_template=resolve_template,
                 mapping_holder=mapping_holder, dest_dir=dest_dir,
-                taken=taken, case_id=case_id, today=today, check=_check)
+                taken=taken, case_id=case_id, today=today, check=_check,
+                static=doc_specs is not None)
         docs.append(entry)
         (saved if entry["status"] == "saved" else failed).append(key)
         if report_progress is not None:
-            report_progress(len(docs), total,
-                            f"văn bản {len(docs)}/{total}")
+            try:
+                report_progress(len(docs), total,
+                                f"văn bản {len(docs)}/{total}")
+            except Exception:
+                # jobstore.report_progress cung la cancel checkpoint va
+                # raise CancelledByUser() KHONG kem result — _check() de
+                # cancel van mang pending snapshot (doc -> skipped) len
+                # wire (contract §8.4 canceled example, MIN-115); exception
+                # khac thi _check() no-op roi re-raise nguyen ban.
+                _check()
+                raise
 
-    data = _batch_data(dest_dir, docs, succeeded=saved, failed=failed,
+    data = _batch_data(granted_dir, docs, succeeded=saved, failed=failed,
                        skipped=[])
     if len(failed) == total:
         raise WordBatchError(                      # §8.4 — job failed
@@ -561,5 +749,7 @@ __all__ = [
     "export_batch",
     "export_options",
     "is_safe_windows_filename",
+    "scan_template_dir",
+    "template_path_resolver",
     "validate_document_keys",
 ]

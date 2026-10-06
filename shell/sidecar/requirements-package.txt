@@ -28,6 +28,7 @@ python-multipart==0.0.9
 SQLAlchemy==2.0.47
 openpyxl==3.1.2
 python-docx==1.1.2
+regex==2026.9.29
 PyMuPDF==1.24.5
 PyMuPDFb==1.24.3
 playwright==1.63.0

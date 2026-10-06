@@ -22,6 +22,14 @@ Input → gợi ý chờ duyệt → Stage → Pool → Diagram → Word
 Ngoài flow chính, [`fast-text-audit.md`](./fast-text-audit.md) mô tả CLI độc
 lập để so Word với scan. Công cụ này không ghi Stage, Diagram hoặc database.
 
+[`administrative-timeline.md`](./administrative-timeline.md) giữ kho local tên
+xã/huyện/tỉnh và lịch sử nhiều bước; Bando là nguồn tên hiện hành, phần chưa rõ
+ngày/danh tính giữ chờ xác nhận.
+Luật tra trên kho là [lõi dùng chung](../shared/administrative-lookup.md);
+[administrative-address.md](./administrative-address.md) là Draft cách hồ sơ gọi
+lõi, runtime chưa đáp ứng; nhập DOCX là luồng độc lập tại
+[input/docx-import.md](./input/docx-import.md).
+
 ## 2. Bất biến của module
 
 - Input chỉ tạo gợi ý; người dùng phải xác nhận trước khi vào Stage.
@@ -76,12 +84,24 @@ Quy tắc màu, chữ, khoảng cách và thao tác dùng chung nằm tại
 - Stage commit gồm Người + Tài sản trong một transaction.
 - Xóa phần tử Stage rồi commit phải prune tham chiếu Diagram trong cùng
   transaction.
+- **Từ điển dữ liệu Người, Tài sản, Hồ sơ và quy tắc suy ra (Owner chốt 01/10/2026):**
+  * **Người (`customers`):** 6 trường nghiệp vụ chính (`ten`, `ngaysinh`, `ngaychet`, `sogiayto`, `ngaycap`, `diachi`); DB còn giữ giới tính và cột kỹ thuật. Người sống suy loại giấy tờ/nơi cấp/nhãn cư trú theo ngày cấp, mốc 01/10/2024; thiếu ngày để trống. Người chết dùng bằng chứng đã xác nhận trong snapshot cho loại giấy tờ/nơi cấp, nhãn địa chỉ là `Nơi chết`. Quê quán chỉ lưu snapshot hồ sơ.
+  * **Tài sản (`properties`):** Bỏ trường lẻ `thoi_han` mồ côi; lưu theo cụm `(loaidat, dientich, thoihan)` 1..20; đa tài sản đánh số kết hợp như `loaidat12`.
+  * **Hồ sơ (`inheritance_cases`):** Bổ sung `noiniemyet` (nhập tay; gợi ý theo [tra cứu địa chỉ](./administrative-address.md) đang triển khai), `nguoinhanuyquyen` (danh mục quen/tạo mới), `noidungviec` (cụm text thủ công); UI hiển thị 3 dòng dưới tài sản, giảm 10% chiều cao ô nhập.
+  * **Rule chung:** Đặt tên tiếng Việt không dấu, viết liền số nếu có (`loaidat1`). Xem chi tiết tại `contracts/entities.md` §8–§9.
+- **Xóa hồ sơ nháp (MIN-141 đợt 4):** chỉ hồ sơ `draft` được xóa; xóa kèm dọn master (`customers`/`properties`) "thuộc hồ sơ" — người chết, tài sản chính, participant kể cả `parent_customer_id`, tài sản link phụ — nhưng CHỈ khi master đó không còn tham chiếu từ hồ sơ khác (`nguoi_chet_id`/`tai_san_id`/`nguoi_nhan_uy_quyen_id`), participant còn lại, `inheritance_case_properties` còn lại, hoặc snapshot `case_state_json`/`engine_state_json` của hồ sơ còn tồn tại. Người nhận ủy quyền là danh bạ tái dùng — không bị xóa theo hồ sơ; không quét danh bạ mồ côi ngoài phạm vi hồ sơ. Toàn bộ trong một transaction, lỗi → rollback.
+- **Thống kê (`/api/stats`):** `customers`/`properties` đếm DISTINCT master thực sự gắn hồ sơ qua case/participant/link/snapshot — danh bạ trơ chưa gắn hồ sơ không tính; tài sản vừa primary vừa link đếm một lần. `cases`/`locked` đếm số hồ sơ như cũ.
+
+- **Gộp MIN-141 (Owner xác nhận 03/10/2026):** giữ hành vi cuối 14 commit worker; các quy tắc Stage thay MIN-140 ghi tại [`stage.md`](./stage.md) §5.
 
 ### Còn mở
 
-- Từ điển dữ liệu Người đầy đủ: ai nhập/xem/sửa, nguồn, công thức, nơi lưu và
-  placeholder nào dùng. Không suy ngược từ code hay template Word.
 - Quy tắc per-asset, contract A/B và owner scope chưa được suy từ các flag cũ.
+- Tích hợp bảng tra địa chỉ vào hồ sơ (NAIA-9): kho lịch sử đã có tại
+  [`administrative-timeline.md`](./administrative-timeline.md), luồng sử dụng tại
+  [`administrative-address.md`](./administrative-address.md), luật tra tại
+  [lõi dùng chung](../shared/administrative-lookup.md); ngày hiệu lực và
+  danh tính cũ còn chờ nguồn, không gán chung 01/07/2025.
 
 ## 7. Nguồn khi sửa code
 

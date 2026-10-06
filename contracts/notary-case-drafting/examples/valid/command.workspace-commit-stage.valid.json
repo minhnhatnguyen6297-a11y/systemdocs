@@ -1,5 +1,7 @@
 {
-  "fixture_context": { "server_revision": 1 },
+  "fixture_context": {
+    "server_revision": 1
+  },
   "contract_version": "desktopcommand.v1",
   "command_id": "a1b2c3d4-0006-4006-8006-000000000006",
   "command": "notary.workspace_commit_stage",
@@ -19,7 +21,9 @@
           "ngay_cap": "2010-06-15",
           "noi_cap": "CA Hà Nội",
           "dia_chi": "Số 1 phố Huế, Hà Nội",
-          "place_of_origin": "Hà Nam"
+          "place_of_origin": "Hà Nam",
+          "loai_giay_to": null,
+          "loai_dia_chi": null
         },
         {
           "row_id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
@@ -32,7 +36,9 @@
           "ngay_cap": "2021-01-10",
           "noi_cap": "Cục CSĐKQL cư trú và DLQG về dân cư",
           "dia_chi": "Số 5 phố Bạch Mai, Hà Nội",
-          "place_of_origin": null
+          "place_of_origin": null,
+          "loai_giay_to": null,
+          "loai_dia_chi": null
         }
       ],
       "assets": [
@@ -52,11 +58,18 @@
           "ngay_cap": "2005-09-30",
           "co_quan_cap": "UBND quận Hai Bà Trưng",
           "land_rows": [
-            { "loai_dat": "ODT", "dien_tich": 85.5, "thoi_han": "Lâu dài" }
+            {
+              "loai_dat": "ODT",
+              "dien_tich": 85.5,
+              "thoi_han": "Lâu dài"
+            }
           ]
         }
       ]
     }
   },
-  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+  "client_meta": {
+    "shell_version": "0.1.0",
+    "module": "document-review"
+  }
 }

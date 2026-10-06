@@ -1,7 +1,9 @@
 # Word Export UX và Flow
 
-Cập nhật: 24/09/2026 — phân biệt hiện trạng web / đích Electron ở §5 và §7
-(MIN-104). Bản gốc 22/07/2026 chỉ mô tả hiện trạng web.
+Cập nhật: 04/10/2026 — tích hợp NAIA-8/12 và giữ snapshot MIN-141.
+Bản gốc 22/07/2026 mô tả web; quy tắc hiện hành ở
+[`word-output.md`](./word-output.md). Các điều kiện pháp lý dưới đây dành cho
+catalog web/legacy; phase thư mục mẫu chỉ chặn lỗi kỹ thuật.
 
 ## 1. Mục đích
 
@@ -62,11 +64,29 @@ Ví dụ:
 [Chủ đất chết 1 - Ngày chết]
 ```
 
-- `[Người 3 - ...]`: `3` là số người trên Diagram.
+- `[Người 3 - ...]`: `3` là thứ tự dòng Stage đã lưu, kể cả chưa có node.
+  Hai bên dùng cùng thứ tự Stage cho Người; `[Bên A N - ...]`/`[Bên B N - ...]`
+  theo ghế cố định, ghế trống giữ nguyên vị trí.
 - `[Người nhận 1 - ...]`: `1` là thứ tự của người nhận trong danh sách.
 - Trường dùng chung: họ tên, xưng hô, giới tính, ngày sinh, ngày chết,
   giấy tờ, ngày/nơi cấp, địa chỉ, quan hệ, vai trò, tỷ lệ.
+- Tên chuẩn `entities.md` (viết liền, không dấu, không `_`) cũng được
+  thay: `[noiniemyet]`, `[nguoinhanuyquyen]`, `[noidungviec]`,
+  `[ngaylaphoso]`, `[ghichu]`, `[documenttype]` cho hồ sơ; `[ten1]`,
+  `[gioitinh1]`, `[ngaysinh1]`, `[ngaychet1]`, `[sogiayto1]`,
+  `[ngaycap1]`, `[diachi1]`, `[loaigiayto1]`, `[noicap1]`,
+  `[loaicutru1]`/`[loaidiachi1]` cho người số `N` (giá trị trùng alias
+  tiếng Việt tương ứng).
 - Alias cũ được giữ để mở template cũ nhưng không dùng làm mẫu mới.
+
+### Cập nhật MIN-141 (Owner xác nhận 03/10/2026)
+
+Tài sản và thông tin hồ sơ đọc snapshot đã commit; field người trong slot
+legacy cũng đọc snapshot, fallback master chỉ khi key thiếu. Null đã lưu
+không bị thay bằng dữ liệu dùng chung mới. Không đắp thời hạn lẻ vào cụm.
+Token `[loaidatMN]`/`[dientichMN]`/`[thoihanMN]` hỗ trợ 20 cụm mỗi tài sản;
+M là cụm, N là tài sản. Nơi niêm yết chưa nhập để trống, không lấy địa chỉ đất.
+Đây là runtime hiện tại; phase engine tĩnh trong `word-output.md` vẫn Draft.
 
 ## 5. UX xuất Word
 

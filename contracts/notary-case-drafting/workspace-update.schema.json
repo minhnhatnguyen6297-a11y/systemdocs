@@ -1,0 +1,204 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://systemdocs/contracts/notary-case-drafting/workspace-update.schema.json",
+  "title": "notary.workspace_update — payload + result.data (§6.2, NAIA-8)",
+  "description": "Cập nhật meta hồ sơ đã lưu (ngay_lap_ho_so, noi_niem_yet, ghi_chu) — không đụng Stage/Diagram. base_revision khác server → workspace_conflict là rule ngữ cảnh, kiểm ở validate_examples.py, không nằm trong schema. Normative text: contracts/notary-case-drafting.md §6.2 (v1) + §13 (v2).",
+  "definitions": {
+    "case_meta_patch": {
+      "type": "object",
+      "description": "Chỉ 3 meta cập nhật được; patch rỗng, không phải object hoặc key lạ (kể cả case_type/document_type — định danh không đổi sau create) → validation_error (§6.2)",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "ngay_lap_ho_so": {
+          "$ref": "common.schema.json#/definitions/date_full"
+        },
+        "noi_niem_yet": {
+          "$ref": "common.schema.json#/definitions/nullable_string"
+        },
+        "ghi_chu": {
+          "$ref": "common.schema.json#/definitions/nullable_string"
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "description": "Version-agnostic — cùng shape cho wire v1 lẫn v2 (§13)",
+      "required": [
+        "case_id",
+        "base_revision",
+        "case"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "base_revision": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Revision client đang giữ; khác server → workspace_conflict (kiểm ngữ cảnh ở validator)"
+        },
+        "case": {
+          "$ref": "#/definitions/case_meta_patch"
+        }
+      }
+    },
+    "case_v2": {
+      "type": "object",
+      "description": "case theo shape §4 trên wire v2 (§13): case_type ∈ {inheritance, two_party}; document_type theo case_type — hai bên dùng bộ hợp đồng, thừa kế dùng bộ v1",
+      "required": [
+        "id",
+        "case_type",
+        "document_type",
+        "status",
+        "locked",
+        "revision",
+        "ngay_lap_ho_so",
+        "noi_niem_yet",
+        "ghi_chu",
+        "nguoi_nhan_uy_quyen",
+        "nguoi_nhan_uy_quyen_id",
+        "noi_dung_viec"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "case_type": {
+          "enum": [
+            "inheritance",
+            "two_party"
+          ]
+        },
+        "document_type": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "draft",
+            "locked"
+          ]
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "ngay_lap_ho_so": {
+          "$ref": "common.schema.json#/definitions/date_full"
+        },
+        "noi_niem_yet": {
+          "$ref": "common.schema.json#/definitions/nullable_string"
+        },
+        "ghi_chu": {
+          "$ref": "common.schema.json#/definitions/nullable_string"
+        },
+        "nguoi_nhan_uy_quyen": {
+          "$ref": "common.schema.json#/definitions/nullable_string"
+        },
+        "nguoi_nhan_uy_quyen_id": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "noi_dung_viec": {
+          "$ref": "common.schema.json#/definitions/nullable_string"
+        }
+      },
+      "if": {
+        "properties": {
+          "case_type": {
+            "const": "two_party"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "document_type": {
+            "enum": [
+              "chuyen_nhuong",
+              "tang_cho",
+              "cho_thue",
+              "dat_coc"
+            ]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "document_type": {
+            "enum": [
+              "khai_nhan",
+              "thoa_thuan"
+            ]
+          }
+        }
+      }
+    },
+    "result_data_v1": {
+      "type": "object",
+      "description": "§6.2 — schema_version v1 (corpus ví dụ contract)",
+      "required": [
+        "schema_version",
+        "revision",
+        "case"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "$ref": "common.schema.json#/definitions/schema_version"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Revision mới sau update — tăng đúng 1 (kiểm ngữ cảnh ở validator)"
+        },
+        "case": {
+          "$ref": "workspace.schema.json#/definitions/result_data/properties/case"
+        }
+      }
+    },
+    "result_data_v2": {
+      "type": "object",
+      "description": "§6.2 + §13 — backend P5 emit schema_version v2 thống nhất; case mang case_type/document_type theo §13.6",
+      "required": [
+        "schema_version",
+        "revision",
+        "case"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "$ref": "draft-v2.schema.json#/definitions/schema_version_v2"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Revision mới sau update — tăng đúng 1 (kiểm ngữ cảnh ở validator)"
+        },
+        "case": {
+          "$ref": "#/definitions/case_v2"
+        }
+      }
+    },
+    "result_data": {
+      "description": "result.data §6.2 — nhánh v1 (corpus v1) hoặc v2 (§13.1 backend emit v2 thống nhất, gồm two_party)",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/result_data_v1"
+        },
+        {
+          "$ref": "#/definitions/result_data_v2"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "fixture_context": {
+    "case_type": "inheritance",
+    "note": "NAIA-8 folder mode: template_dir chỉ nguồn mẫu; document_keys = basename .docx đã quét; create_case_subdir → ghi vào <destination>/HS-<case_id>/"
+  },
+  "contract_version": "desktopcommand.v1",
+  "command": "notary.word_export_batch",
+  "command_id": "a1b2c3d4-2009-4001-8001-000000000010",
+  "payload": {
+    "case_id": 7,
+    "document_keys": ["Mau don xin chung thuc.docx", "To tuyet doi.docx"],
+    "destination": {
+      "path": "D:\\out",
+      "scope": "machine_local",
+      "is_dir": true
+    },
+    "template_dir": {
+      "path": "D:\\templates",
+      "scope": "machine_local",
+      "is_dir": true
+    },
+    "create_case_subdir": true
+  }
+}

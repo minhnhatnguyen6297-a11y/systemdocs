@@ -86,7 +86,10 @@ function canonicalTwoParty(nodes) {
 // position > len(assets), canonical 30 slot cho two_party.
 function fakeClient(seed) {
   const cases = {};
+  const catalog = JSON.parse(
+    JSON.stringify((seed && seed.__customers) || []));
   for (const [cid, c] of Object.entries(seed)) {
+    if (cid === '__customers') continue;
     cases[Number(cid)] = JSON.parse(JSON.stringify(c));
     cases[Number(cid)].id = Number(cid);
   }
@@ -135,6 +138,9 @@ function fakeClient(seed) {
         locked: !!c.locked, revision: c.revision,
         ngay_lap_ho_so: c.ngay_lap_ho_so ?? null,
         noi_niem_yet: c.noi_niem_yet ?? null,
+        nguoi_nhan_uy_quyen: c.nguoi_nhan_uy_quyen ?? null,
+        nguoi_nhan_uy_quyen_id: c.nguoi_nhan_uy_quyen_id ?? null,
+        noi_dung_viec: c.noi_dung_viec ?? null,
         ghi_chu: c.ghi_chu ?? null,
       },
       stage: JSON.parse(JSON.stringify(c.stage)),
@@ -142,7 +148,7 @@ function fakeClient(seed) {
       capabilities: {
         intake: sup ? ['image', 'pdf', 'docx', 'xlsx', 'text'] : [],
         diagram: sup,
-        word_export: c.case_type === 'inheritance',
+        word_export: sup,
       },
     };
   }
@@ -257,6 +263,55 @@ function fakeClient(seed) {
           return fail('stage_validation_error', 'loi field',
                       { field_errors: fieldErrors });
         }
+        // MIN-141 đợt 3: payload.case (neu co) ap cung transaction —
+        // validate immutable type + uq id/name nhu mock adapter.
+        const cm = payload.case;
+        if (cm != null) {
+          if (typeof cm !== 'object' || Array.isArray(cm)) {
+            return fail('validation_error', 'payload.case phai la object');
+          }
+          if (cm.case_type !== undefined && cm.case_type !== c.case_type) {
+            return fail('validation_error',
+                        'case_type immutable', { expected: c.case_type });
+          }
+          if (cm.document_type !== undefined &&
+              cm.document_type !== c.document_type) {
+            return fail('validation_error',
+                        'document_type immutable',
+                        { expected: c.document_type });
+          }
+          const uid = cm.nguoi_nhan_uy_quyen_id;
+          if (uid !== undefined && uid !== null &&
+              (!Number.isInteger(uid) || uid < 1)) {
+            return fail('validation_error',
+                        'nguoi_nhan_uy_quyen_id phai la int >= 1/null');
+          }
+          if (uid != null) {
+            const cust = catalog.find((x) => x.id === uid);
+            if (!cust) {
+              return fail('validation_error',
+                          `nguoi_nhan_uy_quyen_id ${uid} khong ton tai`);
+            }
+            if (cm.nguoi_nhan_uy_quyen !== undefined &&
+                cm.nguoi_nhan_uy_quyen !== null &&
+                cm.nguoi_nhan_uy_quyen !== cust.ho_ten) {
+              return fail('validation_error',
+                          'nguoi_nhan_uy_quyen vs id mau thuan');
+            }
+            c.nguoi_nhan_uy_quyen = cust.ho_ten;
+            c.nguoi_nhan_uy_quyen_id = cust.id;
+          } else if ('nguoi_nhan_uy_quyen' in cm) {
+            c.nguoi_nhan_uy_quyen = cm.nguoi_nhan_uy_quyen;
+            c.nguoi_nhan_uy_quyen_id = null;
+          }
+          for (const f of ['noi_niem_yet', 'noi_dung_viec', 'ghi_chu']) {
+            if (f in cm) c[f] = cm[f];
+          }
+          if (cm.ngay_lap_ho_so !== undefined &&
+              cm.ngay_lap_ho_so !== null) {
+            c.ngay_lap_ho_so = cm.ngay_lap_ho_so;
+          }
+        }
         c.stage = JSON.parse(JSON.stringify(stage));
         for (const row of [...c.stage.people, ...c.stage.assets]) {
           if (row.entity_id == null) row.entity_id = nextEid++;
@@ -369,6 +424,11 @@ function fakeClient(seed) {
           status: 'draft', locked: false, revision: 1,
           ngay_lap_ho_so: payload.case.ngay_lap_ho_so ?? null,
           noi_niem_yet: payload.case.noi_niem_yet ?? null,
+          nguoi_nhan_uy_quyen:
+            payload.case.nguoi_nhan_uy_quyen ?? null,
+          nguoi_nhan_uy_quyen_id:
+            payload.case.nguoi_nhan_uy_quyen_id ?? null,
+          noi_dung_viec: payload.case.noi_dung_viec ?? null,
           ghi_chu: payload.case.ghi_chu ?? null,
           stage: stored,
           diagram: {
@@ -380,6 +440,46 @@ function fakeClient(seed) {
         cases[c.id] = c;
         idem[key] = c.id;
         return ok({ ...workspaceData(c), created: true });
+      }
+      case 'notary.customer_list': {
+        // MIN-141 đợt 3: danh ba gia — loc theo ten/so giay to/dia chi.
+        const q = String((payload && payload.query) || '').toLowerCase();
+        let rows = catalog.slice();
+        if (q) {
+          rows = rows.filter((x) =>
+            String(x.ho_ten || '').toLowerCase().includes(q) ||
+            String(x.so_giay_to || '').toLowerCase().includes(q) ||
+            String(x.dia_chi || '').toLowerCase().includes(q));
+        }
+        return ok({ customers: rows, total: rows.length },
+                  { type: 'customer_list' });
+      }
+      case 'notary.customer_create': {
+        const name = String((payload && payload.ho_ten) || '').trim();
+        if (!name) {
+          return fail('validation_error', 'ho_ten bat buoc');
+        }
+        const sgt = String((payload && payload.so_giay_to) || '')
+          .trim() || null;
+        let cust = sgt &&
+          catalog.find((x) => x.so_giay_to === sgt);
+        if (cust) {
+          cust.ho_ten = name;
+          return ok({ customer: cust, updated: true },
+                    { type: 'customer_upsert' });
+        }
+        cust = {
+          id: nextEid++, ho_ten: name,
+          gioi_tinh: payload.gioi_tinh ?? null,
+          ngay_sinh: payload.ngay_sinh ?? null,
+          ngay_chet: payload.ngay_chet ?? null,
+          so_giay_to: sgt,
+          ngay_cap: payload.ngay_cap ?? null,
+          dia_chi: payload.dia_chi ?? null,
+        };
+        catalog.push(cust);
+        return ok({ customer: cust, updated: false },
+                  { type: 'customer_upsert' });
       }
       case 'notary.diagram_evaluate': {
         if (payload.case_id == null) {
@@ -496,6 +596,34 @@ function fakeClient(seed) {
           },
         });
       }
+      case 'notary.workspace_update': {
+        // §6.2: cap nhat meta case da luu (khong cham stage/diagram),
+        // revision+1; workspace_conflict/locked nhu moi write.
+        const { c, err } = getCase(payload);
+        if (err) return err;
+        if (c.locked) return fail('workspace_locked', 'da khoa');
+        if (payload.base_revision !== c.revision) {
+          return fail('workspace_conflict', 'revision khac',
+                      { server_revision: c.revision });
+        }
+        const cm = payload.case;
+        if (!cm || typeof cm !== 'object' || Array.isArray(cm) ||
+            !Object.keys(cm).length) {
+          return fail('validation_error', 'case meta rong');
+        }
+        for (const k of Object.keys(cm)) {
+          if (!['ngay_lap_ho_so', 'noi_niem_yet', 'ghi_chu'].includes(k)) {
+            return fail('validation_error', `key la: ${k}`);
+          }
+          c[k] = cm[k];
+        }
+        c.revision += 1;
+        return ok({
+          schema_version: SCHEMA,
+          revision: c.revision,
+          case: workspaceData(c).case,
+        });
+      }
       case 'notary.intake_analyze': {
         if (payload.case_id !== undefined) {
           if (payload.case_id === null) {
@@ -527,8 +655,23 @@ function fakeClient(seed) {
       case 'notary.word_export_options': {
         const { c, err } = getCase(payload);
         if (err) return err;
-        if (isTp(c)) {
-          return fail('case_type_unsupported', 'two_party khong word');
+        if (!supported(c)) {
+          return fail('case_type_unsupported', 'case type khong ho tro');
+        }
+        // NAIA-8 folder mode: template_dir co mat → nguon mau la cac
+        // .docx trong thu muc (fake tra tap co dinh, key = basename).
+        if (payload.template_dir) {
+          return ok({
+            schema_version: SCHEMA,
+            documents: [
+              { document_key: 'Mau thue nha.docx',
+                display_name: 'Mau thue nha',
+                ready: true, block_reason: null },
+              { document_key: 'To cam ket.docx',
+                display_name: 'To cam ket',
+                ready: true, block_reason: null },
+            ],
+          });
         }
         return ok({
           schema_version: SCHEMA,
@@ -544,13 +687,14 @@ function fakeClient(seed) {
       case 'notary.word_export_batch': {
         const { c, err } = getCase(payload);
         if (err) return err;
-        if (isTp(c)) {
-          return fail('case_type_unsupported', 'two_party khong word');
+        if (!supported(c)) {
+          return fail('case_type_unsupported', 'case type khong ho tro');
         }
         const docs = payload.document_keys.map((k) => ({
           document_key: k, display_name: k,
           status: k === 'niem_yet' ? 'failed' : 'saved',
-          actual_filename: k === 'niem_yet' ? null : `${k}_HS-42.docx`,
+          actual_filename: k === 'niem_yet' ? null
+            : `${k.replace(/\.docx$/i, '')}_HS-42.docx`,
           output_file: null,
           error: k === 'niem_yet'
             ? { code: 'word.template_missing', message: 'no template' }
@@ -619,7 +763,7 @@ test('openCase: tai workspace ready — stage/diagram/revision/mock banner', asy
   assert.equal(raw.includes('is_primary'), false);
 });
 
-test('openCase: two_party — domain/state 30 slot canonical, word_export off', async () => {
+test('openCase: two_party — domain/state 30 slot canonical, word_export on (NAIA-8)', async () => {
   const { model } = makeModel(seedCases('ready-two-party'));
   const r = await model.openCase(48);
   assert.equal(r.ok, true);
@@ -632,7 +776,7 @@ test('openCase: two_party — domain/state 30 slot canonical, word_export off', 
   assert.deepEqual(s.diagram.nodes.map((n) => n.id), TP_IDS);
   assert.equal(s.renderModel.status, 'unsupported');
   assert.equal(s.capabilities.diagram, true);
-  assert.equal(s.capabilities.word_export, false);
+  assert.equal(s.capabilities.word_export, true);
 });
 
 test('openCase: backend_mode real thi khong co banner mo phong', async () => {
@@ -1234,12 +1378,243 @@ test('wordExportOptions + exportWord: options/result theo tung van ban', async (
   assert.equal(res.breakdown.failed.length, 1);
 });
 
-test('word tren two_party: server tu choi case_type_unsupported', async () => {
+test('word tren two_party: duoc phep (NAIA-8) — options + batch', async () => {
   const { model } = makeModel(seedCases('ready-two-party'));
   await model.openCase(48);
   const o = await model.loadWordOptions();
-  assert.equal(o.ok, false);
-  assert.equal(o.error.code, 'case_type_unsupported');
+  assert.equal(o.ok, true);
+  assert.equal(model.state.wordOptions.length, 2);
+
+  const r = await model.exportWord(
+    ['khai_nhan_di_san'],
+    { path: 'D:/out', scope: 'machine_local', is_dir: true });
+  assert.equal(r.ok, true);
+  assert.deepEqual(
+    model.state.wordResult.breakdown.succeeded, ['khai_nhan_di_san']);
+});
+
+test('word folder mode (NAIA-8): template_dir + create_case_subdir len wire', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const dirToken = { file_token: 'tok-tpl-dir' };
+
+  const o = await model.loadWordOptions(dirToken);
+  assert.equal(o.ok, true);
+  // Folder mode: documents la file .docx quet duoc (key = basename).
+  assert.deepEqual(
+    model.state.wordOptions.map((d) => d.document_key),
+    ['Mau thue nha.docx', 'To cam ket.docx']);
+  const optCall = client.calls.find(
+    (c) => c.command === 'notary.word_export_options');
+  assert.deepEqual(optCall.payload.template_dir, dirToken);
+
+  const r = await model.exportWord(
+    ['Mau thue nha.docx'],
+    { path: 'D:/out', scope: 'machine_local', is_dir: true },
+    { templateDir: dirToken, createCaseSubdir: true });
+  assert.equal(r.ok, true);
+  const call = client.calls.find(
+    (c) => c.command === 'notary.word_export_batch');
+  assert.deepEqual(call.payload.template_dir, dirToken);
+  assert.equal(call.payload.create_case_subdir, true);
+  assert.equal(call.payload.destination.is_dir, true);
+  assert.deepEqual(
+    model.state.wordResult.breakdown.succeeded, ['Mau thue nha.docx']);
+});
+
+// NAIA-8 review: doi folder giua chung — chi response MOI NHAT duoc ap
+// vao state; thanh cong/loi cua scan cu deu phai bi bo.
+function scanClient(seed, handlers) {
+  const base = fakeClient(seed);
+  return {
+    calls: base.calls, cases: base.cases,
+    run: async (cmd, payload) => {
+      if (cmd === 'notary.word_export_options' && payload.template_dir) {
+        const h = handlers[payload.template_dir.file_token];
+        return h ? h() : { ok: false, error: {
+          code: 'file_not_found', message: 'khong thay thu muc',
+          retryable: false, next_action: null, details: null } };
+      }
+      return base.run(cmd, payload);
+    },
+  };
+}
+const docsOf = (keys) => ({ ok: true, data: {
+  schema_version: SCHEMA,
+  documents: keys.map((k) => ({
+    document_key: k, display_name: k.replace(/\.docx$/i, ''),
+    ready: true, block_reason: null })) } });
+const deferred = () => {
+  let resolve;
+  const promise = new Promise((res) => { resolve = res; });
+  return { promise, resolve };
+};
+
+test('loadWordOptions: doi folder — xoa options ngay + chi response moi nhat thang (response dao)', async () => {
+  // Hai folder TRUNG basename "mau" nhung token khac nhau — dinh danh
+  // scan la file_token, khong phai ten hien thi (NAIA-8 review).
+  const dA = deferred();
+  const dB = deferred();
+  const client = scanClient(seedCases('ready'), {
+    'tok-A-mau': () => dA.promise,
+    'tok-B-mau': () => dB.promise,
+  });
+  const model = M.createModel({ client, uuid });
+  await model.openCase(42);
+  const pA = model.loadWordOptions({ file_token: 'tok-A-mau' });
+  // Cho A quet xong de co options roi doi folder.
+  dA.resolve(docsOf(['a1.docx', 'a2.docx']));
+  assert.equal((await pA).ok, true);
+  assert.deepEqual(
+    model.state.wordOptions.map((d) => d.document_key),
+    ['a1.docx', 'a2.docx']);
+
+  const dA2 = deferred();
+  // Scan lai folder A (re-scan) roi ngay lap tuc doi sang B.
+  const pA2 = model.loadWordOptions({ file_token: 'tok-A-mau' });
+  // Lai nay van cho — nhung phai xoa options cu NGAY.
+  assert.equal(model.state.wordOptions, null);
+  const pB = model.loadWordOptions({ file_token: 'tok-B-mau' });
+  // B ve truoc → state la danh sach cua B.
+  dB.resolve(docsOf(['b.docx']));
+  assert.equal((await pB).ok, true);
+  assert.deepEqual(
+    model.state.wordOptions.map((d) => d.document_key), ['b.docx']);
+  // A tre ve sau — KHONG duoc de len options cua B.
+  dA2.resolve(docsOf(['a-late.docx']));
+  const rA2 = await pA2;
+  assert.equal(rA2.stale, true);
+  assert.deepEqual(
+    model.state.wordOptions.map((d) => d.document_key), ['b.docx']);
+});
+
+test('loadWordOptions: loi cua scan cu ve muon → khong set state.error', async () => {
+  const dA = deferred();
+  const client = scanClient(seedCases('ready'), {
+    'tok-A': () => dA.promise,
+    'tok-B': async () => docsOf(['b.docx']),
+  });
+  const model = M.createModel({ client, uuid });
+  await model.openCase(42);
+  const pA = model.loadWordOptions({ file_token: 'tok-A' });
+  const pB = model.loadWordOptions({ file_token: 'tok-B' });
+  assert.equal((await pB).ok, true);
+  // A fail tre — bi bo, state.error khong bi set boi scan cu.
+  dA.resolve({ ok: false, error: {
+    code: 'file_not_found', message: 'A khong doc duoc',
+    retryable: false, next_action: null, details: null } });
+  const rA = await pA;
+  assert.equal(rA.stale, true);
+  assert.equal(model.state.error, null);
+  assert.deepEqual(
+    model.state.wordOptions.map((d) => d.document_key), ['b.docx']);
+});
+
+test('loadWordOptions: scan moi nhat fail → state.error co code loi quet', async () => {
+  const client = scanClient(seedCases('ready'), {
+    'tok-x': async () => docsOf(['x.docx']),
+    'tok-missing': async () => ({ ok: false, error: {
+      code: 'file_not_found', message: 'khong thay thu muc',
+      retryable: false, next_action: null, details: null } }),
+  });
+  const model = M.createModel({ client, uuid });
+  await model.openCase(42);
+  await model.loadWordOptions({ file_token: 'tok-x' });
+  const r = await model.loadWordOptions({ file_token: 'tok-missing' });
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, 'file_not_found');
+  assert.equal(model.state.error.code, 'file_not_found');
+  assert.equal(model.state.wordOptions, null);
+});
+
+test('saveCaseMeta: case da luu → wire workspace_update, revision+1, caseInfo cap nhat', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const rev = model.state.revision;
+  const r = await model.saveCaseMeta({ noi_niem_yet: 'xã Yên Sở' });
+  assert.equal(r.ok, true, JSON.stringify(r.error));
+  const call = client.calls.find(
+    (c) => c.command === 'notary.workspace_update');
+  assert.ok(call);
+  assert.equal(call.payload.case_id, 42);
+  assert.equal(call.payload.base_revision, rev);
+  assert.deepEqual(call.payload.case, { noi_niem_yet: 'xã Yên Sở' });
+  assert.equal(model.state.revision, rev + 1);
+  assert.equal(model.state.caseInfo.noi_niem_yet, 'xã Yên Sở');
+  assert.equal(model.state.notice, 'Đã lưu thông tin hồ sơ');
+  // Reload qua workspace_get thay gia tri da luu (mot nguon du lieu).
+  await model.openCase(42);
+  assert.equal(model.state.caseInfo.noi_niem_yet, 'xã Yên Sở');
+});
+
+test('saveCaseMeta preserves other metadata drafts and refreshes cancel baseline', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  model.updateCaseMeta('noi_dung_viec', 'Nội dung đang sửa');
+  const result = await model.saveCaseMeta({ noi_niem_yet: 'xã Đã Lưu' });
+  assert.equal(result.ok, true);
+  assert.equal(model.state.caseInfo.noi_dung_viec, 'Nội dung đang sửa');
+  assert.equal(model.state.metaDirty, true);
+  assert.equal(model.state.committedCaseInfo.noi_niem_yet, 'xã Đã Lưu');
+});
+
+test('saveCaseMeta keeps edits made to a clean field while response is pending', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const revision = model.state.revision;
+  const committedContent = model.state.committedCaseInfo.noi_dung_viec;
+  assert.equal(model.state.caseInfo.noi_dung_viec, committedContent);
+  const run = client.run;
+  let finish;
+  client.run = (command, payload) => command === 'notary.workspace_update'
+    ? new Promise((resolve) => { finish = async () => resolve(await run(command, payload)); })
+    : run(command, payload);
+  const pending = model.saveCaseMeta({ noi_niem_yet: 'xã Đã Lưu' });
+  assert.equal(typeof finish, 'function');
+  model.updateCaseMeta('noi_dung_viec', 'Sửa khi đang chờ');
+  await finish();
+  const result = await pending;
+  assert.equal(result.ok, true);
+  assert.equal(model.state.caseInfo.noi_dung_viec, 'Sửa khi đang chờ');
+  assert.equal(model.state.committedCaseInfo.noi_dung_viec, committedContent);
+  assert.equal(model.state.committedCaseInfo.noi_niem_yet, 'xã Đã Lưu');
+  assert.equal(model.state.caseInfo.noi_niem_yet, 'xã Đã Lưu');
+  assert.equal(model.state.revision, revision + 1);
+  assert.equal(model.state.metaDirty, true);
+});
+
+test('saveCaseMeta: conflict → ok:false, error ro rang, khong ghi de state', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  client.cases[42].revision += 5;   // ben thu ba da ghi truoc
+  const r = await model.saveCaseMeta({ noi_niem_yet: 'xã X' });
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, 'workspace_conflict');
+  assert.equal(model.state.conflict != null, true);
+  assert.equal(model.state.caseInfo.noi_niem_yet ?? null, null);
+});
+
+test('saveCaseMeta: case locked → khong goi wire, tra workspace_locked', async () => {
+  const { model, client } = makeModel(seedCases('locked'));
+  await model.openCase(44);
+  const r = await model.saveCaseMeta({ noi_niem_yet: 'xã Y' });
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, 'workspace_locked');
+  assert.equal(client.calls.filter(
+    (c) => c.command === 'notary.workspace_update').length, 0);
+});
+
+test('saveCaseMeta: draft → cap nhat nhap local, khong goi wire; key la → validation_error', async () => {
+  const { model, client } = makeModel(seedCases('empty'));
+  model.newDraft();
+  const r = await model.saveCaseMeta({ noi_niem_yet: 'phường A' });
+  assert.equal(r.ok, true);
+  assert.equal(model.state.caseInfo.noi_niem_yet, 'phường A');
+  assert.equal(client.calls.filter(
+    (c) => c.command === 'notary.workspace_update').length, 0);
+  const bad = await model.saveCaseMeta({ case_type: 'gift' });
+  assert.equal(bad.ok, false);
+  assert.equal(bad.error.code, 'validation_error');
 });
 
 // ---------- locked: draft mutations bi chan (defense-in-depth) ----------
@@ -1922,4 +2297,141 @@ test('commitStage chi goi tren case that — draft khong co commitStage', async 
   const r = await model.saveDraft();
   assert.equal(r.ok, true);
   assert.ok(client.calls.length > callsBefore);
+});
+
+// ---------- MIN-141 đợt 3: case metadata + danh bạ ủy quyền ----------
+
+test('đợt3 openCase: meta mới vào caseInfo + baseline committedCaseInfo', async () => {
+  const seed = seedCases('ready');
+  seed[42].noi_niem_yet = 'xã Niêm Yết';
+  seed[42].nguoi_nhan_uy_quyen = 'Người Nhận UQ';
+  seed[42].nguoi_nhan_uy_quyen_id = 7;
+  seed[42].noi_dung_viec = 'Khai nhận thừa kế';
+  const { model } = makeModel(seed);
+  await model.openCase(42);
+  const ci = model.state.caseInfo;
+  assert.equal(ci.noi_niem_yet, 'xã Niêm Yết');
+  assert.equal(ci.nguoi_nhan_uy_quyen, 'Người Nhận UQ');
+  assert.equal(ci.nguoi_nhan_uy_quyen_id, 7);
+  assert.equal(ci.noi_dung_viec, 'Khai nhận thừa kế');
+  assert.deepEqual(model.state.committedCaseInfo.noi_niem_yet,
+    'xã Niêm Yết');
+  assert.equal(model.state.metaDirty, false);
+  assert.equal(model.hasUnsaved(), false);
+});
+
+test('đợt3 commitStage meta-only: payload.case đi kèm stage, metaDirty clear', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  model.updateCaseMeta('noi_niem_yet', 'xã Mới');
+  model.updateCaseMeta('noi_dung_viec', 'Việc mới');
+  assert.equal(model.state.metaDirty, true);
+  assert.equal(model.hasUnsaved(), true);
+  const rev = model.state.revision;
+  const r = await model.commitStage();
+  assert.equal(r.ok, true, JSON.stringify(r.error));
+  const call = client.calls.find(
+    (c) => c.command === 'notary.workspace_commit_stage');
+  assert.ok(call.payload.case, 'commit meta-only phải gửi payload.case');
+  assert.equal(call.payload.case.noi_niem_yet, 'xã Mới');
+  assert.equal(call.payload.case.noi_dung_viec, 'Việc mới');
+  assert.equal(call.payload.case.case_type, 'inheritance');
+  assert.equal(call.payload.base_revision, rev);
+  assert.equal(model.state.metaDirty, false);
+  assert.equal(model.state.revision, rev + 1);
+  assert.equal(model.state.committedCaseInfo.noi_niem_yet, 'xã Mới');
+  // Reopen: meta da luu quay ve tu server.
+  await model.openCase(42);
+  assert.equal(model.state.caseInfo.noi_niem_yet, 'xã Mới');
+  assert.equal(model.state.caseInfo.noi_dung_viec, 'Việc mới');
+});
+
+test('đợt3 commitStage: khong sua meta → payload khong kem case', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  model.addPerson({ ho_ten: 'Người Mới' });       // stageDirty only
+  const r = await model.commitStage();
+  assert.equal(r.ok, true, JSON.stringify(r.error));
+  const call = client.calls.find(
+    (c) => c.command === 'notary.workspace_commit_stage');
+  assert.equal(call.payload.case, undefined,
+    'stage-only commit khong duoc dinh kem payload.case');
+});
+
+test('đợt3 commit meta: uq_id danh ba hop le → server resolve ten master', async () => {
+  const seed = seedCases('ready');
+  seed.__customers = [{ id: 5, ho_ten: 'Người Danh Bạ' }];
+  const { model, client } = makeModel(seed);
+  await model.openCase(42);
+  model.updateCaseMeta('nguoi_nhan_uy_quyen', 'Người Danh Bạ');
+  model.updateCaseMeta('nguoi_nhan_uy_quyen_id', 5);
+  const r = await model.commitStage();
+  assert.equal(r.ok, true, JSON.stringify(r.error));
+  assert.equal(model.state.caseInfo.nguoi_nhan_uy_quyen,
+    'Người Danh Bạ');
+  assert.equal(model.state.caseInfo.nguoi_nhan_uy_quyen_id, 5);
+  // Id khong ton tai → validation_error, meta giu nguyen de sua lai.
+  model.updateCaseMeta('nguoi_nhan_uy_quyen_id', 999);
+  const r2 = await model.commitStage();
+  assert.equal(r2.ok, false);
+  assert.equal(r2.error.code, 'validation_error');
+  assert.equal(model.state.metaDirty, true,
+    'commit loi phai giu metaDirty de khong mat noi dung');
+});
+
+test('đợt3 commit meta: immutable case_type mismatch → validation_error', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  model.updateCaseMeta('noi_niem_yet', 'x');
+  // Gia lap client lo gui kem case_type khac — server phai tu choi.
+  const orig = client.run;
+  client.run = (cmd, p) => {
+    if (cmd === 'notary.workspace_commit_stage' && p.case) {
+      p = { ...p, case: { ...p.case, case_type: 'two_party' } };
+    }
+    return orig(cmd, p);
+  };
+  const r = await model.commitStage();
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, 'validation_error');
+  assert.equal(model.state.caseInfo.case_type, 'inheritance');
+});
+
+test('đợt3 loadUqCatalog: nap danh ba mot lan; resolveUqName gan/xoa id', async () => {
+  const seed = seedCases('ready');
+  seed.__customers = [
+    { id: 5, ho_ten: 'Người Danh Bạ', so_giay_to: '001' },
+    { id: 6, ho_ten: 'Người Khác', so_giay_to: '002' },
+  ];
+  const { model, client } = makeModel(seed);
+  await model.openCase(42);
+  const r = await model.loadUqCatalog();
+  assert.equal(r.ok, true);
+  assert.equal(model.state.uqCatalog.length, 2);
+  // Trung danh ba → gan id on dinh; nhap tu do → id null.
+  model.resolveUqName('Người Danh Bạ');
+  assert.equal(model.state.caseInfo.nguoi_nhan_uy_quyen_id, 5);
+  model.resolveUqName('Tên Tự Do');
+  assert.equal(model.state.caseInfo.nguoi_nhan_uy_quyen, 'Tên Tự Do');
+  assert.equal(model.state.caseInfo.nguoi_nhan_uy_quyen_id, null);
+});
+
+test('đợt3 createUqCustomer: tao danh ba moi → chon lam nguoi nhan UQ', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const r = await model.createUqCustomer('Người Mới Thêm');
+  assert.equal(r.ok, true, JSON.stringify(r.error));
+  const call = client.calls.find(
+    (c) => c.command === 'notary.customer_create');
+  assert.equal(call.payload.ho_ten, 'Người Mới Thêm');
+  assert.equal(model.state.caseInfo.nguoi_nhan_uy_quyen,
+    'Người Mới Thêm');
+  assert.ok(model.state.caseInfo.nguoi_nhan_uy_quyen_id >= 900,
+    'id danh ba moi phai di vao meta de commit giu tham chieu');
+  assert.equal(model.state.metaDirty, true);
+  // Ten trong → tu choi cuc bo, khong goi command.
+  const before = client.calls.length;
+  const r2 = await model.createUqCustomer('   ');
+  assert.equal(r2.ok, false);
+  assert.equal(client.calls.length, before);
 });

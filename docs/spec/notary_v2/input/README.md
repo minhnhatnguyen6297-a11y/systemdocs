@@ -12,7 +12,7 @@ có nguồn để người dùng kiểm tra trước khi đưa vào Stage.
 | Nguồn | Cách nhận | Công nghệ |
 |---|---|---|
 | Ảnh/PDF giấy tờ | Chọn file | PyMuPDF + Qwen-VL-OCR |
-| DOCX | Chọn file | `python-docx` |
+| DOCX | Chọn file | Đọc ZIP/XML theo thứ tự thật bằng `lxml`, rồi dùng lõi regex chung |
 | XLSX | Chọn file | `openpyxl` |
 | Text | Dán hoặc nhập | Parser tất định |
 | Zalo | Sync gói raw đã công bố | Xem [`zalo/`](./zalo/README.md) |
@@ -59,6 +59,11 @@ Lỗi một nguồn không làm mất kết quả nguồn khác. Job có thể `
 - Không tự gán vai trò hợp đồng hoặc thừa kế từ OCR.
 - Đếm riêng ảnh, giấy tờ, người ứng viên và người đã duyệt.
 - Parser tài sản phân biệt serial GCN với thửa/tờ; một GCN có thể có nhiều thửa.
+
+Địa chỉ đọc từ giấy vẫn giữ nguyên nguồn. Tra cứu tên xã/tỉnh không tự nâng
+kết quả thành dữ liệu đã xác nhận hoặc thay nguyên văn OCR. Tra cứu dùng kho
+cục bộ tại [`administrative-address.md`](../administrative-address.md); người
+dùng tự copy kết quả vào hồ sơ, không gửi địa chỉ khách hàng ra Bando.
 
 Danh mục regex/scoring tài sản nằm tại
 [`property-rules.md`](./property-rules.md). Đây là phụ lục lớn của Input, không
@@ -111,6 +116,18 @@ Nếu file thứ hai OCR lỗi, job có thể `partial`: suggestion trên vẫn 
 không field nào được đổi thành `confirmed`.
 
 ## 9. Kiến trúc và lịch sử
+
+Luồng hợp đồng DOCX Word-first hiện hành và giới hạn vị trí nguồn nằm tại
+[`docx-import.md`](./docx-import.md). Adapter dùng lõi regex chung, nhiều
+gợi ý có bằng chứng từng trường; không dùng OCR parser để gom cả file thành
+một gợi ý. Review, lưu đối chiếu và xuất theo bản gốc đều cần người kiểm tra.
+
+**Đợt quy tắc mới — TASK-5, 05/10/2026:**
+[bảng dấu hiệu/vùng/ranh giới từ 20 mẫu](../../../../.agents/review/sample-rules-20261005/README.md)
+và [bàn giao task/plan/spec](../../../../.agents/handoff/notary-20261005/README.md)
+được gom để tiếp tục duyệt. Các bảng chưa là spec triển khai; không dùng plan
+đã rút trong `withdrawn-20261004` hoặc mặc định của Upload Lab thay quyết định
+Owner. Runtime hiện hành ở DOCX spec chưa chứng minh đáp ứng đích mới.
 
 - Cloud OCR hiện hành là Qwen-only. QR/local OCR đã rời active path; không tự
   khôi phục khi sửa lỗi chung.

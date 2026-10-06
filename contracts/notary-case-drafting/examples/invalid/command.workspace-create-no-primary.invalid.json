@@ -8,7 +8,9 @@
   "command": "notary.workspace_create",
   "payload": {
     "idempotency_key": "9a1b2c3d-4444-4444-8444-0000000000ac",
-    "case": { "document_type": "thoa_thuan" },
+    "case": {
+      "document_type": "thoa_thuan"
+    },
     "stage": {
       "people": [
         {
@@ -22,7 +24,9 @@
           "ngay_cap": null,
           "noi_cap": null,
           "dia_chi": null,
-          "place_of_origin": null
+          "place_of_origin": null,
+          "loai_giay_to": null,
+          "loai_dia_chi": null
         }
       ],
       "assets": [
@@ -80,5 +84,8 @@
       }
     }
   },
-  "client_meta": { "shell_version": "0.1.0", "module": "document-review" }
+  "client_meta": {
+    "shell_version": "0.1.0",
+    "module": "document-review"
+  }
 }

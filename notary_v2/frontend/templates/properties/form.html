@@ -96,10 +96,13 @@
           <textarea name="dia_chi" class="form-control {% if fe.dia_chi %}is-invalid{% endif %}" rows="2" placeholder="Thôn/xóm, xã/phường, huyện/quận, tỉnh" required>{{ f.get('dia_chi','') if f else (obj.dia_chi if obj else '') }}</textarea>
           {% if fe.dia_chi %}<div class="invalid-feedback">{{ fe.dia_chi }}</div>{% endif %}
         </div>
+        {# MIN-141: bỏ ô nhập thời hạn lẻ — thời hạn mới chỉ thuộc cụm đất (land_rows). Giá trị lịch sử giữ nguyên, hiển thị read-only để đối chiếu. #}
+        {% if obj and obj.thoi_han %}
         <div class="col-md-6">
-          <label class="form-label">Thời hạn sử dụng</label>
-          <input type="text" name="thoi_han" class="form-control" value="{{ f.get('thoi_han','') if f else (obj.thoi_han if obj else '') }}" placeholder="Ví dụ: Lâu dài / 50 năm đến 15/10/2060">
+          <label class="form-label text-muted">Thời hạn sử dụng (dữ liệu cũ)</label>
+          <div class="form-control-plaintext border rounded px-2 py-1 text-muted" style="background:#f8f9fa">{{ obj.thoi_han }}</div>
         </div>
+        {% endif %}
       </div>
 
       <hr class="divider">

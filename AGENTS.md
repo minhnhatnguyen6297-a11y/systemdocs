@@ -1,80 +1,36 @@
 # AGENTS.md — luật làm việc trong systemdocs
-
-Nói với người dùng như học sinh cấp 3. Dùng từ dễ hiểu; thuật ngữ bắt buộc phải
+- Cách giao tiếp: Nói với người dùng như người dung nontech - vibecoder. Dùng từ dễ hiểu; thuật ngữ bắt buộc phải
 giải thích hoặc có ví dụ.
+- Agent tạo và ghi file theo sơ đồ cấu trúc thư mục tại file README. Các file sinh ra trong quá trình làm việc tạm: task, rác, handoff,... ghi vào .agents, KHÔNG lưu tùy tiện ở các folder code.
+- `docs/spec là tài lieu SOT của toàn dự án, khi tôi chỉ dẫn, sửa lỗi, đưa quan điểm,... tức là quyết định từ tôi phải được agent chắt lọc và ghi vào file docs tương ứng: QUYẾT ĐỊNH LÀ GÌ? TẠI SAO?
+- Spec quyết định hành vi phải có; code chỉ chứng minh hiện trạng, KHÔNG sửa code, code mới khi không có spec, yêu cầu tôi thêm spec trước.
+- Luật cứng Backlog: mọi việc phải có task backlog trước khi code. Xong việc nào, agent tự chắt lọc quyết định vào backlog decision, tự cập nhật hoặc thêm mới spec trong docs/spec, rồi mới tick Done. File tạm (task, rác, handoff) ghi vào .agents, KHÔNG để lẫn vào folder code.
+- Luôn áp dung khi có thể:
++ Ponytail: Code tối thiểu, đây là giai đoạn MVP, cần 1 bản chạy được trước khi phát triển 1 hệ thống lớn
++ Caveman: Nói ít - Luôn áp dụng khi handoff, viết spec, plan giao tiếp agent với agent. Không ap dụng khi nói chuyện, brainstorming với tôi.
++ bmad: tuân theo quy trình coding của bmad
++ graphify: code map, luôn đọc trước khi dò file thủ công, nếu chưa có hoặc file graphify behind nhiều ngày so với hiện tại -> chạy graphify trước.
 
-Nhánh default là `consolidate/monorepo`, chứa cả runtime Electron thật và toàn bộ tài liệu hệ thống.
+<!-- BACKLOG.MD GUIDELINES START -->
+<!-- backlog.md-instructions-version: 1.53.0 -->
+<CRITICAL_INSTRUCTION>
 
-## Trước khi đọc hoặc sửa
+## Backlog.md Workflow
 
-1. Mở `README.md` để tìm đường trong cây spec.
-2. Đọc `docs/spec/README.md`, rồi mọi `README.md` từ module tới thư mục cha của
-   feature, cuối cùng đọc spec lá.
-3. Kiểm tra trạng thái `Draft`, `Approved`, `Active` hoặc `Superseded` và nguồn.
-4. Khi sửa code, đối chiếu source/test hiện tại. Spec quyết định hành vi phải có;
-   code chỉ chứng minh hiện trạng.
+This project uses Backlog.md for task and project management.
 
-## Đặt thông tin vào đâu
+**At the beginning of each conversation in this project, run `backlog instructions overview` before answering or taking action. Re-read it only if you have not read it yet in the current conversation.**
 
-Đặt thông tin tại **cấp nhỏ nhất bao phủ toàn bộ ảnh hưởng**:
+Use the overview to decide whether to search, read, create, or update Backlog tasks.
 
-- chỉ một feature: ghi ngay trong spec feature;
-- nhiều feature cùng flow: ghi trong `README.md` của flow;
-- nhiều flow cùng module: ghi trong `README.md` của module;
-- nhiều module: ghi trong `docs/spec/README.md`.
+Before task lifecycle actions, read the matching detailed guide:
+- `backlog instructions task-creation` before creating or splitting tasks
+- `backlog instructions task-execution` before planning, changing status or assignee, adding a plan or implementation notes, or implementing task work
+- `backlog instructions task-finalization` before checking acceptance criteria, writing final summaries, or moving tasks to terminal statuses
 
-Kiến trúc, giao diện, câu hỏi mở, quyết định và lịch sử lựa chọn nằm trong spec
-ở đúng cấp trên. Không tạo `architecture.md`, `design.md`, `decisions.md`,
-`open-decisions.md` hoặc chỉ mục song song chỉ vì loại nội dung khác nhau.
+Use `backlog <command> --help` before running unfamiliar commands. Help shows options, fields, and examples.
 
-Chỉ tạo file/thư mục con khi có một chức năng độc lập đáng tra cứu hoặc phụ lục
-lớn như bảng trường, schema, catalog regex hay tài sản prototype. Spec cha phải
-nói rõ vai trò của phụ lục; phụ lục không trở thành SOT thứ hai.
+Do not edit Backlog task, draft, document, decision, or milestone markdown files directly. Use the `backlog` CLI so metadata, relationships, and history stay consistent.
 
-## Cấu trúc tối thiểu của feature
-
-Spec feature trả lời các mục có liên quan:
-
-1. Công dụng và phạm vi.
-2. Người dùng và cách thao tác.
-3. Input, output và flow.
-4. Quy tắc nghiệp vụ và **Tại sao?**
-5. Trạng thái và dữ liệu được lưu ở đâu, dạng gì.
-6. Contract với feature/module khác.
-7. Kiến trúc và công nghệ.
-8. Giao diện.
-9. Lỗi, ngoại lệ và ví dụ.
-10. Câu hỏi mở, lịch sử và nguồn.
-
-Không thêm mục rỗng cho đủ mẫu.
-
-## Nguồn sự thật và quyết định
-
-- Linear là SOT của task, acceptance criteria và trạng thái issue.
-- `docs/spec/` là SOT sản phẩm dài hạn.
-- `contracts/` giữ contract đã duyệt và schema máy đọc. Spec giải thích ý nghĩa
-  rồi dẫn link; không chép schema thành bản thứ hai.
-- `.agent/tasks/<LINEAR-ID>/` giữ `brief.md`, `progress.md`, `decisions.md` khi
-  cần và `handoff.md`. Đây là record thực thi, không phải spec.
-- Khi owner giải thích lý do, giữ nguyên ý, ví dụ, ngoại lệ, nguồn và ngày. Tách
-  rõ lời owner với diễn giải của agent. Thiếu nguồn thì ghi `[CONFIRM]`.
-- Draft, prototype, plan, code và task log không tự trở thành quy tắc đã duyệt.
-- Khi thay đổi quyền sở hữu, cập nhật spec cũ, spec mới và mọi link trong cùng
-  thay đổi. Không để hai file cùng tự nhận là SOT.
-
-## File tạm và điều cấm
-
-File tạm chỉ vào `.agent/scratch/`, `.tmp/`, `.cache/`, `logs/` hoặc
-`artifacts/`; dọn khi xong và không commit.
-
-Không:
-
-- tạo Markdown mới ở root ngoài `AGENTS.md` và `README.md`;
-- tạo `AGENTS.md`, `agent.md`, `memory-bank/` trong repo con;
-- tạo spec, log, plan hoặc handoff rời ngoài cây quy định;
-- tự chốt câu hỏi nghiệp vụ, contract hoặc kiến trúc chưa có nguồn;
-- rebuild toàn bộ Graphify cho thay đổi nhỏ.
-
-Biết file/symbol thì dùng tìm kiếm hẹp và đọc đúng đoạn. Cần quan hệ nhiều file
-thì dùng graph có sẵn ở depth 1–2 rồi đối chiếu source.
-
+</CRITICAL_INSTRUCTION>
+<!-- BACKLOG.MD GUIDELINES END -->

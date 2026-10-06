@@ -4,7 +4,11 @@
   "command_id": "a1b2c3d4-0012-4012-8012-000000000012",
   "status": "failed",
   "waiting_on": null,
-  "progress": { "done": 2, "total": 2, "current_label": "Lỗi toàn bộ" },
+  "progress": {
+    "done": 2,
+    "total": 2,
+    "current_label": "Lỗi toàn bộ"
+  },
   "result": {
     "kind": "word_export_batch",
     "data": {
@@ -40,7 +44,10 @@
       ],
       "breakdown": {
         "succeeded": [],
-        "failed": ["khai_nhan_di_san", "niem_yet"],
+        "failed": [
+          "khai_nhan_di_san",
+          "niem_yet"
+        ],
         "skipped": []
       }
     },

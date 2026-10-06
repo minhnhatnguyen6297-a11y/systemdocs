@@ -16,6 +16,8 @@ Tài liệu được tổ chức theo **phạm vi và flow**, không theo loại
 ```text
 docs/spec/
 ├── README.md                       # Tầm nhìn, ranh giới, kiến trúc và câu hỏi toàn hệ thống
+├── shared/
+│   └── administrative-lookup.md    # Lõi tra cứu tên xã/tỉnh dùng chung
 ├── notary_v2/
 │   ├── README.md                   # Input → Stage → Pool → Diagram → Word
 │   ├── input/
@@ -94,4 +96,6 @@ không tạo phần sản phẩm thứ tư.
 | `_bmad-output/` | Artifact workflow BMAD |
 | `.agent/scratch/`, `.tmp/`, `.cache/`, `logs/`, `artifacts/` | File tạm, không commit |
 
-Linear là nguồn task. Trước khi sửa tài liệu, đọc [luật agent](./AGENTS.md).
+Backlog.md là nguồn task; ghi chú Linear cũ là lịch sử. Trước khi sửa tài liệu,
+đọc [luật agent](./AGENTS.md). Tiến độ sau gom worktree 05/10 tại
+[bàn giao từng việc](./.agents/handoff/notary-20261005/README.md).

@@ -13,6 +13,8 @@ de kiem chung wire shape.
 import copy
 import importlib.util
 import json
+import os
+import subprocess
 import sys
 import threading
 import time
@@ -47,10 +49,12 @@ DRAFTING_COMMANDS = [
     "notary.workspace_create",
     "notary.intake_analyze",
     "notary.workspace_commit_stage",
+    "notary.workspace_update",
     "notary.diagram_evaluate",
     "notary.diagram_save",
     "notary.word_export_options",
     "notary.word_export_batch",
+    "notary.address_lookup",
 ]
 
 P_OWNER = "11111111-1111-4111-8111-111111111111"
@@ -82,6 +86,32 @@ def _job(command="notary.workspace_get"):
     j = Job(str(uuid.uuid4()), command)
     j.status = "running"
     return j
+
+
+def _dir_link(link, target):
+    """Directory link `link` -> `target`: os.symlink truoc, fallback
+    junction `mklink /J` tren Windows (khong can quyen admin)."""
+    try:
+        os.symlink(target, link, target_is_directory=True)
+        return
+    except OSError:
+        pass
+    if os.name == "nt":
+        r = subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(link), str(target)],
+            capture_output=True)
+        if r.returncode == 0:
+            return
+    pytest.skip("không tạo được directory link (thiếu quyền)")
+
+
+def _file_link(link, target):
+    """File symlink — Windows can SeCreateSymbolicLinkPrivilege
+    (WinError 1314 tren may khong co quyen) -> skip."""
+    try:
+        os.symlink(target, link)
+    except OSError as exc:
+        pytest.skip(f"không tạo được file symlink: {exc}")
 
 
 def _call(fn_name, payload):
@@ -201,6 +231,29 @@ class TestScaffolding:
     def test_commands_registered(self):
         for cmd in DRAFTING_COMMANDS:
             assert cmd in reg.COMMANDS, f"thieu {cmd} trong COMMANDS"
+
+    def test_address_lookup_dispatch_envelope(self):
+        """registry → gateway → adapter → service → _result envelope.
+
+        Mock delegate sang adapter that → doc ledger local that
+        (`notary_v2/data/administrative_units`), khong can fixture.
+        """
+        res = _call("address_lookup", {
+            "query": "Thị trấn Lâm, huyện Ý Yên, tỉnh Nam Định",
+            "presentation": "drafting",
+        })
+        assert res["kind"] == "address_lookup"
+        assert res["data"]["schema_version"] == "notary.address-lookup.v2"
+        assert res["data"]["status"] in (
+            "found", "not_found", "too_many", "invalid_input",
+            "reload_failed")
+        assert res["data"]["presentation"] in ("drafting", "full", None)
+        assert res["data"]["total"] == len(res["data"]["results"]) or \
+            res["data"]["status"] == "too_many"
+        bad = _call("address_lookup", {
+            "query": "xã A", "presentation": "drafting",
+            "source_date": "2024-06-01"})
+        assert bad["data"]["status"] == "invalid_input"
 
     def test_fixtures_loadable_and_no_real_pii(self):
         names = ["empty", "ready", "locked", "conflict", "intake-partial",
@@ -359,7 +412,7 @@ class TestWorkspaceGet:
         rm = data["diagram"]["render_model"]
         assert rm["status"] == "unsupported"
         assert rm["allocations"] == {}
-        assert data["capabilities"]["word_export"] is False
+        assert data["capabilities"]["word_export"] is True   # NAIA-8
         assert data["capabilities"]["diagram"] is True
 
     def test_case_not_found(self):
@@ -481,7 +534,7 @@ class TestWorkspaceCreate:
         assert [n["id"] for n in st["nodes"]] == \
             [f"p{i}" for i in range(1, 31)]
         assert data["diagram"]["render_model"] is None
-        assert data["capabilities"]["word_export"] is False
+        assert data["capabilities"]["word_export"] is True   # NAIA-8
 
     def test_two_party_stage_owner_row_id_rejected(self):
         p = {
@@ -963,6 +1016,83 @@ class TestCommitStage:
         assert any(e["code"] == "people_limit" for e in fe)
 
 
+# ---------- workspace_update (§6.2 — NAIA-8) ----------
+
+class TestWorkspaceUpdate:
+    def test_update_meta_persists_and_reloads(self):
+        mock.reset_backend(_load_fixture("ready.json"))
+        rev = _call("workspace_get", {"case_id": 42})[
+            "data"]["case"]["revision"]
+        res = _call("workspace_update", {
+            "case_id": 42, "base_revision": rev,
+            "case": {"noi_niem_yet": "xã Yên Sở"}})
+        assert res["kind"] == "workspace_update"
+        assert res["data"]["schema_version"] == SCHEMA
+        assert res["data"]["revision"] == rev + 1
+        assert res["data"]["case"]["noi_niem_yet"] == "xã Yên Sở"
+        got = _call("workspace_get", {"case_id": 42})
+        assert got["data"]["case"]["noi_niem_yet"] == "xã Yên Sở"
+        assert got["data"]["case"]["revision"] == rev + 1
+        # Stage/Diagram khong bi cham.
+        assert len(got["data"]["stage"]["people"]) == 4
+
+    def test_conflict_and_locked(self):
+        mock.reset_backend(_load_fixture("ready.json"))
+        rev = _call("workspace_get", {"case_id": 42})[
+            "data"]["case"]["revision"]
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_update", {
+                "case_id": 42, "base_revision": rev + 9,
+                "case": {"ghi_chu": "x"}})
+        assert exc.value.code == "workspace_conflict"
+        assert exc.value.details["server_revision"] == rev
+        mock.reset_backend(_load_fixture("locked.json"))
+        rev = _call("workspace_get", {"case_id": 44})[
+            "data"]["case"]["revision"]
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_update", {
+                "case_id": 44, "base_revision": rev,
+                "case": {"ghi_chu": "x"}})
+        assert exc.value.code == "workspace_locked"
+
+    def test_validation_errors(self):
+        mock.reset_backend(_load_fixture("ready.json"))
+        rev = _call("workspace_get", {"case_id": 42})[
+            "data"]["case"]["revision"]
+        for bad_case in ({"case_type": "gift"}, {}, "chuoi", None):
+            with pytest.raises(CommandError) as exc:
+                _call("workspace_update", {
+                    "case_id": 42, "base_revision": rev, "case": bad_case})
+            assert exc.value.code == "validation_error", bad_case
+        for bad_rev in (0, "1", None, True):
+            with pytest.raises(CommandError) as exc:
+                _call("workspace_update", {
+                    "case_id": 42, "base_revision": bad_rev,
+                    "case": {"ghi_chu": "x"}})
+            assert exc.value.code == "validation_error", bad_rev
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_update", {
+                "case_id": 999, "base_revision": 1,
+                "case": {"ghi_chu": "x"}})
+        assert exc.value.code == "case_not_found"
+
+    def test_invalid_patch_keeps_meta_and_revision(self):
+        # NAIA-8 review: patch gom field dung + sai phai loi nguyen khoi —
+        # khong luu mot phan (parity real update_meta, §6.2 atomic).
+        mock.reset_backend(_load_fixture("ready.json"))
+        before = _call("workspace_get", {"case_id": 42})["data"]["case"]
+        rev = before["revision"]
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_update", {
+                "case_id": 42, "base_revision": rev,
+                "case": {"noi_niem_yet": "xã Đã Đổi", "ghi_chu": 123}})
+        assert exc.value.code == "validation_error"
+        after = _call("workspace_get", {"case_id": 42})["data"]["case"]
+        assert after["noi_niem_yet"] == before["noi_niem_yet"]
+        assert after["ghi_chu"] == before["ghi_chu"]
+        assert after["revision"] == rev
+
+
 # ---------- intake_analyze ----------
 
 class TestIntakeAnalyze:
@@ -1442,6 +1572,54 @@ class TestWordExport:
         return {"path": str(tmp_path), "scope": "machine_local",
                 "is_dir": True}
 
+    @pytest.mark.parametrize("case_type,people,assets,has_diagram,expected", [
+        ("inheritance", 1, 1, False, None),
+        ("inheritance", 0, 0, False, "word.no_people"),
+        ("inheritance", 1, 0, False, "word.no_assets"),
+        ("inheritance", 1, 6, False, "word.too_many_assets"),
+        ("inheritance", 21, 1, False, "word.too_many_people"),
+        ("two_party", 1, 1, False, "word.no_diagram"),
+        ("two_party", 1, 1, True, None),
+        ("two_party", 31, 1, True, "word.too_many_people"),
+        ("two_party", 1, 0, False, "word.no_assets"),
+    ])
+    def test_folder_readiness_matches_real_technical_checks(
+            self, case_type, people, assets, has_diagram, expected, monkeypatch):
+        from types import SimpleNamespace
+        monkeypatch.syspath_prepend(str(_REPO / "notary_v2"))
+        from services.word_engine import word_block_reason
+
+        case = {"case_type": case_type,
+                "stage": {"people": [{"row_id": str(i)} for i in range(people)],
+                          "assets": [{} for _ in range(assets)]},
+                "diagram": {"state": {"nodes": [{}] if has_diagram else []}}}
+        context = SimpleNamespace(case_type=case_type,
+            persons=case["stage"]["people"], assets=case["stage"]["assets"],
+            has_diagram_state=has_diagram)
+        assert mock._word_block_reason(case, static=True) == expected
+        assert word_block_reason(context, static=True) == expected
+
+    def test_folder_options_and_export_allow_no_inheritance_owner_or_receiver(self, tmp_path):
+        import docx
+
+        seed = _load_fixture("ready.json")
+        seed["cases"]["42"]["diagram"]["state"]["nodes"] = []
+        mock.reset_backend(seed)
+        templates, dest = tmp_path / "templates", tmp_path / "out"
+        templates.mkdir()
+        dest.mkdir()
+        docx.Document().save(templates / "static.docx")
+        payload = {"case_id": 42, "template_dir": self._dest(templates)}
+        options = _call("word_export_options", payload)
+        assert options["data"]["documents"][0]["ready"] is True
+        batch = _call("word_export_batch", {**payload,
+            "document_keys": ["static.docx"], "destination": self._dest(dest)})
+        assert batch["data"]["documents"][0]["status"] == "saved"
+        # Catalog callers still use the legacy checks.
+        legacy = _call("word_export_options", {"case_id": 42})
+        docs = {d["document_key"]: d for d in legacy["data"]["documents"]}
+        assert docs["khai_nhan_di_san"]["block_reason"] == "word.no_landowner"
+
     def test_options_ready_case(self):
         mock.reset_backend(_load_fixture("ready.json"))
         res = _call("word_export_options", {"case_id": 42})
@@ -1461,20 +1639,22 @@ class TestWordExport:
         assert docs["khai_nhan_di_san"]["block_reason"] == "word.no_assets"
         assert docs["niem_yet"]["block_reason"] == "word.template_missing"
 
-    def test_two_party_word_rejected(self):
-        """§13.10: word_export_* tren two_party -> case_type_unsupported."""
+    def test_two_party_word_allowed(self, tmp_path):
+        """NAIA-8: word_export_* tren two_party khong con
+        case_type_unsupported — fixture ready-two-party du dieu kien:
+        options ready, batch ghi DOCX that."""
         mock.reset_backend(_load_fixture("ready-two-party.json"))
-        for cmd, payload in (
-                ("word_export_options", {"case_id": 48}),
-                ("word_export_batch", {
-                    "case_id": 48,
-                    "document_keys": ["khai_nhan_di_san"],
-                    "destination": {"path": "x", "scope": "machine_local",
-                                    "is_dir": True}})):
-            with pytest.raises(CommandError) as exc:
-                _call(cmd, payload)
-            assert exc.value.code == "case_type_unsupported", cmd
-            assert exc.value.details["case_type"] == "two_party"
+        res = _call("word_export_options", {"case_id": 48})
+        docs = {d["document_key"]: d for d in res["data"]["documents"]}
+        assert docs["khai_nhan_di_san"]["ready"] is True
+        assert docs["niem_yet"]["block_reason"] == "word.template_missing"
+        res = _call("word_export_batch", {
+            "case_id": 48,
+            "document_keys": ["khai_nhan_di_san"],
+            "destination": self._dest(tmp_path)})
+        d = res["data"]["documents"][0]
+        assert d["status"] == "saved"
+        assert Path(d["output_file"]["path"]).is_file()
 
     def test_batch_writes_real_docx(self, tmp_path):
         mock.reset_backend(_load_fixture("ready.json"))
@@ -1663,6 +1843,109 @@ class TestWordExport:
             "destination": self._dest(tmp_path)})
         assert job.progress["done"] == 1
         assert job.progress["total"] == 1
+
+    def test_batch_subdir_link_escape_rejected(self, tmp_path):
+        """Parity engine that (review NAIA-8): destination/HS-<id> la
+        junction/symlink tro ra ngoai -> mkdir(exist_ok) van pass; phai
+        word_path_traversal va khong ghi file nao ben ngoai."""
+        mock.reset_backend(_load_fixture("ready.json"))
+        dest = tmp_path / "selected"
+        dest.mkdir()
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        _dir_link(dest / "HS-42", outside)
+        with pytest.raises(CommandError) as exc:
+            _call("word_export_batch", {
+                "case_id": 42, "document_keys": ["khai_nhan_di_san"],
+                "destination": {"path": str(dest),
+                                "scope": "machine_local", "is_dir": True},
+                "create_case_subdir": True})
+        assert exc.value.code == "word_path_traversal"
+        # khong file nao duoc tao — ngoai outside lan trong selected
+        assert list(outside.iterdir()) == []
+        assert [p.name for p in dest.iterdir()] == ["HS-42"]
+
+    def test_batch_subdir_result_destination_is_granted_dir(
+            self, tmp_path):
+        """Contract §8.2: create_case_subdir=true -> ghi vao
+        <dest>/HS-<id>/ nhung data.destination van la thu muc nguoi
+        dung chon."""
+        mock.reset_backend(_load_fixture("ready.json"))
+        res = _call("word_export_batch", {
+            "case_id": 42, "document_keys": ["khai_nhan_di_san"],
+            "destination": self._dest(tmp_path),
+            "create_case_subdir": True})
+        data = res["data"]
+        assert data["destination"]["path"] == str(tmp_path)
+        assert (tmp_path / "HS-42"
+                / "Van_ban_khai_nhan_di_san_HS-42.docx").is_file()
+
+    def test_folder_mode_skips_link_to_outside(self, tmp_path):
+        """Mau symlink tro ra ngoai thu muc mau: bi loai khoi scan ->
+        options khong list, batch tu choi word_unknown_document_key,
+        khong doc file ngoai thu muc duoc cap quyen."""
+        mock.reset_backend(_load_fixture("ready.json"))
+        tdir = tmp_path / "templates"
+        tdir.mkdir()
+        (tdir / "mau.docx").write_bytes(b"real")
+        outside = tmp_path / "outside.docx"
+        outside.write_bytes(b"outside-bytes")
+        _file_link(tdir / "linked.docx", outside)
+        tref = {"path": str(tdir), "scope": "machine_local",
+                "is_dir": True}
+        res = _call("word_export_options", {"case_id": 42,
+                                            "template_dir": tref})
+        keys = [d["document_key"] for d in res["data"]["documents"]]
+        assert keys == ["mau.docx"]
+        dest = tmp_path / "out"
+        dest.mkdir()
+        with pytest.raises(CommandError) as exc:
+            _call("word_export_batch", {
+                "case_id": 42, "document_keys": ["linked.docx"],
+                "template_dir": tref,
+                "destination": {"path": str(dest),
+                                "scope": "machine_local",
+                                "is_dir": True}})
+        assert exc.value.code == "word_unknown_document_key"
+        assert list(dest.iterdir()) == []
+
+    def test_folder_template_swapped_for_link(self, tmp_path,
+                                              monkeypatch):
+        """Parity real: mau quet duoc bi doi thanh symlink ra ngoai
+        truoc luc ghi -> per-file word.template_missing (kiem tra lai
+        containment tai thoi diem mo)."""
+        mock.reset_backend(_load_fixture("ready.json"))
+        tdir = tmp_path / "templates"
+        tdir.mkdir()
+        target = tdir / "mau.docx"
+        target.write_bytes(b"real")
+        outside = tmp_path / "outside.docx"
+        outside.write_bytes(b"outside-bytes")
+        # snapshot scan luc file con that — bang cach gia lap ket qua
+        # scan (fixture ready chi co document_keys catalog; folder mode
+        # quet lai moi lan nen phai patch de mo phong scan cu)
+        monkeypatch.setattr(mock, "_scan_template_dir",
+                            lambda _d: [{"document_key": "mau.docx",
+                                         "display_name": "mau"}])
+        target.unlink()
+        _file_link(target, outside)
+        dest = tmp_path / "out"
+        dest.mkdir()
+        with pytest.raises(CommandError) as exc:
+            _call("word_export_batch", {
+                "case_id": 42, "document_keys": ["mau.docx"],
+                "template_dir": {"path": str(tdir),
+                                 "scope": "machine_local",
+                                 "is_dir": True},
+                "destination": {"path": str(dest),
+                                "scope": "machine_local",
+                                "is_dir": True}})
+        err = exc.value
+        assert err.code == "word_batch_failed"
+        d = err.result["data"]["documents"][0]
+        assert d["status"] == "failed"
+        assert d["error"]["code"] == "word.template_missing"
+        assert list(dest.iterdir()) == []
 
 
 # ---------- job lifecycle qua JobStore that ----------
@@ -1866,3 +2149,215 @@ class TestCaseListMock:
         assert {c["id"] for c in res2["data"]["cases"]} == {45}
         res3 = _call("case_list", {"query": "khong-co-gi"})
         assert res3["data"]["cases"] == []
+
+
+# ---------- MIN-141 đợt 3: case meta + danh bạ ủy quyền ----------
+
+class TestCaseMetaMock:
+    """Parity voi real backend (đợt 3): payload.case di qua create/commit,
+    canonical alias fold + conflict, uq id resolve qua danh ba gia."""
+
+    def _commit_payload(self, case_id=43, base_revision=1, meta=None):
+        rid = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+        p = {"case_id": case_id, "base_revision": base_revision,
+             "stage": {"owner_row_id": rid,
+                       "people": [{"row_id": rid, "entity_id": None,
+                                   "ho_ten": "Người Mẫu X"}],
+                       "assets": []}}
+        if meta is not None:
+            p["case"] = meta
+        return p
+
+    def test_create_meta_roundtrip(self):
+        res = _call("workspace_create", _create_payload(
+            case_meta={"document_type": "khai_nhan",
+                       "noi_niem_yet": "xã Yên Sở",
+                       "nguoi_nhan_uy_quyen": "Người UQ Tự Do",
+                       "noi_dung_viec": "Khai nhận thừa kế",
+                       "ghi_chu": "Ghi chú"}))
+        c = res["data"]["case"]
+        assert c["noi_niem_yet"] == "xã Yên Sở"
+        assert c["nguoi_nhan_uy_quyen"] == "Người UQ Tự Do"
+        assert c["nguoi_nhan_uy_quyen_id"] is None   # free text → id null
+        assert c["noi_dung_viec"] == "Khai nhận thừa kế"
+        assert c["ghi_chu"] == "Ghi chú"
+        # workspace_get tra lai dung cac field moi.
+        got = _call("workspace_get", {"case_id": c["id"]})
+        for k in ("noi_niem_yet", "nguoi_nhan_uy_quyen",
+                  "nguoi_nhan_uy_quyen_id", "noi_dung_viec"):
+            assert k in got["data"]["case"], f"thieu {k} tren wire"
+
+    def test_create_meta_canonical_alias(self):
+        res = _call("workspace_create", _create_payload(
+            case_meta={"document_type": "khai_nhan",
+                       "noiniemyet": "xã Canonical",
+                       "noidungviec": "Nội dung canonical"}))
+        c = res["data"]["case"]
+        assert c["noi_niem_yet"] == "xã Canonical"
+        assert c["noi_dung_viec"] == "Nội dung canonical"
+
+    def test_create_meta_alias_conflict_rejected(self):
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_create", _create_payload(
+                case_meta={"document_type": "khai_nhan",
+                           "noiniemyet": "xã A",
+                           "noi_niem_yet": "xã B"}))
+        assert exc.value.code == "validation_error"
+
+    def test_create_uq_id_unknown_rejected(self):
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_create", _create_payload(
+                case_meta={"document_type": "khai_nhan",
+                           "nguoi_nhan_uy_quyen_id": 777}))
+        assert exc.value.code == "validation_error"
+        assert "không tồn tại" in exc.value.message
+
+    def test_create_uq_id_resolves_name_from_catalog(self):
+        mock.reset_backend({"customers": [
+            {"id": 9, "ho_ten": "Người Danh Bạ", "so_giay_to": None}],
+            "cases": _load_fixture("empty.json")["cases"]})
+        res = _call("workspace_create", _create_payload(
+            case_meta={"document_type": "khai_nhan",
+                       "nguoi_nhan_uy_quyen_id": 9}))
+        c = res["data"]["case"]
+        assert c["nguoi_nhan_uy_quyen"] == "Người Danh Bạ"
+        assert c["nguoi_nhan_uy_quyen_id"] == 9
+
+    def test_create_uq_name_id_mismatch_rejected(self):
+        mock.reset_backend({"customers": [
+            {"id": 9, "ho_ten": "Người Danh Bạ", "so_giay_to": None}],
+            "cases": _load_fixture("empty.json")["cases"]})
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_create", _create_payload(
+                case_meta={"document_type": "khai_nhan",
+                           "nguoi_nhan_uy_quyen": "Tên Khác",
+                           "nguoi_nhan_uy_quyen_id": 9}))
+        assert exc.value.code == "validation_error"
+
+    def test_commit_meta_atomic(self):
+        mock.reset_backend(_load_fixture("empty.json"))
+        meta = {"noi_niem_yet": "xã Commit", "noi_dung_viec": "Việc",
+                "nguoi_nhan_uy_quyen": "Người UQ", "ghi_chu": None}
+        res = _call("workspace_commit_stage",
+                    self._commit_payload(meta=meta))
+        assert res["data"]["revision"] == 2
+        got = _call("workspace_get", {"case_id": 43})["data"]["case"]
+        assert got["noi_niem_yet"] == "xã Commit"
+        assert got["nguoi_nhan_uy_quyen"] == "Người UQ"
+        assert got["nguoi_nhan_uy_quyen_id"] is None
+        assert got["noi_dung_viec"] == "Việc"
+
+    def test_commit_meta_canonical_alias(self):
+        mock.reset_backend(_load_fixture("empty.json"))
+        res = _call("workspace_commit_stage", self._commit_payload(
+            meta={"noiniemyet": "xã Canonical", "noidungviec": "N"}))
+        assert res["data"]["revision"] == 2
+        got = _call("workspace_get", {"case_id": 43})["data"]["case"]
+        assert got["noi_niem_yet"] == "xã Canonical"
+
+    def test_commit_meta_invalid_rolls_back_stage(self):
+        """Meta loi → ca commit roll back (atomic): stage khong doi."""
+        mock.reset_backend(_load_fixture("empty.json"))
+        p = self._commit_payload(meta={"case_type": "two_party"})
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_commit_stage", p)
+        assert exc.value.code == "validation_error"
+        got = _call("workspace_get", {"case_id": 43})["data"]
+        assert got["case"]["revision"] == 1
+        assert got["stage"]["people"] == []
+
+    def test_commit_without_meta_keeps_case(self):
+        mock.reset_backend(_load_fixture("empty.json"))
+        res = _call("workspace_commit_stage", self._commit_payload())
+        assert res["data"]["revision"] == 2
+        got = _call("workspace_get", {"case_id": 43})["data"]["case"]
+        assert got["noi_niem_yet"] is None   # default, khong bi xoa
+
+    def test_person_canonical_alias_fold(self):
+        """Canonical person keys (ten/diachi/…) fold vao legacy snake."""
+        mock.reset_backend(_load_fixture("empty.json"))
+        rid = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+        p = {"case_id": 43, "base_revision": 1,
+             "stage": {"owner_row_id": rid,
+                       "people": [{"row_id": rid, "entity_id": None,
+                                   "ten": "Người Canonical",
+                                   "diachi": "Địa chỉ canonical",
+                                   "loaigiayto": "CCCD",
+                                   "loaidiachi": "Thường trú"}],
+                       "assets": []}}
+        res = _call("workspace_commit_stage", p)
+        row = res["data"]["stage"]["people"][0]
+        assert row["ho_ten"] == "Người Canonical"
+        assert row["dia_chi"] == "Địa chỉ canonical"
+        assert row["loai_giay_to"] == "CCCD"
+        assert row["loai_dia_chi"] == "Thường trú"
+
+    def test_person_alias_conflict_rejected(self):
+        mock.reset_backend(_load_fixture("empty.json"))
+        rid = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+        p = {"case_id": 43, "base_revision": 1,
+             "stage": {"owner_row_id": rid,
+                       "people": [{"row_id": rid, "entity_id": None,
+                                   "ten": "A", "ho_ten": "B"}],
+                       "assets": []}}
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_commit_stage", p)
+        assert exc.value.code == "validation_error"
+
+
+class TestCustomerCatalogMock:
+    """notary.customer_list/customer_create qua gateway (đợt 3)."""
+
+    def test_customer_list_empty_default(self):
+        res = _call("customer_list", {})
+        assert res["kind"] == "customer_list"
+        assert res["data"]["customers"] == []
+        assert res["data"]["total"] == 0
+
+    def test_customer_create_then_list(self):
+        r = _call("customer_create", {"ho_ten": "Người Danh Bạ A"})
+        assert r["kind"] == "customer_upsert"
+        cust = r["data"]["customer"]
+        assert cust["id"] >= 900
+        assert cust["ho_ten"] == "Người Danh Bạ A"
+        assert r["data"]["updated"] is False
+        res = _call("customer_list", {})
+        assert [c["id"] for c in res["data"]["customers"]] == [cust["id"]]
+
+    def test_customer_create_requires_name(self):
+        with pytest.raises(CommandError) as exc:
+            _call("customer_create", {"ho_ten": "  "})
+        assert exc.value.code == "validation_error"
+
+    def test_customer_upsert_same_sogiayto(self):
+        r1 = _call("customer_create",
+                   {"ho_ten": "Tên Cũ", "so_giay_to": "S001"})
+        r2 = _call("customer_create",
+                   {"ho_ten": "Tên Mới", "so_giay_to": "S001"})
+        assert r2["data"]["updated"] is True
+        assert r2["data"]["customer"]["id"] == r1["data"]["customer"]["id"]
+        assert r2["data"]["customer"]["ho_ten"] == "Tên Mới"
+
+    def test_customer_list_query_filter(self):
+        mock.reset_backend({"customers": [
+            {"id": 1, "ho_ten": "Nguyễn An", "so_giay_to": "A1",
+             "dia_chi": "Hà Nội"},
+            {"id": 2, "ho_ten": "Trần Bình", "so_giay_to": "B2",
+             "dia_chi": "Huế"}]})
+        res = _call("customer_list", {"query": "nguyễn"})
+        assert [c["id"] for c in res["data"]["customers"]] == [1]
+        res = _call("customer_list", {"query": "huế"})
+        assert [c["id"] for c in res["data"]["customers"]] == [2]
+
+    def test_case_commit_with_catalog_uq(self):
+        """UQ tu danh ba gia: commit id → get tra id + ten master."""
+        mock.reset_backend({"customers": [
+            {"id": 9, "ho_ten": "Người Danh Bạ", "so_giay_to": None}],
+            "cases": _load_fixture("empty.json")["cases"]})
+        p = TestCaseMetaMock()._commit_payload(
+            meta={"nguoi_nhan_uy_quyen_id": 9})
+        res = _call("workspace_commit_stage", p)
+        assert res["data"]["revision"] == 2
+        got = _call("workspace_get", {"case_id": 43})["data"]["case"]
+        assert got["nguoi_nhan_uy_quyen"] == "Người Danh Bạ"
+        assert got["nguoi_nhan_uy_quyen_id"] == 9

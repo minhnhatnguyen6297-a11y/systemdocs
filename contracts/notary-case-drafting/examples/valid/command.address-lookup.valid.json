@@ -1,0 +1,7 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-0001-4001-8001-000000000021",
+  "command": "notary.address_lookup",
+  "payload": {"query": "Thị trấn Lâm, huyện Ý Yên, tỉnh Nam Định", "presentation": "drafting"},
+  "client_meta": {"shell_version": "0.1.0", "module": "document-review"}
+}

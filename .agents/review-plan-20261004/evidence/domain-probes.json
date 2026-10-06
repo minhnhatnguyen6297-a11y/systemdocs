@@ -1,0 +1,73 @@
+{
+  "word_order": {
+    "[Người 1 - Họ tên]": "Người nhận đứng dòng 1",
+    "[Tên 1]": "Chủ đứng dòng 2",
+    "[ten1]": "Chủ đứng dòng 2",
+    "[Người 2 - Họ tên]": "Chủ đứng dòng 2",
+    "[Tên 2]": "",
+    "[Tên 3]": "Người nhận đứng dòng 1"
+  },
+  "authorization": {
+    "metadata_name": "Đại diện được chọn ở hồ sơ",
+    "authorized_people": [],
+    "group_slot": ""
+  },
+  "total_area": {
+    "source_property_total": 300,
+    "land_rows_sum": 100,
+    "exports": {
+      "[Diện tích]": "100",
+      "[Tài sản 1 - Diện tích]": "100",
+      "[Diện tích chữ]": "Một trăm"
+    }
+  },
+  "asset_required": {
+    "empty_required_fields": [],
+    "arbitrary_serial": [
+      {
+        "row_id": "c0cf4908-5e61-48fc-adf2-87c12471d9b9",
+        "field": "so_serial",
+        "code": "invalid_format",
+        "message": "so_serial phải canonical [A-Z]{2} + 6-8 chữ số"
+      }
+    ]
+  },
+  "legacy_serial": {
+    "original": "1234/X-2020",
+    "wire": "XX000001",
+    "warnings": [
+      "asset c0cf4908-5e61-48fc-adf2-87c12471d9b9: so_serial '1234/X-2020' không canonical — emit 'XX000001'"
+    ],
+    "after_save": "XX000001"
+  },
+  "migration_totals": {
+    "occurrences": 2128,
+    "tokens": 1171,
+    "applied": 47,
+    "literal_events": 14
+  },
+  "legacy_name_occurrences": {
+    "1. Khai nhận di sản Vũ Dương.docx": 85,
+    "1. PCDS .docx": 131,
+    "1.1. Từ chối di sản_ Ý Yên.docx": 29,
+    "2. DK18, thuế  1.docx": 12,
+    "2. DK18, thuế  2.docx": 12,
+    "2. DK18, thuế  3.docx": 11,
+    "3. UQ.docx": 4,
+    "Biên bản giao nhận sổ đỏ.docx": 0,
+    "BIÊN BẢN HỌP GIA ĐÌNH.2026.docx": 44,
+    "Biên bản kết thúc niêm yết (2).docx": 0,
+    "Công khai niêm yết Vạn Thắng.docx": 33,
+    "mau Don trich do (2).docx": 0,
+    "mau-so-21 (1).docx": 0,
+    "VP_Phân chia di sản.docx": 0,
+    "VP_Thông báo.docx": 42,
+    "VP_Từ chối di sản.docx": 21,
+    "ĐK 08 Gia hạn đất  - Copy.docx": 2,
+    "ĐK 08 Gia hạn đất .docx": 2,
+    "ĐƠN XIN XÁC NHẬN KHÔNG CÓ CHỒNG.docx": 0,
+    "ĐƠN XIN XÁC NHẬN VỢ CHỒNG.docx": 0,
+    "ĐƠN XIN XÁC NHẬN ÔNG BÀ ĐÃ CHẾT.docx": 0,
+    "Đơn Xác nhận bố mẹ đẻ.docx": 0
+  }
+}

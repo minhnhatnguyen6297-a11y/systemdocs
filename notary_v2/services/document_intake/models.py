@@ -77,6 +77,7 @@ class AdapterContext:
     ocr_call: Optional[Callable] = None  # injectable OCR (tests)
     check_cancel: Optional[Callable[[], None]] = None
     read_file: Optional[Callable[[SourceSpec], bytes]] = None
+    store_docx: Optional[Callable] = None
 
 
 def make_suggestion(

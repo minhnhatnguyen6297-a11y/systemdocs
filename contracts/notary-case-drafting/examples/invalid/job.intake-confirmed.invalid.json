@@ -22,7 +22,11 @@
               "normalized_value": "Nguyễn Văn An",
               "observation_state": "normalized",
               "confidence": null,
-              "source_refs": [{ "page": 1 }]
+              "source_refs": [
+                {
+                  "page": 1
+                }
+              ]
             }
           },
           "warnings": []

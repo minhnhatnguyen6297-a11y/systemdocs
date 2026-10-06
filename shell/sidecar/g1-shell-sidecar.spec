@@ -99,6 +99,7 @@ _ENGINE_DEP_PACKAGES = [
     'sqlalchemy',
     'docx',
     'lxml',
+    'regex',
     'pymupdf',
     'fitz',
     'openpyxl',

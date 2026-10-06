@@ -1,0 +1,23 @@
+{
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_addr_002",
+  "command_id": "a1b2c3d4-0001-4001-8001-000000000023",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "address_lookup",
+    "data": {
+      "schema_version": "notary.address-lookup.v2",
+      "status": "too_many",
+      "presentation": "drafting",
+      "total": 312,
+      "results": [],
+      "dataset_version": "bando-2026-10-04",
+      "revision": 1
+    },
+    "warnings": []
+  },
+  "error": null,
+  "updated_at": "2026-10-05T09:00:00Z"
+}

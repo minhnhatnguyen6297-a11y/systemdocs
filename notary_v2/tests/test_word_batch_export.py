@@ -19,6 +19,7 @@ import pytest
 from docx import Document
 
 from services import word_batch_export as wbe
+from services import word_engine
 
 
 BUILTIN_TEMPLATE = Path("word_templates/1. PCDS .docx")
@@ -380,6 +381,160 @@ class TestExportBatch:
         # không output nào được tạo
         assert not list(tmp_path.glob("*_HS-*.docx"))
 
+    def test_unresolved_placeholder_in_header_fails_document(self, tmp_path):
+        """Placeholder ngoài body (header) cũng phải chặn file, không xuất thầm."""
+        bad_template = tmp_path / "bad_header_template.docx"
+        doc = Document()
+        doc.add_paragraph("Thân văn bản")
+        doc.sections[0].header.paragraphs[0].add_run("[Trường Chưa Hỗ Trợ]")
+        doc.save(str(bad_template))
+        with pytest.raises(wbe.WordBatchError) as exc:
+            _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path,
+                   resolve_template=lambda _k: bad_template)
+        result = exc.value.result_data["documents"][0]
+        assert result["error"]["code"] == "word.unresolved_placeholders"
+        assert not list(tmp_path.glob("*_HS-*.docx"))
+
+    def test_verified_fixed_form_codes_do_not_block_export(self, tmp_path):
+        """Mã in cứng đã xác minh của ĐÚNG mẫu DK18 không bị coi là thiếu."""
+        case = _ready_case()
+        mapping = word_engine.build_template_mapping(case)
+        real_token = next(
+            token for token, value in sorted(mapping.items())
+            if value and token.startswith("[") and not token.startswith("[Tài sản")
+        )
+        template = tmp_path / "2. DK18, thuế  1.docx"
+        doc = Document()
+        doc.add_paragraph("[01] Nội dung mục một")
+        doc.add_paragraph("[06.1] Nội dung mục sáu")
+        doc.add_paragraph(real_token)
+        doc.save(str(template))
+        data = _batch(case, ["khai_nhan_di_san"], tmp_path,
+                      resolve_template=lambda _k: template)
+        docs = _docs_by_key(data)
+        assert docs["khai_nhan_di_san"]["status"] == "saved"
+        assert list(tmp_path.glob("*_HS-*.docx"))
+
+    def test_numeric_tokens_on_unverified_template_block_export(self, tmp_path):
+        """Mẫu bất kỳ chứa "[01]"/"[54.99]" KHÔNG được miễn — phải báo sót."""
+        template = tmp_path / "codes_template.docx"
+        doc = Document()
+        doc.add_paragraph("[01] Mục chưa xác minh")
+        doc.add_paragraph("[54.99] Ngoài bộ DK18")
+        doc.save(str(template))
+        with pytest.raises(wbe.WordBatchError) as exc:
+            _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path,
+                   resolve_template=lambda _k: template)
+        result = exc.value.result_data["documents"][0]
+        assert result["error"]["code"] == "word.unresolved_placeholders"
+        assert "[01]" in result["error"]["message"]
+        assert "[54.99]" in result["error"]["message"]
+        assert not list(tmp_path.glob("*_HS-*.docx"))
+
+    def test_fixed_code_outside_verified_list_still_blocks_export(self, tmp_path):
+        """Mẫu DK18 đã xác minh nhưng chứa mã NGOÀI danh sách vẫn bị chặn."""
+        case = _ready_case()
+        mapping = word_engine.build_template_mapping(case)
+        real_token = next(
+            token for token, value in sorted(mapping.items())
+            if value and token.startswith("[") and not token.startswith("[Tài sản")
+        )
+        template = tmp_path / "2. DK18, thuế  2.docx"
+        doc = Document()
+        doc.add_paragraph("[01] Mục một")
+        doc.add_paragraph("[54.99] Mã lạ")
+        doc.add_paragraph(real_token)
+        doc.save(str(template))
+        with pytest.raises(wbe.WordBatchError) as exc:
+            _batch(case, ["khai_nhan_di_san"], tmp_path,
+                   resolve_template=lambda _k: template)
+        result = exc.value.result_data["documents"][0]
+        assert result["error"]["code"] == "word.unresolved_placeholders"
+        assert "[54.99]" in result["error"]["message"]
+        assert "[01]" not in result["error"]["message"]
+
+    def _uq_template(self, path, slot=1):
+        doc = Document()
+        doc.add_paragraph(f"tôi uỷ quyền cho: [Dòng người được ủy quyền {slot}]")
+        doc.save(str(path))
+        return path
+
+    def _case_with_authorized_via_saved_role(self):
+        """Người được ủy quyền chỉ gán qua participants.vai_tro (không node
+        Diagram) — đúng tình huống luồng nhập lưu vai trò đã xác nhận."""
+        owner = _person(1, "Nguyễn Văn Chủ", dead=date(2024, 2, 3), doc_no="001")
+        heir = _person(2, "Nguyễn Văn Con", doc_no="002")
+        proxy = _person(3, "Trần Thị Ủy", gender="Nữ", doc_no="003")
+        return _make_case(
+            owner,
+            participants=[
+                _participant(heir, "Con"),
+                _participant(proxy, "Người được ủy quyền", receive=False),
+            ],
+            properties=[_prop()],
+            case_state=_case_state(
+                owner, heir, proxy,
+                nodes=[
+                    _node(1, role="Owner", is_land_owner=True),
+                    _node(2, role="Con", will_receive=True),
+                ]))
+
+    def test_template_requiring_authorized_person_fails_loudly(self, tmp_path):
+        """Mẫu UQ dùng token nhóm 'người được ủy quyền' mà hồ sơ chưa gán vai
+        trò đó -> per-doc failed, KHÔNG xuất file trống thầm lặng (NAIA-12)."""
+        template = self._uq_template(tmp_path / "3. UQ.docx")
+        with pytest.raises(wbe.WordBatchError) as exc:
+            _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path,
+                   resolve_template=lambda _k: template)
+        result = exc.value.result_data["documents"][0]
+        assert result["status"] == "failed"
+        assert result["error"]["code"] == "word.missing_authorized_person"
+        assert not list(tmp_path.glob("*_HS-*.docx"))
+
+    def test_template_requiring_authorized_slot_2_fails_with_one_person(
+            self, tmp_path):
+        """Mẫu đòi người được ủy quyền THỨ HAI nhưng hồ sơ chỉ gán một -> fail."""
+        template = self._uq_template(tmp_path / "3. UQ.docx", slot=2)
+        case = self._case_with_authorized_via_saved_role()
+        with pytest.raises(wbe.WordBatchError) as exc:
+            _batch(case, ["khai_nhan_di_san"], tmp_path,
+                   resolve_template=lambda _k: template)
+        result = exc.value.result_data["documents"][0]
+        assert result["error"]["code"] == "word.missing_authorized_person"
+        assert not list(tmp_path.glob("*_HS-*.docx"))
+
+    def test_template_authorized_inline_slot_2_fails_with_one_person(
+            self, tmp_path):
+        """Phản ví dụ review NAIA-12: mẫu dùng "[Người được ủy quyền inline 2]"
+        với chỉ 1 đại diện -> word.missing_authorized_person, KHÔNG tạo file
+        (trước đây inline 2 bị nhận nhầm slot 1 nên slot 2 trống vẫn saved)."""
+        template = tmp_path / "3. UQ.docx"
+        doc = Document()
+        doc.add_paragraph(
+            "đại diện thứ hai: [Người được ủy quyền inline 2]")
+        doc.save(str(template))
+        case = self._case_with_authorized_via_saved_role()
+        with pytest.raises(wbe.WordBatchError) as exc:
+            _batch(case, ["khai_nhan_di_san"], tmp_path,
+                   resolve_template=lambda _k: template)
+        result = exc.value.result_data["documents"][0]
+        assert result["status"] == "failed"
+        assert result["error"]["code"] == "word.missing_authorized_person"
+        assert not list(tmp_path.glob("*_HS-*.docx"))
+
+    def test_template_authorized_person_saved_from_persisted_role(
+            self, tmp_path):
+        """Vai trò ủy quyền đã lưu (không node) -> export được và đầu ra chứa
+        ĐÚNG người đó, không chỉ qua được vòng kiểm unresolved."""
+        template = self._uq_template(tmp_path / "3. UQ.docx")
+        case = self._case_with_authorized_via_saved_role()
+        data = _batch(case, ["khai_nhan_di_san"], tmp_path,
+                      resolve_template=lambda _k: template)
+        entry = _docs_by_key(data)["khai_nhan_di_san"]
+        assert entry["status"] == "saved"
+        out = Document(str(tmp_path / entry["actual_filename"]))
+        assert "Trần Thị Ủy" in out.paragraphs[0].text
+
     def test_cancel_mid_batch_keeps_saved_and_marks_skipped(self, tmp_path):
         class _Cancel(Exception):
             def __init__(self, data):
@@ -455,6 +610,42 @@ class TestExportBatch:
                ["khai_nhan_di_san", "thoa_thuan_phan_chia"], tmp_path,
                report_progress=lambda d, t, label: calls.append((d, t)))
         assert calls == [(1, 2), (2, 2)]
+
+    def test_cancel_at_progress_checkpoint_keeps_pending_result(
+            self, tmp_path):
+        """jobstore.report_progress cung la cancel checkpoint va raise
+        CancelledByUser() KHONG kem result — batch phai re-check de
+        pending snapshot (doc chua bat dau -> skipped) van len wire
+        (contract §8.4 canceled example, MIN-115)."""
+        class _Cancel(Exception):
+            def __init__(self, data=None):
+                super().__init__("cancel")
+                self.data = data
+
+        flag = {"canceled": False}
+
+        def _check(data):
+            if flag["canceled"]:
+                raise _Cancel(data)
+
+        def _report(done, _total, _label):
+            # Gia lap jobstore: progress quan sat cancel flag -> raise
+            # exception KHONG kem result (bare).
+            if done == 2:
+                flag["canceled"] = True
+                raise _Cancel()
+
+        keys = ["khai_nhan_di_san", "thoa_thuan_phan_chia", "niem_yet"]
+        with pytest.raises(_Cancel) as exc:
+            _batch(_ready_case(), keys, tmp_path,
+                   check_cancel=_check, report_progress=_report)
+        data = exc.value.data
+        assert data is not None           # pending snapshot len wire
+        docs = _docs_by_key(data)
+        assert docs["khai_nhan_di_san"]["status"] == "saved"
+        assert docs["thoa_thuan_phan_chia"]["status"] == "saved"
+        assert docs["niem_yet"]["status"] == "skipped"
+        assert data["breakdown"]["skipped"] == ["niem_yet"]
 
 
 # ------------------------------------------- MIN-116 dest deny-write
@@ -678,3 +869,282 @@ class TestFilenameSafety:
     ])
     def test_safe_names_accepted(self, name):
         assert wbe.is_safe_windows_filename(name) is True
+
+
+# ================================================================ NAIA-8
+# Folder mode — mẫu từ thư mục người dùng chọn (template_dir).
+
+import shutil
+import subprocess
+
+
+def _folder_templates(tmp_path, names):
+    """Copy template builtin vào tmp dưới các tên cho trước."""
+    tdir = tmp_path / "templates"
+    tdir.mkdir()
+    for name in names:
+        shutil.copyfile(BUILTIN_TEMPLATE, tdir / name)
+    return tdir
+
+
+def _dir_link(link, target):
+    """Directory link `link` → `target`: os.symlink trước, fallback
+    junction `mklink /J` trên Windows (không cần quyền admin)."""
+    try:
+        os.symlink(target, link, target_is_directory=True)
+        return
+    except OSError:
+        pass
+    if os.name == "nt":
+        r = subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(link), str(target)],
+            capture_output=True)
+        if r.returncode == 0:
+            return
+    pytest.skip("không tạo được directory link (thiếu quyền)")
+
+
+def _file_link(link, target):
+    """File symlink — Windows cần SeCreateSymbolicLinkPrivilege
+    (WinError 1314 trên máy không có quyền) → skip."""
+    try:
+        os.symlink(target, link)
+    except OSError as exc:
+        pytest.skip(f"không tạo được file symlink: {exc}")
+
+
+class TestScanTemplateDir:
+    def test_scans_only_top_level_docx_sorted(self, tmp_path):
+        tdir = _folder_templates(
+            tmp_path, ["b mau.docx", "A mau.docx", "~$locked.docx"])
+        (tdir / "readme.txt").write_text("x")
+        (tdir / "sub").mkdir()
+        (tdir / "sub" / "inner.docx").write_text("x")
+        specs = wbe.scan_template_dir(tdir)
+        assert [s.document_key for s in specs] == [
+            "A mau.docx", "b mau.docx"]
+        assert [s.display_name for s in specs] == ["A mau", "b mau"]
+
+    def test_missing_dir_raises(self, tmp_path):
+        with pytest.raises(wbe.WordBatchError) as exc:
+            wbe.scan_template_dir(tmp_path / "nope")
+        assert exc.value.code == "file_not_found"
+
+    def test_ascii_stem_sanitized(self):
+        assert wbe._ascii_stem("Mẫu đơn xin.docx") == "Mau_don_xin"
+        assert wbe._ascii_stem("CON.docx") == "Mau"
+
+
+class TestFolderModeExport:
+    def test_static_folder_exports_saved_stage_without_receiver(self, tmp_path):
+        case = _ready_case()
+        case.case_state_json = None
+        case.participants = []
+        tdir = tmp_path / "static_templates"
+        tdir.mkdir()
+        doc = Document()
+        doc.add_paragraph("[Người 1 - Họ tên] | [Người nhận 1 - Họ tên]")
+        doc.save(tdir / "static.docx")
+        specs = wbe.scan_template_dir(tdir)
+        resolve = wbe.template_path_resolver(tdir)
+        options = wbe.export_options(case, resolve_template=resolve, doc_specs=specs)
+        assert options["documents"][0]["ready"] is True
+        dest = tmp_path / "static_output"
+        dest.mkdir()
+        result = wbe.export_batch(case, case_id=case.id,
+            document_keys=["static.docx"], dest_dir=dest,
+            resolve_template=resolve, doc_specs=specs)
+        assert result["breakdown"]["succeeded"] == ["static.docx"]
+        output = Document(result["documents"][0]["output_file"]["path"])
+        assert case.nguoi_chet.ho_ten in output.paragraphs[0].text
+        assert "[" not in output.paragraphs[0].text
+
+    def test_options_lists_folder_files(self, tmp_path):
+        tdir = _folder_templates(tmp_path, ["Mẫu thuê nhà.docx"])
+        specs = wbe.scan_template_dir(tdir)
+        data = wbe.export_options(
+            _ready_case(), resolve_template=wbe.template_path_resolver(tdir),
+            doc_specs=specs)
+        docs = _docs_by_key(data)
+        assert set(docs) == {"Mẫu thuê nhà.docx"}
+        assert docs["Mẫu thuê nhà.docx"]["display_name"] == "Mẫu thuê nhà"
+        assert docs["Mẫu thuê nhà.docx"]["ready"] is True
+
+    def test_batch_writes_ascii_stem_outputs(self, tmp_path):
+        tdir = _folder_templates(
+            tmp_path, ["Mẫu đơn.docx", "b mau.docx"])
+        dest = tmp_path / "out"
+        dest.mkdir()
+        specs = wbe.scan_template_dir(tdir)
+        data = _batch(
+            _ready_case(), ["Mẫu đơn.docx", "b mau.docx"], dest,
+            resolve_template=wbe.template_path_resolver(tdir),
+            doc_specs=specs)
+        assert data["breakdown"]["succeeded"] == [
+            "Mẫu đơn.docx", "b mau.docx"]
+        names = sorted(p.name for p in dest.iterdir())
+        assert names == ["Mau_don_HS-99.docx", "b_mau_HS-99.docx"]
+        for d in data["documents"]:
+            assert d["status"] == "saved"
+            assert Path(d["output_file"]["path"]).is_file()
+
+    def test_batch_rejects_unknown_or_traversal_key(self, tmp_path):
+        tdir = _folder_templates(tmp_path, ["a.docx"])
+        dest = tmp_path / "out"
+        dest.mkdir()
+        specs = wbe.scan_template_dir(tdir)
+        resolver = wbe.template_path_resolver(tdir)
+        for bad in ("../other.docx", "khai_nhan_di_san",
+                    "chua_quet.docx", r"..\win.docx"):
+            with pytest.raises(wbe.WordBatchError) as exc:
+                _batch(_ready_case(), [bad], dest,
+                       resolve_template=resolver, doc_specs=specs)
+            assert exc.value.code == "word_unknown_document_key"
+
+    def test_create_case_subdir(self, tmp_path):
+        tdir = _folder_templates(tmp_path, ["mau.docx"])
+        dest = tmp_path / "out"
+        dest.mkdir()
+        specs = wbe.scan_template_dir(tdir)
+        data = _batch(
+            _ready_case(), ["mau.docx"], dest,
+            resolve_template=wbe.template_path_resolver(tdir),
+            doc_specs=specs, create_case_subdir=True)
+        subdir = dest / "HS-99"
+        assert data["documents"][0]["status"] == "saved"
+        assert (subdir / "mau_HS-99.docx").is_file()
+        # contract §8.2: data.destination vẫn là thư mục người dùng chọn
+        assert data["destination"]["path"] == str(dest)
+        # Không ghi đè: chạy lại cùng mẫu → suffix _2
+        data2 = _batch(
+            _ready_case(), ["mau.docx"], dest,
+            resolve_template=wbe.template_path_resolver(tdir),
+            doc_specs=specs, create_case_subdir=True)
+        assert data2["documents"][0]["actual_filename"] == "mau_HS-99_2.docx"
+
+    def test_template_deleted_after_scan_fails_file(self, tmp_path):
+        tdir = _folder_templates(tmp_path, ["mau.docx", "mau2.docx"])
+        dest = tmp_path / "out"
+        dest.mkdir()
+        specs = wbe.scan_template_dir(tdir)
+        resolver = wbe.template_path_resolver(tdir)
+        (tdir / "mau.docx").unlink()
+        data = _batch(
+            _ready_case(), ["mau.docx", "mau2.docx"], dest,
+            resolve_template=resolver, doc_specs=specs)
+        docs = _docs_by_key(data)
+        assert docs["mau.docx"]["status"] == "failed"
+        assert docs["mau.docx"]["error"]["code"] == "word.template_missing"
+        assert docs["mau2.docx"]["status"] == "saved"
+        assert data["breakdown"]["failed"] == ["mau.docx"]
+
+    def test_catalog_mode_still_works(self, tmp_path):
+        dest = tmp_path / "out"
+        dest.mkdir()
+        data = _batch(_ready_case(), ["khai_nhan_di_san"], dest)
+        assert data["documents"][0]["status"] == "saved"
+
+
+class TestDestSubdirLinkEscape:
+    """Review NAIA-8: `HS-<case_id>` tồn tại sẵn dạng junction/symlink
+    trỏ ra ngoài — mkdir(exist_ok=True) chấp nhận vì "đã có dir" và mọi
+    ghi sau đó thoát khỏi thư mục được cấp quyền. Phải kiểm tra đích
+    THẬT và từ chối trước probe/ghi/publish."""
+
+    def test_case_subdir_link_to_outside_rejected(self, tmp_path):
+        dest = tmp_path / "selected"
+        dest.mkdir()
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        _dir_link(dest / "HS-99", outside)
+        with pytest.raises(wbe.WordBatchError) as exc:
+            _batch(_ready_case(), ["khai_nhan_di_san"], dest,
+                   create_case_subdir=True)
+        assert exc.value.code == "word_path_traversal"
+        # không file nào được tạo — ngoài outside lẫn trong selected
+        assert list(outside.iterdir()) == []
+        assert [p.name for p in dest.iterdir()] == ["HS-99"]
+
+    def test_case_subdir_link_inside_dest_allowed(self, tmp_path):
+        """Link trỏ vào TRONG destination (không thoát) vẫn được chấp
+        nhận — chỉ chặn liên kết thoát ra ngoài."""
+        dest = tmp_path / "selected"
+        dest.mkdir()
+        inner = dest / "inner"
+        inner.mkdir()
+        _dir_link(dest / "HS-99", inner)
+        data = _batch(_ready_case(), ["khai_nhan_di_san"], dest,
+                      create_case_subdir=True)
+        assert data["documents"][0]["status"] == "saved"
+        assert (inner
+                / "Van_ban_khai_nhan_di_san_HS-99.docx").is_file()
+        # file đi qua link vào inner — vẫn nằm trong destination
+        assert sorted(p.name for p in dest.iterdir()) == ["HS-99", "inner"]
+
+
+class TestTemplateLinkEscape:
+    """Mẫu qua liên kết: `.docx` trong thư mục mẫu là symlink trỏ ra
+    ngoài — `is_file()` đuổi theo link nên basename check không đủ;
+    phải kiểm containment khi quét lẫn khi resolve để mở."""
+
+    def test_scan_skips_file_link_to_outside(self, tmp_path):
+        tdir = tmp_path / "templates"
+        tdir.mkdir()
+        shutil.copyfile(BUILTIN_TEMPLATE, tdir / "mau.docx")
+        outside = tmp_path / "outside.docx"
+        shutil.copyfile(BUILTIN_TEMPLATE, outside)
+        _file_link(tdir / "linked.docx", outside)
+        specs = wbe.scan_template_dir(tdir)
+        assert [s.document_key for s in specs] == ["mau.docx"]
+        resolver = wbe.template_path_resolver(tdir)
+        assert resolver("linked.docx") is None
+        assert resolver("mau.docx") is not None
+        # key của file liên kết cũng bị từ chối ở tầng validate
+        dest = tmp_path / "out"
+        dest.mkdir()
+        with pytest.raises(wbe.WordBatchError) as exc:
+            _batch(_ready_case(), ["linked.docx"], dest,
+                   resolve_template=resolver, doc_specs=specs)
+        assert exc.value.code == "word_unknown_document_key"
+        assert list(dest.iterdir()) == []
+
+    def test_template_swapped_for_link_after_scan(self, tmp_path):
+        """Mẫu quét được lúc scan bị thay bằng symlink ra ngoài trước khi
+        mở — resolver kiểm tra lại containment → word.template_missing,
+        không bao giờ đọc file ngoài thư mục được cấp quyền."""
+        tdir = tmp_path / "templates"
+        tdir.mkdir()
+        target = tdir / "mau.docx"
+        shutil.copyfile(BUILTIN_TEMPLATE, target)
+        outside = tmp_path / "outside.docx"
+        doc = Document()                       # nội dung khác hẳn —
+        doc.add_paragraph("SECRET-OUTSIDE")    # nếu bị đọc lộ sẽ thấy
+        doc.save(str(outside))
+        specs = wbe.scan_template_dir(tdir)
+        resolver = wbe.template_path_resolver(tdir)
+        assert resolver("mau.docx") is not None
+        # swap sau khi quét: xóa file thật, đặt symlink trỏ ra ngoài
+        target.unlink()
+        _file_link(target, outside)
+        assert resolver("mau.docx") is None
+        dest = tmp_path / "out"
+        dest.mkdir()
+        with pytest.raises(wbe.WordBatchError) as exc:
+            _batch(_ready_case(), ["mau.docx"], dest,
+                   resolve_template=resolver, doc_specs=specs)
+        assert exc.value.code == "word_batch_failed"
+        d = exc.value.result_data["documents"][0]
+        assert d["status"] == "failed"
+        assert d["error"]["code"] == "word.template_missing"
+        assert list(dest.iterdir()) == []
+
+    def test_dir_link_in_templates_skipped(self, tmp_path):
+        """Junction/symlink THƯ MỤC có đuôi .docx trỏ ra ngoài: không
+        phải file → loại khỏi scan (và không đuổi link)."""
+        tdir = tmp_path / "templates"
+        tdir.mkdir()
+        outside_dir = tmp_path / "outside_dir"
+        outside_dir.mkdir()
+        _dir_link(tdir / "linkdir.docx", outside_dir)
+        specs = wbe.scan_template_dir(tdir)
+        assert specs == []

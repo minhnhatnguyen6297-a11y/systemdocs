@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Regex Workbench — tools/regex_workbench</title>
+  <link rel="stylesheet" href="/ui/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <strong>Regex Workbench</strong>
+      <span class="muted">tools/regex_workbench — dev tool, không phải UI sản phẩm</span>
+    </div>
+    <div class="actions">
+      <button id="btn-run" class="primary">▶ Run</button>
+      <button id="btn-export">Export profile</button>
+      <button id="btn-import">Import profile</button>
+      <button id="btn-reset">Reset profile</button>
+      <input type="file" id="file-import" accept=".json,application/json" hidden>
+    </div>
+  </header>
+
+  <main class="grid">
+    <section class="col">
+      <h2>Văn bản nguồn</h2>
+      <textarea id="source" spellcheck="false" placeholder="Dán toàn văn bản hợp đồng/văn bản công chứng vào đây..."></textarea>
+      <h2>Highlight <span class="legend" id="legend"></span></h2>
+      <pre id="highlight" class="highlight"></pre>
+    </section>
+
+    <section class="col">
+      <h2>Rule editor (profile JSON — pattern ở dạng folded: chữ thường, không dấu)</h2>
+      <textarea id="profile" spellcheck="false" class="code"></textarea>
+      <div id="profile-status" class="status"></div>
+    </section>
+
+    <section class="col">
+      <h2>Kết quả</h2>
+      <div id="summary" class="summary"></div>
+      <div id="errors" class="errors"></div>
+      <h3>Fields</h3>
+      <table id="fields" class="tbl"></table>
+      <h3>Đương sự</h3>
+      <table id="persons" class="tbl"></table>
+      <h3>JSON</h3>
+      <pre id="json" class="json"></pre>
+    </section>
+  </main>
+
+  <script src="/ui/app.js"></script>
+</body>
+</html>

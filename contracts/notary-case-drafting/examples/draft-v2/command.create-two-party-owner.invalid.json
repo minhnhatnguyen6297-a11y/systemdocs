@@ -22,12 +22,16 @@
         {
           "row_id": "11111111-1111-4111-8111-111111111111",
           "entity_id": null,
-          "ho_ten": "Nguyễn Văn A"
+          "ho_ten": "Nguyễn Văn A",
+          "loai_giay_to": null,
+          "loai_dia_chi": null
         },
         {
           "row_id": "99999999-9999-4999-8999-999999999999",
           "entity_id": null,
-          "ho_ten": "Lê Văn B"
+          "ho_ten": "Lê Văn B",
+          "loai_giay_to": null,
+          "loai_dia_chi": null
         }
       ],
       "assets": [

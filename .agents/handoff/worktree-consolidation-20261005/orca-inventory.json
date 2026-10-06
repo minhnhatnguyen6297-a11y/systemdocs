@@ -1,0 +1,62 @@
+{
+  "workspaces": [
+    {
+      "path": "C:\\Users\\MINH\\orca\\workspaces",
+      "files": [],
+      "subdirectories": [
+        ".orca-preparing",
+        "systemdocs"
+      ]
+    },
+    {
+      "path": "C:\\Users\\MINH\\orca\\workspaces\\.orca-preparing",
+      "files": [],
+      "subdirectories": []
+    },
+    {
+      "path": "C:\\Users\\MINH\\orca\\workspaces\\systemdocs",
+      "files": [],
+      "subdirectories": [
+        "fix-bug-notary_v2",
+        "notaryoffice-bmad-brainstorm",
+        "otter",
+        "xuất-word"
+      ]
+    },
+    {
+      "path": "C:\\Users\\MINH\\orca\\workspaces\\systemdocs\\fix-bug-notary_v2",
+      "files": [],
+      "subdirectories": []
+    },
+    {
+      "path": "C:\\Users\\MINH\\orca\\workspaces\\systemdocs\\notaryoffice-bmad-brainstorm",
+      "files": [
+        "nul"
+      ],
+      "subdirectories": []
+    },
+    {
+      "path": "C:\\Users\\MINH\\orca\\workspaces\\systemdocs\\otter",
+      "files": [
+        "nul"
+      ],
+      "subdirectories": []
+    },
+    {
+      "path": "C:\\Users\\MINH\\orca\\workspaces\\systemdocs\\xuất-word",
+      "files": [],
+      "subdirectories": []
+    }
+  ],
+  "session_records_matched": 13,
+  "profile_metadata_files": [],
+  "systemdocs_paths": {
+    "D:\\systemdocs": {
+      "exists": true,
+      "origins": [
+        "C:\\Users\\MINH\\.orca\\sessions\\78f2d46a8e50a3090a8e4818bc6e0751.json:worktreePath",
+        "C:\\Users\\MINH\\.orca\\sessions\\78f2d46a8e50a3090a8e4818bc6e0751.json:activeWorktreePathsOnShutdown"
+      ]
+    }
+  }
+}

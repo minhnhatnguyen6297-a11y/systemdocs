@@ -1,0 +1,2399 @@
+............................s........................................... [ 13%]
+........................................................................ [ 26%]
+.............F.....F.................................................... [ 39%]
+..............................................F............F..F......... [ 52%]
+...........FFFF...........FFFFFF...FF............................F...FFF [ 66%]
+FFF.FFF............................sss.................................. [ 79%]
+........................................................................ [ 92%]
+.........................................                                [100%]
+================================== FAILURES ===================================
+___________ test_actual_context_and_proposals_match_contract_schema ___________
+
+db = <sqlalchemy.orm.session.Session object at 0x000001D3A2BF9DF0>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_actual_context_and_propos0')
+
+    def test_actual_context_and_proposals_match_contract_schema(db, tmp_path):
+>       from jsonschema import Draft7Validator, FormatChecker
+E       ModuleNotFoundError: No module named 'jsonschema'
+
+notary_v2\tests\test_docx_word_first.py:515: ModuleNotFoundError
+_____________ test_source_row_21_survives_saved_stage_and_schema ______________
+
+db = <sqlalchemy.orm.session.Session object at 0x000001D3A3354860>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_source_row_21_survives_sa0')
+
+    def test_source_row_21_survives_saved_stage_and_schema(db, tmp_path):
+        doc = Document(); doc.add_paragraph('Tài sản 1:')
+        doc.add_paragraph('Số serial: ZZ123456; có địa chỉ tại: Nhà đất A')
+        for n in range(1, 22): doc.add_paragraph(f'Loại đất: ONT; Diện tích: {n}; Thời hạn: Lâu dài')
+        doc.add_paragraph('Điều 2: Giữ nguyên')
+        stream = io.BytesIO(); doc.save(stream); store = DocxStore(tmp_path / 'sources')
+        candidate = next(s for s in extraction(stream.getvalue(), store) if s['target'] == 'asset')
+        rows = json.loads(candidate['fields']['land_rows']['normalized_value'])
+        assert len(rows) == 21
+        person = _person_row(); asset = _asset_row(land_rows=rows[1:])
+        ref = candidate['fields']['so_serial']['source_refs'][0]
+        context = {'version': 1, 'sources': [{'source_id': ref['source_id'], 'sha256': ref['source_sha256'],
+            'records': [{'candidate_id': candidate['suggestion_id'], 'row_id': asset['row_id'], 'land_rows': list(range(2, 22))}], 'bindings': []}]}
+        service = CaseWorkspaceService(db, store)
+        data = service.create(str(uuid.uuid4()), {'case_type': 'inheritance', 'document_type': 'khai_nhan'},
+            {'owner_row_id': person['row_id'], 'people': [person], 'assets': [asset]}, None, context)
+        saved = service.commit_stage(data['case']['id'], data['case']['revision'], data['stage'], docx_import=data['docx_import'])
+        db.expire_all(); loaded = service.get(data['case']['id'])
+        assert loaded['docx_import']['sources'][0]['records'][0]['land_rows'][-1] == 21
+        assert len(loaded['stage']['assets'][0]['land_rows']) == 20
+>       from jsonschema import Draft7Validator
+E       ModuleNotFoundError: No module named 'jsonschema'
+
+notary_v2\tests\test_docx_word_first.py:651: ModuleNotFoundError
+_ test_placeholder_catalog_documents_vietnamese_contract_without_snake_case_public_contract _
+
+    def test_placeholder_catalog_documents_vietnamese_contract_without_snake_case_public_contract():
+>       catalog = Path("word_templates/placeholder_mapping.md").read_text(encoding="utf-8")
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+notary_v2\tests\test_word_engine.py:1066:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\pathlib.py:1027: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('word_templates/placeholder_mapping.md'), mode = 'r'
+buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+    def open(self, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None):
+        """
+        Open the file pointed to by this path and return a file object, as
+        the built-in open() function does.
+        """
+        if "b" not in mode:
+            encoding = io.text_encoding(encoding)
+>       return io.open(self, mode, buffering, encoding, errors, newline)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       FileNotFoundError: [Errno 2] No such file or directory: 'word_templates\\placeholder_mapping.md'
+
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\pathlib.py:1013: FileNotFoundError
+______ test_real_pcds_template_resolves_two_properties_into_one_document ______
+
+    def test_real_pcds_template_resolves_two_properties_into_one_document():
+        owner = _person(1, "Nguyễn Văn A", gender="Nam", dead=date(2024, 2, 3))
+        receiver = _person(2, "Nguyễn Văn B", gender="Nam")
+        case = _make_case(
+            owner,
+            properties=[
+                _prop(dia_chi="Thửa đất thứ nhất", so_serial="S1"),
+                _prop(dia_chi="Thửa đất thứ hai", so_serial="S2"),
+            ],
+            case_state=_case_state(
+                owner,
+                receiver,
+                nodes=[
+                    _node(1, role="Owner", is_land_owner=True),
+                    _node(2, role="Con", will_receive=True),
+                ],
+            ),
+        )
+>       doc = Document("word_templates/1. PCDS .docx")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+notary_v2\tests\test_word_engine.py:1404:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\docx\api.py:27: in Document
+    document_part = cast("DocumentPart", Package.open(docx).main_document_part)
+                                         ^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\docx\opc\package.py:126: in open
+    pkg_reader = PackageReader.from_file(pkg_file)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\docx\opc\pkgreader.py:22: in from_file
+    phys_reader = PhysPkgReader(pkg_file)
+                  ^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+cls = <class 'docx.opc.phys_pkg.PhysPkgReader'>
+pkg_file = 'word_templates/1. PCDS .docx'
+
+    def __new__(cls, pkg_file):
+        # if `pkg_file` is a string, treat it as a path
+        if isinstance(pkg_file, str):
+            if os.path.isdir(pkg_file):
+                reader_cls = _DirPkgReader
+            elif is_zipfile(pkg_file):
+                reader_cls = _ZipPkgReader
+            else:
+>               raise PackageNotFoundError("Package not found at '%s'" % pkg_file)
+E               docx.opc.exceptions.PackageNotFoundError: Package not found at 'word_templates/1. PCDS .docx'
+
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\docx\opc\phys_pkg.py:21: PackageNotFoundError
+_______________ test_pcds_template_no_old_critical_placeholders _______________
+
+    def test_pcds_template_no_old_critical_placeholders():
+>       doc = Document("word_templates/1. PCDS .docx")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+notary_v2\tests\test_word_engine.py:1455:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\docx\api.py:27: in Document
+    document_part = cast("DocumentPart", Package.open(docx).main_document_part)
+                                         ^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\docx\opc\package.py:126: in open
+    pkg_reader = PackageReader.from_file(pkg_file)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\docx\opc\pkgreader.py:22: in from_file
+    phys_reader = PhysPkgReader(pkg_file)
+                  ^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+cls = <class 'docx.opc.phys_pkg.PhysPkgReader'>
+pkg_file = 'word_templates/1. PCDS .docx'
+
+    def __new__(cls, pkg_file):
+        # if `pkg_file` is a string, treat it as a path
+        if isinstance(pkg_file, str):
+            if os.path.isdir(pkg_file):
+                reader_cls = _DirPkgReader
+            elif is_zipfile(pkg_file):
+                reader_cls = _ZipPkgReader
+            else:
+>               raise PackageNotFoundError("Package not found at '%s'" % pkg_file)
+E               docx.opc.exceptions.PackageNotFoundError: Package not found at 'word_templates/1. PCDS .docx'
+
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\docx\opc\phys_pkg.py:21: PackageNotFoundError
+__________ TestExportBatch.test_writes_independent_docx_per_document __________
+
+self = <tests.test_word_batch_export.TestExportBatch object at 0x000001D39D33A750>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_writes_independent_docx_p0')
+
+    def test_writes_independent_docx_per_document(self, tmp_path):
+>       data = _batch(_ready_case(),
+                      ["khai_nhan_di_san", "thoa_thuan_phan_chia"],
+                      tmp_path)
+
+notary_v2\tests\test_word_batch_export.py:272:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+notary_v2\tests\test_word_batch_export.py:142: in _batch
+    return wbe.export_batch(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+case = namespace(id=99, nguoi_chet=namespace(id=1, ho_ten='Nguyễn Văn Chủ', gioi_tinh='Nam', ngay_sinh=None, ngay_chet=dateti...isLandOwner": false, "willReceive": true, "hidden": false, "deleted": false}]}, "engineResult": {"allocations": {}}}}')
+case_id = 99, document_keys = ['khai_nhan_di_san', 'thoa_thuan_phan_chia']
+dest_dir = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_writes_independent_docx_p0')
+resolve_template = <function _resolve_builtin at 0x000001D39D311C60>
+check_cancel = None, report_progress = None, today = None, doc_specs = None
+create_case_subdir = False
+
+    def export_batch(case: Any, *, case_id: int, document_keys: Any,
+                     dest_dir: Any, resolve_template: Callable[[str], Any],
+                     check_cancel: Optional[Callable[[dict], None]] = None,
+                     report_progress: Optional[Callable] = None,
+                     today: Any = None,
+                     doc_specs: Optional[list[WordDocumentSpec]] = None,
+                     create_case_subdir: bool = False) -> dict:
+        """`result.data` của notary.word_export_batch — read snapshot + ghi file.
+
+        `check_cancel(data)` được gọi GIỮA các văn bản với result.data hiện
+        tại (doc chưa bắt đầu → skipped) — caller bọc job.check_cancel(result)
+        của jobstore để canceled job vẫn mang breakdown (MIN-115).
+
+        `doc_specs` (NAIA-8): spec động từ `scan_template_dir` — khi truyền,
+        `document_keys` được đối chiếu lại với ĐÚNG tập file của thư mục
+        được cấp quyền (folder-authorized), không phải catalog cố định.
+        `create_case_subdir=True` → ghi vào `<dest>/HS-<case_id>/`
+        (tạo nếu thiếu; file bên trong vẫn không bao giờ ghi đè);
+        `data.destination` trong result vẫn là thư mục người dùng chọn
+        (contract §8.2).
+
+        Tất cả failed → WordBatchError("word_batch_failed", result_data=...).
+        """
+        # Catalog map (không phải tuple) — test/caller có thể patch entry
+        # theo key; folder mode override bằng doc_specs của thư mục mẫu.
+        specs = ({spec.document_key: spec for spec in doc_specs}
+                 if doc_specs is not None else DOC_CATALOG_BY_KEY)
+        keys = validate_document_keys(
+            document_keys,
+            allowed_keys=set(specs) if doc_specs is not None else None)
+        granted_dir = Path(dest_dir)     # thư mục người dùng chọn (result)
+        dest_dir = granted_dir
+        if create_case_subdir:
+            dest_dir = granted_dir / f"HS-{case_id}"
+            try:
+                dest_dir.mkdir(exist_ok=True)
+            except FileExistsError:
+                raise WordBatchError(
+                    "file_locked",
+                    "thư mục con hồ sơ bị chặn bởi file cùng tên") from None
+            except OSError as exc:
+                raise WordBatchError(
+                    "file_locked",
+                    f"không tạo được thư mục con hồ sơ: {exc}") from exc
+            # `HS-<case_id>` tồn tại sẵn dạng junction/symlink trỏ ra ngoài:
+            # mkdir(exist_ok=True) chấp nhận vì "đã có dir" và mọi ghi sau đó
+            # thoát khỏi thư mục được cấp quyền. Kiểm tra đích THẬT (đuổi
+            # theo reparse point mọi cấp) phải nằm trong granted dir —
+            # TRƯỚC probe/ghi/publish.
+            try:
+                granted_real = granted_dir.resolve()
+            except (OSError, RuntimeError) as exc:
+                raise WordBatchError(
+                    "file_not_found",
+                    f"không xác định được destination: {exc}") from exc
+            if not _contained_in(dest_dir, granted_real):
+                raise WordBatchError(
+                    "word_path_traversal",
+                    "thư mục con hồ sơ trỏ ra ngoài thư mục đích được chọn")
+        if not dest_dir.is_dir():
+            raise WordBatchError(
+                "file_not_found",
+                "destination không phải thư mục đang tồn tại")
+
+        taken: set[str] = set()
+        docs: list[dict] = []
+        saved: list[str] = []
+        failed: list[str] = []
+        total = len(keys)
+
+        def _pending_data() -> dict:
+            """Snapshot result.data: đã xong giữ status; chưa bắt đầu → skipped."""
+            entries = list(docs)
+            remaining = keys[len(entries):]
+            for key in remaining:
+                entries.append(_skipped_entry(specs[key]))
+            return _batch_data(
+                granted_dir, entries, succeeded=list(saved),
+                failed=list(failed), skipped=list(remaining))
+
+        def _check() -> None:
+            if check_cancel is not None:
+                check_cancel(_pending_data())
+
+        # MIN-116: probe writability destination MỘT lần đầu batch, trước khi
+        # build context/render — destination deny-write (ACL) thì mọi doc
+        # nhận per-file error chung, job kết thúc trong giây, KHÔNG hang.
+        _check()                                       # cancel trước khi probe
+        dest_error: Optional[tuple[str, str]] = None
+        try:
+            _probe_dest_writable(dest_dir)
+        except FileNotFoundError as exc:
+            dest_error = ("file_not_found",
+                          f"destination không còn tồn tại: {exc}")
+        except PermissionError as exc:
+            dest_error = ("file_locked",
+                          f"destination không ghi được: {exc}")
+        except OSError as exc:
+            dest_error = ("word.render_failed",
+                          f"destination không tạo được file: {exc}")
+
+        # Chỉ build context khi dest ghi được — dest_error set thì mọi doc
+        # nhận per-file error chung, context build vừa thừa vừa có thể ném
+        # raw exception ngoài shape per-doc (review MIN-116 minor).
+        context = None
+        data_reason = None
+        if dest_error is None:
+            context = word_engine.build_word_context(case, today=today)
+            data_reason = word_engine.word_block_reason(context, static=doc_specs is not None)
+        mapping_holder: dict = {}
+
+        for key in keys:
+            _check()                                   # cancel giữa batch
+            spec = specs[key]
+            if dest_error is not None:
+                code, message = dest_error
+                entry = _failed_entry(spec, code, message)
+            else:
+                entry = _export_one_document(
+                    spec=spec, case=case, context=context,
+                    data_reason=data_reason, resolve_template=resolve_template,
+                    mapping_holder=mapping_holder, dest_dir=dest_dir,
+                    taken=taken, case_id=case_id, today=today, check=_check,
+                    static=doc_specs is not None)
+            docs.append(entry)
+            (saved if entry["status"] == "saved" else failed).append(key)
+            if report_progress is not None:
+                try:
+                    report_progress(len(docs), total,
+                                    f"văn bản {len(docs)}/{total}")
+                except Exception:
+                    # jobstore.report_progress cung la cancel checkpoint va
+                    # raise CancelledByUser() KHONG kem result — _check() de
+                    # cancel van mang pending snapshot (doc -> skipped) len
+                    # wire (contract §8.4 canceled example, MIN-115); exception
+                    # khac thi _check() no-op roi re-raise nguyen ban.
+                    _check()
+                    raise
+
+        data = _batch_data(granted_dir, docs, succeeded=saved, failed=failed,
+                           skipped=[])
+        if len(failed) == total:
+>           raise WordBatchError(                      # §8.4 — job failed
+                "word_batch_failed",
+                "Toàn bộ văn bản trong lượt xuất đều lỗi",
+                details={"documents": [
+                    {"document_key": d["document_key"],
+                     "code": d["error"]["code"],
+                     "message": d["error"]["message"]} for d in docs]},
+                result_data=data)
+E           services.word_batch_export.WordBatchError: Toàn bộ văn bản trong lượt xuất đều lỗi
+
+notary_v2\services\word_batch_export.py:733: WordBatchError
+_____ TestExportBatch.test_collision_with_existing_files_keeps_old_bytes ______
+
+self = <tests.test_word_batch_export.TestExportBatch object at 0x000001D39D33AA50>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_collision_with_existing_f0')
+
+    def test_collision_with_existing_files_keeps_old_bytes(self, tmp_path):
+        old1 = tmp_path / "Van_ban_khai_nhan_di_san_HS-99.docx"
+        old2 = tmp_path / "Van_ban_khai_nhan_di_san_HS-99_2.docx"
+        old1.write_bytes(b"cu-1")
+        old2.write_bytes(b"cu-2")
+>       data = _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+notary_v2\tests\test_word_batch_export.py:302:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+notary_v2\tests\test_word_batch_export.py:142: in _batch
+    return wbe.export_batch(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+case = namespace(id=99, nguoi_chet=namespace(id=1, ho_ten='Nguyễn Văn Chủ', gioi_tinh='Nam', ngay_sinh=None, ngay_chet=dateti...isLandOwner": false, "willReceive": true, "hidden": false, "deleted": false}]}, "engineResult": {"allocations": {}}}}')
+case_id = 99, document_keys = ['khai_nhan_di_san']
+dest_dir = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_collision_with_existing_f0')
+resolve_template = <function _resolve_builtin at 0x000001D39D311C60>
+check_cancel = None, report_progress = None, today = None, doc_specs = None
+create_case_subdir = False
+
+    def export_batch(case: Any, *, case_id: int, document_keys: Any,
+                     dest_dir: Any, resolve_template: Callable[[str], Any],
+                     check_cancel: Optional[Callable[[dict], None]] = None,
+                     report_progress: Optional[Callable] = None,
+                     today: Any = None,
+                     doc_specs: Optional[list[WordDocumentSpec]] = None,
+                     create_case_subdir: bool = False) -> dict:
+        """`result.data` của notary.word_export_batch — read snapshot + ghi file.
+
+        `check_cancel(data)` được gọi GIỮA các văn bản với result.data hiện
+        tại (doc chưa bắt đầu → skipped) — caller bọc job.check_cancel(result)
+        của jobstore để canceled job vẫn mang breakdown (MIN-115).
+
+        `doc_specs` (NAIA-8): spec động từ `scan_template_dir` — khi truyền,
+        `document_keys` được đối chiếu lại với ĐÚNG tập file của thư mục
+        được cấp quyền (folder-authorized), không phải catalog cố định.
+        `create_case_subdir=True` → ghi vào `<dest>/HS-<case_id>/`
+        (tạo nếu thiếu; file bên trong vẫn không bao giờ ghi đè);
+        `data.destination` trong result vẫn là thư mục người dùng chọn
+        (contract §8.2).
+
+        Tất cả failed → WordBatchError("word_batch_failed", result_data=...).
+        """
+        # Catalog map (không phải tuple) — test/caller có thể patch entry
+        # theo key; folder mode override bằng doc_specs của thư mục mẫu.
+        specs = ({spec.document_key: spec for spec in doc_specs}
+                 if doc_specs is not None else DOC_CATALOG_BY_KEY)
+        keys = validate_document_keys(
+            document_keys,
+            allowed_keys=set(specs) if doc_specs is not None else None)
+        granted_dir = Path(dest_dir)     # thư mục người dùng chọn (result)
+        dest_dir = granted_dir
+        if create_case_subdir:
+            dest_dir = granted_dir / f"HS-{case_id}"
+            try:
+                dest_dir.mkdir(exist_ok=True)
+            except FileExistsError:
+                raise WordBatchError(
+                    "file_locked",
+                    "thư mục con hồ sơ bị chặn bởi file cùng tên") from None
+            except OSError as exc:
+                raise WordBatchError(
+                    "file_locked",
+                    f"không tạo được thư mục con hồ sơ: {exc}") from exc
+            # `HS-<case_id>` tồn tại sẵn dạng junction/symlink trỏ ra ngoài:
+            # mkdir(exist_ok=True) chấp nhận vì "đã có dir" và mọi ghi sau đó
+            # thoát khỏi thư mục được cấp quyền. Kiểm tra đích THẬT (đuổi
+            # theo reparse point mọi cấp) phải nằm trong granted dir —
+            # TRƯỚC probe/ghi/publish.
+            try:
+                granted_real = granted_dir.resolve()
+            except (OSError, RuntimeError) as exc:
+                raise WordBatchError(
+                    "file_not_found",
+                    f"không xác định được destination: {exc}") from exc
+            if not _contained_in(dest_dir, granted_real):
+                raise WordBatchError(
+                    "word_path_traversal",
+                    "thư mục con hồ sơ trỏ ra ngoài thư mục đích được chọn")
+        if not dest_dir.is_dir():
+            raise WordBatchError(
+                "file_not_found",
+                "destination không phải thư mục đang tồn tại")
+
+        taken: set[str] = set()
+        docs: list[dict] = []
+        saved: list[str] = []
+        failed: list[str] = []
+        total = len(keys)
+
+        def _pending_data() -> dict:
+            """Snapshot result.data: đã xong giữ status; chưa bắt đầu → skipped."""
+            entries = list(docs)
+            remaining = keys[len(entries):]
+            for key in remaining:
+                entries.append(_skipped_entry(specs[key]))
+            return _batch_data(
+                granted_dir, entries, succeeded=list(saved),
+                failed=list(failed), skipped=list(remaining))
+
+        def _check() -> None:
+            if check_cancel is not None:
+                check_cancel(_pending_data())
+
+        # MIN-116: probe writability destination MỘT lần đầu batch, trước khi
+        # build context/render — destination deny-write (ACL) thì mọi doc
+        # nhận per-file error chung, job kết thúc trong giây, KHÔNG hang.
+        _check()                                       # cancel trước khi probe
+        dest_error: Optional[tuple[str, str]] = None
+        try:
+            _probe_dest_writable(dest_dir)
+        except FileNotFoundError as exc:
+            dest_error = ("file_not_found",
+                          f"destination không còn tồn tại: {exc}")
+        except PermissionError as exc:
+            dest_error = ("file_locked",
+                          f"destination không ghi được: {exc}")
+        except OSError as exc:
+            dest_error = ("word.render_failed",
+                          f"destination không tạo được file: {exc}")
+
+        # Chỉ build context khi dest ghi được — dest_error set thì mọi doc
+        # nhận per-file error chung, context build vừa thừa vừa có thể ném
+        # raw exception ngoài shape per-doc (review MIN-116 minor).
+        context = None
+        data_reason = None
+        if dest_error is None:
+            context = word_engine.build_word_context(case, today=today)
+            data_reason = word_engine.word_block_reason(context, static=doc_specs is not None)
+        mapping_holder: dict = {}
+
+        for key in keys:
+            _check()                                   # cancel giữa batch
+            spec = specs[key]
+            if dest_error is not None:
+                code, message = dest_error
+                entry = _failed_entry(spec, code, message)
+            else:
+                entry = _export_one_document(
+                    spec=spec, case=case, context=context,
+                    data_reason=data_reason, resolve_template=resolve_template,
+                    mapping_holder=mapping_holder, dest_dir=dest_dir,
+                    taken=taken, case_id=case_id, today=today, check=_check,
+                    static=doc_specs is not None)
+            docs.append(entry)
+            (saved if entry["status"] == "saved" else failed).append(key)
+            if report_progress is not None:
+                try:
+                    report_progress(len(docs), total,
+                                    f"văn bản {len(docs)}/{total}")
+                except Exception:
+                    # jobstore.report_progress cung la cancel checkpoint va
+                    # raise CancelledByUser() KHONG kem result — _check() de
+                    # cancel van mang pending snapshot (doc -> skipped) len
+                    # wire (contract §8.4 canceled example, MIN-115); exception
+                    # khac thi _check() no-op roi re-raise nguyen ban.
+                    _check()
+                    raise
+
+        data = _batch_data(granted_dir, docs, succeeded=saved, failed=failed,
+                           skipped=[])
+        if len(failed) == total:
+>           raise WordBatchError(                      # §8.4 — job failed
+                "word_batch_failed",
+                "Toàn bộ văn bản trong lượt xuất đều lỗi",
+                details={"documents": [
+                    {"document_key": d["document_key"],
+                     "code": d["error"]["code"],
+                     "message": d["error"]["message"]} for d in docs]},
+                result_data=data)
+E           services.word_batch_export.WordBatchError: Toàn bộ văn bản trong lượt xuất đều lỗi
+
+notary_v2\services\word_batch_export.py:733: WordBatchError
+________ TestExportBatch.test_intra_batch_same_filename_stem_no_clash _________
+
+self = <tests.test_word_batch_export.TestExportBatch object at 0x000001D39D33AD80>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_intra_batch_same_filename0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001D3A2EB0B00>
+
+    def test_intra_batch_same_filename_stem_no_clash(
+            self, tmp_path, monkeypatch):
+        """Hai document_key trỏ cùng filename_stem → reservation nội
+        batch → file thứ hai hậu tố _2."""
+        spec = dataclasses.replace(
+            wbe.DOC_CATALOG_BY_KEY["thoa_thuan_phan_chia"],
+            filename_stem="Van_ban_khai_nhan_di_san")
+        monkeypatch.setitem(
+            wbe.DOC_CATALOG_BY_KEY, "thoa_thuan_phan_chia", spec)
+>       data = _batch(_ready_case(),
+                      ["khai_nhan_di_san", "thoa_thuan_phan_chia"],
+                      tmp_path)
+
+notary_v2\tests\test_word_batch_export.py:319:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+notary_v2\tests\test_word_batch_export.py:142: in _batch
+    return wbe.export_batch(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+case = namespace(id=99, nguoi_chet=namespace(id=1, ho_ten='Nguyễn Văn Chủ', gioi_tinh='Nam', ngay_sinh=None, ngay_chet=dateti...isLandOwner": false, "willReceive": true, "hidden": false, "deleted": false}]}, "engineResult": {"allocations": {}}}}')
+case_id = 99, document_keys = ['khai_nhan_di_san', 'thoa_thuan_phan_chia']
+dest_dir = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_intra_batch_same_filename0')
+resolve_template = <function _resolve_builtin at 0x000001D39D311C60>
+check_cancel = None, report_progress = None, today = None, doc_specs = None
+create_case_subdir = False
+
+    def export_batch(case: Any, *, case_id: int, document_keys: Any,
+                     dest_dir: Any, resolve_template: Callable[[str], Any],
+                     check_cancel: Optional[Callable[[dict], None]] = None,
+                     report_progress: Optional[Callable] = None,
+                     today: Any = None,
+                     doc_specs: Optional[list[WordDocumentSpec]] = None,
+                     create_case_subdir: bool = False) -> dict:
+        """`result.data` của notary.word_export_batch — read snapshot + ghi file.
+
+        `check_cancel(data)` được gọi GIỮA các văn bản với result.data hiện
+        tại (doc chưa bắt đầu → skipped) — caller bọc job.check_cancel(result)
+        của jobstore để canceled job vẫn mang breakdown (MIN-115).
+
+        `doc_specs` (NAIA-8): spec động từ `scan_template_dir` — khi truyền,
+        `document_keys` được đối chiếu lại với ĐÚNG tập file của thư mục
+        được cấp quyền (folder-authorized), không phải catalog cố định.
+        `create_case_subdir=True` → ghi vào `<dest>/HS-<case_id>/`
+        (tạo nếu thiếu; file bên trong vẫn không bao giờ ghi đè);
+        `data.destination` trong result vẫn là thư mục người dùng chọn
+        (contract §8.2).
+
+        Tất cả failed → WordBatchError("word_batch_failed", result_data=...).
+        """
+        # Catalog map (không phải tuple) — test/caller có thể patch entry
+        # theo key; folder mode override bằng doc_specs của thư mục mẫu.
+        specs = ({spec.document_key: spec for spec in doc_specs}
+                 if doc_specs is not None else DOC_CATALOG_BY_KEY)
+        keys = validate_document_keys(
+            document_keys,
+            allowed_keys=set(specs) if doc_specs is not None else None)
+        granted_dir = Path(dest_dir)     # thư mục người dùng chọn (result)
+        dest_dir = granted_dir
+        if create_case_subdir:
+            dest_dir = granted_dir / f"HS-{case_id}"
+            try:
+                dest_dir.mkdir(exist_ok=True)
+            except FileExistsError:
+                raise WordBatchError(
+                    "file_locked",
+                    "thư mục con hồ sơ bị chặn bởi file cùng tên") from None
+            except OSError as exc:
+                raise WordBatchError(
+                    "file_locked",
+                    f"không tạo được thư mục con hồ sơ: {exc}") from exc
+            # `HS-<case_id>` tồn tại sẵn dạng junction/symlink trỏ ra ngoài:
+            # mkdir(exist_ok=True) chấp nhận vì "đã có dir" và mọi ghi sau đó
+            # thoát khỏi thư mục được cấp quyền. Kiểm tra đích THẬT (đuổi
+            # theo reparse point mọi cấp) phải nằm trong granted dir —
+            # TRƯỚC probe/ghi/publish.
+            try:
+                granted_real = granted_dir.resolve()
+            except (OSError, RuntimeError) as exc:
+                raise WordBatchError(
+                    "file_not_found",
+                    f"không xác định được destination: {exc}") from exc
+            if not _contained_in(dest_dir, granted_real):
+                raise WordBatchError(
+                    "word_path_traversal",
+                    "thư mục con hồ sơ trỏ ra ngoài thư mục đích được chọn")
+        if not dest_dir.is_dir():
+            raise WordBatchError(
+                "file_not_found",
+                "destination không phải thư mục đang tồn tại")
+
+        taken: set[str] = set()
+        docs: list[dict] = []
+        saved: list[str] = []
+        failed: list[str] = []
+        total = len(keys)
+
+        def _pending_data() -> dict:
+            """Snapshot result.data: đã xong giữ status; chưa bắt đầu → skipped."""
+            entries = list(docs)
+            remaining = keys[len(entries):]
+            for key in remaining:
+                entries.append(_skipped_entry(specs[key]))
+            return _batch_data(
+                granted_dir, entries, succeeded=list(saved),
+                failed=list(failed), skipped=list(remaining))
+
+        def _check() -> None:
+            if check_cancel is not None:
+                check_cancel(_pending_data())
+
+        # MIN-116: probe writability destination MỘT lần đầu batch, trước khi
+        # build context/render — destination deny-write (ACL) thì mọi doc
+        # nhận per-file error chung, job kết thúc trong giây, KHÔNG hang.
+        _check()                                       # cancel trước khi probe
+        dest_error: Optional[tuple[str, str]] = None
+        try:
+            _probe_dest_writable(dest_dir)
+        except FileNotFoundError as exc:
+            dest_error = ("file_not_found",
+                          f"destination không còn tồn tại: {exc}")
+        except PermissionError as exc:
+            dest_error = ("file_locked",
+                          f"destination không ghi được: {exc}")
+        except OSError as exc:
+            dest_error = ("word.render_failed",
+                          f"destination không tạo được file: {exc}")
+
+        # Chỉ build context khi dest ghi được — dest_error set thì mọi doc
+        # nhận per-file error chung, context build vừa thừa vừa có thể ném
+        # raw exception ngoài shape per-doc (review MIN-116 minor).
+        context = None
+        data_reason = None
+        if dest_error is None:
+            context = word_engine.build_word_context(case, today=today)
+            data_reason = word_engine.word_block_reason(context, static=doc_specs is not None)
+        mapping_holder: dict = {}
+
+        for key in keys:
+            _check()                                   # cancel giữa batch
+            spec = specs[key]
+            if dest_error is not None:
+                code, message = dest_error
+                entry = _failed_entry(spec, code, message)
+            else:
+                entry = _export_one_document(
+                    spec=spec, case=case, context=context,
+                    data_reason=data_reason, resolve_template=resolve_template,
+                    mapping_holder=mapping_holder, dest_dir=dest_dir,
+                    taken=taken, case_id=case_id, today=today, check=_check,
+                    static=doc_specs is not None)
+            docs.append(entry)
+            (saved if entry["status"] == "saved" else failed).append(key)
+            if report_progress is not None:
+                try:
+                    report_progress(len(docs), total,
+                                    f"văn bản {len(docs)}/{total}")
+                except Exception:
+                    # jobstore.report_progress cung la cancel checkpoint va
+                    # raise CancelledByUser() KHONG kem result — _check() de
+                    # cancel van mang pending snapshot (doc -> skipped) len
+                    # wire (contract §8.4 canceled example, MIN-115); exception
+                    # khac thi _check() no-op roi re-raise nguyen ban.
+                    _check()
+                    raise
+
+        data = _batch_data(granted_dir, docs, succeeded=saved, failed=failed,
+                           skipped=[])
+        if len(failed) == total:
+>           raise WordBatchError(                      # §8.4 — job failed
+                "word_batch_failed",
+                "Toàn bộ văn bản trong lượt xuất đều lỗi",
+                details={"documents": [
+                    {"document_key": d["document_key"],
+                     "code": d["error"]["code"],
+                     "message": d["error"]["message"]} for d in docs]},
+                result_data=data)
+E           services.word_batch_export.WordBatchError: Toàn bộ văn bản trong lượt xuất đều lỗi
+
+notary_v2\services\word_batch_export.py:733: WordBatchError
+________________ TestExportBatch.test_partial_saved_and_failed ________________
+
+self = <tests.test_word_batch_export.TestExportBatch object at 0x000001D39D33B080>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_partial_saved_and_failed0')
+
+    def test_partial_saved_and_failed(self, tmp_path):
+>       data = _batch(_ready_case(),
+                      ["khai_nhan_di_san", "niem_yet"], tmp_path)
+
+notary_v2\tests\test_word_batch_export.py:328:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+notary_v2\tests\test_word_batch_export.py:142: in _batch
+    return wbe.export_batch(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+case = namespace(id=99, nguoi_chet=namespace(id=1, ho_ten='Nguyễn Văn Chủ', gioi_tinh='Nam', ngay_sinh=None, ngay_chet=dateti...isLandOwner": false, "willReceive": true, "hidden": false, "deleted": false}]}, "engineResult": {"allocations": {}}}}')
+case_id = 99, document_keys = ['khai_nhan_di_san', 'niem_yet']
+dest_dir = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_partial_saved_and_failed0')
+resolve_template = <function _resolve_builtin at 0x000001D39D311C60>
+check_cancel = None, report_progress = None, today = None, doc_specs = None
+create_case_subdir = False
+
+    def export_batch(case: Any, *, case_id: int, document_keys: Any,
+                     dest_dir: Any, resolve_template: Callable[[str], Any],
+                     check_cancel: Optional[Callable[[dict], None]] = None,
+                     report_progress: Optional[Callable] = None,
+                     today: Any = None,
+                     doc_specs: Optional[list[WordDocumentSpec]] = None,
+                     create_case_subdir: bool = False) -> dict:
+        """`result.data` của notary.word_export_batch — read snapshot + ghi file.
+
+        `check_cancel(data)` được gọi GIỮA các văn bản với result.data hiện
+        tại (doc chưa bắt đầu → skipped) — caller bọc job.check_cancel(result)
+        của jobstore để canceled job vẫn mang breakdown (MIN-115).
+
+        `doc_specs` (NAIA-8): spec động từ `scan_template_dir` — khi truyền,
+        `document_keys` được đối chiếu lại với ĐÚNG tập file của thư mục
+        được cấp quyền (folder-authorized), không phải catalog cố định.
+        `create_case_subdir=True` → ghi vào `<dest>/HS-<case_id>/`
+        (tạo nếu thiếu; file bên trong vẫn không bao giờ ghi đè);
+        `data.destination` trong result vẫn là thư mục người dùng chọn
+        (contract §8.2).
+
+        Tất cả failed → WordBatchError("word_batch_failed", result_data=...).
+        """
+        # Catalog map (không phải tuple) — test/caller có thể patch entry
+        # theo key; folder mode override bằng doc_specs của thư mục mẫu.
+        specs = ({spec.document_key: spec for spec in doc_specs}
+                 if doc_specs is not None else DOC_CATALOG_BY_KEY)
+        keys = validate_document_keys(
+            document_keys,
+            allowed_keys=set(specs) if doc_specs is not None else None)
+        granted_dir = Path(dest_dir)     # thư mục người dùng chọn (result)
+        dest_dir = granted_dir
+        if create_case_subdir:
+            dest_dir = granted_dir / f"HS-{case_id}"
+            try:
+                dest_dir.mkdir(exist_ok=True)
+            except FileExistsError:
+                raise WordBatchError(
+                    "file_locked",
+                    "thư mục con hồ sơ bị chặn bởi file cùng tên") from None
+            except OSError as exc:
+                raise WordBatchError(
+                    "file_locked",
+                    f"không tạo được thư mục con hồ sơ: {exc}") from exc
+            # `HS-<case_id>` tồn tại sẵn dạng junction/symlink trỏ ra ngoài:
+            # mkdir(exist_ok=True) chấp nhận vì "đã có dir" và mọi ghi sau đó
+            # thoát khỏi thư mục được cấp quyền. Kiểm tra đích THẬT (đuổi
+            # theo reparse point mọi cấp) phải nằm trong granted dir —
+            # TRƯỚC probe/ghi/publish.
+            try:
+                granted_real = granted_dir.resolve()
+            except (OSError, RuntimeError) as exc:
+                raise WordBatchError(
+                    "file_not_found",
+                    f"không xác định được destination: {exc}") from exc
+            if not _contained_in(dest_dir, granted_real):
+                raise WordBatchError(
+                    "word_path_traversal",
+                    "thư mục con hồ sơ trỏ ra ngoài thư mục đích được chọn")
+        if not dest_dir.is_dir():
+            raise WordBatchError(
+                "file_not_found",
+                "destination không phải thư mục đang tồn tại")
+
+        taken: set[str] = set()
+        docs: list[dict] = []
+        saved: list[str] = []
+        failed: list[str] = []
+        total = len(keys)
+
+        def _pending_data() -> dict:
+            """Snapshot result.data: đã xong giữ status; chưa bắt đầu → skipped."""
+            entries = list(docs)
+            remaining = keys[len(entries):]
+            for key in remaining:
+                entries.append(_skipped_entry(specs[key]))
+            return _batch_data(
+                granted_dir, entries, succeeded=list(saved),
+                failed=list(failed), skipped=list(remaining))
+
+        def _check() -> None:
+            if check_cancel is not None:
+                check_cancel(_pending_data())
+
+        # MIN-116: probe writability destination MỘT lần đầu batch, trước khi
+        # build context/render — destination deny-write (ACL) thì mọi doc
+        # nhận per-file error chung, job kết thúc trong giây, KHÔNG hang.
+        _check()                                       # cancel trước khi probe
+        dest_error: Optional[tuple[str, str]] = None
+        try:
+            _probe_dest_writable(dest_dir)
+        except FileNotFoundError as exc:
+            dest_error = ("file_not_found",
+                          f"destination không còn tồn tại: {exc}")
+        except PermissionError as exc:
+            dest_error = ("file_locked",
+                          f"destination không ghi được: {exc}")
+        except OSError as exc:
+            dest_error = ("word.render_failed",
+                          f"destination không tạo được file: {exc}")
+
+        # Chỉ build context khi dest ghi được — dest_error set thì mọi doc
+        # nhận per-file error chung, context build vừa thừa vừa có thể ném
+        # raw exception ngoài shape per-doc (review MIN-116 minor).
+        context = None
+        data_reason = None
+        if dest_error is None:
+            context = word_engine.build_word_context(case, today=today)
+            data_reason = word_engine.word_block_reason(context, static=doc_specs is not None)
+        mapping_holder: dict = {}
+
+        for key in keys:
+            _check()                                   # cancel giữa batch
+            spec = specs[key]
+            if dest_error is not None:
+                code, message = dest_error
+                entry = _failed_entry(spec, code, message)
+            else:
+                entry = _export_one_document(
+                    spec=spec, case=case, context=context,
+                    data_reason=data_reason, resolve_template=resolve_template,
+                    mapping_holder=mapping_holder, dest_dir=dest_dir,
+                    taken=taken, case_id=case_id, today=today, check=_check,
+                    static=doc_specs is not None)
+            docs.append(entry)
+            (saved if entry["status"] == "saved" else failed).append(key)
+            if report_progress is not None:
+                try:
+                    report_progress(len(docs), total,
+                                    f"văn bản {len(docs)}/{total}")
+                except Exception:
+                    # jobstore.report_progress cung la cancel checkpoint va
+                    # raise CancelledByUser() KHONG kem result — _check() de
+                    # cancel van mang pending snapshot (doc -> skipped) len
+                    # wire (contract §8.4 canceled example, MIN-115); exception
+                    # khac thi _check() no-op roi re-raise nguyen ban.
+                    _check()
+                    raise
+
+        data = _batch_data(granted_dir, docs, succeeded=saved, failed=failed,
+                           skipped=[])
+        if len(failed) == total:
+>           raise WordBatchError(                      # §8.4 — job failed
+                "word_batch_failed",
+                "Toàn bộ văn bản trong lượt xuất đều lỗi",
+                details={"documents": [
+                    {"document_key": d["document_key"],
+                     "code": d["error"]["code"],
+                     "message": d["error"]["message"]} for d in docs]},
+                result_data=data)
+E           services.word_batch_export.WordBatchError: Toàn bộ văn bản trong lượt xuất đều lỗi
+
+notary_v2\services\word_batch_export.py:733: WordBatchError
+_____ TestExportBatch.test_cancel_mid_batch_keeps_saved_and_marks_skipped _____
+
+self = <tests.test_word_batch_export.TestExportBatch object at 0x000001D39D339D60>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_cancel_mid_batch_keeps_sa0')
+
+    def test_cancel_mid_batch_keeps_saved_and_marks_skipped(self, tmp_path):
+        class _Cancel(Exception):
+            def __init__(self, data):
+                super().__init__("cancel")
+                self.data = data
+
+        def _check(data):
+            # Raise khi đã có doc saved mà còn doc pending → tương đương
+            # cancel flag của jobstore bật giữa văn bản 1 và 2.
+            if data["breakdown"]["succeeded"] \
+                    and data["breakdown"]["skipped"]:
+                raise _Cancel(data)
+
+        keys = ["khai_nhan_di_san", "thoa_thuan_phan_chia", "niem_yet"]
+        with pytest.raises(_Cancel) as exc:
+>           _batch(_ready_case(), keys, tmp_path, check_cancel=_check)
+
+notary_v2\tests\test_word_batch_export.py:553:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+notary_v2\tests\test_word_batch_export.py:142: in _batch
+    return wbe.export_batch(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+case = namespace(id=99, nguoi_chet=namespace(id=1, ho_ten='Nguyễn Văn Chủ', gioi_tinh='Nam', ngay_sinh=None, ngay_chet=dateti...isLandOwner": false, "willReceive": true, "hidden": false, "deleted": false}]}, "engineResult": {"allocations": {}}}}')
+case_id = 99
+document_keys = ['khai_nhan_di_san', 'thoa_thuan_phan_chia', 'niem_yet']
+dest_dir = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_cancel_mid_batch_keeps_sa0')
+resolve_template = <function _resolve_builtin at 0x000001D39D311C60>
+check_cancel = <function TestExportBatch.test_cancel_mid_batch_keeps_saved_and_marks_skipped.<locals>._check at 0x000001D3A1CF9D00>
+report_progress = None, today = None, doc_specs = None
+create_case_subdir = False
+
+    def export_batch(case: Any, *, case_id: int, document_keys: Any,
+                     dest_dir: Any, resolve_template: Callable[[str], Any],
+                     check_cancel: Optional[Callable[[dict], None]] = None,
+                     report_progress: Optional[Callable] = None,
+                     today: Any = None,
+                     doc_specs: Optional[list[WordDocumentSpec]] = None,
+                     create_case_subdir: bool = False) -> dict:
+        """`result.data` của notary.word_export_batch — read snapshot + ghi file.
+
+        `check_cancel(data)` được gọi GIỮA các văn bản với result.data hiện
+        tại (doc chưa bắt đầu → skipped) — caller bọc job.check_cancel(result)
+        của jobstore để canceled job vẫn mang breakdown (MIN-115).
+
+        `doc_specs` (NAIA-8): spec động từ `scan_template_dir` — khi truyền,
+        `document_keys` được đối chiếu lại với ĐÚNG tập file của thư mục
+        được cấp quyền (folder-authorized), không phải catalog cố định.
+        `create_case_subdir=True` → ghi vào `<dest>/HS-<case_id>/`
+        (tạo nếu thiếu; file bên trong vẫn không bao giờ ghi đè);
+        `data.destination` trong result vẫn là thư mục người dùng chọn
+        (contract §8.2).
+
+        Tất cả failed → WordBatchError("word_batch_failed", result_data=...).
+        """
+        # Catalog map (không phải tuple) — test/caller có thể patch entry
+        # theo key; folder mode override bằng doc_specs của thư mục mẫu.
+        specs = ({spec.document_key: spec for spec in doc_specs}
+                 if doc_specs is not None else DOC_CATALOG_BY_KEY)
+        keys = validate_document_keys(
+            document_keys,
+            allowed_keys=set(specs) if doc_specs is not None else None)
+        granted_dir = Path(dest_dir)     # thư mục người dùng chọn (result)
+        dest_dir = granted_dir
+        if create_case_subdir:
+            dest_dir = granted_dir / f"HS-{case_id}"
+            try:
+                dest_dir.mkdir(exist_ok=True)
+            except FileExistsError:
+                raise WordBatchError(
+                    "file_locked",
+                    "thư mục con hồ sơ bị chặn bởi file cùng tên") from None
+            except OSError as exc:
+                raise WordBatchError(
+                    "file_locked",
+                    f"không tạo được thư mục con hồ sơ: {exc}") from exc
+            # `HS-<case_id>` tồn tại sẵn dạng junction/symlink trỏ ra ngoài:
+            # mkdir(exist_ok=True) chấp nhận vì "đã có dir" và mọi ghi sau đó
+            # thoát khỏi thư mục được cấp quyền. Kiểm tra đích THẬT (đuổi
+            # theo reparse point mọi cấp) phải nằm trong granted dir —
+            # TRƯỚC probe/ghi/publish.
+            try:
+                granted_real = granted_dir.resolve()
+            except (OSError, RuntimeError) as exc:
+                raise WordBatchError(
+                    "file_not_found",
+                    f"không xác định được destination: {exc}") from exc
+            if not _contained_in(dest_dir, granted_real):
+                raise WordBatchError(
+                    "word_path_traversal",
+                    "thư mục con hồ sơ trỏ ra ngoài thư mục đích được chọn")
+        if not dest_dir.is_dir():
+            raise WordBatchError(
+                "file_not_found",
+                "destination không phải thư mục đang tồn tại")
+
+        taken: set[str] = set()
+        docs: list[dict] = []
+        saved: list[str] = []
+        failed: list[str] = []
+        total = len(keys)
+
+        def _pending_data() -> dict:
+            """Snapshot result.data: đã xong giữ status; chưa bắt đầu → skipped."""
+            entries = list(docs)
+            remaining = keys[len(entries):]
+            for key in remaining:
+                entries.append(_skipped_entry(specs[key]))
+            return _batch_data(
+                granted_dir, entries, succeeded=list(saved),
+                failed=list(failed), skipped=list(remaining))
+
+        def _check() -> None:
+            if check_cancel is not None:
+                check_cancel(_pending_data())
+
+        # MIN-116: probe writability destination MỘT lần đầu batch, trước khi
+        # build context/render — destination deny-write (ACL) thì mọi doc
+        # nhận per-file error chung, job kết thúc trong giây, KHÔNG hang.
+        _check()                                       # cancel trước khi probe
+        dest_error: Optional[tuple[str, str]] = None
+        try:
+            _probe_dest_writable(dest_dir)
+        except FileNotFoundError as exc:
+            dest_error = ("file_not_found",
+                          f"destination không còn tồn tại: {exc}")
+        except PermissionError as exc:
+            dest_error = ("file_locked",
+                          f"destination không ghi được: {exc}")
+        except OSError as exc:
+            dest_error = ("word.render_failed",
+                          f"destination không tạo được file: {exc}")
+
+        # Chỉ build context khi dest ghi được — dest_error set thì mọi doc
+        # nhận per-file error chung, context build vừa thừa vừa có thể ném
+        # raw exception ngoài shape per-doc (review MIN-116 minor).
+        context = None
+        data_reason = None
+        if dest_error is None:
+            context = word_engine.build_word_context(case, today=today)
+            data_reason = word_engine.word_block_reason(context, static=doc_specs is not None)
+        mapping_holder: dict = {}
+
+        for key in keys:
+            _check()                                   # cancel giữa batch
+            spec = specs[key]
+            if dest_error is not None:
+                code, message = dest_error
+                entry = _failed_entry(spec, code, message)
+            else:
+                entry = _export_one_document(
+                    spec=spec, case=case, context=context,
+                    data_reason=data_reason, resolve_template=resolve_template,
+                    mapping_holder=mapping_holder, dest_dir=dest_dir,
+                    taken=taken, case_id=case_id, today=today, check=_check,
+                    static=doc_specs is not None)
+            docs.append(entry)
+            (saved if entry["status"] == "saved" else failed).append(key)
+            if report_progress is not None:
+                try:
+                    report_progress(len(docs), total,
+                                    f"văn bản {len(docs)}/{total}")
+                except Exception:
+                    # jobstore.report_progress cung la cancel checkpoint va
+                    # raise CancelledByUser() KHONG kem result — _check() de
+                    # cancel van mang pending snapshot (doc -> skipped) len
+                    # wire (contract §8.4 canceled example, MIN-115); exception
+                    # khac thi _check() no-op roi re-raise nguyen ban.
+                    _check()
+                    raise
+
+        data = _batch_data(granted_dir, docs, succeeded=saved, failed=failed,
+                           skipped=[])
+        if len(failed) == total:
+>           raise WordBatchError(                      # §8.4 — job failed
+                "word_batch_failed",
+                "Toàn bộ văn bản trong lượt xuất đều lỗi",
+                details={"documents": [
+                    {"document_key": d["document_key"],
+                     "code": d["error"]["code"],
+                     "message": d["error"]["message"]} for d in docs]},
+                result_data=data)
+E           services.word_batch_export.WordBatchError: Toàn bộ văn bản trong lượt xuất đều lỗi
+
+notary_v2\services\word_batch_export.py:733: WordBatchError
+______ TestExportBatch.test_traversal_generated_filename_fails_document _______
+
+self = <tests.test_word_batch_export.TestExportBatch object at 0x000001D39D33BD70>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_traversal_generated_filen0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001D3A2CB66F0>
+
+    def test_traversal_generated_filename_fails_document(
+            self, tmp_path, monkeypatch):
+        """Defense-in-depth: stem chứa `..`/separator → word_path_traversal
+        (code đã register §8.3), không file nào được tạo."""
+        spec = dataclasses.replace(
+            wbe.DOC_CATALOG_BY_KEY["khai_nhan_di_san"],
+            filename_stem="..\\evil")
+        monkeypatch.setitem(
+            wbe.DOC_CATALOG_BY_KEY, "khai_nhan_di_san", spec)
+        with pytest.raises(wbe.WordBatchError) as exc:
+            _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path)
+        assert exc.value.code == "word_batch_failed"
+        result = exc.value.result_data["documents"][0]
+        assert result["status"] == "failed"
+>       assert result["error"]["code"] == "word_path_traversal"
+E       AssertionError: assert 'word.render_failed' == 'word_path_traversal'
+E
+E         - word_path_traversal
+E         + word.render_failed
+
+notary_v2\tests\test_word_batch_export.py:580: AssertionError
+________ TestExportBatch.test_unsafe_generated_filename_fails_document ________
+
+self = <tests.test_word_batch_export.TestExportBatch object at 0x000001D39D3600E0>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_unsafe_generated_filename0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001D3A2CB5CD0>
+
+    def test_unsafe_generated_filename_fails_document(
+            self, tmp_path, monkeypatch):
+        """Stem xấu nhưng không traversal → word.invalid_filename."""
+        spec = dataclasses.replace(
+            wbe.DOC_CATALOG_BY_KEY["khai_nhan_di_san"],
+            filename_stem="bad:name")
+        monkeypatch.setitem(
+            wbe.DOC_CATALOG_BY_KEY, "khai_nhan_di_san", spec)
+        with pytest.raises(wbe.WordBatchError) as exc:
+            _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path)
+        assert exc.value.code == "word_batch_failed"
+        result = exc.value.result_data["documents"][0]
+        assert result["status"] == "failed"
+>       assert result["error"]["code"] == "word.invalid_filename"
+E       AssertionError: assert 'word.render_failed' == 'word.invalid_filename'
+E
+E         - word.invalid_filename
+E         + word.render_failed
+
+notary_v2\tests\test_word_batch_export.py:596: AssertionError
+_____ TestExportBatch.test_same_name_directory_in_destination_increments ______
+
+self = <tests.test_word_batch_export.TestExportBatch object at 0x000001D39D360410>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_same_name_directory_in_de0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001D3A2CB6930>
+
+    def test_same_name_directory_in_destination_increments(
+            self, tmp_path, monkeypatch):
+        """Directory trùng tên file đích → tăng `_2`, không fail doc."""
+        (tmp_path / "Van_ban_khai_nhan_di_san_HS-99.docx").mkdir()
+>       data = _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+notary_v2\tests\test_word_batch_export.py:603:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+notary_v2\tests\test_word_batch_export.py:142: in _batch
+    return wbe.export_batch(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+case = namespace(id=99, nguoi_chet=namespace(id=1, ho_ten='Nguyễn Văn Chủ', gioi_tinh='Nam', ngay_sinh=None, ngay_chet=dateti...isLandOwner": false, "willReceive": true, "hidden": false, "deleted": false}]}, "engineResult": {"allocations": {}}}}')
+case_id = 99, document_keys = ['khai_nhan_di_san']
+dest_dir = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_same_name_directory_in_de0')
+resolve_template = <function _resolve_builtin at 0x000001D39D311C60>
+check_cancel = None, report_progress = None, today = None, doc_specs = None
+create_case_subdir = False
+
+    def export_batch(case: Any, *, case_id: int, document_keys: Any,
+                     dest_dir: Any, resolve_template: Callable[[str], Any],
+                     check_cancel: Optional[Callable[[dict], None]] = None,
+                     report_progress: Optional[Callable] = None,
+                     today: Any = None,
+                     doc_specs: Optional[list[WordDocumentSpec]] = None,
+                     create_case_subdir: bool = False) -> dict:
+        """`result.data` của notary.word_export_batch — read snapshot + ghi file.
+
+        `check_cancel(data)` được gọi GIỮA các văn bản với result.data hiện
+        tại (doc chưa bắt đầu → skipped) — caller bọc job.check_cancel(result)
+        của jobstore để canceled job vẫn mang breakdown (MIN-115).
+
+        `doc_specs` (NAIA-8): spec động từ `scan_template_dir` — khi truyền,
+        `document_keys` được đối chiếu lại với ĐÚNG tập file của thư mục
+        được cấp quyền (folder-authorized), không phải catalog cố định.
+        `create_case_subdir=True` → ghi vào `<dest>/HS-<case_id>/`
+        (tạo nếu thiếu; file bên trong vẫn không bao giờ ghi đè);
+        `data.destination` trong result vẫn là thư mục người dùng chọn
+        (contract §8.2).
+
+        Tất cả failed → WordBatchError("word_batch_failed", result_data=...).
+        """
+        # Catalog map (không phải tuple) — test/caller có thể patch entry
+        # theo key; folder mode override bằng doc_specs của thư mục mẫu.
+        specs = ({spec.document_key: spec for spec in doc_specs}
+                 if doc_specs is not None else DOC_CATALOG_BY_KEY)
+        keys = validate_document_keys(
+            document_keys,
+            allowed_keys=set(specs) if doc_specs is not None else None)
+        granted_dir = Path(dest_dir)     # thư mục người dùng chọn (result)
+        dest_dir = granted_dir
+        if create_case_subdir:
+            dest_dir = granted_dir / f"HS-{case_id}"
+            try:
+                dest_dir.mkdir(exist_ok=True)
+            except FileExistsError:
+                raise WordBatchError(
+                    "file_locked",
+                    "thư mục con hồ sơ bị chặn bởi file cùng tên") from None
+            except OSError as exc:
+                raise WordBatchError(
+                    "file_locked",
+                    f"không tạo được thư mục con hồ sơ: {exc}") from exc
+            # `HS-<case_id>` tồn tại sẵn dạng junction/symlink trỏ ra ngoài:
+            # mkdir(exist_ok=True) chấp nhận vì "đã có dir" và mọi ghi sau đó
+            # thoát khỏi thư mục được cấp quyền. Kiểm tra đích THẬT (đuổi
+            # theo reparse point mọi cấp) phải nằm trong granted dir —
+            # TRƯỚC probe/ghi/publish.
+            try:
+                granted_real = granted_dir.resolve()
+            except (OSError, RuntimeError) as exc:
+                raise WordBatchError(
+                    "file_not_found",
+                    f"không xác định được destination: {exc}") from exc
+            if not _contained_in(dest_dir, granted_real):
+                raise WordBatchError(
+                    "word_path_traversal",
+                    "thư mục con hồ sơ trỏ ra ngoài thư mục đích được chọn")
+        if not dest_dir.is_dir():
+            raise WordBatchError(
+                "file_not_found",
+                "destination không phải thư mục đang tồn tại")
+
+        taken: set[str] = set()
+        docs: list[dict] = []
+        saved: list[str] = []
+        failed: list[str] = []
+        total = len(keys)
+
+        def _pending_data() -> dict:
+            """Snapshot result.data: đã xong giữ status; chưa bắt đầu → skipped."""
+            entries = list(docs)
+            remaining = keys[len(entries):]
+            for key in remaining:
+                entries.append(_skipped_entry(specs[key]))
+            return _batch_data(
+                granted_dir, entries, succeeded=list(saved),
+                failed=list(failed), skipped=list(remaining))
+
+        def _check() -> None:
+            if check_cancel is not None:
+                check_cancel(_pending_data())
+
+        # MIN-116: probe writability destination MỘT lần đầu batch, trước khi
+        # build context/render — destination deny-write (ACL) thì mọi doc
+        # nhận per-file error chung, job kết thúc trong giây, KHÔNG hang.
+        _check()                                       # cancel trước khi probe
+        dest_error: Optional[tuple[str, str]] = None
+        try:
+            _probe_dest_writable(dest_dir)
+        except FileNotFoundError as exc:
+            dest_error = ("file_not_found",
+                          f"destination không còn tồn tại: {exc}")
+        except PermissionError as exc:
+            dest_error = ("file_locked",
+                          f"destination không ghi được: {exc}")
+        except OSError as exc:
+            dest_error = ("word.render_failed",
+                          f"destination không tạo được file: {exc}")
+
+        # Chỉ build context khi dest ghi được — dest_error set thì mọi doc
+        # nhận per-file error chung, context build vừa thừa vừa có thể ném
+        # raw exception ngoài shape per-doc (review MIN-116 minor).
+        context = None
+        data_reason = None
+        if dest_error is None:
+            context = word_engine.build_word_context(case, today=today)
+            data_reason = word_engine.word_block_reason(context, static=doc_specs is not None)
+        mapping_holder: dict = {}
+
+        for key in keys:
+            _check()                                   # cancel giữa batch
+            spec = specs[key]
+            if dest_error is not None:
+                code, message = dest_error
+                entry = _failed_entry(spec, code, message)
+            else:
+                entry = _export_one_document(
+                    spec=spec, case=case, context=context,
+                    data_reason=data_reason, resolve_template=resolve_template,
+                    mapping_holder=mapping_holder, dest_dir=dest_dir,
+                    taken=taken, case_id=case_id, today=today, check=_check,
+                    static=doc_specs is not None)
+            docs.append(entry)
+            (saved if entry["status"] == "saved" else failed).append(key)
+            if report_progress is not None:
+                try:
+                    report_progress(len(docs), total,
+                                    f"văn bản {len(docs)}/{total}")
+                except Exception:
+                    # jobstore.report_progress cung la cancel checkpoint va
+                    # raise CancelledByUser() KHONG kem result — _check() de
+                    # cancel van mang pending snapshot (doc -> skipped) len
+                    # wire (contract §8.4 canceled example, MIN-115); exception
+                    # khac thi _check() no-op roi re-raise nguyen ban.
+                    _check()
+                    raise
+
+        data = _batch_data(granted_dir, docs, succeeded=saved, failed=failed,
+                           skipped=[])
+        if len(failed) == total:
+>           raise WordBatchError(                      # §8.4 — job failed
+                "word_batch_failed",
+                "Toàn bộ văn bản trong lượt xuất đều lỗi",
+                details={"documents": [
+                    {"document_key": d["document_key"],
+                     "code": d["error"]["code"],
+                     "message": d["error"]["message"]} for d in docs]},
+                result_data=data)
+E           services.word_batch_export.WordBatchError: Toàn bộ văn bản trong lượt xuất đều lỗi
+
+notary_v2\services\word_batch_export.py:733: WordBatchError
+_____________ TestExportBatch.test_progress_reported_per_document _____________
+
+self = <tests.test_word_batch_export.TestExportBatch object at 0x000001D39D360770>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_progress_reported_per_doc0')
+
+    def test_progress_reported_per_document(self, tmp_path):
+        calls = []
+>       _batch(_ready_case(),
+               ["khai_nhan_di_san", "thoa_thuan_phan_chia"], tmp_path,
+               report_progress=lambda d, t, label: calls.append((d, t)))
+
+notary_v2\tests\test_word_batch_export.py:609:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+notary_v2\tests\test_word_batch_export.py:142: in _batch
+    return wbe.export_batch(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+case = namespace(id=99, nguoi_chet=namespace(id=1, ho_ten='Nguyễn Văn Chủ', gioi_tinh='Nam', ngay_sinh=None, ngay_chet=dateti...isLandOwner": false, "willReceive": true, "hidden": false, "deleted": false}]}, "engineResult": {"allocations": {}}}}')
+case_id = 99, document_keys = ['khai_nhan_di_san', 'thoa_thuan_phan_chia']
+dest_dir = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_progress_reported_per_doc0')
+resolve_template = <function _resolve_builtin at 0x000001D39D311C60>
+check_cancel = None
+report_progress = <function TestExportBatch.test_progress_reported_per_document.<locals>.<lambda> at 0x000001D3A1CAF880>
+today = None, doc_specs = None, create_case_subdir = False
+
+    def export_batch(case: Any, *, case_id: int, document_keys: Any,
+                     dest_dir: Any, resolve_template: Callable[[str], Any],
+                     check_cancel: Optional[Callable[[dict], None]] = None,
+                     report_progress: Optional[Callable] = None,
+                     today: Any = None,
+                     doc_specs: Optional[list[WordDocumentSpec]] = None,
+                     create_case_subdir: bool = False) -> dict:
+        """`result.data` của notary.word_export_batch — read snapshot + ghi file.
+
+        `check_cancel(data)` được gọi GIỮA các văn bản với result.data hiện
+        tại (doc chưa bắt đầu → skipped) — caller bọc job.check_cancel(result)
+        của jobstore để canceled job vẫn mang breakdown (MIN-115).
+
+        `doc_specs` (NAIA-8): spec động từ `scan_template_dir` — khi truyền,
+        `document_keys` được đối chiếu lại với ĐÚNG tập file của thư mục
+        được cấp quyền (folder-authorized), không phải catalog cố định.
+        `create_case_subdir=True` → ghi vào `<dest>/HS-<case_id>/`
+        (tạo nếu thiếu; file bên trong vẫn không bao giờ ghi đè);
+        `data.destination` trong result vẫn là thư mục người dùng chọn
+        (contract §8.2).
+
+        Tất cả failed → WordBatchError("word_batch_failed", result_data=...).
+        """
+        # Catalog map (không phải tuple) — test/caller có thể patch entry
+        # theo key; folder mode override bằng doc_specs của thư mục mẫu.
+        specs = ({spec.document_key: spec for spec in doc_specs}
+                 if doc_specs is not None else DOC_CATALOG_BY_KEY)
+        keys = validate_document_keys(
+            document_keys,
+            allowed_keys=set(specs) if doc_specs is not None else None)
+        granted_dir = Path(dest_dir)     # thư mục người dùng chọn (result)
+        dest_dir = granted_dir
+        if create_case_subdir:
+            dest_dir = granted_dir / f"HS-{case_id}"
+            try:
+                dest_dir.mkdir(exist_ok=True)
+            except FileExistsError:
+                raise WordBatchError(
+                    "file_locked",
+                    "thư mục con hồ sơ bị chặn bởi file cùng tên") from None
+            except OSError as exc:
+                raise WordBatchError(
+                    "file_locked",
+                    f"không tạo được thư mục con hồ sơ: {exc}") from exc
+            # `HS-<case_id>` tồn tại sẵn dạng junction/symlink trỏ ra ngoài:
+            # mkdir(exist_ok=True) chấp nhận vì "đã có dir" và mọi ghi sau đó
+            # thoát khỏi thư mục được cấp quyền. Kiểm tra đích THẬT (đuổi
+            # theo reparse point mọi cấp) phải nằm trong granted dir —
+            # TRƯỚC probe/ghi/publish.
+            try:
+                granted_real = granted_dir.resolve()
+            except (OSError, RuntimeError) as exc:
+                raise WordBatchError(
+                    "file_not_found",
+                    f"không xác định được destination: {exc}") from exc
+            if not _contained_in(dest_dir, granted_real):
+                raise WordBatchError(
+                    "word_path_traversal",
+                    "thư mục con hồ sơ trỏ ra ngoài thư mục đích được chọn")
+        if not dest_dir.is_dir():
+            raise WordBatchError(
+                "file_not_found",
+                "destination không phải thư mục đang tồn tại")
+
+        taken: set[str] = set()
+        docs: list[dict] = []
+        saved: list[str] = []
+        failed: list[str] = []
+        total = len(keys)
+
+        def _pending_data() -> dict:
+            """Snapshot result.data: đã xong giữ status; chưa bắt đầu → skipped."""
+            entries = list(docs)
+            remaining = keys[len(entries):]
+            for key in remaining:
+                entries.append(_skipped_entry(specs[key]))
+            return _batch_data(
+                granted_dir, entries, succeeded=list(saved),
+                failed=list(failed), skipped=list(remaining))
+
+        def _check() -> None:
+            if check_cancel is not None:
+                check_cancel(_pending_data())
+
+        # MIN-116: probe writability destination MỘT lần đầu batch, trước khi
+        # build context/render — destination deny-write (ACL) thì mọi doc
+        # nhận per-file error chung, job kết thúc trong giây, KHÔNG hang.
+        _check()                                       # cancel trước khi probe
+        dest_error: Optional[tuple[str, str]] = None
+        try:
+            _probe_dest_writable(dest_dir)
+        except FileNotFoundError as exc:
+            dest_error = ("file_not_found",
+                          f"destination không còn tồn tại: {exc}")
+        except PermissionError as exc:
+            dest_error = ("file_locked",
+                          f"destination không ghi được: {exc}")
+        except OSError as exc:
+            dest_error = ("word.render_failed",
+                          f"destination không tạo được file: {exc}")
+
+        # Chỉ build context khi dest ghi được — dest_error set thì mọi doc
+        # nhận per-file error chung, context build vừa thừa vừa có thể ném
+        # raw exception ngoài shape per-doc (review MIN-116 minor).
+        context = None
+        data_reason = None
+        if dest_error is None:
+            context = word_engine.build_word_context(case, today=today)
+            data_reason = word_engine.word_block_reason(context, static=doc_specs is not None)
+        mapping_holder: dict = {}
+
+        for key in keys:
+            _check()                                   # cancel giữa batch
+            spec = specs[key]
+            if dest_error is not None:
+                code, message = dest_error
+                entry = _failed_entry(spec, code, message)
+            else:
+                entry = _export_one_document(
+                    spec=spec, case=case, context=context,
+                    data_reason=data_reason, resolve_template=resolve_template,
+                    mapping_holder=mapping_holder, dest_dir=dest_dir,
+                    taken=taken, case_id=case_id, today=today, check=_check,
+                    static=doc_specs is not None)
+            docs.append(entry)
+            (saved if entry["status"] == "saved" else failed).append(key)
+            if report_progress is not None:
+                try:
+                    report_progress(len(docs), total,
+                                    f"văn bản {len(docs)}/{total}")
+                except Exception:
+                    # jobstore.report_progress cung la cancel checkpoint va
+                    # raise CancelledByUser() KHONG kem result — _check() de
+                    # cancel van mang pending snapshot (doc -> skipped) len
+                    # wire (contract §8.4 canceled example, MIN-115); exception
+                    # khac thi _check() no-op roi re-raise nguyen ban.
+                    _check()
+                    raise
+
+        data = _batch_data(granted_dir, docs, succeeded=saved, failed=failed,
+                           skipped=[])
+        if len(failed) == total:
+>           raise WordBatchError(                      # §8.4 — job failed
+                "word_batch_failed",
+                "Toàn bộ văn bản trong lượt xuất đều lỗi",
+                details={"documents": [
+                    {"document_key": d["document_key"],
+                     "code": d["error"]["code"],
+                     "message": d["error"]["message"]} for d in docs]},
+                result_data=data)
+E           services.word_batch_export.WordBatchError: Toàn bộ văn bản trong lượt xuất đều lỗi
+
+notary_v2\services\word_batch_export.py:733: WordBatchError
+___ TestExportBatch.test_cancel_at_progress_checkpoint_keeps_pending_result ___
+
+self = <tests.test_word_batch_export.TestExportBatch object at 0x000001D39D360AD0>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_cancel_at_progress_checkp0')
+
+    def test_cancel_at_progress_checkpoint_keeps_pending_result(
+            self, tmp_path):
+        """jobstore.report_progress cung la cancel checkpoint va raise
+        CancelledByUser() KHONG kem result — batch phai re-check de
+        pending snapshot (doc chua bat dau -> skipped) van len wire
+        (contract §8.4 canceled example, MIN-115)."""
+        class _Cancel(Exception):
+            def __init__(self, data=None):
+                super().__init__("cancel")
+                self.data = data
+
+        flag = {"canceled": False}
+
+        def _check(data):
+            if flag["canceled"]:
+                raise _Cancel(data)
+
+        def _report(done, _total, _label):
+            # Gia lap jobstore: progress quan sat cancel flag -> raise
+            # exception KHONG kem result (bare).
+            if done == 2:
+                flag["canceled"] = True
+                raise _Cancel()
+
+        keys = ["khai_nhan_di_san", "thoa_thuan_phan_chia", "niem_yet"]
+        with pytest.raises(_Cancel) as exc:
+            _batch(_ready_case(), keys, tmp_path,
+                   check_cancel=_check, report_progress=_report)
+        data = exc.value.data
+        assert data is not None           # pending snapshot len wire
+        docs = _docs_by_key(data)
+>       assert docs["khai_nhan_di_san"]["status"] == "saved"
+E       AssertionError: assert 'failed' == 'saved'
+E
+E         - saved
+E         + failed
+
+notary_v2\tests\test_word_batch_export.py:645: AssertionError
+_______ TestDestWriteDenied.test_toctou_publish_denied_maps_file_locked _______
+
+self = <tests.test_word_batch_export.TestDestWriteDenied object at 0x000001D39D33BDA0>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_toctou_publish_denied_map0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001D3A2CB48F0>
+
+    def test_toctou_publish_denied_maps_file_locked(
+            self, tmp_path, monkeypatch):
+        """Probe + tạo temp OK nhưng quyền bị thu hồi trước lúc publish
+        (TOCTOU): chỉ file đích `*_HS-*.docx` bị deny → per-doc
+        file_locked, file tạm được dọn, không hang."""
+        _deny_writes_under(
+            monkeypatch, tmp_path,
+            name_filter=lambda name: "_HS-" in name)
+        with pytest.raises(wbe.WordBatchError) as exc:
+            _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path)
+        assert exc.value.code == "word_batch_failed"
+        doc = exc.value.result_data["documents"][0]
+        assert doc["status"] == "failed"
+>       assert doc["error"]["code"] == "file_locked"
+E       AssertionError: assert 'word.render_failed' == 'file_locked'
+E
+E         - file_locked
+E         + word.render_failed
+
+notary_v2\tests\test_word_batch_export.py:787: AssertionError
+_______ TestDestWriteDenied.test_toctou_render_denied_maps_file_locked ________
+
+self = <tests.test_word_batch_export.TestDestWriteDenied object at 0x000001D39D33A090>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_toctou_render_denied_maps0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001D3A2CB7050>
+
+    def test_toctou_render_denied_maps_file_locked(
+            self, tmp_path, monkeypatch):
+        """Probe OK nhưng `_render_temp` gặp PermissionError (quyền thu
+        hồi sau probe) → per-doc file_locked, không propagate thành
+        lỗi job khô hay hang."""
+        def _denied(_doc, _dest):
+            raise PermissionError(13, "Access is denied")
+        monkeypatch.setattr(wbe, "_render_temp", _denied)
+        with pytest.raises(wbe.WordBatchError) as exc:
+            _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path)
+        assert exc.value.code == "word_batch_failed"
+        doc = exc.value.result_data["documents"][0]
+        assert doc["status"] == "failed"
+>       assert doc["error"]["code"] == "file_locked"
+E       AssertionError: assert 'word.render_failed' == 'file_locked'
+E
+E         - file_locked
+E         + word.render_failed
+
+notary_v2\tests\test_word_batch_export.py:803: AssertionError
+__________ TestScanTemplateDir.test_scans_only_top_level_docx_sorted __________
+
+self = <tests.test_word_batch_export.TestScanTemplateDir object at 0x000001D39D361C10>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_scans_only_top_level_docx0')
+
+    def test_scans_only_top_level_docx_sorted(self, tmp_path):
+>       tdir = _folder_templates(
+            tmp_path, ["b mau.docx", "A mau.docx", "~$locked.docx"])
+
+notary_v2\tests\test_word_batch_export.py:918:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+notary_v2\tests\test_word_batch_export.py:886: in _folder_templates
+    shutil.copyfile(BUILTIN_TEMPLATE, tdir / name)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+src = WindowsPath('word_templates/1. PCDS .docx')
+dst = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_scans_only_top_level_docx0/templates/b mau.docx')
+follow_symlinks = True
+
+    def copyfile(src, dst, *, follow_symlinks=True):
+        """Copy data from src to dst in the most efficient way possible.
+
+        If follow_symlinks is not set and src is a symbolic link, a new
+        symlink will be created instead of copying the file it points to.
+
+        """
+        sys.audit("shutil.copyfile", src, dst)
+
+        if _samefile(src, dst):
+            raise SameFileError("{!r} and {!r} are the same file".format(src, dst))
+
+        file_size = 0
+        for i, fn in enumerate([src, dst]):
+            try:
+                st = _stat(fn)
+            except OSError:
+                # File most likely does not exist
+                pass
+            else:
+                # XXX What about other special files? (sockets, devices...)
+                if stat.S_ISFIFO(st.st_mode):
+                    fn = fn.path if isinstance(fn, os.DirEntry) else fn
+                    raise SpecialFileError("`%s` is a named pipe" % fn)
+                if _WINDOWS and i == 0:
+                    file_size = st.st_size
+
+        if not follow_symlinks and _islink(src):
+            os.symlink(os.readlink(src), dst)
+        else:
+>           with open(src, 'rb') as fsrc:
+                 ^^^^^^^^^^^^^^^
+E           FileNotFoundError: [Errno 2] No such file or directory: 'word_templates\\1. PCDS .docx'
+
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\shutil.py:260: FileNotFoundError
+____________ TestFolderModeExport.test_options_lists_folder_files _____________
+
+self = <tests.test_word_batch_export.TestFolderModeExport object at 0x000001D39D363110>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_options_lists_folder_file0')
+
+    def test_options_lists_folder_files(self, tmp_path):
+>       tdir = _folder_templates(tmp_path, ["Mẫu thuê nhà.docx"])
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+notary_v2\tests\test_word_batch_export.py:963:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+notary_v2\tests\test_word_batch_export.py:886: in _folder_templates
+    shutil.copyfile(BUILTIN_TEMPLATE, tdir / name)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+src = WindowsPath('word_templates/1. PCDS .docx')
+dst = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_options_lists_folder_file0/templates/Mẫu thuê nhà.docx')
+follow_symlinks = True
+
+    def copyfile(src, dst, *, follow_symlinks=True):
+        """Copy data from src to dst in the most efficient way possible.
+
+        If follow_symlinks is not set and src is a symbolic link, a new
+        symlink will be created instead of copying the file it points to.
+
+        """
+        sys.audit("shutil.copyfile", src, dst)
+
+        if _samefile(src, dst):
+            raise SameFileError("{!r} and {!r} are the same file".format(src, dst))
+
+        file_size = 0
+        for i, fn in enumerate([src, dst]):
+            try:
+                st = _stat(fn)
+            except OSError:
+                # File most likely does not exist
+                pass
+            else:
+                # XXX What about other special files? (sockets, devices...)
+                if stat.S_ISFIFO(st.st_mode):
+                    fn = fn.path if isinstance(fn, os.DirEntry) else fn
+                    raise SpecialFileError("`%s` is a named pipe" % fn)
+                if _WINDOWS and i == 0:
+                    file_size = st.st_size
+
+        if not follow_symlinks and _islink(src):
+            os.symlink(os.readlink(src), dst)
+        else:
+>           with open(src, 'rb') as fsrc:
+                 ^^^^^^^^^^^^^^^
+E           FileNotFoundError: [Errno 2] No such file or directory: 'word_templates\\1. PCDS .docx'
+
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\shutil.py:260: FileNotFoundError
+__________ TestFolderModeExport.test_batch_writes_ascii_stem_outputs __________
+
+self = <tests.test_word_batch_export.TestFolderModeExport object at 0x000001D39D363410>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_batch_writes_ascii_stem_o0')
+
+    def test_batch_writes_ascii_stem_outputs(self, tmp_path):
+>       tdir = _folder_templates(
+            tmp_path, ["Mẫu đơn.docx", "b mau.docx"])
+
+notary_v2\tests\test_word_batch_export.py:974:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+notary_v2\tests\test_word_batch_export.py:886: in _folder_templates
+    shutil.copyfile(BUILTIN_TEMPLATE, tdir / name)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+src = WindowsPath('word_templates/1. PCDS .docx')
+dst = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_batch_writes_ascii_stem_o0/templates/Mẫu đơn.docx')
+follow_symlinks = True
+
+    def copyfile(src, dst, *, follow_symlinks=True):
+        """Copy data from src to dst in the most efficient way possible.
+
+        If follow_symlinks is not set and src is a symbolic link, a new
+        symlink will be created instead of copying the file it points to.
+
+        """
+        sys.audit("shutil.copyfile", src, dst)
+
+        if _samefile(src, dst):
+            raise SameFileError("{!r} and {!r} are the same file".format(src, dst))
+
+        file_size = 0
+        for i, fn in enumerate([src, dst]):
+            try:
+                st = _stat(fn)
+            except OSError:
+                # File most likely does not exist
+                pass
+            else:
+                # XXX What about other special files? (sockets, devices...)
+                if stat.S_ISFIFO(st.st_mode):
+                    fn = fn.path if isinstance(fn, os.DirEntry) else fn
+                    raise SpecialFileError("`%s` is a named pipe" % fn)
+                if _WINDOWS and i == 0:
+                    file_size = st.st_size
+
+        if not follow_symlinks and _islink(src):
+            os.symlink(os.readlink(src), dst)
+        else:
+>           with open(src, 'rb') as fsrc:
+                 ^^^^^^^^^^^^^^^
+E           FileNotFoundError: [Errno 2] No such file or directory: 'word_templates\\1. PCDS .docx'
+
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\shutil.py:260: FileNotFoundError
+______ TestFolderModeExport.test_batch_rejects_unknown_or_traversal_key _______
+
+self = <tests.test_word_batch_export.TestFolderModeExport object at 0x000001D39D363710>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_batch_rejects_unknown_or_0')
+
+    def test_batch_rejects_unknown_or_traversal_key(self, tmp_path):
+>       tdir = _folder_templates(tmp_path, ["a.docx"])
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+notary_v2\tests\test_word_batch_export.py:992:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+notary_v2\tests\test_word_batch_export.py:886: in _folder_templates
+    shutil.copyfile(BUILTIN_TEMPLATE, tdir / name)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+src = WindowsPath('word_templates/1. PCDS .docx')
+dst = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_batch_rejects_unknown_or_0/templates/a.docx')
+follow_symlinks = True
+
+    def copyfile(src, dst, *, follow_symlinks=True):
+        """Copy data from src to dst in the most efficient way possible.
+
+        If follow_symlinks is not set and src is a symbolic link, a new
+        symlink will be created instead of copying the file it points to.
+
+        """
+        sys.audit("shutil.copyfile", src, dst)
+
+        if _samefile(src, dst):
+            raise SameFileError("{!r} and {!r} are the same file".format(src, dst))
+
+        file_size = 0
+        for i, fn in enumerate([src, dst]):
+            try:
+                st = _stat(fn)
+            except OSError:
+                # File most likely does not exist
+                pass
+            else:
+                # XXX What about other special files? (sockets, devices...)
+                if stat.S_ISFIFO(st.st_mode):
+                    fn = fn.path if isinstance(fn, os.DirEntry) else fn
+                    raise SpecialFileError("`%s` is a named pipe" % fn)
+                if _WINDOWS and i == 0:
+                    file_size = st.st_size
+
+        if not follow_symlinks and _islink(src):
+            os.symlink(os.readlink(src), dst)
+        else:
+>           with open(src, 'rb') as fsrc:
+                 ^^^^^^^^^^^^^^^
+E           FileNotFoundError: [Errno 2] No such file or directory: 'word_templates\\1. PCDS .docx'
+
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\shutil.py:260: FileNotFoundError
+________________ TestFolderModeExport.test_create_case_subdir _________________
+
+self = <tests.test_word_batch_export.TestFolderModeExport object at 0x000001D39D363A40>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_create_case_subdir0')
+
+    def test_create_case_subdir(self, tmp_path):
+>       tdir = _folder_templates(tmp_path, ["mau.docx"])
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+notary_v2\tests\test_word_batch_export.py:1005:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+notary_v2\tests\test_word_batch_export.py:886: in _folder_templates
+    shutil.copyfile(BUILTIN_TEMPLATE, tdir / name)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+src = WindowsPath('word_templates/1. PCDS .docx')
+dst = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_create_case_subdir0/templates/mau.docx')
+follow_symlinks = True
+
+    def copyfile(src, dst, *, follow_symlinks=True):
+        """Copy data from src to dst in the most efficient way possible.
+
+        If follow_symlinks is not set and src is a symbolic link, a new
+        symlink will be created instead of copying the file it points to.
+
+        """
+        sys.audit("shutil.copyfile", src, dst)
+
+        if _samefile(src, dst):
+            raise SameFileError("{!r} and {!r} are the same file".format(src, dst))
+
+        file_size = 0
+        for i, fn in enumerate([src, dst]):
+            try:
+                st = _stat(fn)
+            except OSError:
+                # File most likely does not exist
+                pass
+            else:
+                # XXX What about other special files? (sockets, devices...)
+                if stat.S_ISFIFO(st.st_mode):
+                    fn = fn.path if isinstance(fn, os.DirEntry) else fn
+                    raise SpecialFileError("`%s` is a named pipe" % fn)
+                if _WINDOWS and i == 0:
+                    file_size = st.st_size
+
+        if not follow_symlinks and _islink(src):
+            os.symlink(os.readlink(src), dst)
+        else:
+>           with open(src, 'rb') as fsrc:
+                 ^^^^^^^^^^^^^^^
+E           FileNotFoundError: [Errno 2] No such file or directory: 'word_templates\\1. PCDS .docx'
+
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\shutil.py:260: FileNotFoundError
+______ TestFolderModeExport.test_template_deleted_after_scan_fails_file _______
+
+self = <tests.test_word_batch_export.TestFolderModeExport object at 0x000001D39D363DA0>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_template_deleted_after_sc0')
+
+    def test_template_deleted_after_scan_fails_file(self, tmp_path):
+>       tdir = _folder_templates(tmp_path, ["mau.docx", "mau2.docx"])
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+notary_v2\tests\test_word_batch_export.py:1026:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+notary_v2\tests\test_word_batch_export.py:886: in _folder_templates
+    shutil.copyfile(BUILTIN_TEMPLATE, tdir / name)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+src = WindowsPath('word_templates/1. PCDS .docx')
+dst = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_template_deleted_after_sc0/templates/mau.docx')
+follow_symlinks = True
+
+    def copyfile(src, dst, *, follow_symlinks=True):
+        """Copy data from src to dst in the most efficient way possible.
+
+        If follow_symlinks is not set and src is a symbolic link, a new
+        symlink will be created instead of copying the file it points to.
+
+        """
+        sys.audit("shutil.copyfile", src, dst)
+
+        if _samefile(src, dst):
+            raise SameFileError("{!r} and {!r} are the same file".format(src, dst))
+
+        file_size = 0
+        for i, fn in enumerate([src, dst]):
+            try:
+                st = _stat(fn)
+            except OSError:
+                # File most likely does not exist
+                pass
+            else:
+                # XXX What about other special files? (sockets, devices...)
+                if stat.S_ISFIFO(st.st_mode):
+                    fn = fn.path if isinstance(fn, os.DirEntry) else fn
+                    raise SpecialFileError("`%s` is a named pipe" % fn)
+                if _WINDOWS and i == 0:
+                    file_size = st.st_size
+
+        if not follow_symlinks and _islink(src):
+            os.symlink(os.readlink(src), dst)
+        else:
+>           with open(src, 'rb') as fsrc:
+                 ^^^^^^^^^^^^^^^
+E           FileNotFoundError: [Errno 2] No such file or directory: 'word_templates\\1. PCDS .docx'
+
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\shutil.py:260: FileNotFoundError
+_____________ TestFolderModeExport.test_catalog_mode_still_works ______________
+
+self = <tests.test_word_batch_export.TestFolderModeExport object at 0x000001D39D380140>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_catalog_mode_still_works0')
+
+    def test_catalog_mode_still_works(self, tmp_path):
+        dest = tmp_path / "out"
+        dest.mkdir()
+>       data = _batch(_ready_case(), ["khai_nhan_di_san"], dest)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+notary_v2\tests\test_word_batch_export.py:1044:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+notary_v2\tests\test_word_batch_export.py:142: in _batch
+    return wbe.export_batch(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+case = namespace(id=99, nguoi_chet=namespace(id=1, ho_ten='Nguyễn Văn Chủ', gioi_tinh='Nam', ngay_sinh=None, ngay_chet=dateti...isLandOwner": false, "willReceive": true, "hidden": false, "deleted": false}]}, "engineResult": {"allocations": {}}}}')
+case_id = 99, document_keys = ['khai_nhan_di_san']
+dest_dir = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_catalog_mode_still_works0/out')
+resolve_template = <function _resolve_builtin at 0x000001D39D311C60>
+check_cancel = None, report_progress = None, today = None, doc_specs = None
+create_case_subdir = False
+
+    def export_batch(case: Any, *, case_id: int, document_keys: Any,
+                     dest_dir: Any, resolve_template: Callable[[str], Any],
+                     check_cancel: Optional[Callable[[dict], None]] = None,
+                     report_progress: Optional[Callable] = None,
+                     today: Any = None,
+                     doc_specs: Optional[list[WordDocumentSpec]] = None,
+                     create_case_subdir: bool = False) -> dict:
+        """`result.data` của notary.word_export_batch — read snapshot + ghi file.
+
+        `check_cancel(data)` được gọi GIỮA các văn bản với result.data hiện
+        tại (doc chưa bắt đầu → skipped) — caller bọc job.check_cancel(result)
+        của jobstore để canceled job vẫn mang breakdown (MIN-115).
+
+        `doc_specs` (NAIA-8): spec động từ `scan_template_dir` — khi truyền,
+        `document_keys` được đối chiếu lại với ĐÚNG tập file của thư mục
+        được cấp quyền (folder-authorized), không phải catalog cố định.
+        `create_case_subdir=True` → ghi vào `<dest>/HS-<case_id>/`
+        (tạo nếu thiếu; file bên trong vẫn không bao giờ ghi đè);
+        `data.destination` trong result vẫn là thư mục người dùng chọn
+        (contract §8.2).
+
+        Tất cả failed → WordBatchError("word_batch_failed", result_data=...).
+        """
+        # Catalog map (không phải tuple) — test/caller có thể patch entry
+        # theo key; folder mode override bằng doc_specs của thư mục mẫu.
+        specs = ({spec.document_key: spec for spec in doc_specs}
+                 if doc_specs is not None else DOC_CATALOG_BY_KEY)
+        keys = validate_document_keys(
+            document_keys,
+            allowed_keys=set(specs) if doc_specs is not None else None)
+        granted_dir = Path(dest_dir)     # thư mục người dùng chọn (result)
+        dest_dir = granted_dir
+        if create_case_subdir:
+            dest_dir = granted_dir / f"HS-{case_id}"
+            try:
+                dest_dir.mkdir(exist_ok=True)
+            except FileExistsError:
+                raise WordBatchError(
+                    "file_locked",
+                    "thư mục con hồ sơ bị chặn bởi file cùng tên") from None
+            except OSError as exc:
+                raise WordBatchError(
+                    "file_locked",
+                    f"không tạo được thư mục con hồ sơ: {exc}") from exc
+            # `HS-<case_id>` tồn tại sẵn dạng junction/symlink trỏ ra ngoài:
+            # mkdir(exist_ok=True) chấp nhận vì "đã có dir" và mọi ghi sau đó
+            # thoát khỏi thư mục được cấp quyền. Kiểm tra đích THẬT (đuổi
+            # theo reparse point mọi cấp) phải nằm trong granted dir —
+            # TRƯỚC probe/ghi/publish.
+            try:
+                granted_real = granted_dir.resolve()
+            except (OSError, RuntimeError) as exc:
+                raise WordBatchError(
+                    "file_not_found",
+                    f"không xác định được destination: {exc}") from exc
+            if not _contained_in(dest_dir, granted_real):
+                raise WordBatchError(
+                    "word_path_traversal",
+                    "thư mục con hồ sơ trỏ ra ngoài thư mục đích được chọn")
+        if not dest_dir.is_dir():
+            raise WordBatchError(
+                "file_not_found",
+                "destination không phải thư mục đang tồn tại")
+
+        taken: set[str] = set()
+        docs: list[dict] = []
+        saved: list[str] = []
+        failed: list[str] = []
+        total = len(keys)
+
+        def _pending_data() -> dict:
+            """Snapshot result.data: đã xong giữ status; chưa bắt đầu → skipped."""
+            entries = list(docs)
+            remaining = keys[len(entries):]
+            for key in remaining:
+                entries.append(_skipped_entry(specs[key]))
+            return _batch_data(
+                granted_dir, entries, succeeded=list(saved),
+                failed=list(failed), skipped=list(remaining))
+
+        def _check() -> None:
+            if check_cancel is not None:
+                check_cancel(_pending_data())
+
+        # MIN-116: probe writability destination MỘT lần đầu batch, trước khi
+        # build context/render — destination deny-write (ACL) thì mọi doc
+        # nhận per-file error chung, job kết thúc trong giây, KHÔNG hang.
+        _check()                                       # cancel trước khi probe
+        dest_error: Optional[tuple[str, str]] = None
+        try:
+            _probe_dest_writable(dest_dir)
+        except FileNotFoundError as exc:
+            dest_error = ("file_not_found",
+                          f"destination không còn tồn tại: {exc}")
+        except PermissionError as exc:
+            dest_error = ("file_locked",
+                          f"destination không ghi được: {exc}")
+        except OSError as exc:
+            dest_error = ("word.render_failed",
+                          f"destination không tạo được file: {exc}")
+
+        # Chỉ build context khi dest ghi được — dest_error set thì mọi doc
+        # nhận per-file error chung, context build vừa thừa vừa có thể ném
+        # raw exception ngoài shape per-doc (review MIN-116 minor).
+        context = None
+        data_reason = None
+        if dest_error is None:
+            context = word_engine.build_word_context(case, today=today)
+            data_reason = word_engine.word_block_reason(context, static=doc_specs is not None)
+        mapping_holder: dict = {}
+
+        for key in keys:
+            _check()                                   # cancel giữa batch
+            spec = specs[key]
+            if dest_error is not None:
+                code, message = dest_error
+                entry = _failed_entry(spec, code, message)
+            else:
+                entry = _export_one_document(
+                    spec=spec, case=case, context=context,
+                    data_reason=data_reason, resolve_template=resolve_template,
+                    mapping_holder=mapping_holder, dest_dir=dest_dir,
+                    taken=taken, case_id=case_id, today=today, check=_check,
+                    static=doc_specs is not None)
+            docs.append(entry)
+            (saved if entry["status"] == "saved" else failed).append(key)
+            if report_progress is not None:
+                try:
+                    report_progress(len(docs), total,
+                                    f"văn bản {len(docs)}/{total}")
+                except Exception:
+                    # jobstore.report_progress cung la cancel checkpoint va
+                    # raise CancelledByUser() KHONG kem result — _check() de
+                    # cancel van mang pending snapshot (doc -> skipped) len
+                    # wire (contract §8.4 canceled example, MIN-115); exception
+                    # khac thi _check() no-op roi re-raise nguyen ban.
+                    _check()
+                    raise
+
+        data = _batch_data(granted_dir, docs, succeeded=saved, failed=failed,
+                           skipped=[])
+        if len(failed) == total:
+>           raise WordBatchError(                      # §8.4 — job failed
+                "word_batch_failed",
+                "Toàn bộ văn bản trong lượt xuất đều lỗi",
+                details={"documents": [
+                    {"document_key": d["document_key"],
+                     "code": d["error"]["code"],
+                     "message": d["error"]["message"]} for d in docs]},
+                result_data=data)
+E           services.word_batch_export.WordBatchError: Toàn bộ văn bản trong lượt xuất đều lỗi
+
+notary_v2\services\word_batch_export.py:733: WordBatchError
+_____ TestDestSubdirLinkEscape.test_case_subdir_link_inside_dest_allowed ______
+
+self = <tests.test_word_batch_export.TestDestSubdirLinkEscape object at 0x000001D39D380860>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_case_subdir_link_inside_d0')
+
+    def test_case_subdir_link_inside_dest_allowed(self, tmp_path):
+        """Link trỏ vào TRONG destination (không thoát) vẫn được chấp
+        nhận — chỉ chặn liên kết thoát ra ngoài."""
+        dest = tmp_path / "selected"
+        dest.mkdir()
+        inner = dest / "inner"
+        inner.mkdir()
+        _dir_link(dest / "HS-99", inner)
+>       data = _batch(_ready_case(), ["khai_nhan_di_san"], dest,
+                      create_case_subdir=True)
+
+notary_v2\tests\test_word_batch_export.py:1076:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+notary_v2\tests\test_word_batch_export.py:142: in _batch
+    return wbe.export_batch(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+case = namespace(id=99, nguoi_chet=namespace(id=1, ho_ten='Nguyễn Văn Chủ', gioi_tinh='Nam', ngay_sinh=None, ngay_chet=dateti...isLandOwner": false, "willReceive": true, "hidden": false, "deleted": false}]}, "engineResult": {"allocations": {}}}}')
+case_id = 99, document_keys = ['khai_nhan_di_san']
+dest_dir = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_case_subdir_link_inside_d0/selected/HS-99')
+resolve_template = <function _resolve_builtin at 0x000001D39D311C60>
+check_cancel = None, report_progress = None, today = None, doc_specs = None
+create_case_subdir = True
+
+    def export_batch(case: Any, *, case_id: int, document_keys: Any,
+                     dest_dir: Any, resolve_template: Callable[[str], Any],
+                     check_cancel: Optional[Callable[[dict], None]] = None,
+                     report_progress: Optional[Callable] = None,
+                     today: Any = None,
+                     doc_specs: Optional[list[WordDocumentSpec]] = None,
+                     create_case_subdir: bool = False) -> dict:
+        """`result.data` của notary.word_export_batch — read snapshot + ghi file.
+
+        `check_cancel(data)` được gọi GIỮA các văn bản với result.data hiện
+        tại (doc chưa bắt đầu → skipped) — caller bọc job.check_cancel(result)
+        của jobstore để canceled job vẫn mang breakdown (MIN-115).
+
+        `doc_specs` (NAIA-8): spec động từ `scan_template_dir` — khi truyền,
+        `document_keys` được đối chiếu lại với ĐÚNG tập file của thư mục
+        được cấp quyền (folder-authorized), không phải catalog cố định.
+        `create_case_subdir=True` → ghi vào `<dest>/HS-<case_id>/`
+        (tạo nếu thiếu; file bên trong vẫn không bao giờ ghi đè);
+        `data.destination` trong result vẫn là thư mục người dùng chọn
+        (contract §8.2).
+
+        Tất cả failed → WordBatchError("word_batch_failed", result_data=...).
+        """
+        # Catalog map (không phải tuple) — test/caller có thể patch entry
+        # theo key; folder mode override bằng doc_specs của thư mục mẫu.
+        specs = ({spec.document_key: spec for spec in doc_specs}
+                 if doc_specs is not None else DOC_CATALOG_BY_KEY)
+        keys = validate_document_keys(
+            document_keys,
+            allowed_keys=set(specs) if doc_specs is not None else None)
+        granted_dir = Path(dest_dir)     # thư mục người dùng chọn (result)
+        dest_dir = granted_dir
+        if create_case_subdir:
+            dest_dir = granted_dir / f"HS-{case_id}"
+            try:
+                dest_dir.mkdir(exist_ok=True)
+            except FileExistsError:
+                raise WordBatchError(
+                    "file_locked",
+                    "thư mục con hồ sơ bị chặn bởi file cùng tên") from None
+            except OSError as exc:
+                raise WordBatchError(
+                    "file_locked",
+                    f"không tạo được thư mục con hồ sơ: {exc}") from exc
+            # `HS-<case_id>` tồn tại sẵn dạng junction/symlink trỏ ra ngoài:
+            # mkdir(exist_ok=True) chấp nhận vì "đã có dir" và mọi ghi sau đó
+            # thoát khỏi thư mục được cấp quyền. Kiểm tra đích THẬT (đuổi
+            # theo reparse point mọi cấp) phải nằm trong granted dir —
+            # TRƯỚC probe/ghi/publish.
+            try:
+                granted_real = granted_dir.resolve()
+            except (OSError, RuntimeError) as exc:
+                raise WordBatchError(
+                    "file_not_found",
+                    f"không xác định được destination: {exc}") from exc
+            if not _contained_in(dest_dir, granted_real):
+                raise WordBatchError(
+                    "word_path_traversal",
+                    "thư mục con hồ sơ trỏ ra ngoài thư mục đích được chọn")
+        if not dest_dir.is_dir():
+            raise WordBatchError(
+                "file_not_found",
+                "destination không phải thư mục đang tồn tại")
+
+        taken: set[str] = set()
+        docs: list[dict] = []
+        saved: list[str] = []
+        failed: list[str] = []
+        total = len(keys)
+
+        def _pending_data() -> dict:
+            """Snapshot result.data: đã xong giữ status; chưa bắt đầu → skipped."""
+            entries = list(docs)
+            remaining = keys[len(entries):]
+            for key in remaining:
+                entries.append(_skipped_entry(specs[key]))
+            return _batch_data(
+                granted_dir, entries, succeeded=list(saved),
+                failed=list(failed), skipped=list(remaining))
+
+        def _check() -> None:
+            if check_cancel is not None:
+                check_cancel(_pending_data())
+
+        # MIN-116: probe writability destination MỘT lần đầu batch, trước khi
+        # build context/render — destination deny-write (ACL) thì mọi doc
+        # nhận per-file error chung, job kết thúc trong giây, KHÔNG hang.
+        _check()                                       # cancel trước khi probe
+        dest_error: Optional[tuple[str, str]] = None
+        try:
+            _probe_dest_writable(dest_dir)
+        except FileNotFoundError as exc:
+            dest_error = ("file_not_found",
+                          f"destination không còn tồn tại: {exc}")
+        except PermissionError as exc:
+            dest_error = ("file_locked",
+                          f"destination không ghi được: {exc}")
+        except OSError as exc:
+            dest_error = ("word.render_failed",
+                          f"destination không tạo được file: {exc}")
+
+        # Chỉ build context khi dest ghi được — dest_error set thì mọi doc
+        # nhận per-file error chung, context build vừa thừa vừa có thể ném
+        # raw exception ngoài shape per-doc (review MIN-116 minor).
+        context = None
+        data_reason = None
+        if dest_error is None:
+            context = word_engine.build_word_context(case, today=today)
+            data_reason = word_engine.word_block_reason(context, static=doc_specs is not None)
+        mapping_holder: dict = {}
+
+        for key in keys:
+            _check()                                   # cancel giữa batch
+            spec = specs[key]
+            if dest_error is not None:
+                code, message = dest_error
+                entry = _failed_entry(spec, code, message)
+            else:
+                entry = _export_one_document(
+                    spec=spec, case=case, context=context,
+                    data_reason=data_reason, resolve_template=resolve_template,
+                    mapping_holder=mapping_holder, dest_dir=dest_dir,
+                    taken=taken, case_id=case_id, today=today, check=_check,
+                    static=doc_specs is not None)
+            docs.append(entry)
+            (saved if entry["status"] == "saved" else failed).append(key)
+            if report_progress is not None:
+                try:
+                    report_progress(len(docs), total,
+                                    f"văn bản {len(docs)}/{total}")
+                except Exception:
+                    # jobstore.report_progress cung la cancel checkpoint va
+                    # raise CancelledByUser() KHONG kem result — _check() de
+                    # cancel van mang pending snapshot (doc -> skipped) len
+                    # wire (contract §8.4 canceled example, MIN-115); exception
+                    # khac thi _check() no-op roi re-raise nguyen ban.
+                    _check()
+                    raise
+
+        data = _batch_data(granted_dir, docs, succeeded=saved, failed=failed,
+                           skipped=[])
+        if len(failed) == total:
+>           raise WordBatchError(                      # §8.4 — job failed
+                "word_batch_failed",
+                "Toàn bộ văn bản trong lượt xuất đều lỗi",
+                details={"documents": [
+                    {"document_key": d["document_key"],
+                     "code": d["error"]["code"],
+                     "message": d["error"]["message"]} for d in docs]},
+                result_data=data)
+E           services.word_batch_export.WordBatchError: Toàn bộ văn bản trong lượt xuất đều lỗi
+
+notary_v2\services\word_batch_export.py:733: WordBatchError
+_________ TestTemplateLinkEscape.test_scan_skips_file_link_to_outside _________
+
+self = <tests.test_word_batch_export.TestTemplateLinkEscape object at 0x000001D39D380BC0>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_scan_skips_file_link_to_o0')
+
+    def test_scan_skips_file_link_to_outside(self, tmp_path):
+        tdir = tmp_path / "templates"
+        tdir.mkdir()
+>       shutil.copyfile(BUILTIN_TEMPLATE, tdir / "mau.docx")
+
+notary_v2\tests\test_word_batch_export.py:1093:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+src = WindowsPath('word_templates/1. PCDS .docx')
+dst = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_scan_skips_file_link_to_o0/templates/mau.docx')
+follow_symlinks = True
+
+    def copyfile(src, dst, *, follow_symlinks=True):
+        """Copy data from src to dst in the most efficient way possible.
+
+        If follow_symlinks is not set and src is a symbolic link, a new
+        symlink will be created instead of copying the file it points to.
+
+        """
+        sys.audit("shutil.copyfile", src, dst)
+
+        if _samefile(src, dst):
+            raise SameFileError("{!r} and {!r} are the same file".format(src, dst))
+
+        file_size = 0
+        for i, fn in enumerate([src, dst]):
+            try:
+                st = _stat(fn)
+            except OSError:
+                # File most likely does not exist
+                pass
+            else:
+                # XXX What about other special files? (sockets, devices...)
+                if stat.S_ISFIFO(st.st_mode):
+                    fn = fn.path if isinstance(fn, os.DirEntry) else fn
+                    raise SpecialFileError("`%s` is a named pipe" % fn)
+                if _WINDOWS and i == 0:
+                    file_size = st.st_size
+
+        if not follow_symlinks and _islink(src):
+            os.symlink(os.readlink(src), dst)
+        else:
+>           with open(src, 'rb') as fsrc:
+                 ^^^^^^^^^^^^^^^
+E           FileNotFoundError: [Errno 2] No such file or directory: 'word_templates\\1. PCDS .docx'
+
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\shutil.py:260: FileNotFoundError
+______ TestTemplateLinkEscape.test_template_swapped_for_link_after_scan _______
+
+self = <tests.test_word_batch_export.TestTemplateLinkEscape object at 0x000001D39D363E90>
+tmp_path = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_template_swapped_for_link0')
+
+    def test_template_swapped_for_link_after_scan(self, tmp_path):
+        """Mẫu quét được lúc scan bị thay bằng symlink ra ngoài trước khi
+        mở — resolver kiểm tra lại containment → word.template_missing,
+        không bao giờ đọc file ngoài thư mục được cấp quyền."""
+        tdir = tmp_path / "templates"
+        tdir.mkdir()
+        target = tdir / "mau.docx"
+>       shutil.copyfile(BUILTIN_TEMPLATE, target)
+
+notary_v2\tests\test_word_batch_export.py:1118:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+src = WindowsPath('word_templates/1. PCDS .docx')
+dst = WindowsPath('C:/Users/MINH/.codex/worktrees/1aae/systemdocs/.agent/scratch/audit_20261004/tmp/pytest/test_template_swapped_for_link0/templates/mau.docx')
+follow_symlinks = True
+
+    def copyfile(src, dst, *, follow_symlinks=True):
+        """Copy data from src to dst in the most efficient way possible.
+
+        If follow_symlinks is not set and src is a symbolic link, a new
+        symlink will be created instead of copying the file it points to.
+
+        """
+        sys.audit("shutil.copyfile", src, dst)
+
+        if _samefile(src, dst):
+            raise SameFileError("{!r} and {!r} are the same file".format(src, dst))
+
+        file_size = 0
+        for i, fn in enumerate([src, dst]):
+            try:
+                st = _stat(fn)
+            except OSError:
+                # File most likely does not exist
+                pass
+            else:
+                # XXX What about other special files? (sockets, devices...)
+                if stat.S_ISFIFO(st.st_mode):
+                    fn = fn.path if isinstance(fn, os.DirEntry) else fn
+                    raise SpecialFileError("`%s` is a named pipe" % fn)
+                if _WINDOWS and i == 0:
+                    file_size = st.st_size
+
+        if not follow_symlinks and _islink(src):
+            os.symlink(os.readlink(src), dst)
+        else:
+>           with open(src, 'rb') as fsrc:
+                 ^^^^^^^^^^^^^^^
+E           FileNotFoundError: [Errno 2] No such file or directory: 'word_templates\\1. PCDS .docx'
+
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\shutil.py:260: FileNotFoundError
+============================== warnings summary ===============================
+notary_v2/tests/test_docx_word_first.py: 24 warnings
+notary_v2/tests/test_case_workspace.py: 17 warnings
+  C:\Users\MINH\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\default.py:1180: DeprecationWarning: The default datetime adapter is deprecated as of Python 3.12; see the sqlite3 documentation for suggested replacement recipes
+    cursor.execute(statement, parameters)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED notary_v2/tests/test_docx_word_first.py::test_actual_context_and_proposals_match_contract_schema
+FAILED notary_v2/tests/test_docx_word_first.py::test_source_row_21_survives_saved_stage_and_schema
+FAILED notary_v2/tests/test_word_engine.py::test_placeholder_catalog_documents_vietnamese_contract_without_snake_case_public_contract
+FAILED notary_v2/tests/test_word_engine.py::test_real_pcds_template_resolves_two_properties_into_one_document
+FAILED notary_v2/tests/test_word_engine.py::test_pcds_template_no_old_critical_placeholders
+FAILED notary_v2/tests/test_word_batch_export.py::TestExportBatch::test_writes_independent_docx_per_document
+FAILED notary_v2/tests/test_word_batch_export.py::TestExportBatch::test_collision_with_existing_files_keeps_old_bytes
+FAILED notary_v2/tests/test_word_batch_export.py::TestExportBatch::test_intra_batch_same_filename_stem_no_clash
+FAILED notary_v2/tests/test_word_batch_export.py::TestExportBatch::test_partial_saved_and_failed
+FAILED notary_v2/tests/test_word_batch_export.py::TestExportBatch::test_cancel_mid_batch_keeps_saved_and_marks_skipped
+FAILED notary_v2/tests/test_word_batch_export.py::TestExportBatch::test_traversal_generated_filename_fails_document
+FAILED notary_v2/tests/test_word_batch_export.py::TestExportBatch::test_unsafe_generated_filename_fails_document
+FAILED notary_v2/tests/test_word_batch_export.py::TestExportBatch::test_same_name_directory_in_destination_increments
+FAILED notary_v2/tests/test_word_batch_export.py::TestExportBatch::test_progress_reported_per_document
+FAILED notary_v2/tests/test_word_batch_export.py::TestExportBatch::test_cancel_at_progress_checkpoint_keeps_pending_result
+FAILED notary_v2/tests/test_word_batch_export.py::TestDestWriteDenied::test_toctou_publish_denied_maps_file_locked
+FAILED notary_v2/tests/test_word_batch_export.py::TestDestWriteDenied::test_toctou_render_denied_maps_file_locked
+FAILED notary_v2/tests/test_word_batch_export.py::TestScanTemplateDir::test_scans_only_top_level_docx_sorted
+FAILED notary_v2/tests/test_word_batch_export.py::TestFolderModeExport::test_options_lists_folder_files
+FAILED notary_v2/tests/test_word_batch_export.py::TestFolderModeExport::test_batch_writes_ascii_stem_outputs
+FAILED notary_v2/tests/test_word_batch_export.py::TestFolderModeExport::test_batch_rejects_unknown_or_traversal_key
+FAILED notary_v2/tests/test_word_batch_export.py::TestFolderModeExport::test_create_case_subdir
+FAILED notary_v2/tests/test_word_batch_export.py::TestFolderModeExport::test_template_deleted_after_scan_fails_file
+FAILED notary_v2/tests/test_word_batch_export.py::TestFolderModeExport::test_catalog_mode_still_works
+FAILED notary_v2/tests/test_word_batch_export.py::TestDestSubdirLinkEscape::test_case_subdir_link_inside_dest_allowed
+FAILED notary_v2/tests/test_word_batch_export.py::TestTemplateLinkEscape::test_scan_skips_file_link_to_outside
+FAILED notary_v2/tests/test_word_batch_export.py::TestTemplateLinkEscape::test_template_swapped_for_link_after_scan
+27 failed, 514 passed, 4 skipped, 41 warnings in 84.07s (0:01:24)

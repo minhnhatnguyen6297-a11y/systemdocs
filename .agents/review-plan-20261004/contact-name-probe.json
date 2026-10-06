@@ -1,0 +1,16 @@
+{
+  "catalog": [
+    {
+      "id": 11,
+      "ho_ten": "Nguyễn Văn An",
+      "so_giay_to": "111"
+    },
+    {
+      "id": 22,
+      "ho_ten": "Nguyễn Văn An",
+      "so_giay_to": "222"
+    }
+  ],
+  "selected_id": 11,
+  "selected_name": "Nguyễn Văn An"
+}

@@ -4,6 +4,10 @@ Thư mục này chứa contract đã publish và bản Draft đang review; trạ
 đầu từng file quyết định có được code tích hợp hay chưa. Ý tưởng chưa thành
 contract không đặt tại đây.
 
+Schema lưu kho cục bộ NAIA-9: [`administrative-timeline/ledger.schema.json`](./administrative-timeline/ledger.schema.json).
+Chỉ định dạng ledger; chưa là contract tích hợp liên module. Ý nghĩa/trạng thái tại
+[`spec lịch sử hành chính`](../docs/spec/notary_v2/administrative-timeline.md).
+
 ## Trạng thái: kênh nội bộ đã publish; Zalo và Upload còn draft
 
 Cột **Trạng thái** ghi rõ đã duyệt hay draft — không ngầm coi draft là đã

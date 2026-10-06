@@ -29,7 +29,11 @@
         ],
         "errors": [],
         "unresolvedEstates": [],
-        "conservation": { "allocated": "0", "unresolved": "0", "total": "0" }
+        "conservation": {
+          "allocated": "0",
+          "unresolved": "0",
+          "total": "0"
+        }
       }
     }
   }
