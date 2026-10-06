@@ -570,7 +570,12 @@ def _detect_document_kind_and_title(text: str) -> tuple[str, str]:
     # File .doc/IFilter chi trich duoc trang "LỜI CHỨNG" (than van ban
     # khong co trong file) — route generic nhu trang phu, khong ap luat
     # thua ke (R08 se bao oan vi khoi tai san khong ton tai trong text).
-    if any(l.strip().startswith("loi chung") for l in head_lines):
+    # Van giu loai hop dong neu loi chung dung truoc than van ban co
+    # heading ben ("I. Bên A: ..." — tom tat kem loi chung trong 1 file).
+    if any(l.strip().startswith("loi chung") for l in head_lines) and not re.search(
+        r"(?im)^\s*(?:[IVX]+\s*[./]?\s*)?b\u00ean\b[^:\n]{0,60}:",
+        text,
+    ):
         return DOC_KIND_GENERIC, title_line
     # Trang "ĐÍNH CHÍNH <văn bản gốc>" chi sua loi van ban da cong chung —
     # khong co khoi duong su/nguoi chet/tai san rieng (11/10/2026).
