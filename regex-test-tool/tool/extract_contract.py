@@ -797,6 +797,9 @@ def _find_tai_san_inheritance_refusal(text: str) -> str:
             r"(?m)^\s*(?:1\.\s*)?tai san(?: thu nhat)?\s*:",
             r"quyen su dung dat(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:)",
             r"phan quyen su dung dat(?: cua[^\n]{0,200})?[^\n]{0,300}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:|la\s*:)",
+            # "Di san cua ong X de lai la ky phan thua ke ... tai dia chi:"
+            # — don tu choi ke lai di san khong qua cum "quyen su dung dat".
+            r"di san\s+cua\s+[^\n]{0,250}?\bde\s+lai\b[^\n]{0,250}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:|la\s*:)",
         ),
         (
             r"(?m)^\s*bang van ban nay\b",

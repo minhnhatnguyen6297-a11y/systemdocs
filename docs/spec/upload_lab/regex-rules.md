@@ -150,7 +150,7 @@ mục này chỉ tra nhanh. Khi lệch nhau, file riêng của loại đó đún
   - Dừng trước `Nay, tôi/chúng tôi tự nguyện lập Văn bản này`, `Theo quy định của pháp luật`.
   - *Người đã chết (`chết ngày...`) không vào danh sách đương sự*.
 - **Tài sản**:
-  - Hỗ trợ đơn tài sản hoặc đa tài sản (`1. Tài sản thứ nhất:`, `2. Tài sản thứ hai:`...).
+  - Hỗ trợ đơn tài sản hoặc đa tài sản (`1. Tài sản thứ nhất:`, `2. Tài sản thứ hai:`...); khối tài sản mở được cả khi chỉ ghi `Di sản của ông/bà X để lại là <mô tả>` không qua cụm `quyền sử dụng đất` (11/10/2026).
   - Tài sản đất: xem quy tắc tách thửa ở §2.5.
   - Tài sản sổ tiết kiệm / tài khoản: xem §2.8.
   - *Điểm kết thúc*: Dừng trước `Bằng Văn bản này, tôi ... từ chối nhận kỷ phần thừa kế`, `Tôi xin cam đoan`, `Người từ chối hưởng di sản`, `Lời chứng`.
