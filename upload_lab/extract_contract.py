@@ -780,7 +780,7 @@ def _find_tai_san_inheritance_partition(text: str) -> str:
         (
             r"quyen su dung dat(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:)",
             r"nha o va quyen su dung dat o(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:)",
-            r"phan quyen su dung dat(?: cua[^\n]{0,200})?[^\n]{0,300}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:|la\s*:)",
+            r"phan quyen su dung dat(?: cua[^\n]{0,200})?[^\n]{0,300}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:|la\s*:|(?:cu the\s+)?nhu sau\s*:)",
             r"quyen su dung dat[^\n]{0,300}?theo\s*[\"'“”‘’]?\s*giay chung nhan",
             r"thua dat so[^\n]{0,200}?(?:co dia chi tai|tai dia chi|theo\s*[\"'“”‘’]?\s*giay chung nhan|theo ban do)",
             # "Phần Quyền tài sản của ông X ... đối với một phần thửa đất số 62"
@@ -812,7 +812,7 @@ def _find_tai_san_inheritance_refusal(text: str) -> str:
             r"phan quyen su dung dat(?: cua[^\n]{0,200})?[^\n]{0,300}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:|la\s*:)",
             # "Di san cua ong X de lai la ky phan thua ke ... tai dia chi:"
             # — don tu choi ke lai di san khong qua cum "quyen su dung dat".
-            r"di san\s+cua\s+[^\n]{0,250}?\bde\s+lai\b[^\n]{0,250}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:|la\s*:)",
+            r"di san\s+(?:cua\s+)?[^\n]{0,250}?\bde\s+lai\b[^\n]{0,250}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:|la\s*:)",
         ),
         (
             r"(?m)^\s*bang van ban nay\b",
@@ -1359,6 +1359,17 @@ def _cell_has_letters(value: str) -> bool:
     return bool(re.search(r"[A-Za-zÀ-ỹ]", value or ""))
 
 
+def _la_o_thoi_han(value: str) -> bool:
+    """O ky han su dung: nam 4 so ("2043"), ngay co "/" ("15/10/2063"),
+    hoac chu ("Lau dai"). So nho 3 chu so ("119") la dien tich, tra False."""
+    text = (value or "").strip()
+    if not text:
+        return False
+    if re.match(r"^\d{4}\s*$", text) or "/" in text:
+        return True
+    return _cell_has_letters(text)
+
+
 def _tach_nay_la(value: str) -> tuple[str, str]:
     """Cat duoi "(nay la to ban do so N)"/"nay la thua dat so N" ra ghi chu
     — tra (ky hieu dau, ghi chu). Vi du "104 Nay la thua dat so 321" ->
@@ -1469,16 +1480,22 @@ def _tach_thua_cell_stream(cells: list[str], context: dict, parcels: list[dict])
                 pos += 1
             continue
         if (
-            pos + 2 < len(data)
+            pos + 1 < len(data)
             and _is_pure_number_cell(data[pos])
             and _cell_has_letters(data[pos + 1])
         ):
             detail = {
                 "dien_tich": data[pos],
                 "muc_dich_su_dung": data[pos + 1],
-                "thoi_han_su_dung": data[pos + 2],
+                "thoi_han_su_dung": "",
             }
-            pos += 3
+            pos += 2
+            # O thoi han chi nhan khi giong ky han that (nam 4 so,
+            # ngay co "/", hoac chu "Lau dai") — so 3 chu so nhu "119"
+            # la dien tich cua chi tiet tiep theo, khong duoc nuot.
+            if pos < len(data) and _la_o_thoi_han(data[pos]):
+                detail["thoi_han_su_dung"] = data[pos]
+                pos += 1
             extras: list[str] = []
             while pos < len(data):
                 peek = data[pos]
@@ -1486,6 +1503,8 @@ def _tach_thua_cell_stream(cells: list[str], context: dict, parcels: list[dict])
                 if peek_fold in ("trong do", "trong do:") or peek_fold.startswith("trong do"):
                     break
                 if re.match(r"^\d+\.\d+", peek.strip()):
+                    break
+                if re.search(r"bang van ban nay|xin cam doan|cam doan\s*:", peek_fold):
                     break
                 if _is_pure_number_cell(peek) and pos + 1 < len(data) and (
                     _cell_has_letters(data[pos + 1])

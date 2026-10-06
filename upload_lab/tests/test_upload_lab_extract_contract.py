@@ -2406,5 +2406,25 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertTrue(any(p["ho_ten"] == "Phùng Trường Giang" for p in nguoi))
 
 
+
+    def test_tach_thua_cell_stream_chi_tiet_thieu_thoi_han(self):
+        from extract_contract import _new_thua_dat, _tach_thua_cell_stream
+
+        # Bang .doc: chi tiet "225 Dat o" khong ky han, so "119" sau do
+        # la dien tich chi tiet moi, khong phai thoi han cua "225".
+        cells = [
+            "Số tờ bản đồ", "Số thửa", "Diện tích (m2)", "Mục đích", "Thời hạn",
+            "", "44", "80", "546,0", "", "", "225", "Đất ở", "", "119", "CLN",
+            "15/10/2063", "", "202", "NTS", "15/10/2063", "",
+        ]
+        parcels = []
+        self.assertTrue(_tach_thua_cell_stream(cells, {}, parcels))
+        self.assertEqual(len(parcels), 1)
+        ct = parcels[0]["chi_tiet_dien_tich"]
+        self.assertEqual([c["dien_tich"] for c in ct], ["225", "119", "202"])
+        self.assertEqual(ct[0]["thoi_han_su_dung"], "")
+        self.assertEqual(ct[1]["thoi_han_su_dung"], "15/10/2063")
+
+
 if __name__ == "__main__":
     unittest.main()
