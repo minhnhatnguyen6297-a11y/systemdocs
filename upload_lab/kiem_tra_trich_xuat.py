@@ -48,6 +48,7 @@ TEN_FILE_NGOAI_LE = (
     ("thue", "thuế"),
     ("to khai", "tờ khai"),
     ("danh muc", "danh mục hồ sơ"),
+    ("ho so luu", "danh mục hồ sơ lưu"),
     ("danh sach", "danh sách"),
     ("11dk", "mẫu đăng ký biến động"),
     ("dk11", "mẫu đăng ký biến động"),
@@ -102,6 +103,10 @@ def _ten_file_folded(payload: dict) -> str:
 
 
 def _ly_do_ngoai_le(payload: dict) -> str:
+    # File khong doc duoc chu nao (docx chi chua anh scan, giay to dinh
+    # kem chup) — bo qua, khong phai loi engine.
+    if payload.get("raw", {}).get("text_rong"):
+        return "file kh\u00f4ng c\u00f3 n\u1ed9i dung text"
     name = _ten_file_folded(payload)
     raw_name = str(payload.get("raw", {}).get("file_goc") or "").lower()
     for key, label in TEN_FILE_NGOAI_LE:

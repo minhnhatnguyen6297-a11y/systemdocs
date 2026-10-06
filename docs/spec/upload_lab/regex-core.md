@@ -83,7 +83,11 @@ python tools/regex_lab.py approve --cluster <id>   # chi khi owner da duyet ket 
 1. Lỗi chỉ công nhận khi **mã trong code** báo:
    `upload_lab/kiem_tra_trich_xuat.py` (R00 bỏ qua — mọi key tên file
    đều được cứu khi nội dung là hợp đồng thật, không chỉ `thue`;
-   key thêm 09/10/2026: `11dk`, `truoc ba`, `tncn`, `thu nhap` —
+   key thêm 09/10/2026: `11dk`, `truoc ba`, `tncn`, `thu nhap`; thêm
+   10/10/2026: `dk11`/`dk 11`, `ho so luu` (danh mục hồ sơ lưu không
+   tiền tố `danh muc`), và `raw.text_rong` — file không đọc được chữ
+   nào (docx chỉ chứa ảnh scan, giấy tờ đính kèm chụp) thì bỏ qua,
+   không chấm lỗi —
    R01 sai loại,
    R02 0 người (lỗi ở thừa kế; cảnh báo ở loại non-generic khác và
    generic có `ten_hop_dong` — 09/10/2026), R03 thiếu trường người, R04 tên bẩn (gồm tên đương

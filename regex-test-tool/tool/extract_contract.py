@@ -2909,6 +2909,7 @@ def _build_payload_generic(filepath, text: str, scan_result: dict, *, extract_mo
             "engine_version": ENGINE_VERSION,
             "extract_mode": extract_mode,
             "extract_is_partial": bool(missing_fields),
+            "text_rong": not str(text or "").strip(),
             "missing_web_form_fields": missing_fields,
         },
     }
