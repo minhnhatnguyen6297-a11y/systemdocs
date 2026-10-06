@@ -2292,6 +2292,49 @@ class UploadLabExtractContractTests(unittest.TestCase):
             ],
         )
 
+    def test_bang_danh_sach_nguoi_su_dung_chung_o_tron(self):
+        # Mau 04a/ĐK "DANH SÁCH NGƯỜI SỬ DỤNG CHUNG": hang o
+        # "STT | Ông X | nam sinh | loai giay | so | ngay cap | noi cap |
+        # dia chi" — nam sinh la o tron khong nhan (11/10/2026).
+        from extract_contract import _extract_plain_text_person_entries
+        text = (
+            "STT | Tên | Năm sinh | Loại giấy tờ | Số | Ngày cấp | Cơ quan cấp | Địa chỉ\n"
+            "1\nÔng Trương Anh Dũng | 1955 | CCCD | 036055003111 | 25/04/2021 | "
+            "Cục Cảnh sát quản lý hành chính về trật tự xã hội | "
+            "Thôn Dư Duệ, xã Tham Thanh, huyện Vụ Bản, tỉnh Nam Định |  | "
+            "2 | Ông Trương Ngọc Mạnh | 1970 | CCCD | 036070012528 | 24/06/2021 | "
+            "Cục Cảnh sát quản lý hành chính về trật tự xã hội | "
+            "Tổ 27, thị trấn Đông Anh, huyện Đông Anh, thành phố Hà Nội |  |  | "
+            "Nam Định, ngày ……., tháng ….. năm 2025\nNgười kê khai"
+        )
+        persons = _extract_plain_text_person_entries(text)
+        self.assertEqual(len(persons), 2)
+        dung = persons[0]
+        self.assertEqual(dung["ho_ten"], "Trương Anh Dũng")
+        self.assertEqual(dung["ngay_sinh"], "1955")
+        self.assertEqual(dung["cccd"], "036055003111")
+        self.assertEqual(dung["ngay_cap_cccd"], "25/04/2021")
+        self.assertIn("Cảnh sát", dung["noi_cap"])
+        self.assertIn("Vụ Bản", dung["dia_chi"])
+        self.assertEqual(persons[1]["ho_ten"], "Trương Ngọc Mạnh")
+
+    def test_bang_thanh_vien_hdtv_khong_cot_giay_to(self):
+        # "BIÊN BẢN HỌP HĐTV": hang "STT | Ông X | chuc vu | ty le | ghi chu"
+        # khong co cot giay to — van tinh nguoi nho o chuc vu (11/10/2026).
+        from extract_contract import _extract_plain_text_person_entries
+        text = (
+            "STT | Họ tên | Chức vụ | Tỷ lệ vốn góp (%) | Ghi chú\n"
+            "1 | Ông Nguyễn Hữu Công | Thành viên góp vốn kiêm Giám đốc | 33,33 % | Có mặt\n"
+            "2 | Bà Phạm Thị Hà | Thành viên góp vốn | 33,33 % | Có mặt\n"
+            "3 | Bà Phạm Thị Oanh | Thành viên góp vốn | 33,33 % | Có mặt\n"
+            "Ban tổ chức Đại hội công bố kết quả:"
+        )
+        persons = _extract_plain_text_person_entries(text)
+        names = [p["ho_ten"] for p in persons]
+        self.assertIn("Nguyễn Hữu Công", names)
+        self.assertIn("Phạm Thị Hà", names)
+        self.assertIn("Phạm Thị Oanh", names)
+
 
 if __name__ == "__main__":
     unittest.main()

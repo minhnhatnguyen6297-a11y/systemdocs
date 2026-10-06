@@ -2646,6 +2646,99 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         if nxt["dia_chi"] and re.search(r"\bva\s+(vo|chong)\s+la\b", nxt_head):
             person["dia_chi"] = nxt["dia_chi"]
 
+    # Bang hanh chinh dang o ("DANH SÁCH NGƯỜI SỬ DỤNG CHUNG" mau 04a/DK,
+    # "BIÊN BẢN HỌP HĐTV"): hang "STT | Ông/Bà X | <cac o> | so giay to |
+    # ..." — nam sinh co the la o tron khong nhan (1955) hoac vang mat,
+    # truong lay theo vi tri o (11/10/2026). Chi tinh hang co o so giay
+    # to 6-12 so de tranh nhan nham muc van xuoi danh so.
+    table_row_re = re.compile(
+        r"(?im)(?:^|\|)\s*\d{1,3}[\s|]*"
+        r"(?P<title>\u00f4ng|b\u00e0)\s+(?P<name>[^|\d;]{2,60}?)\s*"
+        r"(?P<tail>(?:\|[^|\n]*){0,20}?)"
+        r"(?=\|\s*\d{1,3}[\s|]*(?:\u00f4ng|b\u00e0)|\n|$)"
+    )
+    for tr in table_row_re.finditer(section):
+        name = re.sub(r"\s+", " ", tr.group("name")).strip(" ;,.")
+        if not _ho_ten_hop_le(name):
+            continue
+        tail_cells = [
+            re.sub(r"\s+", " ", c).strip(" ;,.")
+            for c in tr.group("tail").split("|")
+            if re.search(r"\w", c)
+        ]
+        ngay_sinh = cccd = noi_cap = ngay_cap = dia_chi = ""
+        expect_noi_cap = False
+        has_role_cell = False
+        for cell in tail_cells:
+            # O ky ket "Nam Định, ngày … năm 2025 | Người kê khai (Ký...)"
+            # — cat phan chu ky, chi giu phan truoc.
+            cell = re.sub(r"(?i)\s*ng\u01b0\u1eddi\s+k\u00ea\s+khai.*$", "", cell).strip(" ;,.")
+            # O ngay-thang-noi-chot "Nam Định, ngày … năm 2025" khong phai
+            # truong nguoi.
+            if not cell or re.search(r"(?i)ng\u00e0y\b[^\n]{0,30}\bn\u0103m\b", cell):
+                continue
+            if not ngay_sinh and re.fullmatch(r"(?:19|20)\d{2}", cell):
+                ngay_sinh = cell
+                continue
+            m_id = re.search(r"\b(\d{9,12})\b", cell)
+            if m_id:
+                if not cccd:
+                    cccd = m_id.group(1)
+                    cap = re.search(
+                        r"(?i)\bdo\s+([^|]{2,80}?)\s+(?:c\u1ea5p ng\u00e0y|cap ngay)\s*(\d{1,2}/\d{1,2}/\d{4})",
+                        cell,
+                    )
+                    if cap:
+                        noi_cap = cap.group(1).strip(" ;,.")
+                        ngay_cap = cap.group(2)
+                continue
+            # O nhan loai giay to / nhan cot bo qua — khong phai du lieu.
+            if re.fullmatch(
+                r"(?i)(?:CCCD|CMND|CC|H\u1ed9 chi\u1ebfu|C\u0103n c\u01b0\u1edbc(?:\s+c\u00f4ng d\u00e2n)?"
+                r"|Lo\u1ea1i gi\u1ea5y t\u1edd|S\u1ed1|Ch\u1ee9c v\u1ee5|Ghi ch\u00fa|C\u00f3 m\u1eb7t"
+                r"|[\d.,\s%]+)",
+                cell,
+            ):
+                continue
+            if expect_noi_cap and not noi_cap:
+                noi_cap = cell
+                expect_noi_cap = False
+                continue
+            if not ngay_cap and re.fullmatch(r"\d{1,2}/\d{1,2}/\d{4}", cell):
+                ngay_cap = cell
+                # Cot ngay cap: o sau ngay cap la noi cap, sau nua la
+                # dia chi (mau 04a/DK "so | ngay cap | noi cap | dia chi").
+                expect_noi_cap = True
+                continue
+            fold = _fold_text(cell)
+            # "xa hoi" trong "Cục cảnh sát ... trật tự xã hội" khong phai
+            # don vi hanh chinh — bo tu "hoi" dung sau "xa".
+            if re.search(r"xa\b(?! hoi)|phuong|huyen|tinh|thi tran|thanh pho|thon|to\b", fold):
+                dia_chi = cell
+            elif re.search(
+                r"thanh vien|chu tich|chu toa|giam doc|thu ky|pho chu|truong phong",
+                fold,
+            ):
+                has_role_cell = True
+            elif not noi_cap:
+                noi_cap = cell
+        if not cccd and not (has_role_cell and len(tail_cells) >= 3):
+            continue
+        persons.append(
+            {
+                "gioi_tinh": tr.group("title").capitalize(),
+                "ho_ten": name,
+                "ngay_sinh": ngay_sinh,
+                "chi_co_nam_sinh": bool(ngay_sinh),
+                "cccd": cccd,
+                "noi_cap": noi_cap,
+                "ngay_cap_cccd": ngay_cap,
+                "dia_chi": dia_chi,
+                "dia_chi_line": "",
+                "_line_idx": len(lines),
+            }
+        )
+
     for person in persons:
         person["source_start_line_idx"] = person["_line_idx"]
         person.pop("_line_idx", None)
