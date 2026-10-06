@@ -2642,9 +2642,9 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                     else "Bà"
                 )
                 base_name = base_name[_dx.end() :].strip()
-            if re.search(r"(?:vo|me|dau)", role_fold):
+            if re.search(r"\b(?:vo|me|dau)\b", role_fold):
                 gioi_tinh = "Bà"
-            elif re.search(r"(?:chong|bo|cha|re)", role_fold):
+            elif re.search(r"\b(?:chong|bo|cha|re)\b", role_fold):
                 gioi_tinh = "Ông"
             elif _dx_gender:
                 gioi_tinh = _dx_gender
