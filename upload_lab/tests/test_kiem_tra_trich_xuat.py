@@ -67,7 +67,14 @@ class KiemTraTrichXuatTests(unittest.TestCase):
         self.assertEqual(kiem_tra_payload(make_payload()), [])
 
     def test_file_ngoai_le_thi_bo_qua(self):
-        payload = make_payload(raw={"file_goc": r"D:\3. DK18, thuế.docx"})
+        payload = make_payload(raw={
+            "file_goc": r"D:\3. DK18, thuế.docx",
+            "document_kind": "generic",
+            "ben_a": {"nguoi": [], "dia_chi": "", "entity_lines": []},
+            "ben_b": {"nguoi": [], "dia_chi": "", "entity_lines": []},
+            "nguoi_chet": [],
+            "danh_sach_thua_dat": [],
+        })
         findings = kiem_tra_payload(payload)
 
         self.assertEqual(len(findings), 1)
@@ -162,6 +169,63 @@ class KiemTraTrichXuatTests(unittest.TestCase):
 
         r13 = [f for f in findings if f["id"] == "R13" and "diện tích" in f["noi_dung"]]
         self.assertEqual(len(r13), 1)
+
+    def test_thue_nha_khong_bi_nham_la_thue_thue(self):
+        # Sweep 09/10/2026: file "HD THUÊ QSDĐ" (thuê đất) dung "thue" fold
+        # giong "thuế" (tax). Co noi dung hop dong -> khong duoc bo qua.
+        payload = make_payload(raw={
+            "file_goc": r"D:\thue\HD THUÊ QSDĐ.doc",
+            "document_kind": "generic",
+        })
+        findings = kiem_tra_payload(payload)
+        self.assertFalse([f for f in findings if f["muc"] == MUC_BO_QUA])
+
+    def test_file_thue_that_van_bo_qua(self):
+        # File thue (tax) thuan tuy: khong co nguoi/thua -> van R00.
+        payload = make_payload(raw={
+            "file_goc": r"D:\soan\4. Thuế ĐẤT PNN.doc",
+            "document_kind": "generic",
+            "ben_a": {"nguoi": [], "dia_chi": "", "entity_lines": []},
+            "ben_b": {"nguoi": [], "dia_chi": "", "entity_lines": []},
+            "nguoi_chet": [],
+            "danh_sach_thua_dat": [],
+        })
+        findings = kiem_tra_payload(payload)
+        self.assertTrue(any(f["muc"] == MUC_BO_QUA for f in findings))
+
+    def test_0_nguoi_o_loai_da_nhan_dien_la_canh_bao(self):
+        # Sweep 09/10/2026: R02 mo rong sang non-generic (chuyen nhuong 0
+        # nguoi = warning, khong phai "sach").
+        payload = make_payload(raw={
+            "document_kind": "transfer_contract",
+            "ben_a": {"nguoi": [], "dia_chi": "", "entity_lines": []},
+            "ben_b": {"nguoi": [], "dia_chi": "", "entity_lines": []},
+        })
+        findings = kiem_tra_payload(payload)
+        r02 = [f for f in findings if f["id"] == "R02"]
+        self.assertEqual(len(r02), 1)
+        self.assertEqual(r02[0]["muc"], MUC_CANH_BAO)
+
+    def test_ten_ben_ban_la_cau_co_r04(self):
+        # Sweep 09/10/2026: ten ben A/B nuot "CCCD so..." cung la R04.
+        payload = make_payload()
+        payload["raw"]["ben_a"]["nguoi"][0]["ho_ten"] = "Nguyễn Trường Nam CCCD số 036"
+        findings = kiem_tra_payload(payload)
+        self.assertTrue(any(f["id"] == "R04" for f in findings))
+
+    def test_so_thua_chua_van_ban_co_r13(self):
+        # Sweep 09/10/2026: loi tach thua de "Dien tich:" hoac cau dai
+        # lot vao so_thua_dat.
+        payload = make_payload()
+        payload["raw"]["danh_sach_thua_dat"] = [{
+            "so_thua_dat": "Diện tích:",
+            "dien_tich": "450",
+            "chi_tiet_dien_tich": [],
+        }]
+        findings = kiem_tra_payload(payload)
+        r13 = [f for f in findings if f["id"] == "R13" and "thửa" in f["noi_dung"]]
+        self.assertEqual(len(r13), 1)
+        self.assertEqual(r13[0]["muc"], MUC_LOI)
 
     def test_ten_nguoi_chet_la_cau_co_r04(self):
         # Mau that 07/10/2026: cau pha he lot vao ho_ten nguoi chet.

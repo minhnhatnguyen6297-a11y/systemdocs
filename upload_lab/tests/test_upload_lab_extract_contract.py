@@ -868,7 +868,11 @@ class UploadLabExtractContractTests(unittest.TestCase):
         thua_list = tach_danh_sach_thua_dat(block)
 
         self.assertEqual(len(thua_list), 1)
-        self.assertIn("321", thua_list[0]["so_thua_dat"])
+        # Ky hieu dau la gia tri hien tai; duoi "nay la thua/to ..." vao ghi chu.
+        self.assertEqual(thua_list[0]["so_thua_dat"], "104")
+        self.assertEqual(thua_list[0]["so_to_ban_do"], "04")
+        self.assertIn("321", thua_list[0]["phan_ghi_them"])
+        self.assertIn("24", thua_list[0]["phan_ghi_them"])
         self.assertEqual(thua_list[0]["dien_tich"], "206")
         self.assertEqual(thua_list[0]["so_gcn"], "A000030")
 
@@ -928,7 +932,9 @@ class UploadLabExtractContractTests(unittest.TestCase):
 
         self.assertEqual(len(thua_list), 1)
         self.assertEqual(thua_list[0]["so_thua_dat"], "106")
-        self.assertIn("107", thua_list[0]["so_to_ban_do"])
+        # "(nay la to ban do so 107)" -> ky hieu "2" + ghi chu giu duoi.
+        self.assertEqual(thua_list[0]["so_to_ban_do"], "2")
+        self.assertIn("107", thua_list[0]["phan_ghi_them"])
         self.assertEqual(thua_list[0]["dien_tich"], "450")
         self.assertEqual(thua_list[0]["loai_gcn"], "quyền sử dụng đất")
         details = thua_list[0]["chi_tiet_dien_tich"]
@@ -1302,6 +1308,166 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual([p["ho_ten"] for p in payload["raw"]["nguoi_chet"]], ["Tạ Thị H"])
         self.assertEqual(payload["raw"]["tai_san_chua_ho_tro"], ["bao_hiem"])
         self.assertNotIn("danh_sach_bao_hiem", payload["raw"])
+
+    def test_tai_san_chi_co_tiet_kiem_khong_sinh_thua_ma(self):
+        # Sweep 09/10/2026: van ban chi co so tiet kiem, muc "Tài sản thứ N:"
+        # khong duoc sinh thua rong.
+        docx_path = make_docx(
+            self.root / "chi_tiet_kiem.docx",
+            "VĂN BẢN PHÂN CHIA DI SẢN",
+            "Tôi là người được hưởng di sản theo pháp luật của ông Nguyễn Văn T:",
+            "Bà Trần Thị K Sinh ngày: 01/01/1960",
+            "Căn cước công dân số: 036160000001 do Bộ Công an cấp ngày 01/01/2021",
+            "Thường trú tại: Thôn A, xã B.",
+            "Người để lại di sản:",
+            "Ông Nguyễn Văn T - sinh năm: 1930, đã chết ngày 01/02/2025.",
+            "Di sản của ông Nguyễn Văn T để lại gồm:",
+            "Tài sản thứ 3:",
+            "Sổ tiết kiệm số 123456 tại Ngân hàng X.",
+            "Tài sản thứ 4:",
+            "Tài khoản ngân hàng số 789 tại Ngân hàng Y.",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+        )
+
+        payload = extract(docx_path)
+
+        self.assertEqual(payload["raw"]["danh_sach_thua_dat"], [])
+        self.assertEqual(payload["raw"]["tai_san_chua_ho_tro"], ["so_tiet_kiem"])
+
+    def test_cap_vo_chong_chet_tren_mot_dong(self):
+        # Sweep 09/10/2026: "Ông A và bà B; Sinh năm...; chết ngày..." la
+        # 2 nguoi chet, khong phai 0.
+        docx_path = make_docx(
+            self.root / "cap_chet.docx",
+            "VĂN BẢN PHÂN CHIA DI SẢN",
+            "Chúng tôi là những người thừa kế của ông Trần Xuân V và bà Nguyễn Thị L:",
+            "Bà Nguyễn Thị T Sinh ngày: 01/01/1960",
+            "Căn cước công dân số: 036160000001 do Bộ Công an cấp ngày 01/01/2021",
+            "Thường trú tại: Thôn A, xã B.",
+            "Người để lại di sản:",
+            "Ông Trần Xuân V và bà Nguyễn Thị L; Sinh năm: 1928; chết ngày 09/10/2019.",
+            "Di sản để lại:",
+            "Quyền sử dụng đất tại: xã B.",
+            "- Thửa đất số: 65",
+            "- Diện tích: 190 m2",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+        )
+
+        payload = extract(docx_path)
+        chet = payload["raw"]["nguoi_chet"]
+
+        self.assertEqual(
+            sorted(c["ho_ten"] for c in chet),
+            ["Nguyễn Thị L", "Trần Xuân V"],
+        )
+
+    def test_dia_chi_chung_cap_vo_chong(self):
+        # Sweep 09/10/2026: "Cả hai ông bà cùng thường trú tại: X" phai gan
+        # cho ca 2 nguoi, khong chi nguoi dung sau.
+        docx_path = make_docx(
+            self.root / "dia_chi_chung_vo_chong.docx",
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+            "BÊN CHUYỂN NHƯỢNG:",
+            "Ông Trương Mạnh H Sinh ngày: 01/01/1970",
+            "Căn cước công dân số: 036170000001 do Bộ Công an cấp ngày 01/01/2021",
+            "Và vợ là bà Ninh Thị T Sinh ngày: 02/02/1972",
+            "Căn cước công dân số: 036172000002 do Bộ Công an cấp ngày 02/02/2022",
+            "Cả hai ông bà cùng thường trú tại: Thôn QP, xã YN, huyện YY, tỉnh NĐ.",
+            "BÊN NHẬN CHUYỂN NHƯỢNG:",
+            "Ông Nguyễn Trường N Sinh ngày: 03/03/1980",
+            "Căn cước công dân số: 036180000003 do Bộ Công an cấp ngày 03/03/2021",
+            "Địa chỉ: Tổ 12, thị trấn L, huyện YY, tỉnh NĐ.",
+            "Nội dung chuyển nhượng:",
+            "Thửa đất số: 176; Tờ bản đồ số: 12; Diện tích: 1386,0 m2.",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+        )
+
+        payload = extract(docx_path)
+        persons = payload["raw"]["ben_a"]["nguoi"]
+
+        self.assertEqual(len(persons), 2)
+        for person in persons:
+            self.assertIn("Thôn QP", person["dia_chi"], person["ho_ten"])
+
+    def test_ten_cat_truoc_khong_va_vaitro_dau_dong(self):
+        # Sweep 09/10/2026: "...Tam không có ai" cat o "không"; "Con đẻ - Bà X"
+        # va "Người chồng - Ông Y" la nguoi.
+        docx_path = make_docx(
+            self.root / "vai_tro_dau_dong.docx",
+            "HỢP ĐỒNG TẶNG CHO QUYỀN SỬ DỤNG ĐẤT",
+            "BÊN TẶNG CHO:",
+            "Người chồng - Ông Nguyễn Quang H Sinh ngày: 01/01/1960",
+            "Căn cước công dân số: 036160000001 do Bộ Công an cấp ngày 01/01/2021",
+            "Trú tại: Thôn TL, xã YY, tỉnh NB.",
+            "Người vợ - Bà Phạm Thị T Sinh ngày: 02/02/1962",
+            "Căn cước công dân số: 036162000002 do Bộ Công an cấp ngày 02/02/2022",
+            "Trú tại: Thôn TL, xã YY, tỉnh NB.",
+            "BÊN ĐƯỢC TẶNG CHO:",
+            "Con đẻ - Ông Nguyễn Văn K Sinh ngày: 03/03/1990",
+            "CC số: 036190000003 cấp ngày: 03/03/2021",
+            "Nơi thường trú tại: Thôn TL, xã YY, tỉnh NB.",
+            "Thửa đất số: 284; Tờ bản đồ số: 7; Diện tích: 156,0 m2.",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+        )
+
+        payload = extract(docx_path)
+        ten_a = [p["ho_ten"] for p in payload["raw"]["ben_a"]["nguoi"]]
+        ten_b = [p["ho_ten"] for p in payload["raw"]["ben_b"]["nguoi"]]
+
+        self.assertIn("Nguyễn Quang H", ten_a)
+        self.assertIn("Phạm Thị T", ten_a)
+        self.assertEqual(ten_b, ["Nguyễn Văn K"])
+        self.assertEqual(
+            payload["raw"]["ben_b"]["nguoi"][0]["cccd"], "036190000003")
+
+    def test_so_thua_giu_ky_hieu_chinh_nguon_goc_vao_ghi_chu(self):
+        # Sweep 09/10/2026: "378 (được tách từ thửa 376)" -> so_thua "378",
+        # nguon goc tach giu trong phan_ghi_them.
+        docx_path = make_docx(
+            self.root / "thua_tach_tu.docx",
+            "VĂN BẢN CAM KẾT TÀI SẢN RIÊNG",
+            "Tôi là: Bà Nguyễn Thị Q Sinh ngày: 01/01/1970",
+            "Căn cước công dân số: 036170000001 do Bộ Công an cấp ngày 01/01/2021",
+            "Địa chỉ: Thôn TA, xã YY, tỉnh NB.",
+            "Tôi cam kết quyền sử dụng đất có địa chỉ tại: Thôn TA, xã YY, tỉnh NB theo Giấy chứng nhận quyền sử dụng đất số: AA 04244199 do Văn phòng đăng ký đất đai NB cấp ngày 12/01/2026, cụ thể như sau:",
+            "- Thửa đất số: 378 (được tách từ thửa 376)",
+            "- Tờ bản đồ số: 46",
+            "- Diện tích: 109,9 m2",
+            "- Hình thức sử dụng: Sử dụng riêng",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+        )
+
+        payload = extract(docx_path)
+        thua = payload["raw"]["danh_sach_thua_dat"]
+
+        self.assertEqual(len(thua), 1)
+        self.assertEqual(thua[0]["so_thua_dat"], "378")
+        self.assertIn("376", thua[0]["phan_ghi_them"])
+
+    def test_truong_xe_may_khong_sinh_thua_dat(self):
+        # Sweep 09/10/2026: so khung/so may/bien so cua xe khong phai thua.
+        docx_path = make_docx(
+            self.root / "xe_may.docx",
+            "HỢP ĐỒNG MUA BÁN XE MÁY",
+            "BÊN BÁN:",
+            "Ông Bùi Văn C Sinh ngày: 01/01/1970",
+            "Căn cước công dân số: 036170000001 do Bộ Công an cấp ngày 01/01/2021",
+            "Địa chỉ: xã YD, huyện YY, tỉnh NĐ.",
+            "BÊN MUA:",
+            "Ông Đinh Văn T Sinh ngày: 02/02/1980",
+            "Căn cước công dân số: 036180000002 do Bộ Công an cấp ngày 02/02/2021",
+            "Địa chỉ: xã YL, huyện YY, tỉnh NĐ.",
+            "Xe mô tô:",
+            "- Nhãn hiệu: HONDA",
+            "- Số khung: RLH123456",
+            "- Số máy: 7890123",
+            "- Biển số đăng ký: 18-B1 234.56",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+        )
+
+        payload = extract(docx_path)
+
+        self.assertEqual(payload["raw"]["danh_sach_thua_dat"], [])
 
 
 if __name__ == "__main__":

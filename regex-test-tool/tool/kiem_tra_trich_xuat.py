@@ -97,10 +97,28 @@ def _ten_file_folded(payload: dict) -> str:
 
 def _ly_do_ngoai_le(payload: dict) -> str:
     name = _ten_file_folded(payload)
+    raw_name = str(payload.get("raw", {}).get("file_goc") or "").lower()
     for key, label in TEN_FILE_NGOAI_LE:
-        if key in name:
-            return label
+        if key not in name:
+            continue
+        if key == "thue":
+            # "thue" bo dau trung "thuê" (thue dat/nha) va ten nguoi
+            # "Thuế" — khong bo qua van ban co noi dung hop dong that.
+            if "thuê" in raw_name or _co_noi_dung_hop_dong(payload):
+                continue
+        return label
     return ""
+
+
+def _co_noi_dung_hop_dong(payload: dict) -> bool:
+    """Van ban co noi dung hop dong that (nguoi/thua) thi khong bo qua —
+    ten file co the dung ten nguoi hoac bi dat nham."""
+    raw = payload.get("raw", {})
+    if str(raw.get("document_kind") or "generic") != "generic":
+        return True
+    if _nguoi_1_ben(payload) or raw.get("danh_sach_thua_dat"):
+        return True
+    return False
 
 
 def _nguoi_1_ben(payload: dict) -> list[dict]:
@@ -131,10 +149,16 @@ def luat_loai_van_ban(payload: dict) -> list[dict]:
 
 
 def luat_0_nguoi(payload: dict) -> list[dict]:
-    """R02: van ban thua ke khong co nguoi nao."""
+    """R02: van ban da nhan loai nhung khong co nguoi nao — thua ke la loi,
+    cac loai hop dong khac (CN/TC/the chap/cam ket) la canh bao; generic
+    khong ap (thong bao, don tu co the khong co chu the)."""
     kind = str(payload.get("raw", {}).get("document_kind", ""))
-    if kind in KIND_THUA_KE and not _nguoi_1_ben(payload):
+    if _nguoi_1_ben(payload):
+        return []
+    if kind in KIND_THUA_KE:
         return [{"id": "R02", "muc": MUC_LOI, "noi_dung": "0 người tham gia"}]
+    if kind and kind != "generic":
+        return [{"id": "R02", "muc": MUC_CANH_BAO, "noi_dung": f"0 người tham gia ({kind})"}]
     return []
 
 
@@ -152,19 +176,39 @@ def luat_thieu_truong_nguoi(payload: dict) -> list[dict]:
     return findings
 
 
+_TU_DEM_TEN = {"văn", "thị", "đẻ"}
+
+
 def _ten_la_cau(ten: str) -> bool:
     """Ten la cau van (rac lot vao): qua 6 tu hoac co tu viet thuong —
-    ten nguoi Viet moi tu deu viet hoa chu cai dau."""
+    ten nguoi Viet moi tu deu viet hoa chu cai dau (tru tu dem
+    "văn"/"thị"/"đẻ" doi khi viet thuong trong mau go tat)."""
     tokens = ten.split()
-    return not tokens or len(tokens) > 6 or any(not t[0].isupper() for t in tokens)
+    return (
+        not tokens
+        or len(tokens) > 6
+        or any(not t[0].isupper() and t.lower() not in _TU_DEM_TEN for t in tokens)
+    )
+
+
+_TU_KHOA_TEN_RAC = re.compile(
+    r"(?i)(?:\d|cccd|cmnd|c\u0103n c\u01b0\u1edbc|sinh\b|ng\u00e0y|n\u0103m|c\u1ea5p\b|\u0111\u1ecba ch\u1ec9|th\u01b0\u1eddng tr\u00fa|h\u1ed9 kh\u1ea9u|chi nh\u00e1nh|v\u0103n ph\u00f2ng|c\u00f4ng ty|ng\u00e2n h\u00e0ng|chi c\u1ee5c|\bubnd\b|b\u1ec7nh vi\u1ec7n)"
+)
+
+
+def _ten_ben_ban(ten: str) -> bool:
+    """Ten ben A/B co dau hieu rac: cau van, dung keyword giay to,
+    hoac ten to chuc ("Chi nhánh văn phòng...") lot vao."""
+    s = str(ten or "")
+    return _ten_la_cau(s) or bool(_TU_KHOA_TEN_RAC.search(s))
 
 
 def luat_ten_ban(payload: dict) -> list[dict]:
-    """R04: ten con rac can le (|, cum ngay sinh, cau van lot vao ten)."""
+    """R04: ten con rac can le (|, cum ngay sinh, cau van, ten to chuc)."""
     ban = [
         p.get("ho_ten", "")
         for p in _nguoi_1_ben(payload)
-        if "|" in str(p.get("ho_ten", "")) or "Sinh n" in str(p.get("ho_ten", ""))
+        if _ten_ben_ban(str(p.get("ho_ten", "")))
     ]
     ban += [
         p.get("ho_ten", "")
@@ -248,17 +292,29 @@ def luat_du_lieu_mo_ho(payload: dict) -> list[dict]:
             "noi_dung": f"giới tính để trống (không suy đoán): {', '.join(trong_gt[:3])}" + ("..." if len(trong_gt) > 3 else ""),
         })
     mo_ho = []
+    thua_rac = []
     for thua in payload.get("raw", {}).get("danh_sach_thua_dat", []):
         label = f"thửa {thua.get('so_thua_dat') or '?'}"
         if _dien_tich_mo_ho(thua.get("dien_tich")):
             mo_ho.append(label)
         elif any(_dien_tich_mo_ho(c.get("dien_tich")) for c in thua.get("chi_tiet_dien_tich", [])):
             mo_ho.append(label)
+        # So thua phai la ky hieu ngan ("143", "68/T1") — chuoi dai co
+        # ":" hoac khong co chu so la text van xuoi lot vao (loi tach).
+        so_thua = str(thua.get("so_thua_dat") or "").strip()
+        if so_thua and (":" in so_thua or len(so_thua) > 15 or not re.search(r"\d", so_thua)):
+            thua_rac.append(so_thua[:30])
     if mo_ho:
         findings.append({
             "id": "R13",
             "muc": MUC_CANH_BAO,
             "noi_dung": f"diện tích mơ hồ (giữ nguyên văn): {', '.join(mo_ho[:3])}" + ("..." if len(mo_ho) > 3 else ""),
+        })
+    if thua_rac:
+        findings.append({
+            "id": "R13",
+            "muc": MUC_LOI,
+            "noi_dung": f"số thửa đất nghi rác (text văn xuôi): {', '.join(thua_rac[:3])}" + ("..." if len(thua_rac) > 3 else ""),
         })
     return findings
 

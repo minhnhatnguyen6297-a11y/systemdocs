@@ -82,11 +82,14 @@ python tools/regex_lab.py approve --cluster <id>   # chi khi owner da duyet ket 
 
 1. Lỗi chỉ công nhận khi **mã trong code** báo:
    `upload_lab/kiem_tra_trich_xuat.py` (R00 bỏ qua, R01 sai loại,
-   R02 0 người, R03 thiếu trường người, R04 tên bẩn, R05 trùng tên,
+   R02 0 người (lỗi ở thừa kế, cảnh báo ở loại non-generic khác —
+   09/10/2026), R03 thiếu trường người, R04 tên bẩn (gồm tên đương
+   sự nuốt `CCCD số...`/tổ chức — 09/10/2026), R05 trùng tên,
    R06 thiếu người chết, R07 thiếu trường người chết, R08 mất khối
    tài sản, R09 không tách tài sản, R10 lệch diện tích tuyệt đối,
    R12 tài sản chưa hỗ trợ, R13 dữ liệu mơ hồ/thiếu căn cứ (giới tính
-   trống, diện tích chỉ có dấu chấm). Agent/LLM chỉ đọc mã, không tự
+   trống, diện tích chỉ có dấu chấm, `so_thua_dat` chứa văn/nhãn —
+   09/10/2026). Agent/LLM chỉ đọc mã, không tự
    đặt tên lỗi.
 2. Sửa ở engine (`upload_lab/extract_contract.py`), thêm test giữ
    hành vi, chạy toàn bộ suite.
