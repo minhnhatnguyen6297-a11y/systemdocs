@@ -567,6 +567,11 @@ def _detect_document_kind_and_title(text: str) -> tuple[str, str]:
         l.strip().startswith("trang sua loi ky thuat") for l in head_lines
     ):
         return DOC_KIND_GENERIC, title_line
+    # File .doc/IFilter chi trich duoc trang "LỜI CHỨNG" (than van ban
+    # khong co trong file) — route generic nhu trang phu, khong ap luat
+    # thua ke (R08 se bao oan vi khoi tai san khong ton tai trong text).
+    if any(l.strip().startswith("loi chung") for l in head_lines):
+        return DOC_KIND_GENERIC, title_line
     # Trang "ĐÍNH CHÍNH <văn bản gốc>" chi sua loi van ban da cong chung —
     # khong co khoi duong su/nguoi chet/tai san rieng (11/10/2026).
     if title_fold.startswith("dinh chinh") or any(
