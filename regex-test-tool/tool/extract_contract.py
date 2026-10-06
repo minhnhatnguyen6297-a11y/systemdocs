@@ -2879,17 +2879,26 @@ def _doi_ngay_excel(chunk: str) -> str:
         return ""
 
 
-def _extract_nguoi_chet(text: str) -> list[dict]:
+def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
     """Trich NGUOI DA CHET (nguoi de lai di san) theo shape person_row
     (decision-46 06/10/2026): trich luc khai tu la giay to cua nguoi chet,
     dien vao so_giay_to/ngay_cap/noi_cap/loai_giay_to; dia chi cuoi -> dia_chi.
     Dau hieu bat buoc: "chet ngay DD/MM/YYYY", hoac "chet nam YYYY"
     chi khi ngay sau co "trich luc/khai tu" (bang chung nguoi de lai
     di san; tranh vo nhan bo/me de chi ghi "chet nam...").
+    Rieng van ban TU CHOI nhan di san: "chet nam YYYY" duoc nhan them
+    khi phia truoc co tu quan he (bo/me de, vo/chong...) — cha/me cua
+    nguoi tu choi mac dinh la nguoi de lai di san (11/10/2026).
     """
     source = unicodedata.normalize("NFC", str(text or ""))
     found: list[dict] = []
     seen: set[str] = set()
+    is_refusal = doc_kind == DOC_KIND_INHERITANCE_REFUSAL
+    death_y_evidence = (
+        r""
+        if is_refusal
+        else r"(?=\s*(?:theo\s+)?tr\u00edch\s+l\u1ee5c|[^.\n]{0,60}?khai\s+t\u1eed)"
+    )
     death_re = re.compile(
         r"(?i)(?P<title>\u00d4ng|B\u00e0|Anh|Ch\u1ecb)\s*:?\s*(?P<name>[^;(\n.,]+?)"
         r"(?:\s+v\u00e0\s+(?P<title2>\u00f4ng|b\u00e0|anh|ch\u1ecb)\s*:?\s*(?P<name2>[^;(\n.,]+?))?"
@@ -2899,7 +2908,7 @@ def _extract_nguoi_chet(text: str) -> list[dict]:
         r"\s*[:\u2013-]?\s*(?P<birth>(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4}))?"
         r"\s*[;,]?\s*(?:\u0111\u00e3\s+)?ch\u1ebft\s+(?:ng\u00e0y\s*[:\u2013-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
         r"|n\u0103m\s*[:\u2013-]?\s*(?P<death_y>(?:19|20)\d{2})"
-        r"(?=\s*(?:theo\s+)?tr\u00edch\s+l\u1ee5c|[^.\n]{0,60}?khai\s+t\u1eed))"
+        + death_y_evidence + r")"
     )
     matches = list(death_re.finditer(source))
     for match_idx, match in enumerate(matches):
@@ -2937,6 +2946,17 @@ def _extract_nguoi_chet(text: str) -> list[dict]:
             match_title = match.group("title")
         title_fold = _fold_text(match_title)
         death_val = match.group("death") or match.group("death_y") or ""
+        # Tu choi: "chet nam" khong trich luc chi nhan khi truoc ten co
+        # tu quan he (bo/me/vo/chong...) — tranh nhan ten ghep thoang.
+        if is_refusal and match.group("death_y") and not match.group("death"):
+            tail_after = source[match.end():match.end() + 80]
+            if not re.search(r"(?i)tr\u00edch\s+l\u1ee5c|khai\s+t\u1eed", tail_after):
+                head_before = source[max(0, match.start() - 100):match.start()]
+                if not re.search(
+                    r"(?i)b\u1ed1|m\u1eb9|cha|ba|v\u1ee3|ch\u1ed3ng|anh|ch\u1ecb|em\b|con\b|ch\u00e1u",
+                    head_before,
+                ):
+                    continue
         # Nguoi thu 2 cung dong ("... và bà B; chết ngày ...") — tach thanh
         # ban ghi rieng, dung chung truong ngay/giay to cua cap.
         name2 = re.sub(r"\s+", " ", match.group("name2") or "").strip(" ;,.-")
@@ -3177,7 +3197,7 @@ def _build_payload_generic(filepath, text: str, scan_result: dict, *, extract_mo
             # decision-46 (06/10/2026): khong trich loi chung; so TK/bao hiem
             # tam dung — chi nhan dien va gan co "chua ho tro".
             "tai_san_chua_ho_tro": _phat_hien_tai_san_chua_ho_tro(text),
-            "nguoi_chet": _extract_nguoi_chet(text),
+            "nguoi_chet": _extract_nguoi_chet(text, doc_kind),
             "danh_sach_thua_dat": tach_danh_sach_thua_dat(tai_san),
             "file_goc": file_goc,
             "scan_contract_no": scan_result.get("contract_no", ""),

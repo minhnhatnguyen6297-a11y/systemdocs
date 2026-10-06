@@ -2146,6 +2146,22 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(parcels[1]["dien_tich"], "160")
         self.assertEqual(parcels[1]["muc_dich_su_dung"], "Ao nuôi cá")
 
+    def test_nguoi_chet_chet_nam_tu_choi_co_quan_he(self):
+        # VB từ chối: "Bố đẻ tôi là ông X; Sinh năm 1924, đã chết năm 2007"
+        # — chết năm KHÔNG trích lục vẫn nhận vì trước có "Bố đẻ"
+        # (11/10/2026). Các kind khác vẫn cần trích lục/khai tử.
+        from extract_contract import _extract_nguoi_chet
+        text = (
+            "Bố đẻ tôi là ông Dương Xuân Khả; Sinh năm 1924, đã chết năm 2007; "
+            "Nơi thường trú cuối cùng trước khi chết: Tổ 5, thị trấn Lâm, huyện Ý Yên.\n"
+            "Mẹ đẻ tôi là bà Trịnh Thị Đai; Sinh năm 1924, đã chết năm 2009."
+        )
+        chet = _extract_nguoi_chet(text, "inheritance_refusal")
+        self.assertEqual([p["ho_ten"] for p in chet], ["Dương Xuân Khả", "Trịnh Thị Đai"])
+        self.assertEqual(chet[0]["ngay_chet"], "2007")
+        # Van ban phan chia: cung cau do phai bi loai (can trich luc).
+        self.assertEqual(_extract_nguoi_chet(text, "inheritance_partition"), [])
+
 
 if __name__ == "__main__":
     unittest.main()
