@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import tempfile
 import unicodedata
 import unittest
@@ -7,7 +8,7 @@ from pathlib import Path
 
 from docx import Document
 
-from extract_contract import extract, find_tai_san, guess_loai_tai_san
+from extract_contract import extract, find_tai_san, guess_loai_tai_san, tach_danh_sach_so_tiet_kiem, tach_danh_sach_thua_dat
 
 
 def make_docx(path: Path, *paragraphs: str) -> Path:
@@ -488,6 +489,778 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertIn("122(12)", tai_san)
         self.assertNotIn("Bằng Văn bản này, tôi", tai_san)
         self.assertNotIn("LỜI CHỨNG", tai_san)
+
+    def test_extract_partition_counts_bare_name_spouse_and_tai_dia_chi_asset(self):
+        # Cau truc rut gon (ten gia) mo phong mau that: nguoi vo dung dau dong
+        # khong co "Ba", tai san dung cach noi "tai dia chi:", co bay nguoi
+        # chet / bo me de / nguoi lam chung phai loai khoi duong su.
+        docx_path = make_docx_with_blocks(
+            self.root / "phan_chia_ten_tran.docx",
+            [
+                ("p", "VĂN BẢN PHÂN CHIA DI SẢN"),
+                ("p", "Chúng tôi là những người được hưởng di sản theo pháp luật của ông Trần Văn X:"),
+                ("p", "Trần Thị Mơ - Vợ ông X Sinh ngày: 01/01/1940;"),
+                ("p", "Căn cước công dân số 036140000001 do Cục cảnh sát quản lý hành chính về trật tự xã hội cấp ngày 10/07/2021;"),
+                ("p", "Thường trú tại: Tổ 1, Thị trấn L, huyện Y, tỉnh N."),
+                ("p", "Bà Trần Thị A - Con đẻ ông X Sinh ngày: 01/05/1960"),
+                ("p", "Căn cước công dân số 036160000002 do Bộ Công an cấp ngày 19/11/2024;"),
+                ("p", "Thường trú tại: Tổ 1, Thị trấn L, huyện Y, tỉnh N."),
+                ("p", "Ông Trần Văn B - Con đẻ ông X Sinh ngày: 15/01/1962"),
+                ("p", "Căn cước công dân số 036062000003 do Bộ Công an cấp ngày 02/07/2021;"),
+                ("p", "Thường trú tại: Tổ 2, Thị trấn L, huyện Y, tỉnh N."),
+                ("p", "Chúng tôi tự nguyện lập Văn bản này với nội dung như sau:"),
+                ("p", "Người để lại di sản:"),
+                ("p", "Ông Trần Văn X; Sinh năm: 1935, chết ngày 11/06/2004 theo Trích lục khai tử số 12/TLKT-BS."),
+                ("p", "Về bố, mẹ đẻ của ông Trần Văn X:"),
+                ("p", "Bố đẻ ông Trần Văn X là ông Trần Văn Y; chết năm 1972. Mẹ đẻ ông Trần Văn X là bà Lê Thị Z, chết năm 1976."),
+                ("p", "Di sản."),
+                ("p", "Phần quyền sử dụng đất của ông Trần Văn X trong khối tài sản chung với vợ là bà Trần Thị Mơ tại địa chỉ: xã YX (nay là Tổ 1 Thị trấn L), huyện Y, tỉnh N theo Giấy chứng nhận quyền sử dụng đất số B 000001 do UBND huyện Y cấp ngày 15/03/1992, cụ thể như sau:"),
+                (
+                    "table",
+                    [
+                        ("Số tờ bản đồ", "Số thửa", "Diện tích (m2)", "Mục đích sử dụng"),
+                        ("3 (nay là tờ bản đồ số 34)", "324", "205", "Đất ở"),
+                    ],
+                ),
+                ("p", "Những người nhận thừa kế."),
+                ("p", "Những người thừa kế của ông Trần Văn X gồm vợ và các con."),
+                ("p", "Nội dung phân chia di sản."),
+                ("p", "Bằng Văn bản này, chúng tôi xin nhận kỷ phần thừa kế."),
+                ("p", "NHỮNG NGƯỜI HƯỞNG DI SẢN"),
+                ("p", "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN"),
+                ("p", "Hôm nay, ngày 11 tháng 06 năm 2025, tại trụ sở Văn phòng Công chứng VP, địa chỉ tại: Tổ 8, thị trấn L, huyện Y, tỉnh N,"),
+                ("p", "Tôi, Phạm Minh Chi, Công chứng viên Văn phòng Công chứng VP, tỉnh N."),
+                ("p", "CHỨNG NHẬN:"),
+                ("p", "Văn bản phân chia di sản này được lập bởi:"),
+                ("p", "Bà Phạm Thị C Sinh ngày: 19/05/1962;"),
+                ("p", "Căn cước công dân số 036162000004 do Cục cảnh sát quản lý hành chính về trật tự xã hội cấp ngày 25/08/2021;"),
+                ("p", "Thường trú tại: Thôn T, xã P, huyện Y, tỉnh N."),
+            ],
+        )
+
+        payload = extract(docx_path)
+        duong_su = payload["web_form"]["duong_su"]
+        tai_san = payload["web_form"]["tai_san"]
+
+        self.assertEqual(payload["raw"]["document_kind"], "inheritance_partition")
+        self.assertEqual(len(payload["raw"]["ben_a"]["nguoi"]), 3)
+        self.assertEqual(payload["raw"]["ben_a"]["nguoi"][0]["ho_ten"], "Trần Thị Mơ - Vợ ông X")
+        self.assertEqual(payload["raw"]["ben_a"]["nguoi"][0]["gioi_tinh"], "Bà")
+        self.assertEqual(payload["raw"]["ben_a"]["nguoi"][0]["ngay_sinh"], "01/01/1940")
+        self.assertEqual(payload["raw"]["ben_a"]["nguoi"][0]["cccd"], "036140000001")
+        self.assertIn("Con đẻ ông X", payload["raw"]["ben_a"]["nguoi"][1]["ho_ten"])
+        self.assertNotIn("chết", duong_su)
+        self.assertNotIn("Bố đẻ", duong_su)
+        self.assertNotIn("Người để lại di sản", duong_su)
+        self.assertNotIn("Phạm Thị C", duong_su)
+        self.assertIn("tại địa chỉ:", tai_san)
+        self.assertIn("324", tai_san)
+        self.assertNotIn("Những người nhận thừa kế", tai_san)
+        self.assertNotIn("Nội dung phân chia di sản", tai_san)
+        self.assertEqual(payload["web_form"]["loai_tai_san"], "Đất đai không có tài sản")
+
+    def test_real_inheritance_samples_partition_nine_heirs_and_refusal_one_refuser(self):
+        # Chay tren file that (khong copy PII vao repo); bo qua khi may chay
+        # khong co o dia D:/Minh.
+        partition_path = Path(
+            r"D:\Minh\1. Thừa kế Minh\Ý YÊN\26. Thừa kế ông Xương\9. Thoả thuận phân chia thừa kế.docx"
+        )
+        refusal_path = Path(
+            r"D:\Minh\1. Thừa kế Minh\VŨ DƯƠNG\12. Thừa kế Bùi Văn Tài\Từ chối bà Luyến.docx"
+        )
+        if not partition_path.exists() or not refusal_path.exists():
+            self.skipTest("Thieu file mau that tren D:/Minh")
+
+        partition = extract(partition_path)
+        partition_parties = partition["raw"]["ben_a"]["nguoi"]
+        partition_duong_su = partition["web_form"]["duong_su"]
+        partition_tai_san = partition["web_form"]["tai_san"]
+
+        self.assertEqual(partition["raw"]["document_kind"], "inheritance_partition")
+        self.assertEqual(len(partition_parties), 9)
+        self.assertTrue(all(person.get("ngay_sinh") and person.get("cccd") for person in partition_parties))
+        self.assertNotIn("chết", partition_duong_su)
+        self.assertNotIn("Bố đẻ", partition_duong_su)
+        self.assertNotIn("Người để lại di sản", partition_duong_su)
+        self.assertIn("Số tờ bản đồ", partition_tai_san)
+        self.assertNotIn("Những người nhận thừa kế", partition_tai_san)
+        self.assertNotIn("Nội dung phân chia di sản", partition_tai_san)
+
+        refusal = extract(refusal_path)
+        refusal_parties = refusal["raw"]["ben_a"]["nguoi"]
+        refusal_duong_su = refusal["web_form"]["duong_su"]
+        refusal_tai_san = refusal["web_form"]["tai_san"]
+
+        self.assertEqual(refusal["raw"]["document_kind"], "inheritance_refusal")
+        self.assertEqual(len(refusal_parties), 1)
+        self.assertTrue(refusal_parties[0].get("ngay_sinh") and refusal_parties[0].get("cccd"))
+        self.assertNotIn("chết", refusal_duong_su)
+        self.assertIn("Số tờ bản đồ", refusal_tai_san)
+        self.assertNotIn("Bằng Văn bản này, tôi", refusal_tai_san)
+
+    def test_extract_partition_birth_year_no_colon_and_noi_thuong_tru(self):
+        # Nguoi lon tuoi chi ghi "Sinh nam 1965" (khong co dau hai cham),
+        # dia chi ghi "Nơi thường trú:" — ten phai sach, nam sinh giu lai.
+        docx_path = make_docx(
+            self.root / "phan_chia_sinh_nam.docx",
+            "VĂN BẢN PHÂN CHIA DI SẢN THỪA KẾ",
+            "Chúng tôi là những người được hưởng di sản thừa kế theo pháp luật của ông Trần Ngọc X, gồm:",
+            "Bà Nguyễn Thị A – Sinh năm 1965;",
+            "CCCD số 036165000001, do Cục cảnh sát QLHC về TTXH cấp ngày 16/12/2021; Nơi thường trú: xã YP, huyện YY, tỉnh NĐ.",
+            "Ông Trần Văn B – Sinh năm 1986,",
+            "CCCD số 036086000002, do Cục cảnh sát QLHC về TTXH cấp ngày 10/05/2021;",
+            "Nơi thường trú: Thôn BQ, xã YP, huyện YY, tỉnh NĐ.",
+            "Chúng tôi tự nguyện lập Văn bản này với nội dung như sau:",
+            "Người để lại di sản:",
+            "Ông Trần Ngọc X - Sinh năm 1940; chết ngày 29/05/2022 theo Trích lục khai tử số 21/TLKT-BS.",
+            "Di sản thừa kế của ông Trần Ngọc X bao gồm:",
+            "Quyền sử dụng đất tại địa chỉ: xã YP, huyện YY, tỉnh NĐ theo Giấy chứng nhận quyền sử dụng đất: A 000002 do UBND huyện YY cấp ngày 15/04/1991.",
+            "- Thửa đất số: 145; Tờ bản đồ số: 9",
+            "- Diện tích: 240 m2",
+            "Những người nhận thừa kế.",
+            "Những người thừa kế của ông Trần Ngọc X gồm vợ và con.",
+            "Số công chứng 100.2025/DSTK/CCGD.",
+        )
+
+        payload = extract(docx_path)
+        persons = payload["raw"]["ben_a"]["nguoi"]
+        duong_su = payload["web_form"]["duong_su"]
+        tai_san = payload["web_form"]["tai_san"]
+
+        self.assertEqual(payload["raw"]["document_kind"], "inheritance_partition")
+        self.assertEqual(len(persons), 2)
+        self.assertEqual(persons[0]["ho_ten"], "Nguyễn Thị A")
+        self.assertEqual(persons[0]["ngay_sinh"], "1965")
+        self.assertTrue(persons[0]["chi_co_nam_sinh"])
+        self.assertEqual(persons[0]["cccd"], "036165000001")
+        self.assertIn("xã YP", persons[0]["dia_chi"])
+        self.assertEqual(persons[1]["ho_ten"], "Trần Văn B")
+        self.assertEqual(persons[1]["ngay_sinh"], "1986")
+        self.assertTrue(persons[1]["chi_co_nam_sinh"])
+        self.assertNotIn("chết", duong_su)
+        self.assertNotIn("Người để lại di sản", duong_su)
+        self.assertIn("145", tai_san)
+        self.assertNotIn("Những người nhận thừa kế", tai_san)
+
+    def test_extract_refusal_plural_anh_chi_refusers(self):
+        # Tu choi tap the: mo dau "Chúng tôi là:", nguoi dung "Chị/Anh" thay
+        # vi "Bà/Ông", ket "Nay, chúng tôi tự nguyện...".
+        docx_path = make_docx(
+            self.root / "tu_choi_anh_chi.docx",
+            "VĂN BẢN TỪ CHỐI NHẬN DI SẢN",
+            "Chúng tôi là:",
+            "1. Chị Phạm Thị Duyên Sinh ngày: 14/08/1997;",
+            "Căn cước công dân số 020197000001 do Cục cảnh sát quản lý hành chính về trật tự xã hội cấp ngày 09/01/2023;",
+            "Thường trú tại: Thôn XC, xã HT, huyện HL, tỉnh LS.",
+            "2. Anh Phạm Văn Thái Sinh ngày: 23/02/2005;",
+            "Căn cước công dân số 020205000002 do Cục cảnh sát quản lý hành chính về trật tự xã hội cấp ngày 18/08/2021;",
+            "Thường trú tại: Thôn XC, xã HT, huyện HL, tỉnh LS.",
+            "Nay, chúng tôi tự nguyện lập Văn bản này với nội dung như sau:",
+            "Mẹ đẻ chúng tôi là bà Nguyễn Thị M; Sinh năm: 1969; chết ngày 24/09/2010 theo Trích lục khai tử số 36/2025/TLKT.",
+            "Theo quy định của pháp luật, chúng tôi là người được hưởng thừa kế đối với di sản là:",
+            "Phần quyền sử dụng đất của bà Nguyễn Thị M tại địa chỉ: xã YP, huyện YY, tỉnh NĐ theo Giấy chứng nhận quyền sử dụng đất số: A 000003 do UBND huyện YY cấp ngày 15/04/1991.",
+            "- Thửa đất số: 169; Tờ bản đồ số: 4",
+            "Bằng Văn bản này, chúng tôi tự nguyện từ chối nhận kỷ phần thừa kế.",
+            "Tôi xin cam đoan việc từ chối này là hoàn toàn tự nguyện.",
+            "Những người từ chối nhận di sản",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+            "Số công chứng 978.2025/TCDS/CCGD.",
+        )
+
+        payload = extract(docx_path)
+        persons = payload["raw"]["ben_a"]["nguoi"]
+        duong_su = payload["web_form"]["duong_su"]
+        tai_san = payload["web_form"]["tai_san"]
+
+        self.assertEqual(payload["raw"]["document_kind"], "inheritance_refusal")
+        self.assertEqual(len(persons), 2)
+        self.assertEqual(persons[0]["ho_ten"], "Phạm Thị Duyên")
+        self.assertEqual(persons[0]["gioi_tinh"], "Bà")
+        self.assertEqual(persons[1]["ho_ten"], "Phạm Văn Thái")
+        self.assertEqual(persons[1]["gioi_tinh"], "Ông")
+        self.assertNotIn("chết", duong_su)
+        self.assertIn("169", tai_san)
+        self.assertNotIn("Bằng Văn bản này, chúng tôi", tai_san)
+
+    def test_extract_partition_toi_la_opener_typo_single_heir(self):
+        # Loi danh may pho bien: "Tôi là những người..." (thieu "Chúng").
+        docx_path = make_docx(
+            self.root / "phan_chia_toi_la.docx",
+            "VĂN BẢN PHÂN CHIA DI SẢN",
+            "Tôi là những người được hưởng di sản theo pháp luật của ông Trần Văn C:",
+            "Bà Nguyễn Thị Xuân Sinh ngày: 03/09/1946;",
+            "Căn cước công dân số 036146000001 do Cục cảnh sát quản lý hành chính về trật tự xã hội cấp ngày 16/03/2022;",
+            "Thường trú tại: Thôn PG, xã YP, tỉnh NB.",
+            "Tôi tự nguyện lập Văn bản này với nội dung như sau:",
+            "Người để lại di sản:",
+            "Ông Trần Văn C; Sinh năm: 1947, chết ngày 12/04/2005 theo Trích lục khai tử số 169/TLKT-BS.",
+            "Di sản của ông Trần Văn C là:",
+            "Phần quyền sử dụng đất của ông Trần Văn C tại địa chỉ: xã YP, huyện YY, tỉnh NĐ theo Giấy chứng nhận quyền sử dụng đất số A 000004 do UBND huyện YY cấp ngày 15/04/1991.",
+            "- Thửa đất số: 104; Tờ bản đồ số: 24",
+            "Những người nhận thừa kế.",
+            "Số công chứng 500.2025/DSTK/CCGD.",
+        )
+
+        payload = extract(docx_path)
+        persons = payload["raw"]["ben_a"]["nguoi"]
+
+        self.assertEqual(payload["raw"]["document_kind"], "inheritance_partition")
+        self.assertEqual(len(persons), 1)
+        self.assertEqual(persons[0]["ho_ten"], "Nguyễn Thị Xuân")
+        self.assertNotIn("chết", payload["web_form"]["duong_su"])
+        self.assertIn("104", payload["web_form"]["tai_san"])
+
+    def test_real_inheritance_the_vi_refusal_three_refusers(self):
+        # File that: tu choi huong the vi (khong copy PII vao repo).
+        refusal_path = Path(
+            r"D:\systemdocs\.agent\scratch\Dữ liệu mẫu word test\THỪA KẾ\1. Thừa kế Minh\Ý YÊN\30. Thừa kế ông Kính bà Tới\Từ chối di sản hưởng thế vị từ bà Tới.docx"
+        )
+        if not refusal_path.exists():
+            self.skipTest("Thieu file mau the vi tren may nay")
+
+        refusal = extract(refusal_path)
+        refusal_parties = refusal["raw"]["ben_a"]["nguoi"]
+
+        self.assertEqual(refusal["raw"]["document_kind"], "inheritance_refusal")
+        self.assertEqual(len(refusal_parties), 3)
+        self.assertTrue(all(person.get("ngay_sinh") and person.get("cccd") for person in refusal_parties))
+        self.assertNotIn("chết", refusal["web_form"]["duong_su"])
+        self.assertIn("Số tờ bản đồ", refusal["web_form"]["tai_san"])
+
+    def test_tach_danh_sach_thua_dat_table_nhieu_thua_va_trong_do(self):
+        # Bang 2 thua + dong "Trong do" tach nho dien tich.
+        docx_path = make_docx_with_blocks(
+            self.root / "tach_thua_table.docx",
+            [
+                ("p", "VĂN BẢN TỪ CHỐI NHẬN DI SẢN"),
+                ("p", "Tôi là: Bà Nguyễn Thị M Sinh ngày: 01/01/1960;"),
+                ("p", "Căn cước công dân số 036160000001 do Bộ Công an cấp ngày 01/01/2021;"),
+                ("p", "Thường trú tại: Thôn A, xã B."),
+                ("p", "Nay, tôi tự nguyện lập Văn bản này với nội dung như sau:"),
+                ("p", "Theo quy định của pháp luật, tôi là người được hưởng thừa kế đối với di sản là:"),
+                ("p", "Phần quyền sử dụng đất của ông Trần Văn X tại địa chỉ: xã B, huyện C theo Giấy chứng nhận quyền sử dụng đất số: A 000010 do UBND huyện C cấp ngày 01/01/1991. Cụ thể như sau:"),
+                (
+                    "table",
+                    [
+                        ("Số tờ bản đồ", "Số thửa", "Diện tích (m2)", "Mục đích sử dụng", "Thời gian sử dụng"),
+                        ("4", "169", "427", "", ""),
+                        ("Trong đó", "", "", "", ""),
+                        ("200", "Đất ở", "Lâu dài", "", ""),
+                        ("227", "Đất vườn", "Lâu dài", "", ""),
+                        ("5", "170", "100", "Đất ở", "Lâu dài"),
+                    ],
+                ),
+                ("p", "Bằng Văn bản này, tôi tự nguyện từ chối nhận kỷ phần thừa kế."),
+                ("p", "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN"),
+                ("p", "Số công chứng 1.2026/TCDS/CCGD."),
+            ],
+        )
+
+        payload = extract(docx_path)
+        thua_list = payload["raw"]["danh_sach_thua_dat"]
+
+        self.assertEqual(len(thua_list), 2)
+        self.assertEqual(thua_list[0]["so_thua_dat"], "169")
+        self.assertEqual(thua_list[0]["so_to_ban_do"], "4")
+        self.assertEqual(thua_list[0]["dien_tich"], "427")
+        self.assertEqual(thua_list[0]["so_gcn"], "A000010")
+        self.assertEqual(len(thua_list[0]["chi_tiet_dien_tich"]), 2)
+        self.assertEqual(thua_list[0]["chi_tiet_dien_tich"][0]["dien_tich"], "200")
+        self.assertEqual(thua_list[1]["so_thua_dat"], "170")
+        self.assertEqual(thua_list[1]["muc_dich_su_dung"], "Đất ở")
+
+    def test_tach_danh_sach_thua_dat_dang_gach_dau_dong(self):
+        # Tai san ghi dang "- Thua dat so: ..." thi 1 dong 1 thua.
+        docx_path = make_docx(
+            self.root / "tach_thua_bullet.docx",
+            "VĂN BẢN PHÂN CHIA DI SẢN",
+            "Chúng tôi là những người được hưởng di sản theo pháp luật của ông Trần Văn X:",
+            "Bà Nguyễn Thị A Sinh ngày: 01/01/1960;",
+            "Căn cước công dân số 036160000001 do Bộ Công an cấp ngày 01/01/2021;",
+            "Thường trú tại: Thôn A, xã B.",
+            "Chúng tôi tự nguyện lập Văn bản này với nội dung như sau:",
+            "Di sản của ông Trần Văn X để lại là:",
+            "Quyền sử dụng đất của ông Trần Văn X có địa chỉ tại: xã B, huyện C theo Giấy chứng nhận quyền sử dụng đất số B 000020 do UBND huyện C cấp ngày 02/02/1992.",
+            "- Thửa đất số: 65; Tờ bản đồ số: 21",
+            "- Diện tích: 190 m2",
+            "- Mục đích sử dụng: Đất ở",
+            "- Thời hạn sử dụng: Lâu dài.",
+            "Người thừa kế:",
+            "Những người thừa kế của ông Trần Văn X gồm vợ và con.",
+            "Số công chứng 2.2026/DSTK/CCGD.",
+        )
+
+        payload = extract(docx_path)
+        thua_list = payload["raw"]["danh_sach_thua_dat"]
+
+        self.assertEqual(len(thua_list), 1)
+        self.assertEqual(thua_list[0]["so_thua_dat"], "65")
+        self.assertEqual(thua_list[0]["so_to_ban_do"], "21")
+        self.assertEqual(thua_list[0]["dien_tich"], "190 m2")
+        self.assertEqual(thua_list[0]["muc_dich_su_dung"], "Đất ở")
+        self.assertEqual(thua_list[0]["thoi_han_su_dung"], "Lâu dài")
+        self.assertEqual(thua_list[0]["so_gcn"], "B000020")
+        self.assertIn("xã B", thua_list[0]["dia_chi"])
+
+    def test_loi_chung_nguoi_xuat_het_khong_doi_chieu(self):
+        # Core regex: co nguoi nao xuat nguoi do — ke ca khi Loi chung ghi
+        # nguoi khac voi dau van ban. Khong doi chieu, khong gop.
+        docx_path = make_docx(
+            self.root / "loi_chung_khac.docx",
+            "VĂN BẢN PHÂN CHIA DI SẢN",
+            "Chúng tôi là những người được hưởng di sản theo pháp luật của ông Trần Văn X:",
+            "Bà Nguyễn Thị A Sinh ngày: 01/01/1960;",
+            "Căn cước công dân số 036160000001 do Bộ Công an cấp ngày 01/01/2021;",
+            "Thường trú tại: Thôn A, xã B.",
+            "Chúng tôi tự nguyện lập Văn bản này với nội dung như sau:",
+            "Di sản của ông Trần Văn X để lại là:",
+            "Quyền sử dụng đất có địa chỉ tại: xã B, huyện C.",
+            "- Thửa đất số: 1",
+            "Nội dung phân chia di sản.",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+            "Văn bản phân chia di sản này được lập bởi:",
+            "Bà Phạm Thị Z Sinh ngày: 02/02/1970;",
+            "Căn cước công dân số 036170000002 do Bộ Công an cấp ngày 02/02/2022;",
+            "Thường trú tại: Thôn C, xã D.",
+            "Số công chứng 3.2026/DSTK/CCGD.",
+        )
+
+        payload = extract(docx_path)
+
+        self.assertEqual(len(payload["raw"]["ben_a"]["nguoi"]), 1)
+        self.assertEqual(payload["raw"]["ben_a"]["nguoi"][0]["ho_ten"], "Nguyễn Thị A")
+        loi_chung = payload["raw"]["loi_chung_nguoi"]
+        self.assertEqual(len(loi_chung), 1)
+        self.assertEqual(loi_chung[0]["ho_ten"], "Phạm Thị Z")
+
+    def test_so_cong_chung_khong_con_tieu_chi_du_thieu_cua_core(self):
+        # Khong co so cong chung van khong bi danh "thieu" neu nguoi +
+        # tai san du — core chi chiu trach nhiem nguoi + tai san.
+        docx_path = make_docx(
+            self.root / "khong_so_cc.docx",
+            "VĂN BẢN TỪ CHỐI NHẬN DI SẢN",
+            "Tôi là: Bà Nguyễn Thị M Sinh ngày: 01/01/1960;",
+            "Căn cước công dân số 036160000001 do Bộ Công an cấp ngày 01/01/2021;",
+            "Thường trú tại: Thôn A, xã B.",
+            "Nay, tôi tự nguyện lập Văn bản này với nội dung như sau:",
+            "Theo quy định của pháp luật, tôi là người được hưởng thừa kế đối với di sản là:",
+            "Phần quyền sử dụng đất tại địa chỉ: xã B, huyện C.",
+            "- Thửa đất số: 7",
+            "Bằng Văn bản này, tôi tự nguyện từ chối nhận kỷ phần thừa kế.",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+        )
+
+        payload = extract(docx_path)
+
+        self.assertEqual(payload["web_form"]["so_cong_chung"], "")
+        self.assertNotIn("so_cong_chung", payload["raw"]["missing_web_form_fields"])
+        self.assertFalse(payload["raw"]["extract_is_partial"])
+
+    def test_tach_thua_dong_nay_la_khong_nham_tieu_de_bang(self):
+        # Dong du lieu "04 Nay la to ban do 24 | 104 Nay la thua dat so 321
+        # | ..." chua chu "to ban do"/"thua" nhung khong phai tieu de.
+        block = "\n".join(
+            [
+                "Phần quyền sử dụng đất tại địa chỉ: xã B, huyện C theo Giấy chứng nhận quyền sử dụng đất số A 000030 do UBND huyện C cấp ngày 01/01/1991, cụ thể như sau:",
+                "Số tờ bản đồ | Số thửa | Diện tích (m2) | Mục đích sử dụng | Thời gian sử dụng | Phần ghi thêm",
+                "04 Nay là tờ bản đồ 24 | 104 Nay là thửa đất số 321 | 206 | Đất ở | Lâu dài",
+            ]
+        )
+
+        thua_list = tach_danh_sach_thua_dat(block)
+
+        self.assertEqual(len(thua_list), 1)
+        self.assertIn("321", thua_list[0]["so_thua_dat"])
+        self.assertEqual(thua_list[0]["dien_tich"], "206")
+        self.assertEqual(thua_list[0]["so_gcn"], "A000030")
+
+    def test_extract_nguoi_chet_hai_nguoi_co_ten_goi_khac(self):
+        # 2 nguoi de lai di san: ten, ten goi khac, nam sinh, ngay chet,
+        # trich luc, dia chi cuoi. Nguoi chet khong vao ben_a.
+        docx_path = make_docx(
+            self.root / "nguoi_chet_doi.docx",
+            "VĂN BẢN PHÂN CHIA DI SẢN",
+            "Người được hưởng di sản theo pháp luật của ông Trần Văn X và bà Lê Thị Y là:",
+            "Ông: Trần Văn Z Sinh ngày: 01/01/1955",
+            "Căn cước công dân số: 036055000001 do Bộ Công an cấp ngày 05/03/2023;",
+            "Thường trú tại: thôn A, xã B.",
+            "Tôi tự nguyện lập Văn bản này với nội dung như sau:",
+            "I. Người để lại di sản:",
+            "1. Ông Trần Văn X (tên gọi khác là Trần Văn W) - Sinh năm 1920, đã chết ngày 12/06/2010 theo Trích lục khai tử (bản sao) số 866/2025/TLKT-BS do UBND xã B ký ngày: 27/11/2025; Nơi thường trú cuối cùng trước khi chết: thôn A, xã B.",
+            "2. Bà Lê Thị Y - Sinh năm 1923, đã chết ngày 18/09/2010 theo Trích lục khai tử (bản sao) số 867/2025/TLKT-BS do UBND xã B ký ngày: 27/11/2025; Nơi thường trú cuối cùng trước khi chết: thôn A, xã B.",
+            "II. Di sản:",
+            "Di sản của ông Trần Văn X và bà Lê Thị Y là:",
+            "Phần quyền sử dụng đất tại địa chỉ: xã B, huyện C theo Giấy chứng nhận quyền sử dụng đất số: A 000040 do UBND huyện C cấp ngày 20/02/1992, cụ thể:",
+            "- Thửa đất số: 106; Tờ bản đồ số: 2",
+            "- Diện tích: 450 m2",
+            "III. Người thừa kế:",
+            "Những người thừa kế gồm ông Trần Văn Z.",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+            "Số công chứng 212.2026/CCGD.",
+        )
+
+        payload = extract(docx_path)
+
+        self.assertEqual(payload["raw"]["document_kind"], "inheritance_partition")
+        self.assertEqual([p["ho_ten"] for p in payload["raw"]["ben_a"]["nguoi"]], ["Trần Văn Z"])
+        chet = payload["raw"]["nguoi_chet"]
+        self.assertEqual(len(chet), 2)
+        self.assertEqual(chet[0]["ho_ten"], "Trần Văn X")
+        self.assertEqual(chet[0]["ten_goi_khac"], "Trần Văn W")
+        self.assertEqual(chet[0]["ngay_sinh"], "1920")
+        self.assertTrue(chet[0]["chi_co_nam_sinh"])
+        self.assertEqual(chet[0]["ngay_chet"], "12/06/2010")
+        self.assertEqual(chet[0]["so_trich_luc"], "866/2025/TLKT-BS")
+        self.assertIn("thôn A", chet[0]["dia_chi_cuoi"])
+        self.assertEqual(chet[1]["ho_ten"], "Lê Thị Y")
+        self.assertEqual(chet[1]["ngay_chet"], "18/09/2010")
+
+    def test_tach_thua_cell_stream_bang_doc_don_dong(self):
+        # IFilter giu o bang bang TAB (doi thanh "|"): tieu de + du lieu
+        # don chung 1 dong, "Trong do" tach chi tiet, "2.2." dung lai.
+        block = "\n".join(
+            [
+                "Phần quyền sử dụng đất tại địa chỉ: xã B, huyện C theo Giấy chứng nhận quyền sử dụng đất số: A 000050 do UBND huyện C cấp ngày 20/02/1992, cụ thể:",
+                "Số tờ bản đồ | Số thửa | Diện tích",
+                "( m2) | Mục đích sử dụng | Thời hạn sử dụng | Phần ghi thêm |  | 2 (nay là tờ bản đồ số 107) | 106 | 450 | Trong đó | 200 | Đất ở | Lâu dài | 250 | NTS | 15/10/2063 | Đất HTX giao lại |  | 2.2. | Phần quyền khác.",
+            ]
+        )
+
+        thua_list = tach_danh_sach_thua_dat(block)
+
+        self.assertEqual(len(thua_list), 1)
+        self.assertEqual(thua_list[0]["so_thua_dat"], "106")
+        self.assertIn("107", thua_list[0]["so_to_ban_do"])
+        self.assertEqual(thua_list[0]["dien_tich"], "450")
+        self.assertEqual(thua_list[0]["loai_gcn"], "quyền sử dụng đất")
+        details = thua_list[0]["chi_tiet_dien_tich"]
+        self.assertEqual(len(details), 2)
+        self.assertEqual(details[0]["dien_tich"], "200")
+        self.assertEqual(details[1]["muc_dich_su_dung"], "NTS")
+        self.assertEqual(details[1]["thoi_han_su_dung"], "15/10/2063")
+        self.assertIn("HTX", details[1].get("phan_ghi_them", ""))
+
+    def test_tach_thua_nhan_so_thua_va_trong_do_chi_tiet(self):
+        # Nhan "So thua:/So to ban do" (nguoc thu tu), "Trong do:" gom
+        # chi tiet vao thua dang mo thay vi ghi de dien tich thua.
+        block = "\n".join(
+            [
+                "Quyền sử dụng đất mang tên Hộ ông Trần Văn X được quyền sử dụng 450 m2 đất theo Giấy chứng nhận quyền sử dụng đất số: Y000001 vào sổ giấy chứng nhận quyền sử dụng đất số 376 QSDD/số 887QĐ-UB huyện ngày 09/06/2003 do UBND huyện C ký ngày 09/06/2003, cụ thể như sau:",
+                "Thửa đất:",
+                "Số thửa: 204          Số tờ bản đồ: 17",
+                "Diện tích: 285.0 m2 (bằng chữ: Hai trăm tám mươi lăm mét vuông)",
+                "Trong đó:",
+                "Diện tích: 130.0 m2",
+                "Mục đích sử dụng: Đất vườn",
+                "Thời hạn sử dụng: 2043",
+                "Diện tích: 155.0 m2",
+                "Mục đích sử dụng: Đất ở",
+                "Thời hạn sử dụng: Lâu dài",
+                "Số thửa: 205          Số tờ bản đồ: 17",
+                "Diện tích: 165.0 m2",
+            ]
+        )
+
+        thua_list = tach_danh_sach_thua_dat(block)
+
+        self.assertEqual(len(thua_list), 2)
+        self.assertEqual(thua_list[0]["so_thua_dat"], "204")
+        self.assertEqual(thua_list[0]["so_to_ban_do"], "17")
+        self.assertEqual(thua_list[0]["dien_tich"], "285.0 m2")
+        self.assertEqual(thua_list[0]["so_gcn"], "Y000001")
+        self.assertEqual(thua_list[0]["so_vao_so"], "376 QSDD/số 887QĐ-UB")
+        self.assertEqual(thua_list[0]["ngay_cap_gcn"], "09/06/2003")
+        details = thua_list[0]["chi_tiet_dien_tich"]
+        self.assertEqual(len(details), 2)
+        self.assertEqual(details[0]["dien_tich"], "130.0 m2")
+        self.assertEqual(details[1]["muc_dich_su_dung"], "Đất ở")
+        self.assertEqual(thua_list[1]["so_thua_dat"], "205")
+        self.assertEqual(thua_list[1]["dien_tich"], "165.0 m2")
+
+    def test_land_rows_theo_shape_database(self):
+        # Moi loai dat trong 1 thua tach rieng: ONT/NTS/CLN...
+        thua_list = tach_danh_sach_thua_dat(
+            "\n".join(
+                [
+                    "Quyền sử dụng đất có địa chỉ tại: xã B theo Giấy chứng nhận quyền sử dụng đất số A 000001.",
+                    "Số tờ bản đồ | Số thửa | Diện tích (m2) | Mục đích sử dụng | Thời gian sử dụng",
+                    "1 | 10 | 200",
+                    "Trong đó",
+                    "100 | ONT | Lâu dài",
+                    "50 | NTS | Lâu dài",
+                    "50 | CLN | Lâu dài",
+                ]
+            )
+        )
+
+        self.assertEqual(len(thua_list), 1)
+        land_rows = thua_list[0]["land_rows"]
+        self.assertEqual(len(land_rows), 3)
+        self.assertEqual(land_rows[0], {"loai_dat": "ONT", "dien_tich": 100.0, "thoi_han": "Lâu dài"})
+        self.assertEqual(land_rows[1]["loai_dat"], "NTS")
+        self.assertEqual(land_rows[2]["dien_tich"], 50.0)
+
+    def test_tach_so_tiet_kiem_va_tai_khoan(self):
+        block = "\n".join(
+            [
+                "Di sản thừa kế là phần sở hữu số tiền gốc và lãi trong khối tài sản chung:",
+                "Sổ tiết kiệm có kỳ hạn do ngân hàng NN chi nhánh huyện C số hiệu: AC 000000001, Phát hành ngày 05/01/2023 cho ông: Trần Văn X.",
+                "Sổ tiết kiệm có kỳ hạn do ngân hàng NN chi nhánh huyện C số hiệu: AD 000000002, Phát hành ngày 21/06/2023 cho ông: Trần Văn X.",
+                "Xác nhận số dư tài khoản do ngân hàng NN chi nhánh huyện C xác nhận số tài khoản: 3214600000001 mang tên Trần Văn X.",
+            ]
+        )
+
+        entries = tach_danh_sach_so_tiet_kiem(block)
+
+        self.assertEqual(len(entries), 3)
+        self.assertEqual(entries[0]["so_hieu"], "AC 000000001")
+        self.assertIn("ngân hàng NN", entries[0]["ngan_hang"])
+        self.assertEqual(entries[0]["chi_nhanh"], "huyện C")
+        self.assertEqual(entries[0]["ngay_phat_hanh"], "05/01/2023")
+        self.assertEqual(entries[0]["chu_so"], "Trần Văn X")
+        self.assertEqual(entries[1]["so_hieu"], "AD 000000002")
+        self.assertEqual(entries[2]["loai_so"], "tài khoản")
+        self.assertEqual(entries[2]["so_hieu"], "3214600000001")
+        self.assertEqual(entries[2]["chu_so"], "Trần Văn X")
+
+    def test_khai_nhan_toi_la_mot_nguoi_va_tai_san_tiet_kiem(self):
+        docx_path = make_docx(
+            self.root / "khai_nhan_tiet_kiem.docx",
+            "VĂN BẢN KHAI NHẬN DI SẢN THỪA KẾ",
+            "Người được hưởng di sản thừa kế của ông Trần Văn X và bà Lê Thị Y:",
+            "Tôi là: Bà Trần Thị T Sinh năm 1990;",
+            "Căn cước công dân số 036190000001 Cục cảnh sát QLHC về TTXH cấp ngày 10/08/2021;",
+            "Nơi thường trú: xóm 06, xã B.",
+            "Tôi tự nguyện lập Văn bản này với nội dung như sau:",
+            "I. Người để lại di sản:",
+            "Ông Trần Văn X - sinh năm 1954, đã chết ngày 29/03/2025 theo Trích lục khai tử (bản sao) số 120/TLKT-BS do UBND xã B cấp ngày 31/03/2025.",
+            "Bà Lê Thị Y - sinh năm 1956, đã chết ngày 22/12/2024 theo Trích lục khai tử số 66/2024/TLKT do UBND xã B cấp ngày 23/12/2024.",
+            "II. Di sản thừa kế.",
+            "Di sản thừa kế của ông Trần Văn X và bà Lê Thị Y là:",
+            "Toàn bộ gốc và lãi theo Sổ tiết kiệm có kỳ hạn do ngân hàng NN - chi nhánh C số hiệu: AC 000000003, phát hành ngày 02/05/2024 cho ông: Trần Văn X.",
+            "III. Những người nhận thừa kế.",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+            "Số công chứng 100.2026/CCGD.",
+        )
+
+        payload = extract(docx_path)
+
+        self.assertEqual(payload["raw"]["document_kind"], "inheritance_declaration")
+        persons = payload["raw"]["ben_a"]["nguoi"]
+        self.assertEqual(len(persons), 1)
+        self.assertEqual(persons[0]["ho_ten"], "Trần Thị T")
+        self.assertIn("xóm 06", persons[0]["dia_chi"])
+        self.assertEqual(len(payload["raw"]["nguoi_chet"]), 2)
+        self.assertEqual(payload["web_form"]["loai_tai_san"], "Sổ tiết kiệm")
+        stk = payload["raw"]["danh_sach_so_tiet_kiem"]
+        self.assertEqual(len(stk), 1)
+        self.assertEqual(stk[0]["so_hieu"], "AC 000000003")
+        self.assertEqual(stk[0]["chu_so"], "Trần Văn X")
+
+    def test_dia_chi_chung_dong_voi_ten_nguoi(self):
+        # Dia chi nam chung dong voi ten ("...; Nơi thường trú: X").
+        docx_path = make_docx(
+            self.root / "dia_chi_chung_dong.docx",
+            "VĂN BẢN TỪ CHỐI NHẬN DI SẢN",
+            "Tôi là: Bà Nguyễn Thị M Sinh ngày: 01/01/1960;",
+            "Căn cước công dân số 036160000001 do Bộ Công an cấp ngày 01/01/2021; Nơi thường trú: Thôn A, xã B.",
+            "Nay, tôi tự nguyện lập Văn bản này với nội dung như sau:",
+            "Theo quy định của pháp luật, tôi là người được hưởng thừa kế đối với di sản là:",
+            "Phần quyền sử dụng đất tại địa chỉ: xã B, huyện C.",
+            "- Thửa đất số: 7",
+            "Bằng Văn bản này, tôi tự nguyện từ chối nhận kỷ phần thừa kế.",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+        )
+
+        payload = extract(docx_path)
+        persons = payload["raw"]["ben_a"]["nguoi"]
+
+        self.assertEqual(len(persons), 1)
+        self.assertIn("Thôn A", persons[0]["dia_chi"])
+
+    def test_nhan_ngay_sinh_dau_gach_ngang(self):
+        # Bien the dau phan cach sau nhan: ":" , "-" , khong dau.
+        docx_path = make_docx(
+            self.root / "ngay_sinh_gach.docx",
+            "VĂN BẢN PHÂN CHIA DI SẢN",
+            "Chúng tôi là những người được hưởng di sản theo pháp luật của ông Trần Văn X:",
+            "Bà Nguyễn Thị A - Ngày sinh - 01/05/1960;",
+            "Căn cước công dân số 036160000001 do Bộ Công an cấp ngày 01/01/2021;",
+            "Thường trú tại: Thôn A, xã B.",
+            "Ông Trần Văn B - Sinh năm - 1962;",
+            "Căn cước công dân số 036062000002 do Bộ Công an cấp ngày 02/02/2022;",
+            "Thường trú tại: Thôn A, xã B.",
+            "Chúng tôi tự nguyện lập Văn bản này với nội dung như sau:",
+            "Người để lại di sản:",
+            "Ông Trần Văn X - Sinh năm - 1940; chết ngày - 11/06/2004 theo Trích lục khai tử số 1/TLKT.",
+            "Di sản của ông Trần Văn X để lại là:",
+            "Quyền sử dụng đất có địa chỉ tại: xã B, huyện C.",
+            "- Thửa đất số: 9",
+            "Nội dung phân chia di sản.",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+            "Số công chứng 9.2026/CCGD.",
+        )
+
+        payload = extract(docx_path)
+        persons = payload["raw"]["ben_a"]["nguoi"]
+
+        self.assertEqual(len(persons), 2)
+        self.assertEqual(persons[0]["ho_ten"], "Nguyễn Thị A")
+        self.assertEqual(persons[0]["ngay_sinh"], "01/05/1960")
+        self.assertFalse(persons[0]["chi_co_nam_sinh"])
+        self.assertEqual(persons[1]["ngay_sinh"], "1962")
+        self.assertTrue(persons[1]["chi_co_nam_sinh"])
+        chet = payload["raw"]["nguoi_chet"]
+        self.assertEqual(len(chet), 1)
+        self.assertEqual(chet[0]["ho_ten"], "Trần Văn X")
+        self.assertEqual(chet[0]["ngay_chet"], "11/06/2004")
+
+    def test_xa_hang_thua_ke_ong_ba_title_va_noi_cu_tru(self):
+        # Mau ky o xa: mo dau "Hang thua ke ...", ten "Ông/bà:",
+        # vai tro dong rieng "La con de ...", dia chi "Nơi cư trú:".
+        docx_path = make_docx(
+            self.root / "xa_hang_thua_ke.docx",
+            "VĂN BẢN THỎA THUẬN",
+            "PHÂN CHIA DI SẢN THỪA KẾ",
+            "Hôm nay, tại UBND xã C. Hàng thừa kế của ông Trần Văn X gồm những người có tên sau đây:",
+            "Ông/bà: Phạm Thị A; Sinh ngày: 02/01/1965;",
+            "Căn cước số: 036065000001 do Bộ Công an cấp ngày 18/12/2024;",
+            "Cư trú tại: xã C, tỉnh N.",
+            "Là con đẻ ông Trần Văn X.",
+            "Ông/bà: Trần Văn B; Sinh ngày: 01/01/1967;",
+            "Căn cước công dân số: 036067000002 do Bộ Công an cấp ngày 09/08/2021;",
+            "Thường trú tại: xã C, tỉnh N.",
+            "Là con đẻ ông Trần Văn X.",
+            "Ông Trần Văn X; Sinh năm: 1932; chết ngày 24/11/2013 theo Giấy chứng tử số 53 do UBND xã C ký ngày 29/11/2013.",
+            "Khi còn sống, ông Trần Văn X có vợ là bà Lê Thị Y.",
+            "Chúng tôi là những người thừa kế theo pháp luật, thỏa thuận về việc phân chia di sản như sau:",
+            "Di sản của ông Trần Văn X để lại:",
+            "Ông Trần Văn X có sử dụng quyền sử dụng đất có địa chỉ tại: xã C theo Giấy chứng nhận quyền sử dụng đất số: P 000001 do UBND huyện C cấp ngày 28/11/1999, cụ thể như sau:",
+            "Số tờ bản đồ | Số thửa | Diện tích (m2)",
+            "13 | 169 | 684",
+            "Thống nhất phân chia quyền sử dụng đất:",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+            "Số công chứng 100.2026/CCGD.",
+        )
+
+        payload = extract(docx_path)
+        persons = payload["raw"]["ben_a"]["nguoi"]
+
+        self.assertEqual(payload["raw"]["document_kind"], "inheritance_partition")
+        self.assertEqual(len(persons), 2)
+        self.assertEqual(persons[0]["gioi_tinh"], "Bà")
+        self.assertIn("Phạm Thị A", persons[0]["ho_ten"])
+        self.assertIn("Con đẻ", persons[0]["ho_ten"])
+        self.assertEqual(persons[1]["gioi_tinh"], "Ông")
+        self.assertIn("xã C", persons[0]["dia_chi"])
+        chet = payload["raw"]["nguoi_chet"]
+        self.assertEqual(len(chet), 1)
+        self.assertEqual(chet[0]["ho_ten"], "Trần Văn X")
+        thua = payload["raw"]["danh_sach_thua_dat"]
+        self.assertEqual(len(thua), 1)
+        self.assertEqual(thua[0]["so_thua_dat"], "169")
+
+    def test_ten_dung_truoc_co_vo_la(self):
+        # Dong pha he "Ông X co vo la ba Y (Sinh ngay...)" khong duoc
+        # vo ten X + ngay sinh/ID cua Y.
+        docx_path = make_docx(
+            self.root / "co_vo_la.docx",
+            "VĂN BẢN PHÂN CHIA DI SẢN",
+            "Hàng thừa kế của ông Trần Văn X gồm những người có tên sau đây:",
+            "Ông Trần Văn Z Sinh ngày: 13/02/2008",
+            "Căn cước công dân số 036208000001 do Bộ Công an cấp ngày 01/06/2022;",
+            "Thường trú tại: xã C.",
+            "Là con đẻ ông Trần Văn X.",
+            "Ông Trần Văn X; Sinh năm: 1967, chết ngày 06/07/2012 theo Trích lục khai tử số 1573/TLKT-BS.",
+            "Ông Trần Văn X có vợ là bà Vũ Thị Y (Sinh ngày: 01/01/1968; Căn cước công dân số 036168000001 do Bộ Công an cấp ngày 13/08/2021; Thường trú tại: Thôn T).",
+            "Chúng tôi là những người thừa kế theo pháp luật, thỏa thuận về việc phân chia di sản như sau:",
+            "Di sản của ông Trần Văn X để lại:",
+            "Ông Trần Văn X có sử dụng quyền sử dụng đất có địa chỉ tại: xã C theo Giấy chứng nhận quyền sử dụng đất số A 000002, do UBND huyện C cấp ngày 20/02/1992.",
+            "- Thửa đất số: 130",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+            "Số công chứng 101.2026/CCGD.",
+        )
+
+        payload = extract(docx_path)
+        persons = payload["raw"]["ben_a"]["nguoi"]
+
+        self.assertEqual(len(persons), 1)
+        self.assertIn("Trần Văn Z", persons[0]["ho_ten"])
+        self.assertNotIn("chết", payload["web_form"]["duong_su"])
+
+    def test_cln_toi_ten_la_tai_san_viet_lien_va_ngay_excel(self):
+        # "Toi ten la:" khong Ông/Bà; tai san viet lien 1 cau
+        # ("thua dat so 153, ... CLN 70m2 ..."); "cap ngay 44546" la
+        # so Excel -> doi ra ngay. Khoi nguoi dung truoc dong chet.
+        docx_path = make_docx(
+            self.root / "cln_lien.docx",
+            "VĂN BẢN THỎA THUẬN",
+            "PHÂN CHIA DI SẢN THỪA KẾ",
+            "Hôm nay, tại UBND xã C.",
+            "Tôi tên là: Trần Gia H; Sinh ngày: 12/08/1963;",
+            "Căn cước công dân số: 036063000001 do Bộ Công an cấp ngày 44546;",
+            "Thường trú tại: xã C.",
+            "Tôi là người thừa kế duy nhất của ông Trần Gia X; Sinh năm: 1942; chết ngày 03/07/2019 theo Trích lục khai tử số 598/TLKT-BS.",
+            "Trước khi chết ông Trần Gia X không để lại di chúc.",
+            "Chúng tôi là những người thừa kế theo pháp luật, thỏa thuận về việc phân chia di sản như sau:",
+            "Di sản của ông Trần Gia X để lại:",
+            "Hộ ông Trần Gia X có sử dụng thửa đất số 153, tờ bản đồ số 12, diện tích 70 m2, trong đó: CLN 70m2 theo Bản đồ địa chính xã C lập năm 1991, có địa chỉ tại: xã C theo Giấy chứng nhận quyền sử dụng đất số: S 000001 do UBND huyện C cấp ngày 18/03/2003.",
+            "Thống nhất phân chia quyền sử dụng đất:",
+            "LỜI CHỨNG CỦA UBND XÃ C",
+        )
+
+        payload = extract(docx_path)
+        persons = payload["raw"]["ben_a"]["nguoi"]
+
+        self.assertEqual(len(persons), 1)
+        self.assertEqual(persons[0]["ho_ten"], "Trần Gia H")
+        self.assertEqual(persons[0]["gioi_tinh"], "Ông")
+        self.assertEqual(persons[0]["ngay_cap_cccd"], "16/12/2021")
+        thua = payload["raw"]["danh_sach_thua_dat"]
+        self.assertEqual(len(thua), 1)
+        self.assertEqual(thua[0]["so_thua_dat"], "153")
+        self.assertEqual(thua[0]["so_to_ban_do"], "12")
+        self.assertEqual(thua[0]["dien_tich"], "70 m2")
+        self.assertEqual(thua[0]["dia_chi"], "xã C")
+        details = thua[0]["chi_tiet_dien_tich"]
+        self.assertEqual(len(details), 1)
+        self.assertEqual(details[0]["muc_dich_su_dung"], "CLN")
+
+    def test_bao_hiem_gom_dong_ben_mua_doi_tuong(self):
+        # Quyen loi bao hiem: so HD + ben (cat hau to ben mua) + dong
+        # "Ben mua / Doi tuong" gom vao 1 quyen loi.
+        docx_path = make_docx(
+            self.root / "phan_chia_bao_hiem.docx",
+            "VĂN BẢN PHÂN CHIA DI SẢN",
+            "Tôi là người được hưởng di sản theo pháp luật của bà Tạ Thị H:",
+            "Ông Trương Văn H Sinh ngày: 18/05/1984",
+            "Căn cước công dân số: 036084000001 do Bộ Công an cấp ngày 19/05/2024",
+            "Thường trú tại: Tổ 1, phường A.",
+            "Tôi tự nguyện lập Văn bản này với nội dung như sau:",
+            "Người để lại di sản:",
+            "Bà Tạ Thị H - sinh năm: 1960, đã chết ngày 02/01/2026 theo Trích lục khai tử (bản sao) số 127/2026/TLKT-BS do UBND xã B ký ngày 19/01/2026.",
+            "Di sản:",
+            "Di sản của bà Tạ Thị H để lại là: Quyền lợi bảo hiểm phát sinh từ Hợp đồng bảo hiểm sức khoẻ nhóm số 25CN.SK.01.03B02700002 ký giữa Tổng công ty BH Sài Gòn và Công ty TNHH Phú Thái ngày 15/08/2025. Cụ thể:",
+            "Bên mua bảo hiểm: Công ty TNHH Phú Thái",
+            "Đối tượng bảo hiểm, người được bảo hiểm: bà Tạ Thị H (mẹ đẻ ông Trương Văn H).",
+            "Người thừa kế:",
+            "Những người thừa kế của bà Tạ Thị H gồm ông Trương Văn H.",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+            "Số công chứng 488.2026/CCGD.",
+        )
+
+        payload = extract(docx_path)
+
+        self.assertEqual(payload["raw"]["document_kind"], "inheritance_partition")
+        self.assertEqual([p["ho_ten"] for p in payload["raw"]["ben_a"]["nguoi"]], ["Trương Văn H"])
+        self.assertEqual([p["ho_ten"] for p in payload["raw"]["nguoi_chet"]], ["Tạ Thị H"])
+        bh = payload["raw"]["danh_sach_bao_hiem"]
+        self.assertEqual(len(bh), 1)
+        self.assertEqual(bh[0]["so_hop_dong"], "25CN.SK.01.03B02700002")
+        self.assertEqual(bh[0]["ben_bao_hiem"], "Tổng công ty BH Sài Gòn")
+        self.assertEqual(bh[0]["ben_mua"], "Công ty TNHH Phú Thái")
+        self.assertIn("Tạ Thị H", bh[0]["doi_tuong"])
+        self.assertEqual(bh[0]["ngay_ky"], "15/08/2025")
 
 
 if __name__ == "__main__":

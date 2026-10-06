@@ -1,0 +1,1390 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Phim chụp phiên brainstorm · Chuẩn hóa tool regex thành share core · 06/10/2026</title>
+<style>
+:root{
+  color-scheme: dark;
+  --bg:#070d14; --bg2:#0b1520; --panel:#0e1925; --panel2:#132232; --line:#20344a; --line2:#2b4560;
+  --ink:#e8eff6; --muted:#9fb1c3; --faint:#687e94;
+  --scan:#5be7ff; --scan-rgb:91,231,255;
+  --hl:#ffd84a; --hl-rgb:255,216,74; --hl-ink:#1b1500; --mark-a:.2;
+  --fa:#ff6b6b; --fa-rgb:255,107,107;
+  --bc:#b39dff; --bc-rgb:179,157,255;
+  --ma:#3fe0c5; --ma-rgb:63,224,197;
+  --ar:#ffae5c; --ar-rgb:255,174,92;
+  --gold:#ffcf5a; --gold-rgb:255,207,90; --gold-hi:#fff4c8; --gold-lo:#f0b43a;
+  --seal:#ff7a93; --seal-rgb:255,122,147;
+  --on-acc:#071018;
+  --film:#0a1f2e; --film-line:rgba(120,205,240,.30); --film-ink:#c7efff;
+  --shadow:0 14px 40px -14px rgba(0,0,0,.65);
+  --sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --display:"Segoe UI Variable Display","Segoe UI",system-ui,-apple-system,Arial,sans-serif;
+  --serif:"Times New Roman",Times,"Noto Serif",Georgia,serif;
+  --mono:"Cascadia Mono","Cascadia Code",Consolas,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: light){
+  :root{
+    color-scheme: light;
+    --bg:#f3efe4; --bg2:#ebe5d5; --panel:#fffdf8; --panel2:#f6f1e5; --line:#ddd4c0; --line2:#c9bda3;
+    --ink:#17202a; --muted:#4d5965; --faint:#857f73;
+    --scan:#0a7f9f; --scan-rgb:10,127,159;
+    --hl:#ffe45a; --hl-rgb:255,228,90; --hl-ink:#1b1500; --mark-a:.75;
+    --fa:#c2362c; --fa-rgb:194,54,44;
+    --bc:#6844c2; --bc-rgb:104,68,194;
+    --ma:#0c8673; --ma-rgb:12,134,115;
+    --ar:#bd5f0b; --ar-rgb:189,95,11;
+    --gold:#9c6a06; --gold-rgb:156,106,6; --gold-hi:#d39a1a; --gold-lo:#6b4703;
+    --seal:#b0243c; --seal-rgb:176,36,60;
+    --on-acc:#ffffff;
+    --film:#ffffff; --film-line:rgba(40,60,85,.16); --film-ink:#1d2731;
+    --shadow:0 14px 34px -16px rgba(70,50,20,.30);
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(1100px 560px at 88% -8%,rgba(var(--scan-rgb),.11),transparent 62%),
+    radial-gradient(900px 520px at -12% 34%,rgba(var(--bc-rgb),.07),transparent 60%),
+    linear-gradient(rgba(var(--scan-rgb),.04) 1px,transparent 1px) 0 0/32px 32px,
+    linear-gradient(90deg,rgba(var(--scan-rgb),.04) 1px,transparent 1px) 0 0/32px 32px;}
+a{color:inherit}
+code{font:.86em var(--mono);background:rgba(var(--scan-rgb),.09);border:1px solid rgba(var(--scan-rgb),.18);border-radius:5px;padding:0 .3em;word-break:break-word}
+.wrap{max-width:1240px;margin:0 auto;padding:0 28px}
+section[hidden]{display:none!important}
+
+/* ---------- topbar ---------- */
+.topbar{position:sticky;top:0;z-index:50;background:var(--bg);background:color-mix(in srgb,var(--bg) 84%,transparent);backdrop-filter:blur(10px) saturate(1.2);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.topbar .wrap{display:flex;align-items:center;gap:16px;height:56px}
+.brand{display:flex;align-items:center;gap:9px;font:600 13.5px var(--sans);text-decoration:none;white-space:nowrap;color:var(--ink)}
+.brand svg{color:var(--muted);flex:none}
+.navlinks{display:flex;gap:2px;flex:1;justify-content:center;min-width:0}
+.navlinks a{font-size:13.5px;color:var(--muted);text-decoration:none;padding:6px 9px;border-radius:8px;display:flex;align-items:center;gap:6px;white-space:nowrap;transition:background .15s,color .15s}
+.navlinks a i{width:7px;height:7px;border-radius:50%;background:var(--c,var(--scan));flex:none}
+.navlinks a:hover{color:var(--ink)}
+.navlinks a.on{color:var(--ink);background:var(--panel2)}
+.navlinks a.off{opacity:.38;text-decoration:line-through}
+.search{position:relative;flex:none}
+.search input{width:236px;font:13.5px var(--sans);color:var(--ink);background:var(--panel);border:1px solid var(--line2);border-radius:9px;padding:7px 30px 7px 31px;outline:none}
+.search input:focus{border-color:var(--scan);box-shadow:0 0 0 3px rgba(var(--scan-rgb),.18)}
+.search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;stroke:var(--muted);fill:none;stroke-width:2}
+.search kbd{position:absolute;right:8px;top:50%;transform:translateY(-50%);font:11px var(--mono);color:var(--faint);border:1px solid var(--line2);border-radius:4px;padding:0 5px;pointer-events:none}
+.search input:not(:placeholder-shown)+kbd{display:none}
+.vis{font:12px var(--mono);color:var(--muted);white-space:nowrap;flex:none;padding:4px 9px;border:1px solid var(--line);border-radius:8px}
+.vis b{color:var(--ink);font-size:14.5px}
+.vis.filtered{border-color:var(--hl)}
+.vis.filtered b{color:var(--hl)}
+
+/* ---------- hero ---------- */
+.hero{padding:40px 0 22px}
+.hero-grid{display:grid;grid-template-columns:minmax(0,1fr) 600px;gap:36px;align-items:center}
+.kicker{display:flex;align-items:center;gap:10px;font:600 11.5px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--scan)}
+.kicker::before{content:"";width:28px;height:2px;background:var(--scan);box-shadow:0 0 8px var(--scan)}
+h1{font:800 44px/1.13 var(--display);letter-spacing:-.02em;margin:14px 0 16px}
+h1 .hl{background:linear-gradient(transparent 60%,rgba(var(--hl-rgb),.5) 60% 92%,transparent 92%);padding:0 .06em}
+.goal{border-left:3px solid var(--scan);padding:2px 0 2px 16px;margin:0 0 12px}
+.goal .lbl{font:600 10.5px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.goal p{margin:3px 0 0;font-size:17px;line-height:1.55}
+.plain{font-size:14.5px;color:var(--muted);margin:0 0 18px;line-height:1.55}
+.plain b{color:var(--ink);font-weight:600}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px;padding:0}
+.meta div{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:5px 12px 6px}
+.meta dt{font:600 10px var(--mono);letter-spacing:.14em;color:var(--faint);text-transform:uppercase}
+.meta dd{margin:0;font-weight:600;font-size:14px}
+.tally{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 18px 14px}
+.tally-top{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.bigN{font:800 60px/.9 var(--display);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.tally-top small{color:var(--muted);font-size:14px;line-height:1.3;padding-bottom:4px}
+.stats{display:flex;gap:12px;margin-left:auto;font:12px var(--mono);color:var(--muted);padding-bottom:4px;flex-wrap:wrap}
+.stats b{color:var(--ink);font-size:14px}
+.bar{display:flex;height:32px;border-radius:9px;overflow:hidden;margin:14px 0 9px;gap:3px}
+.seg{border:0;cursor:pointer;color:var(--on-acc);font:700 13px var(--mono);background:var(--c);transition:opacity .2s,filter .2s;flex:1 1 0;min-width:0}
+.seg[aria-pressed="false"]{opacity:.2;filter:grayscale(.7)}
+.seg:focus-visible{outline:2px solid var(--ink);outline-offset:-3px}
+.legend{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px 8px}
+.legend button{all:unset;cursor:pointer;font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px;line-height:1.3}
+.legend button i{width:10px;height:10px;border-radius:3px;background:var(--c);flex:none}
+.legend button[aria-pressed="false"]{opacity:.45;text-decoration:line-through}
+.legend button:focus-visible{outline:2px solid var(--scan)}
+.tally .hint{font-size:12px;color:var(--faint);margin:8px 0 0}
+
+/* scanner */
+.scanner{position:relative;width:600px;justify-self:end}
+.sc-head{display:flex;align-items:center;gap:8px;font:600 11px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--scan);margin:0 0 10px}
+.sc-head .dot{width:8px;height:8px;border-radius:50%;background:var(--scan);box-shadow:0 0 10px var(--scan);animation:blink 1.4s steps(2,start) infinite}
+.page{position:relative;width:340px;padding:26px;background:var(--film);color:var(--film-ink);border:1px solid rgba(var(--scan-rgb),.3);border-radius:4px;box-shadow:var(--shadow),inset 0 0 50px rgba(var(--scan-rgb),.07);font:13px/1 var(--serif)}
+.page::after{content:"";position:absolute;right:-1px;top:-1px;width:24px;height:24px;background:linear-gradient(225deg,var(--bg) 50%,rgba(var(--scan-rgb),.28) 50%)}
+.beam{position:absolute;left:0;right:0;top:0;height:2px;background:var(--scan);box-shadow:0 0 14px 2px rgba(var(--scan-rgb),.85);animation:beam 7s linear infinite;z-index:2;pointer-events:none}
+.beam::before{content:"";position:absolute;left:0;right:0;bottom:2px;height:64px;background:linear-gradient(to bottom,transparent,rgba(var(--scan-rgb),.17))}
+.ln{position:relative;height:30px;display:flex;align-items:center;gap:7px;white-space:nowrap}
+.ln.c{justify-content:center}
+.ln i{display:block;height:8px;border-radius:3px;background:var(--film-line);flex:none}
+.anc{font-weight:700;padding:2px 4px;margin:0 -2px;border-radius:3px;animation:lit 7s linear infinite backwards;animation-delay:calc(var(--t) * 7s)}
+.val{opacity:.92}
+.co{position:absolute;left:calc(100% + 44px);top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:0;padding:3px 8px;border:1px solid rgba(var(--scan-rgb),.5);border-radius:6px;background:var(--panel);color:var(--ink);font:11.5px/1.35 var(--mono);white-space:nowrap;animation:coLit 7s linear infinite backwards;animation-delay:calc(var(--t) * 7s)}
+.co::before{content:"";position:absolute;right:100%;top:50%;width:40px;border-top:1px dashed rgba(var(--scan-rgb),.6)}
+.co .k{color:var(--muted);font-size:10.5px}
+.co.warn{border-color:rgba(var(--fa-rgb),.75);color:var(--fa)}
+.co.warn::before{border-top-color:rgba(var(--fa-rgb),.6)}
+.sc-foot{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:12px;font:11px var(--mono);color:var(--muted);width:340px}
+.sc-foot span{padding:2px 6px;border-radius:5px;border:1px solid var(--line2);animation:coLit 7s linear infinite backwards;animation-delay:calc(var(--t) * 7s)}
+.sc-cap{font-size:12px;color:var(--faint);margin:8px 0 0;width:340px;line-height:1.45}
+@keyframes beam{from{top:0}to{top:100%}}
+@keyframes blink{50%{opacity:.25}}
+@keyframes lit{
+  0%{background:rgba(var(--hl-rgb),0);color:var(--film-ink);box-shadow:none}
+  1.2%{background:var(--hl);color:var(--hl-ink);box-shadow:0 0 0 3px rgba(var(--hl-rgb),.35),0 0 18px rgba(var(--hl-rgb),.7)}
+  7%{background:var(--hl);color:var(--hl-ink);box-shadow:none}
+  90%{background:var(--hl);color:var(--hl-ink)}
+  100%{background:rgba(var(--hl-rgb),0);color:var(--film-ink)}
+}
+@keyframes coLit{0%{opacity:.45}1.5%{opacity:1}88%{opacity:1}100%{opacity:.45}}
+@keyframes pulse{50%{opacity:.25;transform:scale(.7)}}
+
+/* glossary */
+.gloss-wrap{margin:6px auto 0}
+details.gloss{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:0 16px}
+details.gloss summary{cursor:pointer;padding:11px 0;font-weight:600;font-size:14.5px;list-style:none;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+details.gloss summary::-webkit-details-marker{display:none}
+details.gloss summary::before{content:"";width:7px;height:7px;border-right:2px solid var(--scan);border-bottom:2px solid var(--scan);transform:rotate(-45deg);transition:transform .2s}
+details.gloss[open] summary::before{transform:rotate(45deg)}
+details.gloss summary small{font-weight:400;color:var(--muted);font-size:13px}
+.glist{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 22px;margin:0 0 14px}
+.glist div{font-size:13.5px;padding:5px 0;border-bottom:1px dotted var(--line);line-height:1.45}
+.glist b{font-family:var(--mono);font-size:12.5px;color:var(--scan);margin-right:6px}
+
+/* terms */
+.term{border-bottom:1px dotted currentColor;cursor:help}
+.gl-note{font-size:.74em;line-height:1.3;color:var(--muted);background:rgba(var(--scan-rgb),.08);border:1px solid rgba(var(--scan-rgb),.24);border-radius:5px;padding:0 .4em;margin:0 .2em 0 .3em;font-weight:400;font-style:normal;letter-spacing:0;text-transform:none;vertical-align:.06em;font-family:var(--sans)}
+.gl-note::before{content:"= ";opacity:.6}
+#tip{position:fixed;z-index:100;max-width:290px;background:var(--panel2);color:var(--ink);border:1px solid var(--line2);border-radius:10px;padding:8px 11px;font-size:13px;line-height:1.45;box-shadow:var(--shadow);pointer-events:none}
+#tip b{display:block;font:600 10.5px var(--mono);letter-spacing:.12em;color:var(--scan);text-transform:uppercase;margin-bottom:2px}
+
+/* ---------- section shell ---------- */
+.sec{padding:80px 0 34px}
+#fa{--acc:var(--fa);--acc-rgb:var(--fa-rgb)}
+#bc{--acc:var(--bc);--acc-rgb:var(--bc-rgb)}
+#ma{--acc:var(--ma);--acc-rgb:var(--ma-rgb)}
+#ar{--acc:var(--ar);--acc-rgb:var(--ar-rgb)}
+#tong-hop{--acc:var(--gold);--acc-rgb:var(--gold-rgb)}
+.readout{display:flex;align-items:center;gap:12px;font:600 11.5px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--acc,var(--scan))}
+.readout .ro-dot{width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 10px currentColor;flex:none}
+.readout .ro-line{flex:1;height:1px;background:linear-gradient(90deg,currentColor,transparent);opacity:.55}
+.readout .ro-count{color:var(--muted);letter-spacing:.08em}
+.readout .ro-count b{color:var(--acc,var(--ink));font-size:15px}
+.sec-head h2{font:800 44px/1.12 var(--display);letter-spacing:-.02em;margin:14px 0 8px}
+.sec-head .sub,.tgloss{color:var(--muted);font-size:16px;max-width:820px;margin:0;line-height:1.55}
+.tgloss b{color:var(--acc);font-weight:700}
+.no{font:600 11px/1 var(--mono);color:var(--acc,var(--muted));letter-spacing:.04em}
+.idea{transition:opacity .2s,box-shadow .2s,border-color .2s}
+.idea.dim{opacity:.15}
+.idea.hit{box-shadow:0 0 0 2px var(--hl),0 0 18px rgba(var(--hl-rgb),.35)}
+.btn{font:600 13px var(--sans);color:var(--acc,var(--ink));background:transparent;border:1px solid rgba(var(--acc-rgb,var(--scan-rgb)),.65);border-radius:999px;padding:7px 15px;cursor:pointer;transition:background .15s}
+.btn:hover{background:rgba(var(--acc-rgb,var(--scan-rgb)),.12)}
+.btn:focus-visible{outline:2px solid var(--acc,var(--scan));outline-offset:2px}
+.head-row{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.layout-note{font-size:12.5px;color:var(--faint);margin:14px 0 0;line-height:1.5}
+
+/* ---------- direction ---------- */
+.dan-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:26px;margin-top:28px;align-items:start}
+.memo{list-style:none;margin:0;padding:16px 26px 16px 70px;background:var(--panel);border:1px solid var(--line);border-radius:6px;position:relative;box-shadow:var(--shadow)}
+.memo::before{content:"";position:absolute;left:54px;top:0;bottom:0;width:1px;background:rgba(var(--seal-rgb),.45)}
+.memo::after{content:"direction by user";position:absolute;right:6px;top:18px;writing-mode:vertical-rl;transform:rotate(180deg);font:600 10.5px var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--faint)}
+.memo li{position:relative;padding:11px 0;border-bottom:1px dashed var(--line);font-size:15.5px;line-height:1.6}
+.memo li:last-child{border-bottom:0}
+.memo .hn{position:absolute;left:-60px;top:13px;width:44px;text-align:right;font:700 12.5px var(--mono);color:var(--scan)}
+mark{background:rgba(var(--hl-rgb),var(--mark-a));color:inherit;padding:0 .12em;border-radius:2px;box-shadow:inset 0 -2px 0 rgba(var(--hl-rgb),.75)}
+.decided{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px 18px;overflow:hidden}
+.stamp{position:absolute;right:16px;top:16px;transform:rotate(-9deg);border:3px double var(--seal);color:var(--seal);font:800 12.5px/1 var(--mono);letter-spacing:.22em;padding:7px 10px 6px;border-radius:6px;opacity:.85}
+.decided h3{margin:0 0 4px;font:700 19px/1.3 var(--display)}
+.decided .who{font:600 10.5px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+.dec-block{margin-top:14px;font-size:15px}
+.dec-block>b{font-weight:700}
+.checks{list-style:none;margin:6px 0 0;padding:0}
+.checks li{position:relative;padding:6px 0 6px 26px;font-size:14.5px;border-bottom:1px dotted var(--line);line-height:1.5}
+.checks li:last-child{border-bottom:0}
+.checks li::before{content:"";position:absolute;left:4px;top:12px;width:11px;height:6px;border-left:2px solid var(--seal);border-bottom:2px solid var(--seal);transform:rotate(-45deg)}
+.tchip{display:inline-block;padding:0 8px;border-radius:999px;border:1px solid var(--c);color:var(--c);text-decoration:none;font-weight:600;font-size:13.5px;line-height:1.7;margin:2px 0}
+.tchip:hover{background:color-mix(in srgb,var(--c) 14%,transparent)}
+.loopbox{margin-top:26px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 26px 22px}
+.loop-title{font:600 11px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--scan)}
+.loopwrap{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;margin-top:14px}
+.entry{display:flex;align-items:center;margin-top:3px}
+.entry .lchip{border-color:var(--scan);background:rgba(var(--scan-rgb),.12);font-weight:600}
+.entry .arr{margin:0 8px}
+.loop{position:relative;border:2px dashed rgba(var(--scan-rgb),.45);border-radius:46px;min-height:150px;display:flex;flex-direction:column;justify-content:space-between;padding:0 36px;margin:20px 0 22px}
+.lrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.lrow.top{transform:translateY(-50%)}
+.lrow.bottom{transform:translateY(50%)}
+.lchip{background:var(--panel);border:1px solid rgba(var(--scan-rgb),.55);border-radius:10px;padding:7px 12px;font-size:14px;line-height:1.3;text-align:center;max-width:260px}
+.arr{color:var(--scan);font-weight:700;flex:none}
+.lside{position:absolute;top:50%;transform:translate(-50%,-50%);background:var(--panel);padding:4px 7px;font:700 12px var(--mono);color:var(--scan);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.lside.l{left:0}.lside.r{left:100%}
+.fork{display:flex;flex-wrap:wrap;align-items:center;gap:10px;font-size:14px;margin-left:4px}
+.fork .fk{font:600 10.5px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.fork .b{padding:5px 12px;border-radius:10px;border:1px solid var(--line2)}
+.fork .b.ok{border-color:rgba(var(--ma-rgb),.65)}
+.fork .b.no2{border-color:rgba(var(--fa-rgb),.65)}
+
+/* ---------- context ---------- */
+.ctx-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin-top:28px}
+.ctx{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--scan);border-radius:12px;padding:16px 18px 18px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow)}
+.ctx .clbl{font:600 10.5px var(--mono);letter-spacing:.16em;color:var(--scan);text-transform:uppercase}
+.ctx h3{margin:-6px 0 0;font:700 19px/1.25 var(--display)}
+.ctx p{margin:0;font-size:14.5px;line-height:1.58}
+.ctx p .pre{color:var(--muted);font-weight:600}
+.mismatch{display:grid;grid-template-columns:minmax(0,1fr) 20px minmax(0,1fr);gap:6px;align-items:center;font:12px var(--mono)}
+.mm-h{font:600 10px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.mismatch .a,.mismatch .b{padding:5px 8px;border-radius:6px;background:var(--panel2);border:1px solid var(--line)}
+.mismatch .b{border-color:rgba(var(--ma-rgb),.55)}
+.neq{color:var(--fa);font-weight:700;text-align:center;font-size:15px}
+.verdict{font:700 12.5px var(--mono);color:var(--fa)}
+.crumbs{display:flex;flex-wrap:wrap;gap:4px;align-items:center;font:11.5px var(--mono);color:var(--muted)}
+.crumbs span{padding:2px 6px;border-radius:5px;background:var(--panel2);border:1px solid var(--line)}
+.crumbs span:last-child{color:var(--ink);border-color:rgba(var(--scan-rgb),.6)}
+.keys{display:grid;gap:6px}
+.keys div{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:6px 9px;border-radius:7px;background:var(--panel2);border:1px solid var(--line);font-size:12.5px}
+.keys code{background:none;border:0;padding:0;color:var(--scan)}
+.keys span{color:var(--muted);text-align:right}
+.half{display:grid;gap:6px}
+.half .track{height:12px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);overflow:hidden}
+.half .track i{display:block;height:100%;width:50%;background:repeating-linear-gradient(135deg,rgba(var(--scan-rgb),.75) 0 6px,rgba(var(--scan-rgb),.45) 6px 12px)}
+.half small{font:11.5px var(--mono);color:var(--muted)}
+.mini-chain{display:flex;flex-wrap:wrap;align-items:center;gap:5px;font:12px var(--mono)}
+.mini-chain span{padding:3px 8px;border-radius:6px;border:1px solid rgba(var(--scan-rgb),.5);background:rgba(var(--scan-rgb),.07)}
+.mini-chain i{font-style:normal;color:var(--scan)}
+.mini-chain .fail{border-color:rgba(var(--fa-rgb),.6);color:var(--fa);background:transparent}
+
+/* ---------- Failure Analysis ---------- */
+.crack{display:block;width:100%;height:70px;margin:24px 0 6px;overflow:visible}
+.crack path{fill:none;stroke:var(--fa);stroke-width:2.2;vector-effect:non-scaling-stroke;stroke-linejoin:round;stroke-linecap:round;filter:drop-shadow(0 0 5px rgba(var(--fa-rgb),.7));stroke-dasharray:3200;stroke-dashoffset:3200;transition:stroke-dashoffset 2.2s cubic-bezier(.6,.1,.2,1)}
+.crack .c-br{stroke-width:1.4;opacity:.8;transition-delay:.9s}
+.seen .crack path{stroke-dashoffset:0}
+.fa-board{columns:3;column-gap:22px}
+.crack-card{break-inside:avoid;margin:0 0 22px;background:var(--panel);border:1px solid rgba(var(--fa-rgb),.32);border-radius:14px;padding:15px 15px 14px;position:relative;box-shadow:var(--shadow)}
+.crack-card::after{content:"";position:absolute;right:14px;top:14px;width:18px;height:18px;border-radius:50%;border:2px solid rgba(var(--fa-rgb),.5);background:radial-gradient(circle,rgba(var(--fa-rgb),.6) 0 3px,transparent 4px)}
+.cc-head{margin-bottom:11px;padding-right:26px}
+.cc-head .zig{width:38px;height:14px;fill:none;stroke:var(--fa);stroke-width:2;vertical-align:middle}
+.cc-no{font:700 11px var(--mono);letter-spacing:.18em;color:var(--fa);margin-left:6px;vertical-align:middle}
+.cc-head h3{margin:7px 0 3px;font:700 17.5px/1.3 var(--display)}
+.cc-src{font:11px var(--mono);color:var(--faint)}
+.patches{list-style:none;margin:0;padding:0;display:grid;gap:9px}
+.patch{position:relative;background:rgba(var(--fa-rgb),.055);border:1px solid rgba(var(--fa-rgb),.22);border-radius:9px;padding:9px 12px 10px 27px;font-size:14.3px;line-height:1.52}
+.patch::before{content:"";position:absolute;left:12px;top:10px;bottom:10px;width:2px;background:repeating-linear-gradient(to bottom,rgba(var(--fa-rgb),.85) 0 5px,transparent 5px 10px)}
+.patch .no{display:block;margin-bottom:3px}
+
+/* ---------- Backcasting ---------- */
+.bc-track{display:flex;flex-direction:column;gap:14px;margin-top:26px}
+.bc-track.forward{flex-direction:column-reverse}
+.axis{font:600 11px var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--bc);display:flex;align-items:center;gap:10px;padding-left:14px}
+.axis::before{content:"";width:26px;height:2px;background:currentColor}
+.axis.now{color:var(--muted)}
+.rewind{list-style:none;margin:0;padding:0 0 0 64px;position:relative;display:flex;flex-direction:column;gap:18px}
+.bc-track.forward .rewind{flex-direction:column-reverse}
+.rewind::before{content:"";position:absolute;left:25px;top:10px;bottom:10px;width:3px;border-radius:3px;background:linear-gradient(to bottom,var(--bc),rgba(var(--bc-rgb),.12))}
+.bc-track.forward .rewind::before{background:linear-gradient(to top,var(--bc),rgba(var(--bc-rgb),.12))}
+.station{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:22px;align-items:start;position:relative}
+.station::before{content:"";position:absolute;left:-47px;top:16px;width:16px;height:16px;border-radius:50%;background:var(--bg);border:3px solid var(--bc);box-shadow:0 0 0 4px rgba(var(--bc-rgb),.15)}
+.station.goal::before{width:24px;height:24px;left:-51px;top:12px;background:var(--bc);box-shadow:0 0 0 5px rgba(var(--bc-rgb),.25),0 0 0 11px rgba(var(--bc-rgb),.1),0 0 24px rgba(var(--bc-rgb),.6)}
+.station.start::before{border-style:dashed}
+.st-main{background:linear-gradient(135deg,rgba(var(--bc-rgb),.16),rgba(var(--bc-rgb),.04));border:1px solid rgba(var(--bc-rgb),.45);border-radius:14px;padding:11px 16px 13px;font-size:15.3px;line-height:1.55}
+.station.goal .st-main{font-size:17px;border-width:2px}
+.st-meta{display:flex;align-items:center;gap:10px;margin-bottom:5px}
+.tminus{font:700 12px var(--mono);color:var(--on-acc);background:var(--bc);padding:2px 8px;border-radius:6px;letter-spacing:.06em}
+.st-label{color:var(--bc)}
+.st-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;border-left:2px dotted rgba(var(--bc-rgb),.4);padding-left:18px;min-height:10px}
+.st-tools:empty{border-left-color:transparent}
+.tool{background:var(--panel);border:1px dashed rgba(var(--bc-rgb),.55);border-radius:10px;padding:8px 11px 9px;font-size:13.8px;line-height:1.5}
+.tool .no{display:block;margin-bottom:3px}
+
+/* ---------- Morphological ---------- */
+.insight-quote{margin:22px 0 0;padding:13px 18px;border-left:3px solid var(--ma);background:rgba(var(--ma-rgb),.07);border-radius:0 10px 10px 0;font-size:14.3px;line-height:1.6}
+.insight-quote .who{display:block;font:600 10.5px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ma);margin-bottom:3px}
+.ma-layout{display:grid;grid-template-columns:520px minmax(0,1fr);gap:26px;align-items:start;margin-top:24px}
+.ma-side{position:sticky;top:68px}
+.ma-grid{background:var(--panel);border:1px solid rgba(var(--ma-rgb),.42);border-radius:14px;padding:4px 12px;box-shadow:var(--shadow)}
+.mrow{display:grid;grid-template-columns:112px minmax(0,1fr);gap:10px;align-items:center;padding:5px 0;border-bottom:1px dashed var(--line)}
+.mrow:last-child{border-bottom:0}
+.mvar{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);line-height:1.2}
+.mvar b{font:800 19px var(--mono);color:var(--ma);width:18px;flex:none}
+.mopts{display:flex;flex-wrap:wrap;gap:5px}
+.cell{--h:0;font:500 12.8px/1.35 var(--sans);color:var(--ink);background:rgba(var(--ma-rgb),calc(.05 + var(--h) * .5));border:1px solid rgba(var(--ma-rgb),calc(.25 + var(--h) * .6));border-radius:8px;padding:4px 9px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:opacity .15s,box-shadow .15s,transform .15s}
+.cell .cnt{font:600 10.5px var(--mono);color:var(--muted)}
+.cell.zero{border-style:dashed;opacity:.6}
+.ma-grid.preview .cell{opacity:.25}
+.ma-grid.preview .cell.lit{opacity:1;box-shadow:0 0 0 2px var(--ma),0 0 18px rgba(var(--ma-rgb),.55);transform:translateY(-1px)}
+.cell.sel{box-shadow:0 0 0 2px var(--ink)}
+.cell:focus-visible{outline:2px solid var(--ma);outline-offset:2px}
+.ma-legend{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;font-size:12.5px;color:var(--muted);margin:10px 2px 0;line-height:1.4}
+.heat{display:inline-flex;gap:2px}.heat i{width:15px;height:10px;border-radius:2px;background:rgba(var(--ma-rgb),var(--a))}
+#maNote{font-size:13px;color:var(--ma);margin:8px 2px 0;min-height:1.4em}
+.ma-ideas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.mcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;font-size:14.3px;line-height:1.52;outline:none;cursor:default}
+.mcard:hover,.mcard:focus-visible{border-color:var(--ma)}
+.mcard.combo{border-left:4px solid var(--ma);background:linear-gradient(90deg,rgba(var(--ma-rgb),.08),transparent 60%),var(--panel)}
+.mcard p{margin:5px 0 8px}
+.mcard.mdim{opacity:.16}
+.mtags{display:flex;flex-wrap:wrap;gap:4px}
+.mtag{font:11px var(--mono);padding:1px 6px;border-radius:5px;background:rgba(var(--ma-rgb),.12);color:var(--ink);border:1px solid rgba(var(--ma-rgb),.32)}
+.mtag b{color:var(--ma);margin-right:4px}
+.mtag.off{background:transparent;border-style:dashed;color:var(--faint)}
+
+/* ---------- Assumption Reversal ---------- */
+.deck{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;align-items:start;margin-top:26px}
+.unit{display:flex;flex-direction:column;gap:8px}
+.flip{perspective:1100px;cursor:pointer;border-radius:14px;outline:none}
+.flip:focus-visible{box-shadow:0 0 0 2px var(--ar)}
+.flip .inner{display:grid;transform-style:preserve-3d;transition:transform .65s cubic-bezier(.3,.7,.2,1)}
+.flip.flipped .inner{transform:rotateY(180deg)}
+.face{grid-area:1/1;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:14px;padding:13px 15px 15px;min-height:180px;display:flex;flex-direction:column;gap:8px}
+.front{background:var(--panel2);border:1px solid var(--line2);background-image:repeating-linear-gradient(135deg,transparent 0 9px,rgba(var(--ar-rgb),.045) 9px 10px)}
+.back{transform:rotateY(180deg);background:linear-gradient(160deg,rgba(var(--ar-rgb),.25),rgba(var(--ar-rgb),.05) 70%),var(--panel);border:1px solid rgba(var(--ar-rgb),.62)}
+.f-top{display:flex;justify-content:space-between;align-items:center}
+.face-lbl{font:700 10.5px var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--faint)}
+.back .face-lbl{color:var(--ar)}
+.assume{margin:auto 0;font:italic 600 20px/1.3 var(--serif)}
+.assume .verb{display:block;font:normal 700 11px var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--ar);margin-bottom:6px}
+.hint{font:11px var(--mono);color:var(--faint);display:flex;align-items:center;gap:7px}
+.hint::before{content:"";width:13px;height:10px;border:1.5px solid currentColor;border-radius:2px;transform:perspective(30px) rotateY(-35deg)}
+.was{margin:0;font:italic 13.5px/1.35 var(--serif);color:var(--muted);text-decoration:line-through;text-decoration-color:var(--ar);text-decoration-thickness:2px}
+.rev{margin:0;font-size:15px;line-height:1.5;font-weight:500}
+.tail{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--ar);border-radius:4px 10px 10px 4px;padding:8px 12px 9px;font-size:13.5px;line-height:1.5}
+.tail-lbl{font:700 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ar);margin-right:6px}
+.after-head{margin:48px 0 4px;font:700 22px/1.3 var(--display)}
+.after{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:16px}
+.acard{background:var(--panel);border:1px solid var(--line);border-top:3px solid rgba(var(--ar-rgb),.75);border-radius:8px 8px 10px 10px;padding:10px 13px 12px;font-size:14px;line-height:1.52}
+.acard .no{display:block;margin-bottom:3px}
+
+/* ---------- Synthesis ---------- */
+.synth{padding:96px 0 90px;margin-top:64px;position:relative;background:radial-gradient(1000px 480px at 50% 0,rgba(var(--gold-rgb),.15),transparent 70%),linear-gradient(180deg,rgba(var(--gold-rgb),.04),transparent 40%);border-top:1px solid rgba(var(--gold-rgb),.35)}
+.synth::before{content:"";position:absolute;left:0;right:0;top:-1px;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent);box-shadow:0 0 18px var(--gold)}
+.synth .sec-head{text-align:center}
+.synth .readout{justify-content:center}
+.synth .readout .ro-line{max-width:160px}
+.synth .readout .ro-line.rev{background:linear-gradient(270deg,currentColor,transparent)}
+.synth .sec-head h2.gold-title{font:900 70px/1.08 var(--display);letter-spacing:-.03em;background:linear-gradient(180deg,var(--gold-hi),var(--gold-lo));-webkit-background-clip:text;background-clip:text;color:transparent;margin:16px 0 10px}
+.synth .sub{margin:0 auto}
+.films{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:18px;margin-top:40px}
+.film{grid-column:span 2;position:relative;overflow:hidden;background:var(--panel);border:1px solid rgba(var(--gold-rgb),.42);border-radius:16px;padding:18px 20px 20px;box-shadow:0 22px 50px -28px rgba(var(--gold-rgb),.5);display:flex;flex-direction:column}
+.film.w3{grid-column:span 3}
+.film.f1{grid-column:span 6;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:30px;padding:24px 26px;align-items:center}
+.film .big{position:absolute;right:12px;top:-24px;font:900 130px/1 var(--display);color:transparent;-webkit-text-stroke:1.5px rgba(var(--gold-rgb),.22);pointer-events:none}
+.flbl{font:700 11px var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--gold);position:relative}
+.film p{margin:8px 0 14px;font-size:15.3px;line-height:1.6;position:relative}
+.film.f1 p{font-size:17px}
+.root-diagram{display:flex;flex-direction:column;font-size:13.5px}
+.symptoms{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;text-align:center}
+.symptoms span{padding:8px 6px;border-radius:9px;border:1px solid rgba(var(--fa-rgb),.55);background:rgba(var(--fa-rgb),.08);font-weight:600}
+.funnel{width:100%;height:40px;display:block}
+.funnel path{fill:none;stroke:var(--gold);stroke-width:1.6;vector-effect:non-scaling-stroke;opacity:.85}
+.rootbox{align-self:center;max-width:84%;text-align:center;padding:10px 14px;border-radius:12px;border:2px solid var(--gold);background:rgba(var(--gold-rgb),.1);font-weight:600;line-height:1.45}
+.rootbox small{display:block;font:600 10.5px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--gold);margin-bottom:3px}
+.need{align-self:center;font:600 10.5px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:14px 0 8px;display:flex;align-items:center;gap:8px}
+.need::before,.need::after{content:"";width:40px;height:1px;background:var(--line2)}
+.pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pillars div{border:1px solid rgba(var(--gold-rgb),.5);border-top:4px solid var(--gold);border-radius:6px 6px 10px 10px;padding:10px 10px 12px;background:var(--panel2);text-align:center}
+.pillars b{display:block;font-size:14px;line-height:1.35}
+.pillars span{display:block;font-size:12.3px;color:var(--muted);margin-top:3px;line-height:1.4}
+.mini{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font:12px var(--mono);margin-top:auto;position:relative}
+.mini span{padding:4px 8px;border-radius:7px;border:1px solid rgba(var(--gold-rgb),.42);background:rgba(var(--gold-rgb),.07)}
+.mini i{font-style:normal;color:var(--gold)}
+.mini .key{background:var(--gold);color:var(--on-acc);border-color:var(--gold);font-weight:700}
+.mini .muted{opacity:.65;border-style:dashed;background:transparent}
+.mini .vs{border:0;background:none;color:var(--muted);padding:0 2px}
+.finale{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:32px;margin-top:56px;align-items:start}
+.blk-sub{font:600 10.5px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--gold)}
+.blk-h{font:800 26px/1.2 var(--display);margin:6px 0 2px}
+.steps{list-style:none;margin:18px 0 0;padding:0;position:relative;display:flex;flex-direction:column;gap:12px}
+.steps::before{content:"";position:absolute;left:25px;top:24px;bottom:24px;width:2px;background:linear-gradient(var(--gold),rgba(var(--gold-rgb),.15))}
+.step{display:grid;grid-template-columns:52px minmax(0,1fr);gap:16px;align-items:center}
+.step .num{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;font:800 20px var(--mono);color:var(--gold);background:var(--bg);border:2px solid var(--gold);position:relative;z-index:1;box-shadow:0 0 0 5px var(--bg),0 0 20px rgba(var(--gold-rgb),.35)}
+.step .body{background:var(--panel);border:1px solid rgba(var(--gold-rgb),.32);border-radius:12px;padding:12px 16px;font-size:15.3px;line-height:1.52}
+.step.key4 .body{border-color:rgba(var(--gold-rgb),.7)}
+.chain{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:8px;font:12.3px var(--mono)}
+.chain span{padding:3px 8px;border-radius:6px;background:rgba(var(--gold-rgb),.1);border:1px solid rgba(var(--gold-rgb),.45)}
+.chain span:last-child{background:var(--gold);color:var(--on-acc);font-weight:700;border-color:var(--gold)}
+.chain i{font-style:normal;color:var(--gold)}
+.asks{position:sticky;top:76px}
+.ask{position:relative;border:1.5px dashed rgba(var(--gold-rgb),.6);border-radius:14px;padding:15px 18px 16px;background:var(--panel);margin-top:14px}
+.ask .state{display:inline-flex;align-items:center;gap:7px;font:600 10.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--gold)}
+.ask .state::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--gold);animation:pulse 1.8s ease-in-out infinite}
+.ask p{margin:8px 0 12px;font-size:16.3px;line-height:1.5;font-weight:600}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opts span{display:inline-flex;align-items:center;gap:8px;font-size:13.3px;padding:4px 11px;border:1px solid var(--line2);border-radius:999px;color:var(--muted)}
+.opts span::before{content:"";width:11px;height:11px;border:1.5px solid currentColor;border-radius:3px}
+.ask-note{font-size:12.5px;color:var(--faint);margin:12px 2px 0;line-height:1.5}
+
+footer{padding:40px 0 60px;border-top:1px solid var(--line);margin-top:10px}
+footer p{margin:4px 0;font-size:13px;color:var(--faint);line-height:1.6}
+footer b{color:var(--muted)}
+
+/* ---------- responsive ---------- */
+@media (max-width:1200px){
+  .hero-grid{grid-template-columns:1fr}
+  .scanner{justify-self:center}
+  .ma-layout{grid-template-columns:1fr}
+  .ma-side{position:static}
+  .deck,.after{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .fa-board{columns:2}
+  .navlinks a span{display:none}
+  .navlinks a{padding:6px}
+}
+@media (max-width:820px){
+  .navlinks,.brand span{display:none}
+  .search{flex:1}.search input{width:100%}
+  .dan-grid,.ctx-grid,.finale,.film.f1{grid-template-columns:1fr}
+  .station{grid-template-columns:1fr}
+  .st-tools{border-left:0;padding-left:0}
+  .deck,.after,.ma-ideas,.glist{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .film,.film.w3{grid-column:span 6}
+  .fa-board{columns:1}
+  .loopwrap{grid-template-columns:1fr}
+  .asks{position:static}
+  h1{font-size:34px}.sec-head h2{font-size:34px}
+  .scanner{width:100%}.co{display:none}
+}
+@media (max-width:560px){
+  .deck,.after,.ma-ideas,.glist,.legend{grid-template-columns:1fr}
+  .lrow{flex-direction:column}.loop{border-radius:24px}
+}
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  .beam{display:none}
+  .anc{animation:none;background:var(--hl);color:var(--hl-ink)}
+  .co,.sc-foot span{animation:none}
+  .flip .inner{transition:none}
+  .crack path{transition:none;stroke-dashoffset:0}
+  .sc-head .dot,.ask .state::before{animation:none}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap">
+    <a class="brand" href="#top">
+      <svg width="20" height="24" viewBox="0 0 22 26" aria-hidden="true"><path d="M2 1h12l6 6v18H2z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M14 1v6h6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 11h9M5 15h12M5 19h7" stroke="currentColor" stroke-width="1.5" opacity=".55"/><rect x="0" y="12.5" width="22" height="2" fill="var(--scan)"/></svg>
+      <span>Phim chụp brainstorm</span>
+    </a>
+    <nav class="navlinks" aria-label="Mục lục">
+      <a href="#dan"><i></i><span>Lời dặn</span></a>
+      <a href="#boi-canh"><i></i><span>Bối cảnh</span></a>
+      <a href="#fa" style="--c:var(--fa)"><i></i><span>Khám nghiệm</span></a>
+      <a href="#bc" style="--c:var(--bc)"><i></i><span>Đếm ngược</span></a>
+      <a href="#ma" style="--c:var(--ma)"><i></i><span>Ma trận</span></a>
+      <a href="#ar" style="--c:var(--ar)"><i></i><span>Lật ngược</span></a>
+      <a href="#tong-hop" style="--c:var(--gold)"><i></i><span>Tổng hợp</span></a>
+    </nav>
+    <label class="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+      <input id="q" type="search" placeholder="Tìm trong các ý (không dấu cũng được)" aria-label="Tìm trong các ý tưởng" autocomplete="off">
+      <kbd>/</kbd>
+    </label>
+    <div class="vis" id="vis-wrap" title="Số ý đang hiện / tổng số ý"><b id="vis">114</b>/<span data-count="all">114</span> ý</div>
+  </div>
+</div>
+
+<header class="hero" id="top">
+  <div class="wrap hero-grid">
+    <div class="hero-text">
+      <div class="kicker">Hồ sơ phiên brainstorm · 06/10/2026</div>
+      <h1>Chuẩn hóa tool regex thành <span class="hl">share core</span> cho systemdocs</h1>
+      <div class="goal">
+        <div class="lbl">Mục tiêu</div>
+        <p data-gloss>Input mọi Word/raw text -&gt; xuất đủ thông tin chung + người + tài sản khớp DB; flow dev/agent cho mẫu mới tự chấm, không hỏi lặp, docs gọn</p>
+      </div>
+      <p class="plain no-gloss"><b>Nói dễ hiểu:</b> gom các mẫu tìm chữ (regex) thành một lõi dùng chung, để đọc văn bản công chứng dạng Word hoặc một đoạn chữ dán vào, rồi bóc ra thông tin chung, thông tin người và tài sản, khớp đúng các cột trong cơ sở dữ liệu. Khi có mẫu mới, trợ lý AI phải tự chấm bài, không hỏi lại cùng một câu, và tài liệu phải gọn.</p>
+      <dl class="meta no-gloss">
+        <div><dt>Ngày</dt><dd>06/10/2026</dd></div>
+        <div><dt>Chế độ</dt><dd>Ideate for me <span class="gl-note">coach tự nghĩ ý, người dùng định hướng</span></dd></div>
+        <div><dt>Trạng thái</dt><dd>complete</dd></div>
+        <div><dt>Cập nhật</dt><dd>2026-10-06T21:54</dd></div>
+      </dl>
+      <div class="tally no-gloss">
+        <div class="tally-top">
+          <span class="bigN" id="bigN">114</span>
+          <small>ý tưởng được ghi<br>qua 4 kỹ thuật</small>
+          <div class="stats"><span><b>6</b> tổng hợp</span><span><b>7</b> bước đề xuất</span><span><b>2</b> câu hỏi mở</span></div>
+        </div>
+        <div class="bar" role="group" aria-label="Bật hoặc tắt từng kỹ thuật">
+          <button class="seg" style="--c:var(--fa)" data-tech="fa" data-toggle="fa" aria-pressed="true" title="Failure Analysis"><span data-count="fa">23</span></button>
+          <button class="seg" style="--c:var(--bc)" data-tech="bc" data-toggle="bc" aria-pressed="true" title="Backcasting"><span data-count="bc">26</span></button>
+          <button class="seg" style="--c:var(--ma)" data-tech="ma" data-toggle="ma" aria-pressed="true" title="Morphological Analysis"><span data-count="ma">26</span></button>
+          <button class="seg" style="--c:var(--ar)" data-tech="ar" data-toggle="ar" aria-pressed="true" title="Assumption Reversal"><span data-count="ar">39</span></button>
+        </div>
+        <div class="legend">
+          <button style="--c:var(--fa)" data-toggle="fa" aria-pressed="true"><i></i>Failure Analysis</button>
+          <button style="--c:var(--bc)" data-toggle="bc" aria-pressed="true"><i></i>Backcasting</button>
+          <button style="--c:var(--ma)" data-toggle="ma" aria-pressed="true"><i></i>Morphological Analysis</button>
+          <button style="--c:var(--ar)" data-toggle="ar" aria-pressed="true"><i></i>Assumption Reversal</button>
+        </div>
+        <p class="hint">Bấm vào từng đoạn màu để ẩn/hiện kỹ thuật đó. Gõ <b>/</b> để tìm nhanh trong mọi ý.</p>
+      </div>
+    </div>
+
+    <div class="scanner no-gloss" role="img" aria-label="Minh họa: tia quét chạy dọc một trang Word, tô sáng các chữ neo như Sinh năm, CCCD số, Thửa đất số, Sổ tiết kiệm, rồi đổi giá trị sang dạng database cần.">
+      <div class="sc-head"><span class="dot"></span>Soi trang Word · anchor-first</div>
+      <div class="page">
+        <div class="beam"></div>
+        <div class="ln c" style="--t:.087"><i style="width:58%"></i></div>
+        <div class="ln c" style="--t:.150"><i style="width:34%"></i></div>
+        <div class="ln" style="--t:.214"></div>
+        <div class="ln" style="--t:.278"><b class="anc">Ông</b><i style="width:30%"></i><b class="anc">Sinh năm</b><i style="width:14%"></i><span class="co"><span>gioi_tinh: Ông → Nam</span></span></div>
+        <div class="ln" style="--t:.341"><b class="anc">CCCD số</b><i style="width:30%"></i><i style="width:18%"></i><span class="co"><span>cccd → so_giay_to</span></span></div>
+        <div class="ln" style="--t:.405"><i style="width:88%"></i></div>
+        <div class="ln" style="--t:.468"><b class="anc">Bà</b><i style="width:30%"></i><b class="anc">Sinh ngày</b><i style="width:14%"></i><span class="co"><span class="k">ngay_sinh</span><span>DD/MM/YYYY → YYYY-MM-DD</span></span></div>
+        <div class="ln" style="--t:.532"><i style="width:22%"></i><b class="anc">chết ngày</b><i style="width:18%"></i></div>
+        <div class="ln" style="--t:.595"><i style="width:80%"></i></div>
+        <div class="ln" style="--t:.659"><b class="anc">Thửa đất số</b><i style="width:9%"></i><i style="width:12%"></i><span class="val">1.234,0</span><b class="anc">m2</b><span class="co"><span>'1.234,0 m2' → số + cờ</span></span></div>
+        <div class="ln" style="--t:.722"><i style="width:40%"></i><i style="width:26%"></i><span class="co"><span>so_gcn → so_serial</span></span></div>
+        <div class="ln" style="--t:.786"><b class="anc">Sổ tiết kiệm</b><i style="width:36%"></i><span class="co warn"><span>DB chưa có chỗ</span></span></div>
+        <div class="ln" style="--t:.850"><b class="anc">|</b><i style="width:22%"></i><b class="anc">|</b><i style="width:22%"></i><b class="anc">|</b><i style="width:22%"></i><b class="anc">|</b><span class="co"><span>giá trị chứa '|' → cờ</span></span></div>
+        <div class="ln" style="--t:.913"><i style="width:62%"></i></div>
+      </div>
+      <div class="sc-foot">Đếm neo:
+        <span style="--t:.278">Sinh năm/Sinh ngày</span><span style="--t:.341">CCCD</span><span style="--t:.659">Thửa</span><span style="--t:.786">Sổ tiết kiệm</span><span style="--t:.532">chết ngày</span>
+      </div>
+      <p class="sc-cap">Trang minh họa. Giá trị thật được che bằng vạch, giống bộ ẩn danh ở ý #075. Nhãn bên phải là các chỗ lệch giữa engine và database mà phiên này tìm ra.</p>
+    </div>
+  </div>
+</header>
+
+<main data-gloss>
+
+<div class="wrap gloss-wrap no-gloss">
+  <details class="gloss">
+    <summary>Sổ tay từ khó <small>Chữ có gạch chấm bên dưới: rê chuột vào để xem nghĩa. Lần đầu gặp, nghĩa được ghi ngay cạnh trong ô nhỏ.</small></summary>
+    <div class="glist" id="glist"></div>
+  </details>
+</div>
+
+<!-- ================= DIRECTION ================= -->
+<section id="dan" class="sec">
+  <div class="wrap">
+    <header class="sec-head">
+      <div class="readout"><span class="ro-dot"></span>Trước khi quét · lời dặn<span class="ro-line"></span><span class="ro-count"><b>6</b> hướng · <b>2</b> quyết định</span></div>
+      <h2>Người dùng dặn gì?</h2>
+      <p class="sub">Trước khi coach nghĩ ý, người dùng vạch hướng và chốt sẵn vài quyết định. Chỗ tô vàng là những “cơn đau” mà các kỹ thuật phía dưới sẽ xử lý.</p>
+    </header>
+    <div class="dan-grid">
+      <ol class="memo">
+        <li><span class="hn">H1</span>Tool regex-test-tool là nhánh trực quan để test trước khi update code dự án; <mark>core dùng chung systemdocs</mark></li>
+        <li><span class="hn">H2</span>Input: mọi loại Word (văn bản cố định) hoặc 1 đoạn raw text user copy; output: mọi thông tin người + tài sản engine quét được, khớp trường database (<mark>regex tốt mà không khớp DB là vô nghĩa</mark>)</li>
+        <li><span class="hn">H3</span>Thông tin chung (công chứng viên, loại VB, ngày, số CC) đang khá ổn; người + tài sản nhiều biểu mẫu nhưng format giống hoặc <mark>có dấu hiệu bắt đầu/kết thúc rõ</mark></li>
+        <li><span class="hn">H4</span>Docs + rule hiện tại <mark>dài dòng, lặp nội dung</mark></li>
+        <li><span class="hn">H5</span>Vấn đề: chưa rõ context nạp ban đầu cho agent; chưa có ràng buộc để agent tự đánh giá -&gt; <mark>hỏi duyệt lặp cùng 1 lỗi</mark></li>
+        <li><span class="hn">H6</span>Flow lý tưởng: dev chỉ thư mục mẫu mới -&gt; agent đọc Word với context cần biết -&gt; tự ghi trường nhìn thấy -&gt; chạy code cũ -&gt; đọc log cờ -&gt; so với kết quả ban đầu -&gt; tinh chỉnh -&gt; lặp; thêm logic nếu không xung đột, <mark>tạo phiên bản regex mới nếu xung đột</mark></li>
+      </ol>
+      <aside class="decided">
+        <div class="stamp no-gloss">ĐÃ CHỐT</div>
+        <div class="who">decision by user</div>
+        <h3>Người dùng đã quyết</h3>
+        <div class="dec-block"><b>Review trước:</b>
+          <ul class="checks">
+            <li>diện tích lấy số trước m2 làm mốc, chỉ có dấu chấm thì gắn cờ;</li>
+            <li>R11 gắn cờ cả khi 0 người;</li>
+            <li>phát triển trong regex-test-tool trước rồi chép sang upload_lab;</li>
+            <li>PII test đọc từ cấu hình không commit;</li>
+            <li>tài sản hỗn hợp gộp mọi khối;</li>
+            <li>giới tính thiếu căn cứ để trống + cờ</li>
+          </ul>
+        </div>
+        <div class="dec-block">Phiên chạy kiểu Ideate for me, kỹ thuật: <a class="tchip" style="--c:var(--fa)" href="#fa">Failure Analysis</a>, <a class="tchip" style="--c:var(--bc)" href="#bc">Backcasting</a>, <a class="tchip" style="--c:var(--ma)" href="#ma">Morphological Analysis</a>, <a class="tchip" style="--c:var(--ar)" href="#ar">Assumption Reversal</a></div>
+      </aside>
+    </div>
+
+    <div class="loopbox" aria-label="Vòng lặp lý tưởng H6 vẽ thành vòng">
+      <div class="loop-title">Vòng lặp lý tưởng (H6), vẽ thành một vòng</div>
+      <div class="loopwrap">
+        <div class="entry"><span class="lchip">dev chỉ thư mục mẫu mới</span><span class="arr">→</span></div>
+        <div>
+          <div class="loop">
+            <div class="lrow top"><span class="lchip">agent đọc Word với context cần biết</span><span class="arr">→</span><span class="lchip">tự ghi trường nhìn thấy</span><span class="arr">→</span><span class="lchip">chạy code cũ</span></div>
+            <div class="lrow bottom"><span class="lchip">tinh chỉnh</span><span class="arr">←</span><span class="lchip">so với kết quả ban đầu</span><span class="arr">←</span><span class="lchip">đọc log cờ</span></div>
+            <span class="lside l">↑ lặp</span><span class="lside r">↓</span>
+          </div>
+          <div class="fork"><span class="fk">Khi tinh chỉnh</span><span class="b ok">thêm logic nếu không xung đột</span><span class="b no2">tạo phiên bản regex mới nếu xung đột</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CONTEXT ================= -->
+<section id="boi-canh" class="sec">
+  <div class="wrap">
+    <header class="sec-head">
+      <div class="readout"><span class="ro-dot"></span>Soi kho code · bối cảnh<span class="ro-line"></span><span class="ro-count"><b>3</b> phát hiện</span></div>
+      <h2>Ba điều coach thấy khi soi kho</h2>
+      <p class="sub">Trước khi nghĩ ý, coach nhìn những gì đang có. Một chỗ lệch, và hai món đồ nghề đã nằm sẵn trong kho.</p>
+    </header>
+    <div class="ctx-grid">
+      <article class="ctx">
+        <div class="clbl">Bối cảnh 1 · insight by coach</div>
+        <h3>Engine nói một kiểu, database cần một kiểu</h3>
+        <p><span class="pre">Bối cảnh:</span> engine xuất gioi_tinh Ông/Bà, ngay_sinh DD/MM/YYYY, cccd, so_gcn — contract person_row/asset_row cần Nam/Nữ, YYYY-MM-DD, so_giay_to, so_serial canonical → regex chưa khớp DB</p>
+        <div class="mismatch no-gloss" aria-hidden="true">
+          <span class="mm-h">engine xuất</span><span></span><span class="mm-h">contract cần</span>
+          <span class="a">gioi_tinh Ông/Bà</span><span class="neq">≠</span><span class="b">Nam/Nữ</span>
+          <span class="a">ngay_sinh DD/MM/YYYY</span><span class="neq">≠</span><span class="b">YYYY-MM-DD</span>
+          <span class="a">cccd</span><span class="neq">≠</span><span class="b">so_giay_to</span>
+          <span class="a">so_gcn</span><span class="neq">≠</span><span class="b">so_serial canonical</span>
+        </div>
+        <div class="verdict no-gloss">→ regex chưa khớp DB</div>
+      </article>
+      <article class="ctx">
+        <div class="clbl">Bối cảnh 2 · insight by coach</div>
+        <h3>Bộ chuẩn hóa đã có sẵn</h3>
+        <p><span class="pre">Bối cảnh:</span> <code>notary_v2/services/document_intake/normalization.py</code> đã có tầng chuẩn hóa ra suggestion (raw_value/normalized_value/observation_state) theo contract intake_analyze, nhận cả kind=text</p>
+        <div class="crumbs no-gloss" aria-hidden="true"><span>notary_v2</span>/<span>services</span>/<span>document_intake</span>/<span>normalization.py</span></div>
+        <div class="keys no-gloss" aria-hidden="true">
+          <div><code>raw_value</code><span>giá trị nguyên văn</span></div>
+          <div><code>normalized_value</code><span>giá trị đã chuẩn hóa</span></div>
+          <div><code>observation_state</code><span>thấy / chuẩn hóa / suy ra</span></div>
+        </div>
+      </article>
+      <article class="ctx">
+        <div class="clbl">Bối cảnh 3 · insight by coach</div>
+        <h3>Nửa vòng dev đã tồn tại</h3>
+        <p><span class="pre">Bối cảnh:</span> <code>upload_lab/tools/regex_lab.py</code> đã có vòng ingest→packets→approve→verify golden (CHANGED fail) — nửa flow dev đã tồn tại nhưng không được dùng trong task5</p>
+        <div class="mini-chain no-gloss" aria-hidden="true"><span>ingest</span><i>→</i><span>packets</span><i>→</i><span>approve</span><i>→</i><span>verify golden</span><span class="fail">CHANGED fail</span></div>
+        <div class="half no-gloss" aria-hidden="true"><div class="track"><i></i></div><small>nửa flow dev đã tồn tại · không được dùng trong task5</small></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FAILURE ANALYSIS ================= -->
+<section id="fa" class="sec reveal" data-tech="fa">
+  <div class="wrap">
+    <header class="sec-head">
+      <div class="readout"><span class="ro-dot"></span>Lần quét 1/4<span class="ro-line"></span><span class="ro-count"><b data-count="fa">23</b> ý</span></div>
+      <h2>Failure Analysis</h2>
+      <p class="tgloss"><b>Phân tích thất bại:</b> tưởng tượng tool đã hỏng thật, rồi soi từng vết nứt và khâu sẵn một miếng vá cho mỗi vết. Mỗi thẻ dưới đây là một vết nứt; mỗi dòng có đường khâu là một ý vá.</p>
+    </header>
+    <svg class="crack" viewBox="0 0 1200 70" preserveAspectRatio="none" aria-hidden="true">
+      <path class="c-main" d="M0 36 L70 31 L118 44 L160 27 L214 39 L262 20 L318 42 L366 30 L420 47 L468 25 L530 38 L584 18 L640 41 L700 29 L748 46 L806 24 L862 37 L918 21 L972 43 L1030 30 L1086 45 L1140 27 L1200 35"/>
+      <path class="c-br" d="M262 20 L276 6 L292 9 M584 18 L596 3 M748 46 L760 62 L780 66 M972 43 L990 58 M420 47 L410 64"/>
+    </svg>
+    <div class="fa-board">
+
+      <article class="crack-card">
+        <header class="cc-head">
+          <svg class="zig" viewBox="0 0 40 16" aria-hidden="true"><path d="M1 8 L8 3 L14 12 L21 4 L27 13 L33 5 L39 9"/></svg><span class="cc-no">Vết nứt 01</span>
+          <h3>“regex tốt mà không khớp DB là vô nghĩa”</h3>
+          <span class="cc-src">trích lời người dùng · H2</span>
+        </header>
+        <ul class="patches">
+          <li class="idea patch" data-tech="fa" data-n="1"><span class="no">#001</span>Tầng xuất db_view: engine xuất thêm person_row/asset_row đúng contract §4.1/§4.2 (Nam/Nữ, YYYY-MM-DD, so_giay_to, so_serial canonical) song song raw</li>
+          <li class="idea patch" data-tech="fa" data-n="2"><span class="no">#002</span>Dùng chung <code>normalization.py</code> của notary_v2 làm bộ chuẩn hóa duy nhất; regex chỉ quan sát raw, không tự chuẩn hóa</li>
+          <li class="idea patch" data-tech="fa" data-n="3"><span class="no">#003</span>Regex engine trở thành 1 adapter của intake_analyze: xuất suggestion shape (raw_value/normalized_value/observation_state/source_refs) cho kind docx/doc/text</li>
+          <li class="idea patch" data-tech="fa" data-n="4"><span class="no">#004</span>Contract test: validate output tool bằng <code>contracts/notary-case-drafting/*.schema.json</code> — regex tốt mà sai schema là test đỏ</li>
+          <li class="idea patch" data-tech="fa" data-n="5"><span class="no">#005</span>Ma trận phủ trường DB: mỗi trường DB ↔&#xFE0E; rule nào điền, loại văn bản nào; ô trống = lỗ hổng, sinh tự động từ code</li>
+        </ul>
+      </article>
+
+      <article class="crack-card">
+        <header class="cc-head">
+          <svg class="zig" viewBox="0 0 40 16" aria-hidden="true"><path d="M1 8 L8 3 L14 12 L21 4 L27 13 L33 5 L39 9"/></svg><span class="cc-no">Vết nứt 02</span>
+          <h3>“hỏi duyệt lặp cùng 1 lỗi”</h3>
+          <span class="cc-src">trích lời người dùng · H5</span>
+        </header>
+        <ul class="patches">
+          <li class="idea patch" data-tech="fa" data-n="6"><span class="no">#006</span>Sổ quyết định máy đọc được (ledger YAML): Q-id, câu hỏi, quyết định, ví dụ snippet, ngày, owner; specs chỉ link Q-id</li>
+          <li class="idea patch" data-tech="fa" data-n="7"><span class="no">#007</span>Luật không hỏi 2 lần: mỗi câu owner trả lời → cùng lượt thành ledger entry + fixture test; agent phải dẫn kết quả tìm ledger trước khi hỏi</li>
+          <li class="idea patch" data-tech="fa" data-n="8"><span class="no">#008</span>Mỗi mã cờ kèm chính sách tự xử lý: sửa code / chấp nhận / hỏi owner — agent biết khi nào được hỏi</li>
+        </ul>
+      </article>
+
+      <article class="crack-card">
+        <header class="cc-head">
+          <svg class="zig" viewBox="0 0 40 16" aria-hidden="true"><path d="M1 8 L8 3 L14 12 L21 4 L27 13 L33 5 L39 9"/></svg><span class="cc-no">Vết nứt 03</span>
+          <h3>“rơi im lặng”: lỗi lọt qua mà không ai biết</h3>
+          <span class="cc-src">từ ý #014</span>
+        </header>
+        <ul class="patches">
+          <li class="idea patch" data-tech="fa" data-n="9"><span class="no">#009</span>Fixture validator dùng tên file/tên người tiếng Việt có dấu thật (ẩn danh) — bắt lớp lỗi như R00 không bỏ dấu</li>
+          <li class="idea patch" data-tech="fa" data-n="10"><span class="no">#010</span>Golden snapshot (regex_lab verify) làm hàng rào hồi quy: mẫu đã duyệt đổi giá trị → đỏ</li>
+          <li class="idea patch" data-tech="fa" data-n="11"><span class="no">#011</span>Tách luật có mặt (presence) và luật đúng giá trị (correctness); correctness chỉ đến từ golden/expected</li>
+          <li class="idea patch" data-tech="fa" data-n="14"><span class="no">#014</span>Bất biến chống rơi im lặng: mỗi lần xuất hiện 'CCCD số' phải map vào 1 người; mỗi 'thửa đất số' → 1 thửa; lệch → cờ</li>
+          <li class="idea patch" data-tech="fa" data-n="15"><span class="no">#015</span>Đếm neo làm oracle rẻ: đếm Sinh năm/Sinh ngày, CCCD, Thửa, Sổ tiết kiệm, chết ngày trong text vs số bản ghi trích được</li>
+          <li class="idea patch" data-tech="fa" data-n="16"><span class="no">#016</span>Tổng quát R04 thành kiểm tra rò nhãn cho mọi trường: giá trị chứa '|', 'Sinh n', 'CCCD', quá dài → cờ</li>
+          <li class="idea patch" data-tech="fa" data-n="17"><span class="no">#017</span>Validator định dạng từ contract: so_serial 2 chữ + 6-8 số, CCCD 9/12 số, ngày hợp lệ → cờ</li>
+        </ul>
+      </article>
+
+      <article class="crack-card">
+        <header class="cc-head">
+          <svg class="zig" viewBox="0 0 40 16" aria-hidden="true"><path d="M1 8 L8 3 L14 12 L21 4 L27 13 L33 5 L39 9"/></svg><span class="cc-no">Vết nứt 04</span>
+          <h3>“Docs + rule hiện tại dài dòng, lặp nội dung”</h3>
+          <span class="cc-src">trích lời người dùng · H4</span>
+        </header>
+        <ul class="patches">
+          <li class="idea patch" data-tech="fa" data-n="12"><span class="no">#012</span>Bỏ catalog văn xuôi regex-rules: sinh catalog từ registry pattern/docstring trong code</li>
+          <li class="idea patch" data-tech="fa" data-n="13"><span class="no">#013</span>Pattern registry: mỗi regex có id, field, doc_kind, ví dụ khớp/không khớp — ví dụ chạy thành test, docs sinh ra</li>
+        </ul>
+      </article>
+
+      <article class="crack-card">
+        <header class="cc-head">
+          <svg class="zig" viewBox="0 0 40 16" aria-hidden="true"><path d="M1 8 L8 3 L14 12 L21 4 L27 13 L33 5 L39 9"/></svg><span class="cc-no">Vết nứt 05</span>
+          <h3>Không “lần ngược giá trị sai về rule” được</h3>
+          <span class="cc-src">từ ý #018</span>
+        </header>
+        <ul class="patches">
+          <li class="idea patch" data-tech="fa" data-n="18"><span class="no">#018</span>Provenance từng trường: pattern id + engine version sinh ra giá trị — agent lần ngược giá trị sai về rule ngay</li>
+          <li class="idea patch" data-tech="fa" data-n="19"><span class="no">#019</span>source_refs: offset/số dòng cho mỗi giá trị → tool tô sáng trong text gốc, agent so nhanh</li>
+        </ul>
+      </article>
+
+      <article class="crack-card">
+        <header class="cc-head">
+          <svg class="zig" viewBox="0 0 40 16" aria-hidden="true"><path d="M1 8 L8 3 L14 12 L21 4 L27 13 L33 5 L39 9"/></svg><span class="cc-no">Vết nứt 06</span>
+          <h3>Engine phải “copy tay” sang tool</h3>
+          <span class="cc-src">từ ý #020</span>
+        </header>
+        <ul class="patches">
+          <li class="idea patch" data-tech="fa" data-n="20"><span class="no">#020</span>Bỏ copy tay: tool import engine từ package/đường dẫn chung, build script đóng gói</li>
+          <li class="idea patch" data-tech="fa" data-n="21"><span class="no">#021</span><code>build_tool.py</code> 1 lệnh: chép engine, tăng <code>ENGINE_VERSION</code>, chạy test, nén folder có ngày</li>
+        </ul>
+      </article>
+
+      <article class="crack-card">
+        <header class="cc-head">
+          <svg class="zig" viewBox="0 0 40 16" aria-hidden="true"><path d="M1 8 L8 3 L14 12 L21 4 L27 13 L33 5 L39 9"/></svg><span class="cc-no">Vết nứt 07</span>
+          <h3>Agent nhìn kết quả rồi mới “đoán”: thiên vị</h3>
+          <span class="cc-src">từ ý #022</span>
+        </header>
+        <ul class="patches">
+          <li class="idea patch" data-tech="fa" data-n="22"><span class="no">#022</span>Kết quả nhìn trước của agent lưu thành <code>expected/&lt;hash&gt;.json</code> TRƯỚC khi chạy code (dự đoán mù, tránh thiên vị)</li>
+          <li class="idea patch" data-tech="fa" data-n="23"><span class="no">#023</span>Diff tool expected vs output từng trường, mã M01 thiếu / M02 sai giá trị / M03 thừa</li>
+        </ul>
+      </article>
+
+    </div>
+    <p class="layout-note">Cách gom ý vào 7 vết nứt là do trang này xếp cho dễ đọc; tên vết nứt lấy từ chính lời người dùng hoặc chữ trong ý. Số # giữ đúng thứ tự trong nhật ký.</p>
+  </div>
+</section>
+
+<!-- ================= BACKCASTING ================= -->
+<section id="bc" class="sec" data-tech="bc">
+  <div class="wrap">
+    <header class="sec-head">
+      <div class="readout"><span class="ro-dot"></span>Lần quét 2/4<span class="ro-line"></span><span class="ro-count"><b data-count="bc">26</b> ý</span></div>
+      <div class="head-row">
+        <div>
+          <h2>Backcasting</h2>
+          <p class="tgloss"><b>Đi ngược từ đích:</b> vẽ cảnh đã thành công trước, rồi lùi từng bước về hôm nay để biết việc đầu tiên phải làm. Nhãn <b>T−3</b> nghĩa là còn 3 bước nữa mới tới đích.</p>
+        </div>
+        <button class="btn" id="bcFlip" aria-pressed="false">Xem xuôi thời gian</button>
+      </div>
+    </header>
+
+    <div class="bc-track" id="bcTrack">
+      <div class="axis">Tương lai · đích</div>
+      <ol class="rewind">
+
+        <li class="station goal">
+          <div class="idea st-main" data-tech="bc" data-n="24"><div class="st-meta"><span class="tminus">T−0</span><span class="no">#024</span></div><b class="st-label">Đích:</b> dev nói 'mẫu mới ở D:\X' → agent tự chạy hết vòng, chỉ hỏi quyết định nghiệp vụ mới thật sự, gom 1 lần cuối vòng</div>
+          <div class="st-tools"><div class="idea tool" data-tech="bc" data-n="35"><span class="no">#035</span>Điều kiện dừng rõ: không còn lỗi M/R trên mẫu cụm + golden cũ không đổi (trừ đã duyệt) + câu hỏi mở đã ghi</div><div class="idea tool" data-tech="bc" data-n="36"><span class="no">#036</span>Leo thang có giới hạn: 3 vòng thất bại cùng 1 trường → gom bằng chứng hỏi 1 lần, không hỏi lắt nhắt</div><div class="idea tool" data-tech="bc" data-n="37"><span class="no">#037</span>Gom câu hỏi: case không tự quyết được vào 1 bảng hỏi cuối vòng (trắc nghiệm + ví dụ), owner trả 1 lần → ledger</div><div class="idea tool" data-tech="bc" data-n="38"><span class="no">#038</span>Lệnh chốt tự động: câu trả lời owner → ledger + fixture + (nếu cần) sửa rule</div></div>
+        </li>
+
+        <li class="station">
+          <div class="idea st-main" data-tech="bc" data-n="25"><div class="st-meta"><span class="tminus">T−1</span><span class="no">#025</span></div><b class="st-label">Bước cuối:</b> báo cáo vòng tự sinh — số file, sạch/cờ, câu hỏi mới (gom), diff golden</div>
+          <div class="st-tools"><div class="idea tool" data-tech="bc" data-n="43"><span class="no">#043</span>Kiểm DB cuối: output đổi sang person_row/asset_row và qua schema — chưa qua thì chưa xong</div><div class="idea tool" data-tech="bc" data-n="44"><span class="no">#044</span>Báo cáo tỉ lệ lấp đầy từng trường DB trên toàn mẫu</div><div class="idea tool" data-tech="bc" data-n="45"><span class="no">#045</span>Người kiểm chỉ xem mẫu gắn cờ + 10% ngẫu nhiên để đo độ chính xác thật</div><div class="idea tool" data-tech="bc" data-n="48"><span class="no">#048</span>Handoff tự sinh: thay đổi gì, câu hỏi nào đang chờ</div></div>
+        </li>
+
+        <li class="station">
+          <div class="idea st-main" data-tech="bc" data-n="26"><div class="st-meta"><span class="tminus">T−2</span><span class="no">#026</span></div><b class="st-label">Trước đó:</b> fixture xanh + golden cập nhật kèm danh sách duyệt</div>
+          <div class="st-tools"><div class="idea tool" data-tech="bc" data-n="47"><span class="no">#047</span>Ghim phiên bản: bản tool gắn engine version + hash bộ golden</div></div>
+        </li>
+
+        <li class="station">
+          <div class="idea st-main" data-tech="bc" data-n="27"><div class="st-meta"><span class="tminus">T−3</span><span class="no">#027</span></div><b class="st-label">Trước đó:</b> xung đột được phát hiện → tạo profile/phiên bản rule mới thay vì sửa đè</div>
+          <div class="st-tools"><div class="idea tool" data-tech="bc" data-n="39"><span class="no">#039</span>Phát hiện xung đột vận hành: sau khi sửa, chạy golden cũ; mẫu đã duyệt đổi → thu hẹp phạm vi rule hoặc tạo profile mới</div><div class="idea tool" data-tech="bc" data-n="40"><span class="no">#040</span>Profile rule theo họ biểu mẫu (<code>thua_ke.v1</code>, <code>thua_ke.mau_X.v2</code>) chọn bằng vân tay — tránh if-else chồng chất</div></div>
+        </li>
+
+        <li class="station">
+          <div class="idea st-main" data-tech="bc" data-n="28"><div class="st-meta"><span class="tminus">T−4</span><span class="no">#028</span></div><b class="st-label">Trước đó:</b> bảng lệch được phân loại: lỗi code / lỗi văn bản gốc / chưa có quyết định</div>
+          <div class="st-tools"></div>
+        </li>
+
+        <li class="station">
+          <div class="idea st-main" data-tech="bc" data-n="29"><div class="st-meta"><span class="tminus">T−5</span><span class="no">#029</span></div><b class="st-label">Trước đó:</b> agent đã ghi expected JSON cho từng file (hoặc từng cụm)</div>
+          <div class="st-tools"><div class="idea tool" data-tech="bc" data-n="46"><span class="no">#046</span>Flow nhân viên đích: import/dán → bảng theo cột DB → gửi log có engine version + provenance</div><div class="idea tool" data-tech="bc" data-n="49"><span class="no">#049</span>Flow dev và flow nhân viên dùng chung 1 schema kết quả (expected/log) → log nhân viên thành ứng viên golden</div></div>
+        </li>
+
+        <li class="station">
+          <div class="idea st-main" data-tech="bc" data-n="30"><div class="st-meta"><span class="tminus">T−6</span><span class="no">#030</span></div><b class="st-label">Trước đó:</b> agent nạp context pack ngắn: từ điển trường DB (nghĩa, định dạng, ví dụ), từ điển neo mở/kết từng khối, ledger quyết định, chính sách mã cờ</div>
+          <div class="st-tools"><div class="idea tool" data-tech="bc" data-n="34"><span class="no">#034</span>Skill agent <code>.devin/skills/regex-mau-moi/SKILL.md</code> mã hóa vòng lặp; dev chỉ gọi skill</div></div>
+        </li>
+
+        <li class="station start">
+          <div class="idea st-main" data-tech="bc" data-n="31"><div class="st-meta"><span class="tminus">T−7</span><span class="no">#031</span></div><b class="st-label">Bước đầu tiên:</b> lệnh <code>regex_lab new-samples D:\X</code> — nạp, khử trùng theo hash, phân loại, gom cụm theo vân tay mẫu, tạo packet</div>
+          <div class="st-tools"><div class="idea tool" data-tech="bc" data-n="32"><span class="no">#032</span>Vân tay mẫu (template fingerprint): hash khung tiêu đề/nhãn neo → gom biểu mẫu giống nhau, agent đọc 1 đại diện mỗi cụm</div><div class="idea tool" data-tech="bc" data-n="33"><span class="no">#033</span>Packet mỗi cụm: text đã cắt đúng khối liên quan, output hiện tại, cờ, số neo</div><div class="idea tool" data-tech="bc" data-n="41"><span class="no">#041</span>Đường raw text: ô dán trong tool → cùng pipeline kind=text; loại văn bản suy từ nội dung; chấp nhận đoạn thiếu tiêu đề</div><div class="idea tool" data-tech="bc" data-n="42"><span class="no">#042</span>Chế độ mảnh (fragment): không có tiêu đề thì chạy độc lập parser người/tài sản theo neo</div></div>
+        </li>
+
+      </ol>
+      <div class="axis now">Hôm nay · bước đầu tiên</div>
+    </div>
+    <p class="layout-note">Cột trái là 8 trạm chính đúng như coach ghi (Đích → Bước cuối → Trước đó ×5 → Bước đầu tiên). Cột phải là 18 ý phụ, được trang này đặt cạnh trạm gần nghĩa nhất.</p>
+  </div>
+</section>
+
+<!-- ================= MORPHOLOGICAL ANALYSIS ================= -->
+<section id="ma" class="sec" data-tech="ma">
+  <div class="wrap">
+    <header class="sec-head">
+      <div class="readout"><span class="ro-dot"></span>Lần quét 3/4<span class="ro-line"></span><span class="ro-count"><b data-count="ma">26</b> ý</span></div>
+      <h2>Morphological Analysis</h2>
+      <p class="tgloss"><b>Phân tích hình thái:</b> tách bài toán thành các “núm vặn” độc lập, mỗi núm có vài nấc; ghép một nấc của núm này với một nấc của núm kia là ra một tổ hợp thiết kế.</p>
+    </header>
+    <blockquote class="insight-quote"><span class="who">insight by coach</span>Biến độc lập: (A) input docx/doc/text; (B) cắt khối doc-kind-first/anchor-first/profile; (C) output raw/DB rows/suggestion; (D) nguồn đúng sai: comment Word/expected agent/golden/log nhân viên; (E) rule: code/YAML/lai; (F) bộ nhớ quyết định: văn xuôi/ledger/test; (G) phiên bản: 1 engine/profile/semver; (H) kiểm tra: presence/format/đếm neo/golden/schema; (I) context: full spec/pack sinh/packet cụm</blockquote>
+
+    <div class="ma-layout">
+      <div class="ma-side">
+        <div class="ma-grid no-gloss" id="maGrid" role="group" aria-label="Lưới 9 biến độc lập">
+          <div class="mrow"><div class="mvar"><b>A</b>input</div><div class="mopts"><button class="cell" data-cell="A1"><span class="cl">docx</span></button><button class="cell" data-cell="A2"><span class="cl">doc</span></button><button class="cell" data-cell="A3"><span class="cl">text</span></button></div></div>
+          <div class="mrow"><div class="mvar"><b>B</b>cắt khối</div><div class="mopts"><button class="cell" data-cell="B1"><span class="cl">doc-kind-first</span></button><button class="cell" data-cell="B2"><span class="cl">anchor-first</span></button><button class="cell" data-cell="B3"><span class="cl">profile</span></button></div></div>
+          <div class="mrow"><div class="mvar"><b>C</b>output</div><div class="mopts"><button class="cell" data-cell="C1"><span class="cl">raw</span></button><button class="cell" data-cell="C2"><span class="cl">DB rows</span></button><button class="cell" data-cell="C3"><span class="cl">suggestion</span></button></div></div>
+          <div class="mrow"><div class="mvar"><b>D</b>nguồn đúng sai</div><div class="mopts"><button class="cell" data-cell="D1"><span class="cl">comment Word</span></button><button class="cell" data-cell="D2"><span class="cl">expected agent</span></button><button class="cell" data-cell="D3"><span class="cl">golden</span></button><button class="cell" data-cell="D4"><span class="cl">log nhân viên</span></button></div></div>
+          <div class="mrow"><div class="mvar"><b>E</b>rule</div><div class="mopts"><button class="cell" data-cell="E1"><span class="cl">code</span></button><button class="cell" data-cell="E2"><span class="cl">YAML</span></button><button class="cell" data-cell="E3"><span class="cl">lai</span></button></div></div>
+          <div class="mrow"><div class="mvar"><b>F</b>bộ nhớ quyết định</div><div class="mopts"><button class="cell" data-cell="F1"><span class="cl">văn xuôi</span></button><button class="cell" data-cell="F2"><span class="cl">ledger</span></button><button class="cell" data-cell="F3"><span class="cl">test</span></button></div></div>
+          <div class="mrow"><div class="mvar"><b>G</b>phiên bản</div><div class="mopts"><button class="cell" data-cell="G1"><span class="cl">1 engine</span></button><button class="cell" data-cell="G2"><span class="cl">profile</span></button><button class="cell" data-cell="G3"><span class="cl">semver</span></button></div></div>
+          <div class="mrow"><div class="mvar"><b>H</b>kiểm tra</div><div class="mopts"><button class="cell" data-cell="H1"><span class="cl">presence</span></button><button class="cell" data-cell="H2"><span class="cl">format</span></button><button class="cell" data-cell="H3"><span class="cl">đếm neo</span></button><button class="cell" data-cell="H4"><span class="cl">golden</span></button><button class="cell" data-cell="H5"><span class="cl">schema</span></button></div></div>
+          <div class="mrow"><div class="mvar"><b>I</b>context</div><div class="mopts"><button class="cell" data-cell="I1"><span class="cl">full spec</span></button><button class="cell" data-cell="I2"><span class="cl">pack sinh</span></button><button class="cell" data-cell="I3"><span class="cl">packet cụm</span></button></div></div>
+        </div>
+        <div class="ma-legend no-gloss"><span class="heat"><i style="--a:.06"></i><i style="--a:.2"></i><i style="--a:.35"></i><i style="--a:.55"></i></span>Ô càng đậm = càng nhiều ý chọn nấc đó · viền đứt = chưa ý nào chọn</div>
+        <p id="maNote" class="no-gloss">Rê chuột lên một ý để thấy tổ hợp của nó sáng lên. Bấm một ô để chỉ giữ các ý chọn nấc đó.</p>
+        <p class="layout-note">Ô sáng của từng ý do trang này đọc chữ trong ý mà đánh dấu; ý không chạm biến nào ghi “ngoài lưới”.</p>
+      </div>
+
+      <div class="ma-ideas">
+        <article class="idea mcard combo" data-tech="ma" data-n="50" data-cells="B2 C2 D3 F2" tabindex="0"><span class="no">#050</span><p>Tổ hợp anchor-first + DB rows + golden + ledger: khối xác định bằng neo mở/kết độc lập loại văn bản; loại văn bản chỉ chọn nhãn</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard combo" data-tech="ma" data-n="51" data-cells="A3 B2" tabindex="0"><span class="no">#051</span><p>Tổ hợp raw text + anchor-first: hỗ trợ dán đoạn tự nhiên, không cần biết loại</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard combo" data-tech="ma" data-n="52" data-cells="B2 E2 E3" tabindex="0"><span class="no">#052</span><p>Tổ hợp neo YAML + parser trường Python: neo mở/kết khai báo trong file dữ liệu theo họ biểu mẫu; file YAML chính là docs</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard combo" data-tech="ma" data-n="53" data-cells="D1 D2" tabindex="0"><span class="no">#053</span><p>Tổ hợp comment Word làm đáp án: <code>read_word_comments.py</code> đã có → owner chú thích 'ho_ten=...' → sinh expected JSON tự động</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard combo" data-tech="ma" data-n="54" data-cells="D4 D3" tabindex="0"><span class="no">#054</span><p>Tổ hợp phản hồi nhân viên: chuột phải 'ô này sai' + sửa → log mang correction → ứng viên golden</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard combo" data-tech="ma" data-n="55" data-cells="B3 G2 G3" tabindex="0"><span class="no">#055</span><p>Tổ hợp profile theo vân tay + semver: <code>thua_ke@1.2</code></p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard" data-tech="ma" data-n="56" data-cells="I2 F2" tabindex="0"><span class="no">#056</span><p>Context pack sinh tự động: <code>context_pack.py</code> tạo 1 file ≤300 dòng từ contract + code + ledger</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard" data-tech="ma" data-n="57" data-cells="B2" tabindex="0"><span class="no">#057</span><p>Share core theo KHỐI chứ không theo loại văn bản: parser khối người dùng chung thừa kế/chuyển nhượng/tặng cho</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard" data-tech="ma" data-n="58" data-cells="B2" tabindex="0"><span class="no">#058</span><p>Parser tài sản dạng module có registry neo: đất, sổ TK, bảo hiểm, xe, nhà, cổ phần — tài sản hỗn hợp tự nhiên</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard" data-tech="ma" data-n="59" data-cells="C1 C2" tabindex="0"><span class="no">#059</span><p>Output 3 tầng: raw (đoạn nguyên văn + offset) / db (dòng chuẩn hóa) / flags</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard" data-tech="ma" data-n="60" data-cells="C1 C2" tabindex="0"><span class="no">#060</span><p>Chuẩn hóa chỉ ở biên: raw giữ '1.234,0 m2', db nhận số + cờ</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard" data-tech="ma" data-n="61" data-cells="C3" tabindex="0"><span class="no">#061</span><p>Dùng observation_state của contract (observed/normalized/inferred) thay cờ tự chế như chi_co_nam_sinh</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard" data-tech="ma" data-n="62" data-cells="C2" tabindex="0"><span class="no">#062</span><p>Bỏ cờ chi_co_nam_sinh ở tầng db vì contract đã nhận YYYY</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard" data-tech="ma" data-n="63" data-cells="C3" tabindex="0"><span class="no">#063</span><p>Giới tính: Ông→Nam (normalized); suy từ 'Thị' → inferred + confidence (cân nhắc thay cho để trống)</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard" data-tech="ma" data-n="64" data-cells="H5 H2 H3 H4 H1" tabindex="0"><span class="no">#064</span><p>Thứ tự kiểm: schema → định dạng → đếm neo → golden → presence</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard" data-tech="ma" data-n="65" data-cells="" tabindex="0"><span class="no">#065</span><p>Mã cờ phân cấp tự mô tả (<code>P.ho_ten.ro_nhan</code>, <code>A.dat.thieu_dien_tich</code>) thay R00..R11 đánh số</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard" data-tech="ma" data-n="66" data-cells="E1" tabindex="0"><span class="no">#066</span><p>Catalog cờ trong code có message + chính sách + ví dụ; tool hiện câu mô tả (sửa vấn đề không thấy rule)</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard" data-tech="ma" data-n="67" data-cells="E3 E2" tabindex="0"><span class="no">#067</span><p>Rule lai: neo + nhãn ở YAML (người không code đọc được), phân tích phức tạp ở Python</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard" data-tech="ma" data-n="68" data-cells="D1 F2 D3 D2" tabindex="0"><span class="no">#068</span><p>Thứ bậc sự thật: comment owner &gt; ledger &gt; golden đã duyệt &gt; expected của agent</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard" data-tech="ma" data-n="69" data-cells="H4" tabindex="0"><span class="no">#069</span><p>Định nghĩa xung đột vận hành: thay đổi làm đổi giá trị trường của bất kỳ golden đã duyệt</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard" data-tech="ma" data-n="70" data-cells="G2" tabindex="0"><span class="no">#070</span><p>Phiên bản mới = chép file profile, không chép engine; mẫu cũ giữ profile cũ</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard" data-tech="ma" data-n="71" data-cells="A1 A2 A3 G1" tabindex="0"><span class="no">#071</span><p>API engine duy nhất <code>extract(source)</code> với source = path/text/bytes; tool, upload_lab, notary_v2 cùng gọi</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard" data-tech="ma" data-n="72" data-cells="G1" tabindex="0"><span class="no">#072</span><p>Chuyển core ra package dùng chung cấp monorepo (<code>core/regex_core/</code>) cho upload_lab, notary_v2, build tool</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard" data-tech="ma" data-n="73" data-cells="H4 H5" tabindex="0"><span class="no">#073</span><p>Kim tự tháp test: ví dụ pattern (nhanh) → fixture khối tổng hợp → golden thật (local, PII) → schema</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard" data-tech="ma" data-n="74" data-cells="D3 H4" tabindex="0"><span class="no">#074</span><p>Golden an toàn PII: golden thật chỉ local; fixture commit được sinh từ mẫu thật qua bộ ẩn danh</p><div class="mtags no-gloss"></div></article>
+        <article class="idea mcard" data-tech="ma" data-n="75" data-cells="" tabindex="0"><span class="no">#075</span><p>Bộ ẩn danh: thay tên/CCCD/địa chỉ bằng giá trị giả nhất quán, giữ nguyên cấu trúc → fixture commit được</p><div class="mtags no-gloss"></div></article>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ASSUMPTION REVERSAL ================= -->
+<section id="ar" class="sec" data-tech="ar">
+  <div class="wrap">
+    <header class="sec-head">
+      <div class="readout"><span class="ro-dot"></span>Lần quét 4/4<span class="ro-line"></span><span class="ro-count"><b data-count="ar">39</b> ý</span></div>
+      <div class="head-row">
+        <div>
+          <h2>Assumption Reversal</h2>
+          <p class="tgloss"><b>Lật ngược giả định:</b> lấy một điều ai cũng mặc nhiên tin, rồi thử làm ngược lại xem có lối mới không. Mặt trước là giả định cũ; bấm vào thẻ để lật sang mặt sau.</p>
+        </div>
+        <button class="btn" id="flipAll">Lật tất cả</button>
+      </div>
+    </header>
+
+    <div class="deck">
+      <div class="unit"><div class="idea flip" data-tech="ar" data-n="76" tabindex="0" role="button" aria-pressed="false"><div class="inner"><div class="face front"><div class="f-top"><span class="face-lbl">giả định</span><span class="no">#076</span></div><p class="assume"><span class="verb">Lật</span>'rule viết bằng văn xuôi':</p><span class="hint">bấm để lật</span></div><div class="face back"><div class="f-top"><span class="face-lbl">lật ngược</span><span class="no">#076</span></div><p class="was">'rule viết bằng văn xuôi'</p><p class="rev">rule sống trong code/data, docs là thẻ rule sinh tự động theo trường</p></div></div></div></div>
+
+      <div class="unit"><div class="idea flip" data-tech="ar" data-n="77" tabindex="0" role="button" aria-pressed="false"><div class="inner"><div class="face front"><div class="f-top"><span class="face-lbl">giả định</span><span class="no">#077</span></div><p class="assume"><span class="verb">Lật</span>'phải biết loại văn bản trước':</p><span class="hint">bấm để lật</span></div><div class="face back"><div class="f-top"><span class="face-lbl">lật ngược</span><span class="no">#077</span></div><p class="was">'phải biết loại văn bản trước'</p><p class="rev">loại văn bản là output, không phải điều kiện</p></div></div></div></div>
+
+      <div class="unit"><div class="idea flip" data-tech="ar" data-n="78" tabindex="0" role="button" aria-pressed="false"><div class="inner"><div class="face front"><div class="f-top"><span class="face-lbl">giả định</span><span class="no">#078</span></div><p class="assume"><span class="verb">Lật</span>'agent hỏi khi không chắc':</p><span class="hint">bấm để lật</span></div><div class="face back"><div class="f-top"><span class="face-lbl">lật ngược</span><span class="no">#078</span></div><p class="was">'agent hỏi khi không chắc'</p><p class="rev">giữa vòng không hỏi; chọn mặc định an toàn (raw + cờ) và ghi câu hỏi chờ</p></div></div></div>
+        <div class="idea tail" data-tech="ar" data-n="79"><span class="tail-lbl">kéo theo</span><span class="no">#079</span><br>Chính sách mặc định bảo thủ: không chắc thì xuất nguyên văn + cờ, không suy luận</div></div>
+
+      <div class="unit"><div class="idea flip" data-tech="ar" data-n="80" tabindex="0" role="button" aria-pressed="false"><div class="inner"><div class="face front"><div class="f-top"><span class="face-lbl">giả định</span><span class="no">#080</span></div><p class="assume"><span class="verb">Lật</span>'engine 1 file':</p><span class="hint">bấm để lật</span></div><div class="face back"><div class="f-top"><span class="face-lbl">lật ngược</span><span class="no">#080</span></div><p class="was">'engine 1 file'</p><p class="rev">tách <code>extract_contract.py</code> 2500 dòng thành header/people/deceased/land/savings/insurance/normalize</p></div></div></div></div>
+
+      <div class="unit"><div class="idea flip" data-tech="ar" data-n="81" tabindex="0" role="button" aria-pressed="false"><div class="inner"><div class="face front"><div class="f-top"><span class="face-lbl">giả định</span><span class="no">#081</span></div><p class="assume"><span class="verb">Lật</span>'test viết tay':</p><span class="hint">bấm để lật</span></div><div class="face back"><div class="f-top"><span class="face-lbl">lật ngược</span><span class="no">#081</span></div><p class="was">'test viết tay'</p><p class="rev">test sinh từ mẫu đã duyệt + câu trả lời owner (snippet + trường kỳ vọng)</p></div></div></div></div>
+
+      <div class="unit"><div class="idea flip" data-tech="ar" data-n="82" tabindex="0" role="button" aria-pressed="false"><div class="inner"><div class="face front"><div class="f-top"><span class="face-lbl">giả định</span><span class="no">#082</span></div><p class="assume"><span class="verb">Lật</span>'golden toàn văn bản':</p><span class="hint">bấm để lật</span></div><div class="face back"><div class="f-top"><span class="face-lbl">lật ngược</span><span class="no">#082</span></div><p class="was">'golden toàn văn bản'</p><p class="rev">golden theo trường, chỉ khẳng định trường đã xác minh → ít xung đột giả</p></div></div></div></div>
+
+      <div class="unit"><div class="idea flip" data-tech="ar" data-n="83" tabindex="0" role="button" aria-pressed="false"><div class="inner"><div class="face front"><div class="f-top"><span class="face-lbl">giả định</span><span class="no">#083</span></div><p class="assume"><span class="verb">Lật</span>'tool nhân viên tách tool dev':</p><span class="hint">bấm để lật</span></div><div class="face back"><div class="f-top"><span class="face-lbl">lật ngược</span><span class="no">#083</span></div><p class="was">'tool nhân viên tách tool dev'</p><p class="rev">1 app 2 chế độ (Nhân viên / Dev hiện provenance, cờ, diff expected)</p></div></div></div></div>
+
+      <div class="unit"><div class="idea flip" data-tech="ar" data-n="84" tabindex="0" role="button" aria-pressed="false"><div class="inner"><div class="face front"><div class="f-top"><span class="face-lbl">giả định</span><span class="no">#084</span></div><p class="assume"><span class="verb">Lật</span>'chép engine vào tool':</p><span class="hint">bấm để lật</span></div><div class="face back"><div class="f-top"><span class="face-lbl">lật ngược</span><span class="no">#084</span></div><p class="was">'chép engine vào tool'</p><p class="rev">tool chỉ là frontend GUI/CLI của engine; build đóng gói</p></div></div></div></div>
+
+      <div class="unit"><div class="idea flip" data-tech="ar" data-n="85" tabindex="0" role="button" aria-pressed="false"><div class="inner"><div class="face front"><div class="f-top"><span class="face-lbl">giả định</span><span class="no">#085</span></div><p class="assume"><span class="verb">Lật</span>'agent đọc cả file Word':</p><span class="hint">bấm để lật</span></div><div class="face back"><div class="f-top"><span class="face-lbl">lật ngược</span><span class="no">#085</span></div><p class="was">'agent đọc cả file Word'</p><p class="rev">agent đọc lát cắt khối + số dòng + số neo</p></div></div></div></div>
+
+      <div class="unit"><div class="idea flip" data-tech="ar" data-n="86" tabindex="0" role="button" aria-pressed="false"><div class="inner"><div class="face front"><div class="f-top"><span class="face-lbl">giả định</span><span class="no">#086</span></div><p class="assume"><span class="verb">Lật</span>'regex phải hoàn hảo':</p><span class="hint">bấm để lật</span></div><div class="face back"><div class="f-top"><span class="face-lbl">lật ngược</span><span class="no">#086</span></div><p class="was">'regex phải hoàn hảo'</p><p class="rev">regex sinh ứng viên, bộ chấm chọn theo khoảng cách neo, mơ hồ → cờ</p></div></div></div></div>
+
+      <div class="unit"><div class="idea flip" data-tech="ar" data-n="87" tabindex="0" role="button" aria-pressed="false"><div class="inner"><div class="face front"><div class="f-top"><span class="face-lbl">giả định</span><span class="no">#087</span></div><p class="assume"><span class="verb">Lật</span>'lỗi do validator tìm':</p><span class="hint">bấm để lật</span></div><div class="face back"><div class="f-top"><span class="face-lbl">lật ngược</span><span class="no">#087</span></div><p class="was">'lỗi do validator tìm'</p><p class="rev">lỗi = chênh giữa 2 bộ trích độc lập (agent đọc mù vs engine, đếm neo vs parser)</p></div></div></div></div>
+
+      <div class="unit"><div class="idea flip" data-tech="ar" data-n="88" tabindex="0" role="button" aria-pressed="false"><div class="inner"><div class="face front"><div class="f-top"><span class="face-lbl">giả định</span><span class="no">#088</span></div><p class="assume"><span class="verb">Lật</span>'quyết định theo từng case':</p><span class="hint">bấm để lật</span></div><div class="face back"><div class="f-top"><span class="face-lbl">lật ngược</span><span class="no">#088</span></div><p class="was">'quyết định theo từng case'</p><p class="rev">≤10 nguyên tắc có ví dụ Q-id, agent áp dụng tương tự và trích nguyên tắc</p></div></div></div></div>
+
+      <div class="unit"><div class="idea flip" data-tech="ar" data-n="89" tabindex="0" role="button" aria-pressed="false"><div class="inner"><div class="face front"><div class="f-top"><span class="face-lbl">giả định</span><span class="no">#089</span></div><p class="assume"><span class="verb">Lật</span>'cờ = thất bại':</p><span class="hint">bấm để lật</span></div><div class="face back"><div class="f-top"><span class="face-lbl">lật ngược</span><span class="no">#089</span></div><p class="was">'cờ = thất bại'</p><p class="rev">ratchet — chỉ số lấp đầy/số cờ mỗi loại không được tệ hơn vòng trước</p></div></div></div></div>
+
+      <div class="unit"><div class="idea flip" data-tech="ar" data-n="90" tabindex="0" role="button" aria-pressed="false"><div class="inner"><div class="face front"><div class="f-top"><span class="face-lbl">giả định</span><span class="no">#090</span></div><p class="assume"><span class="verb">Lật</span>'code regex là sản phẩm':</p><span class="hint">bấm để lật</span></div><div class="face back"><div class="f-top"><span class="face-lbl">lật ngược</span><span class="no">#090</span></div><p class="was">'code regex là sản phẩm'</p><p class="rev">bộ mẫu chú thích (ẩn danh) là tài sản dài hạn, engine nào cũng đo bằng nó</p></div></div></div></div>
+
+      <div class="unit"><div class="idea flip" data-tech="ar" data-n="91" tabindex="0" role="button" aria-pressed="false"><div class="inner"><div class="face front"><div class="f-top"><span class="face-lbl">giả định</span><span class="no">#091</span></div><p class="assume"><span class="verb">Lật</span>'spec theo loại văn bản':</p><span class="hint">bấm để lật</span></div><div class="face back"><div class="f-top"><span class="face-lbl">lật ngược</span><span class="no">#091</span></div><p class="was">'spec theo loại văn bản'</p><p class="rev">spec theo khối/tài sản (người, đất, sổ TK...), file loại văn bản chỉ liệt kê neo</p></div></div></div></div>
+
+      <div class="unit"><div class="idea flip" data-tech="ar" data-n="92" tabindex="0" role="button" aria-pressed="false"><div class="inner"><div class="face front"><div class="f-top"><span class="face-lbl">giả định</span><span class="no">#092</span></div><p class="assume"><span class="verb">Lật</span>'agent cần nhiều context':</p><span class="hint">bấm để lật</span></div><div class="face back"><div class="f-top"><span class="face-lbl">lật ngược</span><span class="no">#092</span></div><p class="was">'agent cần nhiều context'</p><p class="rev">context tối thiểu + công cụ trả lời (explain field, rule nào sinh giá trị)</p></div></div></div>
+        <div class="idea tail" data-tech="ar" data-n="93"><span class="tail-lbl">kéo theo</span><span class="no">#093</span><br><code>regex_lab explain &lt;file&gt; &lt;field&gt;</code>: in pattern id, đoạn khớp, số dòng</div></div>
+
+      <div class="unit"><div class="idea flip" data-tech="ar" data-n="94" tabindex="0" role="button" aria-pressed="false"><div class="inner"><div class="face front"><div class="f-top"><span class="face-lbl">giả định</span><span class="no">#094</span></div><p class="assume"><span class="verb">Lật</span>'hỏi owner trong chat':</p><span class="hint">bấm để lật</span></div><div class="face back"><div class="f-top"><span class="face-lbl">lật ngược</span><span class="no">#094</span></div><p class="was">'hỏi owner trong chat'</p><p class="rev">câu hỏi vào file hàng đợi, owner trả bất đồng bộ, agent làm việc khác</p></div></div></div>
+        <div class="idea tail" data-tech="ar" data-n="95"><span class="tail-lbl">kéo theo</span><span class="no">#095</span><br>Hàng đợi <code>cau-hoi-mo.yaml</code> có trạng thái; vòng sau agent đọc câu trả lời</div></div>
+
+      <div class="unit"><div class="idea flip" data-tech="ar" data-n="96" tabindex="0" role="button" aria-pressed="false"><div class="inner"><div class="face front"><div class="f-top"><span class="face-lbl">giả định</span><span class="no">#096</span></div><p class="assume"><span class="verb">Lật</span>'dán text là trường hợp đặc biệt':</p><span class="hint">bấm để lật</span></div><div class="face back"><div class="f-top"><span class="face-lbl">lật ngược</span><span class="no">#096</span></div><p class="was">'dán text là trường hợp đặc biệt'</p><p class="rev">mọi input chuyển về text đánh dấu chuẩn (dòng, ô bảng '|', heading) rồi 1 pipeline</p></div></div></div></div>
+
+      <div class="unit"><div class="idea flip" data-tech="ar" data-n="97" tabindex="0" role="button" aria-pressed="false"><div class="inner"><div class="face front"><div class="f-top"><span class="face-lbl">giả định</span><span class="no">#097</span></div><p class="assume"><span class="verb">Lật</span>'trường DB là điểm cuối':</p><span class="hint">bấm để lật</span></div><div class="face back"><div class="f-top"><span class="face-lbl">lật ngược</span><span class="no">#097</span></div><p class="was">'trường DB là điểm cuối'</p><p class="rev">trường DB dẫn thiết kế parser (bắt đầu từ danh sách trường)</p></div></div></div>
+        <div class="idea tail" data-tech="ar" data-n="98"><span class="tail-lbl">kéo theo</span><span class="no">#098</span><br>Spec theo trường: định nghĩa, định dạng, neo, ví dụ, ngoại lệ, Q-id — lõi của context pack</div></div>
+    </div>
+
+    <h3 class="after-head">Những ý nảy ra sau khi lật</h3>
+    <p class="tgloss">16 ý nối tiếp, giữ đúng thứ tự nhật ký.</p>
+    <div class="after">
+      <div class="idea acard" data-tech="ar" data-n="99"><span class="no">#099</span>Danh sách thiếu: trường DB engine chưa bóc (place_of_origin quê quán, hinh_thuc_su_dung, nguon_goc)</div>
+      <div class="idea acard" data-tech="ar" data-n="100"><span class="no">#100</span>Danh sách thừa: engine bóc nhưng DB chưa có (sổ TK, bảo hiểm, trích lục người chết) → owner quyết mở rộng contract hay dừng bóc</div>
+      <div class="idea acard" data-tech="ar" data-n="101"><span class="no">#101</span>Thông tin chung (ngày, số CC, CCV) có 2 đích: web_form portal và DB notary — xuất cả 2 view</div>
+      <div class="idea acard" data-tech="ar" data-n="102"><span class="no">#102</span>Tự kiểm parity: chạy docx và chạy text dump của chính nó dán lại — kết quả phải như nhau (kiểm đường raw text)</div>
+      <div class="idea acard" data-tech="ar" data-n="103"><span class="no">#103</span>Mutation test regex: biến đổi khoảng trắng, dấu hai chấm, hoa thường, NFC/NFD trong fixture — bắt lỗi kiểu R00, BẢO HIỂM</div>
+      <div class="idea acard" data-tech="ar" data-n="104"><span class="no">#104</span>Sinh biến thể nhãn từ ledger: 'Sinh năm:' / 'Sinh năm' / 'sinh năm-' tự động</div>
+      <div class="idea acard" data-tech="ar" data-n="105"><span class="no">#105</span>Diff mẫu: căn mẫu mới với khuôn cụm gần nhất, chỉ hiện dòng khác → agent thấy ngay vì sao hỏng</div>
+      <div class="idea acard" data-tech="ar" data-n="106"><span class="no">#106</span>Gắn mẫu chứng minh cho từng pattern: bỏ pattern thì biết mẫu nào vỡ</div>
+      <div class="idea acard" data-tech="ar" data-n="107"><span class="no">#107</span>Phát hiện rule chết: pattern không bao giờ khớp trên kho mẫu → ứng viên xóa (giảm phình)</div>
+      <div class="idea acard" data-tech="ar" data-n="108"><span class="no">#108</span>Hạn mức docs: mỗi spec ≤150 dòng</div>
+      <div class="idea acard" data-tech="ar" data-n="109"><span class="no">#109</span>1 cửa vào duy nhất cho agent: <code>regex-core.md</code> chỉ dẫn tới context pack sinh tự động</div>
+      <div class="idea acard" data-tech="ar" data-n="110"><span class="no">#110</span>Báo cáo HTML trong chế độ dev của tool, bảng theo cụm</div>
+      <div class="idea acard" data-tech="ar" data-n="111"><span class="no">#111</span>Thực thi hỏi 1 lần: wrapper hỏi owner tra ledger theo dấu vân tay câu hỏi (trường + pattern + hash snippet), chặn trùng</div>
+      <div class="idea acard" data-tech="ar" data-n="112"><span class="no">#112</span>Thống nhất phân loại lỗi: M (lệch expected), R/P (tự kiểm), S (schema)</div>
+      <div class="idea acard" data-tech="ar" data-n="113"><span class="no">#113</span>Log nhân viên thành đầu vào dev: định kỳ nhập log, file có cờ → packet vòng dev</div>
+      <div class="idea acard" data-tech="ar" data-n="114"><span class="no">#114</span>Dry-run xung đột: trước khi chốt rule, chạy toàn kho local, hiện số file đổi</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SYNTHESIS ================= -->
+<section id="tong-hop" class="synth">
+  <div class="wrap">
+    <header class="sec-head">
+      <div class="readout"><span class="ro-line rev"></span><span class="ro-dot"></span>Quét xong · kết tinh<span class="ro-dot"></span><span class="ro-line"></span></div>
+      <h2 class="gold-title">Tổng hợp</h2>
+      <p class="sub"><span data-count="all">114</span> ý cô lại thành 6 nhận định, 1 hướng đi 7 bước và 2 câu hỏi đang chờ owner. Đây là “golden” của cả phiên.</p>
+    </header>
+
+    <div class="films">
+      <article class="film f1">
+        <span class="big" aria-hidden="true">1</span>
+        <div>
+          <div class="flbl">Tổng hợp 1 (gốc rễ):</div>
+          <p>agent hỏi lặp + docs phình + regex lệch DB cùng 1 nguyên nhân — sự thật nằm trong văn xuôi, không máy đọc được ở cấp trường. Cần 3 tài sản máy đọc: từ điển trường (sinh từ contract), ledger quyết định Q-id có snippet+kỳ vọng (tự thành test), golden theo trường</p>
+        </div>
+        <div class="root-diagram no-gloss" aria-hidden="true">
+          <div class="symptoms"><span>agent hỏi lặp</span><span>docs phình</span><span>regex lệch DB</span></div>
+          <svg class="funnel" viewBox="0 0 300 40" preserveAspectRatio="none"><path d="M50 0 C50 26 150 14 150 40 M150 0 L150 40 M250 0 C250 26 150 14 150 40"/></svg>
+          <div class="rootbox"><small>cùng 1 nguyên nhân</small>sự thật nằm trong văn xuôi, không máy đọc được ở cấp trường</div>
+          <div class="need">Cần 3 tài sản máy đọc</div>
+          <div class="pillars">
+            <div><b>từ điển trường</b><span>sinh từ contract</span></div>
+            <div><b>ledger quyết định Q-id</b><span>có snippet+kỳ vọng (tự thành test)</span></div>
+            <div><b>golden theo trường</b><span>&nbsp;</span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="film w3">
+        <span class="big" aria-hidden="true">2</span>
+        <div class="flbl">Tổng hợp 2:</div>
+        <p>share core theo KHỐI (anchor-first), loại văn bản là output — một ý giải 3 bài: dán raw text, tài sản hỗn hợp, mẫu mới chưa biết loại</p>
+        <div class="mini no-gloss" aria-hidden="true"><span class="key">theo KHỐI</span><i>→</i><span>dán raw text</span><span>tài sản hỗn hợp</span><span>mẫu mới chưa biết loại</span></div>
+      </article>
+
+      <article class="film w3">
+        <span class="big" aria-hidden="true">3</span>
+        <div class="flbl">Tổng hợp 3:</div>
+        <p>đừng xây mới, nối cái đã có — regex_lab (golden/approve/verify), read_word_comments (đáp án owner), normalization.py notary_v2 (shape DB + observation_state), schema contracts (validator). Task5 đã xây song song (quet_kiem_tra, R-codes, bản copy)</p>
+        <div class="mini no-gloss" aria-hidden="true"><span class="key">nối</span><span>regex_lab</span><span>read_word_comments</span><span>normalization.py</span><span>schema contracts</span><span class="muted">song song: quet_kiem_tra · R-codes · bản copy</span></div>
+      </article>
+
+      <article class="film">
+        <span class="big" aria-hidden="true">4</span>
+        <div class="flbl">Tổng hợp 4:</div>
+        <p>observation_state của contract (observed/normalized/inferred) chuẩn hóa sẵn ý 'trống + cờ' — giải luôn các quyết định giới tính suy từ Thị, năm sinh YYYY, diện tích chỉ dấu chấm (raw giữ, normalized null + warning)</p>
+        <div class="mini no-gloss" aria-hidden="true"><span>observed</span><span>normalized</span><span>inferred</span></div>
+      </article>
+
+      <article class="film">
+        <span class="big" aria-hidden="true">5</span>
+        <div class="flbl">Tổng hợp 5:</div>
+        <p>flow dev = so 2 bộ trích độc lập (agent đọc mù ra expected theo schema trường DB vs engine → mã M); dùng chung schema với log nhân viên nên sửa của nhân viên thành ứng viên golden</p>
+        <div class="mini no-gloss" aria-hidden="true"><span>agent đọc mù</span><span class="vs">vs</span><span>engine</span><i>→</i><span class="key">mã M</span></div>
+      </article>
+
+      <article class="film">
+        <span class="big" aria-hidden="true">6</span>
+        <div class="flbl">Tổng hợp 6:</div>
+        <p>'không hỏi 2 lần' phải do công cụ ép, không do kỷ luật — vân tay câu hỏi + tra ledger + gom bảng hỏi cuối vòng + câu trả lời tự thành fixture; xung đột định nghĩa vận hành = golden đã duyệt bị đổi → tạo profile theo vân tay mẫu</p>
+        <div class="mini no-gloss" aria-hidden="true"><span>vân tay câu hỏi</span><i>→</i><span>tra ledger</span><i>→</i><span>gom bảng hỏi</span><i>→</i><span class="key">fixture</span></div>
+      </article>
+    </div>
+
+    <div class="finale">
+      <div class="route">
+        <div class="blk-sub">decision by coach</div>
+        <h3 class="blk-h">Hướng đề xuất theo thứ tự</h3>
+        <ol class="steps">
+          <li class="step"><span class="num">1</span><div class="body">từ điển trường + tầng db (person_row/asset_row) dùng normalization.py + test schema</div></li>
+          <li class="step"><span class="num">2</span><div class="body">parser khối anchor-first + API <code>extract(path|text)</code></div></li>
+          <li class="step"><span class="num">3</span><div class="body">ledger + fixture tự sinh + hàng đợi câu hỏi</div></li>
+          <li class="step key4"><span class="num">4</span><div class="body">hồi sinh regex_lab:<div class="chain"><span>new-samples</span><i>→</i><span>cụm vân tay</span><i>→</i><span>packet</span><i>→</i><span>expected mù</span><i>→</i><span>diff M</span><i>→</i><span>verify golden</span></div></div></li>
+          <li class="step"><span class="num">5</span><div class="body">catalog cờ có message + chính sách, hiện trong tool</div></li>
+          <li class="step"><span class="num">6</span><div class="body">context pack sinh tự động + skill regex-mau-moi</div></li>
+          <li class="step"><span class="num">7</span><div class="body">ăn kiêng docs: catalog văn xuôi → sinh tự động, spec theo khối ≤150 dòng</div></li>
+        </ol>
+      </div>
+
+      <aside class="asks">
+        <div class="blk-sub">question by coach</div>
+        <h3 class="blk-h">Owner cần chốt:</h3>
+        <div class="ask">
+          <span class="state">đang chờ</span>
+          <p>DB chưa có chỗ cho sổ tiết kiệm/bảo hiểm/trích lục người chết — mở rộng contract hay dừng bóc?</p>
+          <div class="opts no-gloss" aria-hidden="true"><span>mở rộng contract</span><span>dừng bóc</span></div>
+        </div>
+        <div class="ask">
+          <span class="state">đang chờ</span>
+          <p>Thông tin chung (ngày, số CC, CCV) đích là web_form portal, DB notary hay cả hai?</p>
+          <div class="opts no-gloss" aria-hidden="true"><span>web_form portal</span><span>DB notary</span><span>cả hai</span></div>
+        </div>
+        <p class="ask-note">Ô vuông để trống vì chưa ai chốt. Liên quan: ý #100 và #101 ở phần lật ngược.</p>
+      </aside>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p><b>Nguồn duy nhất:</b> nhật ký <code>.memlog.md</code> của phiên brainstorm-chuan-hoa-tool-regex-2026-10-06 · cập nhật 2026-10-06T21:54 · trạng thái complete.</p>
+    <p>Trang tự đếm được <b><span data-count="all">114</span> ý</b>: Failure Analysis <span data-count="fa">23</span> · Backcasting <span data-count="bc">26</span> · Morphological Analysis <span data-count="ma">26</span> · Assumption Reversal <span data-count="ar">39</span>.</p>
+    <p>Chữ của từng ý, hướng, nhận định, quyết định và câu hỏi được giữ nguyên như nhật ký. Phần gom nhóm, sắp xếp, hình minh họa và lời giải nghĩa từ khó là của trang này.</p>
+  </div>
+</footer>
+
+<div id="tip" role="tooltip" hidden></div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var fold = function (s) {
+    return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\u0111\u0110]/g, 'd').toLowerCase().replace(/\s+/g, ' ');
+  };
+
+  /* ---------- count ideas ---------- */
+  var ideas = $$('.idea');
+  var TOTAL = ideas.length;
+  var TECHS = ['fa', 'bc', 'ma', 'ar'];
+  var per = {};
+  TECHS.forEach(function (t) { per[t] = ideas.filter(function (el) { return el.dataset.tech === t; }).length; });
+  ideas.forEach(function (el) { el._t = fold(el.textContent); });
+  var nums = ideas.map(function (el) { return +el.dataset.n; }).sort(function (a, b) { return a - b; });
+  if (!nums.every(function (n, i) { return n === i + 1; })) { console.warn('Số thứ tự ý không liên tục:', nums); }
+  $$('[data-count]').forEach(function (el) { var k = el.dataset.count; el.textContent = k === 'all' ? TOTAL : per[k]; });
+  $$('.seg').forEach(function (s) { s.style.flexGrow = per[s.dataset.tech]; });
+
+  var big = $('#bigN');
+  if (big && !reduce) {
+    var t0 = performance.now(), dur = 1300;
+    var stepN = function (now) {
+      var p = Math.min(1, (now - t0) / dur);
+      big.textContent = Math.round(TOTAL * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(stepN);
+    };
+    requestAnimationFrame(stepN);
+  } else if (big) { big.textContent = TOTAL; }
+
+  /* ---------- technique toggle + search ---------- */
+  var hidden = {};
+  var q = $('#q'), visEl = $('#vis'), visWrap = $('#vis-wrap');
+  function apply() {
+    var words = fold(q.value.trim()).split(' ').filter(Boolean);
+    var on = words.length > 0, vis = 0;
+    ideas.forEach(function (el) {
+      var match = words.every(function (w) { return el._t.indexOf(w) !== -1; });
+      el.classList.toggle('dim', on && !match);
+      el.classList.toggle('hit', on && match);
+      if (match && !hidden[el.dataset.tech]) vis++;
+    });
+    TECHS.forEach(function (t) {
+      var sec = document.getElementById(t);
+      if (sec) sec.hidden = !!hidden[t];
+      $$('[data-toggle="' + t + '"]').forEach(function (b) { b.setAttribute('aria-pressed', String(!hidden[t])); });
+      $$('.navlinks a[href="#' + t + '"]').forEach(function (a) { a.classList.toggle('off', !!hidden[t]); });
+    });
+    visEl.textContent = vis;
+    visWrap.classList.toggle('filtered', vis !== TOTAL);
+  }
+  $$('[data-toggle]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var t = b.dataset.toggle;
+      if (hidden[t]) { delete hidden[t]; }
+      else {
+        var shown = TECHS.filter(function (x) { return !hidden[x]; }).length;
+        if (shown > 1) hidden[t] = true;
+      }
+      apply();
+    });
+  });
+  q.addEventListener('input', apply);
+  document.addEventListener('keydown', function (e) {
+    var tag = (e.target.tagName || '').toLowerCase();
+    if (e.key === '/' && tag !== 'input' && tag !== 'textarea') { e.preventDefault(); q.focus(); }
+    if (e.key === 'Escape' && document.activeElement === q) { q.value = ''; apply(); q.blur(); }
+  });
+
+  /* ---------- morphological grid ---------- */
+  var grid = $('#maGrid');
+  if (grid) {
+    var cells = {};
+    $$('.cell', grid).forEach(function (c) { cells[c.dataset.cell] = c; c._label = $('.cl', c).textContent; c.setAttribute('aria-pressed', 'false'); });
+    var cards = $$('.mcard');
+    var tally = {};
+    cards.forEach(function (m) {
+      m._cells = (m.dataset.cells || '').split(/\s+/).filter(Boolean);
+      m._cells.forEach(function (id) { tally[id] = (tally[id] || 0) + 1; });
+      var box = $('.mtags', m);
+      if (!m._cells.length) {
+        var off = document.createElement('span'); off.className = 'mtag off'; off.textContent = 'ngoài lưới 9 biến'; box.appendChild(off);
+      } else {
+        m._cells.forEach(function (id) {
+          var s = document.createElement('span'); s.className = 'mtag';
+          var b = document.createElement('b'); b.textContent = id.charAt(0);
+          s.appendChild(b); s.appendChild(document.createTextNode(cells[id]._label)); box.appendChild(s);
+        });
+      }
+    });
+    var max = 1;
+    Object.keys(tally).forEach(function (k) { if (tally[k] > max) max = tally[k]; });
+    Object.keys(cells).forEach(function (id) {
+      var c = cells[id], n = tally[id] || 0;
+      c.style.setProperty('--h', (n / max).toFixed(3));
+      var s = document.createElement('span'); s.className = 'cnt'; s.textContent = n; c.appendChild(s);
+      c.classList.toggle('zero', !n);
+      c.title = n + ' ý chọn nấc này';
+    });
+    var light = function (ids) {
+      grid.classList.toggle('preview', !!ids);
+      Object.keys(cells).forEach(function (id) { cells[id].classList.toggle('lit', !!ids && ids.indexOf(id) !== -1); });
+    };
+    cards.forEach(function (m) {
+      m.addEventListener('mouseenter', function () { light(m._cells); });
+      m.addEventListener('mouseleave', function () { light(null); });
+      m.addEventListener('focus', function () { light(m._cells); });
+      m.addEventListener('blur', function () { light(null); });
+    });
+    var sel = null, note = $('#maNote'), baseNote = note.textContent;
+    Object.keys(cells).forEach(function (id) {
+      cells[id].addEventListener('click', function () {
+        sel = sel === id ? null : id;
+        var n = 0;
+        Object.keys(cells).forEach(function (k) { cells[k].classList.toggle('sel', k === sel); cells[k].setAttribute('aria-pressed', String(k === sel)); });
+        cards.forEach(function (m) { var has = !sel || m._cells.indexOf(sel) !== -1; m.classList.toggle('mdim', !has); if (sel && has) n++; });
+        note.textContent = sel ? ('Đang lọc ô ' + sel.charAt(0) + ' · ' + cells[sel]._label + ': ' + n + ' ý. Bấm lại ô để bỏ lọc.') : baseNote;
+      });
+    });
+  }
+
+  /* ---------- flip cards ---------- */
+  var flips = $$('.flip');
+  var flipAll = $('#flipAll');
+  var syncAll = function () {
+    if (flipAll) flipAll.textContent = flips.every(function (f) { return f.classList.contains('flipped'); }) ? 'Úp tất cả lại' : 'Lật tất cả';
+  };
+  var flipTo = function (f, v) { f.classList.toggle('flipped', v); f.setAttribute('aria-pressed', String(v)); };
+  flips.forEach(function (f) {
+    f.addEventListener('click', function () { flipTo(f, !f.classList.contains('flipped')); syncAll(); });
+    f.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flipTo(f, !f.classList.contains('flipped')); syncAll(); }
+    });
+  });
+  if (flipAll) flipAll.addEventListener('click', function () {
+    var all = flips.every(function (f) { return f.classList.contains('flipped'); });
+    flips.forEach(function (f, i) { setTimeout(function () { flipTo(f, !all); }, reduce ? 0 : i * 45); });
+    setTimeout(syncAll, reduce ? 0 : flips.length * 45 + 20);
+  });
+
+  /* ---------- backcasting direction ---------- */
+  var track = $('#bcTrack'), bt = $('#bcFlip');
+  if (bt && track) bt.addEventListener('click', function () {
+    var fwd = track.classList.toggle('forward');
+    bt.textContent = fwd ? 'Xem ngược từ đích' : 'Xem xuôi thời gian';
+    bt.setAttribute('aria-pressed', String(fwd));
+  });
+
+  /* ---------- glossary: gloss on first appearance, tooltip everywhere ---------- */
+  var GL = [
+    ['share core', 'lõi dùng chung: một bộ code mà nhiều công cụ cùng gọi', 1],
+    ['regex', 'mẫu tìm chữ: công thức mô tả dạng chữ cần bắt', 1],
+    ['engine', 'bộ máy đọc văn bản và bóc thông tin', 1],
+    ['DB', 'cơ sở dữ liệu: nơi lưu thông tin theo từng cột có tên cố định', 1],
+    ['database', 'cơ sở dữ liệu', 0],
+    ['raw text', 'chữ thô: đoạn chữ copy nguyên văn, chưa chỉnh', 1],
+    ['raw', 'nguyên văn, chưa chuẩn hóa', 0],
+    ['agent', 'trợ lý AI tự đọc, chạy lệnh và sửa code', 1],
+    ['owner', 'người chủ sản phẩm, có quyền chốt luật nghiệp vụ', 1],
+    ['contract', 'bản quy ước dữ liệu: mỗi trường tên gì, viết dạng gì', 1],
+    ['schema', 'khuôn kiểm: file mô tả dữ liệu đúng phải trông thế nào', 1],
+    ['golden', 'đáp án chuẩn đã duyệt; chạy lại mà ra khác là báo đỏ', 1],
+    ['ledger', 'sổ cái quyết định: ghi mỗi câu owner đã trả lời, có mã để tra lại', 1],
+    ['anchor-first', 'neo trước: tìm chữ mốc như "Sinh năm" để khoanh khối, rồi mới đọc giá trị', 1],
+    ['neo', 'chữ mốc cố định trong văn bản, ví dụ "CCCD số"', 1],
+    ['fixture', 'bài test mẫu: đoạn chữ nhỏ kèm kết quả mong đợi', 1],
+    ['cờ', 'dấu cảnh báo engine cắm vào chỗ nghi ngờ', 1],
+    ['expected', 'kết quả kỳ vọng, ghi ra trước khi chạy', 1],
+    ['diff', 'bảng so chỗ khác nhau giữa hai kết quả', 1],
+    ['PII', 'thông tin cá nhân thật (tên, CCCD, địa chỉ), không được đưa lên kho code', 1],
+    ['provenance', 'nguồn gốc: rule nào, phiên bản nào sinh ra giá trị', 1],
+    ['packet', 'gói việc: đoạn chữ + kết quả hiện tại + cờ để agent xem', 1],
+    ['profile', 'bộ rule riêng cho một họ biểu mẫu', 1],
+    ['semver', 'cách đánh số phiên bản kiểu 1.2', 1],
+    ['vân tay mẫu', 'dấu nhận dạng biểu mẫu, tính từ khung tiêu đề và nhãn neo', 1],
+    ['context pack', 'gói bối cảnh: một file ngắn chứa đúng điều agent cần biết', 1],
+    ['context', 'bối cảnh: thông tin nạp cho agent trước khi làm', 0],
+    ['observation_state', 'trạng thái quan sát: thấy trực tiếp, đã chuẩn hóa hay suy ra', 1],
+    ['oracle', 'trọng tài: cách rẻ để biết kết quả đúng hay sai', 1],
+    ['ratchet', 'bánh cóc: chỉ cho tiến, không cho lùi', 1],
+    ['parity', 'kiểm ngang bằng: hai đường vào phải ra cùng kết quả', 1],
+    ['mutation test', 'test đột biến: cố ý làm méo chữ xem regex còn bắt được không', 1],
+    ['pipeline', 'dây chuyền: dữ liệu đi qua lần lượt từng bước', 0],
+    ['registry', 'sổ đăng ký tập trung, mỗi mục có mã riêng', 0],
+    ['adapter', 'bộ chuyển để hai hệ thống nói chuyện được với nhau', 0],
+    ['hash', 'mã băm: chuỗi ngắn đại diện nội dung; nội dung đổi thì mã đổi', 0],
+    ['snapshot', 'bản chụp kết quả tại một lúc', 0],
+    ['presence', 'có mặt: trường có giá trị hay không', 0],
+    ['correctness', 'đúng giá trị', 0],
+    ['handoff', 'giấy bàn giao việc', 0],
+    ['fragment', 'mảnh: đoạn chữ rời, thiếu tiêu đề', 0],
+    ['dry-run', 'chạy thử, không ghi thay đổi', 0],
+    ['monorepo', 'một kho code chứa nhiều dự án', 0],
+    ['suggestion', 'gợi ý: giá trị đề xuất kèm nguồn, chờ xác nhận', 0],
+    ['offset', 'vị trí ký tự trong văn bản', 0],
+    ['Q-id', 'mã số câu hỏi/quyết định để tra lại', 0],
+    ['skill', 'kịch bản việc đóng gói sẵn cho agent', 0],
+    ['frontend', 'phần giao diện người dùng nhìn thấy', 0],
+    ['canonical', 'dạng chuẩn duy nhất', 0],
+    ['observed', 'thấy trực tiếp trong văn bản', 0],
+    ['normalized', 'đã chuẩn hóa', 0],
+    ['inferred', 'suy ra, không thấy trực tiếp', 0],
+    ['validator', 'bộ kiểm tra tự động', 0],
+    ['flags', 'các cờ cảnh báo', 0]
+  ];
+  var gmap = {};
+  GL.forEach(function (x) { gmap[x[0].toLowerCase()] = { k: x[0], g: x[1], i: x[2] }; });
+
+  var glist = $('#glist');
+  if (glist) {
+    GL.slice().sort(function (a, b) { return a[0].localeCompare(b[0], 'vi'); }).forEach(function (x) {
+      var d = document.createElement('div'); var b = document.createElement('b'); b.textContent = x[0];
+      d.appendChild(b); d.appendChild(document.createTextNode(x[1])); glist.appendChild(d);
+    });
+  }
+
+  var esc = function (s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); };
+  var alts = GL.map(function (x) { return x[0]; }).sort(function (a, b) { return b.length - a.length; }).map(esc).join('|');
+  var RE = null;
+  try {
+    RE = new RegExp('(?<![\\p{L}\\p{N}_]|[\\p{L}\\p{N}][-.\\\\])(' + alts + ')(?![\\p{L}\\p{N}_]|[-.\\\\][\\p{L}\\p{N}])', 'giu');
+  } catch (err) { RE = null; }
+
+  if (RE) {
+    var SKIP = 'h1,h2,h3,code,button,input,textarea,script,style,svg,kbd,.no-gloss,.term,.gl-note,.no,.face-lbl,.mtags,.tminus,.st-label';
+    var seen = {};
+    $$('[data-gloss]').forEach(function (scope) {
+      var tw = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, {
+        acceptNode: function (n) {
+          if (!n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+          return n.parentElement && n.parentElement.closest(SKIP) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+        }
+      });
+      var nodes = [];
+      while (tw.nextNode()) nodes.push(tw.currentNode);
+      nodes.forEach(function (node) {
+        var txt = node.nodeValue, m, last = 0, frag = null;
+        RE.lastIndex = 0;
+        while ((m = RE.exec(txt))) {
+          var hit = m[1], ent = gmap[hit.toLowerCase()];
+          if (!ent) continue;
+          frag = frag || document.createDocumentFragment();
+          frag.appendChild(document.createTextNode(txt.slice(last, m.index)));
+          var sp = document.createElement('span');
+          sp.className = 'term'; sp.setAttribute('data-g', ent.g); sp.setAttribute('data-k', ent.k); sp.textContent = hit;
+          frag.appendChild(sp);
+          if (ent.i && !seen[ent.k]) {
+            var nt = document.createElement('span'); nt.className = 'gl-note'; nt.textContent = ent.g; frag.appendChild(nt);
+          }
+          seen[ent.k] = 1;
+          last = m.index + hit.length;
+        }
+        if (frag) { frag.appendChild(document.createTextNode(txt.slice(last))); node.parentNode.replaceChild(frag, node); }
+      });
+    });
+  }
+
+  var tip = $('#tip'), tipFor = null;
+  var showTip = function (el) {
+    tip.textContent = '';
+    var b = document.createElement('b'); b.textContent = el.getAttribute('data-k');
+    tip.appendChild(b); tip.appendChild(document.createTextNode(el.getAttribute('data-g')));
+    tip.hidden = false;
+    var r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+    var x = Math.min(window.innerWidth - w - 10, Math.max(10, r.left + r.width / 2 - w / 2));
+    var y = r.top - h - 8; if (y < 64) y = r.bottom + 8;
+    tip.style.left = x + 'px'; tip.style.top = y + 'px'; tipFor = el;
+  };
+  var hideTip = function () { tip.hidden = true; tipFor = null; };
+  document.addEventListener('mouseover', function (e) {
+    var t = e.target.closest ? e.target.closest('.term') : null;
+    if (t) { if (t !== tipFor) showTip(t); } else if (tipFor) hideTip();
+  });
+  window.addEventListener('scroll', hideTip, { passive: true });
+
+  /* ---------- scroll spy + reveal ---------- */
+  if ('IntersectionObserver' in window) {
+    var links = $$('.navlinks a');
+    var spy = new IntersectionObserver(function (es) {
+      es.forEach(function (en) {
+        if (en.isIntersecting) links.forEach(function (a) { a.classList.toggle('on', a.getAttribute('href') === '#' + en.target.id); });
+      });
+    }, { rootMargin: '-40% 0px -55% 0px' });
+    $$('main section[id]').forEach(function (s) { spy.observe(s); });
+    var rv = new IntersectionObserver(function (es) {
+      es.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('seen'); rv.unobserve(en.target); } });
+    }, { threshold: 0.12 });
+    $$('.reveal').forEach(function (s) { rv.observe(s); });
+  } else {
+    $$('.reveal').forEach(function (s) { s.classList.add('seen'); });
+  }
+
+  apply();
+})();
+</script>
+</body>
+</html>

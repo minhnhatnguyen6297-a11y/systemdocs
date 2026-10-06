@@ -4,6 +4,27 @@
 fixture rồi cập nhật cùng thay đổi. **Nguồn:** `upload_lab/docs/regex-rules.md`
 trước đợt gom 29/09/2026. Flow và giới hạn ở [`README.md`](./README.md).
 
+## 0. Core nằm ở đâu (đọc trước khi sửa)
+
+Core regex dùng chung (người + tài sản) hiện sống trong `upload_lab`:
+
+| Thứ | File |
+|---|---|
+| Engine (code duy nhất cần sửa) | `upload_lab/extract_contract.py` (docstring đầu file dẫn tiếp) |
+| Test giữ hành vi | `upload_lab/tests/test_upload_lab_extract_contract.py` |
+| Tool test giao diện (chọn 1 file Word → xem Người/Thửa/JSON) | `upload_lab/tools/regex_test_tool.py` (chạy bằng `upload_lab/run_regex_test.bat`) |
+| Luật kiểm tra kết quả (CHUẨN duy nhất, mã R00..R11) | `upload_lab/kiem_tra_trich_xuat.py` + test `tests/test_kiem_tra_trich_xuat.py` |
+| Quét hàng loạt bằng luật trên | `upload_lab/tools/quet_kiem_tra.py` (`--loc`, `--offset/--limit`, `--ca-doc`) |
+| Repo test cho nhân viên (Test 1 file + Test cả thư mục + Xem log, log cố định) | `regex-test-tool/tool/` tất cả trong 1 folder (chạy bằng `tool/run.bat`) |
+| Catalog quy tắc này | `docs/spec/upload_lab/regex-rules.md` |
+| Báo cáo từng loại văn bản (kết quả test + nguyên tắc bằng lời) | `.agent/scratch/regex-core/bao-cao-NN-*.md` (file tạm, không commit) |
+
+Phạm vi core (quyết định owner 05/10/2026): core chỉ trích **xuất**
+người + tài sản bằng regex, **không** so sánh/đối chiếu/gộp —
+có người nào xuất dữ liệu người đó (kể cả người trong Lời chứng).
+`so_cong_chung` vẫn được đọc để phục vụ upload/audit portal nhưng
+không còn là tiêu chí đủ/thiếu của core.
+
 Catalog này tập hợp và chuẩn hóa toàn bộ quy tắc trích xuất dữ liệu từ file Word (`.doc`, `.docx`) sang JSON web form trong `extract_contract.py`.
 
 ---
@@ -34,6 +55,10 @@ Catalog này tập hợp và chuẩn hóa toàn bộ quy tắc trích xuất d�
 ---
 
 ## 2. Quy tắc chi tiết theo từng loại văn bản
+
+Chi tiết đầy đủ từng loại nằm ở file riêng (`regex-<loại>.md`,
+hiện có [`regex-thua-ke.md`](./regex-thua-ke.md) v1 cho thừa kế);
+mục này chỉ tra nhanh. Khi lệch nhau, file riêng của loại đó đúng.
 
 ### 2.1. Hợp đồng chuyển nhượng (`DOC_KIND_TRANSFER`)
 - **Nhóm HĐ**: `Chuyển nhượng - Mua bán`
@@ -76,22 +101,50 @@ Catalog này tập hợp và chuẩn hóa toàn bộ quy tắc trích xuất d�
 - **Nhóm HĐ**: `Thừa kế (khai nhận - phân chia di sản thừa kế )`
 - **Tiêu đề canonical**: `Văn bản phân chia di sản`
 - **Đương sự**:
-  - Nhóm người ký ở phần mở đầu: `NHỮNG NGƯỜI HƯỞNG DI SẢN` (bắt đầu từ `Chúng tôi là những người được hưởng di sản...`).
-  - Dừng trước `Người để lại di sản:`, `Chúng tôi tự nguyện lập Văn bản này`.
-  - *Không đưa người để lại di sản hoặc giải trình phả hệ vào danh sách đương sự*.
+  - Nhóm người ký ở phần mở đầu: `NHỮNG NGƯỜI HƯỞNG DI SẢN` (bắt đầu từ `Chúng tôi là những người được hưởng di sản...`; chấp nhận biến thể `Tôi là những người...`, mở đầu đơn `Người được hưởng di sản theo pháp luật ... là:`, `Người được hưởng di sản thừa kế của ...:`, `(Tôi/Chúng tôi) là người được hưởng di sản ...` + kết `Tôi/Chúng tôi tự nguyện lập Văn bản này`).
+  - Tên người đứng sau `Ông`/`Bà` (kể cả dạng `1. Bà ...`, `Bà: ...`, `Ông/bà:` (suy giới tính qua `Thị`), `Người vợ - Bà: ...`, `Tôi là:/Tôi tên là: Bà ...` cùng dòng; vai trò dòng riêng (`Là con đẻ...`) giữ vào tên); người vợ ghi tên trần `Tên - Vợ ông X` vẫn tính 1 người, giới tính suy từ `Vợ`/`Chồng`. Tên cắt trước `|` (dấu căn dòng của `.doc`), trước nhãn ngày sinh (bắt buộc kèm giá trị ngày/năm, vì `Năm` là âm tiết tên hay gặp), trước `có vợ/chồng là` và ngoặc ngày sinh của người khác; bỏ cả dòng phả hệ (`Ông X có vợ là bà Y (Sinh ngày...)`); khối của 1 người dừng trước dòng `chết ngày`.
+  - Người một dòng (`Bà ... - Sinh năm ..., CCCD số ..., ...; Nơi thường trú: ...`): địa chỉ lấy ngay trên dòng tên.
+  - Ngày sinh 2 dạng: `Sinh ngày: DD/MM/YYYY` và `Sinh năm YYYY` (không dấu hai chấm cũng nhận). Quy ước owner 06/10/2026 (phương án 1): chỉ có năm thì `ngay_sinh` giữ đúng `YYYY` (không tự thêm 01/01), kèm cờ `chi_co_nam_sinh: true` để phân biệt với ngày đủ (nhận diện chắc vì luôn có nhãn `Sinh năm` đi kèm, không đoán số năm trôi nổi).
+  - CCCD sau `Căn cước công dân số` / `Căn cước số` / `CCCD số` (kể cả `số:` dính hai chấm); nơi cấp sau `do ... cấp ngày`, nếu thiếu `do` thì lấy cụm sau số giấy tờ; ngày cấp sau `cấp/ký ngày`; địa chỉ sau `Thường trú tại:` / `Cư trú tại:` / `Nơi thường trú:` / `Nơi thường trú tại:` (kể cả giữa dòng sau `;`), trừ `Nơi thường trú cuối cùng trước khi chết` của người đã chết.
+  - Dừng trước `Người để lại di sản:`, `Chúng tôi/Tôi tự nguyện lập Văn bản này`.
+  - *Không đưa người để lại di sản, bố mẹ đẻ đã chết, phần kể phả hệ, người làm chứng trong Lời chứng vào danh sách đương sự. Người đã chết trích riêng ở `raw.nguoi_chet` (bắt buộc có `chết/đã chết ngày DD/MM/YYYY`), gồm tên gọi khác, năm sinh, trích lục khai tử, địa chỉ cuối. Điều kiện loại người chết trong khối đương sự là `chết ngày + ngày tháng` cụ thể (không loại khi chỉ có chữ `chết` chung chung).*
 - **Tài sản**:
-  - *Điểm bắt đầu*: Sau heading `Di sản:` / `Di sản của ... để lại là:` hoặc dòng `quyền sử dụng đất ... có địa chỉ tại:`.
-  - *Điểm kết thúc*: Dừng trước `Người thừa kế:`, `Những người thừa kế`, `Nội dung phân chia di sản`, `Bằng Văn bản này`, `Lời chứng`.
+  - *Điểm bắt đầu*: Sau heading `Di sản:` / `Di sản của ... để lại là:` hoặc dòng `quyền sử dụng đất ... có địa chỉ tại:` / `... tại địa chỉ:` / `Phần quyền sử dụng đất ... trong khối tài sản chung ...`.
+  - *Điểm kết thúc*: Dừng trước `Người thừa kế:`, `Những người thừa kế`, `Những người nhận thừa kế` (kể cả `III. ...`, `III. | ...` của `.doc`), `Nội dung phân chia di sản`, `Bằng Văn bản này`, `Lời chứng`.
+  - *Loại sổ (`loai_gcn`)*: cụm sau `Giấy chứng nhận` trước `số` (ví dụ `quyền sử dụng đất`).
+  - *Tách thửa* (quyết định owner 05/10/2026): mỗi thửa 1 dòng trong `raw.danh_sach_thua_dat` — dòng bảng/bullet nào có số thửa thì mở thửa mới (nhãn `Thửa đất số` hoặc `Số thửa`, `Tờ bản đồ số` hoặc `Số tờ`); dòng `Trong đó` hoặc dòng ngắn không số thửa thì gộp vào `chi_tiet_dien_tich` của thửa đang mở (không ghi đè diện tích thửa); `Diện tích` bỏ `(bằng chữ: ...)`; số vào sổ cắt từ thừa; context GCN/địa chỉ/ngày cấp/cơ quan cấp copy vào từng thửa. Dòng dữ liệu kiểu `04 Nay là tờ bản đồ 24 | 104 Nay là thửa đất số 321 | ...` không được nhận nhầm làm tiêu đề bảng. Khối đất mở được cả khi không có cụm địa chỉ mà chỉ có `... theo Giấy chứng nhận` (ví dụ `Quyền sử dụng đất mang tên Hộ ông ... 450 m2 đất theo GCN`). Serial chấp nhận `Đ` (`Đ 364866`).
+  - *Bảng `.doc` đọc bằng IFilter*: IFilter giữ ô bảng bằng TAB (code đổi thành ` | `, cắt `|` thừa đầu/cuối dòng do TAB thụt đầu dòng); bảng dồn 1 dòng thì tách theo dòng ô (ô `Số thửa` làm neo, hết `Phần ghi thêm` thì vào dữ liệu, gặp `2.2.`/chữ thường thì dừng).
 
 ### 2.6. Văn bản từ chối nhận di sản (`DOC_KIND_INHERITANCE_REFUSAL`)
 - **Nhóm HĐ**: `Từ chối nhận di sản thừa kế`
 - **Tiêu đề canonical**: `Văn bản từ chối nhận di sản`
 - **Đương sự**:
-  - Đơn phương 1 người: `NGƯỜI TỪ CHỐI NHẬN DI SẢN` (bắt đầu sau `Tôi là:`).
-  - Dừng trước `Nay, tôi tự nguyện lập Văn bản này`, `Theo quy định của pháp luật`.
+  - Đơn phương 1 người (`Tôi là:`) hoặc tập thể (`Chúng tôi là:`, kể cả từ chối hưởng thế vị): `NGƯỜI TỪ CHỐI NHẬN DI SẢN`.
+  - Tên người đứng sau `Ông`/`Bà`/`Anh`/`Chị` (kể cả `1. Chị ...`, `3. Anh ...`).
+  - Dừng trước `Nay, tôi/chúng tôi tự nguyện lập Văn bản này`, `Theo quy định của pháp luật`.
+  - *Người đã chết (`chết ngày...`) không vào danh sách đương sự*.
 - **Tài sản**:
   - Hỗ trợ đơn tài sản hoặc đa tài sản (`1. Tài sản thứ nhất:`, `2. Tài sản thứ hai:`...).
+  - Tài sản đất: xem quy tắc tách thửa ở §2.5.
+  - Tài sản sổ tiết kiệm / tài khoản: xem §2.8.
   - *Điểm kết thúc*: Dừng trước `Bằng Văn bản này, tôi ... từ chối nhận kỷ phần thừa kế`, `Tôi xin cam đoan`, `Người từ chối hưởng di sản`, `Lời chứng`.
+
+### 2.7. Văn bản khai nhận di sản (`DOC_KIND_INHERITANCE_DECLARATION`)
+- **Nhóm HĐ**: `Thừa kế (khai nhận - phân chia di sản thừa kế )`
+- **Tiêu đề canonical**: chứa `khai nhận di sản` (ví dụ `Văn bản khai nhận di sản thừa kế`).
+- **Đương sự**: cùng cấu trúc mở đầu với phân chia (`Chúng tôi là...`, `Tôi là: ...`, `Người được hưởng di sản ...`); nhãn hiển thị `NGƯỜI KHAI NHẬN DI SẢN`.
+- **Tài sản**: đất (quy tắc §2.5) hoặc sổ tiết kiệm / tài khoản (quy tắc §2.8).
+
+### 2.8. Tài sản sổ tiết kiệm / tài khoản (trong văn bản thừa kế)
+- Khối tài sản bắt đầu ở `sổ tiết kiệm`, `số dư tài khoản`, `số tiền gốc và lãi`; dừng trước phần người thừa kế, `Bằng Văn bản này`, cam đoan, `Lời chứng`.
+- Mỗi sổ 1 dòng trong `raw.danh_sach_so_tiet_kiem`: loại sổ (`có kỳ hạn`), số hiệu (`AC 00033961022`, `IE4025426`), ngân hàng (sau `do`, trước `chi nhánh`/`số hiệu`/`phát hành`), chi nhánh, ngày phát hành, chủ sổ (sau `cho ông/bà:`).
+- Tài khoản: số tài khoản (`số tài khoản:`), chủ (sau `mang tên`).
+- `loai_tai_san` của văn bản: `Sổ tiết kiệm`.
+
+### 2.9. Quyền lợi bảo hiểm (trong văn bản thừa kế)
+- Khối tài sản bắt đầu ở `quyền lợi bảo hiểm`; dừng trước phần người thừa kế, `Bằng Văn bản này`, cam đoan, `Lời chứng`.
+- Mỗi quyền lợi 1 dòng trong `raw.danh_sach_bao_hiem`: số hợp đồng (sau `số`, mở đầu bằng chữ số), bên bảo hiểm (sau `ký giữa`, cắt hậu tố bên mua), bên mua (sau `Bên mua bảo hiểm:`), đối tượng (sau `Đối tượng bảo hiểm...:`), ngày ký. Dòng `Bên mua`/`Đối tượng` không có số hợp đồng thì gộp vào quyền lợi đang mở.
+- `loai_tai_san` của văn bản: `Tài sản khác` (portal chưa có enum bảo hiểm — [CONFIRM]).
 
 ---
 

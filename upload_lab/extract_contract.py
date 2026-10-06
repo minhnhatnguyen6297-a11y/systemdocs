@@ -1,6 +1,16 @@
 """
 TRICH XUAT HOP DONG CONG CHUNG -> JSON CHO WEB FORM
 ===================================================
+CORE REGEX DUNG CHUNG (nguoi + tai san) — agent moi doc them:
+- Catalog quy tac: docs/spec/upload_lab/regex-rules.md (dau file co muc
+  "Core nam o dau" chi dung file engine/test/bao cao).
+- Test: upload_lab/tests/test_upload_lab_extract_contract.py
+- Bao cao tung loai van ban: .agent/scratch/regex-core/bao-cao-NN-*.md
+Pham vi core: chi trich XUAT (regex) nguoi + tai san; KHONG so sanh,
+KHONG doi chieu, KHONG gop — co nguoi nao xuat du lieu nguoi do.
+So cong chung van duoc doc (phuc vu upload/audit) nhung khong con la
+tieu chi "du/thieu" cua core.
+
 Cach dung:
     python extract_contract.py "hop_dong.docx"
     python extract_contract.py "hop_dong.doc"
@@ -23,6 +33,9 @@ import unicodedata
 from pathlib import Path
 from typing import Iterable
 
+
+ENGINE_VERSION = "2026-10-06-thuake5"
+"""Ban engine snapshot cho repo test cua nhan vien ghi vao log."""
 
 # ============================================================
 # CAU HINH MAC DINH — sua tai day cho phu hop van phong
@@ -60,11 +73,13 @@ NHOM_HD_MAP = {
 
 CRITICAL_WEB_FORM_FIELDS = (
     "ten_hop_dong",
-    "so_cong_chung",
     "nhom_hop_dong",
     "loai_tai_san",
     "tai_san",
 )
+# Core regex chi chiu trach nhiem NGUOI + TAI SAN.
+# "so_cong_chung" van duoc trich (find_so_cong_chung, scan) de phuc vu
+# upload/audit portal, nhung khong con la tieu chi du/thieu cua core.
 
 DOC_KIND_TRANSFER = "transfer_contract"
 DOC_KIND_GIFT = "gift_contract"
@@ -73,6 +88,7 @@ DOC_KIND_TRANSFER_CANCELLATION = "transfer_cancellation"
 DOC_KIND_MORTGAGE = "mortgage_contract"
 DOC_KIND_INHERITANCE_PARTITION = "inheritance_partition"
 DOC_KIND_INHERITANCE_REFUSAL = "inheritance_refusal"
+DOC_KIND_INHERITANCE_DECLARATION = "inheritance_declaration"
 DOC_KIND_GENERIC = "generic"
 
 
@@ -295,11 +311,19 @@ def has_contract_keyword(text: str, file_name: str = "") -> bool:
 def _normalize_plain_text_for_extract(text: str) -> str:
     normalized = str(text or "")
     normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")
-    normalized = normalized.replace("\x0b", "\n").replace("\t", " ").replace("\xa0", " ")
+    # IFilter giu o bang bang TAB — doi thanh " | " (cung quy uoc voi
+    # _append_table_lines cua .docx) de parser bang dung chung duoc.
+    # Nguoi doc ten khong bao gio co "|" nen khong so nham.
+    normalized = normalized.replace("\x0b", "\n").replace("\t", " | ").replace("\xa0", " ")
     normalized = unicodedata.normalize("NFC", normalized)
     lines = []
     for raw in normalized.split("\n"):
-        line = re.sub(r"\s+", " ", raw).strip()
+        line = re.sub(r"[ \xa0]+", " ", raw).strip()
+        line = re.sub(r"\s*\|\s*", " | ", line)
+        # Dau/cuoi dong con "| " la do TAB thu dau dong cua .doc —
+        # cat de pattern ^...$ khong bi lech (o trong bang van giu).
+        line = re.sub(r"^(?:\s*\|\s*)+", "", line)
+        line = re.sub(r"(?:\s*\|\s*)+$", "", line)
         if line:
             lines.append(line)
     return "\n".join(lines)
@@ -541,6 +565,16 @@ def _detect_document_kind_and_title(text: str) -> tuple[str, str]:
     if any(
         marker in title_fold
         for marker in (
+            "van ban khai nhan di san",
+            "khai nhan di san thua ke",
+            "bien ban khai nhan di san",
+        )
+    ):
+        return DOC_KIND_INHERITANCE_DECLARATION, title_line
+
+    if any(
+        marker in title_fold
+        for marker in (
             "van ban phan chia di san",
             "thoa thuan phan chia di san",
         )
@@ -706,14 +740,18 @@ def _find_tai_san_inheritance_partition(text: str) -> str:
     return _extract_block_by_folded_patterns(
         text,
         (
-            r"quyen su dung dat(?: cua[^\n]{0,120})?[^\n]{0,250}?co dia chi tai\s*:?",
-            r"nha o va quyen su dung dat o(?: cua[^\n]{0,120})?[^\n]{0,250}?co dia chi tai\s*:?",
-            r"phan quyen su dung dat(?: cua[^\n]{0,120})?[^\n]{0,250}?co dia chi tai\s*:?",
+            r"quyen su dung dat(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:co dia chi tai|tai dia chi)\s*:?",
+            r"nha o va quyen su dung dat o(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:co dia chi tai|tai dia chi)\s*:?",
+            r"phan quyen su dung dat(?: cua[^\n]{0,200})?[^\n]{0,300}?(?:co dia chi tai|tai dia chi)\s*:?",
+            r"quyen su dung dat[^\n]{0,300}?theo giay chung nhan",
+            r"thua dat so[^\n]{0,200}?(?:co dia chi tai|tai dia chi|theo giay chung nhan|theo ban do)",
         ),
         (
-            r"(?m)^\s*nguoi thua ke\s*:",
-            r"(?m)^\s*nhung nguoi thua ke\b",
+            r"(?m)^\s*(?:[IVX]+\.[\s|]*)?(?:\|\s*)?nguoi thua ke\s*:",
+            r"(?m)^\s*(?:[IVX]+\.[\s|]*)?(?:\|\s*)?nhung nguoi thua ke\b",
+            r"(?m)^\s*(?:[IVX]+\.[\s|]*)?(?:\|\s*)?nhung nguoi nhan thua ke\b",
             r"(?m)^\s*noi dung phan chia di san\b",
+            r"(?m)^\s*thong nhat phan chia\b",
             r"(?m)^\s*bang van ban nay\b",
             r"(?m)^\s*nhung nguoi huong di san\b",
             r"(?m)^\s*loi chung\b",
@@ -726,8 +764,8 @@ def _find_tai_san_inheritance_refusal(text: str) -> str:
         text,
         (
             r"(?m)^\s*(?:1\.\s*)?tai san(?: thu nhat)?\s*:",
-            r"quyen su dung dat(?: cua[^\n]{0,120})?[^\n]{0,250}?co dia chi tai\s*:?",
-            r"phan quyen su dung dat(?: cua[^\n]{0,120})?[^\n]{0,250}?co dia chi tai\s*:?",
+            r"quyen su dung dat(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:co dia chi tai|tai dia chi)\s*:?",
+            r"phan quyen su dung dat(?: cua[^\n]{0,200})?[^\n]{0,300}?(?:co dia chi tai|tai dia chi)\s*:?",
         ),
         (
             r"(?m)^\s*bang van ban nay\b",
@@ -738,16 +776,245 @@ def _find_tai_san_inheritance_refusal(text: str) -> str:
     )
 
 
+def _find_tai_san_insurance(text: str) -> str:
+    """Khoi QUYEN LOI BAO HIEM trong van ban thua ke."""
+    return _extract_block_by_folded_patterns(
+        text,
+        (
+            r"quyen loi bao hiem",
+        ),
+        (
+            r"(?m)^\s*(?:[IVX]+\.[\s|]*)?(?:\|\s*)?nguoi thua ke\s*:",
+            r"(?m)^\s*(?:[IVX]+\.[\s|]*)?(?:\|\s*)?nhung nguoi (?:thua ke|nhan thua ke)\b",
+            r"(?m)^\s*noi dung (?:phan chia|thoa thuan phan chia|khai nhan) di san\b",
+            r"(?m)^\s*bang van ban nay\b",
+            r"(?m)^\s*(?:chung toi|toi) xin cam doan\b",
+            r"(?m)^\s*nguoi (?:tu choi huong|huong) di san\b",
+            r"(?m)^\s*loi chung\b",
+        ),
+    )
+
+
+def tach_danh_sach_bao_hiem(tai_san: str) -> list[dict]:
+    """Moi quyen loi bao hiem 1 dong: so hop dong, ben bao hiem,
+    ben mua, doi tuong, ngay ky."""
+    block = unicodedata.normalize("NFC", str(tai_san or ""))
+    if not block.strip():
+        return []
+    entries: list[dict] = []
+    current: dict | None = None
+
+    for raw_line in block.split("\n"):
+        line = raw_line.strip()
+        if not line or "bảo hiểm" not in line and "Bảo hiểm" not in line:
+            if current is not None and line:
+                extra = current.get("mo_ta", "")
+                if line not in extra:
+                    current["mo_ta"] = f"{extra} {line}".strip()
+            continue
+        # Dong "Ben mua / Doi tuong" bo sung cho quyen loi dang mo (khong
+        # mo dong moi khi chua co so hop dong).
+        has_so = bool(re.search(r"(?i)\bs\u1ed1\s*[0-9]", line))
+        if current is not None and not has_so and current["so_hop_dong"]:
+            current["mo_ta"] = f"{current['mo_ta']} {line}".strip()
+        else:
+            current = {
+                "loai_quyen_loi": "",
+                "so_hop_dong": "",
+                "ben_bao_hiem": "",
+                "ben_mua": "",
+                "doi_tuong": "",
+                "ngay_ky": "",
+                "mo_ta": line,
+            }
+            entries.append(current)
+        loai_match = re.search(r"(?i)(Quy\u1ec1n l\u1ee3i b\u1ea3o hi\u1ec3m[^\n:]*|H\u1ee3p \u0111\u1ed3ng b\u1ea3o hi\u1ec3m[^\n]*?)(?:\s+s\u1ed1\b|$)", line)
+        if loai_match:
+            current["loai_quyen_loi"] = _clean_asset_cell(loai_match.group(1))
+        so_match = re.search(r"(?i)\bs\u1ed1\s*([0-9][A-Z0-9.\-]{5,40})", line)
+        if so_match:
+            current["so_hop_dong"] = so_match.group(1).strip()
+        mua_match = re.search(r"(?i)B\u00ean mua b\u1ea3o hi\u1ec3m:\s*([^\n]+)", line)
+        if mua_match and not current["ben_mua"]:
+            current["ben_mua"] = _clean_asset_cell(mua_match.group(1))
+        dt_match = re.search(
+            r"(?i)\u0110\u1ed1i t\u01b0\u1ee3ng b\u1ea3o hi\u1ec3m[^\n:]*:\s*([^\n]+)", line
+        )
+        if dt_match and not current["doi_tuong"]:
+            current["doi_tuong"] = _clean_asset_cell(dt_match.group(1))
+        ngay_match = re.search(r"ng\u00e0y\s*(\d{1,2}/\d{1,2}/\d{4})", line)
+        if ngay_match and not current["ngay_ky"]:
+            current["ngay_ky"] = ngay_match.group(1)
+        ky_match = re.search(r"(?i)k\u00fd gi\u1eefa\s+(.+?)\s+ng\u00e0y\s*\d{1,2}/\d{1,2}/\d{4}", line)
+        if ky_match:
+            ben = _clean_asset_cell(ky_match.group(1))
+            mua = current["ben_mua"]
+            if mua and ben.endswith(mua):
+                ben = ben[: -len(mua)].strip()
+                ben = re.sub(r"(?i)\s*v\u00e0\s*$", "", ben).strip()
+            current["ben_bao_hiem"] = ben
+    known_mua = [entry["ben_mua"] for entry in entries if entry["ben_mua"]]
+    for entry in entries:
+        if not entry["ben_mua"] and known_mua:
+            entry["ben_mua"] = known_mua[0]
+        mua = entry["ben_mua"]
+        ben = entry["ben_bao_hiem"]
+        if mua and ben.endswith(mua):
+            ben = ben[: -len(mua)].strip()
+            entry["ben_bao_hiem"] = re.sub(r"(?i)\s*và\s*$", "", ben).strip()
+    return [entry for entry in entries if entry["so_hop_dong"] or entry["ben_mua"] or entry["doi_tuong"]]
+
+
+def _find_tai_san_savings(text: str) -> str:
+    """Khoi tai san SO TIET KIEM / TAI KHOAN trong van ban thua ke."""
+    return _extract_block_by_folded_patterns(
+        text,
+        (
+            r"so tiet kiem",
+            r"so du tai khoan",
+            r"so tien goc va lai",
+        ),
+        (
+            r"(?m)^\s*(?:[IVX]+\.[\s|]*)?(?:\|\s*)?nhung nguoi (?:thua ke|nhan thua ke)\b",
+            r"(?m)^\s*noi dung (?:phan chia|thoa thuan phan chia|khai nhan) di san\b",
+            r"(?m)^\s*bang van ban nay\b",
+            r"(?m)^\s*(?:chung toi|toi) xin cam doan\b",
+            r"(?m)^\s*nguoi (?:tu choi huong|huong) di san\b",
+            r"(?m)^\s*loi chung\b",
+        ),
+    )
+
+
+def tach_danh_sach_so_tiet_kiem(tai_san: str) -> list[dict]:
+    """Moi so tiet kiem / tai khoan 1 dong: số hiệu, ngan hang, chi nhánh,
+    ngay phát hành, chu so."""
+    block = unicodedata.normalize("NFC", str(tai_san or ""))
+    if not block.strip():
+        return []
+    entries: list[dict] = []
+    current: dict | None = None
+
+    def new_entry(loai: str) -> dict:
+        return {
+            "loai_so": loai,
+            "so_hieu": "",
+            "ngan_hang": "",
+            "chi_nhanh": "",
+            "ngay_phat_hanh": "",
+            "chu_so": "",
+            "mo_ta": "",
+        }
+
+    for raw_line in block.split("\n"):
+        line = raw_line.strip()
+        if not line:
+            continue
+        folded = _fold_text(line)
+        la_tai_khoan = "tai khoan" in folded and (
+            "so tai khoan" in folded
+            or "so hieu tai khoan" in folded
+            or "chu tai khoan" in folded
+            or "ngay mo tai khoan" in folded
+            or "xac nhan" in folded
+        )
+        if la_tai_khoan:
+            stk_match = re.search(r"(?i)(?:s\u1ed1 t\u00e0i kho\u1ea3n|s\u1ed1 hi\u1ec7u t\u00e0i kho\u1ea3n):?\s*(\d{6,20})", line)
+            if current is None or (stk_match and current["so_hieu"]):
+                current = new_entry("tài khoản")
+                entries.append(current)
+                current["mo_ta"] = line
+            elif line not in current["mo_ta"]:
+                current["mo_ta"] = f"{current['mo_ta']} {line}".strip()
+            if stk_match and not current["so_hieu"]:
+                current["so_hieu"] = stk_match.group(1)
+            chu_tk = re.search(r"(?i)(?:mang t\u00ean|ch\u1ee7 t\u00e0i kho\u1ea3n)\s*:?\s*([^\n,.]+)", line)
+            if chu_tk and not current["chu_so"]:
+                current["chu_so"] = _clean_asset_cell(chu_tk.group(1))
+            mo_tk = re.search(r"(?i)ng\u00e0y m\u1edf t\u00e0i kho\u1ea3n\s*:?\s*(\d{1,2}/\d{1,2}/\d{4})", line)
+            if mo_tk and not current["ngay_phat_hanh"]:
+                current["ngay_phat_hanh"] = mo_tk.group(1)
+            ten_match = re.search(r"(?i)mang t\u00ean\s+([^\n,.]+)", line)
+            if ten_match and not current["chu_so"]:
+                current["chu_so"] = _clean_asset_cell(ten_match.group(1))
+            bank_match = re.search(
+                r"(?i)\bdo\s+(.+?)(?=\s+(?:chi nhánh|số hiệu|số tài khoản|phát hành|xác nhận|như sau)|$)",
+                line,
+            )
+            if not bank_match:
+                bank_match = re.search(
+                    r"(?i)\bc\u1ee7a\s+(Ng\u00e2n h\u00e0ng[^\n]+?)(?=\s*[–-]\s*|\s+ng\u00e0y\s+\d|$)",
+                    line,
+                )
+            if bank_match and not current["ngan_hang"]:
+                current["ngan_hang"] = re.sub(r"\s*[-\u2013\u2014]\s*$", "", _clean_asset_cell(bank_match.group(1)))
+            branch_match = re.search(
+                r"(?i)chi nh\u00e1nh\s+(.+?)(?=\s+(?:số hiệu|số tài khoản|phát hành|xác nhận|như sau)|$)",
+                line,
+            )
+            if branch_match and not current["chi_nhanh"]:
+                current["chi_nhanh"] = re.sub(r"\s*[-\u2013\u2014]\s*$", "", _clean_asset_cell(branch_match.group(1)))
+            continue
+        if "so tiet kiem" not in folded and "the tiet kiem" not in folded:
+            if current is not None:
+                extra_hieu = re.search(r"(?i)(?:s\u1ed1 hi\u1ec7u|s\u1ed1(?!\s*(?:t\u00e0i kho\u1ea3n|ti\u1ec1n)))\s*:?\s*([A-Za-z]{1,3}\s*\d{6,14}|\d{7,20})", line)
+                if extra_hieu and not current["so_hieu"]:
+                    current["so_hieu"] = _clean_asset_cell(extra_hieu.group(1))
+                extra_ngay = re.search(
+                    r"(?i)ph\u00e1t h\u00e0nh ng\u00e0y\s*(\d{1,2}/\d{1,2}/\d{4})", line
+                )
+                if extra_ngay and not current["ngay_phat_hanh"]:
+                    current["ngay_phat_hanh"] = extra_ngay.group(1)
+            continue
+        current = new_entry("sổ tiết kiệm")
+        entries.append(current)
+        current["mo_ta"] = line
+        ky_han = re.search(r"(?i)S\u1ed5 ti\u1ebft ki\u1ec7m\s+(c\u00f3 k\u1ef3 h\u1ea1n|kh\u00f4ng k\u1ef3 h\u1ea1n)", line)
+        if ky_han:
+            current["loai_so"] = f"sổ tiết kiệm ({ky_han.group(1).lower()})"
+        bank_match = re.search(
+            r"(?i)\bdo\s+(.+?)(?=\s+(?:chi nhánh|số hiệu|phát hành|như sau)|$)",
+            line,
+        )
+        if bank_match:
+            current["ngan_hang"] = re.sub(r"\s*[-\u2013\u2014]\s*$", "", _clean_asset_cell(bank_match.group(1)))
+        branch_match = re.search(
+            r"(?i)chi nh\u00e1nh\s+(.+?)(?=\s+(?:số hiệu|phát hành|như sau)|$)",
+            line,
+        )
+        if branch_match:
+            current["chi_nhanh"] = re.sub(r"\s*[-\u2013\u2014]\s*$", "", _clean_asset_cell(branch_match.group(1)))
+        hieu_match = re.search(r"(?i)(?:s\u1ed1 hi\u1ec7u|s\u1ed1(?!\s*(?:t\u00e0i kho\u1ea3n|ti\u1ec1n)))\s*:?\s*([A-Za-z]{1,3}\s*\d{6,14}|\d{7,20})", line)
+        if hieu_match:
+            current["so_hieu"] = _clean_asset_cell(hieu_match.group(1))
+        ngay_match = re.search(
+            r"(?i)ph\u00e1t h\u00e0nh ng\u00e0y\s*(\d{1,2}/\d{1,2}/\d{4})", line
+        )
+        if ngay_match:
+            current["ngay_phat_hanh"] = ngay_match.group(1)
+        chu_match = re.search(r"(?i)\b(?:cho|mang t\u00ean)\s+(?:\u00f4ng|b\u00e0|anh|ch\u1ecb)?\s*:?\s*([^\n,;.]+)", line)
+        if chu_match:
+            current["chu_so"] = _clean_asset_cell(chu_match.group(1))
+    return entries
+
+
 def _find_tai_san_by_kind(text: str, doc_kind: str) -> str:
-    if doc_kind == DOC_KIND_INHERITANCE_PARTITION:
+    if doc_kind in (DOC_KIND_INHERITANCE_PARTITION, DOC_KIND_INHERITANCE_DECLARATION):
         tai_san = _find_tai_san_inheritance_partition(text)
         if tai_san:
             return tai_san
+        savings = _find_tai_san_savings(text)
+        if savings:
+            return savings
+        return _find_tai_san_insurance(text)
 
     if doc_kind == DOC_KIND_INHERITANCE_REFUSAL:
         tai_san = _find_tai_san_inheritance_refusal(text)
         if tai_san:
             return tai_san
+        savings = _find_tai_san_savings(text)
+        if savings:
+            return savings
+        return _find_tai_san_insurance(text)
 
     if doc_kind in (DOC_KIND_TRANSFER, DOC_KIND_GIFT):
         common_qsdd_block = _find_tai_san_qsdd_common(text)
@@ -893,6 +1160,571 @@ def guess_loai_tai_san(tai_san, ten_hd):
 
 
 # ============================================================
+# TACH MOI THUA DAT THANH 1 DONG TAI SAN RIENG
+# Quyet dinh cua owner 05/10/2026: tai san nhieu thua thi tach rieng.
+# Nguyen tac: dong nao co so thua (khac "_" , khac rong) thi mo thua moi;
+# dong "Trong do" / dong khong co so thua thi gan vao thua dang mo
+# (chi_tiet_dien_tich) — giu du lieu, khong tu bia danh tinh thua.
+# ============================================================
+_THUA_TABLE_DEFAULT_ORDER = ("to", "thua", "dien_tich", "muc_dich", "thoi_han", "ghi_them")
+
+
+def _clean_asset_cell(value: str) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip(" ;,.")
+
+
+def _map_asset_table_columns(header_line: str) -> tuple:
+    order: list = []
+    for cell in header_line.split("|"):
+        folded = _fold_text(cell)
+        if "to ban do" in folded or "to so" in folded:
+            order.append("to")
+        elif "thua" in folded:
+            order.append("thua")
+        elif "dien tich" in folded:
+            order.append("dien_tich")
+        elif "muc dich" in folded:
+            order.append("muc_dich")
+        elif "thoi gian" in folded or "thoi han" in folded:
+            order.append("thoi_han")
+        elif "ghi them" in folded or "phan ghi" in folded:
+            order.append("ghi_them")
+        else:
+            order.append("")
+    return tuple(order)
+
+
+def _tach_ngu_canh_gcn(tai_san: str) -> dict:
+    block = unicodedata.normalize("NFC", str(tai_san or ""))
+    context = {
+        "so_gcn": "",
+        "so_gcn_raw": "",
+        "loai_gcn": "",
+        "so_vao_so": "",
+        "dia_chi": "",
+        "ngay_cap_gcn": "",
+        "co_quan_cap": "",
+    }
+    gcn_match = re.search(
+        r"(?i)(?:ch\u1ee9ng nh\u1eadn|GCN)[^\n]{0,100}?(?:s\u1ed1\s*:?\s*|\u0111\u1ea5t\s*:?\s*)([A-Za-z\u0110\u0111]{1,3})\s*(\d{6,8})",
+        block,
+    )
+    if gcn_match:
+        context["so_gcn_raw"] = f"{gcn_match.group(1)} {gcn_match.group(2)}"
+        context["so_gcn"] = (gcn_match.group(1) + gcn_match.group(2)).upper()
+    loai_match = re.search(
+        r"(?i)Gi\u1ea5y ch\u1ee9ng nh\u1eadn\s+(.+?)\s+s\u1ed1\s*:?\s*[A-Za-z]{1,3}\s*\d{6,8}",
+        block,
+    )
+    if loai_match:
+        context["loai_gcn"] = _clean_asset_cell(loai_match.group(1))
+    vao_so_match = re.search(
+        r"(?i)(?:v\u00e0o s\u1ed5|v\u00e0o s\u1ed1)[^\n:]{0,60}?s\u1ed1\s+([A-Z0-9][^\n,;]*?)(?=\s+ng\u00e0y\s+\d|\s+do\s+|\s*$)",
+        block,
+    )
+    if vao_so_match:
+        so_vao_so = _clean_asset_cell(vao_so_match.group(1))
+        # Cat tu thua rot ("...887QD-UB huyen" -> "...887QD-UB"): token cuoi
+        # khong chua so thi cat, lap den khi token cuoi co so.
+        while " " in so_vao_so and not re.search(r"\d", so_vao_so.rsplit(" ", 1)[-1]):
+            so_vao_so = so_vao_so.rsplit(" ", 1)[0].strip()
+        context["so_vao_so"] = so_vao_so
+    dia_chi_match = re.search(
+        r"(?i)(?:c\u00f3 \u0111\u1ecba ch\u1ec9 t\u1ea1i|t\u1ea1i \u0111\u1ecba ch\u1ec9)\s*:?\s*(.+?)(?=\s+theo\s+[A-Z]|\s+theo\s+Gi\u1ea5y|$)",
+        block,
+    )
+    if dia_chi_match:
+        context["dia_chi"] = _clean_asset_cell(dia_chi_match.group(1))
+    cap_match = re.search(
+        r"(?i)do\s+([^\n]+?)\s+(?:c\u1ea5p|k\u00fd)\s+ng\u00e0y\s*(\d{1,2}/\d{1,2}/\d{4})",
+        block,
+    )
+    if cap_match:
+        context["co_quan_cap"] = _clean_asset_cell(cap_match.group(1))
+        context["ngay_cap_gcn"] = cap_match.group(2)
+    return context
+
+
+def _new_thua_dat(context: dict) -> dict:
+    return {
+        "so_thua_dat": "",
+        "so_to_ban_do": "",
+        "dien_tich": "",
+        "muc_dich_su_dung": "",
+        "thoi_han_su_dung": "",
+        "phan_ghi_them": "",
+        "dia_chi": context.get("dia_chi", ""),
+        "loai_gcn": context.get("loai_gcn", ""),
+        "so_gcn": context.get("so_gcn", ""),
+        "so_gcn_raw": context.get("so_gcn_raw", ""),
+        "so_vao_so": context.get("so_vao_so", ""),
+        "ngay_cap_gcn": context.get("ngay_cap_gcn", ""),
+        "co_quan_cap": context.get("co_quan_cap", ""),
+        "chi_tiet_dien_tich": [],
+    }
+
+
+def _is_pure_number_cell(value: str) -> bool:
+    return bool(re.match(r"^\d+(?:[.,]\d+)*$", (value or "").strip()))
+
+
+def _cell_has_letters(value: str) -> bool:
+    return bool(re.search(r"[A-Za-zÀ-ỹ]", value or ""))
+
+
+def _tach_thua_cell_stream(cells: list[str], context: dict, parcels: list[dict]) -> bool:
+    """Tach dong bang don (nhieu o, co ca tieu de + du lieu, gap o .doc
+    doc bang IFilter). Tra True neu an duoc it nhat 1 thua.
+    Quy tac: bo thu tuc tieu de sau o "Phan ghi them"/"Muc dich";
+    bo 3 o so dau (to, thua, tong DT) la thua moi; cum (DT, loai dat,
+    thoi han) sau "Trong do" la chi tiet; gap "2.2."/chu thuong thi dung.
+    """
+    anchor = None
+    for idx, cell in enumerate(cells):
+        if "so thua" in _fold_text(cell):
+            anchor = idx
+            break
+    if anchor is None:
+        return False
+    # Tieu de co the thua o trong ("( m2)", "Thoi han su dung", ...) —
+    # di qua het cac o tieu de moi toi du lieu.
+    header_words = ("so thua", "so to", "dien tich", "muc dich", "thoi han", "phan ghi", "ghi them", "( m2)", "m2)")
+    last_header = anchor
+    for idx in range(anchor + 1, len(cells)):
+        folded = _fold_text(cells[idx])
+        if not folded.strip():
+            last_header = idx
+            continue
+        if any(word in folded for word in header_words):
+            last_header = idx
+            continue
+        break
+    start = last_header + 1
+    data = [cell for cell in cells[start:] if cell.strip()]
+    pos = 0
+    current: dict | None = None
+    if (
+        pos + 2 < len(data)
+        and re.search(r"\d", data[pos])
+        and _is_pure_number_cell(data[pos + 1])
+        and _is_pure_number_cell(data[pos + 2])
+    ):
+        current = _new_thua_dat(context)
+        current["so_to_ban_do"] = data[pos]
+        current["so_thua_dat"] = data[pos + 1]
+        current["dien_tich"] = data[pos + 2]
+        parcels.append(current)
+        pos += 3
+    else:
+        return False
+    while pos < len(data):
+        folded = _fold_text(data[pos])
+        if folded in ("trong do", "trong do:") or folded.startswith("trong do"):
+            pos += 1
+            continue
+        if re.match(r"^\d+\.\d+", data[pos].strip()):
+            break
+        if (
+            pos + 2 < len(data)
+            and _is_pure_number_cell(data[pos])
+            and _cell_has_letters(data[pos + 1])
+        ):
+            detail = {
+                "dien_tich": data[pos],
+                "muc_dich_su_dung": data[pos + 1],
+                "thoi_han_su_dung": data[pos + 2],
+            }
+            pos += 3
+            extras: list[str] = []
+            while pos < len(data):
+                peek = data[pos]
+                peek_fold = _fold_text(peek)
+                if peek_fold in ("trong do", "trong do:") or peek_fold.startswith("trong do"):
+                    break
+                if re.match(r"^\d+\.\d+", peek.strip()):
+                    break
+                if _is_pure_number_cell(peek) and pos + 1 < len(data) and _cell_has_letters(data[pos + 1]):
+                    break
+                extras.append(peek)
+                pos += 1
+                if len(extras) >= 2:
+                    break
+            if extras:
+                detail["phan_ghi_them"] = " ".join(extras)
+            current["chi_tiet_dien_tich"].append(detail)
+            continue
+        break
+    return True
+
+
+def _tach_thua_bang_don_dong(text: str, context: dict, parcels: list[dict]) -> bool:
+    """Bang .doc bi don thanh 1 dong chu (mat dau |): tim tieu de
+    "So to ban do ... Dien tich ... Muc dich" roi tach dong du lieu
+    theo sau. Tra True neu an duoc it nhat 1 thua.
+    Vi du: "So thua ... 2 (nay la to ban do so 107) 106 450 Trong do
+    200 Dat o Lau dai 250 NTS 15/10/2063 ...".
+    """
+    folded = _fold_text(text)
+    if not (("so thua" in folded or "so to" in folded) and ("dien tich" in folded or "muc dich" in folded)):
+        return False
+    head_end = re.search(
+        r"(?i)(?:Ph\u1ea7n ghi th\u00eam|M\u1ee5c \u0111\u00edch s\u1eed d\u1ee5ng|Di\u1ec7n t\u00edch[^\n]*?m2\))\s*",
+        text,
+    )
+    if not head_end:
+        return False
+    data = text[head_end.end():]
+    # Cat phan chu thich dieu khoan ke tiep ("2.2. Phan quyen...").
+    data = re.split(r"\s(?=\d+\.\d+\.\s)", data, maxsplit=1)[0]
+    parcel_match = re.search(
+        r"(\d+(?:\s*\(nay l\u00e0 t\u1edd b\u1ea3n \u0111\u1ed3 s\u1ed1\s*\d+\))?)\s+(\d+)\s+([\d.,]+)\s*(?=Trong |$)",
+        data,
+        flags=re.IGNORECASE,
+    )
+    if not parcel_match:
+        return False
+    current = _new_thua_dat(context)
+    current["so_to_ban_do"] = _clean_asset_cell(parcel_match.group(1))
+    current["so_thua_dat"] = _clean_asset_cell(parcel_match.group(2))
+    current["dien_tich"] = _clean_asset_cell(parcel_match.group(3))
+    parcels.append(current)
+    rest = data[parcel_match.end():]
+    detail_re = re.compile(
+        r"Trong\s+([\d.,]+)\s+(.+?)\s+(L\u00e2u d\u00e0i|\d{1,2}/\d{1,2}/\d{4})\b\s*",
+        flags=re.IGNORECASE,
+    )
+    pos = 0
+    while True:
+        seg_match = re.search(r"(?i)Trong", rest[pos:])
+        if not seg_match:
+            break
+        detail = detail_re.match(rest, pos + seg_match.start())
+        if not detail:
+            break
+        ghi_them = rest[detail.end():]
+        next_seg = re.search(r"(?i)Trong", ghi_them)
+        if next_seg:
+            ghi_them = ghi_them[:next_seg.start()]
+        current["chi_tiet_dien_tich"].append({
+            "dien_tich": _clean_asset_cell(detail.group(1)),
+            "muc_dich_su_dung": _clean_asset_cell(detail.group(2)),
+            "thoi_han_su_dung": _clean_asset_cell(detail.group(3)),
+            "phan_ghi_them": _clean_asset_cell(ghi_them),
+        })
+        pos = detail.end() + len(ghi_them)
+    return True
+
+
+def _so_thuc_dien_tich(value: str) -> float | None:
+    """So dau tien trong o dien tich -> float (phuc vu land_rows).
+    Khong parse duoc thi None (giu text goc o muc_dich/dien_tich raw).
+    """
+    match = re.match(r"\s*(\d+(?:[.,]\d+)*)", str(value or ""))
+    if not match:
+        return None
+    cleaned = match.group(1)
+    if cleaned.count(".") > 1:
+        cleaned = cleaned.replace(".", "")
+    try:
+        return float(cleaned.replace(",", "."))
+    except ValueError:
+        return None
+
+
+def thua_dat_sang_land_rows(parcel: dict) -> list[dict]:
+    """Doi chi_tiet_dien_tich sang shape DB land_rows (contracts/
+    notary-case-drafting.md asset_row): [{loai_dat, dien_tich, thoi_han}].
+    loai_dat giu text goc (ma nhu ONT/CLN hoac ten nhu "Dat o") —
+    khong tu suy ma khi thieu can cu.
+    """
+    rows: list[dict] = []
+    for detail in (parcel or {}).get("chi_tiet_dien_tich", []):
+        if not isinstance(detail, dict):
+            continue
+        loai_dat = _clean_asset_cell(detail.get("muc_dich_su_dung", ""))
+        thoi_han = _clean_asset_cell(detail.get("thoi_han_su_dung", ""))
+        dien_tich = _so_thuc_dien_tich(detail.get("dien_tich", ""))
+        if not loai_dat and dien_tich is None and not thoi_han:
+            continue
+        rows.append({
+            "loai_dat": loai_dat or None,
+            "dien_tich": dien_tich,
+            "thoi_han": thoi_han or None,
+        })
+    return rows
+
+
+def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
+    """Tach khoi text tai san thanh list moi thua 1 dong (gop context GCN)."""
+    block = unicodedata.normalize("NFC", str(tai_san or ""))
+    if not block.strip():
+        return []
+    context = _tach_ngu_canh_gcn(block)
+    parcels: list[dict] = []
+    current: dict | None = None
+    pending: dict | None = None
+    trong_do_seen = False
+    col_order: tuple = ()
+
+    bullet_labels = (
+        ("so_thua_dat", r"Th\u1eeda \u0111\u1ea5t s\u1ed1|S\u1ed1 th\u1eeda"),
+        ("so_to_ban_do", r"T\u1edd b\u1ea3n \u0111\u1ed3 s\u1ed1|S\u1ed1 t\u1edd(?: b\u1ea3n \u0111\u1ed3)?"),
+        ("dien_tich", r"Di\u1ec7n t\u00edch"),
+        ("muc_dich_su_dung", r"M\u1ee5c \u0111\u00edch s\u1eed d\u1ee5ng"),
+        ("thoi_han_su_dung", r"Th\u1eddi h\u1ea1n s\u1eed d\u1ee5ng"),
+        ("dia_chi", r"\u0110\u1ecba ch\u1ec9"),
+    )
+
+    # IFilter cat tieu de bang lam 2 dong ("Dien tich" / "( m2) muc dich...")
+    # — noi lai truoc khi tach de du tieu de + du lieu chung 1 dong.
+    raw_lines = block.split("\n")
+    merged_lines: list[str] = []
+    skip_next = False
+    for idx, raw_line in enumerate(raw_lines):
+        if skip_next:
+            skip_next = False
+            continue
+        folded_line = _fold_text(raw_line)
+        next_line = raw_lines[idx + 1] if idx + 1 < len(raw_lines) else ""
+        if (
+            "|" in raw_line
+            and "so to ban do" in folded_line
+            and "muc dich" not in folded_line
+            and "muc dich" in _fold_text(next_line)
+        ):
+            merged_lines.append(raw_line.strip() + " | " + next_line.strip())
+            skip_next = True
+            continue
+        merged_lines.append(raw_line)
+
+    for raw_line in merged_lines:
+        line = raw_line.strip()
+        if not line:
+            continue
+        folded = _fold_text(line)
+        # "Trong do: | 300 | Dat o | ..." — cat moc, giu lai o du lieu.
+        if "|" in line and "trong do" in folded:
+            line = re.sub(r"(?i)trong\s+đ[oó]:?", "", line)
+            folded = _fold_text(line)
+            if not line.strip(" |"):
+                trong_do_seen = True
+                continue
+        if folded in ("trong do", "trong do:") or folded.startswith("trong do"):
+            trong_do_seen = True
+            continue
+        # Dong tieu de bang that co chu "So thua"/"So to" + "Dien tich"/
+        # "Muc dich" — dong du lieu kieu "04 Nay la to ban do 24 | 104 Nay
+        # la thua dat so 321 | ..." khong duoc nhan nham lam tieu de.
+        # Bang .doc bi don thanh 1 dong (mat dau |): tach rieng, khong de
+        # roi vao nhan bullet gay thua rac.
+        if ("so thua" in folded or "so to" in folded) and ("dien tich" in folded or "muc dich" in folded):
+            if "|" not in line:
+                _tach_thua_bang_don_dong(line, context, parcels)
+                continue
+            pipe_cells = [_clean_asset_cell(cell) for cell in line.split("|")]
+            if not _tach_thua_cell_stream(pipe_cells, context, parcels):
+                col_order = _map_asset_table_columns(line)
+            continue
+        if "|" in line:
+            order = col_order or _THUA_TABLE_DEFAULT_ORDER
+            cells = [_clean_asset_cell(cell) for cell in line.split("|")]
+            # Dong van xuoi rat dai (lap lai GCN/QSDD trong doan tom tat
+            # phan chia) khong phai dong du lieu bang — o that luon ngan.
+            if any(len(cell) > 100 for cell in cells):
+                continue
+            if col_order and len(cells) >= len(order):
+                row = {
+                    "so_to_ban_do": "",
+                    "so_thua_dat": "",
+                    "dien_tich": "",
+                    "muc_dich_su_dung": "",
+                    "thoi_han_su_dung": "",
+                    "phan_ghi_them": "",
+                }
+                key_map = {
+                    "to": "so_to_ban_do",
+                    "thua": "so_thua_dat",
+                    "dien_tich": "dien_tich",
+                    "muc_dich": "muc_dich_su_dung",
+                    "thoi_han": "thoi_han_su_dung",
+                    "ghi_them": "phan_ghi_them",
+                }
+                for pos, cell in enumerate(cells):
+                    if pos >= len(order) or not order[pos]:
+                        continue
+                    target = key_map.get(order[pos], "")
+                    if target and not row[target]:
+                        row[target] = cell
+                if row["so_thua_dat"] == "_":
+                    row["so_thua_dat"] = ""
+                if row["so_to_ban_do"] == "_":
+                    row["so_to_ban_do"] = ""
+                if re.search(r"\d", row["so_thua_dat"]):
+                    current = _new_thua_dat(context)
+                    for key, value in row.items():
+                        if value:
+                            current[key] = value
+                    parcels.append(current)
+                elif current is not None:
+                    detail = {key: value for key, value in row.items() if value}
+                    if detail:
+                        current["chi_tiet_dien_tich"].append(detail)
+                else:
+                    current = _new_thua_dat(context)
+                    detail = {key: value for key, value in row.items() if value}
+                    if detail:
+                        current["chi_tiet_dien_tich"].append(detail)
+                    parcels.append(current)
+                continue
+            # Dong ngan khong du o: o giua co chu so la thua moi
+            # ("4|169|427", "_|201|622"); khong co thi la chi tiet
+            # ("200|Dat o|Lau dai" = dien tich|muc dich|thoi han).
+            mid = cells[1] if len(cells) > 1 else ""
+            if mid.strip() not in ("", "_") and re.search(r"\d", mid):
+                current = _new_thua_dat(context)
+                shorts = cells + ["", "", "", "", ""]
+                current["so_to_ban_do"] = "" if shorts[0].strip() == "_" else shorts[0]
+                current["so_thua_dat"] = shorts[1]
+                current["dien_tich"] = shorts[2]
+                current["muc_dich_su_dung"] = shorts[3]
+                current["thoi_han_su_dung"] = shorts[4]
+                parcels.append(current)
+            elif current is not None:
+                if len(cells) == 3:
+                    current["chi_tiet_dien_tich"].append(
+                        {
+                            "dien_tich": cells[0],
+                            "muc_dich_su_dung": cells[1],
+                            "thoi_han_su_dung": cells[2],
+                        }
+                    )
+                elif len(cells) == 4:
+                    current["chi_tiet_dien_tich"].append(
+                        {
+                            "dien_tich": cells[0],
+                            "muc_dich_su_dung": cells[1],
+                            "thoi_han_su_dung": cells[2],
+                            "phan_ghi_them": cells[3],
+                        }
+                    )
+                elif any(cells):
+                    current["chi_tiet_dien_tich"].append({"o_tho": cells})
+            else:
+                current = _new_thua_dat(context)
+                parcels.append(current)
+                if len(cells) == 3:
+                    current["chi_tiet_dien_tich"].append(
+                        {
+                            "dien_tich": cells[0],
+                            "muc_dich_su_dung": cells[1],
+                            "thoi_han_su_dung": cells[2],
+                        }
+                    )
+                elif len(cells) == 4:
+                    current["chi_tiet_dien_tich"].append(
+                        {
+                            "dien_tich": cells[0],
+                            "muc_dich_su_dung": cells[1],
+                            "thoi_han_su_dung": cells[2],
+                            "phan_ghi_them": cells[3],
+                        }
+                    )
+                elif any(cells):
+                    current["chi_tiet_dien_tich"].append({"o_tho": cells})
+            continue
+        # Chi nhan dong co nhan: gach dau dong, nhan thua/to, hoac nhan
+        # chi tiet (dien tich/muc dich/thoi han/dia chi) khi da mo thua —
+        # tranh nhan nham dong mo ta chung ("... tai dia chi: ...").
+        line_fold = _fold_text(line)
+        has_thua_to = (
+            "thua dat so" in line_fold
+            or "to ban do so" in line_fold
+            or "so thua" in line_fold
+            or "so to" in line_fold
+        )
+        hits: list[tuple[int, int, str]] = []
+        for field, label in bullet_labels:
+            for label_match in re.finditer(f"(?i)({label})\\s*:?", line):
+                hits.append((label_match.start(), label_match.end(), field))
+        if not hits:
+            continue
+        if (
+            not re.match(r"\s*[-*]", line)
+            and not has_thua_to
+            and current is None
+        ):
+            continue
+        hits.sort()
+        values: dict[str, str] = {}
+        for pos, (start, end, field) in enumerate(hits):
+            next_start = hits[pos + 1][0] if pos + 1 < len(hits) else len(line)
+            value = _clean_asset_cell(line[end:next_start])
+            if not value or field in values:
+                continue
+            if field == "dien_tich":
+                value = re.sub(r"(?i)\s*\(b\u1eb1ng ch\u1eef:[^)]*\)", "", value).strip()
+                # Cat phan thua ("70 m2, trong do: ...", "70 m2 theo ...").
+                value = re.split(r",\s*(?=[A-Za-z\u00c0-\u1ef9])|\s+(?:trong|theo)\b", value, maxsplit=1)[0].strip()
+            if field == "dia_chi":
+                value = re.sub(r"(?i)^t\u1ea1i:\s*", "", value).strip()
+                value = re.split(r"\s+theo\b|;", value, maxsplit=1)[0].strip()
+            values[field] = value
+        if not values:
+            continue
+        if "so_thua_dat" in values:
+            if current is not None and pending:
+                current["chi_tiet_dien_tich"].append(pending)
+            pending = None
+            trong_do_seen = False
+            current = _new_thua_dat(context)
+            for field, value in values.items():
+                if value:
+                    current[field] = value
+            parcels.append(current)
+            # Chi tiet viet lien ("trong do: CLN 70m2").
+            inline = re.search(
+                r"(?i)trong đ[oó]:\s*([A-Za-z\u00c0-\u1ef9./]+)\s*([\d.,]+\s*m2?)",
+                line,
+            )
+            if inline:
+                current["chi_tiet_dien_tich"].append({
+                    "dien_tich": _clean_asset_cell(inline.group(2)),
+                    "muc_dich_su_dung": _clean_asset_cell(inline.group(1)),
+                    "thoi_han_su_dung": "",
+                })
+        elif current is not None:
+            if trong_do_seen and "so_thua_dat" not in values:
+                if "dien_tich" in values:
+                    if pending and pending.get("dien_tich"):
+                        current["chi_tiet_dien_tich"].append(pending)
+                    pending = {}
+                if pending is None:
+                    pending = {}
+                for field, value in values.items():
+                    if value:
+                        pending[field] = value
+            else:
+                for field, value in values.items():
+                    if value:
+                        current[field] = value
+        else:
+            current = _new_thua_dat(context)
+            for field, value in values.items():
+                if value:
+                    current[field] = value
+            parcels.append(current)
+        continue
+
+    if current is not None and pending:
+        current["chi_tiet_dien_tich"].append(pending)
+
+    for parcel in parcels:
+        parcel["land_rows"] = thua_dat_sang_land_rows(parcel)
+
+    return parcels
+
+
+# ============================================================
 # FORMAT CHO 3 O CKEDITOR TREN WEB
 # ============================================================
 def _normalize_person_block_lines(person: dict) -> list[str]:
@@ -1013,18 +1845,46 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     header_re = re.compile(
         r"(?i)^\s*(?:[-*]\s*)?(?:(?:\u0110\u1ea1i di\u1ec7n|Dai dien)(?:\s+[^:]{0,80})?:\s*)?"
         r"(?:\d+\.\s*)?"
+        r"(?:T\u00f4i (?:t\u00ean )?l\u00e0\s*:|Ch\u00fang t\u00f4i l\u00e0\s*:)?\s*"
         r"(?:(?:ng\u01b0\u1eddi\s+)?(?:v\u1ee3|ch\u1ed3ng)\s*[\-\u2013]\s*)?"
         r"(?:v\u00e0\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\s+)?"
-        r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?:v\u00e0\s+)?(?P<title>\u00f4ng|ong|b\u00e0|ba)\s*:?\s*"
-        r"(?P<name>.+?)(?=\s+(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh):|\s+(?:Ch\u1ee9c v\u1ee5|Chuc vu)\s*:|[;]|$)"
+        r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?:v\u00e0\s+)?(?P<title>\u00f4ng/b\u00e0|ong/ba|\u00f4ng|ong|b\u00e0|ba|anh|ch\u1ecb|chi)\s*:?\s*"
+        r"(?P<name>.+?)(?=\s+(?:[\-\u2013]\s+)?(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh)\s*[:\u2013-]?\s*\d{1,2}/\d{1,2}/\d{4}|\s+(?:[\-\u2013]\s+)?(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)\s*[:\u2013-]?\s*(?:19|20)\d{2}|\s+(?:[\-\u2013]\s+)?(?:Ch\u1ee9c v\u1ee5|Chuc vu)\s*:|\s+c\u00f3\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\b|\s*\(\s*(?:Sinh|Ng\u00e0y)|[;]|$)"
     )
-    birth_re = re.compile(r"(?i)(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh):?\s*(\d{1,2}/\d{1,2}/\d{4})")
+    birth_re = re.compile(r"(?i)(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh)\s*[:\u2013-]?\s*(\d{1,2}/\d{1,2}/\d{4})")
+    # Nguoi lon tuoi thuong chi ghi "Sinh nam 1965" — database chap nhan YYYY
+    # (docs/spec/notary_v2/stage.md muc 5) nen giu nam lam ngay_sinh.
+    birth_year_re = re.compile(r"(?i)(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)\s*[:\u2013-]?\s*((?:19|20)\d{2})")
     id_re = re.compile(r"(?i)(?:C\u0103n c\u01b0\u1edbc(?:\s+c\u00f4ng d\u00e2n)?|Can cuoc(?:\s+cong dan)?|CCCD|CMND)\s*(?:s\u1ed1|so)?\s*:?\s*(\d+)")
     issue_place_re = re.compile(r"(?i)\bdo\s+([^\n]+?)\s+(?:c\u1ea5p ng\u00e0y|cap ngay)")
     issue_date_re = re.compile(r"(?i)(?:c\u1ea5p ng\u00e0y|cap ngay)\s*(\d{1,2}/\d{1,2}/\d{4})")
+    # Nguoi tham gia thua ke ghi ten tran khong kem "Ong/Ba", vi du:
+    # "Nguyen Van A - Vo ong X Sinh ngay: 01/01/1933;" — chi nhan khi cung
+    # dong co ngay sinh (han che nhan nham cau van mo ta nhu "Di san").
+    bare_header_re = re.compile(
+        r"(?i)^\s*(?P<name>[^\d;:\n]{2,60}?)\s*[\-\u2013]\s*"
+        r"(?P<role>(?:v\u1ee3|vo|ch\u1ed3ng|chong|con(?:\s+\u0111\u1ebb|\s+de)?)\b[^\n;]*?)"
+        r"\s+(?:(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh)\s*[:\u2013-]?\s*\d{1,2}/\d{1,2}/\d{4}|(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)\s*[:\u2013-]?\s*(?:19|20)\d{2})"
+    )
+    bare_name_noise_re = re.compile(
+        r"chung toi|nguoi de lai|di san|van ban|loi chung|cong chung|thua ke|tai san",
+        re.IGNORECASE,
+    )
+    # "Toi ten la: Tran Gia Huy; Sinh ngay: ..." — ten tran khong
+    # Ông/Bà, nhan ngay sinh cung dong de chac la nguoi.
+    intro_bare_re = re.compile(
+        r"(?i)^\s*Tôi (?:tên )?là:\s*(?P<name>[^;|\n]+?)\s*[;|][\s|]*"
+        r"(?:Sinh ngày|Ngày sinh|Sinh ngay|Ngay sinh|Sinh năm|Năm sinh|Sinh nam|Nam sinh)"
+    )
     address_re = re.compile(
         r"(?im)^(?:C\u1ea3 hai \u00f4ng b\u00e0\s+)?(?:C\u00f9ng\s+)?"
-        r"(?:(?:N\u01a1i\s+)?(?:th\u01b0\u1eddng tr\u00fa|c\u01b0 tr\u00fa)\s+t\u1ea1i|\u0110\u1ecba ch\u1ec9\s+n\u01a1i\s+c\u01b0\s+tr\u00fa|\u0110\u1ecba ch\u1ec9\s+\u0111\u0103ng\s+k\u00fd)\s*:?\s*(.+)$"
+        r"(?:(?:N\u01a1i\s+)?(?:th\u01b0\u1eddng tr\u00fa|c\u01b0 tr\u00fa)\s+t\u1ea1i|N\u01a1i\s+th\u01b0\u1eddng\s+tr\u00fa|N\u01a1i\s+c\u01b0\s+tr\u00fa|\u0110\u1ecba ch\u1ec9\s+n\u01a1i\s+c\u01b0\s+tr\u00fa|\u0110\u1ecba ch\u1ec9\s+\u0111\u0103ng\s+k\u00fd)\s*:?\s*(.+)$"
+    )
+    # Dia chi nam giua dong (vi du "...; Nơi thường trú: X") — chi dung khi
+    # nhan dau dong khong khop; loai "Nơi thường trú cuối cùng..." cua nguoi
+    # da chet de khong vo tinh gan dia chi nguoi chet cho nguoi song.
+    address_fallback_re = re.compile(
+        r"(?i)(?:(?:N\u01a1i\s+)?(?:th\u01b0\u1eddng tr\u00fa|c\u01b0 tr\u00fa)\s+t\u1ea1i|N\u01a1i\s+th\u01b0\u1eddng\s+tr\u00fa|N\u01a1i\s+c\u01b0\s+tr\u00fa|\u0110\u1ecba ch\u1ec9\s+n\u01a1i\s+c\u01b0\s+tr\u00fa|\u0110\u1ecba ch\u1ec9\s+\u0111\u0103ng\s+k\u00fd)\s*:?\s*(?!\s*cu\u1ed1i c\u00f9ng\b)(.+)$"
     )
 
     lines = _split_section_lines(section)
@@ -1033,39 +1893,135 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     for idx, line in enumerate(lines):
         match = header_re.search(line)
         if match:
-            headers.append((idx, match))
+            # Dong pha he ("Ông X co vo la ba Y (Sinh ngay...)") — ngay
+            # sinh/ID tren dong la cua nguoi khac, bo ca dong.
+            line_fold = _fold_text(line)
+            la_pha_he = re.search(r"\bco\s+(vo|chong)\s+la\b", line_fold) is not None
+            ngoac_nguoi_khac = bool(
+                re.search(r"\(\s*(?:Sinh|Ng\u00e0y|CCCD|CMND|C\u0103n c\u01b0\u1edbc)", line)
+            )
+            if not la_pha_he and not ngoac_nguoi_khac:
+                headers.append((idx, match))
+        else:
+            bare_match = bare_header_re.search(line)
+            if bare_match:
+                bare_name = re.sub(r"\s+", " ", bare_match.group("name")).strip(" ;,.")
+                if len(bare_name.split()) >= 2 and not re.search(r"\d", bare_name):
+                    bare_fold = _fold_text(bare_name)
+                    if bare_fold and not bare_name_noise_re.search(bare_fold):
+                        headers.append((idx, bare_match))
+            else:
+                intro_match = intro_bare_re.search(line)
+                if intro_match:
+                    intro_name = re.sub(r"\s+", " ", intro_match.group("name")).strip(" ;,.")
+                    if len(intro_name.split()) >= 2 and not re.search(r"\d", intro_name):
+                        intro_fold = _fold_text(intro_name)
+                        if intro_fold and not bare_name_noise_re.search(intro_fold):
+                            headers.append((idx, intro_match))
+        # Khong "continue" sau header: dia chi co the nam chung dong
+        # voi ten ("...; Nơi thường trú: X").
         address_match = address_re.search(line)
+        if not address_match:
+            address_match = address_fallback_re.search(line)
         if address_match:
             address_lines.append((idx, line.strip(" ;"), re.sub(r"\s+", " ", address_match.group(1)).strip(" .;")))
 
     persons = []
+    death_line_re = re.compile(r"chet\s+ngay\s*\d", re.IGNORECASE)
     for header_idx, (line_idx, match) in enumerate(headers):
         next_idx = headers[header_idx + 1][0] if header_idx + 1 < len(headers) else len(lines)
+        # Khoi cua 1 nguoi dung truoc dong "chet ngay ..." (dong mo ta
+        # nguoi chet) — khong de chum lan sang nguoi song.
+        for stop_idx in range(line_idx + 1, next_idx):
+            if death_line_re.search(_fold_text(lines[stop_idx])):
+                next_idx = stop_idx
+                break
         chunk_lines = [line.strip() for line in lines[line_idx:next_idx] if line.strip()]
         chunk = "\n".join(chunk_lines)
-        title = match.group("title").strip().lower()
-        person = {
-            "gioi_tinh": "\u00d4ng" if _fold_text(title).startswith("ong") else "B\u00e0",
-            "ho_ten": re.sub(r"\s+", " ", match.group("name")).strip(" ;,."),
-            "_line_idx": line_idx,
-            "raw_text": chunk,
-        }
+        groups = match.groupdict()
+        if groups.get("title"):
+            title = str(groups.get("title") or "").strip().lower()
+            title_fold = _fold_text(title)
+            if title_fold in ("ong", "anh"):
+                gioi_tinh = "\u00d4ng"
+            elif title_fold in ("ong/ba", "ong / ba"):
+                gioi_tinh = "B\u00e0" if re.search(r"\bthi\b", _fold_text(groups.get("name") or "")) else "\u00d4ng"
+            else:
+                gioi_tinh = "B\u00e0"
+            ho_ten = re.sub(r"\s+", " ", match.group("name")).split("|")[0].strip(" ;,.-\u2013\u2014")
+            person = {
+                "gioi_tinh": gioi_tinh,
+                "ho_ten": ho_ten,
+                "_line_idx": line_idx,
+                "raw_text": chunk,
+            }
+            # Vai tro nam rieng dong cuoi ("La con de ong X") — giu vao ten.
+            last_line = chunk_lines[-1] if chunk_lines else ""
+            role_tail = re.match(
+                r"(?i)^\s*L\u00e0\s+((?:con|v\u1ee3|ch\u1ed3ng)\b.+)$", last_line
+            )
+            if role_tail and len(chunk_lines) > 1:
+                role_text = _clean_title_line(role_tail.group(1)).strip(" ;,.")
+                if role_text:
+                    role_text = role_text[0].upper() + role_text[1:]
+                    person["ho_ten"] = f"{ho_ten} - {role_text}"
+        else:
+            base_name = re.sub(r"\s+", " ", groups.get("name") or "").split("|")[0].strip(" ;,.")
+            role_phrase = re.sub(r"\s+", " ", groups.get("role") or "").strip(" ;,.")
+            role_fold = _fold_text(role_phrase)
+            if re.search(r"\bvo\b", role_fold):
+                gioi_tinh = "B\u00e0"
+            elif re.search(r"\bchong\b", role_fold):
+                gioi_tinh = "\u00d4ng"
+            elif re.search(r"\bthi\b", _fold_text(base_name)):
+                gioi_tinh = "B\u00e0"
+            else:
+                gioi_tinh = "\u00d4ng"
+            person = {
+                "gioi_tinh": gioi_tinh,
+                "ho_ten": f"{base_name} - {role_phrase}" if role_phrase else base_name,
+                "_line_idx": line_idx,
+                "raw_text": chunk,
+            }
         birth_match = birth_re.search(chunk)
-        person["ngay_sinh"] = birth_match.group(1) if birth_match else ""
+        birth_year_match = birth_year_re.search(chunk) if not birth_match else None
+        has_birth = bool(birth_match or birth_year_match)
+        ngay_sinh, chi_co_nam = _chuan_hoa_ngay_sinh(
+            birth_match.group(1) if birth_match else "",
+            birth_year_match.group(1) if birth_year_match else "",
+        )
+        person["ngay_sinh"] = ngay_sinh
+        person["chi_co_nam_sinh"] = chi_co_nam
         id_match = id_re.search(chunk)
         person["cccd"] = id_match.group(1) if id_match else ""
         issue_place_match = issue_place_re.search(chunk)
+        if not issue_place_match:
+            # Bien the thieu "do": "CCCD so 036... Cuc canh sat ... cap ngay..."
+            # — chi nhan cum dung sau so giay to, tranh vo nham ca menh de.
+            issue_place_match = re.search(
+                r"(?i)(?:\d{9,12}\s+|\bCCCD\s+|\bCMND\s+)([^\n,;]{2,60}?)\s+(?:c\u1ea5p ng\u00e0y|cap ngay)",
+                chunk,
+            )
         person["noi_cap"] = re.sub(r"\s+", " ", issue_place_match.group(1)).strip(" ;,.") if issue_place_match else ""
         issue_date_match = issue_date_re.search(chunk)
-        person["ngay_cap_cccd"] = issue_date_match.group(1) if issue_date_match else ""
+        if issue_date_match:
+            person["ngay_cap_cccd"] = issue_date_match.group(1)
+        else:
+            # So Excel ("cap ngay 44546") — doi sang ngay that.
+            person["ngay_cap_cccd"] = _doi_ngay_excel(chunk)
         address_match = next((item for item in address_lines if line_idx <= item[0] < next_idx), None)
         person["dia_chi"] = address_match[2] if address_match else ""
         person["dia_chi_line"] = address_match[1] if address_match else ""
         name_fold = _fold_text(person["ho_ten"])
         if "hien dang so huu" in name_fold or "tai san la" in name_fold:
             continue
+        # Loai nguoi da chet: chi khi co "chet ngay + ngay thang" cu the
+        # (dong mo ta thua ke luon co; chu "chet" dung mot minh nhu
+        # "ngay chet" trong checklist khong du de loai).
+        if re.search(r"\bchet\s+ngay\b", _fold_text(chunk)):
+            continue
         role_match = re.search(r"(?i)(?:Ch\u1ee9c v\u1ee5|Chuc vu)\s*:", chunk)
-        if not birth_match and not id_match and not role_match:
+        if not has_birth and not id_match and not role_match:
             continue
         persons.append(person)
 
@@ -1078,10 +2034,15 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
 def _extract_plain_text_address(section: str) -> str:
     address_re = re.compile(
         r"(?im)^(?:C\u1ea3 hai \u00f4ng b\u00e0\s+)?(?:C\u00f9ng\s+)?"
-        r"(?:(?:N\u01a1i\s+)?(?:th\u01b0\u1eddng tr\u00fa|c\u01b0 tr\u00fa)\s+t\u1ea1i|\u0110\u1ecba ch\u1ec9\s+n\u01a1i\s+c\u01b0\s+tr\u00fa|\u0110\u1ecba ch\u1ec9\s+\u0111\u0103ng\s+k\u00fd)\s*:?\s*(.+)$"
+        r"(?:(?:N\u01a1i\s+)?(?:th\u01b0\u1eddng tr\u00fa|c\u01b0 tr\u00fa)\s+t\u1ea1i|N\u01a1i\s+th\u01b0\u1eddng\s+tr\u00fa|N\u01a1i\s+c\u01b0\s+tr\u00fa|\u0110\u1ecba ch\u1ec9\s+n\u01a1i\s+c\u01b0\s+tr\u00fa|\u0110\u1ecba ch\u1ec9\s+\u0111\u0103ng\s+k\u00fd)\s*:?\s*(.+)$"
     )
     for line in _split_section_lines(section):
         match = address_re.search(line)
+        if not match:
+            match = re.search(
+                r"(?i)(?:(?:N\u01a1i\s+)?(?:th\u01b0\u1eddng tr\u00fa|c\u01b0 tr\u00fa)\s+t\u1ea1i|N\u01a1i\s+th\u01b0\u1eddng\s+tr\u00fa|N\u01a1i\s+c\u01b0\s+tr\u00fa|\u0110\u1ecba ch\u1ec9\s+n\u01a1i\s+c\u01b0\s+tr\u00fa|\u0110\u1ecba ch\u1ec9\s+\u0111\u0103ng\s+k\u00fd)\s*:?\s*(?!\s*cu\u1ed1i c\u00f9ng\b)(.+)$",
+                line,
+            )
         if match:
             return re.sub(r"\s+", " ", match.group(1)).strip(" .;")
     return ""
@@ -1098,7 +2059,8 @@ def _extract_party_data(section: str) -> dict:
     header_line_re = re.compile(
         r"(?i)^\s*(?:[-*]\s*)?(?:\u0110\u1ea1i di\u1ec7n:\s*)?(?:(?:ng\u01b0\u1eddi\s+)?(?:v\u1ee3|ch\u1ed3ng)\s*[\-\u2013]\s*)?"
         r"(?:\d+\.\s*)?(?:v\u00e0\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\s+)?"
-        r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?:\u00f4ng|b\u00e0)\s*:?"
+        r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?:\u00f4ng|b\u00e0|anh|ch\u1ecb)\s*:?"
+        r"|^[^\d;:\n]{2,60}?[\-\u2013]\s*(?:v\u1ee3|vo|ch\u1ed3ng|chong|con(?:\s+\u0111\u1ebb|\s+de)?)\b"
     )
     party_heading_re = re.compile(r"(?i)^(?:[IVX]+\.\s*)?B\u00caN\b")
     entity_lines: list[str] = []
@@ -1198,12 +2160,23 @@ def _extract_inheritance_partition_parties(text: str) -> tuple[dict, dict]:
         text,
         (
             r"(?im)^\s*Chúng tôi là những người được hưởng di sản\b",
+            r"(?im)^\s*Tôi là những người được hưởng di sản\b",
+            r"(?im)^\s*(?:Tôi là|Chúng tôi là)\s+người được hưởng di sản\b",
+            r"(?im)^\s*Người được hưởng di sản theo pháp luật\b",
+            r"(?im)^\s*Người được hưởng di sản thừa kế của\b",
+            r"(?im)^\s*Tôi tên là:",
+            r"(?im)Hàng thừa kế\b.{0,120}?gồm những người có tên sau đây\b",
             r"(?im)^\s*Văn bản phân chia di sản này được lập bởi\b",
         ),
         (
             r"(?im)^\s*Chúng tôi tự nguyện lập Văn bản này\b",
+            r"(?im)^\s*Tôi tự nguyện lập Văn bản này\b",
             r"(?im)^\s*Người để lại di sản\s*:",
             r"(?im)^\s*Di sản\s*:",
+            r"(?im)^\s*Khi còn sống\b",
+            r"(?im)^\s*Trước khi chết\b",
+            r"(?im)^\s*(?:Về\s+)?bố(?:,?\s*mẹ)?\s+đẻ\b",
+            r"(?im)^\s*Chúng tôi là những người thừa kế\b",
             r"(?im)^\s*LỜI CHỨNG\b",
         ),
     )
@@ -1217,10 +2190,11 @@ def _extract_inheritance_refusal_parties(text: str) -> tuple[dict, dict]:
         text,
         (
             r"(?im)^\s*Tôi là\s*:?",
+            r"(?im)^\s*Chúng tôi là\s*:?",
             r"(?im)^\s*Văn bản từ chối nhận di sản này được lập bởi\s*:?",
         ),
         (
-            r"(?im)^\s*Nay,\s*tôi tự nguyện lập Văn bản này\b",
+            r"(?im)^\s*Nay,\s*(?:tôi|chúng tôi)\s+tự nguyện lập Văn bản này\b",
             r"(?im)^\s*Theo quy định của pháp luật\b",
             r"(?im)^\s*LỜI CHỨNG\b",
         ),
@@ -1231,12 +2205,132 @@ def _extract_inheritance_refusal_parties(text: str) -> tuple[dict, dict]:
     return ben_a, ben_b
 
 
+def _chuan_hoa_ngay_sinh(ngay_du: str = "", nam: str = "") -> tuple[str, bool]:
+    """Ngay sinh giu dung dang van ban viet.
+    Quy uoc owner (sua 06/10/2026): chi co nam thi xuat dung YYYY
+    (khong tu them 01/01), kem co chi_co_nam_sinh=True de tang duoi
+    biet phan biet voi ngay du khi dien portal.
+    """
+    if (ngay_du or "").strip():
+        return (ngay_du or "").strip(), False
+    if re.fullmatch(r"(?:19|20)\d{2}", (nam or "").strip()):
+        return (nam or "").strip(), True
+    return "", False
+
+
+def _doi_ngay_excel(chunk: str) -> str:
+    """So Excel sau "cap ngay" (vi du 44546) -> DD/MM/YYYY.
+    Chi nhan so 5 chu so trong khoang nam 1995-2040 de tranh so CCCD.
+    """
+    match = re.search(r"(?i)(?:c\u1ea5p ng\u00e0y|cap ngay)\s*:?\s*(\d{5})(?!\d)", chunk or "")
+    if not match:
+        return ""
+    try:
+        serial = int(match.group(1))
+    except ValueError:
+        return ""
+    if serial < 34000 or serial > 60000:
+        return ""
+    try:
+        from datetime import date, timedelta
+
+        day = date(1899, 12, 30) + timedelta(days=serial)
+        return day.strftime("%d/%m/%Y")
+    except (OverflowError, ValueError):
+        return ""
+
+
+def _extract_nguoi_chet(text: str) -> list[dict]:
+    """Trich NGUOI DA CHET (nguoi de lai di san): ten, ten goi khac,
+    nam sinh, NGAY CHET, trich luc khai tu, noi thuong tru cuoi.
+    Dau hieu bat buoc: co "chet ngay DD/MM/YYYY". Khong co ngay chet
+    thi khong nhan (tranh vo nhan bo/me de chi ghi "chet nam...").
+    """
+    source = unicodedata.normalize("NFC", str(text or ""))
+    found: list[dict] = []
+    seen: set[str] = set()
+    death_re = re.compile(
+        r"(?i)(?P<title>\u00d4ng|B\u00e0|Anh|Ch\u1ecb)\s*:?\s*(?P<name>[^;(\n]+?)"
+        r"\s*(?:\((?P<alias>[^)]+)\))?"
+        r"\s*[-\u2013;,]?\s*"
+        r"(?:Sinh n\u0103m\s*[:\u2013-]?\s*(?P<birth_year>(?:19|20)\d{2})"
+        r"|Sinh ng\u00e0y\s*[:\u2013-]?\s*(?P<birth_full>\d{1,2}/\d{1,2}/\d{4}))?"
+        r"\s*[;,]?\s*(?:\u0111\u00e3\s+)?ch\u1ebft ng\u00e0y\s*[:\u2013-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
+    )
+    for match in death_re.finditer(source):
+        raw_name = re.sub(r"\s+", " ", match.group("name")).strip(" ;,.-")
+        raw_name = re.sub(r"(?i)^\d+\.\s*", "", raw_name)
+        raw_name = re.sub(r"(?i)^(?:l\u00e0|bao g\u1ed3m)\s+", "", raw_name)
+        title_fold = _fold_text(match.group("title"))
+        alias = re.sub(r"\s+", " ", match.group("alias") or "").strip()
+        alias = re.sub(r"(?i)^t\u00ean g\u1ecdi kh\u00e1c l\u00e0\s+", "", alias)
+        tail = source[match.end():match.end() + 400]
+        tlkt_no = ""
+        tlkt_match = re.search(
+            r"(?i)Tr\u00edch l\u1ee5c khai t\u1eed[^\n]{0,60}?s\u1ed1:?\s*([A-Za-z0-9/.-]+)",
+            tail,
+        )
+        if tlkt_match:
+            tlkt_no = tlkt_match.group(1).strip(" ;,.")
+        tlkt_by = ""
+        tlkt_date = ""
+        tlkt_by_match = re.search(
+            r"(?i)\bdo\s+([^\n]+?)\s+(?:k\u00fd|c\u1ea5p)\s+ng\u00e0y:?\s*(\d{1,2}/\d{1,2}/\d{4})",
+            tail,
+        )
+        if tlkt_by_match:
+            tlkt_by = re.sub(r"\s+", " ", tlkt_by_match.group(1)).strip(" ;,.")
+            tlkt_date = tlkt_by_match.group(2)
+        last_addr = ""
+        addr_match = re.search(
+            r"(?i)N\u01a1i th\u01b0\u1eddng tr\u00fa cu\u1ed1i c\u00f9ng tr\u01b0\u1edbc khi ch\u1ebft:\s*([^.\n]+)",
+            tail,
+        )
+        if addr_match:
+            last_addr = re.sub(r"\s+", " ", addr_match.group(1)).strip(" ;,.")
+        key = f"{_fold_text(raw_name)}|{match.group('death')}"
+        if not raw_name or key in seen:
+            continue
+        seen.add(key)
+        ngay_sinh, chi_co_nam = _chuan_hoa_ngay_sinh(
+            match.group("birth_full") or "", match.group("birth_year") or ""
+        )
+        found.append({
+            "gioi_tinh": "\u00d4ng" if title_fold in ("ong", "anh") else "B\u00e0",
+            "ho_ten": raw_name,
+            "ten_goi_khac": alias,
+            "ngay_sinh": ngay_sinh,
+            "chi_co_nam_sinh": chi_co_nam,
+            "ngay_chet": match.group("death"),
+            "so_trich_luc": tlkt_no,
+            "co_quan_trich_luc": tlkt_by,
+            "ngay_trich_luc": tlkt_date,
+            "dia_chi_cuoi": last_addr,
+        })
+    return found
+
+
+def _extract_loi_chung_persons(text: str) -> list[dict]:
+    """Lay MOI nguoi co khoi CCCD trong phan Loi chung (nguoi lam chung,
+    nguoi lap van ban ky lai...). Core regex xuat het, khong doi chieu
+    voi phan dau van ban — viec so sanh la cua tang khac.
+    """
+    section = _extract_section_between_patterns(
+        text,
+        (r"(?im)^\s*LỜI CHỨNG\b",),
+        (),
+    )
+    if not section:
+        return []
+    return _extract_plain_text_persons(section)
+
+
 def _extract_parties_generic(text: str, doc_kind: str) -> tuple[dict, dict]:
     if doc_kind == DOC_KIND_ASSET_COMMITMENT:
         ben_a, ben_b = _extract_commitment_parties(text)
         if ben_a.get("nguoi") or ben_b.get("nguoi"):
             return ben_a, ben_b
-    if doc_kind == DOC_KIND_INHERITANCE_PARTITION:
+    if doc_kind in (DOC_KIND_INHERITANCE_PARTITION, DOC_KIND_INHERITANCE_DECLARATION):
         ben_a, ben_b = _extract_inheritance_partition_parties(text)
         if ben_a.get("nguoi") or ben_b.get("nguoi"):
             return ben_a, ben_b
@@ -1328,6 +2422,8 @@ def _fmt_duong_su_by_kind(doc_kind: str, ben_a: dict, ben_b: dict) -> str:
         )
     if doc_kind == DOC_KIND_INHERITANCE_PARTITION:
         return _fmt_single_party_with_label(ben_a, label="NHỮNG NGƯỜI HƯỞNG DI SẢN")
+    if doc_kind == DOC_KIND_INHERITANCE_DECLARATION:
+        return _fmt_single_party_with_label(ben_a, label="NGƯỜI KHAI NHẬN DI SẢN")
     if doc_kind == DOC_KIND_INHERITANCE_REFUSAL:
         return _fmt_single_party_with_label(ben_a, label="NGƯỜI TỪ CHỐI NHẬN DI SẢN")
     return _fmt_duong_su_with_labels(ben_a, ben_b, label_a="BÊN A", label_b="BÊN B")
@@ -1361,10 +2457,16 @@ def _build_payload_generic(filepath, text: str, scan_result: dict, *, extract_mo
         "raw": {
             "ben_a": ben_a,
             "ben_b": ben_b,
+            "loi_chung_nguoi": _extract_loi_chung_persons(text),
+            "nguoi_chet": _extract_nguoi_chet(text),
+            "danh_sach_thua_dat": tach_danh_sach_thua_dat(tai_san),
+            "danh_sach_so_tiet_kiem": tach_danh_sach_so_tiet_kiem(tai_san),
+            "danh_sach_bao_hiem": tach_danh_sach_bao_hiem(tai_san),
             "file_goc": file_goc,
             "scan_contract_no": scan_result.get("contract_no", ""),
             "scan_reason": scan_result.get("reason", ""),
             "document_kind": doc_kind,
+            "engine_version": ENGINE_VERSION,
             "extract_mode": extract_mode,
             "extract_is_partial": bool(missing_fields),
             "missing_web_form_fields": missing_fields,
