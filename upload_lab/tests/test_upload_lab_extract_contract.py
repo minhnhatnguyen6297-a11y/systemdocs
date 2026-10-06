@@ -2201,6 +2201,24 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(ninh["cccd"], "036087006087")
         self.assertEqual(ninh["dia_chi"], "Tổ 8, Thị trấn Lâm, huyện Ý Yên, tỉnh Nam Định")
 
+    def test_so_thu_tu_truoc_vai_tro_nguoi_chong(self):
+        # "1. Người chồng – Vũ Văn Khoan; Sinh ngày:..." — tiền tố "1." trước
+        # vai trò vẫn nhận người tên trần (11/10/2026).
+        from extract_contract import _extract_parties_generic
+        text = (
+            "VĂN BẢN CAM KẾT TÀI SẢN RIÊNG\n"
+            "Chúng tôi gồm có:\n"
+            "1. Người chồng – Vũ Văn Khoan;\tSinh ngày: 01/01/1962;\n"
+            "Căn cước công dân số: 036062020689 do Cục cảnh sát cấp ngày 02/07/2021;\n"
+            "2. Người vợ - Nguyễn Thị Chiến;\tSinh ngày: 02/11/1960;\n"
+            "Căn cước công dân số: 036160018620 do Cục cảnh sát cấp ngày 02/07/2021;\n"
+            "Cả hai cùng thường trú tại: Xã Vũ Dương, tỉnh Ninh Bình.\n"
+        )
+        ben_a, ben_b = _extract_parties_generic(text, "generic")
+        names = [p["ho_ten"] for s in (ben_a, ben_b) for p in s["nguoi"]]
+        self.assertIn("Vũ Văn Khoan", names)
+        self.assertIn("Nguyễn Thị Chiến", names)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2279,7 +2279,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # vai tro dung dau dong, khong co danh xung Ong/Ba; chi nhan khi dong
     # co dau hieu nguoi (ngay sinh/giay to/dia chi).
     lead_role_re = re.compile(
-        r"(?i)^\s*(?:Ng\u01b0\u1eddi\s+)?(?P<role>v\u1ee3|ch\u1ed3ng|con|m\u1eb9|b\u1ed1|cha)\b"
+        r"(?i)^\s*(?:\[\d+\]\s*|\d+\.\s*)?(?:Ng\u01b0\u1eddi\s+)?(?P<role>v\u1ee3|ch\u1ed3ng|con|m\u1eb9|b\u1ed1|cha)\b"
         r"(?:\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i))?\s*[-\u2013\u2014:]\s*"
         r"(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{1,60}?)"
         r"(?=\s+(?:sinh|ng\u00e0y|n\u0103m|cccd|c\u0103n c\u01b0\u1edbc|c\u1ea5p|\u0111\u1ecba ch\u1ec9|th\u01b0\u1eddng tr\u00fa|c\u01b0 tr\u00fa|n\u01a1i|h\u1ed9 kh\u1ea9u)\b|[;]|$)"
