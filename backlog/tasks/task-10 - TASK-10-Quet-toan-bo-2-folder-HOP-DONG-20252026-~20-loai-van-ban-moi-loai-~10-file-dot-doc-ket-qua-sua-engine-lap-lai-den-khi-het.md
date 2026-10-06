@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-06 18:48'
-updated_date: '2026-10-06 19:43'
+updated_date: '2026-10-06 21:27'
 labels: []
 dependencies: []
 ordinal: 10000
@@ -31,5 +31,5 @@ ordinal: 10000
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-Dot 1 (09/10/2026): 6 agent quet ~165 file dau moi loai, 0 loi IFilter. Tim 9 nhom loi engine (L1-L9): thue/thue, tach thua vo tren .doc bullet, dia chi chung cap vo chong, ten rac qua R04, tien to vai tro (Con de/Nguoi chong), nhan dia chi/CC thieu, nhan loai VB moi, nguon_goc + cam ket pop dia chi, vo chong chet 1 dong. Da sua tap trung o upload_lab + dong bo regex-test-tool (decision-48). Test 209 pass. Bao cao: .agent/scratch/sweep/*.md
+sweep-17 (offset 160): (a) '| |' split si?t la?i — chi t?ch tru?c nhan danh xung Ong:/Ba: (tranh be 'Tôi tên là: X; | | Sinh ngày'); (b) tien to 'Mẹ đẻ tôi:'/'Bố đẻ ông X là bà Y' + '+ Bà:' bullet; (c) ranh tên 'có' + so (Thăng có 01), '-sinh' dính; (d) dedupe tuong thich nam: '01/01/1932' vs '1932' gop. Ca 'Đơn xác nhận ông Hạnh': Cường+Vân+Nhi?u d?y d?; 'Khang-Phòng': Đằng+Thái them; danh sách l?p Sinh năm g?p. Tests 95+7.
 <!-- SECTION:NOTES:END -->

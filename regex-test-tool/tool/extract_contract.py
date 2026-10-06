@@ -2825,8 +2825,9 @@ def _extract_nguoi_chet(text: str) -> list[dict]:
     """Trich NGUOI DA CHET (nguoi de lai di san) theo shape person_row
     (decision-46 06/10/2026): trich luc khai tu la giay to cua nguoi chet,
     dien vao so_giay_to/ngay_cap/noi_cap/loai_giay_to; dia chi cuoi -> dia_chi.
-    Dau hieu bat buoc: co "chet ngay DD/MM/YYYY". Khong co ngay chet
-    thi khong nhan (tranh vo nhan bo/me de chi ghi "chet nam...").
+    Dau hieu bat buoc: "chet ngay DD/MM/YYYY", hoac "chet nam YYYY"
+    chi khi ngay sau co "trich luc/khai tu" (bang chung nguoi de lai
+    di san; tranh vo nhan bo/me de chi ghi "chet nam...").
     """
     source = unicodedata.normalize("NFC", str(text or ""))
     found: list[dict] = []
@@ -2838,7 +2839,9 @@ def _extract_nguoi_chet(text: str) -> list[dict]:
         r"\s*[-\u2013;,]?\s*"
         r"(?:(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh)"
         r"\s*[:\u2013-]?\s*(?P<birth>(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4}))?"
-        r"\s*[;,]?\s*(?:\u0111\u00e3\s+)?ch\u1ebft ng\u00e0y\s*[:\u2013-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
+        r"\s*[;,]?\s*(?:\u0111\u00e3\s+)?ch\u1ebft\s+(?:ng\u00e0y\s*[:\u2013-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
+        r"|n\u0103m\s*[:\u2013-]?\s*(?P<death_y>(?:19|20)\d{2})"
+        r"(?=\s*(?:theo\s+)?tr\u00edch\s+l\u1ee5c|[^.\n]{0,60}?khai\s+t\u1eed))"
     )
     matches = list(death_re.finditer(source))
     for match_idx, match in enumerate(matches):
@@ -2875,12 +2878,13 @@ def _extract_nguoi_chet(text: str) -> list[dict]:
         else:
             match_title = match.group("title")
         title_fold = _fold_text(match_title)
+        death_val = match.group("death") or match.group("death_y") or ""
         # Nguoi thu 2 cung dong ("... và bà B; chết ngày ...") — tach thanh
         # ban ghi rieng, dung chung truong ngay/giay to cua cap.
         name2 = re.sub(r"\s+", " ", match.group("name2") or "").strip(" ;,.-")
         if name2:
             t2 = name2.split()
-            key2 = f"{_fold_text(name2)}|{match.group('death')}"
+            key2 = f"{_fold_text(name2)}|{death_val}"
             if t2 and len(t2) <= 6 and all(tok[0].isupper() for tok in t2) and key2 not in seen:
                 seen.add(key2)
                 found.append({
@@ -2889,7 +2893,7 @@ def _extract_nguoi_chet(text: str) -> list[dict]:
                     "ten_goi_khac": "",
                     "ngay_sinh": "",
                     "chi_co_nam_sinh": False,
-                    "ngay_chet": match.group("death"),
+                    "ngay_chet": death_val,
                     "so_giay_to": "",
                     "ngay_cap": "",
                     "noi_cap": "",
@@ -2920,12 +2924,12 @@ def _extract_nguoi_chet(text: str) -> list[dict]:
             tlkt_date = tlkt_by_match.group(2)
         last_addr = ""
         addr_match = re.search(
-            r"(?i)N\u01a1i th\u01b0\u1eddng tr\u00fa cu\u1ed1i c\u00f9ng tr\u01b0\u1edbc khi ch\u1ebft:\s*([^.\n]+)",
+            r"(?i)N\u01a1i th\u01b0\u1eddng tr\u00fa(?:\s+cu\u1ed1i c\u00f9ng)?\s+tr\u01b0\u1edbc khi ch\u1ebft:\s*([^.\n;]+)",
             tail,
         )
         if addr_match:
             last_addr = re.sub(r"\s+", " ", addr_match.group(1)).strip(" ;,.")
-        key = f"{_fold_text(raw_name)}|{match.group('death')}"
+        key = f"{_fold_text(raw_name)}|{death_val}"
         if not raw_name or key in seen:
             continue
         seen.add(key)
@@ -2939,7 +2943,7 @@ def _extract_nguoi_chet(text: str) -> list[dict]:
             "ten_goi_khac": alias,
             "ngay_sinh": ngay_sinh,
             "chi_co_nam_sinh": chi_co_nam,
-            "ngay_chet": match.group("death"),
+            "ngay_chet": death_val,
             "so_giay_to": tlkt_no,
             "ngay_cap": tlkt_date,
             "noi_cap": tlkt_by,

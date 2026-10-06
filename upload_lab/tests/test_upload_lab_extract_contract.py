@@ -2022,6 +2022,28 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual([q["ho_ten"] for q in persons], ["Hoàng Thị Hanh"])
         self.assertEqual(persons[0]["cccd"], "036132002879")
 
+    def test_nguoi_chet_nam_co_trich_luc_khai_tu(self):
+        # "chết năm 2016 theo Trích lục khai tử" -> nguoi chet that
+        # (bang chung TLKT); "chết năm" troi khong TLKT van bo.
+        from extract_contract import _extract_nguoi_chet
+        text = (
+            "Mẹ đẻ của chúng tôi là bà Nguyễn Thị Ngò - Sinh năm 1923; "
+            "chết năm 2016 theo Trích lục khai tử số 95/2026/TLKT do "
+            "Uỷ ban nhân dân xã Yên Đồng, tỉnh Ninh Bình ký ngày 07/04/2026; "
+            "Nơi thường trú trước khi chết: Thôn Mễ Hạ, xã Yên Đồng, "
+            "tỉnh Ninh Bình; theo quy định của pháp luật.\n"
+            "- Ông Nguyễn Văn A có bố đẻ là ông Nguyễn Văn B, đã chết năm 1990."
+        )
+        chet = _extract_nguoi_chet(text)
+        self.assertEqual([q["ho_ten"] for q in chet], ["Nguyễn Thị Ngò"])
+        self.assertEqual(chet[0]["ngay_chet"], "2016")
+        self.assertEqual(chet[0]["ngay_sinh"], "1923")
+        self.assertEqual(chet[0]["so_giay_to"], "95/2026/TLKT")
+        self.assertEqual(
+            chet[0]["dia_chi"],
+            "Thôn Mễ Hạ, xã Yên Đồng, tỉnh Ninh Bình",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
