@@ -2372,8 +2372,8 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # co dau hieu nguoi (ngay sinh/giay to/dia chi).
     lead_role_re = re.compile(
         r"(?i)^\s*(?:\[\d+\]\s*|\d+\.\s*)?(?:Ng\u01b0\u1eddi\s+)?(?P<role>v\u1ee3|ch\u1ed3ng|con|m\u1eb9|b\u1ed1|cha)\b"
-        r"(?:\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i))?\s*[-\u2013\u2014:]\s*"
-        r"(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{1,60}?)"
+        r"(?:\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i|d\u00e2u|r\u1ec3))?\s*[-\u2013\u2014:]\s*"
+        r"(?P<name>(?:(?:\u00f4ng|\u00d4ng|b\u00e0|B\u00e0|anh|Anh|ch\u1ecb|Ch\u1ecb|c\u00f4|C\u00f4|ch\u00fa|Chú|em|Em)\s+)?[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{1,60}?)"
         r"(?=\s+(?:sinh|ng\u00e0y|n\u0103m|cccd|c\u0103n c\u01b0\u1edbc|c\u1ea5p|\u0111\u1ecba ch\u1ec9|th\u01b0\u1eddng tr\u00fa|c\u01b0 tr\u00fa|n\u01a1i|h\u1ed9 kh\u1ea9u)\b|[;]|$)"
     )
     bare_name_noise_re = re.compile(
@@ -2482,6 +2482,18 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         match = header_re.search(line)
         if match is None:
             match = numbered_bare_re.search(line)
+        if match:
+            # "2. Con dâu - bà X" — header nam bat ca cum vai tro; neu
+            # "ten" mo dau bang tu quan he thi thu lai bang lead_role_re.
+            _hm = _cat_ho_ten(match.groupdict().get("name") or "")
+            if re.match(
+                r"(?i)^\s*(?:người\s+)?(?:vợ|chồng|con|mẹ|bố|cha)"
+                r"(?:\s+(?:đẻ|ruột|nuôi|dâu|rể))?\s*[-–—:]",
+                _hm,
+            ):
+                _lead = lead_role_re.search(line)
+                if _lead:
+                    match = _lead
         if match:
             # Dong pha he ("Ông X co vo la ba Y (Sinh ngay...)") — ngay
             # sinh/ID tren dong la cua nguoi khac, bo ca dong.
@@ -2617,10 +2629,25 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             base_name = _cat_ho_ten(base_name)
             role_phrase = re.sub(r"\s+", " ", groups.get("role") or "").strip(" ;,.")
             role_fold = _fold_text(role_phrase)
-            if re.search(r"\b(?:vo|me)\b", role_fold):
-                gioi_tinh = "B\u00e0"
-            elif re.search(r"\b(?:chong|bo|cha)\b", role_fold):
-                gioi_tinh = "\u00d4ng"
+            # Danh xung di kem ten ("Con dau - ba Nguyen Thi Trang") — tach
+            # khoi ten, dung de xac dinh gioi tinh.
+            _dx = re.match(
+                r"(?i)^(ông|bà|anh|chị|cô|chú|bác|dì|cậu|mợ|em)\s+", base_name
+            )
+            _dx_gender = ""
+            if _dx:
+                _dx_gender = (
+                    "Ông"
+                    if _fold_text(_dx.group(1)) in ("ong", "anh", "chu", "cau", "bac")
+                    else "Bà"
+                )
+                base_name = base_name[_dx.end() :].strip()
+            if re.search(r"(?:vo|me|dau)", role_fold):
+                gioi_tinh = "Bà"
+            elif re.search(r"(?:chong|bo|cha|re)", role_fold):
+                gioi_tinh = "Ông"
+            elif _dx_gender:
+                gioi_tinh = _dx_gender
             else:
                 # Khong suy tu chu "Thi" trong ten (Owner 06/10/2026).
                 gioi_tinh = ""
