@@ -1526,7 +1526,7 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
 
     bullet_labels = (
         ("so_thua_dat", r"Th\u1eeda \u0111\u1ea5t s\u1ed1|S\u1ed1 th\u1eeda"),
-        ("so_to_ban_do", r"T\u1edd b\u1ea3n \u0111[\u1ed3\u0111\u1ed5] s\u1ed1|S\u1ed1 t\u1edd(?: b\u1ea3n \u0111[\u1ed3\u0111\u1ed5])?"),
+        ("so_to_ban_do", r"T\u1edd b\u1ea3n \u0111[\u1ed3\u0111\u1ed5](?: \u0111\u1ecba ch\u00ednh)? s\u1ed1|S\u1ed1 t\u1edd(?: b\u1ea3n \u0111[\u1ed3\u0111\u1ed5])?"),
         ("dien_tich", r"Di\u1ec7n t\u00edch"),
         ("muc_dich_su_dung", r"M\u1ee5c \u0111\u00edch s\u1eed d\u1ee5ng"),
         ("thoi_han_su_dung", r"Th\u1eddi h\u1ea1n s\u1eed d\u1ee5ng"),
