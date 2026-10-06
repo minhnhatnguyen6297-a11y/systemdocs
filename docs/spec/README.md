@@ -214,6 +214,9 @@ thêm cloud.
 - Code là bằng chứng về hiện trạng chạy thật; spec quyết định hành vi phải có.
 - Backlog giữ task, tiêu chí hoàn thành và quyết định; `.agent/tasks/` là tiến độ
   lịch sử. Không dùng ghi chép Linear cũ thay task đang có hiệu lực.
+- **TASK-1 (05/10/2026):** `backlog/docs/` chỉ chứa con trỏ tới file trong
+  `docs/spec/` (xem doc-39 inventory); nội dung SOT vẫn ở file gốc. Quyết định
+  kiến trúc trích từ spec đã ghi thành `backlog/decisions/` decision-22…39.
 - **Owner 05/10/2026, TASK-7:** tiếp tục từ `D:\systemdocs`, nhánh
   `consolidate/monorepo`. *Tại sao:* một bộ spec/task chung sau khi gom các
   worktree. [Bàn giao và kiểm tra](../../.agents/handoff/worktree-consolidation-20261005/root-verification.md).
