@@ -2268,6 +2268,30 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertIn("Phạm Thị Nụ", names)
         self.assertIn("Lê Ngọc Trình", names)
 
+    def test_dedupe_ten_gan_giong_nhau_khong_mat_ban_tom_tat(self):
+        # "Vũ Thị Lanh" vs "Vũ Thị Lành" cung fold key nhung la 2 nguoi khac
+        # (khac CCCD/nam sinh); ban tom tat "Sinh năm" phai gop vao dung
+        # nguoi chi tiet, khong de lech sang nguoi ten gan giong (11/10/2026).
+        from extract_contract import _extract_plain_text_person_entries
+        text = (
+            "1. Bà: Đỗ Thị Đợi - Sinh ngày: 01/01/1946; Căn cước số: 036146008526;\n"
+            "2. Bà: Vũ Thị Lanh - Sinh ngày: 09/10/1986; Căn cước số: 036186001854;\n"
+            "3. Bà Vũ Thị Lành - Sinh ngày: 15/02/1984; Căn cước số: 036184014148;\n"
+            "Hộ gia đình gồm:\n"
+            "1. Bà: Vũ Thị Lanh - Sinh năm: 1986 (con ông Luỹ)\n"
+            "2. Bà Vũ Thị Lành - Sinh năm: 1984 (con ông Luỹ)\n"
+        )
+        persons = _extract_plain_text_person_entries(text)
+        names = [(p["ho_ten"], p["ngay_sinh"]) for p in persons]
+        self.assertEqual(
+            names,
+            [
+                ("Đỗ Thị Đợi", "01/01/1946"),
+                ("Vũ Thị Lanh", "09/10/1986"),
+                ("Vũ Thị Lành", "15/02/1984"),
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

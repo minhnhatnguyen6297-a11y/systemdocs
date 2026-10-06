@@ -2651,44 +2651,47 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         person.pop("_line_idx", None)
     # Form lap lai nguyen trang (DK18 in 2 mat): cung nguoi xuat hien 2 lan.
     # Dedupe khi trung ho_ten + cccd (uu tien), hoac ho_ten + ngay_sinh.
-    seen_person: dict[str, dict] = {}
+    # Gop khi trung ten va (a) co it nhat 1 truong phan biet khop
+    # khong-rong (cung cccd/ngay sinh), hoac (b) ca 2 deu trong het
+    # truong phan biet (nguoi chi co ten, form lap trang). Hai nguoi
+    # khac nhau cung ten thuong co du giay to mau thuan -> giu rieng.
+    # Fold ten bo dau — "Vũ Thị Lanh"/"Vũ Thị Lành" cung key, nen moi key
+    # giu DANH SACH base va gop vao base dau tien khong mau thuan
+    # (11/10/2026).
+    def _ns_conflict(a: str, b: str) -> bool:
+        if not (a and b) or a == b:
+            return False
+        a_year = re.search(r"(\d{4})\s*$", a)
+        b_year = re.search(r"(\d{4})\s*$", b)
+        a_full = "/" in a
+        b_full = "/" in b
+        if a_year and b_year and a_year.group(1) != b_year.group(1):
+            return True
+        # Hai ngay day du khac nhau -> khac nguoi; chi-nam trung
+        # nam voi ngay-du thi la cung nguoi (form tom tat).
+        return a_full and b_full
+
+    def _can_merge(base: dict, person: dict) -> bool:
+        a_vals = {f: str(base.get(f) or "").strip() for f in ("cccd", "ngay_sinh")}
+        b_vals = {f: str(person.get(f) or "").strip() for f in ("cccd", "ngay_sinh")}
+        conflict = bool(
+            a_vals["cccd"] and b_vals["cccd"] and a_vals["cccd"] != b_vals["cccd"]
+        ) or _ns_conflict(a_vals["ngay_sinh"], b_vals["ngay_sinh"])
+        shared = (a_vals["cccd"] and a_vals["cccd"] == b_vals["cccd"]) or (
+            a_vals["ngay_sinh"]
+            and not _ns_conflict(a_vals["ngay_sinh"], b_vals["ngay_sinh"])
+            and b_vals["ngay_sinh"]
+        )
+        both_empty = not any((*a_vals.values(), *b_vals.values()))
+        return not conflict and (shared or both_empty)
+
+    seen_person: dict[str, list[dict]] = {}
     deduped: list[dict] = []
     for person in persons:
         name_key = _fold_text(person.get("ho_ten") or "")
-        base = seen_person.get(name_key) if name_key else None
-        # Gop khi trung ten va (a) co it nhat 1 truong phan biet khop
-        # khong-rong (cung cccd/ngay sinh), hoac (b) ca 2 deu trong het
-        # truong phan biet (nguoi chi co ten, form lap trang). Hai nguoi
-        # khac nhau cung ten thuong co du giay to mau thuan -> giu rieng.
-        mergeable = False
+        bases = (seen_person.get(name_key) or []) if name_key else []
+        base = next((b for b in bases if _can_merge(b, person)), None)
         if base is not None:
-            a_vals = {f: str(base.get(f) or "").strip() for f in ("cccd", "ngay_sinh")}
-            b_vals = {f: str(person.get(f) or "").strip() for f in ("cccd", "ngay_sinh")}
-
-            def _ns_conflict(a: str, b: str) -> bool:
-                if not (a and b) or a == b:
-                    return False
-                a_year = re.search(r"(\d{4})\s*$", a)
-                b_year = re.search(r"(\d{4})\s*$", b)
-                a_full = "/" in a
-                b_full = "/" in b
-                if a_year and b_year and a_year.group(1) != b_year.group(1):
-                    return True
-                # Hai ngay day du khac nhau -> khac nguoi; chi-nam trung
-                # nam voi ngay-du thi la cung nguoi (form tom tat).
-                return a_full and b_full
-
-            conflict = bool(
-                a_vals["cccd"] and b_vals["cccd"] and a_vals["cccd"] != b_vals["cccd"]
-            ) or _ns_conflict(a_vals["ngay_sinh"], b_vals["ngay_sinh"])
-            shared = (a_vals["cccd"] and a_vals["cccd"] == b_vals["cccd"]) or (
-                a_vals["ngay_sinh"]
-                and not _ns_conflict(a_vals["ngay_sinh"], b_vals["ngay_sinh"])
-                and b_vals["ngay_sinh"]
-            )
-            both_empty = not any((*a_vals.values(), *b_vals.values()))
-            mergeable = not conflict and (shared or both_empty)
-        if mergeable:
             for field in ("ngay_sinh", "cccd", "noi_cap", "ngay_cap_cccd", "dia_chi"):
                 if not str(base.get(field) or "").strip() and str(person.get(field) or "").strip():
                     base[field] = person[field]
@@ -2706,7 +2709,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                 base["chi_co_nam_sinh"] = False
             continue
         if name_key:
-            seen_person[name_key] = person
+            seen_person.setdefault(name_key, []).append(person)
         deduped.append(person)
     return deduped
 
