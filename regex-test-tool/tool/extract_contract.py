@@ -2151,16 +2151,18 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         r"(?:\d+\.\s*)?"
         r"(?:T\u00f4i (?:t\u00ean )?l\u00e0\s*:?|Ch\u00fang t\u00f4i l\u00e0\s*:?)?\s*"
         r"(?:(?:ng\u01b0\u1eddi\s+)?(?:v\u1ee3|ch\u1ed3ng)\s*[\-\u2013]\s*)?"
+        r"(?:(?:em|anh|ch\u1ecb|c\u00f4|ch\u00fa|b\u00e1c|d\u00ec|c\u1eadu|m\u1ee3)\s+(?:trai|g\u00e1i|d\u00e2u|r\u1ec3|\u0111\u1ebb|ru\u1ed9t)\s*[-\u2013:]\s*)?"
         r"(?:v\u00e0\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\s+)?"
         r"(?:(?:b\u00ean|ben)\s+[A-Za-z\u00c0-\u1ef9]\s*[:.,]?\s*)?"
         r"(?:(?:con|m\u1eb9|b\u1ed1|cha|v\u1ee3|ch\u1ed3ng)\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i)\s*[-\u2013\u2014:]\s*)?"
         r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?:v\u00e0\s+)?(?P<title>\u00f4ng/b\u00e0|ong/ba|\u00f4ng|ong|b\u00e0|ba|anh|ch\u1ecb|chi)\s*:?\s*"
-        r"(?P<name>.+?)(?=\s+(?:[\-\u2013]\s+)?(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh)\s*[:\u2013-]?\s*\d{1,2}/\d{1,2}/\d{4}|\s+(?:[\-\u2013]\s+)?(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)\s*[:\u2013-]?\s*(?:(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})|\s+(?:[\-\u2013]\s+)?(?:Ch\u1ee9c v\u1ee5|Chuc vu)\s*:|\s+c\u00f3\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\b|\s*\(\s*(?:Sinh|Ng\u00e0y)|[;]|$)"
+        r"(?P<name>.+?)(?=\s+(?:[\-\u2013]\s+)?(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)\s*[:\u2013-]?\s*(?:(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})|\s+(?:[\-\u2013]\s+)?(?:Ch\u1ee9c v\u1ee5|Chuc vu)\s*:|\s+c\u00f3\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\b|\s*\(\s*(?:Sinh|Ng\u00e0y)|[;]|$)"
     )
     birth_re = re.compile(r"(?i)(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)\s*[:\u2013-]?\s*(\d{1,2}/\d{1,2}/\d{4})")
     # Nguoi lon tuoi thuong chi ghi "Sinh nam 1965" — database chap nhan YYYY
     # (docs/spec/notary_v2/stage.md muc 5) nen giu nam lam ngay_sinh.
-    birth_year_re = re.compile(r"(?i)(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)\s*[:\u2013-]?\s*((?:19|20)\d{2})(?!\d)")
+    # Gia tri chi co nam van nhan du nhan viet "Sinh ngay: 1982" (loi mau thuc te).
+    birth_year_re = re.compile(r"(?i)(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh)\s*[:\u2013-]?\s*((?:19|20)\d{2})(?!\d)")
     id_re = re.compile(r"(?i)(?:C\u0103n c\u01b0\u1edbc(?:\s+c\u00f4ng(?:\s+d\u00e2n)?)?(?:\s+m\u1edbi)?|Can cuoc(?:\s+cong(?:\s+dan)?)?|CCCD|CMND|\bCC)\s*(?:[A-Z\u00c0-\u1ef9\u0110][^\d:;\n]{0,40}?)?\s*(?:s\u1ed1|so)\s*:?\s*(\d{6,12})")
     issue_place_re = re.compile(r"(?i)\bdo\s+([^\n]+?)\s+(?:c\u1ea5p ng\u00e0y|cap ngay)")
     issue_date_re = re.compile(r"(?i)(?:c\u1ea5p ng\u00e0y|cap ngay|c\u1ea5p v\u00e0o ng\u00e0y)\s*:?\s*(\d{1,2}/\d{1,2}/\d{4})")
@@ -2348,6 +2350,10 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         person["ngay_sinh"] = ngay_sinh
         person["chi_co_nam_sinh"] = chi_co_nam
         id_match = id_re.search(chunk)
+        if not id_match:
+            # Form viet tat "Ông Vũ Văn Thạnh số: 036070006771 Cấp ngày ..."
+            # — "số:" tran khong nhan CCCD; so 9-12 chu so van la giay to.
+            id_match = re.search(r"\bs\u1ed1\s*:\s*(\d{9,12})(?!\d)", chunk)
         person["cccd"] = id_match.group(1) if id_match else ""
         issue_place_match = issue_place_re.search(chunk)
         if not issue_place_match:
@@ -2364,6 +2370,12 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             # — chi nhan cum dung sau so giay to, tranh vo nham ca menh de.
             issue_place_match = re.search(
                 r"(?i)(?:\d{9,12}\s+|\bCCCD\s+|\bCMND\s+)([^\n,;]{2,60}?)\s+(?:c\u1ea5p ng\u00e0y|cap ngay)",
+                chunk,
+            )
+        if not issue_place_match:
+            # Form "Nơi cấp Cục cảnh sát ..." (don xac nhan thoi han dat).
+            issue_place_match = re.search(
+                r"(?i)\bN\u01a1i\s+c\u1ea5p\s*[:;,]?\s*([^\n,;.]+?)(?=\s*[,;.]|\s*$)",
                 chunk,
             )
         person["noi_cap"] = re.sub(r"\s+", " ", issue_place_match.group(1)).strip(" ;,.") if issue_place_match else ""

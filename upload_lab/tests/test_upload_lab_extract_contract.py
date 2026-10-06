@@ -1684,6 +1684,57 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual([q["ho_ten"] for q in ben_a], ["Nguyễn Thị Mơ"])
         self.assertEqual(ben_a[0]["ngay_sinh"], "20/05/1949")
 
+    def test_tien_to_quan_he_em_trai_chi_gai_van_nhan(self):
+        # "Em trai - ông ..." / "Chị gái – bà ..." la vai tro, khong lam mat nguoi.
+        docx_path = make_docx(
+            self.root / "tang_cho.docx",
+            "HỢP ĐỒNG TẶNG CHO QUYỀN SỬ DỤNG ĐẤT",
+            "Chúng tôi gồm:",
+            "I. BÊN TẶNG CHO (Sau đây gọi là bên A):",
+            "Em trai - ông Ngô Văn Bảng; Sinh ngày: 05/03/1983;",
+            "Căn cước công dân số 036083008245 do Cục Cảnh sát cấp ngày 24/07/2021;",
+            "Nơi thường trú tại: Thôn Đìa, xã Phúc Thịnh.",
+            "II. BÊN NHẬN TẶNG CHO (Sau đây gọi là bên B):",
+            "Chị gái – bà Ngô Thị Lanh Sinh ngày: 07/06/1977",
+            "Căn cước công dân số 036177007241 do Cục Cảnh sát cấp ngày 09/01/2022;",
+            "Hai bên tự nguyện cùng nhau lập Hợp đồng tặng cho quyền sử dụng đất.",
+        )
+        payload = extract(docx_path)
+        self.assertEqual([q["ho_ten"] for q in payload["raw"]["ben_a"]["nguoi"]], ["Ngô Văn Bảng"])
+        self.assertEqual([q["ho_ten"] for q in payload["raw"]["ben_b"]["nguoi"]], ["Ngô Thị Lanh"])
+
+    def test_sinh_ngay_chi_co_nam_van_cat_ten(self):
+        # "Sinh ngày: 1982" (nhan ngay nhung gia tri chi la nam) — ten cat
+        # truoc nhan, nam vao ngay_sinh kem chi_co_nam_sinh.
+        docx_path = make_docx(
+            self.root / "uq_nam.docx",
+            "GIẤY UỶ QUYỀN",
+            "Tôi là: Ông Phạm Văn Chinh - Sinh ngày: 1982; Căn cước công dân số: 036082017340 do Cục cảnh sát cấp ngày 17/06/2021;",
+            "Và vợ là bà Ngô Thị Phương - Sinh ngày: 1991 Căn cước công dân số: 036191017271 do Cục cảnh sát cấp ngày 17/06/2021;",
+            "uỷ quyền cho: Ông Phạm Huy Thành - Sinh ngày: 1985; Căn cước công dân số: 036085009361 do Cục cảnh sát cấp ngày 17/06/2021;",
+        )
+        payload = extract(docx_path)
+        ben_a = payload["raw"]["ben_a"]["nguoi"]
+        self.assertEqual([q["ho_ten"] for q in ben_a], ["Phạm Văn Chinh", "Ngô Thị Phương"])
+        self.assertEqual(ben_a[0]["ngay_sinh"], "1982")
+        self.assertTrue(ben_a[0]["chi_co_nam_sinh"])
+
+    def test_so_tran_12_chu_so_van_la_giay_to(self):
+        # Form xac nhan: "Ông Vũ Văn Thạnh số: 036070006771 Cấp ngày ..." —
+        # "số:" tran (khong nhan CCCD) van dem la giay to -> giu nguoi.
+        docx_path = make_docx(
+            self.root / "xac_nhan_so.docx",
+            "ĐƠN XIN XÁC NHẬN LẠI THỜI HẠN SỬ DỤNG ĐẤT",
+            "Kính gửi: Văn phòng đăng ký đất đai",
+            "Người sử dụng đất:",
+            "Ông Vũ Văn Thạnh số: 036070006771 Cấp ngày 22/12/2021, Nơi cấp Cục cảnh sát quản lý hành chính về trật tự xã hội.",
+        )
+        payload = extract(docx_path)
+        ben_a = payload["raw"]["ben_a"]["nguoi"]
+        self.assertEqual([q["ho_ten"] for q in ben_a], ["Vũ Văn Thạnh"])
+        self.assertEqual(ben_a[0]["cccd"], "036070006771")
+        self.assertIn("Cục cảnh sát", ben_a[0]["noi_cap"])
+
 
 if __name__ == "__main__":
     unittest.main()
