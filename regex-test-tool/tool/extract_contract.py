@@ -2319,7 +2319,8 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # "Toi ten la: Tran Gia Huy; Sinh ngay: ..." — ten tran khong
     # Ông/Bà, nhan ngay sinh cung dong de chac la nguoi.
     intro_bare_re = re.compile(
-        r"(?i)^\s*(?:Tôi (?:tên )?là|Tên tôi là)\s*:?\s*(?P<name>[^;|\-\u2013\n]+?)(?:\s*[;|\-\u2013]|\s+)[\s|]*"
+        r"(?i)^\s*(?:Tôi (?:tên )?là|Tên tôi là)\s*:?\s*(?P<name>[^;|\-\u2013\n]+?)"
+        r"(?:\s*[-\u2013]\s*[^\n;|]{0,60}?)?(?:\s*[;|]|\s+)[\s|]*"
         r"(?:Sinh ngày|Ngày sinh|Sinh ngay|Ngay sinh|Sinh năm|Năm sinh|Sinh nam|Nam sinh)"
     )
     # Don hanh chinh co nhan nguoi danh so: "1. Người xin gia hạn sử dụng
