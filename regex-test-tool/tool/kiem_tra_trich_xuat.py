@@ -17,7 +17,8 @@ Truong hop acceptable (ghi nhan, khong sua code):
 
 Quyet dinh Owner 06/10/2026 (decision-46): khong trich/doi chieu loi chung
 (bo R11); nguoi chet mang truong person_row (so_giay_to/ngay_cap/noi_cap/
-dia_chi); so TK/bao hiem chi gan co "chua ho tro" (R12).
+dia_chi); so TK/bao hiem chi gan co "chua ho tro" (R12); khong suy doan
+gioi tinh / dien tich mo ho — de trong, giu nguyen van, co canh bao (R13).
 """
 from __future__ import annotations
 
@@ -208,6 +209,43 @@ def luat_khong_tach_tai_san(payload: dict) -> list[dict]:
     return []
 
 
+def _dien_tich_mo_ho(text: Any) -> bool:
+    """Dien tich co chu so nhung khong parse duoc theo quy tac (vd '1.234')."""
+    s = str(text or "").strip()
+    return bool(s) and any(c.isdigit() for c in s) and _so_thuc(s) is None
+
+
+def luat_du_lieu_mo_ho(payload: dict) -> list[dict]:
+    """R13: truong de trong vi thieu can cu phai co co de nguoi kiem.
+
+    - gioi_tinh trong: danh xung mo ho ("Ong/ba:") hoac khong suy duoc.
+    - dien_tich co chu so nhung mo ho ("1.234" chi co dau cham): giu nguyen
+      van, khong doan so.
+    """
+    findings = []
+    trong_gt = [p.get("ho_ten", "?") for p in _nguoi_1_ben(payload) if not str(p.get("gioi_tinh") or "").strip()]
+    if trong_gt:
+        findings.append({
+            "id": "R13",
+            "muc": MUC_CANH_BAO,
+            "noi_dung": f"giới tính để trống (không suy đoán): {', '.join(trong_gt[:3])}" + ("..." if len(trong_gt) > 3 else ""),
+        })
+    mo_ho = []
+    for thua in payload.get("raw", {}).get("danh_sach_thua_dat", []):
+        label = f"thửa {thua.get('so_thua_dat') or '?'}"
+        if _dien_tich_mo_ho(thua.get("dien_tich")):
+            mo_ho.append(label)
+        elif any(_dien_tich_mo_ho(c.get("dien_tich")) for c in thua.get("chi_tiet_dien_tich", [])):
+            mo_ho.append(label)
+    if mo_ho:
+        findings.append({
+            "id": "R13",
+            "muc": MUC_CANH_BAO,
+            "noi_dung": f"diện tích mơ hồ (giữ nguyên văn): {', '.join(mo_ho[:3])}" + ("..." if len(mo_ho) > 3 else ""),
+        })
+    return findings
+
+
 def luat_tai_san_chua_ho_tro(payload: dict) -> list[dict]:
     """R12: co so tiet kiem/bao hiem nhung tam dung boc dong (decision-46)."""
     kinds = payload.get("raw", {}).get("tai_san_chua_ho_tro") or []
@@ -253,6 +291,7 @@ LUAT = (
     luat_mat_khoi_tai_san,
     luat_khong_tach_tai_san,
     luat_lech_dien_tich,
+    luat_du_lieu_mo_ho,
     luat_tai_san_chua_ho_tro,
 )
 

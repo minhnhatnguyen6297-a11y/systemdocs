@@ -26,7 +26,7 @@ lại di sản:`, `Di sản:`, `Khi còn sống`, `Trước khi chết`,
 
 | Trường | Cách nhận |
 |---|---|
-| `gioi_tinh` | `Ông`/`Anh` → Ông; `Bà`/`Chị` → Bà; `Ông/bà:` suy qua `Thị` trong tên |
+| `gioi_tinh` | `Ông`/`Anh`/`Ngài` → Ông; `Bà`/`Chị`/`Bà mụ` → Bà; `Ông/bà:` hoặc mơ hồ → **để trống** + cờ R13 (không suy qua `Thị`, decision-46) |
 | `ho_ten` | Sau danh xưng, cắt trước `\|`, nhãn ngày sinh (bắt buộc kèm giá trị vì `Năm` là âm tiết tên), `có vợ/chồng là`, ngoặc ngày sinh người khác; vai trò dòng riêng (`Là con đẻ...`) giữ vào tên |
 | `ngay_sinh` | `Sinh ngày[:/-] DD/MM/YYYY`, hoặc `Sinh năm[:/-] YYYY` → giữ đúng `YYYY` + cờ `chi_co_nam_sinh` |
 | `cccd` | Sau `Căn cước (công dân) số` / `CCCD số` / `CMND` (`số:` dính hai chấm cũng nhận) |
@@ -44,8 +44,8 @@ dừng trước dòng `chết ngày`.
 | `ho_ten`, `ten_goi_khac` | `Ông/Bà ... [(tên gọi khác là ...)]` |
 | `ngay_sinh` | `Sinh năm[:] YYYY` (giữ `YYYY` + cờ) hoặc đủ ngày |
 | `ngay_chet` | Sau `chết/đã chết ngày[:/-]` |
-| `so_trich_luc`, `co_quan_trich_luc`, `ngay_trich_luc` | Sau `Trích lục khai tử... số`, `do... ký/cấp ngày` |
-| `dia_chi_cuoi` | Sau `Nơi thường trú cuối cùng trước khi chết:` |
+| `so_giay_to`, `loai_giay_to`, `ngay_cap`, `noi_cap` | Trích lục khai tử là giấy tờ của người chết: sau `Trích lục khai tử... số`, `do... ký/cấp ngày` (decision-46) |
+| `dia_chi` | Sau `Nơi thường trú cuối cùng trước khi chết:` |
 
 ## 4. Tài sản đất (mỗi thửa 1 dòng `danh_sach_thua_dat` + `land_rows` shape DB)
 
@@ -70,31 +70,25 @@ theo dòng ô (ô `Số thửa` làm neo); tiêu đề tách 2 dòng thì nối 
 dòng văn xuôi >100 ký tự trong vùng bảng thì bỏ; `Trong đó: | ...`
 thì cắt mốc giữ ô.
 
-## 5. Tài sản sổ tiết kiệm / tài khoản (`danh_sach_so_tiet_kiem`)
+## 5. Tài sản sổ tiết kiệm / tài khoản — TẠM DỪNG (decision-46)
 
-Khối mở bằng `sổ tiết kiệm`, `số dư tài khoản`, `số tiền gốc và lãi`.
-Mỗi sổ/tài khoản 1 dòng: `loai_so` (`có kỳ hạn`, `tài khoản`),
-`so_hieu` (`AC 00033961022`, `IE4025426`, `STK: 3214...`;
-`Thẻ tiết kiệm` tính như sổ), `ngan_hang` (sau `do`/`của Ngân
-hàng..., cắt hậu tố), `chi_nhanh`, `ngay_phat_hanh` (+`Ngày mở tài
-khoản`), `chu_so` (sau `cho/mang tên/chủ tài khoản:`).
-`loai_tai_san` của văn bản: `Sổ tiết kiệm`.
+Không bóc dòng. Khi văn bản có khối `sổ tiết kiệm` / `số dư tài khoản`,
+engine chỉ ghi `"so_tiet_kiem"` vào `raw.tai_san_chua_ho_tro` và R12
+cảnh báo để nhân viên biết file có phần này.
 
-## 6. Quyền lợi bảo hiểm (`danh_sach_bao_hiem`)
+## 6. Quyền lợi bảo hiểm — TẠM DỪNG (decision-46)
 
-Khối mở bằng `quyền lợi bảo hiểm`. Mỗi quyền lợi 1 dòng:
-`so_hop_dong` (sau `số`, mở đầu bằng chữ số), `ben_bao_hiem`
-(sau `ký giữa`, cắt hậu tố bên mua), `ben_mua`, `doi_tuong`,
-`ngay_ky`. Dòng không số thì gộp vào dòng đang mở.
-`loai_tai_san`: `Tài sản khác` ([CONFIRM] portal chưa có enum).
+Tương tự §5: nhận diện khối `quyền lợi bảo hiểm` → `"bao_hiem"` trong
+`raw.tai_san_chua_ho_tro` + R12. Không trích `so_hop_dong`, `ben_bao_hiem`...
 
-## 7. Lời chứng (`raw.loi_chung_nguoi`)
+## 7. Lời chứng — KHÔNG TRÍCH (decision-46)
 
-Mọi khối CCCD trong Lời chứng đều xuất, không đối chiếu với đầu
-văn bản (cờ R11 khi lệch số lượng).
+Không đối chiếu với người đầu văn bản nên không bóc người trong Lời chứng;
+không còn `raw.loi_chung_nguoi` và luật R11.
 
 ## 8. Lịch sử phiên bản
 
 | Bản | Ngày | Nội dung | Engine |
 |---|---|---|---|
 | v1.0 | 06/10/2026 | Vòng 1–5: mở đầu/kết 12+ biến thể, tên trần + vai trò, `Ông/bà`, Anh/Chị, `Tôi tên là:`, năm sinh + cờ, ngày Excel, người chết + trích lục, tách thửa + `land_rows`, sổ TK/tài khoản/thẻ, bảo hiểm, bảng `.doc`, luật R00–R11 | thuake5 |
+| v1.1 | 06/10/2026 | decision-46: bỏ lời chứng + R11; người chết dùng trường Người (`so_giay_to`/`ngay_cap`/`noi_cap`/`dia_chi`); sổ TK/bảo hiểm chỉ gắn cờ `tai_san_chua_ho_tro` + R12; không suy giới tính từ `Thị`, giới tính trống → R13; diện tích mơ hồ (`1.234`) → R13 | thuake5 |

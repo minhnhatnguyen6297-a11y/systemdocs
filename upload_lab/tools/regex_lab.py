@@ -89,8 +89,11 @@ def cluster_id_for(signature: str) -> str:
 
 
 def _extractor_fingerprint() -> str:
+    """Bam engine + luat kiem tra + file nay: doi 1 trong 3 -> cache het han,
+    ingest phai chay lai (khong duoc cham tren ket qua luu cu)."""
     digest = hashlib.sha256()
     digest.update(Path(extract_contract.__file__).read_bytes())
+    digest.update(Path(kiem_tra_trich_xuat.__file__).read_bytes())
     digest.update(Path(__file__).read_bytes())
     return digest.hexdigest()
 
@@ -107,8 +110,18 @@ def _json_write(path: Path, payload: Any) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def _names(persons: Any) -> list[str]:
-    return [str(p.get("ho_ten") or "") for p in persons or []]
+_NGUOI_FIELDS = ("ho_ten", "gioi_tinh", "ngay_sinh", "cccd", "ngay_cap_cccd", "dia_chi")
+_CHET_FIELDS = ("ho_ten", "ngay_sinh", "ngay_chet", "so_giay_to", "ngay_cap", "noi_cap", "dia_chi")
+_THUA_FIELDS = ("so_thua_dat", "so_to_ban_do", "dien_tich", "dia_chi", "so_gcn", "ngay_cap_gcn")
+
+
+def _rows(records: Any, fields: tuple[str, ...]) -> list[dict[str, str]]:
+    """Giu tap truong con cua moi ban ghi — du de so tung truong, khong chi ten."""
+    return [
+        {k: str(r.get(k) or "") for k in fields}
+        for r in records or []
+        if isinstance(r, dict)
+    ]
 
 
 def _snapshot(payload: dict[str, Any] | None, error: str = "") -> dict[str, Any]:
@@ -121,9 +134,10 @@ def _snapshot(payload: dict[str, Any] | None, error: str = "") -> dict[str, Any]
         "nguoi_yeu_cau": str(web.get("nguoi_yeu_cau") or ""),
         "duong_su": str(web.get("duong_su") or ""),
         "tai_san": str(web.get("tai_san") or ""),
-        "nguoi": _names(raw.get("ben_a", {}).get("nguoi")) + _names(raw.get("ben_b", {}).get("nguoi")),
-        "nguoi_chet": _names(raw.get("nguoi_chet")),
-        "thua_dat": [str(t.get("so_thua_dat") or "") for t in raw.get("danh_sach_thua_dat") or []],
+        "nguoi": _rows(raw.get("ben_a", {}).get("nguoi"), _NGUOI_FIELDS)
+                 + _rows(raw.get("ben_b", {}).get("nguoi"), _NGUOI_FIELDS),
+        "nguoi_chet": _rows(raw.get("nguoi_chet"), _CHET_FIELDS),
+        "thua_dat": _rows(raw.get("danh_sach_thua_dat"), _THUA_FIELDS),
         "tai_san_chua_ho_tro": list(raw.get("tai_san_chua_ho_tro") or []),
         "missing_fields": list(raw.get("missing_web_form_fields") or []),
         "error": error,
@@ -214,12 +228,12 @@ def ingest_corpus(input_dir: Path | str = DEFAULT_INPUT, cache_dir: Path | str =
             extraction = _snapshot(payload, error)
             kind_label = str(extraction.get("document_kind") or "unknown").upper()
             signature = f"{layout_signature(text)}>KIND_{kind_label}"
-            kiem_tra = []
+            kiem_tra: list | None = []
             if payload and not error:
                 try:
                     kiem_tra = kiem_tra_trich_xuat.kiem_tra_payload(payload)
                 except Exception:  # noqa: BLE001 - luat kiem khong duoc lam chet ingest
-                    kiem_tra = []
+                    kiem_tra = None  # khac voi []: khong kiem duoc, khong phai sach
             record = {
                 "content_hash": content_hash,
                 "extractor_fingerprint": fingerprint,
@@ -304,7 +318,8 @@ _ANSWER_FIELDS = (
 
 
 def _expected_template() -> dict[str, Any]:
-    return {field: ([] if field != "document_kind" and field != "ten_hop_dong" else "") for field in _ANSWER_FIELDS}
+    # null = chua tra loi. [] = DA xac nhan khong co. compare phai phan biet 2 thu nay.
+    return {field: None for field in _ANSWER_FIELDS}
 
 
 def review_corpus(
@@ -328,6 +343,14 @@ def review_corpus(
             reasons.append("OUTLIER_SIZE_1")
         if any(index["records"][item].get("flags") for item in hashes):
             reasons.append("HAS_FLAGS")
+        if any(index["records"][item].get("kiem_tra") is None for item in hashes):
+            reasons.append("KIEM_TRA_ERROR")
+        elif any(
+            f.get("muc") in (kiem_tra_trich_xuat.MUC_LOI, kiem_tra_trich_xuat.MUC_CANH_BAO)
+            for item in hashes
+            for f in (index["records"][item].get("kiem_tra") or [])
+        ):
+            reasons.append("HAS_R_FLAGS")
         if any(item in golden and _changed(index["records"][item], golden[item]) for item in hashes):
             reasons.append("CHANGED_VS_GOLDEN")
         if reasons:
@@ -346,9 +369,13 @@ def review_corpus(
         packet_name = f"cluster-{cluster_id}.md"
         packet_paths.append(packet_name)
         index_lines.append(f"- [{cluster_id}]({packet_name}): {', '.join(reasons)}")
+        signature = cluster["signature"]
+        if blind:
+            # Khong lo du lieu may doan: KIND_* trong signature.
+            signature = re.sub(r">KIND_[A-Z_]+$", "", signature)
         lines = [
             f"# Cluster {cluster_id}", "", f"Reasons: {', '.join(reasons)}", "",
-            f"Signature: `{cluster['signature']}`", "", f"Files: {len(cluster['paths'])}; unique hashes: {len(cluster['hashes'])}", "",
+            f"Signature: `{signature}`", "", f"Files: {len(cluster['paths'])}; unique hashes: {len(cluster['hashes'])}", "",
         ]
         for content_hash in hashes:
             record = index["records"][content_hash]
@@ -377,41 +404,80 @@ def review_corpus(
     return {"packet_dir": str(run_dir), "selected_cluster_count": len(selected), "packets": packet_paths, "index": index}
 
 
+def _diff_list(field: str, want: list, got: list, label: str) -> list[dict[str, Any]]:
+    """So tung phan tu: dict -> so tung khoa khai bao; chuoi -> so khoa dinh danh."""
+    diffs: list[dict[str, Any]] = []
+    id_key = "ho_ten" if field.startswith("nguoi") else "so_thua_dat"
+    if len(want) != len(got):
+        diffs.append({"file": label, "field": f"{field}.len", "expected": len(want), "actual": len(got)})
+    for i, (w, g) in enumerate(zip(want, got)):
+        if isinstance(w, dict):
+            for k, v in w.items():
+                if v is None:
+                    continue  # null trong item = khong tra loi truong nay
+                gv = g.get(k) if isinstance(g, dict) else None
+                if gv != v:
+                    diffs.append({"file": label, "field": f"{field}[{i}].{k}", "expected": v, "actual": gv})
+        else:
+            gv = g.get(id_key) if isinstance(g, dict) else g
+            if gv != w:
+                diffs.append({"file": label, "field": f"{field}[{i}]", "expected": w, "actual": gv})
+    return diffs
+
+
 def compare_answers(
     answers_dir: Path | str,
     cache_dir: Path | str = DEFAULT_CACHE,
 ) -> dict[str, Any]:
     """So dap an agent viet (expected.json trong packet blind) voi extraction.
 
-    Moi file <hash>.expected.json duoc diff tung field trong _ANSWER_FIELDS.
-    expected=None/""/[] nghia la agent khong tra loi field do -> bo qua field do.
+    - null / field khong co = CHUA tra loi -> bo qua (nhung file toan null = loi).
+    - [] = DA xac nhan khong co -> dem so luong, boc thua bi bat.
+    - JSON hong / thu muc rong / cache cu -> loi, khong tra "dat".
     """
     answers_dir = Path(answers_dir)
     index = _json_read(Path(cache_dir) / "index.json", {})
     records = index.get("records", {})
     diffs: list[dict[str, Any]] = []
     files_checked = 0
-    for answer_path in sorted(answers_dir.glob("*.expected.json")):
+    answer_paths = sorted(answers_dir.glob("*.expected.json")) if answers_dir.is_dir() else []
+    if not answer_paths:
+        diffs.append({"file": "*", "field": "*", "expected": "dap an", "actual": "khong tim thay *.expected.json"})
+    if index.get("extractor_fingerprint") != _extractor_fingerprint():
+        diffs.append({"file": "*", "field": "cache", "expected": _extractor_fingerprint()[:12], "actual": "cache cu/khong co — chay lai ingest"})
+    for answer_path in answer_paths:
         content_hash = answer_path.name[: -len(".expected.json")]
-        expected = _json_read(answer_path, {})
+        try:
+            expected = json.loads(answer_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            diffs.append({"file": answer_path.name, "field": "*", "expected": "json hop le", "actual": str(exc)})
+            continue
+        if not isinstance(expected, dict):
+            diffs.append({"file": answer_path.name, "field": "*", "expected": "object json", "actual": type(expected).__name__})
+            continue
         record = records.get(content_hash)
         if record is None:
-            diffs.append({"file": answer_path.name, "error": "hash khong co trong cache — chay ingest truoc"})
+            diffs.append({"file": answer_path.name, "field": "*", "expected": "hash trong cache", "actual": "khong co — chay ingest truoc"})
             continue
         files_checked += 1
         actual = record.get("extraction", {})
+        answered = 0
         for field in _ANSWER_FIELDS:
-            want = expected.get(field)
-            if want in (None, "", []):
+            if field not in expected or expected[field] is None:
                 continue
-            got = actual.get(field)
-            if got != want:
+            answered += 1
+            want, got = expected[field], actual.get(field)
+            if isinstance(want, list) and isinstance(got, list):
+                diffs.extend(_diff_list(field, want, got, record.get("relative_path", content_hash)))
+            elif got != want:
                 diffs.append({
                     "file": record.get("relative_path", answer_path.name),
                     "field": field,
                     "expected": want,
                     "actual": got,
                 })
+        if answered == 0:
+            diffs.append({"file": answer_path.name, "field": "*", "expected": "dap an co noi dung", "actual": "tat ca null"})
     report = {
         "files_checked": files_checked,
         "diff_count": len(diffs),

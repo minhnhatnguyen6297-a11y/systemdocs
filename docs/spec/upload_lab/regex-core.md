@@ -51,7 +51,12 @@ mẫu thật → agent đọc MÙ source → viết đáp án expected.json (ch�
 4. Số liệu giữ nguyên chữ trong văn bản (diện tích tuyệt đối chính
    xác, không làm tròn). Thiếu căn cứ thì để trống + gắn cờ, không
    tự bịa, không tự suy mã.
-5. Golden đổi kết quả ≠ tự động tách phiên bản rule: trước hết xác
+5. Trong `expected.json`: `null`/thiếu = **chưa trả lời** (compare bỏ
+   qua, nhưng file toàn null = lỗi); `[]` = **đã xác nhận không có**
+   — máy bóc thừa sẽ bị bắt. JSON hỏng, thiếu thư mục đáp án hoặc
+   cache từ engine/luật cũ (fingerprint lệch) đều khiến compare báo
+   lỗi thay vì trả "đạt".
+6. Golden đổi kết quả ≠ tự động tách phiên bản rule: trước hết xác
    định đáp án cũ sai, code cũ sai, hay biểu mẫu thật sự khác.
 
 ### Lệnh của vòng (engine hiện hành `upload_lab`)
@@ -79,7 +84,9 @@ python tools/regex_lab.py approve --cluster <id>   # chi khi owner da duyet ket 
    R02 0 người, R03 thiếu trường người, R04 tên bẩn, R05 trùng tên,
    R06 thiếu người chết, R07 thiếu trường người chết, R08 mất khối
    tài sản, R09 không tách tài sản, R10 lệch diện tích tuyệt đối,
-   R12 tài sản chưa hỗ trợ). Agent/LLM chỉ đọc mã, không tự đặt tên lỗi.
+   R12 tài sản chưa hỗ trợ, R13 dữ liệu mơ hồ/thiếu căn cứ (giới tính
+   trống, diện tích chỉ có dấu chấm). Agent/LLM chỉ đọc mã, không tự
+   đặt tên lỗi.
 2. Sửa ở engine (`upload_lab/extract_contract.py`), thêm test giữ
    hành vi, chạy toàn bộ suite.
 3. Quét lại hàng loạt bằng `upload_lab/tools/quet_kiem_tra.py`

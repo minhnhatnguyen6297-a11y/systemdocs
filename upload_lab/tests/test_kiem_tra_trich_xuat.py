@@ -128,6 +128,30 @@ class KiemTraTrichXuatTests(unittest.TestCase):
         self.assertEqual(len(r12), 1)
         self.assertEqual(r12[0]["muc"], MUC_CANH_BAO)
 
+    def test_gioi_tinh_trong_co_canh_bao_r13(self):
+        payload = make_payload()
+        payload["raw"]["ben_a"]["nguoi"][0]["gioi_tinh"] = ""
+        findings = kiem_tra_payload(payload)
+
+        r13 = [f for f in findings if f["id"] == "R13" and "giới tính" in f["noi_dung"]]
+        self.assertEqual(len(r13), 1)
+        self.assertEqual(r13[0]["muc"], MUC_CANH_BAO)
+
+    def test_dien_tich_mo_ho_co_canh_bao_r13(self):
+        payload = make_payload()
+        payload["raw"]["danh_sach_thua_dat"][0]["dien_tich"] = "1.234"
+        payload["raw"]["danh_sach_thua_dat"][0]["chi_tiet_dien_tich"] = []
+        findings = kiem_tra_payload(payload)
+
+        r13 = [f for f in findings if f["id"] == "R13" and "diện tích" in f["noi_dung"]]
+        self.assertEqual(len(r13), 1)
+
+    def test_dien_tich_chuan_khong_co_r13(self):
+        payload = make_payload()
+        findings = kiem_tra_payload(payload)
+
+        self.assertFalse([f for f in findings if f["id"] == "R13"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -22,7 +22,7 @@ chuyển nhượng, tặng cho, thế chấp...).
      file, file lỗi không làm dừng cả đợt, có thanh tiến trình và
      nút `Dừng`. Xong sẽ báo số lượng từng loại
      (phân chia/từ chối/chuyển nhượng...) + số file lỗi/cảnh báo;
-     mỗi dòng ghi mã kiểm tra (R00..R12, bỏ qua R11 đã xóa) để tra cứu.
+     mỗi dòng ghi mã kiểm tra (R00..R13, bỏ qua R11 đã xóa) để tra cứu.
    - Mỗi lần chạy máy **tự ghi vào file log**, không cần làm gì thêm.
 3. Gửi log: mở tab **Xem log** → bấm **Mở thư mục chứa log** →
    copy file `ket-qua-test.jsonl` gửi cho chủ.

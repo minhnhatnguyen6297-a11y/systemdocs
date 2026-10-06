@@ -20,7 +20,7 @@ là bản gốc của core dùng chung.
 | Engine thừa kế đang chạy (nguồn port sang profile) | `upload_lab/extract_contract.py` (docstring đầu file dẫn tiếp) |
 | Test giữ hành vi | `upload_lab/tests/test_upload_lab_extract_contract.py` |
 | Tool test giao diện (chọn 1 file Word → xem Người/Thửa/JSON) | `upload_lab/tools/regex_test_tool.py` (chạy bằng `upload_lab/run_regex_test.bat`) |
-| Luật kiểm tra kết quả (R00..R10, R12; R11 lời chứng đã xóa theo decision-46) | `upload_lab/kiem_tra_trich_xuat.py` + test `tests/test_kiem_tra_trich_xuat.py` |
+| Luật kiểm tra kết quả (R00..R10, R12 tài sản chưa hỗ trợ, R13 dữ liệu mơ hồ/thiếu căn cứ; R11 lời chứng đã xóa theo decision-46) | `upload_lab/kiem_tra_trich_xuat.py` + test `tests/test_kiem_tra_trich_xuat.py` |
 | Quét hàng loạt bằng luật trên | `upload_lab/tools/quet_kiem_tra.py` (`--loc`, `--offset/--limit`, `--ca-doc`) |
 | Repo test cho nhân viên (Test 1 file + Test cả thư mục + Xem log, log cố định) | `regex-test-tool/tool/` tất cả trong 1 folder (chạy bằng `tool/run.bat`) |
 | Catalog quy tắc này | `docs/spec/upload_lab/regex-rules.md` |
