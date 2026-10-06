@@ -112,7 +112,7 @@ def _json_write(path: Path, payload: Any) -> None:
 
 _NGUOI_FIELDS = ("ho_ten", "ten_goi_khac", "gioi_tinh", "ngay_sinh", "cccd", "noi_cap", "ngay_cap_cccd", "dia_chi")
 _CHET_FIELDS = ("ho_ten", "ten_goi_khac", "ngay_sinh", "ngay_chet", "loai_giay_to", "so_giay_to", "ngay_cap", "noi_cap", "dia_chi")
-_THUA_FIELDS = ("so_thua_dat", "so_to_ban_do", "dien_tich", "chi_tiet_dien_tich", "land_rows",
+_THUA_FIELDS = ("so_thua_dat", "so_to_ban_do", "dien_tich", "chi_tiet_dien_tich", "land_rows", "nguon_goc",
                 "muc_dich_su_dung", "thoi_han_su_dung", "phan_ghi_them",
                 "dia_chi", "loai_gcn", "so_gcn", "so_gcn_raw", "so_vao_so", "ngay_cap_gcn", "co_quan_cap")
 

@@ -44,9 +44,11 @@ def make_payload() -> dict:
                     "dien_tich": "190 m2",
                     "muc_dich_su_dung": "Đất ở",
                     "thoi_han_su_dung": "Lâu dài",
+                    "nguon_goc": "Thừa kế",
                     "so_gcn": "B000020",
                     "loai_gcn": "quyền sử dụng đất",
                     "ngay_cap_gcn": "02/02/1992",
+                    "co_quan_cap": "UBND huyện C",
                     "dia_chi": "xã B, huyện C",
                 }
             ],
@@ -113,7 +115,8 @@ class RegexTestToolTests(unittest.TestCase):
         }
         rows = person_rows(payload)
 
-        self.assertEqual(rows[0][4], "1965 (chỉ có năm)")
+        # Quy uoc noi bo: giu nguyen "1965", khong gan chu thich vao ket qua.
+        self.assertEqual(rows[0][4], "1965")
 
     def test_parcel_rows_follow_parcel_table_order(self):
         rows = parcel_rows(make_payload())
@@ -121,7 +124,7 @@ class RegexTestToolTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(
             rows[0][1:],
-            ("65", "21", "190 m2", "Đất ở", "Lâu dài", "B000020", "quyền sử dụng đất", "02/02/1992", "xã B, huyện C"),
+            ("65", "21", "190 m2", "Đất ở", "Lâu dài", "Thừa kế", "B000020", "quyền sử dụng đất", "02/02/1992", "UBND huyện C", "xã B, huyện C"),
         )
 
     def test_summarize_reports_error_payload(self):

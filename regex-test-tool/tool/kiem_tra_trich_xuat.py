@@ -19,6 +19,10 @@ Quyet dinh Owner 06/10/2026 (decision-46): khong trich/doi chieu loi chung
 (bo R11); nguoi chet mang truong person_row (so_giay_to/ngay_cap/noi_cap/
 dia_chi); so TK/bao hiem chi gan co "chua ho tro" (R12); khong suy doan
 gioi tinh / dien tich mo ho — de trong, giu nguyen van, co canh bao (R13).
+
+Bo sung 07/10/2026 (mau thua ke that ong Thuong): R04 bat ca ten nguoi
+chet la cau van (qua 6 tu / co tu viet thuong); R13 bat moi dien tich
+co gia tri nhung khong parse duoc thanh so (ke ca van xuoi lot vao).
 """
 from __future__ import annotations
 
@@ -148,12 +152,24 @@ def luat_thieu_truong_nguoi(payload: dict) -> list[dict]:
     return findings
 
 
+def _ten_la_cau(ten: str) -> bool:
+    """Ten la cau van (rac lot vao): qua 6 tu hoac co tu viet thuong —
+    ten nguoi Viet moi tu deu viet hoa chu cai dau."""
+    tokens = ten.split()
+    return not tokens or len(tokens) > 6 or any(not t[0].isupper() for t in tokens)
+
+
 def luat_ten_ban(payload: dict) -> list[dict]:
-    """R04: ten con rac can le (|, cum ngay sinh lot vao ten)."""
+    """R04: ten con rac can le (|, cum ngay sinh, cau van lot vao ten)."""
     ban = [
         p.get("ho_ten", "")
         for p in _nguoi_1_ben(payload)
         if "|" in str(p.get("ho_ten", "")) or "Sinh n" in str(p.get("ho_ten", ""))
+    ]
+    ban += [
+        p.get("ho_ten", "")
+        for p in payload.get("raw", {}).get("nguoi_chet", [])
+        if _ten_la_cau(str(p.get("ho_ten", "")))
     ]
     if ban:
         return [{"id": "R04", "muc": MUC_LOI, "noi_dung": f"tên bẩn: {', '.join(ban[:3])}"}]
@@ -210,17 +226,18 @@ def luat_khong_tach_tai_san(payload: dict) -> list[dict]:
 
 
 def _dien_tich_mo_ho(text: Any) -> bool:
-    """Dien tich co chu so nhung khong parse duoc theo quy tac (vd '1.234')."""
+    """Dien tich khong rong nhung khong parse duoc thanh so — gom ca text van
+    xuoi lot vao ("thua dat neu tren") lan so mo ho ("1.234")."""
     s = str(text or "").strip()
-    return bool(s) and any(c.isdigit() for c in s) and _so_thuc(s) is None
+    return bool(s) and _so_thuc(s) is None
 
 
 def luat_du_lieu_mo_ho(payload: dict) -> list[dict]:
-    """R13: truong de trong vi thieu can cu phai co co de nguoi kiem.
+    """R13: truong de trong/nhiem rac vi thieu can cu phai co co de nguoi kiem.
 
     - gioi_tinh trong: danh xung mo ho ("Ong/ba:") hoac khong suy duoc.
-    - dien_tich co chu so nhung mo ho ("1.234" chi co dau cham): giu nguyen
-      van, khong doan so.
+    - dien_tich co gia tri nhung khong parse duoc: giu nguyen van, khong doan so
+      ("1.234" chi co dau cham; "dien tich thua dat neu tren" la van xuoi).
     """
     findings = []
     trong_gt = [p.get("ho_ten", "?") for p in _nguoi_1_ben(payload) if not str(p.get("gioi_tinh") or "").strip()]

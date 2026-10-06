@@ -544,11 +544,11 @@ class UploadLabExtractContractTests(unittest.TestCase):
 
         self.assertEqual(payload["raw"]["document_kind"], "inheritance_partition")
         self.assertEqual(len(payload["raw"]["ben_a"]["nguoi"]), 3)
-        self.assertEqual(payload["raw"]["ben_a"]["nguoi"][0]["ho_ten"], "Trần Thị Mơ - Vợ ông X")
+        self.assertEqual(payload["raw"]["ben_a"]["nguoi"][0]["ho_ten"], "Trần Thị Mơ")
         self.assertEqual(payload["raw"]["ben_a"]["nguoi"][0]["gioi_tinh"], "Bà")
         self.assertEqual(payload["raw"]["ben_a"]["nguoi"][0]["ngay_sinh"], "01/01/1940")
         self.assertEqual(payload["raw"]["ben_a"]["nguoi"][0]["cccd"], "036140000001")
-        self.assertIn("Con đẻ ông X", payload["raw"]["ben_a"]["nguoi"][1]["ho_ten"])
+        self.assertEqual(payload["raw"]["ben_a"]["nguoi"][1]["ho_ten"], "Trần Thị A")
         self.assertNotIn("chết", duong_su)
         self.assertNotIn("Bố đẻ", duong_su)
         self.assertNotIn("Người để lại di sản", duong_su)
@@ -1146,8 +1146,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(len(persons), 2)
         # "Ông/bà:" la nhan mo ho — khong suy gioi tinh (decision-46).
         self.assertEqual(persons[0]["gioi_tinh"], "")
-        self.assertIn("Phạm Thị A", persons[0]["ho_ten"])
-        self.assertIn("Con đẻ", persons[0]["ho_ten"])
+        self.assertEqual(persons[0]["ho_ten"], "Phạm Thị A")
         self.assertEqual(persons[1]["gioi_tinh"], "")
         self.assertIn("xã C", persons[0]["dia_chi"])
         chet = payload["raw"]["nguoi_chet"]
@@ -1223,6 +1222,55 @@ class UploadLabExtractContractTests(unittest.TestCase):
         details = thua[0]["chi_tiet_dien_tich"]
         self.assertEqual(len(details), 1)
         self.assertEqual(details[0]["muc_dich_su_dung"], "CLN")
+
+    def test_mau_that_thua_ke_duc_mo_2026(self):
+        # Hoi quy tu VB thoa thuan thua ke thuc te (Owner 07/10/2026):
+        # dong IFilter gop ca khoi nguoi thanh 1 dong; "Hoi khau thuong tru"
+        # la nhan dia chi; vai tro "La vo/con cua..." khong vao ho_ten;
+        # cau ke pha he ("Ong Duc va ba Khung la vo chong hop phap...")
+        # khong duoc sinh nguoi chet rac; "Hien nay la thua ... To ..."
+        # la cung thua (ghi chu), khong mo thua moi; so to ban do chi giu
+        # ky hieu, bo duoi "Ban do dia chinh nam 1991"; dien tich cat o dau
+        # ";" truoc "Trong do" va tach duoc ONT/NTS.
+        docx_path = make_docx(
+            self.root / "mau_that_duc_mo.docx",
+            "VĂN BẢN THỎA THUẬN PHÂN CHIA DI SẢN THỪA KẾ",
+            "Hàng thừa kế của ông Nguyễn Bá Lộc gồm những người có tên sau đây:",
+            "Bà Nguyễn Thị Loan; sinh ngày: 02/03/1962 Căn cước công dân số: 036162004393 Cấp ngày 16/12/2021; Nơi cấp: Cục Cảnh sát quản lý hành chính về trật tự xã hội Hộ khẩu thường trú: Xã Ý Yên, tỉnh Ninh Bình  Là vợ của ông Nguyễn Bá Lộc",
+            "Chúng tôi là những người thừa kế theo pháp luật, thỏa thuận về việc phân chia di sản như sau:",
+            "Di sản của ông Nguyễn Văn Đức để lại:",
+            "Ông Nguyễn Văn Đức, Sinh năm 1906, đã chết ngày 29/06/2000 theo Trích lục khai tử số 86/TLKT-BS do UBND xã Yên Khánh cấp ngày 09/05/2023. Nơi thường trú cuối cùng trước khi chết: Thôn An Lạc, xã Yên Khánh.",
+            "Bà Đỗ Thị Mở, Sinh năm 1919, đã chết ngày 03/03/2010 theo Trích lục khai tử số 85/TLKT-BS do UBND xã Yên Khánh cấp ngày 08/05/2023.",
+            "Ông Đức và bà Khuâng là vợ chồng hợp pháp từ năm 1935 cho đến khi bà Khuâng chết. Sau khi bà Khuâng chết, ông Đức kết hôn với bà Đỗ Thị Mở.",
+            "Phần quyền sử dụng đất tại địa chỉ: Thôn An Lạc, xã Yên Khánh theo Giấy chứng nhận quyền sử dụng đất số: B 011092 do Uỷ ban nhân dân huyện Ý Yên cấp ngày 05/03/1992, cụ thể như sau:",
+            "Thửa đất số: 143; Tờ bản đồ số: 05, Bản đồ địa chính năm 1991.",
+            "Hiện nay là thửa đất số 124; Tờ bản đồ số 13, Bản đồ địa chính lập năm 2006.",
+            "Diện tích: 265,0 m2; Trong đó: ONT: 190,0 m2; NTS: 75,0 m2;",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+        )
+
+        payload = extract(docx_path)
+        persons = payload["raw"]["ben_a"]["nguoi"]
+        self.assertEqual(persons[0]["ho_ten"], "Nguyễn Thị Loan")
+        self.assertEqual(persons[0]["dia_chi"], "Xã Ý Yên, tỉnh Ninh Bình")
+        self.assertTrue(all("của ông" not in p["ho_ten"] for p in persons))
+
+        chet = payload["raw"]["nguoi_chet"]
+        self.assertEqual([p["ho_ten"] for p in chet], ["Nguyễn Văn Đức", "Đỗ Thị Mở"])
+        self.assertEqual(chet[0]["ngay_sinh"], "1906")
+        self.assertEqual(chet[0]["so_giay_to"], "86/TLKT-BS")
+
+        thua = payload["raw"]["danh_sach_thua_dat"]
+        self.assertEqual(len(thua), 1)
+        self.assertEqual(thua[0]["so_thua_dat"], "143")
+        self.assertEqual(thua[0]["so_to_ban_do"], "05")
+        self.assertEqual(thua[0]["dien_tich"], "265,0 m2")
+        self.assertIn("124", thua[0]["phan_ghi_them"])
+        details = {d["muc_dich_su_dung"]: d["dien_tich"] for d in thua[0]["chi_tiet_dien_tich"]}
+        self.assertEqual(details.get("ONT"), "190,0 m2")
+        self.assertEqual(details.get("NTS"), "75,0 m2")
+        self.assertEqual(thua[0]["co_quan_cap"], "Uỷ ban nhân dân huyện Ý Yên")
+        self.assertIn("nguon_goc", thua[0])
 
     def test_bao_hiem_gom_dong_ben_mua_doi_tuong(self):
         # Quyen loi bao hiem: so HD + ben (cat hau to ben mua) + dong

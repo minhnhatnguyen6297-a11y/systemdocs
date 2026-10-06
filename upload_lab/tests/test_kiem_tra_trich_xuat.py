@@ -152,6 +152,29 @@ class KiemTraTrichXuatTests(unittest.TestCase):
 
         self.assertFalse([f for f in findings if f["id"] == "R13"])
 
+    def test_dien_tich_van_xuoi_lot_vao_co_r13(self):
+        # Mau that 07/10/2026: "dien tich thua dat neu tren" (khong chu so)
+        # cung la du lieu rac, phai co co.
+        payload = make_payload()
+        payload["raw"]["danh_sach_thua_dat"][0]["dien_tich"] = "thửa đất nêu trên"
+        payload["raw"]["danh_sach_thua_dat"][0]["chi_tiet_dien_tich"] = []
+        findings = kiem_tra_payload(payload)
+
+        r13 = [f for f in findings if f["id"] == "R13" and "diện tích" in f["noi_dung"]]
+        self.assertEqual(len(r13), 1)
+
+    def test_ten_nguoi_chet_la_cau_co_r04(self):
+        # Mau that 07/10/2026: cau pha he lot vao ho_ten nguoi chet.
+        payload = make_payload()
+        payload["raw"]["nguoi_chet"] = [{
+            "ho_ten": "Đức và bà Khuâng là vợ chồng hợp pháp từ năm 1935",
+            "ngay_chet": "03/03/2010",
+        }]
+        findings = kiem_tra_payload(payload)
+
+        r04 = [f for f in findings if f["id"] == "R04"]
+        self.assertEqual(len(r04), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

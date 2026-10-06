@@ -54,9 +54,9 @@ INSURANCE_COLUMNS = ("stt", "so_hd", "ben_bh", "ben_mua", "doi_tuong", "ngay_ky"
 INSURANCE_HEADERS = ("STT", "Số hợp đồng", "Bên bảo hiểm", "Bên mua", "Đối tượng", "Ngày ký")
 INSURANCE_WIDTHS = (40, 170, 220, 200, 220, 100)
 INSURANCE_THIEU = (1,)
-PARCEL_COLUMNS = ("stt", "thua", "to", "dien_tich", "muc_dich", "thoi_han", "gcn", "loai_so", "ngay_cap", "dia_chi")
-PARCEL_HEADERS = ("STT", "Thửa", "Tờ", "Diện tích", "Mục đích", "Thời hạn", "Serial", "Loại sổ", "Ngày cấp sổ", "Địa chỉ")
-PARCEL_WIDTHS = (40, 70, 90, 90, 120, 100, 90, 150, 90, 220)
+PARCEL_COLUMNS = ("stt", "thua", "to", "dien_tich", "muc_dich", "thoi_han", "nguon_goc", "gcn", "loai_so", "ngay_cap", "co_quan_cap", "dia_chi")
+PARCEL_HEADERS = ("STT", "Thửa", "Tờ", "Diện tích", "Mục đích", "Thời hạn", "Nguồn gốc", "Serial", "Loại sổ", "Ngày cấp sổ", "Cơ quan cấp", "Địa chỉ")
+PARCEL_WIDTHS = (40, 70, 90, 90, 120, 100, 160, 90, 150, 90, 180, 220)
 PARCEL_THIEU = (1, 3)
 BATCH_COLUMNS = ("file", "loai", "nguoi", "thua", "ghi_chu")
 BATCH_HEADERS = ("File", "Loại", "Người", "Thửa/STK/BH", "Ghi chú")
@@ -87,10 +87,9 @@ def run_extract(path: str | Path) -> dict:
 
 
 def _ngay_sinh_hien_thi(person: dict) -> str:
-    ngay = person.get("ngay_sinh", "")
-    if ngay and person.get("chi_co_nam_sinh"):
-        return f"{ngay} (chỉ có năm)"
-    return ngay
+    # Quy uoc noi bo: nam sinh chi co nam thi giu nguyen "1906", khong gan
+    # chu thich "(chi co nam)" vao ket qua (Owner 07/10/2026).
+    return person.get("ngay_sinh", "")
 
 
 def ban_ghi_thanh_payload(record: dict) -> dict:
@@ -141,8 +140,10 @@ def parcel_rows(payload: dict) -> list[tuple]:
         rows.append((
             idx, thua.get("so_thua_dat", ""), thua.get("so_to_ban_do", ""),
             thua.get("dien_tich", ""), thua.get("muc_dich_su_dung", ""),
-            thua.get("thoi_han_su_dung", ""), thua.get("so_gcn", ""),
-            thua.get("loai_gcn", ""), thua.get("ngay_cap_gcn", ""), thua.get("dia_chi", ""),
+            thua.get("thoi_han_su_dung", ""), thua.get("nguon_goc", ""),
+            thua.get("so_gcn", ""), thua.get("loai_gcn", ""),
+            thua.get("ngay_cap_gcn", ""), thua.get("co_quan_cap", ""),
+            thua.get("dia_chi", ""),
         ))
     return rows
 

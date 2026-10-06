@@ -111,7 +111,7 @@ python tools/regex_lab.py approve --cluster <id>   # chi khi owner da duyet ket 
 |---|---|
 | Lõi regex dùng chung (SOT, Owner 06/10/2026) | `tools/regex_workbench/engine/` + profile JSON — trích xuất + đề xuất placeholder |
 | Engine thừa kế đang chạy (nguồn kiến thức trường để port) | `upload_lab/extract_contract.py` (`ENGINE_VERSION`) |
-| Luật kiểm tra R00..R10, R12 | `upload_lab/kiem_tra_trich_xuat.py` |
+| Luật kiểm tra R00..R10, R12, R13 | `upload_lab/kiem_tra_trich_xuat.py` |
 | Quét hàng loạt chuẩn | `upload_lab/tools/quet_kiem_tra.py` (có summary theo luật/loại) |
 | Gói đọc mù + so đáp án + golden | `upload_lab/tools/regex_lab.py` (`ingest`/`review --blind`/`compare`/`verify`/`approve`) |
 | Test giữ hành vi | `upload_lab/tests/test_upload_lab_extract_contract.py` + `test_kiem_tra_trich_xuat.py` |
