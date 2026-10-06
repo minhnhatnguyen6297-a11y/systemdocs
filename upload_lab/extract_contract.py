@@ -2310,7 +2310,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         r"(?:(?:em|anh|ch\u1ecb|c\u00f4|ch\u00fa|b\u00e1c|d\u00ec|c\u1eadu|m\u1ee3)\s+(?:trai|g\u00e1i|d\u00e2u|r\u1ec3|\u0111\u1ebb|ru\u1ed9t)\s*[-\u2013:]\s*)?"
         r"(?:v\u00e0\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\s+)?"
         r"(?:(?:b\u00ean|ben)\s+[A-Za-z\u00c0-\u1ef9]\s*[:.,]?\s*)?"
-        r"(?:(?:con|m\u1eb9|b\u1ed1|cha|v\u1ee3|ch\u1ed3ng)\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i)(?:\s+(?:t\u00f4i|c\u1ee7a\s+t\u00f4i))?(?:\s+\u00f4ng\s+[^\d;:]{2,50}?)?\s*(?:[-\u2013\u2014:]|l\u00e0)\s*)?"
+        r"(?:(?:con|m\u1eb9|b\u1ed1|cha|v\u1ee3|ch\u1ed3ng)\s+(?:(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i)(?:\s+(?:t\u00f4i|c\u1ee7a\s+t\u00f4i))?|t\u00f4i)(?:\s+\u00f4ng\s+[^\d;:]{2,50}?)?\s*(?:[-\u2013\u2014:,]|l\u00e0)\s*)?"
         r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?:v\u00e0\s+)?(?P<title>\u00f4ng/b\u00e0|ong/ba|\u00f4ng\s*\(b\u00e0\)|b\u00e0\s*\(\u00f4ng\)|\u00f4ng|ong|b\u00e0|ba|anh|ch\u1ecb|chi)\s*:?\s*"
         r"(?P<name>.+?)(?=[\s|]+\s*(?:[\-\u2013]\s*)?(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|sinh n\u0103m|sinh ng\u00e0y)\s*[:\u2013-]?\s*(?:(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})|\s+(?:[\-\u2013]\s*)?(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:|\s+c\u00f3\s+(?:(?:m\u1eb9|b\u1ed1|cha|con|v\u1ee3|ch\u1ed3ng)(?:\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i))?|\d)\b|\s*\(\s*(?:Sinh|Ng\u00e0y)|[;]|$)"
     )
