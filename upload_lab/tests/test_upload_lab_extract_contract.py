@@ -1634,6 +1634,56 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(guess_nhom_hd("GIẤY UỶ QUYỀN"), "Ủy quyền")
         self.assertEqual(guess_nhom_hd("HỢP ĐỒNG ỦY QUYỀN"), "Ủy quyền")
 
+    def test_ghi_chu_tach_tu_va_nay_la_cung_dong(self):
+        # Giang 2026: ghi chu "(tach tu thua so 02)" + "(nay la to ban do so 100)"
+        # phai cong don, khong de ghi chu sau ghi de ghi chu truoc.
+        from extract_contract import tach_danh_sach_thua_dat
+        ds = tach_danh_sach_thua_dat(
+            "Quyền sử dụng đất có địa chỉ tại: xã G theo Giấy chứng nhận số CB123 "
+            "do huyện H cấp ngày 01/01/2020. Thửa đất số: 180 (tách từ thửa số 02), "
+            "tờ bản đồ số: 08 (nay là tờ bản đồ số 100). Diện tích: 200 m2"
+        )
+        self.assertEqual(len(ds), 1)
+        self.assertEqual(ds[0]["so_thua_dat"], "180")
+        self.assertEqual(ds[0]["so_to_ban_do"], "08")
+        self.assertIn("tách từ thửa số 02", ds[0]["phan_ghi_them"])
+        self.assertIn("nay là tờ bản đồ số 100", ds[0]["phan_ghi_them"])
+
+    def test_ben_thu_nhat_ben_thu_hai_van_duoc_nhan(self):
+        # Hop dong gop von dung "I. BÊN THỨ NHẤT (BÊN A)" / "II. BÊN THỨ HAI (BÊN B)".
+        docx_path = make_docx(
+            self.root / "gop_von.docx",
+            "HỢP ĐỒNG GÓP VỐN",
+            "Hôm nay ngày 01/01/2025 chúng tôi gồm:",
+            "I. BÊN THỨ NHẤT (BÊN A):",
+            "Ông Nguyễn Văn Thịnh - Sinh năm 1982; Căn cước công dân số 036078001056 do Cục Cảnh sát cấp ngày 05/08/2022; Nơi thường trú tại: xã A, huyện B.",
+            "II. BÊN THỨ HAI (BÊN B):",
+            "Ông Phạm Xuân Giang - Sinh năm 1978; Căn cước công dân số 036078001057 do Cục Cảnh sát cấp ngày 05/08/2022; Nơi thường trú tại: xã C, huyện D.",
+            "Các bên tự nguyện ký kết Hợp đồng với nội dung góp vốn vào thửa đất số 112.",
+        )
+        payload = extract(docx_path)
+        ben_a = payload["raw"]["ben_a"]["nguoi"]
+        ben_b = payload["raw"]["ben_b"]["nguoi"]
+        self.assertEqual([q["ho_ten"] for q in ben_a], ["Nguyễn Văn Thịnh"])
+        self.assertEqual([q["ho_ten"] for q in ben_b], ["Phạm Xuân Giang"])
+
+    def test_toi_la_ten_cach_tab_sinh_van_nhan(self):
+        # Don xac nhan: "Tôi là: Nguyễn Thị Mơ\t\t\tSinh ngày: 20/05/1949;" —
+        # tab bi gop thanh 1 dau cach, van phai nhan ten.
+        docx_path = make_docx(
+            self.root / "xac_nhan.docx",
+            "ĐƠN XIN XÁC NHẬN",
+            "Kính gửi: UBND Xã A",
+            "Tôi là: Nguyễn Thị Mơ\t\t\tSinh ngày: 20/05/1949;",
+            "Căn cước công dân số: 036159003310 do Cục cảnh sát cấp ngày 14/11/2019;",
+            "Thường trú tại: xã A, tỉnh B.",
+            "Nay tôi làm đơn này kính mong Quý cơ quan xác nhận tôi và ông X là vợ chồng.",
+        )
+        payload = extract(docx_path)
+        ben_a = payload["raw"]["ben_a"]["nguoi"]
+        self.assertEqual([q["ho_ten"] for q in ben_a], ["Nguyễn Thị Mơ"])
+        self.assertEqual(ben_a[0]["ngay_sinh"], "20/05/1949")
+
 
 if __name__ == "__main__":
     unittest.main()

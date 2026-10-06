@@ -1296,7 +1296,7 @@ def _tach_nay_la(value: str) -> tuple[str, str]:
     ("104", "Nay la thua dat so 321")."""
     text = str(value or "")
     match = re.search(
-        r"(?i)\s*(\((?:\u0111\u01b0\u1ee3c|\u0111\u00e3)\s+(?:t\u00e1ch|g\u1ed9p|s\u00e1p|nh\u1eadp|chia|h\u1ee3p|t\u0103ng|gi\u1ea3m)[^)]*\)?"
+        r"(?i)\s*(\((?:(?:\u0111\u01b0\u1ee3c|\u0111\u00e3)\s+)?(?:t\u00e1ch|g\u1ed9p|s\u00e1p|nh\u1eadp|chia|h\u1ee3p|t\u0103ng|gi\u1ea3m)[^)]*\)?"
         r"|(?:\u0111\u01b0\u1ee3c|\u0111\u00e3)\s+(?:t\u00e1ch|g\u1ed9p|s\u00e1p|nh\u1eadp|chia|h\u1ee3p)\s+t\u1eeb\b.*"
         r"|\(?\s*(?:hi\u1ec7n nay|nay)\s+l\u00e0\b[^)]*\)?)\s*$",
         text,
@@ -1756,6 +1756,10 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
         hits: list[tuple[int, int, str]] = []
         for field, label in bullet_labels:
             for label_match in re.finditer(f"(?i)({label})\\s*:?", line):
+                # Nhan nam trong ngoac ("(nay la to ban do so 100)") la
+                # ghi chu nguon goc/danh so lai, khong phai nhan du lieu.
+                if line.count("(", 0, label_match.start()) > line.count(")", 0, label_match.start()):
+                    continue
                 hits.append((label_match.start(), label_match.end(), field))
         if not hits:
             continue
@@ -1778,7 +1782,8 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
             if field in ("so_to_ban_do", "so_thua_dat"):
                 _head, _note = _tach_nay_la(value)
                 if _note:
-                    values["_nay_la"] = _note
+                    _cu = values.get("_nay_la", "")
+                    values["_nay_la"] = (_cu + "; " + _note).lstrip("; ")
                 value = _head
             if field == "so_to_ban_do":
                 value = _clean_so_to_ban_do(value)
@@ -2183,7 +2188,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # "Toi ten la: Tran Gia Huy; Sinh ngay: ..." — ten tran khong
     # Ông/Bà, nhan ngay sinh cung dong de chac la nguoi.
     intro_bare_re = re.compile(
-        r"(?i)^\s*Tôi (?:tên )?là\s*:?\s*(?P<name>[^;|\-\u2013\n]+?)\s*[;|\-\u2013][\s|]*"
+        r"(?i)^\s*Tôi (?:tên )?là\s*:?\s*(?P<name>[^;|\-\u2013\n]+?)(?:\s*[;|\-\u2013]|\s+)[\s|]*"
         r"(?:Sinh ngày|Ngày sinh|Sinh ngay|Ngay sinh|Sinh năm|Năm sinh|Sinh nam|Nam sinh)"
     )
     _ADDR_LABEL = _DIA_CHI_LABEL
@@ -2772,6 +2777,7 @@ def _extract_parties_generic(text: str, doc_kind: str) -> tuple[dict, dict]:
         r"(?m)^\s*(?:I\.\s*)?B\u00caN G\u00d3P V\u1ed0N\b",
         r"(?m)^\s*(?:I\.\s*)?B\u00caN T\u1eb6NG CHO\b",
         r"(?m)^\s*(?:I\.\s*)?B\u00caN B\u00c1N\b",
+        r"(?m)^\s*(?:I\.\s*)?B\u00caN TH\u1ee8 NH\u1ea4T\b",
         r"(?m)^\s*(?:I\.\s*)?B\u00caN A\b",
     )
     ben_b_patterns = (
@@ -2788,6 +2794,7 @@ def _extract_parties_generic(text: str, doc_kind: str) -> tuple[dict, dict]:
         r"(?m)^\s*(?:II\.\s*)?B\u00caN NH\u1eacN T\u1eb6NG CHO\b",
         r"(?m)^\s*(?:II\.\s*)?B\u00caN \u0110\u01af\u1ee2C T\u1eb6NG CHO\b",
         r"(?m)^\s*(?:II\.\s*)?B\u00caN MUA\b",
+        r"(?m)^\s*(?:II\.\s*)?B\u00caN TH\u1ee8 HAI\b",
         r"(?m)^\s*(?:II\.\s*)?B\u00caN B\b",
     )
     preamble_patterns = (
