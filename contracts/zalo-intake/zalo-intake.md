@@ -4,7 +4,7 @@
 duyệt trong MIN-92; sau duyệt publish sang `contracts/zalo-intake/` ·
 **Hai bên:** module Zalo độc lập `zalo-intake` (**producer**) ↔ máy công chứng —
 Document Intake trong Soạn hồ sơ (**consumer**) · **Linear:** MIN-92 ·
-**Spec hành vi:** `docs/spec/notary_v2/input/zalo/README.md`
+**Spec hành vi:** `_bmad-output/specs/notary_v2/input/zalo/README.md`
 (CAP-11…CAP-16)
 
 Contract này mô tả **toàn bộ ranh giới trao đổi** giữa hai repo: gói file raw
@@ -940,7 +940,7 @@ Inventory fixture cụ thể theo nhóm (slice ghi kèm schema):
 ## Phụ lục A. Facts adapter & provider đã kiểm chứng (zca-js 2.1.2, Qwen)
 
 Cơ sở: audit code `notary_v2/zalo_connector/` + typings zca-js 2.1.2 + tài
-liệu Qwen-OCR (nguồn: `.agent/scratch/MIN-92/source-facts.md`).
+liệu Qwen-OCR (nguồn: `_bmad-output/archive/linear-tasks/MIN-92/source-facts.md`).
 
 - zca-js 2.1.2 phát `undo` (thu hồi) và `reaction`; **không** có event sửa
   tin (`edit`). `undo` tham chiếu tin gốc bằng `globalMsgId` + `cliMsgId`;

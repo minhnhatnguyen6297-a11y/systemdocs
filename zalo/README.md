@@ -79,7 +79,7 @@ runtime/       GITIGNORED — DB/session/media/packages/outbox/access.jsonl
 
 ## Tài liệu (`docs/`)
 
-- [`docs/spec-producer.md`](docs/spec-producer.md) — **producer SOT**:
+- [`_bmad-output/specs-producer.md`](_bmad-output/specs-producer.md) — **producer SOT**:
   CAP-01..16 chuyển từ `notary_v2` spec.md §2 tại MIN-103
 - [`docs/connector-protocol.md`](docs/connector-protocol.md) — wire contract
   nội bộ connector↔module (`/connector/v1`, event shapes, HMAC, env)

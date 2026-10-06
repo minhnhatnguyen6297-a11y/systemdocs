@@ -6,7 +6,7 @@ Tài liệu được tổ chức theo **phạm vi và flow**, không theo loại
 
 ## Bắt đầu đọc
 
-1. Đọc [spec toàn hệ thống](./docs/spec/README.md).
+1. Đọc [spec toàn hệ thống](./_bmad-output/specs/README.md).
 2. Chọn module trong cây dưới.
 3. Đi qua README của từng thư mục cha tới feature cần sửa.
 4. Đọc contract và source được spec lá dẫn tới.
@@ -14,7 +14,7 @@ Tài liệu được tổ chức theo **phạm vi và flow**, không theo loại
 ## Cây tài liệu
 
 ```text
-docs/spec/
+_bmad-output/specs/
 ├── README.md                       # Tầm nhìn, ranh giới, kiến trúc và câu hỏi toàn hệ thống
 ├── shared/
 │   └── administrative-lookup.md    # Lõi tra cứu tên xã/tỉnh dùng chung
@@ -71,7 +71,7 @@ Ví dụ feature **Nhập liệu**:
 
 Không cần mục rỗng. Kiến trúc hay câu hỏi chỉ ảnh hưởng Nhập liệu nằm ngay trong
 spec Nhập liệu. Nếu ảnh hưởng cả Stage và Diagram, đặt ở README `notary_v2`.
-Nếu ảnh hưởng nhiều module, đặt ở `docs/spec/README.md`.
+Nếu ảnh hưởng nhiều module, đặt ở `_bmad-output/specs/README.md`.
 
 ## Module và runtime
 
@@ -91,11 +91,10 @@ không tạo phần sản phẩm thứ tư.
 | Chỗ | Dùng cho |
 |---|---|
 | [`contracts/`](./contracts/README.md) | Contract đã duyệt và schema máy đọc |
-| `.agent/tasks/` | Tiến độ, quyết định trong task và handoff |
+| `_bmad-output/specs/` | SOT đặc tả hành vi (spec quyết định, code chứng minh) |
+| `_bmad-output/decisions/` | Quyết định đã chốt: LÀ GÌ và TẠI SAO |
 | `code-graphs/` | Snapshot để tìm quan hệ code; không phải spec |
-| `_bmad-output/` | Artifact workflow BMAD |
-| `.agent/scratch/`, `.tmp/`, `.cache/`, `logs/`, `artifacts/` | File tạm, không commit |
+| `_bmad-output/` | Artifact workflow BMAD (plans, review, archive) |
+| `.tmp/`, `.cache/`, `logs/`, `artifacts/` | File tạm, không commit |
 
-Backlog.md là nguồn task; ghi chú Linear cũ là lịch sử. Trước khi sửa tài liệu,
-đọc [luật agent](./AGENTS.md). Tiến độ sau gom worktree 05/10 tại
-[bàn giao từng việc](./.agents/handoff/notary-20261005/README.md).
+Trước khi sửa tài liệu, đọc [luật agent](./AGENTS.md).

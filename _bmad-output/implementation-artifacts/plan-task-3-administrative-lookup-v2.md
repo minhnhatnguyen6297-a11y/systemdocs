@@ -4,7 +4,7 @@ type: 'feature'
 ticket: ''
 created: '2026-10-05'
 status: 'superseded'
-superseded_by: '.agents/plans/task-3-administrative-lookup-v2.md'
+superseded_by: '_bmad-output/archive/removed-agents-files.md'
 route: 'full'
 route_source: 'auto'
 review: ''
@@ -18,7 +18,7 @@ context: ['docs/spec/shared/administrative-lookup.md', 'contracts/notary-case-dr
 
 > **Lịch sử, không dùng để giao worker.** Owner yêu cầu hoàn thiện lại spec
 > và plan TASK-3/TASK-4 ngày 05/10/2026. Plan tiếp nối tại
-> [`.agents/plans/task-3-administrative-lookup-v2.md`](../../.agents/plans/task-3-administrative-lookup-v2.md).
+> [`_bmad-output/archive/removed-agents-files.md`](../../_bmad-output/archive/removed-agents-files.md).
 > Spec hiện hành ưu tiên: nhận diện dấu trước mở rộng viết tắt; cách xử lý
 > nhiều observation cùng đơn vị/bản kho đã chốt: trả riêng các dòng khớp để
 > người dùng chọn. Các đề xuất nối
@@ -107,7 +107,7 @@ context: ['docs/spec/shared/administrative-lookup.md', 'contracts/notary-case-dr
 
 ## Review Triage Log
 
-Codex review (orca run_a4b4870f70d1, `.agents/task3-plan-review-codex.md`) — verdict APPROVE_WITH_FIXES, 9 findings; xử lý 05/10:
+Codex review (orca run_a4b4870f70d1, `_bmad-output/archive/removed-agents-files.md`) — verdict APPROVE_WITH_FIXES, 9 findings; xử lý 05/10:
 
 - #1 [high] renderer giữ auto-lookup/`(nay là …)` tới TASK-4 → **Owner chọn A: ngủ đông** (tắt trigger, bỏ nối; đã sửa Boundaries/Code Map/Tasks).
 - #2 [high] cụm cuối `quận Hà Đông` khớp raw_phrase tỉnh → **không còn là vấn đề**: Owner đổi luật — cụm huyện tra như cụm thường vào xã lẫn tỉnh, khớp gì in nấy (spec §7, decision-19). Đã kiểm ledger thật: 0 province raw_phrase chứa từ huyện.

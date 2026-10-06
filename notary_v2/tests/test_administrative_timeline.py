@@ -310,7 +310,7 @@ def test_reimport_older_snapshot_keeps_history_without_duplicate_ids(tmp_path):
 
 def test_spec_json_patch_is_valid_and_cli_query_semantics(tmp_path):
     import re
-    text = (Path(__file__).resolve().parents[2] / "docs/spec/notary_v2/administrative-timeline.md").read_text(encoding="utf8")
+    text = (Path(__file__).resolve().parents[2] / "_bmad-output/specs/notary_v2/administrative-timeline.md").read_text(encoding="utf8")
     example = json.loads(re.search(r"```json\n(.*?)\n```", text, re.S).group(1))
     ledger = empty_ledger()
     ledger["revision"] = 1
@@ -663,7 +663,7 @@ def test_actual_cli_update_query_date_boundary_and_errors(tmp_path):
     import subprocess
     import sys
     root = Path(__file__).resolve().parents[2]
-    text = (root / "docs/spec/notary_v2/administrative-timeline.md").read_text(encoding="utf8")
+    text = (root / "_bmad-output/specs/notary_v2/administrative-timeline.md").read_text(encoding="utf8")
     example = json.loads(re.search(r"```json\n(.*?)\n```", text, re.S).group(1))
     ledger = empty_ledger()
     ledger["revision"] = example["base_revision"]

@@ -11,7 +11,7 @@ review_source: auto
 lenses_ran: [blind-hunter, edge-case-hunter, verification-gap, intent-alignment]
 review_loop_iteration: 2
 baseline_revision: a32c1fe6f69259097a32115ca60acc30374be2f3
-context: ['AGENTS.md', 'docs/spec/notary_v2/README.md', '.agent/tasks/NAIA-9/decisions.md']
+context: ['AGENTS.md', 'docs/spec/notary_v2/README.md', '_bmad-output/archive/linear-tasks/NAIA-9-decisions.md']
 ---
 
 <frozen-after-approval reason="Owner explicitly requests timeline storage and Bando data">

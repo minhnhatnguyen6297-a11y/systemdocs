@@ -26,11 +26,10 @@ Thumbs.db
 .DS_Store
 
 # Agent scratch & temp — bãi rác chính thức, không commit
-.agent/scratch/
+_bmad-output/tmp/
 .tmp/
 .cache/
 logs/
 artifacts/
 
 # Local samples and worktree recovery; never commit personal sample data.
-/.agents/local-only/

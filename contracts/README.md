@@ -6,7 +6,7 @@ contract không đặt tại đây.
 
 Schema lưu kho cục bộ NAIA-9: [`administrative-timeline/ledger.schema.json`](./administrative-timeline/ledger.schema.json).
 Chỉ định dạng ledger; chưa là contract tích hợp liên module. Ý nghĩa/trạng thái tại
-[`spec lịch sử hành chính`](../docs/spec/notary_v2/administrative-timeline.md).
+[`spec lịch sử hành chính`](../_bmad-output/specs/notary_v2/administrative-timeline.md).
 
 ## Trạng thái: kênh nội bộ đã publish; Zalo và Upload còn draft
 
@@ -20,7 +20,7 @@ contract; fixture/validator tồn tại không tự biến draft thành đã duy
 Ba công cụ nghiệp vụ vẫn **chạy độc lập** — chưa có API giữa chúng, chưa đọc DB
 của nhau, chưa có file trao đổi tự động. Đó là trạng thái của **giai đoạn hiện
 tại**, không phải đích đến: hệ thống sẽ gộp lại và dùng chung database
-([spec hệ thống](../docs/spec/README.md) mục 5).
+([spec hệ thống](../_bmad-output/specs/README.md) mục 5).
 
 Contract xuyên-sản-phẩm đang soạn — kênh Zalo intake → Document Intake
 (MIN-92, chờ owner duyệt):
@@ -56,7 +56,7 @@ runtime integration và vì vậy chưa được đặt thành file riêng trong
 
 Nhưng "sau này sẽ gộp" **không phải giấy phép** để nối bừa bây giờ. Mỗi kết nối
 vẫn phải có contract được duyệt trước. Xem
-[`../docs/spec/README.md`](../docs/spec/README.md) mục 5.
+[`../_bmad-output/specs/README.md`](../_bmad-output/specs/README.md) mục 5.
 
 Ngoài hai contract kênh nội bộ G1 ở trên, thư mục này còn có chuẩn định danh
 dùng chung dưới đây. Hiện chưa có contract trao đổi dữ liệu xuyên sản phẩm:
@@ -64,7 +64,7 @@ dùng chung dưới đây. Hiện chưa có contract trao đổi dữ liệu xuy
 | File | Nội dung | Trạng thái |
 |---|---|---|
 | [`entities.md`](./entities.md) | Định nghĩa & chuẩn hóa các khóa định danh hồ sơ (CCCD, số GCN, thửa/tờ, số công chứng) | Bắt buộc tham chiếu, mỗi repo tự implement |
-| [`../docs/spec/README.md`](../docs/spec/README.md) | Công nghệ dùng chung + ràng buộc để lúc gộp DB không xung đột | Đọc trước khi chọn công nghệ mới |
+| [`../_bmad-output/specs/README.md`](../_bmad-output/specs/README.md) | Công nghệ dùng chung + ràng buộc để lúc gộp DB không xung đột | Đọc trước khi chọn công nghệ mới |
 
 ## Quy tắc: contract trước, code sau
 

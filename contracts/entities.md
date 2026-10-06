@@ -8,7 +8,7 @@ tên biến, schema DB hay dùng định danh người/tài sản làm khóa ch�
 **Bắt buộc:** khi một repo trích xuất hoặc so khớp một trong các khóa dưới đây,
 nó phải chuẩn hóa về **dạng canonical** ghi ở đây trước khi so sánh hoặc trước
 khi ghi vào trường "khóa định danh". Giữ raw và nguồn gốc theo
-[`../docs/spec/README.md`](../docs/spec/README.md) mục 4; chuẩn hóa không được
+[`../_bmad-output/specs/README.md`](../_bmad-output/specs/README.md) mục 4; chuẩn hóa không được
 ghi đè bằng chứng gốc.
 
 Cập nhật: 03/10/2026 — Owner xác nhận lấy hành vi cuối MIN-141 khi gộp nhánh.
@@ -29,7 +29,7 @@ Cập nhật: 03/10/2026 — Owner xác nhận lấy hành vi cuối MIN-141 khi
 |---|---|---|
 | `notary_v2` | `(?<!\d)(\d{12})(?!\d)` — mọi cụm 12 số (`routers/ocr_ai.py`) | Rộng nhất, vì OCR ảnh hay mất chữ đầu |
 | `upload_lab` | Neo theo nhãn: `(?:Căn cước\|CCCD\|CMND)\s*(?:số)?\s*:?\s*(\d+)` (`extract_contract.py`) | Chặt theo ngữ cảnh vì text Word có sẵn nhãn |
-| `notaryoffice` (dự kiến) | `\b\d{12}\b` (`docs/spec/notaryoffice/intent-source.md` v1.0 §7.2) | Đã bỏ ràng buộc số 0 đầu; chưa có implementation |
+| `notaryoffice` (dự kiến) | `\b\d{12}\b` (`_bmad-output/specs/notaryoffice/intent-source.md` v1.0 §7.2) | Đã bỏ ràng buộc số 0 đầu; chưa có implementation |
 
 **Quy tắc thống nhất:** dù regex nào, giá trị đem đi so khớp phải là đúng 12 chữ
 số. Không so khớp một phần, không so khớp 9 số cuối.
@@ -48,7 +48,7 @@ số. Không so khớp một phần, không so khớp 9 số cuối.
 - Quy tắc serial tùy chọn/nguyên văn của MIN-140 ngày 29/09/2026 là lịch sử,
   được thay thế trong lần gộp này theo xác nhận mới của Owner.
 - Nguồn nhận dạng OCR hiện hành: `notary_v2/routers/ocr_ai.py:924-925,972`;
-  thiết kế đã đồng bộ: `docs/spec/notaryoffice/intent-source.md` v1.0 §7.2
+  thiết kế đã đồng bộ: `_bmad-output/specs/notaryoffice/intent-source.md` v1.0 §7.2
   (`[A-Z]{2}\s*\d{6,8}` — gợi ý trích xuất, không phải rule chặn nhập).
 
 ---
@@ -59,7 +59,7 @@ số. Không so khớp một phần, không so khớp 9 số cuối.
 - Đây là khóa **phụ**, dùng để tăng độ tin cậy, không đủ để tự ghép hồ sơ một
   mình vì tiền tố trùng nhiều giữa các xã/huyện.
 - `notary_v2` gọi trường này `so_vao_so` (xem
-  `docs/spec/notary_v2/input/property-rules.md`).
+  `_bmad-output/specs/notary_v2/input/property-rules.md`).
 
 ---
 
@@ -71,7 +71,7 @@ số. Không so khớp một phần, không so khớp 9 số cuối.
   `(thửa, tờ, địa phương)` mới đủ mạnh để xếp hạng cao.
 - `notary_v2`: `so_thua_dat`, `so_to_ban_do`, `dia_chi`.
 - `notaryoffice` dự kiến dùng tên `so_thua_dat`, `so_to_ban_do`
-  (`docs/spec/notaryoffice/intent-source.md` §7.2), không quy định regex thửa/tờ tại mục đó.
+  (`_bmad-output/specs/notaryoffice/intent-source.md` §7.2), không quy định regex thửa/tờ tại mục đó.
 - `upload_lab` hiện **không tách thửa/tờ thành trường riêng** — nó trích cả khối
   mô tả tài sản dưới dạng text để điền web. Nếu sau này cần khớp hồ sơ giữa
   `upload_lab` và `notaryoffice`, đây là việc phải làm thêm ở `upload_lab`.
@@ -128,10 +128,10 @@ sơ. Một người/tài sản có thể liên quan nhiều hồ sơ. Liên kế
 có provenance, được người có thẩm quyền xác nhận theo owner; chuẩn hóa thành
 công không tự nâng dữ liệu thành `CONFIRMED`.
 
-Điểm bám thiết kế: `docs/spec/notaryoffice/intent-source.md` §7 phân biệt `entities`,
+Điểm bám thiết kế: `_bmad-output/specs/notaryoffice/intent-source.md` §7 phân biệt `entities`,
 `cases` và `case_entities` M:N; `:385-394` mô tả xếp hạng rồi xác nhận.
 Không suy ra số lượng quan hệ Case giữa hai repo từ quan hệ nội bộ này; xem
-[`../docs/spec/README.md`](../docs/spec/README.md) mục 5. Không định nghĩa thêm
+[`../_bmad-output/specs/README.md`](../_bmad-output/specs/README.md) mục 5. Không định nghĩa thêm
 shared ID/schema trong lần sửa này.
 
 ---

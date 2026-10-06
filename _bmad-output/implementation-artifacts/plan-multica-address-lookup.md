@@ -11,7 +11,7 @@ review_source: auto
 lenses_ran: []
 review_loop_iteration: 0
 baseline_revision: 4665e65c56f96a4fc00d2a51c4707b6c588da7ef
-context: ['AGENTS.md', 'docs/spec/notary_v2/README.md', 'docs/spec/notary_v2/administrative-timeline.md', '.agent/tasks/NAIA-9/decisions.md']
+context: ['AGENTS.md', 'docs/spec/notary_v2/README.md', 'docs/spec/notary_v2/administrative-timeline.md', '_bmad-output/archive/linear-tasks/NAIA-9-decisions.md']
 ---
 
 <frozen-after-approval reason="Owner requests all Multica tasks and confirms Bando SOT/date rule">

@@ -40,7 +40,7 @@ rủi ro **đang sống** của module — cập nhật ở repo này, không c�
 ### OCR-SHARED-001 — Active OCR runtime must remove QR OCR
 
 - Decision: approved by user on 2026-08-11.
-- Normative rule: `docs/spec/notary_v2/input/README.md` is Qwen-only. Active Cloud AI OCR must not use server QR decode, client QR scan, QR rescue/fallback, QR-first routing, or QR/source priority.
+- Normative rule: `_bmad-output/specs/notary_v2/input/README.md` is Qwen-only. Active Cloud AI OCR must not use server QR decode, client QR scan, QR rescue/fallback, QR-first routing, or QR/source priority.
 - Historical blocker (2026-08-11): the integrated verifier reported a missing `ocr_ai.shape_cached_ocr`. Source recheck on 2026-09-24 found `shape_cached_ocr` in `routers/ocr_ai.py:2584` and the active Qwen-only route at `:2641`. The old missing-symbol note no longer describes this snapshot; no test suite or live OCR was rerun in MIN-89.
 - Required task: a separate shared-OCR implementation/review must align `routers/ocr_ai.py`, its frontend callers, and tests with the normative Qwen-only contract.
 - Scope boundary: do not solve this by restoring QR helpers or silently changing the Zalo module contract.
@@ -110,4 +110,4 @@ phải giữ parity hoặc ghi rõ trong `docs/migration-notes.md`.
 - **MIN-92**: contract `contracts/zalo-intake/` — wire producer↔consumer
   (SOT: monorepo).
 - **MIN-94/95/97**: rebuild listener/OCR/quota-dedupe-config_version trong
-  module — xem `docs/spec-producer.md` §4.
+  module — xem `_bmad-output/specs-producer.md` §4.
