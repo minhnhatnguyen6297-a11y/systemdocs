@@ -551,6 +551,11 @@ def _detect_document_kind_and_title(text: str) -> tuple[str, str]:
     title_line = _clean_title_line(_find_title_line(text))
     title_fold = _fold_text(title_line)
 
+    # Trang phu "Lời chứng chứng thực văn bản ..." chi xac nhan chu ky —
+    # khong mang nguoi chet/tai san, ap luat generic thay vi loai noi trang.
+    if title_fold.startswith("loi chung"):
+        return DOC_KIND_GENERIC, title_line
+
     if "cam ket tai san rieng" in title_fold:
         return DOC_KIND_ASSET_COMMITMENT, title_line
 

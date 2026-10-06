@@ -43,6 +43,7 @@ Catalog này tập hợp và chuẩn hóa toàn bộ quy tắc trích xuất d�
 - `.docx` đọc có cấu trúc (bảo toàn thứ tự đoạn văn và bảng biểu table để tránh trộn lẫn Bên A / Bên B).
 - `.doc` đọc qua Windows IFilter dạng plain text.
 - Tầng regex tập trung nhận diện tiêu đề, phân tách đương sự, bóc tách tài sản và chuẩn hóa trường sau khi đã đọc text.
+- Trang phụ `Lời chứng chứng thực văn bản <loại>` (tiêu đề bắt đầu `Lời chứng`) chỉ chứng nhận chữ ký: nhận loại `generic` và áp luật `generic` — người ký vẫn được bóc, nhưng không đòi người chết/tài sản như loại trong tiêu đề (10/10/2026).
 
 ### 1.2. Chuẩn hóa Số công chứng
 - Dạng raw thường gặp:
