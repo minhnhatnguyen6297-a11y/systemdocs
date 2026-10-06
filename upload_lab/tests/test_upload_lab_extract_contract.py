@@ -2378,6 +2378,33 @@ class UploadLabExtractContractTests(unittest.TestCase):
         )
         self.assertAlmostEqual(tong_ct, 371.7, places=1)
 
+    def test_danh_sach_danh_so_ten_tran_chung_toi_la(self):
+        # Don tu choi nhieu nguoi: "Chúng tôi là: 1. Trần Văn Cát   Sinh
+        # ngày: ..." — ten tran khong Ong/Ba, danh so + ngay sinh cung
+        # dong (11/10/2026).
+        from extract_contract import _extract_party_data
+        sec = (
+            "1. Trần Văn Cát\t\t\tSinh ngày: 05/01/1960;\n"
+            "Căn cước công dân số 036060001798 do Cục cảnh sát cấp ngày 02/07/2021;\n"
+            "Thường trú tại: thôn Thiện Mỹ, xã Yên Mỹ.\n"
+            "2. Trần Văn Tông\t\t\tSinh ngày: 25/12/1963;\n"
+            "Căn cước số 036063028788 do Bộ Công an cấp ngày 09/08/2024;\n"
+            "Cư trú tại: thôn Thiện Mỹ, xã Yên Mỹ."
+        )
+        nguoi = _extract_party_data(sec)["nguoi"]
+        self.assertEqual([p["ho_ten"] for p in nguoi], ["Trần Văn Cát", "Trần Văn Tông"])
+        self.assertEqual(nguoi[0]["cccd"], "036060001798")
+        self.assertEqual(nguoi[1]["ngay_sinh"], "25/12/1963")
+
+    def test_cat_ten_truoc_chuc_vu_dinh_gach_lien(self):
+        # "Ông Phùng Trường Giang      -Chức vụ: Phó Giám đốc" — dau gach
+        # dinh lien vao "Chức vụ" khong co khoang trang sau dau, ten van
+        # phai cat dung (11/10/2026).
+        from extract_contract import _extract_party_data
+        sec = "Đại diện hợp pháp: Ông Phùng Trường Giang      -Chức vụ: Phó Giám đốc"
+        nguoi = _extract_party_data(sec)["nguoi"]
+        self.assertTrue(any(p["ho_ten"] == "Phùng Trường Giang" for p in nguoi))
+
 
 if __name__ == "__main__":
     unittest.main()

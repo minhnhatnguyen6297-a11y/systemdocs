@@ -2281,7 +2281,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         r"(?:(?:b\u00ean|ben)\s+[A-Za-z\u00c0-\u1ef9]\s*[:.,]?\s*)?"
         r"(?:(?:con|m\u1eb9|b\u1ed1|cha|v\u1ee3|ch\u1ed3ng)\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i)(?:\s+(?:t\u00f4i|c\u1ee7a\s+t\u00f4i))?(?:\s+\u00f4ng\s+[^\d;:]{2,50}?)?\s*(?:[-\u2013\u2014:]|l\u00e0)\s*)?"
         r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?:v\u00e0\s+)?(?P<title>\u00f4ng/b\u00e0|ong/ba|\u00f4ng|ong|b\u00e0|ba|anh|ch\u1ecb|chi)\s*:?\s*"
-        r"(?P<name>.+?)(?=[\s|]+\s*(?:[\-\u2013]\s*)?(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|sinh n\u0103m|sinh ng\u00e0y)\s*[:\u2013-]?\s*(?:(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})|\s+(?:[\-\u2013]\s+)?(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:|\s+c\u00f3\s+(?:(?:m\u1eb9|b\u1ed1|cha|con|v\u1ee3|ch\u1ed3ng)(?:\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i))?|\d)\b|\s*\(\s*(?:Sinh|Ng\u00e0y)|[;]|$)"
+        r"(?P<name>.+?)(?=[\s|]+\s*(?:[\-\u2013]\s*)?(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|sinh n\u0103m|sinh ng\u00e0y)\s*[:\u2013-]?\s*(?:(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})|\s+(?:[\-\u2013]\s*)?(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:|\s+c\u00f3\s+(?:(?:m\u1eb9|b\u1ed1|cha|con|v\u1ee3|ch\u1ed3ng)(?:\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i))?|\d)\b|\s*\(\s*(?:Sinh|Ng\u00e0y)|[;]|$)"
     )
     birth_re = re.compile(r"(?i)(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Ng\u00e0y/th\u00e1ng/n\u0103m\s+sinh)\s*[:\u2013-]?\s*(\d{1,2}/\d{1,2}/\d{4})")
     # Nguoi lon tuoi thuong chi ghi "Sinh nam 1965" — database chap nhan YYYY
@@ -2344,6 +2344,13 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     )
 
     lines = _split_section_lines(section)
+    # Nguoi liet ke danh so khong danh xung trong don nhieu nguoi
+    # ("Chúng tôi là: 1. Trần Văn Cát   Sinh ngày: ...") — chi nhan khi
+    # cung dong co ngay sinh de chac la nguoi (11/10/2026).
+    numbered_bare_re = re.compile(
+        r"(?i)\s*\d{1,2}\.\s*(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?)\s+"
+        r"(?=Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|sinh ng\u00e0y|sinh n\u0103m)"
+    )
     # Dong "2. Ông X có mẹ đẻ là bà Y; Sinh ngày..." — "bà Y" la nguoi
     # rieng bi nuot vao khoi X; tach "là bà/ông <tên>" thanh dong ao de
     # parser chuan nhan ca hai (10/10/2026 — don xac nhan nhan than).
@@ -2404,6 +2411,8 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             re.match(r"(?i)^\s*(?:T\u00f4i|Ch\u00fang t\u00f4i)\s+l\u00e0\s*:?\s*$", line)
         ) or (prev_intro_bare and not line.strip())
         match = header_re.search(line)
+        if match is None:
+            match = numbered_bare_re.search(line)
         if match:
             # Dong pha he ("Ông X co vo la ba Y (Sinh ngay...)") — ngay
             # sinh/ID tren dong la cua nguoi khac, bo ca dong.
