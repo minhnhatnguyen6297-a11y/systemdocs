@@ -5,12 +5,12 @@ Ngày: 24/09/2026 · Owner: platform/case-workspace · Spec: MIN-104 · Goal tri
 
 > **Cập nhật MIN-138 (29/09/2026):** file này là nguồn chi tiết để đối chiếu
 > **hành vi/dữ liệu**; SOT dài hạn nằm trong
-> [`docs/spec/notary_v2/`](./README.md). Lớp
+> [`_bmad-output/specs/notary_v2/`](./README.md). Lớp
 > **thị giác/bố cục mới** (bảng chuyển vị Tài sản,
 > dialog loại đất, chip vị trí trên node, action bar) nằm ở
 > [`visual-reference.md`](./visual-reference.md) +
-> [`docs/spec/ui/`](../ui/README.md) — phần đó
-> là hướng đã duyệt bằng ảnh và token trong `docs/spec/ui/`. Khi nội dung hai
+> [`_bmad-output/specs/ui/`](../ui/README.md) — phần đó
+> là hướng đã duyệt bằng ảnh và token trong `_bmad-output/specs/ui/`. Khi nội dung hai
 > lớp trông mâu thuẫn (vd hình thức card Tài sản, nút `Chủ đất`/`Nhận` ↔
 > chip số), **hành vi/dữ liệu lấy file này làm chuẩn**, hình thức lấy
 > `visual-reference.md`. Các quyết định nghiệp vụ mới (chip vị trí ↔ tài sản,
@@ -27,11 +27,11 @@ Ngày: 24/09/2026 · Owner: platform/case-workspace · Spec: MIN-104 · Goal tri
   map hành vi → command đích.
 - Quyết định **cấp sản phẩm/UX** (taxonomy module/tab, luồng, bố cục, bảng
   nút, danh mục trạng thái UI, UX xuất Word, loại trừ) thuộc
-[`docs/spec/notary_v2/README.md`](./README.md) —
+[`_bmad-output/specs/notary_v2/README.md`](./README.md) —
   file này tham chiếu, không chép lại.
 - **Thị giác/bố cục đích** (palette, token, bảng chuyển vị, dialog loại
 đất, node chip, zoom sơ đồ) nằm ở `visual-reference.md` cùng thư mục +
-[`docs/spec/ui/`](../ui/README.md) — file này không định nghĩa
+[`_bmad-output/specs/ui/`](../ui/README.md) — file này không định nghĩa
 màu/kích thước.
 - **Wire contract** `desktopcommand.v1` cho các command đích đã publish tại
   `contracts/notary-case-drafting.md`: §1–12 là `notary.case-drafting.v1`

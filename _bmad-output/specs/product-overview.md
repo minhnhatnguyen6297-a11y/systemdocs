@@ -1,6 +1,6 @@
 # Notary System — Tổng quan dành cho developer
 
-**Bản giới thiệu · cập nhật 02/10/2026.** Tổng hợp từ tài liệu sản phẩm trong `docs/spec/`; không thay thế spec chi tiết hoặc quyết định còn chờ duyệt. Mức độ hoàn thiện dưới đây theo tài liệu, không phải kết quả chạy thử toàn bộ ứng dụng.
+**Bản giới thiệu · cập nhật 02/10/2026.** Tổng hợp từ tài liệu sản phẩm trong `_bmad-output/specs/`; không thay thế spec chi tiết hoặc quyết định còn chờ duyệt. Mức độ hoàn thiện dưới đây theo tài liệu, không phải kết quả chạy thử toàn bộ ứng dụng.
 
 ## Ý tưởng trong một phút
 
@@ -194,7 +194,7 @@ systemdocs/
 ├── notaryoffice/          # Phần dành cho module theo dõi; chưa có runtime
 ├── zalo/                  # Bản sao một chiều từ repo thu nhận riêng
 ├── contracts/             # Định dạng trao đổi dữ liệu và schema đã duyệt
-├── docs/spec/
+├── _bmad-output/specs/
 │   ├── README.md          # Tầm nhìn, ranh giới và kiến trúc toàn hệ thống
 │   ├── notary_v2/         # Tài liệu theo bước trong luồng soạn hồ sơ
 │   ├── upload_lab/        # Tài liệu quét, đối chiếu và portal
@@ -205,7 +205,7 @@ systemdocs/
 
 **Contract** là thỏa thuận về dữ liệu gửi/nhận giữa các phần, giống việc thống nhất các cột trong một biểu mẫu. Tài liệu sản phẩm giải thích ý nghĩa; schema trong `contracts/` giúp máy kiểm tra cấu trúc. Có cả contract nháp, nên luôn đọc trạng thái trước khi dùng.
 
-Đường đọc đề nghị: [README gốc](../../README.md) → [Spec toàn hệ thống](./README.md) → README module → tài liệu chức năng → contract → source/test liên quan. Task và điều kiện nghiệm thu được quản lý ở Backlog.md; tài liệu sản phẩm dài hạn nằm trong `docs/spec/`. Các ghi chép Linear cũ chỉ dùng như lịch sử. Trạng thái các đợt sửa regex/địa chỉ hiện tại nằm trong [bàn giao 05/10](../../_bmad-output/archive/removed-agents-files.md).
+Đường đọc đề nghị: [README gốc](../../README.md) → [Spec toàn hệ thống](./README.md) → README module → tài liệu chức năng → contract → source/test liên quan. Task và điều kiện nghiệm thu được quản lý ở Backlog.md; tài liệu sản phẩm dài hạn nằm trong `_bmad-output/specs/`. Các ghi chép Linear cũ chỉ dùng như lịch sử. Trạng thái các đợt sửa regex/địa chỉ hiện tại nằm trong [bàn giao 05/10](../../_bmad-output/archive/removed-agents-files.md).
 
 ## Các hướng phát triển để trao đổi với dev
 

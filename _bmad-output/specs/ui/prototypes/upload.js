@@ -1,7 +1,7 @@
 /* ==========================================================================
    upload.js — module Upload Lab: tab "Audit Sổ Công Chứng" + tab
    "Quét & Upload Hồ Sơ". Bố cục/hành vi và thị giác riêng theo
-   docs/spec/upload_lab/ui.md; token chung theo docs/spec/ui/.
+   _bmad-output/specs/upload_lab/ui.md; token chung theo _bmad-output/specs/ui/.
    Dữ liệu giả — không gọi backend, không mở website thật.
    ========================================================================== */
 'use strict';

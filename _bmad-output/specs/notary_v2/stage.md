@@ -136,7 +136,7 @@ hoặc chưa có giá trị khiến cả transaction bị hủy.
 - Lỗi field tô đúng ô/dòng theo `row_id`. `+ Người`, `+ Tài sản` và xóa chỉ
   thay draft cho tới khi commit.
 - Toolbar dùng `Nhập file`, `Hủy thay đổi`, `Cập nhật`; chấm dirty cho biết
-  Stage chưa commit. Quy tắc màu/kích thước chung thuộc `docs/spec/ui/`.
+  Stage chưa commit. Quy tắc màu/kích thước chung thuộc `_bmad-output/specs/ui/`.
 
 ## 10. Kiến trúc, câu hỏi và lịch sử
 
@@ -154,6 +154,6 @@ không thay các quy tắc revision, owner và giữ nháp.
 ## 11. Nguồn
 
 - Contract: `contracts/notary-case-drafting.md` §13.
-- Ảnh bố cục đã duyệt: `docs/spec/ui/references/approved-drafting-v2.png`.
+- Ảnh bố cục đã duyệt: `_bmad-output/specs/ui/references/approved-drafting-v2.png`.
 - Source chính: `shell/src/renderer/notary/case-drafting-view.js` và
   `notary_v2/routers/cases.py`.

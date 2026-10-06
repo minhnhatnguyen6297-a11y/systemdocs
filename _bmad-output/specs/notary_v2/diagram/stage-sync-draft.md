@@ -517,7 +517,7 @@ khó đảo, người đọc sau sẽ thắc mắc vì sao, và là kết quả 
 
 Sau khi user duyệt, ghi quyết định này vào spec nhỏ nhất mà nó ảnh hưởng; nếu
 ảnh hưởng nhiều feature thì ghi vào README chung gần nhất trong
-`docs/spec/notary_v2/`.
+`_bmad-output/specs/notary_v2/`.
 
 ### Thứ tự lát thực thi (đề xuất, chờ duyệt)
 

@@ -131,7 +131,7 @@ Phần triển khai giao diện vẫn phụ thuộc lõi v2, vì hai task dùng 
   ghi trong TASK-3. Chưa có nút Tra/popup không được mô tả là hoàn tất TASK-4.
 - TASK-4: nhận lại model/view đã chuyển v2, thêm thao tác Tra, kết quả copy
   và cửa sổ full. Không viết lại luật khớp trong renderer.
-- Backlog giữ kế hoạch thực hiện và trạng thái task; `docs/spec` giữ hành vi.
+- Backlog giữ kế hoạch thực hiện và trạng thái task; `_bmad-output/specs` giữ hành vi.
   Plan không được tự thêm quy tắc tìm kiếm hoặc chọn/gộp kết quả thay người dùng.
 
 ## Còn mở

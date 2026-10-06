@@ -583,7 +583,7 @@ cung cấp chính xác số bản in. Số bản chỉ có thể suy ra từ s�
 làm điều kiện cứng để phân biệt `DRAFT_PRINTED` với `FINAL_PRINTED`; phải xét
 thời điểm in so với lần sửa cuối, có/không sửa file sau in và số lần in. Tính
 năng nào bắt buộc biết chính xác số bản in thì không khả thi. Nội dung này được
-được giữ tại `docs/spec/notaryoffice/README.md`; nguồn phép đo gốc
+được giữ tại `_bmad-output/specs/notaryoffice/README.md`; nguồn phép đo gốc
 hoặc lời giải thích nguyên văn của owner chưa được dẫn trong tài liệu hiện có.
 
 **A4 vẫn phải khảo sát trên 6 máy thật.** Không được giả định tài khoản Windows
@@ -597,7 +597,7 @@ thông báo/ngày, họ có thể bấm “Đúng” theo phản xạ mà không
 đẹp nhưng sai, và hệ thống sẽ học theo sai lệch đó. Đây là lý do giữ giới hạn
 3 thông báo/người/ngày, dồn phần còn lại vào màn hình xem cuối ngày và dùng
 thời gian bấm dưới 1,5 giây liên tục làm dấu hiệu cần kiểm tra. Lời giải thích
-này được giữ tại `docs/spec/notaryoffice/README.md`; chưa có link tới lời
+này được giữ tại `_bmad-output/specs/notaryoffice/README.md`; chưa có link tới lời
 owner nguyên văn trong tài liệu hiện có.
 
 | Rủi ro tiềm ẩn | Mức độ | Biện pháp giảm thiểu đã thiết kế |

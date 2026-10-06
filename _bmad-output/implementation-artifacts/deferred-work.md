@@ -44,3 +44,12 @@
 - source_plan: plan-multica-docx-intake.md
   summary: Clarify whether repeated Analyze should rerun completed sources or only new sources in the retained Intake queue.
   evidence: Existing MIN112 at baseline sends all listed nonerror sources including completed ones; DOCX reanalysis produces new review candidates. A deliberate rerun/new-only interaction belongs to existing batch selection behavior; no automatic Stage acceptance occurs.
+
+## Deferred from: code review tái cấu trúc SOT (2026-10-07)
+
+- summary: 47 file `_bmad-output/decisions/*.md` chỉ có tiêu đề, phần Context/Decision/Consequences rỗng.
+  evidence: pre-existing — bản gốc `bf161a5:backlog/decisions/` đã rỗng y hệt; lần chuyển chỉ copy nguyên.
+- summary: 21 tiêu đề decision chứa chữ `\r` thừa (vd decision-33).
+  evidence: pre-existing — có sẵn trong backlog gốc.
+- summary: `_bmad-output/specs/README.md` §9 vẫn mô tả mô hình cũ (Backlog giữ task, `.agent/tasks/` giữ tiến độ, decision-31).
+  evidence: cần quyết định có viết lại lịch sử spec không; AGENTS.md mới đã là luật hiện hành.

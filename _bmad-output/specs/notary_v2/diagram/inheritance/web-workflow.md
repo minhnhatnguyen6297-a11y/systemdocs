@@ -8,7 +8,7 @@ Read this before changing:
 - Stage / Pool / Diagram interaction
 - preview/export behavior that depends on case state
 - Word export UX and flow: [`word-output-detail.md`](../../word-output-detail.md)
-- Đích Electron — tab `Soạn hồ sơ` (nguồn chi tiết): [`workspace-detail.md`](../../workspace-detail.md); SOT dài hạn ở [`docs/spec/notary_v2/`](../../README.md)
+- Đích Electron — tab `Soạn hồ sơ` (nguồn chi tiết): [`workspace-detail.md`](../../workspace-detail.md); SOT dài hạn ở [`_bmad-output/specs/notary_v2/`](../../README.md)
 
 Resolved bug notes are historical. Vấn đề đang làm theo Linear và record
 `.agent/tasks/`; `plan.md` cũ chỉ còn trong Git baseline `5c58970`.
@@ -19,7 +19,7 @@ Resolved bug notes are historical. Vấn đề đang làm theo Linear và record
   đến cutover, trừ khi ghi khác.
 - **Đích Electron:** tab `Soạn hồ sơ` có chi tiết hành vi tại
 [`workspace-detail.md`](../../workspace-detail.md); spec cấp sản phẩm ở
-[`docs/spec/notary_v2/README.md`](../../README.md).
+[`_bmad-output/specs/notary_v2/README.md`](../../README.md).
   Luồng đích khác hiện trạng: intake đa nguồn (`image/pdf/docx/xlsx/text`)
   → mọi kết quả là gợi ý chờ người kiểm tra → `Cập nhật` commit Stage
   atomic (Người + Tài sản, một transaction, kèm `base_revision`) → Pool

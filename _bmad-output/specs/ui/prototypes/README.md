@@ -18,7 +18,7 @@ owner duyệt **bố cục và tương tác** trước khi P4 implement vào Ele
 Cách nhanh nhất — mở file trực tiếp:
 
 ```
-docs/spec/ui/prototypes/index.html
+_bmad-output/specs/ui/prototypes/index.html
 ```
 
 (không dùng ES module nên `file://` chạy được trên Chrome/Edge).
@@ -26,7 +26,7 @@ docs/spec/ui/prototypes/index.html
 Hoặc qua static server:
 
 ```powershell
-cd docs/spec/ui/prototypes
+cd _bmad-output/specs/ui/prototypes
 python -m http.server 8137
 # mở http://localhost:8137/
 ```

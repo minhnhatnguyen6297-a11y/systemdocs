@@ -2,7 +2,7 @@
 
 **Trạng thái:** Owner duyệt 05/10/2026; runtime v2 đã nghiệm thu TASK-3/TASK-4 ngày 06/10/2026 · **Phạm vi:** dùng chung toàn hệ thống ·
 **Nguồn quyết định:** Owner, brainstorm 05/10/2026 —
-[TASK-2](../../../backlog/tasks/task-2%20-%20Brainstorm-Muc-5-Loi-tra-cuu-thay-doi-ten-don-vi-hanh-chinh-dung-chung.md),
+[TASK-2](../../archive/backlog/tasks/task-2%20-%20Brainstorm-Muc-5-Loi-tra-cuu-thay-doi-ten-don-vi-hanh-chinh-dung-chung.md),
 [memlog](../../../_bmad-output/brainstorming/brainstorm-tra-cuu-don-vi-hanh-chinh-2026-10-05/.memlog.md).
 
 ## 1. Công dụng và Tại sao?

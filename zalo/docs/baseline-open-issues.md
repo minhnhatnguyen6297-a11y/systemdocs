@@ -110,4 +110,4 @@ phải giữ parity hoặc ghi rõ trong `docs/migration-notes.md`.
 - **MIN-92**: contract `contracts/zalo-intake/` — wire producer↔consumer
   (SOT: monorepo).
 - **MIN-94/95/97**: rebuild listener/OCR/quota-dedupe-config_version trong
-  module — xem `_bmad-output/specs-producer.md` §4.
+  module — xem `docs/spec-producer.md` §4.

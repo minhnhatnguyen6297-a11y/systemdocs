@@ -30,7 +30,8 @@ MODULE_READMES = (
 )
 LEGACY_DOC_DIRS = (
     "docs/plans",
-    "_bmad-output/specs",
+    "docs/spec",
+    "docs/specs",
     "docs/issues",
     "docs/changelog",
     "docs/learning",

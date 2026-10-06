@@ -6,15 +6,15 @@
 > `Soạn hồ sơ`. Hành vi/dữ liệu (Stage/Pool/Diagram, revision, suggestion,
 > `case_type`) đối chiếu tại [`workspace-detail.md`](./workspace-detail.md); UX cấp
 > sản phẩm (taxonomy, luồng, bảng nút) là
-> [`docs/spec/notary_v2/README.md`](./README.md);
+> [`_bmad-output/specs/notary_v2/README.md`](./README.md);
 > wire contract là `contracts/notary-case-drafting.md`.
 >
 > Ngôn ngữ chung (màu, chữ, token, component, responsive, thao tác) →
-> [`docs/spec/ui/README.md`](../ui/README.md) +
+> [`_bmad-output/specs/ui/README.md`](../ui/README.md) +
 > `tokens.json`. File này **chỉ giữ phần riêng của
 > Notary**, không chép lại quy tắc chung.
 >
-> Ảnh chuẩn: `docs/spec/ui/references/approved-drafting.png`
+> Ảnh chuẩn: `_bmad-output/specs/ui/references/approved-drafting.png`
 > (toàn màn) và `approved-land-types.png` (dialog loại đất).
 
 ## 1. Bố cục màn hình (đích, theo ảnh approved)
@@ -46,7 +46,7 @@
 \* Zalo giữ **disabled** trong bản thật (ràng buộc MIN-123).
 
 Mật độ/tỉ lệ theo mockup MIN-133 đã duyệt (28/09/2026 —
-`docs/spec/ui/references/approved-drafting-v2.png`): Stage 35:65
+`_bmad-output/specs/ui/references/approved-drafting-v2.png`): Stage 35:65
 (38:62 ở ≥1920), Pool 176px, một thanh trên gộp tab + hành động (bỏ «quay
 lại», tiêu đề, pill Nháp), `Lưu sơ đồ`/`Xuất Word` nằm trong header vùng
 sơ đồ (không còn footer), bảng Người 7 cột đúng cột DB `Customer` (bỏ ô
@@ -66,7 +66,7 @@ thắng", đích là hai bảng; xác nhận lại bằng prototype P3.
   `Số vào sổ`, `Thửa đất`, `Tờ bản đồ`, `Loại đất`, `Địa chỉ`…); mỗi cột
   sau là một tài sản (`Tài sản 1`, `Tài sản 2`, …).
 - Cột tài sản có thể cuộn ngang khi nhiều tài sản; header cột có `×` xóa
-  (draft UI, xem quy tắc dialog trong `docs/spec/ui/README.md`) và nhãn
+  (draft UI, xem quy tắc dialog trong `_bmad-output/specs/ui/README.md`) và nhãn
   `+ Tài sản` thêm cột.
 - Ô `Loại đất` hiển thị **chip số lượng + `↗`** (vd `3 loại ↗`) — bấm mở
   **dialog loại đất** (§4); không nhập trực tiếp danh sách parcel trên
@@ -156,7 +156,7 @@ thắng", đích là hai bảng; xác nhận lại bằng prototype P3.
   `Cập nhật` (primary — commit Stage; khi nháp mới là `Lưu hồ sơ`).
 - Dirty: **chấm** cạnh `Cập nhật`/`Lưu sơ đồ` theo tầng dirty tương ứng
   (`stageDirty`/`diagramDirty`) — không còn nhãn "Chưa lưu hồ sơ"; xem
-  mục dirty trong `docs/spec/ui/README.md`.
+  mục dirty trong `_bmad-output/specs/ui/README.md`.
 - Card `Thông tin hồ sơ` đã bỏ khỏi màn chính (MIN-133 D2 — meta
   `document_type`/`ngay_lap_ho_so`/`noi_niem_yet`/`ghi_chu` vẫn persist
   với mặc định vì Word đọc; chỗ nhập dành cho task Word riêng).
@@ -171,7 +171,7 @@ thắng", đích là hai bảng; xác nhận lại bằng prototype P3.
 - **Xuất Word** (`word-export-dialog.js`): chọn nhiều văn bản, folder
   đích, breakdown kết quả từng văn bản — giữ ngữ nghĩa spec UX §7.
 - **Conflict** (`conflictDialog`): tải bản mới / giữ nháp — không nút
-  ghi đè (mục conflict trong `docs/spec/ui/README.md`).
+  ghi đè (mục conflict trong `_bmad-output/specs/ui/README.md`).
 - **Gán vị trí** (`openAssignMenu`): đường bàn phím thay kéo-thả — giữ.
 
 ## 8. Trạng thái riêng của tab

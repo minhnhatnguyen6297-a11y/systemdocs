@@ -3,7 +3,7 @@
 Covers the slice-C implementation of `contracts/zalo-intake/` (vendored
 read-only under `schemas/`): raw package construction + ledger, the
 authenticated consumer API, receipts, post-ACK retention, and bounded OCR
-re-requests. Internal producer behavior defers to `_bmad-output/specs-producer.md`;
+re-requests. Internal producer behavior defers to `docs/spec-producer.md`;
 the wire contract defers to the vendored schemas.
 
 ## 1. Components

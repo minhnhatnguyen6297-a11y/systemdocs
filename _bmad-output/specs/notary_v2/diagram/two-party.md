@@ -36,7 +36,7 @@ domain này; readiness riêng qua `block_reason` `word.*` (chỉ kiểm tra kỹ
 thuật — không áp điều kiện thừa kế). Mapping `[Bên A N - *]`/`[Bên B
 N - *]` theo slot `p1..p15`/`p16..p30` và mẫu do người dùng chọn trong
 thư mục mẫu — spec hiện hành tại
-[`docs/spec/notary_v2/word-output.md`](../word-output.md). Chi tiết wire
+[`_bmad-output/specs/notary_v2/word-output.md`](../word-output.md). Chi tiết wire
 và fixture:
 [`contracts/notary-case-drafting.md`](../../../../contracts/notary-case-drafting.md)
 mục 13.5 và `contracts/notary-case-drafting/examples/draft-v2/`.
@@ -49,5 +49,5 @@ Nhóm `[Người N - ...]` luôn theo dòng Stage đã lưu, không theo số gh
 
 Owner duyệt layout 30 vị trí, ranh giới hai bên, giữ slot trống và hành vi swap
 trong MIN-125; runtime triển khai P7/MIN-130. Mapping placeholder Word hai bên
-đã được định nghĩa trong `docs/spec/notary_v2/word-output.md` (NAIA-8); bộ file
+đã được định nghĩa trong `_bmad-output/specs/notary_v2/word-output.md` (NAIA-8); bộ file
 mẫu cụ thể do người dùng cung cấp qua thư mục mẫu khi xuất.

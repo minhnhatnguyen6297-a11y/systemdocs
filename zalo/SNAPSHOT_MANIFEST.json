@@ -28,7 +28,7 @@
                   "docs/ocr.md":  "4a30294b50df99ae3837bf68d16ee622d6ac347b862217de9b6e920f816df7d0",
                   "docs/repo-ownership.md":  "61ae471a69cbb13322bc3fc3e470877beef1a2e1ae64f3a9ee8ef16b039ec9ae",
                   "docs/rollback-runbook.md":  "de268eceb08c26c2ee0de5145ea1788e21c0e4a9029944686fc7beb75ce1d42a",
-                  "_bmad-output/specs-producer.md":  "56dfaeeccf165c93f624bc864c7ed933405ebc1405631f3401bb21bb878b7800",
+                  "docs/spec-producer.md":  "56dfaeeccf165c93f624bc864c7ed933405ebc1405631f3401bb21bb878b7800",
                   "schemas/common.schema.json":  "f88a1517c984546b06306fe81f096fb1e778d757b9f315e9758ea13169403aa9",
                   "schemas/CONTRACT_REVISION":  "171108dc937c9327a5d76d573f974d199fa69490cd2ff6bd9c592e017af43efc",
                   "schemas/error.schema.json":  "cd542da54a1eb52319000089b681fc5addc2daf3c2bfcdd4b3859bf7fa81ec0d",

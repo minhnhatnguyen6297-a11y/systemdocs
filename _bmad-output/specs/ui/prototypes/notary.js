@@ -4,7 +4,7 @@
    loại đất, intake, conflict, stub Xuất Word. Dữ liệu giả — xem data.js.
 
    Đề xuất ban đầu ghi ở README.md + .agent/tasks/MIN-126/decisions.md —
-   ĐÃ ĐƯỢC owner chốt 27/09/2026 (docs/spec/ui + contract §13 v2): semantics
+   ĐÃ ĐƯỢC owner chốt 27/09/2026 (_bmad-output/specs/ui + contract §13 v2): semantics
    chip số, drop lên chỗ có người = swap, `Hủy thay đổi` = revert Stage
    draft, `Mở rộng` = canvas toàn màn.
    ========================================================================== */
