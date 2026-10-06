@@ -49,6 +49,10 @@ TEN_FILE_NGOAI_LE = (
     ("to khai", "tờ khai"),
     ("danh muc", "danh mục hồ sơ"),
     ("danh sach", "danh sách"),
+    ("11dk", "mẫu đăng ký biến động"),
+    ("truoc ba", "lệ phí trước bạ"),
+    ("tncn", "thuế TNCN"),
+    ("thu nhap", "thu nhập cá nhân"),
 )
 
 KIND_THUA_KE = (
@@ -101,11 +105,14 @@ def _ly_do_ngoai_le(payload: dict) -> str:
     for key, label in TEN_FILE_NGOAI_LE:
         if key not in name:
             continue
-        if key == "thue":
-            # "thue" bo dau trung "thuê" (thue dat/nha) va ten nguoi
-            # "Thuế" — khong bo qua van ban co noi dung hop dong that.
-            if "thuê" in raw_name or _co_noi_dung_hop_dong(payload):
-                continue
+        if key == "thue" and "thuê" in raw_name:
+            # "thue" bo dau trung "thuê" (thue dat/nha) va ten nguoi "Thuế".
+            continue
+        if _co_noi_dung_hop_dong(payload):
+            # Van ban co noi dung hop dong that thi khong bo qua — ten
+            # file co the dat nham (09/10/2026: ap cho moi key, khong
+            # chi "thue").
+            continue
         return label
     return ""
 
@@ -159,6 +166,8 @@ def luat_0_nguoi(payload: dict) -> list[dict]:
         return [{"id": "R02", "muc": MUC_LOI, "noi_dung": "0 người tham gia"}]
     if kind and kind != "generic":
         return [{"id": "R02", "muc": MUC_CANH_BAO, "noi_dung": f"0 người tham gia ({kind})"}]
+    if str(payload.get("web_form", {}).get("ten_hop_dong") or "").strip():
+        return [{"id": "R02", "muc": MUC_CANH_BAO, "noi_dung": "0 người tham gia (generic có tiêu đề)"}]
     return []
 
 

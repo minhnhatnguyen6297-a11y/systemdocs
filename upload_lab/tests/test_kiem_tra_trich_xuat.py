@@ -206,6 +206,28 @@ class KiemTraTrichXuatTests(unittest.TestCase):
         self.assertEqual(len(r02), 1)
         self.assertEqual(r02[0]["muc"], MUC_CANH_BAO)
 
+    def test_generic_co_tieu_de_0_nguoi_van_co_r02(self):
+        # Sweep 09/10/2026 (dot 2): van ban co ten hop dong nhung boc
+        # trang nguoi -> canh bao, khong con "sach gia".
+        payload = make_payload(raw={
+            "document_kind": "generic",
+            "ben_a": {"nguoi": [], "dia_chi": "", "entity_lines": []},
+            "ben_b": {"nguoi": [], "dia_chi": "", "entity_lines": []},
+        })
+        findings = kiem_tra_payload(payload)
+        r02 = [f for f in findings if f["id"] == "R02"]
+        self.assertEqual(len(r02), 1)
+        self.assertEqual(r02[0]["muc"], MUC_CANH_BAO)
+
+    def test_generic_khong_tieu_de_0_nguoi_van_sach(self):
+        payload = make_payload(web_form={"ten_hop_dong": ""}, raw={
+            "document_kind": "generic",
+            "ben_a": {"nguoi": [], "dia_chi": "", "entity_lines": []},
+            "ben_b": {"nguoi": [], "dia_chi": "", "entity_lines": []},
+        })
+        findings = kiem_tra_payload(payload)
+        self.assertFalse(any(f["id"] == "R02" for f in findings))
+
     def test_ten_ben_ban_la_cau_co_r04(self):
         # Sweep 09/10/2026: ten ben A/B nuot "CCCD so..." cung la R04.
         payload = make_payload()

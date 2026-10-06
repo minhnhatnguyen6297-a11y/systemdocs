@@ -81,9 +81,12 @@ python tools/regex_lab.py approve --cluster <id>   # chi khi owner da duyet ket 
 ## 4. Cách sửa lỗi
 
 1. Lỗi chỉ công nhận khi **mã trong code** báo:
-   `upload_lab/kiem_tra_trich_xuat.py` (R00 bỏ qua, R01 sai loại,
-   R02 0 người (lỗi ở thừa kế, cảnh báo ở loại non-generic khác —
-   09/10/2026), R03 thiếu trường người, R04 tên bẩn (gồm tên đương
+   `upload_lab/kiem_tra_trich_xuat.py` (R00 bỏ qua — mọi key tên file
+   đều được cứu khi nội dung là hợp đồng thật, không chỉ `thue`;
+   key thêm 09/10/2026: `11dk`, `truoc ba`, `tncn`, `thu nhap` —
+   R01 sai loại,
+   R02 0 người (lỗi ở thừa kế; cảnh báo ở loại non-generic khác và
+   generic có `ten_hop_dong` — 09/10/2026), R03 thiếu trường người, R04 tên bẩn (gồm tên đương
    sự nuốt `CCCD số...`/tổ chức — 09/10/2026), R05 trùng tên,
    R06 thiếu người chết, R07 thiếu trường người chết, R08 mất khối
    tài sản, R09 không tách tài sản, R10 lệch diện tích tuyệt đối,

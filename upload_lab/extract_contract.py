@@ -560,6 +560,7 @@ def _detect_document_kind_and_title(text: str) -> tuple[str, str]:
             "van ban tu choi nhan di san",
             "tu choi nhan di san",
             "tu choi quyen huong di san",
+            "tu choi di san",
         )
     ):
         return DOC_KIND_INHERITANCE_REFUSAL, title_line
@@ -1081,9 +1082,9 @@ def _find_tai_san_by_kind(text: str, doc_kind: str) -> str:
 
 
 def guess_nhom_hd(ten_hd):
-    lower = ten_hd.lower()
+    lower = _fold_text(ten_hd)
     for kw, nhom in NHOM_HD_MAP.items():
-        if kw in lower:
+        if _fold_text(kw) in lower:
             return nhom
     return "Khác"
 
@@ -1293,7 +1294,8 @@ def _tach_nay_la(value: str) -> tuple[str, str]:
     ("104", "Nay la thua dat so 321")."""
     text = str(value or "")
     match = re.search(
-        r"(?i)\s*(\((?:\u0111\u01b0\u1ee3c|\u0111\u00e3)\s+(?:t\u00e1ch|g\u1ed9p|s\u00e1p|nh\u1eadp|chia|h\u1ee3p|t\u0103ng|gi\u1ea3m)[^)]*\)"
+        r"(?i)\s*(\((?:\u0111\u01b0\u1ee3c|\u0111\u00e3)\s+(?:t\u00e1ch|g\u1ed9p|s\u00e1p|nh\u1eadp|chia|h\u1ee3p|t\u0103ng|gi\u1ea3m)[^)]*\)?"
+        r"|(?:\u0111\u01b0\u1ee3c|\u0111\u00e3)\s+(?:t\u00e1ch|g\u1ed9p|s\u00e1p|nh\u1eadp|chia|h\u1ee3p)\s+t\u1eeb\b.*"
         r"|\(?\s*(?:hi\u1ec7n nay|nay)\s+l\u00e0\b[^)]*\)?)\s*$",
         text,
     )
@@ -1665,7 +1667,7 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
             # ("200|Dat o|Lau dai" = dien tich|muc dich|thoi han).
             mid = cells[1] if len(cells) > 1 else ""
             cells_fold = " ".join(_fold_text(c) for c in cells)
-            if re.search(r"so khung|so may|so dang ky|nhan hieu|bien (so|kiem)|loai (xe|tau)|dung tich|ma so", cells_fold):
+            if re.search(r"so khung|so may|so dang ky|nhan hieu|bien (so|kiem)|loai (xe|tau)|dung tich|ma so|mau son|so cho|nam san xuat|nam sx|kieu dang|trong tai", cells_fold):
                 continue
             if re.search(r"tai san (thu|rieng)\b", cells_fold):
                 continue
@@ -1888,22 +1890,54 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
         )
         or (str(th.get("dia_chi") or "").strip()
             and str(th.get("dia_chi") or "").strip() != context.get("dia_chi", ""))
-        or any(c.get("dien_tich") for c in th.get("chi_tiet_dien_tich", []))
+        or any(re.search(r"\d", str(c.get("dien_tich") or "")) for c in th.get("chi_tiet_dien_tich", []))
     ]
 
     # Cung thua duoc nhac lai nhieu lan trong bai viet (khoi "di san de lai"
-    # roi khoi "thong nhat phan chia") — giu ban ghi dau tien.
+    # roi khoi "thong nhat phan chia") — gop vao ban ghi dau tien: do truong
+    # trong, cong don phan_ghi_them va chi_tiet (09/10/2026: truoc day chi bo
+    # ban sau -> mat du lieu neu lan nhac sau giau hon; IFilter cung cat
+    # "2067 duoc tach tu thua X" thanh 2 thua cung so).
     dedup: list[dict] = []
-    seen_keys: set[tuple[str, str]] = set()
     for parcel in parcels:
-        key = (
-            _fold_text(parcel.get("so_thua_dat", "")),
-            _fold_text(parcel.get("so_to_ban_do", "")),
-        )
-        if parcel.get("so_thua_dat") and key in seen_keys:
+        key = _fold_text(parcel.get("so_thua_dat", ""))
+        key_to = _fold_text(parcel.get("so_to_ban_do", ""))
+        giu = None
+        if key:
+            for cu in dedup:
+                if _fold_text(cu.get("so_thua_dat", "")) != key:
+                    continue
+                to_cu = _fold_text(cu.get("so_to_ban_do", ""))
+                if to_cu == key_to or not to_cu or not key_to:
+                    giu = cu
+                    break
+        if giu is not None:
+            for field in (
+                "so_to_ban_do", "dien_tich", "muc_dich_su_dung",
+                "thoi_han_su_dung", "nguon_goc", "dia_chi", "loai_gcn",
+                "so_gcn", "so_gcn_raw", "so_vao_so", "ngay_cap_gcn",
+                "co_quan_cap",
+            ):
+                if not giu.get(field) and parcel.get(field):
+                    giu[field] = parcel[field]
+            for detail in parcel.get("chi_tiet_dien_tich", []):
+                if detail and detail not in giu["chi_tiet_dien_tich"]:
+                    giu["chi_tiet_dien_tich"].append(detail)
+            ghi = str(parcel.get("phan_ghi_them") or "").strip(" ;")
+            if ghi and ghi not in giu["phan_ghi_them"]:
+                giu["phan_ghi_them"] = (giu["phan_ghi_them"] + "; " + ghi).lstrip("; ")
             continue
-        seen_keys.add(key)
         dedup.append(parcel)
+    # Note nguon goc bi cat doan o IFilter ("duoc tach tu" khong co so) —
+    # khong mang thong tin, bo.
+    for parcel in dedup:
+        parcel["phan_ghi_them"] = "; ".join(
+            part for part in str(parcel.get("phan_ghi_them") or "").split("; ")
+            if not re.fullmatch(
+                r"(?i)(?:\u0111\u01b0\u1ee3c|\u0111\u00e3)?\s*(?:t\u00e1ch|g\u1ed9p|s\u00e1p|nh\u1eadp)\s+t\u1eeb",
+                part.strip(" (),;"),
+            )
+        ).strip(" ;")
 
     for parcel in dedup:
         parcel["land_rows"] = thua_dat_sang_land_rows(parcel)
@@ -2013,6 +2047,7 @@ _DIA_CHI_LABEL = (
     r"|H\u1ed9\s+kh\u1ea9u\s*(?:th\u01b0\u1eddng\s+tr\u00fa)?\s*:"
     r"|\u0110\u1ecba ch\u1ec9\s+n\u01a1i\s+c\u01b0\s+tr\u00fa|\u0110\u1ecba ch\u1ec9\s+\u0111\u0103ng\s+k\u00fd"
     r"|\u0110\u1ecba ch\u1ec9\s+th\u01b0\u1eddng\s+tr\u00fa|Tr\u00fa\s+t\u1ea1i"
+    r"|\u0110\u0103ng\s+k\u00fd\s+(?:th\u01b0\u1eddng\s+tr\u00fa|h\u1ed9\s+kh\u1ea5u)|HKTT"
     r"|\u0110\u1ecba ch\u1ec9(?!\s+(?:th\u1eeda|nh\u00e0|\u0111\u1ea5t|li\u00ean h\u1ec7|giao d\u1ecbch))"
 )
 
@@ -2091,7 +2126,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     header_re = re.compile(
         r"(?i)^\s*(?:[-*]\s*)?(?:(?:\u0110\u1ea1i di\u1ec7n|Dai dien)(?:\s+[^:]{0,80})?:\s*)?"
         r"(?:\d+\.\s*)?"
-        r"(?:T\u00f4i (?:t\u00ean )?l\u00e0\s*:|Ch\u00fang t\u00f4i l\u00e0\s*:)?\s*"
+        r"(?:T\u00f4i (?:t\u00ean )?l\u00e0\s*:?|Ch\u00fang t\u00f4i l\u00e0\s*:?)?\s*"
         r"(?:(?:ng\u01b0\u1eddi\s+)?(?:v\u1ee3|ch\u1ed3ng)\s*[\-\u2013]\s*)?"
         r"(?:v\u00e0\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\s+)?"
         r"(?:(?:b\u00ean|ben)\s+[A-Za-z\u00c0-\u1ef9]\s*[:.,]?\s*)?"
@@ -2103,7 +2138,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # Nguoi lon tuoi thuong chi ghi "Sinh nam 1965" — database chap nhan YYYY
     # (docs/spec/notary_v2/stage.md muc 5) nen giu nam lam ngay_sinh.
     birth_year_re = re.compile(r"(?i)(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)\s*[:\u2013-]?\s*((?:19|20)\d{2})")
-    id_re = re.compile(r"(?i)(?:C\u0103n c\u01b0\u1edbc(?:\s+c\u00f4ng(?:\s+d\u00e2n)?)?(?:\s+m\u1edbi)?|Can cuoc(?:\s+cong(?:\s+dan)?)?|CCCD|CMND|\bCC)\s*(?:s\u1ed1|so)?\s*:?\s*(\d{6,12})")
+    id_re = re.compile(r"(?i)(?:C\u0103n c\u01b0\u1edbc(?:\s+c\u00f4ng(?:\s+d\u00e2n)?)?(?:\s+m\u1edbi)?|Can cuoc(?:\s+cong(?:\s+dan)?)?|CCCD|CMND|\bCC)\s*(?:[A-Z\u00c0-\u1ef9\u0110][^\d:;\n]{0,40}?)?\s*(?:s\u1ed1|so)\s*:?\s*(\d{6,12})")
     issue_place_re = re.compile(r"(?i)\bdo\s+([^\n]+?)\s+(?:c\u1ea5p ng\u00e0y|cap ngay)")
     issue_date_re = re.compile(r"(?i)(?:c\u1ea5p ng\u00e0y|cap ngay|c\u1ea5p v\u00e0o ng\u00e0y)\s*:?\s*(\d{1,2}/\d{1,2}/\d{4})")
     # Nguoi tham gia thua ke ghi ten tran khong kem "Ong/Ba", vi du:
@@ -2151,7 +2186,25 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     lines = _split_section_lines(section)
     headers: list[tuple[int, re.Match[str]]] = []
     address_lines: list[tuple[int, str, str]] = []
+    prev_intro_bare = False
     for idx, line in enumerate(lines):
+        # "Toi la:" dung rieng 1 dong -> ten tran o dong ke tiep
+        # ("Nguyen Thi Yen\t\tSinh ngay: ...").
+        if (
+            prev_intro_bare
+            and re.search(r"\d", line)
+            and header_re.search(line) is None
+        ):
+            next_match = re.match(
+                r"\s*(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?)"
+                r"\s+(?:[-\u2013]\s*)?(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)",
+                line,
+            )
+            if next_match:
+                headers.append((idx, next_match))
+        prev_intro_bare = bool(
+            re.match(r"(?i)^\s*(?:T\u00f4i|Ch\u00fang t\u00f4i)\s+l\u00e0\s*:?\s*$", line)
+        ) or (prev_intro_bare and not line.strip())
         match = header_re.search(line)
         if match:
             # Dong pha he ("Ông X co vo la ba Y (Sinh ngay...)") — ngay
@@ -2223,7 +2276,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             else:
                 gioi_tinh = "B\u00e0"
             ho_ten = re.sub(r"\s+", " ", match.group("name")).split("|")[0].strip(" ;,.-\u2013\u2014")
-            ho_ten = re.split(r"(?i)\s*[-\u2013\u2014]\s+(?:con\b|v\u1ee3\b|ch\u1ed3ng\b|l\u00e0\b|b\u1ed1\b|m\u1eb9\b|cha\b|b\u00ean\b)", ho_ten, maxsplit=1)[0].strip(" ;,.-\u2013\u2014")
+            ho_ten = re.split(r"(?i)\s*[-\u2013\u2014]\s+(?:con\b|ch\u00e1u\b|chau\b|v\u1ee3\b|ch\u1ed3ng\b|l\u00e0\b|b\u1ed1\b|m\u1eb9\b|cha\b|b\u00ean\b)", ho_ten, maxsplit=1)[0].strip(" ;,.-\u2013\u2014")
             ho_ten = _cat_ho_ten(ho_ten)
             person = {
                 "gioi_tinh": gioi_tinh,
@@ -2235,7 +2288,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             # ho_ten (Owner 07/10/2026: ten chi giu ho ten).
         else:
             base_name = re.sub(r"\s+", " ", groups.get("name") or "").split("|")[0].strip(" ;,.")
-            base_name = re.split(r"(?i)\s*[-\u2013\u2014]\s+(?:con\b|v\u1ee3\b|ch\u1ed3ng\b|l\u00e0\b|b\u1ed1\b|m\u1eb9\b|cha\b|b\u00ean\b)", base_name, maxsplit=1)[0].strip(" ;,.-\u2013\u2014")
+            base_name = re.split(r"(?i)\s*[-\u2013\u2014]\s+(?:con\b|ch\u00e1u\b|chau\b|v\u1ee3\b|ch\u1ed3ng\b|l\u00e0\b|b\u1ed1\b|m\u1eb9\b|cha\b|b\u00ean\b)", base_name, maxsplit=1)[0].strip(" ;,.-\u2013\u2014")
             base_name = _cat_ho_ten(base_name)
             role_phrase = re.sub(r"\s+", " ", groups.get("role") or "").strip(" ;,.")
             role_fold = _fold_text(role_phrase)
@@ -2567,8 +2620,28 @@ def _extract_nguoi_chet(text: str) -> list[dict]:
             or len(name_tokens) > 6
             or not all(tok[0].isupper() for tok in name_tokens)
         ):
-            continue
-        title_fold = _fold_text(match.group("title"))
+            # Nguoi chet nam sau cum quan he ("ong X co me de la ba Y;
+            # chet ngay ...") — regex nuot ca cum lam ten; thu lay danh
+            # xung + ten CUOI trong cum truoc khi bo (09/10/2026).
+            inner = re.search(
+                r"(?i)\b(ông|bà|anh|chị)\s+([A-ZÀ-ỹĐ][^\d;:.,()\n]{2,60}?)\s*$",
+                raw_name,
+            )
+            if not inner:
+                continue
+            inner_name = re.sub(r"\s+", " ", inner.group(2)).strip(" ;,.-")
+            inner_tokens = inner_name.split()
+            if (
+                not inner_tokens
+                or len(inner_tokens) > 6
+                or not all(tok[0].isupper() for tok in inner_tokens)
+            ):
+                continue
+            raw_name = inner_name
+            match_title = inner.group(1)
+        else:
+            match_title = match.group("title")
+        title_fold = _fold_text(match_title)
         # Nguoi thu 2 cung dong ("... và bà B; chết ngày ...") — tach thanh
         # ban ghi rieng, dung chung truong ngay/giay to cua cap.
         name2 = re.sub(r"\s+", " ", match.group("name2") or "").strip(" ;,.-")
@@ -2664,6 +2737,11 @@ def _extract_parties_generic(text: str, doc_kind: str) -> tuple[dict, dict]:
         r"(?m)^\s*(?:I\.\s*)?B\u00caN CHO VAY\b",
         r"(?m)^\s*(?:I\.\s*)?B\u00caN CHO THU\u00ca\b",
         r"(?m)^\s*(?:I\.\s*)?B\u00caN (?:UY|U\u1ef6|\u1ee6Y) QUY\u1ec0N\b",
+        r"(?m)^\s*(?:I\.\s*)?NG\u01af\u1edcI (?:UY|U\u1ef6|\u1ee6Y) QUY\u1ec0N\b(?=\s*[:(])(?![^\n]*\bNG\u01af\u1edcI\b)",
+        r"(?m)^\s*(?:I\.\s*)?B\u00caN \u0110\u1eb6T C\u1eccC\b",
+        r"(?m)^\s*(?:I\.\s*)?NG\u01af\u1edcI DI CH\u00daC\b(?=\s*[:(])(?![^\n]*\bNG\u01af\u1edcI\b)",
+        r"(?m)^\s*(?:I\.\s*)?NG\u01af\u1edcI CAM K\u1ebeT\b(?=\s*[:(])(?![^\n]*\bNG\u01af\u1edcI\b)",
+        r"(?m)^\s*(?:I\.\s*)?B\u00caN G\u00d3P V\u1ed0N\b",
         r"(?m)^\s*(?:I\.\s*)?B\u00caN T\u1eb6NG CHO\b",
         r"(?m)^\s*(?:I\.\s*)?B\u00caN B\u00c1N\b",
         r"(?m)^\s*(?:I\.\s*)?B\u00caN A\b",
@@ -2676,6 +2754,9 @@ def _extract_parties_generic(text: str, doc_kind: str) -> tuple[dict, dict]:
         r"(?m)^\s*(?:II\.\s*)?B\u00caN VAY\b",
         r"(?m)^\s*(?:II\.\s*)?B\u00caN THU\u00ca\b",
         r"(?m)^\s*(?:II\.\s*)?B\u00caN \u0110\u01af\u1ee2C (?:UY|U\u1ef6|\u1ee6Y) QUY\u1ec0N\b",
+        r"(?m)^\s*(?:II\.\s*)?NG\u01af\u1edcI \u0110\u01af\u1ee2C (?:UY|U\u1ef6|\u1ee6Y) QUY\u1ec0N\b(?=\s*[:(])(?![^\n]*\bNG\u01af\u1edcI\b)",
+        r"(?i)uỷ\s+quyền\s+cho\s*:",
+        r"(?m)^\s*(?:II\.\s*)?B\u00caN NH\u1eacN \u0110\u1eb6T C\u1eccC\b",
         r"(?m)^\s*(?:II\.\s*)?B\u00caN NH\u1eacN T\u1eb6NG CHO\b",
         r"(?m)^\s*(?:II\.\s*)?B\u00caN \u0110\u01af\u1ee2C T\u1eb6NG CHO\b",
         r"(?m)^\s*(?:II\.\s*)?B\u00caN MUA\b",

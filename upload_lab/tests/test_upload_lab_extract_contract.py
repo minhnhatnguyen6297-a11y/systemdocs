@@ -1470,5 +1470,108 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(payload["raw"]["danh_sach_thua_dat"], [])
 
 
+
+    def test_guq_nguoi_uy_quyen_khong_bat_hang_chu_ky(self):
+        # GUQ: dong chu ky "NGUOI UY QUYEN    NGUOI DUOC UY QUYEN" khong
+        # phai tieu de vung; "uy quyen cho:" la ranh ben B.
+        docx_path = make_docx(
+            self.root / "guq_chu_ky.docx",
+            "GIẤY UỶ QUYỀN",
+            "Tôi là: Ông LUO SHUAI    Sinh năm: 2000",
+            "Số hộ chiếu: EP9129199 do Cục Quản lý Xuất nhập cảnh cấp ngày 11/07/2025",
+            "Nơi cư trú: Trùng Khánh - Trung Quốc",
+            "Nay bằng giấy này tôi uỷ quyền cho:",
+            "Bà Trần Thị Huyền - Sinh năm 1992; Căn cước số: 036192016533 do Cục cảnh sát cấp ngày 01/01/2020",
+            "Nơi cư trú tại: xã Yên Đồng, tỉnh Ninh Bình.",
+            "Thời gian ủy quyền: 01 năm.",
+            "NGƯỜI UỶ QUYỀN        NGƯỜI ĐƯỢC UỶ QUYỀN",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+        )
+
+        payload = extract(docx_path)
+
+        ten_a = [p["ho_ten"] for p in payload["raw"]["ben_a"]["nguoi"]]
+        ten_b = [p["ho_ten"] for p in payload["raw"]["ben_b"]["nguoi"]]
+        self.assertIn("LUO SHUAI", ten_a)
+        self.assertEqual(ten_b, ["Trần Thị Huyền"])
+
+    def test_toi_la_ong_khong_dau_hai_cham(self):
+        # "Tôi là ông X" (khong dau ':') van la header nguoi.
+        docx_path = make_docx(
+            self.root / "toi_la_ong.docx",
+            "GIẤY UỶ QUYỀN",
+            "Tôi là ông Đinh Đức Tuyến;     Sinh ngày: 20/11/1963;",
+            "Căn cước công dân số: 036063007568 do Cục cảnh sát cấp ngày 03/10/2023;",
+            "Nơi thường trú tại: xã Yên Cường, huyện Ý Yên, tỉnh Nam Định.",
+            "Nay bằng giấy này tôi uỷ quyền cho:",
+            "Ông Bùi Quang Kiên - Sinh năm 1991; Căn cước công dân số 036091015717 do Cục Cảnh sát cấp ngày 01/01/2020",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+        )
+
+        payload = extract(docx_path)
+
+        ten_a = [p["ho_ten"] for p in payload["raw"]["ben_a"]["nguoi"]]
+        self.assertEqual(ten_a, ["Đinh Đức Tuyến"])
+
+    def test_thua_lap_gop_du_lieu_khong_de_mat(self):
+        # Cung so thua nhac lai 2 lan: lan sau bo sung truong cho lan dau.
+        docx_path = make_docx(
+            self.root / "thua_lap.docx",
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG",
+            "BÊN CHUYỂN NHƯỢNG:",
+            "Ông Nguyễn Văn A Sinh ngày: 01/01/1970",
+            "Căn cước công dân số: 036170000001 do Bộ Công an cấp ngày 01/01/2021",
+            "Địa chỉ: xã A, huyện B, tỉnh C.",
+            "BÊN NHẬN CHUYỂN NHƯỢNG:",
+            "Bà Trần Thị B Sinh ngày: 02/02/1980",
+            "Căn cước công dân số: 036180000002 do Bộ Công an cấp ngày 02/02/2021",
+            "Địa chỉ: xã D, huyện E, tỉnh F.",
+            "Đối tượng của Hợp đồng này là quyền sử dụng đất có địa chỉ tại: xã G",
+            "Thửa đất số: 2067 được tách từ",
+            "thửa 2068",
+            "Tờ bản đồ số: 09",
+            "Diện tích: 786,0 m2",
+            "Hình thức sử dụng: Sử dụng riêng",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+        )
+
+        payload = extract(docx_path)
+
+        thua = payload["raw"]["danh_sach_thua_dat"]
+        ids = [t["so_thua_dat"] for t in thua]
+        self.assertEqual(ids.count("2067"), 1)
+        thua67 = [t for t in thua if t["so_thua_dat"] == "2067"][0]
+        self.assertEqual(thua67["so_to_ban_do"], "09")
+        self.assertIn("Sử dụng riêng", thua67["phan_ghi_them"])
+
+    def test_nguoi_chet_sau_cum_quan_he(self):
+        # "Ong X co me de la ba Y; chet ngay ..." — nguoi chet la Y,
+        # khong phai ca cum 9 tu.
+        docx_path = make_docx(
+            self.root / "chet_quan_he.docx",
+            "VĂN BẢN TỪ CHỐI NHẬN DI SẢN",
+            "Chúng tôi là:",
+            "1. Ông Hoàng Văn Khôi – cháu nội bà Hoàng Thị Phao;    Sinh ngày: 25/10/1973",
+            "Căn cước công dân số: 036073007917 do Cục cảnh sát cấp ngày 02/07/2021;",
+            "Thường trú tại: xã Phong Doanh, tỉnh Ninh Bình.",
+            "Nay, chúng tôi tự nguyện lập Văn bản này với nội dung như sau:",
+            "Ông Hoàng Văn Toản có mẹ đẻ là bà Hoàng Thị Phao; Sinh năm: 1924; đã chết ngày: 27/12/2020 theo Trích lục khai tử.",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+        )
+
+        payload = extract(docx_path)
+
+        ten_a = [p["ho_ten"] for p in payload["raw"]["ben_a"]["nguoi"]]
+        self.assertEqual(ten_a, ["Hoàng Văn Khôi"])
+        chet = [q["ho_ten"] for q in payload["raw"]["nguoi_chet"]]
+        self.assertIn("Hoàng Thị Phao", chet)
+
+    def test_nhom_hop_dong_uy_quyen_cach_viet_cu(self):
+        # "uỷ quyền" (chu viet u+1EF7) cung ra nhom "Uy quyen".
+        from extract_contract import guess_nhom_hd
+        self.assertEqual(guess_nhom_hd("GIẤY UỶ QUYỀN"), "Ủy quyền")
+        self.assertEqual(guess_nhom_hd("HỢP ĐỒNG ỦY QUYỀN"), "Ủy quyền")
+
+
 if __name__ == "__main__":
     unittest.main()
