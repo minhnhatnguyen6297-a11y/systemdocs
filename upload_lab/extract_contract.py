@@ -919,6 +919,27 @@ def _find_tai_san_savings(text: str) -> str:
     )
 
 
+def _find_tai_san_vehicle(text: str) -> str:
+    """Khoi tai san XE O TO / XE MAY trong van ban thua ke — giu nguyen
+    van text (bien so, so khung), chua boc dong theo decision-46."""
+    return _extract_block_by_folded_patterns(
+        text,
+        (
+            r"quyen so huu\s+xe\b",
+            r"toan bo\s+quyen so huu[^\n]{0,60}?\b(?:xe|o to|xe may)\b",
+            r"(?m)^\s*(?:[IVX]+\.[\s|]*)?di san[^\n]{0,120}?(?:xe\s+o to|xe\s+may|o to)\b",
+        ),
+        (
+            r"(?m)^\s*(?:[IVX]+\.[\s|]*)?(?:\|\s*)?nhung nguoi (?:thua ke|nhan thua ke)\b",
+            r"(?m)^\s*noi dung (?:phan chia|thoa thuan phan chia|khai nhan) di san\b",
+            r"(?m)^\s*bang van ban nay\b",
+            r"(?m)^\s*(?:chung toi|toi) xin cam doan\b",
+            r"(?m)^\s*nguoi (?:tu choi huong|huong) di san\b",
+            r"(?m)^\s*loi chung\b",
+        ),
+    )
+
+
 def tach_danh_sach_so_tiet_kiem(tai_san: str) -> list[dict]:
     """Moi so tiet kiem / tai khoan 1 dong: số hiệu, ngan hang, chi nhánh,
     ngay phát hành, chu so."""
@@ -1039,7 +1060,10 @@ def _find_tai_san_by_kind(text: str, doc_kind: str) -> str:
         savings = _find_tai_san_savings(text)
         if savings:
             return savings
-        return _find_tai_san_insurance(text)
+        insurance = _find_tai_san_insurance(text)
+        if insurance:
+            return insurance
+        return _find_tai_san_vehicle(text)
 
     if doc_kind == DOC_KIND_INHERITANCE_REFUSAL:
         tai_san = _find_tai_san_inheritance_refusal(text)
@@ -1048,7 +1072,10 @@ def _find_tai_san_by_kind(text: str, doc_kind: str) -> str:
         savings = _find_tai_san_savings(text)
         if savings:
             return savings
-        return _find_tai_san_insurance(text)
+        insurance = _find_tai_san_insurance(text)
+        if insurance:
+            return insurance
+        return _find_tai_san_vehicle(text)
 
     if doc_kind in (DOC_KIND_TRANSFER, DOC_KIND_GIFT):
         common_qsdd_block = _find_tai_san_qsdd_common(text)
@@ -3358,6 +3385,8 @@ def _phat_hien_tai_san_chua_ho_tro(text: str) -> list[str]:
         found.append("so_tiet_kiem")
     if _find_tai_san_insurance(text):
         found.append("bao_hiem")
+    if _find_tai_san_vehicle(text):
+        found.append("xe")
     return found
 
 

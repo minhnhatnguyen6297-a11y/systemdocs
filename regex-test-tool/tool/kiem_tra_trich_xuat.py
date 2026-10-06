@@ -351,7 +351,7 @@ def luat_tai_san_chua_ho_tro(payload: dict) -> list[dict]:
     """R12: co so tiet kiem/bao hiem nhung tam dung boc dong (decision-46)."""
     kinds = payload.get("raw", {}).get("tai_san_chua_ho_tro") or []
     if kinds:
-        ten = {"so_tiet_kiem": "sổ tiết kiệm", "bao_hiem": "bảo hiểm"}
+        ten = {"so_tiet_kiem": "sổ tiết kiệm", "bao_hiem": "bảo hiểm", "xe": "xe"}
         return [{
             "id": "R12",
             "muc": MUC_CANH_BAO,
