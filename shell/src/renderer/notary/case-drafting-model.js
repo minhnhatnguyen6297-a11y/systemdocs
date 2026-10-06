@@ -212,8 +212,14 @@ function createModel(deps) {
   // folder lien tiep trong cung session van phai "response moi nhat
   // thang" — session chi bat duoc chuyen case, khong bat duoc doi folder.
   let wordScanSeq = 0;
-  const addressRequests = new Map();
-  const addressTimers = new Map();
+  // Tra cuu dia chi thu cong (TASK-4): chi nut Tra moi gui lenh, khong
+  // tu tra khi render/go, khong ghi Stage/o. lookupSeq don dieu tang moi
+  // khi du lieu nguon doi hoac co lan Tra moi — response chi hien khi seq
+  // van nguyen (bat ca A->B->A). lookupCallId phan biet cac lan Tra.
+  let lookupSeq = 0;
+  let lookupCallId = 0;
+  state.addressSlots = {};
+  state.addressFull = null;
   state.addressSuggestions = {};
   state.postingAssetId = null;
 
@@ -234,101 +240,211 @@ function createModel(deps) {
     return `${m[3]}-${pad(mo)}-${pad(d)}`;
   }
 
-  function addressContext(kind, rowId) {
-    const person = kind === 'person' || kind === 'issuer';
-    const row = (person ? state.stage.people : state.stage.assets).find(r => r.row_id === rowId);
-    if (!row) return null;
-    const address = kind === 'issuer' ? row.noi_cap : row.dia_chi;
-    const target = kind === 'issuer' ? row.ngay_cap : (state.caseInfo || {}).ngay_lap_ho_so;
-    return { address: address || '', source_date: isoDate(row.ngay_cap), target_date: isoDate(target) };
+  // Nguon chuoi tra cuu theo spec: dia chi Nguoi/Tai san lay o dia chi
+  // cua chinh dong do; Noi niem yet lay noi dung chinh o niem yet; Noi cap
+  // giay khai tu lay dia chi cua chinh nguoi da chet (o dich van la noi_cap
+  // cua nguoi do — hai o co the khac nhau). Doc tu state model (input nao
+  // cung dong bo vao model ngay khi go) nen la chu chua luu moi nhat.
+  function lookupSlotKey(kind, rowId) {
+    return kind + ':' + rowId;
   }
 
-  // Chuyen case/nhap moi: huy debounce dang cho + quen moi identity da
-  // request — session guard da lo response, nhung timer cu con ban mot
-  // client.run thua neu khong clear.
+  function addressContext(kind, rowId) {
+    if (kind === 'posting') {
+      const query = (state.caseInfo || {}).noi_niem_yet;
+      if (typeof query !== 'string' || !query.trim()) return null;
+      return { query, presentation: 'drafting' };
+    }
+    const person = kind === 'person' || kind === 'issuer';
+    const row = (person ? state.stage.people : state.stage.assets)
+      .find(r => r.row_id === rowId);
+    if (!row) return null;
+    // issuer tra dia chi nguoi chet, khong tra chu trong o noi_cap.
+    const query = row.dia_chi;
+    if (typeof query !== 'string' || !query.trim()) return null;
+    return { query, presentation: 'drafting' };
+  }
+
+  // Chuyen case/nhap moi: xoa ket qua tra cuu cu — session guard loai
+  // response tre cua case cu.
   function clearAddressLookups() {
-    for (const t of addressTimers.values()) clearTimeout(t);
-    addressTimers.clear();
-    addressRequests.clear();
+    lookupSeq += 1;
+    state.addressSlots = {};
+    state.addressFull = null;
     state.addressSuggestions = {};
     state.postingAssetId = null;
   }
 
-  function ensureAddressSuggestion(kind, rowId) {
-    const key = kind + ':' + rowId;
+  function lookupShapeValid(data, presentation) {
+    const text = (v) => typeof v === 'string';
+    const ref = (v) => v && text(v.unit_id) && text(v.name);
+    if (!data || data.schema_version !== 'notary.address-lookup.v2' ||
+        !['found', 'not_found', 'too_many', 'invalid_input', 'reload_failed'].includes(data.status) ||
+        !(data.presentation === presentation ||
+          (data.status === 'invalid_input' && data.presentation === null)) ||
+        !Number.isInteger(data.total) || data.total < 0 || !Array.isArray(data.results) ||
+        !(data.dataset_version === null || text(data.dataset_version)) ||
+        !(data.revision === null || (Number.isInteger(data.revision) && data.revision >= 0))) return false;
+    if (data.status !== 'found') return data.results.length === 0 &&
+      (data.status === 'too_many' ? presentation === 'drafting' && data.total > 10 : data.total === 0);
+    return data.total === data.results.length && data.total > 0 &&
+      (presentation !== 'drafting' || data.total <= 10) && data.results.every((row) =>
+        row && ref(row) && ['commune', 'province'].includes(row.level) &&
+        (row.level === 'commune' ? ref(row.province) : row.province === null) &&
+        (row.source_text === null || text(row.source_text)) &&
+        text(row.display) && row.display.length > 0 &&
+        (row.observation_id === undefined || text(row.observation_id)) &&
+        Array.isArray(row.evidence) && row.evidence.every((e) =>
+          e && text(e.source_id) && text(e.row_key)));
+  }
+
+  function lookupFailure(response) {
+    return { ok: false,
+      error: { message: 'Không đọc được bảng địa chỉ cục bộ.' } };
+  }
+
+  // Nut Tra cua o drafting: gui {query, presentation:'drafting'} voi
+  // chu dang thay trong o nguon. Bam lai cung chuoi van gui (khong chan).
+  // Moi lan bam la mot callId moi; response cu (sai callId, doi seq, doi
+  // session, query hien tai khac luc bam) deu bi bo.
+  async function requestLookup(kind, rowId) {
+    const key = lookupSlotKey(kind, rowId);
     const payload = addressContext(kind, rowId);
-    const identity = JSON.stringify([session, state.caseId, kind, rowId, payload,
-      kind === 'posting' ? (state.caseInfo || {}).noi_niem_yet : null]);
-    if (addressRequests.get(key) === identity) return;
-    addressRequests.set(key, identity);
-    clearTimeout(addressTimers.get(key));
-    delete state.addressSuggestions[key];
-    if (!payload) return;
-    // Gate UBND phai bo dau giong normalize() phia service — "uy ban
-    // nhan dan" khong dau van la dia chi co quan hop le.
-    const addrAscii = (payload.address || '').normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
-    if (kind === 'issuer' && !/^(?:ubnd|uy ban nhan dan)\s/i.test(addrAscii)) {
-      state.addressSuggestions[key] = { message: 'Nhập đúng địa chỉ UBND trên giấy khai tử; không lấy địa chỉ cư trú.' };
+    lookupSeq += 1;
+    const callId = ++lookupCallId;
+    if (!payload) {
+      state.addressSlots[key] = { phase: 'error', query: '', callId,
+        message: 'Nhập địa chỉ cần tra rồi bấm Tra.' };
+      emit();
       return;
     }
-    if (!payload.address || !/^\d{4}-\d{2}-\d{2}$/.test(payload.source_date) || !/^\d{4}-\d{2}-\d{2}$/.test(payload.target_date)) {
-      state.addressSuggestions[key] = { message: 'Cần địa chỉ, ngày cấp đầy đủ và ngày lập hồ sơ (ngày cấp cho khai tử).' };
-      return;
-    }
-    state.addressSuggestions[key] = { loading: true };
+    state.addressSlots[key] = { phase: 'loading', query: payload.query,
+      callId, gen: lookupSeq };
+    emit();
     const capturedSession = session;
-    addressTimers.set(key, setTimeout(async () => {
+    const capturedSeq = lookupSeq;
+    let response;
+    try { response = await client.run('notary.address_lookup', payload); }
+    catch (error) { response = lookupFailure(error); }
+    if (capturedSession !== session) return;
+    const slot = state.addressSlots[key];
+    if (!slot || slot.callId !== callId) return;
+    if (lookupSeq !== capturedSeq ||
+        JSON.stringify(addressContext(kind, rowId)) !== JSON.stringify(payload)) {
+      // Nguon doi khi request dang bay ma chua co lan Tra moi hon: don
+      // loading treo, bao nguoi dung bam Tra lai thay vi treo mai.
+      state.addressSlots[key] = { phase: 'error', query: payload.query,
+        callId, gen: capturedSeq,
+        message: 'Nội dung đã đổi sau khi bấm Tra. Bấm Tra lại.' };
+      emit();
+      return;
+    }
+    const data = response.ok ? response.data : null;
+    state.addressSlots[key] = lookupShapeValid(data, 'drafting')
+      ? { phase: 'ready', query: payload.query, callId, gen: capturedSeq,
+        result: data }
+      : { phase: 'error', query: payload.query, callId, gen: capturedSeq,
+        message: (response.error || {}).message || 'Tra cứu thất bại.' };
+    emit();
+  }
+
+  // Xoa ghi chu/ket qua cua mot o (sau khi huy xac nhan too_many).
+  function dismissLookupSlot(kind, rowId) {
+    delete state.addressSlots[lookupSlotKey(kind, rowId)];
+    emit();
+  }
+
+  // Bao ket qua cua o da cu (nguoi dung doi du lieu sau khi xac nhan).
+  function markLookupStale(kind, rowId) {
+    const key = lookupSlotKey(kind, rowId);
+    state.addressSlots[key] = { phase: 'error',
+      query: (state.addressSlots[key] || {}).query || '',
+      callId: (state.addressSlots[key] || {}).callId || 0,
+      message: 'Nội dung đã đổi sau lần Tra trước. Bấm Tra lại.' };
+    emit();
+  }
+
+  // Mo overlay full sau khi nguoi dung dong y cau hoi too_many: gui ngay
+  // yeu cau full DAU TIEN bang dung query da chup tu lan Tra do. Tra ve
+  // {ok:false, stale:true} khi slot hoac chu nguon da doi — view bao
+  // nguoi dung bam Tra lai, khong mo overlay.
+  function openFullFromSlot(kind, rowId) {
+    const key = lookupSlotKey(kind, rowId);
+    const slot = state.addressSlots[key];
+    const current = addressContext(kind, rowId);
+    if (!slot || slot.phase !== 'ready' || !slot.result ||
+        slot.result.status !== 'too_many' ||
+        slot.result.presentation !== 'drafting' ||
+        !current || current.query !== slot.query ||
+        slot.gen !== lookupSeq) {
+      return { ok: false, stale: true };
+    }
+    lookupSeq += 1;
+    const callId = ++lookupCallId;
+    state.addressFull = { slotKey: key, query: slot.query, callId,
+      phase: 'loading', result: null, message: null };
+    emit();
+    const capturedSession = session;
+    const capturedSeq = lookupSeq;
+    const payload = { query: slot.query, presentation: 'full' };
+    (async () => {
       let response;
       try { response = await client.run('notary.address_lookup', payload); }
-      catch (error) { response = { ok: false, error: { message: 'Không đọc được bảng địa chỉ cục bộ.' } }; }
-      if (capturedSession !== session || addressRequests.get(key) !== identity ||
-          JSON.stringify(addressContext(kind, rowId)) !== JSON.stringify(payload)) return;
-      // User da bam "Bo qua" trong luc response dang bay — ignored thang.
-      if (state.addressSuggestions[key] && state.addressSuggestions[key].ignored) return;
-      // Kiem shape truoc khi tin — du lieu thieu schema_version/fields ma ap
-      // vao dia chi se ghi "undefined, undefined" vao ho so.
+      catch (error) { response = lookupFailure(error); }
+      if (capturedSession !== session) return;
+      const full = state.addressFull;
+      if (!full || full.callId !== callId) return;
+      if (lookupSeq !== capturedSeq) return;
       const data = response.ok ? response.data : null;
-      const valid = !!data && data.schema_version === 'notary.address-lookup.v1' &&
-        typeof data.status === 'string' && Array.isArray(data.candidates);
-      state.addressSuggestions[key] = valid ? { result: data, identity }
-        : { message: (response.error || {}).message || 'Tra cứu thất bại.' };
+      state.addressFull = lookupShapeValid(data, 'full')
+        ? { slotKey: key, query: full.query, callId, phase: 'ready',
+          result: data, message: null }
+        : { slotKey: key, query: full.query, callId, phase: 'error',
+          result: null,
+          message: (response.error || {}).message || 'Tra cứu thất bại.' };
       emit();
-    }, deps.addressDebounceMs ?? 350));
+    })();
+    return { ok: true };
   }
 
-  function applyAddressSuggestion(kind, rowId, unitId) {
-    if (!canWrite()) return false;
-    ensureAddressSuggestion(kind, rowId);
-    const key = kind + ':' + rowId;
-    const suggestion = state.addressSuggestions[key];
-    const candidate = suggestion?.result?.candidates?.find(c => c.unit_id === unitId);
-    if (!candidate || suggestion.identity !== addressRequests.get(key)) return false;
-    if (typeof candidate.address !== 'string' || typeof candidate.commune !== 'string' ||
-        typeof candidate.province !== 'string') return false;
-    // An undated current catalog can never prove the office on a death record.
-    if (kind === 'issuer' && !candidate.historical) return false;
-    if (kind === 'posting') return updateCaseMeta('noi_niem_yet', candidate.commune + ', ' + candidate.province);
-    const row = (kind === 'person' || kind === 'issuer' ? state.stage.people : state.stage.assets).find(r => r.row_id === rowId);
-    if (!row) return false;
-    if (kind === 'issuer') updatePersonField(rowId, 'noi_cap', 'UBND ' + candidate.address);
-    else {
-      const original = (row.dia_chi || '').replace(/ \(nay là .*\)\s*$/i, '');
-      const value = original + ' (nay là ' + candidate.address + ')';
-      if (kind === 'person') updatePersonField(rowId, 'dia_chi', value);
-      else updateAssetField(rowId, 'dia_chi', value);
-    }
-    return true;
+  // Nut Tra trong overlay: gui query dang thay voi presentation full.
+  // Sua chu khong tu gui — chi nut nay gui.
+  function requestFull(queryText) {
+    const full = state.addressFull;
+    if (!full) return;
+    lookupSeq += 1;
+    const callId = ++lookupCallId;
+    state.addressFull = { slotKey: full.slotKey, query: queryText, callId,
+      phase: 'loading', result: null, message: null };
+    emit();
+    const capturedSession = session;
+    const capturedSeq = lookupSeq;
+    const payload = { query: queryText, presentation: 'full' };
+    (async () => {
+      let response;
+      try { response = await client.run('notary.address_lookup', payload); }
+      catch (error) { response = lookupFailure(error); }
+      if (capturedSession !== session) return;
+      const current = state.addressFull;
+      if (!current || current.callId !== callId) return;
+      if (lookupSeq !== capturedSeq) return;
+      const data = response.ok ? response.data : null;
+      state.addressFull = lookupShapeValid(data, 'full')
+        ? { slotKey: current.slotKey, query: queryText, callId,
+          phase: 'ready', result: data, message: null }
+        : { slotKey: current.slotKey, query: queryText, callId,
+          phase: 'error', result: null,
+          message: (response.error || {}).message || 'Tra cứu thất bại.' };
+      emit();
+    })();
   }
 
-  function ignoreAddressSuggestion(kind, rowId) {
-    const key = kind + ':' + rowId;
-    // Huy debounce dang cho — response da bay bi chan boi co ignored
-    // trong handler. Giu addressRequests[key]=identity de ensure lan
-    // sau early-return (ignored ben); doi input → identity doi → fresh.
-    clearTimeout(addressTimers.get(key));
-    addressTimers.delete(key);
-    state.addressSuggestions[key] = { ignored: true };
+  // Dong overlay: huy phien full; response ve muon bi bo (khong mo lai
+  // cua so, khong doi focus, khong hien ket qua).
+  function closeFull() {
+    if (!state.addressFull) return;
+    state.addressFull = null;
+    lookupSeq += 1;
     emit();
   }
 
@@ -593,6 +709,7 @@ function createModel(deps) {
       state.diagramErrors = [];
       state.metaDirty = true;
       state.stageDirty = true;
+      noteLookupSourceChanged();
       emit();
       return true;
     }
@@ -604,6 +721,7 @@ function createModel(deps) {
     if ((state.caseInfo[field] ?? null) === v) return true;
     state.caseInfo[field] = v;
     state.metaDirty = true;
+    if (field === 'noi_niem_yet') noteLookupSourceChanged();
     emit();
     return true;
   }
@@ -728,6 +846,21 @@ function createModel(deps) {
     emit();
   }
 
+  // Dau thay doi cho tra cuu: chi dia chi/noi cap/noi niem yet, them/xoa
+  // dong Nguoi/Tai san, doi case. Sua ho ten/ngay thang/sap xep khong lam
+  // request dang bay het hieu luc.
+  function noteLookupSourceChanged() {
+    lookupSeq += 1;
+    for (const [key, slot] of Object.entries(state.addressSlots)) {
+      const separator = key.indexOf(':');
+      const context = addressContext(key.slice(0, separator), key.slice(separator + 1));
+      if (!context || context.query !== slot.query) {
+        state.addressSlots[key] = { ...slot, phase: 'error', result: null,
+          message: 'Nội dung đã đổi sau khi bấm Tra. Bấm Tra lại.' };
+      }
+    }
+  }
+
   // Loai ho so hien tai cua nhap/case (stage draft hay caseInfo).
   function caseType() {
     return (state.caseInfo && state.caseInfo.case_type) ||
@@ -747,6 +880,7 @@ function createModel(deps) {
     }
     const row = newPersonRow(uuid, fields);
     state.stage.people.push(row);
+    noteLookupSourceChanged();
     touchStage();
     return row;
   }
@@ -757,6 +891,7 @@ function createModel(deps) {
     if (state.stage.assets.length >= MAX_ASSETS) return null;
     const row = newAssetRow(uuid, fields);
     state.stage.assets.push(row);
+    noteLookupSourceChanged();
     touchStage();
     return row;
   }
@@ -773,6 +908,7 @@ function createModel(deps) {
     if (!row || !PERSON_FIELDS.includes(field)) return;
     row[field] = value === '' ? null : value;
     clearRowFieldError(rowId, field);
+    if (field === 'dia_chi' || field === 'noi_cap') noteLookupSourceChanged();
     touchStage();
   }
 
@@ -803,6 +939,7 @@ function createModel(deps) {
       return;
     }
     clearRowFieldError(rowId, field);
+    if (field === 'dia_chi') noteLookupSourceChanged();
     touchStage();
   }
 
@@ -851,6 +988,7 @@ function createModel(deps) {
     if (state.stage.people.length + state.stage.assets.length === before) {
       return;
     }
+    noteLookupSourceChanged();
     // Xoa dong owner → pointer ve null (draft cho phep; commit se bat
     // workspace_owner_required neu chua chon lai truoc khi Cap nhat).
     if (state.stage.owner_row_id === rowId) {
@@ -1739,7 +1877,8 @@ function createModel(deps) {
 
   return {
     state, subscribe,
-    ensureAddressSuggestion, applyAddressSuggestion, ignoreAddressSuggestion,
+    addressContext, requestLookup, dismissLookupSlot, markLookupStale,
+    openFullFromSlot, requestFull, closeFull,
     openCase, newDraft, isDraft, saveDraft, updateCaseMeta, saveCaseMeta,
     loadUqCatalog, createUqCustomer, resolveUqName,
 

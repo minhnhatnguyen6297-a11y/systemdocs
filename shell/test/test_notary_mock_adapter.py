@@ -239,21 +239,20 @@ class TestScaffolding:
         (`notary_v2/data/administrative_units`), khong can fixture.
         """
         res = _call("address_lookup", {
-            "address": "xã Gia Tân, huyện Gia Viễn, tỉnh Ninh Bình",
-            "source_date": "2024-06-01",
-            "target_date": "2026-10-04",
+            "query": "Thị trấn Lâm, huyện Ý Yên, tỉnh Nam Định",
+            "presentation": "drafting",
         })
         assert res["kind"] == "address_lookup"
-        assert res["data"]["schema_version"] == "notary.address-lookup.v1"
+        assert res["data"]["schema_version"] == "notary.address-lookup.v2"
         assert res["data"]["status"] in (
-            "match", "ambiguous", "not_found", "invalid_input")
-        assert res["data"]["coverage"]["kind"] in (
-            "confirmed_history", "current_catalog_candidates",
-            "insufficient_confirmed_history", "invalid_input",
+            "found", "not_found", "too_many", "invalid_input",
             "reload_failed")
+        assert res["data"]["presentation"] in ("drafting", "full", None)
+        assert res["data"]["total"] == len(res["data"]["results"]) or \
+            res["data"]["status"] == "too_many"
         bad = _call("address_lookup", {
-            "address": "xã A", "source_date": "2024",
-            "target_date": "2026-10-04"})
+            "query": "xã A", "presentation": "drafting",
+            "source_date": "2024-06-01"})
         assert bad["data"]["status"] == "invalid_input"
 
     def test_fixtures_loadable_and_no_real_pii(self):

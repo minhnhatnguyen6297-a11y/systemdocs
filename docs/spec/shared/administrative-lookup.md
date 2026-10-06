@@ -1,6 +1,6 @@
 # Lõi tra cứu tên đơn vị hành chính — TASK-2
 
-**Trạng thái:** Owner duyệt 05/10/2026, runtime chưa đáp ứng · **Phạm vi:** dùng chung toàn hệ thống ·
+**Trạng thái:** Owner duyệt 05/10/2026; runtime v2 đã nghiệm thu TASK-3/TASK-4 ngày 06/10/2026 · **Phạm vi:** dùng chung toàn hệ thống ·
 **Nguồn quyết định:** Owner, brainstorm 05/10/2026 —
 [TASK-2](../../../backlog/tasks/task-2%20-%20Brainstorm-Muc-5-Loi-tra-cuu-thay-doi-ten-don-vi-hanh-chinh-dung-chung.md),
 [memlog](../../../_bmad-output/brainstorming/brainstorm-tra-cuu-don-vi-hanh-chinh-2026-10-05/.memlog.md).
@@ -61,12 +61,19 @@ dễ sai; đoạn gốc đã tự nói gộp toàn bộ hay một phần.
 Owner chấp nhận: cụm có thể khớp vào ghi chú trong ngoặc, ví dụ `phường Đại Mỗ`
 ra cả dòng phường Hà Đông.
 
-Tỉnh cũ chỉ nằm trong đoạn chữ của tỉnh mới, nên khớp `tỉnh Nam Định` = phạm vi
-tỉnh Ninh Bình. Không cần bảng tỉnh cũ riêng.
+Tỉnh cũ nằm trong đoạn chữ của tỉnh mới, nên `tỉnh Nam Định` có thể khớp dòng
+tỉnh Ninh Bình. Đây là một dòng kết quả độc lập, không giới hạn phạm vi tra
+các cụm khác vào tỉnh đó (mục 7). Không cần bảng tỉnh cũ riêng.
 
 Kết quả phải cùng một phiên bản kho: tên trả về lấy từ đúng bản đang hoạt động
 (DC-08 là lỗi hiện có, ngoài luật tra). Kho mới lỗi → báo lỗi kho, không trả
 kết quả cũ dưới nhãn mới. Bổ sung/sửa lịch sử theo spec timeline.
+
+**Nhiều dòng nguồn:** trong bản dữ liệu đang hoạt động, một đơn vị có nhiều
+dòng nguồn thì tra và trả từng dòng khớp, giữ nguyên đoạn chữ và bằng chứng
+của dòng đó. Không chọn hộ, nối các đoạn nguồn hay báo lỗi chỉ vì có nhiều
+dòng. *Tại sao:* đây là công cụ truy vấn kho; người dùng xem dữ liệu và tự
+chọn (Owner chốt 05/10/2026).
 
 ## 5. Chuẩn hóa đầu vào
 
@@ -79,8 +86,14 @@ kết quả cũ dưới nhãn mới. Bổ sung/sửa lịch sử theo spec timel
   `Phường Yên Bình` (DC-02), `thôn Yên Bình` không khớp `Xã Yên Bình`.
   `Thị trấn Lâm` → ít kết quả; `Lâm` → hàng trăm.
 - **Hoa/thường:** không phân biệt.
+- **Unicode:** chuẩn hóa NFC trước khi so để hai cách mã hóa cùng một chữ có
+  dấu cho cùng kết quả (ví dụ chữ `ế` dựng sẵn và chữ ghép dấu).
 - **Dấu:** cụm có dấu → so có dấu. Cụm hoàn toàn không dấu → bỏ dấu phía DB rồi
-  so (`yen binh` ra cả `Yên Bình`, `Yến Bình`).
+  so (`yen binh` ra cả `Yên Bình`, `Yến Bình`); ở phép so không dấu, đổi `đ`/`Đ`
+  phía DB thành `d`/`D`. Phép so có dấu giữ phân biệt `d` và `đ`.
+  Xác định có dấu từ cụm người dùng nhập sau NFC, trước khi mở rộng viết tắt;
+  chữ có dấu do máy thêm (`P.` → `Phường`) không đổi cách so của đầu vào.
+  Ví dụ `P. yen binh`: mở rộng tiền tố rồi so hai phía ở dạng không dấu.
 - **Số:** không quy đổi `1`/`01`/`I`. DB ghi ký tự nào thì tìm ký tự đó; sai thì
   người dùng gõ lại.
 
@@ -88,6 +101,9 @@ kết quả cũ dưới nhãn mới. Bổ sung/sửa lịch sử theo spec timel
 
 Cụm sau chuẩn hóa phải **nằm nguyên vẹn, liên tiếp, đúng thứ tự** trong tên hoặc
 đoạn chữ gốc. Không chèn, không cắt ký tự.
+So riêng từng trường: không nối tên với đoạn chữ gốc để tạo một chuỗi khớp
+vắt qua ranh giới hai trường. *Tại sao:* một cụm như vậy không nằm trong tên
+hay đoạn nguồn nào như luật đã chốt.
 
 | Gõ `yên bình` | Khớp? |
 |---|---|
@@ -103,7 +119,8 @@ Engine không phân biệt vị trí hay vai trò của cụm. Dán một đoạ
 (thôn, xã, huyện, tỉnh) hay gõ một tên lẻ đều chạy cùng một luật:
 
 1. **Mỗi cụm** so với các dòng **xã** (tên + đoạn chữ gốc) trên **toàn quốc**
-   bằng đúng luật khớp mục 6; gom mọi dòng khớp, bỏ trùng theo đơn vị.
+   bằng đúng luật khớp mục 6; gom mọi dòng khớp. Một dòng khớp nhiều cụm chỉ
+   xuất hiện một lần; các dòng nguồn khác nhau của cùng đơn vị vẫn giữ riêng.
 2. **Mỗi cụm** cũng so với các dòng **tỉnh** (tên + đoạn chữ gốc); mọi tỉnh
    khớp in một dòng riêng, **kể cả** khi tỉnh đó đã là tỉnh cha của một xã
    trong kết quả.
@@ -129,7 +146,17 @@ bày**; lõi không biết feature nào gọi. *Tại sao:* thêm nơi gọi kh�
 | `full` | Tool tra cứu riêng | `Xã Ý Yên = <đoạn chữ gốc>, Tỉnh Ninh Bình` |
 | `drafting` | Trình soạn thảo | `xã Ý Yên, tỉnh Ninh Bình` |
 
-- Mỗi dòng một đơn vị **hiện hành**; trùng tên → nhiều dòng (khác tỉnh).
+- Mỗi dòng kết quả gắn với một đơn vị **hiện hành** và một dòng nguồn. Cùng
+  `unit_id` có thể xuất hiện nhiều lần khi có nhiều dòng nguồn khớp; mỗi dòng
+  giữ `observation_id`, `source_text`, `evidence` riêng. Đơn vị không có đoạn
+  nguồn vẫn có thể khớp tên và trả một dòng với `source_text: null`.
+- Bỏ lặp theo cùng dòng `(unit_id, observation_id)` khi nhiều cụm cùng khớp;
+  không bỏ dòng chỉ vì tên, `unit_id` hoặc `display` giống nhau. Không có
+  observation thì dùng một dòng tên của đơn vị. Thứ tự các dòng nguồn cùng
+  đơn vị theo thứ tự trong kho. `total` đếm **dòng kết quả**, không đếm số
+  `unit_id` khác nhau; ngưỡng 10 áp dụng theo số dòng này.
+- Với `full`, mỗi dòng hiện đúng đoạn nguồn của nó để người dùng chọn.
+  `drafting` giữ dạng ngắn đã chốt, kể cả khi hai dòng có cùng `display`.
 - Tra tên mới hay tên cũ đều cùng dạng; không gắn nhãn chiều cũ→mới.
 - `drafting`: danh từ chung (`xã`, `phường`, `tỉnh`…) viết thường, tên riêng viết
   hoa, theo thể thức NĐ 30/2020. Owner bỏ bước xác minh văn bản gốc (05/10).
@@ -160,7 +187,7 @@ Ví dụ minh họa luật; kết quả thật phụ thuộc dữ liệu kho.
 
 | Gõ | Máy hiểu | Trả |
 |---|---|---|
-| `xã YÊn Bình` | 1 cụm → toàn quốc | Mọi đơn vị hiện hành có tên/đoạn gốc chứa `xã yên bình`; mỗi tỉnh một dòng |
+| `xã YÊn Bình` | 1 cụm → toàn quốc | Mọi đơn vị hiện hành có tên/đoạn gốc chứa `xã yên bình`; chỉ thêm dòng tỉnh nếu chính dòng tỉnh khớp |
 | `Yên Bình` | Không tiền tố → cả xã, phường, `Yên Bình Đông`… | Nhiều dòng; `drafting` >10 → popup "Nhiều kết quả khớp. Xem đầy đủ?" |
 | `yen binh` | Không dấu → so bỏ dấu | Thêm `Yến Bình`… |
 | `P. Yên Bình` | `P.` → `Phường` | Chỉ dòng chứa `phường yên bình` |
@@ -182,37 +209,54 @@ Ví dụ minh họa luật; kết quả thật phụ thuộc dữ liệu kho.
 - **Won't (lần này):** tra huyện → tỉnh; dữ liệu thôn; tách đoạn gốc thành
   trường riêng; tự tra khi gõ/bong bóng gợi ý; chặn tra lại chuỗi không đổi.
 
-## 12. Hiện trạng runtime/contract — đích chưa đáp ứng
+## 12. Hiện trạng runtime/contract — đã nghiệm thu TASK-3/TASK-4
 
-Code là hiện trạng, không là hành vi đích. Khi triển khai phải sửa:
+Runtime đã chuyển sang `notary.address-lookup.v2`: payload `query` +
+`presentation`, mọi cụm tra độc lập vào xã và tỉnh trên toàn quốc, mỗi
+dòng nguồn khớp trả riêng để người dùng chọn, không tự tra/không tự
+ghi/không nối `(nay là …)`. Schema v1
+(`address-lookup.schema.json`) đã xóa; contract §14 và
+[schema v2](../../../contracts/notary-case-drafting/address-lookup.v2.schema.json)
+là SOT. Renderer đã có nút Tra và overlay full của TASK-4; không tự tra
+hoặc áp dụng kết quả. Phần triển khai hiện có chưa đồng nghĩa nghiệm thu.
 
-- Contract đích: `notary.address-lookup.v2` tại
-  [§14 contract](../../../contracts/notary-case-drafting.md) +
-  [schema v2](../../../contracts/notary-case-drafting/address-lookup.v2.schema.json)
-  (Owner duyệt 05/10). Runtime còn trả v1
-  ([schema v1](../../../contracts/notary-case-drafting/address-lookup.schema.json):
-  bắt hai ngày, tách xã+tỉnh, `coverage`) → trái mục 2, 7, 8.
-- [`administrative_address.py`](../../../notary_v2/services/administrative_address.py):
-  bỏ tiền tố khi so (DC-02), đoán cấp theo mốc 01/07/2025 (DC-04), tách tên cũ
-  bằng regex `predecessor_names`, `apply_address` nối `(nay là …)` (DC-03),
-  chọn tên theo bản observed cuối (DC-08). Cụm được phân vai trò theo vị trí
-  (xã so với cụm đầu, tỉnh cụm cuối) — luật mới: mọi cụm so độc lập vào cả
-  xã lẫn tỉnh.
-- [`administrative_timeline.py`](../../../notary_v2/administrative_timeline.py):
-  cờ "một phần" gắn cho cả dòng — MVP không dùng, đoạn gốc tự hiện ghi chú.
-- Renderer chỉ gửi khi đủ địa chỉ + hai ngày; nơi niêm yết lấy địa chỉ tài sản
-  (DC-01, DC-05).
+Lịch sử: runtime từng trả v1 (bắt hai ngày, tách xã+tỉnh, `coverage`,
+bỏ tiền tố khi so, đoán cấp theo mốc 01/07/2025, tách tên cũ bằng regex,
+nối `(nay là …)`, renderer chỉ gửi khi đủ địa chỉ + hai ngày) → trái mục
+2, 7, 8; đã thay toàn bộ tại TASK-3.
+
+Kiểm tra độc lập 05/10/2026 (`.agents/audit-task3-4-20261005/REVIEW.md`)
+tìm thêm 2 lỗi lõi đã sửa xong: raw khớp nhiều observation chỉ trả dòng
+đầu (R1); tên/tỉnh cha lấy bản ghi cũ nhất thay vì đúng version (R2).
+Sau sửa: kiểm importer thật hai snapshot (đổi tên + tỉnh cha), raw khớp
+2/11 dòng, ngưỡng `too_many` đếm dòng — pytest 211 pass/3 skip.
+
+Review tiếp tìm lỗi đơn vị đã mất khỏi catalog mới, thứ tự dòng nguồn và
+xã thiếu tỉnh. Đã sửa/kiểm lại 06/10: ID phiên bản importer phân biệt lịch sử
+với đơn vị tên-only hợp lệ; xuất nguồn theo thứ tự kho; không phát found sai schema.
+*Tại sao:* đáp ứng mục 4, 7, 8 và contract hiện có; không thêm luật tra.
+Python 294 đạt/2 bỏ qua symlink, npm 403 đạt, examples 82/0; kiểm bỏ sửa
+trong bộ nhớ bắt lỗi cũ. Producer frozen với kho public và component Word
+trên Electron thật đã kiểm, gồm full 3.001 dòng, clipboard và lỗi snapshot.
+[Kết quả nghiệm thu](../../../.agents/fix-task3-4-20261005/RESULT.md);
+[review trước sửa](../../../.agents/review-task3-4-resumed-20261005/REVIEW.md) giữ làm lịch sử.
 
 ## 13. Còn mở
 
-- Danh mục viết tắt đầy đủ và ký tự ngăn cách dự phòng.
-- Vị trí nút Tra và bố cục bên trong popup tool tra cứu.
+- Mở rộng danh mục viết tắt hoặc ký tự ngăn cách ngoài danh mục cố định mục 5
+  là việc sau MVP; không phải điều kiện chặn TASK-3.
+- Bố cục TASK-4 đã chốt tại [spec nơi gọi](../notary_v2/administrative-address.md).
 - Contract cho module ngoài `notary_v2` gọi lõi.
 - Nguồn dữ liệu huyện (Won't hiện tại).
 - `drafting` >10: vì kết quả giờ gồm cả các cụm huyện khớp, ca dán địa chỉ cũ
   đầy đủ dễ vượt 10 → popup/tool phải đọc được số lượng lớn.
 
 ## 14. Lịch sử
+
+Owner 05/10/2026 chốt nhiều dòng nguồn: “in dữ liệu ra, chọn dòng nào là việc
+của user”, vì đây là tool truy vấn database. Thay đề xuất báo lỗi kho và
+quy tắc bỏ trùng theo đơn vị: giữ các dòng nguồn khớp riêng, chỉ bỏ cùng dòng
+bị tìm thấy lặp lại qua nhiều cụm. Không thêm cơ chế xét đúng/sai giữa các nguồn.
 
 Owner 05/10/2026, sau khi quan sát hành vi Bando (`quận hà đông` ra các xã
 từng thuộc quận; `phường linh đàm, tỉnh nam định` trả xã và tỉnh độc lập),

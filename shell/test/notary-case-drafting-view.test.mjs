@@ -36,7 +36,7 @@ function fid(root, v) {
 
 // Build view + model voi client stub ghi lai moi command call (de chung
 // minh apply/cancel KHONG goi command ra ngoai).
-function build(t, { draft = true, confirm = true, respond = null } = {}) {
+function build(t, { draft = true, confirm = true, confirmSeen = null, respond = null } = {}) {
   const { document } = makeDom();
   global.document = document;
   global.window = {
@@ -45,6 +45,7 @@ function build(t, { draft = true, confirm = true, respond = null } = {}) {
     G1_NOTARY_WORD: WORD, G1_NOTARY_ERRORS: ERRORS,
   };
   const calls = [];
+  const notifications = [];
   const client = {
     run: async (cmd, payload) => {
       calls.push([cmd, payload]);
@@ -54,8 +55,8 @@ function build(t, { draft = true, confirm = true, respond = null } = {}) {
   };
   const model = M.createModel({ client });
   const view = VIEW.createNotaryModuleView({
-    model, lib: L, notify: () => {},
-    confirm: async () => confirm,
+    model, lib: L, notify: (message) => notifications.push(message),
+    confirm: async (args) => { if (confirmSeen) confirmSeen.push(args); return confirm; },
     pickFiles: async () => ({ ok: true, data: { files: [] } }),
     openPath: async () => ({ ok: true }),
     registerDroppedFile: null,
@@ -71,7 +72,7 @@ function build(t, { draft = true, confirm = true, respond = null } = {}) {
     model.dismissNotice();       // emit → render workspace
   }
   t.after(() => { delete global.document; delete global.window; });
-  return { model, view, document, calls };
+  return { model, view, document, calls, notifications };
 }
 
 // Gia lap case da ton tai (committed data) — kieu model.state sau
@@ -1462,39 +1463,34 @@ test('NAIA-8 word dialog: Huy xuat an/hien theo batch + scope cd-word-modal', as
 
 });
 
-// ---------- NAIA-9: address suggestion wiring ----------
+// ---------- TASK-3: renderer ngu dong (khong tu tra) ----------
 
-test('NAIA-9: suggestion box render candidates + apply ghi dia_chi qua model', async () => {
+test('TASK-3: render/go/refresh khong goi lookup, khong sua du lieu', async () => {
   const answer = { ok: true, data: {
-    schema_version: 'notary.address-lookup.v1', status: 'ambiguous',
-    coverage: { kind: 'current_catalog_candidates', historical: false,
-                reason: null },
-    parsed: { hamlet: '', commune: 'Xã A', district: null,
-              province: 'Tỉnh P' },
-    candidates: [
-      { unit_id: 'B', commune: 'Xã B', province: 'Tỉnh P',
-        address: 'Xã B, Tỉnh P', historical: false },
-      { unit_id: 'C', commune: 'Xã C', province: 'Tỉnh P',
-        address: 'Xã C, Tỉnh P', historical: false }],
-    provenance: [], dataset_version: 'v1', revision: 1 }};
+    schema_version: 'notary.address-lookup.v2', status: 'found',
+    presentation: 'drafting', total: 1,
+    results: [{
+      unit_id: 'B', level: 'commune', name: 'Xã B',
+      province: { unit_id: 'P', name: 'Tỉnh P' },
+      source_text: 'Xã B', display: 'xã B, tỉnh P',
+      observation_id: 'obs-b', evidence: [] }],
+    dataset_version: 'v2', revision: 1 }};
   const { model, view, calls } = build(test, {
     respond: (cmd) => cmd === 'notary.address_lookup' ? answer : null });
   model.updateCaseMeta('ngay_lap_ho_so', '2026-10-04');
   const p = model.addPerson({ ho_ten: 'A', dia_chi: 'Xã A, Tỉnh P',
                               ngay_cap: '2020-01-01' });
+  const before = model.state.stage.people[0].dia_chi;
   await new Promise(r => setTimeout(r, 450));
   const box = collect(view.el,
     (e) => e.id === `address-person-${p.row_id}`)[0];
-  assert.ok(box, 'thiếu ô gợi ý địa chỉ person');
-  assert.ok(box.textContent.includes('Danh mục hiện tại'),
-    'coverage label phải phân biệt current catalog vs confirmed');
-  assert.ok(calls.some(([c]) => c === 'notary.address_lookup'),
-    'chưa gọi command notary.address_lookup');
-  const applyB = fid(view.el, `address-apply:person:${p.row_id}:B`);
-  assert.ok(applyB, 'thiếu nút Chọn ứng viên B');
-  applyB.onclick();
-  assert.equal(model.state.stage.people[0].dia_chi,
-    'Xã A, Tỉnh P (nay là Xã B, Tỉnh P)');
+  assert.ok(box, 'thiếu ô tra cứu địa chỉ person');
+  assert.equal(box.textContent, '');
+  assert.ok(!calls.some(([c]) => c === 'notary.address_lookup'),
+    'render khong duoc goi notary.address_lookup');
+  assert.ok(!fid(view.el, `address-apply:person:${p.row_id}:B`),
+    'ngu dong khong co nut ap dung');
+  assert.equal(model.state.stage.people[0].dia_chi, before);
 });
 
 test('NAIA-9: issuer input + suggestion box chỉ hiện khi ngay_chet có', async () => {
@@ -1509,4 +1505,497 @@ test('NAIA-9: issuer input + suggestion box chỉ hiện khi ngay_chet có', asy
     'người chết phải có ô gợi ý nơi cấp khai tử');
   assert.ok(fid(view.el, `p:${dead.row_id}:noi_cap`),
     'thiếu input nhập địa chỉ UBND trên giấy khai tử');
+});
+
+// ---------- TASK-4: nut Tra thu cong + overlay full ----------
+
+const ltick = (ms = 30) => new Promise(r => setTimeout(r, ms));
+
+function lookupResponders(mode) {
+  const mk = (status, presentation, total, results) => ({ ok: true, data: {
+    schema_version: 'notary.address-lookup.v2', status, presentation,
+    total, results, dataset_version: 'v2', revision: 1 } });
+  const fullRows = [
+    { unit_id: 'U1', level: 'commune', name: 'Xã A',
+      province: { unit_id: 'P', name: 'Tỉnh P' },
+      source_text: 'Xã A (nguồn một)', display: 'Xã A = Xã A (nguồn một), Tỉnh P',
+      observation_id: 'obs-1', evidence: [] },
+    { unit_id: 'U1', level: 'commune', name: 'Xã A',
+      province: { unit_id: 'P', name: 'Tỉnh P' },
+      source_text: 'Xã A (nguồn hai)', display: 'Xã A = Xã A (nguồn hai), Tỉnh P',
+      observation_id: 'obs-2', evidence: [] },
+  ];
+  return (cmd, payload) => {
+    if (cmd !== 'notary.address_lookup') return null;
+    if (payload.presentation === 'full') {
+      return mk('found', 'full', fullRows.length, fullRows);
+    }
+    if (mode === 'too_many') return mk('too_many', 'drafting', 12, []);
+    if (mode === 'not_found') return mk('not_found', 'drafting', 0, []);
+    return mk('found', 'drafting', 2, fullRows.map((r) => ({
+      ...r, display: 'xã A, tỉnh P' })));
+  };
+}
+
+function panelOf(el, root) {
+  let n = el;
+  while (n && n.parentElement && n.parentElement !== root) n = n.parentElement;
+  return n;
+}
+
+test('TASK-4: moi o co nut Tra; go/dan/blur khong gui lenh', async () => {
+  const { model, view, calls } = build(test,
+    { respond: lookupResponders('found') });
+  const p = model.addPerson({ ho_ten: 'A', dia_chi: 'Xã A, Tỉnh P',
+    ngay_chet: '2020-01-01', noi_cap: 'UBND Xã A' });
+  const a = model.addAsset({ dia_chi: 'Xã A, Tỉnh P' });
+  model.updateCaseMeta('noi_niem_yet', 'Xã A, Tỉnh P');
+  await ltick(400);
+  assert.ok(fid(view.el, `lookup-tra:person:${p.row_id}`), 'thiếu Tra person');
+  assert.ok(fid(view.el, `lookup-tra:asset:${a.row_id}`), 'thiếu Tra asset');
+  assert.ok(fid(view.el, `lookup-tra:issuer:${p.row_id}`), 'thiếu Tra issuer');
+  assert.ok(fid(view.el, 'lookup-tra:posting:posting'), 'thiếu Tra posting');
+  assert.ok(!calls.some(([c]) => c === 'notary.address_lookup'),
+    'render/go khong duoc tu gui lookup');
+  // Go them vao o dia chi cung khong gui.
+  const inp = fid(view.el, `p:${p.row_id}:dia_chi`);
+  inp.value = 'Xã A sửa, Tỉnh P';
+  inp.oninput();
+  await ltick(400);
+  assert.ok(!calls.some(([c]) => c === 'notary.address_lookup'),
+    'go khong duoc tu gui lookup');
+});
+
+test('TASK-4: bam Tra gui drafting, hien ket qua + Copy, khong sua du lieu', async () => {
+  const copied = [];
+  Object.defineProperty(globalThis, 'navigator',
+    { value: { clipboard: { writeText: async (t) => { copied.push(t); } } },
+      configurable: true });
+  try {
+    const { model, view, calls } = build(test,
+      { respond: lookupResponders('found') });
+    const p = model.addPerson({ ho_ten: 'A', dia_chi: 'Xã A, Tỉnh P' });
+    const before = model.state.stage.people[0].dia_chi;
+    fid(view.el, `lookup-tra:person:${p.row_id}`).onclick();
+    await ltick(200);
+    assert.ok(calls.some(([c, pl]) => c === 'notary.address_lookup' &&
+      pl.presentation === 'drafting' && pl.query === 'Xã A, Tỉnh P'));
+    const box = collect(view.el,
+      (e) => e.id === `address-person-${p.row_id}`)[0];
+    assert.ok(box.textContent.includes('Tìm thấy 2 dòng'));
+    // Cung unit_id hien rieng hai dong, moi dong mot Copy.
+    const c0 = fid(view.el, `lookup-copy:person:${p.row_id}:0`);
+    const c1 = fid(view.el, `lookup-copy:person:${p.row_id}:1`);
+    assert.ok(c0 && c1, 'moi dong mot Copy rieng');
+    await c0.onclick();
+    assert.deepEqual(copied, ['xã A, tỉnh P']);
+    assert.equal(model.state.stage.people[0].dia_chi, before);
+    // Copy khong dong hop, khong sua o.
+    assert.ok(fid(view.el, `lookup-copy:person:${p.row_id}:0`));
+    assert.equal(c0.textContent, 'Đã copy');
+  } finally {
+    delete globalThis.navigator;
+  }
+});
+
+test('TASK-4: Copy loi bao loi, khong bao da copy', async () => {
+  Object.defineProperty(globalThis, 'navigator',
+    { value: { clipboard: { writeText: async () => {
+      throw new Error('denied'); } } }, configurable: true });
+  try {
+    const { model, view } = build(test,
+      { respond: lookupResponders('found') });
+    const p = model.addPerson({ ho_ten: 'A', dia_chi: 'Xã A, Tỉnh P' });
+    fid(view.el, `lookup-tra:person:${p.row_id}`).onclick();
+    await ltick(200);
+    const c0 = fid(view.el, `lookup-copy:person:${p.row_id}:0`);
+    await c0.onclick();
+    assert.equal(c0.textContent, 'Copy');
+    const box = collect(view.el,
+      (e) => e.id === `address-person-${p.row_id}`)[0];
+    assert.ok(box.textContent.includes('Copy thất bại'));
+  } finally {
+    delete globalThis.navigator;
+  }
+});
+
+test('TASK-4: issuer tra dia chi nguoi chet; posting tra o niem yet', async () => {
+  const { model, view, calls } = build(test,
+    { respond: lookupResponders('found') });
+  const p = model.addPerson({ ho_ten: 'Chết', ngay_chet: '2020-01-01',
+    dia_chi: 'Xã Chết, Tỉnh P', noi_cap: 'UBND Xã Cũ' });
+  const a = model.addAsset({ dia_chi: 'Xã Tài sản, Tỉnh P' });
+  model.updateCaseMeta('noi_niem_yet', 'Nơi niêm yết thật');
+  await ltick(100);
+  fid(view.el, `lookup-tra:issuer:${p.row_id}`).onclick();
+  await ltick(200);
+  fid(view.el, 'lookup-tra:posting:posting').onclick();
+  await ltick(200);
+  const queries = calls.filter(([c]) => c === 'notary.address_lookup')
+    .map(([, pl]) => pl.query);
+  assert.ok(queries.includes('Xã Chết, Tỉnh P'),
+    'issuer phai tra dia chi nguoi chet, thay: ' + JSON.stringify(queries));
+  assert.ok(queries.includes('Nơi niêm yết thật'),
+    'posting phai tra noi dung o niem yet, khong lay dia chi tai san');
+  assert.ok(!queries.includes('Xã Tài sản, Tỉnh P'));
+});
+
+test('TASK-4: too_many Huy khong goi full; Dong y mo overlay dung query', async () => {
+  const b1 = build(test, { confirm: false, respond: lookupResponders('too_many') });
+  b1.model.addPerson({ ho_ten: 'A', dia_chi: 'Xã A, Tỉnh P' });
+  const p1 = b1.model.state.stage.people[0].row_id;
+  await ltick(100);
+  fid(b1.view.el, `lookup-tra:person:${p1}`).onclick();
+  await ltick(200);
+  assert.equal(b1.calls.filter(([c, pl]) => c === 'notary.address_lookup' &&
+    pl.presentation === 'full').length, 0, 'Huy khong duoc goi full');
+  assert.equal(collect(b1.view.el,
+    (e) => e.dataset && e.dataset.fid === 'lookup-full-list').length, 0);
+
+  const seen = [];
+  const b2 = build(test, { confirm: true, confirmSeen: seen,
+    respond: lookupResponders('too_many') });
+  const p2 = b2.model.addPerson({ ho_ten: 'A', dia_chi: 'Xã A, Tỉnh P' });
+  await ltick(100);
+  fid(b2.view.el, `lookup-tra:person:${p2.row_id}`).onclick();
+  await ltick(300);
+  const fullCalls = b2.calls.filter(([c, pl]) => c === 'notary.address_lookup' &&
+    pl.presentation === 'full');
+  assert.equal(fullCalls.length, 1);
+  assert.equal(fullCalls[0][1].query, 'Xã A, Tỉnh P');
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0].title, 'Nhiều kết quả khớp. Xem đầy đủ?');
+  const list = fid(b2.view.el, 'lookup-full-list');
+  assert.ok(list, 'thieu danh sach overlay');
+  assert.ok(list.textContent.includes('nguồn một'));
+  assert.ok(list.textContent.includes('nguồn hai'));
+  assert.ok(fid(b2.view.el, 'lookup-full-query'));
+  assert.ok(fid(b2.view.el, 'lookup-full-tra'));
+  assert.ok(fid(b2.view.el, 'lookup-full-close'));
+});
+
+test('TASK-4: sua query trong overlay khong tu tra; Tra moi gui full', async () => {
+  const { model, view, calls } = build(test,
+    { confirm: true, respond: lookupResponders('too_many') });
+  const p = model.addPerson({ ho_ten: 'A', dia_chi: 'Xã A, Tỉnh P' });
+  await ltick(100);
+  fid(view.el, `lookup-tra:person:${p.row_id}`).onclick();
+  await ltick(300);
+  const n0 = calls.length;
+  const q = fid(view.el, 'lookup-full-query');
+  q.value = 'Xã A sửa, Tỉnh P';
+  await ltick(200);
+  assert.equal(calls.length, n0, 'sua query khong duoc tu gui');
+  fid(view.el, 'lookup-full-tra').onclick();
+  await ltick(200);
+  assert.equal(calls.length, n0 + 1);
+  assert.deepEqual(calls[calls.length - 1][1],
+    { query: 'Xã A sửa, Tỉnh P', presentation: 'full' });
+});
+
+test('TASK-4: dong overlay giu nhap, caret, scroll; late response bi bo', async () => {
+  const { model, view, calls } = build(test,
+    { confirm: true, respond: lookupResponders('too_many') });
+  const p = model.addPerson({ ho_ten: 'A', dia_chi: 'Xã A, Tỉnh P' });
+  await ltick(100);
+  const inp = fid(view.el, `p:${p.row_id}:dia_chi`);
+  inp.setSelectionRange(2, 5);
+  const dp = panelOf(inp, view.el);
+  dp.scrollTop = 55;
+  fid(view.el, `lookup-tra:person:${p.row_id}`).onclick();
+  await ltick(300);
+  assert.ok(fid(view.el, 'lookup-full-list'), 'overlay chua mo');
+  // Doi chu trong luc overlay mo van giu trong model (nhap chua luu).
+  assert.equal(model.state.stage.people[0].dia_chi, 'Xã A, Tỉnh P');
+  fid(view.el, 'lookup-full-close').onclick();
+  await ltick(100);
+  assert.equal(collect(view.el,
+    (e) => e.dataset && e.dataset.fid === 'lookup-full-list').length, 0);
+  const inp2 = fid(view.el, `p:${p.row_id}:dia_chi`);
+  assert.ok(inp2, 'mat o nhap sau khi dong');
+  assert.equal(inp2.value, 'Xã A, Tỉnh P');
+  assert.equal(document.activeElement, inp2);
+  assert.deepEqual([inp2.selectionStart, inp2.selectionEnd], [2, 5]);
+  const dp2 = panelOf(inp2, view.el);
+  assert.equal(dp2.scrollTop, 55);
+  assert.ok(!calls.some(([c, pl]) => c === 'notary.address_lookup' &&
+    pl.presentation === 'full' && pl.query !== 'Xã A, Tỉnh P'));
+});
+
+function fireMouseDown(el) {
+  for (const f of (el._ev && el._ev.mousedown) || []) f();
+}
+
+test('R3: ket qua ve khi dang sua o khac van hien, khong giut focus', async () => {
+  const { model, view } = build(test,
+    { respond: lookupResponders('found') });
+  const p = model.addPerson({ ho_ten: 'A', dia_chi: 'Xã A, Tỉnh P' });
+  await ltick(100);
+  const tra = fid(view.el, `lookup-tra:person:${p.row_id}`);
+  const nameInp = fid(view.el, `p:${p.row_id}:ho_ten`);
+  nameInp.focus();
+  fireMouseDown(tra);
+  tra.onclick();
+  // Nguoi dung chuyen sang sua o Ho ten trong luc cho (nguon khong doi).
+  await ltick(50);
+  assert.equal(document.activeElement, nameInp);
+  await ltick(300);
+  const box = collect(view.el,
+    (e) => e.id === `address-person-${p.row_id}`)[0];
+  assert.ok(box.textContent.includes('Tìm thấy 2 dòng'),
+    'ket qua phai hien du dang sua o khac, thay: ' + box.textContent);
+  assert.ok(fid(view.el, `lookup-copy:person:${p.row_id}:0`));
+  assert.equal(document.activeElement, nameInp,
+    'khong duoc keo con tro ve nut Tra');
+});
+
+test('R5: Huy cau hoi phuc hoi dung o dang sua, vung chon va scroll', async () => {
+  const { model, view, calls } = build(test,
+    { confirm: false, respond: lookupResponders('too_many') });
+  const p = model.addPerson({ ho_ten: 'Nguyen Van A', dia_chi: 'Xã A, Tỉnh P' });
+  await ltick(100);
+  const nameInp = fid(view.el, `p:${p.row_id}:ho_ten`);
+  nameInp.focus();
+  nameInp.setSelectionRange(1, 4);
+  const dp = panelOf(nameInp, view.el);
+  dp.scrollTop = 42;
+  const tra = fid(view.el, `lookup-tra:person:${p.row_id}`);
+  fireMouseDown(tra);
+  tra.onclick();
+  await ltick(300);
+  assert.equal(calls.filter(([c, pl]) => c === 'notary.address_lookup' &&
+    pl.presentation === 'full').length, 0);
+  const nameInp2 = fid(view.el, `p:${p.row_id}:ho_ten`);
+  assert.equal(document.activeElement, nameInp2,
+    'Huy phai tra focus ve o Ho ten dang sua');
+  assert.deepEqual([nameInp2.selectionStart, nameInp2.selectionEnd], [1, 4]);
+  assert.equal(panelOf(nameInp2, view.el).scrollTop, 42);
+});
+
+test('R5: dong full khi dang sua o khac dich phuc hoi o do', async () => {
+  const { model, view } = build(test,
+    { confirm: true, respond: lookupResponders('too_many') });
+  const p = model.addPerson({ ho_ten: 'Nguyen Van A', dia_chi: 'Xã A, Tỉnh P' });
+  await ltick(100);
+  const nameInp = fid(view.el, `p:${p.row_id}:ho_ten`);
+  nameInp.focus();
+  nameInp.setSelectionRange(0, 6);
+  const tra = fid(view.el, `lookup-tra:person:${p.row_id}`);
+  fireMouseDown(tra);
+  tra.onclick();
+  await ltick(300);
+  assert.ok(fid(view.el, 'lookup-full-list'), 'overlay chua mo');
+  fid(view.el, 'lookup-full-close').onclick();
+  await ltick(100);
+  const nameInp2 = fid(view.el, `p:${p.row_id}:ho_ten`);
+  assert.equal(document.activeElement, nameInp2);
+  assert.deepEqual([nameInp2.selectionStart, nameInp2.selectionEnd], [0, 6]);
+  assert.equal(nameInp2.value, 'Nguyen Van A');
+});
+
+test('P4: reversed replies from two Tra clicks open just one confirmation', async () => {
+  const pending = [], seen = [];
+  let finishConfirm;
+  const confirmation = new Promise(resolve => { finishConfirm = resolve; });
+  const { model, view } = build(test, { confirm: confirmation, confirmSeen: seen,
+    respond: (cmd) => cmd === 'notary.address_lookup' ? new Promise(r => pending.push(r)) : null });
+  const p = model.addPerson({ dia_chi: 'Query A' });
+  fid(view.el, `lookup-tra:person:${p.row_id}`).onclick();
+  fid(view.el, `lookup-tra:person:${p.row_id}`).onclick();
+  pending[1](lookupResponders('too_many')('notary.address_lookup', { presentation: 'drafting' }));
+  await ltick();
+  pending[0](lookupResponders('too_many')('notary.address_lookup', { presentation: 'drafting' }));
+  await ltick();
+  try {
+    assert.equal(seen.length, 1);
+  } finally {
+    finishConfirm(false);
+    await ltick();
+  }
+  assert.equal(model.state.addressSlots['person:' + p.row_id], undefined);
+});
+
+test('P7: background replies preserve full Copy node, focus and scroll', async () => {
+  const pending = [];
+  const { model, view, document } = build(test, { respond: (cmd, payload) => {
+    if (cmd !== 'notary.address_lookup') return null;
+    if (payload.query === 'Delayed') return new Promise(r => pending.push(r));
+    return lookupResponders('too_many')(cmd, payload);
+  }});
+  const p = model.addPerson({ dia_chi: 'Delayed' });
+  const a = model.addAsset({ dia_chi: 'Open full' });
+  fid(view.el, `lookup-tra:person:${p.row_id}`).onclick();
+  fid(view.el, `lookup-tra:asset:${a.row_id}`).onclick();
+  await ltick();
+  const copy = fid(view.el, 'lookup-full-copy:0'), list = fid(view.el, 'lookup-full-list');
+  copy.focus(); list.scrollTop = 55;
+  pending[0](lookupResponders('found')('notary.address_lookup', { presentation: 'drafting' }));
+  await ltick();
+  assert.equal(fid(view.el, 'lookup-full-copy:0'), copy);
+  assert.equal(document.activeElement, copy);
+  assert.equal(list.scrollTop, 55);
+});
+
+test('P8: delayed clipboard failure remains visible after re-Tra', async () => {
+  let fail;
+  Object.defineProperty(globalThis, 'navigator', { configurable: true,
+    value: { clipboard: { writeText: () => new Promise((_, reject) => { fail = reject; }) } } });
+  try {
+    const { model, view } = build(test, { respond: lookupResponders('found') });
+    const p = model.addPerson({ dia_chi: 'Query A' });
+    fid(view.el, `lookup-tra:person:${p.row_id}`).onclick(); await ltick();
+    const copying = fid(view.el, `lookup-copy:person:${p.row_id}:0`).onclick();
+    fid(view.el, `lookup-tra:person:${p.row_id}`).onclick(); await ltick();
+    fail(new Error('denied')); await copying;
+    assert.ok(view.el.textContent.includes('Copy thất bại'));
+  } finally { delete globalThis.navigator; }
+});
+
+test('P12: keyboard Tra cancel restores previous input and selection without mousedown', async () => {
+  const { model, view, document } = build(test, { confirm: false, respond: lookupResponders('too_many') });
+  const p = model.addPerson({ ho_ten: 'Keyboard name', dia_chi: 'Query A' });
+  const name = fid(view.el, `p:${p.row_id}:ho_ten`);
+  name.focus(); name.setSelectionRange(2, 6);
+  const tra = fid(view.el, `lookup-tra:person:${p.row_id}`);
+  tra.focus(); tra.onclick(); await ltick();
+  assert.equal(document.activeElement.dataset.fid, name.dataset.fid);
+  assert.deepEqual([document.activeElement.selectionStart, document.activeElement.selectionEnd], [2, 6]);
+});
+
+test('P11: terminal lookup messages remove Copy in drafting and full', async () => {
+  for (const [status, message] of [['not_found', 'Không tìm thấy'],
+    ['invalid_input', 'Chuỗi tra chưa hợp lệ'], ['reload_failed', 'Không đọc được bảng địa chỉ cục bộ']]) {
+    let mode = 'found';
+    const { model, view } = build(test, { respond: (cmd, payload) => {
+      if (cmd !== 'notary.address_lookup') return null;
+      if (mode === 'found' || mode === 'too_many') return lookupResponders(mode)(cmd, payload);
+      return { ok: true, data: { schema_version: 'notary.address-lookup.v2', status,
+        presentation: payload.presentation, total: 0, results: [], dataset_version: 'v2', revision: 1 } };
+    }});
+    const p = model.addPerson({ dia_chi: 'Query A' });
+    const tra = () => fid(view.el, `lookup-tra:person:${p.row_id}`).onclick();
+    tra(); await ltick();
+    mode = 'error'; tra(); await ltick();
+    assert.ok(collect(view.el, e => e.id === `address-person-${p.row_id}`)[0].textContent.includes(message));
+    assert.equal(fid(view.el, `lookup-copy:person:${p.row_id}:0`), null);
+    mode = 'too_many'; tra(); await ltick();
+    mode = 'error'; fid(view.el, 'lookup-full-tra').onclick(); await ltick();
+    assert.ok(fid(view.el, 'lookup-full-note').textContent.includes(message));
+    assert.equal(fid(view.el, 'lookup-full-copy:0'), null);
+    fid(view.el, 'lookup-full-close').onclick();
+  }
+});
+
+test('P6: Word posting Tra uses its own draft and Copy does not save; full suspends Word', async () => {
+  let mode = 'found';
+  Object.defineProperty(globalThis, 'navigator', { configurable: true,
+    value: { clipboard: { writeText: async () => {} } } });
+  try {
+    const { model, view, calls, document } = build(test, { draft: false,
+      respond: (cmd, payload) => lookupResponders(mode)(cmd, payload) });
+    findBtns(view.el, 'Xuất Word')[0].onclick(); await ltick();
+    const input = fid(view.el, 'word-posting-input');
+    assert.ok(input);
+    input.value = 'Word draft query'; input.oninput(); input.focus(); input.setSelectionRange(1, 5);
+    const wordBox = input.closest('.cd-word-modal');
+    const lookupRow = input.parentElement;
+    assert.ok(lookupRow.classList.contains('cd-lookup-row'));
+    assert.ok(input.classList.contains('cd-cell'));
+    assert.equal(lookupRow.children[0], input);
+    assert.equal(lookupRow.children[1], fid(wordBox, 'word-lookup-tra:posting:posting'));
+    const postingRegion = lookupRow.parentElement;
+    assert.ok(!postingRegion.classList.contains('cd-toolbar'));
+    const resultRegion = collect(wordBox, e => e.id === 'address-dlg-posting-posting')[0].parentElement;
+    assert.equal(resultRegion.parentElement, postingRegion);
+    assert.ok(postingRegion.children.indexOf(resultRegion) > postingRegion.children.indexOf(lookupRow));
+    const tra = () => fid(wordBox, 'word-lookup-tra:posting:posting').onclick();
+    tra(); await ltick();
+    assert.deepEqual(calls.filter(([cmd]) => cmd === 'notary.address_lookup')[0][1],
+      { query: 'Word draft query', presentation: 'drafting' });
+    await fid(wordBox, 'word-lookup-copy:posting:posting:0').onclick();
+    const identifiers = collect(view.el, e => !!e.dataset.fid).map(e => e.dataset.fid);
+    assert.equal(new Set(identifiers).size, identifiers.length);
+    assert.ok(!calls.some(([cmd]) => ['notary.workspace_update', 'notary.workspace_commit_stage'].includes(cmd)));
+    mode = 'too_many'; tra(); await ltick();
+    assert.ok(fid(view.el, 'lookup-full-list'));
+    assert.equal(wordBox.parentElement.hidden, true);
+    assert.equal(collect(view.el, e => e.getAttribute('role') === 'dialog').length, 1);
+    const lastFull = fid(view.el, 'lookup-full-close');
+    const firstFull = fid(view.el, 'lookup-full-query').closest('.modal')
+      .querySelector('button, input, textarea, select, [tabindex]');
+    lastFull.focus();
+    document.dispatch('keydown', { key: 'Tab', preventDefault() {} });
+    assert.equal(document.activeElement, firstFull);
+    firstFull.focus();
+    document.dispatch('keydown', { key: 'Tab', shiftKey: true, preventDefault() {} });
+    assert.equal(document.activeElement, lastFull);
+    document.dispatch('keydown', { key: 'Escape' });
+    assert.equal(wordBox.parentElement.hidden, false);
+    assert.equal(document.activeElement, input);
+    assert.deepEqual([input.selectionStart, input.selectionEnd], [1, 5]);
+    assert.equal(input.value, 'Word draft query');
+    const wordItems = wordBox.querySelectorAll('button, input, textarea, select, [tabindex]')
+      .filter(e => !e.disabled && !e.hidden);
+    wordItems.at(-1).focus();
+    document.dispatch('keydown', { key: 'Tab', preventDefault() {} });
+    assert.equal(document.activeElement, wordItems[0]);
+    document.dispatch('keydown', { key: 'Tab', shiftKey: true, preventDefault() {} });
+    assert.equal(document.activeElement, wordItems.at(-1));
+    document.dispatch('keydown', { key: 'Escape' });
+    assert.equal(wordBox.isConnected, false);
+  } finally { delete globalThis.navigator; }
+});
+
+test('Word focused Copy refreshes changed slot and keeps delayed failure in Word', async () => {
+  let fail;
+  Object.defineProperty(globalThis, 'navigator', { configurable: true,
+    value: { clipboard: { writeText: () => new Promise((_, reject) => { fail = reject; }) } } });
+  try {
+    const { model, view, calls } = build(test, { draft: false, respond: lookupResponders('found') });
+    findBtns(view.el, 'Xuất Word')[0].onclick(); await ltick();
+    const input = fid(view.el, 'word-posting-input'), word = input.closest('.cd-word-modal');
+    const tra = () => fid(word, 'word-lookup-tra:posting:posting').onclick();
+    tra(); await ltick();
+    const copy = fid(word, 'word-lookup-copy:posting:posting:0'); copy.focus();
+    model.dismissNotice();
+    assert.equal(fid(word, 'word-lookup-copy:posting:posting:0'), copy);
+    const copying = copy.onclick();
+    model.updateCaseMeta('noi_niem_yet', 'Changed source');
+    assert.equal(fid(word, 'word-lookup-copy:posting:posting:0'), null);
+    fail(new Error('denied')); await copying;
+    assert.ok(word.textContent.includes('Copy thất bại'));
+    const main = collect(view.el, e => e.id === 'address-posting-posting')[0];
+    assert.ok(!main.textContent.includes('Copy thất bại'));
+    assert.ok(!calls.some(([cmd]) => cmd === 'notary.workspace_update'));
+  } finally { delete globalThis.navigator; }
+});
+
+test('disposed Word origin cannot open full over reopened Word; disposed Copy notifies', async () => {
+  const pending = [], seen = [];
+  let fail;
+  Object.defineProperty(globalThis, 'navigator', { configurable: true,
+    value: { clipboard: { writeText: () => new Promise((_, reject) => { fail = reject; }) } } });
+  try {
+    let delayed = false;
+    const { view, document, notifications } = build(test, { draft: false, confirmSeen: seen,
+      respond: (cmd, payload) => cmd === 'notary.address_lookup' && delayed
+        ? new Promise(r => pending.push(r)) : lookupResponders('found')(cmd, payload) });
+    const open = async () => { findBtns(view.el, 'Xuất Word')[0].onclick(); await ltick();
+      return fid(view.el, 'word-posting-input').closest('.cd-word-modal'); };
+    const oldWord = await open();
+    fid(oldWord, 'word-lookup-tra:posting:posting').onclick(); await ltick();
+    const copying = fid(oldWord, 'word-lookup-copy:posting:posting:0').onclick();
+    delayed = true;
+    fid(oldWord, 'word-lookup-tra:posting:posting').onclick();
+    document.dispatch('keydown', { key: 'Escape' });
+    const newWord = await open();
+    pending.shift()(lookupResponders('too_many')('notary.address_lookup', { presentation: 'drafting' }));
+    await ltick();
+    assert.equal(seen.length, 0);
+    assert.equal(fid(view.el, 'lookup-full-list'), null);
+    assert.equal(newWord.parentElement.hidden, false);
+    fail(new Error('denied')); await copying;
+    assert.ok(notifications.some(msg => msg.includes('Copy thất bại')));
+    assert.ok(!newWord.textContent.includes('Copy thất bại'));
+  } finally { delete globalThis.navigator; }
 });

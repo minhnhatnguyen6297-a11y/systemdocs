@@ -1026,7 +1026,7 @@ Consumer (Electron main/renderer) PHẢI:
 | v2 MIN-141 | 03/10/2026 | Owner xác nhận hành vi cuối 14 commit worker và yêu cầu gộp vào nhánh chính; thay các quy tắc MIN-140 mâu thuẫn, đồng bộ dữ liệu Người/cụm đất/Hồ sơ. Xem §13.16 |
 | v2 (APPROVED) | 27/09/2026 | Owner duyệt §13 (MIN-125, toàn bộ Q1–Q12): `schema_version` bump `notary.case-drafting.v2`; Stage draft/committed + create nguyên khối; `owner_row_id`; asset theo vị trí 1..3, bỏ `is_primary`; `ownPositions`/`receivePositions`; domain `two_party` 30 slot `p1..p30`; `case_type` immutable; error codes §13.9. Implement ở P5 (MIN-128). C1–C4 xử lý theo §13.13 |
 | additive NAIA-9 | 04/10/2026 | Thêm command thứ mười `notary.address_lookup` (§14): tra cứu đơn vị hành chính đích theo địa chỉ nguồn + `source_date`/`target_date` đầy đủ; read-only, local-only trên ledger Bando đóng gói; `result.data.schema_version` = `notary.address-lookup.v1` — ngoại lệ rule §1 |
-| address-lookup v2 (APPROVED) | 05/10/2026 | TASK-2, Owner duyệt 05/10: thay v1 bằng `notary.address-lookup.v2` (§14) — payload `query`+`presentation`, bỏ ngày/tách xã-tỉnh/`coverage`/`partial`; result `found\|not_found\|too_many\|invalid_input\|reload_failed`. **Breaking**; runtime còn v1 tới khi triển khai. |
+| address-lookup v2 (APPROVED, triển khai TASK-3) | 05/10/2026 | TASK-2, Owner duyệt 05/10: thay v1 bằng `notary.address-lookup.v2` (§14) — payload `query`+`presentation`, bỏ ngày/tách xã-tỉnh/`coverage`/`partial`; result `found\|not_found\|too_many\|invalid_input\|reload_failed`. **Breaking**; runtime và schema v1 đã chuyển/xóa tại TASK-3. |
 
 ---
 
@@ -1638,10 +1638,9 @@ contract trao đổi hồ sơ giữa Upload Lab và Soạn hồ sơ. Envelope v�
 
 ## 14. `notary.address_lookup` — lõi tra cứu tên xã/tỉnh (v2, TASK-2)
 
-**Trạng thái:** v2 APPROVED 05/10/2026 — Owner duyệt.
-**Breaking** so với v1. Runtime hiện vẫn trả v1 theo
-[`address-lookup.schema.json`](./notary-case-drafting/address-lookup.schema.json);
-xóa schema v1 cùng lúc runtime chuyển sang v2.
+**Trạng thái:** v2 APPROVED 05/10/2026 — Owner duyệt, runtime đã chuyển
+sang v2 tại TASK-3 (schema v1 đã xóa).
+**Breaking** so với v1.
 **SOT hành vi:** [`docs/spec/shared/administrative-lookup.md`](../docs/spec/shared/administrative-lookup.md);
 cách hồ sơ gọi: [`docs/spec/notary_v2/administrative-address.md`](../docs/spec/notary_v2/administrative-address.md).
 
@@ -1662,7 +1661,8 @@ payload:
 - Key ngoài danh sách (kể cả `source_date`, `target_date`, `province`,
   `commune`, `district` của v1), `query` không phải chuỗi 1..4000 ký tự,
   `presentation` lạ → `invalid_input`. *Tại sao bỏ ngày và tách xã/tỉnh:* lõi
-  chỉ trả bước cuối và tự tách cụm phải→trái (spec §2, §7).
+  chỉ trả bước cuối; mỗi cụm được tra độc lập vào xã và tỉnh trên toàn quốc,
+  không khoanh phạm vi theo tỉnh hay bỏ qua cụm huyện (spec §2, §7).
 
 ### 14.2 Result
 
@@ -1671,7 +1671,7 @@ result.data:
   schema_version: "notary.address-lookup.v2"
   status: found | not_found | too_many | invalid_input | reload_failed
   presentation: drafting | full | null    # null chỉ khi invalid_input
-  total: <int >= 0>                        # số đơn vị khớp
+  total: <int >= 0>                        # số dòng kết quả khớp, kể cả cùng đơn vị
   results:                                 # rỗng nếu status != found
     - unit_id: <string>                    # đơn vị HIỆN HÀNH
       level: commune | province
@@ -1686,6 +1686,12 @@ result.data:
 ```
 
 - `found`: `total = len(results) >= 1`. Với `drafting`, `total <= 10`.
+- Mỗi dòng nguồn khớp trả riêng với `source_text`, `evidence`, `observation_id`
+  của nó. Cùng `unit_id` được có nhiều dòng; client không bỏ trùng theo tên,
+  `unit_id` hoặc `display`. Chỉ bỏ cùng dòng `(unit_id, observation_id)` khớp
+  nhiều cụm. Đơn vị không có observation khớp tên thì trả một dòng, không có
+  `observation_id`, `source_text: null`. Không tự chọn/gộp nguồn hay trả lỗi
+  vì có nhiều nguồn; người dùng xem và chọn (Owner 05/10/2026).
 - `too_many`: chỉ khi `presentation = drafting` và `total > 10`; `results`
   rỗng. Client hiện popup "Nhiều kết quả khớp. Xem đầy đủ?"; chỉ khi người
   dùng đồng ý mới mở tool tra cứu dạng popup đè lên màn hình hiện tại (không

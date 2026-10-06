@@ -951,3 +951,8 @@
 .cd-root .cd-address-choice { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .cd-root .cd-address-suggestion button { height: auto; min-height: 28px; white-space: normal; text-align: left; }
 .cd-root .cd-address-suggestion button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.cd-root .cd-lookup-row { display: flex; gap: 6px; align-items: center; }
+.cd-root .cd-lookup-row .cd-cell { flex: 1; min-width: 0; }
+.cd-root .cd-lookup-list { max-height: 40vh; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
+.cd-root .cd-lookup-item { display: flex; gap: 8px; align-items: flex-start; }
+.cd-root .cd-lookup-item span { flex: 1; min-width: 0; }
