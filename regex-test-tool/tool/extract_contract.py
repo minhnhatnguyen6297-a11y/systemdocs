@@ -783,6 +783,9 @@ def _find_tai_san_inheritance_partition(text: str) -> str:
             r"phan quyen su dung dat(?: cua[^\n]{0,200})?[^\n]{0,300}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:|la\s*:)",
             r"quyen su dung dat[^\n]{0,300}?theo\s*[\"'“”‘’]?\s*giay chung nhan",
             r"thua dat so[^\n]{0,200}?(?:co dia chi tai|tai dia chi|theo\s*[\"'“”‘’]?\s*giay chung nhan|theo ban do)",
+            # "Phần Quyền tài sản của ông X ... đối với một phần thửa đất số 62"
+            # — di san ke trong van xuoi, khong co bang/dia chi ranh ro.
+            r"phan quyen tai san[^\n]{0,300}?thua dat\b",
             r"(?m)^\s*[-–—•]?\s*thua dat so\s*[:.]?\s*\d",
         ),
         (
@@ -1943,6 +1946,11 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
                     r"[,;]\s*(?=[A-Za-z\u00c0-\u1ef9])|\s+(?i:trong|theo)\b",
                     value, maxsplit=1,
                 )[0].strip()
+                # Gia tri van xuoi kem so ("duoc cap de lam nha o 288 m2")
+                # — chi lay cum so, khong giu ca cau.
+                if re.search(r"[A-Za-z\u00c0-\u1ef9]", value):
+                    _num = re.search(r"\d[\d.,]*", value)
+                    value = _num.group(0) if _num else ""
                 # Dien tich khong co so nao la text van xuoi
                 # ("dien tich thua dat neu tren") — bo, khong gan vao thua.
                 if not re.search(r"\d", value):
