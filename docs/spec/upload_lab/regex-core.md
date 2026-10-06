@@ -57,7 +57,7 @@ mẫu thật → đáp án (comment/field-list) → chạy engine → đối chi
    R02 0 người, R03 thiếu trường người, R04 tên bẩn, R05 trùng tên,
    R06 thiếu người chết, R07 thiếu trường người chết, R08 mất khối
    tài sản, R09 không tách tài sản, R10 lệch diện tích tuyệt đối,
-   R11 lời chứng khác). Agent/LLM chỉ đọc mã, không tự đặt tên lỗi.
+   R12 tài sản chưa hỗ trợ). Agent/LLM chỉ đọc mã, không tự đặt tên lỗi.
 2. Sửa ở engine (`upload_lab/extract_contract.py`), thêm test giữ
    hành vi, chạy toàn bộ suite.
 3. Quét lại hàng loạt bằng `upload_lab/tools/quet_kiem_tra.py`

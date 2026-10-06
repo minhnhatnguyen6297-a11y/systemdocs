@@ -7,7 +7,7 @@ Cach dung:
 - Mac dinh chi lay .docx (nhanh). Them --ca-doc de gom ca .doc (cham).
 - --loc: chi lay file ten chua cum nay (khong dau cung duoc).
 - Ket qua: in bang ra man hinh + luu JSON cung thu muc chay.
-- Ma loi xem tai kiem_tra_trich_xuat.py (R00..R11).
+- Ma loi xem tai kiem_tra_trich_xuat.py (R00..R12, bo qua R11 da xoa).
 """
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ import json
 import os
 import sys
 import unicodedata
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -95,12 +96,31 @@ def main() -> int:
         print(f"... {num}/{len(batch)} {item['ten_file'][:50]} -> {item['kind']} [{codes}]", flush=True)
 
     out_path = args.ra or "quet_kiem_tra.json"
+
+    dem_luat = Counter()
+    file_theo_luat: dict[str, list[str]] = {}
+    dem_loai = Counter()
+    for r in results:
+        dem_loai[r["kind"] or "?"] += 1
+        for f in r["phat_hien"]:
+            if f["muc"] == MUC_BO_QUA:
+                continue
+            dem_luat[f["id"]] += 1
+            file_theo_luat.setdefault(f["id"], []).append(r["ten_file"])
+
+    summary = {
+        "theo_loai": dict(dem_loai.most_common()),
+        "theo_luat": dict(dem_luat.most_common()),
+        "file_theo_luat": {k: v for k, v in sorted(file_theo_luat.items())},
+    }
     with open(out_path, "w", encoding="utf-8") as fh:
-        json.dump({"folder": args.folder, "results": results}, fh, ensure_ascii=False)
+        json.dump({"folder": args.folder, "summary": summary, "results": results}, fh, ensure_ascii=False)
     sach = sum(1 for r in results if not r["phat_hien"])
     bo_qua = sum(1 for r in results if any(f["muc"] == MUC_BO_QUA for f in r["phat_hien"]))
     loi = sum(1 for r in results if any(f["muc"] == MUC_LOI for f in r["phat_hien"]))
+    top = ", ".join(f"{k}:{v}" for k, v in dem_luat.most_common(8)) or "không có"
     print(f"XONG: sach {sach}/{len(results)} | bo-qua {bo_qua} | co loi {loi} | JSON: {out_path}", flush=True)
+    print(f"Luat hay gap: {top}", flush=True)
     return 0
 
 
