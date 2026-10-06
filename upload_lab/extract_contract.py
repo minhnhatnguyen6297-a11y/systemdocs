@@ -2113,7 +2113,7 @@ def _cat_duoi_dia_chi(value: str) -> str:
 # Moc cat duoi trong ho_ten: dau cau/cum khoi dau truong ("CCCD so...",
 # "Sinh ngay...", "Dia chi...", "cap ngay...", vai tro "la vo/chong...").
 _NAME_BOUNDARY_RE = re.compile(
-    r"[,;(|]"
+    r"[,;(|:]"
     r"|\s+\d"
     r"|\s+(?i:cccd|cmnd|cc\b|c\u0103n c\u01b0\u1edbc|c\u0103n c\u1ee9|gi\u1ea5y\b|\u0111\u1ecba ch\u1ec9|th\u01b0\u1eddng tr\u00fa|c\u01b0 tr\u00fa"
     r"|h\u1ed9 kh\u1ea9u|qu\u00ea qu\u00e1n|ch\u1ee9c v\u1ee5|hi\u1ec7n\b|l\u00e0\b|thu\u1ed9c\b|theo\b|\u0111\u01b0\u1ee3c\b|n\u01a1i\b|v\u1ee3\b|ch\u1ed3ng\b|kh\u00f4ng\b|con\s+(?:\u0111\u1ebb|ru\u1ed9t))"
@@ -2669,8 +2669,8 @@ def _extract_nguoi_chet(text: str) -> list[dict]:
         r"(?:\s+v\u00e0\s+(?P<title2>\u00f4ng|b\u00e0|anh|ch\u1ecb)\s*:?\s*(?P<name2>[^;(\n.,]+?))?"
         r"\s*(?:\((?P<alias>[^)]+)\))?"
         r"\s*[-\u2013;,]?\s*"
-        r"(?:Sinh n\u0103m\s*[:\u2013-]?\s*(?P<birth_year>(?:19|20)\d{2})"
-        r"|Sinh ng\u00e0y\s*[:\u2013-]?\s*(?P<birth_full>\d{1,2}/\d{1,2}/\d{4}))?"
+        r"(?:(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh)"
+        r"\s*[:\u2013-]?\s*(?P<birth>(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4}))?"
         r"\s*[;,]?\s*(?:\u0111\u00e3\s+)?ch\u1ebft ng\u00e0y\s*[:\u2013-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
     )
     matches = list(death_re.finditer(source))
@@ -2762,8 +2762,9 @@ def _extract_nguoi_chet(text: str) -> list[dict]:
         if not raw_name or key in seen:
             continue
         seen.add(key)
+        _birth = match.group("birth") or ""
         ngay_sinh, chi_co_nam = _chuan_hoa_ngay_sinh(
-            match.group("birth_full") or "", match.group("birth_year") or ""
+            _birth if "/" in _birth else "", _birth if "/" not in _birth else ""
         )
         found.append({
             "gioi_tinh": "\u00d4ng" if title_fold in ("ong", "anh") else "B\u00e0",

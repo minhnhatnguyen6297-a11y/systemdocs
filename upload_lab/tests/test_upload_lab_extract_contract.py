@@ -1767,6 +1767,28 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual([q["ho_ten"] for q in payload["raw"]["ben_a"]["nguoi"]], ["Nguyễn Văn Tự"])
         self.assertEqual([q["ho_ten"] for q in payload["raw"]["ben_b"]["nguoi"]], ["Ngô Tuấn Minh"])
 
+    def test_nguoi_chet_sinh_nam_ngay_day_du_va_dau_hai_cham(self):
+        # Nguoi chet: "Sinh năm: 01/01/1948" (nhan nam nhung gia tri ngay day
+        # du — loi mau thuc te) van nhan; ten nguoi cat o ":" truoc dia chi
+        # (don DK18 "6. Ông X: phường ...").
+        docx_path = make_docx(
+            self.root / "chet_sinh_nam.docx",
+            "VĂN BẢN TỪ CHỐI NHẬN DI SẢN",
+            "Văn bản từ chối nhận di sản này được lập bởi ông:",
+            "Ông Nguyễn Đắc Nhường - Sinh ngày: 01/01/1980",
+            "Bố đẻ tôi là ông Nguyễn Đắc Kính; Sinh năm: 01/01/1948; chết ngày 18/07/2023 "
+            "theo Trích lục khai tử (Bản sao) số 774/2025/TLKT-BS do UBND xã Ý Yên cấp ngày 01/01/2025.",
+            "Di sản ông Kính để lại gồm thửa đất số 317, tờ bản đồ số 26.",
+        )
+        payload = extract(docx_path)
+        chet = payload["raw"]["nguoi_chet"]
+        self.assertEqual([q["ho_ten"] for q in chet], ["Nguyễn Đắc Kính"])
+        self.assertEqual(chet[0]["ngay_sinh"], "01/01/1948")
+
+        # Ranh gioi ":" trong ten (don DK18 "N. Ông X: <địa chỉ>").
+        from extract_contract import _cat_ho_ten
+        self.assertEqual(_cat_ho_ten("Phùng Xuân Tính: phường Thành Nam, tỉnh Ninh Bình"), "Phùng Xuân Tính")
+
 
 if __name__ == "__main__":
     unittest.main()
