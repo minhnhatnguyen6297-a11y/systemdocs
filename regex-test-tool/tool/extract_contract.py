@@ -2424,8 +2424,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # rieng bi nuot vao khoi X; tach "là bà/ông <tên>" thanh dong ao de
     # parser chuan nhan ca hai (10/10/2026 — don xac nhan nhan than).
     _kinship_la_re = re.compile(
-        r"\s+c\u00f3\s+(?:m\u1eb9|b\u1ed1|cha|con|v\u1ee3|ch\u1ed3ng)"
-        r"(?:\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i))?\s+l\u00e0\s+"
+        r"(?i)\s+(?:c\u00f3\s+(?:m\u1eb9|b\u1ed1|cha|con|v\u1ee3|ch\u1ed3ng)(?:\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i))?|(?:m\u1eb9|b\u1ed1|cha|con|v\u1ee3|ch\u1ed3ng)\s+c\u1ee7a\s+(?:\u00f4ng|b\u00e0)\s+[^\n]{2,50}?)\s+l\u00e0\s+"
         r"(?=(?:\u00f4ng|b\u00e0)\s+[A-Z\u00c0-\u1ef9\u0110])"
     )
     _split_lines: list[str] = []
