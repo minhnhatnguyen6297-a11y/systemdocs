@@ -2044,6 +2044,37 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "Thôn Mễ Hạ, xã Yên Đồng, tỉnh Ninh Bình",
         )
 
+    def test_heading_gach_cheo_va_cccd_khong_so(self):
+        # Mau ngan hang: "I/ BÊN ỦY QUYỀN" (gach cheo, khong phai "I."),
+        # bullet "* Ông:", nhan "Năm sinh" dao, "CCCD:" khong chu "số".
+        import extract_contract as ec
+        text = (
+            "HỢP ĐỒNG ỦY QUYỀN XỬ LÝ TÀI SẢN BẢO ĐẢM\n"
+            "I/ BÊN ỦY QUYỀN ( Chủ tài sản):\n"
+            "* Ông: Đinh Văn Tuyển\tNăm sinh: 03/08/1978\n"
+            "- CCCD: 036078005311; ngày cấp: 16/09/2021\n"
+            "- Hộ khẩu thường trú: TDP Ô Mễ 1, phường Thái Bình\n"
+            "II/ BÊN ĐƯỢC ỦY QUYỀN:\n"
+            "Ngân hàng ABC - Chi nhánh X\n"
+        )
+        ben_a, ben_b = ec._extract_parties_generic(
+            ec._normalize_plain_text_for_extract(text), "generic"
+        )
+        self.assertEqual([q["ho_ten"] for q in ben_a["nguoi"]], ["Đinh Văn Tuyển"])
+        self.assertEqual(ben_a["nguoi"][0]["ngay_sinh"], "03/08/1978")
+        self.assertEqual(ben_a["nguoi"][0]["cccd"], "036078005311")
+
+    def test_trang_sua_loi_ky_thuat_la_generic(self):
+        # Trang phu dinh kem sua loi — khong nhan loai hop dong noi trang.
+        import extract_contract as ec
+        text = (
+            "TRANG SỬA LỖI KỸ THUẬT ĐÍNH KÈM\n"
+            "\tHợp đồng chuyển nhượng quyền sử dụng đất Số công chứng: 919.2025\n"
+            "Nội dung cũ: Thửa đất số: 58 - Tờ bản đồ số: 41\n"
+        )
+        kind, _ = ec._detect_document_kind_and_title(text)
+        self.assertEqual(kind, "generic")
+
 
 if __name__ == "__main__":
     unittest.main()

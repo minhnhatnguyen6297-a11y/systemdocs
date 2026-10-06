@@ -559,6 +559,14 @@ def _detect_document_kind_and_title(text: str) -> tuple[str, str]:
     # khong mang nguoi chet/tai san, ap luat generic thay vi loai noi trang.
     if title_fold.startswith("loi chung"):
         return DOC_KIND_GENERIC, title_line
+    # Trang phu "Trang sửa lỗi kỹ thuật đính kèm" cung vay — chi chep lai
+    # dieu khoan sua, khong co khoi duong su rieng. Dung dau file, khong
+    # nam trong tien to _find_title_line nen quet vai dong dau.
+    head_lines = [ _fold_text(l) for l in str(text or "").split("\n")[:6] ]
+    if title_fold.startswith("trang sua loi ky thuat") or any(
+        l.strip().startswith("trang sua loi ky thuat") for l in head_lines
+    ):
+        return DOC_KIND_GENERIC, title_line
 
     if "cam ket tai san rieng" in title_fold:
         return DOC_KIND_ASSET_COMMITMENT, title_line
@@ -2199,14 +2207,14 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         r"(?:(?:b\u00ean|ben)\s+[A-Za-z\u00c0-\u1ef9]\s*[:.,]?\s*)?"
         r"(?:(?:con|m\u1eb9|b\u1ed1|cha|v\u1ee3|ch\u1ed3ng)\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i)(?:\s+(?:t\u00f4i|c\u1ee7a\s+t\u00f4i))?(?:\s+\u00f4ng\s+[^\d;:]{2,50}?)?\s*(?:[-\u2013\u2014:]|l\u00e0)\s*)?"
         r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?:v\u00e0\s+)?(?P<title>\u00f4ng/b\u00e0|ong/ba|\u00f4ng|ong|b\u00e0|ba|anh|ch\u1ecb|chi)\s*:?\s*"
-        r"(?P<name>.+?)(?=\s+(?:[\-\u2013]\s*)?(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|sinh n\u0103m|sinh ng\u00e0y)\s*[:\u2013-]?\s*(?:(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})|\s+(?:[\-\u2013]\s+)?(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:|\s+c\u00f3\s+(?:(?:m\u1eb9|b\u1ed1|cha|con|v\u1ee3|ch\u1ed3ng)(?:\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i))?|\d)\b|\s*\(\s*(?:Sinh|Ng\u00e0y)|[;]|$)"
+        r"(?P<name>.+?)(?=[\s|]+\s*(?:[\-\u2013]\s*)?(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|sinh n\u0103m|sinh ng\u00e0y)\s*[:\u2013-]?\s*(?:(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})|\s+(?:[\-\u2013]\s+)?(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:|\s+c\u00f3\s+(?:(?:m\u1eb9|b\u1ed1|cha|con|v\u1ee3|ch\u1ed3ng)(?:\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i))?|\d)\b|\s*\(\s*(?:Sinh|Ng\u00e0y)|[;]|$)"
     )
     birth_re = re.compile(r"(?i)(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)\s*[:\u2013-]?\s*(\d{1,2}/\d{1,2}/\d{4})")
     # Nguoi lon tuoi thuong chi ghi "Sinh nam 1965" — database chap nhan YYYY
     # (docs/spec/notary_v2/stage.md muc 5) nen giu nam lam ngay_sinh.
     # Gia tri chi co nam van nhan du nhan viet "Sinh ngay: 1982" (loi mau thuc te).
     birth_year_re = re.compile(r"(?i)(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh)\s*[:\u2013-]?\s*((?:19|20)\d{2})(?!\d)")
-    id_re = re.compile(r"(?i)(?:C\u0103n c\u01b0\u1edbc(?:\s+c\u00f4ng(?:\s+d\u00e2n)?)?(?:\s+m\u1edbi)?|Can cuoc(?:\s+cong(?:\s+dan)?)?|CCCD|CMND|\bCC)\s*(?:[A-Z\u00c0-\u1ef9\u0110][^\d:;\n]{0,40}?)?\s*(?:s\u1ed1|so)\s*:?\s*(\d{6,12})")
+    id_re = re.compile(r"(?i)(?:C\u0103n c\u01b0\u1edbc(?:\s+c\u00f4ng(?:\s+d\u00e2n)?)?(?:\s+m\u1edbi)?|Can cuoc(?:\s+cong(?:\s+dan)?)?|CCCD|CMND|\bCC)\s*(?:[A-Z\u00c0-\u1ef9\u0110][^\d:;\n]{0,40}?)?\s*(?:(?:s\u1ed1|so)\s*:?|:)\s*(\d{6,12})")
     issue_place_re = re.compile(r"(?i)\bdo\s+([^\n]+?)\s+(?:c\u1ea5p ng\u00e0y|cap ngay)")
     issue_date_re = re.compile(r"(?i)(?:c\u1ea5p ng\u00e0y|cap ngay|c\u1ea5p v\u00e0o ng\u00e0y|ng\u00e0y c\u1ea5p|ngay cap)\s*:?\s*(\d{1,2}/\d{1,2}/\d{4})")
     # Nguoi tham gia thua ke ghi ten tran khong kem "Ong/Ba", vi du:
@@ -2968,39 +2976,39 @@ def _extract_parties_generic(text: str, doc_kind: str) -> tuple[dict, dict]:
             return ben_a, ben_b
 
     ben_a_patterns = (
-        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN CHUY\u1ec2N NH\u01af\u1ee2NG\b",
-        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN TH\u1ebe CH\u1ea4P\b",
+        r"(?im)^\s*(?:I[./]\s*(?:\|\s*)?)?B\u00caN CHUY\u1ec2N NH\u01af\u1ee2NG\b",
+        r"(?im)^\s*(?:I[./]\s*(?:\|\s*)?)?B\u00caN TH\u1ebe CH\u1ea4P\b",
         r"(?im)^\s*\(?A\)?\s*B\u00caN TH\u1ebe CH\u1ea4P\b",
-        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?BEN THE CHAP\b",
-        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN CHO VAY\b",
-        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN CHO THU\u00ca\b",
-        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN (?:UY|U\u1ef6|\u1ee6Y) QUY\u1ec0N\b",
-        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?NG\u01af\u1edcI (?:UY|U\u1ef6|\u1ee6Y) QUY\u1ec0N\b(?=\s*[:(])(?![^\n]*\bNG\u01af\u1edcI\b)",
-        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN \u0110\u1eb6T C\u1eccC\b",
-        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?NG\u01af\u1edcI DI CH\u00daC\b(?=\s*[:(])(?![^\n]*\bNG\u01af\u1edcI\b)",
-        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?NG\u01af\u1edcI CAM K\u1ebeT\b(?=\s*[:(])(?![^\n]*\bNG\u01af\u1edcI\b)",
-        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN G\u00d3P V\u1ed0N\b",
-        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN T\u1eb6NG CHO\b",
-        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN B\u00c1N\b",
-        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN TH\u1ee8 NH\u1ea4T\b",
-        r"(?im)^\s*(?:I\.\s*(?:\|\s*)?)?B\u00caN A\b",
+        r"(?im)^\s*(?:I[./]\s*(?:\|\s*)?)?BEN THE CHAP\b",
+        r"(?im)^\s*(?:I[./]\s*(?:\|\s*)?)?B\u00caN CHO VAY\b",
+        r"(?im)^\s*(?:I[./]\s*(?:\|\s*)?)?B\u00caN CHO THU\u00ca\b",
+        r"(?im)^\s*(?:I[./]\s*(?:\|\s*)?)?B\u00caN (?:UY|U\u1ef6|\u1ee6Y) QUY\u1ec0N\b",
+        r"(?im)^\s*(?:I[./]\s*(?:\|\s*)?)?NG\u01af\u1edcI (?:UY|U\u1ef6|\u1ee6Y) QUY\u1ec0N\b(?=\s*[:(])(?![^\n]*\bNG\u01af\u1edcI\b)",
+        r"(?im)^\s*(?:I[./]\s*(?:\|\s*)?)?B\u00caN \u0110\u1eb6T C\u1eccC\b",
+        r"(?im)^\s*(?:I[./]\s*(?:\|\s*)?)?NG\u01af\u1edcI DI CH\u00daC\b(?=\s*[:(])(?![^\n]*\bNG\u01af\u1edcI\b)",
+        r"(?im)^\s*(?:I[./]\s*(?:\|\s*)?)?NG\u01af\u1edcI CAM K\u1ebeT\b(?=\s*[:(])(?![^\n]*\bNG\u01af\u1edcI\b)",
+        r"(?im)^\s*(?:I[./]\s*(?:\|\s*)?)?B\u00caN G\u00d3P V\u1ed0N\b",
+        r"(?im)^\s*(?:I[./]\s*(?:\|\s*)?)?B\u00caN T\u1eb6NG CHO\b",
+        r"(?im)^\s*(?:I[./]\s*(?:\|\s*)?)?B\u00caN B\u00c1N\b",
+        r"(?im)^\s*(?:I[./]\s*(?:\|\s*)?)?B\u00caN TH\u1ee8 NH\u1ea4T\b",
+        r"(?im)^\s*(?:I[./]\s*(?:\|\s*)?)?B\u00caN A\b",
     )
     ben_b_patterns = (
-        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN NH\u1eacN CHUY\u1ec2N NH\u01af\u1ee2NG\b",
-        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN NH\u1eacN TH\u1ebe CH\u1ea4P\b",
+        r"(?im)^\s*(?:II[./]\s*(?:\|\s*)?)?B\u00caN NH\u1eacN CHUY\u1ec2N NH\u01af\u1ee2NG\b",
+        r"(?im)^\s*(?:II[./]\s*(?:\|\s*)?)?B\u00caN NH\u1eacN TH\u1ebe CH\u1ea4P\b",
         r"(?im)^\s*\(?B\)?\s*B\u00caN NH\u1eacN TH\u1ebe CH\u1ea4P\b",
-        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?BEN NHAN THE CHAP\b",
-        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN VAY\b",
-        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN THU\u00ca\b",
-        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN \u0110\u01af\u1ee2C (?:UY|U\u1ef6|\u1ee6Y) QUY\u1ec0N\b",
-        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?NG\u01af\u1edcI \u0110\u01af\u1ee2C (?:UY|U\u1ef6|\u1ee6Y) QUY\u1ec0N\b(?=\s*[:(])(?![^\n]*\bNG\u01af\u1edcI\b)",
+        r"(?im)^\s*(?:II[./]\s*(?:\|\s*)?)?BEN NHAN THE CHAP\b",
+        r"(?im)^\s*(?:II[./]\s*(?:\|\s*)?)?B\u00caN VAY\b",
+        r"(?im)^\s*(?:II[./]\s*(?:\|\s*)?)?B\u00caN THU\u00ca\b",
+        r"(?im)^\s*(?:II[./]\s*(?:\|\s*)?)?B\u00caN \u0110\u01af\u1ee2C (?:UY|U\u1ef6|\u1ee6Y) QUY\u1ec0N\b",
+        r"(?im)^\s*(?:II[./]\s*(?:\|\s*)?)?NG\u01af\u1edcI \u0110\u01af\u1ee2C (?:UY|U\u1ef6|\u1ee6Y) QUY\u1ec0N\b(?=\s*[:(])(?![^\n]*\bNG\u01af\u1edcI\b)",
         r"(?i)uỷ\s+quyền\s+cho\s*:",
-        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN NH\u1eacN \u0110\u1eb6T C\u1eccC\b",
-        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN NH\u1eacN T\u1eb6NG CHO\b",
-        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN \u0110\u01af\u1ee2C T\u1eb6NG CHO\b",
-        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN MUA\b",
-        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN TH\u1ee8 HAI\b",
-        r"(?im)^\s*(?:II\.\s*(?:\|\s*)?)?B\u00caN B\b",
+        r"(?im)^\s*(?:II[./]\s*(?:\|\s*)?)?B\u00caN NH\u1eacN \u0110\u1eb6T C\u1eccC\b",
+        r"(?im)^\s*(?:II[./]\s*(?:\|\s*)?)?B\u00caN NH\u1eacN T\u1eb6NG CHO\b",
+        r"(?im)^\s*(?:II[./]\s*(?:\|\s*)?)?B\u00caN \u0110\u01af\u1ee2C T\u1eb6NG CHO\b",
+        r"(?im)^\s*(?:II[./]\s*(?:\|\s*)?)?B\u00caN MUA\b",
+        r"(?im)^\s*(?:II[./]\s*(?:\|\s*)?)?B\u00caN TH\u1ee8 HAI\b",
+        r"(?im)^\s*(?:II[./]\s*(?:\|\s*)?)?B\u00caN B\b",
     )
     preamble_patterns = (
         r"\bCh\u00fang t\u00f4i g\u1ed3m c\u00f3\s*:\s*",
