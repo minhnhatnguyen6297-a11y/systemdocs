@@ -2269,7 +2269,7 @@ _NAME_BOUNDARY_RE = re.compile(
     r"|h\u1ed9 kh\u1ea9u|qu\u00ea qu\u00e1n|ch\u1ee9c v\u1ee5|hi\u1ec7n\b|l\u00e0\b|thu\u1ed9c\b|theo\b|\u0111\u01b0\u1ee3c\b|n\u01a1i\b|v\u1ee3\b|ch\u1ed3ng\b|kh\u00f4ng\b|con\s+(?:\u0111\u1ebb|ru\u1ed9t))"
     r"|\s+mang\s+(?=c\u0103n|cccd|cmnd|gi\u1ea5y|h\u1ed9 chi\u1ebfu|s\u1ed5|theo)"
     r"|\s+v\u00e0\s+(?=\u00f4ng|b\u00e0|anh|ch\u1ecb)\b"
-    r"|\s+c\u00f3\s+(?=\d|(?:m\u1ed9t|hai|ba|b\u1ed1n|n\u0103m|s\u00e1u|b\u1ea3y|t\u00e1m|ch\u00edn|m\u01b0\u1eddi)\s+ng\u01b0\u1eddi)"
+    r"|\s+(?:c\u00f3|cho)\s+(?=\d|\(|(?:m\u1ed9t|hai|ba|b\u1ed1n|n\u0103m|s\u00e1u|b\u1ea3y|t\u00e1m|ch\u00edn|m\u01b0\u1eddi)\s+ng\u01b0\u1eddi)"
     r"|\s+(?:sinh\b|ng\u00e0y\b|n\u0103m\s*[:\d]|s\u1ed1\s*[:\d]|c\u1ea5p\s*(?:ng\u00e0y|t\u1ea1i|:))"
 )
 
