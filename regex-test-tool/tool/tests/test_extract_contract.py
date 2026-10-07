@@ -3593,3 +3593,30 @@ def test_extract_contract_thua_lap_muc_phan_chia_khong_nhan_doi_chi_tiet():
     assert not any("o_tho" in d for d in thua["chi_tiet_dien_tich"])
     assert "Tống Duy Tuyền" in thua["phan_ghi_them"]
     assert not thua["dia_chi"].rstrip().endswith("tại")
+
+
+def test_extract_contract_nguoi_chet_dau_cham_phay_truoc_ngoac():
+    """Nguoi chet co dau `;` kep giua ten va ngoac ("Sơn; (Sinh năm
+    1957, đã chết...)") van trich; "là ông X" suy gioi tinh tu danh
+    xung tach trong ten (VB tu choi ba Vong — 13/10/2026)."""
+    import extract_contract
+
+    text = "\n".join(
+        [
+            "Văn bản từ chối nhận di sản thừa kế",
+            "Tôi là: Bà Phạm Thị Vòng; Sinh ngày 01/01/1929;",
+            "Con đẻ tôi là ông Nguyễn Xuân Sơn; (Sinh năm 1957, đã chết"
+            " ngày 25/05/2025 theo Trích lục khai tử (bản sao) số"
+            " 32/2025/TLKT do UBND phường Chùa Hang, thành phố Thái"
+            " Nguyên, ký ngày 26/05/2025; Nơi thường trú cuối cùng"
+            " trước khi chết: số nhà 82, tổ 2, phường Chùa Hang, thành"
+            " phố Thái Nguyên, tỉnh Thái Nguyên.",
+        ]
+    )
+    dead = extract_contract._extract_nguoi_chet(text)
+    assert len(dead) == 1
+    assert dead[0]["ho_ten"] == "Nguyễn Xuân Sơn"
+    assert dead[0]["gioi_tinh"] == "Ông"
+    assert dead[0]["ngay_chet"] == "25/05/2025"
+    assert dead[0]["so_giay_to"] == "32/2025/TLKT"
+    assert "Chùa Hang" in dead[0]["dia_chi"]

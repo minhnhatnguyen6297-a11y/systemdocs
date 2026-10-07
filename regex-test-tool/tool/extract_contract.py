@@ -3345,6 +3345,14 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             for field in ("ngay_sinh", "cccd", "noi_cap", "ngay_cap_cccd", "dia_chi", "gioi_tinh"):
                 if not str(base.get(field) or "").strip() and str(person.get(field) or "").strip():
                     base[field] = person[field]
+            # Nguon go thuong 1 am tiet ("Khiếu Minh hải" vs "Khiếu Minh
+            # Hải" o muc sau) — giu ban viet hoa dung (13/10/2026).
+            _b_name = str(base.get("ho_ten") or "")
+            _n_name = str(person.get("ho_ten") or "")
+            if _n_name and _b_name != _n_name:
+                _sc = lambda nm: sum(1 for w in nm.split() if w[:1].isupper())
+                if _sc(_n_name) > _sc(_b_name):
+                    base["ho_ten"] = _n_name
             # Nang "ngay_sinh" chi-co-nam len ngay day du cung nam — ban
             # "Sinh ngay: 25/12/1958" day du hon "Sinh nam 1958" (11/10/2026).
             base_ns = str(base.get("ngay_sinh") or "").strip()
@@ -3613,7 +3621,9 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
         r"(?:\s*\((?P<alias>[^)]+)\)\s*[-–;,]?)?"
         # Ngoac co the lap lai danh xung + ten rut gon truoc ngay sinh:
         # "ong Luong Van Nguyen (ong Nguyen Sinh nam 1952; chet ngay ...)".
-        r"\s*\(\s*(?:(?:ông|bà)\s+[^;()\n]{2,40}?\s+)?(?:Sinh\s+năm|Năm\s+sinh|Sinh\s+ngày|Ngày\s+sinh)"
+        # Dau cau kep giua ten va ngoac ("Sơn; (Sinh năm...)") van nhan
+        # (VB tu choi ba Vong — 13/10/2026).
+        r"\s*[-–;,]?\s*\(\s*(?:(?:ông|bà)\s+[^;()\n]{2,40}?\s+)?(?:Sinh\s+năm|Năm\s+sinh|Sinh\s+ngày|Ngày\s+sinh)"
         r"\s*[:–-]?\s*(?P<birth>(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})"
         r"\s*[,;]?\s*(?:đã\s+)?(?:chết|mất)\s+"
         r"(?:ngày\s*(?:ngày\s*)?[:–-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
@@ -3669,6 +3679,10 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
             match_title = inner.group(1)
         else:
             match_title = match.groupdict().get("title") or _salut_title
+        # "là ông X" — title regex bat "là", danh xung that nam trong ten
+        # da tach (_salut_title) — dung danh xung de suy gioi tinh.
+        if _fold_text(str(match_title or "")) in ("la", "lam") and _salut_title:
+            match_title = _salut_title
         if len(raw_name.split()) == 1:
             # Ten rut gon 1 am tiet ("Bà Yểng Sinh năm 1931; chết...") —
             # tim ten day du ket thuc bang am tiet do ngay truoc trong
