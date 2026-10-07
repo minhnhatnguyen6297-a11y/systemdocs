@@ -562,11 +562,25 @@ def _detect_document_kind_and_title(text: str) -> tuple[str, str]:
     # Trang phu "Trang sửa lỗi kỹ thuật đính kèm" cung vay — chi chep lai
     # dieu khoan sua, khong co khoi duong su rieng. Dung dau file, khong
     # nam trong tien to _find_title_line nen quet vai dong dau.
-    head_lines = [ _fold_text(l) for l in str(text or "").split("\n")[:6] ]
+    head_raw = str(text or "").split("\n")[:6]
+    head_lines = [_fold_text(l) for l in head_raw]
+
+    def _trang_phu_title(marker: str) -> str:
+        # Tieu de tra ve phai bat dau bang dong trang phu ("Trang sửa
+        # lỗi kỹ thuật đính kèm ...") de R02 nhan dien — neu
+        # _find_title_line bo qua dong marker thi ghep lai (12/10/2026).
+        if title_fold.startswith(marker):
+            return title_line
+        for raw, folded in zip(head_raw, head_lines):
+            if folded.strip().startswith(marker):
+                head = _clean_title_line(raw)
+                return f"{head} {title_line}".strip() if title_line else head
+        return title_line
+
     if title_fold.startswith("trang sua loi ky thuat") or any(
         l.strip().startswith("trang sua loi ky thuat") for l in head_lines
     ):
-        return DOC_KIND_GENERIC, title_line
+        return DOC_KIND_GENERIC, _trang_phu_title("trang sua loi ky thuat")
     # File .doc/IFilter chi trich duoc trang "LỜI CHỨNG" (than van ban
     # khong co trong file) — route generic nhu trang phu, khong ap luat
     # thua ke (R08 se bao oan vi khoi tai san khong ton tai trong text).
@@ -576,13 +590,13 @@ def _detect_document_kind_and_title(text: str) -> tuple[str, str]:
         r"(?im)^\s*(?:[IVX]+\s*[./]?\s*)?b\u00ean\b[^:\n]{0,60}:",
         text,
     ):
-        return DOC_KIND_GENERIC, title_line
+        return DOC_KIND_GENERIC, _trang_phu_title("loi chung")
     # Trang "ĐÍNH CHÍNH <văn bản gốc>" chi sua loi van ban da cong chung —
     # khong co khoi duong su/nguoi chet/tai san rieng (11/10/2026).
     if title_fold.startswith("dinh chinh") or any(
         l.strip().startswith("dinh chinh") for l in head_lines
     ):
-        return DOC_KIND_GENERIC, title_line
+        return DOC_KIND_GENERIC, _trang_phu_title("dinh chinh")
 
     if "cam ket tai san rieng" in title_fold:
         return DOC_KIND_ASSET_COMMITMENT, title_line
