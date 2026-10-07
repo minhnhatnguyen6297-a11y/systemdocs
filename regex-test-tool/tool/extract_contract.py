@@ -2004,6 +2004,16 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
                 continue
             if field == "so_thua_dat" and thua_hit_pos < 0:
                 thua_hit_pos = start
+            if (
+                field == "so_thua_dat"
+                and value
+                and not re.search(r"\d", value)
+                and "«" not in value
+                and "[" not in value
+            ):
+                # Gia tri so thua khong co chu so nao la van xuoi
+                # ("số thửa và sơ đồ sẽ được điều chỉnh...") — bo.
+                continue
             if field in ("so_to_ban_do", "so_thua_dat"):
                 _head, _note = _tach_nay_la(value)
                 if _note:
@@ -2533,7 +2543,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # "Toi ten la: Tran Gia Huy; Sinh ngay: ..." — ten tran khong
     # Ông/Bà, nhan ngay sinh cung dong de chac la nguoi.
     intro_bare_re = re.compile(
-        r"(?i)^\s*(?:Tôi (?:tên )?là|Tên tôi(?:\s+là)?|Tôi\s+(?:Ông|Bà))\s*:?\s*(?P<name>[^;|\-\u2013\n]+?)"
+        r"(?i)^\s*(?:Tôi (?:tên )?là|Tên tôi(?:\s+là)?|Tôi\s+(?:Ông|Bà))\s*[:–\-]?\s*(?P<name>[^;|\-\u2013\n]+?)"
         r"(?:\s*[-\u2013]\s*[^\n;|]{0,60}?)?(?:\s*[;|]|\s+)[\s|]*"
         r"(?:Sinh ngày|Ngày sinh|Sinh ngay|Ngay sinh|Sinh năm|Năm sinh|Sinh nam|Nam sinh)"
     )
@@ -3695,7 +3705,7 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
             tlkt_date = tlkt_by_match.group(2)
         last_addr = ""
         addr_match = re.search(
-            r"(?i)(?P<ca_hai>c\u1ea3 hai\s+c\u00f3\s+)?N\u01a1i\s+(?:th\u01b0\u1eddng tr\u00fa|c\u01b0 tr\u00fa)(?:\s+cu\u1ed1i c\u00f9ng)?\s+tr\u01b0\u1edbc khi ch\u1ebft\s*(?:t\u1ea1i)?\s*:\s*(?P<addr>[^.\n;)]+)",
+            r"(?i)(?P<ca_hai>c\u1ea3 hai\s+c\u00f3\s+)?N\u01a1i\s+(?:th\u01b0\u1eddng tr\u00fa|c\u01b0 tr\u00fa|t\u1ea1m tr\u00fa)(?:\s*/\s*t\u1ea1m tr\u00fa)?\s+(?:(?:cu\u1ed1i c\u00f9ng\s+)?tr\u01b0\u1edbc khi ch\u1ebft|cu\u1ed1i c\u00f9ng)\s*(?:t\u1ea1i)?\s*:\s*(?P<addr>[^.\n;)]+)",
             tail,
         )
         if addr_match:

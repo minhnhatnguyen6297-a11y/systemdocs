@@ -3532,3 +3532,29 @@ def test_mat_dong_nghia_chet():
     ten = [p["ho_ten"] for p in nguoi]
     assert "Đỗ Văn Quân" not in ten, ten
     assert "Đỗ Tiến Dũng" in ten, ten
+
+
+def test_toi_la_gach_ba_va_dia_chi_cuoi_cung_tam_tru():
+    """'Tôi là - Bà X – Sinh năm 1964' (gach sau 'la'); 'Nơi thường
+    trú/tạm trú cuối cùng:' la dia chi nguoi chet."""
+    import extract_contract as ec
+    text = "\n".join([
+        "Tôi là - Bà Bùi Thị Minh Thu – Sinh năm 1964; Căn cước công dân số 001164010666 do Cục Cảnh sát cấp ngày 19/06/2017;",
+    ])
+    nguoi = ec._extract_plain_text_person_entries(text)
+    assert any("Minh Thu" in p["ho_ten"] for p in nguoi), nguoi
+    chet = ec._extract_nguoi_chet(
+        "Ông Uông Đình Khoa - Sinh năm 1960, đã chết ngày 11/08/2020 "
+        "theo Trích lục khai tử (Bản sao) - Số 338/TLKT-BS do UBND phường Thanh Nhàn cấp ngày 13/08/2020. "
+        "Nơi thường trú/tạm trú cuối cùng: 6 ngách 281/76 đường Trần Khát Chân, phường Thanh Nhàn."
+    )
+    assert chet and "Trần Khát Chân" in chet[0]["dia_chi"], chet
+
+
+def test_so_thua_khong_chu_so_la_rac():
+    """'Số tờ, số thửa và sơ đồ sẽ được điều chỉnh' — so thua khong co
+    chu so nao la van xuoi, khong tao thua."""
+    import extract_contract as ec
+    assert ec.tach_danh_sach_thua_dat(
+        "Số tờ, số thửa và sơ đồ sẽ được điều chỉnh khi có bản đồ địa chính."
+    ) == []
