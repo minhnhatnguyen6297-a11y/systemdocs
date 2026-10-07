@@ -3182,6 +3182,33 @@ class UploadLabExtractContractTests(unittest.TestCase):
             ("Nguyễn Thị Bình", "Bà", "01/01/1960", ""),
         ])
 
+    def test_dia_chi_keyed_noi_thuong_tru_khong_cua(self):
+        # "Nơi thường trú ông Cường: ..." — khong co chu "của"
+        # (mau 18 ban — 13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "a) Tên: Ông Nguyễn Tiến Cường;\tSinh ngày: 24/06/1990;",
+            "Tên: Bà  Đinh Thị Lan;\tSinh ngày: 05/11/1992",
+            "b) Giấy tờ:",
+            "1. Ông Nguyễn Tiến Cường;\tSinh ngày: 24/06/1990;",
+            "2. Bà  Đinh Thị Lan;\tSinh ngày: 05/11/1992",
+            "c) Địa chỉ:",
+            "Nơi thường trú ông Cường: thôn Chiến Thắng, xã Tân Thuận, tỉnh Hưng Yên",
+            "Nơi thường trú bà Lan: thôn 7, xã Phong Doanh, tỉnh Ninh Bình",
+            "d) Điện thoại liên hệ (nếu có):",
+        ])
+        r = ec._build_payload_generic("a.docx", text, {}, extract_mode="plain_text_doc")
+        ppl = r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]
+        cuong = [x for x in ppl if x["ho_ten"] == "Nguyễn Tiến Cường"]
+        lan = [x for x in ppl if x["ho_ten"] == "Đinh Thị Lan"]
+        self.assertTrue(cuong and lan)
+        self.assertEqual(
+            cuong[0]["dia_chi"], "thôn Chiến Thắng, xã Tân Thuận, tỉnh Hưng Yên"
+        )
+        self.assertEqual(
+            lan[0]["dia_chi"], "thôn 7, xã Phong Doanh, tỉnh Ninh Bình"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
