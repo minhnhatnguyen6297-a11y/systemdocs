@@ -2413,7 +2413,7 @@ _TEN_TO_CHUC_DAU_RE = re.compile(
 
 def _cat_ho_ten(name: str) -> str:
     """Cat phan duoi khong phai ten: keyword truong, dau cau, so."""
-    return _NAME_BOUNDARY_RE.split(str(name or ""), maxsplit=1)[0].strip(" ;,.-\u2013\u2014")
+    return _NAME_BOUNDARY_RE.split(str(name or ""), maxsplit=1)[0].strip(" ;,.-\u2013\u2014`")
 
 
 def _ho_ten_hop_le(name: str) -> bool:
@@ -2853,12 +2853,12 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                 gioi_tinh = ""
             else:
                 gioi_tinh = "B\u00e0"
-            ho_ten = re.sub(r"\s+", " ", match.groupdict().get("name") or "").split("|")[0].strip(" ;,.-\u2013\u2014")
-            ho_ten = re.split(r"(?i)\s*[-\u2013\u2014]\s+(?:con\b|ch\u00e1u\b|chau\b|v\u1ee3\b|ch\u1ed3ng\b|l\u00e0\b|b\u1ed1\b|m\u1eb9\b|cha\b|b\u00ean\b|ch\u1ecb\b|chi\b|anh\b|em\b|c\u00f4\b|co\b|ch\u00fa\b|chu\b|b\u00e1c\b|bac\b|d\u00ec\b|di\b|c\u1eadu\b|cau\b|m\u1ee3\b|mo\b|\u00f4ng\b|b\u00e0\b|(?:ch\u1ee9c|chuc)\s*(?:v\u1ee5|vu|danh)\b)", ho_ten, maxsplit=1)[0].strip(" ;,.-\u2013\u2014")
+            ho_ten = re.sub(r"\s+", " ", match.groupdict().get("name") or "").split("|")[0].strip(" ;,.-\u2013\u2014`")
+            ho_ten = re.split(r"(?i)\s*[-\u2013\u2014]\s+(?:con\b|ch\u00e1u\b|chau\b|v\u1ee3\b|ch\u1ed3ng\b|l\u00e0\b|b\u1ed1\b|m\u1eb9\b|cha\b|b\u00ean\b|ch\u1ecb\b|chi\b|anh\b|em\b|c\u00f4\b|co\b|ch\u00fa\b|chu\b|b\u00e1c\b|bac\b|d\u00ec\b|di\b|c\u1eadu\b|cau\b|m\u1ee3\b|mo\b|\u00f4ng\b|b\u00e0\b|(?:ch\u1ee9c|chuc)\s*(?:v\u1ee5|vu|danh)\b)", ho_ten, maxsplit=1)[0].strip(" ;,.-\u2013\u2014`")
             ho_ten = _cat_ho_ten(ho_ten)
             # Danh xung lap/dinh trong ten ("là bà Bà Hoàng Thị Mỹ" —
             # nguon go thua "bà Bà") — gioi tinh da chot tu title.
-            ho_ten = re.sub(r"(?i)^(?:[ôo]ng|bà)\s+", "", ho_ten).strip(" ;,.-\u2013\u2014")
+            ho_ten = re.sub(r"(?i)^(?:[ôo]ng|bà)\s+", "", ho_ten).strip(" ;,.-\u2013\u2014`")
             person = {
                 "gioi_tinh": gioi_tinh,
                 "ho_ten": ho_ten,
@@ -2869,7 +2869,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             # ho_ten (Owner 07/10/2026: ten chi giu ho ten).
         else:
             base_name = re.sub(r"\s+", " ", groups.get("name") or "").split("|")[0].strip(" ;,.")
-            base_name = re.split(r"(?i)\s*[-\u2013\u2014]\s+(?:con\b|ch\u00e1u\b|chau\b|v\u1ee3\b|ch\u1ed3ng\b|l\u00e0\b|b\u1ed1\b|m\u1eb9\b|cha\b|b\u00ean\b|ch\u1ecb\b|chi\b|anh\b|em\b|c\u00f4\b|co\b|ch\u00fa\b|chu\b|b\u00e1c\b|bac\b|d\u00ec\b|di\b|c\u1eadu\b|cau\b|m\u1ee3\b|mo\b|\u00f4ng\b|b\u00e0\b|(?:ch\u1ee9c|chuc)\s*(?:v\u1ee5|vu|danh)\b)", base_name, maxsplit=1)[0].strip(" ;,.-\u2013\u2014")
+            base_name = re.split(r"(?i)\s*[-\u2013\u2014]\s+(?:con\b|ch\u00e1u\b|chau\b|v\u1ee3\b|ch\u1ed3ng\b|l\u00e0\b|b\u1ed1\b|m\u1eb9\b|cha\b|b\u00ean\b|ch\u1ecb\b|chi\b|anh\b|em\b|c\u00f4\b|co\b|ch\u00fa\b|chu\b|b\u00e1c\b|bac\b|d\u00ec\b|di\b|c\u1eadu\b|cau\b|m\u1ee3\b|mo\b|\u00f4ng\b|b\u00e0\b|(?:ch\u1ee9c|chuc)\s*(?:v\u1ee5|vu|danh)\b)", base_name, maxsplit=1)[0].strip(" ;,.-\u2013\u2014`")
             base_name = _cat_ho_ten(base_name)
             role_phrase = re.sub(r"\s+", " ", groups.get("role") or "").strip(" ;,.")
             role_fold = _fold_text(role_phrase)
