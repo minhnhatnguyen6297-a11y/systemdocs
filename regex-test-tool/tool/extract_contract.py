@@ -2389,21 +2389,21 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         r"(?i)^\s*(?:[-*]\s*)?(?:(?:ng\u01b0\u1eddi\s+)?(?:v\u1ee3|ch\u1ed3ng)\s*[–-]\s*)?"
         r"(?:\d+\.\s*)?(?:v\u00e0\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\s+)?"
         r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?P<title>\u00f4ng|b\u00e0)\s*:?\s*"
-        r"(?P<name>.+?)(?=\s+Sinh ng\u00e0y:|[;]|$)"
+        r"(?P<name>.+?)(?=\s+Sinh ng\s*\u00e0y:|[;]|$)"
     )
     header_re = re.compile(
         r"(?i)^\s*(?:[-*]\s*)?(?:\u0110\u1ea1i di\u1ec7n:\s*)?(?:(?:ng\u01b0\u1eddi\s+)?(?:v\u1ee3|ch\u1ed3ng)\s*[â€“-]\s*)?"
         r"(?:\d+\.\s*)?(?:v\u00e0\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\s+)?"
         r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?P<title>\u00f4ng|b\u00e0)\s*:?\s*"
-        r"(?P<name>.+?)(?=\s+(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh):|\s+Ch\u1ee9c v\u1ee5\s*:|[;]|$)"
+        r"(?P<name>.+?)(?=\s+(?:Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh):|\s+Ch\u1ee9c v\u1ee5\s*:|[;]|$)"
     )
     header_re = re.compile(
         r"(?i)^\s*(?:[-*]\s*)?(?:\u0110\u1ea1i di\u1ec7n:\s*)?(?:(?:ng\u01b0\u1eddi\s+)?(?:v\u1ee3|ch\u1ed3ng)\s*[\-\u2013:]\s*)?"
         r"(?:\d+\.\s*)?(?:v\u00e0\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\s+)?"
         r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?P<title>\u00f4ng|b\u00e0)\s*:?\s*"
-        r"(?P<name>.+?)(?=\s+(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh):|\s+Ch\u1ee9c v\u1ee5\s*:|[;]|$)"
+        r"(?P<name>.+?)(?=\s+(?:Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh):|\s+Ch\u1ee9c v\u1ee5\s*:|[;]|$)"
     )
-    birth_re = re.compile(r"(?i)(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh):?\s*(\d{1,2}/\d{1,2}/\d{4})")
+    birth_re = re.compile(r"(?i)(?:Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh):?\s*(\d{1,2}/\d{1,2}/\d{4})")
     id_re = re.compile(r"(?i)(?:C\u0103n c\u01b0\u1edbc(?:\s+c\u00f4ng d\u00e2n)?|CCCD|CMND)\s*(?:s\u1ed1)?\s*:?\s*(\d+)")
     issue_place_re = re.compile(r"(?i)\bdo\s+([^\n]+?)\s+c\u1ea5p ng\u00e0y")
     issue_date_re = re.compile(r"(?i)c\u1ea5p ng\u00e0y\s*(\d{1,2}/\d{1,2}/\d{4})")
@@ -2417,13 +2417,13 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         r"(?:(?:b\u00ean|ben)\s+[A-Za-z\u00c0-\u1ef9]\s*[:.,]?\s*)?"
         r"(?:(?:con|m\u1eb9|b\u1ed1|cha|v\u1ee3|ch\u1ed3ng)\s+(?:(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i)(?:\s+(?:t\u00f4i|c\u1ee7a\s+t\u00f4i))?|t\u00f4i)(?:\s+\u00f4ng\s+[^\d;:]{2,50}?)?\s*(?:[-\u2013\u2014:,]|l\u00e0)\s*)?"
         r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?:v\u00e0\s+)?(?P<title>\u00f4ng/b\u00e0|ong/ba|\u00f4ng\s*\(b\u00e0\)|b\u00e0\s*\(\u00f4ng\)|\u00f4ng|ong|b\u00e0|ba|anh|ch\u1ecb|chi)\s*:?\s*"
-        r"(?P<name>.+?)(?=[\s|]+\s*(?:[\-\u2013]\s*)?(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|sinh n\u0103m|sinh ng\u00e0y)\s*[:\u2013-]?\s*(?:(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})|\s+(?:[\-\u2013]\s*)?(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:|\s+c\u00f3\s+(?:(?:m\u1eb9|b\u1ed1|cha|con|v\u1ee3|ch\u1ed3ng)(?:\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i))?|\d)\b|\s*\(\s*(?:Sinh|Ng\u00e0y)|[;]|$)"
+        r"(?P<name>.+?)(?=[\s|]+\s*(?:[\-\u2013]\s*)?(?:Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|sinh n\u0103m|sinh ng\u00e0y)\s*[:\u2013-]?\s*(?:(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})|\s+(?:[\-\u2013]\s*)?(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:|\s+c\u00f3\s+(?:(?:m\u1eb9|b\u1ed1|cha|con|v\u1ee3|ch\u1ed3ng)(?:\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i))?|\d)\b|\s*\(\s*(?:Sinh|Ng\u00e0y)|[;]|$)"
     )
-    birth_re = re.compile(r"(?i)(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Ng\u00e0y/th\u00e1ng/n\u0103m\s+sinh)\s*[:\u2013-]?\s*(\d{1,2}/\d{1,2}/\d{4})")
+    birth_re = re.compile(r"(?i)(?:Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Ng\u00e0y/th\u00e1ng/n\u0103m\s+sinh)\s*[:\u2013-]?\s*(\d{1,2}/\d{1,2}/\d{4})")
     # Nguoi lon tuoi thuong chi ghi "Sinh nam 1965" — database chap nhan YYYY
     # (docs/spec/notary_v2/stage.md muc 5) nen giu nam lam ngay_sinh.
     # Gia tri chi co nam van nhan du nhan viet "Sinh ngay: 1982" (loi mau thuc te).
-    birth_year_re = re.compile(r"(?i)(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh)\s*[:\u2013-]?\s*((?:19|20)\d{2})(?!\d)")
+    birth_year_re = re.compile(r"(?i)(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh)\s*[:\u2013-]?\s*((?:19|20)\d{2})(?!\d)")
     id_re = re.compile(r"(?i)(?:C\u0103n c\u01b0\u1edbc(?:\s+c\u00f4ng(?:\s+d\u00e2n)?)?(?:\s+m\u1edbi)?|Can cuoc(?:\s+cong(?:\s+dan)?)?|CCCD|CMND|\bCC)\s*(?:[A-Z\u00c0-\u1ef9\u0110][^\d:;\n]{0,40}?)?\s*(?:(?:s\u1ed1|so)\s*:?|:)\s*(\d{4}\s\d{4}\s\d{4}|\d{6,12})")
     issue_place_re = re.compile(
         r"(?i)\bdo\s+((?:(?!k[ýí]\s+ng\u00e0y)[^\n])+?)\s+(?:c\u1ea5p\s+ng\u00e0y|cap ngay|ng\u00e0y\s*\d)"
@@ -2440,7 +2440,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     bare_header_re = re.compile(
         r"(?i)^\s*(?P<name>[^\d;:\n]{2,60}?)\s*[\-\u2013]\s*"
         r"(?P<role>(?:v\u1ee3|vo|ch\u1ed3ng|chong|con(?:\s+\u0111\u1ebb|\s+de)?)\b[^\n;]*?)"
-        r"\s+(?:(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh)\s*[:\u2013-]?\s*\d{1,2}/\d{1,2}/\d{4}|(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)\s*[:\u2013-]?\s*(?:19|20)\d{2})"
+        r"\s+(?:(?:Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh)\s*[:\u2013-]?\s*\d{1,2}/\d{1,2}/\d{4}|(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)\s*[:\u2013-]?\s*(?:19|20)\d{2})"
     )
     # "Người chồng – Vũ Văn X, Sinh ngày ..." / "Con đẻ – Nguyễn Thị Y" —
     # vai tro dung dau dong, khong co danh xung Ong/Ba; chi nhan khi dong
@@ -2493,7 +2493,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # cung dong co ngay sinh de chac la nguoi (11/10/2026).
     numbered_bare_re = re.compile(
         r"(?i)\s*\d{1,2}\.\s*(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?)\s+"
-        r"(?=Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|sinh ng\u00e0y|sinh n\u0103m)"
+        r"(?=Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|sinh ng\u00e0y|sinh n\u0103m)"
     )
     # Dong "2. Ông X có mẹ đẻ là bà Y; Sinh ngày..." — "bà Y" la nguoi
     # rieng bi nuot vao khoi X; tach "là bà/ông <tên>" thanh dong ao de
@@ -2560,7 +2560,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         ):
             next_match = re.match(
                 r"\s*(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?)"
-                r"\s+(?:[-\u2013]\s*)?(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)",
+                r"\s+(?:[-\u2013]\s*)?(?:Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)",
                 line,
             )
             if next_match:
@@ -2587,7 +2587,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         if match is None and gom_list and re.search(r"\d", line):
             match = re.match(
                 r"\s*(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?)"
-                r"\s+(?:[-\u2013]\s*)?(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)",
+                r"\s+(?:[-\u2013]\s*)?(?:Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)",
                 line,
             )
         if match:
@@ -3346,7 +3346,7 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
         r"(?:\s+v\u00e0\s+(?P<title2>\u00f4ng|b\u00e0|anh|ch\u1ecb)\s*:?\s*(?P<name2>[^;(\n.,]+?))?"
         r"\s*(?:\((?P<alias>[^)]+)\))?"
         r"\s*[-\u2013;,]?\s*"
-        r"(?:(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh)"
+        r"(?:(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh)"
         r"\s*[:\u2013-]?\s*(?P<birth>(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4}))?"
         r"\s*[;,]?\s*(?:\u0111\u00e3\s+)?ch\u1ebft\s+(?:ng\u00e0y\s*(?:ng\u00e0y\s*)?[:\u2013-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
         r"|n\u0103m\s*[:\u2013-]?\s*(?P<death_y>(?:19|20)\d{2})"

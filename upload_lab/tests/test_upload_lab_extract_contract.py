@@ -2869,6 +2869,24 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(dc.get("Nguyễn Hữu Lành"), "thôn Tây Vinh, xã Yên Lương, huyện Ý Yên, tỉnh Nam Định")
         self.assertEqual(dc.get("Phạm Thị Lý"), "thôn Tây Vinh, xã Yên Lương, huyện Ý Yên, tỉnh Nam Định")
 
+    def test_sinh_ng_ay_go_loi(self):
+        # "Sinh ng ày: 05/08/1980" — nhan viet loi co khoang trang
+        # giua "ng" va "ay" (mau 11 - 13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "ĐƠN ĐĂNG KÝ BIẾN ĐỘNG",
+            "1. Người sử dụng đất:",
+            "1.1.\tTên Ông Vũ Hồng Vinh;\tSinh ngày: 05/08/1980",
+            "1.2. Giấy tờ nhân thân:",
+            "Ông Vũ Hồng Vinh;\tSinh ng ày: 05/08/1980;",
+            "Căn cước công dân số 037080003154 do Cục cảnh sát cấp ngày 27/04/2021;",
+            "1.3. Địa chỉ: 224 Trung Kính, phường Yên Hoà, Hà Nội.",
+        ])
+        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        q = [x for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"] if x["ho_ten"] == "Vũ Hồng Vinh"]
+        self.assertTrue(q)
+        self.assertEqual(q[0]["ngay_sinh"], "05/08/1980")
+
 
 if __name__ == "__main__":
     unittest.main()
