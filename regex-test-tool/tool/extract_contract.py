@@ -2502,7 +2502,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # ("Chúng tôi là: 1. Trần Văn Cát   Sinh ngày: ...") — chi nhan khi
     # cung dong co ngay sinh de chac la nguoi (11/10/2026).
     numbered_bare_re = re.compile(
-        r"(?i)\s*\d{1,2}\.\s*(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?)\s+"
+        r"(?i)\s*\d{1,2}(?:\.\d{1,2})*\.\s*(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?);?\s+"
         r"(?=Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|sinh ng\u00e0y|sinh n\u0103m)"
     )
     # Dong "2. Ông X có mẹ đẻ là bà Y; Sinh ngày..." — "bà Y" la nguoi
