@@ -3569,3 +3569,28 @@ def test_ten_cat_tu_chi_cung():
     nguoi = ec._extract_plain_text_person_entries(text)
     ten = [p["ho_ten"] for p in nguoi]
     assert all("chỉ" not in t.lower().split() for t in ten), ten
+
+def test_extract_contract_thua_lap_muc_phan_chia_khong_nhan_doi_chi_tiet():
+    """Thửa lặp lại ở mục phân chia ("IV. Nội dung...") chỉ khác chú thích
+    — chi tiết không nhân đôi (R10), chú thích gộp phan_ghi_them (13/10/2026)."""
+    import extract_contract
+
+    text = "\n".join(
+        [
+            "Văn bản phân chia di sản thừa kế",
+            "II. Di sản thừa kế",
+            "Quyền sử dụng đất có địa chỉ tại: thôn Đồng Quang, xã Vạn Thắng, tỉnh Ninh Bình tại thửa đất số 57, tờ bản đồ số 5, trong đó diện tích: 210 m2. Trong đó: ONT: 170 m2; CLN: 40 m2.",
+            "III. Người thừa kế",
+            "IV. Nội dung phân chia thừa kế",
+            "toàn bộ quyền sử dụng đất có địa chỉ tại: thôn Đồng Quang, xã Vạn Thắng, tỉnh Ninh Bình tại thửa đất số 57, tờ bản đồ số 5, trong đó diện tích: 210 m2. Trong đó: ONT: 170 m2; CLN: 40 m2, thuộc quyền sử dụng riêng của ông Tống Duy Tuyền.",
+        ]
+    )
+    parcels = extract_contract.tach_danh_sach_thua_dat(text)
+    assert len(parcels) == 1
+    thua = parcels[0]
+    assert thua["so_thua_dat"] == "57"
+    assert len(thua["chi_tiet_dien_tich"]) == 2
+    assert not any("o_tho" in d for d in thua["chi_tiet_dien_tich"])
+    assert "Tống Duy Tuyền" in thua["phan_ghi_them"]
+    assert not thua["dia_chi"].rstrip().endswith("tại")
+

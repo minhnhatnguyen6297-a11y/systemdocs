@@ -1904,6 +1904,15 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
             # du lieu bang — bo truoc khi vao chi tiet/thua "ma".
             if any(re.match(r"^\s*\d{1,2}\.\s+\S", c) for c in cells if c):
                 continue
+            # Dong marker muc ("IV | Nội dung phân chia thừa kế") — khong phai
+            # chi tiet dien tich; dong thoi ngat thua hien tai de chi tiet
+            # muc sau khong dinh vao thua truoc (13/10/2026).
+            if (
+                re.match(r"^\s*(?:[IVXLCDM]{1,5}|[A-Za-z])[.)]?\s*$", cells[0])
+                and not any(re.search(r"\d", c) for c in cells)
+            ):
+                current = None
+                continue
             mid_head, _mid_note = _tach_nay_la(mid)
             if (
                 mid_head.strip() not in ("", "_")
@@ -2052,6 +2061,17 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
                     value = ""
             values[field] = value
         if not values:
+            # Tieu de muc ("III. Người thừa kế", "IV. Nội dung phân
+            # chia") — ngat trang thai de dong nhan muc sau khong dinh
+            # vao thua truoc (thua 57 dinh "40 CLN" cua muc phan chia,
+            # 13/10/2026).
+            if re.match(
+                r"(?i)^\s*(?:[IVXLCDM]{1,5}|\d{1,2})[.)]\s+(?:Nội dung|Điều|Người thừa|Di sản|Phần|Mục|Quyền|Nghĩa vụ|Cam kết|Thỏa thuận|Tài sản|Người nhận)\b",
+                line,
+            ):
+                current = None
+                pending = None
+                trong_do_seen = False
             continue
         if (
             "so_thua_dat" in values
@@ -2201,7 +2221,30 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
                 if not giu.get(field) and parcel.get(field):
                     giu[field] = parcel[field]
             for detail in parcel.get("chi_tiet_dien_tich", []):
-                if detail and detail not in giu["chi_tiet_dien_tich"]:
+                if not detail:
+                    continue
+                # Ban lap cung thua o muc khac ("Trong đó: ONT 170; CLN 40"
+                # roi lai "CLN: 40 m2, thuộc ... ông X") — chi tiet trung
+                # (dien_tich + loai dat dau) thi gop chu thich, khong nhan
+                # doi dong keo R10 (13/10/2026).
+                _d_dup = None
+                if "dien_tich" in detail:
+                    _d_dt = re.findall(r"\d[\d.,]*", str(detail.get("dien_tich") or ""))
+                    _d_md = _fold_text(str(detail.get("muc_dich_su_dung") or "")).split(":")[0].strip()
+                    for cu_d in giu["chi_tiet_dien_tich"]:
+                        if "dien_tich" not in cu_d:
+                            continue
+                        _c_dt = re.findall(r"\d[\d.,]*", str(cu_d.get("dien_tich") or ""))
+                        _c_md = _fold_text(str(cu_d.get("muc_dich_su_dung") or "")).split(":")[0].strip()
+                        if _d_dt == _c_dt and _d_md == _c_md:
+                            _d_dup = cu_d
+                            break
+                if _d_dup is not None:
+                    _extra = str(detail.get("muc_dich_su_dung") or "").split(":", 1)[-1].strip(" ,;")
+                    if _extra and _extra not in giu["phan_ghi_them"]:
+                        giu["phan_ghi_them"] = (giu["phan_ghi_them"] + "; " + _extra).lstrip("; ")
+                    continue
+                if detail not in giu["chi_tiet_dien_tich"]:
                     giu["chi_tiet_dien_tich"].append(detail)
             ghi = str(parcel.get("phan_ghi_them") or "").strip(" ;")
             if ghi and ghi not in giu["phan_ghi_them"]:
@@ -2211,6 +2254,12 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
     # Note nguon goc bi cat doan o IFilter ("duoc tach tu" khong co so) —
     # khong mang thong tin, bo.
     for parcel in dedup:
+        # Dia chi bat theo prose "tai <dia chi> tai thua dat so N" — cat
+        # duoi gioi tu "tại/là" con treo (13/10/2026).
+        if parcel.get("dia_chi"):
+            parcel["dia_chi"] = re.sub(
+                r"(?i)\s+(?:tại|là|tại:|ở)\s*$", "", str(parcel["dia_chi"])
+            ).strip(" ,;")
         parcel["phan_ghi_them"] = "; ".join(
             part for part in str(parcel.get("phan_ghi_them") or "").split("; ")
             if not re.fullmatch(
