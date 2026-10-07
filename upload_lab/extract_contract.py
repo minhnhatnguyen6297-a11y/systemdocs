@@ -2260,6 +2260,19 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
             parcel["dia_chi"] = re.sub(
                 r"(?i)\s+(?:tại|là|tại:|ở)\s*$", "", str(parcel["dia_chi"])
             ).strip(" ,;")
+        # Chi tiet rac: muc_dich la cau van xuoi/tieu de ("Di sản của bà
+        # Nguyễn Thị Mý để lại là:") — khong phai loai dat (13/10/2026).
+        if parcel.get("chi_tiet_dien_tich"):
+            parcel["chi_tiet_dien_tich"] = [
+                d for d in parcel["chi_tiet_dien_tich"]
+                if not (
+                    str(d.get("muc_dich_su_dung") or "").rstrip().endswith(":")
+                    or (
+                        len(str(d.get("muc_dich_su_dung") or "")) > 40
+                        and not re.search(r"\d", str(d.get("muc_dich_su_dung") or ""))
+                    )
+                )
+            ]
         parcel["phan_ghi_them"] = "; ".join(
             part for part in str(parcel.get("phan_ghi_them") or "").split("; ")
             if not re.fullmatch(
@@ -3715,6 +3728,26 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
                 if 1 < len(c.split()) <= 6
                 and all(t[0].isupper() for t in c.split())
             ]
+            if not _full:
+                # Ten goi tat khac dau loi chinh ta ("ông Khê" cho
+                # "Vũ Kim Kê") — so am tiet cuoi theo fold hoac cung
+                # chu cai dau (13/10/2026).
+                _tok_fold = _fold_text(_tok)
+                _cands = re.findall(
+                    r"(?:ông|bà)\s+([A-ZÀ-ỹĐ][^\d;:.,()\n]{1,58})\b",
+                    _before,
+                    re.I,
+                )
+                _full = [
+                    re.sub(r"\s+", " ", c).strip(" ;,.-")
+                    for c in _cands
+                    if 1 < len(c.split()) <= 6
+                    and all(t[0].isupper() for t in c.split())
+                    and (
+                        _fold_text(c.split()[-1]) == _tok_fold
+                        or _fold_text(c.split()[-1])[:1] == _tok_fold[:1]
+                    )
+                ]
             if _full:
                 raw_name = max(_full, key=len)
         title_fold = _fold_text(match_title)

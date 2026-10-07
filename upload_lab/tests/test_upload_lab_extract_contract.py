@@ -3672,3 +3672,37 @@ def test_extract_contract_nhan_nguoi_su_dung_dat_va_dia_chi_lien_he_ngoac():
     assert duong["cccd"] == "036079008789"
     assert "Mỹ Lộ" in duong["dia_chi"]
 
+def test_extract_contract_ten_chet_rut_gon_khac_dau_va_chi_tiet_prose():
+    """Ten goi tat 1 am tiet khac dau loi chinh ta ("ông Khê" cho
+    "Vũ Kim Kê") phuc hoi ten day du theo chu cai dau am tiet cuoi;
+    chi tiet co muc_dich la cau van xuoi (ket thuc ":") bi loai khoi
+    chi_tiet_dien_tich (13/10/2026)."""
+    import extract_contract
+
+    text = "\n".join(
+        [
+            "ĐƠN XIN XÁC NHẬN",
+            "Bố chồng tôi là ông Vũ Kim Kê (bố đẻ ông Vũ Văn Quốc);",
+            "ông Khê đã chết ngày 05/05/1989, theo trích lục khai tử",
+            "(bản sao) số 21/TLKT-BS do UBND xã Yên Khánh ký ngày 30/05/2025.",
+        ]
+    )
+    dead = extract_contract._extract_nguoi_chet(text)
+    assert dead and dead[0]["ho_ten"] == "Vũ Kim Kê"
+    assert dead[0]["ngay_chet"] == "05/05/1989"
+
+    parcels = extract_contract.tach_danh_sach_thua_dat(
+        "\n".join(
+            [
+                "Thửa đất số: 156",
+                "Diện tích: 334 m2",
+                "204 Đất ở Lâu dài",
+                "46 Đất vườn 15/10/2043",
+                "84 Ao 31/12/2063",
+                "2 Di sản của bà Nguyễn Thị Mý để lại là:",
+            ]
+        )
+    )
+    thua = parcels[0]
+    assert all("Di sản" not in str(d.get("muc_dich_su_dung") or "") for d in thua["chi_tiet_dien_tich"])
+
