@@ -3223,7 +3223,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         ])
         r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
         ppl = r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]
-        dang = [x for x in ppl if "Đặng" in x["ho_ten"]]
+        dang = [x for x in ppl if "ĐẶNG" in x["ho_ten"].upper()]
         self.assertTrue(dang)
         self.assertEqual(
             dang[0]["dia_chi"], "Lộng Đồng, phường Nam Định, tỉnh Ninh Bình"
