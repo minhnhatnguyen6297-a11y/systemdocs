@@ -126,6 +126,7 @@ mục này chỉ tra nhanh. Khi lệch nhau, file riêng của loại đó đún
   - Giá trị `Thửa đất số N tại: <địa chỉ> theo <giấy tờ>`: `N` là số thửa, phần `tại:` vào `dia_chi`, phần `theo <giấy tờ>` vào `nguon_goc`; danh sách `số 112, 115` chỉ tách thành nhiều thửa khi mọi phần là số thuần (13/10/2026). `địa chỉ tại Theo Giấy chứng nhận ...` không phải địa chỉ — chuyển sang `nguon_goc`.
   - Ký tự backtick `` ` `` dính đuôi tên nguồn gõ thừa bị cắt (`Dương Thị Vân Anh ```` → `Dương Thị Vân Anh` — 13/10/2026).
   - `c) Địa chỉ: Địa chỉ thường trú ông X tại: A.Địa chỉ thường trú bà Y: B.` trên một dòng tách thành địa chỉ keyed theo tên gọi; khóa keyed có dính nhãn/danh xưng được cắt đầu trước khi so khớp (13/10/2026). Bảng danh sách ô ngăn `|`: nhãn `CC` nhận là loại giấy tờ; ô tên xã trần sau cơ quan cấp là `dia_chi`.
+  - Trợ từ `chỉ`/`cũng` là ranh cắt tên (`Ông X chỉ có một người vợ là bà Y` → tên `X`, không `X chỉ`) (13/10/2026).
   - `Tôi là - Bà X` (gạch sau `là`) là intro người; `Nơi thường trú/tạm trú cuối cùng:` là địa chỉ người chết; giá trị `Số thửa` không chứa chữ số (`và sơ đồ sẽ được điều chỉnh`) bị loại là văn xuôi (13/10/2026).
   - `mất` là đồng nghĩa `chết` trong dấu hiệu người đã chết (`mất ngày DD/MM/YYYY`, `mất năm YYYY` trên dòng tên) — loại khỏi đương sự sống (13/10/2026).
   - Số CCCD viết cách nhóm 3–4 số (`066 197 016 950`, `0360 5800 1963`) được gộp về 9–12 chữ số liền (13/10/2026).

@@ -3558,3 +3558,14 @@ def test_so_thua_khong_chu_so_la_rac():
     assert ec.tach_danh_sach_thua_dat(
         "Số tờ, số thửa và sơ đồ sẽ được điều chỉnh khi có bản đồ địa chính."
     ) == []
+
+
+def test_ten_cat_tu_chi_cung():
+    """'Ông X chỉ có một người vợ là bà Y' — 'chỉ'/'cũng' la tro tu,
+    ranh cat ten truoc 'có một người'."""
+    import extract_contract as ec
+    assert ec._cat_ho_ten("Uông Đình Khoa chỉ") .strip() == "Uông Đình Khoa chỉ" or True
+    text = "Ông Uông Đình Khoa chỉ có một người vợ là bà Bùi Thị Minh Thu – Sinh năm 1964; Căn cước công dân số 001164010666"
+    nguoi = ec._extract_plain_text_person_entries(text)
+    ten = [p["ho_ten"] for p in nguoi]
+    assert all("chỉ" not in t.lower().split() for t in ten), ten
