@@ -1322,7 +1322,16 @@ def _tach_ngu_canh_gcn(tai_san: str) -> dict:
         block,
     )
     if dia_chi_match:
-        context["dia_chi"] = _clean_asset_cell(dia_chi_match.group(1))
+        _dc = _clean_asset_cell(dia_chi_match.group(1))
+        if re.match(
+            r"(?i)theo\s+(?:Gi\u1ea5y|Quy\u1ebft|H\u1ee3p|\u0110\u01a1n|Bi\u00ean|GCN)\b",
+            _dc,
+        ):
+            # "địa chỉ tại Theo Giấy chứng nhận ..." — nguon viet nham:
+            # gia tri la mo ta giay to, khong phai dia chi (13/10/2026).
+            context["nguon_goc"] = context.get("nguon_goc") or _dc
+        else:
+            context["dia_chi"] = _dc
     cap_match = re.search(
         r"(?i)do\s+([^\n]+?)\s+(?:c\u1ea5p|k\u00fd)\s+ng\u00e0y\s*(\d{1,2}/\d{1,2}/\d{4})",
         block,
@@ -2022,6 +2031,15 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
             if field == "dia_chi":
                 value = re.sub(r"(?i)^t\u1ea1i:\s*", "", value).strip()
                 value = re.split(r"\s+theo\b|;", value, maxsplit=1)[0].strip()
+                if re.match(
+                    r"(?i)theo\s+(?:Gi\u1ea5y|Quy\u1ebft|H\u1ee3p|\u0110\u01a1n|Bi\u00ean|GCN)\b",
+                    value,
+                ):
+                    # "địa chỉ tại Theo Giấy chứng nhận ..." — nguon viet
+                    # nham: gia tri la mo ta giay to, khong phai dia chi
+                    # (cam ket tai san rieng, 13/10/2026).
+                    values.setdefault("nguon_goc", value)
+                    value = ""
             values[field] = value
         if not values:
             continue
@@ -2046,13 +2064,42 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
                 current["chi_tiet_dien_tich"].append(pending)
             pending = None
             trong_do_seen = False
+            # Gia tri van xuoi keo theo mo ta ("thua dat so 8 tai: xa A,
+            # tinh B theo Giay chung nhan ...") — tach head la so thua,
+            # "tai: ..." thanh dia chi, "theo ..." thanh nguon goc
+            # (HD uy quyen dau gia, 13/10/2026). Khong tach khi head
+            # khong phai so thuan.
+            _th = re.match(
+                r"^\s*(\d[\d/.,]*)\s*[:,]?\s*"
+                r"(t\u1ea1i\s*:|theo\b|,\s*)(.*)$",
+                values["so_thua_dat"], re.I | re.S,
+            )
+            if _th and _th.group(3):
+                _head = _th.group(1).rstrip("., ")
+                _rest = _th.group(3).strip(" ,;")
+                if _rest:
+                    _dia_m = re.match(
+                        r"(?i)(.*?)\s+theo\s+(Gi\u1ea5y|Quy\u1ebft|H\u1ee3p|\u0110\u01a1n|Bi\u00ean)\b(.*)$",
+                        _rest, re.S,
+                    )
+                    if _dia_m:
+                        values.setdefault("dia_chi", _dia_m.group(1).strip(" ,;"))
+                        values.setdefault("nguon_goc", ("theo " + _dia_m.group(2) + _dia_m.group(3)).strip(" ,;"))
+                    elif _fold_text(_th.group(2)).startswith("tai"):
+                        values.setdefault("dia_chi", _rest)
+                    else:
+                        values.setdefault("phan_ghi_them", _rest)
+                    values["so_thua_dat"] = _head
             # Liet ke nhieu thua trong van xuoi ("cac thua dat so 112, 115,
             # to ban do so 80") — moi so la mot thua cung truong con lai;
             # dedupe se gop vao ban chi tiet cung so o duoi (12/10/2026).
-            thua_parts = [
-                p.strip() for p in re.split(r"[,;]", values["so_thua_dat"])
-                if p.strip()
-            ] or [values["so_thua_dat"]]
+            # Chi tach khi moi phan deu la so thuan ("112, 115"), tranh tach
+            # dia chi co dau phay ("8 tai: xa A, tinh B").
+            _raw_parts = [p.strip() for p in re.split(r"[,;]", values["so_thua_dat"]) if p.strip()]
+            if all(re.fullmatch(r"\d[\d/.,]*[a-zA-Z]?", p) for p in _raw_parts):
+                thua_parts = _raw_parts
+            else:
+                thua_parts = [values["so_thua_dat"]]
             for part_idx, thua_part in enumerate(thua_parts):
                 current = _new_thua_dat(context)
                 for field, value in values.items():

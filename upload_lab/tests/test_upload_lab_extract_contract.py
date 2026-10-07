@@ -3384,5 +3384,30 @@ class ChucDanhCuoiDongTests(unittest.TestCase):
         self.assertEqual(_clean_so_to_ban_do("29"), "29")
 
 
+
+
+class ThuaVanXuoiTests(unittest.TestCase):
+    def test_thua_dat_so_dinh_dia_chi_theo_giay_to(self):
+        from extract_contract import tach_danh_sach_thua_dat
+        ts = (
+            "diện tích 101.6m² thuộc vị trí: Tờ bản đồ số 22, Thửa đất số 8 "
+            "tại: xã Ý Yên, tỉnh Ninh Bình theo Giấy chứng nhận kết quả trúng "
+            "đấu giá QSDĐ số 13/XN-CT ngày 18/11/2025 của Công ty đấu giá."
+        )
+        ds = tach_danh_sach_thua_dat(ts)
+        self.assertEqual(len(ds), 1)
+        self.assertEqual(ds[0]["so_thua_dat"], "8")
+        self.assertEqual(ds[0]["dia_chi"], "xã Ý Yên, tỉnh Ninh Bình")
+
+    def test_dia_chi_tai_theo_giay_chung_nhan_khong_phai_dia_chi(self):
+        from extract_contract import _tach_ngu_canh_gcn
+        ctx = _tach_ngu_canh_gcn(
+            "Quyền sử dụng đất có địa chỉ tại Theo Giấy chứng nhận quyền sử "
+            "dụng đất số: AA 01709062 do Văn phòng đăng ký đất đai tỉnh Nam "
+            "Định cấp ngày 29/05/2025."
+        )
+        self.assertEqual(ctx["dia_chi"], "")
+
+
 if __name__ == "__main__":
     unittest.main()
