@@ -2973,6 +2973,24 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertNotIn("Gia", names)
         self.assertNotIn("Gia và bà Mỳ", names)
 
+    def test_nguoi_chet_ngoac_lap_danh_xung(self):
+        # "ong Luong Van Nguyen (ong Nguyen Sinh nam 1952; chet ngay...)" —
+        # ngoac lap danh xung + ten rut gon; phai lay ten day du ngoai
+        # ngoac, khong tao nguoi chet "Nguyen" rieng (13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "VĂN BẢN TỪ CHỐI NHẬN DI SẢN",
+            "- Bà Yểng chỉ có một người con duy nhất là ông Lương Văn Nguyên "
+            "(ông Nguyên Sinh năm 1952; chết ngày 05/03/2010 theo Trích lục "
+            "khai tử (bản sao) số 4479/2025/TLKT-BS do UBND xã Vạn Thắng, "
+            "tỉnh Ninh Bình ký ngày 13/10/2025).",
+        ])
+        chet = ec._extract_nguoi_chet(text, "")
+        names = [x["ho_ten"] for x in chet]
+        self.assertEqual(names, ["Lương Văn Nguyên"])
+        self.assertEqual(chet[0]["ngay_chet"], "05/03/2010")
+        self.assertEqual(chet[0]["so_giay_to"], "4479/2025/TLKT-BS")
+
 
 if __name__ == "__main__":
     unittest.main()

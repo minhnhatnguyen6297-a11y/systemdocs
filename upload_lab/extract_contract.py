@@ -3375,7 +3375,9 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
         # Ngoac bi danh co the dung TRUOC ngoac sinh/chet:
         # "ong X (Tran Huu Dam); (Sinh nam 1945, da chet ngay ...)".
         r"(?:\s*\((?P<alias>[^)]+)\)\s*[-–;,]?)?"
-        r"\s*\(\s*(?:Sinh\s+năm|Năm\s+sinh|Sinh\s+ngày|Ngày\s+sinh)"
+        # Ngoac co the lap lai danh xung + ten rut gon truoc ngay sinh:
+        # "ong Luong Van Nguyen (ong Nguyen Sinh nam 1952; chet ngay ...)".
+        r"\s*\(\s*(?:(?:ông|bà)\s+[^;()\n]{2,40}?\s+)?(?:Sinh\s+năm|Năm\s+sinh|Sinh\s+ngày|Ngày\s+sinh)"
         r"\s*[:–-]?\s*(?P<birth>(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})"
         r"\s*[,;]?\s*(?:đã\s+)?chết\s+"
         r"(?:ngày\s*(?:ngày\s*)?[:–-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
@@ -3386,7 +3388,12 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
         list(death_re.finditer(source)) + list(death_paren_re.finditer(source)),
         key=lambda m: m.start(),
     )
+    _accepted_end = -1
     for match_idx, match in enumerate(matches):
+        # Match nam gon trong mot match da nhan (vd "ong Nguyen" ben trong
+        # ngoac cua "ong Luong Van Nguyen (ong Nguyen Sinh nam...)") — bo.
+        if match.start() < _accepted_end:
+            continue
         raw_name = re.sub(r"\s+", " ", match.groupdict().get("name") or "").strip(" ;,.-")
         raw_name = re.sub(r"(?i)^\d+\.\s*", "", raw_name)
         raw_name = re.sub(r"(?i)^(?:l\u00e0|bao g\u1ed3m)\s+", "", raw_name)
@@ -3464,8 +3471,12 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
         alias = re.sub(r"(?i)^t\u00ean g\u1ecdi kh\u00e1c l\u00e0\s+", "", alias)
         tail_end = min(match.end() + 400, len(source))
         if match_idx + 1 < len(matches):
-            tail_end = min(tail_end, matches[match_idx + 1].start())
-        tail = source[match.end():tail_end]
+            _next_starts = [m.start() for m in matches[match_idx + 1:] if m.start() > match.end()]
+            if _next_starts:
+                tail_end = min(tail_end, _next_starts[0])
+        # Quet tu dau match: TLKT co the nam TRONG ngoac
+        # "(ong Nguyen Sinh nam 1952; chet ngay ... theo Trich luc ...)".
+        tail = source[match.start():tail_end]
         tlkt_no = ""
         tlkt_match = re.search(
             r"(?i)Tr\u00edch l\u1ee5c khai t\u1eed[^\n]{0,60}?s\u1ed1:?\s*([A-Za-z0-9/.-]+)",
@@ -3522,9 +3533,11 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
             for field, value in record.items():
                 if not str(base.get(field) or "").strip() and str(value or "").strip():
                     base[field] = value
+            _accepted_end = match.end()
             continue
         seen[key] = record
         found.append(record)
+        _accepted_end = match.end()
     return found
 
 
