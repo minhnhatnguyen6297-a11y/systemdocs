@@ -2543,7 +2543,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         # chi ca nhan theo ten (mau 18 - 13/10/2026).
         if keyed_addr_mode:
             km = re.match(
-                r"^\s*(?:\u0110\u1ecba\s+ch[\u1ec9\u1ee7]\s+c\u1ee7a\s+|Dia\s+chi\s+cua\s+)?[-\u2013]?\s*(?:(?:\u00d4ng|\u00f4ng|B\u00e0|b\u00e0)\s+)?([A-Z\u00c0-\u1ef9\u0110][^\d;:]{2,60}?)\s*:\s*(\S.{3,}?)\s*$",
+                r"^\s*(?:(?:\u0110\u1ecba\s+ch[\u1ec9\u1ee7]|N\u01a1i\s+th\u01b0\u1eddng\s+tr\u00fa)\s+c\u1ee7a\s+|Dia\s+chi\s+cua\s+|Noi\s+thuong\s+tru\s+cua\s+)?[-\u2013]?\s*(?:(?:\u00d4ng|\u00f4ng|B\u00e0|b\u00e0)\s+)?([A-Z\u00c0-\u1ef9\u0110][^\d;:]{2,60}?)\s*(?:t\u1ea1i)?\s*:\s*(\S.{3,}?)\s*$",
                 line,
             )
             if km:
@@ -2946,11 +2946,14 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         if not person["dia_chi"]:
             keyed = keyed_addrs.get(_fold_text(person["ho_ten"]))
             if not keyed:
-                # "Địa chỉ của ông Minh:" / "bà Quỳnh:" — nhan theo ten goi
-                # (am tiet cuoi) khi ten day du khong khop (13/10/2026).
-                _last = _fold_text(person["ho_ten"]).split()[-1:]
-                if _last:
-                    keyed = keyed_addrs.get(_last[0])
+                # "Địa chỉ của ông Minh:" / "bà Quỳnh:" / "bà Lan Anh:" —
+                # nhan theo ten goi; khoa keyed co the la hau to cua ho
+                # ten (am tiet cuoi hoac cum ten goi — 13/10/2026).
+                _fold = _fold_text(person["ho_ten"])
+                for _k, _v in keyed_addrs.items():
+                    if _fold == _k or _fold.endswith(" " + _k):
+                        keyed = _v
+                        break
             if keyed:
                 person["dia_chi"] = keyed
             elif shared_addrs:

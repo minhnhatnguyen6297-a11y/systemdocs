@@ -3052,6 +3052,52 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "thôn Kiều Thị, xã Chương Dương, thành phố Hà Nội",
         )
 
+    def test_dia_chi_keyed_noi_thuong_tru_va_ten_goi_2_am(self):
+        # "Nơi thường trú của bà Đởn tại:" / "bà Lan Anh:" — nhan keyed
+        # "Nơi thường trú của", cho "tại" sau ten, khop ten goi nhieu am
+        # tiet theo hau to (mau 18 ban - 13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "ĐƠN ĐĂNG KÝ",
+            "a) Tên: Ông Phạm Văn Mạnh;\t\t\tSinh ngày: 10/10/2000",
+            "Tên: Bà Bùi Thị Lan Anh;\t\t\tSinh ngày: 01/01/2000",
+            "b) Giấy tờ nhân thân:",
+            "1. Ông Phạm Văn Mạnh;\t\t\tSinh ngày: 10/10/2000",
+            "Căn cước số: 036200004575 do Bộ công an cấp ngày 07/01/2025;",
+            "2. Bà Bùi Thị Lan Anh;\t\t\tSinh ngày: 01/01/2000;",
+            "c) Địa chỉ:",
+            "Địa chỉ của ông Mạnh:  Châu Bạc Tháp, xã Minh Tân, tỉnh Ninh Bình.",
+            "Địa chỉ của bà Lan Anh: xóm Sôi Phủ, xã Hiển Khánh, tỉnh Ninh Bình.",
+            "d) Điện thoại:",
+        ])
+        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        ppl = r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]
+        lan_anh = [x for x in ppl if x["ho_ten"] == "Bùi Thị Lan Anh"]
+        self.assertTrue(lan_anh)
+        self.assertEqual(
+            lan_anh[0]["dia_chi"], "xóm Sôi Phủ, xã Hiển Khánh, tỉnh Ninh Bình"
+        )
+        text2 = "\n".join([
+            "ĐƠN ĐĂNG KÝ",
+            "a) Tên: Ông Nguyễn Văn Vượng;\tSinh ngày: 01/01/1940;",
+            "Tên: Bà Phạm Thị Đởn;\t\tSinh ngày: 08/08/1957;",
+            "b) Giấy tờ:",
+            "1. Ông Nguyễn Văn Vượng;\tSinh ngày: 01/01/1940;",
+            "c) Địa chỉ:",
+            "Nơi thường trú của ông Vượng: Khu Đoàn Kết, xã An Nghĩa, tỉnh Phú Thọ.",
+            "Nơi thường trú của bà Đởn tại: thôn 1, xã Ý Yên, tỉnh Ninh Bình.",
+            "d) Điện thoại:",
+        ])
+        r2 = ec._build_payload_generic("a.doc", text2, {}, extract_mode="plain_text_doc")
+        ppl2 = r2["raw"]["ben_a"]["nguoi"] + r2["raw"]["ben_b"]["nguoi"]
+        don = [x for x in ppl2 if x["ho_ten"] == "Phạm Thị Đởn"]
+        vuong = [x for x in ppl2 if x["ho_ten"] == "Nguyễn Văn Vượng"]
+        self.assertTrue(don and vuong)
+        self.assertEqual(don[0]["dia_chi"], "thôn 1, xã Ý Yên, tỉnh Ninh Bình")
+        self.assertEqual(
+            vuong[0]["dia_chi"], "Khu Đoàn Kết, xã An Nghĩa, tỉnh Phú Thọ"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
