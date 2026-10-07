@@ -2896,8 +2896,22 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                 chunk_scan,
             )
         person["noi_cap"] = re.sub(r"\s+", " ", issue_place_match.group(1)).strip(" ;,.") if issue_place_match else ""
+        # Bo ngay cap HO CHIEU ("Hộ chiếu số: X do Y cấp ngày D") — khong
+        # phai ngay cap CCCD (Hoàn — HĐCN cũ Thường Lan — 13/10/2026).
+        def _issue_date_first(rx):
+            for m in rx.finditer(chunk_scan):
+                if re.search(
+                    r"(?i)h\u1ed9\s+chi\u1ebfu|ho chieu|passport",
+                    chunk_scan[max(0, m.start() - 140):m.start()],
+                ) and not re.search(
+                    r"(?i)c\u0103n c\u01b0\u1edbc|cccd|cmnd",
+                    chunk_scan[max(0, m.start() - 140):m.start()],
+                ):
+                    continue
+                return m
+            return None
         issue_date_match = min(
-            (m for m in (issue_date_re.search(chunk_scan), issue_date_do_re.search(chunk_scan)) if m),
+            (m for m in (_issue_date_first(issue_date_re), _issue_date_first(issue_date_do_re)) if m),
             key=lambda m: m.start(),
             default=None,
         )
@@ -3779,6 +3793,25 @@ def _build_payload_generic(filepath, text: str, scan_result: dict, *, extract_mo
     # (HĐCN Duyên Liên — 13/10/2026).
     for ben in (ben_a, ben_b):
         for person in ben.get("nguoi") or []:
+            name = str(person.get("ho_ten") or "").strip()
+            # Dien cccd tu ban in lai: tim ten nguoi roi lay "Căn cước
+            # ... số" truoc khoi nguoi ke (Hoàn — hộ chiếu o ban 1,
+            # CCCD o ban 2 — 13/10/2026).
+            if name and not str(person.get("cccd") or "").strip():
+                for m in re.finditer(re.escape(name), text, re.IGNORECASE):
+                    window = text[m.end():m.end() + 300]
+                    end = re.search(
+                        r"(?im)^\s*(?:[\u00d4O]ng|[Bb]\u00e0|[Aa]nh|[Cc]h\u1ecb|[Cc]\u00f4)|\b(?:v\u00e0|c\u00f9ng)\s+(?:v\u1ee3|ch\u1ed3ng)\b",
+                        window,
+                    )
+                    seg = window[: end.start() if end else 300]
+                    cap = re.search(
+                        r"(?i)c\u0103n c\u01b0\u1edbc(?:\s+c\u00f4ng\s*d\u00e2n)?\s*(?:s\u1ed1)?\s*:?\s*(\d{6,12})",
+                        seg,
+                    )
+                    if cap:
+                        person["cccd"] = cap.group(1)
+                        break
             cccd = str(person.get("cccd") or "").strip()
             if not cccd or str(person.get("ngay_cap_cccd") or "").strip():
                 continue
@@ -3824,7 +3857,16 @@ def _build_payload_generic(filepath, text: str, scan_result: dict, *, extract_mo
             # tam dung — chi nhan dien va gan co "chua ho tro".
             "tai_san_chua_ho_tro": _phat_hien_tai_san_chua_ho_tro(text),
             "nguoi_chet": nguoi_chet,
-            "danh_sach_thua_dat": tach_danh_sach_thua_dat(tai_san),
+            # Mau template: gia tri «merge_field» khong phai du lieu —
+            # bo thua chi chua placeholder (cam ket DH 090202 — 13/10/2026).
+            "danh_sach_thua_dat": [
+                p for p in tach_danh_sach_thua_dat(tai_san)
+                if not all(
+                    not str(p.get(f) or "").strip()
+                    or "«" in str(p.get(f) or "")
+                    for f in ("so_thua_dat", "so_to_ban_do", "dia_chi")
+                )
+            ],
             "file_goc": file_goc,
             "scan_contract_no": scan_result.get("contract_no", ""),
             "scan_reason": scan_result.get("reason", ""),

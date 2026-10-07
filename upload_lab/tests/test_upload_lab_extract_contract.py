@@ -3334,6 +3334,29 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(ec._cat_ho_ten("Trịnh Văn Công - Sinh"), "Trịnh Văn Công")
         self.assertEqual(ec._cat_ho_ten("Nguyễn Văn Anh – sinh"), "Nguyễn Văn Anh")
 
+    def test_ngay_cap_ho_chieu_khong_tinh_cccd(self):
+        # "Hộ chiếu số: X do Y cấp ngày D" — khong gan vao ngay_cap_cccd
+        # (Hoàn — HĐCN cũ Thường Lan — 13/10/2026).
+        from extract_contract import _extract_party_data
+        section = "\n".join([
+            "2. Và vợ là bà Trần Thị Thúy Hoàn;\tSinh ngày: 29/08/1985;",
+            "Hộ chiếu số: C3222981 do Cục quản lý xuất nhập cảnh cấp ngày 16/05/2017;",
+        ])
+        ds = _extract_party_data(section)
+        self.assertEqual(ds["nguoi"][0]["ngay_cap_cccd"], "")
+
+    def test_bo_thua_placeholder_merge_field(self):
+        # Template "«Số_thửa»" khong phai du lieu — bo thua chi chua
+        # placeholder (cam ket DH 090202 — 13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "-\tThửa đất số: «Số_thửa», \ttờ bản đồ số: «Số_tờ»",
+            "-\tDiện tích: «Diện_tích»,0 m2",
+            "- \tĐịa chỉ: «Địa_chỉ_đất»;",
+        ])
+        r = ec._build_payload_generic("a.docx", text, {}, extract_mode="docx")
+        self.assertEqual(r["raw"]["danh_sach_thua_dat"], [])
+
 
 if __name__ == "__main__":
     unittest.main()
