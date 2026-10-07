@@ -3098,6 +3098,36 @@ class UploadLabExtractContractTests(unittest.TestCase):
             vuong[0]["dia_chi"], "Khu Đoàn Kết, xã An Nghĩa, tỉnh Phú Thọ"
         )
 
+    def test_danh_xung_lap_ba_ba_va_xom_dau_dia_chi(self):
+        # "là bà Bà Hoàng Thị Mỹ" — danh xung lap; "c) Địa chỉ:" + dong
+        # tran mo dau "Xóm ..." la dia chi chung (13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "ĐƠN XIN XÁC NHẬN",
+            "Tôi là ông Nguyễn Thị Lương; Sinh ngày: 01/01/1960;",
+            "- Bà Đinh Thị Hoa có bố đẻ là ông Đinh Văn Phương; Sinh ngày: 08/10/1948",
+            "- Bà Đinh Thị Hoa có mẹ đẻ là bà Bà Hoàng Thị Mỹ; Sinh ngày: 01/01/1947;",
+        ])
+        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        names = [x["ho_ten"] for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]]
+        self.assertIn("Hoàng Thị Mỹ", names)
+        self.assertNotIn("Bà Hoàng Thị Mỹ", names)
+        text2 = "\n".join([
+            "ĐƠN ĐĂNG KÝ",
+            "a) Tên: Ông Vũ Đức Dũng;\tSinh ngày: 25/06/1991;",
+            "b) Giấy tờ:",
+            "Ông Vũ Đức Dũng;\t\tSinh ngày: 25/06/1991;",
+            "c) Địa chỉ:",
+            "Xóm Chùa, Triều Khúc, phường Thanh Liệt, thành phố Hà Nội.",
+            "d) Điện thoại:",
+        ])
+        r2 = ec._build_payload_generic("a.doc", text2, {}, extract_mode="plain_text_doc")
+        dung = [x for x in r2["raw"]["ben_a"]["nguoi"] + r2["raw"]["ben_b"]["nguoi"] if x["ho_ten"] == "Vũ Đức Dũng"]
+        self.assertTrue(dung)
+        self.assertEqual(
+            dung[0]["dia_chi"], "Xóm Chùa, Triều Khúc, phường Thanh Liệt, thành phố Hà Nội"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

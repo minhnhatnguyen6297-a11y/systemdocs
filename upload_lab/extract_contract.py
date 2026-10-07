@@ -2551,7 +2551,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                 continue
             if re.match(r"\s*(?:[a-zA-Z][.)]|\d+\.)", line):
                 keyed_addr_mode = False
-            elif re.match(r"^\s*(?:th\u00f4n|x\u00e3|ph\u01b0\u1eddng|s\u1ed1|t\u1ed5|khu|qu\u1eadn|th\u00e0nh|huy\u1ec7n)", line, re.I):
+            elif re.match(r"^\s*(?:th\u00f4n|x\u00e3|ph\u01b0\u1eddng|s\u1ed1|t\u1ed5|khu|qu\u1eadn|th\u00e0nh|huy\u1ec7n|x\u00f3m|\u1ea5p|b\u1ea3n|\u0111\u1ed9i)", line, re.I):
                 # Dong dia chi tran ngay sau "c) Dia chi:" rong — dia chi
                 # CHUNG cho moi nguoi trong muc (don DK18 - 13/10/2026).
                 address_lines.append(
@@ -2779,6 +2779,9 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             ho_ten = re.sub(r"\s+", " ", match.groupdict().get("name") or "").split("|")[0].strip(" ;,.-\u2013\u2014")
             ho_ten = re.split(r"(?i)\s*[-\u2013\u2014]\s+(?:con\b|ch\u00e1u\b|chau\b|v\u1ee3\b|ch\u1ed3ng\b|l\u00e0\b|b\u1ed1\b|m\u1eb9\b|cha\b|b\u00ean\b|ch\u1ecb\b|chi\b|anh\b|em\b|c\u00f4\b|co\b|ch\u00fa\b|chu\b|b\u00e1c\b|bac\b|d\u00ec\b|di\b|c\u1eadu\b|cau\b|m\u1ee3\b|mo\b|\u00f4ng\b|b\u00e0\b|(?:ch\u1ee9c|chuc)\s*(?:v\u1ee5|vu|danh)\b)", ho_ten, maxsplit=1)[0].strip(" ;,.-\u2013\u2014")
             ho_ten = _cat_ho_ten(ho_ten)
+            # Danh xung lap/dinh trong ten ("là bà Bà Hoàng Thị Mỹ" —
+            # nguon go thua "bà Bà") — gioi tinh da chot tu title.
+            ho_ten = re.sub(r"(?i)^(?:[ôo]ng|bà)\s+", "", ho_ten).strip(" ;,.-\u2013\u2014")
             person = {
                 "gioi_tinh": gioi_tinh,
                 "ho_ten": ho_ten,
