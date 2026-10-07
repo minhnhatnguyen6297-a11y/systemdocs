@@ -2887,6 +2887,42 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertTrue(q)
         self.assertEqual(q[0]["ngay_sinh"], "05/08/1980")
 
+    def test_can_cuoc_so_cong_dan_dao_thu_tu(self):
+        # "Căn cước số công dân 036048001446" — thu tu dao "số công dân"
+        # va so dung lien khong "số:" (mau 18 - 13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "ĐƠN ĐĂNG KÝ BIẾN ĐỘNG",
+            "a) Tên: Ông Trần Văn Tạo\t\tSinh ngày: 20/10/1948 ;",
+            "b) Giấy tờ nhân thân:",
+            "Ông Trần Văn Tạo\t\t\t\tSinh ngày: 20/10/1948",
+            "Căn cước số công dân 036048001446 do Cục cảnh sát cấp ngày 10/08/2021",
+            "c) Địa chỉ: thôn Phương Nhi, xã Tân Minh, tỉnh Ninh Bình.",
+        ])
+        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        q = [x for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"] if x["ho_ten"] == "Trần Văn Tạo"]
+        self.assertTrue(q)
+        self.assertEqual(q[0]["cccd"], "036048001446")
+
+    def test_dia_chi_muc_cham_va_ten_tran(self):
+        # "c. Địa chỉ:" (dau cham) + dong "- Nguyễn Thị Anh : X" ten tran
+        # khong danh xung (don DK18 - 13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "ĐƠN ĐĂNG KÝ",
+            "a. Tên: Nguyễn Thị Anh ;\tSinh ngày: 14/07/1980;",
+            "b. Giấy tờ nhân thân:",
+            "Ông Nguyễn Thị Anh ;\tSinh ngày: 14/07/1980;",
+            "Căn cước công dân số 036180001092 do Cục cảnh sát cấp ngày 02/11/2022;",
+            "c. Địa chỉ:",
+            "- Nguyễn Thị Anh : Số 20A - Ô18, phường Nam Định, tỉnh Ninh Bình",
+            "d. Điện thoại:",
+        ])
+        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        q = [x for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"] if x["ho_ten"] == "Nguyễn Thị Anh"]
+        self.assertTrue(q)
+        self.assertEqual(q[0]["dia_chi"], "Số 20A - Ô18, phường Nam Định, tỉnh Ninh Bình")
+
 
 if __name__ == "__main__":
     unittest.main()

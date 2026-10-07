@@ -2424,7 +2424,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # (docs/spec/notary_v2/stage.md muc 5) nen giu nam lam ngay_sinh.
     # Gia tri chi co nam van nhan du nhan viet "Sinh ngay: 1982" (loi mau thuc te).
     birth_year_re = re.compile(r"(?i)(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh)\s*[:\u2013-]?\s*((?:19|20)\d{2})(?!\d)")
-    id_re = re.compile(r"(?i)(?:C\u0103n c\u01b0\u1edbc(?:\s+c\u00f4ng(?:\s+d\u00e2n)?)?(?:\s+m\u1edbi)?|Can cuoc(?:\s+cong(?:\s+dan)?)?|CCCD|CMND|\bCC)\s*(?:[A-Z\u00c0-\u1ef9\u0110][^\d:;\n]{0,40}?)?\s*(?:(?:s\u1ed1|so)\s*:?|:)\s*(\d{4}\s\d{4}\s\d{4}|\d{6,12})")
+    id_re = re.compile(r"(?i)(?:C\u0103n c\u01b0\u1edbc(?:\s+(?:s\u1ed1\s+)?c\u00f4ng(?:\s+d\u00e2n)?)?(?:\s+m\u1edbi)?|Can cuoc(?:\s+cong(?:\s+dan)?)?|CCCD|CMND|\bCC)\s*(?:[A-Z\u00c0-\u1ef9\u0110][^\d:;\n]{0,40}?)?\s*(?:(?:s\u1ed1|so)\s*:?|:)?\s*(\d{4}\s\d{4}\s\d{4}|\d{6,12})")
     issue_place_re = re.compile(
         r"(?i)\bdo\s+((?:(?!k[ýí]\s+ng\u00e0y)[^\n])+?)\s+(?:c\u1ea5p\s+ng\u00e0y|cap ngay|ng\u00e0y\s*\d)"
     )
@@ -2543,13 +2543,13 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         # chi ca nhan theo ten (mau 18 - 13/10/2026).
         if keyed_addr_mode:
             km = re.match(
-                r"^\s*(?:\u00d4ng|\u00f4ng|B\u00e0|b\u00e0)\s+([^\d;:]{2,60}?)\s*:\s*(\S.{3,}?)\s*$",
+                r"^\s*[-\u2013]?\s*(?:(?:\u00d4ng|\u00f4ng|B\u00e0|b\u00e0)\s+)?([A-Z\u00c0-\u1ef9\u0110][^\d;:]{2,60}?)\s*:\s*(\S.{3,}?)\s*$",
                 line,
             )
             if km:
                 keyed_addrs[_fold_text(km.group(1))] = _cat_duoi_dia_chi(km.group(2))
                 continue
-            if re.match(r"\s*(?:[a-zA-Z]\)|\d+\.)", line):
+            if re.match(r"\s*(?:[a-zA-Z][.)]|\d+\.)", line):
                 keyed_addr_mode = False
         # "Toi la:" dung rieng 1 dong -> ten tran o dong ke tiep
         # ("Nguyen Thi Yen\t\tSinh ngay: ...").
@@ -2705,8 +2705,8 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             # cua mau 11/DK, c) cua mau 18) la truong CHUNG cho moi nguoi
             # khai trong muc X — danh dau shared de dien cho nguoi chua
             # co dia chi (12/10/2026).
-            _sub_item = bool(re.match(r"\s*(?:\d+\.\d+\.|[a-z]\))", line)) or bool(
-                re.search(r"[a-zđ]\)\s*(?:" + _ADDR_LABEL + r")", line, re.I)
+            _sub_item = bool(re.match(r"\s*(?:\d+\.\d+\.|[a-z][.)])", line)) or bool(
+                re.search(r"[a-zđ][.)]\s*(?:" + _ADDR_LABEL + r")", line, re.I)
             )
             address_lines.append(
                 (idx, line.strip(" ;"), addr_val, _sub_item or bool(shared_addr_re.match(line)))
