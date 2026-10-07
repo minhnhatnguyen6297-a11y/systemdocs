@@ -3209,6 +3209,26 @@ class UploadLabExtractContractTests(unittest.TestCase):
             lan[0]["dia_chi"], "thôn 7, xã Phong Doanh, tỉnh Ninh Bình"
         )
 
+    def test_dia_chi_keyed_gach_truoc_nhan(self):
+        # "- Địa chỉ ông Nguyễn Duy Đặng: ..." — gach dung TRUOC nhan
+        # "Địa chỉ" (don dinh chinh — 13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "a) Tên: ông NGUYỄN DUY ĐẶNG\t\tSinh ngày: 28/7/1953",
+            "b) Giấy tờ:",
+            "- CCCD của ông Nguyễn Duy Đặng số: 036053001094; cấp ngày: 29/4/2021",
+            "c) Địa chỉ: ",
+            "- Địa chỉ ông Nguyễn Duy Đặng: Lộng Đồng, phường Nam Định, tỉnh Ninh Bình.",
+            "- Địa chỉ bà Nguyễn Thị Tơ: Thôn Đông Duy, xã Ý Yên, tỉnh Ninh Bình.",
+        ])
+        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        ppl = r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]
+        dang = [x for x in ppl if "Đặng" in x["ho_ten"]]
+        self.assertTrue(dang)
+        self.assertEqual(
+            dang[0]["dia_chi"], "Lộng Đồng, phường Nam Định, tỉnh Ninh Bình"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
