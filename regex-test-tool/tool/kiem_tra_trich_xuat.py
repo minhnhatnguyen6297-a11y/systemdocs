@@ -372,7 +372,14 @@ def luat_lech_dien_tich(payload: dict) -> list[dict]:
     findings = []
     for thua in payload.get("raw", {}).get("danh_sach_thua_dat", []):
         tong = _so_thuc(thua.get("dien_tich", ""))
-        chi_tiet = [_so_thuc(c.get("dien_tich", "")) for c in thua.get("chi_tiet_dien_tich", [])]
+        # O "o_tho" giu cells dang ["80", "ONT"] (dien tich + loai dat) —
+        # ONT/ONTN... la loai dat that, phai tinh vao tong chi tiet
+        # (bang GCN mau so 18, 13/10/2026).
+        chi_tiet = [
+            _so_thuc(c.get("dien_tich", "")) if "dien_tich" in c
+            else _so_thuc(next((x for x in c.get("o_tho", []) if _so_thuc(x) is not None), ""))
+            for c in thua.get("chi_tiet_dien_tich", [])
+        ]
         chi_tiet = [v for v in chi_tiet if v is not None]
         tong_chi_tiet = sum(chi_tiet)
         # bang GCN 2 dong: dong chinh ghi muc dich chinh (VD "Dat o"), dong phu

@@ -1368,6 +1368,9 @@ def _clean_so_to_ban_do(value: str) -> str:
     )[0]
     # Duoi marker muc ke ("20 b." dung truoc "Diện tích") — bo.
     cut = re.sub(r"\s+[a-zĐ]{1,2}[.)]?\s*$", "", cut)
+    # O to ban do ghi kem tu khoa "thửa/tờ" ("thửa 423" thay vi "423" —
+    # bang GCN 5 cot mau so 18, 13/10/2026).
+    cut = re.sub(r"^\s*(?i:th\u1eeda|thua|t\u1edd|to)\s+(?=\d)", "", cut)
     return cut.strip(" ;,.")
 
 
@@ -2339,7 +2342,8 @@ _NAME_BOUNDARY_RE = re.compile(
     r"|\s+\d"
     r"|\s*[-\u2013\u2014]\s+(?i:sinh)\b"
     r"|\s+(?i:cccd|cmnd|cc\b|c\u0103n c\u01b0\u1edbc|c\u0103n c\u1ee9|gi\u1ea5y\b|\u0111\u1ecba ch\u1ec9|th\u01b0\u1eddng tr\u00fa|c\u01b0 tr\u00fa"
-    r"|h\u1ed9 kh\u1ea9u|qu\u00ea qu\u00e1n|ch\u1ee9c v\u1ee5|hi\u1ec7n\b|l\u00e0\b|thu\u1ed9c\b|theo\b|\u0111\u01b0\u1ee3c\b|n\u01a1i\b|v\u1ee3\b|ch\u1ed3ng\b|kh\u00f4ng\b|con\s+(?:\u0111\u1ebb|ru\u1ed9t))"
+    r"|h\u1ed9 kh\u1ea9u|qu\u00ea qu\u00e1n|ch\u1ee9c v\u1ee5|hi\u1ec7n\b|l\u00e0\b|thu\u1ed9c\b|theo\b|\u0111\u01b0\u1ee3c\b|n\u01a1i\b|v\u1ee3\b|ch\u1ed3ng\b|kh\u00f4ng\b|con\s+(?:\u0111\u1ebb|ru\u1ed9t)"
+    r"|th\u01b0\s+k\u00fd|thu\s+ky|c\u1ed5\s+\u0111\u00f4ng|co\s+dong|ch\u1ee7\s+t\u1ecda|chu\s+toa|th\u00e0nh\s+vi\u00ean|thanh\s+vien)"
     r"|\s+mang\s+(?=c\u0103n|cccd|cmnd|gi\u1ea5y|h\u1ed9 chi\u1ebfu|s\u1ed5|theo)"
     r"|\s+v\u00e0\s+(?=\u00f4ng|b\u00e0|anh|ch\u1ecb)\b"
     r"|\s+(?:c\u00f3|cho)\s+(?=\d|\(|(?:m\u1ed9t|hai|ba|b\u1ed1n|n\u0103m|s\u00e1u|b\u1ea3y|t\u00e1m|ch\u00edn|m\u01b0\u1eddi)\s+ng\u01b0\u1eddi)"
@@ -2971,6 +2975,14 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         ):
             continue
         role_match = re.search(r"(?i)(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:", chunk_scan)
+        if not role_match:
+            # Nhan chuc danh tran cuoi dong danh so ("3. Bà X   Cổ đông",
+            # "9. Bà Y   Thư ký") — bien ban hop co dong khong co giay to
+            # (BB hop Quang Trung — 13/10/2026).
+            role_match = re.search(
+                r"(?i)(?:c\u1ed5\s+\u0111\u00f4ng|co\s+dong|th\u01b0\s+k\u00fd|thu\s+ky|ch\u1ee7\s+t\u1ecda|chu\s+toa|th\u00e0nh\s+vi\u00ean|thanh\s+vien|tr\u01b0\u1edfng\s+ph\u00f2ng|k\u1ebf\s+to\u00e1n)\s*$",
+                lines[line_idx],
+            )
         if (
             not has_birth
             and not id_match

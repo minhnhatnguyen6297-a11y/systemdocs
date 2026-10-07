@@ -279,5 +279,26 @@ class KiemTraTrichXuatTests(unittest.TestCase):
         self.assertEqual(len(r04), 1)
 
 
+
+
+class OThoR10Tests(unittest.TestCase):
+    def test_r10_dem_ca_o_tho(self):
+        payload = {
+            "raw": {
+                "danh_sach_thua_dat": [{
+                    "so_thua_dat": "33",
+                    "dien_tich": "117,0",
+                    "muc_dich_su_dung": "",
+                    "chi_tiet_dien_tich": [
+                        {"o_tho": ["80", "ONT"]},
+                        {"dien_tich": "12", "muc_dich_su_dung": "CLN"},
+                        {"dien_tich": "25", "muc_dich_su_dung": "CLN"},
+                    ],
+                }],
+            },
+        }
+        self.assertFalse([f for f in kiem_tra_payload(payload) if f["id"] == "R10"])
+
+
 if __name__ == "__main__":
     unittest.main()

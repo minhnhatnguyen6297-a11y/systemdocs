@@ -3358,5 +3358,31 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(r["raw"]["danh_sach_thua_dat"], [])
 
 
+
+
+class ChucDanhCuoiDongTests(unittest.TestCase):
+    def test_nhan_chuc_danh_co_dong_thu_ky_bien_ban_hop(self):
+        text = "\n".join([
+            "BIÊN BẢN HỌP HỘI ĐỒNG QUẢN TRỊ",
+            "Hôm nay, ngày 10 tháng 10 năm 2025, công ty tiến hành họp.",
+            "1. Ông Nguyễn Tăng Cường                    Chức vụ: GĐ  -  Chủ Tọa",
+            "2. Ông Nguyễn Xuân Thủy                        Cổ đông",
+            "3. Bà Chu Thị Minh Tâm                           Cổ đông",
+            "9. Bà Lê Thị Thu Hà                                   Thư ký",
+        ])
+        from extract_contract import _extract_party_data
+        ds = _extract_party_data(text)
+        ten = [p["ho_ten"] for p in ds["nguoi"]]
+        self.assertIn("Nguyễn Xuân Thủy", ten)
+        self.assertIn("Chu Thị Minh Tâm", ten)
+        self.assertIn("Lê Thị Thu Hà", ten)
+        self.assertNotIn("Lê Thị Thu Hà Thư ký", ten)
+
+    def test_to_ban_do_dinh_tu_khoa_thua(self):
+        from extract_contract import _clean_so_to_ban_do
+        self.assertEqual(_clean_so_to_ban_do("thửa 423"), "423")
+        self.assertEqual(_clean_so_to_ban_do("29"), "29")
+
+
 if __name__ == "__main__":
     unittest.main()
