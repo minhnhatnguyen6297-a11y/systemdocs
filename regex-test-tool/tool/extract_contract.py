@@ -2551,6 +2551,14 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                 continue
             if re.match(r"\s*(?:[a-zA-Z][.)]|\d+\.)", line):
                 keyed_addr_mode = False
+            elif re.match(r"^\s*(?:th\u00f4n|x\u00e3|ph\u01b0\u1eddng|s\u1ed1|t\u1ed5|khu|qu\u1eadn|th\u00e0nh|huy\u1ec7n)", line, re.I):
+                # Dong dia chi tran ngay sau "c) Dia chi:" rong — dia chi
+                # CHUNG cho moi nguoi trong muc (don DK18 - 13/10/2026).
+                address_lines.append(
+                    (idx, line.strip(" ;"), _cat_duoi_dia_chi(line), True)
+                )
+                keyed_addr_mode = False
+                continue
         # "Toi la:" dung rieng 1 dong -> ten tran o dong ke tiep
         # ("Nguyen Thi Yen\t\tSinh ngay: ...").
         if (
