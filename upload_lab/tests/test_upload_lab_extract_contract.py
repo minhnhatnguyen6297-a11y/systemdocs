@@ -2496,6 +2496,26 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(nga["cccd"], "036160000971")
         self.assertEqual(nga["gioi_tinh"], "Bà")
 
+    def test_vai_tro_con_gai_chau_dong_su_dung(self):
+        # "1. Con gái - Bà X" / "2. Cháu - Ông X" / "2. Đồng sử dụng –
+        # Ông X" — vai tro mo rong (cam ket dong so huu, tang cho —
+        # 12/10/2026).
+        from extract_contract import _extract_party_data
+        section = "\n".join([
+            "1. Con gái - Bà Nguyễn Thị Hằng, Sinh năm 1980;",
+            "2. Cháu - Ông Nguyễn Tuấn Anh, Sinh năm 1977;",
+            "3. Cháu - Ông Nguyễn Tuấn Anh, Sinh năm 1993;",
+            "4. Đồng sử dụng – Ông Nguyễn Minh Quang Sinh ngày: 05/12/1991;",
+        ])
+        ds = _extract_party_data(section)
+        names = [(x["ho_ten"], x["gioi_tinh"], x["ngay_sinh"]) for x in ds["nguoi"]]
+        self.assertEqual(names, [
+            ("Nguyễn Thị Hằng", "Bà", "1980"),
+            ("Nguyễn Tuấn Anh", "Ông", "1977"),
+            ("Nguyễn Tuấn Anh", "Ông", "1993"),
+            ("Nguyễn Minh Quang", "Ông", "05/12/1991"),
+        ])
+
 
 if __name__ == "__main__":
     unittest.main()
