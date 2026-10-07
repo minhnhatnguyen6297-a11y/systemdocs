@@ -3462,3 +3462,14 @@ def test_marker_so_khoang_trang_truoc_cham_va_ca_ba_ong_ba():
     for p in nguoi:
         assert "Cốc Dương" in p["dia_chi"]
     assert nguoi[1]["cccd"] == "036168004183"
+
+
+def test_so_thua_dinh_ty_le_ban_do():
+    """Quyet dinh chuyen muc dich: 'thua dat so 143 ty le 1/1000 do chi
+    nhanh ...' — so thua chi lay '143', phan 'ty le...' la ghi chu."""
+    import extract_contract as ec
+    thua = ec.tach_danh_sach_thua_dat(
+        "trích lục bản đồ địa chính tại tờ số 169, "
+        "thửa đất số 143 tỷ lệ 1/1000 do chi nhánh văn phòng đăng ký lập ngày 5/8/2025."
+    )
+    assert thua and thua[0]["so_thua_dat"] == "143"

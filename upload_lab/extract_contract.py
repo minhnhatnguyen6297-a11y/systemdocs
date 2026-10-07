@@ -2071,7 +2071,7 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
             # khong phai so thuan.
             _th = re.match(
                 r"^\s*(\d[\d/.,]*)\s*[:,]?\s*"
-                r"(t\u1ea1i\s*:|theo\b|,\s*)(.*)$",
+                r"(t\u1ea1i\s*:|theo\b|t\u1ef7 l\u1ec7\b|,\s*)(.*)$",
                 values["so_thua_dat"], re.I | re.S,
             )
             if _th and _th.group(3):
