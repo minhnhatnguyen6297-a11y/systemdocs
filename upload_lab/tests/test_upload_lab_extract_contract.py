@@ -2715,6 +2715,30 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertTrue(q)
         self.assertEqual(q[0]["cccd"], "036058001963")
 
+    def test_dia_chi_muc_chu_cai_theo_ten_nguoi(self):
+        # "c) Địa chỉ:" rong roi tung dong "Ông X: <dia chi>" — dia chi
+        # ca nhan theo ten (mau 18 - 13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "ĐƠN ĐĂNG KÝ BIẾN ĐỘNG ĐẤT ĐAI",
+            "1. Người sử dụng đất:",
+            "a) Tên: Ông Mai Quốc Việt;\tSinh ngày: 12/07/1986",
+            "Tên: Bà Bùi Thị Thu Hương;\tSinh ngày: 22/10/1986",
+            "b) Giấy tờ nhân thân:",
+            "1. Ông Mai Quốc Việt;\tSinh ngày: 12/07/1986;",
+            "Căn cước số 036086001288 do Bộ công an cấp ngày 22/02/2025",
+            "2. Và vợ là bà Bùi Thị Thu Hương;\tSinh ngày: 22/10/1986;",
+            "Căn cước công dân số 022186011606 do Cục cảnh sát cấp ngày 14/08/2021",
+            "c) Địa chỉ:",
+            "Ông Mai Quốc Việt: xã Ý Yên, tỉnh Ninh Bình",
+            "Bà Bùi Thị Thu Hương: Tổ 68, Khu 7, phường Việt Hưng, tỉnh Quảng Ninh",
+            "d) Điện thoại liên hệ:",
+        ])
+        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        dc = {x["ho_ten"]: x["dia_chi"] for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]}
+        self.assertEqual(dc.get("Mai Quốc Việt"), "xã Ý Yên, tỉnh Ninh Bình")
+        self.assertEqual(dc.get("Bùi Thị Thu Hương"), "Tổ 68, Khu 7, phường Việt Hưng, tỉnh Quảng Ninh")
+
 
 if __name__ == "__main__":
     unittest.main()

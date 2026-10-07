@@ -2533,9 +2533,23 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     headers: list[tuple[int, re.Match[str]]] = []
     address_lines: list[tuple[int, str, str]] = []
     labeled_person_idx: set[int] = set()
+    keyed_addrs: dict[str, str] = {}
+    keyed_addr_mode = False
     prev_intro_bare = False
     gom_list = False
     for idx, line in enumerate(lines):
+        # "c) Địa chỉ:" rong roi den "Ông X: <dia chi>" tung dong — dia
+        # chi ca nhan theo ten (mau 18 - 13/10/2026).
+        if keyed_addr_mode:
+            km = re.match(
+                r"^\s*(?:\u00d4ng|\u00f4ng|B\u00e0|b\u00e0)\s+([^\d;:]{2,60}?)\s*:\s*(\S.{3,}?)\s*$",
+                line,
+            )
+            if km:
+                keyed_addrs[_fold_text(km.group(1))] = _cat_duoi_dia_chi(km.group(2))
+                continue
+            if re.match(r"\s*(?:[a-zA-Z]\)|\d+\.)", line):
+                keyed_addr_mode = False
         # "Toi la:" dung rieng 1 dong -> ten tran o dong ke tiep
         # ("Nguyen Thi Yen\t\tSinh ngay: ...").
         if (
@@ -2687,6 +2701,8 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             address_lines.append(
                 (idx, line.strip(" ;"), addr_val, _sub_item or bool(shared_addr_re.match(line)))
             )
+            if _sub_item and not addr_val:
+                keyed_addr_mode = True
 
     persons = []
     death_line_re = re.compile(r"chet\s+ngay\s*\d", re.IGNORECASE)
@@ -2894,8 +2910,12 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # — gan cho moi nguoi con thieu, khong chi nguoi dung truoc dong do.
     shared_addrs = [a[2] for a in address_lines if len(a) > 3 and a[3] and a[2]]
     for person in persons:
-        if not person["dia_chi"] and shared_addrs:
-            person["dia_chi"] = shared_addrs[0]
+        if not person["dia_chi"]:
+            keyed = keyed_addrs.get(_fold_text(person["ho_ten"]))
+            if keyed:
+                person["dia_chi"] = keyed
+            elif shared_addrs:
+                person["dia_chi"] = shared_addrs[0]
 
     # Cap vo chong viet "1. Ong X ... 2. Va vo la ba Y ... Nơi thường trú: Z"
     # — chi co 1 dong dia chi cuoi khoi, ap cho ca hai (khong co tu khoa
