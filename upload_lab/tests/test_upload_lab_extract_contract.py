@@ -3024,6 +3024,34 @@ class UploadLabExtractContractTests(unittest.TestCase):
         names = [x["ho_ten"] for x in chet]
         self.assertEqual(names, ["Nguyễn Thị Yểng"])
 
+    def test_dia_chi_cua_danh_xung_ten_goi(self):
+        # "Địa chỉ của ông Minh:" / "Địa chủ của bà Quỳnh:" — nhan keyed
+        # co nhan dia chi + ten goi (khong ho), khop theo am tiet cuoi
+        # (mau 18 Minh - 13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "ĐƠN ĐĂNG KÝ",
+            "a) Tên: Ông Bùi Văn Minh;\tSinh ngày: 30/05/1992;",
+            "Tên: Bà Nguyễn Thị Thu Quỳnh;\tSinh ngày: 30/05/1992",
+            "b) Giấy tờ nhân thân:",
+            "1. Ông Bùi Văn Minh;\tSinh ngày: 30/05/1992;",
+            "Căn cước số 036092010881 do Bộ công an ngày 08/07/2024",
+            "c) Địa chỉ:",
+            "Địa chỉ của ông Minh: Xóm 7, xã Nghĩa Hưng, tỉnh Ninh Bình.",
+            "Địa chủ của bà Quỳnh: thôn Kiều Thị, xã Chương Dương, thành phố Hà Nội.",
+            "d) Điện thoại:",
+        ])
+        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        ppl = r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]
+        minh = [x for x in ppl if x["ho_ten"] == "Bùi Văn Minh"]
+        quynh = [x for x in ppl if x["ho_ten"] == "Nguyễn Thị Thu Quỳnh"]
+        self.assertTrue(minh and quynh)
+        self.assertEqual(minh[0]["dia_chi"], "Xóm 7, xã Nghĩa Hưng, tỉnh Ninh Bình")
+        self.assertEqual(
+            quynh[0]["dia_chi"],
+            "thôn Kiều Thị, xã Chương Dương, thành phố Hà Nội",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
