@@ -2499,7 +2499,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # (docs/spec/notary_v2/stage.md muc 5) nen giu nam lam ngay_sinh.
     # Gia tri chi co nam van nhan du nhan viet "Sinh ngay: 1982" (loi mau thuc te).
     birth_year_re = re.compile(r"(?i)(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh)\s*[:\u2013-]?\s*((?:19|20)\d{2})(?!\d)")
-    id_re = re.compile(r"(?i)(?:C\u0103n c\u01b0\u1edbc(?:\s+(?:s\u1ed1\s+)?c\u00f4ng(?:\s+d\u00e2n)?)?(?:\s+m\u1edbi)?|Can cuoc(?:\s+cong(?:\s+dan)?)?|CCCD|CMND|\bCC)\s*(?:[A-Z\u00c0-\u1ef9\u0110][^\d:;\n]{0,40}?)?[\s|]*(?:(?:s\u1ed1|so)\s*:?|:)?[\s|]*(\d{4}\s\d{4}\s\d{4}|\d{6,12})")
+    id_re = re.compile(r"(?i)(?:C\u0103n c\u01b0\u1edbc(?:\s+(?:s\u1ed1\s+)?c\u00f4ng(?:\s+d\u00e2n)?)?(?:\s+m\u1edbi)?|Can cuoc(?:\s+cong(?:\s+dan)?)?|CCCD|CMND|\bCC)\s*(?:[A-Z\u00c0-\u1ef9\u0110][^\d:;\n]{0,40}?)?[\s|]*(?:(?:s\u1ed1|so)\s*:?|:)?[\s|]*(\d{3,4}(?:\s\d{3,4})+|\d{6,12})")
     issue_place_re = re.compile(
         r"(?i)\bdo\s+((?:(?!k[ýí]\s+ng\u00e0y)[^\n])+?)\s+(?:c\u1ea5p\s+ng\u00e0y|cap ngay|ng\u00e0y\s*\d)"
     )
@@ -2954,7 +2954,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         if not id_match:
             # Form viet tat "Ông Vũ Văn Thạnh số: 036070006771 Cấp ngày ..."
             # — "số:" tran khong nhan CCCD; so 9-12 chu so van la giay to.
-            id_match = re.search(r"\bs\u1ed1\s*:\s*(\d{4}\s\d{4}\s\d{4}|\d{9,12})(?!\d)", chunk_scan)
+            id_match = re.search(r"\bs\u1ed1\s*:\s*(\d{3,4}(?:\s\d{3,4})+|\d{9,12})(?!\d)", chunk_scan)
         if not id_match:
             # To khai thue "[06] Số CMND/CCCD/Hộ chiếu ...:\n 036158024616"
             # — nhan bat dau bang "Số <loai giay to>", so o dong sau.

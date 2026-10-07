@@ -3503,3 +3503,17 @@ def test_nam_sinh_tach_khoang_trang():
     nguoi = ec._extract_plain_text_person_entries(text)
     m = [p for p in nguoi if "Mận" in p["ho_ten"]]
     assert m and m[0]["ngay_sinh"] == "05/07/1992", nguoi
+
+
+def test_cccd_cach_nhom_3_so():
+    """CCCD viet cach nhom 3 so '066 197 016 950' — gop thanh 12 chu so."""
+    import extract_contract as ec
+    text = "\n".join([
+        "Bà : LÊ THỊ HẢI YẾN",
+        "Sinh ngày : 17/11/1997",
+        "Căn cước công dân số : 066 197 016 950 - Ngày cấp : 16/09/2022",
+    ])
+    nguoi = ec._extract_plain_text_person_entries(text)
+    y = [p for p in nguoi if "YẾN" in p["ho_ten"].upper()]
+    assert y and y[0]["cccd"] == "066197016950", nguoi
+    assert y[0]["ngay_cap_cccd"] == "16/09/2022"
