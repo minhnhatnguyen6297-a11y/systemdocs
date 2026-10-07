@@ -2506,6 +2506,8 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "2. Cháu - Ông Nguyễn Tuấn Anh, Sinh năm 1977;",
             "3. Cháu - Ông Nguyễn Tuấn Anh, Sinh năm 1993;",
             "4. Đồng sử dụng – Ông Nguyễn Minh Quang Sinh ngày: 05/12/1991;",
+            "5.  Ông ngoại – ông Đoàn Xuân Lam; Sinh ngày: 04/09/1956;",
+            "Cháu ngoại – bà Lê Thị Thơm; Sinh ngày: 14/03/1996;",
         ])
         ds = _extract_party_data(section)
         names = [(x["ho_ten"], x["gioi_tinh"], x["ngay_sinh"]) for x in ds["nguoi"]]
@@ -2514,6 +2516,8 @@ class UploadLabExtractContractTests(unittest.TestCase):
             ("Nguyễn Tuấn Anh", "Ông", "1977"),
             ("Nguyễn Tuấn Anh", "Ông", "1993"),
             ("Nguyễn Minh Quang", "Ông", "05/12/1991"),
+            ("Đoàn Xuân Lam", "Ông", "04/09/1956"),
+            ("Lê Thị Thơm", "Bà", "14/03/1996"),
         ])
 
 
