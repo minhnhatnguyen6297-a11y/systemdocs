@@ -2878,6 +2878,9 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             " ",
             chunk,
         )
+        # Nam bi tach khoang trang trong nguon ("05/07/199 2") — gop lai
+        # truoc khi soi ngay (13/10/2026).
+        chunk_scan = re.sub(r"(\d{1,2}/\d{1,2}/\d{3})\s+(\d)\b", r"\1\2", chunk_scan)
         groups = match.groupdict()
         if groups.get("title"):
             title = str(groups.get("title") or "").strip().lower()

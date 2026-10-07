@@ -3491,3 +3491,15 @@ def test_ten_khong_la_gioi_tu_dau_cau():
     ])
     nguoi = ec._extract_plain_text_person_entries(text)
     assert all(p["ho_ten"] != "Theo" for p in nguoi)
+
+
+def test_nam_sinh_tach_khoang_trang():
+    """Nguon go '05/07/199 2' (nam tach khoang trang) — gop thanh 1992."""
+    import extract_contract as ec
+    text = "\n".join([
+        "2. Và vợ là bà Phạm Thị Mận; Sinh ngày: 05/07/199 2;",
+        "Căn cước công dân số 036192024985 do Cục cảnh sát cấp ngày 16/08/2021;",
+    ])
+    nguoi = ec._extract_plain_text_person_entries(text)
+    m = [p for p in nguoi if "Mận" in p["ho_ten"]]
+    assert m and m[0]["ngay_sinh"] == "05/07/1992", nguoi

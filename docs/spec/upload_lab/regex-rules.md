@@ -126,6 +126,7 @@ mục này chỉ tra nhanh. Khi lệch nhau, file riêng của loại đó đún
   - Giá trị `Thửa đất số N tại: <địa chỉ> theo <giấy tờ>`: `N` là số thửa, phần `tại:` vào `dia_chi`, phần `theo <giấy tờ>` vào `nguon_goc`; danh sách `số 112, 115` chỉ tách thành nhiều thửa khi mọi phần là số thuần (13/10/2026). `địa chỉ tại Theo Giấy chứng nhận ...` không phải địa chỉ — chuyển sang `nguon_goc`.
   - Ký tự backtick `` ` `` dính đuôi tên nguồn gõ thừa bị cắt (`Dương Thị Vân Anh ```` → `Dương Thị Vân Anh` — 13/10/2026).
   - `c) Địa chỉ: Địa chỉ thường trú ông X tại: A.Địa chỉ thường trú bà Y: B.` trên một dòng tách thành địa chỉ keyed theo tên gọi; khóa keyed có dính nhãn/danh xưng được cắt đầu trước khi so khớp (13/10/2026). Bảng danh sách ô ngăn `|`: nhãn `CC` nhận là loại giấy tờ; ô tên xã trần sau cơ quan cấp là `dia_chi`.
+  - Năm bị tách khoảng trắng trong nguồn (`05/07/199 2`) được gộp lại trong vùng soi trường của từng người (13/10/2026).
   - Tên không được mở đầu bằng giới từ/liên từ (`Theo`, `Tại`, `Và`, `Với`...) — chặn câu văn xuôi bị bắt làm tên (`Theo CCCD...` → "Theo"); KHÔNG chặn `la`/`do`/`tu` vì `La`, `Đỗ`, `Từ`, `Đồ` là họ thật (13/10/2026).
   - `Thửa đất số <n> tỷ lệ 1/1000 do <cơ quan> lập ngày...`: `tỷ lệ` là ranh cắt — số thửa chỉ lấy `<n>`, phần sau vào ghi chú (13/10/2026).
   - Marker người `N .` cho phép khoảng trắng trước dấu chấm (`2 . Bà X`); địa chỉ chung `Cả <x> ông bà cùng thường trú` gán cho cả nhóm (13/10/2026).
