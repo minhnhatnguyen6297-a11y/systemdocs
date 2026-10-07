@@ -2427,7 +2427,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     issue_place_re = re.compile(
         r"(?i)\bdo\s+((?:(?!k[ýí]\s+ng\u00e0y)[^\n])+?)\s+(?:c\u1ea5p\s+ng\u00e0y|cap ngay|ng\u00e0y\s*\d)"
     )
-    issue_date_re = re.compile(r"(?i)(?:c\u1ea5p ng\u00e0y|cap ngay|c\u1ea5p v\u00e0o ng\u00e0y|ng\u00e0y c\u1ea5p|ngay cap|c\u1ea5p|cap)\s*:?\s*(\d{1,2}/\d{1,2}/\d{4})")
+    issue_date_re = re.compile(r"(?i)(?:c\u1ea5p ng\u00e0y|cap ngay|c\u1ea5p v\u00e0o ng\u00e0y|ng\u00e0y c\u1ea5p|ngay cap|c\u1ea5p|cap)\s*:?\s*(\d{1,2}/+\d{1,2}/+\d{4})")
     # "do <co quan> ngay DD/MM/YYYY" (nguon go thieu chu "cap") — "ngay"
     # tran chi tinh khi dung sau "do <co quan>", khong phai "ky ngay".
     issue_date_do_re = re.compile(
@@ -2457,7 +2457,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # "Toi ten la: Tran Gia Huy; Sinh ngay: ..." — ten tran khong
     # Ông/Bà, nhan ngay sinh cung dong de chac la nguoi.
     intro_bare_re = re.compile(
-        r"(?i)^\s*(?:Tôi (?:tên )?là|Tên tôi là)\s*:?\s*(?P<name>[^;|\-\u2013\n]+?)"
+        r"(?i)^\s*(?:Tôi (?:tên )?là|Tên tôi là|Tôi\s+(?:Ông|Bà))\s*:?\s*(?P<name>[^;|\-\u2013\n]+?)"
         r"(?:\s*[-\u2013]\s*[^\n;|]{0,60}?)?(?:\s*[;|]|\s+)[\s|]*"
         r"(?:Sinh ngày|Ngày sinh|Sinh ngay|Ngay sinh|Sinh năm|Năm sinh|Sinh nam|Nam sinh)"
     )
@@ -2473,11 +2473,11 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     )
     _ADDR_LABEL = _DIA_CHI_LABEL
     address_re = re.compile(
-        r"(?im)^\s*(?:\[\d+\]\s*|[a-zA-Z][.)]\s*|\d+(?:\.\d+)*[.)]?\s*)?(?:C\u1ea3 hai(?:\s+\u00f4ng b\u00e0|\s+v\u1ee3 ch\u1ed3ng)?|C\u00f9ng|Hai v\u1ee3 ch\u1ed3ng)?\s*(?:"
+        r"(?im)^\s*(?:\[\d+\]\s*|[a-zA-Z][.)]\s*|\d+(?:\.\d+)*[.)]?\s*)?(?:C\u1ea3 hai(?:\s+\u00f4ng b\u00e0|\s+v\u1ee3 ch\u1ed3ng)?|C\u00f9ng|Hai v\u1ee3 ch\u1ed3ng|T\u1ea5t c\u1ea3(?:\s+\u00f4ng b\u00e0)?)?\s*(?:"
         + _ADDR_LABEL + r")\s*:?\s*(.+)$"
     )
     shared_addr_re = re.compile(
-        r"(?i)^\s*(?:c\u1ea3 hai|hai\s+v\u1ee3 ch\u1ed3ng|hai\s+\u00f4ng b\u00e0|c\u00f9ng)\b"
+        r"(?i)^\s*(?:c\u1ea3 hai|hai\s+v\u1ee3 ch\u1ed3ng|hai\s+\u00f4ng b\u00e0|c\u00f9ng|t\u1ea5t c\u1ea3)\b"
     )
     # Dia chi nam giua dong (vi du "...; Nơi thường trú: X") — chi dung khi
     # nhan dau dong khong khop; loai "Nơi thường trú cuối cùng..." cua nguoi
@@ -2681,6 +2681,14 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         # Khong "continue" sau header: dia chi co the nam chung dong
         # voi ten ("...; Nơi thường trú: X").
         address_match = address_re.search(line)
+        if not address_match and re.match(r"\s*\d+(?:\.\d+)*\.\s*\u0110\u1ecba ch\u1ec9\s+li\u00ean h\u1ec7", line, re.I):
+            # "2. Địa chỉ liên hệ (điện thoại, email...): X" — truong
+            # dia chi nguoi trong don mau 09 gia han; nhan "Địa chỉ liên
+            # hệ" binh thuong thuoc co quan/van phong nen chi tinh khi
+            # dong mo dau bang so muc.
+            address_match = re.search(
+                r"(?i)\u0110\u1ecba ch\u1ec9\s+li\u00ean h\u1ec7[^:\n]*:\s*(.+)$", line
+            )
         if not address_match:
             address_match = address_fallback_re.search(line)
             if address_match:
@@ -2839,9 +2847,14 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                 chunk_scan,
             )
         person["noi_cap"] = re.sub(r"\s+", " ", issue_place_match.group(1)).strip(" ;,.") if issue_place_match else ""
-        issue_date_match = issue_date_re.search(chunk_scan) or issue_date_do_re.search(chunk_scan)
+        issue_date_match = min(
+            (m for m in (issue_date_re.search(chunk_scan), issue_date_do_re.search(chunk_scan)) if m),
+            key=lambda m: m.start(),
+            default=None,
+        )
         if issue_date_match:
-            person["ngay_cap_cccd"] = issue_date_match.group(1)
+            # Chuan hoa "//" kep go nham ("23/04//2021" -> "23/04/2021").
+            person["ngay_cap_cccd"] = re.sub(r"/+", "/", issue_date_match.group(1))
         else:
             # So Excel ("cap ngay 44546") — doi sang ngay that.
             person["ngay_cap_cccd"] = _doi_ngay_excel(chunk_scan)

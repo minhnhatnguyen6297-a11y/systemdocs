@@ -2753,6 +2753,75 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(ds[0]["gioi_tinh"], "Ông")
         self.assertEqual(ds[0]["dia_chi"], "phường Hạ Long, tỉnh Quảng Ninh")
 
+    def test_dia_chi_chung_tat_ca_ong_ba(self):
+        # "Tất cả ông bà cùng thường trú tại: X" — dia chi chung danh
+        # sach ho gia dinh (hop dong chuyen nhuong - 13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG",
+            "I. BÊN CHUYỂN NHƯỢNG:",
+            "1. Ông Nguyễn Văn Tuyến; | Sinh ngày: 10/07/1966",
+            "Căn cước công dân số: 036066024280 do Cục cảnh sát cấp ngày 10/05/2021.",
+            "2. Bà Đinh Thị Hưng; | Sinh ngày: 13/05/1971;",
+            "Căn cước công dân số: 036171012352 do Cục Cảnh sát cấp ngày 12/04/2021;",
+            "Tất cả ông bà cùng thường trú tại: Thôn Cổ Phương, Xã Phong Doanh, Tỉnh Ninh Bình.",
+            "II. BÊN NHẬN CHUYỂN NHƯỢNG:",
+            "Bà Đinh Thị Kiều Vân; | Sinh ngày: 20/12/1975",
+            "Căn cước số 019175000150 do Bộ công an cấp ngày 13/04/2021;",
+            "Nơi thường trú tại: thôn Đông Hoa, phường Hoa Lư, Tỉnh Ninh Bình.",
+        ])
+        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        dc = {x["ho_ten"]: x["dia_chi"] for x in r["raw"]["ben_a"]["nguoi"]}
+        self.assertEqual(dc.get("Nguyễn Văn Tuyến"), "Thôn Cổ Phương, Xã Phong Doanh, Tỉnh Ninh Bình")
+        self.assertEqual(dc.get("Đinh Thị Hưng"), "Thôn Cổ Phương, Xã Phong Doanh, Tỉnh Ninh Bình")
+
+    def test_toi_ong_ten_cung_dong(self):
+        # "Tôi Ông Trần Văn Hương; | Sinh ngày: ..." — intro "Tôi + danh
+        # xung" khong co "là" (don cam doan - 13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "ĐƠN CAM ĐOAN",
+            "Tôi Ông Trần Văn Hương; |  |  |  | Sinh ngày: 16/08/1974",
+            "Căn cước công dân số 036074002923 do Cục cảnh sát ngày 05/09/2022;",
+            "Nơi cư trú tại: thôn Vĩnh Trị, xã Yên Đồng, tỉnh Ninh Bình.",
+        ])
+        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        names = [x["ho_ten"] for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]]
+        self.assertIn("Trần Văn Hương", names)
+        q = [x for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"] if x["ho_ten"] == "Trần Văn Hương"]
+        self.assertEqual(q[0]["ngay_cap_cccd"], "05/09/2022")
+
+    def test_dia_chi_lien_he_muc_so(self):
+        # "2. Địa chỉ liên hệ (điện thoại, email...): X" — truong dia chi
+        # nguoi trong don mau 09 gia han (13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "ĐƠN XIN GIA HẠN SỬ DỤNG ĐẤT",
+            "1. Người sử dụng đất:",
+            "1.1. Bà Nguyễn Thị Thảo\t\tSinh ngày: 01/06/1962",
+            "Căn cước công dân số 036162012803 do Cục cảnh sát cấp ngày 25/08/2021",
+            "2. Địa chỉ liên hệ (điện thoại, email...):  thôn Văn Hưng, xã Vạn Thắng, tỉnh Ninh Bình",
+        ])
+        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        q = [x for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"] if x["ho_ten"] == "Nguyễn Thị Thảo"]
+        self.assertTrue(q)
+        self.assertEqual(q[0]["dia_chi"], "thôn Văn Hưng, xã Vạn Thắng, tỉnh Ninh Bình")
+
+    def test_ngay_cap_gach_chep_kep(self):
+        # "cấp ngày 23/04//2021" — gach chep kep go nham, chuan hoa ve
+        # "23/04/2021" (thong bao thua ke - 13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "THÔNG BÁO",
+            "Bà Ngô Thị Thanh | Sinh năm 1995",
+            "Căn cước công dân số 036195007112 do Cục cảnh sát cấp ngày 23/04//2021.",
+            "Nơi thường trú tại: thôn Hạ Kỳ, xã Đồng Thịnh, tỉnh Nam Định.",
+        ])
+        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        q = [x for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"] if x["ho_ten"] == "Ngô Thị Thanh"]
+        self.assertTrue(q)
+        self.assertEqual(q[0]["ngay_cap_cccd"], "23/04/2021")
+
 
 if __name__ == "__main__":
     unittest.main()
