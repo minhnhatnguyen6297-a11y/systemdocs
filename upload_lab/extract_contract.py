@@ -2430,7 +2430,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     )
     _ADDR_LABEL = _DIA_CHI_LABEL
     address_re = re.compile(
-        r"(?im)^\s*(?:\[\d+\]\s*|\d+(?:\.\d+)*[.)]?\s*)?(?:C\u1ea3 hai(?:\s+\u00f4ng b\u00e0|\s+v\u1ee3 ch\u1ed3ng)?|C\u00f9ng|Hai v\u1ee3 ch\u1ed3ng)?\s*(?:"
+        r"(?im)^\s*(?:\[\d+\]\s*|[a-zA-Z][.)]\s*|\d+(?:\.\d+)*[.)]?\s*)?(?:C\u1ea3 hai(?:\s+\u00f4ng b\u00e0|\s+v\u1ee3 ch\u1ed3ng)?|C\u00f9ng|Hai v\u1ee3 ch\u1ed3ng)?\s*(?:"
         + _ADDR_LABEL + r")\s*:?\s*(.+)$"
     )
     shared_addr_re = re.compile(
@@ -2581,7 +2581,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             or re.search(
                 # "1.1. Tên: Ha Van Thinh; Sinh ngay:" — nhan "Tên:" tran
                 # khong danh xung (mau 11/DK don bien dong — 12/10/2026).
-                r"(?i)^\s*(?:\d+(?:\.\d+)*[.)]?\s*)?T\u00ean\s*:\s*"
+                r"(?i)^\s*(?:[a-zA-Z][.)]|\d+(?:\.\d+)*[.)]?)?\s*T\u00ean\s*:\s*"
                 r"(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?)\s*(?=[;|]|$)",
                 line,
             )
