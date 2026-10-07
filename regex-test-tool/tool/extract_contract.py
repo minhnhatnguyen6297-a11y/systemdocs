@@ -2423,7 +2423,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         r"(?:T\u00f4i (?:t\u00ean )?l\u00e0\s*:?|Ch\u00fang t\u00f4i l\u00e0\s*:?)?\s*"
         r"(?:(?:ng\u01b0\u1eddi\s+)?(?:v\u1ee3|ch\u1ed3ng)\s*[\-\u2013:]\s*)?"
         r"(?:(?:em|anh|ch\u1ecb|c\u00f4|ch\u00fa|b\u00e1c|d\u00ec|c\u1eadu|m\u1ee3)\s+(?:trai|g\u00e1i|d\u00e2u|r\u1ec3|\u0111\u1ebb|ru\u1ed9t)\s*[-\u2013:]\s*)?"
-        r"(?:(?:v\u00e0|c\u00f9ng\s+v\u1edbi)\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\s+)?"
+        r"(?:(?:v\u00e0|c\u00f9ng\s+v\u1edbi)\s+(?:v\u1ee3|ch\u1ed3ng)(?:\s+l\u00e0)?\s+)?"
         r"(?:(?:b\u00ean|ben)\s+[A-Za-z\u00c0-\u1ef9]\s*[:.,]?\s*)?"
         r"(?:(?:con|m\u1eb9|b\u1ed1|cha|v\u1ee3|ch\u1ed3ng)\s+(?:(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i)(?:\s+(?:t\u00f4i|c\u1ee7a\s+t\u00f4i))?|t\u00f4i)(?:\s+\u00f4ng\s+[^\d;:]{2,50}?)?\s*(?:[-\u2013\u2014:,]|l\u00e0)\s*)?"
         r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?:v\u00e0\s+)?(?P<title>\u00f4ng/b\u00e0|ong/ba|\u00f4ng\s*\(b\u00e0\)|b\u00e0\s*\(\u00f4ng\)|\u00f4ng|ong|b\u00e0|ba|anh|ch\u1ecb|chi)\s*:?\s*"
