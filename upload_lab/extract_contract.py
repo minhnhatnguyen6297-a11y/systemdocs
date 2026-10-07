@@ -2512,14 +2512,29 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         r"(?i)\s+(?:c\u00f3\s+(?:m\u1eb9|b\u1ed1|cha|con|v\u1ee3|ch\u1ed3ng)(?:\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i))?|(?:m\u1eb9|b\u1ed1|cha|con|v\u1ee3|ch\u1ed3ng)\s+c\u1ee7a\s+(?:\u00f4ng|b\u00e0)\s+[^\n]{2,50}?)\s+l\u00e0\s+"
         r"(?=(?:\u00f4ng|b\u00e0)\s+[A-Z\u00c0-\u1ef9\u0110])"
     )
+    # Hang vo chong chung mot dong danh sach:
+    # "- Ông Trần Văn Khải và bà Bà: Trần Thị Lan; Sinh ngày: ..." —
+    # tach thanh 2 dong ao; danh xung lap "bà Bà:" gom ve "Bà:".
+    _va_couple_re = re.compile(
+        r"(?i)^(?P<lead>\s*[-–—•]?\s*(?:\d+[.)]?\s*)?)"
+        r"(?P<t1>ông|bà)\s+(?P<n1>[A-ZÀ-ỹĐ][^\d;:()\n]{1,50}?)\s+"
+        r"và\s+(?P<t2>ông|bà)\s+(?:(?:ông|bà)\s*:\s*)?(?P<rest>[A-ZÀ-ỹĐ][^\n]*)$"
+    )
     _split_lines: list[str] = []
     for ln in lines:
-        kinship_match = _kinship_la_re.search(ln)
-        parts = (
-            [ln[: kinship_match.start()], ln[kinship_match.end():]]
-            if kinship_match
-            else [ln]
-        )
+        couple = _va_couple_re.match(ln)
+        if couple:
+            parts = [
+                couple.group("lead") + couple.group("t1") + " " + couple.group("n1"),
+                couple.group("t2") + " " + couple.group("rest"),
+            ]
+        else:
+            kinship_match = _kinship_la_re.search(ln)
+            parts = (
+                [ln[: kinship_match.start()], ln[kinship_match.end():]]
+                if kinship_match
+                else [ln]
+            )
         for part in parts:
             # O trong "| |" truoc nhan danh xung ("| | Bà: Y") la ranh
             # nguoi moi trong bang ngan hang — tach dong ao. Chi tach

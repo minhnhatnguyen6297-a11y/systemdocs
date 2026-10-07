@@ -3166,6 +3166,22 @@ class UploadLabExtractContractTests(unittest.TestCase):
             [("Trịnh Văn Phong", "036079000477")],
         )
 
+    def test_vo_chong_chung_dong_danh_sach(self):
+        # "- Ông Trần Văn Khải và bà Bà: Trần Thị Lan; Sinh ngày..." —
+        # vo chong tren 1 hang: tach 2 nguoi; truong sau "và" la cua
+        # nguoi thu hai, danh xung lap "bà Bà:" gom ve "Bà" (13/10/2026).
+        from extract_contract import _extract_party_data
+        section = "\n".join([
+            "- Ông Trần Văn Khải và bà Bà: Trần Thị Lan; Sinh ngày: 01/01/1930; Căn cước công dân số: 036130003151 do Cục Cảnh sát cấp ngày 12/04/2023 là vợ chồng hợp pháp từ năm 1960 cho đến khi ông Khải chết.",
+            "- Ông Phạm Văn An và bà Nguyễn Thị Bình; Sinh ngày: 01/01/1960;",
+        ])
+        ds = _extract_party_data(section)
+        names = [(x["ho_ten"], x["gioi_tinh"], x["ngay_sinh"], x["cccd"]) for x in ds["nguoi"]]
+        self.assertEqual(names, [
+            ("Trần Thị Lan", "Bà", "01/01/1930", "036130003151"),
+            ("Nguyễn Thị Bình", "Bà", "01/01/1960", ""),
+        ])
+
 
 if __name__ == "__main__":
     unittest.main()
