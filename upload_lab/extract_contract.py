@@ -1389,13 +1389,22 @@ def _cell_has_letters(value: str) -> bool:
 
 def _la_o_thoi_han(value: str) -> bool:
     """O ky han su dung: nam 4 so ("2043"), ngay co "/" ("15/10/2063"),
-    hoac chu ("Lau dai"). So nho 3 chu so ("119") la dien tich, tra False."""
+    ngay cham "12.2013" (MM.YYYY), hoac chu ("Lau dai"). So nho 3 chu
+    so ("119") la dien tich, tra False."""
     text = (value or "").strip()
     if not text:
         return False
     if re.match(r"^\d{4}\s*$", text) or "/" in text:
         return True
+    if re.match(r"^\d{1,2}\.\d{4}\s*$", text):
+        return True
     return _cell_has_letters(text)
+
+
+def _la_o_so_thua(value: str) -> bool:
+    """O so thua: so thuan hoac co "/" ("26/9", "380/16"). Khac
+    _is_pure_number_cell cho phep "/" trong ky hieu thua dat."""
+    return bool(re.match(r"^\d[\d/.,]*$", (value or "").strip()))
 
 
 def _tach_nay_la(value: str) -> tuple[str, str]:
@@ -1496,6 +1505,17 @@ def _tach_thua_cell_stream(cells: list[str], context: dict, parcels: list[dict])
         pos = _nuot_o_chu_thua(data, pos, current)
     else:
         return False
+    pos = _quet_cell_stream_thua(data, pos, context, parcels, current)
+    return True
+
+
+def _quet_cell_stream_thua(
+    data: list[str], pos: int, context: dict, parcels: list[dict], current: dict | None
+) -> int:
+    """Quet chuoi o bang (khong tieu de): bo 3 so (to, thua, DT) = thua
+    moi — o thua cho phep "/" ("26/9"); bo (DT, loai dat, thoi han) la
+    chi tiet cua thua dang mo. Dung cho ca dong "|" don nhieu hang
+    vat ly cua bang .doc qua IFilter (13/10/2026)."""
     while pos < len(data):
         folded = _fold_text(data[pos])
         if folded in ("trong do", "trong do:") or folded.startswith("trong do"):
@@ -1508,7 +1528,7 @@ def _tach_thua_cell_stream(cells: list[str], context: dict, parcels: list[dict])
         if (
             pos + 2 < len(data)
             and _is_pure_number_cell(data[pos])
-            and _is_pure_number_cell(data[pos + 1])
+            and _la_o_so_thua(data[pos + 1])
             and _is_pure_number_cell(data[pos + 2])
         ):
             current = _new_thua_dat(context)
@@ -1556,6 +1576,7 @@ def _tach_thua_cell_stream(cells: list[str], context: dict, parcels: list[dict])
                 if _is_pure_number_cell(peek) and pos + 1 < len(data) and (
                     _cell_has_letters(data[pos + 1])
                     or _is_pure_number_cell(data[pos + 1])
+                    or _la_o_so_thua(data[pos + 1])
                 ):
                     break
                 extras.append(peek)
@@ -1564,10 +1585,11 @@ def _tach_thua_cell_stream(cells: list[str], context: dict, parcels: list[dict])
                     break
             if extras:
                 detail["phan_ghi_them"] = " ".join(extras)
-            current["chi_tiet_dien_tich"].append(detail)
+            if current is not None:
+                current["chi_tiet_dien_tich"].append(detail)
             continue
         break
-    return True
+    return pos
 
 
 def _tach_thua_bang_don_dong(text: str, context: dict, parcels: list[dict]) -> bool:
@@ -1828,6 +1850,16 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
                 # Dong van xuoi troi vao bang ("15/10/2063 | | | 2. Thống nhất
                 # phân chia...") — o tieu de muc "2. ..." khong phai du lieu.
                 if any(re.match(r"^\s*\d{1,2}\.\s+\S", c) for c in cells if c):
+                    continue
+                # Bang .doc don nhieu hang vat ly vao 1 dong "|" (IFilter bo
+                # \n trong bang): so o khac rong > so cot => quet stream
+                # "to|thua|dt|md|th | dt|md|th | to|thua|dt..." (thua 202 +
+                # 26/9 + 380/16 + 171/26 chung 1 dong, 13/10/2026).
+                if len([c for c in cells if c.strip()]) > len(order):
+                    _stream_cells = [_clean_asset_cell(c) for c in cells if c.strip()]
+                    _quet_cell_stream_thua(_stream_cells, 0, context, parcels, current)
+                    if parcels:
+                        current = parcels[-1]
                     continue
                 row = {
                     "so_to_ban_do": "",

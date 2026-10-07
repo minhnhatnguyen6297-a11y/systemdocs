@@ -2467,6 +2467,32 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(ds[0]["ten_goi_khac"], "Trần Hữu Đàm")
         self.assertEqual(ds[0]["ngay_chet"], "08/08/2014")
 
+    def test_bang_doc_nhieu_hang_mot_dong_pipe(self):
+        # Bang .doc qua IFilter don nhieu hang vat ly vao 1 dong "|"
+        # (thua 202 + "Trong do" + thua 26/9 + 380/16 + 171/26 chung hang).
+        # O thua cho phep "/" ("26/9"); ky han cham "12.2013" (13/10/2026).
+        from extract_contract import tach_danh_sach_thua_dat
+        text = (
+            "Số tờ bản đồ | Số thửa | Diện tích (m2) | Mục đích sử dụng | Thời hạn sử dụng\n"
+            "28 | 202 | 497 |  |  |  |  | Trong đó |  |  |  |  |  | 240 | Đất ở | "
+            "Lâu dài |  |  |  | 257 | Đất vườn tạp | 12/2043 |  | 27 | 26/9 | 185 | "
+            "2 Vụ lúa | 12.2013 |  | 28 | 380/16 | 48 | 1 vụ lúa 1 vụ mầu | "
+            "12.2013 |  | 28 | 171/26 | 67 | Chuyên mạ | 12.2013"
+        )
+        parcels = tach_danh_sach_thua_dat(text)
+        self.assertEqual(
+            [p["so_thua_dat"] for p in parcels], ["202", "26/9", "380/16", "171/26"]
+        )
+        t202 = parcels[0]
+        self.assertEqual(t202["dien_tich"], "497")
+        self.assertEqual(
+            [(c["dien_tich"], c["muc_dich_su_dung"]) for c in t202["chi_tiet_dien_tich"]],
+            [("240", "Đất ở"), ("257", "Đất vườn tạp")],
+        )
+        self.assertEqual(parcels[1]["dien_tich"], "185")
+        self.assertEqual(parcels[1]["thoi_han_su_dung"], "12.2013")
+        self.assertEqual(parcels[3]["muc_dich_su_dung"], "Chuyên mạ")
+
 
     def test_bang_tab_stt_danh_xung_anh_chi(self):
         # Bang mau 04a/DK qua .doc: "STT	Bà X	năm	CCCD	số	ngày cấp	cơ quan	địa chỉ"

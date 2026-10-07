@@ -3727,3 +3727,22 @@ class BangTabTests(unittest.TestCase):
         assert chinh["ho_ten"] == "Đào Duy Chinh"
         assert chinh["gioi_tinh"] == "Ông"
         assert chinh["cccd"] == "036211017670"
+
+    def test_bang_doc_nhieu_hang_mot_dong_pipe(self):
+        # Bang .doc don nhieu hang vat ly vao 1 dong "|" — thua 202 +
+        # "Trong do" + thua 26/9 + 380/16 + 171/26 (13/10/2026).
+        text = (
+            "Số tờ bản đồ | Số thửa | Diện tích (m2) | Mục đích sử dụng | Thời hạn sử dụng\n"
+            "28 | 202 | 497 |  |  |  |  | Trong đó |  |  |  |  |  | 240 | Đất ở | "
+            "Lâu dài |  |  |  | 257 | Đất vườn tạp | 12/2043 |  | 27 | 26/9 | 185 | "
+            "2 Vụ lúa | 12.2013 |  | 28 | 380/16 | 48 | 1 vụ lúa 1 vụ mầu | "
+            "12.2013 |  | 28 | 171/26 | 67 | Chuyên mạ | 12.2013"
+        )
+        parcels = tach_danh_sach_thua_dat(text)
+        assert [p["so_thua_dat"] for p in parcels] == ["202", "26/9", "380/16", "171/26"]
+        assert parcels[0]["dien_tich"] == "497"
+        assert [
+            (c["dien_tich"], c["muc_dich_su_dung"]) for c in parcels[0]["chi_tiet_dien_tich"]
+        ] == [("240", "Đất ở"), ("257", "Đất vườn tạp")]
+        assert parcels[1]["thoi_han_su_dung"] == "12.2013"
+        assert parcels[3]["muc_dich_su_dung"] == "Chuyên mạ"
