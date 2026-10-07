@@ -2505,6 +2505,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     address_lines: list[tuple[int, str, str]] = []
     labeled_person_idx: set[int] = set()
     prev_intro_bare = False
+    gom_list = False
     for idx, line in enumerate(lines):
         # "Toi la:" dung rieng 1 dong -> ten tran o dong ke tiep
         # ("Nguyen Thi Yen\t\tSinh ngay: ...").
@@ -2523,9 +2524,28 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         prev_intro_bare = bool(
             re.match(r"(?i)^\s*(?:T\u00f4i|Ch\u00fang t\u00f4i)\s+l\u00e0\s*:?\s*$", line)
         ) or (prev_intro_bare and not line.strip())
+        # "Chúng tôi gồm:" / "Chúng tôi là:" mo danh sach TEN TRAN (VB cua
+        # nguoi dai dien — ong Nghinh 12/10/2026): cac dong ten khong danh
+        # xung/so van la nguoi khi di kem "Sinh ngay" tren cung dong.
+        if re.match(
+            r"(?i)^\s*Ch\u00fang t\u00f4i\s*(?:g\u1ed3m|l\u00e0\s*:|:)",
+            line,
+        ):
+            gom_list = True
+        elif gom_list and re.match(
+            r"(?i)^\s*(?:Nay\b|\u0110I\u1ec0U|\u0110i\u1ec1u\s+\d|N\u1ed9i\s+dung|Khi\s|c\u00f2n\s+s\u1ed1ng)",
+            line,
+        ):
+            gom_list = False
         match = header_re.search(line)
         if match is None:
             match = numbered_bare_re.search(line)
+        if match is None and gom_list and re.search(r"\d", line):
+            match = re.match(
+                r"\s*(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?)"
+                r"\s+(?:[-\u2013]\s*)?(?:Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)",
+                line,
+            )
         if match:
             # "2. Con dâu - bà X" — header nam bat ca cum vai tro; neu
             # "ten" mo dau bang tu quan he thi thu lai bang lead_role_re.
@@ -3379,11 +3399,16 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
             tlkt_date = tlkt_by_match.group(2)
         last_addr = ""
         addr_match = re.search(
-            r"(?i)N\u01a1i th\u01b0\u1eddng tr\u00fa(?:\s+cu\u1ed1i c\u00f9ng)?\s+tr\u01b0\u1edbc khi ch\u1ebft:\s*([^.\n;)]+)",
+            r"(?i)(?P<ca_hai>c\u1ea3 hai\s+c\u00f3\s+)?N\u01a1i\s+(?:th\u01b0\u1eddng tr\u00fa|c\u01b0 tr\u00fa)(?:\s+cu\u1ed1i c\u00f9ng)?\s+tr\u01b0\u1edbc khi ch\u1ebft\s*(?:t\u1ea1i)?\s*:\s*(?P<addr>[^.\n;)]+)",
             tail,
         )
         if addr_match:
-            last_addr = re.sub(r"\s+", " ", addr_match.group(1)).strip(" ;,.")
+            last_addr = re.sub(r"\s+", " ", addr_match.group("addr")).strip(" ;,.")
+            # "Cả hai có nơi cư trú cuối cùng..." — dia chi chung cua cap
+            # vo chong chet cung dong; dien nguoc cho nguoi ngay truoc
+            # con trong (ong Moc/ba Den — tho a thuan phan chia 12/10/2026).
+            if addr_match.group("ca_hai") and found and not found[-1]["dia_chi"]:
+                found[-1]["dia_chi"] = last_addr
         key = f"{_fold_text(raw_name)}|{death_val}"
         if not raw_name:
             continue

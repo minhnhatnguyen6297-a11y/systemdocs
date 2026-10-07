@@ -2539,6 +2539,17 @@ class UploadLabExtractContractTests(unittest.TestCase):
         party = _extract_party_data(text)
         self.assertEqual([x["ho_ten"] for x in party["nguoi"]], [])
 
+    def test_dia_chi_cuoi_ca_hai_chung_cho_vo_chong_chet(self):
+        # "Cả hai có nơi cư trú cuối cùng trước khi chết tại: X" la dia
+        # chi CHUNG cua cap vo chong chet cung dong — dien cho ca hai,
+        # ke ca nguoi dung truoc (ong Moc/ba Den — 12/10/2026).
+        from extract_contract import _extract_nguoi_chet, DOC_KIND_INHERITANCE_PARTITION
+        text = "- Bố đẻ ông Vũ Đình Đạc là ông Vũ Đình Mộc; chết ngày 28/12/1993; Mẹ đẻ ông Vũ Đình Đạc là bà Vũ Thị Dền; chết ngày 08/02/1995; Cả hai có nơi cư trú cuối cùng trước khi chết tại: Xã Yên Trị, huyện Ý Yên, tỉnh Nam Định."
+        ds = _extract_nguoi_chet(text, DOC_KIND_INHERITANCE_PARTITION)
+        got = {x["ho_ten"]: x["dia_chi"] for x in ds}
+        self.assertEqual(got.get("Vũ Đình Mộc"), "Xã Yên Trị, huyện Ý Yên, tỉnh Nam Định")
+        self.assertEqual(got.get("Vũ Thị Dền"), "Xã Yên Trị, huyện Ý Yên, tỉnh Nam Định")
+
 
 if __name__ == "__main__":
     unittest.main()
