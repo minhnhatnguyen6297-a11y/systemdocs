@@ -2678,6 +2678,8 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                 # "1.1. Tên: Ha Van Thinh; Sinh ngay:" — nhan "Tên:" tran
                 # khong danh xung (mau 11/DK don bien dong — 12/10/2026).
                 r"(?i)^\s*(?:[a-zA-Z][.)]|\d+(?:\.\d+)*[.)]?)?\s*T\u00ean\s*:\s*"
+                # Gia tri go thua chu "Tên" lan nua: "Tên: Tên  Ông X" (mau 18).
+                r"(?:T\u00ean\s+)?"
                 r"(?:(?P<title>\u00f4ng|b\u00e0)\s+)?"
                 r"(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?)\s*(?=[;|]|$|[\s|]+\s*(?:Sinh|Ng\u00e0y))",
                 line,
@@ -3433,6 +3435,29 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
             match_title = inner.group(1)
         else:
             match_title = match.groupdict().get("title") or _salut_title
+        if len(raw_name.split()) == 1:
+            # Ten rut gon 1 am tiet ("Bà Yểng Sinh năm 1931; chết...") —
+            # tim ten day du ket thuc bang am tiet do ngay truoc trong
+            # nguyen doan ("là bà Nguyễn Thị Yểng. Bà Yểng Sinh năm...").
+            _tok = raw_name
+            _before = source[max(0, match.start() - 250):match.start()]
+            _full = re.findall(
+                r"(?:\u00f4ng|b\u00e0)\s+([A-Z\u00c0-\u1ef9\u0110](?:(?!\b(?:\u00f4ng|b\u00e0|l\u00e0)\b)[^\d;:.,()\n]){1,58}?"
+                + re.escape(_tok)
+                + r")\b",
+                _before,
+                re.I,
+            )
+            _full = [
+                re.sub(r"\s+", " ", c).strip(" ;,.-") for c in _full
+            ]
+            _full = [
+                c for c in _full
+                if 1 < len(c.split()) <= 6
+                and all(t[0].isupper() for t in c.split())
+            ]
+            if _full:
+                raw_name = max(_full, key=len)
         title_fold = _fold_text(match_title)
         death_val = match.groupdict().get("death") or match.groupdict().get("death_y") or ""
         # Tu choi: "chet nam" khong trich luc chi nhan khi truoc ten co

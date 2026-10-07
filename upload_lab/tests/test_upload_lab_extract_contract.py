@@ -2991,6 +2991,39 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(chet[0]["ngay_chet"], "05/03/2010")
         self.assertEqual(chet[0]["so_giay_to"], "4479/2025/TLKT-BS")
 
+    def test_ten_nhan_lap_chu_ten(self):
+        # "Tên: Tên  Ông Đinh Văn Khanh" — nguon go thua "Tên" trong gia
+        # tri (mau 18 ban tien - 13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "ĐƠN ĐĂNG KÝ",
+            "a) Tên: Tên  Ông Đinh Văn Khanh;\t\tSinh ngày: 09/01/1975",
+            "Tên  Bà Đoàn Thị Hà;\t\t\tSinh ngày: 13/12/1977",
+            "b) Giấy tờ nhân thân:",
+            "1. Ông Đinh Văn Khanh;\t\tSinh ngày: 09/01/1975;",
+            "Căn cước công dân số: 036075026268 do Cục cảnh sát cấp ngày 02/07/2021;",
+        ])
+        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        names = [x["ho_ten"] for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]]
+        self.assertIn("Đinh Văn Khanh", names)
+        self.assertNotIn("Tên Ông Đinh Văn Khanh", names)
+
+    def test_nguoi_chet_ten_rut_gon_mo_rong(self):
+        # "Bà Yểng Sinh năm 1931; chết..." — ten rut gon; mo rong thanh
+        # "Nguyễn Thị Yểng" neu ten day du xuat hien ngay truoc do
+        # (thong bao thua ke ong Quan - 13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "VĂN BẢN",
+            "Mẹ đẻ của ông Lương Văn Nguyên là bà Nguyễn Thị Yểng.",
+            "Bà Yểng Sinh năm 1931; chết ngày 27/09/2014 theo Trích lục khai tử",
+            "(bản sao) số 4487/2025/TLKT-BS do Uỷ ban nhân dân xã Vạn Thắng,",
+            "tỉnh Ninh Bình ký ngày 13/10/2025.",
+        ])
+        chet = ec._extract_nguoi_chet(text, "")
+        names = [x["ho_ten"] for x in chet]
+        self.assertEqual(names, ["Nguyễn Thị Yểng"])
+
 
 if __name__ == "__main__":
     unittest.main()
