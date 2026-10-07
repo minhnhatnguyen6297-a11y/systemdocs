@@ -2550,6 +2550,19 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(got.get("Vũ Đình Mộc"), "Xã Yên Trị, huyện Ý Yên, tỉnh Nam Định")
         self.assertEqual(got.get("Vũ Thị Dền"), "Xã Yên Trị, huyện Ý Yên, tỉnh Nam Định")
 
+    def test_cat_duoi_chuc_vu_khong_dau_sau_gach(self):
+        # "Ông X - Chức vu:Giám dốc" (chức vụ khong dau sau gach) phai cat
+        # duoi — ten nguoi chi la "Đoàn Thế Vinh" (12/10/2026).
+        from extract_contract import _extract_party_data
+        text = (
+            "Người đại diện là ông: Đoàn Thế Vinh - Chức vu:Giám dốc\n"
+            "Căn cước công dân số 037070002088 do Cục Cảnh sát cấp ngày 28/06/2021.\n"
+        )
+        party = _extract_party_data(text)
+        names = [x["ho_ten"] for x in party["nguoi"]]
+        self.assertEqual(names, ["Đoàn Thế Vinh"])
+        self.assertEqual(party["nguoi"][0]["cccd"], "037070002088")
+
 
 if __name__ == "__main__":
     unittest.main()
