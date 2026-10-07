@@ -2468,6 +2468,26 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(ds[0]["ngay_chet"], "08/08/2014")
 
 
+    def test_bang_tab_stt_danh_xung_anh_chi(self):
+        # Bang mau 04a/DK qua .doc: "STT	Bà X	năm	CCCD	số	ngày cấp	cơ quan	địa chỉ"
+        # — TAB là ranh ô; danh xưng "Anh" -> Ông (13/10/2026).
+        from extract_contract import _extract_party_data
+        section = (
+            "1\tBà Nguyễn Thị Toan\t1980\tCCCD\t036180006180\t10/05/2021\tBộ Công an\txã Minh Tân\n"
+            "2\tAnh Đào Duy Chinh\t2011\tCC\t036211017670\t18/11/2024\tBộ Công an\txã Minh Tân\n"
+        )
+        ds = _extract_party_data(section)
+        self.assertEqual(len(ds["nguoi"]), 2)
+        toan = ds["nguoi"][0]
+        self.assertEqual(toan["ho_ten"], "Nguyễn Thị Toan")
+        self.assertEqual(toan["ngay_sinh"], "1980")
+        self.assertEqual(toan["ngay_cap_cccd"], "10/05/2021")
+        self.assertEqual(toan["dia_chi"], "xã Minh Tân")
+        chinh = ds["nguoi"][1]
+        self.assertEqual(chinh["ho_ten"], "Đào Duy Chinh")
+        self.assertEqual(chinh["gioi_tinh"], "Ông")
+        self.assertEqual(chinh["cccd"], "036211017670")
+
     def test_don_dk_ten_tran_va_cccd_dat_ten(self):
         # Mau 11/DK: "1.1. Ten: Ha Van Thinh; Sinh ngay: ..." (khong danh
         # xung) + "- Can cuoc cong dan ong Ha Van Thinh so 036..." — hai

@@ -3706,3 +3706,24 @@ def test_extract_contract_ten_chet_rut_gon_khac_dau_va_chi_tiet_prose():
     )
     thua = parcels[0]
     assert all("Di sản" not in str(d.get("muc_dich_su_dung") or "") for d in thua["chi_tiet_dien_tich"])
+
+
+class BangTabTests(unittest.TestCase):
+    def test_bang_tab_stt_danh_xung_anh_chi(self):
+        # Hang "STT	Bà X	năm	CCCD	số	ngày cấp	cơ quan	địa chỉ" qua .doc (13/10/2026).
+        section = (
+            "1\tBà Nguyễn Thị Toan\t1980\tCCCD\t036180006180\t10/05/2021\tBộ Công an\txã Minh Tân\n"
+            "2\tAnh Đào Duy Chinh\t2011\tCC\t036211017670\t18/11/2024\tBộ Công an\txã Minh Tân\n"
+        )
+        from extract_contract import _extract_party_data
+        ds = _extract_party_data(section)
+        assert len(ds["nguoi"]) == 2
+        toan = ds["nguoi"][0]
+        assert toan["ho_ten"] == "Nguyễn Thị Toan"
+        assert toan["ngay_sinh"] == "1980"
+        assert toan["ngay_cap_cccd"] == "10/05/2021"
+        assert toan["dia_chi"] == "xã Minh Tân"
+        chinh = ds["nguoi"][1]
+        assert chinh["ho_ten"] == "Đào Duy Chinh"
+        assert chinh["gioi_tinh"] == "Ông"
+        assert chinh["cccd"] == "036211017670"

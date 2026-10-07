@@ -3217,11 +3217,15 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # to 6-12 so de tranh nhan nham muc van xuoi danh so.
     table_row_re = re.compile(
         r"(?im)(?:^|\|)\s*\d{1,3}[\s|]*"
-        r"(?P<title>\u00f4ng|b\u00e0)\s+(?P<name>[^|\d;]{2,60}?)\s*"
+        r"(?P<title>\u00f4ng|b\u00e0|anh|ch\u1ecb)\s+(?P<name>[^|\d;]{2,60}?)\s*"
         r"(?P<tail>(?:\|[^|\n]*){0,20}?)"
-        r"(?=\|\s*\d{1,3}[\s|]*(?:\u00f4ng|b\u00e0)|\n|$)"
+        r"(?=\|\s*\d{1,3}[\s|]*(?:\u00f4ng|b\u00e0|anh|ch\u1ecb)|\n|$)"
     )
-    for tr in table_row_re.finditer(section):
+    # Bang .doc qua IFilter dung TAB lam ranh o — chi ban sao TAB->"|" cua
+    # phan bang duoc dua qua table_row_re (13/10/2026). Phan van ban thuong
+    # giu nguyen de TAB sau nhan khong pha cau truc nhan.
+    section_tbl = section.replace("	", " | ") if "	" in section else section
+    for tr in table_row_re.finditer(section_tbl):
         name = re.sub(r"\s+", " ", tr.group("name")).strip(" ;,.")
         if not _ho_ten_hop_le(name):
             continue
@@ -3300,7 +3304,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             continue
         persons.append(
             {
-                "gioi_tinh": tr.group("title").capitalize(),
+                "gioi_tinh": "Ông" if _fold_text(tr.group("title")) in ("ong", "anh") else "Bà",
                 "ho_ten": name,
                 "ngay_sinh": ngay_sinh,
                 "chi_co_nam_sinh": bool(ngay_sinh),
