@@ -1366,6 +1366,8 @@ def _clean_so_to_ban_do(value: str) -> str:
         r",|\s+(?i:b\u1ea3n \u0111\u1ed3)\s+(?:\u0111\u1ecba ch\u00ednh|l\u1eadp|n\u0103m)\b|\s*\(?\s*(?:hi\u1ec7n nay|nay)\s+l\u00e0\b",
         str(value or ""), maxsplit=1,
     )[0]
+    # Duoi marker muc ke ("20 b." dung truoc "Diện tích") — bo.
+    cut = re.sub(r"\s+[a-zĐ]{1,2}[.)]?\s*$", "", cut)
     return cut.strip(" ;,.")
 
 
@@ -1390,7 +1392,7 @@ def _tach_nay_la(value: str) -> tuple[str, str]:
     ("104", "Nay la thua dat so 321")."""
     text = str(value or "")
     match = re.search(
-        r"(?i)\s*(\((?:(?:\u0111\u01b0\u1ee3c|\u0111\u00e3)\s+)?(?:t\u00e1ch|g\u1ed9p|s\u00e1p|nh\u1eadp|chia|h\u1ee3p|t\u0103ng|gi\u1ea3m)[^)]*\)?"
+        r"(?i)\s*(\(\s*(?:(?:\u0111\u01b0\u1ee3c|\u0111\u00e3)\s+)?(?:t\u00e1ch|g\u1ed9p|s\u00e1p|nh\u1eadp|chia|h\u1ee3p|t\u0103ng|gi\u1ea3m)[^)]*\)?"
         r"|(?:\u0111\u01b0\u1ee3c|\u0111\u00e3)\s+(?:t\u00e1ch|g\u1ed9p|s\u00e1p|nh\u1eadp|chia|h\u1ee3p)\s+t\u1eeb\b.*"
         r"|\(?\s*(?:hi\u1ec7n nay|nay)\s+l\u00e0\b[^)]*\)?)\s*$",
         text,
@@ -1790,10 +1792,15 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
             _o_ko_trong = [c for c in _o if c]
             def _la_marker(c: str) -> bool:
                 return bool(re.match(r"^(?:[a-z\u0110]{1,2}|\d{1,3})[.)-]?$", c, re.IGNORECASE))
+            def _co_nhan(c: str) -> bool:
+                # O "a) Thua dat so: 131" — marker danh so dung truoc
+                # nhan cung tinh la o nhan (13/10/2026).
+                c2 = re.sub(r"^[-*_ ;]*(?:[a-z\u0110]{1,2}|\d{1,3})[.)]\s*", "", c.lstrip("-*_ "))
+                return bool(re.match(r"(?i)(?:" + _label_alt + r")\s*:", c2.lstrip("; ")))
             if _o_ko_trong and all(
-                re.match(r"(?i)(?:" + _label_alt + r")\s*:", c.lstrip("-*_ ")) or _la_marker(c)
+                _co_nhan(c) or _la_marker(c)
                 for c in _o_ko_trong
-            ) and any(re.match(r"(?i)(?:" + _label_alt + r")\s*:", c.lstrip("-*_ ")) for c in _o_ko_trong):
+            ) and any(_co_nhan(c) for c in _o_ko_trong):
                 line = "- " + "; ".join(
                     c.rstrip(" ;") for c in _o_ko_trong if not _la_marker(c)
                 )
@@ -2358,6 +2365,21 @@ def _ho_ten_hop_le(name: str) -> bool:
     if not tokens[0][0].isupper():
         return False
     return not _TEN_TO_CHUC_RE.search(_fold_text(name))
+
+
+def _ngay_sinh_conflict(a: str, b: str) -> bool:
+    """Mau thuan ngay sinh: khac nam -> khac nguoi; hai ngay day du
+    khac nhau -> khac nguoi; chi-nam trung nam voi ngay-du la cung
+    nguoi (form tom tat). Mot ben trong -> khong ket luan."""
+    if not (a and b) or a == b:
+        return False
+    a_year = re.search(r"(\d{4})\s*$", a)
+    b_year = re.search(r"(\d{4})\s*$", b)
+    a_full = "/" in a
+    b_full = "/" in b
+    if a_year and b_year and a_year.group(1) != b_year.group(1):
+        return True
+    return a_full and b_full
 
 
 def _extract_plain_text_person_entries(section: str) -> list[dict]:
@@ -2991,17 +3013,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # giu DANH SACH base va gop vao base dau tien khong mau thuan
     # (11/10/2026).
     def _ns_conflict(a: str, b: str) -> bool:
-        if not (a and b) or a == b:
-            return False
-        a_year = re.search(r"(\d{4})\s*$", a)
-        b_year = re.search(r"(\d{4})\s*$", b)
-        a_full = "/" in a
-        b_full = "/" in b
-        if a_year and b_year and a_year.group(1) != b_year.group(1):
-            return True
-        # Hai ngay day du khac nhau -> khac nguoi; chi-nam trung
-        # nam voi ngay-du thi la cung nguoi (form tom tat).
-        return a_full and b_full
+        return _ngay_sinh_conflict(a, b)
 
     def _can_merge(base: dict, person: dict) -> bool:
         a_vals = {f: str(base.get(f) or "").strip() for f in ("cccd", "ngay_sinh")}
@@ -3602,6 +3614,29 @@ def _phat_hien_tai_san_chua_ho_tro(text: str) -> list[str]:
 def _build_payload_generic(filepath, text: str, scan_result: dict, *, extract_mode: str) -> dict:
     doc_kind, ten_hd = _detect_document_kind_and_title(text)
     ben_a, ben_b = _extract_parties_generic(text, doc_kind)
+    nguoi_chet = _extract_nguoi_chet(text, doc_kind)
+    # Nguoi da chet (ten + nam sinh khop voi nguoi_chet) van bi danh sach
+    # thanh vien ho gia dinh ho vao duong su — loai khoi ben (13/10/2026,
+    # van ban cam ket: "1. Ông X - sinh nam 1957 (chu ho)" trong khi phan
+    # sau ghi "chet ngay ... theo trich luc").
+    for ben in (ben_a, ben_b):
+        if not ben.get("nguoi"):
+            continue
+        giu = []
+        for person in ben["nguoi"]:
+            key = _fold_text(person.get("ho_ten") or "")
+            cung_nguoi_chet = any(
+                _fold_text(c.get("ho_ten") or "") == key
+                and not _ngay_sinh_conflict(
+                    str(person.get("ngay_sinh") or "").strip(),
+                    str(c.get("ngay_sinh") or "").strip(),
+                )
+                and bool(str(person.get("ngay_sinh") or "").strip())
+                for c in nguoi_chet
+            )
+            if not cung_nguoi_chet:
+                giu.append(person)
+        ben["nguoi"] = giu
     tai_san = _find_tai_san_by_kind(text, doc_kind)
     so_cong_chung = _normalize_web_contract_no(find_so_cong_chung(text) or scan_result.get("contract_no", ""))
     if doc_kind == DOC_KIND_ASSET_COMMITMENT and ben_a.get("nguoi"):
@@ -3630,7 +3665,7 @@ def _build_payload_generic(filepath, text: str, scan_result: dict, *, extract_mo
             # decision-46 (06/10/2026): khong trich loi chung; so TK/bao hiem
             # tam dung — chi nhan dien va gan co "chua ho tro".
             "tai_san_chua_ho_tro": _phat_hien_tai_san_chua_ho_tro(text),
-            "nguoi_chet": _extract_nguoi_chet(text, doc_kind),
+            "nguoi_chet": nguoi_chet,
             "danh_sach_thua_dat": tach_danh_sach_thua_dat(tai_san),
             "file_goc": file_goc,
             "scan_contract_no": scan_result.get("contract_no", ""),

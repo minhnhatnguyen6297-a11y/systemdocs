@@ -2614,6 +2614,52 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(addrs.get("Tạ Sơn Huấn"), "thôn An Ngọc, xã Vạn Thắng, tỉnh Ninh Bình")
         self.assertEqual(addrs.get("Nguyễn Thị Hoa"), "thôn An Ngọc, xã Vạn Thắng, tỉnh Ninh Bình")
 
+    def test_nguoi_trong_danh_sach_ho_nhung_da_chet_bi_loai(self):
+        # "1. Ông X - sinh năm 1957 (chủ hộ)" trong danh sach hộ gia
+        # dinh cung doc co "chết ngày ... theo trích lục" -> loai khoi
+        # duong su, van giu o nguoi_chet (13/10/2026).
+        import extract_contract as ec
+        text = (
+            "VĂN BẢN CAM KẾT\n"
+            "1. Bà Bùi Thị Xiêm;\t\tSinh ngày: 15/08/1958;\n"
+            "Căn cước công dân số: 036158014 do Bộ Công an cấp ngày 01/01/2020;\n"
+            "Thường trú tại: xã A, huyện B, tỉnh C.\n"
+            "Hộ gia đình ông Bùi Văn Ngà gồm các thành viên là:\n"
+            "1. Ông Bùi Văn Ngà - sinh năm 1957 (chủ hộ)\n"
+            "2. Bà Bùi Thị Xiêm -sinh năm 1958 (vợ ông Ngà)\n"
+            "Toàn bộ quyền sử dụng đất thuộc về ông Bùi Văn Ngà (Ông Bùi Văn Ngà- "
+            "Sinh năm 1957; chết ngày 16/03/2025 theo Trích lục khai tử số 35/TLKT "
+            "do UBND phường Chi Lăng ký ngày 25/03/2025; Nơi thường trú cuối cùng "
+            "trước khi chết: phường Chi Lăng, tỉnh Lạng Sơn).\n"
+        )
+        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        names = [x["ho_ten"] for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]]
+        self.assertNotIn("Bùi Văn Ngà", names)
+        chet = [x["ho_ten"] for x in r["raw"]["nguoi_chet"]]
+        self.assertIn("Bùi Văn Ngà", chet)
+
+    def test_o_nhan_co_marker_muc_va_dau_cham(self):
+        # O "a) Thửa đất số: 131 | | Tờ bản đồ số: 29" (marker a) dinh
+        # trong o nhan, .doc IFilter) van tach dung so thua/to (13/10/2026).
+        import extract_contract as ec
+        ts = (
+            "a) Thửa đất số: 131 | | | Tờ bản đồ số: 29 (nay là tờ bản đồ số 270)\n"
+            "b) Địa chỉ: thôn Hoàng Nê, xã Ý Yên, tỉnh Ninh Bình\n"
+            "c) Diện tích: 1090,6 m²\n"
+        )
+        prs = ec.tach_danh_sach_thua_dat(ts)
+        self.assertEqual(len(prs), 1)
+        self.assertEqual(prs[0]["so_thua_dat"], "131")
+        self.assertEqual(prs[0]["so_to_ban_do"], "29")
+
+    def test_so_thua_ngoac_tach_tu_co_khoang_trang(self):
+        # "108 ( tách từ thửa số 99)" — khoang trang sau "(" van cat ghi
+        # chu, giu so thua 108 (13/10/2026).
+        import extract_contract as ec
+        head, note = ec._tach_nay_la("108 ( tách từ thửa số 99)")
+        self.assertEqual(head, "108")
+        self.assertIn("tách", note)
+
 
 if __name__ == "__main__":
     unittest.main()
