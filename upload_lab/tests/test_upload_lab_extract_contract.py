@@ -2699,6 +2699,22 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertTrue(q)
         self.assertEqual(q[0]["ngay_cap_cccd"], "20/04/2023")
 
+    def test_cccd_co_khoang_trang(self):
+        # "CCCD số: 0360 5800 1963" — so giay to viet cach nhom 4-4-4
+        # van nhan va chuan hoa bo khoang trang (phieu yccc - 13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "PHIẾU YÊU CẦU CÔNG CHỨNG",
+            "Ông: TRẦN NGỌC BẢN;\tNăm sinh: 1958",
+            "CCCD số: 0360 5800 1963 Nơi cấp: Cục cảnh sát quản lý hành chính",
+            "Ngày cấp: 25/04/2021",
+            "Địa chỉ thường trú: Thôn Đồng Cách, Yên Khang, Ý Yên, Nam Định",
+        ])
+        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        q = [x for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"] if "BẢN" in x["ho_ten"]]
+        self.assertTrue(q)
+        self.assertEqual(q[0]["cccd"], "036058001963")
+
 
 if __name__ == "__main__":
     unittest.main()
