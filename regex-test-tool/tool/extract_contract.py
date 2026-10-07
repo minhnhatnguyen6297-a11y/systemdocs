@@ -430,7 +430,7 @@ def find_persons(section):
             "ho_ten": nm.group(2).strip(),
         }
 
-        m = re.search(r"Sinh ngày:?\s*(\d{2}/\d{2}/\d{4})", chunk)
+        m = re.search(r"(?:Sinh ngày|Sinh)\s*:?\s*(\d{1,2}/\d{1,2}/\d{4})", chunk)
         person["ngay_sinh"] = m.group(1) if m else ""
 
         m = re.search(r"(?:Căn cước|CCCD|CMND)(?:\s+công dân)?\s*(?:số:?\s*)(\d+)", chunk)
@@ -2537,7 +2537,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?P<title>\u00f4ng|b\u00e0)\s*:?\s*"
         r"(?P<name>.+?)(?=\s+(?:Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh):|\s+Ch\u1ee9c v\u1ee5\s*:|[;]|$)"
     )
-    birth_re = re.compile(r"(?i)(?:Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh):?\s*(\d{1,2}/\d{1,2}/\d{4})")
+    birth_re = re.compile(r"(?i)(?:Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh):?\s*(\d{1,2}/\d{1,2}/\d{4})")
     id_re = re.compile(r"(?i)(?:C\u0103n c\u01b0\u1edbc(?:\s+c\u00f4ng d\u00e2n)?|CCCD|CMND)\s*(?:s\u1ed1)?\s*:?\s*(\d+)")
     issue_place_re = re.compile(r"(?i)\bdo\s+([^\n]+?)\s+c\u1ea5p ng\u00e0y")
     issue_date_re = re.compile(r"(?i)c\u1ea5p ng\u00e0y\s*(\d{1,2}/\d{1,2}/\d{4})")
@@ -2553,11 +2553,11 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?:v\u00e0\s+)?(?P<title>\u00f4ng/b\u00e0|ong/ba|\u00f4ng\s*\(b\u00e0\)|b\u00e0\s*\(\u00f4ng\)|\u00f4ng|ong|b\u00e0|ba|anh|ch\u1ecb|chi)\s*:?\s*"
         r"(?P<name>.+?)(?=[\s|]+\s*(?:[\-\u2013]\s*)?(?:Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|sinh n\u0103m|sinh ng\u00e0y)\s*[:\u2013-]?\s*(?:(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})|\s+(?:[\-\u2013]\s*)?(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:|\s+c\u00f3\s+(?:(?:m\u1eb9|b\u1ed1|cha|con|v\u1ee3|ch\u1ed3ng)(?:\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i))?|\d)\b|\s*\(\s*(?:Sinh|Ng\u00e0y)|[;]|$)"
     )
-    birth_re = re.compile(r"(?i)(?:Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Ng\u00e0y/th\u00e1ng/n\u0103m\s+sinh)\s*[:\u2013-]?\s*(\d{1,2}/\d{1,2}/\d{4})")
+    birth_re = re.compile(r"(?i)(?:Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Ng\u00e0y/th\u00e1ng/n\u0103m\s+sinh|Sinh)\s*[:\u2013-]?\s*(\d{1,2}/\d{1,2}/\d{4})")
     # Nguoi lon tuoi thuong chi ghi "Sinh nam 1965" — database chap nhan YYYY
     # (docs/spec/notary_v2/stage.md muc 5) nen giu nam lam ngay_sinh.
     # Gia tri chi co nam van nhan du nhan viet "Sinh ngay: 1982" (loi mau thuc te).
-    birth_year_re = re.compile(r"(?i)(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh)\s*[:\u2013-]?\s*((?:19|20)\d{2})(?!\d)")
+    birth_year_re = re.compile(r"(?i)(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh)\s*[:–-]?\s*((?:19|20)\d{2})(?!\d)")
     id_re = re.compile(r"(?i)(?:C\u0103n c\u01b0\u1edbc(?:\s+(?:s\u1ed1\s+)?c\u00f4ng(?:\s+d\u00e2n)?)?(?:\s+m\u1edbi)?|Can cuoc(?:\s+cong(?:\s+dan)?)?|CCCD|CMND|\bCC)\s*(?:[A-Z\u00c0-\u1ef9\u0110][^\d:;\n]{0,40}?)?[\s|]*(?:(?:s\u1ed1|so)\s*:?|:)?[\s|]*(\d{3,4}(?:\s\d{3,4})+|\d{6,12})")
     issue_place_re = re.compile(
         r"(?i)\bdo\s+((?:(?!k[ýí]\s+ng\u00e0y)[^\n])+?)\s+(?:c\u1ea5p\s+ng\u00e0y|cap ngay|ng\u00e0y\s*\d)"
@@ -3157,6 +3157,11 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         return key
 
     for person in persons:
+        # Gia tri dia_chi thuan ngay thang ("[07] Địa chỉ: 23/10/2023" —
+        # nguon dich o sai truong) khong phai dia chi — xoa de R03 bao
+        # thieu trung thuc (DK18 Mai Thị Luân, 13/10/2026).
+        if re.fullmatch(r"\d{1,2}/\d{1,2}/\d{4}", str(person.get("dia_chi") or "").strip()):
+            person["dia_chi"] = ""
         if not person["dia_chi"]:
             keyed = keyed_addrs.get(_fold_text(person["ho_ten"]))
             if not keyed:

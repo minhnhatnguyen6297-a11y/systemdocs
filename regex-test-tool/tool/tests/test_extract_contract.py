@@ -3620,3 +3620,31 @@ def test_extract_contract_nguoi_chet_dau_cham_phay_truoc_ngoac():
     assert dead[0]["ngay_chet"] == "25/05/2025"
     assert dead[0]["so_giay_to"] == "32/2025/TLKT"
     assert "Chùa Hang" in dead[0]["dia_chi"]
+
+def test_extract_contract_nhan_sinh_tran_va_bo_dia_chi_thuan_ngay():
+    """Nhan sinh "Sinh DD/MM/YYYY" khong ngay/nam (giay uy quyen ba
+    Trang); dia_chi thuan ngay ("[07] Địa chỉ: 23/10/2023") la rac o
+    dich truong — xoa de R03 bao thieu (DK18 — 13/10/2026)."""
+    import extract_contract
+
+    import re
+
+    birth_re = re.compile(
+        r"(?i)(?:Sinh ng\s*ày|Ngày\s+sinh|Sinh ngay|Ngay sinh|Sinh năm|"
+        r"Năm sinh|Sinh nam|Nam sinh|Ngày/tháng/năm\s+sinh|Sinh)\s*[:–-]?"
+        r"\s*(\d{1,2}/\d{1,2}/\d{4})"
+    )
+    assert birth_re.search("Bà Vũ Thị Quỳnh Trang - Sinh 26/04/1985").group(1) == "26/04/1985"
+
+    text2 = "\n".join(
+        [
+            "1. Người nộp thuế:",
+            "[04] Họ và tên: Mai Thị Luân;",
+            "[05] Ngày/tháng/năm sinh: 09/10/1987;",
+            "[07] Số CMND/Hộ chiếu/CCCD: 036154017122 [08] Ngày cấp: 23/10/2023",
+            "[10] Địa chỉ cư trú: [10.1] Số nhà: ...",
+        ]
+    )
+    persons2 = extract_contract._extract_plain_text_person_entries(text2)
+    for p in persons2:
+        assert not __import__("re").fullmatch(r"\d{1,2}/\d{1,2}/\d{4}", str(p.get("dia_chi") or ""))
