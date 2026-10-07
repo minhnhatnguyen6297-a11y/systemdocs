@@ -3923,6 +3923,7 @@ def _build_payload_generic(filepath, text: str, scan_result: dict, *, extract_mo
                 if not all(
                     not str(p.get(f) or "").strip()
                     or "«" in str(p.get(f) or "")
+                    or str(p.get(f) or "").strip().startswith("[")
                     for f in ("so_thua_dat", "so_to_ban_do", "dia_chi")
                 )
             ],
