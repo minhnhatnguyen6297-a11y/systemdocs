@@ -3128,6 +3128,27 @@ class UploadLabExtractContractTests(unittest.TestCase):
             dung[0]["dia_chi"], "Xóm Chùa, Triều Khúc, phường Thanh Liệt, thành phố Hà Nội"
         )
 
+    def test_vai_tro_gach_dau_dong_dong_su_dung(self):
+        # "- Đồng sử dụng – ông Cù Minh Thắng" — vai tro sau gach dau
+        # dong (mau 18 HĐCN — 13/10/2026).
+        from extract_contract import _extract_party_data
+        section = "\n".join([
+            "- Ông Nguyễn Đức Ngôn;\tSinh ngày 08/05/1969;",
+            "Căn cước công dân số: 036069001108 do Cục cảnh sát cấp ngày 02/03/2023;",
+            "- Đồng sử dụng – ông Cù Minh Thắng;\tSinh ngày 27/09/1984;",
+            "Căn cước số 036084010048 do Bộ Công an cấp ngày 10/01/2025;",
+            "Nơi thường trú tại: An Tĩnh, xã Vũ Dương, tỉnh Ninh Bình.",
+        ])
+        ds = _extract_party_data(section)
+        thang = [x for x in ds["nguoi"] if x["ho_ten"] == "Cù Minh Thắng"]
+        self.assertTrue(thang)
+        self.assertEqual(thang[0]["gioi_tinh"], "Ông")
+        self.assertEqual(thang[0]["cccd"], "036084010048")
+        self.assertEqual(thang[0]["ngay_cap_cccd"], "10/01/2025")
+        self.assertEqual(
+            thang[0]["dia_chi"], "An Tĩnh, xã Vũ Dương, tỉnh Ninh Bình"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
