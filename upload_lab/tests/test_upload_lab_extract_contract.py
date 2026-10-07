@@ -3229,6 +3229,28 @@ class UploadLabExtractContractTests(unittest.TestCase):
             dang[0]["dia_chi"], "Lộng Đồng, phường Nam Định, tỉnh Ninh Bình"
         )
 
+    def test_dia_chi_chung_ca_ba_cung_thuong_tru(self):
+        # "Cả ba cùng thường trú tại: X" — dia chi chung 3 nguoi (khong
+        # chi "cả hai") — HĐCN Thuận Hoà — 13/10/2026.
+        from extract_contract import _extract_party_data
+        section = "\n".join([
+            "1. Ông Ninh Khắc Thuận;\tSinh ngày: 20/10/1983;",
+            "Căn cước công dân số 036083015158 do Cục cảnh sát cấp ngày 05/01/2024;",
+            "2. Bà Ninh Thị Hoà;\tSinh ngày: 06/08/1990;",
+            "Căn cước công dân số 036190005725 do Cục cảnh sát cấp ngày 02/04/2021;",
+            "3. Anh Ninh Khắc Hoàng;\tSinh ngày: 28/03/2009;",
+            "Căn cước công dân số 036209014585 do Cục cảnh sát cấp ngày 26/10/2023;",
+            "Cả ba cùng thường trú tại: Thôn Ninh Xá Thượng, xã Yên Ninh, huyện Ý Yên, tỉnh Nam Định.",
+        ])
+        ds = _extract_party_data(section)
+        for x in ds["nguoi"]:
+            self.assertEqual(
+                x["dia_chi"],
+                "Thôn Ninh Xá Thượng, xã Yên Ninh, huyện Ý Yên, tỉnh Nam Định",
+                x["ho_ten"],
+            )
+        self.assertEqual(len(ds["nguoi"]), 3)
+
 
 if __name__ == "__main__":
     unittest.main()

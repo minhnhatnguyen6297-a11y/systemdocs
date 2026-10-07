@@ -2488,7 +2488,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         + _ADDR_LABEL + r")\s*:?\s*(.+)$"
     )
     shared_addr_re = re.compile(
-        r"(?i)^\s*(?:c\u1ea3 hai|hai\s+v\u1ee3 ch\u1ed3ng|hai\s+\u00f4ng b\u00e0|c\u00f9ng|t\u1ea5t c\u1ea3)\b"
+        r"(?i)^\s*(?:c\u1ea3 hai|hai\s+v\u1ee3 ch\u1ed3ng|hai\s+\u00f4ng b\u00e0|c\u1ea3\s+\S+(?:\s+\S+)?\s+c\u00f9ng|c\u00f9ng|t\u1ea5t c\u1ea3)\b"
     )
     # Dia chi nam giua dong (vi du "...; Nơi thường trú: X") — chi dung khi
     # nhan dau dong khong khop; loai "Nơi thường trú cuối cùng..." cua nguoi
