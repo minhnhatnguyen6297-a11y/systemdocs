@@ -3517,3 +3517,18 @@ def test_cccd_cach_nhom_3_so():
     y = [p for p in nguoi if "YẾN" in p["ho_ten"].upper()]
     assert y and y[0]["cccd"] == "066197016950", nguoi
     assert y[0]["ngay_cap_cccd"] == "16/09/2022"
+
+
+def test_mat_dong_nghia_chet():
+    """'bố tôi ông X, sinh năm 1914, mất năm 2001' — 'mất' dong nghia
+    'chết': loai khoi duong su song."""
+    import extract_contract as ec
+    text = "\n".join([
+        "1. Ông Đỗ Tiến Dũng - Sinh ngày: 12/01/1961",
+        "Căn cước công dân số: 036061009526 do Cục cảnh sát cấp ngày 10/08/2021",
+        "2. Bố tôi, ông Đỗ Văn Quân, sinh năm 1914, mất năm 2001.",
+    ])
+    nguoi = ec._extract_plain_text_person_entries(text)
+    ten = [p["ho_ten"] for p in nguoi]
+    assert "Đỗ Văn Quân" not in ten, ten
+    assert "Đỗ Tiến Dũng" in ten, ten

@@ -3054,10 +3054,10 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         # chi loai khi nam ngay tren dong ten — "chet nam" trong khoi co
         # the la ke bo/me chet ("Me de toi - ba X (sinh nam 1958, chet
         # nam 2016)" — don xac nhan quan he 12/10/2026).
-        if re.search(r"\bchet\s+ngay\s*[:.-]?\s*\d", _fold_text(chunk_scan)):
+        if re.search(r"\b(?:chet|mat)\s+ngay\s*[:.-]?\s*\d", _fold_text(chunk_scan)):
             continue
         if re.search(
-            r"\bchet\s+nam\s*[:.-]?\s*(?:19|20)\d{2}",
+            r"\b(?:chet|mat)\s+nam\s*[:.-]?\s*(?:19|20)\d{2}",
             _fold_text(lines[line_idx]),
         ):
             continue
@@ -3541,7 +3541,7 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
         r"\s*[-\u2013;,]?\s*"
         r"(?:(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh)"
         r"\s*[:\u2013-]?\s*(?P<birth>(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4}))?"
-        r"\s*[;,]?\s*(?:\u0111\u00e3\s+)?ch\u1ebft\s+(?:ng\u00e0y\s*(?:ng\u00e0y\s*)?[:\u2013-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
+        r"\s*[;,]?\s*(?:\u0111\u00e3\s+)?(?:ch\u1ebft|m\u1ea5t)\s+(?:ng\u00e0y\s*(?:ng\u00e0y\s*)?[:\u2013-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
         r"|n\u0103m\s*[:\u2013-]?\s*(?P<death_y>(?:19|20)\d{2})"
         + death_y_evidence + r")"
     )
@@ -3556,7 +3556,7 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
         # "ong Luong Van Nguyen (ong Nguyen Sinh nam 1952; chet ngay ...)".
         r"\s*\(\s*(?:(?:ông|bà)\s+[^;()\n]{2,40}?\s+)?(?:Sinh\s+năm|Năm\s+sinh|Sinh\s+ngày|Ngày\s+sinh)"
         r"\s*[:–-]?\s*(?P<birth>(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})"
-        r"\s*[,;]?\s*(?:đã\s+)?chết\s+"
+        r"\s*[,;]?\s*(?:đã\s+)?(?:chết|mất)\s+"
         r"(?:ngày\s*(?:ngày\s*)?[:–-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
         r"|năm\s*[:–-]?\s*(?P<death_y>(?:19|20)\d{2})"
         + death_y_evidence + r")[^)]*\)"
