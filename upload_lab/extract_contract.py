@@ -2427,7 +2427,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     issue_place_re = re.compile(
         r"(?i)\bdo\s+((?:(?!k[ýí]\s+ng\u00e0y)[^\n])+?)\s+(?:c\u1ea5p\s+ng\u00e0y|cap ngay|ng\u00e0y\s*\d)"
     )
-    issue_date_re = re.compile(r"(?i)(?:c\u1ea5p ng\u00e0y|cap ngay|c\u1ea5p v\u00e0o ng\u00e0y|ng\u00e0y c\u1ea5p|ngay cap)\s*:?\s*(\d{1,2}/\d{1,2}/\d{4})")
+    issue_date_re = re.compile(r"(?i)(?:c\u1ea5p ng\u00e0y|cap ngay|c\u1ea5p v\u00e0o ng\u00e0y|ng\u00e0y c\u1ea5p|ngay cap|c\u1ea5p|cap)\s*:?\s*(\d{1,2}/\d{1,2}/\d{4})")
     # "do <co quan> ngay DD/MM/YYYY" (nguon go thieu chu "cap") — "ngay"
     # tran chi tinh khi dung sau "do <co quan>", khong phai "ky ngay".
     issue_date_do_re = re.compile(
@@ -2681,7 +2681,9 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             # cua mau 11/DK, c) cua mau 18) la truong CHUNG cho moi nguoi
             # khai trong muc X — danh dau shared de dien cho nguoi chua
             # co dia chi (12/10/2026).
-            _sub_item = bool(re.match(r"\s*(?:\d+\.\d+\.|[a-z]\))", line))
+            _sub_item = bool(re.match(r"\s*(?:\d+\.\d+\.|[a-z]\))", line)) or bool(
+                re.search(r"[a-zđ]\)\s*(?:" + _ADDR_LABEL + r")", line, re.I)
+            )
             address_lines.append(
                 (idx, line.strip(" ;"), addr_val, _sub_item or bool(shared_addr_re.match(line)))
             )

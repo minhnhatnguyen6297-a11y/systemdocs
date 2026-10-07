@@ -2661,5 +2661,44 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertIn("tách", note)
 
 
+
+    def test_dia_chi_muc_chu_cai_dinh_vao_dong_truoc(self):
+        # "c) Địa chỉ:" dinh vao cuoi dong truoc (2021c) — van la dia chi
+        # CHUNG cua muc, dien cho moi nguoi thieu (mau 18 - 13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "ĐƠN ĐĂNG KÝ BIẾN ĐỘNG",
+            "1. Người sử dụng đất:",
+            "a) Tên: Ông Đinh Thành Công;\tSinh ngày: 20/02/1983;",
+            "Tên: Bà Trần Thị Vân;\tSinh ngày: 30/01/1987;",
+            "b) Giấy tờ nhân thân:",
+            "1. Ông Đinh Thành Công;\tSinh ngày: 20/02/1983;",
+            "Căn cước công dân số 036083000874 do Cục cảnh sát ngày 14/04/2021;",
+            "2. Bà: Trần Thị Vân;\tSinh ngày: 30/01/1987;",
+            "Căn cước công dân số 036187024995 do Cục cảnh sát ngày 02/07/2021c) Địa chỉ: B13, KP3, phường Tam Hiệp, tỉnh Đồng Nai.",
+            "d) Điện thoại liên hệ:",
+        ])
+        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        dc = {x["ho_ten"]: x["dia_chi"] for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]}
+        self.assertEqual(dc.get("Đinh Thành Công"), "B13, KP3, phường Tam Hiệp, tỉnh Đồng Nai")
+        self.assertEqual(dc.get("Trần Thị Vân"), "B13, KP3, phường Tam Hiệp, tỉnh Đồng Nai")
+
+    def test_ngay_cap_nhan_cap_tran(self):
+        # "nơi cấp: Cục ... cấp: 20/04/2023" — nhan "cấp:" tran van la
+        # ngay cap (loi chung the chap - 13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "LỜI CHỨNG",
+            "I. BÊN THẾ CHẤP:",
+            "2. Ông Hoàng Văn Quyết;\t \tNăm sinh: 1986",
+            "Căn cước công dân số: 037086000267 nơi cấp: Cục cảnh sát quản lý hành chính về trật tự xã hội cấp: 20/04/2023",
+            "Cư trú tại: 1A/52 Vĩnh Trường, phường Lộc Vượng, thành phố Nam Định.",
+        ])
+        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        q = [x for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"] if x["ho_ten"] == "Hoàng Văn Quyết"]
+        self.assertTrue(q)
+        self.assertEqual(q[0]["ngay_cap_cccd"], "20/04/2023")
+
+
 if __name__ == "__main__":
     unittest.main()
