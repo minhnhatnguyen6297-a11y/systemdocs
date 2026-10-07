@@ -3198,7 +3198,7 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
         r"\s*[-\u2013;,]?\s*"
         r"(?:(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh)"
         r"\s*[:\u2013-]?\s*(?P<birth>(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4}))?"
-        r"\s*[;,]?\s*(?:\u0111\u00e3\s+)?ch\u1ebft\s+(?:ng\u00e0y\s*[:\u2013-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
+        r"\s*[;,]?\s*(?:\u0111\u00e3\s+)?ch\u1ebft\s+(?:ng\u00e0y\s*(?:ng\u00e0y\s*)?[:\u2013-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
         r"|n\u0103m\s*[:\u2013-]?\s*(?P<death_y>(?:19|20)\d{2})"
         + death_y_evidence + r")"
     )
@@ -3212,7 +3212,7 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
         r"\s*\(\s*(?:Sinh\s+năm|Năm\s+sinh|Sinh\s+ngày|Ngày\s+sinh)"
         r"\s*[:–-]?\s*(?P<birth>(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})"
         r"\s*[,;]?\s*(?:đã\s+)?chết\s+"
-        r"(?:ngày\s*[:–-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
+        r"(?:ngày\s*(?:ngày\s*)?[:–-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
         r"|năm\s*[:–-]?\s*(?P<death_y>(?:19|20)\d{2})"
         + death_y_evidence + r")[^)]*\)"
     )

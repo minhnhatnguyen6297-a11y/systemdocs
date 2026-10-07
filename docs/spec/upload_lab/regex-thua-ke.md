@@ -43,7 +43,7 @@ dừng trước dòng `chết ngày`.
 |---|---|
 | `ho_ten`, `ten_goi_khac` | `Ông/Bà ... [(tên gọi khác là ...)]`; tên tối đa 6 từ, mọi từ phải viết hoa chữ cái đầu — câu kể phả hệ (`Ông Đức và bà Khuâng là vợ chồng...`) bị loại, không sinh bản ghi rác |
 | `ngay_sinh` | `Sinh năm[:] YYYY` (giữ `YYYY` + cờ) hoặc đủ ngày |
-| `ngay_chet` | Sau `chết/đã chết ngày[:/-]` |
+| `ngay_chet` | Sau `chết/đã chết ngày[:/-]` (kể cả lỗi gõ lặp `ngày ngày`) |
 | `so_giay_to`, `loai_giay_to`, `ngay_cap`, `noi_cap` | Trích lục khai tử là giấy tờ của người chết: sau `Trích lục khai tử... số`, `do... ký/cấp ngày` (decision-46) |
 | `dia_chi` | Sau `Nơi thường trú cuối cùng trước khi chết:` (cắt `)` đóng ngoặc) |
 
