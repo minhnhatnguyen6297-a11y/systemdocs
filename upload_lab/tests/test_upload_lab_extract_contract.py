@@ -2739,6 +2739,20 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(dc.get("Mai Quốc Việt"), "xã Ý Yên, tỉnh Ninh Bình")
         self.assertEqual(dc.get("Bùi Thị Thu Hương"), "Tổ 68, Khu 7, phường Việt Hưng, tỉnh Quảng Ninh")
 
+    def test_nguoi_chet_tach_danh_xung_dinh_ten(self):
+        # "1.1 Ông Nguyễn Văn Toản - Sinh năm 1959, đã chết ngày ..." —
+        # danh xung dinh trong nhom ten; tach ra de gop 2 lan nhac cung
+        # nguoi (tt phan chia - 13/10/2026).
+        import extract_contract as ec
+        ds = ec._extract_nguoi_chet(
+            "1.1 Ông Nguyễn Văn Toản - Sinh năm 1959, đã chết ngày 20/07/2014 theo Trích lục số 20/TL.\n"
+            "Ông Nguyễn Văn Toản - Sinh năm 1959, đã chết ngày 20/07/2014 theo Trích lục; Nơi thường trú cuối cùng trước khi chết tại: phường Hạ Long, tỉnh Quảng Ninh\n"
+        )
+        self.assertEqual(len(ds), 1)
+        self.assertEqual(ds[0]["ho_ten"], "Nguyễn Văn Toản")
+        self.assertEqual(ds[0]["gioi_tinh"], "Ông")
+        self.assertEqual(ds[0]["dia_chi"], "phường Hạ Long, tỉnh Quảng Ninh")
+
 
 if __name__ == "__main__":
     unittest.main()

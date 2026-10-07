@@ -3359,6 +3359,13 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
         raw_name = re.sub(r"\s+", " ", match.groupdict().get("name") or "").strip(" ;,.-")
         raw_name = re.sub(r"(?i)^\d+\.\s*", "", raw_name)
         raw_name = re.sub(r"(?i)^(?:l\u00e0|bao g\u1ed3m)\s+", "", raw_name)
+        # Danh xung dinh trong nhom ten ("1.1 Ông Nguyễn Văn Toản - Sinh
+        # năm ...") — tach ra, dung lam gioi tinh neu title trong.
+        _lead_salut = re.match(r"(?i)^(ông|bà|anh|chị)\s+(.{2,})$", raw_name)
+        _salut_title = None
+        if _lead_salut:
+            _salut_title = _lead_salut.group(1)
+            raw_name = _lead_salut.group(2)
         # Ten chi gom toi da 6 tu va moi tu phai viet hoa — cau van ke
         # ("va ba Khung la vo chong hop phap...", "duoc cap ngay...") bi loai.
         name_tokens = raw_name.split()
@@ -3387,7 +3394,7 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
             raw_name = inner_name
             match_title = inner.group(1)
         else:
-            match_title = match.groupdict().get("title")
+            match_title = match.groupdict().get("title") or _salut_title
         title_fold = _fold_text(match_title)
         death_val = match.groupdict().get("death") or match.groupdict().get("death_y") or ""
         # Tu choi: "chet nam" khong trich luc chi nhan khi truoc ten co
