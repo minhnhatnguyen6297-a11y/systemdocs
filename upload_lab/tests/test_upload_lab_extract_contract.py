@@ -3441,3 +3441,24 @@ class BangDanhSachNguoiDungTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+def test_marker_so_khoang_trang_truoc_cham_va_ca_ba_ong_ba():
+    """Mau HĐ tang cho: '2 . Bà X' (so + khoang trang + cham) va
+    'Cả ba ông bà cùng thường trú' (dia chi chung 3 nguoi)."""
+    import extract_contract as ec
+    text = "\n".join([
+        "I. BÊN TẶNG CHO:",
+        "Hộ ông Nguyễn Quốc Trung và bà Nguyễn Thị Liễu gồm:",
+        "1. Ông Nguyễn Quốc Trung; Sinh ngày: 20/05/1968;",
+        "Căn cước công dân số 036068014288 do Cục cảnh sát cấp ngày 13/08/2021;",
+        "2 . Bà Nguyễn Thị Liễu; Sinh ngày: 27/03/1968;",
+        "Căn cước công dân số 036168004183 do Cục cảnh sát cấp ngày 02/07/2021;",
+        "3. Ông Nguyễn Văn Thuỷ; Sinh ngày: 02/12/1989;",
+        "Căn cước công dân số 036089014258 do Cục cảnh sát cấp ngày 15/05/2023;",
+        "Cả ba ông bà cùng thường trú tại: thôn Cốc Dương, xã Yên Đồng, tỉnh Ninh Bình;",
+    ])
+    nguoi = ec._extract_plain_text_person_entries(text)
+    ten = [p["ho_ten"] for p in nguoi]
+    assert ten == ["Nguyễn Quốc Trung", "Nguyễn Thị Liễu", "Nguyễn Văn Thuỷ"]
+    for p in nguoi:
+        assert "Cốc Dương" in p["dia_chi"]
+    assert nguoi[1]["cccd"] == "036168004183"

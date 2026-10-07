@@ -2449,19 +2449,19 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     section = unicodedata.normalize("NFC", str(section or ""))
     header_re = re.compile(
         r"(?i)^\s*(?:[-*]\s*)?(?:(?:ng\u01b0\u1eddi\s+)?(?:v\u1ee3|ch\u1ed3ng)\s*[–-]\s*)?"
-        r"(?:\d+\.\s*)?(?:v\u00e0\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\s+)?"
+        r"(?:\d+\s*\.\s*)?(?:v\u00e0\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\s+)?"
         r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?P<title>\u00f4ng|b\u00e0)\s*:?\s*"
         r"(?P<name>.+?)(?=\s+Sinh ng\s*\u00e0y:|[;]|$)"
     )
     header_re = re.compile(
         r"(?i)^\s*(?:[-*]\s*)?(?:\u0110\u1ea1i di\u1ec7n:\s*)?(?:(?:ng\u01b0\u1eddi\s+)?(?:v\u1ee3|ch\u1ed3ng)\s*[â€“-]\s*)?"
-        r"(?:\d+\.\s*)?(?:v\u00e0\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\s+)?"
+        r"(?:\d+\s*\.\s*)?(?:v\u00e0\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\s+)?"
         r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?P<title>\u00f4ng|b\u00e0)\s*:?\s*"
         r"(?P<name>.+?)(?=\s+(?:Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh):|\s+Ch\u1ee9c v\u1ee5\s*:|[;]|$)"
     )
     header_re = re.compile(
         r"(?i)^\s*(?:[-*]\s*)?(?:\u0110\u1ea1i di\u1ec7n:\s*)?(?:(?:ng\u01b0\u1eddi\s+)?(?:v\u1ee3|ch\u1ed3ng)\s*[\-\u2013:]\s*)?"
-        r"(?:\d+\.\s*)?(?:v\u00e0\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\s+)?"
+        r"(?:\d+\s*\.\s*)?(?:v\u00e0\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\s+)?"
         r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?P<title>\u00f4ng|b\u00e0)\s*:?\s*"
         r"(?P<name>.+?)(?=\s+(?:Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh):|\s+Ch\u1ee9c v\u1ee5\s*:|[;]|$)"
     )
@@ -2471,7 +2471,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     issue_date_re = re.compile(r"(?i)c\u1ea5p ng\u00e0y\s*(\d{1,2}/\d{1,2}/\d{4})")
     header_re = re.compile(
         r"(?i)^\s*(?:(?:[-*:|\u201c\u201d\"]|\+|\|)\s*)*(?:(?:\u0110\u1ea1i di\u1ec7n|Dai dien|Ng\u01b0\u1eddi \u0111\u1ea1i di\u1ec7n|Nguoi dai dien)(?:\s+[^:]{0,80})?:|(?:Người|Nguoi)\s+đại\s+diện\s+(?:là|la)\s*)?"
-        r"(?:\d+\.\s*|\d+\s+(?=[\u00d4O]ng|[Bb]\u00e0\s*:))?(?:[|\-\u2013\u2014]\s*)?[\u201c\u201d\"']?\s*"
+        r"(?:\d+\s*\.\s*|\d+\s+(?=[\u00d4O]ng|[Bb]\u00e0\s*:))?(?:[|\-\u2013\u2014]\s*)?[\u201c\u201d\"']?\s*"
         r"(?:T\u00f4i (?:t\u00ean )?l\u00e0\s*:?|Ch\u00fang t\u00f4i l\u00e0\s*:?)?\s*"
         r"(?:(?:ng\u01b0\u1eddi\s+)?(?:v\u1ee3|ch\u1ed3ng)\s*[\-\u2013:]\s*)?"
         r"(?:(?:em|anh|ch\u1ecb|c\u00f4|ch\u00fa|b\u00e1c|d\u00ec|c\u1eadu|m\u1ee3)\s+(?:trai|g\u00e1i|d\u00e2u|r\u1ec3|\u0111\u1ebb|ru\u1ed9t)\s*[-\u2013:]\s*)?"
@@ -2528,7 +2528,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # đất: Nguyễn Thị Chúc" — ten khong kem danh xung Ong/Ba va thuong khong
     # co giay to, nen danh dau de vuot cong loc "phai co ngay sinh/ID".
     labeled_name_re = re.compile(
-        r"(?i)^\s*(?:\[\d+\]\s*|\d+(?:\.\d+)*[.)]?\s*)?"
+        r"(?i)^\s*(?:\[\d+\]\s*|\d+\s*(?:\.\d+)*[.)]?\s*)?"
         r"(?:(?:t\u00ean\s+)?(?:ng\u01b0\u1eddi|nguoi)\s+"
         r"(?:xin|n\u1ed9p|nop|l\u1eadp|lap|\u0111\u1ec1 ngh\u1ecb|de nghi|y\u00eau c\u1ea7u|yeu cau|\u0111\u0103ng k\u00fd|dang ky|k\u00fd|ky|nh\u1eadn|nhan|giao)"
         r"|H\u1ecd\s+v\u00e0\s+t\u00ean)"
@@ -2540,7 +2540,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         + _ADDR_LABEL + r")\s*:?\s*(.+)$"
     )
     shared_addr_re = re.compile(
-        r"(?i)^\s*(?:c\u1ea3 hai|hai\s+v\u1ee3 ch\u1ed3ng|hai\s+\u00f4ng b\u00e0|c\u1ea3\s+\S+(?:\s+\S+)?\s+c\u00f9ng|c\u00f9ng|t\u1ea5t c\u1ea3)\b"
+        r"(?i)^\s*(?:c\u1ea3 hai|hai\s+v\u1ee3 ch\u1ed3ng|hai\s+\u00f4ng b\u00e0|c\u1ea3\s+\S+(?:\s+\S+){0,2}\s+c\u00f9ng|c\u00f9ng|t\u1ea5t c\u1ea3)\b"
     )
     # Dia chi nam giua dong (vi du "...; Nơi thường trú: X") — chi dung khi
     # nhan dau dong khong khop; loai "Nơi thường trú cuối cùng..." cua nguoi
@@ -3311,12 +3311,12 @@ def _extract_party_data(section: str) -> dict:
     lines = _split_section_lines(section)
     header_line_re = re.compile(
         r"(?i)^\s*(?:[-*]\s*)?(?:\u0110\u1ea1i di\u1ec7n:\s*)?(?:(?:ng\u01b0\u1eddi\s+)?(?:v\u1ee3|ch\u1ed3ng)\s*[â€“-]\s*)?"
-        r"(?:\d+\.\s*)?(?:v\u00e0\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\s+)?"
+        r"(?:\d+\s*\.\s*)?(?:v\u00e0\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\s+)?"
         r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?:\u00f4ng|b\u00e0)\s*:?"
     )
     header_line_re = re.compile(
         r"(?i)^\s*(?:[-*]\s*)?(?:\u0110\u1ea1i di\u1ec7n:\s*)?(?:(?:ng\u01b0\u1eddi\s+)?(?:v\u1ee3|ch\u1ed3ng)\s*[\-\u2013:]\s*)?"
-        r"(?:\d+\.\s*)?(?:v\u00e0\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\s+)?"
+        r"(?:\d+\s*\.\s*)?(?:v\u00e0\s+(?:v\u1ee3|ch\u1ed3ng)\s+l\u00e0\s+)?"
         r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?:\u00f4ng|b\u00e0|anh|ch\u1ecb)\s*:?"
         r"|^[^\d;:\n]{2,60}?[\-\u2013]\s*(?:v\u1ee3|vo|ch\u1ed3ng|chong|con(?:\s+\u0111\u1ebb|\s+de)?)\b"
     )
