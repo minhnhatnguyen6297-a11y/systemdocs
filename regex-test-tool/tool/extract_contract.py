@@ -2416,13 +2416,26 @@ def _cat_ho_ten(name: str) -> str:
     return _NAME_BOUNDARY_RE.split(str(name or ""), maxsplit=1)[0].strip(" ;,.-\u2013\u2014`")
 
 
+# "la" khong dua vao: "La Thị Hà" la ten that (ho La); tuong tu
+# "Đỗ" (fold "do"), "Đồ" (ho Do) — chi giu tu chac chan khong phai
+# ho/ten (13/10/2026).
+_TU_GIOI_TU_DAU_TEN = {
+    "theo", "tai", "cua", "va", "voi", "ve", "tren", "trong",
+    "khi", "neu", "vay", "den", "giao", "cho", "boi", "nhu",
+    "cung", "hoac", "hay", "ma", "thi",
+}
+
+
 def _ho_ten_hop_le(name: str) -> bool:
-    """Tu dau phai viet hoa (chan "nhánh văn phòng...", cau van) va khong
-    chua tu khoa to chuc. Ten Viet 1-6 tu."""
+    """Tu dau phai viet hoa (chan "nhánh văn phòng...", cau van), khong
+    chua tu khoa to chuc, va tu dau khong phai gioi tu/lien tu ("Theo
+    CCCD..." bi bat lam ten "Theo" — 13/10/2026). Ten Viet 1-6 tu."""
     tokens = str(name or "").split()
     if not tokens or len(tokens) > 6:
         return False
     if not tokens[0][0].isupper():
+        return False
+    if _fold_text(tokens[0]) in _TU_GIOI_TU_DAU_TEN:
         return False
     folded = _fold_text(name)
     if _TEN_TO_CHUC_RE.search(folded) or _TEN_TO_CHUC_DAU_RE.search(folded):

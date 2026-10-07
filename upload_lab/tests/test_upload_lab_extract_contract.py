@@ -3473,3 +3473,21 @@ def test_so_thua_dinh_ty_le_ban_do():
         "thửa đất số 143 tỷ lệ 1/1000 do chi nhánh văn phòng đăng ký lập ngày 5/8/2025."
     )
     assert thua and thua[0]["so_thua_dat"] == "143"
+
+
+def test_ten_khong_la_gioi_tu_dau_cau():
+    """'Theo CCCD và giấy tờ tuỳ thân bà X sinh năm 1976' — 'Theo' la gioi
+    tu, khong phai ten; nhung 'Đỗ'/'La'/'Từ' la ho that, khong chan."""
+    import extract_contract as ec
+    assert not ec._ho_ten_hop_le("Theo")
+    assert not ec._ho_ten_hop_le("Tại")
+    for ho in ("Đỗ Thị Ngọ", "La Thị Hà", "Từ Văn Minh", "Đồ Văn An"):
+        assert ec._ho_ten_hop_le(ho), ho
+    text = "\n".join([
+        "Tên tôi là: DƯƠNG THANH XUÂN; Sinh năm: 01/4/1957",
+        "Tôi đang sử dụng thửa đất mang tên hộ ông Dương Thanh Xuân và bà "
+        "Phạm Thị Liễu, sai năm sinh vợ tôi trên GCN là 1974. Theo CCCD "
+        "bà Phạm Thị Liễu sinh năm 1976.",
+    ])
+    nguoi = ec._extract_plain_text_person_entries(text)
+    assert all(p["ho_ten"] != "Theo" for p in nguoi)
