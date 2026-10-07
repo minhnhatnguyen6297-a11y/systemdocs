@@ -2951,6 +2951,28 @@ class UploadLabExtractContractTests(unittest.TestCase):
                 x["dia_chi"], "thôn Vũ Xuyên, xã Vũ Dương, tỉnh Ninh Bình"
             )
 
+    def test_vo_chong_van_xuoi_khong_la_nguoi_va_so_khong_cham(self):
+        # "Ông Gia và bà Mỳ có 6 người con..." — van xuoi nhac nguoi
+        # chet, khong phai hang duong su; "1 Bà:" danh so khong cham
+        # van la nguoi (don xac nhan nhan than - 13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "ĐƠN XIN XÁC NHẬN NHÂN THÂN",
+            "Ông: Đặng Văn Thiêm | | | Sinh ngày: 19/11/1973",
+            "Căn cước công dân số: 036073018417 do Cục cảnh sát cấp ngày 16/12/2021;",
+            "Ông Gia và bà Mỳ có 6 người con trong đó bao gồm:",
+            "1 Bà: Đặng Thị Thìn | | | Sinh ngày: 01/01/1953",
+            "Căn cước công dân số: 036153012094 do Cục cảnh sát cấp ngày 02/07/2021;",
+            "2. Ông: Đặng Văn Hòa | | | Sinh ngày: 01/01/1957",
+        ])
+        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        names = [x["ho_ten"] for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]]
+        self.assertIn("Đặng Văn Thiêm", names)
+        self.assertIn("Đặng Thị Thìn", names)
+        self.assertIn("Đặng Văn Hòa", names)
+        self.assertNotIn("Gia", names)
+        self.assertNotIn("Gia và bà Mỳ", names)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2409,7 +2409,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     issue_date_re = re.compile(r"(?i)c\u1ea5p ng\u00e0y\s*(\d{1,2}/\d{1,2}/\d{4})")
     header_re = re.compile(
         r"(?i)^\s*(?:(?:[-*:|\u201c\u201d\"]|\+|\|)\s*)*(?:(?:\u0110\u1ea1i di\u1ec7n|Dai dien|Ng\u01b0\u1eddi \u0111\u1ea1i di\u1ec7n|Nguoi dai dien)(?:\s+[^:]{0,80})?:|(?:Người|Nguoi)\s+đại\s+diện\s+(?:là|la)\s*)?"
-        r"(?:\d+\.\s*)?(?:[|\-\u2013\u2014]\s*)?[\u201c\u201d\"']?\s*"
+        r"(?:\d+\.\s*|\d+\s+(?=[\u00d4O]ng|[Bb]\u00e0\s*:))?(?:[|\-\u2013\u2014]\s*)?[\u201c\u201d\"']?\s*"
         r"(?:T\u00f4i (?:t\u00ean )?l\u00e0\s*:?|Ch\u00fang t\u00f4i l\u00e0\s*:?)?\s*"
         r"(?:(?:ng\u01b0\u1eddi\s+)?(?:v\u1ee3|ch\u1ed3ng)\s*[\-\u2013:]\s*)?"
         r"(?:(?:em|anh|ch\u1ecb|c\u00f4|ch\u00fa|b\u00e1c|d\u00ec|c\u1eadu|m\u1ee3)\s+(?:trai|g\u00e1i|d\u00e2u|r\u1ec3|\u0111\u1ebb|ru\u1ed9t)\s*[-\u2013:]\s*)?"
@@ -2625,7 +2625,15 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             title_fold = _fold_text((match.groupdict().get("title") or ""))
             name_fold = _fold_text(match.groupdict().get("name") or "")
             la_chi_nhanh = title_fold == "chi" and name_fold.startswith("nhanh")
-            if not la_pha_he and not ngoac_nguoi_khac and not la_chi_nhanh:
+            # "Ông Gia và bà Mỳ có 6 người con..." — nhac lai vo chong
+            # nguoi chet trong van xuoi, khong phai hang duong su (13/10/2026).
+            la_vo_chong_van_xuoi = bool(
+                re.search(
+                    r"(?i)^\s*[\u00d4O]ng\s+\S.*?\bv\u00e0\s+(?:\u00f4ng|b\u00e0)\s+\S+\s+(?:c\u00f3|l\u00e0)\b",
+                    line,
+                )
+            )
+            if not la_pha_he and not ngoac_nguoi_khac and not la_chi_nhanh and not la_vo_chong_van_xuoi:
                 headers.append((idx, match))
                 # O nhan "Ông: <ten>" / "Bà: <ten>" dung mot minh (danh
                 # sach thanh vien to dinh gia) — nhan danh xung la du
