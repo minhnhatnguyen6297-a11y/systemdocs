@@ -3400,6 +3400,12 @@ def _extract_parties_generic(text: str, doc_kind: str) -> tuple[dict, dict]:
         r"\bB\u1eb1ng H\u1ee3p \u0111\u1ed3ng n\u00e0y\b",
         r"\b\u0110I\u1ec0U\s*1\b",
         r"\bL\u1edcI CH\u1ee8NG\b",
+        # Chu ky/chung thuc sau than van: danh sach nguoi ky lai duoi
+        # "CHUNG THUC"/"NGUOI UY QUYEN" khong phai duong su ben B
+        # (mau giay uy quyen UBND xa — 12/10/2026).
+        r"(?im)^\s*CH\u1ee8NG TH\u1ef0C\b",
+        r"(?im)^\s*NG\u01af\u1edcI (?:U\u1ef6|\u1ee6Y|UY) QUY\u1ec0N\b",
+        r"(?im)^\s*NG\u01af\u1edcI \u0110\u01af\u1ee2C (?:U\u1ef6|\u1ee6Y|UY) QUY\u1ec0N\b",
     )
 
     match_a = _find_first_pattern_match_generic(text, ben_a_patterns)
