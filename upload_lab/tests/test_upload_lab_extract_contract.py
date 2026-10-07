@@ -2563,6 +2563,57 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(names, ["Đoàn Thế Vinh"])
         self.assertEqual(party["nguoi"][0]["cccd"], "037070002088")
 
+    def test_vai_tro_chau_lien_ten_khong_dau_noi(self):
+        # "2. Cháu Lê Khánh Chi (con bà Nga)" — vai tro "Cháu" dung lien
+        # truoc ten khong dau noi; tach khoi ho_ten, gioi_tinh de trong
+        # (13/10/2026).
+        from extract_contract import _extract_party_data
+        text = (
+            "1.Bà: Nguyễn Thị Thanh Phương (mẹ bà Nga) Sinh ngày: 15/08/1965;\n"
+            "2. Cháu Lê Khánh Chi (con bà Nga)\t\tSinh ngày: 02/09/2017;\n"
+            "Căn cước công dân số: 036317020683 do Bộ Công an cấp ngày 31/07/2025;\n"
+        )
+        party = _extract_party_data(text)
+        names = [x["ho_ten"] for x in party["nguoi"]]
+        self.assertIn("Lê Khánh Chi", names)
+        self.assertNotIn("Cháu Lê Khánh Chi", names)
+
+    def test_do_co_quan_ngay_thieu_chu_cap(self):
+        # "do <co quan> ngay DD/MM/YYYY" (nguon go thieu chu "cap") van la
+        # ngay cap giay to — khong nham voi "ky ngay" (13/10/2026).
+        from extract_contract import _extract_party_data
+        text = (
+            "Ông Bùi Xuân Khải;\tSinh ngày: 04/04/1989;\n"
+            "Căn cước công dân số 036094017936 do Cục cảnh sát quản lý hành chính về trật tự xã hội ngày 04/04/2022;\n"
+            "Nơi thường trú tại: xã Yên Tiến, huyện Ý Yên, tỉnh Nam Định.\n"
+        )
+        party = _extract_party_data(text)
+        self.assertEqual(len(party["nguoi"]), 1)
+        self.assertEqual(party["nguoi"][0]["ngay_cap_cccd"], "04/04/2022")
+        text_ky = (
+            "Ông Bùi Xuân Khải;\tSinh ngày: 04/04/1989;\n"
+            "Căn cước công dân số 036094017936 do UBND xã Yên Tiến ký ngày 04/04/2022.\n"
+        )
+        party2 = _extract_party_data(text_ky)
+        self.assertNotEqual(party2["nguoi"][0]["ngay_cap_cccd"], "04/04/2022")
+
+    def test_dia_chi_muc_chu_cai_chung(self):
+        # "c) Địa chỉ:" cua mau 18 la dia chi chung cho moi nguoi trong
+        # muc — dien cho nguoi chua co (13/10/2026).
+        from extract_contract import _extract_party_data
+        text = (
+            "a) Tên: Ông Tạ Sơn Huấn;\t\t\t\tSinh ngày: 15/03/1965;\n"
+            "Tên: Bà Nguyễn Thị Hoa;\t\t\tSinh ngày: 18/11/1971\n"
+            "b) Giấy tờ nhân thân/pháp nhân:\n"
+            "1. Ông Tạ Sơn Huấn;\t\t\t\tSinh ngày: 15/03/1965;\n"
+            "Căn cước công dân số 036065006939 do Cục cảnh sát cấp ngày 02/07/2021;\n"
+            "c) Địa chỉ: thôn An Ngọc, xã Vạn Thắng, tỉnh Ninh Bình\n"
+        )
+        party = _extract_party_data(text)
+        addrs = {x["ho_ten"]: x["dia_chi"] for x in party["nguoi"]}
+        self.assertEqual(addrs.get("Tạ Sơn Huấn"), "thôn An Ngọc, xã Vạn Thắng, tỉnh Ninh Bình")
+        self.assertEqual(addrs.get("Nguyễn Thị Hoa"), "thôn An Ngọc, xã Vạn Thắng, tỉnh Ninh Bình")
+
 
 if __name__ == "__main__":
     unittest.main()

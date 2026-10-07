@@ -2402,8 +2402,15 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # Gia tri chi co nam van nhan du nhan viet "Sinh ngay: 1982" (loi mau thuc te).
     birth_year_re = re.compile(r"(?i)(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Sinh ng\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh)\s*[:\u2013-]?\s*((?:19|20)\d{2})(?!\d)")
     id_re = re.compile(r"(?i)(?:C\u0103n c\u01b0\u1edbc(?:\s+c\u00f4ng(?:\s+d\u00e2n)?)?(?:\s+m\u1edbi)?|Can cuoc(?:\s+cong(?:\s+dan)?)?|CCCD|CMND|\bCC)\s*(?:[A-Z\u00c0-\u1ef9\u0110][^\d:;\n]{0,40}?)?\s*(?:(?:s\u1ed1|so)\s*:?|:)\s*(\d{6,12})")
-    issue_place_re = re.compile(r"(?i)\bdo\s+([^\n]+?)\s+(?:c\u1ea5p ng\u00e0y|cap ngay)")
+    issue_place_re = re.compile(
+        r"(?i)\bdo\s+((?:(?!k[ýí]\s+ng\u00e0y)[^\n])+?)\s+(?:c\u1ea5p\s+ng\u00e0y|cap ngay|ng\u00e0y\s*\d)"
+    )
     issue_date_re = re.compile(r"(?i)(?:c\u1ea5p ng\u00e0y|cap ngay|c\u1ea5p v\u00e0o ng\u00e0y|ng\u00e0y c\u1ea5p|ngay cap)\s*:?\s*(\d{1,2}/\d{1,2}/\d{4})")
+    # "do <co quan> ngay DD/MM/YYYY" (nguon go thieu chu "cap") — "ngay"
+    # tran chi tinh khi dung sau "do <co quan>", khong phai "ky ngay".
+    issue_date_do_re = re.compile(
+        r"(?i)\bdo\s+(?:(?!k[ýí]\s+ng\u00e0y)[^\n])+?\s+ng\u00e0y\s*(\d{1,2}/\d{1,2}/\d{4})"
+    )
     # Nguoi tham gia thua ke ghi ten tran khong kem "Ong/Ba", vi du:
     # "Nguyen Van A - Vo ong X Sinh ngay: 01/01/1933;" — chi nhan khi cung
     # dong co ngay sinh (han che nhan nham cau van mo ta nhu "Di san").
@@ -2417,7 +2424,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # co dau hieu nguoi (ngay sinh/giay to/dia chi).
     lead_role_re = re.compile(
         r"(?i)^\s*(?:\[\d+\]\s*|\d+\.\s*)?(?:Ng\u01b0\u1eddi\s+)?(?P<role>v\u1ee3|ch\u1ed3ng|con\s+(?:g\u00e1i|trai)|con|ch\u00e1u|m\u1eb9|b\u1ed1|cha|anh|ch\u1ecb|em|\u0111\u1ed3ng\s+(?:s\u1eed\s+d\u1ee5ng|s\u1edf\s+h\u1eefu)|(?:\u00f4ng|b\u00e0)\s+(?:ngo\u1ea1i|n\u1ed9i))\b"
-        r"(?:\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i|d\u00e2u|r\u1ec3|ngo\u1ea1i|n\u1ed9i))?\s*(?:[-\u2013\u2014:]|l\u00e0)\s*"
+        r"(?:\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i|d\u00e2u|r\u1ec3|ngo\u1ea1i|n\u1ed9i))?(?:\s*(?:[-\u2013\u2014:]|l\u00e0)\s*|\s+)"
         r"(?P<name>(?:(?:\u00f4ng|\u00d4ng|b\u00e0|B\u00e0|anh|Anh|ch\u1ecb|Ch\u1ecb|c\u00f4|C\u00f4|ch\u00fa|Chú|em|Em)\s+)?[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{1,60}?)"
         r"(?=\s+(?:sinh|ng\u00e0y|n\u0103m|cccd|c\u0103n c\u01b0\u1edbc|c\u1ea5p|\u0111\u1ecba ch\u1ec9|th\u01b0\u1eddng tr\u00fa|c\u01b0 tr\u00fa|n\u01a1i|h\u1ed9 kh\u1ea9u)\b|[;]|$)"
     )
@@ -2554,7 +2561,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             ).strip()
             if re.match(
                 r"(?i)^\s*(?:người\s+)?(?:vợ|chồng|con\s+(?:gái|trai)|con|cháu|mẹ|bố|cha|anh|chị|em|đồng\s+(?:sử\s+dụng|sở\s+hữu)|(?:ông|bà)\s+(?:ngoại|nội))"
-                r"(?:\s+(?:đẻ|ruột|nuôi|dâu|rể|ngoại|nội))?\s*(?:[-–—:]|là)",
+                r"(?:\s+(?:đẻ|ruột|nuôi|dâu|rể|ngoại|nội))?(?:\s*(?:[-–—:]|là)\s*|\s+)",
                 _hm,
             ):
                 _lead = lead_role_re.search(line)
@@ -2648,10 +2655,11 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                     address_match = None
         if address_match:
             addr_val = _cat_duoi_dia_chi(address_match.group(1))
-            # Muc con "X.Y. Địa chỉ:" trong don mau (1.3 cua mau 11/DK)
-            # la truong CHUNG cho moi nguoi khai trong muc X — danh dau
-            # shared de dien cho nguoi chua co dia chi (12/10/2026).
-            _sub_item = bool(re.match(r"\s*\d+\.\d+\.", line))
+            # Muc con "X.Y. Địa chỉ:" / "c) Địa chỉ:" trong don mau (1.3
+            # cua mau 11/DK, c) cua mau 18) la truong CHUNG cho moi nguoi
+            # khai trong muc X — danh dau shared de dien cho nguoi chua
+            # co dia chi (12/10/2026).
+            _sub_item = bool(re.match(r"\s*(?:\d+\.\d+\.|[a-z]\))", line))
             address_lines.append(
                 (idx, line.strip(" ;"), addr_val, _sub_item or bool(shared_addr_re.match(line)))
             )
@@ -2791,7 +2799,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                 chunk_scan,
             )
         person["noi_cap"] = re.sub(r"\s+", " ", issue_place_match.group(1)).strip(" ;,.") if issue_place_match else ""
-        issue_date_match = issue_date_re.search(chunk_scan)
+        issue_date_match = issue_date_re.search(chunk_scan) or issue_date_do_re.search(chunk_scan)
         if issue_date_match:
             person["ngay_cap_cccd"] = issue_date_match.group(1)
         else:
