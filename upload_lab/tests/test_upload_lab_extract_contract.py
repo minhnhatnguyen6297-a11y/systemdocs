@@ -3268,6 +3268,22 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(ds["nguoi"][1]["ho_ten"], "Trương Thị Khuyên")
         self.assertEqual(ds["nguoi"][1]["cccd"], "038188025204")
 
+    def test_cung_voi_vo_la_ba(self):
+        # "2. Cùng với vợ là bà X; Sinh ngày" — tien to "cùng với vợ là"
+        # giong "và vợ là" (UQ Tiến Nhàn — 13/10/2026).
+        from extract_contract import _extract_party_data
+        section = "\n".join([
+            "1. Ông Nguyễn Duy Thanh;\tSinh ngày: 25/04/1989;",
+            "Căn cước công dân số: 036089002865 do Bộ Công an cấp ngày 10/01/2025;",
+            "2. Cùng với vợ là bà Nguyễn Thị Khuyên;\tSinh ngày: 11/11/1989;",
+            "Căn cước số: 036189002001 do Bộ Công an cấp ngày 05/03/2024;",
+        ])
+        ds = _extract_party_data(section)
+        self.assertEqual(len(ds["nguoi"]), 2)
+        self.assertEqual(ds["nguoi"][1]["ho_ten"], "Nguyễn Thị Khuyên")
+        self.assertEqual(ds["nguoi"][1]["gioi_tinh"], "Bà")
+        self.assertEqual(ds["nguoi"][1]["ngay_sinh"], "11/11/1989")
+
 
 if __name__ == "__main__":
     unittest.main()
