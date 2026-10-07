@@ -3300,6 +3300,33 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(thu["gioi_tinh"], "Ông")
         self.assertEqual(thu["cccd"], "037069002896")
 
+    def test_ngay_cap_tu_ban_in_lai_thu_hai(self):
+        # Van ban in 2 lan: ban 1 "cấp ngày ......", ban 2 (ngoai section)
+        # "cấp ngày 25/04/2021" — dien tu doan chua CCCD, khong vuot qua
+        # khoi nguoi ke (HĐCN Duyên Liên — 13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "BÊN CHUYỂN NHƯỢNG:",
+            "1. Ông A One;\tSinh ngày: 01/01/1970;",
+            "Căn cước số 111 do Bộ cấp ngày 01/01/2020;",
+            "BÊN NHẬN CHUYỂN NHƯỢNG:",
+            "1. Ông Trần Đình Duyên;\tSinh ngày: 30/11/1974;",
+            "Căn cước công dân số: 036074002694 do Cục cảnh sát cấp ngày ..................;",
+            "2. Và vợ là bà Phạm Thị Bích Liên;\tSinh ngày: 06/10/1979;",
+            "Căn cước công dân số: 036179004799 do Cục cảnh sát cấp ngày 25/08/2021;",
+            "Các bên tự nguyện lập hợp đồng.",
+            "...ban in lai...",
+            "1. Ông Trần Đình Duyên;\tSinh ngày: 30/11/1974;",
+            "Căn cước công dân số: 036074002694 do Cục cảnh sát cấp ngày 25/04/2021;",
+            "2. Và vợ là bà Phạm Thị Bích Liên;\tSinh ngày: 06/10/1979;",
+            "Căn cước công dân số: 036179004799 do Cục cảnh sát cấp ngày 25/08/2021;",
+        ])
+        r = ec._build_payload_generic("a.docx", text, {}, extract_mode="docx")
+        duyen = next(x for x in r["raw"]["ben_b"]["nguoi"] if "Duyên" in x["ho_ten"])
+        self.assertEqual(duyen["ngay_cap_cccd"], "25/04/2021")
+        lien = next(x for x in r["raw"]["ben_b"]["nguoi"] if "Liên" in x["ho_ten"])
+        self.assertEqual(lien["ngay_cap_cccd"], "25/08/2021")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -3772,6 +3772,28 @@ def _build_payload_generic(filepath, text: str, scan_result: dict, *, extract_mo
             if not cung_nguoi_chet:
                 giu.append(person)
         ben["nguoi"] = giu
+    # Van ban in lap 2 mat: ban sao sau section da cat van co the chua
+    # ngay cap CCCD (VD "cấp ngày .................." o ban 1 nhung
+    # "cấp ngày 25/04/2021" o ban 2) — dien tu doan chua so CCCD
+    # (HĐCN Duyên Liên — 13/10/2026).
+    for ben in (ben_a, ben_b):
+        for person in ben.get("nguoi") or []:
+            cccd = str(person.get("cccd") or "").strip()
+            if not cccd or str(person.get("ngay_cap_cccd") or "").strip():
+                continue
+            for m in re.finditer(re.escape(cccd), text):
+                window = text[m.end():m.end() + 250]
+                end = re.search(
+                    r"(?i)c\u0103n c\u01b0\u1edbc|cccd|cmnd|sinh ng\u00e0y",
+                    window,
+                )
+                cap = re.search(
+                    r"(?i)c\u1ea5p\s+ng\u00e0y\s*(\d{1,2}/\d{1,2}/\d{4})",
+                    window[: end.start() if end else 250],
+                )
+                if cap:
+                    person["ngay_cap_cccd"] = cap.group(1)
+                    break
     tai_san = _find_tai_san_by_kind(text, doc_kind)
     so_cong_chung = _normalize_web_contract_no(find_so_cong_chung(text) or scan_result.get("contract_no", ""))
     if doc_kind == DOC_KIND_ASSET_COMMITMENT and ben_a.get("nguoi"):
