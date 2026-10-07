@@ -2493,6 +2493,26 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(parcels[1]["thoi_han_su_dung"], "12.2013")
         self.assertEqual(parcels[3]["muc_dich_su_dung"], "Chuyên mạ")
 
+    def test_thua_nhac_lai_tong_khac_giu_rieng(self):
+        # Van ban SUA DOI: thua 211 duoc mo ta 2 lan voi tong dien tich
+        # khac nhau (336 vs 308,1) — giu 2 ban rieng, khong tron chi tiet;
+        # "to ban do so 9 do Chi nhanh ..." cat duoi " do " -> "9"
+        # (13/10/2026).
+        from extract_contract import tach_danh_sach_thua_dat
+        text = (
+            "Số tờ bản đồ | Số thửa | Diện tích (m2) | Mục đích sử dụng | Thời hạn sử dụng\n"
+            "9 | 211 | 336 | Trong đó | 246 | Đất ở | Lâu dài | 90 | Đất vườn tạp | 12/2043\n"
+            "Thửa đất số 211, tờ bản đồ số 9 do Chi nhánh Văn phòng Đăng ký đất đai "
+            "Ý Yên nhận ngày 26/12/2025; cụ thể như sau\n"
+            "Số tờ bản đồ Số thửa Diện tích (m2) Mục đích sử dụng Thời hạn sử dụng "
+            "9 211 308,1 Trong đó 218,1 Đất ở Lâu dài 90,0 Đất vườn tạp 12/2043"
+        )
+        parcels = tach_danh_sach_thua_dat(text)
+        self.assertEqual(len(parcels), 2)
+        self.assertEqual(parcels[0]["dien_tich"], "336")
+        self.assertEqual(parcels[1]["dien_tich"], "308,1")
+        self.assertEqual(parcels[1]["so_to_ban_do"], "9")
+
 
     def test_bang_tab_stt_danh_xung_anh_chi(self):
         # Bang mau 04a/DK qua .doc: "STT	Bà X	năm	CCCD	số	ngày cấp	cơ quan	địa chỉ"

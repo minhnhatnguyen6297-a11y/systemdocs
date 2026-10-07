@@ -1372,7 +1372,7 @@ def _clean_so_to_ban_do(value: str) -> str:
     di kem mo ta (địa chính/lập/năm) — khong cat cum hop le
     "tờ bản đồ số 107" trong "(nay là tờ bản đồ số 107)"."""
     cut = re.split(
-        r",|\s+(?i:b\u1ea3n \u0111\u1ed3)\s+(?:\u0111\u1ecba ch\u00ednh|l\u1eadp|n\u0103m)\b|\s*\(?\s*(?:hi\u1ec7n nay|nay)\s+l\u00e0\b",
+        r",|\s+(?i:b\u1ea3n \u0111\u1ed3)\s+(?:\u0111\u1ecba ch\u00ednh|l\u1eadp|n\u0103m)\b|\s*\(?\s*(?:hi\u1ec7n nay|nay)\s+l\u00e0\b|\s+do\s+",
         str(value or ""), maxsplit=1,
     )[0]
     # Duoi marker muc ke ("20 b." dung truoc "Diện tích") — bo.
@@ -2241,6 +2241,13 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
                     continue
                 to_cu = _fold_text(cu.get("so_to_ban_do", ""))
                 if to_cu == key_to or not to_cu or not key_to:
+                    # Van ban sua doi nhac lai cung thua voi TONG dien tich
+                    # khac (ban goc 336 vs ban dinh chinh 308,1) — giu 2 ban
+                    # rieng de R10 dung ca hai, khong tron chi tiet cu/moi.
+                    _dt_cu = re.findall(r"\d[\d.,]*", str(cu.get("dien_tich") or ""))
+                    _dt_new = re.findall(r"\d[\d.,]*", str(parcel.get("dien_tich") or ""))
+                    if _dt_cu and _dt_new and _dt_cu != _dt_new:
+                        continue
                     giu = cu
                     break
         if giu is not None:

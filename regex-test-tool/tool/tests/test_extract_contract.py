@@ -3746,3 +3746,20 @@ class BangTabTests(unittest.TestCase):
         ] == [("240", "Đất ở"), ("257", "Đất vườn tạp")]
         assert parcels[1]["thoi_han_su_dung"] == "12.2013"
         assert parcels[3]["muc_dich_su_dung"] == "Chuyên mạ"
+
+    def test_thua_nhac_lai_tong_khac_giu_rieng(self):
+        # Van ban SUA DOI: thua 211 mo ta 2 lan tong khac nhau (336 vs
+        # 308,1) — giu 2 ban rieng; "9 do Chi nhanh" cat " do " -> "9".
+        text = (
+            "Số tờ bản đồ | Số thửa | Diện tích (m2) | Mục đích sử dụng | Thời hạn sử dụng\n"
+            "9 | 211 | 336 | Trong đó | 246 | Đất ở | Lâu dài | 90 | Đất vườn tạp | 12/2043\n"
+            "Thửa đất số 211, tờ bản đồ số 9 do Chi nhánh Văn phòng Đăng ký đất đai "
+            "Ý Yên nhận ngày 26/12/2025; cụ thể như sau\n"
+            "Số tờ bản đồ Số thửa Diện tích (m2) Mục đích sử dụng Thời hạn sử dụng "
+            "9 211 308,1 Trong đó 218,1 Đất ở Lâu dài 90,0 Đất vườn tạp 12/2043"
+        )
+        parcels = tach_danh_sach_thua_dat(text)
+        assert len(parcels) == 2
+        assert parcels[0]["dien_tich"] == "336"
+        assert parcels[1]["dien_tich"] == "308,1"
+        assert parcels[1]["so_to_ban_do"] == "9"
