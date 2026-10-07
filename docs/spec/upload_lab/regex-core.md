@@ -93,7 +93,9 @@ python tools/regex_lab.py approve --cluster <id>   # chi khi owner da duyet ket 
    dòng `Loại: Hợp đồng thế chấp` bị nhận nhầm kind) —
    R01 sai loại,
    R02 0 người (lỗi ở thừa kế; cảnh báo ở loại non-generic khác và
-   generic có `ten_hop_dong` — 09/10/2026), R03 thiếu trường người, R04 tên bẩn (gồm tên đương
+   generic có `ten_hop_dong` — 09/10/2026; **trừ trang phụ** `Đính chính`/
+   `Trang sửa lỗi kỹ thuật`/`Lời chứng` vì bản chất không có đương sự —
+   12/10/2026), R03 thiếu trường người, R04 tên bẩn (gồm tên đương
    sự nuốt `CCCD số...`/tổ chức — 09/10/2026), R05 trùng tên,
    R06 thiếu người chết, R07 thiếu trường người chết, R08 mất khối
    tài sản, R09 không tách tài sản, R10 lệch diện tích tuyệt đối,

@@ -181,7 +181,13 @@ def luat_0_nguoi(payload: dict) -> list[dict]:
         return [{"id": "R02", "muc": MUC_LOI, "noi_dung": "0 người tham gia"}]
     if kind and kind != "generic":
         return [{"id": "R02", "muc": MUC_CANH_BAO, "noi_dung": f"0 người tham gia ({kind})"}]
-    if str(payload.get("web_form", {}).get("ten_hop_dong") or "").strip():
+    title = str(payload.get("web_form", {}).get("ten_hop_dong") or "").strip()
+    if title:
+        # Trang phu (dinh chinh / trang sua loi ky thuat / loi chung rieng)
+        # ban chat khong co duong su — R02 chi gay nhieu (12/10/2026).
+        t_fold = _fold_name(title)
+        if t_fold.startswith(("dinh chinh", "trang sua loi ky thuat", "loi chung")):
+            return []
         return [{"id": "R02", "muc": MUC_CANH_BAO, "noi_dung": "0 người tham gia (generic có tiêu đề)"}]
     return []
 

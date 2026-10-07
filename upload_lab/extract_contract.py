@@ -519,7 +519,7 @@ def _find_title_line(text: str) -> str:
         folded = _fold_text(line)
         if folded.startswith(("chung toi", "toi la", "dieu ", "ben ", "ong ", "ba ")):
             break
-        if folded in ("van ban", "hop dong") and idx + 1 < len(lines):
+        if folded in ("van ban", "hop dong", "dinh chinh") and idx + 1 < len(lines):
             subtitle = _clean_title_line(lines[idx + 1])
             if subtitle:
                 return f"{line} {subtitle}"
