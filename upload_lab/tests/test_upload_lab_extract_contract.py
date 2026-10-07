@@ -2468,5 +2468,34 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(ds[0]["ngay_chet"], "08/08/2014")
 
 
+    def test_don_dk_ten_tran_va_cccd_dat_ten(self):
+        # Mau 11/DK: "1.1. Ten: Ha Van Thinh; Sinh ngay: ..." (khong danh
+        # xung) + "- Can cuoc cong dan ong Ha Van Thinh so 036..." — hai
+        # dong gop thanh 1 nguoi du truong; "1.3. Dia chi:" la dia chi
+        # chung cua ca muc (12/10/2026).
+        from extract_contract import _extract_party_data
+        section = (
+            "1. Người sử dụng đất:\n"
+            "1.1.	Tên: Hà Văn Thinh; 		Sinh ngày: 15/05/1961;\n"
+            "Tên: Nguyễn Thị Nga;		Sinh ngày: 20/02/1960;\n"
+            "1.2. Giấy tờ nhân thân/pháp nhân:\n"
+            "- Căn cước công dân ông Hà Văn Thinh số 036061004683 do Cục cảnh sát cấp ngày 09/04/2021;\n"
+            "- Căn cước công dân bà Nguyễn Thị Nga số 036160000971 do Cục cảnh sát cấp ngày 13/03/2021;\n"
+            "1.3. Địa chỉ: Thôn An Lạc, xã Yên Khánh, huyện Ý Yên.\n"
+            "1.4. Điện thoại liên hệ (nếu có):\n"
+        )
+        ds = _extract_party_data(section)
+        self.assertEqual(len(ds["nguoi"]), 2)
+        thinh = ds["nguoi"][0]
+        self.assertEqual(thinh["ho_ten"], "Hà Văn Thinh")
+        self.assertEqual(thinh["cccd"], "036061004683")
+        self.assertEqual(thinh["ngay_sinh"], "15/05/1961")
+        self.assertEqual(thinh["gioi_tinh"], "Ông")
+        self.assertIn("An Lạc", thinh["dia_chi"])
+        nga = ds["nguoi"][1]
+        self.assertEqual(nga["cccd"], "036160000971")
+        self.assertEqual(nga["gioi_tinh"], "Bà")
+
+
 if __name__ == "__main__":
     unittest.main()

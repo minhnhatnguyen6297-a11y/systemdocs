@@ -2570,11 +2570,29 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                                 headers.append((idx, lead_match))
         # "Chức vụ: Ông Nguyễn Hữu Công" — nhan chuc vu di truoc danh
         # xung giua dong (bang thanh phan to dinh gia ngan hang).
-        labeled_match = labeled_name_re.search(line) or re.search(
-            r"(?i)^\s*(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:?\s*"
-            r"(?P<title>\u00f4ng|b\u00e0)\s+"
-            r"(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?)\s*$",
-            line,
+        labeled_match = (
+            labeled_name_re.search(line)
+            or re.search(
+                r"(?i)^\s*(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:?\s*"
+                r"(?P<title>\u00f4ng|b\u00e0)\s+"
+                r"(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?)\s*$",
+                line,
+            )
+            or re.search(
+                # "1.1. Tên: Ha Van Thinh; Sinh ngay:" — nhan "Tên:" tran
+                # khong danh xung (mau 11/DK don bien dong — 12/10/2026).
+                r"(?i)^\s*(?:\d+(?:\.\d+)*[.)]?\s*)?T\u00ean\s*:\s*"
+                r"(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?)\s*(?=[;|]|$)",
+                line,
+            )
+            or re.search(
+                # "- Căn cước công dân ông X số 036..." — nguoi nam
+                # trong dong giay to (mau 11/DK — 12/10/2026).
+                r"(?i)^\s*[-\u2013*]?\s*(?:C\u0103n c\u01b0\u1edbc(?:\s+c\u00f4ng d\u00e2n)?|CCCD|CMND)\s+"
+                r"(?P<title>\u00f4ng|b\u00e0)\s+"
+                r"(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?)\s+s\u1ed1",
+                line,
+            )
         )
         if labeled_match:
             labeled_name = _cat_ho_ten(labeled_match.groupdict().get("name") or "")
@@ -2594,8 +2612,12 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                     address_match = None
         if address_match:
             addr_val = _cat_duoi_dia_chi(address_match.group(1))
+            # Muc con "X.Y. Địa chỉ:" trong don mau (1.3 cua mau 11/DK)
+            # la truong CHUNG cho moi nguoi khai trong muc X — danh dau
+            # shared de dien cho nguoi chua co dia chi (12/10/2026).
+            _sub_item = bool(re.match(r"\s*\d+\.\d+\.", line))
             address_lines.append(
-                (idx, line.strip(" ;"), addr_val, bool(shared_addr_re.match(line)))
+                (idx, line.strip(" ;"), addr_val, _sub_item or bool(shared_addr_re.match(line)))
             )
 
     persons = []
@@ -2941,7 +2963,24 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             and b_vals["ngay_sinh"]
         )
         both_empty = not any((*a_vals.values(), *b_vals.values()))
-        return not conflict and (shared or both_empty)
+        complementary = False
+        if not shared and not conflict and not both_empty:
+            # Dong giay to dat ten nguoi giua nhan ("- Căn cước công dân
+            # ông X số ...") la bang chung danh tinh cua "Tên: X" khai
+            # cung don (mau 11/DK — 12/10/2026) — gop 2 ban bo sung.
+            # Phia trong het truong phan biet van giu rieng (cung nguoi
+            # 2 vai tro trong to khai -> R05 trung thuc).
+            for id_side, other_vals in ((base, b_vals), (person, a_vals)):
+                complementary = complementary or (
+                    bool(str(id_side.get("cccd") or "").strip())
+                    and re.search(
+                        r"(?i)c\u0103n c\u01b0\u1edbc|cccd|cmnd",
+                        str(id_side.get("raw_text") or ""),
+                    )
+                    is not None
+                    and bool(other_vals["ngay_sinh"] or other_vals["cccd"])
+                )
+        return not conflict and (shared or both_empty or complementary)
 
     seen_person: dict[str, list[dict]] = {}
     deduped: list[dict] = []
@@ -2950,7 +2989,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         bases = (seen_person.get(name_key) or []) if name_key else []
         base = next((b for b in bases if _can_merge(b, person)), None)
         if base is not None:
-            for field in ("ngay_sinh", "cccd", "noi_cap", "ngay_cap_cccd", "dia_chi"):
+            for field in ("ngay_sinh", "cccd", "noi_cap", "ngay_cap_cccd", "dia_chi", "gioi_tinh"):
                 if not str(base.get(field) or "").strip() and str(person.get(field) or "").strip():
                     base[field] = person[field]
             # Nang "ngay_sinh" chi-co-nam len ngay day du cung nam — ban
