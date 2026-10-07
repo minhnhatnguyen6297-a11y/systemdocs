@@ -2602,9 +2602,11 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     labeled_name_re = re.compile(
         r"(?i)^\s*(?:\[\d+\]\s*|\d+\s*(?:\.\d+)*[.)]?\s*)?"
         r"(?:(?:t\u00ean\s+)?(?:ng\u01b0\u1eddi|nguoi)\s+"
-        r"(?:xin|n\u1ed9p|nop|l\u1eadp|lap|\u0111\u1ec1 ngh\u1ecb|de nghi|y\u00eau c\u1ea7u|yeu cau|\u0111\u0103ng k\u00fd|dang ky|k\u00fd|ky|nh\u1eadn|nhan|giao)"
+        r"(?:xin|n\u1ed9p|nop|l\u1eadp|lap|\u0111\u1ec1 ngh\u1ecb|de nghi|y\u00eau c\u1ea7u|yeu cau|\u0111\u0103ng k\u00fd|dang ky|k\u00fd|ky|nh\u1eadn|nhan|giao|s\u1eed d\u1ee5ng|su dung)"
         r"|H\u1ecd\s+v\u00e0\s+t\u00ean)"
-        r"[^:\n]{0,60}:\s*(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?)\s*$"
+        # Duoi ten co the dinh ", sinh ngày: ..." tren cung dong (don gia
+        # han SDD "Người sử dụng đất: Ông X, sinh ngày: 05/05/1979").
+        r"[^:\n]{0,60}:\s*(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?)\s*(?:,[^\n]*)?$"
     )
     _ADDR_LABEL = _DIA_CHI_LABEL
     address_re = re.compile(
@@ -2850,7 +2852,11 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         # Khong "continue" sau header: dia chi co the nam chung dong
         # voi ten ("...; Nơi thường trú: X").
         address_match = address_re.search(line)
-        if not address_match and re.match(r"\s*\d+(?:\.\d+)*\.\s*\u0110\u1ecba ch\u1ec9\s+li\u00ean h\u1ec7", line, re.I):
+        if not address_match and re.match(
+            r"\s*(?:\d+(?:\.\d+)*\.\s*)?Địa chỉ\s+liên hệ\s*\(|"
+            r"\s*\d+(?:\.\d+)*\.\s*Địa chỉ\s+liên hệ",
+            line, re.I,
+        ):
             # "2. Địa chỉ liên hệ (điện thoại, email...): X" — truong
             # dia chi nguoi trong don mau 09 gia han; nhan "Địa chỉ liên
             # hệ" binh thuong thuoc co quan/van phong nen chi tinh khi

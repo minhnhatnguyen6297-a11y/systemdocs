@@ -3648,3 +3648,27 @@ def test_extract_contract_nhan_sinh_tran_va_bo_dia_chi_thuan_ngay():
     persons2 = extract_contract._extract_plain_text_person_entries(text2)
     for p in persons2:
         assert not __import__("re").fullmatch(r"\d{1,2}/\d{1,2}/\d{4}", str(p.get("dia_chi") or ""))
+
+def test_extract_contract_nhan_nguoi_su_dung_dat_va_dia_chi_lien_he_ngoac():
+    """Nhan "Người sử dụng đất: Ông X, sinh ngày: ..." (nhan nguoi
+    labeled + duoi ", sinh ngày" tren cung dong) va "Địa chỉ liên hệ
+    (điện thoại, email...): X" khong so muc (don gia han SDD —
+    13/10/2026)."""
+    import extract_contract
+
+    text = "\n".join(
+        [
+            "ĐƠN XIN XÁC NHẬN LẠI THỜI HẠN SỬ DỤNG ĐẤT",
+            "Người sử dụng đất: Ông Lê Ngọc Dương, sinh ngày: 05/05/1979",
+            "(người đại diện những người thừa kế của ông Lê Văn Điệp)",
+            "Căn cước công dân số: 036079008789 do Cục Cảnh sát cấp ngày 08/04/2021.",
+            "Địa chỉ liên hệ (điện thoại, email...): Số nhà 34, phố Mỹ Lộ,",
+            "phường Hoa Lư, tỉnh Ninh Bình",
+        ]
+    )
+    persons = extract_contract._extract_plain_text_person_entries(text)
+    duong = next((p for p in persons if "Dương" in p["ho_ten"]), None)
+    assert duong is not None
+    assert duong["ngay_sinh"] == "05/05/1979"
+    assert duong["cccd"] == "036079008789"
+    assert "Mỹ Lộ" in duong["dia_chi"]
