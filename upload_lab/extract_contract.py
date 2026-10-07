@@ -2347,7 +2347,14 @@ _NAME_BOUNDARY_RE = re.compile(
 
 
 _TEN_TO_CHUC_RE = re.compile(
-    r"chi nhanh|van phong|cong ty|ngan hang|chi cuc|\bubnd\b|benh vien|\bso\s|ban giam|\bphong\s",
+    r"chi nhanh|cong ty|ngan hang|chi cuc|\bubnd\b|benh vien|\bso\s|ban giam",
+    re.IGNORECASE,
+)
+# "Văn phòng"/"Phòng <đơn vị>" la co quan — nhung "Văn Phong" cung la
+# ten nguoi that ("Trịnh Văn Phong"). Chi loai khi cum dung DAU ten
+# (org mo dau bang "Văn phòng ..."); nguoi thi "Văn Phong" dung sau ho.
+_TEN_TO_CHUC_DAU_RE = re.compile(
+    r"^(?:van phong\b|phong\s+(?:ban|giam|thi|ke|to|hop|nhan|quan|kinh|ky|nghe|dao|hanh|cong|tuyen|phap|tu|xay|ly|tn|y|cntt|kd)\b)",
     re.IGNORECASE,
 )
 
@@ -2365,7 +2372,10 @@ def _ho_ten_hop_le(name: str) -> bool:
         return False
     if not tokens[0][0].isupper():
         return False
-    return not _TEN_TO_CHUC_RE.search(_fold_text(name))
+    folded = _fold_text(name)
+    if _TEN_TO_CHUC_RE.search(folded) or _TEN_TO_CHUC_DAU_RE.search(folded):
+        return False
+    return True
 
 
 def _ngay_sinh_conflict(a: str, b: str) -> bool:

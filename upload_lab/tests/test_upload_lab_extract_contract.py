@@ -3149,6 +3149,23 @@ class UploadLabExtractContractTests(unittest.TestCase):
             thang[0]["dia_chi"], "An Tĩnh, xã Vũ Dương, tỉnh Ninh Bình"
         )
 
+    def test_ten_van_phong_khong_bi_loai_nhu_to_chuc(self):
+        # "Trịnh Văn Phong" la ten nguoi that du fold trung "van phong"
+        # (co quan). Cum org chi loai khi dung DAU ten — "Văn phòng X".
+        from extract_contract import _ho_ten_hop_le, _extract_party_data
+        self.assertTrue(_ho_ten_hop_le("Trịnh Văn Phong"))
+        self.assertTrue(_ho_ten_hop_le("Phong Đức"))
+        self.assertFalse(_ho_ten_hop_le("Văn phòng Công chứng"))
+        self.assertFalse(_ho_ten_hop_le("Phòng hành chính"))
+        ds = _extract_party_data("\n".join([
+            "3. Ông Trịnh Văn Phong\tSinh ngày: 22/07/1979;",
+            "Căn cước công dân số 036079000477 do Cục cảnh sát cấp ngày 17/05/2021;",
+        ]))
+        self.assertEqual(
+            [(x["ho_ten"], x["cccd"]) for x in ds["nguoi"]],
+            [("Trịnh Văn Phong", "036079000477")],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
