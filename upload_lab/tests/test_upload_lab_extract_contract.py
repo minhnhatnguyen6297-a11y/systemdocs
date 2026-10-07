@@ -3327,6 +3327,13 @@ class UploadLabExtractContractTests(unittest.TestCase):
         lien = next(x for x in r["raw"]["ben_b"]["nguoi"] if "Liên" in x["ho_ten"])
         self.assertEqual(lien["ngay_cap_cccd"], "25/08/2021")
 
+    def test_cat_ten_gach_sinh(self):
+        # "Ông X - Sinh ngày: <sai>" — "- Sinh" la ranh nhan, khong nam
+        # trong ten (UQ nghiệp sình — 13/10/2026).
+        import extract_contract as ec
+        self.assertEqual(ec._cat_ho_ten("Trịnh Văn Công - Sinh"), "Trịnh Văn Công")
+        self.assertEqual(ec._cat_ho_ten("Nguyễn Văn Anh – sinh"), "Nguyễn Văn Anh")
+
 
 if __name__ == "__main__":
     unittest.main()

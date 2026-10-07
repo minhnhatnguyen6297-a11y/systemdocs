@@ -2337,6 +2337,7 @@ def _cat_duoi_dia_chi(value: str) -> str:
 _NAME_BOUNDARY_RE = re.compile(
     r"[,;(|:]"
     r"|\s+\d"
+    r"|\s*[-\u2013\u2014]\s+(?i:sinh)\b"
     r"|\s+(?i:cccd|cmnd|cc\b|c\u0103n c\u01b0\u1edbc|c\u0103n c\u1ee9|gi\u1ea5y\b|\u0111\u1ecba ch\u1ec9|th\u01b0\u1eddng tr\u00fa|c\u01b0 tr\u00fa"
     r"|h\u1ed9 kh\u1ea9u|qu\u00ea qu\u00e1n|ch\u1ee9c v\u1ee5|hi\u1ec7n\b|l\u00e0\b|thu\u1ed9c\b|theo\b|\u0111\u01b0\u1ee3c\b|n\u01a1i\b|v\u1ee3\b|ch\u1ed3ng\b|kh\u00f4ng\b|con\s+(?:\u0111\u1ebb|ru\u1ed9t))"
     r"|\s+mang\s+(?=c\u0103n|cccd|cmnd|gi\u1ea5y|h\u1ed9 chi\u1ebfu|s\u1ed5|theo)"
