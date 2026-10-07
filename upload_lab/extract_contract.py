@@ -812,7 +812,7 @@ def _find_tai_san_inheritance_refusal(text: str) -> str:
             r"phan quyen su dung dat(?: cua[^\n]{0,200})?[^\n]{0,400}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:|la\s*:|(?:cu the\s+)?nhu sau\s*:)",
             # "Di san cua ong X de lai la ky phan thua ke ... tai dia chi:"
             # — don tu choi ke lai di san khong qua cum "quyen su dung dat".
-            r"di san\s+(?:cua\s+)?[^\n]{0,250}?\bde\s+lai\b[^\n]{0,250}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:|la\s*:)",
+            r"di san\s+(?:cua\s+)?[^\n]{0,250}?\bde\s+lai\b[^\n]{0,250}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:|la\s*:|(?:cu the\s+)?nhu sau\s*:)",
         ),
         (
             r"(?m)^\s*bang van ban nay\b",
@@ -1976,7 +1976,7 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
                 if _note:
                     _cu = values.get("_nay_la", "")
                     values["_nay_la"] = (_cu + "; " + _note).lstrip("; ")
-                value = _head
+                value = _head.rstrip(" :;").strip()
             if field == "so_to_ban_do":
                 value = _clean_so_to_ban_do(value)
             if field == "dien_tich":
@@ -2022,14 +2022,24 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
                 current["chi_tiet_dien_tich"].append(pending)
             pending = None
             trong_do_seen = False
-            current = _new_thua_dat(context)
-            for field, value in values.items():
-                if value:
-                    current[field] = value
-            if _nay_la:
-                current["phan_ghi_them"] = (current["phan_ghi_them"] + "; " + _nay_la).lstrip("; ")
-            parcels.append(current)
-            _append_trong_do_details(current, line)
+            # Liet ke nhieu thua trong van xuoi ("cac thua dat so 112, 115,
+            # to ban do so 80") — moi so la mot thua cung truong con lai;
+            # dedupe se gop vao ban chi tiet cung so o duoi (12/10/2026).
+            thua_parts = [
+                p.strip() for p in re.split(r"[,;]", values["so_thua_dat"])
+                if p.strip()
+            ] or [values["so_thua_dat"]]
+            for part_idx, thua_part in enumerate(thua_parts):
+                current = _new_thua_dat(context)
+                for field, value in values.items():
+                    if not value:
+                        continue
+                    current[field] = thua_part if field == "so_thua_dat" else value
+                if _nay_la:
+                    current["phan_ghi_them"] = (current["phan_ghi_them"] + "; " + _nay_la).lstrip("; ")
+                parcels.append(current)
+                if part_idx == 0:
+                    _append_trong_do_details(current, line)
         elif current is not None:
             if _nay_la:
                 current["phan_ghi_them"] = (current["phan_ghi_them"] + "; " + _nay_la).lstrip("; ")
@@ -3184,7 +3194,7 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
     """
     source = unicodedata.normalize("NFC", str(text or ""))
     found: list[dict] = []
-    seen: set[str] = set()
+    seen: dict[str, dict] = {}
     is_refusal = doc_kind == DOC_KIND_INHERITANCE_REFUSAL
     death_y_evidence = (
         r""
@@ -3273,8 +3283,7 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
             t2 = name2.split()
             key2 = f"{_fold_text(name2)}|{death_val}"
             if t2 and len(t2) <= 6 and all(tok[0].isupper() for tok in t2) and key2 not in seen:
-                seen.add(key2)
-                found.append({
+                seen[key2] = {
                     "gioi_tinh": "\u00d4ng" if _fold_text(match.groupdict().get("title2") or "") in ("ong", "anh") else "B\u00e0",
                     "ho_ten": name2,
                     "ten_goi_khac": "",
@@ -3286,7 +3295,8 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
                     "noi_cap": "",
                     "loai_giay_to": "",
                     "dia_chi": "",
-                })
+                }
+                found.append(seen[key2])
         alias = re.sub(r"\s+", " ", match.groupdict().get("alias") or "").strip()
         alias = re.sub(r"(?i)^t\u00ean g\u1ecdi kh\u00e1c l\u00e0\s+", "", alias)
         tail_end = min(match.end() + 400, len(source))
@@ -3317,14 +3327,13 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
         if addr_match:
             last_addr = re.sub(r"\s+", " ", addr_match.group(1)).strip(" ;,.")
         key = f"{_fold_text(raw_name)}|{death_val}"
-        if not raw_name or key in seen:
+        if not raw_name:
             continue
-        seen.add(key)
         _birth = match.groupdict().get("birth") or ""
         ngay_sinh, chi_co_nam = _chuan_hoa_ngay_sinh(
             _birth if "/" in _birth else "", _birth if "/" not in _birth else ""
         )
-        found.append({
+        record = {
             "gioi_tinh": "\u00d4ng" if title_fold in ("ong", "anh") else ("B\u00e0" if title_fold in ("ba", "chi") else ""),
             "ho_ten": raw_name,
             "ten_goi_khac": alias,
@@ -3336,7 +3345,18 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
             "noi_cap": tlkt_by,
             "loai_giay_to": "Trích lục khai tử" if tlkt_no else "",
             "dia_chi": last_addr,
-        })
+        }
+        if key in seen:
+            # Lan nhac sau cung nguoi — dien truong trong (dia chi, TLKT)
+            # thay vi bo; ban sau thuong giau hon (12/10/2026 — ba Hien
+            # nhac 2 lan, lan sau co "Noi thuong tru cuoi cung").
+            base = seen[key]
+            for field, value in record.items():
+                if not str(base.get(field) or "").strip() and str(value or "").strip():
+                    base[field] = value
+            continue
+        seen[key] = record
+        found.append(record)
     return found
 
 

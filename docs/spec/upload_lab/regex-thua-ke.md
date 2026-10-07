@@ -52,6 +52,14 @@ Dạng ngoặc gộp (11–12/10/2026): `ông X (sinh năm 1956, đã chết ng�
 ngoặc bí danh có thể đứng trước ngoặc sinh/chết; phần trong ngoặc sau
 ngày chết (`theo trích lục`, `Nơi thường trú`) vẫn được chấp nhận.
 
+Người chết được nhắc **nhiều lần** (`Bà Hiên` nhắc ở mục con đẻ rồi mục
+hàng thừa kế) gộp theo khoá `tên|ngày chết`: bản sau **điền trường
+trống** của bản đầu (địa chỉ cuối thường chỉ có ở lần nhắc sau —
+12/10/2026), không tạo bản ghi trùng. `so_thua_dat` cắt `:`/`;` cuối
+nhãn (`- Thửa đất số 112:`); `thửa đất số 112, 115` liệt kê nhiều số
+tách thành từng thửa cùng các trường còn lại rồi gộp vào bản chi tiết
+cùng số theo luật khử trùng.
+
 ## 4. Tài sản đất (mỗi thửa 1 dòng `danh_sach_thua_dat` + `land_rows` shape DB)
 
 Khối đất mở bằng: `quyền sử dụng đất ... có/tại địa chỉ:`, `Phần
