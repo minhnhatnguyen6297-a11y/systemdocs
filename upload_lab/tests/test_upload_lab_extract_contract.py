@@ -3409,5 +3409,35 @@ class ThuaVanXuoiTests(unittest.TestCase):
         self.assertEqual(ctx["dia_chi"], "")
 
 
+
+
+class BangDanhSachNguoiDungTests(unittest.TestCase):
+    def test_bang_danh_sach_o_cc_dia_chi_xa_tran(self):
+        from extract_contract import _extract_plain_text_person_entries
+        section = "\n".join([
+            "STT | Họ tên | Năm sinh | Loại giấy tờ | Số | Ngày cấp | Cơ quan cấp | Địa chỉ",
+            "1 | Ông Nguyễn Mạnh Dũng | 1977 | CC | 036077014177 | 31/12/2024 | Bộ Công an | Liên Minh",
+            "2 | Ông Nguyễn Công Khương | 1980 | CCCD | 036080022345 | 10/05/2021 | Cục Cảnh sát | Liên Minh",
+        ])
+        ents = _extract_plain_text_person_entries(section)
+        ten = {e["ho_ten"]: e for e in ents}
+        self.assertEqual(len(ents), 2)
+        self.assertEqual(ten["Nguyễn Mạnh Dũng"]["cccd"], "036077014177")
+        self.assertEqual(ten["Nguyễn Mạnh Dũng"]["dia_chi"], "Liên Minh")
+        self.assertEqual(ten["Nguyễn Công Khương"]["cccd"], "036080022345")
+
+    def test_dia_chi_keyed_dinh_nhan_tren_mot_dong(self):
+        from extract_contract import _extract_plain_text_person_entries
+        section = "\n".join([
+            "1. Tên: Ông Phạm Tuấn Linh;Sinh ngày: 24/03/1991",
+            "2. Tên: Bà Lê Thị Bích Vượng;Sinh ngày: 06/04/1994",
+            "c) Địa chỉ: Địa chỉ thường trú  ông Linh tại: thôn Sở Núi, "
+            "xã Thanh Liêm.Địa chỉ thường trú  bà Vượng: Ngõ 13, xã Đại Thanh.",
+        ])
+        ents = _extract_plain_text_person_entries(section)
+        ten = {e["ho_ten"]: e for e in ents}
+        self.assertEqual(ten["Lê Thị Bích Vượng"]["dia_chi"], "Ngõ 13, xã Đại Thanh")
+
+
 if __name__ == "__main__":
     unittest.main()

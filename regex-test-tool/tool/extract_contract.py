@@ -2486,7 +2486,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # (docs/spec/notary_v2/stage.md muc 5) nen giu nam lam ngay_sinh.
     # Gia tri chi co nam van nhan du nhan viet "Sinh ngay: 1982" (loi mau thuc te).
     birth_year_re = re.compile(r"(?i)(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh)\s*[:\u2013-]?\s*((?:19|20)\d{2})(?!\d)")
-    id_re = re.compile(r"(?i)(?:C\u0103n c\u01b0\u1edbc(?:\s+(?:s\u1ed1\s+)?c\u00f4ng(?:\s+d\u00e2n)?)?(?:\s+m\u1edbi)?|Can cuoc(?:\s+cong(?:\s+dan)?)?|CCCD|CMND|\bCC)\s*(?:[A-Z\u00c0-\u1ef9\u0110][^\d:;\n]{0,40}?)?\s*(?:(?:s\u1ed1|so)\s*:?|:)?\s*(\d{4}\s\d{4}\s\d{4}|\d{6,12})")
+    id_re = re.compile(r"(?i)(?:C\u0103n c\u01b0\u1edbc(?:\s+(?:s\u1ed1\s+)?c\u00f4ng(?:\s+d\u00e2n)?)?(?:\s+m\u1edbi)?|Can cuoc(?:\s+cong(?:\s+dan)?)?|CCCD|CMND|\bCC)\s*(?:[A-Z\u00c0-\u1ef9\u0110][^\d:;\n]{0,40}?)?[\s|]*(?:(?:s\u1ed1|so)\s*:?|:)?[\s|]*(\d{4}\s\d{4}\s\d{4}|\d{6,12})")
     issue_place_re = re.compile(
         r"(?i)\bdo\s+((?:(?!k[ýí]\s+ng\u00e0y)[^\n])+?)\s+(?:c\u1ea5p\s+ng\u00e0y|cap ngay|ng\u00e0y\s*\d)"
     )
@@ -2796,6 +2796,30 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                     address_match = None
         if address_match:
             addr_val = _cat_duoi_dia_chi(address_match.group(1))
+            # "c) Địa chỉ: Địa chỉ thường trú ông X tại: A.Địa chỉ thường
+            # trú bà Y: B." — nhieu nhan keyed tren 1 dong (IFilter gop
+            # dong): boc tung doan "nhan + danh xung + ten + :|tại:" thanh
+            # keyed_addrs, khong de ca blob lam dia chi chung
+            # (mau 18 - 13/10/2026).
+            _keyed_inline = list(
+                re.finditer(
+                    r"(?i)(?:\u0110\u1ecba\s+ch[\u1ec9\u1ee7]\s+th\u01b0\u1eddng\s+tr\u00fa|N\u01a1i\s+th\u01b0\u1eddng\s+tr\u00fa|\u0110\u1ecba\s+ch[\u1ec9\u1ee7])"
+                    r"\s+(?i:[\u00d4O]ng|[Bb]\u00e0)\s+([A-Z\u00c0-\u1ef9\u0110][^\d;:]{1,40}?)\s*(?:t\u1ea1i)?\s*:",
+                    addr_val,
+                )
+            )
+            if _keyed_inline:
+                for _ki, _km in enumerate(_keyed_inline):
+                    _seg_end = (
+                        _keyed_inline[_ki + 1].start()
+                        if _ki + 1 < len(_keyed_inline)
+                        else len(addr_val)
+                    )
+                    _v = _cat_duoi_dia_chi(addr_val[_km.end():_seg_end])
+                    if _v:
+                        keyed_addrs[_fold_text(_km.group(1))] = _v
+                addr_val = ""
+            addr_val = re.sub(r"(?i)^t\u1ea1i:?\s*", "", addr_val).strip(" ;,.")
             # Muc con "X.Y. Địa chỉ:" / "c) Địa chỉ:" trong don mau (1.3
             # cua mau 11/DK, c) cua mau 18) la truong CHUNG cho moi nguoi
             # khai trong muc X — danh dau shared de dien cho nguoi chua
@@ -3044,6 +3068,19 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # Dia chi dung chung ca khoi ("Cả hai ông bà cùng thường trú tại: X")
     # — gan cho moi nguoi con thieu, khong chi nguoi dung truoc dong do.
     shared_addrs = [a[2] for a in address_lines if len(a) > 3 and a[3] and a[2]]
+    _KEYED_PREFIX = re.compile(
+        r"^(?:dia chi|noi thuong tru|noi cu tru|thuong tru|cu tru|ho khau|ong|ba|cua|tai)\s+"
+    )
+
+    def _keyed_name(key: str) -> str:
+        # Khoa keyed doi khi dinh ca nhan/danh xung ("dia chi thuong tru
+        # ong linh") — cat phan dau de con ten goi (mau 18, 13/10/2026).
+        prev = None
+        while prev != key:
+            prev = key
+            key = _KEYED_PREFIX.sub("", key)
+        return key
+
     for person in persons:
         if not person["dia_chi"]:
             keyed = keyed_addrs.get(_fold_text(person["ho_ten"]))
@@ -3053,7 +3090,8 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                 # ten (am tiet cuoi hoac cum ten goi — 13/10/2026).
                 _fold = _fold_text(person["ho_ten"])
                 for _k, _v in keyed_addrs.items():
-                    if _fold == _k or _fold.endswith(" " + _k):
+                    _k2 = _keyed_name(_k)
+                    if _k2 and (_fold == _k2 or _fold.endswith(" " + _k2)):
                         keyed = _v
                         break
             if keyed:
@@ -3149,6 +3187,16 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                 has_role_cell = True
             elif not noi_cap:
                 noi_cap = cell
+            elif (
+                not dia_chi
+                and len(cell.split()) <= 5
+                and not re.search(r"[\d;:]", cell)
+                and re.match(r"[A-Z\u00c0-\u1ef9\u0110]", cell)
+            ):
+                # O dia chi ten xa tran ("Liên Minh") dung sau co quan
+                # cap — danh sach nguoi su dung chung mau 04a/DK
+                # (13/10/2026).
+                dia_chi = cell
         if not cccd and not (has_role_cell and len(tail_cells) >= 3):
             continue
         persons.append(
