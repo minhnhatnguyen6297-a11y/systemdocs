@@ -2426,5 +2426,47 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(ct[1]["thoi_han_su_dung"], "15/10/2063")
 
 
+    def test_bang_don_dong_nhieu_thua_trong_do(self):
+        # Bang .doc gop 1 dong, nhieu thua + "Trong do" chi tiet:
+        # "35 44 150 NTS 2063  35 103 299  Trong do 200 ONT Lau dai
+        #  99 CLN 2043  35 134 168 CLN 2043" — phai ra 3 thua, chi tiet
+        # thuoc thua 103 (12/10/2026).
+        from extract_contract import _tach_thua_bang_don_dong
+        line = (
+            "Số tờ bản đồ Số thửa Diện tích (m2) Mục đích sử dụng Thời hạn sử dụng "
+            "35 44 150 NTS 2063 35 103 299 Trong đó 200 ONT Lâu dài 99 CLN 2043 "
+            "35 134 168 CLN 2043"
+        )
+        parcels = []
+        self.assertTrue(_tach_thua_bang_don_dong(line, {}, parcels))
+        self.assertEqual(
+            [p["so_thua_dat"] for p in parcels], ["44", "103", "134"]
+        )
+        self.assertEqual(parcels[0]["muc_dich_su_dung"], "NTS")
+        self.assertEqual(parcels[0]["thoi_han_su_dung"], "2063")
+        ct = parcels[1]["chi_tiet_dien_tich"]
+        self.assertEqual(
+            [(c["dien_tich"], c["muc_dich_su_dung"]) for c in ct],
+            [("200", "ONT"), ("99", "CLN")],
+        )
+        self.assertEqual(parcels[2]["dien_tich"], "168")
+
+    def test_nguoi_chet_ngoac_bi_danh_truoc_ngoac_sinh_chet(self):
+        # "ong X (Ten khac); (Sinh nam 1945, da chet ngay ... theo trich luc...)"
+        # — ngoac bi danh dung truoc ngoac sinh/chet (12/10/2026).
+        from extract_contract import _extract_nguoi_chet, DOC_KIND_INHERITANCE_REFUSAL
+        text = (
+            "Bố chúng tôi là ông Trần Văn Đàm (Trần Hữu Đàm); "
+            "(Sinh năm 1945, đã chết ngày 08/08/2014 theo trích lục khai tử "
+            "số 23/TLKT-BS do UBND xã Yên Phong cấp ngày 28/02/2017. "
+            "Nơi thường trú cuối cùng trước khi chết: thôn Bồng Quỹ, xã Yên Phong)."
+        )
+        ds = _extract_nguoi_chet(text, DOC_KIND_INHERITANCE_REFUSAL)
+        self.assertEqual(len(ds), 1)
+        self.assertEqual(ds[0]["ho_ten"], "Trần Văn Đàm")
+        self.assertEqual(ds[0]["ten_goi_khac"], "Trần Hữu Đàm")
+        self.assertEqual(ds[0]["ngay_chet"], "08/08/2014")
+
+
 if __name__ == "__main__":
     unittest.main()

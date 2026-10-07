@@ -45,7 +45,12 @@ dừng trước dòng `chết ngày`.
 | `ngay_sinh` | `Sinh năm[:] YYYY` (giữ `YYYY` + cờ) hoặc đủ ngày |
 | `ngay_chet` | Sau `chết/đã chết ngày[:/-]` |
 | `so_giay_to`, `loai_giay_to`, `ngay_cap`, `noi_cap` | Trích lục khai tử là giấy tờ của người chết: sau `Trích lục khai tử... số`, `do... ký/cấp ngày` (decision-46) |
-| `dia_chi` | Sau `Nơi thường trú cuối cùng trước khi chết:` |
+| `dia_chi` | Sau `Nơi thường trú cuối cùng trước khi chết:` (cắt `)` đóng ngoặc) |
+
+Dạng ngoặc gộp (11–12/10/2026): `ông X (sinh năm 1956, đã chết ngày ...)` và
+`ông X (Tên khác); (Sinh năm 1945, đã chết ngày ... theo trích lục...)` —
+ngoặc bí danh có thể đứng trước ngoặc sinh/chết; phần trong ngoặc sau
+ngày chết (`theo trích lục`, `Nơi thường trú`) vẫn được chấp nhận.
 
 ## 4. Tài sản đất (mỗi thửa 1 dòng `danh_sach_thua_dat` + `land_rows` shape DB)
 
@@ -77,6 +82,14 @@ cắt `|` thừa đầu/cuối, tên cắt trước `|`): bảng dồn 1 dòng t
 theo dòng ô (ô `Số thửa` làm neo); tiêu đề tách 2 dòng thì nối lại;
 dòng văn xuôi >100 ký tự trong vùng bảng thì bỏ; `Trong đó: | ...`
 thì cắt mốc giữ ô.
+
+Bảng **đơn dòng** (không `|`, không xuống dòng — 12/10/2026): token hóa
+thành "ô giả" — số đứng riêng, cụm chữ gộp, `Trong đó`/`Lâu dài` thành
+ô riêng — rồi dùng chung bộ tách ô với bảng `|`; hỗ trợ **nhiều thửa**
+liên tiếp (`35 44 150 NTS 2063  35 103 299  Trong đó ...  35 134 168`).
+Ô số ngay sau thửa chỉ được nuốt làm `thoi_han_su_dung` khi giống kỳ
+hạn (4 số, ngày `dd/mm/yyyy`, `Lâu dài`) — số diện tích nhỏ (`119`,
+`299`) là thửa/chi tiết tiếp theo.
 
 ## 5. Tài sản sổ tiết kiệm / tài khoản — TẠM DỪNG (decision-46)
 

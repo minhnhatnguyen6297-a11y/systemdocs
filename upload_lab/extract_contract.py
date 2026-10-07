@@ -780,7 +780,7 @@ def _find_tai_san_inheritance_partition(text: str) -> str:
         (
             r"quyen su dung dat(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:)",
             r"nha o va quyen su dung dat o(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:)",
-            r"phan quyen su dung dat(?: cua[^\n]{0,200})?[^\n]{0,300}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:|la\s*:|(?:cu the\s+)?nhu sau\s*:)",
+            r"phan quyen su dung dat(?: cua[^\n]{0,200})?[^\n]{0,400}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:|la\s*:|(?:cu the\s+)?nhu sau\s*:)",
             r"quyen su dung dat[^\n]{0,300}?theo\s*[\"'“”‘’]?\s*giay chung nhan",
             r"thua dat so[^\n]{0,200}?(?:co dia chi tai|tai dia chi|theo\s*[\"'“”‘’]?\s*giay chung nhan|theo ban do)",
             # "Phần Quyền tài sản của ông X ... đối với một phần thửa đất số 62"
@@ -809,7 +809,7 @@ def _find_tai_san_inheritance_refusal(text: str) -> str:
         (
             r"(?m)^\s*(?:1\.\s*)?tai san(?: thu nhat)?\s*:",
             r"quyen su dung dat(?: cua[^\n]{0,120})?[^\n]{0,250}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:)",
-            r"phan quyen su dung dat(?: cua[^\n]{0,200})?[^\n]{0,300}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:|la\s*:)",
+            r"phan quyen su dung dat(?: cua[^\n]{0,200})?[^\n]{0,400}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:|la\s*:|(?:cu the\s+)?nhu sau\s*:)",
             # "Di san cua ong X de lai la ky phan thua ke ... tai dia chi:"
             # — don tu choi ke lai di san khong qua cum "quyen su dung dat".
             r"di san\s+(?:cua\s+)?[^\n]{0,250}?\bde\s+lai\b[^\n]{0,250}?(?:(?:co dia chi(?: tai)?|tai dia chi)\s*:?|tai\s*:|la\s*:)",
@@ -1387,6 +1387,34 @@ def _tach_nay_la(value: str) -> tuple[str, str]:
     return head, match.group(1).strip(" ;,.-")
 
 
+def _nuot_o_chu_thua(data: list[str], pos: int, current: dict) -> int:
+    """Nuot cac o chu ngay sau thua vua mo: muc dich -> thoi han.
+    Dung khi gap o so (thua/chi tiet ke) hoac 'trong do'."""
+    while pos < len(data):
+        cell = data[pos]
+        fold = _fold_text(cell)
+        if fold.startswith("trong do") or len(cell) > 100:
+            break
+        if not _cell_has_letters(cell):
+            # O so: chi nhan khi giong ky han ("2063", "15/10/2063") —
+            # so dien tich nho ("119", "299") la thua/chi tiet tiep theo.
+            if not current["thoi_han_su_dung"] and _la_o_thoi_han(cell):
+                current["thoi_han_su_dung"] = cell
+                pos += 1
+            break
+        head_txt, note_txt = _tach_nay_la(cell)
+        if note_txt:
+            current["phan_ghi_them"] = (current["phan_ghi_them"] + "; " + note_txt).lstrip("; ")
+        if not current["muc_dich_su_dung"]:
+            current["muc_dich_su_dung"] = head_txt
+        elif not current["thoi_han_su_dung"]:
+            current["thoi_han_su_dung"] = head_txt
+        else:
+            break
+        pos += 1
+    return pos
+
+
 def _tach_thua_cell_stream(cells: list[str], context: dict, parcels: list[dict]) -> bool:
     """Tach dong bang don (nhieu o, co ca tieu de + du lieu, gap o .doc
     doc bang IFilter). Tra True neu an duoc it nhat 1 thua.
@@ -1435,6 +1463,9 @@ def _tach_thua_cell_stream(cells: list[str], context: dict, parcels: list[dict])
             current["phan_ghi_them"] = _ghi_nay
         parcels.append(current)
         pos += 3
+        # O chu sau bo 3 so dau (muc dich/thoi han cua thua dau
+        # "150 NTS 2063") — giong nhanh thua moi ben duoi.
+        pos = _nuot_o_chu_thua(data, pos, current)
     else:
         return False
     while pos < len(data):
@@ -1465,19 +1496,7 @@ def _tach_thua_cell_stream(cells: list[str], context: dict, parcels: list[dict])
             pos += 3
             # O chu tiep theo thuoc thua moi ("Ao nuoi ca", "12/2043
             # (nay la 31/12/2063)") — dung khi gap so (thua/chi tiet ke).
-            while pos < len(data) and _cell_has_letters(data[pos]) and len(data[pos]) <= 100:
-                cell_txt = data[pos]
-                head_txt, note_txt = _tach_nay_la(cell_txt)
-                if note_txt:
-                    current["phan_ghi_them"] = (current["phan_ghi_them"] + "; " + note_txt).lstrip("; ")
-                    cell_txt = head_txt
-                if not current["muc_dich_su_dung"]:
-                    current["muc_dich_su_dung"] = cell_txt
-                elif not current["thoi_han_su_dung"]:
-                    current["thoi_han_su_dung"] = cell_txt
-                else:
-                    break
-                pos += 1
+            pos = _nuot_o_chu_thua(data, pos, current)
             continue
         if (
             pos + 1 < len(data)
@@ -1542,46 +1561,48 @@ def _tach_thua_bang_don_dong(text: str, context: dict, parcels: list[dict]) -> b
     data = text[head_end.end():]
     # Cat phan chu thich dieu khoan ke tiep ("2.2. Phan quyen...").
     data = re.split(r"\s(?=\d+\.\d+\.\s)", data, maxsplit=1)[0]
-    parcel_match = re.search(
-        r"(\d+(?:\s*\(nay l\u00e0 t\u1edd b\u1ea3n \u0111\u1ed3 s\u1ed1\s*\d+\))?)\s+(\d+)\s+([\d.,]+)\s*(?=Trong |$)",
-        data,
-        flags=re.IGNORECASE,
-    )
-    if not parcel_match:
-        return False
-    current = _new_thua_dat(context)
-    _to_head, _to_note = _tach_nay_la(_clean_asset_cell(parcel_match.group(1)))
-    current["so_to_ban_do"] = _clean_so_to_ban_do(_to_head)
-    current["so_thua_dat"] = _clean_asset_cell(parcel_match.group(2))
-    current["dien_tich"] = _clean_asset_cell(parcel_match.group(3))
-    if _to_note:
-        current["phan_ghi_them"] = _to_note
-    parcels.append(current)
-    rest = data[parcel_match.end():]
-    detail_re = re.compile(
-        r"Trong\s+([\d.,]+)\s+(.+?)\s+(L\u00e2u d\u00e0i|\d{1,2}/\d{1,2}/\d{4})\b\s*",
-        flags=re.IGNORECASE,
-    )
-    pos = 0
-    while True:
-        seg_match = re.search(r"(?i)Trong", rest[pos:])
-        if not seg_match:
-            break
-        detail = detail_re.match(rest, pos + seg_match.start())
-        if not detail:
-            break
-        ghi_them = rest[detail.end():]
-        next_seg = re.search(r"(?i)Trong", ghi_them)
-        if next_seg:
-            ghi_them = ghi_them[:next_seg.start()]
-        current["chi_tiet_dien_tich"].append({
-            "dien_tich": _clean_asset_cell(detail.group(1)),
-            "muc_dich_su_dung": _clean_asset_cell(detail.group(2)),
-            "thoi_han_su_dung": _clean_asset_cell(detail.group(3)),
-            "phan_ghi_them": _clean_asset_cell(ghi_them),
-        })
-        pos = detail.end() + len(ghi_them)
-    return True
+    # Bang don dong co the chua NHIEU thua + cum chi tiet "Trong do"
+    # ("35 44 150 NTS 2063  35 103 299  Trong do 200 ONT Lau dai
+    # 99 CLN 2043  35 134 168 CLN 2043"). Xay "o gia" — so rieng, cum
+    # chu gop lai — roi dung chung bo tach stream voi bang co "|".
+    cells = [text[: head_end.end()].strip()]
+    buf: list[str] = []
+    toks = data.split()
+    idx = 0
+    while idx < len(toks):
+        tok = toks[idx]
+        tok_fold = _fold_text(tok)
+        if _is_pure_number_cell(tok) or re.match(r"^\d{1,2}/\d{1,2}/\d{4}$", tok):
+            if buf:
+                cells.append(" ".join(buf))
+                buf = []
+            cells.append(tok)
+        elif (
+            tok_fold == "trong"
+            and idx + 1 < len(toks)
+            and _fold_text(toks[idx + 1]) == "do"
+        ):
+            if buf:
+                cells.append(" ".join(buf))
+                buf = []
+            cells.append("trong do")
+            idx += 1
+        elif (
+            tok_fold == "lau"
+            and idx + 1 < len(toks)
+            and _fold_text(toks[idx + 1]) == "dai"
+        ):
+            if buf:
+                cells.append(" ".join(buf))
+                buf = []
+            cells.append("Lâu dài")
+            idx += 1
+        else:
+            buf.append(tok)
+        idx += 1
+    if buf:
+        cells.append(" ".join(buf))
+    return _tach_thua_cell_stream(cells, context, parcels)
 
 
 def _so_thuc_dien_tich(value: str) -> float | None:
@@ -3184,13 +3205,16 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
     # Dang ngoac gop: "ong X (sinh nam 1956, da chet ngay 16/01/2025)" —
     # cum sinh+chet nam trong ngoac bi nhom alias nuot o death_re (11/10/2026).
     death_paren_re = re.compile(
-        r"(?i)(?P<title>\u00d4ng|B\u00e0|Anh|Ch\u1ecb|l\u00e0)\s*:?\s*(?P<name>[^;(\n.,]+?)"
-        r"\s*\(\s*(?:Sinh\s+n\u0103m|N\u0103m\s+sinh|Sinh\s+ng\u00e0y|Ng\u00e0y\s+sinh)"
-        r"\s*[:\u2013-]?\s*(?P<birth>(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})"
-        r"\s*[,;]?\s*(?:\u0111\u00e3\s+)?ch\u1ebft\s+"
-        r"(?:ng\u00e0y\s*[:\u2013-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
-        r"|n\u0103m\s*[:\u2013-]?\s*(?P<death_y>(?:19|20)\d{2})"
-        + death_y_evidence + r")\s*\)"
+        r"(?i)(?P<title>Ông|Bà|Anh|Chị|là)\s*:?\s*(?P<name>[^;(\n.,]+?)"
+        # Ngoac bi danh co the dung TRUOC ngoac sinh/chet:
+        # "ong X (Tran Huu Dam); (Sinh nam 1945, da chet ngay ...)".
+        r"(?:\s*\((?P<alias>[^)]+)\)\s*[-–;,]?)?"
+        r"\s*\(\s*(?:Sinh\s+năm|Năm\s+sinh|Sinh\s+ngày|Ngày\s+sinh)"
+        r"\s*[:–-]?\s*(?P<birth>(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})"
+        r"\s*[,;]?\s*(?:đã\s+)?chết\s+"
+        r"(?:ngày\s*[:–-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
+        r"|năm\s*[:–-]?\s*(?P<death_y>(?:19|20)\d{2})"
+        + death_y_evidence + r")[^)]*\)"
     )
     matches = sorted(
         list(death_re.finditer(source)) + list(death_paren_re.finditer(source)),
@@ -3287,7 +3311,7 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
             tlkt_date = tlkt_by_match.group(2)
         last_addr = ""
         addr_match = re.search(
-            r"(?i)N\u01a1i th\u01b0\u1eddng tr\u00fa(?:\s+cu\u1ed1i c\u00f9ng)?\s+tr\u01b0\u1edbc khi ch\u1ebft:\s*([^.\n;]+)",
+            r"(?i)N\u01a1i th\u01b0\u1eddng tr\u00fa(?:\s+cu\u1ed1i c\u00f9ng)?\s+tr\u01b0\u1edbc khi ch\u1ebft:\s*([^.\n;)]+)",
             tail,
         )
         if addr_match:
