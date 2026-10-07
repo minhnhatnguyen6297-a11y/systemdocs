@@ -2816,7 +2816,10 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         # Loai nguoi da chet: chi khi co "chet ngay + ngay thang" cu the
         # (dong mo ta thua ke luon co; chu "chet" dung mot minh nhu
         # "ngay chet" trong checklist khong du de loai).
-        if re.search(r"\bchet\s+ngay\s*[:.-]?\s*\d", _fold_text(chunk_scan)):
+        if re.search(
+            r"\bchet\s+(?:ngay\s*[:.-]?\s*\d|nam\s*[:.-]?\s*(?:19|20)\d{2})",
+            _fold_text(chunk_scan),
+        ):
             continue
         role_match = re.search(r"(?i)(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:", chunk_scan)
         if (
@@ -3254,7 +3257,7 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
     death_y_evidence = (
         r""
         if is_refusal
-        else r"(?=\s*(?:theo\s+)?tr\u00edch\s+l\u1ee5c|[^.\n]{0,60}?(?:khai\s+t\u1eed|\u0111\u01a1n\s+xin\s+x\u00e1c\s+nh\u1eadn))"
+        else r"(?=\s*(?:theo\s+)?tr\u00edch\s+l\u1ee5c|[^.\n]{0,60}?(?:khai\s+t\u1eed|\u0111\u01a1n\s+(?:xin\s+x\u00e1c\s+nh\u1eadn|\u0111\u1ec1\s+ngh\u1ecb)|gi\u1ea5y\s+x\u00e1c\s+nh\u1eadn))"
     )
     death_re = re.compile(
         r"(?i)(?P<title>\u00d4ng|B\u00e0|Anh|Ch\u1ecb|l\u00e0)\s*:?\s*(?P<name>[^;(\n.,]+?)"

@@ -2520,6 +2520,25 @@ class UploadLabExtractContractTests(unittest.TestCase):
             ("Lê Thị Thơm", "Bà", "14/03/1996"),
         ])
 
+    def test_chet_nam_theo_don_de_nghi_la_nguoi_chet(self):
+        # "chet nam YYYY theo Đơn đề nghị do UBND ... xác nhận" la bang
+        # chung nguoi chet nhu trich luc (12/10/2026); nguoi do khong
+        # duoc roi vao danh sach duong su (VB khai nhan ong Nhiem).
+        from extract_contract import _extract_nguoi_chet, _extract_party_data, DOC_KIND_INHERITANCE_DECLARATION
+        text = "\n".join([
+            "I. Người để lại di sản:",
+            "1. Ông Nguyễn Văn Nhiểm – Sinh năm 1940; chết năm 2002 theo Đơn đề nghị do UBND xã Yên Cường, huyện Ý Yên, tỉnh Nam Định xác nhận ngày 02/04/2025; Nơi thường trú cuối cùng trước khi chết: Thôn Thắng Lợi, xã Yên Cường.",
+            "- Bố đẻ ông Nguyễn Văn Nhiểm là ông Nguyễn Xuân Khài; sinh năm 1900; chết năm 1963, theo Đơn đề nghị do UBND xã Yên Cường, huyện Ý Yên, tỉnh Nam Định xác nhận ngày 02/04/2025; Nơi thường trú cuối cùng trước khi chết: Thôn Thắng Lợi, xã Yên Cường.",
+        ])
+        ds = _extract_nguoi_chet(text, DOC_KIND_INHERITANCE_DECLARATION)
+        names = [(x["ho_ten"], x["ngay_sinh"], x["ngay_chet"]) for x in ds]
+        self.assertEqual(names, [
+            ("Nguyễn Văn Nhiểm", "1940", "2002"),
+            ("Nguyễn Xuân Khài", "1900", "1963"),
+        ])
+        party = _extract_party_data(text)
+        self.assertEqual([x["ho_ten"] for x in party["nguoi"]], [])
+
 
 if __name__ == "__main__":
     unittest.main()
