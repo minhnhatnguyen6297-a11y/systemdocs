@@ -2835,10 +2835,15 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
             continue
         # Loai nguoi da chet: chi khi co "chet ngay + ngay thang" cu the
         # (dong mo ta thua ke luon co; chu "chet" dung mot minh nhu
-        # "ngay chet" trong checklist khong du de loai).
+        # "ngay chet" trong checklist khong du de loai). "chet nam YYYY"
+        # chi loai khi nam ngay tren dong ten — "chet nam" trong khoi co
+        # the la ke bo/me chet ("Me de toi - ba X (sinh nam 1958, chet
+        # nam 2016)" — don xac nhan quan he 12/10/2026).
+        if re.search(r"\bchet\s+ngay\s*[:.-]?\s*\d", _fold_text(chunk_scan)):
+            continue
         if re.search(
-            r"\bchet\s+(?:ngay\s*[:.-]?\s*\d|nam\s*[:.-]?\s*(?:19|20)\d{2})",
-            _fold_text(chunk_scan),
+            r"\bchet\s+nam\s*[:.-]?\s*(?:19|20)\d{2}",
+            _fold_text(lines[line_idx]),
         ):
             continue
         role_match = re.search(r"(?i)(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:", chunk_scan)
