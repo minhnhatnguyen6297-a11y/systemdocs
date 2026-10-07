@@ -2298,6 +2298,7 @@ _DIA_CHI_LABEL = (
     r"|\u0110\u0103ng\s+k\u00fd\s+(?:th\u01b0\u1eddng\s+tr\u00fa|h\u1ed9\s+kh\u1ea5u)|HKTT"
     r"|\u0110\u1ecba ch\u1ec9\s+ch\u1ed7 \u1edf(?:\s+hi\u1ec7n t\u1ea1i)?|\u0110\u1ecba ch\u1ec9\s+n\u01a1i \u1edf(?:\s+hi\u1ec7n t\u1ea1i)?"
     r"|\u0110\u1ecba ch\u1ec9(?:\s*/\s*(?:tr\u1ee5 s\u1edf ch\u00ednh|li\u00ean h\u1ec7))?(?!\s*(?:/\s*tr\u1ee5|th\u1eeda|nh\u00e0|\u0111\u1ea5t|li\u00ean h\u1ec7|giao d\u1ecbch|ch\u1ed7|n\u01a1i))"
+    r"|(?:th\u01b0\u1eddng tr\u00fa|c\u01b0 tr\u00fa)(?!\s+cu\u1ed1i c\u00f9ng)"
 )
 
 
@@ -2457,7 +2458,7 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
     # "Toi ten la: Tran Gia Huy; Sinh ngay: ..." — ten tran khong
     # Ông/Bà, nhan ngay sinh cung dong de chac la nguoi.
     intro_bare_re = re.compile(
-        r"(?i)^\s*(?:Tôi (?:tên )?là|Tên tôi là|Tôi\s+(?:Ông|Bà))\s*:?\s*(?P<name>[^;|\-\u2013\n]+?)"
+        r"(?i)^\s*(?:Tôi (?:tên )?là|Tên tôi(?:\s+là)?|Tôi\s+(?:Ông|Bà))\s*:?\s*(?P<name>[^;|\-\u2013\n]+?)"
         r"(?:\s*[-\u2013]\s*[^\n;|]{0,60}?)?(?:\s*[;|]|\s+)[\s|]*"
         r"(?:Sinh ngày|Ngày sinh|Sinh ngay|Ngay sinh|Sinh năm|Năm sinh|Sinh nam|Nam sinh)"
     )
@@ -2661,7 +2662,8 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                 # "1.1. Tên: Ha Van Thinh; Sinh ngay:" — nhan "Tên:" tran
                 # khong danh xung (mau 11/DK don bien dong — 12/10/2026).
                 r"(?i)^\s*(?:[a-zA-Z][.)]|\d+(?:\.\d+)*[.)]?)?\s*T\u00ean\s*:\s*"
-                r"(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?)\s*(?=[;|]|$)",
+                r"(?:(?P<title>\u00f4ng|b\u00e0)\s+)?"
+                r"(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?)\s*(?=[;|]|$|[\s|]+\s*(?:Sinh|Ng\u00e0y))",
                 line,
             )
             or re.search(

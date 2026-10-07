@@ -2822,6 +2822,53 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertTrue(q)
         self.assertEqual(q[0]["ngay_cap_cccd"], "23/04/2021")
 
+    def test_ten_danh_xung_tab_sinh_ngay(self):
+        # "1.1. Tên:  ông Hà Văn Tiễu \tSinh ngày 02/03/1963" — nhan
+        # "Tên:" + danh xung thuong + tab truoc Sinh (mau 11 - 13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "ĐƠN ĐĂNG KÝ BIẾN ĐỘNG",
+            "1. Người sử dụng đất:",
+            "1.1. Tên:  ông Hà Văn Tiễu \tSinh ngày 02/03/1963",
+            "Tên:   bà  Đỗ Thị Ngọ  \t\tSinh ngày 08/10/1966",
+            "1.2. Giấy tờ nhân thân:",
+        ])
+        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        ns = {x["ho_ten"]: x["ngay_sinh"] for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]}
+        self.assertEqual(ns.get("Hà Văn Tiễu"), "02/03/1963")
+        self.assertEqual(ns.get("Đỗ Thị Ngọ"), "08/10/1966")
+
+    def test_ten_toi_khong_la(self):
+        # "Tên tôi: Bà Nguyễn Thị Lan;" — intro "Tên tôi" khong "là"
+        # (don de nghi chuyen muc dich - 13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "ĐƠN ĐỀ NGHỊ",
+            "Tên tôi: Bà Nguyễn Thị Lan; |  | Sinh ngày: 01/01/1958;",
+            "Căn cước công dân số 036158023063 do Cục cảnh sát cấp ngày 16/01/2022;",
+            "Nơi thường trú: tổ 7, xã Ý Yên, tỉnh Ninh Bình.",
+        ])
+        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        names = [x["ho_ten"] for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]]
+        self.assertIn("Nguyễn Thị Lan", names)
+
+    def test_cung_thuong_tru_khong_tai(self):
+        # "Cả hai cùng thường trú: X" — "thường trú" tran khong "tại"
+        # (don xac nhan - 13/10/2026).
+        import extract_contract as ec
+        text = "\n".join([
+            "ĐƠN XIN XÁC NHẬN",
+            "Tôi tên là: Nguyễn Hữu Lành - Sinh năm: 1950",
+            "Số CCCD: 036050004779 do Cục cảnh sát cấp ngày 25/03/2021.",
+            "Vợ tôi là bà: Phạm Thị Lý;\tSinh năm 1955",
+            "Số CCCD: 036155005743 do Cục cảnh sát cấp ngày 25/03/2021.",
+            "Cả hai cùng thường trú: thôn Tây Vinh, xã Yên Lương, huyện Ý Yên, tỉnh Nam Định.",
+        ])
+        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        dc = {x["ho_ten"]: x["dia_chi"] for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]}
+        self.assertEqual(dc.get("Nguyễn Hữu Lành"), "thôn Tây Vinh, xã Yên Lương, huyện Ý Yên, tỉnh Nam Định")
+        self.assertEqual(dc.get("Phạm Thị Lý"), "thôn Tây Vinh, xã Yên Lương, huyện Ý Yên, tỉnh Nam Định")
+
 
 if __name__ == "__main__":
     unittest.main()
