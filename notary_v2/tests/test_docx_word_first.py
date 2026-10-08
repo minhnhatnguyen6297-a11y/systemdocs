@@ -56,6 +56,36 @@ def extraction(content, store=None):
     return asyncio.run(extract(spec, ctx))
 
 
+@pytest.mark.parametrize('issuer', ['Bộ Coongan', 'Cơ quan Mẫu giữ chữ tự do'])
+def test_literal_issuer_and_number_survive_commit_manual_edit_reload_with_exact_field_evidence(db, tmp_path, issuer):
+    doc = Document()
+    for line in ['HỢP ĐỒNG CHUYỂN NHƯỢNG', 'Bên A:',
+                 f'Ông Lê Văn Mẫu, sinh ngày 01/02/1980; CCCD: 0123456789do {issuer} cấp; thường trú: Nhà Mẫu',
+                 'Bên B:', 'Tài sản 1:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà đất Mẫu',
+                 'Loại đất: ONT; Diện tích: 50; Thời hạn: Lâu dài', 'Điều 2: Nội dung']:
+        doc.add_paragraph(line)
+    stream = io.BytesIO(); doc.save(stream); content = stream.getvalue()
+    suggestion, = [s for s in extraction(content) if s['target'] == 'person']
+    for key, literal in [('so_giay_to', '0123456789'), ('noi_cap', issuer)]:
+        field = suggestion['fields'][key]
+        assert field['raw_value'] == field['normalized_value'] == literal
+        ref, = field['source_refs']
+        assert ref['raw_snippet'] == literal
+        assert read_docx(content).text[slice(*ref['span'])] == literal
+        assert ref['docx_refs']
+    original, store, service, data = reviewed_case(db, tmp_path, content)
+    cid = data['case']['id']
+    person, = data['stage']['people']
+    assert (person['so_giay_to'], person['noi_cap']) == ('0123456789', issuer)
+    person['noi_cap'] = 'Cơ quan người dùng sửa tay'
+    person['so_giay_to'] = 'Số do người dùng ghi tay'
+    service.commit_stage(cid, data['case']['revision'], data['stage'], docx_import=data['docx_import'])
+    restored, = service.get(cid)['stage']['people']
+    assert (restored['so_giay_to'], restored['noi_cap']) == ('Số do người dùng ghi tay', 'Cơ quan người dùng sửa tay')
+    sid = data['docx_import']['sources'][0]['source_id']
+    assert store.load(sid)[0] == original == content
+
+
 @pytest.mark.parametrize('raw', ['31/02/1980', '1980-02-31', '1980-2-31'])
 def test_invalid_source_date_requires_correction_and_commits_exact_original_evidence(db, tmp_path, raw):
     doc = Document(io.BytesIO(fixture_bytes()))

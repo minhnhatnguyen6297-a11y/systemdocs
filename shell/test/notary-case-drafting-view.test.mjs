@@ -1507,6 +1507,22 @@ test('NAIA-9: issuer input + suggestion box chỉ hiện khi ngay_chet có', asy
     'thiếu input nhập địa chỉ UBND trên giấy khai tử');
 });
 
+test('existing issuer input labels distinguish living identity papers from death certificates and remain editable', () => {
+  const {model, view} = build(test);
+  const alive = model.addPerson({ho_ten:'Người Mẫu', noi_cap:'Bộ Coongan'});
+  const dead = model.addPerson({ho_ten:'Người Mẫu Đã Mất', ngay_chet:'2020-01-01', noi_cap:'UBND Mẫu'});
+  const liveInput = fid(view.el, `p:${alive.row_id}:noi_cap`);
+  const deadInput = fid(view.el, `p:${dead.row_id}:noi_cap`);
+  assert.equal(liveInput.placeholder, 'Cơ quan cấp giấy tờ');
+  assert.equal(liveInput.getAttribute('aria-label'), 'Nơi cấp giấy tờ — Người Mẫu');
+  assert.equal(deadInput.placeholder, 'UBND trên giấy khai tử');
+  assert.equal(deadInput.getAttribute('aria-label'), 'Nơi cấp giấy khai tử — Người Mẫu Đã Mất');
+  liveInput.value = 'Cơ quan sửa tay'; liveInput.oninput();
+  deadInput.value = 'UBND sửa tay'; deadInput.oninput();
+  assert.equal(model.state.stage.people.find(p=>p.row_id===alive.row_id).noi_cap, 'Cơ quan sửa tay');
+  assert.equal(model.state.stage.people.find(p=>p.row_id===dead.row_id).noi_cap, 'UBND sửa tay');
+});
+
 // ---------- TASK-4: nut Tra thu cong + overlay full ----------
 
 const ltick = (ms = 30) => new Promise(r => setTimeout(r, ms));

@@ -23,6 +23,45 @@ function suggestion(target = 'asset', ambiguous = false) {
   } };
 }
 
+test('native DOCX free text enters existing Stage fields and manual edits survive commit and reload', async () => {
+  const root = fileURLToPath(new URL('../../', import.meta.url));
+  const code = `import asyncio,io,json,sys,uuid
+from pathlib import Path
+sys.path.insert(0,str(Path(sys.argv[1])/'notary_v2'))
+from docx import Document
+from services.document_intake.adapters.docx import extract
+from services.document_intake.models import AdapterContext,SourceSpec
+doc=Document()
+for line in ['HỢP ĐỒNG CHUYỂN NHƯỢNG','Bên A:','Ông Lê Văn Mẫu, sinh ngày 01/02/1980; CCCD: 0123456789do Bộ Coongan cấp; thường trú: Nhà Mẫu','Bên B:','Điều 2: Nội dung']: doc.add_paragraph(line)
+stream=io.BytesIO();doc.save(stream)
+ctx=AdapterContext('','',None,None,read_file=lambda _:stream.getvalue())
+print(json.dumps(asyncio.run(extract(SourceSpec(str(uuid.uuid4()),'docx',filename='synthetic.docx'),ctx)),ensure_ascii=False))`;
+  const [candidate] = JSON.parse(execFileSync(process.env.NOTARY_TEST_PYTHON || 'python', ['-B', '-X', 'utf8', '-c', code, root], {encoding:'utf8'}));
+  const evidence = structuredClone(candidate.fields);
+  assert.equal(candidate.fields.so_giay_to.raw_value, '0123456789');
+  assert.equal(candidate.fields.noi_cap.raw_value, 'Bộ Coongan');
+  let saved, revision = 1;
+  const model = M.createModel({client:{run:async(command,payload)=>{
+    if(command === 'notary.workspace_commit_stage') {
+      saved = structuredClone({stage:payload.stage, docx_import:payload.docx_import});
+      return {ok:true,data:{...saved, revision:++revision}};
+    }
+    return {ok:true,data:{...structuredClone(saved),case:{id:1,revision,case_type:'inheritance',locked:false}}};
+  }}});
+  model.newDraft(); model.state.suggestions.push(candidate);
+  const row = model.acceptSuggestion(candidate.suggestion_id);
+  assert.equal(row.so_giay_to, '0123456789'); assert.equal(row.noi_cap, 'Bộ Coongan');
+  model.state.caseId = 1; model.state.revision = 1;
+  await model.commitStage(); await model.openCase(1);
+  assert.equal(model.state.stage.people[0].noi_cap, 'Bộ Coongan');
+  model.updatePersonField(row.row_id, 'noi_cap', 'Cơ quan người dùng sửa tay');
+  model.updatePersonField(row.row_id, 'so_giay_to', 'Số do người dùng ghi tay');
+  await model.commitStage(); await model.openCase(1);
+  assert.equal(model.state.stage.people[0].noi_cap, 'Cơ quan người dùng sửa tay');
+  assert.equal(model.state.stage.people[0].so_giay_to, 'Số do người dùng ghi tay');
+  assert.deepEqual(candidate.fields, evidence);
+});
+
 test('capacity retains cards; ambiguous value requires review; land rows decode and source context travels on create', async () => {
   const calls = [];
   const model = M.createModel({ client: { run: async (command, payload) => {

@@ -1,39 +1,58 @@
-# Regex Rule Catalog — Quy chuẩn Trích xuất Văn bản Công chứng
+# Catalog cấu trúc và loại văn bản Word
 
-**Trạng thái:** Catalog quy tắc trích xuất; khi code và catalog lệch, đối chiếu
-fixture rồi cập nhật cùng thay đổi. **Nguồn:** `upload_lab/docs/regex-rules.md`
-trước đợt gom 29/09/2026. Flow và giới hạn ở [`README.md`](./README.md).
+**Trạng thái:** Active cho loại/vùng/cấu trúc. Quy tắc giá trị trường có một nguồn tại [regex-fields.md](regex-fields.md); đáp án mẫu ở [regex-expected-results.md](regex-expected-results.md). Các thuật toán F01/F04/F05 chưa chốt không có ưu tiên theo tuổi tài liệu.
 
-Catalog này tập hợp và chuẩn hóa toàn bộ quy tắc trích xuất dữ liệu từ file Word (`.doc`, `.docx`) sang JSON web form trong `extract_contract.py`.
+## 0. Core nằm ở đâu (đọc trước khi sửa)
+
+**Owner 06/10/2026:** lõi regex dùng chung là
+`tools/regex_workbench/engine` (zoning-first, provenance, trạng thái
+matched/ambiguous/missing — Owner NAIA-4 02/10/2026 chọn). Lõi phục vụ cả
+trích xuất và đề xuất placeholder cho mẫu Word chưa gắn template.
+`upload_lab/extract_contract.py` là **engine thừa kế đang chạy**, giữ vai
+trò nguồn kiến thức trường để port sang profile workbench — không còn
+là bản gốc của core dùng chung.
+
+| Thứ | File |
+|---|---|
+| Lõi regex dùng chung | `tools/regex_workbench/engine/` + profile JSON |
+| Engine thừa kế đang chạy (nguồn port sang profile) | `upload_lab/extract_contract.py` (docstring đầu file dẫn tiếp) |
+| Test giữ hành vi | `upload_lab/tests/test_upload_lab_extract_contract.py` |
+| Tool test giao diện (chọn 1 file Word → xem Người/Thửa/JSON) | `upload_lab/tools/regex_test_tool.py` (chạy bằng `upload_lab/run_regex_test.bat`) |
+| Luật kiểm tra kết quả (R00..R10, R12 tài sản chưa hỗ trợ, R13 dữ liệu mơ hồ/thiếu căn cứ; R11 lời chứng đã xóa theo regex-decision-46) | `upload_lab/kiem_tra_trich_xuat.py` + test `tests/test_kiem_tra_trich_xuat.py` |
+| Quét hàng loạt bằng luật trên | `upload_lab/tools/quet_kiem_tra.py` (`--loc`, `--offset/--limit`, `--ca-doc`) |
+| Repo test cho nhân viên (Test 1 file + Test cả thư mục + Xem log, log cố định) | `regex-test-tool/tool/` tất cả trong 1 folder (chạy bằng `tool/run.bat`) |
+| Catalog cấu trúc này | `_bmad-output/specs/upload_lab/regex-rules.md` |
+| Báo cáo từng loại văn bản (kết quả test + nguyên tắc bằng lời) | `_bmad-output/tmp/` (file tạm, không commit) |
+
+Phạm vi core (quyết định owner 05/10/2026): core chỉ trích **xuất**
+người + tài sản bằng regex; đối chiếu thuộc tầng kiểm tra. Quyết định 06/10
+về không trích người trong Lời chứng và phạm vi gộp hiện hành ở
+[core](regex-core.md) và [quy tắc trường](regex-fields.md); không dùng câu
+tóm tắt lịch sử này để chốt F01/F04/F05.
+`so_cong_chung` vẫn được đọc để phục vụ upload/audit portal nhưng
+không còn là tiêu chí đủ/thiếu của core.
+
+Catalog dẫn tới loại, vùng và cấu trúc; giá trị trường do regex-fields.md
+sở hữu. [Bản trước TASK-10.1](references/regex-rules-before-field-standardization.md)
+giữ biến thể/lý do làm tham khảo, không tái áp luật đang chờ.
 
 ---
 
-## 1. Nguyên tắc chung
+## 1. Chọn nguồn quy tắc
 
-### 1.1. Đọc dữ liệu
-- Nguồn dữ liệu là file Word `.doc` và `.docx`.
-- `.docx` đọc có cấu trúc (bảo toàn thứ tự đoạn văn và bảng biểu table để tránh trộn lẫn Bên A / Bên B).
-- `.doc` đọc qua Windows IFilter dạng plain text.
-- Tầng regex tập trung nhận diện tiêu đề, phân tách đương sự, bóc tách tài sản và chuẩn hóa trường sau khi đã đọc text.
+| Câu hỏi | Nơi quyết định |
+|---|---|
+| Flow, cách kiểm và phạm vi engine | [regex-core.md](regex-core.md) |
+| Tên, giới tính, ngày, giấy tờ, địa chỉ, thửa/diện tích/chi tiết | [regex-fields.md](regex-fields.md) |
+| Đầu vào và đáp án từng ca | [regex-expected-results.md](regex-expected-results.md) |
+| Loại/vùng/đầu-cuối thừa kế | [regex-thua-ke.md](regex-thua-ke.md) |
+| Loại/vùng khác chưa có spec riêng | Các mục 2.1–2.4 dưới đây |
 
-### 1.2. Chuẩn hóa Số công chứng
-- Dạng raw thường gặp:
-  - `428/2026/CCGD` hoặc `428.2026/CCGD` $\rightarrow$ Chuẩn hóa web: `428/2026`
-  - `2433.2025/PCDS/CCGD` $\rightarrow$ Chuẩn hóa web: `2433/2025`
-  - `2233.2025/TCDS/CCGD` $\rightarrow$ Chuẩn hóa web: `2233/2025`
-- Nguyên tắc: Giữ số thứ tự và năm `xxx/yyyy`, loại bỏ hậu tố mã nghiệp vụ khi so khớp và điền web form.
+.docx giữ thứ tự đoạn/bảng; .doc qua IFilter có thể giữ TAB hoặc dồn nhiều hàng chung một dòng. Khi sửa cách đọc phải kiểm cả hai đường. Nội dung không được đọc thì báo trạng thái đọc, không được tính như đáp án không có người/tài sản.
 
-### 1.3. Nhận diện Loại tài sản (`loai_tai_san`)
-- Nếu có `quyền sử dụng đất`:
-  - Có chi tiết nhà ở / công trình xây dựng (diện tích sàn, kết cấu, số tầng, cấp công trình...): **`Đất đai có tài sản`**
-  - Chỉ có thông tin thửa đất / tờ bản đồ / diện tích đất: **`Đất đai không có tài sản`**
-  - *Lưu ý*: Loại bỏ nhiễu tiêu đề chuẩn của phôi sổ ("Giấy chứng nhận quyền sử dụng đất, quyền sở hữu nhà ở và tài sản khác gắn liền với đất") trước khi kiểm tra chi tiết tài sản gắn liền.
-- Ô tô / Xe máy: **`Ô tô - Xe máy`**
-- Không có tài sản: **`Không có tài sản`**
+Trang phụ Lời chứng/Trang sửa lỗi kỹ thuật/Đính chính nhận loại và vùng riêng theo mẫu; không tự coi nội dung chỉ dẫn chiếu là đương sự. Các biến thể ký tự, marker và nhãn cũ xem tham khảo lịch sử; luật trường vẫn ở regex-fields.
 
----
-
-## 2. Quy tắc chi tiết theo từng loại văn bản
+## 2. Catalog theo loại
 
 ### 2.1. Hợp đồng chuyển nhượng (`DOC_KIND_TRANSFER`)
 - **Nhóm HĐ**: `Chuyển nhượng - Mua bán`
@@ -68,32 +87,26 @@ Catalog này tập hợp và chuẩn hóa toàn bộ quy tắc trích xuất d�
 - **Đương sự**:
   - `Bên A`: Bên thế chấp (cá nhân/hộ gia đình).
   - `Bên B`: Bên nhận thế chấp (thường là Ngân hàng / Pháp nhân / Chi nhánh + Người đại diện ký).
+  - Không có heading `BÊN NHẬN THẾ CHẤP` thì phần mở đầu trước `BÊN THẾ CHẤP` (ngân hàng + đại diện, mẫu Lời chứng Agribank/VB sửa đổi) được coi là Bên B (11/10/2026).
   - Người yêu cầu công chứng: Người đại diện ngân hàng (Bên B).
 - **Tài sản**:
   - Trích xuất thông tin thửa đất / GCN từ phần mô tả tài sản hoặc trích xuất tối thiểu `Quyền sử dụng đất`.
 
-### 2.5. Văn bản phân chia di sản (`DOC_KIND_INHERITANCE_PARTITION`)
-- **Nhóm HĐ**: `Thừa kế (khai nhận - phân chia di sản thừa kế )`
-- **Tiêu đề canonical**: `Văn bản phân chia di sản`
-- **Đương sự**:
-  - Nhóm người ký ở phần mở đầu: `NHỮNG NGƯỜI HƯỞNG DI SẢN` (bắt đầu từ `Chúng tôi là những người được hưởng di sản...`).
-  - Dừng trước `Người để lại di sản:`, `Chúng tôi tự nguyện lập Văn bản này`.
-  - *Không đưa người để lại di sản hoặc giải trình phả hệ vào danh sách đương sự*.
-- **Tài sản**:
-  - *Điểm bắt đầu*: Sau heading `Di sản:` / `Di sản của ... để lại là:` hoặc dòng `quyền sử dụng đất ... có địa chỉ tại:`.
-  - *Điểm kết thúc*: Dừng trước `Người thừa kế:`, `Những người thừa kế`, `Nội dung phân chia di sản`, `Bằng Văn bản này`, `Lời chứng`.
+### 2.5. Phân chia di sản
 
-### 2.6. Văn bản từ chối nhận di sản (`DOC_KIND_INHERITANCE_REFUSAL`)
-- **Nhóm HĐ**: `Từ chối nhận di sản thừa kế`
-- **Tiêu đề canonical**: `Văn bản từ chối nhận di sản`
-- **Đương sự**:
-  - Đơn phương 1 người: `NGƯỜI TỪ CHỐI NHẬN DI SẢN` (bắt đầu sau `Tôi là:`).
-  - Dừng trước `Nay, tôi tự nguyện lập Văn bản này`, `Theo quy định của pháp luật`.
-- **Tài sản**:
-  - Hỗ trợ đơn tài sản hoặc đa tài sản (`1. Tài sản thứ nhất:`, `2. Tài sản thứ hai:`...).
-  - *Điểm kết thúc*: Dừng trước `Bằng Văn bản này, tôi ... từ chối nhận kỷ phần thừa kế`, `Tôi xin cam đoan`, `Người từ chối hưởng di sản`, `Lời chứng`.
+Nhóm Thừa kế (khai nhận - phân chia di sản thừa kế ); tiêu đề Văn bản phân chia di sản. Vùng người/tài sản và marker tại [thừa kế §1–4](regex-thua-ke.md). Tên, danh xưng, ngày, giấy tờ, địa chỉ và dữ liệu đất tại [quy tắc trường](regex-fields.md).
 
----
+### 2.6. Từ chối nhận di sản
+
+Nhóm Từ chối nhận di sản thừa kế; tiêu đề Văn bản từ chối nhận di sản. Tôi là/Chúng tôi là hoặc Văn bản từ chối nhận di sản này được lập bởi mở nhóm người từ chối; dừng trước Nay, tôi/chúng tôi tự nguyện lập Văn bản này hoặc Theo quy định của pháp luật. Tài sản có thể nhiều mục Tài sản thứ N, mở từ mô tả di sản; dừng trước Bằng Văn bản này ... từ chối, Tôi xin cam đoan, Người từ chối hưởng di sản, Lời chứng. Trường dùng luật chung; phạm vi người chết chỉ-năm theo [spec loại](regex-thua-ke.md).
+
+### 2.7. Khai nhận di sản
+
+Tiêu đề chứa khai nhận di sản; nhóm thừa kế. Marker mở dùng chung với phân chia; nhãn NGƯỜI KHAI NHẬN DI SẢN. Xem [spec loại](regex-thua-ke.md), không chép lại luật trường.
+
+### 2.8. Sổ tiết kiệm/tài khoản và 2.9. Bảo hiểm
+
+Theo regex-decision-46, chỉ nhận diện [tài sản chưa hỗ trợ](regex-fields.md#7-trường-chưa-hỗ-trợ-và-phạm-vi) và R12; không trích dòng tiền/sổ/quyền lợi đầy đủ. Mô tả bóc chi tiết trong catalog cũ là lịch sử đã bị thay thế, không phải luật hiện hành.
 
 ## 3. Quy trình thêm loại văn bản mới
 

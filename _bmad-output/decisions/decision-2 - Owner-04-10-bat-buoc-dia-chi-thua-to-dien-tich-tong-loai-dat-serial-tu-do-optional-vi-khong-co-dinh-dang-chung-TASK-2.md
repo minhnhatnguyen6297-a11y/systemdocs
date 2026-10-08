@@ -8,11 +8,15 @@ status: accepted
 ---
 ## Context
 
-
+Khi duyệt quy tắc trích Word từ mẫu (TASK-2), các trường bắt buộc của thửa
+đất và format serial GCN chưa thống nhất giữa spec và thực tế giấy tờ.
 
 ## Decision
 
-
+Bắt buộc: địa chỉ, thửa/tờ, diện tích tổng, loại đất. Serial là chuỗi tự
+do, optional, vì không có định dạng chung trên giấy tờ thật.
 
 ## Consequences
 
+Được mở rộng 06/10/2026 bởi decision-46: serial nguyên văn áp ở mọi tầng,
+không chỉ tầng trích xuất.

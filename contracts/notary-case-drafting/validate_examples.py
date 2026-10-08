@@ -130,7 +130,6 @@ UUID4_RX = re.compile(
     r"-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
 DATE_OR_YEAR_RX = re.compile(r"^\d{4}(-\d{2}-\d{2})?$")
 DATE_FULL_RX = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-SERIAL_RX = re.compile(r"^[A-Z]{2}\d{6,8}$")
 DOC_KEY_RX = re.compile(r"^[a-z][a-z0-9_]*$")
 DOCX_NAME_RX = re.compile(r'^[^<>:"/\\|?*]{1,180}\.[dD][oO][cC][xX]$')
 FILENAME_RX = re.compile(r"^[A-Za-z0-9_-]+_HS-\d+(_\d+)?\.docx$")
@@ -276,11 +275,10 @@ def check_asset_row(row, where, v, draft_v2=False):
     if not draft_v2 and not isinstance(row.get("is_primary"), bool):
         v.append(("validation_error", f"{where} is_primary not bool"))
     serial = row.get("so_serial")
-    if not (isinstance(serial, str) and serial.strip()):
-        v.append(("stage_validation_error", f"{where} so_serial required"))
-    elif not SERIAL_RX.match(serial):
-        v.append(("stage_validation_error",
-                  f"{where} so_serial={serial!r} not canonical"))
+    # Owner 06/10/2026 (entities.md §2): serial nguyên văn tùy nguồn,
+    # có thể rỗng/trùng — chỉ kiểm kiểu chuỗi, không ép format.
+    if not isinstance(serial, str):
+        v.append(("stage_validation_error", f"{where} so_serial not string"))
     if not (isinstance(row.get("dia_chi"), str) and row["dia_chi"].strip()):
         v.append(("stage_validation_error", f"{where} dia_chi required"))
     nc = row.get("ngay_cap")

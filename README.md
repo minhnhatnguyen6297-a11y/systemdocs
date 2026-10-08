@@ -33,7 +33,11 @@ _bmad-output/specs/
 │   └── fast-text-audit.md          # CLI soát nhanh Word với scan
 ├── upload_lab/
 │   ├── README.md                   # Word → audit Excel → chuẩn bị upload
-│   ├── regex-rules.md              # Catalog trích xuất Word
+│   ├── regex-core.md               # Phạm vi và vòng kiểm tra trích Word
+│   ├── regex-fields.md             # Một nguồn quy tắc từng trường
+│   ├── regex-expected-results.md   # Đáp án mẫu, Closed/Pending
+│   ├── regex-thua-ke.md            # Loại/vùng thừa kế
+│   ├── regex-rules.md              # Catalog cấu trúc/loại Word
 │   ├── portal-session.md           # Đăng nhập, nhận diện Lưu
 │   ├── ui.md                       # Hai tab Electron và lớp thị giác
 │   └── references/                # Ảnh mockup/UI cũ, không là spec
