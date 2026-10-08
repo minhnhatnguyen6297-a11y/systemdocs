@@ -420,7 +420,7 @@ tài liệu cũ để không gợi ý một tính năng ngoài scope.
 .\venv\Scripts\python.exe -m pytest tests/test_diagram_payload_parser.py tests/test_inheritance_research_catalog.py tests/test_word_engine.py -q
 node --test --test-reporter=dot tests\*.test.mjs
 .\verify.bat
-D:\graphify\.venv\Scripts\graphify.exe update .
+graphify update .
 ```
 
 Chạy thêm `rg` để chứng minh final state không còn active usage:
