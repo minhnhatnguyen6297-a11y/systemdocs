@@ -332,8 +332,11 @@ def luat_du_lieu_mo_ho(payload: dict) -> list[dict]:
         })
     mo_ho = []
     thua_rac = []
+    muc_dich_can_kiem = []
     for thua in payload.get("raw", {}).get("danh_sach_thua_dat", []):
         label = f"thửa {thua.get('so_thua_dat') or '?'}"
+        if "Mục đích cần kiểm:" in str(thua.get("phan_ghi_them") or ""):
+            muc_dich_can_kiem.append(label)
         if _dien_tich_mo_ho(thua.get("dien_tich")):
             mo_ho.append(label)
         elif any(_dien_tich_mo_ho(c.get("dien_tich")) for c in thua.get("chi_tiet_dien_tich", [])):
@@ -354,6 +357,12 @@ def luat_du_lieu_mo_ho(payload: dict) -> list[dict]:
             "id": "R13",
             "muc": MUC_LOI,
             "noi_dung": f"số thửa đất nghi rác (text văn xuôi): {', '.join(thua_rac[:3])}" + ("..." if len(thua_rac) > 3 else ""),
+        })
+    if muc_dich_can_kiem:
+        findings.append({
+            "id": "R13",
+            "muc": MUC_CANH_BAO,
+            "noi_dung": "mục đích cần kiểm (nguồn giữ trong ghi chú): " + ", ".join(muc_dich_can_kiem),
         })
     return findings
 

@@ -50,6 +50,13 @@ là ID database, có thể null trước commit.
   serial tự do của MIN-140 theo Owner xác nhận 03/10/2026.
 - Không chặn chuyển tab khi nhập; chỉ `Cập nhật` mới kiểm dữ liệu.
 - CCCD/giấy tờ là free text, không dùng làm Case key.
+- Nhập Word giữ phần regex lấy được trong ô tương ứng để người dùng sửa,
+  kể cả chữ nguồn bị dính/sai chính tả; không tự sửa tên cơ quan hoặc bỏ
+  giá trị chữ chỉ vì khác mẫu (Owner TASK-10.3, 08/10/2026). Không thêm ô
+  nguyên văn. Ngày/diện tích và nhiều giá trị chưa chọn vẫn theo quy tắc
+  kiểm hiện hành của [nhập DOCX](./input/docx-import.md).
+  Ô nơi cấp đang có phải ghi đúng nghĩa: người sống là nơi cấp giấy tờ,
+  người chết là nơi cấp giấy khai tử; không gắn nhãn giấy khai tử cho CCCD.
 - Tài sản v2 tối đa 3; vị trí là thứ tự mảng, vị trí 1 là primary theo nghĩa
   engine. Không dùng `is_primary` trong wire v2.
   * Bỏ trường lẻ `thoi_han` ở cấp tài sản vì là trường mồ côi: không tự đắp

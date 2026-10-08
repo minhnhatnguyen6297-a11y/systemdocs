@@ -1473,10 +1473,10 @@ function createNotaryModuleView(deps) {
           if (p.ngay_chet || p.noi_cap) {
             const issuer = h('input', 'cd-cell');
             issuer.value = p.noi_cap || '';
-            issuer.placeholder = 'UBND trên giấy khai tử';
+            issuer.placeholder = p.ngay_chet ? 'UBND trên giấy khai tử' : 'Cơ quan cấp giấy tờ';
             issuer.disabled = ro;
             issuer.dataset.fid = `p:${p.row_id}:noi_cap`;
-            issuer.setAttribute('aria-label', `Nơi cấp giấy khai tử — ${p.ho_ten || 'người đã mất'}`);
+            issuer.setAttribute('aria-label', `${p.ngay_chet ? 'Nơi cấp giấy khai tử' : 'Nơi cấp giấy tờ'} — ${p.ho_ten || (p.ngay_chet ? 'người đã mất' : 'người')}`);
             issuer.setAttribute('aria-describedby', `address-issuer-${p.row_id}`);
             issuer.oninput = () => model.updatePersonField(p.row_id, 'noi_cap', issuer.value);
             const irow = h('div', 'cd-lookup-row');

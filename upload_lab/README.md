@@ -114,7 +114,7 @@ upload_lab/
 |   `-- workers.py                  # QThread worker cho scan / audit / upload
 |-- upload_services/                    # Nghiệp vụ kiểm toán Excel, phân loại scan & upload
 |-- tools/inspect_ui_style.py       # Dump metric/màu widget để soi hồi quy giao diện
-|-- tests/                          # 109 unit tests bao phủ toàn bộ luồng
+|-- tests/                          # Kiểm tự động cho các luồng hiện có
 `-- regex_review_samples/           # Thư mục chứa sample test và báo cáo đánh giá regex
 ```
 
@@ -154,10 +154,12 @@ theo contract [`../contracts/upload-workflow.md`](../contracts/upload-workflow.m
   ```cmd
   run.bat
   ```
-- **Chạy toàn bộ Unit Tests**:
+- **Chạy toàn bộ kiểm tự động** (pytest thu cả hàm test và lớp unittest):
   ```powershell
-  .\.venv\Scripts\python.exe -m unittest discover -s tests
+  .\.venv\Scripts\python.exe -B -X utf8 -m pytest tests/ -q -p no:cacheprovider
   ```
+  Ca trường Word nằm trong `tests/fixtures/word_field_cases.json`: Closed có
+  đáp án từng trường; Pending giữ đầu vào để chờ quyết định, không tính đạt.
 - **Đánh giá Regex với mẫu thực tế**:
   Đặt file Word vào `regex_review_samples/input/` và chạy:
   ```powershell

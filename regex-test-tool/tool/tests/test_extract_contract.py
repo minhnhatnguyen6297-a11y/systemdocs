@@ -3627,27 +3627,31 @@ def test_extract_contract_nhan_sinh_tran_va_bo_dia_chi_thuan_ngay():
     dich truong — xoa de R03 bao thieu (DK18 — 13/10/2026)."""
     import extract_contract
 
-    import re
+    from kiem_tra_trich_xuat import kiem_tra_payload
 
-    birth_re = re.compile(
-        r"(?i)(?:Sinh ng\s*ày|Ngày\s+sinh|Sinh ngay|Ngay sinh|Sinh năm|"
-        r"Năm sinh|Sinh nam|Nam sinh|Ngày/tháng/năm\s+sinh|Sinh)\s*[:–-]?"
-        r"\s*(\d{1,2}/\d{1,2}/\d{4})"
+    persons = extract_contract._extract_plain_text_person_entries(
+        "Bà Lê Ngọc Mai - Sinh 26/04/1985;\n"
+        "CCCD số 001085000001 do Bộ Công an cấp ngày 10/05/2021;\n"
+        "Địa chỉ: xã Minh Tân."
     )
-    assert birth_re.search("Bà Vũ Thị Quỳnh Trang - Sinh 26/04/1985").group(1) == "26/04/1985"
+    assert len(persons) == 1
+    assert persons[0]["ho_ten"] == "Lê Ngọc Mai"
+    assert persons[0]["ngay_sinh"] == "26/04/1985"
 
     text2 = "\n".join(
         [
-            "1. Người nộp thuế:",
-            "[04] Họ và tên: Mai Thị Luân;",
-            "[05] Ngày/tháng/năm sinh: 09/10/1987;",
-            "[07] Số CMND/Hộ chiếu/CCCD: 036154017122 [08] Ngày cấp: 23/10/2023",
-            "[10] Địa chỉ cư trú: [10.1] Số nhà: ...",
+            "Bà Lê Ngọc Mai; Sinh ngày: 01/01/1980;",
+            "CCCD số 001080000001 do Bộ Công an cấp ngày 10/05/2021;",
+            "Địa chỉ: 23/10/2023",
         ]
     )
     persons2 = extract_contract._extract_plain_text_person_entries(text2)
-    for p in persons2:
-        assert not __import__("re").fullmatch(r"\d{1,2}/\d{1,2}/\d{4}", str(p.get("dia_chi") or ""))
+    assert len(persons2) == 1
+    assert persons2[0]["ho_ten"] == "Lê Ngọc Mai"
+    assert persons2[0]["ngay_sinh"] == "01/01/1980"
+    assert persons2[0]["dia_chi"] == ""
+    findings = kiem_tra_payload({"raw": {"ben_a": {"nguoi": persons2}, "ben_b": {"nguoi": []}}, "web_form": {}})
+    assert any(f["id"] == "R03" and "dia_chi" in f["noi_dung"] for f in findings)
 
 def test_extract_contract_nhan_nguoi_su_dung_dat_va_dia_chi_lien_he_ngoac():
     """Nhan "Người sử dụng đất: Ông X, sinh ngày: ..." (nhan nguoi
@@ -3673,24 +3677,9 @@ def test_extract_contract_nhan_nguoi_su_dung_dat_va_dia_chi_lien_he_ngoac():
     assert duong["cccd"] == "036079008789"
     assert "Mỹ Lộ" in duong["dia_chi"]
 
-def test_extract_contract_ten_chet_rut_gon_khac_dau_va_chi_tiet_prose():
-    """Ten goi tat 1 am tiet khac dau loi chinh ta ("ông Khê" cho
-    "Vũ Kim Kê") phuc hoi ten day du theo chu cai dau am tiet cuoi;
-    chi tiet co muc_dich la cau van xuoi (ket thuc ":") bi loai khoi
-    chi_tiet_dien_tich (13/10/2026)."""
+def test_extract_contract_chi_tiet_prose():
+    """Loại tiêu đề văn xuôi; phục hồi tên F01 nằm trong fixture pending."""
     import extract_contract
-
-    text = "\n".join(
-        [
-            "ĐƠN XIN XÁC NHẬN",
-            "Bố chồng tôi là ông Vũ Kim Kê (bố đẻ ông Vũ Văn Quốc);",
-            "ông Khê đã chết ngày 05/05/1989, theo trích lục khai tử",
-            "(bản sao) số 21/TLKT-BS do UBND xã Yên Khánh ký ngày 30/05/2025.",
-        ]
-    )
-    dead = extract_contract._extract_nguoi_chet(text)
-    assert dead and dead[0]["ho_ten"] == "Vũ Kim Kê"
-    assert dead[0]["ngay_chet"] == "05/05/1989"
 
     parcels = extract_contract.tach_danh_sach_thua_dat(
         "\n".join(
@@ -3708,58 +3697,217 @@ def test_extract_contract_ten_chet_rut_gon_khac_dau_va_chi_tiet_prose():
     assert all("Di sản" not in str(d.get("muc_dich_su_dung") or "") for d in thua["chi_tiet_dien_tich"])
 
 
-class BangTabTests(unittest.TestCase):
-    def test_bang_tab_stt_danh_xung_anh_chi(self):
-        # Hang "STT	Bà X	năm	CCCD	số	ngày cấp	cơ quan	địa chỉ" qua .doc (13/10/2026).
-        section = (
-            "1\tBà Nguyễn Thị Toan\t1980\tCCCD\t036180006180\t10/05/2021\tBộ Công an\txã Minh Tân\n"
-            "2\tAnh Đào Duy Chinh\t2011\tCC\t036211017670\t18/11/2024\tBộ Công an\txã Minh Tân\n"
-        )
-        from extract_contract import _extract_party_data
-        ds = _extract_party_data(section)
-        assert len(ds["nguoi"]) == 2
-        toan = ds["nguoi"][0]
-        assert toan["ho_ten"] == "Nguyễn Thị Toan"
-        assert toan["ngay_sinh"] == "1980"
-        assert toan["ngay_cap_cccd"] == "10/05/2021"
-        assert toan["dia_chi"] == "xã Minh Tân"
-        chinh = ds["nguoi"][1]
-        assert chinh["ho_ten"] == "Đào Duy Chinh"
-        assert chinh["gioi_tinh"] == "Ông"
-        assert chinh["cccd"] == "036211017670"
+class WordFieldClosedCasesTests(unittest.TestCase):
+    """Đáp án đọc từ spec; pending là dữ liệu, không được cộng vào ca đạt."""
 
-    def test_bang_doc_nhieu_hang_mot_dong_pipe(self):
-        # Bang .doc don nhieu hang vat ly vao 1 dong "|" — thua 202 +
-        # "Trong do" + thua 26/9 + 380/16 + 171/26 (13/10/2026).
-        text = (
-            "Số tờ bản đồ | Số thửa | Diện tích (m2) | Mục đích sử dụng | Thời hạn sử dụng\n"
-            "28 | 202 | 497 |  |  |  |  | Trong đó |  |  |  |  |  | 240 | Đất ở | "
-            "Lâu dài |  |  |  | 257 | Đất vườn tạp | 12/2043 |  | 27 | 26/9 | 185 | "
-            "2 Vụ lúa | 12.2013 |  | 28 | 380/16 | 48 | 1 vụ lúa 1 vụ mầu | "
-            "12.2013 |  | 28 | 171/26 | 67 | Chuyên mạ | 12.2013"
-        )
-        parcels = tach_danh_sach_thua_dat(text)
-        assert [p["so_thua_dat"] for p in parcels] == ["202", "26/9", "380/16", "171/26"]
-        assert parcels[0]["dien_tich"] == "497"
-        assert [
-            (c["dien_tich"], c["muc_dich_su_dung"]) for c in parcels[0]["chi_tiet_dien_tich"]
-        ] == [("240", "Đất ở"), ("257", "Đất vườn tạp")]
-        assert parcels[1]["thoi_han_su_dung"] == "12.2013"
-        assert parcels[3]["muc_dich_su_dung"] == "Chuyên mạ"
+    def _extract_text(self, text, *, native_doc=False, title="VĂN BẢN CAM KẾT TÀI SẢN RIÊNG"):
+        from unittest.mock import patch
 
-    def test_thua_nhac_lai_tong_khac_giu_rieng(self):
-        # Van ban SUA DOI: thua 211 mo ta 2 lan tong khac nhau (336 vs
-        # 308,1) — giu 2 ban rieng; "9 do Chi nhanh" cat " do " -> "9".
+        with tempfile.TemporaryDirectory() as tempdir:
+            if native_doc:
+                path = Path(tempdir) / "field-case.doc"
+                path.touch()
+                with patch("extract_contract.read_docx", return_value=title + "\n" + text) as reader:
+                    payload = extract(path)
+                reader.assert_called_once_with(path, use_ifilter_for_doc=True)
+                self.assertEqual(payload["raw"]["extract_mode"], "plain_text_doc")
+                return payload
+            path = make_docx(Path(tempdir) / "field-case.docx", title, *text.splitlines())
+            return extract(path)
+
+    def _check_case(self, case_id):
+        import json
+        from kiem_tra_trich_xuat import kiem_tra_payload
+
+        fixture = json.loads((Path(__file__).parent / "fixtures/word_field_cases.json").read_text(encoding="utf-8"))
+        case = next(c for c in fixture["closed"] if c["id"] == case_id)
+        self.assertEqual(case["status"], "closed_existing_spec")
+        payload = self._extract_text(case["text"])
+        if "people" in case:
+            people = payload["raw"]["ben_a"]["nguoi"] + payload["raw"]["ben_b"]["nguoi"]
+            self.assertEqual(len(people), len(case["people"]), case_id)
+            for actual, expected in zip(people, case["people"]):
+                for field, value in expected.items():
+                    self.assertIn(field, actual)
+                    self.assertEqual(actual[field], value, f"{case_id}: {field}")
+        if "parcels" in case:
+            parcels = payload["raw"]["danh_sach_thua_dat"]
+            self.assertEqual(len(parcels), len(case["parcels"]), case_id)
+            for actual, expected in zip(parcels, case["parcels"]):
+                for field, value in expected.items():
+                    self.assertIn(field, actual)
+                    self.assertEqual(actual[field], value, f"{case_id}: {field}")
+        if "party_addresses" in case:
+            self.assertEqual([payload["raw"][key]["dia_chi"] for key in ("ben_a", "ben_b")], case["party_addresses"])
+        findings = kiem_tra_payload(payload)
+        for flag in case.get("flags", []):
+            matching = [f for f in findings if f["id"] == flag["id"] and flag["contains"] in f["noi_dung"]]
+            self.assertEqual(len(matching), flag.get("count", 1), case_id)
+            for name in flag.get("names", []):
+                self.assertIn(name, matching[0]["noi_dung"], case_id)
+        for flag_id in case.get("absent_flags", []):
+            self.assertFalse([f for f in findings if f["id"] == flag_id], case_id)
+
+    def test_c01_chau(self): self._check_case("C01")
+    def test_c02_con(self): self._check_case("C02")
+    def test_c03_reversed_columns(self): self._check_case("C03")
+    def test_c04_empty_map_cell(self): self._check_case("C04")
+    def test_c05_long_land_label(self): self._check_case("C05")
+    def test_c06_full_birth_in_tab_table(self): self._check_case("C06")
+    def test_c07_sinh_without_suffix(self): self._check_case("C07")
+    def test_c08_date_only_address(self): self._check_case("C08")
+    def test_c09_shared_date_only_address(self): self._check_case("C09")
+    def test_c10_keyed_date_only_address(self): self._check_case("C10")
+    def test_c11_confirmed_empty_lists(self): self._check_case("C11")
+    def test_c12_year_only_birth(self): self._check_case("C12")
+
+    def _table_person(self, tail):
+        payload = self._extract_text("1\tBà Lê Ngọc Mai\t" + tail)
+        people = payload["raw"]["ben_a"]["nguoi"] + payload["raw"]["ben_b"]["nguoi"]
+        self.assertEqual(len(people), 1)
+        self.assertEqual(people[0]["ho_ten"], "Lê Ngọc Mai")
+        return payload, people[0]
+
+    def test_table_year_before_and_after_identity(self):
+        for tail in (
+            "1980\tCCCD\t001080000001\t10/05/2021\tBộ Công an\txã Minh Tân",
+            "CCCD\t001080000001\t1980\t10/05/2021\tBộ Công an\txã Minh Tân",
+        ):
+            with self.subTest(tail=tail):
+                _, person = self._table_person(tail)
+                self.assertEqual(person["ngay_sinh"], "1980")
+                self.assertTrue(person["chi_co_nam_sinh"])
+                self.assertEqual(person["cccd"], "001080000001")
+                self.assertEqual(person["ngay_cap_cccd"], "10/05/2021")
+                self.assertEqual(person["noi_cap"], "Bộ Công an")
+                self.assertEqual(person["dia_chi"], "xã Minh Tân")
+
+    def test_table_missing_birth_after_identity_digits(self):
+        from kiem_tra_trich_xuat import kiem_tra_payload
+
+        payload, person = self._table_person("\t001080000001\t10/05/2021\tBộ Công an\txã Minh Tân")
+        self.assertEqual(person["ngay_sinh"], "")
+        self.assertFalse(person["chi_co_nam_sinh"])
+        self.assertEqual(person["ngay_cap_cccd"], "10/05/2021")
+        self.assertEqual(person["noi_cap"], "Bộ Công an")
+        self.assertEqual(person["dia_chi"], "xã Minh Tân")
+        self.assertTrue(any(f["id"] == "R03" and "ngay_sinh" in f["noi_dung"] for f in kiem_tra_payload(payload)))
+
+    def test_table_missing_birth_and_identity_number(self):
+        from kiem_tra_trich_xuat import kiem_tra_payload
+
+        payload, person = self._table_person("\tCCCD\t\t10/05/2021\tBộ Công an\txã Minh Tân")
+        self.assertEqual(person["ngay_sinh"], "")
+        self.assertEqual(person["cccd"], "")
+        self.assertFalse(person["chi_co_nam_sinh"])
+        self.assertEqual(person["ngay_cap_cccd"], "10/05/2021")
+        self.assertEqual(person["noi_cap"], "Bộ Công an")
+        self.assertEqual(person["dia_chi"], "xã Minh Tân")
+        findings = kiem_tra_payload(payload)
+        for field in ("ngay_sinh", "cccd"):
+            self.assertTrue(any(f["id"] == "R03" and field in f["noi_dung"] for f in findings))
+
+    def test_table_empty_issuing_place_preserves_address_position(self):
+        for address in ("xã Minh Tân", "Liên Minh", ""):
+            with self.subTest(address=address):
+                _, person = self._table_person("1980\tCCCD\t001080000001\t10/05/2021\t\t" + address)
+                self.assertEqual(person["ngay_sinh"], "1980")
+                self.assertEqual(person["noi_cap"], "")
+                self.assertEqual(person["ngay_cap_cccd"], "10/05/2021")
+                self.assertEqual(person["dia_chi"], address)
+
+    def _asset_payload(self, text, *, native_doc=False):
+        return self._extract_text("Tài sản là quyền sử dụng đất tại xã Minh Tân.\n" + text, native_doc=native_doc)
+
+    def test_native_doc_empty_map_cell(self):
         text = (
-            "Số tờ bản đồ | Số thửa | Diện tích (m2) | Mục đích sử dụng | Thời hạn sử dụng\n"
-            "9 | 211 | 336 | Trong đó | 246 | Đất ở | Lâu dài | 90 | Đất vườn tạp | 12/2043\n"
-            "Thửa đất số 211, tờ bản đồ số 9 do Chi nhánh Văn phòng Đăng ký đất đai "
-            "Ý Yên nhận ngày 26/12/2025; cụ thể như sau\n"
-            "Số tờ bản đồ Số thửa Diện tích (m2) Mục đích sử dụng Thời hạn sử dụng "
-            "9 211 308,1 Trong đó 218,1 Đất ở Lâu dài 90,0 Đất vườn tạp 12/2043"
+            "Số tờ\tSố thửa\tDiện tích\tMục đích sử dụng\tThời hạn sử dụng\n"
+            "\t211\t80\tONT\tLâu dài\t10\t212\t40\tCLN\t12/2043"
         )
-        parcels = tach_danh_sach_thua_dat(text)
-        assert len(parcels) == 2
-        assert parcels[0]["dien_tich"] == "336"
-        assert parcels[1]["dien_tich"] == "308,1"
-        assert parcels[1]["so_to_ban_do"] == "9"
+        payload = self._asset_payload(text, native_doc=True)
+        parcels = payload["raw"]["danh_sach_thua_dat"]
+        self.assertEqual(len(parcels), 2)
+        self.assertEqual([(p["so_thua_dat"], p["so_to_ban_do"], p["dien_tich"], p["muc_dich_su_dung"], p["thoi_han_su_dung"]) for p in parcels], [("211", "", "80", "ONT", "Lâu dài"), ("212", "10", "40", "CLN", "12/2043")])
+        import extract_contract as engine
+        self.assertEqual(engine._normalize_plain_text_for_extract("\tÔng: Lê Minh Bình;\t"), "Ông: Lê Minh Bình;")
+
+    def test_mapped_continuation_trailing_cells_and_renumbering(self):
+        heading = "Số thửa | Số tờ | Diện tích | Mục đích sử dụng | Thời hạn sử dụng\n"
+        cases = (
+            ("211 | 9 | 80 | ONT | Lâu dài | | | 40 | CLN | 12/2043", 1, "211", "9", "", [{"dien_tich": "40", "muc_dich_su_dung": "CLN", "thoi_han_su_dung": "12/2043"}]),
+            ("211 | 9 | 80 | ONT | Lâu dài | |", 1, "211", "9", "", []),
+            ("211 (nay là thửa đất số 301) | 9 | 80 | ONT | Lâu dài | 212 | 10 | 40 | CLN | 12/2043", 2, "211", "9", "nay là thửa đất số 301", []),
+        )
+        for row, count, number, map_number, note, details in cases:
+            with self.subTest(row=row):
+                parcels = self._asset_payload(heading + row)["raw"]["danh_sach_thua_dat"]
+                self.assertEqual(len(parcels), count)
+                self.assertEqual(parcels[0]["so_thua_dat"], number)
+                self.assertEqual(parcels[0]["so_to_ban_do"], map_number)
+                self.assertEqual(parcels[0]["dien_tich"], "80")
+                self.assertEqual(parcels[0]["muc_dich_su_dung"], "ONT")
+                self.assertEqual(parcels[0]["thoi_han_su_dung"], "Lâu dài")
+                self.assertIn(note, parcels[0]["phan_ghi_them"])
+                self.assertEqual(parcels[0]["chi_tiet_dien_tich"], details)
+                if count == 2:
+                    self.assertEqual((parcels[1]["so_thua_dat"], parcels[1]["so_to_ban_do"], parcels[1]["dien_tich"], parcels[1]["muc_dich_su_dung"], parcels[1]["thoi_han_su_dung"]), ("212", "10", "40", "CLN", "12/2043"))
+
+    def test_structured_long_land_label_kept(self):
+        label = "Đất trồng cây lâu năm và đất nuôi trồng thủy sản sử dụng riêng theo giấy chứng nhận quyền sử dụng đất và bản đồ địa chính"
+        self.assertGreater(len(label), 100)
+        payload = self._asset_payload("Thửa đất số: 211\nDiện tích: 40 m2\nTrong đó:\n40 | " + label + " | 12/2043")
+        parcels = payload["raw"]["danh_sach_thua_dat"]
+        self.assertEqual(len(parcels), 1)
+        self.assertEqual(parcels[0]["chi_tiet_dien_tich"], [{"dien_tich": "40", "muc_dich_su_dung": label, "thoi_han_su_dung": "12/2043"}])
+        self.assertEqual(parcels[0]["land_rows"], [{"loai_dat": label, "dien_tich": 40.0, "thoi_han": "12/2043"}])
+
+    def test_land_narrative_preserved_as_note_and_flagged(self):
+        from kiem_tra_trich_xuat import kiem_tra_payload
+
+        for label in ("Di sản của bà Lê Ngọc Mai để lại là", "Chúng tôi thống nhất phân chia phần đất này", "Các bên thống nhất phân chia quyền sử dụng đất theo nội dung đã ghi ở trên"):
+            with self.subTest(label=label):
+                payload = self._asset_payload("Thửa đất số: 211\nDiện tích: 40 m2\nTrong đó:\n40 | " + label + " | 12/2043")
+                parcels = payload["raw"]["danh_sach_thua_dat"]
+                self.assertEqual(len(parcels), 1)
+                self.assertEqual(parcels[0]["chi_tiet_dien_tich"], [])
+                self.assertEqual(parcels[0]["land_rows"], [])
+                self.assertEqual(parcels[0]["dien_tich"], "40 m2")
+                for value in ("40", label, "12/2043"):
+                    self.assertIn(value, parcels[0]["phan_ghi_them"])
+                self.assertTrue(any(f["id"] == "R13" and "mục đích" in f["noi_dung"] for f in kiem_tra_payload(payload)))
+
+    def test_role_composite_neutral_title(self):
+        from kiem_tra_trich_xuat import kiem_tra_payload
+
+        for title in ("Ông/bà", "Ông / bà", "Ông(bà)", "Bà(ông)"):
+            with self.subTest(title=title):
+                payload = self._extract_text(f"Đồng sở hữu – {title} Lê Minh An; Sinh ngày 21/11/2011")
+                people = payload["raw"]["ben_a"]["nguoi"]
+                self.assertEqual(len(people), 1)
+                self.assertEqual(people[0]["ho_ten"], "Lê Minh An")
+                self.assertEqual(people[0]["gioi_tinh"], "")
+                self.assertTrue(any(f["id"] == "R13" and "giới tính" in f["noi_dung"] for f in kiem_tra_payload(payload)))
+
+    def test_deceased_sinh_bare_and_date_only_final_address(self):
+        import extract_contract as engine
+        text = (
+            "Ông Lê Minh Bình - Sinh 26/04/1985; đã chết ngày 02/03/2025 theo Trích lục khai tử số 21/TLKT-BS do UBND xã Minh Tân ký ngày 03/03/2025;\n"
+            "Nơi thường trú cuối cùng: 23/10/2023"
+        )
+        for native_doc in (False, True):
+            with self.subTest(native_doc=native_doc):
+                payload = self._extract_text(text, native_doc=native_doc, title="VĂN BẢN TỪ CHỐI NHẬN DI SẢN THỪA KẾ")
+                dead = payload["raw"]["nguoi_chet"]
+                self.assertEqual(len(dead), 1)
+                self.assertEqual(dead[0]["ho_ten"], "Lê Minh Bình")
+                self.assertEqual(dead[0]["ngay_sinh"], "26/04/1985")
+                self.assertFalse(dead[0]["chi_co_nam_sinh"])
+                self.assertEqual(dead[0]["ngay_chet"], "02/03/2025")
+                self.assertEqual(dead[0]["dia_chi"], "")
+                self.assertEqual(dead[0]["so_giay_to"], "21/TLKT-BS")
+                self.assertEqual(dead[0]["ngay_cap"], "03/03/2025")
+                self.assertEqual(dead[0]["noi_cap"], "UBND xã Minh Tân")
+        helper = engine._extract_nguoi_chet(text)
+        self.assertEqual(len(helper), 1)
+        self.assertEqual(helper[0]["ngay_sinh"], "26/04/1985")
+        self.assertEqual(helper[0]["dia_chi"], "")

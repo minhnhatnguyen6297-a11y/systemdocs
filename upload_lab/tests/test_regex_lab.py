@@ -162,6 +162,86 @@ EXTRACTION = regex_lab._snapshot(PAYLOAD)
 
 
 class CompareAnswersTests(unittest.TestCase):
+    def test_nested_unanswered_sibling_does_not_diff_and_empty_row_does(self):
+        self._write_expected({'nguoi': [{'ho_ten': 'Nguyễn Văn A', 'nested': {'f': None}}]})
+        self.assertEqual(regex_lab.compare_answers(self.answers, self.cache)['exit_code'], 0)
+        index_path = self.cache / 'index.json'
+        index = json.loads(index_path.read_text(encoding='utf-8'))
+        index['records'][self.hash]['extraction']['nguoi'].append({'ho_ten':'Người Mẫu Hai'})
+        index_path.write_text(json.dumps(index), encoding='utf-8')
+        self._write_expected({'nguoi': [{'ho_ten': 'Nguyễn Văn A'}, {}]})
+        report = regex_lab.compare_answers(self.answers, self.cache)
+        self.assertEqual(report['exit_code'], 1)
+        self.assertTrue(any('chi kiem duoc so luong' in str(d['actual']) for d in report['diffs']))
+
+    def test_compare_answers_cannot_reuse_actual_parcel_for_two_expected_rows(self):
+        index_path = self.cache / 'index.json'
+        index = json.loads(index_path.read_text(encoding='utf-8'))
+        index['records'][self.hash]['extraction']['thua_dat'] = [{'so_thua_dat':'11'}, {'so_thua_dat':'12'}]
+        index_path.write_text(json.dumps(index), encoding='utf-8')
+        self._write_expected({'thua_dat': [{'so_thua_dat':'11'}, {'so_thua_dat':'11'}]})
+        report = regex_lab.compare_answers(self.answers, self.cache)
+        self.assertEqual(report['exit_code'], 1)
+        self.assertTrue(any(d['field'] == 'thua_dat[1].so_thua_dat' and d['actual'] == '12' for d in report['diffs']))
+
+    def test_strict_identity_booleans_and_one_to_one_rows(self):
+        probes = [
+            ({'ho_ten': 'Nguyễn Văn Mẫu'}, {'ho_ten': 'Nguyên Văn Mẫu'}),
+            ({'cccd': '001234567890'}, {'cccd': '1234567890'}),
+            ({'cccd': '9007199254740992'}, {'cccd': '9007199254740993'}),
+            ({'chi_co_nam_sinh': False}, {'chi_co_nam_sinh': True}),
+            ({'chi_co_nam_sinh': False}, {'chi_co_nam_sinh': 0}),
+            ({'chi_co_nam_sinh': False}, {'chi_co_nam_sinh': 'False'}),
+            ({'ngay_chet': '01/01/2000'}, {'ngay_chet': '02/01/2000'}),
+            ([{'so_thua_dat': '11'}, {'so_thua_dat': '11'}], [{'so_thua_dat': '11'}, {'so_thua_dat': '12'}]),
+        ]
+        for want, got in probes:
+            with self.subTest(want=want, got=got):
+                self.assertFalse(regex_lab._match(want, got, 'thua_dat' if isinstance(want, list) else ''))
+        self.assertTrue(regex_lab._match([{'so_thua_dat':'11'}, {'so_thua_dat':'12'}], [{'so_thua_dat':'12'}, {'so_thua_dat':'11'}], 'thua_dat'))
+        ordered = [{'loai_dat':'ONT','dien_tich':10}, {'loai_dat':'CLN','dien_tich':20}]
+        self.assertFalse(regex_lab._match({'land_rows':ordered}, {'land_rows':list(reversed(ordered))}))
+        self.assertFalse(regex_lab._match({'chi_tiet_dien_tich':ordered}, {'chi_tiet_dien_tich':list(reversed(ordered))}))
+
+    def test_unknown_answer_key_does_not_silently_pass(self):
+        self._write_expected({'nguoi': [{'ho_ten': 'Nguyễn Văn A'}], 'thau_dat': []})
+        report = regex_lab.compare_answers(self.answers, self.cache)
+        self.assertEqual(report['exit_code'], 1)
+        self.assertTrue(any(d['field'] == 'thau_dat' and d['actual'] == 'unknown answer key' for d in report['diffs']))
+
+    def test_snapshot_keeps_boolean_false_and_deceased_gender(self):
+        payload = {'raw': {'ben_a': {'nguoi': [{'ho_ten':'Người Mẫu','chi_co_nam_sinh':False}]},
+                           'nguoi_chet': [{'ho_ten':'Người Chết Mẫu','gioi_tinh':'Ông','chi_co_nam_sinh':True}]}}
+        snapshot = regex_lab._snapshot(payload)
+        self.assertIs(snapshot['nguoi'][0]['chi_co_nam_sinh'], False)
+        self.assertIs(snapshot['nguoi_chet'][0]['chi_co_nam_sinh'], True)
+        self.assertEqual(snapshot['nguoi_chet'][0]['gioi_tinh'], 'Ông')
+
+    def test_nested_null_is_unanswered_and_partial_scope_is_explicit(self):
+        self._write_expected({'nguoi': [{'nested': {'ho_ten': None}}]})
+        report = regex_lab.compare_answers(self.answers, self.cache)
+        self.assertEqual(report['exit_code'], 1)
+        self.assertEqual(report['checked_fields'], 0)
+        self.assertEqual(report['scope'][0]['result_scope'], 'unanswered')
+        self._write_expected({'nguoi': [{}]})
+        self.assertEqual(regex_lab.compare_answers(self.answers, self.cache)['checked_fields'], 0)
+        self._write_expected({'nguoi': [{'ho_ten': 'Nguyễn Văn A'}]})
+        report = regex_lab.compare_answers(self.answers, self.cache)
+        self.assertEqual(report['exit_code'], 0)
+        self.assertEqual(report['checked_fields'], 1)
+        self.assertGreater(report['unanswered_fields'], 0)
+        self.assertEqual(report['scope'][0]['result_scope'], 'checked_fields_only')
+
+    def test_extraction_error_never_matches_answer(self):
+        index_path = self.cache / 'index.json'
+        index = json.loads(index_path.read_text(encoding='utf-8'))
+        index['records'][self.hash]['extraction']['error'] = 'reader failed'
+        index_path.write_text(json.dumps(index), encoding='utf-8')
+        self._write_expected({'nguoi': [{'ho_ten': 'Nguyễn Văn A'}]})
+        report = regex_lab.compare_answers(self.answers, self.cache)
+        self.assertEqual(report['exit_code'], 1)
+        self.assertTrue(any(d['field'] == 'error' for d in report['diffs']))
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)

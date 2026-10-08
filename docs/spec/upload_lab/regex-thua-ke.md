@@ -1,14 +1,17 @@
 # Regex thừa kế v1 — phân chia / từ chối / khai nhận di sản
 
-**Trạng thái:** Active · **Phiên bản:** v1.2 (07/10/2026) ·
-**Engine:** `ENGINE_VERSION 2026-10-07-thuake6` ·
-**Độ phủ:** 50 văn bản phân chia đầu tiên ở `D` (31 sạch, 11 loại
-đúng vì không phải văn bản, 8 gắn cờ người kiểm) + file owner gửi
-(`comment/Văn bản phân chia 1.doc`)
+**Trạng thái:** Active · **Phiên bản tài liệu:** v1.3 (TASK-10.1).
+**Engine hiện hành:** [extract_contract.py](../../../upload_lab/extract_contract.py),
+phiên bản lấy từ `ENGINE_VERSION`, không chép mã bản vào nhiều spec.
+**Bằng chứng lịch sử:** 50 văn bản phân chia đầu tiên ở `D` (31 không có cờ,
+11 được loại vì không phải văn bản, 8 gắn cờ) + file owner gửi
+(`comment/Văn bản phân chia 1.doc`). Đây là kết quả quét cũ, không phải
+độ chính xác được chấm bằng đáp án. Kiểm hiện tại theo [bộ đáp án](regex-expected-results.md).
 
-File này là SOT chi tiết loại thừa kế. Catalog tổng ở
-[`regex-rules.md`](./regex-rules.md) §2.5–§2.9 chỉ tra nhanh;
-khi lệch nhau thì file này đúng.
+File này sở hữu loại/vùng và đầu-cuối bản ghi thừa kế. Giá trị từng trường
+chỉ do [regex-fields.md](regex-fields.md) sở hữu; [đáp án](regex-expected-results.md)
+ghi cách kiểm. [Catalog](regex-rules.md) dẫn đường. Mâu thuẫn gộp/phục hồi tên
+F01/F04/F05 được giữ chờ, không tự giải quyết bằng tuổi hoặc thứ tự file.
 
 ## 1. Ba loại con
 
@@ -24,41 +27,32 @@ lại di sản:`, `Di sản:`, `Khi còn sống`, `Trước khi chết`,
 
 ## 2. Người sống (mỗi người 1 bản ghi)
 
-| Trường | Cách nhận |
+| Trường | Nguồn quy tắc duy nhất |
 |---|---|
-| `gioi_tinh` | `Ông`/`Anh`/`Ngài` → Ông; `Bà`/`Chị`/`Bà mụ` → Bà; `Ông/bà:` hoặc mơ hồ → **để trống** + cờ R13 (không suy qua `Thị`, decision-46) |
-| `ho_ten` | Sau danh xưng, cắt trước `\|`, nhãn ngày sinh (bắt buộc kèm giá trị vì `Năm` là âm tiết tên), `có vợ/chồng là`, ngoặc ngày sinh người khác; **vai trò không vào tên** — cắt cả đuôi ` - Con đẻ ông X` lẫn dòng riêng `Là vợ/con của...` (Owner 07/10/2026: `ho_ten` chỉ giữ họ tên) |
-| `ngay_sinh` | `Sinh ngày[:/-] DD/MM/YYYY`, hoặc `Sinh năm[:/-] YYYY` → giữ đúng `YYYY` + cờ `chi_co_nam_sinh`; văn bản viết nhầm nhãn `Sinh năm: DD/MM/YYYY` (ngày đủ) vẫn lấy ngày đủ, không nuốt `Sinh` vào tên (10/10/2026) |
-| `cccd` | Sau `Căn cước (công dân) số` / `CCCD số` / `CMND` (`số:` dính hai chấm cũng nhận) |
-| `noi_cap` | Giữa `do` và `cấp/ký ngày`; thiếu `do` thì lấy cụm sau số giấy tờ |
-| `ngay_cap_cccd` | Sau `cấp/ký ngày`; số Excel 5 chữ số (`cấp ngày 44546`) đổi ra ngày thật |
-| `dia_chi` | `Thường trú/Cư trú tại:`, `Nơi thường trú[:]`, `Nơi cư trú:`, `Hộ khẩu (thường trú):`, `Địa chỉ...` — kể cả chung dòng tên; giá trị cắt trước `Là vợ/con của...`, `1.`/`2.`..., `Ông:`/`Bà:` đầu người kế (IFilter gộp dòng); trừ `Nơi thường trú cuối cùng...` của người chết |
+| `ho_ten, ten_goi_khac, gioi_tinh` | [Người](regex-fields.md#2-người): tên sạch, danh xưng trung tính để trống |
+| `ngay_sinh, chi_co_nam_sinh` | Ngày/năm, không tự thêm 01/01; bảng phải giữ đúng cột |
+| `cccd, noi_cap, ngay_cap_cccd` | Giấy tờ đúng người; không lấy ngày làm nơi cấp |
+| `dia_chi` | Nhãn/vùng đúng người; ngày thuần không phải địa chỉ |
 
 Bỏ cả dòng phả hệ (`Ông X có vợ là bà Y (Sinh ngày...)`) và khối
 dừng trước dòng `chết ngày`.
 
 ## 3. Người chết (`raw.nguoi_chet`, bắt buộc có `chết/đã chết ngày DD/MM/YYYY`)
 
-| Trường | Cách nhận |
-|---|---|
-| `ho_ten`, `ten_goi_khac` | `Ông/Bà ... [(tên gọi khác là ...)]`; tên tối đa 6 từ, mọi từ phải viết hoa chữ cái đầu — câu kể phả hệ (`Ông Đức và bà Khuâng là vợ chồng...`) bị loại, không sinh bản ghi rác |
-| `ngay_sinh` | `Sinh năm[:] YYYY` (giữ `YYYY` + cờ) hoặc đủ ngày |
-| `ngay_chet` | Sau `chết/đã chết ngày[:/-]` (kể cả lỗi gõ lặp `ngày ngày`) |
-| `so_giay_to`, `loai_giay_to`, `ngay_cap`, `noi_cap` | Trích lục khai tử là giấy tờ của người chết: sau `Trích lục khai tử... số`, `do... ký/cấp ngày` (decision-46) |
-| `dia_chi` | Sau `Nơi thường trú cuối cùng trước khi chết:` (cắt `)` đóng ngoặc) |
+Trường người chết dùng [quy tắc trường §3](regex-fields.md#3-người-chết--theo-spec-hiện-hành-trừ-f01).
+Dấu hiệu chết và vùng khai ở đây quyết định đây là người để lại di sản;
+không đổi người chỉ để đầy đủ giấy tờ. Luật phục hồi gọi tắt F01 còn chờ.
 
 Dạng ngoặc gộp (11–12/10/2026): `ông X (sinh năm 1956, đã chết ngày ...)` và
 `ông X (Tên khác); (Sinh năm 1945, đã chết ngày ... theo trích lục...)` —
 ngoặc bí danh có thể đứng trước ngoặc sinh/chết; phần trong ngoặc sau
 ngày chết (`theo trích lục`, `Nơi thường trú`) vẫn được chấp nhận.
 
-Người chết được nhắc **nhiều lần** (`Bà Hiên` nhắc ở mục con đẻ rồi mục
-hàng thừa kế) gộp theo khoá `tên|ngày chết`: bản sau **điền trường
-trống** của bản đầu (địa chỉ cuối thường chỉ có ở lần nhắc sau —
-12/10/2026), không tạo bản ghi trùng. `so_thua_dat` cắt `:`/`;` cuối
-nhãn (`- Thửa đất số 112:`); `thửa đất số 112, 115` liệt kê nhiều số
-tách thành từng thửa cùng các trường còn lại rồi gộp vào bản chi tiết
-cùng số theo luật khử trùng.
+**Lần nhắc lặp:** luật “bản sau điền trường trống” của v1.2 là hiện trạng đã ghi,
+không mở rộng luật phục hồi hoặc gộp tài sản trong TASK-10.1. Các lựa chọn đang
+mâu thuẫn xem [F01/F04/F05](regex-fields.md#8-chờ-quyết-định--không-tính-đạt).
+Danh sách số thửa 112,115 và ghi chú đánh số lại vẫn theo quy tắc định danh trường;
+không tự chọn cách gộp các bản lặp.
 
 ## 4. Tài sản đất (mỗi thửa 1 dòng `danh_sach_thua_dat` + `land_rows` shape DB)
 
@@ -69,14 +63,16 @@ GCN/theo bản đồ)`. Dừng trước: `Người/Những người thừa kế/
 thừa kế` (kể cả `III.`, `III. |`), `Nội dung/Thống nhất phân chia`,
 `Bằng Văn bản này`, `Lời chứng`.
 
-| Trường thửa | Cách nhận |
+| Trường thửa | Nguồn quy tắc duy nhất |
 |---|---|
-| `so_thua_dat`, `so_to_ban_do` | Nhãn `Thửa đất số`/`Số thửa`, `Tờ bản đồ số`/`Số tờ` (kể cả ngược thứ tự, chung dòng, cắt nhau bằng `;`, kể cả lỗi chính tả `Tờ bản đổ số` 10/10/2026); `so_to_ban_do` chỉ giữ số/ký hiệu — cắt đuôi mô tả `Bản đồ địa chính năm 1991` (Owner 07/10/2026) |
-| `dien_tich` | Giữ chữ gốc (`285.0 m2`), bỏ `(bằng chữ:...)`, cắt phần thừa sau `,`/`;`/`trong`/`theo`; giá trị không chứa chữ số (`diện tích thửa đất nêu trên`) bị loại + R13 |
-| `muc_dich_su_dung`, `thoi_han_su_dung`, `phan_ghi_them` | Ô bảng / nhãn dòng; `Trong đó` gộp vào thửa đang mở, không ghi đè; chi tiết viết liền `Trong đó: ONT: 190,0 m2; NTS: 75,0 m2` tách vào `chi_tiet_dien_tich`; dòng `Hiện nay là thửa đất số X; Tờ Y` là đánh số lại của **cùng thửa** → ghi vào `phan_ghi_them`, không mở thửa mới; thửa `(so_thua_dat, so_to_ban_do)` lặp lại trong văn bản chỉ giữ bản ghi đầu |
-| `nguon_goc` | Nhãn `Nguồn gốc (sử dụng đất)` — có trường sẵn, trống khi văn bản không ghi |
-| `dia_chi`, `loai_gcn`, `so_gcn`, `so_vao_so`, `ngay_cap_gcn`, `co_quan_cap` | Từ câu GCN chung, copy vào từng thửa; serial nhận cả `Đ` (`Đ 364866`); số vào sổ cắt từ thừa |
-| `land_rows[]` | Đổi từng chi tiết sang `{loai_dat (giữ chữ gốc: ONT/CLN hay Đất ở), dien_tich (số), thoi_han}` đúng shape DB `asset_row.land_rows` |
+| `so_thua_dat, so_to_ban_do` | [Định danh thửa](regex-fields.md#4-định-danh-thửa--theo-spec-hiện-hành), giữ nhãn/cột cả khi đảo thứ tự |
+| `dien_tich, chi_tiet_dien_tich, land_rows` | [Diện tích/chi tiết](regex-fields.md#5-diện-tích-và-chi-tiết-đất--theo-spec-hiện-hành-trừ-cách-gộp), tổng độc lập |
+| `muc_dich_su_dung, thoi_han_su_dung, phan_ghi_them, nguon_goc` | Giữ dữ liệu đúng ô; không cắt vì nhãn dài |
+| `dia_chi, loai_gcn, so_gcn, so_vao_so, ngay_cap_gcn, co_quan_cap` | [Giấy chứng nhận](regex-fields.md#6-giấy-chứng-nhận--theo-spec-hiện-hành) |
+
+Luật cũ “cùng thửa/tờ chỉ giữ bản đầu” mâu thuẫn catalog gộp/giữ khác tổng:
+[F04/F05 chờ quyết định](regex-fields.md#8-chờ-quyết-định--không-tính-đạt).
+Không dùng bảng ở đây để chốt một đáp án số bản ghi đang mở.
 
 Hai luật chống nhiễu (10/10/2026): **bảng liệt kê người** (ô chứa
 `Sinh ngày/năm`, `CCCD`, `Hộ khẩu`, hoặc ô đầu dạng `1. Ông/Bà ...`)
@@ -122,3 +118,4 @@ không còn `raw.loi_chung_nguoi` và luật R11.
 | v1.0 | 06/10/2026 | Vòng 1–5: mở đầu/kết 12+ biến thể, tên trần + vai trò, `Ông/bà`, Anh/Chị, `Tôi tên là:`, năm sinh + cờ, ngày Excel, người chết + trích lục, tách thửa + `land_rows`, sổ TK/tài khoản/thẻ, bảo hiểm, bảng `.doc`, luật R00–R11 | thuake5 |
 | v1.1 | 06/10/2026 | decision-46: bỏ lời chứng + R11; người chết dùng trường Người (`so_giay_to`/`ngay_cap`/`noi_cap`/`dia_chi`); sổ TK/bảo hiểm chỉ gắn cờ `tai_san_chua_ho_tro` + R12; không suy giới tính từ `Thị`, giới tính trống → R13; diện tích mơ hồ (`1.234`) → R13 | thuake5 |
 | v1.2 | 07/10/2026 | Mẫu thật ông Thưởng: `ho_ten` chỉ giữ họ tên (bỏ đuôi vai trò ` - Con đẻ...`, `Là vợ của...`); `dia_chi` nhận `Hộ khẩu thường trú` + cắt đuôi người kế trên dòng gộp; lọc tên người chết dạng câu; `so_to_ban_do` chỉ giữ ký hiệu; `dien_tich` phải có chữ số, cắt `; Trong đó`, tách ONT/NTS viết liền; `Hiện nay là thửa...` → `phan_ghi_them` không mở thửa; khử trùng thửa `(thửa,tờ)`; thêm trường `nguon_goc`; tool hiển thị `Nguồn gốc`/`Cơ quan cấp`, bỏ chú thích "(chỉ có năm)"; R13 cờ cả diện tích không parse được; R04 cờ tên người chết dạng câu | thuake6 |
+| v1.3 | TASK-10.1 | Loại/vùng ở đây, luật giá trị ở regex-fields, đáp án ở regex-expected-results; F01/F04/F05 chờ; không coi số cờ là tỷ lệ đúng | Xem ENGINE_VERSION trong engine |

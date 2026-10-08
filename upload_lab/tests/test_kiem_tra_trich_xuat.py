@@ -278,6 +278,16 @@ class KiemTraTrichXuatTests(unittest.TestCase):
         r04 = [f for f in findings if f["id"] == "R04"]
         self.assertEqual(len(r04), 1)
 
+    def test_muc_dich_van_xuoi_giu_ghi_chu_co_r13(self):
+        payload = make_payload()
+        parcel = payload["raw"]["danh_sach_thua_dat"][0]
+        parcel["phan_ghi_them"] = "Mục đích cần kiểm: 40 | Di sản của bà Lê Ngọc Mai để lại là | 12/2043"
+        findings = kiem_tra_payload(payload)
+        flags = [f for f in findings if f["id"] == "R13" and "mục đích" in f["noi_dung"]]
+        self.assertEqual(len(flags), 1)
+        self.assertEqual(flags[0]["muc"], MUC_CANH_BAO)
+        self.assertIn("thửa 65", flags[0]["noi_dung"])
+
 
 
 

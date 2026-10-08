@@ -47,7 +47,9 @@ Không phải cài lại gì thêm (trừ khi được dặn riêng).
 - Đọc log: tab **Xem log** trong tool (lọc theo loại văn bản,
   ô thiếu tô vàng) hoặc đọc trực tiếp file `.jsonl`
   (1 dòng = 1 file đã test).
-- Test tự động: `python -m pytest tests/ -q` trong folder này
-  (máy đã cài Python).
+- Test tự động: `python -B -X utf8 -m pytest tests/ -q -p no:cacheprovider`
+  trong folder này; đây là lệnh chuẩn, thu cả hàm test và lớp unittest.
+  `tests/fixtures/word_field_cases.json` giữ đáp án Closed và đầu vào Pending;
+  Pending chưa có đáp án được duyệt nên không tính đạt.
 - Log chứa họ tên + CCCD thật: chỉ lưu máy nội bộ, gửi trực
   tiếp cho nhau, không đăng lên mạng.

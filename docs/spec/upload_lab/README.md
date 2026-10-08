@@ -34,8 +34,16 @@ Word .doc/.docx
   viên và nhóm hợp đồng.
 - Lưu JSON, registry SQLite và manifest của đúng lượt quét.
 
-Catalog regex lớn nằm tại [`regex-rules.md`](./regex-rules.md); trang này sở
-hữu ý nghĩa flow, catalog chỉ sở hữu chi tiết pattern.
+Tài liệu trích Word:
+
+- [Core](regex-core.md): phạm vi và vòng kiểm tra.
+- [Quy tắc từng trường](regex-fields.md): một nguồn cho tên/giới tính/ngày/giấy tờ/đất; điểm chưa chốt ghi riêng.
+- [Đáp án đích](regex-expected-results.md): mẫu nguồn, trường phải kiểm, Closed/Pending.
+- [Ranh giới chấp nhận](regex-acceptance.md): lỗi máy, lỗi nguồn, ngoài phạm vi và cách báo kết quả từng phần.
+- [Thừa kế](regex-thua-ke.md): loại/vùng và đầu-cuối bản ghi.
+- [Catalog](regex-rules.md): các cấu trúc/loại khác, dẫn tới luật trường.
+
+Trang README này sở hữu flow; các trang trên không tự thay contract Stage.
 
 ## 4. Audit Excel
 
@@ -127,4 +135,6 @@ baseline `072870e`; phải đo lại theo cùng quy trình trước quyết đ�
 - `upload_lab/README.md`.
 - [`ui.md`](./ui.md) — hành vi/bố cục và phần thị giác Proposed.
 - [`portal-session.md`](./portal-session.md) — đăng nhập và nhận diện Lưu.
-- [`regex-rules.md`](./regex-rules.md) — catalog trích xuất.
+- [regex-fields.md](regex-fields.md) — quy tắc từng trường.
+- [regex-expected-results.md](regex-expected-results.md) — đáp án đích và phạm vi chấm.
+- [regex-rules.md](regex-rules.md) — catalog cấu trúc/loại.

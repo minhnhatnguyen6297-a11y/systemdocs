@@ -110,8 +110,8 @@ def _json_write(path: Path, payload: Any) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-_NGUOI_FIELDS = ("ho_ten", "ten_goi_khac", "gioi_tinh", "ngay_sinh", "cccd", "noi_cap", "ngay_cap_cccd", "dia_chi")
-_CHET_FIELDS = ("ho_ten", "ten_goi_khac", "ngay_sinh", "ngay_chet", "loai_giay_to", "so_giay_to", "ngay_cap", "noi_cap", "dia_chi")
+_NGUOI_FIELDS = ("ho_ten", "ten_goi_khac", "gioi_tinh", "ngay_sinh", "chi_co_nam_sinh", "cccd", "noi_cap", "ngay_cap_cccd", "dia_chi")
+_CHET_FIELDS = ("ho_ten", "ten_goi_khac", "gioi_tinh", "ngay_sinh", "chi_co_nam_sinh", "ngay_chet", "loai_giay_to", "so_giay_to", "ngay_cap", "noi_cap", "dia_chi")
 _THUA_FIELDS = ("so_thua_dat", "so_to_ban_do", "dien_tich", "chi_tiet_dien_tich", "land_rows", "nguon_goc",
                 "muc_dich_su_dung", "thoi_han_su_dung", "phan_ghi_them",
                 "dia_chi", "loai_gcn", "so_gcn", "so_gcn_raw", "so_vao_so", "ngay_cap_gcn", "co_quan_cap")
@@ -119,7 +119,7 @@ _THUA_FIELDS = ("so_thua_dat", "so_to_ban_do", "dien_tich", "chi_tiet_dien_tich"
 
 def _cell(value: Any) -> Any:
     """Scalar -> str; list/dict (chi tiet dien tich, land_rows...) giu nguyen de so sau."""
-    return value if isinstance(value, (list, dict)) else str(value or "")
+    return value if isinstance(value, (list, dict, bool, int, float)) else str(value or "")
 
 
 def _rows(records: Any, fields: tuple[str, ...]) -> list[dict[str, Any]]:
@@ -147,7 +147,7 @@ def _snapshot(payload: dict[str, Any] | None, error: str = "") -> dict[str, Any]
         "thua_dat": _rows(raw.get("danh_sach_thua_dat"), _THUA_FIELDS),
         "tai_san_chua_ho_tro": list(raw.get("tai_san_chua_ho_tro") or []),
         "missing_fields": list(raw.get("missing_web_form_fields") or []),
-        "error": error,
+        "error": error or str(payload.get("error") or ""),
     }
 
 
@@ -437,49 +437,97 @@ def review_corpus(
 
 
 def _scalar_eq(want: Any, got: Any) -> bool:
-    """Scalar so bang theo so khi doc duoc ('450' == 450), nguoc lai theo chuoi."""
-    if want == got:
-        return True
-    try:
-        return float(str(want).strip().replace(",", ".")) == float(str(got).strip().replace(",", "."))
-    except (TypeError, ValueError):
-        return str(want) == str(got)
+    """Keep spelling, identifiers and booleans exact; no lossy numeric coercion."""
+    if isinstance(want, bool) or isinstance(got, bool):
+        return type(want) is type(got) and want == got
+    if isinstance(want, str) and isinstance(got, str):
+        return unicodedata.normalize("NFC", want) == unicodedata.normalize("NFC", got)
+    if isinstance(want, (int, float)) and isinstance(got, (int, float)):
+        return want == got
+    return type(want) is type(got) and want == got
 
 
-def _match(want: Any, got: Any) -> bool:
-    """Expected la SPEC CON: dict khop neu moi key non-null khop de quy;
-    list khop neu cung do dai va tung cap khop; scalar so theo _scalar_eq."""
+def _answer_scope(value: Any, field: str = "") -> tuple[int, int]:
+    row_fields = {'nguoi': _NGUOI_FIELDS, 'nguoi_chet': _CHET_FIELDS, 'thua_dat': _THUA_FIELDS}
+    if field in row_fields and isinstance(value, list):
+        value = [{**dict.fromkeys(row_fields[field]), **row} if isinstance(row, dict) else row for row in value]
+    if value is None:
+        return 0, 1
+    if isinstance(value, (dict, list)):
+        children = list(value.values()) if isinstance(value, dict) else value
+        if not children:
+            return (0, 1) if isinstance(value, dict) else (1, 0)
+        scopes = [_answer_scope(child) for child in children]
+        return sum(s[0] for s in scopes), sum(s[1] for s in scopes)
+    return 1, 0
+
+
+def _match(want: Any, got: Any, field: str = "") -> bool:
+    """Answered fields match exactly; record lists one-to-one, nested rows in source order.
+    Only area fields accept numeric equivalence; null means unanswered."""
     if want is None:
         return True
     if isinstance(want, dict):
         return isinstance(got, dict) and all(
-            _match(v, got.get(k)) for k, v in want.items() if v is not None
+            _match(v, got.get(k), k) for k, v in want.items() if _answer_scope(v)[0]
         )
     if isinstance(want, list):
-        return isinstance(got, list) and len(want) == len(got) and all(
-            _match(w, g) for w, g in zip(want, got)
-        )
+        if not isinstance(got, list) or len(want) != len(got):
+            return False
+        if field not in ("nguoi", "nguoi_chet", "thua_dat"):
+            return all(_match(w, g, field) for w, g in zip(want, got))
+        # Each actual row may satisfy exactly one answer (including duplicate IDs).
+        assigned: dict[int, int] = {}
+        def assign(i: int, seen: set[int]) -> bool:
+            for j, actual in enumerate(got):
+                if j in seen or not _match(want[i], actual, field):
+                    continue
+                seen.add(j)
+                if j not in assigned or assign(assigned[j], seen):
+                    assigned[j] = i
+                    return True
+            return False
+        return all(assign(i, set()) for i in range(len(want)))
+    if field in ("dien_tich", "dien_tich_m2") and not isinstance(want, bool) and not isinstance(got, bool):
+        from decimal import Decimal, InvalidOperation
+        try:
+            return Decimal(str(want).replace(",", ".")) == Decimal(str(got).replace(",", "."))
+        except InvalidOperation:
+            pass
     return _scalar_eq(want, got)
 
 
 def _diff_list(field: str, want: list, got: list, label: str) -> list[dict[str, Any]]:
     """So tung phan tu: dict -> so tung khoa khai bao; chuoi -> so khoa dinh danh."""
     diffs: list[dict[str, Any]] = []
+    if all(not isinstance(row, dict) or _answer_scope(row)[0] for row in want) and _match(want, got, field):
+        return diffs
     id_key = "ho_ten" if field.startswith("nguoi") else "so_thua_dat"
     if len(want) != len(got):
         diffs.append({"file": label, "field": f"{field}.len", "expected": len(want), "actual": len(got)})
-    for i, (w, g) in enumerate(zip(want, got)):
+    unused = set(range(len(got)))
+    for i, w in enumerate(want):
+        candidates = sorted(unused)
         if isinstance(w, dict):
-            if not any(v is not None for v in w.values()):
+            identity = w.get(id_key)
+            identified = [j for j in candidates if isinstance(got[j], dict) and identity is not None and _scalar_eq(identity, got[j].get(id_key))]
+            matching = [j for j in candidates if _match(w, got[j])]
+            candidates = matching or identified or candidates
+        j = candidates[0] if candidates else None
+        g = got[j] if j is not None else None
+        if j is not None:
+            unused.remove(j)
+        if isinstance(w, dict):
+            if _answer_scope(w)[0] == 0:
                 diffs.append({"file": label, "field": f"{field}[{i}]",
                               "expected": "it nhat 1 truong co gia tri",
                               "actual": "ban ghi dap an rong — chi kiem duoc so luong"})
                 continue
             for k, v in w.items():
-                if v is None:
+                if not _answer_scope(v)[0]:
                     continue  # null trong item = khong tra loi truong nay
                 gv = g.get(k) if isinstance(g, dict) else None
-                if not _match(v, gv):
+                if not _match(v, gv, k):
                     diffs.append({"file": label, "field": f"{field}[{i}].{k}", "expected": v, "actual": gv})
         else:
             gv = g.get(id_key) if isinstance(g, dict) else g
@@ -503,6 +551,7 @@ def compare_answers(
     records = index.get("records", {})
     diffs: list[dict[str, Any]] = []
     files_checked = 0
+    scopes = []
     answer_paths = sorted(answers_dir.glob("*.expected.json")) if answers_dir.is_dir() else []
     if not answer_paths:
         diffs.append({"file": "*", "field": "*", "expected": "dap an", "actual": "khong tim thay *.expected.json"})
@@ -518,17 +567,27 @@ def compare_answers(
         if not isinstance(expected, dict):
             diffs.append({"file": answer_path.name, "field": "*", "expected": "object json", "actual": type(expected).__name__})
             continue
+        for key in sorted(set(expected) - set(_ANSWER_FIELDS) - {'relative_path', '_document_kind_options'}):
+            diffs.append({"file": answer_path.name, "field": key,
+                          "expected": "supported answer field", "actual": "unknown answer key"})
         record = records.get(content_hash)
         if record is None:
             diffs.append({"file": answer_path.name, "field": "*", "expected": "hash trong cache", "actual": "khong co — chay ingest truoc"})
             continue
         files_checked += 1
         actual = record.get("extraction", {})
+        if actual.get("error"):
+            diffs.append({"file": answer_path.name, "field": "error", "expected": "successful extraction", "actual": actual["error"]})
         answered = 0
+        unanswered = 0
         for field in _ANSWER_FIELDS:
-            if field not in expected or expected[field] is None:
+            checked, unchecked = _answer_scope(expected.get(field), field)
+            answered += checked
+            unanswered += unchecked
+            if not checked:
+                if isinstance(expected.get(field), list) and expected[field]:
+                    diffs.append({"file": answer_path.name, "field": field, "expected": "it nhat 1 truong co gia tri", "actual": "ban ghi dap an rong — chi kiem duoc so luong"})
                 continue
-            answered += 1
             want, got = expected[field], actual.get(field)
             if isinstance(want, list) and isinstance(got, list):
                 diffs.extend(_diff_list(field, want, got, record.get("relative_path", content_hash)))
@@ -541,10 +600,15 @@ def compare_answers(
                 })
         if answered == 0:
             diffs.append({"file": answer_path.name, "field": "*", "expected": "dap an co noi dung", "actual": "tat ca null"})
+        scopes.append({"file": record.get("relative_path", answer_path.name), "checked_fields": answered,
+                       "unanswered_fields": unanswered, "result_scope": "checked_fields_only" if answered else "unanswered"})
     report = {
         "files_checked": files_checked,
         "diff_count": len(diffs),
         "diffs": diffs,
+        "scope": scopes,
+        "checked_fields": sum(s["checked_fields"] for s in scopes),
+        "unanswered_fields": sum(s["unanswered_fields"] for s in scopes),
         "exit_code": 1 if diffs else 0,
     }
     report_path = answers_dir / "compare-report.json"

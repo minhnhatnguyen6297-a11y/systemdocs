@@ -7,8 +7,9 @@
 Trang này là bản đồ duy nhất của core regex: tool là gì, làm việc
 thế nào, sửa lỗi ra sao, tinh thần nào giữ xuyên suốt, owner đã
 chốt gì. Chi tiết pattern từng loại văn bản nằm ở file riêng
-(`regex-thua-ke.md`, ...); catalog tra nhanh nằm ở
-[`regex-rules.md`](./regex-rules.md).
+(`regex-thua-ke.md`, ...). [Quy tắc trường](regex-fields.md) sở hữu giá trị từng trường;
+[đáp án mẫu](regex-expected-results.md) sở hữu kết quả phải kiểm;
+[catalog](regex-rules.md) dẫn tới cấu trúc/loại. TASK-10.1: không chép lại luật trường.
 
 ## 1. Core là gì, không là gì
 
@@ -33,7 +34,7 @@ không còn là tiêu chí đủ/thiếu của core.
 | Ai | Nhân viên văn phòng | Agent + owner |
 | Làm gì | Mở tool → import file/thư mục → xem bảng → gửi log | Đọc mẫu → viết/sửa regex → test → báo cáo |
 | Ra gì | Log `.jsonl` gửi về | Code + test xanh + báo cáo vòng |
-| Chuẩn đúng sai | Bảng trong tool (ô vàng = thiếu) | Mã luật R00..R13 trong code (bỏ qua R11 đã xóa) |
+| Chuẩn đúng sai | Người đối chiếu nguồn và đề xuất trong tool | Đáp án theo spec, so từng trường; R00..R13 hỗ trợ cảnh báo (R11 đã xóa) |
 
 ## 3. Cách làm việc (vòng lặp bắt buộc)
 
@@ -80,37 +81,30 @@ python tools/regex_lab.py approve --cluster <id>   # chi khi owner da duyet ket 
 
 ## 4. Cách sửa lỗi
 
-1. Lỗi chỉ công nhận khi **mã trong code** báo:
-   `upload_lab/kiem_tra_trich_xuat.py` (R00 bỏ qua — mọi key tên file
-   đều được cứu khi nội dung là hợp đồng thật, không chỉ `thue`;
-   key thêm 09/10/2026: `11dk`, `truoc ba`, `tncn`, `thu nhap`; thêm
-   10/10/2026: `dk11`/`dk 11`, `ho so luu` (danh mục hồ sơ lưu không
-   tiền tố `danh muc`), và `raw.text_rong` — file không đọc được chữ
-   nào (docx chỉ chứa ảnh scan, giấy tờ đính kèm chụp) thì bỏ qua,
-   không chấm lỗi; thêm 10/10/2026: R00 cũng nhìn **tiêu đề nội dung** —
-   `ten_hop_dong` bắt đầu `danh muc`/`ho so luu` mà không có nội dung
-   hợp đồng thì bỏ qua (ca `HS thế chấp.docx`: danh mục hồ sơ lưu có
-   dòng `Loại: Hợp đồng thế chấp` bị nhận nhầm kind) —
-   R01 sai loại,
-   R02 0 người (lỗi ở thừa kế; cảnh báo ở loại non-generic khác và
-   generic có `ten_hop_dong` — 09/10/2026; **trừ trang phụ** `Đính chính`/
-   `Trang sửa lỗi kỹ thuật`/`Lời chứng` vì bản chất không có đương sự —
-   12/10/2026), R03 thiếu trường người, R04 tên bẩn (gồm tên đương
-   sự nuốt `CCCD số...`/tổ chức — 09/10/2026), R05 trùng tên,
-   R06 thiếu người chết, R07 thiếu trường người chết, R08 mất khối
-   tài sản, R09 không tách tài sản, R10 lệch diện tích tuyệt đối,
-   R12 tài sản chưa hỗ trợ, R13 dữ liệu mơ hồ/thiếu căn cứ (giới tính
-   trống, diện tích chỉ có dấu chấm, `so_thua_dat` chứa văn/nhãn —
-   09/10/2026). Agent/LLM chỉ đọc mã, không tự
-   đặt tên lỗi.
+1. Công nhận lỗi khi nguồn và đáp án theo spec cho thấy máy trích sai,
+   bỏ mất hoặc trích thừa trường/bản ghi. Không yêu cầu lỗi phải có cờ R.
+   `upload_lab/kiem_tra_trich_xuat.py` vẫn sở hữu mã R00..R13 (R11 đã xóa)
+   để cảnh báo/kiểm điều kiện; không thay việc đọc nguồn và so đáp án.
+   File chưa đọc được chữ hoặc không thuộc loại phải ghi trạng thái tương ứng,
+   không tính như mẫu “đã xác nhận không có người/tài sản”.
 2. Sửa ở engine (`upload_lab/extract_contract.py`), thêm test giữ
    hành vi, chạy toàn bộ suite.
 3. Quét lại hàng loạt bằng `upload_lab/tools/quet_kiem_tra.py`
    (cùng bộ luật, không chấm tay).
-4. Ghi quyết định mới vào mục 7 dưới đây + spec loại văn bản.
+4. Ghi quyết định qua Backlog, cập nhật đúng nguồn sở hữu: luật trường ở
+   [regex-fields.md](regex-fields.md), loại/vùng ở spec loại. F01/F04/F05
+   giữ trạng thái chờ, không gọi approve/Golden hoặc đổi luật thay owner.
 
 ## 5. Tinh thần giữ xuyên suốt
 
+- **Bất đối xứng lỗi (owner, 13/10/2026):** trích thiếu (sót) an toàn hơn cắt
+  nhầm (mất dữ liệu im lặng) — thiếu thì validator/mã R báo được, mất im lặng
+  thì không ai phát hiện. Khi lưỡng lự giữa giữ và cắt: **giữ + gắn cờ R**,
+  không cắt im lặng, không gộp rồi bỏ bản giàu hơn. Rule chặt để sót được cảnh
+  báo vẫn tốt hơn rule rộng để cắt mất — quyết định này nhắm trực tiếp các lỗi gộp
+  im lặng F03/F05/F06 của vòng review 13/10/2026.
+- R có thể không chỉ ra một người/thửa bị sót hoặc một trường bị dịch;
+  phép so đáp án phải kiểm số bản ghi và dữ liệu từng trường.
 - Máy đề xuất, người quyết định cuối; thiếu bằng chứng thì để
   trống, không tự điền.
 - Có người nào xuất người đó; trùng/khác thì gắn cờ cho người kiểm,
@@ -130,9 +124,11 @@ python tools/regex_lab.py approve --cluster <id>   # chi khi owner da duyet ket 
 | Quét hàng loạt chuẩn | `upload_lab/tools/quet_kiem_tra.py` (có summary theo luật/loại) |
 | Gói đọc mù + so đáp án + golden | `upload_lab/tools/regex_lab.py` (`ingest`/`review --blind`/`compare`/`verify`/`approve`) |
 | Test giữ hành vi | `upload_lab/tests/test_upload_lab_extract_contract.py` + `test_kiem_tra_trich_xuat.py` |
-| Catalog tra nhanh | `docs/spec/upload_lab/regex-rules.md` |
-| Chi tiết từng loại (SOT theo loại) | `docs/spec/upload_lab/regex-<loai>.md` |
-| Báo cáo từng vòng (tạm, không commit) | `.agent/scratch/regex-core/bao-cao-NN-*.md` |
+| Catalog cấu trúc/loại | `docs/spec/upload_lab/regex-rules.md` |
+| Quy tắc từng trường (SOT giá trị) | `docs/spec/upload_lab/regex-fields.md` |
+| Đáp án mẫu theo spec; Pending hiện riêng | `docs/spec/upload_lab/regex-expected-results.md` |
+| Chi tiết từng loại (SOT vùng/cấu trúc) | `docs/spec/upload_lab/regex-<loai>.md` |
+| Báo cáo từng vòng (tạm, không commit) | `.agents/task-<id>/` |
 | Repo test cho nhân viên | `regex-test-tool/tool/` tất cả trong 1 folder (engine snapshot + `ENGINE_VERSION`, log đóng dấu bản) |
 
 Lưu ý (Owner 06/10/2026): flow "sửa ở `upload_lab` rồi chép snapshot" chỉ áp
@@ -156,6 +152,7 @@ cả `upload_lab` và `regex-test-tool` gọi lõi chung — không chép tay.
 | 06/10/2026 | Serial là chuỗi nguyên văn tùy nguồn ở mọi tầng (trích xuất, Stage, DB) — bỏ bắt buộc `[A-Z]{2}\d{6,8}`; có thể trống/trùng |
 | 06/10/2026 | `place_of_origin` (quê quán) giữ trong contract để đọc snapshot cũ; engine không điền |
 | 06/10/2026 | Sổ tiết kiệm + bảo hiểm tạm dừng: chỉ nhận diện và gắn cờ "chưa hỗ trợ", không bóc dòng |
+| TASK-10.1 | Một nguồn luật mỗi trường + đáp án theo nguồn; mã R không thay đáp án; F01/F04/F05 chờ quyết định (decision-73) |
 | 06/10/2026 | Người chết = một person_row có `ngay_chet`; trích lục khai tử điền vào trường giấy tờ người, không entity riêng |
 | 06/10/2026 | Không suy giới tính; thiếu căn cứ → để trống + cờ; không đếm/ngang hàng đương sự qua vùng lời chứng (theo TASK-5) |
 
@@ -179,7 +176,7 @@ cả `upload_lab` và `regex-test-tool` gọi lõi chung — không chép tay.
 
 - Spec hệ thống: [`README.md`](./README.md) (flow),
   [`../README.md`](../README.md) (nguyên tắc chung).
-- Contract DB: [`../../contracts/notary-case-drafting.md`](../../contracts/notary-case-drafting.md)
+- Contract DB: [`../../../contracts/notary-case-drafting.md`](../../../contracts/notary-case-drafting.md)
   (shape `asset_row.land_rows`, `person_row` chấp nhận `YYYY`).
-- Định danh: [`../../contracts/entities.md`](../../contracts/entities.md).
+- Định danh: [`../../../contracts/entities.md`](../../../contracts/entities.md).
 - Code là bằng chứng hiện trạng; spec quyết định hành vi phải có.

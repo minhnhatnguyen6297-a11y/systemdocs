@@ -69,6 +69,14 @@ Sổ tiết kiệm và bảo hiểm **tạm dừng**: nhận diện sự hiện 
 "loại tài sản chưa hỗ trợ", không bóc dòng (Owner 06/10/2026).
 Thiếu trường vẫn cho kiểm tra và bổ sung ở Stage; quy tắc commit MIN-141 giữ
 nguyên. Đủ 3 tài sản thì gợi ý tiếp theo vẫn còn, kèm lời báo hết chỗ.
+
+Owner TASK-10.3 (08/10/2026): lỗi gõ/dính chữ không cần chức năng mới.
+Phần regex lấy được điền vào các ô tương ứng đang có ở Stage để sửa;
+số giấy tờ/nơi cấp là chữ tự do, giữ chữ nguồn kể cả sai chính tả.
+Không thêm ô nguyên văn hoặc luật sửa chữ; cảnh báo chỉ khi nhận biết được
+trường cần kiểm. Không bỏ giá trị chữ chỉ vì khác mẫu. Nhiều giá trị chưa
+chọn, ngày/diện tích không hợp lệ vẫn phải chọn/sửa theo quy tắc trên.
+Bằng chứng gốc và vị trí Word không đổi; không dán khối nguồn vào ô khác nghĩa.
 Tài sản có bằng chứng địa chỉ hoặc cụm đất vẫn được giữ khi thiếu mọi mã
 định danh; nhãn trống không tạo tài sản rỗng. Diện tích âm/không hữu hạn trong
 nguồn giữ nguyên chữ và dấu trong bằng chứng, giá trị chuẩn là null và phải sửa
