@@ -1,4 +1,4 @@
-# AGENTS.md — luật làm việc trong systemdocs
+﻿# AGENTS.md — luật làm việc trong systemdocs
 
 ## 1. Vai trò và quy trình
 
@@ -18,7 +18,7 @@
 | Quyết định đã chốt | `_bmad-output/decisions/` |
 | Artifact workflow (plan, review, handoff) | `_bmad-output/` |
 | Bản ghi lịch sử (Linear cũ, file đã dọn) | `_bmad-output/archive/` |
-| Tìm quan hệ code | `code-graphs/` (đọc trước khi dò file thủ công) |
+| Tìm quan hệ code | `graphify-out/` (đọc trước khi dò file thủ công) |
 
 - Spec quyết định hành vi; code chỉ chứng minh hiện trạng. Muốn thay hành vi: thêm/sửa
   spec trước, rồi mới code.

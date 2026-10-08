@@ -1,4 +1,4 @@
-# Notary System
+﻿# Notary System
 
 Kho này chứa runtime tích hợp và nguồn tài liệu chung cho hệ thống công chứng.
 Tài liệu được tổ chức theo **phạm vi và flow**, không theo loại “nghiệp vụ”,
@@ -97,7 +97,7 @@ không tạo phần sản phẩm thứ tư.
 | [`contracts/`](./contracts/README.md) | Contract đã duyệt và schema máy đọc |
 | `_bmad-output/specs/` | SOT đặc tả hành vi (spec quyết định, code chứng minh) |
 | `_bmad-output/decisions/` | Quyết định đã chốt: LÀ GÌ và TẠI SAO |
-| `code-graphs/` | Snapshot để tìm quan hệ code; không phải spec |
+| `graphify-out/` | Snapshot để tìm quan hệ code; không phải spec |
 | `_bmad-output/` | Artifact workflow BMAD (plans, review, archive) |
 | `.tmp/`, `.cache/`, `logs/`, `artifacts/` | File tạm, không commit |
 
