@@ -3,7 +3,7 @@
 Quy ước: `N` là số thứ tự người/tài sản; `M` là số thứ tự loại đất trong tài sản. Slot không có dữ liệu trả về rỗng toàn bộ.
 
 **Vai trò:** catalog tham chiếu mẫu Word đang chạy; spec hiện hành ở
-[`word-output.md`](../../docs/spec/notary_v2/word-output.md).
+[`word-output.md`](../../_bmad-output/specs/notary_v2/word-output.md).
 Phase thư mục mẫu Active sau tích hợp NAIA-8/12 (04/10/2026).
 
 ### Token chuẩn bổ sung MIN-141 (03/10/2026)

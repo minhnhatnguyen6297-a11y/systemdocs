@@ -19,9 +19,9 @@ nháp cho `intake_analyze`/`diagram_evaluate` — `schema_version` giữ
 `notary.case-drafting.v1`, mọi field mới tương thích ngược với consumer
 cũ (field `case` thêm key nullable; command mới chỉ client mới gọi).
 
-SOT hành vi nghiệp vụ: `docs/spec/notary_v2/`; chi tiết đã duyệt MIN-104 để
+SOT hành vi nghiệp vụ: `_bmad-output/specs/notary_v2/`; chi tiết đã duyệt MIN-104 để
 đối chiếu implementation nằm tại
-`docs/spec/notary_v2/workspace-detail.md`. File này là wire
+`_bmad-output/specs/notary_v2/workspace-detail.md`. File này là wire
 contract, không định nghĩa lại hành vi.
 Schema chuẩn: `contracts/notary-case-drafting/*.schema.json`
 (JSON Schema draft-07). Examples kiểm chứng:
@@ -1043,7 +1043,7 @@ Consumer (Electron main/renderer) PHẢI:
 > không chặn implement phần đã duyệt.
 >
 > Mọi mục dưới đây gắn mã `Q#` ↔ bảng quyết định tại
-> `.agent/tasks/MIN-125/decisions.md` (đề xuất + phương án thay thế).
+> `_bmad-output/archive/linear-tasks/MIN-125/decisions.md` (đề xuất + phương án thay thế).
 > Fixtures v2 nằm ở `examples/draft-v2/` với
 > `fixture_context.draft_v2:true` — validator hiểu flag này (§13.15).
 
@@ -1429,7 +1429,7 @@ Data-codes mới: `stage.legacy_asset_overflow`,
 
 - Mọi write mang `base_revision`; lệch (cả `<` lẫn `>`) →
   `workspace_conflict{details:{server_revision}}`; không ép ghi — client
-  reload hoặc giữ draft (`docs/spec/ui/README.md`). Commit retry sau conflict phải
+  reload hoặc giữ draft (`_bmad-output/specs/ui/README.md`). Commit retry sau conflict phải
   gửi `base_revision` mới.
 - `workspace_create`: retry dùng **cùng** `idempotency_key` →
   `created:false`, trả case đã persist — không hồi sinh bản nháp đã
@@ -1440,7 +1440,7 @@ Data-codes mới: `stage.legacy_asset_overflow`,
   sẽ `<` server → `workspace_conflict` (idempotent qua revision).
 - Late response: client tương quan `job_id`/`command_id` + `case_id` của
   phiên hiện tại; result/job trễ từ phiên trước / case đã đổi / draft
-  đã Hủy PHẢI bị discard — không apply vào buffer (`docs/spec/ui/README.md`, giữ
+  đã Hủy PHẢI bị discard — không apply vào buffer (`_bmad-output/specs/ui/README.md`, giữ
   nguyên).
 
 ### 13.12 Ví dụ trước/sau (JSON rút gọn)
@@ -1499,7 +1499,7 @@ Data-codes mới: `stage.legacy_asset_overflow`,
 ### 13.13 Quyết định owner (tập trung)
 
 Q1–Q12 **đã duyệt nguyên đề xuất** (owner, 27/09/2026); phương án thay
-thế bị loại giữ trong `.agent/tasks/MIN-125/decisions.md` làm record.
+thế bị loại giữ trong `_bmad-output/archive/linear-tasks/MIN-125/decisions.md` làm record.
 Các quyết định then chốt:
 
 - **Q1** — phá vòng phụ thuộc bằng `stage.owner_row_id` + create không
@@ -1635,7 +1635,7 @@ contract trao đổi hồ sơ giữa Upload Lab và Soạn hồ sơ. Envelope v�
   không dùng paragraph.text/global replace để làm mất format/ảnh. Output
   độc lập, exclusive create và tăng hậu tố khi trùng; cancellation dọn temp,
   giữ file đã publish. Giới hạn và phạm vi đọc tại
-  [`spec DOCX`](../docs/spec/notary_v2/input/docx-import.md).
+  [`spec DOCX`](../_bmad-output/specs/notary_v2/input/docx-import.md).
 
 ---
 
@@ -1644,8 +1644,8 @@ contract trao đổi hồ sơ giữa Upload Lab và Soạn hồ sơ. Envelope v�
 **Trạng thái:** v2 APPROVED 05/10/2026 — Owner duyệt, runtime đã chuyển
 sang v2 tại TASK-3 (schema v1 đã xóa).
 **Breaking** so với v1.
-**SOT hành vi:** [`docs/spec/shared/administrative-lookup.md`](../docs/spec/shared/administrative-lookup.md);
-cách hồ sơ gọi: [`docs/spec/notary_v2/administrative-address.md`](../docs/spec/notary_v2/administrative-address.md).
+**SOT hành vi:** [`_bmad-output/specs/shared/administrative-lookup.md`](../_bmad-output/specs/shared/administrative-lookup.md);
+cách hồ sơ gọi: [`_bmad-output/specs/notary_v2/administrative-address.md`](../_bmad-output/specs/notary_v2/administrative-address.md).
 
 Command thứ mười của nhóm `notary.*`; `result.data.schema_version` =
 `notary.address-lookup.v2` (literal), ngoại lệ của rule §1. **Read-only,

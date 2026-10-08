@@ -3976,4 +3976,3 @@ class WordFieldClosedCasesTests(unittest.TestCase):
         self.assertEqual(len(helper), 1)
         self.assertEqual(helper[0]["ngay_sinh"], "26/04/1985")
         self.assertEqual(helper[0]["dia_chi"], "")
-

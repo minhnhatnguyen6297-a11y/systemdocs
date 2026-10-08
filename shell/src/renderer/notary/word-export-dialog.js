@@ -367,12 +367,19 @@ function createWordDialog(ctx) {
         niemYetMsg.textContent = 'Đã lưu.';
       });
       niemYetSave.disabled = !metaCanEdit;
-      const niemYetRow = h('div', 'cd-toolbar');
-      niemYetRow.append(h('span', '', 'Nơi niêm yết:'),
-                        niemYetInput, niemYetSave, niemYetMsg);
+      const niemYetRow = h('div', ctx.postingTraButton ? 'cd-slot' : 'cd-toolbar');
+      niemYetRow.append(h('span', '', 'Nơi niêm yết:'));
+      if (ctx.postingTraButton) {
+        const lookupRow = h('div', 'cd-lookup-row');
+        niemYetInput.classList.add('cd-cell');
+        lookupRow.append(niemYetInput, ctx.postingTraButton(niemYetInput));
+        niemYetRow.append(lookupRow);
+      } else niemYetRow.append(niemYetInput, niemYetSave, niemYetMsg);
       if (ctx.postingSuggestionEl) {
         const postingSuggestions = h('div', 'cd-slot');
+        let postingSlot;
         function refreshPostingSuggestions() {
+          postingSlot = model.state.addressSlots && model.state.addressSlots['posting:posting'];
           postingSuggestions.replaceChildren(ctx.postingSuggestionEl(candidate => {
             niemYetInput.value = candidate.address;
             showPostingDraft();
@@ -383,11 +390,14 @@ function createWordDialog(ctx) {
         const dialogCase = model.state.caseId;
         const unsubscribePosting = model.subscribe(() => {
           if (!box.isConnected || model.state.caseId !== dialogCase) { unsubscribePosting(); return; }
-          // Bo qua rebuild khi focus dang trong box (select tai san dang
-          // mo) — rebuild se tao lai select va dong dropdown giua chung.
-          if (postingSuggestions.contains(document.activeElement)) return;
+          if (postingSlot === (model.state.addressSlots && model.state.addressSlots['posting:posting'])) return;
           refreshPostingSuggestions();
         });
+      }
+      if (ctx.postingTraButton) {
+        const postingActions = h('div', 'cd-toolbar');
+        postingActions.append(niemYetSave, niemYetMsg);
+        niemYetRow.append(postingActions);
       }
 
       const tplRow = h('div', 'cd-toolbar');

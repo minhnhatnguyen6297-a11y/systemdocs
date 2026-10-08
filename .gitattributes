@@ -1,0 +1,9 @@
+# Keep shared regex snapshots byte-identical after Windows checkout.
+upload_lab/extract_contract.py text eol=lf
+regex-test-tool/tool/extract_contract.py text eol=lf
+upload_lab/kiem_tra_trich_xuat.py text eol=lf
+regex-test-tool/tool/kiem_tra_trich_xuat.py text eol=lf
+upload_lab/tests/test_bounded_contract.py text eol=lf
+regex-test-tool/tool/tests/test_bounded_contract.py text eol=lf
+upload_lab/tests/fixtures/word_field_cases.json text eol=lf
+regex-test-tool/tool/tests/fixtures/word_field_cases.json text eol=lf
