@@ -110,6 +110,8 @@ Thiếu Electron/Playwright hoặc không chạy được ca native thì ghi **c
 
 ## Quyền thực hiện và bàn giao
 
+**Cập nhật yêu cầu Owner 09/10:** [decision-77](../decisions/decision-77-visual-bug-report-phai-giu-vi-tri-va-comment.md) xác định flow Báo lỗi hiện tại hỏng vì bỏ comment tự gõ. Plan này chỉ sửa lỗi thông báo của Sơ đồ thừa kế; không giải quyết việc lưu comment. Không dùng kết quả task này để nghiệm thu flow Báo lỗi. Sửa flow cần task riêng với ca chọn vị trí → nhập comment tự do → Save → đọc file khớp nội dung đã nhập.
+
 Đây là **Draft** lập theo yêu cầu giao việc, chưa bắt đầu sửa. User gửi nội dung trong `worker-message.md` là phê duyệt phạm vi cho worker; worker chuyển `ready-for-dev`, rồi thực hiện. Phiên lập plan không khởi chạy worker.
 
 Baseline ngày 09/10/2026: `D:/systemdocs`, nhánh `consolidate/monorepo`, HEAD như frontmatter. Source gốc có hash trong review-evidence.json. Kiểm lại live; không giả định HEAD vẫn giữ nguyên khi worker bắt đầu.
