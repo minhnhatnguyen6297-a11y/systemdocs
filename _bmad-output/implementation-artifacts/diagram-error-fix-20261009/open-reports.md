@@ -2,6 +2,8 @@
 
 **Trạng thái:** chờ mô tả triệu chứng. JSON không lưu người tạo; nhóm này chỉ được suy là thao tác tay vì không khớp mẫu E2E.
 
+**Đọc dễ hiểu theo tên chức năng:** [Bạn đã đánh dấu chỗ nào trong app?](./report-map-readable.md). Dùng số R01–R12 trong tài liệu đó khi trao đổi với user; không dùng hàng/cột hoặc ID dài làm tên lỗi.
+
 Kiểm kê đúng: **37 JSON = 18 logo + 7 nút fixture + 12 ngoài E2E**. Có 32 PNG; 5 thiếu ảnh thuộc 18 logo. Tổng 25 report khớp E2E đã gồm 5 thiếu ảnh.
 
 Cả 12 bên dưới mất lời mô tả tự gõ. Nguồn công cụ chỉ giữ ba câu mẫu, không có cách khôi phục lời gốc từ file hiện tại. Không tự bỏ bộ lọc riêng tư của spike trong task sửa sơ đồ.
@@ -10,11 +12,11 @@ Cả 12 bên dưới mất lời mô tả tự gõ. Nguồn công cụ chỉ gi�
 |---|---|---|
 | 534545cf-f020-4e22-8e03-362294f72508 | Toàn vùng nội dung #view 1204×755; bị bỏ sót trong bản điều tra cũ | Toàn màn đó gặp vấn đề gì? |
 | 377d8486-e885-4a21-8e84-497241546eaa | Khối div 1100×197 tại (82,276) | Khối này lệch, quá cao, hay thiếu nội dung? |
-| bb496551-82b6-4f72-bd80-77df2e396e2f | Nút thứ 7 trên thanh hành động | Bạn bấm nút nào; kết quả thực tế khác mong muốn thế nào? |
+| bb496551-82b6-4f72-bd80-77df2e396e2f | Nút Lưu hồ sơ ở góc trên bên phải | Khi bấm Lưu hồ sơ, kết quả thực tế khác mong muốn thế nào? |
 | 0d1b1ff1-73ce-4e8b-a6bf-2c695f06dd3f | Khối con bảng hàng 6, cột 2; có khả năng gợi ý địa chỉ tài sản | Phần gợi ý địa chỉ hiện hoặc hoạt động sai thế nào? |
 | 60e02a79-727d-4de3-be7f-488b3f1a39ee | Ô bảng hàng 6, cột 2, cao 213 px; có khả năng Địa chỉ tài sản | Ô bị kéo cao hay danh sách kết quả có vấn đề? |
 | 2f352897-ab9b-4f11-84e4-a44c43145bf0 | Input bảng hàng 7, cột 2; có khả năng Loại sổ | Sai giá trị, không nhập được, hay sai bố cục? |
-| b5999b39-dce5-48dc-954a-66d231cce6ee | Khối 388×38 dưới vùng tài sản; chưa định danh chắc | Nội dung hoặc thao tác nào trong khối đó bị sai? |
+| b5999b39-dce5-48dc-954a-66d231cce6ee | Dòng Người nhận ủy quyền dưới bảng Tài sản | Ô chọn/nhập tên hoặc nút + Danh bạ bị sai thế nào? |
 | 5db58074-cf8b-4a67-ab5a-09c0dd449a94 | Ô Người hàng đầu, cột 3; có khả năng Giới tính | Sai lựa chọn hay sai kích thước? |
 | 643496a0-c4a4-4e5a-ab2f-bbbfa39d438a | Span trong gợi ý Địa chỉ Người | Dòng đó hiện chữ gì và sai ở đâu? |
 | e3bba3ef-0f1f-4730-a505-cf0d282b75b1 | Input nơi cấp giấy tờ/giấy khai tử trong cột Địa chỉ Người | Là nơi cấp trên giấy nào; bạn mong hiện/tra thế nào? |
