@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lỗi sơ đồ Notary</title>
+<link rel="stylesheet" href="../runtime/htmlplan.css">
+<script src="../runtime/htmlplan.js" defer></script>
+<template data-mock-shared>
+/* Exhibit crop, not application CSS. Values follow the inspected Notary tokens. */
+.app { font: 14px/1.4 "Segoe UI", system-ui, sans-serif; color: #1e293b; background: #e9edf2; padding: 8px; position: relative; box-sizing: border-box; }
+.app *, .app *::before, .app *::after { box-sizing: border-box; }
+.card { background: #fff; border: 1px solid #dde3ea; border-radius: 10px; box-shadow: 0 1px 2px rgba(15,23,42,.06); overflow: hidden; }
+.stage { margin-bottom: 8px; }
+.head { min-height: 34px; padding: 0 10px; display: flex; align-items: center; gap: 6px; }
+.head b { font-size: 15px; white-space: nowrap; }
+.tools { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.btn { font-size: 13px; font-weight: 500; min-height: 28px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; white-space: nowrap; }
+.secondary { color: #2563eb; background: #e8f0fe; border-color: transparent; font-weight: 600; }
+.primary { background: #2563eb; color: #fff; border-color: #2563eb; font-weight: 600; }
+.dirty { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th { text-align: left; font-size: 13px; font-weight: 600; background: #f1f5fb; }
+.table th, .table td { height: 25px; padding: 2px 10px; border-top: 1px solid #e2e8f0; }
+.body { display: flex; gap: 8px; padding: 0 10px 8px; }
+.pool { flex: 0 0 176px; background: #f1f5fb; border-radius: 8px; padding: 8px; }
+.pool b { font-size: 13px; color: #334155; }
+.search { height: 28px; padding: 4px 8px; background: #fff; color: #64748b; border: 1px solid #cbd5e1; border-radius: 8px; margin: 6px 0; font-size: 13px; }
+.person { height: 32px; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; }
+.diagram { flex: 1; min-width: 0; }
+.canvas { position: relative; height: 155px; border-radius: 8px; background-color: #f5f7fa; background-image: radial-gradient(#d5dce6 1px,transparent 1px); background-size: 16px 16px; }
+.node { position: absolute; top: 18px; left: 22px; width: 144px; height: 87px; padding: 4px 5px 5px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; box-shadow: 0 0 0 2px #e8f0fe, 0 1px 2px rgba(15,23,42,.06); }
+.name { display: block; font-weight: 600; line-height: 17px; }
+.years { font-size: 13px; color: #64748b; margin-top: 2px; line-height: 15px; }
+.posrow { display: flex; gap: 3px; margin-top: 3px; align-items: center; font-size: 12px; color: #64748b; }
+.posrow > span:first-child { width: 38px; }
+.chip { display: inline-flex; width: 22px; height: 19px; justify-content: center; align-items: center; border: 1px solid #cbd5e1; border-radius: 4px; }
+.on { background: #e8f0fe; color: #2563eb; border-color: #2563eb; }
+.off { background: #e2e8f0; color: #94a3b8; border-color: #e2e8f0; }
+.btn.disabled, .readonly .chip { background: #e2e8f0; color: #94a3b8; border-color: #e2e8f0; }
+.banner.warn { background: #fef3c7; color: #b45309; }
+.inline-error { padding: 4px 2px 0; color: #b91c1c; }
+.banner { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 8px; border-radius: 8px; font-size: 13px; background: #fee2e2; color: #b91c1c; }
+.banner .close { margin-left: auto; color: #334155; }
+.toast-zone { min-height: 103px; display: flex; align-items: flex-end; justify-content: flex-end; padding: 12px 10px 10px; }
+.toast { max-width: 380px; padding: 10px 14px; border-radius: 8px; border-left: 3px solid #b91c1c; box-shadow: 0 4px 16px rgba(15,23,42,.16); background: #fff; font-size: 13px; }
+.dialog-crop { padding: 16px; background: rgba(15,23,42,.32); }
+.modal { background: #fff; border-radius: 12px; box-shadow: 0 8px 28px rgba(15,23,42,.18); }
+.modal-head { padding: 16px 20px 8px; display: flex; align-items: center; gap: 8px; }
+.modal-head b { font-size: 18px; }
+.modal-head .close { margin-left: auto; font-size: 20px; }
+.modal-body { padding: 8px 20px; color: #64748b; font-size: 13px; }
+.modal-body p { margin: 0 0 8px; }
+.modal-foot { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 20px 18px; }
+/* Isolated view details: omit surrounding app regions, never enlarge app fonts. */
+.detail-diagram { width: 260px; flex: none; margin: 0 auto; }
+.detail-actions .head { justify-content: flex-end; }
+.detail-actions .tools { margin-left: 0; }
+.detail-dialog { background: rgba(15,23,42,.32); }
+.conflict-overlay { position: absolute; inset: 0; display: flex; align-items: center; }
+.conflict-overlay .modal { width: 100%; }
+</template>
+<style>
+/* Document spacing only; the app mock retains its inspected UI tokens. */
+doc-machine[name="diagram"] .mc-scr { padding: 10px 6px; }
+doc-machine[name="diagram"] .mc-scr doc-mock + doc-mock { padding-top: 18px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Thông báo lỗi sơ đồ Notary</h1>
+  <details class="thread"><summary>Vì sao · yêu cầu gốc</summary>
+    <doc-quote via="doc" from="Owner" href="../../../../_bmad-output/decisions/decision-html-plan-exhibits-not-markdown-wrapper.md">thứ tôi cần là 1 bản plan hoặc spec đủ trực quan, thậm chí có hình minh họa app thật sẽ trông như thế nào sau khi implement</doc-quote>
+    <doc-quote via="doc" from="Intent của plan đã có" href="../../../../_bmad-output/implementation-artifacts/plan-diagram-error-fix-20261009.md">Sơ đồ lấy hàm `.relErrText` không tồn tại từ danh mục lỗi. Khi đánh giá, dựng danh sách lỗi hoặc lưu bị lỗi, màn hình ném `TypeError` thay vì thông báo.</doc-quote>
+  </details>
+</header>
+<main>
+<doc-plan open="1">
+  <doc-claim>
+    <p>Lỗi hiện đúng chỗ; màn hình soạn và bản nháp còn nguyên.</p>
+    <doc-machine name="diagram" caption="Đề xuất · chưa implement, không phải ảnh chạy thật. Mỗi trạng thái có vùng chi tiết để đọc và thumbnail để định vị; đây là crop minh họa, không đổi layout app. Nút trong hình chỉ minh họa.">
+<script type="text/plain">
+machine diagram initial draft
+state draft # Bản nháp trước khi đánh giá hoặc lưu.
+state evaluated final # Lỗi đánh giá: banner và toast theo catalog.
+state invalid final # Lỗi sơ đồ: chữ đỏ dưới canvas, không toast riêng.
+state locked final # Lưu bị từ chối: toast lỗi, chấm chưa lưu còn nguyên.
+state conflict final # Xung đột: dialog hiện có, không toast riêng.
+
+| evaluated | draft | locked |
+| invalid | . | conflict |
+
+draft -evaluate-> evaluated : Stage sai
+draft -validate-> invalid : Sơ đồ sai
+draft -save-> locked : Bị khóa
+draft -revision-> conflict : Xung đột
+</script>
+      <div data-state="draft">
+        <doc-mock frame="none" w="340" label="Đề xuất · chưa implement · Chi tiết vùng soạn" caption="Bản nháp: nhóm hành động và vùng node được tách khỏi phần xung quanh; chấm chưa lưu còn nguyên."><template>
+<div class="app">
+  <div class="card detail-actions"><div class="head"><div class="tools"><span class="btn">Xem cách tính</span><span class="btn secondary">Lưu sơ đồ <i class="dirty"></i></span><span class="btn primary">Xuất Word</span></div></div></div>
+  <div class="body"><div class="diagram detail-diagram"><div class="canvas"><div class="node"><span class="name">Nguyễn Văn An</span><div class="years">1950–2024</div><div class="posrow"><span>Chủ</span><span class="chip on">1</span><span class="chip off">2</span><span class="chip off">3</span></div><div class="posrow"><span>Nhận</span><span class="chip">1</span><span class="chip off">2</span><span class="chip off">3</span></div></div></div></div></div>
+</div>
+        </template></doc-mock>
+        <doc-mock frame="none" w="480" max-scale="0.6" label="Thumbnail · Đề xuất · chưa implement" caption="Định vị trong bảng Người và card sơ đồ; đọc vùng chi tiết phía trên. Zoom, mở rộng và các cột khác nằm ngoài khung."><template>
+<div class="app">
+  <div class="card stage"><div class="head"><b>Người</b></div><table class="table"><tr><th>Họ tên</th><th>Ngày mất</th></tr><tr><td>Nguyễn Văn An</td><td>12/03/2024</td></tr><tr><td>Trần Thị Bình</td><td></td></tr></table></div>
+  <div class="card"><div class="head"><b>Sơ đồ thừa kế</b><div class="tools"><span class="btn">Xem cách tính</span><span class="btn secondary">Lưu sơ đồ <i class="dirty"></i></span><span class="btn primary">Xuất Word</span></div></div>
+  <div class="body"><div class="pool"><b>Pool</b><div class="search">Lọc pool…</div><div class="person">Trần Thị Bình</div></div><div class="diagram"><div class="canvas"><div class="node"><span class="name">Nguyễn Văn An</span><div class="years">1950–2024</div><div class="posrow"><span>Chủ</span><span class="chip on">1</span><span class="chip off">2</span><span class="chip off">3</span></div><div class="posrow"><span>Nhận</span><span class="chip">1</span><span class="chip off">2</span><span class="chip off">3</span></div></div></div></div></div></div>
+</div>
+        </template></doc-mock>
+      </div>
+      <div data-state="evaluated">
+        <doc-mock frame="none" w="340" label="Đề xuất · chưa implement · Chi tiết thông báo" caption="C01/C02: banner và toast giữ nguyên lời catalog; tự đánh giá vẫn chờ 500 ms. Chỉ tách vùng thông báo để đọc, không thêm UI."><template>
+<div class="app">
+  <div class="banner">Dữ liệu Stage chưa hợp lệ — Sửa các ô/dòng đánh dấu đỏ rồi lưu lại. (stage_validation_error)<span class="close">×</span></div>
+  <div class="toast-zone"><div class="toast" data-ref="detail-evaluate-toast">Dữ liệu Stage chưa hợp lệ — Sửa các ô/dòng đánh dấu đỏ rồi lưu lại. (stage_validation_error)</div></div>
+</div>
+        </template><doc-pin ref="detail-evaluate-toast" title="Thông báo có sẵn">Toast tự hết sau 6 giây; không thêm nút thử lại.</doc-pin></doc-mock>
+        <doc-mock frame="none" w="480" max-scale="0.6" label="Thumbnail · Đề xuất · chưa implement" caption="Định vị banner phía trên bảng Người và toast bên dưới vùng soạn; đọc lời lỗi trong chi tiết phía trên."><template>
+<div class="app">
+  <div class="banner" data-ref="evaluate-banner">Dữ liệu Stage chưa hợp lệ — Sửa các ô/dòng đánh dấu đỏ rồi lưu lại. (stage_validation_error)<span class="close">×</span></div>
+  <div class="card stage"><div class="head"><b>Người</b></div><table class="table"><tr><th>Họ tên</th><th>Ngày mất</th></tr><tr><td>Nguyễn Văn An</td><td>12/03/2024</td></tr><tr><td>Trần Thị Bình</td><td></td></tr></table></div>
+  <div class="card"><div class="head"><b>Sơ đồ thừa kế</b><div class="tools"><span class="btn">Xem cách tính</span><span class="btn secondary">Lưu sơ đồ <i class="dirty"></i></span><span class="btn primary">Xuất Word</span></div></div>
+  <div class="body"><div class="pool"><b>Pool</b><div class="search">Lọc pool…</div><div class="person">Trần Thị Bình</div></div><div class="diagram"><div class="canvas"><div class="node"><span class="name">Nguyễn Văn An</span><div class="years">1950–2024</div><div class="posrow"><span>Chủ</span><span class="chip on">1</span><span class="chip off">2</span><span class="chip off">3</span></div><div class="posrow"><span>Nhận</span><span class="chip">1</span><span class="chip off">2</span><span class="chip off">3</span></div></div></div></div></div></div>
+  <div class="toast-zone"><div class="toast" data-ref="evaluate-toast">Dữ liệu Stage chưa hợp lệ — Sửa các ô/dòng đánh dấu đỏ rồi lưu lại. (stage_validation_error)</div></div>
+</div>
+        </template></doc-mock>
+      </div>
+      <div data-state="invalid">
+        <doc-mock frame="none" w="340" label="Đề xuất · chưa implement · Chi tiết dưới canvas" caption="C03/C05: crop vùng node và lỗi ngay dưới canvas; details.errors có invalid_parent_slots là dữ liệu minh họa. Không có toast riêng."><template>
+<div class="app">
+  <div class="body"><div class="diagram detail-diagram"><div class="canvas"><div class="node"><span class="name">Nguyễn Văn An</span><div class="years">1950–2024</div><div class="posrow"><span>Chủ</span><span class="chip on">1</span><span class="chip off">2</span><span class="chip off">3</span></div><div class="posrow"><span>Nhận</span><span class="chip">1</span><span class="chip off">2</span><span class="chip off">3</span></div></div></div><div class="inline-error" data-ref="detail-diagram-errors">Quan hệ cha/mẹ không hợp lệ (invalid_parent_slots)</div></div></div>
+</div>
+        </template><doc-pin ref="detail-diagram-errors" title="Giữ vùng soạn">Danh sách lỗi không làm card sơ đồ biến mất.</doc-pin></doc-mock>
+        <doc-mock frame="none" w="480" max-scale="0.6" label="Thumbnail · Đề xuất · chưa implement" caption="Định vị lỗi dưới canvas, cạnh Pool; đọc vùng chi tiết phía trên."><template>
+<div class="app">
+  <div class="card stage"><div class="head"><b>Người</b></div><table class="table"><tr><th>Họ tên</th><th>Ngày mất</th></tr><tr><td>Nguyễn Văn An</td><td>12/03/2024</td></tr><tr><td>Trần Thị Bình</td><td></td></tr></table></div>
+  <div class="card"><div class="head"><b>Sơ đồ thừa kế</b><div class="tools"><span class="btn">Xem cách tính</span><span class="btn secondary">Lưu sơ đồ <i class="dirty"></i></span><span class="btn primary">Xuất Word</span></div></div>
+  <div class="body"><div class="pool"><b>Pool</b><div class="search">Lọc pool…</div><div class="person">Trần Thị Bình</div></div><div class="diagram"><div class="canvas"><div class="node"><span class="name">Nguyễn Văn An</span><div class="years">1950–2024</div><div class="posrow"><span>Chủ</span><span class="chip on">1</span><span class="chip off">2</span><span class="chip off">3</span></div><div class="posrow"><span>Nhận</span><span class="chip">1</span><span class="chip off">2</span><span class="chip off">3</span></div></div></div><div class="inline-error" data-ref="diagram-errors">Quan hệ cha/mẹ không hợp lệ (invalid_parent_slots)</div></div></div></div>
+</div>
+        </template></doc-mock>
+      </div>
+      <div data-state="locked">
+        <doc-mock frame="none" w="340" label="Đề xuất · chưa implement · Chi tiết lưu bị khóa" caption="C04: tách các banner, nhóm hành động và toast sau khi server trả workspace_locked; không ghi thành công giả."><template>
+<div class="app readonly">
+  <div class="banner warn">Hồ sơ đã khóa — toàn bộ chỉ đọc, vẫn xem/sao chép được.</div>
+  <div class="banner">Hồ sơ đã khóa — Mọi thao tác chỉ đọc — mở khóa ở engine trước khi sửa. (workspace_locked)<span class="close">×</span></div>
+  <div class="card detail-actions"><div class="head"><div class="tools"><span class="btn">Xem cách tính</span><span class="btn disabled" data-ref="detail-dirty-save">Lưu sơ đồ <i class="dirty"></i></span><span class="btn primary">Xuất Word</span></div></div></div>
+  <div class="toast-zone"><div class="toast">Hồ sơ đã khóa — Mọi thao tác chỉ đọc — mở khóa ở engine trước khi sửa. (workspace_locked)</div></div>
+</div>
+        </template><doc-pin ref="detail-dirty-save" title="Chưa lưu vẫn còn">Nút disabled vẫn có chấm chưa lưu; draft và revision không đổi như khi lưu thành công.</doc-pin></doc-mock>
+        <doc-mock frame="none" w="480" max-scale="0.6" label="Thumbnail · Đề xuất · chưa implement" caption="Định vị banner khóa, Lưu sơ đồ và toast trong màn hình; đọc vùng chi tiết phía trên."><template>
+<div class="app readonly">
+  <div class="banner warn">Hồ sơ đã khóa — toàn bộ chỉ đọc, vẫn xem/sao chép được.</div>
+  <div class="banner">Hồ sơ đã khóa — Mọi thao tác chỉ đọc — mở khóa ở engine trước khi sửa. (workspace_locked)<span class="close">×</span></div>
+  <div class="card stage"><div class="head"><b>Người</b></div><table class="table"><tr><th>Họ tên</th><th>Ngày mất</th></tr><tr><td>Nguyễn Văn An</td><td>12/03/2024</td></tr><tr><td>Trần Thị Bình</td><td></td></tr></table></div>
+  <div class="card"><div class="head"><b>Sơ đồ thừa kế</b><div class="tools"><span class="btn">Xem cách tính</span><span class="btn disabled" data-ref="dirty-save">Lưu sơ đồ <i class="dirty"></i></span><span class="btn primary">Xuất Word</span></div></div>
+  <div class="body"><div class="pool"><b>Pool</b><div class="search">Lọc pool…</div><div class="person">Trần Thị Bình</div></div><div class="diagram"><div class="canvas"><div class="node"><span class="name">Nguyễn Văn An</span><div class="years">1950–2024</div><div class="posrow"><span>Chủ</span><span class="chip on">1</span><span class="chip off">2</span><span class="chip off">3</span></div><div class="posrow"><span>Nhận</span><span class="chip">1</span><span class="chip off">2</span><span class="chip off">3</span></div></div></div></div></div></div>
+  <div class="toast-zone"><div class="toast">Hồ sơ đã khóa — Mọi thao tác chỉ đọc — mở khóa ở engine trước khi sửa. (workspace_locked)</div></div>
+</div>
+        </template></doc-mock>
+      </div>
+      <div data-state="conflict">
+        <doc-mock frame="none" w="340" label="Đề xuất · chưa implement · Chi tiết dialog xung đột" caption="C06: tách riêng nội dung và hai hành động của dialog hiện có để đọc; revision 8 là dữ liệu minh họa, không phải kết quả thử."><template>
+<div class="app detail-dialog"><div class="modal">
+  <div class="modal-head"><b>Hồ sơ đã thay đổi trên máy chủ</b><span class="close">×</span></div>
+  <div class="modal-body"><p>Phiên bản hiện tại: 8 — bản bạn đang sửa dựa trên phiên bản cũ hơn.</p><p>Không có ghi đè cưỡng bức — bản nháp chỉ để bạn sao chép tay.</p></div>
+  <div class="modal-foot"><span class="btn" data-ref="detail-keep-draft">Giữ bản nháp để sao chép</span><span class="btn primary">Tải bản mới</span></div>
+</div></div>
+        </template><doc-pin ref="detail-keep-draft" title="Không thêm cách lưu">Giữ luồng xung đột; không thêm ghi đè hay retry.</doc-pin></doc-mock>
+        <doc-mock frame="none" w="480" max-scale="0.6" label="Thumbnail · Đề xuất · chưa implement" caption="Định vị dialog xung đột trong màn hình soạn; đọc nội dung và hành động trong chi tiết phía trên."><template>
+<div class="app">
+  <div class="card stage"><div class="head"><b>Người</b></div><table class="table"><tr><th>Họ tên</th><th>Ngày mất</th></tr><tr><td>Nguyễn Văn An</td><td>12/03/2024</td></tr><tr><td>Trần Thị Bình</td><td></td></tr></table></div>
+  <div class="card"><div class="head"><b>Sơ đồ thừa kế</b><div class="tools"><span class="btn">Xem cách tính</span><span class="btn secondary">Lưu sơ đồ <i class="dirty"></i></span><span class="btn primary">Xuất Word</span></div></div>
+  <div class="body"><div class="pool"><b>Pool</b><div class="search">Lọc pool…</div><div class="person">Trần Thị Bình</div></div><div class="diagram"><div class="canvas"><div class="node"><span class="name">Nguyễn Văn An</span><div class="years">1950–2024</div><div class="posrow"><span>Chủ</span><span class="chip on">1</span><span class="chip off">2</span><span class="chip off">3</span></div><div class="posrow"><span>Nhận</span><span class="chip">1</span><span class="chip off">2</span><span class="chip off">3</span></div></div></div></div></div></div>
+  <div class="dialog-crop conflict-overlay"><div class="modal">
+  <div class="modal-head"><b>Hồ sơ đã thay đổi trên máy chủ</b><span class="close">×</span></div>
+  <div class="modal-body"><p>Phiên bản hiện tại: 8 — bản bạn đang sửa dựa trên phiên bản cũ hơn.</p><p>Không có ghi đè cưỡng bức — bản nháp chỉ để bạn sao chép tay.</p></div>
+  <div class="modal-foot"><span class="btn" data-ref="keep-draft">Giữ bản nháp để sao chép</span><span class="btn primary">Tải bản mới</span></div>
+</div></div></div>
+        </template></doc-mock>
+      </div>
+    </doc-machine>
+    <doc-note tone="info">Tên người và dữ liệu là ví dụ giả. Các nhánh là kết quả trả về có kiểm soát, không suy lỗi từ những ô đang thấy.</doc-note>
+    <doc-claim>
+      <p>Ba chỗ báo lỗi dùng hàm <code>errText</code> đã có.</p>
+      <doc-calls title="Đường đi hiện có · chỉ đổi thuộc tính của alias" caption="Dấu ~ là đề xuất; các lệnh, danh mục lỗi và dialog giữ nguyên.">
+<script type="text/plain">
+~ relErrText = G1_NOTARY_ERRORS.errText @ shell/src/renderer/notary/relationship-diagram.js:47
+  runEvaluate() @ shell/src/renderer/notary/relationship-diagram.js:308
+    evaluateDiagram() @ shell/src/renderer/notary/case-drafting-model.js:1334
+    notify(relErrText(error), true) @ shell/src/renderer/notary/relationship-diagram.js:312
+  diagramRegionEl() @ shell/src/renderer/notary/relationship-diagram.js:1244
+    render diagramErrors bằng relErrText @ shell/src/renderer/notary/relationship-diagram.js:1278
+  Lưu sơ đồ → saveDiagram() @ shell/src/renderer/notary/relationship-diagram.js:1329
+    saveDiagram() @ shell/src/renderer/notary/case-drafting-model.js:1376
+    notify(relErrText(error), true) @ shell/src/renderer/notary/relationship-diagram.js:1333
+  errText(error) và export catalog @ shell/src/renderer/notary/error-catalog.js:250
+  workspaceEl() → banner lỗi @ shell/src/renderer/notary/case-drafting-view.js:1873
+  conflictDialog() @ shell/src/renderer/notary/case-drafting-view.js:1818
+</script>
+      </doc-calls>
+      <doc-claim at="shell/src/renderer/notary/relationship-diagram.js:47">
+        <p><b>relationship-diagram.js:47–49</b> · <code>relErrText</code></p>
+        <doc-code src="shell/src/renderer/notary/relationship-diagram.js" lines="42-59" hl="47-49" caption="Source hiện tại vẫn lấy .relErrText. Plan đề xuất lấy .errText, giữ tên alias và fallback."></doc-code>
+      </doc-claim>
+    </doc-claim>
+  </doc-claim>
+  <doc-claim aux="scope">
+    <p>Bản minh họa không đổi nghiệp vụ hoặc đóng report.</p>
+    <ul>
+      <li>Chỉ diễn giải plan <code>plan-diagram-error-fix-20261009.md</code>; không cấp quyền sửa app.</li>
+      <li>Không đổi layout, Stage/Pool, engine, schema, auth, luồng xung đột hoặc thao tác lưu thành công.</li>
+      <li>Giữ stageGate và ngoại lệ two_party; không thêm nút “Đánh giá thử” hoặc “+ Slot” đã bỏ khỏi source hiện tại.</li>
+      <li>Không có quyết định sản phẩm mới. 12 report thiếu mô tả vẫn còn mở; flow Báo lỗi nằm ngoài phạm vi.</li>
+      <li>Evidence 09/10 chỉ là Chrome probe với biến thể source trong bộ nhớ, không phải nghiệm thu Electron sau sửa. Coordinator sẽ pack và xem hình thật.</li>
+    </ul>
+  </doc-claim>
+</doc-plan>
+</main>
+</body>
+</html>

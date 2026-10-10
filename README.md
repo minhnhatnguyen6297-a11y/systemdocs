@@ -102,3 +102,27 @@ không tạo phần sản phẩm thứ tư.
 | `.tmp/`, `.cache/`, `logs/`, `artifacts/` | File tạm, không commit |
 
 Trước khi sửa tài liệu, đọc [luật agent](./AGENTS.md).
+
+## Plan/spec trực quan trong BMAD
+
+`bmad-build` nạp [contract authoring](./_bmad/custom/html-plan/authoring.md) trước
+checkpoint PLAN; `bmad-spec` nạp cùng contract trước trình bày spec. Agent viết
+HTML trực tiếp: cây hành vi và exhibit, mock app đề xuất theo UI đã inspect,
+không bọc Markdown. [Spec hành vi](./_bmad-output/specs/shared/visual-html-plans.md)
+giữ phạm vi và tiêu chí nghiệm thu; Markdown/memory BMAD vẫn là nguồn chuẩn.
+
+Từ root repo, đóng gói ví dụ bằng Node:
+
+```sh
+node _bmad/custom/html-plan/runtime/pack.mjs _bmad/custom/html-plan/examples/notary-diagram-errors.html --root .
+```
+
+Mở `notary-diagram-errors.packed.html` cùng thư mục trong browser. Với task mới,
+agent viết `_bmad-output/tmp/<slug>/plan.html` hoặc `spec.html`, thay input trong
+command, xem cây đóng/mở và từng state rồi giao link `.packed.html` bấm được.
+Không dùng dữ liệu ví dụ làm mặc định cho plan tương lai.
+
+**Giới hạn:** đây là customization ở mức chỉ dẫn agent, không phải hook cưỡng
+chế hay bộ tự sinh HTML/mở browser. Task nhỏ không bị ép lựa chọn hoặc gate mới;
+Respond là phụ, chưa xem không phải đồng ý. Việc pack được không chứng minh
+mock đúng: vẫn cần kiểm tra bằng mắt, hoặc báo rõ chưa kiểm tra được.

@@ -62,3 +62,7 @@
   evidence: pre-existing — có sẵn trong backlog gốc.
 - summary: `_bmad-output/specs/README.md` §9 vẫn mô tả mô hình cũ (Backlog giữ task, `.agent/tasks/` giữ tiến độ, decision-31).
   evidence: cần quyết định có viết lại lịch sử spec không; AGENTS.md mới đã là luật hiện hành.
+
+- source_plan: `D:/systemdocs/_bmad-output/tmp/core-versions-20261008.html`
+  summary: Nang Electron 31 (het ho tro tu 14/01/2025, Chromium 126 khong con va bao mat) len ban stable moi nhat, kem electron-builder va bundle playwright-browsers, chay lai E2E.
+  evidence: E2E hien xanh tren 31.7.7 nhung khong con ban va bao mat; app xu ly ho so nhay cam. Tieu chi xong: E2E xanh + check.cjs PASS + dong goi thu thanh cong.
