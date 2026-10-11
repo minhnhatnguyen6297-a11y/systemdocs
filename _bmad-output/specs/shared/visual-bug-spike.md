@@ -1,11 +1,15 @@
-# Temporary Electron visual reporting spike
+# Development-only Electron visual reporting
 
-Source: implementation-artifacts/plan-visual-bug-electron-evaluation.md.
+Source: implementation-artifacts/plan-debug-monorepo-cutover.md.
 
 - Enabled only by `G1_VISUAL_BUG_SPIKE=1` in unpackaged Electron. Main loads
-  scratch implementation outside package globs; absent flag loads nothing.
-- Main fixes profile, Notary, Upload and output directories inside
-  `_bmad-output/tmp/visual-bug-spike/custom/runtime/`; synthetic mock Notary only.
+  maintained `tools/visual-bug-reporting/main.cjs` outside package globs;
+  absent flag loads nothing. Root `run-dev.bat` calls the shared `run.bat`
+  launcher, preserving arguments and installed-runtime resolution.
+- Main fixes profile, Notary, Upload and output directories inside ignored
+  `_bmad-output/tmp/visual-bug-reporting/runtime/`; synthetic mock Notary only,
+  not production Notary data. `G1_VISUAL_SPIKE_RUNTIME` is a trusted local-test
+  override. Source archival profiles are not imported into this runtime.
 - Ctrl+Shift+B starts element picking; pointer highlights; click selects without
   activating the app action; Escape/cancel exits; submit writes local JSON/PNG.
 - Export the reporter's verbatim note (<=240 chars), structural tag/nth-child
@@ -47,15 +51,19 @@ Source: implementation-artifacts/plan-visual-bug-electron-evaluation.md.
   selector grammar. One report at a time. Fixed sink; no renderer path input.
 - Capture failure produces JSON with missing image and safe failure code. Save
   failure is visible. Reload resets picker. No production delivery or telemetry.
-- Runtime failure switches and the report sink (`G1_VISUAL_SPIKE_SINK`, harness-only)
-  are trusted environment variables; packaged gate stays off. The sink defaults to
-  `reports/`; the E2E harness points it at
-  `_bmad-output/tmp/visual-bug-source-linkage/smoke-reports/` so test records
-  never mix with reporter records. Packaged behavior is unit-tested, not
-  certified through a new installer build.
-- Verification evidence: `_bmad-output/tmp/visual-bug-source-linkage/report.html`
-  and the current spike `custom/evidence/e2e-results.json` / `image-check.json`.
-  This remains a local development spike, not a production rollout.
-- Final scoped verification: `check.cjs` PASS; Electron smoke `passed: true`
-  (19 checks, 11 reports); current native PNG PASS. All 69 historical report
-  hashes unchanged (37 JSON, 32 PNG); separate smoke sink only.
+- Runtime failure switches, runtime override and report sink
+  (`G1_VISUAL_SPIKE_SINK`) are trusted environment variables; packaged gate
+  stays off. The sink defaults to ignored
+  `_bmad-output/tmp/visual-bug-reporting/reports/`. E2E uses a separate
+  `_bmad-output/tmp/visual-bug-reporting/checks/smoke-reports/` sink;
+  `G1_VISUAL_SPIKE_TEST_DIR` chooses a fresh test root. No private data or
+  generated evidence belongs under maintained tools.
+- `tools/visual-bug-reporting/check.cjs`, `e2e.cjs`, `check_image.py` and
+  `launcher-smoke.cjs` exercise policy/ownership, current Electron, PNG privacy
+  and the actual root BAT. Package behavior is unit-tested, not certified
+  through a new installer build.
+- Historical source-linkage verification (19 checks, 11 reports) remains
+  historical evidence, not evidence for the durable path cutover. Historical
+  reporter records (37 JSON, 32 PNG) are archived unchanged in the target's
+  ignored namespaced backup; this is not an active-data migration.
+  Current cutover evidence: `_bmad-output/tmp/debug-monorepo-cutover.html`.

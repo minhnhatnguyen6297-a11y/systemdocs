@@ -19,6 +19,10 @@ const { openPathBlockReason } = require('./open-path');
 
 const SHELL_ROOT = path.join(__dirname, '..', '..');
 const SMOKE = process.env.G1_SMOKE === '1'; // packaged smoke: chay probe roi thoat
+// Opt-in development tooling stays outside packaged application files.
+const visualSpike = !app.isPackaged && process.env.G1_VISUAL_BUG_SPIKE === '1'
+  ? require(path.join(SHELL_ROOT, '..', 'tools', 'visual-bug-reporting', 'main.cjs')) : null;
+if (visualSpike) visualSpike.isolate(app, SHELL_ROOT);
 
 // MIN-69 T9: marker `resources/test-pkg/test-build.json` CHI ton tai trong
 // goi dist:test (electron-builder.test.json). Production khong ship file
@@ -196,8 +200,10 @@ function createWindow() {
       nodeIntegrationInWorker: false,
       webSecurity: true,
       allowRunningInsecureContent: false,
+      additionalArguments: visualSpike ? ['--g1-visual-spike'] : [],
     },
   });
+  if (visualSpike) visualSpike.attach(win, ipcMain, SHELL_ROOT);
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   win.on('close', async (e) => {
     // Quit giua luc job con chay se drain sidecar -> job chet engine_shutdown;

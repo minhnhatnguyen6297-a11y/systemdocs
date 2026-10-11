@@ -14,6 +14,11 @@ context: []
 baseline_revision: '20c3d597a5335f8fcb9a7bed381f3d70472d4acd'
 ---
 
+Historical plan and verification below retain the original scratch paths as evidence.
+The maintained implementation and current commands moved to
+`tools/visual-bug-reporting/`; see [cutover plan](./plan-debug-monorepo-cutover.md).
+Do not execute retired scratch paths.
+
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
 ## Intent
