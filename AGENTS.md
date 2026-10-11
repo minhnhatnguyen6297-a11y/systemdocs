@@ -2,11 +2,13 @@
 
 ## 1. Vai trò và quy trình
 
-- Mọi việc theo **workflow BMAD**. Yêu cầu code → `bmad-build`; ý tưởng còn mơ hồ →
-  `bmad-spec`; cần kiến trúc → `bmad-architecture`; review → `bmad-code-review`.
+- Mọi việc theo **workflow BMAD**. Khảo sát/khám phá trước; brainstorm khi cần;
+  viết spec bằng `bmad-spec` khi ý định đủ rõ. Yêu cầu code → `bmad-build`; cần kiến
+  trúc → `bmad-architecture`; review code → `bmad-code-review`, artifact khác dùng
+  review phù hợp.
   Đọc skill tương ứng trước khi làm, KHÔNG tự chế quy trình riêng.
 - Chọn theo độ rõ: ngắn-rõ → todo + **MỘT** Orca implementation worker → test thật →
-  **MỘT** reviewer độc lập; việc khó → full workflow. Số dòng chỉ là tín hiệu;
+  **MỘT** reviewer độc lập; việc khó → full, chỉ các bước cần. Số dòng chỉ là tín hiệu;
   coordinator sở hữu review, worker không spawn; lens thêm cần lý do rủi ro cụ thể.
   Theo `_bmad-output/specs/shared/adaptive-coding-flow.md`.
 - Ponytail: code tối thiểu, MVP chạy được trước. Caveman: handoff/spec/plan viết ngắn gọn;
