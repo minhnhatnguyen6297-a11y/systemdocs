@@ -7,14 +7,15 @@
   trúc → `bmad-architecture`; review code → `bmad-code-review`, artifact khác dùng
   review phù hợp.
   Đọc skill tương ứng trước khi làm, KHÔNG tự chế quy trình riêng.
-- Chọn theo độ rõ: ngắn-rõ → todo + **MỘT** Orca implementation worker → test thật →
+- Chọn theo độ rõ: ngắn-rõ → todo + **MỘT** implementation worker → test thật →
   **MỘT** reviewer độc lập; việc khó → full, chỉ các bước cần. Số dòng chỉ là tín hiệu;
   coordinator sở hữu review, worker không spawn; lens thêm cần lý do rủi ro cụ thể.
   Theo `_bmad-output/specs/shared/adaptive-coding-flow.md`.
 - Ponytail: code tối thiểu, MVP chạy được trước. Caveman: handoff/spec/plan viết ngắn gọn;
   nói chuyện với user thì nói tự nhiên, dễ hiểu (nontech — vibecoder).
-- Orchestration chỉ dùng **Orca**. Không dùng 1DevTool, Codex multi-agent, hay công cụ
-  khác đã gỡ.
+- Mặc định dùng subagent của harness hiện tại. Chỉ dùng **Orca** khi user yêu cầu rõ.
+- Khi user yêu cầu tự làm trong phiên hiện tại, làm trực tiếp và vẫn kiểm chứng;
+  không bắt spawn worker, báo rõ nếu chưa có review độc lập.
 
 ## 2. Nguồn chuẩn (SOT)
 

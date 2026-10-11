@@ -28,8 +28,9 @@ Spec này quyết định hành vi; code và override chỉ chứng minh hiện 
 
 ### Một implementation worker
 
-- Coordinator giao todo/plan cho **đúng một** Orca implementation worker.
-- Việc ngắn: coordinator không tự viết code; sau khi có plan/todo, dispatch một
+- Coordinator giao todo/plan cho **đúng một** implementation worker qua subagent của
+  harness hiện tại; dùng Orca chỉ khi user yêu cầu rõ.
+- Việc ngắn mặc định: coordinator không tự viết code; sau khi có plan/todo, dispatch một
   worker chạy phần implement của oneshot.
 - Việc khó: handoff của full cũng dispatch đúng một worker đó.
 - Worker chạy test/smoke thật **trước review** rồi báo lại. Worker **không** spawn ai.
@@ -52,10 +53,13 @@ Spec này quyết định hành vi; code và override chỉ chứng minh hiện 
 - Blind-hunter không còn quota số finding; kết quả sạch là hợp lệ.
 - Reviewer độc lập, không dùng skill, không spawn.
 
-### Orca là orchestration duy nhất
+### Transport theo yêu cầu
 
-- Dispatch bằng `orca orchestration worker-start`; không dùng subagent ngoài Orca.
-- Topology phẳng: một worker; worker không spawn.
+- Mặc định dùng cơ chế subagent của harness hiện tại (OMP hoặc agent khác).
+- Chỉ dùng Orca khi user yêu cầu rõ; theo skill/guide Orca hiện hành lúc đó.
+- Coordinator là authority duy nhất; worker và reviewer không spawn thêm agent.
+- User yêu cầu tự làm trong phiên hiện tại thì làm trực tiếp, vẫn test/smoke và
+  báo rõ nếu không có review độc lập; không ép spawn worker để thỏa checklist.
 
 ### Giữ nguyên các luật hiện hành
 
@@ -72,7 +76,7 @@ Spec này quyết định hành vi; code và override chỉ chứng minh hiện 
 
 ## Nghiệm thu
 
-1. Given một việc ngắn-rõ, when build chạy, then chỉ một implementation worker được
+1. Given một việc ngắn-rõ không có yêu cầu tự làm trực tiếp, when build chạy, then chỉ một implementation worker được
    dispatch, test thật chạy, và đúng một reviewer độc lập chạy.
 2. Given một việc khó, when build chạy, then mở full workflow nhưng vẫn một worker và
    mặc định một reviewer.
@@ -83,3 +87,6 @@ Spec này quyết định hành vi; code và override chỉ chứng minh hiện 
 
 Nguồn quyết định:
 [decision-79](../../decisions/decision-79-adaptive-flow-short-clear-one-worker-todo-test-one-review.md).
+- Quyết định transport mới:
+  [native subagents, Orca on request](../../decisions/decision-native-subagents-orca-on-request.md)
+  thay thế riêng yêu cầu Orca trong decision-79.

@@ -2,6 +2,10 @@
 
 Ngày: 2026-10-12. Người dùng đã duyệt triển khai ngay trong phiên này.
 
+Yêu cầu transport Orca trong quyết định này đã được thay thế bởi
+[native subagents, Orca on request](decision-native-subagents-orca-on-request.md).
+Phần dưới giữ nguyên lịch sử; các luật adaptive khác vẫn có hiệu lực.
+
 ## LÀ GÌ
 
 - Việc **ngắn, rõ** → todo list + **một** Orca implementation worker → test/smoke
