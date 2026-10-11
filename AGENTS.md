@@ -28,9 +28,12 @@
 
 ## 3. Trình bày kết quả
 
-- Kết quả phân tích, review, so sánh, báo cáo cho user xem → tạo **file HTML** trong
-  `_bmad-output/tmp/` rồi đưa đường dẫn, thay vì in text dài trong hội thoại.
-- Trong hội thoại chỉ tóm tắt vài dòng: quyết định là gì, cần user xác nhận gì.
+- Chỉ tạo **file HTML** trong `_bmad-output/tmp/` khi trình bày **plan, spec,
+  brainstorming hoặc minh họa cấu trúc**; giao đường dẫn kèm tóm tắt trong hội thoại.
+- Chat, câu hỏi, cập nhật trạng thái, phân tích, review, so sánh và báo cáo thông thường
+  trả lời trực tiếp trong hội thoại; không tự động tạo HTML vì nội dung dài hoặc là kết quả.
+- Plan/spec giữ workflow HTML hiện hành trong `_bmad-output/specs/shared/visual-html-plans.md`
+  và `_bmad/custom/html-plan/authoring.md`, gồm thời điểm trình bày và ngoại lệ việc nhỏ.
 
 ## 4. Commit
 
