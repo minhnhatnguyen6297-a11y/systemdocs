@@ -8,6 +8,12 @@
 
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
+if (process.argv.includes('--g1-visual-spike')) {
+  contextBridge.exposeInMainWorld('visualBugSpike', {
+    save: (payload) => ipcRenderer.invoke('visual-bug-spike.save', payload),
+  });
+}
+
 contextBridge.exposeInMainWorld('desktop', {
   v1: {
     getModules: () => ipcRenderer.invoke('desktop.v1.getModules'),

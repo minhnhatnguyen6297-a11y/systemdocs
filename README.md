@@ -90,6 +90,17 @@ Nếu ảnh hưởng nhiều module, đặt ở `_bmad-output/specs/README.md`.
 `shell` là hạ tầng, không phải module nghiệp vụ. Zalo là nguồn đầu vào kỹ thuật,
 không tạo phần sản phẩm thứ tư.
 
+### Báo lỗi giao diện trong chế độ dev
+
+Chạy `run-dev.bat` ở gốc repo → Ctrl+Shift+B → chọn phần tử → viết ghi chú →
+Save report. Launcher dùng lại `run.bat`, không cần đường dẫn máy cố định hoặc
+`rtk`. Đây là cùng app nhưng **Notary mock, dữ liệu/profile thử tách riêng**,
+không phải dữ liệu công chứng production. Báo cáo JSON/PNG nằm ở thư mục ignored
+`_bmad-output/tmp/visual-bug-reporting/reports/`; ghi chú được giữ nguyên văn,
+phải kiểm tra dữ liệu riêng tư trước khi chia sẻ. App đóng gói không bật tool này.
+Xem [hướng dẫn và kiểm chứng](./tools/visual-bug-reporting/README.md).
+
+
 ## Những nơi khác
 
 | Chỗ | Dùng cho |

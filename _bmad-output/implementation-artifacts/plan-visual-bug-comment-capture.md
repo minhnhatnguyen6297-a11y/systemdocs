@@ -54,7 +54,7 @@ baseline_revision: '3975c73910c18a073f9ec99b0800a89df77097e3'
 ## Verification
 
 **Commands:**
-- `rtk proxy node _bmad-output/tmp/visual-bug-spike/custom/check.cjs` -- expected: PASS lines; a freeform note is returned verbatim; 240-char note accepted and 241 rejected; sender/frame/URL and packaged gates intact.
-- `rtk proxy node _bmad-output/tmp/visual-bug-spike/custom/e2e.cjs` -- expected: all groups pass; the note typed in `#vb-note` equals `report.note`; DOM/state/storage/log/ID sentinels still absent from the report.
-- `rtk proxy node _bmad-output/tmp/visual-bug-spike/custom/regression.cjs` -- expected: unchanged pre-existing 1 failure (missing `docs/spec/ui/tokens.json`), no new failures.
-- `rtk proxy D:/systemdocs/notary_v2/venv/Scripts/python.exe _bmad-output/tmp/visual-bug-spike/custom/check_image.py` -- expected: pass (image path unchanged).
+- `node tools/visual-bug-reporting/check.cjs` -- expected: policy, note boundaries, sender/frame/URL, packaging, registry and anchors PASS.
+- `node tools/visual-bug-reporting/e2e.cjs` -- expected: verbatim note and privacy checks PASS in the separate ignored test sink.
+- `node tools/visual-bug-reporting/regression.cjs` -- optional broad suite; known pre-existing missing-token failure, not rerun for the cutover.
+- `python tools/visual-bug-reporting/check_image.py` -- use the launcher's Python venv (Pillow installed); expected: wireframe pixel check PASS.
