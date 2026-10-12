@@ -5,7 +5,7 @@
 ## Thời điểm
 
 - **Build:** sau investigate và tự kiểm tra plan, trước trình bày **CHECKPOINT 1 / PLAN** và xin duyệt. Không dùng `on_complete` để thay checkpoint. Với oneshot có thay đổi cần hình, tạo trước implementation; không thêm bước duyệt mà workflow không có.
-- **Spec:** sau Self-Validate, trước **Output**. Giữ SPEC.md, companions, .memlog.md và schema headless nguyên vai trò. Headless tạo HTML cùng artifact; caller giao link, không tự thêm key vào schema.
+- **Spec:** sau Self-Validate, trước **Output**. Giữ spec kernel, companions, .memlog.md và schema headless nguyên vai trò. Headless tạo HTML cùng artifact; caller giao link, không tự thêm key vào schema.
 - Task nhỏ không cần hình: giữ output gọn của workflow. User yêu cầu hình: tạo HTML dù task nhỏ. Không đặt quota câu hỏi, số hình hoặc gate mới.
 
 ## Inspect trước khi vẽ

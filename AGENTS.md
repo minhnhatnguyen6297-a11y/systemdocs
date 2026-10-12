@@ -1,49 +1,35 @@
 ﻿# AGENTS.md — luật làm việc trong systemdocs
 
-## 1. Vai trò và quy trình
+## Dùng BMAD
 
-- Mọi việc theo **workflow BMAD**. Khảo sát/khám phá trước; brainstorm khi cần;
-  viết spec bằng `bmad-spec` khi ý định đủ rõ. Yêu cầu code → `bmad-build`; cần kiến
-  trúc → `bmad-architecture`; review code → `bmad-code-review`, artifact khác dùng
-  review phù hợp.
-  Đọc skill tương ứng trước khi làm, KHÔNG tự chế quy trình riêng.
-- Chọn theo độ rõ: ngắn-rõ → todo + **MỘT** implementation worker → test thật →
-  **MỘT** reviewer độc lập; việc khó → full, chỉ các bước cần. Số dòng chỉ là tín hiệu;
-  coordinator sở hữu review, worker không spawn; lens thêm cần lý do rủi ro cụ thể.
-  Theo `_bmad-output/specs/shared/adaptive-coding-flow.md`.
-- Ponytail: code tối thiểu, MVP chạy được trước. Caveman: handoff/spec/plan viết ngắn gọn;
-  nói chuyện với user thì nói tự nhiên, dễ hiểu (nontech — vibecoder).
-- Mặc định dùng subagent của harness hiện tại. Chỉ dùng **Orca** khi user yêu cầu rõ.
-- Khi user yêu cầu tự làm trong phiên hiện tại, làm trực tiếp và vẫn kiểm chứng;
-  chỉ đổi người implement, không tự bỏ review độc lập. Reviewer không khả dụng
-  thì báo blocked; chỉ bỏ review khi user chủ động yêu cầu.
+- Dùng workflow BMAD và customization của repo trong `_bmad/custom/`; đọc skill
+  tương ứng trước khi dùng. Không dựng flow song song.
+- Code tối giản; artifact và handoff ngắn gọn; trao đổi với user tự nhiên, dễ hiểu.
 
-## 2. Nguồn chuẩn (SOT)
+## Nguồn chuẩn
 
 | Nội dung | Nơi lưu |
 |---|---|
-| Spec hành vi (quyết định LÀ GÌ, TẠI SAO) | `_bmad-output/specs/` |
-| Quyết định đã chốt | `_bmad-output/decisions/` |
-| Artifact workflow (plan, review, handoff) | `_bmad-output/` |
-| Bản ghi lịch sử (Linear cũ, file đã dọn) | `_bmad-output/archive/` |
-| Tìm quan hệ code | `graphify-out/` (đọc trước khi dò file thủ công) |
+| Hành vi | `_bmad-output/specs/` |
+| Quyết định đã chốt (LÀ GÌ + TẠI SAO) | `_bmad-output/decisions/` |
+| Artifact workflow | `_bmad-output/` |
+| Lịch sử | `_bmad-output/archive/` |
+| Quan hệ code | `graphify-out/` |
 
-- Spec quyết định hành vi; code chỉ chứng minh hiện trạng. Muốn thay hành vi: thêm/sửa
-  spec trước, rồi mới code.
-- Khi user chốt một quyết định (bất kể trong bối cảnh nào): ghi vào
-  `_bmad-output/decisions/` ngay trong phiên làm việc — LÀ GÌ + TẠI SAO, không để trôi.
-- File tạm (task, rác, handoff) ghi vào `_bmad-output/tmp/`, không để lẫn vào code.
+- Spec quyết định hành vi; code chứng minh hiện trạng. Đổi hành vi thì cập nhật
+  spec liên quan trước khi sửa code.
+- Ghi quyết định của owner vào `_bmad-output/decisions/` trong phiên hiện tại.
+  Task, handoff và file tạm nằm trong `_bmad-output/tmp/`.
+- Đọc `graphify-out/` trước khi dò code thủ công.
 
-## 3. Trình bày kết quả
+## Trình bày
 
-- Chỉ tạo **file HTML** trong `_bmad-output/tmp/` khi trình bày **plan, spec,
-  brainstorming hoặc minh họa cấu trúc**; giao đường dẫn kèm tóm tắt trong hội thoại.
-- Chat, câu hỏi, cập nhật trạng thái, phân tích, review, so sánh và báo cáo thông thường
-  trả lời trực tiếp trong hội thoại; không tự động tạo HTML vì nội dung dài hoặc là kết quả.
-- Plan/spec giữ workflow HTML hiện hành trong `_bmad-output/specs/shared/visual-html-plans.md`
-  và `_bmad/custom/html-plan/authoring.md`, gồm thời điểm trình bày và ngoại lệ việc nhỏ.
+- Chỉ tạo file HTML trong `_bmad-output/tmp/` cho plan, spec, brainstorming hoặc
+  minh họa cấu trúc; chat, trạng thái, phân tích, review và báo cáo thường trả lời
+  trong hội thoại.
+- HTML plan/spec là lớp trình bày; Markdown và artifact BMAD vẫn là nguồn chuẩn.
 
-## 4. Commit
+## Commit
 
-- Xong việc: commit nhỏ, rõ ràng. Trước tác vụ phá hủy (xóa/move hàng loạt):
-  commit bảo lưu trước, hỏi user nếu chưa rõ.
+- Khi xong, tạo commit nhỏ, rõ ràng. Trước khi xóa hoặc move hàng loạt, tạo commit
+  bảo lưu; hỏi owner nếu phạm vi chưa rõ.

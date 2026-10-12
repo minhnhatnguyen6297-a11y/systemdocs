@@ -14,6 +14,13 @@ Các bản cài độc lập dễ lệch nội dung. Flow đã được BMAD quy
 
 ## Giới hạn quyết định
 
-- Đây là yêu cầu được ghi vào ticket; chưa thực hiện cài lại, chuyển link hoặc sửa AGENTS.md.
+- User yêu cầu “xử lý luôn”: thực thi ticket trong phiên này.
 - Giữ cấu trúc HTML Plan Thariq đã chốt và không xây flow song song.
-- Cách tích hợp được đề xuất trong ticket: dùng override Build/Spec hiện có; không sửa trực tiếp installed skill và không dùng AGENTS.md làm nơi điều phối HTML.
+- HTML Plan gắn trực tiếp vào Build/Spec qua override hiện có; không tạo skill HTML lẻ, không patch installed skill và không dùng AGENTS.md làm nơi điều phối HTML.
+
+## Bản cài được chọn
+
+- Dòng BMAD skills preview, version `6.13.0-next`, upstream `main` tại commit `9f1987169a2e5626e5ccb31bb9cee051fdb3df20`; không chuyển sang kiến trúc installer stable v6.
+- Giữ tập skills đang dùng; đổi `bmad-preview-ticketing` thành `bmad-ticket`. Không cài thêm module tùy chọn.
+- Installer: `npx skills`; project scripts được cập nhật bằng `bmad setup`. Customization ở `_bmad/custom/`, không sửa trực tiếp skill được cài.
+- Bản bảo lưu trước thay thế: `_bmad-output/tmp/bmad-shared-migration/backup-before-install/`. Bằng chứng runtime: `_bmad-output/tmp/bmad-shared-migration/smoke-proof.json`.

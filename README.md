@@ -116,11 +116,16 @@ Trước khi sửa tài liệu, đọc [luật agent](./AGENTS.md).
 
 ## Plan/spec trực quan trong BMAD
 
-`bmad-build` nạp [contract authoring](./_bmad/custom/html-plan/authoring.md) trước
-checkpoint PLAN; `bmad-spec` nạp cùng contract trước trình bày spec. Agent viết
-HTML trực tiếp: cây hành vi và exhibit, mock app đề xuất theo UI đã inspect,
-không bọc Markdown. [Spec hành vi](./_bmad-output/specs/shared/visual-html-plans.md)
-giữ phạm vi và tiêu chí nghiệm thu; Markdown/memory BMAD vẫn là nguồn chuẩn.
+`bmad-build` và `bmad-spec` tích hợp HTML qua các field BMAD hỗ trợ
+(`persistent_facts`, `activation_steps_append`) trong `_bmad/custom/`. Cả hai nạp
+[contract authoring](./_bmad/custom/html-plan/authoring.md) và
+[spec hành vi](./_bmad-output/specs/shared/visual-html-plans.md); không gọi
+skill HTML riêng.
+Build trình bày HTML sau điều tra và tự kiểm tra, trước khi trình bày plan/xin
+duyệt; với oneshot cần minh họa thì trước implementation. Spec trình bày sau
+self-validation và trước khi trả kết quả. Agent viết theo cấu trúc
+Thariq: cây hành vi và exhibit, mock app theo UI đã inspect; không bọc Markdown.
+Markdown/memory BMAD vẫn là nguồn chuẩn.
 
 Từ root repo, đóng gói ví dụ bằng Node:
 
@@ -133,7 +138,7 @@ agent viết `_bmad-output/tmp/<slug>/plan.html` hoặc `spec.html`, thay input 
 command, xem cây đóng/mở và từng state rồi giao link `.packed.html` bấm được.
 Không dùng dữ liệu ví dụ làm mặc định cho plan tương lai.
 
-**Giới hạn:** đây là customization ở mức chỉ dẫn agent, không phải hook cưỡng
-chế hay bộ tự sinh HTML/mở browser. Task nhỏ không bị ép lựa chọn hoặc gate mới;
-Respond là phụ, chưa xem không phải đồng ý. Việc pack được không chứng minh
-mock đúng: vẫn cần kiểm tra bằng mắt, hoặc báo rõ chưa kiểm tra được.
+**Giới hạn:** customization là chỉ dẫn agent, không phải hook cưỡng chế, generator
+hay runtime tự mở browser. Task nhỏ không bị ép lựa chọn hoặc gate mới; Respond là
+phụ, chưa xem không phải đồng ý. Pack thành công không chứng minh mock đúng: vẫn
+cần kiểm tra bằng mắt hoặc báo rõ chưa kiểm tra được.

@@ -1,0 +1,20 @@
+[workflow]
+# Same project-root-relative fact as build; no installed-skill or machine path.
+persistent_facts = ["file:_bmad/custom/html-plan/authoring.md"]
+activation_steps_append = ["""
+Load {project-root}/_bmad/custom/html-plan/authoring.md and
+{project-root}/_bmad-output/specs/shared/visual-html-plans.md now; keep the
+contract active throughout this spec operation. Resolve the relative file:
+fact from project root, never from the installed skill directory.
+For create/update, after Self-Validate and BEFORE Output, author exhibit-first
+HTML from the current spec, pack it with Node using the repository root, and
+visually inspect closed/open/state views. Present the clickable packed path
+alongside the canonical spec folder in interactive output. In headless mode
+keep the established JSON schema unchanged: produce the HTML alongside the
+artifacts and let the caller deliver the packed path. Apply the contract's
+trivial-task exception; do not invent choices, quotas or approval gates.
+Preserve the spec kernel, companions, .memlog.md, stable capability IDs and the existing
+spec template. HTML is a presentation, not a replacement source of truth.
+Respond is secondary and unseen defaults are not agreement. Do not postpone
+this presentation to on_complete.
+"""]
