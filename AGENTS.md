@@ -15,7 +15,8 @@
   nói chuyện với user thì nói tự nhiên, dễ hiểu (nontech — vibecoder).
 - Mặc định dùng subagent của harness hiện tại. Chỉ dùng **Orca** khi user yêu cầu rõ.
 - Khi user yêu cầu tự làm trong phiên hiện tại, làm trực tiếp và vẫn kiểm chứng;
-  không bắt spawn worker, báo rõ nếu chưa có review độc lập.
+  chỉ đổi người implement, không tự bỏ review độc lập. Reviewer không khả dụng
+  thì báo blocked; chỉ bỏ review khi user chủ động yêu cầu.
 
 ## 2. Nguồn chuẩn (SOT)
 
