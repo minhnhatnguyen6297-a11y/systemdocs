@@ -32,6 +32,10 @@ _bmad-output/tmp/
 logs/
 artifacts/
 
+# Generated BMAD workflow snapshots and packed example output
+_bmad/render/
+_bmad/custom/html-plan/examples/*.packed.html
+
 # Local samples and worktree recovery; never commit personal sample data.
 
 # graphify machine-local + intermediate (commit only graph.json, GRAPH_REPORT.md, manifest.json, .graphify_analysis.json)
