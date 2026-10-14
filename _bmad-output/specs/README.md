@@ -5,8 +5,8 @@
 Trang này giữ phần dùng chung cho nhiều module. Chi tiết thuộc một module hoặc
 feature phải ghi ở thư mục con gần nhất, không chép lại tại đây.
 
-Bản giới thiệu dành cho dev: [Tổng quan sản phẩm](./product-overview.md).
-Đây là phụ lục tóm tắt, không thay thế spec hoặc contract.
+Điểm vào đầu phiên: [Sổ tay sản phẩm theo màn hình](./product-overview.md) —
+bản đồ ngắn theo UI, không thay thế spec hoặc contract.
 
 **Gom nhánh 05/10/2026 — TASK-6:** tài liệu regex và địa chỉ cùng nằm trên
 `consolidate/monorepo`; xem [bàn giao từng việc](../../_bmad-output/archive/removed-agents-files.md).

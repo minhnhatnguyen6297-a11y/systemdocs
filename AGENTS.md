@@ -8,6 +8,9 @@
 
 ## Nguồn chuẩn
 
+- Đầu phiên, đọc [sổ tay sản phẩm theo màn hình](./_bmad-output/specs/product-overview.md)
+  trước khi dò việc; cập nhật khi UI, trạng thái module hoặc việc đang mở đổi.
+
 | Nội dung | Nơi lưu |
 |---|---|
 | Hành vi | `_bmad-output/specs/` |
