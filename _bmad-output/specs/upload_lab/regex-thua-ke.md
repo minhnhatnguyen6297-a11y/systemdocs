@@ -56,6 +56,14 @@ không tự chọn cách gộp các bản lặp.
 
 ## 4. Tài sản đất (mỗi thửa 1 dòng `danh_sach_thua_dat` + `land_rows` shape DB)
 
+`danh_sach_thua_dat`/`land_rows` ở đây mô tả kết quả bóc theo từng hàng để
+giữ và kiểm dữ liệu thửa; đây có thể là kết quả một phần từ nguồn. Cụm “shape DB”
+trong heading là cách gọi cũ cho hướng nhóm dữ liệu, không chứng minh kết
+quả trùng schema DB hoặc Stage wire của module khác. Nếu chuyển kết quả một phần
+sang chức năng khác, ánh xạ theo contract đích; việc xác nhận với người dùng và
+ghi DB đi theo luồng của chức năng nhận, không tự lưu kết quả một phần hoặc gộp
+hàng thiếu căn cứ.
+
 Khối đất mở bằng: `quyền sử dụng đất ... có/tại địa chỉ:`, `Phần
 quyền sử dụng đất ... trong khối tài sản chung...`, `... theo
 Giấy chứng nhận`, hoặc `thửa đất số ... (có địa chỉ tại/theo

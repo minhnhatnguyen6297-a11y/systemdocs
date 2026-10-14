@@ -123,11 +123,12 @@ gợi ý có bằng chứng từng trường; không dùng OCR parser để gom 
 một gợi ý. Review, lưu đối chiếu và xuất theo bản gốc đều cần người kiểm tra.
 
 **Đợt quy tắc mới — TASK-5, 05/10/2026:**
-[bảng dấu hiệu/vùng/ranh giới từ 20 mẫu](../../../../_bmad-output/archive/removed-agents-files.md)
-và [bàn giao task/plan/spec](../../../../_bmad-output/archive/removed-agents-files.md)
-được gom để tiếp tục duyệt. Các bảng chưa là spec triển khai; không dùng plan
-đã rút trong `withdrawn-20261004` hoặc mặc định của Upload Lab thay quyết định
-Owner. Runtime hiện hành ở DOCX spec chưa chứng minh đáp ứng đích mới.
+Các file về bảng dấu hiệu/vùng/ranh giới từ 20 mẫu và bàn giao task/plan/spec
+được gom để tiếp tục duyệt. [Danh sách tên file `.agents/` đã dọn](../../../../_bmad-output/archive/removed-agents-files.md)
+chỉ còn tên; nội dung các file gốc không còn trong Git tại những đường dẫn đó.
+Bảng gốc khi đó chưa được duyệt và chưa là spec triển khai; không dùng plan đã rút trong
+`withdrawn-20261004` hoặc mặc định của Upload Lab thay quyết định Owner. Runtime
+hiện hành ở DOCX spec chưa chứng minh đáp ứng đích mới.
 
 - Cloud OCR hiện hành là Qwen-only. QR/local OCR đã rời active path; không tự
   khôi phục khi sửa lỗi chung.

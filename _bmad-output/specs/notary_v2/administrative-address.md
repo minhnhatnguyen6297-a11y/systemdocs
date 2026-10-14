@@ -8,10 +8,8 @@ không mở lại Word đã đóng. Word nối producer frozen với kho public,
 full 3.001 dòng và clipboard hệ điều hành đạt.
 Python 294 đạt/2 bỏ qua symlink; renderer 90 đạt; npm 403 đạt; examples 82/0.
 Các test đã thử bỏ sửa trong bộ nhớ và bắt đúng lỗi cũ.
-[Kết quả nghiệm thu và giới hạn](../../../_bmad-output/archive/removed-agents-files.md);
-[review trước sửa](../../../_bmad-output/archive/removed-agents-files.md) giữ làm lịch sử.
-[Báo cáo worker](../../../_bmad-output/archive/removed-agents-files.md)
-và [audit gốc](../../../_bmad-output/archive/removed-agents-files.md) giữ làm lịch sử.
+Các file gốc chứa kết quả nghiệm thu, review, báo cáo worker và audit đã được
+dọn; [danh sách hiện chỉ còn tên file, không còn nội dung các báo cáo](../../../_bmad-output/archive/removed-agents-files.md).
 **Nguồn quyết định:** Owner
 03–04/10/2026 tại [NAIA-9](../../../_bmad-output/archive/linear-tasks/NAIA-9-decisions.md); thay một
 phần bởi Owner 05/10/2026 tại TASK-2.
@@ -141,7 +139,8 @@ Helper/schema/kho và producer frozen đã chạy ở thư mục riêng; không 
 bản cài Electron toàn bộ hoặc phát hành trong lần sửa này.
 Giữ riêng các nhánh D1/D2 chỉ tái hiện khi gọi API model, chưa chứng minh
 đường thao tác người dùng khi full chặn nền; không thêm luật vì các nhánh này.
-Xem [ghi riêng](../../../_bmad-output/archive/removed-agents-files.md).
+Các kết quả trên được giữ lại như ghi chép trong spec; file lưu trữ chỉ còn
+[danh sách tên file gốc đã dọn](../../../_bmad-output/archive/removed-agents-files.md), không còn nội dung báo cáo.
 *Tại sao:* nghiệm thu theo hành vi người dùng đã chốt và bằng chứng chạy thật,
 phân biệt lỗi đã xác nhận với tình huống chưa đạt được trên UI; không đổi luật Owner.
 

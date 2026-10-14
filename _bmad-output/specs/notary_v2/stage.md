@@ -44,10 +44,13 @@ là ID database, có thể null trước commit.
   giấy tờ/nơi cấp/nhãn cư trú theo mốc 01/10/2024; thiếu ngày để trống.
   Người chết giữ loại giấy tờ/nơi cấp theo bằng chứng đã xác nhận trong
   snapshot, không gán mặc định; nhãn địa chỉ là `Nơi chết`.
-- Tài sản: serial bắt buộc `[A-Z]{2}\d{6,8}` và địa chỉ không rỗng;
+- Tài sản: serial là chuỗi nguyên văn tùy nguồn, có thể trống hoặc trùng; không
+  bắt buộc định dạng, không chuẩn hóa hoặc thay mã `XX`. Địa chỉ không rỗng;
   số thửa/số tờ tùy chọn. Cụm đất có thể null/rỗng; nếu có, kiểm kiểu và
-  alias mâu thuẫn, tối đa 20 cụm. Quy tắc hiện hành thay bộ bắt buộc và
-  serial tự do của MIN-140 theo Owner xác nhận 03/10/2026.
+  alias mâu thuẫn, tối đa 20 cụm. Owner 06/10/2026 đã chốt lại riêng quy tắc
+  serial, thay điều kiện serial bắt buộc ghi ngày 03/10; xem
+  [decision-46](../../decisions/regex-decision-46.md) và
+  [contract §13.16](../../../contracts/notary-case-drafting.md).
 - Không chặn chuyển tab khi nhập; chỉ `Cập nhật` mới kiểm dữ liệu.
 - CCCD/giấy tờ là free text, không dùng làm Case key.
 - Nhập Word giữ phần regex lấy được trong ô tương ứng để người dùng sửa,

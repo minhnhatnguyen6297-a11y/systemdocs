@@ -49,8 +49,15 @@ bảng trường + đương sự + JSON. Nút Run / Export / Import / Reset prof
 Pattern trong profile viết trên **văn bản đã fold**: chữ thường, bỏ dấu
 (`hợp đồng` -> `hop dong`), `đ` -> `d`. Engine match trên bản fold rồi ánh
 xạ span về văn bản gốc qua index map — `value`/`raw_snippet` giữ nguyên dấu.
-Validator trong `fields[].validators` chạy trên **raw** (giữ hoa/thường,
-dùng cho kiểm tra serial `[A-Z]{2}`).
+Validator trong `fields[].validators` chạy trên **raw** (giữ hoa/thường).
+Ví dụ validator serial hai chữ cái hoa + 6–8 chữ số trong profile
+`transfer.json` chỉ là kiểm tra riêng của profile; trường hợp không khớp có thể
+giữ giá trị raw kèm cảnh báo, không tự trở thành luật chặn serial cho các flow
+khác. Quy tắc Owner hiện hành
+cho serial GCN là nguyên văn, tùy nguồn, có thể trống hoặc trùng và không bắt
+buộc định dạng ([decision-46](../../_bmad-output/decisions/regex-decision-46.md)).
+Sửa mô tả này không thay profile/runtime và không xác nhận các luồng tích hợp
+đã tuân quy tắc đó.
 
 ## Profile `transfer.json`
 

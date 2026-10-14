@@ -225,8 +225,8 @@ bỏ tiền tố khi so, đoán cấp theo mốc 01/07/2025, tách tên cũ bằ
 nối `(nay là …)`, renderer chỉ gửi khi đủ địa chỉ + hai ngày) → trái mục
 2, 7, 8; đã thay toàn bộ tại TASK-3.
 
-Kiểm tra độc lập 05/10/2026 (`_bmad-output/archive/removed-agents-files.md`)
-tìm thêm 2 lỗi lõi đã sửa xong: raw khớp nhiều observation chỉ trả dòng
+Ghi chép trong spec về kiểm tra độc lập 05/10/2026 cho biết đã tìm thêm 2 lỗi
+lõi và sửa xong: raw khớp nhiều observation chỉ trả dòng
 đầu (R1); tên/tỉnh cha lấy bản ghi cũ nhất thay vì đúng version (R2).
 Sau sửa: kiểm importer thật hai snapshot (đổi tên + tỉnh cha), raw khớp
 2/11 dòng, ngưỡng `too_many` đếm dòng — pytest 211 pass/3 skip.
@@ -238,8 +238,9 @@ với đơn vị tên-only hợp lệ; xuất nguồn theo thứ tự kho; khôn
 Python 294 đạt/2 bỏ qua symlink, npm 403 đạt, examples 82/0; kiểm bỏ sửa
 trong bộ nhớ bắt lỗi cũ. Producer frozen với kho public và component Word
 trên Electron thật đã kiểm, gồm full 3.001 dòng, clipboard và lỗi snapshot.
-[Kết quả nghiệm thu](../../../_bmad-output/archive/removed-agents-files.md);
-[review trước sửa](../../../_bmad-output/archive/removed-agents-files.md) giữ làm lịch sử.
+Các kết quả và số liệu nghiệm thu trên được giữ lại như ghi chép trong spec.
+[Danh sách tên file gốc đã dọn](../../../_bmad-output/archive/removed-agents-files.md)
+không chứa nội dung báo cáo hoặc review.
 
 ## 13. Còn mở
 
@@ -268,4 +269,5 @@ Owner 05/10/2026 thay các quy tắc Draft cũ tại
 [`notary_v2/administrative-address.md`](../notary_v2/administrative-address.md):
 bắt ngày giấy/ngày lập hồ sơ, bắt xã+tỉnh, nối `(nay là …)` khi áp dụng, gợi ý
 nơi niêm yết theo tài sản nguồn. Bằng chứng lỗi: mục 5 của
-[báo cáo điều tra 04/10](../../../_bmad-output/archive/removed-agents-files.md).
+ghi chép trong spec về điều tra 04/10; danh sách tên file gốc đã dọn được giữ tại
+[removed-agents-files.md](../../../_bmad-output/archive/removed-agents-files.md), không chứa báo cáo điều tra.

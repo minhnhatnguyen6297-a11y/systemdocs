@@ -10,7 +10,8 @@ feature phải ghi ở thư mục con gần nhất, không chép lại tại đ�
 việc đang mở. Các spec module bên dưới mới quyết định hành vi chi tiết.
 
 **Ghi chép lịch sử — gom nhánh 05/10/2026, TASK-6:** lúc đó tài liệu regex và địa chỉ cùng nằm trên
-`consolidate/monorepo`; xem [bàn giao từng việc](../../_bmad-output/archive/removed-agents-files.md).
+`consolidate/monorepo`; tên các file `.agents/` đã dọn được liệt kê tại
+[`removed-agents-files.md`](../../_bmad-output/archive/removed-agents-files.md); nội dung các file gốc không còn trong repo.
 Quyết định: giữ trạng thái duyệt của từng tài liệu, không coi thao tác gom/commit
 là nghiệm thu tính năng. Tại sao: spec địa chỉ đã duyệt nhưng runtime chưa theo
 v2; bộ quy tắc regex từ 20 mẫu còn chờ duyệt và chưa là spec triển khai mới.
@@ -76,6 +77,9 @@ thuật có runtime, phiên và database riêng; nó không phải module nghi�
 - Không tự động hóa phán quyết pháp lý.
 - Không giám sát nhân viên, quay màn hình hoặc ghi phím.
 - Không nối hai module trước khi contract được hai bên duyệt.
+- Đầu ra bóc tách nghiệp vụ theo bộ trường, cấu trúc, kiểu, định dạng, nhóm
+  và đích lưu đã chốt cho chức năng nhận dữ liệu; xem
+  [nguyên tắc đầu ra](../decisions/decision-extraction-output-data-contract.md).
 
 **Tại sao:** Trong công chứng, một lần gán sai làm mất lòng tin nhiều hơn nhiều
 lần gán đúng. OCR, suy luận và điểm tin cậy không được tự trở thành sự thật.
@@ -138,6 +142,26 @@ Không ghi đè raw bằng normalized. Không nhận dạng được vẫn giữ
 CCCD, GCN, thửa/tờ và số công chứng chỉ là bằng chứng đối chiếu; chúng không tự
 tạo Case hoặc quan hệ sở hữu. Muốn publish shape xuyên sản phẩm phải có owner
 duyệt và contract/schema riêng.
+
+### 4.2 Nguyên tắc đầu ra bóc tách
+
+Trước khi triển khai, chốt bộ trường, kiểu dữ liệu, định dạng, cách nhóm và nơi
+lưu cho chức năng nhận dữ liệu. Cùng một đối tượng dùng cùng chuẩn đích trong
+suốt luồng; điều này không buộc raw OCR phải mang schema DB và không tạo schema
+dùng chung hay Case liên module. Giữ riêng và nguyên vẹn giá trị gốc (raw) cùng
+vị trí nguồn. Chuẩn hóa giá trị đầu ra theo quy tắc của từng trường; trường nào
+yêu cầu nguyên văn thì giữ nguyên. Mục đích là tránh cùng thông tin cho kết quả
+khác nhau giữa các trường hoặc khiến trường cần thiết không điền/lưu được, mà
+không tự thêm quy tắc ngoài những gì đã chốt. Đặt dữ liệu đúng người, tài sản
+hoặc cụm đất; không tạo field riêng hay nhét dữ liệu vào ghi chú để né bộ trường
+đã chốt. Thiếu căn cứ thì để trống và gắn cờ theo quy ước. Nếu cần field mới,
+đề xuất và chốt trước khi làm. Dữ liệu đúng cấu trúc chưa đồng nghĩa đã được
+xác nhận hoặc được tự ghi DB. Tên nghiệp vụ như `ten` và tên cột đã ánh xạ như
+`ho_ten` giữ đúng ánh xạ; thời hạn đất thuộc cụm và tài sản tương ứng, không đổ
+vào `thoi_han` chung.
+
+Đây là nguyên tắc cho quyết định đầu ra, không nâng `IdentityEvidence` ở §4.1
+từ Draft thành contract xuyên sản phẩm.
 
 ## 5. Kiến trúc hiện tại và đích
 
@@ -265,7 +289,8 @@ thêm cloud.
   kiến trúc trích từ spec đã ghi thành `backlog/decisions/` decision-22…39.
 - **Owner 05/10/2026, TASK-7:** tiếp tục từ `D:\systemdocs`, nhánh
   `consolidate/monorepo`. *Tại sao:* một bộ spec/task chung sau khi gom các
-  worktree. [Bàn giao và kiểm tra](../../_bmad-output/archive/removed-agents-files.md).
+  worktree. Danh sách tên file `.agents/` đã dọn nằm tại
+  [`removed-agents-files.md`](../../_bmad-output/archive/removed-agents-files.md); nội dung file gốc không còn trong repo.
   Việc gom không đổi yêu cầu sản phẩm hoặc duyệt các quy tắc regex còn Draft.
 
 Khi thay đổi chỉ ảnh hưởng một module hoặc feature, cập nhật spec con. Chỉ sửa

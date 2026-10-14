@@ -90,13 +90,22 @@ M là cụm, N là tài sản. Nơi niêm yết chưa nhập để trống, khô
 
 ## 5. UX xuất Word
 
-Điều kiện trước khi xuất (áp dụng cho cả hiện trạng và đích):
+Điều kiện dưới đây chỉ áp dụng cho web/catalog legacy:
 
 - Stage đã có người.
 - Diagram đã lưu quan hệ.
 - Có ít nhất một chủ đất.
 - Có ít nhất một người nhận.
 - Hồ sơ có tài sản.
+
+Chế độ thư mục mẫu (`template_dir`, NAIA-8) chỉ chặn lỗi kỹ thuật: thiếu
+Stage/tài sản, vượt giới hạn, thiếu sơ đồ hai bên hoặc mẫu/đường dẫn không hợp
+lệ. Không chặn thừa kế vì thiếu chủ đất, chủ đất chết hay người nhận; nhóm chưa
+có dữ liệu để trống. Token không hỗ trợ hoặc thiếu slot mà mẫu yêu cầu vẫn làm
+file đó lỗi. Giữ nguyên giới hạn và cách kiểm readiness đã chốt tại
+[`word-output.md`](./word-output.md#4-quy-tắc-dữ-liệu) và
+[`contract §8.1`](../../../contracts/notary-case-drafting.md); đoạn này chỉ
+phân biệt phạm vi checklist legacy với folder mode.
 
 ### Hiện trạng web (`form.html`)
 
