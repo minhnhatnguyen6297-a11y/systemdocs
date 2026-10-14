@@ -6,18 +6,18 @@ Tài liệu được tổ chức theo **phạm vi và flow**, không theo loại
 
 ## Bắt đầu đọc
 
-1. Đọc [sổ tay sản phẩm theo màn hình](./_bmad-output/specs/product-overview.md)
-   để nắm góc nhìn sản phẩm và tìm đúng màn hình.
-2. Đọc [spec toàn hệ thống](./_bmad-output/specs/README.md) làm nguồn chuẩn hành vi.
+1. Đọc [nền sản phẩm và khái niệm chung](./_bmad-output/specs/README.md).
+2. Đọc [sổ tay sản phẩm theo màn hình](./_bmad-output/specs/product-overview.md)
+   để tìm UI và việc đang mở.
 3. Chọn module trong cây dưới.
-4. Đi qua README của từng thư mục cha tới feature cần sửa.
+4. Đọc README của module và từng thư mục cha, rồi tới spec feature để biết hành vi chi tiết.
 5. Đọc contract và source được spec lá dẫn tới.
 
 ## Cây tài liệu
 
 ```text
 _bmad-output/specs/
-├── README.md                       # Tầm nhìn, ranh giới, kiến trúc và câu hỏi toàn hệ thống
+├── README.md                       # Nền sản phẩm, khái niệm chung và spec toàn hệ thống
 ├── shared/
 │   └── administrative-lookup.md    # Lõi tra cứu tên xã/tỉnh dùng chung
 ├── notary_v2/

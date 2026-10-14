@@ -1,14 +1,15 @@
 # Spec hệ thống công chứng
 
-**Trạng thái:** Active · **Cập nhật:** 29/09/2026 · **Phạm vi:** toàn hệ thống
+**Trạng thái:** Active · **Cập nhật:** 14/10/2026 · **Phạm vi:** toàn hệ thống
 
 Trang này giữ phần dùng chung cho nhiều module. Chi tiết thuộc một module hoặc
 feature phải ghi ở thư mục con gần nhất, không chép lại tại đây.
 
-Điểm vào đầu phiên: [Sổ tay sản phẩm theo màn hình](./product-overview.md) —
-bản đồ ngắn theo UI, không thay thế spec hoặc contract.
+Đọc trang này trước để nắm nền sản phẩm và các khái niệm chung. Sau đó mở
+[sổ tay sản phẩm theo màn hình](./product-overview.md) để tìm UI, tài liệu và
+việc đang mở. Các spec module bên dưới mới quyết định hành vi chi tiết.
 
-**Gom nhánh 05/10/2026 — TASK-6:** tài liệu regex và địa chỉ cùng nằm trên
+**Ghi chép lịch sử — gom nhánh 05/10/2026, TASK-6:** lúc đó tài liệu regex và địa chỉ cùng nằm trên
 `consolidate/monorepo`; xem [bàn giao từng việc](../../_bmad-output/archive/removed-agents-files.md).
 Quyết định: giữ trạng thái duyệt của từng tài liệu, không coi thao tác gom/commit
 là nghiệm thu tính năng. Tại sao: spec địa chỉ đã duyệt nhưng runtime chưa theo
@@ -22,6 +23,44 @@ Hệ thống giảm ba việc nhập lại dữ liệu:
 2. `upload_lab` đọc kho Word cũ và hỗ trợ nhập lên CSDL công chứng tỉnh.
 3. `notaryoffice` theo dõi hồ sơ đang ở đâu và đang chờ việc gì.
 
+### Sản phẩm dành cho ai và giúp việc gì
+
+Người dùng chính là chuyên viên và nhân viên văn phòng công chứng. Sản phẩm
+nhằm giảm việc gõ lại thông tin từ giấy tờ, hồ sơ Word và sổ Excel; người dùng
+vẫn kiểm tra dữ liệu trước khi xác nhận hoặc lưu. Đây là ba kết quả thuộc ba
+module riêng, không phải một dây chuyền tự nối dữ liệu:
+
+| Việc | Kết quả và hiện trạng | Nguồn |
+|---|---|---|
+| Soạn hồ sơ mới | `notary_v2` nhận giấy tờ/chữ, tạo gợi ý để người dùng kiểm tra, lập quan hệ và xuất Word; đang phát triển. | [Spec notary_v2](./notary_v2/README.md) |
+| Xử lý hồ sơ Word cũ | `upload_lab` đọc Word, đối chiếu Excel và điền sẵn form portal; người dùng tự kiểm tra, tự bấm Lưu; đang phát triển. | [Spec upload_lab](./upload_lab/README.md) |
+| Theo dõi công việc văn phòng | `notaryoffice` dự kiến gom dấu vết thành ứng viên để người dùng xác nhận; hiện là thiết kế Draft, chưa có chương trình chạy. | [Spec notaryoffice](./notaryoffice/README.md) |
+
+### Câu chuyện công việc
+
+- Khi soạn một hồ sơ mới, chuyên viên đưa giấy tờ vào `notary_v2`, xem và sửa
+  gợi ý, đưa thông tin vào Stage nháp rồi bấm `Cập nhật` để lưu. Sau đó họ sắp
+  quan hệ trên Diagram và lưu sơ đồ riêng trước khi xuất Word.
+- Khi xử lý kho Word cũ, nhân viên dùng `upload_lab` để quét tài liệu, đối
+  chiếu sổ Excel và chuẩn bị form portal. Đây là công việc riêng với kho cũ;
+  người dùng tự kiểm tra và lưu trên portal.
+- Việc biết hồ sơ đang ở đâu thuộc hướng `notaryoffice` dự kiến. Thiết kế này
+  chưa chạy và chưa có nghĩa là hồ sơ từ hai module kia tự chuyển sang đây.
+
+### Khái niệm dùng chung
+
+| Từ | Nghĩa và ví dụ | Phạm vi, nguồn |
+|---|---|---|
+| Hồ sơ | Một đơn vị công việc trong module, ví dụ hồ sơ đang soạn ở `notary_v2` hoặc ứng viên theo dõi ở `notaryoffice`. Hai nơi không mặc định dùng chung một hồ sơ hay mã hồ sơ. | Theo từng module; [ranh giới hệ thống](./README.md#3-ranh-giới-sản-phẩm), [notaryoffice](./notaryoffice/README.md) |
+| Người, Tài sản | Dữ liệu được giữ trong hồ sơ soạn mới. CCCD, số giấy chứng nhận, thửa/tờ và số công chứng giúp đối chiếu; tự chúng không phải mã hồ sơ chung và không đủ để tự gộp hồ sơ. | [Stage](./notary_v2/stage.md), [định danh chung (mục 7)](../../contracts/entities.md) |
+| Input | Nơi nhận file hoặc chữ và tạo gợi ý cho hồ sơ mới; ví dụ thông tin OCR đọc từ ảnh CCCD. Nhận gợi ý đưa dữ liệu vào Stage nháp, chưa lưu. | `notary_v2`; [spec Input](./notary_v2/input/README.md), [chuỗi dữ liệu](#4-chuỗi-dữ-liệu-chung) |
+| Stage | Bảng Người/Tài sản của hồ sơ soạn mới. Sửa trên màn hình là bản nháp; chỉ thao tác `Cập nhật` thành công mới lưu Stage. | `notary_v2`; [spec Stage](./notary_v2/stage.md) |
+| Pool | Danh sách người đã lưu trong Stage nhưng chưa được đặt lên Diagram. Ví dụ kéo một người từ Pool vào vị trí trên sơ đồ. Pool được tính từ Stage và Diagram, không phải kho riêng. | `notary_v2`; [spec Pool](./notary_v2/pool.md) |
+| Diagram | Nơi xếp người vào vai trò/quan hệ của hồ sơ. Diagram có bản nháp riêng; `Lưu sơ đồ` mới lưu thay đổi. Xuất Word dùng Stage và Diagram đã lưu, nhưng bản Word chỉ là văn bản được tạo, không chứng minh việc pháp lý đã hoàn tất. | `notary_v2`; [spec Diagram](./notary_v2/diagram/README.md), [Xuất Word](./notary_v2/word-output.md) |
+| Bản nháp | Từ này phải đọc theo đúng nơi dùng: Stage/Diagram có bản sửa chưa lưu; Draft Case của `notaryoffice` là ứng viên chưa xác nhận; `draft` của hồ sơ `notary_v2` là trạng thái hồ sơ được spec cho phép xóa. Ba nghĩa này không thay thế nhau. | [Stage](./notary_v2/stage.md), [Diagram](./notary_v2/diagram/README.md), [notaryoffice](./notaryoffice/README.md), [quy tắc xóa](./notary_v2/README.md#6-câu-hỏi-và-lịch-sử-module) |
+| Mẫu Word | File mẫu dùng khi xuất văn bản từ hồ sơ mới; không phải kho Word hồ sơ cũ mà `upload_lab` đọc. | [Xuất Word](./notary_v2/word-output.md), [upload_lab](./upload_lab/README.md) |
+| `record_id` | Mã bản ghi Upload dùng để gắn và theo dõi tab đang chuẩn bị upload với hồ sơ tương ứng; không phải mã hồ sơ dùng chung giữa các module. | `upload_lab`; [phiên portal](./upload_lab/portal-session.md), [flow upload](./upload_lab/README.md#5-hàng-đợi-và-upload) |
+
 Đích dài hạn là một ứng dụng, giao diện chung và database nghiệp vụ chung.
 Ba module vẫn giữ owner riêng cho dữ liệu của mình. `zalo` là nguồn thu nhận kỹ
 thuật có runtime, phiên và database riêng; nó không phải module nghiệp vụ thứ tư.
@@ -30,7 +69,8 @@ thuật có runtime, phiên và database riêng; nó không phải module nghi�
 
 - Không bắt người dùng nhập lại dữ liệu đã tồn tại.
 - Máy đề xuất; người có thẩm quyền xác nhận.
-- Rule tất định trước, AI sau, người quyết định cuối.
+- Rule tất định (quy tắc cho kết quả cố định khi đầu vào giống nhau) trước, AI
+  sau, người quyết định cuối.
 - Không ép chuyên viên đổi thói quen làm việc đang cần cho nghiệp vụ.
 - Dữ liệu ở lại văn phòng; gọi cloud chỉ tại điểm đã được duyệt.
 - Không tự động hóa phán quyết pháp lý.
@@ -39,6 +79,8 @@ thuật có runtime, phiên và database riêng; nó không phải module nghi�
 
 **Tại sao:** Trong công chứng, một lần gán sai làm mất lòng tin nhiều hơn nhiều
 lần gán đúng. OCR, suy luận và điểm tin cậy không được tự trở thành sự thật.
+
+Ở đây, **contract** là quy ước để các phần thống nhất cách gửi và nhận dữ liệu.
 
 ## 3. Ranh giới sản phẩm
 
@@ -67,6 +109,10 @@ SOURCE → RAW → NORMALIZED → INFERRED → CONFIRMED
 | `NORMALIZED` | Giá trị chuẩn hóa bằng rule | Truy ngược được về RAW |
 | `INFERRED` | Ứng viên, phân loại hoặc quan hệ suy ra | Giữ rule/model và độ tin cậy |
 | `CONFIRMED` | Dữ liệu đã được người có quyền xác nhận | Chỉ owner nghiệp vụ được ghi |
+
+Nói gọn: giữ giấy tờ gốc, lấy phần chữ đọc được, chuẩn hóa, tạo suy đoán khi
+cần, rồi để người có quyền xác nhận; máy không tự biến chữ đọc được thành dữ
+liệu đã xác nhận.
 
 Không được đi thẳng từ OCR/LLM tới dữ liệu `CONFIRMED`. Giá trị thiếu bằng
 chứng phải để trống hoặc cảnh báo, không tự điền.

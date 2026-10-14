@@ -3,12 +3,12 @@
 **Cập nhật:** 14/10/2026 · **Dùng để:** giúp owner và coordinator cùng nhìn
 vào sản phẩm, giao diện và việc còn dở khi bắt đầu phiên làm việc.
 
-Đây là bản đồ ngắn để tìm đúng màn hình, tài liệu và điểm vào mã. **Stage** là
-bảng Người/Tài sản đã xác nhận; **Pool** là người chưa gán vào sơ đồ;
-**Diagram** là sơ đồ quan hệ hoặc hai bên hợp đồng; **Input** là giấy tờ/chữ
-được đưa vào để tạo gợi ý. Spec trong `_bmad-output/specs/` quyết định hành vi;
-code cho biết hiện trạng. Có mã nguồn không đồng nghĩa đã nghiệm thu trên ứng
-dụng. Hãy kiểm tra lại nguồn mới nhất trước khi bắt tay vào việc.
+Đọc [nền sản phẩm và khái niệm chung](./README.md) trước để hiểu người dùng,
+ba kết quả và nghĩa các từ dùng chung. Trang này là bản đồ ngắn để tìm đúng
+màn hình, tài liệu và điểm vào mã, đồng thời ghi việc đang mở. Spec trong
+`_bmad-output/specs/` quyết định hành vi; code cho biết hiện trạng. Có mã nguồn
+không đồng nghĩa đã nghiệm thu trên ứng dụng. Hãy kiểm tra lại nguồn mới nhất
+trước khi bắt tay vào việc.
 
 ## Mục tiêu và việc đang mở
 
