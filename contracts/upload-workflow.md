@@ -3,9 +3,9 @@
 **Version:** `upload.workflow.v1` · **Status:** DRAFT — chờ owner duyệt
 (soạn theo plan MIN-69, task T1 — 24/09/2026) · **Owner:** `systemdocs` branch
 `electron-system-shell` · **Kênh mang:** `desktopcommand.v1`
-([`desktop-command.md`](./desktop-command.md)) + shape `g1.module.v1`
-([`g1-module-data.md`](./g1-module-data.md)) · **Spec UI:**
-[`../_bmad-output/specs/upload_lab/ui.md`](../_bmad-output/specs/upload_lab/ui.md)
+([`desktop-command.md`](desktop-command.md)) + shape `g1.module.v1`
+([`g1-module-data.md`](g1-module-data.md)) · **Spec UI:**
+[`../_bmad-output/specs/upload_lab/ui.md`](../_bmad-output/specs/upload_lab/README.md#ui)
 
 Contract giữa **Electron shell (module `upload` — nhãn "Upload Lab")** và
 **Python sidecar** cho nghiệp vụ quét hồ sơ Word, audit sổ công chứng Excel và

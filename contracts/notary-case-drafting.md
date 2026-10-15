@@ -1578,7 +1578,7 @@ tắc MIN-140 ngày 29/09/2026 bị mâu thuẫn; không đổi envelope/schema 
 - `thoi_han` lẻ bỏ khỏi form và payload renderer; dữ liệu lịch sử vẫn giữ
   để đối chiếu/cảnh báo. Không tự gán vào thời hạn từng cụm.
 - Quy tắc suy trường Người, nguồn snapshot và phần tra cứu xã chưa có:
-  [`entities.md`](./entities.md) §8–§9.
+  [`entities.md`](entities.md) §8–§9.
 - Giữ nháp khi chuyển tab và khi commit lỗi; kiểm dữ liệu khi `Cập nhật`.
   Giữ kiểm revision, owner, khóa hồ sơ, giới hạn người/tài sản và trùng ID.
 
@@ -1597,7 +1597,7 @@ contract trao đổi hồ sơ giữa Upload Lab và Soạn hồ sơ. Envelope v�
   refs từng trường con có `land_row` 1-based và `land_field`. Intake không
   emit confirmed. Mơ hồ giữ normalized null và mọi alternative.
 - Create/commit/get và result có optional `docx_import`, schema tại
-  [`common.schema.json`](./notary-case-drafting/common.schema.json) definition
+  [`common.schema.json`](notary-case-drafting/common.schema.json) definition
   `docx_import`: version 1, tối đa 8 nguồn; mỗi nguồn có source_id/hash,
   records candidate_id→row_id, bindings candidate_id/occurrence_id/field_key/
   slot, optional template_sha256 và label do backend tạo. Mỗi record tài sản
@@ -1641,7 +1641,7 @@ contract trao đổi hồ sơ giữa Upload Lab và Soạn hồ sơ. Envelope v�
   không dùng paragraph.text/global replace để làm mất format/ảnh. Output
   độc lập, exclusive create và tăng hậu tố khi trùng; cancellation dọn temp,
   giữ file đã publish. Giới hạn và phạm vi đọc tại
-  [`spec DOCX`](../_bmad-output/specs/notary_v2/input/docx-import.md).
+  [`spec DOCX`](../_bmad-output/specs/notary_v2/word-templates.md#docx-import).
 
 ---
 
@@ -1650,8 +1650,8 @@ contract trao đổi hồ sơ giữa Upload Lab và Soạn hồ sơ. Envelope v�
 **Trạng thái:** v2 APPROVED 05/10/2026 — Owner duyệt, runtime đã chuyển
 sang v2 tại TASK-3 (schema v1 đã xóa).
 **Breaking** so với v1.
-**SOT hành vi:** [`_bmad-output/specs/shared/administrative-lookup.md`](../_bmad-output/specs/shared/administrative-lookup.md);
-cách hồ sơ gọi: [`_bmad-output/specs/notary_v2/administrative-address.md`](../_bmad-output/specs/notary_v2/administrative-address.md).
+**SOT hành vi:** [`_bmad-output/specs/shared/administrative-lookup.md`](../_bmad-output/specs/shared/administrative-lookup.md#lookup);
+cách hồ sơ gọi: [`_bmad-output/specs/notary_v2/administrative-address.md`](../_bmad-output/specs/shared/administrative-lookup.md#usage).
 
 Command thứ mười của nhóm `notary.*`; `result.data.schema_version` =
 `notary.address-lookup.v2` (literal), ngoại lệ của rule §1. **Read-only,
@@ -1724,7 +1724,7 @@ result.data:
 ### 14.3 Schema & examples
 
 - Schema máy đọc v2:
-  [`address-lookup.v2.schema.json`](./notary-case-drafting/address-lookup.v2.schema.json).
+  [`address-lookup.v2.schema.json`](notary-case-drafting/address-lookup.v2.schema.json).
 - Examples:
   `examples/valid/command.address-lookup.valid.json` (payload),
   `examples/valid/job.address-lookup.valid.json` (`found`, `drafting`),

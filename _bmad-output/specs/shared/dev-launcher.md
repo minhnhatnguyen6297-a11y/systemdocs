@@ -17,5 +17,5 @@ Lý do: worktree chia sẻ mã Git nhưng không tự có `node_modules` hoặc 
 - Chế độ này dùng Notary mock và profile/dữ liệu thử tách riêng dưới
   `_bmad-output/tmp/visual-bug-reporting/`, không mở dữ liệu Notary production.
 - JSON/PNG báo lỗi ở đó là dữ liệu riêng tư local, không commit. Xem
-  [visual-bug-spike.md](./visual-bug-spike.md) và
+  [visual-bug-spike.md](visual-bug-spike.md) và
   [hướng dẫn tool](../../../tools/visual-bug-reporting/README.md).

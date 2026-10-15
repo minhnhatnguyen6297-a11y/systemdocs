@@ -74,9 +74,9 @@ số. Không so khớp một phần, không so khớp 9 số cuối.
   (`_bmad-output/specs/notaryoffice/intent-source.md` §7.2), không quy định regex thửa/tờ tại mục đó.
 - `upload_lab` chuẩn bị cả khối mô tả tài sản dưới dạng text để điền web; điều
   này không có nghĩa quy tắc bóc/kiểm không giữ được từng hàng thửa. Ví dụ
-  [regex thừa kế](../_bmad-output/specs/upload_lab/regex-thua-ke.md) giữ hàng
+  [regex thừa kế](../_bmad-output/specs/shared/extraction-rules.md#inheritance) giữ hàng
   thửa để kiểm tra số thửa/tờ, gồm cả tình huống C03/C04 trong
-  [bộ đáp án](../_bmad-output/specs/upload_lab/regex-expected-results.md).
+  [bộ đáp án](../_bmad-output/specs/shared/extraction-rules.md#expected).
   Dạng hàng bóc tách không tự là khóa định danh canonical của tài sản hay
   contract liên kết module. Ánh xạ giữa các trường đã chốt thực hiện theo
   contract; việc ghi DB vẫn phải qua luồng kiểm tra/xác nhận của chức năng đích.

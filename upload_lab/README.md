@@ -67,7 +67,7 @@ flowchart LR
    - Bấm *Tiếp tục N số tiếp theo* để mở đợt mới; app không tự mở đợt kế tiếp.
 
 > [!NOTE]
-> Đăng nhập và nhận diện Lưu xem tại [`portal-session.md`](../_bmad-output/specs/upload_lab/portal-session.md). Đặc tả Fluent UI và kế hoạch kiểm tra môi trường được quản lý trên Linear tại [MIN-31](https://linear.app/minhnotary/issue/MIN-31/upload-lab-fluent-ui-redesign-specification-windows-11).
+> Đăng nhập và nhận diện Lưu xem tại [`portal-session.md`](../_bmad-output/specs/upload_lab/README.md#portal). Đặc tả Fluent UI và kế hoạch kiểm tra môi trường được quản lý trên Linear tại [MIN-31](https://linear.app/minhnotary/issue/MIN-31/upload-lab-fluent-ui-redesign-specification-windows-11).
 
 ---
 
@@ -87,7 +87,7 @@ flowchart LR
 | `tai_san` | Đoạn mô tả thửa đất, diện tích, GCN, dừng trước cam đoan | `Quyền sử dụng đất tại xã A... Thửa số 10...` |
 
 > [!NOTE]
-> Chi tiết regex nhận diện và điểm bắt đầu/kết thúc từng loại văn bản: [`regex-rules.md`](../_bmad-output/specs/upload_lab/regex-rules.md).
+> Chi tiết regex nhận diện và điểm bắt đầu/kết thúc từng loại văn bản: [`regex-rules.md`](../_bmad-output/specs/shared/extraction-rules.md#types).
 
 ---
 
@@ -129,7 +129,7 @@ Spec sản phẩm và ảnh tham chiếu nằm ngoài cây code này, tại
 đúng **hai tab** — *Audit Sổ Công Chứng* và *Quét & Upload Hồ Sơ*, mỗi tab toàn
 chiều rộng. Không còn tab Cấu hình (chuyển lên đầu tab Audit cùng dropdown
 website) và không còn trang Nhật ký (log chỉ là chẩn đoán backend đã lọc).
-Đặc tả hành vi và thị giác riêng: [`ui.md`](../_bmad-output/specs/upload_lab/ui.md) +
+Đặc tả hành vi và thị giác riêng: [`ui.md`](../_bmad-output/specs/upload_lab/README.md#ui) +
 [`../_bmad-output/specs/ui/`](../_bmad-output/specs/ui/) (token chung đã duyệt, cách áp riêng
 cho Upload còn Proposed); giao tiếp shell ↔ Python
 theo contract [`../contracts/upload-workflow.md`](../contracts/upload-workflow.md)
@@ -144,7 +144,7 @@ theo contract [`../contracts/upload-workflow.md`](../contracts/upload-workflow.m
 - **Kiểm tra hồi quy giao diện**: `./.venv/Scripts/python.exe ./tools/inspect_ui_style.py` để dump metric/màu thực tế của widget.
 
 > [!IMPORTANT]
-> Thiết kế UI đích (Electron shell) nằm tại [`ui.md`](../_bmad-output/specs/upload_lab/ui.md), gồm hành vi/bố cục và lớp thị giác riêng. Thay đổi giao diện Qt hiện trạng đối chiếu `ui_qt/main_window.py` và `ui_qt/theme.py`; quy tắc sản phẩm dài hạn cập nhật ở cây spec chung.
+> Thiết kế UI đích (Electron shell) nằm tại [`ui.md`](../_bmad-output/specs/upload_lab/README.md#ui), gồm hành vi/bố cục và lớp thị giác riêng. Thay đổi giao diện Qt hiện trạng đối chiếu `ui_qt/main_window.py` và `ui_qt/theme.py`; quy tắc sản phẩm dài hạn cập nhật ở cây spec chung.
 
 ---
 
