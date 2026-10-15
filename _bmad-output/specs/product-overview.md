@@ -1,6 +1,6 @@
 # Sổ tay sản phẩm theo màn hình
 
-**Cập nhật:** 14/10/2026 · **Dùng để:** giúp owner và coordinator cùng nhìn
+**Cập nhật:** 15/10/2026 · **Dùng để:** giúp owner và coordinator cùng nhìn
 vào sản phẩm, giao diện và việc còn dở khi bắt đầu phiên làm việc.
 
 Đọc [nền sản phẩm và khái niệm chung](README.md) trước để hiểu người dùng,
@@ -25,9 +25,9 @@ Sản phẩm hỗ trợ văn phòng công chứng giảm nhập liệu lặp l�
 3. **Theo dõi vận hành:** dự kiến cho biết hồ sơ đang ở đâu và chờ việc gì;
    hiện mới có thiết kế, chưa có chương trình chạy.
 
-Việc còn dở có căn cứ mới nhất là ticket
-[flow Soạn hồ sơ, regex và mẫu Word](../backlog/bug-notary-flow-ui-regex-word.md)
-(13/10, chưa được đánh giá kỹ, chưa có bằng chứng hoàn tất). Các điểm chính:
+Việc đang mở được tổng hợp tại [catalog issue](../backlog/README.md)
+(15/10, draft/chưa duyệt triển khai). [Ticket tổng cũ](../backlog/bug-notary-flow-ui-regex-word.md)
+giữ làm lịch sử và bị chặn tracking-only để không chạy trùng các leaf. Các điểm chính:
 
 - Tách rõ địa chỉ của người và nơi cấp giấy khai tử; chốt quy tắc đổi loại hồ
   sơ đã lưu trước khi làm.

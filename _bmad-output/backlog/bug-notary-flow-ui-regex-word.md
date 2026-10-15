@@ -14,6 +14,8 @@ severity: P2
 
 # Flow Soạn hồ sơ khó thao tác, khó kiểm tra regex và khó tìm mẫu Word
 
+> **Tracking-only — 15/10/2026:** yêu cầu mới của owner là gom thành nhiều issue và đề xuất thứ tự. [Catalog hiện hành](README.md) phân bổ C01–C26 / #2–#27; các ghi nhận phía dưới giữ làm lịch sử, không là một lượt implementation song song. Không coi việc tách issue là đã sửa hoặc nghiệm thu hành vi. Quyết định mới: `_bmad-output/decisions/decision-issues-reconciliation-20261015.md`.
+
 ## Description
 
 Người dùng gặp ô Địa chỉ chứa hai trường khác nghĩa, không đổi được loại hồ sơ đã lưu, vùng Pool/Sơ đồ chật và ô thả người dẹt. Người dùng không cần nút Hủy thay đổi, cần dùng regex core chung ngay trong flow nhập thực tế và sửa quy tắc dần khi test, đồng thời biết mẫu Word có placeholder ở đâu. Tổng hợp thành một ticket để đánh giá thiết kế toàn flow, đối chiếu specs/docs và sửa đồng bộ thay vì vá từng report.
@@ -122,3 +124,6 @@ Bố cục ưu tiên mật độ dữ liệu nhưng ghép trường khác nghĩa
 - Evidence: intake service thật succeeded, 2 Người/1 Tài sản, profile transfer1.1.2; trace core xác nhận serial/địa chỉ missing; Word service thật saved Synthetic_HS-99.docx với dữ liệu đúng, hash mẫu không đổi. Không coi các smoke này là full flow Electron hoặc installer đã đạt.
 - Notes: core hiện hữu được owner định vị tại `tools/regex_workbench/engine/`; proposal không tạo core thứ hai. Đường thư viện mẫu đã tìm thấy: `C:/Users/MINH/OneDrive/Desktop/2. Mẫu thừa kế/`; catalog hiện hành trong `notary_v2/word_templates/placeholder_mapping.md`. Không hard-code đường máy này vào app.
 - Review: single-ticket check độc lập đã bao phủ toàn scope; finding P2 về fixture và sự khác nhau giữa tái hiện UI/bằng chứng service được chấp nhận và sửa trong Reproduction #7. Không coi review draft là approval hoặc nghiệm thu implementation.
+
+- Decision: 2026-10-15 — yêu cầu nhiều issue thay riêng lựa chọn giữ một ticket ngày 13/10. Giữ ID/filename/nội dung lịch sử #1; dùng catalog hiện hành và các leaf để theo dõi thực thi, không chạy #1 cùng leaf. #1 giữ trạng thái chưa hoàn tất và bị chặn tracking-only.
+- Current sources: `_bmad-output/specs/notary_v2/README.md`, `diagram-rules.md`, `word-templates.md`; `_bmad-output/specs/shared/extraction-rules.md`; `_bmad-output/backlog/README.md`. Các đường cũ phía trên là nguồn lịch sử, không khôi phục spec archive thành hiện hành.
