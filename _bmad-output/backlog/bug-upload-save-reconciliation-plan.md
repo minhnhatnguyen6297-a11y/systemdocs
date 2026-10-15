@@ -53,7 +53,7 @@ context:
 
 **Execution:**
 - [ ] `upload_lab/playwright_uploader.py` — bảo đảm tín hiệu Lưu v1 được công nhận hoàn tất trước khi phân loại tab đã đóng; giữ nguyên xử lý legacy và tiêu chí thành công.
-- [ ] `shell/sidecar/upload_session.py` và `shell/sidecar/upload_adapter.py` — bảo toàn kết quả Lưu đã biết qua lưu trạng thái phiên; xác nhận tình trạng đóng chưa rõ/khởi động lại vẫn tới UI hiện có và điều kiện chặn chuẩn bị, không tạo hành động workflow mới.
+- [ ] `shell/sidecar/upload_session.py` và `shell/sidecar/upload_adapter.py` — bảo toàn kết quả Lưu đã biết qua lưu trạng thái phiên; xác nhận tình trạng đóng chưa rõ/khởi động lại vẫn tới UI hiện có và điều kiện chặn chuẩn bị. Tái sử dụng các điều khiển hiện có; chỉ ghi nhận hành động giải phóng sau khi chủ sở hữu trả lời câu hỏi mở.
 - [ ] `shell/test/test_upload_browser_workflow.py`, `shell/test/test_upload_recovery.py`, `upload_lab/tests/test_playwright_uploader.py` — bổ sung bằng chứng hồi quy cho phản hồi-rồi-đóng, đóng khi chưa rõ/đối chiếu và chặn chuẩn bị lại; dùng portal tổng hợp cục bộ, không thông tin đăng nhập thật hay ghi dữ liệu môi trường sản xuất.
 
 **Acceptance Criteria:**
@@ -64,6 +64,8 @@ context:
 ## Open Questions
 
 1. **Khi audit mới không có số hồ sơ, xác nhận tường minh cho từng hồ sơ của người vận hành sau khi kiểm tra portal có đủ để xóa `needs_reconcile` và cho phép một lần chuẩn bị chủ động sau đó (A), hay hồ sơ phải tiếp tục bị chặn cho đến khi audit mới xác minh có hồ sơ (B)?** (A) Xác nhận sau khi kiểm tra portal có thể cho phép gửi trùng nếu xác nhận nhầm. (B) Tiếp tục chặn đến khi audit mới xác minh có hồ sơ có thể khiến hồ sơ thực sự chưa được lưu vẫn bị chặn. Đặc tả đã cho phép chung “xác nhận của người dùng” nhưng chưa định nghĩa hành động giải phóng hoặc bằng chứng khi audit không có số; code hiện chỉ xóa khi audit mới có hồ sơ.
+
+## Implementation Notes
 
 ## Plan Change Log
 
