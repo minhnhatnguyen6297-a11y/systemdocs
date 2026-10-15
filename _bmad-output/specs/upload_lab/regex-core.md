@@ -92,8 +92,9 @@ python tools/regex_lab.py approve --cluster <id>   # chi khi owner da duyet ket 
 3. Quét lại hàng loạt bằng `upload_lab/tools/quet_kiem_tra.py`
    (cùng bộ luật, không chấm tay).
 4. Ghi quyết định qua Backlog, cập nhật đúng nguồn sở hữu: luật trường ở
-   [regex-fields.md](regex-fields.md), loại/vùng ở spec loại. F01/F04/F05
-   giữ trạng thái chờ, không gọi approve/Golden hoặc đổi luật thay owner.
+   [regex-fields.md](regex-fields.md), loại/vùng ở spec loại. F04/F05 theo
+   lựa chọn owner 15/10/2026; mẫu mâu thuẫn chưa được đọc tay không được gọi
+   approve/Golden hoặc tự chấm đạt.
 
 ## 5. Tinh thần giữ xuyên suốt
 
@@ -152,7 +153,7 @@ cả `upload_lab` và `regex-test-tool` gọi lõi chung — không chép tay.
 | 06/10/2026 | Serial là chuỗi nguyên văn tùy nguồn ở mọi tầng (trích xuất, Stage, DB) — bỏ bắt buộc `[A-Z]{2}\d{6,8}`; có thể trống/trùng |
 | 06/10/2026 | `place_of_origin` (quê quán) giữ trong contract để đọc snapshot cũ; engine không điền |
 | 06/10/2026 | Sổ tiết kiệm + bảo hiểm tạm dừng: chỉ nhận diện và gắn cờ "chưa hỗ trợ", không bóc dòng |
-| TASK-10.1 | Một nguồn luật mỗi trường + đáp án theo nguồn; mã R không thay đáp án; F01/F04/F05 chờ quyết định (decision-73) |
+| TASK-10.1 | Một nguồn luật mỗi trường + đáp án theo nguồn; mã R không thay đáp án; F04/F05 còn chờ tại mốc TASK-10.1; cập nhật ranh giới 15/10/2026 ở regex-fields |
 | 06/10/2026 | Người chết = một person_row có `ngay_chet`; trích lục khai tử điền vào trường giấy tờ người, không entity riêng |
 | 06/10/2026 | Không suy giới tính; thiếu căn cứ → để trống + cờ; không đếm/ngang hàng đương sự qua vùng lời chứng (theo TASK-5) |
 

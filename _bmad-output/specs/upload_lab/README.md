@@ -61,8 +61,10 @@ Trang README này sở hữu flow; các trang trên không tự thay contract St
 - Người dùng chọn 1–30 tab mỗi đợt; mỗi tab gắn một `record_id`.
 - App điền sẵn rồi dừng trước nút Lưu.
 - Người dùng tự kiểm tra và tự bấm Lưu; app không bấm thay.
-- Chỉ sau phản hồi lưu thành công hoặc điều hướng tương đương mới ghi
-  `uploaded_success` và bỏ dòng khỏi bảng.
+- Workflow v1 hiện chỉ ghi `uploaded_success` sau `POST /api/hoso` trả HTTP
+  2xx; điều hướng đơn thuần hoặc đóng tab chưa rõ phải đối chiếu lại. Legacy
+  không truyền `workflow_version` còn cho fallback điều hướng. Xem phạm vi,
+  giới hạn kiểm chứng và contract Draft tại [phiên portal](./portal-session.md).
 
 **Tại sao:** portal là hệ thống bên ngoài và dữ liệu có ý nghĩa pháp lý. Người
 dùng phải giữ quyền kiểm tra cuối; tự điền không đồng nghĩa tự ghi.

@@ -1,6 +1,6 @@
 # Đáp án đích cho trích trường Word
 
-**Trạng thái:** quy tắc/đáp án theo spec hiện hành cho các dòng Closed; F01/F04/F05 còn Pending. **Task:** TASK-10.1. Đây là kết quả phải kiểm, không phải bản chép output máy.
+**Trạng thái:** quy tắc/đáp án theo spec hiện hành cho các dòng Closed; các mẫu F04/F05 còn cần đối chiếu nguồn sau quyết định 15/10/2026, chưa được chấm đạt. **Task:** TASK-10.1. Đây là kết quả phải kiểm, không phải bản chép output máy.
 
 ## 1. Cách ghi
 
@@ -47,7 +47,7 @@ Các biến thể giữ cùng quy tắc và được kiểm riêng:
 | C03/C04 | Dòng tiếp không có thửa, đuôi ô định dạng, ghi chú đánh số lại; đường `.doc` qua bước chuẩn hóa cũng giữ ô tờ trống |
 | C05 | Nhãn đất dài hơn 100 ký tự vẫn giữ; câu kể “Di sản của…”, “Chúng tôi thống nhất…”, “Các bên thống nhất phân chia…” chuyển đủ nguồn vào ghi chú + R13, không thành loại đất |
 | C06/C12 | Năm sinh trong bảng trước/sau giấy tờ; thiếu sinh hoặc thiếu số giấy tờ không lấy ngày cấp làm sinh; nơi cấp trống không nuốt địa chỉ |
-| C07/C08 | Người chết cũng nhận Sinh trần và bỏ địa chỉ cuối thuần ngày; không đổi luật phục hồi tên F01 |
+| C07/C08 | Người chết cũng nhận Sinh trần và bỏ địa chỉ cuối thuần ngày |
 
 Mẫu `.doc` tổng hợp giả phần đọc IFilter để kiểm đường chuẩn hóa và `extract`,
 không được gọi là file `.doc` thật. Bằng chứng file thật thuộc §4 dưới đây.
@@ -56,9 +56,8 @@ không được gọi là file `.doc` thật. Bằng chứng file thật thuộc
 
 | Ca | Nguồn vấn đề | Điều đã thấy | Chưa chấm |
 |---|---|---|---|
-| P01/F01 | Khôi/Khê và tên khác cùng chữ đầu trong đoạn trước | Có thể gán ngày chết của người này cho tên người khác | Tên đích/luật phục hồi; owner chọn bằng chứng đủ |
-| P04/F04 | Cùng thửa/tờ, tổng 210 / 210,0 / 210 m2 hoặc tổng thật khác | So chuỗi sinh trùng; spec loại/catalog không đồng nhất | Số bản ghi, cách giữ phiên bản và so tương thích |
-| P05/F05 | Chi tiết cùng diện tích+loại nhưng bổ sung hoặc đổi thời hạn/ghi chú | Gộp có thể bỏ dữ liệu nguồn | Cách điền, lưu xung đột và ghi chú; không tự chọn một phía |
+| P04/F04 | Cùng thửa/tờ, tổng 210 / 210,0 / 210 m2 hoặc tổng thật khác | Owner đã chốt ranh thửa theo khối liên tục + thửa/tờ | Cần đọc nguồn để ghi đáp án tổng/chi tiết; không tự duyệt số bản ghi của mẫu mâu thuẫn |
+| P05/F05 | Chi tiết cùng diện tích+loại nhưng bổ sung hoặc đổi thời hạn/ghi chú | Owner đã chốt trường/format theo DB, giữ đúng cụm đất | Cần đọc nguồn để ghi đáp án từng trường; không tự chọn một giá trị mâu thuẫn |
 
 Không coi nguồn tự viết là hồ sơ thật. Mẫu tổng hợp chứng minh hành vi trên cấu trúc đã hỗ trợ; tần suất trên hồ sơ thật cần đo riêng.
 

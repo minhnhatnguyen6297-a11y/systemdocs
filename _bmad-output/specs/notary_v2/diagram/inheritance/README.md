@@ -76,8 +76,9 @@ ngược Stage/Pool/Diagram.
 
 - Thiếu slot bắt buộc: trả `requiredSlots`, không bịa node.
 - State `invalid`: save bị chặn. State hợp lệ nhưng `incomplete`: contract hiện
-  hành cho lưu và trả `requiredSlots`/warning. Việc xuất Word của state này
-  chưa được contract hiện hành chặn theo `status`; xem câu hỏi mở bên dưới.
+  hành cho lưu và trả `requiredSlots`/warning. Owner chốt 15/10/2026: cho
+  lưu bản nháp này, hiển thị rõ phần còn thiếu. Xuất Word vẫn theo điều kiện
+  mode/mẫu hiện hành; không thêm lệnh chặn chỉ vì `incomplete`.
 - Engine lỗi: không xóa state cũ.
 - Hồ sơ legacy: migrate khi đọc theo rule đã có; GET không âm thầm ghi DB.
 
@@ -89,10 +90,9 @@ ngược Stage/Pool/Diagram.
   xác nhận trước khi đổi engine. Authority chưa xác minh phải ghi `[CONFIRM]`.
 - Spec nghiệp vụ v2 cũ là draft; workflow/code đang chạy không tự biến mọi đề
   xuất trong draft thành quy tắc hiện hành.
-- Quy tắc lưu/xuất khi `incomplete` còn mâu thuẫn: contract v2 cho lưu;
-  [`engine.md`](./engine.md) đề xuất chặn lưu; Draft
-  [`business-rules.md`](./business-rules.md) đề xuất cho lưu và xuất có nhãn.
-  Chưa tự chọn một phương án để sửa runtime hay contract.
+- Owner đã chốt riêng việc lưu `incomplete` ngày 15/10/2026 ở §8. Quyết định
+  này không duyệt toàn bộ [`business-rules.md`](./business-rules.md), không
+  mở quyền lưu `invalid`/`unsupported`, và chưa chứng minh runtime đã tuân thủ.
 - Còn rủi ro migration giữa `case_state_json.diagram.*`, `engine_state_json`,
   `diagram_payload` và projection legacy. Save phải ưu tiên state canonical,
   prune ghost/orphan nhưng giữ metadata hợp lệ; không suy API mới từ tên field cũ.

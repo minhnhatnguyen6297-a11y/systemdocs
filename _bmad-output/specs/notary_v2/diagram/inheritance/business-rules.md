@@ -19,6 +19,11 @@
 > bằng lời; việc đối chiếu điều luật cần người có chuyên môn pháp lý xác nhận
 > trước khi tài liệu thành chuẩn tắc.
 
+**Owner chốt riêng 15/10/2026:** giữ dữ liệu ngày nhập/hiển thị; ngày quy
+ước chỉ dùng tính toán; cho lưu sơ đồ `incomplete` hợp lệ có nhãn và phần thiếu.
+Các đề xuất dưới đây về lưu mọi trạng thái hoặc điều kiện Word không được
+duyệt theo đó; ranh giới hiện hành ở [README §8](./README.md#8-lỗi-và-ngoại-lệ).
+
 ## 1. Nguyên tắc bất biến
 
 | Mã | Bất biến |

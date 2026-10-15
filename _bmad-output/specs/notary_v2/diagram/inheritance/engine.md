@@ -2,6 +2,9 @@
 
 Status: target contract pending implementation commit; non-normative
 Current only after the implementation and its tests are committed and verification passes. Referenced services, endpoints, and tests may exist only in an uncommitted workspace and cannot be assumed in a clean checkout. Draft business rules do not win until the user explicitly approves them; ask the user when ambiguous.
+Owner 15/10/2026 đã chốt riêng: `incomplete` hợp lệ được lưu nháp kèm
+phần còn thiếu; ngày nhập/hiển thị giữ nguyên độ đầy đủ, ngày quy ước chỉ dùng
+tính toán. Các phần target khác vẫn chưa có hiệu lực; xem README.
 Verification evidence: [`examples.md`](./examples.md),
 [`provenance.md`](./provenance.md) và tests hiện tại.
 
@@ -144,7 +147,8 @@ không tự gắn.
 ### 4.1 Chuẩn hóa thời gian
 
 - Parse `dd/mm/yyyy`, ISO date hiện hữu và `yyyy`.
-- Chỉ có năm `yyyy` được chuẩn hóa thành `01/01/yyyy`.
+- Chỉ có năm `yyyy` dùng `01/01/yyyy` riêng trong tính toán; dữ liệu lưu/hiển
+  thị vẫn giữ năm. Không suy thứ tự chắc chắn của sự kiện từ ngày quy ước.
 - Chỉ so sánh đến ngày; không dùng giờ/phút.
 - Các người chết có cùng ngày sau chuẩn hóa được coi là cùng thời điểm; xử lý từ cùng
   `same_day_snapshot` và không nhận chéo di sản.
@@ -215,8 +219,9 @@ Không được trả một mảng phẳng toàn bộ hậu duệ rồi chia đ�
 - Nhánh thế vị không còn hậu duệ không tạo unresolved quota nếu estate còn đơn vị hợp lệ khác;
   nhánh đó chỉ bị loại khỏi mẫu số. Chỉ estate không còn bất kỳ đơn vị hợp lệ nào mới giữ fraction
   trong `unresolvedEstates` và trả `status=incomplete`.
-- Create/edit không commit hồ sơ diagram như kết quả hoàn tất nếu engine invalid/incomplete. Form
-  phải giữ nguyên Stage/Diagram và hiển thị từng lỗi một dòng.
+- Create/edit: `invalid` vẫn bị chặn theo contract hiện hành; `incomplete`
+  hợp lệ được lưu bản nháp cùng trạng thái, phần còn thiếu và cảnh báo. Không
+  hiển thị bản nháp đó như kết quả hoàn tất; lỗi lưu giữ nguyên Stage/Diagram.
 
 ## 5. Contract output và giải thích kết quả
 
@@ -295,8 +300,8 @@ tài liệu cũ để không gợi ý một tính năng ngoài scope.
 - Thêm `POST /cases/diagram/calculate` nhận JSON engine input, tải Customer theo `personId`, chạy
   engine và trả JSON result; endpoint không mutate DB.
 - Dùng cùng parser/engine trong create, edit và update-diagram.
-- Khi save: parse Stage + engineInput, chờ/kiểm Customer tồn tại, chạy engine, reject invalid hoặc
-  incomplete, ghi engineResult do backend tạo vào `case_state_json`, replace participant projection,
+- Khi save: parse Stage + engineInput, chờ/kiểm Customer tồn tại, chạy engine, reject invalid; cho lưu
+  incomplete hợp lệ kèm nhãn và phần thiếu, ghi engineResult do backend tạo vào `case_state_json`, replace participant projection,
   update case/property và commit một lần.
 - Validation phải xảy ra trước delete/replace participant. Exception phải rollback toàn transaction.
 - Không lấy `allocations`, `trace`, `warnings` do browser gửi làm kết quả có thẩm quyền.
@@ -356,7 +361,7 @@ tài liệu cũ để không gợi ý một tính năng ngoài scope.
 - Chỉ submit canonical `case_state_json` V2 từ `__DIAGRAM_API__`.
 - Không gửi `diagram_payload`/`engine_state_json` từ frontend V2.
 - Trước save: không tự flush/commit Stage draft; chỉ chờ quick-update đã bắt đầu và calculation mới
-  nhất, rồi block nếu engine invalid/incomplete. Nút Stage `Cập nhật` vẫn là commit trigger duy nhất.
+  nhất, rồi block nếu engine invalid; incomplete hợp lệ được lưu nháp. Nút Stage `Cập nhật` vẫn là commit trigger duy nhất.
 - Save native/fetch hiện hữu phải giữ nguyên Stage khi validation/server/network fail.
 - Cảnh báo/lỗi hiển thị trong một vùng chung, mỗi lỗi một dòng; không dùng popup chồng nhau.
 - Gỡ script `inheritance_engine.js` sau khi React đã chuyển sang backend.
@@ -383,7 +388,7 @@ tài liệu cũ để không gợi ý một tính năng ngoài scope.
 5. Người nhận từ nhiều nguồn: tổng đúng và breakdown giữ từng nguồn, không ghi đè.
 6. Người chết sau nguồn nhận tài sản rồi mở estate sau.
 7. Cùng ngày không nhận chéo, dùng snapshot, không warning.
-8. `yyyy` thành `01/01/yyyy`; full date giữ nguyên.
+8. `yyyy` giữ nguyên khi lưu/hiển thị; `01/01/yyyy` chỉ dùng nội bộ cho tính; full date giữ nguyên.
 9. Năm người `Chủ đất` mỗi người base `1/5`.
 10. Chủ đất sống tắt `Nhận` vẫn giữ base share.
 11. Người sống không nhận bị loại theo quy ước sản phẩm; mẫu số/nhánh được tính lại.
@@ -397,7 +402,7 @@ tài liệu cũ để không gợi ý một tính năng ngoài scope.
 
 15. Calculate không mutate DB và không nhận output giả từ client.
 16. Save chạy lại engine; client sửa allocations không thay đổi kết quả backend.
-17. Invalid/incomplete không delete participant hoặc mutate case một phần.
+17. Invalid/lỗi lưu không mutate case một phần; incomplete hợp lệ lưu nháp atomic kèm phần thiếu.
 18. Save/reload giữ `Chủ đất`, `Nhận`, quan hệ và cùng tỷ lệ.
 19. Hồ sơ legacy load được; quan hệ mơ hồ hiện warning thay vì tự nối.
 20. `InheritanceParticipant.ty_le` không còn hardcode `0.0`.

@@ -28,7 +28,7 @@ Trang này sở hữu quy tắc **trường** của engine thừa kế đang ch�
 
 **Kiểm:** `Đồng sở hữu – Cháu Lê Minh An; Sinh ngày 21/11/2011` trả `Lê Minh An`. Khi chỉ có tên được quy tắc loại cho phép, vẫn trả bản ghi để kiểm thiếu trường; không tự loại để hết cờ.
 
-**Nguồn:** Owner 07/10, TASK-9; thừa kế §2; catalog cũ §2.5. Tên người chết gọi tắt xem §8/F01.
+**Nguồn:** Owner 07/10, TASK-9; thừa kế §2; catalog cũ §2.5.
 
 ### ten_goi_khac — Theo spec hiện hành
 
@@ -75,13 +75,13 @@ Ranh giấy tờ kết thúc trước mô tả GCN/tài sản hoặc người k�
 **Kiểm:** `Cả hai cùng thường trú tại: 23/10/2023` không điền ngày làm địa chỉ cho bất kỳ người nào.
 **Nguồn:** thừa kế §2; catalog cũ §2.5 (địa chỉ ô dịch trường).
 
-## 3. Người chết — Theo spec hiện hành, trừ F01
+## 3. Người chết — Theo spec hiện hành
 
 Dùng chung quy tắc tên/ngày/địa chỉ/giới tính ở §2 với vùng và dấu hiệu chết thuộc spec loại. Theo luật lọc tên người chết hiện hành, tên tối đa 6 từ, viết hoa đầu từ; câu kể phả hệ không tạo bản ghi. `ngay_chet` từ chết/đã chết/mất ngày; chết năm chỉ trong phạm vi và bằng chứng giấy tờ đã được spec loại quy định. Trích lục khai tử đi vào `so_giay_to, loai_giay_to, ngay_cap, noi_cap` của người chết.
 
-Không lấy căn cước vợ/chồng trong ngoặc làm giấy của người chết. `Nơi thường trú/cư trú cuối cùng/trước khi chết` là nhãn địa chỉ cuối; giới tính vẫn cần căn cứ rõ. Tên một âm tiết và gộp lần nhắc là các quyết định riêng, không thuộc phép làm sạch tên.
+Không lấy căn cước vợ/chồng trong ngoặc làm giấy của người chết. `Nơi thường trú/cư trú cuối cùng/trước khi chết` là nhãn địa chỉ cuối; giới tính vẫn cần căn cứ rõ. Giữ tên đọc được từ nguồn; không đổi sang tên của người khác để bù dữ liệu.
 
-**Nguồn:** regex-decision-46; thừa kế §3. Phục hồi tên theo chữ đầu còn chờ quyết định ở §8.
+**Nguồn:** regex-decision-46; thừa kế §3.
 
 ## 4. Định danh thửa — Theo spec hiện hành
 
@@ -90,7 +90,14 @@ Không lấy căn cước vợ/chồng trong ngoặc làm giấy của người 
 Ký hiệu tờ bỏ mô tả “Bản đồ địa chính năm…”, `do <cơ quan>` và phần nhãn thừa. Danh sách số thuần `112, 115` tách theo nguồn; dấu phẩy của địa chỉ/diện tích không thành danh sách số thửa. “Hiện nay/Nay là thửa/tờ…” là ghi chú đánh số lại theo spec loại, không tự mở tài sản khác.
 
 **Kiểm:** cột `Số thửa | Số tờ`, giá trị `211 | 9` trả thửa 211/tờ 9; bảng có tờ trống vẫn trả thửa và các dữ liệu còn lại.
-**Nguồn:** thừa kế §4; Owner 07/10/TASK-9. Cách gộp thửa lặp xem §8.
+**Owner 15/10/2026:** thông tin của một thửa được viết liên tục trong cùng
+khối nguồn; cặp `so_thua_dat` + `so_to_ban_do` là dấu hiệu phân biệt chính.
+Đọc các dòng chi tiết nối tiếp vào đúng thửa, không tạo thửa mới chỉ vì đổi
+loại đất/diện tích/thời hạn. Cặp thửa/tờ khác mở thửa khác. Thiếu dấu hiệu rõ
+thì giữ nguồn và gắn cờ; không tự nối sang file/địa phương/hồ sơ khác hoặc bỏ
+bản lặp mâu thuẫn. Đây không phải khóa định danh chung liên module.
+
+**Nguồn:** thừa kế §4; Owner 07/10/TASK-9 và 15/10/2026. Cách giữ giá trị mâu thuẫn xem §8.
 
 ## 5. Diện tích và chi tiết đất — Theo spec hiện hành, trừ cách gộp
 
@@ -122,15 +129,16 @@ Sổ tiết kiệm/tài khoản và bảo hiểm chỉ nhận diện `tai_san_ch
 
 Số/ngày công chứng và tên công chứng viên phục vụ upload/audit theo flow riêng; không dùng làm tiêu chí “trích đúng người/tài sản”. Trang này không tự mở schema hoặc field mới.
 
-## 8. Chờ quyết định — không tính đạt
+## 8. Quyết định 15/10 và phần cần đối chiếu
 
-| Mục | Mâu thuẫn/câu hỏi | Cần chốt |
+| Mục | Owner đã chốt | Phần phải đối chiếu trước khi đổi engine/đáp án |
 |---|---|---|
-| F01 | Catalog cũ cho phục hồi tên chết theo chữ đầu; Khôi/Khê bị đổi sang người khác hoặc chọn tên dài nhất | Khi nào đủ bằng chứng cùng người; giữ gì và báo gì khi có nhiều ứng viên? |
-| F04 | Spec loại giữ bản đầu cùng thửa/tờ; catalog giữ riêng khi tổng khác; 210 / 210,0 / 210 m2 lại bị coi khác | Khóa bản ghi, cách so tổng rõ/mơ hồ, lúc nào được gộp và lúc nào giữ phiên bản |
-| F05 | Gộp theo diện tích+loại đất bỏ thời hạn/ghi chú khác, trong khi nguyên tắc giữ dữ liệu không cho bỏ bản giàu hơn | Điền trường thiếu và lưu xung đột/ghi chú ở đâu; không tự chọn thời hạn hoặc chủ sử dụng |
+| F04 | Theo §4: khối liên tục, phân biệt chính bằng số thửa + số tờ | Các mẫu có tổng trái nhau phải đọc nguồn; không tự lấy bản đầu hoặc bỏ phần khác |
+| F05 | Trường/định dạng theo DB đã duyệt; chi tiết thuộc đúng thửa/cụm | Giữ bộ loại đất–diện tích–thời hạn theo `contracts/entities.md`; alias cũ phải ánh xạ rõ. Hai giá trị mâu thuẫn không được tự chọn một phía |
 
-Mục này lưu đủ vấn đề để owner quyết định; không phê duyệt một thuật toán thay thế. Engine hiện tại có thể còn sai các mục này sau TASK-10.1. Bộ đáp án ghi `pending_decision`, không biến “bỏ qua” thành “đạt”.
+Quyết định về cấu trúc không phê duyệt một thuật toán gộp hoặc đáp án mẫu chưa
+được đọc tay. Engine/fixture có thể còn theo luật cũ; mục `pending_decision`
+cũ vẫn phải được kiểm lại, không biến “bỏ qua” thành “đạt”.
 
 ## 9. Nguồn và bộ đáp án
 

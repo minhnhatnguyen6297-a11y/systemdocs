@@ -3,12 +3,12 @@
 **Dự án:** `notaryoffice` / Notary Work Intelligence  
 **Vai trò tài liệu:** Nguồn chi tiết và lời giải thích gốc ngày 10/09/2026.
 Spec dài hạn sở hữu tại [`README.md`](./README.md);
-file này là phụ lục lớn giữ nguyên lập luận và ví dụ gốc để đối chiếu, không
+file này là phụ lục giữ lập luận và ví dụ đã được cập nhật theo owner, không
 phải SOT song song. Mọi chi tiết chưa có bằng chứng owner duyệt vẫn là Draft
 `[CONFIRM]`; khi trích quy tắc ra triển khai phải cập nhật README/feature
 tương ứng và nêu nguồn, không tự lấy đoạn trong phụ lục làm Approved.  
 **Phiên bản:** 1.0 (Consolidated Unified Intent)  
-**Ngày cập nhật:** 10/09/2026  
+**Ngày cập nhật:** 15/10/2026
 **Môi trường triển khai:** Mạng cục bộ (LAN) văn phòng công chứng (~6 máy trạm Windows của chuyên viên, 1 máy chủ trung tâm / NAS nội bộ).  
 **Trạng thái dự án:** Tài liệu đặc tả kiến trúc — Chưa có code (phải tuân thủ các điều kiện tiên quyết trước khi viết code).  
 
@@ -21,7 +21,7 @@ tương ứng và nêu nguồn, không tự lấy đoạn trong phụ lục làm
 4. [Các Nguồn Dấu vết & Bản ghi Dữ kiện (Evidence Records)](#4-các-nguồn-dấu-vết--bản-ghi-dữ-kiện-evidence-records)
 5. [Đột phá Kỹ thuật: Windows IFilter & Khắc phục File Lock](#5-đột-phá-kỹ-thuật-windows-ifilter--khắc-phục-file-lock)
 6. [Kiến trúc Kỹ thuật & Phân tích Đánh đổi](#6-kiến-trúc-kỹ-thuật--phân-tích-đánh-đổi)
-7. [Mô hình Dữ liệu & 14 Bảng Database Chuẩn](#7-mô-hình-dữ-liệu--14-bảng-database-chuẩn)
+7. [Mô hình Dữ liệu & 13 Bảng Database Chuẩn](#7-mô-hình-dữ-liệu--13-bảng-database-chuẩn)
 8. [Cơ chế Dựng Hồ sơ Ứng viên (Draft Case) & Duyệt Trạm](#8-cơ-chế-dựng-hồ-sơ-ứng-viên-draft-case--duyệt-trạm)
 9. [Giao diện Tra cứu & Thẻ Hồ sơ Cấu trúc](#9-giao-diện-tra-cứu--thẻ-hồ-sơ-cấu-trúc)
 10. [Bảng Quyết định & Quản trị Rủi ro](#10-bảng-quyết-định--quản-trị-rủi-ro)
@@ -51,7 +51,7 @@ Hệ thống **Notary Work Intelligence** chọn con đường hoàn toàn ngư�
 > **"Đặt một 'thư ký thầm lặng' trên mỗi máy tính. Hệ thống không can thiệp vào công việc, chỉ ghi lại những dấu vết mà công việc tự nhiên để lại — rồi tự dựng thành hồ sơ ứng viên tốt nhất và nhờ chuyên viên xác nhận một lần duy nhất."**  
 > *(Triết lý: Capture facts broadly, build the best Draft Case, then ask once).*
 
-Chuyên viên vẫn giữ nguyên thói quen làm việc: vẫn mở Word soạn thảo, in ấn, lưu vào thư mục mạng chung hoặc máy con. Hệ thống tự động quan sát các dấu vết kỹ thuật số, suy luận liên kết và phục vụ tìm kiếm tức thì.
+Chuyên viên vẫn giữ nguyên thói quen làm việc: vẫn mở Word soạn thảo, lưu vào thư mục mạng chung hoặc máy con. Hệ thống tự động quan sát các dấu vết kỹ thuật số, suy luận liên kết và phục vụ tìm kiếm tức thì.
 
 ### 1.4. Bộ nguyên tắc định hướng (Guiding Principles)
 1. **Capture Reality First – Structure Second – Automate Third:** Ghi nhận sự thật khách quan trước, chuẩn hóa cấu trúc sau, tự động hóa ở bước cuối cùng.
@@ -100,7 +100,7 @@ Hệ thống vận hành trơn tru xoay quanh một ngày làm việc thực t�
 ```
 Máy chuyên viên (6 máy trạm)             Máy chủ trung tâm văn phòng (LAN)
 ─────────────────────────────            ──────────────────────────────────
-[Chuyên viên soạn Word/in ấn]
+[Chuyên viên soạn Word]
           │
           ▼
 [Sentinel đọc IFilter <15ms] ──(JSON text)──► [Lưu Snapshot, tính Diff]
@@ -121,26 +121,23 @@ Máy chuyên viên (6 máy trạm)             Máy chủ trung tâm văn phòng
   - Chương trình Sentinel chạy ngầm trên máy PC-02 nhận biết sự kiện lưu file.
   - Sử dụng Windows IFilter bóc tách text thuần trong 10ms, trích xuất: CCCD `036...`, Thửa 125, Tờ bản đồ 09, Số seri GCN `DD 123456`.
   - Sentinel đóng gói bản ghi JSON nhỏ (30KB) gửi về Hub máy chủ qua mạng LAN, không gửi file Word nhị phân nặng.
-- **9:15 — Bình in hợp đồng ra máy in Canon LBP 2900:**
-  - Sentinel bắt sự kiện Print Spooler (Event ID 307): ghi nhận file vừa in, người in, máy in, số trang và dấu mốc thời gian.
-  - Tín hiệu in là bằng chứng cho thấy hợp đồng đã chuyển sang giai đoạn soát lỗi hoặc chuẩn bị ký.
 - **9:20 — Máy chủ tổng hợp và dựng Hồ sơ Ứng viên (Draft Case):**
-  - Hub liên kết phiên sửa file Word và lệnh in cùng chuyên viên Bình thành một `Draft Case`:
+  - Hub liên kết các lần sửa/lưu file Word của chuyên viên Bình thành một `Draft Case`:
     * Khách hàng: Nguyễn Thị Gái — Chuyển nhượng Thửa 125, Tờ 09.
     * Người phụ trách: Bình.
-    * Giai đoạn dự kiến: Soạn thảo xong, chờ soát lỗi / ký.
+    * Giai đoạn dự kiến: Đang soạn thảo; chuyên viên xác nhận bước tiếp theo.
 - **9:21 — Một Toast Notification nhẹ xuất hiện góc màn hình máy Bình:**
   - *"📋 Hồ sơ vừa xử lý: HDCN_NguyenThiGai.docx (Thửa 125, GCN DD123456). [✔ Đúng] [✖ Bỏ qua] [✏ Sửa]"*
   - Bình bấm **Đúng** — mất đúng 1 giây. Hồ sơ ứng viên lập tức chuyển thành Hồ sơ chính thức đã xác nhận.
 - **14:30 — Khách hàng gọi điện hỏi tiến độ:**
   - Chị chủ văn phòng gõ *"Gái"* vào ô tìm kiếm Spotlight.
-  - Trong $< 1$ giây, Thẻ Hồ sơ hiện ra đầy đủ: hồ sơ đang ở đâu, ai đang giữ, tài liệu mới nhất, lần in gần nhất, không cần gọi hỏi bất kỳ ai.
+  - Trong $< 1$ giây, Thẻ Hồ sơ hiện ra đầy đủ: hồ sơ đang ở đâu, ai đang giữ, tài liệu mới nhất, không cần gọi hỏi bất kỳ ai.
 
 ### 3.2. Xử lý ảnh giấy tờ Zalo và tài liệu rời rạc
 - Khi khách hàng gửi ảnh chụp sổ đỏ vào Zalo chung của văn phòng mà không kèm lời nhắn:
   - Zalo Connector trên máy chủ tải ảnh, băm SHA-256 lưu trữ.
   - OCR nhận diện ra số GCN `DD 123456`.
-  - Hệ thống tự động so khớp với Case đang mở của bà Gái (trùng GCN) và gắn ảnh vào danh sách tài liệu (`artifacts`) của Case, cập nhật dòng thời gian mà không cần con người can thiệp.
+  - Hệ thống đề xuất Case đang mở của bà Gái vì trùng GCN, hiển thị bằng chứng để chuyên viên kiểm tra. Chỉ sau khi chuyên viên xác nhận mới gắn ảnh vào `artifacts` của Case và ghi lịch sử xác nhận; trùng GCN không tự cấp quyền ghép.
 - Nếu OCR không tìm thấy Case trùng khớp, hệ thống vẫn lưu trữ Evidence Record và tạo một Draft Case ở trạng thái `UNCLASSIFIED` chờ chuyên viên gộp sau. **Không bao giờ loại bỏ dữ kiện chỉ vì chưa hiểu ý nghĩa.**
 
 ---
@@ -165,8 +162,8 @@ extracted_entities:
   land_parcel: { "thua": 125, "to": 9 }
 ```
 
-### 4.2. Năm Nguồn Dấu vết Trọng tâm cho MVP
-Hệ thống chuẩn hóa 5 Source Connectors chính:
+### 4.2. Bốn Nguồn Dấu vết Trọng tâm cho MVP
+Hệ thống chuẩn hóa 4 Source Connectors chính:
 
 1. **Word Activity Connector (Tín hiệu Nghiệp vụ Cốt lõi):**
    - Theo dõi sự kiện mở, lưu, Save As file `.docx` và `.doc`.
@@ -176,18 +173,10 @@ Hệ thống chuẩn hóa 5 Source Connectors chính:
    - Hỗ trợ đồng thời **80% khối lượng nằm trên ổ mạng chia sẻ (NAS / Server LAN / ổ Z:)** và **20% khối lượng trên ổ máy con cá nhân (`D:\HoSo`, Desktop)**.
    - Bắt sự kiện tạo, sửa, đổi tên, chuyển thư mục hoặc xóa file.
    - Băm SHA-256 nội dung để nhận diện file gốc ngay cả khi nhân viên đổi tên file hoặc lưu sang thư mục khác.
-3. **Print Spooler Connector (Xác thực Giai đoạn Hoàn thiện):**
-   - Lắng nghe sự kiện Windows Print Spooler (Event ID 307 / Win32 API).
-   - Khi phát sinh lệnh in: Kích hoạt IFilter đọc snapshot tài liệu tức thì (không cần chờ hết thời gian debounce).
-   - **Ràng buộc kỹ thuật (Quyết định A2 đã chốt):** Print Spooler **KHÔNG cung cấp số bản in (copies)**. Do đó, **tuyệt đối không dùng số bản in làm điều kiện cứng** phân biệt bản nháp (`DRAFT_PRINTED`) và bản ký (`FINAL_PRINTED`).
-   - **Tiêu chí thay thế để phân định mức độ hoàn thiện:**
-     * *Thời điểm in so với lần sửa cuối:* In sau một chuỗi chỉnh sửa và không phát sinh chỉnh sửa mới trong khoảng thời gian nhất định $\rightarrow$ Hướng tới bản chuẩn ký.
-     * *Có sửa file sau khi in hay không:* Nếu sau lệnh in tiếp tục có các phiên sửa file Word $\rightarrow$ Lệnh in trước đó là in nháp soát lỗi.
-     * *Số lần in lặp lại:* Ghi nhận lịch sử in kết hợp phản hồi xác nhận nhẹ từ chuyên viên (tối đa 3 popup/ngày).
-4. **Scanner & Downloads Watcher:**
+3. **Scanner & Downloads Watcher:**
    - Giám sát thư mục lưu file scan từ máy quét hoặc thư mục Downloads trình duyệt.
    - Khi có file mới: Gửi yêu cầu OCR bóc tách thông tin phiếu hẹn, văn bản trả lời thuế, trích đo địa chính.
-5. **Shared Office Zalo Connector (Server-only theo B2):**
+4. **Shared Office Zalo Connector (Server-only theo B2):**
    - Connector chạy trên máy chủ lắng nghe tin nhắn văn bản, ảnh giấy tờ, file đính kèm gửi tới tài khoản Zalo chung của văn phòng.
    - Tải file về vùng lưu trữ trung tâm, băm SHA-256 và kích hoạt pipeline OCR trích xuất thực thể.
 
@@ -213,7 +202,7 @@ SOURCE → RAW → NORMALIZED → INFERRED → CONFIRMED
 
 | Bước | Đầu vào/đầu ra dự định của notaryoffice | Trường và provenance bắt buộc | Owner ghi dự định | Không được suy ra |
 | :--- | :--- | :--- | :--- | :--- |
-| **SOURCE** | Sự kiện từ Word, file system, Spooler, scanner/download hoặc Zalo chung | connector/source, loại event, thời điểm nhận, file/media type và locator khả dụng | Source Connector tạo observation | Không suy ra Case, người phụ trách hay “bản ký” chỉ từ một event. |
+| **SOURCE** | Sự kiện từ Word, file system, scanner/download hoặc Zalo chung | connector/source, loại event, thời điểm nhận, file/media type và locator khả dụng | Source Connector tạo observation | Không suy ra Case, người phụ trách hay giai đoạn hoàn tất chỉ từ một event. |
 | **RAW** | `Evidence Record` độc lập với Case | record/source id, timestamp, source hash nếu có file, raw path/message reference theo chính sách, workstation/user **chỉ khi source thực sự có**, converter/OCR call, location/ref, warning/error | Evidence ingestion của notaryoffice | Hash/OCR text/đường dẫn không tự là entity canonical hoặc Case. |
 | **NORMALIZED** | Facts được chuẩn hóa, vẫn liên kết Evidence gốc | raw value + canonical value + extractor/converter version + source refs; CCCD/GCN/thửa-tờ/số công chứng theo `systemdocs/contracts/entities.md` | Enrichment/extraction của notaryoffice | Chuẩn hóa thành công không chứng minh hai Evidence cùng Case. |
 | **INFERRED** | Candidate link, activity session, Draft Case và ranking | evidence ids, rule/model version, score/reasons, candidate Case/Draft Case refs, missing/ambiguous signals | Draft Case Builder của notaryoffice | Score dùng để xếp hạng, không auto-link/auto-discard hay ghi Case truth. |
@@ -326,7 +315,7 @@ Trong kiến trúc máy trạm, giải pháp công nghệ then chốt giải quy
 Luồng dữ liệu được thiết kế một chiều, đảm bảo tính phân tách trách nhiệm rõ ràng:
 
 ```
-[Nguồn: Word / File / Print / Scan / Zalo]
+[Nguồn: Word / File / Scan / Zalo]
                    │
                    ▼
          [Source Connectors]
@@ -361,14 +350,12 @@ Hệ thống áp dụng mô hình phân tán thông minh:
   - Chạy dưới dạng Windows Service hoặc Background Tray App.
   - Mức độ chiếm dụng tài nguyên cực thấp: **< 30MB RAM, < 0.5% CPU**.
   - Bắt file event (debounce 3–5 phút) trên cả ổ mạng dùng chung (80%) và ổ local máy con (20%).
-  - Bắt sự kiện in (Event ID 307) $\rightarrow$ Kích hoạt IFilter đọc text tức thì.
   - Tích hợp hàng đợi **SQLite local (FIFO buffer)**: Khi mạng LAN chập chờn hoặc mất kết nối máy chủ, toàn bộ event được lưu cục bộ và tự động flush đồng bộ về Hub khi có mạng trở lại.
 - **Tại máy chủ văn phòng (Central Activity Hub - Python FastAPI + SQLite WAL):**
   - Đóng vai trò Single Source of Truth của toàn văn phòng.
   - Tiếp nhận JSON text, lưu snapshot phiên bản (`document_snapshots`).
   - Tính Text Delta so với phiên trước (`document_deltas`).
   - Chạy bộ lọc Regex tất định bóc tách CCCD, GCN, Thửa, Tờ, diện tích, giá trị.
-  - Nhận diện sự kiện in ấn để cập nhật giai đoạn hồ sơ.
   - Dựng Draft Case và điều phối thông báo xác nhận tới đúng máy trạm của chuyên viên vừa thao tác.
 
 ### 6.3. Các Lựa chọn Kiến trúc ĐÃ LOẠI BỎ (Discarded Alternatives)
@@ -380,20 +367,19 @@ Hệ thống áp dụng mô hình phân tán thông minh:
 | **❌ Auto-link Cứng Ma trận Điểm** | Điểm $\ge 90$ tự động ghép cứng vào Case, không cần hỏi. | Rủi ro pháp lý công chứng rất cao (trùng họ tên, ủy quyền nhiều việc, cùng thửa đất khác xã). Bị loại để chuyển sang **xếp hạng ứng viên + hỏi người 1 lần**. |
 | **❌ Đọc API/DB phần mềm cũ** | Kết nối trực tiếp vào phần mềm quản lý công chứng đang dùng. | Quyết định B1 thuộc [`upload_lab/README.md`](../upload_lab/README.md); đọc nguồn đó trước khi xem lại phương án. |
 | **❌ Đọc Zalo cá nhân nhân viên** | Cài extension/tool đọc Zalo trên máy trạm của nhân viên. | Ranh giới thuộc [`spec hệ thống` §7](../README.md); đọc nguồn đó trước khi xem lại phương án. |
-| **❌ Dùng số bản in từ Spooler** | Đọc số bản copies từ Print Spooler để kết luận bản ký. | **Quyết định A2 đã chốt:** Windows Spooler không báo số bản in. Không thiết kế bất kỳ tính năng nào phụ thuộc vào số này. |
 
 ### 6.4. Vai trò của Lớp OpenClaw / AI Engine (10 – 15% Bất định)
 OpenClaw hoạt động như một Trực ban Ngữ nghĩa (Semantic Observer):
 - **Tuyệt đối KHÔNG làm:** Không lưu trạng thái nghiệp vụ trong bộ nhớ riêng của model; không can thiệp vào các event đã match tất định; không làm chậm luồng xử lý chính.
 - **Nhiệm vụ chính:**
   * **Semantic Diff:** Phân tích các thay đổi dị biệt mà Regex không bắt được (ví dụ: hợp đồng phát sinh điều khoản *"diện tích thực tế tăng 15m2 do khai hoang thêm"* $\rightarrow$ Đề xuất sinh Work Item *"Đo đạc chỉnh lý"*).
-  * **Handoff Inference:** Suy luận bàn giao tạm thời giữa các chuyên viên (A ngừng sửa file, B mở file và in $\rightarrow$ Gợi ý bàn giao A $\rightarrow$ B để người dùng xác nhận).
+  * **Handoff Inference:** Suy luận bàn giao tạm thời giữa các chuyên viên (A ngừng sửa file, B mở và lưu file $\rightarrow$ Gợi ý bàn giao A $\rightarrow$ B để người dùng xác nhận).
   * **Ambient Heartbeat:** Quét định kỳ 30–60 phút phát hiện các hồ sơ chết lâm sàng (**Stale Cases > 7 ngày** không có hoạt động) để gửi thông báo nhắc nhở lãnh đạo.
-  * **Natural Language Query:** Chuyển đổi câu hỏi khẩu ngữ tự nhiên của lãnh đạo (*"Hồ sơ chuyển nhượng nhà bà Gái hôm qua đã in chưa?"*) thành truy vấn dữ liệu chính xác.
+  * **Natural Language Query:** Chuyển đổi câu hỏi khẩu ngữ tự nhiên của lãnh đạo (*"Hồ sơ chuyển nhượng nhà bà Gái hôm qua đã cập nhật chưa?"*) thành truy vấn dữ liệu chính xác.
 
 ---
 
-## 7. Mô hình Dữ liệu & 14 Bảng Database Chuẩn
+## 7. Mô hình Dữ liệu & 13 Bảng Database Chuẩn
 
 ### 7.1. Mô hình Khái niệm 5 Lớp (Core Data Model)
 Mọi hoạt động trong văn phòng công chứng được quy chiếu về mô hình quan hệ 5 tầng:
@@ -410,19 +396,20 @@ Mọi hoạt động trong văn phòng công chứng được quy chiếu về m
    │
    └─► [WORK ITEM] (Đầu việc logic: Chuyển nhượng, Đo đạc, UNCLASSIFIED)
          │
-         └─► [ACTIVITY SESSION] (Chuỗi phiên làm việc, in ấn, nhận tài liệu)
+         └─► [ACTIVITY SESSION] (Chuỗi phiên làm việc, nhận tài liệu)
                │
                └─► [ARTIFACT] (File .docx, .doc, scan, ảnh Zalo, phiếu nộp)
 ```
 
 ### 7.2. Quy chuẩn Định danh Thực thể Công chứng Việt Nam (`contracts/entities.md`)
-Để đảm bảo tính tương thích khi tích hợp toàn hệ thống (theo `systemdocs`), các trường dữ liệu bắt buộc tuân thủ:
-- **Căn cước công dân (CCCD):** Chuỗi 12 chữ số (`\b\d{12}\b`). Nhận diện cả trường hợp số đầu khác 0 do lỗi OCR/nhập liệu.
-- **Số Seri Giấy chứng nhận (Sổ đỏ/Sổ hồng):** 2 chữ cái in hoa + 6–8 chữ số (`[A-Z]{2}\s*\d{6,8}`) (ví dụ: `DD 123456`, `DA 998812`).
-- **Thửa đất & Tờ bản đồ:** Cụm từ chuẩn hóa `so_thua_dat` và `so_to_ban_do`.
-- **Tên trường chuẩn hóa:** Toàn bộ bảng cơ sở dữ liệu phải dùng chung định dạng: `so_serial`, `so_vao_so`, `so_thua_dat`, `so_to_ban_do`, `dia_chi`, `ngay_cap`, `co_quan_cap`, `dien_tich`. Ngày tháng lưu trữ theo chuẩn **ISO-8601** (`YYYY-MM-DDTHH:MM:SSZ`).
+Trường, kiểu và định dạng đầu ra theo [từ điển dữ liệu](../../../contracts/entities.md)
+và contract của chức năng nhận đã duyệt; không tự đặt điều kiện strict mới cho
+CCCD/serial hoặc thay tên cột. Mọi dữ liệu trích giữ nguồn và đúng đối tượng.
+Ngày chỉ có năm giữ đúng độ đầy đủ; ngày quy ước chỉ dùng cho tính toán, không
+ghi đè hoặc hiển thị như ngày người dùng đã nhập. Phần này không duyệt schema
+Office Draft hay tự nối dữ liệu giữa các module.
 
-### 7.3. Cấu trúc 14 Bảng Cơ sở Dữ liệu Chi tiết
+### 7.3. Cấu trúc 13 Bảng Cơ sở Dữ liệu Chi tiết
 
 ```
  ┌──────────────┐       ┌──────────────┐       ┌────────────────────┐
@@ -439,19 +426,15 @@ Mọi hoạt động trong văn phòng công chứng được quy chiếu về m
                         │  artifacts   │◄──────┤ activity_sessions  │
                         └──────┬───────┘       └────────────────────┘
                                │
-            ┌──────────────────┼──────────────────┐
-            ▼                  ▼                  ▼
- ┌────────────────────┐ ┌──────────────┐ ┌────────────────────┐
- │ document_snapshots │ │  print_jobs  │ │case_timeline_events│
- └─────────┬──────────┘ └──────────────┘ └────────────────────┘
-           ▼                   ▲
- ┌────────────────────┐        │
- │  document_deltas   │        │
- └────────────────────┘        │
-                               ▼
-                    ┌─────────────────────┐
-                    │  calibration_logs   │
-                    └─────────────────────┘
+            ┌──────────────────┴────────────────────┐
+            ▼                                       ▼
+ ┌────────────────────┐                 ┌────────────────────┐
+ │ document_snapshots │                 │case_timeline_events│
+ └─────────┬──────────┘                 └────────────────────┘
+           ▼
+ ┌────────────────────┐                 ┌────────────────────┐
+ │  document_deltas   │                 │  calibration_logs  │
+ └────────────────────┘                 └────────────────────┘
 ```
 
 1. **`offices`**: Danh bạ văn phòng công chứng / chi nhánh.
@@ -471,9 +454,8 @@ Mọi hoạt động trong văn phòng công chứng được quy chiếu về m
 9. **`activity_sessions`**: Phiên làm việc gom nhóm do Sentinel ghi nhận (`user_id`, `workstation_id`, `start_time`, `end_time`, `save_count`).
 10. **`document_snapshots`**: Toàn bộ bản text thuần bóc tách từ IFilter qua từng phiên làm việc (v1, v2, v3...) phục vụ đối soát.
 11. **`document_deltas`**: Chi tiết diff các đoạn thêm / sửa / xóa văn bản giữa các snapshot liên tiếp.
-12. **`print_jobs`**: Nhật ký in ấn (`workstation_id`, `user_id`, `printer_name`, `doc_name`, `total_pages`, `printed_at`; không có số copies từ spooler).
-13. **`calibration_logs`**: Sổ cái hiệu chuẩn xác suất ghi nhận phản hồi popup của chuyên viên (`calculated_score`, `detected_signals_json`, `user_action`: CONFIRMED / REJECTED / TIMEOUT, `response_time_ms`).
-14. **`case_timeline_events`**: Dòng thời gian sự kiện bất biến (Audit Trail / Event Sourcing) lưu vết toàn bộ lịch sử biến động của hồ sơ.
+12. **`calibration_logs`**: Sổ cái hiệu chuẩn xác suất ghi nhận phản hồi popup của chuyên viên (`calculated_score`, `detected_signals_json`, `user_action`: CONFIRMED / REJECTED / TIMEOUT, `response_time_ms`).
+13. **`case_timeline_events`**: Dòng thời gian sự kiện bất biến (Audit Trail / Event Sourcing) lưu vết toàn bộ lịch sử biến động của hồ sơ.
 
 ---
 
@@ -493,7 +475,7 @@ Kinh nghiệm thực tế cho thấy việc áp dụng ma trận điểm cứng 
 - Case đang chạy (`IN_PROGRESS`) được ưu tiên hơn Case đã lưu trữ (`COMPLETED`).
 
 ### 8.2. Popup Duyệt Trạm (Workstation Confirmation Toast)
-Khi một Draft Case được dựng sau phiên soạn thảo Word hoặc lệnh in:
+Khi một Draft Case được dựng sau phiên soạn thảo Word:
 - Một Toast Notification nhỏ gọn xuất hiện ở góc dưới màn hình của **chính chuyên viên vừa thao tác**:
 
 ```text
@@ -501,7 +483,7 @@ Khi một Draft Case được dựng sau phiên soạn thảo Word hoặc lệnh
 │ 📋 PHÁT HIỆN HỒ SƠ VỪA SOẠN THẢO                           │
 │ File: HDCN_NguyenThiGai.docx                                │
 │ Khách: Nguyễn Thị Gái | Thửa 125, Tờ 09 | GCN: DD 123456    │
-│ Giai đoạn dự kiến: Đã in bản chuẩn / Sẵn sàng ký            │
+│ Giai đoạn dự kiến: Đang soạn thảo, cần xác nhận            │
 │                                                             │
 │  [ ✔ Đúng là hồ sơ tôi làm ]   [ ✖ Bỏ qua ]   [ ✏ Sửa/Gộp ] │
 └─────────────────────────────────────────────────────────────┘
@@ -529,8 +511,8 @@ Kết quả trả về trong **$< 1$ giây**, hiển thị danh sách các Case 
 
 ```text
 1. Nguyễn Thị Gái – Chuyển nhượng Thửa 125, Tờ 09
-   Giai đoạn: Sẵn sàng ký (Đã in bản chuẩn)
-   Hoạt động cuối: In tài liệu lúc 09:15 bởi Bình
+   Giai đoạn: Đang soạn thảo
+   Hoạt động cuối: Lưu file Word lúc 09:15 bởi Bình
    Trạng thái dữ liệu: [ĐÃ XÁC NHẬN BỞI CHUYÊN VIÊN]
 
 2. Nguyễn Thị Gái – Ủy quyền
@@ -546,15 +528,14 @@ Khi bấm chọn một hồ sơ, hệ thống hiển thị Thẻ Hồ sơ duy nh
 HỒ SƠ: CASE #3812 - NGUYỄN THỊ GÁI
 Tài sản: Thửa đất 125, Tờ bản đồ 09 | GCN số: DD 123456
 ----------------------------------------------------------------------
-Trạng thái:            READY_FOR_SIGNING (Đã in bản chuẩn - Sẵn sàng ký)
+Trạng thái:            IN_PROGRESS (Đang soạn thảo)
 Độ tin cậy liên kết:    100/100 (Bình đã xác nhận lúc 09:21)
 Chủ hồ sơ (Owner):     Nguyễn Văn Bình (Chuyên viên phụ trách chính)
-Người đang xử lý:      Nguyễn Văn Bình (Vừa hoàn thành lệnh in)
-Vị trí thực tế:        Bàn ký / Chờ Công chứng viên kiểm tra và ký
-Lần in gần nhất:       09:15:20 - Máy in Canon LBP 2900 (Đã in 4 trang)
+Người đang xử lý:      Nguyễn Văn Bình (Vừa lưu file Word)
+Vị trí thực tế:        Chưa xác nhận vị trí hồ sơ giấy
 Biến động gần nhất:    Bổ sung diện tích chênh lệch + bên mua (Diff v3)
 Vấn đề chặn (Blocker): Không có
-Việc tiếp theo:        Ký công chứng -> Bàn giao khách nộp thuế & ĐKĐĐ
+Việc tiếp theo:        Chuyên viên xác nhận việc tiếp theo
 Tài liệu liên kết:
   - HDCN_NguyenThiGai.docx (Z:\HOSO\2026\)
   - zalo-attachment-gcn-DD123456.jpg (Zalo Văn phòng)
@@ -569,22 +550,12 @@ Tài liệu liên kết:
 | Mã | Nội dung câu hỏi | Trạng thái | Hướng xử lý / Hệ quả kỹ thuật |
 | :--- | :--- | :--- | :--- |
 | **A1** | Đọc được tài liệu khi Word đang mở không? | 🔴 Cần đo máy thật | Đã có giải pháp đột phá Windows IFilter (`query.dll`); cần kiểm chứng thực tế tại văn phòng. |
-| **A2** | Print Spooler có báo số bản in (copies) không? | 🟢 **ĐÃ CHỐT: KHÔNG** | Spooler không báo số bản in. Cấm dùng số bản in làm điều kiện phân loại; dùng thời điểm in, việc sửa sau in và lịch sử in. |
 | **A3** | Ổ mạng chung (Z:) có báo sự kiện đầy đủ không? | 🔴 Cần đo máy thật | Kiểm tra xem giao thức SMB có bỏ sót event; nếu có sẽ bổ sung job quét đối chiếu định kỳ. |
 | **A4** | 6 máy trạm dùng tài khoản Windows riêng hay chung? | 🔴 Cần khảo sát | Nếu dùng tài khoản riêng: theo dõi bàn giao mượt mà. Nếu dùng chung: phải loại bỏ tính năng theo dõi người làm cụ thể. |
 | **B1** | Phần mềm cũ có API/DB để trích xuất không? | ↗ Nguồn Upload Lab | Xem [`upload_lab/README.md` §B1](../upload_lab/README.md); không chốt lại tại đây. |
 | **B2** | Phạm vi kết nối Zalo | ↗ Nguồn liên sản phẩm | Xem [`spec hệ thống` §7](../README.md); không chốt lại tại đây. |
 | **B3** | Thông báo nhân viên & Nội quy lao động | 🟢 **ĐÃ CHỐT** | Bắt buộc hoàn thành văn bản thông báo và bổ sung nội quy trước khi triển khai thử nghiệm. |
 | **B4** | Chọn chuyên viên tham gia thử nghiệm | 🟢 **ĐÃ CHỐT** | Chủ dự án chọn 2 chuyên viên có tinh thần hợp tác tốt nhất. |
-
-**Lý do và hệ quả của A2 — không lấy số bản in làm sự thật:** Print Spooler không
-cung cấp chính xác số bản in. Số bản chỉ có thể suy ra từ số trang trong event
-(tổng trang ÷ số trang tài liệu), nên kết quả đó là **suy đoán**. Không dùng nó
-làm điều kiện cứng để phân biệt `DRAFT_PRINTED` với `FINAL_PRINTED`; phải xét
-thời điểm in so với lần sửa cuối, có/không sửa file sau in và số lần in. Tính
-năng nào bắt buộc biết chính xác số bản in thì không khả thi. Nội dung này được
-được giữ tại `_bmad-output/specs/notaryoffice/README.md`; nguồn phép đo gốc
-hoặc lời giải thích nguyên văn của owner chưa được dẫn trong tài liệu hiện có.
 
 **A4 vẫn phải khảo sát trên 6 máy thật.** Không được giả định tài khoản Windows
 riêng. Nếu dùng chung, loại bỏ tính năng theo dõi người làm cụ thể; câu hỏi này
@@ -623,7 +594,7 @@ owner nguyên văn trong tài liệu hiện có.
 [Giai đoạn 1: Bản dùng thử MVP] (6 - 10 tuần)
 - 2 máy trạm chuyên viên + 1 Hub trung tâm LAN
 - 15 - 20 hồ sơ đang chạy thực tế
-- Word Diff + IFilter + Print Spooler + Zalo Server + Popup duyệt trạm + Spotlight Search
+- Word Diff + IFilter + Zalo Server + Popup duyệt trạm + Spotlight Search
                 │
                 ▼
 [Giai đoạn 2: Mở rộng Toàn diện] (4 - 6 tuần tiếp theo)

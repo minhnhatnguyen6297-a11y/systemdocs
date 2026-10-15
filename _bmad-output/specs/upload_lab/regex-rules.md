@@ -1,6 +1,6 @@
 # Catalog cấu trúc và loại văn bản Word
 
-**Trạng thái:** Active cho loại/vùng/cấu trúc. Quy tắc giá trị trường có một nguồn tại [regex-fields.md](regex-fields.md); đáp án mẫu ở [regex-expected-results.md](regex-expected-results.md). Các thuật toán F01/F04/F05 chưa chốt không có ưu tiên theo tuổi tài liệu.
+**Trạng thái:** Active cho loại/vùng/cấu trúc. Quy tắc giá trị trường có một nguồn tại [regex-fields.md](regex-fields.md); đáp án mẫu ở [regex-expected-results.md](regex-expected-results.md). F04/F05 theo quy tắc trường cập nhật 15/10/2026; không tự chọn giá trị mâu thuẫn theo tuổi tài liệu.
 
 ## 0. Core nằm ở đâu (đọc trước khi sửa)
 
@@ -28,7 +28,7 @@ Phạm vi core (quyết định owner 05/10/2026): core chỉ trích **xuất**
 người + tài sản bằng regex; đối chiếu thuộc tầng kiểm tra. Quyết định 06/10
 về không trích người trong Lời chứng và phạm vi gộp hiện hành ở
 [core](regex-core.md) và [quy tắc trường](regex-fields.md); không dùng câu
-tóm tắt lịch sử này để chốt F01/F04/F05.
+tóm tắt lịch sử này để chốt F04/F05.
 `so_cong_chung` vẫn được đọc để phục vụ upload/audit portal nhưng
 không còn là tiêu chí đủ/thiếu của core.
 

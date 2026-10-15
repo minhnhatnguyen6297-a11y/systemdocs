@@ -1,6 +1,6 @@
 # Spec hệ thống công chứng
 
-**Trạng thái:** Active · **Cập nhật:** 14/10/2026 · **Phạm vi:** toàn hệ thống
+**Trạng thái:** Active · **Cập nhật:** 15/10/2026 · **Phạm vi:** toàn hệ thống
 
 Trang này giữ phần dùng chung cho nhiều module. Chi tiết thuộc một module hoặc
 feature phải ghi ở thư mục con gần nhất, không chép lại tại đây.
@@ -145,8 +145,10 @@ duyệt và contract/schema riêng.
 
 ### 4.2 Nguyên tắc đầu ra bóc tách
 
-Trước khi triển khai, chốt bộ trường, kiểu dữ liệu, định dạng, cách nhóm và nơi
-lưu cho chức năng nhận dữ liệu. Cùng một đối tượng dùng cùng chuẩn đích trong
+Owner xác nhận 15/10/2026: bộ trường và định dạng DB đã duyệt là chuẩn đích;
+engine phải tuân theo hoặc ánh xạ tường minh tới chuẩn đó. Trước khi triển khai,
+chốt bộ trường, kiểu dữ liệu, định dạng, cách nhóm và nơi lưu cho chức năng nhận.
+Cùng một đối tượng dùng cùng chuẩn đích trong
 suốt luồng; điều này không buộc raw OCR phải mang schema DB và không tạo schema
 dùng chung hay Case liên module. Giữ riêng và nguyên vẹn giá trị gốc (raw) cùng
 vị trí nguồn. Chuẩn hóa giá trị đầu ra theo quy tắc của từng trường; trường nào
@@ -159,6 +161,10 @@ hoặc cụm đất; không tạo field riêng hay nhét dữ liệu vào ghi ch
 xác nhận hoặc được tự ghi DB. Tên nghiệp vụ như `ten` và tên cột đã ánh xạ như
 `ho_ten` giữ đúng ánh xạ; thời hạn đất thuộc cụm và tài sản tương ứng, không đổ
 vào `thoi_han` chung.
+
+Ngày phải lưu và hiển thị đúng độ đầy đủ của dữ liệu nhập: năm riêng giữ năm,
+ngày đầy đủ giữ ngày đầy đủ. Ngày quy ước cho tính toán nằm riêng trong bước
+tính, không ghi đè giá trị nhập hoặc trở thành ngày đã biết.
 
 Đây là nguyên tắc cho quyết định đầu ra, không nâng `IdentityEvidence` ở §4.1
 từ Draft thành contract xuyên sản phẩm.

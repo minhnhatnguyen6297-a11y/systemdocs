@@ -158,6 +158,12 @@ Cập nhật chốt từ Owner (01/10/2026): Từ điển người chuẩn hóa 
 | `ngaycap` | `ngay_cap` | Date | Ngày cấp giấy tờ định danh (ngày cấp CCCD hoặc ngày cấp trích lục khai tử) |
 | `diachi` | `dia_chi` | Text | Địa chỉ người sống; nơi chết / nơi thường trú cuối cùng trước khi chết của người chết |
 
+**Owner 15/10/2026 — độ đầy đủ của ngày:** bảng trên mô tả kiểu lưu hiện có,
+không cho phép làm mất dữ liệu chỉ có năm. Lưu/đọc lại và hiển thị phải phân biệt
+`2010` với ngày thật `01/01/2010`; ngày quy ước chỉ phục vụ tính toán nội bộ.
+Cách giữ dữ liệu nhập/độ đầy đủ trong lưu trữ phải kiểm riêng khi triển khai,
+không suy từ kiểu `Date` rằng đã đáp ứng hoặc tự tạo cột trong lần sửa docs này.
+
 Ngoài 6 trường nghiệp vụ chính, DB hiện vẫn giữ `gioi_tinh`, ID và thời gian tạo; không xóa các cột này.
 
 *Ghi chú về quê quán (`place_of_origin`):* Chỉ lưu snapshot trong từng hồ sơ (`case_state_json` / contract `person_row`), không đưa vào danh bạ `customers` master.

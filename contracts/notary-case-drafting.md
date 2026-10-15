@@ -106,9 +106,15 @@ Kiểu ID không được đổi giữa mock và real backend.
 ### 2.2 Ngày và thời điểm
 
 - Ngày không giờ (ngày sinh/chết/cấp): `YYYY-MM-DD` **hoặc** `YYYY`
-  (year-only — tương đương 01/01 năm đó, dùng khi chỉ biết năm) **hoặc**
+  (chỉ có năm — phải giữ đúng độ đầy đủ của dữ liệu nhập) **hoặc**
   `null`. Wire chỉ hai dạng đó: producer phải chuẩn hóa mọi format khác
   (hiện trạng web trộn `dd/mm/YYYY`, `yyyy`, ISO) trước khi emit.
+- Owner 15/10/2026: lưu và hiển thị đúng dữ liệu ngày đã nhập. `2010` phải
+  đọc lại/hiển thị là `2010`; `01/01/2010` thật vẫn là ngày đầy đủ. Quy ước
+  `01/01` cho dữ liệu chỉ có năm chỉ được dùng nội bộ khi cần tính toán;
+  không ghi đè dữ liệu nhập và không tạo bằng chứng về thứ tự sự kiện chưa biết.
+  Chuẩn hóa định dạng truyền không được làm mất độ đầy đủ. Cách lưu vật lý cần
+  được kiểm khi triển khai; lần cập nhật docs này không đổi schema/runtime.
 - Thời điểm (`updated_at`, `observed_at`): ISO-8601 có múi giờ.
 - `""` **không hợp lệ** thay `null` ở mọi field nullable — consumer
   reject bằng `validation_error` (g1-module-data §6).

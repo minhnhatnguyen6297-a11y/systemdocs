@@ -25,7 +25,7 @@ E5 là các mục GCN đánh số rõ: giữ mỗi mô tả tài sản riêng d�
 
 E4 có token dính `036064005865do` ngay trong byte Word: lỗi nguồn có thể kiểm tay. Nhưng lấy cơ quan cấp GCN để điền nơi cấp CCCD vẫn là lỗi engine phải chặn. Thiếu bằng chứng thì giữ trống/phần đọc được; không đoán hoặc sửa “Bộ Coongan” thành “Bộ Công an”.
 
-Đáp án 3970 thiếu đuôi `, tỉnh Ninh Bình`; đính chính phải dựa trên dòng nguồn, giữ nguyên bộ đáp án TASK-10.2 để truy lại. F01/F04/F05 vẫn Pending; batch này không kiểm được các quyết định đó.
+Đáp án 3970 thiếu đuôi `, tỉnh Ninh Bình`; đính chính phải dựa trên dòng nguồn, giữ nguyên bộ đáp án TASK-10.2 để truy lại. Batch này chưa kiểm các mẫu F04/F05; phần phân biệt thửa/cấu trúc đầu ra đã được owner làm rõ 15/10/2026 tại regex-fields, chưa duyệt lại đáp án các mẫu mâu thuẫn.
 
 ## 3. Kết quả cho người dùng sửa
 
@@ -39,6 +39,6 @@ Không thêm ô nguyên văn, bảng hay nút mới; không dán dữ liệu và
 - Kiểm tên có dấu, cờ năm sinh cả true/false, từng trường người chết và chi tiết đất đã trả lời; so mỗi bản ghi một lần, không dùng một thửa để khớp hai đáp án.
 - Lỗi extract không được thành đạt. Báo số trường đã kiểm/chưa kiểm; ca chỉ có một trường không chứng minh cả file đúng.
 - Output phải gắn hash nguồn, engine, validator, bộ chấm, đáp án và lớp đính chính. Đổi bất kỳ phần nào thì chạy mới; không gắn tên engine mới cho output cũ.
-- Giữ 50 đường dẫn trong mẫu số kể cả bản in lại giống byte. Đáp án đọc từ nguồn, không sửa để khớp máy.
+- Giữ 50 đường dẫn trong mẫu số kể cả bản sao giống byte. Đáp án đọc từ nguồn, không sửa để khớp máy.
 
 Luật trường ở [regex-fields.md](regex-fields.md); đáp án và Pending ở [regex-expected-results.md](regex-expected-results.md). Luồng Stage ở [nhập DOCX](../notary_v2/input/docx-import.md).

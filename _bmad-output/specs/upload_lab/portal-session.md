@@ -45,8 +45,29 @@ chọn website và mở đăng nhập ở đầu tab Audit, không có trang C�
 - URL mặc định là `https://congchungnamdinh.ninhbinh.gov.vn`.
 - Route đăng nhập và tạo nhanh được tự suy ra từ địa chỉ web. Có thể đặt `ND_LOGIN_URL` hoặc `ND_CREATE_URL` trong `.env` nếu web đổi route.
 - Token đăng nhập nằm trong local storage, không phải cookie. Playwright lưu lại storage state sau khi phát hiện đăng nhập thành công.
-- App nhận biết Lưu bằng phản hồi `POST /api/hoso` thành công; đây là tín hiệu chính. Nếu web chuyển khỏi trang tạo nhanh sau khi Lưu, app cũng xem là đã Lưu.
-- Mỗi tab chuẩn bị được gắn với một `record_id`. Một hồ sơ còn tab mở sẽ không bị mở trùng. Nếu tab bị đóng trước khi có tín hiệu Lưu, hồ sơ có thể chuẩn bị lại ở lần Tiếp tục.
+- Phải phân biệt hai luồng, đối chiếu source ngày 15/10/2026: workflow v1
+  chỉ đánh dấu đã Lưu khi tab nhận `POST /api/hoso` trả HTTP 2xx; chỉ rời trang
+  tạo mới thì chuyển sang cần đối chiếu (`needs_reconcile`). Luồng legacy
+  không truyền `workflow_version` còn nhận cả dấu hiệu rời trang. Không áp
+  fallback của legacy cho v1; [contract workflow](../../../contracts/upload-workflow.md)
+  vẫn Draft, việc mô tả code ở đây không nâng trạng thái duyệt của contract.
+- Mỗi tab gắn một `record_id`. Với v1, đóng tab/browser trước khi có kết quả
+  đã xác minh phải đối chiếu lại; không tự mở lại hoặc gửi lại hồ sơ chưa rõ.
+  Luồng legacy cũ có thể cho chuẩn bị lại khi tab đóng.
+- Engine dùng sự kiện phản hồi trên tab do app mở, rồi kiểm tra khoảng 0,5
+  giây khi rảnh; thao tác đang chạy có thể làm chậm vòng kiểm tra. Không có
+  thời hạn tự coi hồ sơ chưa bấm Lưu là đã Lưu. Máy ngủ không được kiểm tra;
+  sau gián đoạn cần đối chiếu các hồ sơ chưa rõ, không bảo đảm giữ nội dung
+  form chưa Lưu qua lần đóng browser hoặc khởi động lại app.
+- Giới hạn hiện tại: code kiểm phương thức/path/mã HTTP, chưa kiểm nội dung
+  phản hồi, hostname hoặc tính đầy đủ của từng trường. Chưa có bằng chứng cổng
+  thật luôn dùng HTTP lỗi cho lỗi nghiệp vụ. Một lần POST 2xx được tính cho cả
+  hồ sơ; engine không xác minh từng trường đã lưu đủ hay chỉ lưu một phần.
+- Đã tái hiện bằng mô phỏng: nhận phản hồi Lưu rồi đóng tab trước vòng kiểm
+  tra tiếp theo có thể vẫn bị ghi là `closed`/cần đối chiếu, vì code kiểm tab
+  đóng trước cờ phản hồi. Nếu mất phản hồi mà vẫn ở trang tạo mới, tab có thể
+  tiếp tục chờ vô thời hạn. Cần kiểm cổng thật và các tình huống gián đoạn
+  trước khi kết luận tín hiệu này đủ tin cậy; chưa sửa engine trong phiên docs.
 - Log mạng chỉ ghi phương thức, URL không có query string và mã trạng thái; không ghi token, cookie hay nội dung request.
 
 ## Không làm trong phạm vi này

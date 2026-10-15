@@ -1,6 +1,6 @@
 # Sổ tay sản phẩm theo màn hình
 
-**Cập nhật:** 14/10/2026 · **Dùng để:** giúp owner và coordinator cùng nhìn
+**Cập nhật:** 15/10/2026 · **Dùng để:** giúp owner và coordinator cùng nhìn
 vào sản phẩm, giao diện và việc còn dở khi bắt đầu phiên làm việc.
 
 Đọc [nền sản phẩm và khái niệm chung](./README.md) trước để hiểu người dùng,
@@ -32,6 +32,14 @@ Việc còn dở có căn cứ mới nhất là ticket
 - Nối việc sửa/thử rule regex với rule dùng trong flow; kiểm tra serial và địa
   chỉ thửa đang thiếu trong fixture.
 - Giúp tìm mẫu Word và biết chỗ điền dữ liệu nào được hỗ trợ.
+
+Owner đã chốt thêm ngày 15/10: giữ ngày nhập/hiển thị, cho lưu sơ đồ thiếu
+thông tin có nhãn, phân biệt thửa theo khối liên tục + thửa/tờ và đầu ra theo
+DB. [Quyết định](../decisions/decision-owner-doc-clarifications-20261015.md)
+đã ghi rõ phạm vi; cần kiểm runtime trước khi coi các việc này hoàn tất. Quy
+tắc bảng đơn dòng vẫn chưa duyệt. Cơ chế nhận biết Lưu portal đã được kiểm
+tra source/test mô phỏng; còn phải kiểm cổng thật và xử lý các giới hạn ở
+[phiên portal](./upload_lab/portal-session.md#quy-tắc-kỹ-thuật-quan-trọng).
 
 Đây là các hướng cần đánh giá theo ticket, không phải lệnh triển khai tự động.
 Danh sách [deferred-work](../implementation-artifacts/deferred-work.md) là
