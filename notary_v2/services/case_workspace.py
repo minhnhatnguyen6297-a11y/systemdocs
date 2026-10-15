@@ -1748,20 +1748,33 @@ class CaseWorkspaceService:
         loai_dia_chi = _nn(snap.get("loai_dia_chi"))
         if loai_dia_chi is None and customer is not None:
             loai_dia_chi = customer.loai_dia_chi
+
+        def date_wire(key: str) -> Optional[str]:
+            """Ngày Người — bằng chứng đã commit trong snapshot trước.
+
+            Snapshot giữ đúng độ đầy đủ (`YYYY` | `YYYY-MM-DD`; legacy
+            dd/mm/YYYY được chuẩn hóa) và là nguồn của hồ sơ; key có mặt
+            kể cả `null` → chặn fallback (cùng quyền key-presence
+            MIN-141). Key vắng (snapshot cũ) → master, ghi nhận dạng đầy
+            đủ — master `Date` không biểu diễn được năm riêng nên không
+            được làm nguồn hiển thị khi snapshot đã có giá trị.
+            """
+            if key in snap:
+                return _emit_date_or_year(snap.get(key))
+            return _emit_date_or_year(
+                getattr(customer, key) if customer is not None else None)
+
         return {
             "row_id": row_id,
             "entity_id": entity,
             "ho_ten": _nn(customer.ho_ten if customer else snap.get("ho_ten")) or "(Chưa rõ)",
             "gioi_tinh": _norm_gender(
                 customer.gioi_tinh if customer else snap.get("gioi_tinh")),
-            "ngay_sinh": _emit_date_or_year(
-                customer.ngay_sinh if customer else snap.get("ngay_sinh")),
-            "ngay_chet": _emit_date_or_year(
-                customer.ngay_chet if customer else snap.get("ngay_chet")),
+            "ngay_sinh": date_wire("ngay_sinh"),
+            "ngay_chet": date_wire("ngay_chet"),
             "so_giay_to": _nn(
                 customer.so_giay_to if customer else snap.get("so_giay_to")),
-            "ngay_cap": _emit_date_or_year(
-                customer.ngay_cap if customer else snap.get("ngay_cap")),
+            "ngay_cap": date_wire("ngay_cap"),
             "noi_cap": noi_cap,
             "dia_chi": _nn(
                 customer.dia_chi if customer else snap.get("dia_chi")),

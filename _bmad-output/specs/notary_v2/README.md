@@ -1,6 +1,6 @@
 # Soạn thảo hồ sơ
 
-**Cập nhật:** 15/10/2026. Spec chính của module. Định hướng mới được ghi rõ; lần gom docs không sửa code hay nghiệm thu runtime.
+**Cập nhật:** 16/10/2026. Spec chính của module; hành vi giữ độ đầy đủ ngày Người đã triển khai, kiểm tra hồi quy và export DOCX thật, review Quick độc lập sạch.
 
 ## 1. Mục đích và luồng
 
@@ -40,7 +40,7 @@ Người sửa theo dòng; tài sản theo cột. Thêm/sửa/xóa/sắp xếp c
 
 | Nhóm | Quy tắc |
 |---|---|
-| Người | Sáu trường nghiệp vụ chính: tên, sinh, chết, số giấy tờ, ngày cấp, địa chỉ; có giới tính và trường kỹ thuật. Chỉ họ tên bắt buộc. Giới tính Nam/Nữ/trống; ngày đúng lịch hoặc năm riêng. Giấy tờ/địa chỉ có thể trống. |
+| Người | Sáu trường nghiệp vụ chính: tên, sinh, chết, số giấy tờ, ngày cấp, địa chỉ; có giới tính và trường kỹ thuật. Chỉ họ tên bắt buộc. Giới tính Nam/Nữ/trống; ngày đúng lịch hoặc năm riêng. Độ đầy đủ ngày giữ theo bằng chứng đã lưu của hồ sơ: `2010` vẫn là năm riêng, phân biệt với `01/01/2010`; đọc lại và xuất dùng giá trị đã commit, master danh bạ không đệm lại. Giấy tờ/địa chỉ có thể trống. |
 | Giấy tờ | Người sống suy loại/nơi cấp/nhãn cư trú theo ngày cấp và mốc 01/10/2024; thiếu ngày để trống. Người chết dùng bằng chứng giấy tờ đã xác nhận, không mặc định nơi cấp. Nhãn nơi cấp phải phân biệt CCCD và giấy khai tử; địa chỉ người chết mang nhãn Nơi chết theo quy tắc đã có. |
 | Tài sản | Tối đa 3; thứ tự 1..3 có ý nghĩa với dấu Chủ/Nhận. Serial nguyên văn, có thể trống/trùng, không ép mẫu hoặc thay mã XX. Địa chỉ không rỗng khi commit; thửa/tờ tùy chọn. |
 | Loại đất | Mỗi tài sản tối đa 20 cụm loại đất–diện tích–thời hạn. Có thể để danh sách trống. Giữ vị trí trống; bỏ thời hạn lẻ cấp tài sản, không tự đắp vào cụm. |

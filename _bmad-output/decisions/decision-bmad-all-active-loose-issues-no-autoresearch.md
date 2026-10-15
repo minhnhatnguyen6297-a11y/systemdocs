@@ -36,3 +36,12 @@ Owner, 2026-10-16:
 > “trien khai”
 
 Áp dụng riêng cho plan #4 hiện tại đã được trình bày; không phê duyệt trước quyết định nghiệp vụ chưa nêu hoặc bất kỳ plan issue tương lai nào.
+## Cập nhật chỉ đạo của owner — 2026-10-16
+
+Chỉ đạo owner, nguyên văn:
+
+> “trien khai lien tuc, khong can duyet plan, chi dung lai khi can hoi”
+
+Với các issue còn hiệu lực theo thứ tự backlog đã duyệt, chỉ đạo này thay thế yêu cầu duyệt riêng từng plan: sau khi đã rà hết bằng chứng repository/spec và semantics nghiệp vụ đã chốt, tự động chuyển từ lập plan sang triển khai, không dừng chờ duyệt plan. Chỉ dừng khi vẫn còn một quyết định nghiệp vụ thực sự chưa được giải đáp sau khi đã khai thác bằng chứng sẵn có trong repo. Không thêm tính năng ngoài backlog hiện có, đổi thứ tự/loại trừ đã chốt, tạo initiative hoặc dùng spike để tự suy ra câu trả lời nghiệp vụ.
+
+Tiếp tục duy trì plan và đánh giá rủi ro cho từng issue; triển khai tuần tự, mỗi thời điểm chỉ một người phụ trách implementation; chạy test/smoke hành vi phù hợp trước review; giữ review Quick độc lập và commit đúng phạm vi. Waiver chỉ bỏ checkpoint duyệt riêng từng plan; giữ nguyên quyền thực thi/handoff của adaptive-coding-flow, kiểm chứng và review. Không chạy luồng song song, Autoresearch, thay config hoặc skill override. #6 được triển khai trước, với một người phụ trách triển khai. Tracker #6 vẫn `refined: false`; chỉ đạo này không âm thầm nâng spec thành đã refined.

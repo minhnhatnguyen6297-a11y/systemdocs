@@ -793,3 +793,21 @@ def test_evaluate_draft_outside_stage_and_invalid_wire(db):
     with pytest.raises(WorkspaceError) as exc:
         _svc(db).evaluate_draft(None, stage, bad)
     assert exc.value.code == "diagram_invalid_state"
+
+
+def test_save_diagram_keeps_year_only_date_precision(db):
+    """Lưu sơ đồ ghi lại `case_state_json.stage` từ `_compose_stage` —
+    năm riêng đã lưu không được đệm thành `01/01`."""
+    case, _people, rows, _prop = _seed_case(db)
+    payload = json.loads(case.case_state_json)
+    for row in payload["stage"]:
+        if row["row_id"] == rows["owner"]:
+            row["ngay_sinh"] = "1950"      # năm riêng đã lưu
+    case.case_state_json = json.dumps(payload, ensure_ascii=False)
+    db.commit()
+
+    _svc(db).save_diagram(case.id, 1, _draft_state(rows))
+
+    persisted = json.loads(db.get(InheritanceCase, case.id).case_state_json)
+    owner = next(r for r in persisted["stage"] if r["row_id"] == rows["owner"])
+    assert owner["ngay_sinh"] == "1950"

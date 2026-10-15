@@ -41,6 +41,10 @@ giữ làm lịch sử và bị chặn tracking-only để không chạy trùng 
 - Sơ đồ: binding thông báo lỗi đã được sửa; có test hồi quy và probe trên
   Electron thật (client stub; không xác minh command IPC/engine), review Quick
   độc lập sạch. [#4](../backlog/bug-diagram-error-messages.md).
+- Ngày Người giữ độ đầy đủ qua lưu/đọc/sửa/xuất Word: `2010` (chỉ năm) không
+  bị đệm thành `01/01/2010`; snapshot hồ sơ là bằng chứng, master chỉ fallback
+  khi snapshot cũ thiếu key. Đã sửa, test hồi quy và export DOCX thật đạt;
+  review độc lập Quick sạch. [#6](../backlog/story-preserve-year-only-precision.md).
 
 Đây là các hướng cần đánh giá theo ticket, không phải lệnh triển khai tự động.
 Danh sách [deferred-work](../implementation-artifacts/deferred-work.md) là

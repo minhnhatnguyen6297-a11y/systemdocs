@@ -252,7 +252,10 @@ class AnalyzeImagesTests(unittest.IsolatedAsyncioTestCase):
                 {"OCR_MODEL": "gpt-4o", "OPENAI_API_KEY": "legacy-key"},
                 clear=True,
             ),
-            mock.patch.object(ocr_ai, "_read_env", return_value={}),
+            # Patch module ĐỊNH NGHĨA: `ocr_ai._read_env` chỉ là re-export;
+            # `_get_api_key`/`_get_model` resolve `_read_env` trong globals
+            # của `ocr_pipeline`, nên patch facade không chặn được dotenv thật.
+            mock.patch.object(ocr_ai._ocr_pipeline, "_read_env", return_value={}),
         ):
             config = await ocr_ai.ocr_config()
 

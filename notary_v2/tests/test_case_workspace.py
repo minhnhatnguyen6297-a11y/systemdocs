@@ -1449,3 +1449,108 @@ def test_update_meta_keeps_committed_stage_and_word_snapshot(db):
                             {"noi_niem_yet": "stale"})
     assert exc.value.code == "workspace_conflict"
     assert build_template_mapping(case)["[Nơi niêm yết]"] == ""
+
+
+# ------------------------------------------- độ đầy đủ ngày (Owner 15/10/2026)
+
+
+def test_year_only_dates_survive_save_reopen_edit_unrelated_and_recommit(db):
+    """`2010` chỉ năm phải phân biệt được với `01/01/2010` qua lưu → mở lại
+    → sửa trường khác → Cập nhật; snapshot không bị đệm thành `01/01`."""
+    case, deceased, prop, _heirs = _make_case(db)
+    people = [
+        _person_row(entity_id=deceased.id, ho_ten="Nguyễn Văn Năm",
+                    ngay_sinh="2010", ngay_chet="2015", ngay_cap="2018",
+                    so_giay_to="001234567890", dia_chi="Số 1 phố Huế"),
+        _person_row(ho_ten="Trần Thị Đầy Đủ", gioi_tinh="Nữ",
+                    ngay_sinh="2010-01-01", so_giay_to="001080012345"),
+    ]
+    assets = [_asset_row(entity_id=prop.id, so_serial="DD123456")]
+    committed = _commit(db, case.id, 1, people, assets)
+    assert [p["ngay_sinh"] for p in _workspace_people(committed)] == [
+        "2010", "2010-01-01"]
+
+    got = _service(db).get(case.id)
+    people_out = _workspace_people(got)
+    assert [p["ngay_sinh"] for p in people_out] == ["2010", "2010-01-01"]
+    assert people_out[0]["ngay_chet"] == "2015"
+    assert people_out[0]["ngay_cap"] == "2018"
+
+    # Mở lại → sửa trường KHÁC → Cập nhật (đường người dùng).
+    stage = got["stage"]
+    stage["people"][0]["dia_chi"] = "Số 2 phố Huế"
+    again = _commit(db, case.id, got["case"]["revision"],
+                    stage["people"], stage["assets"])
+    assert [p["ngay_sinh"] for p in _workspace_people(again)] == [
+        "2010", "2010-01-01"]
+
+    snapshot = json.loads(db.get(InheritanceCase, case.id).case_state_json)
+    assert [row["ngay_sinh"] for row in snapshot["stage"]] == [
+        "2010", "2010-01-01"]
+    assert [row["ngay_chet"] for row in snapshot["stage"]] == ["2015", None]
+    assert [row["ngay_cap"] for row in snapshot["stage"]] == ["2018", None]
+    reopened = _service(db).get(case.id)
+    assert [p["ngay_sinh"] for p in _workspace_people(reopened)] == [
+        "2010", "2010-01-01"]
+
+
+def test_date_key_presence_blocks_master_fallback_but_missing_key_uses_master(db):
+    """Key ngày có mặt (kể cả `null`) → chặn fallback master; key vắng
+    (snapshot cũ) → master, ghi nhận dạng đầy đủ (không đoán năm riêng)."""
+    case, deceased, prop, _heirs = _make_case(db)
+    people = [
+        _person_row(entity_id=deceased.id, ho_ten="Nguyễn Văn Null",
+                    ngay_sinh="1980-02-03", so_giay_to="001234567890"),
+    ]
+    assets = [_asset_row(entity_id=prop.id, so_serial="DD123456")]
+    _commit(db, case.id, 1, people, assets)
+
+    # Master Jan-1 — giới hạn biểu diễn của cột Date; dùng để thử fallback.
+    master = db.get(Customer, deceased.id)
+    master.ngay_sinh = date(1980, 1, 1)
+    master.ngay_chet = date(1990, 1, 1)
+    db.commit()
+
+    payload = json.loads(db.get(InheritanceCase, case.id).case_state_json)
+    row = payload["stage"][0]
+    row["ngay_sinh"] = None       # key có mặt, giá trị null → chặn master
+    row.pop("ngay_chet")          # key vắng → fallback master
+    stored = db.get(InheritanceCase, case.id)
+    stored.case_state_json = json.dumps(payload, ensure_ascii=False)
+    db.commit()
+
+    person = _workspace_people(_service(db).get(case.id))[0]
+    assert person["ngay_sinh"] is None
+    assert person["ngay_chet"] == "1990-01-01"   # đầy đủ, không hạ thành "1990"
+    # Word dùng cùng quyền key-presence: null → rỗng, không đọc master.
+    from services.word_engine import build_template_mapping
+    word_map = build_template_mapping(
+        db.get(InheritanceCase, case.id), static=True)
+    assert word_map["[Người 1 - Ngày sinh]"] == ""
+    assert word_map["[ngaysinh1]"] == ""
+    assert word_map["[ngaychet1]"] == "01/01/1990"
+
+
+def test_migrate_on_read_keeps_year_only_snapshot_value(db):
+    """Migrate-on-read ghi lại stage từ wire — giá trị năm riêng không bị
+    phình thành `01/01` (đường `_persist_migrated`)."""
+    case, deceased, prop, _heirs = _make_case(db)
+    people = [
+        _person_row(entity_id=deceased.id, ho_ten="Nguyễn Văn Năm",
+                    ngay_sinh="2010", so_giay_to="001234567890",
+                    dia_chi="Số 1 phố Huế"),
+    ]
+    assets = [_asset_row(entity_id=prop.id, so_serial="DD123456")]
+    _commit(db, case.id, 1, people, assets)
+
+    payload = json.loads(db.get(InheritanceCase, case.id).case_state_json)
+    del payload["stage"][0]["row_id"]     # row_id thiếu → compose đánh dấu dirty
+    stored = db.get(InheritanceCase, case.id)
+    stored.case_state_json = json.dumps(payload, ensure_ascii=False)
+    db.commit()
+
+    _service(db).get(case.id)
+
+    snapshot = json.loads(db.get(InheritanceCase, case.id).case_state_json)
+    assert snapshot["stage"][0]["ngay_sinh"] == "2010"
+    assert UUID4_RE.match(snapshot["stage"][0]["row_id"])

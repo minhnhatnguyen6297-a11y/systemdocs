@@ -1,6 +1,6 @@
 # Word — xuất văn bản, placeholder và nguồn DOCX
 
-**Cập nhật:** 15/10/2026. Đọc theo luồng nhập nguồn → kiểm tra/lưu → chọn mẫu → xuất. Tab tự tạo/quản lý mẫu lâu dài vẫn chưa đặc tả.
+**Cập nhật:** 16/10/2026. Đọc theo luồng nhập nguồn → kiểm tra/lưu → chọn mẫu → xuất. Tab tự tạo/quản lý mẫu lâu dài vẫn chưa đặc tả.
 
 ## 1. Nguyên tắc và khoảng lệch hiện hành
 
@@ -278,6 +278,11 @@ chủ đất đã chết/người nhận để các consumer legacy không đổ
   Readiness hai bên chỉ kiểm tra kỹ thuật (`word.no_people`,
   `word.no_diagram`, `word.no_assets`, `word.too_many_*`) — không áp điều
   kiện chủ đất/người nhận của thừa kế, không thêm kiểm định pháp lý.
+- Ngày Người render theo đúng độ đầy đủ đã lưu: `YYYY` in nguyên năm
+  (`2010`), `YYYY-MM-DD` in `dd/mm/yyyy`; token `Năm sinh`/`Năm chết` chỉ
+  in năm. Token câu/dòng dựng sẵn không in ISO thô. Năm riêng đã lưu không
+  bị đệm thành `01/01`; hồ sơ cũ thiếu key ngày dùng master và ghi nhận là
+  ngày đầy đủ.
 - **Người được ủy quyền** lấy từ vai trò đã lưu trong `participants.vai_tro`,
   không yêu cầu node Diagram (đại diện hợp lệ có thể không nằm trên sơ đồ;
   người bị ẩn/xóa trên Diagram không tính). Mẫu khai báo nhu cầu qua hậu tố

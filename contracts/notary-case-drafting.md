@@ -304,6 +304,12 @@ backend hiện strip ngoài 10 key). `ho_ten` rỗng/`""` →
   snapshot (kể cả `null`) → dùng snapshot; key vắng → fallback master
   live cho hồ sơ cũ. Hai hồ sơ dùng chung một `Customer` xuất đúng
   bằng chứng riêng đã commit, không bị sửa master kéo lệch nhau.
+- **Độ đầy đủ ngày Người (Owner 15/10/2026):** cùng ngữ nghĩa key-presence áp
+  cho ba field ngày: `workspace_get`/`create`/`commit_stage` emit đúng giá trị
+  đã commit trong snapshot (`YYYY` giữ nguyên năm riêng, không đệm thành
+  `YYYY-01-01`); snapshot vắng key ngày → fallback master và ghi nhận là dạng
+  đầy đủ. Ngày quy ước `date(y,1,1)` chỉ dùng trong tính toán nội bộ, không
+  ghi đè giá trị đã biết.
 
 ### 4.2 `asset_row` — dòng Tài sản Stage
 

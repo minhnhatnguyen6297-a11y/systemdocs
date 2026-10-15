@@ -148,12 +148,23 @@ def _fmt_snapshot_date(value: Any) -> str:
 
 
 def _fmt_birth_or_year(d: Any) -> str:
+    """Ngày/năm sinh cho token và câu dựng sẵn.
+
+    Chuỗi snapshot mang đúng độ đầy đủ đã lưu: `YYYY` → năm, ISO →
+    dd/mm/yyyy (không rò ISO thô), dạng khác giữ nguyên. `date` chỉ đến
+    từ fallback master (hồ sơ cũ thiếu key) → in ĐẦY ĐỦ `dd/mm/yyyy`,
+    không hạ ngày Jan-1 thành chỉ-năm trên đường case.
+    """
     if not d:
         return ""
     if isinstance(d, str):
-        return d
-    if getattr(d, "day", None) == 1 and getattr(d, "month", None) == 1:
-        return str(d.year)
+        text = d.strip()
+        if re.fullmatch(r"\d{4}", text):
+            return text
+        iso = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", text)
+        if iso:
+            return f"{iso.group(3)}/{iso.group(2)}/{iso.group(1)}"
+        return text
     return _fmt_date(d)
 
 
@@ -496,23 +507,34 @@ def _load_case_state(case: Any) -> dict[str, Any]:
     return payload
 
 
-def _word_person_from_stage(stage_person: dict[str, Any]) -> WordPerson:
+def _word_person_from_stage(stage_person: dict[str, Any],
+                            customers: Any = None) -> WordPerson:
     # Stage v3 rows: `row_id` uuid4 (khóa node diagram.state) + `entity_id`
     # int ORM (khóa projection legacy engineInput/engineState). Bản cũ
     # (schemaVersion 1/2) chỉ có `id` = entity id.
     entity = stage_person.get("entity_id")
     if entity is None:
         entity = stage_person.get("id")
+    customer = (customers or {}).get(_safe_text(entity))
+
+    def date_field(key: str) -> Any:
+        """Ngày Người — cùng quyền key-presence với `_snapshot_person_view`:
+        key có trong snapshot (kể cả `null`) → chặn fallback; key vắng
+        (hồ sơ cũ) → master của hồ sơ, `date` render đầy đủ dd/mm/yyyy."""
+        if key in stage_person:
+            return stage_person.get(key) or None
+        return getattr(customer, key, None) if customer is not None else None
+
     return WordPerson(
         id=_safe_text(entity) or None,
         row_id=_safe_text(stage_person.get("row_id")),
         ho_ten=_safe_text(stage_person.get("ho_ten")),
         gioi_tinh=_safe_text(stage_person.get("gioi_tinh")),
-        ngay_sinh=stage_person.get("ngay_sinh") or None,
-        ngay_chet=stage_person.get("ngay_chet") or None,
+        ngay_sinh=date_field("ngay_sinh"),
+        ngay_chet=date_field("ngay_chet"),
         so_giay_to=_safe_text(stage_person.get("so_giay_to")),
         loai_giay_to=_safe_text(stage_person.get("loai_giay_to")),
-        ngay_cap=stage_person.get("ngay_cap") or None,
+        ngay_cap=date_field("ngay_cap"),
         noi_cap=_safe_text(stage_person.get("noi_cap")),
         dia_chi=_safe_text(stage_person.get("dia_chi")),
         loai_dia_chi=_safe_text(stage_person.get("loai_dia_chi", stage_person.get("place_of_origin"))),
@@ -650,9 +672,19 @@ def _build_word_persons(case: Any) -> _WordPersonsBuild:
     owner = getattr(case, "nguoi_chet", None)
 
     if has_state and isinstance(stage, list):
+        # Khách hàng của hồ sơ theo `id` entity (nguồn giống
+        # `_pick_core_people`) — chỉ dùng làm fallback 3 field ngày khi
+        # snapshot cũ thiếu key, không đổi thứ tự/row_id/nhóm Người.
+        customers_by_id: dict[str, Any] = {}
+        for candidate in [owner] + [
+                getattr(p, "customer", None)
+                for p in getattr(case, "participants", []) or []]:
+            if candidate is not None:
+                customers_by_id.setdefault(
+                    _safe_text(getattr(candidate, "id", "")), candidate)
         for item in stage:
             if isinstance(item, dict):
-                persons.append(_word_person_from_stage(item))
+                persons.append(_word_person_from_stage(item, customers_by_id))
 
     # Đảm bảo ngườ chết của hồ sơ luôn có mặt trong danh sách để xử lý chủ đất.
     # two_party: nguoi_chet chỉ là anchor kỹ thuật (không có ngữ nghĩa
@@ -1145,21 +1177,6 @@ def _snapshot_asset_view(item: dict[str, Any]) -> Any:
     )
 
 
-def _snap_date_value(value: Any) -> Any:
-    """Ngày trong snapshot person (ISO 'YYYY-MM-DD' hoặc năm 'YYYY') →
-    `date` để _fmt_date/_fmt_birth_or_year render đồng nhất với đường
-    master. Không parse được → giữ chuỗi gốc (pass-through)."""
-    if not isinstance(value, str) or not value:
-        return value
-    text = value.strip()
-    try:
-        if re.fullmatch(r"\d{4}", text):
-            return date(int(text), 1, 1)
-        return date.fromisoformat(text[:10])
-    except ValueError:
-        return value
-
-
 def _snapshot_person_view(customer: Any, row: dict) -> Any:
     """View Người cho slot `[Tên N]`…`[noicapN]` — đọc bằng chứng đã
     commit trong snapshot `stage[]` của chính hồ sơ thay vì master
@@ -1169,7 +1186,12 @@ def _snapshot_person_view(customer: Any, row: dict) -> Any:
 
     Per-key presence như `_snap_meta`: key có trong snapshot → dùng giá
     trị snapshot (kể cả null chủ ý → rỗng); key vắng (snapshot cũ) →
-    fallback master live."""
+    fallback master live.
+
+    Ngày giữ nguyên giá trị đã commit (`YYYY` | `YYYY-MM-DD`) — formatter
+    `_fmt_date`/`_fmt_year`/`_fmt_birth_or_year` render theo đúng độ đầy
+    đủ; không ép về `date(y,1,1)` vì sẽ làm `2010` ra `01/01/2010`.
+    Fallback master là `date` → render đầy đủ dd/mm/yyyy."""
 
     def pick(key: str) -> Any:
         return row[key] if key in row else getattr(customer, key, None)
@@ -1178,10 +1200,10 @@ def _snapshot_person_view(customer: Any, row: dict) -> Any:
         id=getattr(customer, "id", None),
         ho_ten=_safe_text(pick("ho_ten")),
         gioi_tinh=_safe_text(pick("gioi_tinh")),
-        ngay_sinh=_snap_date_value(pick("ngay_sinh")),
-        ngay_chet=_snap_date_value(pick("ngay_chet")),
+        ngay_sinh=pick("ngay_sinh"),
+        ngay_chet=pick("ngay_chet"),
         so_giay_to=_safe_text(pick("so_giay_to")),
-        ngay_cap=_snap_date_value(pick("ngay_cap")),
+        ngay_cap=pick("ngay_cap"),
         noi_cap=_safe_text(pick("noi_cap")),
         dia_chi=_safe_text(pick("dia_chi")),
         loai_giay_to=_safe_text(pick("loai_giay_to")),

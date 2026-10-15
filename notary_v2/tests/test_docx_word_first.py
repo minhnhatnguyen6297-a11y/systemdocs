@@ -785,3 +785,21 @@ def test_eight_sources_persist_ninth_rejects_transaction(db, tmp_path):
     loaded = service.get(cid)
     assert loaded['case']['revision'] == saved['revision']
     assert loaded['stage']['people'][0]['ho_ten'] != 'Ninth must not save'
+
+
+def test_year_only_source_date_survives_commit_and_reload(db, tmp_path):
+    """Nguồn chỉ có năm sinh → gợi ý giữ `1980`; commit rồi mở lại vẫn
+    `1980` (không bị đệm thành `01/01/1980`)."""
+    doc = Document(io.BytesIO(fixture_bytes()))
+    for p in doc.paragraphs:
+        for run in p.runs:
+            run.text = run.text.replace('01/02/1980', '1980')
+    stream = io.BytesIO(); doc.save(stream); content = stream.getvalue()
+    _, _, service, data = reviewed_case(db, tmp_path / 'case', content)
+    person = data['stage']['people'][0]
+    assert person['ngay_sinh'] == '1980'
+    saved = service.commit_stage(
+        data['case']['id'], data['case']['revision'], data['stage'],
+        docx_import=data['docx_import'])
+    assert saved['stage']['people'][0]['ngay_sinh'] == '1980'
+    assert service.get(data['case']['id'])['stage']['people'][0]['ngay_sinh'] == '1980'
