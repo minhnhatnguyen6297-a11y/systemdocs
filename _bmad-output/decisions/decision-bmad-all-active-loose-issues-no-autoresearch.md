@@ -28,3 +28,11 @@ Owner, 2026-10-15:
 > “duyệt, triển khai”
 
 Áp dụng cho plan #28 hiện tại; không phê duyệt trước quyết định nghiệp vụ chưa nêu hay plan tương lai.
+
+## Phê duyệt plan #4
+
+Owner, 2026-10-16:
+
+> “trien khai”
+
+Áp dụng riêng cho plan #4 hiện tại đã được trình bày; không phê duyệt trước quyết định nghiệp vụ chưa nêu hoặc bất kỳ plan issue tương lai nào.

@@ -45,7 +45,7 @@ const TWO_PARTY = 'two_party';
 // Thong diep loi than thien tu error-catalog (MIN-136) — fallback raw
 // khi module chua nap (node --test nap tung file doc lap).
 const relErrText = (typeof window !== 'undefined' && window.G1_NOTARY_ERRORS)
-  ? window.G1_NOTARY_ERRORS.relErrText
+  ? window.G1_NOTARY_ERRORS.errText
   : (e) => `${e.code}: ${e.message}`;
 
 // Kich thuoc layout canvas (px logic — scale boi zoom, khong co chu).

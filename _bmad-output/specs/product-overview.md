@@ -1,6 +1,6 @@
 # Sổ tay sản phẩm theo màn hình
 
-**Cập nhật:** 15/10/2026 · **Dùng để:** giúp owner và coordinator cùng nhìn
+**Cập nhật:** 16/10/2026 · **Dùng để:** giúp owner và coordinator cùng nhìn
 vào sản phẩm, giao diện và việc còn dở khi bắt đầu phiên làm việc.
 
 Đọc [nền sản phẩm và khái niệm chung](README.md) trước để hiểu người dùng,
@@ -38,6 +38,9 @@ giữ làm lịch sử và bị chặn tracking-only để không chạy trùng 
   chỉ thửa đang thiếu trong fixture.
 - Giúp tìm mẫu Word và biết chỗ điền dữ liệu nào được hỗ trợ.
 - Upload: đã bỏ theo dõi kết quả Lưu, runtime cutover 15/10/2026. [#28](../backlog/story-upload-web-official-sot-cutover.md).
+- Sơ đồ: binding thông báo lỗi đã được sửa; có test hồi quy và probe trên
+  Electron thật (client stub; không xác minh command IPC/engine), review Quick
+  độc lập sạch. [#4](../backlog/bug-diagram-error-messages.md).
 
 Đây là các hướng cần đánh giá theo ticket, không phải lệnh triển khai tự động.
 Danh sách [deferred-work](../implementation-artifacts/deferred-work.md) là

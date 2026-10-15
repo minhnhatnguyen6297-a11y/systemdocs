@@ -1,6 +1,6 @@
 # Quy tắc sơ đồ Hai bên và Thừa kế
 
-**Cập nhật:** 15/10/2026. Quy tắc dưới đây giữ contract đã chốt. Các thiết kế tính thừa kế mở rộng, engine v2 và case-state cũ vẫn chưa được duyệt toàn bộ; chuyển vào lịch sử không phải loại bỏ ý tưởng hay duyệt triển khai.
+**Cập nhật:** 16/10/2026. Quy tắc dưới đây giữ contract đã chốt. Các thiết kế tính thừa kế mở rộng, engine v2 và case-state cũ vẫn chưa được duyệt toàn bộ; chuyển vào lịch sử không phải loại bỏ ý tưởng hay duyệt triển khai.
 
 ## 1. Luồng chung
 
@@ -195,6 +195,11 @@ ngược Stage/Pool/Diagram.
   lưu bản nháp này, hiển thị rõ phần còn thiếu. Xuất Word vẫn theo điều kiện
   mode/mẫu hiện hành; không thêm lệnh chặn chỉ vì `incomplete`.
 - Engine lỗi: không xóa state cũ.
+- Hiển thị lỗi dùng formatter của danh mục lỗi (`errText` ở
+  `error-catalog.js`); Sơ đồ đọc đúng export này khi script nạp theo
+  `index.html`. Ghi chú runtime 16/10/2026: binding `relErrText → errText` đã
+  khôi phục, nên lỗi evaluate/danh sách lỗi/lưu hiện thông điệp thân thiện;
+  ghi chú này chỉ mô tả hiện trạng runtime, không đổi quy tắc nghiệp vụ trên.
 - Hồ sơ legacy: migrate khi đọc theo rule đã có; GET không âm thầm ghi DB.
 
 ### 9.8. Câu hỏi và lịch sử
