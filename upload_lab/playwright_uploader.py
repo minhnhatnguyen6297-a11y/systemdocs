@@ -31,7 +31,6 @@ try:
         connect_registry,
         fetch_registry_records_for_run,
         load_manifest,
-        mark_records_uploaded_success,
         now_iso,
         update_registry_record_by_id,
     )
@@ -42,7 +41,6 @@ except ImportError:  # pragma: no cover
         connect_registry,
         fetch_registry_records_for_run,
         load_manifest,
-        mark_records_uploaded_success,
         now_iso,
         update_registry_record_by_id,
     )
@@ -80,11 +78,9 @@ except ImportError:  # pragma: no cover
 
 QUEUE_STATUSES = ("extracted", "upload_failed", "prepared_dry_run", "prepared_partial")
 PREPARE_QUEUE_STATUSES = ("extracted", "upload_failed")
-PREPARED_QUEUE_STATUSES = ("prepared_dry_run", "prepared_partial")
 ACCESS_TOKEN_STORAGE_KEY = "access_token"
 LOGIN_PATH = "/dang-nhap"
 CREATE_PATH = "/ho-so-cong-chung/tao-moi-nhanh"
-SAVE_API_PATH = "/api/hoso"
 MANUAL_LOGIN_TIMEOUT_SECONDS = 300
 PLAYWRIGHT_MISSING_MESSAGE = (
     "Chua cai Playwright. Scan/Extract van dung duoc. Muon upload, hay chay "
@@ -148,12 +144,6 @@ class PreparedBrowserTab:
     contract_no: str
     page: object
     initial_url: str
-    network_log_path: Path
-    save_response_ok: bool = False
-    # strict_save_evidence (upload.workflow.v1): tab roi trang tao moi
-    # nhung chua co POST /api/hoso 2xx → bao closed/uncertain DUNG MOT
-    # LAN; tab van duoc theo doi — POST 2xx den sau van finalize duoc.
-    reported_uncertain: bool = False
 
 
 def _fold_value(text: str) -> str:
@@ -760,17 +750,6 @@ def load_upload_queue(
     if limit is not None:
         records = records[:limit]
     return manifest, records, total_pending
-
-
-def finalize_uploaded_records(record_ids: list[int], *, working_dir: Path = BASE_DIR) -> int:
-    if not record_ids:
-        return 0
-    conn = connect_registry(working_dir / REGISTRY_DB_PATH.name)
-    try:
-        mark_records_uploaded_success(conn, [int(rid) for rid in record_ids])
-    finally:
-        conn.close()
-    return len(record_ids)
 
 
 def build_upload_form_data(
@@ -1913,113 +1892,35 @@ class NamDinhUploaderSession:
         self,
         record: UploadRecord,
         page,
-        artifact_dir: Path,
     ) -> None:
         record_id = int(record.record_id)
-        network_log_path = artifact_dir / "network.jsonl"
         tab = PreparedBrowserTab(
             record_id=record_id,
             contract_no=str(record.contract_no),
             page=page,
             initial_url=str(page.url or self.settings.create_url),
-            network_log_path=network_log_path,
         )
         self.prepared_pages[record_id] = tab
         self._prepared_record_ids.add(record_id)
 
-        def handle_response(response) -> None:
-            try:
-                request = response.request
-                method = str(request.method or "").upper()
-                url = str(response.url or "")
-                status = int(response.status or 0)
-                path = urllib.parse.urlsplit(url).path.rstrip("/")
-                if method == "POST" and path == SAVE_API_PATH:
-                    self._append_network_event(
-                        network_log_path,
-                        method=method,
-                        url=url,
-                        status=status,
-                        record_id=record_id,
-                    )
-                    if 200 <= status < 300:
-                        tab.save_response_ok = True
-            except Exception:
-                pass
+    def poll_prepared_pages(self) -> dict[str, list[int]]:
+        """Trang thai tai nguyen cua cac tab da dien — khong ket luan Luu.
 
-        try:
-            page.on("response", handle_response)
-        except Exception:
-            pass
-
-    def _page_left_create_route(self, tab: PreparedBrowserTab) -> bool:
-        current_url = str(getattr(tab.page, "url", "") or "")
-        current = urllib.parse.urlsplit(current_url)
-        base = urllib.parse.urlsplit(self.settings.base_url)
-        current_path = current.path.rstrip("/")
-        create_path = urllib.parse.urlsplit(self.settings.create_url).path.rstrip("/")
-        return bool(
-            current.scheme in {"http", "https"}
-            and current.netloc == base.netloc
-            and current_path != create_path
-            and current_path != LOGIN_PATH
-        )
-
-    def poll_prepared_pages(
-        self,
-        strict_save_evidence: bool = False,
-    ) -> dict[str, list[int]]:
-        saved_ids: list[int] = []
+        Chi bao tab con mo va tab da dong; khong doc POST/navigation,
+        khong ghi registry, khong dong tab thay nguoi dung."""
         closed_ids: list[int] = []
         for record_id, tab in list(self.prepared_pages.items()):
-            page = tab.page
-            if self._page_is_closed(page):
-                self.prepared_pages.pop(record_id, None)
-                self._prepared_record_ids.discard(record_id)
-                closed_ids.append(record_id)
-                self.log(
-                    f"[UPLOAD] Tab {tab.contract_no} da dong khi chua nhan duoc tin hieu Luu; "
-                    "ho so co the duoc chuan bi lai."
-                )
+            if not self._page_is_closed(tab.page):
                 continue
-
-            try:
-                # A small Playwright call lets the sync API dispatch response events.
-                page.evaluate("() => document.readyState")
-            except Exception:
-                continue
-
-            if not tab.save_response_ok and not self._page_left_create_route(tab):
-                continue
-
-            if strict_save_evidence and not tab.save_response_ok:
-                # v1: chi POST /api/hoso 2xx la bang chung Luu. Roi trang
-                # tao moi khong co POST = ket qua chua ro → bao
-                # closed/uncertain MOT LAN (needs_reconcile) nhung VAN
-                # giu tab trong prepared_pages — neu POST 2xx den sau,
-                # nhanh saved ben duoi van finalize binh thuong.
-                if not tab.reported_uncertain:
-                    tab.reported_uncertain = True
-                    closed_ids.append(record_id)
-                    self.log(
-                        f"[UPLOAD] {tab.contract_no} roi trang tao moi "
-                        "nhung khong co POST Luu — can doi chieu"
-                    )
-                continue
-
-            finalize_uploaded_records([record_id], working_dir=self.working_dir)
             self.prepared_pages.pop(record_id, None)
             self._prepared_record_ids.discard(record_id)
-            saved_ids.append(record_id)
-            signal = "POST /api/hoso 2xx" if tab.save_response_ok else "trang da chuyen sau khi Luu"
-            self.log(f"[UPLOAD] Da nhan dien Luu {tab.contract_no} ({signal}).")
-            try:
-                page.close()
-            except Exception:
-                pass
+            closed_ids.append(record_id)
+            self.log(
+                f"[UPLOAD] Tab {tab.contract_no} da dong; tien do da chuan bi "
+                "cua ho so van giu theo luot."
+            )
 
         return {
-            "saved_record_ids": saved_ids,
             "closed_record_ids": closed_ids,
             "open_record_ids": sorted(self._prepared_record_ids),
         }
@@ -2075,7 +1976,7 @@ class NamDinhUploaderSession:
             page.wait_for_timeout(self.settings.post_prepare_delay_ms)
 
         if getattr(record, "record_id", None) is not None:
-            self._register_prepared_page(record, page, artifact_dir)
+            self._register_prepared_page(record, page)
 
         return {
             "status": "prepared_partial" if partial else "prepared_dry_run",
@@ -2131,18 +2032,9 @@ class NamDinhUploaderSession:
             requester_lookup=requester_lookup,
             cong_chung_vien=cong_chung_vien,
             thu_ky=thu_ky,
-            statuses=QUEUE_STATUSES,
+            statuses=PREPARE_QUEUE_STATUSES,
         )
         run_id = str(manifest["run_id"])
-        records = [
-            record
-            for record in records
-            if record.status in PREPARE_QUEUE_STATUSES
-            or (
-                record.status in PREPARED_QUEUE_STATUSES
-                and record.record_id not in self._prepared_record_ids
-            )
-        ]
         filtered_records, duplicate_records = split_records_by_existing_contract_nos(
             records,
             set(exclude_contract_nos or set()),
@@ -2282,7 +2174,7 @@ class NamDinhUploaderSession:
                 "message": (
                     f"Da chuan bi {prepared_count}/{filtered_pending} ho so."
                     + (f" Da loai {len(duplicate_records)} ho so trung tren web." if duplicate_records else "")
-                    + " Hay ra soat va bam Luu tren web; app se tu cap nhat."
+                    + " Hay ra soat va tu bam Luu tren web."
                 ),
             }
             (artifact_dir / "upload_manifest.json").write_text(

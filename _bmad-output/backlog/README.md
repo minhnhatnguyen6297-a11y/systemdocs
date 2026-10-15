@@ -1,6 +1,6 @@
 # Catalog issue — 15/10/2026
 
-**Draft, chưa duyệt triển khai hoặc publish.** Có 27 ID leaf #2–#28; 25 leaf active đều `refined: false`, còn #11/#26 được giữ nguyên ID ở trạng thái dropped. #1 là lịch sử và bị chặn tracking-only. Không đổi active initiative. [Quyết định cách theo dõi](../decisions/decision-issues-reconciliation-20261015.md). Chưa kết luận hành vi runtime nào đã sửa.
+**Catalog status (2026-10-16):** #28 is built within its approved scope; this does not approve or complete the rest of the backlog or publish the catalog. Other issue statuses remain as listed; #1 is history/tracking-only and #11/#26 remain dropped. No active initiative change. [Quyết định cách theo dõi](../decisions/decision-issues-reconciliation-20261015.md). The separate pre-existing #28 UI `file_token` blocker remains deferred and is not claimed fixed.
 
 ## Ưu tiên, thứ tự và điều kiện bắt đầu
 
@@ -34,7 +34,7 @@ P1/P2 là ưu tiên đề xuất, không phải severity hay thứ tự ID. Cầ
 | C24 / #25 | [Đổi loại hồ sơ đã lưu theo quy tắc đã chốt](story-saved-case-type-conversion.md) | khoảng lệch đã chọn | P2 | #3 | draft có gate; xem dưới |
 | C25 / #26 | [Kiểm chứng ý nghĩa tín hiệu Lưu trên portal thật](spike-upload-real-save-signal-validation.md) | bằng chứng — dropped | P1 lịch sử | không | DROPPED; không còn là gate ngữ nghĩa portal cho cutover |
 | C26 / #27 | [Đối chiếu văn bản chuyển một phần và bãi bỏ hành chính cùng ngày](spike-administrative-same-day-evidence.md) | bằng chứng | P2 | không | chỉ nghiên cứu văn bản, không đổi thuật toán |
-| C27 / #28 | [Bỏ theo dõi kết quả Lưu và giữ tiến độ chuẩn bị theo lượt](story-upload-web-official-sot-cutover.md) | khoảng lệch theo quyết định owner | P1 | không | draft/unrefined; semantics đã chốt, implementation chưa được duyệt |
+| C27 / #28 | [Bỏ theo dõi kết quả Lưu và giữ tiến độ chuẩn bị theo lượt](story-upload-web-official-sot-cutover.md) | khoảng lệch theo quyết định owner | P1 | không | built (2026-10-16; UI E2E remains blocked by the deferred pre-existing `file_token` mismatch) |
 
 Khuyến nghị hiện hành, không phải lệnh triển khai: (1) #28 cutover đã được owner chốt; tiếp theo #4 formatter, #6 độ đầy đủ ngày, #7 field extraction, #5 lưu incomplete và #17 nền desktop — #11 cũ đã dropped; vị trí đầu của #28 là đề xuất điều phối, không phải phần của lựa chọn A ban đầu; (2) #2 workspace, #9 nghiệm thu Word thật, #24 readiness điền dần; (3) #22 parity rồi #23 khi #8 có đáp án; (4) #25 khi #3 chốt semantics. Các việc nguồn/docs/quyết định độc lập có thể được đánh giá cùng lúc. Cần refinement/approval trước implementation.
 
@@ -60,7 +60,7 @@ Khuyến nghị hiện hành, không phải lệnh triển khai: (1) #28 cutover
 - **C24 / #25:** nhu cầu đổi loại đã được report yêu cầu; chỉ chờ semantics #3, nhất là giữ hay reset gán người. Giữ runtime bất biến tới khi contract chuyển đổi duyệt.
 - **C25 / #26 — DROPPED:** quyết định owner bỏ theo dõi/diễn giải kết quả Lưu; không cần kiểm chứng host/body/từng trường làm gate cho contract hoặc runtime cutover. Nội dung spike và bằng chứng cũ được giữ làm lịch sử, không phải yêu cầu hiện hành.
 - **C26 / #27:** văn bản nào chứng minh chuyển một phần và bãi bỏ phối hợp cùng ngày? Thiếu nguồn giữ chưa xác minh; không chọn thứ tự nội ngày hoặc cấm toàn bộ cùng ngày.
-- **C27 / #28:** quyết định hành vi đã rõ; leaf cutover còn draft/unrefined, chưa duyệt bắt đầu. Không có câu hỏi owner A/B; chỉ refinement implementation trước khi có thể xin phép thực hiện.
+- **C27 / #28:** built within its approved scope (2026-10-16); the pre-existing picker/reference `file_token` mismatch still blocks UI E2E and remains deferred. No unresolved business decision.
 
 ## Ánh xạ đủ bảy report hiện tại
 

@@ -17,6 +17,14 @@ Autoresearch bị tắt theo yêu cầu này: không khởi tạo experiment, kh
 
 ## Ranh giới
 
-Đây là quyền tiếp tục quy trình, không phải tuyên bố plan đã được duyệt tại checkpoint hoặc runtime đã implement/nghiệm thu. BMAD giữ route/checkpoint/review và kiểm chứng riêng cho từng issue; với #28, smoke app/engine thật trên fixture cục bộ, browser cô lập vẫn bắt buộc trước review/complete theo plan chuẩn. Nếu phát sinh quyết định nghiệp vụ thực sự còn thiếu, dừng và hỏi owner; không tự chọn thay.
+Owner đã phê duyệt bản plan #28 hiện tại để triển khai; phạm vi phê duyệt không bao gồm quyết định nghiệp vụ chưa nêu hoặc các plan issue tiếp theo. Nếu gặp lựa chọn ảnh hưởng hành vi còn thiếu, dừng và hỏi owner.
 
 Quyết định này cập nhật phần phạm vi/thứ tự hiện hành của [quyết định ticket rời trước](decision-p1-sequential-loose-tickets.md), không xóa lịch sử. [Quyết định SOT Upload](decision-upload-web-sot-without-save-tracking.md) tiếp tục là nguồn hành vi #28; [plan chuẩn #28](../backlog/story-upload-web-official-sot-cutover-plan.md) vẫn giữ trạng thái thực tế của nó.
+
+## Phê duyệt plan #28
+
+Owner, 2026-10-15:
+
+> “duyệt, triển khai”
+
+Áp dụng cho plan #28 hiện tại; không phê duyệt trước quyết định nghiệp vụ chưa nêu hay plan tương lai.

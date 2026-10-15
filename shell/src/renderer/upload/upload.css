@@ -23,9 +23,9 @@
   min-height: 100%;
 }
 
-/* [hidden] phai thang display rule cua ul-* (.ul-reconcile/.ul-error/
-   .ul-meta/.ul-panel/.pill deu set display — [hidden] cua UA thua
-   specificity → element "an" van hien). Rule scope nay giu semantic an. */
+/* [hidden] phai thang display rule cua ul-* (.ul-error/.ul-meta/.ul-panel/
+   .pill deu set display — [hidden] cua UA thua specificity → element "an"
+   van hien). Rule scope nay giu semantic an. */
 .upload-lab [hidden] { display: none; }
 
 .ul-eng:empty, .ul-notice:empty { display: none; }
@@ -173,7 +173,6 @@ table.ul-grid td.num, table.ul-grid th.num {
   font-variant-numeric: tabular-nums;
 }
 table.ul-grid tbody tr.ul-row-selected td { background: var(--accent-soft); }
-table.ul-grid tbody tr.ul-row-reconcile td { background: var(--warn-bg); }
 /* "dang mo tren web" = danh dau canh, giu nen trung tinh de phan biet
    voi dong da chon (accent-soft). */
 table.ul-grid tbody tr.ul-row-open td:first-child {
@@ -216,16 +215,7 @@ table.ul-grid td.ul-path { max-width: 1px; }
   display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
 }
 
-/* ---------- banner doi chieu (ke duoi thanh thao tac, tren bang) ---- */
-.ul-reconcile {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  padding: 8px 12px; border-radius: var(--r-ctl);
-  background: var(--warn-bg); color: var(--warn-text);
-  font-size: var(--fs-small);
-}
-.ul-reconcile-text { flex: 1; min-width: 200px; }
-.ul-reconcile-hint { font-size: var(--fs-small); opacity: 0.85; }
-.ul-reconcile-btn { flex-shrink: 0; }
+/* ---------- loi chuẩn bị hiển thị trên bảng ---------- */
 .ul-prepare-error { margin-top: 0; }
 
 /* ---------- tien do: 2 thanh rieng, label khong day layout ---------- */

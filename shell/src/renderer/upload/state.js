@@ -84,8 +84,6 @@
       selectedIds: new Set(),
       missingInExcelIds: new Set(),
       issueFilterBackup: null,    // Set — co gia tri = dang loc so loi
-      savedIds: new Set(),        // da xac minh Luu tren portal → roi bang
-      needsReconcileIds: new Set(),
       activeUploadIds: new Set(), // tap record_ids GUI o dot prepare gan nhat
                                   // (Qt: activeUploadSelectedRecordIds) —
                                   // "Tiep tuc" gui lai dung tap nay, engine
@@ -115,7 +113,7 @@
                                   // stomp khi re-adopt moi refresh)
       prepareError: null,         // loi terminal/partial cua upload.prepare
       login: null,                // {status, checked_at}
-      sessionTabs: null,          // {open, saved, closed, unknown}
+      sessionTabs: null,          // {open_record_ids, closed_record_ids, unknown_record_ids}
 
       // Job tracking: moi truong *JobId tham gia vao accepted-job scope.
       scanJobId: null,
@@ -130,7 +128,6 @@
       reviewJobId: null,
       staffJobId: null,
       prefsJobId: null,
-      reconcileJobId: null,
       catalogLoaded: false,       // upload.websites da thanh cong (ke ca rong)
       engineInstanceId: null,     // sidecar instance da thay — doi → fetch lai
       wsTried: false,             // workspace_get lan dau da thanh cong
@@ -206,8 +203,6 @@
     state.hasExcel = false;
     state.uploadSessionActive = false;
     state.remaining = 0;
-    state.savedIds = new Set();
-    state.needsReconcileIds = new Set();
     state.activeUploadIds = new Set();
     state.openTabIds = new Set();
     state.prepareError = null;
@@ -259,10 +254,6 @@
     if (ws.queue_revision !== undefined) {
       state.queueRevision = ws.queue_revision;
     }
-    if (Array.isArray(ws.needs_reconcile_record_ids)) {
-      state.needsReconcileIds =
-        new Set(ws.needs_reconcile_record_ids.map(Number));
-    }
     if (Array.isArray(ws.active_job_ids)) {
       state.knownJobIds = new Set(ws.active_job_ids);
     }
@@ -283,11 +274,6 @@
     state.missingInExcelIds = new Set();
     state.issueFilterBackup = null;
     state.queueStaleFor = null;
-    state.savedIds = new Set();
-    // needsReconcileIds la pham vi WEBSITE (snapshot/§6.15), khong phai
-    // run-scoped: quet run moi khong duoc xoa — ho so chua ro da Luu phai
-    // con hien canh bao cho toi khi doi chieu xong. Doi website moi xoa
-    // (clearWebsiteScope xu ly rieng).
     state.activeUploadIds = new Set();
     state.openTabIds = new Set();
     state.lastPrepareIds = null;
@@ -306,14 +292,12 @@
     state.sessionStartedAt = null;
     state.queueJobId = null;
     state.prepareJobId = null;
-    state.reconcileJobId = null;
     return state;
   }
 
   // Ap result kind upload_queue. Giu co che Qt (render_scan_classification):
   // - hang moi xuat hien: chon theo `selected` mac dinh cua backend;
-  // - hang da co: giu lua chon nguoi dung (khong tu chon/bo chon lai);
-  // - hang da xac minh Luu (savedIds): bo khoi bang va khoi selection.
+  // - hang da co: giu lua chon nguoi dung (khong tu chon/bo chon lai).
   function applyQueue(state, q, opts) {
     const o = opts || {};
     const rows = (q && Array.isArray(q.folder_rows)) ? q.folder_rows : [];
@@ -334,16 +318,8 @@
       }
     }
 
-    // Ho so da xac minh Luu thanh cong roi khoi bang (spec §3).
-    const removed = new Set(
-      [...(state.savedIds || []), ...((o.removedIds) || [])].map(Number));
-    const visibleRows = rows.filter((r) => !removed.has(Number(r.record_id)));
-    const visibleIds = new Set(visibleRows.map((r) => Number(r.record_id)));
-    for (const id of [...sel]) {
-      if (!visibleIds.has(id)) sel.delete(id);
-    }
-
-    state.rowIds = visibleIds;
+    const visibleRows = rows;
+    state.rowIds = newIds;
     state.selectedIds = sel;
     state.queue = Object.assign({}, q, { folder_rows: visibleRows });
     if (q.queue_revision != null) state.queueRevision = q.queue_revision;

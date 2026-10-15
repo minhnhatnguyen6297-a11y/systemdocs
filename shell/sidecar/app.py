@@ -237,10 +237,10 @@ def cancel_job(job_id: str):
 def shutdown():
     def _stop():
         # Drain job truoc (cancel engine_shutdown + persist terminal),
-        # roi cho browser worker reconcile/dong an toan — tab chua xac
-        # minh Luu duoc giu dau needs_reconcile, khong coi la saved.
+        # roi cho browser worker poll trang thai tab + dong an toan —
+        # quyen so huu tab duoc xa; khong suy ket qua Luu nao.
         # Worst-case ≈ 0.2 (timer) + 2 (drain) + ~2 (worker shutdown —
-        # reconcile+join chia budget) + ~0.3 (uvicorn exit) ≈ 4.5s; phai
+        # poll+join chia budget) + ~0.3 (uvicorn exit) ≈ 4.5s; phai
         # nam trong SHUTDOWN_GRACE_MS (shell/src/main/config.js).
         store.drain(timeout=2)
         try:

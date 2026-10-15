@@ -216,8 +216,11 @@ Các bước lỗi phải nêu nguyên nhân và cách thử lại; không bắt
   thức đang nạp. Tải/nạp Excel giữ nguyên là thao tác do người dùng khởi
   tạo; không có fetch tự động hoặc bước đối chiếu bắt buộc để phục hồi kết
   quả Lưu.
-- **Hiện trạng runtime (chưa cutover):** code còn theo dõi kết quả Lưu và
-  có giao diện đối chiếu; runtime chưa đổi. Xem draft
+- **Hiện trạng runtime (đã cutover 15/10/2026):** engine/sidecar/store/UI
+  không còn suy kết quả Lưu và không còn đọc/ghi/tạo mới trạng thái đối
+  chiếu (`upload.reconcile` đã gỡ); dữ liệu di sản (bảng/cột cũ nếu có
+  trong DB) giữ nguyên, không xóa. Tiến độ chuẩn bị theo lượt quét được
+  giữ theo trạng thái registry trong `run_id`. Xem ticket
   [#28](../../backlog/story-upload-web-official-sot-cutover.md).
 - Contract [workflow](../../../contracts/upload-workflow.md) vẫn Draft; spec
   này không nâng trạng thái duyệt của contract.
@@ -244,8 +247,8 @@ IFilter khi Word đang mở và sự kiện ổ mạng phải được đo trên
   năm/khoảng ngày và thời điểm nạp. Đối chiếu đầu vào không suy từ phản hồi
   cục bộ.
 - Owner đã chốt bỏ theo dõi kết quả Lưu suy từ browser và chấp nhận rủi ro
-  người dùng có thể không Lưu. Code còn khác quy tắc này; cần cutover riêng,
-  không yêu cầu xác minh kết quả lưu trên portal.
+  người dùng có thể không Lưu. Runtime đã cutover theo quy tắc này
+  (15/10/2026); không yêu cầu xác minh kết quả lưu trên portal.
 - Chi tiết màu/kích thước riêng của Upload trong bản cũ còn Proposed; không nâng thành đã duyệt. Bộ token giao diện chung giữ hiệu lực.
 
 ## 6. Tra cứu

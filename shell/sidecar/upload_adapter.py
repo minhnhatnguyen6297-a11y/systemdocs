@@ -487,15 +487,8 @@ def _v1_boundary(fn):
                 exc.retryable = False
                 exc.next_action = "contact_admin"
             elif exc.code == "engine_unavailable":
-                if (exc.details or {}).get("needs_reconcile_record_ids"):
-                    # Ho so chua ro da Luu (MIN-69 T5): KHONG auto-retry
-                    # mu — phai upload.reconcile truoc, retry co chu y la
-                    # command moi. Giu marker trong details cho client.
-                    exc.retryable = False
-                    exc.next_action = None
-                else:
-                    exc.retryable = True
-                    exc.next_action = "retry"
+                exc.retryable = True
+                exc.next_action = "retry"
             elif exc.code == "file_scope_not_supported":
                 exc.next_action = "pick_files"
             elif exc.next_action is not None \
@@ -833,8 +826,8 @@ def _canonical_contract_no(value) -> str:
     (`scan_classification_service._canonical_contract_no`): normalize roi
     cat so 0 dau — "0101/2026" ≡ "101/2026".
 
-    queue_get danh dau "da co trong Excel" bang canonical nay; prepare/
-    reconcile PHAI dung cung mot dang, khong dung
+    queue_get danh dau "da co trong Excel" bang canonical nay; prepare
+    PHAI dung cung mot dang, khong dung
     `normalize_contract_no_for_compare` tho (giu so 0 → lech hai phia →
     upload trung)."""
     mod = import_engine_module(
@@ -1189,8 +1182,8 @@ def upload_queue_get(job, payload):
 #   truong hop khac, khong bao gio danh thuc nham.
 # - Status/snapshot doc bo nho do browser thread cap nhat — khong spawn
 #   thread, khong enqueue op, khong tao browser ngam.
-# - Save chi duoc ghi nhan qua POST /api/hoso 2xx (engine xac minh);
-#   tab dong thieu bang chung → needs_reconcile, khong bao gio 'da luu'.
+# - Tab chi la tai nguyen: open/closed/unknown. Khong doc POST/dieu
+#   huong/dong tab de suy ket qua Luu (quyet dinh owner 15/10/2026).
 # =====================================================================
 
 _SESSION_START_V1_KEYS = frozenset({
@@ -1208,8 +1201,6 @@ _PREPARE_V1_KEYS = frozenset({
     "workflow_version", "website_id", "browser_id", "run_id", "audit_id",
     "queue_revision", "record_ids", "chunk_size",
     "cong_chung_vien", "thu_ky"})
-_RECONCILE_V1_KEYS = frozenset({
-    "workflow_version", "website_id", "run_id", "audit_id"})
 
 _STAFF_CACHE_NAME = "uploader_staff_options.json"
 
@@ -1360,31 +1351,6 @@ def _run_record_rows(data_dir, run_id):
         _read,
         generic=("engine_unavailable", True, "retry",
                  f"khong doc duoc registry cua run {run_id}"))
-
-
-def _record_contract_nos(data_dir, record_ids):
-    """contract_no theo record_id tu registry cua website — KHONG scope
-    theo run: file_registry.id la khoa toan cuc trong website. Upload
-    reconcile doc website-wide (F3) nen lookup qua get_row_by_id cho ca
-    row thuoc run khac/mat provenance. Registry hu = LOI nhu _run_record_rows."""
-    batch_scan = import_engine_module("upload_lab", "batch_scan")
-
-    def _read():
-        conn = sqlite3.connect(str(data_dir / "registry.sqlite3"))
-        try:
-            conn.row_factory = sqlite3.Row
-            out = {}
-            for rid in record_ids:
-                row = batch_scan.get_row_by_id(conn, int(rid))
-                out[int(rid)] = str(row["contract_no"] or "") if row else ""
-            return out
-        finally:
-            conn.close()
-
-    return _run_engine(
-        _read,
-        generic=("engine_unavailable", True, "retry",
-                 "khong doc duoc registry cua website"))
 
 
 # ---------- dispatchers (legacy giu nguyen khi khong co workflow_version) --
@@ -1610,9 +1576,9 @@ def upload_session_status_v1(job, payload):
 def upload_session_close_v1(job, payload):
     """`upload.session_close` versioned → kind session_state.
 
-    Poll/reconcile lan cuoi tren browser thread truoc khi dong; tab con
-    mo ma khong xac dinh → needs_reconcile. Khong bao gio tu bam Luu va
-    khong hoan tac save da xac minh (§7.3)."""
+    Poll trang thai tab lan cuoi tren browser thread roi dong phien; tab
+    con lai chi la mat quyen so huu tai nguyen. Khong bao gio tu bam Luu
+    va khong ket luan ket qua Luu (§6.7/§7.3)."""
     p = _require_workflow(payload)
     _require_payload_keys(p, _BROWSER_V1_KEYS)
     wid = _require_website(p)
@@ -1622,25 +1588,20 @@ def upload_session_close_v1(job, payload):
     _begin_workflow_job(store, job, command="upload.session_close",
                         website_id=wid, browser_id=bid, payload=p)
     try:
-        # _poll_then_close la MOT op tren browser thread: poll/reconcile
-        # lan cuoi roi dong ngay — khong op mutating nao xen giua nhip
+        # _poll_then_close la MOT op tren browser thread: poll trang thai
+        # tab lan cuoi roi dong ngay — khong op mutating nao xen giua nhip
         # poll va close (§7.3). Xep hang sau op dang chay (cho no nha
         # browser) va dat stop event truoc de engine dung som.
         _run_engine(
             lambda: worker().call("_poll_then_close", website_id=wid,
                                   stop_current=True),
             generic=("engine_unavailable", True, "retry",
-                     "khong doi chieu/dong duoc browser"))
-        # Tab van con mo sau poll cuoi → khong xac dinh → needs_reconcile
-        # (giu run_id de upload.reconcile doi chieu theo dung run).
-        open_ids = store.open_tab_record_ids(wid)
-        if open_ids:
-            run_map = worker().tab_run_map()
-            store.remove_open_tabs(wid, open_ids)
-            for rid in open_ids:
-                store.add_needs_reconcile(
-                    wid, [rid], run_id=run_map.get(rid),
-                    reason="browser dong khi tab chua xac minh Luu")
+                     "khong dong duoc browser"))
+        # Tab van con trong store sau khi dong phien: khong con chu so
+        # huu → unknown (chi la su that tai nguyen).
+        unknown_ids = sorted(store.open_tab_record_ids(wid))
+        if unknown_ids:
+            store.clear_open_tabs(wid)
         snap = worker().snapshot()
         _finish_workflow_job(store, job.job_id, "succeeded")
     except CancelledByUser:
@@ -1654,8 +1615,9 @@ def upload_session_close_v1(job, payload):
         "website_id": wid,
         "browser_id": bid,
         "closed": True,
-        "verified_record_ids": snap["tabs"]["saved_record_ids"],
-        "needs_reconcile_record_ids": store.needs_reconcile_ids(wid),
+        "closed_record_ids": snap["tabs"]["closed_record_ids"],
+        "unknown_record_ids": sorted(
+            set(snap["tabs"]["unknown_record_ids"]) | set(unknown_ids)),
     })
 
 
@@ -1788,10 +1750,10 @@ def upload_prepare_v1(job, payload):
     """`upload.prepare` versioned → kind upload_prepare.
 
     Manifest giai quyet qua binding run→manifest (resolve_run kiem website
-    + file + hash). Backend tinh loai tru tu audit that + needs_reconcile
-    — khong tin danh sach renderer. Dry-run: mo toi da chunk_size tab da
-    dien roi waiting_user(review); Save chi dem khi engine xac minh POST
-    /api/hoso 2xx (poll ghi registry uploaded_success + bo khoi queue).
+    + file + hash). Backend tinh loai tru tu audit chinh thuc — khong tin
+    danh sach renderer. Dry-run: mo toi da chunk_size tab da dien roi
+    waiting_user(review); tien do prepared thuoc run hien tai, engine
+    khong bao gio bam Luu hay ket luan ket qua Luu.
     """
     p = _require_workflow(payload)
     _require_payload_keys(p, _PREPARE_V1_KEYS)
@@ -1893,14 +1855,6 @@ def upload_prepare_v1(job, payload):
             cn = _canonical_contract_no(getattr(row, "contract_no", ""))
             if cn:
                 canon_existing.add(cn)
-    # b) ho so can doi chieu giu chan khoi dot chuan bi (§6.15)
-    needs = set(store.needs_reconcile_ids(wid))
-    dropped_needs = sorted(set(record_ids) & needs)
-    for rid in dropped_needs:
-        cn = uploader.normalize_contract_no_for_compare(
-            contract_no_by_id.get(rid, ""))
-        if cn:
-            exclude.add(cn)
     # a2) Pre-filter adapter-side: record co canonical ∈ Excel bi loai
     # khoi dot — khong phu thuoc engine normalize (giu so 0). exclude
     # van mang dang ENGINE se tinh cho tung record (zero-keeping) de
@@ -1908,15 +1862,14 @@ def upload_prepare_v1(job, payload):
     # phong thu hai neu contract_no record khac registry.
     dropped_excel = sorted(
         rid for rid in record_ids
-        if rid not in needs
-        and _canonical_contract_no(contract_no_by_id.get(rid, ""))
+        if _canonical_contract_no(contract_no_by_id.get(rid, ""))
         in canon_existing)
     for rid in dropped_excel:
         cn = uploader.normalize_contract_no_for_compare(
             contract_no_by_id.get(rid, ""))
         if cn:
             exclude.add(cn)
-    dropped_set = needs | set(dropped_excel)
+    dropped_set = set(dropped_excel)
     selected = [rid for rid in record_ids if rid not in dropped_set]
 
     _require_login_confirmed()
@@ -1970,14 +1923,13 @@ def upload_prepare_v1(job, payload):
         if batch_open:
             store.add_open_tabs(wid, batch_open, run_id=run_id,
                                 browser_id=bid)
-            worker().note_open_tabs(run_id, batch_open)
         if not batch_open:
             # Khong con gi de kiem tra (excluded het hoac fail toan bo)
             # → terminal ngay, KHONG waiting_user.
             job.check_cancel()
             data = _prepare_result_data(
                 wid, bid, run_id, audit_id, record_ids, summary,
-                errors, store, adapter_excluded=len(dropped_excel))
+                errors, adapter_excluded=len(dropped_excel))
             _finish_workflow_job(
                 store, job.job_id, _prepare_terminal_status(data))
             return _prepare_result(data, errors)
@@ -1995,67 +1947,56 @@ def upload_prepare_v1(job, payload):
                 timeout_msg="het 60 phut cho kiem tra tab")
         finally:
             worker().unregister_wait(job.job_id)
-        # Reconcile lan cuoi TRUOC khi doc ket qua: save via POST /api/hoso
-        # vua bam co the chua kip mot nhip idle poll — _poll_now bao dam
-        # snapshot/store cap nhat dong bo tren browser thread.
+        # Poll trang thai tab lan cuoi TRUOC khi doc ket qua: tab nguoi
+        # dung dong trong luc cho kiem tra co the chua kip mot nhip idle
+        # poll — _poll_now bao dam snapshot/store dong bo tren browser
+        # thread.
         _run_engine(
             lambda: worker().call("_poll_now", website_id=wid),
             generic=("engine_unavailable", True, "retry",
-                     "khong doi chieu duoc tab sau kiem tra"))
+                     "khong doc duoc trang thai tab sau kiem tra"))
         job.check_cancel()
         data = _prepare_result_data(
             wid, bid, run_id, audit_id, record_ids, summary,
-            errors, store, adapter_excluded=len(dropped_excel))
+            errors, adapter_excluded=len(dropped_excel))
         _finish_workflow_job(
-            store, job.job_id, _prepare_terminal_status(data),
-            verified_record_ids=data["saved_record_ids"])
+            store, job.job_id, _prepare_terminal_status(data))
         return _prepare_result(data, errors)
     except CancelledByUser:
         _finish_workflow_job(store, job.job_id, "canceled")
         raise
-    except Exception as exc:
+    except Exception:
         _finish_workflow_job(store, job.job_id, "failed")
-        raise _guard_unclear_retry(store, wid, exc)
+        raise
     finally:
         done.set()
 
 
 def _prepare_result_data(wid, bid, run_id, audit_id, record_ids,
-                         summary, errors, store, adapter_excluded=0):
-    """Data §6.14 — breakdown tach 'da dien' (prepared) khoi 'da Luu'
-    (saved); saved chi tu snapshot da xac minh cua browser thread.
-    `adapter_excluded`: so record bi adapter loai truoc khi goi engine
-    (canonical Excel match) — cong vao excluded_duplicates cua engine."""
+                         summary, errors, adapter_excluded=0):
+    """Data §6.14 — breakdown cua dot chuan bi (chi tien do prepared;
+    khong co stage/ket qua Luu). `adapter_excluded`: so record bi adapter
+    loai truoc khi goi engine (canonical Excel match) — cong vao
+    excluded_duplicates cua engine."""
     snap = worker().snapshot()
     tabs = snap["tabs"]
     requested = set(record_ids)
-    saved = sorted(set(tabs["saved_record_ids"]) & requested)
     closed = sorted(set(tabs["closed_record_ids"]) & requested)
     unknown = sorted(set(tabs["unknown_record_ids"]) & requested)
     still_open = sorted(set(tabs["open_record_ids"]) & requested)
     failed_ids = {int(e.get("record_id") or 0) for e in errors}
-    prepared_ids = set(still_open) | set(saved) | set(closed) | set(unknown)
+    prepared_ids = set(still_open) | set(closed) | set(unknown)
     succeeded = []
     for rid in record_ids:
         if rid in failed_ids or rid not in prepared_ids:
             continue
-        succeeded.append({
-            "record_id": rid,
-            "stage": "saved" if rid in saved else "prepared",
-        })
+        succeeded.append({"record_id": rid, "stage": "prepared"})
     failed = [{
         "record_id": int(e.get("record_id") or 0),
         "stage": "prepared",
         "code": "upload_failed",
         "message": str(e.get("error") or ""),
     } for e in errors]
-    # needs_reconcile cua WEBSITE (F3 — khong scope theo run: row co
-    # provenance run_id khac/None van can bao cho client) ∩ record_ids
-    # dot nay — co che chan prepare (dropped_needs) cung website-wide.
-    needs_reconcile = sorted(
-        (set(closed) | set(unknown)
-         | (set(store.needs_reconcile_ids(wid))
-            & requested)))
     return {
         "workflow_version": WORKFLOW_VERSION,
         "website_id": wid,
@@ -2072,8 +2013,6 @@ def _prepare_result_data(wid, bid, run_id, audit_id, record_ids,
             + int(adapter_excluded),
         },
         "breakdown": {"succeeded": succeeded, "failed": failed},
-        "saved_record_ids": saved,
-        "needs_reconcile_record_ids": needs_reconcile,
     }
 
 
@@ -2091,160 +2030,18 @@ def _prepare_terminal_status(data):
     return "succeeded"
 
 
-def _guard_unclear_retry(store, wid, exc):
-    """Tra exception se raise tu duong loi cua prepare.
-
-    Khi con ho so chua ro da Luu (needs_reconcile) thi cam auto-retry mu
-    theo contract §7.4 — khong phat lai upload khi ket qua chua ro:
-    retryable=False, next_action=None, details keo theo
-    needs_reconcile_record_ids. Client phai upload.reconcile truoc;
-    retry co chu y la command MOI (command_id moi)."""
-    try:
-        unclear = store.needs_reconcile_ids(wid)
-    except Exception:
-        unclear = []
-    if not unclear:
-        return exc
-    details = dict(getattr(exc, "details", None) or {})
-    details["needs_reconcile_record_ids"] = unclear
-    if isinstance(exc, CommandError):
-        exc.retryable = False
-        exc.next_action = None
-        exc.details = details
-        return exc
-    return CommandError(
-        "engine_unavailable", f"chuan bi ho so that bai: {exc}",
-        retryable=False, details=details)
-
-
 def _prepare_result(data, errors):
     """upload_prepare result; co loi tung muc → partial flag + error code
-    upload.partial_failure (contract §6.14/§8). Con ho so chua ro da Luu
-    (needs_reconcile) → retryable=False: cam auto-replay, phai reconcile
-    truoc khi thu lai co chu y bang command_id moi."""
+    upload.partial_failure (contract §6.14/§8). Loi tung ho so la loi job
+    thuong — khong khoa, khong doi chieu ket qua Luu."""
     result = _result("upload_prepare", data)
     if errors:
-        unclear = data.get("needs_reconcile_record_ids") or []
         result["partial"] = True
         result["error"] = error_object(
             "upload.partial_failure",
             f"{len(errors)} ho so chuan bi that bai",
-            retryable=not unclear,
-            next_action=None if unclear else "retry")
+            retryable=True,
+            next_action="retry")
     return result
 
 
-# ---------- upload.reconcile (§6.15) ----------
-
-@_v1_boundary
-def upload_reconcile_v1(job, payload):
-    """`upload.reconcile` → kind reconcile_report.
-
-    Doi chieu ho so needs_reconcile cua WEBSITE voi audit MOI (bat buoc):
-    so da thay tren web → verified (registry uploaded_success + mo khoa
-    needs_reconcile); con lai giu cho doi chieu sau. Khong tu gui lai.
-
-    Scope WEBSITE (F3): needs_reconcile.run_id chi la provenance — co
-    the mat (None) khi tab roi trang khong xac dinh dong lai sau hoac
-    sau restart; co che chan (workspace_get/_guard_unclear_retry/
-    prepare exclusion) deu website-wide. Doc theo run se bo sot row va
-    wedge vinh vien. run_id trong payload van bat buoc: binding
-    audit→run + refresh queue cua run do."""
-    p = _require_workflow(payload)
-    _require_payload_keys(p, _RECONCILE_V1_KEYS)
-    wid = _require_website(p)
-    run_id = _require_run_id(p)
-    audit_id = _optional_audit_id(p)
-    if audit_id is None:
-        raise CommandError("validation_error",
-                           "reconcile can audit_id (audit moi da nap)")
-    store = upload_workspace.open_store()
-    upload_workspace.resolve_run(wid, run_id, store=store)
-    audit_rec = upload_workspace.resolve_audit(wid, audit_id, store=store)
-    data_dir = upload_workspace.website_data_dir(wid)
-    provider = upload_workspace.get_provider(wid)
-    uploader = import_engine_module("upload_lab", "playwright_uploader")
-
-    audit_file = Path(audit_rec["file_path"])
-    if not audit_file.is_file():
-        raise CommandError(
-            "file_not_found",
-            f"file Excel cua audit {audit_rec['audit_id']} khong con "
-            "tren dia — audit lai",
-            retryable=True, next_action="pick_files")
-    bound_hash = audit_rec.get("file_sha256")
-    if bound_hash and \
-            upload_workspace.sha256_file(audit_file) != bound_hash:
-        raise CommandError(
-            "stale_revision",
-            f"file Excel cua audit {audit_rec['audit_id']} da thay doi — "
-            "audit lai",
-            retryable=True, next_action="retry")
-    if not audit_rec.get("from_date") or not audit_rec.get("to_date"):
-        raise CommandError("validation_error",
-                           "audit thieu khoang ngay — audit lai")
-    analysis = _analyze_excel(
-        provider, audit_file, audit_rec["from_date"], audit_rec["to_date"])
-    # Canonical HAI PHIA (cat so 0 dau — cung dang queue_get/prepare):
-    # record "0101/2026" khop audit "101/2026"; dung normalize tho
-    # (giu so 0) o mot phia se bo sot ho so da len web that.
-    existing = {
-        _canonical_contract_no(getattr(row, "contract_no", ""))
-        for row in analysis.display_rows}
-    existing.discard("")
-
-    # Website-wide (F3): moi row needs_reconcile cua website duoc doi
-    # chieu — ca row mat provenance (run_id=None) hoac stamp run khac.
-    needs_rows = store.needs_reconcile_rows(wid)
-    needs = [int(r["record_id"]) for r in needs_rows]
-    _begin_workflow_job(store, job, command="upload.reconcile",
-                        website_id=wid, run_id=run_id,
-                        audit_id=audit_id, record_ids=needs, payload=p)
-    try:
-        verified = []
-        if needs:
-            cn_by_id = _record_contract_nos(data_dir, needs)
-            for rid in needs:
-                cn = _canonical_contract_no(cn_by_id.get(rid, ""))
-                if cn and cn in existing:
-                    verified.append(rid)
-        if verified:
-            _run_engine(
-                lambda: uploader.finalize_uploaded_records(
-                    verified, working_dir=data_dir),
-                generic=("engine_unavailable", True, "retry",
-                         "khong ghi duoc uploaded_success"))
-            store.clear_needs_reconcile(wid, verified)
-            store.remove_open_tabs(wid, verified)
-            # Queue cua MOI run co record vua verified doi — bump run
-            # trong payload + moi run_id con luu tren row needs_reconcile.
-            verified_set = set(verified)
-            runs_to_bump = {run_id}
-            for row in needs_rows:
-                stamped_run = row.get("run_id")
-                if int(row["record_id"]) in verified_set and stamped_run:
-                    runs_to_bump.add(stamped_run)
-            for bumped_run in sorted(runs_to_bump):
-                store.bump_queue_revision(bumped_run)
-        # Audit moi gan vao run (nhu queue_get) de dot sau dung so nay.
-        bound = store.audit_for_run(run_id)
-        if bound is None or bound["audit_id"] != audit_rec["audit_id"]:
-            store.bind_run_audit(run_id, audit_rec["audit_id"])
-            store.bump_queue_revision(run_id)
-        remaining = store.needs_reconcile_ids(wid)
-        _finish_workflow_job(store, job.job_id, "succeeded",
-                             verified_record_ids=verified)
-    except CancelledByUser:
-        _finish_workflow_job(store, job.job_id, "canceled")
-        raise
-    except Exception:
-        _finish_workflow_job(store, job.job_id, "failed")
-        raise
-    return _result("reconcile_report", {
-        "workflow_version": WORKFLOW_VERSION,
-        "website_id": wid,
-        "run_id": run_id,
-        "audit_id": audit_id,
-        "verified_record_ids": verified,
-        "needs_reconcile_record_ids": remaining,
-    })

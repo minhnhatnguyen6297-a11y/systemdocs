@@ -66,3 +66,7 @@
 - source_plan: `D:/systemdocs/_bmad-output/tmp/core-versions-20261008.html`
   summary: Nang Electron 31 (het ho tro tu 14/01/2025, Chromium 126 khong con va bao mat) len ban stable moi nhat, kem electron-builder va bundle playwright-browsers, chay lai E2E.
   evidence: E2E hien xanh tren 31.7.7 nhung khong con ban va bao mat; app xu ly ho so nhay cam. Tieu chi xong: E2E xanh + check.cjs PASS + dong goi thu thanh cong.
+
+- source_plan: `_bmad-output/backlog/story-upload-web-official-sot-cutover-plan.md`
+  summary: Upload UI drops file_token for picked/downloaded refs; audit/scan rejected before sidecar
+  evidence: `shell/src/renderer/upload/index.js:488-492,548` passes raw path references without `file_token`; `shell/src/main/ipc.js:68-109` `resolveFileTokens` rejects a path without a valid token with `validation_error`. Copied blocker logs `_bmad-output/tmp/issue-28-implementation/e2e_blocker_evidence.txt`, `e2e_upload_blocked.log`, and `e2e_pick_blocker.log` show both picker/download failures and no `upload.audit_excel` job; the separate passing real-engine run is recorded in `real-engine-upload-sot-smoke.json`.

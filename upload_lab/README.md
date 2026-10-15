@@ -22,7 +22,7 @@ flowchart LR
     C[Web Sổ Công chứng] -->|Stage 2: Audit & Reconcile| D{So khớp Danh sách}
     B --> D
     D -->|Chưa có trên web| E[Stage 3: Playwright Uploader]
-    E -->|Dry-run / Finalize| C
+    E -->|Dry-run: điền sẵn, dừng trước nút Lưu| C
 ```
 
 ### Giai đoạn 1: Quét & Trích xuất (`batch_scan.py` + `extract_contract.py`)
@@ -63,11 +63,11 @@ flowchart LR
 3. **Chuẩn bị theo đợt & người dùng tự bấm Lưu**:
    - Người dùng chọn số tab mở mỗi đợt (1–30) ngay trên tab *Quét & Upload Hồ Sơ*; mỗi tab gắn với một `record_id` nên không mở trùng hồ sơ.
    - App điền sẵn rồi **dừng trước nút Lưu** — người dùng kiểm tra trực quan và tự bấm *Lưu*. App không bấm thay.
-   - App nhận biết đã Lưu qua phản hồi `POST /api/hoso` thành công (hoặc web chuyển khỏi trang tạo nhanh), tự đóng tab đó, cập nhật `uploaded_success` vào `registry.sqlite3` và bỏ dòng khỏi bảng.
-   - Bấm *Tiếp tục N số tiếp theo* để mở đợt mới; app không tự mở đợt kế tiếp.
+   - Dữ liệu đã được website ghi nhận chính thức là nguồn sự thật (SOT): app **không** suy kết quả Lưu từ `POST /api/hoso`, điều hướng hay đóng tab, không tích lũy số đếm đã Lưu và không tự mở lại hồ sơ chưa Lưu. Muốn biết hồ sơ đã lên web hay chưa, tải/nạp lại sổ Excel chính thức.
+   - Trong một lượt quét, app nhớ tiến độ hồ sơ **đã chuẩn bị** để chia đợt: *Tiếp tục N số tiếp theo* chỉ mở các hồ sơ đã chọn nhưng chưa chuẩn bị; app không tự mở đợt kế tiếp.
 
 > [!NOTE]
-> Đăng nhập và nhận diện Lưu xem tại [`portal-session.md`](../_bmad-output/specs/upload_lab/README.md#portal). Đặc tả Fluent UI và kế hoạch kiểm tra môi trường được quản lý trên Linear tại [MIN-31](https://linear.app/minhnotary/issue/MIN-31/upload-lab-fluent-ui-redesign-specification-windows-11).
+> Đăng nhập và quy tắc điền-sẵn-rồi-dừng xem tại [`portal-session.md`](../_bmad-output/specs/upload_lab/README.md#portal). Đặc tả Fluent UI và kế hoạch kiểm tra môi trường được quản lý trên Linear tại [MIN-31](https://linear.app/minhnotary/issue/MIN-31/upload-lab-fluent-ui-redesign-specification-windows-11).
 
 ---
 

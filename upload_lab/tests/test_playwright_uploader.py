@@ -17,7 +17,6 @@ from playwright_uploader import (
     NamDinhUploaderSession,
     build_upload_form_data,
     field_value_matches,
-    finalize_uploaded_records,
     get_uploader_setup_status,
     get_field_value_candidates,
     load_upload_queue,
@@ -346,7 +345,7 @@ class PlaywrightUploaderQueueTests(unittest.TestCase):
         row = self.conn.execute("SELECT id FROM file_registry WHERE file_key = ?", (file_key,)).fetchone()
         return int(row[0])
 
-    def test_load_upload_queue_uses_manifest_run_id_and_excludes_uploaded_success(self):
+    def test_load_upload_queue_uses_manifest_run_id_and_keeps_legacy_status_history(self):
         run_id = "run123"
         other_run = "run999"
         file_goc = str(self.root / "goc1.docx")
@@ -357,6 +356,8 @@ class PlaywrightUploaderQueueTests(unittest.TestCase):
 
         self._seed_record(file_key="k1", run_id=run_id, contract_no="111/2026/CCGD", status="extracted", output_json_path=output1)
         self._seed_record(file_key="k2", run_id=run_id, contract_no="222/2026/CCGD", status="prepared_dry_run", output_json_path=output2)
+        # Trang thai cu (truoc cutover) chi la lich su du lieu: khong con
+        # duoc doc nhu bang chung Luu, va cung khong tu quay lai queue.
         self._seed_record(file_key="k3", run_id=run_id, contract_no="333/2026/CCGD", status="uploaded_success", output_json_path=output3)
         self._seed_record(file_key="k4", run_id=other_run, contract_no="444/2026/CCGD", status="extracted", output_json_path=output1)
 
@@ -439,26 +440,6 @@ class PlaywrightUploaderQueueTests(unittest.TestCase):
 
         self.assertEqual(total_pending, 2)
         self.assertEqual([record.contract_no for record in records], ["111/2026/CCGD", "222/2026/CCGD"])
-
-    def test_finalize_uploaded_records_marks_selected_rows(self):
-        run_id = "run123"
-        file_goc = str(self.root / "goc2.docx")
-        Path(file_goc).write_text("dummy", encoding="utf-8")
-        output_path = make_output_json(self.workdir / "output" / "x.json", contract_no="555/2026/CCGD", file_goc=file_goc)
-        record_id = self._seed_record(
-            file_key="finalize-key",
-            run_id=run_id,
-            contract_no="555/2026/CCGD",
-            status="prepared_partial",
-            output_json_path=output_path,
-        )
-
-        count = finalize_uploaded_records([record_id], working_dir=self.workdir)
-        row = get_row_by_id(self.conn, record_id)
-
-        self.assertEqual(count, 1)
-        self.assertEqual(row["status"], "uploaded_success")
-        self.assertTrue(row["uploaded_success_at"])
 
     def test_contract_group_aliases_match_for_dropdown_values(self):
         candidates = get_field_value_candidates("nhom_hop_dong", "Cam kết - Thỏa thuận")
@@ -687,7 +668,7 @@ class PlaywrightUploaderQueueTests(unittest.TestCase):
         self.assertEqual(result["status"], "authenticated")
         self.assertEqual(saved_paths, [str(session.settings.storage_state_path)])
 
-    def test_saved_prepared_page_is_finalized_and_closed(self):
+    def test_prepared_page_with_save_evidence_stays_open_tab_resource(self):
         run_id = "run-save-detect"
         output_path = make_output_json(
             self.workdir / "output" / "save-detect.json",
@@ -708,16 +689,48 @@ class PlaywrightUploaderQueueTests(unittest.TestCase):
         )
         page = _FakeTrackedPage(url=session.settings.create_url)
         record = SimpleNamespace(record_id=record_id, contract_no="601/2026/CCGD")
-        artifact_dir = self.workdir / "upload_runs" / "save-detect"
-        artifact_dir.mkdir(parents=True, exist_ok=True)
-        session._register_prepared_page(record, page, artifact_dir)
-        session.prepared_pages[record_id].save_response_ok = True
+        session._register_prepared_page(record, page)
 
         result = session.poll_prepared_pages()
 
-        self.assertEqual(result["saved_record_ids"], [record_id])
-        self.assertTrue(page.closed)
-        self.assertEqual(get_row_by_id(self.conn, record_id)["status"], "uploaded_success")
+        # Poll chi bao tai nguyen: tab con mo, KHONG dong tab thay nguoi
+        # dung va KHONG ghi ket qua Luu vao registry.
+        self.assertEqual(result["open_record_ids"], [record_id])
+        self.assertEqual(result["closed_record_ids"], [])
+        self.assertFalse(page.closed)
+        self.assertEqual(get_row_by_id(self.conn, record_id)["status"],
+                         "prepared_dry_run")
+
+    def test_poll_prepared_pages_reports_closed_tab_without_registry_write(self):
+        run_id = "run-tab-closed"
+        output_path = make_output_json(
+            self.workdir / "output" / "closed-tab.json",
+            contract_no="602/2026/CCGD",
+            file_goc=str(self.root / "closed-tab.docx"),
+        )
+        record_id = self._seed_record(
+            file_key="closed-tab",
+            run_id=run_id,
+            contract_no="602/2026/CCGD",
+            status="prepared_dry_run",
+            output_json_path=output_path,
+        )
+        session = NamDinhUploaderSession(
+            load_uploader_settings(self.workdir),
+            working_dir=self.workdir,
+            log_callback=lambda _msg: None,
+        )
+        page = _FakeTrackedPage(url=session.settings.create_url)
+        page.closed = True
+        record = SimpleNamespace(record_id=record_id, contract_no="602/2026/CCGD")
+        session._register_prepared_page(record, page)
+
+        result = session.poll_prepared_pages()
+
+        self.assertEqual(result["closed_record_ids"], [record_id])
+        self.assertEqual(result["open_record_ids"], [])
+        self.assertEqual(get_row_by_id(self.conn, record_id)["status"],
+                         "prepared_dry_run")
 
     def test_get_uploader_setup_status_tracks_storage_state(self):
         save_uploader_env(

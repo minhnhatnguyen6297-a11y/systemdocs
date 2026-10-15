@@ -32,8 +32,8 @@ va cap nhat snapshot/store; `session_status` chi doc snapshot, khong bao gio
 spawn browser hay enqueue op.
 
 Browser chet/mat ket noi (poll nem loi, vi du target closed) → session bi
-dong, tab dang mo chuyen sang needs_reconcile (khong bao gio danh 'da luu'),
-moi job dang cho tren browser do duoc danh thuc va that bai
+dong, tab dang mo mat quyen so huu tai nguyen (khong suy ket qua Luu), moi
+job dang cho tren browser do duoc danh thuc va that bai
 `engine_unavailable`.
 """
 import queue
@@ -91,7 +91,6 @@ def _new_snapshot() -> dict:
         "login": {"status": "unknown", "checked_at": None},
         "tabs": {
             "open_record_ids": [],
-            "saved_record_ids": [],
             "closed_record_ids": [],
             "unknown_record_ids": [],
         },
@@ -132,9 +131,6 @@ class _BrowserWorker:
         # Snapshot moi nhat do browser thread cap nhat — doc boi
         # session_status ma khong enqueue op.
         self._snapshot = _new_snapshot()
-        # record_id → run_id cho tab dang mo (bo nho; needs_reconcile lo
-        # truong hop restart).
-        self._tab_runs = {}
         # Khoang idle giua hai poll (test dat 0.05; production 0.5 nhu Qt).
         self._poll_interval = 0.5
         # Scope cua session hien tai: None = chua mo / legacy (engine root).
@@ -160,9 +156,9 @@ class _BrowserWorker:
     def shutdown(self, timeout=5.0):
         """Dung browser thread (drain/shutdown sidecar, test teardown).
 
-        Thu tu (MIN-69 T5): bao op mutating dang chay dung som → poll/
-        reconcile + dong session TREN browser thread (Save da xac minh
-        ghi registry truoc khi dong) → stop loop → join.
+        Thu tu (MIN-69 T5): bao op mutating dang chay dung som → poll
+        trang thai tab + dong session TREN browser thread → stop loop →
+        join.
 
         `timeout` la TONG budget chia cho reconcile + join (MIN-69 T5
         fix1): truoc day reconcile nhan timeout-1 roi join nhan timeout
@@ -170,9 +166,8 @@ class _BrowserWorker:
         bi SIGKILL dung luc reconcile/close dang chay. Gio reconcile duoc
         cap `timeout - _SHUTDOWN_JOIN_RESERVE_S`; join chi lay phan CON
         LAI toi deadline → chan khong qua ~`timeout`. Qua thoi han
-        (browser hang): thread con lai la daemon — tab chua xac minh van
-        duoc giu dau needs_reconcile qua open_tabs sweep khi process sau
-        mo store, khong bao gio coi la 'da Luu'."""
+        (browser hang): thread con lai la daemon — quyen so huu tab dang
+        mo bi xoa khi process sau mo store; khong suy ket qua Luu nao."""
         thread = self._thread
         if thread is None:
             return
@@ -193,9 +188,9 @@ class _BrowserWorker:
         # Join chi lay phan budget con lai toi deadline — khong cong
         # them `timeout` day du vao sau reconcile nhu truoc.
         thread.join(timeout=max(0.0, deadline - time.monotonic()))
-        # Timeout/hang: danh dau phan con lai la can doi chieu (giu
-        # run_id) de lan khoi dong sau hoac reconcile doi chieu lai.
-        self._mark_open_tabs_needs_reconcile(wid)
+        # Timeout/hang: tab con lai mat quyen so huu tai nguyen — xoa khoi
+        # store de lan khoi dong sau khong giu tab ma khong con chu.
+        self._clear_open_tabs(wid)
 
     def call(self, op, *args, website_id=None, mutating=False,
              stop_event=None, stop_current=False, timeout=None, **kwargs):
@@ -262,17 +257,6 @@ class _BrowserWorker:
         """Session engine con song (doc-only — khong spawn thread)."""
         with self._lock:
             return self._session is not None
-
-    def note_open_tabs(self, run_id, record_ids):
-        """Ghi run_id cua cac tab vua mo (browser thread doc khi poll)."""
-        with self._lock:
-            for rid in record_ids:
-                self._tab_runs[int(rid)] = run_id
-
-    def tab_run_map(self):
-        """Ban sao {record_id: run_id} cua tab dang duoc theo doi."""
-        with self._lock:
-            return dict(self._tab_runs)
 
     # ------------------------------------------------------------ waits
     def register_wait(self, job_id, *, waiting_on, website_id, browser_id):
@@ -444,15 +428,12 @@ class _BrowserWorker:
             return
         try:
             login_result = session.poll_manual_login()
-            # Session versioned (website_id != None): strict save
-            # evidence — chi POST /api/hoso 2xx tinh la Luu; roi trang
-            # tao moi khong co POST = closed/uncertain → needs_reconcile.
-            # Legacy (website_id=None): giu nguyen heuristic dieu huong.
-            pages = session.poll_prepared_pages(
-                strict_save_evidence=self._website_id is not None)
+            # Poll chi tra trang thai tai nguyen tab (dang mo / da dong);
+            # khong suy ket qua Luu tu POST, dieu huong hay dong tab.
+            pages = session.poll_prepared_pages()
         except Exception:
-            # Poll nem loi = browser/target mat — dong session, danh dau
-            # tab con mo la can doi chieu va danh thuc cac job dang cho.
+            # Poll nem loi = browser/target mat — dong session, mat quyen
+            # so huu tab dang mo va danh thuc cac job dang cho.
             try:
                 self._session_lost()
             except Exception:
@@ -464,14 +445,13 @@ class _BrowserWorker:
             pass  # store/snapshot loi khong duoc giet browser loop
 
     def _update_snapshot(self, login_result, pages):
-        """Gop ket qua poll vao snapshot + mirror vao workspace store.
+        """Gop ket qua poll vao snapshot + mirror quyen so huu tab vao store.
 
         Luat ghi store (chi browser thread goi):
-        - saved (POST /api/hoso 2xx da xac minh boi engine) → bo khoi
-          open_tabs + needs_reconcile, bump queue_revision cua run.
-        - closed truoc khi Luu → bo khoi open_tabs + needs_reconcile.
-        - open trong store nhung engine khong con thay → unknown +
-          needs_reconcile (mat dau truoc khi xac dinh).
+        - tab dong → bo khoi open_tabs (het quyen so huu tai nguyen).
+        - open trong store nhung engine khong con thay → unknown, bo khoi
+          open_tabs (mat dau; chi la su that ve tai nguyen).
+        Khong bump queue_revision: trang thai tab khong doi noi dung queue.
         """
         status = str((login_result or {}).get("status") or "unknown")
         if status == "authenticated":
@@ -483,100 +463,57 @@ class _BrowserWorker:
             status = "authenticated"
         login = {"status": _LOGIN_STATUS_MAP.get(status, "unknown"),
                  "checked_at": _now_z()}
-        saved = sorted({int(i) for i in
-                        (pages or {}).get("saved_record_ids") or []})
         closed = sorted({int(i) for i in
                          (pages or {}).get("closed_record_ids") or []})
         open_ids = sorted({int(i) for i in
                            (pages or {}).get("open_record_ids") or []})
         wid = self._website_id
-        bid = self.browser_id
         unknown = []
-        runs_bumped = set()
         if wid:
             try:
                 from upload_workspace import open_store
                 store = open_store()
-                with self._lock:
-                    tab_runs = dict(self._tab_runs)
-                    for rid in saved + closed:
-                        self._tab_runs.pop(rid, None)
-                if saved or closed:
-                    store.remove_open_tabs(wid, saved + closed)
-                if saved:
-                    store.clear_needs_reconcile(wid, saved)
-                # needs_reconcile giu run_id de upload.reconcile doi chieu
-                # theo dung run (contract §6.15).
-                for rid in closed:
-                    store.add_needs_reconcile(
-                        wid, [rid], run_id=tab_runs.get(rid),
-                        reason="tab dong truoc khi xac minh Luu")
+                if closed:
+                    store.remove_open_tabs(wid, closed)
                 tracked = set(store.open_tab_record_ids(wid))
                 vanished = sorted(tracked - set(open_ids))
                 if vanished:
                     unknown = vanished
                     store.remove_open_tabs(wid, vanished)
-                    with self._lock:
-                        for rid in vanished:
-                            tab_runs[rid] = self._tab_runs.pop(rid, None)
-                    for rid in vanished:
-                        store.add_needs_reconcile(
-                            wid, [rid], run_id=tab_runs.get(rid),
-                            reason="mat dau truoc khi xac dinh Luu")
-                # Save/close/vanish lam queue cua run doi → bump
-                # queue_revision de prepare cu phai doc lai queue.
-                for rid in saved + closed + vanished:
-                    run_id = tab_runs.get(rid)
-                    if run_id and run_id not in runs_bumped:
-                        store.bump_queue_revision(run_id)
-                        runs_bumped.add(run_id)
             except Exception:
                 unknown = []
         with self._lock:
             tabs = self._snapshot["tabs"]
             tabs["open_record_ids"] = open_ids
-            for rid in saved:
-                if rid not in tabs["saved_record_ids"]:
-                    tabs["saved_record_ids"].append(rid)
             for rid in closed:
                 if rid not in tabs["closed_record_ids"]:
                     tabs["closed_record_ids"].append(rid)
             for rid in unknown:
                 if rid not in tabs["unknown_record_ids"]:
                     tabs["unknown_record_ids"].append(rid)
-            tabs["saved_record_ids"].sort()
             tabs["closed_record_ids"].sort()
             tabs["unknown_record_ids"].sort()
             self._snapshot["login"] = login
 
-    def _mark_open_tabs_needs_reconcile(self, wid):
-        """Tab con mo trong store ma browser da dong/mat truoc khi xac
-        minh Luu → needs_reconcile (giu run_id de upload.reconcile doi
-        chieu theo dung run). An toan goi tu moi thread — doc/ghi qua
-        store lock; store loi bi nuot (khong che shutdown)."""
+    def _clear_open_tabs(self, wid):
+        """Browser da dong/mat: xoa quyen so huu tab dang mo trong store.
+
+        An toan goi tu moi thread — doc/ghi qua store lock; store loi bi
+        nuot (khong che shutdown). Khong ghi ket qua Luu nao."""
         if not wid:
             return
         try:
             from upload_workspace import open_store
-            store = open_store()
-            open_ids = store.open_tab_record_ids(wid)
-            if not open_ids:
-                return
-            with self._lock:
-                run_map = dict(self._tab_runs)
-            store.remove_open_tabs(wid, open_ids)
-            for rid in open_ids:
-                store.add_needs_reconcile(
-                    wid, [rid], run_id=run_map.get(rid),
-                    reason="browser dong truoc khi xac minh Luu")
+            open_store().clear_open_tabs(wid)
         except Exception:
             pass
 
     def _session_lost(self):
         """Browser khong con doc duoc (crash/target closed).
 
-        Tab dang mo → needs_reconcile (KHONG 'da luu'); browser row dong;
-        job dang cho duoc danh thuc de that bai engine_unavailable."""
+        Tab dang mo mat quyen so huu tai nguyen (khong suy ket qua Luu);
+        browser row dong; job dang cho duoc danh thuc de that bai
+        engine_unavailable."""
         wid = self._website_id
         bid = self.browser_id
         if wid:
@@ -584,12 +521,6 @@ class _BrowserWorker:
                 from upload_workspace import open_store
                 store = open_store()
                 open_ids = store.open_tab_record_ids(wid)
-                with self._lock:
-                    run_map = dict(self._tab_runs)
-                for rid in open_ids:
-                    store.add_needs_reconcile(
-                        wid, [rid], run_id=run_map.get(rid),
-                        reason="browser mat ket noi truoc khi xac dinh")
                 if open_ids:
                     store.remove_open_tabs(wid, open_ids)
                 with self._lock:
@@ -598,7 +529,6 @@ class _BrowserWorker:
                         if rid not in tabs["unknown_record_ids"]:
                             tabs["unknown_record_ids"].append(rid)
                     tabs["open_record_ids"] = []
-                    self._tab_runs.clear()
             except Exception:
                 pass
         with self._lock:
@@ -662,7 +592,6 @@ class _BrowserWorker:
                 self._login_latched = False
                 with self._lock:
                     self._snapshot = _new_snapshot()
-                    self._tab_runs.clear()
             else:
                 # Legacy path (contract §9.2): data root rieng — engine
                 # root o dev; <G1_UPLOAD_DATA_DIR>/legacy khi bundled

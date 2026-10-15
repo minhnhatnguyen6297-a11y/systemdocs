@@ -362,7 +362,7 @@
     // throttle 4s, khong chong request. Poll phai TU DUY TRI: refresh chi
     // chay khi co push job/status — trong luc cho login/review khong con
     // push nao khac, nen nhip throttle-skip ma khong hen lai se dung poll
-    // vinh vien (Save-awareness chet: hang da Luu khong bao gio roi bang).
+    // vinh vien (trang thai tab/phien khong duoc cap nhat lai).
     // Mot timer cho duy nhat; tu chain lai qua refresh cho toi khi het
     // job waiting (nhip sau waiting=false → return som, khong hen tiep).
     function scheduleSessionTick() {
@@ -586,7 +586,7 @@
       continuePrepare: async () => {
         // Tiep tuc gui lai DUNG tap goc cua dot upload (khong them record
         // ngoai tap, khong doc lai checkbox hien tai) — engine tu loai muc
-        // da mo/da Luu/needs_reconcile. Khong bao gio tu chay dot tiep sau
+        // da chuan bi trong run. Khong bao gio tu chay dot tiep sau
         // cancel/failed: nguoi dung bam la moi submit.
         if (!state.websiteId || !state.runId) {
           notify('Chưa có lượt quét — quét thư mục trước.', true);
@@ -603,49 +603,6 @@
           return;
         }
         await submitPrepareIds(ids);
-      },
-      reconcile: async () => {
-        if (!state.websiteId || !state.runId) {
-          notify('Chưa có lượt quét để đối chiếu.', true);
-          return;
-        }
-        if (!state.needsReconcileIds.size) {
-          notify('Không có hồ sơ nào cần đối chiếu.', true);
-          return;
-        }
-        if (!state.excelFile) {
-          notify(
-            'Nạp sổ Excel mới ở tab Audit trước khi đối chiếu.', true);
-          return;
-        }
-        // Contract §6.15: doi chieu BAT BUOC audit_id moi (so tai lai sau
-        // khi nguoi dung kiem tra tren web) — audit lai file hien tai roi
-        // moi goi upload.reconcile, tuyet doi khong dung lai audit_id cu.
-        state.auditError = null;
-        const aj = await loud('upload.audit_excel', {
-          website_id: state.websiteId, file_ref: state.excelFile,
-          from_date: state.fromDate, to_date: state.toDate,
-        });
-        if (!aj) return;
-        state.auditJobId = aj.job_id;
-        const done = await h.awaitJob(aj.job_id, 120000);
-        const ad = done && C.jobData(done);
-        if (!done || done.status !== 'succeeded' || !ad || !ad.audit_id) {
-          if (done && done.status !== 'succeeded' && !state.auditError) {
-            state.auditError = {
-              code: `job_${done.status}`,
-              message: 'Audit mới cho đối chiếu không hoàn tất.',
-              retryable: true, next_action: 'retry',
-            };
-            view.refresh();
-          }
-          return;
-        }
-        const job = await loud('upload.reconcile', {
-          website_id: state.websiteId, run_id: state.runId,
-          audit_id: ad.audit_id,
-        });
-        if (job) state.reconcileJobId = job.job_id;
       },
       closeSession: async () => {
         if (!state.browserId) return;

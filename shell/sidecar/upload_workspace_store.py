@@ -8,11 +8,10 @@ website cua luong upload.workflow.v1:
 - `audits` / `run_audits` — audit_id → website + file + khoang ngay; run↔audit
 - `browsers` — browser_id → website, trang thai mo/dong
 - `workflow_jobs` — thong tin recovery toi thieu (KHONG cookie): command_id,
-  request_hash, website/run/browser/audit, record_ids, ket qua da xac minh,
-  status. Job con non-terminal cua mot website chan doi website
-  (workflow_busy).
+  request_hash, website/run/browser/audit, record_ids, status. Job con
+  non-terminal cua mot website chan doi website (workflow_busy).
 - `open_tabs` — record_id dang mo cho kiem tra tren browser cua website
-- `needs_reconcile` — ho so can doi chieu truoc khi cho chuan bi lai
+  (chi la quyen so huu tai nguyen, khong ket luan Luu)
 - `preferences` — chunk_size/cong_chung_vien/thu_ky THEO website
 
 Khong co truong credential/cookie/token/storage_state — dung y contract §7.4.
@@ -20,9 +19,9 @@ Khong co truong credential/cookie/token/storage_state — dung y contract §7.4.
 Crash recovery (MIN-69 T5): mot store instance tuong duong mot process —
 constructor quet lai di trang thai do tien trinh truoc de lai:
 workflow_jobs non-terminal → 'failed', browsers 'open' → 'closed',
-open_tabs con treo → needs_reconcile (chua ro da Luu — tuyet doi khong
-coi la saved). Sidecar_jobs journal (command identity cho moi command)
-nam o `job_repository.py` tren cung file nay.
+open_tabs con treo → xoa (tai nguyen khong con chu so huu; khong suy ket qua
+Luu tu trang thai tab). Sidecar_jobs journal (command identity cho moi
+command) nam o `job_repository.py` tren cung file nay.
 """
 from __future__ import annotations
 
@@ -85,7 +84,6 @@ CREATE TABLE IF NOT EXISTS workflow_jobs (
     run_id TEXT,
     audit_id TEXT,
     record_ids TEXT,
-    verified_record_ids TEXT,
     status TEXT NOT NULL,
     waiting_on TEXT,
     updated_at TEXT NOT NULL
@@ -97,14 +95,6 @@ CREATE TABLE IF NOT EXISTS open_tabs (
     browser_id TEXT,
     record_id INTEGER NOT NULL,
     opened_at TEXT NOT NULL,
-    PRIMARY KEY (website_id, record_id)
-);
-CREATE TABLE IF NOT EXISTS needs_reconcile (
-    website_id TEXT NOT NULL,
-    run_id TEXT,
-    record_id INTEGER NOT NULL,
-    reason TEXT,
-    created_at TEXT NOT NULL,
     PRIMARY KEY (website_id, record_id)
 );
 CREATE TABLE IF NOT EXISTS preferences (
@@ -143,12 +133,9 @@ class UploadWorkspaceStore:
         - workflow_jobs con non-terminal → 'failed' (process moi khong
           the co job dang chay; chi tiet loi song o sidecar_jobs qua
           engine_restarted).
-        - browsers 'open' → 'closed' (process moi khong so huu browser
-          nao; open_tabs cua no da duoc dua vao needs_reconcile).
-        - open_tabs con lai → needs_reconcile giu run_id: tab khong con
-          chu so huu = khong xac dinh duoc da Luu — KHONG bao gio coi la
-          saved (contract §7.4: chi POST /api/hoso 2xx da xac minh moi la
-          Luu)."""
+        - browsers 'open' → 'closed' (process moi khong so huu browser nao).
+        - open_tabs → xoa: tab khong con chu so huu; day chi la mat quyen
+          so huu tai nguyen, khong suy ket qua Luu."""
         with self._lock:
             marks = ",".join("?" for _ in TERMINAL_STATUSES)
             self._conn.execute(
@@ -158,22 +145,7 @@ class UploadWorkspaceStore:
             self._conn.execute(
                 "UPDATE browsers SET status='closed', closed_at=?"
                 " WHERE status='open'", (_now(),))
-            rows = self._conn.execute(
-                "SELECT website_id, run_id, record_id FROM open_tabs"
-            ).fetchall()
-            for row in rows:
-                self._conn.execute(
-                    "INSERT INTO needs_reconcile(website_id, run_id,"
-                    " record_id, reason, created_at) VALUES(?,?,?,?,?)"
-                    " ON CONFLICT(website_id, record_id) DO UPDATE SET"
-                    " run_id=excluded.run_id, reason=excluded.reason,"
-                    " created_at=excluded.created_at",
-                    (row["website_id"], row["run_id"],
-                     int(row["record_id"]),
-                     "tien trinh truoc dung dot ngot — chua xac minh Luu",
-                     _now()))
-            if rows:
-                self._conn.execute("DELETE FROM open_tabs")
+            self._conn.execute("DELETE FROM open_tabs")
             self._conn.commit()
 
     def close(self):
@@ -350,10 +322,9 @@ class UploadWorkspaceStore:
     def upsert_job(self, job_id, *, command_id=None, request_hash=None,
                    command=None, website_id=None, browser_id=None,
                    run_id=None, audit_id=None, record_ids=None,
-                   verified_record_ids=None, status="running",
-                   waiting_on=None):
+                   status="running", waiting_on=None):
         # Terminal-state integrity (MIN-69 T5): row da terminal KHONG bi
-        # upsert thuong ghi de status/waiting_on/verified_record_ids —
+        # upsert thuong ghi de status/waiting_on —
         # cancel da chap nhan luon thang cuoc dua finish cua handler
         # (handler viet 'succeeded'/'failed' som vao row da 'canceled'
         # bi bo qua). Duong ghi co tham quyen duy nhat vao row terminal
@@ -363,8 +334,8 @@ class UploadWorkspaceStore:
             self._conn.execute(
                 "INSERT INTO workflow_jobs(job_id, command_id, request_hash,"
                 " command, website_id, browser_id, run_id, audit_id,"
-                " record_ids, verified_record_ids, status, waiting_on,"
-                " updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                " record_ids, status, waiting_on,"
+                " updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)"
                 " ON CONFLICT(job_id) DO UPDATE SET"
                 " command_id=COALESCE(excluded.command_id, workflow_jobs.command_id),"
                 " request_hash=COALESCE(excluded.request_hash, workflow_jobs.request_hash),"
@@ -374,10 +345,6 @@ class UploadWorkspaceStore:
                 " run_id=COALESCE(excluded.run_id, workflow_jobs.run_id),"
                 " audit_id=COALESCE(excluded.audit_id, workflow_jobs.audit_id),"
                 " record_ids=COALESCE(excluded.record_ids, workflow_jobs.record_ids),"
-                f" verified_record_ids=CASE WHEN workflow_jobs.status IN ({marks})"
-                "   THEN workflow_jobs.verified_record_ids"
-                "   ELSE COALESCE(excluded.verified_record_ids,"
-                "     workflow_jobs.verified_record_ids) END,"
                 f" status=CASE WHEN workflow_jobs.status IN ({marks})"
                 "   THEN workflow_jobs.status ELSE excluded.status END,"
                 f" waiting_on=CASE WHEN workflow_jobs.status IN ({marks})"
@@ -386,10 +353,8 @@ class UploadWorkspaceStore:
                 (job_id, command_id, request_hash, command, website_id,
                  browser_id, run_id, audit_id,
                  json.dumps(record_ids) if record_ids is not None else None,
-                 json.dumps(verified_record_ids)
-                 if verified_record_ids is not None else None,
                  status, waiting_on, _now(),
-                 *TERMINAL_STATUSES, *TERMINAL_STATUSES, *TERMINAL_STATUSES))
+                 *TERMINAL_STATUSES, *TERMINAL_STATUSES))
             self._conn.commit()
 
     def job_for(self, job_id) -> dict | None:
@@ -399,15 +364,22 @@ class UploadWorkspaceStore:
                 (job_id,)).fetchone()
             return self._job_dict(row) if row else None
 
-    @staticmethod
-    def _job_dict(row) -> dict:
-        d = dict(row)
-        for key in ("record_ids", "verified_record_ids"):
-            if d.get(key):
-                try:
-                    d[key] = json.loads(d[key])
-                except ValueError:
-                    d[key] = []
+    # Cot vat ly ma store so huu (schema hien hanh). Serializer chi tra cac
+    # field nay — DB cu con cot Save da bo (vd `verified_record_ids`) khong
+    # lo ra qua API, va du lieu vat ly khong bi sua/xoa.
+    _JOB_FIELDS = ("job_id", "command_id", "request_hash", "command",
+                   "website_id", "browser_id", "run_id", "audit_id",
+                   "record_ids", "status", "waiting_on", "updated_at")
+
+    @classmethod
+    def _job_dict(cls, row) -> dict:
+        keys = set(row.keys())
+        d = {key: row[key] for key in cls._JOB_FIELDS if key in keys}
+        if d.get("record_ids"):
+            try:
+                d["record_ids"] = json.loads(d["record_ids"])
+            except ValueError:
+                d["record_ids"] = []
         return d
 
     def set_job_status(self, job_id, status, *, waiting_on=None):
@@ -459,58 +431,6 @@ class UploadWorkspaceStore:
         with self._lock:
             self._conn.execute(
                 "DELETE FROM open_tabs WHERE website_id=?", (website_id,))
-            self._conn.commit()
-
-    # ---------- needs reconcile ----------
-
-    def add_needs_reconcile(self, website_id, record_ids, *, run_id=None,
-                            reason=""):
-        # run_id la provenance (MIN-69 final review F3): re-stamp voi
-        # run_id=None (provenance bo nho da mat — tab uncertain dong lai
-        # sau, _mark_open_tabs sau restart) KHONG duoc xoa run_id cu —
-        # COALESCE giu gia tri da biet, chi ghi de khi stamp moi co
-        # run_id that (provenance moi thang cu).
-        with self._lock:
-            for rid in record_ids:
-                self._conn.execute(
-                    "INSERT INTO needs_reconcile(website_id, run_id,"
-                    " record_id, reason, created_at) VALUES(?,?,?,?,?)"
-                    " ON CONFLICT(website_id, record_id) DO UPDATE SET"
-                    " run_id=COALESCE(excluded.run_id,"
-                    " needs_reconcile.run_id), reason=excluded.reason,"
-                    " created_at=excluded.created_at",
-                    (website_id, run_id, int(rid), reason, _now()))
-            self._conn.commit()
-
-    def needs_reconcile_rows(self, website_id) -> list:
-        """Full needs_reconcile rows cua website (record_id + run_id
-        provenance + reason) — upload.reconcile doc website-wide de khong
-        bo sot row da mat provenance run_id (F3)."""
-        with self._lock:
-            rows = self._conn.execute(
-                "SELECT record_id, run_id, reason FROM needs_reconcile"
-                " WHERE website_id=? ORDER BY record_id",
-                (website_id,)).fetchall()
-            return [dict(r) for r in rows]
-
-    def needs_reconcile_ids(self, website_id, *, run_id=None) -> list:
-        with self._lock:
-            if run_id is None:
-                rows = self._conn.execute(
-                    "SELECT record_id FROM needs_reconcile WHERE website_id=?"
-                    " ORDER BY record_id", (website_id,)).fetchall()
-            else:
-                rows = self._conn.execute(
-                    "SELECT record_id FROM needs_reconcile WHERE website_id=?"
-                    " AND run_id=? ORDER BY record_id",
-                    (website_id, run_id)).fetchall()
-            return [int(r["record_id"]) for r in rows]
-
-    def clear_needs_reconcile(self, website_id, record_ids):
-        with self._lock:
-            self._conn.executemany(
-                "DELETE FROM needs_reconcile WHERE website_id=? AND record_id=?",
-                [(website_id, int(r)) for r in record_ids])
             self._conn.commit()
 
     # ---------- preferences ----------
@@ -570,9 +490,6 @@ class UploadWorkspaceStore:
                 "browser_id": browser["browser_id"] if browser else None,
                 "active_job_ids": self.active_job_ids(website_id)
                 if website_id else [],
-                "needs_reconcile_record_ids":
-                    self.needs_reconcile_ids(website_id)
-                    if website_id else [],
                 "has_excel": bool(audit) or (
                     self.has_excel(website_id) if website_id else False),
                 "queue_revision": (int(run["queue_revision"])

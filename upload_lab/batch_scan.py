@@ -176,19 +176,6 @@ def get_latest_status_for_path(conn: sqlite3.Connection, file_path: Path) -> Opt
     return row["status"] if row else None
 
 
-def has_uploaded_success(conn: sqlite3.Connection, contract_no: str) -> bool:
-    row = conn.execute(
-        """
-        SELECT 1
-        FROM file_registry
-        WHERE contract_no = ? AND status = 'uploaded_success'
-        LIMIT 1
-        """,
-        (contract_no,),
-    ).fetchone()
-    return row is not None
-
-
 def upsert_registry_record(
     conn: sqlite3.Connection,
     *,
@@ -201,7 +188,6 @@ def upsert_registry_record(
     contract_no: str = "",
     matched_at: Optional[str] = None,
     extracted_at: Optional[str] = None,
-    uploaded_success_at: Optional[str] = None,
     last_error: Optional[str] = None,
     output_json_path: Optional[str] = None,
     reason: Optional[str] = None,
@@ -224,7 +210,6 @@ def upsert_registry_record(
             status,
             matched_at,
             extracted_at,
-            uploaded_success_at,
             last_error,
             run_id,
             output_json_path,
@@ -234,7 +219,7 @@ def upsert_registry_record(
             verify_json,
             created_at,
             updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(file_key) DO UPDATE SET
             file_path = excluded.file_path,
             file_mtime_ns = excluded.file_mtime_ns,
@@ -244,7 +229,6 @@ def upsert_registry_record(
             status = excluded.status,
             matched_at = COALESCE(excluded.matched_at, file_registry.matched_at),
             extracted_at = COALESCE(excluded.extracted_at, file_registry.extracted_at),
-            uploaded_success_at = COALESCE(excluded.uploaded_success_at, file_registry.uploaded_success_at),
             last_error = excluded.last_error,
             run_id = excluded.run_id,
             output_json_path = COALESCE(excluded.output_json_path, file_registry.output_json_path),
@@ -264,7 +248,6 @@ def upsert_registry_record(
             status,
             matched_at,
             extracted_at,
-            uploaded_success_at,
             last_error,
             run_id,
             output_json_path,
@@ -311,7 +294,6 @@ def update_registry_record_by_id(
     status: Optional[str] = None,
     last_error: Optional[str] = None,
     reason: Optional[str] = None,
-    uploaded_success_at: Optional[str] = None,
     prepared_at: Optional[str] = None,
     artifact_dir: Optional[str] = None,
     verify_json: Optional[str] = None,
@@ -330,8 +312,6 @@ def update_registry_record_by_id(
         add_field("last_error", last_error)
     if reason is not None:
         add_field("reason", reason)
-    if uploaded_success_at is not None:
-        add_field("uploaded_success_at", uploaded_success_at)
     if prepared_at is not None:
         add_field("prepared_at", prepared_at)
     if artifact_dir is not None:
@@ -348,24 +328,6 @@ def update_registry_record_by_id(
         tuple(params),
     )
     conn.commit()
-
-
-def mark_records_uploaded_success(
-    conn: sqlite3.Connection,
-    record_ids: list[int],
-    *,
-    reason: str = "Finalized via UI",
-) -> None:
-    timestamp = now_iso()
-    for record_id in record_ids:
-        update_registry_record_by_id(
-            conn,
-            int(record_id),
-            status="uploaded_success",
-            uploaded_success_at=timestamp,
-            reason=reason,
-            last_error="",
-        )
 
 
 def should_skip_by_modified_since(
@@ -418,7 +380,6 @@ def initial_manifest(folder_root: Path, modified_since: Optional[str], full_resc
             "extract_success": 0,
             "extract_failed": 0,
             "extract_partial": 0,
-            "skipped_duplicate": 0,
             "ready_for_upload": 0,
         },
         "errors": [],
@@ -675,32 +636,6 @@ def run_batch_scan(
                 continue
 
             manifest["stats"]["candidates_found"] += 1
-
-            if has_uploaded_success(conn, contract_no):
-                upsert_registry_record(
-                    conn,
-                    file_key=file_key,
-                    file_path=file_path,
-                    stat_result=stat_result,
-                    customer_folder=customer_folder,
-                    contract_no=contract_no,
-                    status="skipped_duplicate",
-                    run_id=run_id,
-                    reason="Contract_no da co uploaded_success",
-                )
-                manifest["stats"]["skipped_duplicate"] += 1
-                manifest["stats"]["processed_files"] += 1
-                emit_progress(
-                    progress_callback,
-                    manifest,
-                    stage="processing",
-                    step="file_done",
-                    current_file=file_path,
-                    process_started_at=process_started_at,
-                    last_outcome="skipped_duplicate",
-                    last_contract_no=contract_no,
-                )
-                continue
 
             matched_at = now_iso()
             upsert_registry_record(

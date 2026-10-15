@@ -37,7 +37,7 @@ giữ làm lịch sử và bị chặn tracking-only để không chạy trùng 
 - Nối việc sửa/thử rule regex với rule dùng trong flow; kiểm tra serial và địa
   chỉ thửa đang thiếu trong fixture.
 - Giúp tìm mẫu Word và biết chỗ điền dữ liệu nào được hỗ trợ.
-- Upload: owner đã chốt bỏ theo dõi kết quả Lưu; runtime chưa cutover. [Draft #28](../backlog/story-upload-web-official-sot-cutover.md).
+- Upload: đã bỏ theo dõi kết quả Lưu, runtime cutover 15/10/2026. [#28](../backlog/story-upload-web-official-sot-cutover.md).
 
 Đây là các hướng cần đánh giá theo ticket, không phải lệnh triển khai tự động.
 Danh sách [deferred-work](../implementation-artifacts/deferred-work.md) là

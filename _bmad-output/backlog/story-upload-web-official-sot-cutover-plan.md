@@ -3,15 +3,15 @@ title: 'Bỏ theo dõi kết quả Lưu; giữ tiến độ chuẩn bị theo l�
 type: 'refactor'
 ticket: '28'
 created: '2026-10-15'
-status: 'draft'
+status: 'built'
 baseline_revision: '8a128227d707da02275d865b0ebb5a394df10990'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
-review: ''
-review_source: ''
-lenses_ran: ['adversarial', 'edge-case-hunter']
-review_loop_iteration: 1
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
+review_loop_iteration: 2
 context: ['{project-root}/_bmad-output/decisions/decision-upload-web-sot-without-save-tracking.md', '{project-root}/_bmad-output/specs/upload_lab/README.md']
 ---
 
@@ -54,12 +54,12 @@ context: ['{project-root}/_bmad-output/decisions/decision-upload-web-sot-without
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] engine (`playwright_uploader.py`) — bỏ suy luận Lưu; loại trừ theo trạng thái registry trong run.
-- [ ] scan (+`nam_dinh.py`) — bỏ ghi/đọc `uploaded_success`.
-- [ ] sidecar (4 file trên) — bỏ surface Save; wire khớp §6.7/§6.14.
-- [ ] renderer — UI chỉ mô tả chuẩn bị/tài nguyên.
-- [ ] Qt legacy + `folder_workflow_service.py` — đồng bộ.
-- [ ] fixture + test hai phía + README — xóa echo, test policy.
+- [x] engine (`playwright_uploader.py`) — bỏ suy luận Lưu; loại trừ theo trạng thái registry trong run.
+- [x] scan (+`nam_dinh.py`) — bỏ ghi/đọc `uploaded_success`.
+- [x] sidecar (4 file trên) — bỏ surface Save; wire khớp §6.7/§6.14.
+- [x] renderer — UI chỉ mô tả chuẩn bị/tài nguyên.
+- [x] Qt legacy + `folder_workflow_service.py` — đồng bộ.
+- [x] fixture + test hai phía + README — xóa echo, test policy.
 
 **Acceptance Criteria:**
 - Given luồng v1 với sổ Excel chính thức, when chạy trọn flow (scan → audit → prepare → Lưu/đóng tab → Tiếp tục → `session_close`, kể cả restart), then wire/store/UI không còn kết luận hay số đếm Lưu, lô kế chỉ gồm hồ sơ chưa chuẩn bị, các luồng thường giữ hành vi §6–§8.
@@ -80,6 +80,8 @@ Chốt nghĩa chuẩn tắc cho implementer (đọc kèm I/O Matrix; theo contra
 
 - 2026-10-15 (plan review trước checkpoint): A1–A6/E1–E2 cho thấy dòng matrix `finish_review`/`session_close` mơ hồ và thiếu ranh giới tài nguyên/`queue_revision`, `uploaded_success` cũ, ngữ nghĩa run A + scan B, suite recovery và bằng chứng smoke. Đã bổ sung Implementation Notes + Verification ngoài `<frozen-after-approval>` (giữ nguyên intent và các bất biến: không xóa/migrate dữ liệu, tiến độ theo run, wire không suy Lưu); tránh implementer đóng tab ở `finish_review`, thêm khóa xuyên run, coi status cũ là bằng chứng Lưu, hoặc tưởng session giả của e2e là bằng chứng thật.
 
+- 2026-10-16 (completion): all six execution items are built within the approved #28 scope; final test/smoke evidence and the renderer-only UI proof are recorded below and in `../tmp/issue-28-implementation/runtime-verification.md`. The separate pre-existing `file_token` UI E2E blocker remains explicitly deferred; no gate was bypassed.
+
 ## Review Triage Log
 
 | Finding | Verdict | Route | Evidence |
@@ -94,6 +96,13 @@ Chốt nghĩa chuẩn tắc cho implementer (đọc kèm I/O Matrix; theo contra
 | E2 smoke phải là engine thật, không phải fallback | accepted | patch (Verification) | e2e dùng `PortalBrowserSession` (fake) trong `shell/test/fixtures/upload_portal.py`. |
 | Code hiện trái predicate của plan | covered | — | Đã ghi trong Approach/Code Map; không phải finding mới. |
 | `upload.reconcile` trả `validation_error` hay `command_unknown`; "latest-run" binding | out-of-scope | — | Contract §10 chỉ yêu cầu command/capability đã bỏ bị từ chối; không thêm cơ chế mới. |
+| Q1 `test_upload_browser_workflow.py:609` uses run B with old A ids, not a real-file move | medium | patch | Fixed with same-file upsert and an explicit A-command check; the 40-test `test_upload_browser_workflow.py` run passed, including the same-file rescan regression. |
+| Q2 `store_job_dict(dict(row))` exposes legacy `verified_record_ids` from existing DB rows | low | patch | Fixed with an explicit job projection; all 17 recovery tests passed, including `test_legacy_save_column_is_hidden_and_data_preserved`, confirming the legacy DB value remains stored but is hidden from output. |
+| Q3 Removing shell-chrome source CSS/HTML/token-regex and bare-not-throw assertions loses coverage | false | rejected | The engineering cleanup rule requires deleting incidental-behavior tests and forbids repinning them; tooltip behavior remains and no runtime code changed. Do not restore the forbidden checks. |
+| Post-patch Quick review (2026-10-16) | clean | — | Parent confirmed Q1/Q2 patches and Q3 disposition; no remaining finding. |
+
+**Separate pre-existing blocker (deferred, not a quick-review finding):** `shell/src/renderer/upload/index.js:488-492,548` drops `file_token`; `shell/src/main/ipc.js:68-109` `resolveFileTokens` rejects raw paths without a valid token. It is recorded at `_bmad-output/implementation-artifacts/deferred-work.md:70-72`, with copied UI blocker logs in `_bmad-output/tmp/issue-28-implementation/`.
+
 
 ## Design Notes
 
@@ -107,5 +116,18 @@ Chốt nghĩa chuẩn tắc cho implementer (đọc kèm I/O Matrix; theo contra
 - `& $env:G1_PYTHON test/test_upload_browser_workflow.py`; `& $env:G1_PYTHON test/test_upload_recovery.py`; `npm test` (cwd `shell/`, chỉ chạy Node `test/*.test.mjs`) -- pass, shape tài nguyên.
 - `.\.venv\Scripts\python.exe -B -X utf8 -m pytest tests/ -q -p no:cacheprovider` (cwd `upload_lab/`) -- pass.
 
+**Execution evidence and current blocker (2026-10-15):**
+- Good worker reports the mandatory prepare 10 / Save 3 / close 2 / continue 2 / restart 0 smoke passed with the actual `NamDinhUploaderSession` and no overrides. Its observed JSON output is copied to `../tmp/issue-28-implementation/real-engine-upload-sot-smoke.json`; this worker did not run the smoke.
+- **UI E2E remains blocked; the gate is not bypassed.** `pickExcel` omits `file_token` while constructing `state.excelFile` (`shell/src/renderer/upload/index.js:488-492`), and `pickFolder` stores only path/scope, also dropping the token (`:548`). The downloaded references reportedly expose raw paths without `file_token`, so this real UI flow cannot pass until the pre-existing renderer/reference mismatch is addressed.
+- **UI E2E: BLOCKED, not passed; not rerun.** The known `file_token` picker/download mismatch is recorded above and in deferred work; no gate was bypassed.
+
 **Manual checks (if no CLI):**
 - Không có CLI: chạy đúng smoke chính ở trên bằng tay trên máy, cùng kịch bản và cùng edge A/B.
+
+## Completion record — 2026-10-16
+
+- `status: built` (not `done` or published); `created` remains `2026-10-15`. All six Execution items are complete.
+- **Post-patch Quick review:** clean; source remains pinned and `lenses_ran` remains `['quick']`. Q1/Q2 patches are retained; Q3 remains rejected under the cleanup rule.
+- **Final verification, before this docs-only closeout:** actual `NamDinhUploaderSession` smoke, prepare 10 / manual Save 3 / close 2 / continue 2 / restart 0; shell Python suites 40/17/22/27/27/20; `npm test` 397/397; Upload Lab pytest 424 passed, 2 skipped, 68 subtests; upload workflow validator 53 files with 0 unexpected outcomes. Full recorded commands/results are in `../tmp/issue-28-implementation/runtime-verification.md`. No tests were rerun for this documentation-only finalization.
+- **Renderer-only UI proof:** real Chromium rendered the current `G1_UPLOAD.buildView` with production renderer scripts/styles and in-memory test snapshots. The portal line changed from 10 open to 8 open / 2 closed; rows 101–103 remained visible; review-wait appeared until Finish, which left the 8/2 resource counts unchanged. No save/reconcile outcome banner appeared. This is not Electron IPC, sidecar, engine-smoke, or E2E proof. Screenshots and scenario log are in `../tmp/issue-28-implementation/upload-ui-proof-scenario.json` and adjacent PNGs.
+- **UI E2E remains BLOCKED, not passed:** `pickExcel` (`index.js:488-492`) and `pickFolder` (`:548`) omit `file_token`; `resolveFileTokens` rejects raw paths. The pre-existing mismatch remains deferred at `_bmad-output/implementation-artifacts/deferred-work.md:70-72`; it is not claimed fixed and no gate was bypassed.

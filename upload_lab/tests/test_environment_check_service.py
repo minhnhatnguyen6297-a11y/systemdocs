@@ -258,7 +258,7 @@ class EnvironmentCheckServiceTests(unittest.TestCase):
                 return {"status": "idle"}
 
             def poll_prepared_pages(self):
-                return {"saved_record_ids": [], "closed_record_ids": [], "open_record_ids": []}
+                return {"closed_record_ids": [], "open_record_ids": []}
 
             def close(self):
                 return None

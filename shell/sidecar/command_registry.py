@@ -223,7 +223,6 @@ COMMANDS = {
     "upload.prepare": _upload("prepare_dispatch"),
     "upload.finish_review": _upload("finish_review_dispatch"),
     "upload.staff_options": _upload("upload_staff_options_v1"),
-    "upload.reconcile": _upload("upload_reconcile_v1"),
 }
 
 

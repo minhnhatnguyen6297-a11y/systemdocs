@@ -1317,17 +1317,9 @@ class UploadLabMainWindow(FluentWindow):
 
     def _handle_prepared_pages_changed(self, result: dict) -> None:
         self.openPreparedRecordIds = {int(record_id) for record_id in result.get("open_record_ids") or []}
-        saved_ids = {int(record_id) for record_id in result.get("saved_record_ids") or []}
         closed_ids = {int(record_id) for record_id in result.get("closed_record_ids") or []}
-        if saved_ids:
-            self.activeUploadSelectedRecordIds.difference_update(saved_ids)
-            self._log_message(f"[UPLOAD] Da luu xong {len(saved_ids)} ho so tren web.")
-            self._refresh_scan_results_from_manifest(
-                preserve_selection=True,
-                removed_record_ids=saved_ids,
-            )
         if closed_ids:
-            self._log_message(f"[UPLOAD] Co {len(closed_ids)} tab da dong truoc khi luu.")
+            self._log_message(f"[UPLOAD] Co {len(closed_ids)} tab da dong.")
         self._sync_folder_upload_controls()
 
     def _handle_upload_progress(self, snapshot: dict) -> None:

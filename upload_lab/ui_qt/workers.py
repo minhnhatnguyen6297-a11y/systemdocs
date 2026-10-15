@@ -138,7 +138,7 @@ class UploadWorker(QObject):
                     self.optionsRefreshed.emit(session.fetch_staff_options())
 
             page_result = session.poll_prepared_pages()
-            if page_result["saved_record_ids"] or page_result["closed_record_ids"]:
+            if page_result["closed_record_ids"]:
                 self.preparedPagesChanged.emit(page_result)
         except Exception as exc:
             self.log.emit(f"[UPLOAD] Khong the kiem tra trang thai Chromium: {exc}")

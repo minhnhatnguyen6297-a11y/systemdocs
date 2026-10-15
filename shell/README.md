@@ -96,7 +96,7 @@ npm test                                # redact, ipc allowlist, command client,
 python test/test_jobstore.py            # jobstore cancel/drain
 python test/test_upload_workflow.py     # v1 handlers scan/audit/queue
 python test/test_upload_browser_workflow.py    # browser session + fake portal
-python test/test_upload_recovery.py     # restart/reconcile/recovery
+python test/test_upload_recovery.py     # restart/recovery: khong phat lai prepare
 python test/test_engine_adapters.py     # engine that: case→Word, scan, audit
                                         #   (G1_NOTARY_DATA_DIR/G1_UPLOAD_DATA_DIR/G1_OUTPUT_DIR → tempdir)
 ```

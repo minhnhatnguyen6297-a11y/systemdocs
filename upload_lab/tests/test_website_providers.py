@@ -26,7 +26,7 @@ from providers import (
 NAM_DINH_URL = "https://congchungnamdinh.ninhbinh.gov.vn"
 EXPECTED_CAPABILITIES = [
     "login", "download_export", "audit_excel", "scan", "prepare",
-    "staff_options", "reconcile",
+    "staff_options",
 ]
 
 
@@ -128,7 +128,7 @@ class RegistryInjectionTests(unittest.TestCase):
 
     def test_same_record_id_two_websites_do_not_share_state(self):
         """Hai website gia cung record_id nhung registry.sqlite3 tach biet:
-        trang thai uploaded_success cua web A khong lam web B bo nham."""
+        trang thai registry cua web A khong lam web B doc nham."""
         registry = WebsiteRegistry()
         provider_a = _FakeProvider("fake_a")
         provider_b = _FakeProvider("fake_b")
