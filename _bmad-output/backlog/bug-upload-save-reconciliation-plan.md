@@ -3,7 +3,7 @@ title: 'Kết quả Lưu portal bị lệch khi đóng tab hoặc mất phản h
 type: 'bugfix'
 ticket: '11'
 created: '2026-10-15'
-status: 'draft'
+status: dropped
 baseline_revision: '023148099fc7e093b80abedb0965d978d00ea3e6'
 route: 'full'
 route_source: 'auto'
@@ -64,6 +64,8 @@ context:
 ## Open Questions
 
 1. **Khi audit mới không có số hồ sơ, xác nhận tường minh cho từng hồ sơ của người vận hành sau khi kiểm tra portal có đủ để xóa `needs_reconcile` và cho phép một lần chuẩn bị chủ động sau đó (A), hay hồ sơ phải tiếp tục bị chặn cho đến khi audit mới xác minh có hồ sơ (B)?** (A) Xác nhận sau khi kiểm tra portal có thể cho phép gửi trùng nếu xác nhận nhầm. (B) Tiếp tục chặn đến khi audit mới xác minh có hồ sơ có thể khiến hồ sơ thực sự chưa được lưu vẫn bị chặn. Đặc tả đã cho phép chung “xác nhận của người dùng” nhưng chưa định nghĩa hành động giải phóng hoặc bằng chứng khi audit không có số; code hiện chỉ xóa khi audit mới có hồ sơ.
+
+**Retired 15/10/2026:** [owner decision](../decisions/decision-upload-web-sot-without-save-tracking.md) supersedes this Save-tracking scope. #11 is dropped; this historical A/B question no longer gates work, and no answer was selected. Runtime cutover is tracked by draft #28, not approved implementation.
 
 ## Implementation Notes
 

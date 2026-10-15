@@ -8,17 +8,13 @@
   "result": null,
   "error": {
     "code": "engine_restarted",
-    "message": "sidecar khoi dong lai giua chung; khong phat lai upload mu - doi chieu truoc khi tiep tuc",
+    "message": "sidecar khoi dong lai; khong tu dong phat lai ho so da chuan bi",
     "retryable": true,
     "next_action": "retry",
     "job_id": "j_01HZX0099",
     "details": {
       "run_id": "a1b2c3d4",
-      "open_record_ids": [
-        140,
-        141
-      ],
-      "recovery": "upload.reconcile voi audit_id moi"
+      "open_record_ids": [140, 141]
     }
   },
   "updated_at": "2026-09-24T10:20:00Z"

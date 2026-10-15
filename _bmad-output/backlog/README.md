@@ -1,10 +1,10 @@
 # Catalog issue — 15/10/2026
 
-**Draft, chưa duyệt triển khai hoặc publish.** Có 26 leaf #2–#27, tất cả `refined: false`; #1 giữ lịch sử và bị chặn tracking-only. Không đổi active initiative. [Quyết định cách theo dõi](../decisions/decision-issues-reconciliation-20261015.md). Chưa kết luận hành vi nào đã sửa runtime.
+**Draft, chưa duyệt triển khai hoặc publish.** Có 27 ID leaf #2–#28; 25 leaf active đều `refined: false`, còn #11/#26 được giữ nguyên ID ở trạng thái dropped. #1 là lịch sử và bị chặn tracking-only. Không đổi active initiative. [Quyết định cách theo dõi](../decisions/decision-issues-reconciliation-20261015.md). Chưa kết luận hành vi runtime nào đã sửa.
 
 ## Ưu tiên, thứ tự và điều kiện bắt đầu
 
-P1/P2 là ưu tiên đề xuất, không phải severity hay thứ tự ID. Cần refinement/approval trước implementation; spike chỉ nhận quyết định/bằng chứng. **Hard after: #22 ← #7; #23 ← #8 và #22; #25 ← #3.** Cạnh #7→#22 chỉ tuần tự hóa sửa cùng core, không thêm gate nghiệp vụ; #7 không chờ full parity. Không chặn pilot Office bởi DB vật lý chung hoặc nghiệm thu Word thật bởi naming. #26 kiểm tín hiệu portal thật độc lập với #11; #27 nguồn hành chính độc lập với #12.
+P1/P2 là ưu tiên đề xuất, không phải severity hay thứ tự ID. Cần refinement/approval trước implementation; spike chỉ nhận quyết định/bằng chứng. **Hard after: #22 ← #7; #23 ← #8 và #22; #25 ← #3.** Cạnh #7→#22 chỉ tuần tự hóa sửa cùng core, không thêm gate nghiệp vụ; #7 không chờ full parity. Không chặn pilot Office bởi DB vật lý chung hoặc nghiệm thu Word thật bởi naming. #27 về nguồn hành chính vẫn độc lập với #12. #11/#26 dropped theo quyết định owner; #28 không có hard after.
 
 | Candidate / ID | Issue | Nhóm | Ưu tiên | Hard after | Sẵn sàng |
 |---|---|---|---|---|---|
@@ -17,7 +17,7 @@ P1/P2 là ưu tiên đề xuất, không phải severity hay thứ tự ID. Cầ
 | C07 / #8 | [Chốt vòng đời thử, công bố và chạy lại rule regex](spike-regex-rule-lifecycle.md) | quyết định | P1 | không | lập kế hoạch/bằng chứng |
 | C08 / #9 | [Kiểm chứng đường xuất Word thật và nguồn mẫu](spike-word-real-route-acceptance.md) | bằng chứng | P1 | không | lập kế hoạch/bằng chứng |
 | C09 / #10 | [Đối chiếu phạm vi quy tắc tên entities với hướng dẫn mẫu Word](spike-word-naming-authority.md) | bằng chứng | P2 | không | lập kế hoạch/bằng chứng |
-| C10 / #11 | [Kết quả Lưu portal bị lệch khi đóng tab hoặc mất phản hồi](bug-upload-save-reconciliation.md) | bug/report đã báo | P1 | không | có thể refinement, không cần chọn lại hướng nghiệp vụ |
+| C10 / #11 | [Kết quả Lưu portal bị lệch khi đóng tab hoặc mất phản hồi](bug-upload-save-reconciliation.md) | bug/report đã báo — dropped | P1 lịch sử | không | DROPPED theo quyết định owner; giữ leaf/plan lịch sử, thay phạm vi bằng C27/#28 |
 | C11 / #12 | [Đối chiếu nguồn mâu thuẫn, nhóm dữ liệu và các quy tắc OCR còn mở](spike-extraction-source-policy-evidence.md) | quyết định | P2 | không | lập kế hoạch/bằng chứng |
 | C12 / #13 | [Chốt DB vật lý và contract chuyển dữ liệu liên module](spike-shared-data-transfer-boundary.md) | quyết định | P2 | không | lập kế hoạch/bằng chứng |
 | C13 / #14 | [Chốt phạm vi và tiêu chí pilot NotaryOffice](spike-office-pilot-scope.md) | quyết định | P2 | không | lập kế hoạch/bằng chứng |
@@ -32,10 +32,11 @@ P1/P2 là ưu tiên đề xuất, không phải severity hay thứ tự ID. Cầ
 | C22 / #23 | [Thử và công bố rule regex rồi duyệt kết quả chạy lại trong flow](story-in-flow-regex-publication-review.md) | khoảng lệch đã chọn | P2 | #8, #22 | draft có gate; xem dưới |
 | C23 / #24 | [Xuất Word theo dữ liệu mẫu thực sự cần, cho phép điền dần](story-gradual-fill-word-readiness.md) | khoảng lệch đã chọn | P1 | không | draft có gate; xem dưới |
 | C24 / #25 | [Đổi loại hồ sơ đã lưu theo quy tắc đã chốt](story-saved-case-type-conversion.md) | khoảng lệch đã chọn | P2 | #3 | draft có gate; xem dưới |
-| C25 / #26 | [Kiểm chứng ý nghĩa tín hiệu Lưu trên portal thật](spike-upload-real-save-signal-validation.md) | bằng chứng | P1 | không | nghiên cứu độc lập, thiếu nguồn giữ unresolved |
+| C25 / #26 | [Kiểm chứng ý nghĩa tín hiệu Lưu trên portal thật](spike-upload-real-save-signal-validation.md) | bằng chứng — dropped | P1 lịch sử | không | DROPPED; không còn là gate ngữ nghĩa portal cho cutover |
 | C26 / #27 | [Đối chiếu văn bản chuyển một phần và bãi bỏ hành chính cùng ngày](spike-administrative-same-day-evidence.md) | bằng chứng | P2 | không | chỉ nghiên cứu văn bản, không đổi thuật toán |
+| C27 / #28 | [Bỏ theo dõi kết quả Lưu và giữ tiến độ chuẩn bị theo lượt](story-upload-web-official-sot-cutover.md) | khoảng lệch theo quyết định owner | P1 | không | draft/unrefined; semantics đã chốt, implementation chưa được duyệt |
 
-Khuyến nghị: (1) #11 an toàn Lưu portal, #4 formatter, #6 độ đầy đủ ngày, #7 field extraction, #5 lưu incomplete và #17 nền desktop; (2) #2 workspace, #9 nghiệm thu Word thật, #24 readiness điền dần; (3) #22 parity rồi #23 khi #8 có đáp án; (4) #25 khi #3 chốt semantics. Các việc nguồn/docs/quyết định độc lập có thể được đánh giá cùng lúc. Đây là khuyến nghị, không quyền bắt đầu. Nếu cùng sửa code, điều phối lịch để tránh đè nhau; lịch tránh xung đột không tự thành dependency sản phẩm.
+Khuyến nghị hiện hành, không phải lệnh triển khai: (1) #28 cutover đã được owner chốt; tiếp theo #4 formatter, #6 độ đầy đủ ngày, #7 field extraction, #5 lưu incomplete và #17 nền desktop — #11 cũ đã dropped; vị trí đầu của #28 là đề xuất điều phối, không phải phần của lựa chọn A ban đầu; (2) #2 workspace, #9 nghiệm thu Word thật, #24 readiness điền dần; (3) #22 parity rồi #23 khi #8 có đáp án; (4) #25 khi #3 chốt semantics. Các việc nguồn/docs/quyết định độc lập có thể được đánh giá cùng lúc. Cần refinement/approval trước implementation.
 
 ## Câu hỏi còn mở và phần đã rõ
 
@@ -57,8 +58,9 @@ Khuyến nghị: (1) #11 an toàn Lưu portal, #4 formatter, #6 độ đầy đ�
 - **C16 / #17:** câu hỏi kỹ thuật chọn target còn hỗ trợ, tương thích Windows/package/browser; không hỏi owner duyệt lại rủi ro hỗ trợ đã biết, không bịa CVE.
 - **C22 / #23:** cần lifecycle #8 được nhận và capability consumer chung #22.
 - **C24 / #25:** nhu cầu đổi loại đã được report yêu cầu; chỉ chờ semantics #3, nhất là giữ hay reset gán người. Giữ runtime bất biến tới khi contract chuyển đổi duyệt.
-- **C25 / #26:** portal thật có host/body/lỗi nghiệp vụ/từng trường/lưu một phần thế nào? Cần nguồn và quyền kiểm an toàn; HTTP 2xx hoặc mô phỏng không đủ nghiệm thu. Thiếu bằng chứng giữ unresolved, không đổi tín hiệu, tự gửi lại hoặc nâng contract Draft.
+- **C25 / #26 — DROPPED:** quyết định owner bỏ theo dõi/diễn giải kết quả Lưu; không cần kiểm chứng host/body/từng trường làm gate cho contract hoặc runtime cutover. Nội dung spike và bằng chứng cũ được giữ làm lịch sử, không phải yêu cầu hiện hành.
 - **C26 / #27:** văn bản nào chứng minh chuyển một phần và bãi bỏ phối hợp cùng ngày? Thiếu nguồn giữ chưa xác minh; không chọn thứ tự nội ngày hoặc cấm toàn bộ cùng ngày.
+- **C27 / #28:** quyết định hành vi đã rõ; leaf cutover còn draft/unrefined, chưa duyệt bắt đầu. Không có câu hỏi owner A/B; chỉ refinement implementation trước khi có thể xin phép thực hiện.
 
 ## Ánh xạ đủ bảy report hiện tại
 

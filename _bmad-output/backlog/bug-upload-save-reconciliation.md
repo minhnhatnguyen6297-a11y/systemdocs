@@ -64,3 +64,7 @@ Xử lý tab đóng có thể được ưu tiên trước phản hồi đã nh�
 - Risk: high — Đánh sai kết quả hoặc cho gửi lại hồ sơ chưa rõ có thể gây bản ghi trùng trên portal.
 - Không thêm tín hiệu thành công, tự bấm Lưu, timeout thành thành công hoặc tự gửi lại. Phạm vi body/host/phản hồi portal thật vẫn chưa nghiệm thu; không nâng contract Draft. Điểm vào code: workflow/monitor browser của upload_lab. Refinement chốt đúng thao tác kết thúc chờ/đối chiếu.
 - Independent check: reviewer không phải người thực hiện đối chiếu riêng quyết định/kết quả với nguồn và dữ liệu/đầu ra liên quan, ghi nhận ngoài bằng chứng tự kiểm của issue.
+
+## Tracking update — 15/10/2026
+
+**Dropped:** quyết định owner [bỏ theo dõi kết quả Lưu](../decisions/decision-upload-web-sot-without-save-tracking.md) thay thế hướng trong leaf này. Nội dung và acceptance cũ được giữ làm lịch sử, không còn là yêu cầu hiện hành. Phạm vi cutover runtime được theo dõi riêng ở C27/#28; không có approval triển khai.

@@ -50,3 +50,7 @@ Thu bằng chứng an toàn về ý nghĩa phản hồi Lưu của portal thật
 - Risk: medium — diễn giải sai bằng chứng có thể khiến đóng nhầm rủi ro gửi trùng hoặc lưu thiếu; spike này không đổi engine/tín hiệu.
 - Open question: có môi trường portal/nguồn phản hồi đã che và quyền đối chiếu nào để chứng minh host/body/lỗi nghiệp vụ/từng trường/lưu một phần? Chỉ hỏi phần không lấy được từ nguồn sẵn có.
 - Ai chờ: kết luận nghiệm thu tín hiệu thật và mọi đề xuất thay tín hiệu sau này. Nơi ghi đáp án: Notes issue và ledger bằng chứng private đã che, không mở gate cho sửa race #11.
+
+## Tracking update — 15/10/2026
+
+**Dropped:** quyết định owner [dùng dữ liệu web chính thức làm SOT và bỏ theo dõi Save](../decisions/decision-upload-web-sot-without-save-tracking.md) loại bỏ nhu cầu kiểm chứng tín hiệu Save thật làm gate. Nội dung spike được giữ làm lịch sử; C27/#28 là draft cutover runtime, không có approval triển khai.

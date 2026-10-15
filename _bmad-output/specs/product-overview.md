@@ -20,8 +20,9 @@ Sản phẩm hỗ trợ văn phòng công chứng giảm nhập liệu lặp l�
 
 1. **Soạn hồ sơ mới:** đọc giấy tờ, cho chuyên viên kiểm tra dữ liệu, lập quan
    hệ và xuất Word.
-2. **Số hóa hồ sơ cũ:** đọc Word, đối chiếu sổ Excel và chuẩn bị nhập portal để
-   chuyên viên tự kiểm tra, tự lưu.
+2. **Số hóa hồ sơ cũ:** đọc Word, so với dữ liệu chính thức của website và
+   chuẩn bị biểu mẫu để chuyên viên tự kiểm tra, tự quyết định Lưu. Dữ liệu đã
+   được website ghi nhận chính thức là SOT; app không suy kết quả Lưu từ browser.
 3. **Theo dõi vận hành:** dự kiến cho biết hồ sơ đang ở đâu và chờ việc gì;
    hiện mới có thiết kế, chưa có chương trình chạy.
 
@@ -36,6 +37,7 @@ giữ làm lịch sử và bị chặn tracking-only để không chạy trùng 
 - Nối việc sửa/thử rule regex với rule dùng trong flow; kiểm tra serial và địa
   chỉ thửa đang thiếu trong fixture.
 - Giúp tìm mẫu Word và biết chỗ điền dữ liệu nào được hỗ trợ.
+- Upload: owner đã chốt bỏ theo dõi kết quả Lưu; runtime chưa cutover. [Draft #28](../backlog/story-upload-web-official-sot-cutover.md).
 
 Đây là các hướng cần đánh giá theo ticket, không phải lệnh triển khai tự động.
 Danh sách [deferred-work](../implementation-artifacts/deferred-work.md) là
@@ -105,7 +107,8 @@ lựa chọn loại lúc tạo nháp là bằng chứng đã hỗ trợ đổi l
 ## upload_lab — Số hóa và chuẩn bị upload hồ sơ cũ
 
 Hai tab đang có trong UI là `Audit Sổ Công Chứng` và `Quét & Upload Hồ Sơ`.
-Flow dừng trước thao tác lưu trên portal để người dùng tự kiểm tra.
+App điền sẵn rồi dừng trước nút Lưu để người dùng tự kiểm tra; dữ liệu chính
+thức trên website là nguồn sự thật, không phải tín hiệu browser cục bộ.
 
 | Màn / thao tác | Dùng để | Tài liệu | Điểm vào mã |
 |---|---|---|---|
@@ -124,7 +127,7 @@ Flow dừng trước thao tác lưu trên portal để người dùng tự kiể
 | Quét & Upload: lọc lỗi/hoàn tác | Thu hẹp danh sách và khôi phục lọc | [UI](upload_lab/README.md#ui) | [scan-upload.js](../../shell/src/renderer/upload/scan-upload.js) · `toggleIssueFilter` |
 | Quét & Upload: chọn số thiếu trong Excel | Đưa hàng thiếu vào đợt chuẩn bị | [Upload Lab](upload_lab/README.md) §5 | [scan-upload.js](../../shell/src/renderer/upload/scan-upload.js) |
 | Quét & Upload: điền form đã chọn | Điền sẵn, dừng để người dùng tự bấm Lưu | [Upload Lab](upload_lab/README.md) §5 | [scan-upload.js](../../shell/src/renderer/upload/scan-upload.js) · `actions.prepare` |
-| Quét & Upload: tiếp tục đợt/đối chiếu lại | Làm đợt tiếp theo hoặc nạp sổ mới | [Upload Lab](upload_lab/README.md) §5 | [index.js](../../shell/src/renderer/upload/index.js) |
+| Quét & Upload: tiếp tục đợt/đối chiếu đầu vào | Chuyển qua hồ sơ đã chọn nhưng chưa chuẩn bị, hoặc nạp sổ để so lại dữ liệu chính thức | [Upload Lab](upload_lab/README.md) §2.3, §3.2 | [index.js](../../shell/src/renderer/upload/index.js) |
 | Quét & Upload: dừng/đóng browser | Dừng tiến trình hoặc đóng phiên portal | [Phiên portal](upload_lab/README.md#portal) | [index.js](../../shell/src/renderer/upload/index.js) · `upload.session_close` |
 
 ## notaryoffice — Theo dõi hồ sơ

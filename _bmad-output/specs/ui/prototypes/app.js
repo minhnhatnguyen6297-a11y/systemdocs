@@ -118,7 +118,7 @@ window.P = (() => {
   /* ---------- state toàn cục demo ---------- */
   const state = {
     module: 'notary',
-    flags: new Set(),           // error/loading/stale/conflict/locked/mock/waiting/reconcile/enverr
+    flags: new Set(),           // error/loading/stale/conflict/locked/mock/waiting/enverr
     notary: null,               // do notary.js build
     upload: null,               // do upload.js build
   };

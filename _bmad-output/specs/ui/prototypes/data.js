@@ -209,10 +209,10 @@ window.P_DATA = (() => {
 
   function queueRows(n, mode) {
     const rows = [];
-    const states = ['ok','ok','ok','ok','filled','review','saved','reconcile','err','ok'];
+    const states = ['ok','ok','ok','ok','filled','review','err','ok'];
     const notes = {
       ok: 'hợp lệ', filled: 'Đã điền sẵn', review: 'Đang chờ kiểm tra',
-      saved: 'Đã lưu trên web', reconcile: 'Cần đối chiếu', err: 'Sai năm sổ',
+      err: 'Sai năm sổ',
     };
     for (let i = 0; i < n; i++) {
       let st = states[i % states.length];
@@ -223,7 +223,7 @@ window.P_DATA = (() => {
         so: `0${(120 + i * 3)}/2024`,
         note: notes[st], state: st,
         path: RNG_PATHS[i % RNG_PATHS.length],
-        sel: st === 'ok' || st === 'filled',
+        sel: st === 'ok',
       });
     }
     return rows;

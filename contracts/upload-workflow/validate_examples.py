@@ -30,11 +30,12 @@ STATUSES = {"accepted", "running", "waiting_user", "partial",
             "succeeded", "failed", "canceled"}
 WAITING_ON = {"login", "review", "finalize", "confirm", None}
 NEXT_ACTIONS = {"login_required", "pick_files", "retry", "contact_admin", None}
-STAGES = {"prepared", "saved"}
+STAGES = {"prepared"}
 ENV_STATUSES = {"passed", "warning", "blocked"}
 LOGIN_STATUSES = {"authenticated", "awaiting_login", "closed", "unknown"}
 CAPABILITIES = {"login", "download_export", "audit_excel", "scan",
-                "prepare", "staff_options", "reconcile"}
+                "prepare", "staff_options"}
+
 
 SENSITIVE_KEY = re.compile(
     r"password|passwd|secret|token|credential|cookie|auth|session|"
@@ -89,8 +90,6 @@ COMMANDS = {
                        "opt": []},
     "upload.finish_review": {"req": ["website_id", "browser_id",
                                      "target_job_id"], "opt": []},
-    "upload.reconcile": {"req": ["website_id", "run_id", "audit_id"],
-                         "opt": []},
 }
 
 NULLABLE = {
@@ -262,7 +261,7 @@ def _opt_id(v, path, viols):
 
 
 def _check_data(kind, data, viols):
-    """Kiểm field đặc thù theo result.kind (unknown kind → bỏ qua)."""
+    """Kiểm các field đặc thù của kind đã khai báo trong contract."""
     if kind == "website_catalog":
         ws = data.get("websites")
         if not isinstance(ws, list):
@@ -299,8 +298,6 @@ def _check_data(kind, data, viols):
         for k in ("run_id", "audit_id", "browser_id"):
             _opt_id(data.get(k), f"data.{k}", viols)
         _str_list(data.get("active_job_ids"), "data.active_job_ids", viols)
-        _id_list(data.get("needs_reconcile_record_ids"),
-                 "data.needs_reconcile_record_ids", viols)
         if "has_excel" in data and not isinstance(
                 data["has_excel"], bool):
             viols.append(("validation_error", "data.has_excel not bool"))
@@ -335,14 +332,13 @@ def _check_data(kind, data, viols):
             _check_iso_datetime(login.get("checked_at"),
                                 "login.checked_at", viols, nullable=True)
         tabs = data.get("tabs")
+        if "tabs" in data and not isinstance(tabs, dict):
+            viols.append(("validation_error", "data.tabs not object"))
         if isinstance(tabs, dict):
-            for k in ("open_record_ids", "saved_record_ids",
-                      "closed_record_ids", "unknown_record_ids"):
+            for k in ("open_record_ids", "closed_record_ids",
+                      "unknown_record_ids"):
                 if k in tabs:
                     _id_list(tabs[k], f"tabs.{k}", viols)
-        for k in ("verified_record_ids", "needs_reconcile_record_ids"):
-            if k in data:
-                _id_list(data[k], f"data.{k}", viols)
     elif kind == "export_download":
         for k in ("from_date", "to_date"):
             if k in data:
@@ -399,15 +395,6 @@ def _check_data(kind, data, viols):
                     _int_nonneg(summ[k], f"summary.{k}", viols)
             _id_list(summ.get("open_record_ids"),
                      "summary.open_record_ids", viols, nullable=True)
-        for k in ("saved_record_ids", "needs_reconcile_record_ids"):
-            if k in data:
-                _id_list(data[k], f"data.{k}", viols)
-    elif kind == "reconcile_report":
-        _nonempty_str(data.get("run_id"), "data.run_id", viols)
-        _opt_id(data.get("audit_id"), "data.audit_id", viols)
-        for k in ("verified_record_ids", "needs_reconcile_record_ids"):
-            if k in data:
-                _id_list(data[k], f"data.{k}", viols)
 
 
 def _check_breakdown(bd, viols):
@@ -424,6 +411,12 @@ def _check_breakdown(bd, viols):
             if not isinstance(it, dict):
                 viols.append(("validation_error", f"{p} not object"))
                 continue
+            allowed = ({"record_id", "stage"} if sect == "succeeded" else
+                       {"record_id", "stage", "code", "message"})
+            for k in it:
+                if k not in allowed:
+                    viols.append(("validation_error",
+                                  f"{p}.{k} unexpected"))
             rid = it.get("record_id")
             if not (isinstance(rid, int) and rid >= 1):
                 viols.append(("validation_error",

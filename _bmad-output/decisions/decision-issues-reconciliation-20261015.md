@@ -9,7 +9,7 @@ status: accepted
 
 Owner yêu cầu sau lần viết lại spec: gom mọi bug đã báo và các việc chưa rõ/chưa triển khai thành các issue, cùng đề xuất thứ tự thực hiện. Yêu cầu nhiều issue thay riêng lựa chọn giữ một ticket tổng ngày 13/10 được ghi trong backlog #1.
 
-Giữ nguyên ID, filename và nội dung lịch sử #1. Đánh dấu tracking-only bằng blocker của repo store; không đánh dấu hành vi đã làm xong, không chạy ticket tổng đồng thời với các leaf. Catalog `_bmad-output/backlog/README.md` ánh xạ 26 draft C01–C26 tới #2–#27, report, bằng chứng và dependency thực sự. Hai scope bổ sung sau review là nghiệm thu tín hiệu Lưu portal thật và nguồn hành chính cùng ngày. Giữ 12 report mất ghi chú thành 12 bản ghi độc lập trong một việc điều tra bằng chứng; không đoán triệu chứng hoặc root cause.
+Lúc lập ban đầu, catalog ánh xạ 26 draft C01–C26 tới #2–#27. Hai scope bổ sung sau review là kiểm chứng tín hiệu Lưu portal thật (#26) và văn bản hành chính cùng ngày (#27). Quyết định owner ngày 15/10 sau đó đã bỏ scope theo dõi Lưu: #11 và #26 được giữ nguyên ID nhưng chuyển dropped; C27/#28 là draft cutover mới. Mười hai report mất ghi chú vẫn là 12 bản ghi độc lập; không đoán triệu chứng hoặc root cause.
 
 ## Ranh giới
 
@@ -22,3 +22,7 @@ Các quyết định sản phẩm mới nhất vẫn có hiệu lực theo spec 
 Nguồn: yêu cầu owner trong phiên gom issue 15/10/2026; `_bmad-output/decisions/decision-readable-module-specs-20261015.md`; `_bmad-output/decisions/decision-owner-doc-clarifications-20261015.md`.
 
 Dữ liệu cá nhân, raw notes và ảnh report giữ trong bằng chứng private ignored; catalog và issue chỉ ghi tóm tắt đã che và ID truy vết. Spec mô tả yêu cầu, không là bằng chứng runtime đã hoàn tất. Catalog ghi rõ lựa chọn còn chờ, phạm vi verification chưa có và các việc parked/excluded.
+
+## Cập nhật theo quyết định owner — 15/10/2026
+
+Catalog hiện có 27 ID leaf #2–#28; 25 active leaf chưa refined và hai leaf #11/#26 dropped. #1 vẫn tracking-only. #26 không còn là gate kiểm chứng tín hiệu portal; plan #11 giữ nguyên lịch sử nhưng câu hỏi A/B đã retired. C27/#28 ghi cutover runtime theo quyết định mới, vẫn là draft và không duyệt implementation.

@@ -39,7 +39,7 @@ python -m http.server 8137
 | Loại việc / sơ đồ | Thừa kế (sơ đồ quan hệ) ↔ Hai bên (30 chỗ) |
 | Kịch bản (Notary) | `3 tài sản·7 người` (gần ảnh duyệt) · `1 tài sản` · `Trống` · `30 người` · `60 người` (chứng minh không chặn 30) · `Tên dài & trùng` |
 | Kịch bản (Upload) | `Có dữ liệu` (bảng dài, tên file dài) · `Chưa nạp` · `Nhiều trạng thái dòng` |
-| Trạng thái | Cờ bật/tắt mặt trạng thái: Lỗi trường, Đang tải, Đã cũ, Xung đột, Đã khóa, Mock (Notary); Đang tải, waiting_user, Cần đối chiếu, Lỗi môi trường, Mock (Upload) |
+| Trạng thái | Cờ bật/tắt mặt trạng thái: Lỗi trường, Đang tải, Đã cũ, Xung đột, Đã khóa, Mock (Notary); Đang tải, waiting_user, Lỗi môi trường, Mock (Upload) |
 | Khung nhìn | Mô phỏng cửa sổ: 1280×800 · 1366×768 · 1920×1080 · 1536×864 (≈1920 @125%) · 1280×720 (≈1920 @150%) |
 
 ## Bản đồ màn / trạng thái
@@ -62,7 +62,7 @@ python -m http.server 8137
 | Tab | Có gì |
 |---|---|
 | Audit Sổ Công Chứng | Website + phiên đăng nhập + "Kiểm tra môi trường"/"Mở đăng nhập"; khoảng ngày + nguồn Excel (tải từ web/chọn tệp); 4 KPI; **hai bảng dọc tách được**: Số còn thiếu / Số lỗi-trùng (splitter kéo bằng chuột hoặc ↑/↓) |
-| Quét & Upload Hồ Sơ | Context (website + nguồn sổ), chọn thư mục, CCV/Thư ký, số tab mỗi đợt, 2 thanh tiến độ, banner **waiting_user** + **cần đối chiếu**, thanh thao tác (chọn/bỏ chọn, lọc lỗi, "Số thiếu trong Excel", Upload đã chọn, Tiếp tục N số, Đóng browser), **bảng hàng chờ 6 cột** với pill trạng thái + đường dẫn dài cắt đầu (`…\Scan\HS_0012.pdf`, tooltip full) |
+| Quét & Upload Hồ Sơ | Context (website + nguồn sổ), chọn thư mục, CCV/Thư ký, số tab mỗi đợt, 2 thanh tiến độ, banner **waiting_user**, thanh thao tác (chọn/bỏ chọn, lọc lỗi, "Số thiếu trong Excel", Upload đã chọn, tiếp tục thủ công hồ sơ đã chọn còn chưa chuẩn bị, Đóng browser), **bảng hàng chờ 6 cột** với pill trạng thái + đường dẫn dài cắt đầu |
 | Chuyển tab | Hai panel luôn mounted — **giữ trạng thái + vị trí cuộn** |
 
 ### Trạng thái — ở đâu xem
@@ -75,7 +75,7 @@ python -m http.server 8137
 | Dirty | Sửa ô bất kỳ → chấm trên `Cập nhật` + nhãn "Có thay đổi chưa cập nhật" |
 | Conflict | Cờ `Xung đột` (dialog không có nút ghi đè) |
 | Waiting user | Cờ `waiting_user` (Upload) |
-| Disabled | `Zalo` luôn disabled; cờ `Đã khóa` khóa toàn Stage; nút phụ thuộc ngữ cảnh (VD `Tiếp tục N số` chỉ bật khi waiting) |
+| Disabled | `Zalo` luôn disabled; cờ `Đã khóa` khóa toàn Stage; `Tiếp tục` chỉ bật trong waiting_user và chỉ tiến qua hồ sơ đã chọn còn chưa chuẩn bị |
 | Mock | Cờ `Mock` → banner MOCK trên đầu module |
 | Selected vs focus | Dòng queue chọn = nền accent nhạt; focus = vòng viền 2px — khác nhau rõ |
 

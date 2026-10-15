@@ -1,10 +1,10 @@
 # Upload — đối chiếu kho Word và điền website
 
-**Cập nhật:** 15/10/2026. Spec hành vi module; giữ phân biệt hướng được duyệt, đề xuất thị giác và giới hạn code đã quan sát.
+**Cập nhật:** 15/10/2026. Spec hành vi module; giữ phân biệt hướng được owner chốt, đề xuất thị giác và giới hạn code đã quan sát.
 
 ## 1. Mục đích và luồng
 
-Đọc Word cũ vì phần mềm văn phòng chưa có API lấy dữ liệu. Không tự đổi sang API/DB nguồn khác khi chưa chốt. Luồng: chọn website/đăng nhập → lấy sổ Excel → quét Word → đối chiếu/chọn hồ sơ → bóc trường → điền form → người dùng tự Lưu → xác minh hoặc đối chiếu lại.
+Đọc Word cũ vì phần mềm văn phòng chưa có API lấy dữ liệu. Không tự đổi sang API/DB nguồn khác khi chưa chốt. Luồng: chọn website/đăng nhập → nạp hoặc tải sổ Excel làm ảnh chụp theo website/khoảng ngày → quét Word → đối chiếu/chọn hồ sơ → bóc trường → điền form → người dùng tự kiểm tra và Lưu. Dữ liệu đã được website ghi nhận chính thức là nguồn sự thật (SOT); app không kết luận kết quả Lưu từ tín hiệu browser.
 
 DOC qua IFilter; DOCX giữ thứ tự đoạn/bảng để không trộn bên. Bóc người, người yêu cầu, tài sản, số/ngày công chứng, công chứng viên và loại văn bản. Kết quả giữ JSON, registry SQLite và manifest theo lượt quét; theo bộ trường DB/contract, không tự gộp hoặc suy dữ liệu thiếu. Chuẩn số công chứng hiện hành là xxx/yyyy; phân biệt năm và website, không suy số thứ tự là mã hồ sơ chung.
 
@@ -25,9 +25,9 @@ trong có đúng hai tab:
 - **Không có tab Cấu hình và không có tab/trang Nhật ký riêng.** Chức năng
   cấu hình/kiểm tra môi trường nằm đầu tab Audit (mục 2); log chẩn đoán chỉ
   tồn tại ở backend đã lọc, không hiển thị thành trang.
-- Bỏ trang Nhật ký **không có nghĩa** mất thông báo kết quả hay dữ liệu phục
-  hồi: kết quả/lỗi hiển thị inline tại vùng liên quan và trạng thái khôi phục
-  vẫn được backend lưu trữ.
+- Bỏ trang Nhật ký không làm mất kết quả/lỗi của scan, audit và job: hiển thị
+  inline tại vùng liên quan. Tiến độ job/workspace có thể được giữ để tiếp
+  tục công việc; không dùng làm bằng chứng hay phục hồi kết quả Lưu.
 
 #### Giữ trạng thái khi chuyển đổi
 
@@ -92,14 +92,26 @@ Bảng hồ sơ dùng đúng **sáu cột** (chuẩn MIN-77):
 
 `✓ | STT | Ngày | Số công chứng | Ghi chú | Địa chỉ file`
 
-#### Quy tắc chọn và phân loại (giữ nguyên từ hiện hành)
+#### Quy tắc chọn và phân lô
 
 - **Chưa có Excel**: vẫn cho quét và xem hồ sơ; không tự chọn là "thiếu trên
   web".
-- **Có Excel cùng website**: chọn mặc định các số hợp lệ chưa có trong sổ;
-  giữ ghi chú cho số sai format, sai năm, thiếu trường, trùng trong folder.
-- Người dùng bỏ chọn thủ công → poll/cập nhật nền **không tự chọn lại**; chỉ
-  bỏ khỏi bảng các hồ sơ đã xác minh **Lưu thành công** trên portal.
+- **Có Excel cùng website**: chọn mặc định các số hợp lệ chưa có trong ảnh
+  chụp sổ đang nạp; giữ ghi chú cho số sai format, sai năm, thiếu trường,
+  trùng trong folder. Ảnh chụp là dữ liệu chính thức từ website theo website,
+  năm/khoảng ngày và thời điểm tải/nạp; không dùng phản hồi của lần điền form
+  làm dữ liệu đã upload.
+- Người dùng bỏ chọn thủ công → poll/cập nhật nền **không tự chọn lại**.
+- Trong một lượt quét, app chỉ nhớ tiến độ hồ sơ đã chuẩn bị và quyền sở hữu
+  tài nguyên để phân lô; trạng thái này không chứng minh website đã Lưu và
+  không tạo danh sách chặn vĩnh viễn.
+- Người dùng bấm `Tiếp tục N số tiếp theo` để chuyển qua các hồ sơ đã chọn
+  nhưng chưa chuẩn bị trong lượt hiện tại. Hồ sơ đã chuẩn bị không tự đi vào
+  lô sau chỉ vì chưa được Lưu; app không tự mở lô, retry hoặc đưa hồ sơ chưa
+  Lưu vào queue.
+- Quét lại/chọn lại thủ công dùng phép đối chiếu bình thường với ảnh chụp
+  chính thức đang nạp. Tải/nạp Excel vẫn là thao tác hiện có; không thêm fetch
+  tự động hay bước đối chiếu bắt buộc sau khi điền.
 - `Lọc số lỗi` giữ cơ chế chọn-tạm-thời và `Hoàn tác lọc` của Qt; không đổi
   thành tìm kiếm tự do, không xóa vĩnh viễn dòng khác.
 - Dòng đã chọn xếp lên đầu; mọi thao tác dùng **`record_id` thật** — không
@@ -115,12 +127,13 @@ Bảng hồ sơ dùng đúng **sáu cột** (chuẩn MIN-77):
   quan và tự bấm Lưu trong Chromium. Không có nút "Finalize" trong app.
 - `Dừng` kết thúc sau đơn vị đang xử lý theo khả năng engine; trạng thái "đã
   yêu cầu dừng" không đồng nghĩa browser đã ngừng ngay.
-- `Đã điền sẵn`, `Đang chờ kiểm tra`, `Đã lưu trên web`, `Lỗi` là các trạng
-  thái **khác nhau** trên dòng/trạng thái job. Nút "Xong kiểm tra"
-  (`finish_review`) chỉ kết thúc bước chờ — không phải bằng chứng đã Lưu.
-- Hồ sơ có thể đã Lưu nhưng chưa xác minh được phải vào nhóm **Cần đối
-  chiếu**, hiển thị ngay trong bảng/thanh trạng thái; không được gửi lại cho
-  tới khi đối chiếu xong (sổ mới hoặc xác nhận người dùng).
+- Dòng và job thể hiện tiến độ chuẩn bị/chờ người/lỗi; app không gán trạng
+  thái Lưu suy từ browser hoặc cộng dồn số đếm Lưu suy từ browser. Phân loại
+  hiện diện trong sổ chính thức vẫn được giữ.
+- Người dùng có thể chủ ý không Lưu vì form lỗi, trùng hoặc lý do nghiệp vụ.
+  Tình trạng không rõ Lưu không tự sinh cảnh báo, khóa UI, thao tác giải
+  phóng, retry hoặc lô chuẩn bị lại. Người dùng tự quyết định thao tác tiếp
+  theo theo dữ liệu chính thức của website.
 
 ### 2.4. Dropdown website dùng chung
 
@@ -147,21 +160,24 @@ Bảng hồ sơ dùng đúng **sáu cột** (chuẩn MIN-77):
 - **Ngày**: trên dây truyền/backend dùng ISO `YYYY-MM-DD`; UI hiển thị
   `DD/MM/YYYY`; bộ xử lý website chuyển sang định dạng portal. Giá trị không
   có là `null` → hiển thị trống/"—", không hiển thị `null` hay `""`.
-- **Trạng thái chờ người** (`waiting_user`): banner trong module nêu rõ việc
-  cần làm ("Đăng nhập trên cửa sổ Chromium", "Kiểm tra các tab đã điền");
-  không phải lỗi. Chromium do Python quản lý chỉ được đưa lên trước **một
-  lần có chủ đích**, không giật focus lặp lại.
+- **Trạng thái chờ người** (`waiting_user`): banner nêu rõ việc cần làm
+  ("Đăng nhập trên cửa sổ Chromium", "Kiểm tra các tab đã điền"); đây là bước
+  thao tác của người, không phải trạng thái Lưu. Chromium do Python quản lý
+  chỉ được đưa lên trước **một lần có chủ đích**, không giật focus lặp lại.
+- **Tài nguyên browser**: trạng thái mở/đóng tab và phiên chỉ mô tả tài nguyên
+  đang được app quản lý; không suy ra trạng thái đã Lưu trên website.
 - **Lỗi**: hiển thị inline tại vùng liên quan theo shape lỗi của contract
   (code + message + retryable + next_action); nút Thử lại chỉ khi
-  `retryable: true`. **Không in JSON, tên command, hay stack trace** cho
-  người dùng.
+  `retryable: true`. Đây là xử lý lỗi job thông thường, không tự retry hay
+  xếp lại hồ sơ chỉ vì người dùng chưa Lưu. **Không in JSON, tên command, hay
+  stack trace** cho người dùng.
 - **Không tự hoàn thành bước của người**: không auto-Save, không tự xác nhận
   đăng nhập/review, không tự điền lựa chọn còn trống.
-- **Hủy**: có ở trạng thái đang chạy/chờ; hủy không hoàn tác một lần Lưu đã
-  xảy ra và không tự đóng các tab người dùng đang kiểm tra.
+- **Hủy**: có ở trạng thái đang chạy/chờ; hủy không tự đóng các tab người
+  dùng đang kiểm tra. Hủy job không phải bằng chứng về kết quả lưu trên web.
 
 <a id="portal"></a>
-## 3. Đăng nhập và tín hiệu Lưu
+## 3. Đăng nhập và thao tác Lưu
 
 Một Chromium dùng chung để đăng nhập, tải sổ và điền form. Không lưu username/password; storage state cục bộ phải được bảo vệ vì có token. Với website hiện hành, nhận diện đăng nhập qua access_token và đã rời trang đăng nhập; nút xác nhận chỉ kiểm ngay trạng thái thực.
 
@@ -180,50 +196,56 @@ Các bước lỗi phải nêu nguyên nhân và cách thử lại; không bắt
 - URL mặc định là `https://congchungnamdinh.ninhbinh.gov.vn`.
 - Route đăng nhập và tạo nhanh được tự suy ra từ địa chỉ web. Có thể đặt `ND_LOGIN_URL` hoặc `ND_CREATE_URL` trong `.env` nếu web đổi route.
 - Token đăng nhập nằm trong local storage, không phải cookie. Playwright lưu lại storage state sau khi phát hiện đăng nhập thành công.
-- Phải phân biệt hai luồng, đối chiếu source ngày 15/10/2026: workflow v1
-  chỉ đánh dấu đã Lưu khi tab nhận `POST /api/hoso` trả HTTP 2xx; chỉ rời trang
-  tạo mới thì chuyển sang cần đối chiếu (`needs_reconcile`). Luồng legacy
-  không truyền `workflow_version` còn nhận cả dấu hiệu rời trang. Không áp
-  fallback của legacy cho v1; [contract workflow](../../../contracts/upload-workflow.md)
-  vẫn Draft, việc mô tả code ở đây không nâng trạng thái duyệt của contract.
-- Mỗi tab gắn một `record_id`. Với v1, đóng tab/browser trước khi có kết quả
-  đã xác minh phải đối chiếu lại; không tự mở lại hoặc gửi lại hồ sơ chưa rõ.
-  Luồng legacy cũ có thể cho chuẩn bị lại khi tab đóng.
-- Engine dùng sự kiện phản hồi trên tab do app mở, rồi kiểm tra khoảng 0,5
-  giây khi rảnh; thao tác đang chạy có thể làm chậm vòng kiểm tra. Không có
-  thời hạn tự coi hồ sơ chưa bấm Lưu là đã Lưu. Máy ngủ không được kiểm tra;
-  sau gián đoạn cần đối chiếu các hồ sơ chưa rõ, không bảo đảm giữ nội dung
-  form chưa Lưu qua lần đóng browser hoặc khởi động lại app.
-- Giới hạn hiện tại: code kiểm phương thức/path/mã HTTP, chưa kiểm nội dung
-  phản hồi, hostname hoặc tính đầy đủ của từng trường. Chưa có bằng chứng cổng
-  thật luôn dùng HTTP lỗi cho lỗi nghiệp vụ. Một lần POST 2xx được tính cho cả
-  hồ sơ; engine không xác minh từng trường đã lưu đủ hay chỉ lưu một phần.
-- Đã tái hiện bằng mô phỏng: nhận phản hồi Lưu rồi đóng tab trước vòng kiểm
-  tra tiếp theo có thể vẫn bị ghi là `closed`/cần đối chiếu, vì code kiểm tab
-  đóng trước cờ phản hồi. Nếu mất phản hồi mà vẫn ở trang tạo mới, tab có thể
-  tiếp tục chờ vô thời hạn. Cần kiểm cổng thật và các tình huống gián đoạn
-  trước khi kết luận tín hiệu này đủ tin cậy; chưa sửa engine trong phiên docs.
-- Log mạng chỉ ghi phương thức, URL không có query string và mã trạng thái; không ghi token, cookie hay nội dung request.
+- **Quy tắc owner:** app chỉ điền sẵn biểu mẫu rồi dừng trước nút Lưu; người
+  dùng tự kiểm tra và quyết định có bấm Lưu hay không. Người dùng có thể chủ ý
+  không Lưu do form lỗi, trùng hoặc lý do nghiệp vụ và chấp nhận rủi ro sự cố.
+- Dữ liệu đã được website ghi nhận chính thức là SOT. Tải Excel từ website
+  hoặc nạp Excel hiện có chỉ cung cấp ảnh chụp theo website, năm/khoảng ngày
+  và thời điểm nạp. Không biến phản hồi POST, route/điều hướng, đóng tab,
+  `finish_review` hoặc sự kiện cục bộ thành `uploaded_success` hay sự thật
+  rằng hồ sơ đã Lưu.
+- Không tích lũy trạng thái/số đếm Lưu suy từ browser, `needs_reconcile`,
+  khóa UI vì chưa rõ kết quả Lưu hoặc thao tác giải phóng tương ứng. Phân loại
+  có/thiếu trong sổ dựa trên dữ liệu website vẫn được dùng. Không tự retry/
+  phục hồi Lưu hoặc đưa hồ sơ chưa Lưu vào đợt sau; không tự mở đợt tiếp theo.
+- Trong lượt hiện tại, app chỉ nhớ tiến độ hồ sơ đã chuẩn bị và quyền sở hữu
+  tài nguyên để chia đợt; điều đó không chứng minh website đã Lưu và không
+  tạo blacklist vĩnh viễn. `Tiếp tục` do người dùng bấm, qua các hồ sơ đã
+  chọn nhưng chưa chuẩn bị.
+- Quét/chọn lại thủ công dùng đối chiếu thông thường với ảnh chụp sổ chính
+  thức đang nạp. Tải/nạp Excel giữ nguyên là thao tác do người dùng khởi
+  tạo; không có fetch tự động hoặc bước đối chiếu bắt buộc để phục hồi kết
+  quả Lưu.
+- **Hiện trạng runtime (chưa cutover):** code còn theo dõi kết quả Lưu và
+  có giao diện đối chiếu; runtime chưa đổi. Xem draft
+  [#28](../../backlog/story-upload-web-official-sot-cutover.md).
+- Contract [workflow](../../../contracts/upload-workflow.md) vẫn Draft; spec
+  này không nâng trạng thái duyệt của contract.
 
 ### 3.3. Không làm trong phạm vi này
 
 - Không nhúng Chrome vào giao diện app.
 - Không gửi hồ sơ bằng REST API thay cho Playwright.
 - Không tự bấm nút Lưu thay người dùng.
-- Không tự mở ngay đợt kế tiếp sau khi phát hiện Lưu.
+- Không tự mở đợt kế tiếp.
 
 ## 4. Lỗi, dữ liệu và khôi phục
 
-Engine Python sở hữu quét, audit, browser và registry; Electron không chứa parser/Playwright. Lỗi đọc một file ghi theo record, không làm mất record khác. File đang mở, đường dẫn dài/Unicode hoặc thiếu quyền phải có lỗi rõ. Không để luồng legacy và Electron cùng chiếm browser hoặc ghi registry; quay lui phải giữ dữ liệu cả hai để đối chiếu.
+Engine Python sở hữu quét, audit, browser và registry; Electron không chứa parser/Playwright. Lỗi đọc một file ghi theo record, không làm mất record khác. File đang mở, đường dẫn dài/Unicode hoặc thiếu quyền phải có lỗi rõ. Không để luồng legacy và Electron cùng chiếm browser hoặc ghi registry; khi chuyển đổi phiên bản giữ dữ liệu mỗi bên để đối soát kho.
 
-IFilter khi Word đang mở và sự kiện ổ mạng phải được đo trên máy thật khi ảnh hưởng luồng. Website mới chỉ bật khi có bộ xử lý/selectors và mẫu file thật. Bằng chứng POC giả lập không là nghiệm thu cổng thật.
+IFilter khi Word đang mở và sự kiện ổ mạng phải được đo trên máy thật khi ảnh hưởng luồng. Website mới chỉ bật khi có bộ xử lý/selectors và mẫu file thật. Bằng chứng POC giả lập không là nghiệm thu cổng thật. Trạng thái job/workspace có thể được lưu để tiếp tục công việc; dữ liệu này không phải bằng chứng Lưu hoặc cơ chế phục hồi kết quả POST.
 
 ## 5. Kiểm chứng và việc còn mở
 
-- Quét chưa có Excel vẫn xem được nhưng không tự gọi hồ sơ là thiếu trên web. Đổi nguồn/website phải bỏ kết quả không còn đúng ngữ cảnh.
-- Đã điền, đang chờ người, đã lưu và cần đối chiếu là các trạng thái riêng. Không gửi lại hồ sơ chưa rõ kết quả; không tự mở đợt sau.
-- Đối chiếu phải kiểm nguồn thật, dữ liệu từng trường và số bản ghi. Ít cảnh báo hoặc test xanh không chứng minh đọc đúng.
-- Owner coi module tương đối hoàn thiện; chưa có bằng chứng trong đợt docs này để kết luận chỉ còn regex/website mới. Tín hiệu Lưu và gián đoạn vẫn cần kiểm cổng thật.
+- Đã điền, đang chờ người và lỗi là trạng thái của việc chuẩn bị/chờ thao tác;
+  không có trạng thái Lưu suy từ browser hay đối chiếu kết quả Lưu. Phân loại
+  hiện diện trong sổ chính thức vẫn được dùng.
+- Dữ liệu chính thức từ website là SOT; ảnh chụp Excel cần đúng website,
+  năm/khoảng ngày và thời điểm nạp. Đối chiếu đầu vào không suy từ phản hồi
+  cục bộ.
+- Owner đã chốt bỏ theo dõi kết quả Lưu suy từ browser và chấp nhận rủi ro
+  người dùng có thể không Lưu. Code còn khác quy tắc này; cần cutover riêng,
+  không yêu cầu xác minh kết quả lưu trên portal.
 - Chi tiết màu/kích thước riêng của Upload trong bản cũ còn Proposed; không nâng thành đã duyệt. Bộ token giao diện chung giữ hiệu lực.
 
 ## 6. Tra cứu

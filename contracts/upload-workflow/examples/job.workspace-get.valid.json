@@ -15,7 +15,6 @@
       "audit_id": "aud_7",
       "browser_id": "brw_1",
       "active_job_ids": [],
-      "needs_reconcile_record_ids": [],
       "has_excel": true,
       "queue_revision": 7
     },

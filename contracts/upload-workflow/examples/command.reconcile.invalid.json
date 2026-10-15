@@ -53,5 +53,6 @@
   "client_meta": {
     "shell_version": "0.2.0",
     "module": "upload"
-  }
+  },
+  "expected_error": "validation_error"
 }

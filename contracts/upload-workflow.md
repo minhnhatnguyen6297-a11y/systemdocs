@@ -75,8 +75,9 @@ codes và quy tắc nghiệp vụ của namespace `upload.*`.
    tên thư mục. Manifest thiếu → `file_not_found`; hash/binding sai →
    `manifest_mismatch`. Lỗi đọc registry/manifest là **lỗi** — không đổi
    thành thành công với danh sách rỗng.
-4. Backend tính danh sách loại trừ (đã có trên web / đã Lưu / cần đối chiếu)
-   từ audit và registry thật — không tin danh sách số do renderer tự dựng.
+4. Backend xác định hiện diện trên web từ audit chính thức đã bind đúng
+   website/file/khoảng ngày; dữ liệu registry cục bộ chỉ phục vụ quét và
+   tiến độ chuẩn bị. Không suy trạng thái upload từ POST hoặc browser.
 
 **Quy ước null:** `null` = không quan sát được / không áp dụng; `""` **không
 hợp lệ** thay `null` (g1 §6) — cụ thể áp cho các khóa ID/tham chiếu/datetime/
@@ -104,7 +105,7 @@ Registry hiện có đúng một website:
 
 | website_id | label | display_url | capabilities |
 |---|---|---|---|
-| `nam_dinh` | Nam Định | `https://congchungnamdinh.ninhbinh.gov.vn` | `login`, `download_export`, `audit_excel`, `scan`, `prepare`, `staff_options`, `reconcile` |
+| `nam_dinh` | Nam Định | `https://congchungnamdinh.ninhbinh.gov.vn` | `login`, `download_export`, `audit_excel`, `scan`, `prepare`, `staff_options` |
 
 - `capabilities` liệt kê thao tác website đó hỗ trợ thật; UI chỉ bật nút theo
   capability. Frontend **không** chứa danh sách URL hay nhánh nghiệp vụ theo
@@ -124,22 +125,21 @@ luồng mới.
 | Command | Request chính | Result chính (trong `result.data`) |
 |---|---|---|
 | `upload.websites` — mới | `workflow_version` | `websites[]` (website_id, label, display_url, capabilities, status), `selected_website_id` |
-| `upload.workspace_get` — mới | `workflow_version`, `website_id` (null = đọc lựa chọn đã lưu) | workspace: `website_id`, `revision`, `run_id`, `audit_id`, `browser_id`, `active_job_ids`, `needs_reconcile_record_ids`, `has_excel`, `queue_revision` |
+| `upload.workspace_get` — mới | `workflow_version`, `website_id` (null = đọc lựa chọn đã lưu) | workspace: `website_id`, `revision`, `run_id`, `audit_id`, `browser_id`, `active_job_ids`, `has_excel`, `queue_revision` |
 | `upload.website_select` — mới | `workflow_version`, `website_id`, `expected_revision` | workspace của website mới; từ chối khi website cũ còn hoạt động |
 | `upload.env_check` — bổ sung | `workflow_version`, `website_id` | `status`, `steps[]` đạt/cảnh báo/bị chặn + hướng dẫn đã lọc |
 | `upload.session_start` — bổ sung | `workflow_version`, `website_id`, `expected_revision` | job → `waiting_user(login)`; result `session_state` gồm `browser_id`, `login`, `staff_options`; không chứa credential |
 | `upload.confirm_login` — bổ sung | `workflow_version`, `website_id`, `browser_id`, `target_job_id` | xác nhận đúng job `waiting_on=login`; backend vẫn kiểm trạng thái đăng nhập thật |
-| `upload.session_status` — bổ sung | `workflow_version`, `website_id`, `browser_id` | `login`, `tabs` (open/saved/closed/unknown record ids); không trả cookie |
-| `upload.session_close` — bổ sung | `workflow_version`, `website_id`, `browser_id` | `closed`, `verified_record_ids`, `needs_reconcile_record_ids` |
-| `upload.download_export` — bổ sung | `workflow_version`, `website_id`, `browser_id`, `from_date`, `to_date` | `file_ref` sổ tải xong kèm `from_date`/`to_date` |
+| `upload.session_status` — bổ sung | `workflow_version`, `website_id`, `browser_id` | `login`, trạng thái tab `open/closed/unknown` chỉ về tài nguyên; không trả cookie |
+| `upload.session_close` — bổ sung | `workflow_version`, `website_id`, `browser_id` | `closed` và trạng thái tab đóng/không xác định chỉ về tài nguyên |
+| `upload.download_export` — bổ sung | `workflow_version`, `website_id`, `browser_id`, `from_date`, `to_date` | `file_ref` sổ chính thức tải xong kèm `from_date`/`to_date` |
 | `upload.audit_excel` — bổ sung | `workflow_version`, `website_id`, `file_ref`, `from_date`, `to_date` | `audit_id`, `summary`, `missing[]`, `issues[]`; backend giữ tập số phục vụ đối chiếu |
 | `upload.scan` — bổ sung | `workflow_version`, `website_id`, `folder`, `expected_revision` (+`full_rescan`, `modified_since` tùy chọn) | `run_id`, `manifest_ref` tới **file**, `stats`, `records[]`, `revision` mới |
 | `upload.queue_get` — mới | `workflow_version`, `website_id`, `run_id`, `audit_id` (null được) | `queue_revision`, `folder_rows[]`, `missing_in_excel_record_ids`, `has_excel` |
 | `upload.staff_options` — mới | `workflow_version`, `website_id`, `browser_id` (null được), `refresh` | `cong_chung_vien[]`, `source` (cache/portal), `fetched_at` |
 | `upload.preferences` — mới | `workflow_version`, `website_id`, `values` (thiếu = đọc) | `chunk_size`, `cong_chung_vien`, `thu_ky`; không nhận URL/token tự do |
-| `upload.prepare` — bổ sung | `workflow_version`, `website_id`, `browser_id`, `run_id`, `audit_id` (null được), `queue_revision`, `record_ids[]`, `chunk_size`, `cong_chung_vien`, `thu_ky` | job → `waiting_user(review)`; result `upload_prepare`: `summary`, `breakdown`, `saved_record_ids`, `needs_reconcile_record_ids` |
-| `upload.finish_review` — bổ sung | `workflow_version`, `website_id`, `browser_id`, `target_job_id` | kết thúc đúng bước kiểm tra; **không** tự đánh dấu `uploaded_success` |
-| `upload.reconcile` — mới | `workflow_version`, `website_id`, `run_id`, `audit_id` (mới, bắt buộc) | `verified_record_ids`, `needs_reconcile_record_ids`; không tự gửi lại |
+| `upload.prepare` — bổ sung | `workflow_version`, `website_id`, `browser_id`, `run_id`, `audit_id` (null được), `queue_revision`, `record_ids[]`, `chunk_size`, `cong_chung_vien`, `thu_ky` | job → `waiting_user(review)`; result `upload_prepare`: tiến độ chuẩn bị, tab mở và breakdown |
+| `upload.finish_review` — bổ sung | `workflow_version`, `website_id`, `browser_id`, `target_job_id` | kết thúc đúng bước chờ review; không trả kết luận đã Lưu |
 
 ## 6. Schema chi tiết
 
@@ -157,7 +157,7 @@ data:
     - website_id: "nam_dinh"
       label: "Nam Định"
       display_url: "https://congchungnamdinh.ninhbinh.gov.vn"
-      capabilities: [login, download_export, audit_excel, scan, prepare, staff_options, reconcile]
+      capabilities: [login, download_export, audit_excel, scan, prepare, staff_options]
       status: "available"        # available | unavailable
   selected_website_id: "nam_dinh" | null
 ```
@@ -176,7 +176,6 @@ data:
   audit_id: "aud_7" | null
   browser_id: "brw_1" | null
   active_job_ids: ["job_..."]    # job chưa terminal của website này
-  needs_reconcile_record_ids: [140, 141]
   has_excel: true
   queue_revision: 7 | null       # null khi chưa có run
 ```
@@ -241,8 +240,8 @@ data:
 - `confirm_login` chỉ *xin* xác nhận — job `session_start` vẫn kiểm trạng
   thái portal thật trước khi `succeeded`; không đăng nhập thật →
   `upload.login_not_confirmed`.
-- `finish_review` kết thúc bước chờ của job prepare; **không** tự đánh dấu
-  `uploaded_success` — trạng thái Lưu tiếp tục đọc qua `session_status`.
+- `finish_review` chỉ kết thúc bước chờ của job prepare; result không báo hoặc
+  suy ra trạng thái Lưu. Người dùng vẫn tự thao tác trên portal.
 
 ### 6.6 `upload.session_status` → kind `session_state`
 
@@ -254,10 +253,9 @@ data:
   browser_id: "brw_1"
   login: { status: "authenticated", checked_at: "2026-09-24T10:05:00Z" }
   tabs:
-    open_record_ids: [140, 141]        # đang mở/đã điền, chờ người kiểm
-    saved_record_ids: [138, 139]       # đã xác minh Lưu trên portal
-    closed_record_ids: [137]           # đóng trước khi Lưu
-    unknown_record_ids: [142]          # mất dấu trước khi xác định
+    open_record_ids: [140, 141]        # tab đang mở, trạng thái tài nguyên
+    closed_record_ids: [137]           # tab đã đóng, không suy ý nghĩa Lưu
+    unknown_record_ids: [142]          # không xác định được trạng thái tài nguyên
 ```
 
 Đây là lệnh poll gộp trong lúc job chờ — được gọi thoải mái, không đổi
@@ -272,13 +270,12 @@ data:
   website_id: "nam_dinh"
   browser_id: "brw_1"
   closed: true
-  verified_record_ids: [138, 139]
-  needs_reconcile_record_ids: [142]
+  closed_record_ids: [137]
+  unknown_record_ids: [142]
 ```
 
-Trước khi đóng, backend poll/reconcile các tab còn đọc được; tab không xác
-định → `needs_reconcile_record_ids`. Đóng không hoàn tác một lần Lưu đã xảy
-ra.
+Đóng phiên chỉ kết thúc tài nguyên browser và trả trạng thái tab nếu biết;
+không poll kết quả POST, phân loại đã/chưa Lưu hoặc tạo trạng thái phục hồi.
 
 ### 6.8 `upload.download_export` → kind `export_download`
 
@@ -320,11 +317,12 @@ data:
     - { stt: 1, ngay: "2026-03-14", so_cong_chung: "98/2026", ghi_chu: "trung_so: ..." }
 ```
 
-Backend giữ binding `audit_id → website + file_ref + khoảng ngày + tập số hợp
-lệ` để phục vụ `queue_get`/`prepare` loại trừ. `ngay` ISO hoặc `null`;
-`ghi_chu` có thể `""`. `ghi_chu` ở bảng audit là văn bản do **engine tự định
-nghĩa** (vd `trung_so: ...`) — không chia từ vựng với `ghi_chu` của queue
-ở §6.11.
+Backend giữ binding `audit_id → website + file_ref + khoảng ngày + tập số
+hợp lệ` để phục vụ `queue_get`/`prepare` đối chiếu với ảnh chụp chính thức.
+Đây là bằng chứng hiện diện trong sổ theo phạm vi đã nạp, không phải trạng
+thái suy ra từ request của browser. `ngay` ISO hoặc `null`; `ghi_chu` có thể
+`""`. `ghi_chu` ở bảng audit là văn bản do **engine tự định nghĩa** (vd
+`trung_so: ...`) — không chia từ vựng với `ghi_chu` của queue ở §6.11.
 
 ### 6.10 `upload.scan` → kind `scan_report`
 
@@ -383,6 +381,9 @@ data:
 - `ghi_chu` theo engine: `chua co trong Excel`, `da co trong Excel`,
   `sai format`, `sai nam`, `khong co so`, `trung trong folder`,
   `missing: <fields>`, `chua load Excel` — ghép bằng `; `.
+- `selected` phản ánh đối chiếu với ảnh chụp audit chính thức hiện tại; queue
+  revision bảo vệ thao tác. Prepared progress chỉ loại các ID đã chuẩn bị
+  khỏi lô tiếp theo trong lượt hiện tại; không phải kết luận Lưu hay blacklist.
 
 ### 6.12 `upload.staff_options` → kind `staff_options`
 
@@ -431,8 +432,8 @@ rỗng, không trùng), `chunk_size` (R, int 1–30), `cong_chung_vien` (R, **N*
 
 Job mở tối đa `chunk_size` tab đã điền (dry-run) rồi `waiting_user(review)`
 tới khi `finish_review` đúng `target_job_id`, cancel, hoặc
-`upload.review_timeout` (60 phút). Trong lúc chờ, trạng thái tab đọc qua
-`upload.session_status` — job **không** nhận result hoàn tất giả.
+`upload.review_timeout` (60 phút). Trong lúc chờ, `upload.session_status`
+chỉ báo trạng thái tài nguyên tab, không báo kết quả Lưu.
 
 ```yaml
 data (result cuối):
@@ -443,57 +444,34 @@ data (result cuối):
   summary:
     total_requested: 5
     prepared_count: 4
-    remaining: 26                # hồ sơ đã chọn còn lại chưa mở (đợt sau)
+    remaining: 26                # hồ sơ đã chọn còn lại chưa chuẩn bị
     open_record_ids: [138, 139, 141, 142]
   breakdown:
     succeeded: [{ record_id: 138, stage: "prepared" }, ...]
     failed:    [{ record_id: 140, stage: "prepared",
                   code: "extract_failed", message: "..." }]
-  saved_record_ids: [138, 139]   # đã xác minh Lưu khi job kết thúc
-  needs_reconcile_record_ids: [142]
 ```
 
-- `stage ∈ {prepared, saved}`: `prepared` = điền biểu mẫu/mở tab;
-  `saved` = ghi nhận Lưu trên portal. Một phần lỗi → job `partial` với
-  `data.breakdown` đầy đủ (desktopcommand §5) + `error.code
-  upload.partial_failure`.
-- Backend loại trừ theo audit/registry thật; `record_ids` ngoài run →
-  `scope_violation`; `queue_revision` cũ → `stale_revision`; browser đang bận
-  → `browser_busy`; manifest thiếu/sai → `file_not_found`/`manifest_mismatch`.
+- `stage` trong breakdown là `prepared`; bucket `succeeded`/`failed` và `code`
+  phân biệt kết quả chuẩn bị. Không có stage hoặc trường kết quả Lưu. Một
+  phần lỗi → job `partial` với `data.breakdown` đầy đủ (desktopcommand §5)
+  + `error.code upload.partial_failure`.
+- Backend kiểm scope theo website/run/audit/revision và tài nguyên browser;
+  `record_ids` ngoài run → `scope_violation`; `queue_revision` cũ →
+  `stale_revision`; browser đang bận → `browser_busy`; manifest thiếu/sai →
+  `file_not_found`/`manifest_mismatch`.
+- Tiến độ prepared chỉ thuộc lượt `run_id` hiện tại. Hồ sơ đã chuẩn bị không
+  tự phát lại hoặc chuyển sang lô kế. `remaining` là số hồ sơ đã chọn còn
+  chưa chuẩn bị trong run, bất kể người dùng đã Lưu trên web hay chưa. Người
+  dùng chủ động gửi `prepare` kế tiếp với tập hồ sơ đã chọn còn chưa chuẩn bị;
+  không có lô kế tự chạy.
 - **Prepare semantics (v1):** engine điền biểu mẫu rồi dừng — **không
   bao giờ** click `Lưu`/Finalize, kể cả click "mồi" để ép client-side
   validation của `ten_hop_dong`. Kiểm tra tên hợp đồng dựa vào
   field-commit events (change/blur/Tab) — đường không-submit.
-  *NOTE:* portal thật chỉ hiện lỗi `ten_hop_dong` sau khi submit thử —
-  pilot real-portal phải xác nhận validation vẫn lộ ra khi không bấm
-  Lưu; nếu không, `prepared_partial` mất tín hiệu sớm trên field này.
-
-### 6.15 `upload.reconcile` → kind `reconcile_report`
-
-Payload: `website_id` (R), `run_id` (R), `audit_id` (R — audit **mới** đã nạp,
-bắt buộc: đối chiếu theo sổ mới, không theo Excel cũ).
-
-```yaml
-data:
-  website_id: "nam_dinh"
-  run_id: "run_x9k2"
-  audit_id: "aud_8"
-  verified_record_ids: [142]          # xác minh đã có trên web
-  needs_reconcile_record_ids: [143]   # vẫn cần người kiểm tra
-```
-
-Đối chiếu theo **website**, không theo run: mọi flag `needs_reconcile` của
-`website_id` đều được kiểm với audit mới — kể cả flag mất provenance
-(`run_id=NULL`) hay stamp run khác. `needs_reconcile.run_id` chỉ là
-provenance (record thuộc đợt nào), không phải scope của lệnh đối chiếu —
-cơ chế chặn (workspace/prepare/retry-guard) đã đọc theo website, nên lệnh
-duy nhất có thể gỡ flag cũng phải đọc theo website để không wedge vĩnh
-viễn. `run_id` trong payload vẫn bắt buộc: audit mới được bind vào run đó
-và `queue_revision` của run được refresh (cùng mọi run còn stamp trên flag
-được xác minh).
-
-Không tự gửi lại: `verified` chỉ mở khóa hiển thị "đã có trên web";
-`needs_reconcile` giữ chặn cho tới khi người dùng/audit kế xác minh.
+  *NOTE:* portal thật hiện lỗi `ten_hop_dong` sau khi thử submit; pilot real-
+  portal phải xác nhận lỗi còn lộ ra khi không bấm Lưu. Nếu không, lỗi này
+  không được báo sớm trong kết quả `prepared_partial`.
 
 ## 7. Quy tắc vận hành
 
@@ -504,28 +482,22 @@ Không tự gửi lại: `verified` chỉ mở khóa hiển thị "đã có trê
 2. **waiting_user:** job `waiting_on=login|review` vẫn theo dõi được qua
    `session_status`; không đưa result hoàn tất giả vào job đang chạy. Poll
    được gộp, không chồng request; kết quả truy vấn ngắn hạn dọn khỏi bộ nhớ
-   theo giới hạn xác định.
-3. **Hủy:** `POST .../cancel` → `canceled`; cancel **không** hoàn tác Lưu đã
-   xảy ra, không tự đóng tab người đang kiểm. Trước khi đóng browser backend
-   reconcile các tab đọc được; không xác định → `needs_reconcile`.
-   **Bằng chứng Lưu (v1, strict):** chỉ `POST /api/hoso` HTTP 2xx đã xác
-   minh mới tính `saved`. Tab rời trang tạo mới mà không có POST đó là
-   kết quả chưa rõ → `closed`/uncertain → `needs_reconcile` — KHÔNG
-   `uploaded_success`. Tab uncertain vẫn được theo dõi: POST 2xx đến sau
-   tự khôi phục sang `saved`; chỉ đường legacy (không
-   `workflow_version`) mới coi điều hướng khỏi trang tạo là đã Lưu.
+   theo giới hạn xác định. Tab state chỉ mô tả tài nguyên, không ý nghĩa Lưu.
+3. **Hủy:** `POST .../cancel` → `canceled`; cancel không tự đóng tab người
+   đang kiểm. Người dùng thao tác Lưu trực tiếp trên website; contract không
+   suy kết quả Lưu từ thao tác, response hay tab đóng.
 4. **Restart:** sidecar restart → in-flight `failed{engine_restarted,
    retryable:true}`. Job store giữ tối thiểu `command_id`, hash request,
-   website, run, job, browser, `record_ids`, kết quả đã xác minh — **không**
-   lưu cookie. Không phát lại upload mù sau crash; hồ sơ chưa rõ vào nhóm
-   Cần đối chiếu.
+   website, run, job, browser, `record_ids` và tiến độ/kết quả chuẩn bị —
+   **không** lưu cookie hoặc Save result. Không tự phát lại ID đã chuẩn bị
+   khi retry/restart; đợt tiếp do người dùng gửi với tập chưa chuẩn bị.
 5. **Ngày:** wire ISO `YYYY-MM-DD`; UI `DD/MM/YYYY`; bộ xử lý đổi sang định
    dạng portal.
 6. **`file` → `file_ref`:** luồng versioned dùng `file_ref` (FileRef) ở
    `download_export`/`audit_excel`/`manifest_ref`; legacy giữ `file`/path
    như cũ. Renderer không tự dựng path.
-7. **Dry-run:** không auto-Save/Finalize; `Đã điền sẵn` ≠ `Đã lưu trên web`;
-   `finish_review` không phải bằng chứng Lưu.
+7. **Dry-run:** không auto-Save/Finalize; `finish_review` kết thúc chờ review,
+   không đọc hoặc kết luận kết quả lưu. Tiến độ `prepared` không phải đã Lưu.
 
 ## 8. Error codes
 
@@ -579,13 +551,15 @@ credential/cookie.
    vào kho mới.
 3. Command mới (không tồn tại legacy): `upload.websites`,
    `upload.workspace_get`, `upload.website_select`, `upload.queue_get`,
-   `upload.staff_options`, `upload.preferences`, `upload.reconcile` — gọi
-   không có/ sai `workflow_version` → `unsupported_workflow_version`.
+   `upload.staff_options`, `upload.preferences` — gọi không có/sai
+   `workflow_version` → `unsupported_workflow_version`.
 4. **Khóa xung đột:** backend không cho luồng legacy và versioned đồng thời
    chiếm browser hoặc ghi dữ liệu Upload → `workflow_conflict`.
 5. Thêm field optional = backward-compatible. Đổi nghĩa/kiểu/tên field, đổi
    enum → `upload.workflow.v2`. Bỏ hỗ trợ payload legacy là thay đổi phiên
-   bản riêng sau này — **không** nằm trong đợt này.
+   bản riêng sau này — **không** nằm trong đợt này. Contract hiện vẫn DRAFT;
+   cập nhật này ghi đích chuẩn tắc, không xác nhận runtime đã đổi hoặc cho
+   phép publish.
 6. `command_id` idempotent cho mọi command gây tác dụng phụ (scan, prepare,
    session_start, download_export...): retry an toàn, không nhân đôi tab/hồ
    sơ.
@@ -606,9 +580,11 @@ credential/cookie.
   `fixture` không phải field của envelope.
 - Ví dụ phủ: command hợp lệ từng loại; job succeeded/waiting/partial/failed;
   sai website, ID ngoài run, revision cũ, manifest mất, xác nhận sai job,
-  partial, browser busy, engine restart (recovery qua `upload.reconcile`),
-  website chưa hỗ trợ, `file`→`file_ref`, khóa nhạy cảm, `""`-as-null, date
-  sai, `chunk_size` ngoài 1–30.
+  partial, browser busy, engine restart (không tự chạy lại prepare), website
+  chưa hỗ trợ, `file`→`file_ref`, khóa nhạy cảm, `""`-as-null, date sai.
+- Ví dụ invalid kiểm command/capability không còn hỗ trợ; coverage không
+  thêm denylist toàn cục theo dấu hiệu Lưu lên key/value của evidence/fixture.
+  Ràng buộc khóa nhạy cảm theo §3 giữ nguyên.
 
 ## 11. Conformance checklist
 
@@ -617,16 +593,17 @@ Producer (sidecar) PHẢI:
 - [ ] Reject envelope/version/sensitive-key theo desktopcommand §3 và
       `workflow_version` §2 trước khi dispatch.
 - [ ] Kiểm scope cùng `website_id` + `record_ids ⊆ run` trước khi mở tab;
-      không tin danh sách loại trừ từ renderer.
+      hiện diện trên web chỉ theo audit chính thức, không theo POST/browser.
 - [ ] Giữ binding `run→manifest_ref` (kiểm tồn tại/hash), `audit→website`,
       `browser→website`; một browser thread cho mọi Playwright call.
 - [ ] `expected_revision`/`queue_revision` đúng ngữ nghĩa; poll không tăng
       revision nguồn.
 - [ ] `waiting_on` đúng; confirm đúng `target_job_id`; không auto-Save/
-      Finalize; `partial` kèm breakdown `record_id`+`stage`.
-- [ ] Restart → `engine_restarted`; lưu recovery tối thiểu không cookie;
-      terminal không đổi ngược; `command_id` trùng-nội-dung-khác →
-      `command_id_conflict`.
+      Finalize; `partial` kèm breakdown `record_id`+`stage`. Chỉ theo dõi
+      tiến độ chuẩn bị; không phát trạng thái đã Lưu hoặc tự chạy lô sau.
+- [ ] Restart → `engine_restarted`; lưu job/progress cần thiết không cookie;
+      không replay ID đã chuẩn bị; terminal không đổi ngược;
+      `command_id` trùng-nội-dung-khác → `command_id_conflict`.
 - [ ] Khóa `workflow_conflict` legacy↔versioned; `unknown_website` cho ID lạ.
 
 Consumer (Electron main/renderer) PHẢI:
@@ -640,9 +617,12 @@ Consumer (Electron main/renderer) PHẢI:
       không parse `error.message` cho nghiệp vụ.
 - [ ] Giữ scope khi render kết quả: bỏ qua result của website/run/job khác
       ngữ cảnh đang xem.
+- [ ] Không suy kết quả Lưu từ browser/session/POST và không tự chạy lại hay
+      chuyển lô; người dùng chủ động điều khiển chuẩn bị tiếp và Lưu trên web.
 
 ## 12. Changelog
 
 | Version | Ngày | Thay đổi |
 |---|---|---|
 | v1-draft | 24/09/2026 | Draft đầu tiên theo plan MIN-69 (§4) — 17 command, scope/revision, capability + compatibility policy, examples + validator; **chờ owner duyệt** trước khi coi là publish |
+| v1-draft | 15/10/2026 | Ghi đích chuẩn tắc theo quyết định owner: hiện diện web từ sổ chính thức; giữ tiến độ chuẩn bị trong run; bỏ website capability `reconcile`, command `upload.reconcile`, trường/kết quả Save và tự chạy lại. Giữ capability negotiation `upload.workflow.v1`; runtime chưa đổi, contract vẫn DRAFT. |

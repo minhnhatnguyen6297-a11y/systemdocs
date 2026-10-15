@@ -27,9 +27,9 @@ Tab Word riêng dự kiến giúp nhập văn bản, đề xuất placeholder, t
 
 ## 3. Upload — upload_lab
 
-Đọc kho Word trên máy, đối chiếu sổ của website nghiệp vụ, chọn hồ sơ còn thiếu, bóc trường và điền sẵn biểu mẫu trên trình duyệt. Người dùng tự kiểm tra và bấm Lưu. Điền form không đồng nghĩa lưu thành công.
+Đọc kho Word trên máy, đối chiếu với dữ liệu chính thức từ website, chọn hồ sơ còn thiếu, bóc trường và điền sẵn biểu mẫu trên trình duyệt. Người dùng tự kiểm tra và quyết định có Lưu; dữ liệu đã được website ghi nhận chính thức là nguồn sự thật. App không suy hoặc theo dõi kết quả Lưu từ tín hiệu browser cục bộ.
 
-Số công chứng được đối chiếu theo năm và nguồn website; phải báo số thiếu, lỗi và trùng. Mỗi website có bộ xử lý riêng cho đăng nhập, lấy sổ, đối chiếu và điền form.
+Số công chứng được đối chiếu theo năm và nguồn website; phải báo số thiếu, lỗi và trùng. Mỗi website có bộ xử lý riêng cho đăng nhập, lấy sổ, đối chiếu đầu vào và điền form.
 
 Owner đánh giá module tương đối hoàn thiện; hướng tiếp theo chủ yếu là chất lượng regex và website mới. Đánh giá này không thay bằng chứng kiểm chức năng.
 
