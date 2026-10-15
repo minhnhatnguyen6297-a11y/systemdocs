@@ -14,7 +14,7 @@ severity: P2
 
 # Flow Soạn hồ sơ khó thao tác, khó kiểm tra regex và khó tìm mẫu Word
 
-> **Tracking-only — 15/10/2026:** yêu cầu mới của owner là gom thành nhiều issue và đề xuất thứ tự. [Catalog hiện hành](README.md) phân bổ C01–C26 / #2–#27; các ghi nhận phía dưới giữ làm lịch sử, không là một lượt implementation song song. Không coi việc tách issue là đã sửa hoặc nghiệm thu hành vi. Quyết định mới: `_bmad-output/decisions/decision-issues-reconciliation-20261015.md`.
+> **Tracking-only — 15/10/2026:** yêu cầu mới của owner là gom thành nhiều issue và đề xuất thứ tự. [Catalog hiện hành](README.md) ánh xạ C01–C27 / #2–#28; #11 và #26 được giữ lịch sử ở trạng thái dropped, #28 là draft cutover; các ghi nhận phía dưới không là một lượt implementation song song. Không coi việc tách issue là đã sửa hoặc nghiệm thu hành vi. Quyết định: `_bmad-output/decisions/decision-issues-reconciliation-20261015.md` và `_bmad-output/decisions/decision-upload-web-sot-without-save-tracking.md`.
 
 ## Description
 
