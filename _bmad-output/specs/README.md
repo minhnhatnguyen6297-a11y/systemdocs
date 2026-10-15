@@ -1,6 +1,6 @@
 # Nền sản phẩm
 
-**Cập nhật:** 15/10/2026. Đọc đầu phiên để hiểu sản phẩm; sau đó đọc sổ tay và spec module đang làm. Quy tắc dưới đây mô tả điều cần có, không chứng minh code đã hoàn thành.
+**Cập nhật:** 16/10/2026. Đọc đầu phiên để hiểu sản phẩm; sau đó đọc sổ tay và spec module đang làm. Quy tắc dưới đây mô tả điều cần có, không chứng minh code đã hoàn thành.
 
 ## 1. Người dùng và công việc
 
@@ -76,3 +76,5 @@ Spec viết liền mạch hành vi đang áp dụng, kể cả trùng quyết đ
 | [Dữ liệu chung](shared/data-rules.md) | Đầu ra, quyền ghi và ranh giới hệ thống |
 | [Bóc tách](shared/extraction-rules.md) | Quy tắc trường và nguồn Word |
 | [Backlog](../backlog) | Ghi nhận việc chưa làm; ghi nhận không phải duyệt triển khai |
+| [Electron runtime](shell/electron-runtime-support.md) | Bản hỗ trợ, package matrix và kết quả/giới hạn kiểm chứng |
+

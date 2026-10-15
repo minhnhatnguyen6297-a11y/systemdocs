@@ -23,7 +23,8 @@ P1/P2 là ưu tiên đề xuất, không phải severity hay thứ tự ID. Cầ
 | C13 / #14 | [Chốt phạm vi và tiêu chí pilot NotaryOffice](spike-office-pilot-scope.md) | quyết định | P2 | không | lập kế hoạch/bằng chứng |
 | C14 / #15 | [Đối chiếu các lỗ hổng bằng chứng quyết định còn thực sự tồn tại](spike-decision-source-gaps.md) | bằng chứng | P2 | không | lập kế hoạch/bằng chứng |
 | C15 / #16 | [Sửa tham chiếu không còn đúng trong spec đang dùng](story-canonical-spec-references.md) | khoảng lệch đã chọn | P2 | không | có thể refinement, không cần chọn lại hướng nghiệp vụ |
-| C16 / #17 | [Chuyển desktop sang bản Electron còn được hỗ trợ](story-supported-electron-release.md) | khoảng lệch đã chọn | P1 | không | có thể refinement, không cần chọn lại hướng nghiệp vụ |
+| C16 / #17 | [Chuyển desktop sang bản Electron còn được hỗ trợ](story-supported-electron-release.md) | khoảng lệch đã chọn | P1 | không | built (2026-10-16; independent Quick t2 clean; Electron 44.7.2/builder 24.13.3; 2,975-file snapshot proves startup/IPC `G1_SMOKE` only; public picker→`file.inspect` matched size/hash. Upload UI `upload.audit_excel` still fails on blank `file_ref.path`; production `--case offline` failed at `upload.scan` before its own snapshot; test `--case all` timed out after `upload.download_export`. Full Upload E2E is not green (xem plan/spec) |
+
 | C17 / #18 | [Khôi phục bằng chứng và phân loại 12 report mất ghi chú](spike-historical-report-note-triage.md) | bằng chứng | P2 | không | lập kế hoạch/bằng chứng |
 | C18 / #19 | [Đặc tả tab Word tạo và lưu mẫu](spike-word-tab-authoring-scope.md) | quyết định | P2 | không | lập kế hoạch/bằng chứng |
 | C19 / #20 | [Chốt tìm kiếm, bộ lọc và nhãn Danh sách hồ sơ](spike-case-list-query-labels.md) | quyết định | P2 | không | lập kế hoạch/bằng chứng |
@@ -36,7 +37,7 @@ P1/P2 là ưu tiên đề xuất, không phải severity hay thứ tự ID. Cầ
 | C26 / #27 | [Đối chiếu văn bản chuyển một phần và bãi bỏ hành chính cùng ngày](spike-administrative-same-day-evidence.md) | bằng chứng | P2 | không | chỉ nghiên cứu văn bản, không đổi thuật toán |
 | C27 / #28 | [Bỏ theo dõi kết quả Lưu và giữ tiến độ chuẩn bị theo lượt](story-upload-web-official-sot-cutover.md) | khoảng lệch theo quyết định owner | P1 | không | built (2026-10-16; UI E2E remains blocked by the deferred pre-existing `file_token` mismatch) |
 
-Khuyến nghị hiện hành, không phải lệnh triển khai: (1) #28 cutover đã được owner chốt và #4 formatter, #6 độ đầy đủ ngày, #7 field extraction, #5 lưu incomplete đã built; tiếp theo là #17 nền desktop — #11 cũ đã dropped; vị trí đầu của #28 là đề xuất điều phối, không phải phần của lựa chọn A ban đầu; (2) #2 workspace, #9 nghiệm thu Word thật, #24 readiness điền dần; (3) #22 parity rồi #23 khi #8 có đáp án; (4) #25 khi #3 chốt semantics. Các việc nguồn/docs/quyết định độc lập có thể được đánh giá cùng lúc. Cần refinement/approval trước implementation.
+Khuyến nghị hiện hành, không phải lệnh triển khai: (1) #28 cutover đã được owner chốt và #4 formatter, #6 độ đầy đủ ngày, #7 field extraction, #5 lưu incomplete, #17 nền desktop đã built; #11 cũ đã dropped; vị trí đầu của #28 là đề xuất điều phối, không phải phần của lựa chọn A ban đầu; (2) tiếp theo là #2 workspace (câu hỏi trục đã hỏi owner), #9 nghiệm thu Word thật, #24 readiness điền dần; (3) #22 parity rồi #23 khi #8 có đáp án; (4) #25 khi #3 chốt semantics. Các việc nguồn/docs/quyết định độc lập có thể được đánh giá cùng lúc. Cần refinement/approval trước implementation.
 
 ## Câu hỏi còn mở và phần đã rõ
 
@@ -55,7 +56,7 @@ Khuyến nghị hiện hành, không phải lệnh triển khai: (1) #28 cutover
 - **C20 / #21:** Sau khi báo các con/quan hệ bị ảnh hưởng, nhánh nào giữ, tách hay xóa; xác nhận/hủy ra sao và lưu/mở lại state canonical thế nào?
 - **C23 / #24:** Cụ thể những blocker Stage/Người/Tài sản/slot đại diện và mode legacy nào được nới cho từng nhóm token/mẫu? Giữ ranh unresolved-slot và giới hạn kỹ thuật tới khi chọn đúng scope; không hỏi lại có muốn điền dần không.
 - **C09 đã rõ:** ngoặc vuông, tên nhóm dễ đọc cho mẫu mới, tên viết liền hỗ trợ và alias cũ theo Word §4.1. #10 chỉ đối chiếu phạm vi câu bắt buộc tên viết liền trong entities §9.1; không hỏi lại cú pháp, không thêm hỗ trợ/migration/phát hiện ngoặc nhọn.
-- **C16 / #17:** câu hỏi kỹ thuật chọn target còn hỗ trợ, tương thích Windows/package/browser; không hỏi owner duyệt lại rủi ro hỗ trợ đã biết, không bịa CVE.
+- **C16 / #17 — BUILT:** Runtime/IPC/picker evidence and limitations are recorded in [runtime record](../specs/shell/electron-runtime-support.md); full Upload paths remain failed/incomplete, not a blocker to the scoped runtime-support result.
 - **C22 / #23:** cần lifecycle #8 được nhận và capability consumer chung #22.
 - **C24 / #25:** nhu cầu đổi loại đã được report yêu cầu; chỉ chờ semantics #3, nhất là giữ hay reset gán người. Giữ runtime bất biến tới khi contract chuyển đổi duyệt.
 - **C25 / #26 — DROPPED:** quyết định owner bỏ theo dõi/diễn giải kết quả Lưu; không cần kiểm chứng host/body/từng trường làm gate cho contract hoặc runtime cutover. Nội dung spike và bằng chứng cũ được giữ làm lịch sử, không phải yêu cầu hiện hành.

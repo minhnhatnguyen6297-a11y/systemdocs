@@ -27,8 +27,8 @@ Sản phẩm hỗ trợ văn phòng công chứng giảm nhập liệu lặp l�
    hiện mới có thiết kế, chưa có chương trình chạy.
 
 Việc đang mở được tổng hợp tại [catalog issue](../backlog/README.md)
-(15/10, draft/chưa duyệt triển khai). [Ticket tổng cũ](../backlog/bug-notary-flow-ui-regex-word.md)
-giữ làm lịch sử và bị chặn tracking-only để không chạy trùng các leaf. Các điểm chính:
+(16/10/2026; #17 built after independent Quick t2 clean; Upload failures and proof limits remain in the catalog/runtime record).
+[Ticket tổng cũ](../backlog/bug-notary-flow-ui-regex-word.md) giữ làm lịch sử và bị chặn tracking-only để không chạy trùng các leaf. Các điểm chính:
 
 - Tách rõ địa chỉ của người và nơi cấp giấy khai tử; chốt quy tắc đổi loại hồ
   sơ đã lưu trước khi làm.
@@ -37,6 +37,8 @@ giữ làm lịch sử và bị chặn tracking-only để không chạy trùng 
 - Regex gợi ý intake (#7): runtime giữ serial nguyên văn theo nhãn và nhận địa chỉ thửa có nhãn trong profile transfer 1.1.3; smoke Notary thật và review Quick độc lập sạch. [#7](../backlog/bug-regex-raw-serial-parcel-address.md).
 - Giúp tìm mẫu Word và biết chỗ điền dữ liệu nào được hỗ trợ.
 - Upload: đã bỏ theo dõi kết quả Lưu, runtime cutover 15/10/2026. [#28](../backlog/story-upload-web-official-sot-cutover.md).
+- Desktop runtime (#17): manifest/lock dùng Electron `44.7.2`, builder `24.13.3`; production/test packages build, core tests, Notary IPC và Chromium loopback diagnostic đạt. Snapshot startup/sidecar smoke giữ nguyên 2,975 files; public picker token qua `file.inspect` khớp size/hash. Upload UI `file_ref.path`, production offline `file_token` và test `--case all` vẫn lỗi; chưa khẳng định full Upload E2E hay offline-flow immutability. Xem [runtime record](shell/electron-runtime-support.md).
+
 - Sơ đồ: binding thông báo lỗi đã được sửa; có test hồi quy và probe trên
   Electron thật (client stub; không xác minh command IPC/engine), review Quick
   độc lập sạch. [#4](../backlog/bug-diagram-error-messages.md).

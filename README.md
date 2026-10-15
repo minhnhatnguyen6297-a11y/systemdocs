@@ -83,7 +83,7 @@ Nếu ảnh hưởng nhiều module, đặt ở `_bmad-output/specs/README.md`.
 
 | Đường dẫn | Vai trò | Trạng thái |
 |---|---|---|
-| `shell/` | Electron shell + Python sidecar | Runtime tích hợp |
+| `shell/` | Electron 44.7.2 shell + Python sidecar | Runtime tích hợp |
 | `notary_v2/` | Soạn hồ sơ | Đang phát triển |
 | `upload_lab/` | Số hóa và upload hồ sơ cũ | Đang phát triển |
 | `notaryoffice/` | Theo dõi vận hành văn phòng | Chỉ có thiết kế |
@@ -91,6 +91,10 @@ Nếu ảnh hưởng nhiều module, đặt ở `_bmad-output/specs/README.md`.
 
 `shell` là hạ tầng, không phải module nghiệp vụ. Zalo là nguồn đầu vào kỹ thuật,
 không tạo phần sản phẩm thứ tư.
+
+Shell dùng Electron `44.7.2`; bằng chứng phiên bản và các giới hạn kiểm chứng
+được ghi trong [runtime support](_bmad-output/specs/shell/electron-runtime-support.md).
+
 
 ### Báo lỗi giao diện trong chế độ dev
 

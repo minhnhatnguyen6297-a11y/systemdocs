@@ -14,7 +14,7 @@
     "dist:test": "powershell -ExecutionPolicy Bypass -File test/build-upload-test.ps1"
   },
   "devDependencies": {
-    "electron": "^31.0.2",
+    "electron": "^44.7.2",
     "electron-builder": "^24.13.3"
   },
   "build": {
@@ -50,6 +50,6 @@
     }
   },
   "allowScripts": {
-    "electron@31.7.7": true
+    "electron@44.7.2": true
   }
 }
