@@ -1512,6 +1512,37 @@ class TestDiagram:
         node = next(n for n in dg["state"]["nodes"] if n["id"] == "spouse")
         assert node["receivePositions"] == [1, 2]
 
+    def test_save_unassigned_pool_warning_parity(self):
+        """Save cũng giữ warning Pool + incomplete như evaluate (§6)."""
+        doc = _load_fixture("diagram-warning.json")
+        mock.reset_backend(doc)
+        state = doc["request"]["diagram_evaluate"]["diagram"]["state"]
+        res = _call("diagram_save", {
+            "case_id": 46, "base_revision": 5,
+            "diagram": {"state": state}})
+        rm = res["data"]["diagram"]["render_model"]
+        codes = [w["code"] for w in rm["warnings"]]
+        assert "diagram.unassigned_pool_person" in codes
+        assert rm["status"] == "incomplete"
+        assert res["data"]["revision"] == 6
+
+    def test_save_engine_invalid_missing_land_owner_rejected(self):
+        """Parity real: không ai giữ vị trí tài sản → engine từ chối,
+        không persist, revision giữ nguyên (§6/§9.7)."""
+        mock.reset_backend(_load_fixture("ready.json"))
+        state = _ready_state()
+        for n in state["nodes"]:
+            n["ownPositions"] = []
+        with pytest.raises(CommandError) as exc:
+            _call("diagram_save", {
+                "case_id": 42, "base_revision": 7,
+                "diagram": {"state": state}})
+        assert exc.value.code == "diagram_invalid_state"
+        assert any(e["code"] == "missing_land_owner"
+                   for e in exc.value.details["errors"])
+        got = _call("workspace_get", {"case_id": 42})
+        assert got["data"]["case"]["revision"] == 7
+
     def test_save_two_party(self):
         mock.reset_backend(_load_fixture("ready-two-party.json"))
         res = _call("diagram_save", {

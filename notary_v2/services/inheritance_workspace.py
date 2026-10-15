@@ -475,12 +475,19 @@ class InheritanceWorkspaceService:
                         "message": "Dấu chọn tài sản ngoài vị trí hiện có "
                                    "đã được gỡ"})
                 people_map = _people_map(resolved_people)
-                people_by_id = {p["row_id"]: {"ngay_chet": p["ngay_chet"]}
-                                for p in composed.people}
-                render_model = run_inheritance_case(
-                    {"version": 2,
-                     "nodes": _v3_to_v2_nodes(clean_state["nodes"])},
-                    people_by_id)
+                # Cùng đúng một đường đánh giá với `diagram_evaluate` (§6):
+                # warning Pool + hạ status incomplete phải nằm trong
+                # render_model đã lưu.
+                render_model = self._evaluate_inheritance(
+                    clean_state, valid_row_ids=valid_rows,
+                    people=composed.people)
+                # `invalid` không được persist (§6/§9.7, contract §7.5):
+                # từ chối trước mọi ghi để rollback giữ nguyên bản cũ.
+                if render_model.get("status") == "invalid":
+                    raise WorkspaceError(
+                        "diagram_invalid_state",
+                        "diagram state bị engine từ chối",
+                        details={"errors": render_model.get("errors") or []})
                 legacy_nodes = _v2_to_legacy_nodes(
                     _v3_to_v2_nodes(clean_state["nodes"]), people_map)
             else:

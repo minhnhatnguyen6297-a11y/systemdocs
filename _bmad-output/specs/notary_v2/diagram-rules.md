@@ -75,6 +75,9 @@ và `contracts/notary-case-drafting/*.schema.json`.
 - State sai cấu trúc/nghiệp vụ (`invalid`) không được persist. State hợp lệ
   nhưng kết quả `incomplete` vẫn được lưu; backend trả `requiredSlots`/warning
   để người dùng bổ sung sau.
+- Save chạy đúng một đường đánh giá với `Xem cách tính`: `render_model` đã lưu
+  là kết quả evaluate tại thời điểm ghi (gồm warning Pool và trạng thái
+  `incomplete`); engine trả `invalid` bị từ chối trước khi ghi.
 - Save lỗi giữ nguyên Stage, Diagram và projection cũ.
 - Reload và Word phải dùng cùng snapshot đã lưu.
 
@@ -186,11 +189,15 @@ ngược Stage/Pool/Diagram.
   không hiển thị JSON và không tự tính lại.
 - Canvas rộng dùng cuộn ngang/pan/zoom, không bẻ nhánh hoặc thu node đến mức
   khó đọc. Cảnh báo gom thành vùng rõ ràng, không chồng popup.
+- Khi panel `Xem cách tính` đóng, vùng cảnh báo dưới sơ đồ hiện trạng thái tính
+  và danh sách chỗ engine yêu cầu (`requiredSlots`) dạng chỉ-đọc, kể cả ngay
+  sau khi lưu hoặc mở lại; ô chỉ được sinh khi người dùng bấm `Xem cách tính`.
 
 ### 9.7. Lỗi và ngoại lệ
 
 - Thiếu slot bắt buộc: trả `requiredSlots`, không bịa node.
-- State `invalid`: save bị chặn. State hợp lệ nhưng `incomplete`: contract hiện
+- State `invalid`: save bị chặn, chi tiết lỗi engine nằm trong
+  `diagram_invalid_state.details.errors`. State hợp lệ nhưng `incomplete`: contract hiện
   hành cho lưu và trả `requiredSlots`/warning. Owner chốt 15/10/2026: cho
   lưu bản nháp này, hiển thị rõ phần còn thiếu. Xuất Word vẫn theo điều kiện
   mode/mẫu hiện hành; không thêm lệnh chặn chỉ vì `incomplete`.

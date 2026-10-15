@@ -631,6 +631,55 @@ def test_saved_state_reloads_identically_via_workspace_get(
     assert data["stage"]["owner_row_id"] == rows["owner"]
 
 
+def test_save_unassigned_pool_person_keeps_warning_and_incomplete(
+        db, session_factory):
+    """Save dùng đúng một đường đánh giá với evaluate (§6): người Stage
+    chưa gán → render_model đã lưu có warning Pool + status incomplete;
+    đọc lại bằng session mới trả nguyên trạng."""
+    from services.case_workspace import CaseWorkspaceService
+
+    case, _people, rows, _prop = _seed_case(db)
+    state = _draft_state(rows)
+    # Bỏ node của 'gc' → người này còn trong Pool.
+    state["nodes"] = [n for n in state["nodes"] if n["id"] != "gc"]
+
+    data = _svc(db).save_diagram(case.id, 1, state)
+
+    rm = data["diagram"]["render_model"]
+    assert rm["status"] == "incomplete"
+    assert any(w["code"] == "diagram.unassigned_pool_person"
+               for w in rm["warnings"])
+    assert rm["requiredSlots"]
+
+    db2 = session_factory()
+    try:
+        reloaded = CaseWorkspaceService(db2).get(case.id)
+    finally:
+        db2.close()
+    assert reloaded["diagram"]["render_model"] == rm
+    assert reloaded["diagram"]["state"] == data["diagram"]["state"]
+
+
+def test_save_engine_invalid_missing_land_owner_not_persisted(db):
+    """Wire hợp lệ nhưng mọi ownPositions rỗng → engine invalid →
+    từ chối trước khi ghi; state + revision giữ nguyên (§6/§9.7)."""
+    case, _people, rows, _prop = _seed_case(db)
+    before = case.case_state_json
+    state = _draft_state(rows)
+    for n in state["nodes"]:
+        n["ownPositions"] = []
+
+    with pytest.raises(WorkspaceError) as exc:
+        _svc(db).save_diagram(case.id, 1, state)
+    assert exc.value.code == "diagram_invalid_state"
+    assert any(e["code"] == "missing_land_owner"
+               for e in exc.value.details["errors"])
+
+    db.refresh(case)
+    assert case.case_state_json == before
+    assert case.workspace_revision == 1
+
+
 # ----------------------------------------------------------- evaluate_draft
 
 

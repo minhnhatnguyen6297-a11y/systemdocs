@@ -1881,6 +1881,11 @@ def diagram_save(job, payload):
                 "code": "diagram.selection_pruned",
                 "message": "Các lựa chọn vị trí vượt số tài sản đã bị bỏ"})
         rm = _render(clean_state, case["stage"])
+        # Parity real (§6/§9.7): engine trả `invalid` → không persist.
+        if rm.get("status") == "invalid":
+            raise CommandError(
+                "diagram_invalid_state", "Sơ đồ chưa hợp lệ",
+                details={"errors": rm.get("errors") or []})
     else:
         rm = _unsupported_render()
     case["diagram"]["state"] = clean_state

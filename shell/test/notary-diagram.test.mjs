@@ -451,6 +451,10 @@ test('requiredSlots: engine yeu cau → tao father/mother/spouse/child', async (
   }
   const spouse = after.find((n) => n.spouseSlotId === 'owner');
   assert.ok(spouse, 'phai tao slot spouse tro ve owner');
+  // Wire §7.1: quan he vo/chong phai 2 chieu (lech cap -> spouse_conflict),
+  // neu khong state vua sinh se khong evaluate/save duoc.
+  assert.equal(owner.spouseSlotId, spouse.id,
+    'owner phai tro nguoc lai spouse (2 chieu)');
   const kids = after.filter((n) =>
     !n.personId && (n.parentSlotIds || []).includes('owner'));
   assert.ok(kids.length >= 1, 'phai co ≥1 slot con trong cua owner');
@@ -679,6 +683,142 @@ test('two_party: assign → save → reopen giu 30 cho + nguoi dung cho', async 
     .find((n) => n.id === 'p16').personId, 'c1');
   assert.equal(model2.state.diagram.nodes
     .find((n) => n.id === 'p3').personId, 'c2');
+});
+
+// ---------- cue chỉ-đọc sau lưu / mở lại (story #5) ----------
+
+test('save thiếu dữ liệu: cue chỉ-đọc hiện, không sinh slot', async () => {
+  const calls = [];
+  const stored = {
+    engineVersion: 2, status: 'incomplete', allocations: {}, breakdowns: [],
+    requiredSlots: [{ anchorSlotId: 'owner', reason: 'active_estate',
+                      slotTypes: ['father', 'mother', 'spouse', 'child'],
+                      minimumEmptyChildSlots: 1 }],
+    warnings: [{ code: 'diagram.unassigned_pool_person',
+                 message: 'Người trong Stage chưa được gán trên sơ đồ' }],
+    errors: [], unresolvedEstates: [], conservation: {} };
+  const client = { run: async (cmd, payload) => {
+    calls.push([cmd, payload]);
+    if (cmd === 'notary.diagram_save') {
+      return { ok: true, data: { revision: 4,
+        diagram: { state: structuredClone(payload.diagram.state),
+                   render_model: structuredClone(stored) } } };
+    }
+    return { ok: true, data: {} };
+  } };
+  const { model, view } = build(test, { mode: 'case', client,
+    seed: { people: INH_PEOPLE, nodes: seedSlots() } });
+  model.movePerson('c2', 'child_1');       // dirty → nút Lưu bật
+  const before = model.state.diagram.nodes.length;
+  const save = findBtns(view.el, 'Lưu sơ đồ')[0];
+  assert.ok(save, 'thiếu nút Lưu sơ đồ');
+  await save.onclick();
+  assert.equal(model.state.diagram.nodes.length, before,
+    'không sinh slot từ requiredSlots khi lưu');
+  assert.equal(
+    calls.filter(([c]) => c === 'notary.diagram_evaluate').length, 0,
+    'lưu không được gọi evaluate (tránh vòng lặp)');
+  assert.equal(model.state.diagramDirty, false, 'dirty sạch sau lưu');
+  const warn = byCls(view.el, 'warn-text').map((e) => e.textContent)
+    .join('\n');
+  assert.match(warn, /Chưa đủ điều kiện/);
+  assert.match(warn, /Người trong Stage chưa được gán trên sơ đồ/);
+  assert.match(warn, /Cần bổ sung Cha, Mẹ, Vợ\/chồng, Con/);
+});
+
+test('mở lại case thiếu dữ liệu: graph giữ nguyên, cue từ render_model', async () => {
+  const calls = [];
+  const state = { version: 3, domain: 'inheritance', nodes: [
+    { id: 'owner', personId: 'c1', parentSlotIds: [], spouseSlotId: null,
+      ownPositions: [1], receivePositions: [], hidden: false, deleted: false },
+    { id: 'child_1', personId: null, parentSlotIds: ['owner'],
+      spouseSlotId: null, ownPositions: [], receivePositions: [],
+      hidden: false, deleted: false }] };
+  const rm = {
+    engineVersion: 2, status: 'incomplete', allocations: {}, breakdowns: [],
+    requiredSlots: [{ anchorSlotId: 'owner', reason: 'active_estate',
+                      slotTypes: ['spouse', 'child'],
+                      minimumEmptyChildSlots: 1 }],
+    warnings: [{ code: 'diagram.unassigned_pool_person',
+                 message: 'Người trong Stage chưa được gán trên sơ đồ' }],
+    errors: [], unresolvedEstates: [], conservation: {} };
+  const client = { run: async (cmd, payload) => {
+    calls.push([cmd, payload]);
+    if (cmd === 'notary.workspace_get') {
+      return { ok: true, data: {
+        case: { id: 42, case_type: 'inheritance',
+                document_type: 'khai_nhan', status: 'active',
+                locked: false, revision: 4 },
+        backend_mode: 'real',
+        capabilities: { intake: [], diagram: true, word_export: true },
+        stage: { people: structuredClone(INH_PEOPLE), assets: [],
+                 owner_row_id: 'c1' },
+        diagram: { state: structuredClone(state),
+                   render_model: structuredClone(rm) },
+        warnings: [] } };
+    }
+    return { ok: true, data: {} };
+  } };
+  const { model, view } = build(test, { mode: 'case', client,
+    seed: { people: INH_PEOPLE, nodes: [] } });
+  const r = await model.openCase(42);
+  assert.equal(r.ok, true, 'openCase lỗi');
+  assert.deepEqual(model.state.diagram, state,
+    'mở lại không thêm/đổi node');
+  assert.equal(model.state.diagramDirty, false, 'mở lại không đánh dấu sửa');
+  assert.equal(
+    calls.filter(([c]) => c === 'notary.diagram_evaluate').length, 0,
+    'mở lại không tự evaluate');
+  assert.equal(byCls(view.el, 'cd-node').length, 2, 'không sinh ô mới');
+  const warn = byCls(view.el, 'warn-text').map((e) => e.textContent)
+    .join('\n');
+  assert.match(warn, /Chưa đủ điều kiện/);
+  assert.match(warn, /Cần bổ sung Vợ\/chồng, Con/);
+});
+
+test('cue trạng thái: chuyển sang complete thì xoá dòng thiếu', async () => {
+  const calls = [];
+  let phase = 0;
+  const rmIncomplete = {
+    engineVersion: 2, status: 'incomplete', allocations: {}, breakdowns: [],
+    requiredSlots: [{ anchorSlotId: 'owner', reason: 'active_estate',
+                      slotTypes: ['spouse', 'child'],
+                      minimumEmptyChildSlots: 1 }],
+    warnings: [{ code: 'diagram.unassigned_pool_person',
+                 message: 'Người trong Stage chưa được gán trên sơ đồ' }],
+    errors: [], unresolvedEstates: [], conservation: {} };
+  const rmComplete = { ...structuredClone(rmIncomplete),
+                       status: 'complete', requiredSlots: [], warnings: [] };
+  const client = { run: async (cmd, payload) => {
+    calls.push([cmd, payload]);
+    if (cmd === 'notary.diagram_save') {
+      phase += 1;
+      return { ok: true, data: { revision: 3 + phase,
+        diagram: { state: structuredClone(payload.diagram.state),
+                   render_model: structuredClone(
+                     phase === 1 ? rmIncomplete : rmComplete) } } };
+    }
+    return { ok: true, data: {} };
+  } };
+  const { model, view } = build(test, { mode: 'case', client,
+    seed: { people: INH_PEOPLE, nodes: seedSlots() } });
+  model.movePerson('c2', 'child_1');
+  await findBtns(view.el, 'Lưu sơ đồ')[0].onclick();
+  const warn1 = byCls(view.el, 'warn-text').map((e) => e.textContent)
+    .join('\n');
+  assert.match(warn1, /Chưa đủ điều kiện/);
+  assert.match(warn1, /Cần bổ sung Vợ\/chồng, Con/);
+
+  model.movePerson('c2', null);            // dirty lần nữa
+  await findBtns(view.el, 'Lưu sơ đồ')[0].onclick();
+  const warn2 = byCls(view.el, 'warn-text').map((e) => e.textContent)
+    .join('\n');
+  assert.match(warn2, /Hoàn chỉnh/, 'complete phải hiện trạng thái');
+  assert.doesNotMatch(warn2, /Cần bổ sung/, 'dòng thiếu phải biến mất');
+  assert.equal(model.state.diagramDirty, false, 'dirty sạch sau lưu');
+  assert.equal(
+    calls.filter(([c]) => c === 'notary.diagram_evaluate').length, 0,
+    'cue không gọi evaluate');
 });
 
 // ---------- evaluate khong goi tren two_party ----------

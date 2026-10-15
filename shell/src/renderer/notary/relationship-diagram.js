@@ -70,6 +70,13 @@ const SLOT_LABEL = {
   spouse_mother: 'Mẹ vợ/chồng',
 };
 
+// Nhan trang thai tinh — dung chung cho panel "Xem cach tinh" va cue
+// chi-doc khi panel dong (cung mot nguon render_model).
+const CALC_STATUS_LABEL = {
+  complete: 'Hoàn chỉnh', incomplete: 'Chưa đủ điều kiện',
+  invalid: 'Không hợp lệ', unsupported: 'Chưa hỗ trợ',
+};
+
 // So cho canonical cua node two_party (p16 = dau Ben B); null neu khong
 // phai id canonical.
 function slotNum(id) {
@@ -584,7 +591,10 @@ function createDiagramPane(ctx) {
           const node = model.addSlot(
             freeId(['spouse', `spouse_${anchor.id}`]));
           if (node) {
+            // Wire yêu cầu vợ/chồng 2 chiều (lệch cặp →
+            // spouse_conflict) — mirror cả hai phía.
             model.setNodeRelation(node.id, { spouseSlotId: anchor.id });
+            model.setNodeRelation(anchor.id, { spouseSlotId: node.id });
             touched = true;
           }
         }
@@ -990,10 +1000,7 @@ function createDiagramPane(ctx) {
         'Chưa có kết quả tính — gán người vào sơ đồ để engine đánh giá.')));
       return box;
     }
-    const statusLabel = {
-      complete: 'Hoàn chỉnh', incomplete: 'Chưa đủ điều kiện',
-      invalid: 'Không hợp lệ', unsupported: 'Chưa hỗ trợ',
-    }[rm.status] || rm.status;
+    const statusLabel = CALC_STATUS_LABEL[rm.status] || rm.status;
     box.append(h('div', 'cd-calc-status',
       `Trạng thái tính: ${statusLabel}`));
     if (rm.status === 'unsupported') {
@@ -1273,6 +1280,36 @@ function createDiagramPane(ctx) {
       // {code,message} — render ca hai.
       extra.append(h('div', 'muted warn-text',
         typeof w === 'string' ? w : (w.message || w.code)));
+    }
+    // Cue chi-doc khi panel "Xem cach tinh" dong: trang thai + cho engine
+    // yeu cau (requiredSlots) + loi engine — hien ngay sau save/mo lai
+    // tu render_model da luu. KHONG mutate draft, KHONG goi evaluate;
+    // slot chi sinh khi user bam "Xem cach tinh" (MIN-136).
+    if (!isTp() && !calcOpen && s.renderModel) {
+      const rm = s.renderModel;
+      // Trạng thái chỉ-đọc cho mọi kết quả engine đã lưu (kể cả complete)
+      // — §9.6; không mutate draft, không gọi evaluate.
+      if (CALC_STATUS_LABEL[rm.status]) {
+        extra.append(h('div', 'muted warn-text',
+          `Trạng thái tính: ${CALC_STATUS_LABEL[rm.status]}`));
+      }
+      for (const req of rm.requiredSlots || []) {
+        const anchor = nodeById(req.anchorSlotId);
+        const kinds = (req.slotTypes || [])
+          .map((t) => SLOT_LABEL[t] || (t === 'child' ? 'Con' : t))
+          .join(', ');
+        if (!kinds) continue;
+        extra.append(h('div', 'muted warn-text',
+          `Cần bổ sung ${kinds} cho ô “${anchor ? slotTag(anchor)
+            : req.anchorSlotId}” — bấm “Xem cách tính” để sinh ô.`));
+      }
+      // Loi engine cua render_model da luu; save vua bi tu choi da co
+      // diagramErrors rieng nen khong lap lai.
+      if (rm.status === 'invalid' && !(s.diagramErrors || []).length) {
+        for (const e of rm.errors || []) {
+          extra.append(h('div', 'error', relErrText(e)));
+        }
+      }
     }
     for (const er of s.diagramErrors || []) {
       extra.append(h('div', 'error', relErrText(er)));

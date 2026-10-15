@@ -844,6 +844,84 @@ def test_diagram_save_missing_diagram_is_validation_error(adapter_db):
     assert exc.value.code == "validation_error"
 
 
+def _commit_second_person(adapter_db, case, owner_row):
+    """Thêm người Stage thứ hai (chưa gán diagram) qua commit thật."""
+    adapter_db.refresh(case)
+    res = case_workspace.CaseWorkspaceService(adapter_db).commit_stage(
+        case.id, case.workspace_revision, {
+            "owner_row_id": owner_row,
+            "people": [_person_row(entity_id=None, row_id=owner_row,
+                                   ho_ten="Nguyen Van Xuat",
+                                   ngay_chet="2020-01-01"),
+                       _person_row(ho_ten="Tran Thi Binh",
+                                   ngay_chet=None)],
+            "assets": [_asset_row()]})
+    return res
+
+
+def test_diagram_save_incomplete_reopen_keeps_warning(adapter_db):
+    """Save → workspace_get (session mới, service thật): render_model đã
+    lưu giữ warning Pool + incomplete + requiredSlots (§6 — mở lại)."""
+    case, owner_row = _committed_case(adapter_db)
+    commit = _commit_second_person(adapter_db, case, owner_row)
+    assert commit["revision"] == 3
+    state = _v3_state([_diagram_node("owner", owner_row, own=[1])])
+
+    saved = notary_adapter.diagram_save(
+        _Job(), _save_payload(case.id, 3, state))
+    rm = saved["data"]["diagram"]["render_model"]
+    codes = [w["code"] for w in rm["warnings"]]
+    assert "diagram.unassigned_pool_person" in codes
+    assert rm["status"] == "incomplete"
+    assert rm["requiredSlots"]
+
+    reopened = notary_adapter.workspace_get(_Job(), {"case_id": case.id})
+    assert reopened["data"]["diagram"]["render_model"] == rm
+    assert reopened["data"]["diagram"]["state"] == saved["data"]["diagram"]["state"]
+    assert reopened["data"]["case"]["revision"] == 4
+
+
+def test_diagram_save_engine_invalid_rejected_state_preserved(adapter_db):
+    """Wire hợp lệ nhưng không ai giữ vị trí tài sản → engine từ chối
+    `diagram_invalid_state`; bản cũ + revision giữ nguyên (§6/§9.7)."""
+    case, owner_row = _committed_case(adapter_db)
+    before = notary_adapter.workspace_get(_Job(), {"case_id": case.id})["data"]
+    state = _v3_state([_diagram_node("owner", owner_row, own=[])])
+
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.diagram_save(
+            _Job(), _save_payload(case.id, 2, state))
+    err = exc.value
+    assert err.code == "diagram_invalid_state"
+    assert any(e["code"] == "missing_land_owner"
+               for e in err.details["errors"])
+
+    after = notary_adapter.workspace_get(_Job(), {"case_id": case.id})["data"]
+    assert after["case"]["revision"] == before["case"]["revision"]
+    assert after["diagram"]["state"] == before["diagram"]["state"]
+    assert after["diagram"]["render_model"] == \
+        before["diagram"]["render_model"]
+
+
+def test_workspace_commit_stage_keeps_unassigned_pool_warning(adapter_db):
+    """Cập nhật Stage (không phải diagram_save) cũng lưu render_model
+    khớp evaluate: người chưa gán → warning Pool + incomplete."""
+    case, owner_row = _committed_case(adapter_db)
+    # Chủ đất giữ vị trí 1 đã lưu (state hợp lệ) → rev 3.
+    notary_adapter.diagram_save(
+        _Job(), _save_payload(case.id, 2, _v3_state([
+            _diagram_node("owner", owner_row, own=[1])])))
+    commit = _commit_second_person(adapter_db, case, owner_row)
+    rm = commit["diagram"]["render_model"]
+    codes = [w["code"] for w in rm["warnings"]]
+    assert "diagram.unassigned_pool_person" in codes
+    assert rm["status"] == "incomplete"
+
+    reopened = notary_adapter.workspace_get(_Job(), {"case_id": case.id})
+    stored = reopened["data"]["diagram"]["render_model"]
+    assert stored == rm
+
+
 # ------------------------------------- word_export_options/batch (MIN-110)
 
 

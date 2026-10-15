@@ -185,6 +185,28 @@ test('diagram_invalid_state: loi hien duoi so do, khong toast rieng',
 
 // ---------- luu loi thuong ----------
 
+test('luu diagram_invalid_state: lỗi hiện dưới sơ đồ, không toast, giữ nháp',
+  async () => {
+    const inner = { code: 'missing_land_owner',
+                    message: 'Chưa có người để lại tài sản trên sơ đồ' };
+    const { view, model, notices, CAT } = build(test, {
+      client: errorClient({ 'notary.diagram_save': { ok: false, error: {
+        code: 'diagram_invalid_state', message: 'synthetic',
+        details: { errors: [{ ...inner }] } } } }) });
+    assert.equal(dirtyDiagram(model), true, 'mutation không đổi draft');
+    const save = findBtns(view.el, 'Lưu sơ đồ')[0];
+    assert.ok(save, 'thiếu nút Lưu sơ đồ');
+    await save.onclick();
+    assert.deepEqual(notices, [], 'invalid_state không được toast riêng');
+    assert.equal(model.state.diagramDirty, true, 'nháp còn nguyên');
+    assert.equal(model.state.revision, 3, 'revision không đổi khi bị từ chối');
+    const card = byCls(view.el, 'cd-rel-card')[0];
+    assert.ok(card, 'card sơ đồ phải còn');
+    assert.deepEqual(byCls(card, 'error').map((e) => e.textContent),
+      [CAT.errText(inner)],
+      'lỗi dưới sơ đồ phải đúng errText của catalog thật');
+  });
+
 test('luu loi workspace_locked: toast dung catalog, nhap con nguyen',
   async () => {
     const err = { code: 'workspace_locked', message: 'phien khac dang mo' };

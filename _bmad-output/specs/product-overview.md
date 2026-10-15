@@ -40,6 +40,14 @@ giữ làm lịch sử và bị chặn tracking-only để không chạy trùng 
 - Sơ đồ: binding thông báo lỗi đã được sửa; có test hồi quy và probe trên
   Electron thật (client stub; không xác minh command IPC/engine), review Quick
   độc lập sạch. [#4](../backlog/bug-diagram-error-messages.md).
+- Sơ đồ: lưu bản hợp lệ còn thiếu giữ warning Pool/`requiredSlots` qua mở lại;
+  state `invalid` bị từ chối và giữ nguyên bản cũ; cue chỉ-đọc (trạng thái +
+  phần thiếu) hiện khi panel cách tính đóng. Bằng chứng service/adapter và
+  Electron thật (service thật, SQLite tạm) đạt; independent Quick t3 CLEAN,
+  review xong. Smoke còn ghi nhận toast khởi động thoáng qua
+  `engine_unavailable` khi mở danh sách; danh sách tự retry. Đây là giới hạn
+  đã quan sát, không thuộc scope #5 và không được tuyên bố đã khắc phục.
+  [#5](../backlog/story-save-valid-incomplete-diagram.md).
 - Ngày Người giữ độ đầy đủ qua lưu/đọc/sửa/xuất Word: `2010` (chỉ năm) không
   bị đệm thành `01/01/2010`; snapshot hồ sơ là bằng chứng, master chỉ fallback
   khi snapshot cũ thiếu key. Đã sửa, test hồi quy và export DOCX thật đạt;

@@ -53,7 +53,6 @@ from models import (
     PropertyLandRow,
     derive_person_fields,
 )
-from services.inheritance_engine import run_inheritance_case
 
 
 SCHEMA_VERSION = "notary.case-drafting.v2"
@@ -1163,13 +1162,17 @@ class CaseWorkspaceService:
                                    "đã được gỡ"})
                 # §13.6: owner là con trỏ stage — sync node owner.
                 _sync_owner_node(state["nodes"], owner_row_id)
-                people_by_id = {
-                    rid: {"ngay_chet": wire.get("ngay_chet")}
-                    for rid, _entity, wire in resolved_people}
-                render_model = run_inheritance_case(
-                    {"version": 2,
-                     "nodes": _v3_to_v2_nodes(state["nodes"])},
-                    people_by_id)
+                # Cùng đúng một đường đánh giá với `diagram_evaluate` /
+                # `diagram_save`: warning Pool + status incomplete phải
+                # theo snapshot đã lưu, không nhánh ghi nào tự tính riêng.
+                from services.inheritance_workspace import (
+                    InheritanceWorkspaceService)
+                render_model = InheritanceWorkspaceService(
+                    self.db)._evaluate_inheritance(
+                        state, valid_row_ids=valid_rows,
+                        people=[{"row_id": rid,
+                                 "ngay_chet": wire.get("ngay_chet")}
+                                for rid, _entity, wire in resolved_people])
                 legacy_nodes = _v2_to_legacy_nodes(
                     _v3_to_v2_nodes(state["nodes"]), people_map)
             else:
