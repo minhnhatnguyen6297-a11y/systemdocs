@@ -16,6 +16,7 @@ from services.document_intake import (
     MAX_TEXT_CHARS,
     analyze,
 )
+from services.document_intake.docx_source import read_docx
 
 
 def _sid(n):
@@ -515,6 +516,107 @@ class DocxAdapterTests(unittest.TestCase):
         sug = outcome.result_data["suggestions"][0]
         self.assertEqual(sug["target"], "asset")
         self.assertEqual(sug["fields"]["so_serial"]["normalized_value"], "DD123456")
+
+    def test_docx_transfer_serial_raw_and_labeled_parcel_address(self):
+        # Bug #7: serial nguyên văn TEST-001 + nhãn "Địa chỉ thửa đất" phải vào gợi ý tài sản.
+        import tempfile
+        lines = [
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+            "BÊN CHUYỂN NHƯỢNG (Bên A):",
+            "Ông Nguyễn Văn Mẫu; Sinh ngày: 01/01/1980; CCCD số: 000000000001;",
+            "BÊN NHẬN CHUYỂN NHƯỢNG (Bên B):",
+            "Bà Trần Thị Mẫu; Sinh năm: 1985; CCCD số: 000000000002;",
+            "TÀI SẢN:",
+            "Tài sản thứ 1:",
+            "Giấy chứng nhận số: TEST-001; Thửa đất số: 12; Tờ bản đồ số: 3;",
+            "Địa chỉ thửa đất: xã Mẫu, tỉnh Mẫu;",
+            "Loại đất: Đất ở; Diện tích: 123,5 m2; Thời hạn: Lâu dài;",
+            "ĐIỀU 1: Nội dung thỏa thuận.",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+            "Ông Nhân Chứng Mẫu; Sinh năm: 1970;",
+        ]
+        with tempfile.TemporaryDirectory() as td:
+            f = _make_docx(td, "transfer.docx", lines)
+            content = f.read_bytes()
+            outcome = analyze([_file_source(1, "docx", str(f))], api_key="k")
+        self.assertEqual(outcome.status, "succeeded")
+        suggestions = outcome.result_data["suggestions"]
+
+        assets = [s for s in suggestions if s["target"] == "asset"]
+        self.assertEqual(len(assets), 1)
+        asset = assets[0]
+
+        serial = asset["fields"]["so_serial"]
+        self.assertEqual(serial["raw_value"], "TEST-001")
+        self.assertIsNone(serial["normalized_value"])
+        self.assertEqual(serial["observation_state"], "observed")
+        ref = serial["source_refs"][0]
+        self.assertEqual(ref["rule_id"], "asset.so_serial")
+        self.assertEqual(ref["profile_id"], "transfer")
+        self.assertTrue(ref["profile_version"])
+        self.assertEqual(ref["raw_snippet"], "TEST-001")
+        self.assertEqual(read_docx(content).text[slice(*ref["span"])], "TEST-001")
+        self.assertTrue(ref["docx_refs"])
+        self.assertTrue(any(w["code"] == "intake.warning_nonstandard" for w in asset["warnings"]))
+        self.assertFalse(any(w["code"] == "intake.fragment" for w in asset["warnings"]))
+
+        dia_chi = asset["fields"]["dia_chi"]
+        self.assertEqual(dia_chi["raw_value"], "xã Mẫu, tỉnh Mẫu")
+        self.assertEqual(dia_chi["normalized_value"], "xã Mẫu, tỉnh Mẫu")
+        self.assertEqual(dia_chi["observation_state"], "observed")
+        ref2 = dia_chi["source_refs"][0]
+        self.assertEqual(ref2["rule_id"], "asset.dia_chi_thua")
+        self.assertEqual(ref2["raw_snippet"], "xã Mẫu, tỉnh Mẫu")
+        self.assertEqual(read_docx(content).text[slice(*ref2["span"])], ref2["raw_snippet"])
+
+        people = [s for s in suggestions if s["target"] == "person"]
+        self.assertEqual(len(people), 2)
+        self.assertEqual(
+            {p["fields"]["ho_ten"]["raw_value"] for p in people},
+            {"Nguyễn Văn Mẫu", "Trần Thị Mẫu"},
+        )
+        self.assertFalse(any("Nhân Chứng" in s for s in _walk_strings(outcome.result_data)))
+
+    def test_docx_transfer_blank_serial_and_address_stay_missing(self):
+        # Nhãn trống (dòng mới/';'/nhãn kế cùng dòng) không được mượn "Loại đất"/"Thửa đất số".
+        import tempfile
+        base = [
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+            "BÊN CHUYỂN NHƯỢNG (Bên A):",
+            "Ông Nguyễn Văn Mẫu; Sinh ngày: 01/01/1980; CCCD số: 000000000001;",
+            "TÀI SẢN:",
+            "Tài sản thứ 1:",
+            "Giấy chứng nhận số:",
+            "Thửa đất số: 12; Tờ bản đồ số: 3;",
+        ]
+        variants = {
+            "newline": base + [
+                "Địa chỉ thửa đất:",
+                "Loại đất: Đất ở; Diện tích: 123,5 m2; Thời hạn: Lâu dài;",
+                "ĐIỀU 1: Nội dung thỏa thuận.",
+            ],
+            "same-line label": base + [
+                "Địa chỉ thửa đất: Loại đất: Đất ở; Diện tích: 123,5 m2; Thời hạn: Lâu dài;",
+                "ĐIỀU 1: Nội dung thỏa thuận.",
+            ],
+        }
+        for name, lines in variants.items():
+            with self.subTest(variant=name):
+                with tempfile.TemporaryDirectory() as td:
+                    f = _make_docx(td, "blank.docx", lines)
+                    outcome = analyze([_file_source(1, "docx", str(f))], api_key="k")
+                self.assertEqual(outcome.status, "succeeded")
+                assets = [s for s in outcome.result_data["suggestions"] if s["target"] == "asset"]
+                self.assertEqual(len(assets), 1)
+                asset = assets[0]
+                self.assertNotIn("so_serial", asset["fields"])
+                self.assertNotIn("dia_chi", asset["fields"])
+                self.assertEqual(asset["fields"]["so_thua_dat"]["raw_value"], "12")
+                self.assertTrue(any(w["code"] == "intake.fragment" for w in asset["warnings"]))
+                for field in asset["fields"].values():
+                    for ref in field["source_refs"]:
+                        self.assertNotIn("Thửa đất số", ref["raw_snippet"])
+                        self.assertNotIn("Loại đất", ref["raw_snippet"])
 
     def test_docx_corrupt_parse_failed(self):
         import tempfile

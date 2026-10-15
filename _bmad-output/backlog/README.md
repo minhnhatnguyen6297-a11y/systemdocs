@@ -1,6 +1,6 @@
 # Catalog issue — 15/10/2026
 
-**Catalog status (2026-10-16):** #4, #6, and #28 are built within their approved scopes; this does not approve or complete the rest of the backlog or publish the catalog. Other issue statuses remain as listed; #1 is history/tracking-only and #11/#26 remain dropped. No active initiative change. [Quyết định cách theo dõi](../decisions/decision-issues-reconciliation-20261015.md). The separate pre-existing #28 UI `file_token` blocker remains deferred and is not claimed fixed.
+**Catalog status (2026-10-16):** #4, #6, #7, and #28 are built within their approved scopes; this does not approve or complete the rest of the backlog or publish the catalog. Other issue statuses remain as listed; #1 is history/tracking-only and #11/#26 remain dropped. No active initiative change. [Quyết định cách theo dõi](../decisions/decision-issues-reconciliation-20261015.md). The separate pre-existing #28 UI `file_token` blocker remains deferred and is not claimed fixed.
 
 ## Ưu tiên, thứ tự và điều kiện bắt đầu
 
@@ -13,7 +13,7 @@ P1/P2 là ưu tiên đề xuất, không phải severity hay thứ tự ID. Cầ
 | C03 / #4 | [Sơ đồ không hiển thị đúng thông báo khi gặp lỗi](bug-diagram-error-messages.md) | bug/report đã báo | P1 | không | built (2026-10-16; independent Quick review clean, no findings) |
 | C04 / #5 | [Lưu và mở lại sơ đồ hợp lệ còn thiếu dữ liệu](story-save-valid-incomplete-diagram.md) | khoảng lệch đã chọn | P1 | không | có thể refinement, không cần chọn lại hướng nghiệp vụ |
 | C05 / #6 | [Giữ nguyên độ đầy đủ của ngày qua lưu và xuất](story-preserve-year-only-precision.md) | khoảng lệch đã chọn | P1 | không | built (2026-10-16; Q1 medium-risk fallback patch fixed and clean on recheck; no outstanding business decision) |
-| C06 / #7 | [Regex bỏ sót serial nguyên văn và địa chỉ thửa có nhãn](bug-regex-raw-serial-parcel-address.md) | bug/report đã báo | P1 | không | có thể refinement, không cần chọn lại hướng nghiệp vụ |
+| C06 / #7 | [Regex bỏ sót serial nguyên văn và địa chỉ thửa có nhãn](bug-regex-raw-serial-parcel-address.md) | bug/report đã báo | P1 | không | built (2026-10-16; transfer profile 1.1.3; Notary full suite 1113 passed, 2 skipped, 115 warnings, 2 subtests on short basetemp; workbench 45 passed, 18 subtests; independent Quick review clean) |
 | C07 / #8 | [Chốt vòng đời thử, công bố và chạy lại rule regex](spike-regex-rule-lifecycle.md) | quyết định | P1 | không | lập kế hoạch/bằng chứng |
 | C08 / #9 | [Kiểm chứng đường xuất Word thật và nguồn mẫu](spike-word-real-route-acceptance.md) | bằng chứng | P1 | không | lập kế hoạch/bằng chứng |
 | C09 / #10 | [Đối chiếu phạm vi quy tắc tên entities với hướng dẫn mẫu Word](spike-word-naming-authority.md) | bằng chứng | P2 | không | lập kế hoạch/bằng chứng |
@@ -36,7 +36,7 @@ P1/P2 là ưu tiên đề xuất, không phải severity hay thứ tự ID. Cầ
 | C26 / #27 | [Đối chiếu văn bản chuyển một phần và bãi bỏ hành chính cùng ngày](spike-administrative-same-day-evidence.md) | bằng chứng | P2 | không | chỉ nghiên cứu văn bản, không đổi thuật toán |
 | C27 / #28 | [Bỏ theo dõi kết quả Lưu và giữ tiến độ chuẩn bị theo lượt](story-upload-web-official-sot-cutover.md) | khoảng lệch theo quyết định owner | P1 | không | built (2026-10-16; UI E2E remains blocked by the deferred pre-existing `file_token` mismatch) |
 
-Khuyến nghị hiện hành, không phải lệnh triển khai: (1) #28 cutover đã được owner chốt và #4 formatter, #6 độ đầy đủ ngày đã built; tiếp theo #7 field extraction, rồi #5 lưu incomplete và #17 nền desktop — #11 cũ đã dropped; vị trí đầu của #28 là đề xuất điều phối, không phải phần của lựa chọn A ban đầu; (2) #2 workspace, #9 nghiệm thu Word thật, #24 readiness điền dần; (3) #22 parity rồi #23 khi #8 có đáp án; (4) #25 khi #3 chốt semantics. Các việc nguồn/docs/quyết định độc lập có thể được đánh giá cùng lúc. Cần refinement/approval trước implementation.
+Khuyến nghị hiện hành, không phải lệnh triển khai: (1) #28 cutover đã được owner chốt và #4 formatter, #6 độ đầy đủ ngày, #7 field extraction đã built; tiếp theo #5 lưu incomplete và #17 nền desktop — #11 cũ đã dropped; vị trí đầu của #28 là đề xuất điều phối, không phải phần của lựa chọn A ban đầu; (2) #2 workspace, #9 nghiệm thu Word thật, #24 readiness điền dần; (3) #22 parity rồi #23 khi #8 có đáp án; (4) #25 khi #3 chốt semantics. Các việc nguồn/docs/quyết định độc lập có thể được đánh giá cùng lúc. Cần refinement/approval trước implementation.
 
 ## Câu hỏi còn mở và phần đã rõ
 

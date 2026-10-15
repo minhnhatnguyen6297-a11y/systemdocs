@@ -51,8 +51,10 @@ không sao chép regex sang adapter (Owner NAIA-4 02/10/2026, khẳng định l�
 06/10/2026). Lõi nhận input là file Word hoặc đoạn text thô dán vào; ngoài
 trích xuất còn dùng kết quả chia vùng để đề xuất placeholder cho mẫu Word
 chưa gắn template ở chức năng soạn hồ sơ (Owner 06/10/2026). Profile
-`transfer` 1.1.2 chia người trong
-vùng đương sự và tài sản có nhãn `Tài sản [thứ] N:`. Dòng `Loại đất:` mở một
+`transfer` 1.1.3 chia người trong
+vùng đương sự và tài sản có nhãn `Tài sản [thứ] N:`; serial đọc nguyên văn
+theo nguồn (lệch chuẩn chỉ cảnh báo, giữ raw) và nhãn `Địa chỉ thửa đất:`
+điền địa chỉ thửa. Dòng `Loại đất:` mở một
 cụm đất riêng. Một GCN có nhiều cụm vẫn là một tài sản. Đây là phạm vi mẫu đã
 kiểm tra, chưa phải lời hứa nhận đúng mọi loại hợp đồng.
 Nhãn tài sản ở tiêu đề trước vùng tài sản không mở nhóm chứa dữ liệu đương

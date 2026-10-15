@@ -279,6 +279,133 @@ class TransferProfileTests(unittest.TestCase):
         binh = next(p for p in persons if p["fields"]["ho_ten"]["value"] == "Trần Thị Bình")
         self.assertEqual(binh["fields"]["cccd"]["state"], "missing")
 
+    def test_serial_raw_verbatim_and_labeled_parcel_address(self):
+        """Bug #7: serial TEST-001 va nhan 'Dia chi thua dat' phai vao field + span nguon."""
+        text = load_fixture("transfer_serial_va_dia_chi_thua.txt")
+        result = run(text, self.profile)
+
+        serial = fields_by_name(result, "so_serial")[0]
+        self.assertEqual(serial["state"], "warning_nonstandard")
+        self.assertEqual(serial["value"], "TEST-001")
+        self.assertEqual(serial["raw_snippet"], "TEST-001")
+        s, e = serial["span"]
+        self.assertEqual(text[s:e], "TEST-001")
+        self.assertTrue(serial["warnings"])
+
+        dia_chi = fields_by_name(result, "dia_chi_thua")[0]
+        self.assertEqual(dia_chi["state"], "matched")
+        self.assertEqual(dia_chi["value"], "xã Mẫu, tỉnh Mẫu")
+        s, e = dia_chi["span"]
+        self.assertEqual(text[s:e], dia_chi["raw_snippet"])
+
+        zone = next(z for z in result["zones"] if z["name"] == "asset")
+        self.assertLessEqual(zone["span"][0], s)
+        self.assertLessEqual(e, zone["span"][1])
+
+    def test_serial_raw_formats_keep_source_value(self):
+        """Serial nguon bat ky: giu nguyen chuoi ke ca tien to '-', khong cat theo quota hay chuoi con 'do'."""
+        text = load_fixture("transfer_serial_va_dia_chi_thua.txt")
+        cases = {
+            "TEST-001": "warning_nonstandard",
+            "123456789": "warning_nonstandard",
+            "-TEST-001": "warning_nonstandard",
+            "/TEST-001": "warning_nonstandard",
+            "TEST/001-A": "warning_nonstandard",
+            "SERIES-123456": "warning_nonstandard",
+            "ENDDO123": "warning_nonstandard",
+            "SERIALONLY": "warning_nonstandard",
+            "ABC/RAW": "warning_nonstandard",
+            "DO 123456": "matched",  # hai chu + 6 so: dung chuan hien hanh, van giu raw
+            "AB 123456": "matched",
+        }
+        for raw, state in cases.items():
+            with self.subTest(raw=raw):
+                case_text = text.replace("TEST-001", raw)
+                result = run(case_text, self.profile)
+                serial = fields_by_name(result, "so_serial")[0]
+                self.assertEqual(serial["value"], raw)
+                self.assertEqual(serial["raw_snippet"], raw)
+                s, e = serial["span"]
+                self.assertEqual(case_text[s:e], raw)
+                self.assertEqual(serial["state"], state)
+
+    def test_serial_raw_stops_before_do_issuer_and_line_end(self):
+        """Bien ' do <co quan> cap' va cuoi dong: khong nuot phan sau serial."""
+        text = load_fixture("transfer_chuan.txt").replace("AB 123456", "TEST-001")
+        serial = fields_by_name(run(text, self.profile), "so_serial")[0]
+        self.assertEqual(serial["value"], "TEST-001")
+        self.assertNotIn(" do ", serial["raw_snippet"])
+
+        eol_text = load_fixture("transfer_serial_va_dia_chi_thua.txt").replace(
+            "Giấy chứng nhận số: TEST-001; Thửa đất số: 12",
+            "Giấy chứng nhận số: TEST-001\nThửa đất số: 12",
+        )
+        serial_eol = fields_by_name(run(eol_text, self.profile), "so_serial")[0]
+        self.assertEqual(serial_eol["value"], "TEST-001")
+
+    def test_serial_parenthetical_annotation_only_on_phat_hanh_label(self):
+        """Annotation '(serial)' chi thuoc nhan 'So phat hanh'; sau nhan khac la raw value."""
+        text = load_fixture("transfer_serial_va_dia_chi_thua.txt")
+        annotated = text.replace("Giấy chứng nhận số:", "Số phát hành (serial):")
+        serial = fields_by_name(run(annotated, self.profile), "so_serial")[0]
+        self.assertEqual(serial["state"], "warning_nonstandard")
+        self.assertEqual(serial["value"], "TEST-001")
+
+        prefixed = text.replace(
+            "Giấy chứng nhận số: TEST-001;", "Giấy chứng nhận số: (serial) TEST-001;"
+        )
+        serial2 = fields_by_name(run(prefixed, self.profile), "so_serial")[0]
+        self.assertEqual(serial2["state"], "warning_nonstandard")
+        self.assertEqual(serial2["value"], "(serial) TEST-001")
+        self.assertEqual(serial2["raw_snippet"], "(serial) TEST-001")
+        s, e = serial2["span"]
+        self.assertEqual(prefixed[s:e], "(serial) TEST-001")
+
+    def test_serial_blank_stays_missing_without_borrowing_next_field(self):
+        """Nhan serial trong (ke ca truoc ';' hay dong moi) -> missing, khong muon field ke."""
+        text = load_fixture("transfer_serial_va_dia_chi_thua.txt")
+        blanks = (
+            "Giấy chứng nhận số:\n",
+            "Giấy chứng nhận số: ; ",
+            "Giấy chứng nhận số: \n",
+            "Giấy chứng nhận số: Thửa đất số 12; ",
+        )
+        for blank in blanks:
+            with self.subTest(blank=blank.replace("\n", "\\n")):
+                result = run(
+                    text.replace("Giấy chứng nhận số: TEST-001; ", blank), self.profile
+                )
+                serial = fields_by_name(result, "so_serial")[0]
+                self.assertEqual(serial["state"], "missing")
+                self.assertIsNone(serial["value"])
+
+    def test_dia_chi_thua_blank_stays_missing_without_borrowing_next_field(self):
+        """Nhan dia chi trong (dong moi/';'/nhan ke cung dong) -> missing, khong muon 'Loai dat'."""
+        text = load_fixture("transfer_serial_va_dia_chi_thua.txt")
+        cases = {
+            "newline": text.replace("Địa chỉ thửa đất: xã Mẫu, tỉnh Mẫu;", "Địa chỉ thửa đất:\n"),
+            "semicolon": text.replace("Địa chỉ thửa đất: xã Mẫu, tỉnh Mẫu;", "Địa chỉ thửa đất: ; "),
+            "same-line label": text.replace(
+                "Địa chỉ thửa đất: xã Mẫu, tỉnh Mẫu;\n\n", "Địa chỉ thửa đất: "
+            ),
+        }
+        for name, case_text in cases.items():
+            with self.subTest(name=name):
+                dia_chi = fields_by_name(run(case_text, self.profile), "dia_chi_thua")[0]
+                self.assertEqual(dia_chi["state"], "missing")
+                self.assertIsNone(dia_chi["value"])
+                self.assertIsNone(dia_chi["span"])
+
+    def test_dia_chi_thua_label_only_reported_variant(self):
+        """Chi nhan 'Dia chi thua dat' duoc them; 'Dia chi:' tran khong khop; nhanh cu giu nguyen."""
+        text = load_fixture("transfer_serial_va_dia_chi_thua.txt")
+        result = run(text.replace("Địa chỉ thửa đất:", "Địa chỉ:"), self.profile)
+        self.assertEqual(fields_by_name(result, "dia_chi_thua")[0]["state"], "missing")
+
+        old = fields_by_name(run(load_fixture("transfer_chuan.txt"), self.profile), "dia_chi_thua")[0]
+        self.assertEqual(old["state"], "matched")
+        self.assertTrue(old["value"].startswith("số 12 đường Láng"))
+
     def test_ambiguous_when_multiple_matches(self):
         text = load_fixture("transfer_chuan.txt")
         # Hai so cong chung kha di -> phai ambiguous, khong tu chon.

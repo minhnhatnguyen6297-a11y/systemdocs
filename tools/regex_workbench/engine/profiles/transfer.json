@@ -1,6 +1,6 @@
 {
   "profile_id": "transfer",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "description": "Profile chuan cho hop dong chuyen nhuong quyen su dung dat. Tat ca pattern viet o dang folded: chu thuong, khong dau, 'd' thay 'đ'. Engine match tren van ban da fold roi map span ve van ban goc.",
   "regex_timeout_ms": 1000,
   "title": {
@@ -246,7 +246,7 @@
       "zone": "asset",
       "group": 1,
       "expect": "one",
-      "pattern": "co\\s*dia\\s*chi\\s*tai\\s*[:.]?\\s*([^\\n;.]+)"
+      "pattern": "(?:co\\s*dia\\s*chi\\s*tai|dia\\s*chi\\s*thua\\s*dat)(?![:. \\t]*(?:loai[ \\t]*dat|thua[ \\t]*(?:dat|so)|to[ \\t]*(?:ban[ \\t]*do|so)|dien[ \\t]*tich|thoi[ \\t]*han|so[ \\t]*vao[ \\t]*so|vao[ \\t]*so[ \\t]*cap|cap[ \\t]*ngay|ngay[ \\t]*cap|so[ \\t]*phat[ \\t]*hanh|so[ \\t]*serial|so[ \\t]*seri|ma[ \\t]*phoi|so[ \\t]*phoi|gcn[ \\t]*so|giay[ \\t]*chung[ \\t]*nhan))[ \\t]*[:.]?[ \\t]*([^ \\t\\n;.:][^\\n;.]*)"
     },
     {
       "rule_id": "asset.thua_dat",
@@ -278,7 +278,7 @@
       "zone": "asset",
       "group": 1,
       "expect": "one",
-      "pattern": "(?:so\\s*phat\\s*hanh|so\\s*serial|serial|so\\s*seri|ma\\s*phoi|so\\s*phoi|gcn\\s*so|giay\\s*chung\\s*nhan\\s*so)[^a-z0-9\\n]{0,12}([a-z]{1,2}\\s*\\.?\\s*\\d{4,8})",
+      "pattern": "(?:so\\s*phat\\s*hanh(?:[ \\t]*\\([ \\t]*seri(?:al)?[ \\t]*\\))?|so\\s*serial|serial|so\\s*seri|ma\\s*phoi|so\\s*phoi|gcn\\s*so|giay\\s*chung\\s*nhan\\s*so)(?![:. \\t]*(?:loai[ \\t]*dat|thua[ \\t]*(?:dat|so)|to[ \\t]*(?:ban[ \\t]*do|so)|dien[ \\t]*tich|thoi[ \\t]*han|so[ \\t]*vao[ \\t]*so|vao[ \\t]*so[ \\t]*cap|cap[ \\t]*ngay|ngay[ \\t]*cap|so[ \\t]*phat[ \\t]*hanh|so[ \\t]*serial|so[ \\t]*seri|ma[ \\t]*phoi|so[ \\t]*phoi|gcn[ \\t]*so|giay[ \\t]*chung[ \\t]*nhan))[ \\t]*[:.]?[ \\t]*([^ \\t\\n;|,:][^\\n;|,:]*?)[ \\t]*(?=[,;|]|[ \\t]*$|\\.(?=[ \\t]|$)|[ \\t]+do(?:[ \\t]|$))",
       "validators": [
         {
           "pattern": "^[A-Z]{2}\\s*\\.?\\s*\\d{6,8}$",

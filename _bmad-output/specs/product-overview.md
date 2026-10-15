@@ -34,8 +34,7 @@ giữ làm lịch sử và bị chặn tracking-only để không chạy trùng 
   sơ đã lưu trước khi làm.
 - Làm rõ kích thước Pool/Sơ đồ và thao tác thả người; gỡ nút `Hủy thay đổi`
   theo yêu cầu owner nhưng vẫn giữ bảo vệ dữ liệu chưa lưu.
-- Nối việc sửa/thử rule regex với rule dùng trong flow; kiểm tra serial và địa
-  chỉ thửa đang thiếu trong fixture.
+- Regex gợi ý intake (#7): runtime giữ serial nguyên văn theo nhãn và nhận địa chỉ thửa có nhãn trong profile transfer 1.1.3; smoke Notary thật và review Quick độc lập sạch. [#7](../backlog/bug-regex-raw-serial-parcel-address.md).
 - Giúp tìm mẫu Word và biết chỗ điền dữ liệu nào được hỗ trợ.
 - Upload: đã bỏ theo dõi kết quả Lưu, runtime cutover 15/10/2026. [#28](../backlog/story-upload-web-official-sot-cutover.md).
 - Sơ đồ: binding thông báo lỗi đã được sửa; có test hồi quy và probe trên

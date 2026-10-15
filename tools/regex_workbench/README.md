@@ -2,8 +2,10 @@
 
 Owner NAIA-4 ngày 02/10/2026 chọn `engine/` làm lõi regex chung. Document
 Intake gọi trực tiếp runner cho DOCX; bản đồ XML/nguồn và Word export ở dịch
-vụ riêng, UI dev vẫn độc lập. Profile transfer 1.1.2 bổ sung `asset_groups`
-(nhãn Tài sản thứ N) và `land_rows` (nhãn Loại đất) bằng cùng regex guard.
+vụ riêng, UI dev vẫn độc lập. Profile transfer 1.1.3 giữ `asset_groups`
+(nhãn Tài sản thứ N) và `land_rows` (nhãn Loại đất); serial đọc nguyên văn
+theo nguồn (giữ raw + cảnh báo khi lệch chuẩn hiện hành) và nhãn
+`Địa chỉ thửa đất` điền `dia_chi_thua`.
 Xem [luồng sản phẩm](../../_bmad-output/specs/notary_v2/word-templates.md#docx-import).
 
 Công cụ độc lập cho dev: dán một văn bản công chứng hoàn chỉnh, chạy profile
