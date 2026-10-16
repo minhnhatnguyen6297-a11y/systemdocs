@@ -25,7 +25,7 @@ flowchart LR
     E -->|Dry-run: điền sẵn, dừng trước nút Lưu| C
 ```
 
-### Giai đoạn 1: Quét & Trích xuất (`batch_scan.py` + `extract_contract.py`)
+### Giai đoạn 1: Quét & Trích xuất (`batch_scan.py` + `extraction_adapter.py` + lõi luật chung)
 1. **Đọc tệp tin**:
    - `.docx`: Đọc bằng `python-docx`, bảo toàn thứ tự đoạn văn và bảng biểu (`table`) để tránh trộn lẫn Bên A / Bên B.
    - `.doc`: Đọc bằng Windows IFilter (`query.dll`) không cần Microsoft Word.
@@ -99,7 +99,7 @@ upload_lab/
 |-- run_ui.bat                      # Bootstrap shell: kiểm tra Python & gọi bootstrap_ui.py
 |-- bootstrap_ui.py                 # Tự tạo .venv, cài dependencies & mở UI
 |-- ui_runner.py                    # Entry point khởi chạy PySide6 UI
-|-- extract_contract.py             # Trích xuất Word sang JSON web form
+|-- extraction_adapter.py           # Ranh consumer: đọc Word -> gọi lõi luật chung -> JSON web form
 |-- batch_scan.py                   # Quét folder, xuất manifest, ghi SQLite
 |-- playwright_uploader.py          # Script điều khiển trình duyệt Playwright
 |-- uploader_selectors.py           # Selectors định vị phần tử web form

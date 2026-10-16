@@ -18,8 +18,21 @@ TOOL_DIR = Path(__file__).resolve().parent
 if str(TOOL_DIR) not in sys.path:
     sys.path.insert(0, str(TOOL_DIR))
 
-import extract_contract
-import kiem_tra_trich_xuat
+# Duong import: ban dong goi uu tien vendor/ (build_release.ps1 dung ra);
+# ban chay trong repo dung loi luat chung tools/ + upload_lab/ cua repo.
+_VENDOR_DIR = TOOL_DIR / "vendor"
+if _VENDOR_DIR.is_dir():
+    for _path in (_VENDOR_DIR / "tools", _VENDOR_DIR):
+        if str(_path) not in sys.path:
+            sys.path.insert(0, str(_path))
+else:
+    _REPO_ROOT = TOOL_DIR.parents[1]
+    for _path in (_REPO_ROOT / "tools", _REPO_ROOT):
+        if str(_path) not in sys.path:
+            sys.path.insert(0, str(_path))
+
+from upload_lab import extraction_adapter
+from upload_lab import kiem_tra_trich_xuat
 from ket_qua_log import (
     BAO_HIEM_CAN_THIEU,
     DECEASED_CAN_THIEU,
@@ -36,7 +49,7 @@ from ket_qua_log import (
     truong_trong,
 )
 
-ENGINE_VERSION = getattr(extract_contract, "ENGINE_VERSION", "khong-ro")
+ENGINE_VERSION = getattr(extraction_adapter, "ENGINE_VERSION", "khong-ro")
 
 PERSON_COLUMNS = ("stt", "nguon", "gioi_tinh", "ho_ten", "ngay_sinh", "cccd", "ngay_cap", "dia_chi")
 PERSON_HEADERS = ("STT", "Nguồn", "Giới tính", "Họ tên", "Ngày sinh", "CCCD", "Ngày cấp", "Địa chỉ")
@@ -81,7 +94,7 @@ def kind_label(kind: str) -> str:
 
 def run_extract(path: str | Path) -> dict:
     try:
-        return extract_contract.extract(str(path))
+        return extraction_adapter.extract(str(path))
     except Exception as exc:  # noqa: BLE001 - hien loi ra UI cho nguoi test
         return {"error": str(exc)}
 

@@ -600,7 +600,7 @@ def test_localized_area_complete_span_provenance_and_export(db, tmp_path):
     assert rows[0]['dien_tich'] == 1234.5
     ref = next(r for r in asset['fields']['land_rows']['source_refs'] if r['land_field'] == 'dien_tich')
     assert ref['raw_snippet'] == '1.234,5'
-    assert ref['profile_id'] == 'transfer' and ref['profile_version'] and ref['candidate_state'] == 'matched'
+    assert ref['candidate_state'] == 'matched'
     rendered = replace_spans(content, read_docx(content), [(ref['span'], '2000')])
     assert 'Diện tích: 2000;' in read_docx(rendered).text
     assert '2000,5' not in read_docx(rendered).text

@@ -6,9 +6,11 @@ parent: none
 covers: []
 after: [7]
 assignee: ""
-refined: false
+refined: true
 hitl: false
 risk: high
+status: built
+completed: '2026-10-16'
 ---
 
 # Dùng lõi regex chung cho các consumer sau khi giữ đủ hành vi
@@ -36,7 +38,7 @@ Hoàn tất hướng core chung đã duyệt cho consumer Notary, Upload và too
 
 - Giữ nguồn gốc, dữ liệu đã lưu, ID field/slot và bảo vệ revision/ghi nguyên tử áp dụng cho phạm vi này.
 - Không thêm tính năng không liên quan, suy pháp lý, schema, OCR fallback hoặc tự gộp liên module.
-- Draft không phải duyệt triển khai.
+- Thực thi dưới uỷ quyền liên tục của owner; không thêm gate duyệt rule cho người dùng.
 
 ## References
 
@@ -48,8 +50,11 @@ Hoàn tất hướng core chung đã duyệt cho consumer Notary, Upload và too
 
 ## Notes
 
-- Tracking: C21; draft/chưa refined, chưa duyệt bắt đầu. #1 chỉ tracking, không chạy cùng leaf.
-- Risk: high — Chuyển consumer thiếu parity có thể mất người/thửa/trường đã hỗ trợ trên nhiều luồng.
-- Điểm vào code: tools/regex_workbench/engine, upload_lab/extract_contract.py, regex-test-tool/tool, adapter intake Notary và package staging. #7 có thể sửa trước. Issue này sở hữu parity/caller cutover, không sở hữu vòng đời editable rule #8/#23. Không thêm luật parsing/nhánh OCR.
-- Sequencing: chờ #7 để tuần tự hóa hai lượt sửa cùng core, không thêm gate nghiệp vụ và không làm #7 chờ full cutover. #23 đã superseded 16/10/2026 theo [quyết định owner](../decisions/decision-owner-regex-rule-developer-only-20261016.md) (rule do developer quản lý; người dùng không dùng tính năng); parity/cutover của issue này không đổi.
-- Independent check: reviewer không phải người thực hiện đối chiếu riêng quyết định/kết quả với nguồn và dữ liệu/đầu ra liên quan, ghi nhận ngoài bằng chứng tự kiểm của issue.
+- Tracking: C21; **built 16/10/2026**. #1 chỉ tracking, không chạy cùng leaf.
+- Một đường luật `tools/regex_workbench/engine/contract_extract.py` cho Notary/Upload/tool; adapter giữ IO/mapping và source refs. Bản extraction/copy cũ và pipeline JSON profile đã gỡ sau parity; dev Workbench UI giữ và gọi lõi thật (chỉ editor profile lỗi thời bị bỏ).
+- #7 đã hoàn tất trước cutover để tuần tự sửa core. Rule regex văn bản/rule upload theo website do developer quản lý, có version identity; không UI thử/công bố/chọn phiên bản/rollback cho người dùng. #23 giữ **superseded** theo [quyết định owner](../decisions/decision-owner-regex-rule-developer-only-20261016.md).
+- Review độc lập: retained Quick t1 phát hiện Q1–Q7 → các vòng vá và adjudication MB1–MB9 → **retained Quick final multiline recheck clean 16Oct**; parent chấp nhận, mọi finding/residual đã đóng. Review cuối là read-only scoped recheck, không phải lượt reviewer chạy test.
+- Bằng chứng cuối: workbench **53 passed, 6 subtests**; intake + Word-first **130 passed, 2 subtests**, thêm guard chuyển nhóm **1 passed**; Upload bounded **11 passed, 9 subtests**. Full Notary **1139 passed, 2 skipped** là lượt trước round 5–7, không phải full suite trên source cuối.
+- So API theo nhãn đóng băng + 16 đính chính: **828 trường khớp / 0 lệch**, **44 null + 256 shape chưa kiểm**; F10/F11 unreviewed, Pending không duyệt. Không suy tỷ lệ chính xác toàn corpus.
+- Sidecar thật dùng bundle đã stage: exact DOCX multiline trả 2 dòng typed, đủ raw spans, giữ serial/thửa/tờ, không ô phẳng/ambiguity giả; scan Upload **1/1/1**. Native GUI DOCX chưa thực thi do seam raw path/file_token; các giới hạn native picker/kiểm trang Word/máy khác của #9 không đổi.
+- Bằng chứng, triage, diff và snapshot: [EXECUTION-SUMMARY](../tmp/issue-22-regex-consumer-cutover/evidence/EXECUTION-SUMMARY.md), [plan built](../tmp/issue-22-regex-consumer-cutover/plan.md). Không thêm luật parsing/nhánh OCR; text QR/OCR vẫn ở biên; không đổi schema hay dữ liệu người dùng.

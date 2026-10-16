@@ -16,7 +16,7 @@ $filesToCopy = @(
     "batch_scan.py",
     "bootstrap_ui.py",
     "build_standalone_release.ps1",
-    "extract_contract.py",
+    "extraction_adapter.py",
     "install_python_windows.ps1",
     "playwright_uploader.py",
     "README.md",
@@ -28,7 +28,6 @@ $filesToCopy = @(
 )
 
 $directoriesToCopy = @(
-    "docs",
     "tools",
     "upload_services",
     "ui_qt"
@@ -59,6 +58,19 @@ foreach ($directoryName in $directoriesToCopy) {
 }
 
 Get-ChildItem -LiteralPath (Join-Path $releaseRoot "tools") -Recurse -Force -Directory |
+    Where-Object { $_.Name -eq "__pycache__" } |
+    Remove-Item -Recurse -Force
+
+# Loi luat chung (#22): adapter goi truc tiep core trong tools/regex_workbench/engine.
+# Copy tu repo, khong giu ban chep trong upload_lab.
+$coreSource = Join-Path (Split-Path $toolRoot -Parent) "tools\regex_workbench\engine"
+if (-not (Test-Path -LiteralPath $coreSource)) {
+    throw "Khong tim thay loi luat chung: tools\regex_workbench\engine"
+}
+$coreDest = Join-Path $releaseRoot "tools\regex_workbench\engine"
+New-Item -ItemType Directory -Path $coreDest -Force | Out-Null
+Copy-Item -Path (Join-Path $coreSource "*") -Destination $coreDest -Recurse -Force
+Get-ChildItem -LiteralPath $coreDest -Recurse -Force -Directory |
     Where-Object { $_.Name -eq "__pycache__" } |
     Remove-Item -Recurse -Force
 

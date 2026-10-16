@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import extract_contract
+import extraction_adapter
 
 
 PERSON_COLUMNS = ("stt", "nguon", "gioi_tinh", "ho_ten", "ngay_sinh", "cccd", "ngay_cap", "dia_chi")
@@ -39,7 +39,7 @@ PARCEL_WIDTHS = (40, 70, 90, 90, 120, 100, 160, 90, 150, 90, 180, 220)
 def run_extract(path: str | Path) -> dict:
     """Chay engine len 1 file; loi thi tra {"error": ...} thay vi no tung."""
     try:
-        return extract_contract.extract(str(path))
+        return extraction_adapter.extract(str(path))
     except Exception as exc:  # noqa: BLE001 - hien loi ra UI cho nguoi test
         return {"error": str(exc)}
 

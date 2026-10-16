@@ -3,6 +3,8 @@
 Contract: notary.case-drafting.v2 — suggestions carry observation metadata,
 never `confirmed`; per-source failure isolation; hard limits §5.2.
 """
+import json
+import unicodedata
 import unittest
 import uuid
 from pathlib import Path
@@ -506,6 +508,143 @@ class PdfAdapterTests(unittest.TestCase):
         self.assertEqual(outcome.errors[0]["code"], "intake_source_too_large")
 
 
+class ReviewFindingAdapterTests(unittest.TestCase):
+    """7 phát hiện Quick review #22 — hành vi của Document Intake (consumer).
+
+    Viết TRƯỚC khi vá; log đỏ ở `evidence/q-fixes/before-adapter.txt`.
+    """
+
+    TRANSFER = [
+        "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+        "BÊN CHUYỂN NHƯỢNG (Bên A):",
+        "Ông Nguyễn  Văn Mẫu; Sinh ngày: 01/01/1980; CCCD số: 0010 7500 0001;",
+        "BÊN NHẬN CHUYỂN NHƯỢNG (Bên B):",
+        "Bà Trần Thị Mẫu; Sinh năm: 1985; CCCD số: 000000000002;",
+        "TÀI SẢN:",
+        "Tài sản thứ 1:",
+        "Giấy chứng nhận số: AB123456; Thửa đất số: 12; Tờ bản đồ số: 3;",
+        "Địa chỉ thửa đất: xã Mẫu, tỉnh Mẫu;",
+        "Loại đất: Đất ở; Diện tích: 120 m2; Thời hạn: Lâu dài",
+        "Loại đất: Đất vườn; Diện tích: 120 m2; Thời hạn: Lâu dài",
+        "ĐIỀU 1: Nội dung thỏa thuận.",
+        "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+        "Ông Nhân Chứng Mẫu; Sinh năm: 1970;",
+    ]
+
+    def _run(self, lines):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            f = _make_docx(td, "transfer.docx", lines)
+            content = f.read_bytes()
+            outcome = analyze([_file_source(1, "docx", str(f))], api_key="k")
+        return outcome, content
+
+    def test_q2_normalized_values_keep_source_span(self):
+        """Q2: tên gộp khoảng trắng + CCCD có khoảng trắng vẫn ra trường với span nguồn."""
+        outcome, content = self._run(self.TRANSFER)
+        self.assertEqual(outcome.status, "succeeded")
+        text = read_docx(content).text
+        people = [s for s in outcome.result_data["suggestions"] if s["target"] == "person"]
+        person = next(p for p in people if "Văn Mẫu" in p["fields"]["ho_ten"]["raw_value"])
+        ho_ten = person["fields"]["ho_ten"]
+        ref = ho_ten["source_refs"][0]
+        self.assertEqual(text[slice(*ref["span"])], "Nguyễn  Văn Mẫu")
+        self.assertEqual(ref["raw_snippet"], "Nguyễn  Văn Mẫu")
+        self.assertEqual(ho_ten["normalized_value"], "Nguyễn Văn Mẫu")
+        giay_to = person["fields"]["so_giay_to"]
+        ref_id = giay_to["source_refs"][0]
+        self.assertEqual(text[slice(*ref_id["span"])], "0010 7500 0001")
+        self.assertEqual(giay_to["normalized_value"], "001075000001")
+
+    def test_q2_mixed_unicode_keeps_source_span(self):
+        """Q2: nguồn trộn NFC/NFD vẫn định vị được span (không bỏ trường)."""
+        lines = list(self.TRANSFER)
+        lines[2] = "Ông Nguyễn Văn Mẫu; Sinh ngày: 01/01/1980; CCCD số: 000000000001;"
+        nfd_line = "Bà Trần Thị Bi\u0300nh; Sinh năm: 1985; CCCD số: 000000000002;"
+        lines[4] = nfd_line
+        outcome, content = self._run(lines)
+        self.assertEqual(outcome.status, "succeeded")
+        text = read_docx(content).text
+        people = [s for s in outcome.result_data["suggestions"] if s["target"] == "person"]
+        names = {p["fields"]["ho_ten"]["normalized_value"] for p in people}
+        self.assertIn("Trần Thị Bình", names)
+        person = next(p for p in people if p["fields"]["ho_ten"]["normalized_value"] == "Trần Thị Bình")
+        ref = person["fields"]["ho_ten"]["source_refs"][0]
+        self.assertEqual(unicodedata.normalize("NFC", text[slice(*ref["span"])]), "Trần Thị Bình")
+
+    def test_q3_land_row_refs_stay_in_their_own_cluster(self):
+        """Q3: cụm đất thứ hai nhận bằng chứng của chính nó, không mượn cụm đầu."""
+        outcome, content = self._run(self.TRANSFER)
+        text = read_docx(content).text
+        asset = next(s for s in outcome.result_data["suggestions"] if s["target"] == "asset")
+        refs = asset["fields"]["land_rows"]["source_refs"]
+        row1 = next(r for r in refs if r["land_row"] == 1 and r["land_field"] == "dien_tich")
+        row2 = next(r for r in refs if r["land_row"] == 2 and r["land_field"] == "dien_tich")
+        self.assertEqual(text[slice(*row1["span"])], "120 m2")
+        self.assertEqual(text[slice(*row2["span"])], "120 m2")
+        self.assertGreater(row2["span"][0], row1["span"][0])
+        before_row2 = text[max(0, row2["span"][0] - 60):row2["span"][0]]
+        self.assertIn("Đất vườn", before_row2)
+        before_row1 = text[max(0, row1["span"][0] - 60):row1["span"][0]]
+        self.assertIn("Đất ở", before_row1)
+        self.assertNotIn("Đất vườn", before_row1)
+
+    def test_q3_editing_one_row_does_not_touch_other_rows(self):
+        """Q3: sửa một dòng đất chỉ đổi ref của dòng đó (không đụng dòng khác)."""
+        base_outcome, base_content = self._run(self.TRANSFER)
+        edited = list(self.TRANSFER)
+        edited[10] = "Loại đất: Đất vườn; Diện tích: 150 m2; Thời hạn: Lâu dài"
+        edited_outcome, edited_content = self._run(edited)
+        base_text = read_docx(base_content).text
+        edited_text = read_docx(edited_content).text
+
+        def row_refs(outcome, content, text):
+            asset = next(s for s in outcome.result_data["suggestions"] if s["target"] == "asset")
+            refs = asset["fields"]["land_rows"]["source_refs"]
+            return {
+                (r["land_row"], r["land_field"]): (text[slice(*r["span"])], r["raw_snippet"])
+                for r in refs
+            }
+
+        base_refs = row_refs(base_outcome, base_content, base_text)
+        edited_refs = row_refs(edited_outcome, edited_content, edited_text)
+        self.assertEqual(edited_refs[(2, "dien_tich")][0], "150 m2")
+        for key in ((1, "loai_dat"), (1, "dien_tich"), (1, "thoi_han"), (2, "loai_dat"), (2, "thoi_han")):
+            self.assertEqual(edited_refs[key], base_refs[key], key)
+
+    def test_q4_multiple_serials_kept_for_reviewer(self):
+        """Q4: hai serial trong một nhóm -> giữ mọi lần thấy, normalized null + cảnh báo."""
+        lines = list(self.TRANSFER)
+        lines[7] = "Giấy chứng nhận số: AB 123456; Thửa đất số: 12; Tờ bản đồ số: 3;"
+        lines.insert(8, "Giấy chứng nhận số: CD 654321;")
+        outcome, content = self._run(lines)
+        text = read_docx(content).text
+        asset = next(s for s in outcome.result_data["suggestions"] if s["target"] == "asset")
+        serial = asset["fields"]["so_serial"]
+        self.assertIsNone(serial["normalized_value"])
+        snippets = {r["raw_snippet"] for r in serial["source_refs"]}
+        self.assertEqual(snippets, {"AB 123456", "CD 654321"})
+        for ref in serial["source_refs"]:
+            self.assertEqual(text[slice(*ref["span"])], ref["raw_snippet"])
+            self.assertEqual(ref["candidate_state"], "ambiguous_group")
+        self.assertTrue(any(w["code"] == "intake.ambiguous" for w in asset["warnings"]))
+
+    def test_q5_blank_land_cluster_warns_and_next_cluster_kept(self):
+        """Q5: cụm `Loại đất:` trống không bị nuốt; vẫn cảnh báo thiếu + cụm sau đủ dữ liệu."""
+        lines = list(self.TRANSFER)
+        lines[9] = "Loại đất:"
+        outcome, content = self._run(lines)
+        asset = next(s for s in outcome.result_data["suggestions"] if s["target"] == "asset")
+        rows = json.loads(asset["fields"]["land_rows"]["normalized_value"])
+        self.assertEqual(len(rows), 2)
+        self.assertIsNone(rows[0]["loai_dat"])
+        self.assertEqual(rows[1]["loai_dat"], "Đất vườn")
+        refs = asset["fields"]["land_rows"]["source_refs"]
+        self.assertTrue(any(r["land_row"] == 2 and r["land_field"] == "loai_dat" for r in refs))
+        row2_dien_tich = next(r for r in refs if r["land_row"] == 2 and r["land_field"] == "dien_tich")
+        self.assertEqual(row2_dien_tich["raw_snippet"], "120 m2")
+
+
 class DocxAdapterTests(unittest.TestCase):
     def test_docx_property(self):
         import tempfile
@@ -552,8 +691,6 @@ class DocxAdapterTests(unittest.TestCase):
         self.assertEqual(serial["observation_state"], "observed")
         ref = serial["source_refs"][0]
         self.assertEqual(ref["rule_id"], "asset.so_serial")
-        self.assertEqual(ref["profile_id"], "transfer")
-        self.assertTrue(ref["profile_version"])
         self.assertEqual(ref["raw_snippet"], "TEST-001")
         self.assertEqual(read_docx(content).text[slice(*ref["span"])], "TEST-001")
         self.assertTrue(ref["docx_refs"])
@@ -565,7 +702,7 @@ class DocxAdapterTests(unittest.TestCase):
         self.assertEqual(dia_chi["normalized_value"], "xã Mẫu, tỉnh Mẫu")
         self.assertEqual(dia_chi["observation_state"], "observed")
         ref2 = dia_chi["source_refs"][0]
-        self.assertEqual(ref2["rule_id"], "asset.dia_chi_thua")
+        self.assertEqual(ref2["rule_id"], "asset.dia_chi")
         self.assertEqual(ref2["raw_snippet"], "xã Mẫu, tỉnh Mẫu")
         self.assertEqual(read_docx(content).text[slice(*ref2["span"])], ref2["raw_snippet"])
 
@@ -793,6 +930,468 @@ class AggregationTests(unittest.TestCase):
     def test_result_schema_version(self):
         outcome = analyze([_text_source(1, "\n".join(PROPERTY_LINES))], api_key="k")
         self.assertEqual(outcome.result_data["schema_version"], "notary.case-drafting.v2")
+
+
+def test_spans_slice_source_for_nfd_and_non_bmp_text(tmp_path):
+    """Span/`raw_snippet` phải cắt đúng NGUỒN khi nguồn ở dạng NFD hoặc có emoji.
+
+    Lõi profile cũ có lớp test SpanUnicodeFidelity (CRLF/NFD/non-BMP); sau #22
+    span do adapter Document Intake dựng nên hành vi đó được khoá ở đây: NFD
+    không được mất trường, và mọi ref phải cắt đúng chuỗi trong nguồn gốc.
+    """
+    lines = [
+        "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+        "I. BÊN CHUYỂN NHƯỢNG (Bên A):",
+        "Ông: Nguyễn Văn An, sinh ngày: 10/05/1975;",
+        "Căn cước công dân số: 001075000001 do Bộ Công an cấp ngày 15/03/2021;",
+        "ĐIỀU 1: ĐỐI TƯỢNG",
+        "- Thửa đất số: 215; Tờ bản đồ số: 34; Giấy chứng nhận số: AB 123456",
+    ]
+
+    def collect(variant_lines, name):
+        path = _make_docx(tmp_path, f"{name}.docx", variant_lines)
+        outcome = analyze([_file_source(1, "docx", str(path))], api_key="k")
+        assert outcome.status == "succeeded", (name, outcome.errors)
+        text = read_docx(path.read_bytes()).text
+        fields, refs = {}, []
+        for suggestion in outcome.result_data["suggestions"]:
+            for key, field in suggestion["fields"].items():
+                fields[(suggestion["target"], key)] = field["raw_value"]
+                refs.extend(field["source_refs"])
+        return fields, refs, text
+
+    nfc_fields, nfc_refs, nfc_text = collect(lines, "nfc")
+    nfd_fields, nfd_refs, nfd_text = collect(
+        [unicodedata.normalize("NFD", line) for line in lines], "nfd"
+    )
+    emoji_fields, emoji_refs, emoji_text = collect(
+        ["😀 ghi chú ngoài văn bản"] + lines, "non_bmp"
+    )
+
+    assert nfc_fields == nfd_fields == emoji_fields
+    assert {target for target, _ in nfc_fields} == {"person", "asset"}
+    for refs, text, name in ((nfc_refs, nfc_text, "nfc"), (nfd_refs, nfd_text, "nfd"),
+                             (emoji_refs, emoji_text, "non_bmp")):
+        assert refs, name
+        for ref in refs:
+            assert text[slice(*ref["span"])] == ref["raw_snippet"], (name, ref["rule_id"])
+
+
+def test_refs_stay_candidate_local_when_values_repeat(tmp_path):
+    """Giá trị lặp ở nhiều người: ref phải trỏ đúng vùng từng người.
+
+    Cùng ngày sinh ở hai người → hai span khác nhau; adapter không mượn lần
+    xuất hiện đầu tiên trong toàn văn bản (provenance cục bộ theo ứng viên).
+    """
+    lines = [
+        "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+        "I. BÊN CHUYỂN NHƯỢNG (Bên A):",
+        "Ông: Nguyễn Văn Mẫu, sinh ngày: 10/05/1975;",
+        "Căn cước công dân số: 001075000001 do Bộ Công an cấp ngày 15/03/2021;",
+        "II. BÊN NHẬN CHUYỂN NHƯỢNG (Bên B):",
+        "Bà: Trần Thị Mẫu, sinh ngày: 10/05/1975;",
+        "Căn cước công dân số: 001182000002 do Công an Hà Nội cấp ngày 20/04/2022;",
+        "ĐIỀU 1: ĐỐI TƯỢNG",
+        "- Thửa đất số: 215; Tờ bản đồ số: 34; Giấy chứng nhận số: AB 123456",
+    ]
+    path = _make_docx(tmp_path, "repeat.docx", lines)
+    outcome = analyze([_file_source(1, "docx", str(path))], api_key="k")
+    assert outcome.status == "succeeded", outcome.errors
+    text = read_docx(path.read_bytes()).text
+    refs = [ref for s in outcome.result_data["suggestions"] for f in s["fields"].values()
+            for ref in f["source_refs"]]
+    birth_refs = [ref for ref in refs if ref["raw_snippet"] == "10/05/1975"]
+    spans = {tuple(ref["span"]) for ref in birth_refs}
+    assert len(spans) == 2, f"ref ngày sinh phải cục bộ theo từng người: {sorted(spans)}"
+    for ref in birth_refs:
+        assert text[slice(*ref["span"])] == "10/05/1975"
+
+
+class AdjudicationConsumerTests(unittest.TestCase):
+    """Hành vi consumer sau adjudication 16/10/2026 (Q2/Q4 residual + MB3/MB4).
+
+    Viết trước khi vá: Q2 gắn sai provenance, Q4 chọn hộ địa chỉ, MB3 bỏ địa
+    chỉ của thửa khi câu mở nằm ngoài vùng tìm.
+    """
+
+    def _run(self, lines):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            f = _make_docx(td, "case.docx", lines)
+            content = f.read_bytes()
+            outcome = analyze([_file_source(1, "docx", str(f))], api_key="k")
+        return outcome, content
+
+    def test_q2_same_id_two_people_keep_own_positions(self):
+        """Q2: hai người cùng số giấy tờ (một người ghi có khoảng trắng) -> mỗi người đúng span."""
+        outcome, content = self._run([
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+            "BÊN A:",
+            "Ông Nguyễn Văn An; Sinh năm: 1980; CCCD số: 0010 7500 0001;",
+            "BÊN B:",
+            "Bà Trần Thị Bình; Sinh năm: 1985; CCCD số: 001075000001;",
+            "TÀI SẢN:",
+            "Giấy chứng nhận số: AB123456; Thửa đất số: 12; Tờ bản đồ số: 3;",
+        ])
+        self.assertEqual(outcome.status, "succeeded")
+        text = read_docx(content).text
+        people = [s for s in outcome.result_data["suggestions"] if s["target"] == "person"]
+        by_name = {p["fields"]["ho_ten"]["normalized_value"]: p for p in people}
+        an_ref = by_name["Nguyễn Văn An"]["fields"]["so_giay_to"]["source_refs"][0]
+        binh_ref = by_name["Trần Thị Bình"]["fields"]["so_giay_to"]["source_refs"][0]
+        self.assertEqual(text[slice(*an_ref["span"])], "0010 7500 0001")
+        self.assertEqual(text[slice(*binh_ref["span"])], "001075000001")
+        self.assertLess(an_ref["span"][0], binh_ref["span"][0])
+
+    def test_q4_repeated_address_group_ambiguous(self):
+        """Q4: địa chỉ lặp trong nhóm -> normalized null + ref mọi lần thấy + cảnh báo."""
+        outcome, content = self._run([
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+            "TÀI SẢN:",
+            "Tài sản thứ 1:",
+            "Giấy chứng nhận số: AB123456;",
+            "Địa chỉ thửa đất: xã Một;",
+            "Địa chỉ thửa đất: xã Hai;",
+            "Thửa đất số: 12; Tờ bản đồ số: 3;",
+        ])
+        self.assertEqual(outcome.status, "succeeded")
+        text = read_docx(content).text
+        asset = next(s for s in outcome.result_data["suggestions"] if s["target"] == "asset")
+        dia_chi = asset["fields"]["dia_chi"]
+        self.assertIsNone(dia_chi["normalized_value"])
+        self.assertEqual({r["raw_snippet"] for r in dia_chi["source_refs"]}, {"xã Một", "xã Hai"})
+        for ref in dia_chi["source_refs"]:
+            self.assertEqual(text[slice(*ref["span"])], ref["raw_snippet"])
+        self.assertTrue(any(w["code"] == "intake.ambiguous" for w in asset["warnings"]))
+
+    def test_mb3_opener_address_keeps_ref(self):
+        """MB3: câu mở thửa nằm TRƯỚC nhãn thửa -> địa chỉ vẫn có ref (không bị bỏ)."""
+        outcome, content = self._run([
+            "VĂN BẢN PHÂN CHIA DI SẢN",
+            "Quyền sử dụng đất tại địa chỉ: xã Mẫu, tỉnh Mẫu theo Giấy chứng nhận quyền sử "
+            "dụng đất số AK 732800 do UBND huyện Mẫu cấp ngày 01/01/2016.",
+            "- Thửa đất số: 180; Tờ bản đồ số: 9",
+        ])
+        self.assertEqual(outcome.status, "succeeded")
+        text = read_docx(content).text
+        asset = next(s for s in outcome.result_data["suggestions"] if s["target"] == "asset")
+        ref = asset["fields"]["dia_chi"]["source_refs"][0]
+        self.assertEqual(text[slice(*ref["span"])], "xã Mẫu, tỉnh Mẫu")
+        self.assertEqual(asset["fields"]["dia_chi"]["normalized_value"], "xã Mẫu, tỉnh Mẫu")
+
+
+class Round4ConsumerTests(unittest.TestCase):
+    """Hành vi consumer vòng 4 (16/10/2026): MB9 diện tích land_rows, Q4 khoá
+    metadata theo shape, loại giấy giữ nguyên văn, serial nguyên văn, nhãn
+    trống không thành dấu `:`. Viết trước khi vá: đỏ ở MB9/Q4/loại giấy."""
+
+    def _run(self, lines):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            f = _make_docx(td, "case.docx", lines)
+            content = f.read_bytes()
+            outcome = analyze([_file_source(1, "docx", str(f))], api_key="k")
+        return outcome, content
+
+    def test_mb9_land_rows_area_typed_with_whole_raw_span(self):
+        """MB9: diện tích cụm đất có đơn vị -> số đúng (200/247), nguyên văn giữ đủ."""
+        outcome, content = self._run([
+            "GIẤY CHỨNG NHẬN",
+            "QUYỀN SỬ DỤNG ĐẤT",
+            "Số phát hành (serial): DD 123456",
+            "Thửa đất số: 10",
+            "Tờ bản đồ số: 5",
+            "c. Loại đất: Đất ở tại nông thôn 200,0m²; Đất trồng cây lâu năm 247,0m²",
+            "d. Thời hạn sử dụng: Đất ở tại nông thôn: Lâu dài; Đất trồng cây lâu năm: 12/2043",
+        ])
+        self.assertEqual(outcome.status, "succeeded")
+        text = read_docx(content).text
+        asset = next(s for s in outcome.result_data["suggestions"] if s["target"] == "asset")
+        rows = json.loads(asset["fields"]["land_rows"]["normalized_value"])
+        self.assertEqual([row["dien_tich"] for row in rows], [200, 247])
+        self.assertEqual([row["loai_dat"] for row in rows],
+                         ["Đất ở tại nông thôn", "Đất trồng cây lâu năm"])
+        self.assertEqual([row["thoi_han"] for row in rows], ["Lâu dài", "12/2043"])
+        area_refs = [r for r in asset["fields"]["land_rows"]["source_refs"]
+                     if r.get("land_field") == "dien_tich"]
+        self.assertEqual([r["raw_snippet"] for r in area_refs], ["200,0m²", "247,0m²"])
+        for ref in area_refs:
+            self.assertEqual(text[slice(*ref["span"])], ref["raw_snippet"])
+        term_refs = [r for r in asset["fields"]["land_rows"]["source_refs"]
+                     if r.get("land_field") == "thoi_han"]
+        self.assertEqual([r["raw_snippet"] for r in term_refs], ["Lâu dài", "12/2043"])
+        self.assertFalse(any(w["code"] == "intake.invalid_number" for w in asset["warnings"]))
+        self.assertNotIn("447", asset["fields"]["land_rows"]["normalized_value"])
+        self.assertNotIn("dien_tich", asset["fields"])  # không suy tổng cấp thửa
+
+    def test_q4_serial_without_group_ambiguous_with_both_refs(self):
+        """Q4: hai serial cùng thửa KHÔNG có nhãn nhóm -> null + đủ hai ref + cảnh báo."""
+        outcome, content = self._run([
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+            "TÀI SẢN:",
+            "Giấy chứng nhận số: AB123456;",
+            "Giấy chứng nhận số: CD654321;",
+            "Thửa đất số: 215; Tờ bản đồ số: 34;",
+        ])
+        self.assertEqual(outcome.status, "succeeded")
+        text = read_docx(content).text
+        asset = next(s for s in outcome.result_data["suggestions"] if s["target"] == "asset")
+        field = asset["fields"]["so_serial"]
+        self.assertIsNone(field["normalized_value"])
+        self.assertEqual({r["raw_snippet"] for r in field["source_refs"]},
+                         {"AB123456", "CD654321"})
+        for ref in field["source_refs"]:
+            self.assertEqual(text[slice(*ref["span"])], ref["raw_snippet"])
+        self.assertTrue(any(w["code"] == "intake.ambiguous" for w in asset["warnings"]))
+
+    def test_loai_so_keeps_uppercase_source_slice(self):
+        """MB1: loại giấy giữ NGUYÊN VĂN nguồn (tiêu đề hoa 2 dòng) + giá trị chuẩn."""
+        outcome, content = self._run([
+            "GIẤY CHỨNG NHẬN",
+            "QUYỀN SỬ DỤNG ĐẤT",
+            "Số phát hành (serial): DD 123456",
+            "Thửa đất số: 10",
+            "Tờ bản đồ số: 5",
+        ])
+        self.assertEqual(outcome.status, "succeeded")
+        text = read_docx(content).text
+        asset = next(s for s in outcome.result_data["suggestions"] if s["target"] == "asset")
+        field = asset["fields"]["loai_so"]
+        raw = "GIẤY CHỨNG NHẬN\nQUYỀN SỬ DỤNG ĐẤT"
+        self.assertEqual(field["normalized_value"], "Giấy chứng nhận quyền sử dụng đất")
+        self.assertEqual(field["raw_value"], raw)
+        ref = field["source_refs"][0]
+        self.assertEqual(ref["raw_snippet"], raw)
+        self.assertEqual(text[slice(*ref["span"])], raw)
+
+    def test_serial_raw_keeps_source_spacing(self):
+        """Serial nguyên văn: hai dấu cách trong nguồn giữ đúng ở raw + span."""
+        outcome, content = self._run([
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+            "TÀI SẢN:",
+            "Tài sản thứ 1:",
+            "Giấy chứng nhận số: AB  123456;",
+            "Thửa đất số: 215;",
+        ])
+        self.assertEqual(outcome.status, "succeeded")
+        text = read_docx(content).text
+        asset = next(s for s in outcome.result_data["suggestions"] if s["target"] == "asset")
+        field = asset["fields"]["so_serial"]
+        self.assertEqual(field["raw_value"], "AB  123456")
+        ref = field["source_refs"][0]
+        self.assertEqual(ref["raw_snippet"], "AB  123456")
+        self.assertEqual(text[slice(*ref["span"])], "AB  123456")
+        self.assertFalse(any(w["code"] == "intake.ambiguous" for w in asset["warnings"]))
+
+    def test_serial_same_value_spacing_not_ambiguous(self):
+        """Cùng một serial ghi hai lần khác khoảng trắng: nguyên văn khác nhau nhưng KHÔNG mơ hồ giả."""
+        outcome, content = self._run([
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+            "TÀI SẢN:",
+            "Tài sản thứ 1:",
+            "Giấy chứng nhận số: AB  123456;",
+            "Giấy chứng nhận số: AB 123456;",
+            "Thửa đất số: 215;",
+        ])
+        self.assertEqual(outcome.status, "succeeded")
+        text = read_docx(content).text
+        asset = next(s for s in outcome.result_data["suggestions"] if s["target"] == "asset")
+        field = asset["fields"]["so_serial"]
+        self.assertIsNotNone(field["normalized_value"])
+        self.assertFalse(any(w["code"] == "intake.ambiguous" for w in asset["warnings"]))
+        ref = field["source_refs"][0]
+        self.assertEqual(text[slice(*ref["span"])], ref["raw_snippet"])
+
+    def test_blank_label_does_not_create_colon_address(self):
+        """Nhãn trống: dấu `:` không thành địa chỉ giả, không cảnh báo mơ hồ."""
+        outcome, content = self._run([
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+            "TÀI SẢN:",
+            "Tài sản thứ 1:",
+            "Giấy chứng nhận số: AB123456;",
+            "Địa chỉ thửa đất:",
+            "Địa chỉ thửa đất: xã Mẫu;",
+            "Thửa đất số: 215;",
+        ])
+        self.assertEqual(outcome.status, "succeeded")
+        text = read_docx(content).text
+        asset = next(s for s in outcome.result_data["suggestions"] if s["target"] == "asset")
+        field = asset["fields"]["dia_chi"]
+        self.assertEqual(field["normalized_value"], "xã Mẫu")
+        self.assertEqual([r["raw_snippet"] for r in field["source_refs"]], ["xã Mẫu"])
+        self.assertEqual(text[slice(*field["source_refs"][0]["span"])], "xã Mẫu")
+        self.assertFalse(any(w["code"] == "intake.ambiguous" for w in asset["warnings"]))
+
+
+class Round5ConsumerTests(unittest.TestCase):
+    """Hành vi consumer vòng 5 (16/10/2026): mọi lần thấy trên cùng một dòng,
+    hợp nhất metadata khi gộp thửa, và KHÔNG báo mơ hồ giả khi hai dòng đất
+    hợp lệ khác nhau. Viết trước khi vá: đỏ ở cả ba."""
+
+    def _run(self, lines):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            f = _make_docx(td, "case.docx", lines)
+            content = f.read_bytes()
+            outcome = analyze([_file_source(1, "docx", str(f))], api_key="k")
+        return outcome, content
+
+    def _asset(self, outcome):
+        return next(s for s in outcome.result_data["suggestions"] if s["target"] == "asset")
+
+    def test_same_line_two_areas_ambiguous_with_both_refs(self):
+        """Cùng dòng ghi diện tích hai lần khác nhau: null + đủ hai ref + cảnh báo."""
+        outcome, content = self._run([
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+            "TÀI SẢN:",
+            "Thửa đất số: 215; Tờ bản đồ số: 34;",
+            "Diện tích: 120 m2; Diện tích: 130 m2",
+        ])
+        self.assertEqual(outcome.status, "succeeded")
+        text = read_docx(content).text
+        asset = self._asset(outcome)
+        field = asset["fields"]["dien_tich"]
+        self.assertIsNone(field["normalized_value"])
+        self.assertEqual([r["raw_snippet"] for r in field["source_refs"]], ["120 m2", "130 m2"])
+        for ref in field["source_refs"]:
+            self.assertEqual(text[slice(*ref["span"])], ref["raw_snippet"])
+        self.assertTrue(any(w["code"] == "intake.ambiguous" for w in asset["warnings"]))
+
+    def test_repeated_parcel_term_ambiguity_after_merge(self):
+        """Cùng thửa/tờ/diện tích nhắc lại với thời hạn khác: gộp thửa vẫn giữ đủ ứng viên."""
+        outcome, content = self._run([
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+            "TÀI SẢN:",
+            "Thửa đất số: 215; Tờ bản đồ số: 34; Diện tích: 120 m2; Thời hạn sử dụng: Lâu dài;",
+            "Thửa đất số: 215; Tờ bản đồ số: 34; Diện tích: 120 m2; Thời hạn sử dụng: 12/2043;",
+            "Giá chuyển nhượng: 100.000.000 đồng",
+        ])
+        self.assertEqual(outcome.status, "succeeded")
+        text = read_docx(content).text
+        asset = self._asset(outcome)
+        field = asset["fields"]["thoi_han"]
+        self.assertIsNone(field["normalized_value"])
+        self.assertEqual([r["raw_snippet"] for r in field["source_refs"]], ["Lâu dài", "12/2043"])
+        for ref in field["source_refs"]:
+            self.assertEqual(text[slice(*ref["span"])], ref["raw_snippet"])
+        self.assertTrue(any(w["code"] == "intake.ambiguous" for w in asset["warnings"]))
+
+    def test_group_two_rows_no_false_ambiguous(self):
+        """Nhóm có serial + thửa/tờ + hai dòng cụm đất khác diện tích/thời hạn:
+        hai dòng đúng, đủ ref, KHÔNG mơ hồ giả."""
+        outcome, content = self._run([
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+            "TÀI SẢN:",
+            "Tài sản thứ 1:",
+            "Giấy chứng nhận số: AB123456;",
+            "Thửa đất số: 215; Tờ bản đồ số: 34;",
+            "Loại đất: Đất ở; Diện tích: 120 m2; Thời hạn: Lâu dài",
+            "Loại đất: Đất vườn; Diện tích: 130 m2; Thời hạn: 12/2043",
+        ])
+        self.assertEqual(outcome.status, "succeeded")
+        text = read_docx(content).text
+        asset = self._asset(outcome)
+        rows = json.loads(asset["fields"]["land_rows"]["normalized_value"])
+        self.assertEqual(
+            [(row["loai_dat"], row["dien_tich"], row["thoi_han"]) for row in rows],
+            [("Đất ở", 120, "Lâu dài"), ("Đất vườn", 130, "12/2043")])
+        refs = asset["fields"]["land_rows"]["source_refs"]
+        area_refs = [r for r in refs if r.get("land_field") == "dien_tich"]
+        term_refs = [r for r in refs if r.get("land_field") == "thoi_han"]
+        self.assertEqual([r["raw_snippet"] for r in area_refs], ["120 m2", "130 m2"])
+        self.assertEqual([r["raw_snippet"] for r in term_refs], ["Lâu dài", "12/2043"])
+        for ref in area_refs + term_refs:
+            self.assertEqual(text[slice(*ref["span"])], ref["raw_snippet"])
+        self.assertNotIn("dien_tich", asset["fields"])
+        self.assertNotIn("thoi_han", asset["fields"])
+        self.assertFalse(any(w["code"] == "intake.ambiguous" for w in asset["warnings"]))
+        self.assertEqual(asset["fields"]["so_serial"]["raw_value"], "AB123456")
+        self.assertEqual(asset["fields"]["so_thua_dat"]["raw_value"], "215")
+
+    def test_multiline_group_two_rows_no_false_ambiguous(self):
+        outcome, content = self._run([
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+            "TÀI SẢN:",
+            "Tài sản thứ 1:",
+            "Giấy chứng nhận số: AB123456;",
+            "Thửa đất số: 215; Tờ bản đồ số: 34;",
+            "Loại đất: Đất ở",
+            "Diện tích: 120 m2",
+            "Thời hạn: Lâu dài",
+            "Loại đất: Đất vườn",
+            "Diện tích: 130 m2",
+            "Thời hạn: 12/2043",
+        ])
+        self.assertEqual(outcome.status, "succeeded")
+        text = read_docx(content).text
+        asset = self._asset(outcome)
+        field = asset["fields"]["land_rows"]
+        rows = json.loads(field["normalized_value"])
+        self.assertEqual(
+            [(row["loai_dat"], row["dien_tich"], row["thoi_han"]) for row in rows],
+            [("Đất ở", 120, "Lâu dài"), ("Đất vườn", 130, "12/2043")])
+        for key, expected in (
+            ("loai_dat", ["Đất ở", "Đất vườn"]),
+            ("dien_tich", ["120 m2", "130 m2"]),
+            ("thoi_han", ["Lâu dài", "12/2043"]),
+        ):
+            refs = [r for r in field["source_refs"] if r.get("land_field") == key]
+            self.assertEqual([r["raw_snippet"] for r in refs], expected)
+            self.assertEqual([r["land_row"] for r in refs], [1, 2])
+            for ref in refs:
+                self.assertEqual(text[slice(*ref["span"])], ref["raw_snippet"])
+        self.assertNotIn("dien_tich", asset["fields"])
+        self.assertNotIn("thoi_han", asset["fields"])
+        self.assertFalse(any(w["code"] == "intake.ambiguous" for w in asset["warnings"]))
+        self.assertEqual(asset["fields"]["so_serial"]["raw_value"], "AB123456")
+        self.assertEqual(asset["fields"]["so_thua_dat"]["raw_value"], "215")
+        self.assertEqual(asset["fields"]["so_to_ban_do"]["raw_value"], "34")
+
+    def test_next_group_flat_areas_remain_ambiguous(self):
+        outcome, content = self._run([
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+            "TÀI SẢN:",
+            "Tài sản thứ 1:",
+            "Giấy chứng nhận số: AB123456;",
+            "Thửa đất số: 215; Tờ bản đồ số: 34;",
+            "Loại đất: Đất ở",
+            "Diện tích: 90 m2",
+            "Thời hạn: Lâu dài",
+            "Tài sản thứ 2:",
+            "Giấy chứng nhận số: CD123456;",
+            "Thửa đất số: 300; Tờ bản đồ số: 40;",
+            "Diện tích: 120 m2",
+            "Diện tích: 130 m2",
+        ])
+        self.assertEqual(outcome.status, "succeeded")
+        assets = [s for s in outcome.result_data["suggestions"] if s["target"] == "asset"]
+        self.assertEqual(len(assets), 2)
+        self.assertFalse(any(w["code"] == "intake.ambiguous" for w in assets[0]["warnings"]))
+        field = assets[1]["fields"]["dien_tich"]
+        self.assertIsNone(field["normalized_value"])
+        self.assertTrue(any(w["code"] == "intake.ambiguous" for w in assets[1]["warnings"]))
+        self.assertEqual([r["raw_snippet"] for r in field["source_refs"]], ["120 m2", "130 m2"])
+        text = read_docx(content).text
+        for ref in field["source_refs"]:
+            self.assertEqual(text[slice(*ref["span"])], ref["raw_snippet"])
+
+    def test_bare_group_negative_flat_area_still_invalid(self):
+        outcome, content = self._run([
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+            "TÀI SẢN:",
+            "Tài sản thứ 1:",
+            "Giấy chứng nhận số: AB123456;",
+            "Diện tích: -50",
+        ])
+        self.assertEqual(outcome.status, "succeeded")
+        asset = self._asset(outcome)
+        field = asset["fields"]["dien_tich"]
+        self.assertIsNone(field["normalized_value"])
+        self.assertTrue(any(w["code"] == "intake.invalid_number" for w in asset["warnings"]))
+        text = read_docx(content).text
+        self.assertEqual(field["raw_value"], "-50")
+        for ref in field["source_refs"]:
+            self.assertEqual(text[slice(*ref["span"])], "-50")
 
 
 if __name__ == "__main__":

@@ -12,11 +12,13 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+for _path in (ROOT, ROOT.parent / "tools"):
+    if str(_path) not in sys.path:
+        sys.path.insert(0, str(_path))
 
-import extract_contract
+import extraction_adapter
 import kiem_tra_trich_xuat
+from regex_workbench.engine import contract_extract
 
 
 DEFAULT_INPUT = ROOT / "regex_review_samples" / "input"
@@ -89,10 +91,13 @@ def cluster_id_for(signature: str) -> str:
 
 
 def _extractor_fingerprint() -> str:
-    """Bam engine + luat kiem tra + file nay: doi 1 trong 3 -> cache het han,
-    ingest phai chay lai (khong duoc cham tren ket qua luu cu)."""
+    """Bam lõi luật + adapter + luật kiểm tra + file nay: doi 1 trong 4 ->
+    cache het han, ingest phai chay lai (khong duoc cham tren ket qua luu cu).
+    Luật nằm ở lõi (`contract_extract`), nên phải băm cả lõi — nếu chỉ băm
+    adapter thì sửa luật sẽ không làm cache hết hạn."""
     digest = hashlib.sha256()
-    digest.update(Path(extract_contract.__file__).read_bytes())
+    digest.update(Path(contract_extract.__file__).read_bytes())
+    digest.update(Path(extraction_adapter.__file__).read_bytes())
     digest.update(Path(kiem_tra_trich_xuat.__file__).read_bytes())
     digest.update(Path(__file__).read_bytes())
     return digest.hexdigest()
@@ -226,10 +231,10 @@ def ingest_corpus(input_dir: Path | str = DEFAULT_INPUT, cache_dir: Path | str =
             text = ""
             payload = None
             try:
-                text = extract_contract.read_docx(
+                text = extraction_adapter.read_docx(
                     path, use_ifilter_for_doc=path.suffix.lower() == ".doc"
                 )
-                payload = extract_contract.extract(path, preloaded_text=text)
+                payload = extraction_adapter.extract(path, preloaded_text=text)
             except Exception as exc:  # A broken sample must remain reviewable.
                 error = f"{type(exc).__name__}: {exc}"
             extraction = _snapshot(payload, error)

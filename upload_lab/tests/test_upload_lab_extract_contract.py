@@ -8,7 +8,8 @@ from pathlib import Path
 
 from docx import Document
 
-from extract_contract import extract, find_tai_san, guess_loai_tai_san, tach_danh_sach_so_tiet_kiem, tach_danh_sach_thua_dat
+from extraction_adapter import extract
+from regex_workbench.engine.contract_extract import (find_tai_san, guess_loai_tai_san, tach_danh_sach_so_tiet_kiem, tach_danh_sach_thua_dat)
 
 
 def make_docx(path: Path, *paragraphs: str) -> Path:
@@ -936,7 +937,9 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(thua_list[0]["so_to_ban_do"], "2")
         self.assertIn("107", thua_list[0]["phan_ghi_them"])
         self.assertEqual(thua_list[0]["dien_tich"], "450")
-        self.assertEqual(thua_list[0]["loai_gcn"], "quyền sử dụng đất")
+        # MB1 (adjudication 16/10/2026): loai_gcn là loại giấy GHI TRONG NGUỒN —
+        # bản cũ cắt mất "Giấy chứng nhận"; giá trị đúng giữ đủ nhãn nguồn.
+        self.assertEqual(thua_list[0]["loai_gcn"], "Giấy chứng nhận quyền sử dụng đất")
         details = thua_list[0]["chi_tiet_dien_tich"]
         self.assertEqual(len(details), 2)
         self.assertEqual(details[0]["dien_tich"], "200")
@@ -1630,14 +1633,14 @@ class UploadLabExtractContractTests(unittest.TestCase):
 
     def test_nhom_hop_dong_uy_quyen_cach_viet_cu(self):
         # "uỷ quyền" (chu viet u+1EF7) cung ra nhom "Uy quyen".
-        from extract_contract import guess_nhom_hd
+        from regex_workbench.engine.contract_extract import guess_nhom_hd
         self.assertEqual(guess_nhom_hd("GIẤY UỶ QUYỀN"), "Ủy quyền")
         self.assertEqual(guess_nhom_hd("HỢP ĐỒNG ỦY QUYỀN"), "Ủy quyền")
 
     def test_ghi_chu_tach_tu_va_nay_la_cung_dong(self):
         # Giang 2026: ghi chu "(tach tu thua so 02)" + "(nay la to ban do so 100)"
         # phai cong don, khong de ghi chu sau ghi de ghi chu truoc.
-        from extract_contract import tach_danh_sach_thua_dat
+        from regex_workbench.engine.contract_extract import tach_danh_sach_thua_dat
         ds = tach_danh_sach_thua_dat(
             "Quyền sử dụng đất có địa chỉ tại: xã G theo Giấy chứng nhận số CB123 "
             "do huyện H cấp ngày 01/01/2020. Thửa đất số: 180 (tách từ thửa số 02), "
@@ -1738,7 +1741,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_nguoi_dai_dien_phap_luat_va_o_gach_dau(self):
         # Dai dien phap luat cong ty la nguoi ky that; o bang .doc dang
         # "- Thửa đất số: 73 | | - Tờ bản đồ số: 9" van tach duoc nhan.
-        from extract_contract import tach_danh_sach_thua_dat
+        from regex_workbench.engine.contract_extract import tach_danh_sach_thua_dat
         ds = tach_danh_sach_thua_dat(
             "Phần quyền sử dụng đất có địa chỉ: xã Y theo Giấy chứng nhận số: AK 732800 "
             "do huyện H cấp năm 2008. Cụ thể:\n"
@@ -1786,13 +1789,13 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(chet[0]["ngay_sinh"], "01/01/1948")
 
         # Ranh gioi ":" trong ten (don DK18 "N. Ông X: <địa chỉ>").
-        from extract_contract import _cat_ho_ten
+        from regex_workbench.engine.contract_extract import _cat_ho_ten
         self.assertEqual(_cat_ho_ten("Phùng Xuân Tính: phường Thành Nam, tỉnh Ninh Bình"), "Phùng Xuân Tính")
 
     def test_heading_ben_sau_gach_doc_cua_doc(self):
         # .doc IFilter: tab sau so muc thanh "|" — "I. | BÊN CHUYỂN NHƯỢNG"
         # phai van mo duoc ranh ben (sweep12: Bưởi/Ký - Hợp/Bình).
-        from extract_contract import _extract_parties_generic
+        from regex_workbench.engine.contract_extract import _extract_parties_generic
         text = (
             "HỢP ĐỒNG CHUYỂN NHƯỢNG\n"
             "I. | BÊN CHUYỂN NHƯỢNG: (Bên A).\n"
@@ -1809,7 +1812,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_ngoac_phu_cua_nguoi_khac_khong_doi_giay_to(self):
         # Ong da chet nhung chunk chua "(Sinh/CCCD/Thường trú ...)" cua vo —
         # khong duoc doi giay to cua vo thanh nguoi song (Thong bao Giới).
-        from extract_contract import _extract_parties_generic
+        from regex_workbench.engine.contract_extract import _extract_parties_generic
         text = (
             "THÔNG BÁO THỪA KẾ\n"
             "Ông Nguyễn Văn G không có ai là bố nuôi, mẹ nuôi.\n"
@@ -1829,7 +1832,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # Don hanh chinh: "1. Người xin gia hạn sử dụng đất: Nguyễn Thị C"
         # va to khai thue "[04] Tên người nộp thuế: ..." deu la nguoi that
         # (khong can ngay sinh/ID de duoc giu).
-        from extract_contract import _extract_parties_generic
+        from regex_workbench.engine.contract_extract import _extract_parties_generic
         text = (
             "ĐƠN XIN GIA HẠN SỬ DỤNG ĐẤT\n"
             "1. Người xin gia hạn sử dụng đất: Nguyễn Thị Chúc\n"
@@ -1857,7 +1860,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_dedupe_nguoi_trung_qua_form_lap_trang(self):
         # Form DK18 in 2 mat: cung nguoi (trung ten + CCCD) xuat hien 2 lan —
         # gop thanh 1, bo sung truong con thieu.
-        from extract_contract import _extract_parties_generic
+        from regex_workbench.engine.contract_extract import _extract_parties_generic
         text = (
             "ĐƠN ĐĂNG KÝ BIẾN ĐỘNG\n"
             "a. Tên: Bùi Thị H; Sinh ngày: 27/05/1989;\n"
@@ -1879,7 +1882,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_chi_nhanh_to_chuc_khong_phai_nguoi_va_ten_cat_mang(self):
         # "CHI NHÁNH SÓC SƠN" khong phai nguoi ("Chị" an chu Chi cua to
         # chuc); "Ông Trần Trí Thắng mang căn cước" -> ten "Trần Trí Thắng".
-        from extract_contract import _extract_parties_generic
+        from regex_workbench.engine.contract_extract import _extract_parties_generic
         text = (
             "CÔNG VĂN\n"
             "CHI NHÁNH SÓC SƠN\n"
@@ -1899,7 +1902,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_ten_toi_la_va_nguoi_nhan_giao_bien_ban(self):
         # "Tên tôi là: X; Sinh ngày" (don xac nhan sai ten) va "NGƯỜI
         # NHẬN:/NGƯỜI GIAO:" (bien ban giao nhan) deu la nguoi.
-        from extract_contract import _extract_parties_generic
+        from regex_workbench.engine.contract_extract import _extract_parties_generic
         text = (
             "ĐƠN ĐỀ NGHỊ\n"
             "Tên tôi là: Hoàng Thị Tuyết; Sinh ngày: 19/03/1966;\n"
@@ -1926,7 +1929,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_dedupe_nguoi_chi_co_ten_qua_form_lap(self):
         # Bien ban in 2 lan: nguoi chi co ten (khong cccd/ngay sinh) van
         # gop thanh 1 ban ghi.
-        from extract_contract import _extract_parties_generic
+        from regex_workbench.engine.contract_extract import _extract_parties_generic
         text = (
             "BIÊN BẢN GIAO NHẬN\n"
             "NGƯỜI NHẬN: Trịnh Minh Giang\n"
@@ -1947,7 +1950,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # Mau the chap ngan hang: "I. Bên thế chấp: Ông X | Ông: X |
         # Năm sinh: 1962 | Căn cước ... số: ... | Bà: Y | ..." — nguoi
         # trong o "Ông:/Bà:" tach bang o trong "| |".
-        from extract_contract import _extract_plain_text_person_entries
+        from regex_workbench.engine.contract_extract import _extract_plain_text_person_entries
         section = (
             "I. Bên thế chấp: Ông Nguyễn Văn Trinh |  | Ông: Nguyễn Văn Trinh |  | "
             "Năm sinh: 1962 |  | Căn cước công dân số: 036062009669 do Cục cảnh sát "
@@ -1965,7 +1968,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_co_quan_he_la_tach_nguoi_thu_hai(self):
         # "2. Ông X có mẹ đẻ là bà Y; Sinh ngày..." — "bà Y" la nguoi
         # rieng, khong nuot vao khoi X (don xac nhan nhan than).
-        from extract_contract import _extract_plain_text_person_entries
+        from regex_workbench.engine.contract_extract import _extract_plain_text_person_entries
         section = (
             "1. Ông Nguyễn Huy Nghĩa có bố đẻ là ông Nguyễn Huy Tình; "
             "Sinh năm 1923, đã chết ngày 05/06/2016\n"
@@ -1980,7 +1983,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_tien_to_bo_me_de_toi_va_ong_x_la(self):
         # "Mẹ đẻ tôi: Bà Y" va "Bố đẻ ông X là bà Y" — tien to quan he
         # + ten nguoi than chet, nguoi song la Y.
-        from extract_contract import _extract_plain_text_person_entries
+        from regex_workbench.engine.contract_extract import _extract_plain_text_person_entries
         section = (
             "- | Mẹ đẻ tôi: Bà Nguyễn Thị Vân; Sinh ngày: 01/01/1960; "
             "Căn cước công dân số 036160003674\n"
@@ -1999,7 +2002,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_toi_ten_la_voi_o_trong_bang(self):
         # "Tôi tên là: X; | | Sinh ngày" — khong tach "| |" truoc nhan
         # thuong (Sinh ngày), chi tach truoc nhan danh xung Ong/Ba.
-        from extract_contract import _extract_plain_text_person_entries
+        from regex_workbench.engine.contract_extract import _extract_plain_text_person_entries
         section = (
             "Tôi tên là: Nguyễn Văn Cường; | | Sinh ngày: 20/08/1989;\n"
             "Căn cước công dân số 036089022676 do X cấp ngày 04/05/2021;\n"
@@ -2012,7 +2015,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_dedupe_nam_tron_vs_ngay_day_du(self):
         # Danh sach nguoi lap 2 lan: 1 lan "Sinh ngày: 01/01/1932", 1 lan
         # "Sinh năm 1932" — cung nguoi, gop 1 ban ghi.
-        from extract_contract import _extract_plain_text_person_entries
+        from regex_workbench.engine.contract_extract import _extract_plain_text_person_entries
         section = (
             "Bà Hoàng Thị Hanh; Sinh ngày: 01/01/1932; "
             "Căn cước công dân số 036132002879\n"
@@ -2025,7 +2028,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_nguoi_chet_nam_co_trich_luc_khai_tu(self):
         # "chết năm 2016 theo Trích lục khai tử" -> nguoi chet that
         # (bang chung TLKT); "chết năm" troi khong TLKT van bo.
-        from extract_contract import _extract_nguoi_chet
+        from regex_workbench.engine.contract_extract import _extract_nguoi_chet
         text = (
             "Mẹ đẻ của chúng tôi là bà Nguyễn Thị Ngò - Sinh năm 1923; "
             "chết năm 2016 theo Trích lục khai tử số 95/2026/TLKT do "
@@ -2047,7 +2050,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_heading_gach_cheo_va_cccd_khong_so(self):
         # Mau ngan hang: "I/ BÊN ỦY QUYỀN" (gach cheo, khong phai "I."),
         # bullet "* Ông:", nhan "Năm sinh" dao, "CCCD:" khong chu "số".
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = (
             "HỢP ĐỒNG ỦY QUYỀN XỬ LÝ TÀI SẢN BẢO ĐẢM\n"
             "I/ BÊN ỦY QUYỀN ( Chủ tài sản):\n"
@@ -2066,7 +2069,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
 
     def test_trang_sua_loi_ky_thuat_la_generic(self):
         # Trang phu dinh kem sua loi — khong nhan loai hop dong noi trang.
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = (
             "TRANG SỬA LỖI KỸ THUẬT ĐÍNH KÈM\n"
             "\tHợp đồng chuyển nhượng quyền sử dụng đất Số công chứng: 919.2025\n"
@@ -2079,7 +2082,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # "trong đó diện tích được cấp GCN: 130,1 m2 ONT, diện tích chưa
         # được cấp 89,4 m2 ONT" — ve 2 khong co "Nhan:" van la chi tiet;
         # dau "," thap phan (130,1) khong duoc tach ve.
-        from extract_contract import tach_danh_sach_thua_dat
+        from regex_workbench.engine.contract_extract import tach_danh_sach_thua_dat
         block = (
             "Thửa đất số: 28 , tờ bản đồ số: 4\n"
             "Diện tích: 219,5 m2 trong đó diện tích được cấp GCN: 130,1 m2  ONT, diện tích chưa được cấp 89,4 m2 ONT."
@@ -2094,7 +2097,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # "Người đại diện là Ông: <tên>" — danh xưng trước hai chấm; và thế
         # chấp không heading "BÊN NHẬN THẾ CHẤP" thì preamble là bên nhận
         # (mẫu Lời chứng Agribank).
-        from extract_contract import _extract_parties_generic
+        from regex_workbench.engine.contract_extract import _extract_parties_generic
         lines = [
             "NGÂN HÀNG AGRIBANK – CHI NHÁNH Ý YÊN",
             "Đại diện: Ông Phạm Quốc Vinh \t\t\tChức vụ: Giám đốc",
@@ -2129,7 +2132,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # Dong bang .doc: "...|23|34|425|Trong do|270|Dat vuon tap|12/2043|
         # 155|Dat o|Lau dai|23|32|160|Ao nuoi ca|12/2043 (nay la...)" — bo
         # 3 so sau "Trong do" la thua MOI, khong gop vao chi tiet thua truoc.
-        from extract_contract import _tach_thua_cell_stream, _new_thua_dat
+        from regex_workbench.engine.contract_extract import _tach_thua_cell_stream, _new_thua_dat
         cells = [c.strip() for c in (
             "Số tờ bản đồ|Số thửa|Diện tích (m2)|Mục đích sử dụng|Thời hạn sử dụng||"
             "23|34|425||||||Trong đó|||||||270|Đất vườn tạp|12/2043|||155|Đất ở|Lâu dài||"
@@ -2150,7 +2153,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # VB từ chối: "Bố đẻ tôi là ông X; Sinh năm 1924, đã chết năm 2007"
         # — chết năm KHÔNG trích lục vẫn nhận vì trước có "Bố đẻ"
         # (11/10/2026). Các kind khác vẫn cần trích lục/khai tử.
-        from extract_contract import _extract_nguoi_chet
+        from regex_workbench.engine.contract_extract import _extract_nguoi_chet
         text = (
             "Bố đẻ tôi là ông Dương Xuân Khả; Sinh năm 1924, đã chết năm 2007; "
             "Nơi thường trú cuối cùng trước khi chết: Tổ 5, thị trấn Lâm, huyện Ý Yên.\n"
@@ -2165,7 +2168,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_nguoi_chet_ngoac_gop_sinh_va_chet(self):
         # "Bố chúng tôi là ông X (sinh năm 1956, đã chết ngày 16/01/2025)
         # theo Trích lục khai tử" — cum sinh+chết trong ngoặc (11/10/2026).
-        from extract_contract import _extract_nguoi_chet
+        from regex_workbench.engine.contract_extract import _extract_nguoi_chet
         text = (
             "Bố chúng tôi là ông Đỗ Đình Thắm (sinh năm 1956, đã chết ngày 16/01/2025) "
             "theo Trích lục khai tử (Bản sao) số 04/TLKT-BS của Uỷ ban nhân dân."
@@ -2180,7 +2183,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_to_khai_thue_ho_va_ten_nhan_nguoi(self):
         # Tờ khai thuế điền sẵn: "[04] Họ và tên:", "[05] Ngày/tháng/năm sinh:",
         # "[10.x]" ô địa chỉ con — người phải ra đủ trường (11/10/2026).
-        from extract_contract import _extract_parties_generic
+        from regex_workbench.engine.contract_extract import _extract_parties_generic
         text = (
             "TỜ KHAI THUẾ SỬ DỤNG ĐẤT PHI NÔNG NGHIỆP\n"
             "1. Người nộp thuế:\n"
@@ -2204,7 +2207,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_so_thu_tu_truoc_vai_tro_nguoi_chong(self):
         # "1. Người chồng – Vũ Văn Khoan; Sinh ngày:..." — tiền tố "1." trước
         # vai trò vẫn nhận người tên trần (11/10/2026).
-        from extract_contract import _extract_parties_generic
+        from regex_workbench.engine.contract_extract import _extract_parties_generic
         text = (
             "VĂN BẢN CAM KẾT TÀI SẢN RIÊNG\n"
             "Chúng tôi gồm có:\n"
@@ -2222,7 +2225,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_trang_dinh_chinh_nhan_nguoi_trong_ngoac_kep(self):
         # "ĐÍNH CHÍNH VĂN BẢN ..." -> generic; tên trích dẫn “Bà X – Sinh năm”
         # / “Bà X – Sinh ngày” gộp 1 người, giữ ngày đầy đủ (11/10/2026).
-        from extract_contract import _detect_document_kind_and_title, _extract_parties_generic
+        from regex_workbench.engine.contract_extract import _detect_document_kind_and_title, _extract_parties_generic
         text = (
             "ĐÍNH CHÍNH\n"
             "VĂN BẢN THOẢ THUẬN PHÂN CHIA DI SẢN\n"
@@ -2241,7 +2244,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # "Bố đẻ của tôi là Trần Văn Phúc, sinh năm 1910, đã chết ngày
         # 19/04/1998 theo trích lục khai tử" — ten tran khong danh xung
         # sau "là"; gioi_tinh de trong khong suy (11/10/2026).
-        from extract_contract import _extract_nguoi_chet
+        from regex_workbench.engine.contract_extract import _extract_nguoi_chet
         text = (
             "Bố đẻ của tôi là Trần Văn Phúc, sinh năm 1910, đã chết ngày 19/04/1998 "
             "theo trích lục khai tử (bản sao) số 17/2025/TLKT-BS do UBND xã Yên Thắng."
@@ -2255,7 +2258,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_vai_tro_hai_cham_nguoi_vo_chong(self):
         # "Người vợ:  bà X; Sinh ngày:..." — vai trò dùng ":" thay "-" vẫn
         # nhận người kèm danh xưng (11/10/2026).
-        from extract_contract import _extract_parties_generic
+        from regex_workbench.engine.contract_extract import _extract_parties_generic
         text = (
             "Chúng tôi gồm có:\n"
             "Người vợ:  bà Phạm Thị Nụ;\t\t\tSinh ngày: 05/08/1975;\n"
@@ -2272,7 +2275,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # "Vũ Thị Lanh" vs "Vũ Thị Lành" cung fold key nhung la 2 nguoi khac
         # (khac CCCD/nam sinh); ban tom tat "Sinh năm" phai gop vao dung
         # nguoi chi tiet, khong de lech sang nguoi ten gan giong (11/10/2026).
-        from extract_contract import _extract_plain_text_person_entries
+        from regex_workbench.engine.contract_extract import _extract_plain_text_person_entries
         text = (
             "1. Bà: Đỗ Thị Đợi - Sinh ngày: 01/01/1946; Căn cước số: 036146008526;\n"
             "2. Bà: Vũ Thị Lanh - Sinh ngày: 09/10/1986; Căn cước số: 036186001854;\n"
@@ -2296,7 +2299,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # Mau 04a/ĐK "DANH SÁCH NGƯỜI SỬ DỤNG CHUNG": hang o
         # "STT | Ông X | nam sinh | loai giay | so | ngay cap | noi cap |
         # dia chi" — nam sinh la o tron khong nhan (11/10/2026).
-        from extract_contract import _extract_plain_text_person_entries
+        from regex_workbench.engine.contract_extract import _extract_plain_text_person_entries
         text = (
             "STT | Tên | Năm sinh | Loại giấy tờ | Số | Ngày cấp | Cơ quan cấp | Địa chỉ\n"
             "1\nÔng Trương Anh Dũng | 1955 | CCCD | 036055003111 | 25/04/2021 | "
@@ -2321,7 +2324,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_bang_thanh_vien_hdtv_khong_cot_giay_to(self):
         # "BIÊN BẢN HỌP HĐTV": hang "STT | Ông X | chuc vu | ty le | ghi chu"
         # khong co cot giay to — van tinh nguoi nho o chuc vu (11/10/2026).
-        from extract_contract import _extract_plain_text_person_entries
+        from regex_workbench.engine.contract_extract import _extract_plain_text_person_entries
         text = (
             "STT | Họ tên | Chức vụ | Tỷ lệ vốn góp (%) | Ghi chú\n"
             "1 | Ông Nguyễn Hữu Công | Thành viên góp vốn kiêm Giám đốc | 33,33 % | Có mặt\n"
@@ -2338,7 +2341,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_nhan_danh_xung_dung_mot_minh_ong_hai_cham(self):
         # "Ông: Triệu Tuấn Anh" dung rieng 1 dong khong giay to — nhan danh
         # xung la du hieu nguoi (to dinh gia ngan hang — 11/10/2026).
-        from extract_contract import _extract_plain_text_person_entries
+        from regex_workbench.engine.contract_extract import _extract_plain_text_person_entries
         text = (
             "Thành phần Tổ định giá gồm:\n"
             "Ông: Triệu Tuấn Anh\n"
@@ -2352,7 +2355,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_nhan_chuc_vu_truoc_danh_xung(self):
         # "Chức vụ: Ông Nguyễn Hữu Công" — ten sau nhan chuc vu giua dong
         # (bang thanh phan to dinh gia — 11/10/2026).
-        from extract_contract import _extract_plain_text_person_entries
+        from regex_workbench.engine.contract_extract import _extract_plain_text_person_entries
         text = "Đại diện hợp pháp\nChức vụ: Ông Nguyễn Hữu Công\nGiám đốc\n"
         persons = _extract_plain_text_person_entries(text)
         self.assertTrue(
@@ -2363,7 +2366,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # Bang GCN 2 dong gop 1 o: "Trong đó 324,9 46,8 | Đất ở Vườn |
         # Lâu dài 2043" — o dien tich nhieu so tron tach thanh chi tiet
         # rieng de tong khop 371,7 (11/10/2026).
-        from extract_contract import tach_danh_sach_thua_dat
+        from regex_workbench.engine.contract_extract import tach_danh_sach_thua_dat
         text = (
             "Số tờ bản đồ | Số thửa | Diện tích (m2) | Mục đích sử dụng | Thời hạn\n"
             "18 | 207 | 371,7\n"
@@ -2382,7 +2385,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # Don tu choi nhieu nguoi: "Chúng tôi là: 1. Trần Văn Cát   Sinh
         # ngày: ..." — ten tran khong Ong/Ba, danh so + ngay sinh cung
         # dong (11/10/2026).
-        from extract_contract import _extract_party_data
+        from regex_workbench.engine.contract_extract import _extract_party_data
         sec = (
             "1. Trần Văn Cát\t\t\tSinh ngày: 05/01/1960;\n"
             "Căn cước công dân số 036060001798 do Cục cảnh sát cấp ngày 02/07/2021;\n"
@@ -2400,7 +2403,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # "Ông Phùng Trường Giang      -Chức vụ: Phó Giám đốc" — dau gach
         # dinh lien vao "Chức vụ" khong co khoang trang sau dau, ten van
         # phai cat dung (11/10/2026).
-        from extract_contract import _extract_party_data
+        from regex_workbench.engine.contract_extract import _extract_party_data
         sec = "Đại diện hợp pháp: Ông Phùng Trường Giang      -Chức vụ: Phó Giám đốc"
         nguoi = _extract_party_data(sec)["nguoi"]
         self.assertTrue(any(p["ho_ten"] == "Phùng Trường Giang" for p in nguoi))
@@ -2408,7 +2411,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
 
 
     def test_tach_thua_cell_stream_chi_tiet_thieu_thoi_han(self):
-        from extract_contract import _new_thua_dat, _tach_thua_cell_stream
+        from regex_workbench.engine.contract_extract import _new_thua_dat, _tach_thua_cell_stream
 
         # Bang .doc: chi tiet "225 Dat o" khong ky han, so "119" sau do
         # la dien tich chi tiet moi, khong phai thoi han cua "225".
@@ -2431,7 +2434,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # "35 44 150 NTS 2063  35 103 299  Trong do 200 ONT Lau dai
         #  99 CLN 2043  35 134 168 CLN 2043" — phai ra 3 thua, chi tiet
         # thuoc thua 103 (12/10/2026).
-        from extract_contract import _tach_thua_bang_don_dong
+        from regex_workbench.engine.contract_extract import _tach_thua_bang_don_dong
         line = (
             "Số tờ bản đồ Số thửa Diện tích (m2) Mục đích sử dụng Thời hạn sử dụng "
             "35 44 150 NTS 2063 35 103 299 Trong đó 200 ONT Lâu dài 99 CLN 2043 "
@@ -2454,7 +2457,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_nguoi_chet_ngoac_bi_danh_truoc_ngoac_sinh_chet(self):
         # "ong X (Ten khac); (Sinh nam 1945, da chet ngay ... theo trich luc...)"
         # — ngoac bi danh dung truoc ngoac sinh/chet (12/10/2026).
-        from extract_contract import _extract_nguoi_chet, DOC_KIND_INHERITANCE_REFUSAL
+        from regex_workbench.engine.contract_extract import _extract_nguoi_chet, DOC_KIND_INHERITANCE_REFUSAL
         text = (
             "Bố chúng tôi là ông Trần Văn Đàm (Trần Hữu Đàm); "
             "(Sinh năm 1945, đã chết ngày 08/08/2014 theo trích lục khai tử "
@@ -2471,7 +2474,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # Bang .doc qua IFilter don nhieu hang vat ly vao 1 dong "|"
         # (thua 202 + "Trong do" + thua 26/9 + 380/16 + 171/26 chung hang).
         # O thua cho phep "/" ("26/9"); ky han cham "12.2013" (13/10/2026).
-        from extract_contract import tach_danh_sach_thua_dat
+        from regex_workbench.engine.contract_extract import tach_danh_sach_thua_dat
         text = (
             "Số tờ bản đồ | Số thửa | Diện tích (m2) | Mục đích sử dụng | Thời hạn sử dụng\n"
             "28 | 202 | 497 |  |  |  |  | Trong đó |  |  |  |  |  | 240 | Đất ở | "
@@ -2498,7 +2501,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # khac nhau (336 vs 308,1) — giu 2 ban rieng, khong tron chi tiet;
         # "to ban do so 9 do Chi nhanh ..." cat duoi " do " -> "9"
         # (13/10/2026).
-        from extract_contract import tach_danh_sach_thua_dat
+        from regex_workbench.engine.contract_extract import tach_danh_sach_thua_dat
         text = (
             "Số tờ bản đồ | Số thửa | Diện tích (m2) | Mục đích sử dụng | Thời hạn sử dụng\n"
             "9 | 211 | 336 | Trong đó | 246 | Đất ở | Lâu dài | 90 | Đất vườn tạp | 12/2043\n"
@@ -2517,7 +2520,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_bang_tab_stt_danh_xung_anh_chi(self):
         # Bang mau 04a/DK qua .doc: "STT	Bà X	năm	CCCD	số	ngày cấp	cơ quan	địa chỉ"
         # — TAB là ranh ô; danh xưng "Anh" -> Ông (13/10/2026).
-        from extract_contract import _extract_party_data
+        from regex_workbench.engine.contract_extract import _extract_party_data
         section = (
             "1\tBà Nguyễn Thị Toan\t1980\tCCCD\t036180006180\t10/05/2021\tBộ Công an\txã Minh Tân\n"
             "2\tAnh Đào Duy Chinh\t2011\tCC\t036211017670\t18/11/2024\tBộ Công an\txã Minh Tân\n"
@@ -2539,7 +2542,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # xung) + "- Can cuoc cong dan ong Ha Van Thinh so 036..." — hai
         # dong gop thanh 1 nguoi du truong; "1.3. Dia chi:" la dia chi
         # chung cua ca muc (12/10/2026).
-        from extract_contract import _extract_party_data
+        from regex_workbench.engine.contract_extract import _extract_party_data
         section = (
             "1. Người sử dụng đất:\n"
             "1.1.	Tên: Hà Văn Thinh; 		Sinh ngày: 15/05/1961;\n"
@@ -2566,7 +2569,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # "1. Con gái - Bà X" / "2. Cháu - Ông X" / "2. Đồng sử dụng –
         # Ông X" — vai tro mo rong (cam ket dong so huu, tang cho —
         # 12/10/2026).
-        from extract_contract import _extract_party_data
+        from regex_workbench.engine.contract_extract import _extract_party_data
         section = "\n".join([
             "1. Con gái - Bà Nguyễn Thị Hằng, Sinh năm 1980;",
             "2. Cháu - Ông Nguyễn Tuấn Anh, Sinh năm 1977;",
@@ -2590,7 +2593,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # "chet nam YYYY theo Đơn đề nghị do UBND ... xác nhận" la bang
         # chung nguoi chet nhu trich luc (12/10/2026); nguoi do khong
         # duoc roi vao danh sach duong su (VB khai nhan ong Nhiem).
-        from extract_contract import _extract_nguoi_chet, _extract_party_data, DOC_KIND_INHERITANCE_DECLARATION
+        from regex_workbench.engine.contract_extract import _extract_nguoi_chet, _extract_party_data, DOC_KIND_INHERITANCE_DECLARATION
         text = "\n".join([
             "I. Người để lại di sản:",
             "1. Ông Nguyễn Văn Nhiểm – Sinh năm 1940; chết năm 2002 theo Đơn đề nghị do UBND xã Yên Cường, huyện Ý Yên, tỉnh Nam Định xác nhận ngày 02/04/2025; Nơi thường trú cuối cùng trước khi chết: Thôn Thắng Lợi, xã Yên Cường.",
@@ -2609,7 +2612,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # "Cả hai có nơi cư trú cuối cùng trước khi chết tại: X" la dia
         # chi CHUNG cua cap vo chong chet cung dong — dien cho ca hai,
         # ke ca nguoi dung truoc (ong Moc/ba Den — 12/10/2026).
-        from extract_contract import _extract_nguoi_chet, DOC_KIND_INHERITANCE_PARTITION
+        from regex_workbench.engine.contract_extract import _extract_nguoi_chet, DOC_KIND_INHERITANCE_PARTITION
         text = "- Bố đẻ ông Vũ Đình Đạc là ông Vũ Đình Mộc; chết ngày 28/12/1993; Mẹ đẻ ông Vũ Đình Đạc là bà Vũ Thị Dền; chết ngày 08/02/1995; Cả hai có nơi cư trú cuối cùng trước khi chết tại: Xã Yên Trị, huyện Ý Yên, tỉnh Nam Định."
         ds = _extract_nguoi_chet(text, DOC_KIND_INHERITANCE_PARTITION)
         got = {x["ho_ten"]: x["dia_chi"] for x in ds}
@@ -2619,7 +2622,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_cat_duoi_chuc_vu_khong_dau_sau_gach(self):
         # "Ông X - Chức vu:Giám dốc" (chức vụ khong dau sau gach) phai cat
         # duoi — ten nguoi chi la "Đoàn Thế Vinh" (12/10/2026).
-        from extract_contract import _extract_party_data
+        from regex_workbench.engine.contract_extract import _extract_party_data
         text = (
             "Người đại diện là ông: Đoàn Thế Vinh - Chức vu:Giám dốc\n"
             "Căn cước công dân số 037070002088 do Cục Cảnh sát cấp ngày 28/06/2021.\n"
@@ -2633,7 +2636,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # "2. Cháu Lê Khánh Chi (con bà Nga)" — vai tro "Cháu" dung lien
         # truoc ten khong dau noi; tach khoi ho_ten, gioi_tinh de trong
         # (13/10/2026).
-        from extract_contract import _extract_party_data
+        from regex_workbench.engine.contract_extract import _extract_party_data
         text = (
             "1.Bà: Nguyễn Thị Thanh Phương (mẹ bà Nga) Sinh ngày: 15/08/1965;\n"
             "2. Cháu Lê Khánh Chi (con bà Nga)\t\tSinh ngày: 02/09/2017;\n"
@@ -2647,7 +2650,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_do_co_quan_ngay_thieu_chu_cap(self):
         # "do <co quan> ngay DD/MM/YYYY" (nguon go thieu chu "cap") van la
         # ngay cap giay to — khong nham voi "ky ngay" (13/10/2026).
-        from extract_contract import _extract_party_data
+        from regex_workbench.engine.contract_extract import _extract_party_data
         text = (
             "Ông Bùi Xuân Khải;\tSinh ngày: 04/04/1989;\n"
             "Căn cước công dân số 036094017936 do Cục cảnh sát quản lý hành chính về trật tự xã hội ngày 04/04/2022;\n"
@@ -2666,7 +2669,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_dia_chi_muc_chu_cai_chung(self):
         # "c) Địa chỉ:" cua mau 18 la dia chi chung cho moi nguoi trong
         # muc — dien cho nguoi chua co (13/10/2026).
-        from extract_contract import _extract_party_data
+        from regex_workbench.engine.contract_extract import _extract_party_data
         text = (
             "a) Tên: Ông Tạ Sơn Huấn;\t\t\t\tSinh ngày: 15/03/1965;\n"
             "Tên: Bà Nguyễn Thị Hoa;\t\t\tSinh ngày: 18/11/1971\n"
@@ -2684,7 +2687,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # "1. Ông X - sinh năm 1957 (chủ hộ)" trong danh sach hộ gia
         # dinh cung doc co "chết ngày ... theo trích lục" -> loai khoi
         # duong su, van giu o nguoi_chet (13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = (
             "VĂN BẢN CAM KẾT\n"
             "1. Bà Bùi Thị Xiêm;\t\tSinh ngày: 15/08/1958;\n"
@@ -2698,7 +2701,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "do UBND phường Chi Lăng ký ngày 25/03/2025; Nơi thường trú cuối cùng "
             "trước khi chết: phường Chi Lăng, tỉnh Lạng Sơn).\n"
         )
-        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.doc", text, {}, extract_mode="plain_text_doc")
         names = [x["ho_ten"] for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]]
         self.assertNotIn("Bùi Văn Ngà", names)
         chet = [x["ho_ten"] for x in r["raw"]["nguoi_chet"]]
@@ -2707,7 +2710,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_o_nhan_co_marker_muc_va_dau_cham(self):
         # O "a) Thửa đất số: 131 | | Tờ bản đồ số: 29" (marker a) dinh
         # trong o nhan, .doc IFilter) van tach dung so thua/to (13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         ts = (
             "a) Thửa đất số: 131 | | | Tờ bản đồ số: 29 (nay là tờ bản đồ số 270)\n"
             "b) Địa chỉ: thôn Hoàng Nê, xã Ý Yên, tỉnh Ninh Bình\n"
@@ -2721,7 +2724,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_so_thua_ngoac_tach_tu_co_khoang_trang(self):
         # "108 ( tách từ thửa số 99)" — khoang trang sau "(" van cat ghi
         # chu, giu so thua 108 (13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         head, note = ec._tach_nay_la("108 ( tách từ thửa số 99)")
         self.assertEqual(head, "108")
         self.assertIn("tách", note)
@@ -2731,7 +2734,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_dia_chi_muc_chu_cai_dinh_vao_dong_truoc(self):
         # "c) Địa chỉ:" dinh vao cuoi dong truoc (2021c) — van la dia chi
         # CHUNG cua muc, dien cho moi nguoi thieu (mau 18 - 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "ĐƠN ĐĂNG KÝ BIẾN ĐỘNG",
             "1. Người sử dụng đất:",
@@ -2744,7 +2747,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "Căn cước công dân số 036187024995 do Cục cảnh sát ngày 02/07/2021c) Địa chỉ: B13, KP3, phường Tam Hiệp, tỉnh Đồng Nai.",
             "d) Điện thoại liên hệ:",
         ])
-        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.doc", text, {}, extract_mode="plain_text_doc")
         dc = {x["ho_ten"]: x["dia_chi"] for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]}
         self.assertEqual(dc.get("Đinh Thành Công"), "B13, KP3, phường Tam Hiệp, tỉnh Đồng Nai")
         self.assertEqual(dc.get("Trần Thị Vân"), "B13, KP3, phường Tam Hiệp, tỉnh Đồng Nai")
@@ -2752,7 +2755,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_ngay_cap_nhan_cap_tran(self):
         # "nơi cấp: Cục ... cấp: 20/04/2023" — nhan "cấp:" tran van la
         # ngay cap (loi chung the chap - 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "LỜI CHỨNG",
             "I. BÊN THẾ CHẤP:",
@@ -2760,7 +2763,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "Căn cước công dân số: 037086000267 nơi cấp: Cục cảnh sát quản lý hành chính về trật tự xã hội cấp: 20/04/2023",
             "Cư trú tại: 1A/52 Vĩnh Trường, phường Lộc Vượng, thành phố Nam Định.",
         ])
-        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.doc", text, {}, extract_mode="plain_text_doc")
         q = [x for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"] if x["ho_ten"] == "Hoàng Văn Quyết"]
         self.assertTrue(q)
         self.assertEqual(q[0]["ngay_cap_cccd"], "20/04/2023")
@@ -2768,7 +2771,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_cccd_co_khoang_trang(self):
         # "CCCD số: 0360 5800 1963" — so giay to viet cach nhom 4-4-4
         # van nhan va chuan hoa bo khoang trang (phieu yccc - 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "PHIẾU YÊU CẦU CÔNG CHỨNG",
             "Ông: TRẦN NGỌC BẢN;\tNăm sinh: 1958",
@@ -2776,7 +2779,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "Ngày cấp: 25/04/2021",
             "Địa chỉ thường trú: Thôn Đồng Cách, Yên Khang, Ý Yên, Nam Định",
         ])
-        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.doc", text, {}, extract_mode="plain_text_doc")
         q = [x for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"] if "BẢN" in x["ho_ten"]]
         self.assertTrue(q)
         self.assertEqual(q[0]["cccd"], "036058001963")
@@ -2784,7 +2787,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_dia_chi_muc_chu_cai_theo_ten_nguoi(self):
         # "c) Địa chỉ:" rong roi tung dong "Ông X: <dia chi>" — dia chi
         # ca nhan theo ten (mau 18 - 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "ĐƠN ĐĂNG KÝ BIẾN ĐỘNG ĐẤT ĐAI",
             "1. Người sử dụng đất:",
@@ -2800,7 +2803,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "Bà Bùi Thị Thu Hương: Tổ 68, Khu 7, phường Việt Hưng, tỉnh Quảng Ninh",
             "d) Điện thoại liên hệ:",
         ])
-        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.doc", text, {}, extract_mode="plain_text_doc")
         dc = {x["ho_ten"]: x["dia_chi"] for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]}
         self.assertEqual(dc.get("Mai Quốc Việt"), "xã Ý Yên, tỉnh Ninh Bình")
         self.assertEqual(dc.get("Bùi Thị Thu Hương"), "Tổ 68, Khu 7, phường Việt Hưng, tỉnh Quảng Ninh")
@@ -2809,7 +2812,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # "1.1 Ông Nguyễn Văn Toản - Sinh năm 1959, đã chết ngày ..." —
         # danh xung dinh trong nhom ten; tach ra de gop 2 lan nhac cung
         # nguoi (tt phan chia - 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         ds = ec._extract_nguoi_chet(
             "1.1 Ông Nguyễn Văn Toản - Sinh năm 1959, đã chết ngày 20/07/2014 theo Trích lục số 20/TL.\n"
             "Ông Nguyễn Văn Toản - Sinh năm 1959, đã chết ngày 20/07/2014 theo Trích lục; Nơi thường trú cuối cùng trước khi chết tại: phường Hạ Long, tỉnh Quảng Ninh\n"
@@ -2822,7 +2825,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_dia_chi_chung_tat_ca_ong_ba(self):
         # "Tất cả ông bà cùng thường trú tại: X" — dia chi chung danh
         # sach ho gia dinh (hop dong chuyen nhuong - 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "HỢP ĐỒNG CHUYỂN NHƯỢNG",
             "I. BÊN CHUYỂN NHƯỢNG:",
@@ -2836,7 +2839,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "Căn cước số 019175000150 do Bộ công an cấp ngày 13/04/2021;",
             "Nơi thường trú tại: thôn Đông Hoa, phường Hoa Lư, Tỉnh Ninh Bình.",
         ])
-        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.doc", text, {}, extract_mode="plain_text_doc")
         dc = {x["ho_ten"]: x["dia_chi"] for x in r["raw"]["ben_a"]["nguoi"]}
         self.assertEqual(dc.get("Nguyễn Văn Tuyến"), "Thôn Cổ Phương, Xã Phong Doanh, Tỉnh Ninh Bình")
         self.assertEqual(dc.get("Đinh Thị Hưng"), "Thôn Cổ Phương, Xã Phong Doanh, Tỉnh Ninh Bình")
@@ -2844,14 +2847,14 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_toi_ong_ten_cung_dong(self):
         # "Tôi Ông Trần Văn Hương; | Sinh ngày: ..." — intro "Tôi + danh
         # xung" khong co "là" (don cam doan - 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "ĐƠN CAM ĐOAN",
             "Tôi Ông Trần Văn Hương; |  |  |  | Sinh ngày: 16/08/1974",
             "Căn cước công dân số 036074002923 do Cục cảnh sát ngày 05/09/2022;",
             "Nơi cư trú tại: thôn Vĩnh Trị, xã Yên Đồng, tỉnh Ninh Bình.",
         ])
-        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.doc", text, {}, extract_mode="plain_text_doc")
         names = [x["ho_ten"] for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]]
         self.assertIn("Trần Văn Hương", names)
         q = [x for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"] if x["ho_ten"] == "Trần Văn Hương"]
@@ -2860,7 +2863,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_dia_chi_lien_he_muc_so(self):
         # "2. Địa chỉ liên hệ (điện thoại, email...): X" — truong dia chi
         # nguoi trong don mau 09 gia han (13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "ĐƠN XIN GIA HẠN SỬ DỤNG ĐẤT",
             "1. Người sử dụng đất:",
@@ -2868,7 +2871,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "Căn cước công dân số 036162012803 do Cục cảnh sát cấp ngày 25/08/2021",
             "2. Địa chỉ liên hệ (điện thoại, email...):  thôn Văn Hưng, xã Vạn Thắng, tỉnh Ninh Bình",
         ])
-        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.doc", text, {}, extract_mode="plain_text_doc")
         q = [x for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"] if x["ho_ten"] == "Nguyễn Thị Thảo"]
         self.assertTrue(q)
         self.assertEqual(q[0]["dia_chi"], "thôn Văn Hưng, xã Vạn Thắng, tỉnh Ninh Bình")
@@ -2876,14 +2879,14 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_ngay_cap_gach_chep_kep(self):
         # "cấp ngày 23/04//2021" — gach chep kep go nham, chuan hoa ve
         # "23/04/2021" (thong bao thua ke - 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "THÔNG BÁO",
             "Bà Ngô Thị Thanh | Sinh năm 1995",
             "Căn cước công dân số 036195007112 do Cục cảnh sát cấp ngày 23/04//2021.",
             "Nơi thường trú tại: thôn Hạ Kỳ, xã Đồng Thịnh, tỉnh Nam Định.",
         ])
-        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.doc", text, {}, extract_mode="plain_text_doc")
         q = [x for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"] if x["ho_ten"] == "Ngô Thị Thanh"]
         self.assertTrue(q)
         self.assertEqual(q[0]["ngay_cap_cccd"], "23/04/2021")
@@ -2891,7 +2894,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_ten_danh_xung_tab_sinh_ngay(self):
         # "1.1. Tên:  ông Hà Văn Tiễu \tSinh ngày 02/03/1963" — nhan
         # "Tên:" + danh xung thuong + tab truoc Sinh (mau 11 - 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "ĐƠN ĐĂNG KÝ BIẾN ĐỘNG",
             "1. Người sử dụng đất:",
@@ -2899,7 +2902,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "Tên:   bà  Đỗ Thị Ngọ  \t\tSinh ngày 08/10/1966",
             "1.2. Giấy tờ nhân thân:",
         ])
-        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.doc", text, {}, extract_mode="plain_text_doc")
         ns = {x["ho_ten"]: x["ngay_sinh"] for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]}
         self.assertEqual(ns.get("Hà Văn Tiễu"), "02/03/1963")
         self.assertEqual(ns.get("Đỗ Thị Ngọ"), "08/10/1966")
@@ -2907,21 +2910,21 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_ten_toi_khong_la(self):
         # "Tên tôi: Bà Nguyễn Thị Lan;" — intro "Tên tôi" khong "là"
         # (don de nghi chuyen muc dich - 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "ĐƠN ĐỀ NGHỊ",
             "Tên tôi: Bà Nguyễn Thị Lan; |  | Sinh ngày: 01/01/1958;",
             "Căn cước công dân số 036158023063 do Cục cảnh sát cấp ngày 16/01/2022;",
             "Nơi thường trú: tổ 7, xã Ý Yên, tỉnh Ninh Bình.",
         ])
-        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.doc", text, {}, extract_mode="plain_text_doc")
         names = [x["ho_ten"] for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]]
         self.assertIn("Nguyễn Thị Lan", names)
 
     def test_cung_thuong_tru_khong_tai(self):
         # "Cả hai cùng thường trú: X" — "thường trú" tran khong "tại"
         # (don xac nhan - 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "ĐƠN XIN XÁC NHẬN",
             "Tôi tên là: Nguyễn Hữu Lành - Sinh năm: 1950",
@@ -2930,7 +2933,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "Số CCCD: 036155005743 do Cục cảnh sát cấp ngày 25/03/2021.",
             "Cả hai cùng thường trú: thôn Tây Vinh, xã Yên Lương, huyện Ý Yên, tỉnh Nam Định.",
         ])
-        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.doc", text, {}, extract_mode="plain_text_doc")
         dc = {x["ho_ten"]: x["dia_chi"] for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]}
         self.assertEqual(dc.get("Nguyễn Hữu Lành"), "thôn Tây Vinh, xã Yên Lương, huyện Ý Yên, tỉnh Nam Định")
         self.assertEqual(dc.get("Phạm Thị Lý"), "thôn Tây Vinh, xã Yên Lương, huyện Ý Yên, tỉnh Nam Định")
@@ -2938,7 +2941,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_sinh_ng_ay_go_loi(self):
         # "Sinh ng ày: 05/08/1980" — nhan viet loi co khoang trang
         # giua "ng" va "ay" (mau 11 - 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "ĐƠN ĐĂNG KÝ BIẾN ĐỘNG",
             "1. Người sử dụng đất:",
@@ -2948,7 +2951,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "Căn cước công dân số 037080003154 do Cục cảnh sát cấp ngày 27/04/2021;",
             "1.3. Địa chỉ: 224 Trung Kính, phường Yên Hoà, Hà Nội.",
         ])
-        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.doc", text, {}, extract_mode="plain_text_doc")
         q = [x for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"] if x["ho_ten"] == "Vũ Hồng Vinh"]
         self.assertTrue(q)
         self.assertEqual(q[0]["ngay_sinh"], "05/08/1980")
@@ -2956,7 +2959,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_can_cuoc_so_cong_dan_dao_thu_tu(self):
         # "Căn cước số công dân 036048001446" — thu tu dao "số công dân"
         # va so dung lien khong "số:" (mau 18 - 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "ĐƠN ĐĂNG KÝ BIẾN ĐỘNG",
             "a) Tên: Ông Trần Văn Tạo\t\tSinh ngày: 20/10/1948 ;",
@@ -2965,7 +2968,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "Căn cước số công dân 036048001446 do Cục cảnh sát cấp ngày 10/08/2021",
             "c) Địa chỉ: thôn Phương Nhi, xã Tân Minh, tỉnh Ninh Bình.",
         ])
-        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.doc", text, {}, extract_mode="plain_text_doc")
         q = [x for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"] if x["ho_ten"] == "Trần Văn Tạo"]
         self.assertTrue(q)
         self.assertEqual(q[0]["cccd"], "036048001446")
@@ -2973,7 +2976,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_dia_chi_muc_cham_va_ten_tran(self):
         # "c. Địa chỉ:" (dau cham) + dong "- Nguyễn Thị Anh : X" ten tran
         # khong danh xung (don DK18 - 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "ĐƠN ĐĂNG KÝ",
             "a. Tên: Nguyễn Thị Anh ;\tSinh ngày: 14/07/1980;",
@@ -2984,7 +2987,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "- Nguyễn Thị Anh : Số 20A - Ô18, phường Nam Định, tỉnh Ninh Bình",
             "d. Điện thoại:",
         ])
-        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.doc", text, {}, extract_mode="plain_text_doc")
         q = [x for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"] if x["ho_ten"] == "Nguyễn Thị Anh"]
         self.assertTrue(q)
         self.assertEqual(q[0]["dia_chi"], "Số 20A - Ô18, phường Nam Định, tỉnh Ninh Bình")
@@ -2992,7 +2995,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_dia_chi_dong_tran_sau_nhan_rong(self):
         # "c. Địa chỉ:" rong roi dong dia chi tran (khong ten, khong nhan)
         # -> dia chi chung cho moi nguoi trong muc (don DK18 - 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "ĐƠN ĐĂNG KÝ",
             "a.\tTên: Trần Tiến Thuỳ; \t\t\t\tSinh ngày: 25/05/1986;",
@@ -3006,7 +3009,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "thôn Vũ Xuyên, xã Vũ Dương, tỉnh Ninh Bình",
             "d. Điện thoại:",
         ])
-        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.doc", text, {}, extract_mode="plain_text_doc")
         ppl = r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]
         self.assertEqual(
             {x["ho_ten"] for x in ppl},
@@ -3021,7 +3024,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # "Ông Gia và bà Mỳ có 6 người con..." — van xuoi nhac nguoi
         # chet, khong phai hang duong su; "1 Bà:" danh so khong cham
         # van la nguoi (don xac nhan nhan than - 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "ĐƠN XIN XÁC NHẬN NHÂN THÂN",
             "Ông: Đặng Văn Thiêm | | | Sinh ngày: 19/11/1973",
@@ -3031,7 +3034,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "Căn cước công dân số: 036153012094 do Cục cảnh sát cấp ngày 02/07/2021;",
             "2. Ông: Đặng Văn Hòa | | | Sinh ngày: 01/01/1957",
         ])
-        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.doc", text, {}, extract_mode="plain_text_doc")
         names = [x["ho_ten"] for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]]
         self.assertIn("Đặng Văn Thiêm", names)
         self.assertIn("Đặng Thị Thìn", names)
@@ -3043,7 +3046,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # "ong Luong Van Nguyen (ong Nguyen Sinh nam 1952; chet ngay...)" —
         # ngoac lap danh xung + ten rut gon; phai lay ten day du ngoai
         # ngoac, khong tao nguoi chet "Nguyen" rieng (13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "VĂN BẢN TỪ CHỐI NHẬN DI SẢN",
             "- Bà Yểng chỉ có một người con duy nhất là ông Lương Văn Nguyên "
@@ -3060,7 +3063,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_ten_nhan_lap_chu_ten(self):
         # "Tên: Tên  Ông Đinh Văn Khanh" — nguon go thua "Tên" trong gia
         # tri (mau 18 ban tien - 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "ĐƠN ĐĂNG KÝ",
             "a) Tên: Tên  Ông Đinh Văn Khanh;\t\tSinh ngày: 09/01/1975",
@@ -3069,7 +3072,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "1. Ông Đinh Văn Khanh;\t\tSinh ngày: 09/01/1975;",
             "Căn cước công dân số: 036075026268 do Cục cảnh sát cấp ngày 02/07/2021;",
         ])
-        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.doc", text, {}, extract_mode="plain_text_doc")
         names = [x["ho_ten"] for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]]
         self.assertIn("Đinh Văn Khanh", names)
         self.assertNotIn("Tên Ông Đinh Văn Khanh", names)
@@ -3078,7 +3081,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # "Bà Yểng Sinh năm 1931; chết..." — ten rut gon; mo rong thanh
         # "Nguyễn Thị Yểng" neu ten day du xuat hien ngay truoc do
         # (thong bao thua ke ong Quan - 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "VĂN BẢN",
             "Mẹ đẻ của ông Lương Văn Nguyên là bà Nguyễn Thị Yểng.",
@@ -3094,7 +3097,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # "Địa chỉ của ông Minh:" / "Địa chủ của bà Quỳnh:" — nhan keyed
         # co nhan dia chi + ten goi (khong ho), khop theo am tiet cuoi
         # (mau 18 Minh - 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "ĐƠN ĐĂNG KÝ",
             "a) Tên: Ông Bùi Văn Minh;\tSinh ngày: 30/05/1992;",
@@ -3107,7 +3110,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "Địa chủ của bà Quỳnh: thôn Kiều Thị, xã Chương Dương, thành phố Hà Nội.",
             "d) Điện thoại:",
         ])
-        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.doc", text, {}, extract_mode="plain_text_doc")
         ppl = r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]
         minh = [x for x in ppl if x["ho_ten"] == "Bùi Văn Minh"]
         quynh = [x for x in ppl if x["ho_ten"] == "Nguyễn Thị Thu Quỳnh"]
@@ -3122,7 +3125,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # "Nơi thường trú của bà Đởn tại:" / "bà Lan Anh:" — nhan keyed
         # "Nơi thường trú của", cho "tại" sau ten, khop ten goi nhieu am
         # tiet theo hau to (mau 18 ban - 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "ĐƠN ĐĂNG KÝ",
             "a) Tên: Ông Phạm Văn Mạnh;\t\t\tSinh ngày: 10/10/2000",
@@ -3136,7 +3139,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "Địa chỉ của bà Lan Anh: xóm Sôi Phủ, xã Hiển Khánh, tỉnh Ninh Bình.",
             "d) Điện thoại:",
         ])
-        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.doc", text, {}, extract_mode="plain_text_doc")
         ppl = r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]
         lan_anh = [x for x in ppl if x["ho_ten"] == "Bùi Thị Lan Anh"]
         self.assertTrue(lan_anh)
@@ -3154,7 +3157,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "Nơi thường trú của bà Đởn tại: thôn 1, xã Ý Yên, tỉnh Ninh Bình.",
             "d) Điện thoại:",
         ])
-        r2 = ec._build_payload_generic("a.doc", text2, {}, extract_mode="plain_text_doc")
+        r2 = ec.build_payload("a.doc", text2, {}, extract_mode="plain_text_doc")
         ppl2 = r2["raw"]["ben_a"]["nguoi"] + r2["raw"]["ben_b"]["nguoi"]
         don = [x for x in ppl2 if x["ho_ten"] == "Phạm Thị Đởn"]
         vuong = [x for x in ppl2 if x["ho_ten"] == "Nguyễn Văn Vượng"]
@@ -3167,14 +3170,14 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_danh_xung_lap_ba_ba_va_xom_dau_dia_chi(self):
         # "là bà Bà Hoàng Thị Mỹ" — danh xung lap; "c) Địa chỉ:" + dong
         # tran mo dau "Xóm ..." la dia chi chung (13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "ĐƠN XIN XÁC NHẬN",
             "Tôi là ông Nguyễn Thị Lương; Sinh ngày: 01/01/1960;",
             "- Bà Đinh Thị Hoa có bố đẻ là ông Đinh Văn Phương; Sinh ngày: 08/10/1948",
             "- Bà Đinh Thị Hoa có mẹ đẻ là bà Bà Hoàng Thị Mỹ; Sinh ngày: 01/01/1947;",
         ])
-        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.doc", text, {}, extract_mode="plain_text_doc")
         names = [x["ho_ten"] for x in r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]]
         self.assertIn("Hoàng Thị Mỹ", names)
         self.assertNotIn("Bà Hoàng Thị Mỹ", names)
@@ -3187,7 +3190,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "Xóm Chùa, Triều Khúc, phường Thanh Liệt, thành phố Hà Nội.",
             "d) Điện thoại:",
         ])
-        r2 = ec._build_payload_generic("a.doc", text2, {}, extract_mode="plain_text_doc")
+        r2 = ec.build_payload("a.doc", text2, {}, extract_mode="plain_text_doc")
         dung = [x for x in r2["raw"]["ben_a"]["nguoi"] + r2["raw"]["ben_b"]["nguoi"] if x["ho_ten"] == "Vũ Đức Dũng"]
         self.assertTrue(dung)
         self.assertEqual(
@@ -3197,7 +3200,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_vai_tro_gach_dau_dong_dong_su_dung(self):
         # "- Đồng sử dụng – ông Cù Minh Thắng" — vai tro sau gach dau
         # dong (mau 18 HĐCN — 13/10/2026).
-        from extract_contract import _extract_party_data
+        from regex_workbench.engine.contract_extract import _extract_party_data
         section = "\n".join([
             "- Ông Nguyễn Đức Ngôn;\tSinh ngày 08/05/1969;",
             "Căn cước công dân số: 036069001108 do Cục cảnh sát cấp ngày 02/03/2023;",
@@ -3218,7 +3221,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_ten_van_phong_khong_bi_loai_nhu_to_chuc(self):
         # "Trịnh Văn Phong" la ten nguoi that du fold trung "van phong"
         # (co quan). Cum org chi loai khi dung DAU ten — "Văn phòng X".
-        from extract_contract import _ho_ten_hop_le, _extract_party_data
+        from regex_workbench.engine.contract_extract import _ho_ten_hop_le, _extract_party_data
         self.assertTrue(_ho_ten_hop_le("Trịnh Văn Phong"))
         self.assertTrue(_ho_ten_hop_le("Phong Đức"))
         self.assertFalse(_ho_ten_hop_le("Văn phòng Công chứng"))
@@ -3236,7 +3239,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # "- Ông Trần Văn Khải và bà Bà: Trần Thị Lan; Sinh ngày..." —
         # vo chong tren 1 hang: tach 2 nguoi; truong sau "và" la cua
         # nguoi thu hai, danh xung lap "bà Bà:" gom ve "Bà" (13/10/2026).
-        from extract_contract import _extract_party_data
+        from regex_workbench.engine.contract_extract import _extract_party_data
         section = "\n".join([
             "- Ông Trần Văn Khải và bà Bà: Trần Thị Lan; Sinh ngày: 01/01/1930; Căn cước công dân số: 036130003151 do Cục Cảnh sát cấp ngày 12/04/2023 là vợ chồng hợp pháp từ năm 1960 cho đến khi ông Khải chết.",
             "- Ông Phạm Văn An và bà Nguyễn Thị Bình; Sinh ngày: 01/01/1960;",
@@ -3251,7 +3254,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_dia_chi_keyed_noi_thuong_tru_khong_cua(self):
         # "Nơi thường trú ông Cường: ..." — khong co chu "của"
         # (mau 18 ban — 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "a) Tên: Ông Nguyễn Tiến Cường;\tSinh ngày: 24/06/1990;",
             "Tên: Bà  Đinh Thị Lan;\tSinh ngày: 05/11/1992",
@@ -3263,7 +3266,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "Nơi thường trú bà Lan: thôn 7, xã Phong Doanh, tỉnh Ninh Bình",
             "d) Điện thoại liên hệ (nếu có):",
         ])
-        r = ec._build_payload_generic("a.docx", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.docx", text, {}, extract_mode="plain_text_doc")
         ppl = r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]
         cuong = [x for x in ppl if x["ho_ten"] == "Nguyễn Tiến Cường"]
         lan = [x for x in ppl if x["ho_ten"] == "Đinh Thị Lan"]
@@ -3278,7 +3281,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_dia_chi_keyed_gach_truoc_nhan(self):
         # "- Địa chỉ ông Nguyễn Duy Đặng: ..." — gach dung TRUOC nhan
         # "Địa chỉ" (don dinh chinh — 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "a) Tên: ông NGUYỄN DUY ĐẶNG\t\tSinh ngày: 28/7/1953",
             "b) Giấy tờ:",
@@ -3287,7 +3290,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "- Địa chỉ ông Nguyễn Duy Đặng: Lộng Đồng, phường Nam Định, tỉnh Ninh Bình.",
             "- Địa chỉ bà Nguyễn Thị Tơ: Thôn Đông Duy, xã Ý Yên, tỉnh Ninh Bình.",
         ])
-        r = ec._build_payload_generic("a.doc", text, {}, extract_mode="plain_text_doc")
+        r = ec.build_payload("a.doc", text, {}, extract_mode="plain_text_doc")
         ppl = r["raw"]["ben_a"]["nguoi"] + r["raw"]["ben_b"]["nguoi"]
         dang = [x for x in ppl if "ĐẶNG" in x["ho_ten"].upper()]
         self.assertTrue(dang)
@@ -3298,7 +3301,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_dia_chi_chung_ca_ba_cung_thuong_tru(self):
         # "Cả ba cùng thường trú tại: X" — dia chi chung 3 nguoi (khong
         # chi "cả hai") — HĐCN Thuận Hoà — 13/10/2026.
-        from extract_contract import _extract_party_data
+        from regex_workbench.engine.contract_extract import _extract_party_data
         section = "\n".join([
             "1. Ông Ninh Khắc Thuận;\tSinh ngày: 20/10/1983;",
             "Căn cước công dân số 036083015158 do Cục cảnh sát cấp ngày 05/01/2024;",
@@ -3320,7 +3323,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_nguoi_danh_so_3_cap_mau_11dk(self):
         # "1.2.1. Ông X; Sinh ngày..." — danh so 3 cap la nguoi rieng;
         # ";" ngan ten voi Sinh ngay (mau 11/DK Doanh Khuyen — 13/10/2026).
-        from extract_contract import _extract_party_data
+        from regex_workbench.engine.contract_extract import _extract_party_data
         section = "\n".join([
             "1.2.1. Ông Đinh Hoàng Doanh; \t\tSinh ngày: 09/07/1982;",
             "Căn cước công dân số: 035082000311 do Cục cảnh sát cấp ngày 12/08/2021;",
@@ -3337,7 +3340,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_cung_voi_vo_la_ba(self):
         # "2. Cùng với vợ là bà X; Sinh ngày" — tien to "cùng với vợ là"
         # giong "và vợ là" (UQ Tiến Nhàn — 13/10/2026).
-        from extract_contract import _extract_party_data
+        from regex_workbench.engine.contract_extract import _extract_party_data
         section = "\n".join([
             "1. Ông Nguyễn Duy Thanh;\tSinh ngày: 25/04/1989;",
             "Căn cước công dân số: 036089002865 do Bộ Công an cấp ngày 10/01/2025;",
@@ -3353,7 +3356,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_va_chong_ong_khong_la(self):
         # "2. Và chồng ông X; Sinh ngày" — "là" khong bat buoc sau
         # "và chồng" (mau 18 Tuất Thu — 13/10/2026).
-        from extract_contract import _extract_party_data
+        from regex_workbench.engine.contract_extract import _extract_party_data
         section = "\n".join([
             "1. Bà Trần Thị Tuất;\tSinh ngày 24/04/1970;",
             "Căn cước công dân số 037170009376 do Cục Cảnh sát cấp ngày 28/06/2021;",
@@ -3370,7 +3373,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         # Van ban in 2 lan: ban 1 "cấp ngày ......", ban 2 (ngoai section)
         # "cấp ngày 25/04/2021" — dien tu doan chua CCCD, khong vuot qua
         # khoi nguoi ke (HĐCN Duyên Liên — 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "BÊN CHUYỂN NHƯỢNG:",
             "1. Ông A One;\tSinh ngày: 01/01/1970;",
@@ -3387,7 +3390,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "2. Và vợ là bà Phạm Thị Bích Liên;\tSinh ngày: 06/10/1979;",
             "Căn cước công dân số: 036179004799 do Cục cảnh sát cấp ngày 25/08/2021;",
         ])
-        r = ec._build_payload_generic("a.docx", text, {}, extract_mode="docx")
+        r = ec.build_payload("a.docx", text, {}, extract_mode="docx")
         duyen = next(x for x in r["raw"]["ben_b"]["nguoi"] if "Duyên" in x["ho_ten"])
         self.assertEqual(duyen["ngay_cap_cccd"], "25/04/2021")
         lien = next(x for x in r["raw"]["ben_b"]["nguoi"] if "Liên" in x["ho_ten"])
@@ -3396,14 +3399,14 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_cat_ten_gach_sinh(self):
         # "Ông X - Sinh ngày: <sai>" — "- Sinh" la ranh nhan, khong nam
         # trong ten (UQ nghiệp sình — 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         self.assertEqual(ec._cat_ho_ten("Trịnh Văn Công - Sinh"), "Trịnh Văn Công")
         self.assertEqual(ec._cat_ho_ten("Nguyễn Văn Anh – sinh"), "Nguyễn Văn Anh")
 
     def test_ngay_cap_ho_chieu_khong_tinh_cccd(self):
         # "Hộ chiếu số: X do Y cấp ngày D" — khong gan vao ngay_cap_cccd
         # (Hoàn — HĐCN cũ Thường Lan — 13/10/2026).
-        from extract_contract import _extract_party_data
+        from regex_workbench.engine.contract_extract import _extract_party_data
         section = "\n".join([
             "2. Và vợ là bà Trần Thị Thúy Hoàn;\tSinh ngày: 29/08/1985;",
             "Hộ chiếu số: C3222981 do Cục quản lý xuất nhập cảnh cấp ngày 16/05/2017;",
@@ -3414,13 +3417,13 @@ class UploadLabExtractContractTests(unittest.TestCase):
     def test_bo_thua_placeholder_merge_field(self):
         # Template "«Số_thửa»" khong phai du lieu — bo thua chi chua
         # placeholder (cam ket DH 090202 — 13/10/2026).
-        import extract_contract as ec
+        from regex_workbench.engine import contract_extract as ec
         text = "\n".join([
             "-\tThửa đất số: «Số_thửa», \ttờ bản đồ số: «Số_tờ»",
             "-\tDiện tích: «Diện_tích»,0 m2",
             "- \tĐịa chỉ: «Địa_chỉ_đất»;",
         ])
-        r = ec._build_payload_generic("a.docx", text, {}, extract_mode="docx")
+        r = ec.build_payload("a.docx", text, {}, extract_mode="docx")
         self.assertEqual(r["raw"]["danh_sach_thua_dat"], [])
 
 
@@ -3436,7 +3439,7 @@ class ChucDanhCuoiDongTests(unittest.TestCase):
             "3. Bà Chu Thị Minh Tâm                           Cổ đông",
             "9. Bà Lê Thị Thu Hà                                   Thư ký",
         ])
-        from extract_contract import _extract_party_data
+        from regex_workbench.engine.contract_extract import _extract_party_data
         ds = _extract_party_data(text)
         ten = [p["ho_ten"] for p in ds["nguoi"]]
         self.assertIn("Nguyễn Xuân Thủy", ten)
@@ -3445,7 +3448,7 @@ class ChucDanhCuoiDongTests(unittest.TestCase):
         self.assertNotIn("Lê Thị Thu Hà Thư ký", ten)
 
     def test_to_ban_do_dinh_tu_khoa_thua(self):
-        from extract_contract import _clean_so_to_ban_do
+        from regex_workbench.engine.contract_extract import _clean_so_to_ban_do
         self.assertEqual(_clean_so_to_ban_do("thửa 423"), "423")
         self.assertEqual(_clean_so_to_ban_do("29"), "29")
 
@@ -3454,7 +3457,7 @@ class ChucDanhCuoiDongTests(unittest.TestCase):
 
 class ThuaVanXuoiTests(unittest.TestCase):
     def test_thua_dat_so_dinh_dia_chi_theo_giay_to(self):
-        from extract_contract import tach_danh_sach_thua_dat
+        from regex_workbench.engine.contract_extract import tach_danh_sach_thua_dat
         ts = (
             "diện tích 101.6m² thuộc vị trí: Tờ bản đồ số 22, Thửa đất số 8 "
             "tại: xã Ý Yên, tỉnh Ninh Bình theo Giấy chứng nhận kết quả trúng "
@@ -3466,7 +3469,7 @@ class ThuaVanXuoiTests(unittest.TestCase):
         self.assertEqual(ds[0]["dia_chi"], "xã Ý Yên, tỉnh Ninh Bình")
 
     def test_dia_chi_tai_theo_giay_chung_nhan_khong_phai_dia_chi(self):
-        from extract_contract import _tach_ngu_canh_gcn
+        from regex_workbench.engine.contract_extract import _tach_ngu_canh_gcn
         ctx = _tach_ngu_canh_gcn(
             "Quyền sử dụng đất có địa chỉ tại Theo Giấy chứng nhận quyền sử "
             "dụng đất số: AA 01709062 do Văn phòng đăng ký đất đai tỉnh Nam "
@@ -3479,7 +3482,7 @@ class ThuaVanXuoiTests(unittest.TestCase):
 
 class BangDanhSachNguoiDungTests(unittest.TestCase):
     def test_bang_danh_sach_o_cc_dia_chi_xa_tran(self):
-        from extract_contract import _extract_plain_text_person_entries
+        from regex_workbench.engine.contract_extract import _extract_plain_text_person_entries
         section = "\n".join([
             "STT | Họ tên | Năm sinh | Loại giấy tờ | Số | Ngày cấp | Cơ quan cấp | Địa chỉ",
             "1 | Ông Nguyễn Mạnh Dũng | 1977 | CC | 036077014177 | 31/12/2024 | Bộ Công an | Liên Minh",
@@ -3493,7 +3496,7 @@ class BangDanhSachNguoiDungTests(unittest.TestCase):
         self.assertEqual(ten["Nguyễn Công Khương"]["cccd"], "036080022345")
 
     def test_dia_chi_keyed_dinh_nhan_tren_mot_dong(self):
-        from extract_contract import _extract_plain_text_person_entries
+        from regex_workbench.engine.contract_extract import _extract_plain_text_person_entries
         section = "\n".join([
             "1. Tên: Ông Phạm Tuấn Linh;Sinh ngày: 24/03/1991",
             "2. Tên: Bà Lê Thị Bích Vượng;Sinh ngày: 06/04/1994",
@@ -3510,7 +3513,7 @@ if __name__ == "__main__":
 def test_marker_so_khoang_trang_truoc_cham_va_ca_ba_ong_ba():
     """Mau HĐ tang cho: '2 . Bà X' (so + khoang trang + cham) va
     'Cả ba ông bà cùng thường trú' (dia chi chung 3 nguoi)."""
-    import extract_contract as ec
+    from regex_workbench.engine import contract_extract as ec
     text = "\n".join([
         "I. BÊN TẶNG CHO:",
         "Hộ ông Nguyễn Quốc Trung và bà Nguyễn Thị Liễu gồm:",
@@ -3533,7 +3536,7 @@ def test_marker_so_khoang_trang_truoc_cham_va_ca_ba_ong_ba():
 def test_so_thua_dinh_ty_le_ban_do():
     """Quyet dinh chuyen muc dich: 'thua dat so 143 ty le 1/1000 do chi
     nhanh ...' — so thua chi lay '143', phan 'ty le...' la ghi chu."""
-    import extract_contract as ec
+    from regex_workbench.engine import contract_extract as ec
     thua = ec.tach_danh_sach_thua_dat(
         "trích lục bản đồ địa chính tại tờ số 169, "
         "thửa đất số 143 tỷ lệ 1/1000 do chi nhánh văn phòng đăng ký lập ngày 5/8/2025."
@@ -3544,7 +3547,7 @@ def test_so_thua_dinh_ty_le_ban_do():
 def test_ten_khong_la_gioi_tu_dau_cau():
     """'Theo CCCD và giấy tờ tuỳ thân bà X sinh năm 1976' — 'Theo' la gioi
     tu, khong phai ten; nhung 'Đỗ'/'La'/'Từ' la ho that, khong chan."""
-    import extract_contract as ec
+    from regex_workbench.engine import contract_extract as ec
     assert not ec._ho_ten_hop_le("Theo")
     assert not ec._ho_ten_hop_le("Tại")
     for ho in ("Đỗ Thị Ngọ", "La Thị Hà", "Từ Văn Minh", "Đồ Văn An"):
@@ -3561,7 +3564,7 @@ def test_ten_khong_la_gioi_tu_dau_cau():
 
 def test_nam_sinh_tach_khoang_trang():
     """Nguon go '05/07/199 2' (nam tach khoang trang) — gop thanh 1992."""
-    import extract_contract as ec
+    from regex_workbench.engine import contract_extract as ec
     text = "\n".join([
         "2. Và vợ là bà Phạm Thị Mận; Sinh ngày: 05/07/199 2;",
         "Căn cước công dân số 036192024985 do Cục cảnh sát cấp ngày 16/08/2021;",
@@ -3573,7 +3576,7 @@ def test_nam_sinh_tach_khoang_trang():
 
 def test_cccd_cach_nhom_3_so():
     """CCCD viet cach nhom 3 so '066 197 016 950' — gop thanh 12 chu so."""
-    import extract_contract as ec
+    from regex_workbench.engine import contract_extract as ec
     text = "\n".join([
         "Bà : LÊ THỊ HẢI YẾN",
         "Sinh ngày : 17/11/1997",
@@ -3588,7 +3591,7 @@ def test_cccd_cach_nhom_3_so():
 def test_mat_dong_nghia_chet():
     """'bố tôi ông X, sinh năm 1914, mất năm 2001' — 'mất' dong nghia
     'chết': loai khoi duong su song."""
-    import extract_contract as ec
+    from regex_workbench.engine import contract_extract as ec
     text = "\n".join([
         "1. Ông Đỗ Tiến Dũng - Sinh ngày: 12/01/1961",
         "Căn cước công dân số: 036061009526 do Cục cảnh sát cấp ngày 10/08/2021",
@@ -3603,7 +3606,7 @@ def test_mat_dong_nghia_chet():
 def test_toi_la_gach_ba_va_dia_chi_cuoi_cung_tam_tru():
     """'Tôi là - Bà X – Sinh năm 1964' (gach sau 'la'); 'Nơi thường
     trú/tạm trú cuối cùng:' la dia chi nguoi chet."""
-    import extract_contract as ec
+    from regex_workbench.engine import contract_extract as ec
     text = "\n".join([
         "Tôi là - Bà Bùi Thị Minh Thu – Sinh năm 1964; Căn cước công dân số 001164010666 do Cục Cảnh sát cấp ngày 19/06/2017;",
     ])
@@ -3620,7 +3623,7 @@ def test_toi_la_gach_ba_va_dia_chi_cuoi_cung_tam_tru():
 def test_so_thua_khong_chu_so_la_rac():
     """'Số tờ, số thửa và sơ đồ sẽ được điều chỉnh' — so thua khong co
     chu so nao la van xuoi, khong tao thua."""
-    import extract_contract as ec
+    from regex_workbench.engine import contract_extract as ec
     assert ec.tach_danh_sach_thua_dat(
         "Số tờ, số thửa và sơ đồ sẽ được điều chỉnh khi có bản đồ địa chính."
     ) == []
@@ -3629,8 +3632,7 @@ def test_so_thua_khong_chu_so_la_rac():
 def test_ten_cat_tu_chi_cung():
     """'Ông X chỉ có một người vợ là bà Y' — 'chỉ'/'cũng' la tro tu,
     ranh cat ten truoc 'có một người'."""
-    import extract_contract as ec
-    assert ec._cat_ho_ten("Uông Đình Khoa chỉ") .strip() == "Uông Đình Khoa chỉ" or True
+    from regex_workbench.engine import contract_extract as ec
     text = "Ông Uông Đình Khoa chỉ có một người vợ là bà Bùi Thị Minh Thu – Sinh năm 1964; Căn cước công dân số 001164010666"
     nguoi = ec._extract_plain_text_person_entries(text)
     ten = [p["ho_ten"] for p in nguoi]
@@ -3639,7 +3641,7 @@ def test_ten_cat_tu_chi_cung():
 def test_extract_contract_thua_lap_muc_phan_chia_khong_nhan_doi_chi_tiet():
     """Thửa lặp lại ở mục phân chia ("IV. Nội dung...") chỉ khác chú thích
     — chi tiết không nhân đôi (R10), chú thích gộp phan_ghi_them (13/10/2026)."""
-    import extract_contract
+    from regex_workbench.engine import contract_extract
 
     text = "\n".join(
         [
@@ -3651,7 +3653,7 @@ def test_extract_contract_thua_lap_muc_phan_chia_khong_nhan_doi_chi_tiet():
             "toàn bộ quyền sử dụng đất có địa chỉ tại: thôn Đồng Quang, xã Vạn Thắng, tỉnh Ninh Bình tại thửa đất số 57, tờ bản đồ số 5, trong đó diện tích: 210 m2. Trong đó: ONT: 170 m2; CLN: 40 m2, thuộc quyền sử dụng riêng của ông Tống Duy Tuyền.",
         ]
     )
-    parcels = extract_contract.tach_danh_sach_thua_dat(text)
+    parcels = contract_extract.tach_danh_sach_thua_dat(text)
     assert len(parcels) == 1
     thua = parcels[0]
     assert thua["so_thua_dat"] == "57"
@@ -3664,7 +3666,7 @@ def test_extract_contract_nguoi_chet_dau_cham_phay_truoc_ngoac():
     """Nguoi chet co dau `;` kep giua ten va ngoac ("Sơn; (Sinh năm
     1957, đã chết...)") van trich; "là ông X" suy gioi tinh tu danh
     xung tach trong ten (VB tu choi ba Vong — 13/10/2026)."""
-    import extract_contract
+    from regex_workbench.engine import contract_extract
 
     text = "\n".join(
         [
@@ -3678,7 +3680,7 @@ def test_extract_contract_nguoi_chet_dau_cham_phay_truoc_ngoac():
             " phố Thái Nguyên, tỉnh Thái Nguyên.",
         ]
     )
-    dead = extract_contract._extract_nguoi_chet(text)
+    dead = contract_extract._extract_nguoi_chet(text)
     assert len(dead) == 1
     assert dead[0]["ho_ten"] == "Nguyễn Xuân Sơn"
     assert dead[0]["gioi_tinh"] == "Ông"
@@ -3690,11 +3692,11 @@ def test_extract_contract_nhan_sinh_tran_va_bo_dia_chi_thuan_ngay():
     """Nhan sinh "Sinh DD/MM/YYYY" khong ngay/nam (giay uy quyen ba
     Trang); dia_chi thuan ngay ("[07] Địa chỉ: 23/10/2023") la rac o
     dich truong — xoa de R03 bao thieu (DK18 — 13/10/2026)."""
-    import extract_contract
+    from regex_workbench.engine import contract_extract
 
     from kiem_tra_trich_xuat import kiem_tra_payload
 
-    persons = extract_contract._extract_plain_text_person_entries(
+    persons = contract_extract._extract_plain_text_person_entries(
         "Bà Lê Ngọc Mai - Sinh 26/04/1985;\n"
         "CCCD số 001085000001 do Bộ Công an cấp ngày 10/05/2021;\n"
         "Địa chỉ: xã Minh Tân."
@@ -3710,7 +3712,7 @@ def test_extract_contract_nhan_sinh_tran_va_bo_dia_chi_thuan_ngay():
             "Địa chỉ: 23/10/2023",
         ]
     )
-    persons2 = extract_contract._extract_plain_text_person_entries(text2)
+    persons2 = contract_extract._extract_plain_text_person_entries(text2)
     assert len(persons2) == 1
     assert persons2[0]["ho_ten"] == "Lê Ngọc Mai"
     assert persons2[0]["ngay_sinh"] == "01/01/1980"
@@ -3723,7 +3725,7 @@ def test_extract_contract_nhan_nguoi_su_dung_dat_va_dia_chi_lien_he_ngoac():
     labeled + duoi ", sinh ngày" tren cung dong) va "Địa chỉ liên hệ
     (điện thoại, email...): X" khong so muc (don gia han SDD —
     13/10/2026)."""
-    import extract_contract
+    from regex_workbench.engine import contract_extract
 
     text = "\n".join(
         [
@@ -3735,7 +3737,7 @@ def test_extract_contract_nhan_nguoi_su_dung_dat_va_dia_chi_lien_he_ngoac():
             "phường Hoa Lư, tỉnh Ninh Bình",
         ]
     )
-    persons = extract_contract._extract_plain_text_person_entries(text)
+    persons = contract_extract._extract_plain_text_person_entries(text)
     duong = next((p for p in persons if "Dương" in p["ho_ten"]), None)
     assert duong is not None
     assert duong["ngay_sinh"] == "05/05/1979"
@@ -3744,9 +3746,9 @@ def test_extract_contract_nhan_nguoi_su_dung_dat_va_dia_chi_lien_he_ngoac():
 
 def test_extract_contract_chi_tiet_prose():
     """Loại tiêu đề văn xuôi; phục hồi tên F01 nằm trong fixture pending."""
-    import extract_contract
+    from regex_workbench.engine import contract_extract
 
-    parcels = extract_contract.tach_danh_sach_thua_dat(
+    parcels = contract_extract.tach_danh_sach_thua_dat(
         "\n".join(
             [
                 "Thửa đất số: 156",
@@ -3772,7 +3774,7 @@ class WordFieldClosedCasesTests(unittest.TestCase):
             if native_doc:
                 path = Path(tempdir) / "field-case.doc"
                 path.touch()
-                with patch("extract_contract.read_docx", return_value=title + "\n" + text) as reader:
+                with patch("extraction_adapter.read_docx", return_value=title + "\n" + text) as reader:
                     payload = extract(path)
                 reader.assert_called_once_with(path, use_ifilter_for_doc=True)
                 self.assertEqual(payload["raw"]["extract_mode"], "plain_text_doc")
@@ -3893,7 +3895,7 @@ class WordFieldClosedCasesTests(unittest.TestCase):
         parcels = payload["raw"]["danh_sach_thua_dat"]
         self.assertEqual(len(parcels), 2)
         self.assertEqual([(p["so_thua_dat"], p["so_to_ban_do"], p["dien_tich"], p["muc_dich_su_dung"], p["thoi_han_su_dung"]) for p in parcels], [("211", "", "80", "ONT", "Lâu dài"), ("212", "10", "40", "CLN", "12/2043")])
-        import extract_contract as engine
+        from regex_workbench.engine import contract_extract as engine
         self.assertEqual(engine._normalize_plain_text_for_extract("\tÔng: Lê Minh Bình;\t"), "Ông: Lê Minh Bình;")
 
     def test_mapped_continuation_trailing_cells_and_renumbering(self):
@@ -3954,7 +3956,7 @@ class WordFieldClosedCasesTests(unittest.TestCase):
                 self.assertTrue(any(f["id"] == "R13" and "giới tính" in f["noi_dung"] for f in kiem_tra_payload(payload)))
 
     def test_deceased_sinh_bare_and_date_only_final_address(self):
-        import extract_contract as engine
+        from regex_workbench.engine import contract_extract as engine
         text = (
             "Ông Lê Minh Bình - Sinh 26/04/1985; đã chết ngày 02/03/2025 theo Trích lục khai tử số 21/TLKT-BS do UBND xã Minh Tân ký ngày 03/03/2025;\n"
             "Nơi thường trú cuối cùng: 23/10/2023"

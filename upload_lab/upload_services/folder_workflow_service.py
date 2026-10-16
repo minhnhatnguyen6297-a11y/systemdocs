@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from batch_scan import BASE_DIR, finalize_manifest, run_batch_scan
-from extract_contract import extract
+from extraction_adapter import extract
 from playwright_uploader import (
     load_upload_queue,
     read_exported_contract_numbers,

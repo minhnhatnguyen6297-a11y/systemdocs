@@ -1,207 +1,218 @@
-// Probe UI: chạy ui/app.js THẬT trong DOM giả lập (không cần trình duyệt).
-// pytest gọi file này qua subprocess và assert từng check trong JSON out.
-//
-//   node tests/_ui_dom_probe.mjs
-//
-// Các ca được kiểm chứng (map với findings review):
-//   - esc() escape dấu ngoặc kép/nháy trong HTML attribute (app.js:5)
-//   - renderHighlight slice theo CODE POINT (Array.from) — emoji không lệch (app.js:91)
-//   - sửa source trong lúc request đang chờ -> kết quả cũ bị bỏ qua (app.js:44)
-//   - import file JSON lỗi -> báo lỗi trong profile-status (app.js:204)
-//   - import file hợp lệ -> nạp vào editor; export -> tải profile xuống
-//   - response 400 kèm problems -> hiển thị chi tiết trong #errors
-
-import fs from "node:fs";
-import path from "node:path";
+/* Probe DOM cho ui/app.js — chạy app.js THẬT với document/fetch stub tối thiểu.
+ *
+ * Mục đích: kiểm hành vi UI mà không cần trình duyệt: render kết quả lõi,
+ * đặt đúng cột giấy tờ (`cccd`), bỏ response cũ (stale), hiện lỗi 400,
+ * escape markup, tô vị trí giá trị sau emoji (index code point). Cầu nối lấy
+ * hàm từ app.js chỉ nằm trong file test này — app.js không có hook cho test.
+ *
+ * In JSON: {checks: {name: {pass, detail}}, fails: [...]}
+ */
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-const src = fs.readFileSync(path.join(here, "..", "ui", "app.js"), "utf8");
+const here = dirname(fileURLToPath(import.meta.url));
+const appJs = readFileSync(join(here, "..", "ui", "app.js"), "utf8");
 
-/* ---- DOM stub tối thiểu ---- */
-const els = {};
-const anchors = [];
-function el(id) {
-  if (!els[id]) {
-    els[id] = {
-      id,
-      value: "",
-      textContent: "",
-      innerHTML: "",
-      className: "",
-      disabled: false,
-      files: [],
-      clicked: false,
-      listeners: {},
-      addEventListener(type, fn) {
-        (this.listeners[type] ||= []).push(fn);
-      },
-      click() {
-        this.clicked = true;
-      },
-    };
+class El {
+  constructor(id) {
+    this.id = id;
+    this.value = "";
+    this.checked = false;
+    this.textContent = "";
+    this.innerHTML = "";
+    this.disabled = false;
+    this.listeners = {};
   }
-  return els[id];
+  addEventListener(type, fn) {
+    (this.listeners[type] ||= []).push(fn);
+  }
 }
 
-globalThis.document = {
-  getElementById: el,
-  createElement: () => {
-    const a = { href: "", download: "", clicked: false, click() { a.clicked = true; } };
-    anchors.push(a);
-    return a;
-  },
+const elements = new Map();
+const el = (id) => {
+  if (!elements.has(id)) elements.set(id, new El(id));
+  return elements.get(id);
 };
-let fetchImpl = async () => ({
-  ok: true,
-  status: 200,
-  json: async () => ({ profile: { profile_id: "transfer", version: "test" } }),
-});
-const fetchCalls = [];
-globalThis.fetch = (...args) => {
-  fetchCalls.push(args);
-  return fetchImpl(...args);
+
+const document = { getElementById: (id) => el(id) };
+const window = {};
+
+let queue = [];
+const fetch = async (url) => {
+  const next = queue.shift();
+  if (!next) throw new Error("probe: không có response dựng sẵn cho " + url);
+  if (next.delay) await new Promise((resolve) => setTimeout(resolve, next.delay));
+  return { ok: next.ok !== false, json: async () => next.json };
 };
-globalThis.URL.createObjectURL = () => "blob:mock";
-globalThis.URL.revokeObjectURL = () => {};
-globalThis.Blob = class Blob { constructor(parts) { this.parts = parts; } };
+
+const META = {
+  engine: { id: "probe-engine", version: "probe-version" },
+  web_form_fields: ["ten_hop_dong", "tai_san", "so_cong_chung"],
+  raw_keys: ["ben_a", "ben_b", "danh_sach_thua_dat"],
+};
+
+const SAMPLE = [
+  "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+  "I. BÊN CHUYỂN NHƯỢNG (Bên A):",
+  "Ông: Nguyễn Văn An, sinh ngày: 10/05/1975;",
+  "Căn cước công dân số: 001075000001 do Bộ Công an cấp ngày 15/03/2021;",
+  "Thường trú tại: số 12 đường Láng, quận Đống Đa, Hà Nội.",
+  "TÀI SẢN",
+  "Tài sản thứ 1: Giấy chứng nhận số: B 011092; Địa chỉ thửa đất: xã Mẫu, tỉnh Mẫu",
+  "Loại đất: Đất ở; Diện tích: 120 m2; Thời hạn: Lâu dài",
+  "Số công chứng 428/2026/CCGD",
+].join("\n");
+
+function runPayload(marker) {
+  return {
+    payload: {
+      web_form: {
+        ten_hop_dong: "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+        tai_san: "Tài sản thứ 1: Giấy chứng nhận số: B 011092; Địa chỉ thửa đất: xã Mẫu, tỉnh Mẫu",
+        so_cong_chung: marker,
+      },
+      raw: {
+        document_kind: "transfer_contract",
+        extract_mode: "structured_docx",
+        scan_contract_no: marker,
+        file_goc: "",
+        missing_web_form_fields: ["ngay_cong_chung"],
+        tai_san_chua_ho_tro: ["số tài khoản"],
+        nguoi_chet: [],
+        ben_a: { nguoi: [{ ho_ten: "Nguyễn Văn An", ngay_sinh: "1975-05-10", cccd: "001075000001", cccd_khac: ["001075000002"], dia_chi: "số 12 đường Láng, quận Đống Đa, Hà Nội" }] },
+        ben_b: { nguoi: [] },
+        danh_sach_thua_dat: [{ so_thua_dat: "215", so_to_ban_do: "34", dia_chi: "xã Mẫu", dien_tich: "120", loai_dat: "Đất ở" }],
+      },
+    },
+    groups: [
+      { so_serial: "B 011092", dia_chi: "xã Mẫu, tỉnh Mẫu", so_thua_dat: "", so_to_ban_do: "", land_rows: [{ loai_dat: "Đất ở", dien_tich: "120 m2", thoi_han: "Lâu dài" }] },
+    ],
+    asset_context: { so_serial: "B 011092", co_quan_cap: "" },
+  };
+}
 
 const checks = {};
-const fails = [];
-function check(name, cond, detail = "") {
-  checks[name] = { pass: !!cond, detail };
-}
-
-/* ---- Nạp app.js: strict-mode nên cần trailer export ra globalThis ---- */
-(0, eval)(
-  src +
-    "\n;globalThis.__t = { esc, runEngine, renderHighlight, render, collectIntervals, readProfile, loadDefaultProfile };"
-);
-const t = globalThis.__t;
-await new Promise((r) => setTimeout(r, 0)); // để loadDefaultProfile() settle
-
-const FAKE_RESULT = {
-  doc_kind: "transfer",
-  title: { value: "HỢP ĐỒNG", state: "matched", span: [0, 8], rule_id: "kind.transfer" },
-  zones: [{ name: "parties", state: "matched", span: [1, 4] }],
-  fields: [],
-  parties: { blocks: [] },
-  errors: [],
+const record = (name, fn) => {
+  try {
+    const detail = fn();
+    checks[name] = { pass: detail !== false, detail: typeof detail === "string" ? detail : "" };
+  } catch (err) {
+    checks[name] = { pass: false, detail: String(err && err.message ? err.message : err) };
+  }
+};
+const includes = (haystack, needle, what) => {
+  if (!String(haystack).includes(needle)) throw new Error(`${what}: thiếu ${JSON.stringify(needle)}`);
 };
 
-try {
-  // 1) esc() phải escape cả attribute quotes — finding app.js:5
-  check(
-    "esc_attribute_quotes",
-    t.esc('a"b\'c<d>&') === "a&quot;b&#39;c&lt;d&gt;&amp;",
-    t.esc('a"b\'c<d>&')
-  );
+// Meta response phục vụ loadMeta() chạy ngay khi app.js được nạp.
+queue.push({ json: META });
+// Cầu nối TEST-ONLY: nối vào cuối script để lấy đúng các hàm probe cần —
+// khai báo `function` cấp cao trong app.js không tự thành global khi script
+// chạy qua Function; app.js production không có hook nào cho test.
+const BRIDGE = "globalThis.__probe = { esc, highlightIntervals, renderHighlight, runEngine };";
+new Function("document", "window", "fetch", appJs + "\n" + BRIDGE)(document, window, fetch);
+const wb = globalThis.__probe;
+await new Promise((resolve) => setTimeout(resolve, 0));
 
-  // 2) highlight theo code point — span [1,4] trên "📜ABC" phải tô đúng "ABC"
-  //    (emoji = 1 code point Python nhưng 2 UTF-16 unit trong JS) — app.js:91
-  el("highlight").innerHTML = "";
-  t.renderHighlight("📜ABC", {
-    zones: [{ name: "parties", state: "matched", span: [1, 4] }],
-    fields: [],
-    parties: { blocks: [] },
-    title: {},
-  });
-  const hl = el("highlight").innerHTML;
-  check(
-    "highlight_codepoint_after_emoji",
-    />ABC<\/span>/.test(hl) && hl.includes("📜"),
-    hl
-  );
+await (async () => {
+  el("source").value = SAMPLE;
+  el("plain").checked = false;
+  queue.push({ json: runPayload("428/2026/CCGD") });
+  await wb.runEngine();
+})();
 
-  // 3) sửa source trong lúc request chờ -> bỏ qua response cũ — app.js:44
-  el("profile").value = "{}";
-  el("source").value = "VAN_BAN_V1";
-  el("errors").textContent = "";
-  el("json").textContent = "";
-  let resolveFetch;
-  fetchImpl = () => new Promise((r) => { resolveFetch = r; });
-  const runPromise = t.runEngine();
-  el("source").value = "VAN_BAN_V2_SUA_LUC_CHO";
-  resolveFetch({ ok: true, status: 200, json: async () => ({ result: FAKE_RESULT }) });
-  await runPromise;
-  check(
-    "stale_response_discarded",
-    /đã thay đổi/.test(el("errors").textContent) && el("json").textContent === "",
-    el("errors").textContent
-  );
+record("normal_run_renders", () => {
+  includes(el("fields").innerHTML, "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT", "web_form table");
+  includes(el("parcels").innerHTML, "215", "parcels table");
+  const row = el("persons").innerHTML.split("<tr>").find((r) => r.includes("Nguyễn Văn An"));
+  if (!row) throw new Error("persons: thiếu hàng Bên A");
+  const cells = row.split("<td").slice(1);
+  if (!cells[3] || !cells[3].includes("001075000001, 001075000002")) {
+    throw new Error("persons: cột Giấy tờ sai nội dung: " + row);
+  }
+});
 
-  // 4) request body phải chứa đúng snapshot text lúc gửi
-  check(
-    "request_sent_snapshot",
-    JSON.parse(fetchCalls.at(-1)[1].body).text === "VAN_BAN_V1",
-    fetchCalls.at(-1)[1].body
-  );
+record("groups_and_land_rows_rendered", () => {
+  includes(el("groups").innerHTML, "B 011092", "group serial");
+  includes(el("groups").innerHTML, "Lâu dài", "land row thời hạn");
+});
 
-  // 5) run bình thường (source không đổi) -> render đầy đủ
-  el("errors").textContent = "";
-  fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({ result: FAKE_RESULT }) });
-  await t.runEngine();
-  check(
-    "normal_run_renders",
-    el("json").textContent.includes('"doc_kind"') && el("errors").textContent === "",
-    el("json").textContent.slice(0, 60)
-  );
+record("missing_and_unsupported_shown", () => {
+  includes(el("summary").innerHTML, "ngay_cong_chung", "missing field badge");
+  includes(el("summary").innerHTML, "số tài khoản", "unsupported asset badge");
+});
 
-  // 6) response 400 + problems -> #errors hiển thị chi tiết — serve.py contract
-  fetchImpl = async () => ({
-    ok: false,
-    status: 400,
-    json: async () => ({ error: "profile sai cau truc", problems: ["'fields' phai la list"] }),
-  });
-  await t.runEngine();
-  check(
-    "shape_problems_displayed",
-    /sai cau truc/.test(el("errors").textContent) && /fields/.test(el("errors").textContent),
-    el("errors").textContent
-  );
+record("highlight_marks_extracted_value", () => {
+  const html = el("highlight").innerHTML;
+  includes(html, 'class="mk"', "highlight span");
+  includes(html, "Nguyễn Văn An", "highlighted value");
+});
 
-  // 7) import file JSON lỗi -> profile-status báo lỗi — app.js:204
-  el("file-import").files = [{ text: async () => "not json {" }];
-  await els["file-import"].listeners.change[0]({ target: el("file-import") });
-  check(
-    "import_bad_json_shows_error",
-    el("profile-status").className === "status bad" &&
-      /import/.test(el("profile-status").textContent),
-    el("profile-status").textContent
-  );
+await (async () => {
+  el("source").value = SAMPLE;
+  queue.push({ json: runPayload("111/2026/CCGD"), delay: 40 });
+  const pending = wb.runEngine();
+  el("source").value = SAMPLE + "\n(chỉnh giữa chừng)";
+  await pending;
+})();
 
-  // 8) import file hợp lệ -> nạp vào editor + status ok
-  el("file-import").files = [{ text: async () => '{"a":1}' }];
-  await els["file-import"].listeners.change[0]({ target: el("file-import") });
-  check(
-    "import_ok_loads_profile",
-    el("profile").value === '{\n  "a": 1\n}' && el("profile-status").className === "status ok",
-    el("profile").value
-  );
+record("stale_source_after_run_discarded", () => {
+  includes(el("errors").textContent, "đã thay đổi", "stale notice");
+});
 
-  // 9) export -> tạo blob + anchor download
-  anchors.length = 0;
-  els["btn-export"].listeners.click[0]();
-  check(
-    "export_profile_downloads",
-    anchors.length === 1 &&
-      anchors[0].clicked === true &&
-      anchors[0].download === "regex_workbench_profile.json" &&
-      anchors[0].href === "blob:mock",
-    JSON.stringify(anchors[0] && { href: anchors[0].href, download: anchors[0].download })
-  );
+await (async () => {
+  el("source").value = SAMPLE;
+  queue.push({ json: runPayload("111/2026/CCGD"), delay: 40 });
+  const first = wb.runEngine();
+  queue.push({ json: runPayload("222/2026/CCGD") });
+  const second = wb.runEngine();
+  await Promise.all([first, second]);
+})();
 
-  // 10) profile JSON lỗi trong editor -> Run không gọi fetch, status bad
-  const before = fetchCalls.length;
-  el("profile").value = "{broken";
-  await t.runEngine();
-  check(
-    "invalid_profile_blocks_run",
-    fetchCalls.length === before && el("profile-status").className === "status bad",
-    el("profile-status").textContent
-  );
-} catch (err) {
-  fails.push(String(err && err.stack || err));
-}
+record("out_of_order_response_discarded", () => {
+  includes(el("json").textContent, "222/2026/CCGD", "newest result rendered");
+  if (el("json").textContent.includes("111/2026/CCGD")) throw new Error("response cũ ghi đè kết quả mới");
+});
 
-console.log(JSON.stringify({ checks, fails }, null, 2));
+await (async () => {
+  el("source").value = SAMPLE;
+  queue.push({ ok: false, json: { error: "trường text phải là chuỗi văn bản nguồn" } });
+  await wb.runEngine();
+})();
+
+record("server_error_displayed", () => {
+  includes(el("errors").textContent, "trường text phải là chuỗi", "error text");
+});
+
+record("esc_escapes_text_and_attribute", () => {
+  const out = wb.esc('a"b<c>&d\'e');
+  includes(out, "&quot;", "quote escaped");
+  includes(out, "&lt;c&gt;", "angle escaped");
+  includes(out, "&amp;", "amp escaped");
+  if (out.includes("<") || out.includes('"')) throw new Error("escape còn ký tự thô: " + out);
+});
+
+record("highlight_codepoint_after_emoji", () => {
+  const value = "Nguyễn Văn An";
+  const text = "😀 mở đầu\n" + value + " kết thúc";
+  const intervals = wb.highlightIntervals(text, [{ value, label: "ben_a.ho_ten" }]);
+  if (intervals.length !== 1) throw new Error("không dựng được interval");
+  const cps = Array.from(text);
+  const sliced = cps.slice(intervals[0].s, intervals[0].e).join("");
+  if (sliced !== value) throw new Error(`slice lệch: ${JSON.stringify(sliced)}`);
+  wb.renderHighlight(text, [{ value, label: "ben_a.ho_ten" }]);
+  includes(el("highlight").innerHTML, value, "highlighted after emoji");
+  includes(el("highlight").innerHTML, "😀", "emoji giữ nguyên");
+});
+
+record("highlight_escapes_markup", () => {
+  const value = "<b>giá trị</b>";
+  const text = "trước " + value + " sau";
+  wb.renderHighlight(text, [{ value, label: "web_form.tai_san" }]);
+  includes(el("highlight").innerHTML, "&lt;b&gt;", "escaped markup");
+  if (el("highlight").innerHTML.includes("<b>")) throw new Error("markup thô lọt vào highlight");
+});
+
+const fails = Object.entries(checks).filter(([, info]) => !info.pass).map(([name]) => name);
+process.stdout.write(JSON.stringify({ checks, fails }, null, 2));

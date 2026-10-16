@@ -10,7 +10,8 @@ from pathlib import Path
 from docx import Document
 
 from batch_scan import connect_registry, parse_modified_since, run_batch_scan, upsert_registry_record
-from extract_contract import extract, find_tai_san, scan_docx_for_contract_no
+from extraction_adapter import extract, scan_docx_for_contract_no
+from regex_workbench.engine.contract_extract import find_tai_san
 
 
 def make_docx(path: Path, *paragraphs: str) -> Path:

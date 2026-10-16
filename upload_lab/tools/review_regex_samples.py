@@ -10,7 +10,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-from extract_contract import extract, read_docx
+from extraction_adapter import extract, read_docx
 
 DEFAULT_INPUT_DIR = BASE_DIR / "regex_review_samples" / "input"
 DEFAULT_REPORTS_DIR = BASE_DIR / "regex_review_samples" / "reports"

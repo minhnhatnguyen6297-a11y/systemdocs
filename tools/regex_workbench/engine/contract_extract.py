@@ -1,26 +1,27 @@
 """
-TRICH XUAT HOP DONG CONG CHUNG -> JSON CHO WEB FORM
-===================================================
-CORE REGEX DUNG CHUNG (nguoi + tai san) — agent moi doc them:
-- Catalog quy tac: docs/spec/upload_lab/regex-rules.md (dau file co muc
-  "Core nam o dau" chi dung file engine/test/bao cao).
-- Test: upload_lab/tests/test_upload_lab_extract_contract.py
-- Bao cao tung loai van ban: .agent/scratch/regex-core/bao-cao-NN-*.md
-Pham vi core: chi trich XUAT (regex) nguoi + tai san; KHONG so sanh,
-KHONG doi chieu, KHONG gop — co nguoi nao xuat du lieu nguoi do.
+LÕI CHUNG — LUẬT TRÍCH XUẤT VĂN BẢN CÔNG CHỨNG (một đường luật duy nhất)
+=========================================================================
+Module này là **đường luật nghiệp vụ duy nhất** cho Word: Document Intake
+(Notary), Upload Lab và tool nhân viên đều gọi vào đây qua adapter của mình
+(adapter chỉ giữ đọc file + ánh xạ payload, không chép luật).
+
+- Vào: TEXT của văn bản (adapter đọc `.docx`/`.doc` rồi truyền vào) —
+  `extract_text(text, ...)`.
+- Ra: payload `{"web_form", "raw"}` (giữ nguyên shape đang dùng ở Upload).
+- Không đọc file, không chứa IO. Không có bản sao luật ở consumer.
+
+Catalog quy tắc: `_bmad-output/specs/shared/extraction-rules.md`.
+Đáp án/nhãn độc lập: `upload_lab/tests/fixtures/word_field_cases.json` (C01–C12)
+và test hành vi `upload_lab/tests/`.
+
+Cach dung (adapter):
+    from regex_workbench.engine import contract_extract as core
+    payload = core.extract_text(text, file_goc=str(path), file_name=path.name)
+
+Pham vi luat: chi trich XUAT (regex) nguoi + tai san; KHONG so sanh,
+KHONG doi chieu, KHONG gop.
 So cong chung van duoc doc (phuc vu upload/audit) nhung khong con la
 tieu chi "du/thieu" cua core.
-
-Cach dung:
-    python extract_contract.py "hop_dong.docx"
-    python extract_contract.py "hop_dong.doc"
-
-Ket qua:
-    - In JSON ra man hinh
-    - Luu file .json cung thu muc
-
-Cai dat:
-    pip install python-docx
 """
 
 from __future__ import annotations
@@ -34,8 +35,11 @@ from pathlib import Path
 from typing import Iterable
 
 
-ENGINE_VERSION = "2026-10-08-bounded-correctness"
-"""Ban engine snapshot cho repo test cua nhan vien ghi vao log."""
+ENGINE_ID = "contract_word"
+"""Ten dinh danh cua lõi luat Word (dung cho profile_id o consumer)."""
+
+ENGINE_VERSION = "2026-10-16-core"
+"""Phien ban lõi luat — consumer ghi vao log/payload de truy vet."""
 
 # ============================================================
 # CAU HINH MAC DINH — sua tai day cho phu hop van phong
@@ -92,11 +96,106 @@ DOC_KIND_INHERITANCE_DECLARATION = "inheritance_declaration"
 DOC_KIND_GENERIC = "generic"
 
 
-def _append_text_lines(lines: list[str], values: Iterable[str]) -> None:
-    for raw in values:
-        text = str(raw or "").strip()
-        if text:
-            lines.append(text)
+# ============================================================
+# BAN DO SPAN NGUON — consumer dinh vi gia tri DA CHUAN HOA
+# ============================================================
+
+
+def _nfd_with_index(text: str) -> tuple[str, list[int]]:
+    """NFD(text) + chi so nguon cho tung ky tu (theo do dai mo rong tung ky tu)."""
+    out: list[str] = []
+    index: list[int] = []
+    for position, char in enumerate(text):
+        expanded = unicodedata.normalize("NFD", char)
+        out.append(expanded)
+        index.extend([position] * len(expanded))
+    return "".join(out), index
+
+
+def _form_with_spans(text: str, index: list[int], *, keep_space: bool) -> tuple[str, list[int]]:
+    """Dang tim kiem (gop khoang trang hoac bo khoang trang) + chi so nguon."""
+    chars: list[str] = []
+    spans: list[int] = []
+    pending_space = -1
+    for char, position in zip(text, index):
+        if char.isspace():
+            if keep_space and chars and pending_space < 0:
+                pending_space = position
+            continue
+        if keep_space and pending_space >= 0:
+            chars.append(" ")
+            spans.append(pending_space)
+            pending_space = -1
+        chars.append(char)
+        spans.append(position)
+    return "".join(chars), spans
+
+
+class SourceSpanIndex:
+    """Ban do mot luot: gia tri da chuan hoa -> span nguyen van trong nguon.
+
+    Loi chuan hoa gia tri truoc khi tra (NFC, gop khoang trang o ten, bo
+    khoang trang o so giay to) nen consumer khong the tim chuoi nguyen van de
+    dung `source_refs`. Lop nay anh xa nguoc lai: moi ky tu cua dang da chuan
+    hoa giu chi so nguon, ke ca khi NFC gop dau (nguon tron NFC/NFD).
+    Chi anh xa — khong boc lai gia tri, khong thay luat nghiep vu.
+    """
+
+    def __init__(self, text: str):
+        self.text = str(text or "")
+        nfd, source_index = _nfd_with_index(self.text)
+        self._forms = (
+            _form_with_spans(nfd, source_index, keep_space=True),
+            _form_with_spans(nfd, source_index, keep_space=False),
+        )
+
+    def find_all(self, value: str, window: tuple[int, int] | None = None) -> list[tuple[int, int]]:
+        """Mọi span nguồn của giá trị đã chuẩn hoá, đã bỏ lặp.
+
+        Thu MỌI dạng tương đương (gộp khoảng trắng + bỏ khoảng trắng) rồi mới
+        chọn — không dừng ở dạng đầu tiên có hit: dạng khớp ở nơi khác không
+        được che dạng khớp trong vùng ứng viên (Q2: hai người cùng số giấy tờ,
+        một người ghi có khoảng trắng). Có `window` thì trả các span trong vùng;
+        không có span nào trong vùng mới trả toàn văn bản.
+        """
+        if not value:
+            return []
+        nfd = unicodedata.normalize("NFD", value)
+        needles = (re.sub(r"\s+", " ", nfd).strip(), re.sub(r"\s+", "", nfd))
+        found: list[tuple[int, int]] = []
+        for needle, (form, spans) in zip(needles, self._forms):
+            if not needle:
+                continue
+            start = form.find(needle)
+            while start >= 0:
+                end = start + len(needle)
+                found.append((spans[start], spans[end - 1] + 1))
+                start = form.find(needle, start + 1)
+        unique = sorted(set(found))
+        if window is not None:
+            inside = [span for span in unique if span[0] >= window[0] and span[1] <= window[1]]
+            if inside:
+                return inside
+        return unique
+
+    def find(self, value: str, window: tuple[int, int] | None = None) -> tuple[int, int] | None:
+        """Mot span: duy nhat toan van ban, hoac duy nhat trong `window`."""
+        spans = self.find_all(value)
+        if not spans:
+            return None
+        if window is None:
+            return spans[0] if len(spans) == 1 else None
+        inside = [span for span in spans if span[0] >= window[0] and span[1] <= window[1]]
+        if len(inside) == 1:
+            return inside[0]
+        if not inside and len(spans) == 1:
+            return spans[0]
+        return None
+
+
+def build_span_index(text: str) -> SourceSpanIndex:
+    """Dung ban do span cho mot van ban nguon (goi mot lan cho moi consumer)."""
+    return SourceSpanIndex(text)
 
 
 def _dedupe_preserve_order(values: Iterable[str]) -> list[str]:
@@ -109,175 +208,6 @@ def _dedupe_preserve_order(values: Iterable[str]) -> list[str]:
         items.append(value)
         seen.add(value)
     return items
-
-
-def _append_table_lines(lines: list[str], tables) -> None:
-    for table in tables:
-        for row in table.rows:
-            row_values = []
-            seen_cells = set()
-            for cell in row.cells:
-                if cell._tc in seen_cells:
-                    continue  # A merged physical cell is exposed more than once by python-docx.
-                seen_cells.add(cell._tc)
-                cell_text = " ".join(
-                    p.text.strip()
-                    for p in cell.paragraphs
-                    if p.text and p.text.strip()
-                ).strip()
-                row_values.append(cell_text)
-            if any(row_values):
-                lines.append(" | ".join(row_values))
-
-
-def _append_docx_body_lines(lines: list[str], doc) -> None:
-    from docx.oxml.table import CT_Tbl
-    from docx.oxml.text.paragraph import CT_P
-    from docx.table import Table
-    from docx.text.paragraph import Paragraph
-
-    for child in doc.element.body.iterchildren():
-        if isinstance(child, CT_P):
-            _append_text_lines(lines, [Paragraph(child, doc).text])
-            continue
-        if isinstance(child, CT_Tbl):
-            _append_table_lines(lines, [Table(child, doc)])
-
-
-# ============================================================
-# DOCX / DOC HELPERS
-# ============================================================
-def read_doc_via_ifilter(filepath) -> str:
-    """Trich xuat text tu .doc bang Windows IFilter (cung co che voi Agent Ransack).
-    WHY: Doc .doc tren Windows ma khong can Word/Office.
-         Dung cho scan (tim so hop dong) — chi can plain text, khong can table structure.
-    RISK: IFilter tra plain text thuan — mat cau truc bang va header/footer.
-          Flow extract() cho .doc se chay theo plain text nay.
-    REQUIRE: query.dll (co san tren Windows 7+, khong can cai them).
-    """
-    import ctypes
-
-    abs_path = str(Path(filepath).resolve())
-    ole32 = ctypes.windll.ole32
-    ole32.CoInitialize(None)
-    try:
-        query = ctypes.windll.query
-        # c_long (signed) de compare HRESULT am — WINFUNCTYPE(HRESULT) tu raise exception
-        query.LoadIFilter.restype = ctypes.c_long
-        query.LoadIFilter.argtypes = [
-            ctypes.c_wchar_p,
-            ctypes.c_void_p,
-            ctypes.POINTER(ctypes.c_void_p),
-        ]
-        p_filter = ctypes.c_void_p()
-        hr = query.LoadIFilter(abs_path, None, ctypes.byref(p_filter))
-        if hr != 0 or not p_filter.value:
-            raise OSError(f"LoadIFilter that bai (hr=0x{hr & 0xFFFFFFFF:08X})")
-
-        # IFilter VTBL layout (IUnknown 0-2, IFilter 3-7):
-        #   3=Init, 4=GetChunk, 5=GetText, 6=GetValue, 7=BindRegion
-        VTBL_INIT = 3
-        VTBL_GET_CHUNK = 4
-        VTBL_GET_TEXT = 5
-        VTBL_RELEASE = 2
-
-        vtbl_ptr = ctypes.cast(p_filter, ctypes.POINTER(ctypes.c_void_p))
-        vtbl = ctypes.cast(vtbl_ptr[0], ctypes.POINTER(ctypes.c_void_p))
-
-        # Init(grfFlags, cAttributes, aAttributes, pFlags) — c_long tranh auto-raise
-        InitFunc = ctypes.WINFUNCTYPE(
-            ctypes.c_long, ctypes.c_void_p,
-            ctypes.c_uint, ctypes.c_ulong, ctypes.c_void_p,
-            ctypes.POINTER(ctypes.c_uint),
-        )
-        out_flags = ctypes.c_uint(0)
-        InitFunc(vtbl[VTBL_INIT])(p_filter, 0, 0, None, ctypes.byref(out_flags))
-
-        # STAT_CHUNK tren x64 Windows:
-        #   offset  0: idChunk   (ULONG 4B)
-        #   offset  4: breakType (enum  4B)
-        #   offset  8: flags     (CHUNKSTATE 4B) — CHUNK_TEXT=0x1, CHUNK_VALUE=0x2
-        #   offset 12: locale    (LCID  4B)
-        #   offset 16: attribute (FULLPROPSPEC = GUID(16B) + PROPSPEC(4+4pad+8B) = 32B)
-        #   offset 48: idChunkSource (4B), cwcStartSource (4B), cwcLenSource (4B)
-        #   total: 60B — dung 64B buffer cho an toan tren moi alignment
-        CHUNK_BUF_SIZE = 64
-        CHUNK_FLAGS_OFFSET = 8
-        CHUNK_TEXT = 0x1  # CHUNKSTATE: CHUNK_TEXT=1 (khong phai 2)
-
-        GetChunkFunc = ctypes.WINFUNCTYPE(
-            ctypes.c_long, ctypes.c_void_p, ctypes.c_char_p,
-        )
-        get_chunk_fn = GetChunkFunc(vtbl[VTBL_GET_CHUNK])
-
-        BUF_SIZE = 4096
-        GetTextFunc = ctypes.WINFUNCTYPE(
-            ctypes.c_long, ctypes.c_void_p,
-            ctypes.POINTER(ctypes.c_ulong), ctypes.c_wchar_p,
-        )
-        get_text_fn = GetTextFunc(vtbl[VTBL_GET_TEXT])
-
-        ReleaseFunc = ctypes.WINFUNCTYPE(ctypes.c_ulong, ctypes.c_void_p)
-        release_fn = ReleaseFunc(vtbl[VTBL_RELEASE])
-
-        # HRESULT codes (signed 32-bit)
-        FILTER_E_END_OF_CHUNKS = ctypes.c_long(0x80041700).value  # negative
-        FILTER_E_NO_MORE_TEXT  = ctypes.c_long(0x80041701).value  # negative
-        # FILTER_S_LAST_TEXT = 0x00041709 — SUCCESS: text duoc ghi VA day la phan cuoi cung
-        # Phai capture text TRUOC khi check status nay, roi break
-        FILTER_S_LAST_TEXT = 0x00041709  # positive (success with info)
-
-        parts: list[str] = []
-        chunk_buf = ctypes.create_string_buffer(CHUNK_BUF_SIZE)
-
-        while True:
-            hr_chunk = get_chunk_fn(p_filter, chunk_buf)
-            if hr_chunk == FILTER_E_END_OF_CHUNKS:
-                break
-            if hr_chunk != 0:
-                break
-
-            flags = ctypes.c_uint.from_buffer_copy(chunk_buf, CHUNK_FLAGS_OFFSET).value
-            if not (flags & CHUNK_TEXT):
-                continue
-
-            while True:
-                buf_len = ctypes.c_ulong(BUF_SIZE)
-                text_buf = ctypes.create_unicode_buffer(BUF_SIZE)
-                hr_text = get_text_fn(p_filter, ctypes.byref(buf_len), text_buf)
-                # Capture text TRUOC khi check status — FILTER_S_LAST_TEXT tra text hop le
-                if buf_len.value > 0:
-                    parts.append(text_buf.value[: buf_len.value])
-                if hr_text == FILTER_E_NO_MORE_TEXT:
-                    break
-                if hr_text == FILTER_S_LAST_TEXT:
-                    break  # text da duoc lay, day la phan cuoi cua chunk nay
-                if hr_text != 0:
-                    break
-
-        release_fn(p_filter)
-        return "".join(parts)
-    finally:
-        ole32.CoUninitialize()
-
-
-def read_docx(filepath, *, use_ifilter_for_doc: bool = False):
-    """Doc .docx hoac .doc -> text thuan.
-    - .docx: dung python-docx truc tiep (nhanh).
-    - .doc: dung IFilter/plain text tren Windows, khong can Word.
-    """
-    path = Path(filepath)
-    if path.suffix.lower() == ".doc":
-        return read_doc_via_ifilter(filepath)
-
-    from docx import Document
-    doc = Document(str(filepath))
-    lines: list[str] = []
-    _append_docx_body_lines(lines, doc)
-    for section in doc.sections:
-        _append_text_lines(lines, (p.text for p in section.header.paragraphs))
-        _append_text_lines(lines, (p.text for p in section.footer.paragraphs))
-    return "\n".join(lines)
 
 
 def _normalize_scan_contract_no(contract_no: str) -> str:
@@ -369,32 +299,6 @@ def _scan_contract_text(text: str, *, file_name: str = "") -> dict:
     }
 
 
-def scan_docx_for_contract_no(filepath, *, include_text: bool = False):
-    """Tim so cong chung trong noi dung file .docx hoac .doc.
-    .doc dung IFilter (nhanh) — chi can plain text de tim regex so cong chung.
-    """
-    path = Path(filepath)
-    use_ifilter_for_doc = path.suffix.lower() == ".doc"
-    try:
-        text = read_docx(path, use_ifilter_for_doc=use_ifilter_for_doc)
-        if use_ifilter_for_doc:
-            text = _normalize_plain_text_for_extract(text)
-    except Exception as exc:
-        result = {
-            "is_contract": False,
-            "contract_no": "",
-            "reason": f"Khong doc duoc file: {exc}",
-        }
-        if include_text:
-            result["text"] = ""
-        return result
-
-    result = _scan_contract_text(text, file_name=path.name)
-    if include_text:
-        result["text"] = text
-    return result
-
-
 # ============================================================
 # TRICH XUAT TUNG TRUONG
 # ============================================================
@@ -426,43 +330,6 @@ def find_ngay_cong_chung(text):
 def find_ccv(text):
     m = re.search(r"Tôi,\s+([^,]+),\s+Công chứng viên", text)
     return m.group(1).strip() if m else DEFAULT_CCV
-
-
-def find_persons(section):
-    """Tim tat ca nguoi trong 1 doan (Ben A hoac Ben B)."""
-    persons = []
-    names = list(re.finditer(r"(Ông|[Bb]à)\s+([^;]+?)\s*;", section))
-
-    for idx, nm in enumerate(names):
-        start = nm.start()
-        end = names[idx + 1].start() if idx + 1 < len(names) else len(section)
-        chunk = section[start:end]
-
-        person = {
-            "gioi_tinh": nm.group(1).capitalize(),
-            "ho_ten": nm.group(2).strip(),
-        }
-
-        m = re.search(r"(?:Sinh ngày|Sinh)\s*:?\s*(\d{1,2}/\d{1,2}/\d{4})", chunk)
-        person["ngay_sinh"] = m.group(1) if m else ""
-
-        m = re.search(r"(?:Căn cước|CCCD|CMND)(?:\s+công dân)?\s*(?:số:?\s*)(\d+)", chunk)
-        person["cccd"] = m.group(1) if m else ""
-
-        m = re.search(r"do\s+([^\n]+?)\s+cấp ngày", chunk)
-        person["noi_cap"] = re.sub(r"\s+", " ", m.group(1)).strip() if m else ""
-
-        m = re.search(r"cấp ngày\s*(\d{2}/\d{2}/\d{4})", chunk)
-        person["ngay_cap_cccd"] = m.group(1) if m else ""
-
-        persons.append(person)
-
-    return persons
-
-
-def find_dia_chi(section):
-    m = re.search(r"cùng (?:cư trú|thường trú) tại:?\s*([^\n.]+)\.", section)
-    return re.sub(r"\s+", " ", m.group(1)).strip() if m else ""
 
 
 def find_tai_san(text):
@@ -599,7 +466,11 @@ def _detect_document_kind_and_title(text: str) -> tuple[str, str]:
     # thua ke (R08 se bao oan vi khoi tai san khong ton tai trong text).
     # Van giu loai hop dong neu loi chung dung truoc than van ban co
     # heading ben ("I. Bên A: ..." — tom tat kem loi chung trong 1 file).
-    if any(l.strip().startswith("loi chung") for l in head_lines) and not re.search(
+    # Chỉ coi là trang "Lời chứng" khi DÒNG ĐẦU là mốc đó: nếu văn bản có
+    # tiêu đề riêng ở đầu (F8: "BIÊN BẢN GIAO NHẬN") thì "Lời chứng." ở trang
+    # sau là mục không trích (spec §4.7), không được ghép vào tiêu đề (MB8).
+    _first_head = next((l.strip() for l in head_lines if l.strip()), "")
+    if _first_head.startswith("loi chung") and not re.search(
         r"(?im)^\s*(?:[IVX]+\s*[./]?\s*)?b\u00ean\b[^:\n]{0,60}:",
         text,
     ):
@@ -689,7 +560,11 @@ def _extract_block_by_patterns(text: str, start_patterns: Iterable[str], end_pat
     if not raw:
         return ""
     raw = unicodedata.normalize("NFC", raw)
-    lines = [re.sub(r"\s+", " ", line).strip(" ;,") for line in raw.split("\n") if line.strip()]
+    # Giữ nguyên khoảng trắng BÊN TRONG dòng (chỉ cắt mép): giá trị lõi trả ra
+    # là lát cắt nguồn — "AB  123456" hai dấu cách vẫn nguyên văn (decision-46);
+    # consumer còn định vị đúng span. Dạng đã gộp khoảng trắng là lớp so khớp
+    # riêng, không thay bằng chứng.
+    lines = [line.strip().strip(" ;,") for line in raw.split("\n") if line.strip()]
     return "\n".join(lines).strip()
 
 
@@ -732,7 +607,11 @@ def _extract_block_by_folded_patterns(text: str, start_patterns: Iterable[str], 
     if not raw:
         return ""
     raw = unicodedata.normalize("NFC", raw)
-    lines = [re.sub(r"\s+", " ", line).strip(" ;,") for line in raw.split("\n") if line.strip()]
+    # Giữ nguyên khoảng trắng BÊN TRONG dòng (chỉ cắt mép): giá trị lõi trả ra
+    # là lát cắt nguồn — "AB  123456" hai dấu cách vẫn nguyên văn (decision-46);
+    # consumer còn định vị đúng span. Dạng đã gộp khoảng trắng là lớp so khớp
+    # riêng, không thay bằng chứng.
+    lines = [line.strip().strip(" ;,") for line in raw.split("\n") if line.strip()]
     return "\n".join(lines).strip()
 
 
@@ -747,6 +626,38 @@ _UNIVERSAL_ASSET_END_PATTERNS_FOLDED = (
     r"(?m)^\s*so cong chung\b",
     r"(?m)^\s*(?:nguoi|cac ben|ben)\s+(?:ky|diem chi|lap|yeu cau)\b",
 )
+
+
+def _find_tai_san_land_block(text: str) -> str:
+    """Khoi tai san dat dang NHAN: mo khoi `TÀI SẢN`/`Tài sản thứ N`, hoac
+    khoi giay chung nhan theo nhan (`Số phát hành (serial)`, `Giấy chứng
+    nhận ... số`, `Thửa đất số`).
+
+    Port tu hanh vi da duoc ho tro o Document Intake (#7): serial nguyen
+    van theo nhan va dia chi thua co nhan; khong them luat suy dien moi.
+    Nguon that trong nhom nay la GCN roi / hop dong ghi "TÀI SẢN:" roi
+    liet ke tung tai san — truoc day cac van ban do roi vao khoi `ĐIỀU 1`
+    (van xuoi) nen khong ra thua/serial.
+    """
+    return _extract_block_by_patterns(
+        text,
+        (
+            r"(?m)^\s*TÀI SẢN\s*:?\s*$",
+            r"(?m)^\s*Tài sản(?:\s+riêng)?(?:\s+thứ)?\s*\d+\s*:",
+            r"(?m)^\s*[-*]?\s*Số phát hành\s*\(\s*serial\s*\)\s*:",
+            r"(?m)^\s*[-*]?\s*Số phát hành\s*:",
+            r"(?m)^\s*[-*]?\s*(?:Giấy chứng nhận(?:\s+quyền\s+sử\s+dụng\s+đất)?|Số GCN|GCN)"
+            r"\s*(?:\([^)\n]{0,40}\))?\s*số\s*:",
+            r"(?m)^\s*[-*]?\s*Thửa đất số\s*:",
+        ),
+        (
+            r"(?m)^\s*ĐIỀU\s*\d+\b",
+            r"(?m)^\s*1\.2\b",
+            r"(?m)^\s*Bằng Hợp đồng này\b",
+            r"(?m)^\s*Giá chuyển nhượng\b",
+            r"(?m)^\s*Phương thức thanh toán\b",
+        ),
+    )
 
 
 def _find_tai_san_generic(text: str) -> str:
@@ -1179,6 +1090,12 @@ def _find_tai_san_by_kind(text: str, doc_kind: str) -> str:
     if common_qsdd_block:
         return re.split(r"(?im)^\s*(?:Nay\s+)?(?:bằng giấy này\s+)?(?:tôi|chúng tôi)\s+(?:uỷ|ủy|uy) quyền cho\s*:", common_qsdd_block, maxsplit=1)[0].strip()
 
+    # Khoi tai san dat dang nhan (TÀI SẢN/Tài sản thứ N/nhan GCN) manh hon
+    # khoi "ĐIỀU 1" van xuoi: nhan thua/serial la bang chung truc tiep.
+    land_block = _find_tai_san_land_block(text)
+    if land_block:
+        return land_block
+
     # Keep the article's shared certificate context before its numbered items.
     generic_block = _find_tai_san_generic(text)
     if generic_block:
@@ -1200,6 +1117,11 @@ def _find_tai_san_by_kind(text: str, doc_kind: str) -> str:
 
 def guess_nhom_hd(ten_hd):
     lower = _fold_text(ten_hd)
+    # Hủy bỏ hợp đồng chuyển nhượng: spec §2.3 xếp nhóm `Thoả thuận - Cam kết`
+    # (hoặc `Phụ lục hợp đồng - văn bản sửa đổi`) — chữ "chuyển nhượng" nằm
+    # trong tiêu đề hủy không được kéo sang nhóm Chuyển nhượng (MB7).
+    if ("huy bo" in lower or "huy hop dong" in lower) and "chuyen nhuong" in lower:
+        return "Thoả thuận - Cam kết"
     for kw, nhom in NHOM_HD_MAP.items():
         if _fold_text(kw) in lower:
             return nhom
@@ -1293,6 +1215,57 @@ def _clean_asset_cell(value: str) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip(" ;,.\u2013-")
 
 
+_SERIAL_ISSUER_BOUNDARY = r"(?=[,;|]|[ \t]*$|\.(?=[ \t]|$)|[ \t]+do(?:[ \t]|$))"
+
+
+def _serial_raw_value(cell: str) -> str:
+    """Serial nguyên văn: gộp khoảng trắng nhưng KHÔNG cắt tiền tố (`-`, `/`).
+
+    Khác `_clean_asset_cell` (dùng cho ô đất): serial tự do giữ nguyên văn
+    theo nguồn (decision-46, #7) — chỉ bỏ khoảng trắng thừa và dấu ngăn ô.
+    """
+    value = re.sub(r"\s+", " ", str(cell or "")).strip()
+    return value.strip(" ;,.")
+
+
+def _tach_dong_dat_nhieu_muc(value: str) -> "list[dict] | None":
+    """Dòng `Loại đất` nhiều mục: "Đất ở tại nông thôn 200,0m²; Đất trồng cây lâu năm 247,0m²".
+
+    Trả None khi không phải dạng nhiều mục (một loại đất duy nhất giữ nguyên
+    đường cũ). spec §2.5: tổng và chi tiết kiểm riêng — chi tiết vào
+    `chi_tiet_dien_tich`/`land_rows`, không gộp vào trường cấp thửa.
+    """
+    parts = [part.strip(" ;,.") for part in str(value or "").split(";") if part.strip(" ;,.")]
+    if len(parts) < 2:
+        return None
+    rows: list[dict] = []
+    for part in parts:
+        match = re.match(
+            r"^(.+?)\s+(\d[\d.,]*\s*m\s*\u00b2?|\d[\d.,]*\s*m\s*2|\d[\d.,]*)$",
+            part,
+            re.IGNORECASE,
+        )
+        if not match:
+            return None
+        rows.append({"muc_dich_su_dung": match.group(1).strip(" ;,."),
+                     "dien_tich": match.group(2).strip()})
+    return rows
+
+
+def _tach_dong_thoi_han_nhieu_muc(value: str) -> "list[tuple[str, str]] | None":
+    """Dòng `Thời hạn sử dụng` nhiều mục: "Đất ở tại nông thôn: Lâu dài; Đất trồng cây lâu năm: 12/2043"."""
+    parts = [part.strip(" ;,.") for part in str(value or "").split(";") if part.strip(" ;,.")]
+    if len(parts) < 2:
+        return None
+    pairs: list[tuple[str, str]] = []
+    for part in parts:
+        match = re.match(r"^(.+?)\s*:\s*(.+)$", part)
+        if not match:
+            return None
+        pairs.append((match.group(1).strip(" ;,."), match.group(2).strip(" ;,.")))
+    return pairs
+
+
 def _land_purpose_is_narrative(value: str) -> bool:
     return bool(re.match(r"^(?:di san cua\b.*\bde lai\b|chung toi thong nhat\b|cac ben thong nhat phan chia\b)", _fold_text(value)))
 
@@ -1318,34 +1291,214 @@ def _map_asset_table_columns(header_line: str) -> tuple:
     return tuple(order)
 
 
+_NEXT_LABEL_RE = re.compile(
+    r"(?i)^\s*(?:Thửa đất số|Tờ bản đồ số|Diện tích|Loại đất|Mục đích sử dụng|Thời hạn(?:\s+sử dụng)?"
+    r"|Địa chỉ(?:\s+thửa\s+đất)?|Số vào sổ|Số phát hành|Giấy chứng nhận|Số GCN|Ghi chú)\s*:"
+)
+
+
+_SERIAL_STANDARD_RE = re.compile(
+    r"(?i)(?:ch\u1ee9ng nh\u1eadn|GCN)[^\n]{0,100}?(?:s\u1ed1\s*:?\s*|\u0111\u1ea5t\s*:?\s*)"
+    r"([A-Za-z\u0110\u0111]{1,3})\s*(\d{6,8})"
+)
+_GCN_TYPE_RE = re.compile(
+    r"(?im)(gi\u1ea5y\s+ch\u1ee9ng\s+nh\u1eadn(?:\s+quy\u1ec1n\s+s\u1eed\s+d\u1ee5ng\s+\u0111\u1ea5t)?)"
+    r"(?:(?:\s+s\u1ed1)?[ \t]*:[ \t]*(?=\S)|(?:\s+s\u1ed1)[ \t]+(?=\S)|[ \t]*$)"
+)
+
+
+def _gcn_type_evidence(text: str) -> tuple[str, str]:
+    """Loại giấy chứng nhận ghi trong nguồn -> (giá trị chuẩn, nguyên văn nguồn).
+
+    spec §2.6: `loai_gcn` là loại giấy ghi trong nguồn — không gate dạng serial
+    "hai chữ hoa + số"; nhưng nhãn ghi loại mà KHÔNG có giá trị (serial trống)
+    thì không tính là nguồn đã ghi loại. Nguyên văn là lát cắt nguồn (tiêu đề
+    có thể xuống dòng) để consumer còn cắt được span/bằng chứng; giá trị chuẩn
+    là dạng canonical riêng, không trộn vào bằng chứng.
+    """
+    match = _GCN_TYPE_RE.search(str(text or ""))
+    if not match:
+        return "", ""
+    raw = match.group(1)
+    normalized = ("Giấy chứng nhận quyền sử dụng đất"
+                  if "quyen su dung dat" in _fold_text(raw)
+                  else "Giấy chứng nhận")
+    return normalized, raw
+
+
+def _gcn_type_values(text: str) -> list[str]:
+    """MỌI lần thấy loại giấy chứng nhận trong khối (nguyên văn, thứ tự nguồn)."""
+    values: list[str] = []
+    for match in _GCN_TYPE_RE.finditer(str(text or "")):
+        raw = match.group(1)
+        if raw and raw not in values:
+            values.append(raw)
+    return values
+
+
+def _gcn_type_of(text: str) -> str:
+    """Loại giấy chứng nhận ghi trong nguồn (chỉ giá trị chuẩn, spec §2.6)."""
+    return _gcn_type_evidence(text)[0]
+
+
+def _bo_sung_loai_gcn_document(parcels: list[dict], text: str) -> list[dict]:
+    """Thửa chưa có `loai_gcn` nhận loại giấy chung của văn bản (spec §2.6).
+
+    Khối tài sản của GCN chỉ có các dòng ô (property-gcn, gcn-multi-parcel):
+    loại giấy nằm ở khối tiêu đề của văn bản. Chỉ điền khi thửa còn trống —
+    không ghi đè loại đã đọc được trong khối. Điền kèm nguyên văn + mọi lần
+    thấy để consumer định vị span (tiêu đề hoa 2 dòng) và báo mơ hồ khi nguồn
+    ghi nhiều loại khác nhau.
+    """
+    doc_type, doc_raw = _gcn_type_evidence(text)
+    if not doc_type:
+        return parcels
+    doc_values = _gcn_type_values(text)
+    for row in parcels:
+        if not str(row.get("loai_gcn") or "").strip():
+            row["loai_gcn"] = doc_type
+            if doc_raw:
+                row["loai_gcn_raw"] = doc_raw
+            if doc_values:
+                row["loai_gcn_raw_values"] = list(doc_values)
+    return parcels
+_SERIAL_LABELS = (
+    r"s\u1ed1\s+ph\u00e1t\s+h\u00e0nh(?:\s*\(\s*seri(?:al)?\s*\))?",
+    r"s\u1ed1\s+serial",
+    r"serial",
+    r"s\u1ed1\s+seri",
+    r"s\u1ed1\s+GCN",
+    r"s\u1ed1\s+gi\u1ea5y\s+ch\u1ee9ng\s+nh\u1eadn",
+    r"gi\u1ea5y\s+ch\u1ee9ng\s+nh\u1eadn(?:\s+quy\u1ec1n\s+s\u1eed\s+d\u1ee5ng\s+\u0111\u1ea5t)?"
+    r"(?:\s*\([^)]*\))?\s*s\u1ed1",
+)
+
+
+_SERIAL_VALUE_STOP = r"[ \t\n;|,:]"
+_FIELD_VALUE_STOP = r"[ \t\n;|]"
+_FIELD_BOUNDARY = r"(?=[;|]|[ \t]*$|\.(?=[ \t]|$))"
+
+
+def _labeled_occurrences(block: str, labels: "tuple[str, ...] | list[str]", *,
+                         boundary: str = _FIELD_BOUNDARY,
+                         stop: str = _FIELD_VALUE_STOP) -> list[dict]:
+    """MỌI lần thấy giá trị NGUYÊN VĂN sau một nhãn (span trong khối, thứ tự nguồn).
+
+    Một cơ chế chung cho mọi trường có nhãn (serial, địa chỉ thửa, số vào sổ,
+    ngày cấp…): consumer thấy đủ mọi lần thấy để báo mơ hồ thay vì chọn hộ
+    (spec `word-templates.md`), và mỗi lần thấy mang span để định vị nguồn.
+    `value` là LÁT CẮT NGUỒN, không gộp khoảng trắng ("AB  123456" giữ đúng
+    hai dấu cách — decision-46 "serial nguyên văn", giữ nguyên ở mọi tầng);
+    `normalized` chỉ là dạng đã gộp khoảng trắng/bỏ dấu ngăn ô ở mép để so
+    khớp/khử trùng, KHÔNG phát ra làm bằng chứng.
+    """
+    if not labels:
+        return []
+    label_alt = "|".join(f"(?:{label})" for label in labels)
+    # Ký tự đầu không được là khoảng trắng/dấu ngăn ô; thêm `:` vì dấu ngăn
+    # nhãn là tuỳ chọn nên regex có thể lùi và bắt chính nó làm giá trị khi
+    # nhãn trống ("Địa chỉ thửa đất:" không có giá trị) — nhãn trống không
+    # tạo đáp án/bằng chứng. Phần thân vẫn giữ khoảng trắng ("xã Một, tỉnh
+    # Một"), chỉ dừng ở dấu ngăn ô như trước.
+    first_stop = stop[1:-1]
+    first_char_stop = first_stop + ("" if ":" in first_stop else ":")
+    body_stop = first_stop.replace(" ", "").replace("\\t", "")
+    pattern = re.compile(
+        rf"(?im)(?:^|[;|]\s*)\s*[-*]?\s*(?>(?:{label_alt}))\s*[:.]?[ \t]*"
+        rf"(?P<value>[^{first_char_stop}][^{body_stop}]*?)[ \t]*{boundary}"
+    )
+    found: list[dict] = []
+    for match in pattern.finditer(block):
+        value = block[match.start("value"):match.end("value")].strip(" ;,.")
+        normalized = _serial_raw_value(value)
+        if not normalized or _NEXT_LABEL_RE.match(normalized):
+            continue
+        found.append({"value": value, "normalized": normalized,
+                      "start": match.start("value"), "end": match.end("value")})
+    return found
+
+
+def _serial_occurrences(block: str) -> list[tuple[int, int, str]]:
+    """MỌI serial theo LẦN THẤY, đã gộp các hit chồng nhau.
+
+    Hai recognizer (dạng chuẩn "GCN … số AB123456" và dạng nhãn tự do) có thể
+    cùng thấy MỘT occurrence; gộp theo span chồng nhau và giữ nguyên văn của
+    NHÃN (bản có thẩm quyền) — khác biệt do chuẩn hoá/tiền tố matcher tạo ra
+    không được biến một serial thành hai đáp án mơ hồ (Q1).
+    """
+    hits: list[tuple[int, int, str, bool]] = []
+    for match in _SERIAL_STANDARD_RE.finditer(block):
+        hits.append((match.start(1), match.end(2), block[match.start(1):match.end(2)], False))
+    for item in _labeled_occurrences(block, _SERIAL_LABELS, boundary=_SERIAL_ISSUER_BOUNDARY,
+                                     stop=_SERIAL_VALUE_STOP):
+        hits.append((item["start"], item["end"], item["value"], True))
+    hits.sort(key=lambda hit: (hit[0], -hit[1]))
+    merged: list[tuple[int, int, str, bool]] = []
+    for start, end, value, is_label in hits:
+        if merged and start < merged[-1][1]:
+            prev_start, prev_end, prev_value, prev_label = merged[-1]
+            take = (is_label and not prev_label) or (is_label == prev_label and len(value) > len(prev_value))
+            merged[-1] = (prev_start, max(prev_end, end),
+                          value if take else prev_value, prev_label or is_label)
+            continue
+        merged.append((start, end, value, is_label))
+    return [(start, end, value) for start, end, value, _ in merged]
+
+
+def _serial_raw_values(block: str) -> list[str]:
+    """MỌI serial nguyên văn theo LẦN THẤY trong khối, theo thứ tự nguồn.
+
+    Consumer cần thấy đủ mọi lần thấy để báo mơ hồ thay vì chọn hộ
+    (spec `word-templates.md`: nhiều giá trị -> `normalized_value=null` +
+    cảnh báo, người kiểm tra chọn/sửa).
+    """
+    return [value for _, _, value in _serial_occurrences(block)]
+
+
 def _tach_ngu_canh_gcn(tai_san: str) -> dict:
     block = unicodedata.normalize("NFC", str(tai_san or ""))
     context = {
         "so_gcn": "",
         "so_gcn_raw": "",
+        "so_gcn_raw_values": [],
         "loai_gcn": "",
+        "loai_gcn_raw": "",
+        "loai_gcn_raw_values": [],
         "so_vao_so": "",
+        "so_vao_so_values": [],
         "dia_chi": "",
+        "dia_chi_values": [],
         "ngay_cap_gcn": "",
+        "ngay_cap_values": [],
         "co_quan_cap": "",
+        "co_quan_cap_values": [],
     }
-    gcn_match = re.search(
-        r"(?i)(?:ch\u1ee9ng nh\u1eadn|GCN)[^\n]{0,100}?(?:s\u1ed1\s*:?\s*|\u0111\u1ea5t\s*:?\s*)([A-Za-z\u0110\u0111]{1,3})\s*(\d{6,8})",
-        block,
-    )
+    occurrences = _serial_occurrences(block)
+    if occurrences:
+        # Giữ nguyên văn theo LẦN THẤY; khi có nhãn thì nguyên văn của nhãn là
+        # bản có thẩm quyền (Q1: "AB  123456" và "AB123456 (bản chính)" không
+        # được thành hai đáp án cho cùng một occurrence).
+        context["so_gcn_raw"] = occurrences[0][2]
+    gcn_match = _SERIAL_STANDARD_RE.search(block)
     if gcn_match:
-        context["so_gcn_raw"] = f"{gcn_match.group(1)} {gcn_match.group(2)}"
         context["so_gcn"] = (gcn_match.group(1) + gcn_match.group(2)).upper()
-    loai_match = re.search(
-        r"(?i)Gi\u1ea5y ch\u1ee9ng nh\u1eadn\s+(.+?)\s+s\u1ed1\s*:?\s*[A-Za-z]{1,3}\s*\d{6,8}",
-        block,
-    )
-    if loai_match:
-        context["loai_gcn"] = _clean_asset_cell(loai_match.group(1)).strip('"“”')
+    context["so_gcn_raw_values"] = [value for _, _, value in occurrences]
+    # Loại giấy theo NGUỒN (spec §2.6) — nhãn đầy đủ, KHÔNG gate "hai chữ hoa
+    # + số": nguồn chỉ ghi "Giấy chứng nhận" (F1/F2/F3) hoặc khối tiêu đề
+    # "GIẤY CHỨNG NHẬN / QUYỀN SỬ DỤNG ĐẤT" (property-gcn, gcn-multi-parcel).
+    # Giữ kèm nguyên văn (lát cắt nguồn) để consumer định vị span; giá trị
+    # chuẩn là dạng canonical riêng.
+    context["loai_gcn"], context["loai_gcn_raw"] = _gcn_type_evidence(block)
+    context["loai_gcn_raw_values"] = _gcn_type_values(block)
     vao_so_match = re.search(
         r"(?i)(?:v\u00e0o s\u1ed5|v\u00e0o s\u1ed1)[^\n:]{0,60}?s\u1ed1\s+([A-Z0-9][^\n,;]*?)(?=[,;]|\s+ng\u00e0y\s+\d|\s+do\s+|\s*$)",
         block,
     )
+    if not vao_so_match:
+        vao_so_match = re.search(
+            r"(?im)^\s*[-*]?\s*(?:s\u1ed1\s+)?v\u00e0o\s+s\u1ed5(?:\s+c\u1ea5p\s+(?:GCN|gi\u1ea5y ch\u1ee9ng nh\u1eadn))?(?:\s+s\u1ed1)?\s*:\s*([A-Z0-9][^\n,;]*?)\s*$",
+            block,
+        )
     if not vao_so_match:
         vao_so_match = re.search(
             r"(?i)(?:số\s+)?vào sổ\s+cấp\s+(?:GCN|giấy chứng nhận)(?:\s+số)?\s*:\s*([A-Z0-9][^\n,;]*?)(?=[,;]|\s+ngày\s+\d|\s+do\s+|\s*$)",
@@ -1358,8 +1511,14 @@ def _tach_ngu_canh_gcn(tai_san: str) -> dict:
         while " " in so_vao_so and not re.search(r"\d", so_vao_so.rsplit(" ", 1)[-1]):
             so_vao_so = so_vao_so.rsplit(" ", 1)[0].strip()
         context["so_vao_so"] = so_vao_so
+    context["so_vao_so_values"] = _dedupe_preserve_order(
+        [context["so_vao_so"]]
+        + [item["value"] for item in _labeled_occurrences(
+            block, (r"S\u1ed1 v\u00e0o s\u1ed5", r"V\u00e0o s\u1ed5 s\u1ed1"))]
+    )
     dia_chi_match = re.search(
-        r"(?i)(?:c\u00f3 \u0111\u1ecba ch\u1ec9 t\u1ea1i|t\u1ea1i \u0111\u1ecba ch\u1ec9)\s*:?\s*(.+?)(?=\s+theo\s+[A-Z]|\s+theo\s+Gi\u1ea5y|$)",
+        r"(?im)(?:c\u00f3 \u0111\u1ecba ch\u1ec9 t\u1ea1i|t\u1ea1i \u0111\u1ecba ch\u1ec9)\s*:?[ \t]*"
+        r"([^\n]+?)(?=\s+theo\s+[A-Z]|\s+theo\s+Gi\u1ea5y|$)",
         block,
     )
     if dia_chi_match:
@@ -1374,17 +1533,239 @@ def _tach_ngu_canh_gcn(tai_san: str) -> dict:
         else:
             context["dia_chi"] = _dc
     if not context["dia_chi"]:
-        labeled_address = re.search(r"(?im)^\s*[-*]?\s*Địa chỉ thửa đất\s*:\s*([^\n;]+)", block)
+        # Gia tri phai nam CUNG DONG voi nhan: nhan trong ("Địa chỉ thửa
+        # đất:" roi xuong dong) khong duoc muon nhan/dong ke (#7, Notary).
+        # Nhan co the dung dau dong hoac sau o phan cach ";" tren cung dong
+        # ("Giấy chứng nhận số: B 011092; Địa chỉ thửa đất: xã Mẫu, tỉnh Mẫu").
+        labeled_address = re.search(
+            r"(?im)(?:^|[;|]\s*)\s*[-*]?\s*Địa chỉ thửa đất\s*:[ \t]*(\S[^\n;]*)", block
+        )
         if labeled_address:
-            context["dia_chi"] = _clean_asset_cell(labeled_address.group(1))
-    cap_match = re.search(
+            value = _clean_asset_cell(labeled_address.group(1))
+            if not _NEXT_LABEL_RE.match(value):
+                context["dia_chi"] = value
+    if not context["dia_chi"]:
+        # Khối mở tài sản "quyền sử dụng đất tại <địa chỉ> theo Giấy chứng
+        # nhận …" (F1/F2 — spec §4.4: khối đất mở bằng chính câu này, thửa
+        # chỉ có GCN vẫn giữ `dia_chi`). Giá trị dừng trước "theo".
+        opener = re.search(
+            r"(?i)(?:quy\u1ec1n\s+s\u1eed\s+d\u1ee5ng\s+\u0111\u1ea5t|t\u00e0i\s*s\u1ea3n(?:\s+l\u00e0)?)"
+            r"[^\n:;]{0,60}?\bt\u1ea1i\s+(?!\u0111\u1ecba\s+ch\u1ec9)([^\n;]+?)(?=\s+theo\b|[,;]?\s*$)",
+            block,
+        )
+        if opener:
+            value = _clean_asset_cell(opener.group(1))
+            if value and not _NEXT_LABEL_RE.match(value):
+                if re.match(
+                    r"(?i)theo\s+(?:Gi\u1ea5y|Quy\u1ebft|H\u1ee3p|\u0110\u01a1n|Bi\u00ean|GCN)\b",
+                    value,
+                ):
+                    # "… tại: Theo Giấy chứng nhận …" — mô tả giấy tờ, không
+                    # phải địa chỉ (13/10/2026); giữ ở `nguon_goc`.
+                    context["nguon_goc"] = context.get("nguon_goc") or value
+                else:
+                    context["dia_chi"] = value
+    # MỌI lần thấy địa chỉ trong khối (consumer báo mơ hồ thay vì chọn hộ).
+    _dia_chi_values: list[str] = []
+    if context["dia_chi"]:
+        _dia_chi_values.append(context["dia_chi"])
+    for _match in re.finditer(
+        r"(?im)(?:c\u00f3 \u0111\u1ecba ch\u1ec9 t\u1ea1i|t\u1ea1i \u0111\u1ecba ch\u1ec9)\s*:?[ \t]*"
+        r"([^\n]+?)(?=\s+theo\s+[A-Z]|\s+theo\s+Gi\u1ea5y|$)",
+        block,
+    ):
+        _dia_chi_values.append(_clean_asset_cell(_match.group(1)))
+    for _item in _labeled_occurrences(
+        block, (r"\u0110\u1ecba ch\u1ec9 th\u1eeda \u0111\u1ea5t", r"\u0110\u1ecba ch\u1ec9")
+    ):
+        _dia_chi_values.append(_item["value"])
+    for _match in re.finditer(
+        r"(?i)(?:quy\u1ec1n\s+s\u1eed\s+d\u1ee5ng\s+\u0111\u1ea5t|t\u00e0i\s*s\u1ea3n(?:\s+l\u00e0)?)"
+        r"[^\n:;]{0,60}?\bt\u1ea1i\s+(?!\u0111\u1ecba\s+ch\u1ec9)([^\n;]+?)(?=\s+theo\b|[,;]?\s*$)",
+        block,
+    ):
+        _dia_chi_values.append(_clean_asset_cell(_match.group(1)))
+    context["dia_chi_values"] = _dedupe_preserve_order(_dia_chi_values)
+    cap_matches = list(re.finditer(
         r"(?i)do\s+([^\n]+?)\s+(?:c\u1ea5p|k\u00fd)\s+ng\u00e0y\s*(\d{1,2}/\d{1,2}/\d{4})",
         block,
-    )
-    if cap_match:
-        context["co_quan_cap"] = _clean_asset_cell(cap_match.group(1))
-        context["ngay_cap_gcn"] = cap_match.group(2)
+    ))
+    if cap_matches:
+        context["co_quan_cap"] = _clean_asset_cell(cap_matches[0].group(1))
+        context["ngay_cap_gcn"] = cap_matches[0].group(2)
+    # Nhãn "Ngày cấp:" của ô cấp giấy (spec §2.6) — property-gcn và
+    # gcn-multi-parcel chỉ ghi ngày ở nhãn này, không có câu "do … cấp ngày …".
+    labeled_dates = [
+        item["value"] for item in _labeled_occurrences(block, (r"Ng\u00e0y c\u1ea5p",))
+        if re.match(r"^\d{1,2}/\d{1,2}/\d{4}$", item["value"])
+    ]
+    if not context["ngay_cap_gcn"] and labeled_dates:
+        context["ngay_cap_gcn"] = labeled_dates[0]
+    context["ngay_cap_values"] = _dedupe_preserve_order(
+        [match.group(2) for match in cap_matches] + labeled_dates)
+    context["co_quan_cap_values"] = _dedupe_preserve_order(
+        [_clean_asset_cell(match.group(1)) for match in cap_matches])
     return context
+
+
+def document_asset_context(tai_san: str) -> dict:
+    """Ngu canh giay chung nhan o muc van ban (serial nguyen van, dia chi
+    thua, so vao so, ngay cap, co quan cap) khi van ban khong tach duoc
+    dong thua nao. Consumer (Document Intake) map thanh goi y tai san;
+    luat van nam o `_tach_ngu_canh_gcn`, khong nhan doi o adapter."""
+    return _tach_ngu_canh_gcn(tai_san)
+
+
+_GROUP_HEAD_RE = re.compile(r"(?im)^\s*Tài sản(?:\s+riêng)?(?:\s+thứ)?\s*(\d+)\s*:")
+_ROW_CELL_LABELS = (
+    ("loai_dat", re.compile(r"(?i)^\s*(?:Loại đất|Mục đích sử dụng)\s*:?\s*")),
+    ("dien_tich", re.compile(r"(?i)^\s*Diện tích\s*:?\s*")),
+    ("thoi_han", re.compile(r"(?i)^\s*Thời hạn(?:\s+sử dụng)?\s*:?\s*")),
+)
+
+
+_LAND_ROW_BOUNDARY_RE = re.compile(
+    r"(?i)(?:^|[;|])\s*[-*]?\s*(?:Thửa đất số|Số thửa|Tờ b[ảà]n đ[ồđổ]"
+    r"(?: địa chính)?(?: số)?|Số tờ(?: b[ảà]n đ[ồđổ])?)\b"
+)
+
+
+def _land_row_lines(lines):
+    """Một cách phân loại cụm đất cho cả dựng dòng và metadata cấp thửa.
+
+    Cụm giữ qua xuống dòng; thửa/tờ hoặc nhóm mới ngắt cụm. Nhãn loại đất
+    (kể cả trống) mở cụm mới; diện tích/thời hạn không có cụm vẫn là ô phẳng.
+    """
+    active_cluster = False
+    for raw_line in lines:
+        line = raw_line.strip()
+        boundary = bool(_GROUP_HEAD_RE.match(line) or _LAND_ROW_BOUNDARY_RE.search(line))
+        if boundary:
+            active_cluster = False
+        labeled: list[tuple[str, str]] = []
+        for cell in re.split(r"[;|]", line):
+            cell = cell.strip()
+            for key, label_re in _ROW_CELL_LABELS:
+                match = label_re.match(cell)
+                if match:
+                    labeled.append((key, cell[match.end():].strip(" ;,.")))
+                    if key == "loai_dat":
+                        active_cluster = True
+                    break
+        yield raw_line, labeled, boundary, active_cluster
+
+
+def _land_rows_of(segment: str) -> list[dict]:
+    """Dòng đất trong một nhóm tài sản: mỗi dòng có nhãn
+    `Loại đất`/`Mục đích sử dụng`, `Diện tích`, `Thời hạn` (ngăn bằng `;`
+    hoặc `|`) là một dòng; giá trị GIỮ NGUYÊN VĂN để consumer còn định vị
+    span. Dòng chỉ có nhãn trống vẫn trả về (consumer báo thiếu dữ liệu).
+    """
+    rows: list[dict] = []
+    current: dict | None = None
+    current_has_loai = False
+
+    def start_row() -> dict:
+        nonlocal current_has_loai
+        row = {"loai_dat": "", "dien_tich": "", "thoi_han": ""}
+        rows.append(row)
+        current_has_loai = False
+        return row
+
+    for _, labeled, boundary, _ in _land_row_lines(str(segment or "").split("\n")):
+        if boundary:
+            current = None
+            current_has_loai = False
+        if not labeled:
+            continue
+        for key, value in labeled:
+            if key == "loai_dat":
+                # Moi nhan `Loại đất` mo mot cum rieng — ke ca cum truoc
+                # toan gia tri trong (spec: dong trong van la mot dong,
+                # consumer can thay de bao thieu du lieu).
+                if current is not None and current_has_loai:
+                    current = start_row()
+                if current is None:
+                    current = start_row()
+                current_has_loai = True
+            elif current is None:
+                current = start_row()
+            if current[key] == "":
+                current[key] = value
+            else:
+                current[key] = f"{current[key]}; {value}" if value else current[key]
+    return rows
+
+
+def _o_phang_cua_dong(rows: list[dict], key: str) -> str:
+    """Ô phẳng cấp nhóm lấy từ dòng đất KHÔNG phải cụm (`Loại đất` trống).
+
+    Dòng cụm đất đã thành `land_rows` — không lấy làm ô phẳng (R5-2); dòng chỉ
+    có diện tích/thời hạn (nguồn không ghi `Loại đất`) vẫn là ô phẳng cấp nhóm.
+    """
+    for row in rows:
+        if str(row.get("loai_dat") or "").strip():
+            continue
+        value = str(row.get(key) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def tach_nhom_tai_san(tai_san: str) -> list[dict]:
+    """Khối tài sản có nhãn nhóm (`Tài sản thứ N:` / `Tài sản N:`) -> mỗi
+    nhóm một dict: serial nguyên văn, địa chỉ, thửa/tờ, và các dòng đất
+    (`land_rows`). Trả [] khi khối không có nhãn nhóm (consumer dùng
+    `tach_danh_sach_thua_dat` theo từng thửa như cũ).
+    """
+    block = unicodedata.normalize("NFC", str(tai_san or ""))
+    heads = list(_GROUP_HEAD_RE.finditer(block))
+    if not heads:
+        return []
+    groups: list[dict] = []
+    for index, head in enumerate(heads):
+        end = heads[index + 1].start() if index + 1 < len(heads) else len(block)
+        segment = block[head.start():end]
+        context = _tach_ngu_canh_gcn(segment)
+        parcels = tach_danh_sach_thua_dat(segment, land_rows_as_details=True)
+        first = parcels[0] if parcels else {}
+        rows = _land_rows_of(segment)
+        groups.append({
+            "tieu_de": head.group(0).strip(),
+            "so_serial": context.get("so_gcn_raw", ""),
+            "so_serial_values": list(context.get("so_gcn_raw_values") or []),
+            "so_thua_dat_values": _dedupe_preserve_order(
+                str(parcel.get("so_thua_dat") or "") for parcel in parcels),
+            "so_to_ban_do_values": _dedupe_preserve_order(
+                str(parcel.get("so_to_ban_do") or "") for parcel in parcels),
+            "dia_chi_values": list(context.get("dia_chi_values") or []),
+            "so_vao_so_values": list(context.get("so_vao_so_values") or []),
+            "ngay_cap_values": list(context.get("ngay_cap_values") or []),
+            "co_quan_cap_values": list(context.get("co_quan_cap_values") or []),
+            "loai_so": context.get("loai_gcn", ""),
+            "loai_so_raw": context.get("loai_gcn_raw", ""),
+            "loai_so_values": list(context.get("loai_gcn_raw_values") or []),
+            # Diện tích/thời hạn của NHÓM: chỉ lần thấy ở CẤP THỬA/VĂN BẢN
+            # (scalar), KHÔNG lấy từ các dòng đất chi tiết — hai dòng đất hợp lệ
+            # khác nhau không phải "nhiều giá trị của cùng một ô" (R4-2,
+            # 16/10/2026; trước đây lấy từ `rows` nên consumer báo mơ hồ giả).
+            "dien_tich_values": list(first.get("dien_tich_values") or []),
+            "thoi_han_values": list(first.get("thoi_han_su_dung_values") or []),
+            "so_vao_so": context.get("so_vao_so", ""),
+            "dia_chi": context.get("dia_chi", "") or str(first.get("dia_chi") or ""),
+            "ngay_cap": context.get("ngay_cap_gcn", ""),
+            "co_quan_cap": context.get("co_quan_cap", ""),
+            "so_thua_dat": str(first.get("so_thua_dat") or ""),
+            "so_to_ban_do": str(first.get("so_to_ban_do") or ""),
+            # Diện tích/thời hạn CẤP NHÓM: dòng đất KHÔNG phải cụm (`Loại đất`
+            # trống) là ô phẳng hợp lệ; dòng cụm đã thành `land_rows` (R5-2).
+            # Ô cấp thửa chỉ dùng khi nguồn không có dòng phẳng nào.
+            "dien_tich": str(_o_phang_cua_dong(rows, "dien_tich") or first.get("dien_tich") or ""),
+            "thoi_han": str(_o_phang_cua_dong(rows, "thoi_han")
+                            or first.get("thoi_han_su_dung") or ""),
+            "land_rows": rows,
+        })
+    return groups
 
 
 def _new_thua_dat(context: dict) -> dict:
@@ -1398,13 +1779,44 @@ def _new_thua_dat(context: dict) -> dict:
         "nguon_goc": "",
         "dia_chi": context.get("dia_chi", ""),
         "loai_gcn": context.get("loai_gcn", ""),
+        "loai_gcn_raw": context.get("loai_gcn_raw", ""),
+        "loai_gcn_raw_values": list(context.get("loai_gcn_raw_values") or []),
         "so_gcn": context.get("so_gcn", ""),
         "so_gcn_raw": context.get("so_gcn_raw", ""),
+        "so_gcn_raw_values": list(context.get("so_gcn_raw_values") or []),
+        "dia_chi_values": list(context.get("dia_chi_values") or []),
+        "so_vao_so_values": list(context.get("so_vao_so_values") or []),
+        "ngay_cap_values": list(context.get("ngay_cap_values") or []),
+        "co_quan_cap_values": list(context.get("co_quan_cap_values") or []),
         "so_vao_so": context.get("so_vao_so", ""),
         "ngay_cap_gcn": context.get("ngay_cap_gcn", ""),
         "co_quan_cap": context.get("co_quan_cap", ""),
+        # Trường cấp thửa cũng có thể bị nguồn ghi nhiều lần (Q4): giữ MỌI lần
+        # thấy để consumer báo mơ hồ thay vì nhận giá trị đầu.
+        "so_thua_dat_values": [],
+        "so_to_ban_do_values": [],
+        "dien_tich_values": [],
+        "thoi_han_su_dung_values": [],
         "chi_tiet_dien_tich": [],
     }
+
+
+# Trường cấp thửa giữ kèm danh sách "mọi lần thấy" (`<key>_values`).
+_THUA_MULTI_KEYS = frozenset({"so_thua_dat", "so_to_ban_do", "dien_tich", "thoi_han_su_dung"})
+
+
+def _ghi_lan_thay(current: dict, key: str, value) -> None:
+    """Ghi lại MỘT lần thấy của trường cấp thửa (Q4) — không đổi bản cấp thửa.
+
+    Consumer nhận đủ lần thấy để tự chọn/sửa khi nguồn ghi nhiều giá trị khác
+    nhau; bản cấp thửa giữ nguyên hành vi cũ của từng nhánh đọc.
+    """
+    text = str(value or "").strip()
+    if not text or key not in _THUA_MULTI_KEYS:
+        return
+    values = current.setdefault(f"{key}_values", [])
+    if text not in values:
+        values.append(text)
 
 
 def _is_pure_number_cell(value: str) -> bool:
@@ -1482,6 +1894,7 @@ def _nuot_o_chu_thua(data: list[str], pos: int, current: dict) -> int:
             # so dien tich nho ("119", "299") la thua/chi tiet tiep theo.
             if not current["thoi_han_su_dung"] and _la_o_thoi_han(cell):
                 current["thoi_han_su_dung"] = cell
+                _ghi_lan_thay(current, "thoi_han_su_dung", cell)
                 pos += 1
             break
         head_txt, note_txt = _tach_nay_la(cell)
@@ -1491,6 +1904,7 @@ def _nuot_o_chu_thua(data: list[str], pos: int, current: dict) -> int:
             current["muc_dich_su_dung"] = head_txt
         elif not current["thoi_han_su_dung"]:
             current["thoi_han_su_dung"] = head_txt
+            _ghi_lan_thay(current, "thoi_han_su_dung", head_txt)
         else:
             break
         pos += 1
@@ -1540,6 +1954,8 @@ def _tach_thua_cell_stream(cells: list[str], context: dict, parcels: list[dict])
         current["so_to_ban_do"] = _clean_so_to_ban_do(to_head)
         current["so_thua_dat"] = thua_head
         current["dien_tich"] = data[pos + 2]
+        for _key in ("so_to_ban_do", "so_thua_dat", "dien_tich"):
+            _ghi_lan_thay(current, _key, current[_key])
         _ghi_nay = "; ".join(n for n in (to_note, thua_note) if n)
         if _ghi_nay:
             current["phan_ghi_them"] = _ghi_nay
@@ -1582,6 +1998,8 @@ def _quet_cell_stream_thua(
             current["so_to_ban_do"] = _clean_so_to_ban_do(to_head)
             current["so_thua_dat"] = thua_head
             current["dien_tich"] = data[pos + 2]
+            for _key in ("so_to_ban_do", "so_thua_dat", "dien_tich"):
+                _ghi_lan_thay(current, _key, current[_key])
             _ghi_nay = "; ".join(n for n in (to_note, thua_note) if n)
             if _ghi_nay:
                 current["phan_ghi_them"] = _ghi_nay
@@ -1705,9 +2123,15 @@ def _so_thuc_dien_tich(value: str) -> float | None:
     Quy tac Owner 06/10/2026: "1.234,5"/"1234,5"/"1234.0" doc duoc; chi dau
     cham ("1.234") la mo ho -> None, giu nguyen van + co o tang khac.
     Khong parse duoc thi None (giu text goc o muc_dich/dien_tich raw).
+    Cung luat voi chuan hoa dich (`norm_number`): nhan dau `+` ("+50"), tu choi
+    ky hieu mu ("1e3") va so am — o dien tich la so khong am viet thap phan.
     """
-    match = re.match(r"\s*(\d+(?:[.,]\d+)*)", str(value or ""))
+    text = str(value or "")
+    match = re.match(r"\s*\+?(\d+(?:[.,]\d+)*)", text)
     if not match:
+        return None
+    if re.match(r"[eE][+-]?\d", text[match.end():]):
+        # "1e3"/"1E-3": ky hieu mu khong phai so dien tich (luat dich tu choi).
         return None
     cleaned = match.group(1)
     if "." in cleaned and "," in cleaned:
@@ -1724,6 +2148,15 @@ def _so_thuc_dien_tich(value: str) -> float | None:
         return float(cleaned)
     except ValueError:
         return None
+
+
+def dien_tich_thanh_so(value: str) -> float | None:
+    """Ô diện tích nguồn -> số theo luật Owner 06/10/2026 (`_so_thuc_dien_tich`).
+
+    Cửa công khai cho consumer đọc ô có đơn vị ("200,0m²" -> 200.0) mà KHÔNG
+    chép lại luật; `None` khi không đọc chắc được số (giữ nguyên văn + báo mơ hồ).
+    """
+    return _so_thuc_dien_tich(value)
 
 
 def thua_dat_sang_land_rows(parcel: dict) -> list[dict]:
@@ -1778,8 +2211,14 @@ def _append_trong_do_details(current: dict, line: str) -> None:
             })
 
 
-def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
-    """Tach khoi text tai san thanh list moi thua 1 dong (gop context GCN)."""
+def tach_danh_sach_thua_dat(tai_san: str, *, land_rows_as_details: bool = False) -> list[dict]:
+    """Tach khoi text tai san thanh list moi thua 1 dong (gop context GCN).
+
+    `land_rows_as_details=True` (nhóm `Tài sản thứ N:`): cụm có nhãn `Loại đất`/
+    `Mục đích sử dụng` và các dòng nối tiếp thuộc dòng đất, KHÔNG phải ô cấp
+    thửa (R5-2). Phân loại dùng chung với `_land_rows_of`; thửa/nhóm mới ngắt
+    cụm. Mặc định giữ nguyên hành vi cũ cho consumer đọc ô cấp thửa.
+    """
     block = unicodedata.normalize("NFC", str(tai_san or ""))
     if not block.strip():
         return []
@@ -1791,7 +2230,7 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
         rows = []
         for i, head in enumerate(item_heads):
             item = block[head.start():item_heads[i + 1].start() if i + 1 < len(item_heads) else len(block)]
-            item_rows = tach_danh_sach_thua_dat(item)
+            item_rows = tach_danh_sach_thua_dat(item, land_rows_as_details=land_rows_as_details)
             if shared['so_gcn'] and not _tach_ngu_canh_gcn(item)['so_gcn']:
                 for row in item_rows:
                     for key in ('so_gcn', 'so_gcn_raw', 'loai_gcn', 'so_vao_so', 'ngay_cap_gcn', 'co_quan_cap'):
@@ -1812,6 +2251,7 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
         ("dien_tich", r"Di\u1ec7n t\u00edch"),
         ("muc_dich_su_dung", r"M\u1ee5c \u0111\u00edch s\u1eed d\u1ee5ng"),
         ("thoi_han_su_dung", r"Th\u1eddi h\u1ea1n s\u1eed d\u1ee5ng"),
+        ("thoi_han_su_dung", r"Th\u1eddi h\u1ea1n(?=\s*:)"),
         ("nguon_goc", r"Ngu\u1ed3n g\u1ed1c(?:\s+s\u1eed d\u1ee5ng(?:\s+\u0111\u1ea5t)?)?"),
         ("dia_chi", r"\u0110\u1ecba ch\u1ec9(?:\s+th\u1eeda \u0111\u1ea5t)?"),
         ("phan_ghi_them", r"Ghi ch\u00fa|H\u00ecnh th\u1ee9c s\u1eed d\u1ee5ng"),
@@ -1840,7 +2280,11 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
             continue
         merged_lines.append(raw_line)
 
-    for raw_line in merged_lines:
+    classified_lines = (
+        _land_row_lines(merged_lines) if land_rows_as_details
+        else ((line, (), False, False) for line in merged_lines)
+    )
+    for raw_line, _, _, la_dong_dat in classified_lines:
         line = raw_line.strip()
         if not line:
             continue
@@ -1983,6 +2427,7 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
                         for key, value in row.items():
                             if value:
                                 current[key] = value
+                                _ghi_lan_thay(current, key, value)
                         parcels.append(current)
                     elif current is not None:
                         detail = {key: value for key, value in row.items() if value}
@@ -2051,6 +2496,8 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
                 current["dien_tich"] = shorts[2]
                 current["muc_dich_su_dung"] = shorts[3]
                 current["thoi_han_su_dung"] = shorts[4]
+                for _key in ("so_to_ban_do", "so_thua_dat", "dien_tich", "thoi_han_su_dung"):
+                    _ghi_lan_thay(current, _key, current[_key])
                 parcels.append(current)
             elif current is not None:
                 if len(cells) == 3:
@@ -2123,11 +2570,19 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
             continue
         hits.sort()
         values: dict[str, str] = {}
+        # Lần thấy THỨ HAI của cùng một ô trên CÙNG dòng: bản cấp thửa giữ lần
+        # thấy đầu (nguyên văn như cũ), nhưng metadata phải giữ ĐỦ ứng viên để
+        # consumer báo mơ hồ thật (R4-2, 16/10/2026) — thu trước khi giảm còn
+        # một giá trị.
+        values_extra: dict[str, list[str]] = {}
+        # Cụm đất gồm cả các dòng nối tiếp, theo cùng phân loại với
+        # `_land_rows_of`; không đưa giá trị dòng vào metadata cấp thửa.
+        cluster_row: dict[str, str] = {}
         thua_hit_pos = -1
         for pos, (start, end, field) in enumerate(hits):
             next_start = hits[pos + 1][0] if pos + 1 < len(hits) else len(line)
             value = _clean_asset_cell(line[end:next_start])
-            if not value or field in values:
+            if not value:
                 continue
             if field == "so_thua_dat" and thua_hit_pos < 0:
                 thua_hit_pos = start
@@ -2143,7 +2598,7 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
                 continue
             if field in ("so_to_ban_do", "so_thua_dat"):
                 _head, _note = _tach_nay_la(value)
-                if _note:
+                if _note and field not in values:
                     _cu = values.get("_nay_la", "")
                     values["_nay_la"] = (_cu + "; " + _note).lstrip("; ")
                 value = _head.rstrip(" :;").strip()
@@ -2177,7 +2632,48 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
                     # (cam ket tai san rieng, 13/10/2026).
                     values.setdefault("nguon_goc", value)
                     value = ""
+            # Hai loại đất / hai thời hạn trên CÙNG dòng (gcn-multi-parcel):
+            # giữ từng dòng chi tiết (spec §2.5, §4.4), KHÔNG gộp vào trường
+            # cấp thửa và không suy tổng từ chi tiết (MB5).
+            if field in ("muc_dich_su_dung", "thoi_han_su_dung"):
+                _target = current if current is not None else pending
+                if _target is not None:
+                    if field == "muc_dich_su_dung":
+                        _rows = _tach_dong_dat_nhieu_muc(value)
+                        if _rows:
+                            for _row in _rows:
+                                _target["chi_tiet_dien_tich"].append(dict(_row))
+                            continue
+                    else:
+                        _pairs = _tach_dong_thoi_han_nhieu_muc(value)
+                        if _pairs:
+                            for _ten, _ky in _pairs:
+                                _hit = next(
+                                    (row for row in _target["chi_tiet_dien_tich"]
+                                     if _fold_text(row.get("muc_dich_su_dung") or "") == _fold_text(_ten)),
+                                    None,
+                                )
+                                if _hit is not None:
+                                    _hit["thoi_han_su_dung"] = _ky
+                                else:
+                                    _target["chi_tiet_dien_tich"].append(
+                                        {"muc_dich_su_dung": _ten, "thoi_han_su_dung": _ky})
+                            continue
+            if la_dong_dat and field in ("muc_dich_su_dung", "dien_tich", "thoi_han_su_dung"):
+                # Cụm đất: giá trị thuộc DÒNG (consumer nhận qua `land_rows`),
+                # không ghi vào ô cấp thửa và không vào bộ mơ hồ phẳng.
+                cluster_row[field] = value
+                continue
+            if field in values:
+                # Cùng ô ghi lần thứ hai trên một dòng: giữ scalar là lần thấy
+                # ĐẦU (nguyên văn như cũ) và thu lần thứ hai vào metadata.
+                values_extra.setdefault(field, []).append(value)
+                continue
             values[field] = value
+        if cluster_row:
+            _target = current if current is not None else pending
+            if _target is not None and cluster_row not in _target["chi_tiet_dien_tich"]:
+                _target["chi_tiet_dien_tich"].append(dict(cluster_row))
         if not values:
             # Tieu de muc ("III. Người thừa kế", "IV. Nội dung phân
             # chia") — ngat trang thai de dong nhan muc sau khong dinh
@@ -2260,6 +2756,9 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
                     if not value:
                         continue
                     current[field] = thua_part if field == "so_thua_dat" else value
+                    _ghi_lan_thay(current, field, current[field])
+                    for extra in values_extra.get(field, ()):
+                        _ghi_lan_thay(current, field, extra)
                 if _nay_la:
                     current["phan_ghi_them"] = (current["phan_ghi_them"] + "; " + _nay_la).lstrip("; ")
                 parcels.append(current)
@@ -2286,6 +2785,9 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
                         current[field] = (current[field] + "; " + value).lstrip("; ")
                     else:
                         current[field] = value
+                        _ghi_lan_thay(current, field, value)
+                        for extra in values_extra.get(field, ()):
+                            _ghi_lan_thay(current, field, extra)
                 # Chi tiet viet lien ngay tren dong dien tich:
                 # "Dien tich: 265,0 m2; Trong do: ONT: 190,0 m2; NTS: 75,0 m2".
                 if "dien_tich" in values and "trong do" in folded:
@@ -2295,6 +2797,9 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
             for field, value in values.items():
                 if value:
                     current[field] = value
+                    _ghi_lan_thay(current, field, value)
+                    for extra in values_extra.get(field, ()):
+                        _ghi_lan_thay(current, field, extra)
             parcels.append(current)
         continue
 
@@ -2343,6 +2848,17 @@ def tach_danh_sach_thua_dat(tai_san: str) -> list[dict]:
                     giu = cu
                     break
         if giu is not None:
+            # Metadata "mọi lần thấy" phải HỢP NHẤT khi gộp thửa: bản lặp sau có
+            # thể ghi thời hạn/diện tích khác (nguồn sửa đổi) — bỏ bản sau sẽ
+            # mất ứng viên để consumer báo mơ hồ thật (R4-2, 16/10/2026).
+            # Scalar giữ nguyên bản ĐẦU như cũ.
+            for field, extra_values in parcel.items():
+                if not field.endswith("_values") or not isinstance(extra_values, list):
+                    continue
+                _target = giu.setdefault(field, [])
+                for extra_value in extra_values:
+                    if extra_value not in _target:
+                        _target.append(extra_value)
             for field in (
                 "so_to_ban_do", "dien_tich", "muc_dich_su_dung",
                 "thoi_han_su_dung", "nguon_goc", "dia_chi", "loai_gcn",
@@ -2662,6 +3178,24 @@ def _ngay_sinh_conflict(a: str, b: str) -> bool:
     return a_full and b_full
 
 
+_GIAY_TO_KHAC_RE = re.compile(
+    r"(?i)(?:C\u0103n c\u01b0\u1edbc(?:\s+c\u00f4ng\s*d\u00e2n)?(?:\s+s\u1ed1)?|CCCD|CMND|Ch\u1ee9ng minh nh\u00e2n d\u00e2n(?:\s+s\u1ed1)?|H\u1ed9 chi\u1ebfu(?:\s+s\u1ed1)?)"
+    r"\s*:?\s*(\d{6,12})"
+)
+
+
+def _cac_giay_to_khac(chunk: str, chinh: str) -> list[str]:
+    """Giay to KHAC cua cung mot nguoi trong chunk (nguon in 2 lan / 2 loai
+    giay to). Tra ve nguyen van de consumer bao mo ho va giu bang chung,
+    KHONG tu chon — luat chon thuoc nguoi kiem tra."""
+    values: list[str] = []
+    for match in _GIAY_TO_KHAC_RE.finditer(str(chunk or "")):
+        value = re.sub(r"\s+", "", match.group(1))
+        if value and value != chinh and value not in values:
+            values.append(value)
+    return values
+
+
 def _extract_plain_text_person_entries(section: str) -> list[dict]:
     section = unicodedata.normalize("NFC", str(section or ""))
     section = re.sub(r"(?:[ \t]*\|[ \t]*)+(?=(?:Đại diện|Dai dien|Người đại diện)\s*:)", "\n", section, flags=re.I)
@@ -2699,7 +3233,12 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         r"(?:ng\u01b0\u1eddi\s+(?:v\u1ee3|ch\u1ed3ng)\s+)?(?:v\u00e0\s+)?(?P<title>\u00f4ng/b\u00e0|ong/ba|\u00f4ng\s*\(b\u00e0\)|b\u00e0\s*\(\u00f4ng\)|\u00f4ng|ong|b\u00e0|ba|anh|ch\u1ecb|chi)\s*:?\s*"
         r"(?P<name>.+?)(?=[\s|]+\s*(?:[\-\u2013]\s*)?(?:Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|sinh n\u0103m|sinh ng\u00e0y)\s*[:\u2013-]?\s*(?:(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})|\s+(?:[\-\u2013]\s*)?(?:Ch\u1ee9c v\u1ee5|Chuc vu|Ch\u1ee9c danh|Chuc danh)\s*:|\s+c\u00f3\s+(?:(?:m\u1eb9|b\u1ed1|cha|con|v\u1ee3|ch\u1ed3ng)(?:\s+(?:\u0111\u1ebb|ru\u1ed9t|nu\u00f4i))?|\d)\b|\s*\(\s*(?:Sinh|Ng\u00e0y)|[;]|$)"
     )
-    birth_re = re.compile(r"(?i)(?:Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Ng\u00e0y/th\u00e1ng/n\u0103m\s+sinh|Sinh)\s*[:\u2013-]?\s*(\d{1,2}/\d{1,2}/\d{4})")
+    # Ngay sinh: DD/MM/YYYY hoac ISO YYYY-MM-DD (nguon Word nhap kieu ISO
+    # van giu nguyen van; Document Intake chuan hoa tiep).
+    birth_re = re.compile(
+        r"(?i)(?:Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Ng\u00e0y/th\u00e1ng/n\u0103m\s+sinh|Sinh)\s*[:\u2013-]?\s*"
+        r"(\d{1,2}/\d{1,2}/\d{4}|\d{4}-\d{1,2}-\d{1,2})"
+    )
     # Nguoi lon tuoi thuong chi ghi "Sinh nam 1965" — database chap nhan YYYY
     # (docs/spec/notary_v2/stage.md muc 5) nen giu nam lam ngay_sinh.
     # Gia tri chi co nam van nhan du nhan viet "Sinh ngay: 1982" (loi mau thuc te).
@@ -2741,6 +3280,22 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
         r"(?i)^\s*(?:Tôi (?:tên )?là|Tên tôi(?:\s+là)?|Tôi\s+(?:Ông|Bà))\s*[:–\-]?\s*(?P<name>[^;|\-\u2013\n]+?)"
         r"(?:\s*[-\u2013]\s*[^\n;|]{0,60}?)?(?:\s*[;|]|\s+)[\s|]*"
         r"(?:Sinh ngày|Ngày sinh|Sinh ngay|Ngay sinh|Sinh năm|Năm sinh|Sinh nam|Nam sinh)"
+    )
+    # Ten tran khong danh xung nhung ngay sau ten co bang chung nguoi
+    # (", sinh ngày/năm ...") — nguon bo danh xung "Bà:" sau nhan vai tro
+    # (review f48a762) hoac ten tran trong khoi Ben A/Ben B: van la nguoi,
+    # gioi tinh de trong (khong bia).
+    bare_entry_re = re.compile(
+        r"(?i)^\s*(?:[-\u2013\u2014\u2022]\s*)?(?:\[\d+\]\s*)?"
+        r"(?P<name>[A-Z\u00c0-\u1ef9\u0110][^\d;:\n]{2,60}?)\s*,\s*"
+        r"(?:Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh)"
+    )
+    # Cau van mo ta nguoi khac ("Theo uỷ quyền của ông X, sinh ngày...") co
+    # cung hinh dang "ten, sinh" — loai bang tu dan cau/danh xung.
+    bare_entry_stop_re = re.compile(
+        r"(?i)\b(?:theo|u\u1ef7\s+quy\u1ec1n|uy quyen|c\u1ee7a|cua|t\u1ea1i|tai|v\u1ec1|ve|g\u1ed3m|gom|"
+        r"n\u1ed9i\s+dung|noi dung|\u0111i\u1ec1u|dieu|kho\u1ea3n|khoan|c\u0103n\s+c\u1ee9|can cu|"
+        r"\u00f4ng|ong|b\u00e0|ba|anh|ch\u1ecb|chi|em|ch\u00e1u|chau|v\u1ee3|vo|ch\u1ed3ng|chong)\b"
     )
     # Don hanh chinh co nhan nguoi danh so: "1. Người xin gia hạn sử dụng
     # đất: Nguyễn Thị Chúc" — ten khong kem danh xung Ong/Ba va thuong khong
@@ -2962,6 +3517,18 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                             lead_fold = _fold_text(lead_name)
                             if lead_fold and not bare_name_noise_re.search(lead_fold):
                                 headers.append((idx, lead_match))
+                    else:
+                        entry_match = bare_entry_re.search(line)
+                        if entry_match:
+                            entry_name = str(entry_match.groupdict().get("name") or "").strip(" ;,.")
+                            if len(entry_name.split()) >= 2 and not re.search(r"\d", entry_name):
+                                entry_fold = _fold_text(entry_name)
+                                if (
+                                    entry_fold
+                                    and not bare_name_noise_re.search(entry_fold)
+                                    and not bare_entry_stop_re.search(entry_fold)
+                                ):
+                                    headers.append((idx, entry_match))
         # "Chức vụ: Ông Nguyễn Hữu Công" — nhan chuc vu di truoc danh
         # xung giua dong (bang thanh phan to dinh gia ngan hang).
         labeled_match = (
@@ -3181,6 +3748,9 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                 chunk_scan,
             )
         person["cccd"] = re.sub(r"\s+", "", id_match.group(1)) if id_match else ""
+        giay_to_khac = _cac_giay_to_khac(chunk_scan, person["cccd"])
+        if giay_to_khac:
+            person["cccd_khac"] = giay_to_khac
         issue_place_match = issue_place_re.search(chunk_scan)
         if not issue_place_match:
             cap_tai = re.search(
@@ -3204,6 +3774,12 @@ def _extract_plain_text_person_entries(section: str) -> list[dict]:
                 r"(?i)\bN\u01a1i\s+c\u1ea5p\s*[:;,]?\s*([^\n,;.]+?)(?=\s*[,;.]|\s*$)",
                 chunk_scan,
             )
+        if not issue_place_match:
+            # Form "CCCD: 0123456789do Bo Coongan cap;" — nguon go lien so
+            # va chu "do <co quan> cap" KHONG co "ngay" (giu nguyen van).
+            cap_match = re.search(r"(?i)do\s+([^\n,;]{2,120}?)\s+c\u1ea5p\b", chunk_scan)
+            if cap_match and not re.search(r"(?i)k[\u00fd\u00ed]\s+ng\u00e0y", cap_match.group(0)):
+                issue_place_match = cap_match
         person["noi_cap"] = re.sub(r"\s+", " ", issue_place_match.group(1)).strip(" ;,.") if issue_place_match else ""
         # Bo ngay cap HO CHIEU ("Hộ chiếu số: X do Y cấp ngày D") — khong
         # phai ngay cap CCCD (Hoàn — HĐCN cũ Thường Lan — 13/10/2026).
@@ -3766,6 +4342,31 @@ def _doi_ngay_excel(chunk: str) -> str:
         return ""
 
 
+def _cau_tu_moc(text: str) -> str:
+    """Phần text từ mốc đến KẾT CÂU thật (dấu chấm kết câu hoặc xuống dòng).
+
+    Dấu chấm viết tắt trong tên cơ quan ("UBND TP. Mẫu", "P. Mẫu", "TX. Mẫu")
+    không phải kết câu — cắt ở đó sẽ mất "do … cấp ngày …" hợp lệ của chính
+    chứng từ đang đọc. Dấu chấm sau số trích lục ("… số 95/2026/TLKT. Giấy
+    chứng nhận số …") LÀ kết câu, nên câu sau (GCN của thửa) không được mượn.
+    """
+    for index, char in enumerate(text):
+        if char == "\n":
+            return text[:index]
+        if char == ".":
+            token = re.search(r"([A-Za-z\u00c0-\u1ef9]{1,4})$", text[:index])
+            if token and _fold_text(token.group(1)) in _CAU_VIET_TAT:
+                continue
+            return text[:index]
+    return text
+
+
+# Viết tắt cơ quan thường gặp — dấu chấm theo sau không phải kết câu.
+_CAU_VIET_TAT = frozenset({
+    "tp", "tx", "tt", "p", "q", "h", "x", "kp", "ub", "ubnd", "vn",
+})
+
+
 def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
     """Trich NGUOI DA CHET (nguoi de lai di san) theo shape person_row
     (decision-46 06/10/2026): trich luc khai tu la giay to cua nguoi chet,
@@ -3957,16 +4558,29 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
         tail = source[match.start():tail_end]
         tlkt_no = ""
         tlkt_match = re.search(
-            r"(?i)Tr\u00edch l\u1ee5c khai t\u1eed[^\n]{0,60}?s\u1ed1:?\s*([A-Za-z0-9/.-]+)",
+            r"(?i)Tr\u00edch l\u1ee5c khai t\u1eed[^\n]{0,60}?s\u1ed1:?\s*"
+            # Số trích lục: `/`, `-`, chữ và dấu chấm BÊN TRONG ("95.2026/TLKT")
+            # đọc được, nhưng KHÔNG nuốt dấu chấm kết câu — dấu chấm cuối câu
+            # là ranh giới chứng từ, không phải phần số.
+            r"([A-Za-z0-9/-]+(?:\.[A-Za-z0-9/-]+)*)",
             tail,
         )
         if tlkt_match:
             tlkt_no = tlkt_match.group(1).strip(" ;,.")
         tlkt_by = ""
         tlkt_date = ""
+        # Chỉ nhận "do … cấp ngày …" trong CÙNG CÂU với "Trích lục khai tử …
+        # số …": F4/F9 không ghi ngày/nơi cấp cho trích lục, câu sau là GCN của
+        # thửa — không mượn (spec §2.6 không lấy ngày ký văn bản khác; §2.3
+        # giấy tờ của chính người chết). F6 có thật trong câu nên vẫn nhận.
+        # Ranh câu tính từ mốc trích lục theo kết câu THẬT (bỏ qua viết tắt
+        # cơ quan như "UBND TP."), không cắt ngay sau match.
+        tlkt_scope = tail
+        if tlkt_match:
+            tlkt_scope = _cau_tu_moc(tail[tlkt_match.end():])
         tlkt_by_match = re.search(
             r"(?i)\bdo\s+([^\n]+?)\s+(?:k\u00fd|c\u1ea5p)\s+ng\u00e0y:?\s*(\d{1,2}/\d{1,2}/\d{4})",
-            tail,
+            tlkt_scope,
         )
         if tlkt_by_match:
             tlkt_by = re.sub(r"\s+", " ", tlkt_by_match.group(1)).strip(" ;,.")
@@ -4165,7 +4779,7 @@ def _phat_hien_tai_san_chua_ho_tro(text: str) -> list[str]:
     return found
 
 
-def _build_payload_generic(filepath, text: str, scan_result: dict, *, extract_mode: str) -> dict:
+def build_payload(file_goc: str, text: str, scan_result: dict, *, extract_mode: str) -> dict:
     doc_kind, ten_hd = _detect_document_kind_and_title(text)
     ben_a, ben_b = _extract_parties_generic(text, doc_kind)
     nguoi_chet = _extract_nguoi_chet(text, doc_kind)
@@ -4250,8 +4864,8 @@ def _build_payload_generic(filepath, text: str, scan_result: dict, *, extract_mo
         "duong_su": _fmt_duong_su_by_kind(doc_kind, ben_a, ben_b),
         "tai_san": tai_san,
     }
-    file_goc = os.path.abspath(filepath)
-    missing_fields = get_missing_web_form_fields(web_form, file_hop_dong=file_goc)
+    file_goc_label = os.path.abspath(file_goc) if file_goc else ""
+    missing_fields = get_missing_web_form_fields(web_form, file_hop_dong=file_goc_label)
     return {
         "web_form": web_form,
         "raw": {
@@ -4263,16 +4877,19 @@ def _build_payload_generic(filepath, text: str, scan_result: dict, *, extract_mo
             "nguoi_chet": nguoi_chet,
             # Mau template: gia tri «merge_field» khong phai du lieu —
             # bo thua chi chua placeholder (cam ket DH 090202 — 13/10/2026).
-            "danh_sach_thua_dat": [
-                p for p in tach_danh_sach_thua_dat(tai_san)
-                if not all(
-                    not str(p.get(f) or "").strip()
-                    or "«" in str(p.get(f) or "")
-                    or str(p.get(f) or "").strip().startswith("[")
-                    for f in ("so_thua_dat", "so_to_ban_do", "dia_chi")
-                )
-            ],
-            "file_goc": file_goc,
+            "danh_sach_thua_dat": _bo_sung_loai_gcn_document(
+                [
+                    p for p in tach_danh_sach_thua_dat(tai_san)
+                    if not all(
+                        not str(p.get(f) or "").strip()
+                        or "«" in str(p.get(f) or "")
+                        or str(p.get(f) or "").strip().startswith("[")
+                        for f in ("so_thua_dat", "so_to_ban_do", "dia_chi")
+                    )
+                ],
+                text,
+            ),
+            "file_goc": file_goc_label,
             "scan_contract_no": scan_result.get("contract_no", ""),
             "scan_reason": scan_result.get("reason", ""),
             "document_kind": doc_kind,
@@ -4285,47 +4902,29 @@ def _build_payload_generic(filepath, text: str, scan_result: dict, *, extract_mo
     }
 
 # ============================================================
-# HAM CHINH
+# HAM CHINH (chi nhan TEXT — doc file do adapter consumer lam)
 # ============================================================
-def extract(filepath, *, scan_result: dict | None = None, preloaded_text: str | None = None):
-    path = Path(filepath)
-    use_ifilter_for_doc = path.suffix.lower() == ".doc"
+def extract_text(
+    text: str,
+    *,
+    file_goc: str = "",
+    file_name: str = "",
+    scan_result: dict | None = None,
+    extract_mode: str = "structured_docx",
+    use_ifilter_for_doc: bool = False,
+) -> dict:
+    """Boc mot van ban Word da co text -> payload {web_form, raw}.
 
-    text = preloaded_text
-    if text is None:
-        text = read_docx(path, use_ifilter_for_doc=use_ifilter_for_doc)
-        if use_ifilter_for_doc:
-            text = _normalize_plain_text_for_extract(text)
-
-    if scan_result is None:
-        scan_result = _scan_contract_text(text, file_name=path.name)
-
+    Adapter cua tung consumer chiu trach nhiem doc file (.docx/.doc) va
+    truyen text vao day; lõi nay khong doc file.
+    """
     if use_ifilter_for_doc:
-        return _build_payload_generic(path, text, scan_result, extract_mode="plain_text_doc")
-    return _build_payload_generic(path, text, scan_result, extract_mode="structured_docx")
-
-
-def main():
-    if len(sys.argv) < 2:
-        print("Cách dùng:")
-        print('  python extract_contract.py "hop_dong.docx"')
-        print('  python extract_contract.py "hop_dong.doc"')
-        sys.exit(1)
-
-    fp = sys.argv[1]
-    if not os.path.exists(fp):
-        print(f"Không tìm thấy file: {fp}")
-        sys.exit(1)
-
-    result = extract(fp)
-    output = json.dumps(result, ensure_ascii=False, indent=2)
-    print(output)
-
-    json_path = fp.rsplit(".", 1)[0] + "_extracted.json"
-    with open(json_path, "w", encoding="utf-8") as file_obj:
-        file_obj.write(output)
-    print(f"\n→ Đã lưu: {json_path}", file=sys.stderr)
-
-
-if __name__ == "__main__":
-    main()
+        text = _normalize_plain_text_for_extract(text)
+    # Nguồn Word có thể ở dạng NFD (hoặc hỗn hợp); luật viết trên NFC nên
+    # chuẩn hoá một lần ở cửa vào để không mất trường/tài sản vì dạng dấu.
+    # Consumer tự định vị span trên text GỐC (xem adapter Document Intake).
+    text = unicodedata.normalize("NFC", str(text or ""))
+    if scan_result is None:
+        scan_result = _scan_contract_text(text, file_name=file_name)
+    mode = "plain_text_doc" if use_ifilter_for_doc else extract_mode
+    return build_payload(file_goc, text, scan_result, extract_mode=mode)

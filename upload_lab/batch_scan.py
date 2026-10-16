@@ -12,9 +12,9 @@ from typing import Optional
 from uuid import uuid4
 
 try:
-    from extract_contract import extract, get_missing_web_form_fields, scan_docx_for_contract_no
+    from extraction_adapter import extract, get_missing_web_form_fields, scan_docx_for_contract_no
 except ImportError:  # pragma: no cover - fallback when imported as package
-    from .extract_contract import (
+    from .extraction_adapter import (
         extract,
         get_missing_web_form_fields,
         scan_docx_for_contract_no,

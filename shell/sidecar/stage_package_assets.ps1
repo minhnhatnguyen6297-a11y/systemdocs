@@ -27,7 +27,7 @@ if (Test-Path $engineStage) { Remove-Item -Recurse -Force $engineStage }
 
 $allow = @{
     "upload_lab" = @{
-        files = @("batch_scan.py", "extract_contract.py",
+        files = @("batch_scan.py", "extraction_adapter.py",
                   "playwright_uploader.py", "uploader_selectors.py",
                   "__init__.py")
         dirs  = @("providers", "upload_services")

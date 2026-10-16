@@ -110,7 +110,7 @@ class RegexLabTests(unittest.TestCase):
     def test_extract_change_is_seen_when_cache_is_invalidated(self):
         make_docx(self.input / "one.docx", *TRANSFER)
         regex_lab.approve_corpus(self.input, self.cache, self.golden, approve_all=True)
-        original = regex_lab.extract_contract.extract
+        original = regex_lab.extraction_adapter.extract
 
         def changed_extract(*args, **kwargs):
             payload = original(*args, **kwargs)
@@ -118,7 +118,7 @@ class RegexLabTests(unittest.TestCase):
             return payload
 
         with patch.object(regex_lab, "_extractor_fingerprint", return_value="new-code"), patch.object(
-            regex_lab.extract_contract, "extract", side_effect=changed_extract
+            regex_lab.extraction_adapter, "extract", side_effect=changed_extract
         ):
             changed = regex_lab.verify_corpus(self.input, self.cache, self.golden)
         self.assertEqual(changed["summary"]["CHANGED"], 1)

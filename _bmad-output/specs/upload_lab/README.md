@@ -258,4 +258,4 @@ IFilter khi Word đang mở và sự kiện ổ mạng phải được đo trên
 
 ## 6. Tra cứu
 
-Quy tắc bóc trường và cách kiểm tập trung tại [bóc tách](../shared/extraction-rules.md). Code tại `upload_lab/`, giao diện `shell/src/renderer/upload/`; contract giao tiếp `contracts/upload-workflow.md` còn Draft theo trạng thái của nó, không được nâng duyệt bởi lần gom này.
+Quy tắc bóc trường và cách kiểm tập trung tại [bóc tách](../shared/extraction-rules.md). Code tại `upload_lab/` (adapter `extraction_adapter.py` gọi lõi chung `tools/regex_workbench/engine/contract_extract.py`; bản chép `extract_contract.py` đã gỡ 16/10/2026), giao diện `shell/src/renderer/upload/`; contract giao tiếp `contracts/upload-workflow.md` còn Draft theo trạng thái của nó, không được nâng duyệt bởi lần gom này.

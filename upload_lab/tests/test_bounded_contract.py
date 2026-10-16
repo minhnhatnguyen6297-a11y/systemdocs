@@ -3,7 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 from docx import Document
-import extract_contract as engine
+from extraction_adapter import extract
+from regex_workbench.engine import contract_extract as engine
 
 
 class BoundedContractTests(unittest.TestCase):
@@ -19,7 +20,7 @@ class BoundedContractTests(unittest.TestCase):
                     for cell, value in zip(row.cells, cells):
                         cell.text = value
             doc.save(path)
-            return engine.extract(path)['raw']
+            return extract(path)['raw']
 
     def test_representative_shapes_keep_sides_and_addresses(self):
         for label in ['Đại diện: ông', 'Đại diện ông', ' | | Đại diện: ông']:

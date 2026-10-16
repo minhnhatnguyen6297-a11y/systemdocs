@@ -1,3 +1,0 @@
-# Engine `regex` cung cấp timeout= thật (TimeoutError ngay trong match) —
-# thay ThreadPoolExecutor vốn không ngắt được match re đang chạy.
-regex>=2024.11.6

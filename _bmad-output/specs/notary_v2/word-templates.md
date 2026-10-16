@@ -51,13 +51,19 @@ lồng; ô gộp không bị đọc hai lần. Text không bị strip trước k
 Mỗi vị trí là `[start,end)` theo ký tự Unicode, không theo byte. Chữ xuống
 dòng/ngắt/tab cũng có vị trí nhưng không được thay như chữ bình thường.
 
-Lõi regex chung `tools/regex_workbench/engine` sở hữu quy tắc có phiên bản;
-không sao chép regex sang adapter (Owner NAIA-4 02/10/2026, khẳng định lại
-06/10/2026). Lõi nhận input là file Word hoặc đoạn text thô dán vào; ngoài
-trích xuất còn dùng kết quả chia vùng để đề xuất placeholder cho mẫu Word
-chưa gắn template ở chức năng soạn hồ sơ (Owner 06/10/2026). Profile
-`transfer` 1.1.3 chia người trong
-vùng đương sự và tài sản có nhãn `Tài sản [thứ] N:`; serial đọc nguyên văn
+Lõi luật chung `tools/regex_workbench/engine/contract_extract.py` sở hữu quy
+tắc có phiên bản (identity `contract_word` + `ENGINE_VERSION`); không sao chép
+regex sang adapter (Owner NAIA-4 02/10/2026, khẳng định lại 06/10/2026). Từ
+cutover 16/10/2026 lõi này là **một đường luật duy nhất** cho văn bản Word:
+Document Intake gọi qua adapter
+`notary_v2/services/document_intake/adapters/docx.py` (dựng `source_refs`
+span/`rule_id`/identity lõi) và Word Upload/tool gọi qua adapter
+`upload_lab/extraction_adapter.py`; pipeline profile/zoning cũ đã gỡ cùng
+cutover. Lõi nhận input là văn bản của file Word
+(adapter đọc file) hoặc đoạn text thô; ngoài trích xuất, phần gợi ý điền mẫu
+Word chưa gắn template ở chức năng soạn hồ sơ dùng thẳng các field/span của
+gợi ý intake (Owner 06/10/2026). Người được chia theo vùng đương sự; tài sản có
+nhãn `Tài sản [thứ] N:` mở một nhóm tài sản riêng; serial đọc nguyên văn
 theo nguồn (lệch chuẩn chỉ cảnh báo, giữ raw) và nhãn `Địa chỉ thửa đất:`
 điền địa chỉ thửa. Dòng `Loại đất:` mở một
 cụm đất riêng. Một GCN có nhiều cụm vẫn là một tài sản. Đây là phạm vi mẫu đã
@@ -70,7 +76,11 @@ Không có ranh giới chắc thì giữ `ambiguous_group`; nhiều giá trị g
 thấy và `normalized_value=null`. Phải chọn/sửa trường mơ hồ trước khi nhận.
 Serial là chuỗi nguyên văn tùy nguồn — không ép format, có thể trống,
 có thể trùng giữa thửa (Owner 06/10/2026, `entities.md` §2). Trùng giấy
-tờ/serial chỉ cảnh báo, không gộp. Không suy giới tính, vai trò, quan hệ
+tờ/serial chỉ cảnh báo, không gộp. Khối sổ tiết kiệm/quyền lợi bảo hiểm/xe
+chỉ được nhận diện (lõi giữ trong `raw.tai_san_chua_ho_tro`), không bóc dòng;
+khi văn bản vẫn còn người/tài sản để lập gợi ý thì gợi ý tài sản mang thêm
+cảnh báo `intake.unsupported_asset` để người kiểm tra biết phần chưa hỗ trợ.
+Không suy giới tính, vai trò, quan hệ
 hoặc sở hữu từ lời hợp đồng. Lời chứng ngoài vùng đương sự giữ nguyên,
 không tự thành người mới và không dùng để đối chiếu/đếm lại đương sự
 (TASK-5). Người chết là một `person_row` có `ngay_chet`; giấy tờ của họ

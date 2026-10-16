@@ -1,6 +1,10 @@
+"""Nạp đường dẫn cho test của lõi luật chung."""
+
+from __future__ import annotations
+
 import sys
 from pathlib import Path
 
-WORKBENCH_ROOT = Path(__file__).resolve().parents[1]
-if str(WORKBENCH_ROOT) not in sys.path:
-    sys.path.insert(0, str(WORKBENCH_ROOT))
+_TOOLS_DIR = Path(__file__).resolve().parents[2]
+if str(_TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(_TOOLS_DIR))

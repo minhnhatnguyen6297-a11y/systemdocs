@@ -28,7 +28,7 @@ Cập nhật: 03/10/2026 — Owner xác nhận lấy hành vi cuối MIN-141 khi
 | Repo | Cách nhận | Ghi chú |
 |---|---|---|
 | `notary_v2` | `(?<!\d)(\d{12})(?!\d)` — mọi cụm 12 số (`routers/ocr_ai.py`) | Rộng nhất, vì OCR ảnh hay mất chữ đầu |
-| `upload_lab` | Neo theo nhãn: `(?:Căn cước\|CCCD\|CMND)\s*(?:số)?\s*:?\s*(\d+)` (`extract_contract.py`) | Chặt theo ngữ cảnh vì text Word có sẵn nhãn |
+| `upload_lab` | Neo theo nhãn: `(?:Căn cước\|CCCD\|CMND)\s*(?:số)?\s*:?\s*(\d+)` (lõi chung `tools/regex_workbench/engine/contract_extract.py`, gọi qua adapter Upload) | Chặt theo ngữ cảnh vì text Word có sẵn nhãn |
 | `notaryoffice` (dự kiến) | `\b\d{12}\b` (`_bmad-output/specs/notaryoffice/intent-source.md` v1.0 §7.2) | Đã bỏ ràng buộc số 0 đầu; chưa có implementation |
 
 **Quy tắc thống nhất:** dù regex nào, giá trị đem đi so khớp phải là đúng 12 chữ
@@ -88,7 +88,7 @@ số. Không so khớp một phần, không so khớp 9 số cuối.
 ## 5. Số công chứng
 
 - **Canonical:** `xxx/yyyy` — số thứ tự / năm 4 chữ số. Bỏ mọi hậu tố nghiệp vụ.
-- Ví dụ chuẩn hóa (theo `upload_lab/extract_contract.py`
+- Ví dụ chuẩn hóa (theo lõi chung `tools/regex_workbench/engine/contract_extract.py`
   `_normalize_web_contract_no`):
 
   | Raw | Canonical |

@@ -1,6 +1,6 @@
 # Bóc tách dữ liệu — Word, quy tắc trường và kiểm chứng
 
-**Cập nhật:** 15/10/2026. Tập trung quy tắc để không phải ghép nhiều file. Word Upload đang có engine extract_contract; Document Intake dùng tools/regex_workbench/engine. Gom spec không chứng minh đã thống nhất code hoặc cho phép sao chép luật giữa hai bên.
+**Cập nhật:** 16/10/2026. Tập trung quy tắc để không phải ghép nhiều file. **Một đường luật duy nhất** cho văn bản Word: `tools/regex_workbench/engine/contract_extract.py` (`extract_text` + các hàm nhóm/thửa, identity `contract_word` + `ENGINE_VERSION`). Document Intake, Word Upload và tool nhân viên đều gọi vào đó qua adapter của mình — adapter chỉ giữ đọc file + ánh xạ payload, không chép luật: `upload_lab/extraction_adapter.py` (Upload/tool) và `notary_v2/services/document_intake/adapters/docx.py` (Document Intake, dựng `source_refs` span/`rule_id`/identity lõi). Pipeline profile/zoning cũ đã gỡ cùng cutover 16/10/2026; bản chép `extract_contract.py` trong repo và trong tool cũng đã gỡ — bản tool đóng gói lõi qua script release. Gom spec không chứng minh đã thống nhất code hoặc cho phép sao chép luật giữa các bên.
 
 ## 1. Nguyên tắc
 
@@ -386,8 +386,7 @@ R03/R13 kiểm ở payload đầy đủ bằng validator, không đoán cờ t�
 
 Các ca đất C03–C05 có câu mở vùng tài sản trong đầu vào Word; kiểm danh sách
 thửa từ `extract(filepath)` nguyên trạng, không thay bằng kết quả hàm phụ.
-Fixture thực thi tại [Upload Lab](../../../upload_lab/tests/fixtures/word_field_cases.json)
-và bản snapshot [tool nhân viên](../../../regex-test-tool/tool/tests/fixtures/word_field_cases.json).
+Fixture thực thi tại [Upload Lab](../../../upload_lab/tests/fixtures/word_field_cases.json) (nguồn duy nhất; bản snapshot trong tool đã gỡ 16/10/2026 — tool assemble từ repo, không chép tay).
 
 Các biến thể giữ cùng quy tắc và được kiểm riêng:
 
@@ -421,7 +420,13 @@ Kiểm đúng 4 người và từng trường tên/giới tính/sinh/căn cướ
 
 1. Closed: mọi trường kê trong ca đã kiểm bằng hàm thật; số người/thửa đúng, không bỏ chi tiết.
 2. Pending và trường chưa trả lời được báo riêng, không cộng vào số đạt.
-3. Bỏ một hỗ trợ trong code phải khiến phép kiểm tương ứng thất bại; hai engine có cùng đáp án.
+3. Bỏ một hỗ trợ trong code phải khiến phép kiểm tương ứng thất bại. Tiêu chí
+   nghiệm thu là **test của lõi chung đối chiếu đáp án độc lập** (Closed C01–C12
+   và ca mới có nhãn ghi rõ nguồn, tự soạn theo catalog trước khi xem output);
+   bằng chứng lịch sử before/after của cutover 16/10/2026 (corpus nhãn tự soạn,
+   duy nhất ca DOCX tổng hợp được lợi) nằm ở backlog/decision #22 và
+   `_bmad-output/tmp/issue-22-regex-consumer-cutover/evidence/` — **không thay
+   tiêu chí chung** và không được đọc thành "đã chứng minh mọi ca".
 4. Có ít nhất một lượt đọc Word thật qua đường đọc đang dùng, không chỉ truyền text.
 5. Không gọi approve/ghi Golden mới cho các mục chưa được owner duyệt.
 
@@ -457,7 +462,7 @@ mẫu thật → agent đọc MÙ source → viết đáp án expected.json (ch�
 6. Golden đổi kết quả ≠ tự động tách phiên bản rule: trước hết xác
    định đáp án cũ sai, code cũ sai, hay biểu mẫu thật sự khác.
 
-#### Lệnh của vòng (engine hiện hành `upload_lab`)
+#### Lệnh của vòng (engine hiện hành: lõi chung; adapter `upload_lab/extraction_adapter.py`)
 
 ```bash
 ## quet hang loat + tong hop theo luat
@@ -492,7 +497,7 @@ không phải câu hỏi nghiệp vụ; không thêm role/permission mới. Ghi 
 
 ## 8. Tool nhân viên và thêm loại mới
 
-Mở file/thư mục không cần phân loại trước; lỗi một file không dừng cả lượt. Chuột phải copy ô ngay, nút cuối dòng copy cả dòng; log JSONL là bản giao có phiên bản engine. PII chỉ ở máy nội bộ và gói người dùng chủ động gửi, không ghi log rộng. Bản tool snapshot chỉ áp đường engine cũ; khi chuyển sang lõi chung thì gọi trực tiếp, không chép tay.
+Mở file/thư mục không cần phân loại trước; lỗi một file không dừng cả lượt. Chuột phải copy ô ngay, nút cuối dòng copy cả dòng; log JSONL là bản giao có phiên bản engine. PII chỉ ở máy nội bộ và gói người dùng chủ động gửi, không ghi log rộng. Bản tool gọi trực tiếp lõi chung qua adapter (chuyển 16/10/2026); không chép tay engine/validator.
 
 Thêm loại văn bản cần mẫu thật, nhãn/vùng và đầu ra đã chốt; cập nhật nhận diện, parser, phép so từng trường và kiểm qua extract thật. Không dùng đáp án máy sinh làm chuẩn. Mục pending không gọi approve hoặc ghi Golden mới. Test/validator không thay việc đọc nguồn.
 
