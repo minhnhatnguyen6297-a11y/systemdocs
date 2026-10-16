@@ -475,6 +475,21 @@ python tools/regex_lab.py verify --input "D:\thu-muc-mau" --cache .cache/rl --go
 python tools/regex_lab.py approve --cluster <id>   # chi khi owner da duyet ket qua moi
 ```
 
+### 7.2. Rule do developer quản lý (owner 16/10/2026)
+
+Rule regex văn bản và rule upload theo từng website thuộc phạm vi developer;
+rule có phân biệt phiên bản để nhận biết. Owner chốt 16/10/2026: "đây là phân
+biệt dành cho developers, có phân biệt phiên bản để nhận biết. Users không
+được dùng tính năng này."
+
+Người dùng sản phẩm không có chức năng thử, công bố, chọn phiên bản hoặc
+quay lui rule. Người dùng vẫn xem và sửa kết quả bóc tách trước khi nhận vào
+Stage như quy tắc hiện hành; phần bị loại là quản lý rule, không phải duyệt
+kết quả. Nơi lưu rule, định dạng, ghi nhận version/hash, kích hoạt/quay lui
+nội bộ và phạm vi chạy lại là lựa chọn kỹ thuật của developer khi triển khai,
+không phải câu hỏi nghiệp vụ; không thêm role/permission mới. Ghi canonical:
+[decision-owner-regex-rule-developer-only-20261016](../../decisions/decision-owner-regex-rule-developer-only-20261016.md).
+
 ## 8. Tool nhân viên và thêm loại mới
 
 Mở file/thư mục không cần phân loại trước; lỗi một file không dừng cả lượt. Chuột phải copy ô ngay, nút cuối dòng copy cả dòng; log JSONL là bản giao có phiên bản engine. PII chỉ ở máy nội bộ và gói người dùng chủ động gửi, không ghi log rộng. Bản tool snapshot chỉ áp đường engine cũ; khi chuyển sang lõi chung thì gọi trực tiếp, không chép tay.

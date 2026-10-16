@@ -44,10 +44,15 @@ risk: high
 - tracking — _bmad-output/backlog/README.md, C22
 - source — _bmad-output/specs/shared/extraction-rules.md, §1, §5–§8
 - source — _bmad-output/tmp/notary-flow-remediation/assessment-plan.md, §2 proposed lifecycle
+- source — _bmad-output/decisions/decision-owner-regex-rule-developer-only-20261016.md, §Quyết định
 
 ## Notes
 
-- Tracking: C22; draft/chưa refined, chưa duyệt bắt đầu. #1 chỉ tracking, không chạy cùng leaf.
+- Tracking: C22; **superseded 2026-10-16** theo quyết định owner (rule do developer quản lý; người dùng không dùng tính năng). #1 chỉ tracking, không chạy cùng leaf.
 - Risk: high — Công bố/cache/rerun sai có thể ghi đè dữ liệu đã xác nhận hoặc đổi binding sang bằng chứng khác.
-- Unknown: cần đáp án lifecycle #8 được nhận và capability #22 đã giao trước refinement implementation. Điểm vào code: dialog/model intake, publication profile, package/cache identity. Không tự refresh Stage đã duyệt.
+- Superseded: mục tiêu thử/công bố/chọn phiên bản/chạy lại-duyệt trong flow người dùng bị loại; leaf giữ lịch sử, không triển khai. Điểm vào code cũ (dialog/model intake, publication profile, package/cache identity) không còn là việc chờ. Luồng người dùng xem/sửa kết quả bóc tách trước khi nhận vào Stage giữ nguyên; không tự refresh Stage đã duyệt.
 - Independent check: reviewer không phải người thực hiện đối chiếu riêng quyết định/kết quả với nguồn và dữ liệu/đầu ra liên quan, ghi nhận ngoài bằng chứng tự kiểm của issue.
+
+## Tracking update — 16/10/2026
+
+**Superseded:** quyết định owner [rule regex văn bản và rule upload theo website do developer quản lý](../decisions/decision-owner-regex-rule-developer-only-20261016.md) loại mục tiêu đưa thử/công bố/chọn phiên bản/chạy lại-duyệt vào flow người dùng. Nội dung, acceptance và gate cũ được giữ làm lịch sử, không còn là yêu cầu hiện hành; leaf không triển khai. Luồng người dùng xem/sửa kết quả bóc tách trước khi nhận vào Stage không thuộc phạm vi bị loại.

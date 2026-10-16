@@ -151,6 +151,11 @@ Bảng hồ sơ dùng đúng **sáu cột** (chuẩn MIN-77):
 - `website_id` không đăng ký bị từ chối (`unknown_website`); không quay về
   Nam Định ngầm. Website thứ hai chỉ được bật khi có bộ xử lý và mẫu file
   thật; không cần thay cấu trúc hai tab.
+- Bộ xử lý/rule upload theo từng website thuộc phạm vi developer, có phân biệt
+  phiên bản để nhận biết (owner 16/10/2026 —
+  [decision](../../decisions/decision-owner-regex-rule-developer-only-20261016.md));
+  người dùng sản phẩm không có chức năng thử, công bố, chọn phiên bản hoặc
+  quay lui rule.
 
 ### 2.5. Quy tắc hiển thị chung
 

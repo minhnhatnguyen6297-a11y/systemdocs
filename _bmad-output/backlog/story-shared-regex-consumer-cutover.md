@@ -51,5 +51,5 @@ Hoàn tất hướng core chung đã duyệt cho consumer Notary, Upload và too
 - Tracking: C21; draft/chưa refined, chưa duyệt bắt đầu. #1 chỉ tracking, không chạy cùng leaf.
 - Risk: high — Chuyển consumer thiếu parity có thể mất người/thửa/trường đã hỗ trợ trên nhiều luồng.
 - Điểm vào code: tools/regex_workbench/engine, upload_lab/extract_contract.py, regex-test-tool/tool, adapter intake Notary và package staging. #7 có thể sửa trước. Issue này sở hữu parity/caller cutover, không sở hữu vòng đời editable rule #8/#23. Không thêm luật parsing/nhánh OCR.
-- Sequencing: chờ #7 để tuần tự hóa hai lượt sửa cùng core, không thêm gate nghiệp vụ và không làm #7 chờ full cutover. #23 vẫn chờ lifecycle #8 và capability #22.
+- Sequencing: chờ #7 để tuần tự hóa hai lượt sửa cùng core, không thêm gate nghiệp vụ và không làm #7 chờ full cutover. #23 đã superseded 16/10/2026 theo [quyết định owner](../decisions/decision-owner-regex-rule-developer-only-20261016.md) (rule do developer quản lý; người dùng không dùng tính năng); parity/cutover của issue này không đổi.
 - Independent check: reviewer không phải người thực hiện đối chiếu riêng quyết định/kết quả với nguồn và dữ liệu/đầu ra liên quan, ghi nhận ngoài bằng chứng tự kiểm của issue.

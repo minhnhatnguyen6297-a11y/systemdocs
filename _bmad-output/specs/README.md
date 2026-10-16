@@ -57,6 +57,7 @@ Electron là vỏ ứng dụng; Python/FastAPI xử lý nghiệp vụ. Module gi
 - Ngày nhập/hiển thị giữ đúng độ đầy đủ: năm riêng vẫn là năm. Ngày quy ước chỉ dùng trong tính toán, không ghi đè thành dữ kiện đã biết.
 - Máy hỗ trợ thao tác; người dùng kiểm tra và chịu trách nhiệm xác nhận. Không tự động hóa phán quyết pháp lý.
 - Thiết kế gọn, tối ưu xử lý; không tự thêm chức năng, cơ chế dự phòng hoặc bộ công cụ kiểm thử ngoài phạm vi được phép.
+- Rule regex văn bản và rule upload theo từng website do developer quản lý, có phân biệt phiên bản để nhận biết (owner 16/10/2026; [decision](../decisions/decision-owner-regex-rule-developer-only-20261016.md)); người dùng sản phẩm không có chức năng thử, công bố, chọn phiên bản hoặc quay lui rule.
 - Không ép chuyên viên đổi thói quen cần cho nghiệp vụ. Không quay màn hình, ghi phím hoặc chấm công bằng dấu vết hồ sơ.
 - Dữ liệu ở lại văn phòng; chỉ gọi dịch vụ ngoài tại điểm đã duyệt. Không ghi giấy tờ, raw OCR, cookie hoặc secret vào log rộng.
 - Quy ước sản phẩm phục vụ phần mềm không phải kết luận về pháp luật.

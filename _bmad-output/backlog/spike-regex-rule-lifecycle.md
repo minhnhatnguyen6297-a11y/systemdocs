@@ -36,11 +36,13 @@ Chốt vòng đời rule mà #23 cần để thử, công bố và chạy lại 
 - tracking — _bmad-output/backlog/README.md, C07
 - source — _bmad-output/specs/shared/extraction-rules.md, §1, §5–§8
 - source — _bmad-output/decisions/decision-75-regex-integration.md, §Decision
+- source — _bmad-output/decisions/decision-owner-regex-rule-developer-only-20261016.md, §Quyết định
 
 ## Notes
 
-- Tracking: C07; draft/chưa refined, chưa duyệt bắt đầu. #1 chỉ tracking, không chạy cùng leaf.
+- Tracking: C07; **answered 2026-10-16** (owner chốt phạm vi developer-only; không triển khai sản phẩm). #1 chỉ tracking, không chạy cùng leaf.
 - Risk: high — Công bố hoặc chạy lại sai có thể đổi kết quả của nhiều consumer và làm lệch bằng chứng đã duyệt.
-- Open question: Ai được công bố rule đã thử, nguồn rule có quyền ghi ở đâu, ghi nhận kích hoạt version/hash và rollback thế nào, duyệt khác biệt chạy lại ra sao mà không ghi đè Stage/binding đã xác nhận?
-- Ai chờ: #23; sửa field #7 và parity #22 không chờ. Nơi ghi đáp án: Notes issue này, spec/contract bóc tách và decision có ngày.
-- Independent check: reviewer không phải người thực hiện đối chiếu riêng quyết định/kết quả với nguồn và dữ liệu/đầu ra liên quan, ghi nhận ngoài bằng chứng tự kiểm của issue.
+- Answered (owner, 2026-10-16) — câu hỏi gốc "Ai được công bố rule đã thử, nguồn rule có quyền ghi ở đâu, ghi nhận kích hoạt version/hash và rollback thế nào, duyệt khác biệt chạy lại ra sao…": rule regex văn bản và rule upload theo website do developer quản lý, có phân biệt phiên bản để nhận biết; người dùng sản phẩm không dùng tính năng này. Người dùng vẫn xem/sửa kết quả bóc tách trước khi nhận vào Stage. Ghi canonical: [decision-owner-regex-rule-developer-only-20261016](../decisions/decision-owner-regex-rule-developer-only-20261016.md), `_bmad-output/specs/shared/extraction-rules.md` §7.2, `_bmad-output/specs/README.md` §6.
+- Còn lại là lựa chọn kỹ thuật của developer (nơi lưu/format/version-hash/kích hoạt-quay lui nội bộ/phạm vi chạy lại), không phải câu hỏi nghiệp vụ; không thêm role/permission.
+- Ai chờ: #23 đã superseded theo quyết định trên; sửa field #7 và parity #22 không chờ. Draft/Pending khác giữ trạng thái.
+- Independent check: reviewer không phải người thực hiện đối chiếu riêng quyết định/kết quả với nguồn và dữ liệu/đầu ra liên quan, ghi nhận ngoài bằng chứng tự kiểm của issue. 16/10/2026 (policy): reviewer `developer-rule-policy-review` phát hiện t1 về cách diễn đạt lịch sử đã được vá (banner #1 + Hệ quả decision); t2 CLEAN; các liên kết doc của đợt này đã được kiểm tra. Đây là ghi nhận tài liệu, không phải bằng chứng runtime.

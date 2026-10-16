@@ -14,7 +14,7 @@ severity: P2
 
 # Flow Soạn hồ sơ khó thao tác, khó kiểm tra regex và khó tìm mẫu Word
 
-> **Tracking-only — 15/10/2026:** yêu cầu mới của owner là gom thành nhiều issue và đề xuất thứ tự. [Catalog hiện hành](README.md) ánh xạ C01–C27 / #2–#28; #11 và #26 được giữ lịch sử ở trạng thái dropped, #28 là draft cutover; các ghi nhận phía dưới không là một lượt implementation song song. Không coi việc tách issue là đã sửa hoặc nghiệm thu hành vi. Quyết định: `_bmad-output/decisions/decision-issues-reconciliation-20261015.md` và `_bmad-output/decisions/decision-upload-web-sot-without-save-tracking.md`.
+> **Tracking-only — 15/10/2026:** yêu cầu mới của owner là gom thành nhiều issue và đề xuất thứ tự. [Catalog hiện hành](README.md) ánh xạ C01–C27 / #2–#28; #11 và #26 được giữ lịch sử ở trạng thái dropped, #28 là draft cutover; các ghi nhận phía dưới không là một lượt implementation song song. Không coi việc tách issue là đã sửa hoặc nghiệm thu hành vi. Quyết định: `_bmad-output/decisions/decision-issues-reconciliation-20261015.md` và `_bmad-output/decisions/decision-upload-web-sot-without-save-tracking.md`. 16/10/2026: rule regex văn bản và rule upload theo website do developer quản lý — AC10 dưới đây chỉ còn lịch sử; xem catalog C07/C22 và [decision](../decisions/decision-owner-regex-rule-developer-only-20261016.md). Các cách diễn đạt lịch sử về quy tắc — "sửa quy tắc dần khi test" (Description), "chỉnh quy tắc rồi chạy lại" (AC6) và "chỉnh được khi test" (Notes 13/10) — được hiểu là developer chỉnh/thử rule, không phải tính năng người dùng có UI; luồng người dùng thật vẫn dùng regex core chung và xem/sửa kết quả bóc tách trước khi nhận vào Stage.
 
 ## Description
 
