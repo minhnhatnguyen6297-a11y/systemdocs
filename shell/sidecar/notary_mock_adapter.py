@@ -1728,6 +1728,46 @@ def workspace_commit_stage(job, payload):
     })
 
 
+def workspace_convert_type(job, payload):
+    case = _case(payload)
+    _check_writable(case)
+    _check_base_revision(case, payload)
+    if set(payload) - {"case_id", "base_revision", "case_type", "document_type",
+                       "confirm_diagram_reset", "owner_row_id"}:
+        raise CommandError("validation_error", "payload có key ngoài schema")
+    target = payload.get("case_type")
+    docs = DOCUMENT_TYPES if target == CASE_TYPE_INHERITANCE else DOCUMENT_TYPES_TWO_PARTY
+    if (target not in CASE_TYPES or target == case["case_type"]
+            or payload.get("document_type") not in docs
+            or payload.get("confirm_diagram_reset") is not True):
+        raise CommandError("validation_error", "Phải chọn loại/văn bản mới và xác nhận")
+    owner = payload.get("owner_row_id")
+    if target == CASE_TYPE_TWO_PARTY and "owner_row_id" in payload:
+        raise CommandError("validation_error", "owner_row_id cấm với Hai bên")
+    if target == CASE_TYPE_INHERITANCE and owner not in _person_map(case):
+        raise CommandError("workspace_owner_required", "Phải chọn người từ Stage")
+    fresh = copy.deepcopy(case)
+    fresh["case_type"] = target
+    fresh["document_type"] = payload["document_type"]
+    fresh["revision"] += 1
+    if target == CASE_TYPE_INHERITANCE:
+        fresh["stage"]["owner_row_id"] = owner
+        nodes = [{"id": "owner", "personId": owner, "parentSlotIds": [],
+                  "spouseSlotId": None, "ownPositions": [], "receivePositions": [],
+                  "hidden": False, "deleted": False}]
+    else:
+        fresh["stage"].pop("owner_row_id", None)
+        nodes = _canonical_two_party([])
+    fresh["diagram"] = {"state": {"version": 3, "domain": target, "nodes": nodes},
+                        "render_model": None}
+    result = _result("workspace_convert_type", _workspace_data(payload["case_id"], fresh))
+    def apply():
+        case.clear()
+        case.update(fresh)
+        return result
+    return job.complete_atomic(apply)
+
+
 _WORKSPACE_UPDATE_META = ("ngay_lap_ho_so", "noi_niem_yet", "ghi_chu")
 
 

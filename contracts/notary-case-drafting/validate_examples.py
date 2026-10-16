@@ -53,6 +53,7 @@ COMMANDS = {
     "notary.workspace_create": "workspace_create",
     "notary.workspace_get": "workspace_get",
     "notary.workspace_update": "workspace_update",
+    "notary.workspace_convert_type": "workspace_convert_type",
     "notary.intake_analyze": "intake_analyze",
     "notary.workspace_commit_stage": "workspace_commit_stage",
     "notary.diagram_evaluate": "diagram_evaluate",
@@ -65,6 +66,7 @@ KINDS = set(COMMANDS.values())
 # §2.1a — case_id: bắt buộc / nháp được (absent ok, null lỗi) / cấm
 CASE_ID_REQUIRED = {
     "notary.workspace_get", "notary.workspace_update",
+    "notary.workspace_convert_type",
     "notary.workspace_commit_stage", "notary.diagram_save",
     "notary.word_export_options", "notary.word_export_batch",
 }
@@ -1051,7 +1053,7 @@ def check_result_data(kind, data, stage_ids, v, draft_v2=False, ctx=None):
         v.append(("validation_error",
                   f"schema_version={data.get('schema_version')!r}"))
     ct = _data_case_type(data, ctx) if draft_v2 else "inheritance"
-    if kind == "workspace_get" or kind == "workspace_create":
+    if kind in ("workspace_get", "workspace_create", "workspace_convert_type"):
         if kind == "workspace_create" \
                 and not isinstance(data.get("created"), bool):
             v.append(("validation_error",
@@ -1335,6 +1337,24 @@ def violations(doc):
                                       f"!= owner_row_id={oid!r}"))
         elif cmd == "notary.word_export_batch":
             check_word_batch_payload(payload, v)
+        elif cmd == "notary.workspace_convert_type":
+            check_base_revision(payload, ctx, v)
+            target = payload.get("case_type")
+            docs = DOCUMENT_TYPES if target == "inheritance" else DRAFT_TWO_PARTY_DOC_TYPES
+            if (set(payload) - {"case_id", "base_revision", "case_type",
+                                "document_type", "confirm_diagram_reset", "owner_row_id"}
+                    or target not in DRAFT_CASE_TYPES
+                    or target == ctx.get("case_type")
+                    or payload.get("document_type") not in docs
+                    or payload.get("confirm_diagram_reset") is not True):
+                v.append(("validation_error", "invalid conversion destination/confirmation"))
+            if target == "inheritance":
+                owner = payload.get("owner_row_id")
+                if not isinstance(owner, str) or not UUID4_RX.match(owner) or (
+                        stage_ids is not None and owner not in stage_ids):
+                    v.append(("workspace_owner_required", "conversion owner outside saved Stage"))
+            elif "owner_row_id" in payload:
+                v.append(("validation_error", "owner forbidden for two_party"))
         elif cmd == "notary.workspace_update":
             check_update_payload(payload, ctx, v)
         elif cmd == "notary.workspace_create":

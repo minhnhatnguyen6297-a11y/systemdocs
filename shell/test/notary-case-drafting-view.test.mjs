@@ -2013,3 +2013,29 @@ test('disposed Word origin cannot open full over reopened Word; disposed Copy no
     assert.ok(!newWord.textContent.includes('Copy thất bại'));
   } finally { delete globalThis.navigator; }
 });
+
+test('saved conversion requires explicit document and loss acknowledgement; cancel writes nothing', () => {
+  const {view,calls} = build(test,{draft:false});
+  findBtns(view.el,'Đổi loại')[0].onclick();
+  const select = collect(view.el,e=>e.tagName==='SELECT' && e.getAttribute('aria-label')==='Văn bản mới')[0];
+  const apply = findBtns(view.el,'Áp dụng')[0];
+  const check = collect(view.el,e=>e.tagName==='INPUT' && e.type==='checkbox').at(-1);
+  assert.equal(select.value,'');
+  assert.equal(apply.disabled,true);
+  select.value='tang_cho';select.onchange();
+  assert.equal(apply.disabled,true);
+  check.checked=true;check.onchange();
+  assert.equal(apply.disabled,false);
+  findBtns(view.el,'Hủy')[0].onclick();
+  assert.equal(calls.some(([c])=>c==='notary.workspace_convert_type'),false);
+});
+
+test('conversion dirty Stage explains existing save action without autosave or discard', () => {
+  const {view,model,calls} = build(test,{draft:false});
+  model.updatePersonField('c1','ho_ten','Chữ nháp cần giữ');
+  findBtns(view.el,'Đổi loại')[0].onclick();
+  assert.equal(findBtns(view.el,'Áp dụng').length,0);
+  assert.equal(model.state.stage.people[0].ho_ten,'Chữ nháp cần giữ');
+  assert.equal(model.state.stageDirty,true);
+  assert.equal(calls.some(([c])=>['notary.workspace_convert_type','notary.workspace_commit_stage'].includes(c)),false);
+});

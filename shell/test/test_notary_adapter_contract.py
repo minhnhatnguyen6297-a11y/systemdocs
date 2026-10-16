@@ -1700,3 +1700,35 @@ def test_diagram_evaluate_draft_outside_stage(adapter_db):
         notary_adapter.diagram_evaluate(_Job(), {
             "stage": stage, "diagram": {"state": state}})
     assert exc.value.code == "diagram_reference_outside_stage"
+
+
+def test_conversion_real_adapter_persists_and_publishes_terminal_success(adapter_db):
+    from jobstore import Job
+    case = _seed_word_ready_case(adapter_db)
+    before = notary_adapter.workspace_get(_Job(), {"case_id": case.id})["data"]
+    job = Job("conversion-adapter", "notary.workspace_convert_type")
+    result = notary_adapter.workspace_convert_type(job, {
+        "case_id": case.id, "base_revision": before["case"]["revision"],
+        "case_type": "two_party", "document_type": "tang_cho",
+        "confirm_diagram_reset": True})
+    assert result["data"]["stage"]["people"] == before["stage"]["people"]
+    assert result["data"]["stage"]["assets"] == before["stage"]["assets"]
+    assert result["data"]["case"]["case_type"] == "two_party"
+    assert job.snapshot()["status"] == "succeeded"
+    assert job.request_cancel() is False
+    reopened = notary_adapter.workspace_get(_Job(), {"case_id": case.id})["data"]
+    assert reopened == result["data"]
+
+
+def test_conversion_real_adapter_accepted_cancel_never_writes(adapter_db):
+    from jobstore import Job, CancelledByUser
+    case = _seed_word_ready_case(adapter_db)
+    before = notary_adapter.workspace_get(_Job(), {"case_id": case.id})["data"]
+    job = Job("conversion-canceled", "notary.workspace_convert_type")
+    assert job.request_cancel()
+    with pytest.raises(CancelledByUser):
+        notary_adapter.workspace_convert_type(job, {
+            "case_id": case.id, "base_revision": before["case"]["revision"],
+            "case_type": "two_party", "document_type": "tang_cho",
+            "confirm_diagram_reset": True})
+    assert notary_adapter.workspace_get(_Job(), {"case_id": case.id})["data"] == before

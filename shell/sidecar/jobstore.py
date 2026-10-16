@@ -113,6 +113,21 @@ class Job:
         self._notify()
         return True
 
+    def complete_atomic(self, action):
+        """Conversion-only fence: cancel before action, or publish success.
+
+        action must contain only the short local DB transaction and response
+        construction, never document I/O, exports or asynchronous work.
+        """
+        with self._lock:
+            self.check_cancel()
+            if self.status in TERMINAL:
+                raise CancelledByUser()
+            result = action()
+            self._finish_locked("succeeded", result=result)
+        self._notify()
+        return result
+
     def report_progress(self, done, total, label=""):
         with self._lock:
             if self.status in TERMINAL or self._cancel.is_set():

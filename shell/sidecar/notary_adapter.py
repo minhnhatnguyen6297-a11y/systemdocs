@@ -742,10 +742,38 @@ def workspace_commit_stage(job, payload):
         sess.close()
 
 
+def workspace_convert_type(job, payload):
+    """Dedicated atomic saved-case domain conversion."""
+    if not isinstance(payload, dict):
+        raise CommandError("validation_error", "payload phải là object")
+    extra = set(payload) - {
+        "case_id", "base_revision", "case_type", "document_type",
+        "confirm_diagram_reset", "owner_row_id",
+    }
+    if extra:
+        raise CommandError("validation_error", "payload có key ngoài schema")
+    cid = _int_id(_require(payload.get("case_id"), "case_id"), "case_id")
+    base = _int_id(_require(payload.get("base_revision"), "base_revision"), "base_revision")
+    conversion = {k: v for k, v in payload.items()
+                  if k not in ("case_id", "base_revision")}
+    sess = _db_session()
+    try:
+        def apply():
+            module = _workspace_module()
+            try:
+                data = module.CaseWorkspaceService(sess).convert_type(cid, base, conversion)
+            except module.WorkspaceError as err:
+                raise _workspace_command_error(err)
+            return _result("workspace_convert_type", data)
+        return job.complete_atomic(apply)
+    finally:
+        sess.close()
+
+
 def workspace_update(job, payload):
     """notary.workspace_update — cap nhat meta case da luu
     (ngay_lap_ho_so/noi_niem_yet/ghi_chu; §6.2). case_type/document_type
-    la dinh danh nghiep vu — khong doi sau create. base_revision bat
+    khong doi qua update (dung workspace_convert_type). base_revision bat
     buoc, conflict → workspace_conflict."""
     if not isinstance(payload, dict):
         payload = {}

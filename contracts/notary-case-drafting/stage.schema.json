@@ -13,7 +13,7 @@
         "case": {
           "type": "object",
           "additionalProperties": false,
-          "description": "đợt 3 (MIN-141) — OPTIONAL: metadata hồ sơ ghi cùng Stage trong một transaction; case_type/document_type gửi kèm phải khớp giá trị đã lưu (immutable). Server cũng chấp nhận key canonical liền không dấu: casetype/documenttype/ngaylaphoso/noiniemyet/nguoinhanuyquyen/nguoinhanuyquyenid/noidungviec/ghichu — mang cả hai spelling mà lệch → validation_error.",
+          "description": "OPTIONAL metadata cùng Stage trong một transaction; case_type/document_type gửi kèm phải khớp giá trị đã lưu (immutable qua commit). Chuyển loại chỉ qua workspace_convert_type §13.18. Server chấp nhận key canonical; hai spelling lệch → validation_error.",
           "properties": {
             "case_type": { "type": "string" },
             "document_type": { "enum": ["khai_nhan", "thoa_thuan", null] },

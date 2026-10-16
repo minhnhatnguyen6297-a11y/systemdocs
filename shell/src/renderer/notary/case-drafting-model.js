@@ -43,7 +43,7 @@ const NODE_BOOL_FIELDS = ['hidden', 'deleted'];
 const NODE_POSITION_FIELDS = ['ownPositions', 'receivePositions'];
 
 // Meta cho phep sua — khop payload.case §13.6 + đợt 3 (MIN-141).
-// case_type/document_type chi doi duoc tren NHAP (immutable sau create);
+// case_type/document_type đổi ở nháp hoặc dedicated convertCaseType;
 // 5 truong con lai sua duoc ca tren case that — ghi qua commit Stage
 // cung transaction (contract §6).
 const CASE_META_FIELDS = ['case_type', 'document_type', 'ngay_lap_ho_so',
@@ -55,7 +55,7 @@ const CASE_META_EDITABLE = ['ngay_lap_ho_so', 'noi_niem_yet', 'ghi_chu',
                             'nguoi_nhan_uy_quyen',
                             'nguoi_nhan_uy_quyen_id', 'noi_dung_viec'];
 // Meta cap nhat duoc tren case da luu qua notary.workspace_update (§6.2) —
-// case_type/document_type la dinh danh nghiep vu, khong doi sau create.
+// case_type/document_type chỉ đổi trên case đã lưu qua convertCaseType.
 const CASE_META_UPDATE_FIELDS = ['ngay_lap_ho_so', 'noi_niem_yet',
                                  'ghi_chu'];
 
@@ -683,7 +683,7 @@ function createModel(deps) {
   // Sua meta ho so. Tren nhap moi: du 8 truong (ghi qua
   // workspace_create.payload.case). Tren case da tao: chi
   // CASE_META_EDITABLE — ghi cung commit Stage trong mot transaction
-  // (đợt 3, contract §6); case_type/document_type immutable.
+  // (đợt 3, contract §6); chuyển loại saved dùng convertCaseType riêng.
   function updateCaseMeta(field, value) {
     if (!CASE_META_FIELDS.includes(field) || !canWrite()) return false;
     const draftOnly = field === 'case_type' || field === 'document_type';
@@ -791,6 +791,35 @@ function createModel(deps) {
     return r;
   }
 
+  async function convertCaseType(conversion) {
+    if (!canWrite() || state.caseId == null || state.busy ||
+        state.stageDirty || state.metaDirty || state.conflict || state.stale) {
+      return { ok: false, error: errObj('validation_error',
+        'Hãy Cập nhật Stage/thông tin hồ sơ và xử lý xung đột trước khi đổi loại.') };
+    }
+    const s = session;
+    state.busy = 'notary.workspace_convert_type';
+    emit();
+    let r;
+    try {
+      r = await client.run('notary.workspace_convert_type', {
+        case_id: state.caseId, base_revision: state.revision, ...conversion,
+      });
+    } catch (e) {
+      r = { ok: false, error: errObj('unknown', e.message || 'Không đổi được loại hồ sơ') };
+    }
+    if (s !== session) return r;
+    state.busy = null;
+    if (r.ok) {
+      applyWorkspace(r.data || {});
+      state.notice = 'Đã đổi loại hồ sơ';
+    } else {
+      applyWriteResult(r, 'workspace_convert_type');
+    }
+    emit();
+    return r;
+  }
+
   async function saveDraft() {
     if (!isDraft()) {
       return { ok: false, error: errObj('validation_error',
@@ -834,6 +863,7 @@ function createModel(deps) {
 
   function canWrite() {
     return (state.status === 'ready' || state.status === 'conflict') &&
+      state.busy !== 'notary.workspace_convert_type' &&
       !state.locked && !state.unsupported;
   }
 
@@ -1879,7 +1909,7 @@ function createModel(deps) {
     state, subscribe,
     addressContext, requestLookup, dismissLookupSlot, markLookupStale,
     openFullFromSlot, requestFull, closeFull,
-    openCase, newDraft, isDraft, saveDraft, updateCaseMeta, saveCaseMeta,
+    openCase, newDraft, isDraft, saveDraft, updateCaseMeta, saveCaseMeta, convertCaseType,
     loadUqCatalog, createUqCustomer, resolveUqName,
 
     canWrite, mockBanner, hasUnsaved, isStageEmpty,

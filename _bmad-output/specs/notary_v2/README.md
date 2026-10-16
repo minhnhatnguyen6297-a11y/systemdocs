@@ -14,6 +14,15 @@ Tên mong muốn là Danh sách hồ sơ. Người dùng xem danh sách, tìm/l�
 
 Chọn Thừa kế hoặc Hai bên khi tạo nháp. Loại không hỗ trợ hiện lý do và khóa thao tác không có khả năng, không tự chuyển sang Thừa kế. Tạo hồ sơ lần đầu chưa cần Diagram; intake/evaluate nháp không ghi database. Đổi loại của hồ sơ **đã lưu** chỉ qua đường chuyển loại đã duyệt (`inheritance` ↔ `two_party`): giữ ID + giá trị Người/Tài sản của Stage, reset Diagram theo domain mới (Thừa kế: seed **chỉ** node `owner` mới chọn — không seed khung 7 slot mặc định, không giữ quan hệ/dấu cũ, nhưng vẫn **đủ key bắt buộc** với `parentSlotIds`/`ownPositions`/`receivePositions` rỗng, `spouseSlotId:null`; Hai bên: 30 slot trống), buộc chọn `document_type` hợp lệ của loại mới và xác nhận phần Diagram mất trước khi ghi; chuyển vào Thừa kế cần `owner_row_id` từ Stage, vào Hai bên cấm trường đó. Không suy việc chọn loại lúc tạo nháp thành quyền tự đổi domain; `case_type`/`document_type` vẫn bất biến ngoài đường này ([decision](../../decisions/decision-owner-saved-case-type-conversion-20261016.md), contract §13.18).
 
+Trong Soạn hồ sơ đã lưu, bấm **Đổi loại** cạnh loại hiện tại để mở dialog.
+Văn bản mới và người để lại (khi vào Thừa kế) ban đầu chưa chọn; phải chọn rõ
+và đánh dấu xác nhận xóa Diagram trước **Áp dụng**. Stage/thông tin hồ sơ còn
+nháp thì dialog yêu cầu đóng và **Cập nhật** bằng luồng hiện có, không tự lưu
+hay bỏ nháp. Nháp Diagram chỉ bị reset khi ghi thành công. Hủy/Escape/nền
+trước Áp dụng không ghi; lỗi/xung đột giữ nháp và các lựa chọn. Sau Áp dụng
+chờ kết quả nguyên tử, không đóng dialog giữa ghi. Command riêng
+`notary.workspace_convert_type` giữ commit/update thường bất biến loại.
+
 Chỉ hồ sơ `draft` được xóa. Xóa trong một lần ghi trọn vẹn: dọn dữ liệu thuộc hồ sơ nếu không còn được hồ sơ khác, participant, liên kết tài sản hoặc snapshot tham chiếu. Danh bạ người nhận ủy quyền tái dùng không bị xóa theo hồ sơ; không quét danh bạ mồ côi ngoài phạm vi. Lỗi phải khôi phục toàn bộ.
 
 Thống kê Người/Tài sản đếm mỗi bản ghi thực sự gắn hồ sơ một lần, không đếm danh bạ rời; tài sản vừa chính vừa liên kết không đếm hai lần.

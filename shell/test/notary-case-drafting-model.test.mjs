@@ -2435,3 +2435,59 @@ test('đợt3 createUqCustomer: tao danh ba moi → chon lam nguoi nhan UQ', asy
   assert.equal(r2.ok, false);
   assert.equal(client.calls.length, before);
 });
+
+test('saved conversion preserves Diagram draft on errors and blocks dirty Stage without write', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  model.state.diagram.nodes[0].hidden = true;
+  model.state.diagramDirty = true;
+  const before = structuredClone(model.state.diagram);
+  const original = client.run.bind(client);
+  let writes = 0;
+  client.run = async (command, payload) => {
+    if (command !== 'notary.workspace_convert_type') return original(command, payload);
+    writes++;
+    return {ok:false,error:{code:'workspace_conflict',details:{server_revision:8}}};
+  };
+  model.updatePersonField(model.state.stage.people[0].row_id, 'ho_ten', 'Chữ đang sửa');
+  const request = {case_type:'two_party',document_type:'dat_coc',confirm_diagram_reset:true};
+  assert.equal((await model.convertCaseType(request)).ok, false);
+  assert.equal(writes, 0);
+  assert.equal(model.state.stage.people[0].ho_ten, 'Chữ đang sửa');
+  model.state.stageDirty = false;
+  assert.equal((await model.convertCaseType(request)).ok, false);
+  assert.equal(writes, 1);
+  assert.deepEqual(model.state.diagram, before);
+  assert.equal(model.state.diagramDirty, true);
+  assert.equal(model.hasUnsaved(), true);
+  assert.equal(model.state.caseInfo.case_type, 'inheritance');
+});
+
+test('conversion pending blocks editing; success resets Diagram and invalidates Word result', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const before = structuredClone(model.state.stage);
+  let finish;
+  const original = client.run.bind(client);
+  client.run = (command, payload) => command === 'notary.workspace_convert_type'
+    ? new Promise(resolve => {finish=resolve;}) : original(command,payload);
+  model.state.diagramDirty = true;
+  model.state.wordOptions = {documents:[]};
+  model.state.wordResult = {old:true};
+  const pending = model.convertCaseType({case_type:'two_party',document_type:'dat_coc',confirm_diagram_reset:true});
+  assert.equal(model.canWrite(), false);
+  const name = model.state.stage.people[0].ho_ten;
+  model.updatePersonField(model.state.stage.people[0].row_id, 'ho_ten', 'Must not apply');
+  assert.equal(model.state.stage.people[0].ho_ten, name);
+  const stage = structuredClone(before); delete stage.owner_row_id;
+  finish({ok:true,data:{case:{...model.state.caseInfo,case_type:'two_party',document_type:'dat_coc',revision:8},
+    stage,diagram:{state:M.newTwoPartyState(),render_model:null},
+    capabilities:{intake:[],diagram:true,word_export:true}}});
+  assert.equal((await pending).ok,true);
+  assert.deepEqual(model.state.stage.people,before.people);
+  assert.deepEqual(model.state.stage.assets,before.assets);
+  assert.equal(model.state.diagramDirty,false);
+  assert.equal(model.state.wordOptions,null);
+  assert.equal(model.state.wordResult,null);
+  assert.equal(model.state.diagram.domain,'two_party');
+});

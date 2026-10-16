@@ -50,6 +50,7 @@ DRAFTING_COMMANDS = [
     "notary.intake_analyze",
     "notary.workspace_commit_stage",
     "notary.workspace_update",
+    "notary.workspace_convert_type",
     "notary.diagram_evaluate",
     "notary.diagram_save",
     "notary.word_export_options",
@@ -2392,3 +2393,17 @@ class TestCustomerCatalogMock:
         got = _call("workspace_get", {"case_id": 43})["data"]["case"]
         assert got["nguoi_nhan_uy_quyen"] == "Người Danh Bạ"
         assert got["nguoi_nhan_uy_quyen_id"] == 9
+
+
+def test_mock_saved_conversion_has_real_boundary_shape_and_preserves_stage():
+    mock.reset_backend(_load_fixture("ready.json"))
+    before = _call("workspace_get", {"case_id": 42})["data"]
+    result = _call("workspace_convert_type", {
+        "case_id": 42, "base_revision": before["case"]["revision"],
+        "case_type": "two_party", "document_type": "dat_coc",
+        "confirm_diagram_reset": True})["data"]
+    assert result["case"]["case_type"] == "two_party"
+    assert result["stage"]["people"] == before["stage"]["people"]
+    assert result["stage"]["assets"] == before["stage"]["assets"]
+    assert "owner_row_id" not in result["stage"]
+    assert len(result["diagram"]["state"]["nodes"]) == 30

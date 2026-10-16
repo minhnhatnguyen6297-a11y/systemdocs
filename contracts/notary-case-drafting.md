@@ -1709,9 +1709,32 @@ Phạm vi: hồ sơ **đã lưu** đổi giữa `inheritance` và `two_party`.
   tác toàn bộ, `revision` không đổi, bản cũ còn dùng được.
 - **Word/binding:** giữ nguyên §13.17 — không remap ngầm; N/ghế đổi, hash/slot
   đổi → `word.original_mapping_invalid`; không thêm chặn cho hồ sơ đã xuất/bound.
-- **Đường ghi/command:** developer chọn ở #25 (mở `workspace_update`/commit hay
-  command riêng); decision này không chốt wire. Schema/API mô tả `immutable` ở
-  `stage.schema.json`/`draft-v2.schema.json` do #25 cập nhật cùng code.
+- **Đường ghi:** `notary.workspace_convert_type`; commit Stage và
+  `workspace_update` vẫn từ chối đổi loại. Schema:
+  [`workspace-convert-type.schema.json`](notary-case-drafting/workspace-convert-type.schema.json).
+
+```yaml
+payload:
+  case_id: <int >= 1>
+  base_revision: <int >= 1>
+  case_type: inheritance | two_party # phải khác loại đã lưu
+  document_type: <enum hợp lệ loại đích, người dùng chọn rõ>
+  confirm_diagram_reset: true
+  owner_row_id: <uuid4> # chỉ inheritance, row_id Stage hiện có
+result:
+  kind: workspace_convert_type
+  data: <workspace_get v2 đầy đủ, case.revision tăng 1>
+```
+
+Key ngoài schema, loại không đổi, văn bản sai enum hoặc chưa xác nhận →
+`validation_error`; owner inheritance thiếu/ngoài Stage →
+`workspace_owner_required`. Không gửi Stage hoặc Diagram draft trong command.
+Stage/meta chưa lưu phải Cập nhật trước; UI không tự lưu/bỏ nháp để đổi loại.
+Nháp Diagram chỉ bị reset sau thành công; hủy dialog/Escape/nền trước Áp dụng
+không gửi command. Sau Áp dụng dialog chờ kết quả, không thêm nút hủy in-flight.
+Command cancel được chấp nhận trước giao dịch thì không ghi; giao dịch ngắn
+và publish succeeded được phân xử cùng khóa job, cancel đến sau thành công
+bị từ chối terminal. Các command khác không thay semantics hủy.
 
 ---
 

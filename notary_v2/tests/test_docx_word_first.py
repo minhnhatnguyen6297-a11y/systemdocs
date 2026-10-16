@@ -803,3 +803,45 @@ def test_year_only_source_date_survives_commit_and_reload(db, tmp_path):
         docx_import=data['docx_import'])
     assert saved['stage']['people'][0]['ngay_sinh'] == '1980'
     assert service.get(data['case']['id'])['stage']['people'][0]['ngay_sinh'] == '1980'
+
+
+def test_saved_conversion_preserves_old_bindings_requires_reconfirmation_and_exports(db, tmp_path):
+    from services.inheritance_workspace import InheritanceWorkspaceService
+    from services.word_batch_export import WordBatchError
+    original, store, service, data = reviewed_case(db, tmp_path)
+    cid = data["case"]["id"]
+    source = data["docx_import"]["sources"][0]
+    sid = source["source_id"]
+    proposals = binding_proposals(db.get(InheritanceCase, cid), sid, store)
+    source["bindings"] = [
+        {k: p[k] for k in ("candidate_id", "occurrence_id", "field_key", "slot")}
+        for p in proposals if p["supported"]]
+    assert any(b["slot"].startswith("[Người ") for b in source["bindings"])
+    saved = service.commit_stage(cid, data["case"]["revision"], data["stage"],
+                                 docx_import=data["docx_import"])
+    old_context = json.loads(json.dumps(saved["docx_import"]))
+    converted = service.convert_type(cid, saved["revision"], {
+        "case_type": "two_party", "document_type": "tang_cho",
+        "confirm_diagram_reset": True})
+    assert converted["docx_import"] == old_context
+    with pytest.raises(WordBatchError) as invalid:
+        export_original(db.get(InheritanceCase, cid), sid, store, tmp_path)
+    assert invalid.value.code == "word.original_mapping_invalid"
+    state = converted["diagram"]["state"]
+    for index, person in enumerate(converted["stage"]["people"]):
+        state["nodes"][index * 15]["personId"] = person["row_id"]
+    diagram = InheritanceWorkspaceService(db).save_diagram(
+        cid, converted["case"]["revision"], state)
+    loaded = service.get(cid)
+    proposals = binding_proposals(db.get(InheritanceCase, cid), sid, store)
+    bindings = [{k: p[k] for k in ("candidate_id", "occurrence_id", "field_key", "slot")}
+                for p in proposals if p["supported"]]
+    assert any(b["slot"].startswith("[Bên ") for b in bindings)
+    loaded["docx_import"]["sources"][0]["bindings"] = bindings
+    rebound = service.commit_stage(cid, diagram["revision"], loaded["stage"],
+                                    docx_import=loaded["docx_import"])
+    db.expire_all()
+    assert service.get(cid)["docx_import"] == rebound["docx_import"]
+    output = export_original(db.get(InheritanceCase, cid), sid, store, tmp_path)
+    assert output["documents"][0]["status"] == "saved"
+    assert store.load(sid)[0] == original

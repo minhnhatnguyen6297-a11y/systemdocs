@@ -1554,3 +1554,86 @@ def test_migrate_on_read_keeps_year_only_snapshot_value(db):
     snapshot = json.loads(db.get(InheritanceCase, case.id).case_state_json)
     assert snapshot["stage"][0]["ngay_sinh"] == "2010"
     assert UUID4_RE.match(snapshot["stage"][0]["row_id"])
+
+
+def test_saved_type_conversion_roundtrip_keeps_stage_and_resets_domain(db):
+    case, *_ = _make_case(db, with_participant=True)
+    before = _service(db).get(case.id)
+    snapshot = json.loads(case.case_state_json)
+    converted = _service(db).convert_type(case.id, before["case"]["revision"], {
+        "case_type": "two_party", "document_type": "tang_cho",
+        "confirm_diagram_reset": True})
+    assert converted["case"]["document_type"] == "tang_cho"
+    assert converted["stage"]["people"] == before["stage"]["people"]
+    assert converted["stage"]["assets"] == before["stage"]["assets"]
+    assert "owner_row_id" not in converted["stage"]
+    assert len(converted["diagram"]["state"]["nodes"]) == 30
+    assert all(n["personId"] is None for n in converted["diagram"]["state"]["nodes"])
+    assert case.engine_state_json is None
+    assert db.query(InheritanceParticipant).filter_by(ho_so_id=case.id).count() == 0
+    saved = json.loads(case.case_state_json)
+    assert saved["stage"] == snapshot["stage"]
+    assert saved["assets"] == snapshot["assets"]
+    owner = before["stage"]["people"][-1]["row_id"]
+    restored = _service(db).convert_type(case.id, converted["case"]["revision"], {
+        "case_type": "inheritance", "document_type": "thoa_thuan",
+        "confirm_diagram_reset": True, "owner_row_id": owner})
+    assert restored["stage"]["owner_row_id"] == owner
+    assert restored["diagram"]["state"]["nodes"] == [{
+        "id": "owner", "personId": owner, "parentSlotIds": [],
+        "spouseSlotId": None, "ownPositions": [], "receivePositions": [],
+        "hidden": False, "deleted": False}]
+    db.expire_all()
+    assert _service(db).get(case.id) == restored
+
+
+@pytest.mark.parametrize("patch", [
+    {"document_type": "khai_nhan"}, {"document_type": None},
+    {"confirm_diagram_reset": False}, {"case_type": "inheritance"},
+    {"owner_row_id": None}, {"unexpected": True},
+])
+def test_saved_type_conversion_invalid_leaves_snapshot_unchanged(db, patch):
+    case, *_ = _make_case(db, with_participant=True)
+    before = _service(db).get(case.id)
+    raw = case.case_state_json
+    request = {"case_type": "two_party", "document_type": "dat_coc",
+               "confirm_diagram_reset": True, **patch}
+    with pytest.raises(WorkspaceError):
+        _service(db).convert_type(case.id, before["case"]["revision"], request)
+    db.expire_all()
+    assert case.case_state_json == raw
+    assert _service(db).get(case.id) == before
+
+
+def test_saved_type_conversion_failure_rolls_back_all_projections(db, monkeypatch):
+    case, *_ = _make_case(db, with_participant=True)
+    service = _service(db)
+    before = service.get(case.id)
+    raw = case.case_state_json
+    def fail(*args, **kwargs):
+        raise RuntimeError("injected response construction failure")
+    monkeypatch.setattr(service, "get", fail)
+    with pytest.raises(RuntimeError):
+        service.convert_type(case.id, before["case"]["revision"], {
+            "case_type": "two_party", "document_type": "cho_thue",
+            "confirm_diagram_reset": True})
+    db.expire_all()
+    assert case.case_state_json == raw
+    assert _service(db).get(case.id) == before
+
+
+def test_saved_type_conversion_stale_and_locked_leave_case_usable(db):
+    case, *_ = _make_case(db)
+    before = _service(db).get(case.id)
+    request = {"case_type": "two_party", "document_type": "cho_thue",
+               "confirm_diagram_reset": True}
+    with pytest.raises(WorkspaceError) as conflict:
+        _service(db).convert_type(case.id, before["case"]["revision"] + 1, request)
+    assert conflict.value.code == "workspace_conflict"
+    case.trang_thai = "locked"
+    db.commit()
+    raw = case.case_state_json
+    with pytest.raises(WorkspaceError) as locked:
+        _service(db).convert_type(case.id, before["case"]["revision"], request)
+    assert locked.value.code == "workspace_locked"
+    assert case.case_state_json == raw

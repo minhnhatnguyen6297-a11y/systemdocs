@@ -292,7 +292,7 @@ _STAGE_KEYS = {"owner_row_id", "people", "assets"}
 _PERSON_FIELD_SET = set(_person_contract_keys())
 _ASSET_FIELD_SET = set(_asset_contract_keys())
 # Meta cap nhat duoc tren case da luu qua workspace_update (§6.2) —
-# case_type/document_type la dinh danh nghiep vu, khong doi sau create.
+# case_type/document_type chỉ đổi qua convert_type, không qua update.
 _CASE_META_UPDATE_KEYS = {"ngay_lap_ho_so", "noi_niem_yet", "ghi_chu"}
 
 # Key cụm đất: canonical mới (loaidat/dientich/thoihan — tên nghiệp vụ
@@ -1250,6 +1250,100 @@ class CaseWorkspaceService:
             "diagram": diagram_out,
             **({"docx_import": payload["docx_import"]} if "docx_import" in payload else {}),
         }
+
+    def convert_type(self, case_id: int, base_revision: int,
+                     conversion: Any) -> dict:
+        """Dedicated saved-case domain cutover; Stage is never upserted."""
+        case = self._load_case(case_id)
+        if case.is_locked:
+            raise WorkspaceError("workspace_locked", "Hồ sơ đang bị khóa")
+        source_type, _ = _case_meta(case)
+        if source_type not in CASE_TYPES:
+            raise WorkspaceError("case_type_unsupported", "Loại việc chưa hỗ trợ")
+        if (not isinstance(base_revision, int) or isinstance(base_revision, bool)
+                or base_revision < 1):
+            raise WorkspaceError("validation_error", "base_revision phải là số nguyên ≥ 1")
+        revision = self._revision(case)
+        if base_revision != revision:
+            raise WorkspaceError("workspace_conflict", "Hồ sơ đã thay đổi",
+                                 details={"server_revision": revision})
+        if not isinstance(conversion, Mapping):
+            raise WorkspaceError("validation_error", "conversion phải là object")
+        _check_extra_keys(conversion, {
+            "case_type", "document_type", "confirm_diagram_reset", "owner_row_id",
+        }, "conversion")
+        target = conversion.get("case_type")
+        if target not in CASE_TYPES or target == source_type:
+            raise WorkspaceError("validation_error", "Phải chọn loại hồ sơ khác")
+        docs = DOCUMENT_TYPES if target == CASE_TYPE_INHERITANCE else DOCUMENT_TYPES_TWO_PARTY
+        if conversion.get("document_type") not in docs:
+            raise WorkspaceError("validation_error", "Phải chọn văn bản hợp lệ của loại mới")
+        if conversion.get("confirm_diagram_reset") is not True:
+            raise WorkspaceError("validation_error", "Phải xác nhận xóa Diagram cũ")
+        composed = self._compose_stage(case)
+        owner = self._validate_owner_pointer(conversion, composed.people, target)
+        if target == CASE_TYPE_INHERITANCE:
+            state = {
+                "version": DIAGRAM_STATE_VERSION, "domain": target,
+                "nodes": [{"id": "owner", "personId": owner,
+                           "parentSlotIds": [], "spouseSlotId": None,
+                           "ownPositions": [], "receivePositions": [],
+                           "hidden": False, "deleted": False}],
+            }
+        else:
+            state = _seed_two_party_state()
+        payload = dict(composed.payload)
+        # Legacy rows without stable identities are materialized in this same
+        # transaction, never by a preliminary write or a Stage master upsert.
+        if composed.dirty:
+            payload["stage"] = composed.persisted_people
+            payload["assets"] = composed.persisted_assets
+        people = [(p["row_id"], p["entity_id"], p) for p in composed.people]
+        try:
+            case.loai_van_ban = conversion["document_type"]
+            legacy = (_v2_to_legacy_nodes(_v3_to_v2_nodes(state["nodes"]),
+                                         _people_map(people))
+                      if target == CASE_TYPE_INHERITANCE else [])
+            self._sync_participants_and_owner(
+                case, legacy, owner_entity=next(
+                    (p["entity_id"] for p in composed.people if p["row_id"] == owner),
+                    composed.people[0]["entity_id"] if composed.people else None))
+            now = _utc_now_iso()
+            # Build only domain projections; preserve Stage snapshots verbatim.
+            rebuilt = self._build_payload(
+                {**payload, "diagram": {}}, people,
+                [(a["row_id"], a["entity_id"], a) for a in composed.assets],
+                state, None, legacy, now, domain=target, owner_row_id=owner,
+                case=case)
+            rebuilt["stage"] = payload.get("stage", composed.persisted_people)
+            rebuilt["assets"] = payload.get("assets", composed.persisted_assets)
+            case.case_state_json = json.dumps(rebuilt, ensure_ascii=False)
+            case.engine_state_json = (
+                json.dumps({"version": 2, "updatedAt": now, "nodes": legacy},
+                           ensure_ascii=False)
+                if target == CASE_TYPE_INHERITANCE else None)
+            self.db.flush()
+            updated = self.db.execute(sa_text(
+                "UPDATE inheritance_cases SET workspace_revision = :rev, updated_at = :now "
+                "WHERE id = :cid AND workspace_revision = :base AND trang_thai != 'locked'"),
+                {"rev": revision + 1, "now": datetime.now(timezone.utc).replace(tzinfo=None),
+                 "cid": case.id, "base": revision})
+            if updated.rowcount != 1:
+                self.db.rollback()
+                fresh = self._load_case(case_id)
+                if fresh.is_locked:
+                    raise WorkspaceError("workspace_locked", "Hồ sơ đang bị khóa")
+                raise WorkspaceError("workspace_conflict", "Hồ sơ đã thay đổi",
+                                     details={"server_revision": self._revision(fresh)})
+            # Compose response before commit: no fallible read after a write
+            # has become durable. The freshly built payload needs no migration.
+            self.db.expire(case, ["workspace_revision"])
+            result = self.get(case_id)
+            self.db.commit()
+            return result
+        except Exception:
+            self.db.rollback()
+            raise
 
     def update_meta(self, case_id: int, base_revision: int,
                     meta: Any) -> dict:

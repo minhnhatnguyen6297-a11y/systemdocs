@@ -222,7 +222,7 @@
         "case": {
           "type": "object",
           "additionalProperties": false,
-          "description": "OPTIONAL — đợt 3 (MIN-141): metadata hồ sơ ghi cùng Stage trong một transaction; case_type/document_type kèm theo phải khớp giá trị đã lưu (immutable). Chấp nhận cả key canonical liền không dấu — §6.",
+          "description": "OPTIONAL — metadata hồ sơ ghi cùng Stage trong một transaction; case_type/document_type kèm theo phải khớp giá trị đã lưu. Chỉ dedicated workspace_convert_type (§13.18) được chuyển loại; commit vẫn immutable. Chấp nhận key canonical — §6.",
           "properties": {
             "case_type": { "enum": ["inheritance", "two_party", null] },
             "document_type": { "type": ["string", "null"] },

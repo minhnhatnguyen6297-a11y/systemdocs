@@ -96,6 +96,44 @@ class JobStoreTest(unittest.TestCase):
     def tearDown(self):
         self.store.drain(timeout=2)
 
+    def test_conversion_atomic_success_refuses_cancel_racing_commit(self):
+        entered = threading.Event()
+        release = threading.Event()
+        written = []
+        def handler(job, payload):
+            def transaction():
+                entered.set()
+                self.assertTrue(release.wait(3))
+                written.append("new-domain")
+                return {"kind": "workspace_convert_type", "data": {"revision": 2}}
+            return job.complete_atomic(transaction)
+        job = self.store.submit("convert-race", "notary.workspace_convert_type", handler, {})
+        self.assertTrue(entered.wait(3))
+        outcome = []
+        cancel = threading.Thread(target=lambda: outcome.append(self.store.cancel(job.job_id)))
+        cancel.start()
+        release.set()
+        cancel.join(3)
+        self.assertFalse(cancel.is_alive())
+        self.assertEqual(outcome, ["terminal"])
+        self.assertEqual(written, ["new-domain"])
+        self.assertEqual(wait_terminal(self.store, job.job_id)["status"], "succeeded")
+
+    def test_conversion_accepted_cancel_prevents_transaction(self):
+        ready = threading.Event()
+        release = threading.Event()
+        written = []
+        def handler(job, payload):
+            ready.set()
+            self.assertTrue(release.wait(3))
+            return job.complete_atomic(lambda: written.append("must-not-write"))
+        job = self.store.submit("convert-cancel", "notary.workspace_convert_type", handler, {})
+        self.assertTrue(ready.wait(3))
+        self.assertEqual(self.store.cancel(job.job_id), "ok")
+        release.set()
+        self.assertEqual(wait_terminal(self.store, job.job_id)["status"], "canceled")
+        self.assertEqual(written, [])
+
     def test_user_cancel_running(self):
         job = self.store.submit("c-1", "diag.slow_task", slow, {})
         self.store.cancel(job.job_id)
