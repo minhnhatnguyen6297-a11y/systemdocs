@@ -30,10 +30,8 @@ Việc đang mở được tổng hợp tại [catalog issue](../backlog/README.
 (16/10/2026; #17 built after independent Quick t2 clean; Upload failures and proof limits remain in the catalog/runtime record).
 [Ticket tổng cũ](../backlog/bug-notary-flow-ui-regex-word.md) giữ làm lịch sử và bị chặn tracking-only để không chạy trùng các leaf. Các điểm chính:
 
-- Tách rõ địa chỉ của người và nơi cấp giấy khai tử; chốt quy tắc đổi loại hồ
-  sơ đã lưu trước khi làm.
-- Làm rõ kích thước Pool/Sơ đồ và thao tác thả người; gỡ nút `Hủy thay đổi`
-  theo yêu cầu owner nhưng vẫn giữ bảo vệ dữ liệu chưa lưu.
+- Chốt quy tắc đổi loại hồ sơ đã lưu trước khi làm.
+- Sơ đồ/Stage: nhãn `Nơi chết`/`Nơi cấp giấy khai tử` theo bằng chứng (người đã mất thiếu bằng chứng vẫn `Nơi cấp giấy tờ`), Pool nội dung 224 (khung 240), ô Hai bên 202×52, thông báo tạm trong khoảng trống thanh trên (bám trên cùng khi vùng nội dung cuộn) không đẩy Sơ đồ; nút `Hủy thay đổi` của Stage đã gỡ, bảo vệ nháp giữ. Vùng sơ đồ +50% (802) còn chờ owner chốt trục.
 - Regex gợi ý intake (#7): runtime giữ serial nguyên văn theo nhãn và nhận địa chỉ thửa có nhãn trong profile transfer 1.1.3; smoke Notary thật và review Quick độc lập sạch. [#7](../backlog/bug-regex-raw-serial-parcel-address.md).
 - Giúp tìm mẫu Word và biết chỗ điền dữ liệu nào được hỗ trợ.
 - Upload: đã bỏ theo dõi kết quả Lưu, runtime cutover 15/10/2026. [#28](../backlog/story-upload-web-official-sot-cutover.md).
@@ -104,7 +102,6 @@ trỏ tới phần nhỏ để bắt đầu tìm hiểu.
 | Stage: áp dụng loại đất | Đưa lựa chọn loại đất vào draft hiện tại | [Quy tắc tài sản](shared/ocr-rules.md#property) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `openLandDialog` |
 | Stage: tra địa chỉ | Tra xã/tỉnh, copy kết quả phù hợp rồi tự dán vào ô | [Tra cứu địa chỉ](shared/administrative-lookup.md#usage) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `lookupTraButton`, `lookupCopyButton` |
 | Stage: Cập nhật | Lưu dữ liệu Stage đã kiểm tra | [Stage](notary_v2/README.md#stage) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `runCommit` |
-| Stage: Hủy thay đổi | Hủy phần sửa chưa cập nhật; ticket mới yêu cầu bỏ nút này | [Stage](notary_v2/README.md#stage) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `cancelDraft` |
 | Pool: gán người | Chọn người chưa gán và đưa vào sơ đồ | [Pool](notary_v2/README.md#pool) | [relationship-diagram.js](../../shell/src/renderer/notary/relationship-diagram.js) · `openAssignMenu` |
 | Pool: bỏ gán người | Trả người từ vị trí sơ đồ về Pool | [Pool](notary_v2/README.md#pool) | [relationship-diagram.js](../../shell/src/renderer/notary/relationship-diagram.js) · `inheritanceCardEl` |
 | Diagram: Hai bên | Xếp người theo hai bên hợp đồng | [Hai bên](notary_v2/diagram-rules.md#two-party) | [relationship-diagram.js](../../shell/src/renderer/notary/relationship-diagram.js) · `twoPartyInto` |

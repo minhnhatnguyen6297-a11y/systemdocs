@@ -7,7 +7,7 @@
  * mockup-1440x775.png) trên nền bản mẫu P6 (_bmad-output/specs/ui/prototypes):
  *   - Thanh trên DUY NHẤT (.cd-topbar, ~42px): tab cục bộ (Tổng quan /
  *     Soạn / Word) | loại việc, Nhập file, Zalo (disabled placeholder)
- *     ……… Hủy thay đổi, Lưu hồ sơ/Cập nhật (chấm dirty = tín hiệu chưa
+ *     ……… Lưu hồ sơ/Cập nhật (chấm dirty = tín hiệu chưa
  *     lưu duy nhất). Không nút back, không tiêu đề, không pill Nháp,
  *     không nhãn trạng thái lưu (MIN-133 D4/D5).
  *   - Không card Thông tin hồ sơ (D2): document_type theo mặc định model,
@@ -22,8 +22,6 @@
  *     + dirty; "Hủy" không đụng draft.
  *   - Reorder tài sản = đổi nghĩa vị trí (contract §13.3): dấu chọn
  *     ownPositions/receivePositions giữ SỐ vị trí, không bám row_id.
- *   - Hủy thay đổi = client-only restore cả Stage + Diagram draft về
- *     committed snapshots (§13.2 Q2) — không gọi command ra ngoài.
  *   - Chỉ render từ model.state — không tự suy luận nghiệp vụ, không
  *     render JSON kỹ thuật, không input ID bằng tay trong production view.
  *
@@ -119,34 +117,6 @@ function spliceMove(list, from, to) {
   const [m] = list.splice(i, 1);
   list.splice(j, 0, m);
   return true;
-}
-
-// Client-only restore §13.2 Q2: Stage + Diagram draft về committed
-// snapshot — KHÔNG gọi command nào ra ngoài. Model hiện chưa export
-// cancelDraft() (ghi vào handoff); hàm này thực hiện đúng semantics bằng
-// field public state + emit gián tiếp qua dismissNotice().
-function cancelDraftState(state) {
-  state.stage = structuredClone(state.committed);
-  state.docxImport = structuredClone(state.committedDocxImport || { version: 1, sources: [] });
-  // đợt 3 (MIN-141): meta tren case da tao cung ve baseline committed —
-  // huy nhap khong giu gia tri meta dang sua (huy nhap moi thi
-  // newDraft() da reset san o nhanh tren).
-  if (state.caseId != null && state.committedCaseInfo) {
-    state.caseInfo = structuredClone(state.committedCaseInfo);
-    state.metaDirty = false;
-  }
-  // Inheritance draft mới: committed rỗng thiếu key owner_row_id —
-  // thêm lại để cột "Để lại" render được (§13.1 stage shape).
-  if (state.caseId == null && state.caseInfo &&
-      state.caseInfo.case_type !== 'two_party' &&
-      !('owner_row_id' in state.stage)) {
-    state.stage.owner_row_id = null;
-  }
-  state.diagram = structuredClone(state.committedDiagram);
-  state.stageDirty = false;
-  state.diagramDirty = false;
-  state.fieldErrors = [];
-  state.diagramErrors = [];
 }
 
 // Reorder 1 hàng people trên draft Stage — contract không cấm; thứ tự
@@ -493,35 +463,9 @@ function createNotaryModuleView(deps) {
     }
   }
 
-  // Hủy thay đổi — client-only restore §13.2 Q2 (cả Stage lẫn Diagram
-  // draft về committed); xác nhận trước vì hủy bỏ nháp đang sửa.
-  async function cancelDraft() {
-    const s = model.state;
-    if (!model.canWrite() || !model.hasUnsaved()) return;
-    const ok = await confirm({
-      title: 'Hủy thay đổi chưa cập nhật?',
-      body: 'Stage và sơ đồ quay về bản đã lưu gần nhất — thay đổi ' +
-        'chưa cập nhật sẽ mất.',
-      confirmLabel: 'Hủy thay đổi',
-      cancelLabel: 'Ở lại',
-    });
-    if (!ok) return;
-    if (s.caseId == null) {
-      // Nháp chưa lưu: không có baseline committed — hủy = nháp mới
-      // cùng loại việc. newDraft() reset toàn bộ + emit, không gọi
-      // command nào ra ngoài.
-      model.newDraft(s.caseInfo && s.caseInfo.case_type);
-      return;
-    }
-    cancelDraftState(s);
-    // model chưa export cancelDraft()/emit-only — dismissNotice() trigger
-    // emit (xóa luôn notice/error cũ, hợp lý sau khi restore).
-    model.dismissNotice();
-  }
-
   // Điền phần hành động vào thanh trên (.cd-topbar-actions) — chỉ khi
   // tab Soạn hồ sơ đang mở một workspace. Thứ tự theo mockup MIN-133:
-  // | loại việc · Nhập file · Zalo ……… [pill trạng thái] Hủy · Lưu •
+  // | loại việc · Nhập file · Zalo ……… [pill trạng thái] Lưu •
   function fillTopActions(bar) {
     const s = model.state;
     const c = s.caseInfo || {};
@@ -575,10 +519,17 @@ function createNotaryModuleView(deps) {
       st.title = 'Bản nháp cũ — server đã thay đổi';
       bar.append(st);
     }
-    const undo = btn('Hủy thay đổi', 'js-cd-undo', cancelDraft);
-    undo.disabled = !model.canWrite() || !model.hasUnsaved();
-    undo.title = 'Bỏ thay đổi Stage + Sơ đồ chưa cập nhật (về bản đã lưu)';
-    bar.append(undo);
+    // Thông báo tạm nằm trong khoảng trống sẵn có của vùng hành động
+    // (trước nút chính): luôn trong tầm nhìn, không đè lên điều khiển
+    // và không đẩy vùng Sơ đồ (spec §8).
+    if (s.notice) {
+      const n = h('div', 'banner ok cd-notice-top');
+      const t = h('span', 'cd-notice-text', s.notice);
+      n.title = s.notice;
+      const x = btn('×', 'ghost sm', () => model.dismissNotice());
+      n.append(t, h('span', 'grow', ''), x);
+      bar.append(n);
+    }
     const label = draft ? 'Lưu hồ sơ' : 'Cập nhật';
     const primary = btn(label, 'primary js-cd-update', runCommit);
     primary.dataset.label = label;
@@ -599,7 +550,7 @@ function createNotaryModuleView(deps) {
     }
   }
 
-  // Cập nhật gọn nút commit/undo khi rebuild bị defer (đang gõ trong
+  // Cập nhật gọn nút commit khi rebuild bị defer (đang gõ trong
   // panel) — dirty state phải hiện ngay, không chờ blur.
   function syncChromeUI() {
     const upd = root.querySelector('.js-cd-update');
@@ -607,8 +558,6 @@ function createNotaryModuleView(deps) {
       upd.disabled = commitDisabled();
       setPrimaryDirty(upd, primaryDirty());
     }
-    const undo = root.querySelector('.js-cd-undo');
-    if (undo) undo.disabled = !model.canWrite() || !model.hasUnsaved();
   }
 
   // MIN-133 D2: không còn card "Thông tin hồ sơ". Meta nháp mới đi lên
@@ -1462,6 +1411,17 @@ function createNotaryModuleView(deps) {
         ctl.setAttribute('aria-label',
           `${label} — ${p.ho_ten || `dòng ${ri + 1}`}`);
         if (key === 'dia_chi') {
+          // Nhãn theo bằng chứng đã xác nhận (spec §4): chỉ loai_dia_chi
+          // = Nơi chết mới đổi nhãn ô địa chỉ; nơi cấp chỉ mang nhãn
+          // khai tử khi loai_giay_to là giấy chứng tử/khai tử — riêng
+          // ngày mất không đủ để đổi nhãn giấy tờ đã xác nhận.
+          const addrLabel = p.loai_dia_chi === 'Nơi chết'
+            ? 'Nơi chết' : null;
+          if (addrLabel) {
+            td.append(h('div', 'muted small cd-cell-lbl', addrLabel));
+          }
+          ctl.setAttribute('aria-label',
+            `${addrLabel || label} — ${p.ho_ten || `dòng ${ri + 1}`}`);
           ctl.setAttribute('aria-describedby', `address-person-${p.row_id}`);
           const trow = h('div', 'cd-lookup-row');
           trow.append(ctl,
@@ -1471,18 +1431,24 @@ function createNotaryModuleView(deps) {
           // Hien ca khi ngay_chet rong ma noi_cap con du lieu — tranh
           // gia tri cu "vo hinh" khong noi nao de xem/sua.
           if (p.ngay_chet || p.noi_cap) {
+            const isDeathCert = /chứng tử|khai tử/i.test(
+              String(p.loai_giay_to || ''));
+            const issuerLabel = isDeathCert
+              ? 'Nơi cấp giấy khai tử' : 'Nơi cấp giấy tờ';
             const issuer = h('input', 'cd-cell');
             issuer.value = p.noi_cap || '';
-            issuer.placeholder = p.ngay_chet ? 'UBND trên giấy khai tử' : 'Cơ quan cấp giấy tờ';
+            issuer.placeholder = isDeathCert
+              ? 'UBND trên giấy khai tử' : 'Cơ quan cấp giấy tờ';
             issuer.disabled = ro;
             issuer.dataset.fid = `p:${p.row_id}:noi_cap`;
-            issuer.setAttribute('aria-label', `${p.ngay_chet ? 'Nơi cấp giấy khai tử' : 'Nơi cấp giấy tờ'} — ${p.ho_ten || (p.ngay_chet ? 'người đã mất' : 'người')}`);
+            issuer.setAttribute('aria-label', `${issuerLabel} — ${p.ho_ten || (p.ngay_chet ? 'người đã mất' : 'người')}`);
             issuer.setAttribute('aria-describedby', `address-issuer-${p.row_id}`);
             issuer.oninput = () => model.updatePersonField(p.row_id, 'noi_cap', issuer.value);
             const irow = h('div', 'cd-lookup-row');
             irow.append(issuer,
               lookupTraButton('issuer', p.row_id, `p:${p.row_id}:noi_cap`));
-            td.append(irow, addressSuggestionEl('issuer', p.row_id));
+            td.append(h('div', 'muted small cd-cell-lbl', issuerLabel),
+                      irow, addressSuggestionEl('issuer', p.row_id));
           }
         } else {
           td.append(ctl);
@@ -1863,13 +1829,6 @@ function createNotaryModuleView(deps) {
       ws.append(h('div', 'banner warn',
         'Hồ sơ đã khóa — toàn bộ chỉ đọc, vẫn xem/sao chép được.'));
     }
-    if (s.notice) {
-      const n = h('div', 'banner ok', s.notice);
-      const x = btn('×', 'ghost sm', () => model.dismissNotice());
-      n.append(h('span', 'grow', ''));
-      n.append(x);
-      ws.append(n);
-    }
     if (s.error && s.status !== 'error' && s.status !== 'unavailable') {
       const ed = describeError(s.error);
       const eb = h('div', 'banner err',
@@ -2094,7 +2053,7 @@ function createNotaryModuleView(deps) {
 const G1_NOTARY_VIEW = {
   createNotaryModuleView, isDevMode,
   // pure helpers export cho node --test (không cần DOM).
-  _internals: { spliceMove, cancelDraftState, movePersonRowState,
+  _internals: { spliceMove, movePersonRowState,
                 LAND_TYPE_CODES, PERSON_COLS, ASSET_FIELD_ROWS,
                 DT_ASSET_COL, DT_PERSON_ROW,
                 PERSON_DATE_FIELDS, ASSET_DATE_FIELDS,

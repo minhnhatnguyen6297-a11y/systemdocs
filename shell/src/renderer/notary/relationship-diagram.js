@@ -57,8 +57,9 @@ const NODE_W = 144, NODE_H = 87;
 const EMPTY_W = 88, EMPTY_H = 24;
 const PAD = 6, GAP_X = 14, SPOUSE_GAP = 28, GAP_Y = 14;
 const ROW_H = NODE_H + GAP_Y;          // buoc toi da giua 2 hang the he
-// Hai ben: 2 cot × 15 cho, cho cao 26px (CSS .cd-tp-slot khop).
-const TP_COL_W = 288, TP_SLOT_H = 26, TP_SLOT_GAP = 4, TP_TITLE_H = 26;
+// Hai ben: 2 cot × 15 cho; do thuc te truoc thay doi 288×26 → ap
+// rong−30% (202) / cao+100% (52); CSS .cd-tp-slot phai khop hang so.
+const TP_COL_W = 202, TP_SLOT_H = 52, TP_SLOT_GAP = 4, TP_TITLE_H = 26;
 const TP_W = PAD * 2 + TP_COL_W * 2 + 12;
 const TP_H = PAD * 2 + TP_TITLE_H + 15 * TP_SLOT_H + 14 * TP_SLOT_GAP;
 const ZOOM_MIN = 0.5, ZOOM_MAX = 1.6;
@@ -428,7 +429,7 @@ function createDiagramPane(ctx) {
     card.append(nm);
     // Duong ban phim thay keo-tha (a11y) — menu chon vi tri gan.
     // MIN-133: nut → noi tren mep phai, chi hien khi hover/focus (the
-    // Pool 176px chi con ten) — van trong tab order.
+    // Pool rong chi con ten) — van trong tab order.
     const assign = btn('→', 'sm cd-pool-assign',
       () => openAssignMenu(row));
     assign.title = 'Gán vị trí (bàn phím — thay cho kéo thả)';

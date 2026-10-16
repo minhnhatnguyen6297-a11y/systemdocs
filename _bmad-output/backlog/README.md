@@ -8,7 +8,7 @@ P1/P2 là ưu tiên đề xuất, không phải severity hay thứ tự ID. Cầ
 
 | Candidate / ID | Issue | Nhóm | Ưu tiên | Hard after | Sẵn sàng |
 |---|---|---|---|---|---|
-| C01 / #2 | [Không gian Stage, Pool và Diagram liền mạch, dễ thao tác](story-notary-workspace-continuity.md) | bug/report đã báo | P2 | không | draft có gate; xem dưới |
+| C01 / #2 | [Không gian Stage, Pool và Diagram liền mạch, dễ thao tác](story-notary-workspace-continuity.md) | bug/report đã báo | P2 | không | 5/6 report đã làm + built phần này (18ae/b541/2c232/e86/ac5; Node 369 pass/0 fail, adapter 83 pass, GUI gói default 21/21 + đóng sạch, independent Quick clean); 802 (trục +50% vùng sơ đồ) chờ owner — #2 nói chung vẫn một phần |
 | C02 / #3 | [Chốt quy tắc đổi loại hồ sơ đã lưu](spike-saved-case-conversion-semantics.md) | quyết định | P1 | không | lập kế hoạch/bằng chứng |
 | C03 / #4 | [Sơ đồ không hiển thị đúng thông báo khi gặp lỗi](bug-diagram-error-messages.md) | bug/report đã báo | P1 | không | built (2026-10-16; independent Quick review clean, no findings) |
 | C04 / #5 | [Lưu và mở lại sơ đồ hợp lệ còn thiếu dữ liệu](story-save-valid-incomplete-diagram.md) | khoảng lệch đã chọn | P1 | không | built (2026-10-16; full Notary 1115 passed, 2 skipped; scoped checks 41 + 239 passed, 2 skipped; diagram Node 30 passed; Electron 21/21; independent Quick t3 clean) |
@@ -41,7 +41,7 @@ Khuyến nghị hiện hành, không phải lệnh triển khai: (1) #28 cutover
 
 ## Câu hỏi còn mở và phần đã rõ
 
-- **C01 / #2:** Chốt đo chiều rộng nội dung hay khung Pool, vùng tăng 50% chiều cao, kích thước ô thả và vị trí thông báo. Khi refinement, không để câu hỏi kích thước chặn phần nhãn/nút độc lập.
+- **C01 / #2:** Chỉ còn câu hỏi 802 — trục tăng 50% vùng sơ đồ (chiều cao hay chiều rộng) chờ owner chốt; Pool/ô Hai bên/vị trí thông báo đã chốt theo số đo thật + report. #2 vẫn một phần (5/6 report; chưa built).
 - **C02 / #3:** Khi đổi loại hồ sơ đã lưu, gán người, quyền sở hữu, lựa chọn văn bản và binding được giữ hay chuyển thế nào? Chuyển nào bị cấm; cần xem trước/xác nhận gì?
 - **C07 / #8:** Ai được công bố rule đã thử, nguồn rule có quyền ghi ở đâu, ghi nhận kích hoạt version/hash và rollback thế nào, duyệt khác biệt chạy lại ra sao mà không ghi đè Stage/binding đã xác nhận?
 - **C08 / #9:** Sau khi tận dụng nguồn đã tìm được, còn thiếu bản sao mẫu đại diện/đáp án nào để kiểm native, bản cài sạch và khôi phục? Không yêu cầu thử phá dữ liệu production.

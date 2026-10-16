@@ -41,7 +41,7 @@ Người sửa theo dòng; tài sản theo cột. Thêm/sửa/xóa/sắp xếp c
 | Nhóm | Quy tắc |
 |---|---|
 | Người | Sáu trường nghiệp vụ chính: tên, sinh, chết, số giấy tờ, ngày cấp, địa chỉ; có giới tính và trường kỹ thuật. Chỉ họ tên bắt buộc. Giới tính Nam/Nữ/trống; ngày đúng lịch hoặc năm riêng. Độ đầy đủ ngày giữ theo bằng chứng đã lưu của hồ sơ: `2010` vẫn là năm riêng, phân biệt với `01/01/2010`; đọc lại và xuất dùng giá trị đã commit, master danh bạ không đệm lại. Giấy tờ/địa chỉ có thể trống. |
-| Giấy tờ | Người sống suy loại/nơi cấp/nhãn cư trú theo ngày cấp và mốc 01/10/2024; thiếu ngày để trống. Người chết dùng bằng chứng giấy tờ đã xác nhận, không mặc định nơi cấp. Nhãn nơi cấp phải phân biệt CCCD và giấy khai tử; địa chỉ người chết mang nhãn Nơi chết theo quy tắc đã có. |
+| Giấy tờ | Người sống suy loại/nơi cấp/nhãn cư trú theo ngày cấp và mốc 01/10/2024; thiếu ngày để trống. Người chết dùng bằng chứng giấy tờ đã xác nhận, không mặc định nơi cấp. Nhãn nơi cấp phải phân biệt CCCD và giấy khai tử; địa chỉ người chết mang nhãn Nơi chết theo quy tắc đã có. Nhãn hiển thị theo bằng chứng: chỉ khi `loai_giay_to` là giấy chứng tử/khai tử mới mang nhãn `Nơi cấp giấy khai tử`, còn lại (kể cả người đã mất chưa có bằng chứng) là `Nơi cấp giấy tờ`; ô địa chỉ mang nhãn `Nơi chết` khi `loai_dia_chi` là Nơi chết; giữ nguyên giá trị `dia_chi`/`noi_cap` đã lưu và binding. |
 | Tài sản | Tối đa 3; thứ tự 1..3 có ý nghĩa với dấu Chủ/Nhận. Serial nguyên văn, có thể trống/trùng, không ép mẫu hoặc thay mã XX. Địa chỉ không rỗng khi commit; thửa/tờ tùy chọn. |
 | Loại đất | Mỗi tài sản tối đa 20 cụm loại đất–diện tích–thời hạn. Có thể để danh sách trống. Giữ vị trí trống; bỏ thời hạn lẻ cấp tài sản, không tự đắp vào cụm. |
 | Hồ sơ | Nơi niêm yết nhập tay; người nhận ủy quyền từ danh mục/tạo mới; nội dung việc nhập tay. Ba dòng đặt dưới tài sản. |
@@ -54,7 +54,7 @@ Thừa kế cần `owner_row_id` theo contract lưu hiện hành; Hai bên khôn
 
 Mọi ghi gửi phiên bản đã đọc (`base_revision`); nếu server có bản khác, báo xung đột và cho tải bản mới hoặc giữ nháp để sao chép, không ghi đè cưỡng bức. Hồ sơ khóa chỉ đọc, vẫn xem/sao chép và dùng thao tác đọc được cho phép.
 
-Không chặn chuyển tab chỉ vì đang nhập. Chuyển module phải giữ nháp; rời/đóng khi có thay đổi chưa lưu phải cảnh báo. Cập nhật nền không ghi đè ô đang sửa. Yêu cầu bỏ nút Hủy thay đổi đã có trong backlog; bảo vệ bản nháp vẫn phải giữ. Cơ chế cũ của nút khôi phục cả Stage/Diagram từ bản lưu, không tăng phiên bản; không coi đó là yêu cầu phải giữ nút.
+Không chặn chuyển tab chỉ vì đang nhập. Chuyển module phải giữ nháp; rời/đóng khi có thay đổi chưa lưu phải cảnh báo. Cập nhật nền không ghi đè ô đang sửa. Nút `Hủy thay đổi` của Stage đã bỏ cùng cơ chế khôi phục riêng; dirty, cảnh báo rời/đóng và nhánh bỏ nháp khi mở hồ sơ khác vẫn giữ.
 
 <a id="pool"></a>
 ## 5. Pool và Diagram — gán quan hệ
@@ -92,9 +92,9 @@ Máy chỉ trả kết quả để Copy; không tự sửa, nối “nay là” 
 
 Tài sản bên trái, Người bên phải; phía dưới là Pool và Diagram. Tài sản dùng bảng cột, Người dùng bảng dòng; danh sách dài cuộn trang. Dialog Loại đất sửa cụm, Áp dụng chỉ về nháp, Cập nhật mới lưu. Có đường bàn phím thay kéo thả; lỗi đặt ngay ô/thẻ liên quan.
 
-Mốc bố cục đã duyệt: Stage 35:65 (38:62 ở màn ≥1920), Pool khoảng 176 px, node có người 144 px, node trống 88×24. Màn ≤900 px xếp các vùng dọc; không thu chữ/node đến khó đọc. Canvas pan/zoom; Mở rộng là lớp phủ trong ứng dụng. Dấu chưa lưu của Stage và Diagram tách riêng.
+Mốc bố cục: Stage 35:65 (38:62 ở màn ≥1920), Pool nội dung 224 px (khung ngoài 240), node có người 144 px, node trống 88×24. Ô Hai bên: rộng −30%, cao +100% so với số đo thật trước thay đổi (288×26 → 202×52), JS/CSS đồng bộ; giữ đủ `p1..p30` và đường bàn phím. Màn ≤900 px xếp các vùng dọc; không thu chữ/node đến khó đọc. Canvas pan/zoom; Mở rộng là lớp phủ trong ứng dụng. Dấu chưa lưu của Stage và Diagram tách riêng. Thông báo tạm (`notice`) nằm trong khoảng trống sẵn có của thanh trên (cạnh các pill trạng thái): không đổi vị trí vùng Sơ đồ và không che drop target/điều khiển; thanh trên bám trên cùng khi vùng nội dung cuộn nên thông báo vẫn trong tầm nhìn; banner lỗi/khoá vẫn trong luồng.
 
-Các yêu cầu mới về tăng kích thước Pool/Diagram/ô thả còn trong backlog, chưa tự áp tỷ lệ. Mốc ảnh cũ bỏ ô Nơi cấp nhưng yêu cầu mới cần thể hiện đúng nghĩa nơi cấp giấy tờ/khai tử: phải xử lý trong task giao diện, không âm thầm coi ảnh cũ là quyết định mới.
+Yêu cầu tăng vùng sơ đồ +50% (report 802) vẫn chờ owner chốt trục (chiều cao hay chiều rộng) — chưa tự áp tỷ lệ; Pool/ô Hai bên đã áp theo báo cáo. Ô lớn hơn làm vùng nội dung canvas cao lên theo quy tắc hiện có; canvas vẫn là khung cuộn/pan.
 
 ## 9. Tiêu chí kiểm và phần chưa chốt
 

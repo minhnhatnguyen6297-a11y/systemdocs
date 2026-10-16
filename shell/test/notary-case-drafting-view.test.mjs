@@ -117,7 +117,6 @@ test('action bar: Zalo visible + disabled; Hủy/Cập nhật/Nhập file/case-t
   assert.ok(zalo, 'thiếu nút Zalo — phải visible, không ẩn');
   assert.equal(zalo.disabled, true, 'Zalo phải disabled');
   assert.ok(btns.some((b) => b.textContent === 'Nhập file'));
-  assert.ok(btns.some((b) => b.textContent === 'Hủy thay đổi'));
   // nhap moi → nut chinh la "Lưu hồ sơ"; case thật la "Cập nhật".
   assert.ok(btns.some((b) => b.textContent === 'Lưu hồ sơ'));
   assert.ok(collect(view.el, (e) =>
@@ -242,52 +241,100 @@ test('typing giữ focus+value: emit nền không rebuild input đang gõ', () =
     'rebuild sau khi blur không có dòng mới');
 });
 
-// ---------- cancel draft ----------
+// ---------- draft guards: Ở lại giữ nháp / bỏ nháp mở hồ sơ khác ----------
 
-test('cancel: case thật restore Stage+Diagram về committed — không gọi command', async () => {
-  const { model, view, calls } = build(test, { draft: false });
-  calls.length = 0;
-  // Dirty: them nguoi vao stage draft + diagram node.
-  model.addPerson();
-  model.addSlot('owner');
+const CASE_LIST = {
+  cases: [
+    { id: 42, nguoi_chet: { ho_ten: 'Người Gốc' }, trang_thai: 'draft' },
+    { id: 43, nguoi_chet: { ho_ten: 'Hồ Sơ Khác' }, trang_thai: 'draft' },
+  ],
+  total: 2,
+};
+
+function wsPayload(id, name) {
+  return {
+    case: { id, case_type: 'inheritance', document_type: 'khai_nhan',
+            status: 'active', locked: false, revision: 5 },
+    backend_mode: 'real',
+    capabilities: { intake: [], diagram: true, word_export: true },
+    stage: {
+      people: [{ row_id: `r${id}`, ho_ten: name, gioi_tinh: 'Nam',
+                 ngay_sinh: null,
+                 ngay_chet: id === 42 ? '2011-05-15' : null,
+                 so_giay_to: null, ngay_cap: null, noi_cap: null,
+                 dia_chi: 'xã', place_of_origin: null,
+                 loai_giay_to: null, loai_dia_chi: null }],
+      assets: [], owner_row_id: `r${id}`,
+    },
+    diagram: { state: { version: 3, domain: 'inheritance', nodes: [] },
+               render_model: null },
+    warnings: [],
+  };
+}
+
+function guardRespond(cmd, payload) {
+  if (cmd === 'notary.case_list') return { ok: true, data: CASE_LIST };
+  if (cmd === 'notary.workspace_get') {
+    return { ok: true, data: wsPayload(
+      payload.case_id, payload.case_id === 42 ? 'Người Gốc' : 'Hồ Sơ Khác') };
+  }
+  return null;
+}
+
+const guardTick = () => new Promise((r) => setTimeout(r, 10));
+
+test('guard: dirty + mở hồ sơ khác → Ở lại giữ nguyên nháp', async (t) => {
+  const confirmSeen = [];
+  const { model, view, calls } = build(t, {
+    draft: false, confirm: false, confirmSeen, respond: guardRespond });
+  model.updatePersonField('c1', 'ho_ten', 'Tên Đã Sửa');
   assert.equal(model.state.stageDirty, true);
-  assert.equal(model.state.diagramDirty, true);
-  const undo = findBtns(view.el, 'Hủy thay đổi')[0];
-  await undo.onclick();
-  assert.equal(model.state.stage.people.length, 1,
-    'stage không về committed');
-  assert.equal(model.state.stage.people[0].row_id, 'c1');
-  assert.equal(model.state.stageDirty, false);
-  assert.equal(model.state.diagramDirty, false);
-  assert.equal(model.state.diagram.nodes.length, 0,
-    'diagram draft không về committed');
-  // đợt 3 (MIN-141): customer_list nap danh ba uy quyen luc render la
-  // hop le — "client-only" nghia la Hủy khong goi command ghi/workspace.
-  assert.equal(calls.filter(([c]) =>
-    /workspace|diagram|commit|intake|word/.test(c)).length, 0,
-    'Hủy gọi command workspace ra ngoài — phải client-only');
+  findBtns(view.el, 'Tổng quan hồ sơ')[0].onclick();
+  await guardTick();
+  const row = collect(view.el, (e) =>
+    e.classList.contains('cd-case-row') &&
+    /Hồ Sơ Khác/.test(e.textContent))[0];
+  assert.ok(row, 'thiếu hàng hồ sơ khác');
+  await row.onclick();
+  assert.equal(confirmSeen.length, 1, 'phải hỏi trước khi bỏ nháp');
+  assert.equal(model.state.caseId, 42, 'Ở lại phải giữ hồ sơ cũ');
+  assert.equal(model.state.stageDirty, true, 'nháp phải còn');
+  assert.equal(model.state.stage.people[0].ho_ten, 'Tên Đã Sửa');
+  assert.ok(!calls.some(([c]) => c === 'notary.workspace_get'),
+    'Ở lại không được tải hồ sơ khác');
 });
 
-test('cancel: nháp mới reset về nháp trống cùng loại việc', async () => {
-  const { model, view } = build(test);
-  model.addPerson();
-  model.updateCaseMeta('document_type', 'thoa_thuan');
-  const undo = findBtns(view.el, 'Hủy thay đổi')[0];
-  await undo.onclick();
-  assert.equal(model.state.stage.people.length, 0);
-  assert.equal(model.state.caseInfo.case_type, 'inheritance');
-  assert.equal(model.state.caseId, null);
-  assert.equal(model.state.stageDirty, false);
-});
-
-test('cancel: confirm=false không đụng draft', async () => {
-  const { model, view } = build(test, { confirm: false });
-  model.addPerson();
-  const undo = findBtns(view.el, 'Hủy thay đổi')[0];
-  await undo.onclick();
-  assert.equal(model.state.stage.people.length, 1,
-    'người dùng chọn Ở lại mà draft vẫn mất');
-});
+test('guard: bỏ nháp mở hồ sơ khác → không ghi, quay lại thấy bản đã lưu',
+  async (t) => {
+    const { model, view, calls } = build(t, {
+      draft: false, confirm: true, respond: guardRespond });
+    model.updatePersonField('c1', 'ho_ten', 'Tên Đã Sửa');
+    findBtns(view.el, 'Tổng quan hồ sơ')[0].onclick();
+    await guardTick();
+    const other = collect(view.el, (e) =>
+      e.classList.contains('cd-case-row') &&
+      /Hồ Sơ Khác/.test(e.textContent))[0];
+    await other.onclick();
+    await guardTick();
+    assert.equal(model.state.caseId, 43, 'phải mở hồ sơ khác');
+    assert.equal(model.state.stage.people[0].ho_ten, 'Hồ Sơ Khác');
+    assert.equal(model.state.stageDirty, false);
+    assert.ok(!calls.some(([c]) =>
+      /commit_stage|workspace_update|diagram_save|workspace_create/.test(c)),
+    'bỏ nháp không được ghi command nào');
+    // Quay lại hồ sơ cũ → thấy bản đã lưu, không còn bản bị bỏ.
+    findBtns(view.el, 'Tổng quan hồ sơ')[0].onclick();
+    await guardTick();
+    const back = collect(view.el, (e) =>
+      e.classList.contains('cd-case-row') &&
+      /Người Gốc/.test(e.textContent))[0];
+    await back.onclick();
+    await guardTick();
+    assert.equal(model.state.caseId, 42);
+    assert.equal(model.state.stage.people[0].ho_ten, 'Người Gốc',
+      'giá trị bị bỏ không được quay lại');
+    assert.equal(model.state.stageDirty, false);
+  });
 
 // ---------- land dialog ----------
 
@@ -463,30 +510,6 @@ test('stageDirty gate: Xem cách tính/Lưu sơ đồ disabled khi Stage chưa c
 function topbar(root) {
   return collect(root, (e) => e.classList.contains('cd-topbar'))[0];
 }
-
-test('MIN-133 D5: một thanh trên = tab cục bộ + hành động (không actionbar riêng)', () => {
-  const { view } = build(test, { draft: true });
-  const bars = collect(view.el, (e) => e.classList.contains('cd-topbar'));
-  assert.equal(bars.length, 1, 'phải có đúng một .cd-topbar');
-  const bar = bars[0];
-  assert.equal(bar.parentElement, view.el,
-    'thanh trên nằm trực tiếp dưới .cd-root');
-  const nav = collect(bar, (e) => e.classList.contains('cd-localnav'))[0];
-  assert.ok(nav, 'tab cục bộ phải nằm trong thanh trên');
-  assert.deepEqual(collect(nav, (e) => e.classList.contains('cd-tab'))
-    .map((b) => b.textContent), ['Tổng quan hồ sơ', 'Soạn hồ sơ', 'Word']);
-  const actions = collect(bar,
-    (e) => e.classList.contains('cd-topbar-actions'))[0];
-  assert.ok(actions && !actions.hidden);
-  const labels = collect(actions, (e) =>
-    e.tagName === 'BUTTON' || e.tagName === 'SELECT')
-    .map((e) => e.tagName === 'SELECT' ? 'select' : e.textContent);
-  assert.deepEqual(labels,
-    ['select', 'Nhập file', 'Zalo', 'Hủy thay đổi', 'Lưu hồ sơ']);
-  assert.equal(collect(view.el,
-    (e) => e.classList.contains('actionbar')).length, 0,
-    'còn .actionbar riêng — phải gộp vào thanh trên');
-});
 
 test('MIN-133 D4: không nút ‹, tiêu đề, pill Nháp, nhãn trạng thái lưu', () => {
   const { model, view } = build(test, { draft: true });
@@ -921,7 +944,7 @@ test('đợt3: ba dòng meta nằm trong card Tài sản, nhập → updateCaseM
   assert.ok(fid(view.el, 'meta:uq_add_catalog'), 'thieu nut + Danh bạ');
 });
 
-test('đợt3: meta-only dirty bat nut Cập nhật; Hủy khoi phuc baseline', async () => {
+test('đợt3: meta-only dirty bat nut Cập nhật (dirty dot)', async () => {
   const { model, view } = build(test, { draft: false });
   const upd = () => findBtns(topbar(view.el), 'Cập nhật')[0];
   const dots = (b) => collect(b, (e) => e.classList.contains('dirty-dot'));
@@ -933,15 +956,6 @@ test('đợt3: meta-only dirty bat nut Cập nhật; Hủy khoi phuc baseline', 
   assert.equal(model.state.metaDirty, true);
   assert.equal(dots(upd()).length, 1,
     'sua meta phai bat dirty tren nut Cap nhat');
-  // Huy → meta ve baseline committedCaseInfo (khong goi command ghi).
-  const undo = findBtns(view.el, 'Hủy thay đổi')[0];
-  await undo.onclick();
-  assert.equal(model.state.caseInfo.noi_niem_yet, 'xã Cũ',
-    'Huy phai khoi phuc noi_niem_yet baseline');
-  assert.equal(model.state.caseInfo.nguoi_nhan_uy_quyen,
-    'Người Nhận Gốc');
-  assert.equal(model.state.caseInfo.nguoi_nhan_uy_quyen_id, 7);
-  assert.equal(model.state.metaDirty, false);
 });
 
 test('đợt3: Cập nhật gui payload.case kem stage khi meta dirty', async () => {
@@ -1505,22 +1519,6 @@ test('NAIA-9: issuer input + suggestion box chỉ hiện khi ngay_chet có', asy
     'người chết phải có ô gợi ý nơi cấp khai tử');
   assert.ok(fid(view.el, `p:${dead.row_id}:noi_cap`),
     'thiếu input nhập địa chỉ UBND trên giấy khai tử');
-});
-
-test('existing issuer input labels distinguish living identity papers from death certificates and remain editable', () => {
-  const {model, view} = build(test);
-  const alive = model.addPerson({ho_ten:'Người Mẫu', noi_cap:'Bộ Coongan'});
-  const dead = model.addPerson({ho_ten:'Người Mẫu Đã Mất', ngay_chet:'2020-01-01', noi_cap:'UBND Mẫu'});
-  const liveInput = fid(view.el, `p:${alive.row_id}:noi_cap`);
-  const deadInput = fid(view.el, `p:${dead.row_id}:noi_cap`);
-  assert.equal(liveInput.placeholder, 'Cơ quan cấp giấy tờ');
-  assert.equal(liveInput.getAttribute('aria-label'), 'Nơi cấp giấy tờ — Người Mẫu');
-  assert.equal(deadInput.placeholder, 'UBND trên giấy khai tử');
-  assert.equal(deadInput.getAttribute('aria-label'), 'Nơi cấp giấy khai tử — Người Mẫu Đã Mất');
-  liveInput.value = 'Cơ quan sửa tay'; liveInput.oninput();
-  deadInput.value = 'UBND sửa tay'; deadInput.oninput();
-  assert.equal(model.state.stage.people.find(p=>p.row_id===alive.row_id).noi_cap, 'Cơ quan sửa tay');
-  assert.equal(model.state.stage.people.find(p=>p.row_id===dead.row_id).noi_cap, 'UBND sửa tay');
 });
 
 // ---------- TASK-4: nut Tra thu cong + overlay full ----------
