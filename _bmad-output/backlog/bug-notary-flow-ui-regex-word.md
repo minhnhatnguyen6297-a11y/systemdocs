@@ -40,7 +40,7 @@ Môi trường báo cáo: Electron qua `run-dev.bat`, Notary mock, engine ready,
 
 ## Cause Hypothesis
 
-Bố cục ưu tiên mật độ dữ liệu nhưng ghép trường khác nghĩa và làm vùng thao tác hẹp. Loại hồ sơ bất biến và Hủy thay đổi là contract cũ trái yêu cầu mới. Notary nhập DOCX đã dùng core chung, nhưng matcher vẫn giới hạn serial/nhãn địa chỉ; Upload Lab và tool test còn dùng engine cũ; editor chưa publish vào nguồn rule của app. Word có nhiều nguồn mẫu nhưng dialog không dẫn tới vị trí/catalog và catalog thiếu nhóm Hai bên.
+Bố cục ưu tiên mật độ dữ liệu nhưng ghép trường khác nghĩa và làm vùng thao tác hẹp. Loại hồ sơ bất biến (đã có ngoại lệ chuyển loại đã lưu, owner 16/10/2026 — [decision](../decisions/decision-owner-saved-case-type-conversion-20261016.md)) và Hủy thay đổi là contract cũ trái yêu cầu mới. Notary nhập DOCX đã dùng core chung, nhưng matcher vẫn giới hạn serial/nhãn địa chỉ; Upload Lab và tool test còn dùng engine cũ; editor chưa publish vào nguồn rule của app. Word có nhiều nguồn mẫu nhưng dialog không dẫn tới vị trí/catalog và catalog thiếu nhóm Hai bên.
 
 ## Acceptance Criteria
 
@@ -115,10 +115,10 @@ Bố cục ưu tiên mật độ dữ liệu nhưng ghép trường khác nghĩa
 
 - Decision: 2026-10-13 — owner yêu cầu một ticket tổng, đánh giá thiết kế và đối chiếu tài liệu trước sửa đồng bộ; regex phải dùng trong flow thật và chỉnh được khi test; cần tìm mẫu Word có placeholder.
 - Risk: high vì chuyển loại hồ sơ và thay nguồn trích xuất có thể làm sai snapshot/sơ đồ/Word. Kiểm tra ngoài tiêu chí ticket: người kiểm tra độc lập đối chiếu Word xuất với tài liệu thử và dữ liệu hồ sơ sau khi mở lại.
-- Unknown: quy tắc chuyển loại hồ sơ đã lưu chưa chốt; không triển khai chuyển đổi dựa trên suy đoán.
+- Unknown (đã đóng 16/10/2026): quy tắc chuyển loại hồ sơ đã lưu đã chốt ở #3 ([decision](../decisions/decision-owner-saved-case-type-conversion-20261016.md)); #25 chưa built.
 - Open question: tỷ lệ kích thước report áp vào target thực hay toàn vùng khoanh; thiết kế cần minh họa và xác nhận trước implementation.
 - Decision: 2026-10-13 — giữ một ticket theo yêu cầu owner; các chặng khảo sát, thiết kế, sửa và nghiệm thu nằm trong ticket này, không tự tách thành các ticket khác.
-- Source conflict: loại hồ sơ immutable theo Q8 nhưng report yêu cầu sửa sau lưu; cần quyết định chuyển đổi trước implementation.
+- Source conflict (đã giải 16/10/2026): loại hồ sơ immutable theo Q8 nhưng report yêu cầu sửa sau lưu — đã có ngoại lệ chuyển loại đã duyệt ([decision](../decisions/decision-owner-saved-case-type-conversion-20261016.md), contract §13.18).
 - Source conflict: bố cục ghi bỏ ô nơi cấp, tính năng tra cứu/code lại cho sửa trong ô Địa chỉ; cần vị trí có nghĩa riêng.
 - Source conflict: spec core cho serial nguyên văn nhưng matcher hiện chỉ nhận format hẹp; smoke đã cho thấy mất serial.
 - Evidence: intake service thật succeeded, 2 Người/1 Tài sản, profile transfer1.1.2; trace core xác nhận serial/địa chỉ missing; Word service thật saved Synthetic_HS-99.docx với dữ liệu đúng, hash mẫu không đổi. Không coi các smoke này là full flow Electron hoặc installer đã đạt.

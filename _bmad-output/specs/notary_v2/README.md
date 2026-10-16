@@ -12,7 +12,7 @@ Stage giữ thông tin Người/Tài sản; Diagram giữ vai trò/quan hệ; Wo
 
 Tên mong muốn là Danh sách hồ sơ. Người dùng xem danh sách, tìm/lọc, tạo nháp và mở hồ sơ. Nhãn trạng thái, người tạo, tên/ngày tạo là hướng mô tả; danh sách nhãn, nguồn tìm kiếm và trường lọc chưa chốt đầy đủ.
 
-Chọn Thừa kế hoặc Hai bên khi tạo nháp. Loại không hỗ trợ hiện lý do và khóa thao tác không có khả năng, không tự chuyển sang Thừa kế. Tạo hồ sơ lần đầu chưa cần Diagram; intake/evaluate nháp không ghi database. Quy tắc đổi loại của hồ sơ đã lưu còn chờ quyết định, không suy việc chọn loại lúc tạo thành quyền tự đổi domain.
+Chọn Thừa kế hoặc Hai bên khi tạo nháp. Loại không hỗ trợ hiện lý do và khóa thao tác không có khả năng, không tự chuyển sang Thừa kế. Tạo hồ sơ lần đầu chưa cần Diagram; intake/evaluate nháp không ghi database. Đổi loại của hồ sơ **đã lưu** chỉ qua đường chuyển loại đã duyệt (`inheritance` ↔ `two_party`): giữ ID + giá trị Người/Tài sản của Stage, reset Diagram theo domain mới (Thừa kế: seed **chỉ** node `owner` mới chọn — không seed khung 7 slot mặc định, không giữ quan hệ/dấu cũ, nhưng vẫn **đủ key bắt buộc** với `parentSlotIds`/`ownPositions`/`receivePositions` rỗng, `spouseSlotId:null`; Hai bên: 30 slot trống), buộc chọn `document_type` hợp lệ của loại mới và xác nhận phần Diagram mất trước khi ghi; chuyển vào Thừa kế cần `owner_row_id` từ Stage, vào Hai bên cấm trường đó. Không suy việc chọn loại lúc tạo nháp thành quyền tự đổi domain; `case_type`/`document_type` vẫn bất biến ngoài đường này ([decision](../../decisions/decision-owner-saved-case-type-conversion-20261016.md), contract §13.18).
 
 Chỉ hồ sơ `draft` được xóa. Xóa trong một lần ghi trọn vẹn: dọn dữ liệu thuộc hồ sơ nếu không còn được hồ sơ khác, participant, liên kết tài sản hoặc snapshot tham chiếu. Danh bạ người nhận ủy quyền tái dùng không bị xóa theo hồ sơ; không quét danh bạ mồ côi ngoài phạm vi. Lỗi phải khôi phục toàn bộ.
 
@@ -102,7 +102,8 @@ Yêu cầu tăng vùng sơ đồ +50% (report 802) đã chốt theo quyết đ�
 - Gỡ thẻ không xóa người; xóa Stage dọn tham chiếu đúng; reorder giữ ID và báo đổi nghĩa vị trí.
 - Nhập nhiều nguồn giữ phần đã sửa, lỗi từng nguồn rõ ràng; dữ liệu mơ hồ không tự được xác nhận.
 - Xuất dùng đúng bản đã lưu, không sửa nguồn hoặc ghi đè đầu ra; kiểm văn bản có trường trống và văn bản chỉ cần Stage khi triển khai định hướng mới.
-- Chưa chốt: tìm/lọc/nhãn Danh sách hồ sơ; đổi loại hồ sơ đã lưu; chi tiết xử lý nhánh khi xóa nút giữa; tab Word tạo mẫu; phạm vi thay các điều kiện chặn hiện hành. Quy tắc tính thừa kế Draft không tự được duyệt.
+- Chuyển loại hồ sơ đã lưu: Người/Tài sản giữ ID + giá trị; Diagram reset rỗng theo domain mới; buộc chọn `document_type` mới kèm xác nhận; lỗi/xung đột/khóa không đổi state/revision.
+- Chưa chốt: tìm/lọc/nhãn Danh sách hồ sơ; chi tiết xử lý nhánh khi xóa nút giữa; tab Word tạo mẫu; phạm vi thay các điều kiện chặn hiện hành. Quy tắc tính thừa kế Draft không tự được duyệt.
 
 ## 10. Tra cứu chuyên sâu
 

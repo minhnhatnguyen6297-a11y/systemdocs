@@ -30,7 +30,7 @@ Việc đang mở được tổng hợp tại [catalog issue](../backlog/README.
 (16/10/2026; #17 built after independent Quick t2 clean; Upload failures and proof limits remain in the catalog/runtime record).
 [Ticket tổng cũ](../backlog/bug-notary-flow-ui-regex-word.md) giữ làm lịch sử và bị chặn tracking-only để không chạy trùng các leaf. Các điểm chính:
 
-- Chốt quy tắc đổi loại hồ sơ đã lưu trước khi làm.
+- Đổi loại hồ sơ đã lưu đã chốt 16/10/2026 (giữ ID + giá trị Người/Tài sản của Stage, reset Diagram rỗng, buộc chọn `document_type` mới + xác nhận; ngoại lệ `case_type` immutable — [decision](../decisions/decision-owner-saved-case-type-conversion-20261016.md)); [#25](../backlog/story-saved-case-type-conversion.md) refined, **chưa built**.
 - Sơ đồ/Stage: nhãn `Nơi chết`/`Nơi cấp giấy khai tử` theo bằng chứng (người đã mất thiếu bằng chứng vẫn `Nơi cấp giấy tờ`), Pool nội dung 224 (khung 240), ô Hai bên 202×52, thông báo tạm trong khoảng trống thanh trên (bám trên cùng khi vùng nội dung cuộn) không đẩy Sơ đồ; nút `Hủy thay đổi` của Stage đã gỡ, bảo vệ nháp giữ. Vùng Sơ đồ + Pool +50% chiều cao (802, đã chốt: sàn 726px từ baseline 484px, không đổi chiều rộng).
 - Regex gợi ý intake (#7) và cutover **#22 built 16/10/2026**: Notary/Upload/tool dùng **một đường luật chung** `tools/regex_workbench/engine/contract_extract.py` (identity `contract_word`), adapter giữ IO/mapping và `source_refs` span nguồn. Serial nguyên văn, địa chỉ có nhãn, nhóm/cụm đất nhiều dòng được giữ; ô phẳng mâu thuẫn vẫn báo mơ hồ. Retained Quick t1 findings → các vòng vá Q1–Q7/MB1–MB9 → **retained Quick final multiline recheck clean 16Oct**, parent chấp nhận. Bằng chứng cuối: workbench **53 passed, 6 subtests**; intake + Word-first **130 passed, 2 subtests** + guard chuyển nhóm **1 passed**; Upload bounded **11 passed, 9 subtests**. So API **828 trường khớp / 0 lệch**, **44 null + 256 shape chưa kiểm**, F10/F11 unreviewed — không phải all-accuracy. Sidecar thật trên bundle đã stage chứng minh exact DOCX multiline + provenance, Upload scan 1/1/1; **native GUI DOCX chưa thực thi** (seam raw path/file_token). Full Notary 1139 passed/2 skipped là trước round 5–7, không claim full suite hiện tại. Dev Workbench UI giữ, gọi lõi thật; bỏ editor JSON profile lỗi thời. [#22](../backlog/story-shared-regex-consumer-cutover.md) · [bằng chứng](../tmp/issue-22-regex-consumer-cutover/evidence/EXECUTION-SUMMARY.md).
 - Rule regex văn bản và rule upload theo website do developer quản lý, có phân biệt phiên bản để nhận biết; owner chốt 16/10/2026 người dùng sản phẩm không có tính năng thử/công bố/chọn phiên bản/rollback — [#23](../backlog/story-in-flow-regex-publication-review.md) superseded, [#8](../backlog/spike-regex-rule-lifecycle.md) đã có đáp án nghiệp vụ ([decision](../decisions/decision-owner-regex-rule-developer-only-20261016.md)).
@@ -117,7 +117,9 @@ trỏ tới phần nhỏ để bắt đầu tìm hiểu.
 | Word: xuất | Tạo văn bản từ hồ sơ | [Xuất Word](notary_v2/word-templates.md#export) | [case-drafting-model.js](../../shell/src/renderer/notary/case-drafting-model.js) · `exportWord` |
 | Word: mở file | Mở file kết quả | [Xuất Word](notary_v2/word-templates.md#export) | [word-export-dialog.js](../../shell/src/renderer/notary/word-export-dialog.js) · `resultRowEl` |
 
-**Chuyển loại hồ sơ sau khi lưu** còn chờ quy tắc owner trong ticket; không xem
+**Chuyển loại hồ sơ sau khi lưu** đã có quy tắc owner 16/10/2026 ([decision](../decisions/decision-owner-saved-case-type-conversion-20261016.md),
+contract §13.18): giữ Người/Tài sản của Stage, reset Diagram rỗng theo domain mới, buộc chọn
+`document_type` mới kèm xác nhận. [#25](../backlog/story-saved-case-type-conversion.md) refined, **chưa built**; không xem
 lựa chọn loại lúc tạo nháp là bằng chứng đã hỗ trợ đổi loại.
 
 ## upload_lab — Số hóa và chuẩn bị upload hồ sơ cũ

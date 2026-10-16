@@ -113,7 +113,8 @@ cấm `owner_row_id` cho Case hai bên.
 
 Save dùng `case_id`, `base_revision` và state canonical đủ 30 slot. Slot ngoài
 `p1..p30`, người ngoài Stage, trùng người hoặc mang field thừa kế đều bị từ
-chối. Không được tự đổi domain của Case.
+chối. Không được tự đổi domain của Case, **trừ** đường chuyển loại đã lưu đã
+duyệt (reset Diagram rỗng theo domain mới; spec notary §2, contract §13.18).
 
 Word export đã hỗ trợ hồ sơ hai bên (NAIA-8): `capabilities.word_export`
 trả `true`, `word_export_*` không còn trả `case_type_unsupported` cho

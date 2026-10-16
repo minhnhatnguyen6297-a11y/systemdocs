@@ -552,7 +552,8 @@ result.data:
 - **`payload.case` (đợt 3):** metadata hồ sơ ghi cùng transaction —
   validate fail hoặc stage fail → không cái nào ghi. `case_type`/
   `document_type` gửi kèm phải khớp giá trị đã lưu (immutable qua
-  commit) — khác → `validation_error`. `nguoi_nhan_uy_quyen_id` phải
+  commit — **trừ đường chuyển loại đã duyệt**, §13.18) — khác →
+  `validation_error`. `nguoi_nhan_uy_quyen_id` phải
   tồn tại trong `customers`; kèm `nguoi_nhan_uy_quyen` lệch tên master →
   `validation_error`. Snapshot `case_state_json` đóng băng meta dưới
   block `payload.case` với key **canonical**
@@ -1050,6 +1051,7 @@ Consumer (Electron main/renderer) PHẢI:
 | v1.1 | 26/09/2026 | MIN-121 (additive, tương thích ngược): `notary.workspace_create` + `idempotency_key`; chế độ nháp (`case_id` absent) cho `intake_analyze`/`diagram_evaluate` (evaluate nháp kèm `stage` payload, `evaluated_revision:null`); `case` +`ngay_lap_ho_so`/`noi_niem_yet`/`ghi_chu`; field_error +`duplicate_entity`; error +`workspace_owner_required` |
 | v2 MIN-141 | 03/10/2026 | Owner xác nhận hành vi cuối 14 commit worker và yêu cầu gộp vào nhánh chính; thay các quy tắc MIN-140 mâu thuẫn, đồng bộ dữ liệu Người/cụm đất/Hồ sơ. Xem §13.16 |
 | v2 (APPROVED) | 27/09/2026 | Owner duyệt §13 (MIN-125, toàn bộ Q1–Q12): `schema_version` bump `notary.case-drafting.v2`; Stage draft/committed + create nguyên khối; `owner_row_id`; asset theo vị trí 1..3, bỏ `is_primary`; `ownPositions`/`receivePositions`; domain `two_party` 30 slot `p1..p30`; `case_type` immutable; error codes §13.9. Implement ở P5 (MIN-128). C1–C4 xử lý theo §13.13 |
+| v2 + conversion (owner) | 16/10/2026 | Owner duyệt chuyển loại hồ sơ **đã lưu** (#3): ngoại lệ `case_type`/`document_type` immutable (§6.1, §13.5) — giữ Người/Tài sản Stage, reset Diagram, buộc chọn `document_type` mới kèm xác nhận, `owner_row_id` theo loại đích; §13.18. [Decision](../_bmad-output/decisions/decision-owner-saved-case-type-conversion-20261016.md) |
 | additive NAIA-9 | 04/10/2026 | Thêm command thứ mười `notary.address_lookup` (§14): tra cứu đơn vị hành chính đích theo địa chỉ nguồn + `source_date`/`target_date` đầy đủ; read-only, local-only trên ledger Bando đóng gói; `result.data.schema_version` = `notary.address-lookup.v1` — ngoại lệ rule §1 |
 | address-lookup v2 (APPROVED, triển khai TASK-3) | 05/10/2026 | TASK-2, Owner duyệt 05/10: thay v1 bằng `notary.address-lookup.v2` (§14) — payload `query`+`presentation`, bỏ ngày/tách xã-tỉnh/`coverage`/`partial`; result `found\|not_found\|too_many\|invalid_input\|reload_failed`. **Breaking**; runtime và schema v1 đã chuyển/xóa tại TASK-3. |
 
@@ -1064,6 +1066,10 @@ Consumer (Electron main/renderer) PHẢI:
 >
 > Các câu hỏi C1–C4 (§13.13) vẫn mở — xử lý theo ghi chú từng mục,
 > không chặn implement phần đã duyệt.
+>
+> **Bổ sung 16/10/2026 (owner):** hồ sơ **đã lưu** được chuyển loại
+> (`inheritance` ↔ `two_party`) — ngoại lệ `case_type`/`document_type`
+> immutable, xem §13.18.
 >
 > Mọi mục dưới đây gắn mã `Q#` ↔ bảng quyết định tại
 > `_bmad-output/archive/linear-tasks/MIN-125/decisions.md` (đề xuất + phương án thay thế).
@@ -1325,6 +1331,9 @@ diagram_state v3 (domain two_party):
   là semantics client; wire chỉ thấy state sau hoán đổi.
 - `case_type` **immutable** sau khi tạo; đổi loại ở draft chưa tạo =
   client reset diagram buffer theo domain mới (rule client, Q8).
+- **Ngoại lệ (owner 16/10/2026):** hồ sơ **đã lưu** chuyển loại qua
+  đường chuyển loại đã duyệt — §13.18; ngoài đường đó `case_type`/
+  `document_type` vẫn bất biến (§6.1).
 
 ### 13.6 `workspace_create` v2 — owner trong Stage, diagram optional (Q1)
 
@@ -1665,6 +1674,44 @@ contract trao đổi hồ sơ giữa Upload Lab và Soạn hồ sơ. Envelope v�
   độc lập, exclusive create và tăng hậu tố khi trùng; cancellation dọn temp,
   giữ file đã publish. Giới hạn và phạm vi đọc tại
   [`spec DOCX`](../_bmad-output/specs/notary_v2/word-templates.md#docx-import).
+
+### 13.18 Chuyển loại hồ sơ đã lưu — ngoại lệ `case_type` immutable (owner 16/10/2026)
+
+**Nguồn:** owner duyệt nguyên đề xuất #3 ngày 16/10/2026 —
+[`decision-owner-saved-case-type-conversion-20261016.md`](../_bmad-output/decisions/decision-owner-saved-case-type-conversion-20261016.md);
+evidence `_bmad-output/tmp/issue-3-saved-case-policy/evidence.md`. Đây là ngoại lệ
+duy nhất cho luật `case_type`/`document_type` immutable (§6.1, §13.5, §13.6);
+ngoài đường này hai key vẫn bất biến.
+
+Phạm vi: hồ sơ **đã lưu** đổi giữa `inheritance` và `two_party`.
+
+- **Giữ Stage:** `stage.people`/`stage.assets` giữ nguyên `row_id` và giá trị;
+  không migrate/copy Người/Tài sản, không thêm bớt.
+- **Reset Diagram:** state mới mang domain của loại đích, seed rỗng — two_party:
+  đủ 30 node `p1..p30` với `personId:null`, không field quan hệ/dấu; inheritance:
+  seed **chỉ** node `owner` mirror đúng người vừa chọn — **không** seed khung 7
+  slot mặc định của tạo mới, không slot/quan hệ nào khác. Node này **vẫn đủ 8 key**
+  bắt buộc của `node_v3_inheritance` (§13.4; `draft-v2.schema.json`), **rỗng giá
+  trị chứ không bỏ key**: `id:"owner"`, `personId:<owner_row_id>`,
+  `parentSlotIds:[]`, `spouseSlotId:null`, `ownPositions:[]`, `receivePositions:[]`,
+  `hidden:false`, `deleted:false` (thiếu/`null` mảng → `invalid_node` như §13.4).
+  Không có mapping liên miền; không suy ghế/quan hệ/tài sản từ domain cũ.
+- **`document_type`:** hai tập enum rời nhau (`{khai_nhan, thoa_thuan}` ↔
+  `{chuyen_nhuong, tang_cho, cho_thue, dat_coc}`); client **buộc người dùng chọn**
+  giá trị hợp lệ của loại đích, không tự gán giá trị đầu enum.
+- **Xác nhận:** một bước xác nhận nêu rõ phần Diagram sẽ mất trước khi ghi.
+- **`owner_row_id`:** chuyển **vào** inheritance bắt buộc chọn `owner_row_id` là
+  `row_id` có trong Stage hiện có (thiếu → `workspace_owner_required`); chuyển
+  **vào** two_party **cấm** `owner_row_id` như §13.5/§13.6.
+- **Không reset gì thêm** ngoài Diagram/domain và các guard `document_type`/owner.
+- **Guard (không thêm cơ chế mới):** ghi kèm `base_revision`, lệch →
+  `workspace_conflict`; hồ sơ `locked` chỉ đọc; một transaction, lỗi/hủy → hoàn
+  tác toàn bộ, `revision` không đổi, bản cũ còn dùng được.
+- **Word/binding:** giữ nguyên §13.17 — không remap ngầm; N/ghế đổi, hash/slot
+  đổi → `word.original_mapping_invalid`; không thêm chặn cho hồ sơ đã xuất/bound.
+- **Đường ghi/command:** developer chọn ở #25 (mở `workspace_update`/commit hay
+  command riêng); decision này không chốt wire. Schema/API mô tả `immutable` ở
+  `stage.schema.json`/`draft-v2.schema.json` do #25 cập nhật cùng code.
 
 ---
 
