@@ -110,8 +110,13 @@ cùng toàn bộ `docx_sources/` (gồm bằng chứng và mẫu) vào cùng m�
 không lấy DB trong source checkout thay cho DB engine-data. Khôi phục cả hai
 từ cùng bản sao khi ứng dụng vẫn đóng. Thử trước trong môi trường bản sao:
 mở hồ sơ đã nhập, kiểm hash nguồn/bằng chứng/mẫu và thử xuất theo bản gốc để
-phát hiện thiếu hoặc lệch dữ liệu. Đây là cách thao tác đề nghị; chưa kiểm
-phục hồi thực tế và chưa thay đổi giới hạn sao lưu/phục hồi đã ghi bên dưới.
+phát hiện thiếu hoặc lệch dữ liệu. Đây là cách thao tác đề nghị. Ngày 16/10/2026
+đã khôi phục một DB + `docx_sources` file-backed cô lập bằng dữ liệu tổng hợp
+(đã kiểm bằng các ca tổng hợp cô lập; bằng chứng sau khi dừng app là ca 3):
+`integrity_check` thành công, hồ sơ mở lại với binding đã lưu và xuất bản gốc
+thành công. Kết quả này không kiểm cài sạch, máy khác hoặc filesystem ngoài
+NTFS, và không thay đổi giới hạn vận hành/retention bên dưới; xem
+[Notes của issue #9](../../backlog/spike-word-real-route-acceptance.md#notes).
 
 `case_state_json.docx_import` version 1 chỉ giữ ID/hash nguồn,
 `candidate_id→row_id`, danh tính từng dòng đất và vị trí đã duyệt. Nguồn có tên
@@ -175,9 +180,17 @@ lại; lỗi thư mục/file vẫn dùng lỗi Word hiện hành, file đầu v�
 
 Tests dùng DOCX giả lập sinh trong thư mục thử: nhiều người/tài sản, bảng xen
 đoạn, gộp/lồng, Unicode tổ hợp/emoji, split-run, ảnh, trùng/mơ hồ, serial ngoài
-chuẩn, stale revision, hash/slot đổi, nguồn/mẫu và package không đổi ngoài vị
-trí được chọn. Chưa có corpus văn phòng gán nhãn, kiểm trang bằng Word thật,
-hoặc bản cài sạch trên máy khác. Tách/gộp tùy ý ứng viên từ nguồn không rõ
+chuẩn, stale revision, hash/slot đổi, nguồn/mẫu và package không đổi ngoài vị trí
+được chọn.
+
+Evidence #9 (16/10/2026): direct `word_batch_export` API xuất hai mẫu copy
+với hồ sơ synthetic; không đi qua renderer command transport hoặc native picker.
+Đã kiểm bằng các ca tổng hợp cô lập; bằng chứng sau khi dừng app là ca 3 —
+paired DB + `docx_sources` restore cho một binding synthetic và original export
+sau khi service mở lại đều thành công. Word COM `Documents.Open` bị timeout;
+không tạo PDF/ảnh trang. Xem [Notes của issue #9](../../backlog/spike-word-real-route-acceptance.md#notes).
+
+Chưa có corpus văn phòng gán nhãn, kiểm trang bằng Word thật, hoặc bản cài sạch trên máy khác. Tách/gộp tùy ý ứng viên từ nguồn không rõ
 ranh giới chưa có thao tác riêng; có thể sửa/bỏ ứng viên và thêm dòng Stage
 bằng tay, nhưng không tự tạo binding cho phần thêm tay.
 
@@ -406,7 +419,7 @@ Python giữ catalog, mapping, tên file và dựng câu; giao diện chỉ ch�
 
 Chuyển mẫu đọc bản sao DOCX/DOC, ghi thư mục mới và báo cáo từng file; không sửa nguồn. DOC dùng Word COM, giữ kiểm danh tính file và hash. Không tự tạo giá trị cho token lạ. Đã chốt bỏ token Số công chứng, Giá chuyển nhượng, Người ủy quyền2; giữ nhãn cần điền tay. Mã cố định biểu mẫu thuế chỉ miễn kiểm trên đúng mẫu đã xác minh.
 
-Kiểm chứng cũ không thay nghiệm thu mới: từng có batch 22 mẫu; chưa kiểm trực quan mọi trang. Luồng DOCX có kiểm mô phỏng và Electron nhưng chưa có corpus văn phòng gán nhãn đầy đủ hoặc phục hồi thật. Không tự tuyên bố giữ từng pixel.
+Kiểm chứng cũ không thay nghiệm thu mới: từng có batch 22 mẫu; chưa kiểm trực quan mọi trang. Luồng DOCX có kiểm mô phỏng và Electron. Evidence #9 ngày 16/10/2026 xác nhận direct service batch và paired DB+`docx_sources` backup/restore với dữ liệu synthetic (đã kiểm bằng các ca tổng hợp cô lập; bằng chứng sau khi dừng app là ca 3), nhưng native picker/renderer command transport chưa được chứng minh; Word COM timeout trước khi xuất trang. Chưa có corpus văn phòng gán nhãn đầy đủ hoặc bản cài sạch trên máy khác. Không tự tuyên bố giữ từng pixel.
 
 ## 6. Tab Word dự kiến
 
