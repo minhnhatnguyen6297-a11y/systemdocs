@@ -1352,8 +1352,8 @@ function createDiagramPane(ctx) {
     }
     if (gate) {
       const pill = h('span', 'pill warn', 'Cập nhật Stage trước');
-      pill.title = 'Đánh giá/lưu sơ đồ dùng Stage đã cập nhật — Cập ' +
-        'nhật hoặc Hủy thay đổi Stage trước.';
+      pill.title = 'Đánh giá/lưu sơ đồ dùng Stage đã cập nhật — bấm ' +
+        'Cập nhật ở thanh trên trước.';
       tools.append(pill);
     }
     tools.append(zoomClusterEl());

@@ -8,7 +8,7 @@ P1/P2 là ưu tiên đề xuất, không phải severity hay thứ tự ID. Cầ
 
 | Candidate / ID | Issue | Nhóm | Ưu tiên | Hard after | Sẵn sàng |
 |---|---|---|---|---|---|
-| C01 / #2 | [Không gian Stage, Pool và Diagram liền mạch, dễ thao tác](story-notary-workspace-continuity.md) | bug/report đã báo | P2 | không | 5/6 report đã làm + built phần này (18ae/b541/2c232/e86/ac5; Node 369 pass/0 fail, adapter 83 pass, GUI gói default 21/21 + đóng sạch, independent Quick clean); 802 (trục +50% vùng sơ đồ) chờ owner — #2 nói chung vẫn một phần |
+| C01 / #2 | [Không gian Stage, Pool và Diagram liền mạch, dễ thao tác](story-notary-workspace-continuity.md) | bug/report đã báo | P2 | không | 6/6 report đã built (18ae/b541/2c232/e86/ac5 + 802 sàn chiều cao 726px, geometry thật chứng minh; Node 193 pass/0 fail, adapter 83 pass, GUI gói default 0 fail + đóng sạch; independent Quick t1 patch thông báo dài + t2 clean) |
 | C02 / #3 | [Chốt quy tắc đổi loại hồ sơ đã lưu](spike-saved-case-conversion-semantics.md) | quyết định | P1 | không | lập kế hoạch/bằng chứng |
 | C03 / #4 | [Sơ đồ không hiển thị đúng thông báo khi gặp lỗi](bug-diagram-error-messages.md) | bug/report đã báo | P1 | không | built (2026-10-16; independent Quick review clean, no findings) |
 | C04 / #5 | [Lưu và mở lại sơ đồ hợp lệ còn thiếu dữ liệu](story-save-valid-incomplete-diagram.md) | khoảng lệch đã chọn | P1 | không | built (2026-10-16; full Notary 1115 passed, 2 skipped; scoped checks 41 + 239 passed, 2 skipped; diagram Node 30 passed; Electron 21/21; independent Quick t3 clean) |
@@ -37,11 +37,11 @@ P1/P2 là ưu tiên đề xuất, không phải severity hay thứ tự ID. Cầ
 | C26 / #27 | [Đối chiếu văn bản chuyển một phần và bãi bỏ hành chính cùng ngày](spike-administrative-same-day-evidence.md) | bằng chứng | P2 | không | chỉ nghiên cứu văn bản, không đổi thuật toán |
 | C27 / #28 | [Bỏ theo dõi kết quả Lưu và giữ tiến độ chuẩn bị theo lượt](story-upload-web-official-sot-cutover.md) | khoảng lệch theo quyết định owner | P1 | không | built (2026-10-16; UI E2E remains blocked by the deferred pre-existing `file_token` mismatch) |
 
-Khuyến nghị hiện hành, không phải lệnh triển khai: (1) #28 cutover đã được owner chốt và #4 formatter, #6 độ đầy đủ ngày, #7 field extraction, #5 lưu incomplete, #17 nền desktop đã built; #11 cũ đã dropped; vị trí đầu của #28 là đề xuất điều phối, không phải phần của lựa chọn A ban đầu; (2) tiếp theo là #2 workspace (câu hỏi trục đã hỏi owner), #9 nghiệm thu Word thật, #24 readiness điền dần; (3) #22 parity rồi #23 khi #8 có đáp án; (4) #25 khi #3 chốt semantics. Các việc nguồn/docs/quyết định độc lập có thể được đánh giá cùng lúc. Cần refinement/approval trước implementation.
+Khuyến nghị hiện hành, không phải lệnh triển khai: (1) #28 cutover đã được owner chốt và #4 formatter, #6 độ đầy đủ ngày, #7 field extraction, #5 lưu incomplete, #17 nền desktop đã built; #11 cũ đã dropped; vị trí đầu của #28 là đề xuất điều phối, không phải phần của lựa chọn A ban đầu; (2) #2 workspace đã built (trục 802 owner đã chốt: chiều cao, sàn 726px; Quick t2 clean); tiếp theo #9 nghiệm thu Word thật, #24 readiness điền dần; (3) #22 parity rồi #23 khi #8 có đáp án; (4) #25 khi #3 chốt semantics. Các việc nguồn/docs/quyết định độc lập có thể được đánh giá cùng lúc. Cần refinement/approval trước implementation.
 
 ## Câu hỏi còn mở và phần đã rõ
 
-- **C01 / #2:** Chỉ còn câu hỏi 802 — trục tăng 50% vùng sơ đồ (chiều cao hay chiều rộng) chờ owner chốt; Pool/ô Hai bên/vị trí thông báo đã chốt theo số đo thật + report. #2 vẫn một phần (5/6 report; chưa built).
+- **C01 / #2:** 802 đã làm theo quyết định owner (trả lời '1'): tăng CHIỀU CAO vùng Sơ đồ + Pool — sàn 726px từ baseline 484px của report, không đổi chiều rộng; geometry thật trên gói default xác nhận (thừa kế diagram 236→726px, khối gộp `.cd-rel-body` 244→734px; Hai bên giữ nguyên theo nội dung). 6/6 report đã built; independent Quick t1 (patch thông báo dài) + t2 clean.
 - **C02 / #3:** Khi đổi loại hồ sơ đã lưu, gán người, quyền sở hữu, lựa chọn văn bản và binding được giữ hay chuyển thế nào? Chuyển nào bị cấm; cần xem trước/xác nhận gì?
 - **C07 / #8:** Ai được công bố rule đã thử, nguồn rule có quyền ghi ở đâu, ghi nhận kích hoạt version/hash và rollback thế nào, duyệt khác biệt chạy lại ra sao mà không ghi đè Stage/binding đã xác nhận?
 - **C08 / #9:** Sau khi tận dụng nguồn đã tìm được, còn thiếu bản sao mẫu đại diện/đáp án nào để kiểm native, bản cài sạch và khôi phục? Không yêu cầu thử phá dữ liệu production.
@@ -67,13 +67,13 @@ Khuyến nghị hiện hành, không phải lệnh triển khai: (1) #28 cutover
 
 Chỉ ghi tóm tắt che dữ liệu; UUID dẫn tới bằng chứng private. Spec mới không chứng minh đã sửa.
 
-- `18ae1083-4110-4c2e-bb35-6b815d8d14ac` — Địa chỉ/Nơi chết và nơi cấp giấy tờ lẫn nghĩa → C01/#2; còn mở.
-- `2c232a28-38aa-49e0-b591-ad0f6de1d807` — Cần tăng chiều rộng Pool → C01/#2; còn mở.
-- `802bd69e-0b20-44df-8f83-7c83431fcd75` — Cần thêm chiều cao Pool/Sơ đồ → C01/#2; còn mở.
-- `ac5e3ae3-bb4b-40f1-8cab-97591a182c61` — Thông báo đẩy Sơ đồ xuống, gãy flow → C01/#2; còn mở.
-- `b54184b3-3606-4f7b-afec-1a7cf9d0a8e3` — Bỏ riêng Hủy thay đổi Stage, giữ bảo vệ nháp → C01/#2; còn mở.
+- `18ae1083-4110-4c2e-bb35-6b815d8d14ac` — Địa chỉ/Nơi chết và nơi cấp giấy tờ lẫn nghĩa → C01/#2; đã xử lý (nhãn theo bằng chứng).
+- `2c232a28-38aa-49e0-b591-ad0f6de1d807` — Cần tăng chiều rộng Pool → C01/#2; đã xử lý (nội dung 224/khung 240).
+- `802bd69e-0b20-44df-8f83-7c83431fcd75` — Cần thêm chiều cao Pool/Sơ đồ → C01/#2; đã xử lý (sàn 726px chiều cao, geometry trong plan phase).
+- `ac5e3ae3-bb4b-40f1-8cab-97591a182c61` — Thông báo đẩy Sơ đồ xuống, gãy flow → C01/#2; đã xử lý (thông báo trong thanh trên).
+- `b54184b3-3606-4f7b-afec-1a7cf9d0a8e3` — Bỏ riêng Hủy thay đổi Stage, giữ bảo vệ nháp → C01/#2; đã xử lý (nút + cơ chế khôi phục riêng đã gỡ, guard giữ).
 - `d9da640e-43fd-435e-b892-f05b517eff1f` — Không sửa được loại hồ sơ đã lưu → C02/#3 rồi C24/#25; còn mở.
-- `e86a02bb-9e67-48ba-a14a-46b787553231` — Ô Hai bên dẹt, khó thả → C01/#2; còn mở.
+- `e86a02bb-9e67-48ba-a14a-46b787553231` — Ô Hai bên dẹt, khó thả → C01/#2; đã xử lý (ô 202×52, giữ p1..p30).
 
 ## Mười hai report lịch sử mất ghi chú — C17 / #18
 

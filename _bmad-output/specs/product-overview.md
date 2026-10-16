@@ -31,7 +31,7 @@ Việc đang mở được tổng hợp tại [catalog issue](../backlog/README.
 [Ticket tổng cũ](../backlog/bug-notary-flow-ui-regex-word.md) giữ làm lịch sử và bị chặn tracking-only để không chạy trùng các leaf. Các điểm chính:
 
 - Chốt quy tắc đổi loại hồ sơ đã lưu trước khi làm.
-- Sơ đồ/Stage: nhãn `Nơi chết`/`Nơi cấp giấy khai tử` theo bằng chứng (người đã mất thiếu bằng chứng vẫn `Nơi cấp giấy tờ`), Pool nội dung 224 (khung 240), ô Hai bên 202×52, thông báo tạm trong khoảng trống thanh trên (bám trên cùng khi vùng nội dung cuộn) không đẩy Sơ đồ; nút `Hủy thay đổi` của Stage đã gỡ, bảo vệ nháp giữ. Vùng sơ đồ +50% (802) còn chờ owner chốt trục.
+- Sơ đồ/Stage: nhãn `Nơi chết`/`Nơi cấp giấy khai tử` theo bằng chứng (người đã mất thiếu bằng chứng vẫn `Nơi cấp giấy tờ`), Pool nội dung 224 (khung 240), ô Hai bên 202×52, thông báo tạm trong khoảng trống thanh trên (bám trên cùng khi vùng nội dung cuộn) không đẩy Sơ đồ; nút `Hủy thay đổi` của Stage đã gỡ, bảo vệ nháp giữ. Vùng Sơ đồ + Pool +50% chiều cao (802, đã chốt: sàn 726px từ baseline 484px, không đổi chiều rộng).
 - Regex gợi ý intake (#7): runtime giữ serial nguyên văn theo nhãn và nhận địa chỉ thửa có nhãn trong profile transfer 1.1.3; smoke Notary thật và review Quick độc lập sạch. [#7](../backlog/bug-regex-raw-serial-parcel-address.md).
 - Giúp tìm mẫu Word và biết chỗ điền dữ liệu nào được hỗ trợ.
 - Upload: đã bỏ theo dõi kết quả Lưu, runtime cutover 15/10/2026. [#28](../backlog/story-upload-web-official-sot-cutover.md).

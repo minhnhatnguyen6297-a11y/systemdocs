@@ -1085,7 +1085,7 @@ wire; backend P5 emit `v2` thống nhất.
 | `diagram` trong `workspace_create` | bắt buộc, phải có owner node | **optional** — server tự seed |
 | Pool của hồ sơ mới | đòi owner/primary trước khi gán | `Cập nhật` đầu = `workspace_create` (Q1) |
 
-### 13.2 Vòng đời Stage: draft / committed / Cập nhật / Hủy
+### 13.2 Vòng đời Stage: draft / committed / Cập nhật / bỏ nháp khi mở hồ sơ khác
 
 Contract chỉ định nghĩa trạng thái **committed** (server persist, trả
 qua `workspace_get`/result của write) và payload `stage` trên wire. Phần
@@ -1097,9 +1097,9 @@ stage draft buffer (client, không wire)          committed stage (server)
         │  Cập nhật ──► workspace_commit_stage ──►│  (hoặc workspace_create
         │            payload.stage = snapshot      │   với hồ sơ mới — Q1)
         │                                          │
-        │  Hủy (client-only, KHÔNG có command) ◄── │
-        ◄──────── restore buffer := snapshot ──────┘
-            committed mới nhất
+        │  bỏ nháp khi mở hồ sơ khác / khi đóng ◄──┤
+        ◄── (client-only, KHÔNG ghi) buffer := ────┘
+            committed của hồ sơ được mở
 ```
 
 - **`stage draft buffer`** — bản đang sửa trong phiên (thêm/xóa/sửa
@@ -1118,11 +1118,14 @@ stage draft buffer (client, không wire)          committed stage (server)
   tới khi `Cập nhật` thành công — lúc đó server prune theo §6.1 và trả
   `diagram.state` đã prune. UI được đánh dấu "sẽ gỡ khi Cập nhật" trên
   node (quyết định hiển thị của P6, không phải field wire).
-- **Hủy (Cancel)** — *client-only, không command mới*: discard buffer và
-  restore **cả** stage lẫn diagram buffer về committed snapshot mới
-  nhất (Q2). Sau Hủy: `row_id`, thứ tự asset, `personId`, positions —
-  tất cả đúng như bản committed; `revision` không đổi vì không có write.
-  Ví dụ "xóa asset rồi Hủy" ở §13.12.2.
+- **Bỏ nháp khi mở hồ sơ khác / khi đóng** — *client-only, không
+  command GHI*: buffer chưa commit **không** được ghi (không write nào
+  lên wire; điều hướng/đọc vẫn dùng `workspace_get` bình thường);
+  mở lại hồ sơ thì đọc đúng bản committed — `row_id`, thứ tự asset,
+  `personId`, positions đúng như bản committed; `revision` không đổi.
+  Nút `Hủy thay đổi` của Stage đã bỏ cùng cơ chế khôi phục riêng
+  (b541); dirty, cảnh báo rời/đóng và nhánh bỏ nháp giữ nguyên.
+  Ví dụ "xóa asset rồi bỏ nháp" ở §13.12.2.
 - **Pool** = `stage.people` **committed** trừ những `personId` đang gán
   trên diagram committed (giữ nguyên nghĩa §7/SOT). Pool **không** đọc
   draft buffer — tránh bug `caseId=null` hiện trạng (model đọc buffer
@@ -1452,7 +1455,7 @@ Data-codes mới: `stage.legacy_asset_overflow`,
   sẽ `<` server → `workspace_conflict` (idempotent qua revision).
 - Late response: client tương quan `job_id`/`command_id` + `case_id` của
   phiên hiện tại; result/job trễ từ phiên trước / case đã đổi / draft
-  đã Hủy PHẢI bị discard — không apply vào buffer (`_bmad-output/specs/ui/README.md`, giữ
+  đã bỏ nháp PHẢI bị discard — không apply vào buffer (`_bmad-output/specs/ui/README.md`, giữ
   nguyên).
 
 ### 13.12 Ví dụ trước/sau (JSON rút gọn)
@@ -1478,15 +1481,16 @@ Data-codes mới: `stage.legacy_asset_overflow`,
 // row_id aaaa KHÔNG được "kéo dấu" theo — không remap số sang ID cũ.
 ```
 
-#### 13.12.2 Xóa asset rồi Hủy — buffer vs committed (Q2, §13.2)
+#### 13.12.2 Xóa asset rồi bỏ nháp — buffer vs committed (Q2, §13.2)
 
 ```jsonc
 // committed: assets [A1,B2,C3]; node X.receivePositions=[2]
 // draft: user xóa B2  → buffer assets [A1,C3]; node X GIỮ [2] trong
 //        buffer (chưa prune ngay — khác hiện trạng)
-// Hủy:   buffer := committed → assets [A1,B2,C3], node X [2] — như
-//        chưa xóa. revision không đổi, không command nào lên wire.
-// (Nếu Cập nhật thay vì Hủy: server persist [A1,C3] → vị trí dồn:
+// bỏ nháp (mở hồ sơ khác / đóng, KHÔNG command ghi): buffer := committed →
+//        assets [A1,B2,C3], node X [2] — như chưa xóa.
+//        revision không đổi, không write nào lên wire (đọc vẫn workspace_get).
+// (Nếu Cập nhật thay vì bỏ nháp: server persist [A1,C3] → vị trí dồn:
 //  C3 = 2; X.receivePositions giữ [2] = giờ là C3.)
 ```
 
@@ -1548,8 +1552,9 @@ Producer v2 PHẢI (thêm vào §10):
 
 Consumer v2 PHẢI (thêm vào §10):
 
-- [ ] Giữ buffer draft tách committed; Hủy restore cả stage lẫn diagram;
-      không prune diagram khi xóa row trong draft.
+- [ ] Giữ buffer draft tách committed; bỏ nháp không ghi buffer chưa
+      commit (mở lại hồ sơ đọc bản committed); không prune diagram khi
+      xóa row trong draft.
 - [ ] Map chip `[1][2][3]` ↔ positions; không theo `row_id`; disable
       chip vị trí chưa có asset.
 - [ ] Reject state v2/v3 sai domain, `is_primary`/`isLandOwner` dư —
@@ -1616,7 +1621,8 @@ contract trao đổi hồ sơ giữa Upload Lab và Soạn hồ sơ. Envelope v�
 - Backend chỉ nhận ứng viên/vị trí từ extraction package đã lưu khi intake
   được cấp quyền. Stage và context lưu cùng transaction và revision; omit
   context giữ bản cũ, `sources:[]` là xóa đối chiếu. Xóa row prune record và
-  binding, không gắn sang row khác. Hủy nháp khôi phục context đã commit.
+  binding, không gắn sang row khác. Bỏ nháp không ghi context chưa commit;
+  mở lại hồ sơ đọc đúng context đã commit (nút `Hủy thay đổi` của Stage đã bỏ).
   Client kiểm giới hạn 8 nguồn trước khi thêm row. Gỡ nguồn gửi context còn
   lại (kể cả sources rỗng); không đọc file của nguồn được gỡ. Xóa cụm đất
   loại binding của chính cụm nguồn ấy; không lấy vị trí mảng mới làm danh tính.

@@ -524,8 +524,12 @@ function createNotaryModuleView(deps) {
     // và không đẩy vùng Sơ đồ (spec §8).
     if (s.notice) {
       const n = h('div', 'banner ok cd-notice-top');
-      const t = h('span', 'cd-notice-text', s.notice);
-      n.title = s.notice;
+      // Nội dung đầy đủ phải truy cập được bằng bàn phím: title trên div
+      // không focus được (Quick t1). Nút thật (Tab/Enter) mở dialog sẵn
+      // có của module để đọc hết thông báo dài.
+      const t = btn(s.notice, 'cd-notice-text',
+                    () => noticeDialog(s.notice));
+      t.title = s.notice;
       const x = btn('×', 'ghost sm', () => model.dismissNotice());
       n.append(t, h('span', 'grow', ''), x);
       bar.append(n);
@@ -1780,6 +1784,24 @@ function createNotaryModuleView(deps) {
   }
 
   // ---------- conflict dialog ----------
+
+  // Nội dung đầy đủ của thông báo tạm (Quick t1): dùng dialog sẵn có của
+  // module — Esc/×/click-outside, focus trap, trả focus về nút thông báo
+  // (openModal giữ opener). Không đổi thông báo mặc định trên thanh trên.
+  function noticeDialog(text) {
+    openModal((box, close) => {
+      const head = h('div', 'modal-head');
+      head.append(h('h2', 'modal-title', 'Thông báo'));
+      head.append(modalX(close));
+      box.append(head);
+      const body = h('div', 'modal-body');
+      body.append(h('div', 'cd-notice-full', text));
+      box.append(body);
+      const foot = h('div', 'modal-foot');
+      foot.append(btn('Đóng', '', () => close()));
+      box.append(foot);
+    });
+  }
 
   function conflictDialog() {
     const s = model.state;

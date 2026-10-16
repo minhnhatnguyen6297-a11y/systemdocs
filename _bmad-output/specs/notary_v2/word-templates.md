@@ -119,7 +119,9 @@ file an toàn do backend tạo để phân biệt nhiều hợp đồng. Chữ g
 giá trị người dùng sửa ở Stage đã lưu. Context và Stage ghi trong cùng
 transaction (một lần ghi trọn vẹn), dùng `base_revision` cũ thì từ chối cả
 lần ghi. Create/get/commit trả lại context để mở hồ sơ khác hoặc tải lại không
-mất đối chiếu. Hủy thay đổi khôi phục cả context đã lưu.
+mất đối chiếu. Nút `Hủy thay đổi` của Stage đã bỏ cùng cơ chế khôi phục riêng:
+bỏ nháp khi mở hồ sơ khác không ghi context chưa commit, và mở lại hồ sơ thì
+đọc đúng context đã lưu; dirty, cảnh báo rời/đóng và nhánh bỏ nháp giữ nguyên.
 
 Đối chiếu Word là **một lần xuất hiện → ID dòng + trường + slot catalog**,
 không phải “thay mọi chuỗi giống nhau”. Màn Word hiện chữ gốc, tên/ID dòng,

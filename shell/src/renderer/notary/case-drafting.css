@@ -29,6 +29,14 @@
   --cd-col-name: 214px;
   --cd-col-date: 86px;
   --cd-col-id: 106px;
+  /* Sàn chiều cao vùng Sơ đồ + Pool (report 802; owner chốt 2026-10-16 —
+   * decision-owner-802-diagram-height-20261016): tăng CHIỀU CAO 50% từ
+   * baseline đo 484px tại viewport report (1920×983) → 726px; KHÔNG đổi
+   * chiều rộng. Áp lên chính vùng diagram (đúng phần tử report đo) nên
+   * cả Pool trong cùng hàng cũng cao theo. Nội dung lớn hơn (ô Hai bên
+   * cao lên) vẫn cao theo nội dung, không bị thu nhỏ — phần tăng do nội
+   * dung không tính là fix 802. */
+  --cd-rel-min-h: 726px;
   flex: 1 0 auto;
   display: flex;
   flex-direction: column;
@@ -201,17 +209,47 @@
 }
 /* Thông báo tạm (report ac5): nằm trong vùng hành động của thanh trên
  * (khoảng trống trước nút chính) — luôn trong tầm nhìn, không đè lên
- * điều khiển và không đẩy vùng Sơ đồ. Chỉ nút đóng nhận chuột. */
+ * điều khiển và không đẩy vùng Sơ đồ. Nhận chuột: nút nội dung (mở
+ * dialog đọc đầy đủ, Quick t1) và nút đóng. */
 .cd-notice-top {
   margin: 0;
   padding: 4px 8px;
   min-height: 0;
   max-width: 48ch;
+  /* Cho phép co lại: nút nội dung là <button> nên mặc định không shrink
+   * (flex 0 0 auto + min-width auto) — thông báo dài (>48ch) sẽ tràn
+   * thanh trên và đè nút chính nếu thiếu hai dòng này (Quick t1 long). */
+  flex: 0 1 auto;
+  min-width: 0;
 }
 .cd-notice-top .cd-notice-text {
+  /* Nút thật nhưng trông như chữ: Tab tới được, Enter mở dialog đọc đầy
+   * đủ (Quick t1 — title trên div không dùng được bằng bàn phím). */
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  /* display: block — nút mặc định inline-flex sẽ canh giữa nội dung và
+   * cắt cả hai đầu khi overflow; block cho ellipsis ở cuối như chuỗi. */
+  display: block;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  flex: 0 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.cd-notice-top .cd-notice-text:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.cd-notice-full {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 /* Nhãn trường mới (Nơi chết / Nơi cấp …) đọc đủ trong cột hẹp: cho xuống
  * dòng thay vì bị ellipsis chung của ô bảng. */
@@ -221,8 +259,10 @@
   line-height: 1.25;
 }
 /* Vùng sơ đồ = phần chiều cao còn lại (chỉ lớp NGOÀI CÙNG — bên trong
- * .cd-rel-card thuộc W3/relationship-diagram.js). min-height giữ sơ đồ
- * đọc được khi Stage đẩy xuống (≈ mockup 1366×768). */
+ * .cd-rel-card thuộc W3/relationship-diagram.js). Sàn thật của vùng nằm ở
+ * `.cd-diagram` (min-height 726px — report 802, xem `.cd-diagram`); 280px
+ * ở đây chỉ là sàn cho trạng thái suy giảm khi Stage đẩy xuống
+ * (≈ mockup 1366×768). */
 .cd-workspace > .cd-rel-card {
   flex: 1 0 auto;
   min-height: 280px;
@@ -580,7 +620,10 @@
 .cd-diagram {
   flex: 1 1 0;
   min-width: 0;
-  min-height: 0;
+  /* Sàn 726px = report 802 (+50% từ 484px baseline ở viewport report).
+   * Viewport thấp: vùng cao hơn phần còn lại nên trang (#view) cuộn;
+   * canvas vẫn là khung cuộn/pan bên trong. */
+  min-height: var(--cd-rel-min-h);
   display: flex;
   flex-direction: column;
 }
