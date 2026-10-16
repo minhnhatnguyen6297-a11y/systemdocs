@@ -480,7 +480,10 @@ def export_word(job, payload):
             raise CommandError("engine_unavailable",
                                f"khong mo duoc template: {exc}") from exc
         try:
-            mapping = we.build_template_mapping(case)
+            # Gate nhóm theo token mẫu thực dùng (owner 15/10/2026): mẫu đã
+            # mở ở trên — dùng đúng needs của nó, không gate blanket.
+            mapping = we.build_template_mapping(
+                case, needed=we.template_group_needs(doc))
         except we.WordExportValidationError as exc:
             raise CommandError("validation_error", str(exc)) from exc
         we.replace_in_doc(doc, mapping)

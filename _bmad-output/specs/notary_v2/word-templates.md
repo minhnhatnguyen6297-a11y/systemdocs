@@ -6,7 +6,12 @@
 
 Owner muốn điền được trường nào thì xuất trường đó; không bắt hoàn thành sơ đồ nếu văn bản chỉ cần Stage. Trường hợp lệ chưa có dữ liệu để trống. Token không hỗ trợ, dữ liệu chưa cập nhật và lỗi nguồn/mẫu không phải dữ liệu trống.
 
-Phần dưới giữ rõ giới hạn hiện hành để việc chỉnh spec không bị hiểu thành đã chỉnh code. Catalog legacy còn điều kiện Chủ/Nhận và giới hạn riêng; folder mode còn kiểm Stage/tài sản/slot đại diện. Việc thống nhất các điều kiện này với hướng mới phải được triển khai và kiểm riêng. Chưa có căn cứ đổi mapping hay coi mọi token thiếu slot đều được bỏ qua.
+Phần dưới giữ rõ giới hạn hiện hành. Đã đồng bộ theo owner 15/10/2026: gate
+nhóm (Chủ/Nhận, sơ đồ hai bên) chỉ áp theo **token mẫu thực sự dùng** — nhận
+diện theo registry key engine sinh, không theo chuỗi con; catalog backend áp
+theo mẫu từng `document_key`, folder mode giữ semantics nhóm thiếu để trống;
+gate kỹ thuật (thiếu người/tài sản, giới hạn số lượng) giữ nguyên; slot chưa
+giải quyết và người được ủy quyền mẫu cần vẫn làm riêng file đó lỗi.
 
 <a id="docx-import"></a>
 ## 2. Nhập hợp đồng và dùng lại bản gốc
@@ -267,12 +272,20 @@ quyền — renderer không gửi được path tùy ý hay thoát thư mục qu
 Không lấy dữ liệu chưa commit hoặc kết quả frontend tự tính. Placeholder chưa
 giải quyết phải làm file đó thất bại, không âm thầm để sót trong văn bản.
 
-Phase thư mục mẫu chỉ chặn lỗi kỹ thuật: thiếu người/tài sản đã lưu, giới hạn
-số lượng, mẫu/đường dẫn không hợp lệ và token không hỗ trợ. Thừa kế thiếu
-người nhận hoặc dấu Chủ vẫn xuất được trường tĩnh; nhóm chưa có dữ liệu để
-trống. Tại sao: owner NAIA-8 yêu cầu engine tĩnh trước; xuất được file không
-phải xác nhận hồ sơ đã hoàn thiện pháp lý. Catalog backend cũ giữ điều kiện
-chủ đất đã chết/người nhận để các consumer legacy không đổi hành vi.
+Gate nhóm phân loại theo **token mẫu thực sự dùng** (owner 15/10/2026):
+`no_landowner`/`no_deceased_landowner`/`no_receiver` chỉ áp khi mẫu dùng
+token của đúng nhóm đó — catalog backend áp theo mẫu của từng
+`document_key`; `no_diagram` của hai bên chỉ áp khi mẫu dùng ghế
+`Bên A`/`Bên B`. Nhận diện theo đúng registry key engine sinh (nhóm
+`Chủ đất sống`, `Chủ đất chết`, `Người nhận`, ghế hai bên) sau chuẩn hoá
+không dấu — không đoán theo chuỗi con, nên token metadata/ủy quyền kiểu
+`[Người nhận ủy quyền]` không kéo nhầm gate Người nhận.
+
+Folder mode giữ hành vi hiện hành: nhóm thiếu dữ liệu render rỗng — không
+thêm gate mới. Gate kỹ thuật luôn áp: thiếu người/tài sản đã lưu, giới hạn
+số lượng, mẫu/đường dẫn không hợp lệ và token không hỗ trợ. Tại sao: owner
+muốn điền dần — xuất được file không phải xác nhận hồ sơ đã hoàn thiện
+pháp lý.
 
 #### Placeholder và context
 
@@ -293,8 +306,9 @@ chủ đất đã chết/người nhận để các consumer legacy không đổ
   `[Bên A - Họ tên]`, `[Bên B - Họ tên]`, `[Tên bên A]`, `[Tên bên B]` =
   danh sách họ tên từng bên; placeholder riêng thừa kế render rỗng.
   Readiness hai bên chỉ kiểm tra kỹ thuật (`word.no_people`,
-  `word.no_diagram`, `word.no_assets`, `word.too_many_*`) — không áp điều
-  kiện chủ đất/người nhận của thừa kế, không thêm kiểm định pháp lý.
+  `word.no_assets`, `word.too_many_*`) và `word.no_diagram` khi mẫu thực
+  sự dùng ghế `Bên A`/`Bên B` — không áp điều kiện chủ đất/người nhận
+  của thừa kế, không thêm kiểm định pháp lý.
 - Ngày Người render theo đúng độ đầy đủ đã lưu: `YYYY` in nguyên năm
   (`2010`), `YYYY-MM-DD` in `dd/mm/yyyy`; token `Năm sinh`/`Năm chết` chỉ
   in năm. Token câu/dòng dựng sẵn không in ISO thô. Năm riêng đã lưu không
@@ -335,6 +349,9 @@ chủ đất đã chết/người nhận để các consumer legacy không đổ
 
 - Không chọn văn bản, key lạ/lặp, thiếu template, placeholder còn sót, file bị
   khóa hoặc path sai đều có code riêng.
+- Mẫu có mặt nhưng không mở/parse được: danh sách sẵn sàng báo đúng data-code
+  per-file mà lượt xuất sẽ trả (`word.render_failed`, `file_locked`,
+  `file_not_found`) — không nuốt lỗi thành gate dữ liệu cũ.
 - `word.missing_authorized_person`: mẫu đòi slot đại diện N lớn hơn số vai
   trò `Người được ủy quyền` đã lưu — file đó thất bại, không tạo DOCX.
 - Một file lỗi không bắt buộc làm mất file khác đã tạo.

@@ -831,12 +831,23 @@ per-file (§8.4), `block_reason` không liệt kê riêng.
 Các code này là kiểm tra **kỹ thuật** xuất file — không phải kiểm định
 pháp lý (§13.5).
 
-NAIA-8 phase thư mục mẫu (owner 02–03/10/2026): khi có `template_dir`,
-readiness chỉ chặn thiếu Stage/tài sản, giới hạn số lượng, thiếu sơ đồ hai bên
-và lỗi mẫu/đường dẫn. Không chặn inheritance vì thiếu dấu chủ đất/chủ đất đã
-chết/người nhận; nhóm chưa có dữ liệu render rỗng. Các lý do ba điều kiện này
-chỉ giữ trên catalog legacy không có `template_dir`. Token không hỗ trợ hoặc
-thiếu slot đại diện mẫu yêu cầu vẫn làm riêng file đó lỗi.
+Readiness theo **dữ liệu mẫu thực sự cần** (owner 15/10/2026): gate nhóm —
+`no_landowner`, `no_deceased_landowner`, `no_receiver` (thừa kế) và
+`no_diagram` của `two_party` — chỉ áp khi template **thực sự dùng token của
+nhóm đó**; nhận diện theo đúng registry key engine sinh (nhóm `Chủ đất
+sống`/`Chủ đất chết`/`Người nhận`, ghế `Bên A`/`Bên B`) sau chuẩn hoá không
+dấu, không theo chuỗi con, nên token metadata/ủy quyền không kéo nhầm gate
+Người nhận. Template không dùng nhóm thì bỏ qua gate, không áp blanket —
+catalog legacy áp theo mẫu thật của từng `document_key`; folder mode giữ
+semantics hiện hành (nhóm thiếu render rỗng, không gate nhóm), còn
+`no_diagram` hai bên cũng theo mẫu. Gate kỹ thuật luôn áp: `no_people`,
+`no_assets`, các giới hạn số lượng. Nhóm mà resolver hiện hành đã điền rỗng
+vẫn để trống (không đổi mapping/resolver). Token không hỗ trợ/không xác minh,
+slot chưa giải quyết (`word.unresolved_placeholders`) và thiếu người được ủy
+quyền mà mẫu cần (`word.missing_authorized_person`, NAIA-12) vẫn làm riêng
+file đó lỗi — không coi là field trống. Mẫu hiện diện nhưng không mở/parse
+được: readiness trả đúng data-code per-file mà batch sẽ trả (`word.render_failed`,
+`file_locked`, `file_not_found`) thay vì fallback gate cũ.
 
 Catalog `document_key` v1 (registry mở — backend được thêm):
 

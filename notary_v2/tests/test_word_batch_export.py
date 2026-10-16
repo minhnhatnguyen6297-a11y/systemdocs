@@ -7,6 +7,7 @@ theo persisted workspace shape). Chạy từ repo root notary_v2.
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import json
 import os
 import re
@@ -196,7 +197,65 @@ class TestExportOptions:
                 ]))
         docs = _docs_by_key(wbe.export_options(
             case, resolve_template=_resolve_builtin))
+        # Mẫu builtin không dùng nhóm "Người nhận" → gate nhóm bỏ qua theo
+        # template (owner 15/10/2026: readiness theo dữ liệu MẪU cần).
+        assert docs["khai_nhan_di_san"]["block_reason"] is None
+
+    def test_receiver_gate_only_when_template_needs_group(self, tmp_path):
+        owner = _person(1, "Nguyễn Văn Chủ", dead=date(2024, 2, 3))
+        child = _person(2, "Nguyễn Văn Con")
+        case = _make_case(
+            owner, properties=[_prop()],
+            case_state=_case_state(
+                owner, child,
+                nodes=[
+                    _node(1, role="Owner", is_land_owner=True),
+                    _node(2, role="Con", will_receive=False),
+                ]))
+        # Template TỰ tạo có token nhóm "Người nhận" → gate vẫn báo thiếu;
+        # alias KHÔNG DẤU cùng key cũng phải nhận đúng như consumer
+        # (`_lookup_placeholder` chuẩn hoá token trước khi khớp).
+        needs_receiver = tmp_path / "needs_receiver.docx"
+        doc = Document()
+        doc.add_paragraph("[Người nhận 1 - Họ tên]")
+        doc.save(str(needs_receiver))
+        docs = _docs_by_key(wbe.export_options(
+            case, resolve_template=lambda _k: needs_receiver))
         assert docs["khai_nhan_di_san"]["block_reason"] == "word.no_receiver"
+
+        needs_receiver_unaccented = tmp_path / "needs_receiver_ascii.docx"
+        doc = Document()
+        doc.add_paragraph("[Nguoi nhan 3 - Ho ten]")
+        doc.save(str(needs_receiver_unaccented))
+        docs = _docs_by_key(wbe.export_options(
+            case, resolve_template=lambda _k: needs_receiver_unaccented))
+        assert docs["khai_nhan_di_san"]["block_reason"] == "word.no_receiver"
+
+    def test_stage_only_template_two_party_without_saved_diagram(self, tmp_path):
+        a = _person(1, "Lê Văn A")
+        b = _person(2, "Phạm Thị B")
+        case = _make_case(
+            a, properties=[_prop()],
+            participants=[_participant(a, 'Ben A'), _participant(b, 'Ben B')],
+            case_state=None)
+        case.loai_van_ban = "chuyen_nhuong"
+        stage_only = tmp_path / "stage_only.docx"
+        doc = Document()
+        doc.add_paragraph("[Người 1 - Họ tên] và [Người 2 - Họ tên]")
+        doc.save(str(stage_only))
+        docs = _docs_by_key(wbe.export_options(
+            case, resolve_template=lambda _k: stage_only))
+        # Mẫu chỉ cần Stage → không bắt buộc sơ đồ hai bên đã lưu.
+        assert docs["khai_nhan_di_san"]["block_reason"] is None
+        # Và xuất THẬT được: render cùng needs của mẫu, không rơi lại gate cũ.
+        dest = tmp_path / "tp_out"
+        dest.mkdir()
+        data = _batch(case, ["khai_nhan_di_san"], dest,
+                      resolve_template=lambda _k: stage_only)
+        assert data["breakdown"]["succeeded"] == ["khai_nhan_di_san"]
+        text = Document(
+            data["documents"][0]["output_file"]["path"]).paragraphs[0].text
+        assert "Lê Văn A" in text and "Phạm Thị B" in text
 
     def test_no_deceased_landowner(self):
         owner = _person(1, "Nguyễn Văn Chủ")          # còn sống
@@ -1148,3 +1207,189 @@ class TestTemplateLinkEscape:
         _dir_link(tdir / "linkdir.docx", outside_dir)
         specs = wbe.scan_template_dir(tdir)
         assert specs == []
+
+
+def _folder(tmp_path, files):
+    """Thư mục mẫu + (specs, resolver) như export_options/export_batch."""
+    tdir = tmp_path / "templates"
+    tdir.mkdir()
+    for name, paragraphs in files.items():
+        doc = Document()
+        for text in paragraphs:
+            doc.add_paragraph(text)
+        doc.save(tdir / name)
+    return tdir, wbe.scan_template_dir(tdir), wbe.template_path_resolver(tdir)
+
+
+def _no_receiver_case():
+    owner = _person(1, "Nguyễn Văn Chủ", dead=date(2024, 2, 3))
+    child = _person(2, "Nguyễn Văn Con")
+    return _make_case(
+        owner, properties=[_prop()],
+        case_state=_case_state(
+            owner, child,
+            nodes=[
+                _node(1, role="Owner", is_land_owner=True),
+                _node(2, role="Con", will_receive=False),
+            ]))
+
+
+def _two_party_case():
+    a = _person(1, "Lê Văn A")
+    b = _person(2, "Phạm Thị B")
+    case = _make_case(
+        a, properties=[_prop()], case_state=None,
+        participants=[_participant(a, 'Ben A'), _participant(b, 'Ben B')])
+    case.loai_van_ban = "chuyen_nhuong"
+    return case
+
+
+class TestTemplateGroupClassification:
+    """Gate nhóm theo token mẫu thực dùng (owner 15/10/2026) — kiểm ở
+    biên consumer (export_options/export_batch), không pin helper nội bộ."""
+
+    def test_metadata_token_shapes_do_not_demand_receiver(self, tmp_path):
+        """Token metadata chứa "người nhận" nhưng KHÔNG phải key nhóm
+        Người nhận thì không được kéo gate `word.no_receiver`;
+        `[nguoinhanuyquyen]` là key metadata thật (xuất được), còn
+        `[Người nhận ủy quyền]` chưa hỗ trợ → per-file unresolved."""
+        tdir, specs, resolve = _folder(tmp_path, {
+            "metadata.docx": ["[nguoinhanuyquyen] — [Người 1 - Họ tên]"],
+            "metadata_unsupported.docx": ["[Người nhận ủy quyền]"],
+        })
+        docs = _docs_by_key(wbe.export_options(
+            _no_receiver_case(), resolve_template=resolve, doc_specs=specs))
+        assert docs["metadata.docx"]["block_reason"] is None
+        assert docs["metadata_unsupported.docx"]["block_reason"] is None
+        assert all(d["block_reason"] != "word.no_receiver"
+                   for d in docs.values())
+
+        dest = tmp_path / "out"
+        dest.mkdir()
+        case = _no_receiver_case()
+        data = _batch(case, ["metadata.docx"], dest,
+                      resolve_template=resolve, doc_specs=specs)
+        assert data["breakdown"]["succeeded"] == ["metadata.docx"]
+        assert "[" not in Document(
+            data["documents"][0]["output_file"]["path"]).paragraphs[0].text
+
+    def test_two_party_slots_template_still_requires_diagram(self, tmp_path):
+        """Mẫu dùng ghế `[Bên A N …]` (kể cả alias tên bên) thì gate
+        `word.no_diagram` vẫn áp ở cả folder (static) lẫn legacy."""
+        tdir, specs, resolve = _folder(tmp_path, {
+            "slots.docx": ["[Bên A 1 - Họ tên]"],
+            "names.docx": ["[Tên bên A] và [Tên bên B]"],
+        })
+        case = _two_party_case()
+        docs = _docs_by_key(wbe.export_options(
+            case, resolve_template=resolve, doc_specs=specs))
+        assert docs["slots.docx"]["block_reason"] == "word.no_diagram"
+        assert docs["names.docx"]["block_reason"] == "word.no_diagram"
+
+        dest = tmp_path / "out"
+        dest.mkdir()
+        with pytest.raises(wbe.WordBatchError) as exc:
+            _batch(case, ["slots.docx"], dest,
+                   resolve_template=resolve, doc_specs=specs)
+        assert exc.value.code == "word_batch_failed"
+        assert exc.value.result_data["documents"][0]["error"]["code"] == (
+            "word.no_diagram")
+
+    def test_folder_stage_only_two_party_exports_without_diagram(self, tmp_path):
+        """AC1 folder mode: mẫu chỉ cần Stage xuất được khi chưa có
+        diagram state — render dùng đúng needs của mẫu."""
+        tdir, specs, resolve = _folder(tmp_path, {
+            "stage_only.docx": ["[Người 1 - Họ tên] và [Người 2 - Họ tên]"],
+        })
+        case = _two_party_case()
+        options = wbe.export_options(
+            case, resolve_template=resolve, doc_specs=specs)
+        assert options["documents"][0]["ready"] is True
+        dest = tmp_path / "out"
+        dest.mkdir()
+        data = _batch(case, ["stage_only.docx"], dest,
+                      resolve_template=resolve, doc_specs=specs)
+        assert data["breakdown"]["succeeded"] == ["stage_only.docx"]
+        text = Document(
+            data["documents"][0]["output_file"]["path"]).paragraphs[0].text
+        assert "Lê Văn A" in text and "Phạm Thị B" in text
+
+    def test_folder_group_missing_stays_empty_not_fail(self, tmp_path):
+        """Folder mode giữ semantics §3.3: token nhóm thiếu dữ liệu render
+        rỗng (không thêm gate/fail mới)."""
+        tdir, specs, resolve = _folder(tmp_path, {
+            "needs_receiver.docx": ["[Người nhận 1 - Họ tên] | [Người 1 - Họ tên]"],
+        })
+        case = _no_receiver_case()
+        options = wbe.export_options(
+            case, resolve_template=resolve, doc_specs=specs)
+        assert options["documents"][0]["ready"] is True
+        dest = tmp_path / "out"
+        dest.mkdir()
+        data = _batch(case, ["needs_receiver.docx"], dest,
+                      resolve_template=resolve, doc_specs=specs)
+        assert data["breakdown"]["succeeded"] == ["needs_receiver.docx"]
+        text = Document(
+            data["documents"][0]["output_file"]["path"]).paragraphs[0].text
+        assert "[" not in text
+        assert "Nguyễn Văn Chủ" in text
+
+
+class TestFolderTemplateErrors:
+    def test_malformed_template_reports_per_file_code(self, tmp_path):
+        """Mẫu hỏng: readiness trả đúng data-code per-file mà batch trả —
+        không nuốt lỗi thành gate dữ liệu cũ; nguồn không đổi."""
+        tdir = tmp_path / "templates"
+        tdir.mkdir()
+        bad = tdir / "hong.docx"
+        bad.write_bytes(b"khong-phai-zip-docx")
+        before = bad.read_bytes()
+        specs = wbe.scan_template_dir(tdir)
+        resolve = wbe.template_path_resolver(tdir)
+        options = wbe.export_options(
+            _ready_case(), resolve_template=resolve, doc_specs=specs)
+        assert options["documents"][0]["ready"] is False
+        assert options["documents"][0]["block_reason"] == "word.render_failed"
+
+        dest = tmp_path / "out"
+        dest.mkdir()
+        with pytest.raises(wbe.WordBatchError) as exc:
+            _batch(_ready_case(), ["hong.docx"], dest,
+                   resolve_template=resolve, doc_specs=specs)
+        assert exc.value.code == "word_batch_failed"
+        entry = exc.value.result_data["documents"][0]
+        assert entry["status"] == "failed"
+        assert entry["error"]["code"] == "word.render_failed"
+        assert bad.read_bytes() == before
+        assert list(dest.iterdir()) == []
+
+    def test_mixed_batch_reports_per_file_states(self, tmp_path):
+        """Batch trộn: file tốt lưu; token lạ, token đại diện thiếu vai
+        trò, slot ngoài ranh hỗ trợ lỗi riêng từng file; nguồn không đổi."""
+        tdir, specs, resolve = _folder(tmp_path, {
+            "good.docx": ["[Người 1 - Họ tên]"],
+            "unknown.docx": ["Ký hiệu: [Ký hiệu lạ XYZ]"],
+            "auth_short.docx": ["[Người được ủy quyền 2 - Họ tên]"],
+            "beyond.docx": ["[Người 25 - Họ tên]"],
+        })
+        hashes = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                  for p in tdir.iterdir()}
+        dest = tmp_path / "out"
+        dest.mkdir()
+        case = _ready_case()
+        data = _batch(case, [s.document_key for s in specs], dest,
+                      resolve_template=resolve, doc_specs=specs)
+        by_key = {d["document_key"]: d for d in data["documents"]}
+        assert by_key["good.docx"]["status"] == "saved"
+        assert by_key["unknown.docx"]["error"]["code"] == (
+            "word.unresolved_placeholders")
+        assert by_key["auth_short.docx"]["error"]["code"] == (
+            "word.missing_authorized_person")
+        assert by_key["beyond.docx"]["error"]["code"] == (
+            "word.unresolved_placeholders")
+        assert data["breakdown"]["succeeded"] == ["good.docx"]
+        assert sorted(data["breakdown"]["failed"]) == [
+            "auth_short.docx", "beyond.docx", "unknown.docx"]
+        assert {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in tdir.iterdir()} == hashes
+        assert [p.name for p in dest.iterdir()] == ["good_HS-99.docx"]

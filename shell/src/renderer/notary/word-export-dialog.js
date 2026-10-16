@@ -34,6 +34,12 @@ const WORD_BLOCK_LABEL = {
   'word.too_many_signers': 'Quá nhiều người ký',
   'word.template_missing': 'Văn bản không còn mẫu trong thư mục',
   'word.original_mapping_invalid': 'Hãy kiểm tra và xác nhận lại các vị trí Word gốc',
+  // Mã per-file mà readiness cũng dùng (mẫu không mở/parse được, file đích
+  // khóa/mất) — readiness chỉ có code nên cần nhãn tiếng Việt; hàng kết quả
+  // dùng cùng nếp ưu tiên nhãn như các mã word.* phía trên.
+  'word.render_failed': 'Không xuất được văn bản từ mẫu',
+  'file_locked': 'File đang bị khóa bởi chương trình khác',
+  'file_not_found': 'Không tìm thấy file',
 };
 
 function createWordDialog(ctx) {

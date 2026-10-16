@@ -353,14 +353,17 @@ def _batch_data(dest_dir: Path, documents: list[dict], *,
 
 
 def _doc_error_from(exc: BaseException,
-                    context: word_engine.WordExportContext) -> tuple[str, str]:
+                    context: word_engine.WordExportContext, *,
+                    static: bool = False,
+                    needed: Optional[set] = None) -> tuple[str, str]:
     """Exception → (code, message) cho per-file error — data-code §2.5."""
     if isinstance(exc, _DocFailed):
         return exc.code, exc.message
     if isinstance(exc, word_engine.WordExportValidationError):
-        # Mapping render raise cùng check với word_block_reason — reason
-        # luôn non-None khi đây là một trong các lỗi §8.1.
-        reason = word_engine.word_block_reason(context)
+        # Mapping render raise cùng check với word_block_reason — truyền
+        # đúng `static`/`needed` của file đang xuất để reason khớp gate.
+        reason = word_engine.word_block_reason(context, static=static,
+                                               needed=needed)
         return (reason or "word.render_failed"), str(exc)
     if isinstance(exc, FileNotFoundError):
         return "file_not_found", f"không tìm thấy file/thư mục: {exc}"
@@ -468,17 +471,20 @@ def _publish(tmp_path: Path, dest_dir: Path, spec: WordDocumentSpec,
 
 def _export_one_document(*, spec: WordDocumentSpec, case: Any,
                          context: word_engine.WordExportContext,
-                         data_reason: Optional[str],
                          resolve_template: Callable[[str], Any],
                          mapping_holder: dict, dest_dir: Path,
                          taken: set[str], case_id: int, today: Any,
                          check: Callable[[], None], static: bool = False) -> dict:
     """Xuất một văn bản — trả word_document_result entry.
 
-    Mọi exception trong try → status:failed với data-code; exception
-    cancel (do `check()` raise) vẫn thoát qua — `check()` trong except
-    re-raise khi flag đang set, nên cancel không bao giờ nuốt thành failed.
+    Mẫu được mở ĐÚNG MỘT LẦN trong try: needs nhóm cho readiness lấy từ
+    chính document đang render (owner 15/10/2026 — không quét riêng rồi
+    mở lại). Mọi exception trong try → status:failed với data-code;
+    exception cancel (do `check()` raise) vẫn thoát qua — `check()` trong
+    except re-raise khi flag đang set, nên cancel không bao giờ nuốt
+    thành failed.
     """
+    needed: Optional[set] = None
     try:
         # Thứ tự check như mock: template → data validation → render.
         if not spec.has_template:
@@ -488,11 +494,17 @@ def _export_one_document(*, spec: WordDocumentSpec, case: Any,
         if template_path is None:
             raise _DocFailed("word.template_missing",
                              _block_message("word.template_missing"))
-        if data_reason is not None:
-            raise _DocFailed(data_reason, _block_message(data_reason))
 
         import docx  # lazy — giữ module import được khi thiếu python-docx
         doc = docx.Document(str(template_path))
+        # Readiness theo token mẫu thực dùng — cùng nguồn needs với
+        # export_options; mẫu không mở được rơi vào per-file error bên
+        # dưới (không fallback gate blanket cũ).
+        needed = word_engine.template_group_needs(doc)
+        data_reason = word_engine.word_block_reason(
+            context, static=static, needed=needed)
+        if data_reason is not None:
+            raise _DocFailed(data_reason, _block_message(data_reason))
         # NAIA-12: mẫu dùng token "[... người được ủy quyền N]" mà hồ sơ không
         # có đủ người gán vai trò đó -> FAIL, không xuất thầm văn bản khuyết
         # dữ liệu bắt buộc (token rỗng trông giống "đã điền").
@@ -505,11 +517,15 @@ def _export_one_document(*, spec: WordDocumentSpec, case: Any,
                 "Mẫu yêu cầu người được ủy quyền "
                 + ", ".join(str(slot) for slot in missing_auth)
                 + " nhưng hồ sơ chưa gán đủ vai trò đó")
-        mapping = mapping_holder.get("mapping")
+        # Mapping cache theo (static, needs): gate nhóm phụ thuộc từng mẫu
+        # nên không dùng chung một mapping cho mọi file (tránh kết quả phụ
+        # thuộc thứ tự file trong batch); mẫu cùng needs vẫn tái dùng.
+        cache_key = (static, frozenset(needed))
+        mapping = mapping_holder.get(cache_key)
         if mapping is None:
-            mapping = (word_engine.build_template_mapping(case, today=today, static=True)
-                       if static else word_engine.build_template_mapping(case, today=today))
-            mapping_holder["mapping"] = mapping
+            mapping = word_engine.build_template_mapping(
+                case, today=today, static=static, needed=needed)
+            mapping_holder[cache_key] = mapping
         word_engine.replace_in_doc(doc, mapping)
         unresolved = word_engine.find_unresolved_placeholders(
             doc, template_ref=template_path)
@@ -548,7 +564,8 @@ def _export_one_document(*, spec: WordDocumentSpec, case: Any,
             f"thiếu dependency python-docx: {exc}") from exc
     except Exception as exc:  # noqa: BLE001 — per-document boundary
         check()   # cancel pending → raise tại đây (doc tính skipped)
-        code, message = _doc_error_from(exc, context)
+        code, message = _doc_error_from(exc, context, static=static,
+                                        needed=needed)
         _logger.info("word_doc_failed %s",
                      {"document_key": spec.document_key, "code": code})
         return _failed_entry(spec, code, message)
@@ -569,16 +586,33 @@ def export_options(case: Any, *, resolve_template: Callable[[str], Any],
     `doc_specs` (NAIA-8): danh sách spec động từ `scan_template_dir` —
     thay DOC_CATALOG khi nguồn mẫu là thư mục người dùng chọn."""
     context = word_engine.build_word_context(case, today=today)
-    data_reason = word_engine.word_block_reason(context, static=doc_specs is not None)
     documents = []
     for spec in (doc_specs if doc_specs is not None else DOC_CATALOG):
         block = None
         if not spec.has_template:
             block = "word.template_missing"
-        elif resolve_template(spec.document_key) is None:
-            block = "word.template_missing"
         else:
-            block = data_reason
+            template_path = resolve_template(spec.document_key)
+            if template_path is None:
+                block = "word.template_missing"
+            else:
+                try:
+                    import docx  # lazy — giữ module import được khi thiếu python-docx
+                    doc = docx.Document(str(template_path))
+                    needed = word_engine.template_group_needs(doc)
+                except ImportError as exc:
+                    raise WordBatchError(
+                        "engine_unavailable",
+                        f"thiếu dependency python-docx: {exc}") from exc
+                except Exception as exc:
+                    # Mẫu hiện diện nhưng không mở/parse được: readiness báo
+                    # ĐÚNG data-code per-file mà export_batch sẽ trả — không
+                    # nuốt lỗi rồi fallback gate blanket cũ (AC2 mẫu hỏng).
+                    block = _doc_error_from(exc, context)[0]
+                else:
+                    block = word_engine.word_block_reason(
+                        context, static=doc_specs is not None,
+                        needed=needed)
         documents.append({
             "document_key": spec.document_key,
             "display_name": spec.display_name,
@@ -693,10 +727,8 @@ def export_batch(case: Any, *, case_id: int, document_keys: Any,
     # nhận per-file error chung, context build vừa thừa vừa có thể ném
     # raw exception ngoài shape per-doc (review MIN-116 minor).
     context = None
-    data_reason = None
     if dest_error is None:
         context = word_engine.build_word_context(case, today=today)
-        data_reason = word_engine.word_block_reason(context, static=doc_specs is not None)
     mapping_holder: dict = {}
 
     for key in keys:
@@ -708,7 +740,7 @@ def export_batch(case: Any, *, case_id: int, document_keys: Any,
         else:
             entry = _export_one_document(
                 spec=spec, case=case, context=context,
-                data_reason=data_reason, resolve_template=resolve_template,
+                resolve_template=resolve_template,
                 mapping_holder=mapping_holder, dest_dir=dest_dir,
                 taken=taken, case_id=case_id, today=today, check=_check,
                 static=doc_specs is not None)
