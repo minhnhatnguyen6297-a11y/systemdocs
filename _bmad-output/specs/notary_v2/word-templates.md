@@ -393,13 +393,15 @@ Ví dụ:
 - `[Người nhận 1 - ...]`: `1` là thứ tự của người nhận trong danh sách.
 - Trường dùng chung: họ tên, xưng hô, giới tính, ngày sinh, ngày chết,
   giấy tờ, ngày/nơi cấp, địa chỉ, quan hệ, vai trò, tỷ lệ.
-- Tên chuẩn `entities.md` (viết liền, không dấu, không `_`) cũng được
+- Tên chuẩn [`entities.md` §9.1](../../../contracts/entities.md) (viết liền,
+  không dấu, không `_` — tên trường/khóa canonical) cũng được
   thay: `[noiniemyet]`, `[nguoinhanuyquyen]`, `[noidungviec]`,
   `[ngaylaphoso]`, `[ghichu]`, `[documenttype]` cho hồ sơ; `[ten1]`,
   `[gioitinh1]`, `[ngaysinh1]`, `[ngaychet1]`, `[sogiayto1]`,
   `[ngaycap1]`, `[diachi1]`, `[loaigiayto1]`, `[noicap1]`,
   `[loaicutru1]`/`[loaidiachi1]` cho người số `N` (giá trị trùng alias
-  tiếng Việt tương ứng).
+  tiếng Việt tương ứng). Quy ước viết liền đó đặt tên trường/khóa;
+  dạng nhóm dễ đọc ở trên mới là chuẩn viết cho mẫu mới.
 - Alias cũ được giữ để mở template cũ nhưng không dùng làm mẫu mới.
 
 ### 4.2. Tầng placeholder

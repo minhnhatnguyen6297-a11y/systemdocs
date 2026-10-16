@@ -198,7 +198,8 @@ xã/phường cũ–mới còn ở NAIA-9, chưa có đường suy tự động 
 ### 9.1. Quy tắc chung đặt tên trường (Rule chung)
 
 - **Định dạng bắt buộc:** Tiếng Việt không dấu, viết thường toàn bộ, **viết liền không dấu, tuyệt đối KHÔNG có dấu gạch dưới `_` hay dấu cách**.
-- Tên nghiệp vụ mới và placeholder dùng quy ước trên. Tên cột DB và dữ liệu giao tiếp cũ như `loai_dat`, `so_giay_to` vẫn được giữ để tương thích; không đổi toàn bộ cột/schema. Các alias được hỗ trợ cụ thể ghi tại `notary-case-drafting.md`, không mặc định mọi tên chuẩn đều là key gửi được.
+- **Phạm vi quy ước:** áp cho **tên trường nghiệp vụ mới** và **tên canonical/họ token viết liền của placeholder** — gồm trường hồ sơ (`noiniemyet`, `nguoinhanuyquyen`, `noidungviec`, …), cụm đất `loaidat<M><N>`/`dientich<M><N>`/`thoihan<M><N>` (§9.2) và các alias viết liền được hỗ trợ. Quy ước này đặt tên **trường/khóa**, không đặt mặt chữ của mẫu: **placeholder trong mẫu mới** viết theo dạng nhóm dễ đọc `[Tên danh sách N - Trường]` (ví dụ `[Người 3 - Họ tên]`) tại [`word-templates.md` §4.1](../_bmad-output/specs/notary_v2/word-templates.md#placeholders); tên viết liền canonical vẫn được thay nhưng giữ slot legacy và tương ứng alias cũ — không đồng nhất thứ tự với nhóm dễ đọc của mẫu mới; alias cũ chỉ để mở template cũ.
+- Tên cột DB và dữ liệu giao tiếp cũ như `loai_dat`, `so_giay_to` vẫn được giữ để tương thích; không đổi toàn bộ cột/schema. Các alias được hỗ trợ cụ thể ghi tại `notary-case-drafting.md`, không mặc định mọi tên chuẩn đều là key gửi được.
 - **Ví dụ đúng:** `ten`, `ngaysinh`, `ngaychet`, `sogiayto`, `ngaycap`, `diachi`, `noicap`, `loaigiayto`, `loaicutru`, `noiniemyet`, `nguoinhanuyquyen`, `noidungviec`, `loaidat11`, `dientich11`, `thoihan11`, `loaidat12`, `dientich12`, `thoihan12`.
 
 ### 9.2. Bảng Tài sản (`properties`) — Phân biệt loại đất thứ mấy trong tài sản thứ mấy
