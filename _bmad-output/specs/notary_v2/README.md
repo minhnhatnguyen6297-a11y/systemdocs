@@ -63,7 +63,7 @@ Pool = người trong Stage đã cập nhật − người đã gán trên Diagr
 
 Kéo người vào vị trí để gán; gỡ thẻ trả người về Pool nhưng không xóa Stage. Một người không xuất hiện ở nhiều vị trí xung đột. Xóa ở Stage chỉ ảnh hưởng sơ đồ khi Cập nhật thành công.
 
-Hai bên có 30 vị trí cố định: p1..p15 Bên A, p16..p30 Bên B. Giữ ghế trống; thả lên ghế có người thì hoán đổi, không dồn danh sách. Thừa kế biểu diễn cha/mẹ, vợ/chồng, con và nhánh thế vị. Dấu Chủ/Nhận chọn theo vị trí tài sản 1..3; đổi thứ tự/xóa tài sản phải cảnh báo đổi nghĩa.
+Hai bên có 30 vị trí cố định: p1..p15 Bên A, p16..p30 Bên B. Giữ ghế trống; thả lên ghế có người thì hoán đổi, không dồn danh sách. Thừa kế biểu diễn cha/mẹ, vợ/chồng, con và nhánh thế vị; dấu Chủ/Nhận (sở hữu/nhận tài sản) chỉ thuộc Thừa kế, chọn theo vị trí tài sản 1..3; đổi thứ tự/xóa tài sản phải cảnh báo đổi nghĩa.
 
 Diagram có nháp riêng và nút Lưu sơ đồ. Xem cách tính chỉ đọc kết quả Python, không lưu và không tính lại bằng JavaScript. Quan hệ sai/vòng lặp/người ngoài Stage bị chặn; cấu trúc hợp lệ nhưng thiếu dữ liệu vẫn cho lưu, hiện rõ phần còn thiếu. Lỗi không xóa sơ đồ cũ. Xóa nút giữa có nguy cơ ảnh hưởng nhánh phải thông báo; cách xử lý nhánh cụ thể còn cần chốt.
 

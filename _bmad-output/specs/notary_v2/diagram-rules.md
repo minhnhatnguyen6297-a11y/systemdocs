@@ -60,7 +60,8 @@ tồn tại, `personId` thuộc Stage, không có vòng quan hệ và chạy eng
 - `diagram_state.version = 3` và `domain` bắt buộc.
 - Domain `inheritance` dùng node quan hệ cha/mẹ/vợ-chồng/con.
 - Domain `two_party` dùng 30 slot `p1..p30`; không mang field quan hệ thừa kế.
-- Node v2 dùng `ownPositions` và `receivePositions` theo vị trí tài sản 1..3.
+- Node domain `inheritance` dùng `ownPositions` và `receivePositions` theo vị
+  trí tài sản 1..3; node domain `two_party` cấm hai field này (§8.2).
 - `isLandOwner` và `willReceive` là field legacy, bị cấm trên wire v2.
 
 Contract chuẩn và schema máy đọc:
@@ -103,8 +104,9 @@ và `contracts/notary-case-drafting/*.schema.json`.
 ### 8.2. Dữ liệu và giới hạn
 
 State dùng `version: 3`, `domain: two_party` và 30 node có `id` cố định.
-Node chỉ giữ `id`, `personId`, `ownPositions`, `receivePositions`; cấm field
-quan hệ thừa kế như `parentSlotIds`/`spouseSlotId`. Stage tối đa 30 người và
+Node chỉ giữ `id`, `personId`, `hidden`, `deleted` (contract §13.5 APPROVED
+27/09/2026); cấm field quan hệ thừa kế như `parentSlotIds`/`spouseSlotId` và
+**cấm** `ownPositions`/`receivePositions`. Stage tối đa 30 người và
 cấm `owner_row_id` cho Case hai bên.
 
 ### 8.3. Lưu, lỗi và contract
