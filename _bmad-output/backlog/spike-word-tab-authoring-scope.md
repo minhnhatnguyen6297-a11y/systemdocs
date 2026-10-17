@@ -44,9 +44,9 @@ risk: medium
 
 ## Notes
 
-- Tracking: C18; **17/10/2026 — BLOCKED: owner chưa chọn nguồn vào/cam kết giữ bố cục**. Khảo sát và bản ghi gate đã được giao; `refined: false`, không built, không triển khai trong spike. #1 chỉ tracking, không chạy cùng leaf.
+- Tracking: C18; **owner answered 17/10/2026 — spike scope closed; tab authoring DEFERRED**, owner tự làm sau và cần spec kỹ trước implementation tương lai. Giữ Draft/`refined: false`, không built, không xóa leaf. [Decision](../decisions/decision-owner-word-authoring-deferred-20261017.md). Chuyển #20, không hỏi tiếp #19.
 - Risk: medium — Tự chọn chỉ chữ dán có thể bỏ mất nhu cầu tái dùng mẫu DOCX; tự chọn giữ định dạng có thể hứa vượt phạm vi. Đây là spike đặc tả, không triển khai A hoặc B.
-- Unknown: **Nhập DOCX hiện có và giữ bố cục khi thay placeholder, hay chỉ nhận chữ dán/nhập rồi tự định dạng trong Word?** Đây là một lựa chọn nghiệp vụ về nguồn và đầu ra, không phải checklist kỹ thuật. Câu hỏi **PREPARED — chưa gửi owner**, chưa có đáp án.
+- Lịch sử câu hỏi nguồn/bố cục: coordinator **đã gửi** câu hỏi A/B sau công bố `169e4faf9dfa6f4f6373009cfb25640b66af4c10`; owner đáp: “chức năng này tôi sẽ tự làm sau, cần spec kỹ. Chuyển issue khác”. Đây là trả lời hoãn, **không chọn A/B**. Nguồn/bố cục, storage/catalog và nghiệm thu vẫn cần đặc tả sau, không còn gate hỏi owner lúc này. Ledger và đề xuất bên dưới giữ làm lịch sử, không phải scope được duyệt.
 
 ### Ledger nguồn — 17/10/2026
 
@@ -71,8 +71,8 @@ risk: medium
 ### Bên chờ, giới hạn và đúng ba AC
 
 - **Ai chờ:** chỉ implementation authoring tương lai chờ lựa chọn nguồn/bố cục. Token, xuất Word hiện có và developer bảo trì core không chờ. [#9](spike-word-real-route-acceptance.md#notes) là bằng chứng xuất/restore và giới hạn native/visual; [#24](story-gradual-fill-word-readiness.md) là readiness xuất điền dần, không chứng minh authoring đã hoàn thành. Office vẫn DEFERRED, không giao thêm việc.
-- **Nơi ghi đáp án:** Notes này và Word §6 sau khi owner thực sự chọn; chỉ lúc ấy mới ghi decision và đồng bộ spec. Hiện Word §6 giữ nguyên hướng chưa đặc tả; không có quyết định mới.
+- **Nơi ghi đáp án hoãn:** [decision accepted](../decisions/decision-owner-word-authoring-deferred-20261017.md), Notes này và Word §6. Quyết định nguồn/bố cục chưa có; khi làm sau cần spec chi tiết, không tự viết/chọn trong lượt này.
 - **AC1:** ledger trên đã phân biệt điều chọn sẵn, bằng chứng thiếu và hệ quả A/B có ngày. Đối chiếu nguồn chi tiết ở [evidence](../tmp/issue-19-word-authoring/evidence.md); không có phép đo hoặc nghiệm thu runtime mới.
-- **AC2:** bên chờ và việc không chờ đã chỉ rõ; lựa chọn nguồn/bố cục còn chặn implementation, không được giải bằng giả định kỹ thuật.
-- **AC3 — chưa hoàn tất khâu nhận:** coordinator đã chuẩn bị đúng một câu hỏi cho owner; **chưa gửi/không xác nhận owner đã nhận**, chưa có đáp án. Operator/reviewer tương lai nhận bằng chứng vòng authoring/giữ bố cục nếu triển khai, không bị yêu cầu đo trong spike này. Giữ Draft/Pending, không gắn answered/built hoặc đóng #19.
-- **Independent DOC review — 17/10/2026:** `word-authoring-scope-review` Quick **CLEAN — no actionable findings**, parent đã đọc scoped diff và evidence. Review chỉ xác nhận bản ghi gate phạm vi authoring tương lai; không phải đáp án owner, nghiệm thu tính năng hoặc implementation. #19 vẫn BLOCKED nguồn/bố cục, `refined: false`; câu hỏi vẫn PREPARED/chưa gửi.
+- **AC2:** chỉ implementation authoring tương lai cần spec chi tiết và các lựa chọn chưa chốt; xuất/token hiện có không chờ. Owner đã hoãn nên không có việc authoring đang chờ thực hiện trong lượt này.
+- **AC3 — nhận đáp án phạm vi 17/10/2026:** parent đã gửi câu hỏi; owner đã trả lời hoãn và tự làm sau, cần spec kỹ. Spike scope closed theo deferral, không phải nguồn/bố cục đã được trả lời hoặc tính năng được nghiệm thu. Giữ Draft/Pending và `refined: false`.
+- **Independent DOC review — 17/10/2026:** retained `word-authoring-scope-review` Quick **t2 CLEAN — no actionable findings**, parent đã đọc toàn bộ scoped deferral diff. Review này áp cho quyết định hoãn và đồng bộ tài liệu, khác lượt CLEAN của gate cũ tại `169e4faf9dfa6f4f6373009cfb25640b66af4c10`. Phạm vi spike đã được owner trả lời bằng DEFERRED; không chứng minh nguồn/bố cục đã chọn hoặc feature built.

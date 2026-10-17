@@ -81,6 +81,8 @@ Diagram → Xuất Word.** Tab `Word` hiện chỉ có thông báo, chưa có ch
 riêng; nút xuất nằm trong `Soạn hồ sơ`. Nút Zalo đang tắt. Mỗi dòng dưới đây
 trỏ tới phần nhỏ để bắt đầu tìm hiểu.
 
+**Tab Word tạo/lưu mẫu tương lai DEFERRED — owner 17/10/2026:** “chức năng này tôi sẽ tự làm sau, cần spec kỹ. Chuyển issue khác”. Cần spec chi tiết trước implementation tương lai; chưa giao viết spec hoặc code lúc này, các lựa chọn nguồn/bố cục/catalog/nghiệm thu chưa chốt. #19 đã nhận đáp án hoãn phạm vi, không built; chuyển #20, không hỏi tiếp #19. Nút Xuất Word và intake hiện có không bị hoãn. [Decision](../decisions/decision-owner-word-authoring-deferred-20261017.md).
+
 | Màn / thao tác | Dùng để | Tài liệu | Điểm vào mã |
 |---|---|---|---|
 | Tổng quan: lọc hồ sơ | Thu hẹp danh sách | [Workspace](notary_v2/README.md#stage) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `buildCaseListPanel` |

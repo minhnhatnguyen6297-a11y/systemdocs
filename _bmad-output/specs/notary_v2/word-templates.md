@@ -454,3 +454,5 @@ Kiểm chứng cũ không thay nghiệm thu mới: từng có batch 22 mẫu; ch
 ## 6. Tab Word dự kiến
 
 Nhập văn bản → đề xuất placeholder từ regex → tải về chỉnh → nhập lại xác nhận lưu mẫu. Chưa chốt trải nghiệm, danh mục template và tiêu chí phát hành; không biến mô tả này thành quyền tự triển khai.
+
+**DEFERRED — owner 17/10/2026:** “chức năng này tôi sẽ tự làm sau, cần spec kỹ. Chuyển issue khác”. Tab tạo/lưu mẫu cần spec chi tiết trước implementation tương lai; chưa giao đặc tả hay triển khai lúc này. Nguồn vào/giữ bố cục, storage/catalog và tiêu chí nghiệm thu chưa chốt; không tự chọn hoặc hỏi tiếp trong lượt này. Không áp việc hoãn lên Xuất Word hoặc original-DOCX intake hiện có. [Decision](../../decisions/decision-owner-word-authoring-deferred-20261017.md).

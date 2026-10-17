@@ -89,6 +89,8 @@ Chọn thư mục mẫu, các văn bản và thư mục đích; mỗi văn bản
 
 Nhập DOCX có thể xuất theo bản gốc: người dùng chọn đúng từng vị trí cần thay, gắn với dòng và trường đã lưu, xác nhận rồi xuất. Không thay mọi chuỗi giống nhau; không sửa file nguồn. Tab Word tự tạo/quản lý mẫu lâu dài còn là hướng chưa đặc tả.
 
+**Tab Word tạo/lưu mẫu DEFERRED — owner 17/10/2026:** owner tự làm sau, cần spec chi tiết trước implementation tương lai; không giao đặc tả/triển khai trong lượt này. Nguồn/bố cục, catalog/lưu và nghiệm thu chưa được chọn. Xuất Word và intake bản gốc hiện có không bị hoãn. [Decision](../../decisions/decision-owner-word-authoring-deferred-20261017.md).
+
 <a id="address"></a>
 ## 7. Tra địa chỉ ngay khi nhập
 
@@ -113,6 +115,7 @@ Yêu cầu tăng vùng sơ đồ +50% (report 802) đã chốt theo quyết đ�
 - Xuất dùng đúng bản đã lưu, không sửa nguồn hoặc ghi đè đầu ra; kiểm văn bản có trường trống và văn bản chỉ cần Stage khi triển khai định hướng mới.
 - Chuyển loại hồ sơ đã lưu: Người/Tài sản giữ ID + giá trị; Diagram reset rỗng theo domain mới; buộc chọn `document_type` mới kèm xác nhận; lỗi/xung đột/khóa không đổi state/revision.
 - Chưa chốt: tìm/lọc/nhãn Danh sách hồ sơ; chi tiết xử lý nhánh khi xóa nút giữa; tab Word tạo mẫu; phạm vi thay các điều kiện chặn hiện hành. Quy tắc tính thừa kế Draft không tự được duyệt.
+- Tab Word tạo/lưu mẫu: giữ Draft, **DEFERRED 17/10/2026**, cần spec kỹ khi làm sau; không phải câu hỏi phạm vi đang chờ owner và không phải feature built.
 
 ## 10. Tra cứu chuyên sâu
 
