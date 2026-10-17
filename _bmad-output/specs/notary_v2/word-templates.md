@@ -258,8 +258,9 @@ này. Chọn riêng từng lần xuất hiện → dòng đã lưu → slot cata
 chiếu trước khi xuất. `original_source_id` chỉ resolve nguồn backend thuộc
 hồ sơ, không nhận đường dẫn mẫu tùy ý; batch này cần `base_revision`. Mẫu gốc
 và mẫu dẫn xuất đều kiểm hash; đổi thứ tự/ô phải xác nhận lại. Không thay mọi
-chuỗi giống nhau. Quy tắc và giới hạn tại
-`input/docx-import.md`.
+chuỗi giống nhau. Quy tắc và giới hạn hiện hành tại
+[§2. Nhập hợp đồng và dùng lại bản gốc](#docx-import).
+[Bản trước đợt gom 15/10/2026 (lịch sử, không phải nguồn hiện hành)](../../archive/specs-before-consolidation-20261015/notary_v2/input/docx-import.md).
 
 Nguồn mẫu thông thường chọn từ thư mục. Catalog cố định còn được backend
 giữ để tương thích với các lệnh cũ, không phải lựa chọn trong dialog.

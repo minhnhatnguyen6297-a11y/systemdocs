@@ -17,7 +17,7 @@ Có người/thửa nào giữ người/thửa đó; khi không chắc giữ b�
 - Giữ nguyên giá trị nguồn theo luật từng trường. Thống nhất đáp án không có nghĩa sửa số liệu hoặc sửa tên người theo phỏng đoán.
 - Đáp án có `""` = đã kiểm và trường cần để trống; `[]` = đã kiểm và không có bản ghi; `null`/thiếu = chưa kiểm. Mục chưa kiểm không được tính đạt.
 - R00..R13 là cảnh báo/kiểm điều kiện; không bảo đảm phát hiện mọi trường sai hoặc mọi bản ghi bị mất. Nghiệm thu phải so đáp án.
-- Nguồn đã chốt: regex-decision-46, TASK-5, TASK-9 và quy tắc trường hiện hành trong `regex-thua-ke.md`. TASK-10.1 tổ chức lại các luật này; không duyệt lại quyết định còn mở.
+- Nguồn đã chốt: regex-decision-46, TASK-5, TASK-9. Quy tắc hiện hành nằm trong chính tài liệu này: [giá trị từng trường (§2)](#fields) và [vùng thừa kế, ranh bản ghi (§4)](#inheritance). [`regex-thua-ke.md` trước đợt gom 15/10/2026 (lịch sử, không phải nguồn hiện hành)](../../archive/specs-before-consolidation-20261015/upload_lab/regex-thua-ke.md). TASK-10.1 tổ chức lại các luật này; không duyệt lại quyết định còn mở.
 - Ngoại lệ thuộc loại/vùng phải giữ đúng nghĩa trường. Giá trị mâu thuẫn phải đối chiếu nguồn, không chọn theo độ mới của file.
 
 ### 2.2. Người
