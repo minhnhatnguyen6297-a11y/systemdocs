@@ -83,6 +83,8 @@ trỏ tới phần nhỏ để bắt đầu tìm hiểu.
 
 **Tab Word tạo/lưu mẫu tương lai DEFERRED — owner 17/10/2026:** “chức năng này tôi sẽ tự làm sau, cần spec kỹ. Chuyển issue khác”. Cần spec chi tiết trước implementation tương lai; chưa giao viết spec hoặc code lúc này, các lựa chọn nguồn/bố cục/catalog/nghiệm thu chưa chốt. #19 đã nhận đáp án hoãn phạm vi, không built; chuyển #20, không hỏi tiếp #19. Nút Xuất Word và intake hiện có không bị hoãn. [Decision](../decisions/decision-owner-word-authoring-deferred-20261017.md).
 
+**Danh sách hồ sơ (Tổng quan hồ sơ) làm lại — owner 17/10/2026:** owner “note lại phương hướng (chưa chốt chắc chắn)” và **sẽ tự triển khai spec sau**; chức năng **DEFERRED**, không giao code hoặc spec lúc này. Owner yêu cầu mọi input/output tuân theo chuẩn database; whitelist trường, mapping cụ thể và phạm vi request chưa chốt. Phần tentative **chưa duyệt**: trường hiển thị/search/filter, thẻ chia 3 vùng Người/Tài sản/Hồ sơ. Danh sách/tạo/mở hiện có không bị dừng. [#20](../backlog/spike-case-list-query-labels.md) · [Decision](../decisions/decision-owner-case-list-redesign-deferred-20261017.md).
+
 | Màn / thao tác | Dùng để | Tài liệu | Điểm vào mã |
 |---|---|---|---|
 | Tổng quan: lọc hồ sơ | Thu hẹp danh sách | [Workspace](notary_v2/README.md#stage) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `buildCaseListPanel` |

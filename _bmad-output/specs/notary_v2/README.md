@@ -10,7 +10,7 @@ Stage giữ thông tin Người/Tài sản; Diagram giữ vai trò/quan hệ; Wo
 
 ## 2. Danh sách hồ sơ
 
-Tên mong muốn là Danh sách hồ sơ. Người dùng xem danh sách, tìm/lọc, tạo nháp và mở hồ sơ. Nhãn trạng thái, người tạo, tên/ngày tạo là hướng mô tả; danh sách nhãn, nguồn tìm kiếm và trường lọc chưa chốt đầy đủ.
+Tên mong muốn là Danh sách hồ sơ. Người dùng xem danh sách, tìm/lọc, tạo nháp và mở hồ sơ. Nhãn trạng thái, người tạo, tên/ngày tạo là hướng mô tả; danh sách nhãn, nguồn tìm kiếm và trường lọc chưa chốt đầy đủ. Chức năng sẽ **làm lại** — **DEFERRED 17/10/2026** (owner tự triển khai spec sau); hướng trường hiển thị/tìm/lọc owner ghi là **Draft chưa duyệt**, chưa phải quy tắc. [Decision](../../decisions/decision-owner-case-list-redesign-deferred-20261017.md).
 
 Chọn Thừa kế hoặc Hai bên khi tạo nháp. Loại không hỗ trợ hiện lý do và khóa thao tác không có khả năng, không tự chuyển sang Thừa kế. Tạo hồ sơ lần đầu chưa cần Diagram; intake/evaluate nháp không ghi database. Đổi loại của hồ sơ **đã lưu** chỉ qua đường chuyển loại đã duyệt (`inheritance` ↔ `two_party`): giữ ID + giá trị Người/Tài sản của Stage, reset Diagram theo domain mới (Thừa kế: seed **chỉ** node `owner` mới chọn — không seed khung 7 slot mặc định, không giữ quan hệ/dấu cũ, nhưng vẫn **đủ key bắt buộc** với `parentSlotIds`/`ownPositions`/`receivePositions` rỗng, `spouseSlotId:null`; Hai bên: 30 slot trống), buộc chọn `document_type` hợp lệ của loại mới và xác nhận phần Diagram mất trước khi ghi; chuyển vào Thừa kế cần `owner_row_id` từ Stage, vào Hai bên cấm trường đó. Không suy việc chọn loại lúc tạo nháp thành quyền tự đổi domain; `case_type`/`document_type` vẫn bất biến ngoài đường này ([decision](../../decisions/decision-owner-saved-case-type-conversion-20261016.md), contract §13.18).
 
@@ -114,7 +114,8 @@ Yêu cầu tăng vùng sơ đồ +50% (report 802) đã chốt theo quyết đ�
 - Nhập nhiều nguồn giữ phần đã sửa, lỗi từng nguồn rõ ràng; dữ liệu mơ hồ không tự được xác nhận.
 - Xuất dùng đúng bản đã lưu, không sửa nguồn hoặc ghi đè đầu ra; kiểm văn bản có trường trống và văn bản chỉ cần Stage khi triển khai định hướng mới.
 - Chuyển loại hồ sơ đã lưu: Người/Tài sản giữ ID + giá trị; Diagram reset rỗng theo domain mới; buộc chọn `document_type` mới kèm xác nhận; lỗi/xung đột/khóa không đổi state/revision.
-- Chưa chốt: tìm/lọc/nhãn Danh sách hồ sơ; chi tiết xử lý nhánh khi xóa nút giữa; tab Word tạo mẫu; phạm vi thay các điều kiện chặn hiện hành. Quy tắc tính thừa kế Draft không tự được duyệt.
+- Danh sách hồ sơ: **làm lại — DEFERRED 17/10/2026**; owner tự triển khai spec sau. Hướng trường hiển thị/search/filter là Draft chưa duyệt, chưa phải quy tắc hiện hành. [Decision](../../decisions/decision-owner-case-list-redesign-deferred-20261017.md).
+- Chưa chốt: chi tiết xử lý nhánh khi xóa nút giữa; tab Word tạo mẫu; phạm vi thay các điều kiện chặn hiện hành. Quy tắc tính thừa kế Draft không tự được duyệt.
 - Tab Word tạo/lưu mẫu: giữ Draft, **DEFERRED 17/10/2026**, cần spec kỹ khi làm sau; không phải câu hỏi phạm vi đang chờ owner và không phải feature built.
 
 ## 10. Tra cứu chuyên sâu
