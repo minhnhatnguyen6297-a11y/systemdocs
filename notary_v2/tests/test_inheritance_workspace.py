@@ -860,3 +860,60 @@ def test_save_diagram_keeps_year_only_date_precision(db):
     persisted = json.loads(db.get(InheritanceCase, case.id).case_state_json)
     owner = next(r for r in persisted["stage"] if r["row_id"] == rows["owner"])
     assert owner["ngay_sinh"] == "1950"
+
+
+def test_branch_tombstones_coparent_save_reopen_and_reject_preserve(
+        db, session_factory):
+    from copy import deepcopy
+    from services.case_workspace import CaseWorkspaceService
+
+    case, _people, rows, _prop = _seed_case(db)
+    spouse = Customer(ho_ten="Spouse S", gioi_tinh="Nữ")
+    db.add(spouse)
+    db.flush()
+    rows["S"] = str(uuid.uuid4())
+    payload = json.loads(case.case_state_json)
+    payload["stage"].append({
+        "id": str(spouse.id), "row_id": rows["S"], "ho_ten": spouse.ho_ten,
+    })
+    payload["assets"][0].update(
+        so_serial=_prop.so_serial, dia_chi=_prop.dia_chi, land_rows=[])
+    case.case_state_json = json.dumps(payload, ensure_ascii=False)
+    db.commit()
+    before_stage = CaseWorkspaceService(db).get(case.id)["stage"]
+    original = _draft_state(rows)
+    original["nodes"][2]["spouseSlotId"] = "S"
+    original["nodes"][3]["parentSlotIds"] = ["child", "S"]
+    original["nodes"].extend([
+        _node("S", rows["S"], spouse="child"),
+        _node("empty", parents=("gc",), hidden=True),
+        _node("old", parents=("gc",), deleted=True),
+    ])
+    first = _svc(db).save_diagram(case.id, case.workspace_revision, original)
+    removed = deepcopy(original)
+    for node in removed["nodes"]:
+        if node["id"] in {"child", "gc", "empty"}:
+            node.update(deleted=True, parentSlotIds=[], spouseSlotId=None)
+        if node["id"] == "S":
+            node["spouseSlotId"] = None
+        if node["id"] == "old":
+            node["parentSlotIds"] = []
+    data = _svc(db).save_diagram(case.id, first["revision"], removed)
+    assert data["diagram"]["state"] == removed
+    assert data["revision"] == first["revision"] + 1
+    assert data["diagram"]["render_model"]["status"] != "invalid"
+    with session_factory() as fresh:
+        reopened = CaseWorkspaceService(fresh).get(case.id)
+        assert reopened["diagram"]["state"] == removed
+        assert reopened["stage"] == before_stage
+        assert reopened["case"]["revision"] == data["revision"]
+        bad = deepcopy(removed)
+        bad["nodes"][2]["spouseSlotId"] = "S"  # invalid outgoing tombstone
+        for revision, state, code in [
+            (data["revision"], bad, "diagram_invalid_state"),
+            (first["revision"], removed, "workspace_conflict"),
+        ]:
+            with pytest.raises(WorkspaceError) as exc:
+                _svc(fresh).save_diagram(case.id, revision, state)
+            assert exc.value.code == code
+            assert CaseWorkspaceService(fresh).get(case.id) == reopened

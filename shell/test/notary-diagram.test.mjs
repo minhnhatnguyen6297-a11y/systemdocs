@@ -836,3 +836,116 @@ test('two_party: assign/drop KHONG goi diagram_evaluate', () => {
     calls.filter(([c]) => c === 'notary.diagram_evaluate').length, 0,
     'two_party khong duoc goi engine evaluate');
 });
+
+test('branch warning: all dismissals are inert; confirm returns descendants to visible Pool', async (t) => {
+  const people = ['A', 'B', 'S', 'C', 'D', 'U'].map(id => ({
+    row_id: id, ho_ten: `Người ${id}`,
+  }));
+  const mk = (id, parents = [], spouse = null, extra = {}) => ({
+    id, personId: id, parentSlotIds: parents, spouseSlotId: spouse,
+    ownPositions: [], receivePositions: [1], hidden: false, deleted: false, ...extra,
+  });
+  const nodes = [mk('owner', [], null, { personId: 'A', ownPositions: [1] }),
+    mk('B', ['owner'], 'S'), mk('S', [], 'B'), mk('C', ['B', 'S']),
+    mk('D', ['C'], null, { hidden: true }),
+    mk('empty', ['B'], null, { personId: null }), mk('U', ['owner'])];
+  const { model, view, document, calls } = build(t, { mode: 'case',
+    seed: { people, assets: [{ row_id: 'asset' }], nodes } });
+  const before = structuredClone(model.state);
+  const open = () => {
+    const card = collect(view.el, e => e.dataset.nodeId === 'B')[0];
+    findBtns(card, '×')[0].click();
+    return byCls(view.el, 'modal')[0];
+  };
+  for (const dismiss of ['cancel', 'escape', 'close', 'backdrop']) {
+    const modal = open();
+    const labels = collect(modal, e => e.tagName === 'LI').map(e => e.textContent);
+    assert.equal(labels.length, 10, '4 nodes and 6 parent/spouse edges');
+    assert.ok(labels.includes('Người C — C'));
+    assert.ok(labels.includes('Ô trống — empty'));
+    assert.ok(labels.some(v => v.includes('Người S — S → Người C — C')));
+    assert.ok(labels.some(v => v.includes('Người B — B ↔ Người S — S')));
+    if (dismiss === 'cancel') findBtns(modal, 'Hủy')[0].click();
+    if (dismiss === 'escape') document.dispatch('keydown', { key: 'Escape' });
+    if (dismiss === 'close') byCls(modal, 'modal-close')[0].click();
+    if (dismiss === 'backdrop') byCls(view.el, 'modal-overlay')[0].click();
+    assert.equal(byCls(view.el, 'modal').length, 0);
+    assert.deepEqual(model.state, before);
+  }
+  await new Promise(resolve => setTimeout(resolve, 650));
+  assert.equal(calls.filter(([c]) => c.startsWith('notary.diagram_')).length, 0);
+  const modal = open();
+  let notifications = 0;
+  const unsubscribe = model.subscribe(() => { notifications += 1; });
+  findBtns(modal, 'Gỡ cả nhánh')[0].click();
+  assert.equal(notifications, 1);
+  unsubscribe();
+  assert.deepEqual(model.state.stage, before.stage);
+  assert.equal(model.state.revision, before.revision);
+  assert.equal(model.state.diagram.nodes.filter(n => n.deleted).length, 4);
+  assert.equal(model.state.diagram.nodes.find(n => n.id === 'S').spouseSlotId, null);
+  assert.equal(byCls(view.el, 'modal').length, 0);
+  const poolNames = byCls(view.el, 'cd-pool-card').map(e => e.textContent);
+  assert.equal(poolNames.length, 3);
+  for (const id of ['B', 'C', 'D']) assert.ok(poolNames.some(v => v.includes(`Người ${id}`)));
+  await new Promise(resolve => setTimeout(resolve, 650));
+  assert.equal(calls.filter(([c]) => c === 'notary.diagram_evaluate').length, 1);
+  assert.equal(calls.filter(([c]) => c === 'notary.diagram_save').length, 0);
+});
+
+test('branch warning refuses a changed graph or reopened workspace', async (t) => {
+  const nodes = seedSlots();
+  const { model, view } = build(t, { mode: 'case',
+    seed: { people: INH_PEOPLE, nodes } });
+  const open = () => {
+    findBtns(collect(view.el, e => e.dataset.nodeId === 'child_1')[0], '×')[0].click();
+    return byCls(view.el, 'modal')[0];
+  };
+  for (const changed of ['mutation', 'replacement', 'case']) {
+    const modal = open();
+    if (changed === 'mutation') model.setNodeRelation('child_1', { parentSlotIds: ['owner'] });
+    if (changed === 'replacement') model.state.diagram = structuredClone(model.state.diagram);
+    if (changed === 'case') model.state.caseId += 1;
+    const before = structuredClone(model.state);
+    const apply = findBtns(modal, 'Gỡ cả nhánh')[0];
+    apply.click();
+    assert.equal(apply.disabled, true);
+    assert.deepEqual(model.state, before);
+    findBtns(modal, 'Hủy')[0].click();
+  }
+});
+
+test('removed default child slot stays tombstoned; new required slot can assign and toggle', async (t) => {
+  const mk = (id, personId, parents = [], extra = {}) => ({
+    id, personId, parentSlotIds: parents, spouseSlotId: null,
+    ownPositions: [], receivePositions: [], hidden: false, deleted: false, ...extra,
+  });
+  const client = { run: async (cmd) => ({ ok: true, data: cmd === 'notary.diagram_evaluate'
+    ? { render_model: { requiredSlots: [{ anchorSlotId: 'owner',
+      slotTypes: ['child'], minimumEmptyChildSlots: 1 }] } } : {} }) };
+  const { model, view } = build(t, { mode: 'case', client, seed: {
+    people: INH_PEOPLE, assets: [{ row_id: 'asset' }],
+    nodes: [mk('owner', 'c1', [], { ownPositions: [1] }),
+      mk('child_owner', 'c2', ['owner']), mk('gc', 'c3', ['child_owner'])],
+  } });
+  const card = collect(view.el, e => e.dataset.nodeId === 'child_owner')[0];
+  findBtns(card, '×')[0].click();
+  findBtns(byCls(view.el, 'modal')[0], 'Gỡ cả nhánh')[0].click();
+  await new Promise(resolve => setTimeout(resolve, 650));
+  const nodes = model.state.diagram.nodes;
+  assert.equal(nodes.find(n => n.id === 'child_owner').deleted, true);
+  assert.equal(nodes.find(n => n.id === 'gc').deleted, true);
+  const fresh = nodes.find(n => n.id === 'child_owner_2');
+  assert.ok(fresh && !fresh.personId && !fresh.deleted);
+  assert.deepEqual(fresh.parentSlotIds, ['owner']);
+  collect(view.el, e => e.dataset.nodeId === fresh.id)[0]
+    .dispatch('drop', personPayload('c2'));
+  assert.equal(fresh.personId, 'c2');
+  assert.deepEqual(fresh.receivePositions, [1], 'existing assignment default');
+  const assigned = collect(view.el, e => e.dataset.nodeId === fresh.id)[0];
+  const receive = byCls(assigned, 'cd-posrow')[1];
+  byCls(receive, 'cd-poschip')[0].click();
+  assert.deepEqual(fresh.receivePositions, []);
+  assert.equal(nodes.find(n => n.id === 'child_owner').deleted, true);
+  await new Promise(resolve => setTimeout(resolve, 650));
+});

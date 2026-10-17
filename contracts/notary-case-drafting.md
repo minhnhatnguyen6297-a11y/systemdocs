@@ -647,8 +647,9 @@ diagram_state:
   `nodes`; dangling/self/>2/cycle → `diagram_invalid_state` với
   `details.errors[]` mang engine code (§7.3).
 - `assignments` **không** tồn tại như dữ liệu persist riêng — suy ra từ
-  `nodes[].personId`. `hidden`/`deleted` giữ trong state (engine bỏ qua
-  node `deleted`).
+  `nodes[].personId` trên node **active** (`deleted:false`); `personId`
+  giữ trên tombstone không giữ người ngoài Pool. `hidden`/`deleted` giữ
+  trong state (engine bỏ qua node `deleted`).
 - `version` literal `2` (engine `ENGINE_VERSION=2`); legacy JS shape
   (`parentSlotId`, `parentPersonId`, `familyGroupId`, `role`,
   `relationType`, `person` embedded) **không** thuộc wire này.
@@ -1052,6 +1053,7 @@ Consumer (Electron main/renderer) PHẢI:
 | v2 MIN-141 | 03/10/2026 | Owner xác nhận hành vi cuối 14 commit worker và yêu cầu gộp vào nhánh chính; thay các quy tắc MIN-140 mâu thuẫn, đồng bộ dữ liệu Người/cụm đất/Hồ sơ. Xem §13.16 |
 | v2 (APPROVED) | 27/09/2026 | Owner duyệt §13 (MIN-125, toàn bộ Q1–Q12): `schema_version` bump `notary.case-drafting.v2`; Stage draft/committed + create nguyên khối; `owner_row_id`; asset theo vị trí 1..3, bỏ `is_primary`; `ownPositions`/`receivePositions`; domain `two_party` 30 slot `p1..p30`; `case_type` immutable; error codes §13.9. Implement ở P5 (MIN-128). C1–C4 xử lý theo §13.13 |
 | v2 + conversion (owner) | 16/10/2026 | Owner duyệt chuyển loại hồ sơ **đã lưu** (#3): ngoại lệ `case_type`/`document_type` immutable (§6.1, §13.5) — giữ Người/Tài sản Stage, reset Diagram, buộc chọn `document_type` mới kèm xác nhận, `owner_row_id` theo loại đích; §13.18. [Decision](../_bmad-output/decisions/decision-owner-saved-case-type-conversion-20261016.md) |
+| v2 + branch removal (#21B) | 17/10/2026 | **BUILT — retained Quick CODE t3 No actionable findings; parent accepted AC1–4**. Owner “B - gỡ cả nhánh” semantics §7.1/§13.4 unchanged; no new wire/API/store. Node full 198 before test-only wording-assert deletion, affected file 25 after; service 106 (24 existing warnings), Source Electron real IPC/isolated SQLite proof. Not packaged/Word acceptance. |
 | additive NAIA-9 | 04/10/2026 | Thêm command thứ mười `notary.address_lookup` (§14): tra cứu đơn vị hành chính đích theo địa chỉ nguồn + `source_date`/`target_date` đầy đủ; read-only, local-only trên ledger Bando đóng gói; `result.data.schema_version` = `notary.address-lookup.v1` — ngoại lệ rule §1 |
 | address-lookup v2 (APPROVED, triển khai TASK-3) | 05/10/2026 | TASK-2, Owner duyệt 05/10: thay v1 bằng `notary.address-lookup.v2` (§14) — payload `query`+`presentation`, bỏ ngày/tách xã-tỉnh/`coverage`/`partial`; result `found\|not_found\|too_many\|invalid_input\|reload_failed`. **Breaking**; runtime và schema v1 đã chuyển/xóa tại TASK-3. |
 
@@ -1278,6 +1280,22 @@ diagram_state v3 (domain inheritance):
 - Quan hệ (`parentSlotIds`, `spouseSlotId`), `duplicate_person` (1
   người / 1 node active — A3), `hidden`/`deleted`, auto-seed slot theo
   `requiredSlots` — **giữ nguyên** semantics §7.1.
+- **Gỡ cả nhánh Thừa kế (owner 17/10/2026, “B - gỡ cả nhánh”):**
+  xóa node gỡ node đó và mọi hậu duệ active theo cạnh cha/mẹ → con,
+  kể cả slot trống/ẩn hoặc con còn parent khác. Không mở rộng tập theo
+  spouse, không tự reparent hoặc giữ ô trung gian rỗng. Trước mutation
+  phải liệt kê node/quan hệ thực tế bị tác động và cảnh báo phần hưởng.
+  Hủy/Escape/đóng không mutate draft/dirty/revision hay phát evaluate/save
+  do thao tác này; xác nhận một mutation draft rồi evaluate hiện có,
+  không autosave. Graph thay đổi thì không áp cảnh báo cũ âm thầm.
+  Giữ Node v3 canonical với `deleted:true`, ID/`personId`/Chủ/Nhận;
+  xóa toàn bộ quan hệ đi ra từ tập bị gỡ và mọi tham chiếu đi vào tập
+  này trên tất cả node, kể cả tombstone cũ, để không sinh spouse lệch
+  hai chiều/parent sai. Stage Người/Tài sản, thứ tự/vị trí/giá trị và
+  graph/dấu không bị tác động giữ nguyên. Save/revision/atomic/errors
+  dùng đường hiện có; mở lại giữ đúng canonical, không store/API mới.
+  Quy tắc đầy đủ: `_bmad-output/specs/notary_v2/diagram-rules.md` §9.9;
+  quyết định: `decision-owner-inheritance-remove-entire-branch-20261017.md`.
 
 ### 13.5 Domain `two_party` — sơ đồ hai bên 30 vị trí (Q7, Q8)
 

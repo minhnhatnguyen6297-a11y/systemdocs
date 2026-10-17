@@ -1,6 +1,6 @@
 # Quy tắc sơ đồ Hai bên và Thừa kế
 
-**Cập nhật:** 16/10/2026. Quy tắc dưới đây giữ contract đã chốt. Các thiết kế tính thừa kế mở rộng, engine v2 và case-state cũ vẫn chưa được duyệt toàn bộ; chuyển vào lịch sử không phải loại bỏ ý tưởng hay duyệt triển khai.
+**Cập nhật:** 17/10/2026. Gỡ cả nhánh **#21B BUILT**, retained Quick CODE t3 **No actionable findings**, parent chấp nhận AC1–4; behavior §9.9 không đổi. Node full 198 + affected-file 25 sau patch test-only; service 106 (24 warnings hiện có), Source Electron real IPC/SQLite riêng. Không nghiệm thu packaged/Word hoặc các thiết kế/công thức thừa kế Draft mở rộng.
 
 ## 1. Luồng chung
 
@@ -27,7 +27,7 @@ Output:
 
 - Kéo người từ Pool vào slot: gán `personId` cho node.
 - Di chuyển node: đổi slot/quan hệ trong Diagram draft.
-- Gỡ node: xóa gán, không xóa người khỏi Stage.
+- Gỡ node: không xóa người khỏi Stage. Với Thừa kế, xóa slot gỡ cả nhánh theo §9.9; bỏ gán một người về Pool bằng thao tác hiện có không đổi thành xóa nhánh.
 - Chọn quan hệ/tài sản: sửa field Diagram draft theo domain.
 - `Xem cách tính`: gọi evaluate read-only, chỉ hiển thị render model backend.
 - `Lưu sơ đồ`: validate và ghi state trong một transaction.
@@ -229,6 +229,20 @@ ngược Stage/Pool/Diagram.
 - Việc nối cạnh/mũi tên mới cần fixture hoặc ảnh chấp nhận riêng; không rebuild
   toàn Graph/Diagram chỉ để sửa một connector.
 
+<a id="branch-removal"></a>
+### 9.9. Gỡ cả nhánh khỏi Diagram
+
+Owner chốt ngày **17/10/2026**, nguyên văn **“B - gỡ cả nhánh”** ([decision](../../decisions/decision-owner-inheritance-remove-entire-branch-20261017.md)).
+
+1. Từ node được xóa, lấy node đó và toàn bộ hậu duệ **active** qua cạnh `parentSlotIds` cha/mẹ → con, ở mọi độ sâu. Slot rỗng/ẩn cũng thuộc graph active. Con có hai cha/mẹ vẫn bị gỡ khi chỉ một cha/mẹ trong tập bị gỡ. Không dùng cạnh `spouseSlotId` để mở rộng tập; spouse chỉ bị gỡ nếu bản thân cũng là hậu duệ theo cạnh cha/mẹ.
+2. Trước mutation, hiện danh sách node sẽ gỡ (tên người + slot để phân biệt; slot chưa gán ghi ô trống) và các quan hệ cha/mẹ–con, vợ/chồng thực tế sẽ ngắt. Báo người vẫn ở Stage/trở lại Pool, kết quả/phần hưởng có thể đổi, chỉ Lưu sơ đồ mới ghi. Danh sách dài cuộn được; không chỉ báo số lượng.
+3. Hủy, Escape, nút đóng và đóng nền không đổi draft/dirty/revision hay phát evaluate/save từ thao tác gỡ. Xác nhận chỉ áp tập tác động vừa xem; graph hoặc phiên hồ sơ đã đổi thì không gỡ âm thầm theo cảnh báo cũ. Xác nhận hợp lệ thực hiện **một** mutation draft rồi dùng evaluate/debounce hiện có, không tự save.
+4. Đánh dấu toàn bộ tập `deleted:true` và giữ trong canonical Node v3 hiện có; giữ ID, `personId`, `ownPositions`, `receivePositions`, `hidden`. Xóa `parentSlotIds`/`spouseSlotId` đi ra từ node bị gỡ và dọn mọi tham chiếu đi vào tập này trên tất cả node, **kể cả tombstone cũ**. Không còn spouse một chiều hoặc parent không hợp lệ do thao tác; node/quan hệ/Chủ/Nhận không bị tác động giữ nguyên.
+5. Stage Người/Tài sản (ID, thứ tự, giá trị) không đổi. Pool vẫn là Stage trừ gán trên node active, không tính `personId` còn giữ trên tombstone. Không dồn/đánh lại số slot, đổi vị trí tài sản, tự reparent hoặc giữ ô trung gian rỗng thay cho node đã xóa.
+6. Dùng evaluate/Save hiện có; không store/API/schema mới. Save giữ atomic/revision/errors: invalid hoặc lỗi không ghi và giữ draft; Save thành công rồi mở lại khớp state canonical. Giữ nguyên cơ chế slot trống do `requiredSlots` tạo khi evaluate hiện hành, không hồi sinh người/quan hệ nhánh đã gỡ hoặc tái dùng ID tombstone. Không đổi công thức Python.
+
+Ví dụ A → B → C, B↔S, C có parents `[B,S]`: xóa B gỡ B, C và hậu duệ của C; S còn node nhưng mất spouse B và các liên kết tới tập bị gỡ. A cùng các nhánh khác giữ nguyên; không nối C lên A. Đây là quy tắc đã chọn, chưa phải nghiệm thu implementation #21B.
+
 ## 10. Điểm chưa chốt
 
-Ngày nhập/hiển thị phải giữ đúng độ đầy đủ; ngày quy ước chỉ nằm trong tính toán. Cách tính các tình huống thừa kế mở rộng, thuật toán và ví dụ Draft vẫn cần đối chiếu/duyệt riêng. Không dùng ngày quy ước để tạo bằng chứng về thời điểm chết. Xóa nút giữa phải báo ảnh hưởng; cách giữ/gỡ nhánh phía sau chưa chốt. Không tự mở quyền lưu invalid/unsupported.
+Ngày nhập/hiển thị phải giữ đúng độ đầy đủ; ngày quy ước chỉ nằm trong tính toán. Cách tính các tình huống thừa kế mở rộng, thuật toán và ví dụ Draft vẫn cần đối chiếu/duyệt riêng. Không dùng ngày quy ước để tạo bằng chứng về thời điểm chết. Xóa node Thừa kế áp dụng quy tắc gỡ cả nhánh đã chốt ở §9.9, không còn câu hỏi giữ/gỡ nhánh đang chờ owner. Không tự mở quyền lưu invalid/unsupported.

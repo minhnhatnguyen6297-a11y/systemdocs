@@ -659,6 +659,63 @@ function createDiagramPane(ctx) {
     });
   }
 
+  function openRemovalDialog(nodeId) {
+    if (!model.canWrite()) return;
+    const impact = model.nodeRemovalImpact(nodeId);
+    if (!impact) return;
+    const diagram = model.state.diagram;
+    const snapshot = JSON.stringify(diagram);
+    const caseId = model.state.caseId;
+    const draftId = model.state.draftId;
+    const nodes = new Map(diagram.nodes.map((n) => [n.id, n]));
+    const label = (id) => {
+      const n = nodes.get(id);
+      if (!n) return id;
+      return `${n.personId ? personName(n.personId) : 'Ô trống'} — ${slotTag(n)}` +
+        (n.deleted ? ' (đã gỡ)' : '');
+    };
+    openModal((box, close) => {
+      const head = h('div', 'modal-head');
+      const x = btn('×', 'modal-close', close);
+      x.setAttribute('aria-label', 'Đóng');
+      head.append(h('h2', 'modal-title', 'Gỡ cả nhánh khỏi sơ đồ?'), x);
+      const body = h('div', 'modal-body cd-field-stack');
+      body.append(h('div', 'banner warn',
+        'Gỡ vị trí đã chọn và mọi hậu duệ theo cha/mẹ. Phần hưởng có thể thay đổi.'),
+      h('h3', '', `${impact.nodeIds.length} vị trí sẽ gỡ`));
+      const list = h('ul', '');
+      for (const id of impact.nodeIds) list.append(h('li', '', label(id)));
+      body.append(list, h('h3', '', 'Quan hệ sẽ ngắt'));
+      const relations = h('ul', '');
+      for (const rel of impact.relations) {
+        relations.append(h('li', '', rel.kind === 'parent'
+          ? `Cha/mẹ–con: ${label(rel.from)} → ${label(rel.to)}`
+          : `Vợ/chồng: ${label(rel.from)} ↔ ${label(rel.to)}`));
+      }
+      body.append(relations, h('p', '',
+        'Người vẫn ở Stage và trở lại Pool. Vợ/chồng không bị gỡ chỉ vì quan hệ hôn nhân. Không tự nối lại cha/mẹ.'),
+      h('p', 'muted', 'Chỉ đổi bản nháp. Bấm Lưu sơ đồ sau đó mới ghi hồ sơ.'));
+      const foot = h('div', 'modal-foot');
+      const apply = btn('Gỡ cả nhánh', 'primary danger', () => {
+        if (apply.disabled) return;
+        if (model.state.caseId !== caseId || model.state.draftId !== draftId ||
+            model.state.diagram !== diagram ||
+            JSON.stringify(model.state.diagram) !== snapshot ||
+            !model.canWrite()) {
+          body.replaceChildren(h('div', 'banner warn',
+            'Sơ đồ đã thay đổi. Chưa gỡ nhánh; hãy đóng và xem lại tác động.'));
+          apply.disabled = true;
+          return;
+        }
+        apply.disabled = true;
+        close();
+        if (model.removeNode(nodeId)) scheduleEvaluate();
+      });
+      foot.append(btn('Hủy', '', close), apply);
+      box.append(head, body, foot);
+    }, { bare: true });
+  }
+
   // ---------- card thua ke ----------
 
   function inheritanceCardEl(n, at) {
@@ -676,11 +733,8 @@ function createDiagramPane(ctx) {
     // Nut hanh dong: chi hien khi hover/focus (CSS .cd-node-acts) —
     // van nam trong tab order cho ban phim.
     const acts = h('div', 'cd-node-acts');
-    const del = btn('×', 'icon-x', () => {
-      // Xoa slot = draft Diagram — dong Stage giu nguyen (§7.1).
-      if (model.removeNode(n.id)) scheduleEvaluate();
-    });
-    del.title = `Xóa slot ${slotTag(n)} khỏi sơ đồ (draft — không xóa Stage)`;
+    const del = btn('×', 'icon-x', () => openRemovalDialog(n.id));
+    del.title = `Gỡ slot ${slotTag(n)} và cả nhánh khỏi sơ đồ (không xóa Stage)`;
     del.setAttribute('aria-label', `Xóa slot ${slotTag(n)}`);
     del.disabled = ro;
 
@@ -1183,10 +1237,7 @@ function createDiagramPane(ctx) {
       // da ton tai committed moi co nguoi). Case that: committed. Tai
       // san khong xuong Pool — khong co flow gan len node.
       const src = st.caseId == null ? st.stage : st.committed;
-      const assigned = new Set((st.diagram.nodes || [])
-        .map((n) => n.personId).filter(Boolean));
-      const poolPeople = (src.people || [])
-        .filter((p) => !assigned.has(p.row_id));
+      const poolPeople = model.pool().people;
       title.textContent = `Pool (${poolPeople.length})`;
       const pp = poolPeople.filter((r) => poolMatch(r, poolQuery));
       if (!(src.people || []).length) {

@@ -1343,19 +1343,67 @@ function createModel(deps) {
     return true;
   }
 
+  function nodeRemovalImpact(nodeId) {
+    if (diagramDomain() !== CASE_TYPE_INHERITANCE || !findNode(nodeId)) {
+      return null;
+    }
+    const nodes = state.diagram.nodes;
+    const children = new Map();
+    for (const n of nodes) {
+      if (!n || n.deleted) continue;
+      for (const parent of n.parentSlotIds || []) {
+        if (!children.has(parent)) children.set(parent, []);
+        children.get(parent).push(n.id);
+      }
+    }
+    const removed = new Set([nodeId]);
+    const queue = [nodeId];
+    for (let i = 0; i < queue.length; i += 1) {
+      for (const child of children.get(queue[i]) || []) {
+        if (removed.has(child)) continue;
+        removed.add(child);
+        queue.push(child);
+      }
+    }
+    const relations = [];
+    const spouses = new Set();
+    for (const n of nodes) {
+      if (!n) continue;
+      for (const parent of n.parentSlotIds || []) {
+        if (removed.has(n.id) || removed.has(parent)) {
+          relations.push({ kind: 'parent', from: parent, to: n.id });
+        }
+      }
+      if (n.spouseSlotId &&
+          (removed.has(n.id) || removed.has(n.spouseSlotId))) {
+        const pair = [n.id, n.spouseSlotId].sort();
+        const key = JSON.stringify(pair);
+        if (!spouses.has(key)) {
+          spouses.add(key);
+          relations.push({ kind: 'spouse', from: pair[0], to: pair[1] });
+        }
+      }
+    }
+    return { nodeIds: queue, relations };
+  }
+
   function removeNode(nodeId) {
     if (!canWrite()) return false;
-    const node = findNode(nodeId);
-    if (!node) return false;
-    node.deleted = true;             // engine bo qua node deleted (§7.1)
-    // Xoa tham chieu slot cua node nay khoi cac node khac de tranh
-    // dangling_parent/dangling_spouse khi save.
+    const impact = nodeRemovalImpact(nodeId);
+    if (!impact) return false;
+    const removed = new Set(impact.nodeIds);
     for (const n of state.diagram.nodes) {
-      if (!n || n.deleted) continue;
-      if (Array.isArray(n.parentSlotIds)) {
-        n.parentSlotIds = n.parentSlotIds.filter((p) => p !== nodeId);
+      if (!n) continue;
+      if (removed.has(n.id)) {
+        n.deleted = true;
+        n.parentSlotIds = [];
+        n.spouseSlotId = null;
+      } else {
+        if ((n.parentSlotIds || []).some((p) => removed.has(p))) {
+          n.parentSlotIds = n.parentSlotIds.filter((p) => !removed.has(p));
+        }
+        if (removed.has(n.spouseSlotId)) n.spouseSlotId = null;
       }
-      if (n.spouseSlotId === nodeId) n.spouseSlotId = null;
     }
     touchDiagram();
     return true;
@@ -1919,7 +1967,7 @@ function createModel(deps) {
     removeStageRow, fieldErrorsFor, commitStage,
     pool,
     addSlot, assignPerson, movePerson,
-    setNodeFlag, toggleNodePosition, setNodeRelation, removeNode,
+    setNodeFlag, toggleNodePosition, setNodeRelation, nodeRemovalImpact, removeNode,
     evaluateDiagram, saveDiagram,
     resolveConflict,
     intakeAnalyze, acceptSuggestion, discardSuggestion, reviewSuggestion, confirmOriginalBindings, detachOriginalSource,

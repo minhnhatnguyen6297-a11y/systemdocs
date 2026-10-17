@@ -1201,6 +1201,80 @@ test('diagram draft: addSlot/togglePosition/removeNode → diagramDirty; save re
   assert.equal(model.state.diagramDirty, true);
 });
 
+test('branch removal: active parent closure, reciprocal tombstones, one draft mutation', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const node = (id, parents = [], spouse = null, extra = {}) => ({
+    id, personId: `person-${id}`, parentSlotIds: parents, spouseSlotId: spouse,
+    ownPositions: [1], receivePositions: [2], hidden: false, deleted: false,
+    ...extra,
+  });
+  const nodes = [
+    node('owner'), node('B', ['owner'], 'S'), node('S', [], 'B'),
+    node('C', ['B', 'S']), node('D', ['C']),
+    node('empty', ['B'], null, { personId: null }),
+    node('hidden', ['empty'], null, { hidden: true }),
+    node('U', ['owner'], 'V'), node('V', [], 'U'),
+    node('old', ['B'], 'B', { deleted: true }),
+    node('behind-old', ['old']),
+  ];
+  const s = model.state;
+  s.diagram.nodes = nodes;
+  s.stage.people = nodes.filter(n => n.personId).map(n => ({
+    row_id: n.personId, ho_ten: n.id,
+  }));
+  s.committed = structuredClone(s.stage);
+  const stage = structuredClone(s.stage);
+  const before = structuredClone(s.diagram);
+  let notifications = 0;
+  const unsubscribe = model.subscribe(() => { notifications += 1; });
+  const impact = model.nodeRemovalImpact('B');
+  assert.deepEqual(impact.nodeIds, ['B', 'C', 'empty', 'D', 'hidden']);
+  assert.equal(impact.relations.filter(r => r.kind === 'spouse').length, 2);
+  assert.ok(impact.relations.some(r => r.from === 'S' && r.to === 'C'));
+  assert.ok(impact.relations.some(r => r.from === 'B' && r.to === 'old'));
+  assert.deepEqual(s.diagram, before, 'preview is read-only');
+  assert.equal(notifications, 0);
+  assert.equal(model.removeNode('B'), true);
+  assert.equal(notifications, 1, 'subscribers see only the completed cutover');
+  unsubscribe();
+  assert.deepEqual(s.stage, stage);
+  assert.deepEqual(s.committed, stage);
+  assert.deepEqual(nodes.map(n => n.id), before.nodes.map(n => n.id));
+  for (const id of impact.nodeIds) {
+    const n = nodes.find(n => n.id === id);
+    const original = before.nodes.find(n => n.id === id);
+    assert.deepEqual(n, {
+      ...original, deleted: true, parentSlotIds: [], spouseSlotId: null,
+    });
+  }
+  assert.equal(nodes.find(n => n.id === 'S').spouseSlotId, null);
+  assert.deepEqual(nodes.find(n => n.id === 'old').parentSlotIds, []);
+  assert.equal(nodes.find(n => n.id === 'old').spouseSlotId, null);
+  for (const id of ['owner', 'U', 'V', 'behind-old']) {
+    assert.deepEqual(nodes.find(n => n.id === id), before.nodes.find(n => n.id === id));
+  }
+  const pool = new Set(model.pool().people.map(p => p.row_id));
+  for (const id of ['B', 'C', 'D', 'hidden', 'old']) {
+    assert.ok(pool.has(`person-${id}`), `${id} must not be assigned by a tombstone`);
+  }
+  assert.equal(pool.has('person-S'), false);
+  assert.equal(s.diagramDirty, true);
+  assert.equal(model.removeNode('B'), false);
+  assert.equal(model.nodeRemovalImpact('missing'), null);
+});
+
+test('branch removal does not remove canonical two-party slots', () => {
+  const { model } = makeModel(seedCases('empty'));
+  model.newDraft('two_party');
+  const before = structuredClone(model.state.diagram);
+  const dirty = model.state.diagramDirty;
+  assert.equal(model.nodeRemovalImpact('p1'), null);
+  assert.equal(model.removeNode('p1'), false);
+  assert.deepEqual(model.state.diagram, before);
+  assert.equal(model.state.diagramDirty, dirty);
+});
+
 test('toggleNodePosition: own/receive doc lap, dedupe, chan ngoai {1..3}', async () => {
   const { model } = makeModel(seedCases('ready'));
   await model.openCase(42);

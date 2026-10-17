@@ -51,6 +51,7 @@ Việc đang mở được tổng hợp tại [catalog issue](../backlog/README.
   `engine_unavailable` khi mở danh sách; danh sách tự retry. Đây là giới hạn
   đã quan sát, không thuộc scope #5 và không được tuyên bố đã khắc phục.
   [#5](../backlog/story-save-valid-incomplete-diagram.md).
+- Sơ đồ Thừa kế **#21B BUILT 17/10/2026** theo owner **“B - gỡ cả nhánh”**; retained Quick CODE t3 **No actionable findings**, parent accepted AC1–4. Node full 198 trước patch bỏ assertion chữ; affected file 25 sau patch, service 106 (24 warnings hiện có). Source Electron + real IPC/SQLite riêng đạt cảnh báo/dismiss/focus/atomic cut/Pool/Save invalid và fresh reopen exact. Không claim packaged/Word; startup toast `engine_unavailable` còn quan sát. #21 vẫn là spike nhận đáp án, không chứa implementation. [Proof](../tmp/issue-21b-branch-removal/evidence/ui-ipc-proof.json) · [Quy tắc](notary_v2/diagram-rules.md#branch-removal).
 - Ngày Người giữ độ đầy đủ qua lưu/đọc/sửa/xuất Word: `2010` (chỉ năm) không
   bị đệm thành `01/01/2010`; snapshot hồ sơ là bằng chứng, master chỉ fallback
   khi snapshot cũ thiếu key. Đã sửa, test hồi quy và export DOCX thật đạt;

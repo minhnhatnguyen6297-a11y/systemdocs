@@ -1,6 +1,6 @@
 # Soạn thảo hồ sơ
 
-**Cập nhật:** 16/10/2026. Spec chính của module; hành vi giữ độ đầy đủ ngày Người đã triển khai, kiểm tra hồi quy và export DOCX thật, review Quick độc lập sạch.
+**Cập nhật:** 17/10/2026. Gỡ cả nhánh Thừa kế **#21B BUILT 17/10/2026**; retained Quick CODE t3 **No actionable findings**, parent chấp nhận AC1–4. Node full 198 passed trước patch bỏ assertion chữ; file bị ảnh hưởng chạy lại 25 passed; service 106 passed (24 warnings hiện có); Source Electron + real IPC/SQLite riêng đạt. Không claim packaged/Word; giữ giới hạn startup toast đã ghi.
 
 ## 1. Mục đích và luồng
 
@@ -74,7 +74,11 @@ Kéo người vào vị trí để gán; gỡ thẻ trả người về Pool nh�
 
 Hai bên có 30 vị trí cố định: p1..p15 Bên A, p16..p30 Bên B. Giữ ghế trống; thả lên ghế có người thì hoán đổi, không dồn danh sách. Thừa kế biểu diễn cha/mẹ, vợ/chồng, con và nhánh thế vị; dấu Chủ/Nhận (sở hữu/nhận tài sản) chỉ thuộc Thừa kế, chọn theo vị trí tài sản 1..3; đổi thứ tự/xóa tài sản phải cảnh báo đổi nghĩa.
 
-Diagram có nháp riêng và nút Lưu sơ đồ. Xem cách tính chỉ đọc kết quả Python, không lưu và không tính lại bằng JavaScript. Quan hệ sai/vòng lặp/người ngoài Stage bị chặn; cấu trúc hợp lệ nhưng thiếu dữ liệu vẫn cho lưu, hiện rõ phần còn thiếu. Lỗi không xóa sơ đồ cũ. Xóa nút giữa có nguy cơ ảnh hưởng nhánh phải thông báo; cách xử lý nhánh cụ thể còn cần chốt.
+Diagram có nháp riêng và nút Lưu sơ đồ. Xem cách tính chỉ đọc kết quả Python, không lưu và không tính lại bằng JavaScript. Quan hệ sai/vòng lặp/người ngoài Stage bị chặn; cấu trúc hợp lệ nhưng thiếu dữ liệu vẫn cho lưu, hiện rõ phần còn thiếu. Lỗi không xóa sơ đồ cũ.
+
+**Gỡ cả nhánh Thừa kế — owner 17/10/2026: “B - gỡ cả nhánh”.** Xóa node gỡ cả node đó và mọi hậu duệ active theo cạnh cha/mẹ → con ở mọi độ sâu, kể cả slot trống/ẩn hoặc con còn cha/mẹ khác. Không gỡ spouse chỉ vì quan hệ vợ/chồng, không giữ ô trung gian rỗng và không tự nối lại cha/mẹ. Trước khi đổi draft, liệt kê đúng node sẽ gỡ và quan hệ sẽ ngắt, báo phần hưởng có thể đổi. Hủy/Escape/đóng không đổi draft/dirty/revision và không phát evaluate/save do thao tác này. Xác nhận áp một mutation draft rồi evaluate theo luồng có sẵn, chưa tự lưu.
+
+Người vẫn ở Stage, về Pool theo gán trên node active. Giữ tombstone `deleted:true` trong Node v3 canonical; xóa quan hệ đi ra và tham chiếu đi vào phần bị gỡ, kể cả trên tombstone, để không còn parent sai hoặc spouse lệch hai chiều. Giữ ID/giá trị/thứ tự Người/Tài sản và mọi node, dấu Chủ/Nhận, quan hệ không bị tác động. Save tiếp tục nguyên tử/revision hiện có; lỗi giữ draft/bản lưu cũ; mở lại đọc đúng canonical đã lưu. [Quy tắc chi tiết](diagram-rules.md#branch-removal) · [Decision](../../decisions/decision-owner-inheritance-remove-entire-branch-20261017.md). Đây là spec đã chốt, chưa phải bằng chứng #21B built.
 
 <a id="word"></a>
 ## 6. Xuất Word và quản lý mẫu
@@ -115,7 +119,8 @@ Yêu cầu tăng vùng sơ đồ +50% (report 802) đã chốt theo quyết đ�
 - Xuất dùng đúng bản đã lưu, không sửa nguồn hoặc ghi đè đầu ra; kiểm văn bản có trường trống và văn bản chỉ cần Stage khi triển khai định hướng mới.
 - Chuyển loại hồ sơ đã lưu: Người/Tài sản giữ ID + giá trị; Diagram reset rỗng theo domain mới; buộc chọn `document_type` mới kèm xác nhận; lỗi/xung đột/khóa không đổi state/revision.
 - Danh sách hồ sơ: **làm lại — DEFERRED 17/10/2026**; owner tự triển khai spec sau. Hướng trường hiển thị/search/filter là Draft chưa duyệt, chưa phải quy tắc hiện hành. [Decision](../../decisions/decision-owner-case-list-redesign-deferred-20261017.md).
-- Chưa chốt: chi tiết xử lý nhánh khi xóa nút giữa; tab Word tạo mẫu; phạm vi thay các điều kiện chặn hiện hành. Quy tắc tính thừa kế Draft không tự được duyệt.
+- Gỡ cả nhánh Thừa kế: cảnh báo liệt kê đúng node/quan hệ trước mutation; con có parent khác vẫn gỡ, spouse không tự gỡ; Hủy/Escape/đóng không mutate/evaluate/save; xác nhận một mutation draft, lưu/mở lại giữ đúng tombstone và graph còn lại, Stage/ID/vị trí tài sản không đổi.
+- Chưa chốt: tab Word tạo mẫu; phạm vi thay các điều kiện chặn hiện hành. Quy tắc tính thừa kế Draft không tự được duyệt.
 - Tab Word tạo/lưu mẫu: giữ Draft, **DEFERRED 17/10/2026**, cần spec kỹ khi làm sau; không phải câu hỏi phạm vi đang chờ owner và không phải feature built.
 
 ## 10. Tra cứu chuyên sâu
