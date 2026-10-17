@@ -1,6 +1,6 @@
 # NotaryOffice — hỗ trợ theo dõi công việc văn phòng
 
-**Cập nhật:** 15/10/2026. Định hướng của owner đã rõ; thiết kế kỹ thuật vẫn Draft, chưa có runtime được nghiệm thu. Không tự tạo schema hoặc triển khai các con số đề xuất.
+**Cập nhật:** 17/10/2026. **DEFERRED theo owner:** “notaryoffice để lại, tôi sẽ làm sau”. Giữ toàn bộ thiết kế Draft, chưa có runtime được nghiệm thu; không giao pilot, phép đo A1/A3/A4, code, schema hoặc runtime Office lúc này. Không xóa spec/công việc, không tự đặt hạn mở lại hoặc triển khai các con số đề xuất. [Quyết định owner](../../decisions/decision-owner-notaryoffice-deferred-20261017.md).
 
 ## 1. Vấn đề và mục đích
 

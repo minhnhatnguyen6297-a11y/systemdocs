@@ -1,6 +1,6 @@
 # Sổ tay sản phẩm theo màn hình
 
-**Cập nhật:** 16/10/2026 · **Dùng để:** giúp owner và coordinator cùng nhìn
+**Cập nhật:** 17/10/2026 · **Dùng để:** giúp owner và coordinator cùng nhìn
 vào sản phẩm, giao diện và việc còn dở khi bắt đầu phiên làm việc.
 
 Đọc [nền sản phẩm và khái niệm chung](README.md) trước để hiểu người dùng,
@@ -153,7 +153,10 @@ thức trên website là nguồn sự thật, không phải tín hiệu browser 
 ## notaryoffice — Theo dõi hồ sơ
 
 Đây là module thứ ba trong tầm nhìn nhưng hiện mới là **bản thiết kế nháp**,
-chưa có màn chạy.
+chưa có màn chạy. **DEFERRED — owner 17/10/2026:** “notaryoffice để lại, tôi sẽ làm sau”.
+Giữ Draft và công việc để làm sau; không giao pilot, phép đo A1/A3/A4,
+code/schema/runtime Office lúc này. [Quyết định](../decisions/decision-owner-notaryoffice-deferred-20261017.md);
+[#14](../backlog/spike-office-pilot-scope.md) đã được trả lời về phạm vi, không phải Office built.
 Thiết kế dự kiến nhận dấu vết được phép, gom gợi ý hồ sơ, rồi để chuyên viên
 xác nhận. Đây chưa phải tích hợp hoàn chỉnh; nguồn Zalo riêng cũng chưa nối
 xong contract với ứng dụng chính.
