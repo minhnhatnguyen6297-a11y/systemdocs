@@ -58,4 +58,4 @@ Binding formatter khi nạp browser có thể trỏ tên export không tồn t�
 
 - Tracking: C03; draft/chưa refined, chưa duyệt bắt đầu. #1 chỉ tracking, không chạy cùng leaf.
 - Risk: medium — Hỏng nhánh trình bày lỗi làm người dùng không hiểu thất bại; chưa có bằng chứng bản thân formatter làm hỏng dữ liệu.
-- Điểm vào code: shell/src/renderer/notary/relationship-diagram.js:47-49,312,1278,1333; error-catalog.js. Bằng chứng defect và phạm vi nằm trong nguồn đã dẫn; không đóng 12 report mất ghi chú theo lỗi này.
+- Điểm vào code: shell/src/renderer/notary/relationship-diagram.js:47-49,312,1278,1333; error-catalog.js. Bằng chứng defect và phạm vi nằm trong nguồn đã dẫn; không đóng 12 report mất ghi chú theo lỗi này (issue 12 report lịch sử đã bỏ theo quyết định owner 17/10/2026 — [decision](../decisions/decision-owner-remove-historical-report-issue-20261017.md)).
