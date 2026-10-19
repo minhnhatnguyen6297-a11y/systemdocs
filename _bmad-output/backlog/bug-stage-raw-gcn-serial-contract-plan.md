@@ -93,7 +93,7 @@ context:
 - Legacy properties router/form and case-form placeholder cut over; mock adapter matches contract (string type only).
 - Tests: obsolete rejection/surrogate expectations replaced; migration preservation/failure/idempotence tests added; adapter end-to-end commit→fresh get→`word_export_batch` test added.
 - Live-DB copy migration: 14 properties/14 cases preserved; serial_notnull 0; unique index removed; FK check clean; second run idempotent. No user DB written.
-- Commit pending; no push.
+- Commit 096495f; chưa push.
 
 ## Plan Change Log
 
@@ -116,7 +116,7 @@ context:
 - `repro_adapter.py` → `raw OK revision=2`, `empty OK revision=3`, `duplicate OK revision=4`, serials `['DD123456','DD123456']`.
 - `repro.py` → raw/empty/duplicate OK; `db-nonunique OK duplicate serial rows: 3`; legacy read returns `raw legacy 12/34`; schema `so_serial VARCHAR(100)`.
 - Live-DB copy (`_bmad-output/tmp/issue-40-migration-livecopy/notary-copy.db`): 14 properties/14 cases, data_equal True for props/links/land/cases, FK `[]`, unique index removed, second run idempotent.
-- Independent re-check 20/10/2026: CLEAN — 122 / 244+2 skipped / 71 / Node 97 (4 wire + 93 renderer). Commit pending; no push.
+- Independent re-check 20/10/2026: CLEAN — 122 / 244+2 skipped / 71 / Node 97 (4 wire + 93 renderer). Commit 096495f; chưa push.
 
 **Manual checks:**
 - DOCX export text lines contain exactly `S1=TEST-RAW/001`, `S2=`, `S3=TEST-RAW/001`, `T1=123`, `T2=456`, `T3=789`; unreplaced `S2=[Serial 2]` absent; no `XX`.
