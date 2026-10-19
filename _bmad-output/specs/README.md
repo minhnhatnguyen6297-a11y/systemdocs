@@ -1,6 +1,6 @@
 # Nền sản phẩm
 
-**Cập nhật:** 16/10/2026. Đọc đầu phiên để hiểu sản phẩm; sau đó đọc sổ tay và spec module đang làm. Quy tắc dưới đây mô tả điều cần có, không chứng minh code đã hoàn thành.
+**Cập nhật:** 19/10/2026. Đọc đầu phiên để hiểu sản phẩm; sau đó đọc sổ tay và spec module đang làm. Quy tắc dưới đây mô tả điều cần có, không chứng minh code đã hoàn thành.
 
 ## 1. Người dùng và công việc
 
@@ -50,6 +50,8 @@ Electron là vỏ ứng dụng; Python/FastAPI xử lý nghiệp vụ. Module gi
 ## 6. Khái niệm và nguyên tắc
 
 - Hồ sơ là đơn vị công việc trong từng module. CCCD, GCN, cặp thửa/tờ, số công chứng là bằng chứng đối chiếu, không tự trở thành mã hồ sơ chung.
+- **Toàn bộ luồng nghiệp vụ xoay quanh Người, Tài sản, Hồ sơ** (owner 19/10/2026). Chức năng dùng dữ liệu chuẩn hóa của ba đối tượng; mọi input nghiệp vụ sau chuẩn hóa ánh xạ vào bộ trường canonical đã duyệt, mọi output nghiệp vụ dùng đúng bộ trường đó. Không tạo dữ liệu mồ côi hoặc nhét khác nghĩa vào ghi chú. Thiếu mapping/cần trường mới thì chốt nghiệp vụ/schema trước, không tự mở rộng. Raw/bằng chứng/`source_refs` là provenance kỹ thuật, không buộc có schema DB và không tự tạo quyền gộp Case hay tích hợp liên module.
+- Khi được giao vòng cải thiện theo mẫu thực: **LLM đọc hàng loạt mẫu → nhận diện cấu trúc → so code → điều chỉnh code → test lại, sai thì lặp** (owner 19/10/2026). Mục tiêu xuất đủ, đúng thông tin hợp đồng trong ba đối tượng chuẩn. Cấu trúc chưa chốt có issue theo loại; văn bản lạ/gap mapping vào issue tổng hợp để owner xem sau, giữ pending và tiếp tục file đã rõ, không đoán hoặc dừng cả lô. Quy trình không cấp quyền cloud mới; hiện chỉ ghi tài liệu, chưa bắt đầu vòng chạy. [Chi tiết](shared/extraction-rules.md#sample-iteration).
 - Bản nháp Stage/Diagram là sửa chưa lưu. Draft Case của Office là ứng viên chưa xác nhận. Trạng thái hồ sơ `draft` phục vụ quy tắc quản lý hồ sơ. Ba nghĩa không thay thế nhau.
 - Nguồn gốc → chữ đọc được → dữ liệu chuẩn hóa → gợi ý suy ra nếu cần → người có thẩm quyền xác nhận. Không phải dữ liệu nào cũng cần suy luận.
 - Giữ nguồn và giá trị gốc; không sửa raw để che lỗi. Máy không tự nâng OCR/AI thành dữ liệu đã xác nhận.

@@ -47,6 +47,29 @@ duyệt và contract/schema riêng.
 
 ### 4.2 Nguyên tắc đầu ra bóc tách
 
+**Phạm vi toàn hệ thống — owner 19/10/2026:** mọi luồng nghiệp vụ xoay quanh
+**Người, Tài sản, Hồ sơ**. Mỗi chức năng sử dụng dữ liệu chuẩn hóa của ba đối
+tượng; mọi input nghiệp vụ sau chuẩn hóa phải ánh xạ vào đúng bộ trường
+canonical đã duyệt, và mọi output nghiệp vụ dùng đúng trường/kiểu/định dạng/
+cách nhóm đó. Không để dữ liệu nghiệp vụ mồ côi hoặc đẩy vào ghi chú khác nghĩa.
+Bộ trường là cố định đối với lần triển khai; thiếu mapping/cần mở rộng thì
+ghi issue theo loại và giữ phần phụ thuộc pending để chốt nghiệp vụ/schema,
+không tự tạo trường hoặc dừng cả lô; tiếp tục các file/phần đã rõ. Mở rộng
+được duyệt sau này vẫn được phép. Raw, bằng chứng và `source_refs` giữ vai trò provenance kỹ thuật,
+không buộc raw đã mang schema DB; quy tắc này không tạo thêm entity nghiệp vụ,
+Case chung hoặc quyền tích hợp liên module.
+
+**Kết quả audit catalog 19/10/2026:** báo cáo ổn định
+`D:\testcase\BAO_CAO_KHAO_SAT.md` đã liệt kê trường nền Người/Tài sản/Hồ sơ,
+kiểu, đích wire/DB, thứ tự/cụm và nguồn thẩm quyền. Đây không phải bằng chứng
+mọi biến thể hợp đồng đã có mapping đủ hoặc code đã tuân thủ hết. Serial GCN
+nguyên văn/rỗng/trùng **đã được owner chốt**; validator/ràng buộc DB/projection
+khác chuẩn là [gap implementation tĩnh #40](../../backlog/bug-stage-raw-gcn-serial-contract.md),
+không phải câu hỏi duyệt lại field. Chưa tái hiện runtime trong lượt này.
+Ngày quy ước master + snapshot giữ `YYYY` theo #6 không tự là bug; ngày lập
+hồ sơ optional ở wire versus default DB và `so_giay_to` UNIQUE versus không
+dùng làm Case key phải phân biệt tầng/ngữ nghĩa trước khi kết luận vi phạm.
+
 Owner xác nhận 15/10/2026: bộ trường và định dạng DB đã duyệt là chuẩn đích;
 engine phải tuân theo hoặc ánh xạ tường minh tới chuẩn đó. Trước khi triển khai,
 chốt bộ trường, kiểu dữ liệu, định dạng, cách nhóm và nơi lưu cho chức năng nhận.

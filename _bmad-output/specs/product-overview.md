@@ -26,6 +26,25 @@ Sản phẩm hỗ trợ văn phòng công chứng giảm nhập liệu lặp l�
 3. **Theo dõi vận hành:** dự kiến cho biết hồ sơ đang ở đâu và chờ việc gì;
    hiện mới có thiết kế, chưa có chương trình chạy.
 
+**Định hướng hồ sơ thử — owner 19/10/2026:** folder `D:\testcase`, đọc
+[README chung](file:///D:/testcase/README.md) và
+[context từng loại](notary_v2/README.md#context-ho-so-thu).
+Mọi luồng dùng dữ liệu chuẩn Người–Tài sản–Hồ sơ; hiện **chỉ ghi tài liệu**,
+chưa tạo Word/corpus hoặc chạy E2E. Vị trí người nhận trong cấu trúc Di chúc
+cần nhận diện từ mẫu, không phải quyết định ghế Diagram; thế chấp ngân hàng
+cung cấp nội dung, văn phòng chỉ soạn lời chứng và input
+luôn thiếu thông tin tài sản; mua bán xe chỉ ghi
+[#29 DEFERRED](../backlog/spike-vehicle-sale-case-scope.md), hiện không làm.
+[Decision](../decisions/decision-owner-case-context-standard-data-20261019.md).
+Quy trình cho lượt được giao sau: **LLM đọc hàng loạt mẫu → nhận diện cấu trúc
+→ so code → điều chỉnh code → test lại, sai thì lặp**, nhằm xuất đủ, đúng thông
+tin hợp đồng. Issue riêng theo cấu trúc chưa chốt #30–#38;
+[#39 tổng hợp văn bản lạ](../backlog/spike-unfamiliar-document-review-queue.md)
+để owner xem sau, không chặn các file đã rõ. Không phải lệnh bắt đầu chạy lô.
+Đọc/cập nhật [báo cáo khảo sát ổn định](file:///D:/testcase/BAO_CAO_KHAO_SAT.md)
+trước/sau mỗi lô; audit trường chuẩn và mapping từng biến thể trước claim đủ
+đúng. Danh mục canonical có sẵn không chứng minh đã khảo sát nội dung mẫu.
+
 Việc đang mở được tổng hợp tại [catalog issue](../backlog/README.md)
 (16/10/2026; #17 built after independent Quick t2 clean; Upload failures and proof limits remain in the catalog/runtime record).
 [Ticket tổng cũ](../backlog/bug-notary-flow-ui-regex-word.md) giữ làm lịch sử và bị chặn tracking-only để không chạy trùng các leaf. Các điểm chính:

@@ -37,6 +37,27 @@ P1/P2 là ưu tiên đề xuất, không phải severity hay thứ tự ID. Cầ
 | C25 / #26 | [Kiểm chứng ý nghĩa tín hiệu Lưu trên portal thật](spike-upload-real-save-signal-validation.md) | bằng chứng — dropped | P1 lịch sử | không | DROPPED; không còn là gate ngữ nghĩa portal cho cutover |
 | C26 / #27 | [Đối chiếu văn bản chuyển một phần và bãi bỏ hành chính cùng ngày](spike-administrative-same-day-evidence.md) | bằng chứng | P2 | không | **bounded research completed 17/10/2026; source/confirmation UNRESOLVED, không built/legal-confirmed**. NQ1286 chứng minh partial + nhập phần còn lại cùng hiệu lực; không literal abolish riêng. NQ1674 khác ngày hiệu lực văn bản/ngày chính quyền hoạt động; NQ52 thiếu primary. Không đổi thuật toán; #12 độc lập. |
 | C27 / #28 | [Bỏ theo dõi kết quả Lưu và giữ tiến độ chuẩn bị theo lượt](story-upload-web-official-sot-cutover.md) | khoảng lệch theo quyết định owner | P1 | không | built (2026-10-16; UI E2E remains blocked by the deferred pre-existing `file_token` mismatch) |
+| C28 / #29 | [Để sau: chốt phạm vi hồ sơ mua bán ô tô, xe máy](spike-vehicle-sale-case-scope.md) | quyết định — deferred | chưa xếp | không | **DEFERRED 19/10/2026 — hiện không làm ca này**, `refined: false`. Owner xác định hai bên; bộ trường Tài sản/biến thể xe chưa chọn. Chỉ ghi issue, không tạo field, mẫu hoặc dữ liệu xe, không bắt đầu implementation. |
+| C29 / #30 | [Cấu trúc Di chúc và vùng người nhận](spike-will-document-structure.md) | cấu trúc/mapping — chưa chốt | chưa xếp | không | UNSELECTED / `refined: false`; LLM đọc mẫu trước, không suy “vị trí” là ghế Diagram. |
+| C30 / #31 | [Cấu trúc vay tiền](spike-loan-document-structure.md) | cấu trúc/mapping — chưa chốt | chưa xếp | không | Hai bên đã rõ; vùng thông tin/đích trường cần mẫu, không tự tạo field tài chính. |
+| C31 / #32 | [Hai biến thể ủy quyền](spike-authorization-document-structure.md) | cấu trúc/mapping — chưa chốt | chưa xếp | không | Phân biệt hợp đồng độc lập và bộ phụ cho nhân sự văn phòng; nguồn/vai trò/mapping riêng. |
+| C32 / #33 | [Biến thể văn bản cam kết](spike-commitment-document-structure.md) | cấu trúc/mapping — chưa chốt | chưa xếp | không | Phân biệt phạm vi cam kết tài sản riêng đã có với biến thể chưa khảo sát; không suy lỗi từ thiếu enum. |
+| C33 / #34 | [Lời chứng thế chấp](spike-mortgage-attestation-structure.md) | cấu trúc/mapping — chưa chốt | chưa xếp | không | Chỉ lời chứng; nội dung ngân hàng, input luôn thiếu tài sản; không tự bịa hoặc bỏ gate. |
+| C34 / #35 | [Đơn đăng ký thường dùng Mẫu 18](spike-registration-form-18-structure.md) | cấu trúc/mapping — chưa chốt | chưa xếp | không | Tên/phiên bản/vùng công việc và mapping cần đọc mẫu, không tự áp mẫu quen thuộc. |
+| C35 / #36 | [Nhận diện ba loại khai thuế khi đổi chủ sử dụng](spike-owner-change-tax-form-identification.md) | nhận diện trước cấu trúc | chưa xếp | không | Chưa biết tên ba loại: một leaf nhận diện trước, không bịa ba mẫu/field; không chỉ giới hạn chuyển nhượng. |
+| C36 / #37 | [Cử đại diện thừa kế](spike-inheritance-representative-structure.md) | cấu trúc/mapping — chưa chốt | chưa xếp | không | Đọc mẫu/vai trò trước; không tự đồng nhất với mọi hợp đồng ủy quyền. |
+| C37 / #38 | [Thông báo niêm yết thừa kế](spike-inheritance-public-notice-structure.md) | cấu trúc/mapping — chưa chốt | chưa xếp | không | Thiếu template không tự là lỗi parser; cần nguồn và mapping, không suy đã hoàn tất thủ tục. |
+| C38 / #39 | [Văn bản lạ/gap mapping để owner xem sau](spike-unfamiliar-document-review-queue.md) | queue tổng hợp — hiện rỗng | chưa xếp | không | Pending không tính pass, không dừng file đã rõ; ref repo che PII, chi tiết ở báo cáo ổn định owner-local. |
+| C39 / #40 | [Đồng bộ serial GCN Stage với chuẩn nguyên văn đã chốt](bug-stage-raw-gcn-serial-contract.md) | bug — gap source tĩnh | P2 đề xuất | không | Expected đã chốt 06/10/2026; audit phát hiện validator/UNIQUE/projection khác chuẩn. **Chưa tái hiện runtime, chưa sửa**, `refined: false`; không hỏi owner duyệt lại, không nhập #39 đang rỗng. |
+
+**Quy tắc bền vững 19/10/2026:** #30–#38 là câu hỏi cấu trúc/mapping theo từng
+loại, chưa phải defect, kết luận pháp lý hay quyền implementation; `refined: false`.
+Đọc mẫu thực theo lô trước, nhận diện cấu trúc rồi so spec/code → điều chỉnh có
+căn cứ → test lại, sai thì lặp đến xuất đủ đúng. #39 không là hard dependency
+chặn batch. Phần chưa quyết giữ pending, không loại im lặng để báo đạt.
+Trước tuyên bố đủ: audit field catalog ba đối tượng với tên/kiểu/format/nhóm/
+đích DB-wire/ràng buộc/nguồn; sau mỗi lô lưu `D:\testcase\BAO_CAO_KHAO_SAT.md`
+để dùng lại, giữ kết quả cũ. Hiện chỉ tài liệu, chưa đọc body mẫu hoặc chạy lô.
 
 Khuyến nghị hiện hành, không phải lệnh triển khai: (1) #28 cutover đã được owner chốt và #4 formatter, #6 độ đầy đủ ngày, #7 field extraction, #5 lưu incomplete, #17 nền desktop đã built; #11 cũ đã dropped; vị trí đầu của #28 là đề xuất điều phối, không phải phần của lựa chọn A ban đầu; (2) #2 workspace đã built (trục 802 owner đã chốt: chiều cao, sàn 726px; Quick t2 clean); #9 nghiệm thu Word thật đã answered; #24 readiness điền dần đã built (Quick t1 clean sau vá nhãn readiness); (3) #22 cutover đã built (retained Quick final multiline recheck clean 16Oct); #23 đã superseded theo quyết định owner 16/10/2026 (rule developer-only); (4) #25 đã refined từ decision #3 (16/10/2026) — semantics chốt, chưa built. Các việc nguồn/docs/quyết định độc lập có thể được đánh giá cùng lúc. Cần refinement/approval trước implementation cho việc chưa được uỷ quyền.
 

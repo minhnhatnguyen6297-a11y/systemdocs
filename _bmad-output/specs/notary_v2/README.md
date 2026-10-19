@@ -8,6 +8,64 @@ Giảm đánh máy lại: nhận giấy tờ/chữ, kiểm tra Người/Tài s�
 
 Stage giữ thông tin Người/Tài sản; Diagram giữ vai trò/quan hệ; Word dùng dữ liệu đã lưu. Một phần chưa đủ thông tin phải được chỉ rõ, không tự điền cho đủ.
 
+<a id="context-ho-so-thu"></a>
+### Context theo loại hồ sơ — owner 19/10/2026
+
+Đây là phân loại **nghiệp vụ do owner định hướng**, không phải danh sách loại
+đã được runtime triển khai. Mọi loại dùng dữ liệu chuẩn **Người, Tài sản,
+Hồ sơ**; không tạo bộ trường riêng hoặc tự điền dữ liệu thiếu.
+
+| Nhóm | Context nghiệp vụ cần giữ |
+|---|---|
+| 1. Chuyển nhượng | Hai bên. |
+| 2. Đặt cọc | Hai bên. |
+| 3. Di chúc | Pháp lý là đơn phương; trong bố trí nghiệp vụ của hệ thống có hai bên vì có người nhận. Owner: **“Người nhận tài sản theo di chúc có vị trí khác so với các văn bản khác”**. Đây là context **cấu trúc văn bản**: LLM đọc mẫu thực để tìm vùng/người nhận và mapping vào dữ liệu chuẩn; vị trí cụ thể chưa được cung cấp. Không diễn giải thành quyết định về ghế Diagram. |
+| 4. Thuê đất, vay tiền, ủy quyền, tặng cho, văn bản cam kết | Theo nhóm hai bên thông thường. Đây không phải phê duyệt thêm enum hoặc khẳng định regex chuyên biệt cho tất cả văn bản này. |
+| 5. Mua bán ô tô/xe máy | Hai bên; trường Tài sản và các biến thể xe chưa được chọn. **Chỉ ghi issue DEFERRED [#29](../../backlog/spike-vehicle-sale-case-scope.md); hiện không làm ca này**, không tự tạo field hoặc hồ sơ thử. |
+| 6. Thế chấp | Ngân hàng cung cấp nội dung; văn phòng **chỉ soạn lời chứng**. Đầu vào **luôn thiếu thông tin tài sản** trong hướng dẫn này; không tưởng tượng tài sản bảo đảm, không tự dựng hợp đồng thế chấp đầy đủ thay ngân hàng. |
+| 7. Thừa kế | Văn bản phụ có thể gồm từ chối nhận di sản, cử đại diện, thông báo niêm yết và tài liệu khác theo hồ sơ; không coi đây là checklist pháp lý bắt buộc/đã khép kín. |
+
+Văn bản phụ điển hình của hồ sơ: **ủy quyền cho người của văn phòng đi làm
+thay khách** (khác việc mặc định bên nhận ủy quyền là khách/bên giao dịch);
+**đơn đăng ký, thường dùng Mẫu 18**, ghi công việc đề nghị cơ quan nhà nước
+giải quyết; **bộ khai thuế gồm ba loại khi đổi chủ sử dụng**. Owner chưa cung
+cấp tên/mẫu của ba loại thuế, không tự đoán hoặc sinh biểu mẫu. Đây là context,
+không quyết định rằng mọi hồ sơ phải có đủ bộ phụ hoặc mọi văn bản phụ đều được
+regex/OCR hỗ trợ.
+
+Runtime hiện chỉ có `inheritance/{khai_nhan, thoa_thuan}` và
+`two_party/{chuyen_nhuong, tang_cho, cho_thue, dat_coc}` theo contract hiện hành.
+Nhận diện regex, phân loại nghiệp vụ và khả năng tạo/sửa/xuất hồ sơ là ba trục
+khác nhau; không đổi enum, schema hoặc bỏ gate xuất để làm chúng có vẻ trùng nhau.
+Di chúc, vay tiền, ủy quyền, cam kết, thế chấp và xe không được ghi là runtime
+mới đã hỗ trợ chỉ vì có context trên.
+
+Folder owner chuẩn bị là `D:\testcase`; đọc
+[README chung](file:///D:/testcase/README.md) trước khi làm việc với bộ hồ sơ.
+Hiện chỉ ghi context/README theo định hướng, **chưa tạo Word/corpus hoặc chạy
+test/E2E**, chờ owner chỉ dẫn tiếp. Đề xuất mười bundle và bản nháp trong
+`testdata/notary-e2e/v1/` trước lệnh dừng không phải nguồn triển khai được duyệt.
+[Quyết định và phần chưa chốt](../../decisions/decision-owner-case-context-standard-data-20261019.md).
+
+Khi được giao chạy, theo vòng **LLM đọc hàng loạt mẫu thực → nhận diện cấu trúc
+trước → so code → điều chỉnh code → test lại → sai thì lặp**; mục tiêu xuất đủ,
+đúng thông tin hợp đồng trong ba đối tượng chuẩn. Các cấu trúc/mapping chưa chốt
+có issue riêng theo loại ở [catalog #30–#38](../../backlog/README.md).
+Văn bản lạ hoặc phần không tự quyết được vào
+[#39 — tổng hợp xem sau](../../backlog/spike-unfamiliar-document-review-queue.md),
+giữ nguồn và pending, tiếp tục các file đã rõ; không dừng cả lô hoặc tự thêm
+field/nghiệp vụ. Đây mới là quy trình được ghi lại, chưa bắt đầu đọc mẫu/sửa
+code/test. Chi tiết [vòng theo mẫu thực](../shared/extraction-rules.md#sample-iteration).
+Trước mỗi lô đọc [báo cáo ổn định](file:///D:/testcase/BAO_CAO_KHAO_SAT.md),
+sau mỗi lô cập nhật và giữ kết quả cũ. Chỉ claim chuẩn trường/mapping đủ sau
+audit có tên/kiểu/format/nhóm/thứ tự/đích DB-wire/ràng buộc/nguồn canonical;
+tách defined/Draft/unmapped, không suy mọi biến thể đã rõ từ key có sẵn.
+Audit catalog nền đã ghi trong báo cáo; mapping từng biến thể vẫn chưa khép kín.
+Riêng serial GCN có chuẩn nguyên văn/rỗng/trùng đã chốt nhưng có
+[gap validation/persistence source tĩnh #40](../../backlog/bug-stage-raw-gcn-serial-contract.md).
+Chưa có runtime reproduction, không phải yêu cầu owner chọn lại serial và
+không phải record văn bản lạ trong #39.
+
 ## 2. Danh sách hồ sơ
 
 Tên mong muốn là Danh sách hồ sơ. Người dùng xem danh sách, tìm/lọc, tạo nháp và mở hồ sơ. Nhãn trạng thái, người tạo, tên/ngày tạo là hướng mô tả; danh sách nhãn, nguồn tìm kiếm và trường lọc chưa chốt đầy đủ. Chức năng sẽ **làm lại** — **DEFERRED 17/10/2026** (owner tự triển khai spec sau); hướng trường hiển thị/tìm/lọc owner ghi là **Draft chưa duyệt**, chưa phải quy tắc. [Decision](../../decisions/decision-owner-case-list-redesign-deferred-20261017.md).

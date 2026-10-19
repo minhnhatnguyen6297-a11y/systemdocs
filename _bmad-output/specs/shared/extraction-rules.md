@@ -8,6 +8,72 @@
 
 Có người/thửa nào giữ người/thửa đó; khi không chắc giữ bằng chứng và gắn cờ, không cắt/gộp mất im lặng. Không bóc người từ Lời chứng; R11 đã bỏ. Sổ tiết kiệm/bảo hiểm chỉ nhận diện chưa hỗ trợ + R12. Quê quán chỉ đọc snapshot cũ, intake không tự điền. Số công chứng dùng riêng cho Upload, không là tiêu chí đủ của core Người/Tài sản.
 
+<a id="sample-iteration"></a>
+### Vòng làm việc theo mẫu thực — owner 19/10/2026
+
+**Quy tắc bắt buộc, bền vững cho các phiên sau:** owner yêu cầu
+“ghi lại rule test này lại, tôi không muốn nhắc lại lần sau”.
+LLM phải đọc mẫu thực theo lô trước, nhận diện cấu trúc, đối chiếu **spec/code**,
+chỉnh code có căn cứ rồi test; sai thì lặp cho tới khi xuất đủ, đúng thông tin
+hợp đồng. Đọc `D:\testcase\README.md` và quy tắc này trước khi tạo fixture.
+Không khôi phục kế hoạch mười ca trước lệnh dừng. Phần unresolved không tính
+pass và không bị âm thầm loại khỏi mẫu số để báo toàn bộ đã đạt.
+
+Thứ tự khi được giao chạy: **LLM đọc hàng loạt file mẫu thực → nhận diện
+cấu trúc trước → so sánh với code → điều chỉnh code → test lại → nếu sai thì
+lặp lại**. Mục tiêu là xuất **đủ, đúng thông tin hợp đồng**, không chỉ xuất được
+DOCX hoặc có hash giống nhau. Trước khi đối chiếu code, ghi độc lập vùng/nhóm
+Người, Tài sản, Hồ sơ, giá trị có bằng chứng và mapping vào trường canonical
+hiện có. Không lấy parser output làm đáp án; raw và vị trí nguồn không bị sửa.
+Không thêm entity/field nghiệp vụ, DTO ghi DB riêng hoặc nhét thông tin sai nghĩa
+vào ghi chú để làm phép kiểm có vẻ đạt. Phần cần schema mới phải được duyệt.
+
+Loại đã biết nhưng cấu trúc/mapping chưa chốt có issue riêng theo loại; thiếu
+enum runtime không tự chứng minh cấu trúc chưa biết hoặc parser có lỗi.
+Văn bản lạ/không tự quyết được hoặc gap mapping được ghi theo từng file/ứng viên
+vào [#39 — tổng hợp để owner xem sau](../../backlog/spike-unfamiliar-document-review-queue.md),
+kèm tham chiếu nguồn/hash, vị trí, thông tin có căn cứ, phần còn chưa quyết,
+mapping Người/Tài sản/Hồ sơ và issue theo loại nếu có. Đây là metadata theo dõi,
+không phải schema nghiệp vụ mới. Đánh dấu **pending/chưa kiểm, không phải pass**;
+giữ nguyên nguồn/ứng viên và tiếp tục các file/phần đã rõ, không dừng cả lô hoặc
+tự đoán câu trả lời. Thông tin hợp đồng chưa biểu diễn được phải hiện trong
+phần thiếu/issue, không bỏ mất để báo đủ.
+
+Mỗi vòng khi chạy thực tế ghi phần đã sửa, kết quả test với đáp án độc lập,
+lỗi còn lại và phần pending; không tự tuyên bố hoàn tất nếu còn thiếu thông tin.
+LLM có thể là agent đọc file cục bộ; không có quyền cloud/provider mới hoặc
+runtime LLM fallback từ chỉ dẫn này. Trạng thái hiện tại vẫn **chỉ ghi tài liệu**,
+chưa bắt đầu đọc nội dung file mẫu, sửa code hoặc test. So byte/định dạng/trang
+Word là các lớp kiểm riêng; tiêu chuẩn binary/pixel chưa được owner chọn,
+không tự coi đã nới hoặc đã đạt.
+
+### Báo cáo ổn định và gate hoàn thành
+
+Sau mỗi lô LLM phải cập nhật **`D:\testcase\BAO_CAO_KHAO_SAT.md`**; phiên sau
+đọc báo cáo trước lô mới, dùng lại kết quả có nguồn còn phù hợp. Giữ kết quả cũ
+bằng mục lô có ngày hoặc tham chiếu lịch sử thuộc sở hữu, không ghi đè mất
+khảo sát, không dùng tmp/log làm báo cáo duy nhất.
+
+Trước khi gọi chuẩn trường đã rõ, báo cáo audit phải liệt kê **tên trường,
+kiểu, format/độ đầy đủ ngày, cách nhóm/thứ tự, đích DB hoặc wire, ràng buộc và
+nguồn canonical** cho Người, Tài sản, Hồ sơ. Tách trường defined khỏi Draft và
+ambiguous/unmapped. Có key trong code/contract không tự chứng minh mọi biến thể
+hợp đồng đã có mapping đủ; báo cáo là audit hiện tại, không thay SOT contract.
+Gap chỉ chặn phần phụ thuộc, không mở schema hoặc dừng file đã rõ.
+
+Gate kết quả lô: báo cáo có đường dẫn/ref nguồn + version/ngày, phạm vi
+đã đọc/chưa đọc và phương pháp; vùng/đoạn/bảng và vị trí/vai trò các bên;
+mapping ba đối tượng và coverage có nguồn; code gap + issue; đề xuất/sửa đã áp
+dụng; retest đã/chưa chạy, kết quả quan sát, pending và next resume. Phần thiếu
+không tính pass hoặc bị loại im lặng. Metadata/danh mục chưa đọc body phải ghi
+**coverage nội dung 0**, không gọi là khảo sát mẫu đã hoàn tất.
+
+Báo cáo owner-local giữ tham chiếu/chi tiết theo quyền riêng tư hiện có.
+Repo issue/tài liệu commit chỉ dùng ref an toàn và trích cấu trúc đã che giá trị
+cá nhân; không chép raw Word/CCCD/thông tin khách vào Git hoặc log rộng. Không
+tạo tính năng logging/telemetry. Lượt hiện tại chỉ ghi quy tắc và audit canonical
+nếu được giao, không suy file báo cáo khởi tạo là đã đọc nội dung lô mẫu.
+
 <a id="fields"></a>
 ## 2. Giá trị từng trường
 

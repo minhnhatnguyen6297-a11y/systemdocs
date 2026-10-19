@@ -13,6 +13,15 @@ theo mẫu từng `document_key`, folder mode giữ semantics nhóm thiếu đ�
 gate kỹ thuật (thiếu người/tài sản, giới hạn số lượng) giữ nguyên; slot chưa
 giải quyết và người được ủy quyền mẫu cần vẫn làm riêng file đó lỗi.
 
+**Context thế chấp — owner 19/10/2026:** nội dung do ngân hàng cung cấp, văn
+phòng chỉ soạn lời chứng; đầu vào luôn thiếu thông tin tài sản trong hướng dẫn
+này. Không bịa tài sản, tự dựng toàn bộ hợp đồng hoặc coi việc ghi định hướng
+là đã có loại hồ sơ/đường xuất mới. Các gate kỹ thuật và khả năng xuất hiện
+hành vẫn giữ nguyên; nếu chưa đáp ứng thì ghi đúng giới hạn, không lách gate.
+Context loại văn bản và bộ phụ điển hình nằm trực tiếp trong
+[README Notary](README.md#context-ho-so-thu); bộ hồ sơ owner chuẩn bị ở
+`D:\testcase` hiện chỉ được ghi README/context, chưa sinh Word hoặc chạy E2E.
+
 <a id="docx-import"></a>
 ## 2. Nhập hợp đồng và dùng lại bản gốc
 
