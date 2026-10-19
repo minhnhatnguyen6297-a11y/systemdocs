@@ -52,17 +52,50 @@ duyệt và contract/schema riêng.
 tượng; mọi input nghiệp vụ sau chuẩn hóa phải ánh xạ vào đúng bộ trường
 canonical đã duyệt, và mọi output nghiệp vụ dùng đúng trường/kiểu/định dạng/
 cách nhóm đó. Không để dữ liệu nghiệp vụ mồ côi hoặc đẩy vào ghi chú khác nghĩa.
-Bộ trường là cố định đối với lần triển khai; thiếu mapping/cần mở rộng thì
-ghi issue theo loại và giữ phần phụ thuộc pending để chốt nghiệp vụ/schema,
-không tự tạo trường hoặc dừng cả lô; tiếp tục các file/phần đã rõ. Mở rộng
-được duyệt sau này vẫn được phép. Raw, bằng chứng và `source_refs` giữ vai trò provenance kỹ thuật,
-không buộc raw đã mang schema DB; quy tắc này không tạo thêm entity nghiệp vụ,
+Bộ trường là cố định đối với lần triển khai; cần mở rộng phải chốt trước, không
+tự tạo trường. Raw, bằng chứng và `source_refs` giữ vai trò provenance kỹ thuật,
+không buộc raw đã mang schema DB; quy tắc này không tạo entity nghiệp vụ thứ tư,
 Case chung hoặc quyền tích hợp liên module.
+
+**Bổ sung owner 19/10/2026:** **chủ đất là trường Hồ sơ**, không là thuộc tính
+chủ sở hữu cố định của Tài sản hoặc mặc định node `owner`/`owner_row_id` Thừa kế.
+Thông tin công chứng thuộc Hồ sơ, độc lập ngày tạo hồ sơ. Phải inventory đủ
+số/ngày công chứng, công chứng viên, thư ký và mọi trường nghiệp vụ bóc tách/form
+Upload xuyên module trước khi chốt catalog; không giới hạn theo cột Notary hiện
+có. Key/kiểu/format/nhóm/cardinality và DB-wire-output còn thiếu phải refine
+trong [#41](../../backlog/story-upload-business-field-standardization.md).
+Không xóa trường Upload cần thiết cho vừa schema hiện tại; mở rộng canonical
+Hồ sơ có căn cứ và được duyệt khi cần, không coi định hướng là duyệt cột mới.
+
+Không bóc/chuẩn hóa thông tin giao dịch (giá, đặt cọc, tiền thuê, khoản vay,
+lãi suất, điều khoản thanh toán) hoặc thời hạn nghiệp vụ. **Giữ thời hạn sử dụng
+đất** đúng cụm `land_rows[].thoihan` và timeout kỹ thuật. Nếu portal yêu cầu
+trường bị loại, ghi xung đột consumer để refine, không âm thầm giữ extraction,
+bịa/default hoặc tự quyết bước nhập tay mới. Không xóa/sửa raw, lịch sử hoặc
+runtime trong lượt tài liệu.
+
+**Gate toàn hệ thống trước mọi lượt quét/đọc mẫu thực mới, corpus và vòng E2E
+theo mẫu:** #41 phải được nghiệm thu cả chuẩn DB/contract đã duyệt, cutover mọi
+consumer bị ảnh hưởng và proof luồng thật; bảng mapping/local Draft không đủ.
+Verification riêng #41 khi được giao có thể dùng input tổng hợp/kiểm soát và
+DB/profile cô lập, không phụ thuộc khảo sát corpus owner đang bị gate. Sau gate,
+khi được giao chạy mẫu, thiếu mapping từng file thì giữ pending/ghi #39, tiếp
+tục file đã rõ. Không tắt production Scan/Upload hoặc cấp quyền implementation.
+
+**Một Người nhiều giấy tờ và nhiều địa chỉ** là
+[#42 riêng](../../backlog/story-person-multiple-identities-addresses.md).
+Model hiện hành một bộ giấy tờ/một địa chỉ không phải hỗ trợ đa trị; model,
+schema/migration/chọn dùng/extraction/export tương lai chưa chọn. Child records
+trong Người có thể được thiết kế sau, không thêm đối tượng thứ tư và không tự
+đặt #42 làm prerequisite #41 hoặc gate mẫu.
+Lý do và supersession: [quyết định owner](../../decisions/decision-owner-upload-field-standardization-20261019.md).
 
 **Kết quả audit catalog 19/10/2026:** báo cáo ổn định
 `D:\testcase\BAO_CAO_KHAO_SAT.md` đã liệt kê trường nền Người/Tài sản/Hồ sơ,
-kiểu, đích wire/DB, thứ tự/cụm và nguồn thẩm quyền. Đây không phải bằng chứng
-mọi biến thể hợp đồng đã có mapping đủ hoặc code đã tuân thủ hết. Serial GCN
+kiểu, đích wire/DB, thứ tự/cụm và nguồn thẩm quyền trong phạm vi catalog nền.
+**Catalog đó chưa đủ bộ trường Hồ sơ/Upload xuyên module** và không chứng minh
+mọi biến thể đã có mapping hoặc code tuân thủ hết; #41 đóng phần thiếu này.
+Serial GCN
 nguyên văn/rỗng/trùng **đã được owner chốt**; validator/ràng buộc DB/projection
 khác chuẩn là [gap implementation tĩnh #40](../../backlog/bug-stage-raw-gcn-serial-contract.md),
 không phải câu hỏi duyệt lại field. Chưa tái hiện runtime trong lượt này.

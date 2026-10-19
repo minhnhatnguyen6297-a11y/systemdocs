@@ -8,6 +8,46 @@
 
 DOC qua IFilter; DOCX giữ thứ tự đoạn/bảng để không trộn bên. Bóc người, người yêu cầu, tài sản, số/ngày công chứng, công chứng viên và loại văn bản. Kết quả giữ JSON, registry SQLite và manifest theo lượt quét; theo bộ trường DB/contract, không tự gộp hoặc suy dữ liệu thiếu. Chuẩn số công chứng hiện hành là xxx/yyyy; phân biệt năm và website, không suy số thứ tự là mã hồ sơ chung.
 
+### 1.1. Chuẩn trường và gate mẫu — owner 19/10/2026
+
+Owner báo còn trường nghiệp vụ mồ côi và thiếu trường Hồ sơ. Đây là report của
+owner, chưa phải kết quả chạy lại Upload. [#41](../../backlog/story-upload-business-field-standardization.md)
+phải inventory **toàn bộ trường bóc tách/biểu mẫu Upload xuyên module**: nghĩa
+→ Người/Tài sản/Hồ sơ → key/kiểu/format/nhóm/thứ tự/cardinality → DB/wire/output
+maps và nguồn thẩm quyền/gap. Cột workspace Notary không phải catalog đầy đủ;
+không xóa trường Upload cần thiết chỉ để vừa schema đó. Mở rộng canonical Hồ sơ
+có căn cứ và được duyệt khi cần, không coi mọi trường là cột DB mới đã duyệt.
+
+**Chủ đất thuộc Hồ sơ**, không là thuộc tính chủ sở hữu cố định của Tài sản,
+không mặc định bằng node `owner`/`owner_row_id` Thừa kế; key/kiểu/cardinality/
+quan hệ cụ thể chưa chọn. **Thông tin công chứng thuộc Hồ sơ**, độc lập với ngày
+tạo hồ sơ. Số/ngày công chứng, công chứng viên, thư ký và mọi trường còn lại
+phải vào inventory trước claim đủ.
+
+**Không bóc/chuẩn hóa thông tin giao dịch** (giá, đặt cọc, tiền thuê, khoản vay,
+lãi suất, điều khoản thanh toán) hoặc **thời hạn nghiệp vụ**. Vẫn giữ thời hạn
+sử dụng đất đúng cụm `land_rows[].thoihan` và timeout kỹ thuật. Portal cần trường
+đã loại thì ghi xung đột consumer/câu hỏi refinement; không âm thầm tiếp tục
+extraction, bịa/default hoặc tự chọn bước nhập tay mới. Không xóa raw, bằng chứng
+lịch sử hay sửa runtime trong lượt tài liệu. File/provenance/cookie/cấu hình tab
+là kỹ thuật, không tự là trường nghiệp vụ mồ côi.
+
+**Mọi future sample batch/khảo sát mẫu thực, corpus và vòng E2E theo mẫu toàn hệ
+thống chờ #41 nghiệm thu đủ** chuẩn DB/contract được duyệt, cutover mọi adapter/
+writer/reader/consumer/output bị ảnh hưởng và proof luồng thật. Bảng mapping,
+local Draft, rename hoặc `ghiChu`/raw capture thay trường không đủ. Proof riêng
+#41 khi được giao dùng input tổng hợp/kiểm soát và profile cô lập, không yêu cầu
+quét corpus owner trước khi đóng issue. Sau gate và khi được giao mới chạy vòng
+LLM đọc mẫu trước; pending từng file/#39 vẫn không chặn file đã rõ.
+**Không tắt Scan/Upload production**, không cấp quyền triển khai từ docs.
+
+Một Người nhiều giấy tờ và nhiều địa chỉ là
+[#42 riêng](../../backlog/story-person-multiple-identities-addresses.md);
+model/schema/migration/chọn dùng/extraction/export tương lai chưa thiết kế,
+không tự là prerequisite #41. #40 serial Stage/persistence vẫn riêng, chưa sửa.
+Website chính thức là SOT, người dùng tự bấm Lưu và rule developer-only giữ
+nguyên. [Quyết định](../../decisions/decision-owner-upload-field-standardization-20261019.md).
+
 <a id="ui"></a>
 ## 2. Màn hình và thao tác
 

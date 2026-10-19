@@ -51,7 +51,29 @@ Electron là vỏ ứng dụng; Python/FastAPI xử lý nghiệp vụ. Module gi
 
 - Hồ sơ là đơn vị công việc trong từng module. CCCD, GCN, cặp thửa/tờ, số công chứng là bằng chứng đối chiếu, không tự trở thành mã hồ sơ chung.
 - **Toàn bộ luồng nghiệp vụ xoay quanh Người, Tài sản, Hồ sơ** (owner 19/10/2026). Chức năng dùng dữ liệu chuẩn hóa của ba đối tượng; mọi input nghiệp vụ sau chuẩn hóa ánh xạ vào bộ trường canonical đã duyệt, mọi output nghiệp vụ dùng đúng bộ trường đó. Không tạo dữ liệu mồ côi hoặc nhét khác nghĩa vào ghi chú. Thiếu mapping/cần trường mới thì chốt nghiệp vụ/schema trước, không tự mở rộng. Raw/bằng chứng/`source_refs` là provenance kỹ thuật, không buộc có schema DB và không tự tạo quyền gộp Case hay tích hợp liên module.
-- Khi được giao vòng cải thiện theo mẫu thực: **LLM đọc hàng loạt mẫu → nhận diện cấu trúc → so code → điều chỉnh code → test lại, sai thì lặp** (owner 19/10/2026). Mục tiêu xuất đủ, đúng thông tin hợp đồng trong ba đối tượng chuẩn. Cấu trúc chưa chốt có issue theo loại; văn bản lạ/gap mapping vào issue tổng hợp để owner xem sau, giữ pending và tiếp tục file đã rõ, không đoán hoặc dừng cả lô. Quy trình không cấp quyền cloud mới; hiện chỉ ghi tài liệu, chưa bắt đầu vòng chạy. [Chi tiết](shared/extraction-rules.md#sample-iteration).
+- **Owner 19/10/2026 — bổ sung trường Hồ sơ:** chủ đất là trường **Hồ sơ**,
+  không là thuộc tính sở hữu cố định của Tài sản, không mặc định node `owner`
+  Thừa kế. Thông tin công chứng thuộc Hồ sơ, độc lập ngày tạo hồ sơ; inventory
+  phải đủ số/ngày công chứng, công chứng viên, thư ký và mọi trường Upload.
+  Không bóc/chuẩn hóa giá/cọc/thuê/vay/lãi/điều khoản thanh toán hoặc thời hạn
+  nghiệp vụ; vẫn giữ thời hạn sử dụng đất đúng cụm và timeout kỹ thuật. Portal
+  cần trường bị loại thì ghi xung đột để refine, không bịa/default hoặc tự chọn
+  bước nhập tay. Key/kiểu/cardinality/DB-wire-output chưa được chọn chỉ từ định
+  hướng này. [#41](../backlog/story-upload-business-field-standardization.md)
+  chuẩn hóa toàn bộ trường Upload xuyên module, có thể mở rộng canonical Hồ sơ
+  có căn cứ và được duyệt, không xóa trường cần thiết cho vừa schema Notary.
+  [#42](../backlog/story-person-multiple-identities-addresses.md) riêng cho một
+  Người nhiều giấy tờ và địa chỉ; model tương lai chưa chọn, không tự là gate.
+- **Gate hiện hành trước quy trình theo mẫu:** mọi lượt khảo sát/quét mẫu thực
+  mới, corpus và vòng E2E theo mẫu phải chờ **#41 được nghiệm thu đầy đủ** chuẩn
+  DB/contract, cutover và proof consumer thật, không chỉ bảng mapping. Proof riêng
+  #41 có thể dùng input tổng hợp/kiểm soát cô lập khi được giao, không cần khảo
+  sát corpus owner để đóng gate. Sau gate và khi được giao mới chạy **LLM đọc
+  mẫu → nhận diện cấu trúc → so spec/code → sửa có căn cứ → test/lặp** đến đủ đúng.
+  Khi đó văn bản lạ/gap từng file giữ pending qua #39, tiếp tục file đã rõ.
+  Không tắt Scan/Upload production, cấp quyền code hoặc cloud mới. Hiện chỉ ghi
+  tài liệu. [Chi tiết](shared/extraction-rules.md#sample-iteration) ·
+  [Quyết định](../decisions/decision-owner-upload-field-standardization-20261019.md).
 - Bản nháp Stage/Diagram là sửa chưa lưu. Draft Case của Office là ứng viên chưa xác nhận. Trạng thái hồ sơ `draft` phục vụ quy tắc quản lý hồ sơ. Ba nghĩa không thay thế nhau.
 - Nguồn gốc → chữ đọc được → dữ liệu chuẩn hóa → gợi ý suy ra nếu cần → người có thẩm quyền xác nhận. Không phải dữ liệu nào cũng cần suy luận.
 - Giữ nguồn và giá trị gốc; không sửa raw để che lỗi. Máy không tự nâng OCR/AI thành dữ liệu đã xác nhận.

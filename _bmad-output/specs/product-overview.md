@@ -1,6 +1,6 @@
 # Sổ tay sản phẩm theo màn hình
 
-**Cập nhật:** 17/10/2026 · **Dùng để:** giúp owner và coordinator cùng nhìn
+**Cập nhật:** 19/10/2026 · **Dùng để:** giúp owner và coordinator cùng nhìn
 vào sản phẩm, giao diện và việc còn dở khi bắt đầu phiên làm việc.
 
 Đọc [nền sản phẩm và khái niệm chung](README.md) trước để hiểu người dùng,
@@ -36,14 +36,30 @@ cung cấp nội dung, văn phòng chỉ soạn lời chứng và input
 luôn thiếu thông tin tài sản; mua bán xe chỉ ghi
 [#29 DEFERRED](../backlog/spike-vehicle-sale-case-scope.md), hiện không làm.
 [Decision](../decisions/decision-owner-case-context-standard-data-20261019.md).
-Quy trình cho lượt được giao sau: **LLM đọc hàng loạt mẫu → nhận diện cấu trúc
+**Gate mới — owner 19/10/2026:** mọi future sample batch/khảo sát mẫu thực,
+corpus và E2E theo mẫu chờ
+[#41 chuẩn hóa toàn bộ trường Upload](../backlog/story-upload-business-field-standardization.md)
+được nghiệm thu chuẩn DB/contract, cutover và proof consumer thật, không chỉ
+bảng mapping. Proof riêng #41 khi được giao dùng input tổng hợp/kiểm soát
+cô lập, không cần quét corpus owner để đóng gate. Không tắt Scan/Upload
+production. Chủ đất thuộc **Hồ sơ**, không Tài sản cố định/node `owner` Thừa kế;
+thông tin công chứng thuộc Hồ sơ, khác ngày tạo. Key/kiểu/cardinality chưa
+chọn; inventory gồm số/ngày công chứng, công chứng viên, thư ký và mọi trường.
+Không bóc/chuẩn hóa thông tin giá/cọc/thuê/vay/lãi/thanh toán hoặc thời hạn
+nghiệp vụ; vẫn giữ thời hạn đất và timeout kỹ thuật. Portal cần trường đã loại
+thì ghi xung đột để refine, không bịa/default hay tự chọn bước nhập tay.
+[#42 Người nhiều giấy tờ và địa chỉ](../backlog/story-person-multiple-identities-addresses.md)
+là issue riêng, model tương lai chưa chọn, không tự là prerequisite #41.
+[Quyết định](../decisions/decision-owner-upload-field-standardization-20261019.md).
+Sau gate và khi được giao, quy trình là **LLM đọc hàng loạt mẫu → nhận diện cấu trúc
 → so code → điều chỉnh code → test lại, sai thì lặp**, nhằm xuất đủ, đúng thông
 tin hợp đồng. Issue riêng theo cấu trúc chưa chốt #30–#38;
 [#39 tổng hợp văn bản lạ](../backlog/spike-unfamiliar-document-review-queue.md)
 để owner xem sau, không chặn các file đã rõ. Không phải lệnh bắt đầu chạy lô.
 Đọc/cập nhật [báo cáo khảo sát ổn định](file:///D:/testcase/BAO_CAO_KHAO_SAT.md)
 trước/sau mỗi lô; audit trường chuẩn và mapping từng biến thể trước claim đủ
-đúng. Danh mục canonical có sẵn không chứng minh đã khảo sát nội dung mẫu.
+đúng. Catalog nền chưa đủ trường Hồ sơ/Upload và không chứng minh đã khảo sát
+nội dung mẫu.
 
 Việc đang mở được tổng hợp tại [catalog issue](../backlog/README.md)
 (16/10/2026; #17 built after independent Quick t2 clean; Upload failures and proof limits remain in the catalog/runtime record).

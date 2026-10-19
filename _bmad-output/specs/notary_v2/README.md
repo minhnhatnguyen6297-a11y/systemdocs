@@ -15,6 +15,21 @@ Stage giữ thông tin Người/Tài sản; Diagram giữ vai trò/quan hệ; Wo
 đã được runtime triển khai. Mọi loại dùng dữ liệu chuẩn **Người, Tài sản,
 Hồ sơ**; không tạo bộ trường riêng hoặc tự điền dữ liệu thiếu.
 
+**Bổ sung owner 19/10/2026:** **chủ đất thuộc Hồ sơ**, không là thuộc tính cố
+định của Tài sản hoặc mặc định node `owner`/`owner_row_id` Thừa kế. Thông tin
+công chứng thuộc Hồ sơ, độc lập ngày tạo hồ sơ; inventory phải đủ số/ngày công
+chứng, công chứng viên, thư ký và mọi trường Upload, không chỉ workspace Notary.
+Key/kiểu/cardinality và DB-wire-output còn thiếu được chốt trong
+[#41](../../backlog/story-upload-business-field-standardization.md), không tự
+duyệt cột mới hoặc xóa trường cần thiết cho vừa schema hiện tại.
+Không bóc/chuẩn hóa giá/cọc/thuê/vay/lãi/điều khoản thanh toán hoặc thời hạn
+nghiệp vụ; **giữ thời hạn sử dụng đất** đúng cụm và timeout kỹ thuật. Portal
+cần trường bị loại thì ghi xung đột để refine, không bịa/default hoặc tự quyết
+bước nhập tay mới. Không sửa raw/lịch sử/runtime ở lượt tài liệu.
+Một Người nhiều giấy tờ và địa chỉ là
+[#42 riêng](../../backlog/story-person-multiple-identities-addresses.md);
+model hiện hành ô đơn không được tự ép đa trị, model tương lai chưa chọn.
+
 | Nhóm | Context nghiệp vụ cần giữ |
 |---|---|
 | 1. Chuyển nhượng | Hai bên. |
@@ -47,7 +62,14 @@ test/E2E**, chờ owner chỉ dẫn tiếp. Đề xuất mười bundle và bả
 `testdata/notary-e2e/v1/` trước lệnh dừng không phải nguồn triển khai được duyệt.
 [Quyết định và phần chưa chốt](../../decisions/decision-owner-case-context-standard-data-20261019.md).
 
-Khi được giao chạy, theo vòng **LLM đọc hàng loạt mẫu thực → nhận diện cấu trúc
+**Gate trước mọi lượt quét/đọc mẫu thực mới, corpus và E2E theo mẫu:** chờ #41
+được nghiệm thu đầy đủ chuẩn DB/contract đã duyệt, cutover consumer và proof
+luồng thật, không chỉ lập bảng mapping. Proof riêng #41 có thể dùng input
+tổng hợp/kiểm soát và DB/profile cô lập khi được giao, không cần quét corpus
+owner để đóng issue. #42 không tự là prerequisite; Scan/Upload production
+không bị tắt. Sau gate vẫn chờ được giao thực thi.
+
+Sau gate #41 và khi được giao chạy, theo vòng **LLM đọc hàng loạt mẫu thực → nhận diện cấu trúc
 trước → so code → điều chỉnh code → test lại → sai thì lặp**; mục tiêu xuất đủ,
 đúng thông tin hợp đồng trong ba đối tượng chuẩn. Các cấu trúc/mapping chưa chốt
 có issue riêng theo loại ở [catalog #30–#38](../../backlog/README.md).
@@ -60,7 +82,9 @@ Trước mỗi lô đọc [báo cáo ổn định](file:///D:/testcase/BAO_CAO_K
 sau mỗi lô cập nhật và giữ kết quả cũ. Chỉ claim chuẩn trường/mapping đủ sau
 audit có tên/kiểu/format/nhóm/thứ tự/đích DB-wire/ràng buộc/nguồn canonical;
 tách defined/Draft/unmapped, không suy mọi biến thể đã rõ từ key có sẵn.
-Audit catalog nền đã ghi trong báo cáo; mapping từng biến thể vẫn chưa khép kín.
+Audit catalog nền đã ghi trong báo cáo; bộ trường Hồ sơ/Upload xuyên module
+và mapping từng biến thể **chưa khép kín**; #41 đóng thiếu định nghĩa/mapping,
+không coi catalog local Draft là implementation xong.
 Riêng serial GCN có chuẩn nguyên văn/rỗng/trùng đã chốt nhưng có
 [gap validation/persistence source tĩnh #40](../../backlog/bug-stage-raw-gcn-serial-contract.md).
 Chưa có runtime reproduction, không phải yêu cầu owner chọn lại serial và

@@ -98,3 +98,14 @@ Diễn giải phạm vi — **không** phải quyết định nghiệp vụ:
 - Đoạn trên là **phương hướng Draft** ("chưa chốt chắc chắn"): các câu hỏi trường hiển thị/search/filter, whitelist/mapping cụ thể, bố cục thẻ 3 vùng Người/Tài sản/Hồ sơ, và ý niệm "tên chủ đất" đều **chưa được duyệt**. Riêng ràng buộc "mọi input/output tuân theo chuẩn database" là **yêu cầu trực tiếp của owner**, không phải phần tentative.
 - **Owner yêu cầu mọi input/output tuân theo chuẩn database** — ràng buộc trực tiếp của owner, không phải đề xuất bị bỏ. Whitelist trường hiển thị/search/filter, mapping input/output cụ thể và phạm vi `case_list` gửi tới database **chưa chốt**. Bố cục thẻ, enum trạng thái (đang làm/xuất xong), nghĩa "ngày tạo" và vị trí DB của chủ đất vẫn **tentative/chưa duyệt**.
 - Không hỏi lại #20. Lỗi lọc-sau-`limit` đã tái hiện 17/10/2026 vẫn **chưa sửa** và không thuộc lượt này; evidence cũ giữ nguyên.
+
+### Làm rõ mới — owner 19/10/2026
+
+**Chủ đất là trường Hồ sơ**, không là thuộc tính sở hữu cố định của Tài sản
+hoặc mặc định node `owner`/`owner_row_id` Thừa kế. Lựa chọn này thay phần
+“vị trí chủ đất chưa chốt” trong diễn giải lịch sử 17/10 bên trên; **không sửa
+đoạn owner nguyên văn**. Key/kiểu/cardinality/schema cụ thể còn phải chốt trong
+[#41](story-upload-business-field-standardization.md). #20 vẫn **DEFERRED**;
+whitelist hiển thị/search/filter, phạm vi request và bố cục thẻ chưa được duyệt.
+Không phải quyền triển khai UI, contract hoặc runtime.
+[Quyết định mới](../decisions/decision-owner-upload-field-standardization-20261019.md).

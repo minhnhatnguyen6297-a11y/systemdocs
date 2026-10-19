@@ -6,6 +6,15 @@
 
 P1/P2 là ưu tiên đề xuất, không phải severity hay thứ tự ID. Cần refinement/approval trước implementation; spike chỉ nhận quyết định/bằng chứng. **Hard after: #22 ← #7; #23 ← #8 và #22; #25 ← #3.** Cạnh #7→#22 chỉ tuần tự hóa sửa cùng core, không thêm gate nghiệp vụ; #7 không chờ full parity. Không chặn pilot Office bởi DB vật lý chung hoặc nghiệm thu Word thật bởi naming. #27 về nguồn hành chính vẫn độc lập với #12. #11/#26 dropped theo quyết định owner; #28 không có hard after. #23 superseded 16/10/2026 (rule do developer quản lý) nên cạnh #23 ← #8/#22 chỉ còn lịch sử.
 
+**Gate mới — owner 19/10/2026:** mọi lượt khảo sát/quét mẫu thực mới, corpus
+và E2E theo mẫu toàn hệ thống phải chờ **#41 nghiệm thu đầy đủ** chuẩn
+DB/contract được duyệt, cutover consumer và proof luồng thật; bảng mapping
+không đủ. Proof riêng #41 có thể dùng input tổng hợp/kiểm soát cô lập khi được
+giao, không cần quét corpus owner. Sau gate vẫn cần lệnh thực thi; #39 tiếp tục
+giữ pending từng file không chặn file đã rõ. Không tắt production Scan/Upload.
+#42 nhiều giấy tờ **và** địa chỉ là issue riêng, không tự là hard after của #41
+hoặc gate mẫu. [Quyết định](../decisions/decision-owner-upload-field-standardization-20261019.md).
+
 | Candidate / ID | Issue | Nhóm | Ưu tiên | Hard after | Sẵn sàng |
 |---|---|---|---|---|---|
 | C01 / #2 | [Không gian Stage, Pool và Diagram liền mạch, dễ thao tác](story-notary-workspace-continuity.md) | bug/report đã báo | P2 | không | 6/6 report đã built (18ae/b541/2c232/e86/ac5 + 802 sàn chiều cao 726px, geometry thật chứng minh; Node 193 pass/0 fail, adapter 83 pass, GUI gói default 0 fail + đóng sạch; independent Quick t1 patch thông báo dài + t2 clean) |
@@ -49,15 +58,24 @@ P1/P2 là ưu tiên đề xuất, không phải severity hay thứ tự ID. Cầ
 | C37 / #38 | [Thông báo niêm yết thừa kế](spike-inheritance-public-notice-structure.md) | cấu trúc/mapping — chưa chốt | chưa xếp | không | Thiếu template không tự là lỗi parser; cần nguồn và mapping, không suy đã hoàn tất thủ tục. |
 | C38 / #39 | [Văn bản lạ/gap mapping để owner xem sau](spike-unfamiliar-document-review-queue.md) | queue tổng hợp — hiện rỗng | chưa xếp | không | Pending không tính pass, không dừng file đã rõ; ref repo che PII, chi tiết ở báo cáo ổn định owner-local. |
 | C39 / #40 | [Đồng bộ serial GCN Stage với chuẩn nguyên văn đã chốt](bug-stage-raw-gcn-serial-contract.md) | bug — gap source tĩnh | P2 đề xuất | không | Expected đã chốt 06/10/2026; audit phát hiện validator/UNIQUE/projection khác chuẩn. **Chưa tái hiện runtime, chưa sửa**, `refined: false`; không hỏi owner duyệt lại, không nhập #39 đang rỗng. |
+| C40 / #41 | [Thống nhất toàn bộ trường nghiệp vụ Upload theo Người–Tài sản–Hồ sơ](story-upload-business-field-standardization.md) | chuẩn hóa xuyên module trước mẫu | trước future sample batch | không | **RECORDED / refined:false**, chưa build. Owner báo orphan/thiếu trường Hồ sơ; inventory tất cả extraction/form → nghĩa/đối tượng/key/kiểu/format/nhóm/cardinality/DB-wire-output; chốt gap, cutover mọi consumer và proof thật. Chủ đất/công chứng thuộc Hồ sơ, khác ngày tạo; bỏ extraction giao dịch/thời hạn nghiệp vụ, giữ thời hạn đất. Không chỉ lập bảng hoặc thu hẹp vào workspace Notary. |
+| C41 / #42 | [Một Người nhiều giấy tờ định danh và nhiều địa chỉ](story-person-multiple-identities-addresses.md) | model tương lai riêng | chưa xếp | không | **RECORDED / refined:false**, chưa thiết kế/chọn schema/migration/chọn dùng/extraction/export; model hiện tại một bộ giấy tờ/một địa chỉ. Không thêm đối tượng thứ tư hoặc tự đặt prerequisite cho #41/mẫu. |
 
 **Quy tắc bền vững 19/10/2026:** #30–#38 là câu hỏi cấu trúc/mapping theo từng
 loại, chưa phải defect, kết luận pháp lý hay quyền implementation; `refined: false`.
-Đọc mẫu thực theo lô trước, nhận diện cấu trúc rồi so spec/code → điều chỉnh có
-căn cứ → test lại, sai thì lặp đến xuất đủ đúng. #39 không là hard dependency
-chặn batch. Phần chưa quyết giữ pending, không loại im lặng để báo đạt.
+**Sau gate #41 được nghiệm thu và khi được giao**, đọc mẫu thực theo lô trước,
+nhận diện cấu trúc rồi so spec/code → điều chỉnh có căn cứ → test/lặp đến đủ đúng.
+#39 không là hard dependency chặn file đã rõ **sau gate**; chưa quyết giữ pending,
+không loại im lặng để báo đạt. Catalog nền chưa khép kín trường Hồ sơ/Upload.
 Trước tuyên bố đủ: audit field catalog ba đối tượng với tên/kiểu/format/nhóm/
 đích DB-wire/ràng buộc/nguồn; sau mỗi lô lưu `D:\testcase\BAO_CAO_KHAO_SAT.md`
 để dùng lại, giữ kết quả cũ. Hiện chỉ tài liệu, chưa đọc body mẫu hoặc chạy lô.
+
+**Làm rõ 19/10/2026 cho #20:** chủ đất nay được owner chọn là trường **Hồ sơ**,
+không Tài sản cố định hoặc mặc định node `owner` Thừa kế. Đây chỉ thay phần
+“vị trí chủ đất chưa chốt” trong tóm tắt lịch sử 17/10 ở trên/dưới; key/kiểu/
+cardinality và whitelist hiển thị/search/filter vẫn chưa chọn. #20 vẫn DEFERRED,
+nguyên văn owner và quyết định cũ giữ lịch sử, không phải duyệt UI redesign.
 
 Khuyến nghị hiện hành, không phải lệnh triển khai: (1) #28 cutover đã được owner chốt và #4 formatter, #6 độ đầy đủ ngày, #7 field extraction, #5 lưu incomplete, #17 nền desktop đã built; #11 cũ đã dropped; vị trí đầu của #28 là đề xuất điều phối, không phải phần của lựa chọn A ban đầu; (2) #2 workspace đã built (trục 802 owner đã chốt: chiều cao, sàn 726px; Quick t2 clean); #9 nghiệm thu Word thật đã answered; #24 readiness điền dần đã built (Quick t1 clean sau vá nhãn readiness); (3) #22 cutover đã built (retained Quick final multiline recheck clean 16Oct); #23 đã superseded theo quyết định owner 16/10/2026 (rule developer-only); (4) #25 đã refined từ decision #3 (16/10/2026) — semantics chốt, chưa built. Các việc nguồn/docs/quyết định độc lập có thể được đánh giá cùng lúc. Cần refinement/approval trước implementation cho việc chưa được uỷ quyền.
 

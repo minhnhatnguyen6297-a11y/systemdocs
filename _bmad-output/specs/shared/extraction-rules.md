@@ -18,6 +18,16 @@ chỉnh code có căn cứ rồi test; sai thì lặp cho tới khi xuất đủ
 hợp đồng. Đọc `D:\testcase\README.md` và quy tắc này trước khi tạo fixture.
 Không khôi phục kế hoạch mười ca trước lệnh dừng. Phần unresolved không tính
 pass và không bị âm thầm loại khỏi mẫu số để báo toàn bộ đã đạt.
+**Gate mới trước vòng trên:** mọi lượt quét/đọc mẫu thực mới, mass survey của
+owner, corpus và vòng E2E theo mẫu phải chờ
+[#41 chuẩn hóa trường Upload](../../backlog/story-upload-business-field-standardization.md)
+được nghiệm thu **chuẩn DB/contract đã duyệt + cutover consumer + proof luồng
+thật**, không chỉ có bảng mapping. Proof riêng #41 khi được giao dùng input
+tổng hợp/kiểm soát và DB/profile cô lập; không bắt khảo sát `D:\testcase` trước
+khi đóng issue, tránh vòng phụ thuộc. Inventory source tĩnh hiện tại không phải
+lô khảo sát mẫu. Sau gate vẫn phải được giao thực thi, không tắt Scan/Upload
+production hoặc coi tài liệu là quyền code/chạy mẫu.
+
 
 Thứ tự khi được giao chạy: **LLM đọc hàng loạt file mẫu thực → nhận diện
 cấu trúc trước → so sánh với code → điều chỉnh code → test lại → nếu sai thì
@@ -28,7 +38,7 @@ hiện có. Không lấy parser output làm đáp án; raw và vị trí nguồn
 Không thêm entity/field nghiệp vụ, DTO ghi DB riêng hoặc nhét thông tin sai nghĩa
 vào ghi chú để làm phép kiểm có vẻ đạt. Phần cần schema mới phải được duyệt.
 
-Loại đã biết nhưng cấu trúc/mapping chưa chốt có issue riêng theo loại; thiếu
+**Sau gate #41**, loại đã biết nhưng cấu trúc/mapping chưa chốt có issue riêng theo loại; thiếu
 enum runtime không tự chứng minh cấu trúc chưa biết hoặc parser có lỗi.
 Văn bản lạ/không tự quyết được hoặc gap mapping được ghi theo từng file/ứng viên
 vào [#39 — tổng hợp để owner xem sau](../../backlog/spike-unfamiliar-document-review-queue.md),
@@ -59,7 +69,8 @@ kiểu, format/độ đầy đủ ngày, cách nhóm/thứ tự, đích DB hoặ
 nguồn canonical** cho Người, Tài sản, Hồ sơ. Tách trường defined khỏi Draft và
 ambiguous/unmapped. Có key trong code/contract không tự chứng minh mọi biến thể
 hợp đồng đã có mapping đủ; báo cáo là audit hiện tại, không thay SOT contract.
-Gap chỉ chặn phần phụ thuộc, không mở schema hoặc dừng file đã rõ.
+Sau gate #41, gap từng file chỉ chặn phần phụ thuộc, không tự mở schema hoặc
+dừng file đã rõ. Catalog nền trước đây chưa khép kín trường Hồ sơ/Upload.
 
 Gate kết quả lô: báo cáo có đường dẫn/ref nguồn + version/ngày, phạm vi
 đã đọc/chưa đọc và phương pháp; vùng/đoạn/bảng và vị trí/vai trò các bên;
@@ -76,6 +87,24 @@ nếu được giao, không suy file báo cáo khởi tạo là đã đọc nộ
 
 <a id="fields"></a>
 ## 2. Giá trị từng trường
+
+**Quyết định owner 19/10/2026 cho toàn bộ trường nghiệp vụ:** **chủ đất thuộc
+Hồ sơ**, không là chủ sở hữu cố định của Tài sản và không mặc định node `owner`
+Thừa kế. Thông tin công chứng thuộc Hồ sơ, độc lập ngày tạo hồ sơ; inventory
+phải gồm số/ngày công chứng, công chứng viên, thư ký và mọi trường Upload trước
+khi claim đủ. Key/kiểu/format/nhóm/cardinality/DB-wire-output còn thiếu phải
+chốt trong #41, không tự suy schema mới hoặc chỉ dùng cột workspace Notary.
+
+**Không lấy trường thông tin giao dịch** (giá, cọc, tiền thuê, khoản vay, lãi
+suất, điều khoản thanh toán) **hoặc thời hạn nghiệp vụ** vào extraction/
+normalized. Không áp dụng việc bỏ qua cho thời hạn sử dụng đất đúng cụm
+`land_rows[].thoihan` hoặc timeout kỹ thuật. Portal cần trường bị loại thì ghi
+xung đột để refine, không giữ extraction ngầm, bịa/default hay tự chọn bước
+nhập tay mới. Không xóa/viết lại raw, lịch sử hoặc runtime trong lượt docs-only.
+Một Người nhiều giấy tờ và địa chỉ là
+[#42 riêng](../../backlog/story-person-multiple-identities-addresses.md);
+không ép ô đơn hiện tại thành đa trị hoặc tự thêm prerequisite cho gate #41.
+[Quyết định](../../decisions/decision-owner-upload-field-standardization-20261019.md).
 
 ### 2.1. Cách đọc và trạng thái
 

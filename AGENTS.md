@@ -44,10 +44,25 @@
   [quy tắc dữ liệu](_bmad-output/specs/shared/data-rules.md).
   Thiếu mapping hoặc cần mở rộng bộ trường: không tự xử lý phần phụ thuộc;
   ghi issue đúng loại để chốt nghiệp vụ/schema sau, tiếp tục các file/phần đã rõ.
-  Không dừng cả lô. Quy tắc này vẫn cho phép mở rộng được duyệt trong tương lai.
+  **Sau gate #41** không dừng cả lô vì gap từng file. Quy tắc này vẫn cho phép
+  mở rộng được duyệt trong tương lai.
 - File/chữ raw, bằng chứng và `source_refs` là provenance kỹ thuật phải giữ
   nguyên; không buộc raw đã có schema DB và không coi chúng là đối tượng nghiệp
   vụ mồ côi. Chuẩn hóa không tự xác nhận dữ liệu hay cho phép gộp Case/liên module.
+- Owner 19/10/2026: **chủ đất thuộc Hồ sơ**, không phải thuộc tính cố định
+  của Tài sản hoặc mặc định node `owner` Thừa kế; thông tin công chứng thuộc
+  Hồ sơ, độc lập ngày tạo hồ sơ. Key/kiểu/cardinality còn phải chốt trong
+  [#41](_bmad-output/backlog/story-upload-business-field-standardization.md),
+  inventory toàn bộ trường bóc tách/form Upload xuyên module, không chỉ Notary.
+- Không bóc/chuẩn hóa thông tin giao dịch (giá, cọc, thuê, vay, lãi, điều khoản
+  thanh toán) hoặc thời hạn nghiệp vụ. **Giữ thời hạn sử dụng đất** đúng cụm
+  `land_rows[].thoihan` và timeout kỹ thuật. Portal cần trường đã loại thì ghi
+  xung đột để refine, không bịa/default hay tự quyết bước nhập tay mới.
+  Không xóa raw/lịch sử hoặc sửa runtime trong lượt ghi tài liệu.
+- Một Người nhiều giấy tờ **và** địa chỉ là
+  [#42 riêng](_bmad-output/backlog/story-person-multiple-identities-addresses.md);
+  model tương lai chưa chọn, không thêm đối tượng nghiệp vụ thứ tư hoặc tự
+  ép ô đơn thành đa trị; không tự đặt #42 làm prerequisite quét mẫu.
 
 ## Context hồ sơ thử nghiệm
 
@@ -59,6 +74,12 @@
   tạo Word, corpus, chạy test/E2E hoặc tự triển khai. Bản nháp ở
   `testdata/notary-e2e/v1/` trước lệnh dừng không phải corpus được duyệt;
   không tự tiếp tục, chuyển hoặc xóa.
+- **Gate trước mọi lượt quét/đọc mẫu thực mới, corpus hoặc vòng test/E2E theo
+  mẫu:** chờ #41 được nghiệm thu đầy đủ chuẩn DB/contract, cutover consumer
+  và proof luồng thật; có bảng mapping không đủ. Verification riêng của #41
+  khi được giao dùng input tổng hợp/kiểm soát cô lập, không cần quét corpus
+  owner để mở gate. Sau gate vẫn chờ được giao thực thi; không tắt Scan/Upload
+  production hoặc coi docs là quyền triển khai.
 
 ## Quy tắc test bắt buộc, lưu dùng cho các phiên sau
 
@@ -72,7 +93,8 @@
 - Loại đã biết nhưng cấu trúc chưa chốt: issue riêng theo loại văn bản.
   Văn bản lạ/không tự quyết được hoặc thiếu mapping: thêm nguồn, phần chưa rõ
   và bằng chứng vào [issue tổng hợp xem sau](_bmad-output/backlog/spike-unfamiliar-document-review-queue.md),
-  dẫn issue theo loại nếu có; không đoán field/nghiệp vụ và không dừng các file đã rõ.
+  dẫn issue theo loại nếu có; không đoán field/nghiệp vụ. **Sau gate #41**,
+  phần chưa rõ từng file không dừng các file đã rõ.
 - LLM có thể là agent đọc file cục bộ; chỉ dẫn này không cấp quyền gửi hồ sơ
   cho provider cloud chưa được duyệt hoặc dựng tích hợp LLM mới.
 - Đây là quy trình cho lượt thực thi được giao sau. Lượt ghi định hướng hiện
