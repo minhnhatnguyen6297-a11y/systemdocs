@@ -68,7 +68,6 @@ UUID4_RX = re.compile(
     r"-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
 DATE_OR_YEAR_RX = re.compile(r"^\d{4}(-\d{2}-\d{2})?$")
 DATE_FULL_RX = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-SERIAL_RX = re.compile(r"^[A-Z]{2}\d{6,8}$")
 DOC_KEY_RX = re.compile(r"^[a-z][a-z0-9_]*$")
 GENDERS = ("Nam", "Nữ", None)
 INTAKE_KINDS = ("image", "pdf", "docx", "xlsx", "text")
@@ -876,7 +875,6 @@ def _validate_stage(stage, case_type):
     seen = set()
     seen_pkeys = set()
     seen_pentities = set()
-    seen_serials = set()
     seen_aentities = set()
 
     def _nullable(r, field, w):
@@ -983,18 +981,9 @@ def _validate_stage(stage, case_type):
             else:
                 seen_aentities.add(eid)
         serial = r.get("so_serial")
-        canon = serial.strip() if isinstance(serial, str) else serial
-        if not canon:
-            errs.append(_err(w, "so_serial", "required",
-                             "so_serial bắt buộc"))
-        elif not SERIAL_RX.match(canon):
-            errs.append(_err(w, "so_serial", "invalid_format",
-                             "so_serial phải canonical [A-Z]{2}\\d{6,8}"))
-        elif canon in seen_serials:
-            errs.append(_err(w, "so_serial", "invalid_format",
-                             "so_serial trùng với dòng khác"))
-        else:
-            seen_serials.add(canon)
+        if not isinstance(serial, str):
+            errs.append(_err(w, "so_serial", "invalid_type",
+                             "so_serial phải là chuỗi"))
         dc = r.get("dia_chi")
         if not (isinstance(dc, str) and dc.strip()):
             errs.append(_err(w, "dia_chi", "required", "dia_chi bắt buộc"))
@@ -1028,7 +1017,7 @@ def _validate_stage(stage, case_type):
                         errs.append(_err(w, "land_rows", "invalid_type",
                                          f"{lf} phải là chuỗi/null"))
         row = {f: r.get(f) for f in ASSET_FIELDS}
-        row["so_serial"] = canon or row["so_serial"]
+        row["so_serial"] = serial
         row["land_rows"] = [
             {"loai_dat": x.get("loai_dat"),
              "dien_tich": x.get("dien_tich"),

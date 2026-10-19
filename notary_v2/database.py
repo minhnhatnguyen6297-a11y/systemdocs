@@ -119,6 +119,92 @@ def migrate_properties_schema():
     con.close()
 
 
+def migrate_properties_serial():
+    """Đổi `properties.so_serial` sang nullable, bỏ UNIQUE.
+
+    Serial GCN là chuỗi nguyên văn, có thể rỗng/trùng (entities.md §2,
+    Owner 06/10/2026). SQLite không bỏ được NOT NULL/UNIQUE tại chỗ nên
+    rebuild bảng, giữ nguyên ID/giá trị và khóa ngoại của
+    `inheritance_case_properties`/`property_land_rows`.
+
+    Idempotent: schema đã đúng thì không làm gì. Mọi thay đổi nằm trong
+    một transaction; lỗi → rollback, DB cũ nguyên trạng.
+    """
+    con = sqlite3.connect(DB_PATH)
+    cur = con.cursor()
+    try:
+        cur.execute(
+            "SELECT name FROM sqlite_master "
+            "WHERE type='table' AND name='properties'")
+        if cur.fetchone() is None:
+            return
+
+        cur.execute("PRAGMA table_info(properties)")
+        columns = {row[1]: row for row in cur.fetchall()}
+        if "so_serial" not in columns:
+            return
+        needs_rebuild = bool(columns["so_serial"][3])  # notnull
+        for index_row in cur.execute("PRAGMA index_list(properties)"):
+            if not index_row[2]:  # unique
+                continue
+            index_name = index_row[1]
+            cur.execute(f'PRAGMA index_info("{index_name}")')
+            index_columns = [row[2] for row in cur.fetchall()]
+            if "so_serial" in index_columns:
+                needs_rebuild = True
+                break
+        if not needs_rebuild:
+            return
+
+        try:
+            cur.execute("PRAGMA foreign_keys=off")
+            cur.executescript("""
+                BEGIN IMMEDIATE;
+                DROP TABLE IF EXISTS properties_serial_new;
+                CREATE TABLE properties_serial_new (
+                    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                    so_serial         VARCHAR(100),
+                    so_vao_so         VARCHAR(100),
+                    so_thua_dat       VARCHAR(100),
+                    so_to_ban_do      VARCHAR(100),
+                    dia_chi           TEXT NOT NULL,
+                    loai_dat          VARCHAR(100),
+                    dien_tich         FLOAT,
+                    loai_so           VARCHAR(200),
+                    land_rows_json    TEXT,
+                    hinh_thuc_su_dung VARCHAR(100),
+                    thoi_han          VARCHAR(100),
+                    nguon_goc         TEXT,
+                    ngay_cap          DATE,
+                    co_quan_cap       VARCHAR(200),
+                    created_at        DATETIME DEFAULT (CURRENT_TIMESTAMP)
+                );
+                INSERT INTO properties_serial_new (
+                    id, so_serial, so_vao_so, so_thua_dat, so_to_ban_do,
+                    dia_chi, loai_dat, dien_tich, loai_so, land_rows_json,
+                    hinh_thuc_su_dung, thoi_han, nguon_goc, ngay_cap,
+                    co_quan_cap, created_at)
+                SELECT
+                    id, so_serial, so_vao_so, so_thua_dat, so_to_ban_do,
+                    dia_chi, loai_dat, dien_tich, loai_so, land_rows_json,
+                    hinh_thuc_su_dung, thoi_han, nguon_goc, ngay_cap,
+                    co_quan_cap, created_at
+                FROM properties;
+                DROP TABLE properties;
+                ALTER TABLE properties_serial_new RENAME TO properties;
+                CREATE INDEX IF NOT EXISTS ix_properties_id
+                    ON properties(id);
+                COMMIT;
+            """)
+        except Exception:
+            con.rollback()
+            raise
+        finally:
+            con.execute("PRAGMA foreign_keys=on")
+    finally:
+        con.close()
+
+
 # Bí danh key cụm đất: tên nghiệp vụ mới (canonical, MIN-141) → key JSON/wire
 # legacy. Giữ nguyên cả hai khi đọc; cả hai cùng có giá trị mâu thuẫn → lỗi.
 _LAND_FIELD_ALIASES = (

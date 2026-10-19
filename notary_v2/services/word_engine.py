@@ -201,6 +201,12 @@ def _safe_text(v: Any) -> str:
     return str(v).strip()
 
 
+def _serial_text(v: Any) -> str:
+    """Serial GCN là nguyên văn (entities.md §2): giữ đúng khoảng trắng,
+    chỉ đổi None → chuỗi rỗng cho khớp wire/placeholder."""
+    return "" if v is None else str(v)
+
+
 def _coerce_bool(value: Any, default: bool = False) -> bool:
     if isinstance(value, bool):
         return value
@@ -1305,7 +1311,7 @@ def _property_description(properties: list[Any]) -> str:
     paragraphs = ["Các quyền sử dụng đất như sau:"] if len(properties) > 1 else []
     for idx, prop in enumerate(properties, start=1):
         loai_so = _safe_text(getattr(prop, "loai_so", "")) or "Giấy chứng nhận quyền sử dụng đất"
-        serial = _safe_text(getattr(prop, "so_serial", ""))
+        serial = _serial_text(getattr(prop, "so_serial", ""))
         so_vao_so = _safe_text(getattr(prop, "so_vao_so", ""))
         so_thua = _safe_text(getattr(prop, "so_thua_dat", ""))
         so_to = _safe_text(getattr(prop, "so_to_ban_do", ""))
@@ -1763,7 +1769,7 @@ def _add_property_placeholders(mapping: dict[str, str], properties: list[Any]) -
             values = {
                 "Địa chỉ": _safe_text(getattr(prop, "dia_chi", "")),
                 "Loại sổ": _safe_text(getattr(prop, "loai_so", "")) or "Giấy chứng nhận quyền sử dụng đất",
-                "Serial": _safe_text(getattr(prop, "so_serial", "")),
+                "Serial": _serial_text(getattr(prop, "so_serial", "")),
                 "Số vào sổ": _safe_text(getattr(prop, "so_vao_so", "")),
                 "Số thửa": _safe_text(getattr(prop, "so_thua_dat", "")),
                 "Số tờ": _safe_text(getattr(prop, "so_to_ban_do", "")),
@@ -1956,8 +1962,8 @@ def build_template_mapping(case: Any, today: date | None = None,
         "[NIÊM YẾT]": noi_niem_yet.upper() if noi_niem_yet else "",
         "[Loại sổ]": loai_so_val,
         "[Địa chỉ đất]": _safe_text(getattr(ts, "dia_chi", "")),
-        "[Số serial]": _safe_text(getattr(ts, "so_serial", "")),
-        "[Serial]": _safe_text(getattr(ts, "so_serial", "")),
+        "[Số serial]": _serial_text(getattr(ts, "so_serial", "")),
+        "[Serial]": _serial_text(getattr(ts, "so_serial", "")),
         "[Số vào sổ]": _safe_text(getattr(ts, "so_vao_so", "")),
         "[Số thửa]": _safe_text(getattr(ts, "so_thua_dat", "")),
         "[Số tờ]": _safe_text(getattr(ts, "so_to_ban_do", "")),

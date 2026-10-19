@@ -581,15 +581,60 @@ def test_commit_stage_rejects_is_primary_and_asset_limit(db):
                for e in exc2.value.details["field_errors"])
 
 
-def test_commit_stage_rejects_noncanonical_so_serial(db):
+@pytest.mark.parametrize("serial", ["TEST-RAW/001", "", "  RAW  "])
+def test_commit_stage_accepts_verbatim_so_serial(db, session_factory, serial):
+    """Serial là chuỗi nguyên văn, có thể rỗng/ngoài mẫu (entities.md §2)."""
     case, deceased, _p, _h = _make_case(db)
-    asset = _asset_row(so_serial="dd 12-34")
+    data = _commit(db, case.id, 1, [_person_row(entity_id=deceased.id)],
+                   [_asset_row(so_serial=serial)])
+
+    assert data["stage"]["assets"][0]["so_serial"] == serial
+    fresh = session_factory()
+    try:
+        reopened = CaseWorkspaceService(fresh).get(case.id)
+    finally:
+        fresh.close()
+    assert reopened["stage"]["assets"][0]["so_serial"] == serial
+
+
+def test_commit_stage_allows_duplicate_serial_on_distinct_parcels(
+        db, session_factory):
+    """Hai thửa/tờ khác nhau cùng serial → hai Property riêng, không gộp."""
+    case, deceased, prop, _h = _make_case(db)
+    first = _asset_row(entity_id=prop.id, so_serial="DD123456",
+                       so_thua_dat="123", so_to_ban_do="45",
+                       dia_chi="Thửa 123, tờ 45")
+    second = _asset_row(so_serial="DD123456", so_thua_dat="456",
+                        so_to_ban_do="78", dia_chi="Thửa 456, tờ 78")
+
+    data = _commit(db, case.id, 1, [_person_row(entity_id=deceased.id)],
+                   [first, second])
+
+    assets = data["stage"]["assets"]
+    assert [a["so_serial"] for a in assets] == ["DD123456", "DD123456"]
+    assert assets[0]["entity_id"] != assets[1]["entity_id"]
+    assert db.query(Property).filter_by(so_serial="DD123456").count() == 2
+
+    fresh = session_factory()
+    try:
+        reopened = CaseWorkspaceService(fresh).get(case.id)
+    finally:
+        fresh.close()
+    saved = reopened["stage"]["assets"]
+    assert [a["so_serial"] for a in saved] == ["DD123456", "DD123456"]
+    assert [a["so_thua_dat"] for a in saved] == ["123", "456"]
+    assert saved[0]["entity_id"] != saved[1]["entity_id"]
+
+
+def test_commit_stage_rejects_non_string_so_serial(db):
+    case, deceased, _p, _h = _make_case(db)
+    asset = _asset_row(so_serial=None)
 
     with pytest.raises(WorkspaceError) as exc:
         _commit(db, case.id, 1, [_person_row(entity_id=deceased.id)],
                 [asset])
 
-    assert any(e["field"] == "so_serial" and e["code"] == "invalid_format"
+    assert any(e["field"] == "so_serial" and e["code"] == "invalid_type"
                for e in exc.value.details["field_errors"])
 
 
@@ -947,9 +992,9 @@ def test_get_migrate_on_read_does_not_overwrite_newer_commit(
         p["row_id"] for p in committed["stage"]["people"]]
 
 
-def test_get_normalizes_schema_invalid_legacy_values(db):
-    """M4: serial lạ → surrogate + warnings; dia_chi rỗng → null;
-    ho_ten rỗng → '(Chưa rõ)'."""
+def test_get_keeps_legacy_raw_serial_without_surrogate(db):
+    """Serial cũ ngoài mẫu được đọc nguyên văn; không sinh XX/không cảnh báo
+    thay mã. dia_chi rỗng vẫn → null; ho_ten rỗng → '(Chưa rõ)'."""
     case, _d, prop, _h = _make_case(db)
     prop.so_serial = "dd-12 34"
     prop.dia_chi = ""
@@ -958,9 +1003,10 @@ def test_get_normalizes_schema_invalid_legacy_values(db):
     data = _service(db).get(case.id)
 
     asset = data["stage"]["assets"][0]
-    assert asset["so_serial"] == f"XX{prop.id:06d}"[:8]
+    assert asset["so_serial"] == "dd-12 34"
     assert asset["dia_chi"] is None
-    assert any("so_serial" in w for w in data["diagram"]["warnings"])
+    assert not any("so_serial" in str(w)
+                   for w in data["diagram"].get("warnings", []))
 
     case.case_state_json = json.dumps({
         "schemaVersion": 3,

@@ -82,9 +82,19 @@ function clone(v) {
 // master → xoa o boundary de "ngung gui gia tri le nhu du lieu moi".
 // Backend doc key-presence: key vang = giu nguyen master (lich su con
 // can cho warning orphan_thoi_han), khong phai xoa.
+function normalizeStageAssets(stage) {
+  const s = clone(stage) || { people: [], assets: [] };
+  for (const a of s.assets || []) {
+    if (a && typeof a === 'object') {
+      a.so_serial = a.so_serial == null ? '' : String(a.so_serial);
+    }
+  }
+  return s;
+}
+
 function stageForWire(stage) {
-  const s = clone(stage);
-  for (const a of (s && s.assets) || []) {
+  const s = normalizeStageAssets(stage);
+  for (const a of s.assets || []) {
     if (a && typeof a === 'object') delete a.thoi_han;
     for (const row of a.land_rows || []) delete row._source_land_row;
   }
@@ -129,6 +139,7 @@ function newAssetRow(uuid, fields) {
       row[k] = v;
     }
   }
+  row.so_serial = row.so_serial == null ? '' : String(row.so_serial);
   return row;
 }
 
@@ -526,7 +537,7 @@ function createModel(deps) {
     state.unsupported = !CASE_TYPES.includes(c.case_type);
     state.capabilities = data.capabilities ||
       { intake: [], diagram: false, word_export: false };
-    state.committed = clone(data.stage || { people: [], assets: [] });
+    state.committed = normalizeStageAssets(data.stage || { people: [], assets: [] });
     state.docxImport = clone(data.docx_import || { version: 1, sources: [] });
     state.committedDocxImport = clone(state.docxImport);
     state.stage = clone(state.committed);
@@ -963,6 +974,9 @@ function createModel(deps) {
           delete source.template_sha256;
         }
       }
+    } else if (field === 'so_serial') {
+      // Serial là chuỗi nguyên văn: rỗng giữ '', không đổi thành null.
+      row[field] = value == null ? '' : String(value);
     } else if (ASSET_FIELDS.includes(field)) {
       row[field] = value === '' ? null : value;
     } else {
@@ -1114,7 +1128,7 @@ function createModel(deps) {
     }
     const d = r.data || {};
     state.revision = d.revision;
-    state.committed = clone(d.stage || state.stage);
+    state.committed = normalizeStageAssets(d.stage || state.stage);
     if (d.docx_import) state.docxImport = clone(d.docx_import);
     state.committedDocxImport = clone(state.docxImport || { version: 1, sources: [] });
     state.stage = clone(state.committed);

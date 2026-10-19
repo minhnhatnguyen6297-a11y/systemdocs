@@ -1732,3 +1732,82 @@ def test_conversion_real_adapter_accepted_cancel_never_writes(adapter_db):
             "case_type": "two_party", "document_type": "tang_cho",
             "confirm_diagram_reset": True})
     assert notary_adapter.workspace_get(_Job(), {"case_id": case.id})["data"] == before
+
+
+def test_stage_raw_serial_commit_reopen_and_word_batch(adapter_db, tmp_path):
+    """#40: serial nguyên văn/rỗng/trùng qua commit thật, mở lại phiên mới
+    và xuất Word batch thật — không sinh XX, không gộp tài sản."""
+    case, deceased, prop = _seed_case(adapter_db)
+    people = [_person_row(entity_id=deceased.id)]
+    assets = [
+        _asset_row(entity_id=prop.id, so_serial="TEST-RAW/001",
+                   so_thua_dat="123", so_to_ban_do="45",
+                   dia_chi="Thửa 123, tờ 45"),
+        _asset_row(so_serial="", so_thua_dat="456", so_to_ban_do="78",
+                   dia_chi="Thửa 456, tờ 78"),
+        _asset_row(so_serial="TEST-RAW/001", so_thua_dat="789",
+                   so_to_ban_do="90", dia_chi="Thửa 789, tờ 90"),
+    ]
+    assert assets[1]["entity_id"] is None
+    assert assets[1]["so_serial"] == ""
+    committed = notary_adapter.workspace_commit_stage(_Job(), {
+        "case_id": case.id, "base_revision": case.workspace_revision,
+        "stage": {"owner_row_id": people[0]["row_id"],
+                  "people": people, "assets": assets},
+    })
+    assert [a["so_serial"] for a in committed["data"]["stage"]["assets"]] == [
+        "TEST-RAW/001", "", "TEST-RAW/001"]
+
+    reopened = notary_adapter.workspace_get(_Job(), {"case_id": case.id})
+    saved = reopened["data"]["stage"]["assets"]
+    assert [a["so_serial"] for a in saved] == [
+        "TEST-RAW/001", "", "TEST-RAW/001"]
+    assert [a["so_thua_dat"] for a in saved] == ["123", "456", "789"]
+    assert len({a["entity_id"] for a in saved}) == 3
+    assert adapter_db.query(Property).filter_by(
+        so_serial="TEST-RAW/001").count() == 2
+    assert adapter_db.query(Property).filter_by(so_serial="").count() == 1
+
+    tpl = _tpl_dir(tmp_path, "mau-serial")
+    _write_docx(tpl / "serial.docx",
+                "S1=[Serial 1]",
+                "S2=[Serial 2]",
+                "S3=[Serial 3]",
+                "T1=[Số thửa 1]",
+                "T2=[Số thửa 2]",
+                "T3=[Số thửa 3]")
+    dest = tmp_path / "dich"
+    dest.mkdir()
+    res = notary_adapter.word_export_batch(_Job(), {
+        "case_id": case.id,
+        "document_keys": ["serial.docx"],
+        "template_dir": {"path": str(tpl), "scope": "machine_local",
+                          "is_dir": True},
+        "destination": _dest(dest),
+    })
+    assert res["data"]["breakdown"]["succeeded"] == ["serial.docx"]
+    out = Path(res["data"]["documents"][0]["output_file"]["path"])
+    import docx
+    text = "\n".join(p.text for p in docx.Document(str(out)).paragraphs)
+    lines = text.splitlines()
+    assert "S1=TEST-RAW/001" in lines
+    assert "S2=" in lines
+    assert "S3=TEST-RAW/001" in lines
+    assert "S2=[Serial 2]" not in text
+    assert "T1=123" in lines and "T2=456" in lines and "T3=789" in lines
+    assert "XX" not in text
+
+
+def test_property_create_allows_empty_and_verbatim_serial(adapter_db):
+    """#40: adapter property_create không còn _require serial; giữ raw."""
+    empty = notary_adapter.property_create(_Job(), {
+        "so_serial": "", "dia_chi": "Thửa 0"})
+    assert empty["data"]["property"]["so_serial"] == ""
+
+    raw = notary_adapter.property_create(_Job(), {
+        "so_serial": "  RAW  ", "dia_chi": "Thửa 1"})
+    assert raw["data"]["property"]["so_serial"] == "  RAW  "
+
+    absent = notary_adapter.property_create(_Job(), {
+        "dia_chi": "Thửa 2"})
+    assert absent["data"]["property"]["so_serial"] == ""

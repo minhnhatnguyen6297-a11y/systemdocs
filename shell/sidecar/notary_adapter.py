@@ -3,7 +3,7 @@
 Khong viet lai nghiep vu: moi thao tac deu qua models/services/router
 handlers cua repo con. Write path (customer/property/case/participant) goi
 dung inline-create/participant handlers → giu nguyen validation, upsert va
-business rule (locked case, dedup, unique serial).
+business rule (locked case, dedup).
 
 DB: notary.db cua engine root (database.py neo theo __file__). Sidecar la
 owner ghi duy nhat — renderer khong bao gio cham DB (g1-module-data §5).
@@ -68,6 +68,7 @@ def _ensure_db():
     database.migrate_customers_nullable()
     database.migrate_inheritance_cases_schema()
     database.migrate_properties_schema()
+    database.migrate_properties_serial()
     database.migrate_property_land_rows()
     database.migrate_inheritance_case_properties_schema()
     database.migrate_zalo_schema()
@@ -300,7 +301,7 @@ def property_create(job, payload):
     sess = _db_session()
     try:
         resp = props.inline_create(
-            so_serial=_require(p.get("so_serial"), "so_serial"),
+            so_serial=p.get("so_serial"),
             so_vao_so=p.get("so_vao_so"), so_thua_dat=p.get("so_thua_dat"),
             so_to_ban_do=p.get("so_to_ban_do"),
             dia_chi=_require(p.get("dia_chi"), "dia_chi"),

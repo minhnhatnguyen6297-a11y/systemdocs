@@ -857,17 +857,20 @@ class TestCommitStage:
         assert any(e["field"] == "so_giay_to"
                    for e in exc.value.details["field_errors"])
 
-    def test_duplicate_serial(self):
+    def test_duplicate_serial_allowed_on_distinct_assets(self):
         mock.reset_backend(_load_fixture("empty.json"))
         rid = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
-        a1 = self._asset("aaaaaaa1-1111-4111-8111-111111111111")
-        a2 = self._asset("aaaaaaa2-2222-4222-8222-222222222222")
+        a1 = self._asset("aaaaaaa1-1111-4111-8111-111111111111",
+                         serial="S-001")
+        a2 = self._asset("aaaaaaa2-2222-4222-8222-222222222222",
+                         serial="S-001")
+        a2["so_thua_dat"] = "10"
         payload = self._payload(people=[self._person(rid)],
                                 owner_row_id=rid, assets=[a1, a2])
-        with pytest.raises(CommandError) as exc:
-            _call("workspace_commit_stage", payload)
-        assert any(e["field"] == "so_serial"
-                   for e in exc.value.details["field_errors"])
+        res = _call("workspace_commit_stage", payload)
+        assets = res["data"]["stage"]["assets"]
+        assert [a["so_serial"] for a in assets] == ["S-001", "S-001"]
+        assert assets[0]["entity_id"] != assets[1]["entity_id"]
 
     def test_asset_limit(self):
         """§13.3: toi da 3 asset — dong thu 4 -> asset_limit field error
@@ -895,17 +898,16 @@ class TestCommitStage:
             _call("workspace_commit_stage", payload)
         assert exc.value.code == "validation_error"
 
-    def test_serial_must_be_canonical(self):
-        mock.reset_backend(_load_fixture("empty.json"))
+    def test_serial_is_verbatim_and_may_be_empty(self):
         rid = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
-        a = self._asset("aaaaaaa1-1111-4111-8111-111111111111",
-                        serial="khong-canonical")
-        payload = self._payload(people=[self._person(rid)],
-                                owner_row_id=rid, assets=[a])
-        with pytest.raises(CommandError) as exc:
-            _call("workspace_commit_stage", payload)
-        assert any(e["field"] == "so_serial" and e["code"] == "invalid_format"
-                   for e in exc.value.details["field_errors"])
+        for serial in ("khong-canonical", ""):
+            mock.reset_backend(_load_fixture("empty.json"))
+            a = self._asset("aaaaaaa1-1111-4111-8111-111111111111",
+                            serial=serial)
+            payload = self._payload(people=[self._person(rid)],
+                                    owner_row_id=rid, assets=[a])
+            res = _call("workspace_commit_stage", payload)
+            assert res["data"]["stage"]["assets"][0]["so_serial"] == serial
 
     def test_commit_prunes_diagram_refs(self):
         """Xoa nguoi khoi stage -> node tham chieu bi prune trong cung

@@ -80,7 +80,6 @@ _UUID4_RE = re.compile(
 )
 _DATE_OR_YEAR_RE = re.compile(r"^\d{4}(-\d{2}-\d{2})?$")
 _DATE_FULL_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-_SERIAL_RE = re.compile(r"^[A-Z]{2}\d{6,8}$")
 _GENDER_VALUES = ("Nam", "Nữ")
 _BIRTH_PARENT_IDS = ("father", "mother")
 _SPOUSE_PARENT_IDS = ("spouse_father", "spouse_mother")
@@ -221,14 +220,6 @@ def _emit_date_or_year(value: Any) -> Optional[str]:
         except ValueError:
             return None
     return None
-
-
-def _canonical_serial(value: Any) -> Optional[str]:
-    text = _clean(value)
-    if not text:
-        return None
-    candidate = re.sub(r"[^0-9A-Za-z]", "", text).upper()
-    return candidate if _SERIAL_RE.match(candidate) else None
 
 
 def _case_meta(case: InheritanceCase) -> tuple[str, str]:
@@ -1928,16 +1919,10 @@ class CaseWorkspaceService:
         else:
             land_rows = _land_rows_wire(_prop_land_rows(prop))
         raw_serial = _pick("so_serial")
-        serial = _canonical_serial(raw_serial)
-        if serial is None:
-            # DB cũ có serial lạ → surrogate deterministic, giữ truy vết
-            # qua warnings (không sửa Property — serial là SOT của sổ đỏ).
-            serial = (f"XX{entity:06d}"[:8] if entity
-                      else f"XX{index + 1:06d}")
-            if raw_serial and warnings is not None:
-                warnings.append(
-                    f"asset {row_id}: so_serial '{raw_serial}' không "
-                    f"canonical — emit '{serial}'")
+        # Serial là SOT nguyên văn của sổ (entities.md §2, Owner
+        # 06/10/2026): rỗng/trùng đều hợp lệ. Chỉ đổi NULL legacy →
+        # chuỗi rỗng cho khớp wire `string`; không sinh mã thay thế.
+        serial = "" if raw_serial is None else str(raw_serial)
         return {
             "row_id": row_id,
             "entity_id": entity,
@@ -2343,7 +2328,6 @@ class CaseWorkspaceService:
         seen_row_ids: set = set()
         seen_person_keys: dict[str, Any] = {}
         seen_person_entities: dict[int, Any] = {}
-        seen_serials: dict[str, Any] = {}
         seen_asset_entities: dict[int, Any] = {}
 
         for index, row in enumerate(people):
@@ -2417,25 +2401,9 @@ class CaseWorkspaceService:
                 else:
                     seen_asset_entities[entity] = row_id
             serial = row.get("so_serial")
-            if not isinstance(serial, str) or not serial.strip():
-                emit("so_serial", "required", "so_serial bắt buộc")
-            elif not _SERIAL_RE.match(serial.strip()):
-                emit("so_serial", "invalid_format",
-                     "so_serial phải canonical [A-Z]{2} + 6-8 chữ số")
-            else:
-                canon = serial.strip()
-                if canon in seen_serials:
-                    emit("so_serial", "invalid_format",
-                         "so_serial trùng với dòng khác trong payload")
-                else:
-                    seen_serials[canon] = row_id
-                    owner = self.db.query(Property).filter(
-                        Property.so_serial == canon).first()
-                    if (owner is not None and isinstance(entity, int)
-                            and not isinstance(entity, bool)
-                            and entity != owner.id):
-                        emit("so_serial", "invalid_format",
-                             "so_serial đã thuộc về tài sản khác")
+            if not isinstance(serial, str):
+                emit("so_serial", "invalid_type",
+                     "so_serial phải là chuỗi")
             dia_chi = row.get("dia_chi")
             if not isinstance(dia_chi, str) or not dia_chi.strip():
                 emit("dia_chi", "required", "dia_chi bắt buộc")
@@ -2608,15 +2576,12 @@ class CaseWorkspaceService:
             entity = row.get("entity_id")
             prop = self._property(entity) if isinstance(entity, int) else None
             if prop is None:
-                serial = _clean(row.get("so_serial"))
-                if serial:
-                    prop = self.db.query(Property).filter(
-                        Property.so_serial == serial).first()
-            if prop is None:
-                prop = Property(so_serial=row["so_serial"].strip(),
+                # Serial chỉ là nội dung sổ, không phải khóa liên kết:
+                # hai thửa cùng serial phải thành hai Property riêng.
+                prop = Property(so_serial=row["so_serial"],
                                 dia_chi=row["dia_chi"].strip())
                 self.db.add(prop)
-            prop.so_serial = row["so_serial"].strip()
+            prop.so_serial = row["so_serial"]
             prop.so_vao_so = _nn(row.get("so_vao_so"))
             prop.so_thua_dat = _nn(row.get("so_thua_dat"))
             prop.so_to_ban_do = _nn(row.get("so_to_ban_do"))

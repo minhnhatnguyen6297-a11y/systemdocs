@@ -176,6 +176,22 @@ def test_build_template_mapping_exposes_standard_vietnamese_placeholders_and_leg
     assert "[ho_ten_1_chu_dat]" not in mapping
 
 
+def test_serial_keeps_surrounding_spaces_verbatim():
+    """#40: serial nguyên văn — không bị _safe_text strip khi map/export."""
+    prop = _prop(so_serial="  RAW  ")
+    case = _simple_export_case(properties=[prop])
+    mapping = build_template_mapping(case)
+
+    assert mapping["[Serial]"] == "  RAW  "
+    assert mapping["[Số serial]"] == "  RAW  "
+    assert mapping["[Serial 1]"] == "  RAW  "
+
+    doc = Document()
+    doc.add_paragraph("S=[Serial]")
+    replace_in_doc(doc, mapping)
+    assert doc.paragraphs[0].text == "S=  RAW  "
+
+
 def test_build_template_mapping_resolves_role_and_data_only_snippets():
     owner = _person(1, "Nguyễn Văn Chủ", gender="Nam", born=date(1950, 1, 1), dead=date(2024, 2, 3), doc_no="001050000001")
     spouse = _person(2, "Trần Thị Vợ", gender="Nữ", born=date(1955, 4, 5), doc_no="001055000002")

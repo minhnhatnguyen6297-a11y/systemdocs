@@ -932,6 +932,37 @@ test('commitStage: asset_limit — dong thu 4 bi tu choi o client', async () => 
   assert.equal(model.state.stage.assets.length, 3);
 });
 
+test('asset serial: new/cleared rỗng giữ "" và wire gửi chuỗi rỗng', async () => {
+  const { model, client } = makeModel(seedCases('empty'));
+  await model.openCase(43);
+  const person = model.addPerson({ ho_ten: 'Chủ đất' });
+  model.setOwnerRow(person.row_id);
+
+  const asset = model.addAsset();
+  assert.equal(asset.so_serial, '');
+
+  model.updateAssetField(asset.row_id, 'so_serial', '  RAW  ');
+  assert.equal(model.state.stage.assets[0].so_serial, '  RAW  ');
+
+  model.updateAssetField(asset.row_id, 'so_serial', '');
+  assert.equal(model.state.stage.assets[0].so_serial, '');
+
+  const r = await model.commitStage();
+  assert.equal(r.ok, true);
+  const sent = client.calls.at(-1).payload;
+  assert.equal(sent.stage.assets[0].so_serial, '');
+  assert.notEqual(sent.stage.assets[0].so_serial, null);
+});
+
+test('openCase: serial null từ server được map thành chuỗi rỗng', async () => {
+  const seed = seedCases('ready');
+  seed[42].stage.assets[0].so_serial = null;
+  const { model } = makeModel(seed);
+  await model.openCase(42);
+  assert.equal(model.state.stage.assets[0].so_serial, '');
+  assert.equal(model.state.committed.assets[0].so_serial, '');
+});
+
 test('moveAsset: doi thu tu = doi nghia vi tri, clamp index', async () => {
   const { model } = makeModel(seedCases('ready'));
   await model.openCase(42);

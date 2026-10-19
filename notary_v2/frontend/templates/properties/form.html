@@ -25,8 +25,8 @@
         <div class="col-12"><h6 class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid #eee; padding-bottom:8px;">THÔNG TIN GIẤY CHỨNG NHẬN</h6></div>
 
         <div class="col-md-4">
-          <label class="form-label required">Số Serial (Số phát hành GCN)</label>
-          <input type="text" name="so_serial" class="form-control {% if fe.so_serial %}is-invalid{% endif %}" value="{{ f.get('so_serial','') if f else (obj.so_serial if obj else '') }}" placeholder="Ví dụ: AQ123456" required>
+          <label class="form-label">Số Serial (Số phát hành GCN)</label>
+          <input type="text" name="so_serial" class="form-control {% if fe.so_serial %}is-invalid{% endif %}" value="{{ f.get('so_serial','') if f else (obj.so_serial if obj else '') }}" placeholder="Số serial trên sổ (nếu có)">
           {% if fe.so_serial %}<div class="invalid-feedback">{{ fe.so_serial }}</div>{% endif %}
         </div>
         <div class="col-md-4">
