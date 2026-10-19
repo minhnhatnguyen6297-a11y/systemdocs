@@ -18,11 +18,44 @@ maps và nguồn thẩm quyền/gap. Cột workspace Notary không phải catalo
 không xóa trường Upload cần thiết chỉ để vừa schema đó. Mở rộng canonical Hồ sơ
 có căn cứ và được duyệt khi cần, không coi mọi trường là cột DB mới đã duyệt.
 
-**Chủ đất thuộc Hồ sơ**, không là thuộc tính chủ sở hữu cố định của Tài sản,
-không mặc định bằng node `owner`/`owner_row_id` Thừa kế; key/kiểu/cardinality/
-quan hệ cụ thể chưa chọn. **Thông tin công chứng thuộc Hồ sơ**, độc lập với ngày
-tạo hồ sơ. Số/ngày công chứng, công chứng viên, thư ký và mọi trường còn lại
-phải vào inventory trước claim đủ.
+**Chủ đất thuộc Hồ sơ**; owner làm rõ: **“người được gán chủ đất trong
+diagram”**. `chudat` là text tên Người được chọn Chủ (`ownPositions` trỏ tài
+sản hiện có, không hidden/deleted) trên Diagram đã lưu; đọc tên snapshot
+Stage bằng `personId`, mỗi Người một dòng theo Stage, dedup row ID không tên.
+Không suy từ GCN/Bên A/người chết hoặc tự
+đồng nhất slot `owner`/`owner_row_id`. Upload không có Diagram thì `null`,
+không bóc chủ đất từ Word, không ghi chéo DB để tìm chủ đất.
+**Thông tin công chứng thuộc Hồ sơ**, độc lập ngày tạo hồ sơ.
+
+Phạm vi triển khai hiện tại là metadata Case: `tenvanban`, `nhomhopdong`,
+`loaivanbannhandien`, `socongchung`, `ngaycongchung`, `congchungvien`, `thuky`,
+`chudat`. Chuỗi thiếu là `null`; ngày công chứng full ISO, portal nhận
+`DD/MM/YYYY`; số công chứng `xxx/yyyy` giữ scope sổ/website. Tiêu đề nguồn,
+nhóm portal và enum Notary độc lập. Nhân sự do người dùng chọn khi prepare
+thuộc bản Case dùng để điền, không biến default thành dữ kiện bóc tách.
+Person/Asset/parties và các ô phí/ghi chú/trạng thái portal giữ hành vi cũ;
+slice này không khép toàn #41 hoặc mở gate mẫu.
+
+Đọc queue luôn không ghi metadata Case, kể cả có override nhân sự, lọc ID
+hoặc limit. Override trong candidate chỉ phục vụ preview/form của lượt chuẩn
+bị. Chỉ record thực sự đi vào `_prepare_record`, sau lọc chọn/trùng/chunk,
+mới lưu lựa chọn nhân sự vào Case. Hồ sơ không chọn, trùng bị loại hoặc đợi
+đợt sau giữ nguyên metadata đã lưu; JSON nguồn không bị ghi lại.
+
+**Trạng thái 19/10/2026: metadata Case BUILT, verification hoàn tất, tài liệu
+cuối hoàn tất.** Quick code độc lập sạch sau sửa ghi nhân sự vượt
+selection/chunk.
+Regression bền vững: `upload_lab/tests/test_case_fields.py` và
+`notary_v2/tests/test_case_assigned_landowners.py` cùng test save/reopen Diagram.
+Proof tổng hợp/DB tạm/local browser đạt, không nghiệm thu portal thật có đăng
+nhập hoặc corpus owner. **Toàn #41 chưa hoàn thành; gate khảo sát mẫu ĐÓNG.**
+
+JSON lịch sử có công chứng viên trùng tên default cũ không chứng minh đã bóc
+được tên: Case để `null`, giữ nguyên bằng chứng, không đọc lại file khách để
+đoán. Người dùng chọn nhân sự rõ ràng khi prepare là input Case thực.
+Prefill công chứng viên mặc định hiện có chỉ là policy portal, không dữ kiện
+canonical. Case/raw JSON sai kiểu hoặc giá trị ngày/số không hợp lệ phải báo
+lỗi, không rơi về ô rỗng hay chuyển sang nguồn cũ để che dữ liệu sai.
 
 **Không bóc/chuẩn hóa thông tin giao dịch** (giá, đặt cọc, tiền thuê, khoản vay,
 lãi suất, điều khoản thanh toán) hoặc **thời hạn nghiệp vụ**. Vẫn giữ thời hạn

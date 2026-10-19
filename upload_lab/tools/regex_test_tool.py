@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import extraction_adapter
+from extraction_adapter import case_from_payload
 
 
 PERSON_COLUMNS = ("stt", "nguon", "gioi_tinh", "ho_ten", "ngay_sinh", "cccd", "ngay_cap", "dia_chi")
@@ -55,7 +56,7 @@ def summarize(payload: dict) -> str:
     chua_ho_tro = ", ".join(raw.get("tai_san_chua_ho_tro") or [])
     missing = ", ".join(raw.get("missing_web_form_fields", [])) or "không thiếu"
     return (
-        f"Loại: {raw.get('document_kind', '?')} | Tên: {web.get('ten_hop_dong', '')} | "
+        f"Loại: {case_from_payload(payload)['loaivanbannhandien'] or '?'} | Tên: {case_from_payload(payload)['tenvanban'] or ''} | "
         f"Người (đầu văn bản): {n_party} | "
         f"Người đã chết: {n_chet} | Thửa đất: {n_thua}"
         + (f" | Chưa hỗ trợ: {chua_ho_tro}" if chua_ho_tro else "")

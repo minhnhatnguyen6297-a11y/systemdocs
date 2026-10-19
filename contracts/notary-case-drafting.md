@@ -560,6 +560,14 @@ result.data:
   (`noiniemyet`,`nguoinhanuyquyen:{id,ten}`,`noidungviec`,
   `ngaylaphoso`,`ghichu`) — Word đọc meta từ block này trước, cột
   `inheritance_cases` chỉ là fallback cho hồ sơ cũ.
+- **Metadata Case Upload (owner 19/10, phạm vi Case):** create/commit nhận thêm
+  `tenvanban`, `nhomhopdong`, `loaivanbannhandien`, `socongchung`,
+  `ngaycongchung`, `congchungvien`, `thuky` theo entities §9.4; key không gửi
+  khi commit giữ snapshot cũ, `null` là xóa giá trị. `workspace_get/create`
+  emit cùng key và `chudat` chỉ đọc, derived từ Diagram đã lưu + tên Stage.
+  `chudat` không là input tự do; slot owner/người chết không tự là chủ đất.
+  Lựa chọn Chủ phải trỏ tài sản hiện có, không hidden/deleted. Metadata mới
+  không thay enum Notary, không tự nối Upload với DB Notary hoặc khép #41.
 - `base_revision` khác `revision` hiện server — **nhỏ hơn HOẶC lớn
   hơn** — → `failed{code:workspace_conflict,
   details:{server_revision}}`. Không có ghi đè cưỡng bức — client tải

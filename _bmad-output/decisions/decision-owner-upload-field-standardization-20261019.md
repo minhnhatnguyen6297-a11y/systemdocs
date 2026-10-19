@@ -32,3 +32,19 @@ Owner báo trường Hồ sơ còn thiếu: Upload đang bóc văn bản thành 
 ## Những lựa chọn chưa được thực hiện
 
 Key/kiểu/format/nhóm/cardinality và cột DB/wire mới của các trường Hồ sơ còn thiếu phải được chốt trong #41 từ catalog đầy đủ. Việc ghi issue không duyệt schema hoặc implementation. Chi tiết mô hình đa giấy tờ/đa địa chỉ để #42 thiết kế, không hỏi owner duyệt lại các lựa chọn nghiệp vụ đã nêu ở đây.
+
+## Bổ sung owner — triển khai metadata Hồ sơ
+
+- Owner trả lời nguyên văn: **“người được gán chủ đất trong diagram”**.
+  Lựa chọn này thay các phương án người đứng tên GCN hoặc bên chuyển giao.
+- `chudat` thuộc Hồ sơ, lấy tên Người đã commit được đánh dấu **Chủ** trên
+  Diagram (`ownPositions` có giá trị); không đồng nhất với `owner_row_id`
+  hoặc slot `owner` là người để lại di sản. Không suy từ Word, GCN hay Bên A.
+- Dùng tham chiếu `personId` hiện có để đọc tên snapshot Người; output là một
+  trường text tên, mỗi người một dòng theo thứ tự Stage, không gộp theo tên.
+  Chưa gán/không có Diagram (Upload, Hai bên) là `null`; không thêm quan hệ mới.
+- Giao triển khai metadata Case gồm tiêu đề, nhóm portal, loại nhận diện,
+  số/ngày công chứng, công chứng viên, thư ký và `chudat`; giữ riêng enum
+  văn bản Notary. Không mở rộng Person/Asset/parties hoặc nghiệm thu toàn #41.
+- Giữ nguồn, JSON lịch sử, website SOT và người dùng tự Lưu. Proof dùng
+  DOCX tổng hợp, DB/profile cô lập; không đọc corpus owner hoặc ghi chéo DB.

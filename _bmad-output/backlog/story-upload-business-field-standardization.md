@@ -72,6 +72,8 @@ Owner báo Upload đang bóc văn bản thành trường để điền website n
 - bounded static evidence — upload_lab/playwright_uploader.py, dòng 755–796: dựng dữ liệu form và điều kiện chuẩn bị
 - bounded static evidence — upload_lab/uploader_selectors.py, dòng 23–38: thứ tự trường portal
 - bounded schema evidence — notary_v2/models.py, dòng 36–48 và 99–150: model Notary hiện có, không phải bằng chứng toàn hệ thống không có đích trường
+- implemented Case catalog — contracts/entities.md, §9.4; contracts/notary-case-drafting.md, metadata Case
+- permanent Case regressions — upload_lab/tests/test_case_fields.py; notary_v2/tests/test_case_assigned_landowners.py; notary_v2/tests/test_inheritance_workspace.py, save/reopen ownership transitions
 
 ## Notes
 
@@ -82,4 +84,23 @@ Owner báo Upload đang bóc văn bản thành trường để điền website n
 - Open question: `ten_goi_khac` trong inventory cần chốt mapping của catalog; không tự nới #42 ngoài hai nhu cầu nhiều giấy tờ và địa chỉ. `cccd_khac` có trong một nhánh extraction không chứng minh DB/contract đã hỗ trợ Người nhiều giấy tờ.
 - Open question: catalog đầy đủ sẽ chốt key/kiểu/format/nhóm/cardinality/DB-wire-output còn thiếu và xung đột portal với trường đã loại. Đây là công việc refinement của issue, không yêu cầu owner chọn schema ngay lúc ghi nhận.
 - Risk: high — mapping sai có thể gắn thông tin sai Người/Tài sản/Hồ sơ hoặc mất dữ liệu lưu/điền web. Ngoài AC, reviewer độc lập cần đối chiếu catalog với các consumer và thiết kế bảo toàn dữ liệu trước cutover.
-- Identity: `next_id: 41` từ `tickets.py status _bmad-output/backlog` ngày 19/10/2026. Loose backlog theo waiver hiện có; active initiative để unset, không setup/install/config. Publication chờ independent Quick và parent cho phép; `refined: false`, chưa giao build.
+- Identity: `next_id: 41` từ `tickets.py status _bmad-output/backlog` ngày 19/10/2026. Loose backlog theo waiver hiện có; active initiative để unset, không setup/install/config. Independent review đã chạy và sạch cho slice Case (xem mục dưới); slice đã được giao và BUILT. Phần còn lại của #41 giữ `refined: false`, chưa giao build; commit/push vẫn chờ parent duyệt và cho phép.
+
+### Metadata Case BUILT — chưa hoàn thành toàn #41; gate mẫu ĐÓNG
+
+- Owner làm rõ: **“người được gán chủ đất trong diagram”**; nguồn là lựa chọn
+  Chủ `ownPositions` đã lưu, tên snapshot Stage theo ID, không tự suy từ
+  GCN/Bên A/người chết hoặc slot owner. Không Diagram là null.
+- Phạm vi hiện tại: bảy scalar công chứng/văn bản và `chudat` theo entities
+  §9.4. Person/Asset/parties chưa canonical cutover trong slice này; không
+  set `refined:true`, built toàn #41 hoặc mở gate mẫu từ kết quả Case.
+- Verification Case đã chạy: DOCX tổng hợp → registry/DB tạm → fresh reopen →
+  form builder → Playwright preSave trang local; save Diagram/fresh session
+  kiểm tên chủ đất theo assignment. Không nghiệm thu portal thật/corpus owner.
+- Quick code sạch sau sửa queue read không persist override; chỉ record thực
+  sự prepare sau selection/duplicate/chunk filters mới lưu nhân sự; fix được
+  Quick độc lập chấp nhận. Tài liệu cuối hoàn tất 19/10/2026; chưa
+  commit/push trước khi parent duyệt và cho phép.
+- Catalog, contract và regression bền vững ở References đủ dùng trong clone
+  mới. Plan/proof tạm `_bmad-output/tmp/issue-41-case-fields/` chỉ là evidence
+  local **tùy chọn**, không là dependency hay nguồn chuẩn bắt buộc.

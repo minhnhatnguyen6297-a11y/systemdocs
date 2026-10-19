@@ -199,6 +199,9 @@ def test_get_derives_stage_for_legacy_case_without_case_state(db):
         "nguoi_nhan_uy_quyen_id": None,
         "noi_dung_viec": None,
         "ghi_chu": None,
+        **{key: None for key in (
+            "tenvanban", "nhomhopdong", "loaivanbannhandien", "socongchung",
+            "ngaycongchung", "congchungvien", "thuky", "chudat")},
     }
     people = _workspace_people(data)
     assert [p["entity_id"] for p in people] == [deceased.id, heirs[0].id]

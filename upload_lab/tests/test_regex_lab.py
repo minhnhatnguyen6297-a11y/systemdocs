@@ -114,7 +114,7 @@ class RegexLabTests(unittest.TestCase):
 
         def changed_extract(*args, **kwargs):
             payload = original(*args, **kwargs)
-            payload["web_form"]["ten_hop_dong"] = "CHANGED"
+            payload["case"]["tenvanban"] = "CHANGED"
             return payload
 
         with patch.object(regex_lab, "_extractor_fingerprint", return_value="new-code"), patch.object(

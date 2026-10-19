@@ -17,6 +17,7 @@ for _path in (ROOT, ROOT.parent / "tools"):
         sys.path.insert(0, str(_path))
 
 import extraction_adapter
+from extraction_adapter import case_from_payload
 import kiem_tra_trich_xuat
 from regex_workbench.engine import contract_extract
 
@@ -140,9 +141,10 @@ def _snapshot(payload: dict[str, Any] | None, error: str = "") -> dict[str, Any]
     payload = payload or {}
     web = payload.get("web_form") or {}
     raw = payload.get("raw") or {}
+    case = case_from_payload(payload) if payload else {}
     return {
-        "document_kind": str(raw.get("document_kind") or ""),
-        "ten_hop_dong": str(web.get("ten_hop_dong") or ""),
+        "document_kind": str(case.get("loaivanbannhandien") or ""),
+        "ten_hop_dong": str(case.get("tenvanban") or ""),
         "nguoi_yeu_cau": str(web.get("nguoi_yeu_cau") or ""),
         "duong_su": str(web.get("duong_su") or ""),
         "tai_san": str(web.get("tai_san") or ""),

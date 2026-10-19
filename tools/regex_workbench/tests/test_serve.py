@@ -97,7 +97,7 @@ class ServeHttpTests(unittest.TestCase):
         web_form = data["payload"]["web_form"]
         raw = data["payload"]["raw"]
         self.assertIn("CHUYỂN NHƯỢNG", web_form["ten_hop_dong"])
-        self.assertEqual(raw["document_kind"], "transfer_contract")
+        self.assertEqual(data["payload"]["case"]["loaivanbannhandien"], "transfer_contract")
         self.assertEqual(raw["ben_a"]["nguoi"][0]["ho_ten"], "Nguyễn Văn An")
         self.assertEqual(raw["danh_sach_thua_dat"][0]["so_thua_dat"], "215")
         self.assertEqual(data["groups"], [])  # không có nhãn nhóm -> consumer dùng danh_sach_thua_dat

@@ -51,6 +51,16 @@ thì ghi xung đột để refine, không bịa/default hay tự chọn bước 
 [#42 Người nhiều giấy tờ và địa chỉ](../backlog/story-person-multiple-identities-addresses.md)
 là issue riêng, model tương lai chưa chọn, không tự là prerequisite #41.
 [Quyết định](../decisions/decision-owner-upload-field-standardization-20261019.md).
+**BUILT — slice metadata Case, 19/10/2026; verification đạt, Quick code độc lập
+sạch sau fix được chấp nhận, tài liệu hoàn tất:** tám
+trường canonical đã đi qua extraction, lưu/đọc lại, builder và preSave consumer.
+Chủ đất là **“người được gán chủ đất trong diagram”**: lựa chọn Chủ
+`ownPositions` đã lưu, tên snapshot Stage theo ID, không mặc định slot
+owner/người chết. Upload không có Diagram là null. Catalog ở entities §9.4.
+Proof tổng hợp DOCX/SQLite/fresh reopen/local Chromium đã đạt; Quick code sạch
+sau sửa ghi nhân sự chỉ cho record thực sự prepare (queue read không ghi).
+Không claim portal thật có đăng nhập, packaging hoặc corpus accuracy.
+Person/Asset/parties chưa cutover; **toàn #41 chưa hoàn thành, gate mẫu ĐÓNG**.
 Sau gate và khi được giao, quy trình là **LLM đọc hàng loạt mẫu → nhận diện cấu trúc
 → so code → điều chỉnh code → test lại, sai thì lặp**, nhằm xuất đủ, đúng thông
 tin hợp đồng. Issue riêng theo cấu trúc chưa chốt #30–#38;

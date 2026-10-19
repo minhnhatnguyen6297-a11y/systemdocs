@@ -33,6 +33,7 @@ REGISTRY_EXTRA_COLUMNS = {
     "prepared_at": "TEXT",
     "artifact_dir": "TEXT",
     "verify_json": "TEXT",
+    "case_json": "TEXT",
 }
 
 
@@ -194,8 +195,13 @@ def upsert_registry_record(
     prepared_at: Optional[str] = None,
     artifact_dir: Optional[str] = None,
     verify_json: Optional[str] = None,
+    case_fields: Optional[dict] = None,
 ) -> None:
     existing = get_row_by_file_key(conn, file_key)
+    if case_fields is not None:
+        from_case = json.dumps(case_fields, ensure_ascii=False)
+    else:
+        from_case = None
     created_at = existing["created_at"] if existing else now_iso()
     updated_at = now_iso()
     conn.execute(
@@ -217,9 +223,10 @@ def upsert_registry_record(
             prepared_at,
             artifact_dir,
             verify_json,
+            case_json,
             created_at,
             updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(file_key) DO UPDATE SET
             file_path = excluded.file_path,
             file_mtime_ns = excluded.file_mtime_ns,
@@ -236,6 +243,7 @@ def upsert_registry_record(
             prepared_at = COALESCE(excluded.prepared_at, file_registry.prepared_at),
             artifact_dir = COALESCE(excluded.artifact_dir, file_registry.artifact_dir),
             verify_json = COALESCE(excluded.verify_json, file_registry.verify_json),
+            case_json = COALESCE(excluded.case_json, file_registry.case_json),
             updated_at = excluded.updated_at
         """,
         (
@@ -255,6 +263,7 @@ def upsert_registry_record(
             prepared_at,
             artifact_dir,
             verify_json,
+            from_case,
             created_at,
             updated_at,
         ),
@@ -298,6 +307,7 @@ def update_registry_record_by_id(
     artifact_dir: Optional[str] = None,
     verify_json: Optional[str] = None,
     output_json_path: Optional[str] = None,
+    case_fields: Optional[dict] = None,
 ) -> None:
     fields = []
     params: list[object] = []
@@ -320,6 +330,8 @@ def update_registry_record_by_id(
         add_field("verify_json", verify_json)
     if output_json_path is not None:
         add_field("output_json_path", output_json_path)
+    if case_fields is not None:
+        add_field("case_json", json.dumps(case_fields, ensure_ascii=False))
 
     add_field("updated_at", now_iso())
     params.append(int(record_id))
@@ -723,6 +735,7 @@ def run_batch_scan(
                 matched_at=matched_at,
                 extracted_at=extracted_at,
                 output_json_path=str(output_path),
+                case_fields=payload["case"],
                 reason=reason,
             )
             manifest["stats"]["extract_success"] += 1

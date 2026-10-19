@@ -67,13 +67,18 @@ const SAMPLE = [
 function runPayload(marker) {
   return {
     payload: {
+      case: {
+        tenvanban: "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+        nhomhopdong: null, loaivanbannhandien: "transfer_contract",
+        socongchung: marker, ngaycongchung: null, congchungvien: null,
+        thuky: null, chudat: null,
+      },
       web_form: {
         ten_hop_dong: "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
         tai_san: "Tài sản thứ 1: Giấy chứng nhận số: B 011092; Địa chỉ thửa đất: xã Mẫu, tỉnh Mẫu",
         so_cong_chung: marker,
       },
       raw: {
-        document_kind: "transfer_contract",
         extract_mode: "structured_docx",
         scan_contract_no: marker,
         file_goc: "",

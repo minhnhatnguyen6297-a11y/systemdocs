@@ -10,7 +10,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-from extraction_adapter import extract, read_docx
+from extraction_adapter import case_from_payload, extract, read_docx
 
 DEFAULT_INPUT_DIR = BASE_DIR / "regex_review_samples" / "input"
 DEFAULT_REPORTS_DIR = BASE_DIR / "regex_review_samples" / "reports"
@@ -45,8 +45,8 @@ def _review_file(path: Path, *, root: Path) -> dict:
         raw = dict(payload.get("raw") or {})
         item.update(
             {
-                "document_kind": str(raw.get("document_kind") or ""),
-                "so_cong_chung": str(web_form.get("so_cong_chung") or ""),
+                "document_kind": str(case_from_payload(payload).get("loaivanbannhandien") or ""),
+                "so_cong_chung": str(case_from_payload(payload).get("socongchung") or ""),
                 "nguoi_yeu_cau": str(web_form.get("nguoi_yeu_cau") or ""),
                 "duong_su": str(web_form.get("duong_su") or ""),
                 "tai_san": str(web_form.get("tai_san") or ""),

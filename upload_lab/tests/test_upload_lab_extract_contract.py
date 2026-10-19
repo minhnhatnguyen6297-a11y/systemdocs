@@ -70,7 +70,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
 
         payload = extract(docx_path)
 
-        self.assertEqual(payload["raw"]["document_kind"], "transfer_contract")
+        self.assertEqual(payload["case"]["loaivanbannhandien"], "transfer_contract")
         self.assertEqual(payload["web_form"]["ten_hop_dong"], "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT")
 
     def test_document_kind_uses_two_line_header_not_filename_or_body(self):
@@ -87,7 +87,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
 
         payload = extract(docx_path)
 
-        self.assertEqual(payload["raw"]["document_kind"], "gift_contract")
+        self.assertEqual(payload["case"]["loaivanbannhandien"], "gift_contract")
         self.assertEqual(payload["web_form"]["ten_hop_dong"], "HỢP ĐỒNG Tặng Cho Quyền Sử Dụng Đất")
 
     def test_document_title_joins_specific_multiline_title(self):
@@ -101,7 +101,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
 
         payload = extract(docx_path)
 
-        self.assertEqual(payload["raw"]["document_kind"], "gift_contract")
+        self.assertEqual(payload["case"]["loaivanbannhandien"], "gift_contract")
         self.assertEqual(payload["web_form"]["ten_hop_dong"], "HỢP ĐỒNG TẶNG CHO QUYỀN SỬ DỤNG ĐẤT")
 
     def test_partition_title_wins_over_refusal_phrase_in_body(self):
@@ -114,7 +114,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
 
         payload = extract(docx_path)
 
-        self.assertEqual(payload["raw"]["document_kind"], "inheritance_partition")
+        self.assertEqual(payload["case"]["loaivanbannhandien"], "inheritance_partition")
         self.assertEqual(payload["web_form"]["ten_hop_dong"], "VĂN BẢN PHÂN CHIA DI SẢN")
 
     def test_find_tai_san_commitment_stops_before_cam_ket_xac_nhan(self):
@@ -158,7 +158,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         duong_su = payload["web_form"]["duong_su"]
         tai_san = payload["web_form"]["tai_san"]
 
-        self.assertEqual(payload["raw"]["document_kind"], "asset_commitment")
+        self.assertEqual(payload["case"]["loaivanbannhandien"], "asset_commitment")
         self.assertEqual(payload["web_form"]["ten_hop_dong"], "VĂN BẢN CAM KẾT TÀI SẢN RIÊNG")
         self.assertEqual(payload["web_form"]["nhom_hop_dong"], "Thoả thuận - Cam kết")
         self.assertEqual(payload["web_form"]["loai_tai_san"], "Đất đai không có tài sản")
@@ -265,7 +265,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         payload = extract(docx_path)
         duong_su = payload["web_form"]["duong_su"]
 
-        self.assertEqual(payload["raw"]["document_kind"], "mortgage_contract")
+        self.assertEqual(payload["case"]["loaivanbannhandien"], "mortgage_contract")
         self.assertEqual(payload["web_form"]["ten_hop_dong"], "Hợp đồng thế chấp quyền sử dụng đất")
         self.assertEqual(payload["web_form"]["nhom_hop_dong"], "Cầm cố - Thế chấp - Vay")
         self.assertEqual(payload["web_form"]["tai_san"], "quyền sử dụng đất")
@@ -428,7 +428,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         duong_su = payload["web_form"]["duong_su"]
         tai_san = payload["web_form"]["tai_san"]
 
-        self.assertEqual(payload["raw"]["document_kind"], "inheritance_partition")
+        self.assertEqual(payload["case"]["loaivanbannhandien"], "inheritance_partition")
         self.assertEqual(payload["web_form"]["ten_hop_dong"], "VĂN BẢN PHÂN CHIA DI SẢN")
         self.assertEqual(payload["web_form"]["nhom_hop_dong"], "Thừa kế (khai nhận - phân chia di sản thừa kế )")
         self.assertEqual(payload["web_form"]["so_cong_chung"], "2433/2025")
@@ -479,7 +479,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         duong_su = payload["web_form"]["duong_su"]
         tai_san = payload["web_form"]["tai_san"]
 
-        self.assertEqual(payload["raw"]["document_kind"], "inheritance_refusal")
+        self.assertEqual(payload["case"]["loaivanbannhandien"], "inheritance_refusal")
         self.assertEqual(payload["web_form"]["ten_hop_dong"], "VĂN BẢN TỪ CHỐI NHẬN DI SẢN")
         self.assertEqual(payload["web_form"]["nhom_hop_dong"], "Từ chối nhận di sản thừa kế")
         self.assertEqual(payload["web_form"]["so_cong_chung"], "2233/2025")
@@ -543,7 +543,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         duong_su = payload["web_form"]["duong_su"]
         tai_san = payload["web_form"]["tai_san"]
 
-        self.assertEqual(payload["raw"]["document_kind"], "inheritance_partition")
+        self.assertEqual(payload["case"]["loaivanbannhandien"], "inheritance_partition")
         self.assertEqual(len(payload["raw"]["ben_a"]["nguoi"]), 3)
         self.assertEqual(payload["raw"]["ben_a"]["nguoi"][0]["ho_ten"], "Trần Thị Mơ")
         self.assertEqual(payload["raw"]["ben_a"]["nguoi"][0]["gioi_tinh"], "Bà")
@@ -577,7 +577,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         partition_duong_su = partition["web_form"]["duong_su"]
         partition_tai_san = partition["web_form"]["tai_san"]
 
-        self.assertEqual(partition["raw"]["document_kind"], "inheritance_partition")
+        self.assertEqual(partition["case"]["loaivanbannhandien"], "inheritance_partition")
         self.assertEqual(len(partition_parties), 9)
         self.assertTrue(all(person.get("ngay_sinh") and person.get("cccd") for person in partition_parties))
         self.assertNotIn("chết", partition_duong_su)
@@ -592,7 +592,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         refusal_duong_su = refusal["web_form"]["duong_su"]
         refusal_tai_san = refusal["web_form"]["tai_san"]
 
-        self.assertEqual(refusal["raw"]["document_kind"], "inheritance_refusal")
+        self.assertEqual(refusal["case"]["loaivanbannhandien"], "inheritance_refusal")
         self.assertEqual(len(refusal_parties), 1)
         self.assertTrue(refusal_parties[0].get("ngay_sinh") and refusal_parties[0].get("cccd"))
         self.assertNotIn("chết", refusal_duong_su)
@@ -628,7 +628,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         duong_su = payload["web_form"]["duong_su"]
         tai_san = payload["web_form"]["tai_san"]
 
-        self.assertEqual(payload["raw"]["document_kind"], "inheritance_partition")
+        self.assertEqual(payload["case"]["loaivanbannhandien"], "inheritance_partition")
         self.assertEqual(len(persons), 2)
         self.assertEqual(persons[0]["ho_ten"], "Nguyễn Thị A")
         self.assertEqual(persons[0]["ngay_sinh"], "1965")
@@ -673,7 +673,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         duong_su = payload["web_form"]["duong_su"]
         tai_san = payload["web_form"]["tai_san"]
 
-        self.assertEqual(payload["raw"]["document_kind"], "inheritance_refusal")
+        self.assertEqual(payload["case"]["loaivanbannhandien"], "inheritance_refusal")
         self.assertEqual(len(persons), 2)
         self.assertEqual(persons[0]["ho_ten"], "Phạm Thị Duyên")
         self.assertEqual(persons[0]["gioi_tinh"], "Bà")
@@ -705,7 +705,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         payload = extract(docx_path)
         persons = payload["raw"]["ben_a"]["nguoi"]
 
-        self.assertEqual(payload["raw"]["document_kind"], "inheritance_partition")
+        self.assertEqual(payload["case"]["loaivanbannhandien"], "inheritance_partition")
         self.assertEqual(len(persons), 1)
         self.assertEqual(persons[0]["ho_ten"], "Nguyễn Thị Xuân")
         self.assertNotIn("chết", payload["web_form"]["duong_su"])
@@ -722,7 +722,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         refusal = extract(refusal_path)
         refusal_parties = refusal["raw"]["ben_a"]["nguoi"]
 
-        self.assertEqual(refusal["raw"]["document_kind"], "inheritance_refusal")
+        self.assertEqual(refusal["case"]["loaivanbannhandien"], "inheritance_refusal")
         self.assertEqual(len(refusal_parties), 3)
         self.assertTrue(all(person.get("ngay_sinh") and person.get("cccd") for person in refusal_parties))
         self.assertNotIn("chết", refusal["web_form"]["duong_su"])
@@ -904,7 +904,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
 
         payload = extract(docx_path)
 
-        self.assertEqual(payload["raw"]["document_kind"], "inheritance_partition")
+        self.assertEqual(payload["case"]["loaivanbannhandien"], "inheritance_partition")
         self.assertEqual([p["ho_ten"] for p in payload["raw"]["ben_a"]["nguoi"]], ["Trần Văn Z"])
         chet = payload["raw"]["nguoi_chet"]
         self.assertEqual(len(chet), 2)
@@ -1052,7 +1052,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
 
         payload = extract(docx_path)
 
-        self.assertEqual(payload["raw"]["document_kind"], "inheritance_declaration")
+        self.assertEqual(payload["case"]["loaivanbannhandien"], "inheritance_declaration")
         persons = payload["raw"]["ben_a"]["nguoi"]
         self.assertEqual(len(persons), 1)
         self.assertEqual(persons[0]["ho_ten"], "Trần Thị T")
@@ -1151,7 +1151,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         payload = extract(docx_path)
         persons = payload["raw"]["ben_a"]["nguoi"]
 
-        self.assertEqual(payload["raw"]["document_kind"], "inheritance_partition")
+        self.assertEqual(payload["case"]["loaivanbannhandien"], "inheritance_partition")
         self.assertEqual(len(persons), 2)
         # "Ông/bà:" la nhan mo ho — khong suy gioi tinh (decision-46).
         self.assertEqual(persons[0]["gioi_tinh"], "")
@@ -1306,7 +1306,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
 
         payload = extract(docx_path)
 
-        self.assertEqual(payload["raw"]["document_kind"], "inheritance_partition")
+        self.assertEqual(payload["case"]["loaivanbannhandien"], "inheritance_partition")
         self.assertEqual([p["ho_ten"] for p in payload["raw"]["ben_a"]["nguoi"]], ["Trương Văn H"])
         self.assertEqual([p["ho_ten"] for p in payload["raw"]["nguoi_chet"]], ["Tạ Thị H"])
         self.assertEqual(payload["raw"]["tai_san_chua_ho_tro"], ["bao_hiem"])

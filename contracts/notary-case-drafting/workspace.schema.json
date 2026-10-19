@@ -30,6 +30,14 @@
           ],
           "additionalProperties": false,
           "properties": {
+            "tenvanban": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "nhomhopdong": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "loaivanbannhandien": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "socongchung": { "type": ["string", "null"], "pattern": "^\\d+/\\d{4}$" },
+            "ngaycongchung": { "$ref": "common.schema.json#/definitions/date_full" },
+            "congchungvien": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "thuky": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "chudat": { "$ref": "common.schema.json#/definitions/nullable_string" },
             "id": { "type": "integer", "minimum": 1 },
             "case_type": {
               "type": "string",

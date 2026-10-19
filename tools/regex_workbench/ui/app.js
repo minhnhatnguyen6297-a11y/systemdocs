@@ -93,6 +93,9 @@ function collectValues(data) {
   };
   const payload = (data && data.payload) || {};
   const webForm = payload.web_form || {};
+  for (const [key, value] of Object.entries(payload.case || {})) {
+    if (typeof value === "string") add(value, "case." + key);
+  }
   for (const [key, value] of Object.entries(webForm)) {
     if (typeof value === "string") add(value, "web_form." + key);
   }
@@ -173,9 +176,9 @@ function renderSummary(data) {
     ? missing.map((name) => badge(name, "miss")).join(" ")
     : badge("đủ trường bắt buộc", "ok");
   $("summary").innerHTML =
-    `<div><b>Loại văn bản:</b> <code>${esc(raw.document_kind || "")}</code>` +
+    `<div><b>Loại văn bản:</b> <code>${esc(payload.case.loaivanbannhandien || "")}</code>` +
     ` · <b>chế độ:</b> <code>${esc(raw.extract_mode || "")}</code>` +
-    ` · <b>số công chứng:</b> <code>${esc(raw.scan_contract_no || "—")}</code></div>` +
+    ` · <b>số công chứng:</b> <code>${esc(payload.case.socongchung || "—")}</code></div>` +
     `<div><b>File gốc:</b> <span class="mono">${esc(raw.file_goc || "(text dán)")}</span></div>` +
     `<div><b>Trường còn thiếu:</b> ${chips}</div>` +
     `<div><b>Tài sản chưa hỗ trợ:</b> ${unsupported.length ? unsupported.map((s) => badge(s, "warn")).join(" ") : '<span class="muted">không</span>'}</div>` +
@@ -193,10 +196,19 @@ function renderFields(data) {
   const webForm = (data.payload && data.payload.web_form) || {};
   const raw = (data.payload && data.payload.raw) || {};
   const missing = new Set(raw.missing_web_form_fields || []);
-  const rows = Object.entries(webForm).map(([key, value]) =>
+  const caseFields = data.payload.case;
+  const portalKeys = {
+    tenvanban: "ten_hop_dong", nhomhopdong: "nhom_hop_dong",
+    socongchung: "so_cong_chung", ngaycongchung: "ngay_cong_chung",
+    congchungvien: "cong_chung_vien", thuky: "thu_ky",
+  };
+  const projectedKeys = new Set(Object.values(portalKeys));
+  const entries = [...Object.entries(caseFields),
+    ...Object.entries(webForm).filter(([key]) => !projectedKeys.has(key))];
+  const rows = entries.map(([key, value]) =>
     `<tr><td class="mono">${esc(key)}</td>` +
     `<td class="val">${esc(value == null ? "" : value)}</td>` +
-    `<td>${missing.has(key) ? badge("thiếu", "miss") : ""}</td></tr>`).join("");
+    `<td>${missing.has(portalKeys[key] || key) ? badge("thiếu", "miss") : ""}</td></tr>`).join("");
   $("fields").innerHTML = "<tr><th>Trường</th><th>Giá trị</th><th></th></tr>" + rows;
 }
 

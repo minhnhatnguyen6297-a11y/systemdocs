@@ -39,6 +39,7 @@ def meta() -> dict:
     return {
         "engine": {"id": core.ENGINE_ID, "version": core.ENGINE_VERSION},
         "web_form_fields": list(empty["web_form"]),
+        "case_fields": list(empty["case"]),
         "raw_keys": list(empty["raw"]),
     }
 

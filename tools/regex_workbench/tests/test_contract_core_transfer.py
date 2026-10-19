@@ -40,7 +40,7 @@ class TransferFixturesTests(unittest.TestCase):
         payload = core.extract_text(load_fixture("transfer_chuan.txt"))
         raw, web_form = payload["raw"], payload["web_form"]
 
-        self.assertEqual(raw["document_kind"], core.DOC_KIND_TRANSFER)
+        self.assertEqual(payload["case"]["loaivanbannhandien"], core.DOC_KIND_TRANSFER)
         self.assertEqual(web_form["ngay_cong_chung"], "15/06/2026")
         self.assertEqual(web_form["cong_chung_vien"], "Phạm Minh Chi")
         self.assertEqual(web_form["so_cong_chung"], "428/2026")
@@ -485,7 +485,7 @@ class AdjudicationFixTests(unittest.TestCase):
             "BÊN A: Ông Nguyễn Văn An; Sinh năm 1980; CCCD số 001075000001;",
             "ĐIỀU 1: Nội dung thỏa thuận.",
         ]))
-        self.assertEqual(payload["raw"]["document_kind"], core.DOC_KIND_TRANSFER_CANCELLATION)
+        self.assertEqual(payload["case"]["loaivanbannhandien"], core.DOC_KIND_TRANSFER_CANCELLATION)
         self.assertEqual(payload["web_form"]["nhom_hop_dong"], "Thoả thuận - Cam kết")
 
     def test_mb8_loi_chung_heading_not_in_title(self):

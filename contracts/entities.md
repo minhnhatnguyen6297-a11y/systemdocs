@@ -236,3 +236,32 @@ xã/phường cũ–mới còn ở NAIA-9, chưa có đường suy tự động 
 2. **`nguoinhanuyquyen` (Người nhận ủy quyền):** Người nhận ủy quyền giải quyết công việc — chọn từ danh mục người quen hay ủy quyền hoặc cho phép tạo mới.
 3. **`noidungviec` (Nội dung việc):** Cụm text nhập thủ công mô tả công việc (ví dụ: *"Đính chính hộ ông A thành ông A và bà B"*, *"Đính chính năm sinh ông A từ 1955 thành 1950"*...).
 4. **Bố cục giao diện (UI):** Thêm 3 dòng trường hồ sơ ngay dưới các dòng tài sản; giảm 10% chiều cao các ô nhập liệu để giữ giao diện tổng thể gọn gàng, không phải cuộn nhiều.
+
+### 9.4. Metadata Hồ sơ Upload — triển khai phạm vi Case
+
+Owner giao triển khai chuẩn hóa Case và làm rõ chủ đất: **“người được gán chủ
+đất trong diagram”**. Không mở model Người/Tài sản/vai trò mới hoặc khép toàn #41.
+
+| Key canonical | Kiểu | Nguồn / nghĩa |
+|---|---|---|
+| `tenvanban` | string/null | Tiêu đề nguồn, không enum Notary |
+| `nhomhopdong` | string/null | Nhóm portal, có scope website của lượt quét |
+| `loaivanbannhandien` | string/null | Loại engine nhận diện, độc lập enum Notary |
+| `socongchung` | string/null | `xxx/yyyy` theo §5, không Case ID toàn cục |
+| `ngaycongchung` | ISO full date/null | Ngày công chứng, khác ngày lập hồ sơ |
+| `congchungvien` | string/null | Tên từ nguồn hoặc lựa chọn prepare rõ ràng |
+| `thuky` | string/null | Tên từ input prepare; không tự đoán |
+| `chudat` | string/null | Tên snapshot Người được chọn Chủ trên Diagram đã lưu |
+
+Thứ tự trường theo bảng. Thiếu là `null`, không chuỗi rỗng/default giả.
+`chudat` lấy `personId` của node có `ownPositions` trỏ tài sản hiện có (1..3),
+không hidden/deleted; đọc tên Stage committed theo ID, mỗi Người một dòng
+theo thứ tự Stage, dedup theo row ID, không dedup theo tên.
+Không đồng nhất với `owner_row_id`/slot `owner`; không suy từ Word/GCN/Bên A.
+Hai bên không có lựa chọn Chủ và Upload không có Diagram: `chudat = null`.
+
+Upload lưu record Case nhỏ có schema cố định trong DB registry cục bộ; không
+nhân đôi payload lớn. JSON extraction/nguồn cũ giữ nguyên; form builder đọc Case rồi đổi ngày
+sang `DD/MM/YYYY` tại biên portal. Notary giữ metadata trong snapshot
+`case_state_json.payload.case`, derivation chủ đất trong transaction commit/save.
+Không ghi chéo DB, không tạo shared Case ID. Raw/Person/Asset/parties giữ nguyên.

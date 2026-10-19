@@ -24,6 +24,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import extraction_adapter
+from extraction_adapter import case_from_payload
 from kiem_tra_trich_xuat import MUC_BO_QUA, MUC_LOI, kiem_tra_payload
 
 
@@ -63,7 +64,7 @@ def quet_file(path: str) -> dict:
     return {
         "file": path,
         "ten_file": os.path.basename(path),
-        "kind": raw.get("document_kind", ""),
+        "kind": case_from_payload(payload).get("loaivanbannhandien") or "",
         "so_nguoi": len(raw.get("ben_a", {}).get("nguoi", [])) + len(raw.get("ben_b", {}).get("nguoi", [])),
         "so_chet": len(raw.get("nguoi_chet", [])),
         "so_thua": len(raw.get("danh_sach_thua_dat", [])),

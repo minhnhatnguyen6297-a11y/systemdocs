@@ -64,6 +64,14 @@ Electron là vỏ ứng dụng; Python/FastAPI xử lý nghiệp vụ. Module gi
   có căn cứ và được duyệt, không xóa trường cần thiết cho vừa schema Notary.
   [#42](../backlog/story-person-multiple-identities-addresses.md) riêng cho một
   Người nhiều giấy tờ và địa chỉ; model tương lai chưa chọn, không tự là gate.
+- **Làm rõ tiếp theo của owner 19/10:** chủ đất là **“người được gán chủ đất
+  trong diagram”**. `chudat` lấy lựa chọn Chủ `ownPositions` đã lưu, trỏ tài
+  sản hiện có, không hidden/deleted; tên snapshot Stage theo ID, không đồng
+  nhất slot owner/người chết. Upload không có Diagram là null. Metadata Case
+  BUILT theo entities §9.4, verification cô lập đạt và Quick code sạch sau
+  sửa selected-only prepare; fix được Quick độc lập chấp nhận, tài liệu cuối
+  hoàn tất. Không thay phạm vi Person/Asset/parties: **toàn #41 chưa xong,
+  gate mẫu ĐÓNG**.
 - **Gate hiện hành trước quy trình theo mẫu:** mọi lượt khảo sát/quét mẫu thực
   mới, corpus và vòng E2E theo mẫu phải chờ **#41 được nghiệm thu đầy đủ** chuẩn
   DB/contract, cutover và proof consumer thật, không chỉ bảng mapping. Proof riêng

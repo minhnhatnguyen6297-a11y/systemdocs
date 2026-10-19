@@ -30,6 +30,11 @@ import re
 import unicodedata
 from typing import Any
 
+try:
+    from extraction_adapter import case_from_payload
+except ImportError:  # pragma: no cover
+    from .extraction_adapter import case_from_payload
+
 MUC_LOI = "loi"
 MUC_CANH_BAO = "canh-bao"
 MUC_BO_QUA = "bo-qua"
@@ -111,7 +116,7 @@ def _ly_do_ngoai_le(payload: dict) -> str:
     raw_name = str(payload.get("raw", {}).get("file_goc") or "").lower()
     # Tieu de noi dung cung la dau hieu danh muc ("DANH MỤC HỒ SƠ LƯU") —
     # ten file "HS thế chấp.docx" khong bat duoc key ten file.
-    title_fold = _fold_name(payload.get("web_form", {}).get("ten_hop_dong") or "")
+    title_fold = _fold_name(case_from_payload(payload).get("tenvanban") or "")
     if (
         title_fold.startswith(("danh muc", "ho so luu"))
         and not _co_noi_dung_hop_dong(payload)
@@ -136,7 +141,7 @@ def _co_noi_dung_hop_dong(payload: dict) -> bool:
     """Van ban co noi dung hop dong that (nguoi/thua) thi khong bo qua —
     ten file co the dung ten nguoi hoac bi dat nham."""
     raw = payload.get("raw", {})
-    if str(raw.get("document_kind") or "generic") != "generic":
+    if str(case_from_payload(payload).get("loaivanbannhandien") or "generic") != "generic":
         return True
     if _nguoi_1_ben(payload) or raw.get("danh_sach_thua_dat"):
         return True
@@ -164,7 +169,7 @@ def luat_loai_van_ban(payload: dict) -> list[dict]:
         or "vbpc" in name
         or re.search(r"(?:^|[^a-z0-9])pc(?:[^a-z0-9]|$)", name) is not None
     )
-    kind = str(payload.get("raw", {}).get("document_kind", ""))
+    kind = str(case_from_payload(payload).get("loaivanbannhandien") or "")
     if goi_y and kind not in (*KIND_THUA_KE,):
         return [{"id": "R01", "muc": MUC_CANH_BAO, "noi_dung": f"tên file gợi ý phân chia nhưng nhận diện: {kind}"}]
     return []
@@ -174,14 +179,14 @@ def luat_0_nguoi(payload: dict) -> list[dict]:
     """R02: van ban da nhan loai nhung khong co nguoi nao — thua ke la loi,
     cac loai hop dong khac (CN/TC/the chap/cam ket) la canh bao; generic
     khong ap (thong bao, don tu co the khong co chu the)."""
-    kind = str(payload.get("raw", {}).get("document_kind", ""))
+    kind = str(case_from_payload(payload).get("loaivanbannhandien") or "")
     if _nguoi_1_ben(payload):
         return []
     if kind in KIND_THUA_KE:
         return [{"id": "R02", "muc": MUC_LOI, "noi_dung": "0 người tham gia"}]
     if kind and kind != "generic":
         return [{"id": "R02", "muc": MUC_CANH_BAO, "noi_dung": f"0 người tham gia ({kind})"}]
-    title = str(payload.get("web_form", {}).get("ten_hop_dong") or "").strip()
+    title = str(case_from_payload(payload).get("tenvanban") or "").strip()
     if title:
         # Trang phu (dinh chinh / trang sua loi ky thuat / loi chung rieng)
         # ban chat khong co duong su — R02 chi gay nhieu (12/10/2026).
@@ -270,7 +275,7 @@ def luat_trung_ten(payload: dict) -> list[dict]:
 
 def luat_thieu_nguoi_chet(payload: dict) -> list[dict]:
     """R06: van ban thua ke khong thay nguoi chet."""
-    kind = str(payload.get("raw", {}).get("document_kind", ""))
+    kind = str(case_from_payload(payload).get("loaivanbannhandien") or "")
     if kind in KIND_THUA_KE and not payload.get("raw", {}).get("nguoi_chet"):
         return [{"id": "R06", "muc": MUC_CANH_BAO, "noi_dung": "không thấy người chết"}]
     return []
@@ -292,7 +297,7 @@ def luat_thieu_truong_chet(payload: dict) -> list[dict]:
 
 def luat_mat_khoi_tai_san(payload: dict) -> list[dict]:
     """R08: van ban thua ke khong co khoi text tai san."""
-    kind = str(payload.get("raw", {}).get("document_kind", ""))
+    kind = str(case_from_payload(payload).get("loaivanbannhandien") or "")
     if kind in KIND_THUA_KE and not str(payload.get("web_form", {}).get("tai_san", "")).strip():
         return [{"id": "R08", "muc": MUC_LOI, "noi_dung": "không có khối tài sản"}]
     return []
@@ -300,7 +305,7 @@ def luat_mat_khoi_tai_san(payload: dict) -> list[dict]:
 
 def luat_khong_tach_tai_san(payload: dict) -> list[dict]:
     """R09: co khoi tai san nhung khong tach duoc thua/so/bh nao."""
-    kind = str(payload.get("raw", {}).get("document_kind", ""))
+    kind = str(case_from_payload(payload).get("loaivanbannhandien") or "")
     raw = payload.get("raw", {})
     if kind in KIND_THUA_KE and str(payload.get("web_form", {}).get("tai_san", "")).strip():
         if not raw.get("danh_sach_thua_dat") and not raw.get("tai_san_chua_ho_tro"):

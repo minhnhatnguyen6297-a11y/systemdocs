@@ -174,6 +174,14 @@ Các công thức mở rộng còn Draft; không có quyền thay công thức �
 participant có thể được thay trong transaction, nhưng không được quyết định
 ngược Stage/Pool/Diagram.
 
+Metadata Case `chudat` theo owner **“người được gán chủ đất trong diagram”**:
+lấy node đã lưu có `ownPositions` trỏ tài sản hiện có, không hidden/deleted;
+đọc tên Stage snapshot bằng `personId`, theo thứ tự Stage và dedup row ID.
+Không lấy `owner_row_id` hoặc tự gắn người chết làm chủ. Không gán là `null`.
+Đây là projection Case mới; nhóm Word legacy có nhánh force-flag người chết
+vẫn giữ hiện trạng, không được dùng nhánh fallback đó làm nguồn `chudat`.
+[Catalog](../../../contracts/entities.md#94-metadata-hồ-sơ-upload--triển-khai-phạm-vi-case).
+
 ### 9.5. Word
 
 - Thông tin cá nhân lấy từ Stage.

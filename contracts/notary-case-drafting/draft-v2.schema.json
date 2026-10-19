@@ -184,6 +184,13 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "tenvanban": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "nhomhopdong": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "loaivanbannhandien": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "socongchung": { "type": ["string", "null"], "pattern": "^\\d+/\\d{4}$" },
+            "ngaycongchung": { "$ref": "common.schema.json#/definitions/date_full" },
+            "congchungvien": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "thuky": { "$ref": "common.schema.json#/definitions/nullable_string" },
             "case_type": { "enum": ["inheritance", "two_party"] },
             "document_type": {
               "type": "string",
@@ -224,6 +231,13 @@
           "additionalProperties": false,
           "description": "OPTIONAL — metadata hồ sơ ghi cùng Stage trong một transaction; case_type/document_type kèm theo phải khớp giá trị đã lưu. Chỉ dedicated workspace_convert_type (§13.18) được chuyển loại; commit vẫn immutable. Chấp nhận key canonical — §6.",
           "properties": {
+            "tenvanban": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "nhomhopdong": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "loaivanbannhandien": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "socongchung": { "type": ["string", "null"], "pattern": "^\\d+/\\d{4}$" },
+            "ngaycongchung": { "$ref": "common.schema.json#/definitions/date_full" },
+            "congchungvien": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "thuky": { "$ref": "common.schema.json#/definitions/nullable_string" },
             "case_type": { "enum": ["inheritance", "two_party", null] },
             "document_type": { "type": ["string", "null"] },
             "ngay_lap_ho_so": { "$ref": "common.schema.json#/definitions/date_full" },

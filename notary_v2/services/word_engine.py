@@ -784,6 +784,29 @@ def _dedupe_people(people: list[WordPerson]) -> list[WordPerson]:
     return out
 
 
+def committed_landowner_names(payload: dict) -> str | None:
+    """Case field from assigned, active Diagram owners only; no master fallback."""
+    diagram = payload.get("diagram", {})
+    state = diagram.get("state", {}) if isinstance(diagram, dict) else {}
+    if state.get("domain") != "inheritance":
+        return None
+    stage = payload.get("stage", [])
+    persons = [_word_person_from_stage(row, {}) for row in stage]
+    asset_count = len(payload.get("assets", []))
+    nodes = []
+    for node in state.get("nodes", []):
+        positions = node.get("ownPositions", [])
+        # Committed/pruned positions only: stale legacy positions are not assets.
+        owns = any(isinstance(pos, int) and not isinstance(pos, bool)
+                   and 1 <= pos <= min(3, asset_count) for pos in positions)
+        nodes.append({**node, "isLandOwner": owns})
+    _apply_diagram_nodes(persons, nodes)
+    owners = _dedupe_people([
+        person for person in _active_persons(persons) if person.is_land_owner
+    ])
+    return "\n".join(person.ho_ten for person in owners if person.ho_ten) or None
+
+
 def build_word_context(case: Any, today: date | None = None) -> WordExportContext:
     built = _build_word_persons(case)
     persons = built.persons

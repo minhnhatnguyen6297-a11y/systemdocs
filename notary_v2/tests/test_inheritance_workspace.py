@@ -429,6 +429,7 @@ def test_save_persists_state_render_model_and_bumps_revision(
         persisted = json.loads(fresh.case_state_json)
         assert persisted["schemaVersion"] == 3
         assert persisted["diagram"]["state"] == state
+        assert persisted["case"]["chudat"] == "Nguyễn Văn An"
         assert persisted["diagram"]["render_model"]["engineVersion"] == 2
         # legacy projection cho web cũ (parity commit_stage)
         engine_state = persisted["diagram"]["engineState"]
@@ -917,3 +918,42 @@ def test_branch_tombstones_coparent_save_reopen_and_reject_preserve(
                 _svc(fresh).save_diagram(case.id, revision, state)
             assert exc.value.code == code
             assert CaseWorkspaceService(fresh).get(case.id) == reopened
+
+
+def test_case_landowner_text_transitions_saved_diagram_and_fresh_reopen(
+        db, session_factory):
+    import os
+    from pathlib import Path
+    from services.case_workspace import CaseWorkspaceService
+    case, people, rows, _prop = _seed_case(db)
+    state = _draft_state(rows)
+    spouse = next(node for node in state["nodes"] if node["id"] == "spouse")
+    spouse["ownPositions"] = [1]
+    _svc(db).save_diagram(case.id, 1, state)
+    fresh = session_factory()
+    try:
+        first = CaseWorkspaceService(fresh).get(case.id)
+        assert first["case"]["chudat"] == "Nguyễn Văn An\nNguyễn Thị Bình"
+        spouse["ownPositions"] = []
+        _svc(fresh).save_diagram(case.id, 2, state)
+    finally:
+        fresh.close()
+    reopened_session = session_factory()
+    try:
+        reopened = CaseWorkspaceService(reopened_session).get(case.id)
+        assert reopened["case"]["chudat"] == "Nguyễn Văn An"
+        persisted = json.loads(reopened_session.get(InheritanceCase, case.id).case_state_json)
+        assert persisted["case"]["chudat"] == "Nguyễn Văn An"
+        evidence = os.environ.get("CASE_FIELDS_EVIDENCE_DIR")
+        if evidence:
+            target = Path(evidence)
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "diagram-case-proof.json").write_text(json.dumps({
+                "scope": "controlled synthetic DB; real save_diagram and fresh sessions",
+                "first_case": first["case"], "reopened_case": reopened["case"],
+                "persisted_case": persisted["case"],
+                "saved_nodes": persisted["diagram"]["state"]["nodes"],
+                "stage_snapshot": persisted["stage"],
+            }, ensure_ascii=False, indent=2), encoding="utf-8")
+    finally:
+        reopened_session.close()

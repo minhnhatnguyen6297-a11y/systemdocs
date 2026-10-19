@@ -293,6 +293,11 @@ _PERSON_FIELD_SET = set(_person_contract_keys())
 _ASSET_FIELD_SET = set(_asset_contract_keys())
 # Meta cap nhat duoc tren case da luu qua workspace_update (§6.2) —
 # case_type/document_type chỉ đổi qua convert_type, không qua update.
+CASE_SCALAR_FIELDS = (
+    "tenvanban", "nhomhopdong", "loaivanbannhandien", "socongchung",
+    "ngaycongchung", "congchungvien", "thuky",
+)
+
 _CASE_META_UPDATE_KEYS = {"ngay_lap_ho_so", "noi_niem_yet", "ghi_chu"}
 
 # Key cụm đất: canonical mới (loaidat/dientich/thoihan — tên nghiệp vụ
@@ -1017,6 +1022,10 @@ class CaseWorkspaceService:
                 "nguoi_nhan_uy_quyen": _nn(case.nguoi_nhan_uy_quyen),
                 "nguoi_nhan_uy_quyen_id": case.nguoi_nhan_uy_quyen_id,
                 "noi_dung_viec": _nn(case.noi_dung_viec),
+                **{key: composed.payload.get("case", {}).get(key)
+                   for key in ("tenvanban", "nhomhopdong", "loaivanbannhandien",
+                               "socongchung", "ngaycongchung", "congchungvien", "thuky")},
+                "chudat": self._landowner_names(composed.payload),
                 "ghi_chu": _nn(case.ghi_chu),
             },
         }
@@ -1130,6 +1139,11 @@ class CaseWorkspaceService:
             # _upsert_people; load trước khi upsert vì upsert không đụng
             # case_state_json.
             payload = self._load_payload(case) or {}
+            if meta_edit is not None:
+                payload["case"] = {
+                    **payload.get("case", {}),
+                    **{key: meta_edit[key] for key in CASE_SCALAR_FIELDS if key in meta_edit},
+                }
             previous_import = payload.get('docx_import')
             import_context = docx_import if docx_import is not None else payload.get("docx_import")
             if import_context is not None:
@@ -1586,9 +1600,12 @@ class CaseWorkspaceService:
                     _people_map(resolved_people))
                 self._sync_participants_and_owner(
                     case, legacy_nodes, owner_entity=nguoi_chet)
+            initial_payload = {"case": {key: meta[key] for key in CASE_SCALAR_FIELDS if key in meta}}
+            if docx_import is not None:
+                initial_payload["docx_import"] = self._docx_context(docx_import, stage)
             case.case_state_json = json.dumps(
                 self._build_payload(
-                    ({"docx_import": self._docx_context(docx_import, stage)} if docx_import is not None else {}), resolved_people, resolved_assets,
+                    initial_payload, resolved_people, resolved_assets,
                     clean_state, render_model, legacy_nodes, now,
                     domain=case_type, owner_row_id=owner_row_id,
                     case=case),
@@ -1637,6 +1654,8 @@ class CaseWorkspaceService:
                 "nguoi_nhan_uy_quyen_id": meta["nguoi_nhan_uy_quyen_id"],
                 "noi_dung_viec": meta["noi_dung_viec"],
                 "ghi_chu": meta["ghi_chu"],
+                **{key: meta.get(key) for key in CASE_SCALAR_FIELDS},
+                "chudat": json.loads(case.case_state_json)["case"]["chudat"],
             },
             "stage": stage_out,
             "diagram": {
@@ -2221,7 +2240,7 @@ class CaseWorkspaceService:
         _check_extra_keys(case_meta, {
             "case_type", "document_type", "ngay_lap_ho_so",
             "noi_niem_yet", "nguoi_nhan_uy_quyen", "nguoi_nhan_uy_quyen_id",
-            "noi_dung_viec", "ghi_chu"}, "payload.case")
+            "noi_dung_viec", "ghi_chu", *CASE_SCALAR_FIELDS}, "payload.case")
         case_type = case_meta.get("case_type", CASE_TYPE_INHERITANCE)
         if case_type not in CASE_TYPES:
             raise WorkspaceError(
@@ -2250,6 +2269,19 @@ class CaseWorkspaceService:
                     "validation_error",
                     f"{field} phải là chuỗi non-empty hoặc null")
         auth = self._resolve_auth_recipient(case_meta)
+        canonical_meta = {}
+        for field in CASE_SCALAR_FIELDS:
+            if field not in case_meta:
+                continue
+            value = case_meta[field]
+            if value is not None and (
+                    not isinstance(value, str) or not value.strip()):
+                raise WorkspaceError("validation_error", f"{field}: chuỗi không rỗng hoặc null")
+            if field == "ngaycongchung" and not _valid_date_full(value):
+                raise WorkspaceError("validation_error", "ngaycongchung: YYYY-MM-DD hoặc null")
+            if field == "socongchung" and value is not None and not re.fullmatch(r"\d+/\d{4}", value):
+                raise WorkspaceError("validation_error", "socongchung: xxx/yyyy hoặc null")
+            canonical_meta[field] = value
         return {
             "case_type": case_type,
             "document_type": document_type,
@@ -2259,6 +2291,7 @@ class CaseWorkspaceService:
             "nguoi_nhan_uy_quyen_id": auth["id"],
             "noi_dung_viec": _nn(case_meta.get("noi_dung_viec")),
             "ghi_chu": _nn(case_meta.get("ghi_chu")),
+            **canonical_meta,
         }
 
     @staticmethod
@@ -2711,6 +2744,11 @@ class CaseWorkspaceService:
 
     # ----- persist committed payload
 
+    @staticmethod
+    def _landowner_names(payload: dict) -> Optional[str]:
+        from services.word_engine import committed_landowner_names
+        return committed_landowner_names(payload)
+
     def _build_payload(self, payload: Mapping[str, Any],
                        resolved_people: list, resolved_assets: list,
                        state: dict, render_model: Optional[dict],
@@ -2782,8 +2820,12 @@ class CaseWorkspaceService:
         merged["diagram"] = diagram
         # §4.3/đợt 3: metadata hồ sơ đóng băng cùng commit — Word/UI đọc
         # từ đây (key canonical noiniemyet/nguoinhanuyquyen/noidungviec).
-        if case is not None:
-            merged["case"] = _case_meta_snapshot(case)
+        previous_meta = merged.get("case", {})
+        merged["case"] = {
+            **previous_meta,
+            **(_case_meta_snapshot(case) if case is not None else {}),
+            "chudat": self._landowner_names(merged),
+        }
         return merged
 
     def _asset_snapshot_item(self, row_id: str, entity: Optional[int],

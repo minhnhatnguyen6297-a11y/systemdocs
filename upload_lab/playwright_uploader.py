@@ -75,6 +75,11 @@ except ImportError:  # pragma: no cover
         VERIFY_FIELDS,
     )
 
+try:
+    from extraction_adapter import DEFAULT_CCV, case_from_payload, case_portal_projection, validate_case_fields
+except ImportError:  # pragma: no cover
+    from .extraction_adapter import DEFAULT_CCV, case_from_payload, case_portal_projection, validate_case_fields
+
 
 QUEUE_STATUSES = ("extracted", "upload_failed", "prepared_dry_run", "prepared_partial")
 PREPARE_QUEUE_STATUSES = ("extracted", "upload_failed")
@@ -563,10 +568,10 @@ def resolve_requester_override(
     if not lookup:
         return ""
 
-    web_form = dict(payload.get("web_form") or {})
     raw = dict(payload.get("raw") or {})
-    date_text = str(web_form.get("ngay_cong_chung") or raw.get("ngay_cong_chung") or "").strip()
-    lookup_keys = build_requester_lookup_keys(contract_no or web_form.get("so_cong_chung", ""), date_text=date_text)
+    case = case_from_payload(payload)
+    date_text = case["ngaycongchung"] or ""
+    lookup_keys = build_requester_lookup_keys(contract_no or case["socongchung"] or "", date_text=date_text)
     requester_name = next((lookup.get(key, "") for key in lookup_keys if lookup.get(key, "")), "")
     requester_name = str(requester_name or "").strip()
     if not requester_name:
@@ -719,6 +724,14 @@ def load_upload_queue(
         if not output_json_path.exists():
             continue
         payload = json.loads(output_json_path.read_text(encoding="utf-8"))
+        case = (validate_case_fields(json.loads(row_dict["case_json"]))
+                if row_dict.get("case_json") is not None
+                else case_from_payload(payload, contract_no=str(row_dict.get("contract_no") or "")))
+        for field, selected in (("congchungvien", cong_chung_vien), ("thuky", thu_ky)):
+            if selected is not None:
+                case[field] = selected.strip() or None
+        case = validate_case_fields(case)
+        payload["case"] = case
         upload_form = build_upload_form_data(
             payload,
             contract_no=str(row_dict.get("contract_no") or ""),
@@ -732,7 +745,9 @@ def load_upload_queue(
             UploadRecord(
                 record_id=int(row_dict["id"]),
                 run_id=run_id,
-                contract_no=str(row_dict.get("contract_no") or upload_form.get("so_cong_chung") or ""),
+                # Scan reference retains its original format for issue classification.
+                # The business Case number/form value is canonical independently.
+                contract_no=str(row_dict.get("contract_no") or case["socongchung"] or ""),
                 status=str(row_dict.get("status") or ""),
                 output_json_path=output_json_path,
                 source_file=source_file,
@@ -762,18 +777,19 @@ def build_upload_form_data(
 ) -> dict:
     web_form = dict(payload.get("web_form") or {})
     raw = dict(payload.get("raw") or {})
-    normalized_contract_no = normalize_web_contract_no(web_form.get("so_cong_chung") or contract_no or "")
+    case = case_from_payload(payload, contract_no=contract_no)
+    for field, selected in (("congchungvien", cong_chung_vien), ("thuky", thu_ky)):
+        if selected is not None:
+            case[field] = selected.strip() or None
+    portal_case = case_portal_projection(case)
+    normalized_contract_no = case["socongchung"] or ""
     return {
-        "ten_hop_dong": str(web_form.get("ten_hop_dong") or "").strip(),
-        "ngay_cong_chung": str(web_form.get("ngay_cong_chung") or "").strip(),
-        "so_cong_chung": normalized_contract_no,
+        **portal_case,
         "tinh_trang": DEFAULT_STATUS_TEXT,
-        "nhom_hop_dong": str(web_form.get("nhom_hop_dong") or "").strip(),
         "loai_tai_san": str(web_form.get("loai_tai_san") or "").strip(),
-        "cong_chung_vien": str(
-            cong_chung_vien if cong_chung_vien is not None else web_form.get("cong_chung_vien") or ""
-        ).strip(),
-        "thu_ky": str(thu_ky if thu_ky is not None else web_form.get("thu_ky") or "").strip(),
+        # Legacy portal prefill is policy, never copied into canonical Case.
+        "cong_chung_vien": portal_case["cong_chung_vien"] or (
+            "" if cong_chung_vien is not None else DEFAULT_CCV),
         "nguoi_yeu_cau": (
             resolve_requester_override(
                 payload,
@@ -1926,6 +1942,13 @@ class NamDinhUploaderSession:
         }
 
     def _prepare_record(self, record: UploadRecord, artifact_dir: Path):
+        if getattr(record, "record_id", None) is not None:
+            registry = connect_registry(self.working_dir / REGISTRY_DB_PATH.name)
+            try:
+                update_registry_record_by_id(
+                    registry, record.record_id, case_fields=case_from_payload(record.payload))
+            finally:
+                registry.close()
         if not record.source_file.exists():
             self.log(f"[UPLOAD] File goc khong ton tai, tiep tuc khong upload file: {record.source_file}")
 

@@ -7,7 +7,8 @@ nhân viên. Adapter này chỉ giữ phần biên:
 - đọc file -> text (python-docx cho `.docx`, Windows IFilter cho `.doc`);
 - chuẩn hóa text `.doc` (TAB -> ` | `) trước khi vào luật;
 - quét số công chứng theo file (scan/lọc trước khi bóc);
-- giữ nguyên shape payload `{web_form, raw}` đang dùng ở Upload;
+- giữ payload `{case, web_form, raw}`; Case là metadata canonical,
+  web_form chỉ presentation/portal projection, không nguồn Case thứ hai;
 - CLI `python -m ...` để bóc 1 file ra JSON.
 
 Không chép luật, không giữ bản engine thứ hai; sửa luật thì sửa ở lõi.
@@ -32,7 +33,11 @@ from regex_workbench.engine import contract_extract as core  # noqa: E402
 from regex_workbench.engine.contract_extract import (  # noqa: E402,F401
     ENGINE_ID,
     ENGINE_VERSION,
+    DEFAULT_CCV,
     get_missing_web_form_fields,
+    case_from_payload,
+    case_portal_projection,
+    validate_case_fields,
 )
 
 

@@ -7,7 +7,8 @@ Module này là **đường luật nghiệp vụ duy nhất** cho Word: Document
 
 - Vào: TEXT của văn bản (adapter đọc `.docx`/`.doc` rồi truyền vào) —
   `extract_text(text, ...)`.
-- Ra: payload `{"web_form", "raw"}` (giữ nguyên shape đang dùng ở Upload).
+- Ra: payload `{"case", "web_form", "raw"}`; Case metadata canonical,
+  web_form giữ presentation Người/Tài sản và projection tại biên portal.
 - Không đọc file, không chứa IO. Không có bản sao luật ở consumer.
 
 Catalog quy tắc: `_bmad-output/specs/shared/extraction-rules.md`.
@@ -38,7 +39,7 @@ from typing import Iterable
 ENGINE_ID = "contract_word"
 """Ten dinh danh cua lõi luat Word (dung cho profile_id o consumer)."""
 
-ENGINE_VERSION = "2026-10-16-core"
+ENGINE_VERSION = "2026-10-19-case-fields"
 """Phien ban lõi luat — consumer ghi vao log/payload de truy vet."""
 
 # ============================================================
@@ -4779,6 +4780,78 @@ def _phat_hien_tai_san_chua_ho_tro(text: str) -> list[str]:
     return found
 
 
+CASE_FIELDS = (
+    "tenvanban", "nhomhopdong", "loaivanbannhandien", "socongchung",
+    "ngaycongchung", "congchungvien", "thuky", "chudat",
+)
+CASE_PORTAL_FIELDS = {
+    "tenvanban": "ten_hop_dong", "nhomhopdong": "nhom_hop_dong",
+    "socongchung": "so_cong_chung", "ngaycongchung": "ngay_cong_chung",
+    "congchungvien": "cong_chung_vien", "thuky": "thu_ky",
+}
+
+
+def validate_case_fields(value: dict) -> dict:
+    """Fixed Case record; invalid canonical data never falls back to legacy."""
+    from datetime import date
+    if not isinstance(value, dict) or set(value) != set(CASE_FIELDS):
+        raise ValueError("Case metadata must contain exactly the canonical fields")
+    for key, item in value.items():
+        if item is not None and (not isinstance(item, str) or not item.strip()):
+            raise ValueError(f"Case {key}: expected nonempty string or null")
+    ngay = value["ngaycongchung"]
+    if ngay is not None and date.fromisoformat(ngay).isoformat() != ngay:
+        raise ValueError("Case ngaycongchung: expected full ISO date")
+    number = value["socongchung"]
+    if number is not None and (
+            not re.fullmatch(r"\d+/\d{4}", number)
+            or _normalize_web_contract_no(number) != number):
+        raise ValueError("Case socongchung: expected xxx/yyyy")
+    return dict(value)
+
+
+def case_from_payload(payload: dict, *, contract_no: str = "") -> dict:
+    """Read canonical Case, or convert historical payload without rewriting it."""
+    from datetime import datetime
+    if not isinstance(payload, dict):
+        raise ValueError("Extraction payload must be an object")
+    if "case" in payload:
+        return validate_case_fields(payload["case"])
+    web, raw = payload.get("web_form", {}), payload.get("raw", {})
+    if not isinstance(web, dict) or not isinstance(raw, dict):
+        raise ValueError("Legacy extraction web_form/raw must be objects")
+    result = {key: None for key in CASE_FIELDS}
+    for canonical, portal in CASE_PORTAL_FIELDS.items():
+        item = web.get(portal)
+        if item is not None and not isinstance(item, str):
+            raise ValueError(f"Legacy {portal}: expected string")
+        result[canonical] = item.strip() or None if item is not None else None
+    ngay = result["ngaycongchung"]
+    if ngay and "/" in ngay:
+        result["ngaycongchung"] = datetime.strptime(ngay, "%d/%m/%Y").date().isoformat()
+    number = result["socongchung"] or contract_no
+    result["socongchung"] = _normalize_web_contract_no(number) or None
+    if number and result["socongchung"] is None:
+        raise ValueError("Legacy so_cong_chung: unrecognized number")
+    kind = raw.get("document_kind")
+    result["loaivanbannhandien"] = None if kind == "" else kind
+    # Old JSON cannot distinguish an extracted name from DEFAULT_CCV fallback.
+    # Retain the source JSON as evidence; do not promote that name to a fact.
+    if result["congchungvien"] == DEFAULT_CCV:
+        result["congchungvien"] = None
+    return validate_case_fields(result)
+
+
+def case_portal_projection(case: dict) -> dict:
+    """Only the portal boundary converts canonical null/date representation."""
+    from datetime import date
+    case = validate_case_fields(case)
+    result = {portal: case[key] or "" for key, portal in CASE_PORTAL_FIELDS.items()}
+    if case["ngaycongchung"]:
+        result["ngay_cong_chung"] = date.fromisoformat(case["ngaycongchung"]).strftime("%d/%m/%Y")
+    return result
+
+
 def build_payload(file_goc: str, text: str, scan_result: dict, *, extract_mode: str) -> dict:
     doc_kind, ten_hd = _detect_document_kind_and_title(text)
     ben_a, ben_b = _extract_parties_generic(text, doc_kind)
@@ -4852,14 +4925,22 @@ def build_payload(file_goc: str, text: str, scan_result: dict, *, extract_mode: 
         nguoi_yeu_cau_party = ben_a
     else:
         nguoi_yeu_cau_party = ben_b if ben_b.get("nguoi") else ben_a
+    from datetime import datetime
+    notary_match = re.search(r"Tôi,\s+([^,]+),\s+Công chứng viên", text)
+    notarized_date = find_ngay_cong_chung(text)
+    case = validate_case_fields({
+        "tenvanban": ten_hd or None,
+        "nhomhopdong": guess_nhom_hd(ten_hd) if ten_hd else None,
+        "loaivanbannhandien": doc_kind,
+        "socongchung": so_cong_chung or None,
+        "ngaycongchung": datetime.strptime(notarized_date, "%d/%m/%Y").date().isoformat() if notarized_date else None,
+        "congchungvien": notary_match.group(1).strip() if notary_match else None,
+        "thuky": None,
+        "chudat": None,
+    })
     web_form = {
-        "ten_hop_dong": ten_hd,
-        "ngay_cong_chung": find_ngay_cong_chung(text),
-        "so_cong_chung": so_cong_chung,
-        "nhom_hop_dong": guess_nhom_hd(ten_hd),
+        **case_portal_projection(case),
         "loai_tai_san": guess_loai_tai_san(tai_san, ten_hd),
-        "cong_chung_vien": find_ccv(text),
-        "thu_ky": "",
         "nguoi_yeu_cau": fmt_nguoi_yeu_cau(nguoi_yeu_cau_party),
         "duong_su": _fmt_duong_su_by_kind(doc_kind, ben_a, ben_b),
         "tai_san": tai_san,
@@ -4867,6 +4948,7 @@ def build_payload(file_goc: str, text: str, scan_result: dict, *, extract_mode: 
     file_goc_label = os.path.abspath(file_goc) if file_goc else ""
     missing_fields = get_missing_web_form_fields(web_form, file_hop_dong=file_goc_label)
     return {
+        "case": case,
         "web_form": web_form,
         "raw": {
             "ben_a": ben_a,
@@ -4892,7 +4974,6 @@ def build_payload(file_goc: str, text: str, scan_result: dict, *, extract_mode: 
             "file_goc": file_goc_label,
             "scan_contract_no": scan_result.get("contract_no", ""),
             "scan_reason": scan_result.get("reason", ""),
-            "document_kind": doc_kind,
             "engine_version": ENGINE_VERSION,
             "extract_mode": extract_mode,
             "extract_is_partial": bool(missing_fields),

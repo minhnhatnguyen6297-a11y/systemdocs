@@ -54,6 +54,12 @@
   Hồ sơ, độc lập ngày tạo hồ sơ. Key/kiểu/cardinality còn phải chốt trong
   [#41](_bmad-output/backlog/story-upload-business-field-standardization.md),
   inventory toàn bộ trường bóc tách/form Upload xuyên module, không chỉ Notary.
+- Owner làm rõ sau đó: **“người được gán chủ đất trong diagram”**.
+  Lấy lựa chọn Chủ `ownPositions` của Diagram đã lưu (vị trí tài sản hiện có,
+  không hidden/deleted), tên snapshot Stage theo `personId`; không đồng nhất
+  slot `owner`/`owner_row_id`, không suy từ GCN/Bên A. Upload không có Diagram
+  thì `chudat=null`. Quy tắc này thay phần chưa chọn nguồn chủ đất ở trên;
+  slice metadata Case không khép toàn #41 hoặc mở gate mẫu.
 - Không bóc/chuẩn hóa thông tin giao dịch (giá, cọc, thuê, vay, lãi, điều khoản
   thanh toán) hoặc thời hạn nghiệp vụ. **Giữ thời hạn sử dụng đất** đúng cụm
   `land_rows[].thoihan` và timeout kỹ thuật. Portal cần trường đã loại thì ghi

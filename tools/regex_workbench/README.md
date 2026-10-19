@@ -6,7 +6,7 @@ adapter của mình; adapter chỉ giữ đọc file + ánh xạ payload, **khô
 
 | Thành phần | Vai trò |
 |---|---|
-| `engine/contract_extract.py` | Luật trích xuất (người, tài sản, thửa/GCN, người chết, phần chưa hỗ trợ) + payload `{web_form, raw}`. Vào bằng `extract_text(text, ...)`. |
+| `engine/contract_extract.py` | Luật trích xuất + payload `{case, web_form, raw}`. `case` là nguồn metadata Hồ sơ canonical; key Case trong `web_form` chỉ projection portal. Vào bằng `extract_text(text, ...)`. |
 | `engine/__init__.py` | Bề mặt lõi: `ENGINE_ID`, `ENGINE_VERSION`, `extract_text`. |
 | `tests/fixtures/` | Fixture giả lập (không PII khách thật) cho vùng chuyển nhượng, giữ từ vòng #7. |
 | `tests/test_contract_core_transfer.py` | Hành vi #7 trên lõi: serial nguyên văn theo nhãn, địa chỉ thửa có nhãn, người đồng sử dụng, năm sinh chỉ-năm, nhãn trống không mượn ô kế. |
@@ -14,7 +14,7 @@ adapter của mình; adapter chỉ giữ đọc file + ánh xạ payload, **khô
 Consumer:
 
 - Upload Lab / tool nhân viên: `upload_lab/extraction_adapter.py` (đọc `.docx`/`.doc`,
-  chuẩn hóa text `.doc`, quét số công chứng theo file, giữ payload `{web_form, raw}`).
+  chuẩn hóa text `.doc`, quét số công chứng theo file, giữ payload `{case, web_form, raw}`).
 - Document Intake (Notary): `notary_v2/services/document_intake/adapters/docx.py`
   (đọc DOCX theo thứ tự XML, dựng `source_refs` span/`rule_id`/identity lõi).
 

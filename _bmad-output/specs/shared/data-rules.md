@@ -67,6 +67,13 @@ trong [#41](../../backlog/story-upload-business-field-standardization.md).
 Không xóa trường Upload cần thiết cho vừa schema hiện tại; mở rộng canonical
 Hồ sơ có căn cứ và được duyệt khi cần, không coi định hướng là duyệt cột mới.
 
+Owner làm rõ sau đó: **“người được gán chủ đất trong diagram”**.
+Nguồn `chudat` là `ownPositions` đã lưu trỏ tài sản hiện có, loại hidden/deleted,
+tên snapshot Stage theo `personId`; không tự lấy slot owner/người chết,
+GCN hoặc Bên A. Upload không có Diagram là null. Catalog metadata Case đã
+triển khai ở `contracts/entities.md` §9.4; phần Person/Asset/parties của #41
+chưa hoàn thành nên gate mẫu vẫn **ĐÓNG**.
+
 Không bóc/chuẩn hóa thông tin giao dịch (giá, đặt cọc, tiền thuê, khoản vay,
 lãi suất, điều khoản thanh toán) hoặc thời hạn nghiệp vụ. **Giữ thời hạn sử dụng
 đất** đúng cụm `land_rows[].thoihan` và timeout kỹ thuật. Nếu portal yêu cầu
