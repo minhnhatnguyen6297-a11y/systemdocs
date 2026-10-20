@@ -99,7 +99,7 @@ Canonical names giữ nguyên owner: `tenvanban,nhomhopdong,loaivanbannhandien,s
 | 8 `hopdong.thuky` · Thư ký | freeSolo autocomplete · không R | extraction `thuky=null` `build_payload:4938`; input prepare → **C thuky** tên/null → Case JSON; widget string, form/POST chưa quan sát | `thu_ky` / `#hopdong\.thuky` · 95-102 |
 | 9 `hopdong.nguoiYeucauCongchung` · Thông tin người yêu cầu công chứng (ghi sổ công chứng) | CKEditor HTML · không R | `build_payload` → `_requester_projection` personfacts + mortgage-only sourced bankblock → existing **J `web_form.nguoi_yeu_cau`**, JSON save/fresh queue/builder preserves exact projection; không lookup override. Không toàn canonical Person/parties cutover (§6) | `nguoi_yeu_cau` / label XPath · uploader_selectors103–112; `playwright_uploader.build_upload_form_data` |
 | 10 `hopdong.duongsu` · Đương sự | CKEditor HTML · R | `raw.ben_a/b` → `_fmt_duong_su_by_kind:4749-4765` → **J web_form.duong_su**, raw_text/entity_lines ghép; Person/parties chưa cutover | `duong_su` / label XPath · 113-122 |
-| 11 `hopdong.taisan` · Tài sản | CKEditor HTML · R | `_find_tai_san_by_kind:1007-1116` → **J web_form.tai_san** text; song song `raw.danh_sach_thua_dat` `build_payload:4962-4973`. Asset chưa cutover; text không thay các field chuẩn | `tai_san` / label XPath · 123-132 |
+| 11 `hopdong.taisan` · Tài sản | CKEditor HTML · R | `_find_tai_san_by_kind:1007-1116` → **J web_form.tai_san** text; song song `raw.danh_sach_thua_dat` ở `build_payload` (symbol). Asset chưa cutover; text không thay các field chuẩn | `tai_san` / label XPath · 123-132 |
 | 12 `hopdong.fileHopdong` · Văn bản hợp đồng | upload + preview · không R · accept `.doc,.docx,.pdf` | **F** `raw.file_goc` → JSON + registry.file_path; không canonical business column | `file_hop_dong` / `#hopdong\.fileHopdong`; `FORM_FIELD_ORDER` → `_upload_file`; preSave selection, không proof backend (§8) |
 | 13 `ghichu` · Ghi chú | textarea rows=3 · không R | **Policy bỏ qua**; không extraction/canonical storage. Không dùng Notary `ghichu` làm bucket cho trường khác nghĩa | Không builder key/selector/fill order; giữ default portal |
 | 14 `chiphi.phicongchung` · Phí công chứng | money autocomplete · không R | **Policy bỏ qua**; chưa canonical/DB-wire cho phí trong tuyến Upload | Không builder key/selector/fill order; không ghi 0/clear |
@@ -306,7 +306,7 @@ Proof: `contract_extract.py:3688-3754:_extract_plain_text_person_entries`, `4608
 
 ### 6.2 Tài sản và cụm đất
 
-`_new_thua_dat:1772-1802` giữ hàng thửa và nhiều giá trị/raw để báo mơ hồ; `build_payload:4962-4973` lưu `raw.danh_sach_thua_dat[]`. Map đối chiếu sau chỉ dùng tên canonical đã có, không tự đặt tên mới cho Asset.
+`_new_thua_dat:1779-1810` giữ hàng thửa và nhiều giá trị/raw để báo mơ hồ (gồm `nguon_goc_values`); `build_payload:5086-5098` lưu `raw.danh_sach_thua_dat[]`. Map đối chiếu sau chỉ dùng tên canonical đã có, không tự đặt tên mới cho Asset.
 
 | Nguồn hàng thửa | Wire/cột Notary có thật | Trạng thái mapping |
 |---|---|---|
@@ -317,11 +317,11 @@ Proof: `contract_extract.py:3688-3754:_extract_plain_text_person_entries`, `4608
 | `dien_tich` tổng | `dien_tich` tổng hợp/snapshot; properties.dien_tich có cột | không thay diện tích từng cụm; cần giữ tổng/chi tiết đúng nguồn |
 | `muc_dich_su_dung`, `chi_tiet_dien_tich[].muc_dich_su_dung/dien_tich/thoi_han_su_dung` | `land_rows[].loai_dat/dien_tich/thoi_han` wire; canonical `loaidat/dientich/thoihan` | child DB `property_land_rows(property_id,vitri,loaidat,dientich,thoihan)`; vị trí=index+1, không trộn cụm |
 | `thoi_han_su_dung` cấp thửa | `thoi_han` legacy emit/history | không tự đắp vào cụm không rõ; thời hạn mới chỉ thuộc cụm đất |
-| `nguon_goc` | properties.nguon_goc / wire nguon_goc | có cột/writer, **không trong ASSET_FIELD_SOURCES** DOCX; không claim mapper đã đi hết |
+| `nguon_goc` | properties.nguon_goc / wire nguon_goc | mapped ở DOCX `ASSET_FIELD_SOURCES`+`GROUP_FIELD_SOURCES`; parcel/group giữ nguồn; same-parcel/group nhiều origin → `normalized null`+all refs+`intake.ambiguous`, không broadcast; writer/readback/Word đã có |
 | `phan_ghi_them` (hình thức sử dụng/ghi thêm/narrative lẫn nhau) | properties.hinh_thuc_su_dung có cột nhưng **không mapping toàn blob** | **U** cần tách nghĩa có căn cứ; không nhét Notary ghichu |
 | `chi_tiet_dien_tich` phần không phải bộ ba; `*_raw`,`*_values`,`o_tho` | raw/alternatives/provenance hoặc nghiệp vụ chưa map | giữ nguồn/mơ hồ; không coi mọi nội dung trong container là kỹ thuật hay đủ DB |
 
-Proof: `contract_extract.py:2163-2183:thua_dat_sang_land_rows`; `notary_v2/services/document_intake/adapters/docx.py:58-105:ASSET_FIELD_SOURCES,GROUP_FIELD_SOURCES`, `552-568` map parcel/land_rows; `contracts/notary-case-drafting.md:314-362,1177-1236`; `models.py:99-118:Property`, `182-208:PropertyLandRow`; `case_workspace.py:2572-2636:_upsert_assets` ghi master/child/mirror, `2781-2783` snapshot. Có schema đích **không chứng minh Upload cutover**.
+Proof: `contract_extract.py:2171-2191:thua_dat_sang_land_rows`; `notary_v2/services/document_intake/adapters/docx.py:58-111:ASSET_FIELD_SOURCES,GROUP_FIELD_SOURCES,_PARCEL_MULTI_VALUE_SOURCES,_GROUP_MULTI_VALUE_SOURCES`, `424-578:emit_asset/emit call sites`; `contracts/notary-case-drafting.md:314-362,1177-1236`; `models.py:99-118:Property`, `182-208:PropertyLandRow`; `case_workspace.py:2572-2636:_upsert_assets` ghi master/child/mirror, `2781-2783` snapshot. Có schema đích **không chứng minh Upload cutover**.
 
 `raw.tai_san_chua_ho_tro` nhận diện sổ tiết kiệm/bảo hiểm/xe, chưa bóc đầy đủ row nghiệp vụ (`_phat_hien_tai_san_chua_ho_tro:4768-4780`); mô tả text có thể còn nguyên. Không suy có dropdown loại xe là đã supported Asset DB/extraction hoặc mở phạm vi mua bán xe.
 
@@ -412,10 +412,10 @@ Các locator dưới đây là **source tĩnh đã đọc**, không kết quả 
 | **S-P** | E `3200–3235:_extract_plain_text_person_entries`, `3688–3804` tên/danh xưng/ngày/giấy tờ+nơi cấp; `4154–4183:_extract_party_data` người có thứ tự + entity lines; `4608–4620:_extract_nguoi_chet` alias/ngày chết/TLKT/địa chỉ cuối |
 | **S-R** | E `_requester_person_facts:2984`, `_mortgage_bank_spans:3002`, `_requester_projection:3040`, `build_payload:4969`; `batch_scan.save_output_json` persist payload; U `load_upload_queue:470`, `build_upload_form_data:540` giữ requester projection, không lookup/firstperson override; `_fill_editor:1462` là actual consumer |
 | **S-D** | E `4637–4739:_extract_parties_generic` nhánh loại và headings; `4749–4765:_fmt_duong_su_by_kind`; `4855–4880,4953–4959:build_payload` người chết riêng/lọc khỏi bên; metadata vai trò website **khác** quan hệ app tại §5.2 |
-| **S-A** | E `1772–1802:_new_thua_dat`; `2163–2183:thua_dat_sang_land_rows`; `2249–2259` hình thức sử dụng và Ghi chú chung đổ vào `phan_ghi_them`; `2503–2522` detail/bộ ba/`o_tho`; `4962–4973` output parcel |
+| **S-A** | E `1779–1810:_new_thua_dat`; `2171–2191:thua_dat_sang_land_rows`; `2257–2268:bullet_labels` hình thức sử dụng/Ghi chú chung đổ vào `phan_ghi_them`, `nguon_goc` giữ `*_values`; `2511–2541` detail/bộ ba/`o_tho`; `5086–5098` output parcel |
 | **S-T** | E `1007–1116:_find_tai_san_by_kind` khác vùng tài sản theo loại; `4768–4780:_phat_hien_tai_san_chua_ho_tro`; không chứng minh bóc đủ xe/sổ tiết kiệm/bảo hiểm |
 | **S-C** | `contracts/entities.md:150–185,205–231,240–267`; `contracts/notary-case-drafting.md:246–285,314–362`: Người/Asset/land_rows/Case hiện có; không schema quan hệ Upload mới |
-| **S-N** | N `49–69:PERSON_FIELD_SOURCES,ASSET_FIELD_SOURCES`, `316–350` chỉ mapper người hai bên, `552–568` parcel → land rows. Alias/giới tính/người chết không được suy là mapper đã đi đủ; `nguon_goc/hinh_thuc_su_dung` không có trong bảng ASSET_FIELD_SOURCES |
+| **S-N** | N `PERSON_FIELD_SOURCES`; `ASSET_FIELD_SOURCES`/`GROUP_FIELD_SOURCES` (gồm `nguon_goc`), `_PARCEL_MULTI_VALUE_SOURCES`/`_GROUP_MULTI_VALUE_SOURCES` cho `nguon_goc_values`; `316–350` mapper người hai bên, `554–573` parcel/group → land rows. Alias/giới tính/người chết không suy là mapper đã đi đủ; `hinh_thuc_su_dung` vẫn chưa map toàn blob |
 | **S-J** | `upload_lab/batch_scan.py:32–36,180–203,366–370,726–738`: chỉ Case JSON nhỏ ở registry; payload lớn ở file JSON. Mọi dòng **J** bên dưới mang đúng giới hạn này, không ghi Notary DB |
 
 | Loại nguồn đã có nhánh code | Khác biệt thực cần giữ khi review, không là claim accuracy trên corpus |
@@ -462,10 +462,24 @@ Các locator dưới đây là **source tĩnh đã đọc**, không kết quả 
 | **W11-A04** · Tổng diện tích thửa và diện tích chi tiết | `dien_tich` cấp thửa + `chi_tiet_dien_tich[].dien_tich`; S-A | properties có `dien_tich` tổng, child có `dientich`; contract/mapper chi tiết §6.2, **J**; có cột tổng không chứng minh Upload writer/đủ wire | Tái dùng đúng đích đã có; dựng hiển thị tổng/chi tiết tách nghĩa | Không ghi tổng vào mọi cụm, không tự cộng chi tiết thay tổng nguồn khi chưa chứng minh phủ hết. Wire gap của tổng phải đối chiếu contract trước cutover, không tự thêm key canonical | **Không mở lại nghĩa scalar**; mapping/wire còn phải hoàn tất, không gọi đã implemented |
 | **W11-A05** · Các hàng mục đích/loại đất–diện tích–thời hạn, có thứ tự | `chi_tiet_dien_tich[]` → `thua_dat_sang_land_rows`; S-A/S-N | Canonical `land_rows[].loaidat/dientich/thoihan`; child DB Notary có vị trí; **J** trong Upload | Tái dùng chuẩn + dựng bảng/đoạn HTML từ từng hàng | Không flatten ba danh sách rời, không tráo dòng/rút chỉ một loại đất; giữ vị trí kể cả dòng trống theo contract. Loại đất khác W05/loại GCN | **ĐÃ CHỐT**, không hỏi lại cấu trúc bộ ba |
 | **W11-A06** · Thời hạn đất cấp thửa chưa rõ cụm | `thoi_han_su_dung` riêng và từng detail; S-A | Chỉ thời hạn đúng `land_rows[].thoihan` là đường mới; cấp Asset chỉ legacy/history; **J** | Map vào đúng cụm khi có bằng chứng; phần chưa gắn giữ unresolved/nguồn | **Giữ thời hạn sử dụng đất**, không áp policy loại thời hạn nghiệp vụ để bỏ nó; không tự rải thời hạn lẻ cho mọi hàng hoặc dùng block che gap | **ĐÃ CHỐT**, không xin lại; unresolved không tính đã map |
-| **W11-A07** · Nguồn gốc sử dụng đất | `nguon_goc`; S-A | Wire/properties `nguon_goc` có thật; **S-N chưa map field này**, Upload **J** | Tái dùng đích nghĩa đã có | Ưu tiên hoàn thiện mapping đúng nghĩa, không tạo cụm riêng trùng trường; không nói chung engine đã ghi DB vì có cột | **ĐÃ CÓ đích**, phần mapper/cutover kỹ thuật chưa làm |
-| **W11-A08** · Hình thức sử dụng riêng/chung khi nguồn nêu rõ | Label “Hình thức sử dụng” và “Ghi chú” cùng vào `phan_ghi_them`; S-A `2249–2259` | Wire/properties `hinh_thuc_su_dung` có thật, **chưa mapping cả blob**, Upload **J** | Tách đoạn có nghĩa rõ → tái dùng chuẩn; phần dư xem A09 | **Đề xuất map chỉ phần được nguồn xác định là hình thức sử dụng**, không coi cả `phan_ghi_them` là field này; không cần owner mở lại scalar đã có | **Không quyết định scalar mới**; mapping phải giữ bằng chứng/ambiguous khi chưa tách được |
+| **W11-A07** · Nguồn gốc sử dụng đất | `nguon_goc`; S-A; nhánh nhóm cần source observation riêng | Wire/properties `nguon_goc` có thật; mapper DOCX đã map (`ASSET_FIELD_SOURCES`/`GROUP_FIELD_SOURCES`); **J** | Tái dùng đích nghĩa đã có | Không cụm riêng/trùng trường; giữ từng nguồn theo tài sản. Cùng thửa hoặc group có nhiều nguồn dùng ambiguous hiện có (`normalized null`+all refs+warning), không broadcast first; thiếu giữ thiếu | **ĐÃ MAP/CUTOVER kỹ thuật**, proof cô lập bên dưới |
+| **W11-A08** · Hình thức sử dụng riêng/chung khi nguồn nêu rõ | Label “Hình thức sử dụng” và “Ghi chú” cùng vào `phan_ghi_them`; S-A `2257–2268:bullet_labels` | Wire/properties `hinh_thuc_su_dung` có thật, **chưa mapping cả blob**, Upload **J** | Tách đoạn có nghĩa rõ → tái dùng chuẩn; phần dư xem A09 | **Đề xuất map chỉ phần được nguồn xác định là hình thức sử dụng**, không coi cả `phan_ghi_them` là field này; không cần owner mở lại scalar đã có | **Không quyết định scalar mới**; mapping phải giữ bằng chứng/ambiguous khi chưa tách được |
 | **W11-A09** · Đoạn tài sản ghép và lời dư thật chưa map | `phan_ghi_them`, detail extras/`o_tho`, W11; S-A/S-T | A01–A08 có các đích nghĩa thật; phần dư **chưa field cụm approved**, **J** | Làm rõ đoạn này dùng trường nào, lưu ví dụ tổng hợp §7.5.1 | Toàn đoạn mô tả GCN/thửa/cụm đất có thể dựng từ chuẩn, không vì là đoạn dài mà thành block dư. Chỉ lời còn lại sau mapping mới là ứng viên residual; `phan_ghi_them` hỗn hợp không tự là field hình thức hay field mới; nhà/công trình thiếu catalog/rule | **CHỜ LÀM RÕ A09**, chưa duyệt block/storage/engine |
 | **W11-A10** · Xe / sổ tiết kiệm / bảo hiểm | Flags `tai_san_chua_ho_tro` + text; S-T | Chưa structured Asset/Upload persistence đầy đủ, **J** | Giữ nhận diện + nguồn, **pending structured support**, chưa mở rộng hiện tại | Owner duyệt khuyến nghị này; #29 xe vẫn DEFERRED. Không dùng A10 để loại **đất có tài sản/nhà W05**, không mất nguồn hoặc coi đã chuẩn hóa | **ĐÃ DUYỆT phạm vi**, không permission implementation |
+
+**A07 proof 20/10/2026:** extraction nhóm giữ `nguon_goc`/`nguon_goc_values` từ
+parcel thật (không lấy note/title); adapter đọc cả parcel/group; label dùng
+nhãn nguồn gốc có sẵn. Actual synthetic DOCX→suggestion→workspace→fresh DB
+reopen→`Property.nguon_goc`→Word: cùng một thửa có A và C thành
+`normalized null`+2 source refs/`intake.ambiguous`, không lấy first/broadcast;
+thửa khác giữ B, thửa thiếu giữ thiếu. Group C/D cũng null+2refs, Word A/B
+only. Focused real-DOCX suite **5 passed,61 deselected**; full
+`test_docx_word_first.py` **66 passed**; isolated smoke
+`_bmad-output/tmp/a07-origin-smoke-result.json` PASS. Independent review
+20/10/2026 đọc diff, đối chiếu consumer và chạy lại đúng hai lệnh trên: không
+phát hiện silent loss/broadcast; duplicate cùng nguồn trên một thửa dedupe về
+một value. Không thêm key/schema; raw/history giữ nguyên, #41 vẫn mở/gate mẫu
+ĐÓNG.
 
 ### 7.5.1 A09 — những trường tạo nên đoạn tài sản và ví dụ lưu lại
 
@@ -489,7 +503,7 @@ Upload đã cutover. Đây là bảng giải nghĩa trường có thật, **khô
 | Diện tích **tổng thửa** từ nguồn | extraction/model/snapshot `dien_tich`; wire §4.2 không liệt kê scalar tổng, §13.3 có snapshot tổng hợp | 240 m²; không tự tính tổng chi tiết làm fact hoặc ghi vào mọi cụm |
 | Cụm đất vị trí 1 | canonical/model `land_rows[].loaidat/dientich/thoihan`; wire emit `loai_dat/dien_tich/thoi_han` | Đất ở tại nông thôn; 100 m²; Lâu dài |
 | Cụm đất vị trí 2 | cùng bộ ba, giữ vị trí 2 | Đất trồng cây lâu năm; 140 m²; đến 31/12/2063 |
-| Nguồn gốc | `nguon_goc` có wire/model; S-N chưa map | Công nhận QSDĐ như giao đất không thu tiền sử dụng đất (giả lập) |
+| Nguồn gốc | `nguon_goc` có wire/model; mapper DOCX đã map asset/group, nhiều origin dùng ambiguous | Công nhận QSDĐ như giao đất không thu tiền sử dụng đất (giả lập) |
 | Hình thức sử dụng, **nếu có nguồn rõ** | `hinh_thuc_su_dung` có wire/model; không map toàn blob `phan_ghi_them` | Sử dụng riêng (giả lập) |
 
 **Đoạn minh họa, không phải output runtime hoặc mẫu Word:**

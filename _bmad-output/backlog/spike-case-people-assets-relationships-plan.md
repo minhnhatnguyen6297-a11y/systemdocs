@@ -167,7 +167,8 @@ hoặc hoàn tất normalized cutover #41, không thêm key/bảng/entity nghi�
 - Fresh bank-auto review CLEAN, mandatory Ticket PASS AC1–5; parent cho
   transition completed-analysis done/refined:true. Không dùng review cũ cho
   latest-auto; proof hiện tại250pass0skip28subtests/local smoke0fail đã đọc.
-  #41 normalized cutover vẫn mở/gate mẫu ĐÓNG; chờ parent đọc trước commit.
+  #41 normalized cutover vẫn mở/gate mẫu ĐÓNG. Delta bank đã parent đọc và
+  commit `cb303f6`; A07 là slice #41 tiếp theo, đã land/verified/commit cùng slice.
 
 ## 8. Nguồn tra cứu đã mở
 
@@ -203,7 +204,8 @@ không dựng workflow thay thế. Đây là spike design, không gọi app buil
 
 Proposal/model trước đáp án giữ làm lịch sử thiết kế, không schema áp dụng.
 Fresh latest-auto review CLEAN/Ticket PASS hiện tại bao phủ delta16path và
-final semantic smoke hash8b503e7f/930f1fa5; không push/commit trước parent đọc.
+final semantic smoke hash8b503e7f/930f1fa5; delta bank đã commit `cb303f6`.
+A07 `nguon_goc` là slice #41 riêng, đã land/verified/commit; #41 vẫn mở/gate mẫu ĐÓNG.
 
 ### Kết quả implementation/proof của slice #41, không toàn #41
 

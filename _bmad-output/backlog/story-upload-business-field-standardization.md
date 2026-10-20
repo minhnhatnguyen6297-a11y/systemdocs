@@ -274,3 +274,39 @@ W05/A09 và unrelated pending/deferred vẫn nguyên; fresh independent review C
   đã bỏ theo parent. Chi tiết privacy-safe/proof lưu bền SOT §6.1.
 - Namesake chết thiếu DOB không loại living knownDOB; raw staff giữ nhưng
   requester loại. Không claim skipped pass/portal thật/sample accuracy.
+
+### Slice A07 — mapping `nguon_goc` (kế hoạch giữ lịch sử + landed/verified)
+
+Authority đã có ở contract asset_row/wire và `Property.nguon_goc`; source
+parcel lõi đã phát `nguon_goc`, normalization/writer/snapshot/readback/Word
+đã có đích. DOCX adapter bỏ sót mapping nên hoàn thiện
+`ASSET_FIELD_SOURCES["nguon_goc"] = "nguon_goc"` là cutover kỹ thuật được
+giao, không key/schema/nghiệp vụ mới hoặc owner gate. Audit nhánh group thực
+tế chưa phát origin: source group phải giữ các `nguon_goc` đã có của parcel
+và technical `nguon_goc_values`, rồi GROUP mapper mới được đọc. Nhiều origin
+khác nhau dùng cơ chế ambiguous hiện có (normalized null+refs), không lấy
+first/broadcast; thiếu giữ thiếu. Không lấy nguồn gốc từ note/title.
+
+Phạm vi code chỉ DOCX adapter và regression trong `test_docx_word_first.py`:
+synthetic DOCX hai tài sản có nguồn gốc khác nhau → intake suggestion với
+source refs → workspace asset → save/fresh reopen → Word/property output.
+Giữ từng nguồn gốc đúng tài sản, không broadcast chung/nhét ghi chú; không
+thay bank parser/uploader. Main sở hữu SOT/#41docs/design/review; fast worker
+sở hữu adapter+focused test. Chỉ kiểm cô lập sau land; không hồ sơ thật/
+corpus/production DB/browser portal, #41/gate mẫu không đổi.
+
+**A07 landed/verified 20/10/2026:** parser group chỉ lộ `nguon_goc`/
+`nguon_goc_values` từ parcel observation thật (multi-value path cùng thửa giữ
+mọi lần thấy); adapter map cả asset/group, multi-value dùng ambiguous hiện có;
+label nguồn gốc có sẵn. Hai real-DOCX regression phủ đủ hai mode: cùng thửa
+A/C → `normalized null`+2refs+`intake.ambiguous`, thửa B giữ, thửa thiếu giữ
+thiếu; group C/D → `normalized null`+refs C,D+warning, không broadcast. Cả hai
+đi suggestion→workspace→fresh DB reopen→Property→Word. Focused suite **5
+passed,61 deselected**; isolated smoke `a07-origin-smoke-result.json` PASS.
+Parser hash `583b27e488d46b076bb8c59f00dd0b16acf545fc0bcc141586d9f45487fe602a`,
+adapter `6126ae5c242ef4cc36c759c7ef8deba409b1e805f2bd517a9c71cd99ebcaa32e`.
+Không new key/schema; đây chỉ slice A07, không đóng toàn #41; gate mẫu ĐÓNG.
+Independent review + final verification 20/10/2026 đọc diff/consumer, chạy lại
+focused **5 passed,61 deselected** và full `test_docx_word_first.py`
+**66 passed**; không phát hiện silent loss/broadcast. Commit cùng ngày trong
+slice A07, không push.

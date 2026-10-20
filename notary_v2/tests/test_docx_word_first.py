@@ -20,7 +20,7 @@ from services.document_intake.models import AdapterContext, SourceSpec
 from services.case_workspace import CaseWorkspaceService, WorkspaceError
 from services.word_original import binding_proposals, reviewed_template, export_original, slot_for
 from tests.test_case_workspace import db, session_factory, _person_row, _asset_row
-from models import InheritanceCase
+from models import InheritanceCase, Property
 
 
 def fixture_bytes():
@@ -45,6 +45,14 @@ def fixture_bytes():
     doc.add_paragraph('Lời chứng: Nguyễn Văn Mẫu — tên nhắc lại giữ nguyên')
     doc.sections[0].header.paragraphs[0].text = 'ĐẦU TRANG GIỮ NGUYÊN'
     doc.add_picture(io.BytesIO(base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a3ioAAAAASUVORK5CYII=')))
+    stream = io.BytesIO(); doc.save(stream)
+    return stream.getvalue()
+
+
+def _docx_bytes(lines):
+    doc = Document()
+    for line in lines:
+        doc.add_paragraph(line)
     stream = io.BytesIO(); doc.save(stream)
     return stream.getvalue()
 
@@ -422,6 +430,107 @@ def reviewed_case(db, tmp_path, content=None):
     data = service.create(str(uuid.uuid4()), {'case_type': 'inheritance', 'document_type': 'khai_nhan'},
         {'owner_row_id': people[0]['row_id'], 'people': people, 'assets': assets}, None, context)
     return content, store, service, data
+
+
+def reviewed_case_with_missing_asset_values(db, tmp_path, content):
+    """Keep an absent asset field absent instead of applying fixture defaults."""
+    store = DocxStore(tmp_path / 'sources')
+    suggestions = extraction(content, store)
+    people, assets, records = [], [], []
+    source_ref = next(iter(suggestions[0]['fields'].values()))['source_refs'][0]
+    for suggestion in suggestions:
+        values = {key: field['normalized_value'] for key, field in suggestion['fields'].items()}
+        values.pop('dien_tich', None)
+        if 'land_rows' in values:
+            values['land_rows'] = json.loads(values['land_rows'])
+        if suggestion['target'] == 'asset':
+            values.setdefault('nguon_goc', None)
+        row = _person_row(**values) if suggestion['target'] == 'person' else _asset_row(**values)
+        (people if suggestion['target'] == 'person' else assets).append(row)
+        records.append({'candidate_id': suggestion['suggestion_id'], 'row_id': row['row_id']})
+    context = {'version': 1, 'sources': [{'source_id': source_ref['source_id'], 'sha256': source_ref['source_sha256'], 'records': records, 'bindings': []}]}
+    service = CaseWorkspaceService(db, store)
+    data = service.create(str(uuid.uuid4()), {'case_type': 'inheritance', 'document_type': 'khai_nhan'},
+        {'owner_row_id': people[0]['row_id'], 'people': people, 'assets': assets}, None, context)
+    return content, store, service, data
+
+
+def test_asset_origin_roundtrips_per_asset_not_broadcast(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:',
+        'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+        'Nguồn gốc sử dụng đất: Nguồn A',
+        'Nguồn gốc sử dụng đất: Nguồn C',
+        'Thửa đất số: 22; Tờ bản đồ số: 7',
+        'Nguồn gốc sử dụng đất: Nguồn B',
+        'Thửa đất số: 32; Tờ bản đồ số: 9',
+    ])
+    suggestions = extraction(content)
+    assets = [s for s in suggestions if s['target'] == 'asset']
+    assert [s['fields'].get('nguon_goc', {}).get('normalized_value') for s in assets] == [
+        None, 'Nguồn B', None]
+    assert 'nguon_goc' not in assets[2]['fields']
+    ambiguous = assets[0]['fields']['nguon_goc']
+    assert ambiguous['normalized_value'] is None
+    assert [r['raw_snippet'] for r in ambiguous['source_refs']] == ['Nguồn A', 'Nguồn C']
+    assert any(w['code'] == 'intake.ambiguous' and 'nguon_goc' in w['message']
+               for w in assets[0]['warnings'])
+
+    _, _, service, data = reviewed_case_with_missing_asset_values(db, tmp_path, content)
+    cid = data['case']['id']
+    assert [a['nguon_goc'] for a in data['stage']['assets']] == [None, 'Nguồn B', None]
+    db.expire_all()
+    reloaded = service.get(cid)
+    assert [a['nguon_goc'] for a in reloaded['stage']['assets']] == [None, 'Nguồn B', None]
+    properties = db.query(Property).order_by(Property.so_thua_dat).all()
+    assert {p.so_thua_dat: p.nguon_goc for p in properties} == {
+        '12': None, '22': 'Nguồn B', '32': None}
+    from services.word_engine import _property_description
+    text = _property_description(properties)
+    assert 'Nguồn B' in text and 'Nguồn A' not in text and 'Nguồn C' not in text
+    assert text.count('Nguồn gốc sử dụng đất:') == 3
+
+
+def test_group_asset_origins_stay_scoped_and_ambiguous_not_broadcast(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản 1:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5', 'Nguồn gốc sử dụng đất: Nguồn A',
+        'Tài sản 2:', 'Số serial: YY123456; có địa chỉ tại: Nhà B',
+        'Thửa đất số: 22; Tờ bản đồ số: 7', 'Nguồn gốc sử dụng đất: Nguồn B',
+        'Tài sản 3:', 'Số serial: XX123456; có địa chỉ tại: Nhà C',
+        'Thửa đất số: 32; Tờ bản đồ số: 9', 'Nguồn gốc sử dụng đất: Nguồn C',
+        'Thửa đất số: 33; Tờ bản đồ số: 10', 'Nguồn gốc sử dụng đất: Nguồn D',
+    ])
+    suggestions = extraction(content)
+    assets = [s for s in suggestions if s['target'] == 'asset']
+    assert [s['fields'].get('nguon_goc', {}).get('normalized_value') for s in assets] == [
+        'Nguồn A', 'Nguồn B', None]
+    ambiguous = assets[2]['fields']['nguon_goc']
+    assert ambiguous['normalized_value'] is None
+    assert [r['raw_snippet'] for r in ambiguous['source_refs']] == ['Nguồn C', 'Nguồn D']
+    assert any(w['code'] == 'intake.ambiguous' and 'nguon_goc' in w['message']
+               for w in assets[2]['warnings'])
+
+    _, _, service, data = reviewed_case_with_missing_asset_values(db, tmp_path, content)
+    cid = data['case']['id']
+    assert [a['nguon_goc'] for a in data['stage']['assets']] == ['Nguồn A', 'Nguồn B', None]
+    db.expire_all()
+    reloaded = service.get(cid)
+    assert [a['nguon_goc'] for a in reloaded['stage']['assets']] == ['Nguồn A', 'Nguồn B', None]
+    properties = db.query(Property).order_by(Property.so_serial).all()
+    assert {p.so_serial: p.nguon_goc for p in properties} == {
+        'ZZ123456': 'Nguồn A', 'YY123456': 'Nguồn B', 'XX123456': None}
+    from services.word_engine import _property_description
+    text = _property_description(properties)
+    assert 'Nguồn A' in text and 'Nguồn B' in text
+    assert 'Nguồn C' not in text and 'Nguồn D' not in text
 
 
 def test_intentionally_empty_land_roundtrip_exports_remaining_asset_fields_without_rebinding(db, tmp_path):

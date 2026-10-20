@@ -1731,6 +1731,11 @@ def tach_nhom_tai_san(tai_san: str) -> list[dict]:
         parcels = tach_danh_sach_thua_dat(segment, land_rows_as_details=True)
         first = parcels[0] if parcels else {}
         rows = _land_rows_of(segment)
+        origins = []
+        for parcel in parcels:
+            observed = parcel.get("nguon_goc_values") or [parcel.get("nguon_goc")]
+            origins.extend(str(origin or "").strip() for origin in observed)
+        origins = [origin for origin in _dedupe_preserve_order(origins) if origin]
         groups.append({
             "tieu_de": head.group(0).strip(),
             "so_serial": context.get("so_gcn_raw", ""),
@@ -1752,6 +1757,8 @@ def tach_nhom_tai_san(tai_san: str) -> list[dict]:
             # 16/10/2026; trước đây lấy từ `rows` nên consumer báo mơ hồ giả).
             "dien_tich_values": list(first.get("dien_tich_values") or []),
             "thoi_han_values": list(first.get("thoi_han_su_dung_values") or []),
+            "nguon_goc": origins[0] if origins else "",
+            "nguon_goc_values": origins,
             "so_vao_so": context.get("so_vao_so", ""),
             "dia_chi": context.get("dia_chi", "") or str(first.get("dia_chi") or ""),
             "ngay_cap": context.get("ngay_cap_gcn", ""),
@@ -1798,12 +1805,13 @@ def _new_thua_dat(context: dict) -> dict:
         "so_to_ban_do_values": [],
         "dien_tich_values": [],
         "thoi_han_su_dung_values": [],
+        "nguon_goc_values": [],
         "chi_tiet_dien_tich": [],
     }
 
 
 # Trường cấp thửa giữ kèm danh sách "mọi lần thấy" (`<key>_values`).
-_THUA_MULTI_KEYS = frozenset({"so_thua_dat", "so_to_ban_do", "dien_tich", "thoi_han_su_dung"})
+_THUA_MULTI_KEYS = frozenset({"so_thua_dat", "so_to_ban_do", "dien_tich", "thoi_han_su_dung", "nguon_goc"})
 
 
 def _ghi_lan_thay(current: dict, key: str, value) -> None:

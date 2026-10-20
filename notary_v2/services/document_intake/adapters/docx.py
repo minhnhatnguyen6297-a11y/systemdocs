@@ -62,6 +62,7 @@ ASSET_FIELD_SOURCES = {
     "so_to_ban_do": "so_to_ban_do",
     "dien_tich": "dien_tich",
     "thoi_han": "thoi_han_su_dung",
+    "nguon_goc": "nguon_goc",
     "so_vao_so": "so_vao_so",
     "ngay_cap": "ngay_cap_gcn",
     "co_quan_cap": "co_quan_cap",
@@ -74,6 +75,7 @@ GROUP_FIELD_SOURCES = {
     "so_to_ban_do": "so_to_ban_do",
     "dien_tich": "dien_tich",
     "thoi_han": "thoi_han",
+    "nguon_goc": "nguon_goc",
     "so_vao_so": "so_vao_so",
     "ngay_cap": "ngay_cap",
     "co_quan_cap": "co_quan_cap",
@@ -93,6 +95,7 @@ _PARCEL_MULTI_VALUE_SOURCES = {
     "so_to_ban_do": "so_to_ban_do_values",
     "dia_chi": "dia_chi_values",
     "dien_tich": "dien_tich_values",
+    "nguon_goc": "nguon_goc_values",
     "thoi_han": "thoi_han_su_dung_values",
     "so_vao_so": "so_vao_so_values",
     "ngay_cap": "ngay_cap_values",
@@ -103,6 +106,7 @@ _GROUP_MULTI_VALUE_SOURCES = {
     "so_serial": "so_serial_values",
     "loai_so": "loai_so_values",
     "thoi_han": "thoi_han_values",
+    "nguon_goc": "nguon_goc_values",
 }
 
 
@@ -192,6 +196,7 @@ LABELS = {
     "dien_tich": (r"Diện tích",),
     "loai_dat": (r"Loại đất", r"Mục đích sử dụng"),
     "thoi_han": (r"Thời hạn(?:\s+sử dụng)?",),
+    "nguon_goc": (r"Nguồn gốc(?:\s+sử dụng(?:\s+đất)?)?",),
     "so_vao_so": (r"Số vào sổ", r"Vào sổ số"),
     "ngay_cap": (r"Ngày cấp",),
     "loai_so": (r"Giấy chứng nhận",),
@@ -237,6 +242,7 @@ ASSET_LABELS = {
     "so_to_ban_do": LABELS["so_to_ban_do"],
     "dien_tich": LABELS["dien_tich"],
     "thoi_han": LABELS["thoi_han"],
+    "nguon_goc": LABELS["nguon_goc"],
     "so_vao_so": LABELS["so_vao_so"],
     "ngay_cap": LABELS["ngay_cap"],
     "loai_so": LABELS["loai_so"],
