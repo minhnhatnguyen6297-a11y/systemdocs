@@ -52,26 +52,18 @@ except ImportError:  # pragma: no cover
 
 try:
     from uploader_selectors import (
-        DEFAULT_GHI_CHU,
-        DEFAULT_PHI_CONG_CHUNG,
         DEFAULT_STATUS_TEXT,
-        DEFAULT_THU_LAO,
         FORM_FIELD_ORDER,
         FORM_SELECTORS,
         LOGIN_SELECTORS,
-        SAVE_BUTTON_SELECTORS,
         VERIFY_FIELDS,
     )
 except ImportError:  # pragma: no cover
     from .uploader_selectors import (
-        DEFAULT_GHI_CHU,
-        DEFAULT_PHI_CONG_CHUNG,
         DEFAULT_STATUS_TEXT,
-        DEFAULT_THU_LAO,
         FORM_FIELD_ORDER,
         FORM_SELECTORS,
         LOGIN_SELECTORS,
-        SAVE_BUTTON_SELECTORS,
         VERIFY_FIELDS,
     )
 
@@ -800,9 +792,6 @@ def build_upload_form_data(
         ),
         "duong_su": str(web_form.get("duong_su") or "").strip(),
         "tai_san": str(web_form.get("tai_san") or "").strip(),
-        "ghi_chu": DEFAULT_GHI_CHU,
-        "phi_cong_chung": DEFAULT_PHI_CONG_CHUNG,
-        "thu_lao_cong_chung": DEFAULT_THU_LAO,
         "file_hop_dong": str(raw.get("file_goc") or "").strip(),
     }
 
@@ -1573,19 +1562,14 @@ class NamDinhUploaderSession:
         except Exception:
             pass
 
-    def _select_dropdown_option(self, page, locator, candidate: str) -> None:
-        option = page.get_by_role("option", name=candidate, exact=False).first
-        if option.count() == 0:
-            option = page.get_by_text(candidate, exact=False).first
+    def _select_dropdown_option(self, page, candidate: str) -> bool:
+        # Only select a real matching option. Enter on a freeSolo input can
+        # submit the surrounding form; arbitrary page text is not an option.
+        option = page.get_by_role("option", name=candidate, exact=True).first
         if option.count() > 0:
             option.click()
-            return
-        try:
-            locator.press("ArrowDown")
-            page.wait_for_timeout(100)
-        except Exception:
-            pass
-        locator.press("Enter")
+            return True
+        return False
 
     def _safe_field_validation_error(self, page, field_name: str) -> str:
         try:
@@ -1599,40 +1583,16 @@ class NamDinhUploaderSession:
         accepted = field_value_matches(field_name, expected, actual) and not validation_error
         return accepted, actual, validation_error
 
-    def _prime_contract_name_validation(self, page) -> bool:
-        try:
-            if self._read_field_value(page, "so_cong_chung") or self._read_field_value(page, "nhom_hop_dong"):
-                return False
-        except Exception:
-            return False
 
-        for strategy in SAVE_BUTTON_SELECTORS:
-            button = self._locator_from_strategy(page, strategy)
-            try:
-                if button is not None and button.count() > 0 and button.is_visible():
-                    button.click(timeout=5000)
-                    page.wait_for_timeout(500)
-                    return True
-            except Exception:
-                continue
-        return False
-
-    def _type_dropdown_candidate(self, page, locator, candidate: str) -> None:
+    def _type_dropdown_candidate(self, page, locator, candidate: str, *, free_solo: bool) -> bool:
         locator.click()
         self._clear_control_like_user(page, locator)
         locator.type(candidate, delay=5)
         page.wait_for_timeout(150)
-        self._select_dropdown_option(page, locator, candidate)
+        selected = self._select_dropdown_option(page, candidate)
         self._commit_control_events(page, locator)
+        return selected or free_solo
 
-    def _retype_contract_name_after_validation(self, page, locator, candidate: str) -> None:
-        locator.click()
-        locator.press("Control+A")
-        locator.press("Backspace")
-        page.wait_for_timeout(100)
-        locator.type(candidate, delay=5)
-        locator.press("Tab")
-        page.wait_for_timeout(500)
 
     def _fill_dropdown(self, page, field_name: str, value: str) -> bool:
         locator, source = self._resolve_control_locator(page, field_name)
@@ -1681,6 +1641,7 @@ class NamDinhUploaderSession:
                 return True
 
         last_error = ""
+        free_solo = bool(FORM_SELECTORS[field_name].get("free_solo"))
         for candidate in candidates:
             for attempt in range(2):
                 try:
@@ -1690,38 +1651,26 @@ class NamDinhUploaderSession:
                     except Exception:
                         pass
 
-                    self._type_dropdown_candidate(page, locator, candidate)
-                except Exception as exc:
-                    try:
+                    if tag_name == "input":
+                        committed = self._type_dropdown_candidate(
+                            page, locator, candidate, free_solo=free_solo)
+                    else:
+                        # MUI Select exposes a div combobox, not a text input.
                         locator.click()
-                        locator.fill(candidate)
-                    except Exception as fallback_exc:
-                        last_error = str(fallback_exc)
-                        self.log(
-                            f"[UPLOAD][FIELD] {field_name}: fill_dropdown typing failed via {source} with {candidate!r}: {exc}"
-                        )
+                        committed = self._select_dropdown_option(page, candidate)
+                        locator.press("Tab")
+                    if not committed:
+                        last_error = f"matching_option_not_found expected={candidate!r}"
                         continue
+                except Exception as exc:
+                    last_error = str(exc)
+                    self.log(
+                        f"[UPLOAD][FIELD] {field_name}: fill_dropdown failed via {source} with {candidate!r}: {exc}"
+                    )
+                    continue
 
                 accepted, actual, validation_error = self._dropdown_acceptance_state(page, field_name, candidate)
                 if accepted:
-                    if (
-                        field_name == "ten_hop_dong"
-                        and attempt == 0
-                        and getattr(self, "_prime_save_validation", True)
-                        and self._prime_contract_name_validation(page)
-                    ):
-                        self._retype_contract_name_after_validation(page, locator, candidate)
-                        accepted, actual, validation_error = self._dropdown_acceptance_state(
-                            page,
-                            field_name,
-                            candidate,
-                        )
-                        if not accepted:
-                            last_error = (
-                                f"validation_after_prime expected={candidate!r} actual={actual!r} "
-                                f"error={validation_error!r}"
-                            )
-                            continue
                     retry_text = " after retry" if attempt else ""
                     self.log(
                         f"[UPLOAD][FIELD] {field_name}: dropdown filled via {source} using {candidate!r}{retry_text}"
@@ -1769,28 +1718,27 @@ class NamDinhUploaderSession:
             return False
 
     def _upload_file(self, page, file_path: Path) -> bool:
+        if not file_path.is_file():
+            self.log(f"[UPLOAD][FIELD] file_hop_dong: source file not found: {file_path}")
+            return False
         locator, source = self._resolve_control_locator(page, "file_hop_dong", dynamic_text=file_path.name)
         if locator is None or locator.count() == 0:
             self.log(f"[UPLOAD][FIELD] file_hop_dong: locator not found ({source})")
             return False
         try:
             locator.set_input_files(str(file_path))
-            page.wait_for_function(
-                """(selector) => {
-                    const el = document.querySelector(selector);
-                    return !!(el && el.files && el.files.length > 0);
-                }""",
-                arg="#hopdong\\.fileHopdong",
-                timeout=5000,
+            locator.evaluate(
+                """(el) => {
+                    if (!el.files || el.files.length !== 1) {
+                        throw new Error("No single attachment selected");
+                    }
+                }"""
             )
-            self.log(f"[UPLOAD][FIELD] file_hop_dong: uploaded via {source} -> {file_path.name}")
+            self.log(f"[UPLOAD][FIELD] file_hop_dong: selected before Save via {source} -> {file_path.name}")
             return True
         except Exception as exc:
-            success = page.get_by_text(file_path.name, exact=False).count() > 0
-            self.log(
-                f"[UPLOAD][FIELD] file_hop_dong: upload {'ok' if success else 'failed'} via {source}: {exc}"
-            )
-            return success
+            self.log(f"[UPLOAD][FIELD] file_hop_dong: selection failed via {source}: {exc}")
+            return False
 
     def _read_field_value(self, page, field_name: str) -> str:
         if field_name == "file_hop_dong":
@@ -1869,11 +1817,13 @@ class NamDinhUploaderSession:
         verify_data = {"missing_fields": list(record.missing_fields), "fields": {}}
         partial = bool(record.missing_fields)
         for field_name in VERIFY_FIELDS:
-            expected = record.upload_form.get(field_name, "")
+            expected = DEFAULT_STATUS_TEXT if field_name == "tinh_trang" else record.upload_form.get(field_name, "")
             actual = self._read_field_value(page, field_name)
             if field_name == "file_hop_dong":
-                success = bool(actual)
-                expected_value = Path(expected).name if expected else ""
+                if not expected:
+                    continue  # Attachment is optional; do not clear a portal default.
+                expected_value = Path(expected).name
+                success = actual == expected_value
             else:
                 expected_value = str(expected or "").strip()
                 if not expected_value:
@@ -1967,7 +1917,7 @@ class NamDinhUploaderSession:
 
         field_results: dict[str, dict] = {}
         for field_name in FORM_FIELD_ORDER:
-            value = str(record.upload_form.get(field_name, "") or "")
+            value = DEFAULT_STATUS_TEXT if field_name == "tinh_trang" else str(record.upload_form.get(field_name, "") or "")
             if field_name == "file_hop_dong":
                 if value:
                     field_results[field_name] = {"value": Path(value).name, "success": self._upload_file(page, Path(value))}
@@ -1984,6 +1934,13 @@ class NamDinhUploaderSession:
                 field_results[field_name] = {"value": value, "success": self._fill_editor(page, field_name, value)}
 
         verify_data, partial = self._verify_record(page, record)
+        # Visible text alone is not proof a remote option was selected or the
+        # attachment control accepted a file. Preserve actual filler failures.
+        for field_name, result in field_results.items():
+            if result.get("value") and not result["success"]:
+                partial = True
+                if field_name in verify_data["fields"]:
+                    verify_data["fields"][field_name]["success"] = False
         screenshot_path = artifact_dir / f"before_save_{sanitize_contract_no(record.contract_no)}.png"
         debug_json_path = artifact_dir / f"debug_{sanitize_contract_no(record.contract_no)}.json"
         page.screenshot(path=str(screenshot_path), full_page=True)
@@ -2021,14 +1978,7 @@ class NamDinhUploaderSession:
         cong_chung_vien: str | None = None,
         thu_ky: str | None = None,
         chunk_size: int | None = None,
-        prime_save_validation: bool = True,
     ) -> dict:
-        # prime_save_validation=False (luong upload.workflow.v1): khong
-        # click nut Luu de ep client-side validation cua ten_hop_dong —
-        # dry-run versioned khong bao gio cham nut Luu; validation dua
-        # vao field-commit events (non-submitting). Default True giu
-        # nguyen hanh vi legacy/Qt.
-        self._prime_save_validation = prime_save_validation
 
         def emit_progress(event: str, **payload: object) -> None:
             if progress_callback is None:

@@ -70,9 +70,9 @@ Key/kiểu/format/nhóm/cardinality và cột DB/wire mới của các trường
   `contracts/entities.md` và contract được duyệt vẫn quyết định chuẩn app.
   Catalog không nâng Upload workflow Draft thành approved hoặc mở gate #41.
   Case 8 key đã implement; Person/Asset/parties chưa cutover đầy đủ.
-- Lượt này chỉ tài liệu và bằng chứng website an toàn: không sửa code/schema,
-  không ghi DB, không đọc testcase/corpus owner, không bấm Lưu hợp đồng hoặc
-  dùng credential ngoài quyền được cấp. Chờ review độc lập trước commit.
+- Tại mốc khảo sát website, chỉ tài liệu và bằng chứng an toàn: không sửa code/
+  schema, không ghi DB, không đọc testcase/corpus owner, không bấm Lưu hợp đồng
+  hoặc dùng credential ngoài quyền được cấp. Quyền runtime bổ sung ghi bên dưới.
 
 ## Bổ sung owner 20/10/2026 — policy phí, ghi chú và trạng thái Nam Định
 
@@ -80,5 +80,14 @@ Key/kiểu/format/nhóm/cardinality và cột DB/wire mới của các trường
 - Áp dụng hiện tại: bỏ qua/không điền `chiphi.phicongchung`, `chiphi.thulaoCongchung`, `chiphi.phiDvNgoaicongchung`, `chiphi.phikhac` và Ghi chú `ghichu`. Không ghi 0, không xóa default portal, không thêm extraction/cột phí hoặc quy trình nhập tay.
 - Tổng chi phí là display/derived, không input thứ năm; không persistence riêng. Giữ nguyên inventory/quan sát và gap mapping phí như hiện trạng ngoài scope, không còn câu hỏi chờ owner chọn triển khai.
 - Mọi hợp đồng upload Nam Định mặc định **`DACONGCHUNG` / “Đã công chứng”**. Đây là policy portal, không dữ kiện trích xuất và không mapping trạng thái Notary draft/locked.
-- Docs ghi quy tắc đích đã chốt, **không xác nhận runtime mới đã triển khai** và không giao code/schema/browser/Save/upload/DB/test. Mở rộng tương lai cần duyệt và giao riêng; chưa duyệt business schema, toàn #41 chưa xong, gate mẫu **ĐÓNG**.
+- Tại mốc chốt policy, docs không xác nhận runtime đã triển khai; quyền triển khai được bổ sung ở mục dưới. Mở rộng tương lai cần duyệt và giao riêng; chưa duyệt business schema, toàn #41 chưa xong, gate mẫu **ĐÓNG**.
 
+
+## Bổ sung owner 20/10/2026 — thực thi liên tục phần đã chốt
+
+- Owner: **“triển khai liên tục, chỉ dừng khi cần tôi chốt”**. Giao runtime Nam Định/#41 theo policy đã chốt, không dừng xin technical approval; chỉ hỏi khi thực sự cần quyết định nghiệp vụ/schema chưa có nguồn chuẩn.
+- Slice đầu: bỏ phí/ghi chú khỏi mọi đường điền, status Đã công chứng, gỡ click-Lưu/prime và nguy cơ Enter submit, đưa attachment nguồn kỹ thuật vào preSave; không đoán mapping nghiệp vụ hoặc metadata POST.
+- Verification dùng input/form/SQLite/browser cô lập và consumer thật; không corpus owner, portal thật upload/Save, production DB, session/credential import hoặc cloud/provider mới. Session authenticated do browser worker chuyên trách, không runtime implementer điều khiển.
+- Worker bàn giao trước commit; parent tổ chức review/fix độc lập rồi commit. Không tuyên bố toàn #41 hoàn tất hoặc mở gate mẫu từ slice này; #42 không prerequisite.
+
+- Kết quả slice preparation: implementer và reviewer độc lập cùng xác nhận Upload **42 pass, không skip**, sidecar **60 pass**; **review CLEAN**. Smoke consumer harden sau review: thiếu source dù text filename hiện trên trang vẫn attachment false/partial, affected suite **5 pass, không skip**. Owner giao commit đúng 13 paths, không push/packaging; giữ AGENTS và foreign changes. Không nâng bằng chứng cô lập thành portal/backend/ID-conversion acceptance hoặc hoàn thành #41.

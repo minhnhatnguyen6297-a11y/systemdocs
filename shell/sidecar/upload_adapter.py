@@ -1908,10 +1908,6 @@ def upload_prepare_v1(job, payload):
                 cong_chung_vien=cong_chung_vien,
                 thu_ky=thu_ky,
                 chunk_size=chunk_size,
-                # v1 dry-run KHONG BAO GIO click nut Luu cua portal —
-                # ke ca click "prime" ep client-side validation
-                # ten_hop_dong (F1). Legacy/Qt giu default True.
-                prime_save_validation=False,
                 progress_callback=on_progress),
             generic=("engine_unavailable", True, "retry",
                      "chuan bi ho so that bai"))

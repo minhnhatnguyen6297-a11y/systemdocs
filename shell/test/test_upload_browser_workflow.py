@@ -935,20 +935,6 @@ class PrepareTest(BrowserWorkflowCase):
         snap = self.wait_terminal(dl)
         self.assertEqual(snap["status"], "succeeded", snap["error"])
 
-    def test_v1_prepare_disables_save_prime(self):
-        """F1: duong v1 truyen prime_save_validation=False xuong engine —
-        dry-run versioned khong bao gio click nut Luu cua portal (ke ca
-        click 'moi' ep validation ten_hop_dong tren form con thieu)."""
-        run_id, ids = self.run_scan(CONTRACT_NOS[:1])
-        bid = self.login()
-        job = self.prepare(bid, run_id, ids)
-        self.wait_status(job, "waiting_user")
-        self.assertIs(
-            self.session.last_prepare_kwargs["prime_save_validation"],
-            False)
-        fj = self.finish_review(bid, job.job_id)
-        self.wait_terminal(fj)
-        self.wait_terminal(job)
 
 
 # =====================================================================
@@ -1285,7 +1271,7 @@ class _ComboLoc:
 
 
 class _SaveLoc:
-    """Nut Luu cua portal — dem click de chung minh prime co/khong chay."""
+    """Save button counter for the non-submitting preparation boundary."""
 
     def __init__(self):
         self.clicks = []
@@ -1343,9 +1329,7 @@ class _FormPage:
 
 @unittest.skipUnless(_engines_available(), "upload_lab engine missing")
 class EngineTabResourceTest(unittest.TestCase):
-    """Trang thai tai nguyen tab tren NamDinhUploaderSession that + fake
-    page/locator — khong can Chromium: poll chi bao open/closed, va gate
-    prime_save_validation (F1) khong bao gio click nut Luu khi tat."""
+    """Real uploader with fake locators: tab resources and non-submit commit."""
 
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
@@ -1438,11 +1422,7 @@ class EngineTabResourceTest(unittest.TestCase):
         self.assertNotIn(rid, self.session.prepared_pages)
         self.assertEqual(self._registry_status(rid), "prepared_dry_run")
 
-    # ------------------------------------------------------------ F1 prime
-    def test_fill_dropdown_prime_gate_never_clicks_save_when_off(self):
-        """prime_save_validation=False → block prime+retype bi skip hoan
-        toan — khong locator nao cua SAVE_BUTTON_SELECTORS bi click;
-        default True van click nhu legacy."""
+    def test_free_text_commit_never_clicks_save_or_presses_enter(self):
         combo = _ComboLoc()
         save = _SaveLoc()
         self.session._resolve_control_locator = (
@@ -1452,34 +1432,11 @@ class EngineTabResourceTest(unittest.TestCase):
         self.session._locator_from_strategy = (
             lambda page, strategy, **kw: save)
         page = _FormPage()
-
-        self.session._prime_save_validation = False
-        ok = self.session._fill_dropdown(page, "ten_hop_dong", "HD A")
-        self.assertTrue(ok)
-        self.assertEqual(save.clicks, [],
-                         "v1 khong duoc click nut Luu khi dien form")
-
-        self.session._prime_save_validation = True
-        combo.value = ""
-        ok = self.session._fill_dropdown(page, "ten_hop_dong", "HD A")
-        self.assertTrue(ok)
-        self.assertGreaterEqual(
-            len(save.clicks), 1,
-            "legacy prime van click Luu de ep validation")
-
-    def test_prepare_manifest_stores_prime_flag(self):
-        """Kwargs prime_save_validation di vao session instance — v1
-        adapter truyen False, default True (legacy/Qt)."""
-        with mock.patch.object(
-                self.uploader, "load_upload_queue",
-                return_value=({"run_id": "r1"}, [], 0)):
-            self.session.prepare_manifest(
-                "manifest.json", threading.Event(),
-                prime_save_validation=False)
-            self.assertFalse(self.session._prime_save_validation)
-            self.session.prepare_manifest(
-                "manifest.json", threading.Event())
-            self.assertTrue(self.session._prime_save_validation)
+        self.assertTrue(self.session._fill_dropdown(page, "ten_hop_dong", "HD A"))
+        self.assertEqual(combo.value, "HD A")
+        self.assertEqual(save.clicks, [])
+        self.assertNotIn("Enter", combo.presses)
+        self.assertIn("Tab", combo.presses)
 
 
 if __name__ == "__main__":

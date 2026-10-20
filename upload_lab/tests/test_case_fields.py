@@ -207,6 +207,7 @@ def test_real_local_browser_presave_consumer(tmp_path, monkeypatch):
         value = html.escape(record.upload_form[field], quote=True)
         controls.append(f'<select id="{element_id}"><option></option><option>{value}</option></select>')
     controls.extend(['<input id="hopdong.sohopdong">', '<input placeholder="dd/mm/yyyy">'])
+    controls.append('<input type="file" id="hopdong.fileHopdong" accept=".doc,.docx,.pdf">')
     for label in ("Thông tin người yêu cầu công chứng", "Đương sự", "Tài sản", "Ghi chú"):
         controls.append(f'<div class="Field-container"><label>{label}</label><div contenteditable="true"></div></div>')
     controls.append('<button onclick="window.saved=true">Lưu hợp đồng</button>')
@@ -232,8 +233,7 @@ def test_real_local_browser_presave_consumer(tmp_path, monkeypatch):
             summary = session.prepare_manifest(
                 manifest, Event(), selected_record_ids=selected_ids,
                 exclude_contract_nos={"8/2026"}, chunk_size=1,
-                cong_chung_vien="CCV được chọn", thu_ky="Thư ký Mẫu",
-                prime_save_validation=False)
+                cong_chung_vien="CCV được chọn", thu_ky="Thư ký Mẫu")
             assert summary["prepared_count"] == 1
             assert summary["excluded_duplicates"] == 1
             assert set(session.prepared_pages) == {record.record_id}

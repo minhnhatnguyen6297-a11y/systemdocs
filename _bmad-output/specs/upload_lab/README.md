@@ -34,7 +34,7 @@ Phạm vi triển khai hiện tại là metadata Case: `tenvanban`, `nhomhopdong
 nhóm portal và enum Notary độc lập. Nhân sự do người dùng chọn khi prepare
 thuộc bản Case dùng để điền, không biến default thành dữ kiện bóc tách.
 Person/Asset/parties giữ hiện trạng; phí/ghi chú/trạng thái theo policy owner
-20/10 dưới đây (quy tắc đích, chưa claim runtime đổi). Slice không khép #41/mở gate.
+20/10 dưới đây. Owner đã giao triển khai adapter phần đã chốt; slice không khép #41/mở gate.
 
 Đọc queue luôn không ghi metadata Case, kể cả có override nhân sự, lọc ID
 hoặc limit. Override trong candidate chỉ phục vụ preview/form của lượt chuẩn
@@ -254,13 +254,22 @@ không xóa default portal, không thêm cột/extraction phí hoặc bước nh
 Tổng chi phí không phải ô thứ năm, không persistence riêng. Mọi hợp đồng upload
 mặc định **`DACONGCHUNG` / “Đã công chứng”**, là policy portal, không extracted
 fact hoặc Notary draft/locked. Gap mapping phí giữ làm hiện trạng nhưng ngoài
-scope hiện tại, không pending owner choice. Đây là quy tắc đích trong docs,
-**chưa claim runtime đã đổi**, không cấp quyền code/schema. Mở rộng tương lai
-cần duyệt/giao riêng; auxiliary business schema chưa được duyệt. Case 8 key đã
-implement; Person/Asset/parties chưa cutover, toàn #41 chưa xong, gate mẫu
-vẫn **ĐÓNG**. Catalog source-level cũng ghi discrepancy file không trong fill
-order và nhánh prime validation có click Lưu; không sửa runtime hoặc coi
-tài liệu là nghiệm thu portal. [Quyết định owner](../../decisions/decision-owner-upload-field-standardization-20261019.md#bổ-sung-owner-20102026--sot-cấu-trúc-website).
+scope hiện tại, không pending owner choice. Owner đã giao triển khai liên tục
+phần đã chốt; không duyệt auxiliary business schema mới. Builder/fill order
+loại phí/ghi chú, không dựa vào giá trị rỗng để bỏ qua; giá trị cũ từ caller
+cũng không được điền. Status dùng control thật để chọn Đã công chứng.
+Autocomplete chọn option đúng hoặc title/Thư ký freeSolo input+blur;
+không click Lưu, không Enter/prime, không suppress submit toàn website.
+File nguồn kỹ thuật `raw.file_goc` vào input attachment trước Lưu; thiếu/lỗi
+file phải phản ánh partial, không suy metadata/backend persistence từ filename.
+Case 8 key đã implement; Person/Asset/parties chưa cutover, toàn #41 chưa xong,
+gate mẫu vẫn **ĐÓNG**. [Quyết định owner](../../decisions/decision-owner-upload-field-standardization-20261019.md#bổ-sung-owner-20102026--sot-cấu-trúc-website).
+
+Slice preparation đã implement và **review độc lập CLEAN**: Upload **42 pass,
+không skip**, sidecar **60 pass** được reviewer chạy lại; smoke bổ sung filename
+decoy **5 pass, không skip**. File nguồn thiếu dù có text tên file hiển thị vẫn
+partial/attachment false, không lấy page text thay file state. Proof chỉ Chromium/
+SQLite/form cô lập; không nghiệm thu portal thật/backend/packaged hoặc toàn #41.
 
 
 ### 2.5. Quy tắc hiển thị chung

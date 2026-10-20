@@ -52,7 +52,7 @@ Owner báo Upload đang bóc văn bản thành trường để điền website n
 
 ## Boundaries
 
-- Chỉ ghi ticket/spec trong lượt hiện tại: không đọc mẫu, tạo Word/corpus, sửa code/schema/runtime hoặc chạy parser/app/test/E2E. Inventory source tĩnh không phải khảo sát nội dung mẫu.
+- Owner đã giao triển khai liên tục phần runtime Nam Định đã chốt; không cần technical approval pause. Không đọc mẫu/corpus, portal thật upload/Save, production DB hoặc credentials; verification riêng #41 dùng nguồn tổng hợp và browser/SQLite/form cô lập. Chỉ dừng phần phụ thuộc quyết định nghiệp vụ/schema thật sự chưa chốt.
 - Website chính thức vẫn là SOT; app chỉ điền sẵn, người dùng tự kiểm tra và bấm Lưu. Rule regex/website có version do developer quản lý; không thêm UI quản lý rule cho người dùng.
 - Không chọn engine DB vật lý chung, shared Case ID, DB merge hay quyền liên kết/ghi chéo module. Contract Upload còn Draft không tự thành approved.
 - #40 serial GCN Stage/persistence là issue riêng, không nhân bản phạm vi hoặc tuyên bố fixed bởi #41. #20 Danh sách hồ sơ vẫn DEFERRED, whitelist UI/search/filter chưa duyệt.
@@ -83,12 +83,11 @@ Owner báo Upload đang bóc văn bản thành trường để điền website n
 - Evidence 19/10/2026: `nguoi_yeu_cau`/`duong_su`/`tai_san` là output trình bày cần truy về dữ liệu Người/Tài sản/vai trò Hồ sơ đã chuẩn hóa, không thay canonical bằng chuỗi ghép. Các giá trị portal mặc định `tinh_trang`, `ghi_chu`, `phi_cong_chung`, `thu_lao_cong_chung` phải được phân loại theo nghĩa/consumer, không coi hằng/rỗng là dữ kiện đã bóc hoặc tự suy owner đã chọn chính sách phí công chứng. Raw/file/ambiguity evidence không là orphan nghiệp vụ.
 - Evidence 20/10/2026: [SOT Nam Định bền vững](../specs/upload_lab/nam-dinh-website-sot.md)
   inventory toàn bộ **17 trường public-static quick-create**, 6 catalog, 7 required
-  tĩnh; mapping source→canonical/raw/policy→DB-wire→selector/API. Repo có 15
-  mapping (14 fill-order entries + attachment selector nhưng attachment không
-  iterate); `chiphi.phiDvNgoaicongchung` và `chiphi.phikhac` thiếu mapping, tổng
-  có hidden path khác spelling. Không tự thêm key/cột; catalog IDs/config/
-  provenance khác nghiệp vụ. Phí/ghi chú/status đã chốt policy hiện tại bên dưới.
-  Nhánh prime validation có click Lưu được ghi trung thực, không sửa runtime.
+  tĩnh; mapping source→canonical/raw/policy→DB-wire→selector/API. Tại mốc audit,
+  repo có 15 mapping (14 fill-order entries, thiếu iterate attachment),
+  hai phí thiếu mapping và nhánh prime có click Lưu. Slice runtime bên dưới
+  đã xử lý preparation theo policy; không thêm key/cột. Catalog IDs/config/
+  provenance khác nghiệp vụ; tổng vẫn không persistence riêng.
 - Owner 20/10/2026 chốt **policy đích Nam Định**: bốn ô `chiphi.phicongchung`,
   `chiphi.thulaoCongchung`, `chiphi.phiDvNgoaicongchung`, `chiphi.phikhac`
   và Ghi chú `ghichu` bỏ qua/không điền; không ghi 0 hoặc xóa default portal,
@@ -96,8 +95,8 @@ Owner báo Upload đang bóc văn bản thành trường để điền website n
   không persistence riêng. Mọi hợp đồng upload mặc định `DACONGCHUNG` /
   “Đã công chứng” — portal policy, không extracted fact/Notary draft/locked.
   Gap phí giữ làm hiện trạng ngoài scope, không pending owner choice.
-  Chưa claim runtime triển khai, chưa giao code/schema; mở rộng tương lai
-  cần duyệt/giao riêng. Toàn #41 còn mở, gate mẫu **ĐÓNG**.
+  Runtime preparation đã được giao và kiểm chứng cô lập như mục dưới;
+  mở rộng tương lai cần duyệt/giao riêng. Toàn #41 còn mở, gate mẫu **ĐÓNG**.
 - Coverage hiện tại 20/10/2026 **sau user đăng nhập thủ công**: empty form live
   có **17 trường ngữ nghĩa**, **7 label required** (không HTML attr/enforcement).
   Sáu widget/list hiện render: status **3**, nhóm **13**, asset **12**, title **5**,
@@ -117,7 +116,7 @@ Owner báo Upload đang bóc văn bản thành trường để điền website n
 - Open question: `ten_goi_khac` trong inventory cần chốt mapping của catalog; không tự nới #42 ngoài hai nhu cầu nhiều giấy tờ và địa chỉ. `cccd_khac` có trong một nhánh extraction không chứng minh DB/contract đã hỗ trợ Người nhiều giấy tờ.
 - Open question: catalog đầy đủ sẽ chốt key/kiểu/format/nhóm/cardinality/DB-wire-output còn thiếu và xung đột portal với trường đã loại. Đây là công việc refinement của issue, không yêu cầu owner chọn schema ngay lúc ghi nhận.
 - Risk: high — mapping sai có thể gắn thông tin sai Người/Tài sản/Hồ sơ hoặc mất dữ liệu lưu/điền web. Ngoài AC, reviewer độc lập cần đối chiếu catalog với các consumer và thiết kế bảo toàn dữ liệu trước cutover.
-- Identity: `next_id: 41` từ `tickets.py status _bmad-output/backlog` ngày 19/10/2026. Loose backlog theo waiver hiện có; active initiative để unset, không setup/install/config. Independent review đã chạy và sạch cho slice Case (xem mục dưới); slice đã được giao và BUILT. Phần còn lại của #41 giữ `refined: false`, chưa giao build; commit/push vẫn chờ parent duyệt và cho phép.
+- Identity: `next_id: 41` từ `tickets.py status _bmad-output/backlog` ngày 19/10/2026. Loose backlog theo waiver hiện có; active initiative để unset, không setup/install/config. Slice Case đã BUILT và review sạch; slice Nam Định preparation implement/verify cô lập và **review độc lập CLEAN**, owner đã giao commit. Toàn #41 giữ `refined:false`; không push.
 
 ### Metadata Case BUILT — chưa hoàn thành toàn #41; gate mẫu ĐÓNG
 
@@ -137,3 +136,12 @@ Owner báo Upload đang bóc văn bản thành trường để điền website n
 - Catalog, contract và regression bền vững ở References đủ dùng trong clone
   mới. Plan/proof tạm `_bmad-output/tmp/issue-41-case-fields/` chỉ là evidence
   local **tùy chọn**, không là dependency hay nguồn chuẩn bắt buộc.
+
+### Nam Định preparation — implement/verify 20/10/2026, review độc lập CLEAN
+
+- Bỏ phí/ghi chú khỏi builder, selector và fill order; caller mang giá trị cũ vẫn không điền hoặc clear default. Status policy Đã công chứng được enforce ở consumer và verify, không canonical fact.
+- Gỡ prime-Lưu/retype/flag và mọi caller/test obsolete. FreeSolo input+blur, remote/status chọn role option đúng label; không Enter/native submit, không generic website-submit suppression.
+- File nguồn kỹ thuật vào actual preSave qua input attachment; verify selection filename; lỗi/thiếu source hoặc remote option là partial, không đoán metadata/POST/backend.
+- Verification actual `prepare_manifest → _prepare_record` trên Chromium mới/form MUI-like kiểm soát và SQLite tạm: 0 submit/Save-click/Enter/skipped-field events; file DOM và file-change state đúng; status DACONGCHUNG; nguồn/Case/queue ngoài selection giữ nguyên. Upload scoped **42 passed**, sidecar workflow **60 passed**; warnings openpyxl hiện có.
+- Permanent regression: `upload_lab/tests/test_namdinh_preparation.py`; Case selection/source proof `upload_lab/tests/test_case_fields.py`. Plan/evidence tùy chọn `_bmad-output/tmp/namdinh-preparation/`; giới hạn và behavior bền vững tại SOT §8. Không portal thật writes/credentials/corpus/production DB; không đóng #41 hoặc mở gate mẫu.
+- Reviewer chạy lại **42 pass, không skip + 60 pass**, xác nhận controlled counters/files/persistence và scope 13 paths. Sau review harden permanent consumer smoke với filename decoy hiển thị khi thiếu source: file DOM rỗng, filler/verify false, status partial; affected suite **5 passed, không skip, 32.49s**. Không đổi runtime sau review; không nghiệm thu portal thật/packaged, build/dist chưa tái sinh.

@@ -189,10 +189,14 @@ và ID/label/metadata vai trò nhóm được chép bền vững; nhân sự ch�
 Có default/state và proof props↔DOM/pagination **trong phiên**, không tổng DB
 hoặc mọi đơn vị. Zero authenticated coverage/403/unscoped=[] của audit static
 trước đó giữ làm lịch sử; scope server và form/submission conversion còn unknown.
-Không Lưu/prime/upload hoặc mở record. Auxiliary site fields chưa duyệt schema;
-phí/tổng/ghi chú/trạng thái còn refine #41, Person/Asset/parties chưa cutover,
-gate mẫu vẫn **ĐÓNG**. Website thứ hai chưa khảo sát; không tạo canonical key
-mới từ catalog.
+Không Lưu/prime/upload hoặc mở record trên portal thật. Policy owner đã chốt:
+bốn phí/ghi chú bỏ qua, status Đã công chứng. Slice preSave adapter đã sửa và
+kiểm chứng Chromium cô lập (không submit, có file selection), **review độc lập CLEAN**
+không suy backend từ widget. Person/Asset/parties chưa cutover, **toàn #41 chưa
+xong, gate mẫu ĐÓNG**; website thứ hai chưa khảo sát, không thêm canonical key.
+Reviewer chạy lại Upload **42 pass, không skip** và sidecar **60 pass**; smoke
+filename decoy bổ sung **5 pass, không skip**. Không nghiệm thu portal thật hoặc
+packaged; build/dist chưa tái sinh.
 
 
 | Màn / thao tác | Dùng để | Tài liệu | Điểm vào mã |

@@ -1228,10 +1228,10 @@ class PlaywrightUploaderQueueTests(unittest.TestCase):
             self.assertTrue(session._fill_dropdown(page, "ten_hop_dong", expected))
 
         self.assertEqual(locator.type_values, [expected, expected])
-        self.assertIn("Enter", locator.press_keys)
+        self.assertNotIn("Enter", locator.press_keys)
         self.assertTrue(any("dispatchEvent" in script and "change" in script for script in locator.evaluate_scripts))
 
-    def test_fill_dropdown_clears_with_keyboard_and_selects_first_autocomplete_option(self):
+    def test_free_text_autocomplete_commits_without_option_or_submit(self):
         session = NamDinhUploaderSession(
             load_uploader_settings(self.workdir),
             working_dir=self.workdir,
@@ -1255,8 +1255,9 @@ class PlaywrightUploaderQueueTests(unittest.TestCase):
 
         self.assertIn("Control+A", locator.press_keys)
         self.assertIn("Backspace", locator.press_keys)
-        self.assertIn("ArrowDown", locator.press_keys)
-        self.assertIn("Enter", locator.press_keys)
+        self.assertNotIn("ArrowDown", locator.press_keys)
+        self.assertNotIn("Enter", locator.press_keys)
+        self.assertIn("Tab", locator.press_keys)
 
 
 if __name__ == "__main__":

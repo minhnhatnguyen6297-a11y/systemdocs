@@ -534,7 +534,6 @@ class PortalBrowserSession:
         cong_chung_vien=None,
         thu_ky=None,
         chunk_size=None,
-        prime_save_validation: bool = True,
     ) -> dict:
         self._mark("prepare_manifest")
         self.last_prepare_kwargs = {
@@ -544,9 +543,6 @@ class PortalBrowserSession:
             "cong_chung_vien": cong_chung_vien,
             "thu_ky": thu_ky,
             "chunk_size": chunk_size,
-            # v1 adapter truyen False: dry-run khong click nut Luu (F1).
-            # Fixture ghi lai de test assert kwarg di toi engine seam.
-            "prime_save_validation": prime_save_validation,
         }
         self.prepare_calls += 1
 
