@@ -17,7 +17,7 @@ risk: high
 
 Gộp D06 và D07 của ma trận Nam Định thành một câu hỏi thiết kế nghiệp vụ: Hồ sơ chứa những Người/Tài sản nào, thứ tự và nhóm/vai trò của từng lần tham gia là gì, và Người/nhóm liên quan phạm vi Tài sản nào. Owner duyệt kết quả nghiệp vụ trước khi chọn model/contract để phần quan hệ của #41 có thể cutover đúng. Đây là issue làm rõ, không phải implementation.
 
-**Thứ tự owner:** xử lý ngay sau làm rõ các ô trong SOT §7, không chờ toàn #41 hoàn thành. #41 là nơi nhận kết quả, không là prerequisite hoàn tất của spike; `after: []` không mã hóa thứ tự công việc thành hard dependency. #42 nhiều giấy tờ/địa chỉ không là prerequisite. Owner đã cho tiếp tục audit/thiết kế; proposal đã lập, đang chờ đáp án nghiệp vụ, chưa duyệt model hoặc triển khai.
+**Thứ tự owner:** sau rõ ô Nam Định §7, không chờ toàn #41/#42. Phân tích16ca hoàn tất; owner trả lời Q1 requester/Q2 A-B. Chỉ BANKMODE “dán cả cụm” ngân hàng còn clarification; AC4 chưa khép, chưa model/schema/cutover hoặc runtime.
 
 ## Approach
 
@@ -35,7 +35,7 @@ Gộp D06 và D07 của ma trận Nam Định thành một câu hỏi thiết k�
 2. **Scope Người/nhóm–Tài sản được mô tả đúng và có nguồn**
    Verify: bảng phân biệt cả nhóm/cả tập, từng cặp tách rời, tập con chồng nhau và chưa xác định; không tự suy mọi Người×mọi Tài sản, tỷ lệ/quyền sở hữu, chủ đất từ Bên A/GCN hoặc chuyển quan hệ từ module khác. Tách identity tài sản, thứ tự trình bày và nghĩa dấu chọn Diagram hiện hành; không âm thầm đổi quan hệ cũ.
 3. **R06 và D05 được áp đúng mà không tự lấp ngoại lệ**
-   Verify: đáp án giữ policy “Người yêu cầu công chứng = tất cả người có trong hồ sơ”, thuần dữ liệu chuẩn, không lookup/firstperson/role prose. Owner làm rõ membership người chết, cá nhân đại diện, thân nhân chỉ được nhắc và nhân sự công chứng; không mặc định loại người chết/đại diện hoặc thu hẹp thành chỉ người ký/người sống. Mỗi Người đã xác nhận một lần trong requester theo thứ tự nguồn/danh sách đã xác nhận, giữ đủ các lần tham gia riêng; không dedup tên hoặc đặt approval gate cho kết luận bảo toàn này. Nhóm output A/B không dùng chữ “nhận” làm universal regex hoặc “không nhận=A”; trường hợp một bên/ủy quyền/nhãn mâu thuẫn có đáp án hoặc giới hạn rõ. Pháp nhân không thuộc Người, vẫn nhập tay.
+   Verify: requester Nam Định/Upload gồm cá nhân sống tham gia và đại diện ủy quyền, không đòi tag A/B đã gán kể cả một bên/conflict; người chết/CCV/nhân viên không vào output đó, không xóa Person chết/Stage/Hồ sơ thừa kế/raw/history/metadata nhân sự. Cá nhân chuẩn, mỗi identity xác nhận một lần theo nguồn, không prose/lookup/firstperson/dedup tên. Ngân hàng thế chấp cả cụm không Person; BANKMODE chỉ user dán hay app lấy/điền cụm ngân hàng, không extractor/schema tự chọn hoặc mở prose cá nhân. Ủy quyền A=ủy quyền/B=được ủy quyền; một bên không gán; nguồn trái nhau giữ conflict/xác nhận nhóm không winner. “Nhận” không universal regex; alias/D04/D08 giữ policy.
 4. **Đáp án được owner chấp nhận và bàn giao cho #41**
    Verify: decision/spec và Notes #41 dẫn cùng đáp án có ngày, nêu phần đã chọn/chưa chọn và tác động contract/cutover; không chỉ chọn sơ đồ/bảng lưu mà bỏ nghĩa nghiệp vụ. Trước owner chấp nhận, ticket giữ `refined: false` và không tự khép bằng suy đoán.
 5. **Giữ phạm vi docs/design và gate hiện hành**
@@ -55,16 +55,17 @@ Gộp D06 và D07 của ma trận Nam Định thành một câu hỏi thiết k�
 - consumer — _bmad-output/backlog/story-upload-business-field-standardization.md, AC1–2 và Notes ma trận Nam Định
 - authority — contracts/entities.md, §8–9
 - companion — _bmad-output/backlog/story-person-multiple-identities-addresses.md, Boundaries
-- proposed design/current plan — _bmad-output/backlog/spike-case-people-assets-relationships-plan.md, §1–9: audit, 16 tình huống, Q1–Q2 và trạng thái chờ owner; tự đủ, chưa là spec áp dụng
+- proposed design/current plan — _bmad-output/backlog/spike-case-people-assets-relationships-plan.md, 16ca, Q1/Q2 đã trả lời, BANKMODE còn mở; model chưa schema áp dụng
 
 ## Notes
 
 - Decision 20/10/2026: owner yêu cầu D06 issue riêng ngay sau rõ các ô; D07 cùng issue D06. Chưa duyệt model/FK/cardinality; không implementation lúc ghi nhận.
-- Open question: membership cụ thể của Hồ sơ, thứ tự, nhiều lần tham gia và scope Người–Tài sản là nội dung spike; giữ nguyên nghĩa R06 “tất cả người”, không thay bằng chỉ B/người ký/lookup.
+- Decision 20/10/2026: Q1 requester/Q2 A-B đã trả lời; scope output không xóa Person/Stage/Hồ sơ thừa kế/history. Không hỏi lại nghĩa đã chọn hoặc gate engineering.
 - Risk: high — sai membership hoặc scope có thể điền thiếu Người hoặc gắn nhầm Tài sản. Ngoài AC, reviewer độc lập cần đối chiếu đáp án với các tình huống tổng hợp và ranh giới #41 trước đề xuất cutover.
 - Identity: `next_id: 43` từ `tickets.py status _bmad-output/backlog` ngày 20/10/2026; status đã đọc không có issue cùng phạm vi. Repo store/loose backlog theo waiver hiện có; không đổi active initiative hoặc setup/install/config. Independent docs review CLEAN, mandatory Ticket validation PASS 20/10/2026; parent cho commit đúng phạm vi, không publish remote/push hoặc giao implementation.
 - Decision 20/10/2026 (lệnh tiếp tục mới nhất): owner “chốt chỉ dùng placeholder và trường tĩnh, tiếp tục”. Lệnh này cho phép thiết kế spike #43, **không cho phép runtime**; không tự chọn membership/scope/ngoại lệ A/B hoặc duyệt tầng động. Phương án hai tầng đang cân nhắc trong nguồn cũ không còn là phương án tiếp tục.
-- Evidence 20/10/2026: matching plan chứa đầy đủ thiết kế PROPOSED, audit, 16 ca C01–C16, kết luận bảo toàn có căn cứ và hai câu hỏi owner về membership/A-B. Mỗi Người đã xác nhận một lần/thứ tự nguồn, giữ identity tài sản khi reorder/add và điền dần khi thiếu scope không là owner gate. Không phụ thuộc tmp, không code/schema/runtime/mẫu thật/DB, không sửa SOT/decision/#41.
-- Source conflict: R06/D05 — consumer legacy chọn requester theo bên/người đầu, tách/lọc Người chết và Diagram chặn một Người trên nhiều node; những cơ chế đó không quyết định membership “tất cả Người” hoặc bác bỏ nhiều vai trò. Giới hạn Stage/Word và dấu chọn bám vị trí là phạm vi module hiện hành, không là cap/quan hệ toàn Upload.
-- Open question: Q1 ai thuộc Hồ sơ (người chết/đại diện/thân nhân được nhắc/nhân sự); Q2 A/B một bên/ủy quyền/xung đột. Ví dụ, khuyến nghị PROPOSED và đánh đổi tại plan §6. Các kết luận bảo toàn ở §3 có căn cứ R06/AC1–2/D07/contract thứ tự Stage/spec điền dần; không hỏi duyệt lại identity/thứ tự/reorder/add hoặc tạo gate scope/output toàn cục. Chỉ đặt câu hỏi riêng nếu consumer thực sự cần nghiệp vụ chưa được policy trả lời trước implementation, không invent ở đây; không hỏi JSON/FK/cap.
-- Review 20/10/2026: independent narrow review cuối CLEAN, mandatory BMAD Ticket validation PASS cho draft, không phải closure. Parent đã đọc 16 ca/kết luận/hai câu hỏi và cho commit đúng ticket, matching plan, backlog index; không push. Giữ PROPOSED/refined:false/hitl:true, blocked chờ owner Q1 membership/Q2 A-B; AC4 chưa đạt, chưa built/done; không runtime/schema mới, không đổi Diagram legacy hoặc gate #41.
+- Evidence mới:16ca và bảo toàn đã hoàn tất; đáp án nguyên văn trong decision, phần đã rõ đồng bộ SOT/module/shared/overview/#41. Composition/model/cutover chưa implement; BANKMODE còn clarification, không extractor pháp nhân/blanket raw editor.
+- Decision mới: cá nhân sống A/B/đại diện ủy quyền vào requester; người chết/CCV/nhân viên không vào output đó. Ngân hàng thế chấp cả cụm, không Person. A=ủy quyền/B=được ủy quyền; một bên không gán; conflict nguồn xác nhận phần nhóm không winner/thu hẹp requester.
+- Boundary: không dùng tag A/B làm filter requester; cá nhân sống văn bản một bên/đại diện ủy quyền vẫn vào output khi nhóm không gán/conflict, chỉ phần nhãn nhóm chờ xác nhận.
+- Open question BANKMODE duy nhất: ô người yêu cầu Nam Định, cụm ngân hàng thế chấp do user tự dán hay app tự lấy/điền từ nguồn? Chưa chọn mode; cá nhân khác vẫn chuẩn, không hỏi mở rộng whole-cluster. Policy pháp nhân manual cũ không tự chọn mode mới; không JSON/FK/limits/old gates.
+- Review: delta owner-answer independent review CLEAN, mandatory BMAD Ticket validation PASS cho draft, không closure. Parent cho commit đúng11file, không push/runtime. Giữ refined:false/hitl:true, draft/blocked chỉ BANKMODE, AC4 chưa khép; không schema/cutover hoặc đổi gate #41.

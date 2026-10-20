@@ -104,17 +104,24 @@ Website chính thức SOT, người dùng tự Lưu, rule developer-only giữ n
 
 **Owner trả lời ma trận Nam Định 20/10/2026 — policy đích, chưa đổi runtime:**
 
-- **Người yêu cầu công chứng = tất cả Người có trong Hồ sơ**, chỉ thông tin
-  chuẩn từng Người; không Bên A/B, con đẻ, chức vụ hoặc tư cách/lời phụ. Lookup,
-  ưu tiên một bên/người đầu cũ không còn authority business. Không cắt tên/suy
-  người thiếu; membership/thứ tự, người chết/đại diện làm rõ ở #43, chưa tự loại.
+- **Requester Nam Định/Upload — đáp án #43:** mọi cá nhân sống Bên A/Bên B/
+  đại diện theo ủy quyền; không người chết, công chứng viên, nhân viên trong
+  output requester. Không xóa Person chết, Stage, raw/snapshot/lịch sử hoặc
+  metadata nhân sự. Dữ kiện cá nhân chuẩn, không prose/lookup/firstperson.
+  **Ngân hàng thế chấp hiện cả cụm, không Person; BANKMODE chưa chọn** user
+  dán hay app lấy/điền cụm ngân hàng; cá nhân khác vẫn chuẩn. Không tự
+  mở auto-extraction, field pháp nhân hoặc blanket block ba editor.
+  Requester không yêu cầu tag A/B đã gán; cá nhân sống một bên/đại diện ủy quyền
+  vẫn vào output khi nhóm không gán hoặc conflict.
 - **Alias bỏ tự điền/mở rộng chuẩn hóa**, nếu có user điền tay; không nối `ten`
   hoặc tạo field alias. **D04 bỏ lời tư cách/căn cứ phức tạp**, user tự sửa;
   D08 đã theo R06, không block lời dư hoặc hỏi lại. Nguồn/raw/history giữ,
-  không mở manual fallback cho mọi unknown; pháp nhân vẫn nhập tay.
-- **Đương sự chỉ nhóm Bên A/Bên B nói chung** có căn cứ; “gần như 100% Bên B
-  có chữ nhận” không regex tuyệt đối/“không nhận=A”. Nhận chuyển nhượng, nhận
-  thế chấp, được ủy quyền và thừa kế một bên cần semantic đúng, còn làm rõ.
+  không mở manual fallback cho mọi unknown; pháp nhân không thuộc Person,
+  policy nhập tay trước đó không tự trả lời mode “dán cả cụm” mới.
+- **A/B đã được owner trả lời #43:** ủy quyền A=người ủy quyền/B=người được
+  ủy quyền; chỉ một bên không gán A/B; hai nguồn trái nhau giữ conflict,
+  xác nhận nhóm bị ảnh hưởng, không tự nguồn thắng/thu hẹp requester.
+  “Gần như 100% có nhận” không universal regex hoặc “không nhận=A”.
 - **W05 đồng ý có điều kiện**, giữ **ID1 Đất đai có tài sản**, thường nhà trên
   đất: thiếu mẫu/rule không là loại không tồn tại. Chưa rule chọn một ô cho tổ
   hợp nhiều loại, chưa field/rule chi tiết nhà; không tự dựng schema/regex.

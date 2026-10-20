@@ -87,6 +87,15 @@ Electron là vỏ ứng dụng; Python/FastAPI xử lý nghiệp vụ. Module gi
 - Giữ nguồn và giá trị gốc; không sửa raw để che lỗi. Máy không tự nâng OCR/AI thành dữ liệu đã xác nhận.
 - Đầu ra nghiệp vụ phải theo trường, kiểu, định dạng, cách nhóm và đích lưu đã chốt trong DB/contract. Raw không bắt buộc mang schema DB. Không sinh trường mồ côi hoặc nhét sai nghĩa vào ghi chú. Trường mới phải được chốt trước; ngoại lệ hẹp là cụm trường phụ website theo hướng owner cho phép có điều kiện, không phải ghi chú chung; raw capture chỉ là provenance.
 - **Owner 20/10/2026 — pháp nhân, cụm trường phụ và quan hệ:** pháp nhân **không đưa vào Người**, theo policy người dùng nhập tay; bảng riêng tương lai là định hướng chưa duyệt schema/build. Cụm trường phụ chỉ theo website/ô cụ thể, đáp ứng điều kiện owner nêu (phức tạp, không lặp lại), ưu tiên canonical đã có, giữ provenance, không generic bag/`ghiChú`; raw capture chỉ provenance; không xin duyệt từng chi tiết kỹ thuật. Quan hệ nhiều người/nhiều tài sản chưa chọn model/cardinality. [Dữ liệu chung](shared/data-rules.md) · [Quyết định](../decisions/decision-owner-upload-field-standardization-20261019.md).
+- **Đáp án #43 — phạm vi requester Nam Định/Upload:** lấy cá nhân sống A/B/
+  đại diện ủy quyền, không người chết/CCV/nhân viên trong output đó; không xóa
+  Person chết, Stage/Hồ sơ thừa kế/raw/snapshot/lịch sử. Ngân hàng thế chấp
+  hiện cả cụm là ngoại lệ output, không Person; BANKMODE còn mở user dán/app
+  lấy-điền **cụm ngân hàng thế chấp**; cá nhân khác vẫn chuẩn, không schema/extractor mới.
+  Ủy quyền A=ủy quyền/B=được ủy quyền; một bên không gán; nguồn trái nhau giữ
+  conflict/xác nhận phần nhóm, không tự winner. Q1/Q2 đã trả lời, không hỏi lại.
+  Requester không cần tag A/B đã gán; cá nhân sống một bên/đại diện ủy quyền
+  vẫn được đưa vào khi nhóm không gán hoặc conflict.
 - Ngày nhập/hiển thị giữ đúng độ đầy đủ: năm riêng vẫn là năm. Ngày quy ước chỉ dùng trong tính toán, không ghi đè thành dữ kiện đã biết.
 - Máy hỗ trợ thao tác; người dùng kiểm tra và chịu trách nhiệm xác nhận. Không tự động hóa phán quyết pháp lý.
 - Thiết kế gọn, tối ưu xử lý; không tự thêm chức năng, cơ chế dự phòng hoặc bộ công cụ kiểm thử ngoài phạm vi được phép.

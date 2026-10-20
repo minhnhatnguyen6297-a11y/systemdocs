@@ -58,9 +58,17 @@ thành block. Quan hệ nhiều người/nhiều tài sản chưa chọn model/c
 D06+D07 chuyển [#43 riêng](../backlog/spike-case-people-assets-relationships.md),
 làm ngay sau làm rõ các ô Nam Định §7, không chờ toàn #41 xong/#42.
 [Quyết định](../decisions/decision-owner-upload-field-standardization-20261019.md).
-**Owner đã trả lời ma trận Nam Định 20/10:** requester là **tất cả Người trong
-Hồ sơ**, thuần dữ liệu chuẩn, không lookup/firstperson/role/quan hệ/chức vụ prose;
-alias nếu cần user điền tay, D04 lời phức tạp user tự sửa, D08 theo R06. W05
+**Đáp án #43 — owner 20/10/2026:** requester Nam Định/Upload gồm cá nhân sống
+A/B/đại diện theo ủy quyền; không người chết/CCV/nhân viên trong output đó,
+không xóa Person chết/Stage/Hồ sơ thừa kế/raw/history. Cá nhân vẫn dữ kiện
+chuẩn, alias manual, D04/D08 không prose/lookup/firstperson. Ngân hàng thế
+chấp hiện cả cụm, không Person; **BANKMODE còn mở** user dán hay app lấy/
+điền cụm ngân hàng thế chấp; cá nhân khác vẫn chuẩn, chưa schema/extractor mới. A/B đã
+chốt ủy quyền A=ủy quyền/B=được ủy quyền, một bên không gán, nguồn trái nhau
+giữ conflict/xác nhận phần nhóm không tự winner. #43 có 16 ca, Q1/Q2 đã
+trả lời, chỉ BANKMODE chờ làm rõ; chưa khép AC4/cutover #41. Requester không
+cần tag A/B đã gán: cá nhân sống một bên/đại diện ủy quyền vẫn vào khi nhóm
+không gán/conflict. W05
 đồng ý có điều kiện, giữ ID1 đất có tài sản/nhà dù thiếu mẫu/rule; tổ hợp nhiều
 loại còn rõ rule. D05 chọn nhóm A/B chung, chữ “nhận” gần như 100% không luật
 tuyệt đối. A09 còn rõ phạm vi; [SOT §7.5.1](upload_lab/nam-dinh-website-sot.md)

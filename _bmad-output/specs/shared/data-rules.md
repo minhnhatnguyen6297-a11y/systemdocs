@@ -135,15 +135,25 @@ Lý do và supersession: [quyết định owner](../../decisions/decision-owner-
   Policy này là đích/ranh giới, không chứng minh runtime đã đổi; raw/provenance
   giữ nguyên.
 
-**Owner trả lời Nam Định §7, 20/10/2026:** requester là **tất cả Người có trong
-Hồ sơ**, thuần dữ liệu chuẩn Người, không Bên A/B, con đẻ, chức vụ/tư cách/lời
-phụ; lookup/firstperson cũ không còn authority nghiệp vụ đích. Không cắt tên/suy
-thêm người; membership/thứ tự/người chết/đại diện làm rõ trong #43, không tự loại.
-R05 không tự điền hoặc mở rộng chuẩn alias; nếu cần user điền tay, không nối tên/
-thêm field alias. D04 bỏ lời tư cách/căn cứ phức tạp khỏi tự động điền, user tự
-sửa; D08 theo R06, không residual prose block. Pháp nhân vẫn nhập tay; nguồn
-giữ nguyên, không mở manual fallback cho mọi gap. D05 hướng nhóm output A/B
-chung, chưa đủ semantic ngoại lệ; “gần như 100% có nhận” không universal regex.
+**Đáp án #43 — owner 20/10/2026, phạm vi requester Nam Định/Upload:** bao gồm
+cá nhân sống thuộc Bên A, Bên B, đại diện theo ủy quyền; không đưa người chết,
+công chứng viên, nhân viên vào requester output. Không xóa Person chết hoặc
+đối tượng Hồ sơ thừa kế/Stage/raw/snapshot/lịch sử/metadata nhân sự. Cá nhân
+thông thường dùng chuẩn R06, một lần mỗi identity xác nhận theo thứ tự nguồn;
+không lookup/firstperson/ưu tiên B/prose. R05 alias nhập tay, D04/D08 không tự
+điền lời phức tạp; không mở fallback tay cho mọi gap.
+
+Ngân hàng trong hợp đồng thế chấp hiện **cả cụm** là ngoại lệ output, không
+đưa tổ chức vào Người. **BANKMODE chưa chọn:** user dán hay app lấy/điền cụm
+ngân hàng thế chấp; cá nhân khác vẫn chuẩn. Policy nhập tay pháp nhân trước đó không tự
+giải nghĩa động từ “dán”; không tự tạo extractor/canonical legal field/bảng,
+không biến mọi editor thành block. Nguồn vẫn giữ, model/cutover chưa implement.
+
+**A/B đã chốt:** ủy quyền A=người ủy quyền/B=người được ủy quyền; một bên
+không gán A/B; hai nguồn trái nhau giữ conflict và xác nhận phần nhóm, không
+tự chọn nguồn thắng hoặc thu hẹp requester. Chữ “nhận” không universal regex.
+Requester không lọc theo tag A/B đã gán: cá nhân sống của văn bản một bên/
+đại diện ủy quyền vẫn vào output khi nhóm không gán hoặc conflict.
 
 W05 giữ loại đất có tài sản/nhà dù thiếu mẫu/rule chi tiết, không tự tạo schema;
 A10 chỉ giữ xe/sổ tiết kiệm/bảo hiểm ở nhận diện/pending structured. A09 chưa duyệt

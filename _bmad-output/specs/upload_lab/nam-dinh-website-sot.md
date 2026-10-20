@@ -251,13 +251,20 @@ Năm item có cùng **`danhmucId:5`** và mỗi item có `donviId` (định danh
 
 Nguồn `raw.ben_a/b.nguoi[]` giữ thứ tự, `entity_lines` là text tổ chức/đầu mục; `_extract_party_data:4154-4183`. `_format_person_block:2970-2979` hiện **dùng raw_text**, không rebuild từ canonical; `fmt_nguoi_yeu_cau:2982-2987` lấy người đầu hoặc tối đa ba entity_lines; `_append_party_display:2998-3009` ghép tất cả. `_fmt_duong_su_by_kind:4749-4765` chọn nhóm theo loại văn bản, không là quan hệ DB parties approved. Lookup requester tùy chọn theo số/năm/ngày có thể format người match từ hai bên hoặc trả tên lookup nguyên văn (`resolve_requester_override:561-588`, `_format_requester_person:527-558`); không chứng minh một quan hệ requester canonical được lưu.
 
-**Policy đích R06, owner 20/10/2026:** “Người yêu cầu công chứng = tất cả người
-có trong hồ sơ”. W09 điền thuần dữ liệu chuẩn của mọi Người thuộc Hồ sơ, không
-kèm Bên A/Bên B, quan hệ con đẻ, chức vụ, tư cách hoặc lời văn phụ. Lookup/ưu tiên
-bên/người đầu bên trên chỉ là **hiện trạng cũ cần cutover**, không còn thẩm quyền
-chọn requester. Không cắt danh sách hoặc suy thêm người thiếu. Việc xác định
-membership/thứ tự và trường hợp người chết/cá nhân đại diện thuộc #43; chưa có
-quyết định loại họ khỏi “tất cả người”. Pháp nhân vẫn không thuộc Người, nhập tay.
+**Policy đích R06 — đáp án #43, owner 20/10/2026:** trong requester Nam Định/
+Upload, lấy mọi **cá nhân sống thuộc Bên A, Bên B, người đại diện theo ủy quyền**;
+không đưa người chết, công chứng viên hoặc nhân viên vào output này. Không suy
+thêm thân nhân chỉ được nhắc. Mỗi identity xác nhận một lần, giữ thứ tự nguồn;
+không lookup/ưu tiên B/người đầu hoặc lời quan hệ/chức vụ/tư cách. Đây là phạm
+vi output, không xóa Person chết, Stage, raw, lịch sử hoặc metadata nhân sự.
+Ngân hàng ở hợp đồng thế chấp được hiện **cả cụm** nhưng không là Person;
+**BANKMODE còn mở:** cụm ngân hàng thế chấp do user dán hay app tự lấy/điền
+từ nguồn? Cá nhân khác vẫn chuẩn; chưa chọn auto/manual mới/field pháp nhân.
+Alias/D04/D08 cá nhân giữ policy cũ, không biến cả ba editor thành block.
+Lookup/firstperson/raw formatter ở trên chỉ là hiện trạng chưa cutover.
+Requester không lọc bằng tag A/B đã gán. Cá nhân sống tham gia văn bản một bên/
+đại diện theo ủy quyền vẫn vào requester khi không gán hoặc đang conflict A/B;
+chỉ phần nhãn nhóm bị ảnh hưởng chờ xác nhận, không phát sinh owner gate mới.
 
 | Nguồn extraction | Canonical / wire Notary đã có | Đích thực và ranh giới |
 |---|---|---|
@@ -310,6 +317,11 @@ ngân hàng/chi nhánh/đại diện; loại khác ít xảy ra. Sự có mặt 
 tự bịa tên, người đại diện hoặc default party; chỉ dùng dữ kiện nguồn nêu rõ;
 pháp nhân khác giữ nguồn và không bị âm thầm bỏ mất hoặc tự xếp loại.
 
+**Ngoại lệ output mới #43:** ngân hàng thế chấp hiện cả cụm theo lời owner,
+không đưa tổ chức vào Person. Hướng nhập tay pháp nhân trước đó không tự trả lời
+mode nhập cụm ngân hàng mới; BANKMODE ở §6.1 còn chưa chọn. Không tự bóc+điền
+ngân hàng, tạo canonical legal field/bảng hoặc default cụm từ tên ngân hàng.
+
 **Owner 20/10/2026 cho phép có điều kiện** thêm một trường giữ cả cụm khi cụm
 phức tạp, không lặp lại và thuộc một ô nhập của một website cụ thể. Đây không
 phải quyết định biến cả ba editor hoặc mọi ô web thành block/trường phụ. Khi
@@ -358,8 +370,8 @@ Các cách xử lý dùng trong bảng:
 | **W08** · Thư ký (#8) | Extraction hiện `null`; input prepare → projection; §4/§5.6 | **C `thuky`** tên/null | Tái dùng chuẩn → freeSolo | Giữ lựa chọn rõ ràng trong Case được prepare; không đoán từ list/default | **ĐÃ CHỐT** |
 | **W03** · Ngày công chứng (#3) | `find_ngay_cong_chung` → ISO → display DD/MM/YYYY | **C `ngaycongchung`**; không ngày tạo/ngày default website | Tái dùng chuẩn + đổi format tại biên | Không tạo ngày giả từ ngày mở form; gap clear/default hiện có ở §3 không tự thành policy mới | **ĐÃ CHỐT** scalar; không hỏi lại |
 | **W06** · Số công chứng (#6) | `find_so_cong_chung`/scan → normalize | **C `socongchung`**; `registry.contract_no` chỉ scan/reference | Tái dùng chuẩn | Giữ `xxx/yyyy` và scope sổ/năm/site; không dùng làm shared Case ID | **ĐÃ CHỐT** |
-| **W09** · Thông tin người yêu cầu… (#9) | Legacy first-person/raw formatter hoặc lookup; §6.1 | **J `web_form.nguoi_yeu_cau`**; Người/quan hệ chưa cutover | Dựng từ dữ liệu chuẩn **tất cả Người trong Hồ sơ** | R06 thay authority lookup/firstperson; không role/quan hệ/chức vụ/lời văn phụ, không lưu cả editor thay Người | **ĐÃ CHỐT policy R06/D08**, membership/thứ tự #43; R05 alias nhập tay |
-| **W10** · Đương sự (#10) | `raw.ben_a/b` → formatter theo loại; §6.1 | **J `web_form.duong_su`** và raw hai bên/người chết | Person chuẩn + nhóm hiển thị chung Bên A/Bên B có căn cứ | Không tự lưu block tư cách D04/D08; lời phức tạp D04 user sửa tay; semantic A/B chưa đủ để tự gán mọi loại | **D04/D08 đã trả lời; D05 còn làm rõ; D06/D07 → #43** |
+| **W09** · Thông tin người yêu cầu… (#9) | Legacy first-person/raw formatter hoặc lookup; §6.1 | **J `web_form.nguoi_yeu_cau`**, chưa canonical cutover | Cá nhân sống A/B/đại diện ủy quyền theo chuẩn; ngân hàng thế chấp cả cụm, không Person | Loại người chết/CCV/nhân viên khỏi requester output, không xóa dữ liệu/history; không prose cá nhân/firstperson | **#43 Q1 đã trả lời; chỉ BANKMODE còn chọn**, không blanket block editor |
+| **W10** · Đương sự (#10) | `raw.ben_a/b` → formatter theo loại | **J**, chưa parties cutover | Nhóm A/B theo nghĩa đã chốt | Ủy quyền A=ủy quyền/B=được ủy quyền; một bên không gán; nguồn trái nhau xác nhận phần nhóm, không winner tự động | **D05/#43 Q2 đã trả lời**; model/cutover chưa implement |
 | **W11** · Tài sản (#11) | Text `_find_tai_san_by_kind` + `raw.danh_sach_thua_dat[]`; §6.2 | **J `web_form.tai_san`** và các hàng raw; chưa Upload Asset chuẩn | Dựng từ trường Asset/land rows đã biết | Phân biệt đoạn ghép toàn tài sản với lời dư thật chưa map; ví dụ §7.5.1; chưa duyệt block A09 | **A09 chờ làm rõ phạm vi; A10 đã duyệt nhận diện/pending** |
 | **W12** · Văn bản hợp đồng (#12) | `raw.file_goc` → builder → input file; §8 | **F** JSON + `registry.file_path`; không cột nghiệp vụ | Tái dùng file/provenance kỹ thuật | Giữ nguồn; file selection trước Lưu không chứng minh portal upload/persistence | **ĐÃ PHÂN LOẠI**, không quyết định nghiệp vụ mới |
 | **W13** · Ghi chú (#13) | Không builder/selector/fill | Không storage nghiệp vụ mới | Bỏ qua | Không điền/clear default; không dùng làm kho chứa gap | **ĐÃ CHỐT**, không hỏi lại |
@@ -398,23 +410,23 @@ Các locator dưới đây là **source tĩnh đã đọc**, không kết quả 
 | ID / nội dung | Extraction hiện tại / nguồn | Chuẩn có sẵn + Upload thực lưu | Phương án phù hợp | Khuyến nghị + lý do/đánh đổi | Owner cần chọn? |
 |---|---|---|---|---|---|
 | **W09-R01** · Họ tên, danh xưng | `nguoi[].ho_ten/gioi_tinh`, raw formatter; S-P/S-R | `ten`; `gioitinh` wire Nam/Nữ/null khác Ông/Bà; **J**, mapper N chưa map giới tính | Tái dùng chuẩn rồi dựng hiển thị | Không gộp Ông/Bà/quan hệ vào tên; chỉ dùng giới tính/danh xưng có căn cứ, không đoán từ tên. Không cần field web trùng Person | **ĐÃ CÓ chuẩn scalar**; phần mapper/cutover chưa làm |
-| **W09-R02** · Ngày/năm sinh; ngày chết khi đúng nguồn | `ngay_sinh/chi_co_nam_sinh`; người chết ở nguồn riêng S-P | `ngaysinh/ngaychet` giữ YYYY hoặc full date; **J**, nguồn người chết chưa qua mapper N | Tái dùng chuẩn + format giữ độ đầy đủ | Không đệm năm thành ngày; R06 là mọi Người trong Hồ sơ, không tự loại người chết hoặc tự suy người thiếu | **ĐÃ CHỐT scalar/R06**; membership cụ thể và thứ tự #43 |
+| **W09-R02** · Ngày/năm sinh; ngày chết trong dữ liệu nguồn | `ngay_sinh/chi_co_nam_sinh`; người chết nguồn riêng | `ngaysinh/ngaychet` giữ YYYY/full date; **J** | Giữ trường Person/raw/snapshot đúng nghĩa | Người chết không vào requester theo đáp án #43, nhưng không xóa giấy khai tử/ngày chết khỏi dữ liệu Hồ sơ thừa kế | **Scalar giữ nguyên; requester membership đã trả lời** |
 | **W09-R03** · Giấy tờ, loại, ngày cấp, cơ quan cấp | `cccd/ngay_cap_cccd/noi_cap`; chết: `so_giay_to/ngay_cap/loai_giay_to`; S-P | `sogiayto/ngaycap/noicap/loaigiayto`; snapshot/master theo §6.1; **J** | Tái dùng chuẩn + hiển thị theo loại giấy tờ | Không ép mọi giấy thành CCCD; issuer snapshot có nghĩa riêng, không tự đồng nhất cơ quan công chứng. Nhiều giấy giữ ambiguous/#42, không nhét list vào ô đơn | **ĐÃ CHỐT scalar**; #42 độc lập, không hỏi lại |
 | **W09-R04** · Địa chỉ và nhãn địa chỉ | `dia_chi/dia_chi_line`, người chết địa chỉ cuối; S-P/S-R | `diachi/loaidiachi`, line chỉ presentation; **J** | Tái dùng chuẩn + dựng nhãn theo nguồn/quy tắc đã chốt | Không nhân đôi địa chỉ vì ô web dài; không tự đổi nơi chết thành thường trú. Đa địa chỉ thuộc #42 | **ĐÃ CHỐT scalar** |
 | **W09-R05** · Tên gọi khác | `raw.nguoi_chet[].ten_goi_khac`; S-P | **J raw/lịch sử**, chưa field alias approved | Không tự điền alias vào output chuẩn/không mở rộng chuẩn hóa; nếu cần user điền tay | Owner “bỏ tên gọi khác – nếu có user điền tay”; không nối vào `ten`, thêm field alias hoặc mở rộng normalization/#42; giữ raw/lịch sử, runtime chưa đổi | **ĐÃ CHỐT**, không hỏi lại |
-| **W09-R06** · Ai là requester | Legacy first B/fallback A, cam kết A và lookup; S-R | **J** text cũ; chưa membership canonical Upload cutover | **Tất cả Người có trong Hồ sơ**, thuần dữ liệu chuẩn từng Người | Owner đổi business spec; lookup/firstperson không còn authority đích. Không chỉ B/người đầu, không bỏ tên, không mô tả Bên A/B, con đẻ/chức vụ/tư cách; không suy thêm người. Pháp nhân không thuộc Người | **ĐÃ CHỐT policy**; membership/thứ tự/người chết/đại diện làm kỹ ở #43, không mặc định loại ai |
-| **W09-R07** · Tổ chức và cá nhân đại diện trong nguồn | `entity_lines` hoặc natural representative; S-P/S-R | Pháp nhân không thuộc Person; scalar cá nhân có sẵn, **J** | Pháp nhân nhập tay; cá nhân chuẩn theo R06; lời phức tạp theo D04 | Không biến tổ chức thành Người. R06 không tự loại cá nhân đại diện; phạm vi membership cần chốt ở #43, không suy quyền đại diện | **ĐÃ CHỐT policy**, không hỏi lại D04/R06; membership #43 |
+| **W09-R06** · Ai là requester | Legacy first B/fallback A, lookup | **J**, chưa membership canonical cutover | Mọi cá nhân sống A/B/đại diện ủy quyền, không người chết/CCV/nhân viên | Dữ kiện chuẩn, một lần mỗi identity xác nhận theo nguồn, không prose/lookup/ưu tiên bên; không xóa Person/history | **Q1 đã trả lời; BANKMODE riêng còn mở** |
+| **W09-R07** · Tổ chức và cá nhân đại diện | `entity_lines`/cá nhân đại diện | Tổ chức không Person; cá nhân scalar; **J** | Cá nhân ủy quyền requester; ngân hàng thế chấp cả cụm không Person | Không suy quyền/prose cá nhân; chỉ chưa chọn user dán hay app lấy/điền cụm ngân hàng, không hỏi scope người khác | **BANKMODE chưa chọn**, chưa legal table/schema |
 
 ### 7.4 W10 — đương sự: 8 đơn vị thông tin
 
 | ID / nội dung | Extraction hiện tại / nguồn | Chuẩn có sẵn + Upload thực lưu | Phương án phù hợp | Khuyến nghị + lý do/đánh đổi | Owner cần chọn? |
 |---|---|---|---|---|---|
 | **W10-D01** · Dữ liệu từng thể nhân | `ben_a/b.nguoi[]` với tên/danh xưng/ngày/ID+cấp/địa chỉ; S-P | Cùng scalar R01–R04, không bộ Person thứ hai; **J** raw + web text | Tái dùng chuẩn + dựng từng người | Dùng một chuẩn Người, không sao chép các scalar vào block Đương sự; renderer giữ nguồn/độ đầy đủ, không chỉ ghép tên | **ĐÃ CÓ chuẩn scalar**, chưa Upload cutover |
-| **W10-D02** · Người để lại di sản, ngày chết/TLKT | `raw.nguoi_chet[]` riêng, code cũ lọc khỏi hai bên; S-D/S-P | Scalar Người có sẵn; alias chỉ raw/manual R05; **J**, N chỉ loop hai bên | Tái dùng Người; phân biệt tình trạng sống/chết và vai trò | Không đồng nhất người chết với người giao dịch cho mình hoặc slot owner. R06 là tất cả Người trong Hồ sơ; không lấy việc code cũ lọc làm quyết định loại requester | **ĐÃ CHỐT scalar/R05/R06**; nhóm/thành viên cụ thể D05/#43 |
-| **W10-D03** · Pháp nhân/tổ chức/chi nhánh | `entity_lines` là text đầu mục, không object pháp nhân đã chuẩn; S-P/S-D | Không Person/Upload legal-entity table; **J** text | **Nhập tay** theo policy; giữ nguồn | Không tự bóc/suy tên ngân hàng, chi nhánh, địa chỉ tổ chức hoặc mặc định một bên. Bảng riêng tương lai chưa duyệt; không yêu cầu owner chọn schema ở lượt này | **ĐÃ CHỐT**, không hỏi lại |
+| **W10-D02** · Người để lại di sản, ngày chết/TLKT | `raw.nguoi_chet[]` riêng | Scalar Người có sẵn, **J** | Giữ Person và snapshot Hồ sơ đúng nghĩa | Owner loại người chết khỏi requester Nam Định, không loại khỏi mọi Hồ sơ/Stage hoặc phá dữ kiện thừa kế; không suy chủ đất | **Đã trả lời phạm vi requester; scalar/history giữ** |
+| **W10-D03** · Pháp nhân/tổ chức/chi nhánh | `entity_lines` chưa object chuẩn | Không Person/legal table; **J** text | Ngân hàng thế chấp cả cụm ở output; policy pháp nhân trước không tự quyết mode mới | BANKMODE chỉ user dán hay app lấy/điền cụm ngân hàng; không tự extractor/default/legal field hoặc đổi prose cá nhân/editor | **Không Person đã chốt; mode ngân hàng chưa chọn** |
 | **W10-D04** · Cá nhân đại diện và lời tư cách/căn cứ | S-P tách tên trước chức vụ; lời văn có thể ở raw/entity lines | Scalar cá nhân có sẵn; authority/liên kết chưa model approved, **J** | Dùng dữ liệu chuẩn Người; **bỏ lời văn phức tạp khỏi tự động điền, user tự sửa thủ công** | Không duyệt block D04 hay tự suy quyền/hiệu lực. Giữ nguồn; không mở manual fallback cho mọi unknown; quan hệ đại diện thuộc #43 | **ĐÃ CHỐT**, runtime chưa cutover |
-| **W10-D05** · Nhóm Bên A/Bên B | S-D có chuyển/nhận, thế chấp/nhận, ủy quyền/được ủy quyền, thừa kế một bên | **J**; chưa model participation approved; metadata site không quyết định nghĩa | Owner chọn **chỉ gán Bên A/Bên B nói chung** trong output | “Gần như 100% Bên B luôn có chữ nhận” là quan sát, **không regex phổ quát**, không suy mọi còn lại=A. Bên nhận chuyển nhượng/nhận thế chấp khác nhau; được ủy quyền không có chữ nhận; thừa kế có thể một bên. Xem §7.6 | **ĐÃ CHỌN hướng nhóm**, còn semantic ngoại lệ/ưu tiên nguồn chưa đủ để tự động gán |
-| **W10-D06** · Nhiều người, thứ tự, nhiều lần tham gia | Array nguồn có thứ tự, formatter cũ A rồi B; S-P/S-D | **J**; chưa membership/roles chuẩn được duyệt | Chuyển cùng D07 sang **#43 riêng** | Cần làm kỹ danh tính/thành viên có thứ tự và vai trò lặp; không cắt người đầu, gộp theo tên hoặc chọn cardinality từ code | **ĐÃ CHỐT chuyển issue**, làm ngay sau rõ các ô; chưa duyệt model |
+| **W10-D05** · Nhóm Bên A/Bên B | Nhánh nguồn chuyển/nhận, ủy quyền, một bên | **J**, participation chưa cutover | Nhóm A/B chung; ủy quyền A=người ủy quyền/B=người được ủy quyền | Một bên không gán; hai nguồn trái nhau giữ conflict/xác nhận phần nhóm; không tự winner hoặc dùng “nhận” phổ quát | **#43 Q2 đã trả lời**, không hỏi lại |
+| **W10-D06** · Nhiều người/thứ tự/lần tham gia | Array nguồn có thứ tự | **J**, chưa model chuẩn | #43 có16ca/kết luận bảo toàn, Q1/Q2 đã trả lời | Giữ identity/nguồn/lần tham gia; requester theo scope đã trả lời; không gộp tên/cắt người đầu | **Phân tích đã có; chỉ BANKMODE còn hỏi**, chưa schema/cutover |
 | **W10-D07** · Người liên quan tài sản nào | Cùng payload không chứng minh liên kết cặp; `chudat` Diagram là nghĩa khác | **J**, chưa model/cardinality/FK approved; Upload `chudat=null` | **Cùng một #43 với D06**, scope từng người/nhóm–tài sản có nguồn | Phân biệt cả nhóm/cả tập, từng cặp và chưa rõ; không tích Descartes mọi người×mọi tài sản, không suy chủ đất từ A/GCN | **ĐÃ CHỐT chuyển issue**, không chờ toàn #41/#42 hoặc triển khai ngay |
 | **W10-D08** · Lời quan hệ/tư cách phụ | `raw_text/entity_lines` giữ lời nguồn; S-P | Không field residual prose approved, **J** | Owner trả lời **theo R06**: dữ liệu chuẩn Người, không lời mô tả phụ | Không duyệt cụm dư D08; không đưa con đẻ/quan hệ/chức vụ/role prose vào requester. Nhóm W10 theo D05, quan hệ #43; nguồn vẫn giữ | **ĐÃ TRẢ LỜI**, không hỏi lại D08 |
 
@@ -477,25 +489,22 @@ chưa đủ căn cứ duyệt field “mô tả bổ sung tài sản”.
 
 ### 7.6 Đã chốt và phần còn cần làm rõ
 
-- **Đã trả lời:** R05 alias nhập tay, không chuẩn hóa mở rộng; R06 mọi Người
-  trong Hồ sơ, chỉ dữ liệu chuẩn; D04 bỏ lời phức tạp, user tự sửa; D08 theo R06,
-  không hỏi lại; A10 nhận diện/pending structured, #29 vẫn deferred.
+- **Đã trả lời:** R05 alias nhập tay; R06 requester Nam Định là cá nhân sống
+  A/B/đại diện ủy quyền, không người chết/CCV/nhân viên trong output; dữ kiện/
+  Person/Stage/history giữ nguyên. D04/D08 cá nhân không prose; A10 pending,
+  #29 deferred. Ngân hàng thế chấp cả cụm không Person; BANKMODE còn mở.
 - **W05 đồng ý có điều kiện:** dựng lựa chọn portal từ tập tài sản; giữ ID 1
   đất có tài sản/nhà. Còn thiếu rule khi một hồ sơ thực sự có nhiều loại khác nhau;
   không tự chọn một loại bao quát/đầu/Khác, không đọc mẫu mới để lấp gap.
-- **D05 cần rõ semantic A/B:** nguồn hiện có chứng minh chuyển nhượng
-  A=chuyển/B=nhận chuyển nhượng và thế chấp A=thế chấp/B=nhận thế chấp.
-  Nhánh ủy quyền có “được ủy quyền” không chứa chữ nhận; thừa kế có văn bản một
-  bên. Chưa chốt cách gán cho nhóm một bên, ngoại lệ không có chữ nhận hoặc
-  heading A/B mâu thuẫn nhãn vai trò. “Gần như 100%” không phải 100%, không đủ
-  làm regex tổng quát hay fallback “không nhận=A”. Không đổi R06 theo nhóm A/B.
+- **D05 đã trả lời #43:** ủy quyền A=ủy quyền/B=được ủy quyền; một bên không
+  gán; hai nguồn trái nhau giữ conflict/xác nhận nhóm bị ảnh hưởng, không
+  winner/thu hẹp requester. “Nhận” không universal regex/“không nhận=A”.
 - **A09 còn làm rõ phạm vi:** bảng/ví dụ §7.5.1 cho biết trường thật tạo đoạn
   tài sản; chưa xác định lời dư cụ thể đủ điều kiện để duyệt cụm riêng. Giữ
   chưa map/source cho nội dung chưa rõ, không dựng thêm field nhà/`o_tho`.
-- **D06+D07 → #43 riêng:** giải quyết ngay sau làm rõ các ô; membership/thứ tự,
-  nhiều vai trò và scope người↔tài sản chưa duyệt model/FK/cardinality. Với R06,
-  câu “tất cả người” giữ nguyên; phạm vi thành viên người chết/đại diện phải
-  được làm rõ ở issue này, không tự loại.
+- **D06+D07/#43:** 16ca và kết luận bảo toàn đã có; Q1/Q2 đã trả lời,
+  chỉ BANKMODE user dán/app lấy-điền cụm ngân hàng còn hỏi. Không tự extractor/
+  legal field hoặc blanket raw editor. Chưa model/FK/schema/cutover; #41 mở.
 
 ### 7.7 Hai tầng dữ kiện / đoạn suy ra — lịch sử phương án; owner chốt chỉ placeholder và trường tĩnh
 

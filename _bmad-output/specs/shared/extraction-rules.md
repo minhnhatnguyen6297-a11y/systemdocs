@@ -255,21 +255,24 @@ chưa map/orphan. Chưa chọn cụm/ô nào trong lượt tài liệu này.
 
 **Nam Định §7 — owner trả lời 20/10/2026, policy đích chưa runtime cutover:**
 
-- **R06 requester = tất cả Người có trong Hồ sơ**, thuần thông tin chuẩn từng
-  Người. Bỏ authority chọn một bên/người đầu/lookup cũ ở các nhánh bên dưới;
-  không đưa Bên A/B, con đẻ, chức vụ/tư cách/lời mô tả phụ vào requester,
-  không cắt danh sách hoặc suy người thiếu. Pháp nhân không thuộc Người.
+- **R06 — requester Nam Định/Upload theo đáp án #43:** mọi cá nhân sống A/B/
+  đại diện theo ủy quyền; không người chết, công chứng viên, nhân viên trong
+  output này. Không xóa dữ kiện Người chết/Stage/Hồ sơ thừa kế/raw/history
+  hoặc metadata nhân sự. Cá nhân dùng chuẩn, không prose/lookup/firstperson.
+  Ngân hàng thế chấp hiện cả cụm nhưng không Person; **BANKMODE chưa chọn**
+  mode user dán hay app lấy-điền cụm ngân hàng thế chấp; cá nhân khác vẫn chuẩn.
+  Requester không cần tag A/B đã gán: cá nhân sống một bên/đại diện ủy quyền
+  vẫn vào khi nhóm chưa gán hoặc conflict.
 - **D04** lời tư cách/căn cứ phức tạp bỏ khỏi tự động điền, user tự sửa; không
   block mới, không mất nguồn hoặc mở manual fallback mọi gap. **D08 theo R06**,
   không residual prose block và không hỏi lại.
-- **D05** chỉ nhóm output Bên A/Bên B nói chung theo nghĩa nguồn; “gần như
-  100% Bên B có chữ nhận” không universal regex hoặc “không nhận=A”. Chuyển/
-  nhận chuyển nhượng, thế chấp/nhận thế chấp, ủy quyền/được ủy quyền và thừa kế
-  một bên cần phân biệt; semantic ngoại lệ còn làm rõ, không sửa R06 theo A/B.
-- **D06+D07** chuyển [#43 riêng](../../backlog/spike-case-people-assets-relationships.md),
-  làm ngay sau rõ các ô, không chờ toàn #41 xong/#42. Membership/thứ tự,
-  vai trò lặp, phạm vi Người↔Tài sản và người chết/cá nhân đại diện cần làm kỹ,
-  chưa model/FK/cardinality; không tự loại họ khỏi “tất cả người”.
+- **D05 đã trả lời:** ủy quyền A=người ủy quyền/B=người được ủy quyền; một bên
+  không gán A/B; nguồn trái nhau giữ conflict/xác nhận phần nhóm, không tự
+  winner hoặc thu hẹp requester. “Nhận” không universal regex/“không nhận=A”.
+- **D06+D07 #43:** phân tích 16 ca và kết luận bảo toàn đã có; membership/
+  A-B đã trả lời, chỉ BANKMODE còn cần làm rõ. Không tự extractor/canonical
+  pháp nhân, không blanket raw block mọi editor; nhập tay pháp nhân trước đó
+  không tự quyết mode “dán” mới. Chưa model/FK/schema/cutover; #42 độc lập.
 - **A09 chưa duyệt block**: toàn đoạn tài sản ghép từ các field chuẩn khác
   lời dư thật chưa map. [SOT §7.5.1](../upload_lab/nam-dinh-website-sot.md) lưu
   trường thực/ví dụ tổng hợp và wire/model gaps; không nhét `phan_ghi_them`
@@ -332,7 +335,7 @@ cũ vẫn phải được kiểm lại, không biến “bỏ qua” thành “�
   - `Bên A`: Bên thế chấp (cá nhân/hộ gia đình).
   - `Bên B`: Bên nhận thế chấp; nguồn thường nêu ngân hàng/pháp nhân/chi nhánh + người đại diện ký. Đây là vai trò theo nguồn, không phải dữ kiện mặc định.
   - Không có heading `BÊN NHẬN THẾ CHẤP` thì phần mở đầu trước `BÊN THẾ CHẤP` (ngân hàng + đại diện, mẫu Lời chứng Agribank/VB sửa đổi) được coi là Bên B (11/10/2026, hành vi legacy).
-  - Người yêu cầu công chứng: **tất cả Người trong Hồ sơ** theo R06, không chỉ cá nhân đại diện ngân hàng/Bên B; membership/đại diện chưa tự loại hoặc suy thêm, làm rõ trong #43.
+  - Người yêu cầu công chứng: cá nhân sống A/B/đại diện ủy quyền theo #43, không người chết/CCV/nhân viên; ngân hàng cả cụm không Person, BANKMODE còn mở. Không xóa dữ liệu nguồn/Person lịch sử, không chỉ B/đại diện ngân hàng.
   - **Pháp nhân không bóc thành Người (policy đích 20/10/2026):** người dùng nhập
     tay; không tự tạo tên ngân hàng/chi nhánh/người đại diện hoặc default party
     fact, không thêm loại pháp nhân vào Person. Hành vi legacy ở trên vẫn là hiện

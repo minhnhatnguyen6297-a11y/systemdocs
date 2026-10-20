@@ -3,16 +3,16 @@ title: "Làm rõ quan hệ nhiều Người–nhiều Tài sản trong Hồ sơ"
 ticket: 43
 status: draft
 blocked_at: "2026-10-20"
-blocked_reason: "Refinement/design awaiting owner: 16 synthetic cases completed; Q1 membership definition and Q2 A/B exceptions unresolved. Identity, source order and scope preservation are requirements, not owner gates. No runtime start; refined false; #41 gate unchanged."
+blocked_reason: "Q1 requester and Q2 A/B answered; 16-case analysis complete. Only BANKMODE remains: mortgage bank cluster user paste or app take/fill from source. Other persons standard facts; no A/B tag prerequisite. No runtime/schema; refined false; AC4 not closed; #41 gate unchanged."
 ---
 
 # #43 — Đề xuất nghiệp vụ quan hệ Người–Tài sản trong Hồ sơ
 
 **Artifact bền vững:** nội dung thiết kế PROPOSED nằm đầy đủ ngay trong plan này. Bản tmp chỉ là bằng chứng làm việc tùy chọn, không là nguồn bắt buộc hoặc spec đã áp dụng.
 
-**Trạng thái refinement:** awaiting owner Q1–Q2; `status: draft`/blocked giữ nguyên, không runtime start, `hitl: true`, `refined: false`.
-
-**Ngày:** 20/10/2026 · **Trạng thái: PROPOSED — chờ owner trả lời Q1–Q2.**
+**Trạng thái:** Q1/Q2 đã trả lời; draft/blocked chỉ **BANKMODE** chờ clarification.
+Hitl:true/refined:false; chưa runtime/schema. Nghĩa đã trả lời là policy đích;
+model còn PROPOSED. Cập nhật 20/10/2026.
 
 Đây là kết quả điều tra/refinement D06+D07, không phải contract, schema hoặc lệnh build. Chỉ dùng tình huống tổng hợp. `Người 1`, `Tài sản 1`, `GCN X` là nhãn minh họa, không phải dữ liệu khách hoặc giấy tờ giả. Không đọc mẫu thật, chạy parser, app, browser, test hoặc ghi DB. #43 vẫn `hitl: true`, `refined: false`; #41 chưa xong, gate mẫu ĐÓNG.
 
@@ -21,9 +21,19 @@ blocked_reason: "Refinement/design awaiting owner: 16 synthetic cases completed;
 - Lệnh owner mới nhất: **chỉ placeholder và trường tĩnh**. Không thiết kế tầng 2 đoạn động, formula engine hoặc điều kiện cho người dùng cấu hình. Đoạn trình bày có thể điền từ các trường/tham chiếu đã được duyệt; việc đó không tự duyệt trường văn bản canonical mới. Không xóa hoặc đổi nghĩa các block token Word legacy đang hoạt động.
 - Mọi luồng dựa trên Người–Tài sản–Hồ sơ; quan hệ là nghĩa thuộc Hồ sơ, độc lập bố cục Word/editor. Cùng xuất hiện không chứng minh có liên kết. Không suy tích mọi Người × mọi Tài sản; không gộp theo tên hoặc serial.
 - **Bảo toàn nghĩa scope là yêu cầu đã có** ở ticket AC2/SOT D07, không hỏi duyệt lại: cả nhóm–cả tập (C04), từng cặp riêng (C05), tập con chồng nhau (C06) và chưa rõ (C07) phải phân biệt. Không bung nhóm–tập thành quyền cá nhân, không biến chưa rõ thành tất cả/không có. Không đặt gate output toàn cục vì scope chưa rõ.
-- R06/D08: requester = **tất cả Người thuộc Hồ sơ**, chỉ dữ kiện Người chuẩn. Không chọn B, người đầu, lookup, chỉ người ký hoặc chỉ người sống; không kèm lời quan hệ/chức vụ/tư cách. Phạm vi “thuộc Hồ sơ” chưa được owner xác định hết (Q1).
-- D05 chọn nhóm output chung **Bên A/Bên B**. “Gần như 100% B có chữ nhận” là quan sát, không universal regex; không có chữ nhận không suy thành A. Ngoại lệ một bên/ủy quyền/xung đột nhãn vẫn mở (Q2).
-- Pháp nhân không là Người; người dùng nhập tay. Bảng pháp nhân riêng là hướng tương lai, chưa duyệt/build. Có dữ kiện cá nhân đại diện thì giữ đúng Người đó; không suy quyền đại diện hay tự dựng lời ủy quyền. Alias nếu cần nhập tay, lời tư cách/căn cứ phức tạp D04 sửa tay; không mở fallback tay cho mọi gap.
+- **Q1 đã trả lời — requester Nam Định/Upload:** cá nhân sống A/B/đại diện
+  theo ủy quyền vào output; người chết/CCV/nhân viên không vào output đó.
+  Không xóa Person chết/Stage/Hồ sơ thừa kế/raw/history/metadata nhân sự.
+  Cá nhân chuẩn, không prose/lookup/firstperson; không thêm thân nhân chỉ nhắc.
+  Ngân hàng thế chấp hiện cả cụm, không Person; BANKMODE còn mở, không tự
+  extractor/manual mới/legal field. Alias/D04/D08 cá nhân giữ policy cũ.
+- **Q2 đã trả lời:** ủy quyền A=ủy quyền/B=được ủy quyền; một bên không gán;
+  nguồn trái nhau giữ conflict/xác nhận phần nhóm, không winner/thu hẹp
+  requester. “Nhận” không universal regex. Pháp nhân vẫn không thuộc Person;
+  nhập tay pháp nhân cũ không tự quyết mode nhập cụm ngân hàng mới; cá nhân khác vẫn chuẩn.
+- A/B trong scope requester là tư cách nguồn, không tag filter: cá nhân sống
+  tham gia văn bản một bên/đại diện ủy quyền vẫn vào requester khi nhóm không
+  gán hoặc conflict. Giữ requester độc lập nhãn nhóm, không hỏi lại owner.
 - `chudat` là metadata Hồ sơ lấy lựa chọn Chủ `ownPositions` trên Diagram đã lưu, tài sản hiện có, loại hidden/deleted; tên snapshot Stage theo `personId`. Không lấy GCN/Bên A/slot `owner`/`owner_row_id` làm mặc định; Upload không Diagram thì null. Không biến tên `chudat` thành toàn bộ quan hệ pháp lý hoặc scope chi tiết.
 - Snapshot của chính Hồ sơ là dữ kiện lịch sử; thay master hoặc Hồ sơ/module khác không tự ghi đè. Không ghi chéo DB, ghép Case hoặc tạo shared Case ID. #42 nhiều giấy tờ/địa chỉ độc lập, không là prerequisite.
 
@@ -49,7 +59,7 @@ Nguồn: ticket #43; decision owner §“Trả lời ma trận Nam Định”; S
 ## 3. Cách hiểu nghiệp vụ tối thiểu — đề xuất, chưa duyệt
 
 1. **Người là ai:** dữ kiện nhận dạng của một cá nhân. Trùng tên không đủ gộp; cùng Người chỉ được tái dùng khi có căn cứ đã xác nhận, không nối Case tự động.
-2. **Người có thuộc Hồ sơ không:** danh sách thành viên của chính Hồ sơ, có thứ tự và nguồn. Không đồng nhất với danh sách chữ được nhắc đến, ghế Diagram, người ký hay người yêu cầu theo heuristic cũ. R06 lấy toàn bộ danh sách này sau khi owner chốt nghĩa.
+2. **Membership khác requester:** giữ mọi đối tượng/nguồn hợp lệ của Hồ sơ; output requester Nam Định chỉ scope §1 đã trả lời, không xóa Người chết khỏi Stage/Hồ sơ thừa kế/snapshot.
 3. **Tham gia như thế nào:** mỗi lần/vai trò/nhóm có căn cứ, thứ tự trong nhóm và nguồn riêng; nhiều lần tham gia không nhân bản dữ kiện Người. Nhãn nguồn giữ lại để đối chiếu, không biến thành chức vụ prose trong R06.
 4. **Tài sản có thuộc Hồ sơ không:** danh sách tài sản có thứ tự, giữ identity từng tài sản và snapshot. Mỗi tài sản giữ cụm đất có thứ tự riêng. Người đứng tên GCN là dữ kiện nguồn, không tự là Chủ Diagram.
 5. **Ai liên quan phần nào:** ghi đúng ý nguồn/xác nhận: cả nhóm với cả tập tài sản; riêng cá nhân với tài sản cụ thể; hoặc những tập con khác nhau. Ghi rõ quan hệ đang nói đến (chuyển, nhận, được ủy quyền… khi có căn cứ), không nâng “liên quan” thành sở hữu hợp pháp. Không tính tỷ lệ, chia di sản hay dựng đồ thị pháp lý.
@@ -59,17 +69,17 @@ Các cách tổ chức ở mục 2–5 là đề xuất, **không duyệt entity
 
 ### Kết luận bảo toàn có căn cứ — không chờ owner duyệt lại
 
-- **Một Người, nhiều lần tham gia:** R06 lấy tập tất cả Người đã xác nhận, không tập lần xuất hiện. Mỗi identity cá nhân đã xác nhận xuất một lần trong requester; giữ đủ vai trò/lần tham gia và thứ tự nhóm riêng. Thứ tự theo danh sách/nguồn đã xác nhận (Notary theo Stage; Upload theo lần xuất hiện đầu tiên trong nguồn, không ưu tiên B hoặc container raw). Căn cứ: R06, AC1 không gộp/mất Người, contract §13.10 thứ tự Stage. Không dedup theo tên; chưa đủ căn cứ cùng Người thì giữ phân biệt/mơ hồ.
+- **Một Người, nhiều lần tham gia:** trong tập cá nhân thuộc scope requester đã trả lời, mỗi identity xác nhận một lần theo nguồn/danh sách; giữ đủ các lần tham gia riêng, không dedup tên/ưu tiên B/container raw. Căn cứ R06/AC1/contract §13.10; Notary Stage không đổi, ngân hàng cả cụm không Person giả.
 - **Quan hệ Upload mới bám đúng tài sản nguồn:** reorder chỉ đổi trình bày, không tự chuyển liên kết; thêm tài sản không tự sinh liên kết vào scope đã xác nhận. Căn cứ: AC2/D07 bảo toàn scope, identity khác vị trí và cấm suy Cartesian. Đây là kết luận bảo toàn dữ liệu/engineering cho luồng mới, không đòi owner chọn lại. **Không sửa** Diagram Notary legacy: `ownPositions` vẫn bám vị trí theo contract §13.3.
 - **Thiếu scope:** giữ nguyên chưa rõ, dùng được dữ kiện độc lập theo chính sách điền dần hiện hành; không đoán liên kết, không mở fallback tay hoặc chặn toàn Hồ sơ mới. Căn cứ: spec nền §2 điền dần, AC2/AC5 và data-rules §4.2. Không mở consumer feature, schema hoặc contract mới từ các kết luận này.
 
 ## 4. Ma trận 16 tình huống tổng hợp
 
-“Có căn cứ” dưới đây nghĩa là dữ kiện được đặt rõ trong tình huống, không phải code đã đọc được hoặc owner đã duyệt mô hình. Q1–Q2 trỏ hai câu hỏi ở §6; các kết luận bảo toàn ở §3 không là câu hỏi còn mở.
+Các ca tổng hợp không proof runtime. Q1/Q2 ở §6 đã trả lời; chỉ BANKMODE chưa chọn. Bảo toàn §3 không là câu hỏi mở.
 
 | Ca | Input: dữ kiện / nhóm nguồn | Câu hỏi quan hệ đích | Bất biến phải giữ | Khuyến nghị và phần chưa chọn |
 |---|---|---|---|---|
-| C01 · 1 Người–1 Tài sản | Hồ sơ 1 có Người 1 và Tài sản 1; nguồn nói rõ Người 1 có quan hệ với Tài sản 1, không nêu bên | Có đúng một thành viên và liên kết đã nêu, hay chỉ là hai đối tượng cùng xuất hiện? | Không tự tạo Người/Bên B thứ hai hoặc gán Chủ Diagram | Giữ liên kết có nguồn; không cần đồ thị. Nhóm chưa rõ theo Q2; một đối tượng mỗi loại tự nó chưa chứng minh quan hệ |
+| C01 · 1 Người–1 Tài sản | Hồ sơ có Người 1, Tài sản 1 và quan hệ nguồn, không nhãn bên | Một bên có gán A/B? | Không tạo Người/Bên B giả hoặc Chủ Diagram | **Q2 đã trả lời:** không gán A/B, giữ quan hệ nguồn |
 | C02 · 1 Người–nhiều Tài sản | Người 1; tài sản theo nguồn [Tài sản 2, Tài sản 1]; nguồn nói Người 1 chuyển cả hai | Phạm vi là tập hai tài sản, có thứ tự nào? | Không chỉ lấy tài sản đầu; không chuyển thứ tự thành identity | Giữ cả tập/thứ tự nguồn; reorder không đổi liên kết, thêm tài sản không tự mở scope theo kết luận §3, không owner gate |
 | C03 · nhiều Người–1 Tài sản | Nhóm A theo nguồn [Người 2, Người 1] cùng chuyển Tài sản 1 | Hai Người cùng tham gia một việc, hay mỗi người có quyền/tỷ lệ riêng? | Giữ hai Người và thứ tự; không tự chia đôi hoặc suy vợ chồng | Giữ quan hệ chung có căn cứ, không thêm tỷ lệ; giữ thứ tự nguồn/danh sách đã xác nhận theo §3 |
 | C04 · chung cả nhóm/cả tập | Nguồn nêu nhóm A [Người 1, Người 2] cùng chuyển tập [Tài sản 1, Tài sản 2] cho nhóm B [Người 3, Người 4], nhưng không phân quyền cá nhân | Cả nhóm tham gia với cả tập hay đã có bốn cặp cá nhân? | Không nhân thành quyền sở hữu riêng mỗi Người với mọi tài sản | Phải giữ phát biểu cấp nhóm–tập, không bung cặp; bất biến AC2/D07, không chờ duyệt lại |
@@ -80,10 +90,10 @@ Các cách tổ chức ở mục 2–5 là đề xuất, **không duyệt entity
 | C09 · trùng tên, khác Người | Người 1 và Người 2 có cùng giá trị tên minh họa, nguồn phân biệt rõ bằng dữ kiện riêng; cả hai cùng nhóm A | Hai cá nhân có bị dedup khi dựng requester/nhóm không? | Không gộp tên; giữ hai nguồn và hai dòng dù output tên giống nhau | Hai Người riêng, mỗi Người một dòng theo thứ tự nguồn/danh sách đã xác nhận. Không cần số CCCD giả để chứng minh |
 | C10 · một GCN, nhiều thửa | GCN X được nêu cho hai hàng thửa khác nhau: Tài sản 1 và Tài sản 2; Tài sản 1 có hai cụm loại đất, Tài sản 2 có một cụm | Giấy chứng nhận, hàng thửa và cụm loại đất có phải cùng đơn vị không? | Không gộp vì serial; không tách hai cụm thành hai thửa; giữ đúng bộ ba và thứ tự từng tài sản | Giữ hai tài sản khi nguồn đã xác định hai hàng riêng, giữ GCN X trên từng nguồn; không tạo entity GCN mới. Scope chủ thể nếu nguồn chưa nêu vẫn chưa rõ |
 | C11 · thay nguồn qua Hồ sơ | Hồ sơ 1 đã xác nhận Người 1 địa chỉ “Địa chỉ cũ”, Tài sản 1 hai cụm đất; Hồ sơ 2 có địa chỉ “Địa chỉ mới” và mô tả tài sản khác | Được sửa ngược Hồ sơ 1, chuyển vai trò/scope hoặc tự nối hai Case không? | Snapshot Hồ sơ 1 không đổi theo master/Hồ sơ 2/module khác; không tự đồng nhất hai Người chỉ vì cùng tên | Giữ từng snapshot và nguồn; sửa một Hồ sơ chỉ theo thao tác thuộc quyền của nó. Không đợi #42 để bảo toàn lịch sử |
-| C12 · một bên | Văn bản cam kết chỉ nêu Người 1 và tài sản, không có bên đối ứng trong nguồn | Đưa Người 1 vào A, B hay giữ chưa gán? | Không tạo bên rỗng giả thành dữ kiện; R06 không phụ thuộc nhãn A/B | Đề xuất chỉ gán khi có căn cứ, không tạo B; nhóm một bên cần Q2, không áp universal “không nhận=A” |
-| C13 · thừa kế/người chết | Nguồn có Người 1 đã chết, Người 2 là người nhận; nhắc Người 3 là thân nhân và Người 4 là thư ký; Diagram đã lưu chọn Chủ cho Người 2 trên Tài sản 1 | Ai thuộc Hồ sơ cho R06; người chết/thân nhân/nhân sự có tự vào membership không? | Không chỉ người sống/người ký; không suy `chudat` là Người 1 vì slot owner; không đưa thư ký vào Person tự động từ metadata | Chủ theo lựa chọn Diagram là nghĩa đã chốt; membership bốn trường hợp chờ Q1. Không dùng việc legacy lọc người chết khỏi hai bên để tự loại R06 |
-| C14 · cá nhân đại diện + pháp nhân nhập tay | Nguồn nêu tổ chức “Tổ chức X” và dữ kiện Người 1 đại diện, Người 2 là khách; có Tài sản 1 | Cá nhân đại diện có thuộc Hồ sơ/R06, thuộc nhóm nào; thông tin tổ chức ở đâu? | Không biến Tổ chức X thành Person, không tự dựng chức vụ/quyền hoặc mặc định ngân hàng | Pháp nhân nhập tay đã chốt; dữ kiện cá nhân giữ chuẩn, membership Q1 và nhóm Q2. Authority prose D04 sửa tay, không tạo bảng pháp nhân |
-| C15 · ủy quyền/nhãn xung đột | Nguồn 1 ghi “người ủy quyền” Người 1, “người được ủy quyền” Người 2 (không chữ nhận); nguồn 2 của cùng Hồ sơ đảo nhãn A/B | Dùng nguồn nào để xếp bên, có tự coi người được ủy quyền=B không? | Không dùng thiếu chữ nhận để gán A, không âm thầm chọn một nguồn thắng | Giữ nhãn/vị trí nguồn mâu thuẫn; đề xuất xác nhận nhóm trước output phụ thuộc nhóm. Q2, không dựng rule phân xử chưa duyệt |
+| C12 · một bên | Cam kết chỉ nêu Người 1 và tài sản | Có gán A/B? | Không tạo bên đối ứng; requester độc lập nhóm | **Đã trả lời:** không gán gì, không default A/fake B |
+| C13 · thừa kế/người chết | Người 1 chết; Người 2 nhận; Người 3 chỉ nhắc là thân nhân; Người 4 thư ký; Diagram chọn Chủ Người 2 | Ai vào requester? | Không xóa Person chết/estate snapshot; Chủ vẫn theo Diagram | **Q1 đã trả lời:** không Người 1/4 vào requester; tên thân nhân không tự tạo đối tượng output. Cá nhân sống A/B/ủy quyền dùng chuẩn |
+| C14 · đại diện + ngân hàng | Ngân hàng, Người 1 đại diện theo ủy quyền và Người 2 khách sống; Tài sản 1 | Person/requester/cụm tổ chức có cùng nghĩa? | Không Person giả/quyền đại diện/field/default cụm | Cá nhân ủy quyền vào requester; ngân hàng thế chấp cả cụm về nội dung; **BANKMODE** chỉ chưa chọn user dán hay app lấy-điền cụm ngân hàng, cá nhân khác chuẩn |
+| C15 · ủy quyền/nguồn trái nhau | Người 1 ủy quyền, Người 2 được ủy quyền; hai nguồn đảo A/B | Gán nhóm/phân xử nguồn? | Không regex “nhận”, không winner/đổi requester | **Q2 đã trả lời:** A=ủy quyền/B=được ủy quyền; conflict/xác nhận phần nhóm bị ảnh hưởng |
 | C16 · đổi thứ tự, không đổi tài sản | Nguồn xác nhận Người 1 liên quan Tài sản 1; danh sách từ [Tài sản 1, Tài sản 2] đổi thành [Tài sản 2, Tài sản 1] | Đổi chỗ trình bày có được tự đổi liên kết nguồn không? | Không áp ngầm nghĩa mới lên Diagram legacy: ở đó dấu chọn bám vị trí đã được duyệt | Upload mới giữ liên kết với Tài sản 1 theo kết luận bảo toàn §3; không owner gate, không sửa `ownPositions` Notary |
 
 C04 khác C05 dù có cùng tập Người/Tài sản; C07 khác cả hai dù payload phẳng có thể giống nhau. C08 khác C09: nhiều lần của một cá nhân khác hai cá nhân trùng tên. C10 tách đúng ba nghĩa GCN/thửa/cụm đất; C13 tách người để lại/chủ Diagram/thành viên. Các khác biệt này phải còn đọc được sau khi trình bày thành chuỗi.
@@ -98,32 +108,34 @@ C04 khác C05 dù có cùng tập Người/Tài sản; C07 khác cả hai dù pa
 
 Chọn phương án khuyến nghị không đồng nghĩa mọi liên kết cần tách từng cặp. Cả nhóm–cả tập giữ đúng cấp nhóm–tập; liên kết riêng chỉ có khi nguồn nói riêng. Placeholder chỉ là nơi điền dữ liệu, không định nghĩa quan hệ; không có template vẫn cần hiểu được Người/Tài sản/Hồ sơ. Đích hiện tại không có trường động/công thức/điều kiện cấu hình.
 
-## 6. Hai câu hỏi thật sự cần owner trả lời
+## 6. Đáp án đã có và BANKMODE còn mở
 
-Mỗi khuyến nghị dưới đây vẫn **chưa được chọn**. Không hỏi lại policy R06/A-B/pháp nhân hoặc yêu cầu owner chọn cấu trúc kỹ thuật.
+**Q1 đã trả lời:** requester Nam Định/Upload gồm cá nhân sống A/B/đại diện
+theo ủy quyền; không người chết/CCV/nhân viên trong output đó. Giữ Person
+chết/Stage/Hồ sơ thừa kế/raw/snapshot/history. Ngân hàng thế chấp hiện cả
+cụm, không Person. Nguyên văn đầy đủ tại decision “Đáp án #43”.
 
-### Q1 — Ai thực sự được tính là “Người trong Hồ sơ”?
+**Q2 đã trả lời:** ủy quyền A=ủy quyền/B=được ủy quyền; một bên không gán;
+nguồn trái nhau giữ conflict/xác nhận phần nhóm, không winner/thu hẹp requester.
+Không hỏi lại Q1/Q2, identity/thứ tự/reorder/add hoặc chi tiết kỹ thuật.
 
-**Câu hỏi:** Trong ca C13–C14, xin chốt từng nhóm có thuộc danh sách R06 không: người chết có dữ kiện riêng; cá nhân đại diện; thân nhân chỉ được nhắc để giải thích; công chứng viên/thư ký chỉ xuất hiện với tư cách nhân sự xử lý? Có phải một người chỉ cần được nhắc tên trong văn bản là tự thuộc Hồ sơ không?
+**BANKMODE — câu hỏi duy nhất:** Trong ô người yêu cầu Nam Định, cụm ngân hàng
+của hợp đồng thế chấp do user tự dán hay owner muốn app tự lấy/điền từ nguồn?
+Không hỏi mở rộng cụm sang người khác; dữ kiện cá nhân chuẩn giữ nguyên.
 
-**Khuyến nghị:** Danh sách là những cá nhân được xác định là đối tượng của Hồ sơ; bao gồm người chết và đại diện khi họ là đối tượng, không tự biến mọi tên được nhắc hoặc metadata nhân sự thành thành viên. Trường hợp chỉ được nhắc giữ nguồn và cần xác định tư cách thành viên, không âm thầm loại hoặc thêm. R06 luôn lấy **toàn bộ** danh sách đã chốt, không thêm bộ lọc người sống/người ký.
-
-**Đánh đổi:** Không lẫn nhân sự/nhắc tên vào requester, nhưng cần owner xác nhận ranh giới “đối tượng” bằng bốn nhóm trên. Không dùng cấu trúc parser để quyết định thay owner.
-
-### Q2 — Ngoại lệ A/B: một bên, ủy quyền và nguồn trái nhau xử lý ra sao?
-
-**Câu hỏi:** Với văn bản chỉ có Người 1 không nhãn bên (C12), có gán A không? Với người ủy quyền/được ủy quyền không chữ nhận (C15), có quy ước bên cố định không? Khi hai nguồn đảo A/B, xác nhận lại nhóm thay vì tự chọn có đúng không?
-
-**Khuyến nghị:** Nguồn có A/B rõ thì dùng đúng; một bên không nhãn thì giữ chưa gán, không tự tạo B hay mặc định A; ủy quyền chỉ chuyển sang A/B theo quy ước nghiệp vụ owner chốt hoặc xác nhận cụ thể; xung đột giữ nguồn và chờ xác nhận **phần nhóm**, không thu hẹp requester. Output cần nhóm chưa rõ thì không điền lời gán nhóm chưa được xác nhận.
-
-**Đánh đổi:** Không sai vai trò vì heuristic “nhận”, nhưng không hứa tự điền A/B cho mọi văn bản. Nếu owner muốn một bên luôn A hoặc ủy quyền cố định A/B thì cần trả lời rõ ngoại lệ này; không tự coi đó đã được D05 chọn.
+Động từ “dán” chưa đủ chọn auto-extraction/user paste, policy pháp nhân manual
+cũ không tự trả lời lời mới. Chưa chọn phương án/field persisted/schema.
+Cá nhân vẫn chuẩn R06/alias manual/D04-D08 không prose; không blanket raw ba
+editor hoặc manual fallback mọi gap. Đây là clarification consumer hẹp.
 
 ## 7. Handoff và điều kiện khép spike
 
-- Phần nguồn trả lời được đã hoàn thành: từ điển/identity, snapshot, quan hệ Diagram, raw Upload, metadata Case 8 trường, giới hạn module, R06 và các kết luận bảo toàn §3. Chỉ còn hai câu hỏi ở §6: membership và ngoại lệ A/B; không biến thứ tự/dedup identity/reorder/thêm tài sản hoặc thiếu scope thành owner gate mới.
-- Chờ owner trả lời Q1–Q2; chỉ khi owner chấp nhận nghĩa/tình huống hoặc giới hạn mới cập nhật decision/spec/#41 qua parent. Proposal không tự là đáp án đã duyệt. AC4 vẫn chưa đạt; không nâng refined/built/done hoặc mở gate #41.
-- Sau đáp án, #41 nhận danh sách nghĩa đã chốt cùng các ca C01–C16, nguồn, cách giữ thứ tự/phạm vi/chưa rõ và ranh giới snapshot. Sau đó mới chọn contract kỹ thuật; không tự mở schema/triển khai trong #43. Xung đột Diagram một node/vị trí và quan hệ mới cần được nêu rõ trước cutover consumer, không dựng shim hoặc sửa legacy token.
-- Independent narrow review cuối CLEAN; mandatory BMAD Ticket validation PASS cho bản draft, **không phải closure**. Parent đã đọc đủ 16 tình huống, kết luận và hai câu hỏi, cho commit đúng ba file. Các gate tránh được đã chuyển thành kết luận bảo toàn có căn cứ; Q1 membership/Q2 ngoại lệ A/B vẫn chờ owner, AC4 chưa đạt. Không chạy runtime verification.
+- Phân tích16ca/kết luận bảo toàn hoàn tất; Q1/Q2 đã nhận đáp án, phần đã rõ
+  đồng bộ decision/spec/#41 trong delta này. Chỉ BANKMODE cùng scope còn mở;
+  AC4 chưa khép, chưa refined/built/done; model/cutover #41 chưa implement.
+- Delta owner-answer independent review CLEAN, mandatory BMAD Ticket draft
+  validation PASS, không closure; parent cho commit đúng11file. Không
+  runtime/schema/DB/test/browser/mẫu/corpus hoặc mở gate #41.
 
 ## 8. Nguồn tra cứu đã mở
 
@@ -142,8 +154,8 @@ Mỗi khuyến nghị dưới đây vẫn **chưa được chọn**. Không hỏ
 
 ## 9. BMAD state và acceptance chưa nghiệm thu
 
-AC1–3 đã có bảng đối chiếu để owner xem, chưa có đáp án owner cho phần còn mở.
-AC4 chưa đạt: chưa owner chấp nhận, chưa tích hợp đáp án vào decision/spec/#41.
+AC1–3 có16ca và đáp án Q1/Q2; BANKMODE là clarification output ngân hàng còn mở.
+AC4 chưa khép vì BANKMODE chưa trả lời; phần đã rõ đã tích hợp decision/spec/#41, không gọi cutover #41 xong.
 AC5 được giữ trong phạm vi lượt này; không có implementation hoặc runtime proof.
 Không đánh dấu spike built/done hoặc refined chỉ vì đã viết proposal.
 
@@ -153,4 +165,4 @@ không assignee. Loose-backlog waiver/active initiative unset được giữ. Re
 báo thiếu record `bmod-method`; theo phạm vi giao không install/setup/config,
 không dựng workflow thay thế. Đây là spike design, không gọi app build.
 
-Parent đã duyệt commit đúng ticket, matching plan và dòng #43 backlog index sau independent review CLEAN; không push. Thiết kế vẫn PROPOSED, blocked chờ owner, refined:false/hitl:true. Parent tích hợp đáp án decision/spec/#41 sau khi owner trả lời; không có dependency bắt buộc vào tmp.
+Proposal trước đáp án giữ làm lịch sử. Delta mới đã independent review CLEAN/Ticket draft PASS, parent cho commit đúng11file; draft/blocked chỉ BANKMODE, refined:false/hitl:true, AC4 chưa khép; không push hoặc phụ thuộc tmp.

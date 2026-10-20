@@ -192,15 +192,16 @@ Owner báo Upload đang bóc văn bản thành trường để điền website n
     đai có tài sản/nhà; thiếu mẫu/rule không là loại không tồn tại. Tổ hợp nhiều
     loại vẫn thiếu quy tắc chọn một ô, không tự default/loại đầu/Khác.
   - **R05 đã chốt:** alias nếu cần user điền tay, không auto-fill/mở rộng chuẩn.
-  - **R06 đã chốt:** requester là **tất cả Người có trong Hồ sơ**, thuần dữ
-    liệu chuẩn, không Bên A/B, con đẻ, chức vụ/tư cách/prose. Lookup/firstperson
-    cũ chỉ hiện trạng cần cutover, không còn authority đích; không tự bỏ tên
-    hoặc suy người thiếu. Membership/thứ tự/người chết/đại diện xem #43.
+  - **R06/#43 Q1 đã trả lời:** requester Nam Định/Upload gồm cá nhân sống
+    A/B/đại diện theo ủy quyền; loại người chết/CCV/nhân viên **chỉ khỏi output
+    requester**, không xóa Person chết/Stage/Hồ sơ thừa kế/raw/snapshot/history.
+    Cá nhân chuẩn, không prose/lookup/firstperson; ngân hàng thế chấp hiện cả
+    cụm không Person, **BANKMODE chưa chọn** user dán hay app lấy-điền cụm ngân hàng.
   - **D04 đã chốt:** bỏ lời phức tạp khỏi tự động điền, user tự sửa; không block
     được duyệt hoặc manual fallback cho mọi unknown; nguồn giữ.
-  - **D05 đã chọn hướng nhóm A/B chung**, còn semantic ngoại lệ: “gần như 100%
-    có chữ nhận” không universal regex hoặc “không nhận=A”; nhận chuyển nhượng,
-    nhận thế chấp, được ủy quyền và văn bản một bên khác nhau, không đổi R06.
+  - **D05/#43 Q2 đã trả lời:** ủy quyền A=người ủy quyền/B=người được ủy quyền;
+    một bên không gán; hai nguồn trái nhau giữ conflict/xác nhận nhóm bị ảnh
+    hưởng, không tự winner/thu hẹp requester. Chữ “nhận” không universal regex.
   - **D06+D07 → #43** về membership/roles có thứ tự và scope Người↔Tài sản,
     làm ngay sau rõ các ô, chưa model/cardinality/schema hoặc implementation.
   - **D08 đã trả lời theo R06**, không residual prose block, không hỏi lại.
@@ -224,3 +225,13 @@ Owner báo Upload đang bóc văn bản thành trường để điền website n
   **ĐÓNG**, #42 độc lập; không code/DB/schema/browser/parser/corpus/test,
   independent review cả 10 docs CLEAN, #43 Ticket validation PASS 20/10/2026;
   parent cho commit đúng phạm vi, không publish/push hoặc mở implementation.
+- **Đáp án #43 mới nhất 20/10/2026:** [decision “Đáp án #43”](../decisions/decision-owner-upload-field-standardization-20261019.md)
+  giữ nguyên văn owner. Q1 membership/Q2 A-B không còn chờ trả lời; 16 ca và
+  kết luận bảo toàn đã có. Chỉ **BANKMODE** còn hỏi user dán hay app tự lấy/
+  điền cụm ngân hàng thế chấp; cá nhân khác vẫn chuẩn. Không tự persisted legal field, fake
+  Person hoặc blanket raw editor; policy pháp nhân nhập tay trước không tự
+  quyết lời mới. Model quan hệ/cutover vẫn chưa implement, #43 AC4 chưa khép
+  vì bank cùng scope chưa rõ; không đặt #42/giới hạn/JSON/FK làm gate mới.
+  Delta docs independent review CLEAN/Ticket draft PASS, không closure; parent cho commit đúng11file, không push/runtime/test.
+  Requester không cần tag A/B đã gán: cá nhân sống tham gia văn bản một bên/
+  đại diện theo ủy quyền vẫn vào khi nhóm không gán hoặc conflict.

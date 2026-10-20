@@ -180,17 +180,18 @@ không chứng minh runtime đã cutover; không sửa raw/lịch sử.
   có trong hồ sơ”**. Điền dữ liệu chuẩn của mọi Người trong Hồ sơ; không Bên A,
   Bên B, con đẻ, chức vụ, tư cách hay lời mô tả phụ. Lookup/ưu tiên B/người
   đầu trước đây chỉ là hiện trạng cũ, **không còn authority nghiệp vụ đích**.
-  Không cắt tên hoặc suy thêm người thiếu. Không tự loại người chết/đại diện
-  khỏi “tất cả”; membership/thứ tự làm rõ ở #43. Pháp nhân vẫn không là Người.
+  Không cắt tên hoặc suy thêm người thiếu. Phạm vi requester đã được owner
+  trả lời trong mục “Đáp án #43” bên dưới; không dùng đoạn lịch sử này để
+  đưa người chết/nhân sự vào output requester hoặc xóa Person khỏi Hồ sơ.
 - **D04:** “lời văn phức tạp loại bỏ - user tự sửa thủ công”. Dữ liệu chuẩn cá
   nhân vẫn dùng; lời tư cách/căn cứ phức tạp bỏ khỏi tự động điền, user sửa tay.
   Không duyệt block D04, không xóa nguồn hay mở manual fallback cho mọi gap.
 - **D05:** “Chỉ gán vào Bên A hoặc bên B nói chung”; quan sát **“Gần như 100%
   Bên B luôn có chữ nhận”** không là luật 100% hoặc regex. Nguồn hiện có phân
   biệt chuyển/nhận chuyển nhượng, thế chấp/nhận thế chấp; ủy quyền/được ủy quyền
-  không nhất thiết có chữ nhận; thừa kế có văn bản một bên. Còn làm rõ gán
-  nhóm cho ngoại lệ/nhóm một bên/nhãn mâu thuẫn, không suy mọi còn lại=A và
-  không áp nhóm A/B để thu hẹp requester R06.
+  không nhất thiết có chữ nhận; thừa kế có văn bản một bên. Các ngoại lệ đã
+  được trả lời ở mục “Đáp án #43” bên dưới; không suy mọi còn lại=A và
+  không áp nhóm A/B để thu hẹp requester đã chốt.
 - **D06+D07:** tạo **một [#43 riêng](../backlog/spike-case-people-assets-relationships.md)**
   về nhiều người/nhiều tài sản, membership/vai trò/thứ tự và scope người↔tài
   sản. Xử lý **ngay sau làm rõ các ô**, không chờ toàn #41 nghiệm thu để tránh
@@ -249,3 +250,50 @@ ví dụ tổng hợp trong Git, không chép tên/ID user đưa.
   không cấp quyền gỡ tính năng đang chạy.
 - Lượt này **chỉ tài liệu**: không code/schema/DB/runtime/test/browser/corpus.
   #41 vẫn mở, `refined:false`, gate mẫu **ĐÓNG**.
+
+## Đáp án #43 — membership requester và nhóm A/B, owner 20/10/2026
+
+**Nguyên văn owner:**
+
+> 1. Người trong hồ sơ:
+> Người sống: Bên A, Bên B, người đại diện theo ủy quyền, Ngân hàng (đối với hợp đồng thế chấp) – dán cả cụm,
+> Không đưa vào: người chết, công chứng viên, nhân viên
+> 2. Gán A/b:
+> - ủy quyền: đồng ý
+> - chỉ có 1 bên: Không gán gì
+> - 2 nguồn A/b trái nhau: đồng ý
+
+**Đã chọn — phạm vi Nam Định/Upload requester/output hiện tại:**
+
+- Cá nhân sống thuộc Bên A, Bên B và người đại diện theo ủy quyền được đưa
+  vào requester. Người chết, công chứng viên và nhân viên **không đưa vào
+  requester output**. Không tự đưa tên thân nhân chỉ được nhắc vào danh sách.
+  Đây không là lệnh xóa Người chết/Người liên quan khỏi Stage, Hồ sơ thừa kế,
+  raw, snapshot hoặc lịch sử; trường Person hợp lệ và metadata nhân sự giữ nguyên.
+  “Thuộc Bên A/B” chỉ tư cách tham gia nguồn, **không là điều kiện có tag A/B
+  đã gán**: cá nhân sống của văn bản một bên và đại diện ủy quyền vẫn vào
+  requester khi nhóm chưa gán hoặc đang conflict; chỉ phần nhãn nhóm chờ xác nhận.
+- Cá nhân thông thường vẫn chỉ dữ kiện chuẩn R06, mỗi identity đã xác nhận
+  một lần theo thứ tự nguồn; không B-priority/firstperson/lookup. Alias nhập
+  tay, D04/D08 không prose tự động, không mở fallback cho mọi gap.
+- Ủy quyền: **A = người ủy quyền, B = người được ủy quyền** theo phương án
+  owner đồng ý trong trao đổi trước đáp án. Văn bản chỉ một bên **không gán
+  A/B**; không mặc định A hoặc dựng B giả. Hai nguồn A/B trái nhau giữ xung
+  đột và xác nhận phần nhóm bị ảnh hưởng, không tự chọn nguồn thắng hoặc
+  đổi tập requester. Chữ “nhận” không là regex phổ quát.
+- Ngân hàng trong hợp đồng thế chấp được yêu cầu hiện **cả cụm** như ngoại lệ
+  output, **không là Person**. Policy pháp nhân không thuộc Người/bảng riêng
+  tương lai vẫn giữ. Chưa chọn app tự lấy/điền hay user dán **cụm ngân hàng**;
+  cá nhân khác vẫn dữ kiện chuẩn, không mở lại scope prose/whole-cluster cho họ.
+  Không tự tạo extractor/schema/trường pháp nhân persisted hoặc biến editor thành raw block. Policy nhập tay pháp
+  nhân trước đó không đủ để tự kết luận ý nghĩa động từ “dán” trong đáp án mới.
+
+**Còn một câu hỏi BANKMODE:** Trong ô người yêu cầu Nam Định, cụm ngân hàng
+của hợp đồng thế chấp do user tự dán hay owner muốn app tự lấy/điền từ nguồn?
+Chưa chọn mode; không hỏi lại scope cá nhân chuẩn, membership/A-B/JSON/FK/cardinality.
+
+Phần đã rõ áp dụng vào spec đích ngay, không tự gọi #43 done/refined hoặc AC4
+đạt khi BANKMODE ảnh hưởng cùng scope còn mở. Phần điều tra 16 ca đã hoàn tất;
+model quan hệ/cutover #41 vẫn chưa triển khai/nghiệm thu, gate mẫu ĐÓNG.
+Delta docs/ticket đã independent review CLEAN, mandatory Ticket validation PASS
+cho draft, không closure; parent cho commit đúng11file, không push/runtime.
