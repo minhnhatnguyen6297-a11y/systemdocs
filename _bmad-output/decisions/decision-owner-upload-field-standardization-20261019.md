@@ -302,3 +302,30 @@ Không chạm phiên Chrome đã đăng nhập; review độc lập sau proof tr
 Kế hoạch trước sửa code nằm ở [#43 plan §6.1](../backlog/spike-case-people-assets-relationships-plan.md).
 Đường projection hiện có là persistence hợp lệ, không toàn normalized #41.
 Bounded proof/fresh bank-auto review CLEAN/Ticket PASS đã có; #43 phân tích done theo quyền parent, không toàn #41 BUILT/đóng gate.
+
+## Đáp án W05 — cùng Hồ sơ có thửa đất có nhà + thửa đất trống, owner 20/10/2026
+
+**Câu hỏi nguyên văn (parent chuyển):** cùng một Hồ sơ có một thửa đất có nhà
+và một thửa đất trống, chọn **(1) Đất đai có tài sản** khi có ít nhất một tài
+sản gắn liền với đất, hay **(2) người dùng tự chọn**?
+
+**Owner trả lời: 1.**
+
+**Đã chọn — phạm vi loại tài sản W05:**
+
+- Khi Hồ sơ có **bằng chứng tài sản gắn liền với đất** (nhà/công trình theo
+  rule nguồn hiện có), selector Nam Định nhận **ID 1 — Đất đai có tài sản**,
+  kể cả khi các thửa còn lại là đất trống. Không cần owner chọn tay cho tổ hợp
+  đất-có-nhà + đất-trống.
+- Phạm vi chỉ tổ hợp **đất có nhà/đất trống** đã hỏi. Không biến đây thành ưu
+  tiên phổ quát đè lên xe, sổ tiết kiệm, cổ phần/chứng khoán, tài sản khác.
+- Không tạo field/canonical model nhà, không thêm regex/catalog nhà từ mẫu
+  chưa thấy; chỉ dùng bằng chứng chi tiết gắn liền đất đã được duyệt trong
+  rule hiện có (`Nhà ở:`, `Diện tích xây dựng`, `Kết cấu`, ...).
+- Heading GCN kiểu “Giấy chứng nhận quyền sử dụng đất, quyền sở hữu nhà ở và
+  tài sản khác gắn liền với đất” **một mình không phải** bằng chứng có nhà.
+- Cụm phủ định “không có tài sản/nhà” **không** được tạo positive; giữ
+  absent/không có tài sản theo rule hiện có.
+- Raw/history/source_refs, W11-A10 unsupported-asset recognition và phần A09
+  giữ nguyên. #41 vẫn mở/refined:false; gate mẫu **ĐÓNG**. Chỉ verification
+  tổng hợp/cô lập, không hồ sơ thật/corpus/production DB/portal/Chrome.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import unicodedata
@@ -321,6 +322,77 @@ class UploadLabExtractContractTests(unittest.TestCase):
         loai_tai_san = guess_loai_tai_san(tai_san, "Văn bản cam kết tài sản riêng")
 
         self.assertEqual(loai_tai_san, "Đất đai có tài sản")
+
+    def test_mixed_house_and_bare_land_both_orders_persist_land_with_asset(self):
+        from batch_scan import save_output_json
+        from playwright_uploader import build_upload_form_data
+
+        house = [
+            "Nhà ở:",
+            "Diện tích xây dựng: 60 m2",
+            "Kết cấu: Tường gạch, mái bê tông cốt thép",
+        ]
+        bare = ["Thửa đất số: 22; Tờ bản đồ số: 7", "Diện tích: 180 m2"]
+        house_parcel = ["Thửa đất số: 12; Tờ bản đồ số: 5", "Diện tích: 120 m2"] + house
+        negated_then_house = [
+            "Không có nhà ở tại thửa 22, thửa 12 có Nhà ở: 60 m2",
+        ]
+        negated_value_then_construction = [
+            "Nhà ở: không có, thửa 12 có Công trình xây dựng: nhà 60 m2",
+        ]
+        house_then_negated = [
+            "Thửa đất số: 12; Tờ bản đồ số: 5",
+            "Nhà ở: 60 m2",
+            "Kết cấu: Tường gạch, mái bê tông cốt thép",
+            "Không có nhà ở tại thửa 22",
+        ]
+        for name, asset_lines in (
+            ("house_first", house_parcel + bare),
+            ("house_last", bare + house_parcel),
+            ("negated_other_then_house", negated_then_house + bare),
+            ("negated_value_then_construction", negated_value_then_construction + bare),
+            ("house_then_negated_other", house_then_negated + bare),
+        ):
+            path = make_docx(
+                self.root / f"{name}.docx",
+                "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+                "Bên A: Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890",
+                "Bên B: Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891",
+                "Tài sản:",
+                "Quyền sử dụng đất tại xã Mẫu, huyện Mẫu, tỉnh Nam Định.",
+                *asset_lines,
+            )
+            payload = extract(path)
+            self.assertEqual(payload["web_form"]["loai_tai_san"], "Đất đai có tài sản")
+            output = save_output_json(self.root / "out", "001/2026", name, payload)
+            persisted = json.loads(output.read_text(encoding="utf-8"))
+            form = build_upload_form_data(persisted)
+            self.assertEqual(form["loai_tai_san"], "Đất đai có tài sản")
+
+    def test_certificate_heading_or_negated_house_does_not_imply_land_with_asset(self):
+        heading = (
+            "Giấy chứng nhận quyền sử dụng đất, quyền sở hữu nhà ở và tài sản khác "
+            "gắn liền với đất số: AB 123456."
+        )
+        for name, extra in (
+            ("heading_only", heading),
+            ("negated_house", "Không có nhà ở:"),
+            ("negated_house_value", "Nhà ở: không có; Không có tài sản gắn liền với đất;"),
+            ("negated_all_details", "Nhà ở: không có; Diện tích xây dựng: không có; Kết cấu: không có"),
+            ("negated_attached", "Không có tài sản gắn liền với đất."),
+        ):
+            path = make_docx(
+                self.root / f"{name}.docx",
+                "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+                "Bên A: Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890",
+                "Bên B: Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891",
+                "Tài sản:",
+                "Quyền sử dụng đất tại xã Mẫu, huyện Mẫu, tỉnh Nam Định.",
+                "Thửa đất số: 12; Tờ bản đồ số: 5",
+                extra,
+            )
+            payload = extract(path)
+            self.assertEqual(payload["web_form"]["loai_tai_san"], "Đất đai không có tài sản")
 
     def test_generic_title_strips_duoc_giao_ket_boi_suffix(self):
         docx_path = make_docx(

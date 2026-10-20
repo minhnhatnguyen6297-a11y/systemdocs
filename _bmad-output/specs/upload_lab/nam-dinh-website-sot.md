@@ -215,6 +215,15 @@ là nhà ở trên đất). Chưa có hợp đồng mẫu để rút rule regex 
 này không tồn tại hoặc bị loại khỏi nghiệp vụ. Hiện thiếu nguồn/rule chi tiết
 nhà/công trình; không tự dựng schema/regex hoặc đọc mẫu khi gate còn đóng.
 
+**Owner chốt hỗn hợp 20/10/2026:** cùng Hồ sơ có thửa đất có nhà + thửa đất
+trống → chọn **ID 1 Đất đai có tài sản** khi có ít nhất một bằng chứng tài sản
+gắn liền đất; không chuyển sang người dùng tự chọn. Phạm vi chỉ tổ hợp
+đất-nhà/đất-trống, không ưu tiên phổ quát trên xe/sổ tiết kiệm/cổ phần/… .
+Bằng chứng phải là chi tiết gắn liền đất theo rule hiện có; heading GCN
+“quyền sử dụng đất, quyền sở hữu nhà ở và tài sản khác gắn liền…” một mình
+không tính; “không có tài sản/nhà” không thành positive. Không field/catalog
+nhà mới; raw/history/W11-A10 giữ nguyên.
+
 ### 5.4 Tên hợp đồng — 5 option, freeSolo
 
 | Item ID number | `value` = `label` (string, đúng chính tả A1) |
@@ -387,7 +396,7 @@ Các cách xử lý dùng trong bảng:
 | **W01** · Tên hợp đồng (#1) | Tiêu đề nguồn → `build_payload` → `case_portal_projection`; catalog §5.4 | **C `tenvanban`**; không enum Notary/catalog ID | Tái dùng chuẩn → free text/gợi ý website | Dùng title chuẩn trực tiếp; tránh khóa 5 gợi ý thành mọi loại văn bản | **ĐÃ CHỐT** nghĩa scalar; ID/label là adapter |
 | **W02** · Tình trạng (#2) | Không extraction; policy portal; catalog §5.1 | **P**, không Case status | Policy cố định | Mọi upload `DACONGCHUNG`; không dùng draft/locked Notary | **ĐÃ CHỐT**, không hỏi lại |
 | **W04** · Nhóm hợp đồng (#4) | `guess_nhom_hd(title)` → projection; catalog/role metadata §5.2 | **C `nhomhopdong`** label có scope website | Tái dùng chuẩn + catalog adapter | Giữ label Case, chọn option thật; không biến website ID thành canonical FK, không dùng metadata A/B để duyệt quan hệ | **ĐÃ CHỐT** scalar; conversion form/POST vẫn unknown |
-| **W05** · Loại tài sản (#5) | `guess_loai_tai_san(tai_san,title)`; §5.3, §5.6 | **J `web_form.loai_tai_san`**; chưa Asset chuẩn cutover | Dựng lựa chọn portal từ tập tài sản có căn cứ, mapping site riêng | Owner đồng ý hướng này; giữ **ID 1 Đất đai có tài sản**, thường nhà trên đất; thiếu mẫu/rule không là loại không tồn tại. Không tự tạo trường nhà/regex, chọn loại đầu/“Khác” để che tổ hợp | **ĐỒNG Ý CÓ ĐIỀU KIỆN**; quy tắc một ô khi tổ hợp nhiều loại thực sự chưa chốt, không universal fallback |
+| **W05** · Loại tài sản (#5) | `guess_loai_tai_san(tai_san,title)`; §5.3, §5.6 | **J `web_form.loai_tai_san`**; chưa Asset chuẩn cutover | Dựng lựa chọn portal từ tập tài sản có căn cứ, mapping site riêng | Owner đồng ý hướng này; giữ **ID 1 Đất đai có tài sản**, thường nhà trên đất; thiếu mẫu/rule không là loại không tồn tại. Không tự tạo trường nhà/regex, chọn loại đầu/“Khác” để che tổ hợp. **Owner 20/10/2026:** hồ sơ có ít nhất một tài sản gắn liền đất có bằng chứng → ID 1 dù thửa khác trống; chỉ phạm vi đất-nhà/đất-trống, không ưu tiên phổ quát trên xe/sổ tiết kiệm/… | **ĐÃ CHỐT hỗn hợp đất-nhà/đất-trống**; không universal fallback, không field nhà mới |
 | **W07** · Công chứng viên (#7) | Regex nguồn hoặc lựa chọn prepare rõ ràng; §4/§5.6 | **C `congchungvien`** tên/null; default legacy không thành fact | Tái dùng chuẩn + catalog nhân sự | Chọn đúng option theo tên, không tự thêm staff FK; thiếu option không chọn đầu | **ĐÃ CHỐT** nghĩa/nguồn; không cần owner duyệt technical ID |
 | **W08** · Thư ký (#8) | Extraction hiện `null`; input prepare → projection; §4/§5.6 | **C `thuky`** tên/null | Tái dùng chuẩn → freeSolo | Giữ lựa chọn rõ ràng trong Case được prepare; không đoán từ list/default | **ĐÃ CHỐT** |
 | **W03** · Ngày công chứng (#3) | `find_ngay_cong_chung` → ISO → display DD/MM/YYYY | **C `ngaycongchung`**; không ngày tạo/ngày default website | Tái dùng chuẩn + đổi format tại biên | Không tạo ngày giả từ ngày mở form; gap clear/default hiện có ở §3 không tự thành policy mới | **ĐÃ CHỐT** scalar; không hỏi lại |
@@ -530,9 +539,11 @@ chưa đủ căn cứ duyệt field “mô tả bổ sung tài sản”.
   A/B/đại diện ủy quyền, không người chết/CCV/nhân viên trong output; dữ kiện/
   Person/Stage/history giữ nguyên. D04/D08 cá nhân không prose; A10 pending,
   #29 deferred. Ngân hàng thế chấp cả cụm không Person; **BANKMODE “app tự lấy”**.
-- **W05 đồng ý có điều kiện:** dựng lựa chọn portal từ tập tài sản; giữ ID 1
-  đất có tài sản/nhà. Còn thiếu rule khi một hồ sơ thực sự có nhiều loại khác nhau;
-  không tự chọn một loại bao quát/đầu/Khác, không đọc mẫu mới để lấp gap.
+- **W05 đã chốt hỗn hợp:** dựng lựa chọn portal từ tập tài sản; giữ ID 1
+  đất có tài sản/nhà. Hồ sơ có thửa nhà + thửa trống → ID 1 khi có bằng chứng
+  gắn liền đất, không chọn tay; chỉ phạm vi đất-nhà/đất-trống, không ưu tiên
+  phổ quát trên loại khác. Không đọc mẫu mới để lấp gap; heading GCN/negative
+  không tạo positive.
 - **D05 đã trả lời #43:** ủy quyền A=ủy quyền/B=được ủy quyền; một bên không
   gán; hai nguồn trái nhau giữ conflict/xác nhận nhóm bị ảnh hưởng, không
   winner/thu hẹp requester. “Nhận” không universal regex/“không nhận=A”.

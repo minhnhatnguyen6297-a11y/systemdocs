@@ -73,8 +73,9 @@ winner/thu hẹp requester. #43 giữ đủ 16 ca, Q1/Q2/BANKMODE đủ đáp á
 giao #41; không còn bank owner gate, không tuyên bố #41 cutover xong. Requester không
 cần tag A/B đã gán: cá nhân sống một bên/đại diện ủy quyền vẫn vào khi nhóm
 không gán/conflict. W05
-đồng ý có điều kiện, giữ ID1 đất có tài sản/nhà dù thiếu mẫu/rule; tổ hợp nhiều
-loại còn rõ rule. D05 chọn nhóm A/B chung, chữ “nhận” gần như 100% không luật
+đã chốt: giữ ID1 đất có tài sản/nhà; hồ sơ có thửa nhà + thửa trống chọn ID1
+khi có bằng chứng gắn liền đất, chỉ phạm vi đất-nhà/đất-trống, không ưu tiên
+phổ quát trên loại khác. D05 chọn nhóm A/B chung, chữ “nhận” gần như 100% không luật
 tuyệt đối. A09 còn rõ phạm vi; [SOT §7.5.1](upload_lab/nam-dinh-website-sot.md)
 lưu trường thật/ví dụ tổng hợp GCN/thửa/cụm đất. A10 nhận diện/pending structured,
 #29 deferred; không loại đất có nhà. **Owner 20/10/2026 chốt chỉ dùng

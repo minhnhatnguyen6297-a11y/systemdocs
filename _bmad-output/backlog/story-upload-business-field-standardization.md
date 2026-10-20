@@ -371,3 +371,43 @@ smoke `_bmad-output/tmp/a08-form-smoke-result.json` sha
 PASS (`failures: []`, 11 case explicit/absent/conflict/duplicate/NFD/compound/
 same_line/context/last_parcel/last_group/no_thua). Không new key/schema; đây chỉ slice
 W11-A08 DOCX intake, #41 vẫn mở/gate mẫu ĐÓNG.
+
+### Slice W05 — hỗn hợp thửa có nhà + thửa trống, owner chốt 20/10/2026
+
+Owner trả lời **1** cho câu hỏi cùng Hồ sơ có một thửa đất có nhà + một thửa
+đất trống: chọn **Đất đai có tài sản** khi có ít nhất một tài sản gắn liền đất
+có bằng chứng, thay vì bắt người dùng tự chọn. Phạm vi chỉ tổ hợp đất-nhà/đất-
+trống; không thành ưu tiên phổ quát trên xe/sổ tiết kiệm/cổ phần/… và không
+tạo field/catalog nhà mới. Bằng chứng dùng rule chi tiết hiện có (`Nhà ở:`,
+`Diện tích xây dựng`, `Kết cấu`, ...); heading GCN “quyền sử dụng đất, quyền
+sở hữu nhà ở và tài sản khác gắn liền…” một mình không tính; cụm phủ định
+`Không có nhà ở:`/`Nhà ở: không có`/`Không có tài sản gắn liền với đất` không
+thành positive.
+
+Thay đổi code tối thiểu: `guess_loai_tai_san` hiện đã trả ID 1 cho mọi blob đất
+có chi tiết gắn liền, nên mixed hai thứ tự đã đúng; chỉ bổ sung strip cụm phủ
+định **trong cùng clause** trước khi khớp detail pattern, dừng ở dấu phẩy/chấm
+phẩy/xuống dòng để không xóa positive của thửa khác. Negative của một thửa
+không được ăn positive `Nhà ở:`/`Công trình xây dựng:`/`Diện tích xây dựng:`
+của thửa kế bên. Không đổi canonical key/schema/UI/catalog, raw/history/
+source_refs và W11-A10 giữ nguyên.
+
+Real-DOCX regression: mixed house-first, house-last, negated-other-then-house,
+negated-value-then-construction và house-then-negated-other → payload `loai_tai_san = Đất đai có tài sản` →
+`save_output_json` → JSON reread → `build_upload_form_data` cùng value;
+heading-only và các dạng phủ định (gồm `Nhà ở: không có; Diện tích xây dựng:
+không có; Kết cấu: không có`) → Đất đai không có tài sản. Selector ID1 được
+fast namdinh-login-session xác nhận bằng actual Chromium controlled DOM; không
+giữ mock echo test riêng. `upload_lab/tests/test_upload_lab_extract_contract.py`:
+**200 passed,19 subtests**; `test_playwright_uploader.py`: **26 passed**
+(không đổi file uploader). Isolated smoke
+`_bmad-output/tmp/a07-w05-mixed-kind-smoke.json` sha
+`35cf26dadbd26c1700f8bc8b7399f6ba733439d8143600cd57480b8aaaba3816`,
+PASS (`failures: []`, 9 case house_first/house_last/heading_only/
+negated_house_value/negated_all_details/negated_then_house/
+negated_value_then_construction/house_then_negated/negated_house_only). Fast
+namdinh controlled Chromium artifact `_bmad-output/tmp/w05-asset-kind-browser-after.json`
+(run `2bfcf3df`, parser `067cfe61…`) prepared **9/9**, `errors=[]`, actual
+selected optionId **1** for mixed/positive both orders and **2** for
+heading/bare/negated; Save0/Submit0/Enter0, local `w05.invalid/create` only.
+#41 vẫn mở/gate mẫu ĐÓNG; không đọc mẫu/corpus.

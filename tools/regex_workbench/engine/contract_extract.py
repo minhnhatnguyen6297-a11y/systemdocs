@@ -1141,6 +1141,15 @@ LAND_WITH_ASSET_TITLE_MARKERS = (
     "mua ban nha o",
 )
 
+# Cụm phủ định rõ ("không có nhà ở:", "không có tài sản gắn liền với đất")
+# không được khớp detail pattern thành positive.
+LAND_ATTACHED_ASSET_NEGATION_PATTERNS = (
+    r"\b(?:khong|chua)\s+co\s+(?:tai san|nha o|nha|cong trinh(?: xay dung)?)\b[^.;,\n:]*:?",
+    r"\b(?:nha o|cong trinh(?: xay dung)?|tai san(?: khac)? gan lien voi dat|"
+    r"dien tich xay dung|dien tich san|ket cau|so tang|hinh thuc so huu)\b"
+    r"\s*:\s*(?:khong|chua)\s+co\b[^.;,\n]*",
+)
+
 LAND_ATTACHED_ASSET_DETAIL_PATTERNS = (
     r"\bnha o\b\s*:",
     r"\bquyen so huu nha o\b",
@@ -1160,7 +1169,8 @@ LAND_ATTACHED_ASSET_DETAIL_PATTERNS = (
 
 def _strip_land_certificate_heading_noise(text_folded: str) -> str:
     cleaned = str(text_folded or "")
-    for pattern in LAND_CERTIFICATE_HEADING_NOISE_PATTERNS:
+    for pattern in (*LAND_CERTIFICATE_HEADING_NOISE_PATTERNS,
+                    *LAND_ATTACHED_ASSET_NEGATION_PATTERNS):
         cleaned = re.sub(pattern, " ", cleaned, flags=re.IGNORECASE)
     return re.sub(r"\s+", " ", cleaned).strip()
 
