@@ -107,6 +107,17 @@ trước/sau mỗi lô; audit trường chuẩn và mapping từng biến thể 
 đúng. Catalog nền chưa đủ trường Hồ sơ/Upload và không chứng minh đã khảo sát
 nội dung mẫu.
 
+**Owner 21/10/2026 — sáu quy tắc Người chết đã CHỐT, chỉ cập nhật tài liệu:**
+Nơi chết/cư trú cuối chung một `dia_chi`; `Giấy chứng tử (bản sao)` quy về
+`Giấy chứng tử`, chỉ ba loại cùng `Trích lục khai tử` và `Trích lục khai tử (bản sao)`.
+Giữ cơ quan xã/phường/thị trấn theo ngày cấp giấy, không ép xã/suy lịch sử
+chưa xác nhận. Không đề xuất bổ sung hoặc tự ghép giữa văn bản; không gợi ý
+từ Đơn xin xác nhận. Thiếu ngày chết là không có thông tin, có trường hợp
+lệ nào điền trường đó, không chặn Người/tự coi còn sống/tạo field mới.
+Logic câu Word/trường tĩnh giữ nguyên. Runtime vẫn **TẠM DỪNG**; grammar,
+số TLKT raw-only/UNIQUE/derive chưa được sửa, #41 OPEN/chưa nghiệm thu.
+Ngoại lệ đọc hẹp trước đó cho Người chết Thừa kế không mở gate chung/lô mới.
+
 Việc đang mở được tổng hợp tại [catalog issue](../backlog/README.md)
 (16/10/2026; #17 built after independent Quick t2 clean; Upload failures and proof limits remain in the catalog/runtime record).
 [Ticket tổng cũ](../backlog/bug-notary-flow-ui-regex-word.md) giữ làm lịch sử và bị chặn tracking-only để không chạy trùng các leaf. Các điểm chính:

@@ -91,6 +91,26 @@ DB/profile cô lập, không phụ thuộc khảo sát corpus owner đang bị g
 khi được giao chạy mẫu, thiếu mapping từng file thì giữ pending/ghi #39, tiếp
 tục file đã rõ. Không tắt production Scan/Upload; quyền runtime đã chốt là lệnh owner riêng.
 
+**Người chết — owner 21/10/2026, đã chốt nghiệp vụ/docs-only:**
+- `Nơi chết` và cư trú cuối dùng một `dia_chi` Người hiện có, không thêm
+  trường; không chọn ngầm khi giá trị mâu thuẫn. Ba loại đúng nguyên văn:
+  `Trích lục khai tử`, `Trích lục khai tử (bản sao)`, `Giấy chứng tử`;
+  `Giấy chứng tử (bản sao)` nguồn quy về `Giấy chứng tử`.
+- Số giữ nguyên giá trị, nhãn ngoài số. Ngày cấp của chính giấy quyết định
+  mốc tên cơ quan; giữ loại đơn vị xã/phường/thị trấn, không ép xã, không đổi
+  sang hiện hành hoặc tự bù lịch sử chưa xác nhận.
+- Mỗi văn bản độc lập: **không đề xuất bổ sung, không tự ghép giữa văn bản**,
+  kể cả cùng bộ; không mượn trường thiếu hoặc chọn bản đầy nhất/mới nhất.
+  Không gợi ý sinh/chết/giấy tờ Người từ `Đơn xin xác nhận`, không đi vòng
+  qua inferred/normalized. Đây không xóa raw/history, liên kết Case/ID đã
+  có hoặc cấm địa chỉ chung rõ phạm vi trong **cùng** văn bản.
+- Thiếu ngày chết chỉ là không có thông tin: giữ null/rỗng, điền độc lập các
+  trường có căn cứ được phép; không chặn Người vì thiếu ngày/giấy, tự coi
+  còn sống, bịa ngày/01/01, Boolean hoặc trạng thái mới.
+- Không đổi câu Word/trường tĩnh/placeholder. Runtime vẫn tạm dừng; #41
+  OPEN, chưa nghiệm thu/cutover; gate chung ĐÓNG ngoài ngoại lệ đọc hẹp
+  Người chết Thừa kế đã cho phép trước đó, không cấp lượt đọc/chạy mẫu mới.
+
 **Một Người nhiều giấy tờ và nhiều địa chỉ** là
 [#42 riêng](../../backlog/story-person-multiple-identities-addresses.md).
 Model hiện hành một bộ giấy tờ/một địa chỉ không phải hỗ trợ đa trị; model,

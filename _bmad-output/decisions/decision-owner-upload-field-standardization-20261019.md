@@ -435,3 +435,43 @@ rộng; bằng chứng trong repo phải được che thông tin nhận diện.
 ngoại lệ đọc hẹp này; triển khai tiếp tục tạm dừng theo chỉ dẫn owner. Việc đọc
 mẫu không tự nghiệm thu logic mới, không chốt nghĩa `Nơi chết` so với nơi cư
 trú cuối và không duyệt model Người nhiều giấy tờ/địa chỉ của #42.
+
+## Owner chốt sáu câu hỏi Người chết — 21/10/2026, docs-only
+
+**Nguyên văn owner, theo đúng thứ tự sáu câu hỏi đã trình:**
+
+> 1. là 1
+> 2. quy về giấy chứng tử
+> 3. giữ, không ép thành xã
+> 4. không đề xuất, không tự ý ghép.
+> 5. không gợi ý
+> 6. coi như không có thông tin ngày chết, có trường nào điền trường đó.
+
+| Câu | Quy tắc đã chốt |
+|---|---|
+| 1 — địa chỉ | `Nơi chết` và nơi thường trú/cư trú cuối cùng dùng **một trường `diachi` / `dia_chi` hiện có** của Người chết; không thêm trường hoặc tách nghĩa để chặn điền. Không tự chọn giá trị khi chính nguồn có các giá trị mâu thuẫn. |
+| 2 — loại giấy | Nguồn `Giấy chứng tử (bản sao)` chuẩn hóa thành `Giấy chứng tử`. Chỉ ba loại canonical: `Trích lục khai tử`, `Trích lục khai tử (bản sao)`, `Giấy chứng tử`; không thêm loại thứ tư. |
+| 3 — cơ quan | Giữ đúng loại đơn vị và tên cơ quan nguồn, gồm xã/phường/thị trấn, không ép thành xã. Tên lịch sử xét theo **ngày cấp chính giấy**, không theo ngày chết/ngày hiện tại. Chưa có lịch sử xác nhận thì không tự điền tên suy đoán. |
+| 4 — giữa văn bản | **Không đề xuất bổ sung và không tự ghép dữ kiện giữa các văn bản**, kể cả cùng bộ hồ sơ. Mỗi văn bản nguồn được xử lý độc lập; không mượn phần thiếu, matching người hoặc lấy bản đầy nhất/mới nhất làm chuẩn. |
+| 5 — Đơn xin xác nhận | **Không gợi ý** trường sinh/chết/giấy tờ Người từ `Đơn xin xác nhận`; không đưa vòng qua normalized/inferred. |
+| 6 — thiếu ngày chết | Chỉ là **không có thông tin ngày chết**, giữ `null`/rỗng theo contract hiện có; trường nào có căn cứ được phép thì điền trường đó độc lập. Không chặn Người vì thiếu ngày chết/giấy, không tạo ngày giả, ngày 01/01, Boolean hoặc trạng thái mới; không kết luận còn sống chỉ vì thiếu ngày chết. |
+
+Mục này thay các câu hỏi nghiệp vụ chưa chốt ở mục 407–413 và kết luận chưa
+chốt nghĩa địa chỉ ở ngoại lệ đọc 421–437; các đoạn trước giữ làm lịch sử.
+Đặc biệt, đáp án 4 **bác đề xuất bổ sung chéo văn bản** trong phân tích khảo
+sát, không chỉ cấm ghi tự động. Không xóa raw/history, phá liên kết Case/ID
+đã có hoặc mở quyền ghép liên module/#42. Trong **một văn bản**, địa chỉ chung
+ghi rõ cho đúng hai người và các lần nhắc rõ cùng người vẫn theo phạm vi
+nguồn/luật hiện có khi không mâu thuẫn; không suy chung một giấy cho hai người.
+
+Số giấy vẫn giữ nguyên văn giá trị, nhãn ngoài số; ngày cấp là ngày của chính
+giấy, giữ độ đầy đủ. Không đổi raw, logic câu Word, trường tĩnh/placeholder,
+không chuyển Excel/VBA hoặc tạo field/model mới.
+
+**Trạng thái:** sáu câu đã **CHỐT NGHIỆP VỤ**, không còn cần hỏi lại; lượt này
+chỉ cập nhật decision/spec/contract narrative/backlog. Không sửa/chạy code,
+parser, test, DB, schema/migration/key, không đọc thêm mẫu hoặc mở gate chung.
+Runtime vẫn **TẠM DỪNG** theo chỉ dẫn trước. #41 vẫn **OPEN**, chưa nghiệm thu
+toàn bộ/cutover; #42 riêng chưa duyệt model. Số TLKT raw-only, grammar và
+`Customer.so_giay_to` UNIQUE/lookup vẫn là giới hạn triển khai đã ghi nhận,
+không được xem là đã sửa hoặc đã được owner chọn khóa định danh toàn cục.

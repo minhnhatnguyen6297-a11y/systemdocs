@@ -303,8 +303,8 @@ Fresh bank-auto review CLEAN/Ticket PASS; final semantic smoke parser8b503e7f/up
 | `ngay_sinh`, `chi_co_nam_sinh` | `ngaysinh` / `ngay_sinh` full date hoặc year/null | master Date + snapshot giữ độ đầy đủ; bool extraction không cột nghiệp vụ mới |
 | `cccd` (người sống); `so_giay_to` (người chết) | `sogiayto` / `so_giay_to` | `customers.so_giay_to`; không ép mọi giấy thành CCCD hoặc auto link Case |
 | `ngay_cap_cccd`; `ngay_cap` người chết | `ngaycap` / `ngay_cap` | `customers.ngay_cap`, snapshot; không tự padding năm |
-| `dia_chi`, `dia_chi_line` | `diachi` / `dia_chi` | `customers.dia_chi`, snapshot; line là presentation; người chết địa chỉ theo nghĩa nguồn |
-| `ngay_chet` | `ngaychet` / `ngay_chet` | `customers.ngay_chet`, snapshot |
+| `dia_chi`, `dia_chi_line` | `diachi` / `dia_chi` | `customers.dia_chi`, snapshot; line là presentation; người chết dùng một trường chung cho Nơi chết và cư trú cuối |
+| `ngay_chet` | `ngaychet` / `ngay_chet` | `customers.ngay_chet`, snapshot; thiếu = không có thông tin, không tự phân loại còn sống |
 | `noi_cap`, `loai_giay_to` | `noicap`,`loaigiayto` / legacy wire tương ứng | snapshot/derived evidence, **không cột customers** |
 | `gioi_tinh` Ông/Bà | `gioitinh` / wire `gioi_tinh` Nam/Nữ/null | Cột customers.gioi_tinh có thật; danh xưng không tự là giá trị wire đúng; mapper DOCX hiện không map field này |
 | `cccd_khac` | chưa approved multi-ID model | raw/evidence; Notary DOCX mapper tạo ambiguous normalized null, không persist list giấy tờ; #42 riêng |
@@ -312,6 +312,24 @@ Fresh bank-auto review CLEAN/Ticket PASS; final semantic smoke parser8b503e7f/up
 | `raw_text`, line/span/source_refs | provenance | giữ nguồn, không dùng chuỗi raw để claim canonical cutover |
 
 Proof: `contract_extract.py:3688-3754:_extract_plain_text_person_entries`, `4608-4620:_extract_nguoi_chet`; `contracts/entities.md:150-185`; `contracts/notary-case-drafting.md:246-283:person_row`; `notary_v2/models.py:36-48:Customer`; `case_workspace.py:306-310:_PERSON_KEY_ALIASES`, `2495-2569:_upsert_people`, `2768-2779:_build_payload`. Notary DOCX mapper **thực** là `services/document_intake/adapters/docx.py:49-57:PERSON_FIELD_SOURCES`, loop người hai bên và loop riêng `raw.nguoi_chet` (approved Person fields; số TLKT raw-only). Alias/R05 không auto; `329-343` giữ multi-ID refs + `intake.ambiguous`. Cùng dùng lõi không phải luồng Upload→Notary DB.
+
+**Owner 21/10/2026 — Người chết đã chốt nghiệp vụ, chưa cutover:** dùng cùng
+trường Người; `Nơi chết`/cư trú cuối là một `dia_chi`, không thêm field hoặc
+chọn ngầm khi nguồn mâu thuẫn. Chỉ ba loại `Trích lục khai tử`,
+`Trích lục khai tử (bản sao)`, `Giấy chứng tử`; nguồn `Giấy chứng tử (bản sao)`
+quy về `Giấy chứng tử`. Số giữ nguyên giá trị có dấu phẩy/phần quyển, không
+gồm nhãn. Ngày cấp là ngày chính giấy; cơ quan giữ xã/phường/thị trấn tại
+ngày cấp, không ép xã/đổi sang hiện hành/suy lịch sử chưa xác nhận.
+
+Không đề xuất bổ sung hoặc tự ghép giữa các văn bản, kể cả cùng bộ; không
+mượn dữ kiện hoặc lấy bản đầy nhất/mới nhất. Không gợi ý trường sinh/chết/
+giấy tờ Người từ `Đơn xin xác nhận`. Thiếu ngày chết chỉ giữ `null`/rỗng,
+có trường có căn cứ được phép nào thì điền trường đó; không chặn Người vì
+thiếu ngày/giấy, không tự coi còn sống hoặc tạo ngày giả/Boolean/status.
+Giữ raw/history/liên kết, địa chỉ chung rõ phạm vi trong cùng văn bản và
+logic câu Word/trường tĩnh. Đây không đổi phạm vi requester ở §6.1; số TLKT
+raw-only/UNIQUE, grammar và derive vẫn là giới hạn hiện có. Runtime tạm dừng,
+#41 OPEN/gate chung ĐÓNG ngoài ngoại lệ đọc hẹp đã ghi; không có proof mới.
 
 ### 6.2 Tài sản và cụm đất
 

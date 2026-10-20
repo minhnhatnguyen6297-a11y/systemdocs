@@ -177,9 +177,37 @@ Ranh giấy tờ kết thúc trước mô tả GCN/tài sản hoặc người k�
 
 ### 2.3. Người chết — Theo spec hiện hành
 
-Dùng chung quy tắc tên/ngày/địa chỉ/giới tính ở phần Người với vùng và dấu hiệu chết thuộc spec loại. Theo luật lọc tên người chết hiện hành, tên tối đa 6 từ, viết hoa đầu từ; câu kể phả hệ không tạo bản ghi. `ngay_chet` từ chết/đã chết/mất ngày; chết năm chỉ trong phạm vi và bằng chứng giấy tờ đã được spec loại quy định. Trích lục khai tử đi vào `so_giay_to, loai_giay_to, ngay_cap, noi_cap` của người chết.
+Dùng chung bộ trường Người và quy tắc tên/ngày/giới tính trong đúng vùng nguồn.
+Luật lọc tên/phạm vi hiện có không cho phép đổi sang người khác để làm đầy
+dữ liệu. Không lấy căn cước vợ/chồng trong ngoặc làm giấy của người chết.
 
-Không lấy căn cước vợ/chồng trong ngoặc làm giấy của người chết. `Nơi thường trú/cư trú cuối cùng/trước khi chết` là nhãn địa chỉ cuối; giới tính vẫn cần căn cứ rõ. Giữ tên đọc được từ nguồn; không đổi sang tên của người khác để bù dữ liệu.
+**Owner 21/10/2026 — đã chốt nghiệp vụ, chưa triển khai đầy đủ:**
+- `Nơi chết` và nơi thường trú/cư trú cuối cùng/trước khi chết đi vào **cùng
+  một `dia_chi` hiện có**. Không thêm field, không tự chọn nếu các giá trị
+  nguồn mâu thuẫn. Địa chỉ chung chỉ áp cho đúng những người nguồn chỉ rõ
+  trong cùng văn bản; không suy chung giấy từ chung địa chỉ.
+- Giấy khai tử/chứng tử đi vào `so_giay_to, loai_giay_to, ngay_cap, noi_cap`.
+  Chỉ ba loại canonical: `Trích lục khai tử`, `Trích lục khai tử (bản sao)`,
+  `Giấy chứng tử`; nguồn `Giấy chứng tử (bản sao)` quy về `Giấy chứng tử`.
+  Không default loại khi thiếu bằng chứng. Số giữ nguyên giá trị, gồm dấu
+  phẩy/phần quyển nếu có; nhãn giấy/số không nằm trong giá trị số.
+- `ngay_cap` là ngày cấp chính giấy, không phải ngày chết hay năm trong số;
+  giữ ngày đủ/năm riêng. `noi_cap` giữ cơ quan và loại đơn vị xã/phường/thị
+  trấn theo nguồn, không ép thành xã; tên lịch sử xét tại ngày cấp giấy.
+  Không lấy tên hiện hành/cư trú/đất hoặc lịch sử chưa xác nhận để bù nơi cấp.
+- **Không đề xuất bổ sung hoặc tự ghép giữa văn bản**, kể cả cùng bộ hồ sơ:
+  mỗi văn bản độc lập, không mượn trường thiếu, matching theo tên/số hay chọn
+  bản đầy nhất/mới nhất. Không xóa raw/history hoặc phá liên kết đã có.
+- **Không gợi ý** dữ kiện sinh/chết/giấy tờ Người từ `Đơn xin xác nhận`,
+  kể cả đi vòng qua normalized/inferred.
+- Thiếu ngày chết chỉ là không có thông tin ngày chết: giữ `null`/rỗng,
+  trường nào có căn cứ được phép thì điền trường đó. Không bắt buộc ngày
+  chết hoặc đủ bộ giấy mới nhận phần Người đã rõ; không coi thiếu ngày là
+  còn sống, không bịa ngày/01/01, Boolean hoặc status mới.
+
+Nguồn/raw và logic câu Word giữ nguyên, chỉ trường tĩnh/placeholder đã duyệt.
+Runtime/parser còn các giới hạn grammar, số TLKT raw-only và khóa UNIQUE
+được ghi ở #41; cập nhật quy tắc này không tuyên bố đã cutover/nghiệm thu.
 
 
 ### 2.4. Định danh thửa — Theo spec hiện hành
@@ -395,20 +423,24 @@ lại di sản:`, `Di sản:`, `Khi còn sống`, `Trước khi chết`,
 Bỏ cả dòng phả hệ (`Ông X có vợ là bà Y (Sinh ngày...)`) và khối
 dừng trước dòng `chết ngày`.
 
-### 4.3. Người chết (`raw.nguoi_chet`, bắt buộc có `chết/đã chết ngày DD/MM/YYYY`)
+### 4.3. Người chết (`raw.nguoi_chet`) — điền phần dữ kiện có căn cứ
 
-Trường người chết dùng quy tắc trường §3.
-Dấu hiệu chết và vùng khai ở đây quyết định đây là người để lại di sản;
-không đổi người chỉ để đầy đủ giấy tờ.
+Dùng bộ trường và sáu quy tắc owner tại §2.3. Có ngày/năm chết thì giữ đúng
+độ đầy đủ; thiếu chỉ là không có thông tin ngày chết, không loại/chặn Người
+đã có các trường hợp lệ khác hoặc bắt đủ giấy tờ. Không gợi ý từ `Đơn xin
+xác nhận`; không đổi người để đầy đủ dữ liệu. Đây là quy tắc nghiệp vụ đã
+chốt, **không phải** claim nhánh `raw.nguoi_chet` legacy đã đọc được mọi
+trường hợp thiếu ngày; parser hiện hành vẫn có giới hạn cần xử lý khi được giao.
 
 Dạng ngoặc gộp (11–12/10/2026): `ông X (sinh năm 1956, đã chết ngày ...)` và
 `ông X (Tên khác); (Sinh năm 1945, đã chết ngày ... theo trích lục...)` —
 ngoặc bí danh có thể đứng trước ngoặc sinh/chết; phần trong ngoặc sau
 ngày chết (`theo trích lục`, `Nơi thường trú`) vẫn được chấp nhận.
 
-**Lần nhắc lặp:** luật “bản sau điền trường trống” của v1.2 là hiện trạng đã ghi,
-không tự mở rộng cách gộp tài sản. Ranh giới owner đã chốt và phần cần đối
-chiếu xem quy tắc trường §8.
+**Lần nhắc lặp trong cùng một văn bản:** giữ phạm vi nguồn rõ cùng người và
+luật điền trường trống hiện có khi không mâu thuẫn; không mở rộng thành ghép
+người theo tên hoặc ghép tài sản. **Giữa các văn bản:** không đề xuất bổ sung,
+không tự ghép kể cả cùng bộ hồ sơ; không chọn bản đầy nhất/mới nhất làm chuẩn.
 Danh sách số thửa 112,115 và ghi chú đánh số lại vẫn theo quy tắc định danh trường;
 không tự chọn cách gộp các bản lặp.
 

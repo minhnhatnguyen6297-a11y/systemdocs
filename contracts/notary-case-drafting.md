@@ -252,9 +252,9 @@ person_row:
   ho_ten: <string non-empty>         # bắt buộc
   gioi_tinh: Nam | Nữ | null
   ngay_sinh: <YYYY-MM-DD | YYYY | null>
-  ngay_chet: <YYYY-MM-DD | YYYY | null>   # null = còn sống/không rõ
-  so_giay_to: <string | null>        # CCCD/CMND/hộ chiếu — free text,
-                                     # không ép 12 số (không phải khóa)
+  ngay_chet: <YYYY-MM-DD | YYYY | null>   # null = không có thông tin ngày chết
+  so_giay_to: <string | null>        # số giấy người sống hoặc khai tử/chứng tử;
+                                     # free text, không ép 12 số/không phải khóa
   ngay_cap: <YYYY-MM-DD | YYYY | null>
   noi_cap: <string | null>
   dia_chi: <string | null>
@@ -274,6 +274,27 @@ Không thêm field ngoài danh sách này — producer strip field lạ (tiền 
 backend hiện strip ngoài 10 key). `ho_ten` rỗng/`""` →
 `stage_validation_error{field:ho_ten, code:required}`.
 
+**Owner 21/10/2026 — nghĩa trường đã chốt, docs-only, không đổi wire/key:**
+- `dia_chi` là **một trường hiện có** dùng chung cho `Nơi chết` và nơi thường
+  trú/cư trú cuối cùng của người chết. Không tạo field mới hoặc chọn ngầm khi
+  giá trị mâu thuẫn. Địa chỉ chung ghi rõ trong cùng văn bản chỉ áp đúng nhóm.
+- Ba loại người chết: `Trích lục khai tử`, `Trích lục khai tử (bản sao)`,
+  `Giấy chứng tử`; `Giấy chứng tử (bản sao)` nguồn quy về `Giấy chứng tử`.
+  Số giữ nguyên giá trị gồm dấu phẩy/quyển, nhãn ngoài số. `ngay_cap` là ngày
+  cấp chính giấy; `noi_cap` giữ loại đơn vị xã/phường/thị trấn, không ép xã,
+  tên lịch sử theo ngày cấp giấy, không suy bằng lịch sử chưa xác nhận.
+- Mỗi văn bản độc lập: **không đề xuất bổ sung, không tự ghép giữa văn bản**
+  kể cả cùng bộ hồ sơ, không mượn trường thiếu hoặc chọn bản đầy nhất/mới
+  nhất. Không gợi ý sinh/chết/giấy tờ Người từ `Đơn xin xác nhận`.
+- `ngay_chet=null` chỉ là không có thông tin ngày chết, không tự kết luận
+  còn sống. Các trường hợp lệ khác được điền độc lập; thiếu ngày chết/giấy
+  không chặn Người. Không tạo ngày giả/01/01, Boolean hoặc status mới.
+  Không xóa raw/history, phá liên kết đã có hoặc đổi logic câu Word.
+
+Quy tắc này chưa là bằng chứng runtime đáp ứng: nhánh derive theo ngày chết,
+grammar giấy, số TLKT raw-only và UNIQUE/lookup hiện có vẫn là giới hạn triển
+khai #41; runtime tạm dừng, không cutover/schema/migration trong lượt docs.
+
 - **Key canonical (MIN-141 đợt 3):** server đọc được cả key wire legacy
   trên và tên nghiệp vụ canonical liền không dấu (entities.md §9.1):
   `ten`↔`ho_ten`, `gioitinh`↔`gioi_tinh`, `ngaysinh`↔`ngay_sinh`,
@@ -281,7 +302,7 @@ backend hiện strip ngoài 10 key). `ho_ten` rỗng/`""` →
   `noicap`↔`noi_cap`, `diachi`↔`dia_chi`, `loaigiayto`↔`loai_giay_to`,
   `loaidiachi`↔`loai_dia_chi`. Cùng trường ở cả hai spelling mà giá trị
   mâu thuẫn → `validation_error`. Wire emit giữ bộ legacy.
-- **Giá trị suy ra (đợt 3):** người sống thiếu `loai_giay_to`/`noi_cap`/
+- **Giá trị suy ra hiện trạng (đợt 3, chưa phải đã đáp ứng đáp án 21/10):** người sống thiếu `loai_giay_to`/`noi_cap`/
   `loai_dia_chi` → server derive theo mốc `ngay_cap` 01/10/2024 và ghi
   giá trị hiệu lực vào snapshot commit; thiếu `ngay_cap` → `null`
   (chưa xác định, không suy). Người chết (`ngay_chet` ≠ null): server

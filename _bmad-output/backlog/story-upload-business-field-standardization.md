@@ -464,3 +464,31 @@ it does not select tokens from mapping values. Focused deceased+full notary pass
 smoke `_bmad-output/tmp/deceased-person-smoke.json` sha
 `eea7e5eb6aedfe5d2fbd84a85fa9ffe8f0fba77bfded0a5817781341f23e13c9` PASS
 (mapped death/type/issuer, no TLKT identity, raw retained, not requester).
+
+### Người chết — owner 21/10/2026 chốt sáu câu, chưa triển khai
+
+1. Nơi chết/cư trú cuối dùng một `dia_chi` Người hiện có; không thêm trường
+   hoặc tự chọn giá trị mâu thuẫn.
+2. `Giấy chứng tử (bản sao)` quy về `Giấy chứng tử`; chỉ ba loại cùng
+   `Trích lục khai tử` và `Trích lục khai tử (bản sao)`.
+3. Giữ cơ quan xã/phường/thị trấn theo nguồn tại ngày cấp chính giấy,
+   không ép xã, thay bằng hiện hành hoặc bù lịch sử chưa xác nhận.
+4. **Không đề xuất bổ sung, không tự ghép giữa văn bản**, kể cả cùng bộ;
+   không mượn trường thiếu, matching người hoặc lấy bản đầy nhất/mới nhất.
+5. **Không gợi ý** trường sinh/chết/giấy tờ Người từ `Đơn xin xác nhận`,
+   kể cả qua normalized/inferred.
+6. Thiếu ngày chết là không có thông tin (`null`/rỗng), có trường hợp lệ nào
+   điền trường đó; không chặn Người vì thiếu ngày/giấy, không tự coi còn sống,
+   tạo ngày giả/01/01, Boolean hoặc status mới.
+
+Số giấy giữ nguyên giá trị và nhãn ngoài số; không đổi raw/history/liên kết
+Case/ID, logic câu Word/trường tĩnh. Trong cùng văn bản, địa chỉ chung và lần
+nhắc rõ cùng người giữ đúng phạm vi khi không mâu thuẫn, không suy chung giấy.
+Không duyệt model #42, khóa số toàn cục, migration hoặc ghép liên module.
+
+**BUSINESS CHỐT, runtime TẠM DỪNG:** lượt này chỉ docs, không code/test/mẫu mới.
+Slice deceased intake và proof cũ bên trên giữ đúng phạm vi lịch sử, không
+nghiệm thu sáu quy tắc mới. Grammar ba loại/số freeform, derive thiếu ngày
+và đường số TLKT raw-only do UNIQUE/lookup vẫn là khoảng trống triển khai.
+#41 vẫn OPEN/`refined:false`, chưa cutover Person/Asset/parties hoặc nghiệm
+thu toàn bộ; gate chung ĐÓNG ngoài ngoại lệ đọc hẹp đã ghi, không mở lô mới.

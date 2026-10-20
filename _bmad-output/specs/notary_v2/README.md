@@ -137,6 +137,24 @@ Người sửa theo dòng; tài sản theo cột. Thêm/sửa/xóa/sắp xếp c
 | Loại đất | Mỗi tài sản tối đa 20 cụm loại đất–diện tích–thời hạn. Có thể để danh sách trống. Giữ vị trí trống; bỏ thời hạn lẻ cấp tài sản, không tự đắp vào cụm. |
 | Hồ sơ | Nơi niêm yết nhập tay; người nhận ủy quyền từ danh mục/tạo mới; nội dung việc nhập tay. Ba dòng đặt dưới tài sản. |
 
+**Người chết — owner 21/10/2026 đã chốt, docs-only:** `Nơi chết` và nơi thường
+trú/cư trú cuối cùng dùng cùng `dia_chi` hiện có, không thêm field/đổi câu Word
+hoặc tự chọn giá trị mâu thuẫn. Ba loại là `Trích lục khai tử`,
+`Trích lục khai tử (bản sao)`, `Giấy chứng tử`; nguồn `Giấy chứng tử (bản sao)`
+quy về `Giấy chứng tử`. Số giữ nguyên giá trị, kể cả dấu phẩy/quyển; ngày cấp
+là ngày của chính giấy, giữ độ đầy đủ. Cơ quan giữ xã/phường/thị trấn đúng
+nguồn tại ngày cấp, không ép xã hoặc suy lịch sử chưa xác nhận.
+
+Mỗi văn bản độc lập: **không đề xuất bổ sung hoặc tự ghép giữa văn bản**, kể
+cả cùng bộ hồ sơ; không lấy bản đầy nhất/mới nhất. **Không gợi ý** trường
+sinh/chết/giấy tờ Người từ `Đơn xin xác nhận`. Thiếu ngày chết chỉ là không
+có thông tin: giữ `null`/rỗng, các trường có căn cứ được phép vẫn điền độc lập,
+không chặn Người vì thiếu ngày/giấy, không tự coi còn sống hoặc tạo ngày giả/
+Boolean/status. Địa chỉ chung rõ phạm vi và nhắc lại cùng người trong một
+văn bản vẫn theo nguồn khi không mâu thuẫn; không suy chung giấy.
+Raw/history/liên kết đã có giữ nguyên. Runtime tạm dừng; grammar giấy, số
+TLKT raw-only/UNIQUE và derive còn giới hạn, chưa nghiệm thu #41.
+
 Tên và định dạng trường giữ chuẩn DB; alias cũ cần ánh xạ. Hai alias của cùng trường trái nhau phải báo lỗi, không chọn ngầm. Cụm đất lưu `property_land_rows`, duy nhất theo tài sản và vị trí; JSON cũ chỉ tương thích. Tên token cụm viết đủ `loaidat<M><N>`, `dientich<M><N>`, `thoihan<M><N>`: M là cụm, N là tài sản; không thêm dạng rút gọn gây lẫn cụm 12 với tài sản 2.
 
 Thừa kế cần `owner_row_id` theo contract lưu hiện hành; Hai bên không nhận trường đó, tối đa 30 người. Hồ sơ cũ hơn 3 tài sản vẫn đọc đủ và cảnh báo; commit hiện chặn đến khi còn tối đa 3. Đây là giới hạn hiện hành cần xem xét riêng nếu thay đổi, không tự bỏ vì triết lý điền dần.
@@ -180,7 +198,13 @@ Nhập DOCX có thể xuất theo bản gốc: người dùng chọn đúng từ
 <a id="address"></a>
 ## 7. Tra địa chỉ ngay khi nhập
 
-Tra địa chỉ Người/Tài sản hoặc chính ô Nơi niêm yết; nơi cấp khai tử dùng địa chỉ của chính người chết. Dùng chữ đang nhập, không cần ngày giấy. Tra kho cục bộ, không gửi địa chỉ khách hàng lên website.
+Tra địa chỉ Người/Tài sản hoặc chính ô Nơi niêm yết bằng chữ đang nhập. Lookup
+v2 hiện chỉ trả tên **hiện hành**, không nhận ngày giấy và không tra được tên
+lịch sử tại ngày cấp; tra kho cục bộ, không gửi địa chỉ khách hàng lên website.
+**Nơi cấp giấy chết** phải theo cơ quan tại ngày cấp chính giấy, không suy từ
+địa chỉ người chết hoặc copy tên hiện hành làm tên lịch sử. Lịch sử chưa đủ
+xác nhận thì không tự điền; đây là yêu cầu nghiệp vụ, không claim lookup v2
+đã có chức năng theo ngày hoặc thêm quy trình nhập tay mới.
 
 Máy chỉ trả kết quả để Copy; không tự sửa, nối “nay là” hoặc lưu Stage. Hơn 10 kết quả thì hỏi mở danh sách đầy đủ. Cửa sổ đầy đủ cho sửa câu tìm, bấm Tra và Copy từng dòng; đóng về đúng ô/con trỏ/vùng chọn/cuộn, không mất nháp. Đổi hồ sơ/ô/chuỗi tìm thì bỏ phản hồi cũ. Copy lỗi phải báo lỗi.
 

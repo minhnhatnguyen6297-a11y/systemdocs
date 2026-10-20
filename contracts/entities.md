@@ -153,16 +153,22 @@ Cập nhật chốt từ Owner (01/10/2026): Từ điển người chuẩn hóa 
 |---|---|---|---|
 | `ten` | `ho_ten` | String(200) | Họ và tên, người dùng nhập liệu hoặc OCR |
 | `ngaysinh` | `ngay_sinh` | Date | Ngày tháng năm sinh (hoặc năm sinh) |
-| `ngaychet` | `ngay_chet` | Date | Ngày chết (`NULL` nếu còn sống) |
-| `sogiayto` | `so_giay_to` | String(50) | Số giấy tờ định danh (người sống: số CCCD/CC; người chết: số giấy khai tử / trích lục khai tử) |
-| `ngaycap` | `ngay_cap` | Date | Ngày cấp giấy tờ định danh (ngày cấp CCCD hoặc ngày cấp trích lục khai tử) |
-| `diachi` | `dia_chi` | Text | Địa chỉ người sống; nơi chết / nơi thường trú cuối cùng trước khi chết của người chết |
+| `ngaychet` | `ngay_chet` | Date | Ngày/năm chết; `NULL` là không có thông tin ngày chết, không tự kết luận còn sống |
+| `sogiayto` | `so_giay_to` | String(50) | Số giấy tờ (người chết: khai tử/chứng tử); giữ nguyên giá trị gồm dấu phẩy/phần quyển, không gồm nhãn, không ép CCCD |
+| `ngaycap` | `ngay_cap` | Date | Ngày cấp chính giấy đang dùng, người chết là giấy khai tử/chứng tử, không phải ngày chết |
+| `diachi` | `dia_chi` | Text | Một trường địa chỉ: người chết dùng chung cho Nơi chết và nơi thường trú/cư trú cuối cùng; không tạo thêm trường |
 
 **Owner 15/10/2026 — độ đầy đủ của ngày:** bảng trên mô tả kiểu lưu hiện có,
 không cho phép làm mất dữ liệu chỉ có năm. Lưu/đọc lại và hiển thị phải phân biệt
 `2010` với ngày thật `01/01/2010`; ngày quy ước chỉ phục vụ tính toán nội bộ.
 Cách giữ dữ liệu nhập/độ đầy đủ trong lưu trữ phải kiểm riêng khi triển khai,
 không suy từ kiểu `Date` rằng đã đáp ứng hoặc tự tạo cột trong lần sửa docs này.
+
+**Owner 21/10/2026:** thiếu ngày chết giữ `null`/rỗng theo contract; có trường
+nào có căn cứ được phép thì điền trường đó độc lập, không chặn Người vì thiếu
+ngày chết/bộ giấy. Không bịa ngày, đệm 01/01, tạo Boolean/status mới hoặc tự
+phân loại còn sống. Một trường địa chỉ không cho phép tự chọn giữa các giá
+trị mâu thuẫn hay tự điền từ người/văn bản khác.
 
 Ngoài 6 trường nghiệp vụ chính, DB hiện vẫn giữ `gioi_tinh`, ID và thời gian tạo; không xóa các cột này.
 
@@ -176,10 +182,19 @@ Hành vi cuối MIN-141, Owner xác nhận 03/10/2026:
   `Cục cảnh sát quản lý hành chính về trật tự xã hội`, `Thường trú` /
   `Thường trú tại`; từ mốc dùng `Căn cước`, `Bộ Công an`, `Cư trú` /
   `Cư trú tại`. Thiếu ngày cấp → để trống, không đoán cơ quan.
-- Người đã chết: loại giấy tờ và nơi cấp chỉ lấy từ bằng chứng người dùng
-  xác nhận trong snapshot hồ sơ. Chưa có → để trống; không mặc định
-  `Trích lục khai tử (Bản sao)` và không tự suy UBND xã cũ/mới.
-  Nhãn địa chỉ suy ra là `Nơi chết`.
+- Người đã chết: loại giấy tờ và nơi cấp theo bằng chứng được xác nhận trong
+  snapshot hồ sơ; thiếu thì để trống, không default giấy hoặc UBND.
+  Owner 21/10/2026 chốt ba loại: `Trích lục khai tử`,
+  `Trích lục khai tử (bản sao)`, `Giấy chứng tử`; nguồn `Giấy chứng tử (bản sao)`
+  quy về `Giấy chứng tử`. Giữ loại đơn vị cơ quan xã/phường/thị trấn, không ép
+  thành xã; tên lịch sử theo **ngày cấp giấy**, không theo ngày chết/hiện tại,
+  không suy lịch sử chưa xác nhận. `Nơi chết` và cư trú cuối dùng cùng `diachi`,
+  nhãn Word/logic câu hiện có không đổi.
+- Mỗi văn bản nguồn độc lập: không đề xuất bổ sung hoặc tự ghép giữa văn bản,
+  kể cả cùng bộ hồ sơ; không mượn dữ kiện hoặc chọn bản đầy nhất/mới nhất.
+  Không gợi ý sinh/chết/giấy tờ Người từ `Đơn xin xác nhận`, kể cả qua suy ra.
+  Raw/history và liên kết Case/ID đã có giữ nguyên. Địa chỉ chung chỉ áp cho
+  đúng người được chỉ rõ trong cùng văn bản, không chứng minh chung giấy.
 - Khi người dùng sửa ngày cấp/ngày chết, hệ thống tính lại giá trị từng tự
   suy ra; giá trị người dùng đã sửa khác giá trị suy ra được giữ lại.
 - Word đọc giá trị đã commit trong snapshot của chính hồ sơ, kể cả null;
@@ -190,6 +205,11 @@ Hành vi cuối MIN-141, Owner xác nhận 03/10/2026:
 
 Ý định ban đầu suy UBND theo mốc 01/07/2025 được giữ làm lịch sử; bảng tra
 xã/phường cũ–mới còn ở NAIA-9, chưa có đường suy tự động trong runtime.
+
+**Trạng thái docs-only 21/10/2026:** quy tắc nghiệp vụ trên đã chốt, không đổi
+key/wire/model, không xác nhận triển khai. Runtime đang tạm dừng; grammar,
+số TLKT raw-only và ràng buộc UNIQUE/lookup hiện có chưa được sửa. #41 vẫn
+mở/chưa nghiệm thu; #42 không được duyệt model bởi các đáp án này.
 
 ---
 
