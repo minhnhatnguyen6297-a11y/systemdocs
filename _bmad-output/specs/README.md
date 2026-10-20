@@ -79,21 +79,25 @@ Electron là vỏ ứng dụng; Python/FastAPI xử lý nghiệp vụ. Module gi
   sát corpus owner để đóng gate. Sau gate và khi được giao mới chạy **LLM đọc
   mẫu → nhận diện cấu trúc → so spec/code → sửa có căn cứ → test/lặp** đến đủ đúng.
   Khi đó văn bản lạ/gap từng file giữ pending qua #39, tiếp tục file đã rõ.
-  Không tắt Scan/Upload production, cấp quyền code hoặc cloud mới. Hiện chỉ ghi
-  tài liệu. [Chi tiết](shared/extraction-rules.md#sample-iteration) ·
+  Không tắt Scan/Upload production hoặc cấp quyền cloud mới. Docs-only là mốc
+  ghi nhận trước; owner đã giao runtime Nam Định đã chốt, gồm BANKMODE bên dưới.
   [Quyết định](../decisions/decision-owner-upload-field-standardization-20261019.md).
 - Bản nháp Stage/Diagram là sửa chưa lưu. Draft Case của Office là ứng viên chưa xác nhận. Trạng thái hồ sơ `draft` phục vụ quy tắc quản lý hồ sơ. Ba nghĩa không thay thế nhau.
 - Nguồn gốc → chữ đọc được → dữ liệu chuẩn hóa → gợi ý suy ra nếu cần → người có thẩm quyền xác nhận. Không phải dữ liệu nào cũng cần suy luận.
 - Giữ nguồn và giá trị gốc; không sửa raw để che lỗi. Máy không tự nâng OCR/AI thành dữ liệu đã xác nhận.
 - Đầu ra nghiệp vụ phải theo trường, kiểu, định dạng, cách nhóm và đích lưu đã chốt trong DB/contract. Raw không bắt buộc mang schema DB. Không sinh trường mồ côi hoặc nhét sai nghĩa vào ghi chú. Trường mới phải được chốt trước; ngoại lệ hẹp là cụm trường phụ website theo hướng owner cho phép có điều kiện, không phải ghi chú chung; raw capture chỉ là provenance.
-- **Owner 20/10/2026 — pháp nhân, cụm trường phụ và quan hệ:** pháp nhân **không đưa vào Người**, theo policy người dùng nhập tay; bảng riêng tương lai là định hướng chưa duyệt schema/build. Cụm trường phụ chỉ theo website/ô cụ thể, đáp ứng điều kiện owner nêu (phức tạp, không lặp lại), ưu tiên canonical đã có, giữ provenance, không generic bag/`ghiChú`; raw capture chỉ provenance; không xin duyệt từng chi tiết kỹ thuật. Quan hệ nhiều người/nhiều tài sản chưa chọn model/cardinality. [Dữ liệu chung](shared/data-rules.md) · [Quyết định](../decisions/decision-owner-upload-field-standardization-20261019.md).
+- **Owner 20/10/2026 — pháp nhân, cụm trường phụ và quan hệ:** pháp nhân **không đưa vào Người**; policy nhập tay chung có ngoại lệ ngân hàng thế chấp app tự lấy dưới đây. Bảng riêng tương lai chưa duyệt schema/build. Cụm trường phụ theo website/ô cụ thể, phức tạp, không lặp lại, ưu tiên canonical đã có và giữ provenance; không generic bag/`ghiChú`. Quan hệ nhiều người/nhiều tài sản chưa chọn model/cardinality. [Dữ liệu chung](shared/data-rules.md) · [Quyết định](../decisions/decision-owner-upload-field-standardization-20261019.md).
 - **Đáp án #43 — phạm vi requester Nam Định/Upload:** lấy cá nhân sống A/B/
   đại diện ủy quyền, không người chết/CCV/nhân viên trong output đó; không xóa
   Person chết, Stage/Hồ sơ thừa kế/raw/snapshot/lịch sử. Ngân hàng thế chấp
-  hiện cả cụm là ngoại lệ output, không Person; BANKMODE còn mở user dán/app
-  lấy-điền **cụm ngân hàng thế chấp**; cá nhân khác vẫn chuẩn, không schema/extractor mới.
+  hiện cả cụm là ngoại lệ output, không Person; **BANKMODE đã chốt “app tự lấy”**:
+  chỉ thế chấp, app lấy toàn cụm ngân hàng/chi nhánh/định danh/địa chỉ/đại diện/
+  ủy quyền có nguồn tại vị trí nguồn, không lặp đại diện đã trong cụm.
+  Cá nhân khác vẫn dữ kiện chuẩn. `web_form.nguoi_yeu_cau` → payload JSON →
+  queue → editor là persistence projection hợp lệ, không key/schema canonical mới.
   Ủy quyền A=ủy quyền/B=được ủy quyền; một bên không gán; nguồn trái nhau giữ
-  conflict/xác nhận phần nhóm, không tự winner. Q1/Q2 đã trả lời, không hỏi lại.
+  conflict/xác nhận phần nhóm, không tự winner. Q1/Q2/BANKMODE đủ đáp án,
+  #43 phân tích done/bàn giao #41; #41 mở/gate mẫu ĐÓNG, bounded proof/fresh review CLEAN.
   Requester không cần tag A/B đã gán; cá nhân sống một bên/đại diện ủy quyền
   vẫn được đưa vào khi nhóm không gán hoặc conflict.
 - Ngày nhập/hiển thị giữ đúng độ đầy đủ: năm riêng vẫn là năm. Ngày quy ước chỉ dùng trong tính toán, không ghi đè thành dữ kiện đã biết.

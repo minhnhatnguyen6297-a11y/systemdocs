@@ -529,7 +529,6 @@ class PortalBrowserSession:
         *,
         selected_record_ids=None,
         exclude_contract_nos=None,
-        requester_sheet_url: str = "",
         progress_callback=None,
         cong_chung_vien=None,
         thu_ky=None,
@@ -539,7 +538,6 @@ class PortalBrowserSession:
         self.last_prepare_kwargs = {
             "selected_record_ids": set(selected_record_ids) if selected_record_ids is not None else None,
             "exclude_contract_nos": set(exclude_contract_nos or []),
-            "requester_sheet_url": requester_sheet_url,
             "cong_chung_vien": cong_chung_vien,
             "thu_ky": thu_ky,
             "chunk_size": chunk_size,

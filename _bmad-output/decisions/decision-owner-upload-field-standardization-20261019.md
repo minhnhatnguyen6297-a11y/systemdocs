@@ -7,7 +7,7 @@ status: accepted
 
 ## Nguồn và phạm vi được giao
 
-Owner báo trường Hồ sơ còn thiếu: Upload đang bóc văn bản thành trường để điền web nhưng hệ thống còn trường nghiệp vụ mồ côi. Đây là quan sát của owner, không yêu cầu chạy Upload để chứng minh lại. Owner yêu cầu **ghi quyết định và hai issue độc lập**, chưa giao triển khai, đọc mẫu, tạo Word/corpus hoặc chạy parser/app/test/E2E.
+Owner báo trường Hồ sơ còn thiếu: Upload đang bóc văn bản thành trường để điền web nhưng hệ thống còn trường nghiệp vụ mồ côi. Đây là quan sát của owner, không yêu cầu chạy Upload để chứng minh lại. **Mốc giao ban đầu (lịch sử):** ghi quyết định và hai issue độc lập, chưa giao triển khai/đọc mẫu/parser/app/test. Quyền runtime Nam Định bổ sung về sau, gồm đáp án BANKMODE cuối tài liệu, thay giới hạn docs-only cho slice được duyệt; gate mẫu vẫn giữ.
 
 ## Quyết định hiện hành
 
@@ -15,7 +15,7 @@ Owner báo trường Hồ sơ còn thiếu: Upload đang bóc văn bản thành 
 - **Chủ đất là trường của Hồ sơ**, không phải thuộc tính chủ sở hữu cố định của Tài sản. Chưa chọn key, kiểu, cardinality, quan hệ/FK hay schema danh sách. Không đồng nhất với node `owner`/`owner_row_id` của Diagram Thừa kế.
 - **Thông tin công chứng thuộc Hồ sơ**, độc lập với ngày tạo hồ sơ. Inventory phải gồm số/ngày công chứng, công chứng viên, thư ký và mọi trường Upload khác trước khi chốt đủ; không suy tất cả đã là cột DB được duyệt.
 - **Bỏ qua thông tin giao dịch khi bóc tách và chuẩn hóa**: giá, đặt cọc, tiền thuê, khoản vay, lãi suất, điều khoản thanh toán. **Bỏ qua thời hạn nghiệp vụ**. Không áp dụng việc bỏ qua này cho thời hạn sử dụng đất trong `land_rows[].thoihan`, hoặc timeout kỹ thuật.
-- Nếu portal thực sự yêu cầu trường đã loại, ghi xung đột consumer và câu hỏi refinement. Không âm thầm tiếp tục bóc, bịa/default hoặc tự quyết bước nhập tay mới. Quyết định này không cho xóa/sửa raw, bằng chứng lịch sử hay code/runtime nghiệp vụ trong lượt tài liệu.
+- Nếu portal thực sự yêu cầu trường đã loại, ghi xung đột consumer và câu hỏi refinement. Không âm thầm tiếp tục bóc, bịa/default hoặc tự quyết bước nhập tay mới. Giữ raw/lịch sử; giới hạn không runtime ở lượt tài liệu ban đầu không freeze slice Nam Định được giao về sau.
 - Không xóa trường Upload còn cần chỉ để vừa schema Notary hiện tại. Sau catalog có căn cứ, refine/chốt phần mở rộng canonical Hồ sơ thực sự cần trước khi triển khai. Chưa chọn engine DB vật lý chung, shared Case ID, gộp DB hay tích hợp liên module.
 - Issue [chuẩn hóa trường Upload #41](../backlog/story-upload-business-field-standardization.md) chỉ hoàn thành khi chuẩn DB/contract được duyệt, triển khai và cutover mọi adapter/writer/reader/consumer/output bị ảnh hưởng với bằng chứng luồng thật. Chỉ lập bảng hoặc sửa nhãn/key không đủ; không shim, ghi chú chung hoặc raw capture thay trường nghiệp vụ.
 - **Gate mới toàn hệ thống:** mọi lượt quét/đọc nội dung mẫu thực mới, batch owner-sample, corpus và vòng test/E2E theo mẫu phải chờ #41 được nghiệm thu đầy đủ. Viết bảng mapping không mở gate. Qua gate vẫn cần được giao thực thi; sau đó quy tắc pending từng file/#39 không chặn file đã rõ tiếp tục áp dụng. Không tắt Scan/Upload production đang có hoặc tạo feature flag từ tài liệu này.
@@ -115,11 +115,11 @@ toán riêng, owner yêu cầu làm kỹ, chưa chọn model/cardinality/schema.
   bảng nối hay schema nhiều người–nhiều tài sản. Chỉ đạo mới ở mục “Trả lời ma
   trận” bên dưới thay yêu cầu trước “làm trong #41, không tạo ticket”: D06+D07
   chuyển một issue riêng #43, làm ngay sau rõ các ô, không chờ toàn #41 xong.
-  Không coi mô hình cũ đã duyệt, đổi gate hoặc cấp quyền code/schema.
+  Không coi model cũ đã duyệt hoặc mở gate/schema canonical quan hệ; ngoại lệ runtime projection ngân hàng đã được giao ở đáp án cuối.
 - **Pháp nhân:** không đưa vào Người, không thêm loại pháp nhân vào Person,
-  không tự phân loại tổ chức thành thể nhân. Theo policy, **người dùng nhập tay**;
-  đây là policy nhập liệu, không phải extraction hay default; code hiện tại chưa
-  cutover. Hướng “sau này chuẩn hóa thành một bảng riêng” là định hướng của owner,
+  không tự phân loại tổ chức thành thể nhân. Policy **người dùng nhập tay** chung
+  có ngoại lệ ngân hàng thế chấp **app tự lấy** ở đáp án cuối. Không bịa/default;
+  hướng bảng riêng tương lai vẫn là định hướng của owner,
   **chưa duyệt bảng/cột/migration/contract hoặc triển khai** trong lượt này; nếu
   làm sau, đây là schema riêng phải thiết kế/chốt riêng; phạm vi ba đối tượng
   hiện tại không đổi, còn bảng pháp nhân tương lai là hướng owner cho phép và
@@ -140,7 +140,7 @@ toán riêng, owner yêu cầu làm kỹ, chưa chọn model/cardinality/schema.
   kỹ thuật do implementation sở hữu theo contract/rule đã duyệt. Không dùng
   `ghiChu` chung hoặc JSON bag chung thay trường; raw capture chỉ là provenance,
   không thay trường nghiệp vụ. Không tự đặt canonical key/tên/kiểu/nhóm/storage;
-  không dùng cụm để tự bóc pháp nhân. Cụm có thể là trường riêng theo ô website;
+  chỉ tự lấy ngân hàng trong ngoại lệ đã chốt ở cuối, không tự bóc pháp nhân khác. Cụm có thể là trường riêng theo ô website;
   phần tái dùng được vẫn map canonical, không mặc định coi cụm là dữ liệu chưa
   map/orphan.
 - **Không xin owner duyệt từng chi tiết kỹ thuật** như một gate mới. Phần chưa
@@ -151,12 +151,12 @@ toán riêng, owner yêu cầu làm kỹ, chưa chọn model/cardinality/schema.
 
 - Đường đang implement vẫn là 8 key Case metadata; Person/Asset/parties chưa
   canonical cutover. `nguoi_yeu_cau`/`duong_su`/`taisan` vẫn là output trình
-  bày từ nguồn, chưa phải canonical block field. Chưa có bảng pháp nhân và chưa
-  có trường lưu cụm được duyệt/triển khai. Các quy tắc trên là policy đích và
-  ranh giới, không chứng minh runtime đã đổi.
-- Raw, bằng chứng, file và `source_refs` giữ nguyên vai trò provenance kỹ thuật;
-  không sửa raw/lịch sử để đạt chuẩn hóa. Lượt này chỉ tài liệu: không sửa code,
-  schema, migration, runtime, test hoặc tạo bảng tương lai.
+  bày từ nguồn, chưa phải canonical block field. Chưa có bảng/key canonical
+  pháp nhân mới; projection requester text persist qua payload JSON có sẵn là
+  hợp lệ, không hoàn tất normalized cutover. Runtime slice mới còn chờ proof cuối.
+- Raw, bằng chứng, file và `source_refs` giữ vai trò provenance kỹ thuật;
+  không sửa raw/lịch sử. Giới hạn chỉ tài liệu ở mốc cũ là lịch sử; đáp án cuối
+  cho tiếp tục runtime slice đã chốt, không mở schema/bảng tương lai.
 - #41 vẫn mở, `refined:false`, gate khảo sát mẫu vẫn **ĐÓNG**; #42 vẫn chỉ cho
   nhiều giấy tờ/địa chỉ của một Người và không tự thành prerequisite.
 
@@ -196,7 +196,7 @@ không chứng minh runtime đã cutover; không sửa raw/lịch sử.
   về nhiều người/nhiều tài sản, membership/vai trò/thứ tự và scope người↔tài
   sản. Xử lý **ngay sau làm rõ các ô**, không chờ toàn #41 nghiệm thu để tránh
   vòng phụ thuộc; #41 tiếp nhận kết quả trước cutover quan hệ. #42 không là
-  prerequisite. Chưa duyệt model/FK/cardinality hoặc implementation.
+  prerequisite. Nay phân tích 16 ca/Q1/Q2/BANKMODE đủ đáp án, bàn giao #41; chưa duyệt model/FK/cardinality quan hệ.
 - **D08:** owner “đã trả lời ở R06”. Chỉ dữ liệu chuẩn Người, không lời quan
   hệ/tư cách/chức vụ trong requester; không duyệt residual prose block D08,
   không hỏi lại lựa chọn này.
@@ -248,8 +248,8 @@ ví dụ tổng hợp trong Git, không chép tên/ID user đưa.
   formatter hiện có hay mẫu Word đang hỗ trợ. Các tính năng legacy-supported giữ
   nguyên hiện trạng: quyết định này không phê duyệt framework block mới và cũng
   không cấp quyền gỡ tính năng đang chạy.
-- Lượt này **chỉ tài liệu**: không code/schema/DB/runtime/test/browser/corpus.
-  #41 vẫn mở, `refined:false`, gate mẫu **ĐÓNG**.
+- Giới hạn **chỉ tài liệu** là mốc ghi nhận này trong lịch sử; lệnh liên tục và
+  đáp án BANKMODE bên dưới cho runtime slice đã chốt. #41 mở/refined:false, gate mẫu **ĐÓNG**.
 
 ## Đáp án #43 — membership requester và nhóm A/B, owner 20/10/2026
 
@@ -283,17 +283,22 @@ ví dụ tổng hợp trong Git, không chép tên/ID user đưa.
   đổi tập requester. Chữ “nhận” không là regex phổ quát.
 - Ngân hàng trong hợp đồng thế chấp được yêu cầu hiện **cả cụm** như ngoại lệ
   output, **không là Person**. Policy pháp nhân không thuộc Người/bảng riêng
-  tương lai vẫn giữ. Chưa chọn app tự lấy/điền hay user dán **cụm ngân hàng**;
-  cá nhân khác vẫn dữ kiện chuẩn, không mở lại scope prose/whole-cluster cho họ.
-  Không tự tạo extractor/schema/trường pháp nhân persisted hoặc biến editor thành raw block. Policy nhập tay pháp
-  nhân trước đó không đủ để tự kết luận ý nghĩa động từ “dán” trong đáp án mới.
+  tương lai vẫn giữ. **Owner đã trả lời BANKMODE: “app tự lấy”.** App tự lấy
+  cả cụm ngân hàng thế chấp từ nguồn và điền requester, không user-paste-only.
+  Đây là ngoại lệ output nguồn tĩnh được duyệt, không Person/bảng pháp nhân
+  hoặc trường tầng động. Cá nhân khác giữ dữ kiện chuẩn, không blanket raw.
+  Dùng đích output có sẵn `web_form.nguoi_yeu_cau`, lưu payload JSON và reader/
+  consumer hiện có; không cần entity/key canonical mới để lưu projection.
+  Cụm chỉ ngân hàng/chi nhánh/định danh/địa chỉ/đại diện/căn cứ ủy quyền có nguồn,
+  giữ vị trí nguồn trong requester đầy đủ của mọi cá nhân sống thực sự tham gia;
+  không xuất lặp đại diện đã trong cụm. Giữ raw/person arrays/provenance/history,
+  không nuốt tài sản, giá/cọc/vay/lãi/thanh toán/thời hạn nghiệp vụ hoặc mở prose cá nhân.
 
-**Còn một câu hỏi BANKMODE:** Trong ô người yêu cầu Nam Định, cụm ngân hàng
-của hợp đồng thế chấp do user tự dán hay owner muốn app tự lấy/điền từ nguồn?
-Chưa chọn mode; không hỏi lại scope cá nhân chuẩn, membership/A-B/JSON/FK/cardinality.
-
-Phần đã rõ áp dụng vào spec đích ngay, không tự gọi #43 done/refined hoặc AC4
-đạt khi BANKMODE ảnh hưởng cùng scope còn mở. Phần điều tra 16 ca đã hoàn tất;
-model quan hệ/cutover #41 vẫn chưa triển khai/nghiệm thu, gate mẫu ĐÓNG.
-Delta docs/ticket đã independent review CLEAN, mandatory Ticket validation PASS
-cho draft, không closure; parent cho commit đúng11file, không push/runtime.
+Q1/Q2/BANKMODE đã trả lời đủ; không còn owner gate trong phân tích #43.
+Chỉ đạo liên tục cho phép triển khai slice ngân hàng #41, không docs-only freeze.
+Model/cutover toàn #41 chưa hoàn tất; gate mẫu vẫn ĐÓNG. Chỉ verification tổng
+hợp/cô lập được giao; không hồ sơ thật, portal writes/Save/upload hoặc production DB.
+Không chạm phiên Chrome đã đăng nhập; review độc lập sau proof trước commit scope.
+Kế hoạch trước sửa code nằm ở [#43 plan §6.1](../backlog/spike-case-people-assets-relationships-plan.md).
+Đường projection hiện có là persistence hợp lệ, không toàn normalized #41.
+Bounded proof/fresh bank-auto review CLEAN/Ticket PASS đã có; #43 phân tích done theo quyền parent, không toàn #41 BUILT/đóng gate.

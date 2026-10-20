@@ -22,7 +22,6 @@ from playwright_uploader import (
     load_upload_queue,
     load_uploader_settings,
     normalize_contract_no_for_compare,
-    parse_requester_sheet_csv,
     read_exported_contract_numbers,
     save_uploader_env,
     split_records_by_existing_contract_nos,
@@ -451,65 +450,35 @@ class PlaywrightUploaderQueueTests(unittest.TestCase):
             field_value_matches("nhom_hop_dong", "Cam kết - Thỏa thuận", "Thoả thuận - Cam kết")
         )
 
-    def test_parse_requester_sheet_csv_builds_lookup_keys(self):
-        csv_text = (
-            '"STT","Số CC","Ngày CC","Tên khách hàng"\n'
-            '"","11","7/1/2026","Phùng Đình Việt"\n'
-            '"","405","09/04/2026","Nguyễn Thị Hoa"\n'
-        )
 
-        lookup = parse_requester_sheet_csv(csv_text)
-
-        self.assertEqual(lookup["11"], "Phùng Đình Việt")
-        self.assertEqual(lookup["11/2026"], "Phùng Đình Việt")
-        self.assertEqual(lookup["405/2026"], "Nguyễn Thị Hoa")
-
-    def test_build_upload_form_data_overrides_requester_from_lookup(self):
-        payload = {
-            "web_form": {
-                "ten_hop_dong": "Hợp đồng chuyển nhượng",
-                "ngay_cong_chung": "09/04/2026",
-                "so_cong_chung": "405/2026/CCGD",
-                "nhom_hop_dong": "Chuyển nhượng - Mua bán",
-                "loai_tai_san": "Đất đai không có tài sản",
-                "nguoi_yeu_cau": "Ông A",
-                "duong_su": "BÊN A ...",
-                "tai_san": "Thửa đất ...",
-            },
-            "raw": {
-                "file_goc": str(self.root / "goc_lookup.docx"),
-                "ben_b": {
-                    "nguoi": [
-                        {
-                            "gioi_tinh": "Ông",
-                            "ho_ten": "Nguyễn Văn B",
-                            "ngay_sinh": "01/01/1980",
-                            "cccd": "012345678901",
-                            "noi_cap": "CA Nam Định",
-                            "ngay_cap_cccd": "01/01/2024",
-                            "dia_chi": "xã A, huyện B",
-                        },
-                        {
-                            "gioi_tinh": "Bà",
-                            "ho_ten": "Nguyễn Thị Hoa",
-                            "ngay_sinh": "02/02/1985",
-                            "cccd": "123456789012",
-                            "noi_cap": "CA Nam Định",
-                            "ngay_cap_cccd": "02/02/2024",
-                            "dia_chi": "xã C, huyện D",
-                        },
-                    ]
-                },
-            },
-        }
-
-        form_data = build_upload_form_data(
-            payload,
-            requester_lookup={"405/2026": "Nguyễn Thị Hoa"},
-        )
-
-        self.assertIn("Nguyễn Thị Hoa", form_data["nguoi_yeu_cau"])
-        self.assertIn("Can cuoc so:", form_data["nguoi_yeu_cau"])
+    def test_load_upload_queue_preserves_persisted_requester_and_source_history(self):
+        run_id = "requester-projection"
+        output = make_output_json(
+            self.workdir / "output" / "requester.json",
+            contract_no="405/2026/CCGD", file_goc=str(self.root / "requester.docx"))
+        payload = json.loads(output.read_text(encoding="utf-8"))
+        requester = "  Ông A\nBà B\nNGÂN HÀNG MẪU\nChi nhánh C; đại diện Ông D\n  "
+        payload["web_form"]["nguoi_yeu_cau"] = requester
+        payload["raw"]["ben_b"] = {"nguoi": [{"ho_ten": "Tên cũ trong raw"}]}
+        payload["raw"]["source_refs"] = [{"start": 7, "end": 99}]
+        output.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        original = output.read_bytes()
+        self._seed_record(file_key="requester", run_id=run_id,
+                          contract_no="405/2026/CCGD", status="extracted",
+                          output_json_path=output)
+        manifest = self.workdir / "runs" / "requester.json"
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text(json.dumps({"run_id": run_id}), encoding="utf-8")
+        (self.workdir / "requester_lookup_cache.csv").write_text(
+            '"Số CC","Ngày CC","Tên khách hàng"\n"405","09/04/2026","Tên lookup cũ"\n',
+            encoding="utf-8")
+        for _ in range(2):
+            _, records, total = load_upload_queue(manifest, working_dir=self.workdir)
+            self.assertEqual(total, 1)
+            self.assertEqual(records[0].upload_form["nguoi_yeu_cau"], requester)
+            self.assertEqual(records[0].payload["web_form"], payload["web_form"])
+            self.assertEqual(records[0].payload["raw"], payload["raw"])
+            self.assertEqual(output.read_bytes(), original)
 
     def test_build_upload_form_data_overrides_notary_and_secretary(self):
         payload = {

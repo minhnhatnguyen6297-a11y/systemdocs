@@ -61,9 +61,9 @@ lỗi, không rơi về ô rỗng hay chuyển sang nguồn cũ để che dữ l
 lãi suất, điều khoản thanh toán) hoặc **thời hạn nghiệp vụ**. Vẫn giữ thời hạn
 sử dụng đất đúng cụm `land_rows[].thoihan` và timeout kỹ thuật. Portal cần trường
 đã loại thì ghi xung đột consumer/câu hỏi refinement; không âm thầm tiếp tục
-extraction, bịa/default hoặc tự chọn bước nhập tay mới. Không xóa raw, bằng chứng
-lịch sử hay sửa runtime trong lượt tài liệu. File/provenance/cookie/cấu hình tab
-là kỹ thuật, không tự là trường nghiệp vụ mồ côi.
+extraction, bịa/default hoặc tự chọn bước nhập tay mới. Giữ nguyên raw/lịch sử.
+Lệnh docs-only ở mốc trước không đóng băng runtime slice owner đã giao.
+File/provenance/cookie/cấu hình tab là kỹ thuật, không tự là trường nghiệp vụ mồ côi.
 
 **Mọi future sample batch/khảo sát mẫu thực, corpus và vòng E2E theo mẫu toàn hệ
 thống chờ #41 nghiệm thu đủ** chuẩn DB/contract được duyệt, cutover mọi adapter/
@@ -74,7 +74,7 @@ raw capture.
 Proof riêng #41 khi được giao dùng input tổng hợp/kiểm soát và profile cô lập, không yêu cầu
 quét corpus owner trước khi đóng issue. Sau gate và khi được giao mới chạy vòng
 LLM đọc mẫu trước; pending từng file/#39 vẫn không chặn file đã rõ.
-**Không tắt Scan/Upload production**, không cấp quyền triển khai từ docs.
+**Không tắt Scan/Upload production**; quyền runtime slice đã chốt đến từ lệnh owner, không từ gate mẫu.
 
 Một Người nhiều giấy tờ và nhiều địa chỉ là
 [#42 riêng](../../backlog/story-person-multiple-identities-addresses.md);
@@ -82,8 +82,8 @@ model/schema/migration/chọn dùng/extraction/export tương lai chưa thiết 
 không tự là prerequisite #41. #40 serial Stage/persistence vẫn riêng, chưa sửa.
 
 **Pháp nhân, cụm trường phụ và quan hệ — owner 20/10/2026:** pháp nhân
-**không đưa vào Người**, không thêm loại pháp nhân vào Person; theo policy, người
-dùng nhập tay; code hiện tại chưa cutover. Bảng pháp nhân riêng tương lai là định hướng **chưa duyệt schema/
+**không đưa vào Người**, không thêm loại pháp nhân vào Person; policy nhập tay
+chung có ngoại lệ ngân hàng thế chấp app tự lấy bên dưới. Bảng pháp nhân riêng tương lai là định hướng **chưa duyệt schema/
 build**. Hồ sơ thế chấp là trường hợp mặc định có pháp nhân; nguồn thường nêu
 ngân hàng/đại diện; loại khác ít xảy ra. Không được tự bịa tên ngân hàng/đại diện/
 default party; chỉ dùng dữ kiện nguồn nêu rõ; pháp nhân khác giữ nguồn, không âm
@@ -98,26 +98,29 @@ vẫn map canonical, không mặc định coi là dữ liệu chưa map/orphan; 
 ba editor `nguoi_yeu_cau`/`duong_su`/`taisan` là block. Quan hệ nhiều người/nhiều
 tài sản chưa chọn model/cardinality/schema; D06+D07 chuyển **một #43 riêng**,
 làm ngay sau rõ các ô, không chờ #41 xong/#42; #41 nhận đáp án trước cutover.
-Hiện chưa bảng pháp nhân hoặc field lưu cụm; Person/Asset/parties chưa cutover.
+Chưa bảng/key canonical pháp nhân; projection text vẫn persist hợp lệ qua JSON hiện có. Person/Asset/parties chưa canonical cutover.
 Website chính thức SOT, người dùng tự Lưu, rule developer-only giữ nguyên.
 [Quyết định](../../decisions/decision-owner-upload-field-standardization-20261019.md).
 
-**Owner trả lời ma trận Nam Định 20/10/2026 — policy đích, chưa đổi runtime:**
+**Owner Nam Định 20/10/2026 — bounded proof có/fresh bank-auto review CLEAN:**
 
 - **Requester Nam Định/Upload — đáp án #43:** mọi cá nhân sống Bên A/Bên B/
   đại diện theo ủy quyền; không người chết, công chứng viên, nhân viên trong
   output requester. Không xóa Person chết, Stage, raw/snapshot/lịch sử hoặc
   metadata nhân sự. Dữ kiện cá nhân chuẩn, không prose/lookup/firstperson.
-  **Ngân hàng thế chấp hiện cả cụm, không Person; BANKMODE chưa chọn** user
-  dán hay app lấy/điền cụm ngân hàng; cá nhân khác vẫn chuẩn. Không tự
-  mở auto-extraction, field pháp nhân hoặc blanket block ba editor.
+  **Ngân hàng thế chấp hiện cả cụm, không Person; BANKMODE “app tự lấy”**.
+  App lấy toàn cụm có nguồn ngân hàng/chi nhánh/định danh/địa chỉ/đại diện/
+  ủy quyền tại vị trí nguồn trong requester đầy đủ, không lặp đại diện đã trong
+  cụm. Cá nhân khác vẫn chuẩn; không mở field pháp nhân/blanket block ba editor.
+  Đường `web_form.nguoi_yeu_cau` → payload JSON → queue → editor requester
+  là persistence projection hợp lệ, không canonical/schema mới hoặc toàn #41.
   Requester không yêu cầu tag A/B đã gán; cá nhân sống một bên/đại diện ủy quyền
   vẫn vào output khi nhóm không gán hoặc conflict.
 - **Alias bỏ tự điền/mở rộng chuẩn hóa**, nếu có user điền tay; không nối `ten`
   hoặc tạo field alias. **D04 bỏ lời tư cách/căn cứ phức tạp**, user tự sửa;
   D08 đã theo R06, không block lời dư hoặc hỏi lại. Nguồn/raw/history giữ,
-  không mở manual fallback cho mọi unknown; pháp nhân không thuộc Person,
-  policy nhập tay trước đó không tự trả lời mode “dán cả cụm” mới.
+  không mở manual fallback cho mọi unknown. Policy pháp nhân nhập tay chung
+  được thay riêng cho cụm ngân hàng thế chấp bởi đáp án app tự lấy.
 - **A/B đã được owner trả lời #43:** ủy quyền A=người ủy quyền/B=người được
   ủy quyền; chỉ một bên không gán A/B; hai nguồn trái nhau giữ conflict,
   xác nhận nhóm bị ảnh hưởng, không tự nguồn thắng/thu hẹp requester.
@@ -129,8 +132,8 @@ Website chính thức SOT, người dùng tự Lưu, rule developer-only giữ n
   lưu trường thật và ví dụ đất/GCN tổng hợp, tách toàn đoạn ghép dữ kiện chuẩn
   khỏi lời dư thật chưa map. **A10 đã duyệt** xe/sổ tiết kiệm/bảo hiểm nhận diện
   + nguồn, pending structured; #29 deferred, không áp để loại đất có nhà W05.
-- D06+D07 ở [#43](../../backlog/spike-case-people-assets-relationships.md),
-  **ngay sau rõ các ô**, chưa model/FK/cardinality hoặc implementation.
+- D06+D07 ở [#43](../../backlog/spike-case-people-assets-relationships.md):
+  16 ca và Q1/Q2/BANKMODE đã đủ đáp án, bàn giao #41; chưa model/FK/cardinality.
   **Owner 20/10/2026 chốt chỉ dùng placeholder và trường tĩnh**; không mở
   trường tầng 2 động/tính toán, engine công thức/điều kiện, persisted canonical
   paragraph. Ý tưởng hai tầng chỉ là lịch sử chưa triển khai. Quyền có điều kiện
@@ -138,7 +141,8 @@ Website chính thức SOT, người dùng tự Lưu, rule developer-only giữ n
   chưa duyệt; dữ kiện nguồn tĩnh tách khỏi output/placeholder.
 
 Chi tiết quyết định và phần cần rõ ở [SOT §7](nam-dinh-website-sot.md#owner-review).
-#41 vẫn mở, gate mẫu **ĐÓNG**; lượt trả lời này chỉ docs/ticket, không runtime.
+#41 vẫn mở, gate mẫu **ĐÓNG**; kế hoạch có giới hạn trước sửa code ở #43 plan
+§6.1. Bounded proof/fresh review CLEAN, #43 phân tích done; không toàn normalized/đóng #41.
 
 <a id="ui"></a>
 ## 2. Màn hình và thao tác

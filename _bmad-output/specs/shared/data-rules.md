@@ -80,8 +80,8 @@ Không bóc/chuẩn hóa thông tin giao dịch (giá, đặt cọc, tiền thu�
 lãi suất, điều khoản thanh toán) hoặc thời hạn nghiệp vụ. **Giữ thời hạn sử dụng
 đất** đúng cụm `land_rows[].thoihan` và timeout kỹ thuật. Nếu portal yêu cầu
 trường bị loại, ghi xung đột consumer để refine, không âm thầm giữ extraction,
-bịa/default hoặc tự quyết bước nhập tay mới. Không xóa/sửa raw, lịch sử hoặc
-runtime trong lượt tài liệu.
+bịa/default hoặc tự quyết bước nhập tay mới. Giữ nguyên raw/lịch sử; docs-only
+là giới hạn lượt ghi nhận trước, không cấm runtime slice owner đã giao.
 
 **Gate toàn hệ thống trước mọi lượt quét/đọc mẫu thực mới, corpus và vòng E2E
 theo mẫu:** #41 phải được nghiệm thu cả chuẩn DB/contract đã duyệt, cutover mọi
@@ -89,7 +89,7 @@ consumer bị ảnh hưởng và proof luồng thật; bảng mapping/local Draf
 Verification riêng #41 khi được giao có thể dùng input tổng hợp/kiểm soát và
 DB/profile cô lập, không phụ thuộc khảo sát corpus owner đang bị gate. Sau gate,
 khi được giao chạy mẫu, thiếu mapping từng file thì giữ pending/ghi #39, tiếp
-tục file đã rõ. Không tắt production Scan/Upload hoặc cấp quyền implementation.
+tục file đã rõ. Không tắt production Scan/Upload; quyền runtime đã chốt là lệnh owner riêng.
 
 **Một Người nhiều giấy tờ và nhiều địa chỉ** là
 [#42 riêng](../../backlog/story-person-multiple-identities-addresses.md).
@@ -103,9 +103,9 @@ Lý do và supersession: [quyết định owner](../../decisions/decision-owner-
 **Bổ sung owner 20/10/2026 — pháp nhân, cụm trường phụ website và quan hệ:**
 
 - **Pháp nhân không thuộc Người.** Không thêm loại pháp nhân vào Person, không
-  tự phân loại tổ chức thành thể nhân. Theo policy, **người dùng nhập tay**; hướng
-  “sau này chuẩn hóa thành một bảng riêng” là định hướng của owner, **chưa duyệt
-  schema/bảng/cột/migration hay triển khai**; nếu làm sau, đây là schema riêng
+  tự phân loại tổ chức thành thể nhân. Policy **người dùng nhập tay** chung
+  có ngoại lệ ngân hàng thế chấp app tự lấy bên dưới; hướng bảng riêng tương
+  lai **chưa duyệt schema/bảng/cột/migration hay triển khai**; nếu làm sau, đây là schema riêng
   phải thiết kế/chốt riêng. Phạm vi ba đối tượng hiện tại không đổi; bảng pháp
   nhân tương lai là hướng owner cho phép, không bị quy tắc hiện tại cấm. Hồ sơ
   thế chấp là trường hợp mặc định có pháp nhân; loại khác ít xảy ra. Sự có mặt
@@ -122,7 +122,7 @@ Lý do và supersession: [quyết định owner](../../decisions/decision-owner-
   do implementation sở hữu theo contract/rule đã duyệt. Không dùng `ghiChu` chung
   hoặc JSON bag chung thay trường; raw capture chỉ là provenance, không thay
   trường nghiệp vụ. Không tự đặt canonical key/tên/kiểu/nhóm/storage; không tự
-  coi mọi editor là block; không dùng cụm để tự bóc pháp nhân. Cụm có thể là
+  coi mọi editor là block; chỉ tự lấy cụm ngân hàng trong ngoại lệ đã chốt. Cụm có thể là
   trường riêng theo ô website; phần tái dùng được vẫn map canonical, không mặc
   định coi cụm là dữ liệu chưa map/orphan.
 - **Quan hệ Người–Tài sản–Hồ sơ:** nhiều người/nhiều tài sản chưa chọn model,
@@ -131,9 +131,9 @@ Lý do và supersession: [quyết định owner](../../decisions/decision-owner-
   sau rõ các ô Nam Định §7, không chờ toàn #41 xong/#42. #41 nhận đáp án cho
   cutover quan hệ; không coi model trước đã duyệt hoặc đổi gate.
 - Hiện Person/Asset/parties chưa canonical cutover; `nguoi_yeu_cau`/`duong_su`/
-  `taisan` vẫn là output trình bày; chưa có bảng pháp nhân hoặc trường lưu cụm.
-  Policy này là đích/ranh giới, không chứng minh runtime đã đổi; raw/provenance
-  giữ nguyên.
+  `taisan` vẫn là output trình bày; chưa có bảng/key canonical pháp nhân.
+  Projection requester text persist hợp lệ qua JSON hiện có, không đồng nghĩa
+  normalized cutover. Bounded proof/fresh bank-auto review CLEAN; raw/provenance giữ nguyên.
 
 **Đáp án #43 — owner 20/10/2026, phạm vi requester Nam Định/Upload:** bao gồm
 cá nhân sống thuộc Bên A, Bên B, đại diện theo ủy quyền; không đưa người chết,
@@ -143,11 +143,14 @@ thông thường dùng chuẩn R06, một lần mỗi identity xác nhận theo 
 không lookup/firstperson/ưu tiên B/prose. R05 alias nhập tay, D04/D08 không tự
 điền lời phức tạp; không mở fallback tay cho mọi gap.
 
-Ngân hàng trong hợp đồng thế chấp hiện **cả cụm** là ngoại lệ output, không
-đưa tổ chức vào Người. **BANKMODE chưa chọn:** user dán hay app lấy/điền cụm
-ngân hàng thế chấp; cá nhân khác vẫn chuẩn. Policy nhập tay pháp nhân trước đó không tự
-giải nghĩa động từ “dán”; không tự tạo extractor/canonical legal field/bảng,
-không biến mọi editor thành block. Nguồn vẫn giữ, model/cutover chưa implement.
+Ngân hàng trong hợp đồng thế chấp hiện **cả cụm**, không đưa tổ chức vào Người.
+**BANKMODE đã chốt “app tự lấy”**: chỉ thế chấp, toàn cụm ngân hàng/chi nhánh/
+định danh/địa chỉ/đại diện/ủy quyền có nguồn tại vị trí nguồn trong requester
+đầy đủ; không lặp đại diện đã trong cụm. Cá nhân khác chỉ dữ kiện chuẩn.
+`web_form.nguoi_yeu_cau` → payload JSON → queue → editor là persistence
+projection hợp lệ; không key canonical/bảng/entity mới hoặc blanket raw editor.
+Giữ raw/person arrays/provenance/history. Q1/Q2/BANKMODE đủ đáp án, #43 bàn
+giao #41; bounded proof/fresh review CLEAN; #43 phân tích done, không toàn normalized/#41 complete.
 
 **A/B đã chốt:** ủy quyền A=người ủy quyền/B=người được ủy quyền; một bên
 không gán A/B; hai nguồn trái nhau giữ conflict và xác nhận phần nhóm, không

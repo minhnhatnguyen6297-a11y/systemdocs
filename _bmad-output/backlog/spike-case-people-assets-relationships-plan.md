@@ -1,20 +1,23 @@
 ---
 title: "Làm rõ quan hệ nhiều Người–nhiều Tài sản trong Hồ sơ"
 ticket: 43
-status: draft
-blocked_at: "2026-10-20"
-blocked_reason: "Q1 requester and Q2 A/B answered; 16-case analysis complete. Only BANKMODE remains: mortgage bank cluster user paste or app take/fill from source. Other persons standard facts; no A/B tag prerequisite. No runtime/schema; refined false; AC4 not closed; #41 gate unchanged."
+status: done
 ---
 
 # #43 — Đề xuất nghiệp vụ quan hệ Người–Tài sản trong Hồ sơ
 
 **Artifact bền vững:** nội dung thiết kế PROPOSED nằm đầy đủ ngay trong plan này. Bản tmp chỉ là bằng chứng làm việc tùy chọn, không là nguồn bắt buộc hoặc spec đã áp dụng.
 
-**Trạng thái:** Q1/Q2 đã trả lời; draft/blocked chỉ **BANKMODE** chờ clarification.
-Hitl:true/refined:false; chưa runtime/schema. Nghĩa đã trả lời là policy đích;
-model còn PROPOSED. Cập nhật 20/10/2026.
+**Trạng thái:** phân tích đủ16ca, Q1/Q2/BANKMODE đã trả lời và bàn giao #41.
+Không ownerblock; BANKMODE “app tự lấy”. Phân tích **done/refined:true** theo
+quyền parent sau fresh bank-auto review CLEAN/mandatory Ticket PASS AC1–5.
+Hitl:true giữ lịch sử đáp án owner; không duyệt schema hoặc hoàn tất #41.
 
-Đây là kết quả điều tra/refinement D06+D07, không phải contract, schema hoặc lệnh build. Chỉ dùng tình huống tổng hợp. `Người 1`, `Tài sản 1`, `GCN X` là nhãn minh họa, không phải dữ liệu khách hoặc giấy tờ giả. Không đọc mẫu thật, chạy parser, app, browser, test hoặc ghi DB. #43 vẫn `hitl: true`, `refined: false`; #41 chưa xong, gate mẫu ĐÓNG.
+Đây là kết quả điều tra/refinement D06+D07, không contract/schema quan hệ.
+Lượt docs chỉ dùng tình huống tổng hợp (`Người 1`, `Tài sản 1`, `GCN X`),
+không PII/mẫu thật/parser/app/browser/test/DB. Lệnh owner mới cho phép triển
+khai riêng slice requester/ngân hàng #41 theo §6.1; không docs-only freeze,
+không hoàn thành #41 hoặc mở gate mẫu.
 
 ## 1. Phần đã chốt — không hỏi lại
 
@@ -25,12 +28,12 @@ model còn PROPOSED. Cập nhật 20/10/2026.
   theo ủy quyền vào output; người chết/CCV/nhân viên không vào output đó.
   Không xóa Person chết/Stage/Hồ sơ thừa kế/raw/history/metadata nhân sự.
   Cá nhân chuẩn, không prose/lookup/firstperson; không thêm thân nhân chỉ nhắc.
-  Ngân hàng thế chấp hiện cả cụm, không Person; BANKMODE còn mở, không tự
-  extractor/manual mới/legal field. Alias/D04/D08 cá nhân giữ policy cũ.
+  Ngân hàng **chỉ thế chấp** hiện cả cụm, không Person; BANKMODE **app tự lấy**
+  theo §6.1, không legal field mới. Alias/D04/D08 cá nhân khác giữ policy cũ.
 - **Q2 đã trả lời:** ủy quyền A=ủy quyền/B=được ủy quyền; một bên không gán;
   nguồn trái nhau giữ conflict/xác nhận phần nhóm, không winner/thu hẹp
   requester. “Nhận” không universal regex. Pháp nhân vẫn không thuộc Person;
-  nhập tay pháp nhân cũ không tự quyết mode nhập cụm ngân hàng mới; cá nhân khác vẫn chuẩn.
+  policy nhập tay chung đã có ngoại lệ ngân hàng thế chấp app tự lấy; cá nhân khác vẫn chuẩn.
 - A/B trong scope requester là tư cách nguồn, không tag filter: cá nhân sống
   tham gia văn bản một bên/đại diện ủy quyền vẫn vào requester khi nhóm không
   gán hoặc conflict. Giữ requester độc lập nhãn nhóm, không hỏi lại owner.
@@ -75,7 +78,7 @@ Các cách tổ chức ở mục 2–5 là đề xuất, **không duyệt entity
 
 ## 4. Ma trận 16 tình huống tổng hợp
 
-Các ca tổng hợp không proof runtime. Q1/Q2 ở §6 đã trả lời; chỉ BANKMODE chưa chọn. Bảo toàn §3 không là câu hỏi mở.
+Các ca tổng hợp không proof runtime. Q1/Q2/BANKMODE ở §6 đã đủ đáp án; giữ nguyên đủ C01–C16. Bảo toàn §3 không là câu hỏi mở.
 
 | Ca | Input: dữ kiện / nhóm nguồn | Câu hỏi quan hệ đích | Bất biến phải giữ | Khuyến nghị và phần chưa chọn |
 |---|---|---|---|---|
@@ -92,7 +95,7 @@ Các ca tổng hợp không proof runtime. Q1/Q2 ở §6 đã trả lời; chỉ
 | C11 · thay nguồn qua Hồ sơ | Hồ sơ 1 đã xác nhận Người 1 địa chỉ “Địa chỉ cũ”, Tài sản 1 hai cụm đất; Hồ sơ 2 có địa chỉ “Địa chỉ mới” và mô tả tài sản khác | Được sửa ngược Hồ sơ 1, chuyển vai trò/scope hoặc tự nối hai Case không? | Snapshot Hồ sơ 1 không đổi theo master/Hồ sơ 2/module khác; không tự đồng nhất hai Người chỉ vì cùng tên | Giữ từng snapshot và nguồn; sửa một Hồ sơ chỉ theo thao tác thuộc quyền của nó. Không đợi #42 để bảo toàn lịch sử |
 | C12 · một bên | Cam kết chỉ nêu Người 1 và tài sản | Có gán A/B? | Không tạo bên đối ứng; requester độc lập nhóm | **Đã trả lời:** không gán gì, không default A/fake B |
 | C13 · thừa kế/người chết | Người 1 chết; Người 2 nhận; Người 3 chỉ nhắc là thân nhân; Người 4 thư ký; Diagram chọn Chủ Người 2 | Ai vào requester? | Không xóa Person chết/estate snapshot; Chủ vẫn theo Diagram | **Q1 đã trả lời:** không Người 1/4 vào requester; tên thân nhân không tự tạo đối tượng output. Cá nhân sống A/B/ủy quyền dùng chuẩn |
-| C14 · đại diện + ngân hàng | Ngân hàng, Người 1 đại diện theo ủy quyền và Người 2 khách sống; Tài sản 1 | Person/requester/cụm tổ chức có cùng nghĩa? | Không Person giả/quyền đại diện/field/default cụm | Cá nhân ủy quyền vào requester; ngân hàng thế chấp cả cụm về nội dung; **BANKMODE** chỉ chưa chọn user dán hay app lấy-điền cụm ngân hàng, cá nhân khác chuẩn |
+| C14 · đại diện + ngân hàng | Ngân hàng, Người 1 đại diện theo ủy quyền và Người 2 khách sống; Tài sản 1 | Person/requester/cụm tổ chức có cùng nghĩa? | Không Person giả/quyền đại diện/field/default cụm | **BANKMODE app tự lấy** toàn cụm ngân hàng/chi nhánh/định danh/địa chỉ/đại diện/ủy quyền có nguồn chỉ thế chấp; tại vị trí nguồn trong requester đầy đủ có Người 2 chuẩn, không lặp Người 1 đã trong cụm; JSON projection hợp lệ, không canonical field mới |
 | C15 · ủy quyền/nguồn trái nhau | Người 1 ủy quyền, Người 2 được ủy quyền; hai nguồn đảo A/B | Gán nhóm/phân xử nguồn? | Không regex “nhận”, không winner/đổi requester | **Q2 đã trả lời:** A=ủy quyền/B=được ủy quyền; conflict/xác nhận phần nhóm bị ảnh hưởng |
 | C16 · đổi thứ tự, không đổi tài sản | Nguồn xác nhận Người 1 liên quan Tài sản 1; danh sách từ [Tài sản 1, Tài sản 2] đổi thành [Tài sản 2, Tài sản 1] | Đổi chỗ trình bày có được tự đổi liên kết nguồn không? | Không áp ngầm nghĩa mới lên Diagram legacy: ở đó dấu chọn bám vị trí đã được duyệt | Upload mới giữ liên kết với Tài sản 1 theo kết luận bảo toàn §3; không owner gate, không sửa `ownPositions` Notary |
 
@@ -104,11 +107,11 @@ C04 khác C05 dù có cùng tập Người/Tài sản; C07 khác cả hai dù pa
 |---|---|---|
 | Chỉ danh sách Người + Tài sản của Hồ sơ và nhãn A/B | Đơn giản nhưng không phân biệt C04/C05/C06/C07 hoặc các lần tham gia C08 | **Không đạt AC2/D07 hiện hành**, không là phương án bình thường để owner chọn trong refinement này. Chỉ xem xét nếu có thay đổi phạm vi tương lai được owner yêu cầu rõ; không tự thu nhỏ #43 |
 | **Danh sách thành viên trực tiếp + lần tham gia/nhóm + phạm vi liên quan tường minh** | Giữ các danh sách có thứ tự, cùng một Người nhiều vai trò, nhóm–tập khác cặp riêng; không rõ vẫn không rõ. Cần người dùng/nguồn xác định phạm vi thực sự, không tự suy | **Khuyến nghị PROPOSED.** Chỉ giữ những nghĩa có nguồn ở ma trận, không tạo hệ đồ thị, công thức, tính quyền/tỷ lệ hoặc loại quan hệ tùy biến. Chưa quyết định bảng/entity/FK |
-| Chỉ lưu block raw/editor phẳng, dùng nó làm nghiệp vụ | Giữ nguyên văn được nhưng không bảo đảm identity, danh sách R06, thứ tự/nhóm/cặp hoặc cutover; dễ lấy lời prose thay dữ kiện | **Loại khỏi phương án đích** vì trái chuẩn hóa đã chốt, không phải vì bỏ raw. Raw/history/source_refs vẫn giữ nguyên để kiểm chứng |
+| Chỉ lưu block raw/editor phẳng, dùng nó làm nghiệp vụ | Giữ nguyên văn nhưng không bảo đảm identity/quan hệ/cutover; dễ thay dữ kiện bằng prose | **Loại khỏi model canonical đích**, không loại persistence projection output hiện có: cụm ngân hàng thế chấp §6.1 là ngoại lệ text tĩnh có nguồn được duyệt. Raw/history/source_refs giữ nguyên |
 
 Chọn phương án khuyến nghị không đồng nghĩa mọi liên kết cần tách từng cặp. Cả nhóm–cả tập giữ đúng cấp nhóm–tập; liên kết riêng chỉ có khi nguồn nói riêng. Placeholder chỉ là nơi điền dữ liệu, không định nghĩa quan hệ; không có template vẫn cần hiểu được Người/Tài sản/Hồ sơ. Đích hiện tại không có trường động/công thức/điều kiện cấu hình.
 
-## 6. Đáp án đã có và BANKMODE còn mở
+## 6. Đáp án đầy đủ — Q1/Q2/BANKMODE FINAL
 
 **Q1 đã trả lời:** requester Nam Định/Upload gồm cá nhân sống A/B/đại diện
 theo ủy quyền; không người chết/CCV/nhân viên trong output đó. Giữ Person
@@ -119,23 +122,52 @@ cụm, không Person. Nguyên văn đầy đủ tại decision “Đáp án #43�
 nguồn trái nhau giữ conflict/xác nhận phần nhóm, không winner/thu hẹp requester.
 Không hỏi lại Q1/Q2, identity/thứ tự/reorder/add hoặc chi tiết kỹ thuật.
 
-**BANKMODE — câu hỏi duy nhất:** Trong ô người yêu cầu Nam Định, cụm ngân hàng
-của hợp đồng thế chấp do user tự dán hay owner muốn app tự lấy/điền từ nguồn?
-Không hỏi mở rộng cụm sang người khác; dữ kiện cá nhân chuẩn giữ nguyên.
+**BANKMODE đã trả lời — nguyên văn “app tự lấy”.** App tự lấy toàn cụm ngân
+hàng có nguồn **chỉ thế chấp** và điền requester, không user-paste-only.
+Đáp án cuối decision là authority; quote requester/A-B trước đó giữ nguyên.
+Đây là output text tĩnh có nguồn qua đường hiện có, không pháp nhân Person/
+canonical field/bảng mới. Cá nhân khác chuẩn; không blanket raw ba editor,
+manual fallback mọi gap hoặc D04/D08/alias auto cho cá nhân. Không còn bank
+clarification. W05 tổ hợp/A09 và các pending ngoài #43 giữ nguyên.
 
-Động từ “dán” chưa đủ chọn auto-extraction/user paste, policy pháp nhân manual
-cũ không tự trả lời lời mới. Chưa chọn phương án/field persisted/schema.
-Cá nhân vẫn chuẩn R06/alias manual/D04-D08 không prose; không blanket raw ba
-editor hoặc manual fallback mọi gap. Đây là clarification consumer hẹp.
+### 6.1 Kế hoạch triển khai có giới hạn — ghi trước sửa code
+
+Owner đã chốt BANKMODE **“app tự lấy”** và giao tiếp tục slice runtime #41.
+Mapping dùng đường có sẵn: nguồn văn bản → `web_form.nguoi_yeu_cau` →
+payload JSON hiện có → queue reader/builder → editor requester Nam Định.
+Persist projection text này là hợp lệ; không phải canonical Person/Asset/parties
+hoặc hoàn tất normalized cutover #41, không thêm key/bảng/entity nghiệp vụ.
+
+- Requester đầy đủ gồm mọi cá nhân sống thực sự tham gia/đại diện ủy quyền:
+  block dữ kiện chuẩn theo **thứ tự nguồn**, không chỉ ngân hàng hoặc chỉ B.
+  Văn bản một bên/nhóm chưa gán/conflict vẫn giữ tập requester; người chết,
+  CCV/nhân viên và thân nhân chỉ được nhắc không vào output.
+- **Chỉ hợp đồng thế chấp:** lấy nguyên cụm ngân hàng có nguồn, gồm ngân hàng/
+  chi nhánh, định danh, địa chỉ, đại diện và căn cứ ủy quyền được nêu; giữ vị trí
+  cụm trong thứ tự nguồn. Không xuất trùng đại diện đã nằm trong cụm ngân hàng.
+  Ngoại lệ này không mở job/kinship/role prose, alias auto hoặc D04/D08 cho cá
+  nhân khác; không kéo phần tài sản, giá/cọc/vay/lãi/thanh toán/thời hạn nghiệp vụ.
+- Giữ nguyên raw, person arrays, provenance và payload lịch sử. Source refs kỹ
+  thuật theo convention có sẵn được phép, không thành trường canonical mới.
+  Queue không được lấy requester stale ngân hàng-only/firstperson ghi đè output
+  đầy đủ mới; editor nhận chính projection đã chọn qua consumer hiện có.
+- Runtime tổng hợp/cô lập đã chạy: nguồn → parser → JSON save → fresh queue/
+  form builder → actual `_fill_editor` trên contenteditable local `about:blank`.
+  Cụm ngân hàng đủ, A/B sống giữ thứ tự nguồn, đại diện một lần; loại staff/dead/
+  prose, không tài sản/loan/payment, Save=0/Submit=0. Evidence tại
+  `_bmad-output/tmp/issue-43-bank-smoke-result.json`; không portal/network/
+  customer/corpus/production DB hoặc chạm phiên browser đã đăng nhập.
+  #41 mở/gate mẫu ĐÓNG; W05/A09 và phần quan hệ canonical chưa chốt giữ nguyên.
 
 ## 7. Handoff và điều kiện khép spike
 
-- Phân tích16ca/kết luận bảo toàn hoàn tất; Q1/Q2 đã nhận đáp án, phần đã rõ
-  đồng bộ decision/spec/#41 trong delta này. Chỉ BANKMODE cùng scope còn mở;
-  AC4 chưa khép, chưa refined/built/done; model/cutover #41 chưa implement.
-- Delta owner-answer independent review CLEAN, mandatory BMAD Ticket draft
-  validation PASS, không closure; parent cho commit đúng11file. Không
-  runtime/schema/DB/test/browser/mẫu/corpus hoặc mở gate #41.
+- Phân tích đủ16ca và kết luận bảo toàn hoàn tất; Q1/Q2/BANKMODE đủ đáp án,
+  decision/spec/#41 cùng dẫn đáp án cuối 20/10/2026. **AC4 owner-answer/handoff
+  đã có**, không chờ bank owner hoặc model kỹ thuật; normalized #41 chưa xong.
+- Fresh bank-auto review CLEAN, mandatory Ticket PASS AC1–5; parent cho
+  transition completed-analysis done/refined:true. Không dùng review cũ cho
+  latest-auto; proof hiện tại250pass0skip28subtests/local smoke0fail đã đọc.
+  #41 normalized cutover vẫn mở/gate mẫu ĐÓNG; chờ parent đọc trước commit.
 
 ## 8. Nguồn tra cứu đã mở
 
@@ -152,12 +184,16 @@ editor hoặc manual fallback mọi gap. Đây là clarification consumer hẹp.
 - `notary_v2/services/case_workspace.py:2768–2793` — snapshot Người/Tài sản/Case; `inheritance_workspace.py:146–154,184–196` — ràng buộc node hiện tại.
 - `tools/regex_workbench/engine/contract_extract.py:4855–4880,4924–4973` — output raw/case/web_form và heuristic legacy cần phân biệt với policy đích.
 
-## 9. BMAD state và acceptance chưa nghiệm thu
+## 9. BMAD state và acceptance của phân tích
 
-AC1–3 có16ca và đáp án Q1/Q2; BANKMODE là clarification output ngân hàng còn mở.
-AC4 chưa khép vì BANKMODE chưa trả lời; phần đã rõ đã tích hợp decision/spec/#41, không gọi cutover #41 xong.
-AC5 được giữ trong phạm vi lượt này; không có implementation hoặc runtime proof.
-Không đánh dấu spike built/done hoặc refined chỉ vì đã viết proposal.
+AC1–2: đủ16ca C01–C16/§3 giữ identity/membership/thứ tự/vai trò/scope/history.
+AC3: §1/§6 đủ Q1/Q2/BANKMODE và ranh giới projection ngân hàng chỉ thế chấp.
+AC4: owner đã trả lời đủ; decision/spec/#41 dẫn cùng đáp án ngày 20/10/2026,
+handoff đã ghi, không còn ownerblock. Đây không duyệt schema quan hệ hoặc đóng #41.
+AC5: lượt spike/docs không implementation/runtime; §6.1 chỉ lập kế hoạch trước
+code cho slice #41 đã được giao riêng, không mở gate mẫu.
+Proof bounded #41 có, fresh latest-auto review CLEAN/Ticket PASS; #43 phân tích
+done theo quyền parent, refined:true/hitl:true. Không ownerblock hoặc technicalgate.
 
 BMAD đã resolve output/config/store/customization, `find backlog 43` và `status
 backlog` trước sửa: #43 đang backlog, không plan, `refined:false`, `hitl:true`,
@@ -165,4 +201,22 @@ không assignee. Loose-backlog waiver/active initiative unset được giữ. Re
 báo thiếu record `bmod-method`; theo phạm vi giao không install/setup/config,
 không dựng workflow thay thế. Đây là spike design, không gọi app build.
 
-Proposal trước đáp án giữ làm lịch sử. Delta mới đã independent review CLEAN/Ticket draft PASS, parent cho commit đúng11file; draft/blocked chỉ BANKMODE, refined:false/hitl:true, AC4 chưa khép; không push hoặc phụ thuộc tmp.
+Proposal/model trước đáp án giữ làm lịch sử thiết kế, không schema áp dụng.
+Fresh latest-auto review CLEAN/Ticket PASS hiện tại bao phủ delta16path và
+final semantic smoke hash8b503e7f/930f1fa5; không push/commit trước parent đọc.
+
+### Kết quả implementation/proof của slice #41, không toàn #41
+
+- Parser output version `2026-10-20-requester-bank-projection` dựng requester
+  từ canonical personfacts và cụm ngân hàng mortgage-only với technical source
+  spans. Queue giữ đúng projection đã persist; lookup override/dead helper đã bỏ.
+- Biên ngân hàng có hồi quy direct CCV/staff không cần `LỜI CHỨNG` và loan terms
+  cùng dòng tên ngân hàng; không nuốt EOF/transaction text. Requester lấy source
+  participants trước legacy raw-display filter để không loại người sống trùng
+  tên người chết thiếu ngày sinh; không đổi raw/Person/history cũ.
+- Final isolated five-suite sau bỏ đúng hai test fixture ngoài repo theo parent:
+  **250 passed,0 skipped,28 subtests passed**, gồm5 browsercases với process-only CASE_FIELDS_CHROMIUM riêng; echo test đã bỏ, contradictoryDOB consumer regression giữ.
+  Actual controlled pipeline smoke0fail/Save0/Submit0/about:blank; source hashes
+  ở result. Lượt trước không gọi wholly synthetic: fixture-access possibility
+  **[INFERENCE] từ skip count**, không probe lại hoặc claim nội dung/coverage.
+  Giữ mọi fixture, chỉ bỏ hai methods. Fresh auto review CLEAN/Ticket PASS.

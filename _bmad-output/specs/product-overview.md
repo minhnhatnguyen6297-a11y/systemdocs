@@ -50,9 +50,9 @@ nghiệp vụ; vẫn giữ thời hạn đất và timeout kỹ thuật. Portal 
 thì ghi xung đột để refine, không bịa/default hay tự chọn bước nhập tay.
 [#42 Người nhiều giấy tờ và địa chỉ](../backlog/story-person-multiple-identities-addresses.md)
 là issue riêng, model tương lai chưa chọn, không tự là prerequisite #41.
-**Pháp nhân (owner 20/10/2026):** không đưa vào Người; theo policy, người dùng
-nhập tay, bảng riêng tương lai chưa duyệt schema/build; không tự bịa ngân hàng/đại diện/
-default. **Cụm trường phụ website** theo hướng owner cho phép có điều kiện cho một ô
+**Pháp nhân (owner 20/10/2026):** không đưa vào Người; policy nhập tay chung
+có ngoại lệ ngân hàng thế chấp **app tự lấy** bên dưới. Bảng riêng tương lai
+chưa duyệt schema/build; không bịa/default. **Cụm trường phụ website** theo hướng owner cho phép có điều kiện cho một ô
 cụ thể (phức tạp, không lặp lại); chưa chọn ô/cấu trúc nào và không tự biến editor
 thành block. Quan hệ nhiều người/nhiều tài sản chưa chọn model/cardinality;
 D06+D07 chuyển [#43 riêng](../backlog/spike-case-people-assets-relationships.md),
@@ -62,11 +62,15 @@ làm ngay sau làm rõ các ô Nam Định §7, không chờ toàn #41 xong/#42.
 A/B/đại diện theo ủy quyền; không người chết/CCV/nhân viên trong output đó,
 không xóa Person chết/Stage/Hồ sơ thừa kế/raw/history. Cá nhân vẫn dữ kiện
 chuẩn, alias manual, D04/D08 không prose/lookup/firstperson. Ngân hàng thế
-chấp hiện cả cụm, không Person; **BANKMODE còn mở** user dán hay app lấy/
-điền cụm ngân hàng thế chấp; cá nhân khác vẫn chuẩn, chưa schema/extractor mới. A/B đã
-chốt ủy quyền A=ủy quyền/B=được ủy quyền, một bên không gán, nguồn trái nhau
-giữ conflict/xác nhận phần nhóm không tự winner. #43 có 16 ca, Q1/Q2 đã
-trả lời, chỉ BANKMODE chờ làm rõ; chưa khép AC4/cutover #41. Requester không
+chấp hiện cả cụm, không Person; **BANKMODE đã chốt “app tự lấy”**: toàn cụm có
+nguồn ngân hàng/chi nhánh/định danh/địa chỉ/đại diện/ủy quyền, chỉ thế chấp.
+Requester giữ mọi cá nhân sống thực sự tham gia theo thứ tự nguồn, đặt cụm
+ngân hàng đúng vị trí, không lặp đại diện đã nằm trong cụm. Cá nhân khác chuẩn.
+`web_form.nguoi_yeu_cau` → payload JSON → queue → editor là persistence
+projection hiện có hợp lệ, không thêm canonical field/schema. A/B đã chốt:
+ủy quyền A=ủy quyền/B=được ủy quyền, một bên không gán, conflict nhóm không
+winner/thu hẹp requester. #43 giữ đủ 16 ca, Q1/Q2/BANKMODE đủ đáp án và bàn
+giao #41; không còn bank owner gate, không tuyên bố #41 cutover xong. Requester không
 cần tag A/B đã gán: cá nhân sống một bên/đại diện ủy quyền vẫn vào khi nhóm
 không gán/conflict. W05
 đồng ý có điều kiện, giữ ID1 đất có tài sản/nhà dù thiếu mẫu/rule; tổ hợp nhiều
@@ -77,8 +81,9 @@ lưu trường thật/ví dụ tổng hợp GCN/thửa/cụm đất. A10 nhận 
 placeholder và trường tĩnh**; không mở trường tầng 2 động/tính toán, text
 canonical persisted từ suy ra, engine công thức hoặc framework điều kiện.
 Quyền có điều kiện cho một cụm **text tĩnh** theo ô website vẫn giữ (A09 chưa
-duyệt field); dữ kiện nguồn tĩnh khác lớp định dạng output/placeholder. Đây là
-policy đích docs/ticket, chưa runtime cutover, #41 mở/gate mẫu ĐÓNG.
+duyệt field); dữ kiện nguồn tĩnh khác lớp định dạng output/placeholder.
+Bounded local proof đã có, fresh bank-auto review CLEAN/Ticket PASS; #43 phân
+tích done/bàn giao. Không toàn normalized cutover #41, #41 mở/gate mẫu ĐÓNG.
 **BUILT — slice metadata Case, 19/10/2026; verification đạt, Quick code độc lập
 sạch sau fix được chấp nhận, tài liệu hoàn tất:** tám
 trường canonical đã đi qua extraction, lưu/đọc lại, builder và preSave consumer.

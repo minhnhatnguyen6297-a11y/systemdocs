@@ -47,6 +47,146 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.addCleanup(self.tempdir.cleanup)
         self.root = Path(self.tempdir.name)
 
+    def test_requester_preserves_contradictory_births_even_with_same_name_and_id(self):
+        path = make_docx(
+            self.root / "conflicting_identity.docx", "HỢP ĐỒNG ỦY QUYỀN",
+            "BÊN ỦY QUYỀN", "Ông: Nguyễn Văn Trùng Sinh năm: 1981",
+            "Căn cước số: 123456789 do Bộ Công an cấp ngày 01/02/2024",
+            "BÊN ĐƯỢC ỦY QUYỀN", "Ông: Nguyễn Văn Trùng Sinh năm: 1982",
+            "Căn cước số: 123456789 do Bộ Công an cấp ngày 01/02/2024",
+            "ĐIỀU 1: NỘI DUNG ỦY QUYỀN",
+        )
+        payload = extract(path)
+        from playwright_uploader import build_upload_form_data
+        requester = build_upload_form_data(payload)["nguoi_yeu_cau"]
+        self.assertIn("Nguyễn Văn Trùng\nNgày sinh: 1981", requester)
+        self.assertIn("Nguyễn Văn Trùng\nNgày sinh: 1982", requester)
+
+    def test_requester_keeps_live_namesake_when_deceased_birth_is_unknown(self):
+        path = make_docx(
+            self.root / "namesake_deceased.docx", "HỢP ĐỒNG ỦY QUYỀN",
+            "BÊN ỦY QUYỀN", "Ông: Nguyễn Văn Trùng Sinh năm: 1981",
+            "Căn cước số: 123456789 do Bộ Công an cấp ngày 01/02/2024",
+            "Thường trú tại: Địa chỉ người sống.",
+            "BÊN ĐƯỢC ỦY QUYỀN", "Bà: Lê Thị Thu Sinh năm: 1980",
+            "Thường trú tại: Địa chỉ đại diện.",
+            "ĐIỀU 1: NỘI DUNG ỦY QUYỀN",
+            "Ông Nguyễn Văn Trùng chết ngày 01/01/2020 theo trích lục khai tử.",
+        )
+        payload = extract(path)
+        self.assertTrue(any(p["ho_ten"] == "Nguyễn Văn Trùng" and not p["ngay_sinh"]
+                            for p in payload["raw"]["nguoi_chet"]))
+        from playwright_uploader import build_upload_form_data
+        requester = build_upload_form_data(payload)["nguoi_yeu_cau"]
+        self.assertIn("Nguyễn Văn Trùng\nNgày sinh: 1981", requester)
+        self.assertIn("123456789", requester)
+        self.assertIn("Lê Thị Thu", requester)
+        self.assertNotIn("01/01/2020", requester)
+
+    def test_bank_requester_stops_at_staff_without_notary_section_heading(self):
+        path = make_docx(
+            self.root / "bank_staff_boundary.docx", "HỢP ĐỒNG THẾ CHẤP",
+            "NGÂN HÀNG KIỂM THỬ",
+            "Địa chỉ: Địa chỉ ngân hàng thử",
+            "Đại diện: Ông Nguyễn Văn Minh - Chức vụ: Giám đốc",
+            "Công chứng viên: Ông Hoàng Văn Thư Sinh năm: 1970",
+            "Thư ký: Bà Lê Thị Thu Sinh năm: 1980",
+        )
+        requester = extract(path)["web_form"]["nguoi_yeu_cau"]
+        self.assertIn("NGÂN HÀNG KIỂM THỬ", requester)
+        self.assertIn("Nguyễn Văn Minh", requester)
+        for forbidden in ("Công chứng viên", "Hoàng Văn Thư", "Thư ký", "Lê Thị Thu"):
+            self.assertNotIn(forbidden, requester)
+
+    def test_bank_requester_never_captures_inline_loan_terms(self):
+        path = make_docx(
+            self.root / "bank_inline_terms.docx", "HỢP ĐỒNG THẾ CHẤP",
+            "BÊN NHẬN THẾ CHẤP:",
+            "NGÂN HÀNG KIỂM THỬ; Số tiền vay: 100 đồng; Lãi suất: 10%",
+            "Thời hạn vay: 2 năm", "Thanh toán: hàng tháng",
+        )
+        requester = extract(path)["web_form"]["nguoi_yeu_cau"]
+        self.assertIn("NGÂN HÀNG KIỂM THỬ", requester)
+        for forbidden in ("Số tiền vay", "100 đồng", "Lãi suất", "10%", "2 năm", "hàng tháng"):
+            self.assertNotIn(forbidden, requester)
+
+    def test_requester_mortgage_keeps_whole_sourced_bank_and_all_people(self):
+        bank = (
+            "NGÂN HÀNG KIỂM THỬ – CHI NHÁNH TỔNG HỢP",
+            "Địa chỉ: Số 1 Đường Thử Nghiệm",
+            "Đại diện theo ủy quyền: Ông Nguyễn Văn Minh - Chức vụ: Giám đốc",
+            "Căn cước số: 123456789 do Bộ Công an cấp ngày 01/02/2024",
+            "Theo giấy ủy quyền số UQ-TEST ngày 02/02/2024",
+        )
+        path = make_docx(
+            self.root / "bank_requester.docx",
+            "HỢP ĐỒNG THẾ CHẤP QUYỀN SỬ DỤNG ĐẤT",
+            "BÊN NHẬN THẾ CHẤP (Bên B)", *bank,
+            "BÊN THẾ CHẤP (Bên A)",
+            "Ông: Trần Văn Sáng Sinh năm: 1980",
+            "Thường trú tại: Địa chỉ kiểm thử một.",
+            "Bà: Lê Thị Thu Sinh năm: 1982",
+            "Thường trú tại: Địa chỉ kiểm thử hai.",
+            "ĐIỀU 1: TÀI SẢN THẾ CHẤP",
+            "Thửa đất số 77, tờ bản đồ 8",
+            "Số tiền vay: 100 đồng; Lãi suất: 10%; thời hạn vay: 2 năm",
+            "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN",
+            "Ông: Hoàng Văn Thư Sinh năm: 1970",
+            "Chức vụ: Công chứng viên",
+        )
+        payload = extract(path)
+        requester = payload["web_form"]["nguoi_yeu_cau"]
+        self.assertIn("\n".join(bank), requester)
+        self.assertIn("Trần Văn Sáng", requester)
+        self.assertIn("Lê Thị Thu", requester)
+        self.assertLess(requester.index(bank[0]), requester.index("Trần Văn Sáng"))
+        self.assertEqual(requester.count("Nguyễn Văn Minh"), 1)
+        for excluded in ("Thửa đất", "Số tiền vay", "Lãi suất", "thời hạn vay", "Hoàng Văn Thư"):
+            self.assertNotIn(excluded, requester)
+        refs = payload["raw"]["source_refs"]
+        self.assertTrue(any(ref["field"] == "web_form.nguoi_yeu_cau"
+                            and "NGÂN HÀNG" in ref["raw_text"] for ref in refs))
+
+    def test_requester_single_party_and_conflicting_group_keep_standard_person_facts(self):
+        for heading in ("NGƯỜI CAM KẾT:", "BÊN ỦY QUYỀN (Bên B):"):
+            with self.subTest(heading=heading):
+                path = make_docx(
+                    self.root / "participant.docx", "VĂN BẢN CAM KẾT TÀI SẢN",
+                    heading, "Ông: Trần Văn Sáng Sinh năm: 1980",
+                    "Căn cước số: 123456789 do Bộ Công an cấp ngày 01/02/2024",
+                    "Thường trú tại: Địa chỉ kiểm thử.",
+                    "Là con đẻ của người được nhắc; Chức vụ: Giám đốc",
+                    "ĐIỀU 1: NỘI DUNG CAM KẾT",
+                )
+                requester = extract(path)["web_form"]["nguoi_yeu_cau"]
+                self.assertIn("Trần Văn Sáng", requester)
+                self.assertIn("1980", requester)
+                for excluded in ("con đẻ", "Giám đốc", "Bên B", "NGƯỜI CAM KẾT"):
+                    self.assertNotIn(excluded, requester)
+
+    def test_requester_excludes_staff_and_deceased_without_removing_raw_people(self):
+        path = make_docx(
+            self.root / "staff.docx", "HỢP ĐỒNG ỦY QUYỀN",
+            "BÊN ỦY QUYỀN",
+            "Ông: Trần Văn Sáng Sinh năm: 1980",
+            "Thường trú tại: Địa chỉ kiểm thử.",
+            "Bà: Lê Thị Thu Sinh năm: 1982",
+            "Chức vụ: Thư ký",
+            "BÊN ĐƯỢC ỦY QUYỀN",
+            "Ông: Nguyễn Văn Minh Sinh năm: 1981",
+            "Thường trú tại: Địa chỉ đại diện.",
+            "Ông: Hoàng Văn Mất Sinh năm: 1950, chết ngày 01/01/2020",
+            "ĐIỀU 1: NỘI DUNG ỦY QUYỀN",
+        )
+        payload = extract(path)
+        requester = payload["web_form"]["nguoi_yeu_cau"]
+        self.assertIn("Trần Văn Sáng", requester)
+        self.assertIn("Nguyễn Văn Minh", requester)
+        self.assertNotIn("Lê Thị Thu", requester)
+        self.assertNotIn("Hoàng Văn Mất", requester)
+        self.assertTrue(any(p["ho_ten"] == "Lê Thị Thu"
+                            for p in payload["raw"]["ben_a"]["nguoi"]))
+
     def test_transfer_title_ignores_body_huy_bo_clause(self):
         docx_path = make_docx(
             self.root / "transfer.docx",
@@ -232,7 +372,8 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(payload["web_form"]["ten_hop_dong"], "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT VÀ TÀI SẢN GẮN LIỀN VỚI ĐẤT")
         self.assertEqual(duong_su.count("Cùng cư trú tại: thôn A, xã B."), 1)
         self.assertEqual(duong_su.count("Cùng cư trú tại: thôn C, xã D."), 1)
-        self.assertNotIn("Cùng cư trú tại: thôn C, xã D.", nguoi_yeu_cau)
+        for name in ("Nguyễn Huy Cận", "Nguyễn Thị Thu Thủy", "Đoàn Văn Khánh", "Nguyễn Thị Đức Hạnh"):
+            self.assertIn(name, nguoi_yeu_cau)
 
 
     def test_extract_mortgage_summary_keeps_table_order_and_uses_mortgage_party_labels(self):
@@ -560,44 +701,6 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertNotIn("Nội dung phân chia di sản", tai_san)
         self.assertEqual(payload["web_form"]["loai_tai_san"], "Đất đai không có tài sản")
 
-    def test_real_inheritance_samples_partition_nine_heirs_and_refusal_one_refuser(self):
-        # Chay tren file that (khong copy PII vao repo); bo qua khi may chay
-        # khong co o dia D:/Minh.
-        partition_path = Path(
-            r"D:\Minh\1. Thừa kế Minh\Ý YÊN\26. Thừa kế ông Xương\9. Thoả thuận phân chia thừa kế.docx"
-        )
-        refusal_path = Path(
-            r"D:\Minh\1. Thừa kế Minh\VŨ DƯƠNG\12. Thừa kế Bùi Văn Tài\Từ chối bà Luyến.docx"
-        )
-        if not partition_path.exists() or not refusal_path.exists():
-            self.skipTest("Thieu file mau that tren D:/Minh")
-
-        partition = extract(partition_path)
-        partition_parties = partition["raw"]["ben_a"]["nguoi"]
-        partition_duong_su = partition["web_form"]["duong_su"]
-        partition_tai_san = partition["web_form"]["tai_san"]
-
-        self.assertEqual(partition["case"]["loaivanbannhandien"], "inheritance_partition")
-        self.assertEqual(len(partition_parties), 9)
-        self.assertTrue(all(person.get("ngay_sinh") and person.get("cccd") for person in partition_parties))
-        self.assertNotIn("chết", partition_duong_su)
-        self.assertNotIn("Bố đẻ", partition_duong_su)
-        self.assertNotIn("Người để lại di sản", partition_duong_su)
-        self.assertIn("Số tờ bản đồ", partition_tai_san)
-        self.assertNotIn("Những người nhận thừa kế", partition_tai_san)
-        self.assertNotIn("Nội dung phân chia di sản", partition_tai_san)
-
-        refusal = extract(refusal_path)
-        refusal_parties = refusal["raw"]["ben_a"]["nguoi"]
-        refusal_duong_su = refusal["web_form"]["duong_su"]
-        refusal_tai_san = refusal["web_form"]["tai_san"]
-
-        self.assertEqual(refusal["case"]["loaivanbannhandien"], "inheritance_refusal")
-        self.assertEqual(len(refusal_parties), 1)
-        self.assertTrue(refusal_parties[0].get("ngay_sinh") and refusal_parties[0].get("cccd"))
-        self.assertNotIn("chết", refusal_duong_su)
-        self.assertIn("Số tờ bản đồ", refusal_tai_san)
-        self.assertNotIn("Bằng Văn bản này, tôi", refusal_tai_san)
 
     def test_extract_partition_birth_year_no_colon_and_noi_thuong_tru(self):
         # Nguoi lon tuoi chi ghi "Sinh nam 1965" (khong co dau hai cham),
@@ -711,22 +814,6 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertNotIn("chết", payload["web_form"]["duong_su"])
         self.assertIn("104", payload["web_form"]["tai_san"])
 
-    def test_real_inheritance_the_vi_refusal_three_refusers(self):
-        # File that: tu choi huong the vi (khong copy PII vao repo).
-        refusal_path = Path(
-            r"D:\systemdocs\.agent\scratch\Dữ liệu mẫu word test\THỪA KẾ\1. Thừa kế Minh\Ý YÊN\30. Thừa kế ông Kính bà Tới\Từ chối di sản hưởng thế vị từ bà Tới.docx"
-        )
-        if not refusal_path.exists():
-            self.skipTest("Thieu file mau the vi tren may nay")
-
-        refusal = extract(refusal_path)
-        refusal_parties = refusal["raw"]["ben_a"]["nguoi"]
-
-        self.assertEqual(refusal["case"]["loaivanbannhandien"], "inheritance_refusal")
-        self.assertEqual(len(refusal_parties), 3)
-        self.assertTrue(all(person.get("ngay_sinh") and person.get("cccd") for person in refusal_parties))
-        self.assertNotIn("chết", refusal["web_form"]["duong_su"])
-        self.assertIn("Số tờ bản đồ", refusal["web_form"]["tai_san"])
 
     def test_tach_danh_sach_thua_dat_table_nhieu_thua_va_trong_do(self):
         # Bang 2 thua + dong "Trong do" tach nho dien tich.

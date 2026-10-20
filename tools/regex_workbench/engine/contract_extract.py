@@ -39,7 +39,7 @@ from typing import Iterable
 ENGINE_ID = "contract_word"
 """Ten dinh danh cua lõi luat Word (dung cho profile_id o consumer)."""
 
-ENGINE_VERSION = "2026-10-19-case-fields"
+ENGINE_VERSION = "2026-10-20-requester-bank-projection"
 """Phien ban lõi luat — consumer ghi vao log/payload de truy vet."""
 
 # ============================================================
@@ -2979,12 +2979,126 @@ def _format_person_block(person: dict, *, index: int | None = None) -> str:
     return "\n".join(lines).strip()
 
 
-def fmt_nguoi_yeu_cau(ben_b):
-    """Nguoi yeu cau CC = nguoi dau tien ben B."""
-    if not ben_b.get("nguoi"):
-        entity_lines = [line for line in ben_b.get("entity_lines", []) if line]
-        return "\n".join(entity_lines[:3]).strip()
-    return _format_person_block(ben_b["nguoi"][0])
+
+
+def _requester_person_facts(person: dict) -> str:
+    """Render existing Person facts only; raw role/alias prose is not output."""
+    name = str(person.get("ho_ten") or "").strip()
+    lines = [name] if name else []
+    for label, keys in (
+        ("Ngày sinh", ("ngay_sinh",)),
+        ("Số giấy tờ", ("cccd", "so_giay_to")),
+        ("Ngày cấp", ("ngay_cap_cccd", "ngay_cap")),
+        ("Nơi cấp", ("noi_cap",)),
+        ("Địa chỉ", ("dia_chi",)),
+    ):
+        value = next((str(person.get(key) or "").strip() for key in keys
+                      if str(person.get(key) or "").strip()), "")
+        if value:
+            lines.append(f"{label}: {value}")
+    return "\n".join(lines)
+
+
+def _mortgage_bank_spans(text: str) -> list[tuple[int, int]]:
+    """Bank identity/representation source spans, never collateral or terms."""
+    folded, positions = _fold_text_with_index_map(text)
+    starts = re.compile(
+        r"(?im)^[ \t]*(?:(?:[ivx\d]+[.)/]\s*)?(?:\([ab]\)\s*)?"
+        r"ben[^\n:]{0,80}:\s*)?(?P<bank>ngan hang\b[^\n]*)"
+    )
+    boundary = re.compile(
+        r"(?im)^[ \t]*(?:(?:[ivx\d]+[.)/]\s*)?(?:\([ab]\)\s*)?"
+        r"(?:ben\s|dieu\s*\d|loi chung\b|chung thuc\b|so cong chung\b|"
+        r"tai san\b|doi tuong\b|thua dat\b|quyen su dung dat\b|"
+        r"cac ben\b|hai ben\b|bang hop dong\b|cong chung vien\b|thu ky\b|nhan vien\b|"
+        r"gia (?:tri|chuyen nhuong)\b|tien (?:vay|coc|thue)\b|"
+        r"so tien\b|khoan vay\b|lai suat\b|thanh toan\b|"
+        r"thoi han\b|noi dung hop dong\b))"
+        r"|\b(?:so tien (?:vay|cho vay)|khoan vay|lai suat|phuong thuc thanh toan|"
+        r"thanh toan|dat coc|tien thue|tien vay|thoi han (?:vay|thue|cho vay))\b"
+    )
+    body = re.search(
+        r"(?im)^[ \t]*(?:dieu\s*\d|tai san\b|doi tuong\b|thua dat\b|"
+        r"cac ben\b|hai ben\b|bang hop dong\b|so tien\b|khoan vay\b|"
+        r"lai suat\b|thanh toan\b|thoi han\b)", folded)
+    spans: list[tuple[int, int]] = []
+    for match in starts.finditer(folded):
+        if body and match.start() >= body.start():
+            continue  # A bank mentioned in terms/collateral is not a party block.
+        start = positions[match.start("bank")]
+        if spans and start < spans[-1][1]:
+            continue
+        stop = boundary.search(folded, match.start("bank") + len("ngan hang"))
+        end = positions[stop.start()] if stop else len(text)
+        while end > start and text[end - 1].isspace():
+            end -= 1
+        if end > start:
+            spans.append((start, end))
+    return spans
+
+
+def _requester_projection(text: str, doc_kind: str, parties: tuple[list[dict], list[dict]],
+                          deceased: list[dict]) -> tuple[str, list[dict]]:
+    """Source-ordered live participants plus approved mortgage-bank exception.
+
+    The existing web_form string is presentation, not a new canonical entity.
+    Source refs are technical evidence; raw people and history are untouched.
+    """
+    bank_spans = _mortgage_bank_spans(text) if doc_kind == DOC_KIND_MORTGAGE else []
+    source_index = SourceSpanIndex(text)
+    parts: list[tuple[int, str, int, str]] = [
+        (start, text[start:end], end, text[start:end]) for start, end in bank_spans
+    ]
+    seen: set[tuple[str, str, str]] = set()
+    for people in parties:
+        for person in people:
+            name = str(person.get("ho_ten") or "").strip()
+            if not name or person.get("ngay_chet"):
+                continue
+            raw_text = str(person.get("raw_text") or "")
+            spans = source_index.find_all(raw_text) if raw_text else []
+            if not spans:
+                spans = source_index.find_all(name)
+            start, source_end = spans[0] if spans else (-1, -1)
+            if any(a <= start < b for a, b in bank_spans):
+                continue  # Representative already included in the bank source.
+            own_role = _fold_text(raw_text)
+            if re.search(
+                r"(?:^|\n)\s*(?:(?:chuc vu|chuc danh)\s*:\s*"
+                r"(?:thu ky|nhan vien|cong chung vien)\b|"
+                r"(?:thu ky|nhan vien|cong chung vien)\s*:)", own_role,
+            ):
+                continue
+            if re.search(r"\b(?:chet|mat)\s+(?:ngay|nam)\s*[:.-]?\s*\d",
+                         _fold_text(raw_text.split("\n", 1)[0])):
+                continue
+            if any(
+                _fold_text(name) == _fold_text(dead.get("ho_ten") or "")
+                and str(person.get("ngay_sinh") or "").strip()
+                and str(dead.get("ngay_sinh") or "").strip()
+                and not _ngay_sinh_conflict(
+                    str(person["ngay_sinh"]), str(dead.get("ngay_sinh") or ""))
+                for dead in deceased
+            ):
+                continue
+            identity = str(person.get("cccd") or person.get("so_giay_to") or "").strip()
+            key = (_fold_text(name), identity, str(person.get("ngay_sinh") or "").strip())
+            if identity and key in seen:
+                continue
+            if identity:
+                seen.add(key)
+            facts = _requester_person_facts(person)
+            if facts:
+                source = text[start:source_end] if start >= 0 else ""
+                parts.append((start if start >= 0 else len(text), facts,
+                              source_end if start >= 0 else len(text), source))
+    parts.sort(key=lambda part: part[0])
+    refs = [
+        {"field": "web_form.nguoi_yeu_cau", "start": start, "end": end,
+         "raw_text": source}
+        for start, _, end, source in parts if start < len(text)
+    ]
+    return "\n\n".join(value for _, value, _, _ in parts), refs
 
 
 def fmt_duong_su(ben_a, ben_b):
@@ -4856,6 +4970,9 @@ def build_payload(file_goc: str, text: str, scan_result: dict, *, extract_mode: 
     doc_kind, ten_hd = _detect_document_kind_and_title(text)
     ben_a, ben_b = _extract_parties_generic(text, doc_kind)
     nguoi_chet = _extract_nguoi_chet(text, doc_kind)
+    # Requester reads the original source participants, not the legacy display
+    # filter below, which can drop a namesake without positive identity evidence.
+    requester_participants = (ben_a.get("nguoi") or [], ben_b.get("nguoi") or [])
     # Nguoi da chet (ten + nam sinh khop voi nguoi_chet) van bi danh sach
     # thanh vien ho gia dinh ho vao duong su — loai khoi ben (13/10/2026,
     # van ban cam ket: "1. Ông X - sinh nam 1957 (chu ho)" trong khi phan
@@ -4921,10 +5038,8 @@ def build_payload(file_goc: str, text: str, scan_result: dict, *, extract_mode: 
                     break
     tai_san = _find_tai_san_by_kind(text, doc_kind)
     so_cong_chung = _normalize_web_contract_no(find_so_cong_chung(text) or scan_result.get("contract_no", ""))
-    if doc_kind == DOC_KIND_ASSET_COMMITMENT and ben_a.get("nguoi"):
-        nguoi_yeu_cau_party = ben_a
-    else:
-        nguoi_yeu_cau_party = ben_b if ben_b.get("nguoi") else ben_a
+    requester, requester_refs = _requester_projection(
+        text, doc_kind, requester_participants, nguoi_chet)
     from datetime import datetime
     notary_match = re.search(r"Tôi,\s+([^,]+),\s+Công chứng viên", text)
     notarized_date = find_ngay_cong_chung(text)
@@ -4941,7 +5056,7 @@ def build_payload(file_goc: str, text: str, scan_result: dict, *, extract_mode: 
     web_form = {
         **case_portal_projection(case),
         "loai_tai_san": guess_loai_tai_san(tai_san, ten_hd),
-        "nguoi_yeu_cau": fmt_nguoi_yeu_cau(nguoi_yeu_cau_party),
+        "nguoi_yeu_cau": requester,
         "duong_su": _fmt_duong_su_by_kind(doc_kind, ben_a, ben_b),
         "tai_san": tai_san,
     }
@@ -4957,6 +5072,7 @@ def build_payload(file_goc: str, text: str, scan_result: dict, *, extract_mode: 
             # tam dung — chi nhan dien va gan co "chua ho tro".
             "tai_san_chua_ho_tro": _phat_hien_tai_san_chua_ho_tro(text),
             "nguoi_chet": nguoi_chet,
+            "source_refs": requester_refs,
             # Mau template: gia tri «merge_field» khong phai du lieu —
             # bo thua chi chua placeholder (cam ket DH 090202 — 13/10/2026).
             "danh_sach_thua_dat": _bo_sung_loai_gcn_document(

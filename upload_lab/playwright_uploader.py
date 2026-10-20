@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-import csv
 import importlib
 from importlib import util as importlib_util
-import io
 import json
 import os
 import re
 import shutil
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 import warnings
 from datetime import date, datetime
 from dataclasses import dataclass
@@ -86,12 +82,6 @@ PLAYWRIGHT_MISSING_MESSAGE = (
 )
 UPLOAD_LOG_PATH = BASE_DIR / "logs" / "playwright_uploader.log"
 DOWNLOADS_DIR = BASE_DIR / "downloads"
-DEFAULT_REQUESTER_SHEET_URL = (
-    "https://docs.google.com/spreadsheets/d/1EY5coR_BdMRK-xK6e8d2f1Vj5zr4HbLOqNrd1x89yLk/"
-    "edit?gid=1274078459#gid=1274078459"
-)
-REQUESTER_SHEET_CACHE_NAME = "requester_lookup_cache.csv"
-REQUESTER_SHEET_TIMEOUT_SECONDS = 20
 STAFF_OPTIONS_CACHE_NAME = "uploader_staff_options.json"
 UPLOADER_ENV_KEYS = (
     "ND_BASE_URL",
@@ -370,216 +360,6 @@ def normalize_contract_no_for_compare(value: str) -> str:
     return re.sub(r"\s+", "", text)
 
 
-def normalize_requester_sheet_csv_url(sheet_url: str) -> str:
-    raw_url = str(sheet_url or "").strip()
-    if not raw_url:
-        return ""
-
-    parsed = urllib.parse.urlparse(raw_url)
-    if not parsed.scheme or not parsed.netloc:
-        raise ValueError("Link doi chieu phai la link Google Sheet hop le.")
-
-    host = parsed.netloc.lower()
-    if "docs.google.com" not in host:
-        return raw_url
-
-    match = re.search(r"/spreadsheets/d/([a-zA-Z0-9-_]+)", parsed.path)
-    if not match:
-        raise ValueError("Khong doc duoc ma Google Sheet tu link doi chieu.")
-
-    query = urllib.parse.parse_qs(parsed.query or "")
-    gid = str(query.get("gid", [""])[0] or "").strip()
-    if not gid and str(parsed.fragment or "").startswith("gid="):
-        gid = parsed.fragment.split("=", 1)[1].strip()
-    gid = gid or "0"
-    return f"https://docs.google.com/spreadsheets/d/{match.group(1)}/gviz/tq?tqx=out:csv&gid={gid}"
-
-
-def _extract_lookup_year(value: str) -> str:
-    text = str(value or "").strip()
-    match = re.search(r"(20\d{2})", text)
-    return match.group(1) if match else ""
-
-
-def build_requester_lookup_keys(contract_no: str, *, date_text: str = "") -> list[str]:
-    text = str(contract_no or "").strip()
-    match = re.search(r"(\d+)", text)
-    if not match:
-        return []
-
-    number_key = str(int(match.group(1)))
-    year = ""
-    year_match = re.search(r"/(20\d{2})(?:\D|$)", text)
-    if year_match:
-        year = year_match.group(1)
-    if not year:
-        year = _extract_lookup_year(date_text)
-
-    keys: list[str] = []
-    if year:
-        keys.append(f"{number_key}/{year}")
-    keys.append(number_key)
-    return keys
-
-
-def parse_requester_sheet_csv(csv_text: str) -> dict[str, str]:
-    content = str(csv_text or "").strip()
-    if not content:
-        return {}
-
-    reader = csv.DictReader(io.StringIO(content))
-    fieldnames = list(reader.fieldnames or [])
-    if not fieldnames:
-        return {}
-
-    def pick_field(*candidates: str) -> str:
-        for field in fieldnames:
-            folded = _fold_value(field)
-            if any(candidate in folded for candidate in candidates):
-                return field
-        return ""
-
-    contract_field = pick_field("so cc", "so cong chung")
-    requester_field = pick_field("ten khach hang", "nguoi yeu cau")
-    date_field = pick_field("ngay cc", "ngay cong chung")
-    if not contract_field or not requester_field:
-        return {}
-
-    lookup: dict[str, str] = {}
-    for row in reader:
-        contract_value = str(row.get(contract_field) or "").strip()
-        requester_name = str(row.get(requester_field) or "").strip()
-        date_value = str(row.get(date_field) or "").strip()
-        if not contract_value or not requester_name:
-            continue
-        for key in build_requester_lookup_keys(contract_value, date_text=date_value):
-            lookup.setdefault(key, requester_name)
-    return lookup
-
-
-def load_requester_contract_lookup(
-    *,
-    working_dir: Path = BASE_DIR,
-    sheet_url: str = "",
-    log_callback: Optional[Callable[[str], None]] = None,
-) -> tuple[dict[str, str], str | None]:
-    requested_url = str(sheet_url or "").strip()
-    if not requested_url:
-        return {}, None
-
-    try:
-        csv_url = normalize_requester_sheet_csv_url(requested_url)
-    except ValueError as exc:
-        return {}, str(exc)
-
-    cache_path = Path(working_dir) / DOWNLOADS_DIR.name / REQUESTER_SHEET_CACHE_NAME
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    logger = log_callback or _default_log
-    csv_text = ""
-    warning_text: str | None = None
-
-    request = urllib.request.Request(csv_url, headers={"User-Agent": "upload-lab/1.0"})
-    try:
-        with urllib.request.urlopen(request, timeout=REQUESTER_SHEET_TIMEOUT_SECONDS) as response:
-            csv_bytes = response.read()
-        csv_text = csv_bytes.decode("utf-8-sig", errors="replace")
-        cache_path.write_text(csv_text, encoding="utf-8")
-        logger(f"[UPLOAD][REQUESTER] Tai lookup nguoi yeu cau OK: {csv_url}")
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        if cache_path.exists():
-            csv_text = cache_path.read_text(encoding="utf-8")
-            warning_text = "Khong tai duoc link doi chieu. Dang dung du lieu cache gan nhat."
-            logger(f"[UPLOAD][REQUESTER] Loi tai link doi chieu, dung cache {cache_path.name}: {exc}")
-        else:
-            warning_text = "Khong tai duoc link doi chieu nguoi yeu cau cong chung."
-            logger(f"[UPLOAD][REQUESTER] Loi tai link doi chieu: {exc}")
-            return {}, warning_text
-
-    lookup = parse_requester_sheet_csv(csv_text)
-    if not lookup:
-        return {}, warning_text or "Link doi chieu khong co du lieu hop le."
-
-    logger(f"[UPLOAD][REQUESTER] Da nap {len(lookup)} khoa doi chieu nguoi yeu cau.")
-    return lookup, warning_text
-
-
-def _normalize_person_name(value: str) -> str:
-    folded = _fold_value(value)
-    return re.sub(r"^(ong|ba|anh|chi)\s+", "", folded).strip()
-
-
-def _requester_name_matches(expected_name: str, actual_name: str) -> bool:
-    expected = _normalize_person_name(expected_name)
-    actual = _normalize_person_name(actual_name)
-    if not expected or not actual:
-        return False
-    return expected == actual or expected in actual or actual in expected
-
-
-def _format_requester_person(person: dict) -> str:
-    title = str(person.get("gioi_tinh") or "").strip()
-    name = str(person.get("ho_ten") or person.get("name") or "").strip()
-    first_line = " ".join(part for part in (title, name) if part).strip() or name
-    lines: list[str] = []
-    if first_line:
-        birthday = str(person.get("ngay_sinh") or "").strip()
-        if birthday:
-            first_line += f", sinh ngay: {birthday}"
-        lines.append(first_line)
-
-    cccd = str(person.get("cccd") or "").strip()
-    if cccd:
-        id_line = f"Can cuoc so: {cccd}"
-        issue_place = str(person.get("noi_cap") or "").strip()
-        issue_date = str(person.get("ngay_cap_cccd") or "").strip()
-        if issue_place and issue_date:
-            id_line += f" do {issue_place} cap ngay {issue_date}"
-        elif issue_place:
-            id_line += f" do {issue_place} cap"
-        elif issue_date:
-            id_line += f" cap ngay {issue_date}"
-        lines.append(id_line)
-
-    address_line = str(person.get("dia_chi_line") or "").strip(" ;")
-    if not address_line:
-        address_value = str(person.get("dia_chi") or "").strip(" ;")
-        if address_value:
-            address_line = f"Thuong tru tai: {address_value}"
-    if address_line:
-        lines.append(address_line)
-    return "\n".join(line for line in lines if line).strip()
-
-
-def resolve_requester_override(
-    payload: dict,
-    *,
-    contract_no: str,
-    requester_lookup: Optional[dict[str, str]] = None,
-) -> str:
-    lookup = dict(requester_lookup or {})
-    if not lookup:
-        return ""
-
-    raw = dict(payload.get("raw") or {})
-    case = case_from_payload(payload)
-    date_text = case["ngaycongchung"] or ""
-    lookup_keys = build_requester_lookup_keys(contract_no or case["socongchung"] or "", date_text=date_text)
-    requester_name = next((lookup.get(key, "") for key in lookup_keys if lookup.get(key, "")), "")
-    requester_name = str(requester_name or "").strip()
-    if not requester_name:
-        return ""
-
-    for party_name in ("ben_a", "ben_b"):
-        party = dict(raw.get(party_name) or {})
-        for person in list(party.get("nguoi") or []):
-            person_name = str(person.get("ho_ten") or person.get("name") or person.get("raw_text") or "").strip()
-            if _requester_name_matches(requester_name, person_name):
-                formatted = _format_requester_person(person)
-                if formatted:
-                    return formatted
-    return requester_name
-
-
 def read_exported_contract_numbers(export_path: Path | str) -> set[str]:
     path = Path(export_path)
     if not path.exists():
@@ -693,7 +473,6 @@ def load_upload_queue(
     working_dir: Path = BASE_DIR,
     limit: Optional[int] = None,
     selected_record_ids: set[int] | None = None,
-    requester_lookup: Optional[dict[str, str]] = None,
     cong_chung_vien: str | None = None,
     thu_ky: str | None = None,
     statuses: tuple[str, ...] = QUEUE_STATUSES,
@@ -727,7 +506,6 @@ def load_upload_queue(
         upload_form = build_upload_form_data(
             payload,
             contract_no=str(row_dict.get("contract_no") or ""),
-            requester_lookup=requester_lookup,
             cong_chung_vien=cong_chung_vien,
             thu_ky=thu_ky,
         )
@@ -763,7 +541,6 @@ def build_upload_form_data(
     payload: dict,
     *,
     contract_no: str = "",
-    requester_lookup: Optional[dict[str, str]] = None,
     cong_chung_vien: str | None = None,
     thu_ky: str | None = None,
 ) -> dict:
@@ -774,7 +551,6 @@ def build_upload_form_data(
         if selected is not None:
             case[field] = selected.strip() or None
     portal_case = case_portal_projection(case)
-    normalized_contract_no = case["socongchung"] or ""
     return {
         **portal_case,
         "tinh_trang": DEFAULT_STATUS_TEXT,
@@ -782,14 +558,9 @@ def build_upload_form_data(
         # Legacy portal prefill is policy, never copied into canonical Case.
         "cong_chung_vien": portal_case["cong_chung_vien"] or (
             "" if cong_chung_vien is not None else DEFAULT_CCV),
-        "nguoi_yeu_cau": (
-            resolve_requester_override(
-                payload,
-                contract_no=normalized_contract_no or str(contract_no or "").strip(),
-                requester_lookup=requester_lookup,
-            )
-            or str(web_form.get("nguoi_yeu_cau") or "").strip()
-        ),
+        # Requester is a persisted presentation, including sourced bank text.
+        # Queue reads must neither select a person nor reconstruct this from raw.
+        "nguoi_yeu_cau": web_form.get("nguoi_yeu_cau", ""),
         "duong_su": str(web_form.get("duong_su") or "").strip(),
         "tai_san": str(web_form.get("tai_san") or "").strip(),
         "file_hop_dong": str(raw.get("file_goc") or "").strip(),
@@ -1973,7 +1744,6 @@ class NamDinhUploaderSession:
         *,
         selected_record_ids: set[int] | None = None,
         exclude_contract_nos: Optional[set[str]] = None,
-        requester_sheet_url: str = "",
         progress_callback: Optional[Callable[[dict], None]] = None,
         cong_chung_vien: str | None = None,
         thu_ky: str | None = None,
@@ -1990,19 +1760,10 @@ class NamDinhUploaderSession:
                 # UI progress updates must not break the uploader flow.
                 pass
 
-        requester_lookup, requester_warning = load_requester_contract_lookup(
-            working_dir=self.working_dir,
-            sheet_url=requester_sheet_url,
-            log_callback=self.log,
-        )
-        if requester_warning:
-            self.log(f"[UPLOAD][REQUESTER] {requester_warning}")
-
         manifest, records, total_pending = load_upload_queue(
             manifest_path,
             working_dir=self.working_dir,
             selected_record_ids=selected_record_ids,
-            requester_lookup=requester_lookup,
             cong_chung_vien=cong_chung_vien,
             thu_ky=thu_ky,
             statuses=PREPARE_QUEUE_STATUSES,

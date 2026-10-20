@@ -55,9 +55,9 @@ phần thiếu/issue, không bỏ mất để báo đủ.
 Mỗi vòng khi chạy thực tế ghi phần đã sửa, kết quả test với đáp án độc lập,
 lỗi còn lại và phần pending; không tự tuyên bố hoàn tất nếu còn thiếu thông tin.
 LLM có thể là agent đọc file cục bộ; không có quyền cloud/provider mới hoặc
-runtime LLM fallback từ chỉ dẫn này. Trạng thái hiện tại vẫn **chỉ ghi tài liệu**,
-chưa bắt đầu đọc nội dung file mẫu, sửa code hoặc test. So byte/định dạng/trang
-Word là các lớp kiểm riêng; tiêu chuẩn binary/pixel chưa được owner chọn,
+runtime LLM fallback từ chỉ dẫn này. Mốc **chỉ ghi tài liệu** là lịch sử khảo sát;
+runtime Nam Định đã chốt được owner giao riêng, không cho đọc mẫu thực mới.
+So byte/định dạng/trang Word là các lớp kiểm riêng; tiêu chuẩn binary/pixel chưa được owner chọn,
 không tự coi đã nới hoặc đã đạt.
 
 ### Báo cáo ổn định và gate hoàn thành
@@ -103,7 +103,7 @@ suất, điều khoản thanh toán) **hoặc thời hạn nghiệp vụ** vào 
 normalized. Không áp dụng việc bỏ qua cho thời hạn sử dụng đất đúng cụm
 `land_rows[].thoihan` hoặc timeout kỹ thuật. Portal cần trường bị loại thì ghi
 xung đột để refine, không giữ extraction ngầm, bịa/default hay tự chọn bước
-nhập tay mới. Không xóa/viết lại raw, lịch sử hoặc runtime trong lượt docs-only.
+nhập tay mới. Giữ raw/lịch sử; docs-only ở mốc trước không freeze runtime slice đã giao.
 Một Người nhiều giấy tờ và địa chỉ là
 [#42 riêng](../../backlog/story-person-multiple-identities-addresses.md);
 không ép ô đơn hiện tại thành đa trị hoặc tự thêm prerequisite cho gate #41.
@@ -233,9 +233,9 @@ thiếu catalog/rule/nguồn; không tự dựng schema/regex hoặc đọc mẫ
 Số/ngày công chứng và tên công chứng viên phục vụ upload/audit theo flow riêng; không dùng làm tiêu chí “trích đúng người/tài sản”. Trang này không tự mở schema hoặc field mới.
 
 **Pháp nhân — owner 20/10/2026:** pháp nhân **không đưa vào Người**, không thêm
-loại pháp nhân vào Person và không tự phân loại tổ chức thành thể nhân. Theo
-policy, người dùng nhập tay; code hiện tại chưa cutover. Hướng chuẩn hóa thành một bảng riêng sau này là định hướng,
-**chưa duyệt schema/build**. Hồ sơ thế chấp là trường hợp mặc định có pháp nhân;
+loại pháp nhân vào Person và không tự phân loại tổ chức thành thể nhân. Policy
+nhập tay chung có ngoại lệ ngân hàng thế chấp app tự lấy bên dưới. Bảng pháp
+nhân tương lai **chưa duyệt schema/build**. Thế chấp thường có pháp nhân;
 loại khác ít xảy ra. Điều này không cho phép tự tạo tên ngân hàng/đại diện/default;
 pháp nhân khác giữ nguồn và để
 người dùng nhập tay, không âm thầm bỏ hoặc tự xếp loại.
@@ -249,18 +249,22 @@ Người/Tài sản/Hồ sơ đã biết; chỉ hỏi owner khi có quyết đ�
 chưa rõ, chi tiết kỹ thuật do implementation sở hữu theo contract/rule đã duyệt.
 Không dùng `ghiChu` chung hoặc JSON bag chung thay trường; raw capture chỉ là
 provenance, không thay trường nghiệp vụ; không tự đặt canonical key/tên/kiểu/
-nhóm/storage; không dùng cụm để tự bóc pháp nhân. Cụm có thể là trường riêng
-theo ô; phần tái dùng được vẫn map canonical, không mặc định coi cụm là dữ liệu
-chưa map/orphan. Chưa chọn cụm/ô nào trong lượt tài liệu này.
+nhóm/storage; chỉ tự lấy cụm ngân hàng theo ngoại lệ đã chốt. Cụm có thể là trường
+riêng theo ô; phần tái dùng được vẫn map canonical, không mặc định coi là orphan.
+Projection requester hiện có không là canonical legal field mới.
 
-**Nam Định §7 — owner trả lời 20/10/2026, policy đích chưa runtime cutover:**
+**Nam Định §7 — owner 20/10/2026, bounded proof có/fresh bank-auto review CLEAN:**
 
 - **R06 — requester Nam Định/Upload theo đáp án #43:** mọi cá nhân sống A/B/
   đại diện theo ủy quyền; không người chết, công chứng viên, nhân viên trong
   output này. Không xóa dữ kiện Người chết/Stage/Hồ sơ thừa kế/raw/history
   hoặc metadata nhân sự. Cá nhân dùng chuẩn, không prose/lookup/firstperson.
-  Ngân hàng thế chấp hiện cả cụm nhưng không Person; **BANKMODE chưa chọn**
-  mode user dán hay app lấy-điền cụm ngân hàng thế chấp; cá nhân khác vẫn chuẩn.
+  Ngân hàng thế chấp hiện cả cụm, không Person; **BANKMODE “app tự lấy”**:
+  toàn cụm ngân hàng/chi nhánh/định danh/địa chỉ/đại diện/ủy quyền có nguồn
+  tại vị trí nguồn trong requester đầy đủ, không lặp đại diện đã trong cụm.
+  Cá nhân khác chỉ dữ kiện chuẩn, không alias auto/job/kinship/role prose.
+  `web_form.nguoi_yeu_cau` → payload JSON → queue → editor là persistence
+  projection hợp lệ; không key/schema/entity mới hoặc normalized cutover #41.
   Requester không cần tag A/B đã gán: cá nhân sống một bên/đại diện ủy quyền
   vẫn vào khi nhóm chưa gán hoặc conflict.
 - **D04** lời tư cách/căn cứ phức tạp bỏ khỏi tự động điền, user tự sửa; không
@@ -269,10 +273,10 @@ chưa map/orphan. Chưa chọn cụm/ô nào trong lượt tài liệu này.
 - **D05 đã trả lời:** ủy quyền A=người ủy quyền/B=người được ủy quyền; một bên
   không gán A/B; nguồn trái nhau giữ conflict/xác nhận phần nhóm, không tự
   winner hoặc thu hẹp requester. “Nhận” không universal regex/“không nhận=A”.
-- **D06+D07 #43:** phân tích 16 ca và kết luận bảo toàn đã có; membership/
-  A-B đã trả lời, chỉ BANKMODE còn cần làm rõ. Không tự extractor/canonical
-  pháp nhân, không blanket raw block mọi editor; nhập tay pháp nhân trước đó
-  không tự quyết mode “dán” mới. Chưa model/FK/schema/cutover; #42 độc lập.
+- **D06+D07 #43:** giữ đủ 16 ca/kết luận bảo toàn; Q1/Q2/BANKMODE đủ đáp án,
+  bàn giao #41, không bank owner gate. Không Person pháp nhân/blanket raw editor.
+  Model/FK/schema quan hệ chưa duyệt; #42 độc lập. Kế hoạch trước sửa code ở
+  #43 plan §6.1, bounded proof/fresh review CLEAN; #43 phân tích done, #41 mở/gate mẫu ĐÓNG.
 - **A09 chưa duyệt block**: toàn đoạn tài sản ghép từ các field chuẩn khác
   lời dư thật chưa map. [SOT §7.5.1](../upload_lab/nam-dinh-website-sot.md) lưu
   trường thực/ví dụ tổng hợp và wire/model gaps; không nhét `phan_ghi_them`
@@ -335,12 +339,14 @@ cũ vẫn phải được kiểm lại, không biến “bỏ qua” thành “�
   - `Bên A`: Bên thế chấp (cá nhân/hộ gia đình).
   - `Bên B`: Bên nhận thế chấp; nguồn thường nêu ngân hàng/pháp nhân/chi nhánh + người đại diện ký. Đây là vai trò theo nguồn, không phải dữ kiện mặc định.
   - Không có heading `BÊN NHẬN THẾ CHẤP` thì phần mở đầu trước `BÊN THẾ CHẤP` (ngân hàng + đại diện, mẫu Lời chứng Agribank/VB sửa đổi) được coi là Bên B (11/10/2026, hành vi legacy).
-  - Người yêu cầu công chứng: cá nhân sống A/B/đại diện ủy quyền theo #43, không người chết/CCV/nhân viên; ngân hàng cả cụm không Person, BANKMODE còn mở. Không xóa dữ liệu nguồn/Person lịch sử, không chỉ B/đại diện ngân hàng.
-  - **Pháp nhân không bóc thành Người (policy đích 20/10/2026):** người dùng nhập
-    tay; không tự tạo tên ngân hàng/chi nhánh/người đại diện hoặc default party
-    fact, không thêm loại pháp nhân vào Person. Hành vi legacy ở trên vẫn là hiện
-    trạng cần đối chiếu, chưa phải target extraction. Bảng pháp nhân riêng tương
-    lai là định hướng, chưa duyệt schema/build (decision 20/10/2026).
+  - Người yêu cầu công chứng: mọi cá nhân sống tham gia/đại diện ủy quyền theo
+    #43 kể cả một bên/nhóm chưa gán/conflict, không người chết/CCV/nhân viên.
+    **BANKMODE “app tự lấy”** toàn cụm ngân hàng có nguồn, đúng thứ tự nguồn,
+    không lặp đại diện đã trong cụm; không chỉ B/đại diện ngân hàng.
+  - **Pháp nhân không bóc thành Người:** chỉ ngoại lệ text projection ngân hàng
+    thế chấp vào output hiện có; không bịa ngân hàng/chi nhánh/đại diện/default.
+    Cá nhân khác chuẩn, pháp nhân khác nhập tay. Bảng pháp nhân tương lai chưa
+    duyệt schema/build; legacy phía trên không là authority trái policy mới.
 - **Tài sản**:
   - Trích xuất thông tin thửa đất / GCN từ phần mô tả tài sản hoặc trích xuất tối thiểu `Quyền sử dụng đất`.
 

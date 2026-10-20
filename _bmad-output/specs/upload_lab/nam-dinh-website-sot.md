@@ -97,7 +97,7 @@ Canonical names giữ nguyên owner: `tenvanban,nhomhopdong,loaivanbannhandien,s
 | 6 `hopdong.sohopdong` · Số công chứng | text · không R tĩnh | `find_so_cong_chung`/scan + normalize `build_payload:4923,4935` → **C socongchung**; registry.contract_no vẫn scan/reference | `so_cong_chung` / `#hopdong\.sohopdong` · 56-63 |
 | 7 `hopdong.congchungvien.id` · Công chứng viên | remote autocomplete · R | regex nguồn `build_payload:4929,4937` hoặc lựa chọn prepare rõ ràng → **C congchungvien** tên/null → Case JSON; ID website không là FK Notary | `cong_chung_vien` / `#hopdong\.congchungvien\.id` · 87-94; builder:781-792 |
 | 8 `hopdong.thuky` · Thư ký | freeSolo autocomplete · không R | extraction `thuky=null` `build_payload:4938`; input prepare → **C thuky** tên/null → Case JSON; widget string, form/POST chưa quan sát | `thu_ky` / `#hopdong\.thuky` · 95-102 |
-| 9 `hopdong.nguoiYeucauCongchung` · Thông tin người yêu cầu công chứng (ghi sổ công chứng) | CKEditor HTML · không R | `build_payload:4924-4927,4944` chọn B nếu có người, fallback A; cam kết tài sản A → first person raw_text; optional requester lookup → **J** presentation. Người + vai trò Hồ sơ **chưa cutover** (§6) | `nguoi_yeu_cau` / label XPath · 103-112; `resolve_requester_override:561-588` |
+| 9 `hopdong.nguoiYeucauCongchung` · Thông tin người yêu cầu công chứng (ghi sổ công chứng) | CKEditor HTML · không R | `build_payload` → `_requester_projection` personfacts + mortgage-only sourced bankblock → existing **J `web_form.nguoi_yeu_cau`**, JSON save/fresh queue/builder preserves exact projection; không lookup override. Không toàn canonical Person/parties cutover (§6) | `nguoi_yeu_cau` / label XPath · uploader_selectors103–112; `playwright_uploader.build_upload_form_data` |
 | 10 `hopdong.duongsu` · Đương sự | CKEditor HTML · R | `raw.ben_a/b` → `_fmt_duong_su_by_kind:4749-4765` → **J web_form.duong_su**, raw_text/entity_lines ghép; Person/parties chưa cutover | `duong_su` / label XPath · 113-122 |
 | 11 `hopdong.taisan` · Tài sản | CKEditor HTML · R | `_find_tai_san_by_kind:1007-1116` → **J web_form.tai_san** text; song song `raw.danh_sach_thua_dat` `build_payload:4962-4973`. Asset chưa cutover; text không thay các field chuẩn | `tai_san` / label XPath · 123-132 |
 | 12 `hopdong.fileHopdong` · Văn bản hợp đồng | upload + preview · không R · accept `.doc,.docx,.pdf` | **F** `raw.file_goc` → JSON + registry.file_path; không canonical business column | `file_hop_dong` / `#hopdong\.fileHopdong`; `FORM_FIELD_ORDER` → `_upload_file`; preSave selection, không proof backend (§8) |
@@ -249,7 +249,7 @@ Năm item có cùng **`danhmucId:5`** và mỗi item có `donviId` (định danh
 
 ### 6.1 Người và parties
 
-Nguồn `raw.ben_a/b.nguoi[]` giữ thứ tự, `entity_lines` là text tổ chức/đầu mục; `_extract_party_data:4154-4183`. `_format_person_block:2970-2979` hiện **dùng raw_text**, không rebuild từ canonical; `fmt_nguoi_yeu_cau:2982-2987` lấy người đầu hoặc tối đa ba entity_lines; `_append_party_display:2998-3009` ghép tất cả. `_fmt_duong_su_by_kind:4749-4765` chọn nhóm theo loại văn bản, không là quan hệ DB parties approved. Lookup requester tùy chọn theo số/năm/ngày có thể format người match từ hai bên hoặc trả tên lookup nguyên văn (`resolve_requester_override:561-588`, `_format_requester_person:527-558`); không chứng minh một quan hệ requester canonical được lưu.
+Nguồn `raw.ben_a/b.nguoi[]` giữ thứ tự, `entity_lines` là provenance tổ chức/đầu mục. Requester hiện đi qua `contract_extract._requester_projection` (3040), `_requester_person_facts` (2984), `_mortgage_bank_spans` (3002), `build_payload` (4969); source refs kỹ thuật giữ text/spans. `batch_scan.save_output_json` lưu payload, `playwright_uploader.load_upload_queue` (470) đọc và `build_upload_form_data` (540) giữ nguyên projection cho editor. Lookup/firstperson formatter/override cũ đã bỏ khỏi đường requester. `_format_person_block`/`_fmt_duong_su_by_kind` còn là hiện trạng trình bày Đương sự riêng, không bằng chứng canonical parties đã cutover.
 
 **Policy đích R06 — đáp án #43, owner 20/10/2026:** trong requester Nam Định/
 Upload, lấy mọi **cá nhân sống thuộc Bên A, Bên B, người đại diện theo ủy quyền**;
@@ -258,13 +258,35 @@ thêm thân nhân chỉ được nhắc. Mỗi identity xác nhận một lần,
 không lookup/ưu tiên B/người đầu hoặc lời quan hệ/chức vụ/tư cách. Đây là phạm
 vi output, không xóa Person chết, Stage, raw, lịch sử hoặc metadata nhân sự.
 Ngân hàng ở hợp đồng thế chấp được hiện **cả cụm** nhưng không là Person;
-**BANKMODE còn mở:** cụm ngân hàng thế chấp do user dán hay app tự lấy/điền
-từ nguồn? Cá nhân khác vẫn chuẩn; chưa chọn auto/manual mới/field pháp nhân.
-Alias/D04/D08 cá nhân giữ policy cũ, không biến cả ba editor thành block.
-Lookup/firstperson/raw formatter ở trên chỉ là hiện trạng chưa cutover.
+**BANKMODE đã trả lời: “app tự lấy”.** App lấy/điền cả cụm ngân hàng thế chấp
+từ nguồn vào `web_form.nguoi_yeu_cau` hiện có, persist payload JSON → queue →
+editor requester. Không Person/key canonical/bảng pháp nhân mới. Cụm chỉ
+ngân hàng/chi nhánh/định danh/địa chỉ/đại diện/căn cứ ủy quyền có nguồn,
+tại vị trí nguồn trong requester đầy đủ; không lặp đại diện đã ở trong cụm.
+Không tài sản/giá/cọc/vay/lãi/thanh toán/thời hạn nghiệp vụ. Giữ raw/person arrays/
+provenance/history; cá nhân khác chuẩn, không alias auto/job/kinship/role prose.
+Persistence projection text này hợp lệ, không normalized cutover #41. Kế hoạch
+trước code ở #43 plan §6.1; bounded proof/fresh review CLEAN, #43 phân tích done; #41/gate mẫu không mở.
+Lookup/firstperson/raw formatter ở trên là baseline cũ, không policy đích.
 Requester không lọc bằng tag A/B đã gán. Cá nhân sống tham gia văn bản một bên/
 đại diện theo ủy quyền vẫn vào requester khi không gán hoặc đang conflict A/B;
 chỉ phần nhãn nhóm bị ảnh hưởng chờ xác nhận, không phát sinh owner gate mới.
+
+**Changelog/proof bank-auto 20/10/2026:** engine
+`2026-10-20-requester-bank-projection` lấy sourcebank spans chỉ mortgage,
+normal personfacts source-order; JSON save → fresh queue → builder → actual
+local contenteditable `_fill_editor` đạt, representative một lần, Save=0/
+Submit=0/about:blank. Không portal/network hoặc chạm Chrome đã đăng nhập.
+Final isolated five-suite sau bỏ hai test fixture ngoài repo và forwarding echo:
+**250 passed,0 skipped,28 subtests passed**, gồm cả5 browser cases với
+process-only CASE_FIELDS_CHROMIUM trỏ Chromium headless riêng; không Chrome user.
+Privacy caveat: lượt full suite trước còn hai test hardcoded fixture owner-local;
+khả năng đã truy cập fixture là **[INFERENCE] từ skip count**, không được gọi
+lượt đó wholly synthetic. Không kiểm tra lại file, không biết/claim nội dung
+hoặc corpus coverage; chỉ xóa hai method test, giữ nguyên mọi file/fixture.
+Baseline/result/expectations JSON tmp là bằng chứng phụ; quy tắc/kết quả này
+lưu bền tại SOT/#41. Throwaway script và workdir tổng hợp đã gỡ.
+Fresh bank-auto review CLEAN/Ticket PASS; final semantic smoke parser8b503e7f/uploader930f1fa5; projection không toàn canonical #41.
 
 | Nguồn extraction | Canonical / wire Notary đã có | Đích thực và ranh giới |
 |---|---|---|
@@ -277,7 +299,7 @@ chỉ phần nhãn nhóm bị ảnh hưởng chờ xác nhận, không phát sin
 | `noi_cap`, `loai_giay_to` | `noicap`,`loaigiayto` / legacy wire tương ứng | snapshot/derived evidence, **không cột customers** |
 | `gioi_tinh` Ông/Bà | `gioitinh` / wire `gioi_tinh` Nam/Nữ/null | Cột customers.gioi_tinh có thật; danh xưng không tự là giá trị wire đúng; mapper DOCX hiện không map field này |
 | `cccd_khac` | chưa approved multi-ID model | raw/evidence; Notary DOCX mapper tạo ambiguous normalized null, không persist list giấy tờ; #42 riêng |
-| `ten_goi_khac`, `entity_lines`, vai trò requester/Bên A/Bên B | R05 không tự điền/không mở rộng chuẩn alias; entity/quan hệ chưa canonical cutover | Giữ raw/lịch sử; alias nếu cần do user điền tay, không nối vào `ten`/thêm field alias; pháp nhân nhập tay; nhóm/quan hệ xem D05–D07 |
+| `ten_goi_khac`, `entity_lines`, vai trò requester/Bên A/Bên B | R05 không tự điền/không mở rộng chuẩn alias; entity/quan hệ chưa canonical cutover | Giữ raw/lịch sử; alias nếu cần user điền tay, không nối vào `ten`; pháp nhân khác nhập tay, ngân hàng thế chấp app tự lấy cụm nguồn theo §6.1; nhóm/quan hệ xem D05–D07 |
 | `raw_text`, line/span/source_refs | provenance | giữ nguồn, không dùng chuỗi raw để claim canonical cutover |
 
 Proof: `contract_extract.py:3688-3754:_extract_plain_text_person_entries`, `4608-4620:_extract_nguoi_chet`; `contracts/entities.md:150-185`; `contracts/notary-case-drafting.md:246-283:person_row`; `notary_v2/models.py:36-48:Customer`; `case_workspace.py:306-310:_PERSON_KEY_ALIASES`, `2495-2569:_upsert_people`, `2768-2779:_build_payload`. Notary DOCX mapper **thực** là `services/document_intake/adapters/docx.py:49-57:PERSON_FIELD_SOURCES`, loop **chỉ hai bên** `316-350`; không claim đã map đủ `raw.nguoi_chet`, alias/giới tính. `329-343` giữ multi-ID refs + `intake.ambiguous`. Cùng dùng lõi không phải luồng Upload→Notary DB.
@@ -310,17 +332,17 @@ trình bày dựng từ nguồn; Person/Asset/parties chưa canonical cutover. C
 bảng pháp nhân, chưa có trường canonical lưu cụm. `entity_lines` có thể chứa
 tên tổ chức nhưng không tự là Người và không được gán loại pháp nhân cho Person.
 
-**Owner 20/10/2026 chốt:** pháp nhân **không đưa vào Người**; theo policy, người
-dùng **nhập tay**, code hiện tại chưa cutover. Bảng pháp nhân riêng sau này là định hướng **chưa duyệt schema/
+**Owner 20/10/2026 chốt:** pháp nhân **không đưa vào Người**; policy nhập tay
+chung có ngoại lệ ngân hàng thế chấp bên dưới. Bảng riêng tương lai **chưa duyệt schema/
 build**. Hồ sơ thế chấp là trường hợp mặc định có pháp nhân; nguồn thường nêu
 ngân hàng/chi nhánh/đại diện; loại khác ít xảy ra. Sự có mặt đó không cho phép
 tự bịa tên, người đại diện hoặc default party; chỉ dùng dữ kiện nguồn nêu rõ;
 pháp nhân khác giữ nguồn và không bị âm thầm bỏ mất hoặc tự xếp loại.
 
-**Ngoại lệ output mới #43:** ngân hàng thế chấp hiện cả cụm theo lời owner,
-không đưa tổ chức vào Person. Hướng nhập tay pháp nhân trước đó không tự trả lời
-mode nhập cụm ngân hàng mới; BANKMODE ở §6.1 còn chưa chọn. Không tự bóc+điền
-ngân hàng, tạo canonical legal field/bảng hoặc default cụm từ tên ngân hàng.
+**Ngoại lệ output #43 — BANKMODE “app tự lấy”:** chỉ thế chấp, app lấy toàn
+cụm nguồn ngân hàng/chi nhánh/định danh/địa chỉ/đại diện/ủy quyền vào requester
+đầy đủ theo §6.1, không Person/canonical legal field/bảng hoặc default.
+Policy nhập tay chung không còn áp cho cụm được duyệt này; pháp nhân khác giữ nguyên.
 
 **Owner 20/10/2026 cho phép có điều kiện** thêm một trường giữ cả cụm khi cụm
 phức tạp, không lặp lại và thuộc một ô nhập của một website cụ thể. Đây không
@@ -330,16 +352,16 @@ trường canonical đã biết, kiểu lưu và provenance; giữ nguồn. Ch�
 có quyết định nghiệp vụ thực sự chưa rõ; chi tiết kỹ thuật do implementation sở
 hữu theo contract/rule đã duyệt. Không dùng `ghichu` chung hoặc JSON bag chung
 thay trường; raw capture chỉ là provenance, không thay trường nghiệp vụ; không
-tự đặt key/tên/kiểu/nhóm/storage và không dùng cụm để tự bóc pháp nhân. Cụm có
-thể là trường riêng theo ô; phần tái dùng được vẫn map canonical, không mặc định
-coi cụm là dữ liệu chưa map/orphan. Chưa chọn cụm/ô nào; nhãn “trường phụ” không
-đồng nghĩa canonical field hay DB column đã duyệt.
+tự đặt key/tên/kiểu/nhóm/storage; chỉ tự lấy cụm ngân hàng theo §6.1. Cụm có thể
+là trường riêng theo ô; phần tái dùng được vẫn map canonical, không mặc định
+coi cụm là orphan. Ngoại lệ requester dùng projection có sẵn, không duyệt thêm
+canonical field/DB column hoặc A09.
 
 **Quan hệ Người–Tài sản–Hồ sơ:** nhiều người/nhiều tài sản chưa chọn model,
 cardinality, quan hệ/FK hay bảng nối. D06 và D07 chuyển **một issue riêng
 [#43](../../backlog/spike-case-people-assets-relationships.md)**, xử lý ngay sau
 làm rõ các ô §7; không chờ toàn #41 hoàn thành, không phụ thuộc #42. #41 dùng
-kết quả cho phần cutover quan hệ; lượt này không triển khai hoặc đổi gate mẫu.
+kết quả cho cutover quan hệ; 16ca/Q1/Q2/BANKMODE đã bàn giao. Runtime slice đã giao không đổi gate mẫu.
 
 <a id="owner-review"></a>
 ## 7. Ma trận owner rà soát — quyết định 20/10/2026 và phần còn làm rõ
@@ -352,11 +374,11 @@ Các cách xử lý dùng trong bảng:
 
 - **Tái dùng chuẩn:** lấy đúng trường canonical đã có, không sao chép thành trường web trùng nghĩa.
 - **Dựng hiển thị:** ghép từ dữ liệu chuẩn và tham chiếu/nhóm đã được chốt; renderer của từng website chỉ quyết định trình bày. Khi quan hệ chưa chốt, đây là hướng đề xuất, không giả định đã có model.
-- **Cụm riêng theo ô:** một trường có nghĩa nghiệp vụ cụ thể cho phần phức tạp, không tái dùng, của **một ô Nam Định**; có nguồn và ranh giới rõ. Là phương án thật để owner cân nhắc, không generic bag/ghi chú, không mặc định lưu cả ba editor raw. Không dùng nó thay canonical đã biết, suy liên kết nhiều người–nhiều tài sản hoặc tự bóc pháp nhân.
-- **Nhập tay/sửa tay:** chỉ phạm vi owner đã chọn: pháp nhân, alias nếu cần và lời tư cách/căn cứ phức tạp D04; không là fallback cho mọi gap.
+- **Cụm riêng theo ô:** dữ kiện tĩnh có nghĩa/nguồn/ranh giới theo một ô Nam Định, không generic bag/ghi chú/blanket raw. Ngoại lệ ngân hàng thế chấp đã chốt dùng projection hiện có §6.1, không thay canonical hoặc suy quan hệ.
+- **Nhập tay/sửa tay:** pháp nhân khác ngoài ngoại lệ ngân hàng §6.1, alias nếu cần, lời phức tạp D04 của cá nhân khác; không fallback mọi gap.
 - **Bỏ qua:** chỉ scope đã chốt bỏ qua; không âm thầm bỏ các gap khác để báo đủ.
 
-**Hai lớp không được gộp:** **C** đã đi qua Case JSON/`file_registry.case_json`; **J** mới là payload JSON được lưu file (`output_json_path` trỏ tới), gồm `raw`/`web_form`, **chưa là Upload persistence canonical Người/Tài sản/quan hệ**. DB/contract Notary có trường không có nghĩa Upload đã ghi nó. Chi tiết §3 và §6 giữ nguyên; bảng này là lớp chọn cách xử lý, **không chép lại inventory widget/default/selector ở §4–5**. Pháp nhân nhập tay, bốn phí/Ghi chú bỏ qua, status `DACONGCHUNG`, thời hạn đất giữ, không bóc tài chính/thời hạn nghiệp vụ đều **đã chốt**; #42 độc lập; #41 mở, gate mẫu **ĐÓNG**.
+**Hai lớp không được gộp:** **C** đã qua Case JSON/`file_registry.case_json`; **J** là payload JSON lưu file (`output_json_path`), gồm `raw`/`web_form`. **J là persistence projection hợp lệ**, chưa là canonical Người/Tài sản/quan hệ Upload; DB/contract Notary có trường không chứng minh Upload đã ghi nó. Ngân hàng thế chấp app tự lấy qua J → queue → requester editor; pháp nhân khác nhập tay. Phí/Ghi chú bỏ qua, status `DACONGCHUNG`, thời hạn đất giữ, không bóc tài chính/thời hạn nghiệp vụ; #42 độc lập, #41 mở/gate mẫu **ĐÓNG**.
 
 ### 7.1 Bao phủ 17 trường và phần derived, theo nhóm công việc
 
@@ -370,7 +392,7 @@ Các cách xử lý dùng trong bảng:
 | **W08** · Thư ký (#8) | Extraction hiện `null`; input prepare → projection; §4/§5.6 | **C `thuky`** tên/null | Tái dùng chuẩn → freeSolo | Giữ lựa chọn rõ ràng trong Case được prepare; không đoán từ list/default | **ĐÃ CHỐT** |
 | **W03** · Ngày công chứng (#3) | `find_ngay_cong_chung` → ISO → display DD/MM/YYYY | **C `ngaycongchung`**; không ngày tạo/ngày default website | Tái dùng chuẩn + đổi format tại biên | Không tạo ngày giả từ ngày mở form; gap clear/default hiện có ở §3 không tự thành policy mới | **ĐÃ CHỐT** scalar; không hỏi lại |
 | **W06** · Số công chứng (#6) | `find_so_cong_chung`/scan → normalize | **C `socongchung`**; `registry.contract_no` chỉ scan/reference | Tái dùng chuẩn | Giữ `xxx/yyyy` và scope sổ/năm/site; không dùng làm shared Case ID | **ĐÃ CHỐT** |
-| **W09** · Thông tin người yêu cầu… (#9) | Legacy first-person/raw formatter hoặc lookup; §6.1 | **J `web_form.nguoi_yeu_cau`**, chưa canonical cutover | Cá nhân sống A/B/đại diện ủy quyền theo chuẩn; ngân hàng thế chấp cả cụm, không Person | Loại người chết/CCV/nhân viên khỏi requester output, không xóa dữ liệu/history; không prose cá nhân/firstperson | **#43 Q1 đã trả lời; chỉ BANKMODE còn chọn**, không blanket block editor |
+| **W09** · Thông tin người yêu cầu… (#9) | Baseline first-person/raw/lookup; target §6.1 | **J `web_form.nguoi_yeu_cau`**, projection hợp lệ, chưa canonical cutover | Mọi cá nhân sống tham gia/đại diện chuẩn + chỉ thế chấp toàn cụm ngân hàng app tự lấy | Thứ tự nguồn, không lặp đại diện trong cụm; không người chết/CCV/nhân viên, không prose cá nhân khác; giữ history | **Q1/BANKMODE đã chốt**, proof runtime cuối còn chờ |
 | **W10** · Đương sự (#10) | `raw.ben_a/b` → formatter theo loại | **J**, chưa parties cutover | Nhóm A/B theo nghĩa đã chốt | Ủy quyền A=ủy quyền/B=được ủy quyền; một bên không gán; nguồn trái nhau xác nhận phần nhóm, không winner tự động | **D05/#43 Q2 đã trả lời**; model/cutover chưa implement |
 | **W11** · Tài sản (#11) | Text `_find_tai_san_by_kind` + `raw.danh_sach_thua_dat[]`; §6.2 | **J `web_form.tai_san`** và các hàng raw; chưa Upload Asset chuẩn | Dựng từ trường Asset/land rows đã biết | Phân biệt đoạn ghép toàn tài sản với lời dư thật chưa map; ví dụ §7.5.1; chưa duyệt block A09 | **A09 chờ làm rõ phạm vi; A10 đã duyệt nhận diện/pending** |
 | **W12** · Văn bản hợp đồng (#12) | `raw.file_goc` → builder → input file; §8 | **F** JSON + `registry.file_path`; không cột nghiệp vụ | Tái dùng file/provenance kỹ thuật | Giữ nguồn; file selection trước Lưu không chứng minh portal upload/persistence | **ĐÃ PHÂN LOẠI**, không quyết định nghiệp vụ mới |
@@ -388,7 +410,7 @@ Các locator dưới đây là **source tĩnh đã đọc**, không kết quả 
 | Mã nguồn | Locator chính xác / điều chứng minh |
 |---|---|
 | **S-P** | E `3200–3235:_extract_plain_text_person_entries`, `3688–3804` tên/danh xưng/ngày/giấy tờ+nơi cấp; `4154–4183:_extract_party_data` người có thứ tự + entity lines; `4608–4620:_extract_nguoi_chet` alias/ngày chết/TLKT/địa chỉ cuối |
-| **S-R** | E `2970–3009` formatter từ raw text/entity lines; `4924–4927,4941–4946:build_payload` chọn requester và output; U `519–580:_format_requester_person,resolve_requester_override` match tên hoặc trả tên lookup, `762–795:build_upload_form_data` ưu tiên override |
+| **S-R** | E `_requester_person_facts:2984`, `_mortgage_bank_spans:3002`, `_requester_projection:3040`, `build_payload:4969`; `batch_scan.save_output_json` persist payload; U `load_upload_queue:470`, `build_upload_form_data:540` giữ requester projection, không lookup/firstperson override; `_fill_editor:1462` là actual consumer |
 | **S-D** | E `4637–4739:_extract_parties_generic` nhánh loại và headings; `4749–4765:_fmt_duong_su_by_kind`; `4855–4880,4953–4959:build_payload` người chết riêng/lọc khỏi bên; metadata vai trò website **khác** quan hệ app tại §5.2 |
 | **S-A** | E `1772–1802:_new_thua_dat`; `2163–2183:thua_dat_sang_land_rows`; `2249–2259` hình thức sử dụng và Ghi chú chung đổ vào `phan_ghi_them`; `2503–2522` detail/bộ ba/`o_tho`; `4962–4973` output parcel |
 | **S-T** | E `1007–1116:_find_tai_san_by_kind` khác vùng tài sản theo loại; `4768–4780:_phat_hien_tai_san_chua_ho_tro`; không chứng minh bóc đủ xe/sổ tiết kiệm/bảo hiểm |
@@ -399,7 +421,7 @@ Các locator dưới đây là **source tĩnh đã đọc**, không kết quả 
 | Loại nguồn đã có nhánh code | Khác biệt thực cần giữ khi review, không là claim accuracy trên corpus |
 |---|---|
 | Chuyển nhượng / tặng cho | S-T ưu tiên vùng QSDĐ; S-D formatter chuyển nhượng ghép hai bên, tặng cho đi nhánh formatter chung. Không lấy một nhãn nhóm portal làm vai trò cho mọi loại |
-| Thế chấp | S-D nhận Bên thế chấp/Bên nhận thế chấp, có fallback phần mở đầu cho bên nhận; S-T có thể chỉ lấy mô tả từ title khi không có khối QSDĐ. Context owner: input ngân hàng có thể thiếu tài sản, không được bịa đủ. Pháp nhân nhập tay; cá nhân đại diện và quyền đại diện không cùng nghĩa pháp nhân |
+| Thế chấp | Baseline S-D nhận Bên thế chấp/Bên nhận, fallback phần mở đầu; S-T có thể chỉ có title khi thiếu QSDĐ. Target app tự lấy toàn cụm ngân hàng có nguồn theo §6.1; không bịa tài sản hoặc quyền đại diện. Pháp nhân khác vẫn nhập tay |
 | Phân chia / khai nhận / từ chối di sản | S-D có nhánh lấy bên riêng, formatter hiện chỉ dùng bên A cho W10; `raw.nguoi_chet` tách riêng, không tự gán thành requester/đương sự sống. S-T có vùng tài sản riêng và fallback mô tả savings/insurance/vehicle, chưa structured support |
 | Cam kết tài sản | S-R chọn bên A cho requester khi có người, khác heuristic bên B thường dùng; S-T cắt vùng tài sản trước cam kết/lời chứng |
 | Ủy quyền / di chúc / loại khác | S-D có pattern người ủy quyền/người được ủy quyền/người di chúc và fallback chung; không chứng minh nhận diện đủ người nhận di chúc, quyền đại diện hoặc quan hệ. S-T có fallback vùng đất/generic, không hứa mọi loại đều đủ trường; gate mẫu vẫn đóng |
@@ -414,8 +436,8 @@ Các locator dưới đây là **source tĩnh đã đọc**, không kết quả 
 | **W09-R03** · Giấy tờ, loại, ngày cấp, cơ quan cấp | `cccd/ngay_cap_cccd/noi_cap`; chết: `so_giay_to/ngay_cap/loai_giay_to`; S-P | `sogiayto/ngaycap/noicap/loaigiayto`; snapshot/master theo §6.1; **J** | Tái dùng chuẩn + hiển thị theo loại giấy tờ | Không ép mọi giấy thành CCCD; issuer snapshot có nghĩa riêng, không tự đồng nhất cơ quan công chứng. Nhiều giấy giữ ambiguous/#42, không nhét list vào ô đơn | **ĐÃ CHỐT scalar**; #42 độc lập, không hỏi lại |
 | **W09-R04** · Địa chỉ và nhãn địa chỉ | `dia_chi/dia_chi_line`, người chết địa chỉ cuối; S-P/S-R | `diachi/loaidiachi`, line chỉ presentation; **J** | Tái dùng chuẩn + dựng nhãn theo nguồn/quy tắc đã chốt | Không nhân đôi địa chỉ vì ô web dài; không tự đổi nơi chết thành thường trú. Đa địa chỉ thuộc #42 | **ĐÃ CHỐT scalar** |
 | **W09-R05** · Tên gọi khác | `raw.nguoi_chet[].ten_goi_khac`; S-P | **J raw/lịch sử**, chưa field alias approved | Không tự điền alias vào output chuẩn/không mở rộng chuẩn hóa; nếu cần user điền tay | Owner “bỏ tên gọi khác – nếu có user điền tay”; không nối vào `ten`, thêm field alias hoặc mở rộng normalization/#42; giữ raw/lịch sử, runtime chưa đổi | **ĐÃ CHỐT**, không hỏi lại |
-| **W09-R06** · Ai là requester | Legacy first B/fallback A, lookup | **J**, chưa membership canonical cutover | Mọi cá nhân sống A/B/đại diện ủy quyền, không người chết/CCV/nhân viên | Dữ kiện chuẩn, một lần mỗi identity xác nhận theo nguồn, không prose/lookup/ưu tiên bên; không xóa Person/history | **Q1 đã trả lời; BANKMODE riêng còn mở** |
-| **W09-R07** · Tổ chức và cá nhân đại diện | `entity_lines`/cá nhân đại diện | Tổ chức không Person; cá nhân scalar; **J** | Cá nhân ủy quyền requester; ngân hàng thế chấp cả cụm không Person | Không suy quyền/prose cá nhân; chỉ chưa chọn user dán hay app lấy/điền cụm ngân hàng, không hỏi scope người khác | **BANKMODE chưa chọn**, chưa legal table/schema |
+| **W09-R06** · Ai là requester | Baseline first B/fallback A/lookup | **J**, chưa membership canonical cutover | Mọi cá nhân sống tham gia/đại diện, không cần tag A/B; không người chết/CCV/nhân viên | Một lần mỗi identity xác nhận theo nguồn; không prose/lookup/ưu tiên bên, giữ history | **Q1/BANKMODE đủ đáp án**, handoff #41 |
+| **W09-R07** · Tổ chức và cá nhân đại diện | `entity_lines`/cá nhân đại diện/nguồn §6.1 | Không Person/legal table mới; **J** projection | **App tự lấy** toàn cụm ngân hàng/chi nhánh/định danh/địa chỉ/đại diện/ủy quyền, chỉ thế chấp | Đúng vị trí nguồn, không lặp đại diện đã trong cụm; cá nhân khác chuẩn, không bịa quyền | **BANKMODE đã chốt**, proof runtime còn chờ |
 
 ### 7.4 W10 — đương sự: 8 đơn vị thông tin
 
@@ -423,11 +445,11 @@ Các locator dưới đây là **source tĩnh đã đọc**, không kết quả 
 |---|---|---|---|---|---|
 | **W10-D01** · Dữ liệu từng thể nhân | `ben_a/b.nguoi[]` với tên/danh xưng/ngày/ID+cấp/địa chỉ; S-P | Cùng scalar R01–R04, không bộ Person thứ hai; **J** raw + web text | Tái dùng chuẩn + dựng từng người | Dùng một chuẩn Người, không sao chép các scalar vào block Đương sự; renderer giữ nguồn/độ đầy đủ, không chỉ ghép tên | **ĐÃ CÓ chuẩn scalar**, chưa Upload cutover |
 | **W10-D02** · Người để lại di sản, ngày chết/TLKT | `raw.nguoi_chet[]` riêng | Scalar Người có sẵn, **J** | Giữ Person và snapshot Hồ sơ đúng nghĩa | Owner loại người chết khỏi requester Nam Định, không loại khỏi mọi Hồ sơ/Stage hoặc phá dữ kiện thừa kế; không suy chủ đất | **Đã trả lời phạm vi requester; scalar/history giữ** |
-| **W10-D03** · Pháp nhân/tổ chức/chi nhánh | `entity_lines` chưa object chuẩn | Không Person/legal table; **J** text | Ngân hàng thế chấp cả cụm ở output; policy pháp nhân trước không tự quyết mode mới | BANKMODE chỉ user dán hay app lấy/điền cụm ngân hàng; không tự extractor/default/legal field hoặc đổi prose cá nhân/editor | **Không Person đã chốt; mode ngân hàng chưa chọn** |
-| **W10-D04** · Cá nhân đại diện và lời tư cách/căn cứ | S-P tách tên trước chức vụ; lời văn có thể ở raw/entity lines | Scalar cá nhân có sẵn; authority/liên kết chưa model approved, **J** | Dùng dữ liệu chuẩn Người; **bỏ lời văn phức tạp khỏi tự động điền, user tự sửa thủ công** | Không duyệt block D04 hay tự suy quyền/hiệu lực. Giữ nguồn; không mở manual fallback cho mọi unknown; quan hệ đại diện thuộc #43 | **ĐÃ CHỐT**, runtime chưa cutover |
+| **W10-D03** · Pháp nhân/tổ chức/chi nhánh | `entity_lines`/nguồn, chưa object chuẩn | Không Person/legal table; **J** text | Ngân hàng thế chấp app tự lấy toàn cụm ở requester §6.1; pháp nhân khác nhập tay | Giữ nguồn, không default/canonical legal field/blanket raw editor | **BANKMODE đã chốt**, không schema mới |
+| **W10-D04** · Cá nhân đại diện và lời tư cách/căn cứ | Scalar cá nhân + raw/entity lines | Scalar có sẵn; authority chưa canonical model; **J** | Cá nhân khác chuẩn, lời phức tạp user sửa; chỉ cụm ngân hàng thế chấp giữ đủ đại diện/ủy quyền nguồn §6.1 | Không suy quyền/hiệu lực, không block D04 mới/manual fallback mọi gap | **ĐÃ CHỐT**, proof cuối slice còn chờ |
 | **W10-D05** · Nhóm Bên A/Bên B | Nhánh nguồn chuyển/nhận, ủy quyền, một bên | **J**, participation chưa cutover | Nhóm A/B chung; ủy quyền A=người ủy quyền/B=người được ủy quyền | Một bên không gán; hai nguồn trái nhau giữ conflict/xác nhận phần nhóm; không tự winner hoặc dùng “nhận” phổ quát | **#43 Q2 đã trả lời**, không hỏi lại |
-| **W10-D06** · Nhiều người/thứ tự/lần tham gia | Array nguồn có thứ tự | **J**, chưa model chuẩn | #43 có16ca/kết luận bảo toàn, Q1/Q2 đã trả lời | Giữ identity/nguồn/lần tham gia; requester theo scope đã trả lời; không gộp tên/cắt người đầu | **Phân tích đã có; chỉ BANKMODE còn hỏi**, chưa schema/cutover |
-| **W10-D07** · Người liên quan tài sản nào | Cùng payload không chứng minh liên kết cặp; `chudat` Diagram là nghĩa khác | **J**, chưa model/cardinality/FK approved; Upload `chudat=null` | **Cùng một #43 với D06**, scope từng người/nhóm–tài sản có nguồn | Phân biệt cả nhóm/cả tập, từng cặp và chưa rõ; không tích Descartes mọi người×mọi tài sản, không suy chủ đất từ A/GCN | **ĐÃ CHỐT chuyển issue**, không chờ toàn #41/#42 hoặc triển khai ngay |
+| **W10-D06** · Nhiều người/thứ tự/lần tham gia | Array nguồn có thứ tự | **J**, chưa model chuẩn | #43 đủ16ca/Q1/Q2/BANKMODE, handoff #41 | Giữ identity/nguồn/lần tham gia, không gộp tên/cắt người đầu; requester độc lập tag nhóm | **Phân tích đủ đáp án**, chưa canonical schema/cutover |
+| **W10-D07** · Người liên quan tài sản nào | Cùng payload không chứng minh cặp; `chudat` Diagram khác nghĩa | **J**, chưa model/cardinality/FK; Upload `chudat=null` | #43 giữ scope người/nhóm–tài sản có nguồn | Cả nhóm/cả tập khác từng cặp/chưa rõ, không Cartesian/chủ đất từ A/GCN | **Đã bàn giao #41**, không chờ toàn #41/#42 |
 | **W10-D08** · Lời quan hệ/tư cách phụ | `raw_text/entity_lines` giữ lời nguồn; S-P | Không field residual prose approved, **J** | Owner trả lời **theo R06**: dữ liệu chuẩn Người, không lời mô tả phụ | Không duyệt cụm dư D08; không đưa con đẻ/quan hệ/chức vụ/role prose vào requester. Nhóm W10 theo D05, quan hệ #43; nguồn vẫn giữ | **ĐÃ TRẢ LỜI**, không hỏi lại D08 |
 
 ### 7.5 W11 — tài sản: 10 đơn vị thông tin
@@ -492,7 +514,7 @@ chưa đủ căn cứ duyệt field “mô tả bổ sung tài sản”.
 - **Đã trả lời:** R05 alias nhập tay; R06 requester Nam Định là cá nhân sống
   A/B/đại diện ủy quyền, không người chết/CCV/nhân viên trong output; dữ kiện/
   Person/Stage/history giữ nguyên. D04/D08 cá nhân không prose; A10 pending,
-  #29 deferred. Ngân hàng thế chấp cả cụm không Person; BANKMODE còn mở.
+  #29 deferred. Ngân hàng thế chấp cả cụm không Person; **BANKMODE “app tự lấy”**.
 - **W05 đồng ý có điều kiện:** dựng lựa chọn portal từ tập tài sản; giữ ID 1
   đất có tài sản/nhà. Còn thiếu rule khi một hồ sơ thực sự có nhiều loại khác nhau;
   không tự chọn một loại bao quát/đầu/Khác, không đọc mẫu mới để lấp gap.
@@ -502,9 +524,9 @@ chưa đủ căn cứ duyệt field “mô tả bổ sung tài sản”.
 - **A09 còn làm rõ phạm vi:** bảng/ví dụ §7.5.1 cho biết trường thật tạo đoạn
   tài sản; chưa xác định lời dư cụ thể đủ điều kiện để duyệt cụm riêng. Giữ
   chưa map/source cho nội dung chưa rõ, không dựng thêm field nhà/`o_tho`.
-- **D06+D07/#43:** 16ca và kết luận bảo toàn đã có; Q1/Q2 đã trả lời,
-  chỉ BANKMODE user dán/app lấy-điền cụm ngân hàng còn hỏi. Không tự extractor/
-  legal field hoặc blanket raw editor. Chưa model/FK/schema/cutover; #41 mở.
+- **D06+D07/#43:** đủ16ca/kết luận bảo toàn/Q1/Q2/BANKMODE, không owner bank
+  gate; bàn giao #41. App tự lấy cụm ngân hàng thế chấp qua projection hiện có,
+  không legal field/blanket raw editor; model/FK/schema quan hệ chưa chốt, #41 mở.
 
 ### 7.7 Hai tầng dữ kiện / đoạn suy ra — lịch sử phương án; owner chốt chỉ placeholder và trường tĩnh
 
@@ -560,9 +582,9 @@ engine cấu hình sâu **không được chọn**; không xây framework/engine
 lưu text canonical hoặc policy tính lại/override/version mới. Định dạng output
 bằng placeholder/formatter hiện có vẫn tách khỏi dữ kiện nghiệp vụ tĩnh.
 
-Các quyết định trên đổi **spec nghiệp vụ đích**, không chứng minh runtime đã
-cutover. #41 vẫn mở, gate mẫu **ĐÓNG**; lượt này chỉ docs/ticket, không code,
-schema, DB, parser, browser, corpus hoặc verification runtime.
+Spec đích không tự là proof runtime. Owner đã giao runtime slice Nam Định đã
+chốt, gồm ngân hàng; docs-only mốc trước không freeze slice này. Proof cuối chờ
+main, không BUILT/toàn normalized cutover; #41 mở/gate mẫu **ĐÓNG**.
 
 ## 8. Implementation preSave — đã kiểm chứng cô lập và review độc lập sạch
 
