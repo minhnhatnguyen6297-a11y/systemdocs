@@ -476,10 +476,11 @@ thửa khác giữ B, thửa thiếu giữ thiếu. Group C/D cũng null+2refs, 
 only. Focused real-DOCX suite **5 passed,61 deselected**; full
 `test_docx_word_first.py` **66 passed**; isolated smoke
 `_bmad-output/tmp/a07-origin-smoke-result.json` PASS. Independent review
-20/10/2026 đọc diff, đối chiếu consumer và chạy lại đúng hai lệnh trên: không
-phát hiện silent loss/broadcast; duplicate cùng nguồn trên một thửa dedupe về
-một value. Không thêm key/schema; raw/history giữ nguyên, #41 vẫn mở/gate mẫu
-ĐÓNG.
+20/10/2026 đọc diff, đối chiếu consumer và chấp nhận evidence báo cáo (không
+rerun test/browser); finalizer chạy focused 5/61 + full 66 + smoke trước commit.
+Không phát hiện silent loss/broadcast; duplicate cùng nguồn trên một thửa
+dedupe về một value. Không thêm key/schema; raw/history giữ nguyên, #41 vẫn
+mở/gate mẫu ĐÓNG.
 
 ### 7.5.1 A09 — những trường tạo nên đoạn tài sản và ví dụ lưu lại
 

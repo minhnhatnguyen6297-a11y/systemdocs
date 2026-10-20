@@ -306,7 +306,8 @@ passed,61 deselected**; isolated smoke `a07-origin-smoke-result.json` PASS.
 Parser hash `583b27e488d46b076bb8c59f00dd0b16acf545fc0bcc141586d9f45487fe602a`,
 adapter `6126ae5c242ef4cc36c759c7ef8deba409b1e805f2bd517a9c71cd99ebcaa32e`.
 Không new key/schema; đây chỉ slice A07, không đóng toàn #41; gate mẫu ĐÓNG.
-Independent review + final verification 20/10/2026 đọc diff/consumer, chạy lại
-focused **5 passed,61 deselected** và full `test_docx_word_first.py`
-**66 passed**; không phát hiện silent loss/broadcast. Commit cùng ngày trong
-slice A07, không push.
+Independent review 20/10/2026 đọc diff/consumer và chấp nhận evidence báo cáo
+(không rerun test/browser); finalizer chạy focused **5 passed,61 deselected**,
+full `test_docx_word_first.py` **66 passed** và isolated smoke trước commit;
+không phát hiện silent loss/broadcast. Commit cùng ngày trong slice A07, không
+push.
