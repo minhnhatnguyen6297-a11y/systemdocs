@@ -33,8 +33,8 @@ Phạm vi triển khai hiện tại là metadata Case: `tenvanban`, `nhomhopdong
 `DD/MM/YYYY`; số công chứng `xxx/yyyy` giữ scope sổ/website. Tiêu đề nguồn,
 nhóm portal và enum Notary độc lập. Nhân sự do người dùng chọn khi prepare
 thuộc bản Case dùng để điền, không biến default thành dữ kiện bóc tách.
-Person/Asset/parties và các ô phí/ghi chú/trạng thái portal giữ hành vi cũ;
-slice này không khép toàn #41 hoặc mở gate mẫu.
+Person/Asset/parties giữ hiện trạng; phí/ghi chú/trạng thái theo policy owner
+20/10 dưới đây (quy tắc đích, chưa claim runtime đổi). Slice không khép #41/mở gate.
 
 Đọc queue luôn không ghi metadata Case, kể cả có override nhân sự, lọc ID
 hoặc limit. Override trong candidate chỉ phục vụ preview/form của lượt chuẩn
@@ -247,10 +247,16 @@ unscoped items=[]) giữ làm lịch sử, không còn là trạng thái hiện 
 Scope server, required enforcement và object→ID form/submission còn chưa biết;
 không Lưu, prime validation, upload hoặc mở record trong audit.
 
-Có thể cần auxiliary website fields nhưng **chưa duyệt business schema**:
-ID/label catalog, config/policy và provenance tách khỏi nghiệp vụ phí/thù
-lao/ghi chú/trạng thái cần refine #41. Hai phí ngoài mapping repo và tổng
-website được ghi rõ, không tự thêm key/cột hoặc đổ ghi chú. Case 8 key đã
+**Policy owner 20/10/2026 — Nam Định:** cả bốn ô
+`chiphi.phicongchung`, `chiphi.thulaoCongchung`, `chiphi.phiDvNgoaicongchung`,
+`chiphi.phikhac` và Ghi chú `ghichu` **bỏ qua/không điền**. Không ghi 0,
+không xóa default portal, không thêm cột/extraction phí hoặc bước nhập tay.
+Tổng chi phí không phải ô thứ năm, không persistence riêng. Mọi hợp đồng upload
+mặc định **`DACONGCHUNG` / “Đã công chứng”**, là policy portal, không extracted
+fact hoặc Notary draft/locked. Gap mapping phí giữ làm hiện trạng nhưng ngoài
+scope hiện tại, không pending owner choice. Đây là quy tắc đích trong docs,
+**chưa claim runtime đã đổi**, không cấp quyền code/schema. Mở rộng tương lai
+cần duyệt/giao riêng; auxiliary business schema chưa được duyệt. Case 8 key đã
 implement; Person/Asset/parties chưa cutover, toàn #41 chưa xong, gate mẫu
 vẫn **ĐÓNG**. Catalog source-level cũng ghi discrepancy file không trong fill
 order và nhánh prime validation có click Lưu; không sửa runtime hoặc coi

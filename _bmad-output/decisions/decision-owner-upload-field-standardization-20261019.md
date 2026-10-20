@@ -64,8 +64,8 @@ Key/kiểu/format/nhóm/cardinality và cột DB/wire mới của các trường
 - Có thể cần trường phụ theo website, nhưng **chưa duyệt schema mới**.
   Phân loại riêng ID/nhãn catalog, cấu hình/policy/default portal, provenance
   kỹ thuật và dữ liệu nghiệp vụ thật chưa có mapping. Không tự tạo canonical
-  key/cột DB hoặc nhét vào ghi chú; phí, thù lao, ghi chú, trạng thái và trường
-  giao dịch bị loại phải được xét đúng nghĩa trước quyết định.
+  key/cột DB hoặc nhét vào ghi chú. Phí/ghi chú/status đã có policy hiện tại
+  chốt bên dưới; các mở rộng tương lai và trường giao dịch bị loại vẫn phải xét đúng nghĩa.
 - Cấu trúc/options/API quan sát trên web chỉ là bằng chứng về website;
   `contracts/entities.md` và contract được duyệt vẫn quyết định chuẩn app.
   Catalog không nâng Upload workflow Draft thành approved hoặc mở gate #41.
@@ -73,3 +73,12 @@ Key/kiểu/format/nhóm/cardinality và cột DB/wire mới của các trường
 - Lượt này chỉ tài liệu và bằng chứng website an toàn: không sửa code/schema,
   không ghi DB, không đọc testcase/corpus owner, không bấm Lưu hợp đồng hoặc
   dùng credential ngoài quyền được cấp. Chờ review độc lập trước commit.
+
+## Bổ sung owner 20/10/2026 — policy phí, ghi chú và trạng thái Nam Định
+
+- Owner: **“4 khoản phí hiện tại chưa triển khai, mặc định bỏ qua không điền / ghi chú: bỏ qua / tất cả hợp đồng được upload lên đều là "đã công chứng" mặc định”**.
+- Áp dụng hiện tại: bỏ qua/không điền `chiphi.phicongchung`, `chiphi.thulaoCongchung`, `chiphi.phiDvNgoaicongchung`, `chiphi.phikhac` và Ghi chú `ghichu`. Không ghi 0, không xóa default portal, không thêm extraction/cột phí hoặc quy trình nhập tay.
+- Tổng chi phí là display/derived, không input thứ năm; không persistence riêng. Giữ nguyên inventory/quan sát và gap mapping phí như hiện trạng ngoài scope, không còn câu hỏi chờ owner chọn triển khai.
+- Mọi hợp đồng upload Nam Định mặc định **`DACONGCHUNG` / “Đã công chứng”**. Đây là policy portal, không dữ kiện trích xuất và không mapping trạng thái Notary draft/locked.
+- Docs ghi quy tắc đích đã chốt, **không xác nhận runtime mới đã triển khai** và không giao code/schema/browser/Save/upload/DB/test. Mở rộng tương lai cần duyệt và giao riêng; chưa duyệt business schema, toàn #41 chưa xong, gate mẫu **ĐÓNG**.
+

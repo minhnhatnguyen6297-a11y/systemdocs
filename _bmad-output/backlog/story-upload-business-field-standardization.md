@@ -87,8 +87,17 @@ Owner báo Upload đang bóc văn bản thành trường để điền website n
   mapping (14 fill-order entries + attachment selector nhưng attachment không
   iterate); `chiphi.phiDvNgoaicongchung` và `chiphi.phikhac` thiếu mapping, tổng
   có hidden path khác spelling. Không tự thêm key/cột; catalog IDs/config/
-  provenance khác nghiệp vụ phí/thù lao/ghi chú/trạng thái cần quyết định.
+  provenance khác nghiệp vụ. Phí/ghi chú/status đã chốt policy hiện tại bên dưới.
   Nhánh prime validation có click Lưu được ghi trung thực, không sửa runtime.
+- Owner 20/10/2026 chốt **policy đích Nam Định**: bốn ô `chiphi.phicongchung`,
+  `chiphi.thulaoCongchung`, `chiphi.phiDvNgoaicongchung`, `chiphi.phikhac`
+  và Ghi chú `ghichu` bỏ qua/không điền; không ghi 0 hoặc xóa default portal,
+  không thêm extraction/cột phí/quy trình nhập tay. Tổng không ô thứ năm,
+  không persistence riêng. Mọi hợp đồng upload mặc định `DACONGCHUNG` /
+  “Đã công chứng” — portal policy, không extracted fact/Notary draft/locked.
+  Gap phí giữ làm hiện trạng ngoài scope, không pending owner choice.
+  Chưa claim runtime triển khai, chưa giao code/schema; mở rộng tương lai
+  cần duyệt/giao riêng. Toàn #41 còn mở, gate mẫu **ĐÓNG**.
 - Coverage hiện tại 20/10/2026 **sau user đăng nhập thủ công**: empty form live
   có **17 trường ngữ nghĩa**, **7 label required** (không HTML attr/enforcement).
   Sáu widget/list hiện render: status **3**, nhóm **13**, asset **12**, title **5**,
