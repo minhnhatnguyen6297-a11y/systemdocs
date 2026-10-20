@@ -145,7 +145,6 @@ def test_real_consumer_presave_no_submit_and_attachment(tmp_path, monkeypatch, t
     manifest.write_text('{"run_id":"controlled"}', encoding="utf-8")
     if missing_file:
         source.unlink()
-    monkeypatch.setattr(playwright_uploader, "load_requester_contract_lookup", lambda **kwargs: ({}, ""))
     # Simulate a caller carrying legacy nonempty skipped values: consumer must
     # ignore them as well, not rely on today's builder returning empty values.
     real_builder = playwright_uploader.build_upload_form_data

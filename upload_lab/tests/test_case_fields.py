@@ -219,8 +219,6 @@ def test_real_local_browser_presave_consumer(tmp_path, monkeypatch):
     # Only external authentication/requester sources are bypassed. Selection,
     # duplicate filtering, chunking, persistence and browser filling stay real.
     from threading import Event
-    import playwright_uploader
-    monkeypatch.setattr(playwright_uploader, "load_requester_contract_lookup", lambda **kwargs: ({}, ""))
     monkeypatch.setattr(session, "ensure_authenticated", lambda **kwargs: None)
     artifacts = Path(os.environ.get("CASE_FIELDS_EVIDENCE_DIR", str(tmp_path / "browser-proof")))
     artifacts.mkdir(parents=True, exist_ok=True)
