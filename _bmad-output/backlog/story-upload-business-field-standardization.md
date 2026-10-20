@@ -209,10 +209,16 @@ Owner báo Upload đang bóc văn bản thành trường để điền website n
     đoạn ghép dữ kiện chuẩn với lời dư thật chưa map; wire/model gaps rõ.
   - **A10 đã duyệt** nhận diện + nguồn, pending structured xe/sổ tiết kiệm/
     bảo hiểm; #29 deferred, không áp để loại đất có tài sản W05.
-- **Khám phá, chưa duyệt hướng:** Người/Tài sản có thể nối đoạn tự nhiên,
-  cân nhắc tầng dữ kiện tĩnh và tầng đoạn suy ra/điều kiện với tùy biến sâu,
-  đơn giản và ổn định. Chưa chọn canonical persisted text, placeholder engine,
-  schema/kiến trúc; không chép ví dụ tên/ID user vào Git.
+- **Đã chốt 20/10/2026 — chỉ placeholder và trường tĩnh:** owner chốt
+  “chỉ dùng placeholder và trường tĩnh, tiếp tục”. Không mở trường tầng 2
+  động/tính toán, text canonical persisted từ suy ra, engine công thức hoặc
+  framework điều kiện/cấu hình; không có scope trường động mới và không tạo
+  technical approval gate mới. Đề xuất hai tầng trước đây chỉ là **lịch sử
+  chưa triển khai**, không phải định hướng hiện hành. Quyền có điều kiện trước
+  đó cho cụm **text tĩnh** theo ô website **vẫn giữ** (dữ kiện tĩnh có nguồn,
+  không phải tầng động); A09 vẫn chưa duyệt field. Dữ kiện nguồn tĩnh tách khỏi
+  định dạng output/placeholder; block token do code Word định nghĩa, alias cũ,
+  formatter và mẫu đang hỗ trợ giữ nguyên, không bị xóa/sửa bởi quyết định này.
 - **Lượt này chỉ docs/ticket:** policy đích không chứng minh runtime đổi;
   Person/Asset/parties chưa canonical cutover, #41 `refined:false`, gate mẫu
   **ĐÓNG**, #42 độc lập; không code/DB/schema/browser/parser/corpus/test,

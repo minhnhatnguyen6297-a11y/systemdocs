@@ -207,12 +207,45 @@ không chứng minh runtime đã cutover; không sửa raw/lịch sử.
   structured support; chưa mở rộng hiện tại, #29 vẫn DEFERRED. Không áp loại
   này cho đất có tài sản/nhà của W05.
 
-### Phương án hai tầng — đang cân nhắc, không phải định hướng đã chọn
+### Phương án hai tầng — lịch sử cân nhắc, đã bị thay bởi quyết định bên dưới
 
 Owner nhận xét Người + Tài sản thường nối tự nhiên thành đoạn; cân nhắc tầng 1
 dữ kiện tĩnh, tầng 2 đoạn suy ra từ dữ kiện, có thể có điều kiện. Owner yêu cầu
 **cân nhắc thật kỹ**, độ tùy biến sâu đổi lấy độ đơn giản/ổn định thế nào.
-Không mặc định đây là hướng đã duyệt; chưa chọn canonical persisted text,
-placeholder/conditional engine, schema hoặc kiến trúc. Chỉ dùng ví dụ tổng
-hợp trong Git, không chép tên/ID user đưa. Lượt này docs/ticket, không runtime,
-DB/schema, code, browser, parser, mẫu/corpus/test; #41 mở, gate mẫu **ĐÓNG**.
+Đây là **phương án đã cân nhắc, chưa từng được chọn hoặc triển khai**; nội dung
+mục này giữ làm bằng chứng lịch sử, không phải định hướng hiện hành. Chỉ dùng
+ví dụ tổng hợp trong Git, không chép tên/ID user đưa.
+
+## Bổ sung owner 20/10/2026 — chốt chỉ placeholder và trường tĩnh
+
+**Nguyên văn owner:** “chốt chỉ dùng placeholder và trường tĩnh, tiếp tục”.
+
+**Quyết định hiện hành (thay phần chọn kiến trúc còn treo ở mục trên):**
+
+- Chốt **chỉ dùng placeholder và trường tĩnh**. Không mở **trường tầng 2 động/
+  tính toán**, **text/đoạn canonical persisted từ suy ra**, **engine công thức**
+  hoặc **framework điều kiện/cấu hình**. Không có scope trường động mới và
+  không tạo gate xin duyệt kỹ thuật mới cho hướng đó; owner yêu cầu tiếp tục
+  phần đã chốt. Đây là giới hạn **trường nghiệp vụ mới**, không phải lệnh gỡ
+  cơ chế placeholder/block token mà Word đang có.
+- **Phân biệt nguồn và đầu ra:** dữ kiện nghiệp vụ **tĩnh, ghi nhận từ nguồn**
+  (trường canonical/trường đã chốt, kể cả giá trị text) khác **định dạng output**
+  lúc xuất (placeholder, formatter và bố cục Word hiện có). Việc thay placeholder
+  bằng giá trị không tự biến placeholder/formatter thành trường nghiệp vụ mới.
+  Quyết định này **không cấm** trường tĩnh nhận giá trị là một đoạn/cụm text có nguồn.
+- **Quyền có điều kiện trước đó cho cụm text tĩnh vẫn giữ:** một trường giữ cả
+  cụm khi cụm phức tạp, không lặp lại và thuộc một ô nhập của một website cụ thể
+  vẫn là ngoại lệ được owner cho phép, vì đây là **dữ kiện tĩnh có nguồn**, không
+  phải tầng động/tính toán. Vẫn phải xác định website/ô, nghĩa, lý do không tách,
+  kiểu lưu và provenance, và được chốt theo quy trình hiện có. **A09 vẫn chưa
+  duyệt field**, không dùng quyết định này để tự tạo block/field nhà.
+- `nguoi_yeu_cau`/`duong_su`/`taisan` tiếp tục là **output trình bày từ nguồn**,
+  không mặc nhiên thành canonical block field. Placeholder/formatting hiện có
+  của Word giữ nguyên; không suy từ quyết định này rằng mọi đoạn có thể lưu thành
+  trường nghiệp vụ hoặc mọi editor thành block.
+- **Không xóa hoặc sửa** block token do code Word định nghĩa sẵn, alias cũ,
+  formatter hiện có hay mẫu Word đang hỗ trợ. Các tính năng legacy-supported giữ
+  nguyên hiện trạng: quyết định này không phê duyệt framework block mới và cũng
+  không cấp quyền gỡ tính năng đang chạy.
+- Lượt này **chỉ tài liệu**: không code/schema/DB/runtime/test/browser/corpus.
+  #41 vẫn mở, `refined:false`, gate mẫu **ĐÓNG**.

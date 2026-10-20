@@ -497,14 +497,30 @@ chưa đủ căn cứ duyệt field “mô tả bổ sung tài sản”.
   câu “tất cả người” giữ nguyên; phạm vi thành viên người chết/đại diện phải
   được làm rõ ở issue này, không tự loại.
 
-### 7.7 Hai tầng dữ kiện / đoạn suy ra — chỉ đang cân nhắc
+### 7.7 Hai tầng dữ kiện / đoạn suy ra — lịch sử phương án; owner chốt chỉ placeholder và trường tĩnh
+
+**Cập nhật 20/10/2026 — đã chốt:** owner chốt **“chỉ dùng placeholder và trường
+tĩnh, tiếp tục”**. **Đối với trường nghiệp vụ mới**, spec đích chỉ dùng **trường
+tĩnh ghi nhận từ nguồn** và **placeholder/formatting output hiện có**; không mở
+trường tầng 2 động/tính toán, text canonical persisted từ suy ra, engine công
+thức hoặc framework điều kiện/cấu hình. **Block token/alias/formatter/mẫu Word
+và logic derived cố định đang có giữ nguyên**, không bị quyết định này gỡ hay
+duyệt engine mới. Phần dưới đây giữ làm **lịch sử/phương án đã cân nhắc, chưa
+từng triển khai**, không phải định hướng hay approval hiện hành.
+
+**Giới hạn cần đọc cùng quyết định:** quyền **có điều kiện** cho một trường giữ
+cả cụm **text tĩnh** phức tạp, không lặp lại, của một ô website cụ thể (§6.3/§7)
+**vẫn giữ**, vì đó là dữ kiện tĩnh có nguồn, không phải tầng động; vẫn phải chỉ
+rõ ô/mapping/provenance và chốt theo quy trình hiện có. **A09 vẫn chưa duyệt
+field.** Placeholder/formatting Word hiện có là lớp output, không tự thành
+trường nghiệp vụ mới; block token do code Word định nghĩa, alias cũ, formatter
+và mẫu đang hỗ trợ không bị xóa/sửa bởi quyết định này.
 
 Owner nêu Người và Tài sản thường trình bày tự nhiên trong một đoạn, cân nhắc
 tầng 1 dữ kiện tĩnh và tầng 2 đoạn dựng từ dữ kiện, có thể có điều kiện. Đây là
-**khám phá phương án**, không mặc định định hướng hoặc approval. Cần cân nhắc
-độ tùy biến sâu với độ đơn giản/ổn định; chưa chọn lưu text canonical, placeholder
-engine, cú pháp điều kiện, schema hoặc kiến trúc mới. Ví dụ tổng hợp A09 không
-là quyết định các lựa chọn đó; không đưa ví dụ Người có tên/ID của user vào Git.
+**khám phá phương án lịch sử**, không còn là định hướng hiện hành. Ví dụ tổng
+hợp A09 không phải quyết định field hay kiến trúc; không đưa ví dụ Người có
+tên/ID của user vào Git.
 
 **Tiền lệ hiện có, không phải engine mới đã duyệt:** Word tính mapping token →
 chuỗi và có khối tên cố định với điều kiện trong code; không phải engine công
@@ -512,11 +528,11 @@ thức/điều kiện tổng quát do user cấu hình. Nguồn tĩnh:
 [`build_template_mapping`, `word_engine.py:1877–1917`](../../../notary_v2/services/word_engine.py),
 [`_add_block_placeholders`, `word_engine.py:1607–1642`](../../../notary_v2/services/word_engine.py).
 
-| Phương án đang so sánh | Lợi ích | Đánh đổi |
+| Phương án đã so sánh (lịch sử) | Lợi ích | Đánh đổi |
 |---|---|---|
 | Formatter cố định theo output | Gọn, ít cơ chế mới, dễ kiểm soát câu xuất | Mỗi biến thể cần developer; Word/web có trình bày riêng, dễ lặp logic nếu dùng lại nhiều |
 | Khối suy ra có tên, phạm vi hữu hạn; điều kiện do code định nghĩa | Tái dùng đoạn/điều kiện có tên rõ, phù hợp tiền lệ khối Word | Cần chốt nghĩa/phạm vi từng khối; thêm/sửa vẫn cần code, kiểm tương thích các consumer |
-| Engine công thức/điều kiện cấu hình sâu bởi user | User tự đổi quy tắc/biến thể không cần mỗi lần phát hành code | Thêm gánh kiểm lỗi cấu hình, bảo mật, vòng phụ thuộc và version; chưa có quyết định đánh đổi để chọn |
+| Engine công thức/điều kiện cấu hình sâu bởi user | User tự đổi quy tắc/biến thể không cần mỗi lần phát hành code | Thêm gánh kiểm lỗi cấu hình, bảo mật, vòng phụ thuộc và version; **không được chọn** theo quyết định 20/10/2026 |
 
 **Rủi ro chung, kể cả formatter/khối cố định:** phải rõ đoạn đọc snapshot đã
 commit hay nháp/master; sửa tay kết quả có bị tính lại/ghi đè khi dữ kiện đổi
@@ -529,12 +545,11 @@ thuộc phiên bản formatter, dữ kiện/ngày xuất, không chỉ engine c�
 Tùy biến sâu **thêm** rủi ro vòng/cycle, thực thi nội dung không an toàn,
 version cấu hình và lỗi user; không làm biến mất các rủi ro chung trên.
 
-**Khuyến nghị để cân nhắc, chưa chọn kiến trúc:** ưu tiên dữ kiện chuẩn tĩnh
-làm nguồn sự thật, dựng đoạn theo nhu cầu tại lúc xuất; so formatter cố định
-với khối tên hữu hạn khi thực sự có nhu cầu tái dùng. Chỉ cân nhắc engine cấu
-hình sâu nếu nhu cầu tự đổi quy tắc đủ bù độ phức tạp. Đây không là owner bác
-engine đó, không yêu cầu xây framework, không duyệt lưu text canonical hoặc
-policy tính lại/override/version mới.
+**Khuyến nghị lịch sử — đã bị thay bởi quyết định 20/10/2026:** ưu tiên dữ kiện
+chuẩn tĩnh làm nguồn sự thật, dựng đoạn theo nhu cầu tại lúc xuất. Phương án
+engine cấu hình sâu **không được chọn**; không xây framework/engine, không duyệt
+lưu text canonical hoặc policy tính lại/override/version mới. Định dạng output
+bằng placeholder/formatter hiện có vẫn tách khỏi dữ kiện nghiệp vụ tĩnh.
 
 Các quyết định trên đổi **spec nghiệp vụ đích**, không chứng minh runtime đã
 cutover. #41 vẫn mở, gate mẫu **ĐÓNG**; lượt này chỉ docs/ticket, không code,

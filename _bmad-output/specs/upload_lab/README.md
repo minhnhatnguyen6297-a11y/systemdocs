@@ -123,9 +123,12 @@ Website chính thức SOT, người dùng tự Lưu, rule developer-only giữ n
   khỏi lời dư thật chưa map. **A10 đã duyệt** xe/sổ tiết kiệm/bảo hiểm nhận diện
   + nguồn, pending structured; #29 deferred, không áp để loại đất có nhà W05.
 - D06+D07 ở [#43](../../backlog/spike-case-people-assets-relationships.md),
-  **ngay sau rõ các ô**, chưa model/FK/cardinality hoặc implementation. Ý tưởng
-  hai tầng dữ kiện tĩnh/đoạn suy ra (có thể có điều kiện) chỉ **đang cân nhắc**
-  tùy biến sâu so với đơn giản/ổn định, chưa duyệt engine/text canonical/schema.
+  **ngay sau rõ các ô**, chưa model/FK/cardinality hoặc implementation.
+  **Owner 20/10/2026 chốt chỉ dùng placeholder và trường tĩnh**; không mở
+  trường tầng 2 động/tính toán, engine công thức/điều kiện, persisted canonical
+  paragraph. Ý tưởng hai tầng chỉ là lịch sử chưa triển khai. Quyền có điều kiện
+  cho cụm **text tĩnh** theo ô website vẫn giữ, nhưng chưa chọn field và A09
+  chưa duyệt; dữ kiện nguồn tĩnh tách khỏi output/placeholder.
 
 Chi tiết quyết định và phần cần rõ ở [SOT §7](nam-dinh-website-sot.md#owner-review).
 #41 vẫn mở, gate mẫu **ĐÓNG**; lượt trả lời này chỉ docs/ticket, không runtime.

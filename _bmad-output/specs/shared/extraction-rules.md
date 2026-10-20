@@ -275,9 +275,12 @@ chưa map/orphan. Chưa chọn cụm/ô nào trong lượt tài liệu này.
   trường thực/ví dụ tổng hợp và wire/model gaps; không nhét `phan_ghi_them`
   hỗn hợp vào hình thức sử dụng/ghi chú hoặc bịa trường nhà.
 
-Hai tầng dữ kiện tĩnh/đoạn suy ra (có thể có điều kiện) chỉ **đang cân nhắc**,
-chưa chọn engine/schema/persisted canonical text. Không quyền parser/test/corpus
-từ lượt docs này; #41 mở, gate mẫu vẫn **ĐÓNG**.
+**Owner 20/10/2026 chốt chỉ dùng placeholder và trường tĩnh**: không mở trường
+tầng 2 động/tính toán, engine công thức/điều kiện, hay persisted canonical text
+từ suy ra. Đề xuất hai tầng trước đây chỉ là lịch sử chưa triển khai. Cụm **text
+tĩnh** theo ô website vẫn theo quyền có điều kiện ở trên, chưa chọn field và
+A09 chưa duyệt; dữ kiện nguồn tĩnh tách khỏi output/placeholder. Không quyền
+parser/test/corpus từ lượt docs này; #41 mở, gate mẫu vẫn **ĐÓNG**.
 
 ### 2.8. Quyết định 15/10 và phần cần đối chiếu
 

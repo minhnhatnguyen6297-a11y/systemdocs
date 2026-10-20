@@ -65,9 +65,12 @@ alias nếu cần user điền tay, D04 lời phức tạp user tự sửa, D08 
 loại còn rõ rule. D05 chọn nhóm A/B chung, chữ “nhận” gần như 100% không luật
 tuyệt đối. A09 còn rõ phạm vi; [SOT §7.5.1](upload_lab/nam-dinh-website-sot.md)
 lưu trường thật/ví dụ tổng hợp GCN/thửa/cụm đất. A10 nhận diện/pending structured,
-#29 deferred; không loại đất có nhà. Hai tầng dữ kiện tĩnh/đoạn suy ra chỉ
-đang cân nhắc tùy biến với đơn giản/ổn định, chưa engine/schema/text canonical.
-Đây là policy đích docs/ticket, chưa runtime cutover, #41 mở/gate mẫu ĐÓNG.
+#29 deferred; không loại đất có nhà. **Owner 20/10/2026 chốt chỉ dùng
+placeholder và trường tĩnh**; không mở trường tầng 2 động/tính toán, text
+canonical persisted từ suy ra, engine công thức hoặc framework điều kiện.
+Quyền có điều kiện cho một cụm **text tĩnh** theo ô website vẫn giữ (A09 chưa
+duyệt field); dữ kiện nguồn tĩnh khác lớp định dạng output/placeholder. Đây là
+policy đích docs/ticket, chưa runtime cutover, #41 mở/gate mẫu ĐÓNG.
 **BUILT — slice metadata Case, 19/10/2026; verification đạt, Quick code độc lập
 sạch sau fix được chấp nhận, tài liệu hoàn tất:** tám
 trường canonical đã đi qua extraction, lưu/đọc lại, builder và preSave consumer.
