@@ -1704,7 +1704,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(ids.count("2067"), 1)
         thua67 = [t for t in thua if t["so_thua_dat"] == "2067"][0]
         self.assertEqual(thua67["so_to_ban_do"], "09")
-        self.assertIn("Sử dụng riêng", thua67["phan_ghi_them"])
+        self.assertIn("Sử dụng riêng", thua67["hinh_thuc_su_dung"])
 
     def test_nguoi_chet_sau_cum_quan_he(self):
         # "Ong X co me de la ba Y; chet ngay ..." — nguoi chet la Y,
@@ -4137,3 +4137,228 @@ class WordFieldClosedCasesTests(unittest.TestCase):
         self.assertEqual(len(helper), 1)
         self.assertEqual(helper[0]["ngay_sinh"], "26/04/1985")
         self.assertEqual(helper[0]["dia_chi"], "")
+
+    def test_build_upload_form_data_renders_canonical_asset_only(self):
+        path = make_docx(
+            Path(tempfile.mkdtemp()) / "canonical_asset.docx",
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+            "Bên A: Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890",
+            "Bên B: Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891",
+            "Tài sản:",
+            "Quyền sử dụng đất tại xã Mẫu, huyện Mẫu, tỉnh Nam Định.",
+            "Số serial: ZZ123456; Số vào sổ: CS-001",
+            "Thửa đất số: 12; Tờ bản đồ số: 5",
+            "Diện tích: 120 m2",
+            "Hình thức sử dụng: Sử dụng riêng; Ghi chú: lời dư không được điền",
+            "Loại đất: ONT; Diện tích: 100 m2; Thời hạn: Lâu dài",
+        )
+        from playwright_uploader import build_upload_form_data
+
+        payload = extract(path)
+        raw_asset = payload["web_form"]["tai_san"]
+        form = build_upload_form_data(payload)
+
+        self.assertIn("Ghi chú: lời dư không được điền", raw_asset)
+        self.assertIn("Số serial: ZZ123456", form["tai_san"])
+        self.assertIn("Thửa đất số: 12", form["tai_san"])
+        self.assertIn("Diện tích: 120 m2", form["tai_san"])
+        self.assertIn("Hình thức sử dụng: Sử dụng riêng", form["tai_san"])
+        self.assertIn("Loại đất: ONT", form["tai_san"])
+        self.assertNotIn("Ghi chú", form["tai_san"])
+        self.assertNotIn("lời dư", form["tai_san"])
+
+    def test_build_upload_form_data_no_raw_fallback_for_unsupported_asset(self):
+        path = make_docx(
+            Path(tempfile.mkdtemp()) / "savings_no_structured.docx",
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG",
+            "Bên A: Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890",
+            "Bên B: Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891",
+            "Tài sản: Sổ tiết kiệm số 123456 tại Ngân hàng Mẫu.",
+        )
+        from playwright_uploader import build_upload_form_data
+
+        payload = extract(path)
+        form = build_upload_form_data(payload)
+        self.assertEqual(form["tai_san"], "")
+        self.assertIn("so_tiet_kiem", payload["raw"]["tai_san_chua_ho_tro"])
+
+    def test_renderer_ambiguous_total_and_flat_term_are_not_guessed(self):
+        total_path = make_docx(
+            Path(tempfile.mkdtemp()) / "ambiguous_total.docx",
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG",
+            "Bên A: Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890",
+            "Bên B: Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891",
+            "Tài sản:", "Quyền sử dụng đất tại xã Mẫu.",
+            "Thửa đất số: 12; Tờ bản đồ số: 5",
+            "Diện tích: 120 m2", "Diện tích: 150 m2",
+        )
+        from playwright_uploader import build_upload_form_data
+        form = build_upload_form_data(extract(total_path))
+        self.assertNotIn("120", form["tai_san"])
+        self.assertNotIn("150", form["tai_san"])
+
+        term_path = make_docx(
+            Path(tempfile.mkdtemp()) / "ambiguous_term.docx",
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG",
+            "Bên A: Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890",
+            "Bên B: Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891",
+            "Tài sản:", "Quyền sử dụng đất tại xã Mẫu.",
+            "Thửa đất số: 12; Tờ bản đồ số: 5", "Loại đất: ONT",
+            "Thời hạn: Lâu dài", "Thời hạn: Đến năm 2050",
+        )
+        form = build_upload_form_data(extract(term_path))
+        self.assertIn("Loại đất: ONT", form["tai_san"])
+        self.assertNotIn("Đến năm 2050", form["tai_san"])
+        self.assertNotIn("Lâu dài", form["tai_san"])
+
+        detail_only_path = make_docx(
+            Path(tempfile.mkdtemp()) / "detail_only.docx",
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG",
+            "Bên A: Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890",
+            "Bên B: Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891",
+            "Tài sản:", "Quyền sử dụng đất tại xã Mẫu.",
+            "Thửa đất số: 12; Tờ bản đồ số: 5",
+            "Loại đất: ONT; Diện tích: 100 m2; Thời hạn: Lâu dài",
+        )
+        form = build_upload_form_data(extract(detail_only_path))
+        self.assertIn("Diện tích: 100 m2", form["tai_san"])
+        self.assertIn("Thời hạn: Lâu dài", form["tai_san"])
+        self.assertEqual(form["tai_san"].count("Diện tích:"), 1)
+
+        equal_path = make_docx(
+            Path(tempfile.mkdtemp()) / "equal_total_detail.docx",
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG",
+            "Bên A: Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890",
+            "Bên B: Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891",
+            "Tài sản:", "Quyền sử dụng đất tại xã Mẫu.",
+            "Thửa đất số: 12; Tờ bản đồ số: 5",
+            "Diện tích: 100 m2",
+            "Loại đất: ONT; Diện tích: 100 m2; Thời hạn: Lâu dài",
+        )
+        form = build_upload_form_data(extract(equal_path))
+        self.assertEqual(form["tai_san"].count("Diện tích: 100 m2"), 2)
+        self.assertIn("Loại đất: ONT", form["tai_san"])
+
+        multiline_path = make_docx(
+            Path(tempfile.mkdtemp()) / "purpose_multiline.docx",
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG",
+            "Bên A: Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890",
+            "Bên B: Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891",
+            "Tài sản:", "Quyền sử dụng đất tại xã Mẫu.",
+            "Thửa đất số: 12; Tờ bản đồ số: 5",
+            "Mục đích sử dụng: ONT", "Diện tích: 100 m2", "Thời hạn: Lâu dài",
+        )
+        form = build_upload_form_data(extract(multiline_path))
+        self.assertIn("Loại đất: ONT", form["tai_san"])
+        self.assertIn("Diện tích: 100 m2", form["tai_san"])
+        self.assertIn("Thời hạn: Lâu dài", form["tai_san"])
+        self.assertEqual(form["tai_san"].count("Diện tích:"), 1)
+
+        same_line_path = make_docx(
+            Path(tempfile.mkdtemp()) / "same_line_roles.docx",
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG",
+            "Bên A: Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890",
+            "Bên B: Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891",
+            "Tài sản:", "Quyền sử dụng đất tại xã Mẫu.",
+            "Thửa đất số: 12; Tờ bản đồ số: 5",
+            "Diện tích: 120 m2; Loại đất: ONT; Diện tích: 100 m2; Thời hạn: Lâu dài",
+        )
+        form = build_upload_form_data(extract(same_line_path))
+        self.assertIn("Diện tích: 120 m2", form["tai_san"])
+        self.assertIn("Loại đất: ONT; Diện tích: 100 m2; Thời hạn: Lâu dài", form["tai_san"])
+
+        thua_type_path = make_docx(
+            Path(tempfile.mkdtemp()) / "thua_then_type.docx",
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG",
+            "Bên A: Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890",
+            "Bên B: Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891",
+            "Tài sản:", "Quyền sử dụng đất tại xã Mẫu.",
+            "Thửa đất số: 12; Loại đất: ONT; Diện tích: 100 m2; Thời hạn: Lâu dài",
+        )
+        form = build_upload_form_data(extract(thua_type_path))
+        self.assertIn("Thửa đất số: 12", form["tai_san"])
+        self.assertIn("Loại đất: ONT; Diện tích: 100 m2; Thời hạn: Lâu dài", form["tai_san"])
+
+        conflict_path = make_docx(
+            Path(tempfile.mkdtemp()) / "conflict_total_with_detail.docx",
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG",
+            "Bên A: Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890",
+            "Bên B: Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891",
+            "Tài sản:", "Quyền sử dụng đất tại xã Mẫu.",
+            "Thửa đất số: 12; Tờ bản đồ số: 5",
+            "Diện tích: 120 m2", "Diện tích: 150 m2",
+            "Loại đất: ONT; Diện tích: 100 m2; Thời hạn: Lâu dài",
+        )
+        form = build_upload_form_data(extract(conflict_path))
+        self.assertNotIn("120", form["tai_san"])
+        self.assertNotIn("150", form["tai_san"])
+        self.assertIn("Diện tích: 100 m2", form["tai_san"])
+        self.assertIn("Thời hạn: Lâu dài", form["tai_san"])
+
+    def test_renderer_group_asset_with_blank_land_row_not_dropped(self):
+        path = make_docx(
+            Path(tempfile.mkdtemp()) / "group_asset.docx",
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG",
+            "Bên A: Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890",
+            "Bên B: Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891",
+            "Tài sản thứ 1:",
+            "Giấy chứng nhận số: B 011092",
+            "Loại đất:", "Diện tích: 120 m2",
+            "Loại đất: Đất ở; Diện tích: 100 m2; Thời hạn: Lâu dài",
+            "Hình thức sử dụng: Sử dụng riêng",
+        )
+        from playwright_uploader import build_upload_form_data
+        form = build_upload_form_data(extract(path))
+        self.assertIn("Số serial: B 011092", form["tai_san"])
+        self.assertIn("Loại đất: Đất ở", form["tai_san"])
+        self.assertIn("Loại đất: —", form["tai_san"])
+        self.assertIn("Diện tích: 120 m2", form["tai_san"])
+        self.assertIn("Diện tích: 100 m2", form["tai_san"])
+        self.assertIn("Hình thức sử dụng: Sử dụng riêng", form["tai_san"])
+
+    def test_renderer_does_not_turn_notes_blob_into_form(self):
+        payload = {
+            "web_form": {"tai_san": ""},
+            "raw": {"danh_sach_thua_dat": [{
+                "so_thua_dat": "12",
+                "phan_ghi_them": "Ghi chú: Chưa xác minh; Hình thức sử dụng: Sử dụng chung",
+            }]},
+        }
+        from playwright_uploader import build_upload_form_data
+        form = build_upload_form_data(payload)
+        self.assertNotIn("Hình thức sử dụng", form["tai_san"])
+
+    def test_renderer_mixed_group_shapes_keep_both_groups(self):
+        path = make_docx(
+            Path(tempfile.mkdtemp()) / "mixed_groups.docx",
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG",
+            "Bên A: Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890",
+            "Bên B: Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891",
+            "Tài sản thứ 1:", "Giấy chứng nhận số: AB123456",
+            "Thửa đất số: 12; Tờ bản đồ số: 5",
+            "Loại đất: ONT; Diện tích: 100 m2; Thời hạn: Lâu dài",
+            "Tài sản thứ 2:", "Giấy chứng nhận số: B011092",
+            "Loại đất:", "Loại đất: Đất ở; Diện tích: 120 m2; Thời hạn: Lâu dài",
+        )
+        from playwright_uploader import build_upload_form_data
+        form = build_upload_form_data(extract(path))
+        self.assertIn("Số serial: AB123456", form["tai_san"])
+        self.assertIn("Số serial: B011092", form["tai_san"])
+        self.assertIn("Loại đất: ONT", form["tai_san"])
+        self.assertIn("Loại đất: Đất ở", form["tai_san"])
+        self.assertIn("Loại đất: —", form["tai_san"])
+
+    def test_renderer_group_note_blob_does_not_become_form(self):
+        path = make_docx(
+            Path(tempfile.mkdtemp()) / "group_note.docx",
+            "HỢP ĐỒNG CHUYỂN NHƯỢNG",
+            "Bên A: Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890",
+            "Bên B: Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891",
+            "Tài sản thứ 1:", "Giấy chứng nhận số: B011092",
+            "Loại đất: Đất ở; Diện tích: 120 m2; Thời hạn: Lâu dài",
+            "Ghi chú: lời dư; Hình thức sử dụng: Sử dụng chung",
+        )
+        from playwright_uploader import build_upload_form_data
+        form = build_upload_form_data(extract(path))
+        self.assertIn("Số serial: B011092", form["tai_san"])
+        self.assertNotIn("Hình thức sử dụng", form["tai_san"])

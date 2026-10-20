@@ -41,6 +41,137 @@ from regex_workbench.engine.contract_extract import (  # noqa: E402,F401
 )
 
 
+_ASSET_RENDER_FIELDS = (
+    ("Số serial", "so_gcn_raw", "so_gcn_raw_values"),
+    ("Số vào sổ", "so_vao_so", "so_vao_so_values"),
+    ("Loại giấy", "loai_gcn", "loai_gcn_raw_values"),
+    ("Thửa đất số", "so_thua_dat", "so_thua_dat_values"),
+    ("Tờ bản đồ số", "so_to_ban_do", "so_to_ban_do_values"),
+    ("Địa chỉ", "dia_chi", "dia_chi_values"),
+    ("Ngày cấp", "ngay_cap_gcn", "ngay_cap_values"),
+    ("Cơ quan cấp", "co_quan_cap", "co_quan_cap_values"),
+    ("Nguồn gốc", "nguon_goc", "nguon_goc_values"),
+    ("Hình thức sử dụng", "hinh_thuc_su_dung", "hinh_thuc_su_dung_values"),
+)
+
+
+def _uniq(values) -> list[str]:
+    return list(dict.fromkeys(str(value).strip() for value in values or [] if str(value).strip()))
+
+
+def _asset_value(parcel: dict, key: str, values_key: str) -> str:
+    values = _uniq(parcel.get(values_key))
+    if len(values) > 1:
+        return ""
+    return str(parcel.get(key) or (values[0] if values else "")).strip()
+
+
+def _source_total(parcel: dict) -> str:
+    totals = _uniq(parcel.get("dien_tich_tong_values"))
+    return totals[0] if len(totals) == 1 else ""
+
+
+def _detail_value(detail: dict, key: str, values_key: str) -> str:
+    values = _uniq(detail.get(values_key))
+    if len(values) > 1:
+        return ""
+    return str(detail.get(key) or (values[0] if values else "") or "").strip()
+
+
+def _detail_term(detail: dict) -> str:
+    return _detail_value(detail, "thoi_han_su_dung", "thoi_han_su_dung_values")
+
+
+def _render_land_row(land_type: str, area: str, term: str) -> str:
+    parts = [
+        f"Loại đất: {land_type or '—'}",
+        f"Diện tích: {area or '—'}",
+        f"Thời hạn: {term or '—'}",
+    ]
+    return "; ".join(parts)
+
+
+def _render_parcel(parcel: dict) -> list[str]:
+    lines = []
+    for label, key, values_key in _ASSET_RENDER_FIELDS:
+        value = _asset_value(parcel, key, values_key)
+        if value:
+            lines.append(f"{label}: {value}")
+    total = _source_total(parcel)
+    if total:
+        lines.append(f"Diện tích: {total}")
+    details = [detail for detail in parcel.get("chi_tiet_dien_tich") or []
+               if isinstance(detail, dict) and not detail.get("o_tho")]
+    # Rows are already typed/flat-classified by the shared parser; do not
+    # dedupe a known detail row by equality with a total value.
+
+    if details:
+        for detail in details:
+            lines.append(_render_land_row(
+                _detail_value(detail, "muc_dich_su_dung", "muc_dich_su_dung_values"),
+                _detail_value(detail, "dien_tich", "dien_tich_values"),
+                _detail_term(detail)))
+    return lines
+
+
+def _render_group(group: dict) -> list[str]:
+    lines = []
+    fields = (
+        ("Số serial", "so_serial", "so_serial_values"),
+        ("Số vào sổ", "so_vao_so", "so_vao_so_values"),
+        ("Loại giấy", "loai_so", "loai_so_values"),
+        ("Thửa đất số", "so_thua_dat", "so_thua_dat_values"),
+        ("Tờ bản đồ số", "so_to_ban_do", "so_to_ban_do_values"),
+        ("Địa chỉ", "dia_chi", "dia_chi_values"),
+        ("Ngày cấp", "ngay_cap", "ngay_cap_values"),
+        ("Cơ quan cấp", "co_quan_cap", "co_quan_cap_values"),
+        ("Nguồn gốc", "nguon_goc", "nguon_goc_values"),
+        ("Hình thức sử dụng", "hinh_thuc_su_dung", "hinh_thuc_su_dung_values"),
+    )
+    for label, key, values_key in fields:
+        value = _asset_value(group, key, values_key)
+        if value:
+            lines.append(f"{label}: {value}")
+    totals = _uniq(group.get("dien_tich_tong_values"))
+    if len(totals) == 1:
+        lines.append(f"Diện tích: {totals[0]}")
+    rows = [row for row in group.get("land_rows") or [] if isinstance(row, dict)]
+    for row in rows:
+        lines.append(_render_land_row(
+            str(row.get("loai_dat") or "").strip(),
+            str(row.get("dien_tich") or "").strip(),
+            str(row.get("thoi_han") or "").strip()))
+    return lines
+
+
+def render_asset_text(payload: dict) -> str:
+    """Render asset editor text from approved canonical fields only.
+
+    A09-A: no residual/notes/raw block. Ambiguous values (including total)
+    are omitted; grouped asset shapes are not dropped; blank land-row positions
+    stay represented by placeholders. Unsupported/no structured asset returns
+    empty rather than raw fallback.
+    """
+    source = str((payload.get("web_form") or {}).get("tai_san") or "")
+    groups = core.tach_nhom_tai_san(source, land_rows_as_details=True)
+    blocks: list[str] = []
+    if groups:
+        # Grouped source owns its windows; do not mix/duplicate raw parcels.
+        for group in groups:
+            lines = _render_group(group)
+            if lines:
+                blocks.append("\n".join(lines))
+    else:
+        # Reparse the preserved source in detailed mode so historical payloads
+        # replay the same typed rows/totals as fresh extraction; never trust
+        # legacy raw parcel scalar fields as canonical detail.
+        for parcel in core.tach_danh_sach_thua_dat(source, land_rows_as_details=True):
+            lines = _render_parcel(parcel)
+            if lines:
+                blocks.append("\n".join(lines))
+    return "\n\n".join(blocks).strip()
+
+
 # ============================================================
 # DOCX / DOC HELPERS
 # ============================================================

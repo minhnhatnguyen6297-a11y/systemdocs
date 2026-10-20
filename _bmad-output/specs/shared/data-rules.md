@@ -159,15 +159,16 @@ Requester không lọc theo tag A/B đã gán: cá nhân sống của văn bản
 đại diện ủy quyền vẫn vào output khi nhóm không gán hoặc conflict.
 
 W05 giữ loại đất có tài sản/nhà dù thiếu mẫu/rule chi tiết, không tự tạo schema;
-A10 chỉ giữ xe/sổ tiết kiệm/bảo hiểm ở nhận diện/pending structured. A09 chưa duyệt
-block: toàn đoạn tài sản ghép từ dữ kiện chuẩn không đồng nghĩa lời dư chưa map.
-[SOT §7](../upload_lab/nam-dinh-website-sot.md#owner-review) có trường thật/ví dụ
-tổng hợp. **Owner 20/10/2026 chốt chỉ dùng placeholder và trường tĩnh**; không
+A10 chỉ giữ xe/sổ tiết kiệm/bảo hiểm ở nhận diện/pending structured. A09 đã chốt
+A: không residual field/block; asset editor chỉ render canonical/placeholder,
+raw/history retained không auto-fill. Toàn đoạn tài sản ghép từ dữ kiện chuẩn
+không đồng nghĩa lời dư chưa map; [SOT §7](../upload_lab/nam-dinh-website-sot.md#owner-review)
+có trường thật/ví dụ tổng hợp. **Owner 20/10/2026 chốt chỉ dùng placeholder và trường tĩnh**; không
 mở trường tầng 2 động/tính toán, persisted text canonical từ suy ra, engine
 công thức hoặc framework điều kiện. Đề xuất hai tầng chỉ là lịch sử chưa triển
-khai. Quyền có điều kiện cho cụm **text tĩnh** theo ô website giữ nguyên, nhưng
-A09 chưa duyệt field; dữ kiện nguồn tĩnh tách khỏi định dạng output. Policy đích
-không là runtime đã đổi.
+khai. Quyền có điều kiện cho cụm **text tĩnh** đã duyệt khác giữ nguyên; **A09 đã chốt A**
+không residual field, chỉ render canonical/placeholder. Dữ kiện nguồn tĩnh tách
+khỏi định dạng output. Policy đích không là runtime đã đổi.
 
 **Kết quả audit catalog 19/10/2026:** báo cáo ổn định
 `D:\testcase\BAO_CAO_KHAO_SAT.md` đã liệt kê trường nền Người/Tài sản/Hồ sơ,

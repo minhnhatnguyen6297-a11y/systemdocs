@@ -277,16 +277,18 @@ Projection requester hiện có không là canonical legal field mới.
   bàn giao #41, không bank owner gate. Không Person pháp nhân/blanket raw editor.
   Model/FK/schema quan hệ chưa duyệt; #42 độc lập. Kế hoạch trước sửa code ở
   #43 plan §6.1, bounded proof/fresh review CLEAN; #43 phân tích done, #41 mở/gate mẫu ĐÓNG.
-- **A09 chưa duyệt block**: toàn đoạn tài sản ghép từ các field chuẩn khác
-  lời dư thật chưa map. [SOT §7.5.1](../upload_lab/nam-dinh-website-sot.md) lưu
-  trường thực/ví dụ tổng hợp và wire/model gaps; không nhét `phan_ghi_them`
-  hỗn hợp vào hình thức sử dụng/ghi chú hoặc bịa trường nhà.
+- **A09 đã chốt A:** không residual field/block; asset editor chỉ render
+  canonical/placeholder, raw/history/`phan_ghi_them`/`o_tho` retained nhưng không
+  auto-fill/notes; thiếu mapping là partial, không lấp raw. [SOT §7.5.1](../upload_lab/nam-dinh-website-sot.md)
+  lưu trường thực/ví dụ tổng hợp; không nhét `phan_ghi_them` hỗn hợp vào hình thức
+  sử dụng/ghi chú hoặc bịa trường nhà.
 
 **Owner 20/10/2026 chốt chỉ dùng placeholder và trường tĩnh**: không mở trường
 tầng 2 động/tính toán, engine công thức/điều kiện, hay persisted canonical text
 từ suy ra. Đề xuất hai tầng trước đây chỉ là lịch sử chưa triển khai. Cụm **text
-tĩnh** theo ô website vẫn theo quyền có điều kiện ở trên, chưa chọn field và
-A09 chưa duyệt; dữ kiện nguồn tĩnh tách khỏi output/placeholder. Không quyền
+tĩnh** đã duyệt khác vẫn theo quyền có điều kiện ở trên; **A09 đã chốt A**
+không residual field, chỉ render canonical/placeholder; dữ kiện nguồn tĩnh tách
+khỏi output/placeholder. Không quyền
 parser/test/corpus từ lượt docs này; #41 mở, gate mẫu vẫn **ĐÓNG**.
 
 ### 2.8. Quyết định 15/10 và phần cần đối chiếu

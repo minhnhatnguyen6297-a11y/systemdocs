@@ -33,6 +33,7 @@ from regex_workbench.engine.contract_extract import (  # noqa: E402
     dien_tich_thanh_so,
     document_asset_context,
     extract_text,
+    hinh_thuc_su_dung_occurrences,
     tach_nhom_tai_san,
     thua_dat_sang_land_rows,
 )
@@ -239,6 +240,28 @@ PERSON_LABELS = {
     "ngay_cap": LABELS["ngay_cap_cccd"],
     "dia_chi": LABELS["dia_chi_nguoi"],
 }
+
+# Người chết: chỉ map trường Person đã duyệt/xác định được từ nguồn. Số trích
+# lục khai tử KHÔNG đưa vào `so_giay_to`/Customer vì Customer.so_giay_to unique
+# và writer có thể coi đó là identity/merge; raw.nguoi_chet giữ nguyên.
+DECEASED_PERSON_FIELD_SOURCES = {
+    "ho_ten": "ho_ten",
+    "gioi_tinh": "gioi_tinh",
+    "ngay_sinh": "ngay_sinh",
+    "ngay_chet": "ngay_chet",
+    "loai_giay_to": "loai_giay_to",
+    "ngay_cap": "ngay_cap",
+    "noi_cap": "noi_cap",
+    "dia_chi": "dia_chi",
+}
+DECEASED_PERSON_LABELS = {
+    "ho_ten": PERSON_LABELS["ho_ten"],
+    "ngay_sinh": (r"Sinh ngày", r"Sinh năm", r"Ngày sinh"),
+    "ngay_chet": (r"Chết ngày", r"Ngày chết", r"Chết"),
+    "ngay_cap": (r"cấp ngày", r"ký ngày"),
+    "noi_cap": (r"do",),
+    "dia_chi": (r"Nơi thường trú cuối cùng", r"Nơi cư trú cuối cùng", r"Nơi chết"),
+}
 ASSET_LABELS = {
     "so_serial": LABELS["so_serial"],
     "dia_chi": LABELS["dia_chi"],
@@ -294,66 +317,6 @@ def _locate_person_title(text: str, person: dict,
                     if span not in spans:
                         spans.append(span)
     return [spans[0][0], spans[0][1]] if len(spans) == 1 else None
-
-
-# Chỉ nhãn "Hình thức sử dụng:" trong đúng cửa sổ tài sản. Giá trị dừng ở
-# xuống dòng/ô kế (`|`), cuối cửa sổ, hoặc nhãn kế đã biết CÓ dấu `:` —
-# không cắt prose/token giá trị chỉ vì trùng chữ, không lấy Ghi chú.
-_FORM_LABEL = "Hình thức sử dụng"
-_FORM_NEXT_LABELS = (
-    "Hình thức sử dụng", "Ghi chú", "Thửa đất số", "Số thửa",
-    "Tờ bản đồ số", "Số tờ", "Diện tích", "Thời hạn", "Nguồn gốc",
-    "Địa chỉ", "Loại đất", "Mục đích sử dụng", "Số serial", "Số vào sổ",
-    "Ngày cấp", "Cơ quan cấp", "Giấy chứng nhận",
-)
-
-
-def _form_label_alternation(words: tuple[str, ...]) -> str:
-    variants: list[str] = []
-    for word in words:
-        variants.extend(re.escape(value) for value in _variants(word))
-    return "(?:" + "|".join(dict.fromkeys(variants)) + ")"
-
-
-_FORM_NEXT_ALT = _form_label_alternation(_FORM_NEXT_LABELS)
-_FORM_END_RE = (
-    r"(?=[ \t]*(?:\n|\||$|"
-    r";[ \t]*(?:\n|\||$|" + _FORM_NEXT_ALT + r"[ \t]*:)|"
-    r",?[ \t]*" + _FORM_NEXT_ALT + r"[ \t]*:))"
-)
-_HINH_THUC_SU_DUNG_RES = tuple(
-    re.compile(
-        r"(?im)(?:^|[\n;|,])[ \t]*(?:[-*+•][ \t]*)?"
-        + re.escape(label)
-        + r"[ \t]*:[ \t]*(?P<value>[^\n|]*?)" + _FORM_END_RE
-    )
-    for label in _variants(_FORM_LABEL)
-)
-
-
-def _hinh_thuc_su_dung_occurrences(text: str,
-                                   window: tuple[int, int]) -> list[tuple[str, list[int]]]:
-    """Các lần thấy label `Hình thức sử dụng:` trong MỘT cửa sổ tài sản.
-
-    Không quét ngoài cửa sổ, không suy từ `phan_ghi_them`/title, không nhận
-    ô chỉ có header. Trả (giá trị nguyên văn, span) cho từng lần thấy.
-    """
-    found: list[tuple[str, list[int]]] = []
-    seen: set[tuple[int, int]] = set()
-    for pattern in _HINH_THUC_SU_DUNG_RES:
-        for match in pattern.finditer(str(text or ""), window[0], window[1]):
-            raw = match.group("value").strip()
-            if not raw:
-                continue
-            leading = len(match.group("value")) - len(match.group("value").lstrip())
-            span = (match.start("value") + leading,
-                    match.start("value") + leading + len(raw))
-            if span in seen:
-                continue
-            seen.add(span)
-            found.append((raw, [span[0], span[1]]))
-    found.sort(key=lambda item: item[1][0])
-    return found
 
 
 async def extract(spec, ctx):
@@ -456,6 +419,48 @@ async def extract(spec, ctx):
                                                    "observed", None, refs)
                 warnings.append({"code": "intake.ambiguous",
                                  "message": "so_giay_to: nhiều giá trị; cần chọn hoặc sửa"})
+        if any(key not in fields for key in REQUIRED_PERSON_FIELDS):
+            warnings.append({"code": "intake.fragment",
+                             "message": "Bản ghi thiếu trường; hãy bổ sung trước khi lưu hồ sơ"})
+        suggestion = make_suggestion(source_id=spec.source_id, target="person",
+                                     fields=fields, warnings=warnings)
+        suggestion["suggestion_id"] = candidate_id
+        suggestions.append(suggestion)
+
+    # ----- người chết: source riêng, không requester/owner/Diagram -----
+    for person in raw.get("nguoi_chet") or []:
+        candidate_id = str(uuid.uuid4())
+        fields: dict = {}
+        warnings = [{"code": "intake.docx_coverage", "message": w} for w in source.warnings]
+        person_window = _person_window(source.text, person)
+        sources = dict(DECEASED_PERSON_FIELD_SOURCES)
+        if not str(person.get("loai_giay_to") or "").strip():
+            # Ngày/nơi cấp chỉ có nghĩa khi biết loại giấy (TLKT); không
+            # gán ngày/issuer của giấy khác vào người chết.
+            sources.pop("ngay_cap", None)
+            sources.pop("noi_cap", None)
+        map_fields(fields, warnings, candidate_id, _PERSON_FIELD_NORMALIZERS,
+                   sources, person, person_window, "person",
+                   DECEASED_PERSON_LABELS,
+                   skip=frozenset({"loai_giay_to", "gioi_tinh"}))
+        title = str(person.get("gioi_tinh") or "").strip()
+        title_span = _locate_person_title(source.text, person, person_window) if title else None
+        if title_span:
+            add_field(fields, warnings, candidate_id, _PERSON_FIELD_NORMALIZERS,
+                      key="gioi_tinh", raw_value=title, span=title_span,
+                      rule_id="person.gioi_tinh")
+        doc_type = str(person.get("loai_giay_to") or "").strip()
+        if doc_type:
+            type_span = _locate_in(source.text, doc_type, person_window, span_index)
+            if type_span:
+                add_field(fields, warnings, candidate_id, _PERSON_FIELD_NORMALIZERS,
+                          key="loai_giay_to", raw_value=doc_type, span=type_span,
+                          rule_id="person.loai_giay_to")
+        if not fields:
+            continue
+        # so_giay_to (số TLKT) intentionally omitted: Customer.so_giay_to is
+        # unique identity; raw.nguoi_chet retains it. Missing warning stays
+        # honest/partial rather than merging unrelated deceased by certificate.
         if any(key not in fields for key in REQUIRED_PERSON_FIELDS):
             warnings.append({"code": "intake.fragment",
                              "message": "Bản ghi thiếu trường; hãy bổ sung trước khi lưu hồ sơ"})
@@ -583,7 +588,7 @@ async def extract(spec, ctx):
                    sources, values, window, "asset", ASSET_LABELS, frozenset(skip_keys))
         # `hinh_thuc_su_dung` chỉ lấy đúng giá trị sau label nguồn trong cửa sổ
         # tài sản này; không map blob `phan_ghi_them`, Ghi chú hoặc cửa sổ khác.
-        form_occurrences = _hinh_thuc_su_dung_occurrences(
+        form_occurrences = hinh_thuc_su_dung_occurrences(
             source.text, form_window or window)
         if form_occurrences:
             refs = [make_refs(candidate_id, span, "asset.hinh_thuc_su_dung")

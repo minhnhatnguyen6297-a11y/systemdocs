@@ -329,3 +329,42 @@ sản gắn liền với đất, hay **(2) người dùng tự chọn**?
 - Raw/history/source_refs, W11-A10 unsupported-asset recognition và phần A09
   giữ nguyên. #41 vẫn mở/refined:false; gate mẫu **ĐÓNG**. Chỉ verification
   tổng hợp/cô lập, không hồ sơ thật/corpus/production DB/portal/Chrome.
+
+## Đáp án A09 — owner 20/10/2026: chọn 1a
+
+**Câu hỏi nguyên văn (parent chuyển):** sau khi A01–A08 đã map các trường tài sản
+chuẩn, phần lời dư tài sản chưa map nên có **một trường text tĩnh riêng** hay
+**không tạo field, chỉ giữ raw/history**? Các lựa chọn đã trình: A = raw/history-only,
+render canonical/placeholder; B = một field residual tĩnh per-asset nếu có ví dụ
+nghĩa cụ thể, không catch-all.
+
+**Owner trả lời: 1a — A.** Không tạo trường residual business mới. Asset editor chỉ
+render các trường canonical/placeholder đã duyệt; lời dư nguồn/raw/history được
+giữ nhưng **không tự điền**, không thành ghi chú hoặc field mới.
+
+**Đã chốt — phạm vi A09:**
+
+- Không thêm field/key/schema/alias/bảng cho residual; không biến `phan_ghi_them`
+  hoặc `o_tho` thành field nghiệp vụ.
+- Output tài sản chỉ dựng từ các trường canonical đã duyệt; thiếu trường thì
+  thiếu/placeholder, không lấp bằng raw block/notes.
+- Raw/source/history/provenance vẫn được giữ để tra cứu; không xóa, không
+  reclassify unknown thành “không tồn tại”.
+- Quyền có điều kiện cũ cho một cụm **text tĩnh** theo ô website không còn là
+  quyền A09; các quyền đã duyệt khác (BANKMODE cả cụm ngân hàng thế chấp,
+  trường tĩnh/placeholder, W05) không bị thu hồi.
+- Không mở dynamic block/engine công thức; #41 vẫn mở/refined:false, gate mẫu ĐÓNG.
+
+## Làm rõ owner 20/10/2026 — Word template, Excel/VBA
+
+**Nguyên văn owner:** “chỉ tham khảo bố cục đặt placeholder, chính vì sự bất tiện
+của công thức hàm excel và vba nên tôi muốn chuyển sang code ổn định hơn, còn
+bộ logic văn bản word tôi nghĩ là ổn”.
+
+**Phạm vi:** mẫu Word của owner là nguồn **bố cục đặt placeholder** và **logic
+văn bản nghiệp vụ hiện có** hợp lệ; code đích là canonical/static data → token
+mapping → thay tại chỗ giữ định dạng. Không sao chép/tái tạo công thức Excel,
+VBA/macro, không giải mã thêm XLSB/VBA, không đổi câu/chữ/logic Word theo suy
+luận của code. A09 renderer Upload là biên độc lập, không thay thế template Word.
+Không mở field/tier mới hoặc parser Excel. Các quyết định A09-A/static/BANKMODE
+và W05 không bị thu hồi.

@@ -64,9 +64,9 @@ except ImportError:  # pragma: no cover
     )
 
 try:
-    from extraction_adapter import DEFAULT_CCV, case_from_payload, case_portal_projection, validate_case_fields
+    from extraction_adapter import DEFAULT_CCV, case_from_payload, case_portal_projection, render_asset_text, validate_case_fields
 except ImportError:  # pragma: no cover
-    from .extraction_adapter import DEFAULT_CCV, case_from_payload, case_portal_projection, validate_case_fields
+    from .extraction_adapter import DEFAULT_CCV, case_from_payload, case_portal_projection, render_asset_text, validate_case_fields
 
 
 QUEUE_STATUSES = ("extracted", "upload_failed", "prepared_dry_run", "prepared_partial")
@@ -562,7 +562,7 @@ def build_upload_form_data(
         # Queue reads must neither select a person nor reconstruct this from raw.
         "nguoi_yeu_cau": web_form.get("nguoi_yeu_cau", ""),
         "duong_su": str(web_form.get("duong_su") or "").strip(),
-        "tai_san": str(web_form.get("tai_san") or "").strip(),
+        "tai_san": render_asset_text(payload),
         "file_hop_dong": str(raw.get("file_goc") or "").strip(),
     }
 

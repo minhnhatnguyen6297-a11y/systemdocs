@@ -1388,3 +1388,122 @@ def test_saved_conversion_preserves_old_bindings_requires_reconfirmation_and_exp
     output = export_original(db.get(InheritanceCase, cid), sid, store, tmp_path)
     assert output["documents"][0]["status"] == "saved"
     assert store.load(sid)[0] == original
+
+
+def test_deceased_person_maps_explicit_source_fields_without_identity_merge(db, tmp_path, session_factory):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Sống, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Sống, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+        'Người để lại di sản: Ông Nguyễn Văn Cố, sinh năm 1940, chết ngày 05/06/2016 '
+        'theo Trích lục khai tử số 95/2026/TLKT do UBND xã Mẫu cấp ngày 10/06/2016; '
+        'Nơi thường trú cuối cùng trước khi chết: Thôn Mẫu, xã Mẫu.',
+    ])
+    suggestions = extraction(content)
+    deceased = [s for s in suggestions if s['target'] == 'person'
+                and s['fields'].get('ho_ten', {}).get('normalized_value') == 'Nguyễn Văn Cố']
+    assert len(deceased) == 1
+    fields = deceased[0]['fields']
+    assert fields['gioi_tinh']['normalized_value'] == 'Nam'
+    assert fields['ngay_sinh']['normalized_value'] == '1940'
+    assert fields['ngay_chet']['normalized_value'] == '2016-06-05'
+    assert fields['loai_giay_to']['normalized_value'] == 'Trích lục khai tử'
+    assert fields['ngay_cap']['normalized_value'] == '2016-06-10'
+    assert fields['noi_cap']['normalized_value'] == 'UBND xã Mẫu'
+    assert fields['dia_chi']['normalized_value'] == 'Thôn Mẫu, xã Mẫu'
+    assert 'so_giay_to' not in fields
+    assert fields['ngay_chet']['source_refs'][0]['raw_snippet'] == '05/06/2016'
+    assert fields['loai_giay_to']['source_refs'][0]['raw_snippet'] == 'Trích lục khai tử'
+
+    _, _, service, data = reviewed_case_with_source_form(db, tmp_path, content)
+    cid = data['case']['id']
+    stage_deceased = next(p for p in data['stage']['people'] if p['ho_ten'] == 'Nguyễn Văn Cố')
+    assert stage_deceased['loai_giay_to'] == 'Trích lục khai tử'
+    assert (stage_deceased['ngay_cap'], stage_deceased['noi_cap']) == (
+        '2016-06-10', 'UBND xã Mẫu')
+    assert stage_deceased['dia_chi'] == 'Thôn Mẫu, xã Mẫu'
+    assert any(w['code'] == 'intake.fragment' for w in deceased[0]['warnings'])
+    db.expire_all()
+    assert any(p['ho_ten'] == 'Nguyễn Văn Cố' and p['ngay_chet'] == '2016-06-05'
+               for p in service.get(cid)['stage']['people'])
+    from models import Customer
+    deceased_customer = db.query(Customer).filter(Customer.ho_ten == 'Nguyễn Văn Cố').one()
+    assert deceased_customer.so_giay_to is None
+    assert deceased_customer.ngay_chet.isoformat() == '2016-06-05'
+    fresh = session_factory()
+    try:
+        fresh_people = CaseWorkspaceService(fresh, None).get(cid)['stage']['people']
+        fresh_deceased = next(p for p in fresh_people if p['ho_ten'] == 'Nguyễn Văn Cố')
+        assert (fresh_deceased['ngay_sinh'], fresh_deceased['ngay_chet']) == ('1940', '2016-06-05')
+        assert fresh_deceased['gioi_tinh'] == 'Nam'
+        assert fresh_deceased['loai_giay_to'] == 'Trích lục khai tử'
+        assert (fresh_deceased['ngay_cap'], fresh_deceased['noi_cap']) == (
+            '2016-06-10', 'UBND xã Mẫu')
+        assert fresh_deceased['dia_chi'] == 'Thôn Mẫu, xã Mẫu'
+    finally:
+        fresh.close()
+    from services.word_engine import (
+        build_template_mapping, build_word_context, replace_in_doc)
+    case = db.get(InheritanceCase, cid)
+    context = build_word_context(case)
+    assert any(p.ho_ten == 'Nguyễn Văn Cố' and p.is_deceased for p in context.persons)
+    assert (context.persons[2].ho_ten, context.persons[2].is_deceased) == (
+        'Nguyễn Văn Cố', True)
+    # Template tokens are fixed here BEFORE the engine mapping/output exists:
+    # fixed Stage person slot 3, source-confirmed deceased identity.
+    expected_by_token = {
+        '[Người 3 - Họ tên]': 'Nguyễn Văn Cố',
+        '[Người 3 - Ngày chết]': '05/06/2016',
+        '[Người 3 - Năm sinh]': '1940',
+        '[Người 3 - Giới tính]': 'Nam',
+        '[Người 3 - Loại giấy tờ]': 'Trích lục khai tử',
+        '[Người 3 - Ngày cấp]': '10/06/2016',
+        '[Người 3 - Nơi cấp]': 'UBND xã Mẫu',
+        '[Người 3 - Địa chỉ]': 'Thôn Mẫu, xã Mẫu',
+    }
+    template_text = 'Tài liệu thử: Người để lại di sản. ' + ' | '.join(expected_by_token)
+    mapping = build_template_mapping(case, static=True)
+    mismatches = {token: (mapping.get(token), value)
+                  for token, value in expected_by_token.items()
+                  if mapping.get(token) != value}
+    assert not mismatches, mismatches
+    template = Document()
+    template.add_paragraph(template_text)
+    replace_in_doc(template, mapping)
+    rendered_path = tmp_path / 'deceased-rendered.docx'
+    template.save(str(rendered_path))
+    rendered_text = read_docx(rendered_path.read_bytes()).text
+    assert not any(token in rendered_text for token in expected_by_token)
+    assert 'Tài liệu thử: Người để lại di sản.' in rendered_text
+    assert all(value in rendered_text for value in expected_by_token.values())
+
+
+def test_deceased_namesake_living_not_merged_and_missing_type_stays_partial(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Trùng, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Sống, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+        'Người để lại di sản: Ông Nguyễn Văn Trùng, đã chết ngày 05/06/2016.',
+    ])
+    people = [s for s in extraction(content) if s['target'] == 'person']
+    same_name = [s for s in people
+                 if s['fields'].get('ho_ten', {}).get('normalized_value') == 'Nguyễn Văn Trùng']
+    assert len(same_name) == 2
+    deceased = next(s for s in same_name if 'ngay_chet' in s['fields'])
+    assert deceased['fields']['ngay_chet']['normalized_value'] == '2016-06-05'
+    assert 'loai_giay_to' not in deceased['fields']
+    assert 'ngay_cap' not in deceased['fields']
+    assert 'noi_cap' not in deceased['fields']
+    assert 'so_giay_to' not in deceased['fields']
+
+    _, _, service, data = reviewed_case_with_source_form(db, tmp_path, content)
+    from models import Customer
+    assert db.query(Customer).filter(Customer.ho_ten == 'Nguyễn Văn Trùng').count() == 2
+    deceased_customer = (db.query(Customer)
+                         .filter(Customer.ho_ten == 'Nguyễn Văn Trùng',
+                                 Customer.so_giay_to.is_(None)).one())
+    assert deceased_customer.ngay_chet.isoformat() == '2016-06-05'

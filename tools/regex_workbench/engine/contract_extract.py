@@ -1183,6 +1183,74 @@ def _has_attached_land_asset_details(text_folded: str) -> bool:
     )
 
 
+_FORM_LABEL = "Hình thức sử dụng"
+_FORM_NEXT_LABELS = (
+    "Hình thức sử dụng", "Ghi chú", "Thửa đất số", "Số thửa",
+    "Tờ bản đồ số", "Số tờ", "Diện tích", "Thời hạn", "Nguồn gốc",
+    "Địa chỉ", "Loại đất", "Mục đích sử dụng", "Số serial", "Số vào sổ",
+    "Ngày cấp", "Cơ quan cấp", "Giấy chứng nhận",
+)
+
+
+def _text_variants(value: str) -> tuple[str, ...]:
+    return tuple(dict.fromkeys((
+        value,
+        unicodedata.normalize("NFD", value),
+        unicodedata.normalize("NFC", value),
+    )))
+
+
+def _form_label_alternation(words: tuple[str, ...]) -> str:
+    variants: list[str] = []
+    for word in words:
+        variants.extend(re.escape(value) for value in _text_variants(word))
+    return "(?:" + "|".join(dict.fromkeys(variants)) + ")"
+
+
+_FORM_NEXT_ALT = _form_label_alternation(_FORM_NEXT_LABELS)
+_FORM_END_RE = (
+    r"(?=[ \t]*(?:\n|\||$|"
+    r";[ \t]*(?:\n|\||$|" + _FORM_NEXT_ALT + r"[ \t]*:)|"
+    r",?[ \t]*" + _FORM_NEXT_ALT + r"[ \t]*:))"
+)
+_HINH_THUC_SU_DUNG_RES = tuple(
+    re.compile(
+        r"(?im)(?:^|[\n;|,])[ \t]*(?:[-*+•][ \t]*)?"
+        + re.escape(label)
+        + r"[ \t]*:[ \t]*(?P<value>[^\n|]*?)" + _FORM_END_RE
+    )
+    for label in _text_variants(_FORM_LABEL)
+)
+
+
+def hinh_thuc_su_dung_occurrences(text: str,
+                                  window: tuple[int, int] | None = None
+                                  ) -> list[tuple[str, list[int]]]:
+    """Các lần thấy label `Hình thức sử dụng:` trong một vùng nguồn.
+
+    Dùng chung một luật cho DOCX intake và asset renderer; không map blob
+    `phan_ghi_them`, không lấy Ghi chú/title/prose. Trả (nguyên văn, span).
+    """
+    source = str(text or "")
+    start, end = window or (0, len(source))
+    found: list[tuple[str, list[int]]] = []
+    seen: set[tuple[int, int]] = set()
+    for pattern in _HINH_THUC_SU_DUNG_RES:
+        for match in pattern.finditer(source, start, end):
+            raw = match.group("value").strip()
+            if not raw:
+                continue
+            leading = len(match.group("value")) - len(match.group("value").lstrip())
+            span = (match.start("value") + leading,
+                    match.start("value") + leading + len(raw))
+            if span in seen:
+                continue
+            seen.add(span)
+            found.append((raw, [span[0], span[1]]))
+    found.sort(key=lambda item: item[1][0])
+    return found
+
+
 def guess_loai_tai_san(tai_san, ten_hd):
     tai_san_fold = _fold_text(tai_san)
     title_fold = _fold_text(ten_hd)
@@ -1642,37 +1710,41 @@ _LAND_ROW_BOUNDARY_RE = re.compile(
 
 
 def _land_row_lines(lines):
-    """Một cách phân loại cụm đất cho cả dựng dòng và metadata cấp thửa.
+    """Classify one source line for land-row construction.
 
-    Cụm giữ qua xuống dòng; thửa/tờ hoặc nhóm mới ngắt cụm. Nhãn loại đất
-    (kể cả trống) mở cụm mới; diện tích/thời hạn không có cụm vẫn là ô phẳng.
+    Returns (raw_line, labels, boundary, active_after, active_before), where
+    each label is (key, value, belongs_to_typed_row). Both type labels open a
+    row even when blank; an area before the opener remains a source total.
     """
     active_cluster = False
     for raw_line in lines:
-        line = raw_line.strip()
+        line = re.split(r"(?i)\bGhi chú\s*:", raw_line.strip(), maxsplit=1)[0]
         boundary = bool(_GROUP_HEAD_RE.match(line) or _LAND_ROW_BOUNDARY_RE.search(line))
         if boundary:
             active_cluster = False
-        labeled: list[tuple[str, str]] = []
+        active_before = active_cluster
+        labeled: list[tuple[str, str, bool]] = []
         for cell in re.split(r"[;|]", line):
-            cell = cell.strip()
+            cell = cell.strip().lstrip("-* ").strip()
             for key, label_re in _ROW_CELL_LABELS:
                 match = label_re.match(cell)
                 if match:
-                    labeled.append((key, cell[match.end():].strip(" ;,.")))
                     if key == "loai_dat":
                         active_cluster = True
+                    labeled.append((key, cell[match.end():].strip(" ;,."), active_cluster))
                     break
-        yield raw_line, labeled, boundary, active_cluster
+        yield raw_line, labeled, boundary, active_cluster, active_before
 
 
-def _land_rows_of(segment: str) -> list[dict]:
+def _land_rows_of(segment: str, *, include_flat: bool = True) -> list[dict]:
     """Dòng đất trong một nhóm tài sản: mỗi dòng có nhãn
     `Loại đất`/`Mục đích sử dụng`, `Diện tích`, `Thời hạn` (ngăn bằng `;`
     hoặc `|`) là một dòng; giá trị GIỮ NGUYÊN VĂN để consumer còn định vị
     span. Dòng chỉ có nhãn trống vẫn trả về (consumer báo thiếu dữ liệu).
     """
     rows: list[dict] = []
+    typed_rows: set[int] = set()
+    observations: dict[int, dict[str, list[str]]] = {}
     current: dict | None = None
     current_has_loai = False
 
@@ -1680,32 +1752,44 @@ def _land_rows_of(segment: str) -> list[dict]:
         nonlocal current_has_loai
         row = {"loai_dat": "", "dien_tich": "", "thoi_han": ""}
         rows.append(row)
+        observations[id(row)] = {}
         current_has_loai = False
         return row
 
-    for _, labeled, boundary, _ in _land_row_lines(str(segment or "").split("\n")):
+    for _, labeled, boundary, _, _ in _land_row_lines(str(segment or "").split("\n")):
         if boundary:
             current = None
             current_has_loai = False
         if not labeled:
             continue
-        for key, value in labeled:
-            if key == "loai_dat":
-                # Moi nhan `Loại đất` mo mot cum rieng — ke ca cum truoc
-                # toan gia tri trong (spec: dong trong van la mot dong,
-                # consumer can thay de bao thieu du lieu).
-                if current is not None and current_has_loai:
+        for key, value, typed in labeled:
+            if key == "loai_dat" and typed:
+                # Moi nhan typed mo mot cum rieng — ke ca cum truoc toan
+                # gia tri trong. Cum phang chi co dien tich/thoi han (vd
+                # total) phai tach khoi cum typed.
+                if current is not None and (
+                        current_has_loai
+                        or any(str(value).strip() for value in current.values())):
                     current = start_row()
                 if current is None:
                     current = start_row()
                 current_has_loai = True
+                typed_rows.add(id(current))
             elif current is None:
                 current = start_row()
             if current[key] == "":
                 current[key] = value
             else:
                 current[key] = f"{current[key]}; {value}" if value else current[key]
-    return rows
+            if value:
+                observations[id(current)].setdefault(key, []).append(value)
+    if include_flat:
+        return rows
+    for row in rows:
+        for key, values in observations[id(row)].items():
+            if len(set(values)) > 1:
+                row[key] = ""
+    return [row for row in rows if id(row) in typed_rows]
 
 
 def _o_phang_cua_dong(rows: list[dict], key: str) -> str:
@@ -1723,7 +1807,7 @@ def _o_phang_cua_dong(rows: list[dict], key: str) -> str:
     return ""
 
 
-def tach_nhom_tai_san(tai_san: str) -> list[dict]:
+def tach_nhom_tai_san(tai_san: str, *, land_rows_as_details: bool = False) -> list[dict]:
     """Khối tài sản có nhãn nhóm (`Tài sản thứ N:` / `Tài sản N:`) -> mỗi
     nhóm một dict: serial nguyên văn, địa chỉ, thửa/tờ, và các dòng đất
     (`land_rows`). Trả [] khi khối không có nhãn nhóm (consumer dùng
@@ -1740,12 +1824,29 @@ def tach_nhom_tai_san(tai_san: str) -> list[dict]:
         context = _tach_ngu_canh_gcn(segment)
         parcels = tach_danh_sach_thua_dat(segment, land_rows_as_details=True)
         first = parcels[0] if parcels else {}
-        rows = _land_rows_of(segment)
+        rows = _land_rows_of(segment, include_flat=not land_rows_as_details)
+        totals = []
+        for _raw_line, labeled, _boundary, _after, _before in _land_row_lines(segment.split("\n")):
+            for key, value, typed in labeled:
+                if key == "dien_tich" and not typed and value:
+                    totals.append(value)
+        totals = _dedupe_preserve_order(totals)
         origins = []
+        forms = []
         for parcel in parcels:
             observed = parcel.get("nguon_goc_values") or [parcel.get("nguon_goc")]
             origins.extend(str(origin or "").strip() for origin in observed)
+            observed_forms = (parcel.get("hinh_thuc_su_dung_values")
+                              or [parcel.get("hinh_thuc_su_dung")])
+            forms.extend(str(form or "").strip() for form in observed_forms)
         origins = [origin for origin in _dedupe_preserve_order(origins) if origin]
+        for value, span in hinh_thuc_su_dung_occurrences(segment):
+            prefix = segment[:span[0]]
+            # Label nằm trong blob Ghi chú cùng dòng không phải form field.
+            if re.search(r"(?i)Ghi chú\s*:[^.\n]*$", prefix):
+                continue
+            forms.append(value)
+        forms = [form for form in _dedupe_preserve_order(forms) if form]
         groups.append({
             "tieu_de": head.group(0).strip(),
             "so_serial": context.get("so_gcn_raw", ""),
@@ -1766,9 +1867,13 @@ def tach_nhom_tai_san(tai_san: str) -> list[dict]:
             # khác nhau không phải "nhiều giá trị của cùng một ô" (R4-2,
             # 16/10/2026; trước đây lấy từ `rows` nên consumer báo mơ hồ giả).
             "dien_tich_values": list(first.get("dien_tich_values") or []),
+            "dien_tich_tong": totals[0] if len(totals) == 1 else "",
+            "dien_tich_tong_values": totals,
             "thoi_han_values": list(first.get("thoi_han_su_dung_values") or []),
             "nguon_goc": origins[0] if origins else "",
             "nguon_goc_values": origins,
+            "hinh_thuc_su_dung": forms[0] if len(forms) == 1 else "",
+            "hinh_thuc_su_dung_values": forms,
             "so_vao_so": context.get("so_vao_so", ""),
             "dia_chi": context.get("dia_chi", "") or str(first.get("dia_chi") or ""),
             "ngay_cap": context.get("ngay_cap_gcn", ""),
@@ -1795,6 +1900,8 @@ def _new_thua_dat(context: dict) -> dict:
         "thoi_han_su_dung": "",
         "phan_ghi_them": "",
         "nguon_goc": "",
+        "hinh_thuc_su_dung": "",
+        "dien_tich_tong": "",
         "dia_chi": context.get("dia_chi", ""),
         "loai_gcn": context.get("loai_gcn", ""),
         "loai_gcn_raw": context.get("loai_gcn_raw", ""),
@@ -1816,12 +1923,13 @@ def _new_thua_dat(context: dict) -> dict:
         "dien_tich_values": [],
         "thoi_han_su_dung_values": [],
         "nguon_goc_values": [],
+        "dien_tich_tong_values": [],
         "chi_tiet_dien_tich": [],
     }
 
 
 # Trường cấp thửa giữ kèm danh sách "mọi lần thấy" (`<key>_values`).
-_THUA_MULTI_KEYS = frozenset({"so_thua_dat", "so_to_ban_do", "dien_tich", "thoi_han_su_dung", "nguon_goc"})
+_THUA_MULTI_KEYS = frozenset({"so_thua_dat", "so_to_ban_do", "dien_tich", "thoi_han_su_dung", "nguon_goc", "hinh_thuc_su_dung", "dien_tich_tong"})
 
 
 def _ghi_lan_thay(current: dict, key: str, value) -> None:
@@ -2273,7 +2381,8 @@ def tach_danh_sach_thua_dat(tai_san: str, *, land_rows_as_details: bool = False)
         ("thoi_han_su_dung", r"Th\u1eddi h\u1ea1n(?=\s*:)"),
         ("nguon_goc", r"Ngu\u1ed3n g\u1ed1c(?:\s+s\u1eed d\u1ee5ng(?:\s+\u0111\u1ea5t)?)?"),
         ("dia_chi", r"\u0110\u1ecba ch\u1ec9(?:\s+th\u1eeda \u0111\u1ea5t)?"),
-        ("phan_ghi_them", r"Ghi ch\u00fa|H\u00ecnh th\u1ee9c s\u1eed d\u1ee5ng"),
+        ("hinh_thuc_su_dung", r"H\u00ecnh th\u1ee9c s\u1eed d\u1ee5ng"),
+        ("phan_ghi_them", r"Ghi ch\u00fa"),
         ("muc_dich_su_dung", r"Lo\u1ea1i \u0111\u1ea5t"),
     )
 
@@ -2301,9 +2410,12 @@ def tach_danh_sach_thua_dat(tai_san: str, *, land_rows_as_details: bool = False)
 
     classified_lines = (
         _land_row_lines(merged_lines) if land_rows_as_details
-        else ((line, (), False, False) for line in merged_lines)
+        else ((line, (), False, False, False) for line in merged_lines)
     )
-    for raw_line, _, _, la_dong_dat in classified_lines:
+    current_cluster: dict | None = None
+    for raw_line, labeled, boundary, _active_after, _active_before in classified_lines:
+        if boundary:
+            current_cluster = None
         line = raw_line.strip()
         if not line:
             continue
@@ -2572,8 +2684,11 @@ def tach_danh_sach_thua_dat(tai_san: str, *, land_rows_as_details: bool = False)
             or "so to" in line_fold
         )
         hits: list[tuple[int, int, str]] = []
+        note_label = re.search(r"(?i)\bGhi chú\s*:", line)
         for field, label in bullet_labels:
             for label_match in re.finditer(f"(?i)({label})\\s*:?", line):
+                if note_label and label_match.start() > note_label.start():
+                    continue
                 # Nhan nam trong ngoac ("(nay la to ban do so 100)") la
                 # ghi chu nguon goc/danh so lai, khong phai nhan du lieu.
                 if line.count("(", 0, label_match.start()) > line.count(")", 0, label_match.start()):
@@ -2585,6 +2700,7 @@ def tach_danh_sach_thua_dat(tai_san: str, *, land_rows_as_details: bool = False)
             not re.match(r"\s*[-*]", line)
             and not has_thua_to
             and current is None
+            and not labeled
         ):
             continue
         hits.sort()
@@ -2595,13 +2711,22 @@ def tach_danh_sach_thua_dat(tai_san: str, *, land_rows_as_details: bool = False)
         # một giá trị.
         values_extra: dict[str, list[str]] = {}
         # Cụm đất gồm cả các dòng nối tiếp, theo cùng phân loại với
-        # `_land_rows_of`; không đưa giá trị dòng vào metadata cấp thửa.
-        cluster_row: dict[str, str] = {}
+        # `_land_rows_of`; mỗi lần xuất hiện nhãn loại đất mở MỘT dòng mới,
+        # các dòng nối tiếp cập nhật cùng object. Không append theo từng dòng.
         thua_hit_pos = -1
+        row_labels = iter(labeled)
+        line_details = []
         for pos, (start, end, field) in enumerate(hits):
             next_start = hits[pos + 1][0] if pos + 1 < len(hits) else len(line)
+            typed = False
+            if land_rows_as_details and field in ("muc_dich_su_dung", "dien_tich", "thoi_han_su_dung"):
+                label = next(row_labels, None)
+                typed = bool(label and label[2])
+                if field == "muc_dich_su_dung" and typed:
+                    current_cluster = {"muc_dich_su_dung": ""}
+                    line_details.append(current_cluster)
             value = _clean_asset_cell(line[end:next_start])
-            if not value:
+            if not value and not typed:
                 continue
             if field == "so_thua_dat" and thua_hit_pos < 0:
                 thua_hit_pos = start
@@ -2637,7 +2762,7 @@ def tach_danh_sach_thua_dat(tai_san: str, *, land_rows_as_details: bool = False)
                     value = _num.group(0) if _num else ""
                 # Dien tich khong co so nao la text van xuoi
                 # ("dien tich thua dat neu tren") — bo, khong gan vao thua.
-                if not re.search(r"\d", value):
+                if value and not re.search(r"\d", value):
                     continue
             if field == "dia_chi":
                 value = re.sub(r"(?i)^t\u1ea1i:\s*", "", value).strip()
@@ -2654,7 +2779,7 @@ def tach_danh_sach_thua_dat(tai_san: str, *, land_rows_as_details: bool = False)
             # Hai loại đất / hai thời hạn trên CÙNG dòng (gcn-multi-parcel):
             # giữ từng dòng chi tiết (spec §2.5, §4.4), KHÔNG gộp vào trường
             # cấp thửa và không suy tổng từ chi tiết (MB5).
-            if field in ("muc_dich_su_dung", "thoi_han_su_dung"):
+            if not land_rows_as_details and field in ("muc_dich_su_dung", "thoi_han_su_dung"):
                 _target = current if current is not None else pending
                 if _target is not None:
                     if field == "muc_dich_su_dung":
@@ -2678,10 +2803,24 @@ def tach_danh_sach_thua_dat(tai_san: str, *, land_rows_as_details: bool = False)
                                     _target["chi_tiet_dien_tich"].append(
                                         {"muc_dich_su_dung": _ten, "thoi_han_su_dung": _ky})
                             continue
-            if la_dong_dat and field in ("muc_dich_su_dung", "dien_tich", "thoi_han_su_dung"):
-                # Cụm đất: giá trị thuộc DÒNG (consumer nhận qua `land_rows`),
-                # không ghi vào ô cấp thửa và không vào bộ mơ hồ phẳng.
-                cluster_row[field] = value
+            if typed and field in ("muc_dich_su_dung", "dien_tich", "thoi_han_su_dung"):
+                if current_cluster is not None:
+                    values_key = f"{field}_values"
+                    seen = current_cluster.setdefault(values_key, [])
+                    if value and value not in seen:
+                        seen.append(value)
+                    current_cluster.setdefault(field, value)
+                    if not current_cluster[field]:
+                        current_cluster[field] = value
+                continue
+            if land_rows_as_details and field == "dien_tich":
+                # Diện tích không thuộc dòng đất là TOTAL nguồn (không trộn
+                # với diện tích chi tiết); giữ scalar cũ và mọi observation.
+                if "dien_tich_tong" in values:
+                    values_extra.setdefault("dien_tich_tong", []).append(value)
+                else:
+                    values["dien_tich_tong"] = value
+                    values["dien_tich"] = value
                 continue
             if field in values:
                 # Cùng ô ghi lần thứ hai trên một dòng: giữ scalar là lần thấy
@@ -2689,10 +2828,11 @@ def tach_danh_sach_thua_dat(tai_san: str, *, land_rows_as_details: bool = False)
                 values_extra.setdefault(field, []).append(value)
                 continue
             values[field] = value
-        if cluster_row:
-            _target = current if current is not None else pending
-            if _target is not None and cluster_row not in _target["chi_tiet_dien_tich"]:
-                _target["chi_tiet_dien_tich"].append(dict(cluster_row))
+        if line_details and "so_thua_dat" not in values:
+            if current is None:
+                current = _new_thua_dat(context)
+                parcels.append(current)
+            current["chi_tiet_dien_tich"].extend(line_details)
         if not values:
             # Tieu de muc ("III. Người thừa kế", "IV. Nội dung phân
             # chia") — ngat trang thai de dong nhan muc sau khong dinh
@@ -2820,6 +2960,8 @@ def tach_danh_sach_thua_dat(tai_san: str, *, land_rows_as_details: bool = False)
                     for extra in values_extra.get(field, ()):
                         _ghi_lan_thay(current, field, extra)
             parcels.append(current)
+        if line_details and "so_thua_dat" in values and current is not None:
+            current["chi_tiet_dien_tich"].extend(line_details)
         continue
 
     if current is not None and pending:
@@ -2839,6 +2981,7 @@ def tach_danh_sach_thua_dat(tai_san: str, *, land_rows_as_details: bool = False)
         or (str(th.get("dia_chi") or "").strip()
             and str(th.get("dia_chi") or "").strip() != context.get("dia_chi", ""))
         or any(re.search(r"\d", str(c.get("dien_tich") or "")) for c in th.get("chi_tiet_dien_tich", []))
+        or (land_rows_as_details and bool(th.get("chi_tiet_dien_tich")))
     ]
 
     # Cung thua duoc nhac lai nhieu lan trong bai viet (khoi "di san de lai"
@@ -4749,6 +4892,9 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
             "noi_cap": tlkt_by,
             "loai_giay_to": "Trích lục khai tử" if tlkt_no else "",
             "dia_chi": last_addr,
+            # Technical per-person source window for consumer provenance;
+            # not a canonical business field.
+            "raw_text": tail,
         }
         if key in seen:
             # Lan nhac sau cung nguoi — dien truong trong (dia chi, TLKT)
@@ -5003,6 +5149,7 @@ def build_payload(file_goc: str, text: str, scan_result: dict, *, extract_mode: 
             key = _fold_text(person.get("ho_ten") or "")
             cung_nguoi_chet = any(
                 _fold_text(c.get("ho_ten") or "") == key
+                and bool(str(c.get("ngay_sinh") or "").strip())
                 and not _ngay_sinh_conflict(
                     str(person.get("ngay_sinh") or "").strip(),
                     str(c.get("ngay_sinh") or "").strip(),

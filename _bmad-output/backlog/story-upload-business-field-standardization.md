@@ -205,9 +205,9 @@ Owner báo Upload đang bóc văn bản thành trường để điền website n
   - **D06+D07 → #43:** 16ca/membership/roles/thứ tự/scope đủ đáp án Q1/Q2/
     BANKMODE, bàn giao #41; model/cardinality/schema quan hệ vẫn chưa chọn.
   - **D08 đã trả lời theo R06**, không residual prose block, không hỏi lại.
-  - **A09 chờ làm rõ phạm vi**, không approval block. [SOT §7.5.1](../specs/upload_lab/nam-dinh-website-sot.md)
-    lưu bảng trường thực và ví dụ tổng hợp GCN/thửa/cụm đất; phân biệt toàn
-    đoạn ghép dữ kiện chuẩn với lời dư thật chưa map; wire/model gaps rõ.
+  - **A09 đã chốt A**, không residual field; [SOT §7.5.1](../specs/upload_lab/nam-dinh-website-sot.md)
+    lưu bảng trường thực/ví dụ; raw/history retained, output chỉ canonical/
+    placeholder, không auto-fill notes.
   - **A10 đã duyệt** nhận diện + nguồn, pending structured xe/sổ tiết kiệm/
     bảo hiểm; #29 deferred, không áp để loại đất có tài sản W05.
 - **Đã chốt 20/10/2026 — chỉ placeholder và trường tĩnh:** owner chốt
@@ -216,8 +216,8 @@ Owner báo Upload đang bóc văn bản thành trường để điền website n
   framework điều kiện/cấu hình; không có scope trường động mới và không tạo
   technical approval gate mới. Đề xuất hai tầng trước đây chỉ là **lịch sử
   chưa triển khai**, không phải định hướng hiện hành. Quyền có điều kiện trước
-  đó cho cụm **text tĩnh** theo ô website **vẫn giữ** (dữ kiện tĩnh có nguồn,
-  không phải tầng động); A09 vẫn chưa duyệt field. Dữ kiện nguồn tĩnh tách khỏi
+  đó cho cụm **text tĩnh** đã duyệt khác **vẫn giữ** (dữ kiện tĩnh có nguồn,
+  không phải tầng động); **A09 đã chốt A** không residual field. Dữ kiện nguồn tĩnh tách khỏi
   định dạng output/placeholder; block token do code Word định nghĩa, alias cũ,
   formatter và mẫu đang hỗ trợ giữ nguyên, không bị xóa/sửa bởi quyết định này.
 - **Lịch sử docs/ticket trước FINAL:** independent review CLEAN/Ticket draft
@@ -411,3 +411,56 @@ namdinh controlled Chromium artifact `_bmad-output/tmp/w05-asset-kind-browser-af
 selected optionId **1** for mixed/positive both orders and **2** for
 heading/bare/negated; Save0/Submit0/Enter0, local `w05.invalid/create` only.
 #41 vẫn mở/gate mẫu ĐÓNG; không đọc mẫu/corpus.
+
+### Slice A09-A — không trường residual; render canonical asset
+
+Owner trả lời **1a/A**: không tạo field residual business/catch-all. Asset editor
+render các trường canonical/placeholder đã duyệt; `phan_ghi_them`/`o_tho`/raw
+stay as source/provenance and are not auto-filled. Current upload chain confirmed
+`web_form.tai_san` raw block was copied to editor; `web_form.tai_san` remains the
+raw/source block for DOCX intake/bench compatibility, while
+`build_upload_form_data` now renders canonical parcel/group projections: approved
+asset fields, source total `dien_tich` only when unambiguous (no sum/first-wins),
+ordered land rows including blank positions, explicit `Hình thức sử dụng` from
+parser technical field, no flat term when observations conflict, no notes/residual.
+Unsupported/no structured asset → empty editor text (raw flags/`tai_san_chua_ho_tro`
+retained), no raw fallback. A09 conditional static-field permission is retired;
+bank/W05/static policies unaffected. Raw/history/aliases/Word tokens preserved.
+
+Real-DOCX tests: canonical fields + Ghi chú/residual → editor has serial/thửa/total/
+form/land type, no note; unsupported savings → empty editor + recognition flag;
+ambiguous total/flat term omitted; equal total/detail retained; group-only asset
+with blank/mixed row retained; notes blob cannot become form;
+`upload_lab/tests/test_upload_lab_extract_contract.py`: **207 passed,19 subtests**;
+`test_playwright_uploader.py`: **26 passed**.
+Actual controlled Chromium source→save_output_json→fresh isolated SQLite→builder→
+`_fill_editor` run on current parser `27d117ba…`, renderer `d9a8d8c6…`, uploader
+`f1aa3ea4…`: 8/8 cases PASS (canonical/note excluded, conflicting, detail, grouped,
+equal total/detail, multiline, same-line, mixed blank row), Save/Submit/Enter 0;
+artifact `_bmad-output/tmp/final-a09-verify/final-a09-verification.json` sha
+`5cb2a0ee39a2c0c38d0e558c72eab1b7c5de07c60968c550247993f26a637ef8`, prewritten expectations sha `adae671f79ab1a74038dd532414b61d7832b5ec0a1546cb8f712a0b78e8773dd`. One limitation recorded: one
+mixed-group browser `innerText` repeated a blank line; semantic normalized match
+true, exact raw string false. Not byte-exact layout proof.
+
+### Slice deceased Person intake
+
+DOCX adapter now emits deceased Person suggestions from `raw.nguoi_chet`:
+`ho_ten/gioi_tinh/ngay_sinh/ngay_chet/dia_chi` plus document fields
+`loai_giay_to/ngay_cap/noi_cap` only when source doctype explicitly says Trích lục
+khai tử. Số TLKT is **not** copied into `so_giay_to`/Customer unique because
+writer find-or-create by number can merge unrelated deceased; raw retains it.
+No requester/owner/Diagram assignment; same-name living deceased filter now
+requires positive deceased birth evidence, so living namesake with unknown
+deceased birth is retained; no name-only merge, no #42.
+
+Real-DOCX tests: TLKT full fields + source refs; living namesake/death unknown
+birth; missing doctype leaves document fields absent while date/gender/name/address
+still map; Stage/fresh DB session/Customer/Word. `test_docx_word_first.py`:
+**82 passed**. The Word regression now builds an actual synthetic DOCX from
+**explicit fixed tokens written before mapping/output** (`[Người 3 - ...]`,
+source-confirmed Stage slot 3), replaces them with real `replace_in_doc`, and
+asserts every expected source field/name/date/type/place and no leftover tokens;
+it does not select tokens from mapping values. Focused deceased+full notary pass;
+smoke `_bmad-output/tmp/deceased-person-smoke.json` sha
+`eea7e5eb6aedfe5d2fbd84a85fa9ffe8f0fba77bfded0a5817781341f23e13c9` PASS
+(mapped death/type/issuer, no TLKT identity, raw retained, not requester).

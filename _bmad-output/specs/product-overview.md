@@ -76,13 +76,15 @@ không gán/conflict. W05
 đã chốt: giữ ID1 đất có tài sản/nhà; hồ sơ có thửa nhà + thửa trống chọn ID1
 khi có bằng chứng gắn liền đất, chỉ phạm vi đất-nhà/đất-trống, không ưu tiên
 phổ quát trên loại khác. D05 chọn nhóm A/B chung, chữ “nhận” gần như 100% không luật
-tuyệt đối. A09 còn rõ phạm vi; [SOT §7.5.1](upload_lab/nam-dinh-website-sot.md)
+tuyệt đối. A09 đã chốt A: không residual field/block, chỉ render canonical/
+placeholder; raw/history retained không auto-fill. [SOT §7.5.1](upload_lab/nam-dinh-website-sot.md)
 lưu trường thật/ví dụ tổng hợp GCN/thửa/cụm đất. A10 nhận diện/pending structured,
 #29 deferred; không loại đất có nhà. **Owner 20/10/2026 chốt chỉ dùng
 placeholder và trường tĩnh**; không mở trường tầng 2 động/tính toán, text
 canonical persisted từ suy ra, engine công thức hoặc framework điều kiện.
-Quyền có điều kiện cho một cụm **text tĩnh** theo ô website vẫn giữ (A09 chưa
-duyệt field); dữ kiện nguồn tĩnh khác lớp định dạng output/placeholder.
+Quyền có điều kiện cho cụm **text tĩnh** đã duyệt khác vẫn giữ; **A09 đã chốt A**
+không residual field, chỉ render canonical/placeholder. Dữ kiện nguồn tĩnh khác
+lớp định dạng output/placeholder.
 Bounded local proof đã có, fresh bank-auto review CLEAN/Ticket PASS; #43 phân
 tích done/bàn giao. Không toàn normalized cutover #41, #41 mở/gate mẫu ĐÓNG.
 **BUILT — slice metadata Case, 19/10/2026; verification đạt, Quick code độc lập

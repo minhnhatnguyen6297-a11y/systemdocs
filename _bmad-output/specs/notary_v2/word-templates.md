@@ -452,6 +452,12 @@ dùng một dòng tầng 2.
 Chưa triển khai. Chỉ thêm khi cần đối chiếu nhiều đoạn trong cùng văn bản và
 được chốt bằng một case nghiệp vụ cụ thể.
 
+**Owner clarification 20/10/2026:** mẫu Word hiện có là nguồn hợp lệ cho **bố cục
+đặt placeholder** và **logic văn bản nghiệp vụ**; code đích dùng canonical/static
+data → token mapping → thay tại chỗ giữ định dạng. Không sao chép/tái tạo công
+thức Excel/VBA/macro, không giải mã thêm XLSB/VBA, không đổi câu/chữ/logic Word
+theo suy luận. A09 renderer Upload là biên độc lập, không thay thế template Word.
+
 ## 5. Bộ tạo file và chuyển mẫu
 
 Python giữ catalog, mapping, tên file và dựng câu; giao diện chỉ chọn/hiển thị. Phải xử lý placeholder trong đoạn, bảng, đầu/chân trang và khi Word chia chữ thành nhiều run. Không suy nghiệp vụ từ tên token. Mô tả nhiều tài sản đánh số 1, 2…; cụm đất trong tài sản N đánh số N.1, N.2…

@@ -128,17 +128,18 @@ Website chính thức SOT, người dùng tự Lưu, rule developer-only giữ n
 - **W05 đồng ý có điều kiện**, giữ **ID1 Đất đai có tài sản**, thường nhà trên
   đất: thiếu mẫu/rule không là loại không tồn tại. Chưa rule chọn một ô cho tổ
   hợp nhiều loại, chưa field/rule chi tiết nhà; không tự dựng schema/regex.
-- **A09 chờ làm rõ**, chưa duyệt block: [SOT §7.5.1](nam-dinh-website-sot.md)
-  lưu trường thật và ví dụ đất/GCN tổng hợp, tách toàn đoạn ghép dữ kiện chuẩn
-  khỏi lời dư thật chưa map. **A10 đã duyệt** xe/sổ tiết kiệm/bảo hiểm nhận diện
-  + nguồn, pending structured; #29 deferred, không áp để loại đất có nhà W05.
+- **A09 đã chốt A:** không duyệt residual block/field. Asset editor chỉ render
+  canonical/placeholder; raw/history/`phan_ghi_them`/`o_tho` retained nhưng không
+  auto-fill/notes. Output thiếu mapping là partial, không lấp raw. [SOT §7.5.1](nam-dinh-website-sot.md);
+  **A10 đã duyệt** xe/sổ tiết kiệm/bảo hiểm nhận diện + nguồn, pending structured;
+  #29 deferred, không áp để loại đất có nhà W05.
 - D06+D07 ở [#43](../../backlog/spike-case-people-assets-relationships.md):
   16 ca và Q1/Q2/BANKMODE đã đủ đáp án, bàn giao #41; chưa model/FK/cardinality.
   **Owner 20/10/2026 chốt chỉ dùng placeholder và trường tĩnh**; không mở
   trường tầng 2 động/tính toán, engine công thức/điều kiện, persisted canonical
   paragraph. Ý tưởng hai tầng chỉ là lịch sử chưa triển khai. Quyền có điều kiện
-  cho cụm **text tĩnh** theo ô website vẫn giữ, nhưng chưa chọn field và A09
-  chưa duyệt; dữ kiện nguồn tĩnh tách khỏi output/placeholder.
+  cho cụm **text tĩnh** theo ô website vẫn giữ cho trường đã duyệt, nhưng **A09-A
+  đã chốt không field residual**; dữ kiện nguồn tĩnh tách khỏi output/placeholder.
 
 Chi tiết quyết định và phần cần rõ ở [SOT §7](nam-dinh-website-sot.md#owner-review).
 #41 vẫn mở, gate mẫu **ĐÓNG**; kế hoạch có giới hạn trước sửa code ở #43 plan

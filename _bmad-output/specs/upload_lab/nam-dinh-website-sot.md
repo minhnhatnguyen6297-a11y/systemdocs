@@ -311,7 +311,7 @@ Fresh bank-auto review CLEAN/Ticket PASS; final semantic smoke parser8b503e7f/up
 | `ten_goi_khac`, `entity_lines`, vai trò requester/Bên A/Bên B | R05 không tự điền/không mở rộng chuẩn alias; entity/quan hệ chưa canonical cutover | Giữ raw/lịch sử; alias nếu cần user điền tay, không nối vào `ten`; pháp nhân khác nhập tay, ngân hàng thế chấp app tự lấy cụm nguồn theo §6.1; nhóm/quan hệ xem D05–D07 |
 | `raw_text`, line/span/source_refs | provenance | giữ nguồn, không dùng chuỗi raw để claim canonical cutover |
 
-Proof: `contract_extract.py:3688-3754:_extract_plain_text_person_entries`, `4608-4620:_extract_nguoi_chet`; `contracts/entities.md:150-185`; `contracts/notary-case-drafting.md:246-283:person_row`; `notary_v2/models.py:36-48:Customer`; `case_workspace.py:306-310:_PERSON_KEY_ALIASES`, `2495-2569:_upsert_people`, `2768-2779:_build_payload`. Notary DOCX mapper **thực** là `services/document_intake/adapters/docx.py:49-57:PERSON_FIELD_SOURCES`, loop **chỉ hai bên** `316-350`; không claim đã map đủ `raw.nguoi_chet`, alias/giới tính. `329-343` giữ multi-ID refs + `intake.ambiguous`. Cùng dùng lõi không phải luồng Upload→Notary DB.
+Proof: `contract_extract.py:3688-3754:_extract_plain_text_person_entries`, `4608-4620:_extract_nguoi_chet`; `contracts/entities.md:150-185`; `contracts/notary-case-drafting.md:246-283:person_row`; `notary_v2/models.py:36-48:Customer`; `case_workspace.py:306-310:_PERSON_KEY_ALIASES`, `2495-2569:_upsert_people`, `2768-2779:_build_payload`. Notary DOCX mapper **thực** là `services/document_intake/adapters/docx.py:49-57:PERSON_FIELD_SOURCES`, loop người hai bên và loop riêng `raw.nguoi_chet` (approved Person fields; số TLKT raw-only). Alias/R05 không auto; `329-343` giữ multi-ID refs + `intake.ambiguous`. Cùng dùng lõi không phải luồng Upload→Notary DB.
 
 ### 6.2 Tài sản và cụm đất
 
@@ -403,7 +403,7 @@ Các cách xử lý dùng trong bảng:
 | **W06** · Số công chứng (#6) | `find_so_cong_chung`/scan → normalize | **C `socongchung`**; `registry.contract_no` chỉ scan/reference | Tái dùng chuẩn | Giữ `xxx/yyyy` và scope sổ/năm/site; không dùng làm shared Case ID | **ĐÃ CHỐT** |
 | **W09** · Thông tin người yêu cầu… (#9) | Baseline first-person/raw/lookup; target §6.1 | **J `web_form.nguoi_yeu_cau`**, projection hợp lệ, chưa canonical cutover | Mọi cá nhân sống tham gia/đại diện chuẩn + chỉ thế chấp toàn cụm ngân hàng app tự lấy | Thứ tự nguồn, không lặp đại diện trong cụm; không người chết/CCV/nhân viên, không prose cá nhân khác; giữ history | **Q1/BANKMODE đã chốt**; slice projection đã commit/proof cô lập; normalized #41 vẫn mở/gate mẫu ĐÓNG, không claim canonical requester |
 | **W10** · Đương sự (#10) | `raw.ben_a/b` → formatter theo loại | **J**, chưa parties cutover | Nhóm A/B theo nghĩa đã chốt | Ủy quyền A=ủy quyền/B=được ủy quyền; một bên không gán; nguồn trái nhau xác nhận phần nhóm, không winner tự động | **D05/#43 Q2 đã trả lời**; model/cutover chưa implement |
-| **W11** · Tài sản (#11) | Text `_find_tai_san_by_kind` + `raw.danh_sach_thua_dat[]`; §6.2 | **J `web_form.tai_san`** và các hàng raw; chưa Upload Asset chuẩn | Dựng từ trường Asset/land rows đã biết | Phân biệt đoạn ghép toàn tài sản với lời dư thật chưa map; ví dụ §7.5.1; chưa duyệt block A09 | **A09 chờ làm rõ phạm vi; A10 đã duyệt nhận diện/pending** |
+| **W11** · Tài sản (#11) | Text `_find_tai_san_by_kind` + `raw.danh_sach_thua_dat[]`; §6.2 | **J `web_form.tai_san`** raw source retained; editor render canonical fields; chưa Upload Asset chuẩn | Dựng từ trường Asset/land rows đã biết; A09-A no residual | Phân biệt đoạn ghép toàn tài sản với lời dư thật chưa map; ví dụ §7.5.1; raw retained, no auto-fill | **A09-A đã chốt; A10 đã duyệt nhận diện/pending** |
 | **W12** · Văn bản hợp đồng (#12) | `raw.file_goc` → builder → input file; §8 | **F** JSON + `registry.file_path`; không cột nghiệp vụ | Tái dùng file/provenance kỹ thuật | Giữ nguồn; file selection trước Lưu không chứng minh portal upload/persistence | **ĐÃ PHÂN LOẠI**, không quyết định nghiệp vụ mới |
 | **W13** · Ghi chú (#13) | Không builder/selector/fill | Không storage nghiệp vụ mới | Bỏ qua | Không điền/clear default; không dùng làm kho chứa gap | **ĐÃ CHỐT**, không hỏi lại |
 | **W14** · Phí công chứng (#14) | Ngoài đường fill | Không extraction/cột phí mới | Bỏ qua | Không ghi 0/clear default hoặc thêm bước nhập tay | **ĐÃ CHỐT**, không hỏi lại |
@@ -424,7 +424,7 @@ Các locator dưới đây là **source tĩnh đã đọc**, không kết quả 
 | **S-A** | E `1779–1810:_new_thua_dat`; `2171–2191:thua_dat_sang_land_rows`; `2257–2268:bullet_labels` hình thức sử dụng/Ghi chú chung đổ vào `phan_ghi_them`, `nguon_goc` giữ `*_values`; `2511–2541` detail/bộ ba/`o_tho`; `5086–5098` output parcel |
 | **S-T** | E `1007–1116:_find_tai_san_by_kind` khác vùng tài sản theo loại; `4768–4780:_phat_hien_tai_san_chua_ho_tro`; không chứng minh bóc đủ xe/sổ tiết kiệm/bảo hiểm |
 | **S-C** | `contracts/entities.md:150–185,205–231,240–267`; `contracts/notary-case-drafting.md:246–285,314–362`: Người/Asset/land_rows/Case hiện có; không schema quan hệ Upload mới |
-| **S-N** | N `PERSON_FIELD_SOURCES` (gồm `gioi_tinh` emit riêng bằng title locator, không qua `map_fields`), `ASSET_FIELD_SOURCES`/`GROUP_FIELD_SOURCES` (gồm `nguon_goc`), `_PARCEL_MULTI_VALUE_SOURCES`/`_GROUP_MULTI_VALUE_SOURCES` cho `nguon_goc_values`; `hinh_thuc_su_dung` đọc trực tiếp label trong cửa sổ tài sản (không qua `phan_ghi_them`/blob); `map_fields` + person loop mapper người hai bên, `emit_asset` parcel/group → land rows. Danh xưng trung tính/thiếu giữ null, không suy từ tên; `raw.nguoi_chet` không do adapter này phát. Alias/người chết không suy là mapper đã đi đủ; `hinh_thuc_su_dung` vẫn chưa map toàn blob |
+| **S-N** | N `PERSON_FIELD_SOURCES` (gồm `gioi_tinh` emit riêng bằng title locator, không qua `map_fields`), `ASSET_FIELD_SOURCES`/`GROUP_FIELD_SOURCES` (gồm `nguon_goc`), `_PARCEL_MULTI_VALUE_SOURCES`/`_GROUP_MULTI_VALUE_SOURCES` cho `nguon_goc_values`; `hinh_thuc_su_dung` đọc trực tiếp label trong cửa sổ tài sản; `map_fields` + person loop mapper người hai bên, `emit_asset` parcel/group → land rows. Người chết: loop riêng từ `raw.nguoi_chet` map `ho_ten/gioi_tinh/ngay_sinh/ngay_chet/loai_giay_to/ngay_cap/noi_cap/dia_chi`; số TLKT không vào `so_giay_to`/Customer unique, raw giữ. Alias/R05 không map; danh xưng trung tính/thiếu giữ null, không suy từ tên. |
 | **S-J** | `upload_lab/batch_scan.py:32–36,180–203,366–370,726–738`: chỉ Case JSON nhỏ ở registry; payload lớn ở file JSON. Mọi dòng **J** bên dưới mang đúng giới hạn này, không ghi Notary DB |
 
 | Loại nguồn đã có nhánh code | Khác biệt thực cần giữ khi review, không là claim accuracy trên corpus |
@@ -441,8 +441,8 @@ Các locator dưới đây là **source tĩnh đã đọc**, không kết quả 
 | ID / nội dung | Extraction hiện tại / nguồn | Chuẩn có sẵn + Upload thực lưu | Phương án phù hợp | Khuyến nghị + lý do/đánh đổi | Owner cần chọn? |
 |---|---|---|---|---|---|
 | **W09-R01** · Họ tên, danh xưng | `nguoi[].ho_ten/gioi_tinh`, raw formatter; S-P/S-R | `ten`; `gioitinh` wire Nam/Nữ/null khác Ông/Bà; DOCX intake map `gioi_tinh` chỉ từ danh xưng rõ (Ông→Nam, Bà→Nữ) với source ref đúng token danh xưng, kể cả dòng bảng không `raw_text`; danh xưng trung tính/thiếu → null, không suy từ tên/Thị/năm sinh/ID; **J** | Tái dùng chuẩn rồi dựng hiển thị | Không gộp Ông/Bà/quan hệ vào tên; chỉ dùng giới tính/danh xưng có căn cứ, không đoán từ tên. Không cần field web trùng Person | **ĐÃ MAP/CUTOVER kỹ thuật cho DOCX intake**; không claim toàn bộ người/Excel/OCR |
-| **W09-R02** · Ngày/năm sinh; ngày chết trong dữ liệu nguồn | `ngay_sinh/chi_co_nam_sinh`; người chết nguồn riêng | `ngaysinh/ngaychet` giữ YYYY/full date; **J** | Giữ trường Person/raw/snapshot đúng nghĩa | Người chết không vào requester theo đáp án #43, nhưng không xóa giấy khai tử/ngày chết khỏi dữ liệu Hồ sơ thừa kế | **Scalar giữ nguyên; requester membership đã trả lời** |
-| **W09-R03** · Giấy tờ, loại, ngày cấp, cơ quan cấp | `cccd/ngay_cap_cccd/noi_cap`; chết: `so_giay_to/ngay_cap/loai_giay_to`; S-P | `sogiayto/ngaycap/noicap/loaigiayto`; snapshot/master theo §6.1; **J** | Tái dùng chuẩn + hiển thị theo loại giấy tờ | Không ép mọi giấy thành CCCD; issuer snapshot có nghĩa riêng, không tự đồng nhất cơ quan công chứng. Nhiều giấy giữ ambiguous/#42, không nhét list vào ô đơn | **ĐÃ CHỐT scalar**; #42 độc lập, không hỏi lại |
+| **W09-R02** · Ngày/năm sinh; ngày chết trong dữ liệu nguồn | `ngay_sinh/chi_co_nam_sinh`; người chết nguồn riêng | `ngaysinh/ngaychet` giữ YYYY/full date; **J** | Giữ trường Person/raw/snapshot đúng nghĩa | Người chết không vào requester theo đáp án #43, nhưng không xóa giấy khai tử/ngày chết khỏi dữ liệu Hồ sơ thừa kế. DOCX intake map ngày sinh/ngày chết theo source evidence, kể cả năm; không suy ngày/không merge theo tên. | **ĐÃ MAP một phần DOCX intake**; requester membership đã trả lời |
+| **W09-R03** · Giấy tờ, loại, ngày cấp, cơ quan cấp | `cccd/ngay_cap_cccd/noi_cap`; chết: `so_giay_to/ngay_cap/loai_giay_to`; S-P | `sogiayto/ngaycap/noicap/loaigiayto`; snapshot/master theo §6.1; **J** | Tái dùng chuẩn + hiển thị theo loại giấy tờ | Không ép mọi giấy thành CCCD; issuer snapshot có nghĩa riêng, không tự đồng nhất cơ quan công chứng. DOCX intake map `loai_giay_to/ngay_cap/noi_cap` cho người chết chỉ khi doctype nguồn rõ (TLKT); số TLKT **không** vào `so_giay_to`/Customer unique, raw giữ. | **ĐÃ MAP một phần DOCX intake**; #42 độc lập, không hỏi lại |
 | **W09-R04** · Địa chỉ và nhãn địa chỉ | `dia_chi/dia_chi_line`, người chết địa chỉ cuối; S-P/S-R | `diachi/loaidiachi`, line chỉ presentation; **J** | Tái dùng chuẩn + dựng nhãn theo nguồn/quy tắc đã chốt | Không nhân đôi địa chỉ vì ô web dài; không tự đổi nơi chết thành thường trú. Đa địa chỉ thuộc #42 | **ĐÃ CHỐT scalar** |
 | **W09-R05** · Tên gọi khác | `raw.nguoi_chet[].ten_goi_khac`; S-P | **J raw/lịch sử**, chưa field alias approved | Không tự điền alias vào output chuẩn/không mở rộng chuẩn hóa; nếu cần user điền tay | Owner “bỏ tên gọi khác – nếu có user điền tay”; không nối vào `ten`, thêm field alias hoặc mở rộng normalization/#42; giữ raw/lịch sử, runtime chưa đổi | **ĐÃ CHỐT**, không hỏi lại |
 | **W09-R06** · Ai là requester | Baseline first B/fallback A/lookup | **J**, chưa membership canonical cutover | Mọi cá nhân sống tham gia/đại diện, không cần tag A/B; không người chết/CCV/nhân viên | Một lần mỗi identity xác nhận theo nguồn; không prose/lookup/ưu tiên bên, giữ history | **Q1/BANKMODE đủ đáp án**, handoff #41 |
@@ -473,7 +473,7 @@ Các locator dưới đây là **source tĩnh đã đọc**, không kết quả 
 | **W11-A06** · Thời hạn đất cấp thửa chưa rõ cụm | `thoi_han_su_dung` riêng và từng detail; S-A | Chỉ thời hạn đúng `land_rows[].thoihan` là đường mới; cấp Asset chỉ legacy/history; **J** | Map vào đúng cụm khi có bằng chứng; phần chưa gắn giữ unresolved/nguồn | **Giữ thời hạn sử dụng đất**, không áp policy loại thời hạn nghiệp vụ để bỏ nó; không tự rải thời hạn lẻ cho mọi hàng hoặc dùng block che gap | **ĐÃ CHỐT**, không xin lại; unresolved không tính đã map |
 | **W11-A07** · Nguồn gốc sử dụng đất | `nguon_goc`; S-A; nhánh nhóm cần source observation riêng | Wire/properties `nguon_goc` có thật; mapper DOCX đã map (`ASSET_FIELD_SOURCES`/`GROUP_FIELD_SOURCES`); **J** | Tái dùng đích nghĩa đã có | Không cụm riêng/trùng trường; giữ từng nguồn theo tài sản. Cùng thửa hoặc group có nhiều nguồn dùng ambiguous hiện có (`normalized null`+all refs+warning), không broadcast first; thiếu giữ thiếu | **ĐÃ MAP/CUTOVER kỹ thuật**, proof cô lập bên dưới |
 | **W11-A08** · Hình thức sử dụng riêng/chung khi nguồn nêu rõ | Label “Hình thức sử dụng” và “Ghi chú” cùng vào `phan_ghi_them`; S-A `2257–2268:bullet_labels` | Wire/properties `hinh_thuc_su_dung` có thật; DOCX intake map **chỉ giá trị sau label `Hình thức sử dụng:` trong đúng cửa sổ tài sản**, không map blob `phan_ghi_them`; **J** | Tách đoạn có nghĩa rõ → tái dùng chuẩn; phần dư xem A09 | **Đề xuất map chỉ phần được nguồn xác định là hình thức sử dụng**, không coi cả `phan_ghi_them` là field này; không cần owner mở lại scalar đã có | **ĐÃ MAP/CUTOVER kỹ thuật DOCX**: label thiếu → absent; lặp cùng giá trị → một value giữ refs; nhiều giá trị khác → `null`+all refs+`intake.ambiguous`; không lấy Ghi chú/title/cửa sổ tài sản khác; raw/`phan_ghi_them` giữ nguyên, phần dư A09 chưa đổi |
-| **W11-A09** · Đoạn tài sản ghép và lời dư thật chưa map | `phan_ghi_them`, detail extras/`o_tho`, W11; S-A/S-T | A01–A08 có các đích nghĩa thật; phần dư **chưa field cụm approved**, **J** | Làm rõ đoạn này dùng trường nào, lưu ví dụ tổng hợp §7.5.1 | Toàn đoạn mô tả GCN/thửa/cụm đất có thể dựng từ chuẩn, không vì là đoạn dài mà thành block dư. Chỉ lời còn lại sau mapping mới là ứng viên residual; `phan_ghi_them` hỗn hợp không tự là field hình thức hay field mới; nhà/công trình thiếu catalog/rule | **CHỜ LÀM RÕ A09**, chưa duyệt block/storage/engine |
+| **W11-A09** · Đoạn tài sản ghép và lời dư thật chưa map | `phan_ghi_them`, detail extras/`o_tho`, W11; S-A/S-T | A01–A08 có các đích nghĩa thật; phần dư **không có field**, raw/history/provenance retained; **J** | **Owner 20/10/2026 chọn A:** không tạo trường residual; asset editor chỉ render trường canonical/placeholder đã duyệt | Toàn đoạn mô tả GCN/thửa/cụm đất có thể dựng từ chuẩn, không vì là đoạn dài mà thành block dư. Raw/`phan_ghi_them`/`o_tho` chỉ giữ nguồn, không auto-fill/notes; thiếu mapping thì thiếu/partial, không lấp raw; nhà/công trình catalog chưa có vẫn raw-only | **ĐÃ CHỐT A09-A**, không field residual/catch-all; #41 mở/gate ĐÓNG |
 | **W11-A10** · Xe / sổ tiết kiệm / bảo hiểm | Flags `tai_san_chua_ho_tro` + text; S-T | Chưa structured Asset/Upload persistence đầy đủ, **J** | Giữ nhận diện + nguồn, **pending structured support**, chưa mở rộng hiện tại | Owner duyệt khuyến nghị này; #29 xe vẫn DEFERRED. Không dùng A10 để loại **đất có tài sản/nhà W05**, không mất nguồn hoặc coi đã chuẩn hóa | **ĐÃ DUYỆT phạm vi**, không permission implementation |
 
 **A07 proof 20/10/2026:** extraction nhóm giữ `nguon_goc`/`nguon_goc_values` từ
@@ -492,6 +492,13 @@ dedupe về một value. Không thêm key/schema; raw/history giữ nguyên, #41
 mở/gate mẫu ĐÓNG.
 
 ### 7.5.1 A09 — những trường tạo nên đoạn tài sản và ví dụ lưu lại
+
+**Owner chốt A09-A 20/10/2026:** **không tạo trường residual business**.
+Asset editor chỉ render các trường canonical/placeholder đã duyệt; lời dư
+chưa map trong `phan_ghi_them`/`o_tho` chỉ giữ raw/history/provenance, không
+tự điền và không thành notes/field. Thiếu mapping thì output partial/placeholder,
+không lấp bằng raw block. Quyền text tĩnh cũ cho cụm theo ô không còn là quyền
+A09; BANKMODE/static policy/W05 đã duyệt khác không bị thu hồi.
 
 **Hai nghĩa khác nhau:** (1) toàn đoạn trình bày tài sản ghép từ các dữ kiện chuẩn;
 (2) lời dư thật chưa có mapping sau khi tách dữ kiện. Ví dụ dưới chỉ minh họa (1),
@@ -547,9 +554,10 @@ chưa đủ căn cứ duyệt field “mô tả bổ sung tài sản”.
 - **D05 đã trả lời #43:** ủy quyền A=ủy quyền/B=được ủy quyền; một bên không
   gán; hai nguồn trái nhau giữ conflict/xác nhận nhóm bị ảnh hưởng, không
   winner/thu hẹp requester. “Nhận” không universal regex/“không nhận=A”.
-- **A09 còn làm rõ phạm vi:** bảng/ví dụ §7.5.1 cho biết trường thật tạo đoạn
-  tài sản; chưa xác định lời dư cụ thể đủ điều kiện để duyệt cụm riêng. Giữ
-  chưa map/source cho nội dung chưa rõ, không dựng thêm field nhà/`o_tho`.
+- **A09 đã chốt A:** bảng/ví dụ §7.5.1 cho biết trường thật tạo đoạn tài sản;
+  owner chọn **không field residual**, chỉ render canonical/placeholder, raw/
+  history retained không auto-fill. Không dựng field nhà/`o_tho`; output thiếu
+  mapping là partial, không lấp raw/notes.
 - **D06+D07/#43:** đủ16ca/kết luận bảo toàn/Q1/Q2/BANKMODE, không owner bank
   gate; bàn giao #41. App tự lấy cụm ngân hàng thế chấp qua projection hiện có,
   không legal field/blanket raw editor; model/FK/schema quan hệ chưa chốt, #41 mở.
@@ -568,8 +576,8 @@ từng triển khai**, không phải định hướng hay approval hiện hành.
 **Giới hạn cần đọc cùng quyết định:** quyền **có điều kiện** cho một trường giữ
 cả cụm **text tĩnh** phức tạp, không lặp lại, của một ô website cụ thể (§6.3/§7)
 **vẫn giữ**, vì đó là dữ kiện tĩnh có nguồn, không phải tầng động; vẫn phải chỉ
-rõ ô/mapping/provenance và chốt theo quy trình hiện có. **A09 vẫn chưa duyệt
-field.** Placeholder/formatting Word hiện có là lớp output, không tự thành
+rõ ô/mapping/provenance và chốt theo quy trình hiện có. **A09 đã chốt A:** không residual field, chỉ render canonical/placeholder.
+Placeholder/formatting Word hiện có là lớp output, không tự thành
 trường nghiệp vụ mới; block token do code Word định nghĩa, alias cũ, formatter
 và mẫu đang hỗ trợ không bị xóa/sửa bởi quyết định này.
 

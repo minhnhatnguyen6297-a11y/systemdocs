@@ -128,7 +128,7 @@ hàng có nguồn **chỉ thế chấp** và điền requester, không user-past
 Đây là output text tĩnh có nguồn qua đường hiện có, không pháp nhân Person/
 canonical field/bảng mới. Cá nhân khác chuẩn; không blanket raw ba editor,
 manual fallback mọi gap hoặc D04/D08/alias auto cho cá nhân. Không còn bank
-clarification. W05 tổ hợp/A09 và các pending ngoài #43 giữ nguyên.
+clarification. W05 và A09-A đã chốt; các pending ngoài #43 giữ nguyên.
 
 ### 6.1 Kế hoạch triển khai có giới hạn — ghi trước sửa code
 
@@ -157,7 +157,7 @@ hoặc hoàn tất normalized cutover #41, không thêm key/bảng/entity nghi�
   prose, không tài sản/loan/payment, Save=0/Submit=0. Evidence tại
   `_bmad-output/tmp/issue-43-bank-smoke-result.json`; không portal/network/
   customer/corpus/production DB hoặc chạm phiên browser đã đăng nhập.
-  #41 mở/gate mẫu ĐÓNG; W05/A09 và phần quan hệ canonical chưa chốt giữ nguyên.
+  #41 mở/gate mẫu ĐÓNG; W05 và A09-A đã chốt; phần quan hệ canonical chưa chốt giữ nguyên.
 
 ## 7. Handoff và điều kiện khép spike
 
@@ -222,3 +222,28 @@ A07 `nguon_goc` là slice #41 riêng, đã land/verified/commit; #41 vẫn mở/
   ở result. Lượt trước không gọi wholly synthetic: fixture-access possibility
   **[INFERENCE] từ skip count**, không probe lại hoặc claim nội dung/coverage.
   Giữ mọi fixture, chỉ bỏ hai methods. Fresh auto review CLEAN/Ticket PASS.
+
+
+### A04 + quan hệ Person–Asset–Case — PROPOSED, chưa duyệt
+
+Nguồn: audit kỹ thuật độc lập HEAD `b383031`; artifact tạm
+`_bmad-output/tmp/canonical-area-relationships-proposal.md` chỉ là đề xuất, không
+phải contract publish.
+
+- **A04 total area:** `properties.dien_tich` đã có; `asset_row`/v2 + allowlist
+  backend/UI đang thiếu. Đề xuất thêm đúng key `dien_tich` top-level (number/null,
+  source total), input optional/preserve, server emit always; `land_rows[].dien_tich`
+  giữ riêng/order; không sum, không copy, không backfill; precision qua
+  `dien_tich_thanh_so`. Đây là technical add của scalar đã có nghĩa, cần contract
+  approval trước code; `upload.workflow.v1` DRAFT không authority.
+- **Quan hệ:** đề xuất optional `participation` trong Case snapshot, dùng
+  `person_row_id`/`asset_row_id`; một record = một occurrence/group statement,
+  `asset_set|unknown`, `source_group`, `role`, `sequence`, `source_refs`; C04
+  group-set một record, C05 pairs riêng, C06 overlap nhiều record, C07 unknown
+  không edge, C08 repeated person nhiều occurrence, C09 same name/serial khác
+  row_id, C16 reorder giữ link. Không Person thứ tư/FK/shared ID; không Cartesian/
+  name-serial dedup/inverse. `source_group`/`role` là vocabulary đề xuất, chưa
+  duyệt enum; nếu emit wire phải version contract mới, hiện chỉ snapshot/raw.
+- **Không thay đổi** contract/schema/writer trong slice A09/deceased; không
+  self-publish Draft. Đây là proposal cho #41, không phải owner business question
+  mới.
