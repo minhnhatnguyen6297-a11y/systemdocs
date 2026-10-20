@@ -334,3 +334,40 @@ Focused 4 test mới **4 passed,66 deselected**; full
 `_bmad-output/tmp/w09-gender-smoke-result.json` PASS (4 case, `failures: []`).
 Không new key/schema/alias; đây chỉ slice W09-R01 DOCX intake, không claim toàn
 bộ người/Excel/OCR hoặc đóng #41; gate mẫu ĐÓNG.
+
+### Slice W11-A08 — hình thức sử dụng từ nhãn nguồn DOCX
+
+Authority đã có ở `asset_row.hinh_thuc_su_dung`/`Property.hinh_thuc_su_dung`,
+writer/readback/Word. Adapter map **chỉ** giá trị sau label `Hình thức sử dụng:`
+trong đúng cửa sổ tài sản; không map blob `phan_ghi_them`, `Ghi chú`, title
+hoặc cửa sổ tài sản khác. Parcel dùng cửa sổ bắt đầu tại thửa hiện tại để
+không mượn label của thửa trước; group giữ cửa sổ nhóm, context không có thửa
+dùng đúng span nguồn của khối `tai_san_block` đã bóc (định vị duy nhất; không
+định vị được thì bỏ, không đoán). Label thiếu
+hoặc ô chỉ có header → absent; lặp cùng giá trị → một value giữ đủ refs; nhiều
+label rõ với giá trị khác → `normalized null`+all refs+`intake.ambiguous`.
+Một label có giá trị ghép `;` được giữ nguyên đến nhãn kế/endline, không tự
+tách thành hai form; hai label `Hình thức sử dụng:` rõ trên cùng dòng vẫn là
+hai quan sát và đi vào ambiguous. Prose kiểu "theo Giấy chứng nhận …" chỉ bị
+cắt khi có nhãn kế thật kèm `:`. Label NFC/NFD, bullet/comma prefix trong tài
+sản được nhận; raw/`phan_ghi_them`/history giữ nguyên; phần dư A09 không đổi,
+không claim scalar mới.
+
+Real-DOCX regression phủ: hai thửa khác form (không broadcast, Ghi chú không
+bị lấy), thửa thiếu form vẫn absent và label ngoài tài sản không bị mượn,
+label lặp trùng vs xung đột, NFD + bullet/comma prefix, header rồi prose dòng
+sau không bị lấy, prose tail không bị cắt, semicolon compound giữ một value,
+hai label cùng dòng → ambiguous. Context không có thửa dùng đúng span khối
+`tai_san_block` nên form trước serial trong khối vẫn đọc được, form sau
+`Điều 2` không bị mượn; parcel/group cũng giao cửa sổ form với span khối thật
+nên thửa/nhóm cuối không đọc label sau `Điều 2`; parcel không có nhãn thửa
+cũng giao cửa sổ mặc định với span khối nên label ngoài block vẫn absent.
+Roundtrip
+suggestion→workspace→fresh reopen (session mới) assert Stage+Property+Word
+cho cả value, absent và conflict. Focused 10 test mới **10 passed,70
+deselected**; full `test_docx_word_first.py` **80 passed**; isolated synthetic
+smoke `_bmad-output/tmp/a08-form-smoke-result.json` sha
+`51b8095f319dea3bc3b30fe87c9afe0fe177a3dab12056f69093cece515976da`,
+PASS (`failures: []`, 11 case explicit/absent/conflict/duplicate/NFD/compound/
+same_line/context/last_parcel/last_group/no_thua). Không new key/schema; đây chỉ slice
+W11-A08 DOCX intake, #41 vẫn mở/gate mẫu ĐÓNG.

@@ -556,6 +556,29 @@ def test_group_asset_origins_stay_scoped_and_ambiguous_not_broadcast(db, tmp_pat
     assert 'Nguồn C' not in text and 'Nguồn D' not in text
 
 
+def reviewed_case_with_source_form(db, tmp_path, content):
+    """Reviewed case that keeps an absent hinh_thuc_su_dung absent."""
+    store = DocxStore(tmp_path / 'sources')
+    suggestions = extraction(content, store)
+    people, assets, records = [], [], []
+    source_ref = next(iter(suggestions[0]['fields'].values()))['source_refs'][0]
+    for suggestion in suggestions:
+        values = {key: field['normalized_value'] for key, field in suggestion['fields'].items()}
+        values.pop('dien_tich', None)
+        if 'land_rows' in values:
+            values['land_rows'] = json.loads(values['land_rows'])
+        if suggestion['target'] == 'asset':
+            values.setdefault('hinh_thuc_su_dung', None)
+        row = _person_row(**values) if suggestion['target'] == 'person' else _asset_row(**values)
+        (people if suggestion['target'] == 'person' else assets).append(row)
+        records.append({'candidate_id': suggestion['suggestion_id'], 'row_id': row['row_id']})
+    context = {'version': 1, 'sources': [{'source_id': source_ref['source_id'], 'sha256': source_ref['source_sha256'], 'records': records, 'bindings': []}]}
+    service = CaseWorkspaceService(db, store)
+    data = service.create(str(uuid.uuid4()), {'case_type': 'inheritance', 'document_type': 'khai_nhan'},
+        {'owner_row_id': people[0]['row_id'], 'people': people, 'assets': assets}, None, context)
+    return content, store, service, data
+
+
 def test_person_gender_from_titles_roundtrips_with_title_provenance(db, tmp_path):
     content = _docx_bytes([
         'HỢP ĐỒNG CHUYỂN NHƯỢNG',
@@ -652,6 +675,296 @@ def test_person_gender_table_row_title_evidence_without_raw_text(db, tmp_path):
             for r in s['fields']['gioi_tinh']['source_refs']] == ['Ông', 'Chị']
     _, _, service, data = reviewed_case_with_source_gender(db, tmp_path, content)
     assert [p['gioi_tinh'] for p in data['stage']['people']] == ['Nam', 'Nữ']
+
+
+def test_form_from_explicit_label_roundtrips_per_parcel_without_notes(db, tmp_path, session_factory):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+        'Hình thức sử dụng: Sử dụng riêng; Ghi chú: không lấy phần này',
+        'Thửa đất số: 22; Tờ bản đồ số: 7',
+        'Hình thức sử dụng: Sử dụng chung',
+    ])
+    assets = [s for s in extraction(content) if s['target'] == 'asset']
+    assert [a['fields']['hinh_thuc_su_dung']['normalized_value'] for a in assets] == [
+        'Sử dụng riêng', 'Sử dụng chung']
+    assert [a['fields']['hinh_thuc_su_dung']['raw_value'] for a in assets] == [
+        'Sử dụng riêng', 'Sử dụng chung']
+    assert [r['raw_snippet'] for a in assets
+            for r in a['fields']['hinh_thuc_su_dung']['source_refs']] == [
+                'Sử dụng riêng', 'Sử dụng chung']
+    assert all('Ghi chú' not in a['fields']['hinh_thuc_su_dung']['raw_value'] for a in assets)
+
+    _, _, service, data = reviewed_case_with_source_form(db, tmp_path, content)
+    cid = data['case']['id']
+    assert [a['hinh_thuc_su_dung'] for a in data['stage']['assets']] == [
+        'Sử dụng riêng', 'Sử dụng chung']
+    db.expire_all()
+    assert [a['hinh_thuc_su_dung'] for a in service.get(cid)['stage']['assets']] == [
+        'Sử dụng riêng', 'Sử dụng chung']
+    fresh = session_factory()
+    try:
+        fresh_service = CaseWorkspaceService(fresh, None)
+        assert [a['hinh_thuc_su_dung']
+                for a in fresh_service.get(cid)['stage']['assets']] == [
+                    'Sử dụng riêng', 'Sử dụng chung']
+        fresh_properties = fresh.query(Property).order_by(Property.so_thua_dat).all()
+        assert {p.so_thua_dat: p.hinh_thuc_su_dung for p in fresh_properties} == {
+            '12': 'Sử dụng riêng', '22': 'Sử dụng chung'}
+        from services.word_engine import _property_description
+        fresh_text = _property_description(fresh_properties)
+        assert 'Hình thức sử dụng: Sử dụng riêng' in fresh_text
+        assert 'Hình thức sử dụng: Sử dụng chung' in fresh_text
+    finally:
+        fresh.close()
+    properties = db.query(Property).order_by(Property.so_thua_dat).all()
+    assert {p.so_thua_dat: p.hinh_thuc_su_dung for p in properties} == {
+        '12': 'Sử dụng riêng', '22': 'Sử dụng chung'}
+    from services.word_engine import _property_description
+    text = _property_description(properties)
+    assert 'Hình thức sử dụng: Sử dụng riêng' in text
+    assert 'Hình thức sử dụng: Sử dụng chung' in text
+    assert 'không lấy phần này' not in text
+
+
+def test_form_label_scoped_to_asset_and_absent_stays_absent(db, tmp_path, session_factory):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Hình thức sử dụng: Sử dụng ngoài tài sản',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+        'Thửa đất số: 22; Tờ bản đồ số: 7',
+        'Hình thức sử dụng: Sử dụng chung',
+    ])
+    assets = [s for s in extraction(content) if s['target'] == 'asset']
+    assert [a['fields'].get('hinh_thuc_su_dung', {}).get('normalized_value') for a in assets] == [
+        None, 'Sử dụng chung']
+    assert 'hinh_thuc_su_dung' not in assets[0]['fields']
+    assert assets[1]['fields']['hinh_thuc_su_dung']['raw_value'] == 'Sử dụng chung'
+
+    _, _, service, data = reviewed_case_with_source_form(db, tmp_path, content)
+    assert [a['hinh_thuc_su_dung'] for a in data['stage']['assets']] == [None, 'Sử dụng chung']
+    properties = db.query(Property).order_by(Property.so_thua_dat).all()
+    assert {p.so_thua_dat: p.hinh_thuc_su_dung for p in properties} == {
+        '12': None, '22': 'Sử dụng chung'}
+    fresh = session_factory()
+    try:
+        assert [a['hinh_thuc_su_dung']
+                for a in CaseWorkspaceService(fresh, None).get(data['case']['id'])['stage']['assets']] == [
+                    None, 'Sử dụng chung']
+        fresh_properties = fresh.query(Property).order_by(Property.so_thua_dat).all()
+        assert {p.so_thua_dat: p.hinh_thuc_su_dung for p in fresh_properties} == {
+            '12': None, '22': 'Sử dụng chung'}
+        from services.word_engine import _property_description
+        assert 'Hình thức sử dụng: Sử dụng chung' in _property_description(fresh_properties)
+    finally:
+        fresh.close()
+
+
+def test_form_repeated_labels_duplicate_vs_conflict(db, tmp_path, session_factory):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+        'Hình thức sử dụng: Sử dụng riêng',
+        'Hình thức sử dụng: Sử dụng riêng',
+        'Thửa đất số: 22; Tờ bản đồ số: 7',
+        'Hình thức sử dụng: Sử dụng riêng',
+        'Hình thức sử dụng: Sử dụng chung',
+    ])
+    assets = [s for s in extraction(content) if s['target'] == 'asset']
+    same, conflict = assets
+    assert same['fields']['hinh_thuc_su_dung']['normalized_value'] == 'Sử dụng riêng'
+    assert len(same['fields']['hinh_thuc_su_dung']['source_refs']) == 2
+    assert not any(w['code'] == 'intake.ambiguous' for w in same['warnings'])
+    ambiguous = conflict['fields']['hinh_thuc_su_dung']
+    assert ambiguous['normalized_value'] is None
+    assert [r['raw_snippet'] for r in ambiguous['source_refs']] == [
+        'Sử dụng riêng', 'Sử dụng chung']
+    assert any(w['code'] == 'intake.ambiguous' and 'hinh_thuc_su_dung' in w['message']
+               for w in conflict['warnings'])
+
+    _, _, service, data = reviewed_case_with_source_form(db, tmp_path, content)
+    assert [a['hinh_thuc_su_dung'] for a in data['stage']['assets']] == [
+        'Sử dụng riêng', None]
+    properties = db.query(Property).order_by(Property.so_thua_dat).all()
+    assert {p.so_thua_dat: p.hinh_thuc_su_dung for p in properties} == {
+        '12': 'Sử dụng riêng', '22': None}
+    fresh = session_factory()
+    try:
+        assert [a['hinh_thuc_su_dung']
+                for a in CaseWorkspaceService(fresh, None).get(data['case']['id'])['stage']['assets']] == [
+                    'Sử dụng riêng', None]
+        fresh_properties = fresh.query(Property).order_by(Property.so_thua_dat).all()
+        assert {p.so_thua_dat: p.hinh_thuc_su_dung for p in fresh_properties} == {
+            '12': 'Sử dụng riêng', '22': None}
+        from services.word_engine import _property_description
+        fresh_text = _property_description(fresh_properties)
+        assert 'Hình thức sử dụng: Sử dụng riêng' in fresh_text
+        assert 'Hình thức sử dụng: Sử dụng chung' not in fresh_text
+    finally:
+        fresh.close()
+
+
+def test_form_header_only_or_unclear_cell_not_guessed(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12 | Tờ bản đồ số: 5 | Hình thức sử dụng: Sử dụng riêng | Ghi chú: không lấy',
+        'Thửa đất số: 22 | Tờ bản đồ số: 7 | Hình thức sử dụng | Ghi chú: ô trống',
+    ])
+    assets = [s for s in extraction(content) if s['target'] == 'asset']
+    first = next(a for a in assets
+                 if a['fields']['so_thua_dat']['normalized_value'] == '12')
+    assert first['fields']['hinh_thuc_su_dung']['normalized_value'] == 'Sử dụng riêng'
+    assert first['fields']['hinh_thuc_su_dung']['raw_value'] == 'Sử dụng riêng'
+    assert all(a['fields'].get('hinh_thuc_su_dung', {}).get('normalized_value')
+               != 'Ghi chú' for a in assets)
+    _, _, service, data = reviewed_case_with_source_form(db, tmp_path, content)
+    assert data['stage']['assets'][0]['hinh_thuc_su_dung'] == 'Sử dụng riêng'
+
+
+def test_form_nfd_bullet_and_comma_labels_preserve_source(db, tmp_path):
+    nfd_label = unicodedata.normalize('NFD', 'Hình thức sử dụng')
+    nfd_value = unicodedata.normalize('NFD', 'Sử dụng riêng')
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5', f'{nfd_label}: {nfd_value}',
+        'Thửa đất số: 22; Tờ bản đồ số: 7', '- Hình thức sử dụng: Sử dụng chung',
+        'Thửa đất số: 32, Tờ bản đồ số: 9, Hình thức sử dụng: Sử dụng riêng',
+    ])
+    assets = {a['fields']['so_thua_dat']['normalized_value']: a
+              for a in extraction(content) if a['target'] == 'asset'}
+    nfd_field = assets['12']['fields']['hinh_thuc_su_dung']
+    assert unicodedata.normalize('NFC', nfd_field['normalized_value']) == 'Sử dụng riêng'
+    assert nfd_field['raw_value'] == nfd_value
+    assert [r['raw_snippet'] for r in nfd_field['source_refs']] == [nfd_value]
+    assert assets['22']['fields']['hinh_thuc_su_dung']['normalized_value'] == 'Sử dụng chung'
+    assert assets['32']['fields']['hinh_thuc_su_dung']['normalized_value'] == 'Sử dụng riêng'
+    _, _, service, data = reviewed_case_with_source_form(db, tmp_path, content)
+    assert [a['hinh_thuc_su_dung'] for a in data['stage']['assets']] == [
+        'Sử dụng riêng', 'Sử dụng chung', 'Sử dụng riêng']
+
+
+def test_form_header_newline_and_prose_tail_not_stolen(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+        'Hình thức sử dụng:', 'Nội dung ngoài ô không được lấy',
+        'Thửa đất số: 22; Tờ bản đồ số: 7',
+        'Hình thức sử dụng: Sử dụng riêng theo Giấy chứng nhận AB',
+    ])
+    assets = {a['fields']['so_thua_dat']['normalized_value']: a
+              for a in extraction(content) if a['target'] == 'asset'}
+    assert 'hinh_thuc_su_dung' not in assets['12']['fields']
+    assert assets['22']['fields']['hinh_thuc_su_dung']['normalized_value'] == (
+        'Sử dụng riêng theo Giấy chứng nhận AB')
+
+
+def test_form_semicolon_compound_value_is_one_explicit_value(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+        'Hình thức sử dụng: Sử dụng riêng; Sử dụng chung',
+    ])
+    asset, = [a for a in extraction(content) if a['target'] == 'asset']
+    field = asset['fields']['hinh_thuc_su_dung']
+    assert field['normalized_value'] == 'Sử dụng riêng; Sử dụng chung'
+    assert len(field['source_refs']) == 1
+    assert not any(w['code'] == 'intake.ambiguous' for w in asset['warnings'])
+
+
+def test_form_same_line_repeated_labels_are_ambiguous(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+        'Hình thức sử dụng: Sử dụng riêng; Hình thức sử dụng: Sử dụng chung',
+    ])
+    asset, = [a for a in extraction(content) if a['target'] == 'asset']
+    field = asset['fields']['hinh_thuc_su_dung']
+    assert field['normalized_value'] is None
+    assert [r['raw_snippet'] for r in field['source_refs']] == [
+        'Sử dụng riêng', 'Sử dụng chung']
+    assert any(w['code'] == 'intake.ambiguous' and 'hinh_thuc_su_dung' in w['message']
+               for w in asset['warnings'])
+
+
+def test_form_context_asset_does_not_borrow_pre_asset_label(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Hình thức sử dụng: Sử dụng ngoài tài sản',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:',
+        'Hình thức sử dụng: Sử dụng riêng',
+        'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Điều 2: Quyền và nghĩa vụ',
+        'Hình thức sử dụng: Sử dụng ngoài tài sản',
+    ])
+    assets = [a for a in extraction(content) if a['target'] == 'asset']
+    assert [a['fields']['hinh_thuc_su_dung']['normalized_value'] for a in assets] == [
+        'Sử dụng riêng']
+    assert all(a['fields']['hinh_thuc_su_dung']['normalized_value'] != 'Sử dụng ngoài tài sản'
+               for a in assets)
+
+
+def test_form_last_parcel_and_group_do_not_read_past_asset_block(db, tmp_path):
+    parcel_doc = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+        'Điều 2: Quyền và nghĩa vụ',
+        'Hình thức sử dụng: Ngoài tài sản',
+    ])
+    parcel_asset, = [a for a in extraction(parcel_doc) if a['target'] == 'asset']
+    assert 'hinh_thuc_su_dung' not in parcel_asset['fields']
+
+    group_doc = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản 1:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+        'Điều 2: Quyền và nghĩa vụ',
+        'Hình thức sử dụng: Ngoài tài sản',
+    ])
+    group_asset, = [a for a in extraction(group_doc) if a['target'] == 'asset']
+    assert 'hinh_thuc_su_dung' not in group_asset['fields']
+
+    no_thua_doc = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Tờ bản đồ số: 5',
+        'Điều 2: Quyền và nghĩa vụ',
+        'Hình thức sử dụng: Ngoài tài sản',
+    ])
+    no_thua_asset, = [a for a in extraction(no_thua_doc) if a['target'] == 'asset']
+    assert 'hinh_thuc_su_dung' not in no_thua_asset['fields']
 
 
 def test_intentionally_empty_land_roundtrip_exports_remaining_asset_fields_without_rebinding(db, tmp_path):

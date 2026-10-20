@@ -296,6 +296,66 @@ def _locate_person_title(text: str, person: dict,
     return [spans[0][0], spans[0][1]] if len(spans) == 1 else None
 
 
+# Chỉ nhãn "Hình thức sử dụng:" trong đúng cửa sổ tài sản. Giá trị dừng ở
+# xuống dòng/ô kế (`|`), cuối cửa sổ, hoặc nhãn kế đã biết CÓ dấu `:` —
+# không cắt prose/token giá trị chỉ vì trùng chữ, không lấy Ghi chú.
+_FORM_LABEL = "Hình thức sử dụng"
+_FORM_NEXT_LABELS = (
+    "Hình thức sử dụng", "Ghi chú", "Thửa đất số", "Số thửa",
+    "Tờ bản đồ số", "Số tờ", "Diện tích", "Thời hạn", "Nguồn gốc",
+    "Địa chỉ", "Loại đất", "Mục đích sử dụng", "Số serial", "Số vào sổ",
+    "Ngày cấp", "Cơ quan cấp", "Giấy chứng nhận",
+)
+
+
+def _form_label_alternation(words: tuple[str, ...]) -> str:
+    variants: list[str] = []
+    for word in words:
+        variants.extend(re.escape(value) for value in _variants(word))
+    return "(?:" + "|".join(dict.fromkeys(variants)) + ")"
+
+
+_FORM_NEXT_ALT = _form_label_alternation(_FORM_NEXT_LABELS)
+_FORM_END_RE = (
+    r"(?=[ \t]*(?:\n|\||$|"
+    r";[ \t]*(?:\n|\||$|" + _FORM_NEXT_ALT + r"[ \t]*:)|"
+    r",?[ \t]*" + _FORM_NEXT_ALT + r"[ \t]*:))"
+)
+_HINH_THUC_SU_DUNG_RES = tuple(
+    re.compile(
+        r"(?im)(?:^|[\n;|,])[ \t]*(?:[-*+•][ \t]*)?"
+        + re.escape(label)
+        + r"[ \t]*:[ \t]*(?P<value>[^\n|]*?)" + _FORM_END_RE
+    )
+    for label in _variants(_FORM_LABEL)
+)
+
+
+def _hinh_thuc_su_dung_occurrences(text: str,
+                                   window: tuple[int, int]) -> list[tuple[str, list[int]]]:
+    """Các lần thấy label `Hình thức sử dụng:` trong MỘT cửa sổ tài sản.
+
+    Không quét ngoài cửa sổ, không suy từ `phan_ghi_them`/title, không nhận
+    ô chỉ có header. Trả (giá trị nguyên văn, span) cho từng lần thấy.
+    """
+    found: list[tuple[str, list[int]]] = []
+    seen: set[tuple[int, int]] = set()
+    for pattern in _HINH_THUC_SU_DUNG_RES:
+        for match in pattern.finditer(str(text or ""), window[0], window[1]):
+            raw = match.group("value").strip()
+            if not raw:
+                continue
+            leading = len(match.group("value")) - len(match.group("value").lstrip())
+            span = (match.start("value") + leading,
+                    match.start("value") + leading + len(raw))
+            if span in seen:
+                continue
+            seen.add(span)
+            found.append((raw, [span[0], span[1]]))
+    found.sort(key=lambda item: item[1][0])
+    return found
+
+
 async def extract(spec, ctx):
     content = ctx.read_file(spec)
     try:
@@ -432,6 +492,18 @@ async def extract(spec, ctx):
                 break
         return (start, end)
 
+    def _intersect(a: tuple[int, int], b: tuple[int, int]) -> tuple[int, int]:
+        start, end = max(a[0], b[0]), min(a[1], b[1])
+        return (start, end) if start < end else (0, 0)
+
+    # Span thật của khối tài sản lõi đã bóc. Chỉ dùng cho field form mới;
+    # các field cũ giữ nguyên cửa sổ hiện có. Không định vị duy nhất được
+    # block → không map form (tránh mượn label ngoài tài sản).
+    asset_block = str(tai_san_block or "").strip()
+    asset_block_span = (_locate_in(source.text, asset_block, (0, len(source.text)), span_index)
+                        if asset_block else None)
+    asset_block_window = asset_block_span or (0, 0)
+
     def parcel_window(index: int) -> tuple[int, int]:
         """Vùng nguồn của một thửa (từ đầu khối thửa đến nhãn thửa kế tiếp).
 
@@ -472,7 +544,8 @@ async def extract(spec, ctx):
 
     def emit_asset(values: dict, sources: dict, window: tuple[int, int],
                    land_rows_raw: list[dict] | None = None,
-                   multi_values: dict[str, list[str]] | None = None):
+                   multi_values: dict[str, list[str]] | None = None,
+                   form_window: tuple[int, int] | None = None):
         candidate_id = str(uuid.uuid4())
         fields: dict = {}
         warnings = [{"code": "intake.docx_coverage", "message": w} for w in source.warnings]
@@ -508,6 +581,30 @@ async def extract(spec, ctx):
                 skip_keys.add("loai_so")
         map_fields(fields, warnings, candidate_id, _PROPERTY_FIELD_NORMALIZERS,
                    sources, values, window, "asset", ASSET_LABELS, frozenset(skip_keys))
+        # `hinh_thuc_su_dung` chỉ lấy đúng giá trị sau label nguồn trong cửa sổ
+        # tài sản này; không map blob `phan_ghi_them`, Ghi chú hoặc cửa sổ khác.
+        form_occurrences = _hinh_thuc_su_dung_occurrences(
+            source.text, form_window or window)
+        if form_occurrences:
+            refs = [make_refs(candidate_id, span, "asset.hinh_thuc_su_dung")
+                    for _, span in form_occurrences]
+            first_raw = form_occurrences[0][0]
+            distinct = {re.sub(r"\s+", " ", value).strip()
+                        for value, _ in form_occurrences}
+            if len(distinct) > 1:
+                fields["hinh_thuc_su_dung"] = field_value(
+                    first_raw, None, "observed", None, refs)
+                warnings.append({"code": "intake.ambiguous",
+                                 "message": "hinh_thuc_su_dung: nhiều giá trị; cần chọn hoặc sửa"})
+            else:
+                normalized, state, confidence = _PROPERTY_FIELD_NORMALIZERS[
+                    "hinh_thuc_su_dung"](first_raw)
+                if normalized:
+                    normalized = unicodedata.normalize("NFC", normalized)
+                    if normalized != first_raw:
+                        state = "normalized"
+                fields["hinh_thuc_su_dung"] = field_value(
+                    first_raw, normalized, state, confidence, refs)
         # Nhiều giá trị trong cùng nhóm: giữ MỌI lần thấy, normalized null cho
         # tới khi người kiểm tra chọn/sửa (spec `word-templates.md`), và giữ
         # `ambiguous_group` thay vì mặc định matched.
@@ -602,7 +699,8 @@ async def extract(spec, ctx):
                 continue  # Nhóm chỉ có nhãn trống: không tạo gợi ý rỗng.
             emit_asset(group, GROUP_FIELD_SOURCES, group_window(index),
                        land_rows_raw=group.get("land_rows"),
-                       multi_values=_multi_values_from(group, _GROUP_MULTI_VALUE_SOURCES))
+                       multi_values=_multi_values_from(group, _GROUP_MULTI_VALUE_SOURCES),
+                       form_window=_intersect(group_window(index), asset_block_window))
     else:
         for index, parcel in enumerate(parcels):
             land_rows_raw = [
@@ -611,16 +709,30 @@ async def extract(spec, ctx):
                  "thoi_han": detail.get("thoi_han_su_dung")}
                 for detail in parcel.get("chi_tiet_dien_tich") or []
             ]
-            emit_asset(parcel, ASSET_FIELD_SOURCES, parcel_window(index),
+            window = parcel_window(index)
+            form_window = _intersect(window, asset_block_window)
+            thua = str(parcel.get("so_thua_dat") or "").strip()
+            if thua:
+                thua_span = _locate_labeled(source.text, thua, LABELS["so_thua_dat"], window)
+                if thua_span:
+                    # Không mượn label trước thửa hiện tại (cửa sổ parcel_window
+                    # có thể lùi qua dòng mở thửa của thửa trước) và không vượt
+                    # khỏi khối tài sản (label sau Điều 2 không thuộc tài sản).
+                    form_window = _intersect((thua_span[0], window[1]), asset_block_window)
+            emit_asset(parcel, ASSET_FIELD_SOURCES, window,
                        land_rows_raw=land_rows_raw,
-                       multi_values=_multi_values_from(parcel, _PARCEL_MULTI_VALUE_SOURCES))
+                       multi_values=_multi_values_from(parcel, _PARCEL_MULTI_VALUE_SOURCES),
+                       form_window=form_window)
         if not parcels:
             # GCN ở mức văn bản (không có dòng thửa): giữ hành vi cũ — vẫn ra
             # gợi ý tài sản khi có serial/địa chỉ.
             context = document_asset_context(tai_san_block)
             if any(str(context.get(key) or "").strip() for key in ("so_gcn_raw", "dia_chi")):
+                # Cửa sổ form là CHÍNH khối tài sản mà lõi đã bóc, không phải
+                # anchor→EOF (có thể nuốt Điều 2) và không phải cả văn bản.
                 emit_asset(context, ASSET_FIELD_SOURCES, (0, len(source.text)),
-                           multi_values=_multi_values_from(context, _PARCEL_MULTI_VALUE_SOURCES))
+                           multi_values=_multi_values_from(context, _PARCEL_MULTI_VALUE_SOURCES),
+                           form_window=asset_block_window)
 
     for key in ("so_giay_to", "so_serial"):
         buckets: dict = {}
