@@ -49,6 +49,10 @@ from ..normalization import (  # noqa: E402
 # Notary key -> khoá trường của lõi (payload `web_form`/`raw`).
 PERSON_FIELD_SOURCES = {
     "ho_ten": "ho_ten",
+    # Danh xưng nguồn ("Ông"/"Bà") -> canonical Nam/Nữ. Emit tường minh trong
+    # vòng người: raw_value chính là token danh xưng nên `_locate_labeled`
+    # không định vị được như các ô có nhãn; provenance lấy đúng token.
+    "gioi_tinh": "gioi_tinh",
     "ngay_sinh": "ngay_sinh",
     "so_giay_to": "cccd",
     "noi_cap": "noi_cap",
@@ -256,6 +260,42 @@ def _person_window(text: str, person: dict) -> tuple[int, int]:
     return (span[0], span[1]) if span else (0, len(text))
 
 
+# Danh xưng nguồn tương ứng canonical lõi. Lõi chuẩn hoá Anh/Chị thành
+# Ông/Bà nhưng giữ nguyên văn nguồn; bằng chứng phải trỏ đúng token đã in.
+_PERSON_TITLE_TOKENS = {
+    "Ông": ("Ông", "Anh"),
+    "Bà": ("Bà", "Chị"),
+}
+
+
+def _locate_person_title(text: str, person: dict,
+                         window: tuple[int, int]) -> list[int] | None:
+    """Span token danh xưng đứng ngay trước đúng họ tên của người này.
+
+    Chỉ nhận khi có DUY NHẤT một lần thấy trong vùng người (hoặc toàn văn bản
+    khi lõi không trả `raw_text`, ví dụ dòng bảng); 0/>1 thì bỏ, không đoán.
+    """
+    title = str(person.get("gioi_tinh") or "").strip()
+    name = str(person.get("ho_ten") or "").strip()
+    tokens = _PERSON_TITLE_TOKENS.get(title)
+    if not tokens or not name:
+        return None
+    spans: list[tuple[int, int]] = []
+    for token in tokens:
+        for token_v in _variants(token):
+            for name_v in _variants(name):
+                name_pattern = r"\s+".join(re.escape(part) for part in name_v.split())
+                pattern = re.compile(
+                    r"(?<!\w)" + re.escape(token_v) + r"(?:\s*:\s*|\s+)" + name_pattern,
+                    re.IGNORECASE,
+                )
+                for match in pattern.finditer(text, window[0], window[1]):
+                    span = (match.start(), match.start() + len(token_v))
+                    if span not in spans:
+                        spans.append(span)
+    return [spans[0][0], spans[0][1]] if len(spans) == 1 else None
+
+
 async def extract(spec, ctx):
     content = ctx.read_file(spec)
     try:
@@ -327,15 +367,24 @@ async def extract(spec, ctx):
         candidate_id = str(uuid.uuid4())
         fields: dict = {}
         warnings = [{"code": "intake.docx_coverage", "message": w} for w in source.warnings]
+        person_window = _person_window(source.text, person)
         map_fields(fields, warnings, candidate_id, _PERSON_FIELD_NORMALIZERS,
-                   PERSON_FIELD_SOURCES, person, _person_window(source.text, person),
-                   "person", PERSON_LABELS)
+                   PERSON_FIELD_SOURCES, person, person_window,
+                   "person", PERSON_LABELS, skip=frozenset({"gioi_tinh"}))
+        # Danh xưng là token ngay trước họ tên, không phải ô sau nhãn: emit
+        # riêng để provenance trỏ đúng "Ông"/"Bà" (hoặc Anh/Chị in trong bảng).
+        title = str(person.get("gioi_tinh") or "").strip()
+        title_span = _locate_person_title(source.text, person, person_window) if title else None
+        if title_span:
+            add_field(fields, warnings, candidate_id, _PERSON_FIELD_NORMALIZERS,
+                      key="gioi_tinh", raw_value=title, span=title_span,
+                      rule_id="person.gioi_tinh")
         if not fields:
             continue
         extra_ids = [str(value).strip() for value in (person.get("cccd_khac") or []) if str(value).strip()]
         if extra_ids and "so_giay_to" in fields:
             refs = list(fields["so_giay_to"]["source_refs"])
-            window = _person_window(source.text, person)
+            window = person_window
             for value in extra_ids:
                 span = _locate_labeled(source.text, value, LABELS["so_giay_to"], window, span_index)
                 if span:

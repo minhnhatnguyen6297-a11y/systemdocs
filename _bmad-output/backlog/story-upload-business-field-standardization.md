@@ -311,3 +311,26 @@ Independent review 20/10/2026 đọc diff/consumer và chấp nhận evidence b�
 full `test_docx_word_first.py` **66 passed** và isolated smoke trước commit;
 không phát hiện silent loss/broadcast. Commit cùng ngày trong slice A07, không
 push.
+
+### Slice W09-R01 — giới tính Người từ danh xưng trong DOCX intake
+
+Authority: canonical `Nam`/`Nữ`/null ở Customer/person_row/Word đã có; chỉ
+thiếu đường DOCX intake. Mapping mới dùng **duy nhất** danh xưng rõ trong
+nguồn: lõi phát `Ông`/`Bà` (bảng in `Anh`/`Chị` cũng đã chuẩn hoá về hai giá
+trị này), `norm_gender` nhận thêm `ong`→Nam, `ba`→Nữ; adapter emit riêng
+`person.gioi_tinh` với span đúng token danh xưng đứng trước họ tên (hỗ trợ
+NFC/NFD, `Anh`/`Chị` trong bảng không `raw_text`), không qua `map_fields`.
+Danh xưng trung tính (`Ông/bà`) hoặc thiếu → **không emit**, giữ null; không
+suy từ tên/`Thị`/năm sinh/ID. `raw.nguoi_chet` không do adapter này phát —
+ngoài phạm vi slice, không claim đã map người chết.
+
+Regression real-DOCX: hai bên Ông/Bà → Nam/Nữ + refs đúng token, họ tên không
+đổi; `Ông/bà` → riêng người đó null, người Bà còn lại Nữ; `Đại diện: Ông` →
+Nam; dòng bảng `Ông`/`Chị` → Nam/Nữ với source ref `Ông`/`Chị`. Cả chuỗi
+suggestion→workspace→fresh DB reopen→Customer→WordPerson.gender_normalized
+được assert; test giữ gender vắng = null thay vì default `_person_row`.
+Focused 4 test mới **4 passed,66 deselected**; full
+`test_docx_word_first.py` **70 passed**; isolated synthetic smoke
+`_bmad-output/tmp/w09-gender-smoke-result.json` PASS (4 case, `failures: []`).
+Không new key/schema/alias; đây chỉ slice W09-R01 DOCX intake, không claim toàn
+bộ người/Excel/OCR hoặc đóng #41; gate mẫu ĐÓNG.

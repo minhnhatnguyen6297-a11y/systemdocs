@@ -115,9 +115,9 @@ def norm_gender(raw: str):
     if not cleaned:
         return None, "observed", None
     folded = _fold(cleaned)
-    if folded in ("nam", "male", "m"):
+    if folded in ("nam", "male", "m", "ong"):
         return "Nam", "observed" if cleaned == "Nam" else "normalized", None
-    if folded in ("nu", "female", "f"):
+    if folded in ("nu", "female", "f", "ba"):
         return "Nữ", "observed" if cleaned == "Nữ" else "normalized", None
     return None, "observed", None
 

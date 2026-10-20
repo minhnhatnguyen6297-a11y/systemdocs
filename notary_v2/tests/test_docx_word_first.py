@@ -20,7 +20,7 @@ from services.document_intake.models import AdapterContext, SourceSpec
 from services.case_workspace import CaseWorkspaceService, WorkspaceError
 from services.word_original import binding_proposals, reviewed_template, export_original, slot_for
 from tests.test_case_workspace import db, session_factory, _person_row, _asset_row
-from models import InheritanceCase, Property
+from models import InheritanceCase, Property, Customer
 
 
 def fixture_bytes():
@@ -455,6 +455,29 @@ def reviewed_case_with_missing_asset_values(db, tmp_path, content):
     return content, store, service, data
 
 
+def reviewed_case_with_source_gender(db, tmp_path, content):
+    """Reviewed case that keeps an absent gender absent (no _person_row default)."""
+    store = DocxStore(tmp_path / 'sources')
+    suggestions = extraction(content, store)
+    people, assets, records = [], [], []
+    source_ref = next(iter(suggestions[0]['fields'].values()))['source_refs'][0]
+    for suggestion in suggestions:
+        values = {key: field['normalized_value'] for key, field in suggestion['fields'].items()}
+        values.pop('dien_tich', None)
+        if 'land_rows' in values:
+            values['land_rows'] = json.loads(values['land_rows'])
+        if suggestion['target'] == 'person':
+            values.setdefault('gioi_tinh', None)
+        row = _person_row(**values) if suggestion['target'] == 'person' else _asset_row(**values)
+        (people if suggestion['target'] == 'person' else assets).append(row)
+        records.append({'candidate_id': suggestion['suggestion_id'], 'row_id': row['row_id']})
+    context = {'version': 1, 'sources': [{'source_id': source_ref['source_id'], 'sha256': source_ref['source_sha256'], 'records': records, 'bindings': []}]}
+    service = CaseWorkspaceService(db, store)
+    data = service.create(str(uuid.uuid4()), {'case_type': 'inheritance', 'document_type': 'khai_nhan'},
+        {'owner_row_id': people[0]['row_id'], 'people': people, 'assets': assets}, None, context)
+    return content, store, service, data
+
+
 def test_asset_origin_roundtrips_per_asset_not_broadcast(db, tmp_path):
     content = _docx_bytes([
         'HỢP ĐỒNG CHUYỂN NHƯỢNG',
@@ -531,6 +554,104 @@ def test_group_asset_origins_stay_scoped_and_ambiguous_not_broadcast(db, tmp_pat
     text = _property_description(properties)
     assert 'Nguồn A' in text and 'Nguồn B' in text
     assert 'Nguồn C' not in text and 'Nguồn D' not in text
+
+
+def test_person_gender_from_titles_roundtrips_with_title_provenance(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+    ])
+    suggestions = extraction(content)
+    people = [s for s in suggestions if s['target'] == 'person']
+    assert [s['fields']['ho_ten']['normalized_value'] for s in people] == [
+        'Nguyễn Văn Mẫu', 'Trần Thị Mẫu']
+    assert [s['fields']['gioi_tinh']['normalized_value'] for s in people] == ['Nam', 'Nữ']
+    assert [s['fields']['gioi_tinh']['raw_value'] for s in people] == ['Ông', 'Bà']
+    assert [r['raw_snippet'] for s in people
+            for r in s['fields']['gioi_tinh']['source_refs']] == ['Ông', 'Bà']
+    assert all(r['rule_id'] == 'person.gioi_tinh'
+               for s in people for r in s['fields']['gioi_tinh']['source_refs'])
+
+    _, _, service, data = reviewed_case_with_source_gender(db, tmp_path, content)
+    cid = data['case']['id']
+    assert [p['gioi_tinh'] for p in data['stage']['people']] == ['Nam', 'Nữ']
+    assert [p['ho_ten'] for p in data['stage']['people']] == ['Nguyễn Văn Mẫu', 'Trần Thị Mẫu']
+    assert not {'Ông', 'Bà'} & {p['gioi_tinh'] for p in data['stage']['people']}
+    db.expire_all()
+    reloaded = service.get(cid)
+    assert [p['gioi_tinh'] for p in reloaded['stage']['people']] == ['Nam', 'Nữ']
+    assert {c.ho_ten: c.gioi_tinh for c in db.query(Customer).all()} == {
+        'Nguyễn Văn Mẫu': 'Nam', 'Trần Thị Mẫu': 'Nữ'}
+    from services.word_engine import build_word_context
+    context = build_word_context(db.get(InheritanceCase, cid))
+    assert [(p.ho_ten, p.gender_normalized) for p in context.persons] == [
+        ('Nguyễn Văn Mẫu', 'nam'), ('Trần Thị Mẫu', 'nữ')]
+
+
+def test_person_gender_neutral_title_stays_absent_per_person(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông/bà Nguyễn Thị Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+    ])
+    suggestions = extraction(content)
+    people = [s for s in suggestions if s['target'] == 'person']
+    assert 'gioi_tinh' not in people[0]['fields']
+    assert people[1]['fields']['gioi_tinh']['normalized_value'] == 'Nữ'
+
+    _, _, service, data = reviewed_case_with_source_gender(db, tmp_path, content)
+    cid = data['case']['id']
+    assert [p['gioi_tinh'] for p in data['stage']['people']] == [None, 'Nữ']
+    db.expire_all()
+    assert [p['gioi_tinh'] for p in service.get(cid)['stage']['people']] == [None, 'Nữ']
+    assert {c.ho_ten: c.gioi_tinh for c in db.query(Customer).all()} == {
+        'Nguyễn Thị Mẫu': None, 'Trần Thị Mẫu': 'Nữ'}
+    from services.word_engine import build_word_context
+    context = build_word_context(db.get(InheritanceCase, cid))
+    assert [(p.ho_ten, p.gender_normalized) for p in context.persons] == [
+        ('Nguyễn Thị Mẫu', ''), ('Trần Thị Mẫu', 'nữ')]
+
+
+def test_person_gender_representative_title_maps_to_nam(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:',
+        'Đại diện: Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+    ])
+    people = [s for s in extraction(content) if s['target'] == 'person']
+    representative = people[0]
+    assert representative['fields']['ho_ten']['normalized_value'] == 'Nguyễn Văn Mẫu'
+    assert representative['fields']['gioi_tinh']['normalized_value'] == 'Nam'
+    ref, = representative['fields']['gioi_tinh']['source_refs']
+    assert ref['raw_snippet'] == 'Ông' and ref['rule_id'] == 'person.gioi_tinh'
+
+
+def test_person_gender_table_row_title_evidence_without_raw_text(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'DANH SÁCH NGƯỜI SỬ DỤNG CHUNG',
+        '1 | Ông Nguyễn Văn Mẫu | 1980 | CCCD 001234567890',
+        '2 | Chị Trần Thị Mẫu | 1985 | CCCD 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+    ])
+    people = [s for s in extraction(content) if s['target'] == 'person']
+    assert [s['fields']['ho_ten']['normalized_value'] for s in people] == [
+        'Nguyễn Văn Mẫu', 'Trần Thị Mẫu']
+    assert [s['fields']['gioi_tinh']['normalized_value'] for s in people] == ['Nam', 'Nữ']
+    # Lõi in Anh/Chị thành Ông/Bà; bằng chứng phải giữ đúng token nguồn.
+    assert [r['raw_snippet'] for s in people
+            for r in s['fields']['gioi_tinh']['source_refs']] == ['Ông', 'Chị']
+    _, _, service, data = reviewed_case_with_source_gender(db, tmp_path, content)
+    assert [p['gioi_tinh'] for p in data['stage']['people']] == ['Nam', 'Nữ']
 
 
 def test_intentionally_empty_land_roundtrip_exports_remaining_asset_fields_without_rebinding(db, tmp_path):
