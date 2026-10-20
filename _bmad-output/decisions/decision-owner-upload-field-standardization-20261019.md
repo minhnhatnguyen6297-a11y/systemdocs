@@ -417,3 +417,21 @@ Thừa kế dưới `D:\testcase` rồi thảo luận. Yêu cầu này đang xun
 hiện hành; chưa có ngoại lệ được xác nhận nên lượt này coverage mẫu là **0**,
 chưa đọc body file owner/corpus và không chạy batch. Không đổi
 key/cutover/runtime/test/schema; #41 vẫn mở, gate mẫu **ĐÓNG**.
+
+## Ngoại lệ đọc hẹp — owner 20/10/2026: “cho phép đọc”
+
+**Nguyên văn owner:** “cho phép đọc”, trả lời việc xin đọc các cụm diễn giải
+Người chết trong thư mục Thừa kế dưới `D:\testcase` để đối chiếu quy tắc giấy
+tờ, sau đó thảo luận cách chốt logic.
+
+Quyền này thay phần **chưa có ngoại lệ đọc được xác nhận** ở cuối mục trước,
+chỉ cho phép khảo sát đọc trong phạm vi trên và ghi nhận phân tích. Không phải
+quyền mở khảo sát mẫu toàn bộ, tạo corpus/fixtures, sửa hoặc chạy parser,
+test/E2E, triển khai runtime, migration/schema/key, truy cập DB, production
+hoặc portal thật. Không sao chép nội dung có thông tin cá nhân vào repo/log
+rộng; bằng chứng trong repo phải được che thông tin nhận diện.
+
+**Trạng thái không đổi:** #41 vẫn **OPEN**, gate mẫu chung vẫn **ĐÓNG** ngoài
+ngoại lệ đọc hẹp này; triển khai tiếp tục tạm dừng theo chỉ dẫn owner. Việc đọc
+mẫu không tự nghiệm thu logic mới, không chốt nghĩa `Nơi chết` so với nơi cư
+trú cuối và không duyệt model Người nhiều giấy tờ/địa chỉ của #42.
