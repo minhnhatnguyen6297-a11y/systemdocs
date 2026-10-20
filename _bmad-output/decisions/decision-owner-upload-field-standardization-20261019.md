@@ -368,3 +368,51 @@ VBA/macro, không giải mã thêm XLSB/VBA, không đổi câu/chữ/logic Word
 luận của code. A09 renderer Upload là biên độc lập, không thay thế template Word.
 Không mở field/tier mới hoặc parser Excel. Các quyết định A09-A/static/BANKMODE
 và W05 không bị thu hồi.
+
+## Owner bổ sung quy tắc giấy tờ Người chết — chưa triển khai, cần đối chiếu mẫu
+
+Owner bổ sung bộ dữ kiện người chết: họ tên; ngày/năm sinh; ngày chết (dấu hiệu
+đã chết); số giấy tờ; ngày cấp; nơi cấp; và **`Nơi chết: Ngang với trường địa
+chỉ người sống.`** Đây là quy tắc cần đối chiếu mẫu, chưa triển khai
+parser/schema/key.
+
+**Owner đã nêu rõ:**
+- Số giấy tờ giữ **nguyên văn nguồn**, không ép 12 số và không mặc định là CCCD.
+  Ví dụ owner: `1234/TLKT`, `1234/yyyy/TLKT-BS`, và `Giấy chứng tử số: "12, quyển 1"`
+  — giá trị số là `12, quyển 1`, không gồm nhãn `Giấy chứng tử số`. Đây là ví dụ
+  định dạng, **chưa phải grammar regex đóng**; `yyyy` là chỗ năm.
+- Ba loại canonical đúng nguyên văn: `Trích lục khai tử`;
+  `Trích lục khai tử (bản sao)`; `Giấy chứng tử`. Không tự thêm/xóa hậu tố,
+  không mặc định một loại cho mọi người chết, không suy loại khi nguồn không nêu.
+- `ngay_cap` là ngày cấp **chính giấy chứng tử/khai tử**, không phải ngày chết;
+  độ đầy đủ ngày giữ nguyên (năm riêng vẫn là năm riêng, không đệm).
+- `noi_cap` khi có bằng chứng chết là `Ủy ban nhân dân xã ...`, xác định theo
+  tên xã **tại ngày cấp giấy**; cần lịch sử/mốc đơn vị hành chính. Không suy
+  từ nơi cư trú của người, vị trí đất hoặc chỉ từ ngày cấp.
+- Địa chỉ người chết song song địa chỉ người sống; `Nơi chết` ngang trường địa
+  chỉ, không tự đổi thành thường trú.
+
+**Hiện trạng code cũ — không phải đã có quy tắc mới:** `contract_extract.py`
+`_extract_nguoi_chet` chỉ nhận `Trích lục khai tử … số`, hardcode loại
+`Trích lục khai tử` khi có số, chưa có `Giấy chứng tử`/`bản sao`/grammar mới;
+DOCX adapter cố ý bỏ số khỏi `so_giay_to` vì `Customer.so_giay_to` đang UNIQUE.
+Đây là hành vi cũ cần đối chiếu, không chứng minh quy tắc mới đã được triển khai.
+
+**Audit/proposal tách riêng — chưa phải quy tắc owner:** số giấy tờ không nên
+được giả định là định danh toàn cục; code hiện có `Customer.so_giay_to` UNIQUE
+và lookup theo số có nguy cơ gộp/ghi đè người khác. Chưa chốt key, matching,
+migration hoặc runtime; không dùng đề xuất này để tự động tái dùng/merge Person.
+Nguồn hiện có vẫn giữ nguyên.
+
+**Câu hỏi mở — chưa phải quy tắc:**
+- Hợp đồng hiện có fallback địa chỉ nơi thường trú cuối; owner mới ghi `Nơi chết`
+  ngang trường địa chỉ. Cần chốt bỏ fallback cũ hay dùng nó, và nghĩa chính xác.
+- Người chết thiếu ngày chết/ngày cấp; ngày chỉ có năm; nơi cấp thiếu hoặc mơ hồ.
+- Xung đột hậu tố/loại giấy (`bản sao`, `TLKT-BS`, `Giấy chứng tử`).
+- Nguồn có thể ghi đơn vị cũ `xã`/`phường`; owner nêu `xã ...` nhưng chưa chốt
+  cách xử lý tên đơn vị cũ, mốc sáp nhập và tra cứu địa danh theo ngày cấp.
+
+**Phạm vi ghi nhận:** chỉ xem xét/thảo luận logic đoạn Thừa kế dưới
+`D:\testcase`; đây không phải lệnh đọc mẫu. Việc đọc body đang bị gate README
+chặn, nên lượt này coverage mẫu là **0**, không đọc file owner/corpus và không
+chạy batch. Không đổi key/cutover/runtime/test/schema; #41 vẫn mở, gate mẫu **ĐÓNG**.
