@@ -48,3 +48,28 @@ Key/kiểu/format/nhóm/cardinality và cột DB/wire mới của các trường
   văn bản Notary. Không mở rộng Person/Asset/parties hoặc nghiệm thu toàn #41.
 - Giữ nguồn, JSON lịch sử, website SOT và người dùng tự Lưu. Proof dùng
   DOCX tổng hợp, DB/profile cô lập; không đọc corpus owner hoặc ghi chéo DB.
+
+## Bổ sung owner 20/10/2026 — SOT cấu trúc website
+
+- **Nam Định trước**, tại `https://congchungnamdinh.ninhbinh.gov.vn/`,
+  là website thứ nhất trong hai website Upload Lab cần khảo sát. Website thứ
+  hai chưa được định danh/khảo sát trong lượt này; không dùng cấu trúc hoặc
+  catalog Nam Định thay website đó.
+- Giữ **SOT cấu trúc website lâu dài** trong spec Upload: route/màn hình,
+  biểu mẫu/widget, danh mục dropdown và đường mapping extraction → chuẩn
+  Người–Tài sản–Hồ sơ → DB/wire → API/selector website. Ghi ngày, nguồn và
+  giới hạn kiểm chứng; cập nhật tại cùng nguồn khi website hoặc adapter đổi.
+  Nguồn bền vững: [SOT Nam Định](../specs/upload_lab/nam-dinh-website-sot.md);
+  README module/sổ tay dẫn tới đây, không phụ thuộc evidence tmp.
+- Có thể cần trường phụ theo website, nhưng **chưa duyệt schema mới**.
+  Phân loại riêng ID/nhãn catalog, cấu hình/policy/default portal, provenance
+  kỹ thuật và dữ liệu nghiệp vụ thật chưa có mapping. Không tự tạo canonical
+  key/cột DB hoặc nhét vào ghi chú; phí, thù lao, ghi chú, trạng thái và trường
+  giao dịch bị loại phải được xét đúng nghĩa trước quyết định.
+- Cấu trúc/options/API quan sát trên web chỉ là bằng chứng về website;
+  `contracts/entities.md` và contract được duyệt vẫn quyết định chuẩn app.
+  Catalog không nâng Upload workflow Draft thành approved hoặc mở gate #41.
+  Case 8 key đã implement; Person/Asset/parties chưa cutover đầy đủ.
+- Lượt này chỉ tài liệu và bằng chứng website an toàn: không sửa code/schema,
+  không ghi DB, không đọc testcase/corpus owner, không bấm Lưu hợp đồng hoặc
+  dùng credential ngoài quyền được cấp. Chờ review độc lập trước commit.

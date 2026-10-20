@@ -180,6 +180,16 @@ Hai tab đang có trong UI là `Audit Sổ Công Chứng` và `Quét & Upload H�
 App điền sẵn rồi dừng trước nút Lưu để người dùng tự kiểm tra; dữ liệu chính
 thức trên website là nguồn sự thật, không phải tín hiệu browser cục bộ.
 
+**SOT cấu trúc website — 20/10/2026:** [Nam Định](upload_lab/nam-dinh-website-sot.md)
+là website thứ nhất được catalog lâu dài: 17 input tĩnh, 6 catalog, 7 required
+tĩnh; route/widget/API và mapping DB/wire có nguồn. Public bundle không thay
+DOM authenticated (**0**) hoặc catalog authenticated đầy đủ (**0**); năm list
+còn thiếu đúng scope được nêu rõ. Auxiliary site fields có thể cần nhưng chưa
+duyệt schema; hai phí ngoài mapping và tổng/ghi chú/trạng thái giữ refinement
+#41. Person/Asset/parties chưa cutover, gate mẫu vẫn **ĐÓNG**. Website thứ hai
+chưa khảo sát; không tạo provider/canonical key mới từ catalog.
+
+
 | Màn / thao tác | Dùng để | Tài liệu | Điểm vào mã |
 |---|---|---|---|
 | Audit: chọn website | Chọn nguồn portal dùng chung cho hai tab | [UI](upload_lab/README.md#ui) | [audit.js](../../shell/src/renderer/upload/audit.js) · `buildAuditTab` |

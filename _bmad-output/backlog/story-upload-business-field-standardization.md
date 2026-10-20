@@ -81,6 +81,20 @@ Owner báo Upload đang bóc văn bản thành trường để điền website n
 - Evidence 19/10/2026: inventory source tĩnh có giới hạn đã thấy các key form `ten_hop_dong`, `ngay_cong_chung`, `so_cong_chung`, `nhom_hop_dong`, `loai_tai_san`, `cong_chung_vien`, `thu_ky`, `nguoi_yeu_cau`, `duong_su`, `tai_san`; các vùng Người/hàng đất có cấu trúc và output trình bày cùng tham gia luồng. Đây là ví dụ có căn cứ, không phải tuyên bố inventory toàn bộ đã xong.
 - Evidence 19/10/2026: các điểm cần catalog/refinement gồm thông tin công chứng, tiêu đề/nhóm/loại văn bản, chủ đất, discriminator loại tài sản, `phan_ghi_them` và `chi_tiet_dien_tich`. Không tự đồng nhất nhóm/loại Upload với enum Notary hiện tại hoặc ghi tất cả thành cột mới. Nội dung nghiệp vụ trong container tên `raw` vẫn cần mapping; chỉ raw/bằng chứng kỹ thuật thực sự mới là provenance.
 - Evidence 19/10/2026: `nguoi_yeu_cau`/`duong_su`/`tai_san` là output trình bày cần truy về dữ liệu Người/Tài sản/vai trò Hồ sơ đã chuẩn hóa, không thay canonical bằng chuỗi ghép. Các giá trị portal mặc định `tinh_trang`, `ghi_chu`, `phi_cong_chung`, `thu_lao_cong_chung` phải được phân loại theo nghĩa/consumer, không coi hằng/rỗng là dữ kiện đã bóc hoặc tự suy owner đã chọn chính sách phí công chứng. Raw/file/ambiguity evidence không là orphan nghiệp vụ.
+- Evidence 20/10/2026: [SOT Nam Định bền vững](../specs/upload_lab/nam-dinh-website-sot.md)
+  inventory toàn bộ **17 input public-static quick-create**, 6 catalog, 7 required
+  tĩnh; mapping source→canonical/raw/policy→DB-wire→selector/API. Repo có 15
+  mapping (14 fill-order entries + attachment selector nhưng attachment không
+  iterate); `chiphi.phiDvNgoaicongchung` và `chiphi.phikhac` thiếu mapping, tổng
+  có hidden path khác spelling. Không tự thêm key/cột; catalog IDs/config/
+  provenance khác nghiệp vụ phí/thù lao/ghi chú/trạng thái cần quyết định.
+  Nhánh prime validation có click Lưu được ghi trung thực, không sửa runtime.
+- Coverage 20/10/2026: **0 DOM authenticated, 0 catalog authenticated đầy đủ**;
+  status có 3 option static, group/asset public GET 403, title unscoped items=[]
+  không chứng minh list đơn vị rỗng; title/nhân sự đúng scope chưa có list.
+  Request quick-create source là POST `/api/hoso/nhap-nhanh` với form state,
+  chưa submit hoặc biết portal DB. Tài liệu không đóng #41, mở gate mẫu, duyệt
+  auxiliary business schema hoặc nghiệm thu đủ yêu cầu danh sách dropdown.
 - Open question: `ten_goi_khac` trong inventory cần chốt mapping của catalog; không tự nới #42 ngoài hai nhu cầu nhiều giấy tờ và địa chỉ. `cccd_khac` có trong một nhánh extraction không chứng minh DB/contract đã hỗ trợ Người nhiều giấy tờ.
 - Open question: catalog đầy đủ sẽ chốt key/kiểu/format/nhóm/cardinality/DB-wire-output còn thiếu và xung đột portal với trường đã loại. Đây là công việc refinement của issue, không yêu cầu owner chọn schema ngay lúc ghi nhận.
 - Risk: high — mapping sai có thể gắn thông tin sai Người/Tài sản/Hồ sơ hoặc mất dữ liệu lưu/điền web. Ngoài AC, reviewer độc lập cần đối chiếu catalog với các consumer và thiết kế bảo toàn dữ liệu trước cutover.

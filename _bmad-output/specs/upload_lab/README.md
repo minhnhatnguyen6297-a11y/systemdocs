@@ -1,6 +1,6 @@
 # Upload — đối chiếu kho Word và điền website
 
-**Cập nhật:** 15/10/2026. Spec hành vi module; giữ phân biệt hướng được owner chốt, đề xuất thị giác và giới hạn code đã quan sát.
+**Cập nhật:** 20/10/2026. Spec hành vi module; giữ phân biệt hướng được owner chốt, đề xuất thị giác và giới hạn code đã quan sát.
 
 ## 1. Mục đích và luồng
 
@@ -229,6 +229,27 @@ Bảng hồ sơ dùng đúng **sáu cột** (chuẩn MIN-77):
   [decision](../../decisions/decision-owner-regex-rule-developer-only-20261016.md));
   người dùng sản phẩm không có chức năng thử, công bố, chọn phiên bản hoặc
   quay lui rule.
+
+#### SOT cấu trúc website — Nam Định trước, 20/10/2026
+
+[Catalog Nam Định lâu dài](nam-dinh-website-sot.md) giữ route, toàn bộ 17
+input quick-create, widget, 6 catalog và mapping extraction → canonical →
+DB/wire → selector/API, kèm URL/module/hash nguồn. Đây là website thứ nhất;
+website thứ hai chưa được định danh/khảo sát, không dùng catalog này thay nó.
+Quan sát hiện có là **public static bundle**: 7 required tĩnh, 3 option trạng
+thái tĩnh; **0 DOM authenticated và 0 catalog authenticated đầy đủ**.
+Nhóm/loại tài sản trả 403, title không scope trả items=[] không chứng minh
+catalog đơn vị rỗng; list title/nhân sự đúng scope còn thiếu.
+
+Có thể cần auxiliary website fields nhưng **chưa duyệt business schema**:
+ID/label catalog, config/policy và provenance tách khỏi nghiệp vụ phí/thù
+lao/ghi chú/trạng thái cần refine #41. Hai phí ngoài mapping repo và tổng
+website được ghi rõ, không tự thêm key/cột hoặc đổ ghi chú. Case 8 key đã
+implement; Person/Asset/parties chưa cutover, toàn #41 chưa xong, gate mẫu
+vẫn **ĐÓNG**. Catalog source-level cũng ghi discrepancy file không trong fill
+order và nhánh prime validation có click Lưu; không sửa runtime hoặc coi
+tài liệu là nghiệm thu portal. [Quyết định owner](../../decisions/decision-owner-upload-field-standardization-20261019.md#bổ-sung-owner-20102026--sot-cấu-trúc-website).
+
 
 ### 2.5. Quy tắc hiển thị chung
 
