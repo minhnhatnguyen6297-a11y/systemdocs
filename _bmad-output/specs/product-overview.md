@@ -107,16 +107,19 @@ trước/sau mỗi lô; audit trường chuẩn và mapping từng biến thể 
 đúng. Catalog nền chưa đủ trường Hồ sơ/Upload và không chứng minh đã khảo sát
 nội dung mẫu.
 
-**Owner 21/10/2026 — sáu quy tắc Người chết đã CHỐT, chỉ cập nhật tài liệu:**
+**Owner 21/10/2026 — sáu quy tắc Người chết đã CHỐT, đã giao runtime hẹp:**
 Nơi chết/cư trú cuối chung một `dia_chi`; `Giấy chứng tử (bản sao)` quy về
 `Giấy chứng tử`, chỉ ba loại cùng `Trích lục khai tử` và `Trích lục khai tử (bản sao)`.
 Giữ cơ quan xã/phường/thị trấn theo ngày cấp giấy, không ép xã/suy lịch sử
 chưa xác nhận. Không đề xuất bổ sung hoặc tự ghép giữa văn bản; không gợi ý
 từ Đơn xin xác nhận. Thiếu ngày chết là không có thông tin, có trường hợp
 lệ nào điền trường đó, không chặn Người/tự coi còn sống/tạo field mới.
-Logic câu Word/trường tĩnh giữ nguyên. Runtime vẫn **TẠM DỪNG**; grammar,
-số TLKT raw-only/UNIQUE/derive chưa được sửa, #41 OPEN/chưa nghiệm thu.
-Ngoại lệ đọc hẹp trước đó cho Người chết Thừa kế không mở gate chung/lô mới.
+Logic câu Word/trường tĩnh giữ nguyên. Owner tiếp tục **“trien khai”**:
+workstream Người chết **đã BUILT bounded** (parser/intake, số thật lưu an toàn,
+migration/consumer/Word, UI legacy giới hạn); actual proof implementer-run
+164 checks gồm fresh+migrated DB/Word. **Chưa nghiệm thu toàn #41**.
+Chỉ proof DOCX/SQLite riêng/Word tổng hợp, không mẫu thật/prodDB/corpus/
+Electron packaged; không mở #42/A04/quan hệ hoặc gate chung.
 
 Việc đang mở được tổng hợp tại [catalog issue](../backlog/README.md)
 (16/10/2026; #17 built after independent Quick t2 clean; Upload failures and proof limits remain in the catalog/runtime record).

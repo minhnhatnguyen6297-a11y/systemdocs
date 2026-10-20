@@ -5,21 +5,23 @@ from sqlalchemy.sql import func
 from database import Base
 
 
-def derive_person_fields(ngay_chet, ngay_cap):
+def derive_person_fields(ngay_chet, ngay_cap, loai_giay_to=None, loai_dia_chi=None):
     """Trường suy ra của Người từ input nguồn → tuple
     `(loai_giay_to, noi_cap, loaicutru, loai_dia_chi)`.
 
     Mốc phân biệt giấy tờ cũ/mới = 01/10/2024 (owner chốt 29/09/2026).
-    Người chết (có `ngay_chet`) không suy loại giấy tờ/nơi cấp — đó là
-    bằng chứng người dùng xác nhận, sống trong snapshot hồ sơ; nhãn địa
-    chỉ = "Nơi chết". Người sống thiếu `ngay_cap` → None (chưa xác định,
-    không tự suy cơ quan cụ thể).
+    Ngày chết hoặc loại giấy/nhãn Nơi chết đã xác nhận trong snapshot cho
+    biết ngữ cảnh chết, kể cả thiếu ngày. Không suy loại giấy/nơi cấp cho
+    ngữ cảnh này; nhãn địa chỉ = "Nơi chết". Master không có các bằng chứng
+    snapshot không thể tự khôi phục chúng. Thiếu ngày cấp → không suy cơ quan.
 
     Đây là SOT của rule suy ra: property Customer.* gọi hàm này, và
     case_workspace dùng nó để tính lại giá trị suy ra từ input nguồn
     đã commit trong snapshot — không qua master live (MIN-141 review)."""
     from datetime import date as _date
-    if ngay_chet is not None:
+    if (ngay_chet is not None or loai_dia_chi == "Nơi chết"
+            or loai_giay_to in ("Trích lục khai tử",
+                                "Trích lục khai tử (bản sao)", "Giấy chứng tử")):
         return None, None, "Nơi chết", "Nơi chết"
     if not ngay_cap:
         return None, None, None, None
@@ -41,8 +43,8 @@ class Customer(Base):
     ho_ten       = Column(String(200), nullable=False)
     gioi_tinh    = Column(String(10),  nullable=True)           # Nam / Nữ
     ngay_sinh    = Column(Date,        nullable=True)
-    ngay_chet    = Column(Date,        nullable=True)            # NULL = còn sống
-    so_giay_to   = Column(String(50),  nullable=True,  unique=True)
+    ngay_chet    = Column(Date,        nullable=True)            # NULL = không có thông tin
+    so_giay_to   = Column(String(50),  nullable=True, index=True)
     ngay_cap     = Column(Date,        nullable=True)
     dia_chi      = Column(Text,        nullable=True)
     created_at   = Column(DateTime,    server_default=func.now())

@@ -137,7 +137,7 @@ Người sửa theo dòng; tài sản theo cột. Thêm/sửa/xóa/sắp xếp c
 | Loại đất | Mỗi tài sản tối đa 20 cụm loại đất–diện tích–thời hạn. Có thể để danh sách trống. Giữ vị trí trống; bỏ thời hạn lẻ cấp tài sản, không tự đắp vào cụm. |
 | Hồ sơ | Nơi niêm yết nhập tay; người nhận ủy quyền từ danh mục/tạo mới; nội dung việc nhập tay. Ba dòng đặt dưới tài sản. |
 
-**Người chết — owner 21/10/2026 đã chốt, docs-only:** `Nơi chết` và nơi thường
+**Người chết — owner 21/10/2026 đã chốt và giao runtime hẹp:** `Nơi chết` và nơi thường
 trú/cư trú cuối cùng dùng cùng `dia_chi` hiện có, không thêm field/đổi câu Word
 hoặc tự chọn giá trị mâu thuẫn. Ba loại là `Trích lục khai tử`,
 `Trích lục khai tử (bản sao)`, `Giấy chứng tử`; nguồn `Giấy chứng tử (bản sao)`
@@ -152,8 +152,11 @@ có thông tin: giữ `null`/rỗng, các trường có căn cứ được phép
 không chặn Người vì thiếu ngày/giấy, không tự coi còn sống hoặc tạo ngày giả/
 Boolean/status. Địa chỉ chung rõ phạm vi và nhắc lại cùng người trong một
 văn bản vẫn theo nguồn khi không mâu thuẫn; không suy chung giấy.
-Raw/history/liên kết đã có giữ nguyên. Runtime tạm dừng; grammar giấy, số
-TLKT raw-only/UNIQUE và derive còn giới hạn, chưa nghiệm thu #41.
+Raw/history/liên kết đã có giữ nguyên. Số giấy lưu nguyên giá trị, không
+UNIQUE/tự ghép theo số; cập nhật chỉ theo ID chọn rõ hoặc row_id của chính
+hồ sơ. Snapshot giữ bằng chứng loại/nơi cấp/nhãn, kể cả chết thiếu ngày.
+Migration/consumer đã được actual proof synthetic (fresh+migrated DB, exact
+Word; UI legacy giới hạn); **BUILT bounded**, chưa nghiệm thu toàn #41.
 
 Tên và định dạng trường giữ chuẩn DB; alias cũ cần ánh xạ. Hai alias của cùng trường trái nhau phải báo lỗi, không chọn ngầm. Cụm đất lưu `property_land_rows`, duy nhất theo tài sản và vị trí; JSON cũ chỉ tương thích. Tên token cụm viết đủ `loaidat<M><N>`, `dientich<M><N>`, `thoihan<M><N>`: M là cụm, N là tài sản; không thêm dạng rút gọn gây lẫn cụm 12 với tài sản 2.
 

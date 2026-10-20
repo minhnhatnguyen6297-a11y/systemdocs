@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from database import (
     Base,
     engine,
-    migrate_customers_nullable,
+    migrate_customers_document_number,
     migrate_inheritance_case_properties_schema,
     migrate_inheritance_cases_schema,
     migrate_properties_schema,
@@ -32,7 +32,7 @@ app_logger = logging.getLogger("notary.web")
 app_logger.info("Web logging initialized at %s", WEB_LOG_PATH)
 
 # Run schema migration before create_all.
-migrate_customers_nullable()
+migrate_customers_document_number()
 migrate_inheritance_cases_schema()
 migrate_properties_schema()
 migrate_properties_serial()

@@ -311,9 +311,14 @@ Fresh bank-auto review CLEAN/Ticket PASS; final semantic smoke parser8b503e7f/up
 | `ten_goi_khac`, `entity_lines`, vai trò requester/Bên A/Bên B | R05 không tự điền/không mở rộng chuẩn alias; entity/quan hệ chưa canonical cutover | Giữ raw/lịch sử; alias nếu cần user điền tay, không nối vào `ten`; pháp nhân khác nhập tay, ngân hàng thế chấp app tự lấy cụm nguồn theo §6.1; nhóm/quan hệ xem D05–D07 |
 | `raw_text`, line/span/source_refs | provenance | giữ nguồn, không dùng chuỗi raw để claim canonical cutover |
 
-Proof: `contract_extract.py:3688-3754:_extract_plain_text_person_entries`, `4608-4620:_extract_nguoi_chet`; `contracts/entities.md:150-185`; `contracts/notary-case-drafting.md:246-283:person_row`; `notary_v2/models.py:36-48:Customer`; `case_workspace.py:306-310:_PERSON_KEY_ALIASES`, `2495-2569:_upsert_people`, `2768-2779:_build_payload`. Notary DOCX mapper **thực** là `services/document_intake/adapters/docx.py:49-57:PERSON_FIELD_SOURCES`, loop người hai bên và loop riêng `raw.nguoi_chet` (approved Person fields; số TLKT raw-only). Alias/R05 không auto; `329-343` giữ multi-ID refs + `intake.ambiguous`. Cùng dùng lõi không phải luồng Upload→Notary DB.
+Điểm vào: `contract_extract.py:_extract_nguoi_chet`; `contracts/entities.md:§8`;
+`contracts/notary-case-drafting.md:§4.1`; `models.py:Customer`;
+`case_workspace.py:_upsert_people/_person_wire`. DOCX mapper có loop Người
+hai bên và loop riêng Người chết, số giấy thật qua `so_giay_to`; loại/nơi cấp/
+nhãn là snapshot. Alias/R05 không auto; multi-ID vẫn ambiguous/#42 riêng.
+Cùng dùng lõi không tự là luồng Upload→Notary DB.
 
-**Owner 21/10/2026 — Người chết đã chốt nghiệp vụ, chưa cutover:** dùng cùng
+**Owner 21/10/2026 — Người chết đã chốt nghiệp vụ, runtime BUILT bounded:** dùng cùng
 trường Người; `Nơi chết`/cư trú cuối là một `dia_chi`, không thêm field hoặc
 chọn ngầm khi nguồn mâu thuẫn. Chỉ ba loại `Trích lục khai tử`,
 `Trích lục khai tử (bản sao)`, `Giấy chứng tử`; nguồn `Giấy chứng tử (bản sao)`
@@ -327,9 +332,12 @@ giấy tờ Người từ `Đơn xin xác nhận`. Thiếu ngày chết chỉ gi
 có trường có căn cứ được phép nào thì điền trường đó; không chặn Người vì
 thiếu ngày/giấy, không tự coi còn sống hoặc tạo ngày giả/Boolean/status.
 Giữ raw/history/liên kết, địa chỉ chung rõ phạm vi trong cùng văn bản và
-logic câu Word/trường tĩnh. Đây không đổi phạm vi requester ở §6.1; số TLKT
-raw-only/UNIQUE, grammar và derive vẫn là giới hạn hiện có. Runtime tạm dừng,
-#41 OPEN/gate chung ĐÓNG ngoài ngoại lệ đọc hẹp đã ghi; không có proof mới.
+logic câu Word/trường tĩnh. Đây không đổi phạm vi requester ở §6.1.
+Số TLKT/chứng tử vào `so_giay_to`, không UNIQUE/lookup theo số hoặc tên;
+ID chọn rõ/same-case row_id giữ identity, snapshot giữ nguồn kể cả null.
+Migration giữ ID/FK/history; actual proof synthetic fresh+migrated DB/Word đạt,
+UI legacy giới hạn; **BUILT bounded hẹp**, chưa toàn #41.
+Gate chung ĐÓNG ngoài ngoại lệ đọc hẹp trước đó; không có lượt mẫu mới.
 
 ### 6.2 Tài sản và cụm đất
 
@@ -442,7 +450,7 @@ Các locator dưới đây là **source tĩnh đã đọc**, không kết quả 
 | **S-A** | E `1779–1810:_new_thua_dat`; `2171–2191:thua_dat_sang_land_rows`; `2257–2268:bullet_labels` hình thức sử dụng/Ghi chú chung đổ vào `phan_ghi_them`, `nguon_goc` giữ `*_values`; `2511–2541` detail/bộ ba/`o_tho`; `5086–5098` output parcel |
 | **S-T** | E `1007–1116:_find_tai_san_by_kind` khác vùng tài sản theo loại; `4768–4780:_phat_hien_tai_san_chua_ho_tro`; không chứng minh bóc đủ xe/sổ tiết kiệm/bảo hiểm |
 | **S-C** | `contracts/entities.md:150–185,205–231,240–267`; `contracts/notary-case-drafting.md:246–285,314–362`: Người/Asset/land_rows/Case hiện có; không schema quan hệ Upload mới |
-| **S-N** | N `PERSON_FIELD_SOURCES` (gồm `gioi_tinh` emit riêng bằng title locator, không qua `map_fields`), `ASSET_FIELD_SOURCES`/`GROUP_FIELD_SOURCES` (gồm `nguon_goc`), `_PARCEL_MULTI_VALUE_SOURCES`/`_GROUP_MULTI_VALUE_SOURCES` cho `nguon_goc_values`; `hinh_thuc_su_dung` đọc trực tiếp label trong cửa sổ tài sản; `map_fields` + person loop mapper người hai bên, `emit_asset` parcel/group → land rows. Người chết: loop riêng từ `raw.nguoi_chet` map `ho_ten/gioi_tinh/ngay_sinh/ngay_chet/loai_giay_to/ngay_cap/noi_cap/dia_chi`; số TLKT không vào `so_giay_to`/Customer unique, raw giữ. Alias/R05 không map; danh xưng trung tính/thiếu giữ null, không suy từ tên. |
+| **S-N** | N `PERSON_FIELD_SOURCES`/`DECEASED_PERSON_FIELD_SOURCES`, `ASSET_FIELD_SOURCES`/`GROUP_FIELD_SOURCES`; danh xưng có source token riêng, multi-value giữ ambiguity. Người chết map tên/giới tính/sinh/chết/**số**/loại/ngày cấp/nơi cấp/địa chỉ và nhãn Nơi chết nguồn. Số là freeform không identity; snapshot giữ loại/nơi cấp/nhãn, thiếu ngày không derive CCCD. Alias/R05 không map, không suy giới tính từ tên. |
 | **S-J** | `upload_lab/batch_scan.py:32–36,180–203,366–370,726–738`: chỉ Case JSON nhỏ ở registry; payload lớn ở file JSON. Mọi dòng **J** bên dưới mang đúng giới hạn này, không ghi Notary DB |
 
 | Loại nguồn đã có nhánh code | Khác biệt thực cần giữ khi review, không là claim accuracy trên corpus |
@@ -460,7 +468,7 @@ Các locator dưới đây là **source tĩnh đã đọc**, không kết quả 
 |---|---|---|---|---|---|
 | **W09-R01** · Họ tên, danh xưng | `nguoi[].ho_ten/gioi_tinh`, raw formatter; S-P/S-R | `ten`; `gioitinh` wire Nam/Nữ/null khác Ông/Bà; DOCX intake map `gioi_tinh` chỉ từ danh xưng rõ (Ông→Nam, Bà→Nữ) với source ref đúng token danh xưng, kể cả dòng bảng không `raw_text`; danh xưng trung tính/thiếu → null, không suy từ tên/Thị/năm sinh/ID; **J** | Tái dùng chuẩn rồi dựng hiển thị | Không gộp Ông/Bà/quan hệ vào tên; chỉ dùng giới tính/danh xưng có căn cứ, không đoán từ tên. Không cần field web trùng Person | **ĐÃ MAP/CUTOVER kỹ thuật cho DOCX intake**; không claim toàn bộ người/Excel/OCR |
 | **W09-R02** · Ngày/năm sinh; ngày chết trong dữ liệu nguồn | `ngay_sinh/chi_co_nam_sinh`; người chết nguồn riêng | `ngaysinh/ngaychet` giữ YYYY/full date; **J** | Giữ trường Person/raw/snapshot đúng nghĩa | Người chết không vào requester theo đáp án #43, nhưng không xóa giấy khai tử/ngày chết khỏi dữ liệu Hồ sơ thừa kế. DOCX intake map ngày sinh/ngày chết theo source evidence, kể cả năm; không suy ngày/không merge theo tên. | **ĐÃ MAP một phần DOCX intake**; requester membership đã trả lời |
-| **W09-R03** · Giấy tờ, loại, ngày cấp, cơ quan cấp | `cccd/ngay_cap_cccd/noi_cap`; chết: `so_giay_to/ngay_cap/loai_giay_to`; S-P | `sogiayto/ngaycap/noicap/loaigiayto`; snapshot/master theo §6.1; **J** | Tái dùng chuẩn + hiển thị theo loại giấy tờ | Không ép mọi giấy thành CCCD; issuer snapshot có nghĩa riêng, không tự đồng nhất cơ quan công chứng. DOCX intake map `loai_giay_to/ngay_cap/noi_cap` cho người chết chỉ khi doctype nguồn rõ (TLKT); số TLKT **không** vào `so_giay_to`/Customer unique, raw giữ. | **ĐÃ MAP một phần DOCX intake**; #42 độc lập, không hỏi lại |
+| **W09-R03** · Giấy tờ, loại, ngày cấp, cơ quan cấp | `cccd/ngay_cap_cccd/noi_cap`; chết: `so_giay_to/ngay_cap/loai_giay_to`; S-P | `sogiayto/ngaycap/noicap/loaigiayto`; snapshot/master theo §6.1; **J** | Tái dùng chuẩn + hiển thị theo loại giấy tờ | Ba loại canonical; Giấy chứng tử (bản sao) quy về Giấy chứng tử. Số giấy giữ nguyên phần quyển/dấu câu qua intake và lưu Person; không UNIQUE/auto join. Issuer theo chính giấy tại ngày cấp, snapshot giữ nguồn; không lấy issuer văn bản khác. | **BUILT bounded, actual proof synthetic**; chưa toàn #41/#42 |
 | **W09-R04** · Địa chỉ và nhãn địa chỉ | `dia_chi/dia_chi_line`, người chết địa chỉ cuối; S-P/S-R | `diachi/loaidiachi`, line chỉ presentation; **J** | Tái dùng chuẩn + dựng nhãn theo nguồn/quy tắc đã chốt | Không nhân đôi địa chỉ vì ô web dài; không tự đổi nơi chết thành thường trú. Đa địa chỉ thuộc #42 | **ĐÃ CHỐT scalar** |
 | **W09-R05** · Tên gọi khác | `raw.nguoi_chet[].ten_goi_khac`; S-P | **J raw/lịch sử**, chưa field alias approved | Không tự điền alias vào output chuẩn/không mở rộng chuẩn hóa; nếu cần user điền tay | Owner “bỏ tên gọi khác – nếu có user điền tay”; không nối vào `ten`, thêm field alias hoặc mở rộng normalization/#42; giữ raw/lịch sử, runtime chưa đổi | **ĐÃ CHỐT**, không hỏi lại |
 | **W09-R06** · Ai là requester | Baseline first B/fallback A/lookup | **J**, chưa membership canonical cutover | Mọi cá nhân sống tham gia/đại diện, không cần tag A/B; không người chết/CCV/nhân viên | Một lần mỗi identity xác nhận theo nguồn; không prose/lookup/ưu tiên bên, giữ history | **Q1/BANKMODE đủ đáp án**, handoff #41 |

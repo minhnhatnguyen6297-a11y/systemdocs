@@ -274,7 +274,7 @@ Không thêm field ngoài danh sách này — producer strip field lạ (tiền 
 backend hiện strip ngoài 10 key). `ho_ten` rỗng/`""` →
 `stage_validation_error{field:ho_ten, code:required}`.
 
-**Owner 21/10/2026 — nghĩa trường đã chốt, docs-only, không đổi wire/key:**
+**Owner 21/10/2026 — nghĩa trường đã chốt, đã giao runtime hẹp, không đổi wire/key:**
 - `dia_chi` là **một trường hiện có** dùng chung cho `Nơi chết` và nơi thường
   trú/cư trú cuối cùng của người chết. Không tạo field mới hoặc chọn ngầm khi
   giá trị mâu thuẫn. Địa chỉ chung ghi rõ trong cùng văn bản chỉ áp đúng nhóm.
@@ -291,9 +291,14 @@ backend hiện strip ngoài 10 key). `ho_ten` rỗng/`""` →
   không chặn Người. Không tạo ngày giả/01/01, Boolean hoặc status mới.
   Không xóa raw/history, phá liên kết đã có hoặc đổi logic câu Word.
 
-Quy tắc này chưa là bằng chứng runtime đáp ứng: nhánh derive theo ngày chết,
-grammar giấy, số TLKT raw-only và UNIQUE/lookup hiện có vẫn là giới hạn triển
-khai #41; runtime tạm dừng, không cutover/schema/migration trong lượt docs.
+**Identity/persistence:** số giấy là giá trị không UNIQUE, không lookup/
+ghép Người theo số/tên. Chỉ ID được chọn rõ hoặc row_id trong snapshot
+của chính hồ sơ cập nhật lại cùng Người; trùng entity vẫn bị từ chối.
+Loại/nơi cấp/nhãn nguồn giữ trong snapshot; key đã có kể cả null chặn
+borrow master. Ngày chết thiếu nhưng có loại giấy chết/nhãn Nơi chết nguồn
+thì không derive CCCD/issuer người sống. Migration giữ IDs/FKs/history,
+không thêm field/version. Actual proof synthetic fresh+migrated DB/Word đạt;
+**BUILT bounded hẹp**, chưa nghiệm thu #41.
 
 - **Key canonical (MIN-141 đợt 3):** server đọc được cả key wire legacy
   trên và tên nghiệp vụ canonical liền không dấu (entities.md §9.1):
@@ -302,12 +307,12 @@ khai #41; runtime tạm dừng, không cutover/schema/migration trong lượt do
   `noicap`↔`noi_cap`, `diachi`↔`dia_chi`, `loaigiayto`↔`loai_giay_to`,
   `loaidiachi`↔`loai_dia_chi`. Cùng trường ở cả hai spelling mà giá trị
   mâu thuẫn → `validation_error`. Wire emit giữ bộ legacy.
-- **Giá trị suy ra hiện trạng (đợt 3, chưa phải đã đáp ứng đáp án 21/10):** người sống thiếu `loai_giay_to`/`noi_cap`/
-  `loai_dia_chi` → server derive theo mốc `ngay_cap` 01/10/2024 và ghi
-  giá trị hiệu lực vào snapshot commit; thiếu `ngay_cap` → `null`
-  (chưa xác định, không suy). Người chết (`ngay_chet` ≠ null): server
-  KHÔNG tự suy — chỉ giữ giá trị người dùng xác nhận; `loai_dia_chi`
-  mặc định `"Nơi chết"`.
+- **Giá trị suy ra:** người sống thiếu `loai_giay_to`/`noi_cap`/
+  `loai_dia_chi` → derive theo mốc `ngay_cap` 01/10/2024; thiếu ngày cấp
+  không suy. Khi có ngày chết **hoặc** loại giấy chết/nhãn `Nơi chết` có
+  nguồn trong snapshot, server không dựng CCCD/nơi cấp người sống; loại/nơi
+  cấp theo bằng chứng được xác nhận, nhãn địa chỉ `Nơi chết`. Không biến
+  mọi người thiếu ngày chết thành người chết hoặc thêm field trạng thái.
 - **Phân biệt bằng chứng xác nhận vs giá trị suy ra (MIN-141 fix
   `eff4f12`):** giá trị suy ra đã ghi trong snapshot trước KHÔNG được
   coi là bằng chứng người dùng xác nhận. Tại commit mới, server tính

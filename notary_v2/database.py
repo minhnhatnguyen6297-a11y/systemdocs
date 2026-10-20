@@ -1,6 +1,7 @@
 import json
 import logging
 import math
+import re
 import sqlite3
 from pathlib import Path
 from sqlalchemy import create_engine, event
@@ -39,34 +40,121 @@ def assert_foreign_key_check():
         raise RuntimeError("SQLite foreign key check failed")
 
 
-def migrate_customers_nullable():
-    """Chuyển các cột customers (trừ ho_ten) sang nullable nếu chưa có."""
+def migrate_customers_document_number():
+    """Remove number identity without changing Customer IDs or dependent data.
+
+    Rebuild from the actual DDL, retaining extra columns, constraints, indexes
+    and triggers. Foreign keys are checked before commit and enabled on exit.
+    """
     con = sqlite3.connect(DB_PATH)
-    cur = con.cursor()
-    cur.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='customers'")
-    row = cur.fetchone()
-    if row and "NOT NULL" in row[0]:
-        cur.executescript("""
-            PRAGMA foreign_keys=off;
-            BEGIN;
-            CREATE TABLE customers_new (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                ho_ten      VARCHAR(200) NOT NULL,
-                gioi_tinh   VARCHAR(10),
-                ngay_sinh   DATE,
-                ngay_chet   DATE,
-                so_giay_to  VARCHAR(50) UNIQUE,
-                ngay_cap    DATE,
-                dia_chi     TEXT,
-                created_at  DATETIME DEFAULT (CURRENT_TIMESTAMP)
-            );
-            INSERT INTO customers_new SELECT id,ho_ten,gioi_tinh,ngay_sinh,ngay_chet,so_giay_to,ngay_cap,dia_chi,created_at FROM customers;
-            DROP TABLE customers;
-            ALTER TABLE customers_new RENAME TO customers;
-            COMMIT;
-            PRAGMA foreign_keys=on;
-        """)
-    con.close()
+    try:
+        con.execute("PRAGMA foreign_keys=ON")
+        row = con.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='customers'"
+        ).fetchone()
+        if row is None:
+            return
+        ddl = row[0]
+        indexes = con.execute("PRAGMA index_list(customers)").fetchall()
+        number_indexes = set()
+        for index in indexes:
+            name = index[1].replace('"', '""')
+            columns = con.execute(f'PRAGMA index_info("{name}")').fetchall()
+            if index[2] and [column[2] for column in columns] == ["so_giay_to"]:
+                number_indexes.add(index[1])
+        optional = {"gioi_tinh", "ngay_sinh", "ngay_chet", "so_giay_to",
+                    "ngay_cap", "dia_chi"}
+        nullable_needed = any(
+            column[1] in optional and column[3]
+            for column in con.execute("PRAGMA table_info(customers)")
+        )
+        if not number_indexes and not nullable_needed:
+            con.execute("CREATE INDEX IF NOT EXISTS ix_customers_so_giay_to "
+                        "ON customers(so_giay_to)")
+            con.commit()
+            return
+        objects = con.execute(
+            "SELECT type, name, sql FROM sqlite_master "
+            "WHERE tbl_name='customers' AND type IN ('index','trigger') "
+            "AND sql IS NOT NULL"
+        ).fetchall()
+        # Split only top-level declarations, not commas inside CHECK/defaults.
+        start, end = ddl.index("("), ddl.rindex(")")
+        declarations, last, depth, quote = [], start + 1, 0, None
+        i = last
+        while i < end:
+            char = ddl[i]
+            if quote:
+                if char == quote:
+                    if i + 1 < end and ddl[i + 1] == quote:
+                        i += 1
+                    else:
+                        quote = None
+            elif char in ('"', "'", '`', '['):
+                quote = ']' if char == '[' else char
+            elif char == '(':
+                depth += 1
+            elif char == ')':
+                depth -= 1
+            elif char == ',' and depth == 0:
+                declarations.append(ddl[last:i])
+                last = i + 1
+            i += 1
+        declarations.append(ddl[last:end])
+        rewritten = []
+        for declaration in declarations:
+            if re.fullmatch(
+                r'\s*(?:CONSTRAINT\s+\S+\s+)?UNIQUE\s*\(\s*["`\[]?'
+                r'so_giay_to["`\]]?\s*\)\s*(?:ON\s+CONFLICT\s+\w+)?\s*',
+                declaration, re.I,
+            ):
+                continue
+            column = re.match(r'\s*["`\[]?(\w+)["`\]]?\s+', declaration)
+            if column and column[1] in optional:
+                declaration = re.sub(r'\s+NOT\s+NULL\b', '', declaration, flags=re.I)
+                if column[1] == "so_giay_to":
+                    declaration = re.sub(
+                        r'\s+UNIQUE\b(?:\s+ON\s+CONFLICT\s+\w+)?', '',
+                        declaration, flags=re.I)
+            rewritten.append(declaration)
+        new_ddl = ('CREATE TABLE customers_document_new (' +
+                   ','.join(rewritten) + ddl[end:])
+        columns = [column[1] for column in con.execute("PRAGMA table_info(customers)")]
+        quoted_columns = ','.join('"' + name.replace('"', '""') + '"' for name in columns)
+        sequence = None
+        if "AUTOINCREMENT" in ddl.upper():
+            sequence = con.execute(
+                "SELECT seq FROM sqlite_sequence WHERE name='customers'").fetchone()
+        # SQLite's parent-table rebuild requires FK enforcement off outside
+        # the transaction; otherwise DROP can cascade-delete dependent rows.
+        con.execute("PRAGMA foreign_keys=OFF")
+        con.execute("BEGIN IMMEDIATE")
+        try:
+            con.execute(new_ddl)
+            con.execute(f"INSERT INTO customers_document_new ({quoted_columns}) "
+                        f"SELECT {quoted_columns} FROM customers")
+            con.execute("DROP TABLE customers")
+            con.execute("ALTER TABLE customers_document_new RENAME TO customers")
+            for kind, name, sql in objects:
+                if kind == "index" and name in number_indexes:
+                    sql = re.sub(r'\bCREATE\s+UNIQUE\s+INDEX\b',
+                                 'CREATE INDEX', sql, count=1, flags=re.I)
+                con.execute(sql)
+            con.execute("CREATE INDEX IF NOT EXISTS ix_customers_so_giay_to "
+                        "ON customers(so_giay_to)")
+            if sequence:
+                con.execute("UPDATE sqlite_sequence SET seq=? WHERE name='customers'",
+                            sequence)
+            if con.execute("PRAGMA foreign_key_check").fetchone():
+                raise sqlite3.IntegrityError("Customer migration foreign key violation")
+            con.commit()
+        except Exception:
+            con.rollback()
+            raise
+        finally:
+            con.execute("PRAGMA foreign_keys=ON")
+    finally:
+        con.close()
 
 
 def _ensure_table_columns(cur, table_name: str, expected_columns: dict[str, str]):

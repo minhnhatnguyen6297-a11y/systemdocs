@@ -2184,9 +2184,8 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual([q["ho_ten"] for q in persons], ["Hoàng Thị Hanh"])
         self.assertEqual(persons[0]["cccd"], "036132002879")
 
-    def test_nguoi_chet_nam_co_trich_luc_khai_tu(self):
-        # "chết năm 2016 theo Trích lục khai tử" -> nguoi chet that
-        # (bang chung TLKT); "chết năm" troi khong TLKT van bo.
+    def test_explicit_death_year_is_kept_with_or_without_death_paper(self):
+        # Missing paper does not erase a clearly stated death year.
         from regex_workbench.engine.contract_extract import _extract_nguoi_chet
         text = (
             "Mẹ đẻ của chúng tôi là bà Nguyễn Thị Ngò - Sinh năm 1923; "
@@ -2197,9 +2196,11 @@ class UploadLabExtractContractTests(unittest.TestCase):
             "- Ông Nguyễn Văn A có bố đẻ là ông Nguyễn Văn B, đã chết năm 1990."
         )
         chet = _extract_nguoi_chet(text)
-        self.assertEqual([q["ho_ten"] for q in chet], ["Nguyễn Thị Ngò"])
+        self.assertEqual([q["ho_ten"] for q in chet], ["Nguyễn Thị Ngò", "Nguyễn Văn B"])
         self.assertEqual(chet[0]["ngay_chet"], "2016")
         self.assertEqual(chet[0]["ngay_sinh"], "1923")
+        self.assertEqual(chet[1]["ngay_chet"], "1990")
+        self.assertEqual(chet[1]["so_giay_to"], "")
         self.assertEqual(chet[0]["so_giay_to"], "95/2026/TLKT")
         self.assertEqual(
             chet[0]["dia_chi"],
@@ -2309,9 +2310,8 @@ class UploadLabExtractContractTests(unittest.TestCase):
         self.assertEqual(parcels[1]["muc_dich_su_dung"], "Ao nuôi cá")
 
     def test_nguoi_chet_chet_nam_tu_choi_co_quan_he(self):
-        # VB từ chối: "Bố đẻ tôi là ông X; Sinh năm 1924, đã chết năm 2007"
-        # — chết năm KHÔNG trích lục vẫn nhận vì trước có "Bố đẻ"
-        # (11/10/2026). Các kind khác vẫn cần trích lục/khai tử.
+        # Explicitly stated death years remain facts without a death paper;
+        # document kind does not turn missing paper into a required-field gate.
         from regex_workbench.engine.contract_extract import _extract_nguoi_chet
         text = (
             "Bố đẻ tôi là ông Dương Xuân Khả; Sinh năm 1924, đã chết năm 2007; "
@@ -2321,8 +2321,7 @@ class UploadLabExtractContractTests(unittest.TestCase):
         chet = _extract_nguoi_chet(text, "inheritance_refusal")
         self.assertEqual([p["ho_ten"] for p in chet], ["Dương Xuân Khả", "Trịnh Thị Đai"])
         self.assertEqual(chet[0]["ngay_chet"], "2007")
-        # Van ban phan chia: cung cau do phai bi loai (can trich luc).
-        self.assertEqual(_extract_nguoi_chet(text, "inheritance_partition"), [])
+        self.assertEqual(_extract_nguoi_chet(text, "inheritance_partition"), chet)
 
     def test_nguoi_chet_ngoac_gop_sinh_va_chet(self):
         # "Bố chúng tôi là ông X (sinh năm 1956, đã chết ngày 16/01/2025)

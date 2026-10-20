@@ -78,7 +78,9 @@ class WordPerson:
 
     @property
     def is_deceased(self) -> bool:
-        return bool(self.ngay_chet)
+        return bool(self.ngay_chet or self.loai_dia_chi == "Nơi chết"
+                    or self.loai_giay_to in ("Trích lục khai tử",
+                                            "Trích lục khai tử (bản sao)", "Giấy chứng tử"))
 
     @property
     def is_alive(self) -> bool:

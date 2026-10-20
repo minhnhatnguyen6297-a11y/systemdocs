@@ -1840,21 +1840,20 @@ class CaseWorkspaceService:
     def _person_wire(self, row_id: str, entity: Optional[int],
                      customer: Optional[Customer],
                      snap: Mapping[str, Any]) -> dict:
-        # Bằng chứng đã xác nhận trong snapshot ưu tiên (MIN-141 đợt 3).
-        # Người chết: loại giấy tờ/nơi cấp KHÔNG suy từ master — chỉ đọc
-        # giá trị đã commit trong snapshot; thiếu → None (chưa xác định).
-        # Người sống: thiếu snapshot → derive theo mốc ngay_cap; thiếu
-        # ngày vẫn None (không tự suy cơ quan).
-        alive = customer.con_song if customer is not None else None
-        noi_cap = _nn(snap.get("noi_cap"))
-        if noi_cap is None and customer is not None and alive:
-            noi_cap = customer.noi_cap
-        loai_giay_to = _nn(snap.get("loai_giay_to"))
-        if loai_giay_to is None and customer is not None and alive:
-            loai_giay_to = customer.loai_giay_to
-        loai_dia_chi = _nn(snap.get("loai_dia_chi"))
-        if loai_dia_chi is None and customer is not None:
-            loai_dia_chi = customer.loai_dia_chi
+        # A committed key, including null, belongs to this case's evidence.
+        # Explicit master reuse does not enrich an older source snapshot.
+        def pick(key):
+            if key in snap:
+                return snap[key]
+            return getattr(customer, key, None) if customer is not None else None
+
+        derived = derive_person_fields(
+            _parse_date_or_year(pick("ngay_chet")),
+            _parse_date_or_year(pick("ngay_cap")),
+            snap.get("loai_giay_to"), snap.get("loai_dia_chi"))
+        loai_giay_to = _nn(snap["loai_giay_to"]) if "loai_giay_to" in snap else derived[0]
+        noi_cap = _nn(snap["noi_cap"]) if "noi_cap" in snap else derived[1]
+        loai_dia_chi = _nn(snap["loai_dia_chi"]) if "loai_dia_chi" in snap else derived[3]
 
         def date_wire(key: str) -> Optional[str]:
             """Ngày Người — bằng chứng đã commit trong snapshot trước.
@@ -1874,17 +1873,14 @@ class CaseWorkspaceService:
         return {
             "row_id": row_id,
             "entity_id": entity,
-            "ho_ten": _nn(customer.ho_ten if customer else snap.get("ho_ten")) or "(Chưa rõ)",
-            "gioi_tinh": _norm_gender(
-                customer.gioi_tinh if customer else snap.get("gioi_tinh")),
+            "ho_ten": _nn(pick("ho_ten")) or "(Chưa rõ)",
+            "gioi_tinh": _norm_gender(pick("gioi_tinh")),
             "ngay_sinh": date_wire("ngay_sinh"),
             "ngay_chet": date_wire("ngay_chet"),
-            "so_giay_to": _nn(
-                customer.so_giay_to if customer else snap.get("so_giay_to")),
+            "so_giay_to": _nn(pick("so_giay_to")),
             "ngay_cap": date_wire("ngay_cap"),
             "noi_cap": noi_cap,
-            "dia_chi": _nn(
-                customer.dia_chi if customer else snap.get("dia_chi")),
+            "dia_chi": _nn(pick("dia_chi")),
             "place_of_origin": _nn(snap.get("place_of_origin")),
             "loai_giay_to": loai_giay_to,
             "loai_dia_chi": loai_dia_chi,
@@ -2326,7 +2322,6 @@ class CaseWorkspaceService:
                 _check_extra_keys(row, _ASSET_FIELD_SET, "asset_row")
 
         seen_row_ids: set = set()
-        seen_person_keys: dict[str, Any] = {}
         seen_person_entities: dict[int, Any] = {}
         seen_asset_entities: dict[int, Any] = {}
 
@@ -2364,21 +2359,6 @@ class CaseWorkspaceService:
                           "place_of_origin", "loai_giay_to",
                           "loai_dia_chi"):
                 self._check_nullable_str(row, field, emit)
-            so_giay_to = row.get("so_giay_to")
-            if isinstance(so_giay_to, str) and so_giay_to.strip():
-                sgt = so_giay_to.strip()
-                if sgt in seen_person_keys:
-                    emit("so_giay_to", "invalid_format",
-                         "so_giay_to trùng với dòng khác trong payload")
-                else:
-                    seen_person_keys[sgt] = row_id
-                    owner = self.db.query(Customer).filter(
-                        Customer.so_giay_to == sgt).first()
-                    if (owner is not None and isinstance(entity, int)
-                            and not isinstance(entity, bool)
-                            and entity != owner.id):
-                        emit("so_giay_to", "invalid_format",
-                             "so_giay_to đã thuộc về người khác")
 
         for index, row in enumerate(assets):
             if not isinstance(row, Mapping):
@@ -2495,9 +2475,9 @@ class CaseWorkspaceService:
     def _upsert_people(self, rows: list,
                        prev_rows: Optional[Mapping[str, Any]] = None
                        ) -> list:
-        """→ [(row_id, entity_id, wire_row)]; upsert theo entity_id rồi
-        khóa giấy tờ — không merge theo tên. Dedupe entity đã resolve —
-        hai rows resolve về cùng customer là lỗi (tránh silent merge).
+        """→ [(row_id, entity_id, wire_row)]; identity is explicit Customer.id.
+        A repeated row may recover its ID from this case's committed snapshot;
+        neither document number nor name links independent sources.
 
         `prev_rows`: snapshot `stage[]` đã commit lần trước, keyed theo
         row_id — dùng để phân biệt giá trị echo (backend suy ra) với
@@ -2506,13 +2486,10 @@ class CaseWorkspaceService:
         resolved = []
         resolved_entities: dict[int, str] = {}
         for row in rows:
-            entity = row.get("entity_id")
+            stored = prev_rows.get(row["row_id"])
+            stored = stored if isinstance(stored, Mapping) else {}
+            entity = row.get("entity_id") or _to_int(stored.get("id")) or stored.get("entity_id")
             customer = self._customer(entity) if isinstance(entity, int) else None
-            if customer is None:
-                sgt = _nn(row.get("so_giay_to"))
-                if sgt:
-                    customer = self.db.query(Customer).filter(
-                        Customer.so_giay_to == sgt).first()
             if customer is None:
                 customer = Customer()
                 self.db.add(customer)
@@ -2542,8 +2519,6 @@ class CaseWorkspaceService:
             # input nguồn mới; giá trị khác (bằng chứng đã xác nhận,
             # vd giấy khai tử) → giữ. Người sống chưa có → suy theo mốc
             # ngay_cap; người chết không suy (thiếu → None).
-            stored = prev_rows.get(row["row_id"])
-            stored = stored if isinstance(stored, Mapping) else {}
             # Giá trị suy ra của commit TRƯỚC tính lại từ INPUT NGUỒN đã
             # lưu trong snapshot của chính hồ sơ này (ngay_chet/ngay_cap
             # trong stored) — KHÔNG đọc master live: consumer khác có thể
@@ -2553,19 +2528,23 @@ class CaseWorkspaceService:
             # như bằng chứng đã xác nhận (tương thích snapshot cũ).
             _prev = derive_person_fields(
                 _parse_date_or_year(stored.get("ngay_chet")),
-                _parse_date_or_year(stored.get("ngay_cap")))
+                _parse_date_or_year(stored.get("ngay_cap")),
+                stored.get("loai_giay_to"), stored.get("loai_dia_chi"))
             prev_derived = (_prev[0], _prev[1], _prev[3])
+            current = derive_person_fields(
+                customer.ngay_chet, customer.ngay_cap,
+                row.get("loai_giay_to"), row.get("loai_dia_chi"))
             wire["loai_giay_to"] = _resolve_derived_field(
                 row.get("loai_giay_to"), stored.get("loai_giay_to"),
                 prev_derived[0],
-                customer.loai_giay_to if customer.con_song else None)
+                current[0])
             wire["noi_cap"] = _resolve_derived_field(
                 row.get("noi_cap"), stored.get("noi_cap"),
                 prev_derived[1],
-                customer.noi_cap if customer.con_song else None)
+                current[1])
             wire["loai_dia_chi"] = _resolve_derived_field(
                 row.get("loai_dia_chi"), stored.get("loai_dia_chi"),
-                prev_derived[2], customer.loai_dia_chi)
+                prev_derived[2], current[3])
             resolved.append((row["row_id"], customer.id, wire))
         return resolved
 

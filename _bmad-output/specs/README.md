@@ -82,7 +82,7 @@ Electron là vỏ ứng dụng; Python/FastAPI xử lý nghiệp vụ. Module gi
   Không tắt Scan/Upload production hoặc cấp quyền cloud mới. Docs-only là mốc
   ghi nhận trước; owner đã giao runtime Nam Định đã chốt, gồm BANKMODE bên dưới.
   [Quyết định](../decisions/decision-owner-upload-field-standardization-20261019.md).
-- **Người chết — owner 21/10/2026 đã chốt sáu câu, docs-only:** một `dia_chi`
+- **Người chết — owner 21/10/2026 đã chốt sáu câu, đã giao runtime hẹp:** một `dia_chi`
   dùng chung Nơi chết/cư trú cuối; `Giấy chứng tử (bản sao)` quy về
   `Giấy chứng tử`, vẫn đúng ba loại cùng `Trích lục khai tử` và
   `Trích lục khai tử (bản sao)`. Cơ quan giữ xã/phường/thị trấn tại ngày
@@ -90,8 +90,9 @@ Electron là vỏ ứng dụng; Python/FastAPI xử lý nghiệp vụ. Module gi
   bổ sung/tự ghép giữa văn bản; không gợi ý từ Đơn xin xác nhận. Thiếu ngày
   chết chỉ là không có thông tin, có trường hợp lệ nào điền trường đó,
   không chặn Người/tự coi còn sống/tạo field mới. Không đổi logic câu Word.
-  Runtime vẫn tạm dừng, #41 OPEN/gate chung ĐÓNG; ngoại lệ “cho phép đọc”
-  trước đó chỉ dành cụm Người chết Thừa kế để phân tích, không mở lô mới.
+  Owner tiếp tục “trien khai”: workstream Người chết **đã BUILT bounded**,
+  actual proof implementer-run đạt fresh+migrated DB/Word và DOM legacy giới
+  hạn; #41 vẫn OPEN/gate chung ĐÓNG, không mở #42/A04/quan hệ hoặc lô mẫu.
 - Bản nháp Stage/Diagram là sửa chưa lưu. Draft Case của Office là ứng viên chưa xác nhận. Trạng thái hồ sơ `draft` phục vụ quy tắc quản lý hồ sơ. Ba nghĩa không thay thế nhau.
 - Nguồn gốc → chữ đọc được → dữ liệu chuẩn hóa → gợi ý suy ra nếu cần → người có thẩm quyền xác nhận. Không phải dữ liệu nào cũng cần suy luận.
 - Giữ nguồn và giá trị gốc; không sửa raw để che lỗi. Máy không tự nâng OCR/AI thành dữ liệu đã xác nhận.

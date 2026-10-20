@@ -509,8 +509,4 @@ async def ocr_config():
             "max_pixels": QWEN_OCR_MAX_PIXELS,
             "enable_rotate": QWEN_OCR_ENABLE_ROTATE,
         },
-        "pairing": {
-            "fuzzy_max_id_mismatch": PAIR_FUZZY_MAX_ID_MISMATCH,
-            "fuzzy_name_threshold": PAIR_FUZZY_NAME_THRESHOLD,
-        },
     }

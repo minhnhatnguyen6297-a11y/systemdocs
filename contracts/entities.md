@@ -206,10 +206,17 @@ Hành vi cuối MIN-141, Owner xác nhận 03/10/2026:
 Ý định ban đầu suy UBND theo mốc 01/07/2025 được giữ làm lịch sử; bảng tra
 xã/phường cũ–mới còn ở NAIA-9, chưa có đường suy tự động trong runtime.
 
-**Trạng thái docs-only 21/10/2026:** quy tắc nghiệp vụ trên đã chốt, không đổi
-key/wire/model, không xác nhận triển khai. Runtime đang tạm dừng; grammar,
-số TLKT raw-only và ràng buộc UNIQUE/lookup hiện có chưa được sửa. #41 vẫn
-mở/chưa nghiệm thu; #42 không được duyệt model bởi các đáp án này.
+**Runtime Người chết 21/10/2026 — BUILT bounded, actual proof synthetic:** số giấy
+lưu nguyên giá trị vào `customers.so_giay_to`, index không UNIQUE; identity
+là `Customer.id`, không tự lookup/ghép theo số hoặc tên. Cập nhật Người qua
+ID đã chọn rõ hoặc `row_id` của chính hồ sơ đã lưu; cùng số được tồn tại ở
+nhiều Người. Migration trước bootstrap giữ ID/FK/columns/defaults/checks/
+indexes/triggers và snapshot/history, rollback nguyên tử khi lỗi.
+Loại/nơi cấp và nhãn địa chỉ tiếp tục theo snapshot từng hồ sơ, không thêm
+cột/model #42; không mượn master để lấp key snapshot đã có kể cả null.
+Ngữ cảnh chết thiếu ngày dùng loại giấy/nhãn `Nơi chết` hiện có đã có nguồn,
+không Boolean mới. Master riêng không có context snapshot không thể phục
+hồi dữ kiện chết chưa lưu; không suy để lấp. #41 vẫn mở/chưa nghiệm thu toàn bộ.
 
 ---
 

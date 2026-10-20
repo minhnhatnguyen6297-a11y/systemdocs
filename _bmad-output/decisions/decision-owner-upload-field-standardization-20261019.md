@@ -369,7 +369,7 @@ luận của code. A09 renderer Upload là biên độc lập, không thay thế
 Không mở field/tier mới hoặc parser Excel. Các quyết định A09-A/static/BANKMODE
 và W05 không bị thu hồi.
 
-## Owner bổ sung quy tắc giấy tờ Người chết — chưa triển khai, cần đối chiếu mẫu
+## Owner bổ sung quy tắc giấy tờ Người chết — ghi nhận ban đầu (sau đó đã triển khai)
 
 Owner bổ sung bộ dữ kiện người chết: họ tên; ngày/năm sinh; ngày chết (dấu hiệu
 đã chết); số giấy tờ; ngày cấp; nơi cấp; và **`Nơi chết: Ngang với trường địa
@@ -431,8 +431,9 @@ test/E2E, triển khai runtime, migration/schema/key, truy cập DB, production
 hoặc portal thật. Không sao chép nội dung có thông tin cá nhân vào repo/log
 rộng; bằng chứng trong repo phải được che thông tin nhận diện.
 
-**Trạng thái không đổi:** #41 vẫn **OPEN**, gate mẫu chung vẫn **ĐÓNG** ngoài
-ngoại lệ đọc hẹp này; triển khai tiếp tục tạm dừng theo chỉ dẫn owner. Việc đọc
+**Trạng thái tại thời điểm ngoại lệ đọc (trước chỉ dẫn “trien khai” 21/10):**
+#41 vẫn **OPEN**, gate mẫu chung vẫn **ĐÓNG** ngoài
+ngoại lệ đọc hẹp này; triển khai khi đó tạm dừng theo chỉ dẫn owner. Việc đọc
 mẫu không tự nghiệm thu logic mới, không chốt nghĩa `Nơi chết` so với nơi cư
 trú cuối và không duyệt model Người nhiều giấy tờ/địa chỉ của #42.
 
@@ -468,10 +469,59 @@ Số giấy vẫn giữ nguyên văn giá trị, nhãn ngoài số; ngày cấp 
 giấy, giữ độ đầy đủ. Không đổi raw, logic câu Word, trường tĩnh/placeholder,
 không chuyển Excel/VBA hoặc tạo field/model mới.
 
-**Trạng thái:** sáu câu đã **CHỐT NGHIỆP VỤ**, không còn cần hỏi lại; lượt này
-chỉ cập nhật decision/spec/contract narrative/backlog. Không sửa/chạy code,
-parser, test, DB, schema/migration/key, không đọc thêm mẫu hoặc mở gate chung.
-Runtime vẫn **TẠM DỪNG** theo chỉ dẫn trước. #41 vẫn **OPEN**, chưa nghiệm thu
-toàn bộ/cutover; #42 riêng chưa duyệt model. Số TLKT raw-only, grammar và
+**Trạng thái tại thời điểm chốt sáu câu (trước “trien khai”):** sáu câu đã
+**CHỐT NGHIỆP VỤ**, không còn cần hỏi lại; lượt đó chỉ cập nhật decision/spec/
+contract narrative/backlog. Không sửa/chạy code, parser, test, DB, schema/
+migration/key, không đọc thêm mẫu hoặc mở gate chung. Runtime khi đó vẫn
+**TẠM DỪNG** theo chỉ dẫn trước. #41 vẫn **OPEN**, chưa nghiệm thu
+toàn bộ/cutover; #42 riêng chưa duyệt model. Khi đó số TLKT raw-only, grammar và
 `Customer.so_giay_to` UNIQUE/lookup vẫn là giới hạn triển khai đã ghi nhận,
 không được xem là đã sửa hoặc đã được owner chọn khóa định danh toàn cục.
+
+## Owner “trien khai” — 21/10/2026, mở runtime hẹp Người chết
+
+**Nguyên văn owner:** “trien khai”, tiếp nối sáu đáp án đã chốt và yêu cầu
+giấy tờ Người dùng chung với khai tử. Owner cho triển khai end-to-end sáu
+quy tắc cùng lưu số giấy khai tử/chứng tử vào trường giấy tờ Người hiện có,
+tháo ràng buộc/lookup số toàn cục có nguy cơ gộp sai và chuyển dữ liệu giữ
+nguyên ID, FK, snapshot/history. Không chọn số giấy làm khóa Người toàn cục.
+
+Chỉ dẫn này thay **tạm dừng/runtime docs-only** trước đó **trong workstream
+Người chết này**. Phạm vi gồm extraction/normalization/intake, writer/persistence,
+consumer thực và hồi quy; proof kiểm soát DOCX → intake → Stage → SQLite riêng
+mở lại → Word được phép, không dùng mẫu/body owner, corpus hoặc production DB.
+Kết quả thực hiện và trạng thái hiện tại ở mục actual proof bên dưới.
+
+Không tự gợi ý/ghép chéo văn bản, không mở model #42, A04/quan hệ hoặc toàn
+#41; không thêm field nghiệp vụ/Boolean/status, engine công thức, lịch sử
+hành chính suy đoán hay cloud. Không mở gate khảo sát mẫu chung, portal thật/
+Lưu hoặc Chrome owner. #41 vẫn OPEN, #42 chưa duyệt; các proof cũ giữ nguyên.
+
+**Actual proof hoàn tất — implementer-run, không phải review độc lập:** chạy
+`final_proof_run.py` với venv hiện có, synthetic DOCX + SQLite tạm, không mở
+main/production DB/provider/Chrome owner. Kết quả **PASS 164/164**, code hash
+trước/sau ổn định. Bằng chứng:
+`_bmad-output/tmp/death-runtime-inventory/final_result.json` cùng
+`final_attempt_01.json`–`03.json` và bản tóm tắt `final_summary.json` (giữ cả
+lỗi harness ban đầu, không tái tạo).
+- Fresh và migrated DB đều chạy source→intake→Stage→session mới→Word; đúng
+  số freeform (kể cả `12, quyển 1`, `1234/TLKT`), ba loại canonical, issuer
+  giấy/ngày cấp, địa chỉ, năm riêng và ngày chết thiếu. Word readback khớp
+  exact nội dung khai báo trước; migrated DB giữ case snapshot, Customer id,
+  FK và history; migration lặp idempotent.
+- UI legacy: render route thật `/cases/{id}/edit`, DOM thật, Chromium headless
+  cô lập; hai khách khác nhau cùng số giấy thành hai dòng draft giữ nguyên
+  tên/số/ID chọn rõ, không merge; case/master cũ không đổi. **Giới hạn:** đây
+  là gọi application function `addToOcrStaging` có sẵn trên DOM thật sau khi
+  điền input; nút Add/search-picker đầy đủ chưa pass dưới mạng CDN bị chặn và
+  còn page error `Sortable is not defined`. Không claim Electron packaged.
+- Confirmation-only: không sinh Person; source fail thật
+  `intake.parse_failed` với message lõi không nhận người/tài sản, raw hash
+  giữ nguyên. Không dùng confirmation làm nguồn hay fallback.
+
+Trạng thái chuyển sang **BUILT bounded cho workstream Người chết**: sáu quy
+tắc, lưu số thật an toàn, migration/consumer/Word và UI legacy theo giới hạn
+trên. Không phải nghiệm thu toàn #41, không phải cutover Person/Asset/parties,
+không duyệt #42/A04/quan hệ, không mở gate mẫu chung. Lịch sử chưa
+supported-format/format coverage, historical issuer lookup và packaged
+Electron vẫn là giới hạn, không được gọi đã giải quyết.

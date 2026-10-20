@@ -465,7 +465,7 @@ smoke `_bmad-output/tmp/deceased-person-smoke.json` sha
 `eea7e5eb6aedfe5d2fbd84a85fa9ffe8f0fba77bfded0a5817781341f23e13c9` PASS
 (mapped death/type/issuer, no TLKT identity, raw retained, not requester).
 
-### Người chết — owner 21/10/2026 chốt sáu câu, chưa triển khai
+### Người chết — owner 21/10/2026 chốt sáu câu (trước runtime)
 
 1. Nơi chết/cư trú cuối dùng một `dia_chi` Người hiện có; không thêm trường
    hoặc tự chọn giá trị mâu thuẫn.
@@ -486,9 +486,45 @@ Case/ID, logic câu Word/trường tĩnh. Trong cùng văn bản, địa chỉ c
 nhắc rõ cùng người giữ đúng phạm vi khi không mâu thuẫn, không suy chung giấy.
 Không duyệt model #42, khóa số toàn cục, migration hoặc ghép liên module.
 
+**Trạng thái trước khi owner “trien khai” — lịch sử, đã thay bởi mục dưới:**
 **BUSINESS CHỐT, runtime TẠM DỪNG:** lượt này chỉ docs, không code/test/mẫu mới.
 Slice deceased intake và proof cũ bên trên giữ đúng phạm vi lịch sử, không
 nghiệm thu sáu quy tắc mới. Grammar ba loại/số freeform, derive thiếu ngày
-và đường số TLKT raw-only do UNIQUE/lookup vẫn là khoảng trống triển khai.
+và đường số TLKT raw-only do UNIQUE/lookup khi đó vẫn là khoảng trống triển khai.
 #41 vẫn OPEN/`refined:false`, chưa cutover Person/Asset/parties hoặc nghiệm
 thu toàn bộ; gate chung ĐÓNG ngoài ngoại lệ đọc hẹp đã ghi, không mở lô mới.
+
+### Runtime Người chết — owner “trien khai”, 21/10/2026
+
+**Owner đã mở runtime hẹp:** sáu quy tắc và giấy tờ
+Người dùng chung với khai tử/chứng tử, thay tạm dừng chỉ trong workstream này.
+Thực hiện parser/normalization/intake, lưu số thật với identity `Customer.id`
+không auto ghép theo số, migration SQLite giữ IDs/FKs/snapshot/history và
+consumer/Word. Hồi quy và DOCX → intake → Stage → SQLite riêng mở lại → Word
+bằng dữ kiện tổng hợp được phép. Tại thời điểm mở runtime, chưa claim
+built/cutover hoặc proof mới; kết quả proof ở đoạn dưới.
+Không mẫu thật/corpus/prodDB/portal/Chrome owner; không mở #42/A04/quan hệ,
+field/model mới hoặc gate chung. #41 vẫn OPEN/`refined:false`.
+
+**BUILT bounded, actual proof PASS (21/10):** số giấy freeform qua
+lõi → intake → writer, không còn raw-only; Customer.id/same-case row_id
+giữ identity, số index không UNIQUE. Bootstrap thay migration nullable cũ
+bằng migration số giấy idempotent/atomic giữ schema objects/FKs/history.
+Snapshot giữ loại/issuer/nhãn/ngày chính hồ sơ kể cả null, không borrow master.
+Không cross-file OCR enrichment/fuzzy-number merge; legacy form bỏ dedupe
+theo số và cờ guard đã hết dùng. Word dùng ngữ cảnh loại/nhãn khi thiếu ngày.
+
+Hồi quy đã chạy bằng `notary_v2/venv/Scripts/python.exe`: bảy file Notary
+**297 passed, 2 subtests**; shared core **41 passed, 6 subtests**. Sau sửa hai
+ranh parser (câu kể gián tiếp/tên rút gọn chính xác) và assertion cũ bắt giấy
+cho năm chết: Upload generated class **158 passed, 2 subtests**, tập death
+runtime mới **20 passed**. Cảnh báo còn lại là deprecation SQLite/openpyxl/
+Starlette, không claim đã sửa. Lượt global-env trước thiếu jsonschema/lệch
+Starlette được ghi giới hạn rồi dùng venv hiện có, không sửa môi trường chung.
+
+Evidence số liệu/attempts: `../tmp/death-runtime-regressions.json`; actual proof
+implementer-run `../tmp/death-runtime-inventory/final_summary.json` (chi tiết
+`final_result.json`; 164 checks, fresh+migrated DB, exact Word; UI legacy giới
+hạn programmatic DOM, không nút Add/search-picker đầy đủ). Không claim
+independent review, Electron packaged,
+national coverage hoặc toàn #41; mẫu owner/corpus/prodDB/provider/portal không chạy.

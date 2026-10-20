@@ -33,6 +33,7 @@ from regex_workbench.engine.contract_extract import (  # noqa: E402
     dien_tich_thanh_so,
     document_asset_context,
     extract_text,
+    is_confirmation_document,
     hinh_thuc_su_dung_occurrences,
     tach_nhom_tai_san,
     thua_dat_sang_land_rows,
@@ -241,14 +242,14 @@ PERSON_LABELS = {
     "dia_chi": LABELS["dia_chi_nguoi"],
 }
 
-# Người chết: chỉ map trường Person đã duyệt/xác định được từ nguồn. Số trích
-# lục khai tử KHÔNG đưa vào `so_giay_to`/Customer vì Customer.so_giay_to unique
-# và writer có thể coi đó là identity/merge; raw.nguoi_chet giữ nguyên.
+# Người chết uses the same approved Person fields; source evidence is local
+# to this document. Paper numbers are values, never automatic Person identity.
 DECEASED_PERSON_FIELD_SOURCES = {
     "ho_ten": "ho_ten",
     "gioi_tinh": "gioi_tinh",
     "ngay_sinh": "ngay_sinh",
     "ngay_chet": "ngay_chet",
+    "so_giay_to": "so_giay_to",
     "loai_giay_to": "loai_giay_to",
     "ngay_cap": "ngay_cap",
     "noi_cap": "noi_cap",
@@ -258,7 +259,8 @@ DECEASED_PERSON_LABELS = {
     "ho_ten": PERSON_LABELS["ho_ten"],
     "ngay_sinh": (r"Sinh ngày", r"Sinh năm", r"Ngày sinh"),
     "ngay_chet": (r"Chết ngày", r"Ngày chết", r"Chết"),
-    "ngay_cap": (r"cấp ngày", r"ký ngày"),
+    "so_giay_to": (r"số",),
+    "ngay_cap": (r"cấp ngày", r"ký ngày", r"cấp năm", r"ký năm"),
     "noi_cap": (r"do",),
     "dia_chi": (r"Nơi thường trú cuối cùng", r"Nơi cư trú cuối cùng", r"Nơi chết"),
 }
@@ -384,8 +386,9 @@ async def extract(spec, ctx):
 
     # ----- người: hai bên của lõi, theo thứ tự trong văn bản -----
     people: list[dict] = []
-    for side in ("ben_a", "ben_b"):
-        people.extend((raw.get(side) or {}).get("nguoi") or [])
+    if not is_confirmation_document(source.text):
+        for side in ("ben_a", "ben_b"):
+            people.extend((raw.get(side) or {}).get("nguoi") or [])
     for person in people:
         candidate_id = str(uuid.uuid4())
         fields: dict = {}
@@ -432,13 +435,11 @@ async def extract(spec, ctx):
         candidate_id = str(uuid.uuid4())
         fields: dict = {}
         warnings = [{"code": "intake.docx_coverage", "message": w} for w in source.warnings]
+        if person.get("_field_conflicts"):
+            warnings.append({"code": "intake.ambiguous",
+                             "message": "Dữ kiện cùng người mâu thuẫn trong nguồn; không chọn tự động"})
         person_window = _person_window(source.text, person)
-        sources = dict(DECEASED_PERSON_FIELD_SOURCES)
-        if not str(person.get("loai_giay_to") or "").strip():
-            # Ngày/nơi cấp chỉ có nghĩa khi biết loại giấy (TLKT); không
-            # gán ngày/issuer của giấy khác vào người chết.
-            sources.pop("ngay_cap", None)
-            sources.pop("noi_cap", None)
+        sources = DECEASED_PERSON_FIELD_SOURCES
         map_fields(fields, warnings, candidate_id, _PERSON_FIELD_NORMALIZERS,
                    sources, person, person_window, "person",
                    DECEASED_PERSON_LABELS,
@@ -449,7 +450,7 @@ async def extract(spec, ctx):
             add_field(fields, warnings, candidate_id, _PERSON_FIELD_NORMALIZERS,
                       key="gioi_tinh", raw_value=title, span=title_span,
                       rule_id="person.gioi_tinh")
-        doc_type = str(person.get("loai_giay_to") or "").strip()
+        doc_type = str(person.get("_type_raw") or person.get("loai_giay_to") or "").strip()
         if doc_type:
             type_span = _locate_in(source.text, doc_type, person_window, span_index)
             if type_span:
@@ -458,12 +459,15 @@ async def extract(spec, ctx):
                           rule_id="person.loai_giay_to")
         if not fields:
             continue
-        # so_giay_to (số TLKT) intentionally omitted: Customer.so_giay_to is
-        # unique identity; raw.nguoi_chet retains it. Missing warning stays
-        # honest/partial rather than merging unrelated deceased by certificate.
+        death_label = str(person.get("_death_label") or "").strip()
+        death_span = _locate_in(source.text, death_label, person_window, span_index) if death_label else None
+        if death_span:
+            fields["loai_dia_chi"] = field_value(
+                death_label, "Nơi chết", "normalized", None,
+                [make_refs(candidate_id, death_span, "person.loai_dia_chi")])
         if any(key not in fields for key in REQUIRED_PERSON_FIELDS):
             warnings.append({"code": "intake.fragment",
-                             "message": "Bản ghi thiếu trường; hãy bổ sung trước khi lưu hồ sơ"})
+                             "message": "Nguồn chỉ có một phần thông tin; có thể lưu các trường đã rõ"})
         suggestion = make_suggestion(source_id=spec.source_id, target="person",
                                      fields=fields, warnings=warnings)
         suggestion["suggestion_id"] = candidate_id

@@ -91,7 +91,7 @@ DB/profile cô lập, không phụ thuộc khảo sát corpus owner đang bị g
 khi được giao chạy mẫu, thiếu mapping từng file thì giữ pending/ghi #39, tiếp
 tục file đã rõ. Không tắt production Scan/Upload; quyền runtime đã chốt là lệnh owner riêng.
 
-**Người chết — owner 21/10/2026, đã chốt nghiệp vụ/docs-only:**
+**Người chết — owner 21/10/2026, đã chốt nghiệp vụ và giao runtime hẹp:**
 - `Nơi chết` và cư trú cuối dùng một `dia_chi` Người hiện có, không thêm
   trường; không chọn ngầm khi giá trị mâu thuẫn. Ba loại đúng nguyên văn:
   `Trích lục khai tử`, `Trích lục khai tử (bản sao)`, `Giấy chứng tử`;
@@ -107,9 +107,12 @@ tục file đã rõ. Không tắt production Scan/Upload; quyền runtime đã c
 - Thiếu ngày chết chỉ là không có thông tin: giữ null/rỗng, điền độc lập các
   trường có căn cứ được phép; không chặn Người vì thiếu ngày/giấy, tự coi
   còn sống, bịa ngày/01/01, Boolean hoặc trạng thái mới.
-- Không đổi câu Word/trường tĩnh/placeholder. Runtime vẫn tạm dừng; #41
-  OPEN, chưa nghiệm thu/cutover; gate chung ĐÓNG ngoài ngoại lệ đọc hẹp
-  Người chết Thừa kế đã cho phép trước đó, không cấp lượt đọc/chạy mẫu mới.
+- Không đổi câu Word/trường tĩnh/placeholder. Runtime workstream Người chết
+  **BUILT bounded**, actual proof implementer-run fresh+migrated DB/Word;
+  #41 OPEN/chưa nghiệm thu toàn bộ, #42 chưa duyệt model, gate chung ĐÓNG/
+  không đọc mẫu mới. Số giấy lưu thật, index không UNIQUE, identity theo ID
+  chọn rõ/row_id chính hồ sơ, không auto lookup theo số/tên hoặc ghép giữa
+  file. Snapshot không borrow master khi đã có key, kể cả null.
 
 **Một Người nhiều giấy tờ và nhiều địa chỉ** là
 [#42 riêng](../../backlog/story-person-multiple-identities-addresses.md).
@@ -200,8 +203,9 @@ nguyên văn/rỗng/trùng **đã được owner chốt**; validator/ràng buộ
 khác chuẩn là [gap implementation tĩnh #40](../../backlog/bug-stage-raw-gcn-serial-contract.md),
 không phải câu hỏi duyệt lại field. Chưa tái hiện runtime trong lượt này.
 Ngày quy ước master + snapshot giữ `YYYY` theo #6 không tự là bug; ngày lập
-hồ sơ optional ở wire versus default DB và `so_giay_to` UNIQUE versus không
-dùng làm Case key phải phân biệt tầng/ngữ nghĩa trước khi kết luận vi phạm.
+hồ sơ optional ở wire versus default DB phải phân biệt tầng/ngữ nghĩa.
+Global UNIQUE/lookup số Người cũ đã được owner giao cutover workstream
+Người chết 21/10, không phải quyền chọn số làm khóa Case/Người toàn cục.
 
 Owner xác nhận 15/10/2026: bộ trường và định dạng DB đã duyệt là chuẩn đích;
 engine phải tuân theo hoặc ánh xạ tường minh tới chuẩn đó. Trước khi triển khai,

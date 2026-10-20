@@ -1033,7 +1033,7 @@ def test_commit_stage_does_not_merge_duplicate_names(db):
     assert db.query(Customer).filter_by(ho_ten="Trùng Tên").count() == 2
 
 
-def test_commit_stage_upserts_by_document_key(db):
+def test_commit_stage_does_not_link_by_document_number(db):
     case, _d, prop, _h = _make_case(db)
     existing = Customer(ho_ten="Người Có Sẵn", so_giay_to="007777777777")
     db.add(existing)
@@ -1045,10 +1045,10 @@ def test_commit_stage_upserts_by_document_key(db):
                      so_giay_to="007777777777")],
         [_asset_row(entity_id=prop.id, so_serial="DD123456")])
 
-    assert data["stage"]["people"][0]["entity_id"] == existing.id
-    assert db.get(Customer, existing.id).ho_ten == "Người Có Sẵn Đổi Tên"
+    assert data["stage"]["people"][0]["entity_id"] != existing.id
+    assert db.get(Customer, existing.id).ho_ten == "Người Có Sẵn"
     assert db.query(Customer).filter_by(
-        so_giay_to="007777777777").count() == 1
+        so_giay_to="007777777777").count() == 2
 
 
 def test_commit_stage_updates_links_and_primary_position(db, session_factory):

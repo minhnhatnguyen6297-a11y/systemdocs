@@ -181,7 +181,7 @@ Dùng chung bộ trường Người và quy tắc tên/ngày/giới tính trong 
 Luật lọc tên/phạm vi hiện có không cho phép đổi sang người khác để làm đầy
 dữ liệu. Không lấy căn cước vợ/chồng trong ngoặc làm giấy của người chết.
 
-**Owner 21/10/2026 — đã chốt nghiệp vụ, chưa triển khai đầy đủ:**
+**Owner 21/10/2026 — đã chốt nghiệp vụ và giao runtime hẹp:**
 - `Nơi chết` và nơi thường trú/cư trú cuối cùng/trước khi chết đi vào **cùng
   một `dia_chi` hiện có**. Không thêm field, không tự chọn nếu các giá trị
   nguồn mâu thuẫn. Địa chỉ chung chỉ áp cho đúng những người nguồn chỉ rõ
@@ -206,8 +206,12 @@ dữ liệu. Không lấy căn cước vợ/chồng trong ngoặc làm giấy c�
   còn sống, không bịa ngày/01/01, Boolean hoặc status mới.
 
 Nguồn/raw và logic câu Word giữ nguyên, chỉ trường tĩnh/placeholder đã duyệt.
-Runtime/parser còn các giới hạn grammar, số TLKT raw-only và khóa UNIQUE
-được ghi ở #41; cập nhật quy tắc này không tuyên bố đã cutover/nghiệm thu.
+Runtime dùng số giấy thật trong trường Người, không UNIQUE/lookup theo số;
+ID chọn rõ hoặc row_id chính hồ sơ giữ identity. Không auto ghép OCR giữa
+file; cùng container chỉ ghép hai mặt rõ cùng thẻ, không fuzzy số/tên.
+Số/type/issuer/address/ngày và missing-date context đã được actual proof
+synthetic (fresh+migrated DB/Word); UI legacy chỉ programmatic DOM giới hạn.
+Không claim accuracy toàn quốc hoặc nghiệm thu #41.
 
 
 ### 2.4. Định danh thửa — Theo spec hiện hành
@@ -428,9 +432,9 @@ dừng trước dòng `chết ngày`.
 Dùng bộ trường và sáu quy tắc owner tại §2.3. Có ngày/năm chết thì giữ đúng
 độ đầy đủ; thiếu chỉ là không có thông tin ngày chết, không loại/chặn Người
 đã có các trường hợp lệ khác hoặc bắt đủ giấy tờ. Không gợi ý từ `Đơn xin
-xác nhận`; không đổi người để đầy đủ dữ liệu. Đây là quy tắc nghiệp vụ đã
-chốt, **không phải** claim nhánh `raw.nguoi_chet` legacy đã đọc được mọi
-trường hợp thiếu ngày; parser hiện hành vẫn có giới hạn cần xử lý khi được giao.
+xác nhận`; không đổi người để đầy đủ dữ liệu. Parser nhận lời chết rõ dù
+thiếu ngày, adapter giữ context qua nhãn `Nơi chết` hiện có với source ref.
+Nhiều giấy/mâu thuẫn trong cùng vùng giữ partial/ambiguous, không chọn ngầm.
 
 Dạng ngoặc gộp (11–12/10/2026): `ông X (sinh năm 1956, đã chết ngày ...)` và
 `ông X (Tên khác); (Sinh năm 1945, đã chết ngày ... theo trích lục...)` —

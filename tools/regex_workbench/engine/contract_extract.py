@@ -39,7 +39,7 @@ from typing import Iterable
 ENGINE_ID = "contract_word"
 """Ten dinh danh cua lõi luat Word (dung cho profile_id o consumer)."""
 
-ENGINE_VERSION = "2026-10-20-requester-bank-projection"
+ENGINE_VERSION = "2026-10-21-death-paper-person"
 """Phien ban lõi luat — consumer ghi vao log/payload de truy vet."""
 
 # ============================================================
@@ -3205,6 +3205,8 @@ def _requester_projection(text: str, doc_kind: str, parties: tuple[list[dict], l
     The existing web_form string is presentation, not a new canonical entity.
     Source refs are technical evidence; raw people and history are untouched.
     """
+    if is_confirmation_document(text):
+        return "", []
     bank_spans = _mortgage_bank_spans(text) if doc_kind == DOC_KIND_MORTGAGE else []
     source_index = SourceSpanIndex(text)
     parts: list[tuple[int, str, int, str]] = [
@@ -3214,7 +3216,7 @@ def _requester_projection(text: str, doc_kind: str, parties: tuple[list[dict], l
     for people in parties:
         for person in people:
             name = str(person.get("ho_ten") or "").strip()
-            if not name or person.get("ngay_chet"):
+            if not name or person.get("ngay_chet") or person.get("loai_dia_chi") == "Nơi chết":
                 continue
             raw_text = str(person.get("raw_text") or "")
             spans = source_index.find_all(raw_text) if raw_text else []
@@ -3230,7 +3232,7 @@ def _requester_projection(text: str, doc_kind: str, parties: tuple[list[dict], l
                 r"(?:thu ky|nhan vien|cong chung vien)\s*:)", own_role,
             ):
                 continue
-            if re.search(r"\b(?:chet|mat)\s+(?:ngay|nam)\s*[:.-]?\s*\d",
+            if re.search(r"\b(?:da\s+)?(?:chet|mat)(?:\s+(?:ngay|nam|tu lau|truoc)|\s*[,;.()]|$)",
                          _fold_text(raw_text.split("\n", 1)[0])):
                 continue
             if any(
@@ -4630,6 +4632,9 @@ def _cau_tu_moc(text: str) -> str:
         if char == "\n":
             return text[:index]
         if char == ".":
+            if (index > 0 and index + 1 < len(text)
+                    and text[index - 1].isdigit() and text[index + 1].isdigit()):
+                continue
             token = re.search(r"([A-Za-z\u00c0-\u1ef9]{1,4})$", text[:index])
             if token and _fold_text(token.group(1)) in _CAU_VIET_TAT:
                 continue
@@ -4643,26 +4648,52 @@ _CAU_VIET_TAT = frozenset({
 })
 
 
+def is_confirmation_document(text: str) -> bool:
+    heading = re.search(
+        r"(?im)^[ \t]*ĐƠN\s+(?:XIN\s+)?XÁC\s+NHẬN(?=\s*(?:[.:;\n]|$))",
+        text[:2000])
+    if heading is None:
+        return False
+    # A later citation heading is not the kind of an earlier valid contract.
+    return not re.search(r"(?im)^\s*(?:HỢP ĐỒNG|VĂN BẢN)\b", text[:heading.start()])
+
+_DEATH_PAPER_RE = re.compile(
+    r"(?i)(?:Trích\s+lục\s+khai\s+tử|Giấy\s+chứng\s+tử)"
+    r"(?:\s*\(\s*bản\s+sao\s*\))?")
+
+
+def _death_paper_fields(text: str) -> dict:
+    """Read one paper's own fields, not a neighbour's paper."""
+    matches = list(_DEATH_PAPER_RE.finditer(text))
+    if len(matches) != 1:
+        return {}
+    match = matches[0]
+    raw_type = match.group()
+    doc_type = ("Giấy chứng tử" if _fold_text(raw_type).startswith("giay")
+                else "Trích lục khai tử (bản sao)" if "(" in raw_type
+                else "Trích lục khai tử")
+    scope = _cau_tu_moc(text[match.end():])
+    number = re.search(
+        r"(?i)^\s*số\s*:?\s*(.+?)(?=\s+(?:do|cấp|ký|ngày|nơi)\b|[;\n)]|$)", scope)
+    value = number[1].strip().strip('\"“”').strip() if number else ""
+    issuer = re.search(
+        r"(?i)\bdo\s+(.+?)\s+(?:cấp|ký)\s+(?:ngày|năm)\s*:?\s*"
+        r"(\d{1,2}/\d{1,2}/\d{4}|\d{4})\b", scope)
+    issued = re.search(
+        r"(?i)\b(?:cấp|ký)\s+(?:ngày|năm)\s*:?\s*"
+        r"(\d{1,2}/\d{1,2}/\d{4}|\d{4})\b", scope)
+    return {"loai_giay_to": doc_type, "_type_raw": raw_type,
+            "so_giay_to": value, "noi_cap": issuer[1].strip() if issuer else "",
+            "ngay_cap": issued[1] if issued else ""}
+
+
 def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
-    """Trich NGUOI DA CHET (nguoi de lai di san) theo shape person_row
-    (decision-46 06/10/2026): trich luc khai tu la giay to cua nguoi chet,
-    dien vao so_giay_to/ngay_cap/noi_cap/loai_giay_to; dia chi cuoi -> dia_chi.
-    Dau hieu bat buoc: "chet ngay DD/MM/YYYY", hoac "chet nam YYYY"
-    chi khi ngay sau co "trich luc/khai tu" (bang chung nguoi de lai
-    di san; tranh vo nhan bo/me de chi ghi "chet nam...").
-    Rieng van ban TU CHOI nhan di san: "chet nam YYYY" duoc nhan them
-    khi phia truoc co tu quan he (bo/me de, vo/chong...) — cha/me cua
-    nguoi tu choi mac dinh la nguoi de lai di san (11/10/2026).
-    """
+    """Read explicit deceased clauses, including unknown dates, in this source."""
     source = unicodedata.normalize("NFC", str(text or ""))
     found: list[dict] = []
     seen: dict[str, dict] = {}
-    is_refusal = doc_kind == DOC_KIND_INHERITANCE_REFUSAL
-    death_y_evidence = (
-        r""
-        if is_refusal
-        else r"(?=\s*(?:theo\s+)?tr\u00edch\s+l\u1ee5c|[^.\n]{0,60}?(?:khai\s+t\u1eed|\u0111\u01a1n\s+(?:xin\s+x\u00e1c\s+nh\u1eadn|\u0111\u1ec1\s+ngh\u1ecb)|gi\u1ea5y\s+x\u00e1c\s+nh\u1eadn))"
-    )
+    if is_confirmation_document(source):
+        return []
     death_re = re.compile(
         r"(?i)(?P<title>\u00d4ng|B\u00e0|Anh|Ch\u1ecb|l\u00e0)\s*:?\s*(?P<name>[^;(\n.,]+?)"
         r"(?:\s+v\u00e0\s+(?P<title2>\u00f4ng|b\u00e0|anh|ch\u1ecb)\s*:?\s*(?P<name2>[^;(\n.,]+?))?"
@@ -4670,9 +4701,10 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
         r"\s*[-\u2013;,]?\s*"
         r"(?:(?:Sinh n\u0103m|N\u0103m sinh|Sinh nam|Nam sinh|Sinh ng\s*\u00e0y|Ng\u00e0y\s+sinh|Sinh ngay|Ngay sinh|Sinh)"
         r"\s*[:\u2013-]?\s*(?P<birth>(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4}))?"
-        r"\s*[;,]?\s*(?:\u0111\u00e3\s+)?(?:ch\u1ebft|m\u1ea5t)\s+(?:ng\u00e0y\s*(?:ng\u00e0y\s*)?[:\u2013-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
-        r"|n\u0103m\s*[:\u2013-]?\s*(?P<death_y>(?:19|20)\d{2})"
-        + death_y_evidence + r")"
+        r"\s*[;,]?\s*(?P<death_label>(?:\u0111\u00e3\s+)?(?:ch\u1ebft|m\u1ea5t))"
+        r"(?=\s*(?:ng\u00e0y|n\u0103m|theo|t\u1eeb\s+l\u00e2u|tr\u01b0\u1edbc|[);,.\n]|$))"
+        r"(?:\s+(?:ng\u00e0y\s*(?:ng\u00e0y\s*)?[:\u2013-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
+        r"|n\u0103m\s*[:\u2013-]?\s*(?P<death_y>(?:19|20)\d{2})|t\u1eeb\s+l\u00e2u))?"
     )
     # Dang ngoac gop: "ong X (sinh nam 1956, da chet ngay 16/01/2025)" —
     # cum sinh+chet nam trong ngoac bi nhom alias nuot o death_re (11/10/2026).
@@ -4687,10 +4719,10 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
         # (VB tu choi ba Vong — 13/10/2026).
         r"\s*[-–;,]?\s*\(\s*(?:(?:ông|bà)\s+[^;()\n]{2,40}?\s+)?(?:Sinh\s+năm|Năm\s+sinh|Sinh\s+ngày|Ngày\s+sinh|Sinh)"
         r"\s*[:–-]?\s*(?P<birth>(?:19|20)\d{2}|\d{1,2}/\d{1,2}/\d{4})"
-        r"\s*[,;]?\s*(?:đã\s+)?(?:chết|mất)\s+"
-        r"(?:ngày\s*(?:ngày\s*)?[:–-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
-        r"|năm\s*[:–-]?\s*(?P<death_y>(?:19|20)\d{2})"
-        + death_y_evidence + r")[^)]*\)"
+        r"\s*[,;]?\s*(?P<death_label>(?:đã\s+)?(?:chết|mất))"
+        r"(?=\s*(?:ngày|năm|theo|từ\s+lâu|trước|[);,.\n]|$))"
+        r"(?:\s+(?:ngày\s*(?:ngày\s*)?[:–-]?\s*(?P<death>\d{1,2}/\d{1,2}/\d{4})"
+        r"|năm\s*[:–-]?\s*(?P<death_y>(?:19|20)\d{2})|từ\s+lâu))?[^)]*\)"
     )
     matches = sorted(
         list(death_re.finditer(source)) + list(death_paren_re.finditer(source)),
@@ -4705,6 +4737,12 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
         raw_name = re.sub(r"\s+", " ", match.groupdict().get("name") or "").strip(" ;,.-")
         raw_name = re.sub(r"(?i)^\d+\.\s*", "", raw_name)
         raw_name = re.sub(r"(?i)^(?:l\u00e0|bao g\u1ed3m)\s+", "", raw_name)
+        declaration = _fold_text(source[match.start():match.start("death_label")])
+        if re.search(r"\b(?:la vo chong|ket hon|cho den khi|sau khi)\b", declaration):
+            continue  # A relative narrative is not this person's death declaration.
+        prefix = _fold_text(source[max(0, match.start() - 24):match.start()])
+        if re.search(r"\b(?:sau khi|den khi|truoc khi)\s*$", prefix):
+            continue
         # Danh xung dinh trong nhom ten ("1.1 Ông Nguyễn Văn Toản - Sinh
         # năm ...") — tach ra, dung lam gioi tinh neu title trong.
         _lead_salut = re.match(r"(?i)^(ông|bà|anh|chị)\s+(.{2,})$", raw_name)
@@ -4746,82 +4784,21 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
         if _fold_text(str(match_title or "")) in ("la", "lam") and _salut_title:
             match_title = _salut_title
         if len(raw_name.split()) == 1:
-            # Ten rut gon 1 am tiet ("Bà Yểng Sinh năm 1931; chết...") —
-            # tim ten day du ket thuc bang am tiet do ngay truoc trong
-            # nguyen doan ("là bà Nguyễn Thị Yểng. Bà Yểng Sinh năm...").
-            _tok = raw_name
-            _before = source[max(0, match.start() - 250):match.start()]
-            _full = re.findall(
-                r"(?:\u00f4ng|b\u00e0)\s+([A-Z\u00c0-\u1ef9\u0110](?:(?!\b(?:\u00f4ng|b\u00e0|l\u00e0)\b)[^\d;:.,()\n]){1,58}?"
-                + re.escape(_tok)
-                + r")\b",
-                _before,
-                re.I,
-            )
-            _full = [
-                re.sub(r"\s+", " ", c).strip(" ;,.-") for c in _full
-            ]
-            _full = [
-                c for c in _full
-                if 1 < len(c.split()) <= 6
-                and all(t[0].isupper() for t in c.split())
-            ]
-            if not _full:
-                # Ten goi tat khac dau loi chinh ta ("ông Khê" cho
-                # "Vũ Kim Kê") — so am tiet cuoi theo fold hoac cung
-                # chu cai dau (13/10/2026).
-                _tok_fold = _fold_text(_tok)
-                _cands = re.findall(
-                    r"(?:ông|bà)\s+([A-ZÀ-ỹĐ][^\d;:.,()\n]{1,58})\b",
-                    _before,
-                    re.I,
-                )
-                _full = [
-                    re.sub(r"\s+", " ", c).strip(" ;,.-")
-                    for c in _cands
-                    if 1 < len(c.split()) <= 6
-                    and all(t[0].isupper() for t in c.split())
-                    and (
-                        _fold_text(c.split()[-1]) == _tok_fold
-                        or _fold_text(c.split()[-1])[:1] == _tok_fold[:1]
-                    )
-                ]
-            if _full:
-                raw_name = max(_full, key=len)
+            candidates = {
+                re.sub(r"\s+", " ", candidate).strip()
+                for candidate in re.findall(
+                    r"(?i)(?=(?:ông|bà)\s+([A-ZÀ-ỹĐ][^\d;:.,()\n]{1,58})\b)",
+                    source[max(0, match.start() - 250):match.start()])
+                if 1 < len(candidate.split()) <= 6
+                and all(token[0].isupper() for token in candidate.split())
+                and _fold_text(candidate.split()[-1]) == _fold_text(raw_name)
+            }
+            if len(candidates) == 1:
+                raw_name = candidates.pop()
         title_fold = _fold_text(match_title)
         death_val = match.groupdict().get("death") or match.groupdict().get("death_y") or ""
-        # Tu choi: "chet nam" khong trich luc chi nhan khi truoc ten co
-        # tu quan he (bo/me/vo/chong...) — tranh nhan ten ghep thoang.
-        if is_refusal and match.groupdict().get("death_y") and not match.groupdict().get("death"):
-            tail_after = source[match.end():match.end() + 80]
-            if not re.search(r"(?i)tr\u00edch\s+l\u1ee5c|khai\s+t\u1eed|\u0111\u01a1n\s+xin\s+x\u00e1c\s+nh\u1eadn", tail_after):
-                head_before = source[max(0, match.start() - 100):match.start()]
-                if not re.search(
-                    r"(?i)b\u1ed1|m\u1eb9|cha|ba|v\u1ee3|ch\u1ed3ng|anh|ch\u1ecb|em\b|con\b|ch\u00e1u",
-                    head_before,
-                ):
-                    continue
-        # Nguoi thu 2 cung dong ("... và bà B; chết ngày ...") — tach thanh
-        # ban ghi rieng, dung chung truong ngay/giay to cua cap.
+        # A shared death phrase does not assign one paper to both people.
         name2 = re.sub(r"\s+", " ", match.groupdict().get("name2") or "").strip(" ;,.-")
-        if name2:
-            t2 = name2.split()
-            key2 = f"{_fold_text(name2)}|{death_val}"
-            if t2 and len(t2) <= 6 and all(tok[0].isupper() for tok in t2) and key2 not in seen:
-                seen[key2] = {
-                    "gioi_tinh": "\u00d4ng" if _fold_text(match.groupdict().get("title2") or "") in ("ong", "anh") else "B\u00e0",
-                    "ho_ten": name2,
-                    "ten_goi_khac": "",
-                    "ngay_sinh": "",
-                    "chi_co_nam_sinh": False,
-                    "ngay_chet": death_val,
-                    "so_giay_to": "",
-                    "ngay_cap": "",
-                    "noi_cap": "",
-                    "loai_giay_to": "",
-                    "dia_chi": "",
-                }
-                found.append(seen[key2])
         alias = re.sub(r"\s+", " ", match.groupdict().get("alias") or "").strip()
         alias = re.sub(r"(?i)^t\u00ean g\u1ecdi kh\u00e1c l\u00e0\s+", "", alias)
         tail_end = min(match.end() + 400, len(source))
@@ -4832,51 +4809,69 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
         # Quet tu dau match: TLKT co the nam TRONG ngoac
         # "(ong Nguyen Sinh nam 1952; chet ngay ... theo Trich luc ...)".
         tail = source[match.start():tail_end]
-        tlkt_no = ""
-        tlkt_match = re.search(
-            r"(?i)Tr\u00edch l\u1ee5c khai t\u1eed[^\n]{0,60}?s\u1ed1:?\s*"
-            # Số trích lục: `/`, `-`, chữ và dấu chấm BÊN TRONG ("95.2026/TLKT")
-            # đọc được, nhưng KHÔNG nuốt dấu chấm kết câu — dấu chấm cuối câu
-            # là ranh giới chứng từ, không phải phần số.
-            r"([A-Za-z0-9/-]+(?:\.[A-Za-z0-9/-]+)*)",
-            tail,
-        )
-        if tlkt_match:
-            tlkt_no = tlkt_match.group(1).strip(" ;,.")
-        tlkt_by = ""
-        tlkt_date = ""
-        # Chỉ nhận "do … cấp ngày …" trong CÙNG CÂU với "Trích lục khai tử …
-        # số …": F4/F9 không ghi ngày/nơi cấp cho trích lục, câu sau là GCN của
-        # thửa — không mượn (spec §2.6 không lấy ngày ký văn bản khác; §2.3
-        # giấy tờ của chính người chết). F6 có thật trong câu nên vẫn nhận.
-        # Ranh câu tính từ mốc trích lục theo kết câu THẬT (bỏ qua viết tắt
-        # cơ quan như "UBND TP."), không cắt ngay sau match.
-        tlkt_scope = tail
-        if tlkt_match:
-            tlkt_scope = _cau_tu_moc(tail[tlkt_match.end():])
-        tlkt_by_match = re.search(
-            r"(?i)\bdo\s+([^\n]+?)\s+(?:k\u00fd|c\u1ea5p)\s+ng\u00e0y:?\s*(\d{1,2}/\d{1,2}/\d{4})",
-            tlkt_scope,
-        )
-        if tlkt_by_match:
-            tlkt_by = re.sub(r"\s+", " ", tlkt_by_match.group(1)).strip(" ;,.")
-            tlkt_date = tlkt_by_match.group(2)
+        confirmation = re.search(
+            r"(?i)đơn\s+(?:xin\s+)?xác\s+nhận", _cau_tu_moc(tail))
+        paper_scope = address_scope = tail
+        ignore_dates = False
+        if confirmation:
+            own_paper = _DEATH_PAPER_RE.search(tail)
+            if own_paper is None or name2:
+                continue
+            if own_paper.start() < confirmation.start():
+                # Independent paper evidence precedes the unrelated citation.
+                paper_scope = address_scope = tail[:confirmation.start()]
+            elif re.search(r";|\n|(?i:và\s+theo)",
+                           tail[confirmation.end():own_paper.start()]):
+                # Birth/death claims attached to the confirmation are not hints;
+                # a separately introduced paper still has its own static fields.
+                ignore_dates = True
+                death_val = ""
+                paper_scope = address_scope = tail[own_paper.start():]
+            else:
+                continue
+        if name2:
+            t2 = name2.split()
+            key2 = f"{_fold_text(name2)}|{death_val}"
+            if t2 and len(t2) <= 6 and all(tok[0].isupper() for tok in t2) and key2 not in seen:
+                seen[key2] = {
+                    "gioi_tinh": "Ông" if _fold_text(match.groupdict().get("title2") or "") in ("ong", "anh") else "Bà",
+                    "ho_ten": name2, "ten_goi_khac": "", "ngay_sinh": "",
+                    "chi_co_nam_sinh": False, "ngay_chet": death_val,
+                    "so_giay_to": "", "ngay_cap": "", "noi_cap": "",
+                    "loai_giay_to": "", "dia_chi": "",
+                    "loai_dia_chi": "Nơi chết",
+                    "_death_label": match.groupdict().get("death_label") or "",
+                    "raw_text": tail,
+                }
+                found.append(seen[key2])
+        paper = _death_paper_fields(paper_scope) if not name2 else {}
+        tlkt_no = paper.get("so_giay_to", "")
+        tlkt_date = paper.get("ngay_cap", "")
+        tlkt_by = paper.get("noi_cap", "")
         last_addr = ""
-        addr_match = re.search(
-            r"(?i)(?P<ca_hai>c\u1ea3 hai\s+c\u00f3\s+)?N\u01a1i\s+(?:th\u01b0\u1eddng tr\u00fa|c\u01b0 tr\u00fa|t\u1ea1m tr\u00fa)(?:\s*/\s*t\u1ea1m tr\u00fa)?\s+(?:(?:cu\u1ed1i c\u00f9ng\s+)?tr\u01b0\u1edbc khi ch\u1ebft|cu\u1ed1i c\u00f9ng)\s*(?:t\u1ea1i)?\s*:\s*(?P<addr>[^.\n;)]+)",
-            tail,
-        )
+        addresses = list(re.finditer(
+            r"(?i)(?P<ca_hai>cả hai\s+(?:có\s+)?(?:cùng\s+)?)?"
+            r"(?P<label>Nơi\s+(?:chết|(?:thường trú|cư trú|tạm trú)"
+            r"(?:\s*/\s*tạm trú)?\s+(?:(?:cuối cùng\s+)?trước khi chết|cuối cùng)))"
+            r"\s*(?:tại)?\s*:\s*(?P<addr>[^.\n;)]+)", address_scope))
+        address_values = {_cat_duoi_dia_chi(item.group("addr")) for item in addresses}
+        addr_match = addresses[0] if addresses and len(address_values) == 1 else None
         if addr_match:
             last_addr = _cat_duoi_dia_chi(addr_match.group("addr"))
             # "Cả hai có nơi cư trú cuối cùng..." — dia chi chung cua cap
             # vo chong chet cung dong; dien nguoc cho nguoi ngay truoc
             # con trong (ong Moc/ba Den — tho a thuan phan chia 12/10/2026).
-            if addr_match.group("ca_hai") and found and not found[-1]["dia_chi"]:
-                found[-1]["dia_chi"] = last_addr
+            previous = found[-1] if found else None
+            same_group = bool(name2 or (
+                previous and "_source_start" in previous
+                and "\n" not in source[previous["_source_start"]:match.start()]))
+            if (addr_match.group("ca_hai") and previous and same_group
+                    and not previous["dia_chi"]):
+                previous["dia_chi"] = last_addr
         key = f"{_fold_text(raw_name)}|{death_val}"
         if not raw_name:
             continue
-        _birth = match.groupdict().get("birth") or ""
+        _birth = (match.groupdict().get("birth") or "") if not ignore_dates else ""
         ngay_sinh, chi_co_nam = _chuan_hoa_ngay_sinh(
             _birth if "/" in _birth else "", _birth if "/" not in _birth else ""
         )
@@ -4890,19 +4885,29 @@ def _extract_nguoi_chet(text: str, doc_kind: str = "") -> list[dict]:
             "so_giay_to": tlkt_no,
             "ngay_cap": tlkt_date,
             "noi_cap": tlkt_by,
-            "loai_giay_to": "Trích lục khai tử" if tlkt_no else "",
+            "loai_giay_to": paper.get("loai_giay_to", ""),
             "dia_chi": last_addr,
+            "loai_dia_chi": "Nơi chết",
+            "_death_label": paper.get("_type_raw", "") if ignore_dates else match.groupdict().get("death_label") or "",
+            "_type_raw": paper.get("_type_raw", ""),
             # Technical per-person source window for consumer provenance;
             # not a canonical business field.
             "raw_text": tail,
+            "_source_start": match.start(),
+            "_field_conflicts": ["dia_chi"] if len(address_values) > 1 else [],
         }
         if key in seen:
-            # Lan nhac sau cung nguoi — dien truong trong (dia chi, TLKT)
-            # thay vi bo; ban sau thuong giau hon (12/10/2026 — ba Hien
-            # nhac 2 lan, lan sau co "Noi thuong tru cuoi cung").
             base = seen[key]
+            conflicts = base.setdefault("_field_conflicts", [])
             for field, value in record.items():
-                if not str(base.get(field) or "").strip() and str(value or "").strip():
+                if field.startswith("_") or field == "raw_text":
+                    continue
+                previous = str(base.get(field) or "").strip()
+                incoming = str(value or "").strip()
+                if previous and incoming and previous != incoming:
+                    conflicts.append(field)
+                    base[field] = ""
+                elif not previous and incoming and field not in conflicts:
                     base[field] = value
             _accepted_end = match.end()
             continue

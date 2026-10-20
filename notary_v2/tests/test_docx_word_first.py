@@ -1413,7 +1413,7 @@ def test_deceased_person_maps_explicit_source_fields_without_identity_merge(db, 
     assert fields['ngay_cap']['normalized_value'] == '2016-06-10'
     assert fields['noi_cap']['normalized_value'] == 'UBND xã Mẫu'
     assert fields['dia_chi']['normalized_value'] == 'Thôn Mẫu, xã Mẫu'
-    assert 'so_giay_to' not in fields
+    assert fields['so_giay_to']['normalized_value'] == '95/2026/TLKT'
     assert fields['ngay_chet']['source_refs'][0]['raw_snippet'] == '05/06/2016'
     assert fields['loai_giay_to']['source_refs'][0]['raw_snippet'] == 'Trích lục khai tử'
 
@@ -1424,13 +1424,13 @@ def test_deceased_person_maps_explicit_source_fields_without_identity_merge(db, 
     assert (stage_deceased['ngay_cap'], stage_deceased['noi_cap']) == (
         '2016-06-10', 'UBND xã Mẫu')
     assert stage_deceased['dia_chi'] == 'Thôn Mẫu, xã Mẫu'
-    assert any(w['code'] == 'intake.fragment' for w in deceased[0]['warnings'])
+    assert stage_deceased['so_giay_to'] == '95/2026/TLKT'
     db.expire_all()
     assert any(p['ho_ten'] == 'Nguyễn Văn Cố' and p['ngay_chet'] == '2016-06-05'
                for p in service.get(cid)['stage']['people'])
     from models import Customer
     deceased_customer = db.query(Customer).filter(Customer.ho_ten == 'Nguyễn Văn Cố').one()
-    assert deceased_customer.so_giay_to is None
+    assert deceased_customer.so_giay_to == '95/2026/TLKT'
     assert deceased_customer.ngay_chet.isoformat() == '2016-06-05'
     fresh = session_factory()
     try:

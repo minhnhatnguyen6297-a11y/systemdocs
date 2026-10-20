@@ -2914,7 +2914,7 @@ endif %}
 
         if (typeof window.addToOcrStaging === 'function') {
 
-          const added = window.addToOcrStaging(customer, { source: 'excel', skipDuplicateGuard: true });
+          const added = window.addToOcrStaging(customer, { source: 'excel' });
 
           if (added) addedCount += 1;
 
@@ -3486,7 +3486,6 @@ endif %}
         }
 
 
-        mergeOcrResultsInPlace();
 
         renderResults();
 
@@ -9281,13 +9280,8 @@ endif %}
 
 
 
-      const existingCCCD = existing.data.so_giay_to;
-
-
-      const match = (data.persons || []).find(p => !existingCCCD || p.so_giay_to === existingCCCD)
-
-
-        || (data.persons || [])[0];
+      const persons = data.persons || [];
+      const match = persons.length === 1 ? persons[0] : null;
 
 
 
@@ -9468,153 +9462,10 @@ endif %}
       }
 
 
-      function normalizeDocKey(v) {
 
-        return String(v || '').replace(/\D/g, '');
 
-      }
 
 
-      function getInlineRowDocKey(row) {
-
-        const inputValue = row?.querySelector?.('[data-key="so_giay_to"]')?.value;
-
-        if (inputValue !== undefined) return normalizeDocKey(inputValue);
-
-        const cells = row?.querySelectorAll?.('.inline-cell') || [];
-
-        return normalizeDocKey(cells[4]?.textContent || '');
-
-      }
-
-
-      function isDocInInlinePeople(doc) {
-
-        const key = normalizeDocKey(doc);
-
-        if (!key) return false;
-
-        const rows = document.querySelectorAll('#inline-people-list .inline-people-row');
-
-        for (const row of rows) {
-
-          if (getInlineRowDocKey(row) === key) return true;
-
-        }
-
-        return false;
-
-      }
-
-
-      function isDocInTreeCards(doc) {
-
-        const key = normalizeDocKey(doc);
-
-        if (!key) return false;
-
-        const cards = document.querySelectorAll('.person-card[data-doc]');
-
-        for (const card of cards) {
-
-          if (normalizeDocKey(card.dataset.doc) === key) return true;
-
-        }
-
-        return false;
-
-      }
-
-
-      function isDocAlreadyInCase(doc) {
-
-        const key = normalizeDocKey(doc);
-
-        if (!key) return false;
-
-        return isDocInInlinePeople(key) || isDocInTreeCards(key);
-
-      }
-
-
-      function isDocAlreadyInStaging(doc) {
-
-        const key = normalizeDocKey(doc);
-
-        if (!key) return false;
-
-        const inputs = document.querySelectorAll('#inline-people-list .ocr-staged-row [data-key="so_giay_to"]');
-
-        for (const inp of inputs) {
-
-          if (normalizeDocKey(inp.value) === key) return true;
-
-        }
-
-        return false;
-
-      }
-
-
-      function looksSuspiciousName(name) {
-
-        const s = String(name || '').trim();
-
-        if (!s) return true;
-
-        if (/\d/.test(s)) return true;
-
-        return /CONG HOA|SOCIALIST|MINISTRY|CAN CUOC|CITIZEN|IDENTITY|DAC DIEM|NGON TRO|PLACE OF|DATE OF|BO CONG AN|QUAN LY/i.test(s);
-
-      }
-
-
-      function mergePersonData(base, extra) {
-
-        const out = { ...(base || {}) };
-
-        const inc = extra || {};
-
-        const keys = ['so_giay_to', 'ho_ten', 'ngay_sinh', 'gioi_tinh', 'dia_chi', 'ngay_cap', 'ngay_het_han', '_raw_text'];
-
-        for (const key of keys) {
-
-          const cur = out[key] || '';
-
-          const nxt = inc[key] || '';
-
-          if (!cur && nxt) { out[key] = nxt; continue; }
-
-          if (!nxt) continue;
-
-          if (key === 'ho_ten') {
-
-
-      if (looksSuspiciousName(cur) && !looksSuspiciousName(nxt)) out[key] = nxt;
-
-
-      else if (!cur && nxt) out[key] = nxt;
-
-
-      continue;
-
-          }
-
-          if (key === 'dia_chi' || key === '_raw_text') {
-
-
-      if (String(nxt).length > String(cur).length) out[key] = nxt;
-
-
-      continue;
-
-          }
-
-        }
-
-        return out;
-
-      }
 
 
       function normalizeWarnings(value) {
@@ -9641,155 +9492,6 @@ endif %}
       }
 
 
-      function mergeOcrResultsInPlace() {
-
-        const merged = [];
-
-        const personByDoc = new Map();
-
-        const sourceRank = (src) => {
-
-          const s = String(src || '').toUpperCase();
-
-          if (s === 'OCR' || s === 'AI') return 1;
-
-          return 0;
-
-        };
-
-        for (const r of ocrResults) {
-
-          if (r.type !== 'person') {
-
-
-      merged.push(r);
-
-
-      continue;
-
-          }
-
-          const doc = String(r.data?.so_giay_to || '').replace(/\D/g, '');
-
-          if (!doc) {
-
-
-      merged.push(r);
-
-
-      continue;
-
-          }
-
-          if (!personByDoc.has(doc)) {
-
-
-      const warnings = Array.from(new Set([
-
-
-        ...normalizeWarnings(r.warnings),
-
-
-        ...normalizeWarnings(r.data?.warnings),
-
-
-      ]));
-
-
-      const first = { ...r, data: { ...(r.data || {}) }, warnings };
-
-
-      personByDoc.set(doc, first);
-
-
-      merged.push(first);
-
-
-      continue;
-
-          }
-
-          const target = personByDoc.get(doc);
-
-          target.data = mergePersonData(target.data || {}, r.data || {});
-
-          const targetSide = String(target.side || target.data?.side || '').toLowerCase();
-
-          const incomingSide = String(r.side || r.data?.side || '').toLowerCase();
-
-          const incomingSrc = String(r.source_type || r.source || '').toUpperCase();
-
-
-
-
-          if (targetSide === 'back' && incomingSide === 'front') {
-
-
-      ['ho_ten', 'ngay_sinh', 'dia_chi'].forEach(k => {
-
-
-        if ((r.data?.[k] || '').trim()) target.data[k] = r.data[k];
-
-
-      });
-
-
-      if (!(target.data.gioi_tinh || '').trim() && (r.data?.gioi_tinh || '').trim()) {
-
-
-        target.data.gioi_tinh = r.data.gioi_tinh;
-
-
-      }
-
-          } else if (targetSide === 'front' && incomingSide === 'back') {
-
-
-      if (!(target.data.ngay_cap || '').trim() && (r.data?.ngay_cap || '').trim()) {
-
-
-        target.data.ngay_cap = r.data.ngay_cap;
-
-
-      }
-
-          }
-
-          if (sourceRank(r.source) > sourceRank(target.source)) target.source = r.source;
-
-          if (sourceRank(r.source_type) > sourceRank(target.source_type)) target.source_type = r.source_type;
-
-          if ((!target.side || target.side === 'unknown') && r.side) target.side = r.side;
-
-          if ((!target.data.side || target.data.side === 'unknown') && r.data?.side) target.data.side = r.data.side;
-
-          if (!target.filename && r.filename) target.filename = r.filename;
-
-          if (!target.document_type && r.document_type) target.document_type = r.document_type;
-
-          target.field_sources = { ...(target.field_sources || {}), ...(r.field_sources || {}) };
-
-          target.warnings = Array.from(new Set([
-
-
-      ...normalizeWarnings(target.warnings),
-
-
-      ...normalizeWarnings(target.data?.warnings),
-
-
-      ...normalizeWarnings(r.warnings),
-
-
-      ...normalizeWarnings(r.data?.warnings),
-
-          ]));
-
-        }
-
-        ocrResults = merged;
-
-      }
 
 
       // ── Trích xuất tất cả ──────────────────────────────────────────────────
@@ -10022,7 +9724,6 @@ endif %}
         }
 
 
-        mergeOcrResultsInPlace();
 
         renderResults();
 
@@ -10615,7 +10316,7 @@ endif %}
           const data = { ...(result.data || {}) };
           const card = document.querySelector(`.ocr-person-card[data-idx="${ocrResults.indexOf(result)}"]`);
           card?.querySelectorAll('.ocr-input').forEach((input) => { data[input.dataset.key] = input.value; });
-          if (window.addToOcrStaging?.(data, { source: 'ocr', skipDuplicateGuard: true })) stagedCount += 1;
+          if (window.addToOcrStaging?.(data, { source: 'ocr' })) stagedCount += 1;
         });
         if (stagedCount) showToast(`Đã lưu ${stagedCount} dòng vào Stage`, 'success');
       }
@@ -10625,9 +10326,6 @@ endif %}
 
         if (!c) return;
 
-        const docKey = normalizeDocKey(c.so_giay_to);
-
-        if (docKey && (isDocAlreadyInCase(docKey) || isDocAlreadyInStaging(docKey))) return;
 
         if (window.addToOcrStaging) window.addToOcrStaging(c);
 
@@ -10647,7 +10345,7 @@ endif %}
 
       function _addStagingCard(c) {
 
-        return window.addToOcrStaging?.(c, { source: 'existing', skipDuplicateGuard: true });
+        return window.addToOcrStaging?.(c, { source: 'existing' });
 
         const area = document.getElementById('ocr-staging-area');
 
@@ -10839,7 +10537,7 @@ endif %}
 
       addToStagingLinked = function (c) {
 
-        return window.addToOcrStaging?.(c, { source: 'ocr', skipDuplicateGuard: true });
+        return window.addToOcrStaging?.(c, { source: 'ocr' });
 
       };
 
@@ -10848,7 +10546,7 @@ endif %}
 
         const record = toLegacyCustomerShape(upsertCustomerRecord(c));
 
-        return window.addToOcrStaging?.(record, { source: 'existing', skipDuplicateGuard: true });
+        return window.addToOcrStaging?.(record, { source: 'existing' });
 
         const area = document.getElementById('ocr-staging-area');
 
@@ -11685,35 +11383,6 @@ endif %}
 
         if (!area) return false;
 
-        const docKey = normalizeDocKey(data?.so_giay_to);
-
-        if (!options.skipDuplicateGuard && docKey && (isDocAlreadyInCase(docKey) || isDocAlreadyInStaging(docKey))) {
-
-          if (typeof window.__pushCaseDebugEvent__ === 'function') {
-
-
-      window.__pushCaseDebugEvent__('DRAFT_ROW_REJECTED', {
-
-
-        source: options.source || data?.source || '',
-
-
-        reason: 'duplicate_doc',
-
-
-        doc: data?.so_giay_to || '',
-
-
-        name: data?.ho_ten || ''
-
-
-      });
-
-          }
-
-          return false;
-
-        }
 
         const g = data.gioi_tinh || '';
 
@@ -11841,7 +11510,7 @@ endif %}
 
           if (!record?.id) return;
 
-          window.addToOcrStaging(record, { source: 'existing', skipDuplicateGuard: true });
+          window.addToOcrStaging(record, { source: 'existing' });
 
         });
 
