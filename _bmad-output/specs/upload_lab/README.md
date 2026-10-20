@@ -233,13 +233,19 @@ Bảng hồ sơ dùng đúng **sáu cột** (chuẩn MIN-77):
 #### SOT cấu trúc website — Nam Định trước, 20/10/2026
 
 [Catalog Nam Định lâu dài](nam-dinh-website-sot.md) giữ route, toàn bộ 17
-input quick-create, widget, 6 catalog và mapping extraction → canonical →
+trường quick-create, widget, 6 catalog và mapping extraction → canonical →
 DB/wire → selector/API, kèm URL/module/hash nguồn. Đây là website thứ nhất;
 website thứ hai chưa được định danh/khảo sát, không dùng catalog này thay nó.
-Quan sát hiện có là **public static bundle**: 7 required tĩnh, 3 option trạng
-thái tĩnh; **0 DOM authenticated và 0 catalog authenticated đầy đủ**.
-Nhóm/loại tài sản trả 403, title không scope trả items=[] không chứng minh
-catalog đơn vị rỗng; list title/nhân sự đúng scope còn thiếu.
+Sau khi user tự đăng nhập **20/10/2026**, empty form read-only đã xác nhận
+**17 trường ngữ nghĩa**, **7 label required** (không HTML attr/enforcement),
+default/state của 6 widget và list hiện render: status **3**, nhóm **13**,
+asset **12**, title **5**, CCV **3**, thư ký **5**. SOT chép bền vững list
+phi cá nhân + ID/label/metadata vai trò nhóm, nhân sự chỉ shape/count; có proof
+props↔DOM/pagination. Đầy đủ **trong phiên quan sát**, không tổng DB/mọi đơn vị.
+Mốc static trước đăng nhập (0 coverage authenticated, nhóm/asset 403, title
+unscoped items=[]) giữ làm lịch sử, không còn là trạng thái hiện tại.
+Scope server, required enforcement và object→ID form/submission còn chưa biết;
+không Lưu, prime validation, upload hoặc mở record trong audit.
 
 Có thể cần auxiliary website fields nhưng **chưa duyệt business schema**:
 ID/label catalog, config/policy và provenance tách khỏi nghiệp vụ phí/thù

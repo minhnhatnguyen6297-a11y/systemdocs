@@ -1,6 +1,6 @@
 # Sổ tay sản phẩm theo màn hình
 
-**Cập nhật:** 19/10/2026 · **Dùng để:** giúp owner và coordinator cùng nhìn
+**Cập nhật:** 20/10/2026 · **Dùng để:** giúp owner và coordinator cùng nhìn
 vào sản phẩm, giao diện và việc còn dở khi bắt đầu phiên làm việc.
 
 Đọc [nền sản phẩm và khái niệm chung](README.md) trước để hiểu người dùng,
@@ -180,14 +180,19 @@ Hai tab đang có trong UI là `Audit Sổ Công Chứng` và `Quét & Upload H�
 App điền sẵn rồi dừng trước nút Lưu để người dùng tự kiểm tra; dữ liệu chính
 thức trên website là nguồn sự thật, không phải tín hiệu browser cục bộ.
 
-**SOT cấu trúc website — 20/10/2026:** [Nam Định](upload_lab/nam-dinh-website-sot.md)
-là website thứ nhất được catalog lâu dài: 17 input tĩnh, 6 catalog, 7 required
-tĩnh; route/widget/API và mapping DB/wire có nguồn. Public bundle không thay
-DOM authenticated (**0**) hoặc catalog authenticated đầy đủ (**0**); năm list
-còn thiếu đúng scope được nêu rõ. Auxiliary site fields có thể cần nhưng chưa
-duyệt schema; hai phí ngoài mapping và tổng/ghi chú/trạng thái giữ refinement
-#41. Person/Asset/parties chưa cutover, gate mẫu vẫn **ĐÓNG**. Website thứ hai
-chưa khảo sát; không tạo provider/canonical key mới từ catalog.
+**SOT cấu trúc website — 20/10/2026, sau đăng nhập thủ công:**
+[Nam Định](upload_lab/nam-dinh-website-sot.md) là website thứ nhất được catalog
+lâu dài: **17 trường ngữ nghĩa** trên empty form live, **7 label required**
+(không proof HTML attr/enforcement); 6 widget/list hiện render gồm status **3**,
+nhóm **13**, asset **12**, title **5**, CCV **3**, thư ký **5**. List phi cá nhân
+và ID/label/metadata vai trò nhóm được chép bền vững; nhân sự chỉ shape/count.
+Có default/state và proof props↔DOM/pagination **trong phiên**, không tổng DB
+hoặc mọi đơn vị. Zero authenticated coverage/403/unscoped=[] của audit static
+trước đó giữ làm lịch sử; scope server và form/submission conversion còn unknown.
+Không Lưu/prime/upload hoặc mở record. Auxiliary site fields chưa duyệt schema;
+phí/tổng/ghi chú/trạng thái còn refine #41, Person/Asset/parties chưa cutover,
+gate mẫu vẫn **ĐÓNG**. Website thứ hai chưa khảo sát; không tạo canonical key
+mới từ catalog.
 
 
 | Màn / thao tác | Dùng để | Tài liệu | Điểm vào mã |

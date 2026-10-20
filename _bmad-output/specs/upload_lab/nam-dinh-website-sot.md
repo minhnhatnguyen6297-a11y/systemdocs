@@ -9,28 +9,29 @@
 Owner 20/10 chọn **Nam Định trước; duy trì SOT cấu trúc website lâu dài; có thể cần trường phụ theo website nhưng chưa duyệt schema mới**. Xem [quyết định](../../decisions/decision-owner-upload-field-standardization-20261019.md#bổ-sung-owner-20102026--sot-cấu-trúc-website). Website thứ hai chưa định danh/khảo sát trong lượt này; không dùng catalog Nam Định làm catalog chung hoặc tự bật provider thứ hai.
 
 - **Website/public bundle** chứng minh tên field, widget, rule, route và conversion được frontend định nghĩa; không chứng minh DOM sau đăng nhập, quyền của tài khoản, option hiện hành hoặc backend đã lưu đúng.
+- **Authenticated empty quick-create, 20/10/2026 sau khi user tự đăng nhập:** DOM và option đang render chứng minh trạng thái của form/list trong phiên khảo sát; không chứng minh toàn bộ catalog của mọi đơn vị, form state sau chọn, request submit hoặc DB website. Chỉ đọc/thử chọn rồi trả form về rỗng; không bấm Lưu, prime validation, upload hoặc mở record.
 - **Source repo** chứng minh adapter, storage, projection hiện có; không thay bằng chứng live. **Canonical/contract được duyệt** quyết định nghĩa/key/kiểu/nhóm: [entities §8–9.4](../../../contracts/entities.md#8-từ-điển-dữ-liệu-người-customers-và-các-trường-suy-ra), [Notary contract](../../../contracts/notary-case-drafting.md). Upload workflow vẫn **DRAFT** (`contracts/README.md:11-18,33-44`; `contracts/upload-workflow.md:1-14`); tài liệu website không nâng nó thành approved.
 - 8 key Case đã implement, nhưng Person/Asset/parties chưa canonical cutover đầy đủ. **Toàn #41 chưa hoàn thành; gate khảo sát mẫu ĐÓNG**, không phải tuyên bố issue đã CLOSED. Không đọc testcase/corpus để hoàn thiện catalog này.
 - Không lưu PII, tên/ID nhân sự thật, cookie/token/credential, record hợp đồng hoặc raw khách hàng. Các option công khai phi cá nhân có thể chép; catalog nhân sự chỉ giữ shape/scope/trạng thái coverage.
 
-### Ma trận kiểm chứng 20/10/2026
+### Ma trận kiểm chứng hiện tại — 20/10/2026, sau đăng nhập thủ công
 
 | Bề mặt | Quan sát thực tế | Kết luận được phép |
 |---|---|---|
-| Root, `/dang-nhap`, direct quick-create | Public shell tới được; browser chuyển `/dang-nhap`; phiên browser ban đầu không có tab; relay discovery timeout 8000 ms | Có shell/trang đăng nhập; **0 field DOM authenticated** |
-| Public static assets | GET không credential thành công; route quick-create trỏ module 1517, permission `CREATE_HOSO` | Inventory **17 editable fields, 7 required tĩnh, 6 catalog widgets**, 1 tổng hiển thị + 2 hidden/derived state paths |
-| Trạng thái | Module 926 định nghĩa đủ 3 option tĩnh | Đủ danh sách **static**, không claim đã mở dropdown DOM |
-| Nhóm / Loại tài sản | Public GET trả 403 | Shape có source; **danh sách option chưa có** |
-| Tên hợp đồng | Public GET không scope trả 200, `items=[]` | Không chứng minh catalog đơn vị rỗng/đủ; cần `donvi.id` |
-| Công chứng viên / Thư ký | Không gọi person endpoints, không lưu nhân sự | Shape/scope có source; **count và option chưa xác minh** |
-| Form API / lưu | Không submit/upload, không gọi ghi DB | Không chứng minh backend persistence hoặc Lưu thành công |
-| Repo | Chỉ đọc source tĩnh, không chạy app/parser/build/test | Mapping source-level, không thêm proof runtime |
+| Empty quick-create authenticated | 1 form, 2 section; **17 trường ngữ nghĩa** quan sát DOM | Không đếm raw `<input>` để suy số trường; có editor, hidden input và textarea nội bộ |
+| Required/default/state | **7 label có dấu required**; 17 control nghiệp vụ không disabled/readOnly; status `DACONGCHUNG`, ngày `20/10/2026`, trường khác rỗng | Không có HTML `required`/`aria-required`; chưa thử enforcement client/server |
+| Sáu widget catalog | Status **3**, nhóm **13**, loại tài sản **12**, title **5**, CCV **3**, thư ký **5** option | Đủ option hiện render trong phiên, không phải tổng DB/toàn đơn vị; §5 giữ list phi cá nhân và proof |
+| Scope/pagination | Mỗi remote catalog một GET lúc mount; không quan sát query paging/`donviId`; số `props.options` khớp DOM | Chưa biết server chọn scope theo quyền/đơn vị thế nào hoặc có tổng ngoài response |
+| Public static assets + repo | Inventory **17 fields, 7 required tĩnh, 6 catalog widgets**; mapping source-level | Không chạy app/parser/build/test hoặc thay schema/runtime |
+| Form API / lưu | Không submit/upload/prime; không gọi ghi DB | Không capture request submit, không chứng minh backend persistence hoặc Lưu thành công |
 
-**Coverage còn thiếu:** authenticated empty quick-create DOM (required/readOnly/disabled/default thực), danh sách Nhóm hợp đồng, Loại tài sản, Tên hợp đồng đúng đơn vị, Công chứng viên và Thư ký đúng scope; xác nhận widget/selector thực. **Yêu cầu danh sách dropdown của user chưa được xác minh đầy đủ.** Không coi mảng rỗng public, fixture giả hay labels engine là câu trả lời thay thế.
+**Lịch sử trước đăng nhập, cũng ngày 20/10/2026:** root/direct quick-create chuyển `/dang-nhap`; browser/relay lúc đầu chưa đọc được form (**0 field DOM authenticated, 0 catalog authenticated đầy đủ tại thời điểm đó**). Public GET nhóm/loại tài sản trả **403**; title GET không scope trả **200 `items=[]`**; nhân sự chưa được gọi. Đây là mốc static audit, **không còn là coverage hiện tại** và không chứng minh catalog rỗng. Public module 926 đã cho 3 status static; bằng chứng live sau đó xác nhận list đang render.
+
+**Coverage còn thiếu:** enforcement required; form state/submission conversion object↔ID; scope server/unit/global và tổng DB ngoài response; catalog refresh sau mount/save; nhập tiền/rounding; giới hạn file/editor. Chưa biết portal DB/schema hoặc persistence. Các list §5 chỉ đầy đủ cho option được cung cấp/render trong phiên authenticated này.
 
 ## 2. Nguồn website bền vững và cấu trúc đọc
 
-Các URL là nguồn public được lấy 20/10/2026; số module là locator trong bundle minified, không bịa line code chưa có. Khi hash URL đổi, đọc lại route/module thay vì mặc định module ID còn giữ.
+Các URL W1–W5 là nguồn public được lấy 20/10/2026; **A1** là audit authenticated read-only sau đăng nhập thủ công cùng ngày. Số module là locator trong bundle minified, không bịa line code chưa có. Khi hash URL đổi, đọc lại route/module thay vì mặc định module ID còn giữ.
 
 | Mã | URL / locator | Nội dung dùng làm bằng chứng |
 |---|---|---|
@@ -39,19 +40,20 @@ Các URL là nguồn public được lấy 20/10/2026; số module là locator t
 | W3 | <https://congchungnamdinh.ninhbinh.gov.vn/api/dm/nhomhopdong> | GET 403; không có list |
 | W4 | <https://congchungnamdinh.ninhbinh.gov.vn/api/dm/loaitaisan> | GET 403; không có list |
 | W5 | <https://congchungnamdinh.ninhbinh.gov.vn/api/danh-muc/TEN_HOP_DONG> | GET không scope: 200, `items=[]`; không là list của đơn vị |
+| A1 | <https://congchungnamdinh.ninhbinh.gov.vn/ho-so-cong-chung/tao-moi-nhanh> · authenticated empty form, 20/10/2026 | DOM 17 trường; state/default/required markers; 6 widget catalogs; props↔DOM counts, query/pagination và thử dependency có hoàn tác |
 
 SHA-256 của **text asset đã fetch, encode UTF-8** (không claim raw transfer bytes):
 
 - W1: `0c24bfb433769d9bb6ad70c5c8920ffd04a94ebc572ff8b77e3371641a8fc1ba`.
 - W2: `97553b476fa4120979a3c9c6b2e4e60043f74bbf0faae06bc703ef01595dd637`.
 
-Phần thiết yếu được chép an toàn trong tài liệu này, không phụ thuộc file tmp hoặc bundle còn truy cập được. Evidence chi tiết cục bộ tùy chọn: `_bmad-output/tmp/namdinh-website-sot/website-evidence.json`, `website-handoff.txt`, `public-static-schema-excerpt.txt`, `public-widget-submit-excerpts.txt`; không dùng chúng thay catalog bền vững.
+Phần thiết yếu được chép an toàn trong tài liệu này, không phụ thuộc file tmp hoặc bundle còn truy cập được. Evidence chi tiết cục bộ tùy chọn: `_bmad-output/tmp/namdinh-website-sot/live-authenticated-audit-20261020.json` và `.md` (**A1, bản hiệu chỉnh t3**: tách semantic/raw DOM, widget/form/POST, request context/scope, thêm title item IDs); `website-evidence.json`, `website-handoff.txt`, `public-static-schema-excerpt.txt`, `public-widget-submit-excerpts.txt` (public/static). Không dùng chúng thay catalog bền vững; account/đơn vị/nhân sự/secret đã loại khỏi bản ghi an toàn.
 
 ### Cấu trúc bề mặt được khảo sát
 
-1. Root → `/dang-nhap`: username/password + Đăng nhập (selector repo `uploader_selectors.py:8-21:LOGIN_SELECTORS`); không lưu credential, không thử login.
-2. Sau đăng nhập, adapter đi `/ho-so-cong-chung/tao-moi-nhanh` (`playwright_uploader.py:87-88:LOGIN_PATH,CREATE_PATH`; W2). Không xác minh menu authenticated hoặc toàn bộ trang khác của portal.
-3. Quick-create gồm **Thông tin hồ sơ** (13 input kể cả attachment/ghi chú) và **Chi phí** (4 input tiền). Wrapper Chi phí dùng lại `name:"ghichu"` với `isFieldBuildIn:true`: **không phải input ghi chú thứ hai**. Tổng chi phí chỉ hiển thị.
+1. Root → `/dang-nhap`: username/password + Đăng nhập (selector repo `uploader_selectors.py:8-21:LOGIN_SELECTORS`). User tự đăng nhập; không thu thập credential hoặc điều khiển bước đăng nhập.
+2. Sau đăng nhập, quick-create `/ho-so-cong-chung/tao-moi-nhanh` đã quan sát empty form (**A1**); adapter dùng cùng path (`playwright_uploader.py:87-88:LOGIN_PATH,CREATE_PATH`; W2). Không inventory menu authenticated hoặc toàn bộ trang khác của portal.
+3. Quick-create gồm **Thông tin hồ sơ** (13 trường (kể cả attachment/ghi chú)) và **Chi phí** (4 input tiền). Wrapper Chi phí dùng lại `name:"ghichu"` với `isFieldBuildIn:true`: **không phải input ghi chú thứ hai**. Tổng chi phí chỉ hiển thị.
 4. Nút `Lưu hợp đồng` là đích thao tác người dùng; không click trong khảo sát. Upload Excel audit là bề mặt khác trong module, không lấy schema quick-create áp cho mọi form website.
 
 Route declarations W2 sau đây là cấu trúc static liên quan Hồ sơ công chứng, **không phải menu đã quan sát với quyền thật**; không inventory toàn bộ form khác:
@@ -77,20 +79,20 @@ Route declarations W2 sau đây là cấu trúc static liên quan Hồ sơ công
 
 Canonical names giữ nguyên owner: `tenvanban,nhomhopdong,loaivanbannhandien,socongchung,ngaycongchung,congchungvien,thuky,chudat`. Nguồn chuẩn `contracts/entities.md:240-267`; source mapping `contract_extract.py:4783-4852:CASE_FIELDS,CASE_PORTAL_FIELDS,validate_case_fields,case_from_payload,case_portal_projection`. `loaivanbannhandien/chudat` không có input tương ứng trên quick-create. Upload không Diagram nên `chudat=null`; không suy từ Bên A/GCN/người chết.
 
-## 4. Inventory đầy đủ 17 input quick-create
+## 4. Inventory đầy đủ 17 trường quick-create
 
-**R** là required trong W1 module 1517, không phải đã kiểm server/DOM. Control website lấy từ W1/W2; selector là **repo khai báo** hoặc name source, chưa DOM verified. CSS ID có dấu chấm phải escape `\.`. Các editor repo dùng XPath `Field-container` có label → `[contenteditable='true'][1]` (`uploader_selectors.py:103-132`). W1 defines no explicit title→group/group→asset dependency; không suy ra runtime không có dependency.
+**R** là required trong W1 module 1517; A1 xác nhận đúng 7 **label marker**, không phải HTML attr/enforcement. Bảng giữ default/mapping **static** và selector repo; đối chiếu DOM/default live tại §4.2. CSS ID có dấu chấm phải escape `\.`. Các editor repo dùng XPath `Field-container` có label → `[contenteditable='true'][1]` (`uploader_selectors.py:103-132`). W1 không định nghĩa dependency title→group/group→asset rõ ràng; các phép chọn giới hạn ở §5 không chứng minh mọi runtime path độc lập.
 
 | # / field website / nhãn | Widget · R · default tĩnh | Extraction → canonical/đối tượng → DB/wire thực | App form key / selector / source |
 |---|---|---|---|
 | 1 `hopdong.tenhopdong` · Tên hợp đồng | freeSolo autocomplete · R · không ghi default | detect title `build_payload:4856,4932` → **C tenvanban** → Case JSON; text nguồn, không enum Notary | `ten_hop_dong` / `#hopdong\.tenhopdong` · selectors:41-48 |
 | 2 `hopdong.tinhtrang` · Tình trạng | MUI select · R · `DACONGCHUNG` | Không extraction/canonical; **P** app label “Đã công chứng”; không map `inheritance_cases.trang_thai` draft/locked | `tinh_trang` / `#hopdong\.tinhtrang` · 64-70; defaults:3 |
 | 3 `hopdong.ngaycongchung` · Ngày công chứng | date picker · không R · ngày hiện tại `yyyy-MM-dd`, display `dd/MM/yyyy` | `find_ngay_cong_chung` → **C ngaycongchung**, ISO/null `build_payload:4930-4936`; boundary `case_portal_projection:4845-4852` → DD/MM/YYYY. Ngày website mặc định không là ngày nguồn | `ngay_cong_chung` / `input[placeholder='dd/mm/yyyy']` · 49-55 |
-| 4 `nhomhopdongId` · Nhóm hợp đồng | remote autocomplete · R | `guess_nhom_hd(title):1119-1129` → **C nhomhopdong** label → Case JSON; website chọn ID, app chưa lưu catalog ID | `nhom_hop_dong` / `#nhomhopdongId` · 71-78 |
+| 4 `nhomhopdongId` · Nhóm hợp đồng | remote autocomplete · R | `guess_nhom_hd(title):1119-1129` → **C nhomhopdong** label → Case JSON; static dự kiến ID nhưng A1 chỉ xác nhận widget object, form/POST chưa reconcile; app chưa lưu catalog ID | `nhom_hop_dong` / `#nhomhopdongId` · 71-78 |
 | 5 `loaiTaisan` · Loại tài sản | remote autocomplete, object · R | `guess_loai_tai_san:1176-1202` → **J web_form.loai_tai_san** label; discriminator portal chưa canonical Asset cutover, không cột DB Upload/approved shared enum | `loai_tai_san` / `#loaiTaisan` · 79-86 |
 | 6 `hopdong.sohopdong` · Số công chứng | text · không R tĩnh | `find_so_cong_chung`/scan + normalize `build_payload:4923,4935` → **C socongchung**; registry.contract_no vẫn scan/reference | `so_cong_chung` / `#hopdong\.sohopdong` · 56-63 |
 | 7 `hopdong.congchungvien.id` · Công chứng viên | remote autocomplete · R | regex nguồn `build_payload:4929,4937` hoặc lựa chọn prepare rõ ràng → **C congchungvien** tên/null → Case JSON; ID website không là FK Notary | `cong_chung_vien` / `#hopdong\.congchungvien\.id` · 87-94; builder:781-792 |
-| 8 `hopdong.thuky` · Thư ký | freeSolo autocomplete · không R | extraction `thuky=null` `build_payload:4938`; input prepare → **C thuky** tên/null → Case JSON; không ID conversion cần thêm | `thu_ky` / `#hopdong\.thuky` · 95-102 |
+| 8 `hopdong.thuky` · Thư ký | freeSolo autocomplete · không R | extraction `thuky=null` `build_payload:4938`; input prepare → **C thuky** tên/null → Case JSON; widget string, form/POST chưa quan sát | `thu_ky` / `#hopdong\.thuky` · 95-102 |
 | 9 `hopdong.nguoiYeucauCongchung` · Thông tin người yêu cầu công chứng (ghi sổ công chứng) | CKEditor HTML · không R | `build_payload:4924-4927,4944` chọn B nếu có người, fallback A; cam kết tài sản A → first person raw_text; optional requester lookup → **J** presentation. Người + vai trò Hồ sơ **chưa cutover** (§6) | `nguoi_yeu_cau` / label XPath · 103-112; `resolve_requester_override:561-588` |
 | 10 `hopdong.duongsu` · Đương sự | CKEditor HTML · R | `raw.ben_a/b` → `_fmt_duong_su_by_kind:4749-4765` → **J web_form.duong_su**, raw_text/entity_lines ghép; Person/parties chưa cutover | `duong_su` / label XPath · 113-122 |
 | 11 `hopdong.taisan` · Tài sản | CKEditor HTML · R | `_find_tai_san_by_kind:1007-1116` → **J web_form.tai_san** text; song song `raw.danh_sach_thua_dat` `build_payload:4962-4973`. Asset chưa cutover; text không thay các field chuẩn | `tai_san` / label XPath · 123-132 |
@@ -105,7 +107,7 @@ Chi phí dùng currency `đ`, phân nhóm chữ số bằng khoảng trắng; th
 
 **Derived/hidden không tính thêm input:** module 977 cộng bốn khoản vào `chiphi.tongphi`; wrapper hiển thị `chiphi.total` / “Tổng chi phí” readonly; hidden Field lại viết **`phicongchung.tongphi`** và wrapper hidden trả null. Giữ nguyên discrepancy tên này; không “sửa đúng” bằng doc/schema. Không extraction/Case key/DB column cho tổng; không tự duyệt persist dữ liệu suy ra.
 
-Required tĩnh đúng **7**: Tên hợp đồng, Tình trạng, Nhóm hợp đồng, Loại tài sản, Công chứng viên, Đương sự, Tài sản. **Ngày/Số công chứng không đánh dấu required tĩnh**; app critical list khác (`identify_missing_fields:810-812` gồm title, number, group, asset type, asset text). Rule date cho trống, có giá trị thì parse `yyyy-MM-dd`, lỗi “Định dạng ngày không hợp lệ”. CKEditor emits HTML; chưa xác minh rule semantic-empty HTML. Các control không khai báo disabled riêng, nhưng global viewOnly có thể disable; actual DOM chưa quan sát.
+Required tĩnh đúng **7**: Tên hợp đồng, Tình trạng, Nhóm hợp đồng, Loại tài sản, Công chứng viên, Đương sự, Tài sản. A1 thấy đúng 7 label `Mui-required` + dấu sao, **không HTML `required` hoặc `aria-required`**, chưa submit/prime để thử enforcement. **Ngày/Số công chứng không đánh dấu required**; app critical list khác (`identify_missing_fields:810-812` gồm title, number, group, asset type, asset text). Rule date static cho trống, có giá trị thì parse `yyyy-MM-dd`, lỗi “Định dạng ngày không hợp lệ”. CKEditor emits HTML; chưa xác minh semantic-empty HTML. Global viewOnly có thể disable; A1 chỉ xác nhận 17 control nghiệp vụ của empty quick-create hiện không disabled/readOnly.
 
 ### 4.1 State trước Lưu → request API (public source, chưa submit)
 
@@ -118,10 +120,10 @@ onSubmit:function(t){return Object(l.b)(t).then(/* thông báo + điều hướn
 u=function(t){return Object(a.a)("hoso/nhap-nhanh",{method:"post",data:t})}
 ```
 
-Do đó, đường nối từng hàng §4 sang API là **name path của form**, không phải tên canonical app:
+Đường nối source của từng hàng §4 sang API dùng **name path của form**, không phải tên canonical app. Danh sách sau là **diễn giải static**, chưa capture form state/body; A1 chỉ thấy widget props, nên giả thuyết ID cho nhóm/CCV **chưa được reconcile** với whole-object widget value:
 
-- `hopdong` chứa `tenhopdong` (label/free text), `tinhtrang` (enum), `ngaycongchung` (ISO/null/invalid-date marker trước validation), `sohopdong` (text), `congchungvien.id` (ID), `thuky` (label/free text), `nguoiYeucauCongchung/duongsu/taisan` (HTML), `fileHopdong` (giá trị attachment do upload control quản lý; **shape file metadata/persistence backend chưa xác minh**, không gửi local path như cột business).
-- Root `nhomhopdongId` là ID; root `loaiTaisan` là object từ autocomplete. Root `ghichu` là textarea text.
+- `hopdong` khai báo `tenhopdong` (label/free text), `tinhtrang` (enum), `ngaycongchung` (ISO/null/invalid-date marker trước validation), `sohopdong` (text), `congchungvien.id` (static dự kiến ID), `thuky` (label/free text), `nguoiYeucauCongchung/duongsu/taisan` (HTML), `fileHopdong` (giá trị attachment do upload control quản lý; **shape file metadata/persistence backend chưa xác minh**, không gửi local path như cột business).
+- Root `nhomhopdongId` static dự kiến ID; root `loaiTaisan` static object từ autocomplete. Root `ghichu` là textarea text. **Giá trị form state/POST của mọi autocomplete vẫn UNKNOWN**, không dùng path `.id` hoặc object prop để tự kết luận conversion.
 - `chiphi` chứa bốn field tiền đúng tên ở §4, và `tongphi` do module 977 tính. Money widget W1 **927** emits string input; numeric coercion unary `+` trong tổng không chứng minh backend currency type/rounding hoặc schema monetary amount approved.
 - `chiphi.total` là wrapper hiển thị, không chứng minh có field value trong request. Hidden `phicongchung.tongphi` khác spelling: không chứng minh backend lưu path đó. JSON request thực tế chưa được capture.
 
@@ -129,16 +131,102 @@ Do đó, đường nối từng hàng §4 sang API là **name path của form**,
 
 W1 callback sau promise thành công hiện thông báo “Đã lưu thành công” rồi điều hướng list; đó là hành vi **frontend source**, không evidence đã chạy thành công hoặc quyền app suy Save. Backend portal DB/schema và accepted body/attachment vẫn **chưa biết**, không đồng nhất với DB registry hoặc Notary. W1 module 930 còn khai báo GET `hoso`, GET/PUT/DELETE `hoso/:id`, POST `hoso`, GET `hoso/export`, GET `hoso/export-so-cong-chung`; chỉ catalog quick-create POST ở trên thuộc luồng form này, không thực thi endpoint ghi.
 
+### 4.2 Đối chiếu DOM/default live — A1, 20/10/2026
+
+- **17 trường ngữ nghĩa = 13 input-backed + 1 textarea Ghi chú + 3 CKEditor**, không phải tổng raw DOM. Raw có **16 `<input>`** (13 nghiệp vụ, gồm hidden native input của status, + 3 CKEditor hidden image inputs) và **2 `<textarea>`** (1 nghiệp vụ + 1 MUI artifact); không cộng các tầng đếm với nhau. 1 form, section “Thông tin hồ sơ”/“Chi phí”. Ngoài status/ngày, các control nghiệp vụ rỗng; cả 17 không disabled/readOnly trong phiên này.
+- Tên hợp đồng/Thư ký: autocomplete **freeSolo**; Nhóm/Loại tài sản/CCV: autocomplete remote; status là **`div[role=combobox]`** tại `#hopdong\.tinhtrang` cùng hidden `.MuiSelect-nativeInput`, không native select hiển thị. Default status `DACONGCHUNG`.
+- Ngày: input `type=tel`, placeholder `dd/mm/yyyy`, **không id**; hiển thị `20/10/2026`, nút calendar. Đây là default website ngày khảo sát, không dữ kiện trích từ Word.
+- 3 CKEditor HTML (người yêu cầu/Đương sự/Tài sản) đều rỗng; file input single, accept `.doc,.docx,.pdf`, chưa thử upload. Ghi chú là textarea `rows=3`; textarea hidden readonly `aria-hidden=true`, cao 0 bên trong là artifact MUI, không input nghiệp vụ thứ 18.
+- Cả **4 ô tiền** là autocomplete freeSolo, mỗi ô **0 option**, adornment `đ`, default rỗng. “**Tổng chi phí: 0 đ**” là text **`h5`**, không input; không suy 0 là policy phí được duyệt.
+- Nút `Lưu hợp đồng` có `type=submit`, `Hủy bỏ` có `type=button`; không click. A1 chỉ thấy **widget props**: nhóm/asset/CCV là object option, title/thư ký là string label/free text. **Underlying form state và POST của cả 5 autocomplete đều UNKNOWN**. Static ID interpretation cho `nhomhopdongId`/`hopdong.congchungvien.id` chưa reconcile; không tự khẳng định widget object là submitted object hoặc đã chuyển ID.
+
 ## 5. Sáu catalog: nội dung, scope và ID/label
 
-| Catalog website | Nguồn / shape / conversion website | Nội dung biết chắc 20/10 | Mapping app và gap |
+**Phạm vi chung A1:** website `nam_dinh`, empty quick-create authenticated ngày **20/10/2026**, danh sách được cung cấp/render trong **phiên hiện tại**. Không giữ định danh account/đơn vị. “Đầy đủ” dưới đây nghĩa là đủ option của widget đã quan sát, **không phải từ điển bất biến, tổng DB hoặc coverage mọi đơn vị/quyền**. IDs là technical website scope, không approved canonical business fields/FK.
+
+| Catalog website | Nguồn / shape / lớp giá trị | Live state và count A1 | Mapping app và gap |
 |---|---|---|---|
-| Tình trạng | W1 module 926; value enum → label; default `DACONGCHUNG` | **3 option static đầy đủ:** `DANGXULY` → Đang xử lý; `DACONGCHUNG` → Đã công chứng; `HS_HUY` → Hủy bỏ | app chọn label default, không lưu enum vào Case; không map Notary status |
-| Tên hợp đồng | `/api/danh-muc/TEN_HOP_DONG?donviId=<đơn vị hiện tại>`; `response.items`, accessor mặc định `label`; freeSolo emits label/free text, **không ID** | **List đơn vị chưa biết**. Unscoped items=[] không chứng minh rỗng. `donvi.id` lấy từ `/api/user/me` (không gọi trong khảo sát) | `tenvanban` giữ title nguồn, `ten_hop_dong` label/text; không ép vào enum Notary |
-| Nhóm hợp đồng | `/api/dm/nhomhopdong`; item `id/tennhom`, emits **ID** | **List chưa biết — 403** | `nhomhopdong` Case đang là label; UI resolves label→option→ID, chưa local catalog mapping ID có scope |
-| Loại tài sản | `/api/dm/loaitaisan`; item `id/ten`, `isValueObject:true` emits **object** | **List chưa biết — 403** | app chỉ label `web_form.loai_tai_san`; object website không phải canonical Asset record |
-| Công chứng viên | `/api/user/congchungvien`; item `id/hoten`, emits **ID** | **Count/list chưa biết**, person endpoint không gọi, không giữ tên/ID thật | `congchungvien` Case là tên; UI resolves option ID; không approved new staff FK |
-| Thư ký | `/api/danh-muc/THU_KY?donviId=<đơn vị hiện tại>`; items label, freeSolo emits label/free text, **không ID** | **Count/list chưa biết**, person endpoint không gọi | `thuky` Case là tên/text; scope đơn vị; không tự thêm FK |
+| Tình trạng | W1 module 926, enum string→label; A1 `div[role=combobox]` | **3**, chọn `DACONGCHUNG`; label required; enabled | app chọn label, không lưu enum vào Case; không map Notary status |
+| Tên hợp đồng | `/api/danh-muc/TEN_HOP_DONG`; item có `id,value,label,danhmucId,donviId`; freeSolo label/free text | **5**, rỗng, label required, enabled; `value==label` | **C `tenvanban`** title nguồn, app `ten_hop_dong`; không ép enum Notary hoặc lưu catalog ID như canonical |
+| Nhóm hợp đồng | `/api/dm/nhomhopdong`; `id` numeric, `tennhom`, `vaitroDuongsu`; static dự kiến ID, chưa reconcile | **13**, rỗng, label required, enabled; widget `props.value` whole option object, form state/POST unknown | **C `nhomhopdong`** label theo site; root form name `nhomhopdongId`; không approved local ID business column |
+| Loại tài sản | `/api/dm/loaitaisan`; `id` numeric, `ten`, `nhomTaisanId`, `thuoctinh`; source `isValueObject:true` | **12**, rỗng, label required, enabled; object widget | **J `web_form.loai_tai_san`** label; root `loaiTaisan` object source, không canonical Asset record/enum |
+| Công chứng viên | `/api/user/congchungvien`; option `id/hoten`, không freeSolo | **3**, rỗng, label required, enabled; chỉ shape/count, không tên/ID nhân sự | **C `congchungvien`** tên/null. Static path `hopdong.congchungvien.id` dự kiến ID; live widget prop whole object; form state/POST **UNKNOWN**, hai lớp chưa reconcile |
+| Thư ký | `/api/danh-muc/THU_KY`; shape option label, freeSolo label/free text | **5**, rỗng, không label required, enabled; chỉ shape/count | **C `thuky`** tên/text; không tự thêm staff FK hoặc lưu danh tính vào SOT |
+
+### 5.1 Tình trạng — 3 option
+
+| Value string | Label |
+|---|---|
+| `DANGXULY` | Đang xử lý |
+| `DACONGCHUNG` | Đã công chứng |
+| `HS_HUY` | Hủy bỏ |
+
+Default `DACONGCHUNG` được xác nhận live, không là dữ kiện trích xuất hoặc trạng thái Notary.
+
+### 5.2 Nhóm hợp đồng — 13 option, theo thứ tự A1
+
+| ID number | `tennhom` / label chính xác | `vaitroDuongsu` |
+|---|---|---|
+| 1 | Thuê - Mượn tài sản | Chuẩn A/B |
+| 2 | Di chúc | `null` |
+| 3 | Cầm cố - Thế chấp - Vay | Chuẩn A/B |
+| 5 | Ủy quyền | `null` |
+| 8 | Đặt cọc | `null` |
+| 9 | Thoả thuận - Cam kết | Chuẩn A/B |
+| 10 | Góp vốn - Hợp tác | Chuẩn A/B |
+| 11 | Chuyển nhượng - Mua bán | Chuyển nhượng A/B |
+| 12 | Tặng, cho tài sản | `null` |
+| 14 | Khác | `null` |
+| 17 | Thừa kế (khai nhận - phân chia di sản thừa kế ) | `null` |
+| 16 | Từ chối nhận di sản thừa kế | Chuẩn A/B |
+| 18 | Phụ lục hợp đồng - văn bản sửa đổi | `null` |
+
+`vaitroDuongsu` là metadata website **array hoặc null**, không canonical parties/Diagram role. Giữ nguyên khoảng trắng trước `)` ở label ID 17. Mỗi array gồm hai object theo thứ tự:
+
+- **Chuẩn A/B** (IDs **1,3,9,10,16**): `{label:"Bên A",vaitroValue:"Bên A",vaitroCode:null,required:false}`, `{label:"Bên B",vaitroValue:"Bên B",vaitroCode:null,required:false}`.
+- **Chuyển nhượng A/B** (ID **11**): `{label:"Bên A",vaitroValue:"Bên Chuyển nhượng",vaitroCode:null,required:false}`, `{label:"Bên B",vaitroValue:"Bên Nhận chuyển nhượng",vaitroCode:null,required:false}`.
+- **Null** ở IDs **2,5,8,12,14,17,18**; không đổi null thành array rỗng hoặc tự gán vai trò.
+
+### 5.3 Loại tài sản — 12 option, theo thứ tự A1
+
+| ID number | `ten` / label chính xác |
+|---|---|
+| 1 | Đất đai có tài sản |
+| 2 | Đất đai không có tài sản |
+| 3 | Ô tô |
+| 4 | Xe máy |
+| 5 | Tàu, thuyền |
+| 7 | Sổ tiết kiệm |
+| 11 | Tài sản khác |
+| 9 | Thẻ ATM |
+| 10 | Chứng khoán |
+| 12 | Cổ phần |
+| 13 | Cổ phiếu |
+| 14 | Công việc |
+
+Mọi option A1 có `nhomTaisanId:null`, `thuoctinh` kiểu object; nội dung đầy đủ của object chưa được catalog ở đây. “Công việc” là label website, không đối tượng nghiệp vụ thứ tư. **`loaiTaisan`** là discriminator/catalog object portal; **`hopdong.taisan`/app `tai_san`** là HTML mô tả tài sản; **canonical Asset/land_rows** là dữ liệu có cấu trúc khác. Không đồng nhất với `loai_gcn/loai_so`, loại đất hoặc suy đã hỗ trợ DB/extraction mọi option.
+
+### 5.4 Tên hợp đồng — 5 option, freeSolo
+
+| Item ID number | `value` = `label` (string, đúng chính tả A1) |
+|---|---|
+| 497 | Hợp đồng chuyển nhượng quyền sử dụng đất |
+| 498 | Văn bản cam kết tài sản riêng |
+| 499 | Hợp đồng tặng cho quyền sử dụng đất |
+| 500 | Hợp đồng thế chấp |
+| 501 | Hợp đồng uỷ quyền |
+
+Năm item có cùng **`danhmucId:5`** và mỗi item có `donviId` (định danh đơn vị không lưu). `danhmucId` là ID danh mục chung, **không phải ID riêng từng option 497–501**. FreeSolo cho phép text ngoài 5 gợi ý; không dùng list này làm enum `tenvanban` hoặc synonym của `nhomhopdong/loaivanbannhandien`. ID danh mục/option không thay canonical title text; form state/POST chưa được quan sát.
+
+### 5.5 Scope, completeness/pagination và dependency — A1
+
+- Mỗi remote catalog có **1 GET lúc mount**; các request app đã capture **không có query params**, gồm cả `page/pageSize/limit/donviId`. Static wrapper có đường truyền `donviId` cho title/thư ký, nhưng không dùng source đó để bịa query live; thiếu query cũng **không chứng minh** server scope global hay đơn vị.
+- Response được quan sát là arrays, không paging metadata; không `hasMore/onLoadMore` hoặc UI “xem thêm”. Listbox MUI không virtualize; **props.options.length = DOM `[role=option]`** lần lượt nhóm **13/13**, asset **12/12**, title **5/5**, CCV **3/3**, thư ký **5/5**. Nhóm scrollHeight **550** > clientHeight **367** nhưng đủ 13 option nằm trong DOM. Status có đủ **3** option live. Đây là proof đầy đủ **rendered list của phiên**, không proof server-total.
+- Cookie-only page-context probes (không app headers) là lớp riêng với request của app: nhóm/asset **403**; title **200 `items=[]`**; thư ký **21** item so với UI **5**; CCV không trả JSON. Không gộp probe với list UI hoặc suy 21 là tổng staff có thẩm quyền. Khác request context đã quan sát, nhưng **auth mechanism và scope rule UNKNOWN** (không inspect header/token); không suy server-scoping hoặc nguyên nhân/filter từ khác biệt đó.
+- Thử chọn rồi hoàn tác: nhóm **Di chúc** → asset vẫn 12, không field khác đổi; asset **Ô tô** → nhóm vẫn 13; title **Hợp đồng thế chấp** → không auto-fill nhóm/asset/CCV, ngày/status giữ; nhóm **Thuê - Mượn tài sản** → chưa xuất hiện role UI, số control không đổi. Không suy mọi tổ hợp/luồng đều không dependency hoặc `vaitroDuongsu` không bao giờ được dùng.
+- Sau thử, form về rỗng với status `DACONGCHUNG`, ngày `20/10/2026`; không Lưu/submit/prime/upload. Scope unit/global/quyền, tổng DB ngoài arrays, refresh và body submit vẫn **UNKNOWN**.
+
+### 5.6 Boundary của adapter hiện tại
 
 **Adapter label boundary:** `playwright_uploader.py:161-186:get_field_value_candidates,field_value_matches`; `1637-1739:_fill_dropdown` chọn native select bằng `label` hoặc custom gõ text/chọn role option, không direct API ID assignment. Staff match folded equality; field khác folded substring; không là bằng chứng ID đúng/backend chấp nhận. `FIELD_VALUE_ALIASES:113-118` chỉ các biến thể “Thoả/Thỏa thuận - Cam kết”/“Cam kết - Thỏa thuận”, không catalog web.
 
@@ -204,7 +292,7 @@ Thời hạn sử dụng đất đúng `land_rows[].thoihan` và timeout kỹ th
 
 ## 8. Chênh lệch implementation cần giữ rõ
 
-1. **17 input website vs 15 mapping repo:** hai khoản `chiphi.phiDvNgoaicongchung`/`chiphi.phikhac` chưa builder/selector/canonical/DB-wire. Tổng cũng chưa mapping; không báo inventory repo là toàn form.
+1. **17 trường website vs 15 mapping repo:** hai khoản `chiphi.phiDvNgoaicongchung`/`chiphi.phikhac` chưa builder/selector/canonical/DB-wire. Tổng cũng chưa mapping; không báo inventory repo là toàn form.
 2. `FORM_FIELD_ORDER` chỉ **14 entries** (`uploader_selectors.py:23-38`), không có `file_hop_dong`. Builder/selector/_upload_file có key/nhánh nhưng `_prepare_record:1969-1974` không đi tới attachment khi iterate order hiện tại. Không gọi file upload implemented end-to-end chỉ vì selector tồn tại.
 3. Repo `kind:"text"` cho phí/ghi chú là cách fill của adapter, không widget site: site là money autocomplete/textarea; `kind:"dropdown"` gồm cả freeSolo. `_fill_text:1502-1515`, `_fill_editor:1742-1769` không chứng minh form state/API chấp nhận.
 4. `_prime_contract_name_validation:1602-1618` có thể **click Lưu hợp đồng** khi số/nhóm còn trống; `_fill_dropdown:1707-1713` gọi nó để prime validation. Đây là discrepancy với nguyên tắc người dùng tự Lưu, **không** proof đã lưu/permission chạy hay lý do sửa runtime trong lượt tài liệu. Cần review/refine theo #41 và quy tắc SOT hiện có, không âm thầm mô tả runtime tuyệt đối không click.
