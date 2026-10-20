@@ -412,7 +412,8 @@ Nguồn hiện có vẫn giữ nguyên.
 - Nguồn có thể ghi đơn vị cũ `xã`/`phường`; owner nêu `xã ...` nhưng chưa chốt
   cách xử lý tên đơn vị cũ, mốc sáp nhập và tra cứu địa danh theo ngày cấp.
 
-**Phạm vi ghi nhận:** chỉ xem xét/thảo luận logic đoạn Thừa kế dưới
-`D:\testcase`; đây không phải lệnh đọc mẫu. Việc đọc body đang bị gate README
-chặn, nên lượt này coverage mẫu là **0**, không đọc file owner/corpus và không
-chạy batch. Không đổi key/cutover/runtime/test/schema; #41 vẫn mở, gate mẫu **ĐÓNG**.
+**Phạm vi ghi nhận:** owner yêu cầu đọc các cụm diễn giải Người chết trong
+Thừa kế dưới `D:\testcase` rồi thảo luận. Yêu cầu này đang xung đột gate README
+hiện hành; chưa có ngoại lệ được xác nhận nên lượt này coverage mẫu là **0**,
+chưa đọc body file owner/corpus và không chạy batch. Không đổi
+key/cutover/runtime/test/schema; #41 vẫn mở, gate mẫu **ĐÓNG**.
