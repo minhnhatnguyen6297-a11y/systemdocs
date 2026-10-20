@@ -267,6 +267,13 @@ unscoped items=[]) giữ làm lịch sử, không còn là trạng thái hiện 
 Scope server, required enforcement và object→ID form/submission còn chưa biết;
 không Lưu, prime validation, upload hoặc mở record trong audit.
 
+**Owner rà soát/chọn phương án:** [ma trận §7 của SOT Nam Định](nam-dinh-website-sot.md#owner-review)
+giữ mã **W01–W17 + Tổng derived** và **25 đơn vị con** trong ba editor,
+phân biệt chuẩn sẵn có với Upload thực lưu; từng lựa chọn mở có khuyến nghị/
+đánh đổi và ID để owner trả lời. Đây là **PROPOSED, chưa áp dụng**: không hỏi
+lại scalar đã chốt, pháp nhân nhập tay, status/phí/ghi chú; không duyệt model/
+schema hoặc claim đã rà soát mọi màn portal. #41 vẫn mở, gate mẫu **ĐÓNG**.
+
 **Policy owner 20/10/2026 — Nam Định:** cả bốn ô
 `chiphi.phicongchung`, `chiphi.thulaoCongchung`, `chiphi.phiDvNgoaicongchung`,
 `chiphi.phikhac` và Ghi chú `ghichu` **bỏ qua/không điền**. Không ghi 0,

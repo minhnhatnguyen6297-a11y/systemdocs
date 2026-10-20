@@ -184,7 +184,12 @@ Owner báo Upload đang bóc văn bản thành trường để điền website n
   parties chưa canonical cutover, ba editor vẫn là output trình bày. Policy
   không chứng minh runtime đã đổi; raw/provenance giữ nguyên. #41 vẫn mở,
   `refined:false`, gate mẫu **ĐÓNG**.
-- **Open question (chưa chọn):** (a) model/cardinality/FK cho nhiều người–nhiều
-  tài sản và quan hệ với Hồ sơ; (b) website/ô cụm cụ thể khi chọn theo điều kiện
-  owner nêu, cùng nghĩa/lý do/kiểu lưu/provenance; (c) schema bảng pháp nhân tương lai và
-  mapping nhập tay, chưa được duyệt.
+- **Pending owner review — PROPOSED, chưa áp dụng:** [ma trận Nam Định §7](../specs/upload_lab/nam-dinh-website-sot.md#owner-review)
+  bao phủ **W01–W17 + Tổng derived**, phân rã ba editor thành **25 đơn vị**
+  (requester **7**, đương sự **8**, tài sản **10**), có nguồn, canonical/Upload
+  storage thực, phương án và khuyến nghị theo ID. Có **10 dòng cần chọn**
+  (W05, R05, R06, D04–D08, A09, A10); scalar đã chuẩn/pháp nhân nhập tay/
+  status/phí/ghi chú không hỏi lại. Đây chỉ là quick-create dùng bởi uploader,
+  không coverage mọi màn portal; chưa quyết định model/cardinality/schema,
+  không đóng #41 hoặc mở gate mẫu. Bảng pháp nhân tương lai không là lựa chọn
+  schema phải duyệt trong lượt này; #42 độc lập. Chờ review độc lập trước commit.
