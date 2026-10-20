@@ -210,6 +210,11 @@ Default `DACONGCHUNG` được xác nhận live, không là dữ kiện trích x
 
 Mọi option A1 có `nhomTaisanId:null`, `thuoctinh` kiểu object; nội dung đầy đủ của object chưa được catalog ở đây. “Công việc” là label website, không đối tượng nghiệp vụ thứ tư. **`loaiTaisan`** là discriminator/catalog object portal; **`hopdong.taisan`/app `tai_san`** là HTML mô tả tài sản; **canonical Asset/land_rows** là dữ liệu có cấu trúc khác. Không đồng nhất với `loai_gcn/loai_so`, loại đất hoặc suy đã hỗ trợ DB/extraction mọi option.
 
+**Owner W05, 20/10/2026:** giữ loại **ID 1 — Đất đai có tài sản** (thông thường
+là nhà ở trên đất). Chưa có hợp đồng mẫu để rút rule regex không có nghĩa loại
+này không tồn tại hoặc bị loại khỏi nghiệp vụ. Hiện thiếu nguồn/rule chi tiết
+nhà/công trình; không tự dựng schema/regex hoặc đọc mẫu khi gate còn đóng.
+
 ### 5.4 Tên hợp đồng — 5 option, freeSolo
 
 | Item ID number | `value` = `label` (string, đúng chính tả A1) |
@@ -246,6 +251,14 @@ Năm item có cùng **`danhmucId:5`** và mỗi item có `donviId` (định danh
 
 Nguồn `raw.ben_a/b.nguoi[]` giữ thứ tự, `entity_lines` là text tổ chức/đầu mục; `_extract_party_data:4154-4183`. `_format_person_block:2970-2979` hiện **dùng raw_text**, không rebuild từ canonical; `fmt_nguoi_yeu_cau:2982-2987` lấy người đầu hoặc tối đa ba entity_lines; `_append_party_display:2998-3009` ghép tất cả. `_fmt_duong_su_by_kind:4749-4765` chọn nhóm theo loại văn bản, không là quan hệ DB parties approved. Lookup requester tùy chọn theo số/năm/ngày có thể format người match từ hai bên hoặc trả tên lookup nguyên văn (`resolve_requester_override:561-588`, `_format_requester_person:527-558`); không chứng minh một quan hệ requester canonical được lưu.
 
+**Policy đích R06, owner 20/10/2026:** “Người yêu cầu công chứng = tất cả người
+có trong hồ sơ”. W09 điền thuần dữ liệu chuẩn của mọi Người thuộc Hồ sơ, không
+kèm Bên A/Bên B, quan hệ con đẻ, chức vụ, tư cách hoặc lời văn phụ. Lookup/ưu tiên
+bên/người đầu bên trên chỉ là **hiện trạng cũ cần cutover**, không còn thẩm quyền
+chọn requester. Không cắt danh sách hoặc suy thêm người thiếu. Việc xác định
+membership/thứ tự và trường hợp người chết/cá nhân đại diện thuộc #43; chưa có
+quyết định loại họ khỏi “tất cả người”. Pháp nhân vẫn không thuộc Người, nhập tay.
+
 | Nguồn extraction | Canonical / wire Notary đã có | Đích thực và ranh giới |
 |---|---|---|
 | `ho_ten` | `ten` / `ho_ten` | `customers.ho_ten` + case snapshot Stage |
@@ -257,7 +270,7 @@ Nguồn `raw.ben_a/b.nguoi[]` giữ thứ tự, `entity_lines` là text tổ ch�
 | `noi_cap`, `loai_giay_to` | `noicap`,`loaigiayto` / legacy wire tương ứng | snapshot/derived evidence, **không cột customers** |
 | `gioi_tinh` Ông/Bà | `gioitinh` / wire `gioi_tinh` Nam/Nữ/null | Cột customers.gioi_tinh có thật; danh xưng không tự là giá trị wire đúng; mapper DOCX hiện không map field này |
 | `cccd_khac` | chưa approved multi-ID model | raw/evidence; Notary DOCX mapper tạo ambiguous normalized null, không persist list giấy tờ; #42 riêng |
-| `ten_goi_khac`, `entity_lines`, vai trò requester/Bên A/Bên B | **U** mapping/catalog chưa chốt | không thêm schema, không ghi ghichu; entity_lines có thể chứa tổ chức, không tự xem là Người; pháp nhân do người dùng nhập tay (§6.3) |
+| `ten_goi_khac`, `entity_lines`, vai trò requester/Bên A/Bên B | R05 không tự điền/không mở rộng chuẩn alias; entity/quan hệ chưa canonical cutover | Giữ raw/lịch sử; alias nếu cần do user điền tay, không nối vào `ten`/thêm field alias; pháp nhân nhập tay; nhóm/quan hệ xem D05–D07 |
 | `raw_text`, line/span/source_refs | provenance | giữ nguồn, không dùng chuỗi raw để claim canonical cutover |
 
 Proof: `contract_extract.py:3688-3754:_extract_plain_text_person_entries`, `4608-4620:_extract_nguoi_chet`; `contracts/entities.md:150-185`; `contracts/notary-case-drafting.md:246-283:person_row`; `notary_v2/models.py:36-48:Customer`; `case_workspace.py:306-310:_PERSON_KEY_ALIASES`, `2495-2569:_upsert_people`, `2768-2779:_build_payload`. Notary DOCX mapper **thực** là `services/document_intake/adapters/docx.py:49-57:PERSON_FIELD_SOURCES`, loop **chỉ hai bên** `316-350`; không claim đã map đủ `raw.nguoi_chet`, alias/giới tính. `329-343` giữ multi-ID refs + `intake.ambiguous`. Cùng dùng lõi không phải luồng Upload→Notary DB.
@@ -310,13 +323,14 @@ thể là trường riêng theo ô; phần tái dùng được vẫn map canonic
 coi cụm là dữ liệu chưa map/orphan. Chưa chọn cụm/ô nào; nhãn “trường phụ” không
 đồng nghĩa canonical field hay DB column đã duyệt.
 
-**Quan hệ Người–Tài sản–Hồ sơ** nhiều người/nhiều tài sản chưa chọn model,
-cardinality, quan hệ/FK hay bảng nối; không coi mô hình quan hệ trước đó là đã
-được owner chấp nhận. Phần này thuộc refinement #41 trước implementation, không
-tạo ticket mới.
+**Quan hệ Người–Tài sản–Hồ sơ:** nhiều người/nhiều tài sản chưa chọn model,
+cardinality, quan hệ/FK hay bảng nối. D06 và D07 chuyển **một issue riêng
+[#43](../../backlog/spike-case-people-assets-relationships.md)**, xử lý ngay sau
+làm rõ các ô §7; không chờ toàn #41 hoàn thành, không phụ thuộc #42. #41 dùng
+kết quả cho phần cutover quan hệ; lượt này không triển khai hoặc đổi gate mẫu.
 
 <a id="owner-review"></a>
-## 7. Ma trận owner rà soát/chọn phương án — PROPOSED, chưa áp dụng
+## 7. Ma trận owner rà soát — quyết định 20/10/2026 và phần còn làm rõ
 
 **Phạm vi “mọi cụm của web” ở lượt này:** toàn bộ **17 trường quick-create Nam Định mà uploader dùng**, cộng Tổng chi phí derived; không phải toàn website. Các màn tạo đầy đủ, sửa standard/simple/online và website thứ hai **chưa được audit form**, dù §2 có route static. Không đọc mẫu/corpus mới. A1 là empty form nên chỉ chứng minh **ô nhập**, không chứng minh mọi văn bản có mọi thông tin con dưới đây. Các đơn vị con là phân rã từ extraction/contract/source hiện có, **không phải label con đã thấy trên portal**.
 
@@ -327,7 +341,7 @@ Các cách xử lý dùng trong bảng:
 - **Tái dùng chuẩn:** lấy đúng trường canonical đã có, không sao chép thành trường web trùng nghĩa.
 - **Dựng hiển thị:** ghép từ dữ liệu chuẩn và tham chiếu/nhóm đã được chốt; renderer của từng website chỉ quyết định trình bày. Khi quan hệ chưa chốt, đây là hướng đề xuất, không giả định đã có model.
 - **Cụm riêng theo ô:** một trường có nghĩa nghiệp vụ cụ thể cho phần phức tạp, không tái dùng, của **một ô Nam Định**; có nguồn và ranh giới rõ. Là phương án thật để owner cân nhắc, không generic bag/ghi chú, không mặc định lưu cả ba editor raw. Không dùng nó thay canonical đã biết, suy liên kết nhiều người–nhiều tài sản hoặc tự bóc pháp nhân.
-- **Nhập tay:** chỉ phần pháp nhân theo policy đã chốt; không biến thành fallback chung cho gap.
+- **Nhập tay/sửa tay:** chỉ phạm vi owner đã chọn: pháp nhân, alias nếu cần và lời tư cách/căn cứ phức tạp D04; không là fallback cho mọi gap.
 - **Bỏ qua:** chỉ scope đã chốt bỏ qua; không âm thầm bỏ các gap khác để báo đủ.
 
 **Hai lớp không được gộp:** **C** đã đi qua Case JSON/`file_registry.case_json`; **J** mới là payload JSON được lưu file (`output_json_path` trỏ tới), gồm `raw`/`web_form`, **chưa là Upload persistence canonical Người/Tài sản/quan hệ**. DB/contract Notary có trường không có nghĩa Upload đã ghi nó. Chi tiết §3 và §6 giữ nguyên; bảng này là lớp chọn cách xử lý, **không chép lại inventory widget/default/selector ở §4–5**. Pháp nhân nhập tay, bốn phí/Ghi chú bỏ qua, status `DACONGCHUNG`, thời hạn đất giữ, không bóc tài chính/thời hạn nghiệp vụ đều **đã chốt**; #42 độc lập; #41 mở, gate mẫu **ĐÓNG**.
@@ -339,14 +353,14 @@ Các cách xử lý dùng trong bảng:
 | **W01** · Tên hợp đồng (#1) | Tiêu đề nguồn → `build_payload` → `case_portal_projection`; catalog §5.4 | **C `tenvanban`**; không enum Notary/catalog ID | Tái dùng chuẩn → free text/gợi ý website | Dùng title chuẩn trực tiếp; tránh khóa 5 gợi ý thành mọi loại văn bản | **ĐÃ CHỐT** nghĩa scalar; ID/label là adapter |
 | **W02** · Tình trạng (#2) | Không extraction; policy portal; catalog §5.1 | **P**, không Case status | Policy cố định | Mọi upload `DACONGCHUNG`; không dùng draft/locked Notary | **ĐÃ CHỐT**, không hỏi lại |
 | **W04** · Nhóm hợp đồng (#4) | `guess_nhom_hd(title)` → projection; catalog/role metadata §5.2 | **C `nhomhopdong`** label có scope website | Tái dùng chuẩn + catalog adapter | Giữ label Case, chọn option thật; không biến website ID thành canonical FK, không dùng metadata A/B để duyệt quan hệ | **ĐÃ CHỐT** scalar; conversion form/POST vẫn unknown |
-| **W05** · Loại tài sản (#5) | `guess_loai_tai_san(tai_san,title)`; §5.3, §5.6 | **J `web_form.loai_tai_san`**; không Asset enum/record chuẩn đã cutover | Dựng một lựa chọn portal từ tập tài sản có căn cứ; hoặc giữ một phân loại riêng cho đúng ô site | **Đề xuất dựng từ tập tài sản**, mapping site riêng: không tạo đặc tính cố định mới trên mọi Asset. Ô đơn không diễn đạt chắc tổ hợp nhiều loại; không tự chọn loại đầu/“Khác” để che tổ hợp | **CHỜ CHỌN W05:** với hồ sơ nhiều loại, dùng một loại bao quát theo quy tắc owner chọn hay cần phân loại riêng cấp hồ sơ cho ô này? Khuyến nghị loại bao quát chỉ khi có quy tắc rõ; chưa có thì giữ pending, không default |
+| **W05** · Loại tài sản (#5) | `guess_loai_tai_san(tai_san,title)`; §5.3, §5.6 | **J `web_form.loai_tai_san`**; chưa Asset chuẩn cutover | Dựng lựa chọn portal từ tập tài sản có căn cứ, mapping site riêng | Owner đồng ý hướng này; giữ **ID 1 Đất đai có tài sản**, thường nhà trên đất; thiếu mẫu/rule không là loại không tồn tại. Không tự tạo trường nhà/regex, chọn loại đầu/“Khác” để che tổ hợp | **ĐỒNG Ý CÓ ĐIỀU KIỆN**; quy tắc một ô khi tổ hợp nhiều loại thực sự chưa chốt, không universal fallback |
 | **W07** · Công chứng viên (#7) | Regex nguồn hoặc lựa chọn prepare rõ ràng; §4/§5.6 | **C `congchungvien`** tên/null; default legacy không thành fact | Tái dùng chuẩn + catalog nhân sự | Chọn đúng option theo tên, không tự thêm staff FK; thiếu option không chọn đầu | **ĐÃ CHỐT** nghĩa/nguồn; không cần owner duyệt technical ID |
 | **W08** · Thư ký (#8) | Extraction hiện `null`; input prepare → projection; §4/§5.6 | **C `thuky`** tên/null | Tái dùng chuẩn → freeSolo | Giữ lựa chọn rõ ràng trong Case được prepare; không đoán từ list/default | **ĐÃ CHỐT** |
 | **W03** · Ngày công chứng (#3) | `find_ngay_cong_chung` → ISO → display DD/MM/YYYY | **C `ngaycongchung`**; không ngày tạo/ngày default website | Tái dùng chuẩn + đổi format tại biên | Không tạo ngày giả từ ngày mở form; gap clear/default hiện có ở §3 không tự thành policy mới | **ĐÃ CHỐT** scalar; không hỏi lại |
 | **W06** · Số công chứng (#6) | `find_so_cong_chung`/scan → normalize | **C `socongchung`**; `registry.contract_no` chỉ scan/reference | Tái dùng chuẩn | Giữ `xxx/yyyy` và scope sổ/năm/site; không dùng làm shared Case ID | **ĐÃ CHỐT** |
-| **W09** · Thông tin người yêu cầu… (#9) | First-person/raw formatter hoặc lookup; §6.1 | **J `web_form.nguoi_yeu_cau`**, Người/vai trò chưa cutover | Dựng hiển thị từ Người + nguồn requester đã chốt; cụm riêng chỉ phần đủ điều kiện | **Đề xuất không giữ cả editor làm bản sao Người**; chọn theo **R01–R07** để không mất căn cứ người được ghi sổ | Chỉ các dòng **CHỜ CHỌN** ở §7.3 |
-| **W10** · Đương sự (#10) | `raw.ben_a/b` → formatter theo loại; §6.1 | **J `web_form.duong_su`** và raw hai bên/người chết | Dựng từ Người + nhóm/quan hệ có nguồn; cụm riêng cho phần riêng site | **Đề xuất tách dữ liệu tái dùng và diễn đạt phụ**, không ép hai bên/đại diện thành một Person hoặc một block mất quan hệ | Chọn theo **D01–D08**, không duyệt model từ bảng |
-| **W11** · Tài sản (#11) | Text `_find_tai_san_by_kind` + `raw.danh_sach_thua_dat[]`; §6.2 | **J `web_form.tai_san`** và các hàng raw; chưa Upload Asset chuẩn | Dựng từ Asset/land rows; cụm riêng cho mô tả dư có nghĩa | **Đề xuất chuẩn đất làm lõi**, cụm mô tả dư có ranh giới là lựa chọn thực; không trộn thứ tự thửa/cụm | Chọn theo **A01–A10** |
+| **W09** · Thông tin người yêu cầu… (#9) | Legacy first-person/raw formatter hoặc lookup; §6.1 | **J `web_form.nguoi_yeu_cau`**; Người/quan hệ chưa cutover | Dựng từ dữ liệu chuẩn **tất cả Người trong Hồ sơ** | R06 thay authority lookup/firstperson; không role/quan hệ/chức vụ/lời văn phụ, không lưu cả editor thay Người | **ĐÃ CHỐT policy R06/D08**, membership/thứ tự #43; R05 alias nhập tay |
+| **W10** · Đương sự (#10) | `raw.ben_a/b` → formatter theo loại; §6.1 | **J `web_form.duong_su`** và raw hai bên/người chết | Person chuẩn + nhóm hiển thị chung Bên A/Bên B có căn cứ | Không tự lưu block tư cách D04/D08; lời phức tạp D04 user sửa tay; semantic A/B chưa đủ để tự gán mọi loại | **D04/D08 đã trả lời; D05 còn làm rõ; D06/D07 → #43** |
+| **W11** · Tài sản (#11) | Text `_find_tai_san_by_kind` + `raw.danh_sach_thua_dat[]`; §6.2 | **J `web_form.tai_san`** và các hàng raw; chưa Upload Asset chuẩn | Dựng từ trường Asset/land rows đã biết | Phân biệt đoạn ghép toàn tài sản với lời dư thật chưa map; ví dụ §7.5.1; chưa duyệt block A09 | **A09 chờ làm rõ phạm vi; A10 đã duyệt nhận diện/pending** |
 | **W12** · Văn bản hợp đồng (#12) | `raw.file_goc` → builder → input file; §8 | **F** JSON + `registry.file_path`; không cột nghiệp vụ | Tái dùng file/provenance kỹ thuật | Giữ nguồn; file selection trước Lưu không chứng minh portal upload/persistence | **ĐÃ PHÂN LOẠI**, không quyết định nghiệp vụ mới |
 | **W13** · Ghi chú (#13) | Không builder/selector/fill | Không storage nghiệp vụ mới | Bỏ qua | Không điền/clear default; không dùng làm kho chứa gap | **ĐÃ CHỐT**, không hỏi lại |
 | **W14** · Phí công chứng (#14) | Ngoài đường fill | Không extraction/cột phí mới | Bỏ qua | Không ghi 0/clear default hoặc thêm bước nhập tay | **ĐÃ CHỐT**, không hỏi lại |
@@ -384,25 +398,25 @@ Các locator dưới đây là **source tĩnh đã đọc**, không kết quả 
 | ID / nội dung | Extraction hiện tại / nguồn | Chuẩn có sẵn + Upload thực lưu | Phương án phù hợp | Khuyến nghị + lý do/đánh đổi | Owner cần chọn? |
 |---|---|---|---|---|---|
 | **W09-R01** · Họ tên, danh xưng | `nguoi[].ho_ten/gioi_tinh`, raw formatter; S-P/S-R | `ten`; `gioitinh` wire Nam/Nữ/null khác Ông/Bà; **J**, mapper N chưa map giới tính | Tái dùng chuẩn rồi dựng hiển thị | Không gộp Ông/Bà/quan hệ vào tên; chỉ dùng giới tính/danh xưng có căn cứ, không đoán từ tên. Không cần field web trùng Person | **ĐÃ CÓ chuẩn scalar**; phần mapper/cutover chưa làm |
-| **W09-R02** · Ngày/năm sinh; ngày chết khi đúng nguồn | `ngay_sinh/chi_co_nam_sinh`; người chết ở nguồn riêng S-P | `ngaysinh/ngaychet` giữ YYYY hoặc full date; **J**, nguồn người chết chưa qua mapper N | Tái dùng chuẩn + format giữ độ đầy đủ | Không đệm năm thành ngày; có người chết trong nguồn không tự là người yêu cầu | **ĐÃ CHỐT scalar**; gán vai trò xem R06 |
+| **W09-R02** · Ngày/năm sinh; ngày chết khi đúng nguồn | `ngay_sinh/chi_co_nam_sinh`; người chết ở nguồn riêng S-P | `ngaysinh/ngaychet` giữ YYYY hoặc full date; **J**, nguồn người chết chưa qua mapper N | Tái dùng chuẩn + format giữ độ đầy đủ | Không đệm năm thành ngày; R06 là mọi Người trong Hồ sơ, không tự loại người chết hoặc tự suy người thiếu | **ĐÃ CHỐT scalar/R06**; membership cụ thể và thứ tự #43 |
 | **W09-R03** · Giấy tờ, loại, ngày cấp, cơ quan cấp | `cccd/ngay_cap_cccd/noi_cap`; chết: `so_giay_to/ngay_cap/loai_giay_to`; S-P | `sogiayto/ngaycap/noicap/loaigiayto`; snapshot/master theo §6.1; **J** | Tái dùng chuẩn + hiển thị theo loại giấy tờ | Không ép mọi giấy thành CCCD; issuer snapshot có nghĩa riêng, không tự đồng nhất cơ quan công chứng. Nhiều giấy giữ ambiguous/#42, không nhét list vào ô đơn | **ĐÃ CHỐT scalar**; #42 độc lập, không hỏi lại |
 | **W09-R04** · Địa chỉ và nhãn địa chỉ | `dia_chi/dia_chi_line`, người chết địa chỉ cuối; S-P/S-R | `diachi/loaidiachi`, line chỉ presentation; **J** | Tái dùng chuẩn + dựng nhãn theo nguồn/quy tắc đã chốt | Không nhân đôi địa chỉ vì ô web dài; không tự đổi nơi chết thành thường trú. Đa địa chỉ thuộc #42 | **ĐÃ CHỐT scalar** |
-| **W09-R05** · Tên gọi khác, nếu nguồn có | `raw.nguoi_chet[].ten_goi_khac`; không claim mọi người sống đã có alias; S-P | Alias chưa có mapping approved; **J raw**, không key Person mới | Chuẩn hóa bổ sung nghĩa alias tái dùng trong #41; không trộn vào `ten` | **Đề xuất giữ alias như thông tin Người cần chuẩn hóa**, không field web riêng chỉ để né mapping: alias có thể tái dùng, không đáp ứng tự nhiên tiêu chí cụm không lặp. Chưa chọn key/type/storage | **CHỜ CHỌN R05:** giữ nghĩa “tên gọi khác” trong chuẩn Người cho output cần nó? Khuyến nghị có; không mở rộng #42 |
-| **W09-R06** · Ai là requester; một/nhiều người; thứ tự, nguồn lựa chọn | Hiện first B có người, fallback A; cam kết A; lookup match/không match trả text; S-R | Người có scalar nhưng **chưa có quan hệ requester Upload được duyệt/lưu**; **J** text chỉ chọn một người hoặc vài entity lines | Dựng từ tham chiếu Người + nguồn ghi sổ; hoặc một cụm requester riêng theo ô nếu thực sự không tái dùng | **Đề xuất nguồn người yêu cầu ghi rõ/lookup có scope số+năm/ngày được ưu tiên, giữ mọi người và thứ tự được nguồn nêu; không duyệt heuristic “người đầu” làm sự thật.** Cụm riêng dễ giữ lời văn nhưng mất định danh, số lượng và khả năng tái dùng nếu thay cả quan hệ | **CHỜ CHỌN R06:** chọn hướng requester theo người/nhóm có nguồn thay vì cả ô riêng? Khuyến nghị tham chiếu + hiển thị; trường hợp lookup chỉ có tên chưa match giữ unresolved, không đoán |
-| **W09-R07** · Tổ chức/ngân hàng/chi nhánh và cá nhân đại diện nếu nằm trong cụm | `entity_lines` có thể lọt vào requester fallback; `nguoi[]` có thể nhận natural representative; S-P/S-R | Pháp nhân không thuộc Person; cá nhân có scalar, **chưa có quan hệ đại diện chuẩn**; **J** | Pháp nhân nhập tay; cá nhân tái dùng chuẩn, quan hệ/authority theo D04 | **Tách nghĩa**, không biến ba dòng entity thành Người/requester canonical; không tự điền pháp nhân vì formatter hiện có text. Cá nhân đại diện không mặc nhiên chính là người yêu cầu | **ĐÃ CHỐT pháp nhân nhập tay**; chỉ nghĩa đại diện/requester chờ D04/R06 |
+| **W09-R05** · Tên gọi khác | `raw.nguoi_chet[].ten_goi_khac`; S-P | **J raw/lịch sử**, chưa field alias approved | Không tự điền alias vào output chuẩn/không mở rộng chuẩn hóa; nếu cần user điền tay | Owner “bỏ tên gọi khác – nếu có user điền tay”; không nối vào `ten`, thêm field alias hoặc mở rộng normalization/#42; giữ raw/lịch sử, runtime chưa đổi | **ĐÃ CHỐT**, không hỏi lại |
+| **W09-R06** · Ai là requester | Legacy first B/fallback A, cam kết A và lookup; S-R | **J** text cũ; chưa membership canonical Upload cutover | **Tất cả Người có trong Hồ sơ**, thuần dữ liệu chuẩn từng Người | Owner đổi business spec; lookup/firstperson không còn authority đích. Không chỉ B/người đầu, không bỏ tên, không mô tả Bên A/B, con đẻ/chức vụ/tư cách; không suy thêm người. Pháp nhân không thuộc Người | **ĐÃ CHỐT policy**; membership/thứ tự/người chết/đại diện làm kỹ ở #43, không mặc định loại ai |
+| **W09-R07** · Tổ chức và cá nhân đại diện trong nguồn | `entity_lines` hoặc natural representative; S-P/S-R | Pháp nhân không thuộc Person; scalar cá nhân có sẵn, **J** | Pháp nhân nhập tay; cá nhân chuẩn theo R06; lời phức tạp theo D04 | Không biến tổ chức thành Người. R06 không tự loại cá nhân đại diện; phạm vi membership cần chốt ở #43, không suy quyền đại diện | **ĐÃ CHỐT policy**, không hỏi lại D04/R06; membership #43 |
 
 ### 7.4 W10 — đương sự: 8 đơn vị thông tin
 
 | ID / nội dung | Extraction hiện tại / nguồn | Chuẩn có sẵn + Upload thực lưu | Phương án phù hợp | Khuyến nghị + lý do/đánh đổi | Owner cần chọn? |
 |---|---|---|---|---|---|
 | **W10-D01** · Dữ liệu từng thể nhân | `ben_a/b.nguoi[]` với tên/danh xưng/ngày/ID+cấp/địa chỉ; S-P | Cùng scalar R01–R04, không bộ Person thứ hai; **J** raw + web text | Tái dùng chuẩn + dựng từng người | Dùng một chuẩn Người, không sao chép các scalar vào block Đương sự; renderer giữ nguồn/độ đầy đủ, không chỉ ghép tên | **ĐÃ CÓ chuẩn scalar**, chưa Upload cutover |
-| **W10-D02** · Người để lại di sản, alias, ngày chết/TLKT | `raw.nguoi_chet[]` riêng, lọc khỏi hai bên theo tên/ngày sinh trong code; S-D/S-P | `ngaychet`, giấy tờ/địa chỉ theo người chết; alias chưa map; **J**, N chỉ loop hai bên | Tái dùng Người; đặt đúng nhóm/vai trò theo nguồn; alias theo R05 | Không tự thêm người chết vào danh sách người đang tham gia chỉ để “đủ người”; giữ đối tượng tham chiếu và tình trạng sống/chết riêng với vai trò | **ĐÃ CHỐT scalar**; alias R05, cách thể hiện vai trò D05 chưa chọn |
+| **W10-D02** · Người để lại di sản, ngày chết/TLKT | `raw.nguoi_chet[]` riêng, code cũ lọc khỏi hai bên; S-D/S-P | Scalar Người có sẵn; alias chỉ raw/manual R05; **J**, N chỉ loop hai bên | Tái dùng Người; phân biệt tình trạng sống/chết và vai trò | Không đồng nhất người chết với người giao dịch cho mình hoặc slot owner. R06 là tất cả Người trong Hồ sơ; không lấy việc code cũ lọc làm quyết định loại requester | **ĐÃ CHỐT scalar/R05/R06**; nhóm/thành viên cụ thể D05/#43 |
 | **W10-D03** · Pháp nhân/tổ chức/chi nhánh | `entity_lines` là text đầu mục, không object pháp nhân đã chuẩn; S-P/S-D | Không Person/Upload legal-entity table; **J** text | **Nhập tay** theo policy; giữ nguồn | Không tự bóc/suy tên ngân hàng, chi nhánh, địa chỉ tổ chức hoặc mặc định một bên. Bảng riêng tương lai chưa duyệt; không yêu cầu owner chọn schema ở lượt này | **ĐÃ CHỐT**, không hỏi lại |
-| **W10-D04** · Cá nhân đại diện và nội dung tư cách/căn cứ đại diện | S-P nhận pattern “Đại diện”, ngắt tên trước “Chức vụ/Chức danh”; các nội dung còn lại có thể ở raw_text/entity lines; chưa có structured authority extractor | Scalar cá nhân có sẵn; tư cách/quyền đại diện và liên kết được đại diện **chưa approved model**, **J**; không coi mọi nguồn đều có chức vụ/căn cứ | Tái dùng Person + nhóm/tham chiếu có nguồn; **cụm riêng W10 cho phần diễn đạt tư cách/căn cứ không tái dùng** là lựa chọn khác | **Đề xuất hybrid:** cá nhân dùng chuẩn; tư cách/căn cứ dạng lời văn riêng Nam Định có thể là cụm riêng, nhưng “đại diện cho ai/trong vai trò nào” phải giữ chính xác để không hiển thị như người giao dịch cho mình. Không dùng cụm để tự bóc pháp nhân hoặc suy hiệu lực pháp lý; chi tiết tài chính/thời hạn nghiệp vụ bị loại | **CHỜ CHỌN D04:** cho phép cụm tư cách/căn cứ riêng W10 bên cạnh cá nhân và liên kết có nguồn? Khuyến nghị có cho lời văn không tái dùng; quan hệ chưa được duyệt bởi lựa chọn này |
-| **W10-D05** · Vai trò theo loại văn bản | Headings S-D: chuyển/nhận, thế chấp/nhận, ủy quyền/được ủy quyền; thừa kế formatter một bên; metadata site §5.2 có cả null | `loaivanbannhandien` có C; **vai trò/participation chưa canonical cutover**, **J**; không FK/enum quan hệ approved | Dựng từ nhóm/vai trò theo nguồn; hoặc cụm vai trò riêng site nếu chỉ cần lời văn | **Đề xuất nhóm vai trò nguồn độc lập nhãn portal**, rồi dựng W10 theo loại. A/B chỉ vị trí nguồn, không nghĩa pháp lý chung; null metadata không tự gán A/B. Block dễ hiển thị nhưng không tái dùng/mất liên kết vai trò | **CHỜ CHỌN D05:** giữ vai trò có nguồn để tái dùng hay chỉ lời văn Nam Định? Khuyến nghị hướng tái dùng; chưa chọn model/cardinality |
-| **W10-D06** · Số người, thứ tự người/nhóm, nhiều lần tham gia | `nguoi[]` thứ tự; entity lines trước người; formatter ghép A rồi B; S-P/S-D | Thứ tự array nguồn là bằng chứng; **chưa quan hệ hồ sơ nhiều người được duyệt**, **J** | Dựng từ danh sách/nhóm tham chiếu có thứ tự; không một Person text gộp | **Đề xuất giữ thứ tự nguồn trong từng nhóm, phân biệt lần tham gia với danh tính**; không dedup theo tên, không cắt còn người đầu. Cả editor riêng đơn giản hơn nhưng không chứng minh đủ số người hay một người ở nhiều vai trò | **CHỜ CHỌN D06:** chọn hướng bảo toàn danh sách/nhóm có thứ tự? Khuyến nghị có; không duyệt cấu trúc bảng/list hoặc số lượng cố định |
-| **W10-D07** · Người nào liên quan tài sản nào trong hồ sơ | Hai bên/người và `danh_sach_thua_dat[]` cùng payload **không chứng minh có liên kết từng cặp**; S-D/S-A; `chudat` Diagram theo §3 là nghĩa khác | **Chưa model/cardinality/FK approved**; J không phải bảng nối; Upload `chudat=null` | Dựng từ quan hệ có bằng chứng trong Người–Tài sản–Hồ sơ; block riêng chỉ trình bày lời nguồn, không thay model | **Đề xuất thiết kế quan hệ theo từng vai trò/nhóm và phạm vi tài sản có nguồn**, phân biệt “cả nhóm/cả tập” với “từng người/từng tài sản” và chưa rõ; không suy tích Descartes mọi người×mọi tài sản hoặc chủ đất từ Bên A/GCN | **CHỜ CHỌN D07:** chọn yêu cầu bảo toàn phạm vi liên quan chi tiết này trước khi thiết kế? Khuyến nghị có; thiết kế cụ thể phải làm kỹ sau, không chốt model đơn giản tại đây |
-| **W10-D08** · Lời mô tả quan hệ/tư cách còn dư theo nguồn | `raw_text/entity_lines` có thể giữ lời quan hệ/thành viên; S-P tách role phrase khỏi tên; chưa extractor chuẩn cho mọi nghĩa | Không field chung approved để chứa tất cả; **J**; không dùng Notary `ghichu` | Chuẩn hóa nghĩa thật sự tái dùng; **cụm riêng “diễn đạt bổ sung đương sự” W10** cho phần phức tạp không tái dùng | **Đề xuất cụm riêng có ranh giới** cho lời văn còn dư sau Person/vai trò/liên kết, giữ scope nhóm/người mà lời đó nói tới. Lợi: không thêm hàng loạt field site ít dùng; đổi lại không truy vấn như dữ kiện chuẩn. Không gộp pháp nhân, scalar, quan hệ D05–D07 hoặc dữ liệu bị loại vào cụm | **CHỜ CHỌN D08:** giữ phần diễn đạt phụ W10 như cụm riêng thay vì chuẩn hóa mọi câu? Khuyến nghị có, chỉ khi đúng điều kiện owner; chưa đặt key/type/storage |
+| **W10-D04** · Cá nhân đại diện và lời tư cách/căn cứ | S-P tách tên trước chức vụ; lời văn có thể ở raw/entity lines | Scalar cá nhân có sẵn; authority/liên kết chưa model approved, **J** | Dùng dữ liệu chuẩn Người; **bỏ lời văn phức tạp khỏi tự động điền, user tự sửa thủ công** | Không duyệt block D04 hay tự suy quyền/hiệu lực. Giữ nguồn; không mở manual fallback cho mọi unknown; quan hệ đại diện thuộc #43 | **ĐÃ CHỐT**, runtime chưa cutover |
+| **W10-D05** · Nhóm Bên A/Bên B | S-D có chuyển/nhận, thế chấp/nhận, ủy quyền/được ủy quyền, thừa kế một bên | **J**; chưa model participation approved; metadata site không quyết định nghĩa | Owner chọn **chỉ gán Bên A/Bên B nói chung** trong output | “Gần như 100% Bên B luôn có chữ nhận” là quan sát, **không regex phổ quát**, không suy mọi còn lại=A. Bên nhận chuyển nhượng/nhận thế chấp khác nhau; được ủy quyền không có chữ nhận; thừa kế có thể một bên. Xem §7.6 | **ĐÃ CHỌN hướng nhóm**, còn semantic ngoại lệ/ưu tiên nguồn chưa đủ để tự động gán |
+| **W10-D06** · Nhiều người, thứ tự, nhiều lần tham gia | Array nguồn có thứ tự, formatter cũ A rồi B; S-P/S-D | **J**; chưa membership/roles chuẩn được duyệt | Chuyển cùng D07 sang **#43 riêng** | Cần làm kỹ danh tính/thành viên có thứ tự và vai trò lặp; không cắt người đầu, gộp theo tên hoặc chọn cardinality từ code | **ĐÃ CHỐT chuyển issue**, làm ngay sau rõ các ô; chưa duyệt model |
+| **W10-D07** · Người liên quan tài sản nào | Cùng payload không chứng minh liên kết cặp; `chudat` Diagram là nghĩa khác | **J**, chưa model/cardinality/FK approved; Upload `chudat=null` | **Cùng một #43 với D06**, scope từng người/nhóm–tài sản có nguồn | Phân biệt cả nhóm/cả tập, từng cặp và chưa rõ; không tích Descartes mọi người×mọi tài sản, không suy chủ đất từ A/GCN | **ĐÃ CHỐT chuyển issue**, không chờ toàn #41/#42 hoặc triển khai ngay |
+| **W10-D08** · Lời quan hệ/tư cách phụ | `raw_text/entity_lines` giữ lời nguồn; S-P | Không field residual prose approved, **J** | Owner trả lời **theo R06**: dữ liệu chuẩn Người, không lời mô tả phụ | Không duyệt cụm dư D08; không đưa con đẻ/quan hệ/chức vụ/role prose vào requester. Nhóm W10 theo D05, quan hệ #43; nguồn vẫn giữ | **ĐÃ TRẢ LỜI**, không hỏi lại D08 |
 
 ### 7.5 W11 — tài sản: 10 đơn vị thông tin
 
@@ -416,22 +430,115 @@ Các locator dưới đây là **source tĩnh đã đọc**, không kết quả 
 | **W11-A06** · Thời hạn đất cấp thửa chưa rõ cụm | `thoi_han_su_dung` riêng và từng detail; S-A | Chỉ thời hạn đúng `land_rows[].thoihan` là đường mới; cấp Asset chỉ legacy/history; **J** | Map vào đúng cụm khi có bằng chứng; phần chưa gắn giữ unresolved/nguồn | **Giữ thời hạn sử dụng đất**, không áp policy loại thời hạn nghiệp vụ để bỏ nó; không tự rải thời hạn lẻ cho mọi hàng hoặc dùng block che gap | **ĐÃ CHỐT**, không xin lại; unresolved không tính đã map |
 | **W11-A07** · Nguồn gốc sử dụng đất | `nguon_goc`; S-A | Wire/properties `nguon_goc` có thật; **S-N chưa map field này**, Upload **J** | Tái dùng đích nghĩa đã có | Ưu tiên hoàn thiện mapping đúng nghĩa, không tạo cụm riêng trùng trường; không nói chung engine đã ghi DB vì có cột | **ĐÃ CÓ đích**, phần mapper/cutover kỹ thuật chưa làm |
 | **W11-A08** · Hình thức sử dụng riêng/chung khi nguồn nêu rõ | Label “Hình thức sử dụng” và “Ghi chú” cùng vào `phan_ghi_them`; S-A `2249–2259` | Wire/properties `hinh_thuc_su_dung` có thật, **chưa mapping cả blob**, Upload **J** | Tách đoạn có nghĩa rõ → tái dùng chuẩn; phần dư xem A09 | **Đề xuất map chỉ phần được nguồn xác định là hình thức sử dụng**, không coi cả `phan_ghi_them` là field này; không cần owner mở lại scalar đã có | **Không quyết định scalar mới**; mapping phải giữ bằng chứng/ambiguous khi chưa tách được |
-| **W11-A09** · Diễn đạt phụ của tài sản/GCN, nội dung hỗn hợp còn lại | `phan_ghi_them`, detail extras/`o_tho`, text W11; S-A/S-T; có thể có mô tả tài sản gắn đất nhưng chưa catalog đủ trường nhà/công trình | Phần có nghĩa chuẩn phải tách theo A01–A08; phần dư **chưa field cụm approved**, **J**; `o_tho` không tự là một field nghiệp vụ | Chuẩn hóa riêng các nghĩa tái dùng; **cụm riêng “mô tả bổ sung tài sản” W11** cho phần phức tạp không tái dùng | **Đề xuất cụm riêng có ranh giới theo tài sản/nhóm được nguồn nêu**; tránh thêm schema từng câu site-specific. Đánh đổi: không search/tính như structured data; không dùng nó chứa cả đất, sửa mơ hồ `o_tho`, tài chính/thời hạn nghiệp vụ hay quan hệ người–tài sản. Raw nguyên bản vẫn provenance, không mặc định copy toàn blob thành cụm | **CHỜ CHỌN A09:** cho phép cụm bổ sung W11 bên cạnh phần đất chuẩn? Khuyến nghị có cho lời văn dư có nghĩa rõ; phần chưa nhận diện vẫn unresolved |
-| **W11-A10** · Xe / sổ tiết kiệm / bảo hiểm và loại chưa supported | `tai_san_chua_ho_tro` flags + mô tả text; S-T; catalog W05 rộng hơn extraction | Không structured Asset fields/Upload persistence đủ cho các loại này; **J**, không suy dropdown = supported | Giữ phạm vi nhận diện + nguồn, pending chuẩn hóa; hoặc giao phạm vi chuẩn hóa riêng sau quyết định owner; không tự nhập tay thay gap | **Đề xuất chưa mở rộng hỗ trợ các loại này trong lựa chọn hiện tại**; giữ rõ “chưa hỗ trợ structured”, không claim block W11 đã chuẩn hóa xe/savings và không mất bằng chứng. Mua bán xe #29 vẫn deferred; giữ text cũ không cấp quyền extraction tài chính mới | **CHỜ CHỌN A10:** giữ ngoài phạm vi structured hiện tại hay giao mở rộng? Khuyến nghị giữ nhận diện/pending; không tự bỏ khỏi coverage #41 hoặc coi đã hoàn thành |
+| **W11-A09** · Đoạn tài sản ghép và lời dư thật chưa map | `phan_ghi_them`, detail extras/`o_tho`, W11; S-A/S-T | A01–A08 có các đích nghĩa thật; phần dư **chưa field cụm approved**, **J** | Làm rõ đoạn này dùng trường nào, lưu ví dụ tổng hợp §7.5.1 | Toàn đoạn mô tả GCN/thửa/cụm đất có thể dựng từ chuẩn, không vì là đoạn dài mà thành block dư. Chỉ lời còn lại sau mapping mới là ứng viên residual; `phan_ghi_them` hỗn hợp không tự là field hình thức hay field mới; nhà/công trình thiếu catalog/rule | **CHỜ LÀM RÕ A09**, chưa duyệt block/storage/engine |
+| **W11-A10** · Xe / sổ tiết kiệm / bảo hiểm | Flags `tai_san_chua_ho_tro` + text; S-T | Chưa structured Asset/Upload persistence đầy đủ, **J** | Giữ nhận diện + nguồn, **pending structured support**, chưa mở rộng hiện tại | Owner duyệt khuyến nghị này; #29 xe vẫn DEFERRED. Không dùng A10 để loại **đất có tài sản/nhà W05**, không mất nguồn hoặc coi đã chuẩn hóa | **ĐÃ DUYỆT phạm vi**, không permission implementation |
 
-### 7.6 Các lựa chọn owner thực sự cần chốt
+### 7.5.1 A09 — những trường tạo nên đoạn tài sản và ví dụ lưu lại
 
-Không cần trả lời lại từng scalar đã có chuẩn, pháp nhân nhập tay, status/phí/ghi chú hoặc kỹ thuật JSON/ID. Có **10 dòng CHỜ CHỌN**, mỗi dòng có khuyến nghị cụ thể ở trên:
+**Hai nghĩa khác nhau:** (1) toàn đoạn trình bày tài sản ghép từ các dữ kiện chuẩn;
+(2) lời dư thật chưa có mapping sau khi tách dữ kiện. Ví dụ dưới chỉ minh họa (1),
+**không chứng minh cần field lưu cả đoạn hoặc duyệt cụm A09**.
 
-1. **W05:** hướng phân loại một ô portal khi hồ sơ có nhiều loại tài sản — đề xuất dựng từ tập tài sản, chỉ dùng loại bao quát khi có quy tắc có căn cứ.
-2. **R05:** giữ nghĩa alias trong chuẩn Người để tái dùng — đề xuất có, không trộn tên/không mở #42.
-3. **R06:** requester theo người/nhóm có nguồn — đề xuất tham chiếu và hiển thị, không hợp thức hóa “người đầu” hiện tại.
-4. **D04:** lời tư cách/căn cứ đại diện — đề xuất hybrid Person chuẩn + cụm lời văn W10 nếu không tái dùng; quan hệ đại diện vẫn phải rõ, pháp nhân vẫn nhập tay.
-5. **D05, D06, D07:** đề xuất hướng quan hệ có vai trò, thứ tự và phạm vi người–tài sản có nguồn; **ba yêu cầu nghiệp vụ, không một model đơn giản đã duyệt**. Bước thiết kế phải xử lý nhiều người/nhiều tài sản, vai trò lặp và phạm vi chưa rõ; không suy FK/cardinality từ bảng review.
-6. **D08, A09:** đề xuất hai ứng viên cụm phụ có nghĩa/phạm vi riêng (lời bổ sung đương sự W10; mô tả bổ sung tài sản W11), **không đề xuất cả ba editor thành raw block**.
-7. **A10:** đề xuất giữ loại chưa hỗ trợ ở trạng thái nhận diện/pending thay vì mở structured support ngay.
+Nguồn thẩm quyền: [contract Notary](../../../contracts/notary-case-drafting.md)
+**§4.2 asset_row, §13.3 snapshot tài sản** và
+[entities §9.2](../../../contracts/entities.md).
+§6.2/S-A/S-N ghi đường extraction/mapper và gap; có đích Notary không chứng minh
+Upload đã cutover. Đây là bảng giải nghĩa trường có thật, **không wire payload mới**.
 
-Owner chọn hướng nghiệp vụ không đồng nghĩa duyệt key/kiểu/schema mới. Implementation chịu trách nhiệm đề xuất chi tiết contract/DB-wire theo hướng được chọn, migration/cutover mọi consumer và proof được giao; không đặt thêm gate hỏi owner từng chi tiết kỹ thuật. Lượt này chỉ đề xuất tài liệu; **chưa quyết định mới, chưa sửa runtime/schema/DB, chưa verification**, không đóng #41/mở gate mẫu hoặc tạo ticket mới.
+| Dữ kiện hiển thị | Trường nguồn/đích đã có | Giá trị minh họa hoàn toàn giả lập |
+|---|---|---|
+| Serial GCN nguyên văn | extraction `so_gcn_raw` → wire/model `so_serial` | `MINH-HOA AB 000000` (giữ nguyên văn) |
+| Số vào sổ | `so_vao_so` | `CS-MINH-HOA-001` |
+| Loại giấy | `loai_gcn` → `loai_so` | Giấy chứng nhận quyền sử dụng đất |
+| Ngày cấp; cơ quan cấp | `ngay_cap_gcn` → `ngay_cap`; `co_quan_cap` | 15/06/2020; Cơ quan cấp minh họa |
+| Thửa; tờ; địa chỉ | `so_thua_dat`; `so_to_ban_do`; `dia_chi` | 101; 09; Thôn Minh Họa, xã Giả Lập, tỉnh Minh Họa |
+| Diện tích **tổng thửa** từ nguồn | extraction/model/snapshot `dien_tich`; wire §4.2 không liệt kê scalar tổng, §13.3 có snapshot tổng hợp | 240 m²; không tự tính tổng chi tiết làm fact hoặc ghi vào mọi cụm |
+| Cụm đất vị trí 1 | canonical/model `land_rows[].loaidat/dientich/thoihan`; wire emit `loai_dat/dien_tich/thoi_han` | Đất ở tại nông thôn; 100 m²; Lâu dài |
+| Cụm đất vị trí 2 | cùng bộ ba, giữ vị trí 2 | Đất trồng cây lâu năm; 140 m²; đến 31/12/2063 |
+| Nguồn gốc | `nguon_goc` có wire/model; S-N chưa map | Công nhận QSDĐ như giao đất không thu tiền sử dụng đất (giả lập) |
+| Hình thức sử dụng, **nếu có nguồn rõ** | `hinh_thuc_su_dung` có wire/model; không map toàn blob `phan_ghi_them` | Sử dụng riêng (giả lập) |
+
+**Đoạn minh họa, không phải output runtime hoặc mẫu Word:**
+
+> Tài sản minh họa: quyền sử dụng thửa đất số 101, tờ bản đồ số 09, tại Thôn
+> Minh Họa, xã Giả Lập, tỉnh Minh Họa. Diện tích toàn thửa: 240 m². Theo thứ tự
+> nguồn: (1) Đất ở tại nông thôn, 100 m², thời hạn Lâu dài; (2) Đất trồng cây
+> lâu năm, 140 m², thời hạn đến 31/12/2063. Hình thức sử dụng: Sử dụng riêng.
+> Nguồn gốc: Công nhận QSDĐ như giao đất không thu tiền sử dụng đất.
+> Giấy chứng nhận quyền sử dụng đất số nguyên văn “MINH-HOA AB 000000”,
+> số vào sổ “CS-MINH-HOA-001”, cấp ngày 15/06/2020 bởi Cơ quan cấp minh họa.
+
+Mọi giá trị/địa danh/cơ quan trên đều bịa để minh họa, không PII, không fixture,
+corpus hoặc hợp đồng thật; không giá/cọc/vay/điều khoản giao dịch. Ví dụ không
+mô tả nhà vì **chưa có catalog/rule chi tiết nhà**, không phủ nhận loại W05 ID 1.
+Trường vắng không được bịa; việc bỏ nhãn/dấu câu tương ứng chỉ là cách minh họa,
+chưa chọn renderer/template engine. Ví dụ không có residual narrative thực;
+chưa đủ căn cứ duyệt field “mô tả bổ sung tài sản”.
+
+### 7.6 Đã chốt và phần còn cần làm rõ
+
+- **Đã trả lời:** R05 alias nhập tay, không chuẩn hóa mở rộng; R06 mọi Người
+  trong Hồ sơ, chỉ dữ liệu chuẩn; D04 bỏ lời phức tạp, user tự sửa; D08 theo R06,
+  không hỏi lại; A10 nhận diện/pending structured, #29 vẫn deferred.
+- **W05 đồng ý có điều kiện:** dựng lựa chọn portal từ tập tài sản; giữ ID 1
+  đất có tài sản/nhà. Còn thiếu rule khi một hồ sơ thực sự có nhiều loại khác nhau;
+  không tự chọn một loại bao quát/đầu/Khác, không đọc mẫu mới để lấp gap.
+- **D05 cần rõ semantic A/B:** nguồn hiện có chứng minh chuyển nhượng
+  A=chuyển/B=nhận chuyển nhượng và thế chấp A=thế chấp/B=nhận thế chấp.
+  Nhánh ủy quyền có “được ủy quyền” không chứa chữ nhận; thừa kế có văn bản một
+  bên. Chưa chốt cách gán cho nhóm một bên, ngoại lệ không có chữ nhận hoặc
+  heading A/B mâu thuẫn nhãn vai trò. “Gần như 100%” không phải 100%, không đủ
+  làm regex tổng quát hay fallback “không nhận=A”. Không đổi R06 theo nhóm A/B.
+- **A09 còn làm rõ phạm vi:** bảng/ví dụ §7.5.1 cho biết trường thật tạo đoạn
+  tài sản; chưa xác định lời dư cụ thể đủ điều kiện để duyệt cụm riêng. Giữ
+  chưa map/source cho nội dung chưa rõ, không dựng thêm field nhà/`o_tho`.
+- **D06+D07 → #43 riêng:** giải quyết ngay sau làm rõ các ô; membership/thứ tự,
+  nhiều vai trò và scope người↔tài sản chưa duyệt model/FK/cardinality. Với R06,
+  câu “tất cả người” giữ nguyên; phạm vi thành viên người chết/đại diện phải
+  được làm rõ ở issue này, không tự loại.
+
+### 7.7 Hai tầng dữ kiện / đoạn suy ra — chỉ đang cân nhắc
+
+Owner nêu Người và Tài sản thường trình bày tự nhiên trong một đoạn, cân nhắc
+tầng 1 dữ kiện tĩnh và tầng 2 đoạn dựng từ dữ kiện, có thể có điều kiện. Đây là
+**khám phá phương án**, không mặc định định hướng hoặc approval. Cần cân nhắc
+độ tùy biến sâu với độ đơn giản/ổn định; chưa chọn lưu text canonical, placeholder
+engine, cú pháp điều kiện, schema hoặc kiến trúc mới. Ví dụ tổng hợp A09 không
+là quyết định các lựa chọn đó; không đưa ví dụ Người có tên/ID của user vào Git.
+
+**Tiền lệ hiện có, không phải engine mới đã duyệt:** Word tính mapping token →
+chuỗi và có khối tên cố định với điều kiện trong code; không phải engine công
+thức/điều kiện tổng quát do user cấu hình. Nguồn tĩnh:
+[`build_template_mapping`, `word_engine.py:1877–1917`](../../../notary_v2/services/word_engine.py),
+[`_add_block_placeholders`, `word_engine.py:1607–1642`](../../../notary_v2/services/word_engine.py).
+
+| Phương án đang so sánh | Lợi ích | Đánh đổi |
+|---|---|---|
+| Formatter cố định theo output | Gọn, ít cơ chế mới, dễ kiểm soát câu xuất | Mỗi biến thể cần developer; Word/web có trình bày riêng, dễ lặp logic nếu dùng lại nhiều |
+| Khối suy ra có tên, phạm vi hữu hạn; điều kiện do code định nghĩa | Tái dùng đoạn/điều kiện có tên rõ, phù hợp tiền lệ khối Word | Cần chốt nghĩa/phạm vi từng khối; thêm/sửa vẫn cần code, kiểm tương thích các consumer |
+| Engine công thức/điều kiện cấu hình sâu bởi user | User tự đổi quy tắc/biến thể không cần mỗi lần phát hành code | Thêm gánh kiểm lỗi cấu hình, bảo mật, vòng phụ thuộc và version; chưa có quyết định đánh đổi để chọn |
+
+**Rủi ro chung, kể cả formatter/khối cố định:** phải rõ đoạn đọc snapshot đã
+commit hay nháp/master; sửa tay kết quả có bị tính lại/ghi đè khi dữ kiện đổi
+hoặc xuất lại; thiếu trường, ngày chỉ có năm, dấu câu/nhãn thừa; Word là text
+còn editor web là HTML nên không mặc định dùng chung chuỗi/escaping. Ngay logic
+suy ra cố định đã có phân biệt giá trị user sửa với giá trị tự suy
+([`_resolve_derived_field`, `case_workspace.py:341–361`](../../../notary_v2/services/case_workspace.py));
+đó chưa là policy override cho mọi đoạn. Khả năng tái tạo văn bản cũ cũng phụ
+thuộc phiên bản formatter, dữ kiện/ngày xuất, không chỉ engine cấu hình.
+Tùy biến sâu **thêm** rủi ro vòng/cycle, thực thi nội dung không an toàn,
+version cấu hình và lỗi user; không làm biến mất các rủi ro chung trên.
+
+**Khuyến nghị để cân nhắc, chưa chọn kiến trúc:** ưu tiên dữ kiện chuẩn tĩnh
+làm nguồn sự thật, dựng đoạn theo nhu cầu tại lúc xuất; so formatter cố định
+với khối tên hữu hạn khi thực sự có nhu cầu tái dùng. Chỉ cân nhắc engine cấu
+hình sâu nếu nhu cầu tự đổi quy tắc đủ bù độ phức tạp. Đây không là owner bác
+engine đó, không yêu cầu xây framework, không duyệt lưu text canonical hoặc
+policy tính lại/override/version mới.
+
+Các quyết định trên đổi **spec nghiệp vụ đích**, không chứng minh runtime đã
+cutover. #41 vẫn mở, gate mẫu **ĐÓNG**; lượt này chỉ docs/ticket, không code,
+schema, DB, parser, browser, corpus hoặc verification runtime.
 
 ## 8. Implementation preSave — đã kiểm chứng cô lập và review độc lập sạch
 

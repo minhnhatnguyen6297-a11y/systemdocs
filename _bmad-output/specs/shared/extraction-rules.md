@@ -131,9 +131,12 @@ không ép ô đơn hiện tại thành đa trị hoặc tự thêm prerequisite
 **Kiểm:** `Đồng sở hữu – Cháu Lê Minh An; Sinh ngày 21/11/2011` trả `Lê Minh An`. Khi chỉ có tên được quy tắc loại cho phép, vẫn trả bản ghi để kiểm thiếu trường; không tự loại để hết cờ.
 
 
-#### ten_goi_khac — Theo spec hiện hành
+#### ten_goi_khac — policy đích owner R05, 20/10/2026
 
-Lấy bí danh được nguồn ghi rõ trong ngoặc/nhãn tên gọi khác; ngoặc có sinh/chết/giấy tờ không tự coi là bí danh. Không đổi tên chính thành một người khác chỉ để khớp ngày hoặc giấy tờ.
+Bỏ tự động điền và mở rộng chuẩn hóa alias; nếu cần user điền tay. Không nối
+alias vào tên chính hoặc thêm field alias mới; giữ raw/lịch sử. Code cũ có thể
+còn bóc nhãn/ngoặc tên gọi khác: đó là hiện trạng chưa cutover, không authority
+để tiếp tục mở chuẩn. Ngoặc sinh/chết/giấy tờ không tự thành alias.
 
 #### gioi_tinh — Theo spec hiện hành
 
@@ -220,6 +223,13 @@ Danh sách mô tả tài sản đánh số, mỗi mục một GCN rõ, giữ t�
 
 Sổ tiết kiệm/tài khoản và bảo hiểm chỉ nhận diện `tai_san_chua_ho_tro` + R12 theo regex-decision-46, không tạo dòng tài sản đầy đủ. Xe/tàu theo giới hạn loại hiện hành. Quê quán giữ khả năng đọc snapshot cũ; intake không tự điền.
 
+**W05 owner 20/10/2026:** đất đai có tài sản (thường nhà ở trên đất) vẫn là loại
+nghiệp vụ có thật, có option Nam Định **ID1**. Chưa có hợp đồng mẫu để rút rule
+regex nhà/công trình không có nghĩa loại không tồn tại/thuộc A10 bị loại. Ghi
+thiếu catalog/rule/nguồn; không tự dựng schema/regex hoặc đọc mẫu khi gate đóng.
+**A10 đã duyệt** giữ xe/sổ tiết kiệm/bảo hiểm nhận diện + nguồn, pending structured;
+#29 mua bán xe vẫn DEFERRED, không tự mở tài chính/extraction đầy đủ.
+
 Số/ngày công chứng và tên công chứng viên phục vụ upload/audit theo flow riêng; không dùng làm tiêu chí “trích đúng người/tài sản”. Trang này không tự mở schema hoặc field mới.
 
 **Pháp nhân — owner 20/10/2026:** pháp nhân **không đưa vào Người**, không thêm
@@ -243,6 +253,32 @@ nhóm/storage; không dùng cụm để tự bóc pháp nhân. Cụm có thể l
 theo ô; phần tái dùng được vẫn map canonical, không mặc định coi cụm là dữ liệu
 chưa map/orphan. Chưa chọn cụm/ô nào trong lượt tài liệu này.
 
+**Nam Định §7 — owner trả lời 20/10/2026, policy đích chưa runtime cutover:**
+
+- **R06 requester = tất cả Người có trong Hồ sơ**, thuần thông tin chuẩn từng
+  Người. Bỏ authority chọn một bên/người đầu/lookup cũ ở các nhánh bên dưới;
+  không đưa Bên A/B, con đẻ, chức vụ/tư cách/lời mô tả phụ vào requester,
+  không cắt danh sách hoặc suy người thiếu. Pháp nhân không thuộc Người.
+- **D04** lời tư cách/căn cứ phức tạp bỏ khỏi tự động điền, user tự sửa; không
+  block mới, không mất nguồn hoặc mở manual fallback mọi gap. **D08 theo R06**,
+  không residual prose block và không hỏi lại.
+- **D05** chỉ nhóm output Bên A/Bên B nói chung theo nghĩa nguồn; “gần như
+  100% Bên B có chữ nhận” không universal regex hoặc “không nhận=A”. Chuyển/
+  nhận chuyển nhượng, thế chấp/nhận thế chấp, ủy quyền/được ủy quyền và thừa kế
+  một bên cần phân biệt; semantic ngoại lệ còn làm rõ, không sửa R06 theo A/B.
+- **D06+D07** chuyển [#43 riêng](../../backlog/spike-case-people-assets-relationships.md),
+  làm ngay sau rõ các ô, không chờ toàn #41 xong/#42. Membership/thứ tự,
+  vai trò lặp, phạm vi Người↔Tài sản và người chết/cá nhân đại diện cần làm kỹ,
+  chưa model/FK/cardinality; không tự loại họ khỏi “tất cả người”.
+- **A09 chưa duyệt block**: toàn đoạn tài sản ghép từ các field chuẩn khác
+  lời dư thật chưa map. [SOT §7.5.1](../upload_lab/nam-dinh-website-sot.md) lưu
+  trường thực/ví dụ tổng hợp và wire/model gaps; không nhét `phan_ghi_them`
+  hỗn hợp vào hình thức sử dụng/ghi chú hoặc bịa trường nhà.
+
+Hai tầng dữ kiện tĩnh/đoạn suy ra (có thể có điều kiện) chỉ **đang cân nhắc**,
+chưa chọn engine/schema/persisted canonical text. Không quyền parser/test/corpus
+từ lượt docs này; #41 mở, gate mẫu vẫn **ĐÓNG**.
+
 ### 2.8. Quyết định 15/10 và phần cần đối chiếu
 
 | Mục | Owner đã chốt | Phần phải đối chiếu trước khi đổi engine/đáp án |
@@ -265,7 +301,7 @@ cũ vẫn phải được kiểm lại, không biến “bỏ qua” thành “�
 - **Đương sự**:
   - `Bên A`: Bên chuyển nhượng
   - `Bên B`: Bên nhận chuyển nhượng
-  - Người yêu cầu công chứng: Ưu tiên Bên B (Bên nhận chuyển nhượng).
+  - Người yêu cầu công chứng: **tất cả Người trong Hồ sơ** theo R06; ưu tiên Bên B là luật cũ đã bị thay trong business spec, runtime có thể chưa cutover.
 - **Tài sản**:
   - *Điểm bắt đầu*: `quyền sử dụng đất ... có địa chỉ tại:` hoặc `Đối tượng của Hợp đồng này là...`
   - *Điểm kết thúc*: Dừng trước `1.2`, `Điều 2`, `Giá chuyển nhượng`, `Phương thức thanh toán`, `Bằng Hợp đồng này`.
@@ -275,7 +311,7 @@ cũ vẫn phải được kiểm lại, không biến “bỏ qua” thành “�
 - **Tiêu đề canonical**: `Văn bản cam kết tài sản riêng`
 - **Đương sự**:
   - Gồm cả 2 vợ chồng (Người chồng - Ông ... / Người vợ - Bà ...).
-  - Người yêu cầu công chứng: Người đứng tên cam kết tài sản riêng.
+  - Người yêu cầu công chứng: **tất cả Người trong Hồ sơ** theo R06, không chỉ người đứng tên cam kết.
 - **Tài sản**:
   - *Điểm bắt đầu*: `quyền sử dụng đất ... có địa chỉ tại:` hoặc `hiện đang sở hữu Tài Sản là` / `Tài Sản là`.
   - *Điểm kết thúc*: Dừng trước `Bằng văn bản này chúng tôi xác định`, `Hai vợ chồng chúng tôi cam kết`, `Chúng tôi công nhận`.
@@ -293,7 +329,7 @@ cũ vẫn phải được kiểm lại, không biến “bỏ qua” thành “�
   - `Bên A`: Bên thế chấp (cá nhân/hộ gia đình).
   - `Bên B`: Bên nhận thế chấp; nguồn thường nêu ngân hàng/pháp nhân/chi nhánh + người đại diện ký. Đây là vai trò theo nguồn, không phải dữ kiện mặc định.
   - Không có heading `BÊN NHẬN THẾ CHẤP` thì phần mở đầu trước `BÊN THẾ CHẤP` (ngân hàng + đại diện, mẫu Lời chứng Agribank/VB sửa đổi) được coi là Bên B (11/10/2026, hành vi legacy).
-  - Người yêu cầu công chứng: nếu nguồn ghi người đại diện ngân hàng (Bên B), giữ vai trò theo nguồn; không suy ra khi nguồn không nêu.
+  - Người yêu cầu công chứng: **tất cả Người trong Hồ sơ** theo R06, không chỉ cá nhân đại diện ngân hàng/Bên B; membership/đại diện chưa tự loại hoặc suy thêm, làm rõ trong #43.
   - **Pháp nhân không bóc thành Người (policy đích 20/10/2026):** người dùng nhập
     tay; không tự tạo tên ngân hàng/chi nhánh/người đại diện hoặc default party
     fact, không thêm loại pháp nhân vào Person. Hành vi legacy ở trên vẫn là hiện

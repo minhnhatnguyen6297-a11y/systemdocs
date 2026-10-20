@@ -112,10 +112,10 @@ toán riêng, owner yêu cầu làm kỹ, chưa chọn model/cardinality/schema.
 ### Quy tắc áp dụng
 
 - **Quan hệ Người–Tài sản–Hồ sơ:** chưa chọn model, cardinality, quan hệ/FK,
-  bảng nối hay schema cho nhiều người–nhiều tài sản hoặc các tổ hợp khác. Không
-  coi mô hình quan hệ trước đó là đã được owner chấp nhận. Đây là phần phải làm kỹ
-  trong refinement/inventory canonical của #41 trước implementation; lượt này không
-  tạo ticket mới, không đổi gate và không cấp quyền sửa code/schema.
+  bảng nối hay schema nhiều người–nhiều tài sản. Chỉ đạo mới ở mục “Trả lời ma
+  trận” bên dưới thay yêu cầu trước “làm trong #41, không tạo ticket”: D06+D07
+  chuyển một issue riêng #43, làm ngay sau rõ các ô, không chờ toàn #41 xong.
+  Không coi mô hình cũ đã duyệt, đổi gate hoặc cấp quyền code/schema.
 - **Pháp nhân:** không đưa vào Người, không thêm loại pháp nhân vào Person,
   không tự phân loại tổ chức thành thể nhân. Theo policy, **người dùng nhập tay**;
   đây là policy nhập liệu, không phải extraction hay default; code hiện tại chưa
@@ -127,8 +127,9 @@ toán riêng, owner yêu cầu làm kỹ, chưa chọn model/cardinality/schema.
   nhân; loại khác ít xảy ra. Sự có mặt đó không đồng nghĩa đã biết hoặc được
   phép tự điền tên ngân hàng, chi nhánh, người đại diện hay coi một bên là mặc
   định; chỉ dùng dữ kiện nguồn nêu rõ. Pháp nhân khác không được âm thầm bỏ mất
-  hoặc tự xếp loại; giữ nguồn và để người dùng nhập tay. Manual entry chỉ áp cho
-  pháp nhân, không mở rộng thành cơ chế cho dữ liệu chưa rõ nghĩa.
+  hoặc tự xếp loại; giữ nguồn và để người dùng nhập tay. Ngoài pháp nhân, chỉ
+  alias R05 và lời phức tạp D04 có lựa chọn nhập/sửa tay cụ thể bên dưới;
+  không mở thành cơ chế cho mọi dữ liệu chưa rõ nghĩa.
 - **Cụm trường phụ website:** owner cho phép **có điều kiện** thêm một trường
   để giữ cả cụm khi cụm phức tạp, không lặp lại và thuộc một ô nhập của một
   website cụ thể, thay vì làm cồng kềnh hệ thống. Đây không phải quyết định rằng
@@ -158,3 +159,60 @@ toán riêng, owner yêu cầu làm kỹ, chưa chọn model/cardinality/schema.
   schema, migration, runtime, test hoặc tạo bảng tương lai.
 - #41 vẫn mở, `refined:false`, gate khảo sát mẫu vẫn **ĐÓNG**; #42 vẫn chỉ cho
   nhiều giấy tờ/địa chỉ của một Người và không tự thành prerequisite.
+
+## Trả lời ma trận Nam Định §7 — owner 20/10/2026
+
+Nguồn: owner trả lời trực tiếp các dòng trong [SOT §7](../specs/upload_lab/nam-dinh-website-sot.md#owner-review).
+Ma trận đề xuất trước và lần làm rõ pháp nhân trước đó là lịch sử phương án,
+không phải approval toàn bảng. Các lựa chọn dưới đây là **spec nghiệp vụ đích**,
+không chứng minh runtime đã cutover; không sửa raw/lịch sử.
+
+- **W05:** owner đồng ý hướng dựng lựa chọn portal từ tập tài sản có căn cứ.
+  Giữ loại live **ID 1 Đất đai có tài sản**, thường nhà ở trên đất: chưa có hợp
+  đồng mẫu để rút rule regex **không có nghĩa loại không tồn tại**. Chưa có
+  rule chọn một ô cho tổ hợp nhiều loại hoặc catalog/rule nhà chi tiết; giữ
+  thiếu nguồn/rule rõ ràng, không tự tạo schema/regex, đọc corpus hoặc chọn
+  đầu/Khác/loại bao quát không căn cứ.
+- **R05:** “bỏ tên gọi khác – nếu có user điền tay”. Loại auto-fill alias và
+  mở rộng chuẩn hóa alias khỏi đích hiện tại; không nối alias vào `ten`, không
+  tạo field alias mới hoặc mở #42. Raw/history vẫn giữ.
+- **R06:** owner đổi business spec: **“Người yêu cầu công chứng = tất cả người
+  có trong hồ sơ”**. Điền dữ liệu chuẩn của mọi Người trong Hồ sơ; không Bên A,
+  Bên B, con đẻ, chức vụ, tư cách hay lời mô tả phụ. Lookup/ưu tiên B/người
+  đầu trước đây chỉ là hiện trạng cũ, **không còn authority nghiệp vụ đích**.
+  Không cắt tên hoặc suy thêm người thiếu. Không tự loại người chết/đại diện
+  khỏi “tất cả”; membership/thứ tự làm rõ ở #43. Pháp nhân vẫn không là Người.
+- **D04:** “lời văn phức tạp loại bỏ - user tự sửa thủ công”. Dữ liệu chuẩn cá
+  nhân vẫn dùng; lời tư cách/căn cứ phức tạp bỏ khỏi tự động điền, user sửa tay.
+  Không duyệt block D04, không xóa nguồn hay mở manual fallback cho mọi gap.
+- **D05:** “Chỉ gán vào Bên A hoặc bên B nói chung”; quan sát **“Gần như 100%
+  Bên B luôn có chữ nhận”** không là luật 100% hoặc regex. Nguồn hiện có phân
+  biệt chuyển/nhận chuyển nhượng, thế chấp/nhận thế chấp; ủy quyền/được ủy quyền
+  không nhất thiết có chữ nhận; thừa kế có văn bản một bên. Còn làm rõ gán
+  nhóm cho ngoại lệ/nhóm một bên/nhãn mâu thuẫn, không suy mọi còn lại=A và
+  không áp nhóm A/B để thu hẹp requester R06.
+- **D06+D07:** tạo **một [#43 riêng](../backlog/spike-case-people-assets-relationships.md)**
+  về nhiều người/nhiều tài sản, membership/vai trò/thứ tự và scope người↔tài
+  sản. Xử lý **ngay sau làm rõ các ô**, không chờ toàn #41 nghiệm thu để tránh
+  vòng phụ thuộc; #41 tiếp nhận kết quả trước cutover quan hệ. #42 không là
+  prerequisite. Chưa duyệt model/FK/cardinality hoặc implementation.
+- **D08:** owner “đã trả lời ở R06”. Chỉ dữ liệu chuẩn Người, không lời quan
+  hệ/tư cách/chức vụ trong requester; không duyệt residual prose block D08,
+  không hỏi lại lựa chọn này.
+- **A09:** owner yêu cầu rõ trường nào tạo cụm và có ví dụ lưu lại. SOT §7.5.1
+  lưu bảng trường thực và ví dụ đất/GCN tổng hợp, không PII. Phân biệt **đoạn
+  trình bày ghép từ chuẩn** với **lời dư thật chưa map**; chưa duyệt field
+  A09, storage hoặc block tài sản/nhà. Wire/model/mapper gap vẫn ghi rõ.
+- **A10:** duyệt giữ xe/sổ tiết kiệm/bảo hiểm ở nhận diện + nguồn, pending
+  structured support; chưa mở rộng hiện tại, #29 vẫn DEFERRED. Không áp loại
+  này cho đất có tài sản/nhà của W05.
+
+### Phương án hai tầng — đang cân nhắc, không phải định hướng đã chọn
+
+Owner nhận xét Người + Tài sản thường nối tự nhiên thành đoạn; cân nhắc tầng 1
+dữ kiện tĩnh, tầng 2 đoạn suy ra từ dữ kiện, có thể có điều kiện. Owner yêu cầu
+**cân nhắc thật kỹ**, độ tùy biến sâu đổi lấy độ đơn giản/ổn định thế nào.
+Không mặc định đây là hướng đã duyệt; chưa chọn canonical persisted text,
+placeholder/conditional engine, schema hoặc kiến trúc. Chỉ dùng ví dụ tổng
+hợp trong Git, không chép tên/ID user đưa. Lượt này docs/ticket, không runtime,
+DB/schema, code, browser, parser, mẫu/corpus/test; #41 mở, gate mẫu **ĐÓNG**.

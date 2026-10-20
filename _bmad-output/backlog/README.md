@@ -15,6 +15,14 @@ giữ pending từng file không chặn file đã rõ. Không tắt production S
 #42 nhiều giấy tờ **và** địa chỉ là issue riêng, không tự là hard after của #41
 hoặc gate mẫu. [Quyết định](../decisions/decision-owner-upload-field-standardization-20261019.md).
 
+**Thứ tự owner 20/10/2026:** ngay sau làm rõ các ô [Nam Định §7](../specs/upload_lab/nam-dinh-website-sot.md#owner-review),
+làm **[#43 quan hệ nhiều Người–nhiều Tài sản](spike-case-people-assets-relationships.md)**
+(gộp D06+D07: membership/roles có thứ tự và scope người↔tài sản). Không chờ toàn
+#41 hoàn thành để tránh vòng phụ thuộc; #41 nhận đáp án trước cutover quan hệ.
+Không hard after #41/#42, chưa duyệt model/FK/cardinality hoặc implementation.
+R05/R06/D04/D08/A10 đã trả lời; W05 đồng ý có điều kiện, còn quy tắc tổ hợp;
+D05 semantic A/B và A09 phạm vi đoạn/cụm còn làm rõ. Không còn 10 dòng pending.
+
 | Candidate / ID | Issue | Nhóm | Ưu tiên | Hard after | Sẵn sàng |
 |---|---|---|---|---|---|
 | C01 / #2 | [Không gian Stage, Pool và Diagram liền mạch, dễ thao tác](story-notary-workspace-continuity.md) | bug/report đã báo | P2 | không | 6/6 report đã built (18ae/b541/2c232/e86/ac5 + 802 sàn chiều cao 726px, geometry thật chứng minh; Node 193 pass/0 fail, adapter 83 pass, GUI gói default 0 fail + đóng sạch; independent Quick t1 patch thông báo dài + t2 clean) |
@@ -60,6 +68,7 @@ hoặc gate mẫu. [Quyết định](../decisions/decision-owner-upload-field-st
 | C39 / #40 | [Đồng bộ serial GCN Stage với chuẩn nguyên văn đã chốt](bug-stage-raw-gcn-serial-contract.md) | bug — gap source tĩnh | P2 đề xuất | không | **BUILT 20/10/2026** — plan approved CHECKPOINT 1; serial raw/empty/duplicate qua adapter + fresh reopen + Word batch; DB migration verified on an isolated copy preserved 14/14 IDs/links/values and removed UNIQUE; Notary 122 passed, shell adapter/mock 244 passed/2 skipped, word_engine 71 passed, Node 97 passed (4 wire + 93 renderer). Independent Quick review 3 blocking/3 minor fixed; re-check CLEAN 20/10/2026. No real-portal/native-UI claim; commit 096495f; chưa push. [Plan](bug-stage-raw-gcn-serial-contract-plan.md) |
 | C40 / #41 | [Thống nhất toàn bộ trường nghiệp vụ Upload theo Người–Tài sản–Hồ sơ](story-upload-business-field-standardization.md) | chuẩn hóa xuyên module trước mẫu | trước future sample batch | không | **RECORDED / refined:false**; slice metadata Case BUILT 19/10/2026 (verification cô lập + independent review sạch), toàn #41 chưa build và gate mẫu ĐÓNG. Owner báo orphan/thiếu trường Hồ sơ; inventory tất cả extraction/form → nghĩa/đối tượng/key/kiểu/format/nhóm/cardinality/DB-wire-output; chốt gap, cutover mọi consumer và proof thật. Chủ đất/công chứng thuộc Hồ sơ, khác ngày tạo; bỏ extraction giao dịch/thời hạn nghiệp vụ, giữ thời hạn đất. Không chỉ lập bảng hoặc thu hẹp vào workspace Notary. |
 | C41 / #42 | [Một Người nhiều giấy tờ định danh và nhiều địa chỉ](story-person-multiple-identities-addresses.md) | model tương lai riêng | chưa xếp | không | **RECORDED / refined:false**, chưa thiết kế/chọn schema/migration/chọn dùng/extraction/export; model hiện tại một bộ giấy tờ/một địa chỉ. Không thêm đối tượng thứ tư hoặc tự đặt prerequisite cho #41/mẫu. |
+| C42 / #43 | [Làm rõ quan hệ nhiều Người–nhiều Tài sản trong Hồ sơ](spike-case-people-assets-relationships.md) | nghiệp vụ/thiết kế — D06+D07 | ngay sau làm rõ các ô Nam Định §7 | không; không chờ #41 xong/#42 | **RECORDED / refined:false**; một issue cho membership/roles/thứ tự và scope người↔tài sản; #41 nhận đáp án, chưa model/FK/cardinality, không implementation hoặc mở gate mẫu. |
 
 **Quy tắc bền vững 19/10/2026:** #30–#38 là câu hỏi cấu trúc/mapping theo từng
 loại, chưa phải defect, kết luận pháp lý hay quyền implementation; `refined: false`.

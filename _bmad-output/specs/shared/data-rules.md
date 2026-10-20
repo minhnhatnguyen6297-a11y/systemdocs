@@ -112,8 +112,8 @@ Lý do và supersession: [quyết định owner](../../decisions/decision-owner-
   đó không đồng nghĩa đã biết hoặc được phép tự điền tên ngân hàng/chi nhánh/
   người đại diện hoặc coi một bên là mặc định; chỉ dùng dữ kiện nguồn nêu rõ.
   Pháp nhân khác không được âm thầm bỏ mất hoặc tự xếp loại; giữ nguồn và để
-  người dùng nhập tay. Nhập tay chỉ áp cho pháp nhân, không mở rộng cho dữ liệu
-  chưa rõ nghĩa.
+  người dùng nhập tay. R05 alias và D04 lời phức tạp có lựa chọn nhập/sửa tay
+  riêng bên dưới; không mở thành fallback cho mọi dữ liệu chưa rõ nghĩa.
 - **Cụm trường phụ website là ngoại lệ hẹp có điều kiện.** Khi chọn cụm (phức
   tạp, không lặp lại, thuộc một ô nhập của một website cụ thể) phải xác định
   website/phạm vi ô, nghĩa nghiệp vụ, lý do không tách, kiểu lưu và
@@ -126,13 +126,31 @@ Lý do và supersession: [quyết định owner](../../decisions/decision-owner-
   trường riêng theo ô website; phần tái dùng được vẫn map canonical, không mặc
   định coi cụm là dữ liệu chưa map/orphan.
 - **Quan hệ Người–Tài sản–Hồ sơ:** nhiều người/nhiều tài sản chưa chọn model,
-  cardinality, quan hệ/FK hay schema. Không coi đề xuất quan hệ trước đó là đã
-  được owner chấp nhận; phần này phải làm kỹ trong refinement/inventory canonical
-  của #41 trước implementation. Không tạo ticket mới hoặc đổi gate.
+  cardinality, quan hệ/FK hay schema. D06+D07 chuyển một
+  [#43 riêng](../../backlog/spike-case-people-assets-relationships.md), làm ngay
+  sau rõ các ô Nam Định §7, không chờ toàn #41 xong/#42. #41 nhận đáp án cho
+  cutover quan hệ; không coi model trước đã duyệt hoặc đổi gate.
 - Hiện Person/Asset/parties chưa canonical cutover; `nguoi_yeu_cau`/`duong_su`/
   `taisan` vẫn là output trình bày; chưa có bảng pháp nhân hoặc trường lưu cụm.
   Policy này là đích/ranh giới, không chứng minh runtime đã đổi; raw/provenance
   giữ nguyên.
+
+**Owner trả lời Nam Định §7, 20/10/2026:** requester là **tất cả Người có trong
+Hồ sơ**, thuần dữ liệu chuẩn Người, không Bên A/B, con đẻ, chức vụ/tư cách/lời
+phụ; lookup/firstperson cũ không còn authority nghiệp vụ đích. Không cắt tên/suy
+thêm người; membership/thứ tự/người chết/đại diện làm rõ trong #43, không tự loại.
+R05 không tự điền hoặc mở rộng chuẩn alias; nếu cần user điền tay, không nối tên/
+thêm field alias. D04 bỏ lời tư cách/căn cứ phức tạp khỏi tự động điền, user tự
+sửa; D08 theo R06, không residual prose block. Pháp nhân vẫn nhập tay; nguồn
+giữ nguyên, không mở manual fallback cho mọi gap. D05 hướng nhóm output A/B
+chung, chưa đủ semantic ngoại lệ; “gần như 100% có nhận” không universal regex.
+
+W05 giữ loại đất có tài sản/nhà dù thiếu mẫu/rule chi tiết, không tự tạo schema;
+A10 chỉ giữ xe/sổ tiết kiệm/bảo hiểm ở nhận diện/pending structured. A09 chưa duyệt
+block: toàn đoạn tài sản ghép từ dữ kiện chuẩn không đồng nghĩa lời dư chưa map.
+[SOT §7](../upload_lab/nam-dinh-website-sot.md#owner-review) có trường thật/ví dụ
+tổng hợp. Hai tầng dữ kiện tĩnh/đoạn suy ra có điều kiện chỉ đang cân nhắc, chưa
+duyệt persisted text canonical/engine/schema. Policy đích không là runtime đã đổi.
 
 **Kết quả audit catalog 19/10/2026:** báo cáo ổn định
 `D:\testcase\BAO_CAO_KHAO_SAT.md` đã liệt kê trường nền Người/Tài sản/Hồ sơ,

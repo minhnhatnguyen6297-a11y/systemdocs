@@ -96,10 +96,39 @@ thay trường; raw capture chỉ provenance, không thay trường nghiệp v�
 đặt key/kiểu/nhóm/storage; cụm có thể là trường riêng theo ô, phần tái dùng được
 vẫn map canonical, không mặc định coi là dữ liệu chưa map/orphan; không tự coi
 ba editor `nguoi_yeu_cau`/`duong_su`/`taisan` là block. Quan hệ nhiều người/nhiều
-tài sản chưa chọn model/cardinality/schema, không coi mô hình trước đó là đã được
-owner chấp nhận; làm kỹ trong refinement #41, không tạo ticket mới. Hiện chưa có
-bảng pháp nhân hoặc trường lưu cụm; Person/Asset/parties vẫn chưa cutover. Website
-chính thức là SOT, người dùng tự bấm Lưu và rule developer-only giữ nguyên. [Quyết định](../../decisions/decision-owner-upload-field-standardization-20261019.md#bổ-sung-owner-20102026--quan-hệ-ba-đối-tượng-pháp-nhân-và-cụm-trường-website).
+tài sản chưa chọn model/cardinality/schema; D06+D07 chuyển **một #43 riêng**,
+làm ngay sau rõ các ô, không chờ #41 xong/#42; #41 nhận đáp án trước cutover.
+Hiện chưa bảng pháp nhân hoặc field lưu cụm; Person/Asset/parties chưa cutover.
+Website chính thức SOT, người dùng tự Lưu, rule developer-only giữ nguyên.
+[Quyết định](../../decisions/decision-owner-upload-field-standardization-20261019.md).
+
+**Owner trả lời ma trận Nam Định 20/10/2026 — policy đích, chưa đổi runtime:**
+
+- **Người yêu cầu công chứng = tất cả Người có trong Hồ sơ**, chỉ thông tin
+  chuẩn từng Người; không Bên A/B, con đẻ, chức vụ hoặc tư cách/lời phụ. Lookup,
+  ưu tiên một bên/người đầu cũ không còn authority business. Không cắt tên/suy
+  người thiếu; membership/thứ tự, người chết/đại diện làm rõ ở #43, chưa tự loại.
+- **Alias bỏ tự điền/mở rộng chuẩn hóa**, nếu có user điền tay; không nối `ten`
+  hoặc tạo field alias. **D04 bỏ lời tư cách/căn cứ phức tạp**, user tự sửa;
+  D08 đã theo R06, không block lời dư hoặc hỏi lại. Nguồn/raw/history giữ,
+  không mở manual fallback cho mọi unknown; pháp nhân vẫn nhập tay.
+- **Đương sự chỉ nhóm Bên A/Bên B nói chung** có căn cứ; “gần như 100% Bên B
+  có chữ nhận” không regex tuyệt đối/“không nhận=A”. Nhận chuyển nhượng, nhận
+  thế chấp, được ủy quyền và thừa kế một bên cần semantic đúng, còn làm rõ.
+- **W05 đồng ý có điều kiện**, giữ **ID1 Đất đai có tài sản**, thường nhà trên
+  đất: thiếu mẫu/rule không là loại không tồn tại. Chưa rule chọn một ô cho tổ
+  hợp nhiều loại, chưa field/rule chi tiết nhà; không tự dựng schema/regex.
+- **A09 chờ làm rõ**, chưa duyệt block: [SOT §7.5.1](nam-dinh-website-sot.md)
+  lưu trường thật và ví dụ đất/GCN tổng hợp, tách toàn đoạn ghép dữ kiện chuẩn
+  khỏi lời dư thật chưa map. **A10 đã duyệt** xe/sổ tiết kiệm/bảo hiểm nhận diện
+  + nguồn, pending structured; #29 deferred, không áp để loại đất có nhà W05.
+- D06+D07 ở [#43](../../backlog/spike-case-people-assets-relationships.md),
+  **ngay sau rõ các ô**, chưa model/FK/cardinality hoặc implementation. Ý tưởng
+  hai tầng dữ kiện tĩnh/đoạn suy ra (có thể có điều kiện) chỉ **đang cân nhắc**
+  tùy biến sâu so với đơn giản/ổn định, chưa duyệt engine/text canonical/schema.
+
+Chi tiết quyết định và phần cần rõ ở [SOT §7](nam-dinh-website-sot.md#owner-review).
+#41 vẫn mở, gate mẫu **ĐÓNG**; lượt trả lời này chỉ docs/ticket, không runtime.
 
 <a id="ui"></a>
 ## 2. Màn hình và thao tác

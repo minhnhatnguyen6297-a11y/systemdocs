@@ -54,9 +54,20 @@ là issue riêng, model tương lai chưa chọn, không tự là prerequisite #
 nhập tay, bảng riêng tương lai chưa duyệt schema/build; không tự bịa ngân hàng/đại diện/
 default. **Cụm trường phụ website** theo hướng owner cho phép có điều kiện cho một ô
 cụ thể (phức tạp, không lặp lại); chưa chọn ô/cấu trúc nào và không tự biến editor
-thành block. Quan hệ
-nhiều người/nhiều tài sản chưa chọn model/cardinality.
+thành block. Quan hệ nhiều người/nhiều tài sản chưa chọn model/cardinality;
+D06+D07 chuyển [#43 riêng](../backlog/spike-case-people-assets-relationships.md),
+làm ngay sau làm rõ các ô Nam Định §7, không chờ toàn #41 xong/#42.
 [Quyết định](../decisions/decision-owner-upload-field-standardization-20261019.md).
+**Owner đã trả lời ma trận Nam Định 20/10:** requester là **tất cả Người trong
+Hồ sơ**, thuần dữ liệu chuẩn, không lookup/firstperson/role/quan hệ/chức vụ prose;
+alias nếu cần user điền tay, D04 lời phức tạp user tự sửa, D08 theo R06. W05
+đồng ý có điều kiện, giữ ID1 đất có tài sản/nhà dù thiếu mẫu/rule; tổ hợp nhiều
+loại còn rõ rule. D05 chọn nhóm A/B chung, chữ “nhận” gần như 100% không luật
+tuyệt đối. A09 còn rõ phạm vi; [SOT §7.5.1](upload_lab/nam-dinh-website-sot.md)
+lưu trường thật/ví dụ tổng hợp GCN/thửa/cụm đất. A10 nhận diện/pending structured,
+#29 deferred; không loại đất có nhà. Hai tầng dữ kiện tĩnh/đoạn suy ra chỉ
+đang cân nhắc tùy biến với đơn giản/ổn định, chưa engine/schema/text canonical.
+Đây là policy đích docs/ticket, chưa runtime cutover, #41 mở/gate mẫu ĐÓNG.
 **BUILT — slice metadata Case, 19/10/2026; verification đạt, Quick code độc lập
 sạch sau fix được chấp nhận, tài liệu hoàn tất:** tám
 trường canonical đã đi qua extraction, lưu/đọc lại, builder và preSave consumer.

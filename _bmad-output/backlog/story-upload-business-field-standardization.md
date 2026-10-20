@@ -57,6 +57,7 @@ Owner báo Upload đang bóc văn bản thành trường để điền website n
 - Không chọn engine DB vật lý chung, shared Case ID, DB merge hay quyền liên kết/ghi chéo module. Contract Upload còn Draft không tự thành approved.
 - #40 serial GCN Stage/persistence là issue riêng, không nhân bản phạm vi hoặc tuyên bố fixed bởi #41. #20 Danh sách hồ sơ vẫn DEFERRED, whitelist UI/search/filter chưa duyệt.
 - #42 nhiều giấy tờ và địa chỉ của một Người là một issue riêng, không tự là prerequisite; không ép model một giấy hiện tại thành đa trị để hoàn thành #41.
+- D06+D07 về nhiều Người–nhiều Tài sản chuyển một [#43 riêng](spike-case-people-assets-relationships.md), xử lý ngay sau làm rõ các ô Nam Định §7. Không chờ toàn #41 xong, không #42 prerequisite; #41 tiếp nhận đáp án trước cutover quan hệ, không chọn model/FK/cardinality ở lượt docs.
 
 ## References
 
@@ -113,7 +114,7 @@ Owner báo Upload đang bóc văn bản thành trường để điền website n
   với form state; audit live chưa capture submit body. Bổ sung evidence
   không đóng #41, mở gate mẫu, duyệt auxiliary business schema hoặc nghiệm thu
   cutover/consumer/backend.
-- Open question: `ten_goi_khac` trong inventory cần chốt mapping của catalog; không tự nới #42 ngoài hai nhu cầu nhiều giấy tờ và địa chỉ. `cccd_khac` có trong một nhánh extraction không chứng minh DB/contract đã hỗ trợ Người nhiều giấy tờ.
+- Decision 20/10/2026 R05: bỏ tự điền/chuẩn hóa mở rộng `ten_goi_khac`; nếu cần user điền tay. Giữ raw/history, không nối `ten` hoặc tạo field alias. Không mở rộng #42; `cccd_khac` trong extraction không chứng minh hỗ trợ đa giấy tờ end-to-end.
 - Open question: catalog đầy đủ sẽ chốt key/kiểu/format/nhóm/cardinality/DB-wire-output còn thiếu và xung đột portal với trường đã loại. Đây là công việc refinement của issue, không yêu cầu owner chọn schema ngay lúc ghi nhận.
 - Risk: high — mapping sai có thể gắn thông tin sai Người/Tài sản/Hồ sơ hoặc mất dữ liệu lưu/điền web. Ngoài AC, reviewer độc lập cần đối chiếu catalog với các consumer và thiết kế bảo toàn dữ liệu trước cutover.
 - Identity: `next_id: 41` từ `tickets.py status _bmad-output/backlog` ngày 19/10/2026. Loose backlog theo waiver hiện có; active initiative để unset, không setup/install/config. Slice Case đã BUILT và review sạch; slice Nam Định preparation implement/verify cô lập và **review độc lập CLEAN**, owner đã giao commit. Toàn #41 giữ `refined:false`; không push.
@@ -161,8 +162,8 @@ Owner báo Upload đang bóc văn bản thành trường để điền website n
   Phạm vi ba đối tượng hiện tại không đổi; bảng pháp nhân tương lai là hướng
   owner cho phép. Hồ sơ thế chấp là mặc định có pháp nhân, loại khác ít xảy ra;
   sự có mặt đó không đồng nghĩa đã biết hoặc được tự điền ngân hàng/chi nhánh/
-  người đại diện/default party; chỉ dùng dữ kiện nguồn nêu rõ. Nhập tay chỉ áp
-  cho pháp nhân, không mở cho dữ liệu chưa rõ nghĩa.
+  người đại diện/default party; chỉ dùng dữ kiện nguồn nêu rõ. R05 alias và D04
+  lời phức tạp có lựa chọn nhập/sửa tay riêng bên dưới; không fallback mọi gap.
 - **Cụm trường phụ website:** owner cho phép **có điều kiện** thêm một trường
   giữ cả cụm khi cụm phức tạp, không lặp lại và thuộc một ô nhập của một website
   cụ thể. Không phải quyết định biến ba editor `nguoi_yeu_cau`/`duong_su`/
@@ -175,21 +176,45 @@ Owner báo Upload đang bóc văn bản thành trường để điền website n
   nhóm/storage; không dùng cụm để tự bóc pháp nhân. Cụm có thể là trường riêng
   theo ô website; phần tái dùng được vẫn map canonical, không mặc định coi cụm
   là dữ liệu chưa map/orphan. Cụm/ô cụ thể **chưa chọn**.
-- **Quan hệ Người–Tài sản–Hồ sơ:** nhiều người/nhiều tài sản chưa chọn model,
-  cardinality, quan hệ/FK, bảng nối hoặc schema; không coi mô hình quan hệ trước
-  đó là đã được owner chấp nhận. Phần này làm kỹ trong refinement/inventory
-  canonical của #41; không tạo ticket mới, #42 vẫn chỉ giới hạn nhiều giấy tờ/địa
-  chỉ của một Người.
+- **Quan hệ Người–Tài sản–Hồ sơ:** chưa chọn model/cardinality/quan hệ/FK hoặc
+  bảng nối. Owner mới chuyển D06+D07 sang **một #43 riêng**, làm ngay sau rõ
+  các ô §7; thay chỉ đạo trước “refinement #41, không tạo ticket mới”. #41 nhận
+  đáp án trước cutover phần quan hệ, không đòi #41 hoàn thành để #43 bắt đầu;
+  #42 vẫn chỉ là nhiều giấy tờ/địa chỉ của một Người, không prerequisite.
 - **Hiện trạng:** chưa có bảng pháp nhân hoặc trường lưu cụm; Person/Asset/
   parties chưa canonical cutover, ba editor vẫn là output trình bày. Policy
   không chứng minh runtime đã đổi; raw/provenance giữ nguyên. #41 vẫn mở,
   `refined:false`, gate mẫu **ĐÓNG**.
-- **Pending owner review — PROPOSED, chưa áp dụng:** [ma trận Nam Định §7](../specs/upload_lab/nam-dinh-website-sot.md#owner-review)
-  bao phủ **W01–W17 + Tổng derived**, phân rã ba editor thành **25 đơn vị**
-  (requester **7**, đương sự **8**, tài sản **10**), có nguồn, canonical/Upload
-  storage thực, phương án và khuyến nghị theo ID. Có **10 dòng cần chọn**
-  (W05, R05, R06, D04–D08, A09, A10); scalar đã chuẩn/pháp nhân nhập tay/
-  status/phí/ghi chú không hỏi lại. Đây chỉ là quick-create dùng bởi uploader,
-  không coverage mọi màn portal; chưa quyết định model/cardinality/schema,
-  không đóng #41 hoặc mở gate mẫu. Bảng pháp nhân tương lai không là lựa chọn
-  schema phải duyệt trong lượt này; #42 độc lập. Chờ review độc lập trước commit.
+- **Ma trận Nam Định — owner đã trả lời 20/10/2026:** [SOT §7](../specs/upload_lab/nam-dinh-website-sot.md#owner-review)
+  giữ **W01–W17 + Tổng derived**, **25 đơn vị** (R7/D8/A10), source và giới hạn
+  storage thực. Không còn 10 dòng đồng loạt chờ chọn:
+  - **W05 đồng ý có điều kiện:** dựng loại portal từ tập tài sản, giữ ID1 Đất
+    đai có tài sản/nhà; thiếu mẫu/rule không là loại không tồn tại. Tổ hợp nhiều
+    loại vẫn thiếu quy tắc chọn một ô, không tự default/loại đầu/Khác.
+  - **R05 đã chốt:** alias nếu cần user điền tay, không auto-fill/mở rộng chuẩn.
+  - **R06 đã chốt:** requester là **tất cả Người có trong Hồ sơ**, thuần dữ
+    liệu chuẩn, không Bên A/B, con đẻ, chức vụ/tư cách/prose. Lookup/firstperson
+    cũ chỉ hiện trạng cần cutover, không còn authority đích; không tự bỏ tên
+    hoặc suy người thiếu. Membership/thứ tự/người chết/đại diện xem #43.
+  - **D04 đã chốt:** bỏ lời phức tạp khỏi tự động điền, user tự sửa; không block
+    được duyệt hoặc manual fallback cho mọi unknown; nguồn giữ.
+  - **D05 đã chọn hướng nhóm A/B chung**, còn semantic ngoại lệ: “gần như 100%
+    có chữ nhận” không universal regex hoặc “không nhận=A”; nhận chuyển nhượng,
+    nhận thế chấp, được ủy quyền và văn bản một bên khác nhau, không đổi R06.
+  - **D06+D07 → #43** về membership/roles có thứ tự và scope Người↔Tài sản,
+    làm ngay sau rõ các ô, chưa model/cardinality/schema hoặc implementation.
+  - **D08 đã trả lời theo R06**, không residual prose block, không hỏi lại.
+  - **A09 chờ làm rõ phạm vi**, không approval block. [SOT §7.5.1](../specs/upload_lab/nam-dinh-website-sot.md)
+    lưu bảng trường thực và ví dụ tổng hợp GCN/thửa/cụm đất; phân biệt toàn
+    đoạn ghép dữ kiện chuẩn với lời dư thật chưa map; wire/model gaps rõ.
+  - **A10 đã duyệt** nhận diện + nguồn, pending structured xe/sổ tiết kiệm/
+    bảo hiểm; #29 deferred, không áp để loại đất có tài sản W05.
+- **Khám phá, chưa duyệt hướng:** Người/Tài sản có thể nối đoạn tự nhiên,
+  cân nhắc tầng dữ kiện tĩnh và tầng đoạn suy ra/điều kiện với tùy biến sâu,
+  đơn giản và ổn định. Chưa chọn canonical persisted text, placeholder engine,
+  schema/kiến trúc; không chép ví dụ tên/ID user vào Git.
+- **Lượt này chỉ docs/ticket:** policy đích không chứng minh runtime đổi;
+  Person/Asset/parties chưa canonical cutover, #41 `refined:false`, gate mẫu
+  **ĐÓNG**, #42 độc lập; không code/DB/schema/browser/parser/corpus/test,
+  independent review cả 10 docs CLEAN, #43 Ticket validation PASS 20/10/2026;
+  parent cho commit đúng phạm vi, không publish/push hoặc mở implementation.
