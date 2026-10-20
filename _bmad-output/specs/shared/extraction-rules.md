@@ -1,6 +1,6 @@
 # Bóc tách dữ liệu — Word, quy tắc trường và kiểm chứng
 
-**Cập nhật:** 16/10/2026. Tập trung quy tắc để không phải ghép nhiều file. **Một đường luật duy nhất** cho văn bản Word: `tools/regex_workbench/engine/contract_extract.py` (`extract_text` + các hàm nhóm/thửa, identity `contract_word` + `ENGINE_VERSION`). Document Intake, Word Upload và tool nhân viên đều gọi vào đó qua adapter của mình — adapter chỉ giữ đọc file + ánh xạ payload, không chép luật: `upload_lab/extraction_adapter.py` (Upload/tool) và `notary_v2/services/document_intake/adapters/docx.py` (Document Intake, dựng `source_refs` span/`rule_id`/identity lõi). Pipeline profile/zoning cũ đã gỡ cùng cutover 16/10/2026; bản chép `extract_contract.py` trong repo và trong tool cũng đã gỡ — bản tool đóng gói lõi qua script release. Gom spec không chứng minh đã thống nhất code hoặc cho phép sao chép luật giữa các bên.
+**Cập nhật:** 20/10/2026. Tập trung quy tắc để không phải ghép nhiều file. **Một đường luật duy nhất** cho văn bản Word: `tools/regex_workbench/engine/contract_extract.py` (`extract_text` + các hàm nhóm/thửa, identity `contract_word` + `ENGINE_VERSION`). Document Intake, Word Upload và tool nhân viên đều gọi vào đó qua adapter của mình — adapter chỉ giữ đọc file + ánh xạ payload, không chép luật: `upload_lab/extraction_adapter.py` (Upload/tool) và `notary_v2/services/document_intake/adapters/docx.py` (Document Intake, dựng `source_refs` span/`rule_id`/identity lõi). Pipeline profile/zoning cũ đã gỡ cùng cutover 16/10/2026; bản chép `extract_contract.py` trong repo và trong tool cũng đã gỡ — bản tool đóng gói lõi qua script release. Gom spec không chứng minh đã thống nhất code hoặc cho phép sao chép luật giữa các bên.
 
 ## 1. Nguyên tắc
 
@@ -37,6 +37,9 @@ Người, Tài sản, Hồ sơ, giá trị có bằng chứng và mapping vào t
 hiện có. Không lấy parser output làm đáp án; raw và vị trí nguồn không bị sửa.
 Không thêm entity/field nghiệp vụ, DTO ghi DB riêng hoặc nhét thông tin sai nghĩa
 vào ghi chú để làm phép kiểm có vẻ đạt. Phần cần schema mới phải được duyệt.
+Ngoại lệ hẹp là cụm trường phụ website theo hướng owner cho phép có điều kiện (mục 2.7);
+đó là trường đã chốt, không phải ghi chú chung/raw capture, và không tự biến mọi
+editor thành block.
 
 **Sau gate #41**, loại đã biết nhưng cấu trúc/mapping chưa chốt có issue riêng theo loại; thiếu
 enum runtime không tự chứng minh cấu trúc chưa biết hoặc parser có lỗi.
@@ -219,6 +222,27 @@ Sổ tiết kiệm/tài khoản và bảo hiểm chỉ nhận diện `tai_san_ch
 
 Số/ngày công chứng và tên công chứng viên phục vụ upload/audit theo flow riêng; không dùng làm tiêu chí “trích đúng người/tài sản”. Trang này không tự mở schema hoặc field mới.
 
+**Pháp nhân — owner 20/10/2026:** pháp nhân **không đưa vào Người**, không thêm
+loại pháp nhân vào Person và không tự phân loại tổ chức thành thể nhân. Theo
+policy, người dùng nhập tay; code hiện tại chưa cutover. Hướng chuẩn hóa thành một bảng riêng sau này là định hướng,
+**chưa duyệt schema/build**. Hồ sơ thế chấp là trường hợp mặc định có pháp nhân;
+loại khác ít xảy ra. Điều này không cho phép tự tạo tên ngân hàng/đại diện/default;
+pháp nhân khác giữ nguồn và để
+người dùng nhập tay, không âm thầm bỏ hoặc tự xếp loại.
+
+**Cụm trường phụ website — owner 20/10/2026:** có thể dùng thêm một trường để
+giữ cả cụm khi cụm phức tạp, không lặp lại và thuộc một ô nhập của một website
+cụ thể. Đây là ngoại lệ hẹp, không phải quyết định biến ba editor hoặc mọi ô web
+thành block/trường phụ. Khi chọn cụm phải xác định website/phạm vi ô, nghĩa
+nghiệp vụ, lý do không tách, kiểu lưu và provenance; ưu tiên trường canonical
+Người/Tài sản/Hồ sơ đã biết; chỉ hỏi owner khi có quyết định nghiệp vụ thực sự
+chưa rõ, chi tiết kỹ thuật do implementation sở hữu theo contract/rule đã duyệt.
+Không dùng `ghiChu` chung hoặc JSON bag chung thay trường; raw capture chỉ là
+provenance, không thay trường nghiệp vụ; không tự đặt canonical key/tên/kiểu/
+nhóm/storage; không dùng cụm để tự bóc pháp nhân. Cụm có thể là trường riêng
+theo ô; phần tái dùng được vẫn map canonical, không mặc định coi cụm là dữ liệu
+chưa map/orphan. Chưa chọn cụm/ô nào trong lượt tài liệu này.
+
 ### 2.8. Quyết định 15/10 và phần cần đối chiếu
 
 | Mục | Owner đã chốt | Phần phải đối chiếu trước khi đổi engine/đáp án |
@@ -265,11 +289,16 @@ cũ vẫn phải được kiểm lại, không biến “bỏ qua” thành “�
 #### 2.4. Hợp đồng thế chấp (`DOC_KIND_MORTGAGE`)
 - **Nhóm HĐ**: `Cầm cố - Thế chấp - Vay`
 - **Tiêu đề canonical**: `Hợp đồng thế chấp quyền sử dụng đất` (hoặc kèm tài sản gắn liền với đất)
-- **Đương sự**:
+- **Đương sự (hành vi hiện tại, giữ để đối chiếu):**
   - `Bên A`: Bên thế chấp (cá nhân/hộ gia đình).
-  - `Bên B`: Bên nhận thế chấp (thường là Ngân hàng / Pháp nhân / Chi nhánh + Người đại diện ký).
-  - Không có heading `BÊN NHẬN THẾ CHẤP` thì phần mở đầu trước `BÊN THẾ CHẤP` (ngân hàng + đại diện, mẫu Lời chứng Agribank/VB sửa đổi) được coi là Bên B (11/10/2026).
-  - Người yêu cầu công chứng: Người đại diện ngân hàng (Bên B).
+  - `Bên B`: Bên nhận thế chấp; nguồn thường nêu ngân hàng/pháp nhân/chi nhánh + người đại diện ký. Đây là vai trò theo nguồn, không phải dữ kiện mặc định.
+  - Không có heading `BÊN NHẬN THẾ CHẤP` thì phần mở đầu trước `BÊN THẾ CHẤP` (ngân hàng + đại diện, mẫu Lời chứng Agribank/VB sửa đổi) được coi là Bên B (11/10/2026, hành vi legacy).
+  - Người yêu cầu công chứng: nếu nguồn ghi người đại diện ngân hàng (Bên B), giữ vai trò theo nguồn; không suy ra khi nguồn không nêu.
+  - **Pháp nhân không bóc thành Người (policy đích 20/10/2026):** người dùng nhập
+    tay; không tự tạo tên ngân hàng/chi nhánh/người đại diện hoặc default party
+    fact, không thêm loại pháp nhân vào Person. Hành vi legacy ở trên vẫn là hiện
+    trạng cần đối chiếu, chưa phải target extraction. Bảng pháp nhân riêng tương
+    lai là định hướng, chưa duyệt schema/build (decision 20/10/2026).
 - **Tài sản**:
   - Trích xuất thông tin thửa đất / GCN từ phần mô tả tài sản hoặc trích xuất tối thiểu `Quyền sử dụng đất`.
 

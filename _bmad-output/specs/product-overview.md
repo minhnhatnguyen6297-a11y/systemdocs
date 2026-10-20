@@ -50,6 +50,12 @@ nghiệp vụ; vẫn giữ thời hạn đất và timeout kỹ thuật. Portal 
 thì ghi xung đột để refine, không bịa/default hay tự chọn bước nhập tay.
 [#42 Người nhiều giấy tờ và địa chỉ](../backlog/story-person-multiple-identities-addresses.md)
 là issue riêng, model tương lai chưa chọn, không tự là prerequisite #41.
+**Pháp nhân (owner 20/10/2026):** không đưa vào Người; theo policy, người dùng
+nhập tay, bảng riêng tương lai chưa duyệt schema/build; không tự bịa ngân hàng/đại diện/
+default. **Cụm trường phụ website** theo hướng owner cho phép có điều kiện cho một ô
+cụ thể (phức tạp, không lặp lại); chưa chọn ô/cấu trúc nào và không tự biến editor
+thành block. Quan hệ
+nhiều người/nhiều tài sản chưa chọn model/cardinality.
 [Quyết định](../decisions/decision-owner-upload-field-standardization-20261019.md).
 **BUILT — slice metadata Case, 19/10/2026; verification đạt, Quick code độc lập
 sạch sau fix được chấp nhận, tài liệu hoàn tất:** tám

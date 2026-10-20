@@ -91,3 +91,70 @@ Key/kiểu/format/nhóm/cardinality và cột DB/wire mới của các trường
 - Worker bàn giao trước commit; parent tổ chức review/fix độc lập rồi commit. Không tuyên bố toàn #41 hoàn tất hoặc mở gate mẫu từ slice này; #42 không prerequisite.
 
 - Kết quả slice preparation: implementer và reviewer độc lập cùng xác nhận Upload **42 pass, không skip**, sidecar **60 pass**; **review CLEAN**. Smoke consumer harden sau review: thiếu source dù text filename hiện trên trang vẫn attachment false/partial, affected suite **5 pass, không skip**. Owner giao commit đúng 13 paths, không push/packaging; giữ AGENTS và foreign changes. Không nâng bằng chứng cô lập thành portal/backend/ID-conversion acceptance hoặc hoàn thành #41.
+
+## Bổ sung owner 20/10/2026 — quan hệ ba đối tượng, pháp nhân và cụm trường website
+
+**Nguyên văn owner:**
+
+> 1. “quan hệ người - tài sản - hồ sơ: là 1 quan hệ phức tạp, cần làm kỹ. Nhất là trong trường hợp nhiều người, nhiều tài sản”.
+> 2. “Pháp nhân không đưa vào người, hiện tại chỉ có hồ sơ thế chấp mặc định có pháp nhân, còn lại ít xảy ra - trường thông tin pháp nhân còn chưa đồng nhất - ghi lại đây là quyết định của tôi: pháp nhân để user nhập tay, sau này sẽ chuẩn hóa thành 1 bảng riêng”.
+> 3. “Đối với một số cụm thông tin có tính phức tạp nhưng không lặp lại (1 số ô nhập trên web) - có thể dùng thêm 1 trường để bóc tách cả cụm thay vì làm cồng kềnh hệ thống - web khác lại có yêu cầu khác”.
+
+**Đề xuất trước bị bác (phạm vi hẹp):** việc đưa pháp nhân vào **Người** bị owner bác,
+**không phải quyết định đã được chấp nhận** và không được dùng làm tiền đề. Lý do:
+pháp nhân không phải thể nhân, trường pháp nhân chưa đồng nhất; ép vào Person sẽ
+phân loại sai và trộn nghĩa. Đề xuất mô hình parties rộng hoặc mô hình quan hệ
+đơn giản trước đây cũng **chưa được chấp nhận**, nhưng owner **không bác mọi khái
+niệm parties/ordered participation**: quan hệ nhiều người/nhiều tài sản là bài
+toán riêng, owner yêu cầu làm kỹ, chưa chọn model/cardinality/schema. Không có
+“phương án cũ đã duyệt” để kế thừa.
+
+### Quy tắc áp dụng
+
+- **Quan hệ Người–Tài sản–Hồ sơ:** chưa chọn model, cardinality, quan hệ/FK,
+  bảng nối hay schema cho nhiều người–nhiều tài sản hoặc các tổ hợp khác. Không
+  coi mô hình quan hệ trước đó là đã được owner chấp nhận. Đây là phần phải làm kỹ
+  trong refinement/inventory canonical của #41 trước implementation; lượt này không
+  tạo ticket mới, không đổi gate và không cấp quyền sửa code/schema.
+- **Pháp nhân:** không đưa vào Người, không thêm loại pháp nhân vào Person,
+  không tự phân loại tổ chức thành thể nhân. Theo policy, **người dùng nhập tay**;
+  đây là policy nhập liệu, không phải extraction hay default; code hiện tại chưa
+  cutover. Hướng “sau này chuẩn hóa thành một bảng riêng” là định hướng của owner,
+  **chưa duyệt bảng/cột/migration/contract hoặc triển khai** trong lượt này; nếu
+  làm sau, đây là schema riêng phải thiết kế/chốt riêng; phạm vi ba đối tượng
+  hiện tại không đổi, còn bảng pháp nhân tương lai là hướng owner cho phép và
+  không bị quy tắc hiện tại cấm. Hồ sơ thế chấp là trường hợp mặc định có pháp
+  nhân; loại khác ít xảy ra. Sự có mặt đó không đồng nghĩa đã biết hoặc được
+  phép tự điền tên ngân hàng, chi nhánh, người đại diện hay coi một bên là mặc
+  định; chỉ dùng dữ kiện nguồn nêu rõ. Pháp nhân khác không được âm thầm bỏ mất
+  hoặc tự xếp loại; giữ nguồn và để người dùng nhập tay. Manual entry chỉ áp cho
+  pháp nhân, không mở rộng thành cơ chế cho dữ liệu chưa rõ nghĩa.
+- **Cụm trường phụ website:** owner cho phép **có điều kiện** thêm một trường
+  để giữ cả cụm khi cụm phức tạp, không lặp lại và thuộc một ô nhập của một
+  website cụ thể, thay vì làm cồng kềnh hệ thống. Đây không phải quyết định rằng
+  ba editor `nguoi_yeu_cau`/`duong_su`/`taisan` hay mọi ô web đều thành block/
+  trường phụ. Khi chọn cụm phải xác định website/phạm vi ô, nghĩa nghiệp vụ,
+  lý do không tái dùng trường canonical Người/Tài sản/Hồ sơ đã biết, kiểu lưu và
+  provenance; chỉ hỏi owner khi có quyết định nghiệp vụ thực sự chưa rõ, chi tiết
+  kỹ thuật do implementation sở hữu theo contract/rule đã duyệt. Không dùng
+  `ghiChu` chung hoặc JSON bag chung thay trường; raw capture chỉ là provenance,
+  không thay trường nghiệp vụ. Không tự đặt canonical key/tên/kiểu/nhóm/storage;
+  không dùng cụm để tự bóc pháp nhân. Cụm có thể là trường riêng theo ô website;
+  phần tái dùng được vẫn map canonical, không mặc định coi cụm là dữ liệu chưa
+  map/orphan.
+- **Không xin owner duyệt từng chi tiết kỹ thuật** như một gate mới. Phần chưa
+  có nghĩa nghiệp vụ hoặc chưa chọn ô website phải được ghi rõ là chưa chọn;
+  không được giả định rồi triển khai.
+
+### Hiện trạng và giới hạn
+
+- Đường đang implement vẫn là 8 key Case metadata; Person/Asset/parties chưa
+  canonical cutover. `nguoi_yeu_cau`/`duong_su`/`taisan` vẫn là output trình
+  bày từ nguồn, chưa phải canonical block field. Chưa có bảng pháp nhân và chưa
+  có trường lưu cụm được duyệt/triển khai. Các quy tắc trên là policy đích và
+  ranh giới, không chứng minh runtime đã đổi.
+- Raw, bằng chứng, file và `source_refs` giữ nguyên vai trò provenance kỹ thuật;
+  không sửa raw/lịch sử để đạt chuẩn hóa. Lượt này chỉ tài liệu: không sửa code,
+  schema, migration, runtime, test hoặc tạo bảng tương lai.
+- #41 vẫn mở, `refined:false`, gate khảo sát mẫu vẫn **ĐÓNG**; #42 vẫn chỉ cho
+  nhiều giấy tờ/địa chỉ của một Người và không tự thành prerequisite.

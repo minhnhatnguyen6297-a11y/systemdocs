@@ -257,7 +257,7 @@ Nguồn `raw.ben_a/b.nguoi[]` giữ thứ tự, `entity_lines` là text tổ ch�
 | `noi_cap`, `loai_giay_to` | `noicap`,`loaigiayto` / legacy wire tương ứng | snapshot/derived evidence, **không cột customers** |
 | `gioi_tinh` Ông/Bà | `gioitinh` / wire `gioi_tinh` Nam/Nữ/null | Cột customers.gioi_tinh có thật; danh xưng không tự là giá trị wire đúng; mapper DOCX hiện không map field này |
 | `cccd_khac` | chưa approved multi-ID model | raw/evidence; Notary DOCX mapper tạo ambiguous normalized null, không persist list giấy tờ; #42 riêng |
-| `ten_goi_khac`, `entity_lines`, vai trò requester/Bên A/Bên B | **U** mapping/catalog chưa chốt | không thêm schema, không ghi ghichu; entity_lines có thể chứa tổ chức, không tự xem là Người |
+| `ten_goi_khac`, `entity_lines`, vai trò requester/Bên A/Bên B | **U** mapping/catalog chưa chốt | không thêm schema, không ghi ghichu; entity_lines có thể chứa tổ chức, không tự xem là Người; pháp nhân do người dùng nhập tay (§6.3) |
 | `raw_text`, line/span/source_refs | provenance | giữ nguồn, không dùng chuỗi raw để claim canonical cutover |
 
 Proof: `contract_extract.py:3688-3754:_extract_plain_text_person_entries`, `4608-4620:_extract_nguoi_chet`; `contracts/entities.md:150-185`; `contracts/notary-case-drafting.md:246-283:person_row`; `notary_v2/models.py:36-48:Customer`; `case_workspace.py:306-310:_PERSON_KEY_ALIASES`, `2495-2569:_upsert_people`, `2768-2779:_build_payload`. Notary DOCX mapper **thực** là `services/document_intake/adapters/docx.py:49-57:PERSON_FIELD_SOURCES`, loop **chỉ hai bên** `316-350`; không claim đã map đủ `raw.nguoi_chet`, alias/giới tính. `329-343` giữ multi-ID refs + `intake.ambiguous`. Cùng dùng lõi không phải luồng Upload→Notary DB.
@@ -283,6 +283,38 @@ Proof: `contract_extract.py:2163-2183:thua_dat_sang_land_rows`; `notary_v2/servi
 
 `raw.tai_san_chua_ho_tro` nhận diện sổ tiết kiệm/bảo hiểm/xe, chưa bóc đầy đủ row nghiệp vụ (`_phat_hien_tai_san_chua_ho_tro:4768-4780`); mô tả text có thể còn nguyên. Không suy có dropdown loại xe là đã supported Asset DB/extraction hoặc mở phạm vi mua bán xe.
 
+### 6.3 Pháp nhân và cụm trường phụ theo website — chưa chọn cấu trúc
+
+**Hiện trạng:** ba editor `nguoi_yeu_cau`, `duong_su`, `taisan` vẫn nhận chuỗi
+trình bày dựng từ nguồn; Person/Asset/parties chưa canonical cutover. Chưa có
+bảng pháp nhân, chưa có trường canonical lưu cụm. `entity_lines` có thể chứa
+tên tổ chức nhưng không tự là Người và không được gán loại pháp nhân cho Person.
+
+**Owner 20/10/2026 chốt:** pháp nhân **không đưa vào Người**; theo policy, người
+dùng **nhập tay**, code hiện tại chưa cutover. Bảng pháp nhân riêng sau này là định hướng **chưa duyệt schema/
+build**. Hồ sơ thế chấp là trường hợp mặc định có pháp nhân; nguồn thường nêu
+ngân hàng/chi nhánh/đại diện; loại khác ít xảy ra. Sự có mặt đó không cho phép
+tự bịa tên, người đại diện hoặc default party; chỉ dùng dữ kiện nguồn nêu rõ;
+pháp nhân khác giữ nguồn và không bị âm thầm bỏ mất hoặc tự xếp loại.
+
+**Owner 20/10/2026 cho phép có điều kiện** thêm một trường giữ cả cụm khi cụm
+phức tạp, không lặp lại và thuộc một ô nhập của một website cụ thể. Đây không
+phải quyết định biến cả ba editor hoặc mọi ô web thành block/trường phụ. Khi
+chọn cụm phải xác định website/phạm vi ô, nghĩa nghiệp vụ, lý do không tái dùng
+trường canonical đã biết, kiểu lưu và provenance; giữ nguồn. Chỉ hỏi owner khi
+có quyết định nghiệp vụ thực sự chưa rõ; chi tiết kỹ thuật do implementation sở
+hữu theo contract/rule đã duyệt. Không dùng `ghichu` chung hoặc JSON bag chung
+thay trường; raw capture chỉ là provenance, không thay trường nghiệp vụ; không
+tự đặt key/tên/kiểu/nhóm/storage và không dùng cụm để tự bóc pháp nhân. Cụm có
+thể là trường riêng theo ô; phần tái dùng được vẫn map canonical, không mặc định
+coi cụm là dữ liệu chưa map/orphan. Chưa chọn cụm/ô nào; nhãn “trường phụ” không
+đồng nghĩa canonical field hay DB column đã duyệt.
+
+**Quan hệ Người–Tài sản–Hồ sơ** nhiều người/nhiều tài sản chưa chọn model,
+cardinality, quan hệ/FK hay bảng nối; không coi mô hình quan hệ trước đó là đã
+được owner chấp nhận. Phần này thuộc refinement #41 trước implementation, không
+tạo ticket mới.
+
 ## 7. Phân loại trường phụ website — chưa duyệt schema
 
 | Nhóm | Ví dụ | Hướng refinement, không phải implementation approval |
@@ -291,11 +323,13 @@ Proof: `contract_extract.py:2163-2183:thua_dat_sang_land_rows`; `notary_v2/servi
 | Policy/config portal | default status, label aliases, selectors, route, default CCV legacy | Quản lý developer theo site; không nâng thành extraction fact. Không đồng nhất trạng thái portal với Notary draft/locked |
 | Provenance/file/technical | file path, source_refs, asset hash/module, run/record IDs, timeout | Giữ evidence/scope an toàn; không buộc thành cột nghiệp vụ mới, không nhét PII vào doc |
 | Scope owner đã chốt 20/10/2026 | bốn phí/thù lao, ghi chú, trạng thái portal | Bốn phí và ghi chú bỏ qua/không điền; không ghi 0/xóa default/thêm extraction, cột hoặc nhập tay. Status mọi hợp đồng upload mặc định `DACONGCHUNG`/Đã công chứng, không Notary status. Adapter đã sửa, proof consumer kiểm soát ở §8; chưa nghiệm thu portal thật |
+| Pháp nhân — owner 20/10/2026 | hồ sơ thế chấp là mặc định có pháp nhân; nguồn thường nêu ngân hàng/chi nhánh/đại diện; loại khác ít xảy ra; trường chưa đồng nhất | Theo policy, người dùng **nhập tay**; không đưa vào Người, không thêm loại pháp nhân vào Person, không tự bịa tên/đại diện/default; chỉ dùng dữ kiện nguồn nêu rõ. Bảng riêng tương lai là định hướng, **chưa duyệt schema/build**; giữ nguồn, không âm thầm bỏ hoặc tự xếp loại |
+| Cụm trường phụ website — owner 20/10/2026 | một số ô nhập web phức tạp, không lặp lại; website khác yêu cầu khác | Khi đáp ứng điều kiện owner nêu, xác định website/phạm vi ô/nghĩa/lý do/kiểu/provenance; ưu tiên canonical đã có; chỉ hỏi owner khi quyết định nghiệp vụ thực sự chưa rõ. Không generic bag/`ghichu` chung; raw capture chỉ provenance, không thay trường; không tự đặt key/type/group/storage, không tự coi ba editor là block; chưa chọn ô nào |
 | Nghiệp vụ còn refine | Asset/parties chưa map; mở rộng thực sự cần trong tương lai | Refine **#41** theo nghĩa/owner/key/kiểu/cardinality/DB-wire-output trước implementation; quyết định bỏ phí/ghi chú hiện tại không duyệt schema tương lai |
 | Derived website | tổng chi phí và hidden path khác spelling | Không phải ô phí thứ năm; không persistence riêng, không sửa spelling; quan sát tổng 0 không cho phép app ghi 0 |
 | Owner đã loại | giá giao dịch/cọc/thuê/vay/lãi/điều khoản thanh toán/thời hạn nghiệp vụ | Không extraction/normalized; portal đòi thì ghi conflict #41, không bịa/default/âm thầm giữ hoặc tự quyết nhập tay. Phí công chứng/thù lao không đồng nghĩa giá giao dịch; đã có policy bỏ qua riêng ở trên |
 
-Thời hạn sử dụng đất đúng `land_rows[].thoihan` và timeout kỹ thuật vẫn giữ. Không xóa raw/lịch sử để đạt catalog. #42 model đa giấy tờ/đa địa chỉ chưa chọn; không tự là gate mới. Không tạo ticket trùng #41 chỉ vì mới thấy hai khoản phí.
+Thời hạn sử dụng đất đúng `land_rows[].thoihan` và timeout kỹ thuật vẫn giữ. Không xóa raw/lịch sử để đạt catalog. #42 model đa giấy tờ/đa địa chỉ chưa chọn; không tự là gate mới. Quan hệ nhiều người/nhiều tài sản cũng chưa chọn model/cardinality/schema và không coi mô hình quan hệ trước đó là đã được owner chấp nhận; thuộc refinement #41, không tạo ticket mới. Các quy tắc pháp nhân/cụm trường là policy đích: hiện chưa có bảng pháp nhân hoặc trường lưu cụm, Person/Asset/parties chưa cutover, ba editor vẫn là output trình bày. Không tạo ticket trùng #41 chỉ vì mới thấy hai khoản phí.
 
 ## 8. Implementation preSave — đã kiểm chứng cô lập và review độc lập sạch
 
@@ -315,5 +349,5 @@ Verification implementer: **42 passed** (Upload scoped, gồm 5 ca Chromium) và
 - Đầu lượt đọc AGENTS → specs README/product-overview → module README → graphify-out → source hiện hành. Dùng source `file:symbol:line`; line có thể trôi nên kiểm symbol trước khi cập nhật. Không dùng file tmp/cache như nguồn chuẩn bắt buộc.
 - Thu thập an toàn theo quyền có thật: public GET/static trước; authenticated **empty form read-only** khi có phiên được phép, không tự tìm/import credential. Không Lưu/upload/ghi DB/đọc record cá nhân để kiểm widget. Ghi riêng static vs authenticated; nếu không vào được thì giữ gap, không sửa nhãn thành verified.
 - Mỗi catalog phải có site/đơn vị/date/source, item value/label/type hoặc shape-only với lý do PII; ghi query/dependency/pagination trước khi claim đầy đủ. Không ghi tên nhân sự thật trong Git. Không suy 200+items=[] là list đầy đủ nếu thiếu scope; không suy 403 là catalog rỗng.
-- Nếu chỉ đổi selector/catalog/policy, phân loại technical adapter config; nếu đổi nghĩa nghiệp vụ/DB-wire, refine #41 và xin schema approval theo contract trước code. Không tự rename canonical, thêm alias, dùng ghichu/raw capture thay trường hoặc đóng gate.
+- Nếu chỉ đổi selector/catalog/policy, phân loại technical adapter config; nếu đổi nghĩa nghiệp vụ/DB-wire, refine #41 và xin schema approval theo contract trước code. Không tự rename canonical, thêm alias, dùng ghichu/raw capture thay trường hoặc đóng gate. Ngoại lệ hẹp đã được owner chấp thuận là cụm trường phụ website rõ nghĩa (§6.3, §7); không phải quyền mở rộng schema hoặc biến editor thành block.
 - Main agent/reviewer kiểm liên kết/citation/counter consistency và đối chiếu source độc lập trước commit. Audit website A1 không chạy app/test hoặc submit/upload; implementation sau đó chỉ chạy kiểm chứng cô lập theo §8. Không tạo HTML vì đây là catalog tra cứu, không thay app UI.

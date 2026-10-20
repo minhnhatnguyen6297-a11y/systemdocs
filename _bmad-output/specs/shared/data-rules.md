@@ -1,6 +1,6 @@
 # Quy tắc dữ liệu và ranh giới hệ thống
 
-**Cập nhật:** 15/10/2026. Quy tắc có hiệu lực được viết tại đây; mục ghi Draft vẫn chưa được duyệt.
+**Cập nhật:** 20/10/2026. Quy tắc có hiệu lực được viết tại đây; mục ghi Draft vẫn chưa được duyệt.
 
 ## 4. Chuỗi dữ liệu chung
 
@@ -51,9 +51,11 @@ duyệt và contract/schema riêng.
 **Người, Tài sản, Hồ sơ**. Mỗi chức năng sử dụng dữ liệu chuẩn hóa của ba đối
 tượng; mọi input nghiệp vụ sau chuẩn hóa phải ánh xạ vào đúng bộ trường
 canonical đã duyệt, và mọi output nghiệp vụ dùng đúng trường/kiểu/định dạng/
-cách nhóm đó. Không để dữ liệu nghiệp vụ mồ côi hoặc đẩy vào ghi chú khác nghĩa.
-Bộ trường là cố định đối với lần triển khai; cần mở rộng phải chốt trước, không
-tự tạo trường. Raw, bằng chứng và `source_refs` giữ vai trò provenance kỹ thuật,
+cách nhóm đó. Không để dữ liệu nghiệp vụ mồ côi hoặc đẩy vào ghi chú khác nghĩa;
+ngoại lệ hẹp duy nhất là cụm trường phụ website theo hướng owner cho phép có điều kiện
+theo mục dưới, không phải lý do chung để giữ dữ liệu chưa map. Bộ trường là cố
+định đối với lần triển khai; cần mở rộng phải chốt trước, không tự tạo trường.
+Raw, bằng chứng và `source_refs` giữ vai trò provenance kỹ thuật,
 không buộc raw đã mang schema DB; quy tắc này không tạo entity nghiệp vụ thứ tư,
 Case chung hoặc quyền tích hợp liên module.
 
@@ -93,9 +95,44 @@ tục file đã rõ. Không tắt production Scan/Upload hoặc cấp quyền im
 [#42 riêng](../../backlog/story-person-multiple-identities-addresses.md).
 Model hiện hành một bộ giấy tờ/một địa chỉ không phải hỗ trợ đa trị; model,
 schema/migration/chọn dùng/extraction/export tương lai chưa chọn. Child records
-trong Người có thể được thiết kế sau, không thêm đối tượng thứ tư và không tự
-đặt #42 làm prerequisite #41 hoặc gate mẫu.
+trong Người có thể được thiết kế sau; trong phạm vi #42 hiện tại không thêm đối tượng thứ tư;
+bảng pháp nhân tương lai là hướng riêng phải thiết kế/chốt sau, không bị quy tắc #42 này cấm;
+không tự đặt #42 làm prerequisite #41 hoặc gate mẫu.
 Lý do và supersession: [quyết định owner](../../decisions/decision-owner-upload-field-standardization-20261019.md).
+
+**Bổ sung owner 20/10/2026 — pháp nhân, cụm trường phụ website và quan hệ:**
+
+- **Pháp nhân không thuộc Người.** Không thêm loại pháp nhân vào Person, không
+  tự phân loại tổ chức thành thể nhân. Theo policy, **người dùng nhập tay**; hướng
+  “sau này chuẩn hóa thành một bảng riêng” là định hướng của owner, **chưa duyệt
+  schema/bảng/cột/migration hay triển khai**; nếu làm sau, đây là schema riêng
+  phải thiết kế/chốt riêng. Phạm vi ba đối tượng hiện tại không đổi; bảng pháp
+  nhân tương lai là hướng owner cho phép, không bị quy tắc hiện tại cấm. Hồ sơ
+  thế chấp là trường hợp mặc định có pháp nhân; loại khác ít xảy ra. Sự có mặt
+  đó không đồng nghĩa đã biết hoặc được phép tự điền tên ngân hàng/chi nhánh/
+  người đại diện hoặc coi một bên là mặc định; chỉ dùng dữ kiện nguồn nêu rõ.
+  Pháp nhân khác không được âm thầm bỏ mất hoặc tự xếp loại; giữ nguồn và để
+  người dùng nhập tay. Nhập tay chỉ áp cho pháp nhân, không mở rộng cho dữ liệu
+  chưa rõ nghĩa.
+- **Cụm trường phụ website là ngoại lệ hẹp có điều kiện.** Khi chọn cụm (phức
+  tạp, không lặp lại, thuộc một ô nhập của một website cụ thể) phải xác định
+  website/phạm vi ô, nghĩa nghiệp vụ, lý do không tách, kiểu lưu và
+  provenance; ưu tiên tái dùng trường canonical Người/Tài sản/Hồ sơ đã biết;
+  chỉ hỏi owner khi có quyết định nghiệp vụ thực sự chưa rõ, chi tiết kỹ thuật
+  do implementation sở hữu theo contract/rule đã duyệt. Không dùng `ghiChu` chung
+  hoặc JSON bag chung thay trường; raw capture chỉ là provenance, không thay
+  trường nghiệp vụ. Không tự đặt canonical key/tên/kiểu/nhóm/storage; không tự
+  coi mọi editor là block; không dùng cụm để tự bóc pháp nhân. Cụm có thể là
+  trường riêng theo ô website; phần tái dùng được vẫn map canonical, không mặc
+  định coi cụm là dữ liệu chưa map/orphan.
+- **Quan hệ Người–Tài sản–Hồ sơ:** nhiều người/nhiều tài sản chưa chọn model,
+  cardinality, quan hệ/FK hay schema. Không coi đề xuất quan hệ trước đó là đã
+  được owner chấp nhận; phần này phải làm kỹ trong refinement/inventory canonical
+  của #41 trước implementation. Không tạo ticket mới hoặc đổi gate.
+- Hiện Person/Asset/parties chưa canonical cutover; `nguoi_yeu_cau`/`duong_su`/
+  `taisan` vẫn là output trình bày; chưa có bảng pháp nhân hoặc trường lưu cụm.
+  Policy này là đích/ranh giới, không chứng minh runtime đã đổi; raw/provenance
+  giữ nguyên.
 
 **Kết quả audit catalog 19/10/2026:** báo cáo ổn định
 `D:\testcase\BAO_CAO_KHAO_SAT.md` đã liệt kê trường nền Người/Tài sản/Hồ sơ,

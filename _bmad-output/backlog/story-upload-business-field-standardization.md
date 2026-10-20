@@ -38,7 +38,7 @@ Owner báo Upload đang bóc văn bản thành trường để điền website n
    **Given** catalog, mapping và phần mở rộng cần thiết đã được duyệt trước implementation
    **When** triển khai phạm vi chuẩn hóa được giao
    **Then** schema/contract, adapter, writer, reader, payload chuẩn hóa, output điền web và mọi consumer bị ảnh hưởng đều dùng cùng nghĩa/kiểu/format/nhóm/cardinality đã chốt; lưu/đọc lại không mất hoặc đổi nghĩa dữ liệu cần thiết.
-   **And** không còn đường nghiệp vụ mồ côi trong phạm vi inventory; không dùng `ghiChu` chung/raw capture thay trường nghiệp vụ, không shim/alias mới chưa duyệt hoặc chỉ đổi tên để báo xanh. Consumer cũ bị thay được cutover đầy đủ, không để hai chuẩn song song; dữ liệu cũ và tham chiếu được bảo toàn theo thiết kế chuyển đổi đã duyệt.
+   **And** không còn đường nghiệp vụ mồ côi trong phạm vi inventory; cụm trường phụ website đáp ứng điều kiện owner nêu là trường đã chốt, không tính orphan; không dùng `ghiChu` chung thay trường; raw capture chỉ provenance, không thay trường nghiệp vụ, không shim/alias mới chưa duyệt hoặc chỉ đổi tên để báo xanh. Consumer cũ bị thay được cutover đầy đủ, không để hai chuẩn song song; dữ liệu cũ và tham chiếu được bảo toàn theo thiết kế chuyển đổi đã duyệt.
 5. **Chứng minh luồng thật, độc lập corpus owner đang bị gate**
    **Given** implementation được giao, input tổng hợp/kiểm soát và DB/profile cô lập có đáp án độc lập
    **When** chạy đường consumer thật từ extraction/chuẩn hóa qua ghi–đọc–mở lại đến output website theo khả năng được hỗ trợ
@@ -145,3 +145,46 @@ Owner báo Upload đang bóc văn bản thành trường để điền website n
 - Verification actual `prepare_manifest → _prepare_record` trên Chromium mới/form MUI-like kiểm soát và SQLite tạm: 0 submit/Save-click/Enter/skipped-field events; file DOM và file-change state đúng; status DACONGCHUNG; nguồn/Case/queue ngoài selection giữ nguyên. Upload scoped **42 passed**, sidecar workflow **60 passed**; warnings openpyxl hiện có.
 - Permanent regression: `upload_lab/tests/test_namdinh_preparation.py`; Case selection/source proof `upload_lab/tests/test_case_fields.py`. Plan/evidence tùy chọn `_bmad-output/tmp/namdinh-preparation/`; giới hạn và behavior bền vững tại SOT §8. Không portal thật writes/credentials/corpus/production DB; không đóng #41 hoặc mở gate mẫu.
 - Reviewer chạy lại **42 pass, không skip + 60 pass**, xác nhận controlled counters/files/persistence và scope 13 paths. Sau review harden permanent consumer smoke với filename decoy hiển thị khi thiếu source: file DOM rỗng, filler/verify false, status partial; affected suite **5 passed, không skip, 32.49s**. Không đổi runtime sau review; không nghiệm thu portal thật/packaged, build/dist chưa tái sinh.
+
+### Owner 20/10/2026 — pháp nhân, cụm trường phụ và quan hệ
+
+- **Đề xuất cũ bị bác (hẹp):** việc đưa pháp nhân vào Người bị owner bác,
+  **không phải quyết định đã chấp nhận**; lý do pháp nhân không phải thể nhân,
+  trường chưa đồng nhất, ép vào Person sẽ phân loại sai/trộn nghĩa. Mô hình
+  parties rộng hoặc quan hệ đơn giản trước đây **chưa được chấp nhận**, không
+  dùng làm tiền đề, nhưng owner **không bác mọi khái niệm parties/ordered
+  participation**; quan hệ nhiều người/nhiều tài sản là bài toán riêng, cần làm
+  kỹ, chưa chọn model/cardinality/schema.
+- **Pháp nhân:** owner chốt **“pháp nhân để user nhập tay”**, không đưa vào
+  Người, không thêm loại pháp nhân vào Person. Bảng pháp nhân riêng sau này là
+  định hướng **chưa duyệt schema/build**; nếu làm sau phải chốt schema riêng.
+  Phạm vi ba đối tượng hiện tại không đổi; bảng pháp nhân tương lai là hướng
+  owner cho phép. Hồ sơ thế chấp là mặc định có pháp nhân, loại khác ít xảy ra;
+  sự có mặt đó không đồng nghĩa đã biết hoặc được tự điền ngân hàng/chi nhánh/
+  người đại diện/default party; chỉ dùng dữ kiện nguồn nêu rõ. Nhập tay chỉ áp
+  cho pháp nhân, không mở cho dữ liệu chưa rõ nghĩa.
+- **Cụm trường phụ website:** owner cho phép **có điều kiện** thêm một trường
+  giữ cả cụm khi cụm phức tạp, không lặp lại và thuộc một ô nhập của một website
+  cụ thể. Không phải quyết định biến ba editor `nguoi_yeu_cau`/`duong_su`/
+  `taisan` hoặc mọi ô web thành block/trường phụ. Khi chọn cụm phải xác định
+  website/phạm vi ô/nghĩa/lý do/kiểu/provenance; chỉ hỏi owner khi có quyết định
+  nghiệp vụ thực sự chưa rõ, chi tiết kỹ thuật do implementation sở hữu theo
+  contract/rule đã duyệt. Ưu tiên tái dùng trường canonical Người/Tài sản/Hồ sơ
+  đã biết; không dùng `ghiChu` chung hoặc JSON bag chung thay trường; raw capture
+  chỉ là provenance, không thay trường nghiệp vụ; không tự đặt key/tên/kiểu/
+  nhóm/storage; không dùng cụm để tự bóc pháp nhân. Cụm có thể là trường riêng
+  theo ô website; phần tái dùng được vẫn map canonical, không mặc định coi cụm
+  là dữ liệu chưa map/orphan. Cụm/ô cụ thể **chưa chọn**.
+- **Quan hệ Người–Tài sản–Hồ sơ:** nhiều người/nhiều tài sản chưa chọn model,
+  cardinality, quan hệ/FK, bảng nối hoặc schema; không coi mô hình quan hệ trước
+  đó là đã được owner chấp nhận. Phần này làm kỹ trong refinement/inventory
+  canonical của #41; không tạo ticket mới, #42 vẫn chỉ giới hạn nhiều giấy tờ/địa
+  chỉ của một Người.
+- **Hiện trạng:** chưa có bảng pháp nhân hoặc trường lưu cụm; Person/Asset/
+  parties chưa canonical cutover, ba editor vẫn là output trình bày. Policy
+  không chứng minh runtime đã đổi; raw/provenance giữ nguyên. #41 vẫn mở,
+  `refined:false`, gate mẫu **ĐÓNG**.
+- **Open question (chưa chọn):** (a) model/cardinality/FK cho nhiều người–nhiều
+  tài sản và quan hệ với Hồ sơ; (b) website/ô cụm cụ thể khi chọn theo điều kiện
+  owner nêu, cùng nghĩa/lý do/kiểu lưu/provenance; (c) schema bảng pháp nhân tương lai và
+  mapping nhập tay, chưa được duyệt.

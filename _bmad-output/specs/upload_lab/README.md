@@ -68,8 +68,10 @@ là kỹ thuật, không tự là trường nghiệp vụ mồ côi.
 **Mọi future sample batch/khảo sát mẫu thực, corpus và vòng E2E theo mẫu toàn hệ
 thống chờ #41 nghiệm thu đủ** chuẩn DB/contract được duyệt, cutover mọi adapter/
 writer/reader/consumer/output bị ảnh hưởng và proof luồng thật. Bảng mapping,
-local Draft, rename hoặc `ghiChu`/raw capture thay trường không đủ. Proof riêng
-#41 khi được giao dùng input tổng hợp/kiểm soát và profile cô lập, không yêu cầu
+local Draft, rename hoặc `ghiChu`/raw capture thay trường không đủ; cụm trường
+phụ website chỉ hợp lệ khi đáp ứng điều kiện owner nêu theo §1.1, không phải
+raw capture.
+Proof riêng #41 khi được giao dùng input tổng hợp/kiểm soát và profile cô lập, không yêu cầu
 quét corpus owner trước khi đóng issue. Sau gate và khi được giao mới chạy vòng
 LLM đọc mẫu trước; pending từng file/#39 vẫn không chặn file đã rõ.
 **Không tắt Scan/Upload production**, không cấp quyền triển khai từ docs.
@@ -78,8 +80,26 @@ Một Người nhiều giấy tờ và nhiều địa chỉ là
 [#42 riêng](../../backlog/story-person-multiple-identities-addresses.md);
 model/schema/migration/chọn dùng/extraction/export tương lai chưa thiết kế,
 không tự là prerequisite #41. #40 serial Stage/persistence vẫn riêng, chưa sửa.
-Website chính thức là SOT, người dùng tự bấm Lưu và rule developer-only giữ
-nguyên. [Quyết định](../../decisions/decision-owner-upload-field-standardization-20261019.md).
+
+**Pháp nhân, cụm trường phụ và quan hệ — owner 20/10/2026:** pháp nhân
+**không đưa vào Người**, không thêm loại pháp nhân vào Person; theo policy, người
+dùng nhập tay; code hiện tại chưa cutover. Bảng pháp nhân riêng tương lai là định hướng **chưa duyệt schema/
+build**. Hồ sơ thế chấp là trường hợp mặc định có pháp nhân; nguồn thường nêu
+ngân hàng/đại diện; loại khác ít xảy ra. Không được tự bịa tên ngân hàng/đại diện/
+default party; chỉ dùng dữ kiện nguồn nêu rõ; pháp nhân khác giữ nguồn, không âm
+thầm bỏ hoặc tự xếp loại. Cụm trường phụ website chỉ dùng cho cụm phức tạp, không
+lặp lại, thuộc một ô của website cụ thể, theo hướng owner cho phép có điều kiện;
+xác định website/ô/nghĩa/lý do/kiểu/provenance, chỉ hỏi owner khi quyết định
+nghiệp vụ thực sự chưa rõ, chi tiết kỹ thuật implementation-owned. Ưu tiên
+trường canonical đã có, giữ provenance; không dùng `ghiChu` chung/JSON bag chung
+thay trường; raw capture chỉ provenance, không thay trường nghiệp vụ; không tự
+đặt key/kiểu/nhóm/storage; cụm có thể là trường riêng theo ô, phần tái dùng được
+vẫn map canonical, không mặc định coi là dữ liệu chưa map/orphan; không tự coi
+ba editor `nguoi_yeu_cau`/`duong_su`/`taisan` là block. Quan hệ nhiều người/nhiều
+tài sản chưa chọn model/cardinality/schema, không coi mô hình trước đó là đã được
+owner chấp nhận; làm kỹ trong refinement #41, không tạo ticket mới. Hiện chưa có
+bảng pháp nhân hoặc trường lưu cụm; Person/Asset/parties vẫn chưa cutover. Website
+chính thức là SOT, người dùng tự bấm Lưu và rule developer-only giữ nguyên. [Quyết định](../../decisions/decision-owner-upload-field-standardization-20261019.md#bổ-sung-owner-20102026--quan-hệ-ba-đối-tượng-pháp-nhân-và-cụm-trường-website).
 
 <a id="ui"></a>
 ## 2. Màn hình và thao tác

@@ -1,6 +1,6 @@
 # Nền sản phẩm
 
-**Cập nhật:** 19/10/2026. Đọc đầu phiên để hiểu sản phẩm; sau đó đọc sổ tay và spec module đang làm. Quy tắc dưới đây mô tả điều cần có, không chứng minh code đã hoàn thành.
+**Cập nhật:** 20/10/2026. Đọc đầu phiên để hiểu sản phẩm; sau đó đọc sổ tay và spec module đang làm. Quy tắc dưới đây mô tả điều cần có, không chứng minh code đã hoàn thành.
 
 ## 1. Người dùng và công việc
 
@@ -50,7 +50,7 @@ Electron là vỏ ứng dụng; Python/FastAPI xử lý nghiệp vụ. Module gi
 ## 6. Khái niệm và nguyên tắc
 
 - Hồ sơ là đơn vị công việc trong từng module. CCCD, GCN, cặp thửa/tờ, số công chứng là bằng chứng đối chiếu, không tự trở thành mã hồ sơ chung.
-- **Toàn bộ luồng nghiệp vụ xoay quanh Người, Tài sản, Hồ sơ** (owner 19/10/2026). Chức năng dùng dữ liệu chuẩn hóa của ba đối tượng; mọi input nghiệp vụ sau chuẩn hóa ánh xạ vào bộ trường canonical đã duyệt, mọi output nghiệp vụ dùng đúng bộ trường đó. Không tạo dữ liệu mồ côi hoặc nhét khác nghĩa vào ghi chú. Thiếu mapping/cần trường mới thì chốt nghiệp vụ/schema trước, không tự mở rộng. Raw/bằng chứng/`source_refs` là provenance kỹ thuật, không buộc có schema DB và không tự tạo quyền gộp Case hay tích hợp liên module.
+- **Toàn bộ luồng nghiệp vụ xoay quanh Người, Tài sản, Hồ sơ** (owner 19/10/2026). Chức năng dùng dữ liệu chuẩn hóa của ba đối tượng; mọi input nghiệp vụ sau chuẩn hóa ánh xạ vào bộ trường canonical đã duyệt, mọi output nghiệp vụ dùng đúng bộ trường đó. Không tạo dữ liệu mồ côi hoặc nhét khác nghĩa vào ghi chú; ngoại lệ hẹp là cụm trường phụ website theo hướng owner cho phép có điều kiện, không phải ghi chú chung; raw capture chỉ là provenance, không thay trường nghiệp vụ. Thiếu mapping/cần trường mới thì chốt nghiệp vụ/schema trước, không tự mở rộng. Raw/bằng chứng/`source_refs` là provenance kỹ thuật, không buộc có schema DB và không tự tạo quyền gộp Case hay tích hợp liên module.
 - **Owner 19/10/2026 — bổ sung trường Hồ sơ:** chủ đất là trường **Hồ sơ**,
   không là thuộc tính sở hữu cố định của Tài sản, không mặc định node `owner`
   Thừa kế. Thông tin công chứng thuộc Hồ sơ, độc lập ngày tạo hồ sơ; inventory
@@ -85,7 +85,8 @@ Electron là vỏ ứng dụng; Python/FastAPI xử lý nghiệp vụ. Module gi
 - Bản nháp Stage/Diagram là sửa chưa lưu. Draft Case của Office là ứng viên chưa xác nhận. Trạng thái hồ sơ `draft` phục vụ quy tắc quản lý hồ sơ. Ba nghĩa không thay thế nhau.
 - Nguồn gốc → chữ đọc được → dữ liệu chuẩn hóa → gợi ý suy ra nếu cần → người có thẩm quyền xác nhận. Không phải dữ liệu nào cũng cần suy luận.
 - Giữ nguồn và giá trị gốc; không sửa raw để che lỗi. Máy không tự nâng OCR/AI thành dữ liệu đã xác nhận.
-- Đầu ra nghiệp vụ phải theo trường, kiểu, định dạng, cách nhóm và đích lưu đã chốt trong DB/contract. Raw không bắt buộc mang schema DB. Không sinh trường mồ côi hoặc nhét sai nghĩa vào ghi chú. Trường mới phải được chốt trước.
+- Đầu ra nghiệp vụ phải theo trường, kiểu, định dạng, cách nhóm và đích lưu đã chốt trong DB/contract. Raw không bắt buộc mang schema DB. Không sinh trường mồ côi hoặc nhét sai nghĩa vào ghi chú. Trường mới phải được chốt trước; ngoại lệ hẹp là cụm trường phụ website theo hướng owner cho phép có điều kiện, không phải ghi chú chung; raw capture chỉ là provenance.
+- **Owner 20/10/2026 — pháp nhân, cụm trường phụ và quan hệ:** pháp nhân **không đưa vào Người**, theo policy người dùng nhập tay; bảng riêng tương lai là định hướng chưa duyệt schema/build. Cụm trường phụ chỉ theo website/ô cụ thể, đáp ứng điều kiện owner nêu (phức tạp, không lặp lại), ưu tiên canonical đã có, giữ provenance, không generic bag/`ghiChú`; raw capture chỉ provenance; không xin duyệt từng chi tiết kỹ thuật. Quan hệ nhiều người/nhiều tài sản chưa chọn model/cardinality. [Dữ liệu chung](shared/data-rules.md) · [Quyết định](../decisions/decision-owner-upload-field-standardization-20261019.md).
 - Ngày nhập/hiển thị giữ đúng độ đầy đủ: năm riêng vẫn là năm. Ngày quy ước chỉ dùng trong tính toán, không ghi đè thành dữ kiện đã biết.
 - Máy hỗ trợ thao tác; người dùng kiểm tra và chịu trách nhiệm xác nhận. Không tự động hóa phán quyết pháp lý.
 - Thiết kế gọn, tối ưu xử lý; không tự thêm chức năng, cơ chế dự phòng hoặc bộ công cụ kiểm thử ngoài phạm vi được phép.
