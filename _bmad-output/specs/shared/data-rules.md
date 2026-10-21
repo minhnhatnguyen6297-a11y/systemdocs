@@ -1,6 +1,6 @@
 # Quy tắc dữ liệu và ranh giới hệ thống
 
-**Cập nhật:** 20/10/2026. Quy tắc có hiệu lực được viết tại đây; mục ghi Draft vẫn chưa được duyệt.
+**Cập nhật:** 21/10/2026. Quy tắc có hiệu lực được viết tại đây; mục ghi Draft vẫn chưa được duyệt.
 
 ## 4. Chuỗi dữ liệu chung
 
@@ -22,6 +22,18 @@ liệu đã xác nhận.
 
 Không được đi thẳng từ OCR/LLM tới dữ liệu `CONFIRMED`. Giá trị thiếu bằng
 chứng phải để trống hoặc cảnh báo, không tự điền.
+
+**Snapshot và lịch sử nghiệp vụ — owner 21/10/2026:** record nghiệp vụ là
+Hồ sơ (ai, tài sản gì, làm gì); mỗi Hồ sơ chỉ giữ một snapshot hiện hành.
+Lưu lại cùng Hồ sơ cập nhật snapshot đó, không tự tạo Hồ sơ mới hay giữ
+snapshot từng lần lưu/lịch sử sửa từng ô. Lịch sử Người/Tài sản là các Hồ sơ
+liên quan được user liên kết cùng ID; đọc snapshot của Hồ sơ user chọn,
+không tự lấy mới nhất hoặc gộp dữ kiện giữa Hồ sơ. Không mặc định thêm bảng
+phiên bản Người/Tài sản hoặc bitemporal. Một snapshot logic không bắt buộc
+một dòng JSON: cấu trúc bảng/cột còn thiết kế. Bộ đếm revision chống ghi đè
+khác với lưu nhiều snapshot. Raw, nguồn, `source_refs` và lịch sử kỹ thuật
+đã có vẫn giữ; không cấp quyền xóa lịch sử hoặc tạo logging mới.
+[Quyết định](../../decisions/decision-owner-case-snapshot-as-history-20261021.md).
 
 ### 4.1 `IdentityEvidence` — bản nháp dùng để đối chiếu
 

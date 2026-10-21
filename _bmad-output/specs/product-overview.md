@@ -55,6 +55,17 @@ không quyết định thay người dùng. Không thêm business/UX gate hoặc
 vi chưa báo và được owner duyệt. Ưu tiên tối thiểu: 80% kết quả hơn 90% cộng
 10 thao tác, không phải quyền làm sai dữ liệu/xóa nguồn. UX chưa rõ ghi issue.
 Blocker hiện có chưa kiểm kê/xác minh; không tự gỡ safeguard hay claim đã audit.
+**Snapshot — owner chốt 21/10/2026:** một record nghiệp vụ là một Hồ sơ,
+chỉ giữ một snapshot hiện hành. Lưu lại cập nhật snapshot đó; lịch sử là
+các Hồ sơ liên quan, không snapshot mỗi lần lưu hoặc lịch sử sửa từng ô.
+ID Người/Tài sản và liên kết do user quyết định; raw/nguồn/history kỹ thuật
+đã có vẫn giữ. [Quyết định](../decisions/decision-owner-case-snapshot-as-history-20261021.md).
+**Hồ sơ nháp — owner duyệt 21/10/2026, chưa triển khai lưu tiến độ mới:**
+Nháp được lưu database để mở lại làm tiếp dù mới nhập một phần; giữ và hiện
+nhãn **Nháp** rõ khi hiển thị/thống kê/báo cáo có chứa Nháp. Mốc chuyển khỏi
+Nháp và cách tính trong từng báo cáo chưa chốt; cấu trúc lưu còn thiết kế.
+Xem [quy tắc Hồ sơ nháp](notary_v2/README.md#2-danh-sách-hồ-sơ) và
+[quyết định](../decisions/decision-owner-persistent-case-drafts-20261021.md).
 **Identity — thay UNIQUE của `6eaf42b`, docs-only:** một bảng Người,
 `Customer.id` ổn định, chết vẫn là cùng Người. CCCD đã có DB → gợi ý ID cũ;
 chọn → liên kết dòng input và gợi ý biến mất; sai khác không chặn, ghi

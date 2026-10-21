@@ -92,6 +92,17 @@ không phải record văn bản lạ trong #39.
 
 ## 2. Danh sách hồ sơ
 
+**Hồ sơ nháp lưu bền — owner duyệt 21/10/2026; yêu cầu thiết kế chưa triển khai:**
+Hồ sơ đang làm dở được lưu trong database để mở lại làm tiếp, kể cả mới nhập
+2/6 trường Người; không ép đủ bộ trường hoặc tự điền dữ liệu để giữ tiến độ.
+Trạng thái **Nháp** phải được giữ khi lưu/đọc lại và thể hiện rõ khi hiển thị,
+thống kê hoặc báo cáo có chứa Hồ sơ nháp, tránh gộp mất phân biệt.
+Mốc chuyển khỏi Nháp, từng báo cáo có tính Nháp hay không và bộ lọc mặc định
+**chưa chốt**. Cấu trúc lưu, thời điểm tạo liên kết và chi tiết lưu/đóng còn
+thiết kế; owner ưu tiên đơn giản, chấp nhận lưu thủ công nếu phục hồi tự động
+phức tạp. Nháp phiên/đường Cập nhật hiện có chưa chứng minh đáp ứng yêu cầu này.
+[Quyết định](../../decisions/decision-owner-persistent-case-drafts-20261021.md).
+
 Tên mong muốn là Danh sách hồ sơ. Người dùng xem danh sách, tìm/lọc, tạo nháp và mở hồ sơ. Nhãn trạng thái, người tạo, tên/ngày tạo là hướng mô tả; danh sách nhãn, nguồn tìm kiếm và trường lọc chưa chốt đầy đủ. Chức năng sẽ **làm lại** — **DEFERRED 17/10/2026** (owner tự triển khai spec sau); hướng trường hiển thị/tìm/lọc owner ghi là **Draft chưa duyệt**, chưa phải quy tắc. [Decision](../../decisions/decision-owner-case-list-redesign-deferred-20261017.md).
 
 Chọn Thừa kế hoặc Hai bên khi tạo nháp. Loại không hỗ trợ hiện lý do và khóa thao tác không có khả năng, không tự chuyển sang Thừa kế. Tạo hồ sơ lần đầu chưa cần Diagram; intake/evaluate nháp không ghi database. Đổi loại của hồ sơ **đã lưu** chỉ qua đường chuyển loại đã duyệt (`inheritance` ↔ `two_party`): giữ ID + giá trị Người/Tài sản của Stage, reset Diagram theo domain mới (Thừa kế: seed **chỉ** node `owner` mới chọn — không seed khung 7 slot mặc định, không giữ quan hệ/dấu cũ, nhưng vẫn **đủ key bắt buộc** với `parentSlotIds`/`ownPositions`/`receivePositions` rỗng, `spouseSlotId:null`; Hai bên: 30 slot trống), buộc chọn `document_type` hợp lệ của loại mới và xác nhận phần Diagram mất trước khi ghi; chuyển vào Thừa kế cần `owner_row_id` từ Stage, vào Hai bên cấm trường đó. Không suy việc chọn loại lúc tạo nháp thành quyền tự đổi domain; `case_type`/`document_type` vẫn bất biến ngoài đường này ([decision](../../decisions/decision-owner-saved-case-type-conversion-20261016.md), contract §13.18).
@@ -108,6 +119,8 @@ chờ kết quả nguyên tử, không đóng dialog giữa ghi. Command riêng
 Chỉ hồ sơ `draft` được xóa. Xóa trong một lần ghi trọn vẹn: dọn dữ liệu thuộc hồ sơ nếu không còn được hồ sơ khác, participant, liên kết tài sản hoặc snapshot tham chiếu. Danh bạ người nhận ủy quyền tái dùng không bị xóa theo hồ sơ; không quét danh bạ mồ côi ngoài phạm vi. Lỗi phải khôi phục toàn bộ.
 
 Thống kê Người/Tài sản đếm mỗi bản ghi thực sự gắn hồ sơ một lần, không đếm danh bạ rời; tài sản vừa chính vừa liên kết không đếm hai lần.
+Đây là quy tắc chống đếm lặp; phạm vi tính Hồ sơ Nháp trong từng báo cáo
+còn chờ chốt, không suy từ việc đã lưu database rằng Nháp được tính chung.
 
 <a id="input"></a>
 ## 3. Input — đọc và kiểm tra nguồn
@@ -187,6 +200,15 @@ Thừa kế cần `owner_row_id` theo contract lưu hiện hành; Hai bên khôn
 Mọi ghi gửi phiên bản đã đọc (`base_revision`); nếu server có bản khác, báo xung đột và cho tải bản mới hoặc giữ nháp để sao chép, không ghi đè cưỡng bức. Hồ sơ khóa chỉ đọc, vẫn xem/sao chép và dùng thao tác đọc được cho phép.
 
 Không chặn chuyển tab chỉ vì đang nhập. Chuyển module phải giữ nháp; rời/đóng khi có thay đổi chưa lưu phải cảnh báo. Cập nhật nền không ghi đè ô đang sửa. Nút `Hủy thay đổi` của Stage đã bỏ cùng cơ chế khôi phục riêng; dirty, cảnh báo rời/đóng và nhánh bỏ nháp khi mở hồ sơ khác vẫn giữ.
+
+**Snapshot — owner 21/10/2026:** mỗi Hồ sơ chỉ có một snapshot hiện hành,
+kể cả Nháp đã lưu DB. Cập nhật cùng Hồ sơ thay snapshot hiện hành, không
+tạo record nghiệp vụ mới hoặc giữ snapshot theo từng lần lưu/sửa ô.
+Lịch sử Người/Tài sản là các Hồ sơ liên quan được user liên kết cùng ID;
+đọc bộ thông tin của Hồ sơ được chọn. Revision trên đường ghi chỉ phục vụ
+kiểm tra xung đột, không là kho snapshot các lần Lưu. Giữ raw/nguồn/history
+kỹ thuật đã có; cấu trúc vật lý snapshot còn thiết kế, chưa triển khai mới.
+[Quyết định](../../decisions/decision-owner-case-snapshot-as-history-20261021.md).
 
 <a id="pool"></a>
 ## 5. Pool và Diagram — gán quan hệ
