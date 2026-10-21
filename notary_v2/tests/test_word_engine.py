@@ -1005,6 +1005,45 @@ def test_replace_in_doc_reaches_textbox_nested_inside_textbox(tmp_path):
     assert find_unresolved_placeholders(Document(str(path))) == []
 
 
+def test_split_token_around_textbox_preserves_paragraph_isolation(tmp_path):
+    from docx.oxml import parse_xml
+    from docx.oxml.ns import qn
+    from services.word_engine import collect_placeholder_occurrences
+
+    doc = Document()
+    doc.element.body.append(parse_xml(
+        f'<w:p xmlns:w="{_W_NS}" xmlns:v="urn:schemas-microsoft-com:vml">'
+        "<w:r><w:rPr><w:b/></w:rPr><w:t>[Tên </w:t></w:r>"
+        "<w:r><w:pict><v:shape><v:textbox><w:txbxContent>"
+        "<w:p><w:r><w:rPr><w:i/></w:rPr><w:t>[Năm sinh 1]</w:t>"
+        "</w:r></w:p></w:txbxContent></v:textbox></v:shape></w:pict></w:r>"
+        "<w:r><w:t>1]</w:t></w:r></w:p>"
+    ))
+    source = tmp_path / "source.docx"
+    doc.save(source)
+    doc = Document(source)
+    assert collect_placeholder_occurrences(doc) == ["[Tên 1]", "[Năm sinh 1]"]
+    assert replace_in_doc(
+        doc, {"[Tên 1]": "NGƯỜI TỔNG HỢP", "[Năm sinh 1]": "1980"}
+    ) == 2
+
+    output = tmp_path / "output.docx"
+    doc.save(output)
+    saved = Document(output)
+    outer = saved.element.body.find(qn("w:p"))
+    assert [node.text or "" for node in outer.iter(TEXT_TAG)] == [
+        "NGƯỜI TỔNG HỢP", "1980", "",
+    ]
+    assert outer.find("w:r/w:rPr/w:b", outer.nsmap) is not None
+    inner = outer.find(".//w:txbxContent/w:p", outer.nsmap)
+    assert [node.text for node in inner.iter(TEXT_TAG)] == ["1980"]
+    assert inner.find("w:r/w:rPr/w:i", inner.nsmap) is not None
+    assert collect_placeholder_occurrences(saved) == []
+    assert collect_placeholder_occurrences(Document(source)) == [
+        "[Tên 1]", "[Năm sinh 1]",
+    ]
+
+
 def etree_tostring(element):
     from lxml import etree
 

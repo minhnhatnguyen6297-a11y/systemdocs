@@ -2290,16 +2290,12 @@ def _iter_part_paragraphs(root: Any, qn) -> list[Any]:
 def _paragraph_text_nodes(paragraph: Any, qn) -> list[Any]:
     """Các node w:t thuộc trực tiếp paragraph (bỏ qua w:p lồng trong textbox)."""
     nodes: list[Any] = []
-    for run in paragraph.iter(qn("w:r")):
-        owner = None
-        for ancestor in run.iterancestors():
+    for node in paragraph.iter(qn("w:t")):
+        for ancestor in node.iterancestors():
             if ancestor.tag == qn("w:p"):
-                owner = ancestor
+                if ancestor is paragraph:
+                    nodes.append(node)
                 break
-        if owner is not paragraph:
-            continue
-        for node in run.iter(qn("w:t")):
-            nodes.append(node)
     return nodes
 
 

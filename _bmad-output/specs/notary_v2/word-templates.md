@@ -458,9 +458,40 @@ data → token mapping → thay tại chỗ giữ định dạng. Không sao ch�
 thức Excel/VBA/macro, không giải mã thêm XLSB/VBA, không đổi câu/chữ/logic Word
 theo suy luận. A09 renderer Upload là biên độc lập, không thay thế template Word.
 
+**Coverage giới hạn 21/10/2026 — không phải nghiệm thu corpus:** đối chiếu
+`contracts/entities.md`, contract Soạn thảo và catalog
+`notary_v2/word_templates/placeholder_mapping.md`, không lấy danh mục file làm
+bằng chứng đã đọc nội dung. Nhóm Người canonical gồm tên, giới tính, ngày/năm
+sinh/chết, số/loại/ngày cấp/nơi cấp giấy tờ, địa chỉ và nhãn địa chỉ; alias cũ
+đã có `[Tên N]`, `[Năm sinh N]`, `[CCCD N]`, `[Nơi cấp CC N]`,
+`[Ngày cấp N]`, `[Địa chỉ N]`, `[Năm chết]` giữ đúng slot hiện hành, không
+suy thứ tự vai trò từ tên token. Nhóm Tài sản dùng các token địa chỉ đất,
+giấy chứng nhận, thửa/tờ, diện tích và cụm đất `loaidatMN/dientichMN/thoihanMN`;
+nhóm Hồ sơ dùng metadata snapshot theo catalog, không thêm trường.
+
+Layout đã khảo sát không tự duyệt alias/composition mới: `[Loại CC N]`,
+`[Thường trú N]`, `[Năm chết 2]`, `[Thời hạn 1]` còn chờ mapping rõ,
+không tự đăng ký hoặc gán nghĩa từ mặt chữ. `[Người ủy quyền2]` thuộc quyết
+định bỏ trước đây, không khôi phục bằng alias rỗng. `[Tên file]` hiện là tên
+file xuất, không đồng nhất với selector của công cụ Excel cũ. Không đổi prose,
+bố cục hoặc thêm business gate trong lượt sửa này.
+
+Proof tổng hợp cô lập đã đi qua DOCX intake có `source_refs` → workspace
+SQLite tạm → mở session mới → mapping tĩnh → thay Word và đọc lại: tên/năm
+sinh ở hai đoạn ngoài/textbox, số giấy trên header, ngày cấp trên footer,
+nơi cấp trong bảng; giữ bold/italic và không còn token của mẫu kiểm soát.
+Hồi quy `tests/test_word_engine.py`: **72 passed** (21/10/2026).
+Đây là proof đường lỗi phân lập paragraph, không chứng minh toàn bộ grammar,
+mọi token hoặc mọi mẫu thực. #41 còn OPEN: không đọc body mẫu owner mới,
+không chạy corpus/E2E theo mẫu trước nghiệm thu đầy đủ gate hiện hành.
+
 ## 5. Bộ tạo file và chuyển mẫu
 
 Python giữ catalog, mapping, tên file và dựng câu; giao diện chỉ chọn/hiển thị. Phải xử lý placeholder trong đoạn, bảng, đầu/chân trang và khi Word chia chữ thành nhiều run. Không suy nghiệp vụ từ tên token. Mô tả nhiều tài sản đánh số 1, 2…; cụm đất trong tài sản N đánh số N.1, N.2…
+
+Chữ trong textbox (kể cả textbox lồng) thuộc đoạn riêng: không ghép vào
+placeholder của đoạn bao ngoài. Token bị chia run trong cùng đoạn vẫn thay
+đúng một lần, giữ nguyên định dạng run và nội dung của các đoạn lồng.
 
 Chuyển mẫu đọc bản sao DOCX/DOC, ghi thư mục mới và báo cáo từng file; không sửa nguồn. DOC dùng Word COM, giữ kiểm danh tính file và hash. Không tự tạo giá trị cho token lạ. Đã chốt bỏ token Số công chứng, Giá chuyển nhượng, Người ủy quyền2; giữ nhãn cần điền tay. Mã cố định biểu mẫu thuế chỉ miễn kiểm trên đúng mẫu đã xác minh.
 
