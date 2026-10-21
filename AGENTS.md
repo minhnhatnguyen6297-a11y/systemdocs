@@ -4,7 +4,7 @@
 
 - Dùng workflow BMAD và customization của repo trong `_bmad/custom/`; đọc skill
   tương ứng trước khi dùng. Không dựng flow song song.
-- Code tối giản; artifact và handoff ngắn gọn; trao đổi với user tự nhiên, dễ hiểu.
+- Code tối giản; artifact và handoff ngắn gọn; trao đổi với user dễ hiểu - vibecoder.
 
 ## Nguồn chuẩn
 
@@ -32,7 +32,7 @@
 ## Bất biến dữ liệu toàn hệ thống
 
 - Mọi luồng nghiệp vụ xoay quanh ba đối tượng **Người, Tài sản, Hồ sơ**.
-  Chức năng sử dụng dữ liệu đã chuẩn hóa của ba đối tượng, không dựng bộ trường
+  Mọi chức năng đều sử dụng dữ liệu đã chuẩn hóa của ba đối tượng, không dựng bộ trường
   nghiệp vụ riêng cho từng màn hình/văn bản.
 - Bộ trường canonical đã duyệt là chuẩn cố định cho lần triển khai:
   mọi input nghiệp vụ sau chuẩn hóa phải ánh xạ tường minh vào đúng trường;
