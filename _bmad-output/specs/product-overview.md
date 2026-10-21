@@ -72,8 +72,9 @@ Xem [quy tắc Hồ sơ nháp](notary_v2/README.md#2-danh-sách-hồ-sơ) và
 Người khi **tên + số giấy tờ đồng thời giống nhau**; ngày cấp/địa chỉ khác vẫn
 cùng ID. Đổi tên/số chấp nhận ID khác. Tài sản gom theo **serial** nguyên văn.
 Khi lấy lại dữ liệu vào Hồ sơ mới mặc định bộ mới nhất, không chọn phiên bản.
-Tra cứu Người nhằm xem các Hồ sơ đã làm. Người sống/chết cùng bảng; liên kết
-địa chỉ cũ–mới còn mở. Thiếu điểm neo không gom rỗng, không chặn lưu Nháp.
+Tra cứu Người nhằm xem các Hồ sơ đã làm. Người sống/chết cùng bảng; địa chỉ
+cũ–mới tạm giữ cách hiện tại, mô hình mới chưa chốt. Thiếu điểm neo không gom
+rỗng, không chặn lưu Nháp.
 Mốc “mới nhất”/Nháp thiếu trường làm nguồn hay không, so sánh/chuyển ID cũ và
 schema tiếp tục thiết kế. Policy gợi ý CCCD/user chọn/bỏ qua tạo mới ở
 [#44](../backlog/story-person-cccd-suggestion-link.md) đã bị thay thế;

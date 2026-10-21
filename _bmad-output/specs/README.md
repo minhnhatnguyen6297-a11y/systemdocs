@@ -58,17 +58,24 @@ Electron là vỏ ứng dụng; Python/FastAPI xử lý nghiệp vụ. Module gi
   cộng 10 thao tác; không có nghĩa chấp nhận dữ liệu sai hay xóa provenance.
   Chưa kiểm kê/xác minh các blocker hiện có; không tự gỡ safeguard hoặc claim
   đã audit. Không dùng policy này để tự bỏ kiểm tra wire/security/FK/atomicity.
-- **Identity hiện hành — owner 21/10, thay UNIQUE `6eaf42b`, UX chưa built:**
-  một bảng Người, `Customer.id` ổn định; chết vẫn là cùng Người. CCCD đã có
-  DB → gợi ý ID cũ; user chọn → liên kết dòng input, gợi ý biến mất.
-  Sai khác không chặn, ghi “thông tin liên kết” để user xem/xóa/sửa bất cứ lúc
-  nào. Không chọn/bỏ qua → ID mới, không auto merge. Không có gate UNIQUE,
-  chặn khác tên hoặc xác nhận thêm vì trùng tên. Lifecycle gợi ý bị bỏ qua
-  và lưu bền thông tin liên kết còn mở trong
-  [#44](../backlog/story-person-cccd-suggestion-link.md), không tự bịa UX/
-  field/model hoặc quyết định field thắng/ghi đè master. Runtime bỏ global
-  UNIQUE vẫn BUILT bounded, chưa có đầy đủ UX mới. Giữ Case links/raw/history/
-  snapshot null; #41 OPEN/gate mẫu ĐÓNG, #42 độc lập.
+- **Điểm neo — owner 21/10 mới nhất, thiết kế chưa triển khai:** Người tự dùng
+  cùng ID khi **tên + số giấy tờ đồng thời giống nhau**; ngày cấp/địa chỉ khác
+  vẫn cùng ID. Đổi tên hoặc số chấp nhận ID khác. Tài sản gom theo **serial**
+  nguyên văn. Người sống/chết cùng bảng. Tìm Người để xem các Hồ sơ đã làm;
+  lấy dữ liệu vào Hồ sơ mới mặc định bộ mới nhất, không chọn liên kết/phiên bản.
+  Policy gợi ý CCCD/user chọn/bỏ qua tạo ID mới ở #44 đã bị thay thế; không
+  khôi phục CCCD UNIQUE/chặn luồng. Chi tiết so sánh/mốc mới nhất/Nháp thiếu
+  trường/chuyển ID cũ và cấu trúc bảng còn thiết kế; không coi đã implemented.
+  [Quyết định](../decisions/decision-owner-entity-anchors-case-snapshots-20261021.md).
+- **Snapshot — owner 21/10:** record nghiệp vụ là Hồ sơ; mỗi Hồ sơ một snapshot
+  hiện hành. Lưu lại thay snapshot đó, không lưu lịch sử từng ô/lần lưu. Các
+  bộ thông tin khác nhau của cùng ID giữ qua những Hồ sơ liên quan. Hồ sơ cũ
+  chỉ user sửa thủ công, không tự đổi theo dữ liệu mới nơi khác. Nháp được lưu
+  DB dù nhập thiếu, nhãn Nháp rõ; mốc hoàn thiện/cách tính báo cáo chưa chốt.
+  Raw/nguồn/history kỹ thuật đã có vẫn giữ; #41 OPEN/gate mẫu ĐÓNG, #42 độc lập.
+- **Địa chỉ cũ–mới — owner kết phiên 21/10:** tạm giữ cách hiện tại; mô hình
+  mới chưa chốt. Đề xuất danh mục/quan hệ chuyển đổi và mã tham chiếu từ các
+  trường địa chỉ chưa duyệt, không đổi cấu trúc/hành vi theo đề xuất đó.
 - **Toàn bộ luồng nghiệp vụ xoay quanh Người, Tài sản, Hồ sơ** (owner 19/10/2026). Chức năng dùng dữ liệu chuẩn hóa của ba đối tượng; mọi input nghiệp vụ sau chuẩn hóa ánh xạ vào bộ trường canonical đã duyệt, mọi output nghiệp vụ dùng đúng bộ trường đó. Không tạo dữ liệu mồ côi hoặc nhét khác nghĩa vào ghi chú; ngoại lệ hẹp là cụm trường phụ website theo hướng owner cho phép có điều kiện, không phải ghi chú chung; raw capture chỉ là provenance, không thay trường nghiệp vụ. Thiếu mapping/cần trường mới thì chốt nghiệp vụ/schema trước, không tự mở rộng. Raw/bằng chứng/`source_refs` là provenance kỹ thuật, không buộc có schema DB và không tự tạo quyền gộp Case hay tích hợp liên module.
 - **Owner 19/10/2026 — bổ sung trường Hồ sơ:** chủ đất là trường **Hồ sơ**,
   không là thuộc tính sở hữu cố định của Tài sản, không mặc định node `owner`
@@ -109,8 +116,8 @@ Electron là vỏ ứng dụng; Python/FastAPI xử lý nghiệp vụ. Module gi
   bổ sung/tự ghép giữa văn bản; không gợi ý từ Đơn xin xác nhận. Thiếu ngày
   chết chỉ là không có thông tin, có trường hợp lệ nào điền trường đó,
   không chặn Người/tự coi còn sống/tạo field mới. Không đổi logic câu Word.
-  Luật nội dung giấy tờ này không cấm gợi ý ID/liên kết user chọn theo policy
-  hiện hành ở trên, cũng không cho phép auto enrichment/ghi đè master.
+  Luật nội dung giấy tờ này không cấm gom ID theo điểm neo ở trên, cũng không
+  cho phép tự mượn trường thiếu giữa văn bản hoặc đổi Hồ sơ đã lưu ở nơi khác.
   Owner tiếp tục “trien khai”: workstream Người chết **đã BUILT bounded**,
   actual proof implementer-run đạt fresh+migrated DB/Word và DOM legacy giới
   hạn; #41 vẫn OPEN/gate chung ĐÓNG, không mở #42/A04/quan hệ hoặc lô mẫu.

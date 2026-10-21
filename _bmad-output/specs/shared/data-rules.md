@@ -144,6 +144,10 @@ tục file đã rõ. Không tắt production Scan/Upload; quyền runtime đã c
   luồng. Runtime cũ chưa thực hiện điểm neo mới; giữ Case links/raw/history/
   snapshot null. #41 OPEN/gate mẫu ĐÓNG, #42 độc lập.
   [Quyết định](../../decisions/decision-owner-entity-anchors-case-snapshots-20261021.md).
+- **Địa chỉ cũ–mới — owner kết phiên 21/10:** tạm thời giữ cách hiện tại.
+  Chưa chốt mô hình mới; đề xuất danh mục/quan hệ chuyển đổi và mã tham chiếu
+  từ các trường địa chỉ chưa được duyệt. Không đổi cấu trúc/hành vi theo đề
+  xuất đó, không tự cập nhật địa chỉ trong Hồ sơ đã lưu.
 - **Nguyên tắc bền vững cho task hiện tại/tương lai:** engine xử lý dữ liệu,
   không quyết định thay người dùng chịu trách nhiệm pháp lý. Không tự thêm
   business/UX gate hoặc đổi hành vi chưa báo và được owner duyệt; UX chưa rõ

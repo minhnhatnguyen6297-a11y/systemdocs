@@ -30,8 +30,11 @@ quy tắc gom ID mặc định, không đòi người dùng quản lý nhóm hay
    phẳng mọi thay đổi giấy tờ/địa chỉ thành danh sách phiên bản bắt người dùng đọc.
 7. Người sống và Người chết cùng một bảng Người. Logic dùng ngày chết và
    thông tin phụ có nguồn; thiếu ngày chết không tự chứng minh còn sống.
-8. Liên kết địa chỉ cũ–mới do sáp nhập **chưa chốt**. Dữ liệu nền và quy tắc
-   đối chiếu hiện có không được coi là mô hình lịch sử địa chỉ đã chuẩn hóa.
+8. Liên kết địa chỉ cũ–mới do sáp nhập **tạm thời giữ nguyên cách hiện tại**,
+   owner chưa chốt mô hình mới. Đề xuất danh mục/quan hệ chuyển đổi và mã
+   tham chiếu từ các trường địa chỉ chưa được duyệt, không triển khai theo
+   đề xuất đó. Dữ liệu nền và quy tắc đối chiếu hiện có không được coi là mô
+   hình lịch sử địa chỉ đã chuẩn hóa.
 
 ## Lý do và rủi ro owner chấp nhận
 

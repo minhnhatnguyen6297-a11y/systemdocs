@@ -190,7 +190,8 @@ Word; UI legacy giới hạn); **BUILT bounded**, chưa nghiệm thu toàn #41.
 Một bảng Người cho sống/chết. Luồng gợi ý CCCD/user chọn/bỏ qua tạo ID mới và
 “thông tin liên kết” cũ ở [#44](../../backlog/story-person-cccd-suggestion-link.md)
 đã bị thay thế, không mang thành thao tác mặc định. Không khôi phục CCCD UNIQUE
-hoặc tự ghép trường giữa văn bản. Địa chỉ cũ–mới do sáp nhập chưa chọn mô hình.
+hoặc tự ghép trường giữa văn bản. Địa chỉ cũ–mới do sáp nhập tạm giữ cách hiện
+tại; chưa chọn mô hình mới hoặc duyệt đề xuất mã tham chiếu từ các ô địa chỉ.
 #41 OPEN/gate mẫu ĐÓNG, #42 độc lập; giữ nguồn và dữ liệu đã có.
 [Quyết định](../../decisions/decision-owner-entity-anchors-case-snapshots-20261021.md).
 
