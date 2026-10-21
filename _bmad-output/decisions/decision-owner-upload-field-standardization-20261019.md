@@ -525,3 +525,38 @@ trên. Không phải nghiệm thu toàn #41, không phải cutover Person/Asset/
 không duyệt #42/A04/quan hệ, không mở gate mẫu chung. Lịch sử chưa
 supported-format/format coverage, historical issuer lookup và packaged
 Electron vẫn là giới hạn, không được gọi đã giải quyết.
+
+## Owner “chốt” — 21/10/2026, duyệt thiết kế identity, chỉ cập nhật tài liệu
+
+**Nguyên văn owner:** “chốt”, duyệt đề xuất trước đó. Đây là phê duyệt thiết
+kế khái niệm, **không phải lệnh triển khai runtime/migration**.
+
+- Một bảng Người, `Customer.id` ổn định; chết vẫn là cùng Người, không tách
+  bảng sống/chết. CCCD có loại giấy tờ được xác nhận đáng tin cậy phải UNIQUE;
+  số giấy khai tử/chứng tử không UNIQUE toàn cục.
+- Khi tạo Người có CCCD xác nhận đã tồn tại: không tạo ID mới, không tự ghi
+  đè/merge trường. Người dùng phải chọn rõ Người hiện có nếu dùng lại; lựa
+  chọn đó không cho phép đề xuất/bổ sung/ghép dữ kiện giữa văn bản.
+  Đây là ngăn trùng có điều kiện, không auto matching/merge.
+- Phân biệt bằng loại giấy tờ xác nhận, không dựa ngày chết null, ngày cấp
+  hoặc độ dài/chữ số. Thiếu ngày chết chỉ là không có thông tin.
+- Loại chỉ có trong snapshot hoặc master suy ra hiện tại chưa đủ DB enforce.
+  Cần thiết kế lưu bền loại canonical được duyệt trước index/migration;
+  chưa chọn tên field/key, kiểu hay model vật lý và không gán lựa chọn đó
+  cho owner. **Chưa triển khai conditional index.**
+- Audit trùng/migration tương lai phải giữ ID và Case links, không tự
+  merge/xóa ID. Không audit DB production hoặc đọc lại mẫu trong lượt này.
+
+Quyết định này thay **ý định mọi số giấy đều không UNIQUE** trước đó bằng
+ngoại lệ CCCD theo loại xác nhận. Hiện trạng commit `f6d53b5` bỏ global UNIQUE
+và merge theo số vẫn giữ nguyên; runtime một Người/death subset đã BUILT
+bounded, các tests/actual proof trên vẫn có giá trị trong phạm vi lịch sử.
+Tuy nhiên ngăn tạo trùng CCCD đang là **gap OPEN**, không được coi toàn bộ
+identity hay #41 đã hoàn tất. Không hoàn tác code, không tuyên bố thiết kế
+uniqueness mới đã làm xong. #41 OPEN, gate mẫu ĐÓNG; #42 độc lập/chưa chọn model.
+
+Giữ nguyên ba loại giấy khai tử/chứng tử canonical, sáu quy tắc owner, một
+địa chỉ, `Giấy chứng tử (bản sao)` → `Giấy chứng tử`, loại đơn vị nguồn,
+cấm cross-document SUGGEST/JOIN, cấm confirmation hints và điền trường có
+căn cứ khi thiếu ngày. Raw/history PII tại local và snapshot key null giữ
+nguyên. Không mở mô hình nhiều giấy/địa chỉ #42, thực thể thứ tư hay field mới.

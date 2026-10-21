@@ -1,6 +1,6 @@
 # Sổ tay sản phẩm theo màn hình
 
-**Cập nhật:** 20/10/2026 · **Dùng để:** giúp owner và coordinator cùng nhìn
+**Cập nhật:** 21/10/2026 · **Dùng để:** giúp owner và coordinator cùng nhìn
 vào sản phẩm, giao diện và việc còn dở khi bắt đầu phiên làm việc.
 
 Đọc [nền sản phẩm và khái niệm chung](README.md) trước để hiểu người dùng,
@@ -50,6 +50,18 @@ nghiệp vụ; vẫn giữ thời hạn đất và timeout kỹ thuật. Portal 
 thì ghi xung đột để refine, không bịa/default hay tự chọn bước nhập tay.
 [#42 Người nhiều giấy tờ và địa chỉ](../backlog/story-person-multiple-identities-addresses.md)
 là issue riêng, model tương lai chưa chọn, không tự là prerequisite #41.
+**Identity — owner “chốt” 21/10/2026, docs-only:** một bảng Người, ID
+`Customer.id` ổn định, chết vẫn là cùng Người. CCCD theo loại giấy tờ xác
+nhận đáng tin cậy phải UNIQUE; số khai tử/chứng tử không UNIQUE toàn cục.
+Tạo với CCCD xác nhận đã tồn tại không tạo ID mới hoặc tự ghi đè/merge;
+dùng lại qua user chọn rõ không cho phép enrichment giữa văn bản.
+Không dùng ngày chết null/ngày cấp/độ dài số làm loại. Cần duyệt lưu bền
+loại canonical trước index/migration, chưa chọn field/model vật lý.
+**Gap hiện tại:** commit `f6d53b5` đã bỏ global UNIQUE/merge theo số; runtime
+một Người/death subset và proof lịch sử vẫn BUILT bounded, nhưng bảo vệ
+trùng CCCD chưa triển khai, chưa có conditional index. Audit trùng tương
+lai không tự merge/xóa IDs, giữ Case links/raw/history/snapshot null.
+Không mở mẫu/prodDB hoặc rollback code; #41 OPEN/gate mẫu ĐÓNG, #42 độc lập.
 **Pháp nhân (owner 20/10/2026):** không đưa vào Người; policy nhập tay chung
 có ngoại lệ ngân hàng thế chấp **app tự lấy** bên dưới. Bảng riêng tương lai
 chưa duyệt schema/build; không bịa/default. **Cụm trường phụ website** theo hướng owner cho phép có điều kiện cho một ô

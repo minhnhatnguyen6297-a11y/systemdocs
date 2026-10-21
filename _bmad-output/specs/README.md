@@ -1,6 +1,6 @@
 # Nền sản phẩm
 
-**Cập nhật:** 20/10/2026. Đọc đầu phiên để hiểu sản phẩm; sau đó đọc sổ tay và spec module đang làm. Quy tắc dưới đây mô tả điều cần có, không chứng minh code đã hoàn thành.
+**Cập nhật:** 21/10/2026. Đọc đầu phiên để hiểu sản phẩm; sau đó đọc sổ tay và spec module đang làm. Quy tắc dưới đây mô tả điều cần có, không chứng minh code đã hoàn thành.
 
 ## 1. Người dùng và công việc
 
@@ -50,6 +50,17 @@ Electron là vỏ ứng dụng; Python/FastAPI xử lý nghiệp vụ. Module gi
 ## 6. Khái niệm và nguyên tắc
 
 - Hồ sơ là đơn vị công việc trong từng module. CCCD, GCN, cặp thửa/tờ, số công chứng là bằng chứng đối chiếu, không tự trở thành mã hồ sơ chung.
+- **Identity owner “chốt” 21/10/2026, thiết kế chưa triển khai:** một bảng
+  Người với `Customer.id` ổn định, chết vẫn là cùng Người. CCCD theo loại
+  giấy tờ xác nhận đáng tin cậy phải UNIQUE; số khai tử/chứng tử không
+  UNIQUE toàn cục. CCCD xác nhận đã tồn tại không tạo ID mới hoặc tự ghi
+  đè/merge; user chọn rõ Người hiện có không cho phép enrichment giữa
+  văn bản. Không dùng ngày chết null/ngày cấp/độ dài số để phân loại.
+  Cần duyệt lưu bền loại canonical trước index/migration, chưa chọn
+  field/model vật lý; snapshot/derived master chưa đủ enforce. Chưa có
+  conditional index. Runtime bỏ global UNIQUE vẫn BUILT bounded; bảo vệ
+  trùng CCCD còn OPEN #41/gate mẫu ĐÓNG. Audit trùng tương lai không tự
+  merge/xóa IDs, giữ Case links; #42 độc lập.
 - **Toàn bộ luồng nghiệp vụ xoay quanh Người, Tài sản, Hồ sơ** (owner 19/10/2026). Chức năng dùng dữ liệu chuẩn hóa của ba đối tượng; mọi input nghiệp vụ sau chuẩn hóa ánh xạ vào bộ trường canonical đã duyệt, mọi output nghiệp vụ dùng đúng bộ trường đó. Không tạo dữ liệu mồ côi hoặc nhét khác nghĩa vào ghi chú; ngoại lệ hẹp là cụm trường phụ website theo hướng owner cho phép có điều kiện, không phải ghi chú chung; raw capture chỉ là provenance, không thay trường nghiệp vụ. Thiếu mapping/cần trường mới thì chốt nghiệp vụ/schema trước, không tự mở rộng. Raw/bằng chứng/`source_refs` là provenance kỹ thuật, không buộc có schema DB và không tự tạo quyền gộp Case hay tích hợp liên module.
 - **Owner 19/10/2026 — bổ sung trường Hồ sơ:** chủ đất là trường **Hồ sơ**,
   không là thuộc tính sở hữu cố định của Tài sản, không mặc định node `owner`

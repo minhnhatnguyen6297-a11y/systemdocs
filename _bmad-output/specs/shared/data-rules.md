@@ -113,6 +113,17 @@ tục file đã rõ. Không tắt production Scan/Upload; quyền runtime đã c
   không đọc mẫu mới. Số giấy lưu thật, index không UNIQUE, identity theo ID
   chọn rõ/row_id chính hồ sơ, không auto lookup theo số/tên hoặc ghép giữa
   file. Snapshot không borrow master khi đã có key, kể cả null.
+- **Owner “chốt” 21/10 — thiết kế được duyệt, chưa triển khai:** một bảng
+  Người với `Customer.id` ổn định; chết vẫn là cùng Người. CCCD theo loại
+  giấy tờ xác nhận đáng tin cậy phải UNIQUE; số khai tử/chứng tử không
+  UNIQUE toàn cục. Không dùng ngày chết null/ngày cấp/độ dài số để phân loại.
+  Tạo với CCCD xác nhận đã tồn tại không tạo ID mới, không tự ghi đè/merge;
+  chỉ dùng lại Người qua user chọn rõ, không enrichment giữa văn bản.
+  Cần duyệt lưu bền loại canonical trước index/migration; snapshot/derived
+  master hiện tại chưa đủ enforce. Chưa chọn field/model vật lý, chưa có
+  conditional index. Audit trùng tương lai giữ IDs/Case links, không tự
+  merge/xóa. Runtime bỏ global UNIQUE vẫn là fact/proof bounded; bảo vệ
+  trùng CCCD là gap OPEN #41, gate mẫu ĐÓNG, #42 độc lập.
 
 **Một Người nhiều giấy tờ và nhiều địa chỉ** là
 [#42 riêng](../../backlog/story-person-multiple-identities-addresses.md).
@@ -204,8 +215,10 @@ khác chuẩn là [gap implementation tĩnh #40](../../backlog/bug-stage-raw-gcn
 không phải câu hỏi duyệt lại field. Chưa tái hiện runtime trong lượt này.
 Ngày quy ước master + snapshot giữ `YYYY` theo #6 không tự là bug; ngày lập
 hồ sơ optional ở wire versus default DB phải phân biệt tầng/ngữ nghĩa.
-Global UNIQUE/lookup số Người cũ đã được owner giao cutover workstream
-Người chết 21/10, không phải quyền chọn số làm khóa Case/Người toàn cục.
+Global UNIQUE/lookup số Người cũ đã cutover trong workstream Người chết
+21/10; không phải quyền chọn số làm khóa Case/Người toàn cục. Quy tắc đích
+CCCD UNIQUE có điều kiện theo loại xác nhận đã được owner chốt sau đó,
+nhưng chưa triển khai; xem `contracts/entities.md` §8.3.
 
 Owner xác nhận 15/10/2026: bộ trường và định dạng DB đã duyệt là chuẩn đích;
 engine phải tuân theo hoặc ánh xạ tường minh tới chuẩn đó. Trước khi triển khai,

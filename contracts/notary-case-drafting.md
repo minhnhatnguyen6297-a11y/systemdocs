@@ -254,7 +254,7 @@ person_row:
   ngay_sinh: <YYYY-MM-DD | YYYY | null>
   ngay_chet: <YYYY-MM-DD | YYYY | null>   # null = không có thông tin ngày chết
   so_giay_to: <string | null>        # số giấy người sống hoặc khai tử/chứng tử;
-                                     # free text, không ép 12 số/không phải khóa
+                                     # free text; không phải ID Người; CCCD UNIQUE theo loại xác nhận (§8.3 entities), chưa triển khai
   ngay_cap: <YYYY-MM-DD | YYYY | null>
   noi_cap: <string | null>
   dia_chi: <string | null>
@@ -291,14 +291,26 @@ backend hiện strip ngoài 10 key). `ho_ten` rỗng/`""` →
   không chặn Người. Không tạo ngày giả/01/01, Boolean hoặc status mới.
   Không xóa raw/history, phá liên kết đã có hoặc đổi logic câu Word.
 
-**Identity/persistence:** số giấy là giá trị không UNIQUE, không lookup/
-ghép Người theo số/tên. Chỉ ID được chọn rõ hoặc row_id trong snapshot
-của chính hồ sơ cập nhật lại cùng Người; trùng entity vẫn bị từ chối.
+**Identity/persistence hiện tại (không phải chuẩn đích toàn bộ):** số giấy
+không UNIQUE, không lookup/ghép Người theo số/tên; còn gap trùng CCCD.
+Chỉ ID được chọn rõ hoặc row_id trong snapshot của chính hồ sơ cập nhật
+lại cùng Người; trùng entity vẫn bị từ chối.
 Loại/nơi cấp/nhãn nguồn giữ trong snapshot; key đã có kể cả null chặn
 borrow master. Ngày chết thiếu nhưng có loại giấy chết/nhãn Nơi chết nguồn
 thì không derive CCCD/issuer người sống. Migration giữ IDs/FKs/history,
 không thêm field/version. Actual proof synthetic fresh+migrated DB/Word đạt;
 **BUILT bounded hẹp**, chưa nghiệm thu #41.
+**Thiết kế owner “chốt” 21/10, chưa triển khai:** một bảng Người với
+`Customer.id` ổn định, chết vẫn là cùng Người. CCCD theo loại giấy tờ xác nhận
+đáng tin cậy phải UNIQUE; số khai tử/chứng tử không UNIQUE toàn cục.
+Tạo Người với CCCD xác nhận đã tồn tại phải không tạo ID mới hoặc tự ghi
+đè/merge trường; dùng lại qua lựa chọn rõ của user, không enrichment giữa
+văn bản. Không dùng ngày chết null/ngày cấp/độ dài số để phân loại.
+Theo [entities §8.3](entities.md#83-owner-chốt-21102026--thiết-kế-identity-được-duyệt-chưa-triển-khai),
+cần duyệt lưu bền loại canonical trước index/migration; snapshot/derived
+master hiện tại chưa đủ enforce. Chưa chọn field/model vật lý hoặc triển khai
+conditional index; audit trùng tương lai không merge/xóa IDs, giữ Case links.
+#41 OPEN/gate mẫu ĐÓNG; #42 độc lập.
 
 - **Key canonical (MIN-141 đợt 3):** server đọc được cả key wire legacy
   trên và tên nghiệp vụ canonical liền không dấu (entities.md §9.1):

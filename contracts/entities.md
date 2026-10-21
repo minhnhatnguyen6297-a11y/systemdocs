@@ -209,14 +209,38 @@ xã/phường cũ–mới còn ở NAIA-9, chưa có đường suy tự động 
 **Runtime Người chết 21/10/2026 — BUILT bounded, actual proof synthetic:** số giấy
 lưu nguyên giá trị vào `customers.so_giay_to`, index không UNIQUE; identity
 là `Customer.id`, không tự lookup/ghép theo số hoặc tên. Cập nhật Người qua
-ID đã chọn rõ hoặc `row_id` của chính hồ sơ đã lưu; cùng số được tồn tại ở
-nhiều Người. Migration trước bootstrap giữ ID/FK/columns/defaults/checks/
-indexes/triggers và snapshot/history, rollback nguyên tử khi lỗi.
+ID đã chọn rõ hoặc `row_id` của chính hồ sơ đã lưu; hiện cùng số có thể tồn tại
+ở nhiều Người, kể cả CCCD — đây là gap đã biết, không phải chuẩn đích.
+Migration trước bootstrap giữ ID/FK/columns/defaults/checks/indexes/triggers
+và snapshot/history, rollback nguyên tử khi lỗi.
 Loại/nơi cấp và nhãn địa chỉ tiếp tục theo snapshot từng hồ sơ, không thêm
 cột/model #42; không mượn master để lấp key snapshot đã có kể cả null.
 Ngữ cảnh chết thiếu ngày dùng loại giấy/nhãn `Nơi chết` hiện có đã có nguồn,
 không Boolean mới. Master riêng không có context snapshot không thể phục
 hồi dữ kiện chết chưa lưu; không suy để lấp. #41 vẫn mở/chưa nghiệm thu toàn bộ.
+
+### 8.3. Owner “chốt” 21/10/2026 — thiết kế identity được duyệt, chưa triển khai
+
+Một bảng Người, identity ổn định `Customer.id`; Người chết vẫn là chính Người
+đó, không tách bảng sống/chết. CCCD có **loại giấy tờ được xác nhận đáng tin cậy**
+phải UNIQUE; số khai tử/chứng tử không UNIQUE toàn cục. Không phân loại để
+enforce bằng `ngay_chet` null, ngày cấp hoặc độ dài/chữ số của số giấy.
+Thiếu ngày chết chỉ là không có thông tin ngày chết.
+
+Khi tạo Người với CCCD đã xác nhận đã tồn tại: không tạo ID mới, không tự
+ghi đè/merge trường; người dùng phải chọn rõ Người hiện có nếu muốn dùng lại.
+Đây là ngăn trùng có điều kiện, không auto matching/merge và không cho phép
+bổ sung/đề xuất/ghép dữ kiện giữa văn bản kể cả khi đã chọn Người.
+
+Loại trong snapshot hoặc thuộc tính master suy ra hiện có chưa đủ để DB
+enforce quy tắc này. Cần duyệt thiết kế lưu bền loại giấy tờ canonical trước
+khi chọn index/migration; chưa chọn tên cột/key, kiểu hoặc model vật lý.
+Chưa triển khai conditional index. Audit trùng và migration là việc tương lai
+được giao riêng: không tự merge/xóa ID, giữ Case links, raw/history và snapshot
+có key null; không audit production DB trong lượt chốt docs.
+Quy tắc này thay ý định “mọi số giấy đều không UNIQUE”, không thay sự thật
+runtime/proof hẹp ở §8.2. Bảo vệ trùng CCCD còn OPEN trong #41; gate mẫu ĐÓNG,
+#42 nhiều giấy tờ/địa chỉ độc lập, không mở rộng model trong quyết định này.
 
 ---
 

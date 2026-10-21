@@ -206,12 +206,22 @@ dữ liệu. Không lấy căn cước vợ/chồng trong ngoặc làm giấy c�
   còn sống, không bịa ngày/01/01, Boolean hoặc status mới.
 
 Nguồn/raw và logic câu Word giữ nguyên, chỉ trường tĩnh/placeholder đã duyệt.
-Runtime dùng số giấy thật trong trường Người, không UNIQUE/lookup theo số;
-ID chọn rõ hoặc row_id chính hồ sơ giữ identity. Không auto ghép OCR giữa
-file; cùng container chỉ ghép hai mặt rõ cùng thẻ, không fuzzy số/tên.
+Runtime hiện tại dùng số giấy thật trong trường Người, không UNIQUE/lookup
+theo số (còn gap trùng CCCD); ID chọn rõ hoặc row_id chính hồ sơ giữ identity.
+Không auto ghép OCR giữa file; cùng container chỉ ghép hai mặt rõ cùng thẻ,
+không fuzzy số/tên.
 Số/type/issuer/address/ngày và missing-date context đã được actual proof
 synthetic (fresh+migrated DB/Word); UI legacy chỉ programmatic DOM giới hạn.
 Không claim accuracy toàn quốc hoặc nghiệm thu #41.
+Thiết kế owner “chốt” 21/10 chưa triển khai: một bảng Người, chết vẫn là
+cùng `Customer.id`; CCCD theo loại giấy tờ xác nhận đáng tin cậy phải UNIQUE,
+số khai tử/chứng tử không UNIQUE toàn cục. Không suy loại để enforce từ
+ngày chết null/ngày cấp/độ dài số. Tạo với CCCD xác nhận đã tồn tại không
+tạo ID mới hoặc tự ghi đè/merge; user chọn rõ Người hiện có không cho phép
+cross-document enrichment. Cần duyệt lưu bền loại canonical trước index/
+migration, chưa chọn field/model vật lý; snapshot/derived master chưa đủ.
+Chưa có conditional index; audit trùng tương lai giữ IDs/Case links, không
+tự merge/xóa. Gap thuộc #41 OPEN/gate mẫu ĐÓNG; #42 độc lập.
 
 
 ### 2.4. Định danh thửa — Theo spec hiện hành

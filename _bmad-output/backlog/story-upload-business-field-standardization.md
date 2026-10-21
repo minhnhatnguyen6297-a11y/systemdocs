@@ -528,3 +528,26 @@ implementer-run `../tmp/death-runtime-inventory/final_summary.json` (chi tiết
 hạn programmatic DOM, không nút Add/search-picker đầy đủ). Không claim
 independent review, Electron packaged,
 national coverage hoặc toàn #41; mẫu owner/corpus/prodDB/provider/portal không chạy.
+
+### Owner “chốt” identity — 21/10/2026, duyệt thiết kế, không giao runtime
+
+Quyết định bổ sung trong phạm vi #41, không tạo issue mới hoặc mở #42:
+một bảng Người, `Customer.id` ổn định; chết vẫn là chính Người. CCCD theo
+loại giấy tờ xác nhận đáng tin cậy phải UNIQUE, số khai tử/chứng tử không
+UNIQUE toàn cục. Không phân loại bằng ngày chết null/ngày cấp/độ dài số.
+CCCD xác nhận đã tồn tại thì không tạo ID mới, không tự ghi đè/merge;
+user chọn rõ Người hiện có không cho phép cross-document SUGGEST/JOIN.
+
+**Gap OPEN:** `f6d53b5` bỏ global UNIQUE/merge theo số nhưng chưa bảo vệ
+trùng CCCD. Proof/tests ở trên giữ giá trị historical bounded, không chứng
+minh hoàn tất identity/#41. Runtime một Người/death subset giữ nguyên.
+Quy tắc mới thay ý định “mọi số giấy không UNIQUE”, không thay current fact.
+
+**Điều kiện thiết kế/triển khai tương lai, chưa được giao trong lượt “chốt”:**
+duyệt lưu bền loại giấy tờ canonical trước chọn index/migration; loại chỉ ở
+snapshot/derived master chưa đủ DB enforce. Chưa chọn tên field/key, kiểu,
+model vật lý; chưa triển khai conditional index. Audit trùng/migration tương
+lai không tự merge/xóa IDs, giữ Case links, raw/history local và snapshot
+có key null. Không audit production DB, đọc mẫu/corpus hoặc chạy test mới.
+Ba loại canonical và sáu quy tắc owner giữ nguyên. #41 OPEN/`refined:false`,
+gate mẫu ĐÓNG; #42 độc lập/chưa chọn model, không mở entity/broad flow mới.
