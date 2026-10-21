@@ -165,8 +165,8 @@ có thông tin: giữ `null`/rỗng, các trường có căn cứ được phép
 không chặn Người vì thiếu ngày/giấy, không tự coi còn sống hoặc tạo ngày giả/
 Boolean/status. Địa chỉ chung rõ phạm vi và nhắc lại cùng người trong một
 văn bản vẫn theo nguồn khi không mâu thuẫn; không suy chung giấy.
-Luật nội dung giấy tờ này không cấm gợi ý ID/liên kết user chọn theo luồng
-bên dưới; không cho phép auto enrichment hoặc tự ghi đè master.
+Luật nội dung giấy tờ này không cấm gom ID theo điểm neo bên dưới; không
+cho phép mượn trường thiếu giữa văn bản hoặc tự đổi Hồ sơ đã lưu.
 Raw/history/liên kết đã có giữ nguyên. Runtime hiện tại lưu số giấy nguyên
 giá trị, không UNIQUE/tự ghép theo số, cho số CCCD trùng. Cập nhật theo ID
 chọn rõ hoặc row_id của chính hồ sơ; đây chưa phải UX liên kết mới.
@@ -174,22 +174,25 @@ Snapshot giữ bằng chứng loại/nơi cấp/nhãn, kể cả chết thiếu 
 Migration/consumer đã được actual proof synthetic (fresh+migrated DB, exact
 Word; UI legacy giới hạn); **BUILT bounded**, chưa nghiệm thu toàn #41.
 
-**Luồng Người owner duyệt 21/10 — thay UNIQUE `6eaf42b`, chưa triển khai UX:**
-1. CCCD đã có DB → hiển thị gợi ý Người/ID cũ.
-2. User bấm chọn → liên kết dòng input hiện tại với ID cũ.
-3. Gợi ý đã chọn biến mất.
-4. Sai khác trường không chặn; ghi “thông tin liên kết” cho user xem/xóa/sửa
-   bất cứ lúc nào, không tự chọn field thắng/ghi đè master.
-5. Không chọn/bỏ qua → tạo ID mới, không auto merge.
-6. Lifecycle gợi ý bị bỏ qua chưa chốt, ghi
-   [#44](../../backlog/story-person-cccd-suggestion-link.md) để làm riêng;
-   không tự thêm dismiss/snooze/modal/nút/xác nhận.
+**Luồng Người/Tài sản owner duyệt 21/10 mới nhất — chưa triển khai:**
+1. Người có **tên + số giấy tờ đồng thời giống nhau** → tự dùng cùng ID.
+   Ngày cấp/địa chỉ khác vẫn cùng ID; đổi tên hoặc số thì chấp nhận ID khác.
+2. Tài sản cùng **serial** → dùng cùng ID; serial giữ nguyên văn, giữ đủ các
+   hàng thửa/cụm đất. Cấu trúc liên kết còn thiết kế.
+3. Khi lấy Người/Tài sản vào Hồ sơ mới → mặc định bộ mới nhất, không bắt chọn
+   liên kết hoặc phiên bản. Người dùng vẫn sửa thông tin của Hồ sơ đang soạn.
+4. Hồ sơ đã lưu giữ snapshot riêng; dữ liệu mới nơi khác không tự cập nhật
+   ngược. Tìm Người để xem đã làm những Hồ sơ gì, không trải mọi lần đổi trường
+   thành danh sách phiên bản Người.
+5. Thiếu điểm neo không gom theo rỗng, không chặn lưu Nháp. Mốc “mới nhất”,
+   Nháp thiếu trường làm nguồn hay không, chi tiết so sánh/chuyển ID cũ còn mở.
 
-Một bảng Người, `Customer.id` ổn định; chết vẫn là cùng Người. Không chặn
-CCCD trùng/khác tên hoặc thêm xác nhận trùng tên. Shape/key/nơi lưu/
-cardinality “thông tin liên kết” chưa chọn, không tự thêm field/model hay
-gate. Link explicit không phải auto enrichment giữa văn bản. #41 OPEN/gate
-mẫu ĐÓNG, #42 độc lập; giữ Case links/raw/history/snapshot null.
+Một bảng Người cho sống/chết. Luồng gợi ý CCCD/user chọn/bỏ qua tạo ID mới và
+“thông tin liên kết” cũ ở [#44](../../backlog/story-person-cccd-suggestion-link.md)
+đã bị thay thế, không mang thành thao tác mặc định. Không khôi phục CCCD UNIQUE
+hoặc tự ghép trường giữa văn bản. Địa chỉ cũ–mới do sáp nhập chưa chọn mô hình.
+#41 OPEN/gate mẫu ĐÓNG, #42 độc lập; giữ nguồn và dữ liệu đã có.
+[Quyết định](../../decisions/decision-owner-entity-anchors-case-snapshots-20261021.md).
 
 Tên và định dạng trường giữ chuẩn DB; alias cũ cần ánh xạ. Hai alias của cùng trường trái nhau phải báo lỗi, không chọn ngầm. Cụm đất lưu `property_land_rows`, duy nhất theo tài sản và vị trí; JSON cũ chỉ tương thích. Tên token cụm viết đủ `loaidat<M><N>`, `dientich<M><N>`, `thoihan<M><N>`: M là cụm, N là tài sản; không thêm dạng rút gọn gây lẫn cụm 12 với tài sản 2.
 
@@ -204,8 +207,9 @@ Không chặn chuyển tab chỉ vì đang nhập. Chuyển module phải giữ 
 **Snapshot — owner 21/10/2026:** mỗi Hồ sơ chỉ có một snapshot hiện hành,
 kể cả Nháp đã lưu DB. Cập nhật cùng Hồ sơ thay snapshot hiện hành, không
 tạo record nghiệp vụ mới hoặc giữ snapshot theo từng lần lưu/sửa ô.
-Lịch sử Người/Tài sản là các Hồ sơ liên quan được user liên kết cùng ID;
-đọc bộ thông tin của Hồ sơ được chọn. Revision trên đường ghi chỉ phục vụ
+Lịch sử Người/Tài sản là các Hồ sơ liên quan cùng ID theo điểm neo ở trên;
+mở Hồ sơ nào đọc snapshot Hồ sơ đó, lấy vào Hồ sơ mới mặc định bộ mới nhất.
+Các bộ thông tin khác nhau vẫn được giữ qua những Hồ sơ đó. Revision chỉ phục vụ
 kiểm tra xung đột, không là kho snapshot các lần Lưu. Giữ raw/nguồn/history
 kỹ thuật đã có; cấu trúc vật lý snapshot còn thiết kế, chưa triển khai mới.
 [Quyết định](../../decisions/decision-owner-case-snapshot-as-history-20261021.md).

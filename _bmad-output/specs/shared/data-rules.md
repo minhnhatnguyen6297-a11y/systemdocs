@@ -27,8 +27,10 @@ chứng phải để trống hoặc cảnh báo, không tự điền.
 Hồ sơ (ai, tài sản gì, làm gì); mỗi Hồ sơ chỉ giữ một snapshot hiện hành.
 Lưu lại cùng Hồ sơ cập nhật snapshot đó, không tự tạo Hồ sơ mới hay giữ
 snapshot từng lần lưu/lịch sử sửa từng ô. Lịch sử Người/Tài sản là các Hồ sơ
-liên quan được user liên kết cùng ID; đọc snapshot của Hồ sơ user chọn,
-không tự lấy mới nhất hoặc gộp dữ kiện giữa Hồ sơ. Không mặc định thêm bảng
+liên quan cùng ID theo điểm neo bên dưới. Mỗi Hồ sơ đã lưu giữ bộ thông tin
+riêng, chỉ user sửa thủ công; không tự cập nhật theo danh mục hoặc Hồ sơ khác.
+Khi lấy Người/Tài sản vào Hồ sơ mới mặc định bộ mới nhất, không chọn phiên bản.
+Các bộ thông tin khác nhau vẫn giữ qua những Hồ sơ đó. Không mặc định thêm bảng
 phiên bản Người/Tài sản hoặc bitemporal. Một snapshot logic không bắt buộc
 một dòng JSON: cấu trúc bảng/cột còn thiết kế. Bộ đếm revision chống ghi đè
 khác với lưu nhiều snapshot. Raw, nguồn, `source_refs` và lịch sử kỹ thuật
@@ -116,8 +118,8 @@ tục file đã rõ. Không tắt production Scan/Upload; quyền runtime đã c
   Không gợi ý sinh/chết/giấy tờ Người từ `Đơn xin xác nhận`, không đi vòng
   qua inferred/normalized. Đây không xóa raw/history, liên kết Case/ID đã
   có hoặc cấm địa chỉ chung rõ phạm vi trong **cùng** văn bản.
-  Luật này không cấm gợi ý ID theo CCCD/liên kết user chọn theo policy mới
-  bên dưới; không đồng nghĩa cho phép auto enrichment/ghi đè master.
+  Luật này không cấm gom ID theo điểm neo ở policy bên dưới; không đồng nghĩa
+  cho phép mượn trường thiếu giữa văn bản hoặc tự đổi Hồ sơ đã lưu.
 - Thiếu ngày chết chỉ là không có thông tin: giữ null/rỗng, điền độc lập các
   trường có căn cứ được phép; không chặn Người vì thiếu ngày/giấy, tự coi
   còn sống, bịa ngày/01/01, Boolean hoặc trạng thái mới.
@@ -127,19 +129,21 @@ tục file đã rõ. Không tắt production Scan/Upload; quyền runtime đã c
   không đọc mẫu mới. Số giấy lưu thật, index không UNIQUE, identity theo ID
   chọn rõ/row_id chính hồ sơ, không auto lookup theo số/tên hoặc ghép giữa
   file. Snapshot không borrow master khi đã có key, kể cả null.
-- **Policy owner 21/10 thay UNIQUE `6eaf42b`, UX chưa triển khai:** một bảng
-  Người với `Customer.id` ổn định, chết vẫn là cùng Người. CCCD đã có DB
-  chỉ gợi ý ID cũ; user chọn thì liên kết dòng input và gợi ý biến mất.
-  Sai khác không chặn, lưu “thông tin liên kết” để user xem/xóa/sửa bất cứ
-  lúc nào. Không chọn/bỏ qua → ID mới, không auto merge. Không chặn khác tên
-  hoặc thêm xác nhận vì trùng tên. Gợi ý ID/liên kết explicit được duyệt
-  không đồng nghĩa tự đề xuất bổ sung nội dung/auto enrichment giữa văn bản,
-  chọn field thắng hoặc tự ghi đè master. Runtime cũ cập nhật master qua ID
-  rõ chưa chứng minh UX mới đã built. Lifecycle gợi ý bị bỏ qua và shape/key/
-  nơi lưu/cardinality thông tin liên kết còn mở ở
-  [#44](../../backlog/story-person-cccd-suggestion-link.md), không tự bịa
-  field/model/thao tác. Không làm conditional UNIQUE; giữ Case links/
-  raw/history/snapshot null. #41 OPEN/gate mẫu ĐÓNG, #42 độc lập.
+- **Policy owner 21/10 mới nhất, chưa triển khai:** tự gom Người cùng ID khi
+  **tên + số giấy tờ đồng thời giống nhau**; ngày cấp/địa chỉ khác vẫn cùng ID.
+  Chỉ trùng một trường không đủ; đổi tên hoặc số thì chấp nhận ID khác.
+  Tài sản gom theo **serial** giữ nguyên văn. Không đòi user bấm liên kết hoặc
+  chọn phiên bản. Tìm Người để xem các Hồ sơ đã làm. Một bảng Người cho sống/chết.
+  Khi lấy vào Hồ sơ mới mặc định bộ mới nhất; Hồ sơ đã lưu không tự cập nhật.
+  Thiếu điểm neo không gom theo rỗng và không chặn lưu Nháp. Chi tiết so sánh,
+  mốc “mới nhất”, Nháp thiếu trường làm nguồn hay không, chuyển ID cũ trùng neo
+  và schema còn thiết kế. Không tự ghép trường giữa nhiều Hồ sơ/văn bản.
+  Policy gợi ý CCCD/user chọn/bỏ qua tạo ID mới và kho “thông tin liên kết”
+  trước đó đã bị thay thế; [#44](../../backlog/story-person-cccd-suggestion-link.md)
+  chưa sẵn sàng triển khai theo tiêu chí cũ. Không khôi phục CCCD UNIQUE/chặn
+  luồng. Runtime cũ chưa thực hiện điểm neo mới; giữ Case links/raw/history/
+  snapshot null. #41 OPEN/gate mẫu ĐÓNG, #42 độc lập.
+  [Quyết định](../../decisions/decision-owner-entity-anchors-case-snapshots-20261021.md).
 - **Nguyên tắc bền vững cho task hiện tại/tương lai:** engine xử lý dữ liệu,
   không quyết định thay người dùng chịu trách nhiệm pháp lý. Không tự thêm
   business/UX gate hoặc đổi hành vi chưa báo và được owner duyệt; UX chưa rõ

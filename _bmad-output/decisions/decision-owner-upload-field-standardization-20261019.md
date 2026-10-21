@@ -600,3 +600,24 @@ UX gợi ý/liên kết/evidence mới. Proof lịch sử vẫn BUILT bounded tr
 Blocker hiện có chưa kiểm kê/xác minh, không claim audit toàn bộ hoặc tự gỡ
 kiểm tra tên/ngày/revision/khóa hồ sơ hay wire/security/FK/atomicity.
 Không tạo task audit tự động; không code/schema/tests/mẫu/DB audit trong lượt này.
+
+## Owner 21/10/2026 — thay policy gợi ý bằng điểm neo mặc định
+
+Quyết định sau cùng phiên **thay policy gợi ý CCCD/user chọn/bỏ qua tạo ID
+mới ở mục trước**, không khôi phục thiết kế CCCD UNIQUE. Người tự dùng cùng
+ID khi **tên + số giấy tờ đồng thời giống nhau**; ngày cấp/địa chỉ khác vẫn
+cùng ID. Đổi tên hoặc số chấp nhận ID khác. Tài sản gom theo **serial**.
+
+Khi lấy Người/Tài sản vào Hồ sơ mới mặc định bộ mới nhất, không chọn phiên
+bản. Hồ sơ đã lưu giữ snapshot riêng, chỉ user sửa thủ công; dữ liệu ở nơi
+khác không tự cập nhật ngược. Các bộ thông tin khác nhau vẫn giữ qua các Hồ
+sơ, không lịch sử từng ô/lần lưu. Tra cứu Người để xem các Hồ sơ đã làm.
+Người sống/chết vẫn cùng bảng; liên kết địa chỉ cũ–mới chưa chốt mô hình.
+
+Thiếu điểm neo không gom theo rỗng, không chặn lưu Nháp. Cách xác định “mới
+nhất” khi có Nháp thiếu trường, so sánh điểm neo, xử lý ID cũ trùng và schema
+còn thiết kế. Không tự mượn trường giữa văn bản hoặc xóa/chuyển dữ liệu cũ.
+Luồng “thông tin liên kết” và lifecycle gợi ý cũ không là yêu cầu mặc định.
+
+[Quyết định đầy đủ](decision-owner-entity-anchors-case-snapshots-20261021.md).
+Đây là thiết kế chưa triển khai; #44 còn cần refine lại, #41 mở/gate mẫu đóng.

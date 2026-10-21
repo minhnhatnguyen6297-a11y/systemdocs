@@ -11,7 +11,7 @@ khi ghi vào trường "khóa định danh". Giữ raw và nguồn gốc theo
 [`../_bmad-output/specs/README.md`](../_bmad-output/specs/README.md) mục 4; chuẩn hóa không được
 ghi đè bằng chứng gốc.
 
-Cập nhật: 03/10/2026 — Owner xác nhận lấy hành vi cuối MIN-141 khi gộp nhánh.
+Cập nhật: 21/10/2026 — bổ sung điểm neo gom ID; quy tắc chuẩn hóa giữ theo nguồn.
 
 ---
 
@@ -33,6 +33,8 @@ Cập nhật: 03/10/2026 — Owner xác nhận lấy hành vi cuối MIN-141 khi
 
 **Quy tắc thống nhất:** dù regex nào, giá trị đem đi so khớp phải là đúng 12 chữ
 số. Không so khớp một phần, không so khớp 9 số cuối.
+Đây là chuẩn của trường CCCD, không ép mọi số giấy tờ thành CCCD. Điểm neo
+Người ở §8.3 dùng tên + số giấy tờ đang có theo đúng loại dữ liệu nguồn.
 
 ---
 
@@ -50,6 +52,11 @@ số. Không so khớp một phần, không so khớp 9 số cuối.
 - Nguồn nhận dạng OCR hiện hành: `notary_v2/routers/ocr_ai.py:924-925,972`;
   thiết kế đã đồng bộ: `_bmad-output/specs/notaryoffice/intent-source.md` v1.0 §7.2
   (`[A-Z]{2}\s*\d{6,8}` — gợi ý trích xuất, không phải rule chặn nhập).
+- **Owner 21/10/2026, thiết kế chưa triển khai:** serial là điểm neo gom
+  các bộ thông tin Tài sản vào cùng ID. Thiếu serial không gom theo rỗng,
+  không chặn lưu Nháp. Serial chung nhiều thửa không cho phép mất các hàng
+  thửa/cụm đất; cấu trúc liên kết còn thiết kế. Khi lấy vào Hồ sơ mới dùng
+  bộ mới nhất; Hồ sơ đã lưu giữ snapshot riêng, không tự cập nhật ngược.
 
 ---
 
@@ -108,11 +115,12 @@ số. Không so khớp một phần, không so khớp 9 số cuối.
 
 ---
 
-## 6. Tên người — KHÔNG phải khóa
+## 6. Tên người — không đứng một mình để gom ID
 
 Trùng họ tên **không bao giờ** đủ để tự động ghép hai dữ liệu thành một hồ sơ.
-Được dùng để: xếp hạng ứng viên, tìm kiếm, hiển thị. Không được dùng để: tự động
-gán, tự động gộp record.
+Được dùng để tìm kiếm, hiển thị. Owner 21/10/2026 chốt **tên + số giấy tờ
+đồng thời giống nhau** là điểm neo tự dùng cùng ID Người (§8.3); tên riêng lẻ
+không đủ. Quy tắc đó không tự gộp các Hồ sơ thành một record.
 
 Lý do: tên Việt trùng lặp rất cao trong cùng một địa phương, và một lần gán sai
 trong nghề công chứng đắt hơn hai mươi lần gán đúng.
@@ -124,14 +132,17 @@ trong nghề công chứng đắt hơn hai mươi lần gán đúng.
 | Tham chiếu | Đối tượng/phạm vi | Được dùng để |
 |---|---|---|
 | CCCD 12 số | Người được giấy tờ định danh | Đối chiếu người; tìm hồ sơ có người đó, không tự gộp Case |
-| Serial GCN | Giấy chứng nhận, dẫn tới tài sản liên quan | Đối chiếu giấy tờ/tài sản; không suy ra một hồ sơ duy nhất |
+| Tên + số giấy tờ đồng thời | Người | Owner 21/10: tự dùng cùng ID Người; không tự gộp Case |
+| Serial GCN | Giấy chứng nhận, dẫn tới tài sản liên quan | Owner 21/10: điểm neo cùng ID Tài sản; không suy ra một hồ sơ duy nhất |
 | Thửa + tờ + địa phương | Thửa đất trong phạm vi địa phương | Xếp hạng tài sản/hồ sơ liên quan; giữ nguồn và bước xác nhận |
 | Số công chứng + năm + phạm vi sổ/đơn vị | Hồ sơ có tham chiếu công chứng | Liên kết khi đủ phạm vi và bằng chứng, không coi `xxx/yyyy` là ID toàn cục |
 | Số vào sổ GCN | Tham chiếu phụ giấy chứng nhận | Bổ sung bằng chứng, không đứng một mình để ghép hồ sơ |
 | Đường dẫn, họ tên | Ngữ cảnh yếu | Tìm kiếm/xếp hạng, không tự gán hoặc gộp record |
 
 Không có thứ tự mạnh/yếu chung để thay thế định danh người bằng định danh hồ
-sơ. Một người/tài sản có thể liên quan nhiều hồ sơ. Liên kết Case là inference
+sơ. Một người/tài sản có thể liên quan nhiều hồ sơ. Gom ID Người/Tài sản theo
+điểm neo owner chọn không đồng nghĩa gộp hoặc liên kết các Case xuyên module.
+Liên kết Case là inference
 có provenance, được người có thẩm quyền xác nhận theo owner; chuẩn hóa thành
 công không tự nâng dữ liệu thành `CONFIRMED`.
 
@@ -195,8 +206,8 @@ Hành vi cuối MIN-141, Owner xác nhận 03/10/2026:
   Không gợi ý sinh/chết/giấy tờ Người từ `Đơn xin xác nhận`, kể cả qua suy ra.
   Raw/history và liên kết Case/ID đã có giữ nguyên. Địa chỉ chung chỉ áp cho
   đúng người được chỉ rõ trong cùng văn bản, không chứng minh chung giấy.
-  Đây là luật không tự bổ sung nội dung giấy tờ; gợi ý ID theo CCCD và liên
-  kết user chọn ở §8.3 không bị cấm, cũng không cho tự ghi đè master.
+  Đây là luật không tự bổ sung nội dung giấy tờ; gom ID theo tên + số giấy tờ
+  ở §8.3 không bị cấm, không cho phép mượn trường thiếu giữa văn bản.
 - Khi người dùng sửa ngày cấp/ngày chết, hệ thống tính lại giá trị từng tự
   suy ra; giá trị người dùng đã sửa khác giá trị suy ra được giữ lại.
 - Word đọc giá trị đã commit trong snapshot của chính hồ sơ, kể cả null;
@@ -212,7 +223,7 @@ xã/phường cũ–mới còn ở NAIA-9, chưa có đường suy tự động 
 lưu nguyên giá trị vào `customers.so_giay_to`, index không UNIQUE; identity
 là `Customer.id`, không tự lookup/ghép theo số hoặc tên. Cập nhật Người qua
 ID đã chọn rõ hoặc `row_id` của chính hồ sơ đã lưu; hiện cùng số có thể tồn tại
-ở nhiều Người, kể cả CCCD; việc cho tạo ID mới được giữ trong policy mới.
+ở nhiều Người, kể cả CCCD. Đây là hiện trạng, chưa thực hiện điểm neo mới ở §8.3.
 Migration trước bootstrap giữ ID/FK/columns/defaults/checks/indexes/triggers
 và snapshot/history, rollback nguyên tử khi lỗi.
 Loại/nơi cấp và nhãn địa chỉ tiếp tục theo snapshot từng hồ sơ, không thêm
@@ -221,38 +232,34 @@ Ngữ cảnh chết thiếu ngày dùng loại giấy/nhãn `Nơi chết` hiện
 không Boolean mới. Master riêng không có context snapshot không thể phục
 hồi dữ kiện chết chưa lưu; không suy để lấp. #41 vẫn mở/chưa nghiệm thu toàn bộ.
 
-### 8.3. Owner 21/10/2026 — gợi ý CCCD, người dùng quyết định liên kết
+<a id="83-owner-21102026--gợi-ý-cccd-người-dùng-quyết-định-liên-kết"></a>
+### 8.3. Owner 21/10/2026 — tên + số giấy tờ là điểm neo gom Người
 
-**Quy tắc hiện hành thay thiết kế UNIQUE trong `6eaf42b`; chưa triển khai UX.**
-Một bảng Người, identity ổn định `Customer.id`; chết vẫn là chính Người,
-không tách bảng sống/chết. CCCD đã có trong DB không là lý do chặn tạo Người.
+**Quyết định mới thay policy gợi ý/user chọn ở `8b4e85f`; chưa triển khai.**
+Một bảng Người cho sống/chết; ID kỹ thuật vẫn là `Customer.id`.
 
-1. CCCD đã có trong DB → hiển thị gợi ý Người với ID hiện có.
-2. Người dùng bấm chọn gợi ý → liên kết dòng input hiện tại với **ID cũ**.
-3. Sau khi chọn, gợi ý đó biến mất.
-4. Các trường khác không khớp **không chặn** liên kết. Ghi thông tin khác
-   biệt vào **“thông tin liên kết”**, người dùng xem, xóa hoặc sửa bất cứ lúc nào.
-5. Không bấm/bỏ qua gợi ý → tạo **ID Người mới**, không tự merge.
-6. Cách xử lý gợi ý bị bỏ qua chưa được owner chọn; ghi riêng
-   [#44](../_bmad-output/backlog/story-person-cccd-suggestion-link.md),
-   không tự thêm dismiss/snooze/modal/nút hoặc bước xác nhận.
+- Đồng thời tên và số giấy tờ giống nhau → tự dùng cùng ID, không đòi user
+  bấm liên kết. Ngày cấp/địa chỉ khác vẫn cùng ID. Chỉ trùng một trong hai
+  không đủ; đổi tên hoặc số thì chấp nhận thành ID khác.
+- Không thêm loại giấy/ngày sinh/ngày cấp/địa chỉ vào điều kiện gom. Không
+  coi số giấy tờ riêng lẻ là UNIQUE toàn cục hoặc chặn vì số đã tồn tại.
+- Tìm Người để xem các Hồ sơ liên quan; không bắt đọc danh sách thay đổi từng
+  trường. Khi lấy Người vào Hồ sơ mới mặc định bộ mới nhất, không chọn phiên bản.
+- Mỗi Hồ sơ đã lưu giữ snapshot riêng, kể cả null; dữ liệu mới ở nơi khác
+  không tự đổi Hồ sơ cũ. User có thể sửa trực tiếp Hồ sơ theo quyền hiện hành.
+  Các bộ thông tin khác nhau vẫn giữ qua các Hồ sơ, không thêm lịch sử từng ô.
+- Thiếu tên/số chưa đủ để gom; không gom theo rỗng hoặc chặn lưu Nháp.
+  Cách cấp ID cho dòng thiếu dữ liệu, chi tiết so sánh tên/số, chọn mốc
+  “mới nhất” và xử lý nhiều ID cũ cùng điểm neo còn thiết kế.
+- Quy tắc gom ID không cho phép tự bổ sung dữ kiện giữa văn bản, xác nhận
+  dữ kiện thay user hoặc xóa/hợp nhất dữ liệu lịch sử. Không suy còn sống
+  từ ngày chết null. Không áp mô hình “thông tin liên kết” của policy cũ
+  làm yêu cầu mặc định; nguồn/bằng chứng đã có vẫn giữ.
 
-“Thông tin liên kết” là khái niệm nghiệp vụ owner nêu, chưa chọn shape/key/
-nơi lưu/cardinality; không phải tên cột/bảng/alias mới. #44 theo dõi thiết kế
-lưu bền và UX còn mở, không biến chúng thành gate bổ sung cho người dùng.
-Chọn liên kết cho phép ghi nhận sai khác, không tự chọn trường thắng, ghi
-đè master hay hợp nhất dữ liệu giữa văn bản. Cấm auto enrichment/merge vẫn
-giữ; gợi ý CCCD và liên kết do user chọn là hành vi được duyệt, không phải
-auto SUGGEST/JOIN nội dung giấy tờ. Không suy loại từ ngày chết null/ngày cấp/
-độ dài số; thiếu ngày chết chỉ là không có thông tin.
-
-Runtime `f6d53b5` đã cho số trùng và cập nhật master theo ID được chọn;
-chưa có đầy đủ UX gợi ý/liên kết/thông tin liên kết theo policy này.
-Không gọi thiết kế mới đã built. Không có yêu cầu làm conditional UNIQUE
-index/ngăn trùng CCCD; đề xuất chặn khác tên hoặc xác nhận thêm vì trùng tên
-của assistant cũng bị bác bỏ. Giữ ID/Case links, raw/history local và snapshot
-key null; không tự merge/xóa dữ liệu lịch sử. #41 OPEN/gate mẫu ĐÓNG,
-#42 nhiều giấy tờ/địa chỉ độc lập.
+Runtime `f6d53b5` vẫn không tự tìm theo tên/số và có thể cập nhật master khi
+ghi theo ID rõ; chưa thực hiện quy tắc mới. Không sửa schema/index trong
+quyết định này. #41 OPEN/gate mẫu ĐÓNG, #42 độc lập; #44 cần điều chỉnh theo
+[quyết định điểm neo/snapshot](../_bmad-output/decisions/decision-owner-entity-anchors-case-snapshots-20261021.md).
 
 ---
 

@@ -15,8 +15,10 @@ các bản ghi đó, không lưu thông tin vụn vặt”.
 - Lưu lại cùng Hồ sơ cập nhật snapshot hiện hành; sửa ô/lưu nhiều lần
   không tự sinh Hồ sơ mới hoặc một chuỗi snapshot của các lần lưu.
 - Lịch sử nghiệp vụ của Người/Tài sản được xem qua những Hồ sơ liên quan.
-  Liên kết cùng ID do user quyết định; lấy thông tin từ snapshot của Hồ sơ
-  user chọn, không tự lấy bản mới nhất hoặc ghép các Hồ sơ thành một.
+  **Làm rõ sau đó cùng phiên:** Người gom ID bằng tên + số giấy tờ đồng thời,
+  Tài sản bằng serial. Lấy vào Hồ sơ mới mặc định bộ mới nhất, không chọn phiên
+  bản. Mỗi Hồ sơ đã lưu giữ snapshot riêng, chỉ user sửa thủ công, không tự đổi
+  theo dữ liệu mới ở nơi khác. Các bộ thông tin khác nhau vẫn giữ qua các Hồ sơ.
 - Không thêm bảng phiên bản Người/Tài sản theo từng lần sửa, lịch sử từng ô
   hoặc bitemporal để đáp ứng yêu cầu lịch sử nghiệp vụ này.
 
@@ -35,11 +37,13 @@ hiểu không trở thành yêu cầu; không có schema đó đã được duy�
   lịch sử; giữ các bảo đảm ghi trọn vẹn/quyền ghi hiện hành.
 - Giữ raw, nguồn, `source_refs` và lịch sử kỹ thuật đã có theo quy tắc hiện
   hành; quyết định không cấp quyền xóa dữ liệu/lịch sử hoặc tạo logging mới.
-- #42 nhiều giấy tờ/địa chỉ, #44 thông tin liên kết và phạm vi schema toàn
-  #41 vẫn còn thiết kế. Không suy đã duyệt mô hình năm bảng minh họa.
+- #42 nhiều giấy tờ/địa chỉ và phạm vi schema toàn #41 vẫn còn thiết kế.
+  Policy user chọn liên kết ở #44 bị thay; không suy đã duyệt mô hình năm bảng.
 
 ## Hiệu lực
 
 Đồng bộ trong shared data-rules, spec Notary và sổ tay cùng phiên.
-Đây là quyết định thiết kế; chưa sửa runtime, DB/contract/schema hoặc chạy
+Yêu cầu chọn snapshot/ID do user trước đó đã được thay bằng
+[điểm neo và mặc định mới nhất](decision-owner-entity-anchors-case-snapshots-20261021.md).
+Đây là quyết định thiết kế; cập nhật văn bản contract, chưa sửa runtime/schema hoặc chạy
 migration/test. Brainstorming tiếp tục; #41 mở/gate mẫu đóng.

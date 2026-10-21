@@ -13,11 +13,20 @@ risk: high
 
 # Gợi ý CCCD và liên kết Người do người dùng chọn, không chặn luồng
 
+> **21/10/2026 — policy đã bị thay thế, chưa triển khai:** owner chốt tự dùng
+> cùng ID khi **tên + số giấy tờ đồng thời giống nhau**, không đòi user chọn
+> gợi ý. Ngày cấp/địa chỉ khác vẫn cùng ID; đổi tên/số chấp nhận ID khác.
+> Lấy vào Hồ sơ mới dùng bộ mới nhất, Hồ sơ đã lưu không tự cập nhật.
+> Nội dung bên dưới (mô tả, tiêu chí, giới hạn, ghi chú) giữ làm lịch sử thiết kế
+> cũ, **không dùng để thực thi**.
+> Chưa refine lại ticket/schema; `refined:false`, không tuyên bố built/done.
+> [Quyết định hiện hành](../decisions/decision-owner-entity-anchors-case-snapshots-20261021.md).
+
 ## Description
 
-Cho người dùng chọn liên kết dòng input với Người đã có khi CCCD có trong DB, hoặc bỏ qua để tạo Người mới. Sai khác không cản lựa chọn; người dùng quản lý thông tin liên kết. Owner cần chọn lifecycle của gợi ý bị bỏ qua; issue ghi riêng cả interaction này, chưa giao triển khai trong lượt docs.
+**Mô tả cũ đã bị thay:** cho người dùng chọn liên kết dòng input với Người đã có khi CCCD có trong DB, hoặc bỏ qua để tạo Người mới. Sai khác không cản lựa chọn; người dùng quản lý thông tin liên kết. Không tiếp tục thiết kế lifecycle gợi ý này làm luồng mặc định; phạm vi thay thế tra ở quyết định hiện hành.
 
-## Acceptance Criteria
+## Acceptance Criteria — lịch sử, đã bị thay thế
 
 1. **Gợi ý Người hiện có**
    **Given** CCCD của dòng input đã có trong DB.

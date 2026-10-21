@@ -58,26 +58,30 @@ Blocker hiện có chưa kiểm kê/xác minh; không tự gỡ safeguard hay cl
 **Snapshot — owner chốt 21/10/2026:** một record nghiệp vụ là một Hồ sơ,
 chỉ giữ một snapshot hiện hành. Lưu lại cập nhật snapshot đó; lịch sử là
 các Hồ sơ liên quan, không snapshot mỗi lần lưu hoặc lịch sử sửa từng ô.
-ID Người/Tài sản và liên kết do user quyết định; raw/nguồn/history kỹ thuật
-đã có vẫn giữ. [Quyết định](../decisions/decision-owner-case-snapshot-as-history-20261021.md).
+Hồ sơ đã lưu giữ dữ liệu riêng, chỉ user sửa thủ công; dữ liệu mới ở nơi khác
+không tự cập nhật ngược. Các bộ thông tin khác nhau của cùng ID vẫn giữ qua
+những Hồ sơ đó; raw/nguồn/history kỹ thuật đã có vẫn giữ.
+[Quyết định](../decisions/decision-owner-case-snapshot-as-history-20261021.md).
 **Hồ sơ nháp — owner duyệt 21/10/2026, chưa triển khai lưu tiến độ mới:**
 Nháp được lưu database để mở lại làm tiếp dù mới nhập một phần; giữ và hiện
 nhãn **Nháp** rõ khi hiển thị/thống kê/báo cáo có chứa Nháp. Mốc chuyển khỏi
 Nháp và cách tính trong từng báo cáo chưa chốt; cấu trúc lưu còn thiết kế.
 Xem [quy tắc Hồ sơ nháp](notary_v2/README.md#2-danh-sách-hồ-sơ) và
 [quyết định](../decisions/decision-owner-persistent-case-drafts-20261021.md).
-**Identity — thay UNIQUE của `6eaf42b`, docs-only:** một bảng Người,
-`Customer.id` ổn định, chết vẫn là cùng Người. CCCD đã có DB → gợi ý ID cũ;
-chọn → liên kết dòng input và gợi ý biến mất; sai khác không chặn, ghi
-“thông tin liên kết” để user xem/xóa/sửa bất cứ lúc nào. Không chọn/bỏ qua
-→ ID mới, không auto merge. Không tự chặn khác tên/xác nhận thêm vì trùng tên.
-[#44](../backlog/story-person-cccd-suggestion-link.md) làm riêng interaction
-này và lifecycle gợi ý bị bỏ qua còn chờ owner chọn; chưa chọn shape/key/nơi
-lưu/cardinality thông tin liên kết, không tự thêm thao tác/field/model.
-`f6d53b5` đã cho số trùng và cập nhật master theo ID explicit, chưa có đầy đủ
-UX gợi ý/liên kết/evidence mới; proof death subset lịch sử vẫn BUILT bounded.
-Không tự chọn field thắng/ghi đè master khi link; giữ Case links/raw/history/
-snapshot null. #41 OPEN/gate mẫu ĐÓNG; #42 độc lập. Không runtime/mẫu/prodDB.
+**Điểm neo — owner chốt 21/10 mới nhất, chưa triển khai:** tự dùng cùng ID
+Người khi **tên + số giấy tờ đồng thời giống nhau**; ngày cấp/địa chỉ khác vẫn
+cùng ID. Đổi tên/số chấp nhận ID khác. Tài sản gom theo **serial** nguyên văn.
+Khi lấy lại dữ liệu vào Hồ sơ mới mặc định bộ mới nhất, không chọn phiên bản.
+Tra cứu Người nhằm xem các Hồ sơ đã làm. Người sống/chết cùng bảng; liên kết
+địa chỉ cũ–mới còn mở. Thiếu điểm neo không gom rỗng, không chặn lưu Nháp.
+Mốc “mới nhất”/Nháp thiếu trường làm nguồn hay không, so sánh/chuyển ID cũ và
+schema tiếp tục thiết kế. Policy gợi ý CCCD/user chọn/bỏ qua tạo mới ở
+[#44](../backlog/story-person-cccd-suggestion-link.md) đã bị thay thế;
+không dùng tiêu chí cũ để triển khai hoặc khôi phục CCCD UNIQUE/chặn luồng.
+`f6d53b5` vẫn không tự tìm theo tên/số, có cập nhật master qua ID rõ; chưa
+thực hiện policy mới. Không tự ghép dữ kiện giữa văn bản/đổi snapshot nơi khác.
+#41 OPEN/gate mẫu ĐÓNG, #42 độc lập; chưa sửa runtime/schema/DB/mẫu.
+[Quyết định](../decisions/decision-owner-entity-anchors-case-snapshots-20261021.md).
 **Pháp nhân (owner 20/10/2026):** không đưa vào Người; policy nhập tay chung
 có ngoại lệ ngân hàng thế chấp **app tự lấy** bên dưới. Bảng riêng tương lai
 chưa duyệt schema/build; không bịa/default. **Cụm trường phụ website** theo hướng owner cho phép có điều kiện cho một ô
@@ -142,8 +146,8 @@ Giữ cơ quan xã/phường/thị trấn theo ngày cấp giấy, không ép x�
 chưa xác nhận. Không đề xuất bổ sung hoặc tự ghép giữa văn bản; không gợi ý
 từ Đơn xin xác nhận. Thiếu ngày chết là không có thông tin, có trường hợp
 lệ nào điền trường đó, không chặn Người/tự coi còn sống/tạo field mới.
-Luật nội dung giấy tờ này không cấm gợi ý ID/liên kết user chọn theo policy
-hiện hành ở trên, cũng không cho phép auto enrichment/ghi đè master.
+Luật nội dung giấy tờ này không cấm gom ID theo điểm neo ở trên, cũng không
+cho phép mượn trường thiếu giữa văn bản hoặc tự cập nhật Hồ sơ đã lưu.
 Logic câu Word/trường tĩnh giữ nguyên. Owner tiếp tục **“trien khai”**:
 workstream Người chết **đã BUILT bounded** (parser/intake, số thật lưu an toàn,
 migration/consumer/Word, UI legacy giới hạn); actual proof implementer-run

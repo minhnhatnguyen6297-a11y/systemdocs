@@ -286,8 +286,8 @@ backend hiện strip ngoài 10 key). `ho_ten` rỗng/`""` →
 - Mỗi văn bản độc lập: **không đề xuất bổ sung, không tự ghép giữa văn bản**
   kể cả cùng bộ hồ sơ, không mượn trường thiếu hoặc chọn bản đầy nhất/mới
   nhất. Không gợi ý sinh/chết/giấy tờ Người từ `Đơn xin xác nhận`.
-  Đây không cấm gợi ý ID theo CCCD/liên kết user chọn bên dưới; không được
-  biến lựa chọn liên kết thành auto enrichment hay tự ghi đè master.
+  Đây không cấm gom ID theo điểm neo bên dưới; không được tự mượn trường
+  thiếu giữa văn bản hoặc cập nhật ngược Hồ sơ đã lưu.
 - `ngay_chet=null` chỉ là không có thông tin ngày chết, không tự kết luận
   còn sống. Các trường hợp lệ khác được điền độc lập; thiếu ngày chết/giấy
   không chặn Người. Không tạo ngày giả/01/01, Boolean hoặc status mới.
@@ -302,18 +302,22 @@ borrow master. Ngày chết thiếu nhưng có loại giấy chết/nhãn Nơi c
 thì không derive CCCD/issuer người sống. Migration giữ IDs/FKs/history,
 không thêm field/version. Actual proof synthetic fresh+migrated DB/Word đạt;
 **BUILT bounded hẹp**, chưa nghiệm thu #41.
-**Policy owner 21/10 thay thiết kế UNIQUE của `6eaf42b`, UX chưa triển khai:**
-một bảng Người, `Customer.id` ổn định; chết vẫn là cùng Người. CCCD đã có DB
-thì gợi ý Người/ID cũ; user bấm chọn liên kết dòng input với ID đó, gợi ý
-biến mất. Sai khác trường không chặn, ghi vào “thông tin liên kết” để user
-xem/xóa/sửa bất cứ lúc nào. Không chọn/bỏ qua → tạo ID mới, không auto merge.
-Lifecycle gợi ý bị bỏ qua và shape/key/nơi lưu/cardinality thông tin liên kết
-còn mở trong [#44](../_bmad-output/backlog/story-person-cccd-suggestion-link.md);
-không tự thêm nút, modal hay xác nhận. Chưa chọn field/model vật lý.
-Liên kết explicit không tự chọn field thắng/ghi đè master hoặc auto enrichment
-giữa văn bản. Runtime hiện tại cập nhật master qua ID rõ, chưa có đầy đủ UX này;
-không coi đó là thực hiện policy mới. Chi tiết ở [entities §8.3](entities.md#83-owner-21102026--gợi-ý-cccd-người-dùng-quyết-định-liên-kết).
-#41 OPEN/gate mẫu ĐÓNG; #42 độc lập. Không làm conditional UNIQUE/chặn CCCD.
+**Policy owner 21/10 mới nhất, chưa triển khai:** tự dùng cùng ID Người khi
+đồng thời **tên + số giấy tờ** giống nhau; ngày cấp/địa chỉ khác không tách ID.
+Đổi tên hoặc số thì chấp nhận ID khác. Tài sản gom theo **serial** nguyên văn.
+Không bắt user chọn liên kết hay phiên bản. Khi lấy Người/Tài sản vào Hồ sơ mới
+mặc định bộ mới nhất; mỗi Hồ sơ đã lưu giữ snapshot riêng, không tự cập nhật
+ngược, user vẫn sửa thủ công được. Các bộ khác nhau giữ qua những Hồ sơ đó;
+không lưu chuỗi thay đổi từng ô/lần lưu. Tìm Người nhằm xem các Hồ sơ đã làm.
+Thiếu điểm neo không gom theo rỗng, không chặn lưu Nháp. Mốc “mới nhất”, Nháp
+thiếu trường làm nguồn hay không, chi tiết so sánh và xử lý ID cũ trùng neo còn
+thiết kế; không tự ghép trường giữa nhiều văn bản để tạo bộ đầy đủ nhất.
+Một bảng Người cho sống/chết; thiếu ngày chết không suy còn sống. Luồng gợi ý
+CCCD/user chọn/bỏ qua tạo mới và “thông tin liên kết” ở #44 đã bị thay thế,
+không phải yêu cầu mặc định. Runtime ở trên chưa thực hiện policy mới.
+Chi tiết [entities §8.3](entities.md#83-owner-21102026--tên--số-giấy-tờ-là-điểm-neo-gom-người)
+và [quyết định](../_bmad-output/decisions/decision-owner-entity-anchors-case-snapshots-20261021.md).
+#41 OPEN/gate mẫu ĐÓNG; #42 độc lập. Chưa chốt schema/index hoặc migration.
 
 - **Key canonical (MIN-141 đợt 3):** server đọc được cả key wire legacy
   trên và tên nghiệp vụ canonical liền không dấu (entities.md §9.1):
