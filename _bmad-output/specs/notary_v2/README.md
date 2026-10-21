@@ -152,22 +152,31 @@ có thông tin: giữ `null`/rỗng, các trường có căn cứ được phép
 không chặn Người vì thiếu ngày/giấy, không tự coi còn sống hoặc tạo ngày giả/
 Boolean/status. Địa chỉ chung rõ phạm vi và nhắc lại cùng người trong một
 văn bản vẫn theo nguồn khi không mâu thuẫn; không suy chung giấy.
+Luật nội dung giấy tờ này không cấm gợi ý ID/liên kết user chọn theo luồng
+bên dưới; không cho phép auto enrichment hoặc tự ghi đè master.
 Raw/history/liên kết đã có giữ nguyên. Runtime hiện tại lưu số giấy nguyên
-giá trị, không UNIQUE/tự ghép theo số; còn gap trùng CCCD, không phải chuẩn
-đích toàn bộ. Cập nhật chỉ theo ID chọn rõ hoặc row_id của chính hồ sơ.
+giá trị, không UNIQUE/tự ghép theo số, cho số CCCD trùng. Cập nhật theo ID
+chọn rõ hoặc row_id của chính hồ sơ; đây chưa phải UX liên kết mới.
 Snapshot giữ bằng chứng loại/nơi cấp/nhãn, kể cả chết thiếu ngày.
 Migration/consumer đã được actual proof synthetic (fresh+migrated DB, exact
 Word; UI legacy giới hạn); **BUILT bounded**, chưa nghiệm thu toàn #41.
-**Owner “chốt” 21/10 — thiết kế, chưa triển khai:** một bảng Người,
-`Customer.id` ổn định; chết vẫn là cùng Người. CCCD có loại giấy tờ xác nhận
-đáng tin cậy phải UNIQUE; số khai tử/chứng tử không UNIQUE toàn cục.
-Không dùng ngày chết null/ngày cấp/độ dài số để phân loại. CCCD xác nhận đã
-tồn tại thì không tạo ID mới, không tự ghi đè/merge; user chọn rõ Người
-hiện có không cho phép enrichment giữa văn bản. Cần duyệt lưu bền loại
-canonical trước index/migration; snapshot/derived master chưa đủ enforce,
-chưa chọn field/model vật lý và chưa triển khai conditional index.
-Audit trùng tương lai không merge/xóa IDs, giữ Case links.
-Gap #41 OPEN/gate mẫu ĐÓNG; #42 riêng.
+
+**Luồng Người owner duyệt 21/10 — thay UNIQUE `6eaf42b`, chưa triển khai UX:**
+1. CCCD đã có DB → hiển thị gợi ý Người/ID cũ.
+2. User bấm chọn → liên kết dòng input hiện tại với ID cũ.
+3. Gợi ý đã chọn biến mất.
+4. Sai khác trường không chặn; ghi “thông tin liên kết” cho user xem/xóa/sửa
+   bất cứ lúc nào, không tự chọn field thắng/ghi đè master.
+5. Không chọn/bỏ qua → tạo ID mới, không auto merge.
+6. Lifecycle gợi ý bị bỏ qua chưa chốt, ghi
+   [#44](../../backlog/story-person-cccd-suggestion-link.md) để làm riêng;
+   không tự thêm dismiss/snooze/modal/nút/xác nhận.
+
+Một bảng Người, `Customer.id` ổn định; chết vẫn là cùng Người. Không chặn
+CCCD trùng/khác tên hoặc thêm xác nhận trùng tên. Shape/key/nơi lưu/
+cardinality “thông tin liên kết” chưa chọn, không tự thêm field/model hay
+gate. Link explicit không phải auto enrichment giữa văn bản. #41 OPEN/gate
+mẫu ĐÓNG, #42 độc lập; giữ Case links/raw/history/snapshot null.
 
 Tên và định dạng trường giữ chuẩn DB; alias cũ cần ánh xạ. Hai alias của cùng trường trái nhau phải báo lỗi, không chọn ngầm. Cụm đất lưu `property_land_rows`, duy nhất theo tài sản và vị trí; JSON cũ chỉ tương thích. Tên token cụm viết đủ `loaidat<M><N>`, `dientich<M><N>`, `thoihan<M><N>`: M là cụm, N là tài sản; không thêm dạng rút gọn gây lẫn cụm 12 với tài sản 2.
 

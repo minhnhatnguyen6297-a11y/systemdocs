@@ -526,7 +526,10 @@ không duyệt #42/A04/quan hệ, không mở gate mẫu chung. Lịch sử chư
 supported-format/format coverage, historical issuer lookup và packaged
 Electron vẫn là giới hạn, không được gọi đã giải quyết.
 
-## Owner “chốt” — 21/10/2026, duyệt thiết kế identity, chỉ cập nhật tài liệu
+## Lịch sử owner “chốt” — 21/10/2026, thiết kế UNIQUE ĐÃ BỊ THAY THẾ
+
+**Superseded:** mục policy tiếp theo thay UNIQUE/chặn tạo ID và prerequisite
+index/migration trong mục này; giữ lại nội dung để truy lịch sử `6eaf42b`.
 
 **Nguyên văn owner:** “chốt”, duyệt đề xuất trước đó. Đây là phê duyệt thiết
 kế khái niệm, **không phải lệnh triển khai runtime/migration**.
@@ -560,3 +563,40 @@ Giữ nguyên ba loại giấy khai tử/chứng tử canonical, sáu quy tắc 
 cấm cross-document SUGGEST/JOIN, cấm confirmation hints và điền trường có
 căn cứ khi thiếu ngày. Raw/history PII tại local và snapshot key null giữ
 nguyên. Không mở mô hình nhiều giấy/địa chỉ #42, thực thể thứ tư hay field mới.
+
+## Owner 21/10/2026 — gợi ý/liên kết do người dùng chọn, thay thiết kế UNIQUE
+
+**Nguyên văn yêu cầu ghi việc riêng:** “Ghi issue để làm riêng”.
+Các quy tắc dưới đây tóm tắt chỉ đạo mới của owner, không phải câu trích
+nguyên văn hay quyền triển khai runtime trong lượt này.
+
+- Không tự bịa code/quy tắc chặn luồng hoặc đổi hành vi khi chưa báo và được
+  owner duyệt. Trong sản phẩm pháp lý, người dùng chịu trách nhiệm bước quan
+  trọng; engine xử lý dữ liệu, không quyết định thay người dùng.
+- CCCD đã có DB → hiển thị gợi ý Người/ID cũ. User bấm chọn → dòng input hiện
+  tại liên kết ID cũ và gợi ý biến mất. Sai khác trường **không chặn**; ghi
+  vào **“thông tin liên kết”** để user xem, xóa, sửa bất cứ lúc nào.
+- Không chọn/bỏ qua gợi ý → tạo ID mới, không auto merge. Cách làm gợi ý bị
+  bỏ qua biến mất chưa được chọn; [#44](../backlog/story-person-cccd-suggestion-link.md)
+  theo dõi riêng cả interaction và UX còn mở. Không tự thêm dismiss/snooze/
+  modal/nút/xác nhận hay biến câu hỏi UX thành gate cho người dùng.
+- “Thông tin liên kết” chưa có shape/key/nơi lưu/cardinality được chọn.
+  Không tự đặt field/bảng/alias hoặc chọn field thắng/ghi đè master.
+  Liên kết explicit cho phép ghi nhận sai khác, không phải auto enrichment
+  giữa văn bản; cấm auto ghép và dùng confirmation hints vẫn giữ.
+- UNIQUE/chặn trùng CCCD của thiết kế `6eaf42b` bị thay thế. Đề xuất assistant
+  chặn khác tên hoặc thêm xác nhận vì trùng tên cũng bị bác bỏ; không gán
+  chúng thành quy tắc owner. Không còn prerequisite làm conditional index.
+- Ưu tiên thiết kế tối thiểu: 80% kết quả hơn 90% cộng 10 thao tác. Đây không
+  phải cho phép dữ liệu sai/fake confidence hay xóa provenance. Mọi task
+  tương lai theo policy không thêm gate chưa duyệt; chưa rõ UX thì ghi issue.
+
+Một bảng Người/`Customer.id` ổn định; chết vẫn là cùng Người, không mở #42/
+entity mới. Giữ raw/history local, Case links và snapshot key null, không
+auto merge/xóa lịch sử. Ba loại giấy chết canonical và sáu quy tắc giữ nguyên.
+Hiện trạng `f6d53b5` cho số trùng, cập nhật master theo ID rõ; chưa có đầy đủ
+UX gợi ý/liên kết/evidence mới. Proof lịch sử vẫn BUILT bounded trong phạm vi
+đã ghi, không chứng minh policy mới implemented. #41 OPEN/gate mẫu ĐÓNG.
+Blocker hiện có chưa kiểm kê/xác minh, không claim audit toàn bộ hoặc tự gỡ
+kiểm tra tên/ngày/revision/khóa hồ sơ hay wire/security/FK/atomicity.
+Không tạo task audit tự động; không code/schema/tests/mẫu/DB audit trong lượt này.

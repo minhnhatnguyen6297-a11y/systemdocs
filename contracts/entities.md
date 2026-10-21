@@ -195,6 +195,8 @@ Hành vi cuối MIN-141, Owner xác nhận 03/10/2026:
   Không gợi ý sinh/chết/giấy tờ Người từ `Đơn xin xác nhận`, kể cả qua suy ra.
   Raw/history và liên kết Case/ID đã có giữ nguyên. Địa chỉ chung chỉ áp cho
   đúng người được chỉ rõ trong cùng văn bản, không chứng minh chung giấy.
+  Đây là luật không tự bổ sung nội dung giấy tờ; gợi ý ID theo CCCD và liên
+  kết user chọn ở §8.3 không bị cấm, cũng không cho tự ghi đè master.
 - Khi người dùng sửa ngày cấp/ngày chết, hệ thống tính lại giá trị từng tự
   suy ra; giá trị người dùng đã sửa khác giá trị suy ra được giữ lại.
 - Word đọc giá trị đã commit trong snapshot của chính hồ sơ, kể cả null;
@@ -210,7 +212,7 @@ xã/phường cũ–mới còn ở NAIA-9, chưa có đường suy tự động 
 lưu nguyên giá trị vào `customers.so_giay_to`, index không UNIQUE; identity
 là `Customer.id`, không tự lookup/ghép theo số hoặc tên. Cập nhật Người qua
 ID đã chọn rõ hoặc `row_id` của chính hồ sơ đã lưu; hiện cùng số có thể tồn tại
-ở nhiều Người, kể cả CCCD — đây là gap đã biết, không phải chuẩn đích.
+ở nhiều Người, kể cả CCCD; việc cho tạo ID mới được giữ trong policy mới.
 Migration trước bootstrap giữ ID/FK/columns/defaults/checks/indexes/triggers
 và snapshot/history, rollback nguyên tử khi lỗi.
 Loại/nơi cấp và nhãn địa chỉ tiếp tục theo snapshot từng hồ sơ, không thêm
@@ -219,28 +221,38 @@ Ngữ cảnh chết thiếu ngày dùng loại giấy/nhãn `Nơi chết` hiện
 không Boolean mới. Master riêng không có context snapshot không thể phục
 hồi dữ kiện chết chưa lưu; không suy để lấp. #41 vẫn mở/chưa nghiệm thu toàn bộ.
 
-### 8.3. Owner “chốt” 21/10/2026 — thiết kế identity được duyệt, chưa triển khai
+### 8.3. Owner 21/10/2026 — gợi ý CCCD, người dùng quyết định liên kết
 
-Một bảng Người, identity ổn định `Customer.id`; Người chết vẫn là chính Người
-đó, không tách bảng sống/chết. CCCD có **loại giấy tờ được xác nhận đáng tin cậy**
-phải UNIQUE; số khai tử/chứng tử không UNIQUE toàn cục. Không phân loại để
-enforce bằng `ngay_chet` null, ngày cấp hoặc độ dài/chữ số của số giấy.
-Thiếu ngày chết chỉ là không có thông tin ngày chết.
+**Quy tắc hiện hành thay thiết kế UNIQUE trong `6eaf42b`; chưa triển khai UX.**
+Một bảng Người, identity ổn định `Customer.id`; chết vẫn là chính Người,
+không tách bảng sống/chết. CCCD đã có trong DB không là lý do chặn tạo Người.
 
-Khi tạo Người với CCCD đã xác nhận đã tồn tại: không tạo ID mới, không tự
-ghi đè/merge trường; người dùng phải chọn rõ Người hiện có nếu muốn dùng lại.
-Đây là ngăn trùng có điều kiện, không auto matching/merge và không cho phép
-bổ sung/đề xuất/ghép dữ kiện giữa văn bản kể cả khi đã chọn Người.
+1. CCCD đã có trong DB → hiển thị gợi ý Người với ID hiện có.
+2. Người dùng bấm chọn gợi ý → liên kết dòng input hiện tại với **ID cũ**.
+3. Sau khi chọn, gợi ý đó biến mất.
+4. Các trường khác không khớp **không chặn** liên kết. Ghi thông tin khác
+   biệt vào **“thông tin liên kết”**, người dùng xem, xóa hoặc sửa bất cứ lúc nào.
+5. Không bấm/bỏ qua gợi ý → tạo **ID Người mới**, không tự merge.
+6. Cách xử lý gợi ý bị bỏ qua chưa được owner chọn; ghi riêng
+   [#44](../_bmad-output/backlog/story-person-cccd-suggestion-link.md),
+   không tự thêm dismiss/snooze/modal/nút hoặc bước xác nhận.
 
-Loại trong snapshot hoặc thuộc tính master suy ra hiện có chưa đủ để DB
-enforce quy tắc này. Cần duyệt thiết kế lưu bền loại giấy tờ canonical trước
-khi chọn index/migration; chưa chọn tên cột/key, kiểu hoặc model vật lý.
-Chưa triển khai conditional index. Audit trùng và migration là việc tương lai
-được giao riêng: không tự merge/xóa ID, giữ Case links, raw/history và snapshot
-có key null; không audit production DB trong lượt chốt docs.
-Quy tắc này thay ý định “mọi số giấy đều không UNIQUE”, không thay sự thật
-runtime/proof hẹp ở §8.2. Bảo vệ trùng CCCD còn OPEN trong #41; gate mẫu ĐÓNG,
-#42 nhiều giấy tờ/địa chỉ độc lập, không mở rộng model trong quyết định này.
+“Thông tin liên kết” là khái niệm nghiệp vụ owner nêu, chưa chọn shape/key/
+nơi lưu/cardinality; không phải tên cột/bảng/alias mới. #44 theo dõi thiết kế
+lưu bền và UX còn mở, không biến chúng thành gate bổ sung cho người dùng.
+Chọn liên kết cho phép ghi nhận sai khác, không tự chọn trường thắng, ghi
+đè master hay hợp nhất dữ liệu giữa văn bản. Cấm auto enrichment/merge vẫn
+giữ; gợi ý CCCD và liên kết do user chọn là hành vi được duyệt, không phải
+auto SUGGEST/JOIN nội dung giấy tờ. Không suy loại từ ngày chết null/ngày cấp/
+độ dài số; thiếu ngày chết chỉ là không có thông tin.
+
+Runtime `f6d53b5` đã cho số trùng và cập nhật master theo ID được chọn;
+chưa có đầy đủ UX gợi ý/liên kết/thông tin liên kết theo policy này.
+Không gọi thiết kế mới đã built. Không có yêu cầu làm conditional UNIQUE
+index/ngăn trùng CCCD; đề xuất chặn khác tên hoặc xác nhận thêm vì trùng tên
+của assistant cũng bị bác bỏ. Giữ ID/Case links, raw/history local và snapshot
+key null; không tự merge/xóa dữ liệu lịch sử. #41 OPEN/gate mẫu ĐÓNG,
+#42 nhiều giấy tờ/địa chỉ độc lập.
 
 ---
 

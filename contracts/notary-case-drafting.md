@@ -254,7 +254,7 @@ person_row:
   ngay_sinh: <YYYY-MM-DD | YYYY | null>
   ngay_chet: <YYYY-MM-DD | YYYY | null>   # null = không có thông tin ngày chết
   so_giay_to: <string | null>        # số giấy người sống hoặc khai tử/chứng tử;
-                                     # free text; không phải ID Người; CCCD UNIQUE theo loại xác nhận (§8.3 entities), chưa triển khai
+                                     # free text, được trùng; gợi ý/liên kết do user chọn (§8.3 entities), UX chưa triển khai
   ngay_cap: <YYYY-MM-DD | YYYY | null>
   noi_cap: <string | null>
   dia_chi: <string | null>
@@ -286,13 +286,15 @@ backend hiện strip ngoài 10 key). `ho_ten` rỗng/`""` →
 - Mỗi văn bản độc lập: **không đề xuất bổ sung, không tự ghép giữa văn bản**
   kể cả cùng bộ hồ sơ, không mượn trường thiếu hoặc chọn bản đầy nhất/mới
   nhất. Không gợi ý sinh/chết/giấy tờ Người từ `Đơn xin xác nhận`.
+  Đây không cấm gợi ý ID theo CCCD/liên kết user chọn bên dưới; không được
+  biến lựa chọn liên kết thành auto enrichment hay tự ghi đè master.
 - `ngay_chet=null` chỉ là không có thông tin ngày chết, không tự kết luận
   còn sống. Các trường hợp lệ khác được điền độc lập; thiếu ngày chết/giấy
   không chặn Người. Không tạo ngày giả/01/01, Boolean hoặc status mới.
   Không xóa raw/history, phá liên kết đã có hoặc đổi logic câu Word.
 
 **Identity/persistence hiện tại (không phải chuẩn đích toàn bộ):** số giấy
-không UNIQUE, không lookup/ghép Người theo số/tên; còn gap trùng CCCD.
+không UNIQUE, không lookup/ghép Người theo số/tên; cho phép số CCCD trùng.
 Chỉ ID được chọn rõ hoặc row_id trong snapshot của chính hồ sơ cập nhật
 lại cùng Người; trùng entity vẫn bị từ chối.
 Loại/nơi cấp/nhãn nguồn giữ trong snapshot; key đã có kể cả null chặn
@@ -300,17 +302,18 @@ borrow master. Ngày chết thiếu nhưng có loại giấy chết/nhãn Nơi c
 thì không derive CCCD/issuer người sống. Migration giữ IDs/FKs/history,
 không thêm field/version. Actual proof synthetic fresh+migrated DB/Word đạt;
 **BUILT bounded hẹp**, chưa nghiệm thu #41.
-**Thiết kế owner “chốt” 21/10, chưa triển khai:** một bảng Người với
-`Customer.id` ổn định, chết vẫn là cùng Người. CCCD theo loại giấy tờ xác nhận
-đáng tin cậy phải UNIQUE; số khai tử/chứng tử không UNIQUE toàn cục.
-Tạo Người với CCCD xác nhận đã tồn tại phải không tạo ID mới hoặc tự ghi
-đè/merge trường; dùng lại qua lựa chọn rõ của user, không enrichment giữa
-văn bản. Không dùng ngày chết null/ngày cấp/độ dài số để phân loại.
-Theo [entities §8.3](entities.md#83-owner-chốt-21102026--thiết-kế-identity-được-duyệt-chưa-triển-khai),
-cần duyệt lưu bền loại canonical trước index/migration; snapshot/derived
-master hiện tại chưa đủ enforce. Chưa chọn field/model vật lý hoặc triển khai
-conditional index; audit trùng tương lai không merge/xóa IDs, giữ Case links.
-#41 OPEN/gate mẫu ĐÓNG; #42 độc lập.
+**Policy owner 21/10 thay thiết kế UNIQUE của `6eaf42b`, UX chưa triển khai:**
+một bảng Người, `Customer.id` ổn định; chết vẫn là cùng Người. CCCD đã có DB
+thì gợi ý Người/ID cũ; user bấm chọn liên kết dòng input với ID đó, gợi ý
+biến mất. Sai khác trường không chặn, ghi vào “thông tin liên kết” để user
+xem/xóa/sửa bất cứ lúc nào. Không chọn/bỏ qua → tạo ID mới, không auto merge.
+Lifecycle gợi ý bị bỏ qua và shape/key/nơi lưu/cardinality thông tin liên kết
+còn mở trong [#44](../_bmad-output/backlog/story-person-cccd-suggestion-link.md);
+không tự thêm nút, modal hay xác nhận. Chưa chọn field/model vật lý.
+Liên kết explicit không tự chọn field thắng/ghi đè master hoặc auto enrichment
+giữa văn bản. Runtime hiện tại cập nhật master qua ID rõ, chưa có đầy đủ UX này;
+không coi đó là thực hiện policy mới. Chi tiết ở [entities §8.3](entities.md#83-owner-21102026--gợi-ý-cccd-người-dùng-quyết-định-liên-kết).
+#41 OPEN/gate mẫu ĐÓNG; #42 độc lập. Không làm conditional UNIQUE/chặn CCCD.
 
 - **Key canonical (MIN-141 đợt 3):** server đọc được cả key wire legacy
   trên và tên nghiệp vụ canonical liền không dấu (entities.md §9.1):

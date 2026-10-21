@@ -50,18 +50,23 @@ nghiệp vụ; vẫn giữ thời hạn đất và timeout kỹ thuật. Portal 
 thì ghi xung đột để refine, không bịa/default hay tự chọn bước nhập tay.
 [#42 Người nhiều giấy tờ và địa chỉ](../backlog/story-person-multiple-identities-addresses.md)
 là issue riêng, model tương lai chưa chọn, không tự là prerequisite #41.
-**Identity — owner “chốt” 21/10/2026, docs-only:** một bảng Người, ID
-`Customer.id` ổn định, chết vẫn là cùng Người. CCCD theo loại giấy tờ xác
-nhận đáng tin cậy phải UNIQUE; số khai tử/chứng tử không UNIQUE toàn cục.
-Tạo với CCCD xác nhận đã tồn tại không tạo ID mới hoặc tự ghi đè/merge;
-dùng lại qua user chọn rõ không cho phép enrichment giữa văn bản.
-Không dùng ngày chết null/ngày cấp/độ dài số làm loại. Cần duyệt lưu bền
-loại canonical trước index/migration, chưa chọn field/model vật lý.
-**Gap hiện tại:** commit `f6d53b5` đã bỏ global UNIQUE/merge theo số; runtime
-một Người/death subset và proof lịch sử vẫn BUILT bounded, nhưng bảo vệ
-trùng CCCD chưa triển khai, chưa có conditional index. Audit trùng tương
-lai không tự merge/xóa IDs, giữ Case links/raw/history/snapshot null.
-Không mở mẫu/prodDB hoặc rollback code; #41 OPEN/gate mẫu ĐÓNG, #42 độc lập.
+**Policy owner 21/10/2026, áp dụng cả task tương lai:** máy xử lý dữ liệu,
+không quyết định thay người dùng. Không thêm business/UX gate hoặc đổi hành
+vi chưa báo và được owner duyệt. Ưu tiên tối thiểu: 80% kết quả hơn 90% cộng
+10 thao tác, không phải quyền làm sai dữ liệu/xóa nguồn. UX chưa rõ ghi issue.
+Blocker hiện có chưa kiểm kê/xác minh; không tự gỡ safeguard hay claim đã audit.
+**Identity — thay UNIQUE của `6eaf42b`, docs-only:** một bảng Người,
+`Customer.id` ổn định, chết vẫn là cùng Người. CCCD đã có DB → gợi ý ID cũ;
+chọn → liên kết dòng input và gợi ý biến mất; sai khác không chặn, ghi
+“thông tin liên kết” để user xem/xóa/sửa bất cứ lúc nào. Không chọn/bỏ qua
+→ ID mới, không auto merge. Không tự chặn khác tên/xác nhận thêm vì trùng tên.
+[#44](../backlog/story-person-cccd-suggestion-link.md) làm riêng interaction
+này và lifecycle gợi ý bị bỏ qua còn chờ owner chọn; chưa chọn shape/key/nơi
+lưu/cardinality thông tin liên kết, không tự thêm thao tác/field/model.
+`f6d53b5` đã cho số trùng và cập nhật master theo ID explicit, chưa có đầy đủ
+UX gợi ý/liên kết/evidence mới; proof death subset lịch sử vẫn BUILT bounded.
+Không tự chọn field thắng/ghi đè master khi link; giữ Case links/raw/history/
+snapshot null. #41 OPEN/gate mẫu ĐÓNG; #42 độc lập. Không runtime/mẫu/prodDB.
 **Pháp nhân (owner 20/10/2026):** không đưa vào Người; policy nhập tay chung
 có ngoại lệ ngân hàng thế chấp **app tự lấy** bên dưới. Bảng riêng tương lai
 chưa duyệt schema/build; không bịa/default. **Cụm trường phụ website** theo hướng owner cho phép có điều kiện cho một ô
@@ -126,6 +131,8 @@ Giữ cơ quan xã/phường/thị trấn theo ngày cấp giấy, không ép x�
 chưa xác nhận. Không đề xuất bổ sung hoặc tự ghép giữa văn bản; không gợi ý
 từ Đơn xin xác nhận. Thiếu ngày chết là không có thông tin, có trường hợp
 lệ nào điền trường đó, không chặn Người/tự coi còn sống/tạo field mới.
+Luật nội dung giấy tờ này không cấm gợi ý ID/liên kết user chọn theo policy
+hiện hành ở trên, cũng không cho phép auto enrichment/ghi đè master.
 Logic câu Word/trường tĩnh giữ nguyên. Owner tiếp tục **“trien khai”**:
 workstream Người chết **đã BUILT bounded** (parser/intake, số thật lưu an toàn,
 migration/consumer/Word, UI legacy giới hạn); actual proof implementer-run

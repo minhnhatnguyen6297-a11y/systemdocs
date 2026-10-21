@@ -529,7 +529,11 @@ hạn programmatic DOM, không nút Add/search-picker đầy đủ). Không clai
 independent review, Electron packaged,
 national coverage hoặc toàn #41; mẫu owner/corpus/prodDB/provider/portal không chạy.
 
-### Owner “chốt” identity — 21/10/2026, duyệt thiết kế, không giao runtime
+### Lịch sử owner “chốt” identity — 21/10/2026, ĐÃ BỊ THAY THẾ
+
+**Superseded:** policy gợi ý/liên kết không chặn bên dưới thay toàn bộ yêu
+cầu UNIQUE, prerequisite index/migration và nhận định “gap bảo vệ trùng CCCD”
+trong mục lịch sử này; không dùng nó làm AC hiện hành.
 
 Quyết định bổ sung trong phạm vi #41, không tạo issue mới hoặc mở #42:
 một bảng Người, `Customer.id` ổn định; chết vẫn là chính Người. CCCD theo
@@ -551,3 +555,23 @@ lai không tự merge/xóa IDs, giữ Case links, raw/history local và snapshot
 có key null. Không audit production DB, đọc mẫu/corpus hoặc chạy test mới.
 Ba loại canonical và sáu quy tắc owner giữ nguyên. #41 OPEN/`refined:false`,
 gate mẫu ĐÓNG; #42 độc lập/chưa chọn model, không mở entity/broad flow mới.
+
+### Policy mới của owner — 21/10/2026, docs + issue, không triển khai
+
+CCCD có trong DB chỉ gợi ý ID cũ. User chọn → dòng input liên kết ID cũ,
+gợi ý biến mất. Sai khác không chặn, ghi “thông tin liên kết” để user
+xem/xóa/sửa bất cứ lúc nào. Không chọn/bỏ qua → ID mới; không auto merge.
+Đề xuất UNIQUE/chặn CCCD, chặn khác tên hoặc xác nhận thêm vì trùng tên
+đã bị bác bỏ/thay thế; không còn prerequisite lưu loại để làm unique index.
+
+[#44](story-person-cccd-suggestion-link.md) là issue riêng cho interaction
+và lifecycle gợi ý bị bỏ qua chưa chốt, không nhét vào #42. Shape/key/nơi
+lưu/cardinality thông tin liên kết chưa chọn, không bịa field/model hoặc
+field thắng/ghi đè master. Runtime `f6d53b5` cho số trùng/cập nhật master qua
+ID explicit chưa phải đầy đủ UX mới; proof lịch sử giữ đúng phạm vi.
+Một bảng Người/ID ổn định, death subset, raw/history/Case links/snapshot null
+giữ nguyên. #41 OPEN/`refined:false`, gate mẫu ĐÓNG; #42 độc lập.
+Policy mọi task: không tự thêm gate/đổi hành vi chưa báo và owner duyệt;
+ưu tiên tối thiểu 80% hơn 90% cộng 10 thao tác, không đánh đổi tính đúng/nguồn.
+Blocker hiện có chưa kiểm kê/xác minh; không tự audit/gỡ safeguard hoặc mở
+thêm issue audit. Lượt này không code/schema/tests/DB/mẫu/production.

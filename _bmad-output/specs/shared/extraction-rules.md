@@ -198,6 +198,8 @@ dữ liệu. Không lấy căn cước vợ/chồng trong ngoặc làm giấy c�
 - **Không đề xuất bổ sung hoặc tự ghép giữa văn bản**, kể cả cùng bộ hồ sơ:
   mỗi văn bản độc lập, không mượn trường thiếu, matching theo tên/số hay chọn
   bản đầy nhất/mới nhất. Không xóa raw/history hoặc phá liên kết đã có.
+  Luật bóc nội dung này không cấm gợi ý ID theo CCCD/liên kết user chọn
+  ở policy bên dưới, cũng không cho tự chọn field thắng/ghi đè master.
 - **Không gợi ý** dữ kiện sinh/chết/giấy tờ Người từ `Đơn xin xác nhận`,
   kể cả đi vòng qua normalized/inferred.
 - Thiếu ngày chết chỉ là không có thông tin ngày chết: giữ `null`/rỗng,
@@ -207,21 +209,22 @@ dữ liệu. Không lấy căn cước vợ/chồng trong ngoặc làm giấy c�
 
 Nguồn/raw và logic câu Word giữ nguyên, chỉ trường tĩnh/placeholder đã duyệt.
 Runtime hiện tại dùng số giấy thật trong trường Người, không UNIQUE/lookup
-theo số (còn gap trùng CCCD); ID chọn rõ hoặc row_id chính hồ sơ giữ identity.
+theo số; ID chọn rõ hoặc row_id chính hồ sơ giữ identity, số CCCD được trùng.
 Không auto ghép OCR giữa file; cùng container chỉ ghép hai mặt rõ cùng thẻ,
 không fuzzy số/tên.
 Số/type/issuer/address/ngày và missing-date context đã được actual proof
 synthetic (fresh+migrated DB/Word); UI legacy chỉ programmatic DOM giới hạn.
 Không claim accuracy toàn quốc hoặc nghiệm thu #41.
-Thiết kế owner “chốt” 21/10 chưa triển khai: một bảng Người, chết vẫn là
-cùng `Customer.id`; CCCD theo loại giấy tờ xác nhận đáng tin cậy phải UNIQUE,
-số khai tử/chứng tử không UNIQUE toàn cục. Không suy loại để enforce từ
-ngày chết null/ngày cấp/độ dài số. Tạo với CCCD xác nhận đã tồn tại không
-tạo ID mới hoặc tự ghi đè/merge; user chọn rõ Người hiện có không cho phép
-cross-document enrichment. Cần duyệt lưu bền loại canonical trước index/
-migration, chưa chọn field/model vật lý; snapshot/derived master chưa đủ.
-Chưa có conditional index; audit trùng tương lai giữ IDs/Case links, không
-tự merge/xóa. Gap thuộc #41 OPEN/gate mẫu ĐÓNG; #42 độc lập.
+Policy owner 21/10 thay UNIQUE `6eaf42b`, UX chưa triển khai: một bảng Người,
+chết vẫn là cùng `Customer.id`. CCCD đã có DB → gợi ý ID cũ; user chọn thì
+liên kết dòng input và gợi ý biến mất. Sai khác không chặn, ghi “thông tin
+liên kết” để user xem/xóa/sửa bất cứ lúc nào. Không chọn/bỏ qua → ID mới,
+không auto merge. Không tự chọn field thắng hoặc ghi đè master từ nội dung
+văn bản; quyền liên kết explicit không phải auto enrichment/ghép OCR.
+Lifecycle gợi ý bị bỏ qua và shape/key/nơi lưu/cardinality thông tin liên
+kết còn mở ở [#44](../../backlog/story-person-cccd-suggestion-link.md);
+không tự thêm thao tác/field/model hoặc gate. Không làm conditional UNIQUE.
+Giữ IDs/Case links/raw/history/snapshot null; #41 OPEN/gate mẫu ĐÓNG, #42 riêng.
 
 
 ### 2.4. Định danh thửa — Theo spec hiện hành

@@ -104,6 +104,8 @@ tục file đã rõ. Không tắt production Scan/Upload; quyền runtime đã c
   Không gợi ý sinh/chết/giấy tờ Người từ `Đơn xin xác nhận`, không đi vòng
   qua inferred/normalized. Đây không xóa raw/history, liên kết Case/ID đã
   có hoặc cấm địa chỉ chung rõ phạm vi trong **cùng** văn bản.
+  Luật này không cấm gợi ý ID theo CCCD/liên kết user chọn theo policy mới
+  bên dưới; không đồng nghĩa cho phép auto enrichment/ghi đè master.
 - Thiếu ngày chết chỉ là không có thông tin: giữ null/rỗng, điền độc lập các
   trường có căn cứ được phép; không chặn Người vì thiếu ngày/giấy, tự coi
   còn sống, bịa ngày/01/01, Boolean hoặc trạng thái mới.
@@ -113,17 +115,26 @@ tục file đã rõ. Không tắt production Scan/Upload; quyền runtime đã c
   không đọc mẫu mới. Số giấy lưu thật, index không UNIQUE, identity theo ID
   chọn rõ/row_id chính hồ sơ, không auto lookup theo số/tên hoặc ghép giữa
   file. Snapshot không borrow master khi đã có key, kể cả null.
-- **Owner “chốt” 21/10 — thiết kế được duyệt, chưa triển khai:** một bảng
-  Người với `Customer.id` ổn định; chết vẫn là cùng Người. CCCD theo loại
-  giấy tờ xác nhận đáng tin cậy phải UNIQUE; số khai tử/chứng tử không
-  UNIQUE toàn cục. Không dùng ngày chết null/ngày cấp/độ dài số để phân loại.
-  Tạo với CCCD xác nhận đã tồn tại không tạo ID mới, không tự ghi đè/merge;
-  chỉ dùng lại Người qua user chọn rõ, không enrichment giữa văn bản.
-  Cần duyệt lưu bền loại canonical trước index/migration; snapshot/derived
-  master hiện tại chưa đủ enforce. Chưa chọn field/model vật lý, chưa có
-  conditional index. Audit trùng tương lai giữ IDs/Case links, không tự
-  merge/xóa. Runtime bỏ global UNIQUE vẫn là fact/proof bounded; bảo vệ
-  trùng CCCD là gap OPEN #41, gate mẫu ĐÓNG, #42 độc lập.
+- **Policy owner 21/10 thay UNIQUE `6eaf42b`, UX chưa triển khai:** một bảng
+  Người với `Customer.id` ổn định, chết vẫn là cùng Người. CCCD đã có DB
+  chỉ gợi ý ID cũ; user chọn thì liên kết dòng input và gợi ý biến mất.
+  Sai khác không chặn, lưu “thông tin liên kết” để user xem/xóa/sửa bất cứ
+  lúc nào. Không chọn/bỏ qua → ID mới, không auto merge. Không chặn khác tên
+  hoặc thêm xác nhận vì trùng tên. Gợi ý ID/liên kết explicit được duyệt
+  không đồng nghĩa tự đề xuất bổ sung nội dung/auto enrichment giữa văn bản,
+  chọn field thắng hoặc tự ghi đè master. Runtime cũ cập nhật master qua ID
+  rõ chưa chứng minh UX mới đã built. Lifecycle gợi ý bị bỏ qua và shape/key/
+  nơi lưu/cardinality thông tin liên kết còn mở ở
+  [#44](../../backlog/story-person-cccd-suggestion-link.md), không tự bịa
+  field/model/thao tác. Không làm conditional UNIQUE; giữ Case links/
+  raw/history/snapshot null. #41 OPEN/gate mẫu ĐÓNG, #42 độc lập.
+- **Nguyên tắc bền vững cho task hiện tại/tương lai:** engine xử lý dữ liệu,
+  không quyết định thay người dùng chịu trách nhiệm pháp lý. Không tự thêm
+  business/UX gate hoặc đổi hành vi chưa báo và được owner duyệt; UX chưa rõ
+  ghi issue để owner chọn, không tạo gate mới. Ưu tiên thiết kế tối thiểu:
+  80% kết quả tốt hơn 90% cộng 10 thao tác, không đánh đổi tính đúng/nguồn.
+  Các blocker hiện có chưa kiểm kê/xác minh; không claim audit hoặc tự gỡ
+  kiểm tra tên/ngày/revision/khóa hồ sơ hay wire/security/FK/atomicity.
 
 **Một Người nhiều giấy tờ và nhiều địa chỉ** là
 [#42 riêng](../../backlog/story-person-multiple-identities-addresses.md).
@@ -216,9 +227,9 @@ không phải câu hỏi duyệt lại field. Chưa tái hiện runtime trong l�
 Ngày quy ước master + snapshot giữ `YYYY` theo #6 không tự là bug; ngày lập
 hồ sơ optional ở wire versus default DB phải phân biệt tầng/ngữ nghĩa.
 Global UNIQUE/lookup số Người cũ đã cutover trong workstream Người chết
-21/10; không phải quyền chọn số làm khóa Case/Người toàn cục. Quy tắc đích
-CCCD UNIQUE có điều kiện theo loại xác nhận đã được owner chốt sau đó,
-nhưng chưa triển khai; xem `contracts/entities.md` §8.3.
+21/10. Thiết kế CCCD UNIQUE sau đó đã bị owner thay bằng gợi ý/liên kết
+không chặn; không còn prerequisite lưu loại để làm unique index.
+Xem `contracts/entities.md` §8.3 và #44 cho hành vi chưa triển khai.
 
 Owner xác nhận 15/10/2026: bộ trường và định dạng DB đã duyệt là chuẩn đích;
 engine phải tuân theo hoặc ánh xạ tường minh tới chuẩn đó. Trước khi triển khai,
