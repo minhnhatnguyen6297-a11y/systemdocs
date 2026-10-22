@@ -427,7 +427,7 @@ def test_fixture_uuids_are_canonical_v4(dataset):
         for section in ("people_prototypes", "asset_prototypes")
         for proto in dataset[section].values()
     ]
-    assert len(row_ids) == 10  # P101-103/111/301 + T101-205
+    assert len(row_ids) == 11  # P101-103/111/301/302 + T101-205
     for row_id in row_ids:
         assert UUID4_RE.match(row_id), row_id
         assert str(uuid.UUID(row_id)) == row_id

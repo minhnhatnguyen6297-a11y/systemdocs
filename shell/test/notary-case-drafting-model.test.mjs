@@ -2912,6 +2912,31 @@ test('B5 saveCase: khóa snapshot thứ hai và bỏ response thành công của
   assert.equal(model.state.savingCase, false);
 });
 
+// ---------- nhãn trạng thái nghiệp vụ (D2) ----------
+
+test('statusLabel: draft→Nháp, done→Đã lưu, giữ nguyên dirty/unknown', async () => {
+  const { model } = makeModel(seedCases('ready', 'done'));
+  await model.openCase(42);
+  assert.equal(model.state.stageDirty, false);
+  assert.equal(model.statusLabel(), 'Nháp');
+
+  await model.openCase(44);
+  assert.equal(model.state.caseInfo.status, 'done');
+  assert.equal(model.statusLabel(), 'Đã lưu');
+  model.addPerson();
+  assert.equal(model.state.stageDirty, true,
+    'case Done phải dirty khi sửa');
+  assert.equal(model.statusLabel(), 'Đã lưu',
+    'Done + local dirty vẫn Đã lưu (nhãn độc lập chấm dirty)');
+
+  model.state.caseInfo.status = 'archived';
+  assert.equal(model.statusLabel(), 'archived');
+
+  await model.newDraft('inheritance');
+  assert.equal(model.statusLabel(), 'Nháp',
+    'nháp mới đọc caseInfo.status=draft, không suy từ isDraft');
+});
+
 test('saveCase thành công: thay model bằng workspace, xóa ba dirty flag', async () => {
   const calls = [];
   const client = { run: async (cmd, payload) => {

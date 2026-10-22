@@ -440,7 +440,13 @@ def _v3_to_v2_nodes(nodes: list[dict]) -> list[dict]:
 
 def _seed_inheritance_state(owner_row_id: Optional[str],
                             asset_count: int) -> dict:
-    """Seed `diagram.state` v3 khi create không kèm diagram (§13.6)."""
+    """Seed `diagram.state` v3 khi create không kèm diagram (§13.6).
+
+    Nháp chưa gán owner: `nodes=[]` — không bịa node owner/dấu Chủ.
+    """
+    if owner_row_id is None:
+        return {"version": DIAGRAM_STATE_VERSION,
+                "domain": CASE_TYPE_INHERITANCE, "nodes": []}
     own = list(range(1, max(0, min(MAX_ASSETS, asset_count)) + 1))
     nodes = [
         {"id": "father", "personId": None, "parentSlotIds": [],
@@ -1103,6 +1109,9 @@ class CaseWorkspaceService:
 
         Một transaction: validate → hash/idempotency → tạo case trước →
         resolve/diff rows → projection → Diagram seed/persist → commit.
+        Đây là đường duy nhất nhận **nháp ít dữ liệu** (0 Người/0 Tài
+        sản, `ho_ten=null`, owner inheritance chưa gán); commit_stage/
+        save_case/convert_type giữ strict.
         """
         if not _is_uuid4(idempotency_key):
             raise WorkspaceError(
@@ -1123,9 +1132,11 @@ class CaseWorkspaceService:
         people = [_fold_key_aliases(r, _PERSON_KEY_ALIASES,
                                     "person_row") for r in people]
         owner_row_id = self._validate_owner_pointer(
-            stage, people, case_type)
-        field_errors = self._validate_stage(people, assets, case_type)
-        field_errors += self._validate_create_stage(people, assets)
+            stage, people, case_type, allow_unassigned=True)
+        field_errors = self._validate_stage(
+            people, assets, case_type, allow_partial_draft=True)
+        field_errors += self._validate_create_stage(
+            people, assets, allow_empty=True)
         if field_errors:
             raise WorkspaceError(
                 "stage_validation_error",
@@ -1801,7 +1812,20 @@ class CaseWorkspaceService:
                 _parse_date_or_year(stored_issue),
                 stored_document, stored_address)
             entity = row.get("entity_id")
-            if entity is None:
+            if previous is not None and entity is not None \
+                    and entity == previous.customer_id:
+                # Echo `entity_id` từ GET chỉ là giữ identity nếu neo của
+                # dòng vẫn khớp identity đó; đổi/xóa neo phải resolve lại
+                # (không freeze liên kết cũ, không merge identity).
+                identity = self.db.get(Customer, entity)
+                anchor = self._person_anchor(row.get("ho_ten"),
+                                             row.get("so_giay_to"))
+                if (identity is None or anchor is None
+                        or (identity.name_anchor,
+                            identity.document_anchor) != anchor):
+                    entity = self._resolve_person_identity(
+                        row, previous, person_cache)
+            elif entity is None:
                 entity = self._resolve_person_identity(
                     row, previous, person_cache)
             elif previous is None:
@@ -1814,7 +1838,7 @@ class CaseWorkspaceService:
                 self.db.add(target)
             target.customer_id = entity
             target.vitri = index + 1
-            target.ho_ten = _clean(row.get("ho_ten"))
+            target.ho_ten = _nn(row.get("ho_ten"))
             target.gioi_tinh = _norm_gender(row.get("gioi_tinh"))
             target.ngay_sinh = _nn(row.get("ngay_sinh"))
             target.ngay_chet = _nn(row.get("ngay_chet"))
@@ -1846,10 +1870,23 @@ class CaseWorkspaceService:
             rid = row["row_id"]
             keep_assets.add(rid)
             previous = existing_assets.get(rid)
-            entity = self._resolve_asset_identity(
-                row, previous, asset_cache,
-                preferred_identity_id=(
-                    row.get("entity_id") if previous is None else None))
+            entity = row.get("entity_id")
+            if previous is not None and entity is not None \
+                    and entity == previous.property_id:
+                identity = self.db.get(Property, entity)
+                anchor = self._serial_anchor(row.get("so_serial"))
+                if identity is None or anchor is None \
+                        or identity.so_serial != anchor:
+                    entity = self._resolve_asset_identity(
+                        row, previous, asset_cache)
+            elif entity is None:
+                entity = self._resolve_asset_identity(
+                    row, previous, asset_cache)
+            else:
+                entity = self._resolve_asset_identity(
+                    row, previous, asset_cache,
+                    preferred_identity_id=(
+                        entity if previous is None else None))
             target = previous
             if target is None:
                 target = CaseAssetRow(row_id=rid, case_id=case.id)
@@ -2059,9 +2096,17 @@ class CaseWorkspaceService:
     @staticmethod
     def _validate_owner_pointer(stage: Mapping[str, Any],
                                 people: list,
-                                case_type: str) -> Optional[str]:
+                                case_type: str, *,
+                                allow_unassigned: bool = False
+                                ) -> Optional[str]:
         """owner_row_id: bắt buộc + trỏ row có thật với inheritance; CẤM
-        (kể cả null) với two_party (§13.5/§13.6)."""
+        (kể cả null) với two_party (§13.5/§13.6).
+
+        `allow_unassigned=True` chỉ cho `workspace_create` (nháp ít dữ
+        liệu): inheritance absent/null = chưa gán owner; non-null sai
+        vẫn `workspace_owner_required`. Commit/save_case/convert giữ
+        mặc định strict.
+        """
         if case_type == CASE_TYPE_TWO_PARTY:
             if "owner_row_id" in stage:
                 raise WorkspaceError(
@@ -2069,6 +2114,8 @@ class CaseWorkspaceService:
                     "stage.owner_row_id cấm với case_type two_party")
             return None
         oid = stage.get("owner_row_id")
+        if oid is None and allow_unassigned:
+            return None
         people_ids = {r.get("row_id") for r in people
                       if isinstance(r, Mapping)}
         if not (_is_uuid4(oid) and oid in people_ids):
@@ -2178,15 +2225,18 @@ class CaseWorkspaceService:
         }
 
     @staticmethod
-    def _validate_create_stage(people: list, assets: list) -> list[dict]:
+    def _validate_create_stage(people: list, assets: list, *,
+                               allow_empty: bool = False) -> list[dict]:
         """Rule completeness riêng của `workspace_create`/save_case mới.
 
         Vòng 1 chặn mọi `entity_id`; vòng 2 dòng MỚI được mang gợi ý
         identity có kiểm neo (§13.20), nên rule ID chuyển về
-        `_write_stage_rows`. Ở đây chỉ còn stage non-empty (partial-create
-        thuộc lát riêng).
+        `_write_stage_rows`. `allow_empty=True` chỉ cho `workspace_create`
+        (nháp ít dữ liệu: 0 Người/0 Tài sản); save_case mới giữ strict.
         """
         errors: list[dict] = []
+        if allow_empty:
+            return errors
         if not people:
             errors.append(_field_error(
                 None, "people", "required",
@@ -2198,8 +2248,13 @@ class CaseWorkspaceService:
         return errors
 
     def _validate_stage(self, people: list, assets: list,
-                        case_type: str = CASE_TYPE_INHERITANCE) -> list[dict]:
+                        case_type: str = CASE_TYPE_INHERITANCE, *,
+                        allow_partial_draft: bool = False) -> list[dict]:
         """Field-level rules của stage_v2 (validation vòng 1 giữ nguyên).
+
+        `allow_partial_draft=True` chỉ cho `workspace_create` (nháp ít dữ
+        liệu): `ho_ten` nhận null/absent hoặc chuỗi (rỗng chuẩn hóa null);
+        số/list/object vẫn lỗi kiểu. Mọi field khác giữ strict.
 
         Duplicate entity không còn là lỗi: hai dòng row_id khác nhau có
         thể cùng identity (§4.2 step 6).
@@ -2233,7 +2288,11 @@ class CaseWorkspaceService:
                 emit("entity_id", "invalid_type",
                      "entity_id phải là số nguyên ≥ 1 hoặc null")
             ho_ten = row.get("ho_ten")
-            if not isinstance(ho_ten, str) or not ho_ten.strip():
+            if allow_partial_draft:
+                if ho_ten is not None and not isinstance(ho_ten, str):
+                    emit("ho_ten", "invalid_type",
+                         "ho_ten phải là chuỗi hoặc null")
+            elif not isinstance(ho_ten, str) or not ho_ten.strip():
                 emit("ho_ten", "required", "ho_ten bắt buộc")
             if row.get("gioi_tinh") not in (None, *_GENDER_VALUES):
                 emit("gioi_tinh", "invalid_enum",

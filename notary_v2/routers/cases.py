@@ -453,34 +453,42 @@ def create(
     field_errors: dict[str, str] = {}
 
     owner_id = int(form["nguoi_chet_id"]) if form["nguoi_chet_id"].isdigit() else None
-    if owner_id is None or owner_id not in customers_by_id:
+    if form["nguoi_chet_id"] and (
+            owner_id is None or owner_id not in customers_by_id):
         field_errors["nguoi_chet_id"] = "Người chết không tồn tại"
     missing_props = [pid for pid in selected_property_ids
                      if pid not in properties_by_id]
-    if not selected_property_ids:
-        field_errors["tai_san_id"] = "Bắt buộc"
-    elif missing_props:
+    if missing_props:
         errors.append("Danh sách tài sản có id không tồn tại: "
                       + ", ".join(map(str, missing_props)))
 
     people: list[dict] = []
+    assets: list[dict] = []
     owner_row_id = None
+    posted_stage = None
     try:
-        if owner_id in customers_by_id:
-            payload = _parse_posted_payload(form["case_state_json"])
+        payload = _parse_posted_payload(form["case_state_json"])
+        posted_stage = payload.get("stage") if payload else None
+        if isinstance(posted_stage, list):
+            # Stage gửi tường minh (kể cả []) là ý định của người dùng:
+            # không thay bằng master fallback.
             people = _posted_people(None, payload)
-            if not people:
-                owner_row = _people_from_customer(customers_by_id[owner_id])
-                people = [owner_row]
-                for cid in _to_list(participant_id):
-                    if not str(cid).strip().isdigit():
-                        continue
-                    customer = customers_by_id.get(int(cid))
-                    if customer is not None and customer.id != owner_id:
-                        people.append(_people_from_customer(customer))
-            owner_row = next((row for row in people
-                              if row.get("ho_ten") == customers_by_id[owner_id].ho_ten),
-                             people[0] if people else None)
+        elif owner_id in customers_by_id:
+            # Không có Stage gửi kèm → hydrate đúng master được chọn.
+            owner_row = _people_from_customer(customers_by_id[owner_id])
+            people = [owner_row]
+            for cid in _to_list(participant_id):
+                if not str(cid).strip().isdigit():
+                    continue
+                customer = customers_by_id.get(int(cid))
+                if customer is not None and customer.id != owner_id:
+                    people.append(_people_from_customer(customer))
+        if owner_id in customers_by_id:
+            # Owner chỉ theo lựa chọn; không tự lấy people[0].
+            owner_row = next(
+                (row for row in people
+                 if row.get("ho_ten") == customers_by_id[owner_id].ho_ten),
+                None)
             owner_row_id = owner_row["row_id"] if owner_row else None
     except DiagramPayloadValidationError as exc:
         errors.extend(exc.errors)
@@ -492,6 +500,8 @@ def create(
             all_customers=all_customers, participants=[],
             participant_ids=set(), case_property_ids=selected_property_ids)
 
+    # Stage gửi kèm chỉ chở Người; Tài sản lấy đúng danh sách được chọn
+    # (không tạo placeholder cho []).
     assets = [_asset_row_from_property(properties_by_id[pid])
               for pid in selected_property_ids]
     stage = {"people": people, "assets": assets,

@@ -3,8 +3,8 @@
     "issue": "13",
     "commit": "storage-b-foundation",
     "muc_dich": "Du lieu tong hop cho test nen Storage B (notary_v2/models.py). Khong phai ho so khach, khong chua PII that.",
-    "nguon_dap_an": "issue13-b-phase2-design-20261022.md Phan 7 — dap an chot doc lap voi code, khong lay output service/parser lam dap an. F8: issue13-b-round2-design-20261022.md §5 (resolver nguon Done theo moc luu).",
-    "uuid_pattern": "00000000-0000-4000-8000-000000000NNN (UUID v4 co dinh; NNN theo thiet ke: nguoi 101-103/111/301, tai san 201-204).",
+    "nguon_dap_an": "issue13-b-phase2-design-20261022.md Phan 7 — dap an chot doc lap voi code, khong lay output service/parser lam dap an. F8: issue13-b-round2-design-20261022.md §5 (resolver nguon Done theo moc luu). F3/F3B/F3C/F3D: issue13-b-round2-design-20261022.md §3.1/§5 (nhap it du lieu).",
+    "uuid_pattern": "00000000-0000-4000-8000-000000000NNN (UUID v4 co dinh; NNN theo thiet ke: nguoi 101-103/111/301/302, tai san 201-205).",
     "quy_uoc": {
       "field_khong_neu": "null",
       "so_serial_chua_biet": "\"\" (chuoi rong = thieu neo, khong tao Property)",
@@ -14,11 +14,11 @@
       "khong_co_chuoi_gia": "Khong duoc xuat hien '(Chua ro)' hoac gia tri gia lap trong DB."
     },
     "bo_sung_ngoai_phan_7": {
-      "T203": "Asset toi thieu hop le cua F3 (row 301 chi co ten, khong asset goc): serial rong => identity null.",
+      "P302": "Dong nhap chi co so giay to, ho_ten=null (vong 2 §3.1/§5); du neo de resolve identity neu so khong rong.",
+      "T203": "Asset toi thieu hop le (serial rong => identity null); dung cho bien the assets-only cua F3 va F7, khong con la prerequisite cua F3.",
       "T204": "Chi dung cho test phan biet land_rows=[] (present=true, khong con) voi land_rows=null (present=false); khong thuoc kich ban nghiep vu F1-F7.",
       "T205": "Dong tai san rieng cua F6B (cung serial SYN B 001 voi F6A) de hai Ho so trong CUNG mot DB khong trung row_id PK nhung van chung property_id."
-    },
-    "bo_bien_the": "F3/F7 khong con bien the 'row chi so, khong ten'; F7 bat dau tu dong P301 cua F3 (chi ten) roi them so."
+    }
   },
   "people_prototypes": {
     "P101": {
@@ -84,6 +84,20 @@
       "ngay_sinh": null,
       "ngay_chet": null,
       "so_giay_to": null,
+      "ngay_cap": null,
+      "noi_cap": null,
+      "dia_chi": null,
+      "place_of_origin": null,
+      "loai_giay_to": null,
+      "loai_dia_chi": null
+    },
+    "P302": {
+      "row_id": "00000000-0000-4000-8000-000000000302",
+      "ho_ten": null,
+      "gioi_tinh": null,
+      "ngay_sinh": null,
+      "ngay_chet": null,
+      "so_giay_to": "SYN-P302-01",
       "ngay_cap": null,
       "noi_cap": null,
       "dia_chi": null,
@@ -297,7 +311,7 @@
     },
     {
       "alias": "F3",
-      "ten": "Nháp thiếu dữ liệu",
+      "ten": "Nháp thiếu dữ liệu — chỉ tên, không Tài sản, chưa gán owner",
       "case_type": "inheritance",
       "status_mong_doi": "draft",
       "metadata": {
@@ -307,6 +321,90 @@
       "people": [
         {"prototype": "P301", "vai_tro": "owner"}
       ],
+      "assets": [],
+      "diagram": {
+        "domain": "inheritance",
+        "owner_row_id": null,
+        "ownPositions": {},
+        "receivePositions": {},
+        "relations": []
+      },
+      "expected": {
+        "status": "draft",
+        "revision": 1,
+        "so_person_rows": 1,
+        "so_asset_rows": 0,
+        "so_land_rows": 0,
+        "identity": {
+          "nhom_cung_id": [],
+          "id_null": ["F3:P301"]
+        },
+        "asset_identity": {
+          "nhom_cung_id": [],
+          "id_null": []
+        },
+        "land_rows_theo_asset": {},
+        "khong_co_chuoi_gia": "(Chưa rõ)",
+        "ghi_chu": [
+          "Nguoi chi co ho_ten, thieu so/ngay/dia chi van luu duoc; khong tao Customer gia.",
+          "Khong co Tai san: create nhap v2 cho assets=[] va khong tao Property.",
+          "Owner inheritance null: khong seed node owner gia, nodes=[].",
+          "Nhan Nhap du dirty=false; Cap nhat sau van draft."
+        ]
+      }
+    },
+    {
+      "alias": "F3B",
+      "ten": "Nháp chỉ số giấy tờ — tên null",
+      "case_type": "inheritance",
+      "status_mong_doi": "draft",
+      "metadata": {
+        "loai_van_ban": "khai_nhan",
+        "ngay_lap_ho_so": null
+      },
+      "people": [
+        {"prototype": "P302"}
+      ],
+      "assets": [],
+      "diagram": {
+        "domain": "inheritance",
+        "owner_row_id": null,
+        "ownPositions": {},
+        "receivePositions": {},
+        "relations": []
+      },
+      "expected": {
+        "status": "draft",
+        "revision": 1,
+        "so_person_rows": 1,
+        "so_asset_rows": 0,
+        "so_land_rows": 0,
+        "identity": {
+          "nhom_cung_id": [],
+          "id_null": ["F3B:P302"]
+        },
+        "asset_identity": {
+          "nhom_cung_id": [],
+          "id_null": []
+        },
+        "land_rows_theo_asset": {},
+        "khong_co_chuoi_gia": "(Chưa rõ)",
+        "ghi_chu": [
+          "ho_ten=null luu NULL that, khong luu chuoi rong.",
+          "Co so giay to nhung thieu ten => khong du neo (_person_anchor can ca hai) nen entity_id=null, khong tao Customer."
+        ]
+      }
+    },
+    {
+      "alias": "F3C",
+      "ten": "Nháp chỉ Tài sản — không Người",
+      "case_type": "inheritance",
+      "status_mong_doi": "draft",
+      "metadata": {
+        "loai_van_ban": "khai_nhan",
+        "ngay_lap_ho_so": null
+      },
+      "people": [],
       "assets": [
         {"prototype": "T203"}
       ],
@@ -320,25 +418,64 @@
       "expected": {
         "status": "draft",
         "revision": 1,
-        "so_person_rows": 1,
+        "so_person_rows": 0,
         "so_asset_rows": 1,
         "so_land_rows": 0,
         "identity": {
           "nhom_cung_id": [],
-          "id_null": ["F3:P301"]
+          "id_null": []
         },
         "asset_identity": {
           "nhom_cung_id": [],
-          "id_null": ["F3:T203"]
+          "id_null": ["F3C:T203"]
         },
         "land_rows_theo_asset": {
-          "F3:T203": []
+          "F3C:T203": []
         },
         "khong_co_chuoi_gia": "(Chưa rõ)",
         "ghi_chu": [
-          "Nguoi chi co ho_ten, thieu so/ngay/dia chi van luu duoc; khong tao Customer gia.",
-          "Asset toi thieu hop le: serial rong nghia la thieu neo, khong tao Property gia.",
-          "Nhan Nhap du dirty=false; Cap nhat sau van draft."
+          "Assets-only: people=[] hop le, khong participant/nguoi_chet gia.",
+          "Serial rong => property_id null, khong tao Property."
+        ]
+      }
+    },
+    {
+      "alias": "F3D",
+      "ten": "Nháp rỗng hoàn toàn",
+      "case_type": "inheritance",
+      "status_mong_doi": "draft",
+      "metadata": {
+        "loai_van_ban": "khai_nhan",
+        "ngay_lap_ho_so": null
+      },
+      "people": [],
+      "assets": [],
+      "diagram": {
+        "domain": "inheritance",
+        "owner_row_id": null,
+        "ownPositions": {},
+        "receivePositions": {},
+        "relations": []
+      },
+      "expected": {
+        "status": "draft",
+        "revision": 1,
+        "so_person_rows": 0,
+        "so_asset_rows": 0,
+        "so_land_rows": 0,
+        "identity": {
+          "nhom_cung_id": [],
+          "id_null": []
+        },
+        "asset_identity": {
+          "nhom_cung_id": [],
+          "id_null": []
+        },
+        "land_rows_theo_asset": {},
+        "khong_co_chuoi_gia": "(Chưa rõ)",
+        "ghi_chu": [
+          "people=[]/assets=[] hop le voi workspace_create; khong Customer/Property/participant gia.",
+          "diagram seed nodes=[] khi chua gan owner."
         ]
       }
     },

@@ -8,8 +8,11 @@
  *   - Thanh trên DUY NHẤT (.cd-topbar, ~42px): tab cục bộ (Tổng quan /
  *     Soạn / Word) | loại việc, Nhập file, Zalo (disabled placeholder)
  *     ……… Lưu hồ sơ/Cập nhật (chấm dirty = tín hiệu chưa
- *     lưu duy nhất). Không nút back, không tiêu đề, không pill Nháp,
- *     không nhãn trạng thái lưu (MIN-133 D4/D5).
+ *     lưu duy nhất). Không nút back, không tiêu đề, không pill Nháp
+ *     standalone, không banner trạng thái lưu (MIN-133 D4/D5).
+ *     NGOẠI LỆ theo NS §2: hồ sơ đã có ID mang text trạng thái nghiệp vụ
+ *     (`Nháp`/`Đã lưu`) ngay trong pill định danh `Loại · HS-N · Nhãn`;
+ *     text này độc lập với chấm dirty (Done vẫn Đã lưu khi có sửa chưa ghi).
  *   - Không card Thông tin hồ sơ (D2): document_type theo mặc định model,
  *     ngay_lap_ho_so backend tự điền, noi_niem_yet/ghi_chu null.
  *   - Stage: Tài sản bảng chuyển vị (mỗi tài sản MỘT CỘT, tối đa 3) /
@@ -381,7 +384,8 @@ function createNotaryModuleView(deps) {
           const name = c.nguoi_chet && c.nguoi_chet.ho_ten
             ? c.nguoi_chet.ho_ten : `Hồ sơ ${c.id}`;
           const sub = [c.tai_san && c.tai_san.so_serial,
-                       c.ngay_lap_ho_so, c.trang_thai]
+                       c.ngay_lap_ho_so,
+                       c.status_label ?? c.trang_thai]
             .filter(Boolean).join(' · ');
           const item = btn('', 'cd-case-row', () => onOpen(c.id));
           item.append(h('span', 'cd-case-name', name));
@@ -585,9 +589,10 @@ function createNotaryModuleView(deps) {
       sel.onchange = () => model.updateCaseMeta('case_type', sel.value);
       bar.append(sel);
     } else {
+      const status = model.statusLabel();
       const pill = h('span', 'pill accent cd-case-pill',
         `${CASE_TYPE_LABEL[c.case_type] || c.case_type || '—'} · ` +
-        `HS-${s.caseId}`);
+        `HS-${s.caseId}` + (status ? ` · ${status}` : ''));
       if (c.document_type) {
         pill.title = DOC_TYPE_LABEL[c.document_type] || c.document_type;
       }

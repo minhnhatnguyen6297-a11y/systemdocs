@@ -618,6 +618,16 @@ function createModel(deps) {
       (state.status === 'ready' || state.status === 'conflict');
   }
 
+  // Nhãn nghiệp vụ từ trạng thái ĐÃ LƯU của hồ sơ (`caseInfo.status`),
+  // không suy từ việc có ID hay không. draft = Nháp, done = Đã lưu;
+  // giá trị lạ trả nguyên trạng. Nhãn này độc lập với chấm dirty.
+  function statusLabel() {
+    const status = state.caseInfo && state.caseInfo.status;
+    if (status === 'draft') return 'Nháp';
+    if (status === 'done') return 'Đã lưu';
+    return status || null;
+  }
+
   // Stage/diagram draft theo loai ho so (§13.1): inheritance mang
   // owner_row_id (BẮT BUỘC) + seed 7 slot; two_party khong co owner_row_id,
   // diagram la 30 slot canonical p1..p30.
@@ -2091,7 +2101,7 @@ function createModel(deps) {
     state, subscribe,
     addressContext, requestLookup, dismissLookupSlot, markLookupStale,
     openFullFromSlot, requestFull, closeFull,
-    openCase, newDraft, isDraft, saveDraft, saveCase, updateCaseMeta, saveCaseMeta, convertCaseType,
+    openCase, newDraft, isDraft, statusLabel, saveDraft, saveCase, updateCaseMeta, saveCaseMeta, convertCaseType,
     loadUqCatalog, createUqCustomer, resolveUqName,
 
     canWrite, mockBanner, hasUnsaved, isStageEmpty,

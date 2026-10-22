@@ -387,6 +387,37 @@ def test_workspace_get_contract_shape(adapter_db):
     assert data["capabilities"]["word_export"] is True
 
 
+def test_case_list_status_label_matches_raw_status(adapter_db):
+    """D2: `case_list` giữ `trang_thai` raw cho máy + `status_label` hiển thị;
+    trạng thái lạ trả nguyên giá trị (không coi mọi non-done là Nháp)."""
+    draft, _deceased, _prop = _seed_case(adapter_db)
+    done, _d2, _p2 = _seed_case(adapter_db)
+    done.trang_thai = "done"
+    adapter_db.commit()
+
+    res = notary_adapter.case_list(_Job(), {})
+    assert res["kind"] == "case_list"
+    by_id = {row["id"]: row for row in res["data"]["cases"]}
+    assert by_id[draft.id]["trang_thai"] == "draft"
+    assert by_id[draft.id]["status_label"] == "Nháp"
+    assert by_id[done.id]["trang_thai"] == "done"
+    assert by_id[done.id]["status_label"] == "Đã lưu"
+
+    # Trạng thái ngoài enum draft/done (dữ liệu legacy) không bị gán Nháp.
+    class _LegacyCase:
+        id = 99
+        nguoi_chet = tai_san = None
+        ngay_lap_ho_so = None
+        loai_van_ban = "khai_nhan"
+        trang_thai = "archived"
+        noi_niem_yet = ghi_chu = None
+        tong_ty_le = None
+
+    row = notary_adapter._case_row(_LegacyCase())
+    assert row["trang_thai"] == "archived"
+    assert row["status_label"] == "archived"
+
+
 def test_workspace_get_two_party(adapter_db):
     """two_party: stage khong owner_row_id; diagram canonical 30 slot;
     render_model unsupported sau commit (§13.5); word_export mo
@@ -1576,21 +1607,55 @@ def test_workspace_create_bad_key_and_meta(adapter_db):
     assert adapter_db.query(InheritanceCase).count() == 0
 
 
-def test_workspace_create_owner_pointer_required(adapter_db):
-    """inheritance: owner_row_id null/missing/dangling ->
-    workspace_owner_required (§13.6)."""
+def test_workspace_create_owner_pointer_rules(adapter_db):
+    """inheritance create nháp: absent/null = chưa gán owner (hợp lệ);
+    non-null dangling/bad-uuid -> workspace_owner_required (§13.6)."""
     people, assets, state = _create_args()
-    for bad in (None, _uuid4(), "khong-uuid"):
+    for bad in (_uuid4(), "khong-uuid"):
         p = _create_payload(people, assets, state)
         p["stage"]["owner_row_id"] = bad
         with pytest.raises(CommandError) as exc:
             notary_adapter.workspace_create(_Job(), p)
         assert exc.value.code == "workspace_owner_required", bad
-    p = _create_payload(people, assets, state)   # key hoan toan thieu
+
+    # owner null nhưng diagram có node owner trỏ người khác → không tự sửa.
+    p = _create_payload(people, assets, state)
+    p["stage"]["owner_row_id"] = None
     with pytest.raises(CommandError) as exc:
         notary_adapter.workspace_create(_Job(), p)
-    assert exc.value.code == "workspace_owner_required"
-    assert adapter_db.query(InheritanceCase).count() == 0
+    assert exc.value.code == "diagram_owner_mismatch"
+
+    # absent/null + không diagram → nháp hợp lệ, không seed node Chủ giả.
+    p = _create_payload(people, assets)
+    p["stage"]["owner_row_id"] = None
+    data = notary_adapter.workspace_create(_Job(), p)["data"]
+    assert data["created"] is True
+    assert data["stage"]["owner_row_id"] is None
+    assert data["diagram"]["state"]["nodes"] == []
+    assert adapter_db.query(InheritanceCase).count() == 1
+
+
+def test_workspace_create_entity_id_and_stage_errors(adapter_db):
+    people, assets, state = _create_args()
+    # entity_id non-null trên dòng mới -> stage_validation_error
+    bad_people = [dict(people[0], entity_id=5), people[1]]
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.workspace_create(
+            _Job(), _inheritance_create(bad_people, assets, state))
+    assert exc.value.code == "stage_validation_error"
+    # Sai kiểu tên vẫn lỗi (nháp chỉ nới null, không nới type).
+    bad_name = [dict(people[0], ho_ten=5), people[1]]
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.workspace_create(
+            _Job(), _inheritance_create(bad_name, assets, state))
+    assert exc.value.code == "stage_validation_error"
+    # Stage rỗng hoàn toàn là nháp hợp lệ (vòng 2 §13.6).
+    p = _create_payload([], [])
+    p["stage"]["owner_row_id"] = None
+    data = notary_adapter.workspace_create(_Job(), p)["data"]
+    assert data["created"] is True
+    assert data["stage"] == {"owner_row_id": None, "people": [], "assets": []}
+    assert adapter_db.query(InheritanceCase).count() == 1
 
 
 def test_workspace_create_owner_mismatch(adapter_db):
@@ -1628,22 +1693,6 @@ def test_workspace_create_is_primary_rejected(adapter_db):
         notary_adapter.workspace_create(
             _Job(), _inheritance_create(people, assets, state))
     assert exc.value.code == "validation_error"
-
-
-def test_workspace_create_entity_id_and_stage_errors(adapter_db):
-    people, assets, state = _create_args()
-    # entity_id non-null tren nhap -> stage_validation_error
-    bad_people = [dict(people[0], entity_id=5), people[1]]
-    with pytest.raises(CommandError) as exc:
-        notary_adapter.workspace_create(
-            _Job(), _inheritance_create(bad_people, assets, state))
-    assert exc.value.code == "stage_validation_error"
-    # stage rong assets -> required field error
-    p = _inheritance_create(people, [], state)
-    with pytest.raises(CommandError) as exc:
-        notary_adapter.workspace_create(_Job(), p)
-    assert exc.value.code == "stage_validation_error"
-    assert adapter_db.query(InheritanceCase).count() == 0
 
 
 def test_workspace_create_two_party_owner_row_id_rejected(adapter_db):

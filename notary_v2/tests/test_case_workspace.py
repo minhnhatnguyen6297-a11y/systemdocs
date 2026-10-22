@@ -1242,12 +1242,17 @@ def test_create_case_meta_validation(db):
 
 
 def test_create_missing_owner_maps_workspace_owner_required(db):
-    people, assets, state = _create_args()
-    for bad_owner in (None, str(uuid.uuid4()), "not-uuid"):
+    people, assets, _state = _create_args()
+    # Vòng 2: create nháp cho owner absent/null; non-null sai/ngoài Stage
+    # vẫn workspace_owner_required (§13.6).
+    partial = _create(db, people, assets, None, owner_row_id=None)
+    assert partial["stage"]["owner_row_id"] is None
+    assert partial["diagram"]["state"]["nodes"] == []
+    for bad_owner in (str(uuid.uuid4()), "not-uuid"):
         with pytest.raises(WorkspaceError) as exc:
-            _create(db, people, assets, state, owner_row_id=bad_owner)
+            _create(db, people, assets, None, owner_row_id=bad_owner)
         assert exc.value.code == "workspace_owner_required", bad_owner
-    assert db.query(InheritanceCase).count() == 0
+    assert db.query(InheritanceCase).count() == 1
 
 
 def test_create_owner_node_mismatch_rejected(db):
@@ -1274,20 +1279,19 @@ def test_create_stage_rules_apply(db):
     assert any(e["field"] == "entity_id"
                for e in exc.value.details["field_errors"])
 
-    with pytest.raises(WorkspaceError) as exc:
-        _create(db, people, [], state)
-    assert exc.value.code == "stage_validation_error"
-    with pytest.raises(WorkspaceError) as exc:
-        _create(db, [], assets, state)
-    assert exc.value.code == "workspace_owner_required"
+    # Vòng 2 — nháp ít dữ liệu: 0 Tài sản, 0 Người, tên rỗng đều lưu được.
+    assert _create(db, people, [], state)["stage"]["assets"] == []
+    assert _create(db, [], [], None)["stage"]["people"] == []
+    blank = _create(db, [_person_row(ho_ten="  ")], [], None)
+    assert blank["stage"]["people"][0]["ho_ten"] is None
 
-    bad_name = [dict(people[0], ho_ten="  "), people[1]]
-    with pytest.raises(WorkspaceError) as exc:
-        _create(db, bad_name, assets, state)
-    assert exc.value.code == "stage_validation_error"
-    assert db.query(InheritanceCase).count() == 0
-    assert db.query(Customer).count() == 0
-    assert db.query(Property).count() == 0
+    # Sai kiểu tên vẫn là lỗi field — không bị nới thành null.
+    for bad_name in (123, ["Nguyễn"], {"ho_ten": "Nguyễn"}):
+        with pytest.raises(WorkspaceError) as exc:
+            _create(db, [_person_row(ho_ten=bad_name)], [], None)
+        assert exc.value.code == "stage_validation_error"
+        assert any(e["field"] == "ho_ten"
+                   for e in exc.value.details["field_errors"])
 
 
 def test_create_is_primary_rejected(db):

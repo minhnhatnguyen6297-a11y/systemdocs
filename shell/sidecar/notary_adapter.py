@@ -155,6 +155,9 @@ def _property_row(p):
     }
 
 
+_STATUS_LABELS = {"draft": "Nháp", "done": "Đã lưu"}
+
+
 def _case_row(c):
     return {
         "id": c.id,
@@ -162,6 +165,7 @@ def _case_row(c):
         "tai_san": _property_row(c.tai_san) if c.tai_san else None,
         "ngay_lap_ho_so": _d(c.ngay_lap_ho_so),
         "loai_van_ban": c.loai_van_ban, "trang_thai": c.trang_thai,
+        "status_label": _STATUS_LABELS.get(c.trang_thai, c.trang_thai),
         "noi_niem_yet": c.noi_niem_yet, "ghi_chu": c.ghi_chu,
         "tong_ty_le": c.tong_ty_le,
     }

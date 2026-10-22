@@ -1041,6 +1041,9 @@ def _validate_stage(stage, case_type):
 
 # ---------- commands ----------
 
+_STATUS_LABELS = {"draft": "Nháp", "done": "Đã lưu"}
+
+
 def _mock_case_row(cid, case):
     """Row shape parity voi notary_adapter._case_row — nguoi_chet = person
     co ngay_chet (chu the da mat), tai_san = asset position 1 (index 0)."""
@@ -1079,6 +1082,8 @@ def _mock_case_row(cid, case):
         "ngay_lap_ho_so": case.get("ngay_lap_ho_so"),
         "loai_van_ban": case.get("document_type"),
         "trang_thai": case.get("status"),
+        "status_label": _STATUS_LABELS.get(case.get("status"),
+                                           case.get("status")),
         "noi_niem_yet": case.get("noi_niem_yet"),
         "ghi_chu": case.get("ghi_chu"),
         "tong_ty_le": case.get("tong_ty_le"),

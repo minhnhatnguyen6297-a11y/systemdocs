@@ -82,7 +82,7 @@ function seedExistingCase(model) {
   s.status = 'ready';
   s.caseId = 42;
   s.caseInfo = { id: 42, case_type: 'inheritance',
-                 document_type: 'khai_nhan', status: 'active',
+                 document_type: 'khai_nhan', status: 'draft',
                  locked: false, revision: 3,
                  ngay_lap_ho_so: '2024-05-01', noi_niem_yet: 'xã Cũ',
                  nguoi_nhan_uy_quyen: 'Người Nhận Gốc',
@@ -533,18 +533,47 @@ test('MIN-133 D4: không nút ‹, tiêu đề, pill Nháp, nhãn trạng thái 
   assert.match(save.getAttribute('aria-label'), /có thay đổi chưa lưu/);
 });
 
-test('MIN-133 D4: case thật — chấm dirty theo stageDirty; pill loại · HS', async () => {
+test('MIN-133 D4: case thật — chấm dirty theo stageDirty; pill loại · HS · trạng thái', async () => {
   const { model, view } = await build(test, { draft: false });
   const upd = () => findBtns(topbar(view.el), 'Cập nhật')[0];
   const dots = (b) => collect(b, (e) => e.classList.contains('dirty-dot'));
   assert.equal(dots(upd()).length, 0);
   assert.equal(collect(topbar(view.el), (e) =>
     e.classList.contains('cd-case-pill') &&
-    e.textContent === 'Thừa kế · HS-42').length, 1);
+    e.textContent === 'Thừa kế · HS-42 · Nháp').length, 1);
   assert.equal(collect(topbar(view.el), (e) => e.tagName === 'SELECT').length,
     0, 'case thật không cho đổi loại việc');
   model.addPerson();
   assert.equal(dots(upd()).length, 1);
+  // Done + local dirty vẫn nhãn Đã lưu, chấm dirty là tín hiệu riêng.
+  model.state.caseInfo.status = 'done';
+  model.dismissNotice();
+  assert.equal(collect(topbar(view.el), (e) =>
+    e.classList.contains('cd-case-pill') &&
+    e.textContent === 'Thừa kế · HS-42 · Đã lưu').length, 1);
+  assert.equal(dots(upd()).length, 1);
+});
+
+test('danh sách hồ sơ: status_label (unknown giữ raw), không hiện mã thô', async () => {
+  const rows = [
+    { id: 1, nguoi_chet: null, tai_san: null, ngay_lap_ho_so: null,
+      trang_thai: 'draft', status_label: 'Nháp' },
+    { id: 2, nguoi_chet: null, tai_san: null, ngay_lap_ho_so: null,
+      trang_thai: 'archived', status_label: 'archived' },
+  ];
+  const { view } = await build(test, {
+    draft: true,
+    respond: (cmd) => cmd === 'notary.case_list'
+      ? { ok: true, data: { cases: rows, total: rows.length } } : null,
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const items = collect(view.el, (e) => e.classList.contains('cd-case-row'));
+  assert.equal(items.length, 2);
+  assert.match(items[0].textContent, /Hồ sơ 1/);
+  assert.match(items[0].textContent, /Nháp/);
+  assert.match(items[1].textContent, /archived/);
+  assert.ok(!items[0].textContent.includes('draft'),
+    'đang hiện trạng thái thô');
 });
 
 test('MIN-133: đang gõ trong Stage — nút Cập nhật vẫn hiện chấm dirty (defer rebuild)', async () => {

@@ -662,8 +662,9 @@ def test_replay_conflict_and_error_do_not_advance_stamp(
     assert _stamp_of(factory, case_id) == baseline
 
     # Create lỗi không tạo case và không để lại mốc.
+    # (Nháp vòng 2 cho tên null/rỗng nhưng sai kiểu vẫn là lỗi.)
     bad_stage = _stage_with_owner(_two_person_stage())
-    bad_stage["people"][0]["ho_ten"] = "   "
+    bad_stage["people"][0]["ho_ten"] = 123
     with pytest.raises(WorkspaceError) as exc:
         _create_case(db, bad_stage, state=_diagram_for(bad_stage))
     assert exc.value.code == "stage_validation_error"
