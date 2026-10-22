@@ -2039,3 +2039,90 @@ def test_legacy_case_create_stamps_microsecond(adapter_db, monkeypatch):
     case = sess.get(InheritanceCase, case_id)
     assert case.updated_at == stamp
     assert case.updated_at.microsecond == 654321
+
+
+# ---------------------------------------------- workspace_duplicate (§13.21)
+
+
+def test_registry_wires_workspace_duplicate():
+    assert "notary.workspace_duplicate" in reg.COMMANDS
+    assert callable(reg.COMMANDS["notary.workspace_duplicate"])
+
+
+def _duplicate_job():
+    from jobstore import Job
+    return Job(str(uuid.uuid4()), "notary.workspace_duplicate")
+
+
+def test_workspace_duplicate_real_adapter_created_and_replay(adapter_db):
+    case, deceased, prop = _seed_case(adapter_db)
+    before = notary_adapter.workspace_get(
+        _Job(), {"case_id": case.id})["data"]
+    key = _uuid4()
+    res = notary_adapter.workspace_duplicate(_duplicate_job(), {
+        "source_case_id": case.id, "idempotency_key": key})
+    assert res["kind"] == "workspace_duplicate"
+    data = res["data"]
+    assert data["backend_mode"] == "real"
+    assert data["created"] is True
+    assert data["source_case_id"] == case.id
+    assert data["case"]["status"] == "draft"
+    assert data["case"]["revision"] == 1
+    assert data["case"]["id"] != case.id
+    copy_id = data["case"]["id"]
+    assert data["stage"]["owner_row_id"] == \
+        data["stage"]["people"][0]["row_id"]
+    assert data["stage"]["people"][0]["row_id"] != \
+        before["stage"]["people"][0]["row_id"]
+    assert data["stage"]["people"][0]["entity_id"] == deceased.id
+    assert data["stage"]["assets"][0]["entity_id"] == prop.id
+    assert data["stage"]["assets"][0]["so_serial"] == "AA123456"
+
+    replay = notary_adapter.workspace_duplicate(_duplicate_job(), {
+        "source_case_id": case.id, "idempotency_key": key})
+    assert replay["data"]["created"] is False
+    assert replay["data"]["case"]["id"] == copy_id
+    assert replay["data"]["case"]["revision"] == 1
+
+    # Nguồn không bị rewrite/revision bump.
+    assert notary_adapter.workspace_get(
+        _Job(), {"case_id": case.id})["data"] == before
+    assert adapter_db.query(InheritanceCase).filter_by(id=case.id).one() \
+        .workspace_revision == case.workspace_revision
+
+
+def test_workspace_duplicate_adapter_payload_errors_and_cancel(adapter_db):
+    from jobstore import Job, CancelledByUser
+    case, _deceased, _prop = _seed_case(adapter_db)
+    key = _uuid4()
+    for payload in (
+            None,
+            {},
+            {"source_case_id": case.id},
+            {"source_case_id": True, "idempotency_key": key},
+            {"source_case_id": str(case.id), "idempotency_key": key},
+            {"source_case_id": case.id, "idempotency_key": "not-a-uuid"},
+            {"source_case_id": case.id, "idempotency_key": key,
+             "case_id": case.id},
+            {"source_case_id": case.id, "idempotency_key": key,
+             "base_revision": 1},
+    ):
+        with pytest.raises(CommandError) as exc:
+            notary_adapter.workspace_duplicate(_duplicate_job(), payload)
+        assert exc.value.code == "validation_error"
+    assert adapter_db.query(InheritanceCase).count() == 1
+
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.workspace_duplicate(_duplicate_job(), {
+            "source_case_id": 987654, "idempotency_key": key})
+    assert exc.value.code == "case_not_found"
+    assert exc.value.details["source_case_id"] == 987654
+
+    job = Job("duplicate-canceled", "notary.workspace_duplicate")
+    assert job.request_cancel()
+    with pytest.raises(CancelledByUser):
+        notary_adapter.workspace_duplicate(job, {
+            "source_case_id": case.id, "idempotency_key": key})
+    assert adapter_db.query(InheritanceCase).count() == 1
+    assert adapter_db.query(InheritanceCase).filter(
+        InheritanceCase.workspace_idempotency_key == key).count() == 0

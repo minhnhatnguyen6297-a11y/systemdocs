@@ -179,13 +179,20 @@
 }
 .cd-case-row {
   display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.cd-case-open {
+  display: flex;
   gap: 10px;
   align-items: baseline;
+  flex: 1 1 auto;
   min-height: var(--row-h);
   padding: 6px 10px;
   text-align: left;
   justify-content: flex-start;
 }
+.cd-case-duplicate { flex: 0 0 auto; margin-right: 6px; }
 .cd-case-row .cd-case-name { font-weight: 600; }
 .cd-case-row .muted { margin-left: auto; }
 .cd-caselist-count { font-size: var(--fs-small); }

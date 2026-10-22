@@ -706,6 +706,39 @@ def workspace_source_latest(job, payload):
         sess.close()
 
 
+def workspace_duplicate(job, payload):
+    """notary.workspace_duplicate — nhan ban toan bo ho so (§13.21).
+
+    Payload chi `source_case_id` + `idempotency_key`; session sach; service
+    so huu validate/atomic/idempotency. `complete_atomic` de cancel sau DB
+    commit khong bao sai trang thai ghi."""
+    if not isinstance(payload, dict):
+        raise CommandError("validation_error", "payload phai la object")
+    extra = set(payload) - {"source_case_id", "idempotency_key"}
+    if extra:
+        raise CommandError("validation_error",
+                           f"payload co key ngoai schema: {sorted(extra)}")
+    source = payload.get("source_case_id")
+    if isinstance(source, bool) or not isinstance(source, int) or source < 1:
+        raise CommandError("validation_error",
+                           "source_case_id phai la so nguyen >= 1")
+    sess = _db_session()
+    try:
+        def apply():
+            module = _workspace_module()
+            try:
+                data = module.CaseWorkspaceService(
+                    sess, _docx_store).duplicate(
+                        source_case_id=source,
+                        idempotency_key=payload.get("idempotency_key"))
+            except module.WorkspaceError as err:
+                raise _workspace_command_error(err)
+            return _result("workspace_duplicate", data)
+        return job.complete_atomic(apply)
+    finally:
+        sess.close()
+
+
 def workspace_create(job, payload):
     """notary.workspace_create — tao ho so tu nhap trong mot transaction
     (contract v2 §13.6): case + person + asset + link + diagram + revision=1.

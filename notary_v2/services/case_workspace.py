@@ -83,6 +83,18 @@ _SPOUSE_RELATIONS = ("spouse", "branchSpouse")
 _GHOST_KINDS = ("ghost", "pendingspouse")
 _PLACEHOLDER_ROW_ID = "00000000-0000-4000-8000-000000000000"
 
+# Duplicate (contract §13.21): copy cột tường minh, không serialize/derive.
+_PERSON_COPY_COLUMNS = (
+    "customer_id", "vitri", "ho_ten", "gioi_tinh", "ngay_sinh", "ngay_chet",
+    "so_giay_to", "ngay_cap", "noi_cap", "dia_chi", "place_of_origin",
+    "loai_giay_to", "loai_dia_chi",
+)
+_ASSET_COPY_COLUMNS = (
+    "property_id", "vitri", "so_serial", "so_vao_so", "so_thua_dat",
+    "so_to_ban_do", "dia_chi", "loai_so", "hinh_thuc_su_dung", "thoi_han",
+    "nguon_goc", "ngay_cap", "co_quan_cap", "land_rows_present",
+)
+
 
 class WorkspaceError(Exception):
     """Lỗi nghiệp vụ có `code`/`details` theo contract §9 + §13.9."""
@@ -613,11 +625,11 @@ class CaseWorkspaceService:
         self.db = db
         self.docx_store = docx_store
 
-    def _docx_context(self, context, stage):
+    def _docx_context(self, context, stage, *, read_only=False):
         from .word_original import validate_context
         try:
             store = self.docx_store() if callable(self.docx_store) else self.docx_store
-            return validate_context(context, stage, store)
+            return validate_context(context, stage, store, read_only=read_only)
         except (ValueError, OSError, TypeError, KeyError) as exc:
             raise WorkspaceError("validation_error", str(exc)) from exc
 
@@ -737,6 +749,197 @@ class CaseWorkspaceService:
             "source_status": source_status,
             "stage": stage,
         }
+
+    def duplicate(self, *, source_case_id: Any,
+                  idempotency_key: Any) -> dict:
+        """`notary.workspace_duplicate` — nhân bản toàn bộ hồ sơ (§13.21).
+
+        Một transaction: validate → chiếm write lock → tra key TRƯỚC khi
+        load nguồn (replay trả bản sao hiện tại kể cả nguồn đã bị xóa) →
+        copy rows/đất/participants/projection/Diagram/provenance từ
+        snapshot DB → JSON v4 → draft/rev1 → commit. Không ghi/đổi nguồn.
+        """
+        if not _is_uuid4(idempotency_key):
+            raise WorkspaceError(
+                "validation_error", "idempotency_key phải là UUID v4")
+        if (isinstance(source_case_id, bool)
+                or not isinstance(source_case_id, int)
+                or source_case_id < 1):
+            raise WorkspaceError(
+                "validation_error",
+                "source_case_id phải là số nguyên ≥ 1")
+
+        creation_hash = _duplicate_creation_hash(source_case_id)
+        self._acquire_write_lock()
+        saved_at = case_saved_at()
+        try:
+            existing = self.db.query(InheritanceCase).filter(
+                InheritanceCase.workspace_idempotency_key
+                == str(idempotency_key)).first()
+            if existing is not None:
+                if existing.workspace_creation_hash != creation_hash:
+                    raise WorkspaceError(
+                        "idempotency_conflict",
+                        "idempotency_key đã dùng với nội dung khác")
+                data = self.get(existing.id)
+                data["source_case_id"] = source_case_id
+                data["created"] = False
+                self.db.commit()
+                return data
+
+            source = self.db.get(InheritanceCase, source_case_id)
+            if source is None:
+                raise WorkspaceError(
+                    "case_not_found",
+                    f"Không tìm thấy hồ sơ #{source_case_id}",
+                    details={"source_case_id": source_case_id})
+            self.db.expire(source)
+            case_type, _document_type = _case_meta(source)
+            if case_type not in CASE_TYPES:
+                raise WorkspaceError(
+                    "case_type_unsupported",
+                    f"Loại việc chưa hỗ trợ: {case_type}",
+                    details={"case_type": case_type})
+
+            payload = self._load_payload(source) or {}
+            source_people = sorted(source.person_rows, key=lambda r: r.vitri)
+            source_assets = sorted(source.asset_rows, key=lambda r: r.vitri)
+            person_ids = {r.row_id for r in source_people}
+            asset_ids = {r.row_id for r in source_assets}
+
+            owner_old = None
+            if case_type == CASE_TYPE_INHERITANCE:
+                owner_old = payload.get("owner_row_id")
+                if owner_old is not None and owner_old not in person_ids:
+                    raise WorkspaceError(
+                        "diagram_reference_outside_stage",
+                        "owner_row_id nguồn không thuộc Stage",
+                        details={"personId": owner_old})
+
+            diagram = (payload.get("diagram")
+                       if isinstance(payload.get("diagram"), Mapping) else {})
+            source_render = diagram.get("render_model")
+            source_state = diagram.get("state")
+            if isinstance(source_state, Mapping):
+                for node in source_state.get("nodes") or []:
+                    pid = (node.get("personId")
+                           if isinstance(node, Mapping) else None)
+                    if pid is not None and pid not in person_ids:
+                        raise WorkspaceError(
+                            "diagram_reference_outside_stage",
+                            "personId nguồn không thuộc Stage",
+                            details={"personId": pid})
+            elif source_render is not None:
+                raise WorkspaceError(
+                    "diagram_invalid_state",
+                    "Nguồn có render_model nhưng thiếu diagram.state")
+
+            source_docx = payload.get("docx_import")
+            if source_docx is not None:
+                for src in source_docx.get("sources") or []:
+                    for record in (src.get("records") or []):
+                        rid = (record.get("row_id")
+                               if isinstance(record, Mapping) else None)
+                        if rid not in person_ids and rid not in asset_ids:
+                            raise WorkspaceError(
+                                "validation_error",
+                                "Dòng đối chiếu Word trỏ dòng không thuộc nguồn",
+                                details={"row_id": rid})
+            for participant in source.participants:
+                for pointer in (participant.case_person_row_id,
+                                participant.parent_case_person_row_id):
+                    if pointer is not None and pointer not in person_ids:
+                        raise WorkspaceError(
+                            "validation_error",
+                            "Participant trỏ dòng không thuộc nguồn",
+                            details={"row_id": pointer})
+
+            target = InheritanceCase(
+                nguoi_chet_id=None,
+                tai_san_id=None,
+                ngay_lap_ho_so=source.ngay_lap_ho_so,
+                loai_van_ban=source.loai_van_ban,
+                trang_thai="draft",
+                noi_niem_yet=source.noi_niem_yet,
+                nguoi_nhan_uy_quyen=source.nguoi_nhan_uy_quyen,
+                nguoi_nhan_uy_quyen_id=source.nguoi_nhan_uy_quyen_id,
+                noi_dung_viec=source.noi_dung_viec,
+                ghi_chu=source.ghi_chu,
+                workspace_revision=1,
+                workspace_idempotency_key=str(idempotency_key),
+                workspace_creation_hash=creation_hash,
+                updated_at=saved_at)
+            self.db.add(target)
+            self.db.flush()
+
+            person_map, asset_map = self._copy_case_rows(source, target)
+            stage = case_rows.read_stage(target)
+            owner_new = person_map.get(owner_old) if owner_old else None
+            stage_view = {"people": stage["people"],
+                          "assets": stage["assets"]}
+            self._sync_links(
+                target,
+                [(wire["row_id"], wire["entity_id"], wire)
+                 for wire in stage_view["assets"]])
+            self._sync_owner_projection(
+                target, stage_view["people"], owner_new)
+            self._copy_participants(source, target, person_map)
+
+            prepare_stage = dict(stage_view)
+            if case_type == CASE_TYPE_INHERITANCE:
+                prepare_stage["owner_row_id"] = owner_new
+            clean_state, render_model, diagram_warnings = \
+                self._copy_diagram(
+                    diagram, case_type=case_type, stage=prepare_stage,
+                    person_map=person_map, owner_row_id=owner_new)
+
+            copied_docx = None
+            if source_docx is not None:
+                copied_docx = self._copy_docx_import(
+                    source_docx, person_map, asset_map)
+                copied_docx = self._docx_context(
+                    copied_docx, stage_view, read_only=True)
+
+            scalars = payload.get("case")
+            scalars = scalars if isinstance(scalars, Mapping) else {}
+            new_payload: dict = {
+                "case": {key: scalars.get(key)
+                         for key in CASE_SCALAR_FIELDS}}
+            if copied_docx is not None:
+                new_payload["docx_import"] = copied_docx
+            target.case_state_json = json.dumps(
+                self._build_payload(
+                    new_payload, clean_state, render_model,
+                    _utc_now_iso(), domain=case_type,
+                    owner_row_id=owner_new,
+                    warnings=diagram_warnings),
+                ensure_ascii=False)
+            target.engine_state_json = None
+            self.db.flush()
+            if copied_docx is not None:
+                self._validate_docx_bindings(
+                    target, copied_docx, copied_docx)
+
+            self.db.execute(sa_text(
+                "UPDATE inheritance_cases SET updated_at = :now "
+                "WHERE id = :cid"), {"now": saved_at, "cid": target.id})
+            self.db.commit()
+        except WorkspaceError:
+            self.db.rollback()
+            raise
+        except IntegrityError as exc:
+            self.db.rollback()
+            raise WorkspaceError(
+                "validation_error",
+                "Dữ liệu vi phạm ràng buộc integrity") from exc
+        except Exception:
+            self.db.rollback()
+            raise
+
+        data = self.get(target.id)
+        data["source_case_id"] = source_case_id
+        data["created"] = True
+        return data
 
     def commit_stage(self, case_id: int, base_revision: int,
                      stage: Any, case_meta: Any = None,
@@ -1980,12 +2183,10 @@ class CaseWorkspaceService:
                 self.db.delete(link)
         case.tai_san_id = resolved_assets[0][1] if resolved_assets else None
 
-    def _sync_participants_and_owner(self, case: InheritanceCase,
-                                     role_nodes: list,
-                                     people: list,
-                                     owner_row_id: Optional[str]) -> None:
-        """Diff participant theo `case_person_row_id`; owner projection =
-        identity của owner row (có thể null)."""
+    def _sync_owner_projection(self, case: InheritanceCase,
+                               people: list,
+                               owner_row_id: Optional[str]) -> dict:
+        """`nguoi_chet_id` = identity của owner row (có thể null)."""
         people_by_row = {p["row_id"]: p for p in people
                          if isinstance(p, Mapping) and p.get("row_id")}
         if owner_row_id is not None:
@@ -1993,6 +2194,16 @@ class CaseWorkspaceService:
             case.nguoi_chet_id = owner.get("entity_id")
         else:
             case.nguoi_chet_id = None
+        return people_by_row
+
+    def _sync_participants_and_owner(self, case: InheritanceCase,
+                                     role_nodes: list,
+                                     people: list,
+                                     owner_row_id: Optional[str]) -> None:
+        """Diff participant theo `case_person_row_id`; owner projection =
+        identity của owner row (có thể null)."""
+        people_by_row = self._sync_owner_projection(
+            case, people, owner_row_id)
 
         active_ids = {
             _clean(n.get("personId")) for n in role_nodes
@@ -2037,6 +2248,206 @@ class CaseWorkspaceService:
         for row_id, row in existing.items():
             if row_id not in keep:
                 self.db.delete(row)
+
+    # ----- duplicate (contract §13.21)
+
+    def _copy_case_rows(self, source: InheritanceCase,
+                        target: InheritanceCase) -> tuple[dict, dict]:
+        """Copy dòng Người/Tài sản/đất — cột tường minh, không derive.
+
+        Row UUID mới, land PK mới; `customer_id`/`property_id` giữ nguyên
+        (kể cả null/ID cao trùng neo); null/[] của đất giữ qua
+        `land_rows_present`.
+        """
+        person_map: dict = {}
+        for row in sorted(source.person_rows, key=lambda r: r.vitri):
+            new_row_id = str(uuid.uuid4())
+            person_map[row.row_id] = new_row_id
+            copy = CasePersonRow(row_id=new_row_id, case_id=target.id)
+            for column in _PERSON_COPY_COLUMNS:
+                setattr(copy, column, getattr(row, column))
+            self.db.add(copy)
+        asset_map: dict = {}
+        source_assets = sorted(source.asset_rows, key=lambda r: r.vitri)
+        for row in source_assets:
+            new_row_id = str(uuid.uuid4())
+            asset_map[row.row_id] = new_row_id
+            copy = CaseAssetRow(row_id=new_row_id, case_id=target.id)
+            for column in _ASSET_COPY_COLUMNS:
+                setattr(copy, column, getattr(row, column))
+            self.db.add(copy)
+        self.db.flush()
+        for row in source_assets:
+            for land in sorted(row.land_rows, key=lambda lr: lr.vitri):
+                self.db.add(CaseAssetLandRow(
+                    case_asset_row_id=asset_map[row.row_id],
+                    vitri=land.vitri,
+                    loaidat=land.loaidat,
+                    dientich=land.dientich,
+                    thoihan=land.thoihan))
+        self.db.flush()
+        self.db.expire(target, ["person_rows", "asset_rows"])
+        return person_map, asset_map
+
+    def _copy_participants(self, source: InheritanceCase,
+                           target: InheritanceCase,
+                           person_map: dict) -> None:
+        """Copy participant: pointer remap, identity theo rows mới.
+
+        Pointer null legacy giữ null + identity nguồn; giữ toàn bộ scalar
+        thủ công (vai trò/hàng/tỷ lệ/ghi chú/co_nhan_tai_san).
+        """
+        identity = {row.row_id: row.customer_id
+                    for row in target.person_rows}
+        for participant in sorted(source.participants, key=lambda p: p.id):
+            row_id = participant.case_person_row_id
+            new_row_id = None
+            customer_id = participant.customer_id
+            if row_id is not None:
+                new_row_id = person_map.get(row_id)
+                if new_row_id is None:
+                    raise WorkspaceError(
+                        "validation_error",
+                        "Participant trỏ dòng không thuộc nguồn",
+                        details={"row_id": row_id})
+                customer_id = identity.get(new_row_id)
+            parent_id = participant.parent_case_person_row_id
+            new_parent_id = None
+            parent_customer_id = participant.parent_customer_id
+            if parent_id is not None:
+                new_parent_id = person_map.get(parent_id)
+                if new_parent_id is None:
+                    raise WorkspaceError(
+                        "validation_error",
+                        "Participant cha trỏ dòng không thuộc nguồn",
+                        details={"row_id": parent_id})
+                parent_customer_id = identity.get(new_parent_id)
+            self.db.add(InheritanceParticipant(
+                ho_so_id=target.id,
+                case_person_row_id=new_row_id,
+                customer_id=customer_id,
+                vai_tro=participant.vai_tro,
+                hang_thua_ke=participant.hang_thua_ke,
+                co_nhan_tai_san=participant.co_nhan_tai_san,
+                ty_le=participant.ty_le,
+                ghi_chu=participant.ghi_chu,
+                parent_case_person_row_id=new_parent_id,
+                parent_customer_id=parent_customer_id))
+
+    def _copy_diagram(self, diagram: Mapping[str, Any], *, case_type: str,
+                      stage: Mapping[str, Any], person_map: dict,
+                      owner_row_id: Optional[str]
+                      ) -> tuple[dict, Optional[dict], list]:
+        """Remap `nodes[].personId`; giữ slot id/vị trí; rebuild cache.
+
+        Render cache nguồn có → evaluate chuẩn bằng IW (không commit);
+        nguồn null → giữ null. Không prune/giảm nội dung: vị trí bị cắt
+        hoặc state không hợp lệ → lỗi rollback.
+        """
+        from .inheritance_workspace import (
+            InheritanceWorkspaceService,
+            _persisted_state,
+            _validate_diagram_wire,
+        )
+        warnings = [dict(w) for w in (diagram.get("warnings") or [])
+                    if isinstance(w, Mapping)]
+        raw_state = diagram.get("state")
+        source_render = diagram.get("render_model")
+        if not isinstance(raw_state, Mapping):
+            if source_render is not None:
+                raise WorkspaceError(
+                    "diagram_invalid_state",
+                    "Nguồn có render_model nhưng thiếu diagram.state")
+            return (
+                (_seed_inheritance_state(owner_row_id,
+                                         len(stage.get("assets") or []))
+                 if case_type == CASE_TYPE_INHERITANCE
+                 else _seed_two_party_state()),
+                None, warnings)
+        state = {**raw_state, "nodes": []}
+        for node in raw_state.get("nodes") or []:
+            if not isinstance(node, Mapping):
+                raise WorkspaceError(
+                    "diagram_invalid_state",
+                    "diagram.state chứa node không hợp lệ")
+            copy = dict(node)
+            pid = copy.get("personId")
+            if pid is not None:
+                mapped = person_map.get(pid)
+                if mapped is None:
+                    raise WorkspaceError(
+                        "diagram_reference_outside_stage",
+                        "personId nguồn không thuộc Stage",
+                        details={"personId": pid})
+                copy["personId"] = mapped
+            state["nodes"].append(copy)
+
+        if source_render is not None:
+            clean_state, render_model, prepare_warnings = (
+                InheritanceWorkspaceService(self.db).prepare_diagram(
+                    case_type=case_type, stage=stage, state=state))
+            if any(w.get("code") == "diagram.selection_pruned"
+                   for w in prepare_warnings):
+                raise WorkspaceError(
+                    "diagram_invalid_state",
+                    "Nguồn cần cắt dấu chọn tài sản — không giảm nội dung")
+            for warning in prepare_warnings:
+                if warning not in warnings:
+                    warnings.append(warning)
+            return clean_state, render_model, warnings
+
+        errors = _validate_diagram_wire(state)
+        if errors:
+            raise WorkspaceError(
+                "diagram_invalid_state",
+                f"diagram state có {len(errors)} lỗi",
+                details={"errors": errors})
+        if state.get("domain") != case_type:
+            raise WorkspaceError(
+                "diagram_domain_mismatch",
+                "state.domain không khớp case.case_type",
+                details={"expected": case_type,
+                         "got": state.get("domain")})
+        valid_rows = {p["row_id"] for p in stage.get("people") or []
+                      if isinstance(p, Mapping)}
+        for node in state["nodes"]:
+            pid = node.get("personId")
+            if pid is not None and pid not in valid_rows:
+                raise WorkspaceError(
+                    "diagram_reference_outside_stage",
+                    "personId không thuộc Stage của bản sao",
+                    details={"personId": pid})
+            if (case_type == CASE_TYPE_INHERITANCE
+                    and node.get("id") == "owner"
+                    and node.get("deleted") is not True
+                    and pid is not None and pid != owner_row_id):
+                raise WorkspaceError(
+                    "diagram_owner_mismatch",
+                    "node owner.personId phải khớp owner_row_id",
+                    details={"owner_row_id": owner_row_id,
+                             "node_personId": pid})
+        return _persisted_state(state), None, warnings
+
+    def _copy_docx_import(self, context: Mapping[str, Any],
+                          person_map: dict, asset_map: dict) -> dict:
+        """Deep-copy provenance; remap `records[].row_id` theo đúng target.
+
+        Không remap candidate/occurrence/source UUID hay `land_rows`.
+        """
+        copied = json.loads(json.dumps(context, ensure_ascii=False))
+        for source in copied.get("sources") or []:
+            for record in source.get("records") or []:
+                row_id = record.get("row_id")
+                mapped = person_map.get(row_id)
+                if mapped is None:
+                    mapped = asset_map.get(row_id)
+                if mapped is None:
+                    raise WorkspaceError(
+                        "validation_error",
+                        "Dòng đối chiếu Word trỏ dòng không thuộc nguồn",
+                        details={"row_id": row_id})
+                record["row_id"] = mapped
+        return copied
 
     # ----- diagram state
 
@@ -2626,6 +3037,22 @@ def _creation_hash(case_meta: Any, stage: Any, state: Any,
         "stage": stage,
         "diagram": state,
         "docx_import": docx_import,
+    }
+    raw = json.dumps(canonical, sort_keys=True, ensure_ascii=False,
+                     separators=(",", ":"), default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _duplicate_creation_hash(source_case_id: int) -> str:
+    """SHA-256 canonical `{command, intent, source_case_id}` (§13.21).
+
+    Không hash snapshot nguồn/revision/timestamp/UUID mới/case đích:
+    replay sau khi nguồn đổi vẫn trả bản sao đã tạo.
+    """
+    canonical = {
+        "command": "workspace_duplicate",
+        "intent": "draft",
+        "source_case_id": source_case_id,
     }
     raw = json.dumps(canonical, sort_keys=True, ensure_ascii=False,
                      separators=(",", ":"), default=str)

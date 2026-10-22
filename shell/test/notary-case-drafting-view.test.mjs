@@ -294,7 +294,7 @@ test('guard: dirty + mở hồ sơ khác → Ở lại giữ nguyên nháp', asy
   findBtns(view.el, 'Tổng quan hồ sơ')[0].onclick();
   await guardTick();
   const row = collect(view.el, (e) =>
-    e.classList.contains('cd-case-row') &&
+    e.classList.contains('cd-case-open') &&
     /Hồ Sơ Khác/.test(e.textContent))[0];
   assert.ok(row, 'thiếu hàng hồ sơ khác');
   await row.onclick();
@@ -314,7 +314,7 @@ test('guard: bỏ nháp mở hồ sơ khác → không ghi, quay lại thấy b�
     findBtns(view.el, 'Tổng quan hồ sơ')[0].onclick();
     await guardTick();
     const other = collect(view.el, (e) =>
-      e.classList.contains('cd-case-row') &&
+      e.classList.contains('cd-case-open') &&
       /Hồ Sơ Khác/.test(e.textContent))[0];
     await other.onclick();
     await guardTick();
@@ -328,7 +328,7 @@ test('guard: bỏ nháp mở hồ sơ khác → không ghi, quay lại thấy b�
     findBtns(view.el, 'Tổng quan hồ sơ')[0].onclick();
     await guardTick();
     const back = collect(view.el, (e) =>
-      e.classList.contains('cd-case-row') &&
+      e.classList.contains('cd-case-open') &&
       /Người Gốc/.test(e.textContent))[0];
     await back.onclick();
     await guardTick();
@@ -2204,4 +2204,158 @@ test('newDraft: lỗi đọc nguồn hiện rõ + nút Thử lại, không tạo
   assert.equal(retry.disabled, false);
   assert.ok(!calls.some(([c]) => c === 'notary.workspace_create'),
     'lỗi đọc nguồn không được tự ghi case');
+});
+
+// ---------- đợt 5 / E2: nút Nhân bản trong danh sách ----------
+
+function duplicateWorkspace(id) {
+  return {
+    schema_version: 'notary.case-drafting.v2', backend_mode: 'real',
+    case: {
+      id, case_type: 'inheritance', document_type: 'khai_nhan',
+      status: 'draft', revision: 1, locked: false,
+      ngay_lap_ho_so: null, noi_niem_yet: null,
+      nguoi_nhan_uy_quyen: null, nguoi_nhan_uy_quyen_id: null,
+      noi_dung_viec: null, ghi_chu: null,
+    },
+    stage: {
+      owner_row_id: '00000000-0000-4000-8000-000000000401',
+      people: [{ row_id: '00000000-0000-4000-8000-000000000401',
+                 entity_id: 1, ho_ten: 'Bản sao', gioi_tinh: null,
+                 ngay_sinh: null, ngay_chet: null, so_giay_to: null,
+                 ngay_cap: null, noi_cap: null, dia_chi: null,
+                 place_of_origin: null, loai_giay_to: null,
+                 loai_dia_chi: null }],
+      assets: [],
+    },
+    diagram: { domain: 'inheritance',
+               state: { version: 3, domain: 'inheritance', nodes: [] },
+               render_model: null },
+    capabilities: { intake: [], diagram: true, word_export: true },
+    source_case_id: 43, created: true,
+  };
+}
+
+function caseListResponse() {
+  return { ok: true, data: {
+    cases: [
+      { id: 42, nguoi_chet: { ho_ten: 'Nguồn A' },
+        tai_san: { so_serial: 'S-1' }, ngay_lap_ho_so: '2026-10-01',
+        trang_thai: 'done', status_label: 'Đã lưu' },
+      { id: 43, nguoi_chet: { ho_ten: 'Nguồn B' },
+        tai_san: null, ngay_lap_ho_so: null,
+        trang_thai: 'draft', status_label: 'Nháp' },
+    ],
+    total: 2,
+  } };
+}
+
+async function listRows(view) {
+  await new Promise((r) => setTimeout(r, 30));
+  return collect(view.el, (e) => e.classList.contains('cd-case-row'));
+}
+
+test('đợt5: mỗi dòng có nút Mở và Nhân bản riêng, click Nhân bản đúng hàng', async () => {
+  const respond = (cmd) => {
+    if (cmd === 'notary.case_list') return caseListResponse();
+    if (cmd === 'notary.workspace_duplicate') {
+      return { ok: true, data: duplicateWorkspace(77) };
+    }
+    return null;
+  };
+  const { model, view, calls } = await build(test, { draft: false, respond });
+  const rows = await listRows(view);
+  assert.equal(rows.length, 2);
+
+  const open = collect(rows[1], (e) =>
+    e.classList.contains('cd-case-open'))[0];
+  const dup = collect(rows[1], (e) =>
+    e.classList.contains('cd-case-duplicate'))[0];
+  assert.ok(open && dup);
+  assert.notEqual(open, dup);
+  assert.equal(open.parentElement, rows[1]);
+  assert.equal(dup.parentElement, rows[1]);
+  assert.equal(dup.tagName, 'BUTTON');
+  assert.equal(dup.closest('button'), dup, 'Nhân bản không nested trong Mở');
+  assert.equal(dup.dataset.caseId, '43');
+  assert.equal(dup.disabled, false);
+
+  const beforeDup = calls.filter(([c]) =>
+    c === 'notary.workspace_duplicate').length;
+  await dup.click();
+  const dupCalls = calls.filter(([c]) =>
+    c === 'notary.workspace_duplicate');
+  assert.equal(dupCalls.length, beforeDup + 1);
+  assert.equal(dupCalls.at(-1)[1].source_case_id, 43);
+  assert.match(dupCalls.at(-1)[1].idempotency_key,
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+  assert.ok(!calls.some(([c, p]) =>
+    c === 'notary.workspace_get' && p && p.case_id === 43),
+    'Nhân bản không mở nguồn');
+  assert.equal(model.state.caseId, 77);
+  assert.equal(model.state.stageDirty, false);
+  assert.equal(dup.disabled, false);
+});
+
+test('đợt5: keyboard trên Nhân bản không mở nguồn; cấu trúc hai button', async () => {
+  const respond = (cmd) => {
+    if (cmd === 'notary.case_list') return caseListResponse();
+    return null;
+  };
+  const { view, calls } = await build(test, { draft: false, respond });
+  const rows = await listRows(view);
+  const dup = collect(rows[0], (e) =>
+    e.classList.contains('cd-case-duplicate'))[0];
+  const before = calls.length;
+  dup.dispatch('keydown', { key: 'Enter', preventDefault() {} });
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(calls.length, before,
+    'keydown trên Nhân bản không phát lệnh mở nguồn');
+  assert.equal(dup.closest('button'), dup);
+});
+
+test('đợt5: xác nhận bỏ sửa chưa lưu trước khi Nhân bản', async () => {
+  const confirmSeen = [];
+  const respond = (cmd) => {
+    if (cmd === 'notary.case_list') return caseListResponse();
+    if (cmd === 'notary.workspace_duplicate') {
+      return { ok: true, data: duplicateWorkspace(77) };
+    }
+    return null;
+  };
+  const { model, view, calls } = await build(test, {
+    draft: false, confirm: false, confirmSeen, respond,
+  });
+  const rows = await listRows(view);
+  model.state.stageDirty = true;
+  const dup = collect(rows[1], (e) =>
+    e.classList.contains('cd-case-duplicate'))[0];
+  await dup.click();
+  assert.ok(confirmSeen.some((args) =>
+    /nhân bản/i.test(args.body || '')), 'phải hỏi trước khi mất nháp');
+  assert.ok(!calls.some(([c]) => c === 'notary.workspace_duplicate'));
+  assert.equal(model.state.caseId, 42);
+  assert.equal(model.state.stageDirty, true);
+});
+
+test('đợt5: lỗi Nhân bản giữ workspace và mở lại nút', async () => {
+  const respond = (cmd) => {
+    if (cmd === 'notary.case_list') return caseListResponse();
+    if (cmd === 'notary.workspace_duplicate') {
+      return { ok: false, error: {
+        code: 'engine_unavailable', message: 'busy',
+        retryable: true, next_action: 'retry', details: null } };
+    }
+    return null;
+  };
+  const { model, view } = await build(test, { draft: false, respond });
+  const rows = await listRows(view);
+  const dup = collect(rows[1], (e) =>
+    e.classList.contains('cd-case-duplicate'))[0];
+  await dup.click();
+  assert.equal(dup.disabled, false, 'nút phải enabled lại sau lỗi');
+  assert.equal(model.state.caseId, 42);
+  assert.equal(model.state.status, 'ready');
+  assert.ok(model.state.duplicatePending, 'lỗi hạ tầng giữ key retry');
+  assert.equal(model.state.error.code, 'engine_unavailable');
 });

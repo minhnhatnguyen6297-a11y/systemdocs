@@ -98,6 +98,7 @@ function fakeClient(seed) {
   const idem = {};                        // idempotency_key → case_id
   const calls = [];
   let latestSource = null;
+  const duplicateIdem = {};            // key → {digest, caseId}
   const setSourceLatest = (value) => { latestSource = value; };
   const emptySource = () => ({
     schema_version: SCHEMA,
@@ -257,6 +258,66 @@ function fakeClient(seed) {
         const { c, err } = getCase(payload);
         if (err) return err;
         return ok(workspaceData(c));
+      }
+      case 'notary.workspace_duplicate': {
+        const extra = Object.keys(payload || {})
+          .filter((k) => !['source_case_id', 'idempotency_key'].includes(k));
+        if (extra.length) return fail('validation_error', 'key ngoai schema');
+        const sid = payload.source_case_id;
+        if (!Number.isInteger(sid) || sid < 1) {
+          return fail('validation_error', 'source_case_id khong hop le');
+        }
+        const key = payload.idempotency_key;
+        if (typeof key !== 'string' || !new RegExp(
+          '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+          'i').test(key)) {
+          return fail('validation_error', 'idempotency_key khong hop le');
+        }
+        const digest = JSON.stringify({
+          command: 'workspace_duplicate', source_case_id: sid });
+        if (duplicateIdem[key]) {
+          if (duplicateIdem[key].digest !== digest) {
+            return fail('idempotency_conflict', 'key da dung');
+          }
+          const replay = cases[duplicateIdem[key].caseId];
+          return ok({ ...workspaceData(replay), source_case_id: sid,
+                      created: false });
+        }
+        const source = cases[sid];
+        if (!source) {
+          return fail('case_not_found', 'khong tim thay',
+                      { source_case_id: sid });
+        }
+        if (!supported(source)) {
+          return fail('case_type_unsupported', 'khong ho tro',
+                      { case_type: source.case_type });
+        }
+        const fresh = JSON.parse(JSON.stringify(source));
+        const personMap = {};
+        fresh.stage.people = (fresh.stage.people || []).map((row) => {
+          const rid = crypto.randomUUID();
+          personMap[row.row_id] = rid;
+          return { ...row, row_id: rid };
+        });
+        fresh.stage.assets = (fresh.stage.assets || []).map((row) => ({
+          ...row, row_id: crypto.randomUUID() }));
+        if (fresh.case_type === 'inheritance') {
+          fresh.stage.owner_row_id = personMap[
+            source.stage.owner_row_id] ?? null;
+        } else {
+          delete fresh.stage.owner_row_id;
+        }
+        fresh.diagram.state.nodes = (fresh.diagram.state.nodes || []).map(
+          (node) => (node.personId
+            ? { ...node, personId: personMap[node.personId] ?? null }
+            : node));
+        fresh.id = nextCid++;
+        fresh.status = 'draft';
+        fresh.revision = 1;
+        cases[fresh.id] = fresh;
+        duplicateIdem[key] = { digest, caseId: fresh.id };
+        return ok({ ...workspaceData(fresh), source_case_id: sid,
+                    created: true });
       }
       case 'notary.workspace_commit_stage': {
         const { c, err } = getCase(payload);
@@ -2964,4 +3025,88 @@ test('saveCase thành công: thay model bằng workspace, xóa ba dirty flag', a
   assert.equal(s.metaDirty, false);
   assert.equal(s.notice, 'Đã lưu hồ sơ');
   assert.equal(s.savingCase, false);
+});
+
+// ---------- đợt 5 / E2: duplicateCase — key theo ý định + session guard ----------
+
+test('duplicateCase: timeout giữ key để retry, success đổi key + hydrate bản sao', async () => {
+  const { model, client } = makeModel(seedCases('ready', 'done'));
+  await model.openCase(42);
+  const sourceBefore = JSON.parse(JSON.stringify(client.cases[44]));
+  const realRun = client.run.bind(client);
+  const dupCalls = [];
+  let failOnce = true;
+  client.run = async (cmd, payload) => {
+    if (cmd === 'notary.workspace_duplicate') {
+      dupCalls.push(JSON.parse(JSON.stringify(payload)));
+      if (failOnce) {
+        failOnce = false;
+        throw new Error('timeout');
+      }
+    }
+    return realRun(cmd, payload);
+  };
+
+  const first = await model.duplicateCase(44);
+  assert.equal(first.ok, false);
+  const kept = model.state.duplicatePending;
+  assert.ok(kept, 'timeout phải giữ pending key');
+  assert.equal(kept.sourceId, 44);
+  assert.equal(model.state.duplicating, null);
+  assert.equal(model.state.caseId, 42, 'lỗi giữ workspace cũ');
+
+  const second = await model.duplicateCase(44);
+  assert.equal(second.ok, true);
+  assert.equal(second.data.created, true);
+  assert.equal(dupCalls[1].idempotency_key, kept.key,
+    'retry cùng ý định phải dùng lại key');
+  assert.equal(dupCalls[1].source_case_id, 44);
+  assert.equal(model.state.caseId, second.data.case.id);
+  assert.equal(model.state.caseInfo.status, 'draft');
+  assert.equal(model.state.revision, 1);
+  assert.equal(model.state.stageDirty, false);
+  assert.equal(model.state.diagramDirty, false);
+  assert.equal(model.state.metaDirty, false);
+  assert.equal(model.state.duplicatePending, null);
+  assert.equal(model.state.notice, 'Đã nhân bản hồ sơ');
+  assert.deepEqual(client.cases[44], sourceBefore, 'không sửa nguồn');
+
+  const third = await model.duplicateCase(44);
+  assert.equal(third.ok, true);
+  assert.notEqual(dupCalls[2].idempotency_key, dupCalls[1].idempotency_key,
+    'ý định sau success phải có key mới');
+  assert.notEqual(third.data.case.id, second.data.case.id);
+});
+
+test('duplicateCase: lỗi nghiệp vụ không giữ key; stale response không áp', async () => {
+  const { model, client } = makeModel(seedCases('ready', 'done'));
+  await model.openCase(42);
+  const missing = await model.duplicateCase(999);
+  assert.equal(missing.ok, false);
+  assert.equal(missing.error.code, 'case_not_found');
+  assert.equal(model.state.duplicatePending, null);
+  assert.equal(model.state.caseId, 42);
+
+  const realRun = client.run.bind(client);
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  let dupPayload = null;
+  client.run = (cmd, payload) => {
+    if (cmd === 'notary.workspace_duplicate') {
+      dupPayload = JSON.parse(JSON.stringify(payload));
+      return gate.then(() => realRun(cmd, payload));
+    }
+    return realRun(cmd, payload);
+  };
+  const pending = model.duplicateCase(44);
+  await Promise.resolve();
+  assert.equal(model.state.duplicating, 44);
+  assert.equal(model.canWrite(), false, 'đang nhân bản khóa sửa');
+  await model.openCase(42);          // phiên đổi trước khi response về
+  release();
+  const late = await pending;
+  assert.equal(late.ok, true);
+  assert.equal(dupPayload.source_case_id, 44);
+  assert.equal(model.state.caseId, 42, 'response bản sao của phiên cũ bị bỏ');
+  assert.equal(model.state.duplicating, null);
 });

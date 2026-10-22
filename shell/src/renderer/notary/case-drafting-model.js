@@ -214,6 +214,8 @@ function createModel(deps) {
     wordBusy: false,
     busy: null,                  // command dang chay (commit/evaluate/save)
     savingCase: false,           // request workspace_save_case dang chay
+    duplicatePending: null,      // {sourceId, key} — giu key qua retry
+    duplicating: null,           // sourceCaseId dang cho nhân bản
   };
 
   let lastUnsaved = false;
@@ -579,6 +581,8 @@ function createModel(deps) {
     state.evaluatedRevision = null;
     state.busy = null;
     state.savingCase = false;
+    state.duplicatePending = null;
+    state.duplicating = null;
     state.status = state.locked ? 'locked' : 'ready';
   }
 
@@ -704,6 +708,8 @@ function createModel(deps) {
     state.wordBusy = false;
     state.busy = 'notary.workspace_source_latest';
     state.savingCase = false;
+    state.duplicatePending = null;
+    state.duplicating = null;
     emit();
 
     // Nguon Done moi nhat: dung MOT lan cho phien nhap nay. Loi hien
@@ -1001,9 +1007,66 @@ function createModel(deps) {
     return r;
   }
 
+  // Nhân bản toàn bộ Hồ sơ từ danh sách (§13.21): key sinh MỘT lần cho một
+  // ý định, giữ qua timeout/lỗi hạ tầng để retry đúng payload; success →
+  // key mới. Không đọc buffer nguồn, không gọi newDraft/source_latest.
+  async function duplicateCase(sourceCaseId) {
+    const sid = Number(sourceCaseId);
+    if (!Number.isInteger(sid) || sid < 1) {
+      return { ok: false, error: errObj(
+        'validation_error', 'Hồ sơ nguồn không hợp lệ') };
+    }
+    if (state.duplicating != null) {
+      return { ok: false, error: errObj(
+        'validation_error', 'Đang nhân bản hồ sơ') };
+    }
+    let intent = state.duplicatePending;
+    if (!intent || intent.sourceId !== sid) {
+      intent = { sourceId: sid, key: uuid() };
+      state.duplicatePending = intent;
+    }
+    const s = session;
+    state.duplicating = sid;
+    state.error = null;
+    state.notice = null;
+    emit();
+    let r;
+    let transport = false;
+    try {
+      r = await client.run('notary.workspace_duplicate', {
+        source_case_id: sid,
+        idempotency_key: intent.key,
+      });
+    } catch (e) {
+      transport = true;
+      r = { ok: false, error: errObj(
+        'unknown', (e && e.message) || 'Không nhân bản được hồ sơ') };
+    }
+    if (s !== session) return r;      // phien da doi — bo response tre
+    state.duplicating = null;
+    if (!r || !r.ok) {
+      const err = (r && r.error) || errObj('unknown');
+      // Giữ key khi lỗi hạ tầng/timeout; lỗi nghiệp vụ là ý định mới.
+      if (!transport && !err.retryable && !isInfraError(err.code)) {
+        state.duplicatePending = null;
+      }
+      state.error = err;
+      emit();
+      return r || { ok: false, error: err };
+    }
+    // Success → key mới cho ý định Nhân bản sau (applyWorkspace cũng clear).
+    state.duplicatePending = null;
+    applyWorkspace(r.data || {});
+    state.notice = r.data && r.data.created === false
+      ? 'Đã mở bản sao đã tạo' : 'Đã nhân bản hồ sơ';
+    emit();
+    return r;
+  }
+
   function canWrite() {
     return (state.status === 'ready' || state.status === 'conflict') &&
       !state.savingCase &&
+      !state.duplicating &&
       state.busy !== 'notary.workspace_convert_type' &&
       !state.locked && !state.unsupported;
   }
@@ -2102,6 +2165,7 @@ function createModel(deps) {
     addressContext, requestLookup, dismissLookupSlot, markLookupStale,
     openFullFromSlot, requestFull, closeFull,
     openCase, newDraft, isDraft, statusLabel, saveDraft, saveCase, updateCaseMeta, saveCaseMeta, convertCaseType,
+    duplicateCase,
     loadUqCatalog, createUqCustomer, resolveUqName,
 
     canWrite, mockBanner, hasUnsaved, isStageEmpty,

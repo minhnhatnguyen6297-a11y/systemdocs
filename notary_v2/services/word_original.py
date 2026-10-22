@@ -42,8 +42,13 @@ def slot_for(snapshot, target, row_id, field_key, ref=None, record=None):
     return f"[{prefix} - {label}]"
 
 
-def validate_context(context, stage, store):
-    """Validate opaque references before the Stage transaction; prune removed rows."""
+def validate_context(context, stage, store, *, read_only=False):
+    """Validate opaque references before the Stage transaction; prune removed rows.
+
+    `read_only=True` (bản sao Hồ sơ) chỉ kiểm shape/bytes/candidate/record/
+    occurrence: không prune record/binding, không đổi label/template_sha256
+    và không `save_template`. Mọi tham chiếu thiếu dòng đích là lỗi, không
+    âm thầm bỏ nội dung."""
     if not isinstance(context, dict) or set(context) != {"version", "sources"} or type(context["version"]) is not int or context["version"] != 1:
         raise ValueError("Đối chiếu nguồn Word không hợp lệ")
     if not isinstance(context["sources"], list) or len(context["sources"]) > 8:
@@ -62,7 +67,8 @@ def validate_context(context, stage, store):
         if store is None:
             raise ValueError("Kho nguồn Word chưa sẵn sàng")
         content, package = store.load(source["source_id"], source["sha256"])
-        source['label'] = package.get('label', 'Hợp đồng Word')
+        if not read_only:
+            source['label'] = package.get('label', 'Hợp đồng Word')
         candidates = {s["suggestion_id"]: s for s in package["suggestions"]}
         retained, seen = [], set()
         for record in source["records"]:
@@ -73,6 +79,8 @@ def validate_context(context, stage, store):
                 raise ValueError("Ứng viên Word không hợp lệ hoặc bị lặp")
             seen.add(record["candidate_id"])
             if record["row_id"] not in rows:
+                if read_only:
+                    raise ValueError("Dòng đối chiếu Word không có trong Hồ sơ sao")
                 continue
             if rows[record["row_id"]] != candidate["target"]:
                 raise ValueError("Không thể gắn người với dòng tài sản")
@@ -92,11 +100,15 @@ def validate_context(context, stage, store):
             if not isinstance(binding, dict) or set(binding) != {"candidate_id", "occurrence_id", "field_key", "slot"}:
                 raise ValueError("Vị trí Word không hợp lệ")
             if binding["candidate_id"] not in valid:
+                if read_only:
+                    raise ValueError("Vị trí Word trỏ ứng viên đã mất")
                 continue
             candidate = candidates[binding["candidate_id"]]
             refs = candidate["fields"].get(binding["field_key"], {}).get("source_refs", [])
             record = next(r for r in retained if r['candidate_id'] == binding['candidate_id'])
             if binding['field_key'] == 'land_rows' and not any(r['occurrence_id'] == binding['occurrence_id'] and r['land_row'] in record.get('land_rows', []) for r in refs):
+                if read_only:
+                    raise ValueError("Vị trí đất không còn thuộc dòng nguồn")
                 continue  # Deleted source row cannot transfer its occurrence to a surviving row.
             if not any(ref["occurrence_id"] == binding["occurrence_id"] for ref in refs):
                 raise ValueError("Vị trí không thuộc trường của ứng viên")
@@ -105,6 +117,8 @@ def validate_context(context, stage, store):
             occurrences.add(binding["occurrence_id"])
             bindings.append(binding)
         source["bindings"] = bindings
+        if read_only:
+            continue
         if bindings:
             replacements = []
             for binding in bindings:

@@ -324,11 +324,11 @@ function createNotaryModuleView(deps) {
 
   // ---------- Tổng quan hồ sơ (entry point: mở hồ sơ) ----------
 
-  function buildCaseListPanel(onOpen, onNewDraft) {
+  function buildCaseListPanel(onOpen, onNewDraft, onDuplicate) {
     const s = h('section', 'cd-panel');
     s.append(h('p', 'muted',
       'Danh sách hồ sơ từ engine nghiệp vụ — bấm vào hồ sơ để mở ' +
-      'workspace Soạn hồ sơ.'));
+      'workspace Soạn hồ sơ, hoặc Nhân bản để tạo bản sao đầy đủ.'));
     const row = h('div', 'toolbar');
     const q = h('input');
     q.type = 'search';
@@ -387,9 +387,25 @@ function createNotaryModuleView(deps) {
                        c.ngay_lap_ho_so,
                        c.status_label ?? c.trang_thai]
             .filter(Boolean).join(' · ');
-          const item = btn('', 'cd-case-row', () => onOpen(c.id));
-          item.append(h('span', 'cd-case-name', name));
-          item.append(h('span', 'muted', sub || '—'));
+          // Container + hai button riêng (không nested button): Enter/
+          // Space của Nhân bản không kích hoạt Mở nguồn.
+          const item = h('div', 'cd-case-row');
+          const open = btn('', 'cd-case-open', () => onOpen(c.id));
+          open.append(h('span', 'cd-case-name', name));
+          open.append(h('span', 'muted', sub || '—'));
+          const dup = btn('Nhân bản', 'cd-case-duplicate', async () => {
+            if (dup.disabled || typeof onDuplicate !== 'function') return;
+            dup.disabled = true;
+            try {
+              const ok = await onDuplicate(c.id);
+              if (ok) loadList();
+            } finally {
+              dup.disabled = false;
+            }
+          });
+          dup.dataset.caseId = String(c.id);
+          dup.setAttribute('aria-label', `Nhân bản hồ sơ ${c.id}`);
+          item.append(open, dup);
           list.append(item);
         }
         out.append(list);
@@ -829,6 +845,39 @@ function createNotaryModuleView(deps) {
       return;
     }
     rerender();
+  }
+
+  // "Nhân bản" từ danh sách: xác nhận bỏ sửa chưa lưu như open/newDraft
+  // (không lấy buffer nguồn), rồi mở workspace BẢN SAO khi thành công.
+  async function duplicateCaseFlow(sourceId) {
+    if (model.hasUnsaved()) {
+      const okGo = await confirm({
+        title: 'Thay đổi chưa lưu',
+        body: 'Bản nháp hiện tại còn thay đổi chưa lưu — nhân bản hồ sơ ' +
+          'khác sẽ mất bản nháp này.',
+        confirmLabel: 'Bỏ nháp, nhân bản',
+        cancelLabel: 'Ở lại',
+      });
+      if (!okGo) return false;
+    }
+    let r;
+    try {
+      r = await model.duplicateCase(sourceId);
+    } catch (e) {
+      notify(errText(e && e.code ? e
+        : { code: 'shell_internal_error',
+            message: (e && e.message) || String(e) }), true);
+      return false;
+    }
+    if (!r || !r.ok) {
+      // Lỗi giữ nguyên workspace/dirty; chỉ báo để người dùng thấy.
+      notify(errText((r && r.error) || { code: 'unknown',
+        message: 'Không nhân bản được hồ sơ' }), true);
+      return false;
+    }
+    activeTab = 'drafting';
+    rerender();
+    return true;
   }
 
   function dragHandle(label) {
@@ -2100,7 +2149,7 @@ function createNotaryModuleView(deps) {
   };
 
   panels.overview.append(buildCaseListPanel(openCaseInDrafting,
-    newDraftFlow));
+    newDraftFlow, duplicateCaseFlow));
   const wordPlaceholder = face(L.faceEmpty(
     'Tab Word — nội dung surface văn bản ở lát cắt sau (spec §1). ' +
     'Điểm vào xuất Word nằm trong Soạn hồ sơ → Xuất Word.'));

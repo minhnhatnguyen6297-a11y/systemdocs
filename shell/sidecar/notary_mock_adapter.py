@@ -1271,6 +1271,124 @@ def workspace_source_latest(job, payload):
     })
 
 
+def workspace_duplicate(job, payload):
+    """Mock parity §13.21 — clone case da luu, draft/rev1, key/hash.
+
+    Khong dung mock lam proof DB; giu cung shape/error code voi real.
+    Row/owner/diagram personId duoc cap UUID moi + remap nhu backend."""
+    if not isinstance(payload, dict):
+        raise CommandError("validation_error", "payload phai la object")
+    extra = set(payload) - {"source_case_id", "idempotency_key"}
+    if extra:
+        raise CommandError("validation_error",
+                           f"payload co key ngoai schema: {sorted(extra)}")
+    sid = payload.get("source_case_id")
+    if isinstance(sid, bool) or not isinstance(sid, int) or sid < 1:
+        raise CommandError("validation_error",
+                           "source_case_id phai la so nguyen >= 1")
+    key = payload.get("idempotency_key")
+    if not isinstance(key, str) or not UUID4_RX.match(key):
+        raise CommandError("validation_error",
+                           "idempotency_key phai la uuid4")
+    st = _state()
+    source = st.cases.get(sid)
+    if source is None:
+        raise CommandError(
+            "case_not_found", f"Không tìm thấy hồ sơ #{sid}",
+            details={"source_case_id": sid})
+    digest = hashlib.sha256(json.dumps(
+        {"command": "workspace_duplicate", "intent": "draft",
+         "source_case_id": sid},
+        sort_keys=True, separators=(",", ":"), default=str
+    ).encode("utf-8")).hexdigest()
+
+    with st._lock:
+        existing = st._idempotency.get(key)
+        if existing is not None:
+            if st._idempotency_hashes.get(key) != digest:
+                raise CommandError(
+                    "idempotency_conflict",
+                    "idempotency_key da dung voi noi dung khac")
+            case = st.cases[existing]
+            data = _workspace_data(existing, case)
+            if case.get("docx_import") is not None:
+                data["docx_import"] = copy.deepcopy(case["docx_import"])
+            data["source_case_id"] = sid
+            data["created"] = False
+            job.check_cancel()
+            return _result("workspace_duplicate", data)
+
+        _check_supported(source)
+        ct = source.get("case_type")
+        person_map = {}
+        people = []
+        for row in source["stage"].get("people") or []:
+            new_row_id = str(uuid.uuid4())
+            person_map[row.get("row_id")] = new_row_id
+            people.append({**copy.deepcopy(row), "row_id": new_row_id})
+        assets = [{**copy.deepcopy(row), "row_id": str(uuid.uuid4())}
+                  for row in source["stage"].get("assets") or []]
+        stage = {"people": people, "assets": assets}
+        if ct == CASE_TYPE_INHERITANCE:
+            owner = source["stage"].get("owner_row_id")
+            if owner is not None and owner not in person_map:
+                raise CommandError(
+                    "diagram_reference_outside_stage",
+                    "owner_row_id nguon khong thuoc Stage",
+                    details={"personId": owner})
+            stage = {"owner_row_id": person_map.get(owner), **stage}
+        state = source["diagram"].get("state") or {}
+        nodes = []
+        for node in state.get("nodes") or []:
+            node = copy.deepcopy(node)
+            pid = node.get("personId")
+            if pid is not None:
+                if pid not in person_map:
+                    raise CommandError(
+                        "diagram_reference_outside_stage",
+                        "personId nguon khong thuoc Stage",
+                        details={"personId": pid})
+                node["personId"] = person_map[pid]
+            nodes.append(node)
+
+        new_id = (max(st.cases) + 1) if st.cases else 1
+        fresh = {
+            "id": new_id,
+            "case_type": ct,
+            "document_type": source.get("document_type"),
+            "status": "draft",
+            "revision": 1,
+            "ngay_lap_ho_so": source.get("ngay_lap_ho_so"),
+            "noi_niem_yet": source.get("noi_niem_yet"),
+            "nguoi_nhan_uy_quyen": source.get("nguoi_nhan_uy_quyen"),
+            "nguoi_nhan_uy_quyen_id":
+                source.get("nguoi_nhan_uy_quyen_id"),
+            "noi_dung_viec": source.get("noi_dung_viec"),
+            "ghi_chu": source.get("ghi_chu"),
+            "stage": stage,
+            "diagram": {
+                "domain": source["diagram"].get("domain", ct),
+                "state": {**copy.deepcopy(state), "nodes": nodes},
+                "render_model": copy.deepcopy(
+                    source["diagram"].get("render_model")),
+                "warnings": copy.deepcopy(
+                    source["diagram"].get("warnings") or []),
+            },
+        }
+        if source.get("docx_import") is not None:
+            fresh["docx_import"] = copy.deepcopy(source["docx_import"])
+        st.cases[new_id] = fresh
+        st._idempotency[key] = new_id
+        st._idempotency_hashes[key] = digest
+        data = _workspace_data(new_id, fresh)
+        if fresh.get("docx_import") is not None:
+            data["docx_import"] = copy.deepcopy(fresh["docx_import"])
+        data["source_case_id"] = sid
+        data["created"] = True
+        job.check_cancel()
+        return _result("workspace_duplicate", data)
+
+
 def workspace_get(job, payload):
     case = _case(payload)
     data = _workspace_data(int(payload["case_id"]), case)

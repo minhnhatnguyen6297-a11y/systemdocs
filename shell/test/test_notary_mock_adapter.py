@@ -2502,3 +2502,86 @@ def test_workspace_source_latest_mock_unsupported_and_saved_at_order():
     }})
     assert _call("workspace_source_latest", {})["data"][
         "source_case_id"] == 2
+
+
+# ---------- workspace_duplicate (§13.21, vòng 2) ----------
+
+def test_workspace_duplicate_mock_parity_and_replay():
+    mock.reset_backend(_load_fixture("ready.json"))
+    before = _call("workspace_get", {"case_id": 42})["data"]
+    key = str(uuid.uuid4())
+    data = _call("workspace_duplicate", {
+        "source_case_id": 42, "idempotency_key": key})["data"]
+    assert data["created"] is True
+    assert data["source_case_id"] == 42
+    assert data["backend_mode"] == "mock"
+    assert data["case"]["status"] == "draft"
+    assert data["case"]["revision"] == 1
+    copy_id = data["case"]["id"]
+    assert copy_id != 42
+    assert data["case"]["document_type"] == before["case"]["document_type"]
+
+    old_person = [row["row_id"] for row in before["stage"]["people"]]
+    new_person = [row["row_id"] for row in data["stage"]["people"]]
+    old_asset = [row["row_id"] for row in before["stage"]["assets"]]
+    new_asset = [row["row_id"] for row in data["stage"]["assets"]]
+    assert [uuid.UUID(rid).version for rid in new_person + new_asset] == \
+        [4] * (len(new_person) + len(new_asset))
+    assert not set(new_person) & set(old_person)
+    assert not set(new_asset) & set(old_asset)
+    assert [row["entity_id"] for row in data["stage"]["people"]] == \
+        [row["entity_id"] for row in before["stage"]["people"]]
+    person_map = dict(zip(old_person, new_person))
+    assert data["stage"]["owner_row_id"] == person_map[
+        before["stage"]["owner_row_id"]]
+    for old_node, new_node in zip(before["diagram"]["state"]["nodes"],
+                                  data["diagram"]["state"]["nodes"]):
+        assert old_node["id"] == new_node["id"]
+        assert new_node["personId"] == (
+            person_map.get(old_node["personId"])
+            if old_node["personId"] else None)
+        for field in ("parentSlotIds", "spouseSlotId", "ownPositions",
+                      "receivePositions", "hidden", "deleted"):
+            assert new_node[field] == old_node[field]
+    assert _call("workspace_get", {"case_id": 42})["data"] == before
+
+    replay = _call("workspace_duplicate", {
+        "source_case_id": 42, "idempotency_key": key})["data"]
+    assert replay["created"] is False
+    assert replay["case"]["id"] == copy_id
+    assert replay["case"]["revision"] == 1
+
+    with pytest.raises(CommandError) as exc:
+        _call("workspace_duplicate", {
+            "source_case_id": 43, "idempotency_key": key})
+    assert exc.value.code == "idempotency_conflict"
+
+
+def test_workspace_duplicate_mock_payload_errors_and_unsupported():
+    mock.reset_backend(_load_fixture("ready.json"))
+    key = str(uuid.uuid4())
+    for payload in (
+            None,
+            {},
+            {"source_case_id": 42},
+            {"source_case_id": True, "idempotency_key": key},
+            {"source_case_id": 42, "idempotency_key": "no"},
+            {"source_case_id": 42, "idempotency_key": key, "case_id": 42},
+    ):
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_duplicate", payload)
+        assert exc.value.code == "validation_error"
+    with pytest.raises(CommandError) as exc:
+        _call("workspace_duplicate", {
+            "source_case_id": 987654, "idempotency_key": key})
+    assert exc.value.code == "case_not_found"
+    assert exc.value.details["source_case_id"] == 987654
+
+    mock.reset_backend({"cases": {
+        1: {"case_type": "gift", "status": "done",
+            "stage": {"people": [], "assets": []}},
+    }})
+    with pytest.raises(CommandError) as exc:
+        _call("workspace_duplicate", {
+            "source_case_id": 1, "idempotency_key": key})
+    assert exc.value.code == "case_type_unsupported"
