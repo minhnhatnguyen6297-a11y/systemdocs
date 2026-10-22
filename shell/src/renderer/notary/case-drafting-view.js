@@ -659,7 +659,8 @@ function createNotaryModuleView(deps) {
     const save = root.querySelector('.js-save-diagram');
     if (!save) return;
     const s = model.state;
-    save.disabled = !!s.busy || !s.capabilities.diagram || !model.canWrite();
+    save.disabled = model.isWriteBusy() ||
+      !s.capabilities.diagram || !model.canWrite();
     setPrimaryDirty(save, primaryDirty());
   }
 

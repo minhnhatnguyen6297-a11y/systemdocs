@@ -1377,8 +1377,8 @@ function createDiagramPane(ctx) {
     const dot = currentSaveBtn.querySelector('.dirty-dot');
     if (dirty && !dot) currentSaveBtn.append(h('span', 'dirty-dot', ''));
     if (!dirty && dot) dot.remove();
-    currentSaveBtn.disabled = !!s.busy || !s.capabilities.diagram ||
-      !model.canWrite();
+    currentSaveBtn.disabled = model.isWriteBusy() ||
+      !s.capabilities.diagram || !model.canWrite();
     if (dirty) {
       currentSaveBtn.setAttribute('aria-label',
         'Lưu hồ sơ — có thay đổi chưa lưu');
@@ -1447,7 +1447,8 @@ function createDiagramPane(ctx) {
     // Nút "Lưu hồ sơ" gọi coordinator view → flush editor rồi
     // model.saveCase (workspace_save_case: Stage+meta+Diagram, done).
     // Không disable vì caseId=null, Diagram sạch hay stageDirty; chỉ
-    // khóa khi busy/đang lưu/không capability/không workspace.
+    // khóa khi đang có lệnh GHI (save/convert/duplicate/update), thiếu
+    // capability hoặc không workspace. Lệnh đọc (evaluate) không khóa.
     tools.append(h('span', 'cd-vsep', ''));
     const save = btn('Lưu hồ sơ', 'sm secondary js-save-diagram', async () => {
       // View coordinator đã flush + báo lỗi qua kênh notify hiện có.

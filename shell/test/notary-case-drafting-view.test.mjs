@@ -529,6 +529,30 @@ test('stageDirty: Xem cách tính vẫn bật, evaluate payload là Stage đang 
       'evaluate không dùng Stage đang sửa');
   });
 
+// §7.1 D1: evaluate la lenh DOC — debounce 500ms sau moi thao tac so do
+// khong duoc khoa nut "Luu ho so" (click trong cua so do bi nuot).
+test('Lưu hồ sơ: khóa khi lệnh GHI chạy, KHÔNG khóa vì diagram_evaluate', async () => {
+  const { model, view } = await build(test, { draft: false });
+  model.state.busy = 'notary.diagram_evaluate';
+  model.dismissNotice();                     // emit → sync nút Lưu
+  let save = findBtns(view.el, 'Lưu hồ sơ')[0];
+  assert.equal(save.disabled, false,
+    'Lưu hồ sơ bị khóa vì lệnh ĐỌC diagram_evaluate đang chạy');
+
+  model.state.busy = 'notary.workspace_save_case';
+  model.state.savingCase = true;
+  model.dismissNotice();
+  save = findBtns(view.el, 'Lưu hồ sơ')[0];
+  assert.equal(save.disabled, true, 'Lưu hồ sơ phải khóa khi đang ghi');
+
+  model.state.busy = null;
+  model.state.savingCase = false;
+  model.state.busy = 'notary.workspace_update';
+  model.dismissNotice();
+  save = findBtns(view.el, 'Lưu hồ sơ')[0];
+  assert.equal(save.disabled, true, 'Lưu hồ sơ phải khóa khi update dữ liệu');
+});
+
 
 // ---------- MIN-133 W2: thanh trên + Stage mật độ cao ----------
 

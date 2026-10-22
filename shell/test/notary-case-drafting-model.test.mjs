@@ -1058,6 +1058,37 @@ function makeModel(seed) {
   return { model, client };
 }
 
+// Nhu makeModel, nhung notary.diagram_evaluate tra promise do test
+// resolve thu cong — de dieu khien thu tu response ve (T1/T2 §7.1).
+function makeDeferredModel(seed) {
+  const base = fakeClient(seed);
+  const pending = [];
+  const client = {
+    calls: base.calls,
+    run(command, payload) {
+      if (command === 'notary.diagram_evaluate') {
+        return new Promise((resolve) => pending.push({ payload, resolve }));
+      }
+      return base.run(command, payload);
+    },
+  };
+  const model = M.createModel({ client, uuid });
+  return { model, pending };
+}
+
+function evaluateOk(entry) {
+  return { ok: true,
+    data: { schema_version: SCHEMA,
+      evaluated_revision: null,
+      render_model: fakeRenderModel(entry.payload.diagram.state) } };
+}
+
+function evaluateFail(code) {
+  return { ok: false,
+    error: { code, message: code, retryable: false,
+      next_action: null, details: null } };
+}
+
 // ---------- load workspace ----------
 
 test('openCase: tai workspace ready — stage/diagram/revision/mock banner', async () => {
@@ -1903,6 +1934,67 @@ test('diagram tren case locked: evaluate duoc phep (read-only), save bi chan', a
   const r2 = await model.saveCase();
   assert.equal(r2.ok, false);
   assert.equal(r2.error.code, 'workspace_locked');
+});
+
+// §7.1 D2: response evaluate gui tu so do CU khong duoc dat lai error/
+// renderModel sau khi so do da sua (gan owner) va da co evaluate moi hon.
+test('evaluateDiagram: response cu ve sau khi gan owner bi bo — khong dat lai error/renderModel', async () => {
+  const { model, pending } = makeDeferredModel(seedCases('ready'));
+  await model.openCase(42);
+  const ownerRow = model.state.stage.owner_row_id;
+  model.setOwnerRow(null);                 // so do chua owner — A gui luc nay
+  const pA = model.evaluateDiagram();
+  assert.equal(pending.length, 1);
+  assert.equal(
+    pending[0].payload.diagram.state.nodes.find((n) => n.id === 'owner')
+      .personId, null);
+  model.setOwnerRow(ownerRow);             // nguoi dung gan owner
+  const pB = model.evaluateDiagram();
+  assert.equal(pending.length, 2);
+  pending[1].resolve(evaluateOk(pending[1]));
+  await pB;
+  const renderB = model.state.renderModel;
+  assert.equal(renderB.status, 'complete');
+  // A (gui luc chua owner) ve SAU B va fail — phai bi bo hoan toan.
+  pending[0].resolve(evaluateFail('workspace_owner_required'));
+  const a = await pA;
+  assert.equal(a.ok, false);
+  assert.equal(model.state.error, null,
+    'banner owner_required cu bi dat lai sau khi da gan owner');
+  assert.equal(model.state.renderModel, renderB);
+  assert.deepEqual(model.state.diagramErrors, []);
+  assert.equal(model.state.busy, null);
+});
+
+test('evaluateDiagram: evaluate moi thanh cong don loi do evaluate dat truoc', async () => {
+  const { model, pending } = makeDeferredModel(seedCases('ready'));
+  await model.openCase(42);
+  const pA = model.evaluateDiagram();
+  pending[0].resolve(evaluateFail('workspace_owner_required'));
+  await pA;
+  assert.equal(model.state.error.code, 'workspace_owner_required');
+  // Sua so do qua touchDiagram — duong nay KHONG tu don state.error.
+  model.setNodeFlag('owner', 'hidden', true);
+  assert.equal(model.state.error.code, 'workspace_owner_required');
+  const pB = model.evaluateDiagram();
+  pending[1].resolve(evaluateOk(pending[1]));
+  await pB;
+  assert.equal(model.state.error, null,
+    'loi do evaluate dat van treo sau lan evaluate thanh cong');
+  assert.equal(model.state.renderModel.status, 'complete');
+});
+
+test('evaluateDiagram: evaluate thanh cong KHONG don loi cua duong ghi', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const w = await model.duplicateCase(999);      // lenh ghi fail → state.error
+  assert.equal(w.ok, false);
+  const writeError = model.state.error;
+  assert.equal(writeError.code, 'case_not_found');
+  const r = await model.evaluateDiagram();
+  assert.equal(r.ok, true);
+  assert.equal(model.state.error, writeError,
+    'evaluate khong duoc don loi cua duong ghi');
 });
 
 // ---------- intake / word (thin, cho MIN-112 wire UI) ----------

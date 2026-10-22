@@ -240,6 +240,15 @@ function createModel(deps) {
   // van nguyen (bat ca A->B->A). lookupCallId phan biet cac lan Tra.
   let lookupSeq = 0;
   let lookupCallId = 0;
+  // So lan so do draft bi sua/thay (touchDiagram, gan/go owner, xoa dong,
+  // thay wholesale khi mo/luu/doi loai). evaluate ghi lai luc gui de bo
+  // response ve sau khi so do da doi (§7.1 D2).
+  let diagramMutation = 0;
+  // Lan evaluate moi nhat + error object do evaluate dat — de response cu
+  // chi don busy cua chinh no, va evaluate thanh cong chi don loi do
+  // chinh evaluate dat (khong dung loi cua duong ghi).
+  let evaluateSeq = 0;
+  let evaluateError = null;
   state.addressSlots = {};
   state.addressFull = null;
   state.addressSuggestions = {};
@@ -549,6 +558,7 @@ function createModel(deps) {
         : { version: DIAGRAM_VERSION, domain: CASE_TYPE_INHERITANCE,
             nodes: [] }));
     state.committedDiagram = clone(state.diagram);
+    diagramMutation += 1;             // thay wholesale — response evaluate cu bo
     state.renderModel = dg.render_model || null;
     // dg.warnings = warning compose stage (list[string], real backend);
     // render_model.warnings = warning engine [{code,message}] — gop ca
@@ -691,6 +701,7 @@ function createModel(deps) {
     state.metaDirty = false;
     state.diagram = newDiagramDraft(ct);
     state.committedDiagram = clone(state.diagram);
+    diagramMutation += 1;             // nhap moi — response evaluate cu bo
     state.renderModel = null;
     state.diagramWarnings = [];
     state.diagramErrors = [];
@@ -775,6 +786,7 @@ function createModel(deps) {
       state.diagram = newDiagramDraft(value);
       state.positionTouched.clear();
       state.committedDiagram = clone(state.diagram);
+      diagramMutation += 1;           // doi loai reset so do
       state.diagramDirty = true;
       state.diagramErrors = [];
       state.metaDirty = true;
@@ -1025,6 +1037,22 @@ function createModel(deps) {
       !state.locked && !state.unsupported;
   }
 
+  // Chi lenh GHI moi khoa nut "Luu ho so". Lenh doc (diagram_evaluate,
+  // workspace_source_latest, case_list...) co the dang cho ma nut van
+  // phai bam duoc — neu khong, click trong luc evaluate debounce bi nuot
+  // (§7.1 D1). Giu tap nay dung bang cac duong ghi cua man soan.
+  const WRITE_COMMANDS = [
+    'notary.workspace_save_case',
+    'notary.workspace_update',
+    'notary.workspace_convert_type',
+    'notary.workspace_duplicate',
+  ];
+
+  function isWriteBusy() {
+    return state.savingCase || state.duplicating != null ||
+      WRITE_COMMANDS.includes(state.busy);
+  }
+
   // ---------- Stage draft ----------
 
   // Defense-in-depth: case locked/unsupported khong bao gio mutate draft,
@@ -1175,6 +1203,7 @@ function createModel(deps) {
     if (owner) {
       owner.personId = rowId;
       state.diagramDirty = true;
+      diagramMutation += 1;           // mirror owner doi
     }
     // Chon duoc nguoi de lai → banner workspace_owner_required da het
     // nguyen nhan. Go owner (null) thi nguyen nhan con do: giu banner.
@@ -1213,6 +1242,7 @@ function createModel(deps) {
       if (n.personId === rowId) {
         n.personId = null;
         state.diagramDirty = true;
+        diagramMutation += 1;         // tham chieu node bi go
       }
     }
     state.fieldErrors = state.fieldErrors.filter((e) => e.row_id !== rowId);
@@ -1277,6 +1307,7 @@ function createModel(deps) {
 
   function touchDiagram() {
     state.diagramDirty = true;
+    diagramMutation += 1;
     // Sua so do → diagramErrors cua lan Luu truoc khong con la ket qua
     // hien tai. Khong dung fieldErrors/error: chung thuoc du lieu stage.
     state.diagramErrors = [];
@@ -1551,6 +1582,8 @@ function createModel(deps) {
       return { ok: false, error: errObj('case_type_unsupported',
                                         'Loại việc chưa hỗ trợ') };
     }
+    const call = ++evaluateSeq;
+    const diagramAtIssue = diagramMutation;
     state.busy = 'notary.diagram_evaluate';
     emit();
     const s = session;
@@ -1561,8 +1594,21 @@ function createModel(deps) {
       stage: stageForWire(state.stage, state.committed),
       diagram: { state: clone(state.diagram) } };
     const r = await client.run('notary.diagram_evaluate', payload);
-    state.busy = null;
+    const isLatest = call === evaluateSeq;
+    if (isLatest) state.busy = null;
     if (s !== session) return r;      // response tre — bo
+    if (!isLatest || diagramMutation !== diagramAtIssue) {
+      // Response tre: so do da sua/thay hoac da co lan evaluate moi hon.
+      // Chi don busy cua chinh no; khong dung error/diagramErrors/
+      // renderModel/warnings cua trang thai hien tai (§7.1 D2).
+      if (isLatest) emit();
+      return r;
+    }
+    // Ket qua moi nhat cho dung so do hien tai — loi do evaluate dat
+    // truoc do khong con la ket qua hien tai; loi cua duong ghi thi
+    // KHONG duoc don o day.
+    if (state.error && state.error === evaluateError) state.error = null;
+    evaluateError = null;
     if (!r.ok) {
       const err = r.error || errObj('unknown');
       if (err.code === 'diagram_invalid_state') {
@@ -1570,6 +1616,7 @@ function createModel(deps) {
           (err.details && err.details.errors) || [err];
       } else {
         state.error = err;
+        evaluateError = err;
       }
       emit();
       return r;
@@ -2067,7 +2114,7 @@ function createModel(deps) {
     duplicateCase,
     loadUqCatalog, createUqCustomer, resolveUqName,
 
-    canWrite, mockBanner, hasUnsaved, isStageEmpty,
+    canWrite, isWriteBusy, mockBanner, hasUnsaved, isStageEmpty,
     caseType, diagramDomain, documentTypesFor,
     addPerson, addAsset, updatePersonField, updateAssetField,
     moveAsset, setOwnerRow,
