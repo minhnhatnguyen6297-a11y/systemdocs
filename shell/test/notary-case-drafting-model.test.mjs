@@ -3312,3 +3312,68 @@ test('G3 commitStage: stage_validation_error tat banner cu', async () => {
   assert.equal(model.state.fieldErrors[0].field, 'so_serial');
   assert.deepEqual(model.state.diagramErrors, []);
 });
+
+// G3: sua du lieu lien quan phai don loi cua lan Luu truoc.
+test('G3 setOwnerRow: chon duoc owner → tat banner workspace_owner_required', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const people = model.state.stage.people;
+  const other = people.find(
+    (p) => p.row_id !== model.state.stage.owner_row_id);
+  model.state.error = { code: 'workspace_owner_required', message: 'cu' };
+
+  assert.equal(model.setOwnerRow(other.row_id), true);
+  assert.equal(model.state.error, null,
+               'da co owner thi banner chua-owner phai tat');
+});
+
+test('G3 setOwnerRow: go owner (null) → banner workspace_owner_required con', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  assert.ok(model.state.stage.owner_row_id);
+  model.state.error = { code: 'workspace_owner_required', message: 'cu' };
+  model.state.diagramErrors = [{ code: 'missing_land_owner' }];
+
+  assert.equal(model.setOwnerRow(null), true);
+  assert.equal(model.state.error.code, 'workspace_owner_required',
+               'chua co owner thi nguyen nhan con — giu banner');
+  assert.deepEqual(model.state.diagramErrors, [],
+                   'go owner van la sua so do');
+});
+
+test('G3 toggleNodePosition: sua so do → diagramErrors sach', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  model.state.diagramErrors = [{ code: 'missing_land_owner' }];
+
+  assert.equal(model.toggleNodePosition('spouse', 'receive', 2), true);
+  assert.deepEqual(model.state.diagramErrors, []);
+});
+
+test('G3 addAsset: chi don loi danh sach assets, giu loi khac', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  model.state.fieldErrors = [
+    { row_id: null, field: 'assets', code: 'required', message: 'chua co' },
+    { row_id: 'a1', field: 'so_serial', code: 'required', message: 'bat buoc' },
+  ];
+
+  assert.ok(model.addAsset({ so_serial: 'G1-9' }));
+  assert.deepEqual(model.state.fieldErrors,
+                   [{ row_id: 'a1', field: 'so_serial', code: 'required',
+                      message: 'bat buoc' }]);
+});
+
+test('G3 addPerson: chi don loi danh sach people, giu loi khac', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  model.state.fieldErrors = [
+    { row_id: null, field: 'people', code: 'required', message: 'chua co' },
+    { row_id: 'a1', field: 'so_serial', code: 'required', message: 'bat buoc' },
+  ];
+
+  assert.ok(model.addPerson({ ho_ten: 'Nguoi Moi' }));
+  assert.deepEqual(model.state.fieldErrors,
+                   [{ row_id: 'a1', field: 'so_serial', code: 'required',
+                      message: 'bat buoc' }]);
+});

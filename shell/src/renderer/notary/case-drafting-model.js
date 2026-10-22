@@ -1109,6 +1109,10 @@ function createModel(deps) {
     }
     const row = newPersonRow(uuid, fields);
     state.stage.people.push(row);
+    // Da co nguoi → loi cap danh sach 'people' (row_id=null) cua lan
+    // truoc khong con la ket qua hien tai. Giu nguyen loi khac.
+    state.fieldErrors = state.fieldErrors.filter(
+      (e) => !(e.row_id == null && e.field === 'people'));
     noteLookupSourceChanged();
     touchStage();
     return row;
@@ -1120,6 +1124,10 @@ function createModel(deps) {
     if (state.stage.assets.length >= MAX_ASSETS) return null;
     const row = newAssetRow(uuid, fields);
     state.stage.assets.push(row);
+    // Da co tai san → loi cap danh sach 'assets' (row_id=null) khong con
+    // la ket qua hien tai. Giu nguyen loi khac.
+    state.fieldErrors = state.fieldErrors.filter(
+      (e) => !(e.row_id == null && e.field === 'assets'));
     noteLookupSourceChanged();
     touchStage();
     syncPositionDefaults();
@@ -1209,6 +1217,16 @@ function createModel(deps) {
       owner.personId = rowId;
       state.diagramDirty = true;
     }
+    // Chon duoc nguoi de lai → banner workspace_owner_required da het
+    // nguyen nhan. Go owner (null) thi nguyen nhan con do: giu banner.
+    if (rowId !== null && state.error &&
+        state.error.code === 'workspace_owner_required') {
+      state.error = null;
+    }
+    // Gan/go owner la sua so do — diagramErrors cua lan Luu truoc da cu.
+    // movePerson ve Pool goi thang setOwnerRow(null), khong qua touchDiagram,
+    // nen phai don tai day.
+    state.diagramErrors = [];
     touchStage();
     return true;
   }
@@ -1392,6 +1410,9 @@ function createModel(deps) {
 
   function touchDiagram() {
     state.diagramDirty = true;
+    // Sua so do → diagramErrors cua lan Luu truoc khong con la ket qua
+    // hien tai. Khong dung fieldErrors/error: chung thuoc du lieu stage.
+    state.diagramErrors = [];
     emit();
   }
 
