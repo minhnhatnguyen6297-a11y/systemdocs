@@ -1277,11 +1277,12 @@ theo việc hồ sơ đã có ID hay chưa.
   ngày sinh/mất và nhãn node đều từ Stage hiện tại. Thêm Người xuất hiện
   ngay; sửa Người cập nhật Pool/node ngay; node trỏ dòng đã xóa không được
   mượn dữ kiện baseline. Hồ sơ mới cũng gán được trước lần lưu đầu.
-- **Xóa row trong bản đang sửa:** dòng biến mất khỏi Stage/Pool ngay.
-  `personId`/dấu chọn `ownPositions`/`receivePositions` pending trên Diagram
-  không bị server prune cho tới Lưu hồ sơ thành công; server normalize/prune
-  theo Stage cùng payload (§13.19) rồi trả state mới. Không khôi phục dòng
-  đã xóa từ baseline để hiển thị; vị trí vẫn theo số, không theo row_id.
+- **Xóa row trong bản đang sửa:** dòng Người biến mất khỏi Stage/Pool ngay;
+  client đồng thời xóa `personId` ấy khỏi mọi node Diagram, kể cả node owner,
+  và xóa `owner_row_id` nếu đang trỏ dòng bị xóa. Không lấy tên/nhãn từ
+  baseline để hiển thị lại Người đã xóa. Xóa Tài sản cập nhật Stage ngay;
+  dấu chọn vị trí pending được normalize/prune khi Lưu hồ sơ theo Stage
+  cùng payload (§13.19); vị trí vẫn theo số, không theo row_id.
 - **Rời/đóng hồ sơ thực sự** (mở hồ sơ khác, tạo nháp khác hoặc đóng cửa
   sổ): giữ dirty + guard `canLeave` và window-close. Hủy rời → giữ bản
   đang sửa; xác nhận bỏ → bỏ buffer, **không command ghi**, không tự lưu
@@ -1759,9 +1760,9 @@ Producer v2 PHẢI (thêm vào §10):
       canonical 30 node `p1..p30` cho domain `two_party`.
 - [ ] `workspace_create` v2: cho phép `diagram` absent; seed owner theo
       `owner_row_id`; `tai_san_id` = asset vị trí 1.
-- [ ] Prune `personId` + dấu chọn vị trí `> len(assets)` trong cùng
-      transaction commit/save — không prune tại thời điểm client sửa
-      draft.
+- [ ] Server prune `personId` bị xóa khỏi Stage và dấu chọn vị trí
+      `> len(assets)` trong transaction commit/save. Client đã gỡ
+      `personId`/owner ngay khi xóa Người; dấu vị trí pending theo §13.2.
 - [ ] `diagram_evaluate` two_party → `unsupported` render_model, không
       chạy engine thừa kế; `word_export_*` trên two_party được hỗ trợ
       (NAIA-8) — readiness qua `block_reason` §8.1.
@@ -1791,7 +1792,8 @@ Consumer v2 PHẢI (thêm vào §10):
       baseline committed chỉ là lần lưu gần nhất, không nguồn hiển thị/gán.
       Chỉ Lưu hồ sơ gửi save_case; không create/commit/diagram_save ngầm.
       Bỏ nháp không ghi, giữ canLeave/window-close; mở lại đọc bản đã lưu.
-      Prune refs pending trong transaction lưu, không mượn dữ kiện baseline.
+      Xóa Người gỡ personId/owner ngay; normalize/prune dấu vị trí pending
+      trong transaction lưu, không mượn dữ kiện baseline.
 - [ ] Map chip `[1][2][3]` ↔ positions; không theo `row_id`; disable
       chip vị trí chưa có asset.
 - [ ] Reject state v2/v3 sai domain, `is_primary`/`isLandOwner` dư —
