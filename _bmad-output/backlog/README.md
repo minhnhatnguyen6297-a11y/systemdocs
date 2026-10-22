@@ -1,5 +1,9 @@
 # Catalog issue — 15/10/2026
 
+**Bổ sung 22/10/2026:** [#13 — ba phương án ghi Hồ sơ](spike-shared-data-transfer-boundary.md#bổ-sung-22102026--ba-phương-án-ghi-hồ-sơ-để-owner-cân-nhắc)
+đã ghi chi tiết A lưu khối Hồ sơ, B lưu dòng thuộc Hồ sơ, C dòng đang làm + một
+snapshot đã lưu. Owner đang cân nhắc; chưa chọn schema hoặc duyệt triển khai.
+
 **Catalog status (2026-10-16):** #4, #5, #6, #7, #22, #25, and #28 are built within their approved scopes; this does not approve or complete the rest of the backlog or publish the catalog. Other issue statuses remain as listed; #1 is history/tracking-only and #11/#26 remain dropped. No active initiative change. [Quyết định cách theo dõi](../decisions/decision-issues-reconciliation-20261015.md). The separate pre-existing #28 UI `file_token` blocker remains deferred and is not claimed fixed. C22/#23 is superseded by the 2026-10-16 owner decision (rule management is developer-only); C07/#8's business question is answered with remaining choices technical. C02/#3 is answered by the 2026-10-16 owner decision (saved-case type conversion); C24/#25 is built (independent Quick clean).
 
 ## Ưu tiên, thứ tự và điều kiện bắt đầu

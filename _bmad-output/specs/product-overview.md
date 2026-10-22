@@ -64,8 +64,9 @@ những Hồ sơ đó; raw/nguồn/history kỹ thuật đã có vẫn giữ.
 [Quyết định](../decisions/decision-owner-case-snapshot-as-history-20261021.md).
 **Hồ sơ nháp — owner duyệt 21/10/2026, chưa triển khai lưu tiến độ mới:**
 Nháp được lưu database để mở lại làm tiếp dù mới nhập một phần; giữ và hiện
-nhãn **Nháp** rõ khi hiển thị/thống kê/báo cáo có chứa Nháp. Mốc chuyển khỏi
-Nháp và cách tính trong từng báo cáo chưa chốt; cấu trúc lưu còn thiết kế.
+nhãn **Nháp** rõ khi hiển thị/thống kê/báo cáo có chứa Nháp. Owner 22/10 yêu cầu
+Lưu hồ sơ ghi Diagram và chuyển Nháp sang Done; cách tính trong từng báo cáo
+chưa chốt, cấu trúc lưu còn thiết kế và chưa triển khai hành vi mới này.
 Xem [quy tắc Hồ sơ nháp](notary_v2/README.md#2-danh-sách-hồ-sơ) và
 [quyết định](../decisions/decision-owner-persistent-case-drafts-20261021.md).
 **Điểm neo — owner chốt 21/10 mới nhất, chưa triển khai:** tự dùng cùng ID
@@ -88,6 +89,12 @@ thực hiện policy mới. Không tự ghép dữ kiện giữa văn bản/đ�
 #41 OPEN/gate mẫu ĐÓNG, #42 độc lập; chưa sửa runtime/schema/DB/mẫu.
 [Quyết định](../decisions/decision-owner-entity-anchors-case-snapshots-20261021.md).
 [Làm rõ và lượt rà soát 22/10](../decisions/decision-owner-data-entry-save-rules-20261022.md).
+
+**Rà soát cách ghi DB — 22/10:** [#13](../backlog/spike-shared-data-transfer-boundary.md#bổ-sung-22102026--ba-phương-án-ghi-hồ-sơ-để-owner-cân-nhắc)
+giữ chi tiết ba phương án: A lưu khối Hồ sơ; B lưu dòng Người/Tài sản thuộc Hồ sơ;
+C lưu dòng đang làm và một snapshot đã Lưu hồ sơ. Owner đang cân nhắc, chưa chọn
+schema, thời điểm cấp ID hoặc cách sửa Done; tiếp tục dừng trước code/migration.
+
 **Pháp nhân (owner 20/10/2026):** không đưa vào Người; policy nhập tay chung
 có ngoại lệ ngân hàng thế chấp **app tự lấy** bên dưới. Bảng riêng tương lai
 chưa duyệt schema/build; không bịa/default. **Cụm trường phụ website** theo hướng owner cho phép có điều kiện cho một ô
