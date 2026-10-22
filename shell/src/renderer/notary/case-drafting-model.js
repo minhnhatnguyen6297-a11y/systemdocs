@@ -12,7 +12,9 @@
  *   o renderer runCommand adapter boc submitCommand+getJob toi terminal.
  * - Draft chi song trong phien (drafting-tab §4): khong localStorage,
  *   khong log — state giu trong object nay.
- * - Khong bao gio tu commit: Cập nhật/Lưu hồ sơ la hanh dong nguoi dung.
+ * - Mot ban dang sua: Stage, Pool va Diagram cung doc `state.stage`/
+ *   `state.diagram`. Baseline `committed*` chi la ban da luu gan nhat de
+ *   tinh dirty/diff/conflict. Chi `saveCase` (Luu ho so) ghi DB.
  */
 
 const CASE_TYPE_INHERITANCE = 'inheritance';
@@ -187,8 +189,8 @@ function createModel(deps) {
     stale: false,                // giu nhap sau conflict — server da doi
     revision: 0,
     capabilities: { intake: [], diagram: false, word_export: false },
-    committed: { people: [], assets: [] },   // Stage da commit (nguon Pool)
-    stage: { people: [], assets: [] },       // draft Stage (UI edit)
+    committed: { people: [], assets: [] },   // baseline da luu (diff/dirty)
+    stage: { people: [], assets: [] },       // ban dang sua — nguon hien thi
     stageDirty: false,
     diagramDirty: false,
     metaDirty: false,            // meta nhap chua luu (chi co tren nhap)
@@ -196,7 +198,7 @@ function createModel(deps) {
     draftId: null,               // idempotency_key cua phien nhap (uuid4)
     fieldErrors: [],             // [{row_id, field, code, message}]
     diagram: { version: DIAGRAM_VERSION, domain: CASE_TYPE_INHERITANCE,
-               nodes: [] },                     // draft
+               nodes: [] },                     // ban dang sua
     committedDiagram: { version: DIAGRAM_VERSION,
                         domain: CASE_TYPE_INHERITANCE, nodes: [] },
     renderModel: null,           // output engine gan nhat (evaluate/save)
@@ -205,12 +207,16 @@ function createModel(deps) {
     evaluatedRevision: null,
     conflict: null,              // {server_revision, command}
     error: null,                 // error object job-level gan nhat
-    notice: null,                // thong bao ngan ("Đã cập nhật Stage")
+    notice: null,                // thong bao ngan
     suggestions: [],             // intake results cho review
     intakeErrors: [],
     intakePartial: false,
     intakeBusy: false,
     wordOptions: null,
+    wordBindingProposals: [],
+    // Snapshot Stage/Diagram/case/revision tai luc tai proposals — chi
+    // de xac nhan binding lap lai khi chi docx context doi. Ngoai wire.
+    wordProposalSnapshot: null,
     wordResult: null,
     wordBusy: false,
     busy: null,                  // command dang chay (commit/evaluate/save)
@@ -490,23 +496,15 @@ function createModel(deps) {
     return () => subs.delete(cb);
   }
 
-  function findNode(nodeId, fromCommitted) {
-    const nodes = (fromCommitted ? state.committedDiagram : state.diagram)
-      .nodes || [];
+  function findNode(nodeId) {
+    const nodes = state.diagram.nodes || [];
     return nodes.find((n) => n && n.id === nodeId && !n.deleted) || null;
   }
 
-  function committedPersonIds() {
-    return new Set(state.committed.people.map((p) => p.row_id));
-  }
-
-  // Che do nhap (caseId=null): diagram gan personId theo row_id cua
-  // stage NHAP — chua co gi committed. Case da tao: van theo committed
-  // (§2.1a — personId trong persisted state la row_id cua Stage).
+  // Moi case (nhap hay da luu) gan personId theo row_id cua Stage dang
+  // sua — cung nguon voi bang Nguoi va Pool, khong doi theo committed.
   function assignablePersonIds() {
-    return state.caseId == null
-      ? new Set(state.stage.people.map((p) => p.row_id))
-      : committedPersonIds();
+    return new Set(state.stage.people.map((p) => p.row_id));
   }
 
   function diagramPersonIds() {
@@ -517,17 +515,14 @@ function createModel(deps) {
     return ids;
   }
 
-  // Pool = nguoi chua gan tren draft Diagram. Nhap moi (caseId=null):
-  // nguon la stage NHAP (chua co committed) — MIN-136, truoc day
-  // committed-only khien nhap khong bao gio co gi de tha. Case that:
-  // committed (§2). Tai san khong xuong Pool — khong co flow gan tai
-  // san len node; diagram chi tham chieu qua ownPositions/
-  // receivePositions (vi tri 1..3).
+  // Pool = nguoi cua Stage dang sua chua gan tren Diagram dang sua.
+  // Nguoi vua them/sua xuat hien ngay, khong doi commit. Tai san khong
+  // xuong Pool — khong co flow gan tai san len node; diagram chi tham
+  // chieu qua ownPositions/receivePositions (vi tri 1..3).
   function pool() {
     const assigned = diagramPersonIds();
-    const src = state.caseId == null ? state.stage : state.committed;
     return {
-      people: src.people.filter((p) => !assigned.has(p.row_id)),
+      people: state.stage.people.filter((p) => !assigned.has(p.row_id)),
     };
   }
 
@@ -577,6 +572,8 @@ function createModel(deps) {
     state.intakePartial = false;
     state.intakeBusy = false;
     state.wordOptions = null;
+    state.wordBindingProposals = [];
+    state.wordProposalSnapshot = null;
     state.wordResult = null;
     state.wordBusy = false;
     state.evaluatedRevision = null;
@@ -655,7 +652,7 @@ function createModel(deps) {
   }
 
   // Mo nhap trong — stage rong + diagram seed theo caseType. draftId =
-  // idempotency_key cua phien: retry saveDraft dung lai → khong tao
+  // idempotency_key cua phien: retry saveCase dung lai → khong tao
   // trung (contract §13.6). newDraft lai → key moi = nhap khac.
   async function newDraft(caseType) {
     const ct = CASE_TYPES.includes(caseType)
@@ -688,6 +685,7 @@ function createModel(deps) {
     state.docxImport = { version: 1, sources: [] };
     state.committedDocxImport = clone(state.docxImport);
     state.wordBindingProposals = [];
+    state.wordProposalSnapshot = null;
     state.stageDirty = false;
     state.diagramDirty = true;        // seed la draft chua persist
     state.metaDirty = false;
@@ -800,8 +798,8 @@ function createModel(deps) {
 
   // Luu meta cho case DA TAO qua notary.workspace_update (§6.2) — mot
   // nguon du lieu duy nhat la DB backend; khong localStorage. Nhap chua
-  // luu (caseId null) → cap nhat nhap qua updateCaseMeta, persist kem
-  // "Lưu nháp" (workspace_create). Caller tu hien thi r.error.
+  // nguoi dung (caseId null) → cap nhat nhap local, ghi DB o lan Luu
+  // ho so (workspace_save_case). Caller tu hien thi r.error.
   async function saveCaseMeta(patch) {
     if (state.savingCase) {
       return { ok: false, error: errObj('validation_error',
@@ -871,7 +869,7 @@ function createModel(deps) {
     if (!canWrite() || state.caseId == null || state.busy ||
         state.stageDirty || state.metaDirty || state.conflict || state.stale) {
       return { ok: false, error: errObj('validation_error',
-        'Hãy Cập nhật Stage/thông tin hồ sơ và xử lý xung đột trước khi đổi loại.') };
+        'Hãy Lưu hồ sơ và xử lý xung đột trước khi đổi loại.') };
     }
     const s = session;
     state.busy = 'notary.workspace_convert_type';
@@ -893,45 +891,6 @@ function createModel(deps) {
     } else {
       applyWriteResult(r, 'workspace_convert_type');
     }
-    emit();
-    return r;
-  }
-
-  async function saveDraft() {
-    if (state.savingCase) {
-      return { ok: false, error: errObj('validation_error',
-                                        'Đang lưu hồ sơ') };
-    }
-    if (!isDraft()) {
-      return { ok: false, error: errObj('validation_error',
-                                        'Khong phai nhap moi') };
-    }
-    syncPositionDefaults();
-    state.busy = 'notary.workspace_create';
-    emit();
-    const s = session;
-    const meta = {};
-    for (const f of CASE_META_FIELDS) meta[f] = state.caseInfo[f] ?? null;
-    const r = await client.run('notary.workspace_create', {
-      idempotency_key: state.draftId,
-      case: meta,
-      stage: stageForWire(state.stage, state.committed),
-      diagram: { state: clone(state.diagram) },
-      ...(state.docxImport && state.docxImport.sources.length ? { docx_import: clone(state.docxImport) } : {}),
-    });
-    state.busy = null;
-    if (s !== session) return r;      // nhap da bi thay — bo response
-    if (!r.ok) {
-      const err = r.error || errObj('unknown');
-      if (!applyStageWriteError(err)) state.error = err;
-      emit();
-      return r;
-    }
-    // thanh cong → nhap tro thanh case that (revision=1); draftId giai
-    // phong qua applyWorkspace — retry tiep theo dung luong revision.
-    applyWorkspace(r.data || {});
-    state.notice = r.data && r.data.created === false
-      ? 'Hồ sơ đã tồn tại (đã mở lại)' : 'Đã lưu hồ sơ';
     emit();
     return r;
   }
@@ -995,7 +954,7 @@ function createModel(deps) {
       return r;
     }
     applyWorkspace(r.data || {});
-    state.notice = r.data && r.data.created === false
+    state.notice = caseId == null && r.data && r.data.created === false
       ? 'Hồ sơ đã tồn tại (đã mở lại)' : 'Đã lưu hồ sơ';
     emit();
     return r;
@@ -1202,7 +1161,7 @@ function createModel(deps) {
 
   // Owner cua case inheritance = stage.owner_row_id (contract §13.1).
   // Node 'owner' tren draft diagram chi mirror — server sync luc
-  // commit/save; client cap nhat mirror de render dung ngay.
+  // luu; client cap nhat mirror de render dung ngay.
   function setOwnerRow(rowId) {
     if (!canWrite()) return false;
     if (caseType() !== CASE_TYPE_INHERITANCE) return false;
@@ -1314,98 +1273,6 @@ function createModel(deps) {
     return false;
   }
 
-  async function commitStage() {
-    if (!canWrite()) {
-      return { ok: false, error: errObj(
-        state.locked ? 'workspace_locked' : 'case_type_unsupported',
-        state.locked ? 'Hồ sơ đã khóa — chỉ đọc'
-                     : 'Loại việc chưa hỗ trợ') };
-    }
-    if (!state.stageDirty && !state.metaDirty) {
-      return { ok: true, noop: true };
-    }
-    state.busy = 'notary.workspace_commit_stage';
-    emit();
-    const s = session;
-    const payload = {
-      case_id: state.caseId,
-      base_revision: state.revision,
-      stage: stageForWire(state.stage, state.committed),
-    };
-    if (state.docxImport) payload.docx_import = clone(state.docxImport);
-    // đợt 3 (MIN-141): metadata hồ sơ ghi cung Stage trong mot
-    // transaction — payload.case la block day du, chi gui khi meta
-    // sua de khong ghi de meta cua client khac.
-    if (state.metaDirty) {
-      const meta = {};
-      for (const f of CASE_META_FIELDS) {
-        meta[f] = state.caseInfo[f] ?? null;
-      }
-      payload.case = meta;
-    }
-    const r = await client.run('notary.workspace_commit_stage', payload);
-    state.busy = null;
-    if (s !== session) return r;
-    if (!r.ok) {
-      const err = r.error || errObj('unknown');
-      if (!applyStageWriteError(err)) {
-        applyWriteResult(r, 'workspace_commit_stage');
-      }
-      emit();
-      return r;
-    }
-    const d = r.data || {};
-    state.revision = d.revision;
-    state.committed = normalizeStageAssets(d.stage || state.stage);
-    if (d.docx_import) state.docxImport = clone(d.docx_import);
-    state.committedDocxImport = clone(state.docxImport || { version: 1, sources: [] });
-    state.stage = clone(state.committed);
-    restoreLandIdentity();
-    if (d.diagram) {
-      // Commit prune + re-evaluate trong transaction (§6.1). Baseline
-      // committed luon nap theo state server da prune.
-      state.committedDiagram = clone(d.diagram.state ||
-                                     state.committedDiagram);
-      if (state.diagramDirty) {
-        // Draft diagram co thay doi chua luu — KHONG thay bang ban
-        // server (mat assignment chua persist). Mirror _prune_diagram
-        // phia client: bo gan personId khong con trong stage committed
-        // moi (giong removeStageRow), giu nguyen cac assignment khac.
-        const ids = new Set(state.committed.people.map((p) => p.row_id));
-        for (const n of state.diagram.nodes || []) {
-          if (n && n.personId && !ids.has(n.personId)) {
-            n.personId = null;
-          }
-        }
-        // diagramDirty giu true — user van phai "Lưu hồ sơ" de persist;
-        // evaluatedRevision giu nguyen de badge "Stage đã đổi kể từ lần
-        // đánh giá" bao khi rm hien thi chua mo ta draft hien tai.
-      } else {
-        state.diagram = clone(d.diagram.state || state.diagram);
-        // rm tu commit duoc evaluate tren stage@revision moi — danh dau
-        // de badge khong bao "stale" sai.
-        state.evaluatedRevision = d.revision;
-      }
-      state.renderModel = d.diagram.render_model || state.renderModel;
-      state.diagramWarnings =
-        (d.diagram.render_model && d.diagram.render_model.warnings) || [];
-    }
-    state.stageDirty = false;
-    if (state.metaDirty) {
-      // commit tra stage/diagram, khong tra case — meta da ghi cung
-      // transaction nen caseInfo cuc bo chinh la gia tri da luu.
-      state.metaDirty = false;
-      state.committedCaseInfo = clone(state.caseInfo);
-    }
-    state.fieldErrors = [];
-    state.diagramErrors = [];     // commit da evaluate lai so do phia server
-    state.stale = false;
-    state.error = null;            // ghi thanh cong → loi cu khong con dung
-    state.notice = 'Đã cập nhật Stage';
-    emit();
-    return r;
-  }
-
   // ---------- Diagram draft ----------
 
   function touchDiagram() {
@@ -1472,7 +1339,7 @@ function createModel(deps) {
     if (changed) touchDiagram();
   }
 
-  // Gan nguoi (row_id trong Stage DA COMMIT) vao slot; rowId=null → bo gan,
+  // Gan nguoi (row_id trong Stage dang sua) vao slot; rowId=null → bo gan,
   // nguoi quay ve Pool. Mot nguoi chi nam tren mot node — gan moi se clear
   // node cu (tranh engine duplicate_person).
   function assignPerson(nodeId, rowId) {
@@ -1687,14 +1554,12 @@ function createModel(deps) {
     state.busy = 'notary.diagram_evaluate';
     emit();
     const s = session;
-    // §2.1a: nhap moi (caseId=null) → khong gui case_id, kem stage nhap
-    // + hint case.case_type de server evaluate dung domain (§13.7).
-    const payload = state.caseId == null
-      ? { case: { case_type: caseType() },
-          stage: stageForWire(state.stage, state.committed),
-          diagram: { state: clone(state.diagram) } }
-      : { case_id: state.caseId,
-          diagram: { state: clone(state.diagram) } };
+    // Mọi workspace đang sửa (kể cả case đã lưu) evaluate trên buffer:
+    // nhánh draft của adapter — case hint + Stage + Diagram, KHÔNG
+    // case_id/base_revision, không ghi DB (§2.1a, §13.2).
+    const payload = { case: { case_type: caseType() },
+      stage: stageForWire(state.stage, state.committed),
+      diagram: { state: clone(state.diagram) } };
     const r = await client.run('notary.diagram_evaluate', payload);
     state.busy = null;
     if (s !== session) return r;      // response tre — bo
@@ -1716,56 +1581,6 @@ function createModel(deps) {
     state.diagramWarnings =
       (r.data.render_model && r.data.render_model.warnings) || [];
     state.diagramErrors = [];
-    emit();
-    return r;
-  }
-
-  async function saveDiagram() {
-    if (!canWrite()) {
-      return { ok: false, error: errObj(
-        state.locked ? 'workspace_locked' : 'case_type_unsupported',
-        state.locked ? 'Hồ sơ đã khóa — chỉ đọc'
-                     : 'Loại việc chưa hỗ trợ') };
-    }
-    if (!state.diagramDirty) return { ok: true, noop: true };
-    state.busy = 'notary.diagram_save';
-    emit();
-    const s = session;
-    const r = await client.run('notary.diagram_save', {
-      case_id: state.caseId,
-      base_revision: state.revision,
-      diagram: { state: clone(state.diagram) },
-    });
-    state.busy = null;
-    if (s !== session) return r;
-    if (!r.ok) {
-      const err = r.error || errObj('unknown');
-      if (err.code === 'diagram_invalid_state') {
-        state.diagramErrors =
-          (err.details && err.details.errors) || [err];
-        emit();
-        return r;
-      }
-      applyWriteResult(r, 'diagram_save');
-      emit();
-      return r;
-    }
-    const d = r.data || {};
-    state.revision = d.revision;
-    if (d.diagram) {
-      state.diagram = clone(d.diagram.state || state.diagram);
-      state.committedDiagram = clone(state.diagram);
-      state.renderModel = d.diagram.render_model || state.renderModel;
-      state.diagramWarnings =
-        (d.diagram.render_model && d.diagram.render_model.warnings) || [];
-      // rm evaluate tren state vua persist o revision moi.
-      state.evaluatedRevision = d.revision;
-    }
-    state.diagramDirty = false;
-    state.diagramErrors = [];
-    state.stale = false;
-    state.error = null;
-    state.notice = 'Đã lưu sơ đồ';
     emit();
     return r;
   }
@@ -1970,9 +1785,20 @@ function createModel(deps) {
   }
 
   function confirmOriginalBindings(sourceId, bindings) {
-    if (!canWrite() || state.stageDirty || state.diagramDirty) return false;
+    if (!canWrite()) return false;
     const source = state.docxImport.sources.find((s) => s.source_id === sourceId);
     if (!source) return false;
+    // Proposals chi con dung khi Stage/Diagram/case/revision khong doi
+    // ke tu luc tai. Docx context (nguon/bindings) duoc doi — cho phep
+    // lap confirm tren cung snapshot. Doi buffer thi phai Luu/tai lai.
+    const snap = state.wordProposalSnapshot;
+    if (!snap || snap.caseId !== state.caseId ||
+        snap.revision !== state.revision ||
+        JSON.stringify(snap.stage) !== JSON.stringify(state.stage) ||
+        JSON.stringify(snap.diagram) !== JSON.stringify(state.diagram)) {
+      state.wordProposalSnapshot = null;
+      return false;
+    }
     source.bindings = bindings.map((b) => ({ candidate_id: b.candidate_id,
       occurrence_id: b.occurrence_id, field_key: b.field_key, slot: b.slot }));
     touchStage();
@@ -2076,6 +1902,7 @@ function createModel(deps) {
     // doc danh sach cua folder truoc khi dang cho scan.
     state.wordOptions = null;
     state.wordBindingProposals = [];
+    state.wordProposalSnapshot = null;
     emit();
     const payload = { case_id: state.caseId };
     if (templateDir) payload.template_dir = templateDir;
@@ -2093,6 +1920,16 @@ function createModel(deps) {
     }
     state.wordOptions = (r.data && r.data.documents) || [];
     state.wordBindingProposals = (r.data && r.data.binding_proposals) || [];
+    // Proposals duoc server chung minh tren Stage/Diagram/case/revision
+    // tai thoi diem nay. Chi docx context (nguon/bindings) duoc doi ma
+    // khong vo hieu snapshot; Stage/Diagram/case/revision doi thi phai
+    // Luu ho so roi tai lai.
+    state.wordProposalSnapshot = {
+      caseId: state.caseId,
+      revision: state.revision,
+      stage: clone(state.stage),
+      diagram: clone(state.diagram),
+    };
     emit();
     return r;
   }
@@ -2174,9 +2011,9 @@ function createModel(deps) {
     };
     if (o.templateDir) payload.template_dir = o.templateDir;
     if (o.originalSourceId) {
-      if (state.stageDirty || state.diagramDirty) {
+      if (hasUnsaved()) {
         state.wordBusy = false;
-        return { ok: false, error: errObj('word.original_mapping_invalid', 'Hãy Cập nhật Stage và Lưu hồ sơ trước khi xuất') };
+        return { ok: false, error: errObj('word.original_mapping_invalid', 'Hãy Lưu hồ sơ trước khi xuất.') };
       }
       payload.original_source_id = o.originalSourceId;
       payload.base_revision = state.revision;
@@ -2226,7 +2063,7 @@ function createModel(deps) {
     state, subscribe,
     addressContext, requestLookup, dismissLookupSlot, markLookupStale,
     openFullFromSlot, requestFull, closeFull,
-    openCase, newDraft, isDraft, statusLabel, saveDraft, saveCase, updateCaseMeta, saveCaseMeta, convertCaseType,
+    openCase, newDraft, isDraft, statusLabel, saveCase, updateCaseMeta, saveCaseMeta, convertCaseType,
     duplicateCase,
     loadUqCatalog, createUqCustomer, resolveUqName,
 
@@ -2234,11 +2071,11 @@ function createModel(deps) {
     caseType, diagramDomain, documentTypesFor,
     addPerson, addAsset, updatePersonField, updateAssetField,
     moveAsset, setOwnerRow,
-    removeStageRow, fieldErrorsFor, commitStage,
+    removeStageRow, fieldErrorsFor,
     pool,
     addSlot, assignPerson, movePerson,
     setNodeFlag, toggleNodePosition, setNodeRelation, nodeRemovalImpact, removeNode,
-    evaluateDiagram, saveDiagram,
+    evaluateDiagram,
     resolveConflict,
     intakeAnalyze, acceptSuggestion, discardSuggestion, reviewSuggestion, confirmOriginalBindings, detachOriginalSource,
     loadWordOptions, exportWord,
