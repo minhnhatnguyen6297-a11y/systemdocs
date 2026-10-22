@@ -93,7 +93,7 @@ Tự rà trong các file G4 đã chạm (`case-drafting-model.js`, `case-draftin
 
 4. **Khóa lưu đồng thời.**
    - `case-drafting-model.js:906–909 saveCase`: trả `"Đang lưu hồ sơ"` khi `savingCase`; `canWrite:1020–1027` false khi `savingCase`/`duplicating`/đang convert.
-   - `relationship-diagram.js:1373–1381 syncSaveButton`: disable khi `busy`, thiếu capability Diagram hoặc `!canWrite()`.
+   - `relationship-diagram.js` `syncSaveButton`: disable khi lệnh GHI đang chạy (`model.isWriteBusy()`), thiếu capability Diagram hoặc `!canWrite()`; không khoá vì lệnh đọc `diagram_evaluate` (§7.1).
    - `case-drafting-view.js:475–479 runSaveCase`: early-return khi `savingCase`/`!canWrite()`.
    - Đánh giá: chặn tạm thời để bảo đảm một snapshot; không chặn nhập liệu lâu dài.
 
@@ -169,6 +169,42 @@ Phương pháp: app Electron thật + sidecar Python thật, DB/profile cô lậ
 
 **Phát hiện phụ F1 (nhỏ, ghi nhận — chưa sửa ở lát này):** khi một ô Stage đang giữ focus, cơ chế làm mới hẹp (chỉ khung quan hệ) không vẽ lại trang trí lỗi của bảng Stage, nên ô vừa sửa đúng vẫn còn vệt đỏ cho tới lần phát tín hiệu thay đổi tiếp theo sau khi rời ô (hoặc lần Lưu). Trạng thái model đã dọn lỗi ngay khi sửa (hàm `clearRowFieldError`), lần Lưu vẫn thành công và giao diện sạch sau lưu. Đề xuất lát nhỏ sau: vẽ lại trang trí lỗi trong đường làm mới hẹp.
 
+### §7.1. Vòng sửa S2 — evaluate debounce nuốt click Lưu + banner owner_required treo
+
+Tái hiện sạch trên app thật (DB mới, 1 hồ sơ): sau 5 vòng thả/gỡ node owner (~700ms/vòng) rồi bấm **Lưu hồ sơ**, nút đang disabled → click mất trắng, không có job `workspace_save_case`, revision DB không đổi; banner `workspace_owner_required` cũ treo lại dù evaluate mới nhất succeeded. Harness: `e2e-harness/e2e-s2-clean.mjs` (§7).
+
+**Chẩn đoán (đã xác nhận trong code trước khi sửa):**
+
+- **D1 — nút Lưu khoá vì lệnh ĐỌC.** `relationship-diagram.js` `syncSaveButton` và `case-drafting-view.js` `syncChromeUI` đều đặt `disabled = !!s.busy || …`. `evaluateDiagram()` đặt `state.busy='notary.diagram_evaluate'` suốt round-trip (chỉ đọc) và `scheduleEvaluate` debounce ~500ms sau mỗi lần kéo/thả; click Lưu trong cửa sổ busy bị nuốt không phản hồi. Nút Lưu chỉ được khoá vì lệnh GHI (`workspace_save_case`/`savingCase`, `workspace_convert_type`, `workspace_duplicate`, `workspace_update`) hoặc không ghi được.
+- **D2 — response evaluate cũ ghi đè trạng thái mới.** `evaluateDiagram()` chỉ guard theo `session`, không theo phiên bản sơ đồ: response gửi lúc sơ đồ chưa có owner về sau khi người dùng đã gán owner (và `setOwnerRow` đã dọn banner) vẫn đặt lại `state.error`/`state.diagramErrors` từ payload cũ. Response evaluate thành công đến sau đó không dọn `state.error` do evaluate đặt.
+
+**Sửa (commit `1d1ec3f`):**
+
+- `case-drafting-model.js`: thêm `isWriteBusy()` — nguồn duy nhất cho việc khoá nút Lưu theo lệnh GHI (`savingCase`, `duplicating`, `busy` thuộc tập `workspace_save_case/update/convert_type/duplicate`), export cho view/diagram dùng; cả hai điểm disable bỏ `!!s.busy`.
+- `evaluateDiagram()`: mỗi lần gọi có `evaluateSeq` + `diagramMutation` (đếm mutation: `touchDiagram`, gán/gỡ owner, xoá dòng có tham chiếu node, thay wholesale khi mở/lưu/đổi loại/nháp mới). Response không phải lần mới nhất hoặc sơ đồ đã đổi từ lúc gửi → chỉ dọn `busy` nếu là của chính nó, không đụng `error`/`diagramErrors`/`renderModel`/`diagramWarnings`. Kết quả còn hiệu lực tự dọn `state.error` **chỉ khi** đó là error object do evaluate đặt (đánh dấu bằng tham chiếu nội bộ); lỗi đường ghi (`applyStageWriteError`/`saveCase`/duplicate) giữ nguyên. Hành vi `diagram_invalid_state` (đặt `diagramErrors`) giữ như cũ cho response còn hiệu lực.
+
+**Test mới (`node --test`):**
+
+| Test | File | Kiểm |
+|---|---|---|
+| `evaluateDiagram: response cu ve sau khi gan owner bi bo — khong dat lai error/renderModel` (T1) | `notary-case-drafting-model.test.mjs` | A gửi lúc chưa owner → gán owner → B gửi → B success trước → A fail `workspace_owner_required` sau: `state.error` vẫn null, `renderModel` của B giữ nguyên. |
+| `evaluateDiagram: evaluate moi thanh cong don loi do evaluate dat truoc` (T2) | nt | Evaluate còn hiệu lực fail → sơ đồ sửa qua `touchDiagram` → evaluate mới success → `state.error` được dọn. |
+| `evaluateDiagram: evaluate thanh cong KHONG don loi cua duong ghi` (T2b) | nt | Lỗi từ lệnh ghi (`workspace_duplicate` fail) không bị evaluate thành công dọn. |
+| `Lưu hồ sơ: khóa khi lệnh GHI chạy, KHÔNG khóa vì diagram_evaluate` (T3) | `notary-case-drafting-view.test.mjs` | `busy=diagram_evaluate` → nút bật; `savingCase`/`busy=workspace_save_case`/`busy=workspace_update` → nút khoá. |
+
+Đối chứng trước khi sửa: chạy đúng 2 file test trên worktree tạm tại HEAD `7f099b6` (source cũ) — T1, T2, T3 fail; T2b pass (là guard chống dọn quá tay, không phải test tái hiện lỗi). Sau sửa: cả 4 pass.
+
+**Số liệu suite sau sửa (`node --test test/*.test.mjs`):**
+
+| Thời điểm | tests | pass | fail | Ghi chú |
+|---|---|---|---|---|
+| Trước (HEAD `7f099b6`) | 428 | 404 | 24 | §6 |
+| Sau (`1d1ec3f`) | 432 | 408 | 24 | +4 test mới (3 model, 1 view) |
+
+24 tên fail trùng đúng danh sách nợ cũ ở §6/`g4-test-compare.txt` (5 thiếu `locked.json`, 17 address lookup/fileToken, 2 DOCX thiếu module python hệ thống): **0 fail mới**. Target 4 file model/view/diagram/diagram-errors: 251 test, 246 pass, 5 fail — đúng 5 nợ fixture `locked.json`.
+
+**E2E sau sửa: điều phối viên bổ sung.**
+
 ## §8. Commit list toàn lát G4
 
 | Commit | Nội dung |
@@ -184,5 +220,6 @@ Phương pháp: app Electron thật + sidecar Python thật, DB/profile cô lậ
 | `6729949` | Test view theo một Lưu hồ sơ |
 | `97e62c7` | Test diagram/DOCX/wire theo save_case |
 | `ea719a9` | Dọn comment commit_stage còn sót |
+| `1d1ec3f` | Sửa S2: Lưu không khoá vì lệnh đọc, bỏ response evaluate cũ (§7.1) |
 | (commit biên bản này) | Biên bản vòng 2 G4 + `g4-test-compare.txt` |
 | (commit bổ sung của điều phối viên) | Điền §7 E2E trên app thật vào biên bản |
