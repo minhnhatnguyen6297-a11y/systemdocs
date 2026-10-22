@@ -5,6 +5,7 @@ import hashlib
 import json
 from .document_intake.docx_source import read_docx, replace_spans
 from . import word_engine, word_batch_export as batch
+from .case_rows import materialize_case_state
 
 PERSON_LABELS = {"ho_ten": "Họ tên", "so_giay_to": "Số giấy tờ", "ngay_sinh": "Ngày sinh",
                  "ngay_cap": "Ngày cấp", "noi_cap": "Nơi cấp", "dia_chi": "Địa chỉ", "ngay_chet": "Ngày chết"}
@@ -119,7 +120,7 @@ def validate_context(context, stage, store):
 
 def validate_new_bindings(case, context, previous, store):
     """Check new confirmations against the composed committed rows/seats before DB commit."""
-    snapshot = json.loads(case.case_state_json or '{}')
+    snapshot = materialize_case_state(case)
     values = word_engine.build_template_mapping(case, static=True)
     old = {(s['source_id'], json.dumps(b, sort_keys=True), json.dumps(next((r for r in s['records'] if r['candidate_id'] == b['candidate_id']), {}), sort_keys=True))
            for s in (previous or {}).get('sources', []) for b in s['bindings']}
@@ -138,7 +139,7 @@ def validate_new_bindings(case, context, previous, store):
 
 
 def reviewed_template(case, source_id, store):
-    snapshot = json.loads(case.case_state_json or "{}")
+    snapshot = materialize_case_state(case)
     source = next((s for s in snapshot.get("docx_import", {}).get("sources", []) if s["source_id"] == source_id), None)
     if source is None or not source["bindings"]:
         raise ValueError("Chưa xác nhận các vị trí của nguồn Word trong hồ sơ này")
@@ -171,7 +172,7 @@ def reviewed_template(case, source_id, store):
 
 
 def binding_proposals(case, source_id, store):
-    snapshot = json.loads(case.case_state_json or "{}")
+    snapshot = materialize_case_state(case)
     source = next((s for s in snapshot.get("docx_import", {}).get("sources", []) if s["source_id"] == source_id), None)
     if source is None:
         raise ValueError("Nguồn Word không thuộc hồ sơ")

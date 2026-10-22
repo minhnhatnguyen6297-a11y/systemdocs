@@ -163,7 +163,12 @@ async def stats():
             "customers": len(customer_ids),
             "properties": len(property_ids),
             "cases": db.query(InheritanceCase).count(),
-            "locked": db.query(InheritanceCase).filter(InheritanceCase.trang_thai == "locked").count(),
+            # Trạng thái chỉ còn draft/done; giữ shape cũ bằng cách thay
+            # `locked` bằng `done` và thêm `draft`.
+            "draft": db.query(InheritanceCase).filter(
+                InheritanceCase.trang_thai == "draft").count(),
+            "done": db.query(InheritanceCase).filter(
+                InheritanceCase.trang_thai == "done").count(),
         }
     finally:
         db.close()

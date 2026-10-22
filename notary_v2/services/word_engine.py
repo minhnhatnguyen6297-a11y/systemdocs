@@ -374,45 +374,65 @@ def _format_share(value: Any) -> str:
     return f"{number:g}"
 
 
-def _pick_core_people(case: Any) -> tuple[Any, Any, Any, list[Any]]:
-    owner = getattr(case, "nguoi_chet", None)
-    spouse = None
-    for p in getattr(case, "participants", []) or []:
-        if _role_key(getattr(p, "vai_tro", "")) == "vo_chong":
-            spouse = getattr(p, "customer", None)
-            break
+def _pick_core_people(
+        case: Any, state: dict[str, Any],
+) -> tuple[Any, Any, Any, list[Any]]:
+    """Slot Word legacy (1 = chủ đất, 2 = vợ/chồng, 3/4+ = người nhận).
 
-    pair = [c for c in [owner, spouse] if c is not None]
-    nam = [c for c in pair if _normalize_token(getattr(c, "gioi_tinh", "")) == "nam"]
-    nu = [c for c in pair if _normalize_token(getattr(c, "gioi_tinh", "")) in {"nu", "nữ"}]
+    Nguồn là **dòng Người của hồ sơ**: owner theo `owner_row_id`; vợ/chồng
+    và người nhận join participant theo `case_person_row_id` — không đọc
+    `case.nguoi_chet`/`participant.customer` (master danh bạ). Thứ tự
+    người nhận giữ luật cũ (tỷ lệ giảm dần); hòa tỷ lệ thì theo thứ tự
+    dòng Stage (`vitri`) thay cho customer id.
+    """
+    rows = _snapshot_people_by_row(state)
+    order = {row_id: index for index, row_id in enumerate(rows)}
+
+    def person(row_id: Any) -> Any:
+        row = rows.get(_safe_text(row_id))
+        return _word_person_from_stage(row) if row is not None else None
+
+    owner = person(state.get("owner_row_id"))
+    pairs: list[tuple[Any, Any]] = []
+    for participant in getattr(case, "participants", []) or []:
+        row_id = _safe_text(getattr(participant, "case_person_row_id", ""))
+        row = rows.get(row_id)
+        if row is not None:
+            pairs.append((participant, _word_person_from_stage(row)))
+
+    spouse = next(
+        (wp for participant, wp in pairs
+         if _role_key(getattr(participant, "vai_tro", "")) == "vo_chong"),
+        None)
+    pair = [p for p in (owner, spouse) if p is not None]
+    nam = [p for p in pair if _normalize_token(p.gioi_tinh) == "nam"]
+    nu = [p for p in pair
+          if _normalize_token(p.gioi_tinh) in {"nu", "nữ"}]
 
     if len(nam) == 1 and len(nu) == 1:
-        person1 = nam[0]
-        person2 = nu[0]
+        person1, person2 = nam[0], nu[0]
     elif len(pair) == 2:
-        person1 = pair[0]
-        person2 = pair[1]
+        person1, person2 = pair[0], pair[1]
     elif len(pair) == 1:
-        person1 = pair[0]
-        person2 = None
+        person1, person2 = pair[0], None
     else:
-        person1 = None
-        person2 = None
+        person1, person2 = None, None
 
-    excluded_ids = {getattr(c, "id", None) for c in [person1, person2] if c is not None}
+    excluded = {p.row_id for p in (person1, person2) if p is not None}
     receivers = [
-        p for p in getattr(case, "participants", []) or []
-        if getattr(p, "co_nhan_tai_san", False) and getattr(p, "customer_id", None) not in excluded_ids
-    ]
-    receivers = sorted(receivers, key=lambda p: (-(getattr(p, "ty_le", 0) or 0), getattr(p, "customer_id", 0) or 0))
+        (participant, wp) for participant, wp in pairs
+        if getattr(participant, "co_nhan_tai_san", False)
+        and wp.row_id not in excluded]
+    receivers.sort(key=lambda item: (
+        -(getattr(item[0], "ty_le", 0) or 0), order.get(item[1].row_id, 0)))
     non_receivers = [
-        p for p in getattr(case, "participants", []) or []
-        if not getattr(p, "co_nhan_tai_san", False) and getattr(p, "customer_id", None) not in excluded_ids
-    ]
-    non_receivers = sorted(non_receivers, key=lambda p: getattr(p, "customer_id", 0) or 0)
+        wp for participant, wp in pairs
+        if not getattr(participant, "co_nhan_tai_san", False)
+        and wp.row_id not in excluded]
+    non_receivers.sort(key=lambda wp: order.get(wp.row_id, 0))
 
-    person3 = getattr(receivers[0], "customer", None) if receivers else None
-    people_4_plus = [p.customer for p in receivers[1:]] + [p.customer for p in non_receivers]
+    person3 = receivers[0][1] if receivers else None
+    people_4_plus = [wp for _p, wp in receivers[1:]] + non_receivers
     return person1, person2, person3, people_4_plus
 
 
@@ -499,7 +519,7 @@ def _land_rows_for(prop: Any) -> list[dict[str, str]]:
 
 
 # ---------------------------------------------------------------------------
-# Word export V2: case_state_json-aware helpers
+# Word export: view Storage B (rows + metadata + Diagram)
 # ---------------------------------------------------------------------------
 
 
@@ -513,53 +533,30 @@ def _load_case_state(case: Any) -> dict[str, Any]:
     return materialize_case_state(case)
 
 
-def _word_person_from_stage(stage_person: dict[str, Any],
-                            customers: Any = None) -> WordPerson:
-    # Stage v3 rows: `row_id` uuid4 (khóa node diagram.state) + `entity_id`
-    # int ORM (khóa projection legacy engineInput/engineState). Bản cũ
-    # (schemaVersion 1/2) chỉ có `id` = entity id.
+def _word_person_from_stage(stage_person: dict[str, Any]) -> WordPerson:
+    """View Người cho mọi slot Word — đọc đúng dòng Stage của hồ sơ.
+
+    Reader đã emit đủ key nullable (`ho_ten`, ngày, giấy tờ, `loai_dia_chi`),
+    nên không borrow master `customers` khi thiếu: dòng chưa nhập là rỗng
+    thật. Ngày giữ nguyên chuỗi đã lưu (`YYYY` | `YYYY-MM-DD`) để formatter
+    render đúng độ đầy đủ.
+    """
     entity = stage_person.get("entity_id")
     if entity is None:
         entity = stage_person.get("id")
-    customer = (customers or {}).get(_safe_text(entity))
-
-    def date_field(key: str) -> Any:
-        """Ngày Người — cùng quyền key-presence với `_snapshot_person_view`:
-        key có trong snapshot (kể cả `null`) → chặn fallback; key vắng
-        (hồ sơ cũ) → master của hồ sơ, `date` render đầy đủ dd/mm/yyyy."""
-        if key in stage_person:
-            return stage_person.get(key) or None
-        return getattr(customer, key, None) if customer is not None else None
-
     return WordPerson(
         id=_safe_text(entity) or None,
         row_id=_safe_text(stage_person.get("row_id")),
         ho_ten=_safe_text(stage_person.get("ho_ten")),
         gioi_tinh=_safe_text(stage_person.get("gioi_tinh")),
-        ngay_sinh=date_field("ngay_sinh"),
-        ngay_chet=date_field("ngay_chet"),
+        ngay_sinh=stage_person.get("ngay_sinh") or None,
+        ngay_chet=stage_person.get("ngay_chet") or None,
         so_giay_to=_safe_text(stage_person.get("so_giay_to")),
         loai_giay_to=_safe_text(stage_person.get("loai_giay_to")),
-        ngay_cap=date_field("ngay_cap"),
+        ngay_cap=stage_person.get("ngay_cap") or None,
         noi_cap=_safe_text(stage_person.get("noi_cap")),
         dia_chi=_safe_text(stage_person.get("dia_chi")),
-        loai_dia_chi=_safe_text(stage_person.get("loai_dia_chi", stage_person.get("place_of_origin"))),
-    )
-
-
-def _word_person_from_customer(customer: Any) -> WordPerson:
-    return WordPerson(
-        id=getattr(customer, "id", None),
-        ho_ten=_safe_text(getattr(customer, "ho_ten", "")),
-        gioi_tinh=_safe_text(getattr(customer, "gioi_tinh", "")),
-        ngay_sinh=getattr(customer, "ngay_sinh", None),
-        ngay_chet=getattr(customer, "ngay_chet", None),
-        so_giay_to=_safe_text(getattr(customer, "so_giay_to", "")),
-        loai_giay_to=_safe_text(getattr(customer, "loai_giay_to", "")),
-        ngay_cap=getattr(customer, "ngay_cap", None),
-        noi_cap=_safe_text(getattr(customer, "noi_cap", "")),
-        dia_chi=_safe_text(getattr(customer, "dia_chi", "")),
-        loai_dia_chi=_safe_text(getattr(customer, "loai_dia_chi", "")),
+        loai_dia_chi=_safe_text(stage_person.get("loai_dia_chi")),
     )
 
 
@@ -657,115 +654,98 @@ class _WordPersonsBuild:
 
 
 def _build_word_persons(case: Any) -> _WordPersonsBuild:
+    """Persons theo đúng thứ tự dòng Stage; vai trò/cờ từ Diagram đã lưu.
+
+    Không bổ sung người chết từ master, không fallback participants/JSON
+    Stage legacy: dòng Người là SOT dữ kiện của Hồ sơ.
+    """
     state = _load_case_state(case)
-    has_state = bool(state)
     case_type = _word_case_type(case)
-    stage = state.get("stage", []) if has_state else []
-    diagram = state.get("diagram", {}) if has_state and isinstance(state.get("diagram"), dict) else {}
-    diagram_state = diagram.get("state", {}) if isinstance(diagram.get("state"), dict) else {}
-    state_nodes = diagram_state.get("nodes", [])
-    has_diagram_state = isinstance(state_nodes, list) and bool(state_nodes)
-    engine_input = diagram.get("engineInput", {}) if isinstance(diagram.get("engineInput"), dict) else {}
-    legacy_engine_state = diagram.get("engineState", {}) if isinstance(diagram.get("engineState"), dict) else {}
-    engine_result = diagram.get("engineResult", {}) if isinstance(diagram.get("engineResult"), dict) else {}
-    node_source = engine_input if isinstance(engine_input.get("nodes"), list) else legacy_engine_state
-    nodes = node_source.get("nodes", []) if isinstance(node_source.get("nodes"), list) else []
-    allocations = engine_result.get("allocations", {})
+    stage = state.get("stage")
+    stage = stage if isinstance(stage, list) else []
+    diagram = state.get("diagram")
+    diagram = diagram if isinstance(diagram, dict) else {}
+    diagram_state = diagram.get("state")
+    diagram_state = diagram_state if isinstance(diagram_state, dict) else {}
+    state_nodes = diagram_state.get("nodes")
+    state_nodes = state_nodes if isinstance(state_nodes, list) else []
+    has_diagram_state = bool(state_nodes)
+    render_model = diagram.get("render_model")
+    allocations = (render_model.get("allocations")
+                   if isinstance(render_model, dict) else None)
     if not isinstance(allocations, dict):
         allocations = {}
 
-    persons: list[WordPerson] = []
-    owner = getattr(case, "nguoi_chet", None)
+    persons = [_word_person_from_stage(item) for item in stage
+               if isinstance(item, dict)]
 
-    if has_state and isinstance(stage, list):
-        # Khách hàng của hồ sơ theo `id` entity (nguồn giống
-        # `_pick_core_people`) — chỉ dùng làm fallback 3 field ngày khi
-        # snapshot cũ thiếu key, không đổi thứ tự/row_id/nhóm Người.
-        customers_by_id: dict[str, Any] = {}
-        for candidate in [owner] + [
-                getattr(p, "customer", None)
-                for p in getattr(case, "participants", []) or []]:
-            if candidate is not None:
-                customers_by_id.setdefault(
-                    _safe_text(getattr(candidate, "id", "")), candidate)
-        for item in stage:
-            if isinstance(item, dict):
-                persons.append(_word_person_from_stage(item, customers_by_id))
+    # Hồ sơ chưa có Diagram: người ở `owner_row_id` là chủ đất (giữ nghĩa
+    # slot Word legacy). Diagram đã lưu vẫn là thẩm quyền khi có node —
+    # `_apply_diagram_nodes` đặt lại cờ từ ownPositions/isLandOwner.
+    owner_row_id = _safe_text(state.get("owner_row_id"))
+    if case_type != "two_party" and owner_row_id:
+        for person in persons:
+            if person.row_id == owner_row_id:
+                person.is_land_owner = True
 
-    # Đảm bảo ngườ chết của hồ sơ luôn có mặt trong danh sách để xử lý chủ đất.
-    # two_party: nguoi_chet chỉ là anchor kỹ thuật (không có ngữ nghĩa
-    # chủ đất) → không gắn cờ/bổ sung.
-    if owner is not None and case_type != "two_party":
-        owner_id = str(getattr(owner, "id", ""))
-        existing = next((p for p in persons if str(p.id) == owner_id), None)
-        if existing is None:
-            owner_wp = _word_person_from_customer(owner)
-            owner_wp.is_land_owner = True
-            persons.append(owner_wp)
-        else:
-            existing.is_land_owner = True
+    if case_type == "two_party":
+        persons = _apply_two_party_slots(persons, state_nodes)
+    else:
+        persons = _apply_diagram_nodes(persons, state_nodes, allocations)
+    _merge_participant_roles(persons, case)
+    if case_type != "two_party" and not has_diagram_state:
+        # Chưa có Diagram: projection participant (đã ghi cùng transaction
+        # theo role node trước đó) là nguồn nhận/tỷ lệ; không đọc master.
+        _merge_participant_projection(persons, case)
 
-    if has_state:
-        if case_type == "two_party":
-            # Node v3 two_party tham chiếu Stage bằng row_id, có slot p1..p30.
-            persons = _apply_two_party_slots(persons, state_nodes)
-        else:
-            # Inheritance: projection legacy engineInput/engineState trỏ
-            # entity_id; fallback diagram.state v3 (personId = row_id) khi
-            # projection thiếu.
-            persons = _apply_diagram_nodes(
-                persons, nodes or state_nodes, allocations)
-        _merge_participant_roles(persons, case)
-
-    # Fallback về participants cũ khi không có case_state_json hợp lệ.
-    if not has_state:
-        for participant in getattr(case, "participants", []) or []:
-            customer = getattr(participant, "customer", None)
-            if customer is None:
-                continue
-            wp = _word_person_from_customer(customer)
-            wp.role = _safe_text(getattr(participant, "vai_tro", ""))
-            wp.will_receive = bool(getattr(participant, "co_nhan_tai_san", False))
-            wp.share = _format_share(getattr(participant, "ty_le", ""))
-            persons.append(wp)
-
-    deduped: list[WordPerson] = []
-    seen_ids: set[str] = set()
-    for index, person in enumerate(persons):
-        # Stage rows không có entity id thì dedupe bằng row_id; cả hai
-        # đều trống → giữ nguyên từng dòng (không gộp nhầm người lạ).
-        person_id = person.row_id or _safe_text(person.id) or f"#{index}"
-        if person_id in seen_ids:
-            continue
-        seen_ids.add(person_id)
-        deduped.append(person)
     return _WordPersonsBuild(
-        persons=deduped, case_type=case_type,
+        persons=_dedupe_people(persons), case_type=case_type,
         has_diagram_state=has_diagram_state)
 
 
 def _merge_participant_roles(persons: list[WordPerson], case: Any) -> None:
     """Bổ sung vai trò đã gán TAY trên participants (``vai_tro``) cho Stage persons.
 
-    Node v3 của diagram không lưu role tự do, nên "Người được ủy quyền" — vai trò
-    tác nghiệp xác nhận — chỉ còn sống ở `InheritanceParticipant.vai_tro`. Merge
-    theo customer id: vai trò đã lưu chỉ ghi đè khi person chưa có role hoặc chính
-    vai trò đó là vai trò ủy quyền đã xác nhận (không suy từ vị trí/topology).
+    Node Diagram không lưu role tự do, nên "Người được ủy quyền" — vai trò
+    tác nghiệp xác nhận — chỉ còn sống ở `InheritanceParticipant.vai_tro`.
+    Join theo `case_person_row_id` (dòng Người của hồ sơ), không theo
+    customer id: hai dòng khác row_id có thể cùng identity. Vai trò đã lưu
+    chỉ ghi đè khi person chưa có role hoặc chính vai trò đó là vai trò ủy
+    quyền đã xác nhận (không suy từ vị trí/topology).
     """
     stored: dict[str, str] = {}
     for participant in getattr(case, "participants", []) or []:
         role = _safe_text(getattr(participant, "vai_tro", ""))
-        customer_id = getattr(participant, "customer_id", None)
-        if role and customer_id is not None:
-            stored[str(customer_id)] = role
+        row_id = _safe_text(getattr(participant, "case_person_row_id", ""))
+        if role and row_id:
+            stored[row_id] = role
     if not stored:
         return
     for person in persons:
-        role = stored.get(_safe_text(person.id))
+        role = stored.get(person.row_id)
         if role and (
                 not person.role
                 or _role_key(role).startswith("nguoi_duoc_uy_quyen")):
             person.role = role
+
+
+def _merge_participant_projection(persons: list[WordPerson],
+                                  case: Any) -> None:
+    """Fallback có kiểm soát khi hồ sơ chưa có Diagram: nhận/tỷ lệ lấy từ
+    projection participant của chính hồ sơ, join theo `case_person_row_id`."""
+    stored: dict[str, Any] = {}
+    for participant in getattr(case, "participants", []) or []:
+        row_id = _safe_text(getattr(participant, "case_person_row_id", ""))
+        if row_id:
+            stored[row_id] = participant
+    for person in persons:
+        participant = stored.get(person.row_id)
+        if participant is None:
+            continue
+        person.will_receive = bool(
+            getattr(participant, "co_nhan_tai_san", False))
+        person.share = _format_share(
+            getattr(participant, "ty_le", "")) or person.share
 
 
 def _active_persons(persons: list[WordPerson]) -> list[WordPerson]:
@@ -796,7 +776,7 @@ def committed_landowner_names(payload: dict) -> str | None:
     if state.get("domain") != "inheritance":
         return None
     stage = payload.get("stage", [])
-    persons = [_word_person_from_stage(row, {}) for row in stage]
+    persons = [_word_person_from_stage(row) for row in stage]
     asset_count = len(payload.get("assets", []))
     nodes = []
     for node in state.get("nodes", []):
@@ -1161,21 +1141,13 @@ def _safe_int(v: Any) -> int | None:
         return None
 
 
-def _snapshot_asset_fields(item: Any) -> bool:
-    """Snapshot asset đợt 2 trở đi mang full field + land_rows canonical;
-    snapshot cũ chỉ có {id, entity_id, row_id, is_primary} → fieldless."""
-    return isinstance(item, dict) and any(
-        key not in _SNAPSHOT_ASSET_META_KEYS for key in item)
-
-
 def _snapshot_asset_view(item: dict[str, Any]) -> Any:
-    """Asset snapshot trong case_state_json → view giống ORM Property cho
-    các hàm placeholder (MIN-141 đợt 2 — Word đọc đúng bản đã commit của
-    hồ sơ, không đổi theo master properties của hồ sơ khác).
+    """Dòng Tài sản materialized → view giống ORM Property cho các hàm
+    placeholder (Word đọc đúng bản của hồ sơ, không đổi theo master).
 
     `land_rows` giữ nguyên dict canonical (loaidat/dientich/thoihan) —
-    _land_row_values đọc được cả hai spelling; `land_rows_json` = None vì
-    snapshot đã là nguồn committed."""
+    `_land_row_values` đọc được cả hai spelling; `land_rows_json` = None
+    vì dòng case-owned đã là nguồn committed."""
     ngay_cap = item.get("ngay_cap")
     if isinstance(ngay_cap, str) and ngay_cap:
         try:
@@ -1206,102 +1178,31 @@ def _snapshot_asset_view(item: dict[str, Any]) -> Any:
     )
 
 
-def _snapshot_person_view(customer: Any, row: dict) -> Any:
-    """View Người cho slot `[Tên N]`…`[noicapN]` — đọc bằng chứng đã
-    commit trong snapshot `stage[]` của chính hồ sơ thay vì master
-    `customers` live (MIN-141 review: master dùng chung có thể bị hồ sơ
-    khác đổi sau commit; vd loai_giay_to/ngay_cap của người chết model
-    trả None nên đường live làm mất 'Giấy chứng tử' đã xác nhận).
+def _snapshot_people_by_row(state: dict[str, Any]) -> dict[str, dict]:
+    """{row_id → dòng Stage} — khóa quan hệ Người của hồ sơ.
 
-    Per-key presence như `_snap_meta`: key có trong snapshot → dùng giá
-    trị snapshot (kể cả null chủ ý → rỗng); key vắng (snapshot cũ) →
-    fallback master live.
-
-    Ngày giữ nguyên giá trị đã commit (`YYYY` | `YYYY-MM-DD`) — formatter
-    `_fmt_date`/`_fmt_year`/`_fmt_birth_or_year` render theo đúng độ đầy
-    đủ; không ép về `date(y,1,1)` vì sẽ làm `2010` ra `01/01/2010`.
-    Fallback master là `date` → render đầy đủ dd/mm/yyyy."""
-
-    def pick(key: str) -> Any:
-        return row[key] if key in row else getattr(customer, key, None)
-
-    return SimpleNamespace(
-        id=getattr(customer, "id", None),
-        ho_ten=_safe_text(pick("ho_ten")),
-        gioi_tinh=_safe_text(pick("gioi_tinh")),
-        ngay_sinh=pick("ngay_sinh"),
-        ngay_chet=pick("ngay_chet"),
-        so_giay_to=_safe_text(pick("so_giay_to")),
-        ngay_cap=pick("ngay_cap"),
-        noi_cap=_safe_text(pick("noi_cap")),
-        dia_chi=_safe_text(pick("dia_chi")),
-        loai_giay_to=_safe_text(pick("loai_giay_to")),
-        loai_dia_chi=_safe_text(pick("loai_dia_chi")),
-    )
-
-
-def _snapshot_people_by_id(state: dict[str, Any]) -> dict[str, dict]:
-    """{entity_id str → row} từ snapshot `stage[]` — đối chiếu slot
-    Người legacy (Customer live) với bản đã commit của hồ sơ."""
+    Không key theo entity id: hai dòng khác row_id có thể cùng identity,
+    map theo identity sẽ đè mất một dòng.
+    """
     out: dict[str, dict] = {}
     stage = state.get("stage") if isinstance(state, dict) else None
     for item in stage or []:
-        if isinstance(item, dict) and item.get("id") is not None:
-            out[str(item.get("id"))] = item
-    return out
-
-
-def _live_props_by_id(case: Any) -> dict[int, Any]:
-    """{property_id: Property live} — fallback cho snapshot item chỉ có
-    pointer (payload trước đợt 2)."""
-    out: dict[int, Any] = {}
-    for link in getattr(case, "property_links", None) or []:
-        prop = getattr(link, "property", None)
-        pid = getattr(link, "property_id", None)
-        if prop is not None and isinstance(pid, int):
-            out[pid] = prop
-    ts = getattr(case, "tai_san", None)
-    ts_id = getattr(ts, "id", None)
-    if ts is not None and isinstance(ts_id, int):
-        out.setdefault(ts_id, ts)
+        if isinstance(item, dict) and _safe_text(item.get("row_id")):
+            out[_safe_text(item.get("row_id"))] = item
     return out
 
 
 def _get_property_list(case: Any) -> list[Any]:
-    """Tài sản để render — snapshot đã commit trong case_state_json trước
-    (MIN-141 đợt 2): mỗi hồ sơ xuất đúng bản commit của mình, kể cả khi
-    master properties bị hồ sơ khác dùng chung sửa. Item snapshot chỉ có
-    pointer (payload cũ) → tra master live theo entity_id; không có
-    snapshot assets → đường live cũ (links/tai_san)."""
-    snap_assets = _load_case_state(case).get("assets")
-    if isinstance(snap_assets, list) and snap_assets:
-        live = _live_props_by_id(case)
-        views = []
-        for item in snap_assets:
-            if _snapshot_asset_fields(item):
-                views.append(_snapshot_asset_view(item))
-                continue
-            pid = None
-            if isinstance(item, dict):
-                pid = item.get("entity_id")
-                if not isinstance(pid, int) or isinstance(pid, bool):
-                    pid = _safe_int(item.get("id"))
-            prop = live.get(pid) if isinstance(pid, int) else None
-            if prop is not None:
-                views.append(prop)
-        if views:
-            return views
-    links = getattr(case, "property_links", None)
-    if links:
-        ordered = sorted(links, key=lambda x: (not bool(getattr(x, "is_primary", False)), getattr(x, "id", 0)))
-        props = [getattr(link, "property", None) for link in ordered]
-        props = [p for p in props if p is not None]
-        if props:
-            return props
-    ts = getattr(case, "tai_san", None)
-    if ts is not None:
-        return [ts]
-    return []
+    """Danh sách tài sản để render — chỉ dòng Tài sản case-owned.
+
+    `[]` là [] thật (không fallback `property_links`/`tai_san` master).
+    Mỗi dòng thành view giống ORM Property cho các hàm placeholder.
+    """
+    items = _load_case_state(case).get("assets")
+    if not isinstance(items, list):
+        return []
+    return [_snapshot_asset_view(item) for item in items
+            if isinstance(item, dict)]
 
 
 def _property_description(properties: list[Any]) -> str:
@@ -1882,11 +1783,13 @@ def build_template_mapping(case: Any, today: date | None = None,
     của mẫu đang xuất (`template_group_needs`); `None` = caller không có
     mẫu → giữ đủ gate cũ."""
     context = build_word_context(case, today=today)
-    # Tài sản vị trí 1 (primary) — snapshot đã commit nếu có, không thì
-    # master live case.tai_san (đường cũ, hồ sơ chưa qua commit_stage).
-    ts = context.assets[0] if context.assets else getattr(case, "tai_san", None)
+    # Tài sản vị trí 1 (primary) — chỉ dòng Tài sản case-owned; hồ sơ
+    # chưa có dòng nào thì các token tài sản xuất rỗng, không borrow master.
+    ts = context.assets[0] if context.assets else None
     today = context.today
-    person1, person2, person3, people_4_plus = _pick_core_people(case)
+    _state_doc = _load_case_state(case)
+    person1, person2, person3, people_4_plus = _pick_core_people(
+        case, _state_doc)
 
     people_slots = [None] * 21
     people_slots[1] = person1
@@ -1895,41 +1798,24 @@ def build_template_mapping(case: Any, today: date | None = None,
     for idx, c in enumerate(people_4_plus[:17], start=4):
         people_slots[idx] = c
 
-    # Metadata hồ sơ (MIN-141 đợt 3): snapshot `payload.case` đã commit
-    # là nguồn đọc chính — cột live chỉ fallback khi snapshot KHÔNG có
-    # key (hồ sơ legacy chưa qua commit_stage sau khi nâng cấp). Key đã
-    # commit mà null/rỗng là giá trị chủ ý → xuất rỗng, không đọc master.
-    # `[Nơi niêm yết]` KHÔNG còn đắp từ địa chỉ đất: chưa tra cứu được →
-    # để trống, không tự khẳng định.
-    _state_doc = _load_case_state(case)
+    # Metadata hồ sơ: view case của reader (cột SOT + scalar JSON v4) là
+    # nguồn duy nhất — reader luôn emit đủ key nên không fallback cột live.
+    # Key null/rỗng là giá trị chủ ý → xuất rỗng. `[Nơi niêm yết]` KHÔNG
+    # đắp từ địa chỉ đất: chưa tra cứu được → để trống.
     snap_case = _state_doc.get("case")
-    if not isinstance(snap_case, dict):
-        # Phòng snapshot lồng `payload.case` (một số doc legacy/wire).
-        _inner = _state_doc.get("payload")
-        snap_case = (_inner.get("case") if isinstance(_inner, dict)
-                     else None)
     snap_case = snap_case if isinstance(snap_case, dict) else {}
 
-    def _snap_meta(key: str, live_attr: str) -> str:
-        if key in snap_case:
-            return _safe_text(snap_case.get(key))
-        return _safe_text(getattr(case, live_attr, ""))
+    def _snap_meta(key: str) -> str:
+        return _safe_text(snap_case.get(key))
 
-    noi_niem_yet = _snap_meta("noiniemyet", "noi_niem_yet")
-    noi_dung_viec = _snap_meta("noidungviec", "noi_dung_viec")
-    ghi_chu = _snap_meta("ghichu", "ghi_chu")
-    if "nguoinhanuyquyen" in snap_case:
-        _uq_snap = snap_case.get("nguoinhanuyquyen")
-        nguoi_nhan_uy_quyen = (
-            _safe_text(_uq_snap.get("ten"))
-            if isinstance(_uq_snap, dict) else _safe_text(_uq_snap))
-    else:
-        nguoi_nhan_uy_quyen = _safe_text(
-            getattr(case, "nguoi_nhan_uy_quyen", ""))
-    ngay_lap_ho_so = (
-        _fmt_snapshot_date(snap_case.get("ngaylaphoso"))
-        if "ngaylaphoso" in snap_case
-        else _fmt_date(getattr(case, "ngay_lap_ho_so", None)))
+    noi_niem_yet = _snap_meta("noiniemyet")
+    noi_dung_viec = _snap_meta("noidungviec")
+    ghi_chu = _snap_meta("ghichu")
+    _uq_snap = snap_case.get("nguoinhanuyquyen")
+    nguoi_nhan_uy_quyen = (
+        _safe_text(_uq_snap.get("ten"))
+        if isinstance(_uq_snap, dict) else _safe_text(_uq_snap))
+    ngay_lap_ho_so = _fmt_snapshot_date(snap_case.get("ngaylaphoso"))
     land_rows = _committed_land_rows(ts)
 
     if land_rows:
@@ -1995,19 +1881,10 @@ def build_template_mapping(case: Any, today: date | None = None,
         "[LUC]": "",
     }
 
-    # Slot Người: thứ tự giữ nguyên legacy (_pick_core_people trên
-    # participants live), nhưng FIELD đọc bằng chứng đã commit trong
-    # snapshot stage[] — đối chiếu theo entity id (MIN-141 review:
-    # master customers dùng chung đổi sau commit không được kéo giá trị
-    # slot đi; người chết có bằng chứng 'Giấy chứng tử' không bị model
-    # trả None xóa mất). Snapshot cũ thiếu key → fallback master.
-    _snap_people = _snapshot_people_by_id(_state_doc)
-
+    # Slot Người: `_pick_core_people` đã trả view dòng Stage (đủ dữ kiện
+    # đã lưu, không borrow master), nên slot dùng thẳng giá trị đó.
     def _slot_person(c):
-        if c is None:
-            return None
-        row = _snap_people.get(str(getattr(c, "id", "")))
-        return _snapshot_person_view(c, row) if row is not None else c
+        return c
 
     # Token dữ liệu nghiệp vụ chưa có nguồn trong engine (catalog §8.2/§9: "Ngoại lệ:
     # chưa có nguồn"). Cố ý KHÔNG đăng ký: thay bằng chuỗi rỗng là xuất thầm thiếu dữ
@@ -2015,7 +1892,9 @@ def build_template_mapping(case: Any, today: date | None = None,
     # Danh sách này chỉ để báo cáo/migration, không dùng để thay thế.
     for pending in NO_SOURCE_PLACEHOLDERS:
         if pending == "[Ngườ ủy quyền]" and "nguoinhanuyquyen" in snap_case:
-            # MIN-141 saved metadata is confirmed evidence, including null.
+            # View B luôn emit key metadata (null tường minh) → đây là bằng
+            # chứng "chưa có người nhận ủy quyền", xuất rỗng thay vì làm
+            # hỏng cả file vì token không nguồn.
             continue
         mapping.pop(pending, None)
 
@@ -2075,7 +1954,7 @@ def build_template_mapping(case: Any, today: date | None = None,
             mapping[f"[{field} {label}]"] = value
 
     # -----------------------------------------------------------------------
-    # Word export V2 placeholders based on case_state_json
+    # Placeholder Word dựng từ view Storage B
     # -----------------------------------------------------------------------
     _add_block_placeholders(mapping, context, static=static, needed=needed)
     _add_property_placeholders(mapping, context.assets)

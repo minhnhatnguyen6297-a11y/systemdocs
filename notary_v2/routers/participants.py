@@ -21,8 +21,8 @@ def add(
     db: Session = Depends(get_db)
 ):
     case = db.query(InheritanceCase).filter(InheritanceCase.id == ho_so_id).first()
-    if not case or case.is_locked:
-        raise HTTPException(400, "Hồ sơ đã khoá hoặc không tồn tại")
+    if not case:
+        raise HTTPException(404, "Không tìm thấy hồ sơ")
 
     # Tránh thêm trùng
     exists = db.query(InheritanceParticipant).filter(
@@ -52,7 +52,6 @@ def edit(
 ):
     p = db.query(InheritanceParticipant).filter(InheritanceParticipant.id == pid).first()
     if not p: raise HTTPException(404)
-    if p.ho_so.is_locked: raise HTTPException(400, "Hồ sơ đã khoá")
 
     p.vai_tro = vai_tro; p.hang_thua_ke = hang_thua_ke
     p.co_nhan_tai_san = (co_nhan_tai_san == "on")
@@ -65,7 +64,6 @@ def edit(
 def delete(pid: int, db: Session = Depends(get_db)):
     p = db.query(InheritanceParticipant).filter(InheritanceParticipant.id == pid).first()
     if not p: raise HTTPException(404)
-    if p.ho_so.is_locked: raise HTTPException(400, "Hồ sơ đã khoá")
     case_id = p.ho_so_id
     db.delete(p); db.commit()
     return RedirectResponse(f"/cases/{case_id}", status_code=302)

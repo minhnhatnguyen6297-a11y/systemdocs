@@ -8,25 +8,26 @@ import io
 import json
 from pathlib import Path
 import re
-import unicodedata
 from uuid import uuid4
-from types import SimpleNamespace
 
 from database import get_db
-from models import InheritanceCase, Customer, Property, InheritanceParticipant, InheritanceCaseProperty, WordTemplate
+from models import (
+    CaseAssetRow,
+    CasePersonRow,
+    Customer,
+    InheritanceCase,
+    InheritanceCaseProperty,
+    InheritanceParticipant,
+    Property,
+    WordTemplate,
+)
+from services import word_engine
+from services.case_workspace import CaseWorkspaceService, WorkspaceError
+from services.case_rows import materialize_case_state, read_stage
 
 router = APIRouter()
 templates = Jinja2Templates(directory="frontend/templates")
 WORD_TEMPLATE_UPLOAD_DIR = Path("word_templates/custom")
-def _hang_for_role(role: str) -> int:
-    role = (role or "").strip()
-    if role in ("Cha", "Mẹ", "Cha_vc", "Me_vc", "Vợ/Chồng", "Con", "Cháu", "Con_dau_re"):
-        return 1
-    if role in ("Ông/Bà", "Anh/Chị/Em"):
-        return 2
-    return 1
-
-
 def _to_list(v):
     if v is None:
         return []
@@ -72,18 +73,6 @@ def _normalize_property_ids(primary_property_id: str, raw_property_ids: Optional
     return out
 
 
-def _sync_case_property_links(db: Session, case_id: int, property_ids: list[int], primary_property_id: int) -> None:
-    db.query(InheritanceCaseProperty).filter(InheritanceCaseProperty.case_id == case_id).delete()
-    for pid in property_ids:
-        db.add(
-            InheritanceCaseProperty(
-                case_id=case_id,
-                property_id=pid,
-                is_primary=(pid == primary_property_id),
-            )
-        )
-
-
 class DiagramPayloadValidationError(Exception):
     def __init__(self, errors: list[str]):
         super().__init__("; ".join(errors))
@@ -101,228 +90,6 @@ def _clean_nullable_text(value: Any) -> Optional[str]:
     return text or None
 
 
-def _coerce_bool(value: Any, default: bool = False) -> bool:
-    if isinstance(value, bool):
-        return value
-    if value is None:
-        return default
-    text = str(value).strip().lower()
-    if text in {"1", "true", "yes", "on"}:
-        return True
-    if text in {"0", "false", "no", "off"}:
-        return False
-    return default
-
-
-def _normalize_role(role: str, relation_type: str) -> str:
-    role_text = _clean_text(role)
-    if role_text:
-        return role_text
-    relation = _clean_text(relation_type).lower()
-    defaults = {
-        "owner": "Owner",
-        "spouse": "Vợ/Chồng",
-        "child": "Con",
-        "sibling": "Anh/Chị/Em",
-        "grandchild": "Cháu",
-        "branchspouse": "Con_dau_re",
-    }
-    return defaults.get(relation, "Khac")
-
-
-def _normalize_diagram_payload(raw_payload: str) -> dict[str, Any]:
-    try:
-        payload = json.loads(raw_payload or "{}")
-    except Exception as exc:
-        raise DiagramPayloadValidationError([f"diagram_payload không phải JSON hợp lệ: {exc}"])
-    if not isinstance(payload, dict):
-        raise DiagramPayloadValidationError(["diagram_payload phải là object JSON."])
-
-    payload_root = payload
-    if isinstance(payload.get("engineState"), dict) and payload["engineState"].get("nodes") is not None:
-        payload_root = payload["engineState"]
-
-    version = payload_root.get("version", payload.get("version"))
-    updated_at = _clean_text(payload_root.get("updatedAt", payload.get("updatedAt")))
-    nodes_raw = payload_root.get("nodes")
-
-    errors: list[str] = []
-    if version != 2:
-        errors.append("diagram_payload.version phải bằng 2.")
-    if not updated_at:
-        errors.append("diagram_payload.updatedAt là bắt buộc.")
-    if not isinstance(nodes_raw, list):
-        errors.append("diagram_payload.nodes phải là danh sách.")
-    if errors:
-        raise DiagramPayloadValidationError(errors)
-
-    normalized_nodes: list[dict[str, Any]] = []
-    seen_node_ids: set[str] = set()
-    for idx, raw_node in enumerate(nodes_raw):
-        if not isinstance(raw_node, dict):
-            errors.append(f"Node #{idx + 1} không hợp lệ.")
-            continue
-        node_id = _clean_text(raw_node.get("id"))
-        if not node_id:
-            errors.append(f"Node #{idx + 1} thiếu id.")
-            continue
-        if node_id in seen_node_ids:
-            errors.append(f"Node id trùng: {node_id}.")
-            continue
-        seen_node_ids.add(node_id)
-        person_id = _clean_nullable_text(raw_node.get("personId") or (raw_node.get("person") or {}).get("id"))
-        relation_type = _clean_text(raw_node.get("relationType"))
-        normalized_nodes.append({
-            "id": node_id,
-            "kind": _clean_text(raw_node.get("kind")) or "person",
-            "label": _clean_text(raw_node.get("label")),
-            "role": _normalize_role(raw_node.get("role"), relation_type),
-            "relationType": relation_type,
-            "personId": person_id,
-            "parentPersonId": _clean_nullable_text(raw_node.get("parentPersonId") or raw_node.get("parentId")),
-            "parentSlotId": _clean_nullable_text(raw_node.get("parentSlotId")),
-            "familyGroupId": _clean_nullable_text(raw_node.get("familyGroupId")),
-            "sourceId": _clean_nullable_text(raw_node.get("sourceId")),
-            "willReceive": _coerce_bool(raw_node.get("willReceive"), True),
-            "hidden": _coerce_bool(raw_node.get("hidden"), False),
-            "deleted": _coerce_bool(raw_node.get("deleted"), False),
-            "isLandOwner": _coerce_bool(raw_node.get("isLandOwner"), False),
-        })
-
-    if errors:
-        raise DiagramPayloadValidationError(errors)
-
-    return {
-        "version": 2,
-        "updatedAt": updated_at,
-        "nodes": normalized_nodes,
-    }
-
-
-def _extract_diagram_participants(
-    diagram_state: dict[str, Any],
-    customers_by_id: dict[str, Customer],
-    deceased_customer_id: str,
-) -> tuple[list[SimpleNamespace], set[int]]:
-    errors: list[str] = []
-    active_person_ids: set[str] = set()
-    seen_participant_ids: set[str] = set()
-    participants: list[SimpleNamespace] = []
-
-    for node in diagram_state["nodes"]:
-        if _clean_text(node.get("kind")).lower() != "person":
-            continue
-        person_id = _clean_text(node.get("personId"))
-        if not person_id or node.get("hidden") or node.get("deleted"):
-            continue
-        active_person_ids.add(person_id)
-
-    for node in diagram_state["nodes"]:
-        if _clean_text(node.get("kind")).lower() != "person":
-            continue
-        person_id = _clean_text(node.get("personId"))
-        if not person_id or node.get("hidden") or node.get("deleted"):
-            continue
-        if person_id not in customers_by_id:
-            errors.append(f"Người tham gia #{person_id} không tồn tại trong danh bạ.")
-            continue
-        role = _clean_text(node.get("role")) or "Khac"
-        if role == "Owner":
-            if person_id != deceased_customer_id:
-                errors.append("Node Owner phải trùng với người chết của hồ sơ.")
-            continue
-        if person_id == deceased_customer_id:
-            errors.append("Người chết không được lưu trong danh sách participant.")
-            continue
-        if person_id in seen_participant_ids:
-            errors.append(f"Người tham gia bị trùng trong sơ đồ: #{person_id}.")
-            continue
-        parent_person_id = _clean_nullable_text(node.get("parentPersonId"))
-        if parent_person_id and parent_person_id not in active_person_ids:
-            errors.append(f"parentPersonId không hợp lệ cho participant #{person_id}.")
-            continue
-        seen_participant_ids.add(person_id)
-        customer = customers_by_id[person_id]
-        participants.append(SimpleNamespace(
-            customer_id=customer.id,
-            customer=customer,
-            vai_tro=role,
-            ty_le=0.0,
-            co_nhan_tai_san=_coerce_bool(node.get("willReceive"), True),
-            parent_customer_id=int(parent_person_id) if parent_person_id and parent_person_id.isdigit() else None,
-        ))
-
-    if errors:
-        raise DiagramPayloadValidationError(errors)
-    return participants, {p.customer_id for p in participants}
-
-
-def _parse_case_diagram_payload(
-    raw_payload: str,
-    customers_by_id: dict[str, Customer],
-    deceased_customer_id: str,
-    stage_ids: Optional[set[str]] = None,
-) -> tuple[list[SimpleNamespace], set[int], str]:
-    diagram_state = _normalize_diagram_payload(raw_payload)
-    if stage_ids is not None:
-        diagram_state = _prune_engine_state(diagram_state, stage_ids)
-    participants, participant_ids = _extract_diagram_participants(
-        diagram_state,
-        customers_by_id=customers_by_id,
-        deceased_customer_id=deceased_customer_id,
-    )
-    return participants, participant_ids, json.dumps(diagram_state, ensure_ascii=False)
-
-
-def _build_temp_participants(
-    all_customers: List[Customer],
-    participant_id: Optional[Union[List[str], str]],
-    participant_role: Optional[Union[List[str], str]],
-    participant_share: Optional[Union[List[str], str]],
-    participant_receive: Optional[Union[List[str], str]],
-    participant_parent_id: Optional[Union[List[str], str]] = None,
-):
-    id_list = _to_list(participant_id)
-    role_list = _to_list(participant_role)
-    share_list = _to_list(participant_share)
-    receive_list = _to_list(participant_receive)
-    parent_list = _to_list(participant_parent_id)
-    customers_by_id = {str(c.id): c for c in all_customers}
-    participants = []
-
-    for idx, cid in enumerate(id_list):
-        cid_str = str(cid or "").strip()
-        if not cid_str:
-            continue
-        customer = customers_by_id.get(cid_str)
-        if not customer:
-            continue
-        role = (role_list[idx] if idx < len(role_list) else "") or "Khac"
-        share_raw = share_list[idx] if idx < len(share_list) else "0"
-        receive_raw = receive_list[idx] if idx < len(receive_list) else "1"
-        parent_raw = parent_list[idx] if idx < len(parent_list) else ""
-        try:
-            share_val = float(share_raw)
-        except Exception:
-            share_val = 0.0
-        co_nhan = str(receive_raw).lower() in ("1", "true", "on", "yes")
-
-        parent_cid = None
-        if parent_raw and str(parent_raw).isdigit():
-            parent_cid = int(parent_raw)
-
-        participants.append(SimpleNamespace(
-            customer_id=customer.id,
-            customer=customer,
-            vai_tro=role,
-            ty_le=share_val,
-            co_nhan_tai_san=co_nhan,
-            parent_customer_id=parent_cid
-        ))
-    participant_ids = {p.customer_id for p in participants}
-    return participants, participant_ids
-
-
 def _render_case_form(
     request: Request,
     *,
@@ -333,7 +100,7 @@ def _render_case_form(
     field_errors: dict[str, str],
     form: dict[str, Any],
     all_customers: list[Customer],
-    participants: list[SimpleNamespace],
+    participants: list[Any],
     participant_ids: set[int],
     case_property_ids: list[int],
 ):
@@ -352,156 +119,303 @@ def _render_case_form(
     })
 
 
-def _derive_case_state_json_from_participants(participants: list[Any], deceased: Any = None) -> str:
-    stage = []
-    seen_ids: set[str] = set()
-    for customer in [deceased, *(getattr(participant, "customer", None) for participant in participants or [])]:
-        customer_id = _clean_text(getattr(customer, "id", "")) if customer else ""
-        if not customer_id or customer_id in seen_ids:
+# ------------------------------------------------ biên nhận payload web → B
+_STAGE_PERSON_FIELDS = (
+    "ho_ten", "gioi_tinh", "ngay_sinh", "ngay_chet", "so_giay_to",
+    "ngay_cap", "noi_cap", "dia_chi", "place_of_origin",
+    "loai_giay_to", "loai_dia_chi",
+)
+_STAGE_DATE_FIELDS = {"ngay_sinh", "ngay_chet", "ngay_cap"}
+
+
+def _is_uuid4_text(value: Any) -> bool:
+    return bool(re.fullmatch(
+        r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-"
+        r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}", _clean_text(value)))
+
+
+def _stage_date(value: Any) -> Optional[str]:
+    """Ngày Stage wire `YYYY` | `YYYY-MM-DD` | null.
+
+    Form web cũ post ngày hiển thị `dd/mm/yyyy`; chuẩn hóa ở biên. Chuỗi
+    không nhận diện được giữ nguyên để service báo `invalid_date` thay vì
+    tự đoán.
+    """
+    text = _clean_text(value)
+    if not text or text in {"0", "00/00/0000"}:
+        return None
+    match = re.fullmatch(r"(\d{1,2})/(\d{1,2})/(\d{4})", text)
+    if match:
+        return (f"{int(match.group(3)):04d}-{int(match.group(2)):02d}-"
+                f"{int(match.group(1)):02d}")
+    match = re.fullmatch(r"(\d{4})-(\d{1,2})-(\d{1,2})", text)
+    if match:
+        return (f"{match.group(1)}-{int(match.group(2)):02d}-"
+                f"{int(match.group(3)):02d}")
+    return text
+
+
+def _master_date(value: Optional[date]) -> Optional[str]:
+    """Date master → wire Người: năm trần khi đúng quy ước 01/01."""
+    if value is None:
+        return None
+    if value.day == 1 and value.month == 1:
+        return str(value.year)
+    return value.isoformat()
+
+
+def _parse_posted_payload(raw_payload: Any) -> Optional[dict]:
+    text = _clean_text(raw_payload)
+    if not text:
+        return None
+    try:
+        payload = json.loads(text)
+    except Exception as exc:
+        raise DiagramPayloadValidationError(
+            [f"case_state_json không phải JSON hợp lệ: {exc}"])
+    if not isinstance(payload, dict):
+        raise DiagramPayloadValidationError(
+            ["case_state_json phải là object JSON."])
+    return payload
+
+
+def _person_row_from_item(item: dict, existing: Optional[dict] = None) -> dict:
+    """Một dòng Người stage wire từ item form; giữ row_id nếu là dòng đã lưu.
+
+    Dòng mới nhận row_id client hoặc UUID v4 mới; `entity_id` để null —
+    resolver của service tự tìm danh tính theo neo, form không có quyền
+    ép liên kết master.
+    """
+    if existing is not None:
+        row = dict(existing)
+    else:
+        row_id = _clean_text(item.get("row_id"))
+        row = {
+            "row_id": row_id if _is_uuid4_text(row_id) else str(uuid4()),
+            "entity_id": None,
+            **{key: None for key in _STAGE_PERSON_FIELDS},
+        }
+    for key in _STAGE_PERSON_FIELDS:
+        if key not in item:
             continue
-        seen_ids.add(customer_id)
-        stage.append({
-            "id": customer_id,
-            "ho_ten": _clean_text(getattr(customer, "ho_ten", "")),
-            "gioi_tinh": _clean_text(getattr(customer, "gioi_tinh", "")),
-            "ngay_sinh": _fmt_date(getattr(customer, "ngay_sinh", None)),
-            "ngay_chet": _fmt_date(getattr(customer, "ngay_chet", None)),
-            "so_giay_to": _clean_text(getattr(customer, "so_giay_to", "")),
-            "ngay_cap": _fmt_date(getattr(customer, "ngay_cap", None)),
-            "noi_cap": _clean_text(getattr(customer, "noi_cap", "")),
-            "dia_chi": _clean_text(getattr(customer, "dia_chi", "")),
-            "place_of_origin": _clean_text(getattr(customer, "place_of_origin", "")),
+        if key in _STAGE_DATE_FIELDS:
+            row[key] = _stage_date(item.get(key))
+        else:
+            row[key] = _clean_nullable_text(item.get(key))
+    return row
+
+
+def _people_from_customer(customer: Customer) -> dict:
+    return {
+        "row_id": str(uuid4()),
+        "entity_id": None,
+        "ho_ten": _clean_text(customer.ho_ten),
+        "gioi_tinh": _clean_nullable_text(customer.gioi_tinh),
+        "ngay_sinh": _master_date(customer.ngay_sinh),
+        "ngay_chet": _master_date(customer.ngay_chet),
+        "so_giay_to": _clean_nullable_text(customer.so_giay_to),
+        "ngay_cap": _master_date(customer.ngay_cap),
+        "noi_cap": _clean_nullable_text(customer.noi_cap),
+        "dia_chi": _clean_nullable_text(customer.dia_chi),
+        "place_of_origin": _clean_nullable_text(
+            getattr(customer, "place_of_origin", None)),
+        "loai_giay_to": _clean_nullable_text(customer.loai_giay_to),
+        "loai_dia_chi": _clean_nullable_text(customer.loai_dia_chi),
+    }
+
+
+def _master_land_rows(prop: Property) -> list[dict]:
+    rows = sorted(getattr(prop, "land_rows", None) or [],
+                  key=lambda row: row.vitri)
+    if rows:
+        return [{"loai_dat": row.loaidat, "dien_tich": row.dientich,
+                 "thoi_han": row.thoihan} for row in rows]
+    raw = getattr(prop, "land_rows_json", None)
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(parsed, list):
+        return []
+    out = []
+    for row in parsed:
+        if not isinstance(row, dict):
+            continue
+        out.append({
+            "loai_dat": row.get("loai_dat", row.get("loaidat")),
+            "dien_tich": row.get("dien_tich", row.get("dientich")),
+            "thoi_han": row.get("thoi_han", row.get("thoihan")),
         })
-    return _normalize_case_state_json(json.dumps({"schemaVersion": 1, "stage": stage, "diagram": {}}, ensure_ascii=False))
+    return out
 
 
-def _validate_case_refs(
-    *,
-    nguoi_chet_id: str,
-    tai_san_id: str,
-    selected_property_ids: list[int],
-    customers_by_id: dict[str, Customer],
-    properties_by_id: dict[int, Property],
-    field_errors: dict[str, str],
-    errors: list[str],
-) -> None:
-    if not nguoi_chet_id:
-        field_errors["nguoi_chet_id"] = "Bắt buộc"
-    elif nguoi_chet_id not in customers_by_id:
-        field_errors["nguoi_chet_id"] = "Người chết không tồn tại"
-    if not tai_san_id:
-        field_errors["tai_san_id"] = "Bắt buộc"
-    elif not tai_san_id.isdigit() or int(tai_san_id) not in properties_by_id:
-        field_errors["tai_san_id"] = "Tài sản không tồn tại"
-
-    invalid_property_ids = [pid for pid in selected_property_ids if pid not in properties_by_id]
-    if invalid_property_ids:
-        errors.append(f"Danh sách tài sản có id không tồn tại: {', '.join(map(str, invalid_property_ids))}.")
+def _asset_row_from_property(prop: Property) -> dict:
+    """Dòng Tài sản stage wire từ master chỉ tại biên tạo/cập nhật web."""
+    land_rows = _master_land_rows(prop)
+    return {
+        "row_id": str(uuid4()),
+        "entity_id": None,
+        "so_serial": _clean_text(prop.so_serial),
+        "so_vao_so": _clean_nullable_text(prop.so_vao_so),
+        "so_thua_dat": _clean_nullable_text(prop.so_thua_dat),
+        "so_to_ban_do": _clean_nullable_text(prop.so_to_ban_do),
+        "dia_chi": _clean_text(prop.dia_chi),
+        "loai_so": _clean_nullable_text(prop.loai_so),
+        "hinh_thuc_su_dung": _clean_nullable_text(prop.hinh_thuc_su_dung),
+        "thoi_han": _clean_nullable_text(prop.thoi_han),
+        "nguon_goc": _clean_nullable_text(prop.nguon_goc),
+        "ngay_cap": prop.ngay_cap.isoformat() if prop.ngay_cap else None,
+        "co_quan_cap": _clean_nullable_text(prop.co_quan_cap),
+        "land_rows": land_rows or None,
+    }
 
 
-def _resolve_posted_participants(
-    *,
-    all_customers: list[Customer],
-    deceased_customer_id: str,
-    diagram_payload: str,
-    participant_id: Optional[Union[List[str], str]],
-    participant_role: Optional[Union[List[str], str]],
-    participant_share: Optional[Union[List[str], str]],
-    participant_receive: Optional[Union[List[str], str]],
-    participant_parent_id: Optional[Union[List[str], str]],
-    engine_state_json: str,
-    stage_ids: Optional[set[str]] = None,
-) -> tuple[list[SimpleNamespace], set[int], Optional[str], str]:
-    customers_by_id = {str(c.id): c for c in all_customers}
-    raw_payload = _clean_text(diagram_payload)
-    if raw_payload:
-        participants, participant_ids, normalized_engine_state = _parse_case_diagram_payload(
-            raw_payload,
-            customers_by_id=customers_by_id,
-            deceased_customer_id=deceased_customer_id,
-            stage_ids=stage_ids,
-        )
-        return participants, participant_ids, normalized_engine_state, normalized_engine_state
+def _posted_people(case: Optional[InheritanceCase], payload: Optional[dict]) -> list[dict]:
+    """Dòng Người stage wire: merge item form lên dòng đã lưu theo row_id.
 
-    posted_participants, posted_participant_ids = _build_temp_participants(
-        all_customers,
-        participant_id,
-        participant_role,
-        participant_share,
-        participant_receive,
-        participant_parent_id,
-    )
-    if stage_ids is not None:
-        posted_participants = [
-            participant for participant in posted_participants
-            if _clean_text(participant.customer_id) in stage_ids
-        ]
-        for participant in posted_participants:
-            if (_clean_text(participant.parent_customer_id)
-                    and _clean_text(participant.parent_customer_id) not in stage_ids):
-                participant.parent_customer_id = None
-        posted_participant_ids = {participant.customer_id for participant in posted_participants}
-    normalized_engine_state = _clean_text(engine_state_json) or None
-    if normalized_engine_state and stage_ids is not None:
-        try:
-            engine_state = json.loads(normalized_engine_state)
-        except Exception as exc:
-            raise DiagramPayloadValidationError([f"engine_state_json không phải JSON hợp lệ: {exc}"])
-        if not isinstance(engine_state, dict):
-            raise DiagramPayloadValidationError(["engine_state_json phải là object JSON."])
-        normalized_engine_state = json.dumps(_prune_engine_state(engine_state, stage_ids), ensure_ascii=False)
-    return posted_participants, posted_participant_ids, normalized_engine_state, raw_payload
+    Payload không có `stage` (POST cũ/không hydrate) → giữ nguyên dòng đã
+    lưu, không xóa dữ kiện ngoài ý định.
+    """
+    base = read_stage(case) if case is not None else {"people": []}
+    existing = {row["row_id"]: row for row in base["people"]}
+    posted = payload.get("stage") if isinstance(payload, dict) else None
+    if not isinstance(posted, list):
+        return [dict(row) for row in base["people"]]
+    people = []
+    for index, item in enumerate(posted):
+        if not isinstance(item, dict):
+            raise DiagramPayloadValidationError(
+                [f"case_state_json.stage[{index}] phải là object JSON."])
+        row_id = _clean_text(item.get("row_id"))
+        prior = existing.get(row_id) if row_id else None
+        if prior is None:
+            # Form legacy chỉ có `id` (customer id): ghép lại đúng dòng đã
+            # lưu theo identity để không tạo dòng trùng mỗi lần cập nhật.
+            legacy_id = _clean_text(item.get("id"))
+            if legacy_id.isdigit():
+                prior = next((row for row in base["people"]
+                              if row.get("entity_id") == int(legacy_id)), None)
+        people.append(_person_row_from_item(item, prior))
+    return people
 
 
-def _replace_case_participants(db: Session, case_id: int, participants: list[SimpleNamespace]) -> None:
-    db.query(InheritanceParticipant).filter(InheritanceParticipant.ho_so_id == case_id).delete()
-    for participant in participants:
-        db.add(
-            InheritanceParticipant(
-                ho_so_id=case_id,
-                customer_id=int(participant.customer_id),
-                vai_tro=participant.vai_tro or "Khac",
-                hang_thua_ke=_hang_for_role(participant.vai_tro or "Khac"),
-                ty_le=float(getattr(participant, "ty_le", 0.0) or 0.0),
-                co_nhan_tai_san=bool(getattr(participant, "co_nhan_tai_san", True)),
-                parent_customer_id=getattr(participant, "parent_customer_id", None),
-            )
-        )
+def _owner_row_for_customer(people: list[dict],
+                            customer_id: Optional[int]) -> Optional[str]:
+    if customer_id is None:
+        return None
+    return next((row["row_id"] for row in people
+                 if row.get("entity_id") == customer_id), None)
+
+
+def _case_meta_from_form(case: Optional[InheritanceCase], form: dict) -> dict:
+    meta: dict[str, Any] = {}
+    if case is None:
+        meta.update({"case_type": "inheritance",
+                     "document_type": "khai_nhan"})
+    raw_date = _clean_text(form.get("ngay_lap_ho_so"))
+    if not raw_date and case is not None and case.ngay_lap_ho_so is not None:
+        raw_date = case.ngay_lap_ho_so.isoformat()
+    if not raw_date:
+        raw_date = date.today().isoformat()
+    meta["ngay_lap_ho_so"] = _stage_date(raw_date)
+    for field in ("noi_niem_yet", "ghi_chu", "nguoi_nhan_uy_quyen",
+                  "noi_dung_viec"):
+        if field in form:
+            meta[field] = _clean_nullable_text(form.get(field))
+    return meta
+
+
+def _workspace_error(exc: WorkspaceError) -> DiagramPayloadValidationError:
+    messages = [exc.message]
+    field_errors = (exc.details or {}).get("field_errors")
+    if isinstance(field_errors, list):
+        for item in field_errors:
+            if isinstance(item, dict) and item.get("message"):
+                messages.append(str(item["message"]))
+    return DiagramPayloadValidationError(messages)
+
+
+def _case_facts(case: InheritanceCase) -> dict:
+    """Dữ kiện hiển thị danh sách/chi tiết, đọc từ dòng của hồ sơ."""
+    view = materialize_case_state(case)
+    people = view.get("stage") or []
+    owner = next((row for row in people
+                  if row.get("row_id") == view.get("owner_row_id")), None)
+    owner = owner or (people[0] if people else None)
+    assets = view.get("assets") or []
+    asset = assets[0] if assets else None
+
+    def display_date(value: Any) -> str:
+        text = _clean_text(value)
+        if not text:
+            return ""
+        match = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", text)
+        if match:
+            return f"{match.group(3)}/{match.group(2)}/{match.group(1)}"
+        return text
+
+    return {
+        "owner": {
+            "name": _clean_text(owner.get("ho_ten")) if owner else "",
+            "birth": display_date(owner.get("ngay_sinh")) if owner else "",
+            "death": display_date(owner.get("ngay_chet")) if owner else "",
+            "doc": _clean_text(owner.get("so_giay_to")) if owner else "",
+            "address": _clean_text(owner.get("dia_chi")) if owner else "",
+        } if owner else None,
+        "asset": {
+            "serial": _clean_text(asset.get("so_serial")) if asset else "",
+            "thua": _clean_text(asset.get("so_thua_dat")) if asset else "",
+            "to_ban_do": _clean_text(asset.get("so_to_ban_do")) if asset else "",
+            "address": _clean_text(asset.get("dia_chi")) if asset else "",
+        } if asset else None,
+        "status": case.trang_thai,
+        "status_label": "Đã lưu" if case.trang_thai == "done" else "Nháp",
+    }
+
+
+def _form_from_case(case: InheritanceCase) -> dict:
+    view = materialize_case_state(case)
+    return {
+        "nguoi_chet_id": str(case.nguoi_chet_id) if case.nguoi_chet_id else "",
+        "tai_san_id": str(case.tai_san_id) if case.tai_san_id else "",
+        "ngay_lap_ho_so": case.ngay_lap_ho_so.isoformat() if case.ngay_lap_ho_so else "",
+        "loai_van_ban": case.loai_van_ban or "khai_nhan",
+        "noi_niem_yet": case.noi_niem_yet or "",
+        "ghi_chu": case.ghi_chu or "",
+        "engine_state_json": "",
+        "diagram_payload": "",
+        "case_state_json": json.dumps(view, ensure_ascii=False),
+    }
 
 
 @router.get("/")
 def list_cases(request: Request, db: Session = Depends(get_db), q: str = ""):
     cases = db.query(InheritanceCase).order_by(InheritanceCase.id.desc()).all()
+    facts = {case.id: _case_facts(case) for case in cases}
     if q:
-        cases = [c for c in cases if q.lower() in c.nguoi_chet.ho_ten.lower()]
-    return templates.TemplateResponse("cases/list.html", {"request": request, "cases": cases, "q": q})
-
+        needle = q.lower()
+        cases = [c for c in cases
+                 if needle in (facts[c.id]["owner"] or {}).get("name", "").lower()]
+    return templates.TemplateResponse("cases/list.html", {
+        "request": request, "cases": cases, "case_facts": facts, "q": q})
 
 
 @router.get("/create")
 def create_form(request: Request, db: Session = Depends(get_db)):
     all_customers = db.query(Customer).order_by(Customer.ho_ten).all()
-    # Người chết = có ngày chết
     deceased = [c for c in all_customers if c.ngay_chet is not None]
     properties = db.query(Property).order_by(Property.id.desc()).all()
-    from datetime import date as _date
     form = {
-        "nguoi_chet_id": "", "tai_san_id": "", "ngay_lap_ho_so": _date.today().isoformat(),
-        "loai_van_ban": "khai_nhan", "ghi_chu": "", "engine_state_json": "", "diagram_payload": "", "case_state_json": ""
+        "nguoi_chet_id": "", "tai_san_id": "", "ngay_lap_ho_so": date.today().isoformat(),
+        "loai_van_ban": "khai_nhan", "ghi_chu": "", "engine_state_json": "",
+        "diagram_payload": "", "case_state_json": ""
     }
     return _render_case_form(
-        request,
-        obj=None,
-        deceased=deceased,
-        properties=properties,
-        errors=[],
-        field_errors={},
-        form=form,
-        all_customers=all_customers,
-        participants=[],
-        participant_ids=set(),
-        case_property_ids=[],
-    )
+        request, obj=None, deceased=deceased, properties=properties,
+        errors=[], field_errors={}, form=form, all_customers=all_customers,
+        participants=[], participant_ids=set(), case_property_ids=[])
 
 
 @router.post("/create")
@@ -511,118 +425,88 @@ def create(
     tai_san_id: Optional[str] = Form(None),
     property_ids: Optional[Union[List[str], str]] = Form(None),
     participant_id: Optional[Union[List[str], str]] = Form(None),
-    participant_role: Optional[Union[List[str], str]] = Form(None),
-    participant_share: Optional[Union[List[str], str]] = Form(None),
-    participant_receive: Optional[Union[List[str], str]] = Form(None),
-    participant_parent_id: Optional[Union[List[str], str]] = Form(None),
-    diagram_payload: Optional[str] = Form(None),
-    engine_state_json: Optional[str] = Form(None),
+    noi_niem_yet: Optional[str] = Form(None),
+    ghi_chu: Optional[str] = Form(None),
+    ngay_lap_ho_so: Optional[str] = Form(None),
     case_state_json: Optional[str] = Form(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    from datetime import date as _date
+    """Tạo hồ sơ web qua `CaseWorkspaceService.create` (một transaction B)."""
     form = {
         "nguoi_chet_id": (nguoi_chet_id or "").strip(),
         "tai_san_id": (tai_san_id or "").strip(),
-        "diagram_payload": (diagram_payload or "").strip(),
-        "engine_state_json": (engine_state_json or "").strip(),
+        "ngay_lap_ho_so": (ngay_lap_ho_so or "").strip(),
+        "noi_niem_yet": (noi_niem_yet or "").strip(),
+        "ghi_chu": (ghi_chu or "").strip(),
+        "engine_state_json": "",
+        "diagram_payload": "",
         "case_state_json": (case_state_json or "").strip(),
     }
-    selected_property_ids = _normalize_property_ids(form["tai_san_id"], property_ids)
-    errors = []
-    field_errors = {}
+    selected_property_ids = _normalize_property_ids(
+        form["tai_san_id"], property_ids)
     all_customers = db.query(Customer).order_by(Customer.ho_ten).all()
-    customers_by_id = {str(c.id): c for c in all_customers}
-    deceased = [c for c in all_customers if c.ngay_chet is not None]
+    customers_by_id = {c.id: c for c in all_customers}
     properties = db.query(Property).order_by(Property.id.desc()).all()
     properties_by_id = {p.id: p for p in properties}
-    _validate_case_refs(
-        nguoi_chet_id=form["nguoi_chet_id"],
-        tai_san_id=form["tai_san_id"],
-        selected_property_ids=selected_property_ids,
-        customers_by_id=customers_by_id,
-        properties_by_id=properties_by_id,
-        field_errors=field_errors,
-        errors=errors,
-    )
+    deceased = [c for c in all_customers if c.ngay_chet is not None]
+    errors: list[str] = []
+    field_errors: dict[str, str] = {}
+
+    owner_id = int(form["nguoi_chet_id"]) if form["nguoi_chet_id"].isdigit() else None
+    if owner_id is None or owner_id not in customers_by_id:
+        field_errors["nguoi_chet_id"] = "Người chết không tồn tại"
+    missing_props = [pid for pid in selected_property_ids
+                     if pid not in properties_by_id]
+    if not selected_property_ids:
+        field_errors["tai_san_id"] = "Bắt buộc"
+    elif missing_props:
+        errors.append("Danh sách tài sản có id không tồn tại: "
+                      + ", ".join(map(str, missing_props)))
+
+    people: list[dict] = []
+    owner_row_id = None
     try:
-        form["case_state_json"], stage_ids, committed_diagram = _prepare_committed_case_state(
-            form["case_state_json"]
-        )
-        if committed_diagram is not None:
-            form["diagram_payload"] = committed_diagram
-        posted_participants, posted_participant_ids, normalized_engine_state, normalized_payload = _resolve_posted_participants(
-            all_customers=all_customers,
-            deceased_customer_id=form["nguoi_chet_id"],
-            diagram_payload=form["diagram_payload"],
-            participant_id=participant_id,
-            participant_role=participant_role,
-            participant_share=participant_share,
-            participant_receive=participant_receive,
-            participant_parent_id=participant_parent_id,
-            engine_state_json=form["engine_state_json"],
-            stage_ids=stage_ids,
-        )
-        form["engine_state_json"] = normalized_engine_state or ""
-        form["diagram_payload"] = normalized_payload or ""
+        if owner_id in customers_by_id:
+            payload = _parse_posted_payload(form["case_state_json"])
+            people = _posted_people(None, payload)
+            if not people:
+                owner_row = _people_from_customer(customers_by_id[owner_id])
+                people = [owner_row]
+                for cid in _to_list(participant_id):
+                    if not str(cid).strip().isdigit():
+                        continue
+                    customer = customers_by_id.get(int(cid))
+                    if customer is not None and customer.id != owner_id:
+                        people.append(_people_from_customer(customer))
+            owner_row = next((row for row in people
+                              if row.get("ho_ten") == customers_by_id[owner_id].ho_ten),
+                             people[0] if people else None)
+            owner_row_id = owner_row["row_id"] if owner_row else None
     except DiagramPayloadValidationError as exc:
         errors.extend(exc.errors)
-        if form["diagram_payload"]:
-            try:
-                normalized_state = _normalize_diagram_payload(form["diagram_payload"])
-                form["engine_state_json"] = json.dumps(normalized_state, ensure_ascii=False)
-            except DiagramPayloadValidationError:
-                pass
-        posted_participants, posted_participant_ids = [], set()
 
     if field_errors or errors:
         return _render_case_form(
-            request,
-            obj=None,
-            deceased=deceased,
-            properties=properties,
-            errors=errors,
-            field_errors=field_errors,
-            form=form,
-            all_customers=all_customers,
-            participants=posted_participants,
-            participant_ids=posted_participant_ids,
-            case_property_ids=selected_property_ids,
-        )
+            request, obj=None, deceased=deceased, properties=properties,
+            errors=errors, field_errors=field_errors, form=form,
+            all_customers=all_customers, participants=[],
+            participant_ids=set(), case_property_ids=selected_property_ids)
 
+    assets = [_asset_row_from_property(properties_by_id[pid])
+              for pid in selected_property_ids]
+    stage = {"people": people, "assets": assets,
+             "owner_row_id": owner_row_id}
     try:
-        case = InheritanceCase(
-            nguoi_chet_id=int(form["nguoi_chet_id"]),
-            tai_san_id=int(form["tai_san_id"]),
-            ngay_lap_ho_so=_date.today(),
-            loai_van_ban="khai_nhan",
-            ghi_chu=None,
-            engine_state_json=form["engine_state_json"] or None,
-            case_state_json=form["case_state_json"] or None,
-        )
-        db.add(case)
-        db.flush()
-        if selected_property_ids:
-            _sync_case_property_links(db, case.id, selected_property_ids, int(form["tai_san_id"]))
-        _replace_case_participants(db, case.id, posted_participants)
-        db.commit()
-        return RedirectResponse(f"/cases/{case.id}/edit", status_code=302)
-    except Exception as e:
-        db.rollback()
-        errors.append(f"Lỗi tạo hồ sơ: {e}")
+        data = CaseWorkspaceService(db).create(
+            str(uuid4()), _case_meta_from_form(None, form), stage, None)
+    except WorkspaceError as exc:
+        errors.extend(_workspace_error(exc).errors)
         return _render_case_form(
-            request,
-            obj=None,
-            deceased=deceased,
-            properties=properties,
-            errors=errors,
-            field_errors=field_errors,
-            form=form,
-            all_customers=all_customers,
-            participants=posted_participants,
-            participant_ids=posted_participant_ids,
-            case_property_ids=selected_property_ids,
-        )
+            request, obj=None, deceased=deceased, properties=properties,
+            errors=errors, field_errors=field_errors, form=form,
+            all_customers=all_customers, participants=[],
+            participant_ids=set(), case_property_ids=selected_property_ids)
+    return RedirectResponse(f"/cases/{data['case']['id']}/edit", status_code=302)
 
 
 @router.get("/{cid}")
@@ -633,8 +517,13 @@ def detail(cid: int, request: Request, db: Session = Depends(get_db)):
     all_customers = db.query(Customer).order_by(Customer.ho_ten).all()
     participant_ids = {p.customer_id for p in case.participants}
     available = [c for c in all_customers if c.id not in participant_ids and c.id != case.nguoi_chet_id]
+    view = materialize_case_state(case)
+    rows = {row.get("row_id"): row for row in view.get("stage") or []}
     return templates.TemplateResponse("cases/detail.html", {
         "request": request, "case": case, "available": available,
+        "case_facts": _case_facts(case),
+        "participant_rows": {p.id: rows.get(p.case_person_row_id)
+                             for p in case.participants},
         "vai_tro_options": ["Vợ/Chồng", "Con", "Cha/Mẹ", "Anh/Chị/Em"]
     })
 
@@ -644,300 +533,165 @@ def edit_form(cid: int, request: Request, db: Session = Depends(get_db)):
     case = db.query(InheritanceCase).filter(InheritanceCase.id == cid).first()
     if not case:
         raise HTTPException(404)
-    if case.is_locked:
-        return RedirectResponse(f"/cases/{cid}", status_code=302)
     all_customers = db.query(Customer).order_by(Customer.ho_ten).all()
     deceased = [c for c in all_customers if c.ngay_chet is not None]
     properties = db.query(Property).order_by(Property.id.desc()).all()
     participants = case.participants
     participant_ids = {p.customer_id for p in participants}
-    case_property_ids = [int(link.property_id) for link in sorted(case.property_links, key=lambda x: (not x.is_primary, x.id))]
+    case_property_ids = [row.property_id for row in sorted(
+        case.property_links, key=lambda x: (not x.is_primary, x.id))
+        if row.property_id is not None]
     if not case_property_ids and case.tai_san_id:
         case_property_ids = [int(case.tai_san_id)]
-    form = {
-        "nguoi_chet_id": str(case.nguoi_chet_id) if case.nguoi_chet_id else "",
-        "tai_san_id": str(case.tai_san_id) if case.tai_san_id else "",
-        "ngay_lap_ho_so": case.ngay_lap_ho_so.isoformat() if case.ngay_lap_ho_so else "",
-        "loai_van_ban": case.loai_van_ban or "khai_nhan",
-        "noi_niem_yet": case.noi_niem_yet or "",
-        "ghi_chu": case.ghi_chu or "",
-        "engine_state_json": case.engine_state_json or "",
-        "diagram_payload": case.engine_state_json or "",
-        "case_state_json": case.case_state_json or _derive_case_state_json_from_participants(participants, case.nguoi_chet),
-    }
     return _render_case_form(
-        request,
-        obj=case,
-        deceased=deceased,
-        properties=properties,
-        errors=[],
-        field_errors={},
-        form=form,
-        all_customers=all_customers,
-        participants=participants,
-        participant_ids=participant_ids,
-        case_property_ids=case_property_ids,
-    )
+        request, obj=case, deceased=deceased, properties=properties,
+        errors=[], field_errors={}, form=_form_from_case(case),
+        all_customers=all_customers, participants=participants,
+        participant_ids=participant_ids, case_property_ids=case_property_ids)
+
+
+def _commit_case_form(case: InheritanceCase, db: Session,
+                      form: dict, owner_id: Optional[int]) -> None:
+    """Đẩy Stage form (row-keyed) qua `commit_stage`; giữ status/revision."""
+    payload = _parse_posted_payload(form.get("case_state_json"))
+    people = _posted_people(case, payload)
+    read = read_stage(case)
+    owner_row_id = _owner_row_for_customer(people, owner_id)
+    if owner_row_id is None:
+        stored = read.get("owner_row_id")
+        if any(row["row_id"] == stored for row in people):
+            owner_row_id = stored
+    stage = {
+        "people": people,
+        "assets": read["assets"],
+        "owner_row_id": owner_row_id,
+    }
+    CaseWorkspaceService(db).commit_stage(
+        case.id, case.workspace_revision, stage,
+        _case_meta_from_form(case, form))
+
+
+def _form_from_posted(form: dict) -> dict:
+    out = {
+        "nguoi_chet_id": _clean_text(form.get("nguoi_chet_id")),
+        "tai_san_id": _clean_text(form.get("tai_san_id")),
+        "engine_state_json": "",
+        "diagram_payload": "",
+        "case_state_json": _clean_text(form.get("case_state_json")),
+    }
+    for key in ("noi_niem_yet", "ghi_chu", "ngay_lap_ho_so"):
+        if key in form:
+            out[key] = _clean_text(form[key])
+    return out
 
 
 @router.post("/{cid}/edit")
 def edit(
     cid: int, request: Request,
     nguoi_chet_id: Optional[str] = Form(None), tai_san_id: Optional[str] = Form(None),
-    property_ids: Optional[Union[List[str], str]] = Form(None),
     noi_niem_yet: Optional[str] = Form(None),
-    participant_id: Optional[Union[List[str], str]] = Form(None),
-    participant_role: Optional[Union[List[str], str]] = Form(None),
-    participant_share: Optional[Union[List[str], str]] = Form(None),
-    participant_receive: Optional[Union[List[str], str]] = Form(None),
-    participant_parent_id: Optional[Union[List[str], str]] = Form(None),
-    diagram_payload: Optional[str] = Form(None),
-    engine_state_json: Optional[str] = Form(None),
+    ghi_chu: Optional[str] = Form(None),
+    ngay_lap_ho_so: Optional[str] = Form(None),
     case_state_json: Optional[str] = Form(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     case = db.query(InheritanceCase).filter(InheritanceCase.id == cid).first()
-    if not case or case.is_locked:
-        raise HTTPException(400)
-    form = {
-        "nguoi_chet_id": (nguoi_chet_id or "").strip(),
-        "tai_san_id": (tai_san_id or "").strip(),
-        "noi_niem_yet": (noi_niem_yet or "").strip(),
-        "diagram_payload": (diagram_payload or "").strip(),
-        "engine_state_json": (engine_state_json or "").strip(),
-        "case_state_json": (case_state_json or "").strip(),
-    }
-    selected_property_ids = _normalize_property_ids(form["tai_san_id"], property_ids)
-    errors = []
-    field_errors = {}
+    if not case:
+        raise HTTPException(404)
+    posted = {"nguoi_chet_id": nguoi_chet_id, "tai_san_id": tai_san_id,
+              "case_state_json": case_state_json}
+    # Field vắng mặt nghĩa là form không quản lý → giữ giá trị đã lưu;
+    # chỉ ghi null khi chính form gửi chuỗi rỗng.
+    for key, value in (("noi_niem_yet", noi_niem_yet),
+                       ("ghi_chu", ghi_chu),
+                       ("ngay_lap_ho_so", ngay_lap_ho_so)):
+        if value is not None:
+            posted[key] = value
+    form = _form_from_posted(posted)
+    owner_id = int(form["nguoi_chet_id"]) if form["nguoi_chet_id"].isdigit() else None
     all_customers = db.query(Customer).order_by(Customer.ho_ten).all()
-    customers_by_id = {str(c.id): c for c in all_customers}
     deceased = [c for c in all_customers if c.ngay_chet is not None]
     properties = db.query(Property).order_by(Property.id.desc()).all()
-    properties_by_id = {p.id: p for p in properties}
-    _validate_case_refs(
-        nguoi_chet_id=form["nguoi_chet_id"],
-        tai_san_id=form["tai_san_id"],
-        selected_property_ids=selected_property_ids,
-        customers_by_id=customers_by_id,
-        properties_by_id=properties_by_id,
-        field_errors=field_errors,
-        errors=errors,
-    )
     try:
-        form["case_state_json"], stage_ids, committed_diagram = _prepare_committed_case_state(
-            form["case_state_json"]
-        )
-        if committed_diagram is not None:
-            form["diagram_payload"] = committed_diagram
-        posted_participants, posted_participant_ids, normalized_engine_state, normalized_payload = _resolve_posted_participants(
-            all_customers=all_customers,
-            deceased_customer_id=form["nguoi_chet_id"],
-            diagram_payload=form["diagram_payload"],
-            participant_id=participant_id,
-            participant_role=participant_role,
-            participant_share=participant_share,
-            participant_receive=participant_receive,
-            participant_parent_id=participant_parent_id,
-            engine_state_json=form["engine_state_json"],
-            stage_ids=stage_ids,
-        )
-        form["engine_state_json"] = normalized_engine_state or ""
-        form["diagram_payload"] = normalized_payload or ""
+        _commit_case_form(case, db, form, owner_id)
     except DiagramPayloadValidationError as exc:
-        errors.extend(exc.errors)
-        if form["diagram_payload"]:
-            try:
-                normalized_state = _normalize_diagram_payload(form["diagram_payload"])
-                form["engine_state_json"] = json.dumps(normalized_state, ensure_ascii=False)
-            except DiagramPayloadValidationError:
-                pass
-        posted_participants, posted_participant_ids = [], set()
-    if field_errors or errors:
         return _render_case_form(
-            request,
-            obj=case,
-            deceased=deceased,
-            properties=properties,
-            errors=errors,
-            field_errors=field_errors,
-            form=form,
-            all_customers=all_customers,
-            participants=posted_participants,
-            participant_ids=posted_participant_ids,
-            case_property_ids=selected_property_ids,
-        )
-
-    try:
-        case.nguoi_chet_id = int(form["nguoi_chet_id"])
-        case.tai_san_id = int(form["tai_san_id"])
-        case.noi_niem_yet = form["noi_niem_yet"] or None
-        case.engine_state_json = form["engine_state_json"] or None
-        case.case_state_json = form["case_state_json"] or None
-        if selected_property_ids:
-            _sync_case_property_links(db, case.id, selected_property_ids, int(form["tai_san_id"]))
-        _replace_case_participants(db, case.id, posted_participants)
-        db.commit()
-        return RedirectResponse(f"/cases/{cid}/edit", status_code=302)
-    except Exception as e:
-        db.rollback()
-        errors.append(f"Lỗi cập nhật hồ sơ: {e}")
+            request, obj=case, deceased=deceased, properties=properties,
+            errors=list(exc.errors), field_errors={}, form=form,
+            all_customers=all_customers, participants=case.participants,
+            participant_ids={p.customer_id for p in case.participants},
+            case_property_ids=[], )
+    except WorkspaceError as exc:
+        mapped = _workspace_error(exc)
         return _render_case_form(
-            request,
-            obj=case,
-            deceased=deceased,
-            properties=properties,
-            errors=errors,
-            field_errors=field_errors,
-            form=form,
-            all_customers=all_customers,
-            participants=posted_participants,
-            participant_ids=posted_participant_ids,
-            case_property_ids=selected_property_ids,
-        )
+            request, obj=case, deceased=deceased, properties=properties,
+            errors=list(mapped.errors), field_errors={}, form=form,
+            all_customers=all_customers, participants=case.participants,
+            participant_ids={p.customer_id for p in case.participants},
+            case_property_ids=[], )
+    return RedirectResponse(f"/cases/{cid}/edit", status_code=302)
 
 
 @router.post("/{cid}/stage-update")
-def update_stage(cid: int, case_state_json: str = Form(...), db: Session = Depends(get_db)):
+def update_stage(cid: int, case_state_json: str = Form(...),
+                 nguoi_chet_id: Optional[str] = Form(None),
+                 db: Session = Depends(get_db)):
     case = db.query(InheritanceCase).filter(InheritanceCase.id == cid).first()
-    if not case or case.is_locked:
-        raise HTTPException(400)
+    if not case:
+        return JSONResponse({"ok": False, "error": "case_not_found"},
+                            status_code=404)
+    owner_id = (int(nguoi_chet_id)
+                if (nguoi_chet_id or "").strip().isdigit() else None)
     try:
-        normalized = _normalize_case_state_json(case_state_json)
+        read = read_stage(case)
+        payload = _parse_posted_payload(case_state_json)
+        people = _posted_people(case, payload)
+        owner_row_id = _owner_row_for_customer(people, owner_id)
+        if owner_row_id is None:
+            stored = read.get("owner_row_id")
+            if any(row["row_id"] == stored for row in people):
+                owner_row_id = stored
+        data = CaseWorkspaceService(db).commit_stage(
+            case.id, case.workspace_revision,
+            {"people": people, "assets": read["assets"],
+             "owner_row_id": owner_row_id})
     except DiagramPayloadValidationError as exc:
-        return JSONResponse({"ok": False, "error": "; ".join(exc.errors), "errors": exc.errors}, status_code=400)
-    payload = _prune_case_state_diagram(json.loads(normalized))
-    normalized = _normalize_case_state_json(json.dumps(payload, ensure_ascii=False))
-    try:
-        case.case_state_json = normalized or None
-        current_engine_state = _clean_text(getattr(case, "engine_state_json", ""))
-        if current_engine_state:
-            engine_state = json.loads(current_engine_state)
-            if not isinstance(engine_state, dict):
-                raise DiagramPayloadValidationError(["engine_state_json phải là object JSON."])
-            stage_ids = {
-                _clean_text(person.get("id"))
-                for person in payload["stage"]
-                if isinstance(person, dict) and _clean_text(person.get("id"))
-            }
-            case.engine_state_json = json.dumps(_prune_engine_state(engine_state, stage_ids), ensure_ascii=False)
-        db.commit()
-    except DiagramPayloadValidationError as exc:
-        rollback = getattr(db, "rollback", None)
-        if rollback:
-            rollback()
-        return JSONResponse({"ok": False, "error": "; ".join(exc.errors), "errors": exc.errors}, status_code=400)
-    except Exception as exc:
-        rollback = getattr(db, "rollback", None)
-        if rollback:
-            rollback()
-        return JSONResponse({"ok": False, "error": f"stage_update_failed: {exc}"}, status_code=500)
-    return {"ok": True, "case_state_json": normalized, "engine_state_json": getattr(case, "engine_state_json", "") or ""}
+        return JSONResponse({"ok": False, "error": "; ".join(exc.errors),
+                             "errors": exc.errors}, status_code=400)
+    except WorkspaceError as exc:
+        status = 409 if exc.code == "workspace_conflict" else 400
+        return JSONResponse({"ok": False, "error": exc.message,
+                             "code": exc.code,
+                             "details": exc.details}, status_code=status)
+    view = materialize_case_state(case)
+    return {"ok": True,
+            "case_state_json": json.dumps(view, ensure_ascii=False),
+            "revision": data["revision"]}
+
+
+DEPRECATED_LOCK_MESSAGE = "Dùng Lưu hồ sơ; Hồ sơ không còn khóa"
 
 
 @router.post("/{cid}/lock")
-def lock(cid: int, db: Session = Depends(get_db)):
-    case = db.query(InheritanceCase).filter(InheritanceCase.id == cid).first()
-    if case:
-        case.trang_thai = "locked"
-        db.commit()
-    return RedirectResponse(f"/cases/{cid}", status_code=302)
+def lock(cid: int):
+    return JSONResponse({"code": "endpoint_deprecated",
+                         "message": DEPRECATED_LOCK_MESSAGE},
+                        status_code=410)
 
 
 @router.post("/{cid}/unlock")
-def unlock(cid: int, db: Session = Depends(get_db)):
-    case = db.query(InheritanceCase).filter(InheritanceCase.id == cid).first()
-    if case:
-        case.trang_thai = "draft"
-        db.commit()
-    return RedirectResponse(f"/cases/{cid}", status_code=302)
-
-
-def _snapshot_master_refs(db: Session) -> tuple[set[int], set[int]]:
-    """entity_id người/tài sản còn được snapshot case_state_json của các
-    hồ sơ đang tồn tại giữ lại (MIN-141 đợt 4) — tham chiếu sống chặn
-    dọn master dù bảng quan hệ không còn trỏ tới."""
-    customer_ids: set[int] = set()
-    property_ids: set[int] = set()
-
-    def _ent(row) -> Optional[int]:
-        if not isinstance(row, dict):
-            return None
-        for key in ("entity_id", "id"):
-            v = row.get(key)
-            if isinstance(v, bool):
-                continue
-            if isinstance(v, int):
-                return v
-            if isinstance(v, str) and v.strip().isdigit():
-                return int(v.strip())
-        return None
-
-    def _dig(v) -> Optional[int]:
-        """id kiểu int/str-digit; bỏ bool và uuid row_id."""
-        if isinstance(v, bool):
-            return None
-        if isinstance(v, int):
-            return v
-        if isinstance(v, str) and v.strip().isdigit():
-            return int(v.strip())
-        return None
-
-    for (raw,) in db.query(InheritanceCase.case_state_json):
-        if not raw:
-            continue
-        try:
-            doc = json.loads(raw)
-        except (TypeError, ValueError):
-            continue
-        if not isinstance(doc, dict):
-            continue
-        # payload bọc ở đỉnh hoặc trong key "payload" tuỳ phiên bản
-        payload = doc.get("payload") if isinstance(doc.get("payload"), dict) else doc
-        for row in payload.get("stage") or []:
-            eid = _ent(row)
-            if eid is not None:
-                customer_ids.add(eid)
-        for row in payload.get("assets") or []:
-            eid = _ent(row)
-            if eid is not None:
-                property_ids.add(eid)
-        meta = payload.get("case") if isinstance(payload.get("case"), dict) else {}
-        uq = meta.get("nguoinhanuyquyen")
-        if isinstance(uq, dict):
-            v = _dig(uq.get("id"))
-            if v is not None:
-                customer_ids.add(v)
-        else:
-            v = _dig(uq)
-            if v is not None:
-                customer_ids.add(v)
-
-    # engine_state_json legacy (web cũ): node.personId/parentPersonId là
-    # customer id; node workspace mới dùng row_id uuid → _dig tự lọc.
-    for (raw,) in db.query(InheritanceCase.engine_state_json):
-        if not raw:
-            continue
-        try:
-            doc = json.loads(raw)
-        except (TypeError, ValueError):
-            continue
-        nodes = doc.get("nodes") if isinstance(doc, dict) else None
-        for node in nodes or []:
-            if not isinstance(node, dict):
-                continue
-            for key in ("personId", "parentPersonId"):
-                v = _dig(node.get(key))
-                if v is not None:
-                    customer_ids.add(v)
-    return customer_ids, property_ids
-
+def unlock(cid: int):
+    return JSONResponse({"code": "endpoint_deprecated",
+                         "message": DEPRECATED_LOCK_MESSAGE},
+                        status_code=410)
 
 def _live_master_refs(db: Session) -> tuple[set[int], set[int]]:
-    """Mọi tham chiếu sống tới master customers/properties từ dữ liệu
-    CÒN LẠI (sau khi hồ sơ đã flush-delete): case khác (người chết,
-    tài sản chính, người nhận ủy quyền), participant còn lại (kể cả
-    parent_customer_id), link tài sản phụ còn lại, snapshot còn lại."""
+    """Tham chiếu sống tới master customers/properties từ dữ liệu còn lại.
+
+    Nguồn là FK của dòng case-owned (`case_person_rows.customer_id`,
+    `case_asset_rows.property_id`) + projection còn sống (người chết/tài
+    sản chính/UQ, participant, link) — không quét JSON Stage đã bỏ.
+    """
     customer_ids = {
         v for (v,) in db.query(InheritanceCase.nguoi_chet_id) if v is not None
     }
@@ -945,8 +699,14 @@ def _live_master_refs(db: Session) -> tuple[set[int], set[int]]:
         v for (v,) in db.query(InheritanceCase.nguoi_nhan_uy_quyen_id)
         if v is not None
     }
+    customer_ids |= {
+        v for (v,) in db.query(CasePersonRow.customer_id) if v is not None
+    }
     property_ids = {
         v for (v,) in db.query(InheritanceCase.tai_san_id) if v is not None
+    }
+    property_ids |= {
+        v for (v,) in db.query(CaseAssetRow.property_id) if v is not None
     }
     for c_id, parent_id in db.query(
         InheritanceParticipant.customer_id,
@@ -960,24 +720,21 @@ def _live_master_refs(db: Session) -> tuple[set[int], set[int]]:
         v for (v,) in db.query(InheritanceCaseProperty.property_id)
         if v is not None
     }
-    snap_customers, snap_properties = _snapshot_master_refs(db)
-    return customer_ids | snap_customers, property_ids | snap_properties
+    return customer_ids, property_ids
 
 
 def _delete_case_and_unreferenced_masters(db: Session,
                                           case: InheritanceCase) -> None:
-    """MIN-141 đợt 4: xóa hồ sơ nháp + chỉ dọn master "thuộc hồ sơ" không
-    còn tham chiếu nào. Một transaction chung (caller commit).
+    """Xóa hồ sơ nháp + chỉ dọn master "thuộc hồ sơ" không còn tham chiếu.
 
-    Master thuộc hồ sơ = người chết, tài sản chính, người tham gia
-    (kể cả parent_customer_id) và tài sản liên kết phụ. Người nhận ủy
-    quyền là danh bạ tái dùng → KHÔNG bao giờ dọn theo hồ sơ, kể cả khi
-    kiêm participant/parent của chính hồ sơ bị xóa; tham chiếu người
-    nhận ủy quyền của hồ sơ KHÁC vẫn chặn dọn các master khác.
-    Không quét xóa danh bạ mồ côi ngoài phạm vi hồ sơ này.
+    Master thuộc hồ sơ = người/tài sản trên dòng case-owned + projection
+    (người chết, tài sản chính, participant kể cả parent, link phụ).
+    Người nhận ủy quyền là danh bạ tái dùng → KHÔNG dọn theo hồ sơ.
     """
     customer_ids = {case.nguoi_chet_id}
     property_ids = {case.tai_san_id}
+    customer_ids |= {row.customer_id for row in case.person_rows}
+    property_ids |= {row.property_id for row in case.asset_rows}
     for p in case.participants:
         customer_ids.add(p.customer_id)
         customer_ids.add(p.parent_customer_id)
@@ -988,7 +745,7 @@ def _delete_case_and_unreferenced_masters(db: Session,
     customer_ids.discard(case.nguoi_nhan_uy_quyen_id)
 
     db.delete(case)
-    db.flush()  # participants/links của hồ sơ đã đi — không còn tính tham chiếu
+    db.flush()  # rows/participants/links của hồ sơ đã đi
 
     live_customers, live_properties = _live_master_refs(db)
     for cid_ in customer_ids - live_customers:
@@ -998,19 +755,24 @@ def _delete_case_and_unreferenced_masters(db: Session,
     for pid_ in property_ids - live_properties:
         entity = db.get(Property, pid_)
         if entity is not None:
-            db.delete(entity)  # land_rows cascade theo property
+            db.delete(entity)
 
 
 @router.post("/{cid}/delete")
 def delete(cid: int, db: Session = Depends(get_db)):
+    """Chỉ xóa hồ sơ nháp; hồ sơ Done sửa được nhưng không tự mở quyền xóa."""
     case = db.query(InheritanceCase).filter(InheritanceCase.id == cid).first()
-    if case and not case.is_locked:
-        try:
-            _delete_case_and_unreferenced_masters(db, case)
-            db.commit()
-        except Exception:
-            db.rollback()
-            raise
+    if case is None:
+        raise HTTPException(404)
+    if case.trang_thai != "draft":
+        raise HTTPException(
+            403, "Chỉ xóa được hồ sơ nháp; hồ sơ đã lưu không bị khóa sửa")
+    try:
+        _delete_case_and_unreferenced_masters(db, case)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     return RedirectResponse("/cases", status_code=302)
 
 
@@ -1302,371 +1064,6 @@ def _so_thanh_chu(so: float) -> str:
     return (" ".join(parts) + phan_le_str).strip()
 
 
-def _pick_core_people(case: InheritanceCase):
-    owner = case.nguoi_chet
-    spouse = None
-    for p in case.participants:
-        if (p.vai_tro or "").strip() == "Vợ/Chồng":
-            spouse = p.customer
-            break
-
-    pair = [c for c in [owner, spouse] if c is not None]
-    
-    nam = [c for c in pair if (c.gioi_tinh or "").strip().lower() == "nam"]
-    nu = [c for c in pair if (c.gioi_tinh or "").strip().lower() in ("nữ", "nu", "nu")]
-    
-    if len(nam) == 1 and len(nu) == 1:
-        person1 = nam[0]
-        person2 = nu[0]
-    elif len(pair) == 2:
-        person1 = pair[0]
-        person2 = pair[1]
-    elif len(pair) == 1:
-        person1 = pair[0]
-        person2 = None
-    else:
-        person1 = None
-        person2 = None
-
-    excluded_ids = {c.id for c in [person1, person2] if c is not None}
-    receivers = [p for p in case.participants if p.co_nhan_tai_san and p.customer_id not in excluded_ids]
-    receivers = sorted(receivers, key=lambda p: (-(p.ty_le or 0), p.customer_id))
-    non_receivers = [p for p in case.participants if (not p.co_nhan_tai_san) and p.customer_id not in excluded_ids]
-    non_receivers = sorted(non_receivers, key=lambda p: p.customer_id)
-
-    person3 = receivers[0].customer if receivers else None
-    
-    rest_receivers = [p.customer for p in receivers[1:]] if receivers else []
-    rest_non_receivers = [p.customer for p in non_receivers]
-    people_4_plus = rest_receivers + rest_non_receivers
-    return person1, person2, person3, people_4_plus
-
-
-def _build_template_mapping(case: InheritanceCase) -> dict:
-    ts = case.tai_san
-    person1, person2, person3, people_4_plus = _pick_core_people(case)
-
-    people_slots = [None] * 21
-    people_slots[1] = person1
-    people_slots[2] = person2
-    people_slots[3] = person3
-    for idx, c in enumerate(people_4_plus[:17], start=4):
-        people_slots[idx] = c
-
-    import json as _json
-    from datetime import date as _date_cls
-    today = _date_cls.today()
-
-    # [Nơi niêm yết] chỉ lấy trường người dùng nhập/lưu trên hồ sơ — không
-    # fallback sang địa chỉ đất (quyết định Owner, review NAIA-12).
-    noi_niem_yet = _safe_text(case.noi_niem_yet) if case.noi_niem_yet else ""
-
-    # Phân tích land_rows_json để lấy dữ liệu từng loại đất
-    land_rows = []
-    if ts.land_rows_json:
-        try:
-            land_rows = _json.loads(ts.land_rows_json)
-        except Exception:
-            pass
-
-    # Tổng diện tích: ưu tiên tính từ land_rows, fallback về ts.dien_tich
-    if land_rows:
-        total = 0.0
-        for r in land_rows:
-            try:
-                total += float(r.get("dien_tich") or 0)
-            except (ValueError, TypeError):
-                pass
-        dien_tich_so = total if total > 0 else ts.dien_tich
-    else:
-        dien_tich_so = ts.dien_tich
-
-    dien_tich_str = f"{dien_tich_so:g}" if dien_tich_so else ""
-    dien_tich_chu = _so_thanh_chu(dien_tich_so).capitalize() if dien_tich_so else ""
-
-    loai_so_val = _safe_text(ts.loai_so) or "Giấy chứng nhận quyền sử dụng đất"
-
-    m = {
-        "[Tên file]": f"ho_so_thua_ke_{case.id}",
-        "[Niêm Yết]": noi_niem_yet,
-        "[NIÊM YẾT]": noi_niem_yet.upper() if noi_niem_yet else "",
-        "[Loại sổ]": loai_so_val,
-        "[Địa chỉ đất]": _safe_text(ts.dia_chi),
-        "[Serial]": _safe_text(ts.so_serial),
-        "[Số vào sổ]": _safe_text(ts.so_vao_so),
-        "[Số thửa]": _safe_text(ts.so_thua_dat),
-        "[Số tờ]": _safe_text(ts.so_to_ban_do),
-        "[Diện tích]": dien_tich_str,
-        "[Diện tích chữ]": dien_tich_chu,
-        "[Hình thức sử dụng]": _safe_text(ts.hinh_thuc_su_dung),
-        "[Loại đất]": _safe_text(ts.loai_dat),
-        "[Nguồn gốc]": _safe_text(ts.nguon_goc),
-        "[Ngày cấp sổ]": _fmt_date(ts.ngay_cap),
-        "[Cơ quan cấp sổ]": _safe_text(ts.co_quan_cap),
-        "[Ngày]": str(today.day),
-        "[Tháng]": f"{today.month:02d}",
-        "[Ngày chữ]": _so_thanh_chu(today.day),
-        "[Tháng chữ]": _so_thanh_chu(today.month),
-        "[Người ủy quyền]": "",
-        "[Người ủy quyền2]": "",
-        "[Số công chứng]": "",
-        "[ONT]": "",
-        "[CLN]": "",
-        "[NTS]": "",
-        "[LUC]": "",
-        "[Giá chuyển nhượng]": "",
-        "[SĐT]": "",
-    }
-
-    for i in range(1, 21):
-        c = people_slots[i]
-        m[f"[Tên {i}]"] = _safe_text(c.ho_ten if c else "")
-        m[f"[Năm sinh {i}]"] = _safe_text(_fmt_birth_or_year(c.ngay_sinh) if c else "")
-        m[f"[CCCD {i}]"] = _safe_text(c.so_giay_to if c else "")
-        m[f"[Ngày cấp {i}]"] = _safe_text(_fmt_date(c.ngay_cap) if c else "")
-        m[f"[Địa chỉ {i}]"] = _safe_text(c.dia_chi if c else "")
-        m[f"[Loại CC {i}]"] = _safe_text(c.loai_giay_to if c else "")
-        m[f"[Nơi cấp CC {i}]"] = _safe_text(c.noi_cap if c else "")
-        m[f"[Thường trú {i}]"] = _safe_text(c.loai_dia_chi if c else "")
-        m[f"[Năm chết {i}]"] = _safe_text(_fmt_date(c.ngay_chet) if c else "")
-
-    # Mapping từng loại đất theo số thứ tự: [Loại đất N], [Diện tích N], [Thời hạn N]
-    for i, row in enumerate(land_rows[:10], start=1):
-        loai = str(row.get("loai_dat", "")).strip()
-        dien = str(row.get("dien_tich", "")).strip()
-        thoi = str(row.get("thoi_han", "")).strip()
-        m[f"[Loại đất {i}]"] = loai
-        m[f"[Diện tích {i}]"] = dien
-        m[f"[Thời hạn {i}]"] = thoi
-    # Xóa giá trị cho các slot vượt quá số dòng thực tế (tối đa 10)
-    for i in range(len(land_rows) + 1, 11):
-        m[f"[Loại đất {i}]"] = ""
-        m[f"[Diện tích {i}]"] = ""
-        m[f"[Thời hạn {i}]"] = ""
-
-    # [Thời hạn 1] alias → dòng đầu tiên hoặc ts.thoi_han (backward compat)
-    if not m.get("[Thời hạn 1]") and ts.thoi_han:
-        m["[Thời hạn 1]"] = _safe_text(ts.thoi_han)
-
-    return m
-
-
-def _normalize_token(s: str) -> str:
-    s = (s or "").strip().lower()
-    s = s.replace("đ", "d")
-    s = unicodedata.normalize("NFKD", s)
-    s = "".join(ch for ch in s if not unicodedata.combining(ch))
-    s = re.sub(r"\s+", " ", s)
-    return s
-
-
-def _build_normalized_mapping(mapping: dict) -> dict:
-    normalized = {}
-    for k, v in mapping.items():
-        if not (k.startswith("[") and k.endswith("]")):
-            continue
-        token = k[1:-1]
-        normalized[_normalize_token(token)] = v
-    return normalized
-
-
-def _normalize_case_state_json(raw_payload: str) -> str:
-    raw_text = _clean_text(raw_payload)
-    if not raw_text:
-        return ""
-    try:
-        payload = json.loads(raw_text)
-    except Exception as exc:
-        raise DiagramPayloadValidationError([f"case_state_json không phải JSON hợp lệ: {exc}"])
-    if not isinstance(payload, dict):
-        raise DiagramPayloadValidationError(["case_state_json phải là object JSON."])
-    stage = payload.get("stage", [])
-    diagram = payload.get("diagram", {})
-    if not isinstance(stage, list):
-        raise DiagramPayloadValidationError(["case_state_json.stage phải là danh sách."])
-    if not isinstance(diagram, dict):
-        raise DiagramPayloadValidationError(["case_state_json.diagram phải là object JSON."])
-    errors = []
-    for index, item in enumerate(stage, start=1):
-        if not isinstance(item, dict):
-            errors.append(f"case_state_json.stage[{index}] phải là object JSON.")
-            continue
-        person_id = _clean_text(item.get("id"))
-        if not person_id:
-            errors.append(f"case_state_json.stage[{index}] thiếu id.")
-    if errors:
-        raise DiagramPayloadValidationError(errors)
-    return json.dumps(payload, ensure_ascii=False)
-
-
-def _prune_engine_state(engine_state: Any, stage_ids: set[str]) -> Any:
-    """Remove diagram records that can no longer point at committed Stage people."""
-    if not isinstance(engine_state, dict):
-        return engine_state
-    state = dict(engine_state)
-    raw_nodes = state.get("nodes", [])
-    nodes = []
-    for raw_node in raw_nodes:
-        if not isinstance(raw_node, dict):
-            continue
-        node = dict(raw_node)
-        embedded_person = node.get("person") if isinstance(node.get("person"), dict) else {}
-        person_id = _clean_text(node.get("personId") or embedded_person.get("id"))
-        if person_id and person_id not in stage_ids:
-            if not _clean_text(node.get("kind")) or _clean_text(node.get("kind")).lower() == "person":
-                continue
-            node["personId"] = None
-            if "person" in node:
-                node["person"] = None
-        nodes.append(node)
-
-    node_ids = {_clean_text(node.get("id")) for node in nodes if _clean_text(node.get("id"))}
-    active_people = {
-        _clean_text(node.get("personId") or (node.get("person") or {}).get("id"))
-        for node in nodes
-        if isinstance(node.get("person"), dict) or node.get("personId")
-    }
-    for node in nodes:
-        for key in ("parentPersonId", "parentId"):
-            if _clean_text(node.get(key)) and _clean_text(node.get(key)) not in active_people:
-                node[key] = None
-        for key in ("parentSlotId", "sourceId"):
-            if _clean_text(node.get(key)) and _clean_text(node.get(key)) not in node_ids:
-                node[key] = None
-    topology_changed = nodes != raw_nodes
-    state["nodes"] = nodes
-    if isinstance(state.get("edges"), list):
-        edges = [
-            edge for edge in state["edges"]
-            if isinstance(edge, dict)
-            and _clean_text(edge.get("source") or edge.get("sourceId")) in node_ids
-            and _clean_text(edge.get("target") or edge.get("targetId")) in node_ids
-        ]
-        topology_changed = topology_changed or edges != state["edges"]
-        state["edges"] = edges
-    for key in ("assetOwnerIds", "receiverIds", "participantIds"):
-        if isinstance(state.get(key), list):
-            values = [item for item in state[key] if _clean_text(item) in stage_ids]
-            topology_changed = topology_changed or values != state[key]
-            state[key] = values
-    if isinstance(state.get("allocations"), dict):
-        topology_changed = topology_changed or any(_clean_text(person_id) not in stage_ids for person_id in state["allocations"])
-    if topology_changed:
-        for key, empty in (("allocations", {}), ("trace", []), ("warnings", [])):
-            if key in state:
-                state[key] = empty
-    return state
-
-
-def _prune_case_state_diagram(payload: dict[str, Any]) -> dict[str, Any]:
-    stage_ids = {
-        _clean_text(person.get("id"))
-        for person in payload.get("stage", [])
-        if isinstance(person, dict) and _clean_text(person.get("id"))
-    }
-    result = dict(payload)
-    diagram = dict(payload.get("diagram") or {})
-    if "engineState" in diagram:
-        diagram["engineState"] = _prune_engine_state(diagram.get("engineState"), stage_ids)
-    engine_state = diagram.get("engineState")
-    node_ids = {
-        _clean_text(node.get("id")) for node in engine_state.get("nodes", [])
-        if isinstance(engine_state, dict) and isinstance(node, dict) and _clean_text(node.get("id"))
-    } if isinstance(engine_state, dict) else set()
-    if isinstance(diagram.get("assignments"), dict):
-        diagram["assignments"] = {
-            slot: person_id for slot, person_id in diagram["assignments"].items()
-            if _clean_text(person_id) in stage_ids and _clean_text(slot) in node_ids
-        }
-    result["diagram"] = diagram
-    return result
-
-
-def _prepare_committed_case_state(raw_payload: str) -> tuple[str, Optional[set[str]], Optional[str]]:
-    normalized = _normalize_case_state_json(raw_payload)
-    if not normalized:
-        return "", None, None
-    payload = _prune_case_state_diagram(json.loads(normalized))
-    stage_ids = {
-        _clean_text(person.get("id")) for person in payload["stage"]
-        if isinstance(person, dict) and _clean_text(person.get("id"))
-    }
-    diagram = payload["diagram"]
-    engine_state = diagram.get("engineState")
-    committed_diagram = None
-    if isinstance(engine_state, dict):
-        committed_diagram = json.dumps({
-            "version": 2,
-            "updatedAt": _clean_text(diagram.get("updatedAt") or engine_state.get("updatedAt")),
-            "engineState": engine_state,
-        }, ensure_ascii=False)
-    return json.dumps(payload, ensure_ascii=False), stage_ids, committed_diagram
-
-
-def _replace_text_placeholders(text: str, mapping: dict, normalized_mapping: dict) -> str:
-    new_text = text
-    for k, v in mapping.items():
-        if k in new_text:
-            new_text = new_text.replace(k, v)
-
-    def _token_repl(match):
-        token = match.group(1)
-        direct = mapping.get(f"[{token}]")
-        if direct is not None:
-            return direct
-        norm = _normalize_token(token)
-        if norm in normalized_mapping:
-            return normalized_mapping[norm]
-        return match.group(0)
-
-    return re.sub(r"\[([^\[\]]+)\]", _token_repl, new_text)
-
-
-def _replace_in_paragraph(paragraph, mapping: dict, normalized_mapping: dict):
-    if not paragraph.runs:
-        return
-        
-    # Check if there's anything to replace at all
-    text = "".join(r.text for r in paragraph.runs)
-    if "[" not in text or "]" not in text:
-        return
-
-    # Try run-by-run first to perfectly preserve inline formatting
-    for r in paragraph.runs:
-        if "[" in r.text and "]" in r.text:
-            new_t = _replace_text_placeholders(r.text, mapping, normalized_mapping)
-            if new_t != r.text:
-                r.text = new_t
-
-    # Re-evaluate text since runs might have changed
-    text = "".join(r.text for r in paragraph.runs)
-    if "[" not in text or "]" not in text:
-        return
-        
-    new_text = _replace_text_placeholders(text, mapping, normalized_mapping)
-    if new_text != text:
-        paragraph.runs[0].text = new_text
-        for r in paragraph.runs[1:]:
-            r.clear()
-
-
-
-def _replace_in_doc(doc, mapping: dict):
-    normalized_mapping = _build_normalized_mapping(mapping)
-    for p in doc.paragraphs:
-        _replace_in_paragraph(p, mapping, normalized_mapping)
-    for tbl in doc.tables:
-        for row in tbl.rows:
-            for cell in row.cells:
-                for p in cell.paragraphs:
-                    _replace_in_paragraph(p, mapping, normalized_mapping)
-    for sec in doc.sections:
-        for p in sec.header.paragraphs:
-            _replace_in_paragraph(p, mapping, normalized_mapping)
-        for p in sec.footer.paragraphs:
-            _replace_in_paragraph(p, mapping, normalized_mapping)
-
-
 @router.get("/{cid}/export-word-legacy")
 def export_word(cid: int, db: Session = Depends(get_db)):
     """Xuat ho so thua ke ra file Word."""
@@ -1802,8 +1199,9 @@ def export_word_from_template(cid: int, db: Session = Depends(get_db), template_
     except Exception as ex:
         raise HTTPException(status_code=500, detail=f"Khong mo duoc template: {ex}")
 
-    mapping = _build_template_mapping(case)
-    _replace_in_doc(doc, mapping)
+    # Route web xuất bản đang có (không gate nhóm như batch); đọc dữ kiện B.
+    mapping = word_engine.build_template_mapping(case, static=True)
+    word_engine.replace_in_doc(doc, mapping)
 
     buf = io.BytesIO()
     doc.save(buf)
@@ -1968,8 +1366,8 @@ def preview_word(cid: int, request: Request, db: Session = Depends(get_db)):
     case = db.query(InheritanceCase).filter(InheritanceCase.id == cid).first()
     if not case:
         raise HTTPException(404)
-    mapping = _build_template_mapping(case)
-    
+    mapping = word_engine.build_template_mapping(case, static=True)
+
     html_content = f"""
     <h1 style="text-align: center;">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</h1>
     <h2 style="text-align: center;">Độc lập - Tự do - Hạnh phúc</h2>

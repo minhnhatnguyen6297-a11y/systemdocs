@@ -3,10 +3,10 @@
 AC:
 - Xóa draft → xóa hồ sơ + chỉ dọn master "thuộc hồ sơ" không còn tham
   chiếu (case khác, participant kể cả parent_customer_id, link tài sản,
-  snapshot hồ sơ còn tồn tại, danh mục ủy quyền của case khác).
+  dòng case-owned của hồ sơ còn tồn tại, danh mục ủy quyền của case khác).
 - Người nhận ủy quyền của chính hồ sơ bị xóa = danh bạ tái dùng → GIỮ.
 - Không quét xóa danh bạ mồ côi ngoài phạm vi hồ sơ.
-- Hồ sơ khóa → từ chối xóa.
+- Hồ sơ done → từ chối xóa (không phải "khóa").
 - /api/stats đếm người/tài sản gắn hồ sơ, DISTINCT primary/link —
   danh bạ trơ không tính.
 """
@@ -21,6 +21,8 @@ from sqlalchemy.orm import sessionmaker
 import database
 import routers.cases as cases_router
 from models import (
+    CaseAssetRow,
+    CasePersonRow,
     Customer,
     InheritanceCase,
     InheritanceCaseProperty,
@@ -63,38 +65,34 @@ def _property(db, serial, **kw):
     return p
 
 
-def _case(db, deceased, prop, *, trang_thai="draft", snapshot=None,
+def _case(db, deceased, prop, *, trang_thai="draft",
           uq_id=None, extra_props=(), participants=()):
     case = InheritanceCase(
         nguoi_chet_id=deceased.id, tai_san_id=prop.id,
         ngay_lap_ho_so=date(2026, 10, 1), loai_van_ban="khai_nhan",
         trang_thai=trang_thai,
-        nguoi_nhan_uy_quyen_id=uq_id,
-        case_state_json=snapshot)
+        nguoi_nhan_uy_quyen_id=uq_id)
     db.add(case)
     db.flush()
+    db.add(CasePersonRow(
+        row_id=f"person-{case.id}", case_id=case.id,
+        customer_id=deceased.id, vitri=1, ho_ten=deceased.ho_ten))
+    db.add(CaseAssetRow(
+        row_id=f"asset-{case.id}", case_id=case.id,
+        property_id=prop.id, vitri=1,
+        so_serial=prop.so_serial or "", dia_chi=prop.dia_chi))
     for p in extra_props:
         db.add(InheritanceCaseProperty(case_id=case.id, property_id=p.id))
     for idx, (cust, parent) in enumerate(participants):
         db.add(InheritanceParticipant(
             ho_so_id=case.id, customer_id=cust.id,
+            case_person_row_id=f"participant-{case.id}-{idx}",
             vai_tro="Con", hang_thua_ke=1, ty_le=0.0,
             co_nhan_tai_san=True,
             parent_customer_id=parent.id if parent else None))
     db.flush()
     db.commit()  # commit setup → test rollback không cuốn dữ liệu nền
     return case
-
-
-def _snapshot(people_ids=(), asset_ids=(), uq_id=None):
-    return json.dumps({
-        "schemaVersion": 3,
-        "case_type": "inheritance",
-        "stage": [{"id": str(i), "row_id": f"r{i}"} for i in people_ids],
-        "assets": [{"id": str(i), "row_id": f"a{i}"} for i in asset_ids],
-        "case": {"nguoinhanuyquyen": {"id": uq_id, "ten": "X"}} if uq_id
-                else {"nguoinhanuyquyen": {"id": None, "ten": None}},
-    }, ensure_ascii=False)
 
 
 # --------------------------------------------------------------- xóa hồ sơ
@@ -115,12 +113,14 @@ def test_delete_draft_removes_case_and_unreferenced_masters(db):
     assert db.query(InheritanceParticipant).count() == 0
 
 
-def test_delete_locked_case_refused(db):
+def test_delete_done_case_refused(db):
     dead = _customer(db, "Người chết", ngay_chet=date(2020, 1, 1))
     prop = _property(db, "AA0002")
-    case = _case(db, dead, prop, trang_thai="locked")
+    case = _case(db, dead, prop, trang_thai="done")
 
-    cases_router.delete(case.id, db=db)
+    with pytest.raises(Exception) as exc:
+        cases_router.delete(case.id, db=db)
+    assert getattr(exc.value, "status_code", None) == 403
 
     assert db.get(InheritanceCase, case.id) is not None
     assert db.get(Customer, dead.id) is not None
@@ -241,26 +241,33 @@ def test_delete_uq_reference_of_other_case_blocks_cleanup(db):
     assert db.get(Customer, dead_a.id) is not None
 
 
-def test_delete_respects_surviving_case_snapshot_refs(db):
-    """Snapshot case_state_json của hồ sơ còn tồn tại trỏ entity_id →
-    chặn dọn master dù bảng quan hệ không còn."""
+def test_delete_respects_surviving_case_row_refs(db):
+    """Dòng case-owned của hồ sơ còn tồn tại trỏ identity → chặn dọn
+    master dù bảng quan hệ/projection không còn."""
     dead_a = _customer(db, "Dead A", ngay_chet=date(2020, 1, 1))
     dead_b = _customer(db, "Dead B", ngay_chet=date(2020, 1, 1))
-    snap_person = _customer(db, "Người chỉ trong snapshot")
-    snap_prop = _property(db, "SNAP01")
+    survivor_person = _customer(db, "Người chỉ trong dòng B")
+    survivor_prop = _property(db, "ROW01")
     pa = _property(db, "AA0011")
     pb = _property(db, "AA0012")
     case_a = _case(db, dead_a, pa,
-                   participants=[(snap_person, None)],
-                   extra_props=[snap_prop])
-    _case(db, dead_b, pb,
-          snapshot=_snapshot(people_ids=[snap_person.id],
-                             asset_ids=[snap_prop.id]))
+                   participants=[(survivor_person, None)],
+                   extra_props=[survivor_prop])
+    case_b = _case(db, dead_b, pb)
+    db.add(CasePersonRow(
+        row_id=f"extra-person-{case_b.id}", case_id=case_b.id,
+        customer_id=survivor_person.id, vitri=2,
+        ho_ten=survivor_person.ho_ten))
+    db.add(CaseAssetRow(
+        row_id=f"extra-asset-{case_b.id}", case_id=case_b.id,
+        property_id=survivor_prop.id, vitri=2,
+        so_serial=survivor_prop.so_serial, dia_chi=survivor_prop.dia_chi))
+    db.commit()
 
     cases_router.delete(case_a.id, db=db)
 
-    assert db.get(Customer, snap_person.id) is not None
-    assert db.get(Property, snap_prop.id) is not None
+    assert db.get(Customer, survivor_person.id) is not None
+    assert db.get(Property, survivor_prop.id) is not None
     assert db.get(Customer, dead_a.id) is None
     assert db.get(Property, pa.id) is None
 
@@ -359,8 +366,9 @@ def test_stats_endpoint_response_shape(db, session_factory, monkeypatch):
     dead = _customer(db, "Người chết", ngay_chet=date(2020, 1, 1))
     prop = _property(db, "AA0020")
     _customer(db, "Danh bạ trơ")
-    _case(db, dead, prop, trang_thai="locked")
+    _case(db, dead, prop, trang_thai="done")
 
     monkeypatch.setattr(database, "SessionLocal", session_factory)
     out = asyncio.run(main_mod.stats())
-    assert out == {"customers": 1, "properties": 1, "cases": 1, "locked": 1}
+    assert out == {"customers": 1, "properties": 1, "cases": 1,
+                   "draft": 0, "done": 1}

@@ -102,16 +102,13 @@ def _case_state(*people, nodes=None):
 
 
 def _case_state_v2(*people, nodes, allocations):
+    """Payload v4 với Diagram state row-keyed + render_model allocations."""
     import json
 
-    payload = json.loads(_case_state(*people))
-    payload["version"] = 2
+    payload = json.loads(_case_state(*people, nodes=nodes))
     payload["diagram"] = {
-        "engineInput": {"version": 2, "nodes": nodes},
-        "engineResult": {
-            "status": "complete",
-            "allocations": allocations,
-        },
+        "state": {"version": 3, "domain": "inheritance", "nodes": nodes},
+        "render_model": {"status": "complete", "allocations": allocations},
     }
     return json.dumps(payload, ensure_ascii=False)
 
@@ -132,25 +129,165 @@ def _node(person_id, *, role="Khac", will_receive=False, is_land_owner=False, le
     return node
 
 
-def _make_case(owner, participants=None, *, properties=None, case_state=None):
-    if properties is None:
-        properties = []
-    primary = properties[0] if properties else _prop()
+def _person_row(stage_row, vitri):
+    raw_id = stage_row.get("entity_id")
+    if raw_id is None:
+        legacy = str(stage_row.get("id") or "")
+        raw_id = int(legacy) if legacy.isdigit() else None
     return SimpleNamespace(
+        row_id=stage_row.get("row_id") or f"row-{raw_id}-{vitri}",
+        customer_id=raw_id,
+        vitri=vitri,
+        ho_ten=stage_row.get("ho_ten"),
+        gioi_tinh=stage_row.get("gioi_tinh"),
+        ngay_sinh=stage_row.get("ngay_sinh"),
+        ngay_chet=stage_row.get("ngay_chet"),
+        so_giay_to=stage_row.get("so_giay_to"),
+        ngay_cap=stage_row.get("ngay_cap"),
+        noi_cap=stage_row.get("noi_cap"),
+        dia_chi=stage_row.get("dia_chi"),
+        place_of_origin=stage_row.get("place_of_origin"),
+        loai_giay_to=stage_row.get("loai_giay_to"),
+        loai_dia_chi=stage_row.get("loai_dia_chi"),
+    )
+
+
+def _asset_row(prop, vitri):
+    import json
+
+    raw = prop.land_rows_json
+    rows = []
+    if raw:
+        try:
+            rows = json.loads(raw)
+        except ValueError:
+            rows = []
+    land_rows = [
+        SimpleNamespace(vitri=index + 1,
+                        loaidat=row.get("loai_dat"),
+                        dientich=row.get("dien_tich"),
+                        thoihan=row.get("thoi_han"))
+        for index, row in enumerate(rows if isinstance(rows, list) else [])
+        if isinstance(row, dict)
+    ]
+    return SimpleNamespace(
+        row_id=f"asset-{vitri}",
+        property_id=getattr(prop, "id", None),
+        vitri=vitri,
+        so_serial=prop.so_serial,
+        so_vao_so=prop.so_vao_so,
+        so_thua_dat=prop.so_thua_dat,
+        so_to_ban_do=prop.so_to_ban_do,
+        dia_chi=prop.dia_chi,
+        loai_so=prop.loai_so,
+        hinh_thuc_su_dung=prop.hinh_thuc_su_dung,
+        thoi_han=prop.thoi_han,
+        nguon_goc=prop.nguon_goc,
+        ngay_cap=prop.ngay_cap,
+        co_quan_cap=prop.co_quan_cap,
+        land_rows_present=bool(raw is not None),
+        land_rows=land_rows,
+    )
+
+
+def _stage_fields(person):
+    return {
+        "id": str(person.id),
+        "ho_ten": person.ho_ten,
+        "gioi_tinh": person.gioi_tinh,
+        "ngay_sinh": person.ngay_sinh.isoformat() if person.ngay_sinh else None,
+        "ngay_chet": person.ngay_chet.isoformat() if person.ngay_chet else None,
+        "so_giay_to": person.so_giay_to,
+        "ngay_cap": person.ngay_cap.isoformat() if person.ngay_cap else None,
+        "noi_cap": person.noi_cap,
+        "dia_chi": person.dia_chi,
+        "place_of_origin": getattr(person, "place_of_origin", None),
+        "loai_giay_to": getattr(person, "loai_giay_to", None),
+        "loai_dia_chi": getattr(person, "loai_dia_chi", None),
+    }
+
+
+def _make_case(owner, participants=None, *, properties=None, case_state=None):
+    """Fake case Storage B: dòng Người/Tài sản + JSON v4 (không Stage).
+
+    `case_state` chỉ là nguồn dựng Diagram/rows cho test; sau khi dựng,
+    Word chỉ đọc `person_rows`/`asset_rows`/`case_state_json` giống ORM.
+    """
+    import json
+
+    participants = participants or []
+    if properties is None:
+        properties = [_prop()]
+    primary = properties[0] if properties else _prop()
+    payload = json.loads(case_state) if case_state else {}
+    domain = payload.get("case_type") or "inheritance"
+    stage_items = payload.get("stage") if isinstance(payload.get("stage"), list) else None
+    if stage_items is None:
+        people = ([owner] if owner is not None else []) + [
+            p.customer for p in participants]
+        stage_items = [_stage_fields(person) for person in people]
+
+    person_rows = [_person_row(item, index + 1)
+                   for index, item in enumerate(stage_items)]
+    entity_to_row = {str(row.customer_id): row.row_id
+                     for row in person_rows if row.customer_id is not None}
+    asset_rows = [_asset_row(prop, index + 1)
+                  for index, prop in enumerate(properties)]
+
+    diagram = payload.get("diagram")
+    diagram = diagram if isinstance(diagram, dict) else {}
+    state = diagram.get("state")
+    legacy_engine = diagram.get("engineState")
+    if not isinstance(state, dict) and isinstance(legacy_engine, dict):
+        state = {"version": 3, "domain": domain,
+                 "nodes": legacy_engine.get("nodes") or []}
+    if isinstance(state, dict):
+        nodes = []
+        for node in state.get("nodes") or []:
+            if isinstance(node, dict):
+                mapped = entity_to_row.get(str(node.get("personId")))
+                nodes.append({**node, "personId": mapped or node.get("personId")})
+        state = {**state, "nodes": nodes}
+    render_model = diagram.get("render_model")
+    if isinstance(render_model, dict) and isinstance(render_model.get("allocations"), dict):
+        render_model = {
+            **render_model,
+            "allocations": {
+                entity_to_row.get(str(key), key): value
+                for key, value in render_model["allocations"].items()},
+        }
+
+    case_type = {"case_type": domain,
+                 "diagram": {"state": state or {},
+                             **({"render_model": render_model}
+                                if render_model else {})}}
+    if domain == "inheritance":
+        case_type["owner_row_id"] = entity_to_row.get(
+            str(getattr(owner, "id", None)))
+    new_state = json.dumps(case_type, ensure_ascii=False)
+
+    case = SimpleNamespace(
         id=99,
         nguoi_chet=owner,
         tai_san=primary,
-        property_links=[
-            SimpleNamespace(property=p, is_primary=(p is primary), id=i)
-            for i, p in enumerate(properties)
-        ] if properties else [],
         ngay_lap_ho_so=date(2026, 7, 3),
         loai_van_ban="thoa_thuan",
+        trang_thai="draft",
+        workspace_revision=1,
         noi_niem_yet="UBND xã Minh Tân",
+        nguoi_nhan_uy_quyen=None,
+        nguoi_nhan_uy_quyen_id=None,
+        noi_dung_viec=None,
         ghi_chu="Ghi chú nội bộ",
-        participants=participants or [],
-        case_state_json=case_state,
+        participants=participants,
+        person_rows=person_rows,
+        asset_rows=asset_rows,
+        case_state_json=new_state,
     )
+    by_customer = {row.customer_id: row.row_id for row in person_rows}
+    for participant in participants:
+        participant.case_person_row_id = by_customer.get(participant.customer_id)
+    return case
 
 
 def test_build_template_mapping_exposes_standard_vietnamese_placeholders_and_legacy_aliases():
@@ -261,7 +398,11 @@ def test_correct_spelling_thoi_han_alias_shares_the_same_source():
 def test_no_source_placeholders_are_reported_not_silently_emptied():
     mapping = build_template_mapping(_simple_export_case())
 
+    # `[Ngườ ủy quyền]` có nguồn metadata cột; null tường minh → chuỗi rỗng.
+    assert mapping["[Ngườ ủy quyền]"] == ""
     for token in NO_SOURCE_PLACEHOLDERS:
+        if token == "[Ngườ ủy quyền]":
+            continue
         assert token not in mapping, f"{token} không được map về rỗng"
 
     doc = Document()
@@ -1405,7 +1546,7 @@ def test_five_properties_numbering():
     assert mapping["[Dòng tài sản 5]"].startswith("5. Quyền sử dụng đất tại: Đất 5")
 
 
-def test_multiple_properties_use_primary_first_then_stable_link_order():
+def test_multiple_properties_follow_asset_row_order():
     owner = _person(1, "Nguyễn Văn A", gender="Nam", dead=date(2024, 2, 3))
     receiver = _person(2, "Nguyễn Văn B", gender="Nam")
     primary = _prop(dia_chi="Tài sản chính", so_serial="PRIMARY")
@@ -1423,16 +1564,12 @@ def test_multiple_properties_use_primary_first_then_stable_link_order():
             ],
         ),
     )
-    case.property_links = [
-        SimpleNamespace(property=linked_second, is_primary=False, id=30),
-        SimpleNamespace(property=primary, is_primary=True, id=20),
-        SimpleNamespace(property=linked_first, is_primary=False, id=10),
-    ]
-
     context = build_word_context(case)
     mapping = build_template_mapping(case)
 
-    assert context.assets == [primary, linked_first, linked_second]
+    # Thứ tự tài sản = thứ tự dòng (vitri); link chỉ là projection.
+    assert [asset.so_serial for asset in context.assets] == [
+        "PRIMARY", "LINK-1", "LINK-2"]
     assert mapping["[Tài sản 1 - Serial]"] == "PRIMARY"
     assert mapping["[Tài sản 2 - Serial]"] == "LINK-1"
     assert mapping["[Tài sản 3 - Serial]"] == "LINK-2"

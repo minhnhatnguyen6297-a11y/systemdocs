@@ -20,7 +20,7 @@ from services.document_intake.models import AdapterContext, SourceSpec
 from services.case_workspace import CaseWorkspaceService, WorkspaceError
 from services.word_original import binding_proposals, reviewed_template, export_original, slot_for
 from tests.test_case_workspace import db, session_factory, _person_row, _asset_row
-from models import InheritanceCase, Property, Customer
+from models import CaseAssetRow, InheritanceCase, Property, Customer
 
 
 def fixture_bytes():
@@ -509,11 +509,12 @@ def test_asset_origin_roundtrips_per_asset_not_broadcast(db, tmp_path):
     db.expire_all()
     reloaded = service.get(cid)
     assert [a['nguon_goc'] for a in reloaded['stage']['assets']] == [None, 'Nguồn B', None]
-    properties = db.query(Property).order_by(Property.so_thua_dat).all()
-    assert {p.so_thua_dat: p.nguon_goc for p in properties} == {
-        '12': None, '22': 'Nguồn B', '32': None}
-    from services.word_engine import _property_description
-    text = _property_description(properties)
+    rows = db.query(CaseAssetRow).filter_by(case_id=cid).order_by(
+        CaseAssetRow.vitri).all()
+    assert [row.nguon_goc for row in rows] == [None, 'Nguồn B', None]
+    from services.word_engine import build_template_mapping
+    text = build_template_mapping(
+        db.get(InheritanceCase, cid), static=True)['[Đoạn mô tả di sản]']
     assert 'Nguồn B' in text and 'Nguồn A' not in text and 'Nguồn C' not in text
     assert text.count('Nguồn gốc sử dụng đất:') == 3
 
@@ -547,11 +548,12 @@ def test_group_asset_origins_stay_scoped_and_ambiguous_not_broadcast(db, tmp_pat
     db.expire_all()
     reloaded = service.get(cid)
     assert [a['nguon_goc'] for a in reloaded['stage']['assets']] == ['Nguồn A', 'Nguồn B', None]
-    properties = db.query(Property).order_by(Property.so_serial).all()
-    assert {p.so_serial: p.nguon_goc for p in properties} == {
-        'ZZ123456': 'Nguồn A', 'YY123456': 'Nguồn B', 'XX123456': None}
-    from services.word_engine import _property_description
-    text = _property_description(properties)
+    rows = db.query(CaseAssetRow).filter_by(case_id=cid).order_by(
+        CaseAssetRow.vitri).all()
+    assert [row.nguon_goc for row in rows] == ['Nguồn A', 'Nguồn B', None]
+    from services.word_engine import build_template_mapping
+    text = build_template_mapping(
+        db.get(InheritanceCase, cid), static=True)['[Đoạn mô tả di sản]']
     assert 'Nguồn A' in text and 'Nguồn B' in text
     assert 'Nguồn C' not in text and 'Nguồn D' not in text
 
@@ -606,8 +608,10 @@ def test_person_gender_from_titles_roundtrips_with_title_provenance(db, tmp_path
     db.expire_all()
     reloaded = service.get(cid)
     assert [p['gioi_tinh'] for p in reloaded['stage']['people']] == ['Nam', 'Nữ']
+    # Danh tính dùng chung chỉ giữ neo tên+số giấy; giới tính là dữ kiện
+    # của dòng Hồ sơ (đã assert ở trên), không ghi ngược master.
     assert {c.ho_ten: c.gioi_tinh for c in db.query(Customer).all()} == {
-        'Nguyễn Văn Mẫu': 'Nam', 'Trần Thị Mẫu': 'Nữ'}
+        'Nguyễn Văn Mẫu': None, 'Trần Thị Mẫu': None}
     from services.word_engine import build_word_context
     context = build_word_context(db.get(InheritanceCase, cid))
     assert [(p.ho_ten, p.gender_normalized) for p in context.persons] == [
@@ -633,7 +637,7 @@ def test_person_gender_neutral_title_stays_absent_per_person(db, tmp_path):
     db.expire_all()
     assert [p['gioi_tinh'] for p in service.get(cid)['stage']['people']] == [None, 'Nữ']
     assert {c.ho_ten: c.gioi_tinh for c in db.query(Customer).all()} == {
-        'Nguyễn Thị Mẫu': None, 'Trần Thị Mẫu': 'Nữ'}
+        'Nguyễn Thị Mẫu': None, 'Trần Thị Mẫu': None}
     from services.word_engine import build_word_context
     context = build_word_context(db.get(InheritanceCase, cid))
     assert [(p.ho_ten, p.gender_normalized) for p in context.persons] == [
@@ -711,20 +715,24 @@ def test_form_from_explicit_label_roundtrips_per_parcel_without_notes(db, tmp_pa
         assert [a['hinh_thuc_su_dung']
                 for a in fresh_service.get(cid)['stage']['assets']] == [
                     'Sử dụng riêng', 'Sử dụng chung']
-        fresh_properties = fresh.query(Property).order_by(Property.so_thua_dat).all()
-        assert {p.so_thua_dat: p.hinh_thuc_su_dung for p in fresh_properties} == {
-            '12': 'Sử dụng riêng', '22': 'Sử dụng chung'}
-        from services.word_engine import _property_description
-        fresh_text = _property_description(fresh_properties)
+        from services.word_engine import build_template_mapping
+        fresh_rows = fresh.query(CaseAssetRow).filter_by(
+            case_id=cid).order_by(CaseAssetRow.vitri).all()
+        assert [row.hinh_thuc_su_dung for row in fresh_rows] == [
+            'Sử dụng riêng', 'Sử dụng chung']
+        fresh_text = build_template_mapping(
+            fresh.get(InheritanceCase, cid), static=True)['[Đoạn mô tả di sản]']
         assert 'Hình thức sử dụng: Sử dụng riêng' in fresh_text
         assert 'Hình thức sử dụng: Sử dụng chung' in fresh_text
     finally:
         fresh.close()
-    properties = db.query(Property).order_by(Property.so_thua_dat).all()
-    assert {p.so_thua_dat: p.hinh_thuc_su_dung for p in properties} == {
-        '12': 'Sử dụng riêng', '22': 'Sử dụng chung'}
-    from services.word_engine import _property_description
-    text = _property_description(properties)
+    rows = db.query(CaseAssetRow).filter_by(case_id=cid).order_by(
+        CaseAssetRow.vitri).all()
+    assert [row.hinh_thuc_su_dung for row in rows] == [
+        'Sử dụng riêng', 'Sử dụng chung']
+    from services.word_engine import build_template_mapping
+    text = build_template_mapping(
+        db.get(InheritanceCase, cid), static=True)['[Đoạn mô tả di sản]']
     assert 'Hình thức sử dụng: Sử dụng riêng' in text
     assert 'Hình thức sử dụng: Sử dụng chung' in text
     assert 'không lấy phần này' not in text
@@ -749,19 +757,16 @@ def test_form_label_scoped_to_asset_and_absent_stays_absent(db, tmp_path, sessio
 
     _, _, service, data = reviewed_case_with_source_form(db, tmp_path, content)
     assert [a['hinh_thuc_su_dung'] for a in data['stage']['assets']] == [None, 'Sử dụng chung']
-    properties = db.query(Property).order_by(Property.so_thua_dat).all()
-    assert {p.so_thua_dat: p.hinh_thuc_su_dung for p in properties} == {
-        '12': None, '22': 'Sử dụng chung'}
     fresh = session_factory()
     try:
         assert [a['hinh_thuc_su_dung']
                 for a in CaseWorkspaceService(fresh, None).get(data['case']['id'])['stage']['assets']] == [
                     None, 'Sử dụng chung']
-        fresh_properties = fresh.query(Property).order_by(Property.so_thua_dat).all()
-        assert {p.so_thua_dat: p.hinh_thuc_su_dung for p in fresh_properties} == {
-            '12': None, '22': 'Sử dụng chung'}
-        from services.word_engine import _property_description
-        assert 'Hình thức sử dụng: Sử dụng chung' in _property_description(fresh_properties)
+        from services.word_engine import build_template_mapping
+        fresh_text = build_template_mapping(
+            fresh.get(InheritanceCase, data['case']['id']),
+            static=True)['[Đoạn mô tả di sản]']
+        assert 'Hình thức sử dụng: Sử dụng chung' in fresh_text
     finally:
         fresh.close()
 
@@ -794,19 +799,19 @@ def test_form_repeated_labels_duplicate_vs_conflict(db, tmp_path, session_factor
     _, _, service, data = reviewed_case_with_source_form(db, tmp_path, content)
     assert [a['hinh_thuc_su_dung'] for a in data['stage']['assets']] == [
         'Sử dụng riêng', None]
-    properties = db.query(Property).order_by(Property.so_thua_dat).all()
-    assert {p.so_thua_dat: p.hinh_thuc_su_dung for p in properties} == {
-        '12': 'Sử dụng riêng', '22': None}
+    cid = data['case']['id']
+    rows = db.query(CaseAssetRow).filter_by(case_id=cid).order_by(
+        CaseAssetRow.vitri).all()
+    assert [row.hinh_thuc_su_dung for row in rows] == [
+        'Sử dụng riêng', None]
     fresh = session_factory()
     try:
         assert [a['hinh_thuc_su_dung']
-                for a in CaseWorkspaceService(fresh, None).get(data['case']['id'])['stage']['assets']] == [
+                for a in CaseWorkspaceService(fresh, None).get(cid)['stage']['assets']] == [
                     'Sử dụng riêng', None]
-        fresh_properties = fresh.query(Property).order_by(Property.so_thua_dat).all()
-        assert {p.so_thua_dat: p.hinh_thuc_su_dung for p in fresh_properties} == {
-            '12': 'Sử dụng riêng', '22': None}
-        from services.word_engine import _property_description
-        fresh_text = _property_description(fresh_properties)
+        from services.word_engine import build_template_mapping
+        fresh_text = build_template_mapping(
+            fresh.get(InheritanceCase, cid), static=True)['[Đoạn mô tả di sản]']
         assert 'Hình thức sử dụng: Sử dụng riêng' in fresh_text
         assert 'Hình thức sử dụng: Sử dụng chung' not in fresh_text
     finally:
@@ -1431,7 +1436,8 @@ def test_deceased_person_maps_explicit_source_fields_without_identity_merge(db, 
     from models import Customer
     deceased_customer = db.query(Customer).filter(Customer.ho_ten == 'Nguyễn Văn Cố').one()
     assert deceased_customer.so_giay_to == '95/2026/TLKT'
-    assert deceased_customer.ngay_chet.isoformat() == '2016-06-05'
+    # Ngày chết thuộc dòng Hồ sơ; danh tính dùng chung không bị ghi ngược.
+    assert deceased_customer.ngay_chet is None
     fresh = session_factory()
     try:
         fresh_people = CaseWorkspaceService(fresh, None).get(cid)['stage']['people']
@@ -1502,8 +1508,12 @@ def test_deceased_namesake_living_not_merged_and_missing_type_stays_partial(db, 
 
     _, _, service, data = reviewed_case_with_source_form(db, tmp_path, content)
     from models import Customer
-    assert db.query(Customer).filter(Customer.ho_ten == 'Nguyễn Văn Trùng').count() == 2
-    deceased_customer = (db.query(Customer)
-                         .filter(Customer.ho_ten == 'Nguyễn Văn Trùng',
-                                 Customer.so_giay_to.is_(None)).one())
-    assert deceased_customer.ngay_chet.isoformat() == '2016-06-05'
+    # Dòng người chết thiếu neo giấy tờ → chưa có identity dùng chung;
+    # dòng còn sống có neo thì một identity. Không gộp hai dòng cùng tên.
+    assert db.query(Customer).filter(Customer.ho_ten == 'Nguyễn Văn Trùng').count() == 1
+    rows = [p for p in service.get(data['case']['id'])['stage']['people']
+            if p['ho_ten'] == 'Nguyễn Văn Trùng']
+    assert len(rows) == 2
+    assert [row['ngay_chet'] for row in rows] == [None, '2016-06-05']
+    assert [row['entity_id'] for row in rows][0] is not None
+    assert rows[1]['entity_id'] is None

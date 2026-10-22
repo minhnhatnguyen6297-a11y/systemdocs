@@ -89,16 +89,19 @@ def test_year_only_and_full_dates_stay_distinct_through_export(db, tmp_path):
     assert paragraphs[5] == "2015"
 
 
-def test_legacy_master_date_renders_full_not_year(db, tmp_path):
-    """Hồ sơ cũ thiếu key ngày → fallback master render ĐẦY ĐỦ
-    `01/01/<năm>` trên cả token legacy lẫn new-catalog (export thật);
-    key có mặt (kể cả `null`) chặn fallback."""
-    # A. Không snapshot: người lấy master (slot legacy).
+def test_row_dates_are_sot_and_json_stage_is_ignored(db, tmp_path):
+    """Ngày Người đọc từ dòng case-owned; JSON không còn là Stage.
+
+    - Mất Diagram (chỉ còn owner_row_id) → ngày vẫn đủ từ rows.
+    - Chèn `stage` giả vào JSON → xuất vẫn đúng rows (không đọc JSON/master).
+    """
     data = t._create(db, with_state=True, people_overrides=(
         {"ngay_sinh": "1950-01-01"}, {}))
     case_id = data["case"]["id"]
     case = db.get(t.InheritanceCase, case_id)
-    case.case_state_json = None
+    payload = json.loads(case.case_state_json)
+    case.case_state_json = json.dumps({
+        "schemaVersion": 4, "owner_row_id": payload["owner_row_id"]})
     db.commit()
 
     mapping = t.word_engine.build_template_mapping(
@@ -106,28 +109,29 @@ def test_legacy_master_date_renders_full_not_year(db, tmp_path):
     assert "Sinh ngày: 01/01/1950" in mapping["[Dòng người 1]"]
     assert mapping["[ngaysinh1]"] == "01/01/1950"
 
-    # B. Snapshot CŨ còn stage nhưng THIẾU cả 3 key ngày → new-catalog
-    # (`[Người N - *]`, `[Dòng người N]`) fallback master của hồ sơ.
     data2 = t._create(db, with_state=True, people_overrides=(
         {"ngay_sinh": "1950-01-01", "ngay_chet": "2011-01-01",
          "ngay_cap": "2011-01-02"}, {}))
     case2_id = data2["case"]["id"]
     case2 = db.get(t.InheritanceCase, case2_id)
     payload = json.loads(case2.case_state_json)
-    for row in payload["stage"]:
-        for key in ("ngay_sinh", "ngay_chet", "ngay_cap"):
-            row.pop(key, None)
+    owner_row_id = payload["owner_row_id"]
+    payload["stage"] = [{
+        "row_id": owner_row_id, "ho_ten": "Tên bịa từ JSON",
+        "ngay_sinh": "1900", "ngay_chet": None, "ngay_cap": None}]
     case2.case_state_json = json.dumps(payload, ensure_ascii=False)
     db.commit()
 
-    owner_name = db.get(t.Customer, int(payload["stage"][0]["id"])).ho_ten
+    owner_name = db.get(
+        t.Customer, db.get(t.InheritanceCase, case2_id).person_rows[0].customer_id
+    ).ho_ten
     mapping2 = t.word_engine.build_template_mapping(
         db.get(t.InheritanceCase, case2_id))
+    assert mapping2["[Người 1 - Họ tên]"] == owner_name
     assert mapping2["[Người 1 - Ngày sinh]"] == "01/01/1950"
     assert mapping2["[Người 1 - Ngày chết]"] == "01/01/2011"
     assert mapping2["[Người 1 - Ngày cấp]"] == "02/01/2011"
     assert mapping2["[ngaysinh1]"] == "01/01/1950"
-    # Chủ đất chết vẫn được phân loại đúng (ngay_chet lấy từ master).
     assert mapping2["[Chủ đất chết 1 - Họ tên]"] == owner_name
 
     paragraphs = _export_docx(db, case2_id, [
@@ -139,20 +143,3 @@ def test_legacy_master_date_renders_full_not_year(db, tmp_path):
     assert paragraphs[2] == "02/01/2011"
     assert "Sinh ngày: 01/01/1950" in paragraphs[3]
     assert paragraphs[4] == owner_name
-
-    # C. Key CÓ MẶT nhưng `null` → chặn fallback master (rỗng, không đọc master).
-    payload = json.loads(case2.case_state_json)
-    for row in payload["stage"]:
-        for key in ("ngay_sinh", "ngay_chet", "ngay_cap"):
-            row[key] = None
-    case2.case_state_json = json.dumps(payload, ensure_ascii=False)
-    db.commit()
-
-    mapping3 = t.word_engine.build_template_mapping(
-        db.get(t.InheritanceCase, case2_id), static=True)
-    assert mapping3["[Người 1 - Ngày sinh]"] == ""
-    assert mapping3["[Người 1 - Ngày chết]"] == ""
-    assert "Sinh ngày" not in mapping3["[Dòng người 1]"]
-    null_paragraphs = _export_docx(db, case2_id, [
-        "[Người 1 - Họ tên]", "[Người 1 - Ngày sinh]"], tmp_path / "null")
-    assert null_paragraphs == [owner_name]

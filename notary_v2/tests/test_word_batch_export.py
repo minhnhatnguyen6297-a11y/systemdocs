@@ -95,24 +95,121 @@ def _case_state(*people, nodes=None):
     return json.dumps(payload, ensure_ascii=False)
 
 
+def _person_row(stage_row, vitri):
+    raw_id = stage_row.get("entity_id")
+    if raw_id is None:
+        legacy = str(stage_row.get("id") or "")
+        raw_id = int(legacy) if legacy.isdigit() else None
+    return SimpleNamespace(
+        row_id=stage_row.get("row_id") or f"row-{raw_id}-{vitri}",
+        customer_id=raw_id, vitri=vitri,
+        ho_ten=stage_row.get("ho_ten"),
+        gioi_tinh=stage_row.get("gioi_tinh"),
+        ngay_sinh=stage_row.get("ngay_sinh"),
+        ngay_chet=stage_row.get("ngay_chet"),
+        so_giay_to=stage_row.get("so_giay_to"),
+        ngay_cap=stage_row.get("ngay_cap"),
+        noi_cap=stage_row.get("noi_cap"),
+        dia_chi=stage_row.get("dia_chi"),
+        place_of_origin=stage_row.get("place_of_origin"),
+        loai_giay_to=stage_row.get("loai_giay_to"),
+        loai_dia_chi=stage_row.get("loai_dia_chi"),
+    )
+
+
+def _asset_row(prop, vitri):
+    raw = prop.land_rows_json
+    rows = json.loads(raw) if raw else []
+    return SimpleNamespace(
+        row_id=f"asset-{vitri}", property_id=getattr(prop, "id", None),
+        vitri=vitri, so_serial=prop.so_serial, so_vao_so=prop.so_vao_so,
+        so_thua_dat=prop.so_thua_dat, so_to_ban_do=prop.so_to_ban_do,
+        dia_chi=prop.dia_chi, loai_so=prop.loai_so,
+        hinh_thuc_su_dung=prop.hinh_thuc_su_dung, thoi_han=prop.thoi_han,
+        nguon_goc=prop.nguon_goc, ngay_cap=prop.ngay_cap,
+        co_quan_cap=prop.co_quan_cap, land_rows_present=bool(raw),
+        land_rows=[SimpleNamespace(
+            vitri=index + 1, loaidat=row.get("loai_dat"),
+            dientich=row.get("dien_tich"), thoihan=row.get("thoi_han"))
+            for index, row in enumerate(rows) if isinstance(row, dict)],
+    )
+
+
 def _make_case(owner, *, participants=None, properties=None,
                case_state=None, cid=99):
-    """properties=None → không tài sản (empty); [] cũng vậy."""
+    """Case Storage B: rows case-owned + JSON v4 (Diagram/meta)."""
+    participants = participants or []
     props = properties or []
+    payload = json.loads(case_state) if case_state else {}
+    stage_items = payload.get("stage") if isinstance(payload.get("stage"), list) else None
+    if stage_items is None:
+        stage_items = []
+        if owner is not None:
+            stage_items.append({
+                "id": str(owner.id), "ho_ten": owner.ho_ten,
+                "gioi_tinh": owner.gioi_tinh,
+                "ngay_sinh": owner.ngay_sinh.isoformat() if owner.ngay_sinh else None,
+                "ngay_chet": owner.ngay_chet.isoformat() if owner.ngay_chet else None,
+                "so_giay_to": owner.so_giay_to,
+                "ngay_cap": owner.ngay_cap.isoformat() if owner.ngay_cap else None,
+                "noi_cap": owner.noi_cap, "dia_chi": owner.dia_chi,
+                "loai_dia_chi": owner.loai_dia_chi})
+        for participant in participants:
+            person = participant.customer
+            stage_items.append({
+                "id": str(person.id), "ho_ten": person.ho_ten,
+                "gioi_tinh": person.gioi_tinh,
+                "ngay_sinh": person.ngay_sinh.isoformat() if person.ngay_sinh else None,
+                "ngay_chet": person.ngay_chet.isoformat() if person.ngay_chet else None,
+                "so_giay_to": person.so_giay_to,
+                "ngay_cap": person.ngay_cap.isoformat() if person.ngay_cap else None,
+                "noi_cap": person.noi_cap, "dia_chi": person.dia_chi,
+                "loai_dia_chi": person.loai_dia_chi})
+    person_rows = [_person_row(item, index + 1)
+                   for index, item in enumerate(stage_items)]
+    entity_to_row = {str(row.customer_id): row.row_id
+                     for row in person_rows if row.customer_id is not None}
+
+    diagram = payload.get("diagram") or {}
+    nodes = None
+    engine = diagram.get("engineInput")
+    if isinstance(engine, dict):
+        nodes = engine.get("nodes") or []
+    elif isinstance(diagram.get("state"), dict):
+        nodes = diagram["state"].get("nodes") or []
+    remapped = []
+    for node in nodes or []:
+        if isinstance(node, dict):
+            mapped = entity_to_row.get(str(node.get("personId")))
+            remapped.append({**node,
+                             "personId": mapped or node.get("personId")})
+    state = json.dumps({
+        "schemaVersion": 4,
+        "owner_row_id": entity_to_row.get(str(getattr(owner, "id", None))),
+        "diagram": {"state": {"version": 3, "domain": "inheritance",
+                              "nodes": remapped}},
+    }, ensure_ascii=False)
+    for participant in participants:
+        participant.case_person_row_id = entity_to_row.get(
+            str(participant.customer_id))
     return SimpleNamespace(
         id=cid,
         nguoi_chet=owner,
         tai_san=props[0] if props else None,
-        property_links=[
-            SimpleNamespace(property=p, is_primary=(i == 0), id=i + 1)
-            for i, p in enumerate(props)
-        ],
         ngay_lap_ho_so=date(2026, 7, 3),
         loai_van_ban="khai_nhan",
+        trang_thai="draft",
+        workspace_revision=1,
         noi_niem_yet="UBND xã Minh Tân",
+        nguoi_nhan_uy_quyen=None,
+        nguoi_nhan_uy_quyen_id=None,
+        noi_dung_viec=None,
         ghi_chu="",
-        participants=participants or [],
-        case_state_json=case_state,
+        participants=participants,
+        person_rows=person_rows,
+        asset_rows=[_asset_row(prop, index + 1)
+                    for index, prop in enumerate(props)],
+        case_state_json=state,
     )
 
 
@@ -236,7 +333,7 @@ class TestExportOptions:
         b = _person(2, "Phạm Thị B")
         case = _make_case(
             a, properties=[_prop()],
-            participants=[_participant(a, 'Ben A'), _participant(b, 'Ben B')],
+            participants=[_participant(b, 'Ben B')],
             case_state=None)
         case.loai_van_ban = "chuyen_nhuong"
         stage_only = tmp_path / "stage_only.docx"
@@ -1015,7 +1112,7 @@ class TestFolderModeExport:
             resolve_template=resolve, doc_specs=specs)
         assert result["breakdown"]["succeeded"] == ["static.docx"]
         output = Document(result["documents"][0]["output_file"]["path"])
-        assert case.nguoi_chet.ho_ten in output.paragraphs[0].text
+        assert case.person_rows[0].ho_ten in output.paragraphs[0].text
         assert "[" not in output.paragraphs[0].text
 
     def test_options_lists_folder_files(self, tmp_path):
@@ -1239,7 +1336,7 @@ def _two_party_case():
     b = _person(2, "Phạm Thị B")
     case = _make_case(
         a, properties=[_prop()], case_state=None,
-        participants=[_participant(a, 'Ben A'), _participant(b, 'Ben B')])
+        participants=[_participant(b, 'Ben B')])
     case.loai_van_ban = "chuyen_nhuong"
     return case
 

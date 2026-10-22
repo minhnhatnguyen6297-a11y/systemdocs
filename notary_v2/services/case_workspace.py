@@ -1515,6 +1515,10 @@ class CaseWorkspaceService:
             self.db.delete(row)
 
         self.db.flush()
+        # Collection rows đã cache trước khi thêm dòng mới; expire để
+        # consumer đọc rows trong CÙNG transaction (validate docx/Word)
+        # thấy đủ dòng vừa ghi, không cần commit.
+        self.db.expire(case, ["person_rows", "asset_rows"])
         return person_wires, asset_wires
 
     def _sync_links(self, case: InheritanceCase,

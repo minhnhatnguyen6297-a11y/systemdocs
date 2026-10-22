@@ -5115,9 +5115,9 @@ endif %}
 
     function normalizeCommittedStageRecord(raw) {
       const record = toLegacyCustomerShape(raw) || raw || {};
-      const id = String(record.id || raw?.id || '').trim();
-      if (!id) return null;
       const source = raw && typeof raw === 'object' ? raw : {};
+      const id = String(record.id || raw?.id || source.row_id || '').trim();
+      if (!id) return null;
       const pick = (key, ...fallbacks) => {
         if (Object.prototype.hasOwnProperty.call(source, key)) return String(source[key] ?? '');
         for (const fallback of fallbacks) {
@@ -5127,6 +5127,7 @@ endif %}
       };
       return {
         id,
+        row_id: String(source.row_id || '').trim() || null,
         ho_ten: pick('ho_ten', 'name'), gioi_tinh: pick('gioi_tinh', 'gender'),
         ngay_sinh: pick('ngay_sinh', 'birth'), ngay_chet: pick('ngay_chet', 'death'),
         so_giay_to: pick('so_giay_to', 'doc'), ngay_cap: pick('ngay_cap', 'issue_date'),
