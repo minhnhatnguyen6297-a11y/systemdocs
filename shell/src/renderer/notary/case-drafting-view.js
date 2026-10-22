@@ -6,9 +6,9 @@
  * SOT bo cuc: mockup MIN-133 đã duyệt (_bmad-output/archive/linear-tasks/MIN-133/mockup/
  * mockup-1440x775.png) trên nền bản mẫu P6 (_bmad-output/specs/ui/prototypes):
  *   - Thanh trên DUY NHẤT (.cd-topbar, ~42px): tab cục bộ (Tổng quan /
- *     Soạn / Word) | loại việc, Nhập file, Zalo (disabled placeholder)
- *     ……… Lưu hồ sơ/Cập nhật (chấm dirty = tín hiệu chưa
- *     lưu duy nhất). Không nút back, không tiêu đề, không pill Nháp
+ *     Soạn / Word) | loại việc, Nhập file, Zalo (disabled placeholder).
+ *     Tín hiệu chưa lưu duy nhất là chấm dirty trên nút Lưu hồ sơ ở
+ *     header card Sơ đồ. Không nút back, không tiêu đề, không pill Nháp
  *     standalone, không banner trạng thái lưu (MIN-133 D4/D5).
  *     NGOẠI LỆ theo NS §2: hồ sơ đã có ID mang text trạng thái nghiệp vụ
  *     (`Nháp`/`Đã lưu`) ngay trong pill định danh `Loại · HS-N · Nhãn`;
@@ -461,47 +461,12 @@ function createNotaryModuleView(deps) {
   }
 
   // ---------- thanh trên: phần hành động (MIN-133 D4/D5) ----------
-  // Tín hiệu chưa lưu duy nhất = chấm dirty trên nút Lưu/Cập nhật
-  // (bỏ nhãn "Chưa lưu hồ sơ"/"Đã lưu · phiên bản N").
+  // Tín hiệu chưa lưu duy nhất = chấm dirty trên nút Lưu hồ sơ trong
+  // header card Sơ đồ.
 
   function primaryDirty() {
     const s = model.state;
     return s.stageDirty || s.diagramDirty || s.metaDirty;
-  }
-
-  // Commit/Cập nhật — điểm ghi Stage + meta (§13.2, đợt 3:
-  // payload.case đi cùng transaction). Nháp mới: Lưu nháp =
-  // workspace_create (ghi meta + stage + diagram cùng lúc).
-  // "Lưu hồ sơ" (workspace_save_case) là nút riêng ở card Sơ đồ.
-  function commitDisabled() {
-    const s = model.state;
-    if (!model.canWrite()) return true;
-    if (s.caseId == null) {
-      return s.busy === 'notary.workspace_create';
-    }
-    return !(s.stageDirty || s.metaDirty) ||
-      s.busy === 'notary.workspace_commit_stage';
-  }
-
-  async function runCommit() {
-    const s = model.state;
-    if (s.caseId == null) {
-      const r = await model.saveDraft();
-      if (!r.ok && r.error && r.error.code === 'diagram_invalid_state') {
-        notify(errText(r.error.details?.errors?.[0] || r.error), true);
-      } else if (!r.ok && r.error &&
-          r.error.code !== 'stage_validation_error' &&
-          r.error.code !== 'workspace_owner_required') {
-        notify(errText(r.error), true);
-      }
-    } else {
-      const r = await model.commitStage();
-      if (!r.ok && r.error &&
-          r.error.code !== 'stage_validation_error' &&
-          r.error.code !== 'workspace_conflict') {
-        notify(errText(r.error), true);
-      }
-    }
   }
 
   // Lưu hồ sơ: flush mọi editor đăng ký (text/date/meta) rồi để model
@@ -541,7 +506,7 @@ function createNotaryModuleView(deps) {
       box.append(head, body, foot);
       if (s.stageDirty || s.metaDirty) {
         body.append(h('div', 'banner warn',
-          'Stage hoặc thông tin hồ sơ có thay đổi chưa lưu. Hãy đóng dialog và bấm Cập nhật trước khi đổi loại.'));
+          'Stage hoặc thông tin hồ sơ có thay đổi chưa lưu. Hãy đóng dialog và bấm Lưu hồ sơ trước khi đổi loại.'));
         foot.append(btn('Đóng', '', close));
         return;
       }
@@ -561,8 +526,8 @@ function createNotaryModuleView(deps) {
       }
       const documentType = selectField('Văn bản mới',
         model.documentTypesFor(target).map(v => [v, DOC_TYPE_LABEL[v] || v]), '— Chọn văn bản —');
-      const owner = target === 'inheritance' ? selectField('Người để lại (Stage đã lưu)',
-        s.committed.people.map(p => [p.row_id, p.ho_ten || p.row_id]), '— Chọn người —') : null;
+      const owner = target === 'inheritance' ? selectField('Người để lại',
+        s.stage.people.map(p => [p.row_id, p.ho_ten || p.row_id]), '— Chọn người —') : null;
       const acknowledgement = h('label', 'cd-check-row');
       const check = h('input', ''); check.type = 'checkbox';
       acknowledgement.append(check, h('span', '', 'Tôi xác nhận xóa Diagram cũ.'));
@@ -674,12 +639,6 @@ function createNotaryModuleView(deps) {
       n.append(t, h('span', 'grow', ''), x);
       bar.append(n);
     }
-    const label = draft ? 'Lưu nháp' : 'Cập nhật';
-    const primary = btn(label, 'primary js-cd-update', runCommit);
-    primary.dataset.label = label;
-    setPrimaryDirty(primary, primaryDirty());
-    primary.disabled = commitDisabled();
-    bar.append(primary);
   }
 
   function setPrimaryDirty(upd, dirty) {
@@ -694,14 +653,14 @@ function createNotaryModuleView(deps) {
     }
   }
 
-  // Cập nhật gọn nút commit khi rebuild bị defer (đang gõ trong
-  // panel) — dirty state phải hiện ngay, không chờ blur.
+  // Cập nhật gọn nút Lưu hồ sơ khi rebuild bị defer (đang gõ trong
+  // panel) — dirty/aria/disabled phải hiện ngay, không chờ blur.
   function syncChromeUI() {
-    const upd = root.querySelector('.js-cd-update');
-    if (upd) {
-      upd.disabled = commitDisabled();
-      setPrimaryDirty(upd, primaryDirty());
-    }
+    const save = root.querySelector('.js-save-diagram');
+    if (!save) return;
+    const s = model.state;
+    save.disabled = !!s.busy || !s.capabilities.diagram || !model.canWrite();
+    setPrimaryDirty(save, primaryDirty());
   }
 
   // MIN-133 D2: không còn card "Thông tin hồ sơ". Meta nháp mới đi lên
@@ -853,8 +812,9 @@ function createNotaryModuleView(deps) {
     if (model.hasUnsaved()) {
       const okGo = await confirm({
         title: 'Thay đổi chưa lưu',
-        body: 'Bản nháp hiện tại còn thay đổi chưa lưu — tạo hồ sơ ' +
-          'mới sẽ mất bản nháp này.',
+        body: 'Các thay đổi hiện tại chưa được ghi vào cơ sở dữ liệu. Tạo ' +
+          'hồ sơ mới sẽ mất các thay đổi này. Bấm Lưu hồ sơ trước nếu ' +
+          'muốn lưu.',
         confirmLabel: 'Bỏ nháp, tạo mới',
         cancelLabel: 'Ở lại',
       });
@@ -880,8 +840,9 @@ function createNotaryModuleView(deps) {
     if (model.hasUnsaved()) {
       const okGo = await confirm({
         title: 'Thay đổi chưa lưu',
-        body: 'Bản nháp hiện tại còn thay đổi chưa lưu — nhân bản hồ sơ ' +
-          'khác sẽ mất bản nháp này.',
+        body: 'Các thay đổi hiện tại chưa được ghi vào cơ sở dữ liệu. Nhân ' +
+          'bản và mở hồ sơ khác sẽ mất các thay đổi này. Bấm Lưu hồ sơ ' +
+          'trước nếu muốn lưu.',
         confirmLabel: 'Bỏ nháp, nhân bản',
         cancelLabel: 'Ở lại',
       });
@@ -1460,7 +1421,7 @@ function createNotaryModuleView(deps) {
       foot.append(btn('Hủy', 'ghost', close));
       const apply = btn('Áp dụng', 'primary', () => {
         // Chỉ ghi draft Stage (touchStage → dirty) — không gọi command
-        // ra ngoài; Cập nhật ở action bar mới commit.
+        // ra ngoài; Lưu hồ sơ mới ghi DB.
         const rows = draft.map((d) => ({
           _source_land_row: d._source_land_row || null,
           loai_dat: d.loai_dat || null,
@@ -1713,7 +1674,7 @@ function createNotaryModuleView(deps) {
       if (!ro) {
         const del = h('button', 'icon-x', '×');
         del.type = 'button';
-        del.title = 'Xóa dòng (draft — hiệu lực sau Cập nhật)';
+        del.title = 'Xóa dòng khỏi bản đang sửa — ghi vào hồ sơ khi bấm Lưu hồ sơ.';
         del.dataset.fid = `pdel:${p.row_id}`;
         del.setAttribute('aria-label',
           `Xóa ${p.ho_ten || `dòng ${ri + 1}`}`);
@@ -2157,8 +2118,9 @@ function createNotaryModuleView(deps) {
     if (model.hasUnsaved()) {
       const ok = await confirm({
         title: 'Thay đổi chưa lưu',
-        body: 'Stage/Sơ đồ còn bản nháp chưa lưu — mở hồ sơ khác sẽ mất ' +
-          'bản nháp hiện tại.',
+        body: 'Các thay đổi hiện tại chưa được ghi vào cơ sở dữ liệu. Mở ' +
+          'hồ sơ khác sẽ mất các thay đổi này. Bấm Lưu hồ sơ trước nếu ' +
+          'muốn lưu.',
         confirmLabel: 'Bỏ nháp và mở',
         cancelLabel: 'Ở lại',
       });
@@ -2263,12 +2225,18 @@ function createNotaryModuleView(deps) {
     // Emit nền (jobUpdate/status poll) trong lúc đang gõ trong drafting
     // panel: hoãn rebuild để input không mất focus/giá trị — render sau
     // lần emit kế tiếp (blur/change hoặc action tiếp theo của người
-    // dùng). Chỉ nút commit/undo/nhãn save được cập nhật gọn ngay.
+    // dùng). Chỉ nút Lưu hồ sơ/undo/nhãn save được cập nhật gọn ngay.
     const ae = document.activeElement;
     if (!afterSave && ae && dp.contains(ae) &&
         /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName || '')) {
       syncChromeUI();
       refreshAddressBoxes(dp);
+      // Refresh hẹp phần quan hệ (Pool/nhãn/hint/nút Lưu) để dữ liệu
+      // đang gõ phản ánh ngay, không dựng lại editor Stage.
+      if (diagramPane && typeof diagramPane.refresh === 'function') {
+        diagramPane.refresh();
+        syncChromeUI();
+      }
       // MIN-136 F-1: rebuild bi hoan khi dang go — nhung dialog
       // conflict phai hien NGAY (server tu choi commit thi user can
       // biet lieu ke, khong doi blur/emit sau).

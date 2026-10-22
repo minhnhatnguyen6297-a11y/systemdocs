@@ -6,9 +6,9 @@
  * bo cuc/thao tac: _bmad-output/specs/ui/prototypes/notary.js (canvas pan/zoom/
  * "Mở rộng", card thua ke + 2 hang chip, hai ben 30 cho).
  *
- * - Pool = nguoi CHUA GAN tren draft Diagram — nhap moi (caseId=null)
- *   nguon la stage nhap, case that nguon la committed (MIN-136). Chi
- *   nguoi — tai san khong xuong Pool (khong co flow gan len node).
+ * - Pool = nguoi CHUA GAN tren draft Diagram, luon doc Stage dang sua
+ *   (cung nguon voi bang Nguoi/nhan node). Chi nguoi — tai san khong
+ *   xuong Pool (khong co flow gan len node).
  *   Search chi loc hien thi — khong doi draft.
  * - Keo tha payload 'text/plain' JSON {kind:'person', row_id} — contract
  *   P6 giu nguyen: drop len node/slot = movePerson (move/swap), drop vao
@@ -260,6 +260,12 @@ function createDiagramPane(ctx) {
   let poolDrag = null;   // {el, sp, x}
   // Canvas trong overlay "Mở rộng" — rebuild khi emit den de dong bo.
   let expandBody = null;
+  // Refresh hẹp phần quan hệ khi view hoãn rebuild vì Stage input đang
+  // focus — không dựng lại editor Stage/ô đang gõ.
+  let currentCard = null;
+  let currentDiagramRegion = null;
+  let currentSaveBtn = null;
+  let currentRenderPool = null;
 
   if (typeof document !== 'undefined' && document.addEventListener) {
     document.addEventListener('mousemove', (e) => {
@@ -293,13 +299,8 @@ function createDiagramPane(ctx) {
     model.subscribe(() => { if (expandBody) rebuildExpand(); });
   }
 
-  // Stage dirty (case da ton tai): evaluate phai doi — draft Stage chua
-  // cap nhat nen ket qua tinh se mo ta du lieu cu. Nguoi dung Cap nhat
-  // hoac Huy Stage truoc (MIN-129 dirty-safety). "Luu ho so" KHONG dung
-  // gate nay: nut do flush ca Stage dang sua trong cung snapshot.
-  function stageGate() {
-    return model.state.caseId != null && model.state.stageDirty;
-  }
+  // Stage dirty (case da ton tai): evaluate chay tren buffer dang sua
+  // (payload draft), nen khong con gate bat luu truoc.
 
   function isTp() {
     return model.diagramDomain && model.diagramDomain() === TWO_PARTY;
@@ -310,7 +311,7 @@ function createDiagramPane(ctx) {
   // two_party: engine khong ho tro (§13.5) — khong goi evaluate.
   function scheduleEvaluate() {
     if (isTp() || !model.state.capabilities.diagram ||
-        model.state.unsupported || stageGate()) {
+        model.state.unsupported) {
       return;
     }
     if (evalTimer) clearTimeout(evalTimer);
@@ -329,10 +330,10 @@ function createDiagramPane(ctx) {
   }
 
   function personRow(rowId) {
-    // Draft (caseId=null): nguon la stage nhap; case that: committed.
-    const src = model.state.caseId == null
-      ? model.state.stage.people : model.state.committed.people;
-    return src.find((x) => x.row_id === rowId) || null;
+    // Mọi case: nhãn/năm/hint đọc Stage đang sửa — cùng nguồn với bảng
+    // Người, không chờ lần ghi trung gian.
+    return (model.state.stage.people || [])
+      .find((x) => x.row_id === rowId) || null;
   }
 
   function personName(rowId) {
@@ -1196,7 +1197,7 @@ function createDiagramPane(ctx) {
     }, { bare: true, wide: true });
   }
 
-  // ---------- Pool pane (committed-only) + tier ----------
+  // ---------- Pool pane (Stage đang sửa) + tier ----------
 
   function poolPaneEl() {
     const s = model.state;
@@ -1236,20 +1237,12 @@ function createDiagramPane(ctx) {
 
     function renderPool() {
       box.innerHTML = '';
-      const st = model.state;
-      // MIN-136: nhap moi (caseId=null) nguon la stage NHAP — truoc day
-      // committed-only nen nhap khong bao gio co gi de tha (chi khi case
-      // da ton tai committed moi co nguoi). Case that: committed. Tai
-      // san khong xuong Pool — khong co flow gan len node.
-      const src = st.caseId == null ? st.stage : st.committed;
       const poolPeople = model.pool().people;
       title.textContent = `Pool (${poolPeople.length})`;
       const pp = poolPeople.filter((r) => poolMatch(r, poolQuery));
-      if (!(src.people || []).length) {
+      if (!(model.state.stage.people || []).length) {
         box.append(face(L.faceEmpty(
-          st.caseId == null
-            ? 'Chưa có người — thêm ở bảng Người rồi kéo vào sơ đồ.'
-            : 'Stage chưa có người đã xác nhận — Cập nhật Stage trước.')));
+          'Chưa có người — thêm ở bảng Người rồi kéo vào sơ đồ.')));
         return;
       }
       if (!pp.length) {
@@ -1275,6 +1268,7 @@ function createDiagramPane(ctx) {
       }
     }
     renderPool();
+    currentRenderPool = renderPool;
     return pane;
   }
 
@@ -1376,10 +1370,49 @@ function createDiagramPane(ctx) {
     return dg;
   }
 
+  function syncSaveButton() {
+    if (!currentSaveBtn) return;
+    const s = model.state;
+    const dirty = s.stageDirty || s.diagramDirty || s.metaDirty;
+    const dot = currentSaveBtn.querySelector('.dirty-dot');
+    if (dirty && !dot) currentSaveBtn.append(h('span', 'dirty-dot', ''));
+    if (!dirty && dot) dot.remove();
+    currentSaveBtn.disabled = !!s.busy || !s.capabilities.diagram ||
+      !model.canWrite();
+    if (dirty) {
+      currentSaveBtn.setAttribute('aria-label',
+        'Lưu hồ sơ — có thay đổi chưa lưu');
+    } else {
+      currentSaveBtn.removeAttribute('aria-label');
+    }
+  }
+
+  // Refresh hẹp phần quan hệ (Pool + canvas/nhãn/hint/lỗi + nút Lưu hồ
+  // sơ) trên card hiện có. Dùng khi view hoãn rebuild vì Stage input
+  // đang focus: editor Stage/caret/value không bị dựng lại.
+  function refresh() {
+    if (!currentCard || currentCard.isConnected === false) return false;
+    if (currentRenderPool) currentRenderPool();
+    const oldWrap = currentDiagramRegion &&
+      currentDiagramRegion.querySelector('.cd-canvas-wrap');
+    const scroll = oldWrap
+      ? { top: oldWrap.scrollTop, left: oldWrap.scrollLeft } : null;
+    const next = diagramRegionEl();
+    if (currentDiagramRegion && currentDiagramRegion.isConnected) {
+      currentDiagramRegion.replaceWith(next);
+    }
+    currentDiagramRegion = next;
+    if (scroll) {
+      const wrap = next.querySelector('.cd-canvas-wrap');
+      if (wrap) { wrap.scrollTop = scroll.top; wrap.scrollLeft = scroll.left; }
+    }
+    syncSaveButton();
+    return true;
+  }
+
   function build() {
     const s = model.state;
     const tp = isTp();
-    const gate = stageGate();
     const card = h('div', 'card cd-rel-card');
 
     // Head: title + tools nho (slot, cach tinh, danh gia — chi domain
@@ -1396,21 +1429,15 @@ function createDiagramPane(ctx) {
         if (calcOpen) await runEvaluate();
         rerender();
       });
-      calc.disabled = gate || !s.capabilities.diagram;
+      calc.disabled = !s.capabilities.diagram;
       tools.append(calc);
       // Badge stale: stage revision da vuot lan evaluate cuoi cua draft.
       const staleEval = s.evaluatedRevision != null &&
         s.evaluatedRevision !== s.revision;
-      if (staleEval && !gate) {
+      if (staleEval) {
         tools.append(h('span', 'pill warn',
           'Stage đã đổi kể từ lần đánh giá'));
       }
-    }
-    if (gate) {
-      const pill = h('span', 'pill warn', 'Cập nhật Stage trước');
-      pill.title = 'Đánh giá/lưu sơ đồ dùng Stage đã cập nhật — bấm ' +
-        'Cập nhật ở thanh trên trước.';
-      tools.append(pill);
     }
     tools.append(zoomClusterEl());
     const expand = btn('⛶ Mở rộng', 'sm', () => openExpanded());
@@ -1430,6 +1457,7 @@ function createDiagramPane(ctx) {
       save.append(h('span', 'dirty-dot', ''));
     }
     save.disabled = !!s.busy || !s.capabilities.diagram || !model.canWrite();
+    currentSaveBtn = save;
     const word = btn('Xuất Word', 'sm primary', openWordDialog);
     word.disabled = !s.capabilities.word_export || s.wordBusy;
     tools.append(save, word);
@@ -1442,12 +1470,15 @@ function createDiagramPane(ctx) {
     const poolEl = poolPaneEl();
     body.append(poolEl);
     body.append(poolSplitterEl(poolEl));
-    body.append(diagramRegionEl());
+    const region = diagramRegionEl();
+    currentDiagramRegion = region;
+    body.append(region);
     card.append(body);
+    currentCard = card;
     return card;
   }
 
-  return { build };
+  return { build, refresh };
 }
 
 const G1_NOTARY_DIAGRAM = {
