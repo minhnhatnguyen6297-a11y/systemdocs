@@ -1,0 +1,188 @@
+G4 — so sánh test tự động (2026-10-23)
+Worktree: /home/hatch/workspace/worktrees/omp-drafting-e2e-fixes
+Nhánh: agent/omp/drafting-e2e-fixes, HEAD ea719a9
+Baseline so sánh: worktree tạm /tmp/g4-base-wt @ 198f66f (commit trước phần triển khai G4),
+node_modules symlink từ cây chính. Đã git worktree remove --force sau khi lấy số.
+Lưu ý môi trường: shell có HTTP_PROXY/HTTPS_PROXY/ALL_PROXY/NO_PROXY; NO_PROXY chứa
+mục "[::1]" làm httpx ném InvalidURL: Invalid port ':1]'. Các lần "canonical" dưới đây
+unset toàn bộ biến proxy (env -u ...). Các lần "có proxy" giữ nguyên môi trường shell.
+
+====================================================================
+1. NODE — full suite
+====================================================================
+Lệnh: cd shell && node --test test/*.test.mjs
+
+Baseline 198f66f:  tests 429, pass 381, fail 48, skipped 0
+Sau G4 (ea719a9): tests 428, pass 404, fail 24, skipped 0
+
+So tên từng tên:
+- Fail mới (chỉ có ở sau): KHÔNG CÓ (0).
+- 24 tên fail của baseline không còn fail ở sau; toàn bộ là test đã được di trú/đổi tên
+  theo save_case (design §7) hoặc đã pass sau cutover, không phải fail bị che:
+  diag/log đầy đủ: /tmp/g4-node-base.log và /tmp/g4-node-current.log.
+
+Chênh 429 -> 428 test: nhóm model 125 -> 124 do bỏ test API cũ
+"commitStage chi goi tren case that — draft khong co commitStage" (design §7.1);
+các file còn lại giữ nguyên tổng test.
+
+24 fail còn lại (đều có trong baseline, nợ cũ):
+- Thiếu fixture locked.json (5):
+  openCase: locked → status locked, write bi tu choi o model
+  diagram tren case locked: evaluate duoc phep (read-only), save bi chan
+  saveCaseMeta: case locked → khong goi wire, tra workspace_locked
+  locked case: moi mutation draft la no-op — addPerson/addAsset/update/remove/diagram
+  acceptSuggestion tren case locked → null, suggestion van con cho review
+- Address lookup / fileToken (17):
+  fileTokenStore: issue/resolve tra FileRef; entry cho renderer khong co path
+  P5: changing source removes ready results without sending another lookup
+  P9: malformed v2 responses become communication errors
+  P9: both full entry points reject wrong presentation and malformed rows
+  Tra sends drafting payload with live input text; re-Tra same text sends again
+  no auto lookup on edits; lookup never mutates rows or meta
+  posting query uses the posting box itself, not an asset address
+  issuer query uses the deceased address, not the noi_cap box
+  stale response dropped on new Tra, on source edit, and on A-B-A
+  switching case drops in-flight lookup
+  too_many confirm flow: full uses captured query; overlay edit only sends on Tra
+  closing overlay drops late full responses
+  malformed and transport failures store messages, never results
+  empty query sends nothing
+  R6: A-B-A before confirm keeps the old Tra invalid
+  R3: source change while pending ends stale with guidance, not loading
+  R3: editing an unrelated field does not invalidate the lookup
+- DOCX gọi python3 hệ thống thiếu module (2):
+  native DOCX free text enters existing Stage fields and manual edits survive commit and reload
+    (ModuleNotFoundError: httpx)
+  JSON download keeps original schema-valid result after review and invalid pending edits
+    (ModuleNotFoundError: referencing)
+  Hai lỗi này có ở baseline y hệt; không liên quan G4.
+
+Theo file đã di trú (cùng lệnh node --test):
+File                          Baseline 198f66f        Sau G4 ea719a9
+notary-case-drafting-model    125 test / 120 pass / 5  124 / 119 / 5
+notary-case-drafting-view      85 / 85 / 0              85 / 85 / 0
+notary-diagram                 25 / 20 / 5              25 / 25 / 0
+notary-diagram-errors          13 / 13 / 0              13 / 13 / 0
+notary-docx-intake             27 /  8 / 19             27 / 25 / 2
+notary-wire-payload-schema      4 /  2 / 2               4 /  4 / 0
+=> 0 fail mới ở mọi file.
+
+====================================================================
+2. PYTEST notary_v2
+====================================================================
+Lệnh canonical (proxy unset):
+cd notary_v2 && TMPDIR=/home/hatch/workspace/tmp-pytest \
+  PYTHONPATH=<repo-root> <venv>/python -m pytest tests -q \
+  --basetemp=/home/hatch/workspace/tmp-pytest/run-g4b-notary-clean
+
+Sau G4:   52 failed, 1206 passed, 7 skipped
+Baseline: chạy lại đúng 5 file chứa toàn bộ fail (document_intake,
+word_template_migration, naia12_e2e_migrate_export, zalo_parse_runner,
+document_conversion_poc): 52 failed, 220 passed, 6 skipped.
+So tên fail baseline vs sau: 51 ID duy nhất, TRÙNG KHÍT, 0 fail mới.
+
+Lệnh có proxy (môi trường shell mặc định), full suite 2 phía:
+Sau G4:   76 failed, 1182 passed, 7 skipped
+Baseline: 76 failed, 1182 passed, 7 skipped
+So tên fail: trùng khít (75 ID; 2 SUBFAILED cùng một test), 0 fail mới.
+24 fail tăng thêm so với canonical là httpx.InvalidURL do NO_PROXY "[::1]",
+có ở cả baseline.
+
+Lệch với số vòng 1 (1137 pass / 118 fail / 10 skip): KHÔNG tái lập được trong
+môi trường hiện tại; tổng test không đổi (1265). Baseline và sau đổi y hệt nhau
+(52/1206/7 canonical; 76/1182/7 có proxy), nên đây là khác biệt môi trường/phiên
+bản phụ thuộc của lần đo vòng 1, không phải hồi quy G4. notary_v2 không có diff
+source từ 1bd248d..HEAD (git diff --stat rỗng).
+
+51 tên fail canonical (nợ cũ; nhóm nguyên nhân):
+- Windows-only path/junction trên Linux (document_intake 45 ID, naia12 2,
+  word_template_migration 2):
+  test_document_conversion_poc.py::test_canonical_golden_manifest_hashes_and_routes
+  test_document_intake.py::SourceValidationTests::test_actual_size_over_limit
+  test_document_intake.py::SourceValidationTests::test_declared_size_over_limit
+  test_document_intake.py::SourceValidationTests::test_misdeclared_size_per_source_error
+  test_document_intake.py::ShapeInvariantTests::test_no_confirmed_no_empty_raw
+  test_document_intake.py::ShapeInvariantTests::test_raw_differs_from_normalized
+  test_document_intake.py::ImageAdapterTests::test_cccd_front_person
+  test_document_intake.py::ImageAdapterTests::test_death_certificate_person
+  test_document_intake.py::ImageAdapterTests::test_missing_api_key_is_per_source_error
+  test_document_intake.py::ImageAdapterTests::test_ocr_failure_does_not_stop_other_sources
+  test_document_intake.py::ImageAdapterTests::test_property_asset
+  test_document_intake.py::ImageAdapterTests::test_wrong_extension_parse_failed
+  test_document_intake.py::PdfAdapterTests::test_pdf_scanned_no_api_key
+  test_document_intake.py::PdfAdapterTests::test_pdf_scanned_pages_use_ocr_and_pair
+  test_document_intake.py::PdfAdapterTests::test_pdf_text_layer_property
+  test_document_intake.py::PdfAdapterTests::test_pdf_too_many_pages
+  test_document_intake.py::ReviewFindingAdapterTests::test_q2_mixed_unicode_keeps_source_span
+  test_document_intake.py::ReviewFindingAdapterTests::test_q2_normalized_values_keep_source_span
+  test_document_intake.py::ReviewFindingAdapterTests::test_q3_editing_one_row_does_not_touch_other_rows
+  test_document_intake.py::ReviewFindingAdapterTests::test_q3_land_row_refs_stay_in_their_own_cluster
+  test_document_intake.py::ReviewFindingAdapterTests::test_q4_multiple_serials_kept_for_reviewer
+  test_document_intake.py::ReviewFindingAdapterTests::test_q5_blank_land_cluster_warns_and_next_cluster_kept
+  test_document_intake.py::DocxAdapterTests::test_docx_corrupt_parse_failed
+  test_document_intake.py::DocxAdapterTests::test_docx_property
+  test_document_intake.py::DocxAdapterTests::test_docx_transfer_serial_raw_and_labeled_parcel_address
+  test_document_intake.py::DocxAdapterTests::test_docx_transfer_blank_serial_and_address_stay_missing
+  test_document_intake.py::ExcelAdapterTests::test_missing_required_column_parse_failed
+  test_document_intake.py::ExcelAdapterTests::test_person_rows_with_cell_refs
+  test_document_intake.py::AggregationTests::test_partial_breakdown
+  test_document_intake.py::test_spans_slice_source_for_nfd_and_non_bmp_text
+  test_document_intake.py::test_refs_stay_candidate_local_when_values_repeat
+  test_document_intake.py::AdjudicationConsumerTests::test_mb3_opener_address_keeps_ref
+  test_document_intake.py::AdjudicationConsumerTests::test_q2_same_id_two_people_keep_own_positions
+  test_document_intake.py::AdjudicationConsumerTests::test_q4_repeated_address_group_ambiguous
+  test_document_intake.py::Round4ConsumerTests::test_blank_label_does_not_create_colon_address
+  test_document_intake.py::Round4ConsumerTests::test_loai_so_keeps_uppercase_source_slice
+  test_document_intake.py::Round4ConsumerTests::test_mb9_land_rows_area_typed_with_whole_raw_span
+  test_document_intake.py::Round4ConsumerTests::test_q4_serial_without_group_ambiguous_with_both_refs
+  test_document_intake.py::Round4ConsumerTests::test_serial_raw_keeps_source_spacing
+  test_document_intake.py::Round4ConsumerTests::test_serial_same_value_spacing_not_ambiguous
+  test_document_intake.py::Round5ConsumerTests::test_bare_group_negative_flat_area_still_invalid
+  test_document_intake.py::Round5ConsumerTests::test_group_two_rows_no_false_ambiguous
+  test_document_intake.py::Round5ConsumerTests::test_multiline_group_two_rows_no_false_ambiguous
+  test_document_intake.py::Round5ConsumerTests::test_next_group_flat_areas_remain_ambiguous
+  test_document_intake.py::Round5ConsumerTests::test_repeated_parcel_term_ambiguity_after_merge
+  test_document_intake.py::Round5ConsumerTests::test_same_line_two_areas_ambiguous_with_both_refs
+  test_naia12_e2e_migrate_export.py::TestPreflightWriteTargets::test_junction_escape_target_refused
+  test_naia12_e2e_migrate_export.py::TestPreflightWriteTargets::test_report_junction_refused
+  test_word_template_migration.py::test_scan_source_templates_excludes_files_via_junctioned_dir
+  test_word_template_migration.py::test_write_guard_blocks_junction_swapped_after_copy
+- Merge tên trùng (zalo, 1):
+  test_zalo_parse_runner.py::test_parse_job_pairs_cccd_pages_and_merges_property
+  (AssertionError: assert 2 == 1 — "NGUYỄN VĂN AN" và "NGUYEN VAN AN")
+
+Ghi chú kỷ luật TMPDIR/basetemp: TMPDIR=/home/hatch/workspace/tmp-pytest,
+--basetemp tuyệt đối trong cùng cây.
+
+====================================================================
+3. PYTEST shell (contract/adapter)
+====================================================================
+Lệnh canonical (proxy unset):
+cd shell && TMPDIR=/home/hatch/workspace/tmp-pytest <venv>/python -m pytest \
+  test/test_engine_adapters.py test/test_notary_adapter_contract.py \
+  test/test_notary_mock_adapter.py test/test_sidecar_contract.py -q \
+  --basetemp=/home/hatch/workspace/tmp-pytest/run-g4b-shell-clean
+
+Sau G4:   5 failed, 267 passed, 28 skipped, 22 subtests passed
+Baseline: 5 failed, 267 passed, 28 skipped, 22 subtests passed
+=> TRÙNG KHÍT, 0 fail mới.
+
+5 fail (nợ cũ, có ở cả baseline):
+- test_engine_adapters.py::TestNotaryAdapter::test_case_flow_to_word
+  (CommandError: Không có tài sản để xuất Word)
+- test_engine_adapters.py::TestUploadAdapter::test_scan_and_audit_fixture
+  (CommandError: path khong tuyet doi)
+- test_engine_adapters.py::TestLegacyBundledRedirect::test_legacy_scan_writes_under_data_root
+  (CommandError: path khong tuyet doi)
+- test_sidecar_contract.py::SidecarContractTest::test_file_inspect_real_docx
+  (KeyError: 'job_id' — Windows-only path reject trên Linux)
+- test_sidecar_contract.py::SidecarContractTest::test_notary_word_export_idempotent_no_duplicate
+  (KeyError: 'job_id' — cùng nguyên nhân)
+
+Lệnh có proxy (môi trường shell mặc định), cùng 4 file:
+Sau G4:   3 failed, 243 passed, 28 skipped, 26 errors
+Baseline: 3 failed, 242 passed, 28 skipped, 26 errors (chạy 3 file engine/notary;
+          sidecar riêng: 1 passed, 26 errors)
+26 error đều httpx.InvalidURL: Invalid port ':1]' do NO_PROXY chứa "[::1]",
+có ở baseline; 3 fail engine trùng tên.
+=> 0 fail mới.
