@@ -12,7 +12,7 @@
  *   o renderer runCommand adapter boc submitCommand+getJob toi terminal.
  * - Draft chi song trong phien (drafting-tab §4): khong localStorage,
  *   khong log — state giu trong object nay.
- * - Khong bao gio tu commit: Cập nhật/Lưu sơ đồ la hanh dong nguoi dung.
+ * - Khong bao gio tu commit: Cập nhật/Lưu hồ sơ la hanh dong nguoi dung.
  */
 
 const CASE_TYPE_INHERITANCE = 'inheritance';
@@ -212,6 +212,7 @@ function createModel(deps) {
     wordResult: null,
     wordBusy: false,
     busy: null,                  // command dang chay (commit/evaluate/save)
+    savingCase: false,           // request workspace_save_case dang chay
   };
 
   let lastUnsaved = false;
@@ -576,6 +577,7 @@ function createModel(deps) {
     state.wordBusy = false;
     state.evaluatedRevision = null;
     state.busy = null;
+    state.savingCase = false;
     state.status = state.locked ? 'locked' : 'ready';
   }
 
@@ -592,6 +594,8 @@ function createModel(deps) {
     state.draftId = null;
     state.error = null;
     state.notice = null;
+    state.busy = null;
+    state.savingCase = false;
     emit();
     const r = await client.run('notary.workspace_get',
                                { case_id: caseId });
@@ -688,6 +692,7 @@ function createModel(deps) {
     state.wordResult = null;
     state.wordBusy = false;
     state.busy = null;
+    state.savingCase = false;
     emit();
   }
 
@@ -740,8 +745,12 @@ function createModel(deps) {
   // Luu meta cho case DA TAO qua notary.workspace_update (§6.2) — mot
   // nguon du lieu duy nhat la DB backend; khong localStorage. Nhap chua
   // luu (caseId null) → cap nhat nhap qua updateCaseMeta, persist kem
-  // "Lưu hồ sơ" (workspace_create). Caller tu hien thi r.error.
+  // "Lưu nháp" (workspace_create). Caller tu hien thi r.error.
   async function saveCaseMeta(patch) {
+    if (state.savingCase) {
+      return { ok: false, error: errObj('validation_error',
+                                        'Đang lưu hồ sơ') };
+    }
     const meta = (patch && typeof patch === 'object') ? patch : {};
     const keys = Object.keys(meta);
     if (!keys.length ||
@@ -832,6 +841,10 @@ function createModel(deps) {
   }
 
   async function saveDraft() {
+    if (state.savingCase) {
+      return { ok: false, error: errObj('validation_error',
+                                        'Đang lưu hồ sơ') };
+    }
     if (!isDraft()) {
       return { ok: false, error: errObj('validation_error',
                                         'Khong phai nhap moi') };
@@ -872,8 +885,79 @@ function createModel(deps) {
     return r;
   }
 
+  // "Lưu hồ sơ" — một snapshot nhất quán Stage + meta + docx_import +
+  // Diagram + revision, gửi notary.workspace_save_case (§13.19). Case
+  // mới dùng idempotency_key của phiên nháp (retry giữ nguyên key);
+  // case cũ cấm key và dùng base_revision. Trong lúc chờ: savingCase
+  // khóa mọi mutator (canWrite=false), không cho snapshot thứ hai.
+  // Chỉ response thành công của cùng session mới thay model + clear
+  // dirty; lỗi/conflict giữ nguyên draft để người dùng xử lý.
+  async function saveCase() {
+    if (state.savingCase) {
+      return { ok: false, error: errObj('validation_error',
+                                        'Đang lưu hồ sơ') };
+    }
+    if (!canWrite()) {
+      return { ok: false, error: errObj(
+        state.locked ? 'workspace_locked' : 'case_type_unsupported',
+        state.locked ? 'Hồ sơ đã khóa — chỉ đọc'
+                     : 'Loại việc chưa hỗ trợ') };
+    }
+    const caseId = state.caseId;
+    const s = session;
+    const meta = {};
+    for (const f of CASE_META_FIELDS) meta[f] = state.caseInfo[f] ?? null;
+    const payload = caseId == null
+      ? { idempotency_key: state.draftId || (state.draftId = uuid()) }
+      : { case_id: caseId, base_revision: state.revision };
+    payload.case = meta;
+    payload.stage = stageForWire(state.stage);
+    payload.diagram = { state: clone(state.diagram) };
+    // Case cũ: chỉ gửi docx_import khi draft khác bản đã lưu — absent
+    // nghĩa "giữ provenance" theo §13.19, tránh xóa ngoài ý muốn.
+    const docx = clone(state.docxImport || { version: 1, sources: [] });
+    if (caseId == null ||
+        JSON.stringify(docx) !==
+          JSON.stringify(state.committedDocxImport || null)) {
+      payload.docx_import = docx;
+    }
+    state.savingCase = true;
+    state.busy = 'notary.workspace_save_case';
+    emit();
+    let r;
+    try {
+      r = await client.run('notary.workspace_save_case', payload);
+    } catch (e) {
+      r = { ok: false, error: errObj(
+        'unknown', (e && e.message) || 'Không lưu được hồ sơ') };
+    }
+    if (s !== session) return r;   // session da doi — bo response tre
+    state.savingCase = false;
+    state.busy = null;
+    if (!r.ok) {
+      const err = r.error || errObj('unknown');
+      if (err.code === 'stage_validation_error') {
+        state.fieldErrors =
+          (err.details && err.details.field_errors) || [];
+      } else if (err.code === 'diagram_invalid_state') {
+        state.diagramErrors =
+          (err.details && err.details.errors) || [err];
+      } else {
+        applyWriteResult(r, 'workspace_save_case');
+      }
+      emit();
+      return r;
+    }
+    applyWorkspace(r.data || {});
+    state.notice = r.data && r.data.created === false
+      ? 'Hồ sơ đã tồn tại (đã mở lại)' : 'Đã lưu hồ sơ';
+    emit();
+    return r;
+  }
+
   function canWrite() {
     return (state.status === 'ready' || state.status === 'conflict') &&
+      !state.savingCase &&
       state.busy !== 'notary.workspace_convert_type' &&
       !state.locked && !state.unsupported;
   }
@@ -1149,7 +1233,7 @@ function createModel(deps) {
             n.personId = null;
           }
         }
-        // diagramDirty giu true — user van phai "Lưu sơ đồ" de persist;
+        // diagramDirty giu true — user van phai "Lưu hồ sơ" de persist;
         // evaluatedRevision giu nguyen de badge "Stage đã đổi kể từ lần
         // đánh giá" bao khi rm hien thi chua mo ta draft hien tai.
       } else {
@@ -1921,7 +2005,7 @@ function createModel(deps) {
     if (o.originalSourceId) {
       if (state.stageDirty || state.diagramDirty) {
         state.wordBusy = false;
-        return { ok: false, error: errObj('word.original_mapping_invalid', 'Hãy Cập nhật Stage và Lưu sơ đồ trước khi xuất') };
+        return { ok: false, error: errObj('word.original_mapping_invalid', 'Hãy Cập nhật Stage và Lưu hồ sơ trước khi xuất') };
       }
       payload.original_source_id = o.originalSourceId;
       payload.base_revision = state.revision;
@@ -1971,7 +2055,7 @@ function createModel(deps) {
     state, subscribe,
     addressContext, requestLookup, dismissLookupSlot, markLookupStale,
     openFullFromSlot, requestFull, closeFull,
-    openCase, newDraft, isDraft, saveDraft, updateCaseMeta, saveCaseMeta, convertCaseType,
+    openCase, newDraft, isDraft, saveDraft, saveCase, updateCaseMeta, saveCaseMeta, convertCaseType,
     loadUqCatalog, createUqCustomer, resolveUqName,
 
     canWrite, mockBanner, hasUnsaved, isStageEmpty,

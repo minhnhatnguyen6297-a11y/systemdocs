@@ -244,6 +244,10 @@ function createDiagramPane(ctx) {
   const face = ctx.face;
   const openModal = ctx.openModal;
   const openWordDialog = ctx.openWordDialog || (() => {});
+  // Luu ho so tat ca qua coordinator view (flush editor truoc snapshot);
+  // fallback model.saveCase cho test thuan pane khong co view.
+  const onSaveCase = ctx.onSaveCase ||
+    (() => (typeof model.saveCase === 'function' ? model.saveCase() : null));
   const rerender = ctx.rerender || (() => {});
 
   let evalTimer = null;
@@ -289,9 +293,10 @@ function createDiagramPane(ctx) {
     model.subscribe(() => { if (expandBody) rebuildExpand(); });
   }
 
-  // Stage dirty (case da ton tai): evaluate/save diagram phai doi —
-  // draft Stage chua cap nhat nen ket qua tinh se mo ta du lieu cu.
-  // Nguoi dung Cap nhat hoac Huy Stage truoc (MIN-129 dirty-safety).
+  // Stage dirty (case da ton tai): evaluate phai doi — draft Stage chua
+  // cap nhat nen ket qua tinh se mo ta du lieu cu. Nguoi dung Cap nhat
+  // hoac Huy Stage truoc (MIN-129 dirty-safety). "Luu ho so" KHONG dung
+  // gate nay: nut do flush ca Stage dang sua trong cung snapshot.
   function stageGate() {
     return model.state.caseId != null && model.state.stageDirty;
   }
@@ -694,7 +699,7 @@ function createDiagramPane(ctx) {
       }
       body.append(relations, h('p', '',
         'Người vẫn ở Stage và trở lại Pool. Vợ/chồng không bị gỡ chỉ vì quan hệ hôn nhân. Không tự nối lại cha/mẹ.'),
-      h('p', 'muted', 'Chỉ đổi bản nháp. Bấm Lưu sơ đồ sau đó mới ghi hồ sơ.'));
+      h('p', 'muted', 'Chỉ đổi bản nháp. Bấm Lưu hồ sơ sau đó mới ghi hồ sơ.'));
       const foot = h('div', 'modal-foot');
       const apply = btn('Gỡ cả nhánh', 'primary danger', () => {
         if (apply.disabled) return;
@@ -1412,21 +1417,19 @@ function createDiagramPane(ctx) {
     expand.setAttribute('aria-label', 'Mở rộng sơ đồ toàn màn');
     expand.title = 'Xem sơ đồ ở cửa sổ lớn gần toàn màn hình';
     tools.append(expand);
-    // MIN-133 D6: Luu so do + Xuat Word len head (mockup — bo footer
-    // .cd-rel-foot). Save giu dirty-dot + gate stageDirty nhu truoc.
+    // Nút "Lưu hồ sơ" gọi coordinator view → flush editor rồi
+    // model.saveCase (workspace_save_case: Stage+meta+Diagram, done).
+    // Không disable vì caseId=null, Diagram sạch hay stageDirty; chỉ
+    // khóa khi busy/đang lưu/không capability/không workspace.
     tools.append(h('span', 'cd-vsep', ''));
-    const save = btn('Lưu sơ đồ', 'sm secondary js-save-diagram', async () => {
-      const r = await model.saveDiagram();
-      if (!r.ok && r.error && r.error.code !== 'workspace_conflict' &&
-          r.error.code !== 'diagram_invalid_state') {
-        notify(relErrText(r.error), true);
-      }
+    const save = btn('Lưu hồ sơ', 'sm secondary js-save-diagram', async () => {
+      // View coordinator đã flush + báo lỗi qua kênh notify hiện có.
+      await onSaveCase();
     });
-    if (s.diagramDirty) save.append(h('span', 'dirty-dot', ''));
-    // Nhap moi (caseId=null): chua co case de persist — so do duoc
-    // ghi cung "Lưu hồ sơ" (workspace_create), khong phai nut nay.
-    save.disabled = gate || s.caseId == null || !model.canWrite() ||
-      !s.diagramDirty || !s.capabilities.diagram;
+    if (s.stageDirty || s.diagramDirty || s.metaDirty) {
+      save.append(h('span', 'dirty-dot', ''));
+    }
+    save.disabled = !!s.busy || !s.capabilities.diagram || !model.canWrite();
     const word = btn('Xuất Word', 'sm primary', openWordDialog);
     word.disabled = !s.capabilities.word_export || s.wordBusy;
     tools.append(save, word);

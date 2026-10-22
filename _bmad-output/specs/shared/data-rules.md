@@ -38,9 +38,9 @@ Word và lấy làm nguồn dùng bản hiện tại, không chờ Lưu hồ sơ
 **Lưu hồ sơ** là một lượt ghi trọn vẹn Diagram + toàn bộ Stage/thông tin hồ sơ,
 gồm ô đang sửa chưa Cập nhật, và chuyển draft→done; không báo lưu xong khi
 nội dung mới gõ chưa được ghi. Không thêm bảng phiên bản Người/Tài sản hoặc
-bitemporal. Schema vật lý/migration còn thiết kế (hiện trạng code: master +
-snapshot JSON, chưa phải dòng thuộc Hồ sơ theo B; Lưu sơ đồ chỉ gửi Diagram,
-chưa gom toàn bộ nội dung hoặc chuyển done; locked còn chặn sửa).
+bitemporal. Schema vật lý/migration còn thiết kế (hiện trạng code: Storage B case-owned đã cutover; nút Lưu hồ sơ gọi
+`workspace_save_case` cho Stage+meta+Diagram và chuyển draft→done; locked còn
+chặn sửa trong renderer).
 Bộ đếm revision chống ghi đè khác với lưu nhiều snapshot. Raw, nguồn,
 `source_refs` và lịch sử kỹ thuật đã có vẫn giữ; không cấp quyền xóa lịch sử
 hoặc tạo logging mới.

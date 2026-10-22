@@ -30,7 +30,7 @@ Output:
 - Gỡ node: không xóa người khỏi Stage. Với Thừa kế, xóa slot gỡ cả nhánh theo §9.9; bỏ gán một người về Pool bằng thao tác hiện có không đổi thành xóa nhánh.
 - Chọn quan hệ/tài sản: sửa field Diagram draft theo domain.
 - `Xem cách tính`: gọi evaluate read-only, chỉ hiển thị render model backend.
-- `Lưu sơ đồ`: validate và ghi state trong một transaction.
+- `Lưu hồ sơ`: validate và ghi Stage+meta+Diagram trong một transaction, chuyển draft→done.
 - Cơ chế Hủy cũ khôi phục hai bản nháp; owner đã yêu cầu bỏ nút trong backlog, không coi cơ chế cũ là yêu cầu giữ nút.
 
 ## 4. Cách biểu diễn và lưu
@@ -243,7 +243,7 @@ vẫn giữ hiện trạng, không được dùng nhánh fallback đó làm ngu�
 Owner chốt ngày **17/10/2026**, nguyên văn **“B - gỡ cả nhánh”** ([decision](../../decisions/decision-owner-inheritance-remove-entire-branch-20261017.md)).
 
 1. Từ node được xóa, lấy node đó và toàn bộ hậu duệ **active** qua cạnh `parentSlotIds` cha/mẹ → con, ở mọi độ sâu. Slot rỗng/ẩn cũng thuộc graph active. Con có hai cha/mẹ vẫn bị gỡ khi chỉ một cha/mẹ trong tập bị gỡ. Không dùng cạnh `spouseSlotId` để mở rộng tập; spouse chỉ bị gỡ nếu bản thân cũng là hậu duệ theo cạnh cha/mẹ.
-2. Trước mutation, hiện danh sách node sẽ gỡ (tên người + slot để phân biệt; slot chưa gán ghi ô trống) và các quan hệ cha/mẹ–con, vợ/chồng thực tế sẽ ngắt. Báo người vẫn ở Stage/trở lại Pool, kết quả/phần hưởng có thể đổi, chỉ Lưu sơ đồ mới ghi. Danh sách dài cuộn được; không chỉ báo số lượng.
+2. Trước mutation, hiện danh sách node sẽ gỡ (tên người + slot để phân biệt; slot chưa gán ghi ô trống) và các quan hệ cha/mẹ–con, vợ/chồng thực tế sẽ ngắt. Báo người vẫn ở Stage/trở lại Pool, kết quả/phần hưởng có thể đổi, chỉ Lưu hồ sơ mới ghi. Danh sách dài cuộn được; không chỉ báo số lượng.
 3. Hủy, Escape, nút đóng và đóng nền không đổi draft/dirty/revision hay phát evaluate/save từ thao tác gỡ. Xác nhận chỉ áp tập tác động vừa xem; graph hoặc phiên hồ sơ đã đổi thì không gỡ âm thầm theo cảnh báo cũ. Xác nhận hợp lệ thực hiện **một** mutation draft rồi dùng evaluate/debounce hiện có, không tự save.
 4. Đánh dấu toàn bộ tập `deleted:true` và giữ trong canonical Node v3 hiện có; giữ ID, `personId`, `ownPositions`, `receivePositions`, `hidden`. Xóa `parentSlotIds`/`spouseSlotId` đi ra từ node bị gỡ và dọn mọi tham chiếu đi vào tập này trên tất cả node, **kể cả tombstone cũ**. Không còn spouse một chiều hoặc parent không hợp lệ do thao tác; node/quan hệ/Chủ/Nhận không bị tác động giữ nguyên.
 5. Stage Người/Tài sản (ID, thứ tự, giá trị) không đổi. Pool vẫn là Stage trừ gán trên node active, không tính `personId` còn giữ trên tombstone. Không dồn/đánh lại số slot, đổi vị trí tài sản, tự reparent hoặc giữ ô trung gian rỗng thay cho node đã xóa.

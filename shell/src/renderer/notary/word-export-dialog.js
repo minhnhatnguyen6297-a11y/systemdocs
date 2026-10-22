@@ -441,7 +441,7 @@ function createWordDialog(ctx) {
         }));
         sourceRow.append(btn('Dùng hợp đồng Word đã nhập: ' + sourceLabel, 'secondary', async () => {
           if (exporting || scanning || savingMeta) return;
-          if (model.hasUnsaved()) { notify('Hãy Cập nhật Stage và Lưu sơ đồ trước khi gắn vị trí', true); return; }
+          if (model.hasUnsaved()) { notify('Hãy Cập nhật Stage và Lưu hồ sơ trước khi gắn vị trí', true); return; }
           originalSourceId = source.source_id;
           mappingDirty = false;
           tplToken = null;

@@ -315,6 +315,7 @@ function createNotaryModuleView(deps) {
     ? window.G1_NOTARY_DIAGRAM.createDiagramPane({
         model, lib: L, notify, h, btn, face, openModal,
         openWordDialog: () => openWordDialog(),
+        onSaveCase: () => runSaveCase(),
         rerender: () => rerender() })
     : null;
 
@@ -432,9 +433,10 @@ function createNotaryModuleView(deps) {
     return s.stageDirty || s.diagramDirty || s.metaDirty;
   }
 
-  // Commit/Cập nhật — điểm ghi duy nhất của Stage + meta (§13.2, đợt 3:
-  // payload.case đi cùng transaction). Nháp mới: Lưu hồ sơ =
+  // Commit/Cập nhật — điểm ghi Stage + meta (§13.2, đợt 3:
+  // payload.case đi cùng transaction). Nháp mới: Lưu nháp =
   // workspace_create (ghi meta + stage + diagram cùng lúc).
+  // "Lưu hồ sơ" (workspace_save_case) là nút riêng ở card Sơ đồ.
   function commitDisabled() {
     const s = model.state;
     if (!model.canWrite()) return true;
@@ -463,6 +465,28 @@ function createNotaryModuleView(deps) {
         notify(errText(r.error), true);
       }
     }
+  }
+
+  // Lưu hồ sơ: flush mọi editor đăng ký (text/date/meta) rồi để model
+  // chụp MỘT snapshot Stage+meta+Diagram. Ngày sai → dừng trước IPC.
+  // Conflict giữ draft/dirty; dialog xung đột hiện qua rerender.
+  async function runSaveCase() {
+    const s = model.state;
+    if (s.savingCase) return { ok: false };
+    if (!model.canWrite()) return { ok: false };
+    if (!flushActiveEditors()) {
+      notify('Ngày không hợp lệ — sửa ô được đánh dấu trước khi lưu hồ sơ.',
+             true);
+      return { ok: false, error: { code: 'invalid_date' } };
+    }
+    const r = await model.saveCase();
+    if (!r.ok && r.error &&
+        r.error.code !== 'stage_validation_error' &&
+        r.error.code !== 'diagram_invalid_state' &&
+        r.error.code !== 'workspace_conflict') {
+      notify(errText(r.error), true);
+    }
+    return r;
   }
 
   function openConversionDialog() {
@@ -611,7 +635,7 @@ function createNotaryModuleView(deps) {
       n.append(t, h('span', 'grow', ''), x);
       bar.append(n);
     }
-    const label = draft ? 'Lưu hồ sơ' : 'Cập nhật';
+    const label = draft ? 'Lưu nháp' : 'Cập nhật';
     const primary = btn(label, 'primary js-cd-update', runCommit);
     primary.dataset.label = label;
     setPrimaryDirty(primary, primaryDirty());
@@ -690,6 +714,53 @@ function createNotaryModuleView(deps) {
   // vao model de dirty live; change/blur parse → ISO len wire, repaint
   // display chuan. Sai format → danh dau do + giu raw (backend van
   // chan bang invalid_date khi luu — khong tham lang bo qua).
+  // ---------- flush editor truoc khi chup snapshot Luu ho so ----------
+  // Moi editor Stage/meta dang ky mot ham doc gia tri DOM hien tai va
+  // ghi vao model qua dung duong update cu. dateCellInput ghi nhan ca
+  // loi parse de view dung lai va khong gui payload thieu ngay.
+  let editorFlushers = [];
+
+  function registerEditorFlush(el, fn) {
+    editorFlushers.push({ el, fn });
+  }
+
+  function resetEditorFlushers() {
+    editorFlushers = [];
+  }
+
+  // Text/select: chi ghi khi DOM khac model — tranh touchStage gia lam
+  // dirty moi lan bam Luu. Gia tri rong di qua update nhu oninput cu.
+  function registerValueFlush(el, current, apply) {
+    registerEditorFlush(el, () => {
+      const cur = current();
+      if ((cur == null ? '' : String(cur)) !== el.value) apply(el.value);
+      return { ok: true };
+    });
+  }
+
+  function flushActiveEditors() {
+    for (const { el, fn } of editorFlushers) {
+      const r = fn();
+      if (r && r.ok === false) {
+        if (el && el.focus) {
+          try { el.focus(); } catch (e) { /* khong focus duoc */ }
+        }
+        return false;
+      }
+    }
+    // Diagram draft la state model (mutator ghi ngay khi keo/tha) nen
+    // snapshot trong model.saveCase da la trang thai hien tai.
+    return true;
+  }
+
+  function disableSavingControls() {
+    for (const scope of [panels.drafting, topActions]) {
+      for (const el of scope.querySelectorAll('input, textarea, select, button')) {
+        el.disabled = true;
+      }
+    }
+  }
+
   function dateCellInput(getVal, onSet, allowYear, aria) {
     const inp = h('input', 'cd-cell cd-date');
     inp.value = fmtDisplayDate(getVal());
@@ -712,15 +783,18 @@ function createNotaryModuleView(deps) {
       if (r.error) {
         inp.classList.add('cd-input-bad');
         inp.title = 'Nhập ngày dạng dd/mm/yyyy';
-        return;
+        return false;
       }
       inp.classList.remove('cd-input-bad');
       inp.value = fmtDisplayDate(r.iso);
       setCellTitle(inp);
-      onSet(r.iso);
+      const cur = getVal();
+      if ((cur == null ? null : cur) !== r.iso) onSet(r.iso);
+      return true;
     };
     inp.onchange = commit;
     inp.onblur = commit;
+    registerEditorFlush(inp, () => ({ ok: commit() }));
     if (aria) inp.setAttribute('aria-label', aria);
     return inp;
   }
@@ -1245,6 +1319,8 @@ function createNotaryModuleView(deps) {
             setCellTitle(inp);
             model.updateAssetField(a.row_id, key, inp.value);
           };
+          registerValueFlush(inp, () => a[key],
+            (v) => model.updateAssetField(a.row_id, key, v));
           if (key === 'dia_chi') {
             inp.setAttribute('aria-describedby', `address-asset-${a.row_id}`);
             const trow = h('div', 'cd-lookup-row');
@@ -1471,6 +1547,8 @@ function createNotaryModuleView(deps) {
           }
           ctl.onchange = () => model.updatePersonField(
             p.row_id, key, ctl.value);
+          registerValueFlush(ctl, () => p[key],
+            (v) => model.updatePersonField(p.row_id, key, v));
         } else if (PERSON_DATE_FIELDS.has(key)) {
           // Ngay nguoi: allowYear — contract nhan year-only ("1950").
           ctl = dateCellInput(
@@ -1486,6 +1564,8 @@ function createNotaryModuleView(deps) {
             setCellTitle(inp);
             model.updatePersonField(p.row_id, key, inp.value);
           };
+          registerValueFlush(inp, () => p[key],
+            (v) => model.updatePersonField(p.row_id, key, v));
         }
         ctl.disabled = ro;
         ctl.dataset.fid = `p:${p.row_id}:${key}`;
@@ -1525,6 +1605,8 @@ function createNotaryModuleView(deps) {
             issuer.setAttribute('aria-label', `${issuerLabel} — ${p.ho_ten || (p.ngay_chet ? 'người đã mất' : 'người')}`);
             issuer.setAttribute('aria-describedby', `address-issuer-${p.row_id}`);
             issuer.oninput = () => model.updatePersonField(p.row_id, 'noi_cap', issuer.value);
+            registerValueFlush(issuer, () => p.noi_cap,
+              (v) => model.updatePersonField(p.row_id, 'noi_cap', v));
             const irow = h('div', 'cd-lookup-row');
             irow.append(issuer,
               lookupTraButton('issuer', p.row_id, `p:${p.row_id}:noi_cap`));
@@ -1610,6 +1692,9 @@ function createNotaryModuleView(deps) {
       model.updateCaseMeta('noi_niem_yet',
                            ny.value.trim() === '' ? null : ny.value);
     };
+    registerValueFlush(ny, () => model.state.caseInfo.noi_niem_yet,
+      (v) => model.updateCaseMeta('noi_niem_yet',
+        v.trim() === '' ? null : v));
     const nyrow = h('div', 'cd-lookup-row');
     nyrow.append(ny, lookupTraButton('posting', 'posting', 'meta:noi_niem_yet'));
     r1.append(nyrow);
@@ -1643,6 +1728,9 @@ function createNotaryModuleView(deps) {
       model.updateCaseMeta('nguoi_nhan_uy_quyen',
                            uq.value.trim() === '' ? null : uq.value);
     };
+    registerValueFlush(uq, () => model.state.caseInfo.nguoi_nhan_uy_quyen,
+      (v) => model.updateCaseMeta('nguoi_nhan_uy_quyen',
+        v.trim() === '' ? null : v));
     // Blur/Enter: giai ten -> customers.id khi trung danh ba.
     uq.onchange = () => model.resolveUqName(uq.value);
     r2.append(uq);
@@ -1683,6 +1771,9 @@ function createNotaryModuleView(deps) {
       model.updateCaseMeta('noi_dung_viec',
                            nd.value.trim() === '' ? null : nd.value);
     };
+    registerValueFlush(nd, () => model.state.caseInfo.noi_dung_viec,
+      (v) => model.updateCaseMeta('noi_dung_viec',
+        v.trim() === '' ? null : v));
     r3.append(nd);
     box.append(r3);
     return box;
@@ -1915,6 +2006,7 @@ function createNotaryModuleView(deps) {
   // dưới. Workspace = banner (nếu có) + Stage + vùng sơ đồ.
   function workspaceEl() {
     const s = model.state;
+    resetEditorFlushers();
     const ws = h('div', 'cd-workspace');
     if (s.backendMode === 'mock') {
       ws.append(h('div', 'banner ok', model.mockBanner()));
@@ -1961,6 +2053,7 @@ function createNotaryModuleView(deps) {
   };
   let activeTab = 'drafting';
   let lastConflict = null;
+  let lastSaving = false;
 
   const TABS = [
     { id: 'overview', label: 'Tổng quan hồ sơ' },
@@ -2064,12 +2157,24 @@ function createNotaryModuleView(deps) {
       el.hidden = k !== activeTab;
     }
     const dp = panels.drafting;
+    // Đang chờ workspace_save_case: khóa editor NGAY trên DOM hiện có
+    // (không rebuild để không mất focus/vị trí) và bỏ qua emit nền.
+    // Xong request → rebuild một lần để mở khóa/áp workspace mới.
+    if (s.savingCase) {
+      if (!lastSaving) renderTopActions();
+      lastSaving = true;
+      disableSavingControls();
+      syncChromeUI();
+      return;
+    }
+    const afterSave = lastSaving;
+    lastSaving = false;
     // Emit nền (jobUpdate/status poll) trong lúc đang gõ trong drafting
     // panel: hoãn rebuild để input không mất focus/giá trị — render sau
     // lần emit kế tiếp (blur/change hoặc action tiếp theo của người
     // dùng). Chỉ nút commit/undo/nhãn save được cập nhật gọn ngay.
     const ae = document.activeElement;
-    if (ae && dp.contains(ae) &&
+    if (!afterSave && ae && dp.contains(ae) &&
         /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName || '')) {
       syncChromeUI();
       refreshAddressBoxes(dp);

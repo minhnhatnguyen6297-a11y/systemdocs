@@ -68,8 +68,8 @@ nhãn **Nháp** rõ khi hiển thị/thống kê/báo cáo có chứa Nháp. **O
 22/10/2026:** bấm **Lưu hồ sơ** ghi Diagram và toàn bộ Stage/thông tin hồ sơ,
 kể cả ô đang sửa chưa Cập nhật, trong cùng một lượt; đây là mốc Nháp→Done.
 Cấu trúc lưu đã chọn phương án B; chi tiết vật lý còn thiết kế, cách tính
-trong từng báo cáo chưa chốt (hiện trạng code: Lưu sơ đồ chưa chuyển draft→done
-và chưa gom Stage/thông tin hồ sơ đang sửa).
+trong từng báo cáo chưa chốt (hiện trạng code: renderer gọi
+`workspace_save_case` từ nút Lưu hồ sơ, chuyển draft→done; B6 modal đất pending).
 Xem [quy tắc Hồ sơ nháp](notary_v2/README.md#2-danh-sách-hồ-sơ) và
 [quyết định](../decisions/decision-owner-persistent-case-drafts-20261021.md).
 **Điểm neo — owner chốt 21/10 mới nhất, chưa triển khai:** tự dùng cùng ID
@@ -103,8 +103,8 @@ mỗi Người/Tài sản một dòng thuộc Hồ sơ, ghi đúng dòng đổi;
 **Lưu hồ sơ lưu tất cả**, gồm Diagram, Stage/thông tin hồ sơ và ô chưa Cập nhật,
 trong một lượt ghi trọn vẹn. Phần tạm dừng chờ A/B/C đã gỡ; thiết kế vật lý,
 migration và thời điểm cấp/đối chiếu ID dùng chung còn mở
-(hiện trạng code: ghi master + snapshot JSON, chưa phải các dòng thuộc Hồ sơ
-theo B; nút Lưu sơ đồ chưa lưu tất cả hoặc chuyển draft→done).
+(hiện trạng code: Storage B case-owned đã cutover; nút Lưu hồ sơ gọi
+`workspace_save_case` cho Stage+meta+Diagram và chuyển draft→done).
 [Quyết định chọn B](../decisions/decision-owner-case-storage-b-20261022.md).
 
 **Pháp nhân (owner 20/10/2026):** không đưa vào Người; policy nhập tay chung
@@ -270,7 +270,7 @@ trỏ tới phần nhỏ để bắt đầu tìm hiểu.
 | Diagram: Hai bên | Xếp người theo hai bên hợp đồng | [Hai bên](notary_v2/diagram-rules.md#two-party) | [relationship-diagram.js](../../shell/src/renderer/notary/relationship-diagram.js) · `twoPartyInto` |
 | Diagram: Thừa kế | Xếp quan hệ và vai trò thừa kế | [Sơ đồ](notary_v2/diagram-rules.md#common) · [Thừa kế](notary_v2/diagram-rules.md#inheritance) | [relationship-diagram.js](../../shell/src/renderer/notary/relationship-diagram.js) · `inheritanceInto` |
 | Diagram: xem cách tính | Xem kết quả và giải thích từ engine | [Sơ đồ](notary_v2/diagram-rules.md#common) | [relationship-diagram.js](../../shell/src/renderer/notary/relationship-diagram.js) · `runEvaluate`, `calcPanelEl` |
-| Diagram: lưu | Lưu sơ đồ đã kiểm tra | [Sơ đồ](notary_v2/diagram-rules.md#common) | [case-drafting-model.js](../../shell/src/renderer/notary/case-drafting-model.js) · `saveDiagram` |
+| Diagram: lưu | Lưu toàn bộ hồ sơ (Stage+meta+Diagram, cả ô chưa Cập nhật) và chuyển draft→done | [Sơ đồ](notary_v2/diagram-rules.md#common) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `runSaveCase`, `flushActiveEditors` · [case-drafting-model.js](../../shell/src/renderer/notary/case-drafting-model.js) · `saveCase` |
 | Word: chọn thư mục mẫu | Chọn thư mục chứa các mẫu Word | [Xuất Word](notary_v2/word-templates.md#export) | [word-export-dialog.js](../../shell/src/renderer/notary/word-export-dialog.js) · `createWordDialog` |
 | Word: quét mẫu | Tải danh sách file và trạng thái sẵn sàng | [Xuất Word](notary_v2/word-templates.md#export) | [word-export-dialog.js](../../shell/src/renderer/notary/word-export-dialog.js) · `renderDocs` |
 | Word: chọn thư mục đích | Chọn nơi lưu kết quả | [Xuất Word](notary_v2/word-templates.md#export) | [word-export-dialog.js](../../shell/src/renderer/notary/word-export-dialog.js) · `pickDirToken` |

@@ -281,7 +281,7 @@ test('layoutInheritance: gen tu parentSlotIds, spouse ke nhau', () => {
 
 // ---------- MIN-133: nut so do len head, kich thuoc mockup ----------
 
-test('MIN-133 D6: Lưu sơ đồ + Xuất Word trong card-head, không còn footer', () => {
+test('MIN-133 D6: Lưu hồ sơ + Xuất Word trong card-head, không còn footer', () => {
   const { view } = build(test, { mode: 'draft-inh' });
   assert.equal(byCls(view.el, 'cd-rel-foot').length, 0,
     'footer so do da bo theo mockup');
@@ -289,7 +289,7 @@ test('MIN-133 D6: Lưu sơ đồ + Xuất Word trong card-head, không còn foot
     e.classList.contains('card-head') &&
     /Sơ đồ thừa kế/.test(e.textContent))[0];
   assert.ok(head, 'khong tim thay card-head vung so do');
-  assert.equal(findBtns(head, 'Lưu sơ đồ').length, 1);
+  assert.equal(findBtns(head, 'Lưu hồ sơ').length, 1);
   assert.equal(findBtns(head, 'Xuất Word').length, 1);
 });
 
@@ -710,9 +710,11 @@ test('save thiếu dữ liệu: cue chỉ-đọc hiện, không sinh slot', asyn
     seed: { people: INH_PEOPLE, nodes: seedSlots() } });
   model.movePerson('c2', 'child_1');       // dirty → nút Lưu bật
   const before = model.state.diagram.nodes.length;
-  const save = findBtns(view.el, 'Lưu sơ đồ')[0];
-  assert.ok(save, 'thiếu nút Lưu sơ đồ');
-  await save.onclick();
+  const save = findBtns(view.el, 'Lưu hồ sơ')[0];
+  assert.ok(save, 'thiếu nút Lưu hồ sơ');
+  // Nút chính giờ là workspace_save_case; test cue của saveDiagram cũ
+  // gọi thẳng model (đường riêng còn giữ theo thiết kế 6.4).
+  await model.saveDiagram();
   assert.equal(model.state.diagram.nodes.length, before,
     'không sinh slot từ requiredSlots khi lưu');
   assert.equal(
@@ -803,14 +805,14 @@ test('cue trạng thái: chuyển sang complete thì xoá dòng thiếu', async 
   const { model, view } = build(test, { mode: 'case', client,
     seed: { people: INH_PEOPLE, nodes: seedSlots() } });
   model.movePerson('c2', 'child_1');
-  await findBtns(view.el, 'Lưu sơ đồ')[0].onclick();
+  await model.saveDiagram();
   const warn1 = byCls(view.el, 'warn-text').map((e) => e.textContent)
     .join('\n');
   assert.match(warn1, /Chưa đủ điều kiện/);
   assert.match(warn1, /Cần bổ sung Vợ\/chồng, Con/);
 
   model.movePerson('c2', null);            // dirty lần nữa
-  await findBtns(view.el, 'Lưu sơ đồ')[0].onclick();
+  await model.saveDiagram();
   const warn2 = byCls(view.el, 'warn-text').map((e) => e.textContent)
     .join('\n');
   assert.match(warn2, /Hoàn chỉnh/, 'complete phải hiện trạng thái');

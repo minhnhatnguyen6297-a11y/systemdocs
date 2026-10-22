@@ -190,11 +190,11 @@ test('luu diagram_invalid_state: lỗi hiện dưới sơ đồ, không toast, g
     const inner = { code: 'missing_land_owner',
                     message: 'Chưa có người để lại tài sản trên sơ đồ' };
     const { view, model, notices, CAT } = build(test, {
-      client: errorClient({ 'notary.diagram_save': { ok: false, error: {
+      client: errorClient({ 'notary.workspace_save_case': { ok: false, error: {
         code: 'diagram_invalid_state', message: 'synthetic',
         details: { errors: [{ ...inner }] } } } }) });
     assert.equal(dirtyDiagram(model), true, 'mutation không đổi draft');
-    const save = findBtns(view.el, 'Lưu sơ đồ')[0];
+    const save = findBtns(view.el, 'Lưu hồ sơ')[0];
     assert.ok(save, 'thiếu nút Lưu sơ đồ');
     await save.onclick();
     assert.deepEqual(notices, [], 'invalid_state không được toast riêng');
@@ -211,9 +211,9 @@ test('luu loi workspace_locked: toast dung catalog, nhap con nguyen',
   async () => {
     const err = { code: 'workspace_locked', message: 'phien khac dang mo' };
     const { view, model, notices, CAT } = build(test, {
-      client: errorClient({ 'notary.diagram_save': { ok: false, error: err } }) });
+      client: errorClient({ 'notary.workspace_save_case': { ok: false, error: err } }) });
     assert.equal(dirtyDiagram(model), true, 'mutation khong doi draft');
-    const save = findBtns(view.el, 'Lưu sơ đồ')[0];
+    const save = findBtns(view.el, 'Lưu hồ sơ')[0];
     assert.ok(save, 'thieu nut Luu so do');
     assert.equal(save.disabled, false, 'nut luu phai bat truoc khi bam');
     await save.onclick();
@@ -229,10 +229,10 @@ test('luu loi workspace_locked: toast dung catalog, nhap con nguyen',
 
 test('luu xung dot: luong conflict hien co, khong toast rieng', async () => {
   const { view, model, notices } = build(test, {
-    client: errorClient({ 'notary.diagram_save': { ok: false, error: {
+    client: errorClient({ 'notary.workspace_save_case': { ok: false, error: {
       code: 'workspace_conflict', details: { server_revision: 9 } } } }) });
   assert.equal(dirtyDiagram(model), true);
-  await findBtns(view.el, 'Lưu sơ đồ')[0].onclick();
+  await findBtns(view.el, 'Lưu hồ sơ')[0].onclick();
   assert.deepEqual(notices, [], 'conflict khong duoc toast rieng');
   const modal = byCls(view.el, 'modal')[0];
   assert.ok(modal, 'thieu hop thoai xung dot hien co');
@@ -253,10 +253,17 @@ test('evaluate + luu thanh cong: khong toast loi, revision tang mot lan',
           requiredSlots: [], warnings: [], errors: [],
           unresolvedEstates: [], conservation: {} } } };
       }
-      if (cmd === 'notary.diagram_save') {
+      if (cmd === 'notary.workspace_save_case') {
         saved = structuredClone(p.diagram.state);
-        return { ok: true, data: { revision: 4,
-          diagram: { state: structuredClone(saved), render_model: null } } };
+        return { ok: true, data: {
+          case: { id: 42, case_type: 'inheritance',
+                  document_type: 'khai_nhan', status: 'done',
+                  locked: false, revision: 4 },
+          backend_mode: 'real',
+          capabilities: { intake: [], diagram: true, word_export: true },
+          stage: structuredClone(p.stage),
+          diagram: { state: structuredClone(saved), render_model: null },
+          warnings: [] } };
       }
       return { ok: true, data: {} };
     } });
@@ -264,7 +271,7 @@ test('evaluate + luu thanh cong: khong toast loi, revision tang mot lan',
     assert.deepEqual(notices, [], 'evaluate thanh cong khong duoc toast');
     assert.equal(model.state.renderModel.status, 'ok');
     dirtyDiagram(model);
-    await findBtns(view.el, 'Lưu sơ đồ')[0].onclick();
+    await findBtns(view.el, 'Lưu hồ sơ')[0].onclick();
     assert.deepEqual(notices, [], 'luu thanh cong khong duoc toast loi');
     assert.equal(model.state.revision, 4, 'revision phai tang dung mot lan');
     assert.equal(model.state.diagramDirty, false, 'dirty phai sach sau luu');

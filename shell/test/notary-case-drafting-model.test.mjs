@@ -2596,3 +2596,159 @@ test('conversion pending blocks editing; success resets Diagram and invalidates 
   assert.equal(model.state.wordResult,null);
   assert.equal(model.state.diagram.domain,'two_party');
 });
+
+// ---------- issue 13: saveCase (workspace_save_case) ----------
+
+function seedSaveCaseModel(client) {
+  const model = M.createModel({ client, uuid });
+  const s = model.state;
+  s.status = 'ready';
+  s.caseId = 42;
+  s.caseInfo = { id: 42, case_type: 'inheritance',
+                 document_type: 'khai_nhan', status: 'draft',
+                 locked: false, revision: 3, ngay_lap_ho_so: '2024-05-01',
+                 noi_niem_yet: null, ghi_chu: null,
+                 nguoi_nhan_uy_quyen: null,
+                 nguoi_nhan_uy_quyen_id: null, noi_dung_viec: null };
+  s.committedCaseInfo = structuredClone(s.caseInfo);
+  s.backendMode = 'real';
+  s.revision = 3;
+  s.locked = false;
+  s.unsupported = false;
+  s.capabilities = { intake: [], diagram: true, word_export: true };
+  s.committed = { people: [{ row_id: 'c1', ho_ten: 'Người Đã Lưu' }],
+                  assets: [{ row_id: 'a1', so_serial: 'S-001' }] };
+  s.stage = structuredClone(s.committed);
+  s.stage.owner_row_id = 'c1';
+  s.committedDiagram = { version: 3, domain: 'inheritance', nodes: [
+    { id: 'owner', personId: 'c1', parentSlotIds: [],
+      spouseSlotId: null, ownPositions: [1], receivePositions: [],
+      hidden: false, deleted: false }] };
+  s.diagram = structuredClone(s.committedDiagram);
+  s.diagramDirty = true;
+  return model;
+}
+
+function savedWorkspace(payload, revision, status = 'done') {
+  return {
+    case: { id: 42, case_type: payload.case.case_type,
+            document_type: payload.case.document_type, status,
+            locked: false, revision },
+    backend_mode: 'real',
+    capabilities: { intake: [], diagram: true, word_export: true },
+    stage: structuredClone(payload.stage),
+    diagram: { state: structuredClone(payload.diagram.state),
+               render_model: null },
+    warnings: [],
+  };
+}
+
+test('B5 saveCase conflict: giữ model + dirty, không tự merge/retry', async () => {
+  const calls = [];
+  const client = { run: async (cmd, payload) => {
+    calls.push([cmd, payload]);
+    return { ok: false, error: { code: 'workspace_conflict',
+      message: 'revision khac', details: { server_revision: 9 } } };
+  } };
+  const model = seedSaveCaseModel(client);
+  model.updatePersonField('c1', 'ho_ten', 'Chữ Nháp');
+  const r = await model.saveCase();
+  assert.equal(r.ok, false);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], 'notary.workspace_save_case');
+  assert.equal(calls[0][1].case_id, 42);
+  assert.equal(calls[0][1].base_revision, 3);
+  assert.equal('idempotency_key' in calls[0][1], false);
+  assert.equal(model.state.status, 'conflict');
+  assert.equal(model.state.revision, 3, 'revision client không đổi');
+  assert.equal(model.state.stage.people[0].ho_ten, 'Chữ Nháp');
+  assert.equal(model.state.stageDirty, true, 'dirty phải còn');
+  assert.equal(model.state.diagramDirty, true, 'dirty diagram phải còn');
+  assert.equal(model.state.savingCase, false);
+  assert.equal(model.state.busy, null);
+});
+
+test('B5 saveCase lỗi mạng/validation: giữ dirty, không thay model', async () => {
+  const client = { run: async () => ({ ok: false, error: {
+    code: 'engine_unavailable', message: 'mat ket noi' } }) };
+  const model = seedSaveCaseModel(client);
+  model.updateAssetField('a1', 'so_serial', 'S-002');
+  const r = await model.saveCase();
+  assert.equal(r.ok, false);
+  assert.equal(model.state.caseId, 42);
+  assert.equal(model.state.revision, 3);
+  assert.equal(model.state.stage.assets[0].so_serial, 'S-002');
+  assert.equal(model.state.stageDirty, true);
+  assert.equal(model.state.error.code, 'engine_unavailable');
+  assert.equal(model.state.notice, null, 'không báo thành công khi lỗi');
+
+  const fieldClient = { run: async () => ({ ok: false, error: {
+    code: 'stage_validation_error', message: 'loi field',
+    details: { field_errors: [{ row_id: 'c1', field: 'ho_ten',
+                                code: 'required', message: 'bat buoc' }] } } }) };
+  const m2 = seedSaveCaseModel(fieldClient);
+  const r2 = await m2.saveCase();
+  assert.equal(r2.ok, false);
+  assert.equal(m2.state.fieldErrors.length, 1);
+  assert.equal(m2.state.stageDirty, false,
+    'seed stage chưa dirty nhưng lỗi không được ghi đè model');
+});
+
+test('B5 saveCase: khóa snapshot thứ hai và bỏ response thành công của session cũ', async () => {
+  let resolveSave;
+  const calls = [];
+  const client = { run: (cmd, payload) => {
+    calls.push([cmd, payload]);
+    return new Promise((resolve) => { resolveSave = resolve; });
+  } };
+  const model = seedSaveCaseModel(client);
+  const pending = model.saveCase();
+  assert.equal(model.state.savingCase, true);
+  assert.equal(model.canWrite(), false, 'editor phải bị khóa khi đang lưu');
+  const second = await model.saveCase();
+  assert.equal(second.ok, false, 'không cho snapshot thứ hai chen vào');
+  assert.equal(calls.length, 1);
+  assert.equal(model.updatePersonField('c1', 'ho_ten', 'Gõ chen'), undefined);
+  assert.equal(model.state.stage.people[0].ho_ten, 'Người Đã Lưu',
+    'mutator bị chặn trong lúc lưu');
+
+  // Người dùng mở nháp khác trước khi response cũ về.
+  model.newDraft('inheritance');
+  resolveSave({ ok: true, data: savedWorkspace(calls[0][1], 4) });
+  const r = await pending;
+  assert.equal(r.ok, true);
+  assert.equal(model.state.caseId, null, 'response cũ không được ghi đè');
+  assert.equal(model.state.status, 'ready');
+  assert.equal(model.state.diagramDirty, true, 'nháp mới giữ dirty seed');
+  assert.equal(model.state.notice, null);
+  assert.equal(model.state.savingCase, false);
+});
+
+test('saveCase thành công: thay model bằng workspace, xóa ba dirty flag', async () => {
+  const calls = [];
+  const client = { run: async (cmd, payload) => {
+    calls.push([cmd, payload]);
+    return { ok: true, data: savedWorkspace(payload, 8) };
+  } };
+  const model = seedSaveCaseModel(client);
+  model.updatePersonField('c1', 'ho_ten', 'Người Lưu');
+  model.updateCaseMeta('noi_niem_yet', 'Xã A');
+  const r = await model.saveCase();
+  assert.equal(r.ok, true, JSON.stringify(r.error));
+  assert.equal(calls.length, 1);
+  const p = calls[0][1];
+  assert.equal(p.case.noi_niem_yet, 'Xã A');
+  assert.equal(p.stage.people[0].ho_ten, 'Người Lưu');
+  assert.deepEqual(p.docx_import, { version: 1, sources: [] });
+  const s = model.state;
+  assert.equal(s.caseId, 42);
+  assert.equal(s.revision, 8);
+  assert.equal(s.status, 'ready');
+  assert.equal(s.caseInfo.status, 'done');
+  assert.equal(s.stage.people[0].ho_ten, 'Người Lưu');
+  assert.equal(s.stageDirty, false);
+  assert.equal(s.diagramDirty, false);
+  assert.equal(s.metaDirty, false);
+  assert.equal(s.notice, 'Đã lưu hồ sơ');
+  assert.equal(s.savingCase, false);
+});

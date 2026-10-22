@@ -101,7 +101,8 @@ thống kê hoặc báo cáo có chứa Hồ sơ nháp, tránh gộp mất phân
 kể cả ô chưa Cập nhật, trong cùng một lượt ghi trọn vẹn và chuyển Nháp→Done.
 Done vẫn sửa được; sửa rồi ghi thành công là thay luôn nội dung hiện hành,
 không giữ bản Done cũ riêng. Done không có nghĩa đủ sáu trường hay đã công chứng
-(hiện trạng code: còn draft/locked, locked chỉ đọc; Lưu sơ đồ chưa chuyển done).
+(hiện trạng code: nút Lưu hồ sơ gọi `workspace_save_case`, chuyển draft→done;
+B6 modal đất còn pending).
 Từng báo cáo có tính Nháp hay không và bộ lọc mặc định **chưa chốt**. Cấu trúc
 lưu đã chọn phương án B; chi tiết vật lý, thời điểm tạo liên kết và lưu/đóng còn
 thiết kế; owner ưu tiên đơn giản, chấp nhận lưu thủ công nếu phục hồi tự động
@@ -199,8 +200,8 @@ Word; UI legacy giới hạn); **BUILT bounded**, chưa nghiệm thu toàn #41.
    một lượt; chuyển `draft` → `done`. Cập nhật trên Done thay ngay bản hiện hành
    sau ghi thành công, không chờ Lưu hồ sơ lần nữa. Phương án B đã chọn, phần
    dừng chờ A/B/C đã gỡ; thiết kế vật lý/migration và lifecycle ID khi thiếu/
-   bổ sung/đổi neo còn mở (hiện trạng code: nút Lưu sơ đồ chỉ gửi Diagram,
-   chưa gom Stage/thông tin hồ sơ đang sửa hoặc chuyển draft→done).
+   bổ sung/đổi neo còn mở (hiện trạng code: nút Lưu hồ sơ gọi
+   `workspace_save_case`, ghi Stage+meta+Diagram và chuyển draft→done).
 
 Một bảng Người cho sống/chết. Luồng gợi ý CCCD/user chọn/bỏ qua tạo ID mới và
 “thông tin liên kết” cũ ở [#44](../../backlog/story-person-cccd-suggestion-link.md)
@@ -222,8 +223,8 @@ ngay snapshot hiện hành, giữ Done. Xuất Word và lấy làm nguồn cho H
 dùng bản hiện tại, không có bản Done cũ riêng để dùng thay. **Lưu hồ sơ** lưu
 Diagram cùng toàn bộ Stage/thông tin hồ sơ, flush cả ô đang sửa chưa Cập nhật
 trong cùng một lượt ghi trọn vẹn và chuyển draft→done; không báo lưu xong nếu
-nội dung mới gõ chưa được ghi (hiện trạng code: Cập nhật và Lưu sơ đồ còn tách
-riêng, chưa có lượt ghi chung cho toàn bộ nội dung đang sửa).
+nội dung mới gõ chưa được ghi (hiện trạng code: nút Lưu hồ sơ flush editor rồi
+gọi `workspace_save_case`; Cập nhật giữ đường commit riêng).
 
 Mọi ghi gửi phiên bản đã đọc (`base_revision`); nếu server có bản khác, báo xung đột và cho tải bản mới hoặc giữ nháp để sao chép, không ghi đè cưỡng bức. Done không phải khóa chỉ đọc (hiện trạng code: hồ sơ locked chỉ đọc, vẫn xem/sao chép và dùng thao tác đọc được cho phép; chưa có Done sửa được theo chốt mới).
 
@@ -251,7 +252,7 @@ Kéo người vào vị trí để gán; gỡ thẻ trả người về Pool nh�
 
 Hai bên có 30 vị trí cố định: p1..p15 Bên A, p16..p30 Bên B. Giữ ghế trống; thả lên ghế có người thì hoán đổi, không dồn danh sách. Thừa kế biểu diễn cha/mẹ, vợ/chồng, con và nhánh thế vị; dấu Chủ/Nhận (sở hữu/nhận tài sản) chỉ thuộc Thừa kế, chọn theo vị trí tài sản 1..3; đổi thứ tự/xóa tài sản phải cảnh báo đổi nghĩa.
 
-Diagram có nháp riêng; **owner chốt 22/10/2026** đổi nút **Lưu sơ đồ** thành **Lưu hồ sơ**: lưu Diagram và toàn bộ Stage/thông tin hồ sơ đang sửa, kể cả ô chưa Cập nhật, trong cùng một lượt ghi trọn vẹn; chuyển draft→done. Không chỉ lưu riêng Diagram (hiện trạng code: nút vẫn là Lưu sơ đồ, chỉ gửi Diagram và chưa chuyển done). Xem cách tính chỉ đọc kết quả Python, không lưu và không tính lại bằng JavaScript. Quan hệ sai/vòng lặp/người ngoài Stage bị chặn; cấu trúc hợp lệ nhưng thiếu dữ liệu vẫn cho lưu, hiện rõ phần còn thiếu. Lỗi không xóa sơ đồ cũ; giữ quy tắc revision/xung đột.
+Diagram có nháp riêng; **owner chốt 22/10/2026** đổi nút **Lưu sơ đồ** thành **Lưu hồ sơ**: lưu Diagram và toàn bộ Stage/thông tin hồ sơ đang sửa, kể cả ô chưa Cập nhật, trong cùng một lượt ghi trọn vẹn; chuyển draft→done. Không chỉ lưu riêng Diagram (hiện trạng code: nút Lưu hồ sơ gọi `workspace_save_case`; `saveDiagram` cũ còn là API riêng). Xem cách tính chỉ đọc kết quả Python, không lưu và không tính lại bằng JavaScript. Quan hệ sai/vòng lặp/người ngoài Stage bị chặn; cấu trúc hợp lệ nhưng thiếu dữ liệu vẫn cho lưu, hiện rõ phần còn thiếu. Lỗi không xóa sơ đồ cũ; giữ quy tắc revision/xung đột.
 
 **Gỡ cả nhánh Thừa kế — owner 17/10/2026: “B - gỡ cả nhánh”.** Xóa node gỡ cả node đó và mọi hậu duệ active theo cạnh cha/mẹ → con ở mọi độ sâu, kể cả slot trống/ẩn hoặc con còn cha/mẹ khác. Không gỡ spouse chỉ vì quan hệ vợ/chồng, không giữ ô trung gian rỗng và không tự nối lại cha/mẹ. Trước khi đổi draft, liệt kê đúng node sẽ gỡ và quan hệ sẽ ngắt, báo phần hưởng có thể đổi. Hủy/Escape/đóng không đổi draft/dirty/revision và không phát evaluate/save do thao tác này. Xác nhận áp một mutation draft rồi evaluate theo luồng có sẵn, chưa tự lưu.
 

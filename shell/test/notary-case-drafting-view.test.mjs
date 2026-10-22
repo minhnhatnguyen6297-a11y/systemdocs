@@ -117,17 +117,19 @@ test('action bar: Zalo visible + disabled; Hủy/Cập nhật/Nhập file/case-t
   assert.ok(zalo, 'thiếu nút Zalo — phải visible, không ẩn');
   assert.equal(zalo.disabled, true, 'Zalo phải disabled');
   assert.ok(btns.some((b) => b.textContent === 'Nhập file'));
-  // nhap moi → nut chinh la "Lưu hồ sơ"; case thật la "Cập nhật".
-  assert.ok(btns.some((b) => b.textContent === 'Lưu hồ sơ'));
+  // nhap moi → nut chinh la "Lưu nháp"; case thật la "Cập nhật";
+  // "Lưu hồ sơ" là nút riêng ở card Sơ đồ.
+  assert.ok(btns.some((b) => b.textContent === 'Lưu nháp'));
   assert.ok(collect(view.el, (e) =>
     e.tagName === 'SELECT' &&
     e.getAttribute('aria-label') === 'Loại việc').length === 1);
 });
 
-test('action bar: case thật có nút Cập nhật (không có Lưu hồ sơ)', () => {
+test('action bar: case thật có nút Cập nhật, card Sơ đồ có Lưu hồ sơ', () => {
   const { view } = build(test, { draft: false });
   assert.ok(findBtns(view.el, 'Cập nhật').length >= 1);
-  assert.equal(findBtns(view.el, 'Lưu hồ sơ').length, 0);
+  assert.equal(findBtns(topbar(view.el), 'Lưu nháp').length, 0);
+  assert.equal(findBtns(view.el, 'Lưu hồ sơ').length, 1);
 });
 
 // ---------- asset columns ----------
@@ -483,7 +485,7 @@ test('Pool card payload giữ text/plain {kind,row_id} cho P7', () => {
 
 // ---------- stageDirty gate ----------
 
-test('stageDirty gate: Xem cách tính/Lưu sơ đồ disabled khi Stage chưa cập nhật', () => {
+test('stageDirty gate: Xem cách tính disabled, Lưu hồ sơ vẫn bật', () => {
   const { model, view } = build(test, { draft: false });
   model.addSlot('owner');            // diagramDirty → save enable được
   model.state.stageDirty = true;     // stage chưa cập nhật
@@ -494,11 +496,11 @@ test('stageDirty gate: Xem cách tính/Lưu sơ đồ disabled khi Stage chưa c
   assert.equal(findBtns(view.el, '+ Slot').length, 0,
     'con nút + Slot');
   const evalBtn = findBtns(view.el, 'Xem cách tính')[0];
-  const save = findBtns(view.el, 'Lưu sơ đồ')[0];
+  const save = findBtns(view.el, 'Lưu hồ sơ')[0];
   assert.equal(evalBtn.disabled, true,
     'Xem cách tính vẫn bấm được khi stageDirty');
-  assert.equal(save.disabled, true,
-    'Lưu sơ đồ vẫn bấm được khi stageDirty');
+  assert.equal(save.disabled, false,
+    'Lưu hồ sơ bị khóa oan khi Stage chưa Cập nhật');
   assert.ok(collect(view.el, (e) =>
     e.textContent === 'Cập nhật Stage trước').length >= 1,
     'thiếu pill báo gate');
@@ -524,8 +526,8 @@ test('MIN-133 D4: không nút ‹, tiêu đề, pill Nháp, nhãn trạng thái 
                      'Chưa lưu:', 'Đã lưu · phiên bản']) {
     assert.ok(!txt.includes(bad), `còn chuỗi "${bad}"`);
   }
-  // Tín hiệu duy nhất: chấm dirty trên nút Lưu hồ sơ.
-  const save = findBtns(topbar(view.el), 'Lưu hồ sơ')[0];
+  // Tín hiệu duy nhất: chấm dirty trên nút Lưu nháp.
+  const save = findBtns(topbar(view.el), 'Lưu nháp')[0];
   assert.equal(collect(save,
     (e) => e.classList.contains('dirty-dot')).length, 1);
   assert.match(save.getAttribute('aria-label'), /có thay đổi chưa lưu/);
@@ -566,10 +568,10 @@ test('MIN-133: tab Tổng quan — ẩn phần hành động của thanh trên',
     (e) => e.classList.contains('cd-topbar-actions'))[0];
   findBtns(bar, 'Tổng quan hồ sơ')[0].onclick();
   assert.equal(actions.hidden, true);
-  assert.equal(findBtns(bar, 'Lưu hồ sơ').length, 0);
+  assert.equal(findBtns(topbar(view.el), 'Lưu nháp').length, 0);
   findBtns(bar, 'Soạn hồ sơ')[0].onclick();
   assert.equal(actions.hidden, false);
-  assert.equal(findBtns(bar, 'Lưu hồ sơ').length, 1);
+  assert.equal(findBtns(topbar(view.el), 'Lưu nháp').length, 1);
 });
 
 test('MIN-133: đổi Loại việc trên thanh trên → Stage dựng lại ngay, select giữ focus', () => {
@@ -591,7 +593,7 @@ test('MIN-133: đổi Loại việc trên thanh trên → Stage dựng lại nga
   assert.equal(document.activeElement, sel);
 });
 
-test('MIN-133 D2: không card Thông tin hồ sơ; Lưu hồ sơ vẫn gửi meta mặc định đủ', async () => {
+test('MIN-133 D2: không card Thông tin hồ sơ; Lưu nháp vẫn gửi meta mặc định đủ', async () => {
   const respond = (cmd, p) => cmd === 'notary.workspace_create'
     ? { ok: true, data: {
         created: true, backend_mode: 'real',
@@ -617,9 +619,9 @@ test('MIN-133 D2: không card Thông tin hồ sơ; Lưu hồ sơ vẫn gửi met
   model.setOwnerRow(owner.row_id);
   model.addAsset({ so_serial: 'AA000001' });
   calls.length = 0;
-  await findBtns(topbar(view.el), 'Lưu hồ sơ')[0].onclick();
+  await findBtns(topbar(view.el), 'Lưu nháp')[0].onclick();
   const call = calls.find(([c]) => c === 'notary.workspace_create');
-  assert.ok(call, 'Lưu hồ sơ không gọi workspace_create');
+  assert.ok(call, 'Lưu nháp không gọi workspace_create');
   const meta = call[1].case;
   assert.deepEqual(Object.keys(meta).sort(), ['case_type', 'document_type',
     'ghi_chu', 'ngay_lap_ho_so', 'nguoi_nhan_uy_quyen',
@@ -2038,4 +2040,121 @@ test('conversion dirty Stage explains existing save action without autosave or d
   assert.equal(model.state.stage.people[0].ho_ten,'Chữ nháp cần giữ');
   assert.equal(model.state.stageDirty,true);
   assert.equal(calls.some(([c])=>['notary.workspace_convert_type','notary.workspace_commit_stage'].includes(c)),false);
+});
+
+// ---------- issue 13: Lưu hồ sơ = workspace_save_case ----------
+
+function saveCaseRespond(workspace) {
+  let revision = workspace && workspace.case ? workspace.case.revision : 1;
+  return (cmd, p) => {
+    if (cmd !== 'notary.workspace_save_case') return null;
+    revision += 1;
+    const caseId = p.case_id != null ? p.case_id : 77;
+    return { ok: true, data: {
+      case: { id: caseId, case_type: p.case.case_type,
+              document_type: p.case.document_type, status: 'done',
+              locked: false, revision },
+      backend_mode: 'real',
+      capabilities: { intake: [], diagram: true, word_export: false },
+      stage: structuredClone(p.stage),
+      diagram: { state: structuredClone(p.diagram.state),
+                 render_model: null },
+      warnings: [] } };
+  };
+}
+
+test('B1: một lần bấm gửi đúng một workspace_save_case cùng snapshot', async () => {
+  const respond = saveCaseRespond();
+  const { model, view, calls } = build(test, { draft: true, respond });
+  const owner = model.addPerson({ ho_ten: 'Người Để Lại' });
+  model.setOwnerRow(owner.row_id);
+  model.addAsset({ so_serial: 'AA000001', dia_chi: 'Thửa A' });
+  const key = model.state.draftId;
+  // Gõ vào DOM nhưng KHÔNG bắn input/change — bridge click phải flush.
+  fid(view.el, 'meta:noi_niem_yet').value = 'Xã Mới';
+  fid(view.el, `p:${owner.row_id}:ho_ten`).value = 'Người Sửa Xong';
+  calls.length = 0;
+
+  await findBtns(view.el, 'Lưu hồ sơ')[0].onclick();
+
+  const saves = calls.filter(([c]) => c === 'notary.workspace_save_case');
+  assert.equal(saves.length, 1, 'phải gửi đúng một command');
+  assert.equal(calls.filter(([c]) => c === 'notary.workspace_create').length,
+    0, 'Lưu hồ sơ không đi qua workspace_create');
+  const p = saves[0][1];
+  assert.equal(p.idempotency_key, key, 'case mới giữ key của phiên nháp');
+  assert.equal('case_id' in p, false, 'case mới không gửi case_id');
+  assert.equal(p.case.noi_niem_yet, 'Xã Mới');
+  assert.equal(p.stage.owner_row_id, owner.row_id);
+  assert.equal(p.stage.people.find((x) => x.row_id === owner.row_id).ho_ten,
+    'Người Sửa Xong');
+  assert.equal(p.stage.assets[0].dia_chi, 'Thửa A');
+  assert.equal(p.diagram.state.domain, 'inheritance');
+  assert.equal(p.diagram.state.nodes.find((n) => n.id === 'owner').personId,
+    owner.row_id);
+  assert.equal(model.state.caseId, 77);
+  assert.equal(model.state.stageDirty, false);
+  assert.equal(model.state.diagramDirty, false);
+  assert.equal(model.state.metaDirty, false);
+  assert.equal(model.state.notice, 'Đã lưu hồ sơ');
+});
+
+test('B2: ô text + ô ngày đang sửa được flush; ngày sai không gửi IPC', async () => {
+  const respond = saveCaseRespond();
+  const { model, view, calls, notifications } = build(test,
+    { draft: true, respond });
+  const owner = model.addPerson({ ho_ten: 'Người Để Lại' });
+  model.setOwnerRow(owner.row_id);
+  model.addAsset({ so_serial: 'AA000001' });
+
+  // Ngày hợp lệ dd/mm/yyyy.
+  const birth = fid(view.el, `p:${owner.row_id}:ngay_sinh`);
+  birth.value = '22/10/2026';
+  calls.length = 0;
+  await findBtns(view.el, 'Lưu hồ sơ')[0].onclick();
+  let p = calls.find(([c]) => c === 'notary.workspace_save_case')[1];
+  assert.equal(
+    p.stage.people.find((x) => x.row_id === owner.row_id).ngay_sinh,
+    '2026-10-22');
+
+  // Năm riêng vẫn giữ dạng YYYY.
+  const death = fid(view.el, `p:${owner.row_id}:ngay_chet`);
+  death.value = '2010';
+  calls.length = 0;
+  await findBtns(view.el, 'Lưu hồ sơ')[0].onclick();
+  p = calls.find(([c]) => c === 'notary.workspace_save_case')[1];
+  assert.equal(
+    p.stage.people.find((x) => x.row_id === owner.row_id).ngay_chet,
+    '2010');
+
+  // Ngày không tồn tại: dừng trước IPC, giữ dirty, đánh dấu đúng ô.
+  let bad = fid(view.el, `p:${owner.row_id}:ngay_sinh`);
+  bad.value = '31/02/2026';
+  bad.oninput();                    // gõ thật đã đánh dấu dirty
+  // oninput emit → rerender dựng lại ô; giữ tham chiếu DOM mới.
+  bad = fid(view.el, `p:${owner.row_id}:ngay_sinh`);
+  calls.length = 0;
+  await findBtns(view.el, 'Lưu hồ sơ')[0].onclick();
+  assert.equal(calls.filter(([c]) => c === 'notary.workspace_save_case').length,
+    0, 'ngày sai không được gửi snapshot thiếu');
+  assert.equal(bad.classList.contains('cd-input-bad'), true,
+    'ô ngày sai phải được đánh dấu');
+  assert.ok(notifications.some((m) => /Ngày không hợp lệ/.test(m)),
+    'phải báo lỗi tại chỗ');
+  assert.equal(model.state.stageDirty, true, 'dirty giữ nguyên khi không gửi');
+});
+
+test('B2: ký tự gõ dở trong ô ngày rỗng → null, không chặn lưu', async () => {
+  const respond = saveCaseRespond();
+  const { model, view, calls } = build(test, { draft: true, respond });
+  const owner = model.addPerson({ ho_ten: 'Người Để Lại' });
+  model.setOwnerRow(owner.row_id);
+  model.addAsset({ so_serial: 'AA000001' });
+  const birth = fid(view.el, `p:${owner.row_id}:ngay_sinh`);
+  birth.value = '';
+  calls.length = 0;
+  await findBtns(view.el, 'Lưu hồ sơ')[0].onclick();
+  const p = calls.find(([c]) => c === 'notary.workspace_save_case')[1];
+  assert.equal(
+    p.stage.people.find((x) => x.row_id === owner.row_id).ngay_sinh, null);
 });
