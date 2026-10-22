@@ -16,7 +16,7 @@ Khi đóng/rời hồ sơ chưa Lưu, thay đổi trong bộ nhớ sẽ mất; h
 ## Nguồn và lý do
 
 - Chỉ đạo owner trong chat 23/10/2026 của lát G4.
-- [Recon §2, §4 G4/G6, §5](../../../e2e-drafting-recon/_bmad-output/tmp/e2e-drafting-bug-recon-20261023.md): mô hình hai lần ghi Cập nhật/Lưu hồ sơ khiến Stage đang sửa khác Pool/Diagram theo committed; người vừa thêm không gán được và nhãn cũ còn trong phiên. Đây là gốc G4. G6 đã quan sát nhưng điều kiện kích hoạt chưa được cô lập; không suy việc đổi thiết kế là proof đã sửa runtime.
+- Recon §2, §4 G4/G6, §5 — file `e2e-drafting-bug-recon-20261023.md` trong thư mục tmp của worktree `e2e-drafting-recon` (ngoài repo này): mô hình hai lần ghi Cập nhật/Lưu hồ sơ khiến Stage đang sửa khác Pool/Diagram theo committed; người vừa thêm không gán được và nhãn cũ còn trong phiên. Đây là gốc G4. G6 đã quan sát nhưng điều kiện kích hoạt chưa được cô lập; không suy việc đổi thiết kế là proof đã sửa runtime.
 
 ## Phương án đã loại
 
