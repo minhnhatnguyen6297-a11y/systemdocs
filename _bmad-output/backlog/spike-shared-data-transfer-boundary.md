@@ -77,13 +77,14 @@ Các đường dẫn tính từ root repo; số dòng là vị trí đọc, khô
 
 ## Bổ sung 22/10/2026 — ba phương án ghi Hồ sơ để owner cân nhắc
 
-**Trạng thái: GHI NHẬN ĐỂ CÂN NHẮC — CHƯA CHỌN A/B/C, CHƯA DUYỆT SCHEMA HOẶC TRIỂN KHAI.**
+**Trạng thái: OWNER ĐÃ CHỌN PHƯƠNG ÁN B (22/10/2026) — xem `decision-owner-case-storage-b-20261022.md`. CHƯA DUYỆT SCHEMA VẬT LÝ HOẶC TRIỂN KHAI.**
 
 - Decision: owner yêu cầu ghi chi tiết cả ba phương án vào issue, sau đó commit và push tài liệu. Đây không phải phê duyệt phương án B được đề nghị trong hội thoại.
 - Phạm vi bổ sung: nơi lưu tiến độ Nháp, bộ thông tin Người/Tài sản theo Hồ sơ, ID dùng chung và trách nhiệm của hai nút **Cập nhật / Lưu hồ sơ**. Giữ nguyên phần điều tra ngày 16/10 ở trên; không cấp quyền chuyển dữ liệu liên module.
 - Ai chờ: owner cân nhắc trước khi chọn; người thiết kế/triển khai cách ghi mới chờ phương án và hành vi được duyệt. Không đặt thêm điều kiện chờ #13 cho việc regex/placeholder đã rõ.
 - Ưu tiên owner: cấu trúc ghi đủ rõ và ổn định. Không dùng câu hỏi về tải tương lai, số máy hoặc chức năng “lưu tức thì” làm điều kiện tiếp tục thiết kế.
 - Nơi ghi lựa chọn sau này: decision trong `_bmad-output/decisions/`, quy tắc đang áp dụng trong spec/contract liên quan và Notes issue này. Chưa có lựa chọn mới trong lượt ghi này.
+- Cập nhật 22/10/2026: owner đã chọn **phương án B**, sửa Done là thay luôn (không lấy phần C), và **Lưu hồ sơ lưu luôn cả ô đang sửa chưa Cập nhật** — ghi tại `_bmad-output/decisions/decision-owner-case-storage-b-20261022.md`.
 
 ### 1. Nguyên tắc cả ba phương án phải giữ
 
@@ -238,9 +239,9 @@ Các hướng xử lý dưới đây để cân nhắc, không phải toàn bộ
 
 ### 9. Còn mở và giới hạn bằng chứng
 
-- Open question: chọn A/B/C; nếu kết hợp thì nơi nào chịu trách nhiệm ghi/đọc dữ liệu nào?
+- ĐÃ CHỐT 22/10/2026: chọn **B** (không A, không cộng C) — `decision-owner-case-storage-b-20261022.md`.
 - Open question: cấp/đối chiếu ID tại Cập nhật, Lưu hồ sơ hay mốc khác; xử lý Done thiếu neo, đổi/xóa neo và nhiều ID cũ trùng ra sao?
-- Open question: Lưu hồ sơ nhận cả ô chưa Cập nhật không; sửa Done chưa Lưu hồ sơ thì bản nào còn được làm nguồn/xuất?
+- ĐÃ CHỐT 22/10/2026: Lưu hồ sơ nhận cả ô chưa Cập nhật (lưu tất cả trong cùng lượt); sửa Done là thay luôn nội dung hiện hành, bản đang sửa là nguồn/xuất — cùng decision ở trên.
 - Open question: chi tiết chuẩn hóa tên/số, nguồn mới nhất khi có nhiều ứng viên, và cách lấy dữ liệu khi một ID Tài sản có nhiều dòng/thửa trong Hồ sơ nguồn. Không tự gộp mất dòng hoặc chọn một thửa thay user.
 - Open question: nhân bản lấy bản đang làm hay đã lưu nếu chọn C; mã dòng/quan hệ ở bản sao cấp và nối thế nào để không ảnh hưởng nguồn?
 - Open question: Nháp/Done trong từng báo cáo và UX lưu khi đóng. Không biến phần chưa chọn thành chốt chặn nhập mới.
