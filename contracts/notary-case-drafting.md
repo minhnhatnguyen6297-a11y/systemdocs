@@ -1,7 +1,7 @@
 # Contract: Notary Case Drafting — v2, doc rev Storage B vòng 2 (22/10/2026)
 
 **Version hiện hành:** `notary.case-drafting.v2` · **Doc revision:** Storage B vòng 2,
-22/10/2026 — **đang triển khai vòng 2, chưa BUILT/chưa proof**. V1 APPROVED 24/09/2026 (MIN-105),
+22/10/2026 — **vòng 2 ĐÃ TRIỂN KHAI 22/10/2026, có proof** (chi tiết ở §13.20/§13.21). V1 APPROVED 24/09/2026 (MIN-105),
 rev 1.1 MIN-121 và v2 APPROVED 27/09/2026 (MIN-125/P5 MIN-128) là mốc lịch sử. ·
 **Owner:** `systemdocs` · **Published:** MIN-105 ·
 **Kênh mang:** `desktopcommand.v1` (`contracts/desktop-command.md`) ·
@@ -9,11 +9,13 @@ rev 1.1 MIN-121 và v2 APPROVED 27/09/2026 (MIN-125/P5 MIN-128) là mốc lịch
 
 Contract wire cho tab **Soạn hồ sơ** của module `notary_v2` trên envelope
 `desktopcommand.v1`: payload, result và error của các command bên dưới.
-**Đang triển khai vòng 2 issue 13:** Storage B vòng 1 (rows case-owned + `draft|done` +
+**Vòng 2 issue 13 ĐÃ TRIỂN KHAI 22/10/2026:** Storage B vòng 1 (rows case-owned + `draft|done` +
 `notary.workspace_save_case`, §13.19) đã có code chạy; vòng 2 bổ sung
 `notary.workspace_source_latest` (§13.20), `notary.workspace_duplicate` (§13.21) và
 đường tạo nháp ít dữ liệu trên `workspace_create` (§4.3/§13.6). Mọi hành vi vòng 2
-dưới đây là **đang triển khai, chưa BUILT, chưa proof**. Đây là contract cho cutover
+dưới đây **đã có proof** (`test_issue13_source_latest.py`,
+`test_issue13_workspace_duplicate.py`, `test_issue13_partial_draft.py`,
+`test_issue13_storage_b_proof.py`). Đây là contract cho cutover
 phối hợp renderer/backend tiền MVP, **không tương thích client cũ**.
 Giữ literal `notary.case-drafting.v2` và Diagram v3. V1/rev 1.1 là lịch sử;
 các shape v1 minh họa phần nền được §13 thay bằng v2. Không phát hành song song
@@ -325,7 +327,7 @@ evaluate strict vẫn bắt buộc tên non-empty (không dùng chuỗi giả th
   không chặn Người. Không tạo ngày giả/01/01, Boolean hoặc status mới.
   Không xóa raw/history, phá liên kết đã có hoặc đổi logic câu Word.
 
-**Storage B — vòng 1 có code, vòng 2 đang triển khai:** mỗi dòng thuộc đúng một Hồ sơ.
+**Storage B — vòng 1 có code, vòng 2 ĐÃ TRIỂN KHAI 22/10/2026:** mỗi dòng thuộc đúng một Hồ sơ.
 `case_person_rows` lưu nguyên tên, số và toàn bộ dữ kiện §4.1; `entity_id`
 ánh xạ `customer_id` nullable, không dùng Customer làm SOT hoặc fallback.
 `row_id/case_id/vitri` là khóa dòng/quyền sở hữu/thứ tự; mọi field nghiệp vụ
@@ -1180,7 +1182,7 @@ Consumer (Electron main/renderer) PHẢI:
 | additive NAIA-9 | 04/10/2026 | Thêm command thứ mười `notary.address_lookup` (§14): tra cứu đơn vị hành chính đích theo địa chỉ nguồn + `source_date`/`target_date` đầy đủ; read-only, local-only trên ledger Bando đóng gói; `result.data.schema_version` = `notary.address-lookup.v1` — ngoại lệ rule §1 |
 | address-lookup v2 (APPROVED, triển khai TASK-3) | 05/10/2026 | TASK-2, Owner duyệt 05/10: thay v1 bằng `notary.address-lookup.v2` (§14) — payload `query`+`presentation`, bỏ ngày/tách xã-tỉnh/`coverage`/`partial`; result `found\|not_found\|too_many\|invalid_input\|reload_failed`. **Breaking**; runtime và schema v1 đã chuyển/xóa tại TASK-3. |
 | v2 Storage B vòng 1 (đang triển khai) | 22/10/2026 | Cutover tiền MVP không tương thích client cũ: rows case-owned là SOT, identity nullable khi thiếu neo, draft/done không khóa; thêm workspace_save_case nguyên tử (§13.19). Giữ validation create vòng 1; nới tên/tập rỗng/owner null thuộc vòng 2. Không proof BUILT. |
-| v2 Storage B vòng 2 (đang triển khai) | 22/10/2026 | Thêm `workspace_source_latest` (§13.20: chọn case Done theo updated_at microsecond/id, Stage UUID mới + identity hint) và `workspace_duplicate` (§13.21: copy toàn bộ đã lưu, hash command+intent+source, draft/rev1 là chốt kỹ thuật chờ owner). Nới `workspace_create` cho nháp ít dữ liệu; save_case/commit/convert giữ strict. Chưa BUILT/đã proof. |
+| v2 Storage B vòng 2 (ĐÃ TRIỂN KHAI 22/10/2026) | 22/10/2026 | Thêm `workspace_source_latest` (§13.20: chọn case Done theo updated_at microsecond/id, Stage UUID mới + identity hint) và `workspace_duplicate` (§13.21: copy toàn bộ đã lưu, hash command+intent+source, draft/rev1 là chốt kỹ thuật chờ owner). Nới `workspace_create` cho nháp ít dữ liệu; save_case/commit/convert giữ strict. Proof: `test_issue13_source_latest.py`, `test_issue13_workspace_duplicate.py`, `test_issue13_partial_draft.py`, `test_issue13_storage_b_proof.py`. |
 
 ---
 
@@ -1485,7 +1487,8 @@ payload:
     state: <diagram_state v3>       # domain phải khớp case.case_type
 ```
 
-- **Vòng 2 — create nháp ít dữ liệu (đang triển khai):** create cho
+- **Vòng 2 — create nháp ít dữ liệu (ĐÃ TRIỂN KHAI 22/10/2026; proof:
+  `test_issue13_partial_draft.py`):** create cho
   ≥0 Người/≥0 Tài sản, `ho_ten=null`, owner inheritance absent/null; kiểu/
   ngày/enum/giới hạn vẫn strict. Owner **non-null** sai/ngoài Stage →
   `workspace_owner_required`; two_party vẫn cấm key. Thiếu số giấy hoặc
@@ -1947,9 +1950,11 @@ bị từ chối terminal. Các command khác không thay semantics hủy.
 
 ### 13.19 Storage B, draft/done và workspace_save_case — cutover tiền MVP
 
-**Đang triển khai vòng 2 issue 13, chưa BUILT, chưa proof.** Vòng 1 (rows
+**Vòng 2 issue 13 ĐÃ TRIỂN KHAI 22/10/2026.** Vòng 1 (rows
 case-owned, draft/done, save_case) có code; vòng 2 thêm source_latest/
-duplicate/partial-create. Thay dữ liệu test bằng DB
+duplicate/partial-create (proof: `test_issue13_source_latest.py`,
+`test_issue13_workspace_duplicate.py`, `test_issue13_partial_draft.py`,
+`test_issue13_storage_b_proof.py`). Thay dữ liệu test bằng DB
 test mới; không migration bảo toàn, backfill, migrate-on-read, dual-read/write
 hoặc tương thích locked. Không xóa raw/provenance/evidence/tài liệu repo.
 Đây là breaking cutover phối hợp app/backend, giữ literal wire v2 và Diagram v3.
@@ -2061,7 +2066,8 @@ Không đóng toàn #13 hoặc mở gate mẫu #41 bằng commit contract này.
 
 ### 13.20 `notary.workspace_source_latest` — đọc nguồn Done mới nhất (vòng 2)
 
-**Trạng thái:** đang triển khai vòng 2, chưa BUILT, chưa proof. Read-only trên
+**Trạng thái:** ĐÃ TRIỂN KHAI 22/10/2026 (proof: `test_issue13_source_latest.py`,
+`test_issue13_storage_b_proof.py`). Read-only trên
 DB case: lấy **toàn bộ Người + toàn bộ Tài sản/cụm đất của đúng một Hồ sơ
 `done`** làm nguồn cho nháp mới. Không tạo/nhân bản case, không lấy buffer
 editor của nguồn, không đọc/lưu file DOCX như một phần của Stage nguồn.
@@ -2156,7 +2162,8 @@ dùng chọn; two_party bỏ owner key; nguồn two_party/không nguồn → own
 
 ### 13.21 `notary.workspace_duplicate` — nhân bản toàn bộ hồ sơ (vòng 2)
 
-**Trạng thái:** đang triển khai vòng 2, chưa BUILT, chưa proof. Command tạo
+**Trạng thái:** ĐÃ TRIỂN KHAI 22/10/2026 (proof:
+`test_issue13_workspace_duplicate.py`). Command tạo
 case **mới** bằng cách copy nội dung **đã lưu** của nguồn trong một
 transaction; KHÔNG copy buffer editor chưa Cập nhật. Nguồn được phép
 `draft` hoặc `done`; `case_type` phải thuộc `inheritance`/`two_party`.

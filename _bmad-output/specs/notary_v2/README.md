@@ -92,7 +92,7 @@ không phải record văn bản lạ trong #39.
 
 ## 2. Danh sách hồ sơ
 
-**Hồ sơ nháp lưu bền — owner duyệt 21/10/2026; vòng 1 có code, vòng 2 đang triển khai:**
+**Hồ sơ nháp lưu bền — owner duyệt 21/10/2026; vòng 1 có code, vòng 2 ĐÃ TRIỂN KHAI 22/10/2026:**
 Hồ sơ đang làm dở được lưu trong database để mở lại làm tiếp, kể cả mới nhập
 2/6 trường Người; không ép đủ bộ trường hoặc tự điền dữ liệu để giữ tiến độ.
 Trạng thái **Nháp** phải được giữ khi lưu/đọc lại và thể hiện rõ khi hiển thị,
@@ -103,21 +103,24 @@ Done vẫn sửa được; sửa rồi ghi thành công là thay luôn nội dun
 không giữ bản Done cũ riêng. Done không có nghĩa đủ sáu trường hay đã công chứng
 (hiện trạng code: dòng case-owned, `draft`/`done`, bỏ `locked`; nút Lưu hồ sơ
 gọi `workspace_save_case` nguyên tử; B6 modal đất còn pending).
-**Vòng 2 đang triển khai, chưa proof:** `workspace_create` là đường tạo **nháp
+**Vòng 2 ĐÃ TRIỂN KHAI 22/10/2026 (proof: `test_issue13_partial_draft.py`,
+`test_issue13_storage_b_proof.py`):** `workspace_create` là đường tạo **nháp
 ít dữ liệu** — cho 0 Người/0 Tài sản, tên `null`, owner inheritance `null`;
 row thiếu số/ngày vẫn lưu đúng phần đã có. `workspace_save_case` (case mới),
 `Cập nhật` và chuyển loại vẫn **strict**: cần tên, owner hợp lệ và (save_case
 mới) ≥1 Người/≥1 Tài sản trước khi ghi; không có cờ partial cho các đường này.
 Nhãn hiển thị dùng `trang_thai`: `draft` = **Nháp**, `done` = **Đã lưu**; nhãn
 này độc lập với chấm dirty (Done vẫn Đã lưu khi có sửa chưa ghi). Resolver
-nguồn Done lưu gần nhất và **Nhân bản** thuộc vòng 2 đang triển khai; xem luật
-ở mục Luồng Người/Tài sản. Từng báo cáo có tính Nháp hay không và bộ lọc mặc
+nguồn Done lưu gần nhất và **Nhân bản** đã triển khai vòng 2 22/10/2026
+(proof: `test_issue13_source_latest.py`, `test_issue13_workspace_duplicate.py`);
+xem luật ở mục Luồng Người/Tài sản. Từng báo cáo có tính Nháp hay không và bộ lọc mặc
 định **chưa chốt**; B6 modal đất vẫn pending.
 [Quyết định](../../decisions/decision-owner-persistent-case-drafts-20261021.md).
 
 Tên mong muốn là Danh sách hồ sơ. Người dùng xem danh sách, tìm/lọc, tạo nháp và mở hồ sơ. Nhãn trạng thái, người tạo, tên/ngày tạo là hướng mô tả; danh sách nhãn, nguồn tìm kiếm và trường lọc chưa chốt đầy đủ. Chức năng sẽ **làm lại** — **DEFERRED 17/10/2026** (owner tự triển khai spec sau); hướng trường hiển thị/tìm/lọc owner ghi là **Draft chưa duyệt**, chưa phải quy tắc. [Decision](../../decisions/decision-owner-case-list-redesign-deferred-20261017.md).
 
-**Nhân bản (vòng 2 đang triển khai)** là **thao tác nhỏ trên từng dòng của
+**Nhân bản (vòng 2 ĐÃ TRIỂN KHAI 22/10/2026; proof:
+`test_issue13_workspace_duplicate.py`)** là **thao tác nhỏ trên từng dòng của
 danh sách hiện có**, không phải redesign/filter deferred: mỗi dòng có nút
 **Nhân bản** riêng (không lồng trong nút mở hồ sơ), xác nhận bỏ sửa chưa lưu
 như khi mở/tạo nháp. Nhân bản copy **toàn bộ nội dung đã lưu** của nguồn —
@@ -197,7 +200,7 @@ Snapshot giữ bằng chứng loại/nơi cấp/nhãn, kể cả chết thiếu 
 Migration/consumer đã được actual proof synthetic (fresh+migrated DB, exact
 Word; UI legacy giới hạn); **BUILT bounded**, chưa nghiệm thu toàn #41.
 
-**Luồng Người/Tài sản owner duyệt 21/10 mới nhất — vòng 2 đang triển khai:**
+**Luồng Người/Tài sản owner duyệt 21/10 mới nhất — vòng 2 ĐÃ TRIỂN KHAI 22/10/2026:**
 1. Người có **tên + số giấy tờ đồng thời giống nhau** → tự dùng cùng ID.
    Ngày cấp/địa chỉ khác vẫn cùng ID; đổi tên hoặc số thì chấp nhận ID khác.
 2. Tài sản cùng **serial** → dùng cùng ID; serial giữ nguyên văn, giữ đủ các
@@ -212,7 +215,8 @@ Word; UI legacy giới hạn); **BUILT bounded**, chưa nghiệm thu toàn #41.
    không phân biệt dấu/hoa-thường, giữ nguyên tên hiển thị/xuất. Thiếu điểm neo
    không gom; ID trùng cũ giữ nguyên, không tự hợp nhất, lấy bộ cuối cùng.
    Cùng serial vẫn gom cùng ID dù khác thửa; Nhân bản toàn bộ nội dung.
-   **Vòng 2 (đang triển khai):** chọn nguồn theo `updated_at` microsecond,
+   **Vòng 2 (ĐÃ TRIỂN KHAI 22/10/2026; proof: `test_issue13_source_latest.py`):**
+   chọn nguồn theo `updated_at` microsecond,
    `id` case lớn hơn khi tie, null-last; không theo ngày giấy/độ đầy đủ.
    `workspace_source_latest` trả **chỉ Stage** của đúng một case Done (Người +
    Tài sản/cụm đất, giữ thứ tự/null/identity), cấp `row_id` UUID mới và remap
@@ -223,9 +227,10 @@ Word; UI legacy giới hạn); **BUILT bounded**, chưa nghiệm thu toàn #41.
    một lượt; chuyển `draft` → `done`. Cập nhật trên Done thay ngay bản hiện hành
    sau ghi thành công, không chờ Lưu hồ sơ lần nữa. Vòng 1 có code Storage
    B case-owned, `draft`/`done`, bỏ `locked`; nút Lưu hồ sơ gọi
-   `workspace_save_case` ghi Stage+meta+Diagram nguyên tử. Vòng 2 **đang triển
-   khai, chưa proof**: resolver nguồn Done, Nhân bản, lát nháp ít dữ liệu;
-   B6 modal đất vẫn pending.
+   `workspace_save_case` ghi Stage+meta+Diagram nguyên tử. Vòng 2 **ĐÃ TRIỂN
+   KHAI 22/10/2026**: resolver nguồn Done (`test_issue13_source_latest.py`),
+   Nhân bản (`test_issue13_workspace_duplicate.py`), lát nháp ít dữ liệu + nhãn
+   trạng thái (`test_issue13_partial_draft.py`); B6 modal đất vẫn pending.
    **Nhân bản khác lấy nguồn:** copy **toàn bộ nội dung đã lưu** — Stage,
    meta + bảy scalar, participant tay, Diagram, provenance DOCX — thành case
    mới độc lập (UUID/PK mới, identity giữ); bản sao lần tạo đầu là `draft`
@@ -268,8 +273,9 @@ done lưu mới nhất, không lấy draft. Các bộ thông tin khác nhau vẫ
 qua những Hồ sơ đó. **Owner chốt 22/10/2026 — phương án B:** mỗi Người/Tài sản
 một dòng thuộc Hồ sơ, ghi đúng dòng đổi, không bản đã chốt riêng. Revision
 chỉ phục vụ kiểm tra xung đột, không là kho snapshot các lần Lưu. Giữ raw/
-nguồn/history kỹ thuật đã có. Vòng 1 đã cutover dòng case-owned; vòng 2 đang
-triển khai resolver nguồn Done + Nhân bản, chưa proof toàn bộ.
+nguồn/history kỹ thuật đã có. Vòng 1 đã cutover dòng case-owned; vòng 2 ĐÃ
+TRIỂN KHAI 22/10/2026 resolver nguồn Done + Nhân bản (proof:
+`test_issue13_source_latest.py`, `test_issue13_workspace_duplicate.py`).
 [Quyết định](../../decisions/decision-owner-case-snapshot-as-history-20261021.md).
 
 <a id="pool"></a>

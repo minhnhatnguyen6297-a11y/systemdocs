@@ -39,7 +39,8 @@ Word và lấy làm nguồn dùng bản hiện tại, không chờ Lưu hồ sơ
 gồm ô đang sửa chưa Cập nhật, và chuyển draft→done; không báo lưu xong khi
 nội dung mới gõ chưa được ghi. Không thêm bảng phiên bản Người/Tài sản hoặc
 bitemporal.
-**Chọn nguồn (vòng 2 đang triển khai):** Hồ sơ Done có `updated_at`
+**Chọn nguồn (vòng 2 ĐÃ TRIỂN KHAI 22/10/2026; proof:
+`test_issue13_source_latest.py`, `test_issue13_workspace_duplicate.py`):** Hồ sơ Done có `updated_at`
 microsecond lớn nhất; tie dùng `id` case lớn hơn, timestamp null xếp sau;
 không theo ngày giấy/độ đầy đủ. Đọc nguồn chỉ trả Stage (Người + Tài sản/cụm
 đất, UUID mới, identity giữ) — không trả meta/Diagram/provenance và **không
@@ -48,7 +49,9 @@ tạo bản lịch sử của nguồn; bản sao lần tạo đầu là `draft` 
 kỹ thuật vòng 2 chờ owner xác nhận. Retry cùng khóa không tạo trùng.
 Schema vật lý/migration lịch sử không đổi; hiện trạng code: vòng 1 Storage B
 case-owned đã cutover, nút Lưu hồ sơ gọi `workspace_save_case` cho
-Stage+meta+Diagram và chuyển draft→done; vòng 2 đang triển khai, chưa proof.
+Stage+meta+Diagram và chuyển draft→done; vòng 2 ĐÃ TRIỂN KHAI 22/10/2026
+(resolver nguồn, nhân bản, nháp ít dữ liệu; proof: `test_issue13_source_latest.py`,
+`test_issue13_workspace_duplicate.py`, `test_issue13_partial_draft.py`).
 Bộ đếm revision chống ghi đè khác với lưu nhiều snapshot. Raw, nguồn,
 `source_refs` và lịch sử kỹ thuật đã có vẫn giữ; không cấp quyền xóa lịch sử
 hoặc tạo logging mới. Không suy đổi cách tính báo cáo hoặc gửi dữ liệu
@@ -147,7 +150,7 @@ tục file đã rõ. Không tắt production Scan/Upload; quyền runtime đã c
   không đọc mẫu mới. Số giấy lưu thật, index không UNIQUE, identity theo ID
   chọn rõ/row_id chính hồ sơ, không auto lookup theo số/tên hoặc ghép giữa
   file. Snapshot không borrow master khi đã có key, kể cả null.
-- **Policy owner 21/10 mới nhất — vòng 2 đang triển khai (chưa proof):** tự gom Người cùng ID khi
+- **Policy owner 21/10 mới nhất — vòng 2 ĐÃ TRIỂN KHAI 22/10/2026:** tự gom Người cùng ID khi
   **tên + số giấy tờ đồng thời giống nhau**; ngày cấp/địa chỉ khác vẫn cùng ID.
   Chỉ trùng một trường không đủ; đổi tên hoặc số thì chấp nhận ID khác.
   Tài sản gom theo **serial** giữ nguyên văn. Không đòi user bấm liên kết hoặc
