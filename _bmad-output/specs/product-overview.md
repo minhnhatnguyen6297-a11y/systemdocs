@@ -64,9 +64,12 @@ những Hồ sơ đó; raw/nguồn/history kỹ thuật đã có vẫn giữ.
 [Quyết định](../decisions/decision-owner-case-snapshot-as-history-20261021.md).
 **Hồ sơ nháp — owner duyệt 21/10/2026, chưa triển khai lưu tiến độ mới:**
 Nháp được lưu database để mở lại làm tiếp dù mới nhập một phần; giữ và hiện
-nhãn **Nháp** rõ khi hiển thị/thống kê/báo cáo có chứa Nháp. Owner 22/10 yêu cầu
-Lưu hồ sơ ghi Diagram và chuyển Nháp sang Done; cách tính trong từng báo cáo
-chưa chốt, cấu trúc lưu còn thiết kế và chưa triển khai hành vi mới này.
+nhãn **Nháp** rõ khi hiển thị/thống kê/báo cáo có chứa Nháp. **Owner chốt
+22/10/2026:** bấm **Lưu hồ sơ** ghi Diagram và toàn bộ Stage/thông tin hồ sơ,
+kể cả ô đang sửa chưa Cập nhật, trong cùng một lượt; đây là mốc Nháp→Done.
+Cấu trúc lưu đã chọn phương án B; chi tiết vật lý còn thiết kế, cách tính
+trong từng báo cáo chưa chốt (hiện trạng code: Lưu sơ đồ chưa chuyển draft→done
+và chưa gom Stage/thông tin hồ sơ đang sửa).
 Xem [quy tắc Hồ sơ nháp](notary_v2/README.md#2-danh-sách-hồ-sơ) và
 [quyết định](../decisions/decision-owner-persistent-case-drafts-20261021.md).
 **Điểm neo — owner chốt 21/10 mới nhất, chưa triển khai:** tự dùng cùng ID
@@ -79,9 +82,13 @@ rỗng, không chặn lưu Nháp.
 **Owner 22/10:** mới nhất theo Hồ sơ lưu gần nhất, chỉ nguồn done, không draft;
 tên so không phân biệt dấu/hoa-thường, giữ tên gốc. ID trùng cũ giữ nguyên,
 không tự hợp nhất; cùng serial dù khác thửa vẫn cùng ID. Nhân bản toàn bộ.
-Đổi Lưu sơ đồ thành Lưu hồ sơ để ghi Diagram/draft→done và copy/paste Excel
-đã được giao, **đang dừng trước code để rà soát** ID khi nhập dở và hai bước
-Cập nhật/Lưu hồ sơ. Chưa sửa runtime hoặc chọn schema. Policy cũ ở
+Đổi **Lưu sơ đồ** thành **Lưu hồ sơ** đã chốt: lưu Diagram và toàn bộ nội dung,
+gồm ô chưa Cập nhật, trong một lượt và chuyển draft→done. Cập nhật trên Done
+thay ngay snapshot hiện hành sau khi ghi thành công; Word và nguồn cho Hồ sơ
+mới dùng bản hiện tại, không giữ bản Done cũ riêng. Phương án B đã chốt,
+phần dừng chờ A/B/C đã gỡ; thiết kế vật lý/migration và thời điểm cấp/đối chiếu
+ID khi nhập dở còn mở. Copy/paste Excel đã được giao, chưa triển khai.
+Chưa sửa runtime hoặc chọn schema vật lý. Policy cũ ở
 [#44](../backlog/story-person-cccd-suggestion-link.md) đã bị thay thế;
 không dùng tiêu chí cũ để triển khai hoặc khôi phục CCCD UNIQUE/chặn luồng.
 `f6d53b5` vẫn không tự tìm theo tên/số, có cập nhật master qua ID rõ; chưa
@@ -90,10 +97,15 @@ thực hiện policy mới. Không tự ghép dữ kiện giữa văn bản/đ�
 [Quyết định](../decisions/decision-owner-entity-anchors-case-snapshots-20261021.md).
 [Làm rõ và lượt rà soát 22/10](../decisions/decision-owner-data-entry-save-rules-20261022.md).
 
-**Rà soát cách ghi DB — 22/10:** [#13](../backlog/spike-shared-data-transfer-boundary.md#bổ-sung-22102026--ba-phương-án-ghi-hồ-sơ-để-owner-cân-nhắc)
-giữ chi tiết ba phương án: A lưu khối Hồ sơ; B lưu dòng Người/Tài sản thuộc Hồ sơ;
-C lưu dòng đang làm và một snapshot đã Lưu hồ sơ. Owner đang cân nhắc, chưa chọn
-schema, thời điểm cấp ID hoặc cách sửa Done; tiếp tục dừng trước code/migration.
+**Rà soát cách ghi DB — owner chốt 22/10/2026:** đã chọn **phương án B**:
+mỗi Người/Tài sản một dòng thuộc Hồ sơ, ghi đúng dòng đổi; không giữ bản
+“đã chốt” riêng. Sửa Done là thay luôn nội dung hiện hành sau ghi thành công.
+**Lưu hồ sơ lưu tất cả**, gồm Diagram, Stage/thông tin hồ sơ và ô chưa Cập nhật,
+trong một lượt ghi trọn vẹn. Phần tạm dừng chờ A/B/C đã gỡ; thiết kế vật lý,
+migration và thời điểm cấp/đối chiếu ID dùng chung còn mở
+(hiện trạng code: ghi master + snapshot JSON, chưa phải các dòng thuộc Hồ sơ
+theo B; nút Lưu sơ đồ chưa lưu tất cả hoặc chuyển draft→done).
+[Quyết định chọn B](../decisions/decision-owner-case-storage-b-20261022.md).
 
 **Pháp nhân (owner 20/10/2026):** không đưa vào Người; policy nhập tay chung
 có ngoại lệ ngân hàng thế chấp **app tự lấy** bên dưới. Bảng riêng tương lai

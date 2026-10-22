@@ -29,12 +29,21 @@ Lưu lại cùng Hồ sơ cập nhật snapshot đó, không tự tạo Hồ sơ
 snapshot từng lần lưu/lịch sử sửa từng ô. Lịch sử Người/Tài sản là các Hồ sơ
 liên quan cùng ID theo điểm neo bên dưới. Mỗi Hồ sơ đã lưu giữ bộ thông tin
 riêng, chỉ user sửa thủ công; không tự cập nhật theo danh mục hoặc Hồ sơ khác.
-Khi lấy Người/Tài sản vào Hồ sơ mới mặc định bộ mới nhất, không chọn phiên bản.
-Các bộ thông tin khác nhau vẫn giữ qua những Hồ sơ đó. Không mặc định thêm bảng
-phiên bản Người/Tài sản hoặc bitemporal. Một snapshot logic không bắt buộc
-một dòng JSON: cấu trúc bảng/cột còn thiết kế. Bộ đếm revision chống ghi đè
-khác với lưu nhiều snapshot. Raw, nguồn, `source_refs` và lịch sử kỹ thuật
-đã có vẫn giữ; không cấp quyền xóa lịch sử hoặc tạo logging mới.
+Khi lấy Người/Tài sản vào Hồ sơ mới mặc định bộ từ Hồ sơ done lưu mới nhất,
+không lấy draft hoặc bắt chọn phiên bản. Các bộ thông tin khác nhau vẫn giữ
+qua những Hồ sơ đó. **Owner chốt 22/10/2026 — phương án B:** mỗi Người/Tài sản
+một dòng thuộc Hồ sơ, ghi đúng dòng đổi; không giữ bản “đã chốt” riêng.
+Done vẫn sửa được; Cập nhật thành công thay ngay snapshot hiện hành, giữ Done.
+Word và lấy làm nguồn dùng bản hiện tại, không chờ Lưu hồ sơ lần nữa.
+**Lưu hồ sơ** là một lượt ghi trọn vẹn Diagram + toàn bộ Stage/thông tin hồ sơ,
+gồm ô đang sửa chưa Cập nhật, và chuyển draft→done; không báo lưu xong khi
+nội dung mới gõ chưa được ghi. Không thêm bảng phiên bản Người/Tài sản hoặc
+bitemporal. Schema vật lý/migration còn thiết kế (hiện trạng code: master +
+snapshot JSON, chưa phải dòng thuộc Hồ sơ theo B; Lưu sơ đồ chỉ gửi Diagram,
+chưa gom toàn bộ nội dung hoặc chuyển done; locked còn chặn sửa).
+Bộ đếm revision chống ghi đè khác với lưu nhiều snapshot. Raw, nguồn,
+`source_refs` và lịch sử kỹ thuật đã có vẫn giữ; không cấp quyền xóa lịch sử
+hoặc tạo logging mới.
 [Quyết định](../../decisions/decision-owner-case-snapshot-as-history-20261021.md).
 
 ### 4.1 `IdentityEvidence` — bản nháp dùng để đối chiếu
@@ -135,13 +144,21 @@ tục file đã rõ. Không tắt production Scan/Upload; quyền runtime đã c
   Tài sản gom theo **serial** giữ nguyên văn. Không đòi user bấm liên kết hoặc
   chọn phiên bản. Tìm Người để xem các Hồ sơ đã làm. Một bảng Người cho sống/chết.
   Khi lấy vào Hồ sơ mới mặc định bộ mới nhất; Hồ sơ đã lưu không tự cập nhật.
-  **Owner 22/10:** bộ mới nhất theo Hồ sơ được lưu gần nhất, chỉ nguồn `done`,
+  **Owner chốt 22/10/2026:** bộ mới nhất theo Hồ sơ được lưu gần nhất, chỉ nguồn `done`,
   loại `draft`; không theo ngày giấy hoặc độ đầy đủ. Tên đối chiếu không phân
   biệt dấu/hoa-thường, giữ nguyên tên gốc; không tự mở thành so gần đúng tùy ý.
   Thiếu điểm neo không gom và không chặn lưu Nháp. ID trùng cũ giữ nguyên,
   không tự hợp nhất, lấy bộ cuối cùng; lịch sử user xử lý. Cùng serial vẫn gom
   cùng ID dù khác thửa, không thêm điều kiện thửa/tờ. Nhân bản toàn bộ nội dung.
-  Cách giữ/đổi ID khi bổ sung neo, hai bước ghi và schema đang rà soát; chưa code.
+  Phương án B đã chốt: mỗi Người/Tài sản một dòng thuộc Hồ sơ, ghi đúng dòng
+  đổi, không bản đã chốt riêng. Hai hành vi **Cập nhật trên Done thay ngay
+  snapshot hiện hành sau ghi thành công** và **Lưu hồ sơ lưu toàn bộ Diagram +
+  Stage/thông tin hồ sơ, kể cả ô chưa Cập nhật, trong một lượt ghi trọn vẹn,
+  chuyển draft→done** đã chốt; không chờ Lưu hồ sơ lần nữa để dùng bản Done
+  vừa Cập nhật. Phần tạm dừng chờ A/B/C đã gỡ. Schema vật lý/migration,
+  thời điểm cấp/đối chiếu ID dùng chung và cách giữ/đổi ID khi bổ sung neo
+  vẫn đang thiết kế (hiện trạng code: chưa có nguồn done lưu mới nhất,
+  chưa có lượt ghi chung Stage/thông tin hồ sơ/Diagram; còn draft/locked).
   Không tự ghép trường giữa nhiều Hồ sơ/văn bản.
   Policy gợi ý CCCD/user chọn/bỏ qua tạo ID mới và kho “thông tin liên kết”
   trước đó đã bị thay thế; [#44](../../backlog/story-person-cccd-suggestion-link.md)
@@ -149,7 +166,8 @@ tục file đã rõ. Không tắt production Scan/Upload; quyền runtime đã c
   luồng. Runtime cũ chưa thực hiện điểm neo mới; giữ Case links/raw/history/
   snapshot null. #41 OPEN/gate mẫu ĐÓNG, #42 độc lập.
   [Quyết định](../../decisions/decision-owner-entity-anchors-case-snapshots-20261021.md).
-  [Làm rõ 22/10 và yêu cầu dừng code](../../decisions/decision-owner-data-entry-save-rules-20261022.md).
+  [Làm rõ 22/10](../../decisions/decision-owner-data-entry-save-rules-20261022.md).
+  [Chốt B và Lưu hồ sơ lưu tất cả](../../decisions/decision-owner-case-storage-b-20261022.md).
 - **Địa chỉ cũ–mới — owner kết phiên 21/10:** tạm thời giữ cách hiện tại.
   Chưa chốt mô hình mới; đề xuất danh mục/quan hệ chuyển đổi và mã tham chiếu
   từ các trường địa chỉ chưa được duyệt. Không đổi cấu trúc/hành vi theo đề

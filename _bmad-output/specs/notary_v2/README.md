@@ -97,10 +97,16 @@ Hồ sơ đang làm dở được lưu trong database để mở lại làm ti�
 2/6 trường Người; không ép đủ bộ trường hoặc tự điền dữ liệu để giữ tiến độ.
 Trạng thái **Nháp** phải được giữ khi lưu/đọc lại và thể hiện rõ khi hiển thị,
 thống kê hoặc báo cáo có chứa Hồ sơ nháp, tránh gộp mất phân biệt.
-Mốc chuyển khỏi Nháp, từng báo cáo có tính Nháp hay không và bộ lọc mặc định
-**chưa chốt**. Cấu trúc lưu, thời điểm tạo liên kết và chi tiết lưu/đóng còn
+**Owner chốt 22/10/2026:** bấm **Lưu hồ sơ** lưu Diagram và toàn bộ nội dung,
+kể cả ô chưa Cập nhật, trong cùng một lượt ghi trọn vẹn và chuyển Nháp→Done.
+Done vẫn sửa được; sửa rồi ghi thành công là thay luôn nội dung hiện hành,
+không giữ bản Done cũ riêng. Done không có nghĩa đủ sáu trường hay đã công chứng
+(hiện trạng code: còn draft/locked, locked chỉ đọc; Lưu sơ đồ chưa chuyển done).
+Từng báo cáo có tính Nháp hay không và bộ lọc mặc định **chưa chốt**. Cấu trúc
+lưu đã chọn phương án B; chi tiết vật lý, thời điểm tạo liên kết và lưu/đóng còn
 thiết kế; owner ưu tiên đơn giản, chấp nhận lưu thủ công nếu phục hồi tự động
-phức tạp. Nháp phiên/đường Cập nhật hiện có chưa chứng minh đáp ứng yêu cầu này.
+phức tạp (hiện trạng code: đã lưu/mở lại draft qua validation, chưa đáp ứng
+Nháp rất ít dữ liệu/chưa có tài sản/chưa chọn owner).
 [Quyết định](../../decisions/decision-owner-persistent-case-drafts-20261021.md).
 
 Tên mong muốn là Danh sách hồ sơ. Người dùng xem danh sách, tìm/lọc, tạo nháp và mở hồ sơ. Nhãn trạng thái, người tạo, tên/ngày tạo là hướng mô tả; danh sách nhãn, nguồn tìm kiếm và trường lọc chưa chốt đầy đủ. Chức năng sẽ **làm lại** — **DEFERRED 17/10/2026** (owner tự triển khai spec sau); hướng trường hiển thị/tìm/lọc owner ghi là **Draft chưa duyệt**, chưa phải quy tắc. [Decision](../../decisions/decision-owner-case-list-redesign-deferred-20261017.md).
@@ -135,7 +141,7 @@ Không chắc ranh người/tài sản thì giữ nguồn và báo mơ hồ; nhi
 
 Nhập Word giữ chữ lấy được ở đúng ô để sửa, kể cả lỗi gõ/dính chữ; không thêm ô nguyên văn hoặc tự sửa tên cơ quan. Ngày sai lịch, diện tích âm/không hữu hạn phải sửa; không lấy riêng năm để che ngày sai. Diện tích `1.234,5` đọc được; chỉ `1.234` thì giữ nguyên + báo mơ hồ. Thiếu trường vẫn cho kiểm tra/bổ sung; không vượt giới hạn khi nhận vào Stage.
 
-Ảnh nhập tay được xem lại đúng nguồn. Không lưu bản nháp giấy tờ vào localStorage/log. Chỉ Cập nhật thành công mới ghi dữ liệu nghiệp vụ.
+Ảnh nhập tay được xem lại đúng nguồn. Không lưu bản nháp giấy tờ vào localStorage/log. Chỉ Cập nhật hoặc Lưu hồ sơ thành công mới ghi dữ liệu nghiệp vụ.
 
 <a id="stage"></a>
 ## 4. Stage — sửa thông tin và Cập nhật
@@ -188,10 +194,13 @@ Word; UI legacy giới hạn); **BUILT bounded**, chưa nghiệm thu toàn #41.
    Tên đối chiếu không phân biệt dấu/hoa-thường, giữ nguyên tên hiển thị/xuất.
    Thiếu điểm neo không gom; ID trùng cũ giữ nguyên, không tự hợp nhất, lấy bộ
    cuối cùng. Cùng serial vẫn gom cùng ID dù khác thửa; Nhân bản toàn bộ nội dung.
-6. Owner yêu cầu đổi **Lưu sơ đồ** thành **Lưu hồ sơ**, ghi Diagram và chuyển
-   `draft` → `done`; sau đó dừng code để mô phỏng thứ tự nhập/Cập nhật/Lưu hồ sơ.
-   Lifecycle ID khi thiếu/bổ sung/đổi neo và ghi quan hệ đang rà soát. Các đoạn
-   mô tả nút Lưu sơ đồ bên dưới vẫn là hiện trạng, chưa phải thay đổi đã built.
+6. **Owner chốt 22/10/2026:** đổi **Lưu sơ đồ** thành **Lưu hồ sơ**, ghi Diagram
+   và toàn bộ Stage/thông tin hồ sơ đang sửa, gồm ô chưa Cập nhật, trong cùng
+   một lượt; chuyển `draft` → `done`. Cập nhật trên Done thay ngay bản hiện hành
+   sau ghi thành công, không chờ Lưu hồ sơ lần nữa. Phương án B đã chọn, phần
+   dừng chờ A/B/C đã gỡ; thiết kế vật lý/migration và lifecycle ID khi thiếu/
+   bổ sung/đổi neo còn mở (hiện trạng code: nút Lưu sơ đồ chỉ gửi Diagram,
+   chưa gom Stage/thông tin hồ sơ đang sửa hoặc chuyển draft→done).
 
 Một bảng Người cho sống/chết. Luồng gợi ý CCCD/user chọn/bỏ qua tạo ID mới và
 “thông tin liên kết” cũ ở [#44](../../backlog/story-person-cccd-suggestion-link.md)
@@ -208,7 +217,15 @@ Thừa kế cần `owner_row_id` theo contract lưu hiện hành; Hai bên khôn
 
 **Cập nhật:** kiểm toàn bộ Stage → ghi Người/Tài sản → dọn tham chiếu Diagram của đối tượng đã xóa → tính lại → tăng phiên bản → lưu trọn vẹn. Một dòng lỗi thì không lưu nửa chừng; báo đúng ô và giữ bản nháp. Lần đầu tạo hồ sơ dùng cùng `idempotency_key` khi thử lại sau timeout để tránh tạo trùng.
 
-Mọi ghi gửi phiên bản đã đọc (`base_revision`); nếu server có bản khác, báo xung đột và cho tải bản mới hoặc giữ nháp để sao chép, không ghi đè cưỡng bức. Hồ sơ khóa chỉ đọc, vẫn xem/sao chép và dùng thao tác đọc được cho phép.
+**Owner chốt 22/10/2026:** Cập nhật trên Hồ sơ Done ghi đúng dòng đổi và thay
+ngay snapshot hiện hành, giữ Done. Xuất Word và lấy làm nguồn cho Hồ sơ mới
+dùng bản hiện tại, không có bản Done cũ riêng để dùng thay. **Lưu hồ sơ** lưu
+Diagram cùng toàn bộ Stage/thông tin hồ sơ, flush cả ô đang sửa chưa Cập nhật
+trong cùng một lượt ghi trọn vẹn và chuyển draft→done; không báo lưu xong nếu
+nội dung mới gõ chưa được ghi (hiện trạng code: Cập nhật và Lưu sơ đồ còn tách
+riêng, chưa có lượt ghi chung cho toàn bộ nội dung đang sửa).
+
+Mọi ghi gửi phiên bản đã đọc (`base_revision`); nếu server có bản khác, báo xung đột và cho tải bản mới hoặc giữ nháp để sao chép, không ghi đè cưỡng bức. Done không phải khóa chỉ đọc (hiện trạng code: hồ sơ locked chỉ đọc, vẫn xem/sao chép và dùng thao tác đọc được cho phép; chưa có Done sửa được theo chốt mới).
 
 Không chặn chuyển tab chỉ vì đang nhập. Chuyển module phải giữ nháp; rời/đóng khi có thay đổi chưa lưu phải cảnh báo. Cập nhật nền không ghi đè ô đang sửa. Nút `Hủy thay đổi` của Stage đã bỏ cùng cơ chế khôi phục riêng; dirty, cảnh báo rời/đóng và nhánh bỏ nháp khi mở hồ sơ khác vẫn giữ.
 
@@ -216,10 +233,13 @@ Không chặn chuyển tab chỉ vì đang nhập. Chuyển module phải giữ 
 kể cả Nháp đã lưu DB. Cập nhật cùng Hồ sơ thay snapshot hiện hành, không
 tạo record nghiệp vụ mới hoặc giữ snapshot theo từng lần lưu/sửa ô.
 Lịch sử Người/Tài sản là các Hồ sơ liên quan cùng ID theo điểm neo ở trên;
-mở Hồ sơ nào đọc snapshot Hồ sơ đó, lấy vào Hồ sơ mới mặc định bộ mới nhất.
-Các bộ thông tin khác nhau vẫn được giữ qua những Hồ sơ đó. Revision chỉ phục vụ
-kiểm tra xung đột, không là kho snapshot các lần Lưu. Giữ raw/nguồn/history
-kỹ thuật đã có; cấu trúc vật lý snapshot còn thiết kế, chưa triển khai mới.
+mở Hồ sơ nào đọc snapshot Hồ sơ đó, lấy vào Hồ sơ mới mặc định bộ từ Hồ sơ
+done lưu mới nhất, không lấy draft. Các bộ thông tin khác nhau vẫn được giữ
+qua những Hồ sơ đó. **Owner chốt 22/10/2026 — phương án B:** mỗi Người/Tài sản
+một dòng thuộc Hồ sơ, ghi đúng dòng đổi, không bản đã chốt riêng. Revision
+chỉ phục vụ kiểm tra xung đột, không là kho snapshot các lần Lưu. Giữ raw/
+nguồn/history kỹ thuật đã có; chi tiết vật lý còn thiết kế
+(hiện trạng code: master + snapshot JSON, chưa phải dòng thuộc Hồ sơ theo B).
 [Quyết định](../../decisions/decision-owner-case-snapshot-as-history-20261021.md).
 
 <a id="pool"></a>
@@ -231,7 +251,7 @@ Kéo người vào vị trí để gán; gỡ thẻ trả người về Pool nh�
 
 Hai bên có 30 vị trí cố định: p1..p15 Bên A, p16..p30 Bên B. Giữ ghế trống; thả lên ghế có người thì hoán đổi, không dồn danh sách. Thừa kế biểu diễn cha/mẹ, vợ/chồng, con và nhánh thế vị; dấu Chủ/Nhận (sở hữu/nhận tài sản) chỉ thuộc Thừa kế, chọn theo vị trí tài sản 1..3; đổi thứ tự/xóa tài sản phải cảnh báo đổi nghĩa.
 
-Diagram có nháp riêng và nút Lưu sơ đồ. Xem cách tính chỉ đọc kết quả Python, không lưu và không tính lại bằng JavaScript. Quan hệ sai/vòng lặp/người ngoài Stage bị chặn; cấu trúc hợp lệ nhưng thiếu dữ liệu vẫn cho lưu, hiện rõ phần còn thiếu. Lỗi không xóa sơ đồ cũ.
+Diagram có nháp riêng; **owner chốt 22/10/2026** đổi nút **Lưu sơ đồ** thành **Lưu hồ sơ**: lưu Diagram và toàn bộ Stage/thông tin hồ sơ đang sửa, kể cả ô chưa Cập nhật, trong cùng một lượt ghi trọn vẹn; chuyển draft→done. Không chỉ lưu riêng Diagram (hiện trạng code: nút vẫn là Lưu sơ đồ, chỉ gửi Diagram và chưa chuyển done). Xem cách tính chỉ đọc kết quả Python, không lưu và không tính lại bằng JavaScript. Quan hệ sai/vòng lặp/người ngoài Stage bị chặn; cấu trúc hợp lệ nhưng thiếu dữ liệu vẫn cho lưu, hiện rõ phần còn thiếu. Lỗi không xóa sơ đồ cũ; giữ quy tắc revision/xung đột.
 
 **Gỡ cả nhánh Thừa kế — owner 17/10/2026: “B - gỡ cả nhánh”.** Xóa node gỡ cả node đó và mọi hậu duệ active theo cạnh cha/mẹ → con ở mọi độ sâu, kể cả slot trống/ẩn hoặc con còn cha/mẹ khác. Không gỡ spouse chỉ vì quan hệ vợ/chồng, không giữ ô trung gian rỗng và không tự nối lại cha/mẹ. Trước khi đổi draft, liệt kê đúng node sẽ gỡ và quan hệ sẽ ngắt, báo phần hưởng có thể đổi. Hủy/Escape/đóng không đổi draft/dirty/revision và không phát evaluate/save do thao tác này. Xác nhận áp một mutation draft rồi evaluate theo luồng có sẵn, chưa tự lưu.
 
