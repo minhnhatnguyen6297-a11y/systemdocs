@@ -1453,11 +1453,9 @@ function createDiagramPane(ctx) {
       // View coordinator đã flush + báo lỗi qua kênh notify hiện có.
       await onSaveCase();
     });
-    if (s.stageDirty || s.diagramDirty || s.metaDirty) {
-      save.append(h('span', 'dirty-dot', ''));
-    }
-    save.disabled = !!s.busy || !s.capabilities.diagram || !model.canWrite();
     currentSaveBtn = save;
+    // Dot + aria/disabled theo đúng một nguồn (dirty live cả khi rebuild).
+    syncSaveButton();
     const word = btn('Xuất Word', 'sm primary', openWordDialog);
     word.disabled = !s.capabilities.word_export || s.wordBusy;
     tools.append(save, word);
