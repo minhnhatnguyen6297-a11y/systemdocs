@@ -62,17 +62,19 @@ Hồ sơ đã lưu giữ dữ liệu riêng, chỉ user sửa thủ công; dữ 
 không tự cập nhật ngược. Các bộ thông tin khác nhau của cùng ID vẫn giữ qua
 những Hồ sơ đó; raw/nguồn/history kỹ thuật đã có vẫn giữ.
 [Quyết định](../decisions/decision-owner-case-snapshot-as-history-20261021.md).
-**Hồ sơ nháp — owner duyệt 21/10/2026, chưa triển khai lưu tiến độ mới:**
+**Hồ sơ nháp — owner duyệt 21/10/2026; vòng 1 Storage B đã triển khai:**
 Nháp được lưu database để mở lại làm tiếp dù mới nhập một phần; giữ và hiện
 nhãn **Nháp** rõ khi hiển thị/thống kê/báo cáo có chứa Nháp. **Owner chốt
 22/10/2026:** bấm **Lưu hồ sơ** ghi Diagram và toàn bộ Stage/thông tin hồ sơ,
 kể cả ô đang sửa chưa Cập nhật, trong cùng một lượt; đây là mốc Nháp→Done.
-Cấu trúc lưu đã chọn phương án B; chi tiết vật lý còn thiết kế, cách tính
-trong từng báo cáo chưa chốt (hiện trạng code: renderer gọi
-`workspace_save_case` từ nút Lưu hồ sơ, chuyển draft→done; B6 modal đất pending).
+Cấu trúc lưu phương án B đã triển khai vòng 1: dòng case-owned; trạng thái
+`draft`/`done`, bỏ `locked`; nút Lưu hồ sơ gọi `workspace_save_case` nguyên tử.
+Cách tính trong từng báo cáo chưa chốt. Chưa làm vòng 2: resolver nguồn
+done-mới-nhất, nhân bản hồ sơ, lát (d) nháp ít dữ liệu, B6 modal đất pending.
 Xem [quy tắc Hồ sơ nháp](notary_v2/README.md#2-danh-sách-hồ-sơ) và
 [quyết định](../decisions/decision-owner-persistent-case-drafts-20261021.md).
-**Điểm neo — owner chốt 21/10 mới nhất, chưa triển khai:** tự dùng cùng ID
+**Điểm neo — owner chốt 21/10 mới nhất; identity đã triển khai, nguồn
+done-mới-nhất chưa làm:** tự dùng cùng ID
 Người khi **tên + số giấy tờ đồng thời giống nhau**; ngày cấp/địa chỉ khác vẫn
 cùng ID. Đổi tên/số chấp nhận ID khác. Tài sản gom theo **serial** nguyên văn.
 Khi lấy lại dữ liệu vào Hồ sơ mới mặc định bộ mới nhất, không chọn phiên bản.

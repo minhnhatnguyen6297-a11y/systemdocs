@@ -355,7 +355,7 @@ asset_row:
   so_vao_so: <string | null>
   so_thua_dat: <string | null>
   so_to_ban_do: <string | null>
-  dia_chi: <string non-empty>        # bắt buộc
+  dia_chi: <string | null>           # nullable: thiếu dữ kiện vẫn lưu
   loai_so: <string | null>
   hinh_thuc_su_dung: <string | null>
   thoi_han: <string | null>          # lẻ cấp tài sản — CHỈ còn nghĩa trên
@@ -1818,8 +1818,9 @@ Không Stage/assets/engineInput/assignments persisted; engine_state_json không
 chudat derived active ownPositions + tên rows + asset count, không input tay/
 Property/slot owner. Null meta ghi null; scalar absent giữ giá trị trước.
 
-**Validation vòng 1:** ho_ten bắt buộc non-empty; địa chỉ tài sản giữ rule
-non-empty; create ≥1 Người và ≥1 Tài sản; inheritance create phải có owner
+**Validation vòng 1:** ho_ten bắt buộc non-empty; địa chỉ tài sản
+nullable (thiếu dữ kiện vẫn lưu, chuỗi rỗng ghi null); create ≥1 Người và
+≥1 Tài sản; inheritance create phải có owner
 row hợp lệ. Row thiếu số giấy/serial rỗng hoặc toàn whitespace vẫn lưu với
 entity_id=null. Không tuyên bố lưu tập rỗng/Người không tên/owner null khi tạo;
 thiết kế §3.3 nới các rule đó thuộc lát (d) vòng 2. Giữ kiểu ngày/Boolean,

@@ -92,7 +92,7 @@ không phải record văn bản lạ trong #39.
 
 ## 2. Danh sách hồ sơ
 
-**Hồ sơ nháp lưu bền — owner duyệt 21/10/2026; yêu cầu thiết kế chưa triển khai:**
+**Hồ sơ nháp lưu bền — owner duyệt 21/10/2026; vòng 1 Storage B đã triển khai:**
 Hồ sơ đang làm dở được lưu trong database để mở lại làm tiếp, kể cả mới nhập
 2/6 trường Người; không ép đủ bộ trường hoặc tự điền dữ liệu để giữ tiến độ.
 Trạng thái **Nháp** phải được giữ khi lưu/đọc lại và thể hiện rõ khi hiển thị,
@@ -101,13 +101,12 @@ thống kê hoặc báo cáo có chứa Hồ sơ nháp, tránh gộp mất phân
 kể cả ô chưa Cập nhật, trong cùng một lượt ghi trọn vẹn và chuyển Nháp→Done.
 Done vẫn sửa được; sửa rồi ghi thành công là thay luôn nội dung hiện hành,
 không giữ bản Done cũ riêng. Done không có nghĩa đủ sáu trường hay đã công chứng
-(hiện trạng code: nút Lưu hồ sơ gọi `workspace_save_case`, chuyển draft→done;
-B6 modal đất còn pending).
+(hiện trạng code: dòng case-owned, `draft`/`done`, bỏ `locked`; nút Lưu hồ sơ
+gọi `workspace_save_case` nguyên tử; B6 modal đất còn pending).
 Từng báo cáo có tính Nháp hay không và bộ lọc mặc định **chưa chốt**. Cấu trúc
-lưu đã chọn phương án B; chi tiết vật lý, thời điểm tạo liên kết và lưu/đóng còn
-thiết kế; owner ưu tiên đơn giản, chấp nhận lưu thủ công nếu phục hồi tự động
-phức tạp (hiện trạng code: đã lưu/mở lại draft qua validation, chưa đáp ứng
-Nháp rất ít dữ liệu/chưa có tài sản/chưa chọn owner).
+lưu phương án B đã triển khai vòng 1; thời điểm tạo liên kết và lưu/đóng còn
+thiết kế. Chưa làm vòng 2: resolver nguồn done-mới-nhất, nhân bản hồ sơ, lát
+(d) nháp ít dữ liệu, B6 modal đất pending.
 [Quyết định](../../decisions/decision-owner-persistent-case-drafts-20261021.md).
 
 Tên mong muốn là Danh sách hồ sơ. Người dùng xem danh sách, tìm/lọc, tạo nháp và mở hồ sơ. Nhãn trạng thái, người tạo, tên/ngày tạo là hướng mô tả; danh sách nhãn, nguồn tìm kiếm và trường lọc chưa chốt đầy đủ. Chức năng sẽ **làm lại** — **DEFERRED 17/10/2026** (owner tự triển khai spec sau); hướng trường hiển thị/tìm/lọc owner ghi là **Draft chưa duyệt**, chưa phải quy tắc. [Decision](../../decisions/decision-owner-case-list-redesign-deferred-20261017.md).
@@ -198,10 +197,11 @@ Word; UI legacy giới hạn); **BUILT bounded**, chưa nghiệm thu toàn #41.
 6. **Owner chốt 22/10/2026:** đổi **Lưu sơ đồ** thành **Lưu hồ sơ**, ghi Diagram
    và toàn bộ Stage/thông tin hồ sơ đang sửa, gồm ô chưa Cập nhật, trong cùng
    một lượt; chuyển `draft` → `done`. Cập nhật trên Done thay ngay bản hiện hành
-   sau ghi thành công, không chờ Lưu hồ sơ lần nữa. Phương án B đã chọn, phần
-   dừng chờ A/B/C đã gỡ; thiết kế vật lý/migration và lifecycle ID khi thiếu/
-   bổ sung/đổi neo còn mở (hiện trạng code: nút Lưu hồ sơ gọi
-   `workspace_save_case`, ghi Stage+meta+Diagram và chuyển draft→done).
+   sau ghi thành công, không chờ Lưu hồ sơ lần nữa. Vòng 1 đã triển khai Storage
+   B case-owned, `draft`/`done`, bỏ `locked`; nút Lưu hồ sơ gọi
+   `workspace_save_case` ghi Stage+meta+Diagram nguyên tử. Vòng 2 chưa làm:
+   resolver nguồn done-mới-nhất, nhân bản hồ sơ, lát (d) nháp ít dữ liệu,
+   B6 modal đất pending.
 
 Một bảng Người cho sống/chết. Luồng gợi ý CCCD/user chọn/bỏ qua tạo ID mới và
 “thông tin liên kết” cũ ở [#44](../../backlog/story-person-cccd-suggestion-link.md)
@@ -226,7 +226,7 @@ trong cùng một lượt ghi trọn vẹn và chuyển draft→done; không bá
 nội dung mới gõ chưa được ghi (hiện trạng code: nút Lưu hồ sơ flush editor rồi
 gọi `workspace_save_case`; Cập nhật giữ đường commit riêng).
 
-Mọi ghi gửi phiên bản đã đọc (`base_revision`); nếu server có bản khác, báo xung đột và cho tải bản mới hoặc giữ nháp để sao chép, không ghi đè cưỡng bức. Done không phải khóa chỉ đọc (hiện trạng code: hồ sơ locked chỉ đọc, vẫn xem/sao chép và dùng thao tác đọc được cho phép; chưa có Done sửa được theo chốt mới).
+Mọi ghi gửi phiên bản đã đọc (`base_revision`); nếu server có bản khác, báo xung đột và cho tải bản mới hoặc giữ nháp để sao chép, không ghi đè cưỡng bức. Done không phải khóa chỉ đọc (hiện trạng code: bỏ `locked`; Done sửa được qua Cập nhật/Lưu hồ sơ).
 
 Không chặn chuyển tab chỉ vì đang nhập. Chuyển module phải giữ nháp; rời/đóng khi có thay đổi chưa lưu phải cảnh báo. Cập nhật nền không ghi đè ô đang sửa. Nút `Hủy thay đổi` của Stage đã bỏ cùng cơ chế khôi phục riêng; dirty, cảnh báo rời/đóng và nhánh bỏ nháp khi mở hồ sơ khác vẫn giữ.
 

@@ -2158,9 +2158,9 @@ class CaseWorkspaceService:
             if not isinstance(serial, str):
                 emit("so_serial", "invalid_type",
                      "so_serial phải là chuỗi")
-            dia_chi = row.get("dia_chi")
-            if not isinstance(dia_chi, str) or not dia_chi.strip():
-                emit("dia_chi", "required", "dia_chi bắt buộc")
+            # §3.3 design vòng 1: địa chỉ tài sản nullable — dòng thiếu dữ
+            # kiện vẫn lưu được; chuỗi rỗng chuẩn hóa thành null khi ghi.
+            self._check_nullable_str(row, "dia_chi", emit)
             if not _valid_date_full(row.get("ngay_cap")):
                 emit("ngay_cap", "invalid_date",
                      "ngay_cap phải là YYYY-MM-DD hoặc null")

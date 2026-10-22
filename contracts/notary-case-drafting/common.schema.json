@@ -152,7 +152,7 @@
         "so_vao_so": { "$ref": "#/definitions/nullable_string" },
         "so_thua_dat": { "$ref": "#/definitions/nullable_string" },
         "so_to_ban_do": { "$ref": "#/definitions/nullable_string" },
-        "dia_chi": { "$ref": "#/definitions/non_empty_string" },
+        "dia_chi": { "$ref": "#/definitions/nullable_string" },
         "loai_so": { "$ref": "#/definitions/nullable_string" },
         "hinh_thuc_su_dung": { "$ref": "#/definitions/nullable_string" },
         "thoi_han": { "$ref": "#/definitions/nullable_string" },
