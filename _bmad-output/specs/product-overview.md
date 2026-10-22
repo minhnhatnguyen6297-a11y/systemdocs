@@ -62,16 +62,19 @@ Hồ sơ đã lưu giữ dữ liệu riêng, chỉ user sửa thủ công; dữ 
 không tự cập nhật ngược. Các bộ thông tin khác nhau của cùng ID vẫn giữ qua
 những Hồ sơ đó; raw/nguồn/history kỹ thuật đã có vẫn giữ.
 [Quyết định](../decisions/decision-owner-case-snapshot-as-history-20261021.md).
-**Hồ sơ nháp — owner duyệt 21/10/2026; vòng 1 có code, vòng 2 ĐÃ TRIỂN KHAI 22/10/2026:**
-Nháp được lưu database để mở lại làm tiếp dù mới nhập một phần; giữ và hiện
-nhãn **Nháp** rõ khi hiển thị/thống kê/báo cáo có chứa Nháp. **Owner chốt
-22/10/2026:** bấm **Lưu hồ sơ** ghi Diagram và toàn bộ Stage/thông tin hồ sơ,
-kể cả ô đang sửa chưa Cập nhật, trong cùng một lượt; đây là mốc Nháp→Done.
+**Hồ sơ nháp — owner 21/10; làm rõ luồng Soạn hồ sơ 23/10/2026:**
+Nháp đã tồn tại trong database qua lệnh tạo/nhân bản vẫn mở lại làm tiếp được;
+giữ nhãn **Nháp** rõ khi hiển thị/thống kê/báo cáo có chứa Nháp. Trong Soạn
+hồ sơ, bản mới chỉ ở bộ nhớ phiên đến khi bấm **Lưu hồ sơ**; không có nút
+**Cập nhật** hoặc **Lưu nháp**, không tự ghi khi rời/đóng. Stage, Pool và
+Diagram dùng chung bản đang sửa. **Lưu hồ sơ** ghi Diagram và toàn bộ
+Stage/thông tin hồ sơ, kể cả ô đang sửa, trong cùng một lượt; đây là mốc Nháp→Done.
 Cấu trúc lưu phương án B đã triển khai vòng 1: dòng case-owned; trạng thái
-`draft`/`done`, bỏ `locked`; nút Lưu hồ sơ gọi `workspace_save_case` nguyên tử.
-**Vòng 2 ĐÃ TRIỂN KHAI 22/10/2026 (proof: `test_issue13_partial_draft.py`):**
-tạo nháp ít dữ liệu qua
-`workspace_create` (0 Người/Tài sản, tên/owner null) và mở lại làm tiếp;
+`draft`/`done`, bỏ `locked`; nút Lưu hồ sơ gọi `workspace_save_case` nguyên tử,
+kể cả nhánh tạo mới với `draftId`/`idempotency_key` giữ nguyên khi thử lại.
+**Bằng chứng vòng 2 ngày 22/10/2026 (lịch sử, `test_issue13_partial_draft.py`):**
+`workspace_create` hỗ trợ nháp ít dữ liệu (0 Người/Tài sản, tên/owner null);
+command này vẫn dành cho consumer khác, không phải đường ghi của Soạn hồ sơ.
 save_case/commit/convert vẫn strict. Nhãn dùng `draft`=Nháp, `done`=Đã lưu,
 độc lập chấm dirty. Resolver nguồn Done lưu gần nhất
 (`test_issue13_source_latest.py`) và Nhân bản
@@ -91,9 +94,9 @@ rỗng, không chặn lưu Nháp.
 tên so không phân biệt dấu/hoa-thường, giữ tên gốc. ID trùng cũ giữ nguyên,
 không tự hợp nhất; cùng serial dù khác thửa vẫn cùng ID. Nhân bản toàn bộ.
 Đổi **Lưu sơ đồ** thành **Lưu hồ sơ** đã chốt: lưu Diagram và toàn bộ nội dung,
-gồm ô chưa Cập nhật, trong một lượt và chuyển draft→done. Cập nhật trên Done
-thay ngay snapshot hiện hành sau khi ghi thành công; Word và nguồn cho Hồ sơ
-mới dùng bản hiện tại, không giữ bản Done cũ riêng. Phương án B đã chốt,
+gồm ô đang sửa, trong một lượt và chuyển draft→done. Trên Done, chỉ khi
+Lưu hồ sơ thành công mới thay snapshot hiện hành; Word và nguồn cho Hồ sơ
+mới dùng bản đã lưu hiện tại, không giữ bản Done cũ riêng. Phương án B đã chốt,
 phần dừng chờ A/B/C đã gỡ; vòng 1 đã cutover dòng case-owned + identity neo,
 vòng 2 ĐÃ TRIỂN KHAI 22/10/2026 resolver nguồn Done (updated_at microsecond/tie
 id; proof: `test_issue13_source_latest.py`), Nhân bản toàn bộ
@@ -111,13 +114,15 @@ thay đổi docs này.
 **Rà soát cách ghi DB — owner chốt 22/10/2026:** đã chọn **phương án B**:
 mỗi Người/Tài sản một dòng thuộc Hồ sơ, ghi đúng dòng đổi; không giữ bản
 “đã chốt” riêng. Sửa Done là thay luôn nội dung hiện hành sau ghi thành công.
-**Lưu hồ sơ lưu tất cả**, gồm Diagram, Stage/thông tin hồ sơ và ô chưa Cập nhật,
+**Lưu hồ sơ lưu tất cả**, gồm Diagram, Stage/thông tin hồ sơ và ô đang sửa,
 trong một lượt ghi trọn vẹn. Phần tạm dừng chờ A/B/C đã gỡ. Vòng 1 đã cutover
 Storage B case-owned; vòng 2 ĐÃ TRIỂN KHAI 22/10/2026
 source_latest/duplicate/partial-create (proof: `test_issue13_source_latest.py`,
 `test_issue13_workspace_duplicate.py`, `test_issue13_partial_draft.py`).
 Nút Lưu hồ sơ gọi `workspace_save_case` cho Stage+meta+Diagram
-và chuyển draft→done.
+và chuyển draft→done. Giữ `canLeave` và cảnh báo đóng cửa sổ khi chưa lưu,
+`base_revision`/hộp thoại conflict; rời/đóng không tự lưu nháp. Ngoại lệ Word:
+Nơi niêm yết vẫn lưu riêng qua `saveCaseMeta` → `workspace_update`.
 [Quyết định chọn B](../decisions/decision-owner-case-storage-b-20261022.md).
 
 **Pháp nhân (owner 20/10/2026):** không đưa vào Người; policy nhập tay chung
@@ -211,7 +216,7 @@ Việc đang mở được tổng hợp tại [catalog issue](../backlog/README.
 - Sơ đồ: binding thông báo lỗi đã được sửa; có test hồi quy và probe trên
   Electron thật (client stub; không xác minh command IPC/engine), review Quick
   độc lập sạch. [#4](../backlog/bug-diagram-error-messages.md).
-- Hiệu chỉnh G2 vòng sửa lỗi E2E 23/10: khi Lưu hồ sơ/Lưu nháp bị
+- Hiệu chỉnh G2 vòng sửa lỗi E2E 23/10: khi Lưu hồ sơ bị
   `diagram_invalid_state`, toast hiện lỗi sơ đồ đầu tiên, thiếu chi tiết thì
   hiện lỗi tổng. `missing_land_owner` chỉ rõ thiếu chip Chủ trên vị trí tài
   sản, không hướng dẫn gán lại người đã có trên sơ đồ.
@@ -285,13 +290,13 @@ trỏ tới phần nhỏ để bắt đầu tìm hiểu.
 | Stage: sửa loại đất | Chọn, thêm hoặc sửa loại đất trong draft | [Quy tắc tài sản](shared/ocr-rules.md#property) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `openLandDialog` |
 | Stage: áp dụng loại đất | Đưa lựa chọn loại đất vào draft hiện tại | [Quy tắc tài sản](shared/ocr-rules.md#property) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `openLandDialog` |
 | Stage: tra địa chỉ | Tra xã/tỉnh, copy kết quả phù hợp rồi tự dán vào ô | [Tra cứu địa chỉ](shared/administrative-lookup.md#usage) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `lookupTraButton`, `lookupCopyButton` |
-| Stage: Cập nhật | Lưu dữ liệu Stage đã kiểm tra | [Stage](notary_v2/README.md#stage) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `runCommit` |
+| Stage: đồng bộ khi sửa | Pool/Diagram đọc ngay Stage đang sửa; không có nút Cập nhật/Lưu nháp, chưa ghi DB | [Stage](notary_v2/README.md#stage) | [case-drafting-model.js](../../shell/src/renderer/notary/case-drafting-model.js) · `updatePersonField`, `updateAssetField`, `pool` |
 | Pool: gán người | Chọn người chưa gán và đưa vào sơ đồ | [Pool](notary_v2/README.md#pool) | [relationship-diagram.js](../../shell/src/renderer/notary/relationship-diagram.js) · `openAssignMenu` |
 | Pool: bỏ gán người | Trả người từ vị trí sơ đồ về Pool | [Pool](notary_v2/README.md#pool) | [relationship-diagram.js](../../shell/src/renderer/notary/relationship-diagram.js) · `inheritanceCardEl` |
 | Diagram: Hai bên | Xếp người theo hai bên hợp đồng | [Hai bên](notary_v2/diagram-rules.md#two-party) | [relationship-diagram.js](../../shell/src/renderer/notary/relationship-diagram.js) · `twoPartyInto` |
 | Diagram: Thừa kế | Xếp quan hệ và vai trò thừa kế | [Sơ đồ](notary_v2/diagram-rules.md#common) · [Thừa kế](notary_v2/diagram-rules.md#inheritance) | [relationship-diagram.js](../../shell/src/renderer/notary/relationship-diagram.js) · `inheritanceInto` |
 | Diagram: xem cách tính | Xem kết quả và giải thích từ engine | [Sơ đồ](notary_v2/diagram-rules.md#common) | [relationship-diagram.js](../../shell/src/renderer/notary/relationship-diagram.js) · `runEvaluate`, `calcPanelEl` |
-| Diagram: lưu | Lưu toàn bộ hồ sơ (Stage+meta+Diagram, cả ô chưa Cập nhật) và chuyển draft→done | [Sơ đồ](notary_v2/diagram-rules.md#common) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `runSaveCase`, `flushActiveEditors` · [case-drafting-model.js](../../shell/src/renderer/notary/case-drafting-model.js) · `saveCase` |
+| Hồ sơ: Lưu hồ sơ | Điểm ghi duy nhất của Soạn hồ sơ: lưu Stage+meta+Diagram, cả ô đang sửa, và chuyển draft→done | [Sơ đồ](notary_v2/diagram-rules.md#common) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `runSaveCase`, `flushActiveEditors` · [case-drafting-model.js](../../shell/src/renderer/notary/case-drafting-model.js) · `saveCase` |
 | Word: chọn thư mục mẫu | Chọn thư mục chứa các mẫu Word | [Xuất Word](notary_v2/word-templates.md#export) | [word-export-dialog.js](../../shell/src/renderer/notary/word-export-dialog.js) · `createWordDialog` |
 | Word: quét mẫu | Tải danh sách file và trạng thái sẵn sàng | [Xuất Word](notary_v2/word-templates.md#export) | [word-export-dialog.js](../../shell/src/renderer/notary/word-export-dialog.js) · `renderDocs` |
 | Word: chọn thư mục đích | Chọn nơi lưu kết quả | [Xuất Word](notary_v2/word-templates.md#export) | [word-export-dialog.js](../../shell/src/renderer/notary/word-export-dialog.js) · `pickDirToken` |
@@ -301,7 +306,8 @@ trỏ tới phần nhỏ để bắt đầu tìm hiểu.
 **Chuyển loại hồ sơ sau khi lưu** đã có quy tắc owner 16/10/2026 ([decision](../decisions/decision-owner-saved-case-type-conversion-20261016.md),
 contract §13.18): giữ Người/Tài sản của Stage, reset Diagram rỗng theo domain mới, buộc chọn
 `document_type` mới kèm xác nhận. Nút **Đổi loại** ở Soạn hồ sơ đã triển khai với
-`notary.workspace_convert_type`; Stage/meta nháp phải Cập nhật trước, lỗi giữ nháp
+`notary.workspace_convert_type`; Stage/meta đang sửa phải **Lưu hồ sơ** trước,
+không tự lưu để chuyển loại; lỗi giữ nháp
 Diagram. [#25](../backlog/story-saved-case-type-conversion.md) **built 16/10/2026,
 independent Quick clean**; không coi lựa chọn loại lúc tạo nháp là bằng chứng đổi loại.
 

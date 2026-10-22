@@ -4,24 +4,28 @@
 
 ## 1. Luồng chung
 
-Gán người đã cập nhật trong Stage vào vị trí; chọn Chủ/Nhận theo tài sản; xem kết quả Python; lưu sơ đồ. Thao tác chỉ đổi quan hệ, không sửa Người/Tài sản. Pool phản ánh sơ đồ đang xem và không lưu riêng. Cho lưu cấu trúc hợp lệ còn thiếu dữ liệu, kèm cảnh báo; không cho lưu cấu trúc sai. Xuất Word theo nhu cầu trường dữ liệu, không thêm lệnh chặn chỉ vì kết quả incomplete.
+Gán người từ Stage đang sửa vào vị trí; chọn Chủ/Nhận theo tài sản; xem kết quả Python; Lưu hồ sơ khi muốn ghi DB. Thao tác sơ đồ chỉ đổi quan hệ, không sửa Người/Tài sản. Stage/Pool/Diagram dùng chung bản đang sửa; Pool, nhãn người và dữ kiện evaluate không chờ Cập nhật. Không có nút Cập nhật/Lưu nháp trong Soạn hồ sơ, không tự ghi khi rời/đóng. Cho lưu cấu trúc hợp lệ còn thiếu dữ liệu, kèm cảnh báo; không cho lưu cấu trúc sai. Xuất Word đọc bản đã lưu theo nhu cầu trường dữ liệu, không thêm lệnh chặn chỉ vì kết quả incomplete.
 
 <a id="common"></a>
 ## 2. Input và output
 
-Input chung là `diagram.state` draft và domain của Case. Cụ thể:
+Input chung là Stage và `diagram.state` đang sửa cùng domain của Case. Cụ thể:
 
-- `diagram_evaluate` có `case_id`; nếu chưa có Case thì bỏ `case_id` và gửi
-  thêm Stage draft. Đây là read-only, không có `base_revision`.
-- `diagram_save` có `case_id`, `base_revision` và Diagram; `case_type` lấy từ
-  workspace server, không phải field tự do trong payload.
+- Trong Soạn hồ sơ, `diagram_evaluate` luôn gửi Stage và Diagram đang sửa,
+  kể cả khi đã có `case_id`; bản mới gửi thêm hint `case.case_type`.
+  Đây là read-only, không có `base_revision`, không tạo/lưu nháp vào DB.
+- `workspace_save_case` nhận Stage+meta+Diagram; hồ sơ đã có gửi `case_id` +
+  `base_revision`, bản mới dùng nhánh tạo với `draftId`/`idempotency_key`
+  ổn định qua retry cùng ý định. Domain phải khớp loại hồ sơ.
+- `diagram_save` với `case_id`, `base_revision` và Diagram vẫn là API cho
+  consumer khác; không phải đường ghi của màn Soạn hồ sơ.
 
 Output:
 
 - `diagram.state` canonical đã validate;
 - `render_model` do Python tạo;
 - `requiredSlots`, warnings, errors và kết quả nghiệp vụ;
-- revision mới sau `diagram_save`.
+- revision mới sau khi Lưu hồ sơ thành công (hoặc `diagram_save` ở consumer khác).
 
 ## 3. Thao tác
 
@@ -29,9 +33,9 @@ Output:
 - Di chuyển node: đổi slot/quan hệ trong Diagram draft.
 - Gỡ node: không xóa người khỏi Stage. Với Thừa kế, xóa slot gỡ cả nhánh theo §9.9; bỏ gán một người về Pool bằng thao tác hiện có không đổi thành xóa nhánh.
 - Chọn quan hệ/tài sản: sửa field Diagram draft theo domain.
-- `Xem cách tính`: gọi evaluate read-only, chỉ hiển thị render model backend.
-- `Lưu hồ sơ`: validate và ghi Stage+meta+Diagram trong một transaction, chuyển draft→done.
-- Cơ chế Hủy cũ khôi phục hai bản nháp; owner đã yêu cầu bỏ nút trong backlog, không coi cơ chế cũ là yêu cầu giữ nút.
+- `Xem cách tính`: gọi evaluate read-only trên Stage+Diagram đang sửa, chỉ hiển thị kết quả Python; không dùng tên/ngày từ render model cũ thay bản Stage đang sửa.
+- `Lưu hồ sơ`: flush ô đang nhập, đồng bộ mặc định vị trí chưa user chỉnh rồi validate và ghi Stage+meta+Diagram trong một transaction, chuyển draft→done.
+- Không có nút Cập nhật/Lưu nháp hay Hủy thay đổi của Stage; giữ dirty, `canLeave` và cảnh báo đóng cửa sổ. Hủy rời/đóng giữ bản đang sửa; đồng ý bỏ không phát lệnh lưu.
 
 ## 4. Cách biểu diễn và lưu
 
@@ -70,17 +74,17 @@ và `contracts/notary-case-drafting/*.schema.json`.
 
 ## 6. Quy tắc lưu
 
-- `personId` phải thuộc Stage committed.
-- Save mang đúng `base_revision`; conflict không được ghi đè.
-- Frontend không gửi kết quả tính như sự thật. Backend luôn tính lại từ input.
+- `personId` phải thuộc Stage đang sửa được gửi cùng lần evaluate/Lưu hồ sơ; người vừa thêm gán được ngay, không cần ghi trung gian. Xóa người dọn tham chiếu trong bản Diagram đang sửa.
+- Save mang đúng `base_revision` khi đã có hồ sơ; conflict giữ bản đang sửa, cho tải mới hoặc sao chép, không được ghi đè.
+- Frontend không gửi kết quả tính như sự thật. Backend luôn tính lại từ input; bản committed chỉ là mốc đã lưu/dirty/revision.
 - State sai cấu trúc/nghiệp vụ (`invalid`) không được persist. State hợp lệ
   nhưng kết quả `incomplete` vẫn được lưu; backend trả `requiredSlots`/warning
   để người dùng bổ sung sau.
 - Save chạy đúng một đường đánh giá với `Xem cách tính`: `render_model` đã lưu
   là kết quả evaluate tại thời điểm ghi (gồm warning Pool và trạng thái
   `incomplete`); engine trả `invalid` bị từ chối trước khi ghi.
-- Save lỗi giữ nguyên Stage, Diagram và projection cũ.
-- Reload và Word phải dùng cùng snapshot đã lưu.
+- Save lỗi không đổi Stage, Diagram và projection đã lưu trong DB; giữ bản đang sửa để sửa tiếp.
+- Reload và Word phải dùng cùng snapshot đã lưu, không tự xuất nội dung chưa Lưu hồ sơ.
 
 ## 7. Lỗi và ngoại lệ
 
@@ -136,8 +140,8 @@ Nhóm `[Người N - ...]` luôn theo dòng Stage đã lưu, không theo số gh
 
 ### 9.1. Dữ liệu vào
 
-- Người đã commit trong Stage.
-- `owner_row_id` của người để lại di sản.
+- Người trong Stage đang sửa, gồm tên/ngày và dữ kiện hiện tại, không chỉ bản đã lưu.
+- `owner_row_id` của người để lại di sản trong Stage đang sửa.
 - Node, `parentSlotIds`, `spouseSlotId`.
 - `ownPositions` và `receivePositions` theo vị trí tài sản 1..3.
 - Ngày chết và các dữ kiện pháp lý đã được xác nhận.

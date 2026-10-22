@@ -33,12 +33,23 @@ Khi lấy Người/Tài sản vào Hồ sơ mới mặc định bộ từ Hồ s
 không lấy draft hoặc bắt chọn phiên bản. Các bộ thông tin khác nhau vẫn giữ
 qua những Hồ sơ đó. **Owner chốt 22/10/2026 — phương án B:** mỗi Người/Tài sản
 một dòng thuộc Hồ sơ, ghi đúng dòng đổi; không giữ bản “đã chốt” riêng.
-Done vẫn sửa được; Cập nhật thành công thay ngay snapshot hiện hành, giữ Done.
-Word và lấy làm nguồn dùng bản hiện tại, không chờ Lưu hồ sơ lần nữa.
-**Lưu hồ sơ** là một lượt ghi trọn vẹn Diagram + toàn bộ Stage/thông tin hồ sơ,
-gồm ô đang sửa chưa Cập nhật, và chuyển draft→done; không báo lưu xong khi
-nội dung mới gõ chưa được ghi. Không thêm bảng phiên bản Người/Tài sản hoặc
-bitemporal.
+Done vẫn sửa được; **Lưu hồ sơ** thành công thay snapshot hiện hành, giữ Done.
+Word và lấy làm nguồn dùng bản đã lưu hiện tại, không dùng nội dung chưa ghi.
+**Owner 23/10/2026:** Stage/Pool/Diagram cùng đọc bản đang sửa; Soạn hồ sơ
+không có nút Cập nhật/Lưu nháp. **Lưu hồ sơ** là một lượt ghi trọn vẹn
+Diagram + toàn bộ Stage/thông tin hồ sơ, gồm ô đang sửa, và chuyển draft→done;
+không báo lưu xong khi nội dung mới gõ chưa được ghi. Không thêm bảng phiên
+bản Người/Tài sản hoặc bitemporal.
+Soạn hồ sơ mới chưa tạo DB cho đến lần Lưu hồ sơ đầu qua nhánh tạo mới của
+`workspace_save_case`, giữ `draftId`/`idempotency_key` qua retry cùng ý định.
+Nháp DB từ `workspace_create`/Nhân bản vẫn hợp lệ cho consumer khác và mở lại.
+Không tự lưu nháp khi rời/đóng; chuyển tab/sidebar giữ buffer phiên hiện có,
+không phải lưu bền. Giữ dirty, `canLeave` khi bỏ hồ sơ và cảnh báo đóng cửa
+sổ, `base_revision`/conflict; mở hồ sơ khác hoặc đóng app có thể bỏ buffer
+sau xác nhận. `workspace_commit_stage` ở server/adapter/REST vẫn có cho
+consumer khác, không là đường ghi của Soạn hồ sơ. Ngoại lệ Word:
+`saveCaseMeta` → `workspace_update` vẫn lưu riêng Nơi niêm yết, không lưu
+Stage/Diagram hoặc provenance đang sửa thay cho Lưu hồ sơ.
 **Chọn nguồn (vòng 2 ĐÃ TRIỂN KHAI 22/10/2026; proof:
 `test_issue13_source_latest.py`, `test_issue13_workspace_duplicate.py`):** Hồ sơ Done có `updated_at`
 microsecond lớn nhất; tie dùng `id` case lớn hơn, timestamp null xếp sau;
@@ -163,18 +174,20 @@ tục file đã rõ. Không tắt production Scan/Upload; quyền runtime đã c
   không tự hợp nhất, lấy bộ cuối cùng; lịch sử user xử lý. Cùng serial vẫn gom
   cùng ID dù khác thửa, không thêm điều kiện thửa/tờ. Nhân bản toàn bộ nội dung.
   Phương án B đã chốt: mỗi Người/Tài sản một dòng thuộc Hồ sơ, ghi đúng dòng
-  đổi, không bản đã chốt riêng. Hai hành vi **Cập nhật trên Done thay ngay
-  snapshot hiện hành sau ghi thành công** và **Lưu hồ sơ lưu toàn bộ Diagram +
-  Stage/thông tin hồ sơ, kể cả ô chưa Cập nhật, trong một lượt ghi trọn vẹn,
-  chuyển draft→done** đã chốt; không chờ Lưu hồ sơ lần nữa để dùng bản Done
-  vừa Cập nhật. Phần tạm dừng chờ A/B/C đã gỡ.
-  **Hiện trạng đúng phạm vi:** vòng 1 đã có rows case-owned, `draft`/`done`
-  (bỏ `locked`), `workspace_save_case` và identity neo; vòng 2 **đang triển
-  khai**: chọn nguồn Done theo `updated_at` microsecond/tie `id`, đọc nguồn
-  không ghi DB, Nhân bản toàn bộ nội dung đã lưu, và `workspace_create` cho
-  nháp ít dữ liệu (0 Người/Tài sản, tên/owner null). Save/commit/convert vẫn
-  strict. Chưa proof; bản sao `draft`/rev1 là chốt kỹ thuật chờ owner, không
-  phải owner approved. Không tự ghép trường giữa nhiều Hồ sơ/văn bản.
+  đổi, không bản đã chốt riêng. **Owner 23/10:** sửa Done chỉ thay snapshot
+  sau khi **Lưu hồ sơ** thành công; Stage/Pool/Diagram dùng chung bản đang sửa
+  trước đó. Lưu hồ sơ ghi toàn bộ Diagram + Stage/thông tin hồ sơ, kể cả ô
+  đang sửa, trong một lượt trọn vẹn, chuyển draft→done. Word/nguồn dùng bản
+  đã lưu hiện tại, không có một bản Done cũ riêng. Phần dừng chờ A/B/C đã gỡ.
+  **Hiện trạng Storage B:** vòng 1 đã có rows case-owned, `draft`/`done`
+  (bỏ `locked`), `workspace_save_case` và identity neo; vòng 2 **ĐÃ TRIỂN
+  KHAI 22/10/2026**: chọn nguồn Done theo `updated_at` microsecond/tie `id`,
+  đọc nguồn không ghi DB, Nhân bản toàn bộ nội dung đã lưu, `workspace_create`
+  hỗ trợ nháp ít dữ liệu cho consumer khác (0 Người/Tài sản, tên/owner null).
+  Save/commit/convert vẫn strict. Bằng chứng vòng 2:
+  `test_issue13_source_latest.py`, `test_issue13_workspace_duplicate.py`,
+  `test_issue13_partial_draft.py`; bản sao `draft`/rev1 là chốt kỹ thuật chờ
+  owner, không phải owner approved. Không tự ghép trường giữa Hồ sơ/văn bản.
   Policy gợi ý CCCD/user chọn/bỏ qua tạo ID mới và kho “thông tin liên kết”
   trước đó đã bị thay thế; [#44](../../backlog/story-person-cccd-suggestion-link.md)
   chưa sẵn sàng triển khai theo tiêu chí cũ. Không khôi phục CCCD UNIQUE/chặn

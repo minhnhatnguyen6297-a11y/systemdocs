@@ -4,7 +4,7 @@
 
 ## 1. Nguyên tắc và khoảng lệch hiện hành
 
-Owner muốn điền được trường nào thì xuất trường đó; không bắt hoàn thành sơ đồ nếu văn bản chỉ cần Stage. Trường hợp lệ chưa có dữ liệu để trống. Token không hỗ trợ, dữ liệu chưa cập nhật và lỗi nguồn/mẫu không phải dữ liệu trống.
+Owner muốn điền được trường nào thì xuất trường đó; không bắt hoàn thành sơ đồ nếu văn bản chỉ cần Stage. Trường hợp lệ chưa có dữ liệu để trống. Token không hỗ trợ, dữ liệu chưa lưu và lỗi nguồn/mẫu không phải dữ liệu trống. **Owner 23/10/2026:** Stage/Pool/Diagram cùng dùng bản đang sửa; chỉ Lưu hồ sơ ghi nội dung Soạn hồ sơ, không có nút Cập nhật/Lưu nháp hay commit ngầm từ Word. Xuất Word vẫn đọc snapshot DB đã lưu; ngoại lệ Nơi niêm yết qua `saveCaseMeta` → `workspace_update` giữ ở §3.1.
 
 Phần dưới giữ rõ giới hạn hiện hành. Đã đồng bộ theo owner 15/10/2026: gate
 nhóm (Chủ/Nhận, sơ đồ hai bên) chỉ áp theo **token mẫu thực sự dùng** — nhận
@@ -28,10 +28,11 @@ Context loại văn bản và bộ phụ điển hình nằm trực tiếp trong
 ### 2.1. Công dụng và thao tác
 
 Một hợp đồng `.docx` có chữ → các gợi ý Người/Tài sản → chuyên viên xem chữ
-gốc, chọn/sửa giá trị → Đưa vào Stage → Cập nhật/Lưu hồ sơ → Xuất Word →
-Dùng hợp đồng Word đã nhập → chọn từng vị trí → Xác nhận và lưu → xuất vào
-thư mục đích. Nút Tải JSON giữ bản kết quả phân tích ban đầu, trước mọi sửa đổi;
-chỉ tải về máy. Các sửa đổi được lưu vào Stage, không ghi vào JSON ban đầu.
+gốc, chọn/sửa giá trị → Đưa vào Stage → **Lưu hồ sơ** → Xuất Word →
+Dùng hợp đồng Word đã nhập → chọn từng vị trí → **Xác nhận các vị trí đã chọn**
+(chỉ đổi bản đang sửa) → **Lưu hồ sơ** → đóng/mở lại dialog để tải bản đã lưu
+→ xuất vào thư mục đích. Nút Tải JSON giữ bản kết quả phân tích ban đầu, trước
+mọi sửa đổi; chỉ tải về máy. Sửa gợi ý/Stage không ghi vào JSON ban đầu.
 
 Giữ dialog Nhập file hiện có và đúng hai tab Upload Lab. `.doc`, ảnh/OCR,
 Excel không dùng bản đồ vị trí DOCX trong đợt này. Mỗi trường giữ chữ gốc;
@@ -97,8 +98,8 @@ không tự thành người mới và không dùng để đối chiếu/đếm l
 `loai_giay_to` cùng format với người sống — không tạo entity riêng.
 Sổ tiết kiệm và bảo hiểm **tạm dừng**: nhận diện sự hiện diện và gắn cờ
 "loại tài sản chưa hỗ trợ", không bóc dòng (Owner 06/10/2026).
-Thiếu trường vẫn cho kiểm tra và bổ sung ở Stage; quy tắc commit MIN-141 giữ
-nguyên. Đủ 3 tài sản thì gợi ý tiếp theo vẫn còn, kèm lời báo hết chỗ.
+Thiếu trường vẫn cho kiểm tra và bổ sung ở Stage; quy tắc kiểm tra khi Lưu
+hồ sơ MIN-141 giữ nguyên. Đủ 3 tài sản thì gợi ý tiếp theo vẫn còn, kèm lời báo hết chỗ.
 
 Owner TASK-10.3 (08/10/2026): lỗi gõ/dính chữ không cần chức năng mới.
 Phần regex lấy được điền vào các ô tương ứng đang có ở Stage để sửa;
@@ -145,22 +146,31 @@ NTFS, và không thay đổi giới hạn vận hành/retention bên dưới; xe
 `case_state_json.docx_import` version 1 chỉ giữ ID/hash nguồn,
 `candidate_id→row_id`, danh tính từng dòng đất và vị trí đã duyệt. Nguồn có tên
 file an toàn do backend tạo để phân biệt nhiều hợp đồng. Chữ gốc/quan sát ở package backend;
-giá trị người dùng sửa ở Stage đã lưu. Context và Stage ghi trong cùng
-transaction (một lần ghi trọn vẹn), dùng `base_revision` cũ thì từ chối cả
-lần ghi. Create/get/commit trả lại context để mở hồ sơ khác hoặc tải lại không
-mất đối chiếu. Nút `Hủy thay đổi` của Stage đã bỏ cùng cơ chế khôi phục riêng:
-bỏ nháp khi mở hồ sơ khác không ghi context chưa commit, và mở lại hồ sơ thì
-đọc đúng context đã lưu; dirty, cảnh báo rời/đóng và nhánh bỏ nháp giữ nguyên.
+giá trị người dùng sửa ở Stage chỉ được persist khi **Lưu hồ sơ**. Context,
+Stage+meta+Diagram ghi cùng transaction; `base_revision` cũ từ chối toàn bộ.
+Các API create/get/commit vẫn trả context cho consumer khác; Soạn hồ sơ
+không gọi commit để lưu đối chiếu. Nút `Hủy thay đổi` của Stage đã bỏ cùng
+cơ chế khôi phục riêng: bỏ bản đang sửa khi mở hồ sơ khác không ghi context,
+mở lại đọc đúng context đã lưu; giữ dirty, `canLeave` và cảnh báo rời/đóng.
 
 Đối chiếu Word là **một lần xuất hiện → ID dòng + trường + slot catalog**,
-không phải “thay mọi chuỗi giống nhau”. Màn Word hiện chữ gốc, tên/ID dòng,
-slot và giá trị sẽ xuất; checkbox hiển thị đúng lựa chọn đã lưu, nguồn mới chưa
-chọn. Bỏ chọn hết rồi lưu sẽ xóa toàn bộ vị trí đã gắn.
-Lúc đang lưu, khóa chọn vị trí; nếu lưu lỗi thì giữ lựa chọn và khôi phục
-đối chiếu cục bộ trước lần xác nhận để người dùng thử lưu lại.
-Nếu lưu thành công nhưng tải lại danh sách lỗi, đối chiếu và revision đã lưu
-vẫn giữ nguyên. Màn báo rõ đã lưu, xóa lựa chọn cũ và cho chọn lại nguồn để thử
-tải lại; không dùng danh sách cũ để xuất. Chọn nguồn khác cũng xóa ngay bảng cũ.
+không phải “thay mọi chuỗi giống nhau”. Tải đề xuất ban đầu từ Stage/Diagram
+đã lưu, không có thay đổi nội dung chờ lưu. Màn hiện chữ gốc, tên/ID dòng,
+slot và giá trị từ đề xuất backend; nguồn mới chưa chọn vị trí.
+**Xác nhận các vị trí đã chọn** chỉ sửa bindings trong provenance cục bộ và
+đánh dấu chưa lưu; không ghi DB, tăng revision hay tự gọi Lưu hồ sơ/commit.
+Cho xác nhận lại nhiều lần nếu chỉ thay bindings; checkbox phản ánh lựa
+chọn cục bộ theo đúng occurrence + slot. Bỏ chọn hết rồi xác nhận là yêu cầu
+xóa bindings khi Lưu hồ sơ kế tiếp, chưa xóa bản DB ngay.
+Đổi Stage/Diagram/revision hoặc đổi hồ sơ làm bộ đề xuất cũ không còn dùng
+được: phải Lưu hồ sơ nếu đang sửa rồi đóng/mở lại dialog để tải từ DB.
+Không tự tính lại slot/giá trị/độ sẵn sàng hoặc hash mẫu ở frontend.
+Khi provenance còn chờ lưu, báo rõ **chưa lưu**, chưa cho xuất bản gốc.
+Người dùng phải bấm **Lưu hồ sơ** rồi đóng/mở lại dialog để tải mẫu sẵn sàng,
+đề xuất và revision đã lưu; không lấy bảng cũ làm bằng chứng đã sẵn sàng.
+Lưu lỗi giữ lựa chọn cục bộ để sửa/thử lại. Lưu thành công nhưng tải lại lỗi
+thì DB/revision đã lưu vẫn giữ, báo lỗi tải và cho mở lại; không xuất bằng
+danh sách cũ. Chọn nguồn khác xóa bảng cũ, không chuyển bindings sang nguồn đó.
 Người N theo Stage đã lưu, Bên A/B theo ô `p1..p30` đã lưu, tài sản N theo thứ tự Stage. Đổi thứ tự
 hoặc ô làm slot khác phải xác nhận lại. Xóa dòng làm mất binding của dòng ấy,
 không chuyển sang người kế tiếp. Slot trống/không hỗ trợ thì báo lỗi.
@@ -172,15 +182,17 @@ gỡ vị trí đất cũ và yêu cầu xác nhận lại. Vị trí mới ch�
 dòng/ô và giá trị của bản Stage/sơ đồ được ghi trong cùng lần lưu.
 
 Mỗi hồ sơ giữ tối đa 8 nguồn Word; nguồn thứ 9 bị chặn trước khi thêm dòng
-Stage và gợi ý vẫn còn. Nút **Gỡ nguồn Word** bỏ đối chiếu nguồn, giữ dữ liệu
-Stage. Thao tác này không đọc file gốc nên dùng được khi nguồn đã hỏng.
-Nếu lưu việc gỡ nguồn thất bại thì khôi phục đối chiếu và trạng thái bản nháp
-trước thao tác, giữ nguồn hiện trên màn để thử lại. Không khôi phục sang hồ sơ khác.
+Stage và gợi ý vẫn còn. Nút **Gỡ nguồn Word** chỉ bỏ đối chiếu nguồn trong
+bản đang sửa, giữ dữ liệu Stage và đánh dấu dirty; không gọi commit/Lưu hồ
+sơ ngầm. Thao tác không đọc file gốc nên dùng được khi nguồn hỏng; không xóa
+file nguồn. Chỉ Lưu hồ sơ thành công mới ghi việc gỡ nguồn vào DB. Lưu lỗi
+giữ bản đang sửa để thử lại, không khôi phục sang hồ sơ khác.
 
-Binding được xác nhận tạo bản mẫu riêng tại
-`docx_sources/<source_id>/templates/<template_sha256>.docx`; context giữ hash
-đó. Source và mẫu không bị ghi đè. Xuất đọc dữ liệu đã commit qua catalog Word
-tích hợp. Nguồn/mẫu mới được ghi xong ở vị trí tạm rồi mới công bố (cho phép
+Khi **Lưu hồ sơ**, backend validate context/bindings đã xác nhận và tạo bản
+mẫu riêng tại `docx_sources/<source_id>/templates/<template_sha256>.docx`;
+context giữ hash đó. Source và mẫu không bị ghi đè. Xuất chỉ đọc snapshot
+DB đã lưu qua catalog Word tích hợp, không đọc bindings đang sửa. Nguồn/mẫu
+mới ghi xong ở vị trí tạm rồi mới công bố (cho phép
 đọc bằng ID/hash); lỗi giữa chừng không để lại bản đích ghi dở, có thể thử lại.
 Mẫu hợp lệ đã có không bị thay. File tạm xuất Word được dọn nếu hủy trước
 khi công bố đầu ra; bản gốc còn nguyên. Khi xuất, chỉ thay đúng các span
@@ -241,8 +253,10 @@ kết quả của lần quét mới nhất được hiển thị — không đ�
 trước đè danh sách thư mục sau.
 
 Dialog có ô **Nơi niêm yết**: nạp giá trị đã lưu của hồ sơ, cho sửa và lưu
-qua `notary.workspace_update`. Lệnh cập nhật cả cột hồ sơ và đúng key của
-snapshot đã lưu trong một lần ghi; không đổi Stage, tài sản hoặc sơ đồ.
+riêng qua `saveCaseMeta` → `notary.workspace_update`. Đây là ngoại lệ metadata
+Word, không phải lưu nháp Soạn hồ sơ. Lệnh cập nhật cả cột hồ sơ và đúng key
+của snapshot đã lưu trong một lần ghi; không đổi Stage, tài sản, sơ đồ hoặc
+provenance đang sửa, không thay cho Lưu hồ sơ.
 Lưu lỗi giữ nội dung đang nhập; revision cũ phải báo xung đột. Bản nháp metadata
 khác trong card Tài sản không bị mất khi lưu riêng Nơi niêm yết.
 Nếu ô Nơi niêm yết khác bản đã lưu, dialog yêu cầu lưu trước khi xuất, kể cả
@@ -263,11 +277,12 @@ và lỗi; breakdown luôn có `succeeded`, `failed`, `skipped`.
 #### Nguồn mẫu
 
 Luồng nhập hợp đồng DOCX có thêm **Dùng hợp đồng Word đã nhập** trong dialog
-này. Chọn riêng từng lần xuất hiện → dòng đã lưu → slot catalog rồi lưu đối
-chiếu trước khi xuất. `original_source_id` chỉ resolve nguồn backend thuộc
-hồ sơ, không nhận đường dẫn mẫu tùy ý; batch này cần `base_revision`. Mẫu gốc
-và mẫu dẫn xuất đều kiểm hash; đổi thứ tự/ô phải xác nhận lại. Không thay mọi
-chuỗi giống nhau. Quy tắc và giới hạn hiện hành tại
+này. Tải đề xuất trên bản đã lưu → chọn từng lần xuất hiện → xác nhận cục bộ
+→ **Lưu hồ sơ** → đóng/mở lại dialog, tải đề xuất/mẫu sẵn sàng → xuất.
+Không tự lưu khi xác nhận hoặc xuất. `original_source_id` chỉ resolve nguồn
+backend thuộc hồ sơ, không nhận đường dẫn tùy ý; batch cần `base_revision`
+đã lưu. Mẫu gốc/mẫu dẫn xuất đều kiểm hash; đổi thứ tự/ô phải xác nhận lại.
+Không thay mọi chuỗi giống nhau. Quy tắc và giới hạn hiện hành tại
 [§2. Nhập hợp đồng và dùng lại bản gốc](#docx-import).
 [Bản trước đợt gom 15/10/2026 (lịch sử, không phải nguồn hiện hành)](../../archive/specs-before-consolidation-20261015/notary_v2/input/docx-import.md).
 
@@ -283,14 +298,16 @@ quyền — renderer không gửi được path tùy ý hay thoát thư mục qu
 
 | Nội dung | Nguồn |
 |---|---|
-| Thông tin cá nhân | Stage |
-| Quan hệ | Diagram |
-| Kết quả/phân số | Engine result Python |
-| Tài sản | Stage assets + vị trí Diagram |
+| Thông tin cá nhân | Stage đã lưu trong DB |
+| Quan hệ | Diagram đã lưu trong DB |
+| Kết quả/phân số | Engine result Python của snapshot đã lưu |
+| Tài sản | Stage assets + vị trí Diagram đã lưu trong DB |
 | Mẫu và placeholder | Thư mục người dùng chọn hoặc catalog backend |
 
-Không lấy dữ liệu chưa commit hoặc kết quả frontend tự tính. Placeholder chưa
-giải quyết phải làm file đó thất bại, không âm thầm để sót trong văn bản.
+Không lấy dữ liệu chưa Lưu hồ sơ hoặc kết quả frontend tự tính. Bản gốc còn
+provenance/Stage/Diagram chờ lưu phải yêu cầu **Lưu hồ sơ** và tải lại dialog
+trước khi xuất; không dùng dữ liệu/đề xuất đang sửa thay snapshot DB.
+Placeholder chưa giải quyết phải làm file đó thất bại, không âm thầm để sót.
 
 Gate nhóm phân loại theo **token mẫu thực sự dùng** (owner 15/10/2026):
 `no_landowner`/`no_deceased_landowner`/`no_receiver` chỉ áp khi mẫu dùng

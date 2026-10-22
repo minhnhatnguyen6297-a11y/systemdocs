@@ -16,12 +16,14 @@ Soạn hồ sơ là chức năng trung tâm. Người dùng nhận giấy tờ/f
 |---|---|
 | Danh sách hồ sơ | Tìm và mở hồ sơ đang/đã soạn. Đây là tên mong muốn thay Tổng quan; nhãn, tìm kiếm và bộ lọc còn cần chốt chi tiết. |
 | Input | Đọc ảnh, PDF, Word, Excel hoặc chữ thành gợi ý có nguồn. Phạm vi từng định dạng theo spec module, không hứa đọc mọi file. |
-| Stage | Kiểm tra/sửa thông tin Người và Tài sản. Bấm Cập nhật mới lưu và áp dụng cho các phần sử dụng. |
-| Pool | Những người đã lưu trong Stage nhưng chưa được gán lên Diagram đang xem; không phải kho riêng. |
+| Stage | Kiểm tra/sửa thông tin Người và Tài sản; Pool/Diagram dùng ngay bản đang sửa. Chỉ Lưu hồ sơ mới ghi nội dung Soạn hồ sơ vào DB. |
+| Pool | Những người trong Stage đang sửa nhưng chưa được gán lên Diagram đang xem; không phải kho riêng. |
 | Diagram | Gán vai trò và quan hệ bằng kéo thả/chọn trong thẻ; có Hai bên và Thừa kế. Không sửa thông tin Người/Tài sản thay Stage. |
 | Xuất Word | Điền dữ liệu đã lưu vào placeholder — vị trí đánh dấu trong mẫu. |
 
-**Triết lý: điền dần, không ép hoàn tất mọi bước.** Có dữ liệu nào thì điền trường đó; trường hợp lệ chưa có dữ liệu để trống. Một văn bản chỉ cần Stage không phải dựng sơ đồ không cần thiết. Chỉ chặn hoặc hỏi xác nhận khi có nguy cơ cụ thể như dùng dữ liệu chưa cập nhật, làm gãy quan hệ hoặc không thể tạo file đúng. Điều kiện chặn hiện hành còn phải đồng bộ theo định hướng này; không coi việc sửa docs là đã sửa chương trình.
+Trong Soạn hồ sơ, sửa chỉ ở bộ nhớ phiên đến khi Lưu hồ sơ thành công. Chuyển tab/sidebar giữ buffer phiên hiện có, không phải lưu bền; mở hồ sơ khác hoặc đóng app có thể bỏ buffer sau xác nhận. Ngoại lệ metadata trong dialog Word: Nơi niêm yết vẫn lưu riêng qua `saveCaseMeta` → `workspace_update`, không ghi Stage/Diagram hoặc provenance đang sửa.
+
+**Triết lý: điền dần, không ép hoàn tất mọi bước.** Có dữ liệu nào thì điền trường đó; trường hợp lệ chưa có dữ liệu để trống. Một văn bản chỉ cần Stage không phải dựng sơ đồ không cần thiết. Chỉ chặn hoặc hỏi xác nhận khi có nguy cơ cụ thể như xuất dữ liệu đã lưu khác bản đang sửa, làm gãy quan hệ hoặc không thể tạo file đúng. Điều kiện chặn hiện hành còn phải đồng bộ theo định hướng này; không coi việc sửa docs là đã sửa chương trình.
 
 Tab Word riêng dự kiến giúp nhập văn bản, đề xuất placeholder, tải về sửa rồi nhập lại để lưu mẫu lâu dài. Tab này chưa có spec chi tiết/chưa triển khai; khác nút Xuất Word đang nằm trong Soạn hồ sơ.
 
@@ -73,10 +75,12 @@ Electron là vỏ ứng dụng; Python/FastAPI xử lý nghiệp vụ. Module gi
 - **Snapshot — owner 21/10:** record nghiệp vụ là Hồ sơ; mỗi Hồ sơ một snapshot
   hiện hành. Lưu lại thay snapshot đó, không lưu lịch sử từng ô/lần lưu. Các
   bộ thông tin khác nhau của cùng ID giữ qua những Hồ sơ liên quan. Hồ sơ cũ
-  chỉ user sửa thủ công, không tự đổi theo dữ liệu mới nơi khác. Nháp được lưu
-  DB dù nhập thiếu, nhãn Nháp rõ. Owner 22/10 yêu cầu Lưu hồ sơ ghi Diagram và
-  draft→done, đang dừng trước code để rà soát hai bước Cập nhật/Lưu hồ sơ;
-  cách tính từng báo cáo chưa chốt.
+  chỉ user sửa thủ công, không tự đổi theo dữ liệu mới nơi khác. Nháp đã tồn tại
+  trong DB qua lệnh tạo/nhân bản vẫn mở lại được, nhãn Nháp rõ. **Owner 23/10:**
+  Soạn hồ sơ mới chỉ ở bộ nhớ phiên đến khi bấm **Lưu hồ sơ**; không có nút
+  Cập nhật/Lưu nháp, không tự ghi khi rời/đóng. Stage/Pool/Diagram cùng dùng
+  bản đang sửa; Lưu hồ sơ ghi Stage+meta+Diagram nguyên tử và chuyển draft→done.
+  Giữ cảnh báo rời/đóng khi chưa lưu, revision/conflict; cách tính báo cáo chưa chốt.
   Raw/nguồn/history kỹ thuật đã có vẫn giữ; #41 OPEN/gate mẫu ĐÓNG, #42 độc lập.
 - **Địa chỉ cũ–mới — owner kết phiên 21/10:** tạm giữ cách hiện tại; mô hình
   mới chưa chốt. Đề xuất danh mục/quan hệ chuyển đổi và mã tham chiếu từ các
