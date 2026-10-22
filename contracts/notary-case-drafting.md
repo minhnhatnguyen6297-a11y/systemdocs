@@ -1375,11 +1375,15 @@ diagram_state v3 (domain inheritance):
   result qua `diagram.warnings` data-code `diagram.selection_pruned`;
   UI được disable chip tài sản chưa tồn tại (quyết định hiển thị của
   P6). Không reject cả commit.
-- **Mặc định khi gán (Q5):** node `owner` → `ownPositions` mặc định =
-  tất cả vị trí đang có ({1..len(assets)}); person gán vào slot thừa
-  kế → `receivePositions` mặc định = tất cả vị trí đang có. Đây là
-  tiện ích **client-side** — wire luôn mang mảng explicit; thêm asset
-  sau đó **không** tự mở rộng mảng đã chọn.
+- **Mặc định khi gán (Q5):** node `owner` → `ownPositions`, slot thừa
+  kế khác → `receivePositions`: mảng rỗng được điền tất cả vị trí đang có
+  ({1..len(assets)}). Khi thêm/gỡ tài sản và khi Lưu hồ sơ/Lưu nháp, client
+  đồng bộ đầy đủ tập vị trí hiện có nếu user chưa tự chỉnh chip cho đúng
+  node + loại Chủ/Nhận trong phiên; lựa chọn tay, kể cả tắt hết, không bị
+  tự ghi đè. Riêng owner đang rỗng không được tự điền nếu node khác đã có
+  `ownPositions` không rỗng. Đây là tiện ích **client-side**, wire luôn
+  mang mảng explicit; dấu đã chỉnh chỉ ở state phiên, reset khi mở hồ sơ/
+  phiên mới. *Hiệu chỉnh từ vòng lặp sửa lỗi E2E 23/10 — phương án B.*
 - **Slot `owner` (mirror):** node `id:"owner"` tồn tại như v1 nhưng
   `personId` của nó do server căn theo `stage.owner_row_id` (§13.6).
   `diagram_save` gửi `owner.personId` khác `owner_row_id` →

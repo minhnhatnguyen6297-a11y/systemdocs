@@ -245,6 +245,8 @@ function fakeClient(seed) {
   async function run(command, payload) {
     calls.push({ command, payload: JSON.parse(JSON.stringify(payload)) });
     switch (command) {
+      case 'notary.workspace_save_case':
+        return ok(savedWorkspace(payload, (payload.base_revision || 0) + 1));
       case 'notary.workspace_source_latest': {
         if (!payload || Object.keys(payload).length) {
           return fail('validation_error', 'payload phai la object rong');
@@ -1437,6 +1439,135 @@ test('applyAssignDefaults: owner → ownPositions het; node khac → receivePosi
   model.assignPerson(kid.id, c.row_id);
   assert.deepEqual(model.state.diagram.nodes
     .find((n) => n.id === sp.id).receivePositions, [1]);
+});
+
+test('position defaults: owner assigned without assets expands with every added asset', async () => {
+  const { model } = makeModel({});
+  await model.newDraft();
+  const person = model.addPerson({ ho_ten: 'Owner' });
+  model.assignPerson('owner', person.row_id);
+  const owner = model.state.diagram.nodes.find((n) => n.id === 'owner');
+  assert.deepEqual(owner.ownPositions, []);
+  model.addAsset({ so_serial: 'G1-1' });
+  assert.deepEqual(owner.ownPositions, [1]);
+  model.addAsset({ so_serial: 'G1-2' });
+  assert.deepEqual(owner.ownPositions, [1, 2]);
+});
+
+test('position defaults: removing an asset shrinks untouched ownership', async () => {
+  const { model } = makeModel({});
+  await model.newDraft();
+  const person = model.addPerson({ ho_ten: 'Owner' });
+  model.addAsset({ so_serial: 'G1-1' });
+  const removed = model.addAsset({ so_serial: 'G1-2' });
+  model.assignPerson('owner', person.row_id);
+  const owner = model.state.diagram.nodes.find((n) => n.id === 'owner');
+  assert.deepEqual(owner.ownPositions, [1, 2]);
+  model.removeStageRow(removed.row_id);
+  assert.deepEqual(owner.ownPositions, [1]);
+});
+
+for (const empty of [false, true]) {
+  test(`position defaults: manual ownership ${empty ? 'empty' : 'subset'} survives add and repeated saves`, async () => {
+    const { model, client } = makeModel({});
+    await model.newDraft();
+    const person = model.addPerson({ ho_ten: 'Owner' });
+    model.addAsset({ so_serial: 'G1-1' });
+    if (!empty) model.addAsset({ so_serial: 'G1-2' });
+    model.assignPerson('owner', person.row_id);
+    model.toggleNodePosition('owner', 'own', 1);
+    const expected = empty ? [] : [2];
+    model.addAsset({ so_serial: 'G1-3' });
+    assert.deepEqual(model.state.diagram.nodes[0].ownPositions, expected);
+    assert.equal((await model.saveCase()).ok, true);
+    model.addAsset({ so_serial: 'G1-4' });
+    assert.equal((await model.saveCase()).ok, true);
+    const sent = client.calls.filter((c) =>
+      c.command === 'notary.workspace_save_case');
+    for (const call of sent) {
+      assert.deepEqual(call.payload.diagram.state.nodes[0].ownPositions, expected);
+    }
+    assert.deepEqual(model.state.diagram.nodes[0].ownPositions, expected);
+  });
+}
+
+test('position defaults: saveCase sends ownership after adding first asset without diagram edits', async () => {
+  const { model, client } = makeModel({});
+  await model.newDraft();
+  const person = model.addPerson({ ho_ten: 'Owner' });
+  model.assignPerson('owner', person.row_id);
+  model.addAsset({ so_serial: 'G1-1' });
+  assert.equal((await model.saveCase()).ok, true);
+  const call = client.calls.find((c) => c.command === 'notary.workspace_save_case');
+  assert.deepEqual(call.payload.diagram.state.nodes[0].ownPositions, [1]);
+  assert.equal('positionTouched' in call.payload.diagram.state, false);
+});
+
+test('position defaults: empty owner stays empty when another node owns assets', async () => {
+  const { model } = makeModel({});
+  await model.newDraft();
+  const person = model.addPerson({ ho_ten: 'Owner' });
+  const other = model.addPerson({ ho_ten: 'Other owner' });
+  model.assignPerson('owner', person.row_id);
+  const slot = model.addSlot();
+  model.assignPerson(slot.id, other.row_id);
+  model.toggleNodePosition(slot.id, 'own', 1);
+  model.addAsset({ so_serial: 'G1-1' });
+  assert.deepEqual(model.state.diagram.nodes[0].ownPositions, []);
+  assert.deepEqual(slot.ownPositions, [1]);
+});
+
+test('position defaults: assigned heir receives all assets until receive chips are touched', async () => {
+  const { model } = makeModel({});
+  await model.newDraft();
+  const person = model.addPerson({ ho_ten: 'Heir' });
+  const slot = model.addSlot();
+  model.assignPerson(slot.id, person.row_id);
+  model.addAsset({ so_serial: 'G1-1' });
+  assert.deepEqual(slot.receivePositions, [1]);
+  model.toggleNodePosition(slot.id, 'own', 1);
+  model.addAsset({ so_serial: 'G1-2' });
+  assert.deepEqual(slot.receivePositions, [1, 2]);
+  model.toggleNodePosition(slot.id, 'receive', 1);
+  model.toggleNodePosition(slot.id, 'receive', 2);
+  model.addAsset({ so_serial: 'G1-3' });
+  assert.deepEqual(slot.receivePositions, []);
+  model.removeStageRow(model.state.stage.assets[0].row_id);
+  assert.deepEqual(slot.receivePositions, []);
+});
+
+for (const method of ['saveCase', 'saveDraft']) {
+  test(`position defaults: ${method} synchronizes defaults before capturing payload`, async () => {
+    const { model, client } = makeModel({});
+    await model.newDraft();
+    const person = model.addPerson({ ho_ten: 'Owner' });
+    model.addAsset({ so_serial: 'G1-1' });
+    model.addAsset({ so_serial: 'G1-2' });
+    model.assignPerson('owner', person.row_id);
+    // Represent an untouched partial default loaded into the draft buffer.
+    model.state.diagram.nodes[0].ownPositions = [1];
+    assert.equal((await model[method]()).ok, true);
+    const command = method === 'saveCase'
+      ? 'notary.workspace_save_case' : 'notary.workspace_create';
+    const call = client.calls.find((c) => c.command === command);
+    assert.deepEqual(call.payload.diagram.state.nodes[0].ownPositions, [1, 2]);
+  });
+}
+
+test('position defaults: newDraft and openCase reset manual selection tracking', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  model.toggleNodePosition('owner', 'own', 1);
+  await model.openCase(42);
+  model.addAsset({ so_serial: 'G1-3' });
+  assert.deepEqual(model.state.diagram.nodes.find((n) =>
+    n.id === 'owner').ownPositions, [1, 2, 3]);
+  model.toggleNodePosition('owner', 'own', 1);
+  await model.newDraft();
+  const person = model.addPerson({ ho_ten: 'New owner' });
+  model.assignPerson('owner', person.row_id);
+  model.addAsset({ so_serial: 'G1-1' });
+  assert.deepEqual(model.state.diagram.nodes[0].ownPositions, [1]);
 });
 
 test('saveDiagram: workspace_conflict → status conflict', async () => {

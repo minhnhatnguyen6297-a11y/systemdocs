@@ -471,9 +471,10 @@ function createNotaryModuleView(deps) {
     const s = model.state;
     if (s.caseId == null) {
       const r = await model.saveDraft();
-      if (!r.ok && r.error &&
+      if (!r.ok && r.error && r.error.code === 'diagram_invalid_state') {
+        notify(errText(r.error.details?.errors?.[0] || r.error), true);
+      } else if (!r.ok && r.error &&
           r.error.code !== 'stage_validation_error' &&
-          r.error.code !== 'diagram_invalid_state' &&
           r.error.code !== 'workspace_owner_required') {
         notify(errText(r.error), true);
       }
@@ -500,9 +501,10 @@ function createNotaryModuleView(deps) {
       return { ok: false, error: { code: 'invalid_date' } };
     }
     const r = await model.saveCase();
-    if (!r.ok && r.error &&
+    if (!r.ok && r.error && r.error.code === 'diagram_invalid_state') {
+      notify(errText(r.error.details?.errors?.[0] || r.error), true);
+    } else if (!r.ok && r.error &&
         r.error.code !== 'stage_validation_error' &&
-        r.error.code !== 'diagram_invalid_state' &&
         r.error.code !== 'workspace_conflict') {
       notify(errText(r.error), true);
     }

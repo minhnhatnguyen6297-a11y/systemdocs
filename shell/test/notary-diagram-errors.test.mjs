@@ -185,7 +185,7 @@ test('diagram_invalid_state: loi hien duoi so do, khong toast rieng',
 
 // ---------- luu loi thuong ----------
 
-test('luu diagram_invalid_state: lỗi hiện dưới sơ đồ, không toast, giữ nháp',
+test('luu diagram_invalid_state: toast va lỗi dưới sơ đồ, giữ nháp',
   async () => {
     const inner = { code: 'missing_land_owner',
                     message: 'Chưa có người để lại tài sản trên sơ đồ' };
@@ -197,7 +197,7 @@ test('luu diagram_invalid_state: lỗi hiện dưới sơ đồ, không toast, g
     const save = findBtns(view.el, 'Lưu hồ sơ')[0];
     assert.ok(save, 'thiếu nút Lưu sơ đồ');
     await save.onclick();
-    assert.deepEqual(notices, [], 'invalid_state không được toast riêng');
+    assert.deepEqual(notices, [[CAT.errText(inner), true]]);
     assert.equal(model.state.diagramDirty, true, 'nháp còn nguyên');
     assert.equal(model.state.revision, 3, 'revision không đổi khi bị từ chối');
     const card = byCls(view.el, 'cd-rel-card')[0];
@@ -290,3 +290,32 @@ test('khong co catalog khi nap: nhanh du phong con dung duoc', async () => {
     [['stage_validation_error: synthetic', true]],
     'nhanh du phong phai giu dinh dang code: message');
 });
+
+test('missing_land_owner: chi ro thieu dau Chu, khong huong dan gan lai nguoi', () => {
+  const CAT = catalog();
+  const error = { code: 'missing_land_owner' };
+  const text = CAT.errText(error);
+  assert.match(text, /đánh dấu Chủ đất/);
+  assert.match(text, /chip "Chủ"/);
+  assert.doesNotMatch(text, /Kéo người để lại vào ô khởi tạo/);
+  assert.match(CAT.describeError(error).title, /đánh dấu Chủ đất/);
+});
+
+for (const draft of [false, true]) {
+  for (const withDetails of [true, false]) {
+    test(`${draft ? 'Luu nhap' : 'Luu ho so'}: toast loi diagram dau tien, details=${withDetails}`, async (t) => {
+      const first = { code: 'missing_land_owner' };
+      const error = { code: 'diagram_invalid_state',
+        ...(withDetails ? { details: { errors: [first, { code: 'duplicate_person' }] } } : {}) };
+      const command = draft ? 'notary.workspace_create' : 'notary.workspace_save_case';
+      const { model, view, notices, CAT } = build(t, {
+        client: errorClient({ [command]: { ok: false, error } }),
+      });
+      if (draft) await model.newDraft('inheritance');
+      const button = findBtns(view.el, draft ? 'Lưu nháp' : 'Lưu hồ sơ')[0];
+      assert.ok(button);
+      await button.onclick();
+      assert.deepEqual(notices, [[CAT.errText(withDetails ? first : error), true]]);
+    });
+  }
+}

@@ -135,9 +135,9 @@ const ERROR_CATALOG = {
 
   // ---- Engine thừa kế (inheritance_engine.py) ----
   missing_land_owner: {
-    title: 'Chưa có người để lại tài sản trên sơ đồ',
-    hint: 'Kéo người để lại vào ô khởi tạo — engine chỉ tính được ' +
-      'khi có người đã mất sở hữu tài sản.',
+    title: 'Chưa đánh dấu Chủ đất cho người để lại tài sản',
+    hint: 'Chưa vị trí tài sản nào được bật chip "Chủ" trên sơ đồ. ' +
+      'Bật ít nhất một chip Chủ trên ô người để lại tài sản rồi lưu lại.',
   },
   no_valid_heir: {
     title: 'Không có người thừa kế hợp lệ',

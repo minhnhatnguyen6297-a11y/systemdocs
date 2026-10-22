@@ -211,6 +211,14 @@ Việc đang mở được tổng hợp tại [catalog issue](../backlog/README.
 - Sơ đồ: binding thông báo lỗi đã được sửa; có test hồi quy và probe trên
   Electron thật (client stub; không xác minh command IPC/engine), review Quick
   độc lập sạch. [#4](../backlog/bug-diagram-error-messages.md).
+- Hiệu chỉnh G2 vòng sửa lỗi E2E 23/10: khi Lưu hồ sơ/Lưu nháp bị
+  `diagram_invalid_state`, toast hiện lỗi sơ đồ đầu tiên, thiếu chi tiết thì
+  hiện lỗi tổng. `missing_land_owner` chỉ rõ thiếu chip Chủ trên vị trí tài
+  sản, không hướng dẫn gán lại người đã có trên sơ đồ.
+- Hiệu chỉnh G1 cùng vòng E2E 23/10 (B): mặc định Chủ của owner/Nhận của
+  node thừa kế khác đồng bộ đủ tập tài sản khi thêm/gỡ và khi Lưu, đến khi
+  user tự chỉnh chip cho đúng node + loại trong phiên. Lựa chọn tay kể cả
+  rỗng giữ nguyên; owner rỗng không tự điền nếu node khác đã có Chủ.
 - Sơ đồ: lưu bản hợp lệ còn thiếu giữ warning Pool/`requiredSlots` qua mở lại;
   state `invalid` bị từ chối và giữ nguyên bản cũ; cue chỉ-đọc (trạng thái +
   phần thiếu) hiện khi panel cách tính đóng. Bằng chứng service/adapter và

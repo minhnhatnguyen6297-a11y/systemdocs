@@ -192,6 +192,7 @@ function createModel(deps) {
     stageDirty: false,
     diagramDirty: false,
     metaDirty: false,            // meta nhap chua luu (chi co tren nhap)
+    positionTouched: new Set(),  // session-only "<nodeId>:<own|receive>"
     draftId: null,               // idempotency_key cua phien nhap (uuid4)
     fieldErrors: [],             // [{row_id, field, code, message}]
     diagram: { version: DIAGRAM_VERSION, domain: CASE_TYPE_INHERITANCE,
@@ -594,6 +595,7 @@ function createModel(deps) {
   async function openCase(caseId) {
     const s = ++session;
     clearAddressLookups();
+    state.positionTouched.clear();
     state.status = 'loading';
     state.caseId = caseId;
     state.draftId = null;
@@ -660,6 +662,7 @@ function createModel(deps) {
       ? caseType : CASE_TYPE_INHERITANCE;
     const s = ++session;              // vo hieu response dang cho cua case cu
     clearAddressLookups();
+    state.positionTouched.clear();
     state.status = 'loading';         // khoa sua/luu den khi doc nguon xong
     state.caseId = null;
     state.draftId = uuid();
@@ -772,6 +775,7 @@ function createModel(deps) {
         state.stage.owner_row_id = null;
       }
       state.diagram = newDiagramDraft(value);
+      state.positionTouched.clear();
       state.committedDiagram = clone(state.diagram);
       state.diagramDirty = true;
       state.diagramErrors = [];
@@ -884,6 +888,7 @@ function createModel(deps) {
     state.busy = null;
     if (r.ok) {
       applyWorkspace(r.data || {});
+      state.positionTouched.clear();
       state.notice = 'Đã đổi loại hồ sơ';
     } else {
       applyWriteResult(r, 'workspace_convert_type');
@@ -901,6 +906,7 @@ function createModel(deps) {
       return { ok: false, error: errObj('validation_error',
                                         'Khong phai nhap moi') };
     }
+    syncPositionDefaults();
     state.busy = 'notary.workspace_create';
     emit();
     const s = session;
@@ -955,6 +961,7 @@ function createModel(deps) {
         state.locked ? 'Hồ sơ đã khóa — chỉ đọc'
                      : 'Loại việc chưa hỗ trợ') };
     }
+    syncPositionDefaults();
     const caseId = state.caseId;
     const s = session;
     const meta = {};
@@ -1057,6 +1064,7 @@ function createModel(deps) {
     // Success → key mới cho ý định Nhân bản sau (applyWorkspace cũng clear).
     state.duplicatePending = null;
     applyWorkspace(r.data || {});
+    state.positionTouched.clear();
     state.notice = r.data && r.data.created === false
       ? 'Đã mở bản sao đã tạo' : 'Đã nhân bản hồ sơ';
     emit();
@@ -1127,6 +1135,7 @@ function createModel(deps) {
     state.stage.assets.push(row);
     noteLookupSourceChanged();
     touchStage();
+    syncPositionDefaults();
     return row;
   }
 
@@ -1220,6 +1229,7 @@ function createModel(deps) {
   function removeStageRow(rowId) {
     if (!canWrite()) return;
     const before = state.stage.people.length + state.stage.assets.length;
+    const assetCount = state.stage.assets.length;
     state.stage.people = state.stage.people.filter((p) => p.row_id !== rowId);
     state.stage.assets = state.stage.assets.filter((a) => a.row_id !== rowId);
     if (state.stage.people.length + state.stage.assets.length === before) {
@@ -1243,6 +1253,7 @@ function createModel(deps) {
     }
     state.fieldErrors = state.fieldErrors.filter((e) => e.row_id !== rowId);
     touchStage();
+    if (state.stage.assets.length !== assetCount) syncPositionDefaults();
   }
 
   function fieldErrorsFor(rowId) {
@@ -1411,6 +1422,28 @@ function createModel(deps) {
     }
   }
 
+  function syncPositionDefaults() {
+    if (diagramDomain() !== CASE_TYPE_INHERITANCE) return;
+    const nodes = state.diagram.nodes || [];
+    const count = state.stage.assets.length;
+    const otherOwner = nodes.some((n) => n && !n.deleted &&
+      n.id !== 'owner' && n.ownPositions && n.ownPositions.length);
+    let changed = false;
+    for (const node of nodes) {
+      if (!node || node.deleted || !node.personId) continue;
+      const kind = node.id === 'owner' ? 'own' : 'receive';
+      if (state.positionTouched.has(`${node.id}:${kind}`)) continue;
+      const field = kind === 'own' ? 'ownPositions' : 'receivePositions';
+      const positions = node[field] || [];
+      if (kind === 'own' && !positions.length && otherOwner) continue;
+      if (positions.length === count &&
+          positions.every((pos, i) => pos === i + 1)) continue;
+      node[field] = Array.from({ length: count }, (_, i) => i + 1);
+      changed = true;
+    }
+    if (changed) touchDiagram();
+  }
+
   // Gan nguoi (row_id trong Stage DA COMMIT) vao slot; rowId=null → bo gan,
   // nguoi quay ve Pool. Mot nguoi chi nam tren mot node — gan moi se clear
   // node cu (tranh engine duplicate_person).
@@ -1528,6 +1561,7 @@ function createModel(deps) {
     const i = arr.indexOf(pos);
     if (i >= 0) arr.splice(i, 1); else arr.push(pos);
     node[field] = arr;
+    state.positionTouched.add(`${nodeId}:${kind}`);
     touchDiagram();
     return true;
   }

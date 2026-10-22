@@ -164,6 +164,13 @@ Các công thức mở rộng còn Draft; không có quyền thay công thức �
 - Vị trí tài sản là index 1..3 của Stage assets.
 - `ownPositions`: tài sản người đó sở hữu.
 - `receivePositions`: tài sản người đó nhận.
+- Mặc định khi gán: owner nhận đủ vị trí Chủ, node thừa kế khác nhận đủ
+  vị trí Nhận nếu mảng đang rỗng. Khi thêm/gỡ tài sản hoặc Lưu hồ sơ/Lưu
+  nháp, mảng chưa được user chỉnh chip cho đúng node + Chủ/Nhận trong phiên
+  đồng bộ đủ tập vị trí hiện có. Mảng đã chỉnh, kể cả tắt hết, giữ nguyên.
+  Owner đang rỗng không tự điền nếu node khác đã có vị trí Chủ; không đổi
+  mặc định tại thời điểm gán. Dấu đã chỉnh chỉ ở phiên, reset khi mở hồ sơ/
+  phiên mới, không vào wire. Hiệu chỉnh G1 vòng sửa lỗi E2E 23/10 (B).
 - Reorder tài sản đổi vật đang ở vị trí; dấu chọn bám số vị trí, không bám
   `row_id`. UI phải cảnh báo khi reorder/xóa làm đổi nghĩa.
 
