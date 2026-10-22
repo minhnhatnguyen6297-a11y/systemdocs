@@ -157,10 +157,10 @@ Phương pháp: app Electron thật + sidecar Python thật, DB/profile cô lậ
 - Bấm Lưu đúng một lần: đúng 1 job `workspace_save_case` succeeded, 0 lệnh ghi cấm.
 - Đối chiếu DB sau lưu (SQLite): 3 dòng người khớp từng trường với trạng thái đã thấy trong phiên (owner tên mới + ngày chết 2023-07-07; B ở `father`; C ở `mother`), trạng thái `done`, `workspace_revision` tăng đúng.
 
-**Biến thể stress (agent con, instance riêng) — ĐẠT:**
+**Biến thể stress (agent con, instance riêng) — kết quả gốc: S1/S3/S4 ĐẠT, S2 THẤT BẠI (đã sửa, xem §7.1 và §7.2):**
 - S1 bấm Lưu 10 lần liên tiếp không sửa xen giữa: 10/10 succeeded, đúng 10 job `workspace_save_case`, 0 lệnh cấm, revision tăng đều 1→11, không banner treo.
-- S2 thả/gỡ node owner 5 vòng rồi Lưu: cả 5 vòng thả lại được, Lưu cuối thành công, 0 lệnh cấm.
-- S3 thay TOÀN BỘ thông tin một người (tên, số giấy tờ, ngày sinh, ngày cấp, nơi cấp, địa chỉ) → Lưu → mở lại: 29/30 khớp tuyệt đối; 1 lệch duy nhất là định dạng hiển thị ngày cấp (nhập ISO `2024-03-04`, đọc lại `04/03/2024` — cùng giá trị, khác định dạng trình bày). Đối chiếu DB: mọi trường đã xuống DB, revision/status đúng.
+- S2 thả/gỡ node owner 5 vòng rồi Lưu: **THẤT BẠI ở cả 2 lượt chạy** (kết quả giống hệt nhau): sau khi bấm Lưu, banner `workspace_owner_required` hiện dù node owner vẫn hiển thị người và Pool rỗng; đối chiếu revision DB của phiên stress (13 thay vì 14) xác nhận lần Lưu S2 không ghi được. Điều phối viên tái hiện sạch độc lập (DB mới, `e2e-s2-clean.mjs`) và chẩn đoán ra 2 lỗi D1/D2 — đã sửa ở commit `1d1ec3f`, chi tiết §7.1; kiểm chứng sau sửa ở §7.2.
+- S3 thay TOÀN BỘ thông tin một người (tên, số giấy tờ, ngày sinh, ngày cấp, địa chỉ, ngày chết) → Lưu → mở lại: đọc lại khớp cả 6 trường (MATCH). Đối chiếu DB: mọi trường đã xuống DB, revision/status đúng.
 - S4: 2 người + 2 tài sản (2 dòng đất) → Lưu thành công, sơ đồ đúng; mở được hộp thoại xuất Word và danh sách mẫu. DỪNG TRUNG THỰC tại bước chọn mẫu/hộp chọn file native của HĐH (tự động hoá không qua được) — chưa thực thi xuất Word; ghi nhận là giới hạn môi trường tự động hoá, không phải lỗi app. Toàn phiên S4: 0 lệnh ghi cấm.
 
 **Sự cố khi kiểm chứng (minh bạch, không phải lỗi app):**
@@ -203,7 +203,15 @@ Tái hiện sạch trên app thật (DB mới, 1 hồ sơ): sau 5 vòng thả/g�
 
 24 tên fail trùng đúng danh sách nợ cũ ở §6/`g4-test-compare.txt` (5 thiếu `locked.json`, 17 address lookup/fileToken, 2 DOCX thiếu module python hệ thống): **0 fail mới**. Target 4 file model/view/diagram/diagram-errors: 251 test, 246 pass, 5 fail — đúng 5 nợ fixture `locked.json`.
 
-**E2E sau sửa: điều phối viên bổ sung.**
+**E2E sau sửa: xem §7.2 (điều phối viên bổ sung).**
+
+### §7.2. Kiểm chứng E2E sau sửa S2 (điều phối viên)
+
+Chạy trên bản đã sửa (HEAD `80867ff`), app Electron thật + sidecar thật, DB/profile mới:
+
+- **Tái hiện sạch `e2e-s2-clean.mjs` (đúng kịch bản từng fail):** trước khi bấm Lưu — `saveDisabled: false`, `banners: []` (không còn banner treo, nút không bị khóa vì lệnh đọc); delta jobs gồm `workspace_save_case succeeded`; **revision DB 1 → 2** — lần Lưu ghi thật. So với trước sửa: `saveDisabled: true` tại thời điểm bấm, 0 job save_case, revision đứng nguyên.
+- **Script stress nguyên bản `e2e-stress.mjs` (instance riêng CDP 9223, DB mới):** S1 10/10 succeeded; S2 state sau Lưu `banners: []`, Lưu thành công; S3 MATCH cả 6 trường; S4 đạt, 0 lệnh ghi cấm. **Revision cuối phiên = 14** (setup 1 + S1 10 + S2 1 + S3 1 + S4 1) — mọi lần Lưu đều xuống DB, đúng phần trước sửa bị thiếu (13).
+- **Hồi quy kịch bản A nguyên văn (instance + DB mới):** đạt toàn bộ như §7 (chặn đúng khi chưa thả owner, Lưu thành công sau khi thêm tài sản, nhãn node đổi trong phiên khi sửa chết→sống, "Cập nhật" = NOBTN).
 
 ## §8. Commit list toàn lát G4
 
@@ -223,3 +231,5 @@ Tái hiện sạch trên app thật (DB mới, 1 hồ sơ): sau 5 vòng thả/g�
 | `1d1ec3f` | Sửa S2: Lưu không khoá vì lệnh đọc, bỏ response evaluate cũ (§7.1) |
 | (commit biên bản này) | Biên bản vòng 2 G4 + `g4-test-compare.txt` |
 | (commit bổ sung của điều phối viên) | Điền §7 E2E trên app thật vào biên bản |
+| `80867ff` | Ghi vòng sửa S2 (D1/D2, test, số liệu suite) vào biên bản |
+| (commit đính chính của điều phối viên) | Đính chính kết quả stress S2 trong §7 + bổ sung §7.2 kiểm chứng sau sửa |
