@@ -6,7 +6,7 @@
   "definitions": {
     "case_meta_patch": {
       "type": "object",
-      "description": "Chỉ 3 meta cập nhật được; patch rỗng, không phải object hoặc key lạ (kể cả case_type/document_type — định danh không đổi sau create) → validation_error (§6.2)",
+      "description": "Chỉ 3 meta cập nhật được; patch rỗng/sai object/key lạ (kể cả case_type/document_type — chuyển loại dùng workspace_convert_type §13.18) → validation_error (§6.2)",
       "minProperties": 1,
       "additionalProperties": false,
       "properties": {

@@ -1,7 +1,11 @@
 [workflow]
 # Same project-root-relative fact as build; no installed-skill or machine path.
-persistent_facts = ["file:_bmad/custom/html-plan/authoring.md"]
+persistent_facts = ["file:_bmad/custom/html-plan/authoring.md", "file:_bmad/custom/html-plan/phases.md"]
 activation_steps_append = ["""
+Cloud package wiring repair: read {project-root}/_bmad/custom/html-plan/phases.md
+fully now; re-read its Spec section after Self-Validate and before Output.
+Generate the current spec's packed HTML at that existing phase, not at
+on_complete. Keep the established headless schema and approval semantics.
 Load {project-root}/_bmad/custom/html-plan/authoring.md and
 {project-root}/_bmad-output/specs/shared/visual-html-plans.md now; keep the
 contract active throughout this spec operation. Resolve the relative file:

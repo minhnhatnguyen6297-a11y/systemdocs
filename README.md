@@ -1,4 +1,4 @@
-﻿# Notary System
+# Notary System
 
 Kho này chứa runtime tích hợp và nguồn tài liệu chung cho hệ thống công chứng.
 Tài liệu được tổ chức theo **phạm vi và flow**, không theo loại “nghiệp vụ”,
@@ -6,16 +6,18 @@ Tài liệu được tổ chức theo **phạm vi và flow**, không theo loại
 
 ## Bắt đầu đọc
 
-1. Đọc [spec toàn hệ thống](./_bmad-output/specs/README.md).
-2. Chọn module trong cây dưới.
-3. Đi qua README của từng thư mục cha tới feature cần sửa.
-4. Đọc contract và source được spec lá dẫn tới.
+1. Đọc [nền sản phẩm và khái niệm chung](_bmad-output/specs/README.md).
+2. Đọc [sổ tay sản phẩm theo màn hình](_bmad-output/specs/product-overview.md)
+   để tìm UI và việc đang mở.
+3. Chọn module trong cây dưới.
+4. Đọc README của module và từng thư mục cha, rồi tới spec feature để biết hành vi chi tiết.
+5. Đọc contract và source được spec lá dẫn tới.
 
 ## Cây tài liệu
 
 ```text
 _bmad-output/specs/
-├── README.md                       # Tầm nhìn, ranh giới, kiến trúc và câu hỏi toàn hệ thống
+├── README.md                       # Nền sản phẩm, khái niệm chung và spec toàn hệ thống
 ├── shared/
 │   └── administrative-lookup.md    # Lõi tra cứu tên xã/tỉnh dùng chung
 ├── notary_v2/
@@ -81,7 +83,7 @@ Nếu ảnh hưởng nhiều module, đặt ở `_bmad-output/specs/README.md`.
 
 | Đường dẫn | Vai trò | Trạng thái |
 |---|---|---|
-| `shell/` | Electron shell + Python sidecar | Runtime tích hợp |
+| `shell/` | Electron 44.7.2 shell + Python sidecar | Runtime tích hợp |
 | `notary_v2/` | Soạn hồ sơ | Đang phát triển |
 | `upload_lab/` | Số hóa và upload hồ sơ cũ | Đang phát triển |
 | `notaryoffice/` | Theo dõi vận hành văn phòng | Chỉ có thiết kế |
@@ -89,6 +91,10 @@ Nếu ảnh hưởng nhiều module, đặt ở `_bmad-output/specs/README.md`.
 
 `shell` là hạ tầng, không phải module nghiệp vụ. Zalo là nguồn đầu vào kỹ thuật,
 không tạo phần sản phẩm thứ tư.
+
+Shell dùng Electron `44.7.2`; bằng chứng phiên bản và các giới hạn kiểm chứng
+được ghi trong [runtime support](_bmad-output/specs/shell/electron-runtime-support.md).
+
 
 ### Báo lỗi giao diện trong chế độ dev
 
@@ -98,28 +104,28 @@ Save report. Launcher dùng lại `run.bat`, không cần đường dẫn máy c
 không phải dữ liệu công chứng production. Báo cáo JSON/PNG nằm ở thư mục ignored
 `_bmad-output/tmp/visual-bug-reporting/reports/`; ghi chú được giữ nguyên văn,
 phải kiểm tra dữ liệu riêng tư trước khi chia sẻ. App đóng gói không bật tool này.
-Xem [hướng dẫn và kiểm chứng](./tools/visual-bug-reporting/README.md).
+Xem [hướng dẫn và kiểm chứng](tools/visual-bug-reporting/README.md).
 
 
 ## Những nơi khác
 
 | Chỗ | Dùng cho |
 |---|---|
-| [`contracts/`](./contracts/README.md) | Contract đã duyệt và schema máy đọc |
+| [`contracts/`](contracts/README.md) | Contract đã duyệt và schema máy đọc |
 | `_bmad-output/specs/` | SOT đặc tả hành vi (spec quyết định, code chứng minh) |
 | `_bmad-output/decisions/` | Quyết định đã chốt: LÀ GÌ và TẠI SAO |
 | `graphify-out/` | Snapshot để tìm quan hệ code; không phải spec |
 | `_bmad-output/` | Artifact workflow BMAD (plans, review, archive) |
 | `.tmp/`, `.cache/`, `logs/`, `artifacts/` | File tạm, không commit |
 
-Trước khi sửa tài liệu, đọc [luật agent](./AGENTS.md).
+Trước khi sửa tài liệu, đọc [luật agent](AGENTS.md).
 
 ## Plan/spec trực quan trong BMAD
 
 `bmad-build` và `bmad-spec` tích hợp HTML qua các field BMAD hỗ trợ
 (`persistent_facts`, `activation_steps_append`) trong `_bmad/custom/`. Cả hai nạp
-[contract authoring](./_bmad/custom/html-plan/authoring.md) và
-[spec hành vi](./_bmad-output/specs/shared/visual-html-plans.md); không gọi
+[contract authoring](_bmad/custom/html-plan/authoring.md) và
+[spec hành vi](_bmad-output/specs/shared/visual-html-plans.md); không gọi
 skill HTML riêng.
 Build trình bày HTML sau điều tra và tự kiểm tra, trước khi trình bày plan/xin
 duyệt; với oneshot cần minh họa thì trước implementation. Spec trình bày sau

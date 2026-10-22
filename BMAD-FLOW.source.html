@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HTML plan trong BMAD</title><link rel="stylesheet" href="_bmad/custom/html-plan/runtime/htmlplan.css"><script src="_bmad/custom/html-plan/runtime/htmlplan.js" defer></script></head>
+<body><header><h1>HTML plan trong BMAD</h1><details class="thread"><summary>Phạm vi bản hướng dẫn</summary><doc-quote via="doc" from="Cloud package">Hướng dẫn workflow offline, không phải plan ứng dụng đã thực thi hoặc được duyệt.</doc-quote></details></header>
+<main><doc-plan open="1">
+<doc-claim><p>Full trình bày HTML trước checkpoint duyệt plan hiện có.</p>
+<doc-flow caption="Nguồn: skills/bmad-build/step-02-plan.md; _bmad/custom/html-plan/authoring.md và phases.md. HTML không thêm gate."><script type="text/plain">
+inspect = Investigate / Đọc source thật
+plan = Markdown plan / Tự review; giải quyết câu hỏi
+html = Author HTML / Claim và exhibit của task
+pack = Pack + browser / Cây đóng, mở, state
+checkpoint = CHECKPOINT 1 / Markdown + link HTML
+implement = Implement / Khi owner chọn tiếp tục
+inspect -> plan
+plan -> html
+html -> pack
+pack -> checkpoint
+checkpoint -> implement : Approve and continue
+</script></doc-flow>
+<doc-claim><p>Runtime và quy tắc nằm trong project đã cài.</p><doc-tree caption="Các đường dẫn này được installer cài vào project root."><script type="text/plain">
+_bmad/custom/html-plan/
+  authoring.md # Contract được duyệt
+  phases.md # Thời điểm tạo artifact
+  runtime/
+    htmlplan.css
+    htmlplan.js
+    pack.mjs
+</script></doc-tree></doc-claim></doc-claim>
+<doc-claim><p>Oneshot có hình trước implementation nhưng không thêm duyệt.</p><doc-flow caption="Nguồn: authoring.md / Thời điểm; bmad-build activation; adaptive-coding-flow.md. Task trivial dùng ngoại lệ hiện có."><script type="text/plain">
+intent = Inspect intent / Pattern và verification đã rõ
+plan = Markdown plan / Route oneshot
+html = HTML nếu cần hình / Pack; xem; giao link
+worker = Implement / Một worker theo policy hiện có
+verify = Verification / Trước independent review
+review = Quick review / Trừ explicit none
+intent -> plan
+plan -> html
+html -> worker
+worker -> verify
+verify -> review
+</script></doc-flow></doc-claim>
+<doc-claim><p>Spec tạo HTML sau Self-Validate và trước Output.</p><doc-flow caption="Nguồn: skills/bmad-spec/SKILL.md và custom/bmad-spec.toml. Headless giữ nguyên schema."><script type="text/plain">
+resolve = Resolve customization / Load contract và phases
+spec = Spec operation / Memlog, SPEC và companions
+validate = Self-Validate / Coherence + Preservation
+html = Author + pack / spec.packed.html; xem browser
+output = Output / Spec folder và link HTML
+resolve -> spec
+spec -> validate
+validate -> html
+html -> output
+</script></doc-flow></doc-claim>
+<doc-claim aux="scope"><p>Markdown và memlog vẫn giữ nguồn chuẩn cùng quyền duyệt.</p><ul><li>Không có model alias, gate, workflow hay framework mới.</li><li>Đây là bản đồ workflow; agent phải tạo plan/spec HTML riêng cho task thật.</li><li><a href="_bmad/custom/html-plan/authoring.md">Authoring contract</a> · <a href="_bmad/custom/html-plan/phases.md">Phase instructions</a> · <a href="html-plan-example.html">Ví dụ synthetic đã pack</a></li></ul></doc-claim>
+</doc-plan></main></body></html>

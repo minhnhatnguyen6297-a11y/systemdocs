@@ -1,7 +1,13 @@
 [workflow]
 # Relative file facts resolve under the active project root, not the skill install.
-persistent_facts = ["file:_bmad/custom/html-plan/authoring.md"]
+persistent_facts = ["file:_bmad/custom/html-plan/authoring.md", "file:_bmad/custom/html-plan/phases.md"]
 activation_steps_append = ["""
+Cloud package wiring repair: read {project-root}/_bmad/custom/html-plan/phases.md
+fully now and retain its phase-local instructions while following just-in-time
+step files. Re-read its Build CHECKPOINT 1 section before the existing plan
+presentation, or its oneshot section before implementation (including resume).
+Generate the task-specific packed HTML there; the packaged BMAD-FLOW.html and
+html-plan-example.html are guidance/examples, never substitutes for this task.
 Load {project-root}/_bmad/custom/html-plan/authoring.md and
 {project-root}/_bmad-output/specs/shared/visual-html-plans.md now; keep the
 contract active throughout this build. Resolve the relative file: fact from

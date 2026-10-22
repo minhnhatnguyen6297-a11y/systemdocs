@@ -21,7 +21,7 @@ component dùng chung cho Notary, Upload Lab và các mặt shell.
 
 ## 3. Token chính
 
-Nguồn máy đọc: [`tokens.json`](./tokens.json).
+Nguồn máy đọc: [`tokens.json`](tokens.json).
 
 | Nhóm | Giá trị đã chốt |
 |---|---|
@@ -97,8 +97,8 @@ Lỗi chỉ ở một card thì card đó đổi mặt; không che toàn màn h�
 
 ## 7. Tài sản tham chiếu
 
-- [`prototypes/`](./prototypes/README.md): prototype HTML có dữ liệu giả.
-- [`references/`](./references/README.md): ảnh owner đã duyệt.
+- [`prototypes/`](prototypes/README.md): prototype HTML có dữ liệu giả.
+- [`references/`](references/README.md): ảnh owner đã duyệt.
 - `tokens.json`: giá trị chuẩn; CSS runtime phải ánh xạ từ đây.
 
 ## 8. Lịch sử và câu hỏi

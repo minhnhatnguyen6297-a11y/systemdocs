@@ -1,0 +1,13 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ví dụ HTML plan synthetic</title><link rel="stylesheet" href="_bmad/custom/html-plan/runtime/htmlplan.css"><script src="_bmad/custom/html-plan/runtime/htmlplan.js" defer></script></head><body><header><h1>Ví dụ HTML plan synthetic</h1><details class="thread"><summary>Nguồn ví dụ kiểm tra</summary><doc-quote via="doc" from="Smoke fixture">Ví dụ synthetic kiểm tra runtime, không phải yêu cầu hoặc plan ứng dụng thật.</doc-quote></details></header><main><doc-plan open="1"><doc-claim><p>Người đọc thấy artifact qua từng trạng thái minh họa.</p><doc-machine name="artifact" caption="Synthetic runtime smoke: chọn Đã pack để xem state; không có thao tác ứng dụng thật."><script type="text/plain">
+machine artifact initial authored
+state authored # Đã author
+state packed final # Đã pack
+| authored | packed |
+authored -pack-> packed : Pack HTML
+</script><div data-state="authored"><doc-mock frame="none" w="360" label="Synthetic · chưa phải ứng dụng"><template><section style="font:16px system-ui;padding:20px;background:#f1f5f9;border:1px solid #94a3b8;border-radius:8px;color:#0f172a"><strong>Đã author</strong><p>Claim và exhibit đã sẵn sàng để pack.</p></section></template></doc-mock></div><div data-state="packed"><doc-mock frame="none" w="360" label="Synthetic · chưa phải ứng dụng"><template><section style="font:16px system-ui;padding:20px;background:#ecfdf5;border:1px solid #10b981;border-radius:8px;color:#064e3b"><strong>Đã pack</strong><p>Runtime nằm trong file HTML offline.</p></section></template></doc-mock></div></doc-machine><doc-claim><p>Người đọc theo được bước author tới artifact.</p><doc-flow caption="Luồng synthetic của fixture; không thay flow BMAD."><script type="text/plain">
+author = Author HTML
+pack = Pack HTML
+view = Inspect browser
+author -> pack
+pack -> view
+</script></doc-flow></doc-claim></doc-claim><doc-claim aux="scope"><p>Ví dụ không thay plan thật hoặc tạo quyền duyệt.</p><ul><li>Không có dữ liệu khách, credentials, API, database hay thay đổi ứng dụng.</li><li>Task thật dùng authoring.md và Markdown/spec hiện hành.</li></ul></doc-claim></doc-plan></main></body></html>
