@@ -233,7 +233,7 @@ function createWordDialog(ctx) {
 
       const go = btn('Xuất', 'primary', async () => {
         if (exporting || scanning || savingMeta) return;
-        if (mappingDirty) { notify('Hãy xác nhận và lưu lựa chọn vị trí trước khi xuất', true); return; }
+        if (mappingDirty) { notify('Hãy áp dụng vị trí đã chọn trước khi xuất', true); return; }
         if (postingChanged()) {
           niemYetMsg.textContent = 'Nơi niêm yết đã thay đổi. Hãy bấm “Lưu nơi niêm yết” trước khi xuất.';
           niemYetMsg.className = 'error';
@@ -412,36 +412,28 @@ function createWordDialog(ctx) {
       for (const source of (model.state.docxImport && model.state.docxImport.sources) || []) {
         const sourceRow = h('div', 'cd-toolbar'); originalBox.append(sourceRow);
         const sourceLabel = source.label || `Nguồn ${source.source_id.slice(0, 8)}`;
-        sourceRow.append(btn('Gỡ nguồn Word: ' + sourceLabel, 'ghost sm', async () => {
-          if (exporting || scanning || savingMeta) return;
-          const previousContext = JSON.parse(JSON.stringify(model.state.docxImport));
-          const previousDirty = model.state.stageDirty;
-          const previousCase = model.state.caseId;
+        sourceRow.append(btn('Gỡ nguồn Word: ' + sourceLabel, 'ghost sm', () => {
+          if (exporting || scanning) return;
+          // Gỡ nguồn chỉ sửa docx_import của bản đang sửa; DB ghi ở lần
+          // Lưu hồ sơ kế tiếp.
           if (!model.detachOriginalSource(source.source_id)) return;
-          savingMeta = true;
-          refreshScanLock();
-          let committed = false;
-          try {
-            const saved = await model.commitStage();
-            if (!saved.ok) { notify(saved.error.message || saved.error.code, true); return; }
-            committed = true;
-            if (model.state.caseId !== previousCase || saved.stale) return;
-            if (originalSourceId === source.source_id) { originalSourceId = null; mappingDirty = false; checks = []; listBox.innerHTML = ''; }
-            sourceRow.remove();
-            notify('Đã gỡ nguồn Word; dữ liệu Stage vẫn được giữ');
-          } catch (error) {
-            notify(error.message || 'Không lưu được việc gỡ nguồn Word', true);
-          } finally {
-            if (!committed && model.state.caseId === previousCase) {
-              model.state.docxImport = previousContext;
-              model.state.stageDirty = previousDirty;
-            }
-            savingMeta = false; refreshScanLock();
+          if (originalSourceId === source.source_id) {
+            originalSourceId = null;
+            mappingDirty = false;
+            checks = [];
+            mappingChoices = [];
+            model.state.wordOptions = null;
+            model.state.wordBindingProposals = [];
+            model.state.wordProposalSnapshot = null;
+            listBox.innerHTML = '';
           }
+          sourceRow.remove();
+          refreshScanLock();
+          notify('Đã gỡ nguồn trong bản đang sửa; bấm Lưu hồ sơ để ghi thay đổi.');
         }));
         sourceRow.append(btn('Dùng hợp đồng Word đã nhập: ' + sourceLabel, 'secondary', async () => {
           if (exporting || scanning || savingMeta) return;
-          if (model.hasUnsaved()) { notify('Hãy Cập nhật Stage và Lưu hồ sơ trước khi gắn vị trí', true); return; }
+          if (model.hasUnsaved()) { notify('Hãy Lưu hồ sơ trước khi gắn vị trí.', true); return; }
           originalSourceId = source.source_id;
           mappingDirty = false;
           tplToken = null;
@@ -481,63 +473,26 @@ function createWordDialog(ctx) {
             mappingBox.append(lab);
             choices.push({ proposal, cb });
           }
-          mappingBox.append(btn('Xác nhận và lưu các vị trí đã chọn', 'primary sm', async () => {
-            if (exporting || scanning || savingMeta || originalSourceId !== source.source_id) return;
+          const applyBindings = btn('Áp dụng vị trí vào hồ sơ đang sửa', 'primary sm', () => {
+            if (exporting || scanning || originalSourceId !== source.source_id) return;
             const bindings = choices.filter((c) => c.cb.checked && !c.cb.disabled).map((c) => c.proposal);
-            const previousContext = JSON.parse(JSON.stringify(model.state.docxImport));
-            const previousDirty = model.state.stageDirty;
-            const previousCase = model.state.caseId;
-            if (!model.confirmOriginalBindings(originalSourceId, bindings)) { notify('Hồ sơ đã đổi; hãy tải lại', true); return; }
-            savingMeta = true;
-            for (const choice of choices) choice.cb.disabled = true;
-            refreshScanLock();
-            let committed = false;
-            try {
-              const saved = await model.commitStage();
-              if (!saved.ok) {
-                notify(saved.error.message || saved.error.code, true); return;
-              }
-              committed = true;
-              if (saved.stale || model.state.caseId !== previousCase) return;
-              mappingDirty = false;
-              const loaded = await model.loadWordOptions(null, source.source_id);
-              if (loaded.stale || model.state.caseId !== previousCase) return;
-              if (!loaded.ok) {
-                checks = []; mappingChoices = [];
-                listBox.innerHTML = '';
-                listBox.append(h('div', 'error', 'Đã lưu vị trí Word, nhưng chưa tải lại được danh sách. Chọn lại nguồn Word để thử lại.'));
-                notify('Đã lưu vị trí Word, nhưng tải lại thất bại; chọn lại nguồn để thử lại', true);
-                return;
-              }
-              renderDocs();
-              for (const choice of choices) {
-                const current = (model.state.wordBindingProposals || []).find((p) => p.occurrence_id === choice.proposal.occurrence_id);
-                choice.proposal = current || { ...choice.proposal, supported: false };
-                choice.cb.checked = !!current?.selected;
-                choice.cb.disabled = !current?.supported;
-              }
-              listBox.append(mappingBox);
-              notify('Đã lưu vị trí Word; có thể xuất vào thư mục đích');
-            } catch (error) {
-              if (model.state.caseId !== previousCase) return;
-              if (committed) {
-                checks = []; mappingChoices = []; mappingDirty = false;
-                model.state.wordOptions = null;
-                model.state.wordBindingProposals = [];
-                listBox.innerHTML = '';
-                listBox.append(h('div', 'error', 'Đã lưu vị trí Word, nhưng chưa tải lại được danh sách. Chọn lại nguồn Word để thử lại.'));
-                notify('Đã lưu vị trí Word, nhưng tải lại thất bại; chọn lại nguồn để thử lại', true);
-              } else notify(error.message || 'Không lưu được vị trí Word', true);
-            } finally {
-              if (!committed && model.state.caseId === previousCase) {
-                model.state.docxImport = previousContext;
-                model.state.stageDirty = previousDirty;
-              }
-              savingMeta = false;
-              for (const choice of choices) choice.cb.disabled = !choice.proposal.supported;
-              refreshScanLock();
+            if (!model.confirmOriginalBindings(originalSourceId, bindings)) {
+              notify('Hồ sơ đã đổi; hãy Lưu hồ sơ và mở lại để tải vị trí.', true);
+              return;
             }
-          }));
+            mappingDirty = false;
+            // DB chưa có bindings mới: chỉ cập nhật selected của proposals
+            // đã tải (khớp occurrence_id + slot); supported/reason/value
+            // vẫn là dữ kiện server đã chứng minh.
+            for (const choice of choices) {
+              choice.cb.checked = bindings.some((b) =>
+                b.occurrence_id === choice.proposal.occurrence_id &&
+                b.slot === choice.proposal.slot);
+            }
+            refreshScanLock();
+            notify('Đã áp dụng vị trí vào bản đang sửa. Đóng cửa sổ này và bấm Lưu hồ sơ, rồi mở lại để xuất.');
+          });
+          mappingBox.append(applyBindings);
           listBox.append(mappingBox);
           refreshScanLock();
         }));
