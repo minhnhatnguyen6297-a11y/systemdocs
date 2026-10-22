@@ -1650,11 +1650,17 @@ class CaseWorkspaceService:
                     rid, "row_id", "invalid_format",
                     "row_id đang thuộc hồ sơ khác"))
                 continue
+            explicit = row.get("entity_id")
             allowed = prev.customer_id if prev is not None else None
-            if row.get("entity_id") not in (None, allowed):
-                errors.append(_field_error(
-                    rid, "entity_id", "invalid_format",
-                    "entity_id không phải identity đang gắn dòng này"))
+            if explicit is not None and explicit != allowed:
+                # `entity_id` tường minh trỏ tới Customer có sẵn là cách
+                # người dùng khẳng định dòng này là người đó: gắn lại
+                # identity cho dòng đã có, chỉ giữ dữ kiện của dòng (không
+                # lấy dữ kiện từ identity kia). Dòng mới vẫn phải gửi null.
+                if prev is None or self.db.get(Customer, explicit) is None:
+                    errors.append(_field_error(
+                        rid, "entity_id", "invalid_format",
+                        "entity_id không phải identity đang gắn dòng này"))
         for row in assets_in:
             rid = row.get("row_id")
             prev = existing_assets.get(rid)
@@ -1695,8 +1701,10 @@ class CaseWorkspaceService:
                 _parse_date_or_year(stored_died),
                 _parse_date_or_year(stored_issue),
                 stored_document, stored_address)
-            entity = self._resolve_person_identity(
-                row, previous, person_cache)
+            entity = row.get("entity_id")
+            if entity is None:
+                entity = self._resolve_person_identity(
+                    row, previous, person_cache)
             target = previous
             if target is None:
                 target = CasePersonRow(row_id=rid, case_id=case.id)
