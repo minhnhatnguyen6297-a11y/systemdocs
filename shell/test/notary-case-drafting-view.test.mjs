@@ -2359,3 +2359,38 @@ test('đợt5: lỗi Nhân bản giữ workspace và mở lại nút', async () 
   assert.ok(model.state.duplicatePending, 'lỗi hạ tầng giữ key retry');
   assert.equal(model.state.error.code, 'engine_unavailable');
 });
+
+// G5: lỗi cấp danh sách / lỗi field không có ô đỏ — hộp cảnh báo nổi
+// bật (cd-card-alert) và câu nói rõ thiếu gì, không in mã field thô.
+test('G5: lỗi cấp danh sách assets → hộp cảnh báo nổi bật + câu rõ', async () => {
+  const { model, view } = await build(test, { draft: false });
+  model.state.fieldErrors = [
+    { row_id: null, field: 'assets', code: 'required' }];
+  model.dismissNotice();
+  const card = collect(view.el, (e) => e.classList.contains('cd-assets'))[0];
+  const box = collect(card, (e) => e.classList.contains('cd-card-alert'))[0];
+  assert.ok(box, 'thiếu hộp cảnh báo nổi bật ở card Tài sản');
+  assert.ok(box.classList.contains('cd-row-errors'),
+    'giữ class cũ cho DOM/test hiện có');
+  assert.match(box.textContent, /chưa có tài sản/);
+  assert.doesNotMatch(box.textContent, /Trường bắt buộc chưa có giá trị/);
+});
+
+test('G5: lỗi field người ẩn hiện nhãn dễ hiểu, không in mã thô', async () => {
+  const { model, view } = await build(test, { draft: false });
+  model.state.fieldErrors = [
+    { row_id: 'c1', field: 'noi_cap', code: 'required' }];
+  model.dismissNotice();
+  const card = collect(view.el, (e) => e.classList.contains('cd-people'))[0];
+  const box = collect(card, (e) => e.classList.contains('cd-card-alert'))[0];
+  assert.ok(box, 'thiếu hộp cảnh báo nổi bật ở card Người');
+  assert.match(box.textContent, /Nơi cấp giấy tờ/);
+  assert.doesNotMatch(box.textContent, /noi_cap/);
+  // Field lạ không có trong bảng nhãn → giữ mã thô, không nuốt lỗi.
+  model.state.fieldErrors = [
+    { row_id: 'c1', field: 'field_la_xyz', code: 'required' }];
+  model.dismissNotice();
+  const box2 = collect(view.el,
+    (e) => e.classList.contains('cd-card-alert'))[0];
+  assert.match(box2.textContent, /field_la_xyz/);
+});

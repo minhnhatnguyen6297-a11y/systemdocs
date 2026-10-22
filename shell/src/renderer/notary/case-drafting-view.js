@@ -61,6 +61,22 @@ const PERSON_COLS = [
   ['dia_chi', 'Địa chỉ'],
 ];
 
+// G5: nhãn dễ hiểu cho field người không có cột trên Stage — không in
+// mã snake_case trần cho user. Field lạ giữ mã thô (không nuốt lỗi).
+const PERSON_FIELD_LABELS = {
+  ho_ten: 'Họ tên',
+  gioi_tinh: 'Giới tính',
+  ngay_sinh: 'Ngày sinh',
+  ngay_chet: 'Ngày mất',
+  so_giay_to: 'Số giấy tờ',
+  ngay_cap: 'Ngày cấp',
+  noi_cap: 'Nơi cấp giấy tờ',
+  dia_chi: 'Địa chỉ',
+  place_of_origin: 'Quê quán',
+  loai_giay_to: 'Loại giấy tờ',
+  loai_dia_chi: 'Loại địa chỉ',
+};
+
 // Asset stage rows — 4 hàng đầu khớp bản mẫu + 'land' chip + phần còn
 // lại của ASSET_FIELDS contract §13.3 (không bỏ trường).
 // KHÔNG có 'thoi_han' lẻ (MIN-141 owner chốt): thời hạn chỉ thuộc từng
@@ -699,13 +715,22 @@ function createNotaryModuleView(deps) {
   // field_errors gắn row_id+field → cell err; lỗi cấp danh sách
   // (field 'assets'/'people'/'owner_row_id' hoặc không khớp cột) gom
   // hiển thị trên đầu card tương ứng.
+  // G5: lỗi cấp danh sách không có ô đỏ riêng — hộp cảnh báo nổi bật,
+  // và với code 'required' nói rõ thiếu gì thay vì câu chung của catalog.
+  const CARD_REQUIRED_HINT = {
+    assets: 'Hồ sơ chưa có tài sản nào — thêm ít nhất một tài sản rồi lưu lại.',
+    people: 'Hồ sơ chưa có người nào — thêm ít nhất một người rồi lưu lại.',
+  };
+
   function cardLevelErrors(field) {
     const extra = (model.state.fieldErrors || [])
       .filter((e) => e.field === field);
     if (!extra.length) return null;
-    const box = h('div', 'cd-row-errors');
+    const box = h('div', 'cd-row-errors cd-card-alert');
     for (const er of extra) {
-      box.append(h('div', 'error small', errLine(er)));
+      const text = er.code === 'required' && CARD_REQUIRED_HINT[field]
+        ? CARD_REQUIRED_HINT[field] : errLine(er);
+      box.append(h('div', 'error small', text));
     }
     return box;
   }
@@ -1860,10 +1885,11 @@ function createNotaryModuleView(deps) {
     const extra = (model.state.fieldErrors || []).filter((e) =>
       e.row_id != null && rows.has(e.row_id) && !shown.has(e.field));
     if (!extra.length) return null;
-    const box = h('div', 'cd-row-errors');
+    const box = h('div', 'cd-row-errors cd-card-alert');
     for (const er of extra) {
+      const label = PERSON_FIELD_LABELS[er.field] || er.field;
       box.append(h('div', 'error small',
-        `${rows.get(er.row_id)} · ${er.field}: ${errLine(er)}`));
+        `${rows.get(er.row_id)} · ${label}: ${errLine(er)}`));
     }
     return box;
   }

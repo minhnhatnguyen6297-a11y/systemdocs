@@ -923,14 +923,7 @@ function createModel(deps) {
     if (s !== session) return r;      // nhap da bi thay — bo response
     if (!r.ok) {
       const err = r.error || errObj('unknown');
-      if (err.code === 'stage_validation_error') {
-        state.fieldErrors =
-          (err.details && err.details.field_errors) || [];
-      } else if (err.code === 'diagram_invalid_state') {
-        state.diagramErrors =
-          (err.details && err.details.errors) || [err];
-      }
-      state.error = err;
+      if (!applyStageWriteError(err)) state.error = err;
       emit();
       return r;
     }
@@ -995,13 +988,7 @@ function createModel(deps) {
     state.busy = null;
     if (!r.ok) {
       const err = r.error || errObj('unknown');
-      if (err.code === 'stage_validation_error') {
-        state.fieldErrors =
-          (err.details && err.details.field_errors) || [];
-      } else if (err.code === 'diagram_invalid_state') {
-        state.diagramErrors =
-          (err.details && err.details.errors) || [err];
-      } else {
+      if (!applyStageWriteError(err)) {
         applyWriteResult(r, 'workspace_save_case');
       }
       emit();
@@ -1264,6 +1251,29 @@ function createModel(deps) {
     return !state.stage.people.length && !state.stage.assets.length;
   }
 
+  // Loi hien thi phai la ket qua cua lan ghi GAN NHAT: chi mot kenh loi
+  // duoc bat moi lan, khong treo banner/o do cua lan thao tac truoc.
+  // Tra true khi loi da thuoc kenh field/diagram (khong dat state.error).
+  function applyStageWriteError(err) {
+    if (err.code === 'stage_validation_error') {
+      state.fieldErrors = (err.details && err.details.field_errors) || [];
+      state.diagramErrors = [];
+      state.error = null;
+      return true;
+    }
+    if (err.code === 'diagram_invalid_state') {
+      state.diagramErrors = (err.details && err.details.errors) || [err];
+      state.fieldErrors = [];
+      state.error = null;
+      return true;
+    }
+    // Loi khac (owner_required/conflict/locked/unknown...) — fieldErrors/
+    // diagramErrors thuoc lan truoc, khong con la ket qua hien tai.
+    state.fieldErrors = [];
+    state.diagramErrors = [];
+    return false;
+  }
+
   function applyWriteResult(r, command) {
     // Map loi ghi vao state; tra false neu la loi nghiep vu da xu ly.
     const err = r.error || errObj('unknown');
@@ -1320,13 +1330,9 @@ function createModel(deps) {
     if (s !== session) return r;
     if (!r.ok) {
       const err = r.error || errObj('unknown');
-      if (err.code === 'stage_validation_error') {
-        state.fieldErrors =
-          (err.details && err.details.field_errors) || [];
-        emit();
-        return r;
+      if (!applyStageWriteError(err)) {
+        applyWriteResult(r, 'workspace_commit_stage');
       }
-      applyWriteResult(r, 'workspace_commit_stage');
       emit();
       return r;
     }
@@ -1374,6 +1380,7 @@ function createModel(deps) {
       state.committedCaseInfo = clone(state.caseInfo);
     }
     state.fieldErrors = [];
+    state.diagramErrors = [];     // commit da evaluate lai so do phia server
     state.stale = false;
     state.error = null;            // ghi thanh cong → loi cu khong con dung
     state.notice = 'Đã cập nhật Stage';

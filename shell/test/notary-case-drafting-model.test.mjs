@@ -3241,3 +3241,74 @@ test('duplicateCase: lỗi nghiệp vụ không giữ key; stale response không
   assert.equal(model.state.caseId, 42, 'response bản sao của phiên cũ bị bỏ');
   assert.equal(model.state.duplicating, null);
 });
+
+// G3: trang thai loi hien thi phai thay the theo lan ghi gan nhat —
+// banner cu (state.error) khong duoc treo qua lan bam sau.
+function scriptedFailClient(responses) {
+  let i = 0;
+  return { run: async () => responses[Math.min(i++, responses.length - 1)] };
+}
+
+test('G3 saveCase: moi lan loi chi bat dung kenh cua lan do', async () => {
+  const owner = { ok: false, error: {
+    code: 'workspace_owner_required', message: 'chua chon owner' } };
+  const field = { ok: false, error: {
+    code: 'stage_validation_error', message: 'loi field',
+    details: { field_errors: [{ row_id: 'c1', field: 'ho_ten',
+                                code: 'required', message: 'bat buoc' }] } } };
+  const diagram = { ok: false, error: {
+    code: 'diagram_invalid_state', message: 'so do sai',
+    details: { errors: [{ code: 'missing_land_owner',
+                          message: 'thieu chu dat' }] } } };
+  const model = seedSaveCaseModel(
+    scriptedFailClient([owner, field, diagram, owner]));
+
+  // (a) loi thuong → banner bat, khong co loi field/diagram
+  const r1 = await model.saveCase();
+  assert.equal(r1.ok, false);
+  assert.equal(model.state.error.code, 'workspace_owner_required');
+  assert.deepEqual(model.state.fieldErrors, []);
+  assert.deepEqual(model.state.diagramErrors, []);
+
+  // (b) stage_validation_error → fieldErrors moi, banner tat
+  const r2 = await model.saveCase();
+  assert.equal(r2.error.code, 'stage_validation_error');
+  assert.equal(model.state.error, null, 'banner cua lan truoc phai tat');
+  assert.equal(model.state.fieldErrors.length, 1);
+  assert.equal(model.state.fieldErrors[0].field, 'ho_ten');
+  assert.deepEqual(model.state.diagramErrors, []);
+
+  // (c) diagram_invalid_state → diagramErrors moi, fieldErrors + banner sach
+  const r3 = await model.saveCase();
+  assert.equal(r3.error.code, 'diagram_invalid_state');
+  assert.equal(model.state.error, null);
+  assert.deepEqual(model.state.fieldErrors, []);
+  assert.equal(model.state.diagramErrors.length, 1);
+  assert.equal(model.state.diagramErrors[0].code, 'missing_land_owner');
+
+  // (d) loi thuong lai → ca hai kenh field/diagram sach, banner moi
+  const r4 = await model.saveCase();
+  assert.equal(r4.error.code, 'workspace_owner_required');
+  assert.equal(model.state.error.code, 'workspace_owner_required');
+  assert.deepEqual(model.state.fieldErrors, []);
+  assert.deepEqual(model.state.diagramErrors, []);
+});
+
+test('G3 commitStage: stage_validation_error tat banner cu', async () => {
+  const field = { ok: false, error: {
+    code: 'stage_validation_error', message: 'loi field',
+    details: { field_errors: [{ row_id: 'a1', field: 'so_serial',
+                                code: 'required', message: 'bat buoc' }] } } };
+  const model = seedSaveCaseModel(scriptedFailClient([field]));
+  model.state.stageDirty = true;
+  model.state.error = { code: 'workspace_owner_required', message: 'cu' };
+  model.state.diagramErrors = [{ code: 'missing_land_owner' }];
+
+  const r = await model.commitStage();
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, 'stage_validation_error');
+  assert.equal(model.state.error, null, 'banner cu phai tat');
+  assert.equal(model.state.fieldErrors.length, 1);
+  assert.equal(model.state.fieldErrors[0].field, 'so_serial');
+  assert.deepEqual(model.state.diagramErrors, []);
+});
