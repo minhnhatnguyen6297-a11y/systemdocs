@@ -184,8 +184,14 @@ Word; UI legacy giới hạn); **BUILT bounded**, chưa nghiệm thu toàn #41.
 4. Hồ sơ đã lưu giữ snapshot riêng; dữ liệu mới nơi khác không tự cập nhật
    ngược. Tìm Người để xem đã làm những Hồ sơ gì, không trải mọi lần đổi trường
    thành danh sách phiên bản Người.
-5. Thiếu điểm neo không gom theo rỗng, không chặn lưu Nháp. Mốc “mới nhất”,
-   Nháp thiếu trường làm nguồn hay không, chi tiết so sánh/chuyển ID cũ còn mở.
+5. **Owner 22/10:** lấy theo Hồ sơ lưu gần nhất, chỉ nguồn `done`, loại `draft`.
+   Tên đối chiếu không phân biệt dấu/hoa-thường, giữ nguyên tên hiển thị/xuất.
+   Thiếu điểm neo không gom; ID trùng cũ giữ nguyên, không tự hợp nhất, lấy bộ
+   cuối cùng. Cùng serial vẫn gom cùng ID dù khác thửa; Nhân bản toàn bộ nội dung.
+6. Owner yêu cầu đổi **Lưu sơ đồ** thành **Lưu hồ sơ**, ghi Diagram và chuyển
+   `draft` → `done`; sau đó dừng code để mô phỏng thứ tự nhập/Cập nhật/Lưu hồ sơ.
+   Lifecycle ID khi thiếu/bổ sung/đổi neo và ghi quan hệ đang rà soát. Các đoạn
+   mô tả nút Lưu sơ đồ bên dưới vẫn là hiện trạng, chưa phải thay đổi đã built.
 
 Một bảng Người cho sống/chết. Luồng gợi ý CCCD/user chọn/bỏ qua tạo ID mới và
 “thông tin liên kết” cũ ở [#44](../../backlog/story-person-cccd-suggestion-link.md)
@@ -194,6 +200,7 @@ hoặc tự ghép trường giữa văn bản. Địa chỉ cũ–mới do sáp 
 tại; chưa chọn mô hình mới hoặc duyệt đề xuất mã tham chiếu từ các ô địa chỉ.
 #41 OPEN/gate mẫu ĐÓNG, #42 độc lập; giữ nguồn và dữ liệu đã có.
 [Quyết định](../../decisions/decision-owner-entity-anchors-case-snapshots-20261021.md).
+[Làm rõ và rà soát 22/10](../../decisions/decision-owner-data-entry-save-rules-20261022.md).
 
 Tên và định dạng trường giữ chuẩn DB; alias cũ cần ánh xạ. Hai alias của cùng trường trái nhau phải báo lỗi, không chọn ngầm. Cụm đất lưu `property_land_rows`, duy nhất theo tài sản và vị trí; JSON cũ chỉ tương thích. Tên token cụm viết đủ `loaidat<M><N>`, `dientich<M><N>`, `thoihan<M><N>`: M là cụm, N là tài sản; không thêm dạng rút gọn gây lẫn cụm 12 với tài sản 2.
 

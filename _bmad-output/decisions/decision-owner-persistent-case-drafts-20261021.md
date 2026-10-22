@@ -25,6 +25,12 @@ Owner: “tôi duyệt phần hồ sơ nháp vẫn lưu database nhưng đóng n
 
 ## Phần còn mở
 
+**Làm rõ 22/10:** nguồn tra cứu loại draft, lấy Hồ sơ done được lưu gần nhất;
+owner yêu cầu Lưu hồ sơ ghi Diagram và chuyển draft→done, Nhân bản toàn bộ.
+Đang dừng trước code để rà soát ID khi nhập dở, thứ tự Cập nhật/Lưu hồ sơ và
+sửa Hồ sơ done; [quyết định mới](decision-owner-data-entry-save-rules-20261022.md).
+Các mục dưới giữ bối cảnh còn mở tại thời điểm quyết định ban đầu.
+
 - Mốc nghiệp vụ chuyển khỏi Nháp; từng loại thống kê/báo cáo tính Nháp ra
   sao, tiêu chí lọc và mặc định hiển thị. Nhãn rõ không tự quyết đáp án này.
 - Bảng/cột/cấu trúc lưu nháp, thời điểm tạo liên kết Người/Tài sản, ranh giới

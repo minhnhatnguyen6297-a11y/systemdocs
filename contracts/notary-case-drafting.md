@@ -309,9 +309,12 @@ Không bắt user chọn liên kết hay phiên bản. Khi lấy Người/Tài s
 mặc định bộ mới nhất; mỗi Hồ sơ đã lưu giữ snapshot riêng, không tự cập nhật
 ngược, user vẫn sửa thủ công được. Các bộ khác nhau giữ qua những Hồ sơ đó;
 không lưu chuỗi thay đổi từng ô/lần lưu. Tìm Người nhằm xem các Hồ sơ đã làm.
-Thiếu điểm neo không gom theo rỗng, không chặn lưu Nháp. Mốc “mới nhất”, Nháp
-thiếu trường làm nguồn hay không, chi tiết so sánh và xử lý ID cũ trùng neo còn
-thiết kế; không tự ghép trường giữa nhiều văn bản để tạo bộ đầy đủ nhất.
+**Owner 22/10:** mới nhất theo Hồ sơ lưu gần nhất, chỉ nguồn `done`, loại `draft`.
+Tên so không phân biệt dấu/hoa-thường nhưng giữ tên gốc. Thiếu điểm neo không
+gom, không chặn lưu Nháp. ID trùng cũ giữ nguyên, không tự hợp nhất; lấy bộ cuối.
+Cùng serial dù khác thửa vẫn cùng ID; Nhân bản toàn bộ nội dung Hồ sơ. Lifecycle
+ID khi nhập dở và hai bước Cập nhật/Lưu hồ sơ đang rà soát, chưa triển khai;
+không tự ghép trường giữa nhiều văn bản để tạo bộ đầy đủ nhất.
 Một bảng Người cho sống/chết; thiếu ngày chết không suy còn sống. Luồng gợi ý
 CCCD/user chọn/bỏ qua tạo mới và “thông tin liên kết” ở #44 đã bị thay thế,
 không phải yêu cầu mặc định. Runtime ở trên chưa thực hiện policy mới.

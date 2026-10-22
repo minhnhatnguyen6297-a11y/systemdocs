@@ -248,9 +248,11 @@ Một bảng Người cho sống/chết; ID kỹ thuật vẫn là `Customer.id`
 - Mỗi Hồ sơ đã lưu giữ snapshot riêng, kể cả null; dữ liệu mới ở nơi khác
   không tự đổi Hồ sơ cũ. User có thể sửa trực tiếp Hồ sơ theo quyền hiện hành.
   Các bộ thông tin khác nhau vẫn giữ qua các Hồ sơ, không thêm lịch sử từng ô.
-- Thiếu tên/số chưa đủ để gom; không gom theo rỗng hoặc chặn lưu Nháp.
-  Cách cấp ID cho dòng thiếu dữ liệu, chi tiết so sánh tên/số, chọn mốc
-  “mới nhất” và xử lý nhiều ID cũ cùng điểm neo còn thiết kế.
+- **Owner 22/10:** tên so không phân biệt dấu/hoa-thường, giữ tên gốc; không
+  mở thành fuzzy tùy ý. Mới nhất theo Hồ sơ lưu gần nhất, chỉ nguồn `done`,
+  không `draft`. Nhiều ID trùng cũ giữ nguyên, không tự hợp nhất; lấy bộ cuối.
+  Thiếu tên/số không gom và không chặn lưu Nháp. Lifecycle ID của dòng đang
+  nhập dở qua nhiều lần Cập nhật/Lưu hồ sơ đang rà soát, chưa chọn schema.
 - Quy tắc gom ID không cho phép tự bổ sung dữ kiện giữa văn bản, xác nhận
   dữ kiện thay user hoặc xóa/hợp nhất dữ liệu lịch sử. Không suy còn sống
   từ ngày chết null. Không áp mô hình “thông tin liên kết” của policy cũ

@@ -62,6 +62,11 @@ gộp hai Hồ sơ thành một hoặc nâng dữ kiện chưa xác nhận thàn
 
 ## Phần thiết kế còn mở
 
+Mục này ghi trạng thái tại 21/10. Owner đã trả lời mốc mới nhất, loại draft,
+đối chiếu tên, ID trùng cũ, serial và phạm vi Nhân bản trong
+[quyết định 22/10](decision-owner-data-entry-save-rules-20261022.md); hai bước
+ghi và lifecycle ID khi nhập dở đang được rà soát trước code.
+
 - “Mới nhất” được xếp theo mốc nào; Nháp thiếu trường có được làm nguồn mặc
   định hay không. Chưa chọn lấy theo lần lưu, ngày giấy tờ hoặc ngày nghiệp vụ;
   không tự ghép từng trường của nhiều Hồ sơ để tạo một bộ “đầy đủ nhất”.

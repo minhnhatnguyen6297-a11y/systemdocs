@@ -135,15 +135,21 @@ tục file đã rõ. Không tắt production Scan/Upload; quyền runtime đã c
   Tài sản gom theo **serial** giữ nguyên văn. Không đòi user bấm liên kết hoặc
   chọn phiên bản. Tìm Người để xem các Hồ sơ đã làm. Một bảng Người cho sống/chết.
   Khi lấy vào Hồ sơ mới mặc định bộ mới nhất; Hồ sơ đã lưu không tự cập nhật.
-  Thiếu điểm neo không gom theo rỗng và không chặn lưu Nháp. Chi tiết so sánh,
-  mốc “mới nhất”, Nháp thiếu trường làm nguồn hay không, chuyển ID cũ trùng neo
-  và schema còn thiết kế. Không tự ghép trường giữa nhiều Hồ sơ/văn bản.
+  **Owner 22/10:** bộ mới nhất theo Hồ sơ được lưu gần nhất, chỉ nguồn `done`,
+  loại `draft`; không theo ngày giấy hoặc độ đầy đủ. Tên đối chiếu không phân
+  biệt dấu/hoa-thường, giữ nguyên tên gốc; không tự mở thành so gần đúng tùy ý.
+  Thiếu điểm neo không gom và không chặn lưu Nháp. ID trùng cũ giữ nguyên,
+  không tự hợp nhất, lấy bộ cuối cùng; lịch sử user xử lý. Cùng serial vẫn gom
+  cùng ID dù khác thửa, không thêm điều kiện thửa/tờ. Nhân bản toàn bộ nội dung.
+  Cách giữ/đổi ID khi bổ sung neo, hai bước ghi và schema đang rà soát; chưa code.
+  Không tự ghép trường giữa nhiều Hồ sơ/văn bản.
   Policy gợi ý CCCD/user chọn/bỏ qua tạo ID mới và kho “thông tin liên kết”
   trước đó đã bị thay thế; [#44](../../backlog/story-person-cccd-suggestion-link.md)
   chưa sẵn sàng triển khai theo tiêu chí cũ. Không khôi phục CCCD UNIQUE/chặn
   luồng. Runtime cũ chưa thực hiện điểm neo mới; giữ Case links/raw/history/
   snapshot null. #41 OPEN/gate mẫu ĐÓNG, #42 độc lập.
   [Quyết định](../../decisions/decision-owner-entity-anchors-case-snapshots-20261021.md).
+  [Làm rõ 22/10 và yêu cầu dừng code](../../decisions/decision-owner-data-entry-save-rules-20261022.md).
 - **Địa chỉ cũ–mới — owner kết phiên 21/10:** tạm thời giữ cách hiện tại.
   Chưa chốt mô hình mới; đề xuất danh mục/quan hệ chuyển đổi và mã tham chiếu
   từ các trường địa chỉ chưa được duyệt. Không đổi cấu trúc/hành vi theo đề

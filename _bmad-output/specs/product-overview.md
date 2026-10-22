@@ -75,14 +75,19 @@ Khi lấy lại dữ liệu vào Hồ sơ mới mặc định bộ mới nhất,
 Tra cứu Người nhằm xem các Hồ sơ đã làm. Người sống/chết cùng bảng; địa chỉ
 cũ–mới tạm giữ cách hiện tại, mô hình mới chưa chốt. Thiếu điểm neo không gom
 rỗng, không chặn lưu Nháp.
-Mốc “mới nhất”/Nháp thiếu trường làm nguồn hay không, so sánh/chuyển ID cũ và
-schema tiếp tục thiết kế. Policy gợi ý CCCD/user chọn/bỏ qua tạo mới ở
+**Owner 22/10:** mới nhất theo Hồ sơ lưu gần nhất, chỉ nguồn done, không draft;
+tên so không phân biệt dấu/hoa-thường, giữ tên gốc. ID trùng cũ giữ nguyên,
+không tự hợp nhất; cùng serial dù khác thửa vẫn cùng ID. Nhân bản toàn bộ.
+Đổi Lưu sơ đồ thành Lưu hồ sơ để ghi Diagram/draft→done và copy/paste Excel
+đã được giao, **đang dừng trước code để rà soát** ID khi nhập dở và hai bước
+Cập nhật/Lưu hồ sơ. Chưa sửa runtime hoặc chọn schema. Policy cũ ở
 [#44](../backlog/story-person-cccd-suggestion-link.md) đã bị thay thế;
 không dùng tiêu chí cũ để triển khai hoặc khôi phục CCCD UNIQUE/chặn luồng.
 `f6d53b5` vẫn không tự tìm theo tên/số, có cập nhật master qua ID rõ; chưa
 thực hiện policy mới. Không tự ghép dữ kiện giữa văn bản/đổi snapshot nơi khác.
 #41 OPEN/gate mẫu ĐÓNG, #42 độc lập; chưa sửa runtime/schema/DB/mẫu.
 [Quyết định](../decisions/decision-owner-entity-anchors-case-snapshots-20261021.md).
+[Làm rõ và lượt rà soát 22/10](../decisions/decision-owner-data-entry-save-rules-20261022.md).
 **Pháp nhân (owner 20/10/2026):** không đưa vào Người; policy nhập tay chung
 có ngoại lệ ngân hàng thế chấp **app tự lấy** bên dưới. Bảng riêng tương lai
 chưa duyệt schema/build; không bịa/default. **Cụm trường phụ website** theo hướng owner cho phép có điều kiện cho một ô

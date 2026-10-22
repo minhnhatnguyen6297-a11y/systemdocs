@@ -64,14 +64,19 @@ Electron là vỏ ứng dụng; Python/FastAPI xử lý nghiệp vụ. Module gi
   nguyên văn. Người sống/chết cùng bảng. Tìm Người để xem các Hồ sơ đã làm;
   lấy dữ liệu vào Hồ sơ mới mặc định bộ mới nhất, không chọn liên kết/phiên bản.
   Policy gợi ý CCCD/user chọn/bỏ qua tạo ID mới ở #44 đã bị thay thế; không
-  khôi phục CCCD UNIQUE/chặn luồng. Chi tiết so sánh/mốc mới nhất/Nháp thiếu
-  trường/chuyển ID cũ và cấu trúc bảng còn thiết kế; không coi đã implemented.
+  khôi phục CCCD UNIQUE/chặn luồng. **Owner 22/10:** tên đối chiếu không phân
+  biệt dấu/hoa-thường, giữ tên gốc. Nguồn là Hồ sơ done lưu gần nhất, không
+  draft. ID trùng cũ giữ nguyên, lấy bộ cuối; cùng serial dù khác thửa vẫn
+  cùng ID. Thiếu neo không gom; Nhân bản toàn bộ. Lifecycle ID khi nhập dở
+  và cấu trúc bảng còn rà soát, chưa implemented.
   [Quyết định](../decisions/decision-owner-entity-anchors-case-snapshots-20261021.md).
 - **Snapshot — owner 21/10:** record nghiệp vụ là Hồ sơ; mỗi Hồ sơ một snapshot
   hiện hành. Lưu lại thay snapshot đó, không lưu lịch sử từng ô/lần lưu. Các
   bộ thông tin khác nhau của cùng ID giữ qua những Hồ sơ liên quan. Hồ sơ cũ
   chỉ user sửa thủ công, không tự đổi theo dữ liệu mới nơi khác. Nháp được lưu
-  DB dù nhập thiếu, nhãn Nháp rõ; mốc hoàn thiện/cách tính báo cáo chưa chốt.
+  DB dù nhập thiếu, nhãn Nháp rõ. Owner 22/10 yêu cầu Lưu hồ sơ ghi Diagram và
+  draft→done, đang dừng trước code để rà soát hai bước Cập nhật/Lưu hồ sơ;
+  cách tính từng báo cáo chưa chốt.
   Raw/nguồn/history kỹ thuật đã có vẫn giữ; #41 OPEN/gate mẫu ĐÓNG, #42 độc lập.
 - **Địa chỉ cũ–mới — owner kết phiên 21/10:** tạm giữ cách hiện tại; mô hình
   mới chưa chốt. Đề xuất danh mục/quan hệ chuyển đổi và mã tham chiếu từ các
