@@ -812,9 +812,8 @@ function createNotaryModuleView(deps) {
     if (model.hasUnsaved()) {
       const okGo = await confirm({
         title: 'Thay đổi chưa lưu',
-        body: 'Các thay đổi hiện tại chưa được ghi vào cơ sở dữ liệu. Tạo ' +
-          'hồ sơ mới sẽ mất các thay đổi này. Bấm Lưu hồ sơ trước nếu ' +
-          'muốn lưu.',
+        body: 'Bản nháp hiện tại còn thay đổi chưa lưu — tạo hồ sơ ' +
+          'mới sẽ mất bản nháp này.',
         confirmLabel: 'Bỏ nháp, tạo mới',
         cancelLabel: 'Ở lại',
       });
@@ -840,9 +839,8 @@ function createNotaryModuleView(deps) {
     if (model.hasUnsaved()) {
       const okGo = await confirm({
         title: 'Thay đổi chưa lưu',
-        body: 'Các thay đổi hiện tại chưa được ghi vào cơ sở dữ liệu. Nhân ' +
-          'bản và mở hồ sơ khác sẽ mất các thay đổi này. Bấm Lưu hồ sơ ' +
-          'trước nếu muốn lưu.',
+        body: 'Bản nháp hiện tại còn thay đổi chưa lưu — nhân bản hồ sơ ' +
+          'khác sẽ mất bản nháp này.',
         confirmLabel: 'Bỏ nháp, nhân bản',
         cancelLabel: 'Ở lại',
       });
@@ -1674,7 +1672,7 @@ function createNotaryModuleView(deps) {
       if (!ro) {
         const del = h('button', 'icon-x', '×');
         del.type = 'button';
-        del.title = 'Xóa dòng khỏi bản đang sửa — ghi vào hồ sơ khi bấm Lưu hồ sơ.';
+        del.title = 'Xóa dòng (hiệu lực khi Lưu hồ sơ)';
         del.dataset.fid = `pdel:${p.row_id}`;
         del.setAttribute('aria-label',
           `Xóa ${p.ho_ten || `dòng ${ri + 1}`}`);
@@ -2118,9 +2116,8 @@ function createNotaryModuleView(deps) {
     if (model.hasUnsaved()) {
       const ok = await confirm({
         title: 'Thay đổi chưa lưu',
-        body: 'Các thay đổi hiện tại chưa được ghi vào cơ sở dữ liệu. Mở ' +
-          'hồ sơ khác sẽ mất các thay đổi này. Bấm Lưu hồ sơ trước nếu ' +
-          'muốn lưu.',
+        body: 'Stage/Sơ đồ còn bản nháp chưa lưu — mở hồ sơ khác sẽ mất ' +
+          'bản nháp hiện tại.',
         confirmLabel: 'Bỏ nháp và mở',
         cancelLabel: 'Ở lại',
       });

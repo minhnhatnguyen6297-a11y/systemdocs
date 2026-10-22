@@ -429,7 +429,7 @@ function createWordDialog(ctx) {
           }
           sourceRow.remove();
           refreshScanLock();
-          notify('Đã gỡ nguồn trong bản đang sửa; bấm Lưu hồ sơ để ghi thay đổi.');
+          notify('Đã gỡ nguồn Word; dữ liệu Stage vẫn được giữ');
         }));
         sourceRow.append(btn('Dùng hợp đồng Word đã nhập: ' + sourceLabel, 'secondary', async () => {
           if (exporting || scanning || savingMeta) return;
@@ -473,7 +473,7 @@ function createWordDialog(ctx) {
             mappingBox.append(lab);
             choices.push({ proposal, cb });
           }
-          const applyBindings = btn('Áp dụng vị trí vào hồ sơ đang sửa', 'primary sm', () => {
+          const applyBindings = btn('Áp dụng vị trí đã chọn', 'primary sm', () => {
             if (exporting || scanning || originalSourceId !== source.source_id) return;
             const bindings = choices.filter((c) => c.cb.checked && !c.cb.disabled).map((c) => c.proposal);
             if (!model.confirmOriginalBindings(originalSourceId, bindings)) {
@@ -490,7 +490,7 @@ function createWordDialog(ctx) {
                 b.slot === choice.proposal.slot);
             }
             refreshScanLock();
-            notify('Đã áp dụng vị trí vào bản đang sửa. Đóng cửa sổ này và bấm Lưu hồ sơ, rồi mở lại để xuất.');
+            notify('Đã áp dụng vị trí vào hồ sơ đang sửa.');
           });
           mappingBox.append(applyBindings);
           listBox.append(mappingBox);

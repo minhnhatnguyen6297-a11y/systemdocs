@@ -625,9 +625,8 @@ function buildNotaryView(entry, mod) {
       if (!view.hasUnsaved()) return true;
       return confirmModal({
         title: 'Thay đổi chưa lưu',
-        body: 'Các thay đổi chưa được ghi vào cơ sở dữ liệu. Rời màn hình ' +
-          'chỉ giữ bản nháp trong phiên; đóng ứng dụng sẽ mất các thay ' +
-          'đổi này. Bấm Lưu hồ sơ trước nếu muốn lưu.',
+        body: 'Stage/Sơ đồ còn bản nháp chưa lưu — rời màn hình sẽ giữ ' +
+          'nháp trong phiên nhưng không ghi vào hồ sơ.',
         confirmLabel: 'Rời màn hình',
         cancelLabel: 'Ở lại',
       });

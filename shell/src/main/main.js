@@ -222,11 +222,10 @@ function createWindow() {
       title: active ? 'Còn job đang chạy' : 'Thay đổi chưa lưu',
       message: [
         active ? `Còn ${active} job chưa kết thúc.` : null,
-        rendererDirty ? 'Hồ sơ còn thay đổi chưa được ghi vào cơ sở dữ liệu.'
-          : null,
+        rendererDirty ? 'Stage/Sơ đồ còn bản nháp chưa lưu.' : null,
       ].filter(Boolean).join(' '),
-      detail: 'Thoát sẽ dừng engine (job chuyển canceled) và mất các thay ' +
-        'đổi chưa lưu trong phiên. Bấm Lưu hồ sơ trước nếu muốn lưu.',
+      detail: 'Thoát sẽ dừng engine (job chuyển canceled) và mất bản nháp ' +
+        'chưa lưu trong phiên.',
     });
     if (r.response === 1) {
       allowClose = true;
