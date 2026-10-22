@@ -1711,9 +1711,9 @@ function createNotaryModuleView(deps) {
   }
 
   // --- Ba dòng meta hồ sơ dưới Tài sản (MIN-141 đợt 3) ---
-  // Nơi niêm yết / Người nhận ủy quyền / Nội dung việc — cùng đi qua
-  // model.updateCaseMeta → payload.case trong workspace_create (nháp)
-  // hoặc workspace_commit_stage (case thật, cùng transaction Stage).
+  // Nơi niêm yết / Người nhận ủy quyền / Nội dung việc — sửa local, đi
+  // cùng Stage+Diagram trong một workspace_save_case khi bấm Lưu hồ sơ
+  // (case mới: kèm idempotency_key; case cũ: kèm case_id/base_revision).
   // Danh bạ ủy quyền = notary.customer_list — chọn tên khớp danh bạ sẽ
   // neo customers.id ổn định; gõ tên ngoài danh bạ = free text (id null).
   const UQ_DATALIST_ID = 'cd-uq-catalog';
