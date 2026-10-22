@@ -3,7 +3,7 @@
     "issue": "13",
     "commit": "storage-b-foundation",
     "muc_dich": "Du lieu tong hop cho test nen Storage B (notary_v2/models.py). Khong phai ho so khach, khong chua PII that.",
-    "nguon_dap_an": "issue13-b-phase2-design-20261022.md Phan 7 — dap an chot doc lap voi code, khong lay output service/parser lam dap an.",
+    "nguon_dap_an": "issue13-b-phase2-design-20261022.md Phan 7 — dap an chot doc lap voi code, khong lay output service/parser lam dap an. F8: issue13-b-round2-design-20261022.md §5 (resolver nguon Done theo moc luu).",
     "uuid_pattern": "00000000-0000-4000-8000-000000000NNN (UUID v4 co dinh; NNN theo thiet ke: nguoi 101-103/111/301, tai san 201-204).",
     "quy_uoc": {
       "field_khong_neu": "null",
@@ -660,6 +660,47 @@
           "Chi ten (khong so) => identity null, khong match.",
           "Bien the 'chi so, khong ten' da bo theo chinh sua F3."
         ]
+      }
+    },
+    {
+      "alias": "F8",
+      "ten": "Nguồn Done theo mốc lưu, không theo giấy hoặc độ đầy đủ",
+      "insert_case_moi": false,
+      "metadata": {},
+      "people": [],
+      "assets": [],
+      "scenario": {
+        "aliases": {
+          "F8A": {"case_template": "F1", "person_suffixes": [801, 802, 803], "asset_suffixes": [811]},
+          "F8B": {"case_template": "F6B", "person_suffixes": [804], "asset_suffixes": [812]},
+          "F8C": {"case_template": "F3", "person_suffixes": [805], "asset_suffixes": []}
+        },
+        "overrides": {
+          "F8A": {"people": {"P101": {"ngay_cap": "2026-10-21"}}},
+          "F8B": {"people": {"P111": {"dia_chi": null}}, "assets": {"T205": {"land_rows": []}}},
+          "F8C": {"assets": [], "owner_row_id": null}
+        },
+        "actions": [
+          {"thu_tu": 1, "action": "source_latest", "checkpoint": "empty"},
+          {"thu_tu": 2, "action": "save_case_new", "case": "F8A", "saved_at": "2026-10-22T08:00:00.100001Z"},
+          {"thu_tu": 3, "action": "save_case_new", "case": "F8B", "saved_at": "2026-10-22T08:00:00.100002Z"},
+          {"thu_tu": 4, "action": "create_draft", "case": "F8C", "saved_at": "2026-10-22T08:00:00.100003Z"},
+          {"thu_tu": 5, "action": "source_latest", "checkpoint": "after_b_and_c"},
+          {"thu_tu": 6, "action": "force_equal_saved_at", "cases": ["F8A", "F8B"], "saved_at": "2026-10-22T08:00:01.000000Z"},
+          {"thu_tu": 7, "action": "source_latest", "checkpoint": "absolute_tie"},
+          {"thu_tu": 8, "action": "commit_stage", "case": "F8A", "saved_at": "2026-10-22T08:00:01.000001Z", "override": {"P102": {"dia_chi": "Khu Giả Lập F8A sau Cập nhật"}}},
+          {"thu_tu": 9, "action": "source_latest", "checkpoint": "after_update_a"}
+        ]
+      },
+      "expected": {
+        "case_id_order": ["F8A", "F8B", "F8C"],
+        "steps": [
+          {"checkpoint": "empty", "source_case": null, "source_status": null, "people": [], "assets": []},
+          {"checkpoint": "after_b_and_c", "source_case": "F8B", "source_status": "done", "people_prototypes": ["P111"], "asset_prototypes": ["T205"], "dia_chi": null, "ngay_cap": "2020-06-01", "land_rows": []},
+          {"checkpoint": "absolute_tie", "source_case": "F8B", "tie_reason": "id_F8B_lon_hon_F8A"},
+          {"checkpoint": "after_update_a", "source_case": "F8A", "source_status": "done", "people_prototypes": ["P101", "P102", "P103"], "asset_prototypes": ["T101"], "P102_dia_chi": "Khu Giả Lập F8A sau Cập nhật", "ngay_sinh_P101": "1950", "land_dientich": [100, null, 50]}
+        ],
+        "all_reads": {"fresh_row_uuid4": true, "owner_points_to_remapped_person": true, "entity_id_unchanged": true, "no_diagram_or_case_meta": true, "no_db_write": true}
       }
     }
   ]

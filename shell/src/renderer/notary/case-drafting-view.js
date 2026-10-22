@@ -812,8 +812,17 @@ function createNotaryModuleView(deps) {
       });
       if (!okGo) return;
     }
-    model.newDraft();
     activeTab = 'drafting';
+    try {
+      await model.newDraft();
+    } catch (e) {
+      // client.run reject ngoài dự kiến — model đã set state lỗi riêng;
+      // chỉ chặn unhandled rejection như openCase.
+      notify(errText(e && e.code ? e
+        : { code: 'shell_internal_error',
+            message: (e && e.message) || String(e) }), true);
+      return;
+    }
     rerender();
   }
 
@@ -2204,7 +2213,8 @@ function createNotaryModuleView(deps) {
     } else if (s.status === 'loading') {
       dp.append(face(L.faceLoading('Đang tải workspace…')));
     } else if (s.status === 'unavailable') {
-      const retry = btn('Thử lại', '', () => openCaseInDrafting(s.caseId));
+      const retry = btn('Thử lại', '', s.caseId == null
+        ? newDraftFlow : () => openCaseInDrafting(s.caseId));
       const f = face(L.faceUnavailable(
         'Engine', 'engine_unavailable',
         'Workspace không tải được khi engine chưa sẵn sàng.'));
@@ -2212,6 +2222,11 @@ function createNotaryModuleView(deps) {
       dp.append(f);
     } else if (s.status === 'error') {
       const f = face(L.faceError(s.error || { code: 'unknown' }));
+      if (s.caseId == null) {
+        // Lỗi đọc nguồn cho nháp mới: người dùng chủ động thử lại; không
+        // tự ghi DB hay âm thầm coi nguồn rỗng.
+        f.append(btn('Thử lại', '', newDraftFlow));
+      }
       const back = btn('← Quay lại Tổng quan', '', () => {
         activeTab = 'overview';
         rerender();

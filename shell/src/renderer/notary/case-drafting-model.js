@@ -76,12 +76,10 @@ function clone(v) {
   return v === undefined ? undefined : JSON.parse(JSON.stringify(v));
 }
 
-// Stage payload gui len wire: strip key 'thoi_han' le cap tai san
-// (MIN-141 review — owner chot bo truong le; thoi han moi chi thuoc
-// cum dat land_rows[].thoi_han). Row load tu server van mang key tu
-// master → xoa o boundary de "ngung gui gia tri le nhu du lieu moi".
-// Backend doc key-presence: key vang = giu nguyen master (lich su con
-// can cho warning orphan_thoi_han), khong phai xoa.
+// Stage payload gui len wire: asset `thoi_han` LE cua DONG MOI duoc giu
+// khi co gia tri (nguon Done co the mang field nay; bo di se lam mat du
+// kien khi tao row moi — §13.20). Row da co trong `committed` van strip
+// nhu truoc (backend giu gia tri lich su). Khong mo o nhap moi.
 function normalizeStageAssets(stage) {
   const s = clone(stage) || { people: [], assets: [] };
   for (const a of s.assets || []) {
@@ -92,10 +90,13 @@ function normalizeStageAssets(stage) {
   return s;
 }
 
-function stageForWire(stage) {
+function stageForWire(stage, committed) {
   const s = normalizeStageAssets(stage);
+  const existing = new Set(
+    ((committed && committed.assets) || []).map((a) => a && a.row_id));
   for (const a of s.assets || []) {
-    if (a && typeof a === 'object') delete a.thoi_han;
+    if (!a || typeof a !== 'object') continue;
+    if (a.thoi_han == null || existing.has(a.row_id)) delete a.thoi_han;
     for (const row of a.land_rows || []) delete row._source_land_row;
   }
   return s;
@@ -640,12 +641,12 @@ function createModel(deps) {
   // Mo nhap trong — stage rong + diagram seed theo caseType. draftId =
   // idempotency_key cua phien: retry saveDraft dung lai → khong tao
   // trung (contract §13.6). newDraft lai → key moi = nhap khac.
-  function newDraft(caseType) {
+  async function newDraft(caseType) {
     const ct = CASE_TYPES.includes(caseType)
       ? caseType : CASE_TYPE_INHERITANCE;
-    ++session;                        // vo hieu response dang cho cua case cu
+    const s = ++session;              // vo hieu response dang cho cua case cu
     clearAddressLookups();
-    state.status = 'ready';
+    state.status = 'loading';         // khoa sua/luu den khi doc nguon xong
     state.caseId = null;
     state.draftId = uuid();
     state.caseInfo = {
@@ -691,9 +692,44 @@ function createModel(deps) {
     state.wordOptions = null;
     state.wordResult = null;
     state.wordBusy = false;
-    state.busy = null;
+    state.busy = 'notary.workspace_source_latest';
     state.savingCase = false;
     emit();
+
+    // Nguon Done moi nhat: dung MOT lan cho phien nhap nay. Loi hien
+    // ro (status error/unavailable) — khong nuot thanh nguon rong.
+    let r;
+    try {
+      r = await client.run('notary.workspace_source_latest', {});
+    } catch (e) {
+      r = { ok: false, error: errObj(
+        'unknown', (e && e.message) || 'Không đọc được nguồn') };
+    }
+    if (s !== session) return r;      // phien khac da thay the
+    state.busy = null;
+    if (!r || !r.ok) {
+      setLoadError((r && r.error) || errObj('unknown'));
+      emit();
+      return r || { ok: false, error: errObj('unknown') };
+    }
+    const data = r.data || {};
+    const source = data.stage || {};
+    const people = Array.isArray(source.people) ? clone(source.people) : [];
+    const assets = Array.isArray(source.assets) ? clone(source.assets) : [];
+    // Chi chep Stage nguon: committed van rong (chua co DB), meta/diagram
+    // moi rieng, loai do nguoi dung chon — khong chep case/meta/diagram.
+    const stage = newStageDraft(ct);
+    stage.people = people;
+    stage.assets = assets;
+    if (ct === CASE_TYPE_INHERITANCE) {
+      stage.owner_row_id = typeof source.owner_row_id === 'string'
+        ? source.owner_row_id : null;
+    }
+    state.stage = stage;
+    state.stageDirty = people.length > 0 || assets.length > 0;
+    state.status = 'ready';
+    emit();
+    return r;
   }
 
   // Sua meta ho so. Tren nhap moi: du 8 truong (ghi qua
@@ -857,7 +893,7 @@ function createModel(deps) {
     const r = await client.run('notary.workspace_create', {
       idempotency_key: state.draftId,
       case: meta,
-      stage: stageForWire(state.stage),
+      stage: stageForWire(state.stage, state.committed),
       diagram: { state: clone(state.diagram) },
       ...(state.docxImport && state.docxImport.sources.length ? { docx_import: clone(state.docxImport) } : {}),
     });
@@ -911,7 +947,7 @@ function createModel(deps) {
       ? { idempotency_key: state.draftId || (state.draftId = uuid()) }
       : { case_id: caseId, base_revision: state.revision };
     payload.case = meta;
-    payload.stage = stageForWire(state.stage);
+    payload.stage = stageForWire(state.stage, state.committed);
     payload.diagram = { state: clone(state.diagram) };
     // Case cũ: chỉ gửi docx_import khi draft khác bản đã lưu — absent
     // nghĩa "giữ provenance" theo §13.19, tránh xóa ngoài ý muốn.
@@ -1182,7 +1218,7 @@ function createModel(deps) {
     const payload = {
       case_id: state.caseId,
       base_revision: state.revision,
-      stage: stageForWire(state.stage),
+      stage: stageForWire(state.stage, state.committed),
     };
     if (state.docxImport) payload.docx_import = clone(state.docxImport);
     // đợt 3 (MIN-141): metadata hồ sơ ghi cung Stage trong mot
@@ -1520,7 +1556,7 @@ function createModel(deps) {
     // + hint case.case_type de server evaluate dung domain (§13.7).
     const payload = state.caseId == null
       ? { case: { case_type: caseType() },
-          stage: stageForWire(state.stage),
+          stage: stageForWire(state.stage, state.committed),
           diagram: { state: clone(state.diagram) } }
       : { case_id: state.caseId,
           diagram: { state: clone(state.diagram) } };

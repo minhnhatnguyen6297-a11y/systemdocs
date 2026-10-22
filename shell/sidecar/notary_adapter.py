@@ -349,7 +349,8 @@ def case_create(job, payload):
             ngay_lap_ho_so=ngay_lap, loai_van_ban=loai,
             noi_niem_yet=p.get("noi_niem_yet") or None,
             ghi_chu=p.get("ghi_chu") or None,
-            trang_thai="draft")
+            trang_thai="draft",
+            updated_at=models.case_saved_at())
         sess.add(case)
         sess.commit()
         sess.refresh(case)
@@ -674,6 +675,29 @@ def workspace_get(job, payload):
             raise _workspace_command_error(err)
         job.check_cancel()
         return _result("workspace_get", data)
+    finally:
+        sess.close()
+
+
+def workspace_source_latest(job, payload):
+    """notary.workspace_source_latest — doc Stage cua case Done moi nhat.
+
+    Read-only: payload bat buoc object rong; service chon theo moc luu
+    (`updated_at` microsecond, null-last, tie id DESC) va tra row_id moi.
+    Khong co Done la ket qua rong thanh cong, khong phai loi."""
+    if not isinstance(payload, dict) or payload:
+        raise CommandError(
+            "validation_error",
+            "payload phai la object rong — khong nhan null/case_id/filter")
+    sess = _db_session()
+    try:
+        module = _workspace_module()
+        try:
+            data = module.CaseWorkspaceService(sess).source_latest()
+        except module.WorkspaceError as err:
+            raise _workspace_command_error(err)
+        job.check_cancel()
+        return _result("workspace_source_latest", data)
     finally:
         sess.close()
 

@@ -46,6 +46,7 @@ from models import (
     InheritanceCaseProperty,
     InheritanceParticipant,
     Property,
+    case_saved_at,
     derive_person_fields,
 )
 from services import case_rows
@@ -691,6 +692,46 @@ class CaseWorkspaceService:
         }
         return data
 
+    def source_latest(self) -> dict:
+        """`notary.workspace_source_latest` — đọc Stage của một case Done.
+
+        Chọn trên toàn hệ thống theo mốc lưu kỹ thuật: `updated_at` null
+        xếp sau (null-last), rồi `updated_at DESC`, tie `id DESC`. Đọc
+        read-only bằng reader rows; không gọi `get()` để tránh mang meta/
+        Diagram và không ghi DB. Không Done → kết quả rỗng thành công.
+        """
+        with self.db.no_autoflush:
+            row = self.db.execute(sa_text(
+                "SELECT id, trang_thai FROM inheritance_cases "
+                "WHERE trang_thai = 'done' "
+                "ORDER BY (updated_at IS NULL) ASC, updated_at DESC, "
+                "id DESC LIMIT 1")).first()
+            if row is None:
+                return {
+                    "schema_version": SCHEMA_VERSION,
+                    "backend_mode": "real",
+                    "source_case_id": None,
+                    "source_status": None,
+                    "stage": {"people": [], "assets": []},
+                }
+            case = self._load_case(row[0])
+            case_type, _document_type = _case_meta(case)
+            if case_type not in CASE_TYPES:
+                raise WorkspaceError(
+                    "case_type_unsupported",
+                    f"Loại việc chưa hỗ trợ: {case_type}",
+                    details={"case_type": case_type})
+            stage = _remap_source_stage(case_rows.read_stage(case))
+            source_case_id = case.id
+            source_status = case.trang_thai
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "backend_mode": "real",
+            "source_case_id": source_case_id,
+            "source_status": source_status,
+            "stage": stage,
+        }
+
     def commit_stage(self, case_id: int, base_revision: int,
                      stage: Any, case_meta: Any = None,
                      docx_import: Any = None) -> dict:
@@ -753,6 +794,7 @@ class CaseWorkspaceService:
                 f"Stage có {len(field_errors)} lỗi field",
                 details={"field_errors": field_errors})
 
+        saved_at = case_saved_at()
         try:
             if meta_edit is not None:
                 case.ngay_lap_ho_so = meta_edit["ngay_lap_ho_so"]
@@ -839,7 +881,7 @@ class CaseWorkspaceService:
                 "SET workspace_revision = :rev, updated_at = :now "
                 "WHERE id = :cid AND workspace_revision = :base"),
                 {"rev": new_revision,
-                 "now": datetime.now(timezone.utc).replace(tzinfo=None),
+                 "now": saved_at,
                  "cid": case.id, "base": server_revision})
             if updated.rowcount != 1:
                 self.db.rollback()
@@ -929,6 +971,7 @@ class CaseWorkspaceService:
         else:
             state = _seed_two_party_state()
         payload = dict(composed.payload)
+        saved_at = case_saved_at()
         try:
             case.loai_van_ban = conversion["document_type"]
             if target == CASE_TYPE_INHERITANCE:
@@ -953,7 +996,7 @@ class CaseWorkspaceService:
                 "SET workspace_revision = :rev, updated_at = :now "
                 "WHERE id = :cid AND workspace_revision = :base"),
                 {"rev": revision + 1,
-                 "now": datetime.now(timezone.utc).replace(tzinfo=None),
+                 "now": saved_at,
                  "cid": case.id, "base": revision})
             if updated.rowcount != 1:
                 self.db.rollback()
@@ -1006,6 +1049,7 @@ class CaseWorkspaceService:
                     "validation_error",
                     f"{field} phải là chuỗi non-empty hoặc null")
             updates[field] = _nn(value)
+        saved_at = case_saved_at()
         try:
             for field, value in updates.items():
                 setattr(case, field, value)
@@ -1016,7 +1060,7 @@ class CaseWorkspaceService:
                 "SET workspace_revision = :rev, updated_at = :now "
                 "WHERE id = :cid AND workspace_revision = :base"),
                 {"rev": new_revision,
-                 "now": datetime.now(timezone.utc).replace(tzinfo=None),
+                 "now": saved_at,
                  "cid": case.id, "base": server_revision})
             if updated.rowcount != 1:
                 self.db.rollback()
@@ -1154,6 +1198,7 @@ class CaseWorkspaceService:
                 else _seed_two_party_state())
             render_model = None
 
+        saved_at = case_saved_at()
         try:
             case = InheritanceCase(
                 nguoi_chet_id=None,
@@ -1168,11 +1213,13 @@ class CaseWorkspaceService:
                 ghi_chu=meta["ghi_chu"],
                 workspace_revision=1,
                 workspace_idempotency_key=str(idempotency_key),
-                workspace_creation_hash=creation_hash)
+                workspace_creation_hash=creation_hash,
+                updated_at=saved_at)
             self.db.add(case)
             self.db.flush()
             resolved_people, resolved_assets = self._write_stage_rows(
-                case, {"people": people, "assets": assets})
+                case, {"people": people, "assets": assets},
+                allow_identity_hint=True)
             self._sync_links(case, resolved_assets)
             stage_view = {
                 "people": [wire for _r, _e, wire in resolved_people],
@@ -1203,6 +1250,11 @@ class CaseWorkspaceService:
             if docx_import is not None:
                 self._validate_docx_bindings(
                     case, initial_payload['docx_import'])
+            # stamp cuối sau mọi mutation case: ORM onupdate ở flush trên
+            # không được thay mốc đã chọn.
+            self.db.execute(sa_text(
+                "UPDATE inheritance_cases SET updated_at = :now "
+                "WHERE id = :cid"), {"now": saved_at, "cid": case.id})
             self.db.commit()
         except WorkspaceError:
             self.db.rollback()
@@ -1338,6 +1390,7 @@ class CaseWorkspaceService:
                 state, docx_import)
 
         self._acquire_write_lock()
+        saved_at = case_saved_at()
         try:
             if new_case:
                 existing = self.db.query(InheritanceCase).filter(
@@ -1404,7 +1457,8 @@ class CaseWorkspaceService:
 
             previous_import = payload.get("docx_import")
             resolved_people, resolved_assets = self._write_stage_rows(
-                case, {"people": people, "assets": assets})
+                case, {"people": people, "assets": assets},
+                allow_identity_hint=new_case)
             self._sync_links(case, resolved_assets)
 
             stage_view = {
@@ -1446,15 +1500,19 @@ class CaseWorkspaceService:
                     warnings=warnings),
                 ensure_ascii=False)
             case.engine_state_json = None
+            case.trang_thai = "done"
             self.db.flush()
 
             if "docx_import" in payload:
                 self._validate_docx_bindings(
                     case, payload["docx_import"], previous_import)
 
-            case.trang_thai = "done"
             if new_case:
                 new_revision = 1
+                self.db.execute(sa_text(
+                    "UPDATE inheritance_cases SET updated_at = :now "
+                    "WHERE id = :cid"),
+                    {"now": saved_at, "cid": case.id})
             else:
                 new_revision = server_revision + 1
                 updated = self.db.execute(sa_text(
@@ -1462,7 +1520,7 @@ class CaseWorkspaceService:
                     "SET workspace_revision = :rev, updated_at = :now "
                     "WHERE id = :cid AND workspace_revision = :base"),
                     {"rev": new_revision,
-                     "now": datetime.now(timezone.utc).replace(tzinfo=None),
+                     "now": saved_at,
                      "cid": case.id, "base": server_revision})
                 if updated.rowcount != 1:
                     self.db.rollback()
@@ -1471,7 +1529,6 @@ class CaseWorkspaceService:
                         "workspace_conflict",
                         f"Revision server hiện là {fresh}",
                         details={"server_revision": fresh})
-            self.db.flush()
             self.db.commit()
         except WorkspaceError:
             self.db.rollback()
@@ -1583,11 +1640,22 @@ class CaseWorkspaceService:
 
     def _resolve_person_identity(self, row: Mapping[str, Any],
                                  previous: Optional[CasePersonRow],
-                                 cache: dict) -> Optional[int]:
+                                 cache: dict,
+                                 preferred_identity_id: Optional[int] = None
+                                 ) -> Optional[int]:
         anchor = self._person_anchor(row.get("ho_ten"),
                                      row.get("so_giay_to"))
         if anchor is None:
             return None
+        # Dòng MỚI mang `entity_id` nguồn = gợi ý có kiểm neo (§13.20):
+        # chỉ giữ ID khi neo payload vẫn khớp identity đó (kể cả ID cao
+        # khi có ID cũ trùng neo); lệch neo thì resolve lại bên dưới.
+        if previous is None and preferred_identity_id is not None:
+            identity = self.db.get(Customer, preferred_identity_id)
+            if (identity is not None
+                    and (identity.name_anchor, identity.document_anchor)
+                    == anchor):
+                return identity.id
         if previous is not None and previous.customer_id is not None:
             identity = self.db.get(Customer, previous.customer_id)
             if (identity is not None
@@ -1613,10 +1681,16 @@ class CaseWorkspaceService:
 
     def _resolve_asset_identity(self, row: Mapping[str, Any],
                                 previous: Optional[CaseAssetRow],
-                                cache: dict) -> Optional[int]:
+                                cache: dict,
+                                preferred_identity_id: Optional[int] = None
+                                ) -> Optional[int]:
         anchor = self._serial_anchor(row.get("so_serial"))
         if anchor is None:
             return None
+        if previous is None and preferred_identity_id is not None:
+            identity = self.db.get(Property, preferred_identity_id)
+            if identity is not None and identity.so_serial == anchor:
+                return identity.id
         if previous is not None and previous.property_id is not None:
             identity = self.db.get(Property, previous.property_id)
             if identity is not None and identity.so_serial == anchor:
@@ -1634,8 +1708,15 @@ class CaseWorkspaceService:
         return identity.id
 
     def _write_stage_rows(self, case: InheritanceCase,
-                          stage: Mapping[str, Any]) -> tuple[list, list]:
-        """Diff Stage payload theo row_id → (people wires, asset wires)."""
+                          stage: Mapping[str, Any], *,
+                          allow_identity_hint: bool = False
+                          ) -> tuple[list, list]:
+        """Diff Stage payload theo row_id → (people wires, asset wires).
+
+        `allow_identity_hint=True` (workspace_create/save_case mới) cho
+        phép dòng MỚI mang `entity_id` nguồn như gợi ý identity có kiểm
+        neo (§13.20); commit/save trên case đã có giữ rule cũ.
+        """
         people_in = list(stage.get("people") or [])
         assets_in = list(stage.get("assets") or [])
         existing_people = {r.row_id: r for r in case.person_rows}
@@ -1653,14 +1734,22 @@ class CaseWorkspaceService:
             explicit = row.get("entity_id")
             allowed = prev.customer_id if prev is not None else None
             if explicit is not None and explicit != allowed:
-                # `entity_id` tường minh trỏ tới Customer có sẵn là cách
-                # người dùng khẳng định dòng này là người đó: gắn lại
-                # identity cho dòng đã có, chỉ giữ dữ kiện của dòng (không
-                # lấy dữ kiện từ identity kia). Dòng mới vẫn phải gửi null.
-                if prev is None or self.db.get(Customer, explicit) is None:
+                # Dòng đã có: `entity_id` tường minh trỏ tới Customer có
+                # sẵn là cách khẳng định gắn lại identity (giữ dữ kiện
+                # dòng). Dòng MỚI chỉ nhận gợi ý khi đường tạo cho phép.
+                if prev is not None:
+                    if self.db.get(Customer, explicit) is None:
+                        errors.append(_field_error(
+                            rid, "entity_id", "invalid_format",
+                            "entity_id không phải identity đang gắn dòng này"))
+                elif not allow_identity_hint:
                     errors.append(_field_error(
                         rid, "entity_id", "invalid_format",
-                        "entity_id không phải identity đang gắn dòng này"))
+                        "entity_id phải null — dòng mới chưa có identity"))
+                elif self.db.get(Customer, explicit) is None:
+                    errors.append(_field_error(
+                        rid, "entity_id", "invalid_format",
+                        "entity_id không tồn tại trong danh bạ"))
         for row in assets_in:
             rid = row.get("row_id")
             prev = existing_assets.get(rid)
@@ -1669,11 +1758,21 @@ class CaseWorkspaceService:
                     rid, "row_id", "invalid_format",
                     "row_id đang thuộc hồ sơ khác"))
                 continue
+            explicit = row.get("entity_id")
             allowed = prev.property_id if prev is not None else None
-            if row.get("entity_id") not in (None, allowed):
-                errors.append(_field_error(
-                    rid, "entity_id", "invalid_format",
-                    "entity_id không phải identity đang gắn dòng này"))
+            if explicit is not None and explicit != allowed:
+                if prev is not None:
+                    errors.append(_field_error(
+                        rid, "entity_id", "invalid_format",
+                        "entity_id không phải identity đang gắn dòng này"))
+                elif not allow_identity_hint:
+                    errors.append(_field_error(
+                        rid, "entity_id", "invalid_format",
+                        "entity_id phải null — dòng mới chưa có identity"))
+                elif self.db.get(Property, explicit) is None:
+                    errors.append(_field_error(
+                        rid, "entity_id", "invalid_format",
+                        "entity_id không tồn tại trong danh bạ tài sản"))
         if errors:
             raise WorkspaceError(
                 "stage_validation_error",
@@ -1705,6 +1804,10 @@ class CaseWorkspaceService:
             if entity is None:
                 entity = self._resolve_person_identity(
                     row, previous, person_cache)
+            elif previous is None:
+                entity = self._resolve_person_identity(
+                    row, previous, person_cache,
+                    preferred_identity_id=entity)
             target = previous
             if target is None:
                 target = CasePersonRow(row_id=rid, case_id=case.id)
@@ -1743,7 +1846,10 @@ class CaseWorkspaceService:
             rid = row["row_id"]
             keep_assets.add(rid)
             previous = existing_assets.get(rid)
-            entity = self._resolve_asset_identity(row, previous, asset_cache)
+            entity = self._resolve_asset_identity(
+                row, previous, asset_cache,
+                preferred_identity_id=(
+                    row.get("entity_id") if previous is None else None))
             target = previous
             if target is None:
                 target = CaseAssetRow(row_id=rid, case_id=case.id)
@@ -2073,8 +2179,13 @@ class CaseWorkspaceService:
 
     @staticmethod
     def _validate_create_stage(people: list, assets: list) -> list[dict]:
-        """Rule riêng của `workspace_create` vòng 1 (§13.6): stage non-empty
-        và mọi `entity_id` phải null — backend tự resolve identity."""
+        """Rule completeness riêng của `workspace_create`/save_case mới.
+
+        Vòng 1 chặn mọi `entity_id`; vòng 2 dòng MỚI được mang gợi ý
+        identity có kiểm neo (§13.20), nên rule ID chuyển về
+        `_write_stage_rows`. Ở đây chỉ còn stage non-empty (partial-create
+        thuộc lát riêng).
+        """
         errors: list[dict] = []
         if not people:
             errors.append(_field_error(
@@ -2084,18 +2195,6 @@ class CaseWorkspaceService:
             errors.append(_field_error(
                 None, "assets", "required",
                 "stage.assets phải có ít nhất một dòng"))
-        for index, row in enumerate(people):
-            if isinstance(row, Mapping) and row.get("entity_id") is not None:
-                errors.append(_field_error(
-                    row.get("row_id"), "entity_id", "invalid_format",
-                    "entity_id phải null — workspace_create tạo entity mới",
-                    index))
-        for index, row in enumerate(assets):
-            if isinstance(row, Mapping) and row.get("entity_id") is not None:
-                errors.append(_field_error(
-                    row.get("row_id"), "entity_id", "invalid_format",
-                    "entity_id phải null — workspace_create tạo entity mới",
-                    index))
         return errors
 
     def _validate_stage(self, people: list, assets: list,
@@ -2390,6 +2489,38 @@ def _row_asset_wire(row: CaseAssetRow) -> dict:
         "co_quan_cap": row.co_quan_cap,
         "land_rows": land_rows,
     }
+
+
+def _remap_source_stage(stage: Mapping[str, Any]) -> dict:
+    """Stage nguồn → Stage wire với `row_id` UUID v4 MỚI cho mọi dòng.
+
+    Giữ `entity_id`, thứ tự, null/[] và cụm đất; remap `owner_row_id`
+    theo map person cũ→mới. Đất không có wire ID nên giữ nguyên vị trí.
+    Đây là phép cấp dòng cho hồ sơ tương lai — không persist, đọc lặp
+    lại được phép sinh UUID khác (§13.20).
+    """
+    people: list = []
+    person_map: dict = {}
+    for source in stage.get("people") or []:
+        new_row_id = str(uuid.uuid4())
+        person_map[source.get("row_id")] = new_row_id
+        people.append({**source, "row_id": new_row_id})
+    assets: list = []
+    for source in stage.get("assets") or []:
+        land_rows = source.get("land_rows")
+        assets.append({
+            **source,
+            "row_id": str(uuid.uuid4()),
+            "land_rows": (list(land_rows)
+                          if isinstance(land_rows, list) else land_rows),
+        })
+    out: dict = {}
+    if "owner_row_id" in stage:
+        owner = stage.get("owner_row_id")
+        out["owner_row_id"] = person_map.get(owner) if owner else None
+    out["people"] = people
+    out["assets"] = assets
+    return out
 
 
 def _prune_positions(nodes: list[dict], asset_count: int) -> int:

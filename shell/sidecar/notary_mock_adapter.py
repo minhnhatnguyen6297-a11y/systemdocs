@@ -1206,6 +1206,66 @@ def _workspace_data(cid, case):
     return data
 
 
+def workspace_source_latest(job, payload):
+    """Mock parity §13.20 — chon case done theo moc luu, tra row_id moi.
+
+    Fixture mock khong seed `updated_at`; tie (ke ca cung null) giai bang
+    `id` DESC nhu backend that. Khong co done → nguon rong thanh cong."""
+    if not isinstance(payload, dict) or payload:
+        raise CommandError(
+            "validation_error",
+            "payload phai la object rong — khong nhan null/case_id/filter")
+    done = [(cid, c) for cid, c in _state().cases.items()
+            if c.get("status") == "done"]
+    stamped = [it for it in done if it[1].get("updated_at") is not None]
+    unstamped = [it for it in done if it[1].get("updated_at") is None]
+    stamped.sort(key=lambda it: (it[1]["updated_at"], it[0]), reverse=True)
+    unstamped.sort(key=lambda it: it[0], reverse=True)
+    ordered = stamped + unstamped
+    if not ordered:
+        job.check_cancel()
+        return _result("workspace_source_latest", {
+            "schema_version": SCHEMA_VERSION,
+            "backend_mode": "mock",
+            "source_case_id": None,
+            "source_status": None,
+            "stage": {"people": [], "assets": []},
+        })
+    cid, case = ordered[0]
+    ct = case.get("case_type")
+    if ct not in CASE_TYPES:
+        raise CommandError(
+            "case_type_unsupported",
+            f"Loại việc chưa hỗ trợ: {ct}",
+            details={"case_type": ct})
+    source_stage = case.get("stage") or {}
+    people = []
+    person_map = {}
+    for row in source_stage.get("people") or []:
+        new_row_id = str(uuid.uuid4())
+        person_map[row.get("row_id")] = new_row_id
+        people.append({**copy.deepcopy(row), "row_id": new_row_id})
+    assets = []
+    for row in source_stage.get("assets") or []:
+        assets.append({**copy.deepcopy(row),
+                       "row_id": str(uuid.uuid4())})
+    stage_out = {"people": people, "assets": assets}
+    if ct == CASE_TYPE_INHERITANCE:
+        stage_out = {
+            "owner_row_id": person_map.get(
+                source_stage.get("owner_row_id")),
+            **stage_out,
+        }
+    job.check_cancel()
+    return _result("workspace_source_latest", {
+        "schema_version": SCHEMA_VERSION,
+        "backend_mode": "mock",
+        "source_case_id": cid,
+        "source_status": "done",
+        "stage": stage_out,
+    })
+
+
 def workspace_get(job, payload):
     case = _case(payload)
     data = _workspace_data(int(payload["case_id"]), case)

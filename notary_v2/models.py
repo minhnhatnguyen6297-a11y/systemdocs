@@ -1,8 +1,21 @@
 import uuid
+from datetime import datetime, timezone
+
 from sqlalchemy import Column, Integer, String, Date, Boolean, Float, ForeignKey, Text, DateTime, JSON, UniqueConstraint, Index, CheckConstraint, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
+
+
+def case_saved_at():
+    """Mốc lưu kỹ thuật của Hồ sơ: Python UTC-naive, đủ microsecond.
+
+    Dùng cho `InheritanceCase.updated_at` (resolver nguồn Done chọn theo
+    mốc này) và mọi writer case. `func.now()` của SQLite chỉ tới giây nên
+    không đủ phân định hai lần lưu trong cùng giây (contract §2.2/§13.20).
+    Không làm tròn: `Diagram.updatedAt` trên wire mới là ISO tới giây.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def derive_person_fields(ngay_chet, ngay_cap, loai_giay_to=None, loai_dia_chi=None):
@@ -157,7 +170,8 @@ class InheritanceCase(Base):
     workspace_revision = Column(Integer, nullable=False, default=1, server_default=text("1"))  # revision workspace (notary.case-drafting.v2)
     workspace_idempotency_key = Column(String(64), nullable=True, index=True, unique=True)  # key tạo case — unique nullable
     workspace_creation_hash = Column(String(64), nullable=True)  # SHA-256 payload tạo chuẩn hóa
-    updated_at       = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    updated_at       = Column(DateTime, default=case_saved_at,
+                              onupdate=case_saved_at)
     created_at       = Column(DateTime, server_default=func.now())
 
     # Quan hệ

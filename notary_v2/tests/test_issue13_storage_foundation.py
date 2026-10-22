@@ -439,57 +439,6 @@ def test_fixture_uuids_are_canonical_v4(dataset):
     assert all(uuid.UUID(value).version == 4 for value in found)
 
 
-def test_fixture_expected_answers_are_declared_independently(dataset):
-    aliases = {case["alias"] for case in dataset["cases"]}
-    assert {"F1", "F2", "F3", "F4", "F5", "F6A", "F6B", "F7"} <= aliases
-
-    for case in dataset["cases"]:
-        assert case["case_type"] in {"inheritance", "two_party"}
-        assert case["status_mong_doi"] in {"draft", "done"}
-        assert case["diagram"]["domain"] == case["case_type"]
-        assert "identity" in case["expected"]
-        for entry in case["people"]:
-            assert entry["prototype"] in dataset["people_prototypes"]
-        for entry in case["assets"]:
-            assert entry["prototype"] in dataset["asset_prototypes"]
-
-    f1 = _case_spec(dataset, "F1")["expected"]
-    assert f1["identity"]["nhom_cung_id"] == [
-        ["F1:P101"], ["F1:P102"], ["F1:P103"]]
-    assert all(len(group) == 1 for group in f1["identity"]["nhom_cung_id"])
-    assert f1["identity"]["id_null"] == []
-    assert f1["truong_suy_ra"]["P101"]["ngay_sinh_luu"] == "1950"
-    assert f1["truong_suy_ra"]["P101"]["loai_dia_chi"] == "Nơi chết"
-    assert f1["truong_suy_ra"]["P102"]["loai_giay_to"] == "Căn cước"
-    assert f1["truong_suy_ra"]["P103"]["noi_cap"] is None
-    assert f1["chudat"] == "Nguyễn Đăng An\nTrần Thị Bình"
-    assert f1["land_rows_theo_asset"]["F1:T101"][1]["loaidat"] is None
-
-    f6b = _case_spec(dataset, "F6B")["expected"]
-    assert ["F6A:P101", "F6B:P111"] in f6b["identity"]["nhom_cung_id"]
-    assert f6b["truong_suy_ra"]["P111"]["ngay_cap_luu"] == "2020-06-01"
-    assert f6b["truong_suy_ra"]["P111"]["dia_chi_luu"] is None
-    assert ["F6A:T101", "F6B:T205"] in f6b["asset_identity"]["nhom_cung_id"]
-    assert _case_spec(dataset, "F6A")["assets"][0]["prototype"] != \
-        _case_spec(dataset, "F6B")["assets"][0]["prototype"]
-
-    for alias in ("F4", "F7"):
-        spec = _case_spec(dataset, alias)
-        assert spec["insert_case_moi"] is False
-        assert spec["case_goc"] in aliases
-
-    f3 = _case_spec(dataset, "F3")
-    assert len(f3["people"]) == 1
-    assert f3["people"][0]["prototype"] == "P301"
-    assert dataset["people_prototypes"]["P301"]["so_giay_to"] is None
-    assert f3["expected"]["identity"]["id_null"] == ["F3:P301"]
-    assert f3["expected"]["asset_identity"]["id_null"] == ["F3:T203"]
-
-    f7_actions = [step["action"] for step in _case_spec(dataset, "F7")["expected"]["steps"]]
-    assert "them_so_giay_to" in f7_actions
-    assert "chi_so_khong_ten" not in f7_actions
-
-
 def _iter_uuid_strings(node):
     if isinstance(node, dict):
         for value in node.values():

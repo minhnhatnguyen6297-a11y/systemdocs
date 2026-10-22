@@ -26,7 +26,7 @@ import json
 from collections.abc import Mapping
 from typing import Any, Optional
 
-from models import InheritanceCase
+from models import InheritanceCase, case_saved_at
 from services.inheritance_engine import run_inheritance_case
 from services.case_workspace import (
     CASE_TYPE_INHERITANCE,
@@ -528,10 +528,12 @@ class InheritanceWorkspaceService:
 
             new_revision = server_revision + 1
             from sqlalchemy import text as sa_text
+            saved_at = case_saved_at()
             updated = self.db.execute(sa_text(
-                "UPDATE inheritance_cases SET workspace_revision = :rev "
+                "UPDATE inheritance_cases "
+                "SET workspace_revision = :rev, updated_at = :now "
                 "WHERE id = :cid AND workspace_revision = :base"),
-                {"rev": new_revision, "cid": case.id,
+                {"rev": new_revision, "now": saved_at, "cid": case.id,
                  "base": server_revision})
             if updated.rowcount != 1:
                 self.db.rollback()

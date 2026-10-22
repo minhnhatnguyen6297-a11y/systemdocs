@@ -15,10 +15,11 @@ import os
 import subprocess
 import sys
 import uuid
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
+from sqlalchemy import create_engine, event
 
 _HERE = Path(__file__).resolve().parent
 _SHELL = _HERE.parent
@@ -31,6 +32,7 @@ import notary_adapter  # noqa: E402
 from errors import CommandError  # noqa: E402
 
 from database import Base  # noqa: E402
+import models as engine_models  # noqa: E402
 from models import (CaseAssetRow, CasePersonRow, Customer,  # noqa: E402
                     InheritanceCase, InheritanceCaseProperty,
                     InheritanceParticipant, Property)
@@ -298,9 +300,11 @@ def _tp_state(**kw):
 
 def test_registry_wires_workspace_commands():
     assert "notary.workspace_get" in reg.COMMANDS
+    assert "notary.workspace_source_latest" in reg.COMMANDS
     assert "notary.workspace_commit_stage" in reg.COMMANDS
     assert "notary.workspace_save_case" in reg.COMMANDS
     assert callable(reg.COMMANDS["notary.workspace_get"])
+    assert callable(reg.COMMANDS["notary.workspace_source_latest"])
     assert callable(reg.COMMANDS["notary.workspace_commit_stage"])
     assert callable(reg.COMMANDS["notary.workspace_save_case"])
 
@@ -1886,3 +1890,103 @@ def test_property_create_allows_empty_and_verbatim_serial(adapter_db):
     absent = notary_adapter.property_create(_Job(), {
         "dia_chi": "Thửa 2"})
     assert absent["data"]["property"]["so_serial"] == ""
+
+
+# ------------------------------------------------ workspace_source_latest
+
+
+def _done_case(sess, *, loai_van_ban="khai_nhan", stamp=None):
+    case, deceased, prop = _seed_case(sess, loai_van_ban=loai_van_ban)
+    case.trang_thai = "done"
+    if stamp is not None:
+        case.updated_at = stamp
+    sess.commit()
+    return case, deceased, prop
+
+
+def test_workspace_source_latest_real_db_read_only(adapter_db):
+    sess = adapter_db
+    stamp = datetime(2026, 10, 22, 8, 0, 0, 123456)
+    case, deceased, prop = _done_case(sess, stamp=stamp)
+    engine = sess.get_bind()
+    statements = []
+
+    def before(conn, cursor, statement, parameters, context, many):
+        head = statement.lstrip().split(None, 1)[0].upper()
+        if head in ("INSERT", "UPDATE", "DELETE", "REPLACE"):
+            statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", before)
+    try:
+        res = notary_adapter.workspace_source_latest(_Job(), {})
+    finally:
+        event.remove(engine, "before_cursor_execute", before)
+
+    assert res["kind"] == "workspace_source_latest"
+    data = res["data"]
+    assert data["backend_mode"] == "real"
+    assert data["source_case_id"] == case.id
+    assert data["source_status"] == "done"
+    assert statements == [], statements
+    stage = data["stage"]
+    assert stage["owner_row_id"] == stage["people"][0]["row_id"]
+    original = [r.row_id for r in sess.query(CasePersonRow).all()] + [
+        r.row_id for r in sess.query(CaseAssetRow).all()]
+    returned = [r["row_id"] for r in stage["people"] + stage["assets"]]
+    assert all(rid not in original for rid in returned)
+    assert all(uuid.UUID(rid).version == 4 for rid in returned)
+    assert stage["people"][0]["entity_id"] == deceased.id
+    assert stage["assets"][0]["entity_id"] == prop.id
+    assert set(data) == {"schema_version", "backend_mode",
+                         "source_case_id", "source_status", "stage"}
+    assert set(stage) == {"owner_row_id", "people", "assets"}
+
+    # Đọc lại mốc bằng session mới — handler không tiến mốc/revision.
+    other = sessionmaker(bind=engine)()
+    try:
+        fresh = other.get(InheritanceCase, case.id)
+        other.refresh(fresh)
+        assert fresh.updated_at == stamp
+        assert fresh.workspace_revision == case.workspace_revision
+    finally:
+        other.close()
+
+
+def test_workspace_source_latest_empty_and_payload_errors(adapter_db):
+    res = notary_adapter.workspace_source_latest(_Job(), {})
+    assert res["data"]["source_case_id"] is None
+    assert res["data"]["source_status"] is None
+    assert res["data"]["stage"] == {"people": [], "assets": []}
+
+    for payload in (None, {"case_id": 1}, {"filter": "x"}):
+        with pytest.raises(CommandError) as exc:
+            notary_adapter.workspace_source_latest(_Job(), payload)
+        assert exc.value.code == "validation_error"
+
+
+def test_workspace_source_latest_unsupported_case_type(adapter_db):
+    sess = adapter_db
+    _done_case(sess, loai_van_ban="gift")
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.workspace_source_latest(_Job(), {})
+    assert exc.value.code == "case_type_unsupported"
+    assert exc.value.details["case_type"] == "gift"
+
+
+def test_legacy_case_create_stamps_microsecond(adapter_db, monkeypatch):
+    """NA `case_create` legacy đóng mốc lưu microsecond như mọi writer."""
+    sess = adapter_db
+    customer = Customer(ho_ten="Khách Legacy")
+    prop = Property(so_serial="LEGACY 001")
+    sess.add_all([customer, prop])
+    sess.commit()
+    stamp = datetime(2026, 10, 22, 9, 0, 0, 654321)
+    monkeypatch.setattr(engine_models, "case_saved_at", lambda: stamp)
+    res = notary_adapter.case_create(_Job(), {
+        "nguoi_chet_id": customer.id, "tai_san_id": prop.id,
+        "loai_van_ban": "khai_nhan"})
+    case_id = res["data"]["case"]["id"]
+    sess.expire_all()
+    case = sess.get(InheritanceCase, case_id)
+    assert case.updated_at == stamp
+    assert case.updated_at.microsecond == 654321

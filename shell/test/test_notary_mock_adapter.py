@@ -432,6 +432,7 @@ def _mk_person(**kw):
         "ngay_sinh": "1950", "ngay_chet": "2020-01-15",
         "so_giay_to": None, "ngay_cap": None, "noi_cap": None,
         "dia_chi": None, "place_of_origin": None,
+        "loai_giay_to": None, "loai_dia_chi": None,
     }
     row.update(kw)
     return row
@@ -2431,3 +2432,73 @@ def test_mock_saved_conversion_has_real_boundary_shape_and_preserves_stage():
     assert result["stage"]["assets"] == before["stage"]["assets"]
     assert "owner_row_id" not in result["stage"]
     assert len(result["diagram"]["state"]["nodes"]) == 30
+
+
+# ---------- workspace_source_latest (§13.20, vòng 2) ----------
+
+def test_workspace_source_latest_mock_parity():
+    res = _call("workspace_source_latest", {})
+    assert res["kind"] == "workspace_source_latest"
+    data = res["data"]
+    assert data["source_case_id"] == 44
+    assert data["source_status"] == "done"
+    stage = data["stage"]
+    ws = _call("workspace_get", {"case_id": 44})["data"]
+    assert stage["owner_row_id"] == stage["people"][0]["row_id"]
+    original = {row["row_id"]
+                for row in ws["stage"]["people"] + ws["stage"]["assets"]}
+    returned = [row["row_id"]
+                for row in stage["people"] + stage["assets"]]
+    assert returned and all(rid not in original for rid in returned)
+    assert [p["entity_id"] for p in stage["people"]] == [
+        p["entity_id"] for p in ws["stage"]["people"]]
+    assert [a["entity_id"] for a in stage["assets"]] == [
+        a["entity_id"] for a in ws["stage"]["assets"]]
+    assert set(data) == {"schema_version", "backend_mode",
+                         "source_case_id", "source_status", "stage"}
+    assert set(stage) == {"owner_row_id", "people", "assets"}
+
+
+def test_workspace_source_latest_mock_empty_and_payload_errors():
+    # Không có case Done (chỉ draft) → nguồn rỗng thành công.
+    mock.reset_backend({"cases": {
+        1: {"case_type": "inheritance", "status": "draft",
+            "stage": {"people": [], "assets": []}},
+    }})
+    data = _call("workspace_source_latest", {})["data"]
+    assert data["source_case_id"] is None
+    assert data["source_status"] is None
+    assert data["stage"] == {"people": [], "assets": []}
+    for payload in (None, {"case_id": 44}, {"filter": "x"}):
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_source_latest", payload)
+        assert exc.value.code == "validation_error"
+
+
+def test_workspace_source_latest_mock_unsupported_and_saved_at_order():
+    stage = {"people": [], "assets": []}
+    mock.reset_backend({"cases": {
+        1: {"case_type": "gift", "status": "done", "stage": stage},
+    }})
+    with pytest.raises(CommandError) as exc:
+        _call("workspace_source_latest", {})
+    assert exc.value.code == "case_type_unsupported"
+    assert exc.value.details["case_type"] == "gift"
+
+    mock.reset_backend({"cases": {
+        1: {"case_type": "inheritance", "status": "done",
+            "updated_at": "2026-10-22T08:00:00.100001", "stage": stage},
+        2: {"case_type": "inheritance", "status": "done",
+            "updated_at": "2026-10-22T08:00:00.100002", "stage": stage},
+    }})
+    assert _call("workspace_source_latest", {})["data"][
+        "source_case_id"] == 2
+    # Tie tuyệt đối → id cao thắng.
+    mock.reset_backend({"cases": {
+        1: {"case_type": "inheritance", "status": "done",
+            "updated_at": "2026-10-22T08:00:01.000000", "stage": stage},
+        2: {"case_type": "inheritance", "status": "done",
+            "updated_at": "2026-10-22T08:00:01.000000", "stage": stage},
+    }})
+    assert _call("workspace_source_latest", {})["data"][
+        "source_case_id"] == 2

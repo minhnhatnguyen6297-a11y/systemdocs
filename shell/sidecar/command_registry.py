@@ -248,6 +248,8 @@ COMMANDS.update({
     "notary.customer_list": _notary_drafting("customer_list"),
     "notary.customer_create": _notary_drafting("customer_create"),
     "notary.workspace_get": _notary_drafting("workspace_get"),
+    "notary.workspace_source_latest":
+        _notary_drafting("workspace_source_latest"),
     "notary.workspace_create": _notary_drafting("workspace_create"),
     "notary.workspace_save_case": _notary_drafting("workspace_save_case"),
     "notary.intake_analyze": _notary_drafting("intake_analyze"),

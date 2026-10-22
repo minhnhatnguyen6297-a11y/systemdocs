@@ -36,7 +36,7 @@ function fid(root, v) {
 
 // Build view + model voi client stub ghi lai moi command call (de chung
 // minh apply/cancel KHONG goi command ra ngoai).
-function build(t, { draft = true, confirm = true, confirmSeen = null, respond = null } = {}) {
+async function build(t, { draft = true, confirm = true, confirmSeen = null, respond = null } = {}) {
   const { document } = makeDom();
   global.document = document;
   global.window = {
@@ -66,7 +66,7 @@ function build(t, { draft = true, confirm = true, confirmSeen = null, respond = 
   // Gan vao body de isConnected/focus semantics giong renderer that.
   document.body.append(view.el);
   if (draft) {
-    model.newDraft('inheritance');
+    await model.newDraft('inheritance');
   } else {
     seedExistingCase(model);
     model.dismissNotice();       // emit → render workspace
@@ -110,8 +110,8 @@ function seedExistingCase(model) {
 
 // ---------- action bar ----------
 
-test('action bar: Zalo visible + disabled; Hủy/Cập nhật/Nhập file/case-type đủ', () => {
-  const { view } = build(test, { draft: true });
+test('action bar: Zalo visible + disabled; Hủy/Cập nhật/Nhập file/case-type đủ', async () => {
+  const { view } = await build(test, { draft: true });
   const btns = collect(view.el, (e) => e.tagName === 'BUTTON');
   const zalo = btns.find((b) => b.textContent === 'Zalo');
   assert.ok(zalo, 'thiếu nút Zalo — phải visible, không ẩn');
@@ -125,8 +125,8 @@ test('action bar: Zalo visible + disabled; Hủy/Cập nhật/Nhập file/case-t
     e.getAttribute('aria-label') === 'Loại việc').length === 1);
 });
 
-test('action bar: case thật có nút Cập nhật, card Sơ đồ có Lưu hồ sơ', () => {
-  const { view } = build(test, { draft: false });
+test('action bar: case thật có nút Cập nhật, card Sơ đồ có Lưu hồ sơ', async () => {
+  const { view } = await build(test, { draft: false });
   assert.ok(findBtns(view.el, 'Cập nhật').length >= 1);
   assert.equal(findBtns(topbar(view.el), 'Lưu nháp').length, 0);
   assert.equal(findBtns(view.el, 'Lưu hồ sơ').length, 1);
@@ -134,8 +134,8 @@ test('action bar: case thật có nút Cập nhật, card Sơ đồ có Lưu h�
 
 // ---------- asset columns ----------
 
-test('asset table: add tạo cột Tài sản N + input data-fid; tối đa 3', () => {
-  const { model, view } = build(test);
+test('asset table: add tạo cột Tài sản N + input data-fid; tối đa 3', async () => {
+  const { model, view } = await build(test);
   const addBtn = findBtns(view.el, '+ Tài sản')[0];
   for (let i = 0; i < 3; i++) addBtn.onclick();
   assert.equal(model.state.stage.assets.length, 3);
@@ -154,8 +154,8 @@ test('asset table: add tạo cột Tài sản N + input data-fid; tối đa 3', 
     /is_primary|isLandOwner|willReceive/.test(e.textContent)).length);
 });
 
-test('asset col: Ctrl+→ reorder qua model.moveAsset + giữ focus grip', () => {
-  const { model, view, document } = build(test);
+test('asset col: Ctrl+→ reorder qua model.moveAsset + giữ focus grip', async () => {
+  const { model, view, document } = await build(test);
   model.addAsset(); model.addAsset();
   const [a, b] = model.state.stage.assets.map((x) => x.row_id);
   const grip = fid(view.el, `adrag:${a}`);
@@ -172,7 +172,7 @@ test('asset col: Ctrl+→ reorder qua model.moveAsset + giữ focus grip', () =>
 });
 
 test('asset delete: icon-x xóa đúng draft row', async () => {
-  const { model, view } = build(test);
+  const { model, view } = await build(test);
   model.addAsset(); model.addAsset();
   const [a] = model.state.stage.assets.map((x) => x.row_id);
   const del = fid(view.el, `adel:${a}`);
@@ -184,8 +184,8 @@ test('asset delete: icon-x xóa đúng draft row', async () => {
 
 // ---------- people rows ----------
 
-test('people table: add/remove row; Ctrl+↓ reorder giữ focus', () => {
-  const { model, view, document } = build(test);
+test('people table: add/remove row; Ctrl+↓ reorder giữ focus', async () => {
+  const { model, view, document } = await build(test);
   model.addPerson(); model.addPerson();
   const [p1, p2] = model.state.stage.people.map((x) => x.row_id);
   const grip = fid(view.el, `pdrag:${p1}`);
@@ -202,8 +202,8 @@ test('people table: add/remove row; Ctrl+↓ reorder giữ focus', () => {
   assert.equal(model.state.stage.people.length, 1);
 });
 
-test('MIN-136: bảng Người KHÔNG còn cột Để lại — owner chọn qua sơ đồ', () => {
-  const { model, view } = build(test);
+test('MIN-136: bảng Người KHÔNG còn cột Để lại — owner chọn qua sơ đồ', async () => {
+  const { model, view } = await build(test);
   model.addPerson(); model.addPerson();
   const [p1] = model.state.stage.people.map((x) => x.row_id);
   // Khong con radio/input owner tren bang Nguoi.
@@ -222,8 +222,8 @@ test('MIN-136: bảng Người KHÔNG còn cột Để lại — owner chọn qu
     'hang owner khong duoc highlight sau khi chon qua so do');
 });
 
-test('typing giữ focus+value: emit nền không rebuild input đang gõ', () => {
-  const { model, view, document } = build(test);
+test('typing giữ focus+value: emit nền không rebuild input đang gõ', async () => {
+  const { model, view, document } = await build(test);
   model.addPerson();
   const rid = model.state.stage.people[0].row_id;
   const inp = fid(view.el, `p:${rid}:ho_ten`);
@@ -287,7 +287,7 @@ const guardTick = () => new Promise((r) => setTimeout(r, 10));
 
 test('guard: dirty + mở hồ sơ khác → Ở lại giữ nguyên nháp', async (t) => {
   const confirmSeen = [];
-  const { model, view, calls } = build(t, {
+  const { model, view, calls } = await build(t, {
     draft: false, confirm: false, confirmSeen, respond: guardRespond });
   model.updatePersonField('c1', 'ho_ten', 'Tên Đã Sửa');
   assert.equal(model.state.stageDirty, true);
@@ -308,7 +308,7 @@ test('guard: dirty + mở hồ sơ khác → Ở lại giữ nguyên nháp', asy
 
 test('guard: bỏ nháp mở hồ sơ khác → không ghi, quay lại thấy bản đã lưu',
   async (t) => {
-    const { model, view, calls } = build(t, {
+    const { model, view, calls } = await build(t, {
       draft: false, confirm: true, respond: guardRespond });
     model.updatePersonField('c1', 'ho_ten', 'Tên Đã Sửa');
     findBtns(view.el, 'Tổng quan hồ sơ')[0].onclick();
@@ -341,7 +341,7 @@ test('guard: bỏ nháp mở hồ sơ khác → không ghi, quay lại thấy b�
 // ---------- land dialog ----------
 
 test('land dialog: Áp dụng chỉ ghi draft Stage (dirty, không command)', async () => {
-  const { model, view, calls } = build(test);
+  const { model, view, calls } = await build(test);
   calls.length = 0;
   model.addAsset();
   const rid = model.state.stage.assets[0].row_id;
@@ -360,8 +360,8 @@ test('land dialog: Áp dụng chỉ ghi draft Stage (dirty, không command)', as
     'Áp dụng phải draft-only — không gọi command ra ngoài');
 });
 
-test('land dialog: Hủy không đụng draft Stage', () => {
-  const { model, view } = build(test);
+test('land dialog: Hủy không đụng draft Stage', async () => {
+  const { model, view } = await build(test);
   model.addAsset();
   const rid = model.state.stage.assets[0].row_id;
   model.state.stageDirty = false;
@@ -377,8 +377,8 @@ test('land dialog: Hủy không đụng draft Stage', () => {
 
 // ---------- MIN-141 review: bỏ thoi_han LẺ cấp tài sản ----------
 
-test('MIN-141: asset table KHÔNG còn ô Thời hạn lẻ; dialog cụm đất vẫn có', () => {
-  const { model, view } = build(test);
+test('MIN-141: asset table KHÔNG còn ô Thời hạn lẻ; dialog cụm đất vẫn có', async () => {
+  const { model, view } = await build(test);
   model.addAsset();
   const rid = model.state.stage.assets[0].row_id;
   assert.equal(fid(view.el, `a:${rid}:thoi_han`), null,
@@ -397,7 +397,7 @@ test('MIN-141: asset table KHÔNG còn ô Thời hạn lẻ; dialog cụm đất
 });
 
 test('MIN-141: commit Stage KHÔNG gửi thoi_han lẻ; land_rows.thoi_han giữ', async () => {
-  const { model, view, calls } = build(test, { draft: false });
+  const { model, view, calls } = await build(test, { draft: false });
   // Giả lập tài sản committed mang giá trị lẻ lịch sử + 1 cụm đất.
   const asset = model.state.stage.assets[0];
   asset.thoi_han = 'Lâu dài';
@@ -417,8 +417,8 @@ test('MIN-141: commit Stage KHÔNG gửi thoi_han lẻ; land_rows.thoi_han giữ
 
 // ---------- Pool committed-only ----------
 
-test('Pool case thật = committed − đã gán; KHÔNG có thẻ tài sản (MIN-136)', () => {
-  const { model, view } = build(test, { draft: false });
+test('Pool case thật = committed − đã gán; KHÔNG có thẻ tài sản (MIN-136)', async () => {
+  const { model, view } = await build(test, { draft: false });
   // Draft stage co them nguoi MOI chua commit → KHONG lo vao Pool
   // (case that van lay committed lam nguon — §2).
   model.addPerson();
@@ -439,8 +439,8 @@ test('Pool case thật = committed − đã gán; KHÔNG có thẻ tài sản (M
     'Pool van hien the tai san');
 });
 
-test('MIN-136: Pool nháp mới lấy stage.people — thả được ngay chưa lưu', () => {
-  const { model, view } = build(test);
+test('MIN-136: Pool nháp mới lấy stage.people — thả được ngay chưa lưu', async () => {
+  const { model, view } = await build(test);
   // Stage trong → huong dan them nguoi (khong phai "Cap nhat truoc"
   // vi nhap moi khong co gi de cap nhat).
   let pane = collect(view.el, (e) => e.classList.contains('cd-pool'))[0];
@@ -467,8 +467,8 @@ test('MIN-136: Pool nháp mới lấy stage.people — thả được ngay chưa
     'nguoi da gan van con trong Pool');
 });
 
-test('Pool card payload giữ text/plain {kind,row_id} cho P7', () => {
-  const { view } = build(test, { draft: false });
+test('Pool card payload giữ text/plain {kind,row_id} cho P7', async () => {
+  const { view } = await build(test, { draft: false });
   const card = collect(view.el,
     (e) => e.classList.contains('cd-pool-card'))[0];
   const sent = [];
@@ -485,8 +485,8 @@ test('Pool card payload giữ text/plain {kind,row_id} cho P7', () => {
 
 // ---------- stageDirty gate ----------
 
-test('stageDirty gate: Xem cách tính disabled, Lưu hồ sơ vẫn bật', () => {
-  const { model, view } = build(test, { draft: false });
+test('stageDirty gate: Xem cách tính disabled, Lưu hồ sơ vẫn bật', async () => {
+  const { model, view } = await build(test, { draft: false });
   model.addSlot('owner');            // diagramDirty → save enable được
   model.state.stageDirty = true;     // stage chưa cập nhật
   model.dismissNotice();
@@ -513,8 +513,8 @@ function topbar(root) {
   return collect(root, (e) => e.classList.contains('cd-topbar'))[0];
 }
 
-test('MIN-133 D4: không nút ‹, tiêu đề, pill Nháp, nhãn trạng thái lưu', () => {
-  const { model, view } = build(test, { draft: true });
+test('MIN-133 D4: không nút ‹, tiêu đề, pill Nháp, nhãn trạng thái lưu', async () => {
+  const { model, view } = await build(test, { draft: true });
   model.addPerson();                          // dirty
   const all = collect(view.el, () => true);
   assert.ok(!all.some((e) => e.classList.contains('ab-back')), 'còn nút back');
@@ -533,8 +533,8 @@ test('MIN-133 D4: không nút ‹, tiêu đề, pill Nháp, nhãn trạng thái 
   assert.match(save.getAttribute('aria-label'), /có thay đổi chưa lưu/);
 });
 
-test('MIN-133 D4: case thật — chấm dirty theo stageDirty; pill loại · HS', () => {
-  const { model, view } = build(test, { draft: false });
+test('MIN-133 D4: case thật — chấm dirty theo stageDirty; pill loại · HS', async () => {
+  const { model, view } = await build(test, { draft: false });
   const upd = () => findBtns(topbar(view.el), 'Cập nhật')[0];
   const dots = (b) => collect(b, (e) => e.classList.contains('dirty-dot'));
   assert.equal(dots(upd()).length, 0);
@@ -547,8 +547,8 @@ test('MIN-133 D4: case thật — chấm dirty theo stageDirty; pill loại · H
   assert.equal(dots(upd()).length, 1);
 });
 
-test('MIN-133: đang gõ trong Stage — nút Cập nhật vẫn hiện chấm dirty (defer rebuild)', () => {
-  const { model, view } = build(test, { draft: false });
+test('MIN-133: đang gõ trong Stage — nút Cập nhật vẫn hiện chấm dirty (defer rebuild)', async () => {
+  const { model, view } = await build(test, { draft: false });
   const rid = model.state.stage.people[0].row_id;
   const inp = fid(view.el, `p:${rid}:ho_ten`);
   inp.focus();
@@ -561,8 +561,8 @@ test('MIN-133: đang gõ trong Stage — nút Cập nhật vẫn hiện chấm d
     (e) => e.classList.contains('dirty-dot')).length, 1);
 });
 
-test('MIN-133: tab Tổng quan — ẩn phần hành động của thanh trên', () => {
-  const { view } = build(test, { draft: true });
+test('MIN-133: tab Tổng quan — ẩn phần hành động của thanh trên', async () => {
+  const { view } = await build(test, { draft: true });
   const bar = topbar(view.el);
   const actions = collect(bar,
     (e) => e.classList.contains('cd-topbar-actions'))[0];
@@ -574,8 +574,8 @@ test('MIN-133: tab Tổng quan — ẩn phần hành động của thanh trên',
   assert.equal(findBtns(topbar(view.el), 'Lưu nháp').length, 1);
 });
 
-test('MIN-133: đổi Loại việc trên thanh trên → Stage dựng lại ngay, select giữ focus', () => {
-  const { model, view, document } = build(test, { draft: true });
+test('MIN-133: đổi Loại việc trên thanh trên → Stage dựng lại ngay, select giữ focus', async () => {
+  const { model, view, document } = await build(test, { draft: true });
   model.addPerson();
   const sel = collect(topbar(view.el), (e) =>
     e.tagName === 'SELECT' && e.classList.contains('cd-case-type'))[0];
@@ -603,7 +603,7 @@ test('MIN-133 D2: không card Thông tin hồ sơ; Lưu nháp vẫn gửi meta m
         capabilities: { intake: [], diagram: true, word_export: true },
         stage: p.stage, diagram: { state: p.diagram.state } } }
     : null;
-  const { model, view, calls } = build(test, { draft: true, respond });
+  const { model, view, calls } = await build(test, { draft: true, respond });
   // MIN-141 đợt 3: meta hồ sơ quay lại — 3 dòng trong card Tài sản
   // (không phải card riêng). Chỉ Nơi niêm yết / Người nhận ủy quyền /
   // Nội dung việc; NAIA-9 thêm Ngày lập hồ sơ để chọn ngày tra cứu.
@@ -642,8 +642,8 @@ test('MIN-133 D2: không card Thông tin hồ sơ; Lưu nháp vẫn gửi meta m
     'sau lưu nút chính phải chuyển sang Cập nhật');
 });
 
-test('MIN-133 D1: bảng Người 7 cột theo DB Customer + colgroup cố định', () => {
-  const { model, view } = build(test);
+test('MIN-133 D1: bảng Người 7 cột theo DB Customer + colgroup cố định', async () => {
+  const { model, view } = await build(test);
   model.addPerson();
   const t = collect(view.el, (e) => e.classList.contains('cd-ptbl'))[0];
   assert.ok(t.classList.contains('cd-stage-tbl'));
@@ -670,8 +670,8 @@ test('MIN-133 D1: bảng Người 7 cột theo DB Customer + colgroup cố đị
   assert.equal(inp.title, inp.value);
 });
 
-test('MIN-133 D1: two_party — colgroup khớp số cột (không Để lại)', () => {
-  const { model, view } = build(test);
+test('MIN-133 D1: two_party — colgroup khớp số cột (không Để lại)', async () => {
+  const { model, view } = await build(test);
   model.updateCaseMeta('case_type', 'two_party');
   model.addPerson();
   const t = collect(view.el, (e) => e.classList.contains('cd-ptbl'))[0];
@@ -682,7 +682,7 @@ test('MIN-133 D1: two_party — colgroup khớp số cột (không Để lại)'
 });
 
 test('MIN-133 D1: noi_cap/place_of_origin cũ giữ nguyên trên row và lên wire khi Cập nhật', async () => {
-  const { model, view, calls, document } = build(test, { draft: false });
+  const { model, view, calls, document } = await build(test, { draft: false });
   const row = model.state.stage.people[0];
   row.noi_cap = 'Cục CS QLHC về TTXH';
   row.place_of_origin = 'Hà Nội';
@@ -703,8 +703,8 @@ test('MIN-133 D1: noi_cap/place_of_origin cũ giữ nguyên trên row và lên w
   assert.equal(sent.place_of_origin, 'Hà Nội', 'mất place_of_origin trên wire');
 });
 
-test('MIN-133: lỗi trường không có ô (noi_cap) vẫn hiện ở đầu card Người', () => {
-  const { model, view } = build(test, { draft: false });
+test('MIN-133: lỗi trường không có ô (noi_cap) vẫn hiện ở đầu card Người', async () => {
+  const { model, view } = await build(test, { draft: false });
   model.state.fieldErrors = [{ row_id: 'c1', field: 'noi_cap',
                                code: 'invalid', message: 'Nơi cấp sai' }];
   model.dismissNotice();
@@ -712,8 +712,8 @@ test('MIN-133: lỗi trường không có ô (noi_cap) vẫn hiện ở đầu c
   assert.match(card.textContent, /Nơi cấp sai/);
 });
 
-test('MIN-133: bảng Tài sản colgroup nhãn + mỗi tài sản một cột', () => {
-  const { model, view } = build(test);
+test('MIN-133: bảng Tài sản colgroup nhãn + mỗi tài sản một cột', async () => {
+  const { model, view } = await build(test);
   model.addAsset(); model.addAsset();
   const t = collect(view.el, (e) => e.classList.contains('cd-tbl'))[0];
   assert.ok(t.classList.contains('cd-stage-tbl'));
@@ -725,7 +725,7 @@ test('MIN-133: bảng Tài sản colgroup nhãn + mỗi tài sản một cột',
 
 // ---------- MIN-136: error catalog, dd/mm/yyyy, chrome ----------
 
-test('MIN-136 error catalog: code → thông điệp thân thiện + rule ẩn', () => {
+test('MIN-136 error catalog: code → thông điệp thân thiện + rule ẩn', async () => {
   const d = ERRORS.describeError({ code: 'workspace_owner_required',
     message: 'stage.owner_row_id phải là row_id ...' });
   assert.match(d.title, /Chưa chọn người để lại/);
@@ -769,7 +769,7 @@ test('MIN-136 error catalog: code → thông điệp thân thiện + rule ẩn',
   }
 });
 
-test('MIN-136 date: ISO ↔ dd/mm/yyyy; loai ngay khong ton tai', () => {
+test('MIN-136 date: ISO ↔ dd/mm/yyyy; loai ngay khong ton tai', async () => {
   const { fmtDisplayDate, parseDisplayDate } = VIEW._internals;
   assert.equal(fmtDisplayDate('1990-06-05'), '05/06/1990');
   assert.equal(fmtDisplayDate('1990'), '1990');          // year-only
@@ -800,8 +800,8 @@ test('MIN-136 date: ISO ↔ dd/mm/yyyy; loai ngay khong ton tai', () => {
   assert.deepEqual(parseDisplayDate('1990', false), { error: 'invalid' });
 });
 
-test('MIN-136: ô ngày Stage hiển dd/mm/yyyy, nhập dd/mm → wire ISO', () => {
-  const { model, view } = build(test);
+test('MIN-136: ô ngày Stage hiển dd/mm/yyyy, nhập dd/mm → wire ISO', async () => {
+  const { model, view } = await build(test);
   const p = model.addPerson({ ho_ten: 'A' });
   const rid = p.row_id;
   const inp = fid(view.el, `p:${rid}:ngay_sinh`);
@@ -841,7 +841,7 @@ test('MIN-136: ô ngày Stage hiển dd/mm/yyyy, nhập dd/mm → wire ISO', () 
 });
 
 test('MIN-136: empty-state Soạn hồ sơ có nút + Hồ sơ mới', async () => {
-  const { model, view } = build(test);
+  const { model, view } = await build(test);
   model.state.status = 'idle';
   model.dismissNotice();
   const btnNew = findBtns(view.el, '+ Hồ sơ mới')[0];
@@ -854,24 +854,24 @@ test('MIN-136: empty-state Soạn hồ sơ có nút + Hồ sơ mới', async () 
     e.classList.contains('cd-workspace')).length >= 1);
 });
 
-test('MIN-136: Nhập file mở được trên nháp mới (capabilities đủ 5 loại)', () => {
-  const { view } = build(test);
+test('MIN-136: Nhập file mở được trên nháp mới (capabilities đủ 5 loại)', async () => {
+  const { view } = await build(test);
   const intake = findBtns(view.el, 'Nhập file')[0];
   assert.ok(intake, 'thiếu nút Nhập file');
   assert.equal(intake.disabled, false,
     'Nhập file bi disable trên nháp mới — capabilities.intake rỗng');
 });
 
-test('MIN-136: nhãn tài sản viết tắt Hình thức SD', () => {
-  const { model, view } = build(test);
+test('MIN-136: nhãn tài sản viết tắt Hình thức SD', async () => {
+  const { model, view } = await build(test);
   model.addAsset();
   const t = collect(view.el, (e) => e.classList.contains('cd-tbl'))[0];
   assert.match(t.textContent, /Hình thức SD/);
   assert.ok(!/Hình thức sử dụng/.test(t.textContent));
 });
 
-test('MIN-136 F-1: conflict hiện NGAY khi đang gõ trong Stage', () => {
-  const { model, view } = build(test, { draft: false });
+test('MIN-136 F-1: conflict hiện NGAY khi đang gõ trong Stage', async () => {
+  const { model, view } = await build(test, { draft: false });
   const rid = model.state.stage.people[0].row_id;
   const inp = fid(view.el, `p:${rid}:ho_ten`);
   inp.focus();
@@ -899,7 +899,7 @@ test('MIN-136: case_list retry khi infra error + message thân thiện', async (
     }
     return null;
   };
-  const { view, calls } = build(t, { respond });
+  const { view, calls } = await build(t, { respond });
   await new Promise((r) => setTimeout(r, 40));
   const faceBox = collect(view.el, (e) =>
     e.classList.contains('face-error'))[0];
@@ -918,8 +918,8 @@ test('MIN-136: case_list retry khi infra error + message thân thiện', async (
 
 // ---------- MIN-141 đợt 3: block meta hồ sơ dưới card Tài sản ----------
 
-test('đợt3: ba dòng meta nằm trong card Tài sản, nhập → updateCaseMeta', () => {
-  const { model, view } = build(test, { draft: true });
+test('đợt3: ba dòng meta nằm trong card Tài sản, nhập → updateCaseMeta', async () => {
+  const { model, view } = await build(test, { draft: true });
   const assets = collect(view.el,
     (e) => e.classList.contains('cd-assets'))[0];
   const meta = collect(assets,
@@ -947,7 +947,7 @@ test('đợt3: ba dòng meta nằm trong card Tài sản, nhập → updateCaseM
 });
 
 test('đợt3: meta-only dirty bat nut Cập nhật (dirty dot)', async () => {
-  const { model, view } = build(test, { draft: false });
+  const { model, view } = await build(test, { draft: false });
   const upd = () => findBtns(topbar(view.el), 'Cập nhật')[0];
   const dots = (b) => collect(b, (e) => e.classList.contains('dirty-dot'));
   assert.equal(dots(upd()).length, 0);
@@ -961,7 +961,7 @@ test('đợt3: meta-only dirty bat nut Cập nhật (dirty dot)', async () => {
 });
 
 test('đợt3: Cập nhật gui payload.case kem stage khi meta dirty', async () => {
-  const { model, view, calls } = build(test, { draft: false });
+  const { model, view, calls } = await build(test, { draft: false });
   model.updateCaseMeta('noi_dung_viec', 'Khai nhận nhà đất');
   model.updateCaseMeta('nguoi_nhan_uy_quyen', 'Người UQ Mới');
   calls.length = 0;
@@ -977,7 +977,7 @@ test('đợt3: Cập nhật gui payload.case kem stage khi meta dirty', async ()
 });
 
 test('đợt3: case locked → 3 ô meta disabled, khong goi customer_list', async () => {
-  const { model, view, calls } = build(test, { draft: false });
+  const { model, view, calls } = await build(test, { draft: false });
   model.state.locked = true;
   model.state.status = 'locked';
   model.state.uqCatalog = null;      // reset de test trigger lai
@@ -1491,7 +1491,7 @@ test('TASK-3: render/go/refresh khong goi lookup, khong sua du lieu', async () =
       source_text: 'Xã B', display: 'xã B, tỉnh P',
       observation_id: 'obs-b', evidence: [] }],
     dataset_version: 'v2', revision: 1 }};
-  const { model, view, calls } = build(test, {
+  const { model, view, calls } = await build(test, {
     respond: (cmd) => cmd === 'notary.address_lookup' ? answer : null });
   model.updateCaseMeta('ngay_lap_ho_so', '2026-10-04');
   const p = model.addPerson({ ho_ten: 'A', dia_chi: 'Xã A, Tỉnh P',
@@ -1510,7 +1510,7 @@ test('TASK-3: render/go/refresh khong goi lookup, khong sua du lieu', async () =
 });
 
 test('NAIA-9: issuer input + suggestion box chỉ hiện khi ngay_chet có', async () => {
-  const { model, view } = build(test);
+  const { model, view } = await build(test);
   const alive = model.addPerson({ ho_ten: 'Sống' });
   const dead = model.addPerson({ ho_ten: 'Chết', ngay_chet: '2020-01-01' });
   assert.ok(!collect(view.el,
@@ -1560,7 +1560,7 @@ function panelOf(el, root) {
 }
 
 test('TASK-4: moi o co nut Tra; go/dan/blur khong gui lenh', async () => {
-  const { model, view, calls } = build(test,
+  const { model, view, calls } = await build(test,
     { respond: lookupResponders('found') });
   const p = model.addPerson({ ho_ten: 'A', dia_chi: 'Xã A, Tỉnh P',
     ngay_chet: '2020-01-01', noi_cap: 'UBND Xã A' });
@@ -1588,7 +1588,7 @@ test('TASK-4: bam Tra gui drafting, hien ket qua + Copy, khong sua du lieu', asy
     { value: { clipboard: { writeText: async (t) => { copied.push(t); } } },
       configurable: true });
   try {
-    const { model, view, calls } = build(test,
+    const { model, view, calls } = await build(test,
       { respond: lookupResponders('found') });
     const p = model.addPerson({ ho_ten: 'A', dia_chi: 'Xã A, Tỉnh P' });
     const before = model.state.stage.people[0].dia_chi;
@@ -1619,7 +1619,7 @@ test('TASK-4: Copy loi bao loi, khong bao da copy', async () => {
     { value: { clipboard: { writeText: async () => {
       throw new Error('denied'); } } }, configurable: true });
   try {
-    const { model, view } = build(test,
+    const { model, view } = await build(test,
       { respond: lookupResponders('found') });
     const p = model.addPerson({ ho_ten: 'A', dia_chi: 'Xã A, Tỉnh P' });
     fid(view.el, `lookup-tra:person:${p.row_id}`).onclick();
@@ -1636,7 +1636,7 @@ test('TASK-4: Copy loi bao loi, khong bao da copy', async () => {
 });
 
 test('TASK-4: issuer tra dia chi nguoi chet; posting tra o niem yet', async () => {
-  const { model, view, calls } = build(test,
+  const { model, view, calls } = await build(test,
     { respond: lookupResponders('found') });
   const p = model.addPerson({ ho_ten: 'Chết', ngay_chet: '2020-01-01',
     dia_chi: 'Xã Chết, Tỉnh P', noi_cap: 'UBND Xã Cũ' });
@@ -1657,7 +1657,7 @@ test('TASK-4: issuer tra dia chi nguoi chet; posting tra o niem yet', async () =
 });
 
 test('TASK-4: too_many Huy khong goi full; Dong y mo overlay dung query', async () => {
-  const b1 = build(test, { confirm: false, respond: lookupResponders('too_many') });
+  const b1 = await build(test, { confirm: false, respond: lookupResponders('too_many') });
   b1.model.addPerson({ ho_ten: 'A', dia_chi: 'Xã A, Tỉnh P' });
   const p1 = b1.model.state.stage.people[0].row_id;
   await ltick(100);
@@ -1669,7 +1669,7 @@ test('TASK-4: too_many Huy khong goi full; Dong y mo overlay dung query', async 
     (e) => e.dataset && e.dataset.fid === 'lookup-full-list').length, 0);
 
   const seen = [];
-  const b2 = build(test, { confirm: true, confirmSeen: seen,
+  const b2 = await build(test, { confirm: true, confirmSeen: seen,
     respond: lookupResponders('too_many') });
   const p2 = b2.model.addPerson({ ho_ten: 'A', dia_chi: 'Xã A, Tỉnh P' });
   await ltick(100);
@@ -1691,7 +1691,7 @@ test('TASK-4: too_many Huy khong goi full; Dong y mo overlay dung query', async 
 });
 
 test('TASK-4: sua query trong overlay khong tu tra; Tra moi gui full', async () => {
-  const { model, view, calls } = build(test,
+  const { model, view, calls } = await build(test,
     { confirm: true, respond: lookupResponders('too_many') });
   const p = model.addPerson({ ho_ten: 'A', dia_chi: 'Xã A, Tỉnh P' });
   await ltick(100);
@@ -1710,7 +1710,7 @@ test('TASK-4: sua query trong overlay khong tu tra; Tra moi gui full', async () 
 });
 
 test('TASK-4: dong overlay giu nhap, caret, scroll; late response bi bo', async () => {
-  const { model, view, calls } = build(test,
+  const { model, view, calls } = await build(test,
     { confirm: true, respond: lookupResponders('too_many') });
   const p = model.addPerson({ ho_ten: 'A', dia_chi: 'Xã A, Tỉnh P' });
   await ltick(100);
@@ -1743,7 +1743,7 @@ function fireMouseDown(el) {
 }
 
 test('R3: ket qua ve khi dang sua o khac van hien, khong giut focus', async () => {
-  const { model, view } = build(test,
+  const { model, view } = await build(test,
     { respond: lookupResponders('found') });
   const p = model.addPerson({ ho_ten: 'A', dia_chi: 'Xã A, Tỉnh P' });
   await ltick(100);
@@ -1766,7 +1766,7 @@ test('R3: ket qua ve khi dang sua o khac van hien, khong giut focus', async () =
 });
 
 test('R5: Huy cau hoi phuc hoi dung o dang sua, vung chon va scroll', async () => {
-  const { model, view, calls } = build(test,
+  const { model, view, calls } = await build(test,
     { confirm: false, respond: lookupResponders('too_many') });
   const p = model.addPerson({ ho_ten: 'Nguyen Van A', dia_chi: 'Xã A, Tỉnh P' });
   await ltick(100);
@@ -1789,7 +1789,7 @@ test('R5: Huy cau hoi phuc hoi dung o dang sua, vung chon va scroll', async () =
 });
 
 test('R5: dong full khi dang sua o khac dich phuc hoi o do', async () => {
-  const { model, view } = build(test,
+  const { model, view } = await build(test,
     { confirm: true, respond: lookupResponders('too_many') });
   const p = model.addPerson({ ho_ten: 'Nguyen Van A', dia_chi: 'Xã A, Tỉnh P' });
   await ltick(100);
@@ -1813,7 +1813,7 @@ test('P4: reversed replies from two Tra clicks open just one confirmation', asyn
   const pending = [], seen = [];
   let finishConfirm;
   const confirmation = new Promise(resolve => { finishConfirm = resolve; });
-  const { model, view } = build(test, { confirm: confirmation, confirmSeen: seen,
+  const { model, view } = await build(test, { confirm: confirmation, confirmSeen: seen,
     respond: (cmd) => cmd === 'notary.address_lookup' ? new Promise(r => pending.push(r)) : null });
   const p = model.addPerson({ dia_chi: 'Query A' });
   fid(view.el, `lookup-tra:person:${p.row_id}`).onclick();
@@ -1833,7 +1833,7 @@ test('P4: reversed replies from two Tra clicks open just one confirmation', asyn
 
 test('P7: background replies preserve full Copy node, focus and scroll', async () => {
   const pending = [];
-  const { model, view, document } = build(test, { respond: (cmd, payload) => {
+  const { model, view, document } = await build(test, { respond: (cmd, payload) => {
     if (cmd !== 'notary.address_lookup') return null;
     if (payload.query === 'Delayed') return new Promise(r => pending.push(r));
     return lookupResponders('too_many')(cmd, payload);
@@ -1857,7 +1857,7 @@ test('P8: delayed clipboard failure remains visible after re-Tra', async () => {
   Object.defineProperty(globalThis, 'navigator', { configurable: true,
     value: { clipboard: { writeText: () => new Promise((_, reject) => { fail = reject; }) } } });
   try {
-    const { model, view } = build(test, { respond: lookupResponders('found') });
+    const { model, view } = await build(test, { respond: lookupResponders('found') });
     const p = model.addPerson({ dia_chi: 'Query A' });
     fid(view.el, `lookup-tra:person:${p.row_id}`).onclick(); await ltick();
     const copying = fid(view.el, `lookup-copy:person:${p.row_id}:0`).onclick();
@@ -1868,7 +1868,7 @@ test('P8: delayed clipboard failure remains visible after re-Tra', async () => {
 });
 
 test('P12: keyboard Tra cancel restores previous input and selection without mousedown', async () => {
-  const { model, view, document } = build(test, { confirm: false, respond: lookupResponders('too_many') });
+  const { model, view, document } = await build(test, { confirm: false, respond: lookupResponders('too_many') });
   const p = model.addPerson({ ho_ten: 'Keyboard name', dia_chi: 'Query A' });
   const name = fid(view.el, `p:${p.row_id}:ho_ten`);
   name.focus(); name.setSelectionRange(2, 6);
@@ -1882,7 +1882,7 @@ test('P11: terminal lookup messages remove Copy in drafting and full', async () 
   for (const [status, message] of [['not_found', 'Không tìm thấy'],
     ['invalid_input', 'Chuỗi tra chưa hợp lệ'], ['reload_failed', 'Không đọc được bảng địa chỉ cục bộ']]) {
     let mode = 'found';
-    const { model, view } = build(test, { respond: (cmd, payload) => {
+    const { model, view } = await build(test, { respond: (cmd, payload) => {
       if (cmd !== 'notary.address_lookup') return null;
       if (mode === 'found' || mode === 'too_many') return lookupResponders(mode)(cmd, payload);
       return { ok: true, data: { schema_version: 'notary.address-lookup.v2', status,
@@ -1907,7 +1907,7 @@ test('P6: Word posting Tra uses its own draft and Copy does not save; full suspe
   Object.defineProperty(globalThis, 'navigator', { configurable: true,
     value: { clipboard: { writeText: async () => {} } } });
   try {
-    const { model, view, calls, document } = build(test, { draft: false,
+    const { model, view, calls, document } = await build(test, { draft: false,
       respond: (cmd, payload) => lookupResponders(mode)(cmd, payload) });
     findBtns(view.el, 'Xuất Word')[0].onclick(); await ltick();
     const input = fid(view.el, 'word-posting-input');
@@ -1967,7 +1967,7 @@ test('Word focused Copy refreshes changed slot and keeps delayed failure in Word
   Object.defineProperty(globalThis, 'navigator', { configurable: true,
     value: { clipboard: { writeText: () => new Promise((_, reject) => { fail = reject; }) } } });
   try {
-    const { model, view, calls } = build(test, { draft: false, respond: lookupResponders('found') });
+    const { model, view, calls } = await build(test, { draft: false, respond: lookupResponders('found') });
     findBtns(view.el, 'Xuất Word')[0].onclick(); await ltick();
     const input = fid(view.el, 'word-posting-input'), word = input.closest('.cd-word-modal');
     const tra = () => fid(word, 'word-lookup-tra:posting:posting').onclick();
@@ -1993,7 +1993,7 @@ test('disposed Word origin cannot open full over reopened Word; disposed Copy no
     value: { clipboard: { writeText: () => new Promise((_, reject) => { fail = reject; }) } } });
   try {
     let delayed = false;
-    const { view, document, notifications } = build(test, { draft: false, confirmSeen: seen,
+    const { view, document, notifications } = await build(test, { draft: false, confirmSeen: seen,
       respond: (cmd, payload) => cmd === 'notary.address_lookup' && delayed
         ? new Promise(r => pending.push(r)) : lookupResponders('found')(cmd, payload) });
     const open = async () => { findBtns(view.el, 'Xuất Word')[0].onclick(); await ltick();
@@ -2016,8 +2016,8 @@ test('disposed Word origin cannot open full over reopened Word; disposed Copy no
   } finally { delete globalThis.navigator; }
 });
 
-test('saved conversion requires explicit document and loss acknowledgement; cancel writes nothing', () => {
-  const {view,calls} = build(test,{draft:false});
+test('saved conversion requires explicit document and loss acknowledgement; cancel writes nothing', async () => {
+  const {view,calls} = await build(test,{draft:false});
   findBtns(view.el,'Đổi loại')[0].onclick();
   const select = collect(view.el,e=>e.tagName==='SELECT' && e.getAttribute('aria-label')==='Văn bản mới')[0];
   const apply = findBtns(view.el,'Áp dụng')[0];
@@ -2032,8 +2032,8 @@ test('saved conversion requires explicit document and loss acknowledgement; canc
   assert.equal(calls.some(([c])=>c==='notary.workspace_convert_type'),false);
 });
 
-test('conversion dirty Stage explains existing save action without autosave or discard', () => {
-  const {view,model,calls} = build(test,{draft:false});
+test('conversion dirty Stage explains existing save action without autosave or discard', async () => {
+  const {view,model,calls} = await build(test,{draft:false});
   model.updatePersonField('c1','ho_ten','Chữ nháp cần giữ');
   findBtns(view.el,'Đổi loại')[0].onclick();
   assert.equal(findBtns(view.el,'Áp dụng').length,0);
@@ -2065,7 +2065,7 @@ function saveCaseRespond(workspace) {
 
 test('B1: một lần bấm gửi đúng một workspace_save_case cùng snapshot', async () => {
   const respond = saveCaseRespond();
-  const { model, view, calls } = build(test, { draft: true, respond });
+  const { model, view, calls } = await build(test, { draft: true, respond });
   const owner = model.addPerson({ ho_ten: 'Người Để Lại' });
   model.setOwnerRow(owner.row_id);
   model.addAsset({ so_serial: 'AA000001', dia_chi: 'Thửa A' });
@@ -2101,7 +2101,7 @@ test('B1: một lần bấm gửi đúng một workspace_save_case cùng snapsho
 
 test('B2: ô text + ô ngày đang sửa được flush; ngày sai không gửi IPC', async () => {
   const respond = saveCaseRespond();
-  const { model, view, calls, notifications } = build(test,
+  const { model, view, calls, notifications } = await build(test,
     { draft: true, respond });
   const owner = model.addPerson({ ho_ten: 'Người Để Lại' });
   model.setOwnerRow(owner.row_id);
@@ -2146,7 +2146,7 @@ test('B2: ô text + ô ngày đang sửa được flush; ngày sai không gửi 
 
 test('B2: ký tự gõ dở trong ô ngày rỗng → null, không chặn lưu', async () => {
   const respond = saveCaseRespond();
-  const { model, view, calls } = build(test, { draft: true, respond });
+  const { model, view, calls } = await build(test, { draft: true, respond });
   const owner = model.addPerson({ ho_ten: 'Người Để Lại' });
   model.setOwnerRow(owner.row_id);
   model.addAsset({ so_serial: 'AA000001' });
@@ -2157,4 +2157,22 @@ test('B2: ký tự gõ dở trong ô ngày rỗng → null, không chặn lưu',
   const p = calls.find(([c]) => c === 'notary.workspace_save_case')[1];
   assert.equal(
     p.stage.people.find((x) => x.row_id === owner.row_id).ngay_sinh, null);
+});
+
+// ---------- vòng 2: nguồn Done cho nháp mới (§13.20) ----------
+
+test('newDraft: lỗi đọc nguồn hiện rõ + nút Thử lại, không tạo case', async () => {
+  const { view, calls } = await build(test, {
+    draft: true,
+    respond: (cmd) => (cmd === 'notary.workspace_source_latest'
+      ? { ok: false, error: { code: 'engine_unavailable',
+                              message: 'db busy', retryable: true,
+                              next_action: 'retry', details: null } }
+      : null),
+  });
+  const retry = findBtns(view.el, 'Thử lại')[0];
+  assert.ok(retry, 'thiếu nút Thử lại khi đọc nguồn lỗi');
+  assert.equal(retry.disabled, false);
+  assert.ok(!calls.some(([c]) => c === 'notary.workspace_create'),
+    'lỗi đọc nguồn không được tự ghi case');
 });
