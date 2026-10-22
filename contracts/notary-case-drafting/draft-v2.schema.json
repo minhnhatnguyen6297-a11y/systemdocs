@@ -25,7 +25,7 @@
     },
     "asset_row_v2": {
       "type": "object",
-      "description": "Giống v1 asset_row nhưng KHÔNG có is_primary — vị trí = index+1 (§13.3). MIN-141: `thoi_han` lẻ optional ở input (key vắng = giữ nguyên lịch sử master); emit vẫn mang key — như asset_row/asset_row_input của common.schema.json.",
+      "description": "Giống v1 asset_row nhưng KHÔNG có is_primary — vị trí = index+1 (§13.3). Storage B đang triển khai vòng 1: dữ kiện và land_rows thuộc dòng hồ sơ, không ghi đè master; thoi_han lẻ optional ở input, absent giữ giá trị của dòng hồ sơ.",
       "required": [
         "row_id", "entity_id", "so_serial", "so_vao_so",
         "so_thua_dat", "so_to_ban_do", "dia_chi", "loai_so",
@@ -184,6 +184,14 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "casetype": { "$ref": "#/definitions/payload_workspace_create_v2/properties/case/properties/case_type" },
+            "documenttype": { "$ref": "#/definitions/payload_workspace_create_v2/properties/case/properties/document_type" },
+            "ngaylaphoso": { "$ref": "common.schema.json#/definitions/date_full" },
+            "noiniemyet": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "nguoinhanuyquyen": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "nguoinhanuyquyenid": { "type": ["integer", "null"], "minimum": 1 },
+            "noidungviec": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "ghichu": { "$ref": "common.schema.json#/definitions/nullable_string" },
             "tenvanban": { "$ref": "common.schema.json#/definitions/nullable_string" },
             "nhomhopdong": { "$ref": "common.schema.json#/definitions/nullable_string" },
             "loaivanbannhandien": { "$ref": "common.schema.json#/definitions/nullable_string" },

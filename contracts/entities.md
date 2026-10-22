@@ -11,7 +11,8 @@ khi ghi vào trường "khóa định danh". Giữ raw và nguồn gốc theo
 [`../_bmad-output/specs/README.md`](../_bmad-output/specs/README.md) mục 4; chuẩn hóa không được
 ghi đè bằng chứng gốc.
 
-Cập nhật: 21/10/2026 — bổ sung điểm neo gom ID; quy tắc chuẩn hóa giữ theo nguồn.
+Cập nhật: 22/10/2026 — Storage B tiền MVP, **đang triển khai vòng 1**;
+đây là contract đích, không phải tuyên bố runtime đã BUILT.
 
 ---
 
@@ -52,11 +53,14 @@ Người ở §8.3 dùng tên + số giấy tờ đang có theo đúng loại d�
 - Nguồn nhận dạng OCR hiện hành: `notary_v2/routers/ocr_ai.py:924-925,972`;
   thiết kế đã đồng bộ: `_bmad-output/specs/notaryoffice/intent-source.md` v1.0 §7.2
   (`[A-Z]{2}\s*\d{6,8}` — gợi ý trích xuất, không phải rule chặn nhập).
-- **Owner 21/10/2026, thiết kế chưa triển khai:** serial là điểm neo gom
-  các bộ thông tin Tài sản vào cùng ID. Thiếu serial không gom theo rỗng,
-  không chặn lưu Nháp. Serial chung nhiều thửa không cho phép mất các hàng
-  thửa/cụm đất; cấu trúc liên kết còn thiết kế. Khi lấy vào Hồ sơ mới dùng
-  bộ mới nhất; Hồ sơ đã lưu giữ snapshot riêng, không tự cập nhật ngược.
+- **Storage B — đang triển khai vòng 1:** serial là điểm neo gom ID Tài sản.
+  Lookup exact bằng nguyên chuỗi, case-sensitive/binary; chuẩn hóa là identity/no-op:
+  không trim, uppercase hay gộp whitespace. `"AB 001"`, `"AB001"`, `"ab 001"`
+  và `" AB 001 "` khác nhau. Rỗng/toàn whitespace là thiếu neo:
+  giữ raw nhưng lưu `entity_id=null`, không tạo hoặc match Property theo rỗng.
+- Cùng ID/serial có thể có nhiều hàng khác thửa trong cùng hoặc khác Hồ sơ.
+  Mỗi hàng và cụm đất thuộc case riêng; không ghi đè đất master, không làm mất
+  hàng trống. Chọn ID theo §8.3, không đồng nhất với chọn bộ nguồn `done` mới nhất.
 
 ---
 
@@ -158,7 +162,7 @@ shared ID/schema trong lần sửa này.
 
 Cập nhật chốt từ Owner (01/10/2026): Từ điển người chuẩn hóa gồm 6 trường nghiệp vụ chính lưu cơ sở dữ liệu và 3 nhóm trường suy ra phục vụ hiển thị / soạn thảo văn bản.
 
-### 8.1. Các trường lưu CSDL (bảng `customers`)
+### 8.1. Danh bạ identity (`customers`) và dữ kiện Người thuộc Hồ sơ
 
 | Tên trường canonical | Tên thuộc tính DB | Kiểu dữ liệu | Mô tả |
 |---|---|---|---|
@@ -168,6 +172,32 @@ Cập nhật chốt từ Owner (01/10/2026): Từ điển người chuẩn hóa 
 | `sogiayto` | `so_giay_to` | String(50) | Số giấy tờ (người chết: khai tử/chứng tử); giữ nguyên giá trị gồm dấu phẩy/phần quyển, không gồm nhãn, không ép CCCD |
 | `ngaycap` | `ngay_cap` | Date | Ngày cấp chính giấy đang dùng, người chết là giấy khai tử/chứng tử, không phải ngày chết |
 | `diachi` | `dia_chi` | Text | Một trường địa chỉ: người chết dùng chung cho Nơi chết và nơi thường trú/cư trú cuối cùng; không tạo thêm trường |
+
+Bảng trên mô tả danh bạ hiện hữu, **không phải SOT dữ kiện Hồ sơ Storage B**.
+`case_person_rows` giữ từng bộ thông tin theo `row_id` UUID v4, `case_id` và
+`vitri` có thứ tự. Ánh xạ vật lý của wire hiện có:
+
+| Wire | Cột `case_person_rows` | Vai trò Customer |
+|---|---|---|
+| `row_id` | `row_id` | Không |
+| `entity_id` | `customer_id` nullable | `Customer.id`, do resolver quyết định |
+| `ho_ten` | `ho_ten` | Chỉ ghi tên gốc khi tạo identity |
+| `gioi_tinh` | `gioi_tinh` | Không copy/update master |
+| `ngay_sinh` | `ngay_sinh` String(10) nullable | Không đọc/ghi Date master |
+| `ngay_chet` | `ngay_chet` String(10) nullable | Không đọc/ghi Date master |
+| `so_giay_to` | `so_giay_to` | Chỉ ghi số gốc khi tạo identity |
+| `ngay_cap` | `ngay_cap` String(10) nullable | Không đọc/ghi Date master |
+| `noi_cap` | `noi_cap` | Không fallback master |
+| `dia_chi` | `dia_chi` | Không copy/update master |
+| `place_of_origin` | `place_of_origin` | Không cột master |
+| `loai_giay_to` | `loai_giay_to` | Không fallback master |
+| `loai_dia_chi` | `loai_dia_chi` | Không fallback master |
+
+Ngày case giữ đúng `YYYY` hoặc `YYYY-MM-DD`, không đệm ngày quy ước xuống row.
+Vòng 1 vẫn bắt buộc `ho_ten` không rỗng; tạo Hồ sơ cần ít nhất một Người và một
+Tài sản, thừa kế phải có owner hợp lệ. Giữ validation địa chỉ tài sản hiện có,
+kiểu/ngày/giới hạn và tham chiếu; không áp mở rộng nullable tên/owner hoặc create
+rỗng của thiết kế §3.3. Thiếu số giấy vẫn lưu row với `entity_id=null`.
 
 **Owner 15/10/2026 — độ đầy đủ của ngày:** bảng trên mô tả kiểu lưu hiện có,
 không cho phép làm mất dữ liệu chỉ có năm. Lưu/đọc lại và hiển thị phải phân biệt
@@ -183,7 +213,8 @@ trị mâu thuẫn hay tự điền từ người/văn bản khác.
 
 Ngoài 6 trường nghiệp vụ chính, DB hiện vẫn giữ `gioi_tinh`, ID và thời gian tạo; không xóa các cột này.
 
-*Ghi chú về quê quán (`place_of_origin`):* Chỉ lưu snapshot trong từng hồ sơ (`case_state_json` / contract `person_row`), không đưa vào danh bạ `customers` master.
+*Quê quán (`place_of_origin`):* lưu trên case person row, không còn lấy
+`case_state_json` làm SOT và không đưa vào danh bạ `customers`.
 
 ### 8.2. Trường suy ra và bằng chứng được xác nhận
 
@@ -210,8 +241,8 @@ Hành vi cuối MIN-141, Owner xác nhận 03/10/2026:
   ở §8.3 không bị cấm, không cho phép mượn trường thiếu giữa văn bản.
 - Khi người dùng sửa ngày cấp/ngày chết, hệ thống tính lại giá trị từng tự
   suy ra; giá trị người dùng đã sửa khác giá trị suy ra được giữ lại.
-- Word đọc giá trị đã commit trong snapshot của chính hồ sơ, kể cả null;
-  chỉ dùng dữ liệu master nếu snapshot cũ thiếu key đó.
+- Word đọc dữ kiện đã commit của chính case row, kể cả null; không fallback
+  Customer/Property khi thiếu key, không migrate/write khi GET.
 
 **Tại sao:** không để thay đổi danh bạ dùng chung làm đổi văn bản của hồ sơ
 đã lưu, không biến dữ liệu thiếu thành bằng chứng pháp lý.
@@ -219,49 +250,65 @@ Hành vi cuối MIN-141, Owner xác nhận 03/10/2026:
 Ý định ban đầu suy UBND theo mốc 01/07/2025 được giữ làm lịch sử; bảng tra
 xã/phường cũ–mới còn ở NAIA-9, chưa có đường suy tự động trong runtime.
 
-**Runtime Người chết 21/10/2026 — BUILT bounded, actual proof synthetic:** số giấy
-lưu nguyên giá trị vào `customers.so_giay_to`, index không UNIQUE; identity
-là `Customer.id`, không tự lookup/ghép theo số hoặc tên. Cập nhật Người qua
-ID đã chọn rõ hoặc `row_id` của chính hồ sơ đã lưu; hiện cùng số có thể tồn tại
-ở nhiều Người, kể cả CCCD. Đây là hiện trạng, chưa thực hiện điểm neo mới ở §8.3.
-Migration trước bootstrap giữ ID/FK/columns/defaults/checks/indexes/triggers
-và snapshot/history, rollback nguyên tử khi lỗi.
-Loại/nơi cấp và nhãn địa chỉ tiếp tục theo snapshot từng hồ sơ, không thêm
-cột/model #42; không mượn master để lấp key snapshot đã có kể cả null.
-Ngữ cảnh chết thiếu ngày dùng loại giấy/nhãn `Nơi chết` hiện có đã có nguồn,
-không Boolean mới. Master riêng không có context snapshot không thể phục
-hồi dữ kiện chết chưa lưu; không suy để lấp. #41 vẫn mở/chưa nghiệm thu toàn bộ.
+**Storage B — đang triển khai vòng 1:** suy từ chính dữ kiện case row bằng
+`derive_person_fields` và giữ thuật toán `_resolve_derived_field` hiện có cho
+`loai_giay_to/noi_cap/loai_dia_chi`. Previous input/stored lấy từ row trước ghi,
+current input từ payload: incoming khác stored → giữ ý định sửa kể cả null;
+stored khác previous-derived → giữ bằng chứng đã xác nhận; còn lại suy theo
+input mới. Row mới xử lý như stored rỗng. Năm quy ước chỉ dùng khi tính toán.
+`loaicutru` là derived consumer, không thêm wire/cột nghiệp vụ; Word suy từ row,
+không Customer. Context chết giữ theo helper hiện có, không tự suy giấy/cơ quan
+người sống khi thiếu ngày chết nhưng đã có bằng chứng chết.
+Giới hạn heuristic echo được giữ: lựa chọn trùng giá trị suy ra chưa phân biệt
+được với echo; không thêm cờ confirmed/provenance để giải #42.
+
+Runtime Người chết 21/10/2026 và migration bảo toàn DB trước cutover là lịch sử,
+không phải yêu cầu đọc tương thích/master fallback hay bảo toàn DB test tiền MVP.
+#41 vẫn mở/chưa nghiệm thu toàn bộ; không tuyên bố proof mới trong lượt contract.
 
 <a id="83-owner-21102026--gợi-ý-cccd-người-dùng-quyết-định-liên-kết"></a>
 ### 8.3. Owner 21/10/2026 — tên + số giấy tờ là điểm neo gom Người
 
-**Quyết định mới thay policy gợi ý/user chọn ở `8b4e85f`; chưa triển khai.**
-Một bảng Người cho sống/chết; ID kỹ thuật vẫn là `Customer.id`.
+**Storage B tiền MVP — đang triển khai vòng 1**, thay policy gợi ý/user chọn ở
+`8b4e85f`. `Customer.id` vẫn là identity sống/chết chung; dữ kiện case thuộc
+`case_person_rows`, không thuộc master. Trạng thái chỉ `draft|done`; Done vẫn
+sửa được, không có trường/guard khóa nghiệp vụ.
 
-- Đồng thời tên và số giấy tờ giống nhau → tự dùng cùng ID, không đòi user
-  bấm liên kết. Ngày cấp/địa chỉ khác vẫn cùng ID. Chỉ trùng một trong hai
-  không đủ; đổi tên hoặc số thì chấp nhận thành ID khác.
-- Không thêm loại giấy/ngày sinh/ngày cấp/địa chỉ vào điều kiện gom. Không
-  coi số giấy tờ riêng lẻ là UNIQUE toàn cục hoặc chặn vì số đã tồn tại.
-- Tìm Người để xem các Hồ sơ liên quan; không bắt đọc danh sách thay đổi từng
-  trường. Khi lấy Người vào Hồ sơ mới mặc định bộ mới nhất, không chọn phiên bản.
-- Mỗi Hồ sơ đã lưu giữ snapshot riêng, kể cả null; dữ liệu mới ở nơi khác
-  không tự đổi Hồ sơ cũ. User có thể sửa trực tiếp Hồ sơ theo quyền hiện hành.
-  Các bộ thông tin khác nhau vẫn giữ qua các Hồ sơ, không thêm lịch sử từng ô.
-- **Owner 22/10:** tên so không phân biệt dấu/hoa-thường, giữ tên gốc; không
-  mở thành fuzzy tùy ý. Mới nhất theo Hồ sơ lưu gần nhất, chỉ nguồn `done`,
-  không `draft`. Nhiều ID trùng cũ giữ nguyên, không tự hợp nhất; lấy bộ cuối.
-  Thiếu tên/số không gom và không chặn lưu Nháp. Lifecycle ID của dòng đang
-  nhập dở qua nhiều lần Cập nhật/Lưu hồ sơ đang rà soát, chưa chọn schema.
-- Quy tắc gom ID không cho phép tự bổ sung dữ kiện giữa văn bản, xác nhận
-  dữ kiện thay user hoặc xóa/hợp nhất dữ liệu lịch sử. Không suy còn sống
-  từ ngày chết null. Không áp mô hình “thông tin liên kết” của policy cũ
-  làm yêu cầu mặc định; nguồn/bằng chứng đã có vẫn giữ.
-
-Runtime `f6d53b5` vẫn không tự tìm theo tên/số và có thể cập nhật master khi
-ghi theo ID rõ; chưa thực hiện quy tắc mới. Không sửa schema/index trong
-quyết định này. #41 OPEN/gate mẫu ĐÓNG, #42 độc lập; #44 cần điều chỉnh theo
-[quyết định điểm neo/snapshot](../_bmad-output/decisions/decision-owner-entity-anchors-case-snapshots-20261021.md).
+- Neo Người là **đồng thời tên + số giấy tờ**. Tên: Unicode NFD → bỏ category
+  Mn → đổi `đ/Đ` thành `d/D` → lower → split/join whitespace bằng một dấu cách.
+  Không bỏ dấu câu, đảo từ, fuzzy hay bỏ thành phần tên; giữ tên gốc hiển thị.
+- Số giấy: trim ngoài để làm khóa. Chỉ khi toàn chuỗi gồm chữ số, dấu chấm và
+  whitespace, bỏ dấu phân cách thu được đúng 12 chữ số thì dùng 12 số (§1).
+  Các số khác giữ nguyên sau trim: không uppercase, bỏ dấu phẩy/quyển/gạch,
+  số 0 đầu hay cắt CCCD từ text. `07, quyển 1` khác `07, quyển 2`.
+  Không ghi khóa chuẩn hóa đè dữ kiện gốc. Loại giấy, ngày cấp/sinh/địa chỉ
+  không tham gia match; chỉ tên hoặc chỉ số không đủ.
+- Trong cùng transaction Cập nhật/Lưu nháp/Lưu hồ sơ: thiếu neo → identity null
+  kể cả trước đó đã có ID. Không xóa identity cũ hoặc đổi link Hồ sơ khác.
+  Dòng cũ có ID vẫn khớp khóa đã lưu của identity đó → giữ ID, kể cả có ID
+  trùng nhỏ hơn. Neo đổi chỉ rebind dòng đang ghi, không sửa neo identity cũ.
+- Dòng mới/dòng đổi neo chọn ID nhỏ nhất trong các identity cùng neo; không
+  có match thì tạo identity tối thiểu, flush và cache theo neo trong transaction.
+  Customer mới chỉ tên/số gốc + `name_anchor/document_anchor`; Property mới chỉ
+  serial. Không copy ngày/địa chỉ/cụm đất từ case vào master.
+- `entity_id` gửi lên không cho phép ép liên kết sai: dòng mới gửi null; dòng
+  cũ chỉ gửi null hoặc ID hiện gắn chính row đó (có thể echo ID cũ khi đổi neo),
+  server resolve lại. ID khác là lỗi Stage, không âm thầm sửa master.
+- Nhiều row_id được dùng cùng identity, vẫn giữ từng bộ thông tin/vị trí độc lập;
+  không `duplicate_entity`, compact hoặc dedup theo identity. Giữ row_id duy nhất,
+  kiểm quyền sở hữu cùng case và Diagram tham chiếu row_id, không entity ID.
+- Index neo/serial không UNIQUE; không merge/xóa identity trùng cũ. Chọn ID
+  nhỏ nhất là tie-break kỹ thuật, **khác** chọn bộ nguồn từ Hồ sơ `done` lưu
+  gần nhất (không `draft`) khi lấy vào Hồ sơ mới. Không lấy master của ID đó
+  để lấp dữ kiện thiếu; không thêm lịch sử từng ô.
+- Transaction ghi chiếm SQLite write reservation trước đọc revision/lookup,
+  kiểm revision rồi resolve/diff rows + đất + projections + meta/Diagram,
+  commit duy nhất; lỗi rollback cả identity mới. Helper không tự commit.
+  Diff theo row_id, đất theo parent row_id + vitri; không replace-all hoặc
+  update case khác. GET/Word chỉ materialize rows, không ghi/migrate DB.
+- Quy tắc gom ID không cho phép mượn dữ kiện giữa văn bản, xác nhận thay user,
+  tự suy còn sống hoặc cascade master làm đổi Hồ sơ khác. #41/#42 không khép;
+  xem [quyết định điểm neo/snapshot](../_bmad-output/decisions/decision-owner-entity-anchors-case-snapshots-20261021.md).
 
 ---
 
@@ -271,12 +318,30 @@ quyết định này. #41 OPEN/gate mẫu ĐÓNG, #42 độc lập; #44 cần đ
 
 - **Định dạng bắt buộc:** Tiếng Việt không dấu, viết thường toàn bộ, **viết liền không dấu, tuyệt đối KHÔNG có dấu gạch dưới `_` hay dấu cách**.
 - **Phạm vi quy ước:** áp cho **tên trường nghiệp vụ mới** và **tên canonical/họ token viết liền của placeholder** — gồm trường hồ sơ (`noiniemyet`, `nguoinhanuyquyen`, `noidungviec`, …), cụm đất `loaidat<M><N>`/`dientich<M><N>`/`thoihan<M><N>` (§9.2) và các alias viết liền được hỗ trợ. Quy ước này đặt tên **trường/khóa**, không đặt mặt chữ của mẫu: **placeholder trong mẫu mới** viết theo dạng nhóm dễ đọc `[Tên danh sách N - Trường]` (ví dụ `[Người 3 - Họ tên]`) tại [`word-templates.md` §4.1](../_bmad-output/specs/notary_v2/word-templates.md#placeholders); tên viết liền canonical vẫn được thay nhưng giữ slot legacy và tương ứng alias cũ — không đồng nhất thứ tự với nhóm dễ đọc của mẫu mới; alias cũ chỉ để mở template cũ.
-- Tên cột DB và dữ liệu giao tiếp cũ như `loai_dat`, `so_giay_to` vẫn được giữ để tương thích; không đổi toàn bộ cột/schema. Các alias được hỗ trợ cụ thể ghi tại `notary-case-drafting.md`, không mặc định mọi tên chuẩn đều là key gửi được.
+- Tên cột DB và wire cũ như `loai_dat`, `so_giay_to` giữ ánh xạ đã duyệt.
+  Các cột case-owned mới là ánh xạ vật lý của fields cũ và metadata kỹ thuật,
+  không bộ trường nghiệp vụ mới; không đổi canonical/alias wire tùy ý.
 - **Ví dụ đúng:** `ten`, `ngaysinh`, `ngaychet`, `sogiayto`, `ngaycap`, `diachi`, `noicap`, `loaigiayto`, `loaicutru`, `noiniemyet`, `nguoinhanuyquyen`, `noidungviec`, `loaidat11`, `dientich11`, `thoihan11`, `loaidat12`, `dientich12`, `thoihan12`.
 
 ### 9.2. Bảng Tài sản (`properties`) — Phân biệt loại đất thứ mấy trong tài sản thứ mấy
 
-- **Lưu trữ (MIN-141 đợt 2):** mỗi cụm đất là một bản ghi trong bảng con `property_land_rows(property_id, vitri, loaidat, dientich, thoihan)`, UNIQUE `(property_id, vitri)`; `vitri` = vị trí cụm trong tài sản (1–20, giữ nguyên vị trí trống). `properties.land_rows_json` chỉ còn làm nguồn tương thích/chuyển đổi — không còn là nguồn lưu chính. `N` (vị trí tài sản trong hồ sơ) **không** được ghi cứng vào master — N chỉ xuất hiện trong tên placeholder Word/snapshot của từng hồ sơ.
+- **Storage B — đang triển khai vòng 1:** cụm đất lưu tại
+  `case_asset_land_rows(case_asset_row_id, vitri, loaidat, dientich, thoihan)`,
+  UNIQUE `(case_asset_row_id, vitri)`; vị trí 1–20 giữ cả hàng trống, asset 1–3
+  theo thứ tự case. `PropertyLandRow/property_land_rows` và
+  `properties.land_rows_json` không là nguồn workspace/Word, không fallback,
+  mirror hoặc dual-write. `land_rows=null` có `land_rows_present=false`;
+  `[]` có present=true không con; mảng giữ nguyên vị trí kể cả hàng toàn null.
+- Dữ kiện tài sản thuộc `case_asset_rows`: `row_id`, `case_id`, `vitri`;
+  `entity_id` → `property_id` nullable; `so_serial`, `so_vao_so`, `so_thua_dat`,
+  `so_to_ban_do`, `dia_chi`, `loai_so`, `hinh_thuc_su_dung`, `thoi_han`,
+  `nguon_goc`, `ngay_cap` (Date/ISO full), `co_quan_cap` ánh xạ cùng tên,
+  không copy/update master. Serial string nguyên văn, mặc định `""`.
+  `land_rows` → flag present + con ordered; `loai_dat/loaidat` → con.loaidat,
+  `dien_tich/dientich` → con.dientich, `thoi_han/thoihan` → con.thoihan,
+  `vitri=i+1`. Giữ alias conflict validation và emit key legacy hiện có.
+  Tổng `loai_dat/dien_tich` cấp tài sản không là field/cột case mới; Word
+  có thể tính từ con, không lấy tổng master khi đất trống.
 - **Loại bỏ trường lẻ:** Trường `thoi_han` ở cấp tài sản là trường mồ côi → loại bỏ khỏi đường xuất cụm; không tự đắp vào cụm khi không xác định được cụm tương ứng (báo cần đối chiếu, giữ nguyên bản gốc).
 - **Cụm thông tin loại đất:** Thông tin đất luôn đi liền theo bộ 3 trường: `loaidat` - `dientich` - `thoihan`.
 - **Cú pháp định danh phân biệt Loại đất thứ mấy trong Tài sản thứ mấy:**
@@ -309,6 +374,11 @@ quyết định này. #41 OPEN/gate mẫu ĐÓNG, #42 độc lập; #44 cần đ
 3. **`noidungviec` (Nội dung việc):** Cụm text nhập thủ công mô tả công việc (ví dụ: *"Đính chính hộ ông A thành ông A và bà B"*, *"Đính chính năm sinh ông A từ 1955 thành 1950"*...).
 4. **Bố cục giao diện (UI):** Thêm 3 dòng trường hồ sơ ngay dưới các dòng tài sản; giảm 10% chiều cao các ô nhập liệu để giữ giao diện tổng thể gọn gàng, không phải cuộn nhiều.
 
+Storage B giữ metadata có cột (`noi_niem_yet`, người nhận ủy quyền/id,
+`noi_dung_viec`, `ghi_chu`, ngày lập, loại văn bản…) ở chính cột case làm SOT;
+null ghi null. Chỉ 7 scalar chưa có cột (§9.4, trừ `chudat`) ở
+`case_state_json` v4 key `case`, không lặp metadata cột hoặc Stage/assets JSON.
+
 ### 9.4. Metadata Hồ sơ Upload — triển khai phạm vi Case
 
 Owner giao triển khai chuẩn hóa Case và làm rõ chủ đất: **“người được gán chủ
@@ -323,17 +393,19 @@ Owner giao triển khai chuẩn hóa Case và làm rõ chủ đất: **“ngư�
 | `ngaycongchung` | ISO full date/null | Ngày công chứng, khác ngày lập hồ sơ |
 | `congchungvien` | string/null | Tên từ nguồn hoặc lựa chọn prepare rõ ràng |
 | `thuky` | string/null | Tên từ input prepare; không tự đoán |
-| `chudat` | string/null | Tên snapshot Người được chọn Chủ trên Diagram đã lưu |
+| `chudat` | string/null | Tên case rows được chọn Chủ trên Diagram đã lưu, derived không persist |
 
 Thứ tự trường theo bảng. Thiếu là `null`, không chuỗi rỗng/default giả.
 `chudat` lấy `personId` của node có `ownPositions` trỏ tài sản hiện có (1..3),
-không hidden/deleted; đọc tên Stage committed theo ID, mỗi Người một dòng
-theo thứ tự Stage, dedup theo row ID, không dedup theo tên.
+không hidden/deleted; đọc tên case person rows committed theo `row_id`, mỗi
+Người một dòng theo thứ tự rows, dedup theo row ID, không dedup tên/identity.
 Không đồng nhất với `owner_row_id`/slot `owner`; không suy từ Word/GCN/Bên A.
 Hai bên không có lựa chọn Chủ và Upload không có Diagram: `chudat = null`.
 
 Upload lưu record Case nhỏ có schema cố định trong DB registry cục bộ; không
 nhân đôi payload lớn. JSON extraction/nguồn cũ giữ nguyên; form builder đọc Case rồi đổi ngày
-sang `DD/MM/YYYY` tại biên portal. Notary giữ metadata trong snapshot
-`case_state_json.payload.case`, derivation chủ đất trong transaction commit/save.
+sang `DD/MM/YYYY` tại biên portal. Notary giữ metadata có cột tại cột case
+và 7 scalar tại `case_state_json.case`; `chudat` tính từ active ownPositions
++ tên rows B + số asset trong transaction commit/save, không thuộc Property
+hoặc slot owner. Không persist Stage/assets hay fallback master/legacy JSON.
 Không ghi chéo DB, không tạo shared Case ID. Raw/Person/Asset/parties giữ nguyên.

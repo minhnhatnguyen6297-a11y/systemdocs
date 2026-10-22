@@ -1,4 +1,4 @@
-"""Validator cho contracts/notary-case-drafting/examples — stdlib-only.
+"""Validator cho contracts/notary-case-drafting/examples (jsonschema cho Save Case).
 
 Chạy:  python contracts/notary-case-drafting/validate_examples.py
 Quy tắc: mọi *.valid.json phải pass hết rule; mọi *.invalid.json phải vi phạm
@@ -14,6 +14,8 @@ import ntpath
 import re
 import sys
 from pathlib import Path
+
+from jsonschema import Draft7Validator, RefResolver
 
 HERE = Path(__file__).resolve().parent
 EX = HERE / "examples"
@@ -53,6 +55,7 @@ COMMANDS = {
     "notary.workspace_create": "workspace_create",
     "notary.workspace_get": "workspace_get",
     "notary.workspace_update": "workspace_update",
+    "notary.workspace_save_case": "workspace_save_case",
     "notary.workspace_convert_type": "workspace_convert_type",
     "notary.intake_analyze": "intake_analyze",
     "notary.workspace_commit_stage": "workspace_commit_stage",
@@ -83,6 +86,11 @@ CASE_META_FIELDS = {
     # đợt 3: meta mới trong payload.case create/commit
     "nguoi_nhan_uy_quyen", "nguoi_nhan_uy_quyen_id", "noi_dung_viec",
 }
+CASE_SCALAR_FIELDS = {
+    "tenvanban", "nhomhopdong", "loaivanbannhandien", "socongchung",
+    "ngaycongchung", "congchungvien", "thuky",
+}
+CASE_META_FIELDS |= CASE_SCALAR_FIELDS
 # đợt 3: commit payload.case — meta + cặp immutable gửi kèm kiểm tra
 COMMIT_CASE_FIELDS = CASE_META_FIELDS | {"case_type"}
 # canonical key server chấp nhận ở payload (contract §4.1/§6)
@@ -142,7 +150,7 @@ SENSITIVE_KEY = re.compile(
 
 # Field nullable — "" cấm thay null (g1-module-data §6 + contract §2.2/2.3)
 NEVER_EMPTY = {
-    "normalized_value", "raw_value", "ho_ten", "so_serial", "dia_chi",
+    "normalized_value", "raw_value", "ho_ten", "dia_chi",
     "display_name", "actual_filename", "path", "row_id", "personId",
     "source_id", "suggestion_id", "document_key", "id", "case_type",
     "filename_stem", "text",
@@ -183,8 +191,8 @@ NODE_BOOL_FIELDS = {"isLandOwner", "willReceive", "hidden", "deleted"}
 
 ERRORS = {
     # mã riêng của contract này
-    "case_not_found", "case_type_unsupported", "workspace_locked",
-    "workspace_conflict", "stage_validation_error",
+    "case_not_found", "case_type_unsupported",
+    "workspace_conflict", "idempotency_conflict", "stage_validation_error",
     "intake_unsupported_source", "intake_source_too_large",
     "intake_too_many_sources", "intake_text_too_long",
     "diagram_reference_outside_stage", "diagram_invalid_state",
@@ -715,10 +723,16 @@ def check_case_object(case, where, v, draft_v2=False):
     if not isinstance(case, dict):
         v.append(("validation_error", f"{where} missing/not object"))
         return
-    extra = set(case) - CASE_FIELDS
+    fields = CASE_FIELDS - {"locked"} if draft_v2 else CASE_FIELDS
+    extra = set(case) - fields - CASE_SCALAR_FIELDS - {"chudat"}
     if extra:
         v.append(("validation_error", f"{where} extra keys {sorted(extra)}"))
-    for rk in CASE_FIELDS:
+    if draft_v2:
+        if "locked" in case:
+            v.append(("validation_error", f"{where}.locked forbidden"))
+        if case.get("status") not in {"draft", "done"}:
+            v.append(("validation_error", f"{where}.status invalid"))
+    for rk in fields:
         if rk not in case:
             v.append(("validation_error", f"{where} missing {rk}"))
     ct = case.get("case_type")
@@ -834,6 +848,45 @@ def check_create_payload(payload, v, draft_v2=False):
         if len(owners) != 1 or owners[0].get("personId") not in row_ids:
             v.append(("workspace_owner_required",
                       "node 'owner' must reference one stage person"))
+
+
+def check_save_case_schema(value, definition, v):
+    """Keep the new strict payload/result schema wired into this harness."""
+    documents = [json.loads(path.read_text(encoding="utf-8"))
+                 for path in HERE.glob("*.schema.json")]
+    store = {document["$id"]: document for document in documents}
+    schema = store["https://systemdocs/contracts/notary-case-drafting/workspace-save-case.schema.json"]
+    resolver = RefResolver.from_schema(schema, store=store)
+    target = {**schema, "$ref": f"#/definitions/{definition}"}
+    for error in Draft7Validator(target, resolver=resolver).iter_errors(value):
+        path = ".".join(str(p) for p in error.absolute_path)
+        v.append(("validation_error", f"save_case.{definition}.{path}: {error.message}"))
+
+
+def check_save_case_payload(payload, ctx, v):
+    check_save_case_schema(payload, "payload", v)
+    stage = payload.get("stage")
+    if not isinstance(stage, dict) or any(
+            not isinstance(stage.get(key), list) for key in ("people", "assets")):
+        return  # Schema already reports the malformed Stage shape.
+    # Reuse the current round-1 Stage/owner/meta/diagram checks, without
+    # imposing the old create-only rule that every identity hint is null.
+    candidate = dict(payload)
+    candidate.setdefault("idempotency_key", "00000000-0000-4000-8000-000000000001")
+    candidate["stage"] = dict(stage)
+    for collection in ("people", "assets"):
+        candidate["stage"][collection] = [
+            {**row, "entity_id": None} if isinstance(row, dict) else row
+            for row in candidate["stage"].get(collection, [])
+        ]
+    before = []
+    check_create_payload(candidate, before, draft_v2=True)
+    if "case_id" in payload:
+        check_base_revision(payload, ctx, v)
+        before = [(code, detail) for code, detail in before
+                  if detail not in {"payload.stage.people empty",
+                                    "payload.stage.assets empty"}]
+    v.extend(before)
 
 
 def check_update_payload(payload, ctx, v):
@@ -1053,11 +1106,18 @@ def check_result_data(kind, data, stage_ids, v, draft_v2=False, ctx=None):
         v.append(("validation_error",
                   f"schema_version={data.get('schema_version')!r}"))
     ct = _data_case_type(data, ctx) if draft_v2 else "inheritance"
-    if kind in ("workspace_get", "workspace_create", "workspace_convert_type"):
-        if kind == "workspace_create" \
+    if kind in ("workspace_get", "workspace_create", "workspace_convert_type",
+                "workspace_save_case"):
+        if kind in ("workspace_create", "workspace_save_case") \
                 and not isinstance(data.get("created"), bool):
             v.append(("validation_error",
                       f"data.created={data.get('created')!r}"))
+        if kind == "workspace_save_case":
+            if not draft_v2 or (data.get("case") or {}).get("status") != "done":
+                v.append(("validation_error", "Save Case requires v2 done result"))
+            if (data.get("diagram") or {}).get("render_model") is None:
+                v.append(("validation_error", "Save Case requires render_model"))
+            check_save_case_schema(data, "result_data", v)
         check_case_object(data.get("case"), "data.case", v,
                           draft_v2=draft_v2)
         caps = data.get("capabilities")
@@ -1285,6 +1345,10 @@ def violations(doc):
                 v.append(("validation_error", "address_lookup presentation invalid"))
         elif cmd == "notary.intake_analyze":
             check_intake_payload(payload, v)
+        elif cmd == "notary.workspace_save_case":
+            if not draft_v2:
+                v.append(("validation_error", "Save Case requires wire v2"))
+            check_save_case_payload(payload, ctx, v)
         elif cmd == "notary.workspace_commit_stage":
             check_base_revision(payload, ctx, v)
             # đợt 3: payload.case optional — meta hồ sơ cùng transaction

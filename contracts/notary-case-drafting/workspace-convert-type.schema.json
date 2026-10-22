@@ -28,13 +28,13 @@
         "backend_mode":{"enum":["real","mock"]},
         "case":{
           "type":"object",
-          "required":["id","case_type","document_type","revision","locked"],
+          "required":["id","case_type","document_type","revision","status"],
           "properties":{
             "id":{"type":"integer","minimum":1},
             "case_type":{"enum":["inheritance","two_party"]},
             "document_type":{"enum":["khai_nhan","thoa_thuan","chuyen_nhuong","tang_cho","cho_thue","dat_coc"]},
             "revision":{"type":"integer","minimum":2},
-            "locked":{"const":false}
+            "status":{"enum":["draft","done"]}
           }
         },
         "stage":{"$ref":"draft-v2.schema.json#/definitions/stage_v2"},

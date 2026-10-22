@@ -53,7 +53,6 @@
         "case_type",
         "document_type",
         "status",
-        "locked",
         "revision",
         "ngay_lap_ho_so",
         "noi_niem_yet",
@@ -64,6 +63,14 @@
       ],
       "additionalProperties": false,
       "properties": {
+        "tenvanban": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "nhomhopdong": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "loaivanbannhandien": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "socongchung": { "type": ["string", "null"], "pattern": "^\\d+/\\d{4}$" },
+        "ngaycongchung": { "$ref": "common.schema.json#/definitions/date_full" },
+        "congchungvien": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "thuky": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "chudat": { "$ref": "common.schema.json#/definitions/nullable_string" },
         "id": {
           "type": "integer",
           "minimum": 1
@@ -80,11 +87,8 @@
         "status": {
           "enum": [
             "draft",
-            "locked"
+            "done"
           ]
-        },
-        "locked": {
-          "type": "boolean"
         },
         "revision": {
           "type": "integer",
