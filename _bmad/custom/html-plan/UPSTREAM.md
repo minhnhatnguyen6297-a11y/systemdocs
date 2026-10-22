@@ -21,7 +21,7 @@ Windows clones with `core.autocrlf=true`; it does not reformat upstream content.
 |---|---|---|
 | `runtime/htmlplan.css` | [htmlplan.css](https://raw.githubusercontent.com/anthropics/claude-plugins-community/88003be1129c09381d27100b37a8fdc21b3214bf/html-plan/skills/html-plan/runtime/htmlplan.css) | `f16d2c6aa08e5f275bceee96e38ec38f05dd0add91c4bb6636e8a0a8a4836a9e` |
 | `runtime/htmlplan.js` (locally patched) | [htmlplan.js](https://raw.githubusercontent.com/anthropics/claude-plugins-community/88003be1129c09381d27100b37a8fdc21b3214bf/html-plan/skills/html-plan/runtime/htmlplan.js) | `228c0482486ad4ff0177217efccd125e9fd5c13fb0d34f58f4990b8b9e1bc8e3` |
-| `runtime/pack.mjs` (locally patched) | [pack.mjs](https://raw.githubusercontent.com/anthropics/claude-plugins-community/88003be1129c09381d27100b37a8fdc21b3214bf/html-plan/skills/html-plan/runtime/pack.mjs) | `d2ba3a918e6cdb36f79e3ba75141b7deb515a3489788bb683bc326eca7d8be08` |
+| `runtime/pack.mjs` (locally patched) | [pack.mjs](https://raw.githubusercontent.com/anthropics/claude-plugins-community/88003be1129c09381d27100b37a8fdc21b3214bf/html-plan/skills/html-plan/runtime/pack.mjs) | `e0566fb6fe3839570af0816370c4bd3f9bb2a2e599717cd4fd190d4318719f4b` |
 | `LICENSE` | [repository LICENSE](https://raw.githubusercontent.com/anthropics/claude-plugins-community/88003be1129c09381d27100b37a8fdc21b3214bf/LICENSE) | `cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30` |
 
 Downloaded bytes were authenticated against the pinned commit's Git tree blob
