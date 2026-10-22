@@ -146,7 +146,7 @@ class InheritanceCase(Base):
     tai_san_id       = Column(Integer, ForeignKey("properties.id"), nullable=True)  # projection identity tài sản 1
     ngay_lap_ho_so   = Column(Date,    nullable=True)   # null khi nháp chưa nhập, không default hôm nay
     loai_van_ban     = Column(String(50), default="khai_nhan")   # khai_nhan / thoa_thuan
-    trang_thai       = Column(String(20), default="draft")       # draft / locked
+    trang_thai       = Column(String(20), nullable=False, default="draft", server_default=text("'draft'"))  # draft / done
     noi_niem_yet     = Column(String(200), nullable=True)        # Tên xã/thị trấn nơi lập văn bản / nơi có đất
     nguoi_nhan_uy_quyen = Column(String(200), nullable=True)     # Người nhận ủy quyền (tên hiển thị — denormalized)
     nguoi_nhan_uy_quyen_id = Column(Integer, ForeignKey("customers.id"), nullable=True)  # Tham chiếu ổn định tới danh bạ (MIN-141 đợt 3)
@@ -173,9 +173,10 @@ class InheritanceCase(Base):
                               cascade="all, delete-orphan",
                               order_by="CaseAssetRow.vitri")
 
-    @property
-    def is_locked(self):
-        return self.trang_thai == "locked"
+    __table_args__ = (
+        CheckConstraint("trang_thai IN ('draft', 'done')",
+                        name="ck_inheritance_case_status"),
+    )
 
     @property
     def tong_ty_le(self):

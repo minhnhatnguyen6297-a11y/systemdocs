@@ -24,9 +24,9 @@ from sqlalchemy.orm import sessionmaker
 
 import database
 from models import (
-    Customer,
+    CaseAssetLandRow,
+    CaseAssetRow,
     InheritanceCase,
-    InheritanceCaseProperty,
     Property,
     PropertyLandRow,
 )
@@ -164,14 +164,17 @@ def _commit(db, case_id, base_revision, people, assets):
     return CaseWorkspaceService(db).commit_stage(case_id, base_revision, stage)
 
 
-def _payload_assets(db, case_id):
-    payload = json.loads(
-        db.get(InheritanceCase, case_id).case_state_json)
-    return payload["assets"]
+def _case_land_rows(db, asset_row_id):
+    return (db.query(CaseAssetLandRow)
+            .filter_by(case_asset_row_id=asset_row_id)
+            .order_by(CaseAssetLandRow.vitri).all())
 
 
-def _land_warning_codes(result):
-    return {w["code"] for w in result.get("warnings", [])}
+def _asset_wire(data, index=0, **overrides):
+    """Asset wire từ response create, giữ row_id/entity_id hiện có."""
+    row = dict(data["stage"]["assets"][index])
+    row.update(overrides)
+    return row
 
 
 # --------------------------------------------------------- migration tests
@@ -323,34 +326,32 @@ def test_migration_orphan_thoi_han_reported(legacy_db):
 def test_create_persists_land_rows_to_child_table(db):
     people, assets, state = _create_args()
     data = _create(db, people, assets, state)
+    asset_row_id = data["stage"]["assets"][0]["row_id"]
     prop_id = data["stage"]["assets"][0]["entity_id"]
-    rows = db.query(PropertyLandRow).filter_by(
-        property_id=prop_id).order_by(PropertyLandRow.vitri).all()
+    rows = _case_land_rows(db, asset_row_id)
     assert [(r.vitri, r.loaidat, r.dientich, r.thoihan)
             for r in rows] == [(1, "ODT", 85.5, "Lâu dài")]
-    # Mirror JSON vẫn được ghi theo key legacy cho đường đọc cũ
+    # Master PropertyLandRow/JSON không còn là SOT hay mirror của workspace.
     prop = db.get(Property, prop_id)
-    assert json.loads(prop.land_rows_json) == [
-        {"loai_dat": "ODT", "dien_tich": 85.5, "thoi_han": "Lâu dài"}]
+    assert prop.land_rows_json is None
+    assert prop.land_rows == []
 
 
 def test_commit_writes_land_rows_and_snapshot_in_one_tx(db):
     people, assets, state = _create_args()
     data = _create(db, people, assets, state)
     case_id = data["case"]["id"]
+    asset_row_id = data["stage"]["assets"][0]["row_id"]
     prop_id = data["stage"]["assets"][0]["entity_id"]
 
-    new_assets = [_asset_row(
-        entity_id=prop_id,
-        land_rows=[
-            {"loai_dat": "CLN", "dien_tich": 90, "thoi_han": "50 năm"},
-            {"loai_dat": None, "dien_tich": None, "thoi_han": None},
-            {"loai_dat": "ODT", "dien_tich": 15.5, "thoi_han": "Lâu dài"},
-        ])]
+    new_assets = [_asset_wire(data, land_rows=[
+        {"loai_dat": "CLN", "dien_tich": 90, "thoi_han": "50 năm"},
+        {"loai_dat": None, "dien_tich": None, "thoi_han": None},
+        {"loai_dat": "ODT", "dien_tich": 15.5, "thoi_han": "Lâu dài"},
+    ])]
     out = _commit(db, case_id, 1, people, new_assets)
 
-    rows = db.query(PropertyLandRow).filter_by(
-        property_id=prop_id).order_by(PropertyLandRow.vitri).all()
+    rows = _case_land_rows(db, asset_row_id)
     assert [(r.vitri, r.loaidat, r.dientich, r.thoihan) for r in rows] == [
         (1, "CLN", 90.0, "50 năm"),
         (2, None, None, None),                       # vị trí trống giữ nguyên
@@ -362,13 +363,13 @@ def test_commit_writes_land_rows_and_snapshot_in_one_tx(db):
         {"loai_dat": None, "dien_tich": None, "thoi_han": None},
         {"loai_dat": "ODT", "dien_tich": 15.5, "thoi_han": "Lâu dài"},
     ]
-    # snapshot assets trong case_state_json mang cụm đất key canonical
-    snap = _payload_assets(db, case_id)[0]
-    assert snap["entity_id"] == prop_id
-    assert snap["land_rows"] == [
-        {"loaidat": "CLN", "dientich": 90.0, "thoihan": "50 năm"},
-        {"loaidat": None, "dientich": None, "thoihan": None},
-        {"loaidat": "ODT", "dientich": 15.5, "thoihan": "Lâu dài"},
+    # Đọc lại bằng view cũng lấy dòng hồ sơ, không lấy master.
+    reopened = CaseWorkspaceService(db).get(case_id)
+    assert reopened["stage"]["assets"][0]["entity_id"] == prop_id
+    assert reopened["stage"]["assets"][0]["land_rows"] == [
+        {"loai_dat": "CLN", "dien_tich": 90.0, "thoi_han": "50 năm"},
+        {"loai_dat": None, "dien_tich": None, "thoi_han": None},
+        {"loai_dat": "ODT", "dien_tich": 15.5, "thoi_han": "Lâu dài"},
     ]
 
 
@@ -386,54 +387,47 @@ def test_get_reloads_land_rows_from_child_table(db):
         {"loai_dat": "ODT", "dien_tich": 85.5, "thoi_han": "Lâu dài"}]
 
 
-def test_get_falls_back_to_json_when_table_empty(db):
-    """Tài sản chưa migrate (bảng trống, còn JSON) → wire đọc fallback."""
-    prop = Property(
-        so_serial="DD123456", dia_chi="addr",
-        land_rows_json=json.dumps([
-            {"loai_dat": "LUC", "dien_tich": 70, "thoi_han": "20 năm"}]))
-    deceased = Customer(ho_ten="Người Chết", ngay_chet=date(2020, 1, 1))
-    db.add_all([prop, deceased])
+def test_get_ignores_property_master_land_rows(db):
+    """Bảng con master/JSON không còn fallback: dòng hồ sơ null là null."""
+    people, assets, state = _create_args()
+    assets[0]["land_rows"] = None
+    data = _create(db, people, assets, state)
+    prop_id = data["stage"]["assets"][0]["entity_id"]
+    prop = db.get(Property, prop_id)
+    prop.land_rows = [PropertyLandRow(
+        vitri=1, loaidat="LUC", dientich=70.0, thoihan="20 năm")]
     db.flush()
-    case = InheritanceCase(
-        nguoi_chet_id=deceased.id, tai_san_id=prop.id,
-        ngay_lap_ho_so=date(2026, 9, 1), loai_van_ban="khai_nhan",
-        trang_thai="draft")
-    db.add(case)
-    db.flush()
-    db.add(InheritanceCaseProperty(
-        case_id=case.id, property_id=prop.id, is_primary=True))
-    db.commit()
-    result = CaseWorkspaceService(db).get(case.id)
-    assert result["stage"]["assets"][0]["land_rows"] == [
-        {"loai_dat": "LUC", "dien_tich": 70, "thoi_han": "20 năm"}]
+
+    result = CaseWorkspaceService(db).get(data["case"]["id"])
+
+    assert result["stage"]["assets"][0]["land_rows"] is None
 
 
 def test_commit_land_rows_edit_delete_reorder(db):
     people, assets, state = _create_args()
     data = _create(db, people, assets, state)
     case_id = data["case"]["id"]
+    asset_row_id = data["stage"]["assets"][0]["row_id"]
     prop_id = data["stage"]["assets"][0]["entity_id"]
 
     # reorder + sửa + xóa: [CLN-30] lên vị trí 1, ODT đổi 85.5→90, bỏ dòng 3
-    new_assets = [_asset_row(
-        entity_id=prop_id,
-        land_rows=[
-            {"loai_dat": "CLN", "dien_tich": 30, "thoi_han": "50 năm"},
-            {"loai_dat": "ODT", "dien_tich": 90, "thoi_han": "Lâu dài"},
-        ])]
+    new_assets = [_asset_wire(data, land_rows=[
+        {"loai_dat": "CLN", "dien_tich": 30, "thoi_han": "50 năm"},
+        {"loai_dat": "ODT", "dien_tich": 90, "thoi_han": "Lâu dài"},
+    ])]
     _commit(db, case_id, 1, people, new_assets)
     assert [(r.vitri, r.loaidat, r.dientich, r.thoihan) for r in
-            db.query(PropertyLandRow).filter_by(property_id=prop_id)
-            .order_by(PropertyLandRow.vitri)] == [
+            _case_land_rows(db, asset_row_id)] == [
         (1, "CLN", 30.0, "50 năm"),
         (2, "ODT", 90.0, "Lâu dài"),
     ]
 
-    # xóa hết cụm — bảng trống, mirror None
+    # xóa hết cụm — bảng con hồ sơ trống, wire [] (khác null)
     _commit(db, case_id, 2, people,
-            [_asset_row(entity_id=prop_id, land_rows=None)])
-    assert db.query(PropertyLandRow).filter_by(property_id=prop_id).count() == 0
+            [_asset_wire(data, land_rows=[])])
+    assert _case_land_rows(db, asset_row_id) == []
+    reopened = CaseWorkspaceService(db).get(case_id)
+    assert reopened["stage"]["assets"][0]["land_rows"] == []
     assert db.get(Property, prop_id).land_rows_json is None
 
 
@@ -442,12 +436,11 @@ def test_commit_land_rows_canonical_keys_accepted(db):
     vẫn bộ legacy."""
     people, assets, state = _create_args()
     data = _create(db, people, assets, state)
-    prop_id = data["stage"]["assets"][0]["entity_id"]
-    out = _commit(db, data["case"]["id"], 1, people, [_asset_row(
-        entity_id=prop_id,
-        land_rows=[{"loaidat": "ONT", "dientich": 120,
-                    "thoihan": "Đến 2043"}])])
-    row = db.query(PropertyLandRow).filter_by(property_id=prop_id).one()
+    asset_row_id = data["stage"]["assets"][0]["row_id"]
+    out = _commit(db, data["case"]["id"], 1, people, [_asset_wire(
+        data, land_rows=[{"loaidat": "ONT", "dientich": 120,
+                          "thoihan": "Đến 2043"}])])
+    row = _case_land_rows(db, asset_row_id)[0]
     assert (row.loaidat, row.dientich, row.thoihan) == ("ONT", 120.0, "Đến 2043")
     assert out["stage"]["assets"][0]["land_rows"] == [
         {"loai_dat": "ONT", "dien_tich": 120.0, "thoi_han": "Đến 2043"}]
@@ -484,21 +477,21 @@ def test_commit_land_row_limit(db):
 
 
 def test_invalid_land_row_rolls_back_everything(db):
-    """Commit sai ở dòng thứ 2 → master + cụm đất + snapshot + revision
+    """Commit sai ở dòng thứ 2 → cụm đất + dòng hồ sơ + revision
     của dòng 1 cũng không được ghi (một transaction)."""
     people, assets, state = _create_args()
     assets.append(_asset_row(so_serial="FF123456", land_rows=[
         {"loai_dat": "BHK", "dien_tich": 40, "thoi_han": "Lâu dài"}]))
     data = _create(db, people, assets, state)
     case_id = data["case"]["id"]
-    prop1 = data["stage"]["assets"][0]["entity_id"]
-    prop2 = data["stage"]["assets"][1]["entity_id"]
+    asset_row_1 = data["stage"]["assets"][0]["row_id"]
+    asset_row_2 = data["stage"]["assets"][1]["row_id"]
     before_payload = db.get(InheritanceCase, case_id).case_state_json
 
     bad_assets = [
-        _asset_row(entity_id=prop1, land_rows=[
+        _asset_wire(data, 0, land_rows=[
             {"loai_dat": "LUC", "dien_tich": 999, "thoi_han": "20 năm"}]),
-        _asset_row(entity_id=prop2, land_rows=[
+        _asset_wire(data, 1, land_rows=[
             {"loai_dat": "ODT", "dien_tich": "không-phải-số",
              "thoi_han": None}]),
     ]
@@ -510,13 +503,11 @@ def test_invalid_land_row_rolls_back_everything(db):
     assert case.workspace_revision == 1
     assert case.case_state_json == before_payload
     # Cụm đất cả hai tài sản giữ nguyên như lúc create — không nửa ghi
-    assert [(r.vitri, r.loaidat) for r in db.query(PropertyLandRow)
-            .filter_by(property_id=prop1)
-            .order_by(PropertyLandRow.vitri)] == [(1, "ODT")]
-    assert [(r.vitri, r.loaidat) for r in db.query(PropertyLandRow)
-            .filter_by(property_id=prop2)
-            .order_by(PropertyLandRow.vitri)] == [(1, "BHK")]
-    assert db.get(Property, prop1).so_serial == "EE123456"
+    assert [(r.vitri, r.loaidat) for r in
+            _case_land_rows(db, asset_row_1)] == [(1, "ODT")]
+    assert [(r.vitri, r.loaidat) for r in
+            _case_land_rows(db, asset_row_2)] == [(1, "BHK")]
+    assert db.get(CaseAssetRow, asset_row_1).so_serial == "EE123456"
 
 
 def test_commit_land_rows_3x20_roundtrip(db):
@@ -525,11 +516,11 @@ def test_commit_land_rows_3x20_roundtrip(db):
     assets = [_asset_row(so_serial=f"EE00000{n}") for n in range(1, 4)]
     data = _create(db, people, assets, state)
     case_id = data["case"]["id"]
-    prop_ids = [a["entity_id"] for a in data["stage"]["assets"]]
+    asset_rows = [a["row_id"] for a in data["stage"]["assets"]]
     new_assets = []
-    for n, prop_id in enumerate(prop_ids, start=1):
-        new_assets.append(_asset_row(
-            entity_id=prop_id, so_serial=f"EE00000{n}",
+    for n, asset_row_id in enumerate(asset_rows, start=1):
+        new_assets.append(_asset_wire(
+            data, n - 1, so_serial=f"EE00000{n}",
             land_rows=[{"loai_dat": f"Đất {n}.{m}",
                         "dien_tich": n * 100 + m,
                         "thoi_han": f"TH{n}.{m}"} for m in range(1, 21)]))
@@ -537,9 +528,8 @@ def test_commit_land_rows_3x20_roundtrip(db):
     db.expire_all()
     result = CaseWorkspaceService(db).get(case_id)
     assert len(result["stage"]["assets"]) == 3
-    for n, prop_id in enumerate(prop_ids, start=1):
-        rows = db.query(PropertyLandRow).filter_by(
-            property_id=prop_id).order_by(PropertyLandRow.vitri).all()
+    for n, asset_row_id in enumerate(asset_rows, start=1):
+        rows = _case_land_rows(db, asset_row_id)
         assert len(rows) == 20
         assert (rows[0].vitri, rows[0].loaidat, rows[0].dientich,
                 rows[0].thoihan) == (1, f"Đất {n}.1",
@@ -547,18 +537,17 @@ def test_commit_land_rows_3x20_roundtrip(db):
         assert rows[-1].vitri == 20
     wire0 = result["stage"]["assets"][0]["land_rows"]
     assert len(wire0) == 20 and wire0[0]["loai_dat"] == "Đất 1.1"
-    assert len(_payload_assets(db, case_id)[0]["land_rows"]) == 20
 
 
 def test_two_cases_sharing_property_word_uses_own_snapshot(db):
-    """AC5: hai hồ sơ dùng chung một master property — Word của mỗi hồ sơ
-    đọc đúng snapshot đã commit của mình, không bị commit hồ sơ kia kéo."""
+    """AC5: hai hồ sơ dùng chung một identity property — Word của mỗi hồ
+    sơ đọc cụm đất của dòng hồ sơ mình, không bị hồ sơ kia kéo."""
     people, assets, state = _create_args()
     data_a = _create(db, people, assets, state)
     case_a, prop_id = data_a["case"]["id"], \
         data_a["stage"]["assets"][0]["entity_id"]
 
-    # Hồ sơ B tạo với tài sản khác, rồi commit trỏ sang cùng master prop
+    # Hồ sơ B tạo với tài sản khác, rồi commit trỏ sang cùng identity prop
     people_b = [_person_row(ho_ten="Lê Văn C", ngay_chet="2020-01-01",
                             so_giay_to="111222333444"),
                 _person_row(ho_ten="Phạm Thị D", gioi_tinh="Nữ",
@@ -573,16 +562,15 @@ def test_two_cases_sharing_property_word_uses_own_snapshot(db):
                                              "thoi_han": "x"}])],
                      state_b)
     case_b = data_b["case"]["id"]
-    _commit(db, case_b, 1, people_b, [_asset_row(
-        entity_id=prop_id,
+    _commit(db, case_b, 1, people_b, [_asset_wire(
+        data_b, entity_id=None, so_serial="DD123456",
         land_rows=[{"loai_dat": "CLN", "dien_tich": 90,
                     "thoi_han": "Đến 2043"}])])
 
-    # Master bị commit của B ghi đè — đúng semantics master dùng chung
-    row = db.query(PropertyLandRow).filter_by(property_id=prop_id).one()
-    assert row.loaidat == "CLN"
+    # Không còn mirror/master land rows để ghi đè.
+    assert db.get(Property, prop_id).land_rows == []
 
-    # Nhưng Word của A đọc snapshot A, Word của B đọc snapshot B
+    # Word của A đọc dòng A, Word của B đọc dòng B
     map_a = word_engine.build_template_mapping(db.get(InheritanceCase, case_a))
     map_b = word_engine.build_template_mapping(db.get(InheritanceCase, case_b))
     assert map_a["[loaidat11]"] == "ODT"
@@ -607,98 +595,70 @@ def test_standalone_thoi_han_not_grafted_into_word_cluster(db):
     assert mapping["[Tài sản 1 - Thời hạn]"] == "Lâu dài lẻ"
 
 
-def test_get_warns_orphan_and_invalid_and_overflow(db):
-    """workspace_get báo data warning cho 3 loại legacy land data."""
-    deceased = Customer(ho_ten="Người Chết", ngay_chet=date(2020, 1, 1))
-    orphan = Property(so_serial="DD000001", dia_chi="a",
-                      thoi_han="Lâu dài")
-    broken = Property(so_serial="DD000002", dia_chi="b",
-                      land_rows_json="not-json{{{")
-    overflow = Property(so_serial="DD000003", dia_chi="c",
-                        land_rows_json=json.dumps([
-                            {"loai_dat": "X"} for _ in range(25)]))
-    ok = Property(so_serial="DD000004", dia_chi="d",
-                  land_rows_json=json.dumps([{"loai_dat": "ODT",
-                                              "dien_tich": 10,
-                                              "thoi_han": "Lâu dài"}]),
-                  thoi_han="Lâu dài")
-    db.add_all([deceased, orphan, broken, overflow, ok])
+def test_land_rows_null_vs_empty_and_no_master_warning_path(db):
+    """`land_rows=null` giữ null, `[]` giữ [] (land_rows_present);
+    không còn đường cảnh báo/fallback dữ liệu master legacy."""
+    people, assets, state = _create_args()
+    assets[0]["land_rows"] = None
+    data = _create(db, people, assets, state)
+    case_id = data["case"]["id"]
+    asset_row_id = data["stage"]["assets"][0]["row_id"]
+    prop_id = data["stage"]["assets"][0]["entity_id"]
+    db.add(PropertyLandRow(
+        property_id=prop_id, vitri=1, loaidat="ODT", dientich=10.0,
+        thoihan="Lâu dài"))
     db.flush()
-    case = InheritanceCase(
-        nguoi_chet_id=deceased.id, tai_san_id=orphan.id,
-        ngay_lap_ho_so=date(2026, 9, 1), loai_van_ban="khai_nhan",
-        trang_thai="draft")
-    db.add(case)
-    db.flush()
-    for prop in (orphan, broken, overflow, ok):
-        db.add(InheritanceCaseProperty(
-            case_id=case.id, property_id=prop.id,
-            is_primary=prop is orphan))
-    db.commit()
-    # >3 asset → cần payload thủ công (commit_stage chặn asset_limit)
-    payload = {"schemaVersion": 3, "case_type": "inheritance",
-               "stage": [{"id": str(deceased.id), "row_id": str(uuid.uuid4()),
-                          "ho_ten": deceased.ho_ten}],
-               "assets": [{"id": str(p.id), "row_id": str(uuid.uuid4()),
-                           "is_primary": i == 0}
-                          for i, p in enumerate((orphan, broken, overflow, ok))],
-               "diagram": {}}
-    case.case_state_json = json.dumps(payload)
-    db.commit()
 
-    codes = _land_warning_codes(CaseWorkspaceService(db).get(case.id))
-    assert "stage.orphan_thoi_han" in codes          # orphan: thoi_han lẻ
-    assert "stage.legacy_land_rows_invalid" in codes  # broken JSON
-    assert "stage.legacy_land_rows_overflow" in codes # 25 cụm
-    assert "stage.legacy_asset_overflow" in codes     # 4 asset > 3
-    # tài sản khớp thoihan với thời hạn lẻ → không báo orphan cho nó
-    orphan_msgs = [w["message"] for w in
-                   CaseWorkspaceService(db).get(case.id)["warnings"]
-                   if w["code"] == "stage.orphan_thoi_han"]
-    assert len(orphan_msgs) == 1
+    result = CaseWorkspaceService(db).get(case_id)
+    assert result["stage"]["assets"][0]["land_rows"] is None
+    assert not result.get("warnings")
+
+    stage = result["stage"]
+    stage["assets"][0]["land_rows"] = []
+    CaseWorkspaceService(db).commit_stage(
+        case_id, result["case"]["revision"], stage)
+    reopened = CaseWorkspaceService(db).get(case_id)
+    assert reopened["stage"]["assets"][0]["land_rows"] == []
+    assert _case_land_rows(db, asset_row_id) == []
 
 
 def test_reopen_commit_noop_preserves_own_snapshot(db):
-    """MIN-141 đợt 2 fix: mở lại Stage hồ sơ A (đọc snapshot A, không kéo
-    master mà hồ sơ B vừa đổi) rồi commit nguyên trạng → snapshot A giữ
-    nguyên giá trị, Word vẫn đúng."""
+    """Mở lại Stage hồ sơ A (đọc dòng A, không kéo dòng B) rồi commit
+    nguyên trạng → dòng đất A giữ nguyên, Word vẫn đúng."""
     people, assets, state = _create_args()
     data_a = _create(db, people, assets, state)
     case_a = data_a["case"]["id"]
-    prop_id = data_a["stage"]["assets"][0]["entity_id"]
+    asset_row_a = data_a["stage"]["assets"][0]["row_id"]
 
-    # Hồ sơ B trỏ cùng master property và đổi cụm đất thành CLN
+    # Hồ sơ B trỏ cùng identity property và đổi cụm đất thành CLN
     people_b = [_person_row(ho_ten="Lê Văn C", ngay_chet="2020-01-01",
                             so_giay_to="111222333444")]
     state_b = _v3_state([_node("owner", people_b[0]["row_id"], own=[1])])
     data_b = _create(db, people_b,
                      [_asset_row(so_serial="FF123456")], state_b)
-    _commit(db, data_b["case"]["id"], 1, people_b, [_asset_row(
-        entity_id=prop_id, so_serial="EE123456",
+    _commit(db, data_b["case"]["id"], 1, people_b, [_asset_wire(
+        data_b, entity_id=None, so_serial="DD123456",
         land_rows=[{"loai_dat": "CLN", "dien_tich": 90,
                     "thoi_han": "Đến 2043"}])])
-    assert db.query(PropertyLandRow).filter_by(
-        property_id=prop_id).one().loaidat == "CLN"
 
     service = CaseWorkspaceService(db)
     reopened = service.get(case_a)
-    # Stage A đọc snapshot A — ODT, không phải CLN của master
+    # Stage A đọc dòng A — ODT, không phải CLN của B.
     assert reopened["stage"]["assets"][0]["land_rows"][0][
         "loai_dat"] == "ODT"
-    # Commit nguyên trạng payload vừa mở → snapshot A không đổi
+    # Commit nguyên trạng payload vừa mở → dòng A không đổi
     result = service.commit_stage(
         case_a, reopened["case"]["revision"],
         reopened["stage"])
     assert result["revision"] == 2
-    snap = _payload_assets(db, case_a)[0]
-    assert snap["land_rows"][0]["loaidat"] == "ODT"
+    assert _case_land_rows(db, asset_row_a)[0].loaidat == "ODT"
     assert word_engine.build_template_mapping(
         db.get(InheritanceCase, case_a))["[loaidat11]"] == "ODT"
 
 
-def test_pointer_snapshot_falls_back_to_master_rows(db):
-    """Snapshot legacy chỉ có con trỏ {id,row_id,is_primary} → vẫn đọc
-    master (bảng con), không đọc nhầm snapshot rỗng."""
+def test_pointer_json_ignored_case_rows_are_sot(db):
+    """JSON assets kiểu pointer legacy không còn là nguồn; master
+    PropertyLandRow cũng không được fallback."""
     people, _assets, state = _create_args()
     prop = Property(so_serial="DD777777", dia_chi="Thửa cũ")
     prop.land_rows = [PropertyLandRow(
@@ -715,7 +675,7 @@ def test_pointer_snapshot_falls_back_to_master_rows(db):
     db.commit()
     result = CaseWorkspaceService(db).get(case.id)
     assert result["stage"]["assets"][0]["land_rows"] == [
-        {"loai_dat": "BHK", "dien_tich": 33.0, "thoi_han": "50 năm"}]
+        {"loai_dat": "ODT", "dien_tich": 85.5, "thoi_han": "Lâu dài"}]
 
 
 def test_inline_create_writes_land_rows_and_mirror_atomically(db):

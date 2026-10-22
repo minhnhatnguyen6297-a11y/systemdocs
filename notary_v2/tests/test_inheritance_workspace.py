@@ -21,6 +21,8 @@ from sqlalchemy.orm import sessionmaker
 
 import database
 from models import (
+    CaseAssetRow,
+    CasePersonRow,
     Customer,
     InheritanceCase,
     InheritanceCaseProperty,
@@ -53,25 +55,29 @@ def db(session_factory):
 
 
 def _seed_case(db, *, trang_thai="draft", loai_van_ban="khai_nhan"):
-    """Case với Stage đã commit (4 người) trong case_state_json v3.
+    """Case với Stage đã commit (4 người) bằng dòng case-owned B.
 
     Gia đình: chủ đất đã chết (2011) + vợ sống + con chết trước chủ đất
     (2010) + cháu nội sống — đủ để kiểm chứng nhánh thế vị (representation).
     Trả (case, people{key:Customer}, rows{key:row_id}, prop).
     """
     prop = Property(so_serial="DD123456", dia_chi="Thửa 123, tờ 45")
-    people = {
-        "owner": Customer(ho_ten="Nguyễn Văn An", gioi_tinh="Nam",
-                          ngay_sinh=date(1950, 1, 1),
-                          ngay_chet=date(2011, 5, 15)),
-        "spouse": Customer(ho_ten="Nguyễn Thị Bình", gioi_tinh="Nữ",
-                           ngay_sinh=date(1955, 3, 2)),
-        "child": Customer(ho_ten="Nguyễn Văn Con", gioi_tinh="Nam",
-                          ngay_sinh=date(1978, 7, 20),
-                          ngay_chet=date(2010, 1, 1)),
-        "gc": Customer(ho_ten="Nguyễn Văn Cháu", gioi_tinh="Nam",
-                       ngay_sinh=date(2000, 6, 6)),
+    identities = {
+        "owner": ("Nguyễn Văn An", "Nam", date(1950, 1, 1),
+                  date(2011, 5, 15), "001111111111", "nguyen van an"),
+        "spouse": ("Nguyễn Thị Bình", "Nữ", date(1955, 3, 2),
+                   None, "002222222222", "nguyen thi binh"),
+        "child": ("Nguyễn Văn Con", "Nam", date(1978, 7, 20),
+                  date(2010, 1, 1), "003333333333", "nguyen van con"),
+        "gc": ("Nguyễn Văn Cháu", "Nam", date(2000, 6, 6),
+               None, "004444444444", "nguyen van chau"),
     }
+    people = {}
+    for key, (name, gender, born, died, number, anchor) in identities.items():
+        people[key] = Customer(
+            ho_ten=name, gioi_tinh=gender, ngay_sinh=born, ngay_chet=died,
+            so_giay_to=number, name_anchor=anchor,
+            document_anchor=number)
     db.add(prop)
     db.add_all(people.values())
     db.flush()
@@ -81,23 +87,37 @@ def _seed_case(db, *, trang_thai="draft", loai_van_ban="khai_nhan"):
         trang_thai=trang_thai)
     db.add(case)
     db.flush()
-    db.add(InheritanceCaseProperty(
-        case_id=case.id, property_id=prop.id, is_primary=True))
     rows = {key: str(uuid.uuid4()) for key in people}
-    case.case_state_json = json.dumps({
-        "schemaVersion": 3,
-        "owner_row_id": rows["owner"],
-        "stage": [{"id": str(c.id), "row_id": rows[k],
-                   "ho_ten": c.ho_ten,
-                   "ngay_chet": c.ngay_chet.isoformat() if c.ngay_chet
-                    else None}
-                  for k, c in people.items()],
-        "assets": [{"id": str(prop.id), "row_id": str(uuid.uuid4()),
-                    "is_primary": True}],
+    for index, (key, customer) in enumerate(people.items(), start=1):
+        db.add(CasePersonRow(
+            row_id=rows[key], case_id=case.id, customer_id=customer.id,
+            vitri=index, ho_ten=customer.ho_ten,
+            gioi_tinh=customer.gioi_tinh,
+            ngay_sinh=(customer.ngay_sinh.isoformat()
+                       if customer.ngay_sinh else None),
+            ngay_chet=(customer.ngay_chet.isoformat()
+                       if customer.ngay_chet else None),
+            so_giay_to=customer.so_giay_to,
+            dia_chi="xã A"))
+    asset_row_id = str(uuid.uuid4())
+    db.add(CaseAssetRow(
+        row_id=asset_row_id, case_id=case.id, property_id=prop.id,
+        vitri=1, so_serial=prop.so_serial, dia_chi=prop.dia_chi,
+        land_rows_present=False))
+    db.add(InheritanceCaseProperty(
+        case_id=case.id, case_asset_row_id=asset_row_id,
+        property_id=prop.id, is_primary=True))
+    payload = {
+        "schemaVersion": 4,
+        "case": {},
         "diagram": {"state": {"version": 3, "domain": "inheritance",
                               "nodes": []},
                     "render_model": None},
-    }, ensure_ascii=False)
+    }
+    if loai_van_ban not in ("chuyen_nhuong", "tang_cho", "cho_thue",
+                            "dat_coc"):
+        payload["owner_row_id"] = rows["owner"]
+    case.case_state_json = json.dumps(payload, ensure_ascii=False)
     db.commit()
     return case, people, rows, prop
 
@@ -335,9 +355,9 @@ def test_evaluate_two_party_bad_canonical(db):
     assert exc.value.code == "diagram_invalid_state"
 
 
-def test_evaluate_allowed_on_locked_case(db):
-    """Read-only theo DB — được phép trên case locked (contract §7.4)."""
-    case, _people, rows, _prop = _seed_case(db, trang_thai="locked")
+def test_evaluate_allowed_on_done_case(db):
+    """Read-only theo DB — evaluate được trên case done (Done sửa được)."""
+    case, _people, rows, _prop = _seed_case(db, trang_thai="done")
 
     data = _svc(db).evaluate_diagram(case.id, _draft_state(rows))
 
@@ -427,26 +447,20 @@ def test_save_persists_state_render_model_and_bumps_revision(
         fresh = db2.get(InheritanceCase, case.id)
         assert fresh.workspace_revision == 2
         persisted = json.loads(fresh.case_state_json)
-        assert persisted["schemaVersion"] == 3
+        assert persisted["schemaVersion"] == 4
         assert persisted["diagram"]["state"] == state
-        assert persisted["case"]["chudat"] == "Nguyễn Văn An"
         assert persisted["diagram"]["render_model"]["engineVersion"] == 2
-        # legacy projection cho web cũ (parity commit_stage)
-        engine_state = persisted["diagram"]["engineState"]
-        legacy_ids = {n["id"]: n for n in engine_state["nodes"]}
-        assert legacy_ids["owner"]["personId"] == str(people["owner"].id)
-        assert persisted["diagram"]["assignments"]["owner"] == \
-            str(people["owner"].id)
-        col = json.loads(fresh.engine_state_json)
-        assert col["nodes"][0]["personId"] == str(people["owner"].id)
-        # participants + nguoi_chet_id sync theo diagram mới
+        # Stage là rows case-owned — không còn bản sao trong JSON.
+        assert "stage" not in persisted and "assets" not in persisted
+        # engine_state_json không còn được đọc/ghi trên case B.
+        assert fresh.engine_state_json is None
+        # participants + nguoi_chet_id sync theo diagram mới, keyed row_id.
         assert fresh.nguoi_chet_id == people["owner"].id
-        parts = {p.customer_id: p for p in fresh.participants}
-        assert people["owner"].id not in parts
-        assert parts[people["spouse"].id].vai_tro == "Vợ/Chồng"
-        assert parts[people["gc"].id].vai_tro == "Cháu"
-        assert parts[people["gc"].id].parent_customer_id == \
-            people["child"].id
+        parts = {p.case_person_row_id: p for p in fresh.participants}
+        assert rows["owner"] not in parts
+        assert parts[rows["spouse"]].vai_tro == "Vợ/Chồng"
+        assert parts[rows["gc"]].vai_tro == "Cháu"
+        assert parts[rows["gc"]].parent_case_person_row_id == rows["child"]
     finally:
         db2.close()
 
@@ -486,15 +500,21 @@ def test_save_prunes_out_of_range_positions(db):
 
 
 def test_save_does_not_change_stage(db):
-    """diagram_save không đổi stage.people/stage.assets (contract §13.7)."""
+    """diagram_save không đổi stage.people/stage.assets (rows B)."""
+    from services.case_workspace import CaseWorkspaceService
+
     case, _people, rows, _prop = _seed_case(db)
+    before = CaseWorkspaceService(db).get(case.id)["stage"]
 
     _svc(db).save_diagram(case.id, 1, _draft_state(rows))
 
+    after = CaseWorkspaceService(db).get(case.id)["stage"]
+    assert after == before
+    assert {r["row_id"] for r in after["people"]} == set(rows.values())
+    assert len(after["assets"]) == 1
+    assert after["owner_row_id"] == rows["owner"]
     persisted = json.loads(db.get(InheritanceCase, case.id).case_state_json)
-    assert {r["row_id"] for r in persisted["stage"]} == set(rows.values())
-    assert len(persisted["assets"]) == 1
-    assert persisted["owner_row_id"] == rows["owner"]
+    assert "stage" not in persisted and "assets" not in persisted
 
 
 def test_save_stale_and_ahead_base_revision_conflict(db):
@@ -515,12 +535,15 @@ def test_save_stale_and_ahead_base_revision_conflict(db):
     assert stale.value.details["server_revision"] == 2
 
 
-def test_save_locked_case(db):
-    case, _people, rows, _prop = _seed_case(db, trang_thai="locked")
+def test_save_done_case_keeps_done_and_bumps_revision(db):
+    """Done sửa được: diagram_save giữ status done, revision +1."""
+    case, _people, rows, _prop = _seed_case(db, trang_thai="done")
 
-    with pytest.raises(WorkspaceError) as exc:
-        _svc(db).save_diagram(case.id, 1, _draft_state(rows))
-    assert exc.value.code == "workspace_locked"
+    data = _svc(db).save_diagram(case.id, 1, _draft_state(rows))
+
+    assert data["revision"] == 2
+    db.expire_all()
+    assert db.get(InheritanceCase, case.id).trang_thai == "done"
 
 
 def test_save_unsupported_case_type(db):
@@ -549,7 +572,9 @@ def test_save_two_party_canonical(db):
     assert data["diagram"]["render_model"]["status"] == "unsupported"
     persisted = json.loads(
         db.get(InheritanceCase, case.id).case_state_json)
-    assert persisted["case_type"] == "two_party"
+    from services.case_workspace import CaseWorkspaceService
+    view = CaseWorkspaceService(db).get(case.id)
+    assert view["case"]["case_type"] == "two_party"
     assert "owner_row_id" not in persisted
     # projections engine legacy phải bị gỡ trên two_party
     for key in ("engineInput", "engineState", "engineResult", "assignments"):
@@ -846,20 +871,18 @@ def test_evaluate_draft_outside_stage_and_invalid_wire(db):
 
 
 def test_save_diagram_keeps_year_only_date_precision(db):
-    """Lưu sơ đồ ghi lại `case_state_json.stage` từ `_compose_stage` —
-    năm riêng đã lưu không được đệm thành `01/01`."""
+    """Lưu sơ đồ không đụng dòng Người — năm riêng đã lưu giữ nguyên."""
+    from services.case_workspace import CaseWorkspaceService
+
     case, _people, rows, _prop = _seed_case(db)
-    payload = json.loads(case.case_state_json)
-    for row in payload["stage"]:
-        if row["row_id"] == rows["owner"]:
-            row["ngay_sinh"] = "1950"      # năm riêng đã lưu
-    case.case_state_json = json.dumps(payload, ensure_ascii=False)
+    owner_row = db.get(CasePersonRow, rows["owner"])
+    owner_row.ngay_sinh = "1950"      # năm riêng đã lưu
     db.commit()
 
     _svc(db).save_diagram(case.id, 1, _draft_state(rows))
 
-    persisted = json.loads(db.get(InheritanceCase, case.id).case_state_json)
-    owner = next(r for r in persisted["stage"] if r["row_id"] == rows["owner"])
+    owner = next(r for r in CaseWorkspaceService(db).get(case.id)[
+        "stage"]["people"] if r["row_id"] == rows["owner"])
     assert owner["ngay_sinh"] == "1950"
 
 
@@ -873,13 +896,9 @@ def test_branch_tombstones_coparent_save_reopen_and_reject_preserve(
     db.add(spouse)
     db.flush()
     rows["S"] = str(uuid.uuid4())
-    payload = json.loads(case.case_state_json)
-    payload["stage"].append({
-        "id": str(spouse.id), "row_id": rows["S"], "ho_ten": spouse.ho_ten,
-    })
-    payload["assets"][0].update(
-        so_serial=_prop.so_serial, dia_chi=_prop.dia_chi, land_rows=[])
-    case.case_state_json = json.dumps(payload, ensure_ascii=False)
+    db.add(CasePersonRow(
+        row_id=rows["S"], case_id=case.id, customer_id=spouse.id,
+        vitri=5, ho_ten=spouse.ho_ten, gioi_tinh="Nữ"))
     db.commit()
     before_stage = CaseWorkspaceService(db).get(case.id)["stage"]
     original = _draft_state(rows)
@@ -943,7 +962,7 @@ def test_case_landowner_text_transitions_saved_diagram_and_fresh_reopen(
         reopened = CaseWorkspaceService(reopened_session).get(case.id)
         assert reopened["case"]["chudat"] == "Nguyễn Văn An"
         persisted = json.loads(reopened_session.get(InheritanceCase, case.id).case_state_json)
-        assert persisted["case"]["chudat"] == "Nguyễn Văn An"
+        assert "chudat" not in persisted.get("case", {})
         evidence = os.environ.get("CASE_FIELDS_EVIDENCE_DIR")
         if evidence:
             target = Path(evidence)
@@ -951,9 +970,8 @@ def test_case_landowner_text_transitions_saved_diagram_and_fresh_reopen(
             (target / "diagram-case-proof.json").write_text(json.dumps({
                 "scope": "controlled synthetic DB; real save_diagram and fresh sessions",
                 "first_case": first["case"], "reopened_case": reopened["case"],
-                "persisted_case": persisted["case"],
                 "saved_nodes": persisted["diagram"]["state"]["nodes"],
-                "stage_snapshot": persisted["stage"],
+                "stage_snapshot": reopened["stage"],
             }, ensure_ascii=False, indent=2), encoding="utf-8")
     finally:
         reopened_session.close()

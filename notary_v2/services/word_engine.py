@@ -504,16 +504,13 @@ def _land_rows_for(prop: Any) -> list[dict[str, str]]:
 
 
 def _load_case_state(case: Any) -> dict[str, Any]:
-    raw = _safe_text(getattr(case, "case_state_json", ""))
-    if not raw:
-        return {}
-    try:
-        payload = json.loads(raw)
-    except Exception:
-        return {}
-    if not isinstance(payload, dict):
-        return {}
-    return payload
+    """View RAM Storage B: rows case-owned + meta + Diagram/docx_import.
+
+    Stage không còn nằm trong `case_state_json` (schemaVersion 4) — reader
+    ghép từ `case_person_rows`/`case_asset_rows`; không fallback master.
+    """
+    from services.case_rows import materialize_case_state
+    return materialize_case_state(case)
 
 
 def _word_person_from_stage(stage_person: dict[str, Any],

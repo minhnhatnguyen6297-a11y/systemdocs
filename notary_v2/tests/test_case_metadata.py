@@ -9,18 +9,15 @@ backend → snapshot → Word.
   create → commit → reload → export; metadata nằm trong payload.case;
   commit meta cùng Stage trong một transaction (revision/idempotency).
 """
-import json
-import sqlite3
 import uuid
 from datetime import date
-from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 import database
-from models import Customer, InheritanceCase, Property, PropertyLandRow
+from models import CaseAssetRow, Customer, InheritanceCase
 from services import word_engine
 from services.case_workspace import CaseWorkspaceService, WorkspaceError
 
@@ -94,7 +91,8 @@ def _create_args(people_overrides=(), case_meta=None, with_state=False,
     }
     owner_fields.update(people_overrides[0] if people_overrides else {})
     owner = _person_row(**owner_fields)
-    heir_fields = {"ho_ten": "Trần Thị Sống", "ngay_sinh": "1980-03-02"}
+    heir_fields = {"ho_ten": "Trần Thị Sống", "ngay_sinh": "1980-03-02",
+                   "so_giay_to": "001234567891"}
     heir_fields.update(
         people_overrides[1] if len(people_overrides) > 1 else {})
     heir = _person_row(**heir_fields)
@@ -126,11 +124,6 @@ def _create(db, **kwargs):
 def _commit(db, case_id, base_revision, stage, case_meta=None):
     return _service(db).commit_stage(
         case_id, base_revision, stage, case_meta)
-
-
-def _snapshot(db, case_id):
-    case = db.get(InheritanceCase, case_id)
-    return json.loads(case.case_state_json)
 
 
 # ============================================================ Người
@@ -187,7 +180,7 @@ def test_deceased_person_confirmed_evidence_persists(db):
     assert owner["loai_giay_to"] == "Giấy chứng tử"
     assert owner["noi_cap"] == "UBND xã A"
 
-    snap_person = _snapshot(db, data["case"]["id"])["stage"][0]
+    snap_person = _service(db).get(data["case"]["id"])["stage"]["people"][0]
     assert snap_person["loai_giay_to"] == "Giấy chứng tử"
     assert snap_person["noi_cap"] == "UBND xã A"
     # Reopen — wire phải trả lại đúng giá trị snapshot đã commit.
@@ -268,11 +261,12 @@ def test_case_meta_create_canonical_round_trip(db):
     assert case["ghi_chu"] == "ghi chú mẫu"
     assert case["ngay_lap_ho_so"] == "2026-09-02"
 
-    snap_case = _snapshot(db, case["id"])["case"]
-    assert snap_case["noiniemyet"] == "UBND xã B"
-    assert snap_case["nguoinhanuyquyen"] == {"id": uq.id, "ten": uq.ho_ten}
-    assert snap_case["noidungviec"] == "Đính chính năm sinh"
-    assert snap_case["ghichu"] == "ghi chú mẫu"
+    stored = db.get(InheritanceCase, case["id"])
+    assert stored.noi_niem_yet == "UBND xã B"
+    assert stored.nguoi_nhan_uy_quyen == uq.ho_ten
+    assert stored.nguoi_nhan_uy_quyen_id == uq.id
+    assert stored.noi_dung_viec == "Đính chính năm sinh"
+    assert stored.ghi_chu == "ghi chú mẫu"
 
 
 def test_case_meta_commit_same_transaction(db):
@@ -297,10 +291,7 @@ def test_case_meta_commit_same_transaction(db):
     assert case.nguoi_nhan_uy_quyen == "Ông Ủy Quyền"
     assert case.nguoi_nhan_uy_quyen_id == uq.id
     assert case.noi_dung_viec == "Đính chính hộ"
-    snap_case = json.loads(case.case_state_json)["case"]
-    assert snap_case["noiniemyet"] == "UBND xã C"
-    assert snap_case["nguoinhanuyquyen"] == {
-        "id": uq.id, "ten": "Ông Ủy Quyền"}
+    assert case.ghi_chu is None
 
     reopened = _service(db).get(case_id)["case"]
     assert reopened["noi_niem_yet"] == "UBND xã C"
@@ -554,14 +545,9 @@ def test_word_canonical_case_meta_tokens_render(db):
 
 
 def test_snapshot_explicit_empty_meta_kept_for_all_fields(db):
-    """Snapshot commit null/rỗng chủ ý → Word xuất rỗng dù cột master
-    sau đó đổi — áp dụng noiniemyet/nguoinhanuyquyen/noidungviec."""
-    data = _create(db, with_state=True)  # meta để trống → snapshot null
+    """Commit meta null → cột là SOT, Word xuất rỗng (không đắp giá trị khác)."""
+    data = _create(db, with_state=True)  # meta để trống → cột null
     case = db.get(InheritanceCase, data["case"]["id"])
-    case.noi_niem_yet = "UBND xã Đổi Sau"
-    case.nguoi_nhan_uy_quyen = "Người Đổi Sau"
-    case.noi_dung_viec = "Nội dung đổi sau"
-    db.flush()
     mapping = word_engine.build_template_mapping(case)
     assert mapping["[Nơi niêm yết]"] == ""
     assert mapping["[Ngườ ủy quyền]"] == ""
@@ -572,7 +558,7 @@ def test_snapshot_explicit_empty_meta_kept_for_all_fields(db):
 
 
 def test_snapshot_cleared_meta_via_commit_kept_empty(db):
-    """Meta có giá trị → commit xóa (null) → master đổi sau → vẫn rỗng."""
+    """Meta có giá trị → commit xóa (null) → cột null, Word xuất rỗng."""
     data = _create(db, with_state=True, case_meta={
         "document_type": "khai_nhan", "ngay_lap_ho_so": "2026-09-01",
         "noiniemyet": "UBND xã Cũ", "noidungviec": "Việc cũ"})
@@ -581,31 +567,26 @@ def test_snapshot_cleared_meta_via_commit_kept_empty(db):
     _commit(db, case_id, data["case"]["revision"], stage,
             case_meta={"noiniemyet": None, "noidungviec": None})
     case = db.get(InheritanceCase, case_id)
-    case.noi_niem_yet = "UBND xã Sửa Ngoài"
-    case.noi_dung_viec = "Sửa ngoài"
-    db.flush()
+    assert case.noi_niem_yet is None
+    assert case.noi_dung_viec is None
     mapping = word_engine.build_template_mapping(case)
     assert mapping["[Nơi niêm yết]"] == ""
     assert mapping["[Nội dung việc]"] == ""
 
 
-def test_legacy_snapshot_without_case_block_reads_master(db):
-    """Hồ sơ legacy: case_state_json không có block `case` → fallback
-    cột master như trước (không nuốt giá trị)."""
+def test_case_meta_reads_columns_as_sot_not_snapshot(db):
+    """Metadata cột là SOT: sửa cột sau commit thì Word đọc giá trị cột,
+    không giữ bản sao JSON."""
     data = _create(db, with_state=True, case_meta={
         "document_type": "khai_nhan", "ngay_lap_ho_so": "2026-09-01",
         "noiniemyet": "UBND xã Snap", "noidungviec": "Việc snap"})
     case = db.get(InheritanceCase, data["case"]["id"])
-    # Giả lập snapshot legacy: giữ stage/assets, bỏ block `case`.
-    payload = json.loads(case.case_state_json)
-    payload.pop("case", None)
-    case.case_state_json = json.dumps(payload, ensure_ascii=False)
-    case.noi_niem_yet = "UBND xã Master"
-    case.noi_dung_viec = "Việc master"
+    case.noi_niem_yet = "UBND xã Cột"
+    case.noi_dung_viec = "Việc cột"
     db.flush()
     mapping = word_engine.build_template_mapping(case)
-    assert mapping["[Nơi niêm yết]"] == "UBND xã Master"
-    assert mapping["[Nội dung việc]"] == "Việc master"
+    assert mapping["[Nơi niêm yết]"] == "UBND xã Cột"
+    assert mapping["[Nội dung việc]"] == "Việc cột"
 
 
 # ============================================================ MIN-141
@@ -640,9 +621,9 @@ def test_word_person_slots_isolated_from_master_edits_after_commit(db):
     data = _create(db, with_state=True,
                    people_overrides=({}, {"ngay_cap": "2024-09-30"}))
     case = db.get(InheritanceCase, data["case"]["id"])
-    snap = _snapshot(db, data["case"]["id"])
-    heir_entity = int(snap["stage"][1]["id"])
-    owner_entity = int(snap["stage"][0]["id"])
+    owner_entity = data["stage"]["people"][0]["entity_id"]
+    heir_entity = data["stage"]["people"][1]["entity_id"]
+    assert owner_entity is not None and heir_entity is not None
     # Consumer khác sửa master: đổi tên chủ đất + ngay_cap người thừa
     # kế qua mốc (live derive giờ trả "Căn cước").
     db.get(Customer, owner_entity).ho_ten = "Tên Master Bị Đổi"
@@ -656,43 +637,40 @@ def test_word_person_slots_isolated_from_master_edits_after_commit(db):
     assert mapping["[ngaycap3]"] == "30/09/2024"
 
 
-def test_derived_fields_legacy_snapshot_missing_source_keys(db):
-    """Snapshot cũ thiếu key nguồn (ngay_cap/ngay_chet) → giá trị đã
-    commit coi như bằng chứng xác nhận, KHÔNG bị tính lại thành None."""
+def test_derived_fields_come_from_case_rows_not_master(db):
+    """Bằng chứng suy ra đọc từ dòng hồ sơ, không đọc lại master live."""
     data = _create(db, people_overrides=({}, {"ngay_cap": "2024-10-01"}))
     heir = data["stage"]["people"][1]
     assert heir["loai_giay_to"] == "Căn cước"
-    # Giả lập snapshot cũ: xoá key nguồn khỏi row đã commit.
-    case = db.get(InheritanceCase, data["case"]["id"])
-    payload = json.loads(case.case_state_json)
-    payload["stage"][1].pop("ngay_cap", None)
-    payload["stage"][1].pop("ngay_chet", None)
-    case.case_state_json = json.dumps(payload, ensure_ascii=False)
+    # Master dùng chung bị xóa nguồn — row vẫn là SOT.
+    master = db.get(Customer, heir["entity_id"])
+    master.ngay_cap = None
     db.flush()
-    stage = _service(db).get(data["case"]["id"])["stage"]
-    updated = _commit(db, data["case"]["id"], data["case"]["revision"],
-                      stage)
-    assert updated["stage"]["people"][1]["loai_giay_to"] == "Căn cước"
+    reopened = _service(db).get(data["case"]["id"])
+    heir_row = reopened["stage"]["people"][1]
+    assert heir_row["ngay_cap"] == "2024-10-01"
+    assert heir_row["loai_giay_to"] == "Căn cước"
+    assert heir_row["noi_cap"] == "Bộ Công an"
+    assert heir_row["loai_dia_chi"] == "Cư trú tại"
 
 
-def test_asset_standalone_thoi_han_key_absent_preserves_master(db):
-    """Commit với asset KHÔNG có key thoi_han (form đã bỏ ô lẻ) → cột
-    master giữ nguyên giá trị lịch sử (còn để warning đối chiếu); asset
-    có key → ghi bình thường (tương thích client cũ)."""
+def test_asset_standalone_thoi_han_belongs_to_case_row(db):
+    """`thoi_han` tài sản là dữ kiện dòng hồ sơ; key vắng ghi null,
+    không đọc/ghi master Property."""
     data = _create(db)                      # _asset_row có thoi_han
     case_id = data["case"]["id"]
-    prop_id = int(_snapshot(db, case_id)["assets"][0]["entity_id"])
-    assert db.get(Property, prop_id).thoi_han == "Lâu dài"
+    asset_row_id = data["stage"]["assets"][0]["row_id"]
+    assert db.get(CaseAssetRow, asset_row_id).thoi_han == "Lâu dài"
     # Commit lại với key thoi_han bị bỏ khỏi row (UI mới không gửi).
     stage = _service(db).get(case_id)["stage"]
     stage["assets"][0].pop("thoi_han", None)
     rev = data["case"]["revision"]
     updated = _commit(db, case_id, rev, stage)
     db.expire_all()
-    assert db.get(Property, prop_id).thoi_han == "Lâu dài", \
-        "key vắng không được phá giá trị lẻ lịch sử trong master"
-    # Client cũ vẫn gửi key → ghi như trước.
+    assert db.get(CaseAssetRow, asset_row_id).thoi_han is None
+    assert updated["stage"]["assets"][0]["thoi_han"] is None
+    # Client cũ vẫn gửi key → ghi vào dòng hồ sơ.
     stage["assets"][0]["thoi_han"] = "50 năm"
     _commit(db, case_id, updated["revision"], stage)
     db.expire_all()
-    assert db.get(Property, prop_id).thoi_han == "50 năm"
+    assert db.get(CaseAssetRow, asset_row_id).thoi_han == "50 năm"
