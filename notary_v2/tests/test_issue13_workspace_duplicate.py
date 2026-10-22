@@ -141,6 +141,21 @@ def _row_free(stage):
     return out
 
 
+def _stage_content(stage):
+    """Nội dung Stage bỏ row_id + owner pointer (resolver cấp UUID mới)."""
+    content = _row_free(stage)
+    content.pop("owner_row_id", None)
+    return content
+
+
+def _owner_name(stage):
+    owner = stage.get("owner_row_id")
+    if owner is None:
+        return None
+    return next(row["ho_ten"] for row in stage["people"]
+                if row["row_id"] == owner)
+
+
 def _case_counts(db):
     return {
         "cases": db.query(InheritanceCase).count(),
@@ -878,3 +893,92 @@ def test_duplicate_two_party_copies_slots_without_owner(dataset, db, store):
     assert copied["diagram"]["render_model"]["status"] == "unsupported"
     assert db.query(InheritanceCase).filter_by(
         id=copied["case"]["id"]).one().nguoi_chet_id is None
+
+
+# ------------------------------ E1: hai khóa, độc lập, nguồn Done theo mốc
+
+
+def test_two_keys_two_independent_copies_and_draft_never_source(
+        dataset, db, session_factory, store):
+    """Hai khóa khác nhau → hai bản sao độc lập; chỉ bản đã lưu Done làm nguồn.
+
+    Bản sao 2 còn draft dù có mốc ghi mới hơn không bao giờ xuất hiện làm
+    nguồn. Replay cùng khóa bản sao 1 trả đúng bản sao 1, không tạo bản sao 3.
+    """
+    saved, _docx = _save_f1_source(db, dataset, store)
+    source_id = saved["case"]["id"]
+    key1, key2 = _uuid4(), _uuid4()
+    first = _duplicate(db, store, source_id, key1)
+    second = _duplicate(db, store, source_id, key2)
+    copy1, copy2 = first["case"]["id"], second["case"]["id"]
+
+    assert first["created"] is True and second["created"] is True
+    assert len({source_id, copy1, copy2}) == 3
+
+    rows1 = [row["row_id"] for row in first["stage"]["people"]] + \
+        [row["row_id"] for row in first["stage"]["assets"]]
+    rows2 = [row["row_id"] for row in second["stage"]["people"]] + \
+        [row["row_id"] for row in second["stage"]["assets"]]
+    source_rows = [row["row_id"] for row in saved["stage"]["people"]] + \
+        [row["row_id"] for row in saved["stage"]["assets"]]
+    assert not set(rows1) & set(rows2)
+    assert not set(rows1) & set(source_rows)
+    assert not set(rows2) & set(source_rows)
+
+    service = _service(db, store)
+    source_before = _source_snapshot(session_factory, source_id)
+    copy2_before = _source_snapshot(session_factory, copy2)
+
+    # Sửa Stage bản sao 1: bản sao 2 và nguồn gốc không đổi.
+    stage1 = service.get(copy1)["stage"]
+    edited = next(row for row in stage1["people"]
+                  if row["row_id"] == stage1["owner_row_id"])
+    edited["ho_ten"] = "Người Bản Sao Một"
+    service.commit_stage(copy1, first["case"]["revision"], stage1)
+    assert _source_snapshot(session_factory, source_id) == source_before
+    assert _source_snapshot(session_factory, copy2) == copy2_before
+
+    # Lưu bản sao 1 lên Done → mốc lưu mới nhất.
+    workspace1 = service.get(copy1)
+    case1 = workspace1["case"]
+    saved1 = service.save_case(
+        case_id=copy1, base_revision=case1["revision"],
+        case_meta={field: case1[field] for field in (
+            "case_type", "document_type", "ngay_lap_ho_so",
+            "noi_niem_yet", "nguoi_nhan_uy_quyen",
+            "nguoi_nhan_uy_quyen_id", "noi_dung_viec", "ghi_chu")},
+        stage=workspace1["stage"],
+        state=workspace1["diagram"]["state"])
+    assert saved1["case"]["status"] == "done"
+
+    resolved = service.source_latest()
+    assert resolved["source_case_id"] == copy1
+    assert resolved["source_status"] == "done"
+    assert _owner_name(resolved["stage"]) == "Người Bản Sao Một"
+    assert _stage_content(resolved["stage"]) == \
+        _stage_content(service.get(copy1)["stage"])
+    assert resolved["stage"]["owner_row_id"] not in rows1
+
+    # Bản sao 2 vẫn draft nhưng có mốc ghi mới hơn bản sao 1 → vẫn không
+    # được làm nguồn; resolver tiếp tục trả bản sao 1.
+    stage2 = service.get(copy2)["stage"]
+    stage2["people"][0]["dia_chi"] = "Địa chỉ bản sao hai"
+    service.commit_stage(copy2, second["case"]["revision"], stage2)
+    assert service.get(copy2)["case"]["status"] == "draft"
+
+    again = service.source_latest()
+    assert again["source_case_id"] == copy1
+    assert again["source_status"] == "done"
+    assert _owner_name(again["stage"]) == "Người Bản Sao Một"
+    assert "Địa chỉ bản sao hai" not in json.dumps(
+        again["stage"], ensure_ascii=False)
+
+    # Replay cùng khóa bản sao 1 → đúng bản sao 1, không tạo bản sao 3.
+    counts = _case_counts(db)
+    replay = _duplicate(db, store, source_id, key1)
+    assert replay["created"] is False
+    assert replay["case"]["id"] == copy1
+    assert replay["case"]["status"] == "done"
+    assert db.query(InheritanceCase).count() == counts["cases"]
+    assert _case_counts(db) == counts
+    assert service.source_latest()["source_case_id"] == copy1
