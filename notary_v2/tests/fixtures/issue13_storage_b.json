@@ -1,0 +1,666 @@
+{
+  "metadata": {
+    "issue": "13",
+    "commit": "storage-b-foundation",
+    "muc_dich": "Du lieu tong hop cho test nen Storage B (notary_v2/models.py). Khong phai ho so khach, khong chua PII that.",
+    "nguon_dap_an": "issue13-b-phase2-design-20261022.md Phan 7 — dap an chot doc lap voi code, khong lay output service/parser lam dap an.",
+    "uuid_pattern": "00000000-0000-4000-8000-000000000NNN (UUID v4 co dinh; NNN theo thiet ke: nguoi 101-103/111/301, tai san 201-204).",
+    "quy_uoc": {
+      "field_khong_neu": "null",
+      "so_serial_chua_biet": "\"\" (chuoi rong = thieu neo, khong tao Property)",
+      "land_rows": "null = khong co cum dat (land_rows_present=false); [] = co mang rong (land_rows_present=true, khong con); mang = giu nguyen vi tri, hang trong van la hang co vitri.",
+      "vitri": "1-based, thu tu mang wire.",
+      "identity_expected": "nhom_cung_id: moi nhom la cac alias cung mot ID identity; hai nhom khac nhau => ID khac nhau. id_null: alias khong du neo => identity null. Alias dang CASE:PROTOTYPE de phan biet khi hai Ho so cung nguoi.",
+      "khong_co_chuoi_gia": "Khong duoc xuat hien '(Chua ro)' hoac gia tri gia lap trong DB."
+    },
+    "bo_sung_ngoai_phan_7": {
+      "T203": "Asset toi thieu hop le cua F3 (row 301 chi co ten, khong asset goc): serial rong => identity null.",
+      "T204": "Chi dung cho test phan biet land_rows=[] (present=true, khong con) voi land_rows=null (present=false); khong thuoc kich ban nghiep vu F1-F7.",
+      "T205": "Dong tai san rieng cua F6B (cung serial SYN B 001 voi F6A) de hai Ho so trong CUNG mot DB khong trung row_id PK nhung van chung property_id."
+    },
+    "bo_bien_the": "F3/F7 khong con bien the 'row chi so, khong ten'; F7 bat dau tu dong P301 cua F3 (chi ten) roi them so."
+  },
+  "people_prototypes": {
+    "P101": {
+      "row_id": "00000000-0000-4000-8000-000000000101",
+      "ho_ten": "Nguyễn Đăng An",
+      "gioi_tinh": "Nam",
+      "ngay_sinh": "1950",
+      "ngay_chet": "2011-05-15",
+      "so_giay_to": "07, quyển 1",
+      "ngay_cap": "2011-05-20",
+      "noi_cap": "UBND phường Thử Nghiệm",
+      "dia_chi": "Khu Giả Lập A",
+      "place_of_origin": null,
+      "loai_giay_to": "Giấy chứng tử",
+      "loai_dia_chi": "Nơi chết"
+    },
+    "P102": {
+      "row_id": "00000000-0000-4000-8000-000000000102",
+      "ho_ten": "Trần Thị Bình",
+      "gioi_tinh": "Nữ",
+      "ngay_sinh": "1952-02-03",
+      "ngay_chet": null,
+      "so_giay_to": "000000000102",
+      "ngay_cap": "2025-01-02",
+      "noi_cap": null,
+      "dia_chi": "Khu Giả Lập B",
+      "place_of_origin": null,
+      "loai_giay_to": null,
+      "loai_dia_chi": null
+    },
+    "P103": {
+      "row_id": "00000000-0000-4000-8000-000000000103",
+      "ho_ten": "Nguyễn Văn Con",
+      "gioi_tinh": "Nam",
+      "ngay_sinh": "1980",
+      "ngay_chet": null,
+      "so_giay_to": "000000000103",
+      "ngay_cap": null,
+      "noi_cap": null,
+      "dia_chi": null,
+      "place_of_origin": null,
+      "loai_giay_to": null,
+      "loai_dia_chi": null
+    },
+    "P111": {
+      "row_id": "00000000-0000-4000-8000-000000000111",
+      "ho_ten": "NGUYEN DANG AN",
+      "gioi_tinh": null,
+      "ngay_sinh": null,
+      "ngay_chet": null,
+      "so_giay_to": "07, quyển 1",
+      "ngay_cap": "2020-06-01",
+      "noi_cap": null,
+      "dia_chi": null,
+      "place_of_origin": null,
+      "loai_giay_to": "Giấy chứng tử",
+      "loai_dia_chi": null
+    },
+    "P301": {
+      "row_id": "00000000-0000-4000-8000-000000000301",
+      "ho_ten": "Người thử chưa đủ neo",
+      "gioi_tinh": null,
+      "ngay_sinh": null,
+      "ngay_chet": null,
+      "so_giay_to": null,
+      "ngay_cap": null,
+      "noi_cap": null,
+      "dia_chi": null,
+      "place_of_origin": null,
+      "loai_giay_to": null,
+      "loai_dia_chi": null
+    }
+  },
+  "asset_prototypes": {
+    "T101": {
+      "row_id": "00000000-0000-4000-8000-000000000201",
+      "so_serial": "SYN B 001",
+      "so_vao_so": null,
+      "so_thua_dat": "11",
+      "so_to_ban_do": "2",
+      "dia_chi": "Thửa giả lập A",
+      "loai_so": null,
+      "hinh_thuc_su_dung": null,
+      "thoi_han": null,
+      "nguon_goc": null,
+      "ngay_cap": null,
+      "co_quan_cap": null,
+      "land_rows": [
+        {"loaidat": "ONT", "dientich": 100, "thoihan": "Lâu dài"},
+        {"loaidat": null, "dientich": null, "thoihan": null},
+        {"loaidat": "CLN", "dientich": 50, "thoihan": "2063"}
+      ]
+    },
+    "T202": {
+      "row_id": "00000000-0000-4000-8000-000000000202",
+      "so_serial": "SYN B 001",
+      "so_vao_so": null,
+      "so_thua_dat": "22",
+      "so_to_ban_do": "2",
+      "dia_chi": null,
+      "loai_so": null,
+      "hinh_thuc_su_dung": null,
+      "thoi_han": null,
+      "nguon_goc": null,
+      "ngay_cap": null,
+      "co_quan_cap": null,
+      "land_rows": [
+        {"loaidat": "LUC", "dientich": 250, "thoihan": "2060"}
+      ]
+    },
+    "T203": {
+      "row_id": "00000000-0000-4000-8000-000000000203",
+      "so_serial": "",
+      "so_vao_so": null,
+      "so_thua_dat": null,
+      "so_to_ban_do": null,
+      "dia_chi": null,
+      "loai_so": null,
+      "hinh_thuc_su_dung": null,
+      "thoi_han": null,
+      "nguon_goc": null,
+      "ngay_cap": null,
+      "co_quan_cap": null,
+      "land_rows": null
+    },
+    "T204": {
+      "row_id": "00000000-0000-4000-8000-000000000204",
+      "so_serial": "",
+      "so_vao_so": null,
+      "so_thua_dat": null,
+      "so_to_ban_do": null,
+      "dia_chi": null,
+      "loai_so": null,
+      "hinh_thuc_su_dung": null,
+      "thoi_han": null,
+      "nguon_goc": null,
+      "ngay_cap": null,
+      "co_quan_cap": null,
+      "land_rows": []
+    },
+    "T205": {
+      "row_id": "00000000-0000-4000-8000-000000000205",
+      "so_serial": "SYN B 001",
+      "so_vao_so": null,
+      "so_thua_dat": "31",
+      "so_to_ban_do": "2",
+      "dia_chi": null,
+      "loai_so": null,
+      "hinh_thuc_su_dung": null,
+      "thoi_han": null,
+      "nguon_goc": null,
+      "ngay_cap": null,
+      "co_quan_cap": null,
+      "land_rows": []
+    }
+  },
+  "cases": [
+    {
+      "alias": "F1",
+      "ten": "Thừa kế đầy đủ",
+      "case_type": "inheritance",
+      "status_mong_doi": "done",
+      "metadata": {
+        "loai_van_ban": "khai_nhan",
+        "ngay_lap_ho_so": "2026-10-22"
+      },
+      "people": [
+        {"prototype": "P101", "vai_tro": "owner"},
+        {"prototype": "P102", "vai_tro": "spouse"},
+        {"prototype": "P103", "vai_tro": "child"}
+      ],
+      "assets": [
+        {"prototype": "T101"}
+      ],
+      "diagram": {
+        "domain": "inheritance",
+        "owner_row_id": "P101",
+        "ownPositions": {"P101": [1], "P102": [1]},
+        "receivePositions": {"P102": [1], "P103": [1]},
+        "relations": [
+          {"kind": "spouse", "from": "P101", "to": "P102"},
+          {"kind": "parent_child", "from": "P101", "to": "P103"},
+          {"kind": "parent_child", "from": "P102", "to": "P103"}
+        ]
+      },
+      "expected": {
+        "status": "done",
+        "revision": 1,
+        "so_person_rows": 3,
+        "so_asset_rows": 1,
+        "so_land_rows": 3,
+        "identity": {
+          "nhom_cung_id": [["F1:P101"], ["F1:P102"], ["F1:P103"]],
+          "id_null": []
+        },
+        "asset_identity": {
+          "nhom_cung_id": [["F1:T101"]],
+          "id_null": []
+        },
+        "land_rows_theo_asset": {
+          "F1:T101": [
+            {"vitri": 1, "loaidat": "ONT", "dientich": 100.0, "thoihan": "Lâu dài"},
+            {"vitri": 2, "loaidat": null, "dientich": null, "thoihan": null},
+            {"vitri": 3, "loaidat": "CLN", "dientich": 50.0, "thoihan": "2063"}
+          ]
+        },
+        "truong_suy_ra": {
+          "P101": {
+            "loai_giay_to": "Giấy chứng tử",
+            "noi_cap": "UBND phường Thử Nghiệm",
+            "loaicutru": "Nơi chết",
+            "loai_dia_chi": "Nơi chết",
+            "ngay_sinh_luu": "1950"
+          },
+          "P102": {
+            "loai_giay_to": "Căn cước",
+            "noi_cap": "Bộ Công an",
+            "loaicutru": "Cư trú",
+            "loai_dia_chi": "Cư trú tại",
+            "ngay_sinh_luu": "1952-02-03"
+          },
+          "P103": {
+            "loai_giay_to": null,
+            "noi_cap": null,
+            "loaicutru": null,
+            "loai_dia_chi": null,
+            "ngay_sinh_luu": "1980"
+          }
+        },
+        "chudat": "Nguyễn Đăng An\nTrần Thị Bình",
+        "ghi_chu": [
+          "Ba land row ke ca hang trong thu 2 (vitri 2) khong bi compact.",
+          "Khong co ban Done phu; reopen va Word cung thu tu/gia tri."
+        ]
+      }
+    },
+    {
+      "alias": "F2",
+      "ten": "Hai bên",
+      "case_type": "two_party",
+      "status_mong_doi": "done",
+      "metadata": {
+        "loai_van_ban": "thoa_thuan",
+        "ngay_lap_ho_so": "2026-10-22"
+      },
+      "people": [
+        {"prototype": "P102", "slot": "p1"},
+        {"prototype": "P103", "slot": "p16"}
+      ],
+      "assets": [
+        {"prototype": "T101"}
+      ],
+      "diagram": {
+        "domain": "two_party",
+        "owner_row_id": null,
+        "ownPositions": {},
+        "receivePositions": {},
+        "slot_assignments": {"p1": "P102", "p16": "P103"}
+      },
+      "expected": {
+        "status": "done",
+        "revision": 1,
+        "so_slot_wire": 30,
+        "owner_row_id": null,
+        "nguoi_chet_id": null,
+        "chudat": null,
+        "identity": {
+          "nhom_cung_id": [["F2:P102"], ["F2:P103"]],
+          "id_null": []
+        },
+        "ghi_chu": [
+          "Engine unsupported la trang thai ky thuat, khong doi case thanh draft.",
+          "p1 ben A, p16 ben B; cac slot con lai trong."
+        ]
+      }
+    },
+    {
+      "alias": "F3",
+      "ten": "Nháp thiếu dữ liệu",
+      "case_type": "inheritance",
+      "status_mong_doi": "draft",
+      "metadata": {
+        "loai_van_ban": "khai_nhan",
+        "ngay_lap_ho_so": null
+      },
+      "people": [
+        {"prototype": "P301", "vai_tro": "owner"}
+      ],
+      "assets": [
+        {"prototype": "T203"}
+      ],
+      "diagram": {
+        "domain": "inheritance",
+        "owner_row_id": null,
+        "ownPositions": {},
+        "receivePositions": {},
+        "relations": []
+      },
+      "expected": {
+        "status": "draft",
+        "revision": 1,
+        "so_person_rows": 1,
+        "so_asset_rows": 1,
+        "so_land_rows": 0,
+        "identity": {
+          "nhom_cung_id": [],
+          "id_null": ["F3:P301"]
+        },
+        "asset_identity": {
+          "nhom_cung_id": [],
+          "id_null": ["F3:T203"]
+        },
+        "land_rows_theo_asset": {
+          "F3:T203": []
+        },
+        "khong_co_chuoi_gia": "(Chưa rõ)",
+        "ghi_chu": [
+          "Nguoi chi co ho_ten, thieu so/ngay/dia chi van luu duoc; khong tao Customer gia.",
+          "Asset toi thieu hop le: serial rong nghia la thieu neo, khong tao Property gia.",
+          "Nhan Nhap du dirty=false; Cap nhat sau van draft."
+        ]
+      }
+    },
+    {
+      "alias": "F4",
+      "ten": "Done sửa/lưu lại",
+      "case_type": "inheritance",
+      "status_mong_doi": "done",
+      "case_goc": "F1",
+      "insert_case_moi": false,
+      "metadata": {
+        "loai_van_ban": "khai_nhan",
+        "ngay_lap_ho_so": "2026-10-22"
+      },
+      "people": [
+        {"prototype": "P101", "vai_tro": "owner"},
+        {"prototype": "P102", "vai_tro": "spouse", "override": {"dia_chi": "Khu Giả Lập B2"}},
+        {"prototype": "P103", "vai_tro": "child"}
+      ],
+      "assets": [
+        {"prototype": "T101"}
+      ],
+      "diagram": {
+        "domain": "inheritance",
+        "owner_row_id": "P101",
+        "ownPositions": {"P101": [1], "P102": [1]},
+        "receivePositions": {"P102": [1], "P103": [1]},
+        "relations": [
+          {"kind": "spouse", "from": "P101", "to": "P102"},
+          {"kind": "parent_child", "from": "P101", "to": "P103"},
+          {"kind": "parent_child", "from": "P102", "to": "P103"}
+        ]
+      },
+      "expected": {
+        "status": "done",
+        "identity": {
+          "nhom_cung_id": [["F4:P101"], ["F4:P102"], ["F4:P103"]],
+          "id_null": []
+        },
+        "chudat": "Nguyễn Đăng An\nTrần Thị Bình",
+        "steps": [
+          {
+            "thu_tu": 1,
+            "action": "cap_nhat",
+            "override": {"P102": {"dia_chi": "Khu Giả Lập B2"}},
+            "expected": {
+              "status": "done",
+              "revision": 2,
+              "identity_P102": "khong_doi",
+              "word_thay": "Khu Giả Lập B2 truoc Save lai"
+            }
+          },
+          {
+            "thu_tu": 2,
+            "action": "luu_lai_sach",
+            "expected": {
+              "status": "done",
+              "revision": 3,
+              "khong_chuyen_done_sang_draft": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "alias": "F5",
+      "ten": "Cùng serial khác thửa",
+      "case_type": "inheritance",
+      "status_mong_doi": "done",
+      "metadata": {
+        "loai_van_ban": "khai_nhan",
+        "ngay_lap_ho_so": "2026-10-22"
+      },
+      "people": [
+        {"prototype": "P101", "vai_tro": "owner"}
+      ],
+      "assets": [
+        {"prototype": "T101"},
+        {"prototype": "T202"}
+      ],
+      "diagram": {
+        "domain": "inheritance",
+        "owner_row_id": "P101",
+        "ownPositions": {"P101": [1, 2]},
+        "receivePositions": {},
+        "relations": []
+      },
+      "expected": {
+        "status": "done",
+        "revision": 1,
+        "so_asset_rows": 2,
+        "identity": {
+          "nhom_cung_id": [["F5:P101"]],
+          "id_null": []
+        },
+        "asset_identity": {
+          "nhom_cung_id": [["F5:T101", "F5:T202"]],
+          "id_null": []
+        },
+        "land_rows_theo_asset": {
+          "F5:T101": [
+            {"vitri": 1, "loaidat": "ONT", "dientich": 100.0, "thoihan": "Lâu dài"},
+            {"vitri": 2, "loaidat": null, "dientich": null, "thoihan": null},
+            {"vitri": 3, "loaidat": "CLN", "dientich": 50.0, "thoihan": "2063"}
+          ],
+          "F5:T202": [
+            {"vitri": 1, "loaidat": "LUC", "dientich": 250.0, "thoihan": "2060"}
+          ]
+        },
+        "steps": [
+          {
+            "thu_tu": 1,
+            "action": "doi_dien_tich_cum_dat",
+            "asset": "T202",
+            "vitri": 1,
+            "dientich_moi": 251,
+            "expected": {
+              "chi_dong_dung_parent_vitri_doi": true,
+              "F5:T101_giu_nguyen": true,
+              "vitri_1_2_giu": true,
+              "khong_duplicate_entity": true
+            }
+          }
+        ],
+        "ghi_chu": [
+          "Hai asset row/link/dat doc lap nhung cung property_id (cung serial nguyen van).",
+          "Loi sau flush phai rollback ca bo, khong doi mot trong hai."
+        ]
+      }
+    },
+    {
+      "alias": "F6A",
+      "ten": "Hai Hồ sơ chung Người — Hồ sơ A",
+      "case_type": "inheritance",
+      "status_mong_doi": "done",
+      "metadata": {
+        "loai_van_ban": "khai_nhan",
+        "ngay_lap_ho_so": "2026-10-22"
+      },
+      "people": [
+        {"prototype": "P101", "vai_tro": "owner"}
+      ],
+      "assets": [
+        {"prototype": "T101"}
+      ],
+      "diagram": {
+        "domain": "inheritance",
+        "owner_row_id": "P101",
+        "ownPositions": {"P101": [1]},
+        "receivePositions": {},
+        "relations": []
+      },
+      "expected": {
+        "status": "done",
+        "revision": 1,
+        "identity": {
+          "nhom_cung_id": [["F6A:P101"]],
+          "id_null": []
+        },
+        "asset_identity": {
+          "nhom_cung_id": [["F6A:T101"]],
+          "id_null": []
+        },
+        "truong_suy_ra": {
+          "P101": {
+            "loai_giay_to": "Giấy chứng tử",
+            "noi_cap": "UBND phường Thử Nghiệm",
+            "loaicutru": "Nơi chết",
+            "loai_dia_chi": "Nơi chết"
+          }
+        },
+        "chudat": "Nguyễn Đăng An"
+      }
+    },
+    {
+      "alias": "F6B",
+      "ten": "Hai Hồ sơ chung Người — Hồ sơ B (khác dữ kiện)",
+      "case_type": "inheritance",
+      "status_mong_doi": "done",
+      "metadata": {
+        "loai_van_ban": "khai_nhan",
+        "ngay_lap_ho_so": "2026-10-22"
+      },
+      "people": [
+        {"prototype": "P111", "vai_tro": "owner"}
+      ],
+      "assets": [
+        {"prototype": "T205"}
+      ],
+      "diagram": {
+        "domain": "inheritance",
+        "owner_row_id": "P111",
+        "ownPositions": {"P111": [1]},
+        "receivePositions": {},
+        "relations": []
+      },
+      "expected": {
+        "status": "done",
+        "revision": 1,
+        "identity": {
+          "nhom_cung_id": [["F6A:P101", "F6B:P111"]],
+          "id_null": []
+        },
+        "asset_identity": {
+          "nhom_cung_id": [["F6A:T101", "F6B:T205"]],
+          "id_null": []
+        },
+        "truong_suy_ra": {
+          "P111": {
+            "loai_giay_to": "Giấy chứng tử",
+            "noi_cap": null,
+            "loaicutru": "Nơi chết",
+            "loai_dia_chi": "Nơi chết",
+            "ngay_cap_luu": "2020-06-01",
+            "dia_chi_luu": null
+          }
+        },
+        "ghi_chu": [
+          "Cung customer_id nhung hai row_id; ten goc tung case giu nguyen.",
+          "B giu ngay cap 2020-06-01/dia chi null; khong lay A lap null; Customer khong bi update.",
+          "Doc lai khong UPDATE DB."
+        ]
+      }
+    },
+    {
+      "alias": "F7",
+      "ten": "Identity biên bổ sung",
+      "case_type": "inheritance",
+      "status_mong_doi": "draft",
+      "case_goc": "F3",
+      "insert_case_moi": false,
+      "metadata": {
+        "loai_van_ban": "khai_nhan",
+        "ngay_lap_ho_so": null
+      },
+      "people": [
+        {"prototype": "P301", "vai_tro": "owner"}
+      ],
+      "assets": [
+        {"prototype": "T203"}
+      ],
+      "diagram": {
+        "domain": "inheritance",
+        "owner_row_id": null,
+        "ownPositions": {},
+        "receivePositions": {},
+        "relations": []
+      },
+      "expected": {
+        "status": "draft",
+        "identity": {
+          "nhom_cung_id": [],
+          "id_null": ["F7:P301"]
+        },
+        "steps": [
+          {
+            "thu_tu": 1,
+            "action": "them_so_giay_to",
+            "override": {"P301": {"so_giay_to": "07, quyển 2"}},
+            "expected": {
+              "identity_P301": "co_id",
+              "row_id_khong_doi": true
+            }
+          },
+          {
+            "thu_tu": 2,
+            "action": "doi_so_giay_to",
+            "override": {"P301": {"so_giay_to": "08, quyển 1"}},
+            "expected": {
+              "identity_P301": "id_moi_khac",
+              "identity_cu_khong_bi_update_neo": true,
+              "link_case_khac_giu_nguyen": true
+            }
+          },
+          {
+            "thu_tu": 3,
+            "action": "xoa_so_giay_to",
+            "override": {"P301": {"so_giay_to": null}},
+            "expected": {
+              "identity_P301": null,
+              "row_van_ton_tai": true
+            }
+          },
+          {
+            "thu_tu": 4,
+            "action": "seed_hai_customer_trung_neo",
+            "seed": {
+              "customers": [
+                {
+                  "ho_ten": "Nguyễn Đăng An",
+                  "so_giay_to": "07, quyển 1",
+                  "name_anchor": "nguyen dang an",
+                  "document_anchor": "07, quyển 1"
+                },
+                {
+                  "ho_ten": "Nguyễn Đăng An",
+                  "so_giay_to": "07, quyển 1",
+                  "name_anchor": "nguyen dang an",
+                  "document_anchor": "07, quyển 1"
+                }
+              ]
+            },
+            "expected": {
+              "dong_moi_chon": "customer_id_nho_nhat",
+              "dong_cu_dang_khop_giu_id": true
+            }
+          },
+          {
+            "thu_tu": 5,
+            "action": "serial_bien_the",
+            "serial_variants": ["AB 001", "AB001", "ab 001", " AB 001 "],
+            "expected": {
+              "khong_match_identity": true,
+              "so_serial_luu_nguyen_van": true
+            }
+          }
+        ],
+        "ghi_chu": [
+          "Chi ten (khong so) => identity null, khong match.",
+          "Bien the 'chi so, khong ten' da bo theo chinh sua F3."
+        ]
+      }
+    }
+  ]
+}
