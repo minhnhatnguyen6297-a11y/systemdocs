@@ -132,9 +132,42 @@ Chi tiết và danh sách tên fail: [`g4-test-compare.txt`](g4-test-compare.txt
 
 Phân loại fail còn lại: **toàn bộ là nợ cũ** (fixture locked, address lookup/fileToken, Windows-path trên Linux, thiếu module python hệ thống, proxy env) — **không có fail mới do G4**.
 
-## §7. E2E
+## §7. E2E trên app thật (điều phối viên bổ sung)
 
-Điền sau bước kiểm chứng E2E trên app thật (điều phối viên bổ sung).
+Phương pháp: app Electron thật + sidecar Python thật, DB/profile cô lập (`/tmp/e2e-g4-data`, `/tmp/e2e-g4-profile`, CDP 9222; instance stress riêng CDP 9223), điều khiển qua CDP (chuột thật cho chip, DragEvent cho kéo/thả), KHÔNG shim. Kiểm chứng chéo bằng job log (`window.desktop.v1.listJobs()`) và đọc trực tiếp SQLite. Ảnh: thư mục `e2e-fix-shots/` (cùng thư mục biên bản này). Harness: `e2e-harness/` (`e2e-scenario-a.mjs`, `e2e-scenario-b2.mjs`, `e2e-scenario-g6.mjs`, `e2e-stress.mjs`).
+
+**Kịch bản A (nguyên văn ca owner) — ĐẠT toàn bộ theo tiêu chí vòng 2:**
+- Mọi bước: `commitBtn: null` — không còn nút Cập nhật/Lưu nháp trên UI.
+- A3 Lưu khi chưa thả owner: chặn đúng `workspace_owner_required`; A4 thả owner vào node → banner biến mất ngay; A5 thiếu tài sản: hộp cảnh báo nổi bật "Hồ sơ chưa có tài sản nào — thêm ít nhất một tài sản rồi lưu lại."; A6 thêm tài sản → Lưu thành công ngay lần đầu → HS-1 "Đã lưu".
+- A7 sửa chết→sống: nhãn node owner đổi trong phiên ("1950 – …") TRƯỚC khi lưu; Lưu thành công.
+- A8 bấm "Cập nhật": NOBTN (nút đã gỡ). A9 ba vòng gỡ/thả owner + Lưu: ổn định, không treo banner.
+
+**Kịch bản B (viết lại theo luồng mới) — ĐẠT:**
+- B2-1 đổi tên chỉ bằng sự kiện `input` (chưa blur): nhãn node owner đổi ngay sang tên mới, ô nhập giữ focus/caret — Pool/Sơ đồ đọc bản đang sửa.
+- Đặt ngày chết + "Xem cách tính": engine sinh các node father/mother/spouse/child_owner ngay trong phiên.
+- Thêm người mới: Pool hiện ngay (chưa cần thao tác lưu trung gian); kéo/thả thẳng vào node thường (`father`) thành công; Lưu một lần thành công, người mới được ghi kèm gán node.
+- Nhiều vòng chết→sống→chết, mỗi vòng Lưu một lần: đều thành công; gán node của người thứ hai được giữ nguyên qua các vòng.
+- Audit job toàn phiên: chỉ `workspace_save_case` + lệnh đọc + `diagram_evaluate`; **0** `workspace_commit_stage` / `workspace_create` / `diagram_save`.
+
+**Kịch bản C (Chủ đất):** giữ nguyên kết quả vòng 1 (biên bản `fix-loop-round1-20261023.md`); vòng 2 không đổi hành vi `ownPositions`/`syncPositionDefaults`, chỉ đổi nguồn đọc sang bản đang sửa — các test model tương ứng vẫn pass (124 test, §6).
+
+**G6 (sơ đồ dirty + Stage sửa rồi Lưu một lần) — ĐẠT:**
+- Trong phiên: đổi tên owner (input-only), thêm người C, thả C vào node `mother` → sơ đồ dirty (nút Lưu hồ sơ có chấm + aria "có thay đổi chưa lưu").
+- "Xem cách tính" trên bản đang sửa: `diagram_evaluate` thành công, payload draft (không `case_id`), không phát sinh lệnh ghi.
+- Bấm Lưu đúng một lần: đúng 1 job `workspace_save_case` succeeded, 0 lệnh ghi cấm.
+- Đối chiếu DB sau lưu (SQLite): 3 dòng người khớp từng trường với trạng thái đã thấy trong phiên (owner tên mới + ngày chết 2023-07-07; B ở `father`; C ở `mother`), trạng thái `done`, `workspace_revision` tăng đúng.
+
+**Biến thể stress (agent con, instance riêng) — ĐẠT:**
+- S1 bấm Lưu 10 lần liên tiếp không sửa xen giữa: 10/10 succeeded, đúng 10 job `workspace_save_case`, 0 lệnh cấm, revision tăng đều 1→11, không banner treo.
+- S2 thả/gỡ node owner 5 vòng rồi Lưu: cả 5 vòng thả lại được, Lưu cuối thành công, 0 lệnh cấm.
+- S3 thay TOÀN BỘ thông tin một người (tên, số giấy tờ, ngày sinh, ngày cấp, nơi cấp, địa chỉ) → Lưu → mở lại: 29/30 khớp tuyệt đối; 1 lệch duy nhất là định dạng hiển thị ngày cấp (nhập ISO `2024-03-04`, đọc lại `04/03/2024` — cùng giá trị, khác định dạng trình bày). Đối chiếu DB: mọi trường đã xuống DB, revision/status đúng.
+- S4: 2 người + 2 tài sản (2 dòng đất) → Lưu thành công, sơ đồ đúng; mở được hộp thoại xuất Word và danh sách mẫu. DỪNG TRUNG THỰC tại bước chọn mẫu/hộp chọn file native của HĐH (tự động hoá không qua được) — chưa thực thi xuất Word; ghi nhận là giới hạn môi trường tự động hoá, không phải lỗi app. Toàn phiên S4: 0 lệnh ghi cấm.
+
+**Sự cố khi kiểm chứng (minh bạch, không phải lỗi app):**
+- Hai lần script E2E lấy nhầm dòng người vì truy vấn DOM quá sớm trong lúc máy đang tải nặng bởi các bộ test chạy song song (render chậm vài giây). Điều phối viên hoàn tất các bước còn lại tương tác trực tiếp với cùng tiêu chí; harness đã sửa sang cơ chế poll chờ dòng mới (40 × 500ms) để chạy lại được về sau.
+- Một lần thao tác tay của điều phối viên bấm nhầm nút xóa dòng của người thứ nhất trong BẢN ĐANG SỬA (chưa lưu) — kiểm chứng SQLite xác nhận DB không hề bị ảnh hưởng (chỉ "Lưu hồ sơ" mới ghi), mở lạnh lại app cho trạng thái đúng từ DB. Sự cố này vô tình chứng minh thêm tiêu chí "chưa Lưu thì DB không đổi".
+
+**Phát hiện phụ F1 (nhỏ, ghi nhận — chưa sửa ở lát này):** khi một ô Stage đang giữ focus, cơ chế làm mới hẹp (chỉ khung quan hệ) không vẽ lại trang trí lỗi của bảng Stage, nên ô vừa sửa đúng vẫn còn vệt đỏ cho tới lần phát tín hiệu thay đổi tiếp theo sau khi rời ô (hoặc lần Lưu). Trạng thái model đã dọn lỗi ngay khi sửa (hàm `clearRowFieldError`), lần Lưu vẫn thành công và giao diện sạch sau lưu. Đề xuất lát nhỏ sau: vẽ lại trang trí lỗi trong đường làm mới hẹp.
 
 ## §8. Commit list toàn lát G4
 
@@ -152,3 +185,4 @@ Phân loại fail còn lại: **toàn bộ là nợ cũ** (fixture locked, addre
 | `97e62c7` | Test diagram/DOCX/wire theo save_case |
 | `ea719a9` | Dọn comment commit_stage còn sót |
 | (commit biên bản này) | Biên bản vòng 2 G4 + `g4-test-compare.txt` |
+| (commit bổ sung của điều phối viên) | Điền §7 E2E trên app thật vào biên bản |
