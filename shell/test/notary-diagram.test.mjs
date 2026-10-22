@@ -88,7 +88,7 @@ function seedSlots() {
   ]);
 }
 
-function build(t, { mode = 'draft-inh', seed = {}, client } = {}) {
+async function build(t, { mode = 'draft-inh', seed = {}, client } = {}) {
   const { document } = makeDom();
   global.document = document;
   global.window = {
@@ -114,8 +114,8 @@ function build(t, { mode = 'draft-inh', seed = {}, client } = {}) {
     runCommand: cl.run,
   });
   document.body.append(view.el);
-  if (mode === 'draft-inh') model.newDraft('inheritance');
-  else if (mode === 'draft-tp') model.newDraft('two_party');
+  if (mode === 'draft-inh') await model.newDraft('inheritance');
+  else if (mode === 'draft-tp') await model.newDraft('two_party');
   else {
     seedCase(model, seed);
     model.dismissNotice();          // emit → render workspace
@@ -133,8 +133,8 @@ const INH_PEOPLE = [
 
 // ---------- inheritance canvas: seed + card + edges ----------
 
-test('draft moi inheritance: DUNG 1 o owner trong (MIN-136)', () => {
-  const { view } = build(test, { mode: 'draft-inh' });
+test('draft moi inheritance: DUNG 1 o owner trong (MIN-136)', async () => {
+  const { view } = await build(test, { mode: 'draft-inh' });
   const cards = byCls(view.el, 'cd-node');
   assert.equal(cards.length, 1, 'draft moi chi co 1 o khoi tao');
   const owner = collect(view.el, (e) =>
@@ -148,8 +148,8 @@ test('draft moi inheritance: DUNG 1 o owner trong (MIN-136)', () => {
     e.classList.contains('cd-edge')).length, 0);
 });
 
-test('legacy 7 slot (case cu): card + edges van render; node trống không chữ', () => {
-  const { view } = build(test, { mode: 'case',
+test('legacy 7 slot (case cu): card + edges van render; node trống không chữ', async () => {
+  const { view } = await build(test, { mode: 'case',
     seed: { people: INH_PEOPLE, nodes: seedSlots() } });
   const cards = byCls(view.el, 'cd-node');
   assert.equal(cards.length, 7, 'case cu 7 slot van render du');
@@ -188,8 +188,8 @@ test('legacy 7 slot (case cu): card + edges van render; node trống không ch�
   assert.match(owner.getAttribute('aria-label'), /Người để lại/);
 });
 
-test('card truoc/sau gan: trong → day du ten+nam+role+chips+bo gan', () => {
-  const { model, view } = build(test, {
+test('card truoc/sau gan: trong → day du ten+nam+role+chips+bo gan', async () => {
+  const { model, view } = await build(test, {
     mode: 'case', seed: {
       people: INH_PEOPLE, assets: [{ row_id: 'a1', so_serial: 'S1' }],
       nodes: seedSlots() } });
@@ -218,10 +218,10 @@ test('card truoc/sau gan: trong → day du ten+nam+role+chips+bo gan', () => {
     'can nut → cho duong ban phim');
 });
 
-test('chip own/receive doc lap, multi-select, disable > so asset', () => {
+test('chip own/receive doc lap, multi-select, disable > so asset', async () => {
   // MIN-133: chip chi hien tren node DA GAN nguoi (node trong la o
   // trong) — seed case co father da gan c1 + 2 asset (pos 3 disabled).
-  const { model, view } = build(test, { mode: 'case', seed: {
+  const { model, view } = await build(test, { mode: 'case', seed: {
     people: INH_PEOPLE,
     assets: [{ row_id: 'a1', so_serial: 'S1' },
              { row_id: 'a2', so_serial: 'S2' }],
@@ -281,8 +281,8 @@ test('layoutInheritance: gen tu parentSlotIds, spouse ke nhau', () => {
 
 // ---------- MIN-133: nut so do len head, kich thuoc mockup ----------
 
-test('MIN-133 D6: Lưu hồ sơ + Xuất Word trong card-head, không còn footer', () => {
-  const { view } = build(test, { mode: 'draft-inh' });
+test('MIN-133 D6: Lưu hồ sơ + Xuất Word trong card-head, không còn footer', async () => {
+  const { model, view } = await build(test, { mode: 'draft-inh' });
   assert.equal(byCls(view.el, 'cd-rel-foot').length, 0,
     'footer so do da bo theo mockup');
   const head = collect(view.el, (e) =>
@@ -291,6 +291,14 @@ test('MIN-133 D6: Lưu hồ sơ + Xuất Word trong card-head, không còn foote
   assert.ok(head, 'khong tim thay card-head vung so do');
   assert.equal(findBtns(head, 'Lưu hồ sơ').length, 1);
   assert.equal(findBtns(head, 'Xuất Word').length, 1);
+  // Dirty aria sống trên chính nút trong card-head.
+  model.updateCaseMeta('noi_niem_yet', 'Xã Mới');
+  const headNow = collect(view.el, (e) =>
+    e.classList.contains('card-head') &&
+    /Sơ đồ thừa kế/.test(e.textContent))[0];
+  const save = findBtns(headNow, 'Lưu hồ sơ')[0];
+  assert.equal(byCls(save, 'dirty-dot').length, 1);
+  assert.match(save.getAttribute('aria-label'), /có thay đổi chưa lưu/);
 });
 
 test('MIN-133 D7: hang layout theo mockup (node 144 / trong 88x24)', () => {
@@ -306,8 +314,8 @@ test('MIN-133 D7: hang layout theo mockup (node 144 / trong 88x24)', () => {
 
 // ---------- two_party canvas ----------
 
-test('two_party: 30 cho canonical, p16 dau Ben B, khong compact', () => {
-  const { model, view } = build(test, {
+test('two_party: 30 cho canonical, p16 dau Ben B, khong compact', async () => {
+  const { model, view } = await build(test, {
     mode: 'case',
     seed: { caseType: 'two_party',
             people: INH_PEOPLE, nodes: tpNodes() } });
@@ -338,8 +346,8 @@ test('two_party: 30 cho canonical, p16 dau Ben B, khong compact', () => {
   assert.equal(filled.personId, 'c1');
 });
 
-test('two_party: swap occupied + keo ve Pool + card chi ten+cho', () => {
-  const { model, view } = build(test, {
+test('two_party: swap occupied + keo ve Pool + card chi ten+cho', async () => {
+  const { model, view } = await build(test, {
     mode: 'case',
     seed: { caseType: 'two_party', people: INH_PEOPLE,
             nodes: tpNodes().map((n) =>
@@ -364,8 +372,8 @@ test('two_party: swap occupied + keo ve Pool + card chi ten+cho', () => {
   assert.equal(byCls(view.el, 'cd-tp-slot').length, 30);
 });
 
-test('two_party: assign menu du 30 cho + swap bang ban phim', () => {
-  const { model, view } = build(test, {
+test('two_party: assign menu du 30 cho + swap bang ban phim', async () => {
+  const { model, view } = await build(test, {
     mode: 'case',
     seed: { caseType: 'two_party', people: INH_PEOPLE,
             nodes: tpNodes().map((n) =>
@@ -432,7 +440,7 @@ test('requiredSlots: engine yeu cau → tao father/mother/spouse/child', async (
       n.deleted = true;            // gia lap bi xoa → required moi
     }
   }
-  const { model, view } = build(test, {
+  const { model, view } = await build(test, {
     mode: 'case', client,
     seed: { people: INH_PEOPLE, nodes } });
   // MIN-136: khong con nut "Đánh giá thử" — "Xem cách tính" trigger
@@ -480,7 +488,7 @@ test('requiredSlots bo qua anchor trong (mock dev) — khong no canvas', async (
       return { ok: true, data: {} };
     },
   };
-  const { model, view } = build(test, {
+  const { model, view } = await build(test, {
     mode: 'case', client,
     seed: { people: INH_PEOPLE, nodes: seedSlots() } });
   await findBtns(view.el, 'Xem cách tính')[0].onclick();
@@ -488,8 +496,8 @@ test('requiredSlots bo qua anchor trong (mock dev) — khong no canvas', async (
     'anchor trong khong duoc sinh slot moi');
 });
 
-test('MIN-136: chủ đất sống → hint điền Ngày mất; đã mất → không hint', () => {
-  const { model, view } = build(test, { mode: 'case', seed: {
+test('MIN-136: chủ đất sống → hint điền Ngày mất; đã mất → không hint', async () => {
+  const { model, view } = await build(test, { mode: 'case', seed: {
     people: [{ row_id: 'c1', ho_ten: 'Chủ Sống', ngay_sinh: '1950' }],
     nodes: [{ id: 'owner', personId: 'c1', parentSlotIds: [],
               spouseSlotId: null, ownPositions: [], receivePositions: [],
@@ -508,8 +516,8 @@ test('MIN-136: chủ đất sống → hint điền Ngày mất; đã mất → 
 
 // ---------- zoom / pan / Mo rong ----------
 
-test('zoom cluster: −/+ doi label; Mo rong mo overlay co canvas', () => {
-  const { view, document } = build(test, { mode: 'draft-inh' });
+test('zoom cluster: −/+ doi label; Mo rong mo overlay co canvas', async () => {
+  const { view, document } = await build(test, { mode: 'draft-inh' });
   const minus = collect(view.el, (e) =>
     e.tagName === 'BUTTON' &&
     e.getAttribute('aria-label') === 'Thu nhỏ sơ đồ')[0];
@@ -534,8 +542,8 @@ test('zoom cluster: −/+ doi label; Mo rong mo overlay co canvas', () => {
     'Esc khong dong overlay');
 });
 
-test('pan: keo nen canvas → scrollLeft/Top doi, mouseup ket thuc', () => {
-  const { view, document } = build(test, { mode: 'draft-inh' });
+test('pan: keo nen canvas → scrollLeft/Top doi, mouseup ket thuc', async () => {
+  const { view, document } = await build(test, { mode: 'draft-inh' });
   const wrap = collect(view.el, (e) =>
     e.classList.contains('cd-canvas-wrap'))[0];
   wrap.dispatch('mousedown',
@@ -550,8 +558,8 @@ test('pan: keo nen canvas → scrollLeft/Top doi, mouseup ket thuc', () => {
 
 // ---------- 60 node ----------
 
-test('60 node thua ke: moi card render + layout khac nhau', () => {
-  const { model, view } = build(test, { mode: 'draft-inh' });
+test('60 node thua ke: moi card render + layout khac nhau', async () => {
+  const { model, view } = await build(test, { mode: 'draft-inh' });
   // MIN-136: draft seed 1 node owner → them 59 slot de du 60.
   for (let i = 0; i < 59; i += 1) model.addSlot();
   assert.equal(model.state.diagram.nodes.length, 60);
@@ -577,13 +585,23 @@ test('save → openCase round-trip: vi tri + quan he giu nguyen', async () => {
   const store = { saved: null, revision: 4 };
   const client = {
     run: async (cmd, payload) => {
-      if (cmd === 'notary.diagram_save') {
+      if (cmd === 'notary.workspace_save_case') {
         store.revision += 1;
         store.saved = structuredClone(payload.diagram.state);
+        const c = payload.case || {};
         return { ok: true, data: {
-          revision: store.revision,
+          created: payload.case_id == null,
+          case: { id: payload.case_id != null ? payload.case_id : 42,
+                  case_type: c.case_type || 'inheritance',
+                  document_type: c.document_type || 'khai_nhan',
+                  status: 'active', locked: false,
+                  revision: store.revision },
+          backend_mode: 'real',
+          capabilities: { intake: [], diagram: true, word_export: true },
+          stage: structuredClone(payload.stage),
           diagram: { state: structuredClone(store.saved),
-                     render_model: null } } };
+                     render_model: null },
+          warnings: [] } };
       }
       if (cmd === 'notary.workspace_get') {
         return { ok: true, data: {
@@ -610,7 +628,7 @@ test('save → openCase round-trip: vi tri + quan he giu nguyen', async () => {
   const nodes = seedSlots().map((n) => ({ ...n }));
   nodes.find((n) => n.id === 'owner').personId = 'c1';
   nodes.find((n) => n.id === 'spouse').personId = 'c2';
-  const { model } = build(test, {
+  const { model } = await build(test, {
     mode: 'case', client,
     seed: { people: INH_PEOPLE, assets: [{ row_id: 'a1' }], nodes } });
   // Doi positions + them slot con → save.
@@ -618,8 +636,8 @@ test('save → openCase round-trip: vi tri + quan he giu nguyen', async () => {
   model.toggleNodePosition('spouse', 'receive', 1);
   const sp = model.state.diagram.nodes.find((n) => n.id === 'spouse');
   sp.parentSlotIds = ['spouse_father', 'spouse_mother'];
-  const r = await model.saveDiagram();
-  assert.equal(r.ok, true, 'saveDiagram loi');
+  const r = await model.saveCase();
+  assert.equal(r.ok, true, 'saveCase loi');
   assert.ok(store.saved, 'adapter khong nhan state');
   // Mo lai qua model khac cung adapter → state diagram giong ban da luu.
   const model2 = M.createModel({ client });
@@ -641,13 +659,23 @@ test('two_party: assign → save → reopen giu 30 cho + nguoi dung cho', async 
   const store = { saved: null, revision: 4 };
   const client = {
     run: async (cmd, payload) => {
-      if (cmd === 'notary.diagram_save') {
+      if (cmd === 'notary.workspace_save_case') {
         store.revision += 1;
         store.saved = structuredClone(payload.diagram.state);
+        const c = payload.case || {};
         return { ok: true, data: {
-          revision: store.revision,
+          created: payload.case_id == null,
+          case: { id: payload.case_id != null ? payload.case_id : 42,
+                  case_type: c.case_type || 'two_party',
+                  document_type: c.document_type || 'chuyen_nhuong',
+                  status: 'active', locked: false,
+                  revision: store.revision },
+          backend_mode: 'real',
+          capabilities: { intake: [], diagram: true, word_export: false },
+          stage: structuredClone(payload.stage),
           diagram: { state: structuredClone(store.saved),
-                     render_model: null } } };
+                     render_model: null },
+          warnings: [] } };
       }
       if (cmd === 'notary.workspace_get') {
         return { ok: true, data: {
@@ -668,13 +696,13 @@ test('two_party: assign → save → reopen giu 30 cho + nguoi dung cho', async 
   const nodes = tpNodes();
   nodes.find((n) => n.id === 'p16').personId = 'c1';
   nodes.find((n) => n.id === 'p3').personId = 'c2';
-  const { model } = build(test, {
+  const { model } = await build(test, {
     mode: 'case', client,
     seed: { caseType: 'two_party', people: INH_PEOPLE, nodes } });
-  // Seeded case co diagramDirty=false — can mot mutation that de save
-  // khong noop (model.saveDiagram skip khi khong dirty).
+  // Seeded case co diagramDirty=false — can mot mutation de save
+  // khong noop.
   model.assignPerson('p7', 'c3');
-  const r = await model.saveDiagram();
+  const r = await model.saveCase();
   assert.equal(r.ok, true);
   const model2 = M.createModel({ client });
   await model2.openCase(42);
@@ -699,22 +727,32 @@ test('save thiếu dữ liệu: cue chỉ-đọc hiện, không sinh slot', asyn
     errors: [], unresolvedEstates: [], conservation: {} };
   const client = { run: async (cmd, payload) => {
     calls.push([cmd, payload]);
-    if (cmd === 'notary.diagram_save') {
-      return { ok: true, data: { revision: 4,
+    if (cmd === 'notary.workspace_save_case') {
+      const c = payload.case || {};
+      return { ok: true, data: {
+        created: false,
+        case: { id: payload.case_id, case_type: c.case_type,
+                document_type: c.document_type, status: 'active',
+                locked: false, revision: 4 },
+        backend_mode: 'real',
+        capabilities: { intake: [], diagram: true, word_export: true },
+        stage: structuredClone(payload.stage),
         diagram: { state: structuredClone(payload.diagram.state),
-                   render_model: structuredClone(stored) } } };
+                   render_model: structuredClone(stored) },
+        warnings: [] } };
     }
     return { ok: true, data: {} };
   } };
-  const { model, view } = build(test, { mode: 'case', client,
+  const { model, view } = await build(test, { mode: 'case', client,
     seed: { people: INH_PEOPLE, nodes: seedSlots() } });
   model.movePerson('c2', 'child_1');       // dirty → nút Lưu bật
   const before = model.state.diagram.nodes.length;
   const save = findBtns(view.el, 'Lưu hồ sơ')[0];
   assert.ok(save, 'thiếu nút Lưu hồ sơ');
-  // Nút chính giờ là workspace_save_case; test cue của saveDiagram cũ
-  // gọi thẳng model (đường riêng còn giữ theo thiết kế 6.4).
-  await model.saveDiagram();
+  await save.onclick();
+  // Nút Lưu hồ sơ = workspace_save_case; cue đọc render_model trả về.
+  assert.equal(
+    calls.filter(([c]) => c === 'notary.workspace_save_case').length, 1);
   assert.equal(model.state.diagram.nodes.length, before,
     'không sinh slot từ requiredSlots khi lưu');
   assert.equal(
@@ -761,7 +799,7 @@ test('mở lại case thiếu dữ liệu: graph giữ nguyên, cue từ render_
     }
     return { ok: true, data: {} };
   } };
-  const { model, view } = build(test, { mode: 'case', client,
+  const { model, view } = await build(test, { mode: 'case', client,
     seed: { people: INH_PEOPLE, nodes: [] } });
   const r = await model.openCase(42);
   assert.equal(r.ok, true, 'openCase lỗi');
@@ -793,26 +831,35 @@ test('cue trạng thái: chuyển sang complete thì xoá dòng thiếu', async 
                        status: 'complete', requiredSlots: [], warnings: [] };
   const client = { run: async (cmd, payload) => {
     calls.push([cmd, payload]);
-    if (cmd === 'notary.diagram_save') {
+    if (cmd === 'notary.workspace_save_case') {
       phase += 1;
-      return { ok: true, data: { revision: 3 + phase,
+      const c = payload.case || {};
+      return { ok: true, data: {
+        created: false,
+        case: { id: payload.case_id, case_type: c.case_type,
+                document_type: c.document_type, status: 'active',
+                locked: false, revision: 2 + phase },
+        backend_mode: 'real',
+        capabilities: { intake: [], diagram: true, word_export: true },
+        stage: structuredClone(payload.stage),
         diagram: { state: structuredClone(payload.diagram.state),
                    render_model: structuredClone(
-                     phase === 1 ? rmIncomplete : rmComplete) } } };
+                     phase === 1 ? rmIncomplete : rmComplete) },
+        warnings: [] } };
     }
     return { ok: true, data: {} };
   } };
-  const { model, view } = build(test, { mode: 'case', client,
+  const { model, view } = await build(test, { mode: 'case', client,
     seed: { people: INH_PEOPLE, nodes: seedSlots() } });
   model.movePerson('c2', 'child_1');
-  await model.saveDiagram();
+  await findBtns(view.el, 'Lưu hồ sơ')[0].onclick();
   const warn1 = byCls(view.el, 'warn-text').map((e) => e.textContent)
     .join('\n');
   assert.match(warn1, /Chưa đủ điều kiện/);
   assert.match(warn1, /Cần bổ sung Vợ\/chồng, Con/);
 
   model.movePerson('c2', null);            // dirty lần nữa
-  await model.saveDiagram();
+  await findBtns(view.el, 'Lưu hồ sơ')[0].onclick();
   const warn2 = byCls(view.el, 'warn-text').map((e) => e.textContent)
     .join('\n');
   assert.match(warn2, /Hoàn chỉnh/, 'complete phải hiện trạng thái');
@@ -825,8 +872,8 @@ test('cue trạng thái: chuyển sang complete thì xoá dòng thiếu', async 
 
 // ---------- evaluate khong goi tren two_party ----------
 
-test('two_party: assign/drop KHONG goi diagram_evaluate', () => {
-  const { model, view, calls } = build(test, {
+test('two_party: assign/drop KHONG goi diagram_evaluate', async () => {
+  const { model, view, calls } = await build(test, {
     mode: 'case',
     seed: { caseType: 'two_party', people: INH_PEOPLE,
             nodes: tpNodes() } });
@@ -851,7 +898,7 @@ test('branch warning: all dismissals are inert; confirm returns descendants to v
     mk('B', ['owner'], 'S'), mk('S', [], 'B'), mk('C', ['B', 'S']),
     mk('D', ['C'], null, { hidden: true }),
     mk('empty', ['B'], null, { personId: null }), mk('U', ['owner'])];
-  const { model, view, document, calls } = build(t, { mode: 'case',
+  const { model, view, document, calls } = await build(t, { mode: 'case',
     seed: { people, assets: [{ row_id: 'asset' }], nodes } });
   const before = structuredClone(model.state);
   const open = () => {
@@ -897,7 +944,7 @@ test('branch warning: all dismissals are inert; confirm returns descendants to v
 
 test('branch warning refuses a changed graph or reopened workspace', async (t) => {
   const nodes = seedSlots();
-  const { model, view } = build(t, { mode: 'case',
+  const { model, view } = await build(t, { mode: 'case',
     seed: { people: INH_PEOPLE, nodes } });
   const open = () => {
     findBtns(collect(view.el, e => e.dataset.nodeId === 'child_1')[0], '×')[0].click();
@@ -925,7 +972,7 @@ test('removed default child slot stays tombstoned; new required slot can assign 
   const client = { run: async (cmd) => ({ ok: true, data: cmd === 'notary.diagram_evaluate'
     ? { render_model: { requiredSlots: [{ anchorSlotId: 'owner',
       slotTypes: ['child'], minimumEmptyChildSlots: 1 }] } } : {} }) };
-  const { model, view } = build(t, { mode: 'case', client, seed: {
+  const { model, view } = await build(t, { mode: 'case', client, seed: {
     people: INH_PEOPLE, assets: [{ row_id: 'asset' }],
     nodes: [mk('owner', 'c1', [], { ownPositions: [1] }),
       mk('child_owner', 'c2', ['owner']), mk('gc', 'c3', ['child_owner'])],

@@ -303,16 +303,16 @@ test('missing_land_owner: chi ro thieu dau Chu, khong huong dan gan lai nguoi', 
 
 for (const draft of [false, true]) {
   for (const withDetails of [true, false]) {
-    test(`${draft ? 'Luu nhap' : 'Luu ho so'}: toast loi diagram dau tien, details=${withDetails}`, async (t) => {
+    test(`${draft ? 'nhap moi' : 'case cu'}: toast loi diagram dau tien, details=${withDetails}`, async (t) => {
       const first = { code: 'missing_land_owner' };
       const error = { code: 'diagram_invalid_state',
         ...(withDetails ? { details: { errors: [first, { code: 'duplicate_person' }] } } : {}) };
-      const command = draft ? 'notary.workspace_create' : 'notary.workspace_save_case';
+      const command = 'notary.workspace_save_case';
       const { model, view, notices, CAT } = build(t, {
         client: errorClient({ [command]: { ok: false, error } }),
       });
       if (draft) await model.newDraft('inheritance');
-      const button = findBtns(view.el, draft ? 'Lưu nháp' : 'Lưu hồ sơ')[0];
+      const button = findBtns(view.el, 'Lưu hồ sơ')[0];
       assert.ok(button);
       await button.onclick();
       assert.deepEqual(notices, [[CAT.errText(withDetails ? first : error), true]]);
