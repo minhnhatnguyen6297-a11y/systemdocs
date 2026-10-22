@@ -645,7 +645,7 @@ def migrate_zalo_schema():
 
 
 def migrate_inheritance_case_properties_schema():
-    """Tao bang lien ket nhieu tai san cho ho so neu chua co."""
+    """Tao/cap nhat bang lien ket; DB cu giu NOT NULL cua property_id."""
     con = sqlite3.connect(DB_PATH)
     cur = con.cursor()
     cur.executescript(
@@ -653,7 +653,8 @@ def migrate_inheritance_case_properties_schema():
         CREATE TABLE IF NOT EXISTS inheritance_case_properties (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             case_id INTEGER NOT NULL,
-            property_id INTEGER NOT NULL,
+            case_asset_row_id VARCHAR(36) REFERENCES case_asset_rows(row_id),
+            property_id INTEGER,
             is_primary BOOLEAN NOT NULL DEFAULT 0,
             created_at DATETIME DEFAULT (CURRENT_TIMESTAMP),
             updated_at DATETIME DEFAULT (CURRENT_TIMESTAMP),
@@ -668,6 +669,9 @@ def migrate_inheritance_case_properties_schema():
         ON inheritance_case_properties(property_id);
         """
     )
+    _ensure_table_columns(cur, "inheritance_case_properties", {
+        "case_asset_row_id": "VARCHAR(36) REFERENCES case_asset_rows(row_id)",
+    })
     con.commit()
     con.close()
 

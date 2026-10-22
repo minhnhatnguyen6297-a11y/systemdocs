@@ -65,7 +65,7 @@ def _ensure_db():
         _db_ready = False
     if _db_ready:
         return
-    database.migrate_customers_nullable()
+    database.migrate_customers_document_number()
     database.migrate_inheritance_cases_schema()
     database.migrate_properties_schema()
     database.migrate_properties_serial()
