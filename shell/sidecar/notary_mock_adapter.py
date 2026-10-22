@@ -10,7 +10,7 @@ case_id). Fixture la database gia cua mock — "mock tra fixture bat bien".
 Thieu thu muc fixture (packaged build, khong bao gio vi gateway chan) ->
 fallback seed toi thieu trong code.
 
-Scenario mac dinh: 42 ready | 43 empty | 44 locked | 45 gift (unsupported)
+Scenario mac dinh: 42 ready | 43 empty | 44 done | 45 gift (unsupported)
 | 46 ready + pool chua gan. Khac -> case_not_found.
 
 Marker deterministic (khong PII, khong parse that):
@@ -149,7 +149,7 @@ def _builtin_cases():
     return {
         "43": {
             "case_type": "inheritance", "document_type": "khai_nhan",
-            "status": "draft", "locked": False, "revision": 1,
+            "status": "draft", "revision": 1,
             "stage": {"owner_row_id": None, "people": [], "assets": []},
             "diagram": {"domain": "inheritance",
                         "state": {"version": 3, "domain": "inheritance",
@@ -163,7 +163,7 @@ def _builtin_cases():
 # conflict/intake-partial la ban giam); seed mac dinh lay phien ban
 # "primary" truoc. Seed rieng trong test dung reset_backend(seed).
 _FIXTURE_PRIORITY = (
-    "ready", "ready-two-party", "empty", "locked", "unsupported",
+    "ready", "ready-two-party", "empty", "done", "unsupported",
     "diagram-warning", "intake-partial", "conflict", "word-collision",
     "word-partial", "word-all-failed", "word-canceled",
 )
@@ -219,7 +219,6 @@ class _MockState:
         case.setdefault("case_type", "inheritance")
         case.setdefault("document_type", "khai_nhan")
         case.setdefault("status", "draft")
-        case.setdefault("locked", False)
         case.setdefault("revision", 1)
         case.setdefault("ngay_lap_ho_so", None)
         case.setdefault("noi_niem_yet", None)
@@ -1483,7 +1482,6 @@ def workspace_create(job, payload):
             "case_type": ct,
             "document_type": dt,
             "status": "draft",
-            "locked": False,
             "revision": 1,
             "ngay_lap_ho_so": nl,
             "noi_niem_yet": cm.get("noi_niem_yet"),
@@ -2038,7 +2036,7 @@ def workspace_update(job, payload):
     """notary.workspace_update mock (§6.2) — parity real: cap nhat meta
     case da luu (khong cham stage/diagram), revision+1. case_type/
     document_type la dinh danh — key la → validation_error.
-    Meta doc lap case_type: chi chan locked + conflict (real
+    Meta doc lap case_type: chi revision guard + validation (real
     update_meta khong _check_supported)."""
     case = _case(payload)
     _check_base_revision(case, payload)
@@ -2093,7 +2091,7 @@ def workspace_update(job, payload):
 
 
 def diagram_evaluate(job, payload):
-    """Read-only — duoc phep tren case locked (§7.4); khong persist.
+    """Read-only — khong persist; khong chan theo trang thai case (§7.4).
 
     case_id absent = che do nhap: stage payload thay Stage DB,
     evaluated_revision=null. case_id + stage cung luc -> validation_error
@@ -2333,8 +2331,8 @@ def _word_template_dir(payload):
 
 
 def word_export_options(job, payload):
-    """Read-only — duoc phep tren locked (chi workspace_get quyet dinh
-    capability); block_reason theo validation that.
+    """Read-only — khong chan theo trang thai case (chi workspace_get
+    quyet dinh capability); block_reason theo validation that.
 
     NAIA-8: two_party mo (readiness word.no_people/no_diagram/...);
     template_dir → documents = .docx quet duoc thay vi catalog co dinh."""

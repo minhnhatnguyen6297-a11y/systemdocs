@@ -261,7 +261,7 @@ class TestScaffolding:
         assert bad["data"]["status"] == "invalid_input"
 
     def test_fixtures_loadable_and_no_real_pii(self):
-        names = ["empty", "ready", "locked", "conflict", "intake-partial",
+        names = ["empty", "ready", "done", "conflict", "intake-partial",
                  "diagram-warning", "word-collision", "word-partial",
                  "word-all-failed", "word-canceled", "unsupported",
                  "ready-two-party"]
@@ -2150,10 +2150,10 @@ class TestContractInvariants:
         """workspace_get tra wire v2: khong is_primary/isLandOwner/
         willReceive o bat ky level nao."""
         for fixture in ("ready.json", "ready-two-party.json",
-                        "locked.json"):
+                        "done.json"):
             mock.reset_backend(_load_fixture(fixture))
             cid = 48 if fixture == "ready-two-party.json" else (
-                44 if fixture == "locked.json" else 42)
+                44 if fixture == "done.json" else 42)
             res = _call("workspace_get", {"case_id": cid})
             _no_legacy_keys(res["data"])
 

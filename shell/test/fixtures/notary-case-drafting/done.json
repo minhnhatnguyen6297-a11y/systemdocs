@@ -1,12 +1,11 @@
 {
-  "scenario": "locked",
-  "description": "Case 44 — ho so da khoa: moi command GHI -> workspace_locked; read-only (workspace_get, word_export_options, diagram_evaluate) van chay.",
+  "scenario": "done",
+  "description": "Case 44 — ho so da done: van ghi duoc (commit_stage/save_case); chi revision guard + validation moi chan.",
   "cases": {
     "44": {
       "case_type": "inheritance",
       "document_type": "khai_nhan",
-      "status": "locked",
-      "locked": true,
+      "status": "done",
       "revision": 3,
       "stage": {
         "people": [
