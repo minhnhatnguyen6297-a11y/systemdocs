@@ -38,22 +38,7 @@
             }
           }
         },
-        "stage": {
-          "type": "object",
-          "required": ["people", "assets"],
-          "additionalProperties": false,
-          "properties": {
-            "people": {
-              "type": "array",
-              "items": { "$ref": "common.schema.json#/definitions/person_row" }
-            },
-            "assets": {
-              "type": "array",
-              "items": { "$ref": "common.schema.json#/definitions/asset_row_input" },
-              "description": "MIN-141: input không bắt buộc thoi_han lẻ — chỉ land_rows[].thoihan"
-            }
-          }
-        },
+        "stage": { "$ref": "draft-v2.schema.json#/definitions/stage_v2" },
         "docx_import": {
           "$ref": "common.schema.json#/definitions/docx_import"
         }
@@ -64,29 +49,15 @@
       "required": ["schema_version", "revision", "stage", "diagram"],
       "additionalProperties": false,
       "properties": {
-        "schema_version": { "$ref": "common.schema.json#/definitions/schema_version" },
+        "schema_version": { "$ref": "draft-v2.schema.json#/definitions/schema_version_v2" },
         "revision": { "type": "integer", "minimum": 1 },
-        "stage": {
-          "type": "object",
-          "required": ["people", "assets"],
-          "additionalProperties": false,
-          "properties": {
-            "people": {
-              "type": "array",
-              "items": { "$ref": "common.schema.json#/definitions/person_row" }
-            },
-            "assets": {
-              "type": "array",
-              "items": { "$ref": "common.schema.json#/definitions/asset_row" }
-            }
-          }
-        },
+        "stage": { "$ref": "draft-v2.schema.json#/definitions/stage_v2_output" },
         "diagram": {
           "type": "object",
           "required": ["state", "render_model"],
           "additionalProperties": false,
           "properties": {
-            "state": { "$ref": "common.schema.json#/definitions/diagram_state" },
+            "state": { "$ref": "draft-v2.schema.json#/definitions/diagram_state_v3" },
             "render_model": {
               "$ref": "common.schema.json#/definitions/render_model",
               "description": "non-null — re-evaluate trong cùng transaction (contract §6.1)"

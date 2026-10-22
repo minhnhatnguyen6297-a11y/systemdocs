@@ -1,0 +1,15 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "note": "§13.21: cấm base_revision/case_id/field override — duplicate là copy nguyên bộ, không phải write case cũ."
+  },
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-2034-4034-8034-000000000034",
+  "command": "notary.workspace_duplicate",
+  "payload": {
+    "source_case_id": 48,
+    "idempotency_key": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    "base_revision": 7
+  },
+  "expected_error": "validation_error"
+}

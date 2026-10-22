@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://systemdocs/contracts/notary-case-drafting/workspace-source-latest.schema.json",
+  "title": "notary.workspace_source_latest — payload + result.data (§13.20, vòng 2 đang triển khai)",
+  "description": "Read-only: toàn bộ Người/Tài sản của case Done lưu gần nhất. Không trả case/meta/Diagram. source_case_id/source_status null đồng thời khi không có Done; có nguồn thì id + done. Stage no-source rỗng và không có owner key. Normative text: contracts/notary-case-drafting.md §13.20.",
+  "definitions": {
+    "payload": {
+      "type": "object",
+      "description": "Bắt buộc object rỗng — case_id/base_revision/idempotency_key/filter đều là key thừa → validation_error.",
+      "additionalProperties": false,
+      "properties": {}
+    },
+    "result_data": {
+      "type": "object",
+      "required": ["schema_version", "source_case_id", "source_status", "stage"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "$ref": "draft-v2.schema.json#/definitions/schema_version_v2"
+        },
+        "backend_mode": { "enum": ["real", "mock"] },
+        "source_case_id": { "type": ["integer", "null"], "minimum": 1 },
+        "source_status": { "enum": ["done", null] },
+        "stage": {
+          "$ref": "draft-v2.schema.json#/definitions/stage_v2_output"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["source_case_id"],
+            "properties": { "source_case_id": { "type": "null" } }
+          },
+          "then": {
+            "properties": {
+              "source_status": { "type": "null" },
+              "stage": {
+                "description": "Không nguồn = case đó không có dòng; không có domain nên không có owner key.",
+                "not": { "required": ["owner_row_id"] },
+                "properties": {
+                  "people": { "maxItems": 0 },
+                  "assets": { "maxItems": 0 }
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "source_status": { "const": "done" }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

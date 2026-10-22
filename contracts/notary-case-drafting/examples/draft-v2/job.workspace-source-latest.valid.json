@@ -1,0 +1,96 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "source_case_type": "inheritance",
+    "source_row_ids": [
+      "aaaaaaaa-0000-4000-8000-000000000001",
+      "aaaaaaaa-0000-4000-8000-000000000002",
+      "aaaaaaaa-0000-4000-8000-000000000003"
+    ],
+    "note": "§13.20: nguồn case 48 done; row_id trả về là UUID v4 mới (khác source_row_ids), owner remap trong cùng bộ, entity_id/land/null giữ nguyên."
+  },
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_ws_source_001",
+  "command_id": "a1b2c3d4-2003-4001-8001-000000000003",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "workspace_source_latest",
+    "data": {
+      "schema_version": "notary.case-drafting.v2",
+      "backend_mode": "real",
+      "source_case_id": 48,
+      "source_status": "done",
+      "stage": {
+        "owner_row_id": "11111111-aaaa-4aaa-8aaa-111111111111",
+        "people": [
+          {
+            "row_id": "11111111-aaaa-4aaa-8aaa-111111111111",
+            "entity_id": 401,
+            "ho_ten": "Nguyễn Văn Nguồn",
+            "gioi_tinh": "Nam",
+            "ngay_sinh": "1950",
+            "ngay_chet": "2011-05-15",
+            "so_giay_to": "012345678901",
+            "ngay_cap": "2010-06-15",
+            "noi_cap": null,
+            "dia_chi": "Số 1 phố Huế, Hà Nội",
+            "place_of_origin": null,
+            "loai_giay_to": null,
+            "loai_dia_chi": null
+          },
+          {
+            "row_id": "22222222-aaaa-4aaa-8aaa-222222222222",
+            "entity_id": null,
+            "ho_ten": "Trần Thị Nguồn",
+            "gioi_tinh": "Nữ",
+            "ngay_sinh": "1955",
+            "ngay_chet": null,
+            "so_giay_to": null,
+            "ngay_cap": null,
+            "noi_cap": null,
+            "dia_chi": null,
+            "place_of_origin": null,
+            "loai_giay_to": null,
+            "loai_dia_chi": null
+          }
+        ],
+        "assets": [
+          {
+            "row_id": "55555555-aaaa-4aaa-8aaa-555555555555",
+            "entity_id": 501,
+            "so_serial": "DD123456",
+            "so_vao_so": null,
+            "so_thua_dat": "123",
+            "so_to_ban_do": "45",
+            "dia_chi": "Thửa 123, tờ 45, phường Bạch Mai, Hà Nội",
+            "loai_so": "GCN QSDĐ",
+            "hinh_thuc_su_dung": null,
+            "thoi_han": "Lâu dài",
+            "nguon_goc": null,
+            "ngay_cap": "2005-09-30",
+            "co_quan_cap": null,
+            "land_rows": [
+              {
+                "loai_dat": "ODT",
+                "dien_tich": 85.5,
+                "thoi_han": "Lâu dài"
+              },
+              {
+                "loai_dat": null,
+                "dien_tich": null,
+                "thoi_han": null
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "evidence": [],
+    "warnings": [],
+    "source_files": []
+  },
+  "error": null,
+  "updated_at": "2026-10-22T08:00:00.600000+00:00"
+}

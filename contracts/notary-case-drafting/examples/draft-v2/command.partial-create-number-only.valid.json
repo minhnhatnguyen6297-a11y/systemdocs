@@ -1,0 +1,41 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "note": "§13.6: nháp chỉ có số giấy — ho_ten null được, identity null vì thiếu tên; không assets/owner."
+  },
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-2022-4022-8022-000000000022",
+  "command": "notary.workspace_create",
+  "payload": {
+    "idempotency_key": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    "case": {
+      "case_type": "inheritance",
+      "document_type": "khai_nhan"
+    },
+    "stage": {
+      "owner_row_id": null,
+      "people": [
+        {
+          "row_id": "44444444-cccc-4ccc-8ccc-444444444444",
+          "entity_id": null,
+          "ho_ten": null,
+          "gioi_tinh": null,
+          "ngay_sinh": null,
+          "ngay_chet": null,
+          "so_giay_to": "001199000001",
+          "ngay_cap": null,
+          "noi_cap": null,
+          "dia_chi": null,
+          "place_of_origin": null,
+          "loai_giay_to": null,
+          "loai_dia_chi": null
+        }
+      ],
+      "assets": []
+    }
+  },
+  "client_meta": {
+    "shell_version": "0.1.0",
+    "module": "document-review"
+  }
+}

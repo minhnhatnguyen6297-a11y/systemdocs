@@ -1,0 +1,41 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "note": "§13.6: nháp assets-only, không Người/owner; địa chỉ tài sản null được, serial rỗng được, land_rows=[] giữ nghĩa."
+  },
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-2024-4024-8024-000000000024",
+  "command": "notary.workspace_create",
+  "payload": {
+    "idempotency_key": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+    "case": {
+      "case_type": "inheritance",
+      "document_type": "khai_nhan"
+    },
+    "stage": {
+      "people": [],
+      "assets": [
+        {
+          "row_id": "77777777-cccc-4ccc-8ccc-777777777777",
+          "entity_id": null,
+          "so_serial": "",
+          "so_vao_so": null,
+          "so_thua_dat": null,
+          "so_to_ban_do": null,
+          "dia_chi": null,
+          "loai_so": null,
+          "hinh_thuc_su_dung": null,
+          "thoi_han": null,
+          "nguon_goc": null,
+          "ngay_cap": null,
+          "co_quan_cap": null,
+          "land_rows": []
+        }
+      ]
+    }
+  },
+  "client_meta": {
+    "shell_version": "0.1.0",
+    "module": "document-review"
+  }
+}

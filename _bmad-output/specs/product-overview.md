@@ -62,19 +62,22 @@ Hồ sơ đã lưu giữ dữ liệu riêng, chỉ user sửa thủ công; dữ 
 không tự cập nhật ngược. Các bộ thông tin khác nhau của cùng ID vẫn giữ qua
 những Hồ sơ đó; raw/nguồn/history kỹ thuật đã có vẫn giữ.
 [Quyết định](../decisions/decision-owner-case-snapshot-as-history-20261021.md).
-**Hồ sơ nháp — owner duyệt 21/10/2026; vòng 1 Storage B đã triển khai:**
+**Hồ sơ nháp — owner duyệt 21/10/2026; vòng 1 có code, vòng 2 đang triển khai:**
 Nháp được lưu database để mở lại làm tiếp dù mới nhập một phần; giữ và hiện
 nhãn **Nháp** rõ khi hiển thị/thống kê/báo cáo có chứa Nháp. **Owner chốt
 22/10/2026:** bấm **Lưu hồ sơ** ghi Diagram và toàn bộ Stage/thông tin hồ sơ,
 kể cả ô đang sửa chưa Cập nhật, trong cùng một lượt; đây là mốc Nháp→Done.
 Cấu trúc lưu phương án B đã triển khai vòng 1: dòng case-owned; trạng thái
 `draft`/`done`, bỏ `locked`; nút Lưu hồ sơ gọi `workspace_save_case` nguyên tử.
-Cách tính trong từng báo cáo chưa chốt. Chưa làm vòng 2: resolver nguồn
-done-mới-nhất, nhân bản hồ sơ, lát (d) nháp ít dữ liệu, B6 modal đất pending.
+**Vòng 2 đang triển khai, chưa proof:** tạo nháp ít dữ liệu qua
+`workspace_create` (0 Người/Tài sản, tên/owner null) và mở lại làm tiếp;
+save_case/commit/convert vẫn strict. Nhãn dùng `draft`=Nháp, `done`=Đã lưu,
+độc lập chấm dirty. Resolver nguồn Done lưu gần nhất và Nhân bản thuộc vòng 2;
+bản sao lần đầu `draft`/rev1 là chốt kỹ thuật chờ owner xác nhận.
+Cách tính trong từng báo cáo chưa chốt; B6 modal đất vẫn pending.
 Xem [quy tắc Hồ sơ nháp](notary_v2/README.md#2-danh-sách-hồ-sơ) và
 [quyết định](../decisions/decision-owner-persistent-case-drafts-20261021.md).
-**Điểm neo — owner chốt 21/10 mới nhất; identity đã triển khai, nguồn
-done-mới-nhất chưa làm:** tự dùng cùng ID
+**Điểm neo — owner chốt 21/10 mới nhất; vòng 2 đang triển khai:** tự dùng cùng ID
 Người khi **tên + số giấy tờ đồng thời giống nhau**; ngày cấp/địa chỉ khác vẫn
 cùng ID. Đổi tên/số chấp nhận ID khác. Tài sản gom theo **serial** nguyên văn.
 Khi lấy lại dữ liệu vào Hồ sơ mới mặc định bộ mới nhất, không chọn phiên bản.
@@ -88,14 +91,15 @@ không tự hợp nhất; cùng serial dù khác thửa vẫn cùng ID. Nhân b�
 gồm ô chưa Cập nhật, trong một lượt và chuyển draft→done. Cập nhật trên Done
 thay ngay snapshot hiện hành sau khi ghi thành công; Word và nguồn cho Hồ sơ
 mới dùng bản hiện tại, không giữ bản Done cũ riêng. Phương án B đã chốt,
-phần dừng chờ A/B/C đã gỡ; thiết kế vật lý/migration và thời điểm cấp/đối chiếu
-ID khi nhập dở còn mở. Copy/paste Excel đã được giao, chưa triển khai.
-Chưa sửa runtime hoặc chọn schema vật lý. Policy cũ ở
+phần dừng chờ A/B/C đã gỡ; vòng 1 đã cutover dòng case-owned + identity neo,
+vòng 2 đang triển khai resolver nguồn Done (updated_at microsecond/tie id),
+Nhân bản toàn bộ và nháp ít dữ liệu — chưa proof. Copy/paste Excel vẫn
+chưa triển khai. Policy cũ ở
 [#44](../backlog/story-person-cccd-suggestion-link.md) đã bị thay thế;
 không dùng tiêu chí cũ để triển khai hoặc khôi phục CCCD UNIQUE/chặn luồng.
-`f6d53b5` vẫn không tự tìm theo tên/số, có cập nhật master qua ID rõ; chưa
-thực hiện policy mới. Không tự ghép dữ kiện giữa văn bản/đổi snapshot nơi khác.
-#41 OPEN/gate mẫu ĐÓNG, #42 độc lập; chưa sửa runtime/schema/DB/mẫu.
+Không tự ghép dữ kiện giữa văn bản/đổi snapshot nơi khác.
+#41 OPEN/gate mẫu ĐÓNG, #42 độc lập; không mở gate mẫu hoặc đóng #13 bằng
+thay đổi docs này.
 [Quyết định](../decisions/decision-owner-entity-anchors-case-snapshots-20261021.md).
 [Làm rõ và lượt rà soát 22/10](../decisions/decision-owner-data-entry-save-rules-20261022.md).
 
@@ -103,10 +107,10 @@ thực hiện policy mới. Không tự ghép dữ kiện giữa văn bản/đ�
 mỗi Người/Tài sản một dòng thuộc Hồ sơ, ghi đúng dòng đổi; không giữ bản
 “đã chốt” riêng. Sửa Done là thay luôn nội dung hiện hành sau ghi thành công.
 **Lưu hồ sơ lưu tất cả**, gồm Diagram, Stage/thông tin hồ sơ và ô chưa Cập nhật,
-trong một lượt ghi trọn vẹn. Phần tạm dừng chờ A/B/C đã gỡ; thiết kế vật lý,
-migration và thời điểm cấp/đối chiếu ID dùng chung còn mở
-(hiện trạng code: Storage B case-owned đã cutover; nút Lưu hồ sơ gọi
-`workspace_save_case` cho Stage+meta+Diagram và chuyển draft→done).
+trong một lượt ghi trọn vẹn. Phần tạm dừng chờ A/B/C đã gỡ. Vòng 1 đã cutover
+Storage B case-owned; vòng 2 đang triển khai source_latest/duplicate/partial-create
+(chưa proof). Nút Lưu hồ sơ gọi `workspace_save_case` cho Stage+meta+Diagram
+và chuyển draft→done.
 [Quyết định chọn B](../decisions/decision-owner-case-storage-b-20261022.md).
 
 **Pháp nhân (owner 20/10/2026):** không đưa vào Người; policy nhập tay chung

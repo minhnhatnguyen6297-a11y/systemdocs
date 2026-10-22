@@ -1,0 +1,14 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "note": "§13.21: source_case_id strict int — Boolean không được coi là ID."
+  },
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-2033-4033-8033-000000000033",
+  "command": "notary.workspace_duplicate",
+  "payload": {
+    "source_case_id": true,
+    "idempotency_key": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+  },
+  "expected_error": "validation_error"
+}

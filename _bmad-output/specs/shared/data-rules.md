@@ -38,12 +38,21 @@ Word và lấy làm nguồn dùng bản hiện tại, không chờ Lưu hồ sơ
 **Lưu hồ sơ** là một lượt ghi trọn vẹn Diagram + toàn bộ Stage/thông tin hồ sơ,
 gồm ô đang sửa chưa Cập nhật, và chuyển draft→done; không báo lưu xong khi
 nội dung mới gõ chưa được ghi. Không thêm bảng phiên bản Người/Tài sản hoặc
-bitemporal. Schema vật lý/migration còn thiết kế (hiện trạng code: Storage B case-owned đã cutover; nút Lưu hồ sơ gọi
-`workspace_save_case` cho Stage+meta+Diagram và chuyển draft→done; locked còn
-chặn sửa trong renderer).
+bitemporal.
+**Chọn nguồn (vòng 2 đang triển khai):** Hồ sơ Done có `updated_at`
+microsecond lớn nhất; tie dùng `id` case lớn hơn, timestamp null xếp sau;
+không theo ngày giấy/độ đầy đủ. Đọc nguồn chỉ trả Stage (Người + Tài sản/cụm
+đất, UUID mới, identity giữ) — không trả meta/Diagram/provenance và **không
+ghi DB**. **Nhân bản** copy toàn bộ nội dung đã lưu thành case độc lập, không
+tạo bản lịch sử của nguồn; bản sao lần tạo đầu là `draft` revision 1 — chốt
+kỹ thuật vòng 2 chờ owner xác nhận. Retry cùng khóa không tạo trùng.
+Schema vật lý/migration lịch sử không đổi; hiện trạng code: vòng 1 Storage B
+case-owned đã cutover, nút Lưu hồ sơ gọi `workspace_save_case` cho
+Stage+meta+Diagram và chuyển draft→done; vòng 2 đang triển khai, chưa proof.
 Bộ đếm revision chống ghi đè khác với lưu nhiều snapshot. Raw, nguồn,
 `source_refs` và lịch sử kỹ thuật đã có vẫn giữ; không cấp quyền xóa lịch sử
-hoặc tạo logging mới.
+hoặc tạo logging mới. Không suy đổi cách tính báo cáo hoặc gửi dữ liệu
+cloud/PII từ hai command vòng 2.
 [Quyết định](../../decisions/decision-owner-case-snapshot-as-history-20261021.md).
 
 ### 4.1 `IdentityEvidence` — bản nháp dùng để đối chiếu
@@ -138,14 +147,14 @@ tục file đã rõ. Không tắt production Scan/Upload; quyền runtime đã c
   không đọc mẫu mới. Số giấy lưu thật, index không UNIQUE, identity theo ID
   chọn rõ/row_id chính hồ sơ, không auto lookup theo số/tên hoặc ghép giữa
   file. Snapshot không borrow master khi đã có key, kể cả null.
-- **Policy owner 21/10 mới nhất, chưa triển khai:** tự gom Người cùng ID khi
+- **Policy owner 21/10 mới nhất — vòng 2 đang triển khai (chưa proof):** tự gom Người cùng ID khi
   **tên + số giấy tờ đồng thời giống nhau**; ngày cấp/địa chỉ khác vẫn cùng ID.
   Chỉ trùng một trường không đủ; đổi tên hoặc số thì chấp nhận ID khác.
   Tài sản gom theo **serial** giữ nguyên văn. Không đòi user bấm liên kết hoặc
   chọn phiên bản. Tìm Người để xem các Hồ sơ đã làm. Một bảng Người cho sống/chết.
   Khi lấy vào Hồ sơ mới mặc định bộ mới nhất; Hồ sơ đã lưu không tự cập nhật.
-  **Owner chốt 22/10/2026:** bộ mới nhất theo Hồ sơ được lưu gần nhất, chỉ nguồn `done`,
-  loại `draft`; không theo ngày giấy hoặc độ đầy đủ. Tên đối chiếu không phân
+  **Owner chốt 22/10/2026:** bộ mới nhất theo Hồ sơ được lưu gần nhất, chỉ nguồn `done`;
+  không theo ngày giấy hoặc độ đầy đủ. Tên đối chiếu không phân
   biệt dấu/hoa-thường, giữ nguyên tên gốc; không tự mở thành so gần đúng tùy ý.
   Thiếu điểm neo không gom và không chặn lưu Nháp. ID trùng cũ giữ nguyên,
   không tự hợp nhất, lấy bộ cuối cùng; lịch sử user xử lý. Cùng serial vẫn gom
@@ -155,11 +164,14 @@ tục file đã rõ. Không tắt production Scan/Upload; quyền runtime đã c
   snapshot hiện hành sau ghi thành công** và **Lưu hồ sơ lưu toàn bộ Diagram +
   Stage/thông tin hồ sơ, kể cả ô chưa Cập nhật, trong một lượt ghi trọn vẹn,
   chuyển draft→done** đã chốt; không chờ Lưu hồ sơ lần nữa để dùng bản Done
-  vừa Cập nhật. Phần tạm dừng chờ A/B/C đã gỡ. Schema vật lý/migration,
-  thời điểm cấp/đối chiếu ID dùng chung và cách giữ/đổi ID khi bổ sung neo
-  vẫn đang thiết kế (hiện trạng code: chưa có nguồn done lưu mới nhất,
-  chưa có lượt ghi chung Stage/thông tin hồ sơ/Diagram; còn draft/locked).
-  Không tự ghép trường giữa nhiều Hồ sơ/văn bản.
+  vừa Cập nhật. Phần tạm dừng chờ A/B/C đã gỡ.
+  **Hiện trạng đúng phạm vi:** vòng 1 đã có rows case-owned, `draft`/`done`
+  (bỏ `locked`), `workspace_save_case` và identity neo; vòng 2 **đang triển
+  khai**: chọn nguồn Done theo `updated_at` microsecond/tie `id`, đọc nguồn
+  không ghi DB, Nhân bản toàn bộ nội dung đã lưu, và `workspace_create` cho
+  nháp ít dữ liệu (0 Người/Tài sản, tên/owner null). Save/commit/convert vẫn
+  strict. Chưa proof; bản sao `draft`/rev1 là chốt kỹ thuật chờ owner, không
+  phải owner approved. Không tự ghép trường giữa nhiều Hồ sơ/văn bản.
   Policy gợi ý CCCD/user chọn/bỏ qua tạo ID mới và kho “thông tin liên kết”
   trước đó đã bị thay thế; [#44](../../backlog/story-person-cccd-suggestion-link.md)
   chưa sẵn sàng triển khai theo tiêu chí cũ. Không khôi phục CCCD UNIQUE/chặn

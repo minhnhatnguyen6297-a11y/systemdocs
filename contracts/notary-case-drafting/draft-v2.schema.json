@@ -64,8 +64,122 @@
         "thoi_han": { "$ref": "common.schema.json#/definitions/nullable_string" }
       }
     },
+    "person_row_output_v2": {
+      "type": "object",
+      "description": "Person row phía output/result (vòng 2): ho_ten nullable vì nháp đã lưu có thể chưa có tên; KHÔNG dùng cho input strict.",
+      "required": [
+        "row_id", "entity_id", "ho_ten", "gioi_tinh", "ngay_sinh",
+        "ngay_chet", "so_giay_to", "ngay_cap", "noi_cap", "dia_chi",
+        "place_of_origin", "loai_giay_to", "loai_dia_chi"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "row_id": { "$ref": "common.schema.json#/definitions/uuid4" },
+        "entity_id": { "type": ["integer", "null"], "minimum": 1 },
+        "ho_ten": { "type": ["string", "null"], "minLength": 1 },
+        "gioi_tinh": { "enum": ["Nam", "Nữ", null] },
+        "ngay_sinh": { "$ref": "common.schema.json#/definitions/date_or_year" },
+        "ngay_chet": { "$ref": "common.schema.json#/definitions/date_or_year" },
+        "so_giay_to": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "ngay_cap": { "$ref": "common.schema.json#/definitions/date_or_year" },
+        "noi_cap": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "dia_chi": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "place_of_origin": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "loai_giay_to": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "loai_dia_chi": { "$ref": "common.schema.json#/definitions/nullable_string" }
+      }
+    },
+    "person_row_create_v2": {
+      "type": "object",
+      "description": "Person row phía input của workspace_create partial (vòng 2): ho_ten null/absent được; canonical alias vẫn đọc được. KHÔNG dùng cho save_case/commit/evaluate strict.",
+      "required": [
+        "row_id", "entity_id", "gioi_tinh", "ngay_sinh",
+        "ngay_chet", "so_giay_to", "ngay_cap", "noi_cap", "dia_chi",
+        "place_of_origin", "loai_giay_to", "loai_dia_chi"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "row_id": { "$ref": "common.schema.json#/definitions/uuid4" },
+        "entity_id": { "type": ["integer", "null"], "minimum": 1 },
+        "ho_ten": { "type": ["string", "null"], "minLength": 1 },
+        "gioi_tinh": { "enum": ["Nam", "Nữ", null] },
+        "ngay_sinh": { "$ref": "common.schema.json#/definitions/date_or_year" },
+        "ngay_chet": { "$ref": "common.schema.json#/definitions/date_or_year" },
+        "so_giay_to": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "ngay_cap": { "$ref": "common.schema.json#/definitions/date_or_year" },
+        "noi_cap": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "dia_chi": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "place_of_origin": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "loai_giay_to": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "loai_dia_chi": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "ten": { "type": ["string", "null"], "minLength": 1 },
+        "gioitinh": { "enum": ["Nam", "Nữ", null] },
+        "ngaysinh": { "$ref": "common.schema.json#/definitions/date_or_year" },
+        "ngaychet": { "$ref": "common.schema.json#/definitions/date_or_year" },
+        "sogiayto": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "ngaycap": { "$ref": "common.schema.json#/definitions/date_or_year" },
+        "noicap": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "diachi": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "loaigiayto": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "loaidiachi": { "$ref": "common.schema.json#/definitions/nullable_string" }
+      }
+    },
+    "asset_row_output_v2": {
+      "description": "Asset row phía output: asset_row_v2 + luôn emit `thoi_han` lẻ nullable để đối chiếu lịch sử/warning (§4.2).",
+      "allOf": [
+        { "$ref": "#/definitions/asset_row_v2" },
+        { "required": ["thoi_han"] }
+      ]
+    },
+    "stage_v2_output": {
+      "type": "object",
+      "description": "Stage phía output (§4, §13.20). owner_row_id nullable/absent: inheritance emit key (có thể null khi nháp chưa gán); two_party không key. people/assets có thể rỗng.",
+      "required": ["people", "assets"],
+      "additionalProperties": false,
+      "properties": {
+        "owner_row_id": {
+          "oneOf": [
+            { "$ref": "common.schema.json#/definitions/uuid4" },
+            { "type": "null" }
+          ]
+        },
+        "people": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/person_row_output_v2" }
+        },
+        "assets": {
+          "type": "array",
+          "maxItems": 3,
+          "items": { "$ref": "#/definitions/asset_row_output_v2" }
+        }
+      }
+    },
+    "stage_v2_create": {
+      "type": "object",
+      "description": "Stage input của workspace_create partial (vòng 2): people/assets ≥0, tên null được, owner inheritance absent/null được. Save_case/commit dùng stage_v2 strict, không dùng definition này.",
+      "required": ["people", "assets"],
+      "additionalProperties": false,
+      "properties": {
+        "owner_row_id": {
+          "oneOf": [
+            { "$ref": "common.schema.json#/definitions/uuid4" },
+            { "type": "null" }
+          ]
+        },
+        "people": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/person_row_create_v2" }
+        },
+        "assets": {
+          "type": "array",
+          "maxItems": 3,
+          "items": { "$ref": "#/definitions/asset_row_v2" }
+        }
+      }
+    },
     "stage_v2": {
       "type": "object",
+      "description": "Stage input STRICT cho commit_stage/save_case/evaluate hiện hành: person ho_ten non-empty; owner_row_id (nếu có) là UUID, luật theo domain do command áp. Không dùng cho workspace_create partial.",
       "required": ["people", "assets"],
       "additionalProperties": false,
       "properties": {
@@ -212,7 +326,7 @@
             "ghi_chu": { "$ref": "common.schema.json#/definitions/nullable_string" }
           }
         },
-        "stage": { "$ref": "#/definitions/stage_v2" },
+        "stage": { "$ref": "#/definitions/stage_v2_create" },
         "diagram": {
           "type": "object",
           "description": "OPTIONAL ở v2 — absent thì server seed (§13.6)",

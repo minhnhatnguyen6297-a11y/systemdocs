@@ -92,7 +92,7 @@ không phải record văn bản lạ trong #39.
 
 ## 2. Danh sách hồ sơ
 
-**Hồ sơ nháp lưu bền — owner duyệt 21/10/2026; vòng 1 Storage B đã triển khai:**
+**Hồ sơ nháp lưu bền — owner duyệt 21/10/2026; vòng 1 có code, vòng 2 đang triển khai:**
 Hồ sơ đang làm dở được lưu trong database để mở lại làm tiếp, kể cả mới nhập
 2/6 trường Người; không ép đủ bộ trường hoặc tự điền dữ liệu để giữ tiến độ.
 Trạng thái **Nháp** phải được giữ khi lưu/đọc lại và thể hiện rõ khi hiển thị,
@@ -103,13 +103,30 @@ Done vẫn sửa được; sửa rồi ghi thành công là thay luôn nội dun
 không giữ bản Done cũ riêng. Done không có nghĩa đủ sáu trường hay đã công chứng
 (hiện trạng code: dòng case-owned, `draft`/`done`, bỏ `locked`; nút Lưu hồ sơ
 gọi `workspace_save_case` nguyên tử; B6 modal đất còn pending).
-Từng báo cáo có tính Nháp hay không và bộ lọc mặc định **chưa chốt**. Cấu trúc
-lưu phương án B đã triển khai vòng 1; thời điểm tạo liên kết và lưu/đóng còn
-thiết kế. Chưa làm vòng 2: resolver nguồn done-mới-nhất, nhân bản hồ sơ, lát
-(d) nháp ít dữ liệu, B6 modal đất pending.
+**Vòng 2 đang triển khai, chưa proof:** `workspace_create` là đường tạo **nháp
+ít dữ liệu** — cho 0 Người/0 Tài sản, tên `null`, owner inheritance `null`;
+row thiếu số/ngày vẫn lưu đúng phần đã có. `workspace_save_case` (case mới),
+`Cập nhật` và chuyển loại vẫn **strict**: cần tên, owner hợp lệ và (save_case
+mới) ≥1 Người/≥1 Tài sản trước khi ghi; không có cờ partial cho các đường này.
+Nhãn hiển thị dùng `trang_thai`: `draft` = **Nháp**, `done` = **Đã lưu**; nhãn
+này độc lập với chấm dirty (Done vẫn Đã lưu khi có sửa chưa ghi). Resolver
+nguồn Done lưu gần nhất và **Nhân bản** thuộc vòng 2 đang triển khai; xem luật
+ở mục Luồng Người/Tài sản. Từng báo cáo có tính Nháp hay không và bộ lọc mặc
+định **chưa chốt**; B6 modal đất vẫn pending.
 [Quyết định](../../decisions/decision-owner-persistent-case-drafts-20261021.md).
 
 Tên mong muốn là Danh sách hồ sơ. Người dùng xem danh sách, tìm/lọc, tạo nháp và mở hồ sơ. Nhãn trạng thái, người tạo, tên/ngày tạo là hướng mô tả; danh sách nhãn, nguồn tìm kiếm và trường lọc chưa chốt đầy đủ. Chức năng sẽ **làm lại** — **DEFERRED 17/10/2026** (owner tự triển khai spec sau); hướng trường hiển thị/tìm/lọc owner ghi là **Draft chưa duyệt**, chưa phải quy tắc. [Decision](../../decisions/decision-owner-case-list-redesign-deferred-20261017.md).
+
+**Nhân bản (vòng 2 đang triển khai)** là **thao tác nhỏ trên từng dòng của
+danh sách hiện có**, không phải redesign/filter deferred: mỗi dòng có nút
+**Nhân bản** riêng (không lồng trong nút mở hồ sơ), xác nhận bỏ sửa chưa lưu
+như khi mở/tạo nháp. Nhân bản copy **toàn bộ nội dung đã lưu** của nguồn —
+Người/Tài sản/đất, meta, bảy scalar, participant tay, Diagram, provenance
+DOCX — không copy buffer editor chưa Cập nhật và không đổi nguồn. Bản sao lần
+tạo đầu là **`draft`, revision 1 — chốt kỹ thuật vòng 2, chưa được owner xác
+nhận** (toàn bộ nội dung copy đã là yêu cầu owner). Retry cùng ý định dùng
+cùng khóa idempotency và trả bản sao đã tạo, không tạo trùng; bản sao và nguồn
+độc lập sau đó.
 
 Chọn Thừa kế hoặc Hai bên khi tạo nháp. Loại không hỗ trợ hiện lý do và khóa thao tác không có khả năng, không tự chuyển sang Thừa kế. Tạo hồ sơ lần đầu chưa cần Diagram; intake/evaluate nháp không ghi database. Đổi loại của hồ sơ **đã lưu** chỉ qua đường chuyển loại đã duyệt (`inheritance` ↔ `two_party`): giữ ID + giá trị Người/Tài sản của Stage, reset Diagram theo domain mới (Thừa kế: seed **chỉ** node `owner` mới chọn — không seed khung 7 slot mặc định, không giữ quan hệ/dấu cũ, nhưng vẫn **đủ key bắt buộc** với `parentSlotIds`/`ownPositions`/`receivePositions` rỗng, `spouseSlotId:null`; Hai bên: 30 slot trống), buộc chọn `document_type` hợp lệ của loại mới và xác nhận phần Diagram mất trước khi ghi; chuyển vào Thừa kế cần `owner_row_id` từ Stage, vào Hai bên cấm trường đó. Không suy việc chọn loại lúc tạo nháp thành quyền tự đổi domain; `case_type`/`document_type` vẫn bất biến ngoài đường này ([decision](../../decisions/decision-owner-saved-case-type-conversion-20261016.md), contract §13.18).
 
@@ -180,28 +197,40 @@ Snapshot giữ bằng chứng loại/nơi cấp/nhãn, kể cả chết thiếu 
 Migration/consumer đã được actual proof synthetic (fresh+migrated DB, exact
 Word; UI legacy giới hạn); **BUILT bounded**, chưa nghiệm thu toàn #41.
 
-**Luồng Người/Tài sản owner duyệt 21/10 mới nhất — chưa triển khai:**
+**Luồng Người/Tài sản owner duyệt 21/10 mới nhất — vòng 2 đang triển khai:**
 1. Người có **tên + số giấy tờ đồng thời giống nhau** → tự dùng cùng ID.
    Ngày cấp/địa chỉ khác vẫn cùng ID; đổi tên hoặc số thì chấp nhận ID khác.
 2. Tài sản cùng **serial** → dùng cùng ID; serial giữ nguyên văn, giữ đủ các
-   hàng thửa/cụm đất. Cấu trúc liên kết còn thiết kế.
-3. Khi lấy Người/Tài sản vào Hồ sơ mới → mặc định bộ mới nhất, không bắt chọn
-   liên kết hoặc phiên bản. Người dùng vẫn sửa thông tin của Hồ sơ đang soạn.
+   hàng thửa/cụm đất. Dòng case-owned (phương án B) đã có ở vòng 1.
+3. Khi lấy Người/Tài sản vào Hồ sơ mới → lấy **toàn bộ một bộ** từ Hồ sơ
+   `done` lưu gần nhất, không bắt chọn liên kết/phiên bản và không trộn từng
+   trường giữa các Hồ sơ. Người dùng vẫn sửa thông tin của Hồ sơ đang soạn.
 4. Hồ sơ đã lưu giữ snapshot riêng; dữ liệu mới nơi khác không tự cập nhật
    ngược. Tìm Người để xem đã làm những Hồ sơ gì, không trải mọi lần đổi trường
    thành danh sách phiên bản Người.
-5. **Owner 22/10:** lấy theo Hồ sơ lưu gần nhất, chỉ nguồn `done`, loại `draft`.
-   Tên đối chiếu không phân biệt dấu/hoa-thường, giữ nguyên tên hiển thị/xuất.
-   Thiếu điểm neo không gom; ID trùng cũ giữ nguyên, không tự hợp nhất, lấy bộ
-   cuối cùng. Cùng serial vẫn gom cùng ID dù khác thửa; Nhân bản toàn bộ nội dung.
+5. **Owner 22/10:** lấy theo Hồ sơ lưu gần nhất, chỉ nguồn `done`. Tên đối chiếu
+   không phân biệt dấu/hoa-thường, giữ nguyên tên hiển thị/xuất. Thiếu điểm neo
+   không gom; ID trùng cũ giữ nguyên, không tự hợp nhất, lấy bộ cuối cùng.
+   Cùng serial vẫn gom cùng ID dù khác thửa; Nhân bản toàn bộ nội dung.
+   **Vòng 2 (đang triển khai):** chọn nguồn theo `updated_at` microsecond,
+   `id` case lớn hơn khi tie, null-last; không theo ngày giấy/độ đầy đủ.
+   `workspace_source_latest` trả **chỉ Stage** của đúng một case Done (Người +
+   Tài sản/cụm đất, giữ thứ tự/null/identity), cấp `row_id` UUID mới và remap
+   owner; không trả meta/Diagram/provenance nguồn và không ghi DB. Đọc lại
+   không tạo case, không tự refresh khi người dùng đang sửa.
 6. **Owner chốt 22/10/2026:** đổi **Lưu sơ đồ** thành **Lưu hồ sơ**, ghi Diagram
    và toàn bộ Stage/thông tin hồ sơ đang sửa, gồm ô chưa Cập nhật, trong cùng
    một lượt; chuyển `draft` → `done`. Cập nhật trên Done thay ngay bản hiện hành
-   sau ghi thành công, không chờ Lưu hồ sơ lần nữa. Vòng 1 đã triển khai Storage
+   sau ghi thành công, không chờ Lưu hồ sơ lần nữa. Vòng 1 có code Storage
    B case-owned, `draft`/`done`, bỏ `locked`; nút Lưu hồ sơ gọi
-   `workspace_save_case` ghi Stage+meta+Diagram nguyên tử. Vòng 2 chưa làm:
-   resolver nguồn done-mới-nhất, nhân bản hồ sơ, lát (d) nháp ít dữ liệu,
-   B6 modal đất pending.
+   `workspace_save_case` ghi Stage+meta+Diagram nguyên tử. Vòng 2 **đang triển
+   khai, chưa proof**: resolver nguồn Done, Nhân bản, lát nháp ít dữ liệu;
+   B6 modal đất vẫn pending.
+   **Nhân bản khác lấy nguồn:** copy **toàn bộ nội dung đã lưu** — Stage,
+   meta + bảy scalar, participant tay, Diagram, provenance DOCX — thành case
+   mới độc lập (UUID/PK mới, identity giữ); bản sao lần tạo đầu là `draft`
+   revision 1 (chốt kỹ thuật chờ owner, không phải owner duyệt); retry cùng
+   khóa không tạo trùng.
 
 Một bảng Người cho sống/chết. Luồng gợi ý CCCD/user chọn/bỏ qua tạo ID mới và
 “thông tin liên kết” cũ ở [#44](../../backlog/story-person-cccd-suggestion-link.md)
@@ -212,9 +241,9 @@ tại; chưa chọn mô hình mới hoặc duyệt đề xuất mã tham chiếu
 [Quyết định](../../decisions/decision-owner-entity-anchors-case-snapshots-20261021.md).
 [Làm rõ và rà soát 22/10](../../decisions/decision-owner-data-entry-save-rules-20261022.md).
 
-Tên và định dạng trường giữ chuẩn DB; alias cũ cần ánh xạ. Hai alias của cùng trường trái nhau phải báo lỗi, không chọn ngầm. Cụm đất lưu `property_land_rows`, duy nhất theo tài sản và vị trí; JSON cũ chỉ tương thích. Tên token cụm viết đủ `loaidat<M><N>`, `dientich<M><N>`, `thoihan<M><N>`: M là cụm, N là tài sản; không thêm dạng rút gọn gây lẫn cụm 12 với tài sản 2.
+Tên và định dạng trường giữ chuẩn DB; alias cũ cần ánh xạ. Hai alias của cùng trường trái nhau phải báo lỗi, không chọn ngầm. Cụm đất lưu `case_asset_land_rows` theo dòng tài sản của Hồ sơ + vị trí (vòng 1 có code); `property_land_rows`/JSON cũ chỉ là lịch sử, không phải SOT. `null`, `[]` và hàng trống giữ đúng nghĩa. Tên token cụm viết đủ `loaidat<M><N>`, `dientich<M><N>`, `thoihan<M><N>`: M là cụm, N là tài sản; không thêm dạng rút gọn gây lẫn cụm 12 với tài sản 2.
 
-Thừa kế cần `owner_row_id` theo contract lưu hiện hành; Hai bên không nhận trường đó, tối đa 30 người. Hồ sơ cũ hơn 3 tài sản vẫn đọc đủ và cảnh báo; commit hiện chặn đến khi còn tối đa 3. Đây là giới hạn hiện hành cần xem xét riêng nếu thay đổi, không tự bỏ vì triết lý điền dần.
+Thừa kế cần `owner_row_id` khi **tạo nháp có owner** hoặc khi save/commit/convert strict; create nháp ít dữ liệu được owner `null/absent`, và owner **non-null** phải là row trong Stage. Hai bên không nhận trường đó, tối đa 30 người. Hồ sơ cũ hơn 3 tài sản vẫn đọc đủ và cảnh báo; commit hiện chặn đến khi còn tối đa 3. Đây là giới hạn hiện hành cần xem xét riêng nếu thay đổi, không tự bỏ vì triết lý điền dần.
 
 **Cập nhật:** kiểm toàn bộ Stage → ghi Người/Tài sản → dọn tham chiếu Diagram của đối tượng đã xóa → tính lại → tăng phiên bản → lưu trọn vẹn. Một dòng lỗi thì không lưu nửa chừng; báo đúng ô và giữ bản nháp. Lần đầu tạo hồ sơ dùng cùng `idempotency_key` khi thử lại sau timeout để tránh tạo trùng.
 
@@ -239,8 +268,8 @@ done lưu mới nhất, không lấy draft. Các bộ thông tin khác nhau vẫ
 qua những Hồ sơ đó. **Owner chốt 22/10/2026 — phương án B:** mỗi Người/Tài sản
 một dòng thuộc Hồ sơ, ghi đúng dòng đổi, không bản đã chốt riêng. Revision
 chỉ phục vụ kiểm tra xung đột, không là kho snapshot các lần Lưu. Giữ raw/
-nguồn/history kỹ thuật đã có; chi tiết vật lý còn thiết kế
-(hiện trạng code: master + snapshot JSON, chưa phải dòng thuộc Hồ sơ theo B).
+nguồn/history kỹ thuật đã có. Vòng 1 đã cutover dòng case-owned; vòng 2 đang
+triển khai resolver nguồn Done + Nhân bản, chưa proof toàn bộ.
 [Quyết định](../../decisions/decision-owner-case-snapshot-as-history-20261021.md).
 
 <a id="pool"></a>

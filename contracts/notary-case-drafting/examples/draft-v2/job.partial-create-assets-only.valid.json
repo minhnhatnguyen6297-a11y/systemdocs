@@ -1,0 +1,79 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "note": "§13.6 kết quả nháp assets-only: stage.people rỗng, owner=null, tài sản giữ đủ field/null/[]; candidate assets không tự tạo Người/Chủ."
+  },
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_partial_assets_001",
+  "command_id": "a1b2c3d4-2025-4025-8025-000000000025",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "workspace_create",
+    "data": {
+      "schema_version": "notary.case-drafting.v2",
+      "backend_mode": "real",
+      "created": true,
+      "case": {
+        "id": 93,
+        "case_type": "inheritance",
+        "document_type": "khai_nhan",
+        "status": "draft",
+        "revision": 1,
+        "ngay_lap_ho_so": null,
+        "noi_niem_yet": null,
+        "ghi_chu": null,
+        "nguoi_nhan_uy_quyen": null,
+        "nguoi_nhan_uy_quyen_id": null,
+        "noi_dung_viec": null
+      },
+      "stage": {
+        "owner_row_id": null,
+        "people": [],
+        "assets": [
+          {
+            "row_id": "77777777-cccc-4ccc-8ccc-777777777777",
+            "entity_id": null,
+            "so_serial": "",
+            "so_vao_so": null,
+            "so_thua_dat": null,
+            "so_to_ban_do": null,
+            "dia_chi": null,
+            "loai_so": null,
+            "hinh_thuc_su_dung": null,
+            "thoi_han": null,
+            "nguon_goc": null,
+            "ngay_cap": null,
+            "co_quan_cap": null,
+            "land_rows": []
+          }
+        ]
+      },
+      "diagram": {
+        "domain": "inheritance",
+        "state": {
+          "version": 3,
+          "domain": "inheritance",
+          "nodes": []
+        },
+        "render_model": null,
+        "warnings": []
+      },
+      "capabilities": {
+        "intake": [
+          "image",
+          "pdf",
+          "docx",
+          "xlsx",
+          "text"
+        ],
+        "diagram": true,
+        "word_export": true
+      }
+    },
+    "warnings": []
+  },
+  "error": null,
+  "updated_at": "2026-10-22T08:00:02.400000+00:00"
+}

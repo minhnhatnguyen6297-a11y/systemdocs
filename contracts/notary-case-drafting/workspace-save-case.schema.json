@@ -64,7 +64,7 @@
         "schema_version": {"$ref": "draft-v2.schema.json#/definitions/schema_version_v2"},
         "backend_mode": {"enum": ["real", "mock"]},
         "case": {"allOf": [{"$ref": "workspace-update.schema.json#/definitions/case_v2"}, {"properties": {"status": {"const": "done"}}}]},
-        "stage": {"$ref": "draft-v2.schema.json#/definitions/stage_v2"},
+        "stage": {"$ref": "draft-v2.schema.json#/definitions/stage_v2_output"},
         "diagram": {
           "type": "object", "additionalProperties": false,
           "required": ["domain", "state", "render_model", "warnings"],

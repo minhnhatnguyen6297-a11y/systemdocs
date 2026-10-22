@@ -11,6 +11,56 @@
         "case_id": { "type": "integer", "minimum": 1 }
       }
     },
+    "result_data_v2": {
+      "type": "object",
+      "description": "Workspace result v2 dùng cho workspace_duplicate và các result đọc v2 (get/create/save/convert): case_v2, Stage output nullable nhau, Diagram v3 render nullable, warnings optional. Không dùng definition v1 ở trên để mô tả hành vi vòng 2.",
+      "required": [
+        "schema_version", "case", "stage", "diagram", "capabilities"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": { "$ref": "draft-v2.schema.json#/definitions/schema_version_v2" },
+        "backend_mode": { "enum": ["real", "mock"] },
+        "case": { "$ref": "workspace-update.schema.json#/definitions/case_v2" },
+        "stage": { "$ref": "draft-v2.schema.json#/definitions/stage_v2_output" },
+        "diagram": {
+          "type": "object",
+          "required": ["domain", "state", "render_model"],
+          "additionalProperties": false,
+          "properties": {
+            "domain": { "enum": ["inheritance", "two_party"] },
+            "state": { "$ref": "draft-v2.schema.json#/definitions/diagram_state_v3" },
+            "render_model": {
+              "anyOf": [
+                { "$ref": "common.schema.json#/definitions/render_model" },
+                { "type": "null" }
+              ]
+            },
+            "warnings": {
+              "type": "array",
+              "items": { "$ref": "common.schema.json#/definitions/warning" }
+            }
+          }
+        },
+        "capabilities": {
+          "type": "object",
+          "required": ["intake", "diagram", "word_export"],
+          "additionalProperties": false,
+          "properties": {
+            "intake": {
+              "type": "array",
+              "items": { "enum": ["image", "pdf", "docx", "xlsx", "text"] },
+              "uniqueItems": true
+            },
+            "diagram": { "type": "boolean" },
+            "word_export": { "type": "boolean" }
+          }
+        },
+        "docx_import": {
+          "$ref": "common.schema.json#/definitions/docx_import"
+        }
+      }
+    },
     "result_data": {
       "type": "object",
       "required": [

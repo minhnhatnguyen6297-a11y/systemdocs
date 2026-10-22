@@ -1,0 +1,77 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "note": "§4/§13.6 đọc lại nháp chỉ số: ho_ten=null, entity_id=null, owner_row_id=null, assets=[]; GET không ghi/lấp dữ liệu."
+  },
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_partial_get_number_001",
+  "command_id": "a1b2c3d4-2023-4023-8023-000000000023",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "workspace_get",
+    "data": {
+      "schema_version": "notary.case-drafting.v2",
+      "backend_mode": "real",
+      "case": {
+        "id": 92,
+        "case_type": "inheritance",
+        "document_type": "khai_nhan",
+        "status": "draft",
+        "revision": 1,
+        "ngay_lap_ho_so": null,
+        "noi_niem_yet": null,
+        "ghi_chu": null,
+        "nguoi_nhan_uy_quyen": null,
+        "nguoi_nhan_uy_quyen_id": null,
+        "noi_dung_viec": null
+      },
+      "stage": {
+        "owner_row_id": null,
+        "people": [
+          {
+            "row_id": "44444444-cccc-4ccc-8ccc-444444444444",
+            "entity_id": null,
+            "ho_ten": null,
+            "gioi_tinh": null,
+            "ngay_sinh": null,
+            "ngay_chet": null,
+            "so_giay_to": "001199000001",
+            "ngay_cap": null,
+            "noi_cap": null,
+            "dia_chi": null,
+            "place_of_origin": null,
+            "loai_giay_to": null,
+            "loai_dia_chi": null
+          }
+        ],
+        "assets": []
+      },
+      "diagram": {
+        "domain": "inheritance",
+        "state": {
+          "version": 3,
+          "domain": "inheritance",
+          "nodes": []
+        },
+        "render_model": null,
+        "warnings": []
+      },
+      "capabilities": {
+        "intake": [
+          "image",
+          "pdf",
+          "docx",
+          "xlsx",
+          "text"
+        ],
+        "diagram": true,
+        "word_export": true
+      }
+    },
+    "warnings": []
+  },
+  "error": null,
+  "updated_at": "2026-10-22T08:00:02.300000+00:00"
+}

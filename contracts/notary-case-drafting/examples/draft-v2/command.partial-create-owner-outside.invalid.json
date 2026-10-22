@@ -1,0 +1,38 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "note": "§13.6: create partial cho owner null, nhưng owner non-null phải trỏ row_id trong people."
+  },
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-2036-4036-8036-000000000036",
+  "command": "notary.workspace_create",
+  "payload": {
+    "idempotency_key": "ffffffff-ffff-4fff-8fff-ffffffffffff",
+    "case": {
+      "case_type": "inheritance",
+      "document_type": "khai_nhan"
+    },
+    "stage": {
+      "owner_row_id": "99999999-9999-4999-8999-999999999999",
+      "people": [
+        {
+          "row_id": "44444444-cccc-4ccc-8ccc-444444444444",
+          "entity_id": null,
+          "ho_ten": null,
+          "gioi_tinh": null,
+          "ngay_sinh": null,
+          "ngay_chet": null,
+          "so_giay_to": "001199000001",
+          "ngay_cap": null,
+          "noi_cap": null,
+          "dia_chi": null,
+          "place_of_origin": null,
+          "loai_giay_to": null,
+          "loai_dia_chi": null
+        }
+      ],
+      "assets": []
+    }
+  },
+  "expected_error": "workspace_owner_required"
+}
