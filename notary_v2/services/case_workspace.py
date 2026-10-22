@@ -34,7 +34,7 @@ from datetime import date, datetime, timezone
 from typing import Any, Optional
 
 from sqlalchemy import text as sa_text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 
 from database import MAX_LAND_ROWS, _land_row_field
 from models import (
@@ -1223,6 +1223,293 @@ class CaseWorkspaceService:
         data["created"] = True
         return data
 
+    def save_case(self, *, case_id: Optional[int] = None,
+                  base_revision: Optional[int] = None,
+                  idempotency_key: Optional[str] = None,
+                  case_meta: Any, stage: Any, state: Any,
+                  docx_import: Any = None) -> dict:
+        """`notary.workspace_save_case` — Lưu hồ sơ nguyên tử (§13.19).
+
+        Case mới (`case_id` absent): bắt buộc key, cấm base_revision, tạo
+        case + rows + Diagram trong một transaction, revision=1, replay
+        cùng key/hash trả workspace hiện tại created=false. Case cũ:
+        bắt buộc base_revision, cấm key, CAS revision+1. Mọi nhánh thành
+        công gán `trang_thai='done'`; lỗi sau flush rollback cả identity/
+        meta/rows/đất/Diagram/status/revision.
+        """
+        new_case = case_id is None
+        if new_case:
+            if not _is_uuid4(idempotency_key):
+                raise WorkspaceError(
+                    "validation_error",
+                    "idempotency_key phải là UUID v4 khi tạo mới")
+            if base_revision is not None:
+                raise WorkspaceError(
+                    "validation_error",
+                    "base_revision cấm khi tạo mới")
+        else:
+            if (isinstance(case_id, bool)
+                    or not isinstance(case_id, int) or case_id < 1):
+                raise WorkspaceError(
+                    "validation_error", "case_id phải là số nguyên ≥ 1")
+            if (isinstance(base_revision, bool)
+                    or not isinstance(base_revision, int)
+                    or base_revision < 1):
+                raise WorkspaceError(
+                    "validation_error",
+                    "base_revision phải là số nguyên ≥ 1")
+            if idempotency_key is not None:
+                raise WorkspaceError(
+                    "validation_error",
+                    "idempotency_key cấm với hồ sơ đã có")
+        if not isinstance(case_meta, Mapping):
+            raise WorkspaceError(
+                "validation_error", "payload.case phải là object")
+        if not isinstance(stage, Mapping):
+            raise WorkspaceError(
+                "validation_error", "payload.stage phải là object")
+        _check_extra_keys(stage, _STAGE_KEYS, "stage")
+        people = stage.get("people")
+        assets = stage.get("assets")
+        if not isinstance(people, list) or not isinstance(assets, list):
+            raise WorkspaceError(
+                "validation_error",
+                "stage.people/stage.assets phải là danh sách")
+        people = [_fold_key_aliases(r, _PERSON_KEY_ALIASES,
+                                    "person_row") for r in people]
+        folded_meta = _fold_key_aliases(
+            case_meta, _CASE_META_KEY_ALIASES, "payload.case")
+
+        from services.inheritance_workspace import (
+            InheritanceWorkspaceService,
+            _validate_diagram_wire,
+        )
+        if not isinstance(state, Mapping):
+            raise WorkspaceError(
+                "diagram_invalid_state",
+                "diagram.state phải là object")
+        wire_errors = _validate_diagram_wire(state)
+        if wire_errors:
+            raise WorkspaceError(
+                "diagram_invalid_state",
+                f"diagram state có {len(wire_errors)} lỗi",
+                details={"errors": wire_errors})
+
+        if new_case:
+            meta = self._validate_case_meta(case_meta)
+            case_type = meta["case_type"]
+        else:
+            preloaded = self._load_case(case_id)
+            case_type, stored_doc = _case_meta(preloaded)
+            if case_type not in CASE_TYPES:
+                raise WorkspaceError(
+                    "case_type_unsupported",
+                    f"Loại việc chưa hỗ trợ: {case_type}",
+                    details={"case_type": case_type})
+            sent_type = folded_meta.get("case_type")
+            if sent_type is not None and sent_type != case_type:
+                raise WorkspaceError(
+                    "validation_error", "case_type không đổi qua Lưu hồ sơ")
+            sent_doc = folded_meta.get("document_type")
+            if sent_doc is not None and sent_doc != stored_doc:
+                raise WorkspaceError(
+                    "validation_error",
+                    "document_type không đổi qua Lưu hồ sơ")
+            meta = self._validate_case_meta(
+                {**folded_meta, "case_type": case_type},
+                require_type=False)
+        owner_row_id = self._validate_owner_pointer(
+            stage, people, case_type)
+        field_errors = self._validate_stage(people, assets, case_type)
+        if new_case:
+            field_errors += self._validate_create_stage(people, assets)
+        if field_errors:
+            raise WorkspaceError(
+                "stage_validation_error",
+                f"Stage có {len(field_errors)} lỗi field",
+                details={"field_errors": field_errors})
+
+        creation_hash = None
+        if new_case:
+            creation_hash = _save_case_creation_hash(
+                folded_meta,
+                {"owner_row_id": owner_row_id, "people": people,
+                 "assets": assets},
+                state, docx_import)
+
+        self._acquire_write_lock()
+        try:
+            if new_case:
+                existing = self.db.query(InheritanceCase).filter(
+                    InheritanceCase.workspace_idempotency_key
+                    == str(idempotency_key)).first()
+                if existing is not None:
+                    if existing.workspace_creation_hash != creation_hash:
+                        raise WorkspaceError(
+                            "idempotency_conflict",
+                            "idempotency_key đã dùng với nội dung khác")
+                    data = self.get(existing.id)
+                    data["created"] = False
+                    self.db.commit()
+                    return data
+                case = InheritanceCase(
+                    nguoi_chet_id=None,
+                    tai_san_id=None,
+                    ngay_lap_ho_so=meta["ngay_lap_ho_so"],
+                    loai_van_ban=meta["document_type"],
+                    trang_thai="draft",
+                    noi_niem_yet=meta["noi_niem_yet"],
+                    nguoi_nhan_uy_quyen=meta["nguoi_nhan_uy_quyen"],
+                    nguoi_nhan_uy_quyen_id=meta["nguoi_nhan_uy_quyen_id"],
+                    noi_dung_viec=meta["noi_dung_viec"],
+                    ghi_chu=meta["ghi_chu"],
+                    workspace_revision=1,
+                    workspace_idempotency_key=str(idempotency_key),
+                    workspace_creation_hash=creation_hash)
+                self.db.add(case)
+                self.db.flush()
+                previous_people: list = []
+                payload: dict = {"case": {
+                    key: meta.get(key) for key in CASE_SCALAR_FIELDS}}
+            else:
+                case = self._load_case(case_id)
+                fresh_type, _fresh_doc = _case_meta(case)
+                if fresh_type != case_type:
+                    raise WorkspaceError(
+                        "workspace_conflict", "Hồ sơ đã đổi loại",
+                        details={"server_revision": self._revision(case)})
+                server_revision = self._revision(case)
+                if base_revision != server_revision:
+                    raise WorkspaceError(
+                        "workspace_conflict",
+                        f"Revision server hiện là {server_revision}, "
+                        f"base_revision={base_revision}",
+                        details={"server_revision": server_revision})
+                previous = self._compose_stage(case)
+                previous_people = previous.people
+                payload = dict(previous.payload)
+                present_scalars = {
+                    key for key in CASE_SCALAR_FIELDS if key in folded_meta}
+                payload["case"] = {
+                    **(payload.get("case") or {}),
+                    **{key: meta.get(key) for key in present_scalars},
+                }
+                case.ngay_lap_ho_so = meta["ngay_lap_ho_so"]
+                case.noi_niem_yet = meta["noi_niem_yet"]
+                case.nguoi_nhan_uy_quyen = meta["nguoi_nhan_uy_quyen"]
+                case.nguoi_nhan_uy_quyen_id = \
+                    meta["nguoi_nhan_uy_quyen_id"]
+                case.noi_dung_viec = meta["noi_dung_viec"]
+                case.ghi_chu = meta["ghi_chu"]
+
+            previous_import = payload.get("docx_import")
+            resolved_people, resolved_assets = self._write_stage_rows(
+                case, {"people": people, "assets": assets})
+            self._sync_links(case, resolved_assets)
+
+            stage_view = {
+                "people": [wire for _r, _e, wire in resolved_people],
+                "assets": [wire for _r, _e, wire in resolved_assets],
+            }
+            if docx_import is not None:
+                payload["docx_import"] = self._docx_context(
+                    docx_import, stage_view)
+            elif payload.get("docx_import") is not None:
+                payload["docx_import"] = self._docx_context(
+                    payload["docx_import"], stage_view)
+            self.db.flush()
+
+            valid_rows = {rid for rid, _e, _w in resolved_people}
+            prepare_stage = dict(stage_view)
+            if case_type == CASE_TYPE_INHERITANCE:
+                prepare_stage["owner_row_id"] = owner_row_id
+            previous_stage = (
+                None if new_case else {"people": previous_people})
+            clean_state, render_model, warnings = \
+                InheritanceWorkspaceService(self.db).prepare_diagram(
+                    case_type=case_type, stage=prepare_stage, state=state,
+                    previous_stage=previous_stage)
+
+            if case_type == CASE_TYPE_INHERITANCE:
+                role_nodes = _project_role_nodes(
+                    clean_state["nodes"], stage_view["people"])
+                self._sync_participants_and_owner(
+                    case, role_nodes, stage_view["people"], owner_row_id)
+            else:
+                case.nguoi_chet_id = None
+
+            now = _utc_now_iso()
+            case.case_state_json = json.dumps(
+                self._build_payload(
+                    payload, clean_state, render_model, now,
+                    domain=case_type, owner_row_id=owner_row_id,
+                    warnings=warnings),
+                ensure_ascii=False)
+            case.engine_state_json = None
+            self.db.flush()
+
+            if "docx_import" in payload:
+                self._validate_docx_bindings(
+                    case, payload["docx_import"], previous_import)
+
+            case.trang_thai = "done"
+            if new_case:
+                new_revision = 1
+            else:
+                new_revision = server_revision + 1
+                updated = self.db.execute(sa_text(
+                    "UPDATE inheritance_cases "
+                    "SET workspace_revision = :rev, updated_at = :now "
+                    "WHERE id = :cid AND workspace_revision = :base"),
+                    {"rev": new_revision,
+                     "now": datetime.now(timezone.utc).replace(tzinfo=None),
+                     "cid": case.id, "base": server_revision})
+                if updated.rowcount != 1:
+                    self.db.rollback()
+                    fresh = self._fresh_revision(case.id, server_revision)
+                    raise WorkspaceError(
+                        "workspace_conflict",
+                        f"Revision server hiện là {fresh}",
+                        details={"server_revision": fresh})
+            self.db.flush()
+            self.db.commit()
+        except WorkspaceError:
+            self.db.rollback()
+            raise
+        except IntegrityError as exc:
+            self.db.rollback()
+            raise WorkspaceError(
+                "stage_validation_error",
+                "Dữ liệu vi phạm ràng buộc integrity",
+                details={"field_errors": [_field_error(
+                    None, "entity_id", "invalid_format",
+                    "giá trị trùng/vi phạm ràng buộc duy nhất")]}) from exc
+        except Exception:
+            self.db.rollback()
+            raise
+
+        data = self.get(case.id)
+        data["created"] = new_case
+        return data
+
+    def _acquire_write_lock(self) -> None:
+        """Chiếm write reservation SQLite khi session chưa mở transaction.
+
+        Session đã có DB transaction (caller vi phạm contract sạch) thì giữ
+        CAS guarded UPDATE làm bảo vệ; busy/locked là lỗi hạ tầng retryable.
+        """
+        try:
+            dbapi = self.db.connection().connection.dbapi_connection
+            if getattr(dbapi, "in_transaction", False):
+                return
+            self.db.execute(sa_text("BEGIN IMMEDIATE"))
+        except OperationalError as exc:
+            self.db.rollback()
+            raise WorkspaceError(
+                "engine_unavailable",
+                "Cơ sở dữ liệu đang bận; vui lòng thử lại",
+                details={"retryable": True}) from exc
+
     # ------------------------------------------------------------- internals
 
     @staticmethod
@@ -2137,6 +2424,23 @@ def _creation_hash(case_meta: Any, stage: Any, state: Any,
     canonical = {
         "command": "workspace_create",
         "intent": "draft",
+        "case": case_meta,
+        "stage": stage,
+        "diagram": state,
+        "docx_import": docx_import,
+    }
+    raw = json.dumps(canonical, sort_keys=True, ensure_ascii=False,
+                     separators=(",", ":"), default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _save_case_creation_hash(case_meta: Any, stage: Any, state: Any,
+                             docx_import: Any) -> str:
+    """SHA-256 canonical payload Lưu hồ sơ — khác hash create draft cùng
+    nội dung nhờ command/intent (§13.11/§13.19)."""
+    canonical = {
+        "command": "workspace_save_case",
+        "intent": "done",
         "case": case_meta,
         "stage": stage,
         "diagram": state,

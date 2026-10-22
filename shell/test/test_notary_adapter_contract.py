@@ -31,8 +31,9 @@ import notary_adapter  # noqa: E402
 from errors import CommandError  # noqa: E402
 
 from database import Base  # noqa: E402
-from models import (Customer, InheritanceCase, InheritanceParticipant,  # noqa: E402
-                    Property)
+from models import (CaseAssetRow, CasePersonRow, Customer,  # noqa: E402
+                    InheritanceCase, InheritanceCaseProperty,
+                    InheritanceParticipant, Property)
 import services.case_workspace as case_workspace  # noqa: E402
 import services.inheritance_workspace as inheritance_workspace  # noqa: E402
 import services.word_batch_export as word_batch_export  # noqa: E402
@@ -42,8 +43,13 @@ from sqlalchemy.orm import sessionmaker  # noqa: E402
 
 SCHEMA = "notary.case-drafting.v2"
 TP_IDS = [f"p{i}" for i in range(1, 31)]
+# file_ref chỉ nhận path Windows tuyệt đối (C:\...) — trên POSIX tmp_path
+# không qua validate_file_ref, nên các ca destination/template_dir được skip.
+WINDOWS_ONLY = pytest.mark.skipif(
+    os.name != "nt", reason="file_ref yêu cầu path tuyệt đối Windows")
 
 
+@WINDOWS_ONLY
 def test_original_docx_two_party_adapter_lifecycle_stale_guard_and_subfolder(adapter_db, tmp_path, monkeypatch):
     """Real intake → saved two-party rows/seats → exact original export, with stale no-write."""
     import json
@@ -163,16 +169,57 @@ def adapter_db(tmp_path, monkeypatch):
     sess.close()
 
 
-def _seed_case(sess, locked=False, loai_van_ban="khai_nhan"):
-    deceased = Customer(ho_ten="Nguyen Van Xuat", ngay_chet=date(2020, 1, 1))
+def _seed_case(sess, loai_van_ban="khai_nhan"):
+    """Case + rows Storage B: một chủ đất (identity anchor khớp
+    `_person_row`) và một tài sản (serial khớp `_asset_row`)."""
+    import json
+    deceased = Customer(
+        ho_ten="Nguyen Van Xuat", gioi_tinh="Nam",
+        ngay_chet=date(2020, 1, 1), so_giay_to="001122334455",
+        name_anchor="nguyen van xuat", document_anchor="001122334455")
     prop = Property(so_serial="AA123456", dia_chi="1 duong test")
     sess.add_all([deceased, prop])
     sess.flush()
     case = InheritanceCase(
         nguoi_chet_id=deceased.id, tai_san_id=prop.id,
         ngay_lap_ho_so=date(2026, 9, 1), loai_van_ban=loai_van_ban,
-        trang_thai="locked" if locked else "draft")
+        trang_thai="draft")
     sess.add(case)
+    sess.flush()
+    person_row_id = str(uuid.uuid4())
+    asset_row_id = str(uuid.uuid4())
+    sess.add(CasePersonRow(
+        row_id=person_row_id, case_id=case.id, customer_id=deceased.id,
+        vitri=1, ho_ten=deceased.ho_ten, gioi_tinh="Nam",
+        ngay_sinh="1950-01-01", ngay_chet="2020-01-01",
+        so_giay_to=deceased.so_giay_to))
+    sess.add(CaseAssetRow(
+        row_id=asset_row_id, case_id=case.id, property_id=prop.id,
+        vitri=1, so_serial=prop.so_serial, dia_chi=prop.dia_chi,
+        land_rows_present=False))
+    sess.add(InheritanceCaseProperty(
+        case_id=case.id, case_asset_row_id=asset_row_id,
+        property_id=prop.id, is_primary=True))
+    case_type = ("two_party" if loai_van_ban in
+                 ("chuyen_nhuong", "tang_cho", "cho_thue", "dat_coc")
+                 else "inheritance")
+    if case_type == "inheritance":
+        payload = {
+            "schemaVersion": 4, "case": {}, "owner_row_id": person_row_id,
+            "diagram": {"state": {
+                "version": 3, "domain": "inheritance",
+                "nodes": [{"id": "owner", "personId": person_row_id,
+                           "parentSlotIds": [], "spouseSlotId": None,
+                           "ownPositions": [1], "receivePositions": [],
+                           "hidden": False, "deleted": False}]},
+                "render_model": None}}
+    else:
+        payload = {
+            "schemaVersion": 4, "case": {},
+            "diagram": {"state": {
+                "version": 3, "domain": "two_party", "nodes": []},
+                "render_model": None}}
+    case.case_state_json = json.dumps(payload)
     sess.commit()
     return case, deceased, prop
 
@@ -186,7 +233,7 @@ def _person_row(entity_id=None, **kw):
         "row_id": _uuid4(), "entity_id": entity_id,
         "ho_ten": "Nguyen Van Xuat", "gioi_tinh": "Nam",
         "ngay_sinh": "1950-01-01", "ngay_chet": "2020-01-01",
-        "so_giay_to": None, "ngay_cap": None, "noi_cap": None,
+        "so_giay_to": "001122334455", "ngay_cap": None, "noi_cap": None,
         "dia_chi": None, "place_of_origin": None,
     }
     row.update(kw)
@@ -252,8 +299,56 @@ def _tp_state(**kw):
 def test_registry_wires_workspace_commands():
     assert "notary.workspace_get" in reg.COMMANDS
     assert "notary.workspace_commit_stage" in reg.COMMANDS
+    assert "notary.workspace_save_case" in reg.COMMANDS
     assert callable(reg.COMMANDS["notary.workspace_get"])
     assert callable(reg.COMMANDS["notary.workspace_commit_stage"])
+    assert callable(reg.COMMANDS["notary.workspace_save_case"])
+
+
+def test_workspace_save_case_new_done_and_idempotent_replay(adapter_db):
+    people, assets, state = _create_args()
+    payload = _inheritance_create(people, assets, state)
+    first = notary_adapter.workspace_save_case(_Job(), payload)
+    assert first["kind"] == "workspace_save_case"
+    assert first["data"]["created"] is True
+    assert first["data"]["case"]["status"] == "done"
+    assert first["data"]["case"]["revision"] == 1
+    assert len(first["data"]["stage"]["people"]) == 2
+
+    replay = notary_adapter.workspace_save_case(_Job(), payload)
+    assert replay["data"]["created"] is False
+    assert replay["data"]["case"]["id"] == first["data"]["case"]["id"]
+    assert replay["data"]["case"]["revision"] == 1
+    assert adapter_db.query(InheritanceCase).count() == 1
+
+    other = _inheritance_create(people, assets, state)
+    other["idempotency_key"] = payload["idempotency_key"]
+    other["case"] = {"document_type": "khai_nhan", "ghi_chu": "khac"}
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.workspace_save_case(_Job(), other)
+    assert exc.value.code == "idempotency_conflict"
+
+
+def test_workspace_save_case_existing_revision_guard(adapter_db):
+    case, _deceased, _prop = _seed_case(adapter_db)
+    people, assets, state = _create_args()
+    payload = _inheritance_create(people, assets, state)
+    payload.pop("idempotency_key")
+    payload["case_id"] = case.id
+    payload["base_revision"] = case.workspace_revision
+    saved = notary_adapter.workspace_save_case(_Job(), payload)
+    assert saved["data"]["created"] is False
+    assert saved["data"]["case"]["status"] == "done"
+    assert saved["data"]["case"]["revision"] == 2
+
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.workspace_save_case(_Job(), payload)
+    err = exc.value
+    assert err.code == "workspace_conflict"
+    assert err.retryable is True
+    assert err.next_action == "retry"
+    assert err.details["server_revision"] == 2
+
 
 
 # ----------------------------------------------------------- workspace_get
@@ -271,7 +366,7 @@ def test_workspace_get_contract_shape(adapter_db):
     assert case_info["case_type"] == "inheritance"
     assert case_info["document_type"] == "khai_nhan"
     assert case_info["status"] == "draft"
-    assert case_info["locked"] is False
+    assert "locked" not in case_info
     assert case_info["revision"] == 1
     assert len(data["stage"]["people"]) == 1
     assert len(data["stage"]["assets"]) == 1
@@ -309,8 +404,8 @@ def test_workspace_get_two_party(adapter_db):
     # Commit xong → render_model unsupported (engine khong tinh).
     notary_adapter.workspace_commit_stage(
         _Job(), _commit_payload(
-            case.id, 1, [_person_row(entity_id=deceased.id)],
-            [_asset_row(entity_id=prop.id)]))
+            case.id, 1, [_person_row()],
+            [_asset_row()]))
     res2 = notary_adapter.workspace_get(_Job(), {"case_id": case.id})
     rm = res2["data"]["diagram"]["render_model"]
     assert rm["status"] == "unsupported"
@@ -338,8 +433,8 @@ def test_workspace_commit_stage_contract_shape(adapter_db):
     res = notary_adapter.workspace_commit_stage(
         _Job(), _commit_inheritance(
             case.id, 1,
-            [_person_row(entity_id=deceased.id)],
-            [_asset_row(entity_id=prop.id)]))
+            [_person_row()],
+            [_asset_row()]))
     assert res["kind"] == "workspace_commit_stage"
     data = res["data"]
     assert data["schema_version"] == SCHEMA
@@ -359,16 +454,16 @@ def test_workspace_commit_stage_owner_required(adapter_db):
     case, deceased, prop = _seed_case(adapter_db)
     for bad_owner in (None, _uuid4()):
         p = _commit_payload(
-            case.id, 1, [_person_row(entity_id=deceased.id)],
-            [_asset_row(entity_id=prop.id)])
+            case.id, 1, [_person_row()],
+            [_asset_row()])
         p["stage"]["owner_row_id"] = bad_owner
         with pytest.raises(CommandError) as exc:
             notary_adapter.workspace_commit_stage(_Job(), p)
         assert exc.value.code == "workspace_owner_required", bad_owner
     # key hoan toan thieu -> cung owner_required
     p = _commit_payload(
-        case.id, 1, [_person_row(entity_id=deceased.id)],
-        [_asset_row(entity_id=prop.id)])
+        case.id, 1, [_person_row()],
+        [_asset_row()])
     with pytest.raises(CommandError) as exc:
         notary_adapter.workspace_commit_stage(_Job(), p)
     assert exc.value.code == "workspace_owner_required"
@@ -379,11 +474,11 @@ def test_workspace_commit_stage_owner_syncs_node(adapter_db):
     owner_row_id — SOT la pointer stage; node khong ton tai thi khong
     tu tao."""
     case, deceased, prop = _seed_case(adapter_db)
-    people = [_person_row(entity_id=deceased.id),
+    people = [_person_row(),
               _person_row(ho_ten="Tran Thi Binh", ngay_chet=None)]
     # Commit owner=p1 → rev 2.
     p = _commit_payload(case.id, 1, people,
-                        [_asset_row(entity_id=prop.id)])
+                        [_asset_row()])
     p["stage"]["owner_row_id"] = people[0]["row_id"]
     notary_adapter.workspace_commit_stage(_Job(), p)
     # Persist diagram co node 'owner' (mirror khop pointer) → rev 3.
@@ -392,7 +487,7 @@ def test_workspace_commit_stage_owner_syncs_node(adapter_db):
             _diagram_node("owner", people[0]["row_id"], own=[1])])))
     # Commit doi pointer sang p2 → node owner persisted phai theo pointer.
     p2 = _commit_payload(case.id, 3, people,
-                         [_asset_row(entity_id=prop.id)])
+                         [_asset_row()])
     p2["stage"]["owner_row_id"] = people[1]["row_id"]
     res = notary_adapter.workspace_commit_stage(_Job(), p2)
     nodes = res["data"]["diagram"]["state"]["nodes"]
@@ -403,10 +498,10 @@ def test_workspace_commit_stage_owner_syncs_node(adapter_db):
 def test_workspace_commit_stage_is_primary_rejected(adapter_db):
     """is_primary bi cam tren wire v2 — field la -> validation_error."""
     case, deceased, prop = _seed_case(adapter_db)
-    asset = _asset_row(entity_id=prop.id)
+    asset = _asset_row()
     asset["is_primary"] = True
     p = _commit_inheritance(case.id, 1,
-                            [_person_row(entity_id=deceased.id)], [asset])
+                            [_person_row()], [asset])
     with pytest.raises(CommandError) as exc:
         notary_adapter.workspace_commit_stage(_Job(), p)
     assert exc.value.code == "validation_error"
@@ -414,10 +509,10 @@ def test_workspace_commit_stage_is_primary_rejected(adapter_db):
 
 def test_workspace_commit_stage_asset_limit(adapter_db):
     case, deceased, prop = _seed_case(adapter_db)
-    assets = [_asset_row(entity_id=prop.id)] + [
+    assets = [_asset_row()] + [
         _asset_row(so_serial=f"AA{i:06d}") for i in range(3)]
     p = _commit_inheritance(
-        case.id, 1, [_person_row(entity_id=deceased.id)], assets)
+        case.id, 1, [_person_row()], assets)
     with pytest.raises(CommandError) as exc:
         notary_adapter.workspace_commit_stage(_Job(), p)
     assert exc.value.code == "stage_validation_error"
@@ -430,10 +525,10 @@ def test_workspace_commit_stage_two_party(adapter_db):
     personId hop le da assign; render_model unsupported; revision tang."""
     case, deceased, prop = _seed_case(
         adapter_db, loai_van_ban="chuyen_nhuong")
-    people = [_person_row(entity_id=deceased.id)]
+    people = [_person_row()]
     res = notary_adapter.workspace_commit_stage(
         _Job(), _commit_payload(
-            case.id, 1, people, [_asset_row(entity_id=prop.id)]))
+            case.id, 1, people, [_asset_row()]))
     data = res["data"]
     assert data["revision"] == 2
     assert "owner_row_id" not in data["stage"]
@@ -447,7 +542,7 @@ def test_workspace_commit_stage_two_party(adapter_db):
         case.id, 2, _tp_state(assign={"p1": people[0]["row_id"]})))
     res2 = notary_adapter.workspace_commit_stage(
         _Job(), _commit_payload(
-            case.id, 3, people, [_asset_row(entity_id=prop.id)]))
+            case.id, 3, people, [_asset_row()]))
     st2 = res2["data"]["diagram"]["state"]
     assert st2["nodes"][0]["personId"] == people[0]["row_id"]
 
@@ -456,8 +551,8 @@ def test_workspace_commit_stage_two_party_owner_row_id_rejected(adapter_db):
     case, deceased, prop = _seed_case(
         adapter_db, loai_van_ban="chuyen_nhuong")
     p = _commit_payload(
-        case.id, 1, [_person_row(entity_id=deceased.id)],
-        [_asset_row(entity_id=prop.id)])
+        case.id, 1, [_person_row()],
+        [_asset_row()])
     p["stage"]["owner_row_id"] = None          # key cam voi two_party
     with pytest.raises(CommandError) as exc:
         notary_adapter.workspace_commit_stage(_Job(), p)
@@ -479,8 +574,8 @@ def test_workspace_commit_stage_two_party_people_limit(adapter_db):
 def test_workspace_commit_stage_stale_revision_maps_conflict(adapter_db):
     case, deceased, prop = _seed_case(adapter_db)
     payload = _commit_inheritance(
-        case.id, 1, [_person_row(entity_id=deceased.id)],
-        [_asset_row(entity_id=prop.id)])
+        case.id, 1, [_person_row()],
+        [_asset_row()])
     notary_adapter.workspace_commit_stage(_Job(), payload)  # rev 1 → 2
     with pytest.raises(CommandError) as exc:
         notary_adapter.workspace_commit_stage(_Job(), payload)  # rev 1 stale
@@ -498,18 +593,6 @@ def test_workspace_commit_stage_ahead_revision_maps_conflict(adapter_db):
             _Job(), _commit_payload(case.id, 99, [], []))
     assert exc.value.code == "workspace_conflict"
     assert exc.value.details["server_revision"] == 1
-
-
-def test_workspace_commit_stage_locked_maps_error(adapter_db):
-    case, deceased, prop = _seed_case(adapter_db, locked=True)
-    with pytest.raises(CommandError) as exc:
-        notary_adapter.workspace_commit_stage(
-            _Job(), _commit_inheritance(
-                case.id, 1, [_person_row(entity_id=deceased.id)],
-                [_asset_row(entity_id=prop.id)]))
-    err = exc.value
-    assert err.code == "workspace_locked"
-    assert err.retryable is False
 
 
 def test_workspace_commit_stage_invalid_row_maps_error(adapter_db):
@@ -551,8 +634,8 @@ def test_workspace_commit_stage_case_meta_passes_through(adapter_db):
     uq = Customer(ho_ten="Nguoi Uy Quyen", gioi_tinh="Nu")
     adapter_db.add(uq)
     adapter_db.commit()  # adapter mo session rieng — phai commit
-    stage = {"people": [_person_row(entity_id=deceased.id)],
-             "assets": [_asset_row(entity_id=prop.id)],
+    stage = {"people": [_person_row()],
+             "assets": [_asset_row()],
              "owner_row_id": None}
     stage["owner_row_id"] = stage["people"][0]["row_id"]
     res = notary_adapter.workspace_commit_stage(_Job(), {
@@ -580,8 +663,8 @@ def test_workspace_commit_stage_case_meta_invalid_maps_error(adapter_db):
     """payload.case sai shape/id → CommandError validation_error, khong
     ghi Stage."""
     case, deceased, prop = _seed_case(adapter_db)
-    stage = {"people": [_person_row(entity_id=deceased.id)],
-             "assets": [_asset_row(entity_id=prop.id)]}
+    stage = {"people": [_person_row()],
+             "assets": [_asset_row()]}
     stage["owner_row_id"] = stage["people"][0]["row_id"]
     with pytest.raises(CommandError) as exc:
         notary_adapter.workspace_commit_stage(_Job(), {
@@ -607,8 +690,8 @@ def _committed_case(adapter_db, loai_van_ban="khai_nhan"):
     nhat = owner slot (engine: estate unresolved, status incomplete —
     du de kiem wire shape)."""
     case, deceased, prop = _seed_case(adapter_db, loai_van_ban=loai_van_ban)
-    stage = {"people": [_person_row(entity_id=deceased.id)],
-             "assets": [_asset_row(entity_id=prop.id)]}
+    stage = {"people": [_person_row()],
+             "assets": [_asset_row()]}
     if loai_van_ban in ("khai_nhan", "thoa_thuan"):
         stage["owner_row_id"] = stage["people"][0]["row_id"]
     res = case_workspace.CaseWorkspaceService(adapter_db).commit_stage(
@@ -727,8 +810,8 @@ def test_diagram_evaluate_missing_diagram_is_validation_error(adapter_db):
         assert exc.value.code == "validation_error", bad
 
 
-def test_diagram_evaluate_allowed_on_locked_case(adapter_db):
-    case, _deceased, _prop = _seed_case(adapter_db, locked=True)
+def test_diagram_evaluate_allowed_on_draft_case(adapter_db):
+    case, _deceased, _prop = _seed_case(adapter_db)
     state = _v3_state([])
     res = notary_adapter.diagram_evaluate(_Job(), _eval_payload(case.id, state))
     assert res["kind"] == "diagram_evaluate"
@@ -801,14 +884,6 @@ def test_diagram_save_conflict_maps_retryable(adapter_db):
     assert err.retryable is True
     assert err.next_action == "retry"
     assert err.details["server_revision"] == 2
-
-
-def test_diagram_save_locked_maps_error(adapter_db):
-    case, _deceased, _prop = _seed_case(adapter_db, locked=True)
-    state = _v3_state([])
-    with pytest.raises(CommandError) as exc:
-        notary_adapter.diagram_save(_Job(), _save_payload(case.id, 1, state))
-    assert exc.value.code == "workspace_locked"
 
 
 def test_diagram_save_two_party(adapter_db):
@@ -925,15 +1000,20 @@ def test_workspace_commit_stage_keeps_unassigned_pool_warning(adapter_db):
 # ------------------------------------- word_export_options/batch (MIN-110)
 
 
-def _seed_word_ready_case(sess, locked=False):
+def _seed_word_ready_case(sess):
     """Case du dieu kien xuat Word: chu dat da chet + tai san + nguoi nhan
-    (participants fallback path — khong can case_state_json)."""
-    case, _deceased, _prop = _seed_case(sess, locked=locked)
-    heir = Customer(ho_ten="Nguyen Thi Con")
+    là dòng Người Storage B + participant join theo case_person_row_id."""
+    case, _deceased, _prop = _seed_case(sess)
+    heir = Customer(ho_ten="Nguyen Thi Con", gioi_tinh="Nữ")
     sess.add(heir)
     sess.flush()
+    row_id = str(uuid.uuid4())
+    sess.add(CasePersonRow(
+        row_id=row_id, case_id=case.id, customer_id=heir.id, vitri=2,
+        ho_ten=heir.ho_ten, gioi_tinh="Nữ"))
     sess.add(InheritanceParticipant(
         ho_so_id=case.id, customer_id=heir.id,
+        case_person_row_id=row_id,
         vai_tro="Con", co_nhan_tai_san=True, ty_le=100.0))
     sess.commit()
     return case
@@ -982,13 +1062,6 @@ def test_word_export_options_ready_case(adapter_db):
     assert docs["niem_yet"]["block_reason"] == "word.template_missing"
 
 
-def test_word_export_options_locked_case_still_readonly(adapter_db):
-    # options la read-only — locked case khong bi workspace_locked (§5.3).
-    case = _seed_word_ready_case(adapter_db, locked=True)
-    res = notary_adapter.word_export_options(_Job(), {"case_id": case.id})
-    assert res["data"]["documents"][0]["document_key"]
-
-
 def test_word_export_options_missing_case(adapter_db):
     with pytest.raises(CommandError) as exc:
         notary_adapter.word_export_options(_Job(), {"case_id": 9999})
@@ -997,28 +1070,25 @@ def test_word_export_options_missing_case(adapter_db):
 
 def test_word_export_two_party_allowed(adapter_db, tmp_path):
     """NAIA-8: word_export_* tren two_party khong con
-    case_type_unsupported — readiness per-file qua block_reason
-    (case seed chua commit Stage → word.no_people)."""
+    case_type_unsupported — readiness per-file qua block_reason."""
     case, _d, _p = _seed_case(adapter_db, loai_van_ban="tang_cho")
     res = notary_adapter.word_export_options(_Job(), {"case_id": case.id})
     docs = {d["document_key"]: d for d in res["data"]["documents"]}
-    assert docs["khai_nhan_di_san"]["block_reason"] == "word.no_people"
+    assert docs["khai_nhan_di_san"]["ready"] is True
+    assert docs["khai_nhan_di_san"]["block_reason"] is None
     assert docs["niem_yet"]["block_reason"] == "word.template_missing"
-    # Batch: moi doc failed word.no_people → all-failed word_batch_failed
-    # kem result_data (khong phai case_type_unsupported).
+    if os.name != "nt":
+        return      # destination FileRef chỉ hợp lệ trên Windows
     with pytest.raises(CommandError) as exc:
         notary_adapter.word_export_batch(_Job(), {
             "case_id": case.id,
             "document_keys": ["khai_nhan_di_san"],
             "destination": _dest(tmp_path)})
     err = exc.value
-    assert err.code == "word_batch_failed"
-    assert err.result["data"]["breakdown"]["failed"] == [
-        "khai_nhan_di_san"]
-    assert err.result["data"]["documents"][0]["error"]["code"] == (
-        "word.no_people")
+    assert err.result["data"]["documents"][0]["error"] is None
 
 
+@WINDOWS_ONLY
 def test_word_export_batch_writes_docx(adapter_db, tmp_path):
     case = _seed_word_ready_case(adapter_db)
     res = notary_adapter.word_export_batch(_Job(), {
@@ -1044,6 +1114,7 @@ def test_word_export_batch_writes_docx(adapter_db, tmp_path):
         docx.Document(str(out))             # DOCX that, mo duoc
 
 
+@WINDOWS_ONLY
 def test_word_export_batch_collision_suffix(adapter_db, tmp_path):
     case = _seed_word_ready_case(adapter_db)
     old = tmp_path / f"Van_ban_khai_nhan_di_san_HS-{case.id}.docx"
@@ -1058,6 +1129,7 @@ def test_word_export_batch_collision_suffix(adapter_db, tmp_path):
     assert old.read_bytes() == b"cu"        # khong bao gio ghi de
 
 
+@WINDOWS_ONLY
 def test_word_export_batch_partial(adapter_db, tmp_path):
     case = _seed_word_ready_case(adapter_db)
     res = notary_adapter.word_export_batch(_Job(), {
@@ -1072,6 +1144,7 @@ def test_word_export_batch_partial(adapter_db, tmp_path):
     assert res["data"]["breakdown"]["failed"] == ["niem_yet"]
 
 
+@WINDOWS_ONLY
 def test_word_export_batch_all_failed_keeps_result(adapter_db, tmp_path):
     case = _seed_word_ready_case(adapter_db)
     with pytest.raises(CommandError) as exc:
@@ -1090,6 +1163,7 @@ def test_word_export_batch_all_failed_keeps_result(adapter_db, tmp_path):
     assert list(tmp_path.glob("*.docx")) == []
 
 
+@WINDOWS_ONLY
 def test_word_export_batch_validates_before_writing(adapter_db, tmp_path):
     case = _seed_word_ready_case(adapter_db)
     # document_keys rong -> word_no_documents_selected
@@ -1112,6 +1186,7 @@ def test_word_export_batch_validates_before_writing(adapter_db, tmp_path):
     assert list(tmp_path.glob("*.docx")) == []  # chua file nao duoc tao
 
 
+@WINDOWS_ONLY
 def test_word_export_batch_destination_rules(adapter_db, tmp_path):
     case = _seed_word_ready_case(adapter_db)
     # is_dir thieu/false -> validation_error
@@ -1140,15 +1215,7 @@ def test_word_export_batch_destination_rules(adapter_db, tmp_path):
     assert exc.value.code == "file_not_found"
 
 
-def test_word_export_batch_locked_case(adapter_db, tmp_path):
-    case = _seed_word_ready_case(adapter_db, locked=True)
-    with pytest.raises(CommandError) as exc:
-        notary_adapter.word_export_batch(_Job(), {
-            "case_id": case.id, "document_keys": ["khai_nhan_di_san"],
-            "destination": _dest(tmp_path)})
-    assert exc.value.code == "workspace_locked"
-
-
+@WINDOWS_ONLY
 def test_word_export_batch_subdir_link_escape(adapter_db, tmp_path):
     """Review NAIA-8: destination/HS-<case_id> là junction/symlink trỏ
     ra ngoài — mkdir(exist_ok=True) chấp nhận; phải từ chối
@@ -1169,6 +1236,7 @@ def test_word_export_batch_subdir_link_escape(adapter_db, tmp_path):
     assert [p.name for p in dest.iterdir()] == [f"HS-{case.id}"]
 
 
+@WINDOWS_ONLY
 def test_word_export_batch_subdir_destination_is_granted_dir(
         adapter_db, tmp_path):
     """Contract §8.2: create_case_subdir → ghi vào <dest>/HS-<id>/ nhưng
@@ -1226,7 +1294,7 @@ def test_workspace_update_meta_persists_and_reloads(adapter_db):
     assert got["data"]["case"]["revision"] == case.workspace_revision + 1
 
 
-def test_workspace_update_conflict_locked_and_shape(adapter_db):
+def test_workspace_update_conflict_and_shape(adapter_db):
     case = _seed_word_ready_case(adapter_db)
     rev = case.workspace_revision
     # base_revision cu → workspace_conflict
@@ -1247,16 +1315,16 @@ def test_workspace_update_conflict_locked_and_shape(adapter_db):
             notary_adapter.workspace_update(_Job(), {
                 "case_id": case.id, "base_revision": rev, "case": bad})
         assert exc.value.code == "validation_error", bad
-    # case khoa → workspace_locked
-    case.trang_thai = "locked"
+    # Done sửa được — không còn nhánh workspace_locked.
+    case.trang_thai = "done"
     adapter_db.commit()
-    with pytest.raises(CommandError) as exc:
-        notary_adapter.workspace_update(_Job(), {
-            "case_id": case.id, "base_revision": case.workspace_revision,
-            "case": {"noi_niem_yet": "xã Y"}})
-    assert exc.value.code == "workspace_locked"
+    done = notary_adapter.workspace_update(_Job(), {
+        "case_id": case.id, "base_revision": case.workspace_revision,
+        "case": {"noi_niem_yet": "xã Y"}})
+    assert done["data"]["case"]["status"] == "done"
 
 
+@WINDOWS_ONLY
 def test_word_export_options_folder_mode(adapter_db, tmp_path):
     """template_dir (FileRef da resolve) → documents = .docx quet duoc,
     document_key = basename; lock file ~$ + non-docx + subdir bi loai."""
@@ -1279,6 +1347,7 @@ def test_word_export_options_folder_mode(adapter_db, tmp_path):
     assert all(d["ready"] for d in docs)
 
 
+@WINDOWS_ONLY
 def test_word_export_options_template_dir_missing(adapter_db, tmp_path):
     """Review B3: loi doc folder mau phai la contract file_not_found,
     khong roi engine_internal_error."""
@@ -1299,6 +1368,7 @@ def test_word_export_options_template_dir_missing(adapter_db, tmp_path):
     assert exc.value.code == "file_not_found"
 
 
+@WINDOWS_ONLY
 def test_word_export_batch_folder_mode_real_docx(adapter_db, tmp_path):
     """Integration that: folder mau that → options → batch chi xuat
     mau duoc CHON; output la DOCX that chua noi dung mau do (khong phai
@@ -1414,7 +1484,8 @@ def test_workspace_create_contract_shape(adapter_db):
     assert data["created"] is True
     c = data["case"]
     assert c["case_type"] == "inheritance"
-    assert c["status"] == "draft" and c["locked"] is False
+    assert c["status"] == "draft"
+    assert "locked" not in c
     assert c["revision"] == 1
     assert c["ngay_lap_ho_so"] == "2026-09-26"
     assert c["noi_niem_yet"] == "xa Yen So"
@@ -1477,9 +1548,10 @@ def test_workspace_create_idempotent_replay(adapter_db):
     assert second["data"]["created"] is False
     assert second["data"]["case"]["id"] == first["data"]["case"]["id"]
     assert adapter_db.query(InheritanceCase).count() == 1
-    # key khac = case moi
+    # key khac = case moi; row_id thuộc case cũ nên payload phải mới.
+    people2, assets2, state2 = _create_args()
     third = notary_adapter.workspace_create(
-        _Job(), _inheritance_create(people, assets, state, key=_uuid4()))
+        _Job(), _inheritance_create(people2, assets2, state2, key=_uuid4()))
     assert third["data"]["created"] is True
     assert third["data"]["case"]["id"] != first["data"]["case"]["id"]
 
@@ -1734,13 +1806,14 @@ def test_conversion_real_adapter_accepted_cancel_never_writes(adapter_db):
     assert notary_adapter.workspace_get(_Job(), {"case_id": case.id})["data"] == before
 
 
+@WINDOWS_ONLY
 def test_stage_raw_serial_commit_reopen_and_word_batch(adapter_db, tmp_path):
     """#40: serial nguyên văn/rỗng/trùng qua commit thật, mở lại phiên mới
     và xuất Word batch thật — không sinh XX, không gộp tài sản."""
     case, deceased, prop = _seed_case(adapter_db)
-    people = [_person_row(entity_id=deceased.id)]
+    people = [_person_row()]
     assets = [
-        _asset_row(entity_id=prop.id, so_serial="TEST-RAW/001",
+        _asset_row(so_serial="TEST-RAW/001",
                    so_thua_dat="123", so_to_ban_do="45",
                    dia_chi="Thửa 123, tờ 45"),
         _asset_row(so_serial="", so_thua_dat="456", so_to_ban_do="78",
@@ -1763,10 +1836,12 @@ def test_stage_raw_serial_commit_reopen_and_word_batch(adapter_db, tmp_path):
     assert [a["so_serial"] for a in saved] == [
         "TEST-RAW/001", "", "TEST-RAW/001"]
     assert [a["so_thua_dat"] for a in saved] == ["123", "456", "789"]
-    assert len({a["entity_id"] for a in saved}) == 3
+    # Cùng serial nguyên văn → cùng identity; serial rỗng = thiếu neo → null.
+    assert saved[0]["entity_id"] == saved[2]["entity_id"] is not None
+    assert saved[1]["entity_id"] is None
     assert adapter_db.query(Property).filter_by(
-        so_serial="TEST-RAW/001").count() == 2
-    assert adapter_db.query(Property).filter_by(so_serial="").count() == 1
+        so_serial="TEST-RAW/001").count() == 1
+    assert adapter_db.query(Property).filter_by(so_serial="").count() == 0
 
     tpl = _tpl_dir(tmp_path, "mau-serial")
     _write_docx(tpl / "serial.docx",

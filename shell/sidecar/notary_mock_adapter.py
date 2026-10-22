@@ -205,6 +205,8 @@ class _MockState:
                 self.customers[int(c["id"])] = dict(c)
         # idempotency_key -> case_id (workspace_create replay, §4.3)
         self._idempotency = {}
+        # idempotency_key -> creation hash (workspace_save_case replay)
+        self._idempotency_hashes = {}
         raw = (seed or {}).get("cases") or _load_default_cases()
         self.cases = {}
         for cid, c in raw.items():
@@ -313,13 +315,6 @@ def _check_supported(case):
                            details={"case_type": ct})
 
 
-def _check_writable(case):
-    # Real parity (commit_stage/save_diagram): locked TRUOC case_type —
-    # gift+locked -> workspace_locked, khong phai case_type_unsupported.
-    if case.get("locked"):
-        raise CommandError("workspace_locked",
-                           f"hồ sơ #{case['id']} đã khóa")
-    _check_supported(case)
 
 
 def _check_base_revision(case, payload):
@@ -1087,7 +1082,6 @@ def _mock_case_row(cid, case):
         "trang_thai": case.get("status"),
         "noi_niem_yet": case.get("noi_niem_yet"),
         "ghi_chu": case.get("ghi_chu"),
-        "is_locked": bool(case.get("locked")),
         "tong_ty_le": case.get("tong_ty_le"),
     }
 
@@ -1187,7 +1181,6 @@ def _workspace_data(cid, case):
             "case_type": ct,
             "document_type": case.get("document_type"),
             "status": case.get("status"),
-            "locked": bool(case.get("locked")),
             "revision": case.get("revision"),
             "ngay_lap_ho_so": case.get("ngay_lap_ho_so"),
             "noi_niem_yet": case.get("noi_niem_yet"),
@@ -1514,15 +1507,290 @@ def workspace_create(job, payload):
         return _result("workspace_create", data)
 
 
+_SAVE_CASE_KEYS = {"case_id", "base_revision", "idempotency_key", "case",
+                   "stage", "diagram", "docx_import"}
+
+
+def _save_case_hash(payload):
+    canonical = {
+        "command": "workspace_save_case",
+        "intent": "done",
+        "case": payload.get("case"),
+        "stage": payload.get("stage"),
+        "diagram": payload.get("diagram"),
+        "docx_import": payload.get("docx_import"),
+    }
+    raw = json.dumps(canonical, sort_keys=True, ensure_ascii=False,
+                     separators=(",", ":"), default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _save_case_payload(payload):
+    """Validate phần dùng chung; trả (meta, stage, state).
+
+    Mock phải công khai đúng thứ tự real save_case: shape → meta → Stage
+    (owner/field/create) → Diagram wire/domain/refs/owner → atomically
+    thay case. Không mutate state trước khi validate xong."""
+    p = payload if isinstance(payload, dict) else {}
+    if set(p) - _SAVE_CASE_KEYS:
+        raise CommandError("validation_error",
+                           f"payload có key ngoài schema: "
+                           f"{sorted(set(p) - _SAVE_CASE_KEYS)}")
+    if "case_id" in p and p.get("case_id") is None:
+        raise CommandError("validation_error",
+                           "case_id null — bỏ key khi tạo mới")
+    cm = p.get("case")
+    if not isinstance(cm, dict):
+        raise CommandError("validation_error",
+                           "payload.case phải là object")
+    stage = p.get("stage")
+    if not isinstance(stage, dict):
+        raise CommandError("validation_error", "stage phải là object")
+    dg = p.get("diagram")
+    if not isinstance(dg, dict) or set(dg) != {"state"}:
+        raise CommandError("validation_error",
+                           "payload.diagram chỉ chứa 'state'")
+    return cm, stage, dg.get("state")
+
+
+def _validate_save_stage(stage, ct, *, is_new):
+    errs, people_norm, assets_norm = _validate_stage(stage, ct)
+    if is_new:
+        raw_people = stage.get("people") or []
+        raw_assets = stage.get("assets") or []
+        if not raw_people:
+            errs.append(_err(
+                _det_uuid4("field_error:people_empty"), "people",
+                "required", "stage.people phải có ít nhất một dòng"))
+        if not raw_assets:
+            errs.append(_err(
+                _det_uuid4("field_error:assets_empty"), "assets",
+                "required", "stage.assets phải có ít nhất một dòng"))
+        for i, r in enumerate(raw_people):
+            if isinstance(r, dict) and r.get("entity_id") is not None:
+                errs.append(_err(
+                    _err_row(r.get("row_id"), f"people[{i}]"),
+                    "entity_id", "invalid_format",
+                    "entity_id phải null — tạo mới resolve identity"))
+        for i, r in enumerate(raw_assets):
+            if isinstance(r, dict) and r.get("entity_id") is not None:
+                errs.append(_err(
+                    _err_row(r.get("row_id"), f"assets[{i}]"),
+                    "entity_id", "invalid_format",
+                    "entity_id phải null — tạo mới resolve identity"))
+    if errs:
+        raise CommandError("stage_validation_error",
+                           f"{len(errs)} lỗi field trong Stage",
+                           details={"field_errors": errs})
+    return people_norm, assets_norm
+
+
+def _validate_save_diagram(state, ct, stage, stage_ids):
+    _check_domain(state, ct)
+    errors = _validate_diagram_state(state)
+    if errors:
+        raise CommandError("diagram_invalid_state",
+                           "diagram state không hợp lệ",
+                           details={"errors": errors})
+    outside_pid = _outside_person(state, stage_ids)
+    if outside_pid is not None:
+        raise CommandError(
+            "diagram_reference_outside_stage",
+            f"personId {outside_pid} không thuộc Stage của payload",
+            details={"personId": outside_pid})
+    if ct == CASE_TYPE_INHERITANCE:
+        oid = stage.get("owner_row_id")
+        owner_pid = next(
+            (n.get("personId") for n in state["nodes"]
+             if isinstance(n, dict) and n.get("id") == "owner"
+             and n.get("deleted") is not True
+             and n.get("personId") is not None), None)
+        if owner_pid is not None and owner_pid != oid:
+            raise CommandError(
+                "diagram_owner_mismatch",
+                "node owner.personId phải khớp stage.owner_row_id",
+                details={"owner_row_id": oid, "node_personId": owner_pid})
+
+
+def workspace_save_case(job, payload):
+    """notary.workspace_save_case mock (§13.19) — Lưu hồ sơ nguyên tử:
+    Stage + meta + Diagram + done + revision trong một lần swap.
+
+    Tạo mới idempotent theo key/hash (`created` chỉ true lần đầu); case
+    cũ revision-guarded. Diagram incomplete vẫn done (render_model giữ
+    warning); invalid reject, không đổi case."""
+    p = payload if isinstance(payload, dict) else {}
+    is_new = "case_id" not in p
+    cm_raw, stage, state = _save_case_payload(p)
+    st = _state()
+
+    if is_new:
+        ik = p.get("idempotency_key")
+        if not (isinstance(ik, str) and UUID4_RX.match(ik)):
+            raise CommandError("validation_error",
+                               "idempotency_key phải là uuid4 khi tạo mới")
+        if p.get("base_revision") is not None:
+            raise CommandError("validation_error",
+                               "base_revision cấm khi tạo mới")
+        cm = _fold_canon(cm_raw, CASE_META_CANON, "payload.case")
+        extra = set(cm) - set(_CASE_META_FIELDS)
+        if extra:
+            raise CommandError("validation_error",
+                               f"payload.case key lạ: {sorted(extra)}")
+        ct = cm.get("case_type", CASE_TYPE_INHERITANCE)
+        if ct not in CASE_TYPES:
+            raise CommandError("validation_error",
+                               f"case_type={ct!r} ngoài enum")
+        dt = cm.get("document_type")
+        doc_types = (DOCUMENT_TYPES if ct == CASE_TYPE_INHERITANCE
+                     else DOCUMENT_TYPES_TWO_PARTY)
+        if dt not in doc_types:
+            raise CommandError("validation_error",
+                               f"document_type={dt!r} ngoài enum cho {ct}")
+        scratch = {"case_type": ct, "document_type": dt}
+        _apply_case_meta(scratch, cm)
+        scratch["ngay_lap_ho_so"] = cm.get("ngay_lap_ho_so")
+        people, assets = _validate_save_stage(stage, ct, is_new=True)
+        stage_ids = {r["row_id"] for r in people}
+        _validate_save_diagram(state, ct, stage, stage_ids)
+        clean_state = _persisted_diagram_state(state)
+        if ct == CASE_TYPE_TWO_PARTY:
+            render_model = _unsupported_render()
+            warnings = []
+        else:
+            pruned = _prune_positions_list(clean_state, len(assets))
+            render_model = _render(clean_state, {"people": people,
+                                                 "assets": assets})
+            if render_model.get("status") == "invalid":
+                raise CommandError(
+                    "diagram_invalid_state", "Sơ đồ chưa hợp lệ",
+                    details={"errors": render_model.get("errors") or []})
+            warnings = ([{"code": "diagram.selection_pruned",
+                          "message": "Các lựa chọn vị trí vượt số tài sản "
+                                     "đã bị bỏ"}] if pruned else [])
+        creation_hash = _save_case_hash(p)
+        with st._lock:
+            prior = st._idempotency.get(ik)
+            if prior is not None:
+                if st._idempotency_hashes.get(ik) != creation_hash:
+                    raise CommandError(
+                        "idempotency_conflict",
+                        "idempotency_key đã dùng với nội dung khác")
+                data = _workspace_data(prior, st.cases[prior])
+                data["created"] = False
+                return _result("workspace_save_case", data)
+            for row in people + assets:
+                row["entity_id"] = st.assign_entity_id()
+            new_id = (max(st.cases) + 1) if st.cases else 1
+            case = {
+                "id": new_id,
+                "case_type": ct,
+                "document_type": dt,
+                "status": "done",
+                "revision": 1,
+                "ngay_lap_ho_so": scratch.get("ngay_lap_ho_so"),
+                "noi_niem_yet": scratch.get("noi_niem_yet"),
+                "nguoi_nhan_uy_quyen": scratch.get("nguoi_nhan_uy_quyen"),
+                "nguoi_nhan_uy_quyen_id": scratch.get(
+                    "nguoi_nhan_uy_quyen_id"),
+                "noi_dung_viec": scratch.get("noi_dung_viec"),
+                "ghi_chu": scratch.get("ghi_chu"),
+                "stage": {"people": people, "assets": assets},
+                "diagram": {"domain": ct, "state": clean_state,
+                            "render_model": render_model,
+                            "warnings": warnings},
+            }
+            if ct == CASE_TYPE_INHERITANCE:
+                case["stage"]["owner_row_id"] = stage.get("owner_row_id")
+            st.cases[new_id] = case
+            st._idempotency[ik] = new_id
+            st._idempotency_hashes[ik] = creation_hash
+            data = _workspace_data(new_id, case)
+            data["created"] = True
+        job.check_cancel()
+        return _result("workspace_save_case", data)
+
+    ik = p.get("idempotency_key")
+    if ik is not None:
+        raise CommandError("validation_error",
+                           "idempotency_key cấm với hồ sơ đã có")
+    base = p.get("base_revision")
+    if not isinstance(base, int) or isinstance(base, bool) or base < 1:
+        raise CommandError("validation_error",
+                           f"base_revision={base!r} phải là int >= 1")
+    case = _case(p)
+    _check_supported(case)
+    _check_base_revision(case, p)
+    ct = case["case_type"]
+    cm = _fold_canon(cm_raw, CASE_META_CANON, "payload.case")
+    extra = set(cm) - set(_CASE_META_FIELDS)
+    if extra:
+        raise CommandError("validation_error",
+                           f"payload.case key lạ: {sorted(extra)}")
+    for f in ("case_type", "document_type"):
+        if cm.get(f) is not None and cm.get(f) != case.get(f):
+            raise CommandError("validation_error",
+                               f"payload.case.{f} không đổi qua Lưu hồ sơ")
+    people, assets = _validate_save_stage(stage, ct, is_new=False)
+    fresh = copy.deepcopy(case)
+    _apply_case_meta(fresh, cm)
+    fresh["ngay_lap_ho_so"] = cm.get("ngay_lap_ho_so")
+    for row in people + assets:
+        if row.get("entity_id") is None:
+            row["entity_id"] = st.assign_entity_id()
+    fresh["stage"] = {"people": people, "assets": assets}
+    if ct == CASE_TYPE_INHERITANCE:
+        fresh["stage"]["owner_row_id"] = stage.get("owner_row_id")
+    stage_ids = {r["row_id"] for r in people}
+    _validate_save_diagram(state, ct, fresh["stage"], stage_ids)
+    clean_state = _persisted_diagram_state(state)
+    warnings = []
+    if ct == CASE_TYPE_TWO_PARTY:
+        render_model = _unsupported_render()
+    else:
+        pruned = _prune_positions_list(clean_state, len(assets))
+        render_model = _render(clean_state, fresh["stage"])
+        if render_model.get("status") == "invalid":
+            raise CommandError(
+                "diagram_invalid_state", "Sơ đồ chưa hợp lệ",
+                details={"errors": render_model.get("errors") or []})
+        if pruned:
+            warnings.append({
+                "code": "diagram.selection_pruned",
+                "message": "Các lựa chọn vị trí vượt số tài sản đã bị bỏ"})
+    fresh["diagram"] = {"domain": ct, "state": clean_state,
+                        "render_model": render_model,
+                        "warnings": warnings}
+    fresh["status"] = "done"
+    fresh["revision"] = case["revision"] + 1
+    with st._lock:
+        case.clear()
+        case.update(copy.deepcopy(fresh))
+        data = _workspace_data(case["id"], case)
+        data["created"] = False
+    job.check_cancel()
+    return _result("workspace_save_case", data)
+
+
+def _prune_positions_list(clean_state, asset_count):
+    """Mock parity `_prune_positions`: bỏ vị trí > số asset, trả bool."""
+    pruned = False
+    allowed = list(range(1, asset_count + 1))
+    for n in clean_state.get("nodes") or []:
+        for key in ("ownPositions", "receivePositions"):
+            arr = n.get(key) or []
+            kept = [x for x in arr if x in allowed]
+            if len(kept) != len(arr):
+                pruned = True
+                n[key] = kept
+    return pruned
+
+
 def intake_analyze(job, payload):
     # case_id absent = che do nhap (§2.1a) — bo qua kiem tra case.
     if "case_id" in (payload or {}):
         case = _case(payload)
-        # Real intake_analyze: case_type TRUOC locked (adapter §13.5).
         _check_supported(case)
-        if case.get("locked"):
-            raise CommandError("workspace_locked",
-                               f"hồ sơ #{case['id']} đã khóa")
     sources = (payload or {}).get("sources")
     if not isinstance(sources, list) or not sources:
         raise CommandError("validation_error", "sources phải là list 1..8")
@@ -1670,7 +1938,7 @@ def _canned_suggestion(src):
 
 def workspace_commit_stage(job, payload):
     case = _case(payload)
-    _check_writable(case)
+    _check_supported(case)
     _check_base_revision(case, payload)
     ct = case["case_type"]
     # đợt 3: payload.case optional — meta ghi cùng transaction (validate
@@ -1719,7 +1987,7 @@ def workspace_commit_stage(job, payload):
 
 def workspace_convert_type(job, payload):
     case = _case(payload)
-    _check_writable(case)
+    _check_supported(case)
     _check_base_revision(case, payload)
     if set(payload) - {"case_id", "base_revision", "case_type", "document_type",
                        "confirm_diagram_reset", "owner_row_id"}:
@@ -1773,9 +2041,6 @@ def workspace_update(job, payload):
     Meta doc lap case_type: chi chan locked + conflict (real
     update_meta khong _check_supported)."""
     case = _case(payload)
-    if case.get("locked"):
-        raise CommandError("workspace_locked",
-                           f"hồ sơ #{case['id']} đã khóa")
     _check_base_revision(case, payload)
     cm = (payload or {}).get("case")
     if not isinstance(cm, dict) or not cm:
@@ -1816,7 +2081,6 @@ def workspace_update(job, payload):
             "case_type": case.get("case_type"),
             "document_type": case.get("document_type"),
             "status": case.get("status"),
-            "locked": bool(case.get("locked")),
             "revision": case["revision"],
             "ngay_lap_ho_so": case.get("ngay_lap_ho_so"),
             "noi_niem_yet": case.get("noi_niem_yet"),
@@ -1888,7 +2152,7 @@ def diagram_save(job, payload):
     """Thu tu real save_diagram: domain -> wire -> owner mirror ->
     person refs -> prune positions -> persist + render -> revision+1."""
     case = _case(payload)
-    _check_writable(case)
+    _check_supported(case)
     _check_base_revision(case, payload)
     state = _payload_diagram_state(payload)
     _validate_case_state(case, state)
@@ -2183,7 +2447,7 @@ def word_export_batch(job, payload):
     case = _case(payload)
     # NAIA-8: bo chan case_type_unsupported rieng luong Word — readiness
     # chi tiet qua _word_block_reason (word.no_people/no_diagram/...).
-    _check_writable(case)
+    _check_supported(case)
     create_case_subdir = (payload or {}).get("create_case_subdir", False)
     if not isinstance(create_case_subdir, bool):
         raise CommandError("validation_error",

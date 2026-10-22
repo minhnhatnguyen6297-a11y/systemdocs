@@ -1,0 +1,505 @@
+"""Test `notary.workspace_save_case` — Lưu hồ sơ nguyên tử (issue 13).
+
+Design: `_bmad-output/tmp/issue13-b-phase2-design-20261022.md` Phần 5 + 8
+(A1–A3/B1/B3/B4). Dữ kiện Enter lấy từ fixture tổng hợp
+`fixtures/issue13_storage_b.json` (F1/F3 prototypes); ID integer DB không
+hardcode — assert theo alias/quan hệ.
+"""
+import json
+import uuid
+from pathlib import Path
+
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+import database
+from models import (
+    CaseAssetRow,
+    CasePersonRow,
+    Customer,
+    InheritanceCase,
+    InheritanceCaseProperty,
+    Property,
+)
+from services.case_workspace import CaseWorkspaceService, WorkspaceError
+
+FIXTURE_PATH = Path(__file__).parent / "fixtures" / "issue13_storage_b.json"
+INHERITANCE_META = {"case_type": "inheritance",
+                    "document_type": "khai_nhan",
+                    "ngay_lap_ho_so": "2026-10-22"}
+
+
+@pytest.fixture(scope="module")
+def dataset():
+    with FIXTURE_PATH.open(encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+@pytest.fixture()
+def session_factory(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'save_case.db'}")
+    database.enable_sqlite_foreign_keys(engine)
+    database.Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine)
+    yield factory
+    engine.dispose()
+
+
+@pytest.fixture()
+def db(session_factory):
+    session = session_factory()
+    yield session
+    session.close()
+
+
+# ------------------------------------------------------------------ helpers
+
+
+def _proto(dataset, section, alias, **override):
+    row = dict(dataset[section][alias])
+    row.pop("alias", None)
+    row.update(override)
+    return row
+
+
+def _f1_stage(dataset):
+    return {
+        "owner_row_id": "00000000-0000-4000-8000-000000000101",
+        "people": [_proto(dataset, "people_prototypes", alias)
+                   for alias in ("P101", "P102", "P103")],
+        "assets": [_proto(dataset, "asset_prototypes", "T101")],
+    }
+
+
+def _node(nid, person_id=None, parents=(), spouse=None,
+          own=(), receive=()):
+    return {"id": nid, "personId": person_id,
+            "parentSlotIds": list(parents), "spouseSlotId": spouse,
+            "ownPositions": list(own), "receivePositions": list(receive),
+            "hidden": False, "deleted": False}
+
+
+def _f1_state():
+    return {"version": 3, "domain": "inheritance", "nodes": [
+        _node("owner", "00000000-0000-4000-8000-000000000101",
+              parents=("father", "mother"), spouse="spouse", own=[1]),
+        _node("spouse", "00000000-0000-4000-8000-000000000102",
+              parents=("spouse_father", "spouse_mother"),
+              spouse="owner", own=[1], receive=[1]),
+        _node("child_1", "00000000-0000-4000-8000-000000000103",
+              parents=("owner", "spouse"), receive=[1]),
+        _node("father"), _node("mother"),
+        _node("spouse_father"), _node("spouse_mother"),
+    ]}
+
+
+def _meta(**override):
+    meta = dict(INHERITANCE_META)
+    meta.update(override)
+    return meta
+
+
+def _key():
+    return str(uuid.uuid4())
+
+
+def _create_draft(db, dataset, *, stage=None, meta=None, key=None):
+    return CaseWorkspaceService(db).create(
+        key or _key(), meta or _meta(), stage or _f1_stage(dataset), None)
+
+
+def _counts(db):
+    return (db.query(Customer).count(), db.query(Property).count(),
+            db.query(CasePersonRow).count(), db.query(CaseAssetRow).count())
+
+
+def _snapshot(db, case_id):
+    case = db.get(InheritanceCase, case_id)
+    db.refresh(case)
+    return {
+        "revision": case.workspace_revision,
+        "status": case.trang_thai,
+        "meta": (case.ghi_chu, case.noi_niem_yet, case.ngay_lap_ho_so),
+        "people": [(r.row_id, r.ho_ten, r.vitri) for r in case.person_rows],
+        "assets": [(r.row_id, r.so_serial, r.vitri) for r in case.asset_rows],
+        "json": case.case_state_json,
+    }
+
+
+# ---------------------------------------------------------------- A1/A2
+
+
+def test_save_case_moves_existing_draft_to_done_revision_plus_one(
+        db, dataset):
+    created = _create_draft(db, dataset)
+    case_id = created["case"]["id"]
+    assert created["case"]["status"] == "draft"
+    assert created["case"]["revision"] == 1
+
+    # Renderer gửi snapshot Stage hiện tại (đã có trường suy ra từ create).
+    result = CaseWorkspaceService(db).save_case(
+        case_id=case_id, base_revision=1, idempotency_key=None,
+        case_meta=_meta(), stage=created["stage"], state=_f1_state())
+
+    assert result["created"] is False
+    assert result["case"]["status"] == "done"
+    assert result["case"]["revision"] == 2
+    assert result["diagram"]["render_model"] is not None
+    assert [p["ho_ten"] for p in result["stage"]["people"]] == [
+        "Nguyễn Đăng An", "Trần Thị Bình", "Nguyễn Văn Con"]
+    asset = result["stage"]["assets"][0]
+    assert asset["entity_id"] is not None
+    assert len(asset["land_rows"]) == 3
+    assert asset["land_rows"][1] == {
+        "loai_dat": None, "dien_tich": None, "thoi_han": None}
+    people = {p["ho_ten"]: p for p in result["stage"]["people"]}
+    assert people["Nguyễn Đăng An"]["ngay_sinh"] == "1950"
+    assert people["Nguyễn Đăng An"]["loai_dia_chi"] == "Nơi chết"
+    assert people["Trần Thị Bình"]["loai_giay_to"] == "Căn cước"
+    assert people["Trần Thị Bình"]["noi_cap"] == "Bộ Công an"
+    assert people["Nguyễn Văn Con"]["loai_giay_to"] is None
+    assert result["case"]["chudat"] == "Nguyễn Đăng An\nTrần Thị Bình"
+
+    case = db.get(InheritanceCase, case_id)
+    db.refresh(case)
+    assert case.trang_thai == "done"
+    assert case.workspace_revision == 2
+    assert [(r.vitri, r.ho_ten) for r in case.person_rows] == [
+        (1, "Nguyễn Đăng An"), (2, "Trần Thị Bình"),
+        (3, "Nguyễn Văn Con")]
+
+    reopened = CaseWorkspaceService(db).get(case_id)
+    assert reopened["case"]["status"] == "done"
+    assert reopened["case"]["revision"] == 2
+    assert len(reopened["stage"]["people"]) == 3
+
+
+def test_save_case_creates_new_case_done_revision_one(db, dataset):
+    result = CaseWorkspaceService(db).save_case(
+        case_id=None, base_revision=None, idempotency_key=_key(),
+        case_meta=_meta(), stage=_f1_stage(dataset), state=_f1_state())
+
+    assert result["created"] is True
+    assert result["case"]["status"] == "done"
+    assert result["case"]["revision"] == 1
+    assert result["case"]["id"] >= 1
+    case = db.get(InheritanceCase, result["case"]["id"])
+    assert case.trang_thai == "done"
+    assert case.workspace_revision == 1
+    assert case.workspace_creation_hash
+    assert case.workspace_idempotency_key
+    assert len(case.person_rows) == 3
+    assert len(case.asset_rows) == 1
+    assert len(case.asset_rows[0].land_rows) == 3
+
+    links = db.query(InheritanceCaseProperty).filter(
+        InheritanceCaseProperty.case_id == case.id).all()
+    assert len(links) == 1
+    assert links[0].case_asset_row_id == case.asset_rows[0].row_id
+    assert links[0].property_id == case.asset_rows[0].property_id
+
+
+def test_save_case_done_stays_done_when_commit_and_resave(db, dataset):
+    create = _create_draft(db, dataset)
+    case_id = create["case"]["id"]
+    svc = CaseWorkspaceService(db)
+    svc.save_case(case_id=case_id, base_revision=1, idempotency_key=None,
+                  case_meta=_meta(), stage=_f1_stage(dataset),
+                  state=_f1_state())
+
+    stage = _f1_stage(dataset)
+    stage["people"][1] = dict(stage["people"][1],
+                              dia_chi="Khu Giả Lập B2")
+    updated = svc.commit_stage(case_id, 2, stage, None)
+    assert updated["revision"] == 3
+    case = db.get(InheritanceCase, case_id)
+    db.refresh(case)
+    assert case.trang_thai == "done"
+    assert case.person_rows[1].dia_chi == "Khu Giả Lập B2"
+
+    resaved = svc.save_case(case_id=case_id, base_revision=3,
+                            idempotency_key=None, case_meta=_meta(),
+                            stage=stage, state=_f1_state())
+    assert resaved["case"]["status"] == "done"
+    assert resaved["case"]["revision"] == 4
+    db.refresh(case)
+    assert case.trang_thai == "done"
+    assert case.workspace_revision == 4
+
+
+# ---------------------------------------------------------------- A3
+
+
+def test_save_case_keeps_valid_incomplete_diagram_done(db, dataset):
+    create = _create_draft(db, dataset)
+    case_id = create["case"]["id"]
+    state = {"version": 3, "domain": "inheritance",
+             "nodes": [_node(
+                 "owner", "00000000-0000-4000-8000-000000000101",
+                 own=[1])]}
+    result = CaseWorkspaceService(db).save_case(
+        case_id=case_id, base_revision=1, idempotency_key=None,
+        case_meta=_meta(), stage=_f1_stage(dataset), state=state)
+    assert result["case"]["status"] == "done"
+    assert result["diagram"]["render_model"]["status"] == "incomplete"
+    codes = {w["code"]
+             for w in result["diagram"]["render_model"]["warnings"]}
+    assert "diagram.unassigned_pool_person" in codes
+
+    reopened = CaseWorkspaceService(db).get(case_id)
+    assert reopened["case"]["status"] == "done"
+    assert reopened["diagram"]["render_model"]["status"] == "incomplete"
+    assert {w["code"]
+            for w in reopened["diagram"]["render_model"]["warnings"]} >= codes
+
+
+@pytest.mark.parametrize("state_factory", [
+    lambda: {"version": 3, "domain": "inheritance", "nodes": [
+        _node("owner", "00000000-0000-4000-8000-000000000101", own=[])]},
+    lambda: {"version": 2, "domain": "inheritance", "nodes": []},
+])
+def test_save_case_invalid_diagram_rolls_back_everything(
+        db, dataset, state_factory):
+    create = _create_draft(db, dataset)
+    case_id = create["case"]["id"]
+    before = _snapshot(db, case_id)
+    counts = _counts(db)
+    stage = _f1_stage(dataset)
+    stage["people"].append(_proto(dataset, "people_prototypes", "P103",
+                                  row_id=str(uuid.uuid4()),
+                                  ho_ten="Người Mới Chưa Tồn Tại",
+                                  so_giay_to="000000000999"))
+    stage["people"][1] = dict(stage["people"][1], dia_chi="Sửa Nhưng Rollback")
+    meta = _meta(ghi_chu="không được lưu")
+    with pytest.raises(WorkspaceError) as exc:
+        CaseWorkspaceService(db).save_case(
+            case_id=case_id, base_revision=1, idempotency_key=None,
+            case_meta=meta, stage=stage, state=state_factory())
+    assert exc.value.code == "diagram_invalid_state"
+    db.expire_all()
+    assert _snapshot(db, case_id) == before
+    assert _counts(db) == counts
+
+
+# ---------------------------------------------------------------- B1
+
+
+def test_save_case_writes_new_rows_meta_and_diagram_in_one_revision(
+        db, dataset):
+    stage = {
+        "owner_row_id": "00000000-0000-4000-8000-000000000101",
+        "people": [_proto(dataset, "people_prototypes", "P101")],
+        "assets": [_proto(dataset, "asset_prototypes", "T101")],
+    }
+    create = _create_draft(db, dataset, stage=stage,
+                           meta=_meta(ghi_chu="bản cũ"))
+    case_id = create["case"]["id"]
+    assert create["case"]["revision"] == 1
+
+    full = _f1_stage(dataset)
+    result = CaseWorkspaceService(db).save_case(
+        case_id=case_id, base_revision=1, idempotency_key=None,
+        case_meta=_meta(ghi_chu=None), stage=full, state=_f1_state())
+
+    assert result["case"]["revision"] == 2
+    assert result["case"]["ghi_chu"] is None
+    assert len(result["stage"]["people"]) == 3
+    other = next(p for p in result["stage"]["people"]
+                 if p["row_id"] == "00000000-0000-4000-8000-000000000102")
+    assert other["entity_id"] is not None
+
+    reopened = CaseWorkspaceService(db).get(case_id)
+    assert reopened["case"]["revision"] == 2
+    assert reopened["case"]["ghi_chu"] is None
+    assert [p["row_id"] for p in reopened["stage"]["people"]] == [
+        "00000000-0000-4000-8000-000000000101",
+        "00000000-0000-4000-8000-000000000102",
+        "00000000-0000-4000-8000-000000000103"]
+    assigned = {n.get("personId") for n in reopened["diagram"]["state"]["nodes"]}
+    assert "00000000-0000-4000-8000-000000000102" in assigned
+    assert reopened["diagram"]["render_model"] is not None
+
+
+# ---------------------------------------------------------------- B3
+
+
+def test_save_case_unknown_diagram_uuid_rolls_back_new_identity(
+        db, dataset):
+    create = _create_draft(db, dataset, stage={
+        "owner_row_id": "00000000-0000-4000-8000-000000000101",
+        "people": [_proto(dataset, "people_prototypes", "P101")],
+        "assets": [_proto(dataset, "asset_prototypes", "T101")],
+    })
+    case_id = create["case"]["id"]
+    before = _snapshot(db, case_id)
+    counts = _counts(db)
+    stage = _f1_stage(dataset)
+    stage["people"][1] = dict(stage["people"][1],
+                              so_giay_to="000000000777")
+    state = _f1_state()
+    state["nodes"].append(_node("ghost", str(uuid.uuid4())))
+    with pytest.raises(WorkspaceError) as exc:
+        CaseWorkspaceService(db).save_case(
+            case_id=case_id, base_revision=1, idempotency_key=None,
+            case_meta=_meta(), stage=stage, state=state)
+    assert exc.value.code == "diagram_reference_outside_stage"
+    db.expire_all()
+    assert _snapshot(db, case_id) == before
+    assert _counts(db) == counts
+
+
+def test_save_case_new_case_failure_leaves_no_case_or_key(db, dataset):
+    counts = _counts(db)
+    key = _key()
+    state = _f1_state()
+    state["nodes"].append(_node("ghost", str(uuid.uuid4())))
+    with pytest.raises(WorkspaceError) as exc:
+        CaseWorkspaceService(db).save_case(
+            case_id=None, base_revision=None, idempotency_key=key,
+            case_meta=_meta(), stage=_f1_stage(dataset), state=state)
+    assert exc.value.code == "diagram_reference_outside_stage"
+    assert _counts(db) == counts
+    assert db.query(InheritanceCase).filter(
+        InheritanceCase.workspace_idempotency_key == key).first() is None
+
+
+def test_save_case_bad_meta_type_does_not_write(db, dataset):
+    create = _create_draft(db, dataset)
+    case_id = create["case"]["id"]
+    before = _snapshot(db, case_id)
+    counts = _counts(db)
+    with pytest.raises(WorkspaceError) as exc:
+        CaseWorkspaceService(db).save_case(
+            case_id=case_id, base_revision=1, idempotency_key=None,
+            case_meta=_meta(ghi_chu=123), stage=_f1_stage(dataset),
+            state=_f1_state())
+    assert exc.value.code == "validation_error"
+    db.expire_all()
+    assert _snapshot(db, case_id) == before
+    assert _counts(db) == counts
+
+
+# ---------------------------------------------------------------- B4
+
+
+def test_save_case_two_sessions_same_base_one_conflict(
+        session_factory, dataset):
+    seed = session_factory()
+    created = _create_draft(seed, dataset)
+    case_id = created["case"]["id"]
+    seed.close()
+
+    first = session_factory()
+    second = session_factory()
+    try:
+        res = CaseWorkspaceService(first).save_case(
+            case_id=case_id, base_revision=1, idempotency_key=None,
+            case_meta=_meta(), stage=_f1_stage(dataset),
+            state=_f1_state())
+        assert res["case"]["revision"] == 2
+
+        stage = _f1_stage(dataset)
+        stage["people"][1] = dict(stage["people"][1],
+                                  dia_chi="Người thua cuộc")
+        with pytest.raises(WorkspaceError) as exc:
+            CaseWorkspaceService(second).save_case(
+                case_id=case_id, base_revision=1, idempotency_key=None,
+                case_meta=_meta(), stage=stage, state=_f1_state())
+        assert exc.value.code == "workspace_conflict"
+        assert exc.value.details["server_revision"] == 2
+    finally:
+        first.close()
+        second.close()
+
+    check = session_factory()
+    try:
+        case = check.get(InheritanceCase, case_id)
+        check.refresh(case)
+        assert case.workspace_revision == 2
+        assert case.person_rows[1].dia_chi == "Khu Giả Lập B"
+    finally:
+        check.close()
+
+
+def test_save_case_new_replay_same_key_hash_does_not_increment(
+        session_factory, dataset):
+    key = _key()
+    payload = dict(case_meta=_meta(), stage=_f1_stage(dataset),
+                   state=_f1_state())
+    first = session_factory()
+    try:
+        one = CaseWorkspaceService(first).save_case(
+            case_id=None, base_revision=None, idempotency_key=key, **payload)
+        counts = _counts(first)
+    finally:
+        first.close()
+
+    second = session_factory()
+    try:
+        two = CaseWorkspaceService(second).save_case(
+            case_id=None, base_revision=None, idempotency_key=key, **payload)
+        assert two["created"] is False
+        assert two["case"]["id"] == one["case"]["id"]
+        assert two["case"]["revision"] == 1
+        assert two["case"]["status"] == "done"
+        assert _counts(second) == counts
+    finally:
+        second.close()
+
+
+def test_save_case_same_key_different_payload_conflicts(db, dataset):
+    key = _key()
+    CaseWorkspaceService(db).save_case(
+        case_id=None, base_revision=None, idempotency_key=key,
+        case_meta=_meta(), stage=_f1_stage(dataset), state=_f1_state())
+    with pytest.raises(WorkspaceError) as exc:
+        CaseWorkspaceService(db).save_case(
+            case_id=None, base_revision=None, idempotency_key=key,
+            case_meta=_meta(ghi_chu="khác payload"),
+            stage=_f1_stage(dataset), state=_f1_state())
+    assert exc.value.code == "idempotency_conflict"
+
+
+def test_save_case_retry_old_base_does_not_write_twice(db, dataset):
+    create = _create_draft(db, dataset)
+    case_id = create["case"]["id"]
+    svc = CaseWorkspaceService(db)
+    svc.save_case(case_id=case_id, base_revision=1, idempotency_key=None,
+                  case_meta=_meta(), stage=_f1_stage(dataset),
+                  state=_f1_state())
+    before = _snapshot(db, case_id)
+    with pytest.raises(WorkspaceError) as exc:
+        svc.save_case(case_id=case_id, base_revision=1,
+                      idempotency_key=None, case_meta=_meta(),
+                      stage=_f1_stage(dataset), state=_f1_state())
+    assert exc.value.code == "workspace_conflict"
+    assert exc.value.details["server_revision"] == 2
+    db.expire_all()
+    assert _snapshot(db, case_id) == before
+
+
+# ------------------------------------------------------------ envelope
+
+
+def test_save_case_envelope_rules(db, dataset):
+    svc = CaseWorkspaceService(db)
+    cases = [
+        dict(case_id=None, base_revision=1, idempotency_key=_key(),
+             case_meta=_meta(), stage=_f1_stage(dataset),
+             state=_f1_state()),
+        dict(case_id=None, base_revision=None, idempotency_key=None,
+             case_meta=_meta(), stage=_f1_stage(dataset),
+             state=_f1_state()),
+        dict(case_id=1, base_revision=None, idempotency_key=_key(),
+             case_meta=_meta(), stage=_f1_stage(dataset),
+             state=_f1_state()),
+        dict(case_id=True, base_revision=1, idempotency_key=None,
+             case_meta=_meta(), stage=_f1_stage(dataset),
+             state=_f1_state()),
+    ]
+    for kwargs in cases:
+        with pytest.raises(WorkspaceError) as exc:
+            svc.save_case(**kwargs)
+        assert exc.value.code == "validation_error", kwargs
+    assert db.query(InheritanceCase).count() == 0
