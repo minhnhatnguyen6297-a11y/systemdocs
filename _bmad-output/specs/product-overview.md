@@ -318,6 +318,16 @@ cả hồ sơ mới và đã lưu; hồ sơ đã lưu đi qua
 Diagram. [#25](../backlog/story-saved-case-type-conversion.md) **built 16/10/2026,
 independent Quick clean**; không coi lựa chọn loại lúc tạo nháp là bằng chứng đổi loại.
 
+**Vai trò quan hệ trong DB — owner 23/10/2026:** mỗi lần Lưu, `vai_tro` và
+`hang_thua_ke` của người có node được ghi lại theo Diagram mới; vai trò gán tay
+(ngoài bộ vai trò suy-từ-sơ-đồ, vd "Người được ủy quyền") giữ nguyên — quy tắc
+ở [Sơ đồ §4](notary_v2/diagram-rules.md#4-cách-biểu-diễn-và-lưu) và contract
+§13.19. Phần **neo cặp vợ–chồng theo nhánh** của
+[#45](../backlog/bug-participant-role-projection-stale-spouse-anchor.md) **tạm
+dừng**, chờ owner chốt mô hình quan hệ (nhiều vợ theo thứ tự, con theo từng
+cặp, con chung/con riêng) với Muse; không thêm trường/storage mới.
+[Decision](../decisions/decision-participant-role-projection-scope-20261023.md).
+
 ## upload_lab — Số hóa và chuẩn bị upload hồ sơ cũ
 
 Hai tab đang có trong UI là `Audit Sổ Công Chứng` và `Quét & Upload Hồ Sơ`.

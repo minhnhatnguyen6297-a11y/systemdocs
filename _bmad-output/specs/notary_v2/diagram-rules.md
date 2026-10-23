@@ -40,9 +40,28 @@ Output:
 ## 4. Cách biểu diễn và lưu
 
 Diagram không tự ghi một bảng quan hệ chung. Với hồ sơ thừa kế hiện hành, state
-được lưu trong `case_state_json.diagram.engineInput`; backend tạo
-`engineResult` cùng lần save và có thể cập nhật projection participant theo
-quy tắc module.
+được lưu trong `case_state_json.diagram` (v3); backend tạo `render_model` cùng
+lần save và cập nhật projection participant theo quy tắc module.
+
+Mỗi lần **Lưu hồ sơ**/Lưu sơ đồ, dòng `inheritance_participants` của người có
+node được ghi lại theo hình dạng Diagram đã lưu gần nhất — kể cả dòng đã tồn
+tại: `vai_tro` và `hang_thua_ke` đổi theo quan hệ mới. Có hai nguồn vai trò
+trong cùng cột `vai_tro`, phân biệt bằng chính giá trị đang lưu (không có cột
+nguồn riêng):
+
+- **Suy từ sơ đồ:** `Vợ/Chồng`, `Cha`, `Mẹ`, `Cha_vc`, `Me_vc`, `Con_dau_re`,
+  `Con`, `Anh/Chị/Em`, `Cháu`, `Khac` (owner không thành dòng participant).
+  Đây là bộ giá trị hữu hạn của projection; mỗi lần Lưu ghi đè bằng giá trị
+  suy từ Diagram hiện tại.
+- **Gán tay:** mọi giá trị khác (ví dụ `Người được ủy quyền`). Projection giữ
+  nguyên qua các lần Lưu; hạng thừa kế tính từ chính vai trò đó.
+
+Một dòng chỉ mang một `vai_tro`: nếu người vừa có vị trí quan hệ vừa được gán
+tay vai trò khác thì vai trò gán tay thắng ở cột này; Word vẫn đọc vị trí sơ
+đồ cho các nhóm người/thừa kế khác. Người bị gỡ/ẩn node bị xóa khỏi bảng như
+trước. Cặp vợ–chồng thuộc nhánh (con dâu/rể) hiện chỉ còn trong state Diagram,
+chưa có trường chuẩn — [#45 TC3](../../backlog/bug-participant-role-projection-stale-spouse-anchor.md)
+đang mở, tạm dừng chờ chốt mô hình quan hệ.
 
 Ví dụ: kéo người A vào slot `child_1` của owner và spouse:
 

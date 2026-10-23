@@ -2048,6 +2048,18 @@ Không cập nhật master theo sửa case, không cascade đổi Hồ sơ khác
 không UNIQUE neo/merge. Đất case_asset_land_rows thuộc row tài sản, không master.
 Participant/link là projection theo row_id, identity FK nullable; không dedupe
 hai row theo shared identity, giữ participant PK/vai trò tay/ghi chú còn tồn tại.
+Mỗi lần ghi Stage/Sơ đồ (commit_stage, save_case, diagram_save, convert_type sang
+inheritance), `vai_tro`/`hang_thua_ke` của dòng suy-từ-sơ-đồ được TÍNH LẠI theo
+Diagram đã lưu gần nhất, kể cả dòng đã tồn tại. Hai nguồn vai trò phân biệt
+bằng giá trị đang lưu — không thêm cột nguồn:
+- suy từ sơ đồ = `Vợ/Chồng`, `Cha`, `Mẹ`, `Cha_vc`, `Me_vc`, `Con_dau_re`,
+  `Con`, `Anh/Chị/Em`, `Cháu`, `Khac` (bộ giá trị hữu hạn của
+  `_project_role_nodes`; `Owner` không thành dòng participant);
+- gán tay = mọi giá trị khác (vd `Người được ủy quyền`) → projection giữ
+  nguyên `vai_tro` qua các lần ghi, chỉ tính lại `hang_thua_ke` từ vai trò đó.
+Một dòng chỉ mang một `vai_tro`: vai trò gán tay thắng cột này khi cùng người
+vừa có vị trí quan hệ. Dòng không còn node (gỡ/ẩn/xóa hoặc trùng owner) bị
+xóa như trước. Neo cặp vợ–chồng theo nhánh chưa có trường chuẩn (#45 TC3 mở).
 Nguoi_chet_id/tai_san_id chỉ projection owner/asset1, không fallback dữ kiện.
 
 Case metadata có cột là SOT; JSON case chỉ bảy scalar
