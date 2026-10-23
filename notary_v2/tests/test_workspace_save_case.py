@@ -645,3 +645,80 @@ def test_save_case_asset_ngay_cap_year_only(db):
 
     reopen = CaseWorkspaceService(db).get(saved["case"]["id"])
     assert reopen["stage"]["assets"][0]["ngay_cap"] == "2005"
+
+
+# ------------------------ entity_id là hint nội bộ, không chặn user (23/10)
+
+
+def test_save_case_new_ignores_unknown_entity_hints(db, dataset):
+    """Hint entity_id không tồn tại → bỏ hint, resolve theo neo, Lưu được."""
+    stage = _f1_stage(dataset)
+    for row in stage["people"] + stage["assets"]:
+        row["entity_id"] = 999999
+
+    saved = CaseWorkspaceService(db).save_case(
+        case_id=None, base_revision=None, idempotency_key=_key(),
+        case_meta=_meta(), stage=stage, state=_f1_state())
+
+    assert saved["created"] is True
+    people = {p["row_id"]: p for p in saved["stage"]["people"]}
+    for alias in ("P101", "P102", "P103"):
+        row = people[dataset["people_prototypes"][alias]["row_id"]]
+        assert row["entity_id"] is not None, alias
+        assert row["entity_id"] != 999999, alias
+    asset = saved["stage"]["assets"][0]
+    assert asset["entity_id"] is not None
+    assert asset["entity_id"] != 999999
+    assert db.query(Customer).count() == 3
+    assert db.query(Property).count() == 1
+
+
+def test_save_case_existing_row_hint_mismatch_resolves_by_anchor(db, dataset):
+    """Dòng đã có: hint lệch identity đang gắn (kể cả ID khác có thật) bị
+    bỏ; identity giữ theo neo của chính dòng, không hijack dòng khác."""
+    created = _create_draft(db, dataset)
+    case_id = created["case"]["id"]
+    stage = created["stage"]
+    original = {p["row_id"]: p["entity_id"] for p in stage["people"]}
+    original_asset = stage["assets"][0]["entity_id"]
+    other_identity = stage["people"][1]["entity_id"]
+    assert other_identity is not None
+    stage["people"][0]["entity_id"] = other_identity
+    stage["people"][1]["entity_id"] = 999999
+    stage["assets"][0]["entity_id"] = 999999
+
+    saved = CaseWorkspaceService(db).save_case(
+        case_id=case_id, base_revision=1, idempotency_key=None,
+        case_meta=_meta(), stage=stage, state=_f1_state())
+
+    out = {p["row_id"]: p["entity_id"] for p in saved["stage"]["people"]}
+    assert out[stage["people"][0]["row_id"]] == original[
+        stage["people"][0]["row_id"]]
+    assert out[stage["people"][1]["row_id"]] == original[
+        stage["people"][1]["row_id"]]
+    assert saved["stage"]["assets"][0]["entity_id"] == original_asset
+    assert db.query(Customer).count() == 3
+    assert db.query(Property).count() == 1
+
+
+def test_save_case_new_row_garbage_hint_resolves_or_null(db, dataset):
+    """Dòng mới mang hint rác: có neo → resolve theo neo; thiếu neo →
+    entity_id null. Không raise vì entity_id."""
+    created = _create_draft(db, dataset)
+    case_id = created["case"]["id"]
+    stage = created["stage"]
+    with_doc = _minimal_person(
+        ho_ten="Người Mới Có Neo", so_giay_to="000000000999",
+        entity_id="hint-rác")
+    without_doc = _minimal_person(
+        ho_ten="Người Mới Không Neo", entity_id=999999)
+    stage["people"] = stage["people"] + [with_doc, without_doc]
+
+    saved = CaseWorkspaceService(db).save_case(
+        case_id=case_id, base_revision=1, idempotency_key=None,
+        case_meta=_meta(), stage=stage, state=_f1_state())
+
+    rows = {p["row_id"]: p for p in saved["stage"]["people"]}
+    assert rows[with_doc["row_id"]]["entity_id"] is not None
+    assert rows[without_doc["row_id"]]["entity_id"] is None
+

@@ -937,16 +937,25 @@ def test_commit_stage_rejects_row_id_from_another_case(db):
                for e in exc.value.details["field_errors"])
 
 
-def test_commit_stage_entity_id_must_match_row_identity(db):
+def test_commit_stage_identity_hint_is_advisory(db):
+    """`entity_id` là hint nội bộ (owner 23/10/2026): hint lệch identity
+    đang gắn dòng bị bỏ, identity resolve lại theo neo của chính dòng —
+    commit thành công, không có field_error `entity_id`."""
     case, deceased, _prop, _h = _make_case(db)
+    other = Customer(ho_ten="Người Khác", so_giay_to="000000000001",
+                     name_anchor="nguoi khac",
+                     document_anchor="000000000001")
+    db.add(other)
+    db.flush()
 
-    with pytest.raises(WorkspaceError) as exc:
-        _commit(db, case.id, 1,
-                [_person_row(entity_id=deceased.id)], [_asset_row()])
+    owner_row = case.person_rows[0]
+    data = _commit(db, case.id, 1, [_person_row(
+        row_id=owner_row.row_id, ho_ten=owner_row.ho_ten,
+        so_giay_to=owner_row.so_giay_to, entity_id=other.id)],
+        [_asset_row()])
 
-    assert exc.value.code == "stage_validation_error"
-    assert any(e["field"] == "entity_id"
-               for e in exc.value.details["field_errors"])
+    saved = data["stage"]["people"][0]
+    assert saved["entity_id"] == deceased.id
 
 
 # -------------------------------------------------------------- migration
@@ -1275,13 +1284,17 @@ def test_create_owner_node_mismatch_rejected(db):
 def test_create_stage_rules_apply(db):
     people, assets, state = _create_args()
 
-    bad_people = [dict(p) for p in people]
-    bad_people[0]["entity_id"] = 5
-    with pytest.raises(WorkspaceError) as exc:
-        _create(db, bad_people, assets, state)
-    assert exc.value.code == "stage_validation_error"
-    assert any(e["field"] == "entity_id"
-               for e in exc.value.details["field_errors"])
+    # `entity_id` là hint nội bộ — không phải lỗi field (owner 23/10/2026).
+    hinted = [_person_row(ho_ten=p["ho_ten"], so_giay_to=p["so_giay_to"],
+                          entity_id=5) for p in people]
+    hinted_state = _v3_state([
+        _node("owner", hinted[0]["row_id"], spouse="spouse", own=[1]),
+        _node("spouse", hinted[1]["row_id"], spouse="owner", receive=[1]),
+    ])
+    created = _create(db, hinted, assets, hinted_state)
+    hinted_row = created["stage"]["people"][0]
+    assert hinted_row["entity_id"] is not None
+    assert hinted_row["entity_id"] != 5
 
     # Vòng 2 — nháp ít dữ liệu: 0 Tài sản, 0 Người, tên rỗng đều lưu được.
     assert _create(db, people, [], state)["stage"]["assets"] == []

@@ -1430,8 +1430,7 @@ class CaseWorkspaceService:
             self.db.add(case)
             self.db.flush()
             resolved_people, resolved_assets = self._write_stage_rows(
-                case, {"people": people, "assets": assets},
-                allow_identity_hint=True)
+                case, {"people": people, "assets": assets})
             self._sync_links(case, resolved_assets)
             stage_view = {
                 "people": [wire for _r, _e, wire in resolved_people],
@@ -1675,8 +1674,7 @@ class CaseWorkspaceService:
 
             previous_import = payload.get("docx_import")
             resolved_people, resolved_assets = self._write_stage_rows(
-                case, {"people": people, "assets": assets},
-                allow_identity_hint=new_case)
+                case, {"people": people, "assets": assets})
             self._sync_links(case, resolved_assets)
 
             stage_view = {
@@ -1856,6 +1854,14 @@ class CaseWorkspaceService:
         text = "" if serial is None else str(serial)
         return text if text.strip() else None
 
+    @staticmethod
+    def _identity_hint(value: Any) -> Optional[int]:
+        """`entity_id` wire chỉ là gợi ý nội bộ: giá trị rác → coi như
+        không có hint (không chặn user, không raise)."""
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            return None
+        return value
+
     def _resolve_person_identity(self, row: Mapping[str, Any],
                                  previous: Optional[CasePersonRow],
                                  cache: dict,
@@ -1926,14 +1932,15 @@ class CaseWorkspaceService:
         return identity.id
 
     def _write_stage_rows(self, case: InheritanceCase,
-                          stage: Mapping[str, Any], *,
-                          allow_identity_hint: bool = False
+                          stage: Mapping[str, Any]
                           ) -> tuple[list, list]:
         """Diff Stage payload theo row_id → (people wires, asset wires).
 
-        `allow_identity_hint=True` (workspace_create/save_case mới) cho
-        phép dòng MỚI mang `entity_id` nguồn như gợi ý identity có kiểm
-        neo (§13.20); commit/save trên case đã có giữ rule cũ.
+        `entity_id` là trường nội bộ (wire echo), KHÔNG chặn user: hint
+        lệch/không tồn tại/không khớp neo đang gắn dòng bị bỏ và identity
+        được resolve lại theo neo chuẩn (Người = tên chuẩn hóa + số giấy
+        tờ; Tài sản = serial). Không có neo khớp → identity null như dòng
+        mới (§13.20, owner 23/10/2026).
         """
         people_in = list(stage.get("people") or [])
         assets_in = list(stage.get("assets") or [])
@@ -1948,26 +1955,6 @@ class CaseWorkspaceService:
                 errors.append(_field_error(
                     rid, "row_id", "invalid_format",
                     "row_id đang thuộc hồ sơ khác"))
-                continue
-            explicit = row.get("entity_id")
-            allowed = prev.customer_id if prev is not None else None
-            if explicit is not None and explicit != allowed:
-                # Dòng đã có: `entity_id` tường minh trỏ tới Customer có
-                # sẵn là cách khẳng định gắn lại identity (giữ dữ kiện
-                # dòng). Dòng MỚI chỉ nhận gợi ý khi đường tạo cho phép.
-                if prev is not None:
-                    if self.db.get(Customer, explicit) is None:
-                        errors.append(_field_error(
-                            rid, "entity_id", "invalid_format",
-                            "entity_id không phải identity đang gắn dòng này"))
-                elif not allow_identity_hint:
-                    errors.append(_field_error(
-                        rid, "entity_id", "invalid_format",
-                        "entity_id phải null — dòng mới chưa có identity"))
-                elif self.db.get(Customer, explicit) is None:
-                    errors.append(_field_error(
-                        rid, "entity_id", "invalid_format",
-                        "entity_id không tồn tại trong danh bạ"))
         for row in assets_in:
             rid = row.get("row_id")
             prev = existing_assets.get(rid)
@@ -1975,22 +1962,6 @@ class CaseWorkspaceService:
                 errors.append(_field_error(
                     rid, "row_id", "invalid_format",
                     "row_id đang thuộc hồ sơ khác"))
-                continue
-            explicit = row.get("entity_id")
-            allowed = prev.property_id if prev is not None else None
-            if explicit is not None and explicit != allowed:
-                if prev is not None:
-                    errors.append(_field_error(
-                        rid, "entity_id", "invalid_format",
-                        "entity_id không phải identity đang gắn dòng này"))
-                elif not allow_identity_hint:
-                    errors.append(_field_error(
-                        rid, "entity_id", "invalid_format",
-                        "entity_id phải null — dòng mới chưa có identity"))
-                elif self.db.get(Property, explicit) is None:
-                    errors.append(_field_error(
-                        rid, "entity_id", "invalid_format",
-                        "entity_id không tồn tại trong danh bạ tài sản"))
         if errors:
             raise WorkspaceError(
                 "stage_validation_error",
@@ -2018,9 +1989,9 @@ class CaseWorkspaceService:
                 _parse_date_or_year(stored_died),
                 _parse_date_or_year(stored_issue),
                 stored_document, stored_address)
-            entity = row.get("entity_id")
-            if previous is not None and entity is not None \
-                    and entity == previous.customer_id:
+            entity = self._identity_hint(row.get("entity_id"))
+            if (previous is not None and entity is not None
+                    and entity == previous.customer_id):
                 # Echo `entity_id` từ GET chỉ là giữ identity nếu neo của
                 # dòng vẫn khớp identity đó; đổi/xóa neo phải resolve lại
                 # (không freeze liên kết cũ, không merge identity).
@@ -2032,13 +2003,14 @@ class CaseWorkspaceService:
                             identity.document_anchor) != anchor):
                     entity = self._resolve_person_identity(
                         row, previous, person_cache)
-            elif entity is None:
-                entity = self._resolve_person_identity(
-                    row, previous, person_cache)
-            elif previous is None:
+            else:
+                # Hint lệch/không tồn tại/không khớp dòng không chặn:
+                # bỏ hint và resolve theo neo. Dòng mới còn nhận hint qua
+                # `preferred_identity_id` (resolver tự kiểm neo).
                 entity = self._resolve_person_identity(
                     row, previous, person_cache,
-                    preferred_identity_id=entity)
+                    preferred_identity_id=(
+                        entity if previous is None else None))
             target = previous
             if target is None:
                 target = CasePersonRow(row_id=rid, case_id=case.id)
@@ -2077,19 +2049,19 @@ class CaseWorkspaceService:
             rid = row["row_id"]
             keep_assets.add(rid)
             previous = existing_assets.get(rid)
-            entity = row.get("entity_id")
-            if previous is not None and entity is not None \
-                    and entity == previous.property_id:
+            entity = self._identity_hint(row.get("entity_id"))
+            if (previous is not None and entity is not None
+                    and entity == previous.property_id):
                 identity = self.db.get(Property, entity)
                 anchor = self._serial_anchor(row.get("so_serial"))
                 if identity is None or anchor is None \
                         or identity.so_serial != anchor:
                     entity = self._resolve_asset_identity(
                         row, previous, asset_cache)
-            elif entity is None:
-                entity = self._resolve_asset_identity(
-                    row, previous, asset_cache)
             else:
+                # Hint lệch/không tồn tại/không khớp dòng không chặn:
+                # bỏ hint, resolve theo serial (dòng mới nhận hint có
+                # kiểm neo trong resolver).
                 entity = self._resolve_asset_identity(
                     row, previous, asset_cache,
                     preferred_identity_id=(
@@ -2655,7 +2627,8 @@ class CaseWorkspaceService:
         chỉ nới thêm `ho_ten` cho `workspace_create`.
 
         Duplicate entity không còn là lỗi: hai dòng row_id khác nhau có
-        thể cùng identity (§4.2 step 6).
+        thể cùng identity (§4.2 step 6). `entity_id` không được kiểm ở đây
+        — wire nội bộ, hint được chuẩn hóa/bỏ khi ghi (§4.1 mục 5).
         """
         errors: list[dict] = []
 
@@ -2679,12 +2652,6 @@ class CaseWorkspaceService:
             row_id = row.get("row_id")
             emit = lambda f, c, m, _i=index: err(row_id, f, c, m, _i)
             self._check_row_id(row_id, seen_row_ids, emit)
-            entity = row.get("entity_id")
-            if entity is not None and (
-                    not isinstance(entity, int) or isinstance(entity, bool)
-                    or entity < 1):
-                emit("entity_id", "invalid_type",
-                     "entity_id phải là số nguyên ≥ 1 hoặc null")
             ho_ten = row.get("ho_ten")
             if allow_partial_draft:
                 if ho_ten is not None and not isinstance(ho_ten, str):
@@ -2712,12 +2679,6 @@ class CaseWorkspaceService:
             row_id = row.get("row_id")
             emit = lambda f, c, m, _i=index: err(row_id, f, c, m, _i)
             self._check_row_id(row_id, seen_row_ids, emit)
-            entity = row.get("entity_id")
-            if entity is not None and (
-                    not isinstance(entity, int) or isinstance(entity, bool)
-                    or entity < 1):
-                emit("entity_id", "invalid_type",
-                     "entity_id phải là số nguyên ≥ 1 hoặc null")
             serial = row.get("so_serial")
             if not isinstance(serial, str):
                 emit("so_serial", "invalid_type",
