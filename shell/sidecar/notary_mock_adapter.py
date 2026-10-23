@@ -868,8 +868,6 @@ def _validate_stage(stage, case_type):
     errs = []
     seen = set()
     seen_pkeys = set()
-    seen_pentities = set()
-    seen_aentities = set()
 
     def _nullable(r, field, w):
         """Parity _check_nullable_str: non-string → invalid_type;
@@ -907,17 +905,7 @@ def _validate_stage(stage, case_type):
                              "row_id trùng trong payload"))
         else:
             seen.add(rid)
-        eid = r.get("entity_id")
-        if eid is not None and (not isinstance(eid, int)
-                                or isinstance(eid, bool) or eid < 1):
-            errs.append(_err(w, "entity_id", "invalid_type",
-                             "entity_id phải là int >= 1/null"))
-        elif eid is not None:
-            if eid in seen_pentities:
-                errs.append(_err(w, "entity_id", "invalid_format",
-                                 "entity_id trùng với dòng khác"))
-            else:
-                seen_pentities.add(eid)
+        r = {**r, "entity_id": _entity_hint(r.get("entity_id"))}
         ht = r.get("ho_ten")
         if not (isinstance(ht, str) and ht.strip()):
             errs.append(_err(w, "ho_ten", "required", "ho_ten bắt buộc"))
@@ -963,17 +951,7 @@ def _validate_stage(stage, case_type):
                              "row_id trùng trong payload"))
         else:
             seen.add(rid)
-        eid = r.get("entity_id")
-        if eid is not None and (not isinstance(eid, int)
-                                or isinstance(eid, bool) or eid < 1):
-            errs.append(_err(w, "entity_id", "invalid_type",
-                             "entity_id phải là int >= 1/null"))
-        elif eid is not None:
-            if eid in seen_aentities:
-                errs.append(_err(w, "entity_id", "invalid_format",
-                                 "entity_id trùng với dòng khác"))
-            else:
-                seen_aentities.add(eid)
+        r = {**r, "entity_id": _entity_hint(r.get("entity_id"))}
         serial = r.get("so_serial")
         if not isinstance(serial, str):
             errs.append(_err(w, "so_serial", "invalid_type",
@@ -1403,6 +1381,13 @@ _CASE_META_FIELDS = ("document_type", "ngay_lap_ho_so",
                      "noi_dung_viec")
 
 
+def _entity_hint(value):
+    """`entity_id` wire là hint nội bộ: giá trị rác → bỏ (không chặn)."""
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        return None
+    return value
+
+
 def _fold_canon(obj, canon, where):
     """Fold key canonical -> legacy; cùng mang mà giá trị lệch →
     validation_error (parity _fold_key_aliases)."""
@@ -1573,18 +1558,6 @@ def workspace_create(job, payload):
             errs.append(_err(
                 _det_uuid4("field_error:assets_empty"), "assets",
                 "required", "stage.assets phải có ít nhất một dòng"))
-        for i, r in enumerate(raw_people):
-            if isinstance(r, dict) and r.get("entity_id") is not None:
-                errs.append(_err(
-                    _err_row(r.get("row_id"), f"people[{i}]"),
-                    "entity_id", "invalid_format",
-                    "entity_id phải null — workspace_create tạo entity mới"))
-        for i, r in enumerate(raw_assets):
-            if isinstance(r, dict) and r.get("entity_id") is not None:
-                errs.append(_err(
-                    _err_row(r.get("row_id"), f"assets[{i}]"),
-                    "entity_id", "invalid_format",
-                    "entity_id phải null — workspace_create tạo entity mới"))
         if errs:
             raise CommandError("stage_validation_error",
                                f"{len(errs)} lỗi field trong Stage",
@@ -1633,7 +1606,8 @@ def workspace_create(job, payload):
                                  "node_personId": owner_pid})
 
         for row in people_norm + assets_norm:
-            row["entity_id"] = st.assign_entity_id()
+            if row.get("entity_id") is None:
+                row["entity_id"] = st.assign_entity_id()
         if provided_state is not None:
             state = _persisted_diagram_state(provided_state)
             render_model = (_unsupported_render()
@@ -1747,18 +1721,6 @@ def _validate_save_stage(stage, ct, *, is_new):
             errs.append(_err(
                 _det_uuid4("field_error:assets_empty"), "assets",
                 "required", "stage.assets phải có ít nhất một dòng"))
-        for i, r in enumerate(raw_people):
-            if isinstance(r, dict) and r.get("entity_id") is not None:
-                errs.append(_err(
-                    _err_row(r.get("row_id"), f"people[{i}]"),
-                    "entity_id", "invalid_format",
-                    "entity_id phải null — tạo mới resolve identity"))
-        for i, r in enumerate(raw_assets):
-            if isinstance(r, dict) and r.get("entity_id") is not None:
-                errs.append(_err(
-                    _err_row(r.get("row_id"), f"assets[{i}]"),
-                    "entity_id", "invalid_format",
-                    "entity_id phải null — tạo mới resolve identity"))
     if errs:
         raise CommandError("stage_validation_error",
                            f"{len(errs)} lỗi field trong Stage",
@@ -1861,7 +1823,8 @@ def workspace_save_case(job, payload):
                 data["created"] = False
                 return _result("workspace_save_case", data)
             for row in people + assets:
-                row["entity_id"] = st.assign_entity_id()
+                if row.get("entity_id") is None:
+                    row["entity_id"] = st.assign_entity_id()
             new_id = (max(st.cases) + 1) if st.cases else 1
             case = {
                 "id": new_id,

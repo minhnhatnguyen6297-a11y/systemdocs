@@ -441,8 +441,8 @@ def _mk_person(**kw):
 def _mk_asset(**kw):
     row = {
         "row_id": str(uuid.uuid4()), "entity_id": None,
-        "so_serial": "MM000001", "so_vao_so": None, "so_thua_dat": None,
-        "so_to_ban_do": None, "dia_chi": "Địa chỉ mẫu tài sản 1",
+        "so_serial": "MM000001", "so_vao_so": None, "so_thua_dat": "123",
+        "so_to_ban_do": "45", "dia_chi": "Địa chỉ mẫu tài sản 1",
         "loai_so": None, "hinh_thuc_su_dung": None, "thoi_han": None,
         "nguon_goc": None, "ngay_cap": None, "co_quan_cap": None,
         "land_rows": None,
@@ -607,13 +607,13 @@ class TestWorkspaceCreate:
         assert exc.value.details["owner_row_id"] == \
             p["stage"]["owner_row_id"]
 
-    def test_entity_id_non_null_rejected(self):
+    def test_entity_hint_accepted_on_create(self):
+        """`entity_id` trên dòng mới là hint nội bộ — không chặn
+        (parity server thật, owner 23/10/2026)."""
         p = _create_payload()
         p["stage"]["people"][0]["entity_id"] = 5
-        with pytest.raises(CommandError) as exc:
-            _call("workspace_create", p)
-        assert exc.value.code == "stage_validation_error"
-        assert exc.value.details["field_errors"]
+        res = _call("workspace_create", p)
+        assert res["data"]["stage"]["people"][0]["entity_id"] == 5
 
     def test_empty_stage(self):
         """create stage rong: assets la required (stage_validation_error);
@@ -733,6 +733,33 @@ class TestWorkspaceSaveCase:
             _call("workspace_save_case", payload)
         assert exc.value.code == "workspace_conflict"
         assert exc.value.details["server_revision"] == 8
+
+    def test_new_save_keeps_entity_hints_from_source(self):
+        """Dòng mới mang entity_id nguồn (source_latest/nhân bản) KHÔNG bị
+        chặn — parity server thật: entity_id là hint nội bộ (§4.1 mục 5)."""
+        payload = _create_payload()
+        for row, hint in zip(payload["stage"]["people"], (101, 102)):
+            row["entity_id"] = hint
+        payload["stage"]["assets"][0]["entity_id"] = 201
+
+        saved = _call("workspace_save_case", payload)
+
+        assert saved["data"]["created"] is True
+        assert [r["entity_id"] for r in saved["data"]["stage"]["people"]] == \
+            [101, 102]
+        assert saved["data"]["stage"]["assets"][0]["entity_id"] == 201
+
+    def test_new_save_drops_garbage_entity_hint(self):
+        """Hint rác (không phải int ≥ 1) bị bỏ và backend cấp ID mới."""
+        payload = _create_payload()
+        payload["stage"]["people"][0]["entity_id"] = "hint-rác"
+        payload["stage"]["assets"][0]["entity_id"] = 0
+
+        saved = _call("workspace_save_case", payload)
+
+        assert isinstance(
+            saved["data"]["stage"]["people"][0]["entity_id"], int)
+        assert saved["data"]["stage"]["assets"][0]["entity_id"] >= 1
 
 
 class TestCommitStage:
@@ -875,17 +902,18 @@ class TestCommitStage:
         assert any(e["code"] == "duplicate_row_id"
                    for e in exc.value.details["field_errors"])
 
-    def test_duplicate_entity_id(self):
+    def test_duplicate_entity_id_allowed(self):
+        """Hai dòng cùng identity là hợp lệ (§4.2 step 6) — mock parity
+        server thật sau 23/10/2026."""
         mock.reset_backend(_load_fixture("empty.json"))
         a = self._person("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
                          entity_id=9)
         b = self._person("ffffffff-ffff-4fff-8fff-ffffffffffff",
                          entity_id=9)
         payload = self._payload(people=[a, b], owner_row_id=a["row_id"])
-        with pytest.raises(CommandError) as exc:
-            _call("workspace_commit_stage", payload)
-        assert any(e["field"] == "entity_id"
-                   for e in exc.value.details["field_errors"])
+        res = _call("workspace_commit_stage", payload)
+        assert [r["entity_id"] for r in res["data"]["stage"]["people"]] \
+            == [9, 9]
 
     def test_duplicate_so_giay_to(self):
         mock.reset_backend(_load_fixture("empty.json"))
