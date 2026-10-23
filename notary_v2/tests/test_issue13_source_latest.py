@@ -463,7 +463,7 @@ def _two_person_stage():
         "assets": [
             {"row_id": str(uuid.uuid4()), "entity_id": None,
              "so_serial": "STAMP 001", "so_vao_so": None,
-             "so_thua_dat": None, "so_to_ban_do": None, "dia_chi": None,
+             "so_thua_dat": "1", "so_to_ban_do": "2", "dia_chi": None,
              "loai_so": None, "hinh_thuc_su_dung": None, "thoi_han": None,
              "nguon_goc": None, "ngay_cap": None, "co_quan_cap": None,
              "land_rows": None},
