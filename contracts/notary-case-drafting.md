@@ -499,7 +499,7 @@ payload:
                                     # people; two_party cấm key (§13.6)
     people: [<person_row>]          # v2: ≥0; ho_ten có thể null; v1 lịch sử ≥1
                                     # entity_id: null hoặc gợi ý dương có kiểm neo
-    assets: [<asset_row_v2>]        # v2: ≥0, ≤3; entity_id như trên;
+    assets: [<asset_row_v2>]        # v2: ≥0, ≤5; entity_id như trên;
                                     # v1 lịch sử ≥1 + is_primary
   diagram:
     state: <diagram_state>          # v2 OPTIONAL — absent thì server seed
@@ -1490,7 +1490,7 @@ diagram_state v3 (domain two_party):
   inheritance (đề xuất giữ A3 — 1 người chỉ ngồi 1 ô).
 - **Stage:** `stage.people` ≤ 30 cho `case_type:two_party` → quá →
   `stage_validation_error{code:"people_limit"}`; `owner_row_id` **cấm**
-  (absent — `validation_error` nếu có); assets ≤3 giữ nguyên.
+  (absent — `validation_error` nếu có); assets ≤5 (§13.3).
 - **Không engine:** `diagram_evaluate` trên `two_party` trả `succeeded`
   với `render_model{engineVersion:2, status:"unsupported",
   allocations:{}, breakdowns:[], requiredSlots:[],
@@ -1792,7 +1792,7 @@ Producer v2 PHẢI (thêm vào §10):
       `diagram_state.version:3` + `domain` bắt buộc.
 - [ ] Không emit `is_primary`, `isLandOwner`, `willReceive`; stage
       inheritance mang `owner_row_id` (result) — absent với `two_party`.
-- [ ] `stage.assets` ≤3 trên mọi payload; `two_party` people ≤30;
+- [ ] `stage.assets` ≤5 trên mọi payload; `two_party` people ≤30;
       canonical 30 node `p1..p30` cho domain `two_party`.
 - [ ] `workspace_create` v2: cho phép `diagram` absent; seed owner theo
       `owner_row_id`; `tai_san_id` = asset vị trí 1.
