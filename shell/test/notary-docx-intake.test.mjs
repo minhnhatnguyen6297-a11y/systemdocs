@@ -369,14 +369,23 @@ test('old original export returns stale and cannot clear busy or results of new 
     if (command === 'notary.workspace_source_latest') {
       return Promise.resolve({ok:true,data:{}});
     }
+    if (command === 'notary.word_export_options') {
+      // W2: chế độ gốc nạp lại vị trí ngay trong hành động xuất.
+      return Promise.resolve({ok:true,data:{
+        documents:[{document_key:'original.docx',ready:true,
+                    block_reason:null}]}});
+    }
     return new Promise(resolve=>resolves.push(resolve));
   }}});
   await model.newDraft();model.state.caseId=1;
   model.state.stageDirty=false;model.state.diagramDirty=false;
   const old=model.exportWord(['original.docx'],{}, {originalSourceId:uuid()});
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(resolves.length,1,'batch cũ đã gửi sau khi nạp lại vị trí');
   await model.newDraft();model.state.caseId=2;
   model.state.stageDirty=false;model.state.diagramDirty=false;
   const current=model.exportWord(['original.docx'],{}, {originalSourceId:uuid()});
+  await Promise.resolve(); await Promise.resolve();
   resolves[0]({ok:true,data:{documents:[{document_key:'old',status:'saved'}]}});
   assert.equal((await old).stale,true);
   assert.equal(model.state.wordBusy,true);assert.equal(model.state.wordResult,null);
@@ -490,23 +499,39 @@ test('ninth source cannot mutate Stage and explicit detach allows recovery with 
   assert.deepEqual(calls.at(-1)[1].docx_import,{version:1,sources:[]});
 });
 
-test('dirty original export calls no backend; clean export includes source and saved revision', async () => {
+test('W2: original export dirty tự lưu rồi xuất revision mới; sạch dùng revision đã lưu', async () => {
   const calls=[];
+  let revision=7;
   const model=M.createModel({client:{run:async(command,payload)=>{
     if (command === 'notary.workspace_source_latest') return {ok:true,data:{}};
-    calls.push([command,payload]);return {ok:true,data:{documents:[]}};}}});
+    if (command === 'notary.workspace_save_case') {
+      revision += 1;
+      calls.push([command,payload]);
+      return {ok:true,data:saveCaseData(payload,{revision})};
+    }
+    if (command === 'notary.word_export_options') {
+      return {ok:true,data:{documents:[
+        {document_key:'original.docx',ready:true,block_reason:null}]}};
+    }
+    calls.push([command,payload]);
+    return {ok:true,data:{documents:[]}};
+  }}});
   await model.newDraft();model.state.caseId=12;model.state.revision=7;
   const sourceId=uuid(); const dest={file_token:uuid()};
   model.state.stageDirty=true;
-  assert.equal((await model.exportWord(['original.docx'],dest,{originalSourceId:sourceId})).ok,false);
-  model.state.stageDirty=false;model.state.diagramDirty=true;
-  assert.equal((await model.exportWord(['original.docx'],dest,{originalSourceId:sourceId})).ok,false);
-  model.state.diagramDirty=false;model.state.metaDirty=true;
-  assert.equal((await model.exportWord(['original.docx'],dest,{originalSourceId:sourceId})).ok,false);
-  assert.equal(calls.length,0);
-  model.state.metaDirty=false;
+  const r=await model.exportWord(['original.docx'],dest,{originalSourceId:sourceId});
+  assert.equal(r.ok,true);
+  assert.deepEqual(calls.map(c=>c[0]),
+    ['notary.workspace_save_case','notary.word_export_batch']);
+  assert.equal(calls[0][1].case_id,12);
+  assert.equal(calls[0][1].base_revision,7);
+  assert.equal(calls[1][1].original_source_id,sourceId);
+  assert.equal(calls[1][1].base_revision,8);
+  // Sạch → không lưu lại; batch dùng revision vừa lưu.
+  calls.length=0;
   await model.exportWord(['original.docx'],dest,{originalSourceId:sourceId});
-  assert.equal(calls[0][1].original_source_id,sourceId); assert.equal(calls[0][1].base_revision,7);
+  assert.deepEqual(calls.map(c=>c[0]),['notary.word_export_batch']);
+  assert.equal(calls[0][1].base_revision,8);
 });
 
 test('mapping reopens saved choices, disables empty slot with reason, clears all and identifies sources', async () => {
@@ -530,7 +555,8 @@ test('mapping reopens saved choices, disables empty slot with reason, clears all
   assert.match(box.textContent,/Vị trí chưa có giá trị đã lưu/);
   choice.checked=false;
   choice.onchange();
-  assert.equal(button(box,'Xuất').disabled,true,'unsaved choices cannot misdescribe the export');
+  assert.equal(button(box,'Xuất').disabled,false,
+    'W2: Xuất tự áp lựa chọn hiện tại — không bắt bấm Áp dụng trước');
   await button(box,'Áp dụng vị trí đã chọn').onclick();
   assert.deepEqual(calls[0],[]);
   assert.ok(button(box,'Áp dụng vị trí đã chọn'),'mapping remains available after apply');
@@ -650,8 +676,8 @@ test('applied bindings persist via save_case; later options reload failure keeps
     // Sau Lưu: mở lại nguồn để lấy readiness; lần tải kế tiếp lỗi/throw.
     await button(box,'Dùng hợp đồng Word đã nhập').onclick();
     assert.doesNotMatch(box.textContent,/Tên gốc →/);
-    assert.match(box.textContent,/Không tải được các vị trí Word/);
-    assert.ok(notices.length>=1);
+    assert.match(box.textContent,
+      /Không tải được các vị trí Word|reload failed/);
     assert.deepEqual(model.state.wordBindingProposals,[]);
     assert.equal(model.state.docxImport.sources[0].bindings.length,1,
       'lỗi tải lại không được xoá bindings đã lưu');

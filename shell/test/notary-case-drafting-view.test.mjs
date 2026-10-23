@@ -1180,10 +1180,15 @@ function wordModelStub(overrides = {}) {
   return {
     calls, state,
     canWrite: () => true,
-    saveCaseMeta: async (patch) => {
-      calls.push(['update', patch]);
-      state.caseInfo.noi_niem_yet = patch.noi_niem_yet;
-      state.committedCaseInfo.noi_niem_yet = patch.noi_niem_yet;
+    updateCaseMeta: (field, value) => {
+      calls.push(['meta', field, value]);
+      state.caseInfo[field] = value;
+      return true;
+    },
+    hasUnsaved: () => true,
+    saveCase: async () => {
+      calls.push(['save']);
+      state.committedCaseInfo = { ...state.caseInfo };
       return { ok: true };
     },
     loadWordOptions: async (templateDir) => {
@@ -1408,163 +1413,45 @@ test('NAIA-8 word dialog: folder trung basename — token phan biet, response cu
   assert.match(box.textContent, /Thư mục mẫu: mau/);
 });
 
-for (const initialDraft of [true, false]) {
-  test(`Word posting ${initialDraft ? 'initial draft' : 'dialog edit'} must be saved before export`, async (t) => {
-    const model = wordModelStub();
-    if (initialDraft) model.state.caseInfo.noi_niem_yet = 'xã Chưa Lưu';
-    const pickFiles = async () => ({ ok: true, data: { files: [
-      { file_token: 'tok-folder', name: 'folder', is_dir: true }] } });
-    const { ctx, cap } = wordDialogCtx(t, { model, pickFiles });
-    WORD.createWordDialog(ctx).open();
-    const box = cap.box;
-    await findBtns(box, 'Chọn thư mục mẫu')[0].onclick();
-    await findBtns(box, 'Chọn thư mục đích')[0].onclick();
-    const input = collect(box, (e) => e.tagName === 'INPUT' &&
-      e.getAttribute('aria-label') === 'Nơi niêm yết')[0];
-    assert.equal(input.value, initialDraft ? 'xã Chưa Lưu' : 'xã Yên Sở');
-    if (!initialDraft) {
-      input.value = 'xã Chưa Lưu';
-      input.oninput();
-    }
-    assert.match(box.textContent, /Hãy bấm “Lưu nơi niêm yết” trước khi xuất/);
-    await findBtns(box, 'Xuất')[0].onclick();
-    assert.equal(model.calls.filter(([k]) => k === 'batch').length, 0);
-    assert.equal(model.state.committedCaseInfo.noi_niem_yet, 'xã Yên Sở');
-    await findBtns(box, 'Lưu nơi niêm yết')[0].onclick();
-    assert.equal(model.state.committedCaseInfo.noi_niem_yet, 'xã Chưa Lưu');
-    await findBtns(box, 'Xuất')[0].onclick();
-    assert.equal(model.calls.filter(([k]) => k === 'batch').length, 1);
-  });
-}
-
-test('NAIA-8 word dialog: Noi niem yet — nap gia tri da luu, luu ok/loi ro', async (t) => {
+// W4 (owner 23/10/2026): bỏ nút "Lưu nơi niêm yết" thứ hai — sửa Nơi
+// niêm yết đi vào buffer meta và được ghi KÈM trong chính hành động xuất.
+test('W4: Nơi niêm yết sửa tại dialog đi vào meta, Xuất không bị chặn', async (t) => {
   const model = wordModelStub();
-  const pickFiles = async () => ({ ok: true, data: { files: [] } });
-  const { ctx, cap, notes } = wordDialogCtx(t, { model, pickFiles });
-  WORD.createWordDialog(ctx).open();
-  const box = cap.box;
-  const input = collect(box, (e) => e.tagName === 'INPUT' &&
-    e.type === 'text' &&
-    e.getAttribute('aria-label') === 'Nơi niêm yết')[0];
-  assert.ok(input, 'thieu input Noi niem yet');
-  // Gia tri hien tai cua ho so nap san (workspace_get).
-  assert.equal(input.value, 'xã Yên Sở');
-  input.value = 'phường Mới  ';
-  await findBtns(box, 'Lưu nơi niêm yết')[0].onclick();
-  const upd = model.calls.find(([k]) => k === 'update');
-  assert.deepEqual(upd[1], { noi_niem_yet: 'phường Mới' });
-  // R14: không còn câu chữ báo thành công trong dialog.
-  assert.doesNotMatch(box.textContent, /Đã lưu\./);
-
-  // Loi luu → mot dong loi tai cho, khong toast trung.
-  model.saveCaseMeta = async () => ({ ok: false, error: {
-    code: 'workspace_conflict', message: 'revision khac server',
-    retryable: false } });
-  input.value = 'xã Khác';
-  await findBtns(box, 'Lưu nơi niêm yết')[0].onclick();
-  assert.match(box.textContent, /revision khac server/);
-  assert.equal(notes.length, 0, 'không toast trùng với dòng lỗi tại chỗ');
-
-  // Case locked → input + nut luu bi khoa.
-  model.state.caseInfo.locked = true;
-  model.canWrite = () => false;
-  WORD.createWordDialog(ctx).open();
-  const box2 = cap.box;
-  const input2 = collect(box2, (e) => e.tagName === 'INPUT' &&
-    e.getAttribute('aria-label') === 'Nơi niêm yết')[0];
-  assert.equal(input2.disabled, true);
-  assert.equal(findBtns(box2, 'Lưu nơi niêm yết')[0].disabled, true);
-});
-
-test('NAIA-8 word dialog: dang luu Noi niem yet → Xuat/input/Luu khoa (pending-save)', async (t) => {
-  // Review NAIA-8 (cao): bam Luu roi Xuat khi save con pending → batch
-  // chay voi gia tri cu. Phai khoa Xuat + input + Luu lap den khi save
-  // xong; mo lai theo quyen hien tai ca success lan error.
-  let finishSave;
-  const model = wordModelStub({
-    saveCaseMeta: (patch) => {
-      model.calls.push(['update', patch]);
-      return new Promise((res) => {
-        finishSave = () => {
-          model.state.caseInfo.noi_niem_yet = patch.noi_niem_yet;
-          model.state.committedCaseInfo.noi_niem_yet = patch.noi_niem_yet;
-          res({ ok: true });
-        };
-      });
-    },
-  });
   const pickFiles = async () => ({ ok: true, data: { files: [
-    { file_token: 'tok-m', name: 'mau', is_dir: true }] } });
+    { file_token: 'tok-folder', name: 'folder', is_dir: true }] } });
   const { ctx, cap } = wordDialogCtx(t, { model, pickFiles });
   WORD.createWordDialog(ctx).open();
   const box = cap.box;
-  await findBtns(box, 'Chọn thư mục mẫu')[0].onclick();
-  await findBtns(box, 'Chọn thư mục đích')[0].onclick();
-  const goBtn = findBtns(box, 'Xuất')[0];
   const input = collect(box, (e) => e.tagName === 'INPUT' &&
     e.getAttribute('aria-label') === 'Nơi niêm yết')[0];
-  const saveBtn = findBtns(box, 'Lưu nơi niêm yết')[0];
-  assert.equal(goBtn.disabled, false);
-  input.value = 'phường Mới';
-  const save = saveBtn.onclick();
-  await tick();
-  // Pending-save: Xuat + input + Luu lap deu khoa; goi onclick truc tiep
-  // (stub bo qua disabled) cung khong dispatch batch nho guard trong go.
-  assert.equal(goBtn.disabled, true, 'Xuat phai khoa khi meta dang luu');
-  assert.equal(input.disabled, true, 'input phai khoa khi meta dang luu');
-  assert.equal(saveBtn.disabled, true, 'Luu lap phai khoa khi dang luu');
-  await goBtn.onclick();
-  assert.equal(model.calls.filter(([k]) => k === 'batch').length, 0,
-    'khong duoc dispatch batch khi meta save con pending');
-  // Save xong → mo lai dung quyen; Xuat gio moi duoc phep.
-  finishSave();
-  await save;
-  assert.equal(goBtn.disabled, false);
-  assert.equal(input.disabled, false);
-  assert.equal(saveBtn.disabled, false);
-  assert.doesNotMatch(box.textContent, /Đã lưu\./);
-  await goBtn.onclick();
-  assert.ok(model.calls.some(([k]) => k === 'batch'),
-    'batch phai chay sau khi save hoan tat');
+  assert.equal(input.value, 'xã Yên Sở');
+  assert.equal(findBtns(box, 'Lưu nơi niêm yết').length, 0,
+    'không còn nút lưu meta riêng trong dialog');
+  input.value = 'xã Chưa Lưu';
+  input.oninput();
+  assert.deepEqual(model.calls.filter(([k]) => k === 'meta'),
+    [['meta', 'noi_niem_yet', 'xã Chưa Lưu']]);
+  assert.doesNotMatch(box.textContent, /trước khi xuất/,
+    'không còn câu chặn "lưu nơi niêm yết trước khi xuất"');
+  await findBtns(box, 'Chọn thư mục mẫu')[0].onclick();
+  await findBtns(box, 'Chọn thư mục đích')[0].onclick();
+  await findBtns(box, 'Xuất')[0].onclick();
+  assert.equal(model.calls.filter(([k]) => k === 'batch').length, 1,
+    'Xuất chạy ngay, meta do hành động xuất ghi kèm');
 });
 
-test('NAIA-8 word dialog: pending-save loi → mo lai theo quyen hien tai', async (t) => {
-  // Loi thuong (validation) → mo lai input/Luu/Xuat vi canWrite giu
-  // nguyen; loi lam case locked (canWrite → false) → giu khoa.
-  for (const locked of [false, true]) {
-    let finishSave;
-    const model = wordModelStub({
-      saveCaseMeta: () => new Promise((res) => {
-        finishSave = () => {
-          if (locked) model.canWrite = () => false;
-          res({ ok: false, error: {
-            code: locked ? 'workspace_locked' : 'validation_error',
-            message: 'loi luu', retryable: false } });
-        };
-      }),
-    });
-    const pickFiles = async () => ({ ok: true, data: { files: [
-      { file_token: 'tok-m', name: 'mau', is_dir: true }] } });
-    const { ctx, cap } = wordDialogCtx(t, { model, pickFiles });
-    WORD.createWordDialog(ctx).open();
-    const box = cap.box;
-    await findBtns(box, 'Chọn thư mục mẫu')[0].onclick();
-    const goBtn = findBtns(box, 'Xuất')[0];
-    const input = collect(box, (e) => e.tagName === 'INPUT' &&
-      e.getAttribute('aria-label') === 'Nơi niêm yết')[0];
-    const saveBtn = findBtns(box, 'Lưu nơi niêm yết')[0];
-    const save = saveBtn.onclick();
-    await tick();
-    finishSave();
-    await save;
-    assert.equal(input.disabled, locked,
-      `locked=${locked}: input.disabled`);
-    assert.equal(saveBtn.disabled, locked,
-      `locked=${locked}: save.disabled`);
-    assert.equal(goBtn.disabled, locked,
-      `locked=${locked}: Xuat.disabled`);
-    assert.match(box.textContent, /loi luu/);
-  }
+test('W4: hồ sơ khoá → input Nơi niêm yết + Xuất khoá', async (t) => {
+  const model = wordModelStub();
+  model.state.caseInfo.locked = true;
+  model.canWrite = () => false;
+  const pickFiles = async () => ({ ok: true, data: { files: [] } });
+  const { ctx, cap } = wordDialogCtx(t, { model, pickFiles });
+  WORD.createWordDialog(ctx).open();
+  const box = cap.box;
+  const input = collect(box, (e) => e.tagName === 'INPUT' &&
+    e.getAttribute('aria-label') === 'Nơi niêm yết')[0];
+  assert.equal(input.disabled, true);
+  assert.equal(findBtns(box, 'Xuất')[0].disabled, true);
 });
 
 test('NAIA-8 word dialog: Huy xuat an/hien theo batch + scope cd-word-modal', async (t) => {

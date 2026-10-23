@@ -978,13 +978,31 @@ function fakeClient(seed) {
         });
       }
       case 'notary.word_export_options': {
+        // NAIA-8 folder mode: template_dir co mat → nguon mau la cac
+        // .docx trong thu muc (fake tra tap co dinh, key = basename).
+        // W1: hồ sơ chưa lưu (case_id null) vẫn quét được — readiness
+        // chỉ còn mức mẫu.
+        if (payload.case_id == null) {
+          if (!payload.template_dir) {
+            return fail('validation_error', 'can case_id');
+          }
+          return ok({
+            schema_version: SCHEMA,
+            documents: [
+              { document_key: 'Mau thue nha.docx',
+                display_name: 'Mau thue nha',
+                ready: true, block_reason: null },
+              { document_key: 'To cam ket.docx',
+                display_name: 'To cam ket',
+                ready: true, block_reason: null },
+            ],
+          });
+        }
         const { c, err } = getCase(payload);
         if (err) return err;
         if (!supported(c)) {
           return fail('case_type_unsupported', 'case type khong ho tro');
         }
-        // NAIA-8 folder mode: template_dir co mat → nguon mau la cac
-        // .docx trong thu muc (fake tra tap co dinh, key = basename).
         if (payload.template_dir) {
           return ok({
             schema_version: SCHEMA,
@@ -2608,6 +2626,123 @@ test('exportWord: canceled job giu result (breakdown.skipped len wire — MIN-11
   assert.equal(model.state.wordBusy, false);
 });
 
+// ---------- Phần W: một hành động "Lưu & xuất" (owner 23/10/2026) ----------
+
+test('W1: hồ sơ chưa lưu — quét thư mục mẫu vẫn được (case_id null)', async () => {
+  const { model, client } = makeModel(seedCases('empty'));
+  await model.newDraft();
+  const o = await model.loadWordOptions({ file_token: 'tok-tpl' });
+  assert.equal(o.ok, true);
+  const call = client.calls.find(
+    (c) => c.command === 'notary.word_export_options');
+  assert.equal(call.payload.case_id, null);
+  assert.equal(model.state.wordOptions.length, 2);
+});
+
+test('W1: hồ sơ mới bấm Xuất → tự tạo + lưu trước rồi xuất case vừa tạo', async () => {
+  const { model, client } = makeModel(seedCases('empty'));
+  await model.newDraft();
+  const person = model.addPerson({ ho_ten: 'Nguyễn Văn A' });
+  assert.ok(model.setOwnerRow(person.row_id));
+  assert.ok(model.addAsset({ so_serial: 'S1' }));
+  const r = await model.exportWord(
+    ['Mau thue nha.docx'], { file_token: 'dest' },
+    { templateDir: { file_token: 'tok-tpl' } });
+  assert.equal(r.ok, true);
+  const cmds = client.calls.map((c) => c.command);
+  const saveAt = cmds.indexOf('notary.workspace_save_case');
+  const batchAt = cmds.indexOf('notary.word_export_batch');
+  assert.ok(saveAt >= 0 && batchAt > saveAt, 'phải lưu trước khi xuất');
+  const batch = client.calls[batchAt].payload;
+  assert.ok(Number.isInteger(batch.case_id) && batch.case_id >= 1,
+    'batch phải dùng case vừa tạo');
+  assert.equal(model.state.caseId, batch.case_id);
+});
+
+test('W3: hồ sơ đang sửa dở → tự lưu (kèm nơi niêm yết) trước lần xuất', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  model.updateCaseMeta('noi_niem_yet', 'xã Mới');
+  model.addPerson({ ho_ten: 'Người Thêm' });
+  const r = await model.exportWord(
+    ['khai_nhan_di_san'], { file_token: 'd' });
+  assert.equal(r.ok, true);
+  const saves = client.calls.filter(
+    (c) => c.command === 'notary.workspace_save_case');
+  assert.equal(saves.length, 1);
+  assert.equal(saves[0].payload.case.noi_niem_yet, 'xã Mới');
+  assert.ok(saves[0].payload.stage.people
+    .some((p) => p.ho_ten === 'Người Thêm'));
+  const cmds = client.calls.map((c) => c.command);
+  assert.ok(cmds.indexOf('notary.workspace_save_case')
+    < cmds.indexOf('notary.word_export_batch'));
+});
+
+test('W2: chế độ gốc — tự lưu, nạp lại vị trí, xuất với revision mới', async () => {
+  const base = fakeClient(seedCases('ready'));
+  const batches = [];
+  let optionsReloads = 0;
+  const client = {
+    calls: base.calls,
+    run: async (cmd, payload) => {
+      if (cmd === 'notary.word_export_options'
+          && payload.original_source_id) {
+        optionsReloads += 1;
+        return { ok: true, data: {
+          documents: [{ document_key: 'original.docx',
+            display_name: 'Hợp đồng Word gốc',
+            ready: true, block_reason: null }],
+          binding_proposals: [] } };
+      }
+      if (cmd === 'notary.word_export_batch') batches.push(payload);
+      return base.run(cmd, payload);
+    },
+  };
+  const model = M.createModel({ client, uuid });
+  await model.openCase(42);
+  const sourceId = crypto.randomUUID();
+  model.state.docxImport = { version: 1, sources: [
+    { source_id: sourceId, label: 'A.docx', records: [], bindings: [] }] };
+  model.state.stageDirty = true;
+  const before = model.state.revision;
+  const r = await model.exportWord(
+    ['original.docx'], { file_token: 'd' },
+    { originalSourceId: sourceId });
+  assert.equal(r.ok, true);
+  assert.equal(optionsReloads, 1, 'phải nạp lại vị trí sau khi lưu');
+  assert.equal(batches.length, 1);
+  assert.ok(batches[0].base_revision > before,
+    'base_revision phải là revision vừa lưu');
+  assert.equal(batches[0].base_revision, model.state.revision);
+  assert.equal(batches[0].original_source_id, sourceId);
+});
+
+test('W2: lỗi lưu thật khi xuất → dừng, không gửi batch, báo lỗi tại chỗ', async () => {
+  const base = fakeClient(seedCases('ready'));
+  const cmds = [];
+  const client = {
+    calls: base.calls,
+    run: async (cmd, payload) => {
+      cmds.push(cmd);
+      if (cmd === 'notary.workspace_save_case') {
+        return { ok: false, error: {
+          code: 'workspace_conflict', message: 'revision khac server',
+          retryable: false } };
+      }
+      return base.run(cmd, payload);
+    },
+  };
+  const model = M.createModel({ client, uuid });
+  await model.openCase(42);
+  model.addPerson({ ho_ten: 'Người Thêm' });
+  const r = await model.exportWord(['khai_nhan_di_san'], { file_token: 'd' });
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, 'workspace_conflict');
+  assert.equal(cmds.includes('notary.word_export_batch'), false,
+    'không xuất bản cũ khi lưu thất bại');
+  assert.equal(model.state.wordBusy, false);
+});
+
 // ---------- MIN-122/128: nhap moi / draft / case_type ----------
 
 test('newDraft: inheritance — stage co owner_row_id null + seed DUNG 1 node owner (MIN-136)', async () => {
@@ -2638,7 +2773,9 @@ test('newDraft: inheritance — stage co owner_row_id null + seed DUNG 1 node ow
   assert.deepEqual(s.capabilities.intake,
     ['image', 'pdf', 'docx', 'xlsx', 'text']);
   assert.equal(s.capabilities.diagram, true);
-  assert.equal(s.capabilities.word_export, false);
+  // W1 (owner 23/10/2026): hồ sơ mới xuất Word được — hành động xuất tự
+  // tạo + lưu trước, không cần Lưu thủ công.
+  assert.equal(s.capabilities.word_export, true);
   assert.match(s.draftId,
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 });

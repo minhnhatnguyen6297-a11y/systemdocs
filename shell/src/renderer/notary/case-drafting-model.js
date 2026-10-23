@@ -687,8 +687,10 @@ function createModel(deps) {
     state.unsupported = false;
     // MIN-136: adapter ho tro intake nhap khong case_id (contract §2.1a)
     // — nhap moi cong bo du 5 loai nguon, khong khoa nut Nhap file nua.
+    // W1 (owner 23/10/2026): hồ sơ mới vẫn xuất Word được — hành động
+    // xuất tự tạo + lưu trước; capability chỉ tắt khi loại hồ sơ không hỗ trợ.
     state.capabilities =
-      { intake: INTAKE_KINDS.slice(), diagram: true, word_export: false };
+      { intake: INTAKE_KINDS.slice(), diagram: true, word_export: true };
     state.committed = { people: [], assets: [] };
     state.committedCaseInfo = null;   // nhap moi: khong co baseline case
     state.stage = newStageDraft(ct);
@@ -1996,6 +1998,8 @@ function createModel(deps) {
         actual_filename: d.actual_filename ?? null,
         output_file: d.output_file ?? null,
         error: d.error ?? null,
+        // W6/W8: dữ kiện thiếu của file đã xuất (dialog hiển thị).
+        missing: Array.isArray(d.missing) ? d.missing.slice() : [],
       };
     }
     return {
@@ -2006,6 +2010,7 @@ function createModel(deps) {
       output_file: null,
       error: { code: (d && d.code) || 'unknown',
                message: (d && d.message) || 'lỗi xuất' },
+      missing: [],
     };
   }
 
@@ -2042,6 +2047,12 @@ function createModel(deps) {
   // opts: {onJob, templateDir, createCaseSubdir} — dialog hien thi
   // progress + cancel theo job_id. `templateDir` = {file_token} thu muc
   // mau; `createCaseSubdir` = tao thu muc con HS-<case_id> trong dich.
+  // W1–W3 (owner 23/10/2026): xuất theo NỘI DUNG ĐANG SỬA bằng một hành
+  // động "Lưu & xuất" — hồ sơ chưa lưu thì tạo, đang dirty thì lưu, rồi
+  // xuất trên snapshot vừa ghi trong CÙNG lần bấm. Lỗi lưu thật (xung đột
+  // revision/cấu trúc) dừng hành động và trả lỗi; không xuất bản cũ.
+  // Chế độ gốc: sau khi lưu, nạp lại vị trí (bindings/revision/slot/hash)
+  // rồi mới xuất — các đối chiếu nội bộ chạy trên dữ liệu vừa lưu.
   async function exportWord(documentKeys, destination, opts) {
     if (!canWrite()) {
       return { ok: false, error: errObj(
@@ -2053,6 +2064,21 @@ function createModel(deps) {
     emit();
     const s = session;
     const o = (opts && typeof opts === 'object') ? opts : {};
+    const needsSave = state.caseId == null || hasUnsaved();
+    if (needsSave) {
+      const saved = await saveCase();
+      if (s !== session) return { ok: true, stale: true };
+      if (!saved || !saved.ok) {
+        state.wordBusy = false;
+        emit();
+        return saved || { ok: false, error: errObj(
+          'unknown', 'Không lưu được hồ sơ trước khi xuất') };
+      }
+      // applyWorkspace() reset wordBusy/wordOptions — giữ đúng trạng thái
+      // "đang xuất" trong lúc chờ batch.
+      state.wordBusy = true;
+      emit();
+    }
     const payload = {
       case_id: state.caseId,
       document_keys: documentKeys,
@@ -2060,9 +2086,22 @@ function createModel(deps) {
     };
     if (o.templateDir) payload.template_dir = o.templateDir;
     if (o.originalSourceId) {
-      if (hasUnsaved()) {
+      const reload = await loadWordOptions(null, o.originalSourceId);
+      if (s !== session) return { ok: true, stale: true };
+      if (!reload || !reload.ok) {
         state.wordBusy = false;
-        return { ok: false, error: errObj('word.original_mapping_invalid', 'Hãy Lưu hồ sơ trước khi xuất.') };
+        emit();
+        return { ok: false, error: (reload && reload.error) || errObj(
+          'word.original_mapping_invalid',
+          'Không tải được vị trí Word đã lưu') };
+      }
+      const blocked = (state.wordOptions || []).find((d) => d && !d.ready);
+      if (blocked) {
+        state.wordBusy = false;
+        emit();
+        return { ok: false, error: errObj(
+          blocked.block_reason || 'word.original_mapping_invalid',
+          'Vị trí Word gốc không còn khớp bản đã lưu') };
       }
       payload.original_source_id = o.originalSourceId;
       payload.base_revision = state.revision;
