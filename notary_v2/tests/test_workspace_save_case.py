@@ -255,9 +255,10 @@ def test_save_case_keeps_valid_incomplete_diagram_done(db, dataset):
 
 
 @pytest.mark.parametrize("state_factory", [
-    lambda: {"version": 3, "domain": "inheritance", "nodes": [
-        _node("owner", "00000000-0000-4000-8000-000000000101", own=[])]},
     lambda: {"version": 2, "domain": "inheritance", "nodes": []},
+    lambda: {"version": 3, "domain": "inheritance", "nodes": [
+        _node("owner", "00000000-0000-4000-8000-000000000101",
+              spouse="owner")]},
 ])
 def test_save_case_invalid_diagram_rolls_back_everything(
         db, dataset, state_factory):
@@ -283,6 +284,30 @@ def test_save_case_invalid_diagram_rolls_back_everything(
 
 
 # ---------------------------------------------------------------- B1
+
+
+def test_save_case_missing_land_owner_saves_incomplete(db, dataset):
+    """S3 owner 23/10/2026: thiếu Chủ đất = thiếu dữ kiện, không chặn Lưu.
+    State được ghi, render_model incomplete và giữ lỗi missing_land_owner."""
+    create = _create_draft(db, dataset)
+    case_id = create["case"]["id"]
+    state = {"version": 3, "domain": "inheritance",
+             "nodes": [_node(
+                 "owner", "00000000-0000-4000-8000-000000000101",
+                 own=[])]}
+
+    result = CaseWorkspaceService(db).save_case(
+        case_id=case_id, base_revision=1, idempotency_key=None,
+        case_meta=_meta(), stage=_f1_stage(dataset), state=state)
+
+    assert result["case"]["status"] == "done"
+    assert result["case"]["revision"] == 2
+    rm = result["diagram"]["render_model"]
+    assert rm["status"] == "incomplete"
+    assert any(e["code"] == "missing_land_owner" for e in rm["errors"])
+    reopened = CaseWorkspaceService(db).get(case_id)
+    assert reopened["diagram"]["state"] == result["diagram"]["state"]
+    assert reopened["diagram"]["render_model"]["status"] == "incomplete"
 
 
 def test_save_case_writes_new_rows_meta_and_diagram_in_one_revision(

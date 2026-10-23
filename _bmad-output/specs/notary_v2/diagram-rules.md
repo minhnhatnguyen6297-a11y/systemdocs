@@ -77,12 +77,19 @@ và `contracts/notary-case-drafting/*.schema.json`.
 - `personId` phải thuộc Stage đang sửa được gửi cùng lần evaluate/Lưu hồ sơ; người vừa thêm gán được ngay, không cần ghi trung gian. Xóa người dọn tham chiếu trong bản Diagram đang sửa.
 - Save mang đúng `base_revision` khi đã có hồ sơ; conflict giữ bản đang sửa, cho tải mới hoặc sao chép, không được ghi đè.
 - Frontend không gửi kết quả tính như sự thật. Backend luôn tính lại từ input; bản committed chỉ là mốc đã lưu/dirty/revision.
-- State sai cấu trúc/nghiệp vụ (`invalid`) không được persist. State hợp lệ
-  nhưng kết quả `incomplete` vẫn được lưu; backend trả `requiredSlots`/warning
-  để người dùng bổ sung sau.
+- State sai cấu trúc/nghiệp vụ (`invalid` do wire, tham chiếu, quan hệ) không
+  được persist. State hợp lệ nhưng kết quả `incomplete` vẫn được lưu; backend
+  trả `requiredSlots`/warning để người dùng bổ sung sau.
+- Ranh giới "không tính được" (owner 23/10/2026): engine chỉ báo thiếu dữ
+  kiện (`missing_land_owner`, `invalid_death_date`) thì Lưu hồ sơ vẫn ghi với
+  `render_model.status = incomplete` và giữ danh sách lỗi; lỗi cấu trúc
+  (wire/reference/domain/quan hệ/chu kỳ) vẫn bị từ chối trước khi ghi.
+  Đường `diagram_evaluate` vẫn báo nguyên trạng thái chưa tính được của
+  engine; `diagram_evaluate` chế độ nháp không chặn vì lỗi field tùy chọn —
+  trả `incomplete` kèm warning `stage.incomplete_fields`.
 - Save chạy đúng một đường đánh giá với `Xem cách tính`: `render_model` đã lưu
   là kết quả evaluate tại thời điểm ghi (gồm warning Pool và trạng thái
-  `incomplete`); engine trả `invalid` bị từ chối trước khi ghi.
+  `incomplete`).
 - Save lỗi không đổi Stage, Diagram và projection đã lưu trong DB; giữ bản đang sửa để sửa tiếp.
 - Reload và Word phải dùng cùng snapshot đã lưu, không tự xuất nội dung chưa Lưu hồ sơ.
 

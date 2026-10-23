@@ -246,6 +246,28 @@ def _validate_diagram_wire(state: Any) -> list:
     return errors
 
 
+# Lỗi engine thuộc nhóm "thiếu dữ kiện để tính" (S3, owner 23/10/2026):
+# hồ sơ còn điền dần nên đường Lưu ghi được ở trạng thái incomplete.
+# Mọi lỗi cấu trúc khác (wire/reference/domain/quan hệ) vẫn raise.
+_INCOMPLETE_ENGINE_CODES = frozenset({"missing_land_owner",
+                                      "invalid_death_date"})
+
+
+def _softened_incomplete(render_model: Mapping[str, Any]) -> Optional[dict]:
+    """render_model `invalid` chỉ vì thiếu dữ kiện → bản `incomplete`.
+
+    Trả None khi còn lỗi cấu trúc/không xác định — caller phải raise.
+    """
+    errors = render_model.get("errors")
+    if not isinstance(errors, list) or not errors:
+        return None
+    if not all(isinstance(e, Mapping)
+               and e.get("code") in _INCOMPLETE_ENGINE_CODES
+               for e in errors):
+        return None
+    return {**render_model, "status": "incomplete"}
+
+
 def _persisted_state(state: Mapping[str, Any]) -> dict:
     """State đã validate → canonical persist shape (§13.4).
 
@@ -400,6 +422,13 @@ class InheritanceWorkspaceService:
         Trả `(clean_state, render_model, warnings)`. Ref tới row đã bị xóa
         khỏi chính case (có trong `previous_stage`) được gỡ; UUID chưa
         từng thuộc bản trước/payload là `diagram_reference_outside_stage`.
+
+        Ranh giới lỗi (S3, owner 23/10/2026): lỗi CẤU TRÚC — wire v3,
+        reference ngoài Stage, owner mismatch, quan hệ/chu kỳ engine —
+        vẫn raise `diagram_invalid_state`/mã riêng. Lỗi chỉ vì THIẾU DỮ
+        KIỆN để tính (`missing_land_owner`, `invalid_death_date`) trả
+        render_model `incomplete` để đường Lưu ghi được; đường evaluate
+        vẫn báo nguyên trạng thái chưa tính được của engine.
         """
         self._check_domain(state, case_type)
         errors = _validate_diagram_wire(state)
@@ -457,10 +486,13 @@ class InheritanceWorkspaceService:
             render_model = self._evaluate_inheritance(
                 clean_state, valid_row_ids=valid_rows, people=people)
             if render_model.get("status") == "invalid":
-                raise WorkspaceError(
-                    "diagram_invalid_state",
-                    "diagram state bị engine từ chối",
-                    details={"errors": render_model.get("errors") or []})
+                softened = _softened_incomplete(render_model)
+                if softened is None:
+                    raise WorkspaceError(
+                        "diagram_invalid_state",
+                        "diagram state bị engine từ chối",
+                        details={"errors": render_model.get("errors") or []})
+                render_model = softened
         else:
             render_model = unsupported_render_model()
         return clean_state, render_model, warnings

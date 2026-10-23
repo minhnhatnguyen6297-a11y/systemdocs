@@ -686,24 +686,29 @@ def test_save_unassigned_pool_person_keeps_warning_and_incomplete(
     assert reloaded["diagram"]["state"] == data["diagram"]["state"]
 
 
-def test_save_engine_invalid_missing_land_owner_not_persisted(db):
-    """Wire hợp lệ nhưng mọi ownPositions rỗng → engine invalid →
-    từ chối trước khi ghi; state + revision giữ nguyên (§6/§9.7)."""
+def test_save_missing_land_owner_persists_incomplete(db, session_factory):
+    """S3 owner 23/10/2026: wire hợp lệ nhưng thiếu Chủ đất (mọi
+    ownPositions rỗng) chỉ là THIẾU DỮ KIỆN → lưu được với render_model
+    incomplete + lỗi engine giữ nguyên; revision tăng bình thường."""
     case, _people, rows, _prop = _seed_case(db)
-    before = case.case_state_json
     state = _draft_state(rows)
     for n in state["nodes"]:
         n["ownPositions"] = []
 
-    with pytest.raises(WorkspaceError) as exc:
-        _svc(db).save_diagram(case.id, 1, state)
-    assert exc.value.code == "diagram_invalid_state"
-    assert any(e["code"] == "missing_land_owner"
-               for e in exc.value.details["errors"])
+    data = _svc(db).save_diagram(case.id, 1, state)
+    assert data["revision"] == 2
+    rm = data["diagram"]["render_model"]
+    assert rm["status"] == "incomplete"
+    assert any(e["code"] == "missing_land_owner" for e in rm["errors"])
 
-    db.refresh(case)
-    assert case.case_state_json == before
-    assert case.workspace_revision == 1
+    from services.case_workspace import CaseWorkspaceService
+    db2 = session_factory()
+    try:
+        reopened = CaseWorkspaceService(db2).get(case.id)
+    finally:
+        db2.close()
+    assert reopened["diagram"]["render_model"]["status"] == "incomplete"
+    assert reopened["diagram"]["render_model"]["errors"] == rm["errors"]
 
 
 # ----------------------------------------------------------- evaluate_draft

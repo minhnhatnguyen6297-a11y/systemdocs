@@ -906,10 +906,14 @@ result.data:
 ```
 
 - Atomic write: validate state → evaluate → persist → `revision+1` →
-  commit. State invalid → không persist (`diagram_invalid_state`).
+  commit. State sai CẤU TRÚC → không persist (`diagram_invalid_state`).
+  Lỗi engine chỉ vì THIẾU DỮ KIỆN (`missing_land_owner`,
+  `invalid_death_date`) không chặn ghi: `render_model.status=incomplete`
+  giữ nguyên `errors` (S3, owner 23/10/2026); đường evaluate vẫn trả
+  nguyên trạng thái chưa tính được của engine.
 - Chỉ lưu Diagram trên rows đã commit, không Stage/meta và không đổi status.
   Nút **Lưu hồ sơ** dùng workspace_save_case, không gọi đường này.
-  Incomplete hợp lệ giữ warnings/requiredSlots/Pool; invalid reject và rollback.
+  Incomplete hợp lệ giữ warnings/requiredSlots/Pool; lỗi cấu trúc reject và rollback.
 - base_revision khác server → workspace_conflict; Done vẫn lưu Diagram được.
 
 ## 8. `notary.word_export_options` + `notary.word_export_batch`
