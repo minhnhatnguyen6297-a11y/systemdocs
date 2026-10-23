@@ -228,7 +228,9 @@ test('JSON download keeps original schema-valid result after review and invalid 
   URL.createObjectURL = b => {blob=b;return 'blob:synthetic';}; URL.revokeObjectURL=()=>{};
   try { button(box,'Tải JSON').onclick(); } finally { URL.createObjectURL=create;URL.revokeObjectURL=revoke; }
   const downloaded = await blob.text(); assert.deepEqual(JSON.parse(downloaded),original);
-  assert.match(box.textContent,/sửa đổi được lưu vào Stage/);
+  // R16 (owner 23/10/2026): câu dạy "sửa đổi được lưu vào Stage" đã gỡ khỏi
+  // dialog intake — test khóa hành vi mới: câu đó không còn xuất hiện.
+  assert.doesNotMatch(box.textContent,/sửa đổi được lưu vào Stage/);
   const root = fileURLToPath(new URL('../../',import.meta.url));
   execFileSync(process.env.NOTARY_TEST_PYTHON || 'python3',['-c',
     "import json,sys; from pathlib import Path; from jsonschema import Draft7Validator; from referencing import Registry,Resource; p=Path(sys.argv[1])/'contracts/notary-case-drafting'; ss=[json.loads(f.read_text(encoding='utf-8')) for f in p.glob('*.schema.json')]; reg=Registry().with_resources([(s['$id'],Resource.from_contents(s)) for s in ss]); s=next(s for s in ss if s['$id'].endswith('/intake.schema.json')); Draft7Validator({'$ref':s['$id']+'#/definitions/result_data'},registry=reg).validate(json.load(sys.stdin))",root],{input:downloaded});
