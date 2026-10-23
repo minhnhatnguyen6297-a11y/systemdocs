@@ -148,9 +148,10 @@ Nhóm `[Người N - ...]` luôn theo dòng Stage đã lưu, không theo số gh
 ### 9.1. Dữ liệu vào
 
 - Người trong Stage đang sửa, gồm tên/ngày và dữ kiện hiện tại, không chỉ bản đã lưu.
-- `owner_row_id` của người để lại di sản trong Stage đang sửa.
+- `owner_row_id` của người để lại di sản trong Stage đang sửa (có thể chưa gán
+  khi Lưu hồ sơ — xem §6).
 - Node, `parentSlotIds`, `spouseSlotId`.
-- `ownPositions` và `receivePositions` theo vị trí tài sản 1..3.
+- `ownPositions` và `receivePositions` theo vị trí tài sản 1..5.
 - Ngày chết và các dữ kiện pháp lý đã được xác nhận.
 
 ### 9.2. Quy tắc chính

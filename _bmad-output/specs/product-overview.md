@@ -75,7 +75,12 @@ kể cả nhánh tạo mới với `draftId`/`idempotency_key` giữ nguyên khi
 **Bằng chứng vòng 2 ngày 22/10/2026 (lịch sử, `test_issue13_partial_draft.py`):**
 `workspace_create` hỗ trợ nháp ít dữ liệu (0 Người/Tài sản, tên/owner null);
 command này vẫn dành cho consumer khác, không phải đường ghi của Soạn hồ sơ.
-save_case/commit/convert vẫn strict. Nhãn dùng `draft`=Nháp, `done`=Đã lưu,
+Từ **23/10/2026**, Lưu hồ sơ cũng đi theo triết lý điền dần: không bắt
+≥1 Người/≥1 Tài sản, không bắt Chủ đất; Người chỉ cần họ tên, Tài sản chỉ cần
+số thửa + số tờ, chuỗi rỗng ghi null. Thiếu dữ kiện để engine tính vẫn lưu
+được ở trạng thái incomplete. Trần 5 tài sản; cụm đất không còn trần 20 và
+giá trị không hợp lệ được chuẩn hóa thay vì chặn. `commit_stage`/chuyển loại
+vẫn strict cho consumer khác. Nhãn dùng `draft`=Nháp, `done`=Đã lưu,
 độc lập chấm dirty. Resolver nguồn Done lưu gần nhất
 (`test_issue13_source_latest.py`) và Nhân bản
 (`test_issue13_workspace_duplicate.py`) đã triển khai;

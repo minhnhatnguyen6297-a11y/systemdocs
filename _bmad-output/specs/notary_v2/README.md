@@ -303,7 +303,7 @@ Pool = người trong Stage đang sửa − người đã gán trên node active
 
 Kéo người vào vị trí để gán; gỡ thẻ trả người về Pool nhưng không xóa Stage. Một người không xuất hiện ở nhiều vị trí xung đột. Xóa ở Stage dọn tham chiếu Diagram trong bản đang sửa ngay; chưa đổi DB đến khi Lưu hồ sơ thành công.
 
-Hai bên có 30 vị trí cố định: p1..p15 Bên A, p16..p30 Bên B. Giữ ghế trống; thả lên ghế có người thì hoán đổi, không dồn danh sách. Thừa kế biểu diễn cha/mẹ, vợ/chồng, con và nhánh thế vị; dấu Chủ/Nhận (sở hữu/nhận tài sản) chỉ thuộc Thừa kế, chọn theo vị trí tài sản 1..3; đổi thứ tự/xóa tài sản phải cảnh báo đổi nghĩa.
+Hai bên có 30 vị trí cố định: p1..p15 Bên A, p16..p30 Bên B. Giữ ghế trống; thả lên ghế có người thì hoán đổi, không dồn danh sách. Thừa kế biểu diễn cha/mẹ, vợ/chồng, con và nhánh thế vị; dấu Chủ/Nhận (sở hữu/nhận tài sản) chỉ thuộc Thừa kế, chọn theo vị trí tài sản 1..5; đổi thứ tự/xóa tài sản phải cảnh báo đổi nghĩa.
 
 Diagram là phần của trạng thái đang sửa chung. **Lưu hồ sơ** ghi Stage+meta+Diagram, cả ô đang sửa, trong một lượt trọn vẹn và chuyển draft→done; không chỉ lưu riêng Diagram. `saveDiagram` là API cho consumer khác, không phải đường ghi của Soạn hồ sơ. Xem cách tính gửi Diagram và Stage đang sửa cho Python, kể cả hồ sơ đã có ID; read-only, không ghi DB, không tính lại bằng JavaScript. Quan hệ sai/vòng lặp/người ngoài Stage bị chặn; cấu trúc hợp lệ nhưng thiếu dữ liệu vẫn cho lưu, hiện rõ phần còn thiếu. Lỗi giữ bản đang sửa và snapshot DB cũ; giữ revision/xung đột.
 

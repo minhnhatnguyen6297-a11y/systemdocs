@@ -1224,7 +1224,8 @@ Consumer (Electron main/renderer) PHẢI:
 | additive NAIA-9 | 04/10/2026 | Thêm command thứ mười `notary.address_lookup` (§14): tra cứu đơn vị hành chính đích theo địa chỉ nguồn + `source_date`/`target_date` đầy đủ; read-only, local-only trên ledger Bando đóng gói; `result.data.schema_version` = `notary.address-lookup.v1` — ngoại lệ rule §1 |
 | address-lookup v2 (APPROVED, triển khai TASK-3) | 05/10/2026 | TASK-2, Owner duyệt 05/10: thay v1 bằng `notary.address-lookup.v2` (§14) — payload `query`+`presentation`, bỏ ngày/tách xã-tỉnh/`coverage`/`partial`; result `found\|not_found\|too_many\|invalid_input\|reload_failed`. **Breaking**; runtime và schema v1 đã chuyển/xóa tại TASK-3. |
 | v2 Storage B vòng 1 (đang triển khai) | 22/10/2026 | Cutover tiền MVP không tương thích client cũ: rows case-owned là SOT, identity nullable khi thiếu neo, draft/done không khóa; thêm workspace_save_case nguyên tử (§13.19). Giữ validation create vòng 1; nới tên/tập rỗng/owner null thuộc vòng 2. Không proof BUILT. |
-| v2 Storage B vòng 2 (ĐÃ TRIỂN KHAI 22/10/2026) | 22/10/2026 | Thêm `workspace_source_latest` (§13.20: chọn case Done theo updated_at microsecond/id, Stage UUID mới + identity hint) và `workspace_duplicate` (§13.21: copy toàn bộ đã lưu, hash command+intent+source, draft/rev1 là chốt kỹ thuật chờ owner). Nới `workspace_create` cho nháp ít dữ liệu; save_case/commit/convert giữ strict. Proof: `test_issue13_source_latest.py`, `test_issue13_workspace_duplicate.py`, `test_issue13_partial_draft.py`, `test_issue13_storage_b_proof.py`. |
+| v2 Storage B vòng 2 (ĐÃ TRIỂN KHAI 22/10/2026) | 22/10/2026 | Thêm `workspace_source_latest` (§13.20: chọn case Done theo updated_at microsecond/id, Stage UUID mới + identity hint) và `workspace_duplicate` (§13.21: copy toàn bộ đã lưu, hash command+intent+source, draft/rev1 là chốt kỹ thuật chờ owner). Nới `workspace_create` cho nháp ít dữ liệu; save_case/commit/convert giữ strict (save_case nới tiếp 23/10/2026 — §13.19). Proof: `test_issue13_source_latest.py`, `test_issue13_workspace_duplicate.py`, `test_issue13_partial_draft.py`, `test_issue13_storage_b_proof.py`. |
+| v2 gate inventory S1–S7/S19 (owner) | 23/10/2026 | Đường Lưu phía server đi theo triết lý điền dần: save_case không bắt ≥1 Người/≥1 Tài sản (S1) và không bắt Chủ đất (S2); engine `invalid` chỉ vì thiếu dữ kiện (`missing_land_owner`/`invalid_death_date`) → `incomplete` trên đường Lưu (S3); Người chỉ bắt buộc họ tên, chuỗi rỗng → null (S4/S4d); Tài sản bắt buộc số thửa + số tờ, `ngay_cap` nhận chỉ-năm (S5b/S5c); cụm đất bỏ trần 20, alias mâu thuẫn ghi theo key mới, diện tích không parse → null (S6); trần 5 tài sản (S7); evaluate nháp không chặn field tùy chọn (S19). §4.1/§4.2/§4.3/§7.4/§7.5/§13.2/§13.3/§13.6/§13.16/§13.19. |
 | v2 G4 single-save (owner) | 23/10/2026 | Bỏ Cập nhật/Lưu nháp ở renderer; Stage/Pool/Diagram dùng chung bản đang sửa, baseline chỉ là lần lưu gần nhất; chỉ Lưu hồ sơ persist qua workspace_save_case. Không lưu ngầm khi rời/đóng, giữ canLeave/window-close và revision/conflict. API commit/create/diagram_save vẫn hỗ trợ consumer khác; Word saveCaseMeta giữ workspace_update. §13.2/§13.17–§13.19. |
 
 ---
@@ -1623,7 +1624,7 @@ Field-error code mới trong `stage_validation_error.details.field_errors[]`:
 
 | Code | Nghĩa |
 |---|---|
-| `asset_limit` | `stage.assets` > 3 (v2) |
+| `asset_limit` | `stage.assets` > 5 (v2, S7 23/10/2026) |
 | `people_limit` | `stage.people` > 30 với `case_type:two_party` |
 | `identity_hint` | `entity_id` gợi ý trên dòng mới không phải int dương hoặc không tồn tại đúng bảng; không âm thầm đổi sang null |
 
@@ -1798,7 +1799,8 @@ Producer v2 PHẢI (thêm vào §10):
 - [ ] Rows/đất case-owned là SOT; không upsert/fallback master hoặc persisted
       Stage JSON; cùng identity nhiều row không mất dữ kiện.
 - [ ] Tách validation theo ý định: `workspace_create` partial cho ≥0/tên
-      null/owner null; save_case mới + commit + convert giữ strict. Không
+      null/owner null; `workspace_save_case` cho ≥0/owner null với mức tối
+      thiểu họ tên + số thửa/số tờ; commit + convert giữ strict. Không
       biến incomplete thành invalid hoặc ngược lại.
 - [ ] `workspace_source_latest`: chỉ đọc case Done lưu gần nhất, không ghi
       DB; UUID v4 mới, owner remap, entity_id giữ nguyên; không trả
@@ -1848,15 +1850,16 @@ Consumer v2 PHẢI (thêm vào §10):
 yêu cầu đưa vào nhánh chính và đồng bộ tài liệu/code. Mục này thay các quy
 tắc MIN-140 ngày 29/09/2026 bị mâu thuẫn; không đổi envelope/schema version.
 
-- Người: họ tên non-empty ở save/commit strict; `workspace_create` nháp vòng 2
+- Người: họ tên non-empty ở save/commit; `workspace_create` nháp vòng 2
   cho `ho_ten=null`/absent (không chuỗi rỗng). Giới tính Nam/Nữ/null; ngày
   sinh/chết/cấp nhận YYYY-MM-DD, YYYY hoặc null; số giấy tờ/nơi cấp/địa chỉ/
-  quê quán/loại giấy tờ/nhãn địa chỉ nhận chuỗi hoặc null. Số giấy được trùng,
-  match tên+số theo §4.1.
+  quê quán/loại giấy tờ/nhãn địa chỉ nhận chuỗi hoặc null (chuỗi rỗng ghi
+  null). Số giấy được trùng, match tên+số theo §4.1.
 - Tài sản: serial là chuỗi nguyên văn tùy nguồn (Owner 06/10/2026 bỏ
   bắt buộc `[A-Z]{2}\d{6,8}` ở mọi tầng), **địa chỉ nullable**;
-  số thửa/số tờ và các trường còn lại nullable. Cụm đất có thể null/[];
-  mỗi cụm kiểm kiểu, không cho alias khác giá trị, tối đa 20 cụm.
+  số thửa/số tờ bắt buộc có nội dung, các trường còn lại nullable. Cụm đất
+  có thể null/[]; không còn trần 20 cụm, alias mâu thuẫn ghi theo key mới,
+  diện tích không parse được → null (S6).
 - Case B giữ serial nguyên văn tại row; identity lookup exact, thiếu neo null.
 - `thoi_han` lẻ bỏ khỏi form và payload renderer; dữ liệu lịch sử vẫn giữ
   để đối chiếu/cảnh báo. Không tự gán vào thời hạn từng cụm.
@@ -1864,7 +1867,8 @@ tắc MIN-140 ngày 29/09/2026 bị mâu thuẫn; không đổi envelope/schema 
 - Giữ nháp khi chuyển tab/lỗi; renderer kiểm khi Lưu hồ sơ. Giữ revision,
   owner khi owner được chỉ định/strict, giới hạn/row/FK/date; bỏ guard trùng
   shared identity. Done sửa được. Vòng 2: create nháp cho tập rỗng/tên null/
-  owner null; save_case mới và commit vẫn strict như trên.
+  owner null; save_case từ 23/10 cho tập rỗng/owner null (tối thiểu họ tên +
+  số thửa/tờ), commit vẫn strict như trên.
 
 ### 13.17 Nhập hợp đồng DOCX và mẫu gốc — additive NAIA-4 / MIN-139
 
@@ -2044,17 +2048,19 @@ Property/slot owner. Null meta ghi null; scalar absent giữ giá trị trước
 
 **Validation theo ý định (vòng 2):** `workspace_create` là **partial-create**
 — cho `people`/`assets` ≥0, `ho_ten=null`, owner inheritance absent/null;
-giữ kiểu ngày/Boolean, row ownership/FK, giới hạn 3 tài sản/20 cụm/
-30 Người two_party, và owner **non-null** sai → `workspace_owner_required`.
-`workspace_save_case` **case mới**, save_case/commit trên case đã có và
-convert_type vẫn **strict**: tên non-empty, owner inheritance hợp lệ,
-save_case mới ≥1 Người/≥1 Tài sản. Địa chỉ tài sản nullable ở mọi đường
+giữ kiểu ngày/Boolean, row ownership/FK, giới hạn 5 tài sản/30 Người
+two_party (không còn trần 20 cụm — S6), và owner **non-null** sai →
+`workspace_owner_required`. `workspace_save_case` từ 23/10/2026 đi theo
+đường điền dần (S1/S2): ≥0 Người/≥0 Tài sản, owner null, tối thiểu họ tên
++ số thửa/số tờ; `commit_stage` và convert_type vẫn **strict** (tên
+non-empty, owner inheritance hợp lệ). Địa chỉ tài sản nullable ở mọi đường
 (thiếu dữ kiện vẫn lưu, chuỗi rỗng ghi null). Row thiếu số giấy/serial
 rỗng hoặc toàn whitespace vẫn lưu với `entity_id=null`; dòng chỉ số/ngày
 lưu `ho_ten=null`, không chuỗi giả. Dòng mới có thể mang `entity_id`
 dương như gợi ý có kiểm neo (§4.1 mục 5). Nháp thiếu dữ liệu mở/sửa được
-nhưng phải bổ sung trước khi **Lưu hồ sơ** (hoặc API commit ở consumer khác);
-không có cờ partial cho save/commit và không biến incomplete thành invalid.
+và **Lưu hồ sơ** được ở mức tối thiểu (S1/S2); API commit của consumer
+khác vẫn có ngưỡng strict riêng; không có cờ partial và không biến
+incomplete thành invalid.
 
 **Payload `notary.workspace_save_case`:**
 
