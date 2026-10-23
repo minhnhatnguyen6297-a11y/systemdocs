@@ -123,14 +123,10 @@ const LAND_TYPE_CODES = ['ONT', 'ODT', 'CLN', 'NTS', 'LUC', 'BHK',
 const DT_ASSET_COL = 'application/x-assetcol';
 const DT_PERSON_ROW = 'application/x-personrow';
 
-// INTAKE_KIND_LABEL/OBS_STATE_LABEL khai báo trong intake-dialog.js
-// (load trước file này trong index.html) — script <script> thường share
-// global scope nên không được redeclare const trùng tên. Tên riêng +
-// typeof fallback giữ file require được độc lập trong node --test.
-const _OBS_STATE_LABEL =
-  (typeof OBS_STATE_LABEL !== 'undefined')
-    ? OBS_STATE_LABEL
-    : { observed: 'đọc được', normalized: 'đã chuẩn hóa', inferred: 'suy luận' };
+// INTAKE_KIND_LABEL khai báo trong intake-dialog.js (load trước file này
+// trong index.html) — script <script> thường share global scope nên không
+// được redeclare const trùng tên. Provenance (N1) không còn gắn hậu tố
+// lên nhãn hiển thị; dữ liệu provenance vẫn nằm trong record.
 
 // Dev flag: đặt window.G1_DEV = true trong DevTools để hiện mục debug
 // (mở fixture mock nhanh). Production không có input ID bằng tay.
@@ -366,9 +362,6 @@ function createNotaryModuleView(deps) {
 
   function buildCaseListPanel(onOpen, onNewDraft, onDuplicate) {
     const s = h('section', 'cd-panel');
-    s.append(h('p', 'muted',
-      'Danh sách hồ sơ từ engine nghiệp vụ — bấm vào hồ sơ để mở ' +
-      'workspace Soạn hồ sơ, hoặc Nhân bản để tạo bản sao đầy đủ.'));
     const row = h('div', 'toolbar');
     const q = h('input');
     q.type = 'search';
@@ -615,12 +608,6 @@ function createNotaryModuleView(deps) {
       !(s.capabilities.intake || []).length;
     intakeB.title = 'Nhập file/ảnh/tài liệu → gợi ý (chưa vào Stage)';
     bar.append(intakeB);
-    // Zalo: giữ nút visible + disabled theo bản mẫu — module Zalo tách
-    // repo (MIN-103), KHÔNG kéo engine vào lại.
-    const zalo = btn('Zalo', '', null);
-    zalo.disabled = true;
-    zalo.title = 'Zalo — chưa bật trong phiên bản này';
-    bar.append(zalo);
     bar.append(h('span', 'cd-spacer', ''));
     // Pill trạng thái chỉ khi thật sự có (locked/unsupported/stale) —
     // conflict đã có dialog riêng.
@@ -1665,7 +1652,7 @@ function createNotaryModuleView(deps) {
       }
       const tdh = h('td', 'cd-drag-col');
       const grip = dragHandle(
-        `kéo đổi thứ tự dòng ${ri + 1} (${p.ho_ten || 'chưa tên'})`);
+        `kéo đổi thứ tự dòng ${ri + 1} (${p.ho_ten || '(chưa có tên)'})`);
       grip.draggable = !ro;
       grip.dataset.fid = `pdrag:${p.row_id}`;
       grip.addEventListener('dragstart', (e) => {
@@ -1753,8 +1740,6 @@ function createNotaryModuleView(deps) {
               ? 'Nơi cấp giấy khai tử' : 'Nơi cấp giấy tờ';
             const issuer = h('input', 'cd-cell');
             issuer.value = p.noi_cap || '';
-            issuer.placeholder = isDeathCert
-              ? 'UBND trên giấy khai tử' : 'Cơ quan cấp giấy tờ';
             issuer.disabled = ro;
             issuer.dataset.fid = `p:${p.row_id}:noi_cap`;
             issuer.setAttribute('aria-label', `${issuerLabel} — ${p.ho_ten || (p.ngay_chet ? 'người đã mất' : 'người')}`);
@@ -1837,7 +1822,6 @@ function createNotaryModuleView(deps) {
     r1.append(h('label', 'cd-casemeta-label', 'Nơi niêm yết'));
     const ny = h('input', 'cd-cell cd-meta-input');
     ny.value = c.noi_niem_yet || '';
-    ny.placeholder = 'Chưa xác định';
     ny.disabled = ro;
     ny.setAttribute('aria-label', 'Nơi niêm yết');
     ny.dataset.fid = 'meta:noi_niem_yet';
@@ -1873,7 +1857,6 @@ function createNotaryModuleView(deps) {
     const uq = h('input', 'cd-cell cd-meta-input');
     uq.value = c.nguoi_nhan_uy_quyen || '';
     uq.setAttribute('list', UQ_DATALIST_ID);
-    uq.placeholder = 'Chọn từ danh bạ hoặc nhập tên';
     uq.disabled = ro;
     uq.setAttribute('aria-label', 'Người nhận ủy quyền');
     uq.dataset.fid = 'meta:nguoi_nhan_uy_quyen';
@@ -1916,7 +1899,6 @@ function createNotaryModuleView(deps) {
     r3.append(h('label', 'cd-casemeta-label', 'Nội dung việc'));
     const nd = h('input', 'cd-cell cd-meta-input');
     nd.value = c.noi_dung_viec || '';
-    nd.placeholder = 'VD: Khai nhận di sản thừa kế…';
     nd.disabled = ro;
     nd.setAttribute('aria-label', 'Nội dung việc');
     nd.dataset.fid = 'meta:noi_dung_viec';
@@ -1965,10 +1947,6 @@ function createNotaryModuleView(deps) {
     aHead.append(aTools);
     ac.append(aHead);
     const aBody = h('div', 'card-body cd-stage-body');
-    const aErr = cardLevelErrors('assets');
-    if (aErr) aBody.append(aErr);
-    const aHidden = hiddenAssetFieldErrors();
-    if (aHidden) aBody.append(aHidden);
     if (!s.stage.assets.length) {
       const e = face(L.faceEmpty('Chưa có tài sản.'));
       const b = btn('+ Thêm tài sản đầu tiên', '', () => model.addAsset());
@@ -2004,12 +1982,6 @@ function createNotaryModuleView(deps) {
     pHead.append(pTools);
     pc.append(pHead);
     const pBody = h('div', 'card-body cd-stage-body');
-    for (const f of ['people', 'owner_row_id']) {
-      const e = cardLevelErrors(f);
-      if (e) pBody.append(e);
-    }
-    const hidden = hiddenPersonFieldErrors();
-    if (hidden) pBody.append(hidden);
     if (!s.stage.people.length) {
       const e = face(L.faceEmpty('Chưa có người nào trong Stage.'));
       const b = btn('+ Thêm người đầu tiên', '', () => model.addPerson());
@@ -2052,9 +2024,7 @@ function createNotaryModuleView(deps) {
       for (const [k, f] of Object.entries(sug.fields || {})) {
         const v = f && (f.normalized_value != null
           ? f.normalized_value : f.raw_value);
-        const st = f && f.observation_state;
-        fieldBits.push(`${k}: ${v == null ? '—' : v}` +
-          (st ? ` (${_OBS_STATE_LABEL[st] || st})` : ''));
+        fieldBits.push(`${k}: ${v == null ? '—' : v}`);
       }
       head.append(h('span', 'cd-suggest-text', fieldBits.join(' · ')));
       card.append(head);

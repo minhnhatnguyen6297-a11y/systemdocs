@@ -470,7 +470,7 @@ function createWordDialog(ctx) {
             cb.checked = !!proposal.selected;
             cb.onchange = () => { if (savingMeta || exporting || scanning) return; mappingDirty = true; refreshScanLock(); };
             cb.setAttribute('aria-label', `${proposal.raw_snippet} thành ${proposal.slot}`);
-            lab.append(cb, h('span', '', `${proposal.raw_snippet} → ${proposal.row_label} (${proposal.row_id}) · ${proposal.slot} → ${proposal.value}`));
+            lab.append(cb, h('span', '', `${proposal.raw_snippet} → ${proposal.row_label} · ${proposal.slot} → ${proposal.value}`));
             if (!proposal.supported) lab.append(h('span', 'error', proposal.reason || 'Vùng Word chưa hỗ trợ sửa'));
             mappingBox.append(lab);
             choices.push({ proposal, cb });

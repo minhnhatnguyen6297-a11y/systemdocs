@@ -22,9 +22,6 @@ const INTAKE_EXT_KIND = {
 const INTAKE_KIND_LABEL = {
   image: 'ảnh', pdf: 'PDF', docx: 'Word', xlsx: 'Excel', text: 'văn bản',
 };
-const OBS_STATE_LABEL = {
-  observed: 'đọc được', normalized: 'đã chuẩn hóa', inferred: 'suy luận',
-};
 const INTAKE_FILTERS = [
   { name: 'Tài liệu/Giấy tờ',
     extensions: ['jpg', 'jpeg', 'png', 'pdf', 'docx', 'xlsx'] },
@@ -139,9 +136,7 @@ function createIntakeDialog(ctx) {
       for (const [k, f] of Object.entries(sug.fields || {})) {
         const v = f && (f.normalized_value != null
           ? f.normalized_value : f.raw_value);
-        const st = f && f.observation_state;
-        bits.push(`${INTAKE_FIELD_LABEL[k] || k}: ${k === 'land_rows' ? 'xem từng dòng bên dưới' : v == null ? '—' : v}` +
-          (st ? ` (${OBS_STATE_LABEL[st] || st})` : ''));
+        bits.push(`${INTAKE_FIELD_LABEL[k] || k}: ${k === 'land_rows' ? 'xem từng dòng bên dưới' : v == null ? '—' : v}`);
       }
       head.append(h('span', 'cd-suggest-text', bits.join(' · ')));
       card.append(head);
@@ -164,7 +159,6 @@ function createIntakeDialog(ctx) {
           };
           function renderRows() {
             rowsBox.innerHTML = '';
-            rowsBox.append(h('div', 'muted', 'Cụm đất: mỗi dòng giữ riêng loại đất, diện tích và thời hạn.'));
             for (const row of rows) {
               const rowEl = h('div', 'cd-check-row');
               for (const [name, label] of [['loai_dat', 'Loại đất'], ['dien_tich', 'Diện tích'], ['thoi_han', 'Thời hạn']]) {
@@ -208,8 +202,6 @@ function createIntakeDialog(ctx) {
         input.type = 'text';
         input.value = field.review_input != null ? String(field.review_input) : field.normalized_value == null ? '' : String(field.normalized_value);
         input.setAttribute('aria-label', `Kiểm tra ${INTAKE_FIELD_LABEL[key] || key}`);
-        input.placeholder = 'Thiếu hoặc chưa chắc — nhập giá trị đã kiểm tra';
-        if (key.startsWith('ngay_')) input.placeholder = 'Năm hoặc ngày dạng 2026-10-04';
         const reviewError = h('span', 'error', field.review_error || '');
         const review = () => {
           const valid = model.reviewSuggestion(sug.suggestion_id, key, input.value);
@@ -285,8 +277,6 @@ function createIntakeDialog(ctx) {
       head.append(mx);
       box.append(head);
       const body = h('div', 'modal-body');
-      body.append(h('div', 'muted',
-        'Mọi kết quả là gợi ý chờ kiểm tra — không tự ghi vào hồ sơ.'));
 
       // Drop-zone: file tha vao di qua registerDroppedFile (main cap token)
       // — khong bao gio doc path trong renderer.
@@ -430,10 +420,8 @@ function createIntakeDialog(ctx) {
               anchor.click();
               URL.revokeObjectURL(url);
             }));
-            review.append(h('div', 'muted', 'JSON giữ kết quả phân tích ban đầu; các sửa đổi được lưu vào Stage.'));
             review.append(h('div', 'cd-suggest-title',
-              `${news.length} gợi ý mới — xử lý tại đây hoặc đóng ` +
-              'và xử lý trong khay gợi ý dưới Stage.'));
+              `${news.length} gợi ý mới`));
             const pendingIds = new Set(reviewCards.keys());
             for (const s2 of model.state.suggestions || []) {
               if (!pendingIds.has(s2.suggestion_id)) review.append(reviewCardEl(s2));

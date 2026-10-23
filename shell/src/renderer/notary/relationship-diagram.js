@@ -351,10 +351,11 @@ function createDiagramPane(ctx) {
 
   function personName(rowId) {
     const p = personRow(rowId);
-    return p ? (p.ho_ten || '(không tên)') : '—';
+    return p ? (p.ho_ten || EMPTY_PERSON_NAME) : '—';
   }
 
-  // Nam sinh–mat tu truong Stage (YYYY-MM-DD | YYYY) — chi lay 4 so nam.
+  // N5: còn sống chỉ hiện năm sinh; có năm mất hiện "sinh – mất".
+  // Bỏ dấu "…" lửng của dạng cũ.
   function yearOf(v) {
     const m = /\d{4}/.exec(v || '');
     return m ? m[0] : null;
@@ -364,8 +365,8 @@ function createDiagramPane(ctx) {
     const p = personRow(rowId);
     if (!p) return null;
     const b = yearOf(p.ngay_sinh), d = yearOf(p.ngay_chet);
-    if (!b && !d) return null;
-    return `${b || '…'} – ${d || '…'}`;
+    if (d) return b ? `${b} – ${d}` : d;
+    return b || null;
   }
 
   function liveNodes() {
@@ -427,7 +428,7 @@ function createDiagramPane(ctx) {
     const card = h('div', 'cd-pool-card');
     const canDrag = model.canWrite();
     card.draggable = canDrag;
-    const label = row.ho_ten || '(chưa đặt tên)';
+    const label = row.ho_ten || EMPTY_PERSON_NAME;
     const setPayload = (e) => {
       e.dataTransfer.setData('text/plain',
         JSON.stringify({ kind: 'person', row_id: row.row_id }));
@@ -478,7 +479,7 @@ function createDiagramPane(ctx) {
     openModal((box, close) => {
       const head = h('div', 'modal-head');
       head.append(h('h2', 'modal-title',
-        `Gán vị trí — ${row.ho_ten || '(chưa tên)'}`));
+        `Gán vị trí — ${row.ho_ten || EMPTY_PERSON_NAME}`));
       const x = h('button', 'modal-close', '×');
       x.type = 'button';
       x.setAttribute('aria-label', 'Đóng');
@@ -644,18 +645,6 @@ function createDiagramPane(ctx) {
 
   // ---------- Diagram ----------
 
-  // Allocation badge: chi DOC render_model cua engine — displayPercent la
-  // chuoi engine da tinh, JS khong tu tinh phan tram (contract §10).
-  function allocBadgeEl(personId) {
-    const rm = model.state.renderModel;
-    const a = rm && rm.allocations && rm.allocations[personId];
-    if (!a) return null;
-    const b = h('span', 'cd-badge cd-badge-alloc',
-      `${a.displayPercent ?? '—'}%`);
-    b.title = `phần cuối ${a.finalShare ?? '—'} (engine)`;
-    return b;
-  }
-
   // Drop target chung: nhan pool card hoac node co nguoi keo vao —
   // movePerson bao trum move/swap (§13.5 Q9) cho ca hai domain.
   function wirePersonDrop(el, nodeId) {
@@ -690,8 +679,7 @@ function createDiagramPane(ctx) {
     const label = (id) => {
       const n = nodes.get(id);
       if (!n) return id;
-      return `${n.personId ? personName(n.personId) : 'Ô trống'} — ${slotTag(n)}` +
-        (n.deleted ? ' (đã gỡ)' : '');
+      return `${n.personId ? personName(n.personId) : 'Ô trống'} — ${slotTag(n)}`;
     };
     openModal((box, close) => {
       const head = h('div', 'modal-head');
@@ -763,7 +751,7 @@ function createDiagramPane(ctx) {
       // aria-label/tooltip (screen reader + ban phim qua menu Gán vị trí).
       card.classList.add('cd-node-empty');
       const what = role || slotTag(n);
-      const label = `Ô trống: ${what} — thả người từ Pool vào đây`;
+      const label = `Ô trống: ${what}`;
       card.setAttribute('aria-label', label);
       card.title = label;
       acts.append(del);
@@ -772,7 +760,7 @@ function createDiagramPane(ctx) {
       return card;
     }
 
-    const name = (p && p.ho_ten) || '(chưa đặt tên)';
+    const name = (p && p.ho_ten) || EMPTY_PERSON_NAME;
     card.setAttribute('aria-label', role ? `${name} — ${role}` : name);
     if (role) card.title = role;
     const nm = h('span', 'cd-node-name', name);
@@ -797,8 +785,6 @@ function createDiagramPane(ctx) {
 
     const meta = h('div', 'cd-node-meta');
     meta.append(h('span', '', personYears(n.personId) || '—'));
-    const alloc = allocBadgeEl(n.personId);
-    if (alloc) meta.append(alloc);
     card.append(meta);
 
     // 2 hang chip so (§13.4): "Chủ" = ownPositions (chủ đất), "Nhận" =
@@ -864,7 +850,7 @@ function createDiagramPane(ctx) {
     if (p) {
       // Design P7: card hai ben chi TEN + so cho — khong ngay thang/
       // vai tro/chip thua ke (§13.5).
-      const nm = h('span', 'cd-tp-nm', p.ho_ten || '(chưa đặt tên)');
+      const nm = h('span', 'cd-tp-nm', p.ho_ten || EMPTY_PERSON_NAME);
       nm.title = p.ho_ten || '';
       slot.append(nm);
       // Nut hien khi hover/focus (MIN-133) — van trong tab order.
@@ -895,7 +881,7 @@ function createDiagramPane(ctx) {
     } else {
       // MIN-133 D7: cho trong gon — o viền dut nho, khong hint chu;
       // mo ta cho screen reader/tooltip.
-      const label = `Chỗ ${num} trống — thả người từ Pool vào đây`;
+      const label = `Chỗ ${num} trống`;
       slot.setAttribute('aria-label', label);
       slot.title = label;
       slot.append(h('span', 'cd-tp-empty', ''));
@@ -961,10 +947,7 @@ function createDiagramPane(ctx) {
     if (!liveNodes().length && !tp) {
       // Canvas rong chi xay ra khi user xoa het o — khoi phuc lai o
       // 'owner' khoi tao (seed 1 node MIN-136), khong phai them moi.
-      const e = face(L.faceEmpty(
-        'Sơ đồ trống.',
-        'Khôi phục ô khởi tạo rồi thả người để lại tài sản vào — ' +
-        'các ô sau được sơ đồ sinh tự động theo quy tắc thừa kế.'));
+      const e = face(L.faceEmpty('Sơ đồ trống.'));
       if (model.canWrite()) {
         e.append(btn('Khôi phục ô khởi tạo', 'secondary', () => {
           if (model.addSlot('owner')) scheduleEvaluate();
@@ -1070,8 +1053,7 @@ function createDiagramPane(ctx) {
     const rm = model.state.renderModel;
     const box = h('div', 'cd-calc');
     if (!rm) {
-      box.append(face(L.faceEmpty(
-        'Chưa có kết quả tính — gán người vào sơ đồ để engine đánh giá.')));
+      box.append(face(L.faceEmpty('Chưa có kết quả tính.')));
       return box;
     }
     const statusLabel = CALC_STATUS_LABEL[rm.status] || rm.status;
@@ -1254,14 +1236,12 @@ function createDiagramPane(ctx) {
       title.textContent = `Pool (${poolPeople.length})`;
       const pp = poolPeople.filter((r) => poolMatch(r, poolQuery));
       if (!(model.state.stage.people || []).length) {
-        box.append(face(L.faceEmpty(
-          'Chưa có người — thêm ở bảng Người rồi kéo vào sơ đồ.')));
+        box.append(face(L.faceEmpty('Chưa có người.')));
         return;
       }
       if (!pp.length) {
         box.append(face(L.faceEmpty(
-          poolQuery ? 'Không khớp bộ lọc — chỉ lọc hiển thị.'
-                    : 'Pool trống — mọi người đã được gán.')));
+          poolQuery ? 'Không khớp bộ lọc.' : 'Pool trống.')));
         return;
       }
       // Ten trung: dong phu phan biet (sinh/CCCD) theo ban mau — khong

@@ -998,3 +998,59 @@ test('removed default child slot stays tombstoned; new required slot can assign 
   assert.equal(nodes.find(n => n.id === 'child_owner').deleted, true);
   await new Promise(resolve => setTimeout(resolve, 650));
 });
+
+// ---------- R16/N2/N3/N5/N6: nhãn hiển thị tối giản ----------
+
+test('N3/N5/N6: tên trống một nhãn, năm sống chỉ năm sinh, không badge %', async () => {
+  const people = [
+    { row_id: 'c1', ho_ten: 'Người Đã Lưu', ngay_sinh: '1955-01-01',
+      ngay_chet: '2020-05-10' },
+    { row_id: 'c2', ho_ten: 'Vợ Hai', ngay_sinh: '1960' },
+    { row_id: 'c4', ho_ten: '', ngay_sinh: null },
+  ];
+  const { view } = await build(test, { mode: 'case', seed: {
+    people, assets: [{ row_id: 'a1', so_serial: 'S1' }],
+    nodes: seedSlots().map((n) =>
+      n.id === 'father' ? { ...n, personId: 'c1' }
+        : n.id === 'spouse' ? { ...n, personId: 'c2' } : n) } });
+  const father = collect(view.el, (e) => e.dataset.nodeId === 'father')[0];
+  const fatherMeta = collect(father,
+    (e) => e.classList.contains('cd-node-meta'))[0];
+  assert.equal(fatherMeta.textContent, '1955 – 2020');
+  const spouse = collect(view.el, (e) => e.dataset.nodeId === 'spouse')[0];
+  const spouseMeta = collect(spouse,
+    (e) => e.classList.contains('cd-node-meta'))[0];
+  assert.equal(spouseMeta.textContent, '1960',
+    'còn sống chỉ hiện năm sinh, không "…"');
+  assert.equal(byCls(view.el, 'cd-badge-alloc').length, 0,
+    'N6: không còn badge % trên node');
+  // N3: người chưa có tên trong Pool dùng đúng một nhãn.
+  const pool = byCls(view.el, 'cd-pool')[0];
+  assert.ok(/\(chưa có tên\)/.test(pool.textContent),
+    'Pool phải dùng nhãn tên trống thống nhất');
+  // R16: title ô trống không còn câu dạy thả người.
+  const empty = byCls(view.el, 'cd-node-empty')[0];
+  assert.ok(empty);
+  assert.doesNotMatch(empty.getAttribute('aria-label'),
+    /thả người từ Pool/);
+});
+
+test('N2: danh sách gỡ nhánh không gắn hậu tố "(đã gỡ)"', async () => {
+  const people = [
+    { row_id: 'c1', ho_ten: 'Người Một', ngay_sinh: '1950' },
+    { row_id: 'c2', ho_ten: 'Người Hai', ngay_sinh: '1960' },
+  ];
+  const nodes = seedSlots().map((n) =>
+    n.id === 'father' ? { ...n, personId: 'c1' }
+      : n.id === 'spouse' ? { ...n, personId: 'c2' } : n);
+  // Node đã gỡ từ trước vẫn tham chiếu quan hệ → không được gắn hậu tố.
+  nodes.push({ id: 'ghost', personId: null, parentSlotIds: [],
+               spouseSlotId: 'father', deleted: true });
+  const { view } = await build(test, { mode: 'case', seed: {
+    people, assets: [{ row_id: 'a1' }], nodes } });
+  const card = collect(view.el, (e) => e.dataset.nodeId === 'father')[0];
+  findBtns(card, '×')[0].click();
+  const modal = byCls(view.el, 'modal')[0];
+  assert.ok(modal);
+  assert.doesNotMatch(modal.textContent, /\(đã gỡ\)/);
+});

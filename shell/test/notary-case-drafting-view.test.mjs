@@ -112,13 +112,12 @@ function seedExistingCase(model) {
 
 // ---------- action bar ----------
 
-test('action bar: Zalo visible + disabled; Nhập file/loại việc đủ; không nút lưu cũ',
+test('action bar: R15 không nút Zalo chết; Nhập file đủ; loại sơ đồ ở header Sơ đồ',
   async () => {
     const { view } = await build(test, { draft: true });
     const btns = collect(view.el, (e) => e.tagName === 'BUTTON');
-    const zalo = btns.find((b) => b.textContent === 'Zalo');
-    assert.ok(zalo, 'thiếu nút Zalo — phải visible, không ẩn');
-    assert.equal(zalo.disabled, true, 'Zalo phải disabled');
+    assert.equal(btns.filter((b) => b.textContent === 'Zalo').length, 0,
+      'R15: không còn nút Zalo disable thường trực');
     assert.ok(btns.some((b) => b.textContent === 'Nhập file'));
     // Một nguồn lưu duy nhất: Lưu hồ sơ trên card Sơ đồ — không còn
     // Lưu nháp/Cập nhật trên thanh trên (kể cả nháp mới).
@@ -461,10 +460,9 @@ test('Pool = Stage đang sửa − đã gán; người mới/tên vừa sửa c�
 
 test('MIN-136: Pool nháp mới lấy stage.people — thả được ngay chưa lưu', async () => {
   const { model, view } = await build(test);
-  // Stage trong → huong dan them nguoi (khong phai "Cap nhat truoc"
-  // vi nhap moi khong co gi de cap nhat).
+  // Stage trong → Pool trong (R16: không còn câu dạy thao tác).
   let pane = collect(view.el, (e) => e.classList.contains('cd-pool'))[0];
-  assert.match(pane.textContent, /Chưa có người — thêm ở bảng Người/);
+  assert.match(pane.textContent, /Chưa có người\./);
   // Them nguoi vao stage nhap → xuat hien trong Pool ngay.
   model.addPerson();
   model.state.stage.people[0].ho_ten = 'Người Nháp Mới';
