@@ -127,9 +127,15 @@ test('action bar: Zalo visible + disabled; Nhập file/loại việc đủ; khô
     assert.equal(findBtns(view.el, 'Lưu nháp').length, 0);
     assert.equal(findBtns(view.el, 'Cập nhật').length, 0);
     assert.equal(findBtns(view.el, 'Lưu hồ sơ').length, 1);
-    assert.ok(collect(view.el, (e) =>
+    // R7: loại sơ đồ nằm trong header vùng Sơ đồ, không ở thanh trên.
+    const sel = collect(view.el, (e) =>
       e.tagName === 'SELECT' &&
-      e.getAttribute('aria-label') === 'Loại việc').length === 1);
+      e.getAttribute('aria-label') === 'Loại sơ đồ')[0];
+    assert.ok(sel, 'thiếu select Loại sơ đồ ở header vùng Sơ đồ');
+    assert.ok(sel.closest('.cd-rel-card'), 'select phải nằm trong card Sơ đồ');
+    assert.equal(collect(topbar(view.el), (e) =>
+      e.tagName === 'SELECT' &&
+      e.getAttribute('aria-label') === 'Loại việc').length, 0);
   });
 
 test('action bar: case thật — chỉ một Lưu hồ sơ trên card Sơ đồ, thanh trên không nút lưu',
@@ -689,12 +695,13 @@ test('MIN-133: tab Tổng quan — ẩn phần hành động của thanh trên',
   assert.equal(findBtns(view.el, 'Lưu hồ sơ').length, 1);
 });
 
-test('MIN-133: đổi Loại việc trên thanh trên → Stage dựng lại ngay, select giữ focus', async () => {
+test('R7: đổi Loại sơ đồ ở header vùng Sơ đồ → Stage dựng lại ngay, giữ focus', async () => {
   const { model, view, document } = await build(test, { draft: true });
   model.addPerson();
-  const sel = collect(topbar(view.el), (e) =>
-    e.tagName === 'SELECT' && e.classList.contains('cd-case-type'))[0];
-  assert.ok(sel, 'thiếu select cd-case-type');
+  const sel = collect(view.el, (e) =>
+    e.tagName === 'SELECT' && e.getAttribute('aria-label') === 'Loại sơ đồ')[0];
+  assert.ok(sel, 'thiếu select Loại sơ đồ');
+  assert.ok(sel.closest('.cd-rel-card'), 'select phải nằm trong card Sơ đồ');
   sel.focus();
   sel.value = 'two_party';
   sel.onchange();
@@ -703,9 +710,11 @@ test('MIN-133: đổi Loại việc trên thanh trên → Stage dựng lại nga
   assert.equal(collect(view.el,
     (e) => e.classList.contains('cd-tp-slot')).length, 30,
     'đổi sang Hai bên mà sơ đồ không dựng lại');
-  // Select đang focus không bị thay node (dropdown không đóng).
-  assert.ok(sel.isConnected);
-  assert.equal(document.activeElement, sel);
+  // Focus quay về cùng điều khiển (data-fid restore) sau rebuild.
+  const again = collect(view.el, (e) =>
+    e.tagName === 'SELECT' && e.getAttribute('aria-label') === 'Loại sơ đồ')[0];
+  assert.ok(again && again.isConnected);
+  assert.equal(document.activeElement, again, 'mất focus sau khi đổi loại');
 });
 
 test('MIN-133 D2: không card Thông tin hồ sơ; Lưu hồ sơ tạo mới gửi meta mặc định đủ',
@@ -2134,30 +2143,58 @@ test('disposed Word origin cannot open full over reopened Word; disposed Copy no
   } finally { delete globalThis.navigator; }
 });
 
-test('saved conversion requires explicit document and loss acknowledgement; cancel writes nothing', async () => {
+test('R7 convert: dialog đúng 3 hạng mục; huỷ không ghi gì', async () => {
   const {view,calls} = await build(test,{draft:false});
-  findBtns(view.el,'Đổi loại')[0].onclick();
-  const select = collect(view.el,e=>e.tagName==='SELECT' && e.getAttribute('aria-label')==='Văn bản mới')[0];
-  const apply = findBtns(view.el,'Áp dụng')[0];
-  const check = collect(view.el,e=>e.tagName==='INPUT' && e.type==='checkbox').at(-1);
+  const typeSel = collect(view.el, (e) => e.tagName === 'SELECT' &&
+    e.getAttribute('aria-label') === 'Loại sơ đồ')[0];
+  typeSel.value = 'two_party';
+  typeSel.onchange();
+  const dialog = collect(view.el, (e) => e.classList.contains('modal'))[0];
+  assert.ok(dialog, 'không mở dialog đổi loại');
+  const select = collect(dialog,e=>e.tagName==='SELECT' && e.getAttribute('aria-label')==='Văn bản mới')[0];
+  const apply = findBtns(dialog,'Áp dụng')[0];
+  const check = collect(dialog,e=>e.tagName==='INPUT' && e.type==='checkbox')[0];
+  // (2) Người để lại chỉ xuất hiện khi đích là thừa kế (đây là Hai bên).
+  assert.equal(collect(dialog,e=>e.tagName==='SELECT' &&
+    e.getAttribute('aria-label')==='Người để lại').length, 0);
+  // Không còn câu chữ/banner cũ trong dialog.
+  assert.doesNotMatch(dialog.textContent, /Xóa toàn bộ gán ghế/);
+  assert.doesNotMatch(dialog.textContent, /bấm Lưu hồ sơ trước/);
   assert.equal(select.value,'');
   assert.equal(apply.disabled,true);
   select.value='tang_cho';select.onchange();
   assert.equal(apply.disabled,true);
   check.checked=true;check.onchange();
   assert.equal(apply.disabled,false);
-  findBtns(view.el,'Hủy')[0].onclick();
+  findBtns(dialog,'Hủy')[0].onclick();
   assert.equal(calls.some(([c])=>c==='notary.workspace_convert_type'),false);
 });
 
-test('conversion dirty Stage explains existing save action without autosave or discard', async () => {
-  const {view,model,calls} = await build(test,{draft:false});
+test('R7 convert khi dirty: không bị chặn "Lưu trước", buffer Stage đi cùng hành động', async () => {
+  const respond = saveCaseRespond();
+  const {view,model,calls} = await build(test,{draft:false,respond});
   model.updatePersonField('c1','ho_ten','Chữ nháp cần giữ');
-  findBtns(view.el,'Đổi loại')[0].onclick();
-  assert.equal(findBtns(view.el,'Áp dụng').length,0);
-  assert.equal(model.state.stage.people[0].ho_ten,'Chữ nháp cần giữ');
-  assert.equal(model.state.stageDirty,true);
-  assert.equal(calls.some(([c])=>['notary.workspace_convert_type','notary.workspace_commit_stage'].includes(c)),false);
+  const typeSel = collect(view.el, (e) => e.tagName === 'SELECT' &&
+    e.getAttribute('aria-label') === 'Loại sơ đồ')[0];
+  typeSel.value = 'two_party';
+  typeSel.onchange();
+  const dialog = collect(view.el, (e) => e.classList.contains('modal'))[0];
+  assert.ok(dialog, 'dirty Stage vẫn phải mở được dialog đổi loại');
+  const select = collect(dialog,e=>e.tagName==='SELECT' && e.getAttribute('aria-label')==='Văn bản mới')[0];
+  const check = collect(dialog,e=>e.tagName==='INPUT' && e.type==='checkbox')[0];
+  select.value='dat_coc';select.onchange();
+  check.checked=true;check.onchange();
+  await findBtns(dialog,'Áp dụng')[0].onclick();
+  const saveCall = calls.find(([c])=>c==='notary.workspace_save_case');
+  assert.ok(saveCall, 'buffer Stage phải được ghi trước khi convert');
+  assert.equal(saveCall[1].stage.people.find(p=>p.row_id==='c1').ho_ten,
+    'Chữ nháp cần giữ', 'mất chữ đang sửa khi đổi loại');
+  const convert = calls.find(([c])=>c==='notary.workspace_convert_type');
+  assert.ok(convert, 'phải gọi convert');
+  assert.equal(convert[1].case_type, 'two_party');
+  assert.equal(convert[1].document_type, 'dat_coc');
+  assert.equal(convert[1].confirm_diagram_reset, true);
+  assert.ok(!calls.some(([c])=>c==='notary.workspace_commit_stage'));
 });
 
 // ---------- issue 13: Lưu hồ sơ = workspace_save_case ----------

@@ -872,16 +872,23 @@ function createModel(deps) {
         (state.committedCaseInfo[key] ?? null));
     }
     if (typeof d.revision === 'number') state.revision = d.revision;
-    state.notice = 'Đã lưu thông tin hồ sơ';
     emit();
     return r;
   }
 
+  // R7: không còn cửa "bắt Lưu trước". Buffer Stage/meta đang sửa được
+  // ghi trong CÙNG hành động (workspace_save_case) trước khi convert, để
+  // không mất chữ người dùng vừa nhập; xung đột revision thật vẫn đi qua
+  // cơ chế R8 (conflict dialog) như mọi lần ghi.
   async function convertCaseType(conversion) {
     if (!canWrite() || state.caseId == null || state.busy ||
-        state.stageDirty || state.metaDirty || state.conflict || state.stale) {
+        state.conflict || state.stale) {
       return { ok: false, error: errObj('validation_error',
-        'Hãy Lưu hồ sơ và xử lý xung đột trước khi đổi loại.') };
+        'Hãy xử lý xung đột trước khi đổi loại.') };
+    }
+    if (state.stageDirty || state.metaDirty) {
+      const saved = await saveCase();
+      if (!saved.ok) return saved;
     }
     const s = session;
     state.busy = 'notary.workspace_convert_type';

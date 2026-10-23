@@ -3298,10 +3298,10 @@ test('đợt3 createUqCustomer: tao danh ba moi → chon lam nguoi nhan UQ', asy
   assert.equal(client.calls.length, before);
 });
 
-test('saved conversion preserves Diagram draft on errors and blocks dirty Stage without write', async () => {
+test('saved conversion: dirty Stage được ghi cùng hành động, không bị chặn "Lưu trước"', async () => {
   const { model, client } = makeModel(seedCases('ready'));
   await model.openCase(42);
-  model.state.diagram.nodes[0].hidden = true;
+  model.state.diagram.nodes.find((n) => n.id === 'child_2').hidden = true;
   model.state.diagramDirty = true;
   const before = structuredClone(model.state.diagram);
   const original = client.run.bind(client);
@@ -3313,15 +3313,22 @@ test('saved conversion preserves Diagram draft on errors and blocks dirty Stage 
   };
   model.updatePersonField(model.state.stage.people[0].row_id, 'ho_ten', 'Chữ đang sửa');
   const request = {case_type:'two_party',document_type:'dat_coc',confirm_diagram_reset:true};
-  assert.equal((await model.convertCaseType(request)).ok, false);
-  assert.equal(writes, 0);
-  assert.equal(model.state.stage.people[0].ho_ten, 'Chữ đang sửa');
-  model.state.stageDirty = false;
-  assert.equal((await model.convertCaseType(request)).ok, false);
-  assert.equal(writes, 1);
+  // R7: buffer Stage đang sửa không chặn convert — được ghi trước trong
+  // cùng hành động rồi mới gọi convert (convert lỗi conflict thật).
+  const conv = await model.convertCaseType(request);
+  assert.equal(conv.ok, false);
+  assert.equal(writes, 1, 'convert vẫn được gọi sau khi ghi buffer');
+  const saveCall = client.calls.find(
+    (c) => c.command === 'notary.workspace_save_case');
+  assert.ok(saveCall, 'buffer Stage phải được ghi trước khi convert');
+  assert.equal(model.state.stage.people[0].ho_ten, 'Chữ đang sửa',
+    'chữ đang sửa không bị mất');
+  assert.equal(model.state.stageDirty, false);
   assert.deepEqual(model.state.diagram, before);
-  assert.equal(model.state.diagramDirty, true);
-  assert.equal(model.hasUnsaved(), true);
+  // Convert lỗi sau khi buffer đã được ghi: Diagram đang sửa đã nằm trong
+  // bản lưu (không mất), nên dirty sạch; loại hồ sơ giữ nguyên.
+  assert.equal(model.state.diagramDirty, false);
+  assert.equal(model.hasUnsaved(), false);
   assert.equal(model.state.caseInfo.case_type, 'inheritance');
 });
 

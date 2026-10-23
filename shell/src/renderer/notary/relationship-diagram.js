@@ -42,11 +42,20 @@
 const REL_EVALUATE_DEBOUNCE_MS = 500;   // spec: 400–600ms sau draft doi
 const TWO_PARTY = 'two_party';
 
+// N3: MỘT nhãn duy nhất cho người chưa có tên ở mọi vị trí sơ đồ.
+const EMPTY_PERSON_NAME = '(chưa có tên)';
+const CASE_TYPE_LABELS = { inheritance: 'Thừa kế', two_party: 'Hai bên' };
+
 // Thong diep loi than thien tu error-catalog (MIN-136) — fallback raw
 // khi module chua nap (node --test nap tung file doc lap).
 const relErrText = (typeof window !== 'undefined' && window.G1_NOTARY_ERRORS)
   ? window.G1_NOTARY_ERRORS.errText
-  : (e) => `${e.code}: ${e.message}`;
+  : (e) => (e && (e.message || e.code)) || 'Lỗi';
+const relIsDiagramError =
+  (typeof window !== 'undefined' && window.G1_NOTARY_ERRORS &&
+   typeof window.G1_NOTARY_ERRORS.isDiagramError === 'function')
+    ? window.G1_NOTARY_ERRORS.isDiagramError
+    : () => true;
 
 // Kich thuoc layout canvas (px logic — scale boi zoom, khong co chu).
 // MIN-133 D7 (mockup duyet 28/09/2026): node DA THA 144×87 (ten 14px,
@@ -243,7 +252,13 @@ function createDiagramPane(ctx) {
   const btn = ctx.btn;
   const face = ctx.face;
   const openModal = ctx.openModal;
+  const actionStatus = ctx.actionStatus ||
+    { run: (sel, root, task) => task(), sync: () => {}, isBusy: () => false };
+  const errText = ctx.errText || relErrText;
+  const uiRoot = () => (ctx.uiRoot ? ctx.uiRoot()
+    : (typeof document !== 'undefined' ? document : null));
   const openWordDialog = ctx.openWordDialog || (() => {});
+  const openConversionDialog = ctx.openConversionDialog || (() => {});
   // Luu ho so tat ca qua coordinator view (flush editor truoc snapshot);
   // fallback model.saveCase cho test thuan pane khong co view.
   const onSaveCase = ctx.onSaveCase ||
@@ -1424,18 +1439,50 @@ function createDiagramPane(ctx) {
     const tp = isTp();
     const card = h('div', 'card cd-rel-card');
 
-    // Head: title + tools nho (slot, cach tinh, danh gia — chi domain
-    // inheritance co engine; zoom + Mo rong cho ca hai) — ban mau.
+    // Head: title + chọn loại sơ đồ + tools nho (cach tinh, danh gia —
+    // chi domain inheritance co engine; zoom + Mo rong cho ca hai).
     const head = h('div', 'card-head');
     head.append(h('h3', 'card-title',
       tp ? 'Sơ đồ hai bên' : 'Sơ đồ thừa kế'));
+    // R7: MỘT vị trí + MỘT dạng UI cho cả hồ sơ mới và hồ sơ cũ.
+    // Nháp → đổi loại trực tiếp trên buffer; hồ sơ đã lưu → mở luồng
+    // convert hiện có (chọn văn bản mới/người để lại/xác nhận xóa sơ đồ).
+    const typeSel = h('select', 'cd-case-type cd-diagram-type');
+    for (const [v, lbl] of Object.entries(CASE_TYPE_LABELS)) {
+      const o = h('option', '', lbl);
+      o.value = v;
+      typeSel.append(o);
+    }
+    const currentType =
+      (s.caseInfo && s.caseInfo.case_type) || 'inheritance';
+    typeSel.value = currentType;
+    typeSel.setAttribute('aria-label', 'Loại sơ đồ');
+    typeSel.dataset.fid = 'diagram:case_type';
+    typeSel.disabled = !model.canWrite() || !!s.busy || !!s.conflict ||
+      s.stale || s.unsupported;
+    typeSel.onchange = () => {
+      const cur = (model.state.caseInfo &&
+        model.state.caseInfo.case_type) || 'inheritance';
+      const next = typeSel.value;
+      if (next === cur) return;
+      if (model.state.caseId == null) {
+        model.updateCaseMeta('case_type', next);
+        return;
+      }
+      typeSel.value = cur;             // dialog quyết định thay đổi
+      openConversionDialog(next);
+    };
+    head.append(typeSel);
     const tools = h('div', 'card-tools');
     if (!tp) {
       // MIN-136: chi giu "Xem cach tinh" — bo + Slot va Danh gia thu
       // (evaluate van tu chay qua scheduleEvaluate + khi mo panel).
-      const calc = btn('Xem cách tính', 'sm', async () => {
+      const calc = btn('Xem cách tính', 'sm js-calc-eval', async () => {
         calcOpen = !calcOpen;
-        if (calcOpen) await runEvaluate();
+        if (calcOpen) {
+          await actionStatus.run('.js-calc-eval', uiRoot(),
+            () => runEvaluate(), { ok: (r) => !!(r && r.ok) });
+        }
         rerender();
       });
       calc.disabled = !s.capabilities.diagram;

@@ -355,7 +355,9 @@ function createNotaryModuleView(deps) {
   const diagramPane = window.G1_NOTARY_DIAGRAM
     ? window.G1_NOTARY_DIAGRAM.createDiagramPane({
         model, lib: L, notify, h, btn, face, openModal,
+        actionStatus, errText, uiRoot: () => root,
         openWordDialog: () => openWordDialog(),
+        openConversionDialog: (target) => openConversionDialog(target),
         onSaveCase: () => runSaveCase(),
         rerender: () => rerender() })
     : null;
@@ -488,48 +490,45 @@ function createNotaryModuleView(deps) {
   }
 
   // Lưu hồ sơ: flush mọi editor đăng ký (text/date/meta) rồi để model
-  // chụp MỘT snapshot Stage+meta+Diagram. Ngày sai → dừng trước IPC.
-  // Conflict giữ draft/dirty; dialog xung đột hiện qua rerender.
+  // chụp MỘT snapshot Stage+meta+Diagram. Ngày sai → dừng trước IPC và
+  // báo tại card chứa ô (R13). Thành công → tích xanh tại nút (R14),
+  // không toast chữ; conflict giữ draft/dirty, dialog xung đột qua rerender.
   async function runSaveCase() {
     const s = model.state;
     if (s.savingCase) return { ok: false };
     if (!model.canWrite()) return { ok: false };
+    localSaveError = null;
     if (!flushActiveEditors()) {
-      notify('Ngày không hợp lệ — sửa ô được đánh dấu trước khi lưu hồ sơ.',
-             true);
+      markLocalSaveError();
       return { ok: false, error: { code: 'invalid_date' } };
     }
-    const r = await model.saveCase();
-    if (!r.ok && r.error && r.error.code === 'diagram_invalid_state') {
-      notify(errText(r.error.details?.errors?.[0] || r.error), true);
-    } else if (!r.ok && r.error &&
-        r.error.code !== 'stage_validation_error' &&
-        r.error.code !== 'workspace_conflict') {
-      notify(errText(r.error), true);
-    }
-    return r;
+    return actionStatus.run('.js-save-diagram', root,
+      () => model.saveCase(), { ok: (r) => !!(r && r.ok) });
   }
 
-  function openConversionDialog() {
+  // R7: dialog đổi loại chỉ còn ĐÚNG 3 hạng mục — (1) văn bản mới,
+  // (2) người để lại (chỉ khi đích là thừa kế), (3) xác nhận xóa sơ đồ
+  // cũ. Không còn cửa "bắt Lưu trước": buffer Stage/meta đang sửa được
+  // model mang theo trong cùng hành động convert.
+  function openConversionDialog(targetType) {
     const s = model.state;
     const caseId = s.caseId;
-    const target = s.caseInfo.case_type === 'inheritance' ? 'two_party' : 'inheritance';
+    const current = s.caseInfo.case_type;
+    const target = targetType === 'inheritance' || targetType === 'two_party'
+      ? targetType
+      : (current === 'inheritance' ? 'two_party' : 'inheritance');
+    if (target === current) return;
     openModal((box, close) => {
       let applying = false;
       box._canClose = () => !applying;
       const head = h('div', 'modal-head');
-      head.append(h('h2', 'modal-title', 'Đổi loại hồ sơ'), modalX(close));
+      head.append(h('h2', 'modal-title',
+        `Đổi loại hồ sơ — ${CASE_TYPE_LABEL[current] || current} → ` +
+        `${CASE_TYPE_LABEL[target] || target}`), modalX(close));
       const body = h('div', 'modal-body cd-field-stack');
       const foot = h('div', 'modal-foot');
       box.append(head, body, foot);
-      if (s.stageDirty || s.metaDirty) {
-        body.append(h('div', 'banner warn',
-          'Stage hoặc thông tin hồ sơ có thay đổi chưa lưu. Hãy đóng dialog và bấm Lưu hồ sơ trước khi đổi loại.'));
-        foot.append(btn('Đóng', '', close));
-        return;
-      }
-      body.append(h('p', '', `${CASE_TYPE_LABEL[s.caseInfo.case_type]} → ${CASE_TYPE_LABEL[target]} · HS-${caseId}`),
-        h('div', 'banner warn', 'Xóa toàn bộ gán ghế, quan hệ và dấu Chủ/Nhận của Diagram đã lưu và đang sửa. Giữ nguyên Người/Tài sản trong Stage.'));
+
       function selectField(label, values, empty) {
         const field = h('label', 'cd-field');
         const sel = h('select', '');
@@ -542,27 +541,36 @@ function createNotaryModuleView(deps) {
         body.append(field);
         return sel;
       }
+      // (1) Văn bản mới.
       const documentType = selectField('Văn bản mới',
-        model.documentTypesFor(target).map(v => [v, DOC_TYPE_LABEL[v] || v]), '— Chọn văn bản —');
+        model.documentTypesFor(target).map(v => [v, DOC_TYPE_LABEL[v] || v]),
+        '—');
+      // (2) Người để lại — chỉ khi đích là thừa kế.
       const owner = target === 'inheritance' ? selectField('Người để lại',
-        s.stage.people.map(p => [p.row_id, p.ho_ten || p.row_id]), '— Chọn người —') : null;
+        s.stage.people.map(p => [p.row_id,
+          p.ho_ten || '(chưa có tên)']), '—') : null;
+      // (3) Xác nhận xóa sơ đồ cũ.
       const acknowledgement = h('label', 'cd-check-row');
       const check = h('input', ''); check.type = 'checkbox';
-      acknowledgement.append(check, h('span', '', 'Tôi xác nhận xóa Diagram cũ.'));
-      const error = h('div', 'banner err'); error.style.display = 'none';
-      body.append(acknowledgement, error);
+      acknowledgement.append(check,
+        h('span', '', 'Xóa sơ đồ cũ khi đổi loại.'));
+      body.append(acknowledgement);
+      const error = h('div', 'error small'); error.style.display = 'none';
+      body.append(error);
       const cancel = btn('Hủy', '', close);
       const apply = btn('Áp dụng', 'primary', async () => {
         if (apply.disabled || model.state.caseId !== caseId) return;
         applying = true;
         refresh();
-        const conversion = { case_type: target, document_type: documentType.value,
+        const conversion = { case_type: target,
+          document_type: documentType.value,
           confirm_diagram_reset: check.checked };
         if (owner) conversion.owner_row_id = owner.value;
         const r = await model.convertCaseType(conversion);
         applying = false;
-        if (r.ok) { close(); return; }
-        error.textContent = errText(r.error || {code:'unknown',message:'Không đổi được loại hồ sơ'});
+        if (r.ok) { close(); rerender(); return; }
+        error.textContent = errText(r.error ||
+          { code: 'unknown', message: 'Không đổi được loại hồ sơ' });
         error.style.display = '';
         refresh();
       });
@@ -570,8 +578,9 @@ function createNotaryModuleView(deps) {
         documentType.disabled = applying;
         if (owner) owner.disabled = applying;
         check.disabled = applying; cancel.disabled = applying;
-        apply.disabled = applying || !documentType.value || (owner && !owner.value) ||
-          !check.checked || !model.canWrite() || !!model.state.conflict || model.state.stale;
+        apply.disabled = applying || !documentType.value ||
+          (owner && !owner.value) || !check.checked ||
+          !model.canWrite() || !!model.state.conflict || model.state.stale;
         apply.textContent = applying ? 'Đang áp dụng…' : 'Áp dụng';
       }
       documentType.onchange = refresh;
@@ -583,29 +592,14 @@ function createNotaryModuleView(deps) {
   }
 
   // Điền phần hành động vào thanh trên (.cd-topbar-actions) — chỉ khi
-  // tab Soạn hồ sơ đang mở một workspace. Thứ tự theo mockup MIN-133:
-  // | loại việc · Nhập file · Zalo ……… [pill trạng thái] Lưu •
+  // tab Soạn hồ sơ đang mở một workspace. Loại sơ đồ chọn ở HEADER vùng
+  // Sơ đồ (R7) cho cả hồ sơ mới và hồ sơ cũ; thanh trên chỉ giữ pill
+  // định danh hồ sơ đã lưu + Nhập file.
   function fillTopActions(bar) {
     const s = model.state;
     const c = s.caseInfo || {};
-    const draft = s.caseId == null;
     bar.append(h('span', 'cd-vsep', ''));
-    // Loại việc: nháp → select (ghi updateCaseMeta, đổi loại reset
-    // diagram buffer §13.5); case thật → pill + thao tác đổi loại riêng.
-    if (draft) {
-      const sel = h('select', 'cd-case-type');
-      for (const [v, lbl] of Object.entries(CASE_TYPE_LABEL)) {
-        const o = h('option', '', lbl);
-        o.value = v;
-        if ((c.case_type || 'inheritance') === v) o.selected = true;
-        sel.append(o);
-      }
-      sel.value = c.case_type || 'inheritance';
-      sel.setAttribute('aria-label', 'Loại việc');
-      sel.dataset.fid = 'top:case_type';
-      sel.onchange = () => model.updateCaseMeta('case_type', sel.value);
-      bar.append(sel);
-    } else {
+    if (s.caseId != null) {
       const status = model.statusLabel();
       const pill = h('span', 'pill accent cd-case-pill',
         `${CASE_TYPE_LABEL[c.case_type] || c.case_type || '—'} · ` +
@@ -614,9 +608,6 @@ function createNotaryModuleView(deps) {
         pill.title = DOC_TYPE_LABEL[c.document_type] || c.document_type;
       }
       bar.append(pill);
-      const changeType = btn('Đổi loại', '', openConversionDialog);
-      changeType.disabled = !model.canWrite() || !!s.busy || !!s.conflict || s.stale;
-      bar.append(changeType);
     }
     // Intake duy nhất — mọi nguồn (file/ảnh/drop/text) qua dialog này.
     const intakeB = btn('Nhập file', '', () => openIntakeDialog(null));
@@ -2258,14 +2249,6 @@ function createNotaryModuleView(deps) {
     const s = model.state;
     const show = activeTab === 'drafting' && !NO_WORKSPACE.includes(s.status);
     topActions.hidden = !show;
-    // Select loại việc đang focus (vừa đổi / đang mở bằng bàn phím):
-    // không thay node để không đóng dropdown — chỉ đồng bộ nút.
-    const ae = document.activeElement;
-    if (show && s.caseId == null && ae && ae.tagName === 'SELECT' &&
-        topActions.contains(ae)) {
-      syncChromeUI();
-      return;
-    }
     topActions.innerHTML = '';
     if (show) fillTopActions(topActions);
   }
