@@ -894,9 +894,11 @@ result.data:
   State sai cấu trúc → `diagram_invalid_state`.
 - Chế độ nháp (`case_id` absent): `stage` trong payload thay thế Stage
   DB; `diagram` được đánh giá trên đó; `evaluated_revision: null`;
-  `personId` trỏ `row_id` của stage payload (§2.1). `stage` vẫn phải qua
-  validation của `person_row`/`asset_row` (sai → `stage_validation_error`,
-  không phải `validation_error`).
+  `personId` trỏ `row_id` của stage payload (§2.1). Lỗi field Stage không
+  chặn evaluate (S19, owner 23/10/2026): engine vẫn chạy theo cấu trúc sơ
+  đồ và `render_model.status` trả `incomplete` kèm warning
+  `stage.incomplete_fields`; không còn `stage_validation_error` chỉ vì
+  field tùy chọn. Lỗi cấu trúc wire/reference/domain vẫn raise như §7.
 - Renderer Soạn hồ sơ dùng chế độ nháp với Stage + Diagram đang sửa, cả
   khi hồ sơ đã có `case_id`; không gửi `case_id` trong request evaluate này.
   Nhãn/cảnh báo/tính thử không được đọc baseline đã lưu thay cho dữ liệu
@@ -1587,7 +1589,7 @@ migrate-on-read hoặc dual-read/write; bảng dưới không áp làm requireme
 | error: — | + `diagram_domain_mismatch`, `diagram_owner_mismatch` | §13.9 |
 | field_error: `primary_count` | thay bằng `asset_limit` / `people_limit` | `primary_count` không còn ở v2 |
 | engine codes: §7.3 | + `invalid_position`, `missing_position` | dùng trong `details.errors[]`/`render_model.errors[]` |
-| data-codes | + `stage.legacy_asset_overflow`, `stage.legacy_primary_ambiguous`, `diagram.two_party_unsupported`, `diagram.selection_pruned` | §13.3/13.4/13.5/13.8 |
+| data-codes | + `stage.legacy_asset_overflow`, `stage.legacy_primary_ambiguous`, `diagram.two_party_unsupported`, `diagram.selection_pruned`, `stage.incomplete_fields` (warning evaluate nháp khi Stage còn lỗi field tùy chọn, S19) | §13.3/13.4/13.5/13.8/§7.4 |
 | `person_row`, `personId`, `row_id`, revision, `idempotency_key` | giữ nguyên | — |
 
 ### 13.8 Lịch sử tương thích persisted cũ (không áp cutover Storage B)

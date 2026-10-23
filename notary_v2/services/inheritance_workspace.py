@@ -388,22 +388,28 @@ class InheritanceWorkspaceService:
                 f"diagram state có {len(errors)} lỗi",
                 details={"errors": errors})
         from services.case_workspace import CaseWorkspaceService
-        owner_row_id = CaseWorkspaceService._validate_owner_pointer(
-            stage, people, ct)
+        # S2/S19 (owner 23/10/2026): chưa chọn Chủ đất hoặc Stage còn lỗi
+        # field tùy chọn không chặn "Xem cách tính"; pointer non-null sai
+        # vẫn là mâu thuẫn dữ liệu và vẫn raise.
+        CaseWorkspaceService._validate_owner_pointer(
+            stage, people, ct, allow_unassigned=True)
         field_errors = CaseWorkspaceService(self.db)._validate_stage(
             people, assets, ct)
-        if field_errors:
-            raise WorkspaceError(
-                "stage_validation_error",
-                f"Stage có {len(field_errors)} lỗi field",
-                details={"field_errors": field_errors})
-        row_ids = {p["row_id"] for p in people}
+        row_ids = {p.get("row_id") for p in people
+                   if isinstance(p, Mapping)}
         _check_person_refs(state, row_ids)
         if state["domain"] == CASE_TYPE_TWO_PARTY:
             render_model = unsupported_render_model()
         else:
             render_model = self._evaluate_inheritance(
                 state, valid_row_ids=row_ids, people=people)
+        if field_errors:
+            if render_model.get("status") == "complete":
+                render_model["status"] = "incomplete"
+            render_model["warnings"] = list(
+                render_model.get("warnings") or []) + [{
+                    "code": "stage.incomplete_fields",
+                    "message": f"Stage còn {len(field_errors)} lỗi field"}]
         return {
             "schema_version": SCHEMA_VERSION,
             "evaluated_revision": None,

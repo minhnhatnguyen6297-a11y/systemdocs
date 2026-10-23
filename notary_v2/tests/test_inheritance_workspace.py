@@ -803,11 +803,14 @@ def test_evaluate_draft_two_party_hint(db):
     assert data["render_model"]["status"] == "unsupported"
 
 
-def test_evaluate_draft_owner_required(db):
-    """Draft inheritance thiếu/dangling owner_row_id →
-    workspace_owner_required (§13.6 — pointer là SOT)."""
+def test_evaluate_draft_owner_unassigned_allowed(db):
+    """S2 owner 23/10/2026: chưa chọn Chủ đất không chặn "Xem cách tính";
+    pointer non-null sai/ngoài Stage vẫn workspace_owner_required."""
     rows = _draft_rows()
-    for bad in (None, str(uuid.uuid4()), "not-uuid"):
+    stage = _draft_stage(rows, owner_row_id=None)
+    data = _svc(db).evaluate_draft(None, stage, _draft_state(rows))
+    assert data["render_model"]["status"] in ("complete", "incomplete")
+    for bad in (str(uuid.uuid4()), "not-uuid"):
         stage = _draft_stage(rows, owner_row_id=bad)
         with pytest.raises(WorkspaceError) as exc:
             _svc(db).evaluate_draft(None, stage, _draft_state(rows))
@@ -841,23 +844,22 @@ def test_evaluate_draft_does_not_touch_existing_case(db):
     assert case.case_state_json == before_json
 
 
-def test_evaluate_draft_stage_invalid_maps_stage_error(db):
-    stage = {
-        "owner_row_id": None,   # trỏ xuống dòng hợp lệ sau khi set
-        "people": [
-            {"row_id": str(uuid.uuid4()), "entity_id": None,
-             "ho_ten": "  ",                        # sai: tên rỗng
-             "gioi_tinh": "Nam", "ngay_sinh": None, "ngay_chet": None,
-             "so_giay_to": None, "ngay_cap": None, "noi_cap": None,
-             "dia_chi": None, "place_of_origin": None},
-        ],
-        "assets": [],
-    }
-    stage["owner_row_id"] = stage["people"][0]["row_id"]
-    with pytest.raises(WorkspaceError) as exc:
-        _svc(db).evaluate_draft(None, stage, _v3_state([]))
-    assert exc.value.code == "stage_validation_error"
-    assert exc.value.details["field_errors"]
+def test_evaluate_draft_field_error_returns_incomplete_outcome(db):
+    """S19 owner 23/10/2026: lỗi field tùy chọn không chặn evaluate —
+    vẫn chạy theo cấu trúc sơ đồ, trả outcome chưa-tính-được kèm cảnh
+    báo ngắn; không còn stage_validation_error."""
+    rows = _draft_rows()
+    stage = _draft_stage(rows)
+    stage["people"][1]["gioi_tinh"] = "Khác"      # lỗi enum trên field phụ
+
+    data = _svc(db).evaluate_draft(None, stage, _draft_state(rows))
+
+    rm = data["render_model"]
+    assert rm["status"] == "incomplete"
+    assert any(w["code"] == "stage.incomplete_fields"
+               for w in rm["warnings"])
+    # Cấu trúc sơ đồ vẫn được tính: kết quả engine còn đủ allocation.
+    assert rm["allocations"][rows["spouse"]]["finalShare"] == "1/2"
 
 
 def test_evaluate_draft_requires_stage_object(db):
