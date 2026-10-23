@@ -1348,74 +1348,43 @@ def template_group_needs(doc: Any) -> set[str]:
     return needs
 
 
-def word_block_reason(context: WordExportContext, *, static: bool = False,
-                      needed: set[str] | None = None) -> str | None:
-    """Contract `word.*` block_reason đầu tiên cho một context đã build.
+def word_block_reason(context: WordExportContext, *,
+                      static: bool = False) -> str | None:
+    """`word.*` block_reason còn lại cho một context đã build.
 
-    Cùng thứ tự kiểm tra với `_add_block_placeholders` bên dưới (contract
-    notary.case-drafting.v2 §13.10 mapping). Trả None khi dữ liệu đủ để xuất.
-    Dùng bởi `services.word_batch_export` cho word_export_options +
-    per-document failure của word_export_batch (MIN-110).
+    Owner 23/10/2026 (phần W): thiếu dữ kiện KHÔNG chặn xuất — Stage rỗng,
+    chưa có tài sản/sơ đồ Hai bên/chủ đất/người nhận chỉ làm placeholder
+    tương ứng rỗng và được ghi vào `missing` của kết quả từng file. Hàm
+    này chỉ còn các trần kỹ thuật mà vượt qua là mất dữ liệu (mẫu chỉ phủ
+    hữu hạn slot), dùng bởi `services.word_batch_export` cho
+    word_export_options + per-document failure (MIN-110).
 
-    `needed` = tập nhu cầu của CHÍNH mẫu đang xét
-    (`template_group_needs`): gate nhóm `no_landowner`/`no_deceased_landowner`/
-    `no_receiver` (thừa kế) và `no_diagram` hai bên chỉ áp khi mẫu thực sự
-    dùng nhóm đó (owner 15/10/2026). `needed=None` chỉ dành cho caller
-    KHÔNG có mẫu (vd đối chiếu word gốc) — giữ đủ gate cũ.
-
-    NAIA-8: readiness theo loại hồ sơ — two_party không áp điều kiện
-    riêng thừa kế (chủ đất/người nhận); `[Người N]` theo Stage nên giới
-    hạn người đếm trên Stage (`persons`), không phải node Diagram."""
-    if static:
-        if not context.persons:
-            return "word.no_people"
-        if not context.assets:
-            return "word.no_assets"
-        if len(context.assets) > MAX_WORD_ASSETS:
-            return "word.too_many_assets"
-        if len(context.persons) > (30 if context.case_type == "two_party" else 20):
-            return "word.too_many_people"
-        if context.case_type == "two_party" \
-                and (needed is None or "two_party_slots" in needed) \
-                and not context.has_diagram_state:
-            return "word.no_diagram"
-        return None
+    NAIA-8: `[Người N]` theo Stage nên giới hạn người đếm trên Stage
+    (`persons`), không phải node Diagram."""
+    if len(context.assets) > MAX_WORD_ASSETS:
+        return "word.too_many_assets"
     if context.case_type == "two_party":
-        if not context.persons:
-            return "word.no_people"
-        if (needed is None or "two_party_slots" in needed) \
-                and not context.has_diagram_state:
-            return "word.no_diagram"
-        if not context.assets:
-            return "word.no_assets"
-        if len(context.assets) > MAX_WORD_ASSETS:
-            return "word.too_many_assets"
         if len(context.persons) > 30:
             return "word.too_many_people"
         return None
-    if not context.assets:
-        return "word.no_assets"
-    if len(context.assets) > MAX_WORD_ASSETS:
-        return "word.too_many_assets"
-    # Gate nhóm chỉ khi mẫu THỰC SỰ dùng nhóm (needed=None = caller không
-    # có mẫu → giữ đủ gate cũ; caller có mẫu luôn truyền needs thật).
-    if (needed is None or "landowner" in needed) and not context.landowners:
-        return "word.no_landowner"
-    if (needed is None or "deceased_landowner" in needed) \
-            and not context.deceased_landowners:
-        return "word.no_deceased_landowner"
-    if (needed is None or "receiver" in needed) and not context.receivers:
-        return "word.no_receiver"
     if len(context.persons) > 20:
         return "word.too_many_people"
-    if len(context.signers) > 20:
+    if not static and len(context.signers) > 20:
         return "word.too_many_signers"
     return None
 
 
+def note_missing(missing: list[str] | None, text: str) -> None:
+    """Ghi một dữ kiện thiếu vào danh sách kết quả của file (không chặn)."""
+    if missing is None or text in missing:
+        return
+    missing.append(text)
+
+
 def _add_two_party_placeholders(mapping: dict[str, str],
                                 context: WordExportContext,
-                                *, needed: set[str] | None = None) -> None:
+                                *, needed: set[str] | None = None,
+                                missing: list[str] | None = None) -> None:
     """Block placeholder cho hồ sơ hai bên (§13.5 + NAIA-8).
 
     `[Người N - ...]` = toàn bộ Stage theo thứ tự đã lưu (kể cả người
@@ -1424,17 +1393,17 @@ def _add_two_party_placeholders(mapping: dict[str, str],
     (chủ đất, người nhận, hàng thừa kế, đoạn phân chia) resolve rỗng —
     template cũ dùng chung không rớt unresolved_placeholders.
 
-    `needed` (`template_group_needs`): chỉ đòi diagram.state đã lưu khi
-    mẫu THỰC SỰ dùng ghế hai bên; `None` = caller không có mẫu → giữ
-    gate cũ (luôn đòi)."""
+    Thiếu dữ kiện → placeholder rỗng + ghi vào `missing` (owner
+    23/10/2026 phần W), không raise. `needed` (`template_group_needs`)
+    chỉ quyết định có ghi thiếu `sơ đồ hai bên đã lưu` khi mẫu thực sự
+    dùng ghế hai bên hay không."""
     if not context.persons:
-        raise WordExportValidationError("Stage chưa có người nào.")
+        note_missing(missing, "người trong hồ sơ")
     if (needed is None or "two_party_slots" in needed) \
             and not context.has_diagram_state:
-        raise WordExportValidationError(
-            "Chưa có sơ đồ hai bên đã lưu (diagram.state.nodes).")
+        note_missing(missing, "sơ đồ hai bên đã lưu")
     if not context.assets:
-        raise WordExportValidationError("Không có tài sản để xuất Word.")
+        note_missing(missing, "tài sản")
     if len(context.assets) > MAX_WORD_ASSETS:
         raise WordExportValidationError(
             f"Vượt quá {MAX_WORD_ASSETS} tài sản (hiện có {len(context.assets)}). "
@@ -1506,16 +1475,21 @@ def _add_two_party_placeholders(mapping: dict[str, str],
 
 def _add_block_placeholders(mapping: dict[str, str], context: WordExportContext,
                             *, static: bool = False,
-                            needed: set[str] | None = None) -> None:
-    """Block placeholder thừa kế/hai bên — mirror `word_block_reason`.
+                            needed: set[str] | None = None,
+                            missing: list[str] | None = None) -> None:
+    """Block placeholder thừa kế/hai bên.
 
-    `needed` (`template_group_needs`) gate các raise nhóm theo đúng nhu
-    cầu mẫu; `None` = caller không có mẫu → giữ đủ gate cũ."""
+    Thiếu dữ kiện (Người/Tài sản/Chủ đất/Chủ đất đã mất/Người nhận) →
+    placeholder rỗng + ghi vào `missing`, KHÔNG raise (owner 23/10/2026
+    phần W). Chỉ trần số lượng còn raise: vượt slot mẫu là mất dữ liệu.
+    `needed` (`template_group_needs`) giới hạn việc ghi thiếu theo nhóm
+    mẫu THỰC SỰ dùng."""
     if context.case_type == "two_party":
-        _add_two_party_placeholders(mapping, context, needed=needed)
+        _add_two_party_placeholders(mapping, context, needed=needed,
+                                    missing=missing)
         return
     if not context.assets:
-        raise WordExportValidationError("Không có tài sản để xuất Word.")
+        note_missing(missing, "tài sản")
     if len(context.assets) > MAX_WORD_ASSETS:
         raise WordExportValidationError(
             f"Vượt quá {MAX_WORD_ASSETS} tài sản (hiện có {len(context.assets)}). "
@@ -1523,13 +1497,13 @@ def _add_block_placeholders(mapping: dict[str, str], context: WordExportContext,
         )
     if not static and (needed is None or "landowner" in needed) \
             and not context.landowners:
-        raise WordExportValidationError("Không xác định được chủ đất trên Diagram.")
+        note_missing(missing, "chủ đất")
     if not static and (needed is None or "deceased_landowner" in needed) \
             and not context.deceased_landowners:
-        raise WordExportValidationError("Không xác định được chủ đất đã chết để xuất văn bản.")
+        note_missing(missing, "chủ đất đã mất")
     if not static and (needed is None or "receiver" in needed) \
             and not context.receivers:
-        raise WordExportValidationError("Không có người nhận để xuất văn bản phân chia.")
+        note_missing(missing, "người nhận")
     if len(context.persons) > 20:
         raise WordExportValidationError(
             f"Danh sách Stage vượt quá 20 người (hiện có {len(context.persons)})."
@@ -1776,12 +1750,15 @@ def _add_property_placeholders(mapping: dict[str, str], properties: list[Any]) -
 
 def build_template_mapping(case: Any, today: date | None = None,
                            *, static: bool = False,
-                           needed: set[str] | None = None) -> dict[str, str]:
+                           needed: set[str] | None = None,
+                           missing: list[str] | None = None) -> dict[str, str]:
     """Mapping placeholder cho hồ sơ.
 
     `static`/`needed` mirror `_add_block_placeholders`: `needed` = nhu cầu
     của mẫu đang xuất (`template_group_needs`); `None` = caller không có
-    mẫu → giữ đủ gate cũ."""
+    mẫu. `missing` (list do caller giữ) nhận các dữ kiện còn thiếu để
+    ghi vào kết quả file — thiếu dữ kiện KHÔNG raise (owner 23/10/2026
+    phần W)."""
     context = build_word_context(case, today=today)
     # Tài sản vị trí 1 (primary) — chỉ dòng Tài sản case-owned; hồ sơ
     # chưa có dòng nào thì các token tài sản xuất rỗng, không borrow master.
@@ -1956,7 +1933,8 @@ def build_template_mapping(case: Any, today: date | None = None,
     # -----------------------------------------------------------------------
     # Placeholder Word dựng từ view Storage B
     # -----------------------------------------------------------------------
-    _add_block_placeholders(mapping, context, static=static, needed=needed)
+    _add_block_placeholders(mapping, context, static=static, needed=needed,
+                            missing=missing)
     _add_property_placeholders(mapping, context.assets)
     mapping["[Danh sách người thừa kế]"] = mapping["[Danh sách hàng thừa kế]"]
     mapping["[Đoạn mô tả quan hệ]"] = mapping["[Đoạn quan hệ gia đình]"]

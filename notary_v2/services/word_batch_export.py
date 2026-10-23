@@ -104,18 +104,10 @@ DOC_CATALOG_BY_KEY: dict[str, WordDocumentSpec] = {
     spec.document_key: spec for spec in DOC_CATALOG}
 
 _BLOCK_MESSAGES = {
-    "word.no_people": "Stage chưa có người nào",
-    "word.no_diagram": "Chưa có sơ đồ hai bên đã lưu",
-    "word.no_assets": "Hồ sơ chưa có tài sản",
-    "word.no_landowner": "Chưa có chủ đất trên Diagram",
-    "word.no_deceased_landowner": "Không có chủ đất đã chết",
-    "word.no_receiver": "Chưa có người nhận",
     "word.too_many_assets": "Quá 5 tài sản",
     "word.too_many_people": "Quá 20 người trong Stage",
     "word.too_many_signers": "Quá 20 người ký",
     "word.template_missing": "Văn bản chưa có template",
-    "word.missing_authorized_person": (
-        "Mẫu yêu cầu người được ủy quyền nhưng hồ sơ chưa gán vai trò đó"),
 }
 
 # ------------------------------------------------------------- validation
@@ -319,6 +311,7 @@ def _skipped_entry(spec: WordDocumentSpec) -> dict:
         "actual_filename": None,
         "output_file": None,
         "error": None,
+        "missing": [],
     }
 
 
@@ -330,6 +323,7 @@ def _failed_entry(spec: WordDocumentSpec, code: str, message: str) -> dict:
         "actual_filename": None,
         "output_file": None,
         "error": {"code": code, "message": message},
+        "missing": [],
     }
 
 
@@ -353,17 +347,16 @@ def _batch_data(dest_dir: Path, documents: list[dict], *,
 
 
 def _doc_error_from(exc: BaseException,
-                    context: word_engine.WordExportContext, *,
-                    static: bool = False,
-                    needed: Optional[set] = None) -> tuple[str, str]:
+                    context: Optional[word_engine.WordExportContext], *,
+                    static: bool = False) -> tuple[str, str]:
     """Exception → (code, message) cho per-file error — data-code §2.5."""
     if isinstance(exc, _DocFailed):
         return exc.code, exc.message
     if isinstance(exc, word_engine.WordExportValidationError):
-        # Mapping render raise cùng check với word_block_reason — truyền
-        # đúng `static`/`needed` của file đang xuất để reason khớp gate.
-        reason = word_engine.word_block_reason(context, static=static,
-                                               needed=needed)
+        # Trần số lượng là lý do block duy nhất còn lại của mapping; hồ sơ
+        # chưa lưu (context None) chỉ có template-level readiness.
+        reason = (word_engine.word_block_reason(context, static=static)
+                  if context is not None else None)
         return (reason or "word.render_failed"), str(exc)
     if isinstance(exc, FileNotFoundError):
         return "file_not_found", f"không tìm thấy file/thư mục: {exc}"
@@ -483,8 +476,13 @@ def _export_one_document(*, spec: WordDocumentSpec, case: Any,
     exception cancel (do `check()` raise) vẫn thoát qua — `check()` trong
     except re-raise khi flag đang set, nên cancel không bao giờ nuốt
     thành failed.
+
+    Thiếu dữ kiện KHÔNG làm file lỗi (owner 23/10/2026 phần W): slot
+    trống → placeholder rỗng, danh sách thiếu (dữ kiện nhóm, người được
+    ủy quyền mẫu đòi, token chưa hỗ trợ) đi vào `missing` của entry.
     """
     needed: Optional[set] = None
+    missing: list[str] = []
     try:
         # Thứ tự check như mock: template → data validation → render.
         if not spec.has_template:
@@ -497,42 +495,43 @@ def _export_one_document(*, spec: WordDocumentSpec, case: Any,
 
         import docx  # lazy — giữ module import được khi thiếu python-docx
         doc = docx.Document(str(template_path))
-        # Readiness theo token mẫu thực dùng — cùng nguồn needs với
-        # export_options; mẫu không mở được rơi vào per-file error bên
-        # dưới (không fallback gate blanket cũ).
+        # Nhu cầu nhóm của chính mẫu đang render (owner 15/10/2026):
+        # quyết định ghi thiếu nhóm nào + cache mapping theo needs.
         needed = word_engine.template_group_needs(doc)
-        data_reason = word_engine.word_block_reason(
-            context, static=static, needed=needed)
+        data_reason = word_engine.word_block_reason(context, static=static)
         if data_reason is not None:
             raise _DocFailed(data_reason, _block_message(data_reason))
-        # NAIA-12: mẫu dùng token "[... người được ủy quyền N]" mà hồ sơ không
-        # có đủ người gán vai trò đó -> FAIL, không xuất thầm văn bản khuyết
-        # dữ liệu bắt buộc (token rỗng trông giống "đã điền").
+        # Dữ kiện thiếu (kể cả người được ủy quyền mẫu đòi) chỉ ghi nhận.
         missing_auth = sorted(
             slot for slot in word_engine.required_authorized_slots(doc)
             if slot > len(context.authorized_people))
-        if missing_auth:
-            raise _DocFailed(
-                "word.missing_authorized_person",
-                "Mẫu yêu cầu người được ủy quyền "
-                + ", ".join(str(slot) for slot in missing_auth)
-                + " nhưng hồ sơ chưa gán đủ vai trò đó")
         # Mapping cache theo (static, needs): gate nhóm phụ thuộc từng mẫu
         # nên không dùng chung một mapping cho mọi file (tránh kết quả phụ
-        # thuộc thứ tự file trong batch); mẫu cùng needs vẫn tái dùng.
-        cache_key = (static, frozenset(needed))
-        mapping = mapping_holder.get(cache_key)
-        if mapping is None:
+        # thuộc thứ tự file trong batch); mẫu cùng needs vẫn tái dùng —
+        # ghi chú thiếu đi kèm cache vì chỉ sinh lúc build.
+        cache_key = (static, frozenset(needed or ()))
+        cached = mapping_holder.get(cache_key)
+        if cached is None:
+            data_missing: list[str] = []
             mapping = word_engine.build_template_mapping(
-                case, today=today, static=static, needed=needed)
-            mapping_holder[cache_key] = mapping
+                case, today=today, static=static, needed=needed,
+                missing=data_missing)
+            cached = (mapping, data_missing)
+            mapping_holder[cache_key] = cached
+        else:
+            mapping, data_missing = cached
+        missing.extend(data_missing)
+        for slot in missing_auth:
+            word_engine.note_missing(
+                missing, f"người được ủy quyền {slot}")
         word_engine.replace_in_doc(doc, mapping)
         unresolved = word_engine.find_unresolved_placeholders(
             doc, template_ref=template_path)
         if unresolved:
-            raise _DocFailed(
-                "word.unresolved_placeholders",
-                f"Mẫu còn {len(unresolved)} trường chưa hỗ trợ: "
+            # Token lạ còn trong văn bản: xuất file như hiện trạng (owner
+            # thấy chỗ hỏng ngay trong Word) + ghi rõ vào kết quả.
+            missing.append(
+                f"{len(unresolved)} trường chưa hỗ trợ: "
                 + ", ".join(unresolved))
 
         check()                        # cancel trước khi render
@@ -555,6 +554,7 @@ def _export_one_document(*, spec: WordDocumentSpec, case: Any,
                 "scope": "machine_local",
             },
             "error": None,
+            "missing": missing,
         }
     except ImportError as exc:
         # Thiếu python-docx = lỗi hạ tầng, không phải lỗi của 1 văn bản —
@@ -564,8 +564,7 @@ def _export_one_document(*, spec: WordDocumentSpec, case: Any,
             f"thiếu dependency python-docx: {exc}") from exc
     except Exception as exc:  # noqa: BLE001 — per-document boundary
         check()   # cancel pending → raise tại đây (doc tính skipped)
-        code, message = _doc_error_from(exc, context, static=static,
-                                        needed=needed)
+        code, message = _doc_error_from(exc, context, static=static)
         _logger.info("word_doc_failed %s",
                      {"document_key": spec.document_key, "code": code})
         return _failed_entry(spec, code, message)
@@ -584,8 +583,13 @@ def export_options(case: Any, *, resolve_template: Callable[[str], Any],
     theo `word_engine.word_block_reason` — cùng semantics với render.
 
     `doc_specs` (NAIA-8): danh sách spec động từ `scan_template_dir` —
-    thay DOC_CATALOG khi nguồn mẫu là thư mục người dùng chọn."""
-    context = word_engine.build_word_context(case, today=today)
+    thay DOC_CATALOG khi nguồn mẫu là thư mục người dùng chọn.
+
+    `case=None` = hồ sơ chưa lưu (owner 23/10/2026 phần W): chỉ còn
+    readiness mức mẫu (thiếu/mở không được); dữ kiện hồ sơ chưa có gì
+    để chặn — chính lượt xuất tự tạo + lưu trước."""
+    context = (word_engine.build_word_context(case, today=today)
+               if case is not None else None)
     documents = []
     for spec in (doc_specs if doc_specs is not None else DOC_CATALOG):
         block = None
@@ -598,8 +602,7 @@ def export_options(case: Any, *, resolve_template: Callable[[str], Any],
             else:
                 try:
                     import docx  # lazy — giữ module import được khi thiếu python-docx
-                    doc = docx.Document(str(template_path))
-                    needed = word_engine.template_group_needs(doc)
+                    docx.Document(str(template_path))
                 except ImportError as exc:
                     raise WordBatchError(
                         "engine_unavailable",
@@ -610,9 +613,9 @@ def export_options(case: Any, *, resolve_template: Callable[[str], Any],
                     # nuốt lỗi rồi fallback gate blanket cũ (AC2 mẫu hỏng).
                     block = _doc_error_from(exc, context)[0]
                 else:
-                    block = word_engine.word_block_reason(
-                        context, static=doc_specs is not None,
-                        needed=needed)
+                    if context is not None:
+                        block = word_engine.word_block_reason(
+                            context, static=doc_specs is not None)
         documents.append({
             "document_key": spec.document_key,
             "display_name": spec.display_name,

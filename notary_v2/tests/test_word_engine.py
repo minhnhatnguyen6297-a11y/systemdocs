@@ -2038,15 +2038,20 @@ def test_two_party_ben_a_b_slots_and_names():
 
 
 def test_two_party_word_block_reasons():
+    """W6: thiếu Người/sơ đồ/Tài sản KHÔNG còn là block — chỉ ghi thiếu."""
     ra = _rid()
     rows = [_stage_row_v3(ra, 11, "Nguyễn Bên A")]
 
-    # Stage rỗng → word.no_people
     empty = _two_party_case([], {})
     ctx = build_word_context(empty)
-    assert word_block_reason(ctx) == "word.no_people"
+    assert word_block_reason(ctx) is None
+    missing = []
+    mapping = build_template_mapping(empty, needed={"two_party_slots"},
+                                     missing=missing)
+    assert "người trong hồ sơ" in missing
+    assert mapping["[Bên A 1 - Họ tên]"] == ""
 
-    # Có người nhưng chưa lưu diagram.state → word.no_diagram
+    # Có người nhưng chưa lưu diagram.state → ghế trống + ghi thiếu.
     no_diagram = _make_case(
         None, properties=[_prop()],
         case_state=json.dumps(
@@ -2055,7 +2060,12 @@ def test_two_party_word_block_reasons():
             ensure_ascii=False))
     no_diagram.loai_van_ban = "chuyen_nhuong"
     ctx = build_word_context(no_diagram)
-    assert word_block_reason(ctx) == "word.no_diagram"
+    assert word_block_reason(ctx) is None
+    missing = []
+    mapping = build_template_mapping(no_diagram, needed={"two_party_slots"},
+                                     missing=missing)
+    assert "sơ đồ hai bên đã lưu" in missing
+    assert mapping["[Bên A 1 - Họ tên]"] == ""
 
     # Không áp điều kiện thừa kế: đủ người + slot + tài sản → ready.
     ok = _two_party_case(rows, {1: ra})
@@ -2063,10 +2073,13 @@ def test_two_party_word_block_reasons():
     assert word_block_reason(ctx) is None
 
 
-def test_two_party_no_assets_blocked():
+def test_two_party_no_assets_not_blocked_and_noted():
     ra = _rid()
     rows = [_stage_row_v3(ra, 11, "Nguyễn Bên A")]
     case = _two_party_case(rows, {1: ra}, properties=[])
     case.tai_san = None
     ctx = build_word_context(case)
-    assert word_block_reason(ctx) == "word.no_assets"
+    assert word_block_reason(ctx) is None
+    missing = []
+    build_template_mapping(case, missing=missing)
+    assert "tài sản" in missing

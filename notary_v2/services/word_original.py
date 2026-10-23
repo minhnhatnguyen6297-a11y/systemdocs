@@ -152,7 +152,12 @@ def validate_new_bindings(case, context, previous, store):
                 raise ValueError('Vị trí Word không khớp dòng/ô đã lưu hoặc chưa có giá trị: ' + slot)
 
 
-def reviewed_template(case, source_id, store):
+def reviewed_template(case, source_id, store, *, missing=None):
+    """Dựng bản gốc đã thay tại đúng span đã xác nhận.
+
+    Vị trí đã xác nhận nhưng trường chưa có giá trị đã lưu KHÔNG chặn
+    xuất (owner 23/10/2026 phần W): chỗ đó để trống và ghi vào `missing`.
+    Lệch slot/hash vẫn là lỗi mapping thật (hồ sơ đổi cấu trúc)."""
     snapshot = materialize_case_state(case)
     source = next((s for s in snapshot.get("docx_import", {}).get("sources", []) if s["source_id"] == source_id), None)
     if source is None or not source["bindings"]:
@@ -170,9 +175,12 @@ def reviewed_template(case, source_id, store):
         slot = slot_for(snapshot, candidate["target"], record['row_id'], binding["field_key"], ref, record)
         if slot != binding["slot"]:
             raise ValueError("Thứ tự người/tài sản hoặc ô Bên A/B đã đổi; xác nhận lại vị trí")
-        if slot not in values or values[slot] in (None, ""):
-            raise ValueError("Vị trí đã chọn chưa có giá trị đã lưu: " + slot)
         tokens.append((ref["span"], slot))
+        if slot not in values or values[slot] in (None, ""):
+            if missing is not None and slot not in missing:
+                missing.append(slot)
+            replacements.append((ref["span"], ""))
+            continue
         replacements.append((ref["span"], str(values[slot])))
     derivative = replace_spans(content, reader, tokens)
     derivative_hash = hashlib.sha256(derivative).hexdigest()
@@ -218,8 +226,10 @@ def binding_proposals(case, source_id, store):
 
 
 def export_original(case, source_id, store, destination, *, check_cancel=None):
+    missing = []
     try:
-        rendered, _ = reviewed_template(case, source_id, store)
+        rendered, _ = reviewed_template(case, source_id, store,
+                                        missing=missing)
     except (ValueError, OSError, KeyError, TypeError) as exc:
         raise batch.WordBatchError("word.original_mapping_invalid", str(exc)) from exc
     from pathlib import Path
@@ -241,4 +251,4 @@ def export_original(case, source_id, store, destination, *, check_cancel=None):
             temp.unlink(missing_ok=True)
     return batch._batch_data(dest, [{"document_key": "original.docx", "display_name": spec.display_name,
         "status": "saved", "actual_filename": name, "output_file": {"path": str(dest / name), "scope": "machine_local"},
-        "error": None}], succeeded=["original.docx"], failed=[], skipped=[])
+        "error": None, "missing": missing}], succeeded=["original.docx"], failed=[], skipped=[])
