@@ -84,7 +84,7 @@ job-level. Quyết định giữ nguyên sau review round 1.
 |---|---|---|
 | `case.id` (`case_id`) | integer | ID hồ sơ trong DB |
 | `row_id` | string UUID v4 | Định danh dòng case-owned do UI tạo; ổn định qua ghi/đọc, là khóa Diagram/participant/đất, không phải identity dùng chung. `workspace_source_latest` và `workspace_duplicate` trả **UUID v4 mới** cho mọi dòng, không tái dùng row_id nguồn |
-| `entity_id` | integer \| null | ID Customer/Property dùng chung do server resolve trong transaction ghi; có thể null kéo dài khi thiếu neo, không tạo identity giả. Trên dòng mới của create/save_case mới, ID dương được gửi như **gợi ý identity có kiểm neo** (§4.1 mục 5) |
+| `entity_id` | integer \| null | ID Customer/Property dùng chung do server resolve trong transaction ghi; có thể null kéo dài khi thiếu neo, không tạo identity giả. Đây là **trường nội bộ (wire echo)**, không có ô nhập: mọi `entity_id` client gửi chỉ là gợi ý và server tự quyết (§4.1 mục 5); không bao giờ phát `stage_validation_error` cho field này |
 | `revision` | integer ≥ 1 | Case mới revision=1; mọi write case đã có tăng đúng 1, kể cả lưu lại Done sạch |
 | `base_revision` | integer ≥ 1 | Bắt buộc với write case đã có, gồm save_case/convert_type; khác server (`<` hoặc `>`) → workspace_conflict trước ghi; cấm khi tạo mới |
 | `source_id`, `suggestion_id` | string UUID v4 | `source_id` do client sinh khi build request; `suggestion_id` do backend sinh |
@@ -364,17 +364,17 @@ loại giấy/nơi cấp/nhãn địa chỉ nằm trên row, không trong Stage 
    Neo đổi chỉ rebind row đang ghi, không sửa neo identity cũ hoặc Hồ sơ khác.
    Row mới/đổi neo chọn ID nhỏ nhất trong các match; không có thì tạo identity
    tối thiểu tên/số/khóa. Cache anchor trong transaction để dùng chung ID.
-5. **Gợi ý identity có kiểm neo (vòng 2 — dùng cho nguồn/nhân bản):** dòng
-   **mới** được gửi `entity_id` dương như một gợi ý, không phải dữ kiện master.
-   Server kiểm ID strict int dương và tồn tại đúng bảng; không tồn tại →
-   `stage_validation_error` gắn row/field. Nếu neo của payload còn khớp
-   identity đó → giữ đúng ID (kể cả ID cao khi có ID cũ trùng neo); neo bị
-   sửa → resolve lại theo neo mới, không sửa master; thiếu neo → null. Không
-   lấy trường từ identity để lấp Stage. Dòng cũ chỉ được echo `null` hoặc ID
-   đang gắn chính row đó; ID khác → `stage_validation_error`; ID cũ echo sau
-   đổi neo không ép liên kết sai, server resolve lại. Không upsert dữ kiện
-   vào master. *Hiện trạng code còn nhận explicit ID khác cho Người cũ; vòng 2
-   sửa đúng nhánh này khi có proof, không viết lại toàn resolver.*
+5. **Gợi ý identity (`entity_id`) chỉ là gợi ý nội bộ — không chặn user:**
+   client có thể gửi `entity_id` trên mọi dòng như echo/gợi ý từ GET, nguồn
+   Done hoặc nhân bản. Server chuẩn hóa: chỉ giá trị int ≥ 1 mới là hint;
+   giá trị rác coi như không có hint. Hint không tồn tại, lệch identity đang
+   gắn dòng hoặc không khớp neo đều bị **bỏ** và identity được resolve lại
+   theo neo chuẩn: Người = (tên chuẩn hóa + số giấy tờ), Tài sản = serial.
+   Không có neo khớp → dòng lưu với `entity_id=null` như dòng mới; **không
+   bao giờ** phát `stage_validation_error` cho `entity_id`. Neo của payload
+   còn khớp identity nguồn → giữ đúng ID (kể cả ID cao khi có ID cũ trùng
+   neo); neo bị sửa → resolve lại theo neo mới, không sửa master. Không lấy
+   trường từ identity để lấp Stage, không upsert dữ kiện vào master.
 6. Hai row_id cùng identity vẫn hai dòng độc lập; không duplicate_entity,
    không compact, UNIQUE neo hoặc merge/xóa/chuyển link Hồ sơ khác.
 
@@ -1106,6 +1106,7 @@ Namespace `notary.*` (snake_case không chấm):
 | `workspace_conflict` | `base_revision` khác revision server (cả nhỏ hơn lẫn lớn hơn) | `{server_revision}` |
 | `workspace_owner_required` | Owner inheritance **non-null** sai/ngoài Stage ở create/save_case/diagram_evaluate; chuyển vào inheritance không chọn owner hợp lệ. Chưa gán owner (absent/null) hợp lệ trên create/save_case/evaluate; commit/convert vẫn bắt buộc | — |
 | `stage_validation_error` | field Stage vi phạm | `{field_errors:[{row_id,field,code,message}]}` |
+| `workspace_storage_error` | Ràng buộc integrity khi ghi không ánh xạ được sang ô user thấy (row_id/vitri/entity_id là wire nội bộ). Dữ liệu chưa đổi | `{constraint, retryable:false}` — không field_errors, không row giả |
 | `intake_unsupported_source` | `kind` ngoài enum | `{source_id, kind}` |
 | `intake_source_too_large` | file > 20MB / PDF > 50 trang | `{source_id, limit}` |
 | `intake_too_many_sources` | sources > 8 | `{count, limit}` |
@@ -1626,7 +1627,12 @@ Field-error code mới trong `stage_validation_error.details.field_errors[]`:
 |---|---|
 | `asset_limit` | `stage.assets` > 5 (v2, S7 23/10/2026) |
 | `people_limit` | `stage.people` > 30 với `case_type:two_party` |
-| `identity_hint` | `entity_id` gợi ý trên dòng mới không phải int dương hoặc không tồn tại đúng bảng; không âm thầm đổi sang null |
+
+`entity_id` không còn mã field-error: hint lệch/không tồn tại/không khớp neo
+bị bỏ và resolve lại theo neo chuẩn (§4.1 mục 5, owner 23/10/2026). Ràng buộc
+integrity không ánh xạ được sang ô user thấy → `workspace_storage_error`
+(`details.constraint`, `retryable:false`), không giả danh field và không gắn
+row giả.
 
 Engine/detail codes mới (`details.errors[]`, `render_model.errors[]`):
 `invalid_position` (phần tử ngoài {1..5} / `id` ngoài `p1..p30` / sai
@@ -2056,8 +2062,9 @@ two_party (không còn trần 20 cụm — S6), và owner **non-null** sai →
 non-empty, owner inheritance hợp lệ). Địa chỉ tài sản nullable ở mọi đường
 (thiếu dữ kiện vẫn lưu, chuỗi rỗng ghi null). Row thiếu số giấy/serial
 rỗng hoặc toàn whitespace vẫn lưu với `entity_id=null`; dòng chỉ số/ngày
-lưu `ho_ten=null`, không chuỗi giả. Dòng mới có thể mang `entity_id`
-dương như gợi ý có kiểm neo (§4.1 mục 5). Nháp thiếu dữ liệu mở/sửa được
+lưu `ho_ten=null`, không chuỗi giả. `entity_id` là wire echo/gợi ý nội bộ:
+hint lệch/không tồn tại/không khớp neo bị bỏ và resolve lại theo neo chuẩn,
+không chặn Lưu (§4.1 mục 5). Nháp thiếu dữ liệu mở/sửa được
 và **Lưu hồ sơ** được ở mức tối thiểu (S1/S2); API commit của consumer
 khác vẫn có ngưỡng strict riêng; không có cờ partial và không biến
 incomplete thành invalid.
@@ -2082,9 +2089,10 @@ diagram: {state: <v3, domain khớp case_type>}
 ```
 Đây là đường persist nội dung soạn duy nhất của renderer, không gọi create/
 commit trước. Case mới dùng `draftId` ổn định của phiên làm idempotency_key;
-retry giữ đúng key + snapshot payload (§13.11). `stageForWire` phải giữ
-`entity_id` gợi ý trên dòng mới từ nguồn/nhân bản, kiểm neo theo §4.1 mục 5;
-baseline đã lưu chỉ hỗ trợ phân biệt row mới/cũ, không thay Stage hiện tại.
+retry giữ đúng key + snapshot payload (§13.11). `stageForWire` giữ nguyên
+`entity_id` server trả (echo/gợi ý); server tự bỏ hint khi lệch/không khớp
+neo theo §4.1 mục 5 — client không phải lọc. Baseline đã lưu chỉ hỗ trợ
+phân biệt row mới/cũ, không thay Stage hiện tại.
 
 
 Case mới cấm base_revision; case cũ cấm key; null/Boolean/sai kiểu ID reject.

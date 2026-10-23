@@ -275,16 +275,8 @@ def check_person_row(row, where, v, *, allow_null_name=False,
     rid = row.get("row_id")
     if not (isinstance(rid, str) and UUID4_RX.match(rid)):
         v.append(("stage_validation_error", f"{where} row_id={rid!r}"))
-    eid = row.get("entity_id")
-    if eid is not None and (not isinstance(eid, int) or isinstance(eid, bool)
-                            or eid < 1):
-        v.append(("stage_validation_error",
-                  f"{where} entity_id={eid!r} identity_hint"))
-    elif eid is not None and ctx:
-        known = ctx.get("known_person_entity_ids")
-        if isinstance(known, list) and eid not in known:
-            v.append(("stage_validation_error",
-                      f"{where} entity_id={eid!r} not in fixture identities"))
+    # entity_id là gợi ý nội bộ (§4.1 mục 5): giá trị lạ/không có trong
+    # fixture identity không phải lỗi field.
     name = row.get("ho_ten")
     if allow_null_name:
         if name is not None and (not isinstance(name, str) or not name.strip()):
@@ -334,16 +326,7 @@ def check_asset_row(row, where, v, draft_v2=False, ctx=None,
     if addr is not None and not isinstance(addr, str):
         v.append(("stage_validation_error",
                   f"{where} dia_chi={addr!r} must be str/null"))
-    eid = row.get("entity_id")
-    if eid is not None and (not isinstance(eid, int) or isinstance(eid, bool)
-                            or eid < 1):
-        v.append(("stage_validation_error",
-                  f"{where} entity_id={eid!r} identity_hint"))
-    elif eid is not None and ctx:
-        known = ctx.get("known_asset_entity_ids")
-        if isinstance(known, list) and eid not in known:
-            v.append(("stage_validation_error",
-                      f"{where} entity_id={eid!r} not in fixture identities"))
+    # entity_id là gợi ý nội bộ — không phải lỗi field (§4.1 mục 5).
     nc = row.get("ngay_cap")
     if nc is not None and not (isinstance(nc, str)
                               and DATE_OR_YEAR_RX.match(nc)):
