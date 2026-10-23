@@ -555,6 +555,26 @@ def _parent_role(node_id: str, info: Mapping[str, Any],
     return female_role if _clean(info.get("gioi_tinh")) == "Nữ" else male_role
 
 
+# Vai trò SUY ĐƯỢC từ vị trí node trong Diagram thừa kế — phải khớp mọi
+# nhánh `relation`/`role` của `_project_role_nodes` (kể cả fallback "Khac").
+# `vai_tro` của participant nằm ngoài tập này là vai trò GÁN TAY (vd "Người
+# được ủy quyền", chỉ sống ở cột `vai_tro`) — projection giữ nguyên. Thêm/
+# đổi vai trò suy từ sơ đồ thì cập nhật cả đây và `_project_role_nodes`.
+_DIAGRAM_ROLES = frozenset({
+    "Owner", "Vợ/Chồng", "Cha", "Mẹ", "Cha_vc", "Me_vc", "Con_dau_re",
+    "Con", "Anh/Chị/Em", "Cháu", "Khac",
+})
+
+
+def _is_manual_role(role: str) -> bool:
+    """`vai_tro` không suy ra được từ vị trí node nào → vai trò gán tay.
+
+    Không cần cột nguồn: bộ vai trò suy-từ-sơ-đồ là hữu hạn và nằm trong
+    `_DIAGRAM_ROLES`, nên dấu hiệu nguồn đã có sẵn trong dữ liệu.
+    """
+    return bool(role) and role not in _DIAGRAM_ROLES
+
+
 def _project_role_nodes(nodes: list[dict],
                         people: list[dict]) -> list[dict]:
     """Projection vai trò/quan hệ TRONG RAM, keyed `row_id`.
@@ -2190,7 +2210,12 @@ class CaseWorkspaceService:
                                      people: list,
                                      owner_row_id: Optional[str]) -> None:
         """Diff participant theo `case_person_row_id`; owner projection =
-        identity của owner row (có thể null)."""
+        identity của owner row (có thể null).
+
+        `vai_tro` của dòng suy-từ-sơ-đồ được ghi lại theo hình dạng Diagram
+        ĐÃ LƯU gần nhất mỗi lần gọi (issue #45). Dòng mang vai trò gán tay
+        (`_is_manual_role`) giữ nguyên vai trò đó.
+        """
         people_by_row = self._sync_owner_projection(
             case, people, owner_row_id)
 
@@ -2226,7 +2251,12 @@ class CaseWorkspaceService:
                     ty_le=0.0)
                 self.db.add(row)
             else:
-                role = row.vai_tro or role
+                stored_role = _clean(row.vai_tro)
+                if _is_manual_role(stored_role):
+                    # Vai trò gán tay không suy được từ sơ đồ: giữ nguyên.
+                    role = stored_role
+                else:
+                    row.vai_tro = role
                 row.hang_thua_ke = _hang_for_role(role)
             row.customer_id = (people_by_row.get(person_id) or {}).get(
                 "entity_id")

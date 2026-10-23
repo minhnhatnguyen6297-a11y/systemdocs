@@ -813,6 +813,190 @@ def test_commit_stage_rebuilds_participants_by_row_id(db):
     assert parts[heir_row].co_nhan_tai_san is True
 
 
+def test_commit_stage_reprojects_derived_roles_to_latest_diagram(
+        db, session_factory):
+    """#45 TC1: đổi quan hệ sau lần Lưu đầu → Lưu lại → participants khớp
+    sơ đồ mới và Word điền placeholder vợ/chồng theo người mới."""
+    from services import word_engine
+
+    case, deceased, _prop, _h = _make_case(db)
+    owner_row = case.person_rows[0].row_id
+    first_spouse = str(uuid.uuid4())
+    child = str(uuid.uuid4())
+    people = [
+        _person_row(row_id=owner_row, entity_id=deceased.id,
+                    ho_ten="Nguyễn Văn An", ngay_chet="2011-05-15",
+                    so_giay_to="001234567890"),
+        _person_row(row_id=first_spouse, ho_ten="Trần Thị Vợ",
+                    gioi_tinh="Nữ", ngay_sinh="1955-04-05"),
+        _person_row(row_id=child, ho_ten="Nguyễn Văn Con",
+                    gioi_tinh="Nam", ngay_sinh="1980-08-09"),
+    ]
+
+    _write_state(case, db, _v3_state([
+        _node("owner", owner_row, spouse="spouse", own=[1]),
+        _node("spouse", first_spouse, spouse="owner", receive=[1]),
+        _node("child_1", child, parents=("owner", "spouse"))]),
+        owner_row_id=owner_row)
+    _commit(db, case.id, 1, people, [_asset_row(so_serial="DD123456")])
+
+    db.refresh(case)
+    parts = {p.case_person_row_id: p for p in case.participants}
+    assert parts[first_spouse].vai_tro == "Vợ/Chồng"
+    assert parts[child].vai_tro == "Con"
+    assert parts[child].parent_case_person_row_id == owner_row
+
+    # Đổi quan hệ: đưa người con lên vai trò vợ/chồng, người vợ cũ xuống con.
+    _write_state(case, db, _v3_state([
+        _node("owner", owner_row, spouse="spouse", own=[1]),
+        _node("spouse", child, spouse="owner", receive=[1]),
+        _node("child_1", first_spouse, parents=("owner", "spouse"))]),
+        owner_row_id=owner_row)
+    _commit(db, case.id, 2, people, [_asset_row(so_serial="DD123456")])
+
+    db.refresh(case)
+    parts = {p.case_person_row_id: p for p in case.participants}
+    assert parts[child].vai_tro == "Vợ/Chồng"
+    assert parts[child].hang_thua_ke == 1
+    assert parts[first_spouse].vai_tro == "Con"
+    assert parts[first_spouse].hang_thua_ke == 1
+    assert parts[first_spouse].parent_case_person_row_id == owner_row
+
+    fresh = session_factory()
+    try:
+        db_case = fresh.get(InheritanceCase, case.id)
+        mapping = word_engine.build_template_mapping(db_case)
+        assert mapping["[Họ tên chủ đất]"] == "Nguyễn Văn An"
+        assert mapping["[Họ tên vợ/chồng]"] == "Nguyễn Văn Con"
+    finally:
+        fresh.close()
+
+
+def test_commit_stage_preserves_manual_participant_role(db):
+    """#45 TC2: vai trò gán tay (ngoài bộ suy-từ-sơ-đồ) không bị ghi đè."""
+    from services import word_engine
+
+    case, deceased, _prop, _h = _make_case(db)
+    owner_row = case.person_rows[0].row_id
+    spouse = str(uuid.uuid4())
+    child = str(uuid.uuid4())
+    people = [
+        _person_row(row_id=owner_row, entity_id=deceased.id,
+                    ho_ten="Nguyễn Văn An", ngay_chet="2011-05-15",
+                    so_giay_to="001234567890"),
+        _person_row(row_id=spouse, ho_ten="Trần Thị Vợ", gioi_tinh="Nữ"),
+    ]
+
+    _write_state(case, db, _v3_state([
+        _node("owner", owner_row, spouse="spouse", own=[1]),
+        _node("spouse", spouse, spouse="owner", receive=[1])]),
+        owner_row_id=owner_row)
+    _commit(db, case.id, 1, people, [_asset_row(so_serial="DD123456")])
+
+    db.refresh(case)
+    manual = next(p for p in case.participants
+                  if p.case_person_row_id == spouse)
+    # Tác nghiệp gán tay trên dòng đã có (routers/participants edit).
+    manual.vai_tro = "Người được ủy quyền"
+    db.commit()
+
+    # Thay đổi sơ đồ không liên quan: thêm một người con.
+    _write_state(case, db, _v3_state([
+        _node("owner", owner_row, spouse="spouse", own=[1]),
+        _node("spouse", spouse, spouse="owner", receive=[1]),
+        _node("child_1", child, parents=("owner", "spouse"), receive=[1])]),
+        owner_row_id=owner_row)
+    _commit(db, case.id, 2, [
+        *people,
+        _person_row(row_id=child, ho_ten="Nguyễn Văn Con",
+                    gioi_tinh="Nam"),
+    ], [_asset_row(so_serial="DD123456")])
+
+    db.refresh(case)
+    parts = {p.case_person_row_id: p for p in case.participants}
+    assert parts[spouse].vai_tro == "Người được ủy quyền"
+    assert parts[child].vai_tro == "Con"
+
+    db.expire(case)
+    context = word_engine.build_word_context(case)
+    assert [p.ho_ten for p in context.authorized_people] == [
+        "Trần Thị Vợ"]
+
+
+def test_commit_stage_projects_full_family_with_parent_anchor_and_word_slots(
+        db):
+    """#45 TC4: vợ/chồng owner, neo cha/mẹ và slot Word legacy giữ như trước."""
+    from services import word_engine
+
+    case, deceased, _prop, _h = _make_case(db)
+    owner_row = case.person_rows[0].row_id
+    rows = {
+        "spouse": str(uuid.uuid4()),
+        "child": str(uuid.uuid4()),
+        "father": str(uuid.uuid4()),
+        "mother": str(uuid.uuid4()),
+        "spouse_father": str(uuid.uuid4()),
+        "spouse_mother": str(uuid.uuid4()),
+        "child_spouse": str(uuid.uuid4()),
+        "grandchild": str(uuid.uuid4()),
+    }
+    names = {
+        "spouse": "Trần Thị Vợ", "child": "Nguyễn Văn Con",
+        "father": "Nguyễn Văn Cha", "mother": "Lê Thị Mẹ",
+        "spouse_father": "Trần Văn Cha Vợ",
+        "spouse_mother": "Phạm Thị Mẹ Vợ",
+        "child_spouse": "Đỗ Thị Dâu", "grandchild": "Nguyễn Văn Cháu",
+    }
+    genders = {
+        "spouse": "Nữ", "child": "Nam", "father": "Nam", "mother": "Nữ",
+        "spouse_father": "Nam", "spouse_mother": "Nữ",
+        "child_spouse": "Nữ", "grandchild": "Nam",
+    }
+    people = [
+        _person_row(row_id=owner_row, entity_id=deceased.id,
+                    ho_ten="Nguyễn Văn An", ngay_chet="2011-05-15",
+                    so_giay_to="001234567890"),
+        *[_person_row(row_id=rows[key], ho_ten=names[key],
+                      gioi_tinh=genders[key]) for key in rows],
+    ]
+    _write_state(case, db, _v3_state([
+        _node("father", rows["father"]),
+        _node("mother", rows["mother"]),
+        _node("spouse_father", rows["spouse_father"]),
+        _node("spouse_mother", rows["spouse_mother"]),
+        _node("owner", owner_row, parents=("father", "mother"),
+              spouse="spouse", own=[1]),
+        _node("spouse", rows["spouse"],
+              parents=("spouse_father", "spouse_mother"), spouse="owner"),
+        _node("child_1", rows["child"], parents=("owner", "spouse"),
+              receive=[1]),
+        _node("child_spouse", rows["child_spouse"], spouse="child_1"),
+        _node("grandchild", rows["grandchild"], parents=("child_1",))]),
+        owner_row_id=owner_row)
+    _commit(db, case.id, 1, people, [_asset_row(so_serial="DD123456")])
+
+    db.refresh(case)
+    parts = {p.case_person_row_id: p for p in case.participants}
+    assert owner_row not in parts
+    assert parts[rows["spouse"]].vai_tro == "Vợ/Chồng"
+    assert parts[rows["child"]].vai_tro == "Con"
+    assert parts[rows["child"]].parent_case_person_row_id == owner_row
+    assert parts[rows["father"]].vai_tro == "Cha"
+    assert parts[rows["mother"]].vai_tro == "Mẹ"
+    assert parts[rows["spouse_father"]].vai_tro == "Cha_vc"
+    assert parts[rows["spouse_mother"]].vai_tro == "Me_vc"
+    assert parts[rows["child_spouse"]].vai_tro == "Con_dau_re"
+    assert parts[rows["child_spouse"]].parent_case_person_row_id is None
+    assert parts[rows["grandchild"]].vai_tro == "Cháu"
+    assert parts[rows["grandchild"]].parent_case_person_row_id == rows["child"]
+
+    db.expire(case)
+    mapping = word_engine.build_template_mapping(case)
+    assert mapping["[Họ tên chủ đất]"] == "Nguyễn Văn An"
+    assert mapping["[Họ tên vợ/chồng]"] == "Trần Thị Vợ"
+    assert mapping["[Người nhận 1 - Họ tên]"] == "Nguyễn Văn Con"
+
+
 def test_commit_stage_concurrent_same_base_conflicts(db, session_factory):
     case, deceased, _prop, _h = _make_case(db)
     owner_row = case.person_rows[0].row_id
