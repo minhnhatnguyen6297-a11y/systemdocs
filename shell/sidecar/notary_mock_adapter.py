@@ -2345,65 +2345,38 @@ def diagram_save(job, payload):
 def _word_block_reason(case, document_key=None, *, static=False):
     """Readiness theo validation that (contract §8.1 mapping).
 
-    Folder mode static=True chi kiem dieu kien ky thuat; catalog cu giu
-    dieu kien chu dat/người nhan. Two_party khong ap dieu kien thua ke."""
+    Parity `word_engine.word_block_reason` sau phan W (owner 23/10/2026):
+    thieu du kien KHONG con la ly do chan — chi tran so luong. Folder
+    mode static=True chi kiem dieu kien ky thuat; catalog giu them tran
+    nguoi ky cua thua ke."""
     if document_key is not None and document_key in NO_TEMPLATE_KEYS:
         return "word.template_missing"
     assets = case["stage"]["assets"]
     nodes = [n for n in (case["diagram"].get("state") or {}).get("nodes")
              or [] if isinstance(n, dict) and not n.get("deleted")]
     stage_people = _person_map(case)
-    if static:
-        if not stage_people:
-            return "word.no_people"
-        if not assets:
-            return "word.no_assets"
-        if len(assets) > 5:
-            return "word.too_many_assets"
-        if len(stage_people) > (30 if case.get("case_type") == CASE_TYPE_TWO_PARTY else 20):
-            return "word.too_many_people"
-        state_nodes = (case["diagram"].get("state") or {}).get("nodes")
-        if case.get("case_type") == CASE_TYPE_TWO_PARTY and not state_nodes:
-            return "word.no_diagram"
-        return None
+    if len(assets) > 5:
+        return "word.too_many_assets"
     if case.get("case_type") == CASE_TYPE_TWO_PARTY:
-        if not stage_people:
-            return "word.no_people"
-        if not nodes:
-            return "word.no_diagram"
-        if not assets:
-            return "word.no_assets"
-        if len(assets) > 5:
-            return "word.too_many_assets"
         if len(stage_people) > 30:
             return "word.too_many_people"
         return None
-    if not assets:
-        return "word.no_assets"
-    if len(assets) > 5:
-        return "word.too_many_assets"
-    landowners = [n for n in nodes
-                  if n.get("ownPositions") and n.get("personId")]
-    if not landowners:
-        return "word.no_landowner"
-    deceased = [n for n in landowners
-                if (stage_people.get(n["personId"]) or {}).get("ngay_chet")]
-    if not deceased:
-        return "word.no_deceased_landowner"
-    receivers = [n for n in nodes
-                 if n.get("receivePositions") and n.get("personId")]
-    if not receivers:
-        return "word.no_receiver"
     if len(stage_people) > 20:
         return "word.too_many_people"
-    # signers = living landowners + receivers, dedupe personId — parity
-    # voi word_engine.word_block_reason (real, MIN-110 review).
-    living_landowners = [n for n in landowners if n not in deceased]
-    signer_ids = {n["personId"]
-                  for n in [*living_landowners, *receivers]
-                  if n.get("personId")}
-    if len(signer_ids) > 20:
-        return "word.too_many_signers"
+    if not static:
+        # signers = living landowners + receivers, dedupe personId —
+        # parity voi word_engine.word_block_reason (real, MIN-110 review).
+        receivers = [n for n in nodes
+                     if n.get("receivePositions") and n.get("personId")]
+        living_landowners = [
+            n for n in nodes
+            if n.get("ownPositions") and n.get("personId")
+            and not (stage_people.get(n["personId"]) or {}).get("ngay_chet")]
+        signer_ids = {n["personId"]
+                      for n in [*living_landowners, *receivers]
+                      if n.get("personId")}
+        if len(signer_ids) > 20:
+            return "word.too_many_signers"
     return None
 
 
@@ -2482,13 +2455,16 @@ def word_export_options(job, payload):
 
     NAIA-8: two_party mo (readiness word.no_people/no_diagram/...);
     template_dir → documents = .docx quet duoc thay vi catalog co dinh."""
-    case = _case(payload)
+    case = None
+    if (payload or {}).get("case_id") is not None:
+        case = _case(payload)
     template_root = _word_template_dir(payload)
     if template_root is not None:
         scanned = _scan_template_dir(template_root)
         docs = []
         for item in scanned:
-            reason = _word_block_reason(case, static=True)
+            reason = (_word_block_reason(case, static=True)
+                      if case is not None else None)
             docs.append({"document_key": item["document_key"],
                          "display_name": item["display_name"],
                          "ready": reason is None,
@@ -2499,7 +2475,8 @@ def word_export_options(job, payload):
                         "documents": docs})
     docs = []
     for key, meta in DOC_CATALOG.items():
-        reason = _word_block_reason(case, key)
+        reason = (_word_block_reason(case, key)
+                  if case is not None else None)
         docs.append({"document_key": key,
                      "display_name": meta["display_name"],
                      "ready": reason is None,
@@ -2728,7 +2705,8 @@ def word_export_batch(job, payload):
                          "status": "failed", "actual_filename": None,
                          "output_file": None,
                          "error": {"code": dest_error[0],
-                                   "message": dest_error[1]}})
+                                   "message": dest_error[1]},
+                         "missing": []})
             failed.append(key)
             job.report_progress(i + 1, len(keys),
                                 f"văn bản {i + 1}/{len(keys)}")
@@ -2748,7 +2726,8 @@ def word_export_batch(job, payload):
                          "status": "failed", "actual_filename": None,
                          "output_file": None,
                          "error": {"code": reason,
-                                   "message": _block_message(reason)}})
+                                   "message": _block_message(reason)},
+                         "missing": []})
             failed.append(key)
         else:
             time.sleep(WORD_DOC_DELAY)       # mo phong render docx
@@ -2774,7 +2753,8 @@ def word_export_batch(job, payload):
                              "status": "failed", "actual_filename": None,
                              "output_file": None,
                              "error": {"code": code,
-                                       "message": f"không ghi được file: {exc}"}})
+                                       "message": f"không ghi được file: {exc}"},
+                             "missing": []})
                 failed.append(key)
             else:
                 out_path = dest_dir / name
@@ -2783,7 +2763,7 @@ def word_export_batch(job, payload):
                              "status": "saved", "actual_filename": name,
                              "output_file": {"path": str(out_path),
                                              "scope": "machine_local"},
-                             "error": None})
+                             "error": None, "missing": []})
                 saved.append(key)
         job.report_progress(i + 1, len(keys),
                             f"văn bản {i + 1}/{len(keys)}")

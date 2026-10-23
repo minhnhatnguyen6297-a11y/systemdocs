@@ -1649,15 +1649,16 @@ class TestWordExport:
                 "is_dir": True}
 
     @pytest.mark.parametrize("case_type,people,assets,has_diagram,expected", [
+        # Phần W (owner 23/10/2026): thiếu dữ kiện không còn là block.
         ("inheritance", 1, 1, False, None),
-        ("inheritance", 0, 0, False, "word.no_people"),
-        ("inheritance", 1, 0, False, "word.no_assets"),
+        ("inheritance", 0, 0, False, None),
+        ("inheritance", 1, 0, False, None),
         ("inheritance", 1, 6, False, "word.too_many_assets"),
         ("inheritance", 21, 1, False, "word.too_many_people"),
-        ("two_party", 1, 1, False, "word.no_diagram"),
+        ("two_party", 1, 1, False, None),
         ("two_party", 1, 1, True, None),
         ("two_party", 31, 1, True, "word.too_many_people"),
-        ("two_party", 1, 0, False, "word.no_assets"),
+        ("two_party", 1, 0, False, None),
     ])
     def test_folder_readiness_matches_real_technical_checks(
             self, case_type, people, assets, has_diagram, expected, monkeypatch):
@@ -1692,10 +1693,10 @@ class TestWordExport:
         batch = _call("word_export_batch", {**payload,
             "document_keys": ["static.docx"], "destination": self._dest(dest)})
         assert batch["data"]["documents"][0]["status"] == "saved"
-        # Catalog callers still use the legacy checks.
+        # Catalog callers dùng cùng kiểm tra kỹ thuật: thiếu chủ đất không block.
         legacy = _call("word_export_options", {"case_id": 42})
         docs = {d["document_key"]: d for d in legacy["data"]["documents"]}
-        assert docs["khai_nhan_di_san"]["block_reason"] == "word.no_landowner"
+        assert docs["khai_nhan_di_san"]["block_reason"] is None
 
     def test_options_ready_case(self):
         mock.reset_backend(_load_fixture("ready.json"))
@@ -1708,12 +1709,13 @@ class TestWordExport:
         _assert_contract(_job_doc(
             "notary.word_export_options", {"case_id": 42}, result=res))
 
-    def test_options_empty_case_blocked(self):
+    def test_options_empty_case_ready(self):
+        # W6: thiếu dữ kiện không chặn — readiness chỉ còn mức kỹ thuật/mẫu.
         mock.reset_backend(_load_fixture("empty.json"))
         res = _call("word_export_options", {"case_id": 43})
         docs = {d["document_key"]: d for d in res["data"]["documents"]}
-        assert docs["khai_nhan_di_san"]["ready"] is False
-        assert docs["khai_nhan_di_san"]["block_reason"] == "word.no_assets"
+        assert docs["khai_nhan_di_san"]["ready"] is True
+        assert docs["khai_nhan_di_san"]["block_reason"] is None
         assert docs["niem_yet"]["block_reason"] == "word.template_missing"
 
     @WINDOWS_ONLY

@@ -1147,18 +1147,25 @@ def word_export_options(job, payload):
     Read-only: duoc phep tren locked/unsupported (§5.3 chi workspace_get
     quyet dinh capability) — mock oracle khong _check_writable.
     NAIA-8: `template_dir` (FileRef thu muc) → documents = file .docx
-    quet duoc thay vi catalog co dinh."""
+    quet duoc thay vi catalog co dinh.
+    Phan W (owner 23/10/2026): ho so CHUA LUU (`case_id` absent/null) van
+    quet duoc nguon mau — readiness chi con muc mau; luot xuat tu tao +
+    luu truoc khi render. Nguon Word goc thi phai co ho so da luu."""
     p = payload if isinstance(payload, dict) else {}
     extra = set(p) - {"case_id", "template_dir", "original_source_id"}
     if extra:
         raise CommandError("validation_error",
                            f"payload key la: {sorted(extra)}")
-    cid = _word_case_id(payload)
+    has_case = p.get("case_id") is not None
+    if not has_case and p.get("original_source_id"):
+        raise CommandError("validation_error",
+                           "Hồ sơ chưa lưu — chưa có nguồn Word gốc")
+    cid = _word_case_id(payload) if has_case else None
     wbe = _svc("word_batch_export")
     models = _models()
     sess = _db_session()
     try:
-        case = _word_case(sess, models, cid)
+        case = _word_case(sess, models, cid) if has_case else None
         if p.get("original_source_id"):
             if p.get("template_dir"):
                 raise CommandError("validation_error", "Chỉ chọn một nguồn mẫu Word")
