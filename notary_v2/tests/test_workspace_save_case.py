@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 import database
@@ -722,3 +723,25 @@ def test_save_case_new_row_garbage_hint_resolves_or_null(db, dataset):
     assert rows[with_doc["row_id"]]["entity_id"] is not None
     assert rows[without_doc["row_id"]]["entity_id"] is None
 
+
+def test_save_case_integrity_error_is_infra_not_fake_field(
+        db, dataset, monkeypatch):
+    """IntegrityError không còn giả danh `entity_id`: trả lỗi hạ tầng có mã
+    riêng, không field_errors, không row giả (owner 23/10/2026)."""
+    def boom(self, case, stage):
+        raise IntegrityError(
+            "INSERT INTO case_person_rows", {},
+            Exception("UNIQUE constraint failed: case_person_rows.case_id, "
+                      "case_person_rows.row_id"))
+
+    monkeypatch.setattr(CaseWorkspaceService, "_write_stage_rows", boom)
+    with pytest.raises(WorkspaceError) as exc:
+        CaseWorkspaceService(db).save_case(
+            case_id=None, base_revision=None, idempotency_key=_key(),
+            case_meta=_meta(), stage=_f1_stage(dataset),
+            state=_f1_state())
+
+    assert exc.value.code == "workspace_storage_error"
+    assert "field_errors" not in exc.value.details
+    assert exc.value.details["constraint"] == "case_person_rows"
+    assert exc.value.details["retryable"] is False

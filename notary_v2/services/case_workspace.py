@@ -248,6 +248,36 @@ def _field_error(row_id: Any, field: str, code: str, message: str,
     }
 
 
+# Ràng buộc integrity có thể gặp khi ghi hồ sơ. Không ràng buộc nào ánh xạ
+# tới ô user nhìn thấy được (row_id/vitri là wire nội bộ; customer_id/
+# property_id là `entity_id` nội bộ) → trả lỗi hạ tầng riêng, KHÔNG giả
+# danh field và KHÔNG gắn row giả (owner 23/10/2026).
+_INTEGRITY_CONSTRAINTS = (
+    "uq_case_person_row_case_row",
+    "uq_case_asset_row_case_row",
+    "uq_property_land_row_vitri",
+    "uq_case_asset_land_row_vitri",
+    "ck_case_person_row_vitri",
+    "ck_case_asset_row_vitri",
+    "case_person_rows",
+    "case_asset_rows",
+    "property_land_rows",
+    "case_asset_land_rows",
+    "foreign key",
+)
+
+
+def _integrity_error(exc: IntegrityError) -> WorkspaceError:
+    raw = str(getattr(exc, "orig", None) or exc)
+    constraint = next(
+        (name for name in _INTEGRITY_CONSTRAINTS if name.lower() in
+         raw.lower()), None)
+    return WorkspaceError(
+        "workspace_storage_error",
+        "Không ghi được hồ sơ do ràng buộc dữ liệu nội bộ",
+        details={"constraint": constraint, "retryable": False})
+
+
 def _check_extra_keys(mapping: Any, allowed: set, where: str) -> None:
     if not isinstance(mapping, Mapping):
         return
@@ -929,9 +959,7 @@ class CaseWorkspaceService:
             raise
         except IntegrityError as exc:
             self.db.rollback()
-            raise WorkspaceError(
-                "validation_error",
-                "Dữ liệu vi phạm ràng buộc integrity") from exc
+            raise _integrity_error(exc) from exc
         except Exception:
             self.db.rollback()
             raise
@@ -1105,12 +1133,7 @@ class CaseWorkspaceService:
             raise
         except IntegrityError as exc:
             self.db.rollback()
-            raise WorkspaceError(
-                "stage_validation_error",
-                "Dữ liệu vi phạm ràng buộc integrity",
-                details={"field_errors": [_field_error(
-                    None, "entity_id", "invalid_format",
-                    "giá trị trùng/vi phạm ràng buộc duy nhất")]}) from exc
+            raise _integrity_error(exc) from exc
         except Exception:
             self.db.rollback()
             raise
@@ -1472,12 +1495,7 @@ class CaseWorkspaceService:
             raise
         except IntegrityError as exc:
             self.db.rollback()
-            raise WorkspaceError(
-                "stage_validation_error",
-                "Dữ liệu vi phạm ràng buộc integrity",
-                details={"field_errors": [_field_error(
-                    None, "entity_id", "invalid_format",
-                    "giá trị trùng/vi phạm ràng buộc duy nhất")]}) from exc
+            raise _integrity_error(exc) from exc
         except Exception:
             self.db.rollback()
             raise
@@ -1751,12 +1769,7 @@ class CaseWorkspaceService:
             raise
         except IntegrityError as exc:
             self.db.rollback()
-            raise WorkspaceError(
-                "stage_validation_error",
-                "Dữ liệu vi phạm ràng buộc integrity",
-                details={"field_errors": [_field_error(
-                    None, "entity_id", "invalid_format",
-                    "giá trị trùng/vi phạm ràng buộc duy nhất")]}) from exc
+            raise _integrity_error(exc) from exc
         except Exception:
             self.db.rollback()
             raise
