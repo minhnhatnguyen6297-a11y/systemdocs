@@ -2484,3 +2484,24 @@ test('G5: lỗi field người ẩn hiện nhãn dễ hiểu, không in mã thô
     (e) => e.classList.contains('cd-card-alert'))[0];
   assert.match(box2.textContent, /field_la_xyz/);
 });
+
+test('G5: lỗi field tài sản ẩn (entity_id) → hộp cảnh báo đúng card',
+  async () => {
+    const { model, view } = await build(test, { draft: false });
+    model.state.fieldErrors = [
+      { row_id: 'cA1', field: 'entity_id', code: 'invalid_format' }];
+    model.dismissNotice();
+    const assets = collect(view.el,
+      (e) => e.classList.contains('cd-assets'))[0];
+    const box = collect(assets,
+      (e) => e.classList.contains('cd-card-alert'))[0];
+    assert.ok(box, 'thiếu hộp cảnh báo ở card Tài sản');
+    assert.match(box.textContent, /Tài sản 1/);
+    assert.match(box.textContent, /Mã định danh nội bộ/);
+    assert.doesNotMatch(box.textContent, /entity_id/);
+    // Lỗi thuộc dòng tài sản không được tô đỏ oan card Người.
+    const people = collect(view.el,
+      (e) => e.classList.contains('cd-people'))[0];
+    assert.equal(collect(people,
+      (e) => e.classList.contains('cd-card-alert')).length, 0);
+  });

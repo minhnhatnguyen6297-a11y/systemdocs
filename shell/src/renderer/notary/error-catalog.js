@@ -91,6 +91,11 @@ const ERROR_CATALOG = {
     title: 'Hồ sơ đã thay đổi ở phiên bản khác',
     hint: 'Tải lại bản mới hoặc giữ nháp để sao chép tay.',
   },
+  workspace_storage_error: {
+    title: 'Không ghi được hồ sơ do ràng buộc dữ liệu nội bộ',
+    hint: 'Dữ liệu hồ sơ chưa thay đổi. Đây là lỗi kỹ thuật — thử lại; ' +
+      'nếu vẫn lỗi, chụp thông báo này để kiểm tra.',
+  },
   workspace_owner_required: {
     title: 'Chưa chọn người để lại tài sản',
     hint: 'Kéo người để lại (đã mất) từ bảng Người vào ô khởi tạo ' +

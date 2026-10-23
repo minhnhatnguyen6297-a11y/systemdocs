@@ -75,6 +75,9 @@ const PERSON_FIELD_LABELS = {
   place_of_origin: 'Quê quán',
   loai_giay_to: 'Loại giấy tờ',
   loai_dia_chi: 'Loại địa chỉ',
+  entity_id: 'Mã định danh nội bộ',
+  row_id: 'Mã dòng nội bộ',
+  row: 'Dòng dữ liệu',
 };
 
 // Asset stage rows — 4 hàng đầu khớp bản mẫu + 'land' chip + phần còn
@@ -95,6 +98,17 @@ const ASSET_FIELD_ROWS = [
   ['ngay_cap', 'Ngày cấp'],
   ['co_quan_cap', 'Cơ quan cấp'],
 ];
+
+// Field tài sản không có ô trên bảng → nhãn cho hộp lỗi cuối card. Không
+// in mã snake_case trần; field lạ giữ mã thô (không nuốt lỗi).
+const ASSET_FIELD_LABELS = {
+  entity_id: 'Mã định danh nội bộ',
+  row_id: 'Mã dòng nội bộ',
+  row: 'Dòng dữ liệu',
+  thoi_han: 'Thời hạn',
+  land_rows: 'Loại đất',
+  assets: 'Danh sách tài sản',
+};
 
 const GIOI_TINH_OPTS = [['', '—'], ['Nam', 'Nam'], ['Nữ', 'Nữ']];
 
@@ -1854,6 +1868,26 @@ function createNotaryModuleView(deps) {
     return box;
   }
 
+  // Lỗi field tài sản KHÔNG có ô trên bảng (entity_id/thoi_han/field lạ)
+  // — trước đây chỉ làm đỏ tiêu đề cột mà không nói lỗi gì. Gom lên đầu
+  // card tài sản để viền đỏ luôn có lời giải thích.
+  function hiddenAssetFieldErrors() {
+    const shown = new Set(ASSET_FIELD_ROWS
+      .map(([k]) => (k === 'land' ? 'land_rows' : k)));
+    const rows = new Map(model.state.stage.assets
+      .map((a, i) => [a.row_id, `Tài sản ${i + 1}`]));
+    const extra = (model.state.fieldErrors || []).filter((e) =>
+      e.row_id != null && rows.has(e.row_id) && !shown.has(e.field));
+    if (!extra.length) return null;
+    const box = h('div', 'cd-row-errors cd-card-alert');
+    for (const er of extra) {
+      const label = ASSET_FIELD_LABELS[er.field] || er.field;
+      box.append(h('div', 'error small',
+        `${rows.get(er.row_id)} · ${label}: ${errLine(er)}`));
+    }
+    return box;
+  }
+
   function stageTierEl() {
     const s = model.state;
     const wrap = h('div', 'cd-stage-wrap');
@@ -1875,6 +1909,8 @@ function createNotaryModuleView(deps) {
     const aBody = h('div', 'card-body cd-stage-body');
     const aErr = cardLevelErrors('assets');
     if (aErr) aBody.append(aErr);
+    const aHidden = hiddenAssetFieldErrors();
+    if (aHidden) aBody.append(aHidden);
     if (!s.stage.assets.length) {
       const e = face(L.faceEmpty('Chưa có tài sản.'));
       const b = btn('+ Thêm tài sản đầu tiên', '', () => model.addAsset());
