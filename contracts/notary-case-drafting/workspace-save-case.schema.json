@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://systemdocs/contracts/notary-case-drafting/workspace-save-case.schema.json",
   "title": "notary.workspace_save_case — Storage B đang triển khai vòng 1",
-  "description": "Lưu nguyên tử metadata, Stage case-owned và Diagram v3; server quyết định done, revision, identity và render_model. Không nới validation tên/địa chỉ, create không rỗng hoặc owner thừa kế trong vòng 1.",
+  "description": "Lưu nguyên tử metadata, Stage case-owned và Diagram v3; server quyết định done, revision, identity và render_model. Từ 23/10/2026 (S1/S2): case mới cho 0 Người/0 Tài sản và owner null; mỗi dòng Người cần họ tên, mỗi dòng Tài sản cần số thửa + số tờ; chuỗi rỗng ghi null.",
   "definitions": {
     "case_meta": {
       "allOf": [
@@ -35,15 +35,13 @@
           "then": {"required": ["base_revision"], "not": {"required": ["idempotency_key"]}},
           "else": {
             "required": ["idempotency_key"],
-            "not": {"required": ["base_revision"]},
-            "properties": {"stage": {"properties": {"people": {"minItems": 1}, "assets": {"minItems": 1}}}}
+            "not": {"required": ["base_revision"]}
           }
         },
         {
           "if": {"properties": {"case": {"anyOf": [{"required": ["case_type"], "properties": {"case_type": {"const": "inheritance"}}}, {"required": ["casetype"], "properties": {"casetype": {"const": "inheritance"}}}]}}},
           "then": {
             "properties": {
-              "stage": {"required": ["owner_row_id"]},
               "diagram": {"properties": {"state": {"properties": {"domain": {"const": "inheritance"}}}}}
             }
           },

@@ -515,19 +515,19 @@ Semantics:
   đất/projection + Diagram/meta → revision=1, status=draft → commit duy nhất.
   Lỗi bất kỳ rollback cả identity mới/key/hash; field Stage trả
   `stage_validation_error`, Diagram sai trả mã tương ứng, không partial.
-- **Owner bắt buộc:** v1 lịch sử dùng node owner có personId; v2 dùng
-  stage.owner_row_id trong people (§13.6), diagram optional khi create.
-  Với **create nháp vòng 2**, inheritance được absent/null owner và
-  people có thể rỗng/tên null. Owner **non-null** sai/ngoài Stage →
-  `workspace_owner_required`; two_party vẫn cấm key. Chỉ định này không là
-  chudat và không được thay bằng ownPositions/isLandOwner.
+- **Owner khi tạo (S2 23/10/2026):** v1 lịch sử dùng node owner có
+  personId; v2 dùng stage.owner_row_id trong people (§13.6), diagram
+  optional khi create. **Create nháp và Lưu hồ sơ** đều được
+  absent/null owner (chưa gán Chủ đất); owner **non-null** sai/ngoài Stage
+  → `workspace_owner_required`; two_party vẫn cấm key. Chỉ định này không
+  là chudat và không được thay bằng ownPositions/isLandOwner.
 - **Validation theo ý định, không dùng chung một guard:** `workspace_create`
   (partial-create vòng 2) cho ≥0 Người, ≥0 Tài sản, `ho_ten=null`, owner
-  `null`; vẫn kiểm kiểu/ngày/enum/giới hạn 3 tài sản/20 cụm/30 Người
-  two_party. `workspace_save_case` (case mới) và `workspace_commit_stage`
-  vẫn **strict**: ≥1 Người, ≥1 Tài sản cho save_case mới, tên non-empty,
-  owner inheritance hợp lệ. Không biến incomplete thành invalid và không
-  nới các đường strict.
+  `null`. `workspace_save_case` (S1/S2 23/10/2026) cũng cho ≥0 Người/≥0
+  Tài sản và owner null; mức tối thiểu mỗi dòng là họ tên (Người) và số
+  thửa + số tờ (Tài sản). `workspace_commit_stage` và `convert_type` cho
+  consumer khác vẫn strict: tên non-empty, owner inheritance hợp lệ.
+  Không biến incomplete thành invalid và không thêm cờ partial.
 - Địa chỉ tài sản nullable ở mọi đường ghi (thiếu dữ kiện vẫn lưu; chuỗi
   rỗng ghi null); không còn rule "địa chỉ không rỗng". `is_primary` chỉ là
   rule v1 lịch sử. Không tạo tên/identity giả.
@@ -662,11 +662,12 @@ result.data:
   master. Chỉ UPDATE field/vitri đổi, INSERT row mới, DELETE row bị bỏ và
   phụ thuộc của chính case. Đất diff parent row_id+vitri, giữ hàng trống.
   `commit_stage` trên draft giữ draft, trên Done giữ done; Word đọc snapshot DB mới.
-- **Strict của API:** `commit_stage` (và save_case trên case đã có,
-  convert_type) giữ validation strict hiện hành — tên non-empty, owner
-  inheritance hợp lệ trong Stage, ≥1 tài sản của save_case mới. Nháp tạo
-  thiếu dữ liệu được mở/sửa nhưng phải bổ sung đủ các điều kiện đó trước
-  khi ghi strict thành công; không có cờ partial hay API bypass.
+- **Strict của API:** `commit_stage` và `convert_type` giữ validation
+  strict hiện hành cho consumer khác — tên non-empty, owner inheritance hợp
+  lệ trong Stage. `workspace_save_case` từ 23/10/2026 đi theo đường Soạn
+  hồ sơ điền dần: không bắt ≥1 Người/≥1 Tài sản và không bắt Chủ đất
+  (S1/S2); mức tối thiểu field dùng chung là họ tên + số thửa/số tờ. Nháp
+  thiếu dữ liệu mở/sửa/Lưu được; không có cờ partial hay API bypass.
 - **`payload.case` (đợt 3):** metadata hồ sơ ghi cùng transaction —
   validate fail hoặc stage fail → không cái nào ghi. `case_type`/
   `document_type` gửi kèm phải khớp giá trị đã lưu (immutable qua
@@ -1080,14 +1081,14 @@ Namespace `notary.*` (snake_case không chấm):
 | `case_type_unsupported` | `case_type` engine chưa hỗ trợ trên command ghi/evaluate/export; `workspace_source_latest` chọn case Done có loại ngoài `inheritance`/`two_party` (không lùi sang case khác); word_export chấp nhận `inheritance` + `two_party` (NAIA-8) | `{case_type}` |
 | `idempotency_conflict` | Key tạo đã dùng với creation hash khác (command/ý định draft hoặc done cũng thuộc hash); duplicate dùng cùng key cho source khác hoặc command khác | — |
 | `workspace_conflict` | `base_revision` khác revision server (cả nhỏ hơn lẫn lớn hơn) | `{server_revision}` |
-| `workspace_owner_required` | Owner inheritance **non-null** sai/ngoài Stage ở create; chuyển vào inheritance không chọn owner hợp lệ. Create nháp cho owner absent/null (không áp cho save_case/commit strict) | — |
+| `workspace_owner_required` | Owner inheritance **non-null** sai/ngoài Stage ở create/save_case/diagram_evaluate; chuyển vào inheritance không chọn owner hợp lệ. Chưa gán owner (absent/null) hợp lệ trên create/save_case/evaluate; commit/convert vẫn bắt buộc | — |
 | `stage_validation_error` | field Stage vi phạm | `{field_errors:[{row_id,field,code,message}]}` |
 | `intake_unsupported_source` | `kind` ngoài enum | `{source_id, kind}` |
 | `intake_source_too_large` | file > 20MB / PDF > 50 trang | `{source_id, limit}` |
 | `intake_too_many_sources` | sources > 8 | `{count, limit}` |
 | `intake_text_too_long` | text > 100.000 ký tự | `{source_id, length, limit}` |
 | `diagram_reference_outside_stage` | `personId` không thuộc Stage của thao tác (DB hoặc cùng payload); prune refs pending khi save_case theo §13.19 | `{personId}` |
-| `diagram_invalid_state` | state sai cấu trúc/engine reject | `{errors:[{code,message,...}]}` |
+| `diagram_invalid_state` | state sai cấu trúc; engine reject vì lỗi quan hệ/wire. Trên đường Lưu, engine `invalid` chỉ vì `missing_land_owner`/`invalid_death_date` → render_model `incomplete`, không lỗi | `{errors:[{code,message,...}]}` |
 | `word_no_documents_selected` | `document_keys` rỗng | — |
 | `word_duplicate_document_key` | key lặp | `{document_key}` |
 | `word_unknown_document_key` | key ngoài catalog/sai pattern | `{document_key}` |
@@ -1132,8 +1133,8 @@ Producer (sidecar/backend) PHẢI:
 - [ ] `workspace_create` (partial-create vòng 2): cho ≥0 Người/Tài sản,
       `ho_ten=null`, owner inheritance absent/null; vẫn kiểm kiểu/ngày/
       giới hạn; owner non-null sai → workspace_owner_required.
-      `workspace_save_case` case mới vẫn strict ≥1 Người/≥1 Tài sản,
-      tên non-empty, owner hợp lệ. Địa chỉ tài sản nullable.
+      `workspace_save_case` từ 23/10/2026 cho ≥0 Người/≥0 Tài sản và owner
+      null; tối thiểu họ tên + số thửa/số tờ. Địa chỉ tài sản nullable.
       Key+hash replay không ghi, hash khác idempotency_conflict.
       Case mới revision=1; workspace_save_case ghi nguyên tử và done.
 - [ ] `workspace_source_latest`: payload `{}` strict, chỉ đọc case Done
@@ -1296,17 +1297,18 @@ theo việc hồ sơ đã có ID hay chưa.
 - **API partial-create vẫn hỗ trợ:** consumer khác có thể gọi
   `workspace_create` với tập rỗng/tên null/owner null, status draft/rev1.
   Đây không phải một thao tác lưu của renderer Soạn hồ sơ. Mở draft ấy
-  dùng chung bản đang sửa như mọi case khác; trước Lưu hồ sơ phải thỏa
-  validation strict — tên non-empty, owner inheritance hợp lệ, case mới
-  ≥1 Người/≥1 Tài sản. Không có cờ partial cho save_case/commit/convert;
-  `diagram_save` riêng không chuyển Done.
+  dùng chung bản đang sửa như mọi case khác; Lưu hồ sơ chỉ đòi mức tối
+  thiểu (họ tên mỗi dòng Người, số thửa + số tờ mỗi dòng Tài sản) — không
+  còn ≥1 Người/≥1 Tài sản hay Chủ đất bắt buộc (S1/S2 23/10/2026).
+  Không có cờ partial cho save_case/commit/convert; `diagram_save` riêng
+  không chuyển Done.
 - **Tính thử:** renderer dùng `diagram_evaluate` chế độ nháp (`case_id`
   absent) với Stage + Diagram đang sửa, kể cả case đã có ID (§7.4).
   Payload Stage là `stage_v2`, có `owner_row_id` với inheritance; không
   persist, không tăng revision, `evaluated_revision:null`. Thiếu dữ kiện
   vẫn theo incomplete của engine, không tự chặn thành invalid.
 
-### 13.3 Tài sản: tối đa 3, vị trí = thứ tự mảng (Q3, Q4)
+### 13.3 Tài sản: tối đa 5, vị trí = thứ tự mảng (Q3, Q4; S7 23/10/2026)
 
 ```yaml
 asset_row_v2:               # giống §4.2, TRỪ is_primary (bị loại)
@@ -1514,10 +1516,11 @@ payload:
   serial rỗng/toàn whitespace không chặn ghi row: entity_id=null, không
   identity giả. Dòng không tên lưu `ho_ten=null`, không chuỗi rỗng. Create
   không nhận `is_primary`; địa chỉ tài sản nullable.
-- `workspace_save_case` (case mới) và `commit_stage` **không** dùng nới
-  này: vẫn strict ≥1 Người/≥1 Tài sản (save_case mới), tên non-empty,
-  owner inheritance hợp lệ. Nháp thiếu dữ liệu phải bổ sung trước khi
-  Lưu hồ sơ (hoặc gọi API commit ở consumer khác); không có API bypass.
+- `commit_stage` **không** dùng nới `ho_ten=null`: vẫn cần tên non-empty
+  và owner inheritance hợp lệ. `workspace_save_case` từ 23/10/2026 đi theo
+  mức tối thiểu của Soạn hồ sơ (S1/S2): ≥0 Người/≥0 Tài sản, owner null,
+  mỗi dòng Người cần họ tên, mỗi dòng Tài sản cần số thửa + số tờ.
+  Không có API bypass.
 - nguoi_chet_id chỉ projection identity của owner (two_party không neo people[0]
   vào người chết); tai_san_id chỉ projection identity asset vị trí 1. Hai
   projection nullable khi row thiếu neo, không nguồn dữ kiện Word/hiển thị.
@@ -2033,7 +2036,7 @@ không có cờ partial cho save/commit và không biến incomplete thành inva
 # Mới: case_id ABSENT, không phải null
 idempotency_key: <uuid4>
 case: <meta hiện có; case_type/document_type bắt buộc hợp lệ>
-stage: <stage_v2 strict; partial-create không áp ở đây>
+stage: <stage_v2; mức tối thiểu S1/S2 — 0 Người/Tài sản, owner null được>
 diagram: {state: <v3, domain khớp case_type>} # bắt buộc
 # docx_import optional theo §13.17
 

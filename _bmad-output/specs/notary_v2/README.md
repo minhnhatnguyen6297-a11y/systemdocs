@@ -110,9 +110,11 @@ còn pending).
 `test_issue13_storage_b_proof.py`):** `workspace_create` hỗ trợ nháp ít dữ
 liệu — 0 Người/0 Tài sản, tên `null`, owner inheritance `null`, row thiếu
 số/ngày. Command này vẫn có cho consumer khác, không phải thao tác của Soạn
-hồ sơ. `workspace_save_case` (case mới), `workspace_commit_stage` và chuyển
-loại vẫn **strict**: cần tên, owner hợp lệ và (save_case mới) ≥1 Người/≥1 Tài
-sản trước khi ghi; không có cờ partial cho các đường này.
+hồ sơ. Từ **23/10/2026**, `workspace_save_case` cũng đi theo đường điền
+dần: không bắt ≥1 Người/≥1 Tài sản và không bắt Chủ đất; mức tối thiểu là
+họ tên mỗi dòng Người và số thửa + số tờ mỗi dòng Tài sản, chuỗi rỗng ghi
+null. `workspace_commit_stage` và chuyển loại (consumer khác) vẫn **strict**:
+cần tên và owner hợp lệ; không có cờ partial cho các đường này.
 Nhãn hiển thị dùng `trang_thai`: `draft` = **Nháp**, `done` = **Đã lưu**; nhãn
 này độc lập với chấm dirty (Done vẫn Đã lưu khi có sửa chưa ghi). Resolver
 nguồn Done lưu gần nhất và **Nhân bản** đã triển khai vòng 2 22/10/2026
@@ -252,7 +254,7 @@ tại; chưa chọn mô hình mới hoặc duyệt đề xuất mã tham chiếu
 
 Tên và định dạng trường giữ chuẩn DB; alias cũ cần ánh xạ. Hai alias của cùng trường trái nhau phải báo lỗi, không chọn ngầm. Cụm đất lưu `case_asset_land_rows` theo dòng tài sản của Hồ sơ + vị trí (vòng 1 có code); `property_land_rows`/JSON cũ chỉ là lịch sử, không phải SOT. `null`, `[]` và hàng trống giữ đúng nghĩa. Tên token cụm viết đủ `loaidat<M><N>`, `dientich<M><N>`, `thoihan<M><N>`: M là cụm, N là tài sản; không thêm dạng rút gọn gây lẫn cụm 12 với tài sản 2.
 
-Thừa kế cần `owner_row_id` khi Lưu hồ sơ/chuyển loại strict; lệnh `workspace_create` cho consumer khác hỗ trợ nháp ít dữ liệu với owner `null/absent`, và owner **non-null** phải là row trong Stage. Hai bên không nhận trường đó, tối đa 30 người. Hồ sơ cũ hơn 3 tài sản vẫn đọc đủ và cảnh báo; Lưu hồ sơ/commit chặn đến khi còn tối đa 3. Đây là giới hạn hiện hành cần xem xét riêng nếu thay đổi, không tự bỏ vì triết lý điền dần.
+Thừa kế **không bắt** `owner_row_id` khi Lưu hồ sơ (owner 23/10/2026) — chưa chọn Chủ đất vẫn lưu được; owner **non-null** phải là row trong Stage. Chuyển loại vào Thừa kế vẫn cần owner hợp lệ; lệnh `workspace_create` cho consumer khác cũng nhận owner `null/absent`. Hai bên không nhận trường đó, tối đa 30 người. Trần 5 tài sản áp mọi tầng server; hồ sơ cũ hơn 5 vẫn đọc đủ và cảnh báo, Lưu/commit chặn đến khi còn tối đa 5 (client/Word cập nhật ở lát riêng).
 
 **Lưu hồ sơ:** flush ô đang nhập → đồng bộ mặc định vị trí tài sản còn chưa
 được user chỉnh → gửi Stage+meta+Diagram và provenance Word đang sửa →

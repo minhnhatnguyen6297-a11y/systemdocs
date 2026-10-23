@@ -1312,9 +1312,9 @@ class CaseWorkspaceService:
 
         Một transaction: validate → hash/idempotency → tạo case trước →
         resolve/diff rows → projection → Diagram seed/persist → commit.
-        Đây là đường duy nhất nhận **nháp ít dữ liệu** (0 Người/0 Tài
-        sản, `ho_ten=null`, owner inheritance chưa gán); commit_stage/
-        save_case/convert_type giữ strict.
+        Nhận nháp ít dữ liệu (0 Người/0 Tài sản, `ho_ten=null`, owner
+        inheritance chưa gán) — cùng mức nới với `save_case` từ 23/10;
+        commit_stage/convert_type giữ strict cho consumer khác.
         """
         if not _is_uuid4(idempotency_key):
             raise WorkspaceError(
@@ -1502,6 +1502,11 @@ class CaseWorkspaceService:
         bắt buộc base_revision, cấm key, CAS revision+1. Mọi nhánh thành
         công gán `trang_thai='done'`; lỗi sau flush rollback cả identity/
         meta/rows/đất/Diagram/status/revision.
+
+        Đường Lưu điền dần (owner 23/10/2026): không bắt ≥1 Người/≥1 Tài
+        sản, không bắt Chủ đất; chỉ họ tên + số thửa/số tờ bắt buộc trên
+        dòng tương ứng, chuỗi rỗng chuẩn hóa null. Diagram thiếu dữ kiện
+        để tính vẫn lưu ở dạng incomplete (S3).
         """
         new_case = case_id is None
         if new_case:
@@ -1584,11 +1589,12 @@ class CaseWorkspaceService:
             meta = self._validate_case_meta(
                 {**folded_meta, "case_type": case_type},
                 require_type=False)
+        # S1/S2 (owner 23/10/2026): đường Lưu không bắt ≥1 Người/≥1 Tài sản
+        # và không bắt Chủ đất. owner_row_id vắng/null = chưa gán; chỉ
+        # pointer non-null sai/ngoài Stage mới là mâu thuẫn dữ liệu.
         owner_row_id = self._validate_owner_pointer(
-            stage, people, case_type)
+            stage, people, case_type, allow_unassigned=True)
         field_errors = self._validate_stage(people, assets, case_type)
-        if new_case:
-            field_errors += self._validate_create_stage(people, assets)
         if field_errors:
             raise WorkspaceError(
                 "stage_validation_error",
@@ -2510,13 +2516,15 @@ class CaseWorkspaceService:
                                 case_type: str, *,
                                 allow_unassigned: bool = False
                                 ) -> Optional[str]:
-        """owner_row_id: bắt buộc + trỏ row có thật với inheritance; CẤM
+        """owner_row_id: với inheritance, absent/null = chưa gán Chủ đất;
+        non-null phải là row_id của một dòng Người trong Stage. CẤM
         (kể cả null) với two_party (§13.5/§13.6).
 
-        `allow_unassigned=True` chỉ cho `workspace_create` (nháp ít dữ
-        liệu): inheritance absent/null = chưa gán owner; non-null sai
-        vẫn `workspace_owner_required`. Commit/save_case/convert giữ
-        mặc định strict.
+        `allow_unassigned=True` dùng cho các đường người dùng tự điền dần
+        (`workspace_create`, `workspace_save_case`, `diagram_evaluate`
+        nháp): chưa chọn Chủ đất không chặn. Pointer non-null sai/ngoài
+        Stage vẫn `workspace_owner_required` (mâu thuẫn dữ liệu S11).
+        Commit/convert giữ mặc định strict cho consumer khác.
         """
         if case_type == CASE_TYPE_TWO_PARTY:
             if "owner_row_id" in stage:

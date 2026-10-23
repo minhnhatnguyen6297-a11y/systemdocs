@@ -91,7 +91,7 @@ DUPLICATE_RESULT_FIELDS = {
     "schema_version", "backend_mode", "case", "stage", "diagram",
     "capabilities", "docx_import", "source_case_id", "created",
 }
-STAGE_INTENTS = {"output", "create", "strict"}
+STAGE_INTENTS = {"output", "create", "save", "strict"}
 CASE_FIELDS = {
     "id", "case_type", "document_type", "status", "locked", "revision",
     "ngay_lap_ho_so", "noi_niem_yet", "ghi_chu",
@@ -377,7 +377,7 @@ def check_stage(stage, where, v, draft_v2=False, case_type="inheritance",
             if "owner_row_id" in stage:
                 v.append(("validation_error",
                           f"{where}.owner_row_id forbidden for two_party"))
-        elif intent == "create":
+        elif intent in {"create", "save"}:
             if oid is not None and (
                     not (isinstance(oid, str) and UUID4_RX.match(oid))
                     or oid not in people_ids):
@@ -931,18 +931,13 @@ def check_save_case_payload(payload, ctx, v):
     if not isinstance(stage, dict) or any(
             not isinstance(stage.get(key), list) for key in ("people", "assets")):
         return  # Schema already reports the malformed Stage shape.
-    # Strict save path — intentionally NOT reusing the create-partial guard:
-    # incomplete draft created by workspace_create is not valid here.
+    # Save path từ 23/10/2026 (S1/S2): 0 Người/0 Tài sản và owner null là
+    # hợp lệ; chỉ giữ tối thiểu họ tên + số thửa/số tờ.
     case_type = _payload_case_type(payload, ctx)
     check_stage(stage, "payload.stage", v, draft_v2=True,
-                case_type=case_type, in_payload=True, intent="strict",
+                case_type=case_type, in_payload=True, intent="save",
                 ctx=ctx)
-    if "case_id" not in payload:
-        if not stage.get("people"):
-            v.append(("stage_validation_error", "payload.stage.people empty"))
-        if not stage.get("assets"):
-            v.append(("stage_validation_error", "payload.stage.assets empty"))
-    else:
+    if "case_id" in payload:
         check_base_revision(payload, ctx, v)
 
 

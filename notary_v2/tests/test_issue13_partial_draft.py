@@ -273,30 +273,39 @@ def test_commit_keeps_draft_then_save_case_turns_done(db, dataset):
     assert len(saved["stage"]["assets"]) == 1
 
 
-def test_save_case_new_still_requires_people_and_assets(db, dataset):
+def test_save_case_new_accepts_empty_stage_and_unassigned_owner(db, dataset):
+    """S1+S2 owner 23/10/2026: Lưu hồ sơ mới không bắt ≥1 Người/≥1 Tài
+    sản và không bắt Chủ đất; Diagram thiếu Chủ đất vẫn ghi được ở trạng
+    thái incomplete (S3)."""
     spec = _case_spec(dataset, "F3")
     empty_state = {"version": 3, "domain": "inheritance", "nodes": []}
-    person = _stage(spec, dataset)["people"][0]
-    # Owner null ở save_case mới vẫn strict (khác create nháp).
+    saved = _service(db).save_case(
+        case_id=None, base_revision=None,
+        idempotency_key=str(uuid.uuid4()), case_meta=_meta(spec),
+        stage={"owner_row_id": None, "people": [], "assets": []},
+        state=empty_state)
+
+    assert saved["created"] is True
+    assert saved["case"]["status"] == "done"
+    assert saved["case"]["revision"] == 1
+    assert saved["stage"] == {"owner_row_id": None,
+                              "people": [], "assets": []}
+    assert saved["diagram"]["render_model"]["status"] == "incomplete"
+    assert any(e["code"] == "missing_land_owner"
+               for e in saved["diagram"]["render_model"]["errors"])
+    assert _counts(db) == {"cases": 1, "customers": 0, "properties": 0}
+
+    # Pointer owner non-null sai vẫn là mâu thuẫn dữ liệu (S11).
     with pytest.raises(WorkspaceError) as exc:
         _service(db).save_case(
             case_id=None, base_revision=None,
             idempotency_key=str(uuid.uuid4()), case_meta=_meta(spec),
-            stage={"owner_row_id": None, "people": [person], "assets": []},
+            stage={"owner_row_id": str(uuid.uuid4()),
+                   "people": [], "assets": []},
             state=empty_state)
     assert exc.value.code == "workspace_owner_required"
-    # Thêm owner nhưng 0 Tài sản → vẫn thiếu rule completeness mới.
-    with pytest.raises(WorkspaceError) as exc:
-        _service(db).save_case(
-            case_id=None, base_revision=None,
-            idempotency_key=str(uuid.uuid4()), case_meta=_meta(spec),
-            stage={"owner_row_id": person["row_id"], "people": [person],
-                   "assets": []},
-            state=empty_state)
-    assert exc.value.code == "stage_validation_error"
-    fields = {item["field"] for item in exc.value.details["field_errors"]}
-    assert "assets" in fields
-    assert db.query(InheritanceCase).count() == 0
+
+    assert _counts(db) == {"cases": 1, "customers": 0, "properties": 0}
 
 
 # --------------------------------------------------------------------- D3
