@@ -899,7 +899,6 @@ function createModel(deps) {
     if (r.ok) {
       applyWorkspace(r.data || {});
       state.positionTouched.clear();
-      state.notice = 'Đã đổi loại hồ sơ';
     } else {
       applyWriteResult(r, 'workspace_convert_type');
     }
@@ -966,8 +965,6 @@ function createModel(deps) {
       return r;
     }
     applyWorkspace(r.data || {});
-    state.notice = caseId == null && r.data && r.data.created === false
-      ? 'Hồ sơ đã tồn tại (đã mở lại)' : 'Đã lưu hồ sơ';
     emit();
     return r;
   }
@@ -1023,8 +1020,6 @@ function createModel(deps) {
     state.duplicatePending = null;
     applyWorkspace(r.data || {});
     state.positionTouched.clear();
-    state.notice = r.data && r.data.created === false
-      ? 'Đã mở bản sao đã tạo' : 'Đã nhân bản hồ sơ';
     emit();
     return r;
   }

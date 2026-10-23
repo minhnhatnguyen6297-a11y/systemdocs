@@ -222,12 +222,20 @@ function createNotaryModuleView(deps) {
     : (e) => ({ code: (e && e.code) || 'unknown',
                 title: (e && e.message) || 'Lỗi', hint: null });
   const errText = errCatalog ? errCatalog.errText
-    : (e) => `${e.code}: ${e.message}`;
+    : (e) => (e && (e.message || e.code)) || 'Lỗi';
+  const isDiagramError = errCatalog && typeof errCatalog.isDiagramError ===
+    'function' ? errCatalog.isDiagramError : () => false;
   const pickFiles = deps.pickFiles || (async () => ({ ok: false }));
   const openPath = deps.openPath || (async () => ({ ok: false }));
   const confirm = deps.confirm ||
     (async () => true);
   const runCommand = deps.runCommand;
+  // R14: trạng thái thao tác dùng chung (spinner → tích xanh tại nút).
+  const actionStatus = deps.actionStatus ||
+    (typeof window !== 'undefined' && window.G1_NOTARY_ACTION_STATUS
+      ? window.G1_NOTARY_ACTION_STATUS.createActionStatus()
+      : { run: (sel, root, task) => task(), sync: () => {},
+          isBusy: () => false });
   // MIN-112 seams: drop-zone token + cancel job cho dialogs.
   const registerDroppedFile = deps.registerDroppedFile || null;
   const cancelJob = deps.cancelJob || (async () => ({ ok: false }));
@@ -329,13 +337,13 @@ function createNotaryModuleView(deps) {
 
   const intakeDlg = window.G1_NOTARY_INTAKE
     ? window.G1_NOTARY_INTAKE.createIntakeDialog({
-        model, lib: L, notify, h, btn, face, openModal,
-        pickFiles, registerDroppedFile, cancelJob })
+        model, lib: L, notify, h, btn, face, openModal, actionStatus,
+        errText, pickFiles, registerDroppedFile, cancelJob })
     : null;
   const wordDlg = window.G1_NOTARY_WORD
     ? window.G1_NOTARY_WORD.createWordDialog({
-        model, lib: L, notify, h, btn, face, openModal,
-        pickFiles, openPath, cancelJob,
+        model, lib: L, notify, h, btn, face, openModal, actionStatus,
+        errText, pickFiles, openPath, cancelJob,
         // Prefix rieng cho box trong dialog — id address-posting-* o
         // casemeta va dialog khong duoc trung nhau trong cung document.
         postingSuggestionEl: (cb) => postingSuggestionEl(cb, 'address-dlg'),
@@ -385,10 +393,6 @@ function createNotaryModuleView(deps) {
         const f = face({
           kind: 'error',
           title: d.title,
-          detail: d.raw && d.raw !== d.title ? d.raw : '',
-          hint: (d.hint ? `${d.hint} ` : '') +
-            (isInfraErr(d.code) && infraFails < 5
-              ? `Tự thử lại… (${d.code})` : `[${d.code}]`),
         });
         out.append(f);
         if (isInfraErr(d.code) && infraFails < 5) {
@@ -686,37 +690,120 @@ function createNotaryModuleView(deps) {
 
   // ---------- Stage tier ----------
 
-  // field_errors gắn row_id+field → cell err; lỗi cấp danh sách
-  // (field 'assets'/'people'/'owner_row_id' hoặc không khớp cột) gom
-  // hiển thị trên đầu card tương ứng.
-  // G5: lỗi cấp danh sách không có ô đỏ riêng — hộp cảnh báo nổi bật,
-  // và với code 'required' nói rõ thiếu gì thay vì câu chung của catalog.
-  const CARD_REQUIRED_HINT = {
-    assets: 'Hồ sơ chưa có tài sản nào — thêm ít nhất một tài sản rồi lưu lại.',
-    people: 'Hồ sơ chưa có người nào — thêm ít nhất một người rồi lưu lại.',
+  // ---------- R13: mỗi lỗi hiện ĐÚNG một chỗ ----------
+  // Ô lỗi → ô đỏ + MỘT dòng trong slot của card chứa ô. Lỗi sơ đồ/engine
+  // → một dòng trong slot vùng Sơ đồ (diagram pane). Lỗi không gắn ô/thẻ
+  // → một dòng ở slot Stage. Slot luôn chiếm chỗ sẵn (CSS .cd-*-errslot)
+  // nên lỗi hiện/biến mất không đẩy bố cục vùng khác.
+  let errorSink = { assets: [], people: [], stage: [] };
+  // Lỗi flush ô ngày (client-side, chưa có state model) — giữ 1 dòng
+  // tới lần sửa/render kế tiếp.
+  let localSaveError = null;
+
+  const CARD_REQUIRED_TEXT = {
+    assets: 'Hồ sơ chưa có tài sản nào.',
+    people: 'Hồ sơ chưa có người nào.',
   };
 
-  function cardLevelErrors(field) {
-    const extra = (model.state.fieldErrors || [])
-      .filter((e) => e.field === field);
-    if (!extra.length) return null;
-    const box = h('div', 'cd-row-errors cd-card-alert');
-    for (const er of extra) {
-      const text = er.code === 'required' && CARD_REQUIRED_HINT[field]
-        ? CARD_REQUIRED_HINT[field] : errLine(er);
-      box.append(h('div', 'error small', text));
+  function resetErrorSink() {
+    errorSink = { assets: [], people: [], stage: [] };
+  }
+
+  function pushError(card, text) {
+    if (!text || !errorSink[card]) return;
+    if (!errorSink[card].includes(text)) errorSink[card].push(text);
+  }
+
+  function rowCard(rowId) {
+    const s = model.state;
+    if ((s.stage.assets || []).some((a) => a.row_id === rowId)) {
+      return 'assets';
     }
-    return box;
+    if ((s.stage.people || []).some((p) => p.row_id === rowId)) {
+      return 'people';
+    }
+    return null;
+  }
+
+  function rowLabelOf(card, rowId) {
+    const list = card === 'assets'
+      ? model.state.stage.assets : model.state.stage.people;
+    const i = (list || []).findIndex((r) => r.row_id === rowId);
+    if (i < 0) return null;
+    if (card === 'assets') return `Tài sản ${i + 1}`;
+    return list[i].ho_ten || `dòng ${i + 1}`;
+  }
+
+  function fieldLabelOf(card, field) {
+    if (card === 'people') return PERSON_FIELD_LABELS[field] || field;
+    const row = ASSET_FIELD_ROWS.find(
+      ([k]) => (k === 'land' ? 'land_rows' : k) === field);
+    return (row && row[1]) || ASSET_FIELD_LABELS[field] || field;
   }
 
   function cellErrs(rowId, field, td) {
     const errs = model.fieldErrorsFor(rowId)
       .filter((e) => e.field === field);
+    if (!errs.length) return 0;
+    td.classList.add('cd-cell-err');
+    const card = rowCard(rowId) || 'people';
+    const rl = rowLabelOf(card, rowId) || '';
     for (const fe of errs) {
-      td.classList.add('cd-cell-err');
-      td.append(h('div', 'cd-err-msg', errLine(fe)));
+      pushError(card, `${rl} · ${fieldLabelOf(card, field)}: ${errLine(fe)}`);
     }
     return errs.length;
+  }
+
+  // Gom mọi lỗi không gắn ô cụ thể vào đúng card/slot trước khi dựng bảng.
+  function collectStageErrors() {
+    const s = model.state;
+    const errors = s.fieldErrors || [];
+    for (const f of ['people', 'owner_row_id']) {
+      for (const er of errors.filter((e) => e.field === f)) {
+        pushError('people', er.code === 'required' && CARD_REQUIRED_TEXT.people
+          ? CARD_REQUIRED_TEXT.people : errLine(er));
+      }
+    }
+    for (const er of errors.filter((e) => e.field === 'assets')) {
+      pushError('assets', er.code === 'required' && CARD_REQUIRED_TEXT.assets
+        ? CARD_REQUIRED_TEXT.assets : errLine(er));
+    }
+    // Lỗi field không có ô trên bảng (noi_cap/place_of_origin/field lạ).
+    const shownP = new Set(PERSON_COLS.map(([k]) => k));
+    for (const er of errors) {
+      if (er.row_id == null) continue;
+      const card = rowCard(er.row_id);
+      if (!card) continue;
+      const key = card === 'assets' ? 'land_rows' : null;
+      if (card === 'people' && shownP.has(er.field)) continue;
+      if (card === 'assets') {
+        const shown = new Set(ASSET_FIELD_ROWS.map(
+          ([k]) => (k === 'land' ? 'land_rows' : k)));
+        if (shown.has(er.field) || er.field === key) continue;
+      }
+      const rl = rowLabelOf(card, er.row_id) || '';
+      pushError(card,
+        `${rl} · ${fieldLabelOf(card, er.field)}: ${errLine(er)}`);
+    }
+    // Lỗi không gắn field nhưng có row (hiếm) → card của row.
+    const err = s.error;
+    if (err && s.status !== 'error' && s.status !== 'unavailable' &&
+        s.status !== 'conflict' && !isDiagramError(err.code)) {
+      const rowId = (err.details && err.details.row_id) ||
+        ((err.details && err.details.fields &&
+          err.details.fields[0] && err.details.fields[0].row_id) || null);
+      const card = rowId ? rowCard(rowId) : null;
+      pushError(card || 'stage', errText(err));
+    }
+    if (localSaveError) pushError(localSaveError.card, localSaveError.text);
+  }
+
+  function fillErrorSlot(slot, card) {
+    slot.dataset.card = card;
+    for (const text of errorSink[card] || []) {
+      slot.append(h('div', 'error small', text));
+    }
+    return slot;
   }
 
   // Ô Stage cắt "…" khi dài (CSS) — tooltip = giá trị đầy đủ.
@@ -724,12 +811,23 @@ function createNotaryModuleView(deps) {
     inp.title = inp.value || '';
   }
 
-  // Dong loi hien thi tu danh muc (MIN-136): catalog co entry →
-  // title+hint than thien; khong co → message backend (thuong da la
-  // tieng Viet, van tot hon snake_code troi).
+  // Một câu ngắn từ catalog (R12): title; fallback message backend.
   function errLine(er) {
-    const d = describeError(er);
-    return d.hint ? `${d.title} — ${d.hint}` : d.title;
+    return errText(er);
+  }
+
+  // Lỗi ngày gõ sai (R4/R13): ô đã đỏ + một dòng trong card chứa ô.
+  // Ô ngày có thể nằm ở card Tài sản (a:/meta:) hoặc card Người (p:).
+  function markLocalSaveError() {
+    const el = (typeof document !== 'undefined') ? document.activeElement : null;
+    const fidv = (el && el.dataset && el.dataset.fid) || '';
+    const card = fidv.startsWith('p:') ? 'people'
+      : (fidv.startsWith('a:') || fidv.startsWith('meta:'))
+        ? 'assets' : 'stage';
+    localSaveError = { card, text: errText({ code: 'invalid_date' }) };
+    const slot = root.querySelector(
+      `.cd-card-errslot[data-card="${card}"]`);
+    if (slot) slot.append(h('div', 'error small', localSaveError.text));
   }
 
   // Ô ngay dd/mm/yyyy (MIN-136): hien fmtDisplayDate(row[key]); go raw
@@ -793,6 +891,7 @@ function createNotaryModuleView(deps) {
     inp.oninput = () => {
       setCellTitle(inp);
       inp.classList.remove('cd-input-bad');
+      localSaveError = null;
       onSet(inp.value.trim() === '' ? null : inp.value);
     };
     // Chuan hoa o ca 'change' LAN 'blur': go lai dung chuoi dang hien
@@ -808,6 +907,7 @@ function createNotaryModuleView(deps) {
         return false;
       }
       inp.classList.remove('cd-input-bad');
+      localSaveError = null;
       inp.value = fmtDisplayDate(r.iso);
       setCellTitle(inp);
       const cur = getVal();
@@ -1850,47 +1950,14 @@ function createNotaryModuleView(deps) {
     return t;
   }
 
-  // Lỗi trường người KHÔNG có ô trên Stage (noi_cap/place_of_origin sau
-  // D1, hoặc field lạ) — gom lên đầu card để không bị nuốt mất.
-  function hiddenPersonFieldErrors() {
-    const shown = new Set(PERSON_COLS.map(([k]) => k));
-    const rows = new Map(model.state.stage.people
-      .map((p, i) => [p.row_id, p.ho_ten || `dòng ${i + 1}`]));
-    const extra = (model.state.fieldErrors || []).filter((e) =>
-      e.row_id != null && rows.has(e.row_id) && !shown.has(e.field));
-    if (!extra.length) return null;
-    const box = h('div', 'cd-row-errors cd-card-alert');
-    for (const er of extra) {
-      const label = PERSON_FIELD_LABELS[er.field] || er.field;
-      box.append(h('div', 'error small',
-        `${rows.get(er.row_id)} · ${label}: ${errLine(er)}`));
-    }
-    return box;
-  }
-
-  // Lỗi field tài sản KHÔNG có ô trên bảng (entity_id/thoi_han/field lạ)
-  // — trước đây chỉ làm đỏ tiêu đề cột mà không nói lỗi gì. Gom lên đầu
-  // card tài sản để viền đỏ luôn có lời giải thích.
-  function hiddenAssetFieldErrors() {
-    const shown = new Set(ASSET_FIELD_ROWS
-      .map(([k]) => (k === 'land' ? 'land_rows' : k)));
-    const rows = new Map(model.state.stage.assets
-      .map((a, i) => [a.row_id, `Tài sản ${i + 1}`]));
-    const extra = (model.state.fieldErrors || []).filter((e) =>
-      e.row_id != null && rows.has(e.row_id) && !shown.has(e.field));
-    if (!extra.length) return null;
-    const box = h('div', 'cd-row-errors cd-card-alert');
-    for (const er of extra) {
-      const label = ASSET_FIELD_LABELS[er.field] || er.field;
-      box.append(h('div', 'error small',
-        `${rows.get(er.row_id)} · ${label}: ${errLine(er)}`));
-    }
-    return box;
-  }
-
   function stageTierEl() {
     const s = model.state;
+    resetErrorSink();
+    collectStageErrors();
     const wrap = h('div', 'cd-stage-wrap');
+    const status = h('div', 'cd-stage-status');
+    status.dataset.card = 'stage';
+    wrap.append(status);
     const tier = h('div', 'cd-stage');
 
     // Card Tài sản (~36%)
@@ -1925,6 +1992,8 @@ function createNotaryModuleView(deps) {
     // đợt 3 (MIN-141): ba dong meta hồ sơ duoi tai san — ghi qua
     // payload.case cung transaction commit/create (contract §6/§4.3).
     aBody.append(caseMetaEl());
+    aBody.prepend(fillErrorSlot(
+      h('div', 'cd-card-errslot'), 'assets'));
     ac.append(aBody);
     tier.append(ac);
 
@@ -1961,16 +2030,16 @@ function createNotaryModuleView(deps) {
       twrap.append(peopleTableEl());
       pBody.append(twrap);
     }
+    pBody.prepend(fillErrorSlot(
+      h('div', 'cd-card-errslot'), 'people'));
     pc.append(pBody);
     tier.append(pc);
     wrap.append(tier);
+    fillErrorSlot(status, 'stage');
 
     // Suggestion tray (intake results chờ review — không tự vào Stage)
     if (s.suggestions.length || s.intakeErrors.length) {
       wrap.append(suggestionTrayEl());
-    }
-    if (s.busy) {
-      wrap.append(h('div', 'cd-busy muted small', 'Đang xử lý…'));
     }
     return wrap;
   }
@@ -2107,16 +2176,8 @@ function createNotaryModuleView(deps) {
       ws.append(h('div', 'banner warn',
         'Hồ sơ đã khóa — toàn bộ chỉ đọc, vẫn xem/sao chép được.'));
     }
-    if (s.error && s.status !== 'error' && s.status !== 'unavailable') {
-      const ed = describeError(s.error);
-      const eb = h('div', 'banner err',
-        `${ed.title}${ed.hint ? ' — ' + ed.hint : ''} `);
-      eb.append(h('span', 'muted small', `(${ed.code})`));
-      const x = btn('×', 'ghost sm', () => model.dismissNotice());
-      eb.append(h('span', 'grow', ''));
-      eb.append(x);
-      ws.append(eb);
-    }
+    // R13: s.error không còn banner toàn cục — một dòng tại card Stage
+    // (xem collectStageErrors) hoặc vùng Sơ đồ khi là lỗi engine.
     ws.append(stageTierEl());
     ws.append(relationTierEl());
     return ws;
@@ -2305,7 +2366,8 @@ function createNotaryModuleView(deps) {
       f.append(retry);
       dp.append(f);
     } else if (s.status === 'error') {
-      const f = face(L.faceError(s.error || { code: 'unknown' }));
+      const f = face({ kind: 'error',
+        title: describeError(s.error || { code: 'unknown' }).title });
       if (s.caseId == null) {
         // Lỗi đọc nguồn cho nháp mới: người dùng chủ động thử lại; không
         // tự ghi DB hay âm thầm coi nguồn rỗng.
@@ -2328,6 +2390,9 @@ function createNotaryModuleView(deps) {
         lastConflict = null;
       }
     }
+    // R14: nút thao tác vừa bị dựng lại → áp lại spinner nếu thao tác
+    // vẫn đang chạy (nút mới thay node cũ).
+    actionStatus.sync(root);
     if (lookupOverlay) {
       const st = lookupOverlay.savedScroll;
       if (st) {

@@ -53,6 +53,10 @@ function createWordDialog(ctx) {
   const pickFiles = ctx.pickFiles || (async () => ({ ok: false }));
   const openPath = ctx.openPath || (async () => ({ ok: false }));
   const cancelJob = ctx.cancelJob || (async () => ({ ok: false }));
+  const actionStatus = ctx.actionStatus ||
+    { run: (sel, root, task) => task() };
+  const errText = ctx.errText ||
+    ((e) => (e && (e.message || e.code)) || 'lỗi');
 
   function reasonText(code, message) {
     return WORD_BLOCK_LABEL[code] || message || code || 'lỗi';
@@ -89,7 +93,7 @@ function createWordDialog(ctx) {
   async function pickDirToken() {
     const r = await pickFiles({ directory: true });
     if (!r.ok) {
-      notify(`${r.error.code}: ${r.error.message}`, true);
+      notify(errText(r.error), true);
       return null;
     }
     const f = (r.data.files || [])[0];
@@ -211,7 +215,8 @@ function createWordDialog(ctx) {
           tplToken = null;
           checks = [];
           listBox.innerHTML = '';
-          listBox.append(face(L.faceError(r.error)));
+          listBox.append(face({ kind: 'error',
+            title: errText(r.error) }));
           return;
         }
         renderDocs();
@@ -231,7 +236,7 @@ function createWordDialog(ctx) {
       });
       cancelBtn.hidden = true;
 
-      const go = btn('Xuất', 'primary', async () => {
+      const go = btn('Xuất', 'primary js-word-export', async () => {
         if (exporting || scanning || savingMeta) return;
         if (mappingDirty) { notify('Hãy áp dụng vị trí đã chọn trước khi xuất', true); return; }
         if (postingChanged()) {
@@ -260,20 +265,21 @@ function createWordDialog(ctx) {
         cancelBtn.hidden = false;
         out.innerHTML = '';
         prog.textContent = 'Đang gửi…';
-        const rr = await model.exportWord(
-          keys, destToken, {
-            templateDir: tplToken,
-            originalSourceId,
-            createCaseSubdir: subdirCb.checked,
-            onJob: (job) => {
-              if (job && job.job_id) jobId = job.job_id;
-              const p = job && job.progress;
-              prog.textContent = p
-                ? `Đang xuất ${p.done ?? 0}/${p.total ?? '?'} — ` +
-                  (p.current_label || '')
-                : 'Đang xuất…';
-            },
-          });
+        const rr = await actionStatus.run('.js-word-export', box,
+          () => model.exportWord(
+            keys, destToken, {
+              templateDir: tplToken,
+              originalSourceId,
+              createCaseSubdir: subdirCb.checked,
+              onJob: (job) => {
+                if (job && job.job_id) jobId = job.job_id;
+                const p = job && job.progress;
+                prog.textContent = p
+                  ? `Đang xuất ${p.done ?? 0}/${p.total ?? '?'} — ` +
+                    (p.current_label || '')
+                  : 'Đang xuất…';
+              },
+            }), { ok: (x) => !!(x && x.ok) });
         if (rr.stale) return;
         jobId = null;
         exporting = false;
@@ -303,7 +309,8 @@ function createWordDialog(ctx) {
               'Đã hủy — phần chưa xuất đánh dấu “Bỏ qua”.'));
           }
         } else if (!rr.ok) {
-          out.append(face(L.faceError(rr.error || { code: 'unknown' })));
+          out.append(face({ kind: 'error',
+            title: errText(rr.error || { code: 'unknown' }) }));
         }
         // Khong tu dong dialog khi con loi/cancel (spec §5) — nguoi
         // dung doc ket qua roi tu dong.
@@ -363,14 +370,10 @@ function createWordDialog(ctx) {
         }
         if (!r || !r.ok) {
           const e = (r && r.error) || {};
-          niemYetMsg.textContent =
-            `Lưu thất bại: ${e.message || e.code || 'lỗi'}`;
+          niemYetMsg.textContent = errText(e);
           niemYetMsg.className = 'error';
-          notify(
-            `Lưu nơi niêm yết thất bại: ${e.code || 'lỗi'}`, true);
           return;
         }
-        niemYetMsg.textContent = 'Đã lưu.';
       });
       niemYetSave.disabled = !metaCanEdit;
       const niemYetRow = h('div', ctx.postingTraButton ? 'cd-slot' : 'cd-toolbar');
@@ -429,7 +432,6 @@ function createWordDialog(ctx) {
           }
           sourceRow.remove();
           refreshScanLock();
-          notify('Đã gỡ nguồn Word; dữ liệu Stage vẫn được giữ');
         }));
         sourceRow.append(btn('Dùng hợp đồng Word đã nhập: ' + sourceLabel, 'secondary', async () => {
           if (exporting || scanning || savingMeta) return;
@@ -451,8 +453,8 @@ function createWordDialog(ctx) {
           scanning = false;
           if (!r.ok) {
             listBox.innerHTML = '';
-            listBox.append(h('div', 'error', 'Không tải được các vị trí Word; chọn lại nguồn để thử lại.'));
-            notify(r.error.message || r.error.code, true); refreshScanLock(); return;
+            listBox.append(h('div', 'error', errText(r.error)));
+            refreshScanLock(); return;
           }
           tplLabel.textContent = 'Mẫu: hợp đồng Word gốc đã lưu trong hồ sơ';
           renderDocs();
@@ -490,7 +492,6 @@ function createWordDialog(ctx) {
                 b.slot === choice.proposal.slot);
             }
             refreshScanLock();
-            notify('Đã áp dụng vị trí vào hồ sơ đang sửa.');
           });
           mappingBox.append(applyBindings);
           listBox.append(mappingBox);

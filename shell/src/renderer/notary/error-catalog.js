@@ -11,13 +11,13 @@
  *   - shell/sidecar/notary_adapter.py + notary_mock_adapter.py (CommandError)
  *   - shell/src/main/command-client.js + renderer.js (transport codes)
  *
- * Nguyên tắc hiển thị: user KHÔNG nhìn mã snake_case trần. describeError
- * trả { code, title, hint } — title là câu tiếng Việt; code giữ để tra
- * cứu/diagnostics (hiển thị mờ hoặc tooltip, không phải nội dung chính).
+ * Nguyên tắc hiển thị (R12): mỗi lỗi hiện cho user ĐÚNG MỘT câu ngắn
+ * (title) — không hint dạy thao tác, không hậu tố mã. Code + hint giữ
+ * trong catalog làm tài liệu nội bộ/diagnostics, không in lên giao diện.
  */
 
-// code → { title, hint } — title: chuyện gì; hint: người dùng làm gì /
-// rule ẩn nào đang được bảo vệ. hint=null khi title đã tự đủ.
+// code → { title, hint } — title: câu hiển thị duy nhất; hint: rule ẩn
+// nội bộ (không render). hint=null khi title đã tự đủ.
 const ERROR_CATALOG = {
   // ---- Transport / vỏ ứng dụng ----
   submit_failed: {
@@ -250,15 +250,36 @@ function describeError(err) {
   };
 }
 
-// Dòng thông báo ngắn cho toast/banner: "Title — hint". Mã lỗi kèm ở
-// cuối trong ngoặc (mờ, để tra cứu) — không phải nội dung chính.
+// Dòng thông báo duy nhất cho UI (R12): chỉ title — một câu nói chuyện
+// gì xảy ra. Không ghép hint, không in mã. Code/hint vẫn tra được qua
+// describeError cho log/diagnostics.
 function errText(err) {
-  const d = describeError(err);
-  const base = d.hint ? `${d.title} — ${d.hint}` : d.title;
-  return `${base} (${d.code})`;
+  return describeError(err).title;
 }
 
-const G1_NOTARY_ERRORS = { ERROR_CATALOG, describeError, errText };
+// Mã lỗi thuộc vùng sơ đồ/engine — R13 định tuyến dòng lỗi về vùng
+// Sơ đồ thay vì card Stage. `stage_validation_error` chỉ rơi vào đây khi
+// đến từ evaluate (lỗi field của đường Lưu nằm trong fieldErrors).
+const DIAGRAM_ERROR_CODES = new Set([
+  'diagram_invalid_state', 'diagram_owner_mismatch',
+  'diagram_domain_mismatch', 'diagram_reference_outside_stage',
+  'missing_land_owner', 'no_valid_heir', 'unknown_person',
+  'duplicate_person', 'duplicate_node_id', 'duplicate_node',
+  'duplicate_parent', 'missing_node_id', 'ancestry_cycle',
+  'spouse_conflict', 'self_parent', 'self_spouse', 'dangling_parent',
+  'dangling_spouse', 'too_many_parents', 'invalid_parent_slots',
+  'invalid_parent', 'invalid_spouse', 'invalid_position',
+  'missing_position', 'invalid_death_date', 'invalid_domain',
+  'invalid_node_id', 'invalid_node', 'invalid_nodes', 'invalid_version',
+  'invalid_input', 'conservation_failed', 'stage_validation_error',
+]);
+
+function isDiagramError(code) {
+  return DIAGRAM_ERROR_CODES.has(String(code || ''));
+}
+
+const G1_NOTARY_ERRORS = { ERROR_CATALOG, describeError, errText,
+                           isDiagramError };
 
 if (typeof window !== 'undefined') window.G1_NOTARY_ERRORS = G1_NOTARY_ERRORS;
 if (typeof module !== 'undefined' && module.exports) {

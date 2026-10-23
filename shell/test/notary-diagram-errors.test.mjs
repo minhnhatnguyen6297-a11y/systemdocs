@@ -126,20 +126,35 @@ function errorClient(perCommand) {
 
 // ---------- danh gia loi ----------
 
-test('evaluate loi: toast dung errText cua catalog that', async () => {
+function errSlot(view) {
+  return byCls(view.el, 'cd-diagram-errslot')[0];
+}
+function stageSlot(view) {
+  return byCls(view.el, 'cd-stage-status')[0];
+}
+function errLines(view) {
+  const slot = errSlot(view);
+  return slot ? byCls(slot, 'error').map((e) => e.textContent) : [];
+}
+
+test('R12/R13 evaluate lỗi: một dòng trong vùng sơ đồ, không toast', async () => {
   const { view, model, notices, CAT } = build(test, {
     client: errorClient({ 'notary.diagram_evaluate':
       { ok: false, error: { ...EVAL_ERR } } }) });
   const evalBtn = findBtns(view.el, 'Xem cách tính')[0];
   assert.ok(evalBtn, 'thieu nut Xem cach tinh');
   await evalBtn.onclick();
-  assert.deepEqual(notices, [[CAT.errText(EVAL_ERR), true]],
-    'toast phai dung errText cua catalog that, khong TypeError');
+  assert.deepEqual(notices, [], 'lỗi hiện tại chỗ, không toast');
+  assert.deepEqual(errLines(view), [CAT.errText(EVAL_ERR)]);
+  assert.doesNotMatch(errLines(view)[0], /stage_validation_error/,
+    'R12: không in mã');
+  assert.equal(stageSlot(view).textContent, '',
+    'không lặp cùng lỗi ở card Stage');
   assert.equal(model.state.busy, null, 'model con busy sau loi');
   assert.equal(model.state.error.code, 'stage_validation_error');
 });
 
-test('tu danh gia sau thao tac (debounce ~500ms): co toast, khong bo mac Promise',
+test('tu danh gia sau thao tac (debounce ~500ms): một dòng lỗi, không bỏ mặc Promise',
   async () => {
     const { view, model, notices, CAT } = build(test, {
       client: errorClient({ 'notary.diagram_evaluate':
@@ -156,17 +171,18 @@ test('tu danh gia sau thao tac (debounce ~500ms): co toast, khong bo mac Promise
     process.on('unhandledRejection', onRej);
     test.after(() => process.off('unhandledRejection', onRej));
     un.click();
-    assert.deepEqual(notices, [], 'chua het debounce thi chua co toast');
+    assert.deepEqual(notices, [], 'chua het debounce thi chua co loi');
     await new Promise((r) => setTimeout(r, 650));
-    assert.deepEqual(notices, [[CAT.errText(EVAL_ERR), true]],
-      'tu danh gia phai bao loi dung mot lan');
+    assert.deepEqual(notices, [], 'debounce cũng không toast');
+    assert.deepEqual(errLines(view), [CAT.errText(EVAL_ERR)],
+      'tự đánh giá báo lỗi đúng một lần tại vùng sơ đồ');
     assert.deepEqual(rejections, [],
       'promise danh gia khong duoc bo mac (unhandled rejection)');
   });
 
 // ---------- dung danh sach loi ----------
 
-test('diagram_invalid_state: loi hien duoi so do, khong toast rieng',
+test('diagram_invalid_state: loi hien mot dong duoi so do, khong toast rieng',
   async () => {
     const inner = { code: 'diagram_invalid_state', message: 'vong quan he' };
     const { view, notices, CAT } = build(test, {
@@ -176,38 +192,33 @@ test('diagram_invalid_state: loi hien duoi so do, khong toast rieng',
     assert.ok(byCls(view.el, 'cd-rel-card')[0], 'thieu card so do');
     await findBtns(view.el, 'Xem cách tính')[0].onclick();
     assert.deepEqual(notices, [], 'invalid_state khong duoc toast rieng');
-    const card = byCls(view.el, 'cd-rel-card')[0];
-    assert.ok(card, 'card so do phai con sau khi dung lai');
-    assert.deepEqual(byCls(card, 'error').map((e) => e.textContent),
-      [CAT.errText(inner)],
+    assert.deepEqual(errLines(view), [CAT.errText(inner)],
       'loi duoi so do phai dung errText cua catalog that');
   });
 
 // ---------- luu loi thuong ----------
 
-test('luu diagram_invalid_state: toast va lỗi dưới sơ đồ, giữ nháp',
-  async () => {
-    const inner = { code: 'missing_land_owner',
-                    message: 'Chưa có người để lại tài sản trên sơ đồ' };
-    const { view, model, notices, CAT } = build(test, {
-      client: errorClient({ 'notary.workspace_save_case': { ok: false, error: {
-        code: 'diagram_invalid_state', message: 'synthetic',
-        details: { errors: [{ ...inner }] } } } }) });
-    assert.equal(dirtyDiagram(model), true, 'mutation không đổi draft');
-    const save = findBtns(view.el, 'Lưu hồ sơ')[0];
-    assert.ok(save, 'thiếu nút Lưu sơ đồ');
-    await save.onclick();
-    assert.deepEqual(notices, [[CAT.errText(inner), true]]);
-    assert.equal(model.state.diagramDirty, true, 'nháp còn nguyên');
-    assert.equal(model.state.revision, 3, 'revision không đổi khi bị từ chối');
-    const card = byCls(view.el, 'cd-rel-card')[0];
-    assert.ok(card, 'card sơ đồ phải còn');
-    assert.deepEqual(byCls(card, 'error').map((e) => e.textContent),
-      [CAT.errText(inner)],
-      'lỗi dưới sơ đồ phải đúng errText của catalog thật');
-  });
+test('luu diagram_invalid_state: mot dong duoi so do, giu nhap', async () => {
+  const inner = { code: 'missing_land_owner',
+                  message: 'Chưa có người để lại tài sản trên sơ đồ' };
+  const { view, model, notices, CAT } = build(test, {
+    client: errorClient({ 'notary.workspace_save_case': { ok: false, error: {
+      code: 'diagram_invalid_state', message: 'synthetic',
+      details: { errors: [{ ...inner }] } } } }) });
+  assert.equal(dirtyDiagram(model), true, 'mutation không đổi draft');
+  const save = findBtns(view.el, 'Lưu hồ sơ')[0];
+  assert.ok(save, 'thiếu nút Lưu sơ đồ');
+  await save.onclick();
+  assert.deepEqual(notices, [], 'không toast trùng');
+  assert.equal(model.state.diagramDirty, true, 'nháp còn nguyên');
+  assert.equal(model.state.revision, 3, 'revision không đổi khi bị từ chối');
+  assert.deepEqual(errLines(view), [CAT.errText(inner)],
+    'lỗi dưới sơ đồ phải đúng errText của catalog thật');
+  assert.equal(stageSlot(view).textContent, '',
+    'cùng lỗi không được lặp ở Stage');
+});
 
-test('luu loi workspace_locked: toast dung catalog, nhap con nguyen',
+test('luu loi workspace_locked: một dòng tại Stage, nhap con nguyen',
   async () => {
     const err = { code: 'workspace_locked', message: 'phien khac dang mo' };
     const { view, model, notices, CAT } = build(test, {
@@ -217,13 +228,16 @@ test('luu loi workspace_locked: toast dung catalog, nhap con nguyen',
     assert.ok(save, 'thieu nut Luu so do');
     assert.equal(save.disabled, false, 'nut luu phai bat truoc khi bam');
     await save.onclick();
-    assert.deepEqual(notices, [[CAT.errText(err), true]]);
+    assert.deepEqual(notices, [], 'không toast trùng');
+    assert.equal(stageSlot(view).textContent, CAT.errText(err));
+    assert.deepEqual(errLines(view), [],
+      'lỗi không thuộc sơ đồ không hiện ở vùng sơ đồ');
     assert.equal(model.state.diagramDirty, true, 'nhap bi mat sau loi luu');
     assert.equal(model.state.revision, 3, 'revision khong duoc doi khi loi');
     assert.equal(model.state.diagram.nodes
       .find((n) => n.id === 'child_1').personId, 'c2',
     'draft vua sua phai con nguyen');
-  });
+});
 
 // ---------- xung dot phien ban ----------
 
@@ -281,29 +295,29 @@ test('evaluate + luu thanh cong: khong toast loi, revision tang mot lan',
 
 // ---------- nap tach file trong Node (khong catalog) ----------
 
-test('khong co catalog khi nap: nhanh du phong con dung duoc', async () => {
+test('khong co catalog khi nap: nhanh du phong van mot cau, khong ma', async () => {
   const { view, notices } = build(test, { withCatalog: false,
     client: errorClient({ 'notary.diagram_evaluate':
       { ok: false, error: { ...EVAL_ERR } } }) });
   await findBtns(view.el, 'Xem cách tính')[0].onclick();
-  assert.deepEqual(notices,
-    [['stage_validation_error: synthetic', true]],
-    'nhanh du phong phai giu dinh dang code: message');
+  assert.deepEqual(notices, [], 'không toast trùng');
+  assert.deepEqual(errLines(view), ['synthetic'],
+    'fallback dùng message, không in mã');
 });
 
-test('missing_land_owner: chi ro thieu dau Chu, khong huong dan gan lai nguoi', () => {
+test('R12 missing_land_owner: một câu nói chuyện gì, không dạy thao tác', () => {
   const CAT = catalog();
   const error = { code: 'missing_land_owner' };
   const text = CAT.errText(error);
-  assert.match(text, /đánh dấu Chủ đất/);
-  assert.match(text, /chip "Chủ"/);
-  assert.doesNotMatch(text, /Kéo người để lại vào ô khởi tạo/);
+  assert.equal(text, 'Chưa đánh dấu Chủ đất cho người để lại tài sản');
+  assert.doesNotMatch(text, /chip "Chủ"/);
+  assert.doesNotMatch(text, /missing_land_owner/);
   assert.match(CAT.describeError(error).title, /đánh dấu Chủ đất/);
 });
 
 for (const draft of [false, true]) {
   for (const withDetails of [true, false]) {
-    test(`${draft ? 'nhap moi' : 'case cu'}: toast loi diagram dau tien, details=${withDetails}`, async (t) => {
+    test(`${draft ? 'nhap moi' : 'case cu'}: mot dong loi diagram dau tien, details=${withDetails}`, async (t) => {
       const first = { code: 'missing_land_owner' };
       const error = { code: 'diagram_invalid_state',
         ...(withDetails ? { details: { errors: [first, { code: 'duplicate_person' }] } } : {}) };
@@ -315,7 +329,12 @@ for (const draft of [false, true]) {
       const button = findBtns(view.el, 'Lưu hồ sơ')[0];
       assert.ok(button);
       await button.onclick();
-      assert.deepEqual(notices, [[CAT.errText(withDetails ? first : error), true]]);
+      assert.deepEqual(notices, [], 'không toast trùng');
+      // Mỗi lỗi engine một dòng (không toast/banner trùng): details có
+      // 2 lỗi thì vùng sơ đồ có đúng 2 dòng.
+      assert.deepEqual(errLines(view), withDetails
+        ? [CAT.errText(first), CAT.errText({ code: 'duplicate_person' })]
+        : [CAT.errText(error)]);
     });
   }
 }

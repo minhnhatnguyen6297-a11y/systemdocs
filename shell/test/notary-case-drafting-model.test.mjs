@@ -2203,7 +2203,7 @@ test('saveCaseMeta: case da luu → wire workspace_update, revision+1, caseInfo 
   assert.deepEqual(call.payload.case, { noi_niem_yet: 'xã Yên Sở' });
   assert.equal(model.state.revision, rev + 1);
   assert.equal(model.state.caseInfo.noi_niem_yet, 'xã Yên Sở');
-  assert.equal(model.state.notice, 'Đã lưu thông tin hồ sơ');
+  assert.equal(model.state.notice, null, 'R14: không toast chữ thành công');
   // Reload qua workspace_get thay gia tri da luu (mot nguon du lieu).
   await model.openCase(42);
   assert.equal(model.state.caseInfo.noi_niem_yet, 'xã Yên Sở');
@@ -2347,7 +2347,7 @@ test('openCase(B) sau openCase(A) co aux state → moi aux state sach', async ()
   model.setOwnerRow(p.row_id);
   const rc = await model.saveCase();
   assert.equal(rc.ok, true);
-  assert.equal(model.state.notice, 'Đã lưu hồ sơ');
+  assert.equal(model.state.notice, null, 'R14: không toast chữ thành công');
   // server khoa case → saveCase tiep nhan workspace_locked → state.error
   client.cases[43].locked = true;
   model.updatePersonField(
@@ -3539,7 +3539,7 @@ test('saveCase thành công: thay model bằng workspace, xóa ba dirty flag', a
   assert.equal(s.stageDirty, false);
   assert.equal(s.diagramDirty, false);
   assert.equal(s.metaDirty, false);
-  assert.equal(s.notice, 'Đã lưu hồ sơ');
+  assert.equal(s.notice, null, 'R14: không toast chữ thành công');
   assert.equal(s.savingCase, false);
 });
 
@@ -3584,7 +3584,7 @@ test('duplicateCase: timeout giữ key để retry, success đổi key + hydrate
   assert.equal(model.state.diagramDirty, false);
   assert.equal(model.state.metaDirty, false);
   assert.equal(model.state.duplicatePending, null);
-  assert.equal(model.state.notice, 'Đã nhân bản hồ sơ');
+  assert.equal(model.state.notice, null, 'R14: không toast chữ thành công');
   assert.deepEqual(client.cases[44], sourceBefore, 'không sửa nguồn');
 
   const third = await model.duplicateCase(44);

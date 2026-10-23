@@ -320,11 +320,9 @@ function createDiagramPane(ctx) {
   }
 
   async function runEvaluate() {
+    // R13: lỗi evaluate hiện MỘT dòng trong vùng sơ đồ (state.diagramErrors
+    // hoặc state.error do model đặt) — không toast trùng.
     const r = await model.evaluateDiagram();
-    if (!r.ok && r.error &&
-        r.error.code !== 'diagram_invalid_state') {
-      notify(relErrText(r.error), true);
-    }
     if (r.ok) applyRequiredSlots();     // engine-required slots (SOT)
     return r;
   }
@@ -1304,6 +1302,11 @@ function createDiagramPane(ctx) {
     const dg = h('div', 'cd-diagram');
     dg.append(canvasEl());
     const extra = h('div', 'cd-diagram-extra');
+    // R13: slot lỗi dành sẵn — lỗi sơ đồ hiện đúng một dòng tại đây,
+    // không toast/banner trùng; slot luôn chiếm chỗ nên canvas và các
+    // vùng khác không nhảy khi lỗi xuất hiện/biến mất.
+    const errSlot = h('div', 'cd-diagram-errslot');
+    extra.append(errSlot);
     // MIN-136: chu dat DA GAN nhung chua co ngay mat → engine khong
     // spawn nhanh (dung nghiep vu — thua ke chi phat sinh khi co nguoi
     // chet). Hint user dien Ngay mat o bang Nguoi; evaluate tu chay lai
@@ -1358,15 +1361,21 @@ function createDiagramPane(ctx) {
       // diagramErrors rieng nen khong lap lai.
       if (rm.status === 'invalid' && !(s.diagramErrors || []).length) {
         for (const e of rm.errors || []) {
-          extra.append(h('div', 'error', relErrText(e)));
+          errSlot.append(h('div', 'error small', errText(e)));
         }
       }
     }
     for (const er of s.diagramErrors || []) {
-      extra.append(h('div', 'error', relErrText(er)));
+      errSlot.append(h('div', 'error small', errText(er)));
+    }
+    // Lỗi do evaluate/gọi sơ đồ đặt vào state.error (model chỉ giữ MỘT
+    // kênh lỗi mỗi lần) — hiện tại đây, không lặp ở card Stage.
+    if (s.error && relIsDiagramError(s.error.code) &&
+        !(s.diagramErrors || []).length) {
+      errSlot.append(h('div', 'error small', errText(s.error)));
     }
     if (calcOpen) extra.append(calcPanelEl());
-    if (extra.childElementCount) dg.append(extra);
+    dg.append(extra);
     return dg;
   }
 
@@ -1455,6 +1464,7 @@ function createDiagramPane(ctx) {
       await onSaveCase();
     });
     currentSaveBtn = save;
+    save.dataset.label = 'Lưu hồ sơ';
     // Dot + aria/disabled theo đúng một nguồn (dirty live cả khi rebuild).
     syncSaveButton();
     const word = btn('Xuất Word', 'sm primary', openWordDialog);

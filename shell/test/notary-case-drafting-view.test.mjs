@@ -17,6 +17,7 @@ const VIEW = require('../src/renderer/notary/case-drafting-view.js');
 const INTAKE = require('../src/renderer/notary/intake-dialog.js');
 const DIAGRAM = require('../src/renderer/notary/relationship-diagram.js');
 const WORD = require('../src/renderer/notary/word-export-dialog.js');
+const STATUS = require('../src/renderer/notary/action-status.js');
 
 if (typeof globalThis.crypto?.randomUUID !== 'function') {
   const { webcrypto } = require('node:crypto');
@@ -43,6 +44,7 @@ async function build(t, { draft = true, confirm = true, confirmSeen = null, resp
     G1_NOTARY_MODEL: M, G1_NOTARY_VIEW: VIEW,
     G1_NOTARY_INTAKE: INTAKE, G1_NOTARY_DIAGRAM: DIAGRAM,
     G1_NOTARY_WORD: WORD, G1_NOTARY_ERRORS: ERRORS,
+    G1_NOTARY_ACTION_STATUS: STATUS,
   };
   const calls = [];
   const notifications = [];
@@ -844,10 +846,12 @@ test('MIN-136 error catalog: code → thông điệp thân thiện + rule ẩn',
   assert.match(d.title, /Chưa chọn người để lại/);
   assert.match(d.hint, /ô khởi tạo/);
   assert.equal(d.code, 'workspace_owner_required');
-  // errText: title chính + code mờ trong ngoặc — khong troi snake_case.
+  // R12: errText chỉ còn MỘT câu ngắn — không hint dạy thao tác, không
+  // hậu tố mã snake_case.
   const t = ERRORS.errText({ code: 'submit_failed' });
-  assert.match(t, /Không gửi được lệnh tới engine/);
-  assert.match(t, /\(submit_failed\)$/);
+  assert.equal(t, 'Không gửi được lệnh tới engine');
+  assert.doesNotMatch(t, /submit_failed/);
+  assert.doesNotMatch(t, /đợi vài giây/);
   // Code khong co trong catalog → fallback message backend, khong troi
   // code trang (title != code).
   const u = ERRORS.describeError({ code: 'totally_new_code_xyz',
@@ -1442,17 +1446,17 @@ test('NAIA-8 word dialog: Noi niem yet — nap gia tri da luu, luu ok/loi ro', a
   await findBtns(box, 'Lưu nơi niêm yết')[0].onclick();
   const upd = model.calls.find(([k]) => k === 'update');
   assert.deepEqual(upd[1], { noi_niem_yet: 'phường Mới' });
-  assert.match(box.textContent, /Đã lưu\./);
+  // R14: không còn câu chữ báo thành công trong dialog.
+  assert.doesNotMatch(box.textContent, /Đã lưu\./);
 
-  // Loi luu → thong bao ro rang tai cho + notify loi.
+  // Loi luu → mot dong loi tai cho, khong toast trung.
   model.saveCaseMeta = async () => ({ ok: false, error: {
     code: 'workspace_conflict', message: 'revision khac server',
     retryable: false } });
   input.value = 'xã Khác';
   await findBtns(box, 'Lưu nơi niêm yết')[0].onclick();
-  assert.match(box.textContent, /Lưu thất bại: revision khac server/);
-  assert.ok(notes.some((m) => m.isErr &&
-    /workspace_conflict/.test(m.msg)));
+  assert.match(box.textContent, /revision khac server/);
+  assert.equal(notes.length, 0, 'không toast trùng với dòng lỗi tại chỗ');
 
   // Case locked → input + nut luu bi khoa.
   model.state.caseInfo.locked = true;
@@ -1511,7 +1515,7 @@ test('NAIA-8 word dialog: dang luu Noi niem yet → Xuat/input/Luu khoa (pending
   assert.equal(goBtn.disabled, false);
   assert.equal(input.disabled, false);
   assert.equal(saveBtn.disabled, false);
-  assert.match(box.textContent, /Đã lưu\./);
+  assert.doesNotMatch(box.textContent, /Đã lưu\./);
   await goBtn.onclick();
   assert.ok(model.calls.some(([k]) => k === 'batch'),
     'batch phai chay sau khi save hoan tat');
@@ -1552,7 +1556,7 @@ test('NAIA-8 word dialog: pending-save loi → mo lai theo quyen hien tai', asyn
       `locked=${locked}: save.disabled`);
     assert.equal(goBtn.disabled, locked,
       `locked=${locked}: Xuat.disabled`);
-    assert.match(box.textContent, /Lưu thất bại/);
+    assert.match(box.textContent, /loi luu/);
   }
 });
 
@@ -2213,7 +2217,7 @@ test('B1: một lần bấm gửi đúng một workspace_save_case cùng snapsho
   assert.equal(model.state.stageDirty, false);
   assert.equal(model.state.diagramDirty, false);
   assert.equal(model.state.metaDirty, false);
-  assert.equal(model.state.notice, 'Đã lưu hồ sơ');
+  assert.equal(model.state.notice, null, 'R14: không toast chữ thành công');
 });
 
 test('B2: ô text + ô ngày đang sửa được flush; ngày sai không gửi IPC', async () => {
@@ -2256,8 +2260,14 @@ test('B2: ô text + ô ngày đang sửa được flush; ngày sai không gửi 
     0, 'ngày sai không được gửi snapshot thiếu');
   assert.equal(bad.classList.contains('cd-input-bad'), true,
     'ô ngày sai phải được đánh dấu');
-  assert.ok(notifications.some((m) => /Ngày không hợp lệ/.test(m)),
-    'phải báo lỗi tại chỗ');
+  // R13: một dòng lỗi trong card chứa ô, không toast.
+  assert.equal(notifications.length, 0, 'không toast trùng');
+  const peopleCard = collect(view.el,
+    (e) => e.classList.contains('cd-people'))[0];
+  const slot = collect(peopleCard,
+    (e) => e.classList.contains('cd-card-errslot'))[0];
+  assert.ok(slot && /Ngày không hợp lệ/.test(slot.textContent),
+    'phải báo lỗi tại card chứa ô ngày');
   assert.equal(model.state.stageDirty, true, 'dirty giữ nguyên khi không gửi');
 });
 
@@ -2274,6 +2284,45 @@ test('B2: ký tự gõ dở trong ô ngày rỗng → null, không chặn lưu',
   const p = calls.find(([c]) => c === 'notary.workspace_save_case')[1];
   assert.equal(
     p.stage.people.find((x) => x.row_id === owner.row_id).ngay_sinh, null);
+});
+
+test('R14: Lưu hồ sơ — spinner tại nút, xong tích xanh, không toast chữ', async () => {
+  let finishSave;
+  const respond = (cmd, payload) => {
+    if (cmd !== 'notary.workspace_save_case') return null;
+    return new Promise((res) => {
+      finishSave = () => res({ ok: true, data: {
+        case: { id: 88, case_type: 'inheritance',
+                document_type: 'khai_nhan', status: 'done',
+                locked: false, revision: 2 },
+        backend_mode: 'real',
+        capabilities: { intake: [], diagram: true, word_export: false },
+        stage: structuredClone(payload.stage),
+        diagram: { state: structuredClone(payload.diagram.state),
+                   render_model: null },
+        warnings: [] } });
+    });
+  };
+  const { model, view, notifications } = await build(test, { draft: true, respond });
+  const owner = model.addPerson({ ho_ten: 'Người Để Lại' });
+  model.setOwnerRow(owner.row_id);
+  model.addAsset({ so_serial: 'AA000001' });
+  const saveBtn = findBtns(view.el, 'Lưu hồ sơ')[0];
+  const pending = saveBtn.onclick();
+  await new Promise((r) => setTimeout(r, 0));
+  const busy = findBtns(view.el, 'Lưu hồ sơ')[0];
+  assert.ok(busy.classList.contains('is-busy'), 'thiếu trạng thái bận ở nút');
+  assert.equal(busy.getAttribute('aria-busy'), 'true');
+  assert.equal(busy.querySelectorAll('.act-spin').length, 1,
+    'thiếu spinner tại nút Lưu');
+  finishSave();
+  await pending;
+  const done = findBtns(view.el, 'Lưu hồ sơ')[0];
+  assert.ok(done.classList.contains('is-ok'), 'thiếu dấu tích xanh');
+  const check = done.querySelector('.act-check');
+  assert.ok(check && check.textContent === '✓');
+  assert.equal(done.getAttribute('aria-busy'), null);
+  assert.deepEqual(notifications, [], 'không toast chữ thành công');
 });
 
 // ---------- vòng 2: nguồn Done cho nháp mới (§13.20) ----------
@@ -2450,58 +2499,163 @@ test('đợt5: lỗi Nhân bản giữ workspace và mở lại nút', async () 
   assert.equal(model.state.error.code, 'engine_unavailable');
 });
 
-// G5: lỗi cấp danh sách / lỗi field không có ô đỏ — hộp cảnh báo nổi
-// bật (cd-card-alert) và câu nói rõ thiếu gì, không in mã field thô.
-test('G5: lỗi cấp danh sách assets → hộp cảnh báo nổi bật + câu rõ', async () => {
+// R13: mỗi lỗi đúng một chỗ — dòng lỗi nằm trong slot dành sẵn của
+// card (không phải hộp cảnh báo riêng, không toast trùng).
+function errSlotText(root, cls) {
+  const card = collect(root, (e) => e.classList.contains(cls))[0];
+  const slot = collect(card, (e) => e.classList.contains('cd-card-errslot'))[0];
+  return slot ? slot.textContent : '';
+}
+
+test('R13: lỗi cấp danh sách assets → một dòng trong slot card Tài sản', async () => {
   const { model, view } = await build(test, { draft: false });
   model.state.fieldErrors = [
     { row_id: null, field: 'assets', code: 'required' }];
   model.dismissNotice();
-  const card = collect(view.el, (e) => e.classList.contains('cd-assets'))[0];
-  const box = collect(card, (e) => e.classList.contains('cd-card-alert'))[0];
-  assert.ok(box, 'thiếu hộp cảnh báo nổi bật ở card Tài sản');
-  assert.ok(box.classList.contains('cd-row-errors'),
-    'giữ class cũ cho DOM/test hiện có');
-  assert.match(box.textContent, /chưa có tài sản/);
-  assert.doesNotMatch(box.textContent, /Trường bắt buộc chưa có giá trị/);
+  const text = errSlotText(view.el, 'cd-assets');
+  assert.match(text, /chưa có tài sản/);
+  assert.doesNotMatch(text, /Trường bắt buộc chưa có giá trị/);
+  assert.equal(collect(view.el,
+    (e) => e.classList.contains('cd-card-alert')).length, 0,
+    'không còn hộp alert riêng trùng kênh');
 });
 
-test('G5: lỗi field người ẩn hiện nhãn dễ hiểu, không in mã thô', async () => {
+test('R13: lỗi field người ẩn hiện nhãn dễ hiểu, không in mã thô', async () => {
   const { model, view } = await build(test, { draft: false });
   model.state.fieldErrors = [
     { row_id: 'c1', field: 'noi_cap', code: 'required' }];
   model.dismissNotice();
-  const card = collect(view.el, (e) => e.classList.contains('cd-people'))[0];
-  const box = collect(card, (e) => e.classList.contains('cd-card-alert'))[0];
-  assert.ok(box, 'thiếu hộp cảnh báo nổi bật ở card Người');
-  assert.match(box.textContent, /Nơi cấp giấy tờ/);
-  assert.doesNotMatch(box.textContent, /noi_cap/);
+  assert.match(errSlotText(view.el, 'cd-people'), /Nơi cấp giấy tờ/);
+  assert.doesNotMatch(errSlotText(view.el, 'cd-people'), /noi_cap/);
   // Field lạ không có trong bảng nhãn → giữ mã thô, không nuốt lỗi.
   model.state.fieldErrors = [
     { row_id: 'c1', field: 'field_la_xyz', code: 'required' }];
   model.dismissNotice();
-  const box2 = collect(view.el,
-    (e) => e.classList.contains('cd-card-alert'))[0];
-  assert.match(box2.textContent, /field_la_xyz/);
+  assert.match(errSlotText(view.el, 'cd-people'), /field_la_xyz/);
 });
 
-test('G5: lỗi field tài sản ẩn (entity_id) → hộp cảnh báo đúng card',
-  async () => {
-    const { model, view } = await build(test, { draft: false });
-    model.state.fieldErrors = [
-      { row_id: 'cA1', field: 'entity_id', code: 'invalid_format' }];
-    model.dismissNotice();
-    const assets = collect(view.el,
-      (e) => e.classList.contains('cd-assets'))[0];
-    const box = collect(assets,
-      (e) => e.classList.contains('cd-card-alert'))[0];
-    assert.ok(box, 'thiếu hộp cảnh báo ở card Tài sản');
-    assert.match(box.textContent, /Tài sản 1/);
-    assert.match(box.textContent, /Mã định danh nội bộ/);
-    assert.doesNotMatch(box.textContent, /entity_id/);
-    // Lỗi thuộc dòng tài sản không được tô đỏ oan card Người.
-    const people = collect(view.el,
-      (e) => e.classList.contains('cd-people'))[0];
-    assert.equal(collect(people,
-      (e) => e.classList.contains('cd-card-alert')).length, 0);
-  });
+test('R13: lỗi field tài sản ẩn (entity_id) → đúng card Tài sản', async () => {
+  const { model, view } = await build(test, { draft: false });
+  model.state.fieldErrors = [
+    { row_id: 'cA1', field: 'entity_id', code: 'invalid_format' }];
+  model.dismissNotice();
+  const text = errSlotText(view.el, 'cd-assets');
+  assert.match(text, /Tài sản 1/);
+  assert.match(text, /Mã định danh nội bộ/);
+  assert.doesNotMatch(text, /entity_id/);
+  // Lỗi thuộc dòng tài sản không được tô đỏ oan card Người.
+  assert.equal(errSlotText(view.el, 'cd-people'), '');
+});
+
+test('R13: lỗi gắn ô → ô đỏ + một dòng trong card, không nhét chữ vào ô', async () => {
+  const { model, view } = await build(test, { draft: false });
+  model.state.fieldErrors = [
+    { row_id: 'c1', field: 'ho_ten', code: 'required' }];
+  model.dismissNotice();
+  const td = fid(view.el, 'p:c1:ho_ten').closest('td');
+  assert.ok(td.classList.contains('cd-cell-err'), 'ô phải đỏ');
+  assert.equal(collect(td, (e) => e.classList.contains('cd-err-msg')).length,
+    0, 'không chèn dòng chữ trong ô (không đổi chiều cao hàng)');
+  assert.match(errSlotText(view.el, 'cd-people'), /Người Đã Lưu · Họ tên/);
+});
+
+test('R13: lỗi không gắn ô → một dòng ở slot Stage, không banner toàn cục', async () => {
+  const { model, view } = await build(test, { draft: false });
+  model.state.error = { code: 'workspace_storage_error', message: 'x' };
+  view.refresh();
+  const slot = collect(view.el,
+    (e) => e.classList.contains('cd-stage-status'))[0];
+  assert.ok(slot && /Không ghi được hồ sơ/.test(slot.textContent));
+  assert.equal(collect(view.el,
+    (e) => e.classList.contains('banner') &&
+      e.classList.contains('err')).length, 0,
+    'không còn banner lỗi toàn cục');
+});
+
+// ---------- R16 / N1 / N9 ----------
+
+test('R16: bỏ chữ hướng dẫn tĩnh + placeholder dạy; giữ mặt nạ ngày', async () => {
+  const { model, view } = await build(test, { draft: true });
+  const p = model.addPerson({ ho_ten: 'Người Có Ngày Mất',
+    ngay_chet: '2020-01-01' });
+  const issuer = fid(view.el, `p:${p.row_id}:noi_cap`);
+  assert.ok(issuer);
+  assert.ok(!issuer.placeholder);
+  assert.ok(!fid(view.el, 'meta:noi_niem_yet').placeholder);
+  assert.ok(!fid(view.el, 'meta:nguoi_nhan_uy_quyen').placeholder);
+  assert.ok(!fid(view.el, 'meta:noi_dung_viec').placeholder);
+  // N13: mặt nạ định dạng ngày vẫn giữ.
+  assert.equal(fid(view.el, `p:${p.row_id}:ngay_sinh`).placeholder,
+    'dd/mm/yyyy hoặc năm');
+  // Đoạn giới thiệu danh sách hồ sơ đã gỡ.
+  assert.doesNotMatch(view.el.textContent, /bấm vào hồ sơ để mở/);
+});
+
+test('R14/N1 intake: spinner khi phân tích, gợi ý không gắn hậu tố provenance', async () => {
+  let finish;
+  const respond = (cmd) => (cmd === 'notary.intake_analyze'
+    ? new Promise((res) => {
+        finish = () => res({ ok: true, data: {
+          suggestions: [{
+            suggestion_id: 's1', source_id: 'src1', target: 'person',
+            fields: {
+              ho_ten: {
+                normalized_value: 'Nguyễn Văn A',
+                raw_value: 'Nguyễn Văn A',
+                observation_state: 'observed',
+                source_refs: [],
+              },
+            },
+            warnings: [],
+          }],
+          errors: [],
+        } });
+      })
+    : null);
+  const { view } = await build(test, { draft: true, respond });
+  findBtns(view.el, 'Nhập file')[0].onclick();
+  const modal = collect(view.el, (e) => e.classList.contains('modal'))[0];
+  assert.ok(modal, 'không mở dialog Nhập file');
+  const ta = collect(modal, (e) => e.tagName === 'TEXTAREA')[0];
+  ta.value = 'Ông Nguyễn Văn A';
+  const go = findBtns(modal, 'Phân tích')[0];
+  const pending = go.onclick();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.ok(go.classList.contains('is-busy'), 'thiếu spinner ở nút Phân tích');
+  assert.equal(go.querySelectorAll('.act-spin').length, 1);
+  finish();
+  await pending;
+  await new Promise((r) => setTimeout(r, 0));
+  assert.ok(go.classList.contains('is-ok'), 'thiếu tích xanh sau phân tích');
+  assert.match(modal.textContent, /Họ tên: Nguyễn Văn A/);
+  assert.doesNotMatch(modal.textContent, /\(đọc được\)/,
+    'N1: không gắn hậu tố provenance lên nhãn');
+  assert.doesNotMatch(modal.textContent,
+    /Mọi kết quả là gợi ý chờ kiểm tra/);
+});
+
+test('N9: bảng mapping Word gốc không in row_id', async (t) => {
+  const model = wordModelStub();
+  model.state.docxImport = { version: 1, sources: [
+    { source_id: 'src-1', label: 'Hợp đồng gốc' }] };
+  model.state.wordBindingProposals = [{
+    occurrence_id: 'occ-1', slot: 'ho_ten', value: 'Nguyễn Văn A',
+    raw_snippet: 'Ông Nguyễn Văn A', row_label: 'Người A',
+    row_id: '11111111-1111-4111-8111-111111111111',
+    supported: true, selected: true,
+  }];
+  model.hasUnsaved = () => false;
+  model.loadWordOptions = async () => {
+    model.state.wordOptions = [{ document_key: 'k', display_name: 'k',
+      ready: true, block_reason: null }];
+    return { ok: true };
+  };
+  const pickFiles = async () => ({ ok: true, data: { files: [] } });
+  const { ctx, cap } = wordDialogCtx(t, { model, pickFiles });
+  WORD.createWordDialog(ctx).open();
+  const box = cap.box;
+  await findBtns(box, 'Dùng hợp đồng Word đã nhập')[0].onclick();
+  assert.match(box.textContent, /Người A/);
+  assert.doesNotMatch(box.textContent, /11111111-1111-4111-8111-111111111111/,
+    'N9: không in mã dòng nội bộ lên dialog');
+});

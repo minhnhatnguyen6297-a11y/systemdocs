@@ -56,6 +56,10 @@ function createIntakeDialog(ctx) {
   // registerDroppedFile co the thieu tren shell cu — fallback picker.
   const registerDroppedFile = ctx.registerDroppedFile || null;
   const cancelJob = ctx.cancelJob || (async () => ({ ok: false }));
+  const actionStatus = ctx.actionStatus ||
+    { run: (sel, root, task) => task() };
+  const errText = ctx.errText ||
+    ((e) => (e && (e.message || e.code)) || 'Lỗi');
 
   function open(presetKind) {
     // item: {source_id, kind, label, token?, text?, status, error}
@@ -296,9 +300,8 @@ function createIntakeDialog(ctx) {
         drop.classList.remove('drop-hint');
         if (!registerDroppedFile) {
           dropErr.innerHTML = '';
-          dropErr.append(face(L.faceError({
-            code: 'unsupported', message:
-              'Kéo thả chưa hỗ trợ trên bản này — dùng “Chọn file…”.' })));
+          dropErr.append(face({ kind: 'error', title:
+            'Kéo thả chưa hỗ trợ trên bản này — dùng “Chọn file…”.' }));
           return;
         }
         for (const f of (e.dataTransfer && e.dataTransfer.files) || []) {
@@ -358,7 +361,7 @@ function createIntakeDialog(ctx) {
       });
       cancelBtn.hidden = true;
 
-      const go = btn('Phân tích', 'primary', async () => {
+      const go = btn('Phân tích', 'primary js-intake-run', async () => {
         const sources = [];
         for (const it of items) {
           if (!it.kind || it.status === 'lỗi') continue;  // bo nguon loi
@@ -391,16 +394,17 @@ function createIntakeDialog(ctx) {
         cancelBtn.hidden = false;
         renderList();
         prog.textContent = 'Đang gửi…';
-        const r = await model.intakeAnalyze(sources, {
-          onJob: (job) => {
-            if (job && job.job_id) jobId = job.job_id;
-            const p = job && job.progress;
-            prog.textContent = p
-              ? `Đang phân tích ${p.done ?? 0}/${p.total ?? '?'} — ` +
-                (p.current_label || '')
-              : 'Đang phân tích…';
-          },
-        });
+        const r = await actionStatus.run('.js-intake-run', box,
+          () => model.intakeAnalyze(sources, {
+            onJob: (job) => {
+              if (job && job.job_id) jobId = job.job_id;
+              const p = job && job.progress;
+              prog.textContent = p
+                ? `Đang phân tích ${p.done ?? 0}/${p.total ?? '?'} — ` +
+                  (p.current_label || '')
+                : 'Đang phân tích…';
+            },
+          }), { ok: (x) => !!(x && x.ok) });
         if (r.stale) return;
         busy = false;
         jobId = null;
@@ -415,8 +419,7 @@ function createIntakeDialog(ctx) {
           renderList();
           const news = lastResult.suggestions || [];
           for (const e of lastResult.errors || []) {
-            review.append(h('div', 'error',
-              `${e.code}: ${e.message || ''}`));
+            review.append(h('div', 'error', errText(e)));
           }
           if (news.length) {
             review.append(btn('Tải JSON về máy', 'secondary sm', () => {
@@ -453,7 +456,7 @@ function createIntakeDialog(ctx) {
             }
           }
           renderList();
-          review.append(face(L.faceError(r.error || { code: 'unknown' })));
+          review.append(face({ kind: 'error', title: errText(r.error) }));
         }
       });
       go.disabled = !model.canWrite();
