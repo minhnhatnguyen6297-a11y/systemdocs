@@ -2694,3 +2694,54 @@ test('N9: bảng mapping Word gốc không in row_id', async (t) => {
   assert.doesNotMatch(box.textContent, /11111111-1111-4111-8111-111111111111/,
     'N9: không in mã dòng nội bộ lên dialog');
 });
+
+test('R14: Xuất Word — spinner tại nút Xuất rồi tích xanh tại chỗ', async (t) => {
+  let finish;
+  const model = wordModelStub({
+    exportWord: () => new Promise((res) => { finish = () => res({ ok: true }); }),
+  });
+  const pickFiles = async () => ({ ok: true, data: { files: [
+    { file_token: 'tok-m', name: 'mau', is_dir: true }] } });
+  const { ctx, cap } = wordDialogCtx(t, { model, pickFiles });
+  ctx.actionStatus = STATUS.createActionStatus();
+  WORD.createWordDialog(ctx).open();
+  const box = cap.box;
+  await findBtns(box, 'Chọn thư mục mẫu')[0].onclick();
+  await findBtns(box, 'Chọn thư mục đích')[0].onclick();
+  const go = findBtns(box, 'Xuất')[0];
+  const pending = go.onclick();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.ok(go.classList.contains('is-busy'));
+  assert.equal(go.querySelectorAll('.act-spin').length, 1);
+  finish();
+  await pending;
+  assert.ok(go.classList.contains('is-ok'));
+  assert.ok(go.querySelector('.act-check'));
+});
+
+test('R14: Xem cách tính — spinner tại nút, xong tích xanh, không toast', async () => {
+  let finish;
+  const respond = (cmd) => (cmd === 'notary.diagram_evaluate'
+    ? new Promise((res) => { finish = () => res({ ok: true, data: {
+        evaluated_revision: 3,
+        render_model: { engineVersion: 2, status: 'complete',
+          allocations: {}, breakdowns: [], requiredSlots: [],
+          warnings: [], errors: [], unresolvedEstates: [],
+          conservation: {} } } }); })
+    : null);
+  const { view, notifications } = await build(test, { draft: false, respond });
+  const btnEl = collect(view.el,
+    (e) => e.classList.contains('js-calc-eval'))[0];
+  assert.ok(btnEl, 'thiếu nút Xem cách tính');
+  const pending = btnEl.onclick();
+  await new Promise((r) => setTimeout(r, 0));
+  const busy = collect(view.el, (e) => e.classList.contains('js-calc-eval'))[0];
+  assert.ok(busy.classList.contains('is-busy'));
+  assert.equal(busy.querySelectorAll('.act-spin').length, 1);
+  finish();
+  await pending;
+  const done = collect(view.el, (e) => e.classList.contains('js-calc-eval'))[0];
+  assert.ok(done.classList.contains('is-ok'));
+  assert.ok(done.querySelector('.act-check'));
+  assert.deepEqual(notifications, []);
+});

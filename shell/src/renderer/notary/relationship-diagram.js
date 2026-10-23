@@ -1459,11 +1459,12 @@ function createDiagramPane(ctx) {
       // (evaluate van tu chay qua scheduleEvaluate + khi mo panel).
       const calc = btn('Xem cách tính', 'sm js-calc-eval', async () => {
         calcOpen = !calcOpen;
-        if (calcOpen) {
-          await actionStatus.run('.js-calc-eval', uiRoot(),
-            () => runEvaluate(), { ok: (r) => !!(r && r.ok) });
-        }
-        rerender();
+        if (!calcOpen) { rerender(); return; }
+        // rerender TRONG task: nút được dựng lại trước khi action-status
+        // đóng dấu tích, nên tích xanh nằm trên node đang hiển thị.
+        await actionStatus.run('.js-calc-eval', uiRoot(),
+          () => runEvaluate().then((r) => { rerender(); return r; }),
+          { ok: (r) => !!(r && r.ok) });
       });
       calc.disabled = !s.capabilities.diagram;
       tools.append(calc);
