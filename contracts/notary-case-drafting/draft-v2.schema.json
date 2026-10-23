@@ -18,10 +18,10 @@
       "type": "string",
       "const": "notary.case-drafting.v2"
     },
-    "position_1_3": {
+    "position_1_5": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 3
+      "maximum": 5
     },
     "asset_row_v2": {
       "type": "object",
@@ -152,14 +152,14 @@
         },
         "assets": {
           "type": "array",
-          "maxItems": 3,
+          "maxItems": 5,
           "items": { "$ref": "#/definitions/asset_row_output_v2" }
         }
       }
     },
     "stage_v2_create": {
       "type": "object",
-      "description": "Stage input của workspace_create partial (vòng 2): people/assets ≥0, tên null được, owner inheritance absent/null được. Save_case/commit dùng stage_v2 strict, không dùng definition này.",
+      "description": "Stage input của workspace_create partial (vòng 2): people/assets ≥0, tên null được, owner inheritance absent/null được. Save_case dùng stage_v2 điền dần; commit dùng stage_v2 nhưng server áp strict.",
       "required": ["people", "assets"],
       "additionalProperties": false,
       "properties": {
@@ -175,20 +175,23 @@
         },
         "assets": {
           "type": "array",
-          "maxItems": 3,
+          "maxItems": 5,
           "items": { "$ref": "#/definitions/asset_row_v2" }
         }
       }
     },
     "stage_v2": {
       "type": "object",
-      "description": "Stage input STRICT cho commit_stage/save_case/evaluate hiện hành: person ho_ten non-empty; owner_row_id (nếu có) là UUID, luật theo domain do command áp. Không dùng cho workspace_create partial.",
+      "description": "Stage input cho commit_stage/save_case/evaluate: person ho_ten non-empty; owner_row_id optional/null được trên save_case/evaluate (S2 23/10/2026), commit_stage vẫn bắt buộc theo domain; assets ≤5, mỗi dòng cần số thửa + số tờ. Không dùng cho workspace_create partial.",
       "required": ["people", "assets"],
       "additionalProperties": false,
       "properties": {
         "owner_row_id": {
-          "$ref": "common.schema.json#/definitions/uuid4",
-          "description": "BẮT BUỘC khi case_type=inheritance trong payload; CẤM khi two_party; result emit null cho legacy chưa có owner (§13.6)"
+          "oneOf": [
+            { "$ref": "common.schema.json#/definitions/uuid4" },
+            { "type": "null" }
+          ],
+          "description": "Optional/null khi chưa gán Chủ đất trên save_case/evaluate; commit_stage bắt buộc với inheritance; CẤM khi two_party (§13.6)"
         },
         "people": {
           "type": "array",
@@ -197,9 +200,9 @@
         },
         "assets": {
           "type": "array",
-          "maxItems": 3,
+          "maxItems": 5,
           "items": { "$ref": "#/definitions/asset_row_v2" },
-          "description": "vị trí = index+1; ≤3 → asset_limit (§13.3)"
+          "description": "vị trí = index+1; ≤5 → asset_limit (§13.3)"
         }
       }
     },
@@ -227,12 +230,12 @@
         "ownPositions": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "$ref": "#/definitions/position_1_3" }
+          "items": { "$ref": "#/definitions/position_1_5" }
         },
         "receivePositions": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "$ref": "#/definitions/position_1_3" }
+          "items": { "$ref": "#/definitions/position_1_5" }
         },
         "hidden": { "type": "boolean" },
         "deleted": { "type": "boolean" }

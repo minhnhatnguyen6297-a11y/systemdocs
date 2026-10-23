@@ -32,9 +32,9 @@ DRAFT_CASE_TYPES = {"inheritance", "two_party"}
 DRAFT_TWO_PARTY_DOC_TYPES = {
     "chuyen_nhuong", "tang_cho", "cho_thue", "dat_coc",
 }
-DRAFT_MAX_ASSETS = 3
+DRAFT_MAX_ASSETS = 5
 DRAFT_MAX_PEOPLE_TWO_PARTY = 30
-DRAFT_POSITIONS = {1, 2, 3}
+DRAFT_POSITIONS = {1, 2, 3, 4, 5}
 DRAFT_TWO_PARTY_IDS = [f"p{i}" for i in range(1, 31)]
 DRAFT_NODE_FIELDS = {
     "id", "personId", "parentSlotIds", "spouseSlotId",
@@ -363,12 +363,14 @@ def check_stage(stage, where, v, draft_v2=False, case_type="inheritance",
                 in_payload=False, allow_overflow=False, intent="strict",
                 ctx=None):
     """people/assets rows + primary count + duplicate row_id.
-    draft_v2 (§13): stage = {owner_row_id?, people, assets}; assets ≤3;
+    draft_v2 (§13): stage = {owner_row_id?, people, assets}; assets ≤5;
     two_party people ≤30. `intent` tách rõ:
       output — ho_ten/owner nullable, owner key optional;
       create — partial-create: rỗng/tên null/owner null được, owner non-null
                vẫn phải là UUID trong people;
-      strict — commit/save/evaluate: tên non-empty, owner inheritance bắt buộc.
+      save — workspace_save_case (S1/S2 23/10/2026): rỗng/owner null được,
+             tên non-empty, mỗi asset cần số thửa + số tờ;
+      strict — commit/evaluate: tên non-empty, owner inheritance bắt buộc.
     """
     if intent not in STAGE_INTENTS:
         raise ValueError(f"intent={intent!r}")
@@ -452,7 +454,7 @@ def check_stage(stage, where, v, draft_v2=False, case_type="inheritance",
 
 
 def check_positions(n, w, v):
-    """§13.4 — ownPositions/receivePositions ⊆ {1,2,3}, unique, non-null."""
+    """§13.4 — ownPositions/receivePositions ⊆ {1..5}, unique, non-null."""
     for f in ("ownPositions", "receivePositions"):
         arr = n.get(f)
         if not isinstance(arr, list):

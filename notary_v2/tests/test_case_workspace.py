@@ -567,10 +567,14 @@ def test_commit_stage_rejects_is_primary_and_asset_limit(db):
         _commit(db, case.id, 1, people, [bad_asset])
     assert exc.value.code == "validation_error"
 
-    assets = [_asset_row(so_serial="DD123456")] + [
-        _asset_row(so_serial=f"GG{i:06d}") for i in range(3)]
+    # S7 owner 23/10/2026: trần server = 5 tài sản.
+    five = [_asset_row(so_serial=f"GG{i:06d}") for i in range(5)]
+    data = _commit(db, case.id, 1, people, five)
+    assert len(data["stage"]["assets"]) == 5
+
+    six = five + [_asset_row(so_serial="GG999999")]
     with pytest.raises(WorkspaceError) as exc2:
-        _commit(db, case.id, 1, people, assets)
+        _commit(db, case.id, data["revision"], people, six)
     assert any(e["code"] == "asset_limit"
                for e in exc2.value.details["field_errors"])
 

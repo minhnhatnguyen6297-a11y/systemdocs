@@ -63,9 +63,9 @@ DOCUMENT_TYPES = case_rows.DOCUMENT_TYPES
 DOCUMENT_TYPES_TWO_PARTY = case_rows.DOCUMENT_TYPES_TWO_PARTY
 INTAKE_KINDS = ["image", "pdf", "docx", "xlsx", "text"]
 
-MAX_ASSETS = 3                        # §13.3
+MAX_ASSETS = 5                        # §13.3 (owner 23/10/2026)
 MAX_PEOPLE_TWO_PARTY = 30             # §13.5
-POSITION_VALUES = (1, 2, 3)           # §13.4 — own/receive ⊆ {1,2,3}
+POSITION_VALUES = tuple(range(1, MAX_ASSETS + 1))  # §13.4 own/receive
 TWO_PARTY_NODE_IDS = tuple(f"p{i}" for i in range(1, 31))
 
 _UUID4_RE = re.compile(

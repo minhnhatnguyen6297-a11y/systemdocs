@@ -1265,7 +1265,7 @@ wire; backend P5 emit `v2` thống nhất.
 | `case.case_type` | cam kết `inheritance` | `inheritance` \| `two_party` |
 | `asset_row.is_primary` | bắt buộc, đúng 1 `true` | **bỏ** — primary = vị trí 1 |
 | `stage.owner_row_id` | không có | bắt buộc với `inheritance`, cấm với `two_party` |
-| node cờ thừa kế | `isLandOwner`, `willReceive` bool | `ownPositions`, `receivePositions` ⊆ {1,2,3} |
+| node cờ thừa kế | `isLandOwner`, `willReceive` bool | `ownPositions`, `receivePositions` ⊆ {1..5} |
 | `diagram` trong `workspace_create` | bắt buộc, phải có owner node | **optional** — server tự seed |
 | Pool của hồ sơ mới | đòi owner/primary trước khi gán | Đọc Stage đang sửa, gán ngay trước lần Lưu hồ sơ đầu (§13.2; thay Q1 lịch sử) |
 
@@ -1351,9 +1351,10 @@ asset_row_v2:               # giống §4.2, TRỪ is_primary (bị loại)
 - **`is_primary` bị loại khỏi wire v2** — producer không emit; consumer
   thấy key này → `validation_error` (trường lạ, cùng rule strip-field
   hiện trạng). `primary_count` không còn áp dụng ở v2.
-- **Tối đa 3 asset** trong `stage.assets` của payload
-  `workspace_create`/`workspace_commit_stage`/`workspace_save_case`/`diagram_evaluate` nháp;
-  phần tử thứ 4 trở lên → `stage_validation_error` với
+- **Tối đa 5 asset** trong `stage.assets` của payload
+  `workspace_create`/`workspace_commit_stage`/`workspace_save_case`/`diagram_evaluate` nháp
+  (owner 23/10/2026 — trần 5 thống nhất mọi tầng; client + Word cập nhật ở
+  lát riêng); phần tử thứ 6 trở lên → `stage_validation_error` với
   `field_errors[].code:"asset_limit"` (gắn `row_id` của dòng thừa).
 - **Reorder đổi nghĩa vị trí, không đổi identity:** kéo asset từ vị trí
   1 xuống 2 nghĩa là *dữ liệu tại vị trí 1 đổi*; `row_id` của asset đi
@@ -1394,8 +1395,8 @@ diagram_state v3 (domain inheritance):
       personId: <uuid4 | null>      # row_id Người trong Stage cùng ngữ cảnh (§13.2)
       parentSlotIds: [<node.id>]    # giữ nguyên 0..2
       spouseSlotId: <node.id | null>
-      ownPositions: [<int 1..3>]    # vị trí tài sản người này SỞ HỮU
-      receivePositions: [<int 1..3>]# vị trí tài sản người này ĐƯỢC NHẬN
+      ownPositions: [<int 1..5>]    # vị trí tài sản người này SỞ HỮU
+      receivePositions: [<int 1..5>]# vị trí tài sản người này ĐƯỢC NHẬN
       hidden: <bool>
       deleted: <bool>
 ```
@@ -1403,7 +1404,7 @@ diagram_state v3 (domain inheritance):
 - `isLandOwner`/`willReceive` **cấm** trên wire v2 →
   `diagram_invalid_state` (`invalid_node` — trường lạ trên node).
 - `ownPositions`/`receivePositions`: array không trùng phần tử ⊆
-  {1,2,3}; phần tử ngoài khoảng / trùng / không phải int →
+  {1..5}; phần tử ngoài khoảng / trùng / không phải int →
   `diagram_invalid_state{errors:[{code:"invalid_position"}]}`.
   `null`/thiếu → `diagram_invalid_state` (`invalid_node`).
 - Hai mảng **độc lập**: một người vừa sở hữu vừa nhận, vừa chọn nhiều
@@ -1526,7 +1527,7 @@ payload:
                                     # non-null phải là row_id trong
                                     # stage.people; CẤM khi two_party
     people: [<person_row>]          # ≥0 — ho_ten có thể null (nháp ít dữ liệu)
-    assets: [<asset_row_v2>]        # ≥0, ≤3 — §13.3
+    assets: [<asset_row_v2>]        # ≥0, ≤5 — §13.3
   diagram:                          # OPTIONAL (đổi từ v1 bắt buộc)
     state: <diagram_state v3>       # domain phải khớp case.case_type
 ```
@@ -1625,7 +1626,7 @@ Field-error code mới trong `stage_validation_error.details.field_errors[]`:
 | `identity_hint` | `entity_id` gợi ý trên dòng mới không phải int dương hoặc không tồn tại đúng bảng; không âm thầm đổi sang null |
 
 Engine/detail codes mới (`details.errors[]`, `render_model.errors[]`):
-`invalid_position` (phần tử ngoài {1..3} / `id` ngoài `p1..p30` / sai
+`invalid_position` (phần tử ngoài {1..5} / `id` ngoài `p1..p30` / sai
 thứ tự), `missing_position` (state two_party thiếu slot canonical).
 Data-codes hiện hành: diagram.two_party_unsupported, diagram.selection_pruned.
 stage.legacy_asset_overflow/stage.legacy_primary_ambiguous chỉ là lịch sử §13.8.
@@ -1648,9 +1649,9 @@ Không có workspace_locked hiện hành.
   **không** đổi số Người. Vai trò (Bên A/B, chủ đất, người nhận) lấy từ
   dữ liệu nghiệp vụ đã lưu, không suy từ vị trí node. Mọi alias
   placeholder cũ (`ngườ`, `ngườ ký`, `ngườ nhận`, …) giữ nguyên.
-- Vì v2 chặn `stage.assets` ≤ 3 (inheritance), dữ liệu v2 luôn nằm
-  trong giới hạn 5 của Word; vị trí 1..3 trên Stage tương ứng
-  `[Tài sản 1..3 - *]` — **không đổi nghĩa placeholder**.
+- `stage.assets` ≤ 5 (S7 23/10/2026) nằm đúng giới hạn 5 của Word; vị trí
+  1..5 trên Stage tương ứng `[Tài sản 1..5 - *]` — **không đổi nghĩa
+  placeholder**. Client/UI cập nhật số cụm hiển thị ở lát riêng.
 - `two_party` (NAIA-8 — đã hỗ trợ): `word_export:true`,
   `word_export_*` chạy bình thường. `[Người N - *]` = toàn bộ dòng
   Stage theo thứ tự; `[Bên A N - *]`/`[Bên B N - *]` = người gán vào

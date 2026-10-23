@@ -200,6 +200,27 @@ def test_save_case_creates_new_case_done_revision_one(db, dataset):
     assert links[0].property_id == case.asset_rows[0].property_id
 
 
+def test_save_case_five_assets_ok_six_rejected(db):
+    """S7: trần 5 tài sản áp cả nhánh tạo mới của Lưu hồ sơ."""
+    def stage(count):
+        return {"owner_row_id": None, "people": [_minimal_person()],
+                "assets": [_minimal_asset(so_serial=f"SR{i}")
+                           for i in range(count)]}
+
+    saved = CaseWorkspaceService(db).save_case(
+        case_id=None, base_revision=None, idempotency_key=_key(),
+        case_meta=_meta(), stage=stage(5), state=EMPTY_STATE)
+    assert len(saved["stage"]["assets"]) == 5
+
+    with pytest.raises(WorkspaceError) as exc:
+        CaseWorkspaceService(db).save_case(
+            case_id=None, base_revision=None, idempotency_key=_key(),
+            case_meta=_meta(), stage=stage(6), state=EMPTY_STATE)
+    assert any(e["code"] == "asset_limit"
+               for e in exc.value.details["field_errors"])
+    assert db.query(InheritanceCase).count() == 1
+
+
 def test_save_case_done_stays_done_when_commit_and_resave(db, dataset):
     create = _create_draft(db, dataset)
     case_id = create["case"]["id"]

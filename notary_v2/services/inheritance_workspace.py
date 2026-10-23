@@ -33,6 +33,7 @@ from services.case_workspace import (
     CASE_TYPE_TWO_PARTY,
     CASE_TYPES,
     DIAGRAM_STATE_VERSION,
+    POSITION_VALUES,
     SCHEMA_VERSION,
     WorkspaceError,
     _case_meta,
@@ -54,9 +55,7 @@ _INHERITANCE_NODE_FIELDS = {
 _TWO_PARTY_NODE_FIELDS = {"id", "personId", "hidden", "deleted"}
 _TWO_PARTY_IDS = tuple(f"p{i}" for i in range(1, 31))
 _TWO_PARTY_ID_SET = set(_TWO_PARTY_IDS)
-_POSITIONS = (1, 2, 3)
-
-
+_POSITIONS = POSITION_VALUES
 # --------------------------------------------------------------- wire check
 
 

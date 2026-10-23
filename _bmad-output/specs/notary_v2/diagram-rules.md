@@ -65,7 +65,7 @@ tồn tại, `personId` thuộc Stage, không có vòng quan hệ và chạy eng
 - Domain `inheritance` dùng node quan hệ cha/mẹ/vợ-chồng/con.
 - Domain `two_party` dùng 30 slot `p1..p30`; không mang field quan hệ thừa kế.
 - Node domain `inheritance` dùng `ownPositions` và `receivePositions` theo vị
-  trí tài sản 1..3; node domain `two_party` cấm hai field này (§8.2).
+  trí tài sản 1..5; node domain `two_party` cấm hai field này (§8.2).
 - `isLandOwner` và `willReceive` là field legacy, bị cấm trên wire v2.
 
 Contract chuẩn và schema máy đọc:
@@ -171,8 +171,8 @@ Các công thức mở rộng còn Draft; không có quyền thay công thức �
 
 ### 9.3. Tài sản
 
-- Tối đa 3 tài sản trong contract v2.
-- Vị trí tài sản là index 1..3 của Stage assets.
+- Tối đa 5 tài sản (owner 23/10/2026).
+- Vị trí tài sản là index 1..5 của Stage assets.
 - `ownPositions`: tài sản người đó sở hữu.
 - `receivePositions`: tài sản người đó nhận.
 - Mặc định khi gán: owner nhận đủ vị trí Chủ, node thừa kế khác nhận đủ

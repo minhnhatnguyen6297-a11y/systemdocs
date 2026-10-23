@@ -298,10 +298,10 @@ def test_evaluate_rejects_legacy_v1_node_fields(db):
 
 
 def test_evaluate_position_out_of_range_or_dup(db):
-    """Positions phải ⊆ {1,2,3} không trùng (§13.4)."""
+    """Positions phải ⊆ {1..5} không trùng (§13.4, S7 23/10/2026)."""
     case, _people, rows, _prop = _seed_case(db)
     state = _draft_state(rows)
-    state["nodes"][0]["ownPositions"] = [1, 4]
+    state["nodes"][0]["ownPositions"] = [1, 6]
     with pytest.raises(WorkspaceError) as exc:
         _svc(db).evaluate_diagram(case.id, state)
     assert exc.value.code == "diagram_invalid_state"
@@ -313,6 +313,15 @@ def test_evaluate_position_out_of_range_or_dup(db):
     with pytest.raises(WorkspaceError) as exc2:
         _svc(db).evaluate_diagram(case.id, state)
     assert exc2.value.code == "diagram_invalid_state"
+
+
+def test_evaluate_position_five_allowed(db):
+    """S7: vị trí 5 là hợp lệ trên wire v3 sau khi trần tài sản lên 5."""
+    case, _people, rows, _prop = _seed_case(db)
+    state = _draft_state(rows)
+    state["nodes"][0]["ownPositions"] = [5]
+    data = _svc(db).evaluate_diagram(case.id, state)
+    assert data["render_model"]["status"] in ("complete", "incomplete")
 
 
 def test_evaluate_domain_mismatch(db):

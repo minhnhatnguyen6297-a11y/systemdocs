@@ -288,7 +288,7 @@ class CaseAssetRow(Base):
         Index("ix_case_asset_rows_case_vitri", "case_id", "vitri"),
         Index("ix_case_asset_rows_property", "property_id"),
         UniqueConstraint("case_id", "row_id", name="uq_case_asset_row_case_row"),
-        CheckConstraint("vitri BETWEEN 1 AND 3", name="ck_case_asset_row_vitri"),
+        CheckConstraint("vitri BETWEEN 1 AND 5", name="ck_case_asset_row_vitri"),
     )
 
 
