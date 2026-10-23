@@ -941,9 +941,13 @@ result.data:
 
 ```yaml
 payload:
-  case_id: <int>
+  case_id: <int | null>                  # null = hồ sơ chưa lưu (phần W)
   template_dir: <file_ref is_dir:true>   # optional (NAIA-8) — folder mode
 ```
+
+`case_id` null/absent chỉ quét nguồn mẫu (readiness mức mẫu); lượt xuất mới
+là lúc renderer tự tạo + lưu hồ sơ. `original_source_id` (nhánh hợp đồng
+gốc) đòi hồ sơ đã lưu.
 
 ```yaml
 result.data:
@@ -955,51 +959,39 @@ result.data:
       block_reason: <null | code>   # chỉ khi ready:false
 ```
 
-`block_reason` code hóa (v1 — data-code dạng `word.*`, §2.5):
+`block_reason` code hóa (v1 — data-code dạng `word.*`, §2.5). Owner
+23/10/2026 (phần W): **thiếu dữ kiện không còn là lý do chặn** — Người/Tài
+sản/sơ đồ Hai bên/chủ đất/chủ đất đã mất/người nhận thiếu chỉ làm
+placeholder tương ứng rỗng và được ghi vào `missing` của kết quả từng file.
+Chỉ còn gate **kỹ thuật**:
 
 ```
-word.no_people              # Stage chưa có người nào (NAIA-8)
-word.no_diagram             # hồ sơ chưa lưu diagram state (NAIA-8)
-word.no_assets              # hồ sơ chưa có tài sản
-word.no_landowner           # chưa có chủ đất trên Diagram (inheritance)
-word.no_deceased_landowner  # không có chủ đất đã chết (inheritance)
-word.no_receiver            # chưa có người nhận (inheritance)
 word.too_many_assets        # > 5 tài sản
 word.too_many_people        # Stage: > 20 người (inheritance) / > 30 (two_party)
 word.too_many_signers       # > 20 người ký (inheritance)
 word.template_missing       # văn bản chưa có template
 ```
 
-Mapping từ validation thật của `word_engine`: Stage rỗng → `no_people`;
-chưa có diagram state → `no_diagram`; không tài sản → `no_assets`; >5 tài
-sản → `too_many_assets`. Riêng `inheritance`: không chủ đất →
-`no_landowner`; không chủ đất đã chết → `no_deceased_landowner`; không
-người nhận → `no_receiver`; >20 người trên **Stage** → `too_many_people`
-(`[Người N]` lấy theo Stage đã lưu, không phải node Diagram); >20 người
-ký → `too_many_signers`. `two_party` **không** áp điều kiện chủ đất/người
-nhận; >30 người trên Stage → `too_many_people` (placeholder `[Người
-N]`/`[Bên A N]`/`[Bên B N]` phủ 30 slot); >30 người ký → lỗi render
-per-file (§8.4), `block_reason` không liệt kê riêng.
-Các code này là kiểm tra **kỹ thuật** xuất file — không phải kiểm định
-pháp lý (§13.5).
+`word.no_people`, `word.no_diagram`, `word.no_assets`, `word.no_landowner`,
+`word.no_deceased_landowner`, `word.no_receiver` đã nghỉ hưu (reserved —
+không producer nào trả nữa).
 
-Readiness theo **dữ liệu mẫu thực sự cần** (owner 15/10/2026): gate nhóm —
-`no_landowner`, `no_deceased_landowner`, `no_receiver` (thừa kế) và
-`no_diagram` của `two_party` — chỉ áp khi template **thực sự dùng token của
-nhóm đó**; nhận diện theo đúng registry key engine sinh (nhóm `Chủ đất
-sống`/`Chủ đất chết`/`Người nhận`, ghế `Bên A`/`Bên B`) sau chuẩn hoá không
-dấu, không theo chuỗi con, nên token metadata/ủy quyền không kéo nhầm gate
-Người nhận. Template không dùng nhóm thì bỏ qua gate, không áp blanket —
-catalog legacy áp theo mẫu thật của từng `document_key`; folder mode giữ
-semantics hiện hành (nhóm thiếu render rỗng, không gate nhóm), còn
-`no_diagram` hai bên cũng theo mẫu. Gate kỹ thuật luôn áp: `no_people`,
-`no_assets`, các giới hạn số lượng. Nhóm mà resolver hiện hành đã điền rỗng
-vẫn để trống (không đổi mapping/resolver). Token không hỗ trợ/không xác minh,
-slot chưa giải quyết (`word.unresolved_placeholders`) và thiếu người được ủy
-quyền mà mẫu cần (`word.missing_authorized_person`, NAIA-12) vẫn làm riêng
-file đó lỗi — không coi là field trống. Mẫu hiện diện nhưng không mở/parse
-được: readiness trả đúng data-code per-file mà batch sẽ trả (`word.render_failed`,
-`file_locked`, `file_not_found`) thay vì fallback gate cũ.
+Mapping từ validation thật của `word_engine`: chỉ vượt trần số lượng mới
+chặn (`too_many_assets`, `too_many_people`, `too_many_signers`); `two_party`
+không áp điều kiện chủ đất/người nhận và dùng trần 30 người. `[Người N]`
+lấy theo Stage đã lưu, không phải node Diagram. Các code này là kiểm tra
+**kỹ thuật** xuất file — không phải kiểm định pháp lý (§13.5).
+
+Readiness theo **dữ liệu mẫu thực sự cần** (owner 15/10/2026) chỉ còn dùng
+để quyết định ghi chú `missing` nào vào kết quả file (nhóm `Chủ đất
+sống`/`Chủ đất chết`/`Người nhận`, ghế `Bên A`/`Bên B` nhận diện theo đúng
+registry key engine sinh sau chuẩn hoá không dấu, không theo chuỗi con).
+Nhóm thiếu luôn render rỗng. Token không hỗ trợ/không xác minh, slot chưa
+giải quyết và thiếu người được ủy quyền mà mẫu cần **không còn làm file
+lỗi**: DOCX vẫn ra với chỗ trống và kết quả liệt kê trong `missing`.
+Mẫu hiện diện nhưng không mở/parse được: readiness trả đúng data-code
+per-file mà batch sẽ trả (`word.render_failed`, `file_locked`,
+`file_not_found`) thay vì fallback gate cũ.
 
 Catalog `document_key` v1 (registry mở — backend được thêm):
 
@@ -1027,6 +1019,9 @@ payload:
   create_case_subdir: <bool>        # optional — default false (NAIA-8)
 ```
 
+- `case_id` là hồ sơ **đã lưu**: renderer tự lưu bản đang sửa (hoặc tạo mới)
+  trong cùng hành động xuất trước khi gọi batch; lỗi lưu thật dừng hành
+  động, không xuất bản cũ thay thế (phần W, owner 23/10/2026).
 - `document_keys` rỗng → `word_no_documents_selected`; trùng →
   `word_duplicate_document_key`; key ngoài tập mẫu đã quét (catalog
   hoặc đúng `template_dir`) → `word_unknown_document_key`; key sai
@@ -1073,6 +1068,7 @@ result.data:
       actual_filename: <string | null>   # tên file thật khi saved
       output_file: <file_ref | null>     # path tuyệt đối file đã ghi
       error: {code, message} | null      # per-file — data-code (§2.5)
+      missing: [<string>]                # dữ kiện còn thiếu của file đã xuất
   breakdown:
     succeeded: [<document_key>]
     failed: [<document_key>]
@@ -1089,9 +1085,19 @@ result.data:
   `status:skipped` và vào `breakdown.skipped`; job
   `canceled{code:user_canceled}`; file đang ghi dở được dọn theo chính
   sách engine (không để file nửa vời nếu tránh được).
-- Per-file `error.code` là **data-code** `<ns>.<snake>` (§2.5): registry
-  v1 gồm `word.template_missing`, `word.unresolved_placeholders` và mã
-  envelope reuse (`file_locked`, `file_not_found`). Producer được thêm
+- `missing` là **kết quả**, không phải lỗi: file vẫn `saved` với chỗ đó để
+  trống. Ví dụ: `tài sản`, `chủ đất`, `chủ đất đã mất`, `người nhận`,
+  `người được ủy quyền <slot>`, `1 trường chưa hỗ trợ: [token]`. Producer
+  luôn emit (có thể `[]`); consumer coi vắng mặt = không có ghi chú.
+- Per-file `error.code` là **data-code** `<ns>.<snake>` (§2.5) và chỉ dành
+  cho lỗi kỹ thuật thật. Từ phần W (23/10/2026), thiếu dữ kiện/token chưa hỗ
+  trợ **không** còn sinh `word.unresolved_placeholders` hay
+  `word.missing_authorized_person` per-file; các mã đó giữ reserved.
+  `word.missing_authorized_person` và `word.unresolved_placeholders` không
+  còn producer. Registry còn dùng: `word.template_missing`,
+  `word.too_many_assets`, `word.too_many_people`, `word.too_many_signers`,
+  `word_path_traversal`, `word.invalid_filename`, `word.render_failed` và
+  mã envelope reuse (`file_locked`, `file_not_found`). Producer được thêm
   data-code mới.
 
 ## 9. Bảng error code
@@ -1924,8 +1930,9 @@ contract trao đổi hồ sơ giữa Upload Lab và Soạn hồ sơ. Envelope v�
   chọn binding chỉ đổi selection cục bộ, cho phép sửa lại lựa chọn pending;
   không tự tạo template hash, suy lại slot/giá trị hoặc giả readiness đã lưu.
   Stage/Diagram/revision đổi thì cache proposals hết hiệu lực. Có pending
-  context thì phải **Lưu hồ sơ**, đóng/mở lại dialog để đọc readiness/proposals
-  có thẩm quyền từ DB trước khi xuất; không export bản DB cũ như thể đã lưu.
+  context thì hành động xuất tự lưu (gồm provenance/vị trí) rồi nạp lại
+  readiness/proposals trên bản vừa lưu trước khi render; lưu/lỗi cấu trúc
+  thật dừng hành động, không export bản DB cũ (phần W, 23/10/2026).
 - Người N theo Stage; Bên A/B theo ô Diagram; tài sản N theo thứ tự Stage.
   Binding dùng row_id+field, slot phải khớp lại lúc xuất. N/seat đổi, source/
   derivative hash đổi, row mất hoặc slot trống → `word.original_mapping_invalid`,

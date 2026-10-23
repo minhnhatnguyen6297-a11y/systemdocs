@@ -493,10 +493,8 @@
         "display_name": { "$ref": "#/definitions/non_empty_string" },
         "ready": { "type": "boolean" },
         "block_reason": {
+          "description": "Chỉ còn lý do KỸ THUẬT (vượt trần slot, thiếu/không mở được mẫu). Thiếu dữ kiện không chặn: dữ kiện rỗng và nằm trong `missing` của kết quả từng file.",
           "enum": [
-            "word.no_people", "word.no_diagram",
-            "word.no_assets", "word.no_landowner",
-            "word.no_deceased_landowner", "word.no_receiver",
             "word.too_many_assets", "word.too_many_people",
             "word.too_many_signers", "word.template_missing", null
           ]
@@ -537,6 +535,11 @@
             },
             { "type": "null" }
           ]
+        },
+        "missing": {
+          "description": "Dữ kiện còn thiếu của file đã xuất (owner 23/10/2026 phần W): phần đó để trống trong DOCX; đây là kết quả, không phải lý do chặn. Vắng mặt = không có ghi chú.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
         }
       },
       "allOf": [

@@ -1,17 +1,24 @@
 # Word — xuất văn bản, placeholder và nguồn DOCX
 
-**Cập nhật:** 16/10/2026. Đọc theo luồng nhập nguồn → kiểm tra/lưu → chọn mẫu → xuất. Tab tự tạo/quản lý mẫu lâu dài vẫn chưa đặc tả.
+**Cập nhật:** 23/10/2026. Đọc theo luồng nhập nguồn → kiểm tra/lưu → chọn mẫu → xuất. Tab tự tạo/quản lý mẫu lâu dài vẫn chưa đặc tả.
 
 ## 1. Nguyên tắc và khoảng lệch hiện hành
 
-Owner muốn điền được trường nào thì xuất trường đó; không bắt hoàn thành sơ đồ nếu văn bản chỉ cần Stage. Trường hợp lệ chưa có dữ liệu để trống. Token không hỗ trợ, dữ liệu chưa lưu và lỗi nguồn/mẫu không phải dữ liệu trống. **Owner 23/10/2026:** Stage/Pool/Diagram cùng dùng bản đang sửa; chỉ Lưu hồ sơ ghi nội dung Soạn hồ sơ, không có nút Cập nhật/Lưu nháp hay commit ngầm từ Word. Xuất Word vẫn đọc snapshot DB đã lưu; ngoại lệ Nơi niêm yết qua `saveCaseMeta` → `workspace_update` giữ ở §3.1.
+Owner muốn điền được trường nào thì xuất trường đó; không bắt hoàn thành sơ đồ nếu văn bản chỉ cần Stage. Trường hợp lệ chưa có dữ liệu để trống.
+**Owner 23/10/2026 (phần W): có gì xuất đó.** Thiếu dữ kiện KHÔNG chặn
+xuất: phần thiếu để trống trong văn bản và được ghi vào kết quả xuất của
+file đó dạng “thiếu: …”; ghi kết quả không phải chặn. Stage/Pool/Diagram
+cùng dùng bản đang sửa; Xuất là **một hành động “Lưu & xuất”** — hồ sơ
+chưa lưu thì tự tạo, đang sửa dở thì tự lưu (đi qua `workspace_save_case`)
+rồi mới xuất trên snapshot vừa ghi, trong cùng lần bấm. Không còn chuỗi
+Áp dụng → Đóng → Lưu → Mở lại → Xuất và không có câu “hãy Lưu trước khi
+xuất”. Lỗi lưu THẬT (xung đột revision, lỗi cấu trúc) dừng hành động và
+báo tại chỗ; không bao giờ xuất bản cũ thay thế.
 
-Phần dưới giữ rõ giới hạn hiện hành. Đã đồng bộ theo owner 15/10/2026: gate
-nhóm (Chủ/Nhận, sơ đồ hai bên) chỉ áp theo **token mẫu thực sự dùng** — nhận
-diện theo registry key engine sinh, không theo chuỗi con; catalog backend áp
-theo mẫu từng `document_key`, folder mode giữ semantics nhóm thiếu để trống;
-gate kỹ thuật (thiếu người/tài sản, giới hạn số lượng) giữ nguyên; slot chưa
-giải quyết và người được ủy quyền mẫu cần vẫn làm riêng file đó lỗi.
+Gate còn lại là **kỹ thuật**, không phải dữ kiện thiếu: vượt trần số
+lượng mà mẫu chỉ phủ hữu hạn slot (`word.too_many_assets`,
+`word.too_many_people`, `word.too_many_signers`), văn bản chưa có template,
+mẫu có mặt nhưng không mở/parse được, và thư mục đích không ghi được.
 
 **Context thế chấp — owner 19/10/2026:** nội dung do ngân hàng cung cấp, văn
 phòng chỉ soạn lời chứng; đầu vào luôn thiếu thông tin tài sản trong hướng dẫn
@@ -28,11 +35,12 @@ Context loại văn bản và bộ phụ điển hình nằm trực tiếp trong
 ### 2.1. Công dụng và thao tác
 
 Một hợp đồng `.docx` có chữ → các gợi ý Người/Tài sản → chuyên viên xem chữ
-gốc, chọn/sửa giá trị → Đưa vào Stage → **Lưu hồ sơ** → Xuất Word →
-Dùng hợp đồng Word đã nhập → chọn từng vị trí → **Xác nhận các vị trí đã chọn**
-(chỉ đổi bản đang sửa) → **Lưu hồ sơ** → đóng/mở lại dialog để tải bản đã lưu
-→ xuất vào thư mục đích. Nút Tải JSON giữ bản kết quả phân tích ban đầu, trước
-mọi sửa đổi; chỉ tải về máy. Sửa gợi ý/Stage không ghi vào JSON ban đầu.
+gốc, chọn/sửa giá trị → Đưa vào Stage → Xuất Word →
+Dùng hợp đồng Word đã nhập → chọn từng vị trí → **Xuất**. Hành động xuất tự
+áp lựa chọn, tự lưu hồ sơ/provenance, nạp lại vị trí trên bản vừa lưu rồi
+mới render — không phải đóng/mở lại dialog (owner 23/10/2026 phần W). Nút
+Tải JSON giữ bản kết quả phân tích ban đầu, trước mọi sửa đổi; chỉ tải về
+máy. Sửa gợi ý/Stage không ghi vào JSON ban đầu.
 
 Giữ dialog Nhập file hiện có và đúng hai tab Upload Lab. `.doc`, ảnh/OCR,
 Excel không dùng bản đồ vị trí DOCX trong đợt này. Mỗi trường giữ chữ gốc;
@@ -163,14 +171,15 @@ Cho xác nhận lại nhiều lần nếu chỉ thay bindings; checkbox phản �
 chọn cục bộ theo đúng occurrence + slot. Bỏ chọn hết rồi xác nhận là yêu cầu
 xóa bindings khi Lưu hồ sơ kế tiếp, chưa xóa bản DB ngay.
 Đổi Stage/Diagram/revision hoặc đổi hồ sơ làm bộ đề xuất cũ không còn dùng
-được: phải Lưu hồ sơ nếu đang sửa rồi đóng/mở lại dialog để tải từ DB.
-Không tự tính lại slot/giá trị/độ sẵn sàng hoặc hash mẫu ở frontend.
-Khi provenance còn chờ lưu, báo rõ **chưa lưu**, chưa cho xuất bản gốc.
-Người dùng phải bấm **Lưu hồ sơ** rồi đóng/mở lại dialog để tải mẫu sẵn sàng,
-đề xuất và revision đã lưu; không lấy bảng cũ làm bằng chứng đã sẵn sàng.
-Lưu lỗi giữ lựa chọn cục bộ để sửa/thử lại. Lưu thành công nhưng tải lại lỗi
-thì DB/revision đã lưu vẫn giữ, báo lỗi tải và cho mở lại; không xuất bằng
-danh sách cũ. Chọn nguồn khác xóa bảng cũ, không chuyển bindings sang nguồn đó.
+được: hành động xuất tự lưu bản đang sửa rồi nạp lại vị trí, nên không còn
+bước đóng/mở lại dialog. Không tự tính lại slot/giá trị/độ sẵn sàng hoặc
+hash mẫu ở frontend.
+Khi provenance còn chờ lưu, hành động xuất ghi nó cùng lần lưu đó trước khi
+render. Lưu lỗi thật (xung đột revision, lỗi cấu trúc) dừng hành động và báo
+tại chỗ; giữ lựa chọn cục bộ để sửa/thử lại, không xuất bản DB cũ thay thế.
+Lưu thành công nhưng tải lại vị trí lỗi thì DB/revision đã lưu vẫn giữ, báo
+lỗi tải và cho thử lại; không xuất bằng danh sách cũ. Chọn nguồn khác xóa
+bảng cũ, không chuyển bindings sang nguồn đó.
 Người N theo Stage đã lưu, Bên A/B theo ô `p1..p30` đã lưu, tài sản N theo thứ tự Stage. Đổi thứ tự
 hoặc ô làm slot khác phải xác nhận lại. Xóa dòng làm mất binding của dòng ấy,
 không chuyển sang người kế tiếp. Slot trống/không hỗ trợ thì báo lỗi.
@@ -241,26 +250,27 @@ lịch sử duy nhất. Đợt này chưa nối lịch sử hành chính vào nh
 
 ```text
 Chọn thư mục mẫu + chọn văn bản + thư mục đích
-→ kiểm workspace và loại hồ sơ
-→ đọc Stage và Diagram đã lưu
+→ Lưu hồ sơ nếu chưa lưu/đang sửa (trong cùng hành động)
+→ đọc Stage và Diagram vừa lưu
 → backend dựng placeholder
 → tạo từng DOCX
-→ trả kết quả saved/failed/skipped theo file
+→ trả kết quả saved/failed/skipped + “thiếu: …” theo file
 ```
 
 Đổi thư mục mẫu xoá ngay lựa chọn cũ và khoá Xuất/Chọn trong lúc quét; chỉ
 kết quả của lần quét mới nhất được hiển thị — không để response của thư mục
-trước đè danh sách thư mục sau.
+trước đè danh sách thư mục sau. Quét thư mục mẫu được cả khi hồ sơ chưa lưu:
+readiness khi đó chỉ còn mức mẫu (thiếu/không mở được), vì lượt xuất mới là
+lúc tạo hồ sơ.
 
-Dialog có ô **Nơi niêm yết**: nạp giá trị đã lưu của hồ sơ, cho sửa và lưu
-riêng qua `saveCaseMeta` → `notary.workspace_update`. Đây là ngoại lệ metadata
-Word, không phải lưu nháp Soạn hồ sơ. Lệnh cập nhật cả cột hồ sơ và đúng key
-của snapshot đã lưu trong một lần ghi; không đổi Stage, tài sản, sơ đồ hoặc
-provenance đang sửa, không thay cho Lưu hồ sơ.
-Lưu lỗi giữ nội dung đang nhập; revision cũ phải báo xung đột. Bản nháp metadata
-khác trong card Tài sản không bị mất khi lưu riêng Nơi niêm yết.
-Nếu ô Nơi niêm yết khác bản đã lưu, dialog yêu cầu lưu trước khi xuất, kể cả
-bản nháp đã có từ card Tài sản. Không hiển thị nơi mới rồi xuất theo nơi cũ.
+Dialog có ô **Nơi niêm yết**: nạp giá trị đã lưu, sửa trực tiếp vào buffer
+meta và được ghi **kèm trong chính hành động xuất** (cùng `save_case`) —
+không còn nút “Lưu nơi niêm yết” thứ hai hay câu chặn “lưu trước khi xuất”.
+Lỗi ghi meta là lỗi thật của hành động xuất, hiện tại chỗ và không xuất
+dữ liệu cũ.
+
+Dialog chỉ còn tiến trình, tổng kết thành công/lỗi/bỏ qua, đường dẫn thư mục
+đích và ghi chú “thiếu: …” của từng file; không còn câu hướng dẫn mapping.
 
 Tra nơi niêm yết theo [tra cứu địa chỉ](../shared/administrative-lookup.md#usage): bấm Tra
 trên chính nội dung ô, không chọn tài sản nguồn, không cần ngày. Kết quả chỉ để
@@ -268,20 +278,27 @@ copy; không tự lưu hoặc thay giá trị đang nhập (Owner 05/10/2026, TA
 
 ### 3.2. Input và output
 
-Input: `case_id`, danh sách `document_keys` và thư mục đích local đã tồn tại;
-optional `template_dir` (thư mục chứa mẫu `.docx` người dùng chọn) và
-`create_case_subdir` (ghi vào `<đích>/HS-<case_id>/`). Nhánh mẫu thư mục/catalog
-không nhận `base_revision`; nhánh hợp đồng gốc cần revision đã lưu. Output liệt kê từng document, tên file thực, path, trạng thái
-và lỗi; breakdown luôn có `succeeded`, `failed`, `skipped`.
+Input: `case_id` (có thể chưa có — hành động xuất tự tạo trước), danh sách
+`document_keys` và thư mục đích local đã tồn tại; optional `template_dir`
+(thư mục chứa mẫu `.docx` người dùng chọn) và `create_case_subdir` (ghi vào
+`<đích>/HS-<case_id>/`). Nhánh mẫu thư mục/catalog không nhận
+`base_revision`; nhánh hợp đồng gốc cần revision vừa lưu. Output liệt kê từng document, tên file thực, path, trạng thái,
+lỗi và “thiếu: …” (dữ kiện còn trống); breakdown luôn có `succeeded`,
+`failed`, `skipped`.
 
 #### Nguồn mẫu
 
 Luồng nhập hợp đồng DOCX có thêm **Dùng hợp đồng Word đã nhập** trong dialog
-này. Tải đề xuất trên bản đã lưu → chọn từng lần xuất hiện → xác nhận cục bộ
-→ **Lưu hồ sơ** → đóng/mở lại dialog, tải đề xuất/mẫu sẵn sàng → xuất.
-Không tự lưu khi xác nhận hoặc xuất. `original_source_id` chỉ resolve nguồn
+này. Chọn nguồn → (tự lưu nếu hồ sơ chưa lưu/đang sửa) → tải đề xuất →
+chọn từng lần xuất hiện → **Xuất**. Hành động xuất tự áp lựa chọn, tự lưu
+provenance/vị trí, nạp lại vị trí (bindings/revision/slot/hash) trên bản
+vừa lưu rồi mới xuất — không phải đóng/mở lại dialog. Các đối chiếu
+revision/slot/hash nội bộ vẫn chạy; lệch cấu trúc thật vẫn báo
+`word.original_mapping_invalid`. `original_source_id` chỉ resolve nguồn
 backend thuộc hồ sơ, không nhận đường dẫn tùy ý; batch cần `base_revision`
 đã lưu. Mẫu gốc/mẫu dẫn xuất đều kiểm hash; đổi thứ tự/ô phải xác nhận lại.
+Vị trí đã xác nhận nhưng trường chưa có giá trị đã lưu: chỗ đó để trống và
+ghi vào “thiếu”, không làm hỏng cả file.
 Không thay mọi chuỗi giống nhau. Quy tắc và giới hạn hiện hành tại
 [§2. Nhập hợp đồng và dùng lại bản gốc](#docx-import).
 [Bản trước đợt gom 15/10/2026 (lịch sử, không phải nguồn hiện hành)](../../archive/specs-before-consolidation-20261015/notary_v2/input/docx-import.md).
@@ -304,23 +321,24 @@ quyền — renderer không gửi được path tùy ý hay thoát thư mục qu
 | Tài sản | Stage assets + vị trí Diagram đã lưu trong DB |
 | Mẫu và placeholder | Thư mục người dùng chọn hoặc catalog backend |
 
-Không lấy dữ liệu chưa Lưu hồ sơ hoặc kết quả frontend tự tính. Bản gốc còn
-provenance/Stage/Diagram chờ lưu phải yêu cầu **Lưu hồ sơ** và tải lại dialog
-trước khi xuất; không dùng dữ liệu/đề xuất đang sửa thay snapshot DB.
-Placeholder chưa giải quyết phải làm file đó thất bại, không âm thầm để sót.
+Không đọc buffer chưa lưu trên đường render: hành động xuất tự lưu bản đang
+sửa trước rồi backend đọc snapshot vừa ghi, trong cùng lần bấm (phần W,
+23/10/2026). Không còn chuỗi “Lưu hồ sơ rồi mở lại dialog”. Placeholder
+chưa giải quyết/token lạ **không** làm file thất bại: DOCX vẫn ra với chỗ
+trống và danh sách token được ghi vào “thiếu: …” của file đó.
 
 Gate nhóm phân loại theo **token mẫu thực sự dùng** (owner 15/10/2026):
-`no_landowner`/`no_deceased_landowner`/`no_receiver` chỉ áp khi mẫu dùng
-token của đúng nhóm đó — catalog backend áp theo mẫu của từng
-`document_key`; `no_diagram` của hai bên chỉ áp khi mẫu dùng ghế
+`no_landowner`/`no_deceased_landowner`/`no_receiver` chỉ quyết định ghi chú
+thiếu khi mẫu dùng token của đúng nhóm đó — catalog backend áp theo mẫu của
+từng `document_key`; `no_diagram` của hai bên chỉ áp khi mẫu dùng ghế
 `Bên A`/`Bên B`. Nhận diện theo đúng registry key engine sinh (nhóm
 `Chủ đất sống`, `Chủ đất chết`, `Người nhận`, ghế hai bên) sau chuẩn hoá
 không dấu — không đoán theo chuỗi con, nên token metadata/ủy quyền kiểu
-`[Người nhận ủy quyền]` không kéo nhầm gate Người nhận.
+`[Người nhận ủy quyền]` không kéo nhầm ghi chú Người nhận.
 
-Folder mode giữ hành vi hiện hành: nhóm thiếu dữ liệu render rỗng — không
-thêm gate mới. Gate kỹ thuật luôn áp: thiếu người/tài sản đã lưu, giới hạn
-số lượng, mẫu/đường dẫn không hợp lệ và token không hỗ trợ. Tại sao: owner
+Nhóm thiếu dữ liệu render rỗng — không gate. Gate kỹ thuật duy nhất còn
+lại là vượt trần slot (5 tài sản; 20/30 người; 20 người ký), thiếu template,
+mẫu không mở/parse được và đường dẫn/tên file không an toàn. Tại sao: owner
 muốn điền dần — xuất được file không phải xác nhận hồ sơ đã hoàn thiện
 pháp lý.
 
@@ -342,10 +360,11 @@ pháp lý.
   N - *]` theo slot `p1..p15`/`p16..p30` (ô trống render rỗng, không dồn);
   `[Bên A - Họ tên]`, `[Bên B - Họ tên]`, `[Tên bên A]`, `[Tên bên B]` =
   danh sách họ tên từng bên; placeholder riêng thừa kế render rỗng.
-  Readiness hai bên chỉ kiểm tra kỹ thuật (`word.no_people`,
-  `word.no_assets`, `word.too_many_*`) và `word.no_diagram` khi mẫu thực
-  sự dùng ghế `Bên A`/`Bên B` — không áp điều kiện chủ đất/người nhận
-  của thừa kế, không thêm kiểm định pháp lý.
+  Readiness hai bên chỉ còn kiểm tra kỹ thuật (`word.too_many_assets`,
+  `word.too_many_people`); thiếu Người/Tài sản/sơ đồ hai bên chỉ làm ghế
+  trống và ghi “thiếu: người trong hồ sơ / tài sản / sơ đồ hai bên đã
+  lưu” khi mẫu thực sự dùng ghế `Bên A`/`Bên B` — không áp điều kiện chủ
+  đất/người nhận của thừa kế, không thêm kiểm định pháp lý.
 - Ngày Người render theo đúng độ đầy đủ đã lưu: `YYYY` in nguyên năm
   (`2010`), `YYYY-MM-DD` in `dd/mm/yyyy`; token `Năm sinh`/`Năm chết` chỉ
   in năm. Token câu/dòng dựng sẵn không in ISO thô. Năm riêng đã lưu không
@@ -357,8 +376,9 @@ pháp lý.
   số của token — `[Dòng người được ủy quyền N]`,
   `[Người được ủy quyền N - <trường>]`, `[<Trường> người được ủy quyền N]`,
   `[Người được ủy quyền inline N]` đều là slot `N`; token không số là slot 1.
-  Hồ sơ thiếu đại diện cho slot mẫu đòi → file đó lỗi
-  `word.missing_authorized_person`, không render rỗng rồi xuất.
+  Hồ sơ thiếu đại diện cho slot mẫu đòi → chỗ đó để trống, file vẫn xuất,
+  kết quả ghi “thiếu: người được ủy quyền N” (không còn lỗi
+  `word.missing_authorized_person`).
 - **Diện tích đất theo vị trí** (quyết định Owner 02/10/2026, NAIA-8 comment
   `01a0fd42-5cbe-7076-976e-ef907c8ca086`): `[ONT]`/`[CLN]`/`[NTS]`/`[LUC]`
   (và hậu tố ` N` theo tài sản) là diện tích của dòng loại đất ở VỊ TRÍ
@@ -384,15 +404,18 @@ pháp lý.
 
 ### 3.5. Lỗi
 
-- Không chọn văn bản, key lạ/lặp, thiếu template, placeholder còn sót, file bị
-  khóa hoặc path sai đều có code riêng.
+- Không chọn văn bản, key lạ/lặp, thiếu template, file bị khóa hoặc path sai
+  đều có code riêng. Thiếu dữ kiện và token lạ **không** phải lỗi — chúng
+  là ghi chú “thiếu: …” của file đã xuất (phần W).
 - Mẫu có mặt nhưng không mở/parse được: danh sách sẵn sàng báo đúng data-code
   per-file mà lượt xuất sẽ trả (`word.render_failed`, `file_locked`,
   `file_not_found`) — không nuốt lỗi thành gate dữ liệu cũ.
-- `word.missing_authorized_person`: mẫu đòi slot đại diện N lớn hơn số vai
-  trò `Người được ủy quyền` đã lưu — file đó thất bại, không tạo DOCX.
+- Mẫu đòi slot đại diện N lớn hơn số vai trò `Người được ủy quyền` đã lưu:
+  file vẫn tạo, chỗ thiếu để trống và ghi chú kết quả; không còn
+  `word.missing_authorized_person`.
 - Một file lỗi không bắt buộc làm mất file khác đã tạo.
-- Tất cả file lỗi: job `word_batch_failed`; trộn kết quả: `partial`.
+- Tất cả file lỗi kỹ thuật: job `word_batch_failed`; trộn kết quả: `partial`.
+  Lượt 0 file thành công + ≥1 lỗi kỹ thuật thật → job fail (W10).
 
 <a id="placeholders"></a>
 ## 4. Cách viết placeholder

@@ -139,9 +139,7 @@ GENDERS = {"Nam", "Nữ", None}
 # registry mở — khi backend thêm document_key phải cập nhật set này
 DOC_CATALOG = {"khai_nhan_di_san", "thoa_thuan_phan_chia", "niem_yet"}
 BLOCK_REASONS = {
-    "word.no_people", "word.no_diagram",
-    "word.no_assets", "word.no_landowner", "word.no_deceased_landowner",
-    "word.no_receiver", "word.too_many_assets", "word.too_many_people",
+    "word.too_many_assets", "word.too_many_people",
     "word.too_many_signers", "word.template_missing",
 }
 RENDER_STATUSES = {"invalid", "unsupported", "incomplete", "complete"}
