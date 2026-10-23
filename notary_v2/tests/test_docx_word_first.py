@@ -445,6 +445,10 @@ def reviewed_case_with_missing_asset_values(db, tmp_path, content):
             values['land_rows'] = json.loads(values['land_rows'])
         if suggestion['target'] == 'asset':
             values.setdefault('nguon_goc', None)
+            # S5b 23/10/2026: số thửa + số tờ là mức tối thiểu của dòng
+            # Tài sản; giữ phép thử này tập trung vào nguồn gốc.
+            values['so_thua_dat'] = values.get('so_thua_dat') or '0'
+            values['so_to_ban_do'] = values.get('so_to_ban_do') or '0'
         row = _person_row(**values) if suggestion['target'] == 'person' else _asset_row(**values)
         (people if suggestion['target'] == 'person' else assets).append(row)
         records.append({'candidate_id': suggestion['suggestion_id'], 'row_id': row['row_id']})

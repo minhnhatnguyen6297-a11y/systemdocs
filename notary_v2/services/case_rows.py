@@ -66,7 +66,12 @@ def load_json(case: InheritanceCase) -> dict:
 
 
 def _date_wire(value: Any) -> Optional[str]:
-    return value.isoformat() if value is not None else None
+    """date → ISO; chuỗi snapshot (YYYY|YYYY-MM-DD) → nguyên văn."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value or None
+    return value.isoformat()
 
 
 def _person_wire(row) -> dict:

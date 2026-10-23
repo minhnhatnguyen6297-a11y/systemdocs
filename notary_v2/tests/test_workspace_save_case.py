@@ -528,3 +528,99 @@ def test_save_case_envelope_rules(db, dataset):
             svc.save_case(**kwargs)
         assert exc.value.code == "validation_error", kwargs
     assert db.query(InheritanceCase).count() == 0
+
+
+# ------------------------------------------------- mức tối thiểu owner 23/10
+
+
+def _minimal_person(**overrides):
+    row = {
+        "row_id": str(uuid.uuid4()), "entity_id": None,
+        "ho_ten": "Người Chỉ Tên", "gioi_tinh": None,
+        "ngay_sinh": None, "ngay_chet": None,
+        "so_giay_to": None, "ngay_cap": None, "noi_cap": None,
+        "dia_chi": None, "place_of_origin": None,
+        "loai_giay_to": None, "loai_dia_chi": None,
+    }
+    row.update(overrides)
+    return row
+
+
+def _minimal_asset(**overrides):
+    row = {
+        "row_id": str(uuid.uuid4()), "entity_id": None,
+        "so_serial": "", "so_vao_so": None, "so_thua_dat": "7",
+        "so_to_ban_do": "8", "dia_chi": None, "loai_so": None,
+        "hinh_thuc_su_dung": None, "thoi_han": None, "nguon_goc": None,
+        "ngay_cap": None, "co_quan_cap": None, "land_rows": None,
+    }
+    row.update(overrides)
+    return row
+
+
+EMPTY_STATE = {"version": 3, "domain": "inheritance", "nodes": []}
+
+
+def test_save_case_minimum_fields_and_blank_strings_normalized(db):
+    """S4d/S5b owner 23/10/2026: Người chỉ cần họ tên, Tài sản chỉ cần
+    số thửa + số tờ; chuỗi rỗng/toàn khoảng trắng ghi null, không lỗi."""
+    person = _minimal_person(
+        so_giay_to="  ", noi_cap=" ", dia_chi="   ",
+        place_of_origin="", loai_giay_to="", loai_dia_chi="  ")
+    asset = _minimal_asset(
+        so_vao_so=" ", loai_so="", hinh_thuc_su_dung=" ",
+        thoi_han="", nguon_goc=" ", co_quan_cap="  ",
+        dia_chi=" ", land_rows=None)
+
+    saved = CaseWorkspaceService(db).save_case(
+        case_id=None, base_revision=None, idempotency_key=_key(),
+        case_meta=_meta(),
+        stage={"owner_row_id": None, "people": [person],
+               "assets": [asset]},
+        state=EMPTY_STATE)
+
+    assert saved["case"]["status"] == "done"
+    out_person = saved["stage"]["people"][0]
+    for field in ("so_giay_to", "noi_cap", "dia_chi",
+                  "place_of_origin", "loai_giay_to", "loai_dia_chi"):
+        assert out_person[field] is None, field
+    out_asset = saved["stage"]["assets"][0]
+    assert out_asset["so_thua_dat"] == "7"
+    assert out_asset["so_to_ban_do"] == "8"
+    for field in ("so_vao_so", "loai_so", "hinh_thuc_su_dung",
+                  "thoi_han", "nguon_goc", "co_quan_cap", "dia_chi"):
+        assert out_asset[field] is None, field
+
+
+def test_save_case_asset_requires_thua_and_to(db):
+    """S5b: dòng Tài sản thiếu số thửa hoặc số tờ vẫn bị chặn đúng ô."""
+    for field in ("so_thua_dat", "so_to_ban_do"):
+        person = _minimal_person()
+        asset = _minimal_asset(**{field: "  "})
+        with pytest.raises(WorkspaceError) as exc:
+            CaseWorkspaceService(db).save_case(
+                case_id=None, base_revision=None, idempotency_key=_key(),
+                case_meta=_meta(),
+                stage={"owner_row_id": None, "people": [person],
+                       "assets": [asset]},
+                state=EMPTY_STATE)
+        assert exc.value.code == "stage_validation_error"
+        errors = exc.value.details["field_errors"]
+        assert any(e["field"] == field and e["code"] == "required"
+                   for e in errors), field
+    assert db.query(InheritanceCase).count() == 0
+
+
+def test_save_case_asset_ngay_cap_year_only(db):
+    """S5c: ngày cấp Tài sản chấp nhận chỉ-năm như trường ngày của Người."""
+    saved = CaseWorkspaceService(db).save_case(
+        case_id=None, base_revision=None, idempotency_key=_key(),
+        case_meta=_meta(),
+        stage={"owner_row_id": None,
+               "people": [_minimal_person()],
+               "assets": [_minimal_asset(ngay_cap="2005")]},
+        state=EMPTY_STATE)
+    assert saved["stage"]["assets"][0]["ngay_cap"] == "2005"
+
+    reopen = CaseWorkspaceService(db).get(saved["case"]["id"])
+    assert reopen["stage"]["assets"][0]["ngay_cap"] == "2005"

@@ -15,7 +15,7 @@ from datetime import date
 from pathlib import Path
 
 import pytest
-from sqlalchemy import Date as SADate
+from sqlalchemy import String as SAString
 from sqlalchemy import create_engine, delete, inspect
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
@@ -200,7 +200,9 @@ def test_fresh_schema_has_storage_b_tables_and_columns(engine):
     assert asset["property_id"]["nullable"] is True
     assert asset["so_serial"]["nullable"] is False
     assert asset["land_rows_present"]["nullable"] is False
-    assert isinstance(asset["ngay_cap"]["type"], SADate)
+    # S5c 23/10/2026: giữ độ đầy đủ như Người nên cột là chuỗi.
+    assert isinstance(asset["ngay_cap"]["type"], SAString)
+    assert asset["ngay_cap"]["type"].length == 10
 
     land = {col["name"]: col for col in insp.get_columns("case_asset_land_rows")}
     assert set(land) == {

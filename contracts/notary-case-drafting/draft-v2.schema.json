@@ -45,7 +45,7 @@
         "hinh_thuc_su_dung": { "$ref": "common.schema.json#/definitions/nullable_string" },
         "thoi_han": { "$ref": "common.schema.json#/definitions/nullable_string" },
         "nguon_goc": { "$ref": "common.schema.json#/definitions/nullable_string" },
-        "ngay_cap": { "$ref": "common.schema.json#/definitions/date_full" },
+        "ngay_cap": { "$ref": "common.schema.json#/definitions/date_or_year" },
         "co_quan_cap": { "$ref": "common.schema.json#/definitions/nullable_string" },
         "land_rows": {
           "type": ["array", "null"],

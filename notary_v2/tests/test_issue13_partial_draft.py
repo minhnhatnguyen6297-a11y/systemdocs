@@ -509,7 +509,8 @@ def test_router_create_explicit_empty_stage_skips_master_fallback(
     with session_factory() as session:
         owner = Customer(ho_ten="Owner", so_giay_to="001",
                          name_anchor="owner", document_anchor="001")
-        prop = Property(so_serial="WEB-D1", dia_chi="Đất giả lập")
+        prop = Property(so_serial="WEB-D1", dia_chi="Đất giả lập",
+                        so_thua_dat="12", so_to_ban_do="3")
         session.add_all([owner, prop])
         session.commit()
         owner_id, property_id = owner.id, prop.id

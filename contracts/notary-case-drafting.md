@@ -289,8 +289,8 @@ person_row:
   row_id: <uuid4>
   entity_id: <int | null>
   ho_ten: <string non-empty | null>    # output: null được với nháp chưa có tên
-                                       # input create partial: null/absent được
-                                       # input strict save/commit: bắt buộc non-empty
+                                       # input create partial/save_case: null/absent được
+                                       # input commit strict: bắt buộc non-empty
   gioi_tinh: Nam | Nữ | null
   ngay_sinh: <YYYY-MM-DD | YYYY | null>
   ngay_chet: <YYYY-MM-DD | YYYY | null>   # null = không có thông tin ngày chết
@@ -309,11 +309,18 @@ person_row:
 ```
 
 Không thêm field ngoài danh sách này — producer strip field lạ (tiền lệ
-backend hiện strip ngoài 10 key). `ho_ten` rỗng/`""` luôn
-`stage_validation_error{field:ho_ten, code:required}`; `null` chỉ hợp lệ ở
-**output đọc** và **input create partial** (vòng 2), còn save_case/commit/
-evaluate strict vẫn bắt buộc tên non-empty (không dùng chuỗi giả thay null).
-Ô chỉ có số giấy/ngày cấp mà chưa có tên được lưu thật thành `ho_ten=null`.
+backend hiện strip ngoài 10 key). `ho_ten` là **mức tối thiểu duy nhất**
+của dòng Người: rỗng/`""`/toàn khoảng trắng → `stage_validation_error
+{field:ho_ten, code:required}` trên save_case/commit; `null` chỉ hợp lệ ở
+**output đọc** và **input create partial** (vòng 2). Mọi field Người khác
+được để trống mà không chặn; sáu field chữ tùy chọn (`so_giay_to`,
+`noi_cap`, `dia_chi`, `place_of_origin`, `loai_giay_to`, `loai_dia_chi`)
+nhận `""`/toàn khoảng trắng và **chuẩn hóa thành null khi ghi** (S4d,
+owner 23/10/2026), không sinh lỗi. Ngày trống bỏ qua; ngày có nội dung
+nhưng sai lịch/không parse được → `invalid_date`; giới tính ngoài
+Nam/Nữ/null → `invalid_enum`.
+Ô chỉ có số giấy/ngày cấp mà chưa có tên chỉ được lưu qua `workspace_create`
+(partial) với `ho_ten=null`, không dùng chuỗi giả.
 
 **Owner 21/10/2026 — nghĩa trường đã chốt, đã giao runtime hẹp, không đổi wire/key:**
 - `dia_chi` là **một trường hiện có** dùng chung cho `Nơi chết` và nơi thường
@@ -406,15 +413,15 @@ asset_row:
                                      # có thể trùng — entities.md §2
                                      # (Owner 06/10/2026: không ép format)
   so_vao_so: <string | null>
-  so_thua_dat: <string | null>
-  so_to_ban_do: <string | null>
+  so_thua_dat: <string>             # BẮT BUỘC có nội dung khi ghi dòng (S5b)
+  so_to_ban_do: <string>            # BẮT BUỘC có nội dung khi ghi dòng (S5b)
   dia_chi: <string | null>           # nullable: thiếu dữ kiện vẫn lưu
   loai_so: <string | null>
   hinh_thuc_su_dung: <string | null>
   thoi_han: <string | null>          # lẻ cấp tài sản — CHỈ còn nghĩa trên
                                      # emit/legacy (xem ghi chú dưới)
   nguon_goc: <string | null>
-  ngay_cap: <YYYY-MM-DD | null>      # asset chỉ nhận dạng đầy đủ
+  ngay_cap: <YYYY-MM-DD | YYYY | null>  # nhận chỉ-năm như Người (S5c)
   co_quan_cap: <string | null>
   land_rows:
     - loai_dat: <string | null>
@@ -427,6 +434,13 @@ asset_row:
   `dia_chi` nullable. `workspace_source_latest`/`workspace_duplicate` giữ
   nguyên field/cụm/null của nguồn, chỉ đổi `row_id`; không mở nhập mới và
   không phân bổ `thoi_han` lẻ xuống cụm.
+- **Mức tối thiểu khi ghi (S5b/S5c, owner 23/10/2026):** dòng Tài sản chỉ
+  bắt buộc `so_thua_dat` + `so_to_ban_do` có nội dung (rỗng/toàn khoảng
+  trắng → `stage_validation_error{code:"required"}`). Các field chữ còn lại
+  nhận `""`/khoảng trắng và chuẩn hóa null khi ghi, không lỗi. `so_serial`
+  vẫn phải là chuỗi khi có mặt (S5a). `ngay_cap` nhận `YYYY-MM-DD` hoặc
+  `YYYY`; ngày có nội dung sai lịch vẫn `invalid_date`. Không yêu cầu đủ
+  tài sản/địa chỉ để Lưu hồ sơ.
 - `land_rows` phân biệt null, [] và mảng có hàng trống; giữ thứ tự/vị trí.
 - **`thoi_han` lẻ cấp tài sản (MIN-141):** phía input (payload
   `workspace_create`/`workspace_commit_stage`/`workspace_save_case`/`diagram_evaluate` nháp) KHÔNG

@@ -272,7 +272,9 @@ class CaseAssetRow(Base):
     hinh_thuc_su_dung = Column(String(100), nullable=True)
     thoi_han          = Column(String(100), nullable=True)
     nguon_goc         = Column(Text,        nullable=True)
-    ngay_cap          = Column(Date,        nullable=True)
+    # S5c (23/10/2026): giữ nguyên độ đầy đủ như trường ngày của Người —
+    # 'YYYY' vẫn là năm riêng, không đệm 01/01.
+    ngay_cap          = Column(String(10),  nullable=True)
     co_quan_cap       = Column(String(200), nullable=True)
     land_rows_present = Column(Boolean, nullable=False, default=False, server_default=text("0"))
 

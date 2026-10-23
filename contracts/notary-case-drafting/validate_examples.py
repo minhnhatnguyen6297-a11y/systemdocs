@@ -297,13 +297,16 @@ def check_person_row(row, where, v, *, allow_null_name=False,
                   f"{where} gioi_tinh={row.get('gioi_tinh')!r}"))
     for f in PERSON_DATE_FIELDS:
         val = row.get(f)
+        if isinstance(val, str) and not val.strip():
+            continue  # ô trống = chưa nhập, chuẩn hóa null khi ghi
         if val is not None and not (isinstance(val, str)
                                     and DATE_OR_YEAR_RX.match(val)):
             v.append(("stage_validation_error",
                       f"{where} {f}={val!r} bad date"))
 
 
-def check_asset_row(row, where, v, draft_v2=False, ctx=None):
+def check_asset_row(row, where, v, draft_v2=False, ctx=None,
+                    require_land_keys=False):
     if not isinstance(row, dict):
         v.append(("stage_validation_error", f"{where} not object"))
         return
@@ -320,10 +323,17 @@ def check_asset_row(row, where, v, draft_v2=False, ctx=None):
     # có thể rỗng/trùng — chỉ kiểm kiểu chuỗi, không ép format.
     if not isinstance(serial, str):
         v.append(("stage_validation_error", f"{where} so_serial not string"))
+    if require_land_keys:
+        for f in ("so_thua_dat", "so_to_ban_do"):
+            val = row.get(f)
+            if not (isinstance(val, str) and val.strip()):
+                v.append(("stage_validation_error",
+                          f"{where} {f} required"))
     addr = row.get("dia_chi")
-    if addr is not None and (not isinstance(addr, str) or not addr.strip()):
+    # S4d/S5b: chuỗi rỗng/toàn khoảng trắng chuẩn hóa null, không lỗi.
+    if addr is not None and not isinstance(addr, str):
         v.append(("stage_validation_error",
-                  f"{where} dia_chi={addr!r} must be non-empty str/null"))
+                  f"{where} dia_chi={addr!r} must be str/null"))
     eid = row.get("entity_id")
     if eid is not None and (not isinstance(eid, int) or isinstance(eid, bool)
                             or eid < 1):
@@ -335,7 +345,8 @@ def check_asset_row(row, where, v, draft_v2=False, ctx=None):
             v.append(("stage_validation_error",
                       f"{where} entity_id={eid!r} not in fixture identities"))
     nc = row.get("ngay_cap")
-    if nc is not None and not (isinstance(nc, str) and DATE_FULL_RX.match(nc)):
+    if nc is not None and not (isinstance(nc, str)
+                              and DATE_OR_YEAR_RX.match(nc)):
         v.append(("stage_validation_error", f"{where} ngay_cap={nc!r}"))
     lr = row.get("land_rows")
     if lr is not None:
@@ -415,7 +426,8 @@ def check_stage(stage, where, v, draft_v2=False, case_type="inheritance",
         seen.add(rid)
     for i, r in enumerate(assets):
         check_asset_row(r, f"{where}.assets[{i}]", v, draft_v2=draft_v2,
-                        ctx=ctx)
+                        ctx=ctx,
+                        require_land_keys=(draft_v2 and intent != "output"))
         rid = r.get("row_id") if isinstance(r, dict) else None
         if rid in seen:
             v.append(("stage_validation_error",

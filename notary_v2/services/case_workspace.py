@@ -162,6 +162,8 @@ def _norm_gender(value: Any) -> Optional[str]:
 def _valid_date_or_year(value: Any) -> bool:
     if value is None:
         return True
+    if isinstance(value, str) and not value.strip():
+        return True          # ô trống = chưa nhập, chuẩn hóa null khi ghi
     if not isinstance(value, str) or not _DATE_OR_YEAR_RE.match(value):
         return False
     if len(value) == 4:
@@ -1338,8 +1340,6 @@ class CaseWorkspaceService:
             stage, people, case_type, allow_unassigned=True)
         field_errors = self._validate_stage(
             people, assets, case_type, allow_partial_draft=True)
-        field_errors += self._validate_create_stage(
-            people, assets, allow_empty=True)
         if field_errors:
             raise WorkspaceError(
                 "stage_validation_error",
@@ -2112,7 +2112,7 @@ class CaseWorkspaceService:
             target.hinh_thuc_su_dung = _nn(row.get("hinh_thuc_su_dung"))
             target.thoi_han = _nn(row.get("thoi_han"))
             target.nguon_goc = _nn(row.get("nguon_goc"))
-            target.ngay_cap = _parse_date_or_year(row.get("ngay_cap"))
+            target.ngay_cap = _nn(row.get("ngay_cap"))
             target.co_quan_cap = _nn(row.get("co_quan_cap"))
             raw_land = row.get("land_rows")
             normalized = (
@@ -2643,37 +2643,18 @@ class CaseWorkspaceService:
             **canonical_meta,
         }
 
-    @staticmethod
-    def _validate_create_stage(people: list, assets: list, *,
-                               allow_empty: bool = False) -> list[dict]:
-        """Rule completeness riêng của `workspace_create`/save_case mới.
-
-        Vòng 1 chặn mọi `entity_id`; vòng 2 dòng MỚI được mang gợi ý
-        identity có kiểm neo (§13.20), nên rule ID chuyển về
-        `_write_stage_rows`. `allow_empty=True` chỉ cho `workspace_create`
-        (nháp ít dữ liệu: 0 Người/0 Tài sản); save_case mới giữ strict.
-        """
-        errors: list[dict] = []
-        if allow_empty:
-            return errors
-        if not people:
-            errors.append(_field_error(
-                None, "people", "required",
-                "stage.people phải có ít nhất một dòng"))
-        if not assets:
-            errors.append(_field_error(
-                None, "assets", "required",
-                "stage.assets phải có ít nhất một dòng"))
-        return errors
-
     def _validate_stage(self, people: list, assets: list,
                         case_type: str = CASE_TYPE_INHERITANCE, *,
                         allow_partial_draft: bool = False) -> list[dict]:
-        """Field-level rules của stage_v2 (validation vòng 1 giữ nguyên).
+        """Field-level rules của stage_v2 — mức tối thiểu theo owner 23/10.
 
-        `allow_partial_draft=True` chỉ cho `workspace_create` (nháp ít dữ
-        liệu): `ho_ten` nhận null/absent hoặc chuỗi (rỗng chuẩn hóa null);
-        số/list/object vẫn lỗi kiểu. Mọi field khác giữ strict.
+        Người: chỉ `ho_ten` bắt buộc có nội dung (S4); `gioi_tinh` đúng
+        enum (S4b); ngày có nội dung phải đúng lịch/parse được, ô trống
+        qua (S4c); sáu field chữ tùy chọn nhận ""/khoảng trắng → null khi
+        ghi, không lỗi (S4d). Tài sản: chỉ `so_thua_dat` + `so_to_ban_do`
+        bắt buộc (S5b), `so_serial` vẫn phải là chuỗi khi có mặt (S5a),
+        `ngay_cap` nhận chỉ-năm như Người (S5c). `allow_partial_draft=True`
+        chỉ nới thêm `ho_ten` cho `workspace_create`.
 
         Duplicate entity không còn là lỗi: hai dòng row_id khác nhau có
         thể cùng identity (§4.2 step 6).
@@ -2743,15 +2724,20 @@ class CaseWorkspaceService:
             if not isinstance(serial, str):
                 emit("so_serial", "invalid_type",
                      "so_serial phải là chuỗi")
-            # §3.3 design vòng 1: địa chỉ tài sản nullable — dòng thiếu dữ
-            # kiện vẫn lưu được; chuỗi rỗng chuẩn hóa thành null khi ghi.
+            # S5b (owner 23/10/2026): dòng Tài sản chỉ bắt buộc số thửa đất
+            # + số tờ bản đồ; địa chỉ và các field chữ khác để trống được.
+            for field in ("so_thua_dat", "so_to_ban_do"):
+                value = row.get(field)
+                if not isinstance(value, str) or not value.strip():
+                    emit(field, "required", f"{field} bắt buộc")
+            # §3.3: địa chỉ tài sản nullable — chuỗi rỗng chuẩn hóa null.
             self._check_nullable_str(row, "dia_chi", emit)
-            if not _valid_date_full(row.get("ngay_cap")):
+            # S5c: ngày cấp nhận chỉ-năm như trường ngày của Người.
+            if not _valid_date_or_year(row.get("ngay_cap")):
                 emit("ngay_cap", "invalid_date",
-                     "ngay_cap phải là YYYY-MM-DD hoặc null")
-            for field in ("so_vao_so", "so_thua_dat", "so_to_ban_do",
-                          "loai_so", "hinh_thuc_su_dung", "thoi_han",
-                          "nguon_goc", "co_quan_cap"):
+                     "ngay_cap phải là YYYY-MM-DD | YYYY | null")
+            for field in ("so_vao_so", "loai_so", "hinh_thuc_su_dung",
+                          "thoi_han", "nguon_goc", "co_quan_cap"):
                 self._check_nullable_str(row, field, emit)
             land_rows = row.get("land_rows")
             if land_rows is not None:
@@ -2821,12 +2807,14 @@ class CaseWorkspaceService:
 
     @staticmethod
     def _check_nullable_str(row: Mapping[str, Any], field: str, emit) -> None:
+        """Field chữ tùy chọn: chỉ chặn sai kiểu.
+
+        Chuỗi rỗng/toàn khoảng trắng không phải lỗi (S4d/S5b, owner
+        23/10/2026) — `_nn()` chuẩn hóa thành null trước khi ghi.
+        """
         value = row.get(field)
         if value is not None and not isinstance(value, str):
             emit(field, "invalid_type", f"{field} phải là chuỗi hoặc null")
-        elif isinstance(value, str) and not value.strip():
-            emit(field, "invalid_format",
-                 f"{field} rỗng — dùng null thay chuỗi rỗng")
 
     # ----- persist committed payload
 
