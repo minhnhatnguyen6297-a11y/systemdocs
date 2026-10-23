@@ -265,7 +265,8 @@ module nghiệp vụ và hai tiện ích:
 
 Flow chính: **Tổng quan hồ sơ → Soạn hồ sơ → Nhập liệu/gợi ý → Stage → Pool →
 Diagram → Xuất Word.** Tab `Word` hiện chỉ có thông báo, chưa có chức năng
-riêng; nút xuất nằm trong `Soạn hồ sơ`. Nút Zalo đang tắt. Mỗi dòng dưới đây
+riêng; nút xuất nằm trong `Soạn hồ sơ`. Nút Zalo disable đã gỡ khỏi giao diện
+(chức năng chưa ban hành). Mỗi dòng dưới đây
 trỏ tới phần nhỏ để bắt đầu tìm hiểu.
 
 **Tab Word tạo/lưu mẫu tương lai DEFERRED — owner 17/10/2026:** “chức năng này tôi sẽ tự làm sau, cần spec kỹ. Chuyển issue khác”. Cần spec chi tiết trước implementation tương lai; chưa giao viết spec hoặc code lúc này, các lựa chọn nguồn/bố cục/catalog/nghiệm thu chưa chốt. #19 đã nhận đáp án hoãn phạm vi, không built; chuyển #20, không hỏi tiếp #19. Nút Xuất Word và intake hiện có không bị hoãn. [Decision](../decisions/decision-owner-word-authoring-deferred-20261017.md).
@@ -310,9 +311,10 @@ trỏ tới phần nhỏ để bắt đầu tìm hiểu.
 
 **Chuyển loại hồ sơ sau khi lưu** đã có quy tắc owner 16/10/2026 ([decision](../decisions/decision-owner-saved-case-type-conversion-20261016.md),
 contract §13.18): giữ Người/Tài sản của Stage, reset Diagram rỗng theo domain mới, buộc chọn
-`document_type` mới kèm xác nhận. Nút **Đổi loại** ở Soạn hồ sơ đã triển khai với
-`notary.workspace_convert_type`; Stage/meta đang sửa phải **Lưu hồ sơ** trước,
-không tự lưu để chuyển loại; lỗi giữ nháp
+`document_type` mới kèm xác nhận. Loại chọn ở **dropdown header vùng Sơ đồ** cho
+cả hồ sơ mới và đã lưu; hồ sơ đã lưu đi qua
+`notary.workspace_convert_type`. Buffer Stage/meta đang sửa không chặn đổi loại
+(ghi kèm trong cùng hành động); lỗi giữ nháp
 Diagram. [#25](../backlog/story-saved-case-type-conversion.md) **built 16/10/2026,
 independent Quick clean**; không coi lựa chọn loại lúc tạo nháp là bằng chứng đổi loại.
 
@@ -379,7 +381,8 @@ xong contract với ứng dụng chính.
 | Hồ sơ đã xác nhận / lịch sử | Tìm hồ sơ và xem tiến trình | [Thiết kế](notaryoffice/README.md) | Chưa có mã chạy |
 
 Zalo là nguồn thu nhận, không phải module nghiệp vụ thứ tư. Trong màn Soạn hồ
-sơ, nút Zalo đang disabled. Nguồn inbox có ở phần riêng; kết nối consumer còn
+sơ không còn nút Zalo (chức năng chưa ban hành). Nguồn inbox có ở phần riêng;
+kết nối consumer còn
 đang ở dạng thiết kế nháp.
 
 ## Tiện ích và công cụ khác

@@ -137,13 +137,15 @@ nhận** (toàn bộ nội dung copy đã là yêu cầu owner). Retry cùng ý 
 cùng khóa idempotency và trả bản sao đã tạo, không tạo trùng; bản sao và nguồn
 độc lập sau đó.
 
-Chọn Thừa kế hoặc Hai bên khi tạo bản mới trong phiên. Loại không hỗ trợ hiện lý do và khóa thao tác không có khả năng, không tự chuyển sang Thừa kế. Khởi tạo bản đang sửa chưa cần Diagram; intake/evaluate không ghi database. Đổi loại của hồ sơ **đã lưu** chỉ qua đường chuyển loại đã duyệt (`inheritance` ↔ `two_party`): giữ ID + giá trị Người/Tài sản của Stage, reset Diagram theo domain mới (Thừa kế: seed **chỉ** node `owner` mới chọn — không seed khung 7 slot mặc định, không giữ quan hệ/dấu cũ, nhưng vẫn **đủ key bắt buộc** với `parentSlotIds`/`ownPositions`/`receivePositions` rỗng, `spouseSlotId:null`; Hai bên: 30 slot trống), buộc chọn `document_type` hợp lệ của loại mới và xác nhận phần Diagram mất trước khi ghi; chuyển vào Thừa kế cần `owner_row_id` từ Stage, vào Hai bên cấm trường đó. Không suy việc chọn loại lúc tạo bản mới thành quyền tự đổi domain; `case_type`/`document_type` vẫn bất biến ngoài đường này ([decision](../../decisions/decision-owner-saved-case-type-conversion-20261016.md), contract §13.18).
+Chọn loại sơ đồ (Thừa kế/Hai bên) ở **header vùng Sơ đồ** cho cả hồ sơ mới và hồ sơ đã lưu — cùng một vị trí, cùng một dạng điều khiển. Loại không hỗ trợ hiện lý do và khóa thao tác không có khả năng, không tự chuyển sang Thừa kế. Khởi tạo bản đang sửa chưa cần Diagram; intake/evaluate không ghi database. Đổi loại của hồ sơ **đã lưu** chỉ qua đường chuyển loại đã duyệt (`inheritance` ↔ `two_party`): giữ ID + giá trị Người/Tài sản của Stage, reset Diagram theo domain mới (Thừa kế: seed **chỉ** node `owner` mới chọn — không seed khung 7 slot mặc định, không giữ quan hệ/dấu cũ, nhưng vẫn **đủ key bắt buộc** với `parentSlotIds`/`ownPositions`/`receivePositions` rỗng, `spouseSlotId:null`; Hai bên: 30 slot trống), buộc chọn `document_type` hợp lệ của loại mới và xác nhận phần Diagram mất trước khi ghi; chuyển vào Thừa kế cần `owner_row_id` từ Stage, vào Hai bên cấm trường đó. Không suy việc chọn loại lúc tạo bản mới thành quyền tự đổi domain; `case_type`/`document_type` vẫn bất biến ngoài đường này ([decision](../../decisions/decision-owner-saved-case-type-conversion-20261016.md), contract §13.18).
 
-Trong Soạn hồ sơ đã lưu, bấm **Đổi loại** cạnh loại hiện tại để mở dialog.
-Văn bản mới và người để lại (khi vào Thừa kế) ban đầu chưa chọn; phải chọn rõ
-và đánh dấu xác nhận xóa Diagram trước **Áp dụng**. Stage/thông tin hồ sơ còn
-đang sửa thì dialog yêu cầu đóng và **Lưu hồ sơ** trước, không tự lưu
-hay bỏ thay đổi. Nháp Diagram chỉ bị reset khi chuyển loại ghi thành công. Hủy/Escape/nền
+Chọn loại khác loại hiện tại ở dropdown header Sơ đồ để mở dialog đổi loại.
+Dialog chỉ còn **ba hạng mục**, mỗi hạng mục một câu ngắn: (1) văn bản mới;
+(2) người để lại — chỉ khi đích là Thừa kế; (3) xác nhận xóa sơ đồ cũ.
+Văn bản mới và người để lại ban đầu chưa chọn. Buffer Stage/meta đang sửa
+**không chặn** đổi loại: lần ghi đi kèm trong cùng hành động trước khi convert,
+nên chữ vừa nhập không mất; xung đột revision thật vẫn theo luồng conflict.
+Nháp Diagram chỉ bị reset khi chuyển loại ghi thành công. Hủy/Escape/nền
 trước Áp dụng không ghi; lỗi/xung đột giữ nháp và các lựa chọn. Sau Áp dụng
 chờ kết quả nguyên tử, không đóng dialog giữa ghi. Command riêng
 `notary.workspace_convert_type` giữ commit/update thường bất biến loại.
@@ -260,10 +262,20 @@ Thừa kế **không bắt** `owner_row_id` khi Lưu hồ sơ (owner 23/10/2026)
 được user chỉnh → gửi Stage+meta+Diagram và provenance Word đang sửa →
 validate/tính lại → ghi nguyên tử, tăng revision. Giữ chuẩn hóa `stageForWire`
 và các hint identity khi gửi Stage. Một dòng lỗi thì không lưu nửa chừng;
-báo đúng ô hoặc cảnh báo cấp danh sách/field ẩn và giữ bản đang sửa. Lỗi
-diagram có toast theo lỗi chi tiết đầu tiên. Lỗi của lần ghi mới thay loại
-lỗi cũ, sửa dữ liệu liên quan thì dọn lỗi tương ứng; không để banner lỗi cũ
-che kết quả mới (G2/G3/G5 vòng 1).
+báo đúng ô hoặc cảnh báo cấp danh sách/field ẩn và giữ bản đang sửa. Lỗi của
+lần ghi mới thay loại lỗi cũ, sửa dữ liệu liên quan thì dọn lỗi tương ứng;
+không để lỗi cũ che kết quả mới (G2/G3/G5 vòng 1).
+
+**Hiển thị lỗi và trạng thái thao tác (owner 23/10/2026):** mỗi lỗi hiện
+đúng **một chỗ** — lỗi gắn ô thì ô đỏ + một dòng trong card chứa ô; lỗi sơ
+đồ/engine thì một dòng trong vùng Sơ đồ; lỗi không gắn ô/thẻ thì một dòng
+trong Stage. Không banner/toast/dòng thứ hai cùng nói một lỗi. Mỗi dòng chỉ
+một câu nói chuyện gì xảy ra: không hint dạy thao tác, không in mã lỗi.
+Vùng chứa lỗi có chỗ dành sẵn (chiều cao cố định, cuộn bên trong) nên lỗi
+xuất hiện/biến mất không đẩy bố cục vùng khác. Sau thao tác thành công
+không hiện câu chữ chúc mừng: nút/vùng thao tác hiện spinner khi chạy, dấu
+tích xanh ngắn khi xong, trở về trạng thái thường. Áp dụng cho ít nhất:
+Lưu hồ sơ, Xem cách tính, phân tích intake và Xuất Word.
 
 Trên Done, Lưu hồ sơ ghi đúng dòng đổi và thay snapshot hiện hành, giữ Done.
 Word và lấy làm nguồn cho Hồ sơ mới dùng bản đã lưu hiện tại, không có bản
@@ -342,7 +354,15 @@ Máy chỉ trả kết quả để Copy; không tự sửa, nối “nay là” 
 <a id="layout"></a>
 ## 8. Bố cục và thao tác
 
-Tài sản bên trái, Người bên phải; phía dưới là Pool và Diagram. Tài sản dùng bảng cột, Người dùng bảng dòng; danh sách dài cuộn trang. Dialog Loại đất sửa cụm, Áp dụng chỉ về nháp, Cập nhật mới lưu. Có đường bàn phím thay kéo thả; lỗi đặt ngay ô/thẻ liên quan.
+Tài sản bên trái, Người bên phải; phía dưới là Pool và Diagram. Tài sản dùng bảng cột, Người dùng bảng dòng; danh sách dài cuộn trang. Dialog Loại đất sửa cụm, Áp dụng chỉ về nháp, Lưu hồ sơ mới ghi DB. Có đường bàn phím thay kéo thả; lỗi đặt ngay ô/thẻ liên quan.
+
+**Giao diện tối giản (owner 23/10/2026):** không có chữ hướng dẫn tĩnh trên
+màn hình (đoạn giới thiệu danh sách, câu dạy trên ô trống, placeholder dạng
+ví dụ/“VD: …”, “Chọn từ danh bạ hoặc nhập tên”). Placeholder mặt nạ định dạng
+ngày `dd/mm/yyyy hoặc năm` được giữ vì là khuôn nhập, không phải bài giảng.
+Nút Zalo xám thường trực bị gỡ — chức năng chưa ban hành thì không hiện nút.
+Một lỗi chỉ hiện một chỗ và không đẩy bố cục; thành công dùng spinner/tích
+xanh tại nút, không toast chữ (chi tiết ở mục Lưu hồ sơ).
 
 Mốc bố cục: Stage 35:65 (38:62 ở màn ≥1920), Pool nội dung 224 px (khung ngoài 240), node có người 144 px, node trống 88×24. Ô Hai bên: rộng −30%, cao +100% so với số đo thật trước thay đổi (288×26 → 202×52), JS/CSS đồng bộ; giữ đủ `p1..p30` và đường bàn phím. Màn ≤900 px xếp các vùng dọc; không thu chữ/node đến khó đọc. Canvas pan/zoom; Mở rộng là lớp phủ trong ứng dụng. Dấu chưa lưu của Stage và Diagram tách riêng. Thông báo tạm (`notice`) nằm trong khoảng trống sẵn có của thanh trên (cạnh các pill trạng thái): không đổi vị trí vùng Sơ đồ và không che drop target/điều khiển; thanh trên bám trên cùng khi vùng nội dung cuộn nên thông báo vẫn trong tầm nhìn; banner lỗi/khoá vẫn trong luồng. Thông báo dài quá một dòng được cắt bằng ellipsis nhưng luôn đọc được đầy đủ bằng bàn phím: nút nội dung (Tab tới được) mở dialog `Thông báo` của module (Esc/×/click-outside, focus trả về nút).
 

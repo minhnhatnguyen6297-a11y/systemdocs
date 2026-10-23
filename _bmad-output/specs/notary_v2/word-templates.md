@@ -155,8 +155,8 @@ mở lại đọc đúng context đã lưu; giữ dirty, `canLeave` và cảnh b
 
 Đối chiếu Word là **một lần xuất hiện → ID dòng + trường + slot catalog**,
 không phải “thay mọi chuỗi giống nhau”. Tải đề xuất ban đầu từ Stage/Diagram
-đã lưu, không có thay đổi nội dung chờ lưu. Màn hiện chữ gốc, tên/ID dòng,
-slot và giá trị từ đề xuất backend; nguồn mới chưa chọn vị trí.
+đã lưu, không có thay đổi nội dung chờ lưu. Màn hiện chữ gốc, tên dòng,
+slot và giá trị từ đề xuất backend (không in mã row_id nội bộ); nguồn mới chưa chọn vị trí.
 **Xác nhận các vị trí đã chọn** chỉ sửa bindings trong provenance cục bộ và
 đánh dấu chưa lưu; không ghi DB, tăng revision hay tự gọi Lưu hồ sơ/commit.
 Cho xác nhận lại nhiều lần nếu chỉ thay bindings; checkbox phản ánh lựa

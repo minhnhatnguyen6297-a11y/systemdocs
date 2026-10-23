@@ -222,6 +222,15 @@ vẫn giữ hiện trạng, không được dùng nhánh fallback đó làm ngu�
 - Khi panel `Xem cách tính` đóng, vùng cảnh báo dưới sơ đồ hiện trạng thái tính
   và danh sách chỗ engine yêu cầu (`requiredSlots`) dạng chỉ-đọc, kể cả ngay
   sau khi lưu hoặc mở lại; ô chỉ được sinh khi người dùng bấm `Xem cách tính`.
+- Nhãn hiển thị (owner 23/10/2026): người chưa có tên dùng đúng **một** nhãn
+  `(chưa có tên)` ở mọi vị trí (Pool, node, menu, Hai bên). Node còn sống chỉ
+  hiện năm sinh; có năm mất hiện `{sinh} – {mất}`; không dùng dấu `…` lửng.
+  Node không hiện badge `%` — phần trăm chỉ nằm trong panel `Xem cách tính`.
+  Danh sách gỡ nhánh không gắn `(đã gỡ)` sau tên; node đã gỡ không nằm trong
+  danh sách gỡ. Phụ chú phân biệt trùng tên trong Pool (`sinh {năm}` /
+  `GT {số}`) được giữ vì giúp chọn đúng người. Nhãn provenance
+  (`đọc được`/`đã chuẩn hóa`/`suy luận`) không gắn lên giá trị hiển thị;
+  provenance vẫn nằm trong record.
 
 ### 9.7. Lỗi và ngoại lệ
 
@@ -233,10 +242,12 @@ vẫn giữ hiện trạng, không được dùng nhánh fallback đó làm ngu�
   mode/mẫu hiện hành; không thêm lệnh chặn chỉ vì `incomplete`.
 - Engine lỗi: không xóa state cũ.
 - Hiển thị lỗi dùng formatter của danh mục lỗi (`errText` ở
-  `error-catalog.js`); Sơ đồ đọc đúng export này khi script nạp theo
-  `index.html`. Ghi chú runtime 16/10/2026: binding `relErrText → errText` đã
-  khôi phục, nên lỗi evaluate/danh sách lỗi/lưu hiện thông điệp thân thiện;
-  ghi chú này chỉ mô tả hiện trạng runtime, không đổi quy tắc nghiệp vụ trên.
+  `error-catalog.js`); `errText` chỉ trả **một câu** (title), không hint dạy
+  thao tác, không in mã snake_case. Lỗi evaluate/lưu hiện đúng một dòng trong
+  vùng lỗi dành sẵn của Sơ đồ — không toast/banner trùng. Slot lỗi có chiều
+  cao cố định nên canvas và các vùng khác không nhảy khi lỗi hiện/biến mất.
+  Thành công không có câu chữ: nút hiện spinner khi chạy, tích xanh ngắn khi
+  xong.
 - Hồ sơ legacy: migrate khi đọc theo rule đã có; GET không âm thầm ghi DB.
 
 ### 9.8. Câu hỏi và lịch sử
