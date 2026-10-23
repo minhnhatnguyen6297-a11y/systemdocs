@@ -451,14 +451,17 @@ asset_row:
   `thoi_han` (nullable) — schema `asset_row` — để đối chiếu lịch sử và báo
   `stage.orphan_thoi_han` khi giá trị lẻ không gắn cụm nào. Thời hạn mới
   chỉ thuộc `land_rows[].thoihan`; không tự đắp giá trị lẻ vào cụm.
-- **Key cụm đất (MIN-141 đợt 2):** tên nghiệp vụ canonical mới là
-  `loaidat` / `dientich` / `thoihan` (trùng cột bảng con
+- **Key cụm đất (MIN-141 đợt 2; nới S6 23/10/2026):** tên nghiệp vụ
+  canonical mới là `loaidat` / `dientich` / `thoihan` (trùng cột bảng con
   `case_asset_land_rows` và tên placeholder Word `loaidat<M><N>`... —
   entities.md §9.2). Server đọc được cả bộ legacy
   `loai_dat`/`dien_tich`/`thoi_han` để UI hiện hành không hỏng; wire
   emit tiếp tục dùng bộ legacy (shape trên không đổi). Trong một phần
-  tử, cặp cũ-mới của cùng trường mang giá trị **mâu thuẫn** →
-  `stage_validation_error` (`code:"conflict"`), không âm thầm chọn một.
+  tử, cặp cũ-mới của cùng trường mang giá trị **mâu thuẫn** → **không còn
+  lỗi**: ghi theo key canonical mới và bỏ giá trị key cũ. `dientich`
+  không parse được thành số hữu hạn (kể cả bool/kiểu lạ) → ghi `null`,
+  giữ các trường còn lại của cụm. Không còn trần 20 cụm/tài sản trên đường
+  Lưu; unknown key trong cụm vẫn bị chặn (S9).
   Vị trí cụm = index trong `land_rows` + 1 (cột `vitri`), kể cả dòng
   trống hoàn toàn — giữ nguyên vị trí trống.
 - Storage B: mọi field §4.2 (trừ is_primary v1) ánh xạ cột cùng tên trên
@@ -1366,7 +1369,9 @@ asset_row_v2:               # giống §4.2, TRỪ is_primary (bị loại)
   không phải field wire).
 - Không migrate/đọc legacy test data trong cutover B; mô tả overflow/mirror
   lịch sử ở §13.8 không còn yêu cầu runtime.
-- **Đất tối đa 20/tài sản:** vượt → stage_validation_error/land_row_limit.
+- **Cụm đất (S6 23/10/2026):** đường Lưu không còn trần 20 cụm/tài sản.
+  Alias cũ-mới mâu thuẫn ghi theo key canonical mới; `dientich` không parse
+  được thành số → null (không chặn). Unknown key vẫn bị chặn.
   Lưu case_asset_land_rows theo parent row_id + vitri, không master/mirror
   JSON. Null → land_rows_present=false, không con; [] → true, không con;
   mảng → true, giữ cả hàng trống. Diff từng vị trí, không clear collection.

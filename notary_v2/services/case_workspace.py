@@ -36,7 +36,7 @@ from typing import Any, Optional
 from sqlalchemy import text as sa_text
 from sqlalchemy.exc import IntegrityError, OperationalError
 
-from database import MAX_LAND_ROWS, _land_row_field
+from database import _land_area_to_float, _land_row_field
 from models import (
     CaseAssetLandRow,
     CaseAssetRow,
@@ -275,8 +275,6 @@ _CASE_META_UPDATE_KEYS = {"ngay_lap_ho_so", "noi_niem_yet", "ghi_chu"}
 
 _LAND_ROW_KEY_SET = {"loaidat", "dientich", "thoihan",
                      "loai_dat", "dien_tich", "thoi_han"}
-_LAND_ROW_STR_KEYS = ("loai_dat", "loaidat", "thoi_han", "thoihan")
-_LAND_ROW_NUM_KEYS = ("dien_tich", "dientich")
 
 _PERSON_KEY_ALIASES = {
     "ten": "ho_ten", "gioitinh": "gioi_tinh", "ngaysinh": "ngay_sinh",
@@ -2745,6 +2743,11 @@ class CaseWorkspaceService:
                     emit("land_rows", "invalid_type",
                          "land_rows phải là danh sách hoặc null")
                 else:
+                    # S6 (owner 23/10/2026): đường Lưu gỡ trần 20 cụm, gỡ
+                    # chặn alias cũ-mới mâu thuẫn và chặn diện tích không
+                    # phải số. Chuẩn hóa khi ghi: key canonical mới thắng
+                    # key cũ; diện tích không parse được → null
+                    # (`_normalize_land_row`). Unknown key vẫn bị chặn (S9).
                     for lr_index, lr in enumerate(land_rows):
                         if not isinstance(lr, Mapping):
                             emit("land_rows", "invalid_type",
@@ -2752,32 +2755,6 @@ class CaseWorkspaceService:
                             continue
                         _check_extra_keys(lr, _LAND_ROW_KEY_SET,
                                           f"land_rows[{lr_index}]")
-                        for lf in _LAND_ROW_STR_KEYS:
-                            value = lr.get(lf)
-                            if value is not None and not isinstance(value, str):
-                                emit("land_rows", "invalid_type",
-                                     f"land_rows[{lr_index}].{lf} phải là chuỗi hoặc null")
-                        for lf in _LAND_ROW_NUM_KEYS:
-                            dt = lr.get(lf)
-                            if dt is not None and (
-                                    not isinstance(dt, (int, float))
-                                    or isinstance(dt, bool)):
-                                emit("land_rows", "invalid_type",
-                                     f"land_rows[{lr_index}].{lf} phải là số hoặc null")
-                        for new_key, old_key in (
-                                ("loaidat", "loai_dat"),
-                                ("dientich", "dien_tich"),
-                                ("thoihan", "thoi_han")):
-                            _lv, conflict = _land_row_field(
-                                lr, new_key, old_key)
-                            if conflict:
-                                emit("land_rows", "conflict",
-                                     f"land_rows[{lr_index}] '{new_key}' "
-                                     f"và '{old_key}' có giá trị mâu thuẫn")
-                    for lr_index in range(MAX_LAND_ROWS, len(land_rows)):
-                        emit("land_rows", "land_row_limit",
-                             f"land_rows[{lr_index}] vượt giới hạn "
-                             f"{MAX_LAND_ROWS} cụm đất mỗi tài sản")
 
         for index, row in enumerate(assets[MAX_ASSETS:], start=MAX_ASSETS):
             err(row.get("row_id") if isinstance(row, Mapping) else None,
@@ -2893,15 +2870,24 @@ def _normalize_document_key(value: str) -> Optional[str]:
 
 
 def _normalize_land_row(row: Mapping[str, Any]) -> dict:
-    """land_row wire → canonical {loaidat, dientich, thoihan}."""
+    """land_row wire → canonical {loaidat, dientich, thoihan}.
+
+    S6 (owner 23/10/2026) — chuẩn hóa thay vì chặn trên đường Lưu:
+    - alias cũ/mới mâu thuẫn: key canonical mới (`loaidat`/`dientich`/
+      `thoihan`) thắng, key cũ bị bỏ (`_land_row_field` trả giá trị mới);
+    - `dientich` không parse được thành số hữu hạn (kể cả bool/kiểu lạ)
+      → null, giữ nguyên các trường còn lại của cụm.
+    """
     loaidat, _ = _land_row_field(row, "loaidat", "loai_dat")
     dientich, _ = _land_row_field(row, "dientich", "dien_tich")
     thoihan, _ = _land_row_field(row, "thoihan", "thoi_han")
+    try:
+        area = _land_area_to_float(dientich)
+    except ValueError:
+        area = None
     return {
         "loaidat": _nn(loaidat),
-        "dientich": (float(dientich)
-                     if isinstance(dientich, (int, float))
-                     and not isinstance(dientich, bool) else None),
+        "dientich": area,
         "thoihan": _nn(thoihan),
     }
 

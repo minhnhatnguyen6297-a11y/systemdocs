@@ -56,12 +56,15 @@
     },
     "land_row_v2": {
       "type": "object",
-      "description": "Hàng loại đất cấu trúc: mục đích sử dụng + diện tích + thời hạn (§13.3)",
+      "description": "Hàng loại đất cấu trúc: mục đích sử dụng + diện tích + thời hạn (§13.3/§4.2). Đọc cả key canonical loaidat/dientich/thoihan; alias mâu thuẫn ghi theo key canonical mới (S6 23/10/2026). dien_tich chuỗi không parse được → ghi null.",
       "additionalProperties": false,
       "properties": {
         "loai_dat": { "$ref": "common.schema.json#/definitions/nullable_string" },
-        "dien_tich": { "type": ["number", "null"] },
-        "thoi_han": { "$ref": "common.schema.json#/definitions/nullable_string" }
+        "dien_tich": { "type": ["number", "string", "null"] },
+        "thoi_han": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "loaidat": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "dientich": { "type": ["number", "string", "null"] },
+        "thoihan": { "$ref": "common.schema.json#/definitions/nullable_string" }
       }
     },
     "person_row_output_v2": {

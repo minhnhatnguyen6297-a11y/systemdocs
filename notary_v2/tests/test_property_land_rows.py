@@ -446,34 +446,45 @@ def test_commit_land_rows_canonical_keys_accepted(db):
         {"loai_dat": "ONT", "dien_tich": 120.0, "thoi_han": "Đến 2043"}]
 
 
-def test_commit_land_rows_conflicting_keys_rejected(db):
-    """Key cũ + mới mâu thuẫn → stage_validation_error 'conflict', không
-    âm thầm chọn một."""
+def test_commit_land_rows_conflicting_keys_new_key_wins(db):
+    """S6 owner 23/10/2026: key cũ + mới mâu thuẫn không còn chặn Lưu —
+    ghi theo key canonical mới, bỏ giá trị key cũ."""
     people, assets, state = _create_args()
     data = _create(db, people, assets, state)
-    prop_id = data["stage"]["assets"][0]["entity_id"]
-    with pytest.raises(WorkspaceError) as exc:
-        _commit(db, data["case"]["id"], 1, people, [_asset_row(
-            entity_id=prop_id,
-            land_rows=[{"loai_dat": "ODT", "loaidat": "CLN",
-                        "dien_tich": 80}])])
-    assert exc.value.code == "stage_validation_error"
-    assert any(e["code"] == "conflict" and e["field"] == "land_rows"
-               for e in exc.value.details["field_errors"])
+    asset_row_id = data["stage"]["assets"][0]["row_id"]
+    out = _commit(db, data["case"]["id"], 1, people, [_asset_wire(
+        data, land_rows=[{"loai_dat": "ODT", "loaidat": "CLN",
+                          "dien_tich": 80}])])
+    row = _case_land_rows(db, asset_row_id)[0]
+    assert (row.loaidat, row.dientich, row.thoihan) == ("CLN", 80.0, None)
+    assert out["stage"]["assets"][0]["land_rows"] == [
+        {"loai_dat": "CLN", "dien_tich": 80.0, "thoi_han": None}]
 
 
-def test_commit_land_row_limit(db):
+def test_commit_land_rows_beyond_old_limit_accepted(db):
+    """S6: gỡ trần 20 cụm/tài sản trên đường Lưu — 21 cụm ghi đủ."""
     people, assets, state = _create_args()
     data = _create(db, people, assets, state)
-    prop_id = data["stage"]["assets"][0]["entity_id"]
-    with pytest.raises(WorkspaceError) as exc:
-        _commit(db, data["case"]["id"], 1, people, [_asset_row(
-            entity_id=prop_id,
-            land_rows=[{"loai_dat": f"Đất {i}", "dien_tich": i,
-                        "thoi_han": None} for i in range(21)])])
-    assert exc.value.code == "stage_validation_error"
-    assert any(e["code"] == "land_row_limit"
-               for e in exc.value.details["field_errors"])
+    asset_row_id = data["stage"]["assets"][0]["row_id"]
+    out = _commit(db, data["case"]["id"], 1, people, [_asset_wire(
+        data, land_rows=[{"loai_dat": f"Đất {i}", "dien_tich": i,
+                          "thoi_han": None} for i in range(21)])])
+    assert len(_case_land_rows(db, asset_row_id)) == 21
+    assert len(out["stage"]["assets"][0]["land_rows"]) == 21
+
+
+def test_commit_land_rows_unparseable_area_becomes_null(db):
+    """S6: diện tích không parse được thành số → null, không chặn Lưu."""
+    people, assets, state = _create_args()
+    data = _create(db, people, assets, state)
+    asset_row_id = data["stage"]["assets"][0]["row_id"]
+    _commit(db, data["case"]["id"], 1, people, [_asset_wire(
+        data, land_rows=[{"loai_dat": "ODT",
+                          "dien_tich": "không-phải-số",
+                          "thoi_han": "Lâu dài"}])])
+    row = _case_land_rows(db, asset_row_id)[0]
+    assert (row.loaidat, row.dientich, row.thoihan) == (
+        "ODT", None, "Lâu dài")
 
 
 def test_invalid_land_row_rolls_back_everything(db):
@@ -492,8 +503,7 @@ def test_invalid_land_row_rolls_back_everything(db):
         _asset_wire(data, 0, land_rows=[
             {"loai_dat": "LUC", "dien_tich": 999, "thoi_han": "20 năm"}]),
         _asset_wire(data, 1, land_rows=[
-            {"loai_dat": "ODT", "dien_tich": "không-phải-số",
-             "thoi_han": None}]),
+            "không-phải-object"]),      # sai cấu trúc cụm → chặn cả lô
     ]
     with pytest.raises(WorkspaceError) as exc:
         _commit(db, case_id, 1, people, bad_assets)

@@ -312,7 +312,7 @@ class CaseAssetLandRow(Base):
     __table_args__ = (
         UniqueConstraint("case_asset_row_id", "vitri",
                          name="uq_case_asset_land_row_vitri"),
-        CheckConstraint("vitri BETWEEN 1 AND 20", name="ck_case_asset_land_row_vitri"),
+        CheckConstraint("vitri >= 1", name="ck_case_asset_land_row_vitri"),
     )
 
 
