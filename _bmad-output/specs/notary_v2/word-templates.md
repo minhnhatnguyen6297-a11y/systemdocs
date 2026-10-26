@@ -200,6 +200,12 @@ sơ ngầm. Thao tác không đọc file gốc nên dùng được khi nguồn h
 file nguồn. Chỉ Lưu hồ sơ thành công mới ghi việc gỡ nguồn vào DB. Lưu lỗi
 giữ bản đang sửa để thử lại, không khôi phục sang hồ sơ khác.
 
+Kiểm tra vị trí khi Lưu độc lập với trần xuất Word: Thừa kế có hơn 20
+Người vẫn lưu đầy đủ, kể cả khi đã xác nhận vị trí Word; vẫn kiểm nguồn,
+occurrence, dòng/ô và giá trị. Hai bên giữ trần lưu 30 Người. Khi xuất
+Thừa kế vượt 20 Người, từng văn bản báo `word.too_many_people` với thông báo
+“Quá 20 người trong Stage”, không biến trần xuất thành điều kiện Lưu.
+
 Khi **Lưu hồ sơ**, backend validate context/bindings đã xác nhận và tạo bản
 mẫu riêng tại `docx_sources/<source_id>/templates/<template_sha256>.docx`;
 context giữ hash đó. Source và mẫu không bị ghi đè. Xuất chỉ đọc snapshot

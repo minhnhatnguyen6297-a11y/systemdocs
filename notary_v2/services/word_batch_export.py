@@ -357,12 +357,14 @@ def _doc_error_from(exc: BaseException,
         # chưa lưu (context None) chỉ có template-level readiness.
         reason = (word_engine.word_block_reason(context, static=static)
                   if context is not None else None)
-        return (reason or "word.render_failed"), str(exc)
+        if reason is not None:
+            return reason, _block_message(reason)
+        return "word.render_failed", str(exc)
     if isinstance(exc, FileNotFoundError):
         return "file_not_found", f"không tìm thấy file/thư mục: {exc}"
     if isinstance(exc, PermissionError):
         return "file_locked", f"không ghi được file: {exc}"
-    return "word.render_failed", f"{type(exc).__name__}: {exc}"
+    return "word.render_failed", str(exc)
 
 
 _TEMP_CREATE_ATTEMPTS = 8

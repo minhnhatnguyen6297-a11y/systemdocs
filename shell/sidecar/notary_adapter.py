@@ -1174,11 +1174,13 @@ def word_export_options(job, payload):
                 proposals = original.binding_proposals(case, p["original_source_id"], _docx_store())
             except (ValueError, OSError, KeyError, TypeError) as exc:
                 raise CommandError("word.original_mapping_invalid", str(exc)) from exc
-            reason = None
-            try:
-                original.reviewed_template(case, p["original_source_id"], _docx_store())
-            except (ValueError, OSError, KeyError, TypeError):
-                reason = "word.original_mapping_invalid"
+            we = _svc("word_engine")
+            reason = we.word_block_reason(we.build_word_context(case), static=True)
+            if reason is None:
+                try:
+                    original.reviewed_template(case, p["original_source_id"], _docx_store())
+                except (ValueError, OSError, KeyError, TypeError):
+                    reason = "word.original_mapping_invalid"
             return _result("word_export_options", {"schema_version": wbe.SCHEMA_VERSION,
                 "binding_proposals": proposals,
                 "documents": [{"document_key": "original.docx", "display_name": "Hợp đồng Word gốc",

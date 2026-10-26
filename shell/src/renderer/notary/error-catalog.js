@@ -32,6 +32,9 @@ const ERROR_CATALOG = {
     title: 'Engine nghiệp vụ đã dừng giữa chừng',
     hint: 'Khởi động lại ứng dụng để dựng lại engine.',
   },
+  engine_internal_error: {
+    title: 'Lỗi nội bộ của engine nghiệp vụ',
+  },
   engine_version_mismatch: {
     title: 'Shell và engine không khớp phiên bản contract',
     hint: 'Cập nhật đồng bộ cả hai phía trước khi dùng.',
@@ -229,6 +232,9 @@ const ERROR_CATALOG = {
   word_duplicate_document_key: {
     title: 'Loại văn bản bị chọn trùng',
   },
+  'word.too_many_people': {
+    title: 'Quá 20 người trong Stage',
+  },
 
   // ---- Khác ----
   unknown_website: { title: 'Không nhận diện được trang đích' },
@@ -240,9 +246,12 @@ function describeError(err) {
   const e = err || {};
   const code = e.code || 'unknown';
   const ent = ERROR_CATALOG[code];
+  // Strip repeated Python exception wrappers only from the display fallback.
+  const message = (e.message || '').replace(
+    /^(?:\s*(?:[\w.]*Error|[\w.]*Exception):\s*)+/, '');
   return {
     code,
-    title: ent ? ent.title : (e.message || code),
+    title: ent ? ent.title : (message || ERROR_CATALOG.unknown.title),
     hint: (ent && ent.hint) || null,
     retryable: !!e.retryable,
     nextAction: e.next_action || null,

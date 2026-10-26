@@ -1748,6 +1748,27 @@ def _add_property_placeholders(mapping: dict[str, str], properties: list[Any]) -
 # ---------------------------------------------------------------------------
 
 
+def build_binding_mapping(case: Any) -> dict[str, str]:
+    """Resolve reviewed row/seat fields without applying Word export limits.
+
+    Saving a case validates occurrence bindings, not whether the whole case
+    fits a finite Word template. Reuse the export slot emitters so field
+    formatting and saved two-party seat identities remain identical.
+    """
+    context = build_word_context(case)
+    mapping: dict[str, str] = {}
+    _add_word_person_group(
+        mapping, context, "Người", context.persons,
+        limit=len(context.persons))
+    if context.case_type == "two_party":
+        _add_word_person_group(
+            mapping, context, "Bên A", context.party_a, limit=15)
+        _add_word_person_group(
+            mapping, context, "Bên B", context.party_b, limit=15)
+    _add_property_placeholders(mapping, context.assets)
+    return mapping
+
+
 def build_template_mapping(case: Any, today: date | None = None,
                            *, static: bool = False,
                            needed: set[str] | None = None,

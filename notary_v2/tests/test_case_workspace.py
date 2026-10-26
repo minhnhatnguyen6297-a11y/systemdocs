@@ -1630,3 +1630,201 @@ def test_saved_type_conversion_stale_leaves_case_usable(db):
     db.expire_all()
     assert db.get(InheritanceCase, case.id).trang_thai == "draft"
     assert db.get(InheritanceCase, case.id).workspace_revision == 1
+
+
+@pytest.fixture()
+def many_people_stage():
+    return {
+        "owner_row_id": None,
+        "people": [{"row_id": str(uuid.uuid4()), "ho_ten": f"Người thử {i:02}"}
+                   for i in range(1, 26)],
+        "assets": [{"row_id": str(uuid.uuid4()), "so_serial": "",
+                    "so_thua_dat": "901", "so_to_ban_do": "09"}],
+    }
+
+
+@pytest.fixture()
+def many_people_word_source(tmp_path, many_people_stage):
+    import hashlib
+    import io
+    from docx import Document
+    from services.document_intake.docx_source import read_docx
+    from services.document_intake.docx_store import DocxStore
+
+    name = many_people_stage["people"][-1]["ho_ten"]
+    doc = Document()
+    doc.add_paragraph("Người: " + name)
+    stream = io.BytesIO()
+    doc.save(stream)
+    content = stream.getvalue()
+    text = read_docx(content).text
+    candidate_id, occurrence_id = str(uuid.uuid4()), str(uuid.uuid4())
+    suggestion = {
+        "suggestion_id": candidate_id, "source_id": "", "target": "person",
+        "fields": {"ho_ten": {
+            "raw_value": name, "normalized_value": name,
+            "observation_state": "normalized", "confidence": None,
+            "source_refs": [{
+                "occurrence_id": occurrence_id, "source_id": "",
+                "source_label": "", "raw_snippet": name,
+                "span": [text.index(name), text.index(name) + len(name)],
+            }],
+        }}, "warnings": [],
+    }
+    store = DocxStore(tmp_path / "sources")
+    source_id = store.save(content, [suggestion], "Nguồn tổng hợp.docx")
+    context = {"version": 1, "sources": [{
+        "source_id": source_id, "sha256": hashlib.sha256(content).hexdigest(),
+        "records": [{"candidate_id": candidate_id,
+                     "row_id": many_people_stage["people"][-1]["row_id"]}],
+        "bindings": [{"candidate_id": candidate_id,
+                      "occurrence_id": occurrence_id, "field_key": "ho_ten",
+                      "slot": "[Người 25 - Họ tên]"}],
+    }]}
+    return store, context
+
+
+def test_save_case_inheritance_25_names_only_reopens_updates_replays(
+        db, session_factory, many_people_stage):
+    service = _service(db)
+    key = str(uuid.uuid4())
+    args = {
+        "case_id": None, "base_revision": None, "idempotency_key": key,
+        "case_meta": {"case_type": "inheritance", "document_type": "khai_nhan"},
+        "stage": many_people_stage,
+        "state": {"version": 3, "domain": "inheritance", "nodes": []},
+        "docx_import": {"version": 1, "sources": []},
+    }
+    saved = service.save_case(**args)
+    case_id = saved["case"]["id"]
+    assert saved["created"] is True
+    assert saved["case"]["status"] == "done"
+    assert saved["case"]["revision"] == 1
+    replay = service.save_case(**args)
+    assert replay["created"] is False
+    assert replay["case"]["id"] == case_id
+    assert replay["case"]["revision"] == 1
+    assert db.query(InheritanceCase).count() == 1
+
+    with session_factory() as fresh:
+        reopened = CaseWorkspaceService(fresh).get(case_id)
+        assert [(p["row_id"], p["ho_ten"]) for p in reopened["stage"]["people"]] == [
+            (p["row_id"], p["ho_ten"]) for p in many_people_stage["people"]]
+        assert all(p["so_giay_to"] is None and p["ngay_sinh"] is None
+                   for p in reopened["stage"]["people"])
+        asset, = reopened["stage"]["assets"]
+        assert (asset["so_thua_dat"], asset["so_to_ban_do"]) == ("901", "09")
+        assert reopened["docx_import"] == {"version": 1, "sources": []}
+        reopened["stage"]["people"][-1]["ho_ten"] = "Người thử đã sửa"
+        updated = CaseWorkspaceService(fresh).save_case(
+            case_id=case_id, base_revision=1, case_meta={},
+            stage=reopened["stage"], state=reopened["diagram"]["state"])
+        assert updated["case"]["revision"] == 2
+
+    with session_factory() as fresh:
+        reopened = CaseWorkspaceService(fresh).get(case_id)
+        assert len(reopened["stage"]["people"]) == 25
+        assert reopened["stage"]["people"][-1]["ho_ten"] == "Người thử đã sửa"
+        assert reopened["case"]["revision"] == 2
+
+
+def test_save_case_inheritance_25_with_reviewed_binding(
+        db, session_factory, many_people_stage, many_people_word_source, tmp_path):
+    from services.word_original import binding_proposals, export_original
+    from services.word_batch_export import WordBatchError
+
+    store, context = many_people_word_source
+    saved = CaseWorkspaceService(db, store).save_case(
+        case_id=None, base_revision=None, idempotency_key=str(uuid.uuid4()),
+        case_meta={"case_type": "inheritance", "document_type": "khai_nhan"},
+        stage=many_people_stage,
+        state={"version": 3, "domain": "inheritance", "nodes": []},
+        docx_import=context)
+    case_id = saved["case"]["id"]
+    source_id = context["sources"][0]["source_id"]
+    with session_factory() as fresh:
+        service = CaseWorkspaceService(fresh, store)
+        reopened = service.get(case_id)
+        assert len(reopened["stage"]["people"]) == 25
+        binding, = reopened["docx_import"]["sources"][0]["bindings"]
+        binding = dict(binding)
+        assert binding["slot"] == "[Người 25 - Họ tên]"
+        case = fresh.get(InheritanceCase, case_id)
+        proposal, = binding_proposals(case, source_id, store)
+        assert proposal["supported"] is True
+        assert proposal["selected"] is True
+        assert proposal["value"] == "Người thử 25"
+        with pytest.raises(WordBatchError) as failure:
+            export_original(case, source_id, store, tmp_path)
+        assert failure.value.code == "word_batch_failed"
+        entry, = failure.value.result_data["documents"]
+        assert entry["status"] == "failed"
+        assert entry["error"] == {
+            "code": "word.too_many_people", "message": "Quá 20 người trong Stage"}
+        assert list(tmp_path.glob("*_HS-*.docx")) == []
+
+        reopened["docx_import"]["sources"][0]["bindings"][0]["slot"] = "[Người 24 - Họ tên]"
+        with pytest.raises(WorkspaceError) as failure:
+            service.save_case(
+                case_id=case_id, base_revision=1, case_meta={},
+                stage=reopened["stage"], state=reopened["diagram"]["state"],
+                docx_import=reopened["docx_import"])
+        assert failure.value.code == "validation_error"
+        unchanged = service.get(case_id)
+        assert unchanged["case"]["revision"] == 1
+        assert unchanged["docx_import"]["sources"][0]["bindings"] == [binding]
+
+
+def test_save_case_two_party_people_cap_stays_30(db, many_people_stage):
+    stage = many_people_stage
+    stage.pop("owner_row_id")
+    stage["people"].extend(
+        {"row_id": str(uuid.uuid4()), "ho_ten": f"Người thử {i:02}"}
+        for i in range(26, 31))
+    service = _service(db)
+    args = {
+        "case_id": None, "base_revision": None,
+        "idempotency_key": str(uuid.uuid4()),
+        "case_meta": {"case_type": "two_party", "document_type": "chuyen_nhuong"},
+        "stage": stage,
+        "state": {"version": 3, "domain": "two_party", "nodes": [
+            {"id": pid, "personId": None, "hidden": False, "deleted": False}
+            for pid in TP_IDS]},
+        "docx_import": {"version": 1, "sources": []},
+    }
+    saved = service.save_case(**args)
+    assert len(saved["stage"]["people"]) == 30
+    stage["people"].append(
+        {"row_id": str(uuid.uuid4()), "ho_ten": "Người thử 31"})
+    args["idempotency_key"] = str(uuid.uuid4())
+    with pytest.raises(WorkspaceError) as failure:
+        service.save_case(**args)
+    assert failure.value.code == "stage_validation_error"
+    assert any(e["code"] == "people_limit"
+               for e in failure.value.details["field_errors"])
+    assert len(service.get(saved["case"]["id"])["stage"]["people"]) == 30
+    assert db.query(InheritanceCase).count() == 1
+
+
+def test_save_case_inheritance_25_rejects_binding_without_saved_value(
+        db, many_people_stage, many_people_word_source):
+    store, context = many_people_word_source
+    source = context["sources"][0]
+    content, package = store.load(source["source_id"])
+    candidate, = package["suggestions"]
+    candidate["fields"]["so_giay_to"] = candidate["fields"].pop("ho_ten")
+    source["source_id"] = store.save(
+        content, [candidate], "Nguồn giấy tờ tổng hợp.docx")
+    binding, = source["bindings"]
+    binding.update(field_key="so_giay_to", slot="[Người 25 - Số giấy tờ]")
+    with pytest.raises(WorkspaceError) as failure:
+        CaseWorkspaceService(db, store).save_case(
+            case_id=None, base_revision=None, idempotency_key=str(uuid.uuid4()),
+            case_meta={"case_type": "inheritance", "document_type": "khai_nhan"},
+            stage=many_people_stage,
+            state={"version": 3, "domain": "inheritance", "nodes": []},
+            docx_import=context)
+    assert failure.value.code == "validation_error"
+    assert "chưa có giá trị" in str(failure.value)
+    assert db.query(InheritanceCase).count() == 0
+    assert db.query(CasePersonRow).count() == 0

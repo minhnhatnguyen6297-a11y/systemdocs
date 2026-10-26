@@ -425,10 +425,9 @@ function createWordDialog(ctx) {
           scanning = false;
           if (!r.ok) {
             listBox.innerHTML = '';
-            // Mã lỗi không kèm message vẫn phải nói đúng việc đang hỏng.
-            listBox.append(h('div', 'error',
-              (r.error && r.error.message) ||
-              'Không tải được các vị trí Word'));
+            listBox.append(h('div', 'error', errText(r.error || {
+              message: 'Không tải được các vị trí Word',
+            })));
             refreshScanLock(); return;
           }
           tplLabel.textContent = 'Mẫu: hợp đồng Word gốc đã lưu trong hồ sơ';

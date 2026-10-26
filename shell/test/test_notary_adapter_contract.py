@@ -61,9 +61,11 @@ def test_original_docx_two_party_adapter_lifecycle_stale_guard_and_subfolder(ada
     from services.document_intake.docx_store import DocxStore
     from services.document_intake.docx_source import read_docx
     from services import word_original
+    from services import word_engine
     store = DocxStore(tmp_path / 'sources')
     modules = {'document_intake.service':intake_service, 'word_original':word_original,
-               'word_batch_export':word_batch_export, 'case_workspace':case_workspace}
+               'word_batch_export':word_batch_export, 'case_workspace':case_workspace,
+               'word_engine':word_engine}
     monkeypatch.setattr(notary_adapter, '_svc', lambda name: modules[name])
     monkeypatch.setattr(notary_adapter, '_docx_store', lambda: store)
     document = Document()
@@ -138,6 +140,47 @@ def test_original_docx_two_party_adapter_lifecycle_stale_guard_and_subfolder(ada
             notary_adapter.word_export_batch(_Job(), payload)
         assert err.value.code == 'file_locked'
     assert list(output.parent.iterdir()) == [output]
+
+
+@pytest.mark.parametrize("people_count, block_reason", [
+    (20, None),
+    (21, "word.too_many_people"),
+])
+def test_original_word_options_reports_people_limit_before_template_review(
+        adapter_db, monkeypatch, people_count, block_reason):
+    from types import SimpleNamespace
+    from services import word_engine
+
+    case, _, _ = _seed_case(adapter_db)
+    for position in range(2, people_count + 1):
+        adapter_db.add(CasePersonRow(
+            row_id=_uuid4(), case_id=case.id, vitri=position,
+            ho_ten=f"Người tổng hợp {position}"))
+    adapter_db.commit()
+
+    reviewed = []
+    proposals = [{"field_key": "ho_ten"}]
+    original = SimpleNamespace(
+        binding_proposals=lambda *_: proposals,
+        reviewed_template=lambda *_: reviewed.append(True))
+    modules = {
+        "word_original": original,
+        "word_engine": word_engine,
+        "word_batch_export": word_batch_export,
+    }
+    monkeypatch.setattr(notary_adapter, "_svc", lambda name: modules[name])
+    monkeypatch.setattr(notary_adapter, "_docx_store", lambda: None)
+
+    result = notary_adapter.word_export_options(_Job(), {
+        "case_id": case.id, "original_source_id": _uuid4(),
+    })["data"]
+
+    assert result["binding_proposals"] == proposals
+    assert result["documents"] == [{
+        "document_key": "original.docx", "display_name": "Hợp đồng Word gốc",
+        "ready": block_reason is None, "block_reason": block_reason,
+    }]
+    assert reviewed == ([True] if block_reason is None else [])
 
 
 class _Job:

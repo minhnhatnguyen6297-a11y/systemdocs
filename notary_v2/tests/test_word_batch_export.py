@@ -1519,3 +1519,91 @@ class TestFolderTemplateErrors:
         assert sorted(p.name for p in dest.iterdir()) == [
             "auth_short_HS-99.docx", "beyond_HS-99.docx",
             "good_HS-99.docx", "unknown_HS-99.docx"]
+
+
+@pytest.fixture()
+def synthetic_limit_templates(tmp_path):
+    folder = tmp_path / "templates"
+    folder.mkdir()
+    for key in ("khai_nhan_di_san", "thoa_thuan_phan_chia"):
+        doc = Document()
+        doc.add_paragraph("[Người 1 - Họ tên] | [Người 20 - Họ tên]")
+        doc.save(folder / f"{key}.docx")
+    return folder
+
+
+@pytest.fixture()
+def inheritance_people_case():
+    def make(count):
+        people = [_person(i, f"Người thử {i:02}") for i in range(1, count + 1)]
+        return _make_case(
+            people[0],
+            properties=[_prop(so_serial="", so_thua_dat="901",
+                              so_to_ban_do="09")],
+            case_state=_case_state(*people, nodes=[]))
+    return make
+
+
+@pytest.mark.parametrize("count", [20, 21, 25])
+@pytest.mark.parametrize("folder_mode", [False, True], ids=["catalog", "folder"])
+def test_inheritance_people_export_limit_per_document(
+        tmp_path, synthetic_limit_templates, inheritance_people_case,
+        count, folder_mode):
+    case = inheritance_people_case(count)
+    folder = synthetic_limit_templates
+    specs = wbe.scan_template_dir(folder) if folder_mode else None
+    keys = ([spec.document_key for spec in specs] if folder_mode else
+            ["khai_nhan_di_san", "thoa_thuan_phan_chia"])
+    resolve = (wbe.template_path_resolver(folder) if folder_mode else
+               lambda key: folder / f"{key}.docx")
+    options = _docs_by_key(wbe.export_options(
+        case, resolve_template=resolve, doc_specs=specs))
+    for key in keys:
+        assert options[key]["ready"] is (count == 20)
+        assert options[key]["block_reason"] == (
+            None if count == 20 else "word.too_many_people")
+
+    destination = tmp_path / "output"
+    destination.mkdir()
+    if count == 20:
+        result = _batch(case, keys, destination,
+                        resolve_template=resolve, doc_specs=specs)
+        assert result["breakdown"]["succeeded"] == keys
+        for entry in result["documents"]:
+            text = Document(entry["output_file"]["path"]).paragraphs[0].text
+            assert text == "Người thử 01 | Người thử 20"
+        return
+
+    with pytest.raises(wbe.WordBatchError) as failure:
+        _batch(case, keys, destination,
+               resolve_template=resolve, doc_specs=specs)
+    assert failure.value.code == "word_batch_failed"
+    result = failure.value.result_data
+    assert result["breakdown"] == {"succeeded": [], "failed": keys, "skipped": []}
+    assert len(result["documents"]) == 2
+    for entry in result["documents"]:
+        assert entry["status"] == "failed"
+        assert entry["output_file"] is None
+        assert entry["error"] == {
+            "code": "word.too_many_people", "message": "Quá 20 người trong Stage"}
+    assert list(destination.iterdir()) == []
+
+
+def test_export_limit_exception_uses_catalog_message(inheritance_people_case):
+    context = word_engine.build_word_context(inheritance_people_case(25))
+    code, message = wbe._doc_error_from(
+        word_engine.WordExportValidationError("Danh sách Stage vượt quá 20 người"),
+        context, static=True)
+    assert (code, message) == ("word.too_many_people", "Quá 20 người trong Stage")
+
+
+def test_export_error_message_has_no_python_exception_prefix(tmp_path):
+    def resolve(_key):
+        raise ValueError("Không thể đọc mẫu")
+
+    with pytest.raises(wbe.WordBatchError) as failure:
+        _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path,
+               resolve_template=resolve)
+    entry, = failure.value.result_data["documents"]
+    assert entry["error"] == {
+        "code": "word.render_failed", "message": "Không thể đọc mẫu"}

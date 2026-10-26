@@ -446,9 +446,9 @@ class JobStore:
                         error=error_object(
                 exc.code, exc.message, exc.retryable, exc.next_action,
                 job.job_id, exc.details))
-        except Exception as exc:  # noqa: BLE001 — boundary cuoi cung
+        except Exception:  # noqa: BLE001 — boundary cuoi cung
             job._finish("failed", error=error_object(
-                "engine_internal_error", f"{type(exc).__name__}: {exc}",
+                "engine_internal_error", "Lỗi nội bộ của engine nghiệp vụ",
                 retryable=True, job_id=job.job_id))
 
     def drain(self, timeout=8):

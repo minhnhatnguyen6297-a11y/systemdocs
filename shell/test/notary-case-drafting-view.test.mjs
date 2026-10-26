@@ -904,6 +904,48 @@ test('MIN-136 error catalog: code → thông điệp thân thiện + rule ẩn',
       `ma ${c} title van la snake_case`);
   }
 });
+
+test('error catalog hides unexpected engine details but preserves raw diagnostics', () => {
+  const message = 'ValueError: RuntimeError: lỗi dữ liệu tổng hợp';
+  const error = { code: 'engine_internal_error', message, retryable: true };
+  const described = ERRORS.describeError(error);
+  assert.equal(described.title, 'Lỗi nội bộ của engine nghiệp vụ');
+  assert.equal(described.raw, message);
+  assert.equal(described.code, error.code);
+  assert.equal(described.retryable, true);
+  assert.equal(ERRORS.errText(error), described.title);
+  assert.equal(ERRORS.toastErrorText(error, 'ready'), described.title);
+});
+
+test('error catalog strips nested Python prefixes only from unknown-code display', () => {
+  for (const message of [
+    'ValueError: Không lưu được hồ sơ',
+    ' RuntimeError: ValueError: Không lưu được hồ sơ',
+    'notary.errors.WorkspaceError: Exception: Không lưu được hồ sơ',
+    'Error: Không lưu được hồ sơ',
+  ]) {
+    const error = { code: 'future_backend_error', message };
+    const described = ERRORS.describeError(error);
+    assert.equal(described.title, 'Không lưu được hồ sơ');
+    assert.equal(described.raw, message);
+    assert.equal(ERRORS.errText(error), described.title);
+    assert.equal(ERRORS.toastErrorText(error, 'ready'), described.title);
+  }
+  assert.equal(ERRORS.errText({
+    code: 'future_backend_error', message: 'ValueError: RuntimeError: ',
+  }), 'Lỗi không xác định');
+  const message = 'Nhãn: thông báo nghiệp vụ giữ nguyên';
+  assert.equal(ERRORS.errText({ code: 'future_backend_error', message }), message);
+});
+
+test('word people limit uses the Vietnamese catalog message and keeps raw diagnostics', () => {
+  const message = 'ValueError: word.too_many_people';
+  const error = { code: 'word.too_many_people', message };
+  const described = ERRORS.describeError(error);
+  assert.equal(described.title, 'Quá 20 người trong Stage');
+  assert.equal(described.raw, message);
+  assert.equal(ERRORS.errText(error), described.title);
+});
 test('toast formatter uses friendly titles and suppresses startup engine errors', () => {
   const err = { code: 'engine_unavailable',
     message: 'sidecar chua san sang' };
@@ -2601,6 +2643,27 @@ test('N9: bảng mapping Word gốc không in row_id', async (t) => {
   assert.match(box.textContent, /Người A/);
   assert.doesNotMatch(box.textContent, /11111111-1111-4111-8111-111111111111/,
     'N9: không in mã dòng nội bộ lên dialog');
+});
+
+test('original Word options errors use friendly messages without Python prefixes', async (t) => {
+  const model = wordModelStub();
+  model.state.docxImport = { version: 1, sources: [
+    { source_id: 'src-1', label: 'Hợp đồng gốc' }] };
+  model.hasUnsaved = () => false;
+  model.loadWordOptions = async () => ({
+    ok: false,
+    error: {
+      code: 'future_backend_error',
+      message: 'WordExportValidationError: Không tải được vị trí Word',
+    },
+  });
+  const pickFiles = async () => ({ ok: true, data: { files: [] } });
+  const { ctx, cap } = wordDialogCtx(t, { model, pickFiles });
+  ctx.errText = ERRORS.errText;
+  WORD.createWordDialog(ctx).open();
+  await findBtns(cap.box, 'Dùng hợp đồng Word đã nhập')[0].onclick();
+  assert.match(cap.box.textContent, /Không tải được vị trí Word/);
+  assert.doesNotMatch(cap.box.textContent, /WordExportValidationError:/);
 });
 
 test('R14: Xuất Word — spinner tại nút Xuất rồi tích xanh tại chỗ', async (t) => {

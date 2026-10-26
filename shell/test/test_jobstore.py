@@ -96,6 +96,21 @@ class JobStoreTest(unittest.TestCase):
     def tearDown(self):
         self.store.drain(timeout=2)
 
+    def test_unexpected_error_has_generic_wire_message(self):
+        def handler(job, payload):
+            raise ValueError("RuntimeError: lỗi dữ liệu tổng hợp")
+
+        job = self.store.submit(
+            "unexpected-error", "notary.workspace_save_case", handler, {})
+        snap = wait_terminal(self.store, job.job_id)
+        self.assertEqual(snap["status"], "failed")
+        self.assertEqual(snap["error"]["code"], "engine_internal_error")
+        self.assertEqual(
+            snap["error"]["message"], "Lỗi nội bộ của engine nghiệp vụ")
+        self.assertNotIn("Error:", snap["error"]["message"])
+        self.assertTrue(snap["error"]["retryable"])
+        self.assertEqual(snap["error"]["job_id"], job.job_id)
+
     def test_conversion_atomic_success_refuses_cancel_racing_commit(self):
         entered = threading.Event()
         release = threading.Event()

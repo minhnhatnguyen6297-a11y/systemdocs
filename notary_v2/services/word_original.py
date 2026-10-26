@@ -134,8 +134,7 @@ def validate_context(context, stage, store, *, read_only=False):
 
 def validate_new_bindings(case, context, previous, store):
     """Check new confirmations against the composed committed rows/seats before DB commit."""
-    snapshot = materialize_case_state(case)
-    values = word_engine.build_template_mapping(case, static=True)
+    snapshot = values = None
     old = {(s['source_id'], json.dumps(b, sort_keys=True), json.dumps(next((r for r in s['records'] if r['candidate_id'] == b['candidate_id']), {}), sort_keys=True))
            for s in (previous or {}).get('sources', []) for b in s['bindings']}
     for source in context.get('sources', []):
@@ -145,6 +144,9 @@ def validate_new_bindings(case, context, previous, store):
             record = next(r for r in source['records'] if r['candidate_id'] == binding['candidate_id'])
             if (source['source_id'], json.dumps(binding, sort_keys=True), json.dumps(record, sort_keys=True)) in old:
                 continue
+            if values is None:
+                snapshot = materialize_case_state(case)
+                values = word_engine.build_binding_mapping(case)
             candidate = candidates[binding['candidate_id']]
             ref = next(r for r in candidate['fields'][binding['field_key']]['source_refs'] if r['occurrence_id'] == binding['occurrence_id'])
             slot = slot_for(snapshot, candidate['target'], record['row_id'], binding['field_key'], ref, record)
@@ -201,7 +203,7 @@ def binding_proposals(case, source_id, store):
     content, package = store.load(source_id, source["sha256"])
     reader = read_docx(content)
     candidates = {s["suggestion_id"]: s for s in package["suggestions"]}
-    values = word_engine.build_template_mapping(case, static=True)
+    values = word_engine.build_binding_mapping(case)
     proposals = []
     for record in source["records"]:
         candidate = candidates[record["candidate_id"]]
@@ -226,15 +228,26 @@ def binding_proposals(case, source_id, store):
 
 
 def export_original(case, source_id, store, destination, *, check_cancel=None):
+    from pathlib import Path
+    dest = Path(destination)
+    spec = batch.WordDocumentSpec("original.docx", "Hợp đồng Word gốc", "hop_dong_goc", True)
+    reason = word_engine.word_block_reason(
+        word_engine.build_word_context(case), static=True)
+    if reason is not None:
+        entry = batch._failed_entry(spec, reason, batch._block_message(reason))
+        data = batch._batch_data(
+            dest, [entry], succeeded=[], failed=[spec.document_key], skipped=[])
+        raise batch.WordBatchError(
+            "word_batch_failed", "Toàn bộ văn bản trong lượt xuất đều lỗi",
+            details={"documents": [{"document_key": spec.document_key,
+                                   **entry["error"]}]},
+            result_data=data)
     missing = []
     try:
         rendered, _ = reviewed_template(case, source_id, store,
                                         missing=missing)
     except (ValueError, OSError, KeyError, TypeError) as exc:
         raise batch.WordBatchError("word.original_mapping_invalid", str(exc)) from exc
-    from pathlib import Path
-    dest = Path(destination)
-    spec = batch.WordDocumentSpec("original.docx", "Hợp đồng Word gốc", "hop_dong_goc", True)
     temp = None
     try:
         temp = batch._temp_file_in(dest, prefix=".word_export_", suffix=".docx")
