@@ -732,15 +732,18 @@ Mặc định theo luật (D-019). Cột "Lệch" chỉ ghi khi owner đã chố
 | Vợ/chồng người chết trước | Không thế vị (652) | Ô chỉ để biểu diễn | Không (D-016) |
 | Thoả thuận phân chia | Văn bản (656) | `giữ phần`/`nhường phần` theo tài sản | Không (D-008) |
 | Nhánh không còn ai nhận | Thoả thuận do các bên | Chia lại trong cùng vòng | Lệch (D-011): theo ý user |
-| Từ chối nhận di sản | Văn bản riêng (620) | Không hỗ trợ; không suy từ nhường | **chờ quyết định** (Q-005) |
-| Không được quyền hưởng / truất quyền | 621; di chúc | Không hỗ trợ | **chờ quyết định** (Q-005) |
+| Người thế vị từ chối/không nhận | Về người thừa kế còn lại theo 651–652 (620 cho phép từ chối) | Ở lại nhánh; hết nhánh mới ra cả hàng (engine đang làm vậy) | **Đề xuất D-025, chờ owner xác nhận** |
+| Từ chối nhận di sản | Văn bản riêng (620) | Chủ đất / người nhận / còn lại mặc định "từ chối"; user sửa tay | Lệch (D-024): quá phức tạp; không làm văn bản 620 |
+| Không được quyền hưởng / truất quyền | 621; di chúc | Không mô hình hoá | Lệch (D-024) |
 | Tài sản chung vợ chồng | Chia đôi, nửa người chết là di sản (HNGĐ 33, 66) | Hai vợ chồng cùng Chủ, chia đều | Không (D-017) |
-| Tỷ lệ sở hữu không đều | Theo giấy tờ/thoả thuận (612) | Chia đều | **chờ quyết định** (Q-001) |
-| Vợ/chồng đang ly hôn, tái hôn sau | Vẫn thừa kế (655) | Một `spouseSlotId`, không lịch sử | **chờ quyết định** (Q-003) |
-| Con nuôi, con riêng | 653, 654 | Không phân loại; tối đa 2 cha/mẹ | **chờ quyết định** (Q-004) |
-| Di chúc, phần bắt buộc, thai nhi | 644, 613 | `unsupported` | **chờ quyết định** (Q-007) |
-| Lưu/xuất khi chưa `complete` | Không quy định | Không bao giờ chặn | Kỹ thuật (D-002); code còn chặn |
-| Luật áp dụng theo ngày mở | Luật tại thời điểm mở | Chỉ BLDS 2015 | **chờ quyết định** (Q-002) |
+| Tỷ lệ sở hữu không đều | Theo giấy tờ/thoả thuận (612) | Chia đều giữa chủ đất hiện tại | Lệch (D-020): thực tế hồ sơ |
+| Vợ/chồng đang ly hôn, tái hôn sau | Vẫn thừa kế (655) | Chỉ vợ/chồng hợp pháp cuối cùng; vợ/chồng cũ chỉ để phân biệt con | Lệch (D-022): người cũ không còn liên quan |
+| Con nuôi, con riêng | 653, 654 | Con = đẻ + nuôi; hưởng từ cha/mẹ được gắn tên | Lệch (D-023): đơn giản hoá, user tự gắn |
+| Di chúc, phần bắt buộc | 644 | Không làm (chỉ thừa kế theo pháp luật) | Giới hạn phạm vi (D-026) |
+| Thai nhi | 613 | Bỏ qua; chỉ người có giấy tờ | Lệch (D-026): khách tự chịu trách nhiệm |
+| Người ký | Người thừa kế ký thoả thuận (656) | Không tính; ai trong Stage là liên quan | Lệch (D-027): không can thiệp |
+| Lưu/xuất khi chưa `complete` | Không quy định | Không bao giờ chặn, kể cả lỗi cấu trúc | Kỹ thuật (D-002, D-030); code còn chặn |
+| Luật áp dụng theo ngày mở | Luật tại thời điểm mở | Chỉ BLDS 2015, không logic theo phiên bản | Lệch tạm (D-021); Q-002 còn mở, ưu tiên thấp |
 
 ## 16. Câu hỏi mở Q-xxx
 
@@ -750,17 +753,19 @@ luật trả lời được đã thành D-xxx (ngày chỉ năm, chết cùng ng
 Còn lại là lựa chọn nghiệp vụ thật. Hỏi theo D-018: gom một lượt; trả lời xong
 ghi D-xxx và đổi dòng dưới thành `Đã chốt → D-xxx`.
 
+Cập nhật 26/10/2026: owner trả lời lượt 1 (D-020…D-030). Cột "Khuyến nghị" giữ nguyên để lưu vết; quyết định thật xem D-xxx.
+
 | Q | Câu hỏi | Bối cảnh | Mặc định luật | Khuyến nghị + lý do | Ảnh hưởng code | Phương án | Trạng thái |
 |---|---|---|---|---|---|---|---|
-| Q-001 | Nhập tỷ lệ sở hữu từng người trên từng tài sản? | Code chia đều; giấy tờ thật có tỷ lệ | Di sản = phần của người chết (BLDS 612); trong hôn nhân không chứng minh riêng thì là chung (HNGĐ 33.3) | Cho nhập tỷ lệ tổng = 1, mặc định chia đều, có ô căn cứ — hồ sơ thật cần | Thêm tỷ lệ theo người × tài sản; engine thôi `1/len(owners)` | A chia đều mãi · B nhập tỷ lệ · C chỉ cảnh báo | chờ quyết định |
-| Q-002 | Thừa kế mở trước 01/01/2017 tính theo luật nào? | Hồ sơ đất có người chết từ lâu | Luật tại thời điểm mở (chưa đọc điều khoản chuyển tiếp) | Tính theo BLDS 2015 + cảnh báo "mở trước 2017, kiểm tra luật cũ" — quy tắc hàng 1/thế vị gần như giữ nguyên | Thêm cảnh báo theo ngày | A cảnh báo · B bỏ qua · C hỗ trợ nhiều phiên bản luật | chờ quyết định |
-| Q-003 | Biểu diễn tư cách vợ/chồng theo thời gian? | Một `spouseSlotId`; tái hôn, đang ly hôn, không đăng ký | Đang ly hôn/tái hôn sau khi chết vẫn thừa kế (655); hôn nhân chấm dứt khi chết (HNGĐ 65) | Thêm danh sách hôn nhân có ngày bắt đầu/kết thúc; giai đoạn đầu trả `multiple_spouse_chain` | Đổi schema wire v3, engine, UI | A giữ một vợ/chồng · B lịch sử hôn nhân · C cờ "vợ/chồng tại ngày chết" | chờ quyết định |
-| Q-004 | Cha mẹ đẻ + nuôi + con riêng; một người nhiều quan hệ có nhiều suất? | Tối đa 2 cha/mẹ, không loại | 653, 654 cho thừa kế; luật không nói rõ nhiều suất | Thêm loại quan hệ; một người một suất mỗi vòng; chưa có thì `parent_capacity_exceeded` | Schema `parentSlotIds` có loại | A giữ 2 slot · B slot có loại · C không hỗ trợ | chờ quyết định |
-| Q-005 | Có nhập từ chối hợp pháp / không được quyền hưởng / truất quyền không? | Chỉ có `nhường phần` | 620 (văn bản), 621, 651.3 (hàng sau chỉ khi hàng trước không còn) | Chưa hỗ trợ, giữ `unsupported` cho tới khi có mẫu văn bản — tránh suy nhầm | Thêm cờ + chứng cứ, chia lại theo luật | A unsupported · B cờ theo người · C cờ + file chứng cứ | chờ quyết định |
-| Q-006 | Người thế vị từ chối hợp pháp: chia lại trong nhánh hay cả vòng? | D-011 chỉ chốt cho `nhường phần` | Phần từ chối chia theo pháp luật cho người cùng hàng/vị (650, 651) — cần chuyên gia xác nhận | Trong nhánh trước, hết nhánh mới ra vòng — theo cấu trúc 652 | Engine bước chia lại | A trong nhánh · B cả vòng | chờ quyết định |
-| Q-007 | Di chúc, phần bắt buộc, thai nhi, hàng 2–3: Word ghi gì khi máy không tính? | `unsupported` | 644, 613, 651 | Xuất Word có nhãn "cần công chứng viên tự tính", không điền phân số | Template Word nhánh `unsupported` | A nhãn · B để trống · C nhập tay phân số | chờ quyết định |
-| Q-008 | Ai phải ký dù không nhận tài sản? | Công thức "người không nhận" của UI | Thoả thuận bằng văn bản của những người thừa kế (656) | Mọi người có suất trong vòng (kể cả người nhường) đều ký | Danh sách người ký từ engine | A mọi người có suất · B chỉ người nhận + người nhường | chờ quyết định |
-| Q-009 | Mã 1.1.x thể hiện gì? | Lẫn thế vị với chuyển tiếp; không có lịch sử | Không quy định | Mã = đường nhánh suất; chuyển tiếp mở mã gốc mới cho di sản của người chết sau; giữ bảng lịch sử, không tái dùng số | Bảng mã hiển thị riêng | A nhánh · B di sản nguồn · C số thứ tự văn bản | chờ quyết định |
-| Q-010 | 3 hay 5 tài sản mỗi hồ sơ? | UI 3, Word 5 | Không quy định | Thống nhất một số (đề xuất 5 nếu template đã có) | `MAX_ASSETS`, schema, UI | A 3 · B 5 · C không giới hạn | chờ quyết định |
-| Q-011 | Xoá gốc khi vợ/chồng còn sống; một node chung trên hai nhánh di sản? | Gỡ node trả về Pool (D-009) | Không quy định | Xoá gốc chỉ gỡ node gốc, giữ người còn sống; một `personId` nhiều vai (D-005) | Prune trong diagram | A giữ · B gỡ cả cụm | chờ quyết định |
-| Q-012 | Lỗi cấu trúc (vòng tổ tiên thật, vợ/chồng xung đột) có được lưu? | D-002 nói không chặn; code chặn `diagram_invalid_state` | Không quy định | Lưu dữ liệu nguyên trạng với `status: invalid`, Word in nhãn lỗi — đúng D-002 | Bỏ chặn server+client; sửa 2 bug (spouse một chiều, `ancestry_cycle` nhầm) | A lưu + nhãn · B chặn riêng lỗi cấu trúc | chờ quyết định |
+| Q-001 | Nhập tỷ lệ sở hữu từng người trên từng tài sản? | Code chia đều; giấy tờ thật có tỷ lệ | Di sản = phần của người chết (BLDS 612); trong hôn nhân không chứng minh riêng thì là chung (HNGĐ 33.3) | Cho nhập tỷ lệ tổng = 1, mặc định chia đều, có ô căn cứ — hồ sơ thật cần | Thêm tỷ lệ theo người × tài sản; engine thôi `1/len(owners)` | A chia đều mãi · B nhập tỷ lệ · C chỉ cảnh báo | Đã chốt → D-020 |
+| Q-002 | Thừa kế mở trước 01/01/2017 tính theo luật nào? | Hồ sơ đất có người chết từ lâu | Luật tại thời điểm mở (chưa đọc điều khoản chuyển tiếp) | Tính theo BLDS 2015 + cảnh báo "mở trước 2017, kiểm tra luật cũ" — quy tắc hàng 1/thế vị gần như giữ nguyên | Thêm cảnh báo theo ngày | A cảnh báo · B bỏ qua · C hỗ trợ nhiều phiên bản luật | Mở, ưu tiên thấp — tạm theo D-021; cần giải thích lại cho owner |
+| Q-003 | Biểu diễn tư cách vợ/chồng theo thời gian? | Một `spouseSlotId`; tái hôn, đang ly hôn, không đăng ký | Đang ly hôn/tái hôn sau khi chết vẫn thừa kế (655); hôn nhân chấm dứt khi chết (HNGĐ 65) | Thêm danh sách hôn nhân có ngày bắt đầu/kết thúc; giai đoạn đầu trả `multiple_spouse_chain` | Đổi schema wire v3, engine, UI | A giữ một vợ/chồng · B lịch sử hôn nhân · C cờ "vợ/chồng tại ngày chết" | Đã chốt → D-022 |
+| Q-004 | Cha mẹ đẻ + nuôi + con riêng; một người nhiều quan hệ có nhiều suất? | Tối đa 2 cha/mẹ, không loại | 653, 654 cho thừa kế; luật không nói rõ nhiều suất | Thêm loại quan hệ; một người một suất mỗi vòng; chưa có thì `parent_capacity_exceeded` | Schema `parentSlotIds` có loại | A giữ 2 slot · B slot có loại · C không hỗ trợ | Đã chốt → D-023 |
+| Q-005 | Có nhập từ chối hợp pháp / không được quyền hưởng / truất quyền không? | Chỉ có `nhường phần` | 620 (văn bản), 621, 651.3 (hàng sau chỉ khi hàng trước không còn) | Chưa hỗ trợ, giữ `unsupported` cho tới khi có mẫu văn bản — tránh suy nhầm | Thêm cờ + chứng cứ, chia lại theo luật | A unsupported · B cờ theo người · C cờ + file chứng cứ | Đã chốt → D-024 |
+| Q-006 | Người thế vị từ chối hợp pháp: chia lại trong nhánh hay cả vòng? | D-011 chỉ chốt cho `nhường phần` | Phần từ chối chia theo pháp luật cho người cùng hàng/vị (650, 651) — cần chuyên gia xác nhận | Trong nhánh trước, hết nhánh mới ra vòng — theo cấu trúc 652 | Engine bước chia lại | A trong nhánh · B cả vòng | Đề xuất D-025 — chờ owner xác nhận |
+| Q-007 | Di chúc, phần bắt buộc, thai nhi, hàng 2–3: Word ghi gì khi máy không tính? | `unsupported` | 644, 613, 651 | Xuất Word có nhãn "cần công chứng viên tự tính", không điền phân số | Template Word nhánh `unsupported` | A nhãn · B để trống · C nhập tay phân số | Đã chốt → D-026 |
+| Q-008 | Ai phải ký dù không nhận tài sản? | Công thức "người không nhận" của UI | Thoả thuận bằng văn bản của những người thừa kế (656) | Mọi người có suất trong vòng (kể cả người nhường) đều ký | Danh sách người ký từ engine | A mọi người có suất · B chỉ người nhận + người nhường | Đã chốt → D-027 |
+| Q-009 | Mã 1.1.x thể hiện gì? | Lẫn thế vị với chuyển tiếp; không có lịch sử | Không quy định | Mã = đường nhánh suất; chuyển tiếp mở mã gốc mới cho di sản của người chết sau; giữ bảng lịch sử, không tái dùng số | Bảng mã hiển thị riêng | A nhánh · B di sản nguồn · C số thứ tự văn bản | Đã chốt → D-028 |
+| Q-010 | 3 hay 5 tài sản mỗi hồ sơ? | UI 3, Word 5 | Không quy định | Thống nhất một số (đề xuất 5 nếu template đã có) | `MAX_ASSETS`, schema, UI | A 3 · B 5 · C không giới hạn | Đã chốt → D-029 |
+| Q-011 | Xoá gốc khi vợ/chồng còn sống; một node chung trên hai nhánh di sản? | Gỡ node trả về Pool (D-009) | Không quy định | Xoá gốc chỉ gỡ node gốc, giữ người còn sống; một `personId` nhiều vai (D-005) | Prune trong diagram | A giữ · B gỡ cả cụm | Mở — owner chưa hiểu câu hỏi, cần diễn đạt lại |
+| Q-012 | Lỗi cấu trúc (vòng tổ tiên thật, vợ/chồng xung đột) có được lưu? | D-002 nói không chặn; code chặn `diagram_invalid_state` | Không quy định | Lưu dữ liệu nguyên trạng với `status: invalid`, Word in nhãn lỗi — đúng D-002 | Bỏ chặn server+client; sửa 2 bug (spouse một chiều, `ancestry_cycle` nhầm) | A lưu + nhãn · B chặn riêng lỗi cấu trúc | Đã chốt → D-030 |

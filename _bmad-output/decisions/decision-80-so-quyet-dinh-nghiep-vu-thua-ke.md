@@ -44,7 +44,7 @@ review BLDS 2015) tổng hợp trong brainstorm "Kiến trúc Diagram trong So�
 - **Nguồn:** brainstorm (d) phương án B.
 
 ### D-004 — ID ổn định; mã 1.1.x chỉ là nhãn hiển thị
-- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt · **Loại:** kỹ thuật
+- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt; phần "ý nghĩa mã" đã chốt ở D-028 · **Loại:** kỹ thuật
 - **Quyết định:** quan hệ, phân bổ, lịch sử bám `personId`/`nodes[].id` (và `estateId`/`allocationId` khi có — chưa có trong code). Không bao giờ suy quan hệ hay quyền hưởng từ mã 1.1.x.
 - **Lý do:** mã đổi khi sắp lại cây; ID không đổi.
 - **Hệ quả:** ý nghĩa mã cần chốt riêng (Q-009).
@@ -96,13 +96,13 @@ review BLDS 2015) tổng hợp trong brainstorm "Kiến trúc Diagram trong So�
 - **Nguồn:** BR §6.1.
 
 ### D-013 — Đồng chủ sở hữu mặc định chia đều
-- **Trạng thái:** Đã chốt cho code hiện tại · **Loại:** lệch nghiệp vụ (quy ước sản phẩm)
-- **Quyết định:** `Fraction(1, len(owners))` khi chưa có tỷ lệ. Nhập tỷ lệ riêng: Q-001.
+- **Trạng thái:** Đã chốt; owner xác nhận lại ở D-020 (Q-001) · **Loại:** lệch nghiệp vụ (quy ước sản phẩm)
+- **Quyết định:** `Fraction(1, len(owners))`. Không nhập tỷ lệ riêng (D-020).
 - **Lý do:** đa số hồ sơ đất là hai vợ chồng, chia đôi trùng HNGĐ 66.
 - **Nguồn:** BR §3.1; engine :276.
 
 ### D-014 — `nhường phần` không phải từ chối nhận di sản
-- **Trạng thái:** Đã chốt · **Loại:** luật (620)
+- **Trạng thái:** Đã chốt; **sửa một phần bởi D-024** (nhóm "người còn lại" mang nhãn nghiệp vụ "từ chối" — vẫn không phải văn bản từ chối 620) · **Loại:** luật (620)
 - **Quyết định:** không suy "người từ chối" từ việc bỏ tick Nhận; cấm nhãn "từ chối/khước từ/waive". Word để `legal_refusal_people=[]`.
 - **Hệ quả:** `/export-word-legacy` vẫn ghi "từ chối" — phải gỡ.
 - **Nguồn:** HT2; BR §2.
@@ -130,3 +130,83 @@ review BLDS 2015) tổng hợp trong brainstorm "Kiến trúc Diagram trong So�
 - **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** lệch nghiệp vụ (nguyên tắc)
 - **Quyết định:** khi chưa có quyết định, app làm theo luật. Owner được chọn lệch; mục lệch phải là D-xxx loại `lệch nghiệp vụ` có lý do.
 - **Nguồn:** owner 26/10/2026.
+
+### D-020 — Đồng sở hữu: chia đều giữa các chủ đất hiện tại (Q-001)
+- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** lệch nghiệp vụ
+- **Bối cảnh:** luật: di sản là phần của người chết theo giấy tờ/thoả thuận (BLDS 612); tài sản chung vợ chồng chia đôi (HNGĐ 66).
+- **Quyết định:** mặc định chia đều tài sản cho những người đang là chủ đất. Không thêm ô nhập tỷ lệ.
+- **Lý do:** owner: thực tế hồ sơ; khi chỉ có hai vợ chồng thì trùng luật (chia đôi).
+- **Hệ quả:** giữ `1/len(owners)` (D-013). Lệch luật khi giấy tờ ghi tỷ lệ không đều — công chứng viên tự xử lý ngoài app.
+- **Nguồn:** owner 26/10/2026, trả lời Q-001.
+
+### D-021 — Không có logic theo phiên bản luật; áp quy tắc hiện hành (Q-002, tạm)
+- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt tạm (owner); Q-002 vẫn mở, ưu tiên thấp, cần giải thích lại · **Loại:** lệch nghiệp vụ (giới hạn)
+- **Bối cảnh:** luật áp dụng là luật tại thời điểm mở thừa kế; người chết trước 01/01/2017 có thể thuộc BLDS 2005/1995.
+- **Quyết định:** engine không phân nhánh theo phiên bản luật; luôn áp quy tắc BLDS 2015.
+- **Lý do:** owner: thực tế chưa từng vướng; quy định hàng thừa kế/thế vị ổn định giữa luật cũ và mới.
+- **Hệ quả:** không thêm cảnh báo theo ngày. Cần giải thích lại cho owner: câu hỏi chỉ là "nếu người chết trước 2017 thì có điểm nào luật cũ khác không" (ví dụ quy định chuyển tiếp) — hiện không biết điểm khác nào ảnh hưởng hồ sơ đất.
+- **Nguồn:** owner 26/10/2026, trả lời Q-002.
+
+### D-022 — Chỉ lưu vợ/chồng hợp pháp cuối cùng; vợ/chồng cũ chỉ để phân biệt con (Q-003)
+- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** lệch nghiệp vụ
+- **Bối cảnh:** luật: người đang ly hôn chưa có hiệu lực, hoặc tái hôn sau khi người kia chết, vẫn thừa kế (655).
+- **Quyết định:** một `spouseSlotId` = vợ/chồng hợp pháp cuối cùng. Không lưu lịch sử hôn nhân. Vợ/chồng cũ (nếu nhập) **không** có suất; chỉ dùng để biết con là con chung hay con riêng (gắn cha/mẹ của con, D-023).
+- **Lý do:** owner: về pháp lý vợ/chồng cũ không còn liên quan.
+- **Hệ quả:** không làm phương án lịch sử hôn nhân. Trường hợp 655 (đang ly hôn, tái hôn sau) user tự xác định ai là "vợ/chồng cuối cùng hợp pháp" khi nhập.
+- **Nguồn:** owner 26/10/2026, trả lời Q-003.
+
+### D-023 — "Con" gồm con đẻ và con nuôi; con hưởng từ cha/mẹ được gắn tên (Q-004)
+- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** lệch nghiệp vụ (đơn giản hoá)
+- **Bối cảnh:** luật có 653 (con nuôi), 654 (con riêng – bố dượng/mẹ kế có nuôi dưỡng).
+- **Quyết định:** không phân loại đẻ/nuôi. Mỗi con trong diagram gắn tên cha, tên mẹ (được để trống). Con đã gắn với cha/mẹ nào thì hưởng di sản của người đó. Không gắn = không hưởng từ người đó.
+- **Lý do:** owner: đủ cho thực tế, giảm nhập liệu.
+- **Hệ quả:** giữ tối đa 2 cha/mẹ, không thêm loại quan hệ. Con riêng hưởng từ bố dượng/mẹ kế (654) chỉ khi user tự gắn — lệch luật có chủ đích, user chịu trách nhiệm.
+- **Nguồn:** owner 26/10/2026, trả lời Q-004.
+
+### D-024 — Ba nhóm: chủ đất · người nhận · còn lại mặc định "từ chối" (Q-005)
+- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** lệch nghiệp vụ (cố ý)
+- **Bối cảnh:** luật có từ chối bằng văn bản (620), không được quyền hưởng (621), truất quyền qua di chúc.
+- **Quyết định:** mọi người chia thành **chủ đất / người nhận / những người còn lại**; nhóm còn lại mặc định là người từ chối. Khác biệt thì user sửa tay. App **không** mô hình hoá từ chối hợp pháp, không được quyền hưởng, truất quyền.
+- **Lý do:** owner: làm rõ các trường hợp này quá phức tạp cho hệ thống.
+- **Hệ quả:** sửa một phần D-014: được dùng nhãn "từ chối" cho nhóm còn lại như nhãn nghiệp vụ; app vẫn không tạo/kiểm văn bản từ chối 620. Việc nhóm còn lại có phải lập văn bản từ chối hay không do công chứng viên quyết. Phần của người "từ chối" chia lại theo D-025 (đề xuất).
+- **Nguồn:** owner 26/10/2026, trả lời Q-005.
+
+### D-025 — Người thế vị từ chối: chia lại trong nhánh trước, hết nhánh mới ra cả hàng (Q-006, ĐỀ XUẤT)
+- **Ngày:** 26/10/2026 · **Trạng thái:** **Đề xuất — chờ owner xác nhận** · **Loại:** luật (cách hiểu) + khớp D-024
+- **Bối cảnh:** owner nhờ Mika đề xuất. Luật: 620 cho phép từ chối (văn bản, trước khi chia); BLDS không có điều riêng về chia lại phần bị từ chối trong thừa kế theo pháp luật (650.1(c) nói về người thừa kế theo di chúc từ chối) → phần đó về những người thừa kế theo pháp luật còn lại theo 651–652; 651.2 người cùng hàng hưởng bằng nhau; 652 cháu/chắt hưởng **phần mà cha/mẹ lẽ ra được hưởng** — tức phần đó gắn với vị trí (nhánh) của người chết trước. 623 chỉ là thời hiệu, không ảnh hưởng.
+- **Đề xuất:** người thế vị (cháu/chắt) từ chối/không nhận → phần đó ở lại nhánh, chia đều cho những người thế vị còn nhận **cùng nhánh** (theo từng cấp). Chỉ khi cả nhánh không còn ai nhận thì phần nhánh mới chia cho các suất còn lại của hàng 1 trong cùng vòng (trùng D-011).
+- **Lý do:** đúng cấu trúc 652 (cả nhánh thay một suất), không làm thay đổi phần của nhánh khác; **engine hiện đã làm đúng như vậy** (`descendant_plan` bỏ người không nhận khỏi nhánh rồi chia đều người còn lại; nhánh rỗng thì không thành đơn vị, `first_line_units` chia cho đơn vị còn lại) → không phải sửa code; áp chung cho "từ chối" mặc định của D-024 và `nhường phần`.
+- **Hệ quả nếu chọn "cả hàng":** phải đổi engine, và một cháu từ chối sẽ làm tăng phần của chú/bác — trái tinh thần 652.
+- **Nguồn:** Mika 26/10/2026; `inheritance_engine.py` :308-342.
+
+### D-026 — Chỉ thừa kế theo pháp luật; không di chúc, không phần bắt buộc; bỏ qua thai nhi (Q-007)
+- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** giới hạn phạm vi (di chúc) + lệch nghiệp vụ (thai nhi)
+- **Bối cảnh:** 644 (phần bắt buộc) thuộc thừa kế theo di chúc; 613 người thành thai trước khi người để lại di sản chết và sinh ra còn sống vẫn được thừa kế.
+- **Quyết định:** hồ sơ chỉ làm thừa kế theo pháp luật. Không xử lý thai nhi: chỉ người có giấy tờ cá nhân mới được đưa vào; khách hàng chịu trách nhiệm về việc thành thai.
+- **Hệ quả:** không làm template Word cho nhánh di chúc. Hàng 2–3 vẫn `unsupported` (chưa có quyết định đổi).
+- **Nguồn:** owner 26/10/2026, trả lời Q-007.
+
+### D-027 — Không xét ai ký; ai có tên trong Stage là người liên quan (Q-008)
+- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** lệch nghiệp vụ (không can thiệp)
+- **Quyết định:** app không tính danh sách người phải ký. Ai có tên trong Stage được coi là người liên quan; app không can thiệp thực tế ký.
+- **Nguồn:** owner 26/10/2026, trả lời Q-008.
+
+### D-028 — Bỏ bộ mã 1.x.x làm định danh; nhánh lấy từ engine (Q-009)
+- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner, có điều kiện — điều kiện đã kiểm) · **Loại:** kỹ thuật
+- **Quyết định owner:** mã 1.1.x chỉ là gợi ý ghi nhãn; nếu engine đã nhận diện hàng/tầng/nhánh chính xác thì không cần.
+- **Kiểm engine (26/10/2026):** engine chỉ tính hàng 1 (cha mẹ, vợ/chồng, con; hàng 2/3 không có). Mỗi phần nhận có `kind` (`inheritance`/`representation`), `sourcePersonId` (vòng di sản nguồn) và `viaBranchPersonIds` (đường nhánh qua người chết trước) → **nhánh và người thuộc nhánh nào được xác định chính xác**, chuyển tiếp (vòng mới) và thế vị tách rõ. Không có field "hàng"/"tầng" riêng, nhưng suy ra được (độ dài `via` = tầng; hàng luôn 1).
+- **Kết luận:** bỏ 1.x.x làm định danh/nguồn sự thật. Nếu cần nhãn hiển thị thì sinh từ `sourcePersonId` + `viaBranchPersonIds`.
+- **Ghi chú:** engine không tự dừng ở chắt (D-012) — chưa thấy kiểm độ sâu trong `descendant_plan`; việc code sau.
+- **Nguồn:** owner 26/10/2026; `inheritance_engine.py` :308-360.
+
+### D-029 — Tối đa 3 tài sản mỗi hồ sơ (Q-010)
+- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** kỹ thuật
+- **Quyết định:** 3 tài sản.
+- **Hệ quả (việc code sau, chưa sửa):** `word_engine.py` có `MAX_WORD_ASSETS = 5`, UI là 3 — phải thống nhất về 3.
+- **Nguồn:** owner 26/10/2026, trả lời Q-010.
+
+### D-030 — Lỗi cấu trúc vẫn được lưu (Q-012)
+- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** kỹ thuật (khớp D-002)
+- **Quyết định:** lưu nguyên trạng kể cả khi có lỗi cấu trúc, `status: invalid`, có nhãn.
+- **Hệ quả (việc code sau):** code/contract vẫn chặn `diagram_invalid_state` và README §8 ghi "invalid: save bị chặn" — xung đột còn nguyên.
+- **Nguồn:** owner 26/10/2026, trả lời Q-012.
