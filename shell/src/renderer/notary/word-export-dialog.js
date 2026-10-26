@@ -39,6 +39,13 @@ const WORD_BLOCK_LABEL = {
   'file_not_found': 'Không tìm thấy file',
 };
 
+// Có chữ cho user (message hoặc mục catalog) thì dùng; mã trần thì không.
+function WORD_ERROR_HAS_TEXT(e) {
+  const cat = typeof window !== 'undefined' && window.G1_NOTARY_ERRORS;
+  return !!(e && (e.message ||
+    (cat && cat.ERROR_CATALOG && e.code && cat.ERROR_CATALOG[e.code])));
+}
+
 function createWordDialog(ctx) {
   const model = ctx.model;
   const L = ctx.lib;
@@ -425,9 +432,11 @@ function createWordDialog(ctx) {
           scanning = false;
           if (!r.ok) {
             listBox.innerHTML = '';
-            listBox.append(h('div', 'error', errText(r.error || {
-              message: 'Không tải được các vị trí Word',
-            })));
+            // Mã lỗi không kèm message/catalog vẫn phải nói đúng việc đang hỏng.
+            const e = r.error || {};
+            const known = WORD_ERROR_HAS_TEXT(e);
+            listBox.append(h('div', 'error',
+              known ? errText(e) : 'Không tải được các vị trí Word'));
             refreshScanLock(); return;
           }
           tplLabel.textContent = 'Mẫu: hợp đồng Word gốc đã lưu trong hồ sơ';
