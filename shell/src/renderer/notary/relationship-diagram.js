@@ -86,6 +86,19 @@ const CALC_STATUS_LABEL = {
   complete: 'Hoàn chỉnh', incomplete: 'Chưa đủ điều kiện',
   invalid: 'Không hợp lệ', unsupported: 'Chưa hỗ trợ',
 };
+const INCOMPLETE_ERROR_CODES = new Set([
+  'missing_land_owner', 'invalid_death_date',
+]);
+
+function displayCalcStatus(renderModel) {
+  if (renderModel.status === 'invalid' &&
+      Array.isArray(renderModel.errors) && renderModel.errors.length &&
+      renderModel.errors.every((error) =>
+        INCOMPLETE_ERROR_CODES.has(error && error.code))) {
+    return 'incomplete';
+  }
+  return renderModel.status;
+}
 
 // So cho canonical cua node two_party (p16 = dau Ben B); null neu khong
 // phai id canonical.
@@ -393,17 +406,19 @@ function createDiagramPane(ctx) {
   function slotTag(n) {
     if (!n) return '—';
     if (SLOT_LABEL[n.id]) return SLOT_LABEL[n.id];
-    const m = /^child_(\d+)$/.exec(n.id || '');
-    if (m) return `Con ${m[1]}`;
-    return n.id;
+    if (/^child(?:_|$)/.test(n.id || '')) {
+      const m = /^child_(\d+)$/.exec(n.id || '');
+      return m ? `Con ${m[1]}` : 'Con';
+    }
+    if (/^[a-z]+_[a-z]+$/.test(n.id || '')) return 'Ô trống';
+    return n.id || 'Ô trống';
   }
-
   // Ten ngan de tham chieu slot: ten nguoi neu da gan, nhan slot neu
   // trong.
   function refName(n) {
     if (!n) return '—';
     if (n.personId) return personName(n.personId);
-    return slotTag(n);
+    return SLOT_LABEL[n.id] || slotTag(n);
   }
 
   // Vai tro hien thi tu quan he draft da khai bao — presentation only,
@@ -411,15 +426,15 @@ function createDiagramPane(ctx) {
   // khong: parentSlotIds la tap cha/me).
   function roleLabel(n) {
     if (n.id === 'owner') return 'Người để lại';
+    const sp = nodeById(n.spouseSlotId) ||
+      liveNodes().find((k) => k.spouseSlotId === n.id);
+    if (sp) return `vợ/chồng của ${refName(sp)}`;
     const kids = liveNodes().filter(
       (k) => (k.parentSlotIds || []).includes(n.id));
     if (kids.length) {
       const names = kids.slice(0, 2).map(refName).join(', ');
       return `cha/mẹ của ${names}${kids.length > 2 ? '…' : ''}`;
     }
-    const sp = nodeById(n.spouseSlotId) ||
-      liveNodes().find((k) => k.spouseSlotId === n.id);
-    if (sp) return `vợ/chồng của ${refName(sp)}`;
     const ps = (n.parentSlotIds || []).map(nodeById).filter(Boolean);
     if (ps.length) return `con của ${ps.map(refName).join(' + ')}`;
     return SLOT_LABEL[n.id] || '';
@@ -810,7 +825,7 @@ function createDiagramPane(ctx) {
       const lb = h('span', 'cd-posrow-label', label);
       lb.title = full;
       wrap.append(lb);
-      for (const pos of [1, 2, 3]) {
+      for (const pos of window.G1_NOTARY_MODEL.POSITIONS) {
         const on = Array.isArray(arr) && arr.includes(pos);
         const chip = btn(`${pos}`,
           `cd-poschip${on ? ' on' : ''}`, () => {
@@ -1070,10 +1085,11 @@ function createDiagramPane(ctx) {
       box.append(face(L.faceEmpty('Chưa có kết quả tính.')));
       return box;
     }
-    const statusLabel = CALC_STATUS_LABEL[rm.status] || rm.status;
+    const status = displayCalcStatus(rm);
+    const statusLabel = CALC_STATUS_LABEL[status] || status;
     box.append(h('div', 'cd-calc-status',
       `Trạng thái tính: ${statusLabel}`));
-    if (rm.status === 'unsupported') {
+    if (status === 'unsupported') {
       box.append(h('div', 'cd-badge cd-badge-warn',
         'Chưa hỗ trợ — đây không phải kết quả đã tính'));
     }
@@ -1354,9 +1370,10 @@ function createDiagramPane(ctx) {
       const rm = s.renderModel;
       // Trạng thái chỉ-đọc cho mọi kết quả engine đã lưu (kể cả complete)
       // — §9.6; không mutate draft, không gọi evaluate.
-      if (CALC_STATUS_LABEL[rm.status]) {
+      const status = displayCalcStatus(rm);
+      if (CALC_STATUS_LABEL[status]) {
         extra.append(h('div', 'muted warn-text',
-          `Trạng thái tính: ${CALC_STATUS_LABEL[rm.status]}`));
+          `Trạng thái tính: ${CALC_STATUS_LABEL[status]}`));
       }
       for (const req of rm.requiredSlots || []) {
         const anchor = nodeById(req.anchorSlotId);
@@ -1370,7 +1387,7 @@ function createDiagramPane(ctx) {
       }
       // Loi engine cua render_model da luu; save vua bi tu choi da co
       // diagramErrors rieng nen khong lap lai.
-      if (rm.status === 'invalid' && !(s.diagramErrors || []).length) {
+      if (status === 'invalid' && !(s.diagramErrors || []).length) {
         for (const e of rm.errors || []) {
           errSlot.append(h('div', 'error small', errText(e)));
         }

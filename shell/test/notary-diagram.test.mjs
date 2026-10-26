@@ -233,10 +233,11 @@ test('chip own/receive doc lap, multi-select, disable > so asset', async () => {
   assert.equal(rows.length, 2);
   const chipsOf = (r) => collect(r, (e) =>
     e.classList.contains('cd-poschip'));
-  assert.equal(chipsOf(rows[0]).length, 3);
-  assert.equal(chipsOf(rows[1]).length, 3);
-  // Chip pos 3 disabled (chi co 2 asset).
+  assert.equal(chipsOf(rows[0]).length, M.POSITIONS.length);
+  assert.equal(chipsOf(rows[1]).length, M.POSITIONS.length);
+  // Positions beyond the two current assets stay visible but disabled.
   assert.equal(chipsOf(rows[0])[2].disabled, true);
+  assert.equal(chipsOf(rows[0])[4].disabled, true);
   // Toggle receive/1 → own khong doi.
   chipsOf(rows[1])[0].click();
   let n = model.state.diagram.nodes.find((x) => x.id === 'father');
@@ -1099,6 +1100,66 @@ test('removed default child slot stays tombstoned; new required slot can assign 
   await new Promise(resolve => setTimeout(resolve, 650));
 });
 
+test('inheritance labels never expose slot ids; spouse empty slot names its spouse', async (t) => {
+  const nodes = [
+    { id: 'owner', personId: 'c1', parentSlotIds: ['father', 'mother'],
+      spouseSlotId: 'spouse', ownPositions: [], receivePositions: [] },
+    { id: 'father', personId: null, parentSlotIds: [],
+      spouseSlotId: null, ownPositions: [], receivePositions: [] },
+    { id: 'mother', personId: null, parentSlotIds: [],
+      spouseSlotId: null, ownPositions: [], receivePositions: [] },
+    { id: 'spouse', personId: null, parentSlotIds: [],
+      spouseSlotId: 'owner', ownPositions: [], receivePositions: [] },
+    { id: 'child_owner', personId: null,
+      parentSlotIds: ['owner', 'spouse'], spouseSlotId: null,
+      ownPositions: [], receivePositions: [] },
+  ];
+  const { view } = await build(t, { mode: 'case', seed: {
+    people: [{ row_id: 'c1', ho_ten: 'Người để lại',
+      ngay_chet: '2020-01-01' }],
+    assets: [{ row_id: 'a1', so_serial: 'S1' }],
+    nodes,
+  } });
+  const spouse = collect(view.el, (e) =>
+    e.dataset.nodeId === 'spouse')[0];
+  assert.match(spouse.getAttribute('aria-label'), /vợ\/chồng của Người để lại/);
+  const internalId = /[a-z]+_[a-z]+/;
+  for (const node of byCls(view.el, 'cd-node')) {
+    assert.doesNotMatch(node.textContent, internalId);
+    for (const el of collect(node, () => true).concat(node)) {
+      for (const attr of ['label', 'aria-label', 'title']) {
+        assert.doesNotMatch(el.getAttribute(attr) || '', internalId);
+      }
+    }
+  }
+});
+
+test('missing-data invalid status renders as incomplete in cue and calc panel', async (t) => {
+  const incomplete = {
+    engineVersion: 2, status: 'invalid', allocations: {}, breakdowns: [],
+    requiredSlots: [], warnings: [],
+    errors: [{ code: 'missing_land_owner' },
+      { code: 'invalid_death_date' }],
+    unresolvedEstates: [], conservation: {},
+  };
+  const { model, view } = await build(t, { mode: 'case',
+    client: { run: async (cmd) => ({ ok: true, data:
+      cmd === 'notary.diagram_evaluate'
+        ? { render_model: structuredClone(incomplete) } : {} }) },
+    seed: { people: [
+      { row_id: 'c1', ho_ten: 'Người chưa đặt lên sơ đồ', ngay_chet: null },
+    ], assets: [{ row_id: 'a1' }], nodes: seedSlots() },
+  });
+  model.state.renderModel = incomplete;
+  view.refresh();
+  assert.match(view.el.textContent,
+    /Trạng thái tính: Chưa đủ điều kiện/);
+  await findBtns(view.el, 'Xem cách tính')[0].onclick();
+  assert.match(view.el.textContent,
+    /Trạng thái tính: Chưa đủ điều kiện/);
+  assert.doesNotMatch(view.el.textContent,
+    /Trạng thái tính: Không hợp lệ/);
+});
 // ---------- R16/N2/N3/N5/N6: nhãn hiển thị tối giản ----------
 
 test('N3/N5/N6: tên trống một nhãn, năm sống chỉ năm sinh, không badge %', async () => {
