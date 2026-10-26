@@ -13,6 +13,7 @@
 
 const api = window.desktop && window.desktop.v1;
 const L = window.G1_LIB;
+const ERRORS = window.G1_NOTARY_ERRORS;
 
 // Fail-visible: thieu bridge/lib thi bao loi ro thay vi man hinh trang.
 if (!api || !L) {
@@ -59,6 +60,10 @@ function notify(text, isError) {
   item.setAttribute('role', 'status');
   box.append(item);
   setTimeout(() => item.remove(), 6000);
+}
+function notifyError(error) {
+  const text = ERRORS.toastErrorText(error, sidecarStatus.state);
+  if (text) notify(text, true);
 }
 
 // MIN-133 D3: #statusbar da bo — trang thai engine/version/contract hien o
@@ -197,7 +202,7 @@ async function confirmCancel(d) {
   cancelPending.add(d.jobId);
   const r = await api.cancelJob(d.jobId);
   cancelPending.delete(d.jobId);
-  if (!r.ok) notify(`${r.error.code}: ${r.error.message}`, true);
+  if (!r.ok) notifyError(r.error);
 }
 
 async function retryJob(jobId) {
@@ -287,7 +292,7 @@ async function submit(command, payload, commandId) {
   // nhan doi side effect (idempotency, contract §5).
   const r = await api.submitCommand(command, payload, commandId);
   if (!r.ok) {
-    notify(`${r.error.code}: ${r.error.message}`, true);
+    notifyError(r.error);
     return null;
   }
   jobs.set(r.data.job_id, r.data);
@@ -309,7 +314,7 @@ function engineSlotEl() {
   const retry = el('button', '', 'Thử lại kết nối');
   retry.onclick = async () => {
     const r = await api.restartEngine();
-    if (!r.ok) notify(`${r.error.code}: ${r.error.message}`, true);
+    if (!r.ok) notifyError(r.error);
   };
   return faceEl(
     L.faceUnavailable('Engine',
@@ -547,7 +552,7 @@ function openPathBtn(path, label) {
   const b = el('button', '', label || 'Mở file');
   b.onclick = async () => {
     const r = await api.openPath(path);
-    if (!r.ok) notify(`${r.error.code}: ${r.error.message}`, true);
+    if (!r.ok) notifyError(r.error);
   };
   return b;
 }

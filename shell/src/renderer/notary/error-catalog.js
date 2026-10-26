@@ -256,6 +256,15 @@ function describeError(err) {
 function errText(err) {
   return describeError(err).title;
 }
+// Toast errors use the same user-facing catalog; startup unavailability is
+// already represented by the engine banner and must not leave a stale toast.
+function toastErrorText(err, engineState) {
+  if (err && err.code === 'engine_unavailable' &&
+      (engineState === 'starting' || engineState === 'restarting')) {
+    return null;
+  }
+  return errText(err);
+}
 
 // Mã lỗi thuộc vùng sơ đồ/engine — R13 định tuyến dòng lỗi về vùng
 // Sơ đồ thay vì card Stage. `stage_validation_error` chỉ rơi vào đây khi
@@ -279,7 +288,7 @@ function isDiagramError(code) {
 }
 
 const G1_NOTARY_ERRORS = { ERROR_CATALOG, describeError, errText,
-                           isDiagramError };
+                           toastErrorText, isDiagramError };
 
 if (typeof window !== 'undefined') window.G1_NOTARY_ERRORS = G1_NOTARY_ERRORS;
 if (typeof module !== 'undefined' && module.exports) {
