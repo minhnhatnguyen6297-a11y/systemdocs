@@ -104,7 +104,7 @@ test('capacity retains cards; ambiguous value requires review; land rows decode 
   const row = model.acceptSuggestion(candidate.suggestion_id);
   assert.equal(row.so_serial, 'YY123456');
   assert.equal(row.land_rows[0].loai_dat, 'ONT');
-  model.addAsset({ so_serial: 'AA123456' }); model.addAsset({ so_serial: 'BB123456' });
+  for (const s of ['AA123456', 'BB123456', 'CC123456', 'DD123456']) model.addAsset({ so_serial: s });
   const overflow = suggestion(); model.state.suggestions.push(overflow);
   assert.equal(model.acceptSuggestion(overflow.suggestion_id), null);
   assert.equal(model.state.suggestions.length, 1);
@@ -397,7 +397,7 @@ test('old original export returns stale and cannot clear busy or results of new 
 
 test('review dialog displays evidence and capacity rejection keeps the visible card', async () => {
   const model = M.createModel({ client: { run: async () => ({ ok: true }) } }); await model.newDraft();
-  for (let i = 0; i < 3; i++) model.addAsset({ so_serial: 'AA123456' });
+  for (let i = 0; i < 5; i++) model.addAsset({ so_serial: 'AA123456' });
   model.state.suggestions.push(suggestion());
   const { ctx, box } = dialogContext(model); INTAKE.createIntakeDialog(ctx).open();
   assert.match(box.textContent, /Xem chữ gốc và vị trí/);

@@ -151,22 +151,22 @@ test('action bar: case thật — chỉ một Lưu hồ sơ trên card Sơ đồ
 
 // ---------- asset columns ----------
 
-test('asset table: add tạo cột Tài sản N + input data-fid; tối đa 3', async () => {
+test('asset table: add renders 5 columns and disables at the 5-asset limit', async () => {
   const { model, view } = await build(test);
   const addBtn = findBtns(view.el, '+ Tài sản')[0];
-  for (let i = 0; i < 3; i++) addBtn.onclick();
-  assert.equal(model.state.stage.assets.length, 3);
+  for (let i = 0; i < M.MAX_ASSETS; i += 1) addBtn.onclick();
+  assert.equal(model.state.stage.assets.length, M.MAX_ASSETS);
   const cols = collect(view.el,
     (e) => e.classList.contains('cd-asset-col'));
-  assert.equal(cols.length, 3);
-  const a0 = model.state.stage.assets[0];
-  assert.ok(fid(view.el, `a:${a0.row_id}:so_thua_dat`),
+  assert.equal(cols.length, M.MAX_ASSETS);
+  const a0 = model.state.stage.assets[0].row_id;
+  assert.ok(fid(view.el, `a:${a0}:so_thua_dat`),
     'thiếu input data-fid cho so_thua_dat');
-  assert.ok(fid(view.el, `a:${a0.row_id}:land`),
+  assert.ok(fid(view.el, `a:${a0}:land`),
     'thiếu land chip data-fid');
   const addBtn2 = findBtns(view.el, '+ Tài sản')[0];
-  assert.equal(addBtn2.disabled, true, 'quá 3 cột vẫn cho thêm');
-  // Không render field v1.
+  assert.equal(addBtn2.disabled, true, 'quá 5 cột vẫn cho thêm');
+  assert.equal(addBtn2.title, 'Tối đa 5 tài sản');
   assert.ok(!collect(view.el, (e) =>
     /is_primary|isLandOwner|willReceive/.test(e.textContent)).length);
 });
@@ -903,6 +903,15 @@ test('MIN-136 error catalog: code → thông điệp thân thiện + rule ẩn',
     assert.ok(!/^[a-z_]+$/.test(dd.title) || dd.title === 'Lỗi không xác định',
       `ma ${c} title van la snake_case`);
   }
+});
+test('toast formatter uses friendly titles and suppresses startup engine errors', () => {
+  const err = { code: 'engine_unavailable',
+    message: 'sidecar chua san sang' };
+  assert.equal(ERRORS.toastErrorText(err, 'starting'), null);
+  assert.equal(ERRORS.toastErrorText(err, 'restarting'), null);
+  const text = ERRORS.toastErrorText(err, 'ready');
+  assert.equal(text, 'Engine nghiệp vụ chưa sẵn sàng');
+  assert.doesNotMatch(text, /engine_unavailable|sidecar chua san sang/);
 });
 
 test('MIN-136 date: ISO ↔ dd/mm/yyyy; loai ngay khong ton tai', async () => {

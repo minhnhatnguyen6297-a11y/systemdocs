@@ -126,7 +126,7 @@ def _call(fn_name, payload):
 
 def _node(nid, person_id=None, parents=(), spouse=None,
           own=(), receive=(), hidden=False, deleted=False):
-    """diagram node v3 (§13.4) — ownPositions/receivePositions ⊆ {1,2,3}."""
+    """diagram node v3 (§13.4) — ownPositions/receivePositions ⊆ {1..5}."""
     return {
         "id": nid, "personId": person_id,
         "parentSlotIds": list(parents), "spouseSlotId": spouse,
@@ -645,7 +645,8 @@ class TestWorkspaceCreate:
     def test_asset_limit_create(self):
         p = _create_payload()
         p["stage"]["assets"] += [
-            _mk_asset(so_serial=f"MM{i + 1:06d}") for i in range(3)]
+            _mk_asset(so_serial=f"MM{i + 1:06d}")
+            for i in range(mock.MAX_ASSETS)]
         with pytest.raises(CommandError) as exc:
             _call("workspace_create", p)
         assert exc.value.code == "stage_validation_error"
@@ -942,19 +943,24 @@ class TestCommitStage:
         assert assets[0]["entity_id"] != assets[1]["entity_id"]
 
     def test_asset_limit(self):
-        """§13.3: toi da 3 asset — dong thu 4 -> asset_limit field error
+        """§13.3: toi da 5 asset — dong thu 6 -> asset_limit field error
         gan row_id dong thua."""
         mock.reset_backend(_load_fixture("empty.json"))
         rid = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
-        assets = [self._asset(f"aaaaaaa{i}-1111-4111-8111-11111111111{i}",
-                              serial=f"MM{i:06d}") for i in range(1, 5)]
+        assets = [self._asset(
+            f"aaaaaaa{i}-1111-4111-8111-11111111111{i}",
+            serial=f"MM{i:06d}") for i in range(1, 7)]
         payload = self._payload(people=[self._person(rid)],
-                                owner_row_id=rid, assets=assets)
+                                owner_row_id=rid, assets=assets[:5])
+        saved = _call("workspace_commit_stage", payload)
+        assert len(saved["data"]["stage"]["assets"]) == 5
+        payload["base_revision"] = saved["data"]["revision"]
+        payload["stage"]["assets"] = assets
         with pytest.raises(CommandError) as exc:
             _call("workspace_commit_stage", payload)
         fe = exc.value.details["field_errors"]
         over = [e for e in fe if e["code"] == "asset_limit"]
-        assert over and over[0]["row_id"] == assets[3]["row_id"]
+        assert over and over[0]["row_id"] == assets[5]["row_id"]
 
     def test_is_primary_key_rejected(self):
         mock.reset_backend(_load_fixture("empty.json"))
@@ -1330,7 +1336,7 @@ class TestDiagram:
     def test_evaluate_position_out_of_range(self):
         mock.reset_backend(_load_fixture("ready.json"))
         state = _ready_state()
-        state["nodes"][1]["receivePositions"] = [4]
+        state["nodes"][1]["receivePositions"] = [6]
         with pytest.raises(CommandError) as exc:
             _call("diagram_evaluate",
                   {"case_id": 42, "diagram": {"state": state}})

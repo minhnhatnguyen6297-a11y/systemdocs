@@ -49,9 +49,9 @@ CASE_TYPES = (CASE_TYPE_INHERITANCE, CASE_TYPE_TWO_PARTY)
 DOCUMENT_TYPES = ("khai_nhan", "thoa_thuan")
 DOCUMENT_TYPES_TWO_PARTY = ("chuyen_nhuong", "tang_cho",
                             "cho_thue", "dat_coc")
-MAX_ASSETS = 3
+MAX_ASSETS = 5
 MAX_PEOPLE_TWO_PARTY = 30
-POSITIONS = (1, 2, 3)
+POSITIONS = tuple(range(1, MAX_ASSETS + 1))
 TWO_PARTY_IDS = tuple(f"p{i}" for i in range(1, 31))
 TWO_PARTY_ID_SET = set(TWO_PARTY_IDS)
 

@@ -233,9 +233,10 @@ function fakeClient(seed) {
                   code: 'required', message: 'bat buoc' });
       }
     }
-    if (assets.length > 3) {
-      fe.push({ row_id: assets[3].row_id, field: 'assets',
-                code: 'asset_limit', message: 'toi da 3' });
+    if (assets.length > M.MAX_ASSETS) {
+      fe.push({ row_id: assets[M.MAX_ASSETS].row_id, field: 'assets',
+                code: 'asset_limit',
+                message: `toi da ${M.MAX_ASSETS}` });
     }
     const pLimit = isTp(c) ? 30 : 20;
     if (people.length > pLimit) {
@@ -1297,14 +1298,14 @@ test('saveCase: stage_validation_error → fieldErrors theo row_id, stage giu dr
   assert.equal(model.fieldErrorsFor(row.row_id).length, 0);
 });
 
-test('asset_limit — dong thu 4 bi tu choi o client', async () => {
+test('asset_limit — cho phép 5 tài sản, từ chối tài sản thứ 6 ở client', async () => {
   const { model } = makeModel(seedCases('empty'));
   await model.openCase(43);
-  assert.ok(model.addAsset({ so_serial: 'MM000001' }));
-  assert.ok(model.addAsset({ so_serial: 'MM000002' }));
-  assert.ok(model.addAsset({ so_serial: 'MM000003' }));
-  assert.equal(model.addAsset({ so_serial: 'MM000004' }), null);  // MAX_ASSETS=3
-  assert.equal(model.state.stage.assets.length, 3);
+  for (let i = 1; i <= M.MAX_ASSETS; i += 1) {
+    assert.ok(model.addAsset({ so_serial: `MM${String(i).padStart(6, '0')}` }));
+  }
+  assert.equal(model.addAsset({ so_serial: 'MM000006' }), null);
+  assert.equal(model.state.stage.assets.length, M.MAX_ASSETS);
 });
 
 test('asset serial: new/cleared rỗng giữ "" và wire gửi chuỗi rỗng', async () => {
@@ -1688,7 +1689,7 @@ test('branch removal does not remove canonical two-party slots', async () => {
   assert.equal(model.state.diagramDirty, dirty);
 });
 
-test('toggleNodePosition: own/receive doc lap, dedupe, chan ngoai {1..3}', async () => {
+test('toggleNodePosition: own/receive doc lap, dedupe, chan ngoai {1..5}', async () => {
   const { model } = makeModel(seedCases('ready'));
   await model.openCase(42);
   const spouse = model.state.diagram.nodes.find((n) => n.id === 'spouse');
@@ -1707,7 +1708,7 @@ test('toggleNodePosition: own/receive doc lap, dedupe, chan ngoai {1..3}', async
   assert.equal(model.toggleNodePosition('spouse', 'own', 3), true);
   assert.deepEqual(spouse.ownPositions, []);
   // chan tham so la
-  assert.equal(model.toggleNodePosition('spouse', 'own', 4), false);
+  assert.equal(model.toggleNodePosition('spouse', 'own', 6), false);
   assert.equal(model.toggleNodePosition('spouse', 'bogus', 1), false);
   assert.equal(model.toggleNodePosition('khong-co', 'own', 1), false);
 });

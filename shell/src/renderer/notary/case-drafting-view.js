@@ -15,7 +15,7 @@
  *     text này độc lập với chấm dirty (Done vẫn Đã lưu khi có sửa chưa ghi).
  *   - Không card Thông tin hồ sơ (D2): document_type theo mặc định model,
  *     ngay_lap_ho_so backend tự điền, noi_niem_yet/ghi_chu null.
- *   - Stage: Tài sản bảng chuyển vị (mỗi tài sản MỘT CỘT, tối đa 3) /
+ *   - Stage: Tài sản bảng chuyển vị (mỗi tài sản MỘT CỘT, tối đa 5) /
  *     Người bảng dòng (mỗi người MỘT HÀNG, 7 cột theo DB Customer — D1).
  *     table-layout fixed + colgroup, KHÔNG thanh cuộn trong Stage (D8).
  *   - Kéo-thả đổi vị trí cột tài sản / hàng người + đường bàn phím
@@ -967,7 +967,7 @@ function createNotaryModuleView(deps) {
     return grip;
   }
 
-  // --- Bảng chuyển vị Tài sản: mỗi tài sản MỘT CỘT (tối đa 3) ---
+  // --- Bảng chuyển vị Tài sản: mỗi tài sản MỘT CỘT (tối đa MAX_ASSETS) ---
 
   function removeAssetAt(a, idx) {
     const total = model.state.stage.assets.length;
@@ -1939,10 +1939,11 @@ function createNotaryModuleView(deps) {
     aHead.append(cardTitle('Tài sản', s.stage.assets.length));
     const aTools = h('div', 'card-tools');
     const addA = btn('+ Tài sản', 'secondary sm', () => model.addAsset());
-    // Tối đa 3 asset (§13.3) — hết slot thì disable nút thêm.
-    const assetFull = s.stage.assets.length >= 3;
+    // Tối đa MAX_ASSETS asset (§13.3) — hết slot thì disable nút thêm.
+    const maxAssets = window.G1_NOTARY_MODEL.MAX_ASSETS;
+    const assetFull = s.stage.assets.length >= maxAssets;
     addA.disabled = !model.canWrite() || assetFull;
-    if (assetFull) addA.title = 'Tối đa 3 tài sản';
+    if (assetFull) addA.title = `Tối đa ${maxAssets} tài sản`;
     aTools.append(addA);
     aHead.append(aTools);
     ac.append(aHead);

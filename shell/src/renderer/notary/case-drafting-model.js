@@ -22,9 +22,9 @@ const CASE_TYPE_TWO_PARTY = 'two_party';
 const CASE_TYPES = [CASE_TYPE_INHERITANCE, CASE_TYPE_TWO_PARTY];
 const MOCK_BANNER = 'Dữ liệu mô phỏng';
 const DIAGRAM_VERSION = 3;
-const MAX_ASSETS = 3;
+const MAX_ASSETS = 5;
 const MAX_PEOPLE_TWO_PARTY = 30;
-const POSITIONS = [1, 2, 3];
+const POSITIONS = Array.from({ length: MAX_ASSETS }, (_, i) => i + 1);
 const TWO_PARTY_IDS = Array.from({ length: 30 }, (_, i) => `p${i + 1}`);
 
 // Field whitelist theo contract §13.3/§13.4 — strip field la truoc khi
@@ -527,7 +527,7 @@ function createModel(deps) {
   // Pool = nguoi cua Stage dang sua chua gan tren Diagram dang sua.
   // Nguoi vua them/sua xuat hien ngay, khong doi commit. Tai san khong
   // xuong Pool — khong co flow gan tai san len node; diagram chi tham
-  // chieu qua ownPositions/receivePositions (vi tri 1..3).
+  // chieu qua ownPositions/receivePositions (vi tri 1..MAX_ASSETS).
   function pool() {
     const assigned = diagramPersonIds();
     return {
@@ -1153,7 +1153,7 @@ function createModel(deps) {
 
   function addAsset(fields) {
     if (!canWrite()) return null;
-    // Toi da 3 asset; vi tri = index+1 trong mang (contract §13.3).
+    // Toi da MAX_ASSETS asset; vi tri = index+1 trong mang (contract §13.3).
     if (state.stage.assets.length >= MAX_ASSETS) return null;
     const row = newAssetRow(uuid, fields);
     state.stage.assets.push(row);
