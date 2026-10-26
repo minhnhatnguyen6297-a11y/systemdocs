@@ -4,6 +4,7 @@ G1-SM chi chap nhan path tuyet doi tren may nay; UNC bi tu choi o moi dang:
 \\\\server\\share, \\\\?\\UNC\\server\\share (dang extended cua UNC).
 Prefix \\\\?\\ cho local drive duoc phep (long path, finding F2 cua P1).
 """
+import os
 import re
 from pathlib import Path
 
@@ -39,7 +40,9 @@ def validate_file_ref(ref):
         raise CommandError(
             "file_scope_not_supported",
             "UNC path bi tu choi trong G1-SM (mot may)")
-    if not (path.startswith(_LONG_PREFIX) or _ABS_DRIVE.match(path)):
+    posix_absolute = os.name != "nt" and path.startswith("/") and not path.startswith("//")
+    if not (path.startswith(_LONG_PREFIX) or _ABS_DRIVE.match(path)
+            or posix_absolute):
         raise CommandError(
             "file_scope_not_supported",
             "path khong tuyet doi")

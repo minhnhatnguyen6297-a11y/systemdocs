@@ -8,6 +8,7 @@ import unicodedata
 import unittest
 import uuid
 from pathlib import Path
+from unittest.mock import patch
 
 import openpyxl
 
@@ -19,6 +20,7 @@ from services.document_intake import (
     analyze,
 )
 from services.document_intake.docx_source import read_docx
+from services.document_intake import service as document_intake_service
 
 
 def _sid(n):
@@ -287,6 +289,29 @@ class SourceValidationTests(unittest.TestCase):
         with self.assertRaises(IntakeError) as cm:
             analyze([src])
         self.assertEqual(cm.exception.code, "file_scope_not_supported")
+
+    def test_posix_absolute_path_accepted_only_on_non_windows(self):
+        with patch.object(document_intake_service.os, "name", "posix"):
+            source = {
+                "source_id": _sid(1),
+                "kind": "pdf",
+                "file_ref": {
+                    "path": "/tmp/x.docx",
+                    "scope": "machine_local",
+                    "size_bytes": 1,
+                },
+            }
+            self.assertEqual(
+                document_intake_service._validate_sources([source])[0].path,
+                "/tmp/x.docx",
+            )
+
+            for path in ("tmp/x.docx", "//server/share/x.docx"):
+                source["file_ref"]["path"] = path
+                with self.subTest(path=path):
+                    with self.assertRaises(IntakeError) as cm:
+                        document_intake_service._validate_sources([source])
+                    self.assertEqual(cm.exception.code, "file_scope_not_supported")
 
     def test_relative_path_rejected(self):
         src = {

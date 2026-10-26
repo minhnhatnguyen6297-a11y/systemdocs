@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 from pathlib import Path
 from time import perf_counter
@@ -76,7 +77,8 @@ def _is_unc(path: str) -> bool:
 
 
 def _is_abs(path: str) -> bool:
-    return path.startswith(_LONG_PREFIX) or bool(_ABS_DRIVE.match(path))
+    posix_absolute = os.name != "nt" and path.startswith("/") and not path.startswith("//")
+    return path.startswith(_LONG_PREFIX) or bool(_ABS_DRIVE.match(path)) or posix_absolute
 
 
 def _validate_sources(sources: Any) -> list[SourceSpec]:
