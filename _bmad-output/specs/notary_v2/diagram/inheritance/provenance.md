@@ -27,6 +27,7 @@ not presented as Internet-derived answers.
 
 ## Legal reference
 
-The statutory baseline is BLDS 2015 Articles 619, 620, 621, 644, 650, 651,
-652, and 658. Official text:
+The statutory baseline (BLDS 2015 Art. 611–658, HNGĐ 2014 Art. 33, 43, 65, 66,
+forward inheritance vs representation) is summarised with links in
+[`legal-baseline.md`](./legal-baseline.md). Official text:
 https://vbpl.moj.gov.vn/toaannhandantoicao/Pages/vbpq-toanvan.aspx?ItemID=95942&Keyword=91%2F2015%2FQH13

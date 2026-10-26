@@ -83,6 +83,11 @@ ngược Stage/Pool/Diagram.
 
 ## 9. Câu hỏi và lịch sử
 
+- Sổ quyết định D-xxx: [`decision-80`](../../../../decisions/decision-80-so-quyet-dinh-nghiep-vu-thua-ke.md).
+  Câu hỏi mở Q-xxx: [`business-rules.md` §16](./business-rules.md#16-câu-hỏi-mở-q-xxx).
+  Điều luật: [`legal-baseline.md`](./legal-baseline.md). D-002 (không chặn
+  lưu/xuất) đã chốt; mục "Quy tắc lưu/xuất khi `incomplete`" dưới đây chỉ còn là
+  việc đồng bộ contract/code.
 - Các lựa chọn “Nhận 1/2/3”, contract A/B và quyền sở hữu per-asset cần data
   model được duyệt; không suy từ `willReceive`/`isLandOwner` cũ.
 - Nghiệp vụ từ chối, không nhận, thừa kế thế vị và ngoại lệ phải được owner/legal
@@ -104,6 +109,7 @@ ngược Stage/Pool/Diagram.
 - [`business-rules.md`](./business-rules.md) — Draft mới nhất.
 - [`engine.md`](./engine.md) — contract kỹ thuật/đối chiếu implementation.
 - [`examples.md`](./examples.md) và [`provenance.md`](./provenance.md) — phụ lục.
+- [`legal-baseline.md`](./legal-baseline.md) — điều luật BLDS 2015 / HNGĐ 2014 có link.
 - [`case-state-parked.md`](./case-state-parked.md) — bản thiết kế lưu state cũ
   đang tạm gác, chỉ để hiểu nguyên nhân lỗi và lựa chọn từng cân nhắc.
 - `contracts/notary-case-drafting.md` §13.

@@ -15,12 +15,26 @@
 | Artifact workflow | `_bmad-output/` |
 | Lịch sử | `_bmad-output/archive/` |
 | Quan hệ code | `graphify-out/` |
+| Sổ quyết định nghiệp vụ thừa kế (D-xxx) | `_bmad-output/decisions/decision-80-so-quyet-dinh-nghiep-vu-thua-ke.md` |
+| Điều luật thừa kế (BLDS 2015, HNGĐ 2014) | `_bmad-output/specs/notary_v2/diagram/inheritance/legal-baseline.md` |
+| Câu hỏi mở (Q-xxx), bảng luật ↔ app | `business-rules.md` §15–§16 (cùng thư mục) |
 
 - Spec quyết định hành vi; code chứng minh hiện trạng. Đổi hành vi thì cập nhật
   spec liên quan trước khi sửa code.
 - Ghi quyết định của owner vào `_bmad-output/decisions/` trong phiên hiện tại.
   Task, handoff và file tạm nằm trong `_bmad-output/tmp/`.
 - Đọc `graphify-out/` trước khi dò code thủ công.
+
+## Thứ tự đọc và giao thức hỏi owner
+
+- Đọc trước khi làm việc nghiệp vụ: `_bmad-output/specs/product-overview.md`
+  (bối cảnh, triết lý) → sổ D-xxx → `legal-baseline.md` → `business-rules.md`
+  → code.
+- Trước khi hỏi owner: tra D-xxx → luật → code. Đã có câu trả lời thì dùng, không
+  hỏi lại. Mặc định theo luật trừ khi D-xxx chốt lệch.
+- Chỉ hỏi lựa chọn nghiệp vụ thật; gom một lượt; mỗi câu có bối cảnh, mặc định
+  luật (số điều), khuyến nghị, lý do, ảnh hưởng code. Ghi câu hỏi vào Q-xxx.
+- Owner trả lời xong: ghi D-xxx ngay trong phiên và đánh dấu Q-xxx đã chốt.
 
 ## Trình bày
 
