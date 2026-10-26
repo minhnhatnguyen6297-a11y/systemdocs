@@ -3,7 +3,7 @@
 > **Vai trò:** file duy nhất trong spec ghi **số điều luật**. `business-rules.md`
 > giữ nguyên quy ước "không ghi số điều" và trỏ về đây. Quyết định đã chốt nằm ở
 > [`decision-80`](../../../../decisions/decision-80-so-quyet-dinh-nghiep-vu-thua-ke.md);
-> câu hỏi mở nằm ở [`business-rules.md` §16](./business-rules.md#16-câu-hỏi-mở-q-xxx).
+> câu hỏi mở nằm ở [`business-rules.md` §10](./business-rules.md#10-câu-hỏi-mở-q-xxx); quy tắc app: R-xx trong cùng file.
 > **Trạng thái:** tóm tắt do agent đọc văn bản gốc ngày 26/10/2026. Chưa có người
 > có chuyên môn pháp lý xác nhận. Tóm tắt **không** thay văn bản luật.
 > **Mặc định:** app làm theo luật, trừ khi owner chốt lệch và ghi lý do (D-019).
@@ -19,9 +19,9 @@
 
 | Điều | Nội dung (tóm tắt) | Áp vào app |
 |---|---|---|
-| 611 | Thời điểm mở thừa kế là lúc người có tài sản chết; tuyên bố chết thì là ngày Toà xác định (khoản 2 Điều 71). Địa điểm: nơi cư trú cuối cùng. | Mỗi vòng di sản mở tại ngày chết (`business-rules` §5). |
-| 612 | Di sản gồm tài sản riêng và phần tài sản của người chết trong tài sản chung. | Chủ đất / tỷ lệ sở hữu gốc (§3); chia đều giữa chủ đất (D-020, lệch). |
-| 613 | Người thừa kế phải còn sống lúc mở thừa kế, hoặc đã thành thai trước khi người đó chết và sinh ra còn sống. | Comparator ngày (§4). Thai nhi: `fetus_not_supported`. |
+| 611 | Thời điểm mở thừa kế là lúc người có tài sản chết; tuyên bố chết thì là ngày Toà xác định (khoản 2 Điều 71). Địa điểm: nơi cư trú cuối cùng. | Mỗi vòng di sản mở tại ngày chết (R-14). |
+| 612 | Di sản gồm tài sản riêng và phần tài sản của người chết trong tài sản chung. | Chủ đất / tỷ lệ sở hữu gốc (R-13); chia đều giữa chủ đất (D-020, lệch). |
+| 613 | Người thừa kế phải còn sống lúc mở thừa kế, hoặc đã thành thai trước khi người đó chết và sinh ra còn sống. | So ngày (R-07–R-09). Thai nhi: bỏ qua (R-02, D-026, lệch). |
 | 614 | Quyền, nghĩa vụ tài sản của người thừa kế phát sinh từ thời điểm mở thừa kế. | Phần đã nhận thuộc người nhận ngay, kể cả khi họ chết sau (chuyển tiếp). |
 | 615 | Nghĩa vụ tài sản của người chết được trả trong phạm vi di sản. | Ngoài phạm vi engine. |
 | 619 | Người chết cùng thời điểm, hoặc được coi là cùng thời điểm vì không xác định được ai chết trước, **không thừa kế của nhau**; di sản mỗi người do người thừa kế của người đó hưởng, trừ thế vị theo Điều 652. | D-006, D-007. |
@@ -31,7 +31,7 @@
 | 649 | Thừa kế theo pháp luật: theo hàng, điều kiện, trình tự luật định. | Phạm vi engine. |
 | 650 | Áp dụng khi: không có di chúc; di chúc không hợp pháp; người thừa kế theo di chúc chết trước/cùng lúc; người được chỉ định không có quyền hưởng hoặc từ chối; phần không định đoạt. | Engine giả định không có di chúc. |
 | 651 | Hàng 1: vợ, chồng, cha đẻ, mẹ đẻ, cha nuôi, mẹ nuôi, con đẻ, con nuôi. Hàng 2: ông bà nội/ngoại, anh chị em ruột, cháu ruột (người chết là ông/bà). Hàng 3: cụ nội/ngoại, bác/chú/cậu/cô/dì ruột, cháu ruột (người chết là bác/chú/cậu/cô/dì), chắt ruột (người chết là cụ). Cùng hàng hưởng **bằng nhau**. Hàng sau chỉ hưởng khi hàng trước không còn ai do đã chết, không có quyền hưởng, bị truất quyền hoặc từ chối. | Engine chỉ tính hàng 1 (`second_order_required`). |
-| 652 | **Thế vị:** con chết **trước hoặc cùng thời điểm** người để lại di sản → cháu hưởng phần cha/mẹ cháu lẽ ra được hưởng nếu còn sống; cháu cũng chết trước/cùng lúc → chắt hưởng. | §6; dừng ở chắt (D-012). |
+| 652 | **Thế vị:** con chết **trước hoặc cùng thời điểm** người để lại di sản → cháu hưởng phần cha/mẹ cháu lẽ ra được hưởng nếu còn sống; cháu cũng chết trước/cùng lúc → chắt hưởng. | R-17; dừng ở chắt (R-18, D-012). |
 | 653 | Con nuôi và cha/mẹ nuôi thừa kế của nhau, đồng thời áp dụng Điều 651, 652. | Không phân loại; con = đẻ + nuôi (D-023, lệch). |
 | 654 | Con riêng và bố dượng/mẹ kế chăm sóc, nuôi dưỡng nhau như cha con, mẹ con thì thừa kế của nhau, áp dụng Điều 652, 653. | Chỉ khi user gắn cha/mẹ (D-023, lệch). |
 | 655 | Vợ/chồng đã chia tài sản chung khi hôn nhân còn tồn tại, đang xin ly hôn hoặc đã được ly hôn nhưng bản án/quyết định chưa có hiệu lực, hoặc đã kết hôn với người khác sau khi người kia chết — **vẫn được thừa kế**. | Chỉ lưu vợ/chồng hợp pháp cuối cùng; user tự xác định (D-022, lệch). |

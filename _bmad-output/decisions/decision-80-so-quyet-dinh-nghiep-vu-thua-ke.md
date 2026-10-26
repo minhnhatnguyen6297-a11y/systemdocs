@@ -10,7 +10,8 @@ những gì đã chốt; câu hỏi phải có lý do; nghiệp vụ được ph
 - **Loại:** `luật` (làm theo điều luật) · `lệch nghiệp vụ` (owner chủ động khác
   hoặc thêm ngoài luật) · `kỹ thuật` (cách app lưu/hiển thị, không đổi quyền hưởng).
 - Điều luật: [`legal-baseline.md`](../specs/notary_v2/diagram/inheritance/legal-baseline.md).
-  Câu hỏi chưa chốt: [`business-rules.md` §16](../specs/notary_v2/diagram/inheritance/business-rules.md#16-câu-hỏi-mở-q-xxx).
+  Câu hỏi chưa chốt: [`business-rules.md` §10](../specs/notary_v2/diagram/inheritance/business-rules.md#10-câu-hỏi-mở-q-xxx).
+- Từ 26/10/2026 `business-rules.md` là bộ quy tắc R-xx (ánh xạ D→R ở §9). Tham chiếu `BR §x` trong các mục dưới trỏ về bản cũ trước commit `7e4e9e4`.
 - Khi owner trả lời một Q-xxx: thêm D-xxx ngay trong phiên, đánh dấu Q đó `Đã chốt → D-xxx`.
 
 Nguồn viết tắt: **HT1/HT2** = hai file review hội thoại (vòng 2 adversarial +
