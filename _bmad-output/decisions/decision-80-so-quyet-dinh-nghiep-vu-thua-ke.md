@@ -171,10 +171,10 @@ review BLDS 2015) tổng hợp trong brainstorm "Kiến trúc Diagram trong So�
 - **Hệ quả:** sửa một phần D-014: được dùng nhãn "từ chối" cho nhóm còn lại như nhãn nghiệp vụ; app vẫn không tạo/kiểm văn bản từ chối 620. Việc nhóm còn lại có phải lập văn bản từ chối hay không do công chứng viên quyết. Phần của người "từ chối" chia lại theo D-025 (đề xuất).
 - **Nguồn:** owner 26/10/2026, trả lời Q-005.
 
-### D-025 — Người thế vị từ chối: chia lại trong nhánh trước, hết nhánh mới ra cả hàng (Q-006, ĐỀ XUẤT)
-- **Ngày:** 26/10/2026 · **Trạng thái:** **Đề xuất — chờ owner xác nhận** · **Loại:** luật (cách hiểu) + khớp D-024
+### D-025 — Người thế vị từ chối: chia lại trong nhánh trước, hết nhánh mới ra cả hàng (Q-006)
+- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner xác nhận 26/10/2026; ban đầu là đề xuất của Mika) · **Loại:** luật (cách hiểu) + khớp D-024
 - **Bối cảnh:** owner nhờ Mika đề xuất. Luật: 620 cho phép từ chối (văn bản, trước khi chia); BLDS không có điều riêng về chia lại phần bị từ chối trong thừa kế theo pháp luật (650.1(c) nói về người thừa kế theo di chúc từ chối) → phần đó về những người thừa kế theo pháp luật còn lại theo 651–652; 651.2 người cùng hàng hưởng bằng nhau; 652 cháu/chắt hưởng **phần mà cha/mẹ lẽ ra được hưởng** — tức phần đó gắn với vị trí (nhánh) của người chết trước. 623 chỉ là thời hiệu, không ảnh hưởng.
-- **Đề xuất:** người thế vị (cháu/chắt) từ chối/không nhận → phần đó ở lại nhánh, chia đều cho những người thế vị còn nhận **cùng nhánh** (theo từng cấp). Chỉ khi cả nhánh không còn ai nhận thì phần nhánh mới chia cho các suất còn lại của hàng 1 trong cùng vòng (trùng D-011).
+- **Quyết định:** người thế vị (cháu/chắt) từ chối/không nhận → phần đó ở lại nhánh, chia đều cho những người thế vị còn nhận **cùng nhánh** (theo từng cấp). Chỉ khi cả nhánh không còn ai nhận thì phần nhánh mới chia cho các suất còn lại của hàng 1 trong cùng vòng (trùng D-011).
 - **Lý do:** đúng cấu trúc 652 (cả nhánh thay một suất), không làm thay đổi phần của nhánh khác; **engine hiện đã làm đúng như vậy** (`descendant_plan` bỏ người không nhận khỏi nhánh rồi chia đều người còn lại; nhánh rỗng thì không thành đơn vị, `first_line_units` chia cho đơn vị còn lại) → không phải sửa code; áp chung cho "từ chối" mặc định của D-024 và `nhường phần`.
 - **Hệ quả nếu chọn "cả hàng":** phải đổi engine, và một cháu từ chối sẽ làm tăng phần của chú/bác — trái tinh thần 652.
 - **Nguồn:** Mika 26/10/2026; `inheritance_engine.py` :308-342.
@@ -210,3 +210,10 @@ review BLDS 2015) tổng hợp trong brainstorm "Kiến trúc Diagram trong So�
 - **Quyết định:** lưu nguyên trạng kể cả khi có lỗi cấu trúc, `status: invalid`, có nhãn.
 - **Hệ quả (việc code sau):** code/contract vẫn chặn `diagram_invalid_state` và README §8 ghi "invalid: save bị chặn" — xung đột còn nguyên.
 - **Nguồn:** owner 26/10/2026, trả lời Q-012.
+
+### D-031 — Xoá người gốc: chỉ gỡ nhánh của người đó, không xoá cả hồ sơ (Q-011)
+- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** kỹ thuật (thao tác diagram, không đổi quyền hưởng theo luật)
+- **Quyết định:** xoá một người gốc không xoá cả hồ sơ. Những người thuộc nhánh của người gốc đó bị gỡ khỏi diagram (trả về Pool, D-009). Vợ/chồng của người gốc: **giữ** nếu cũng là người gốc (chủ đất); **gỡ** nếu không phải chủ đất.
+- **Lý do:** owner: đúng đề xuất trong tài liệu owner gửi; vợ/chồng cùng là chủ đất vẫn còn tài sản gốc nên phải giữ.
+- **Hệ quả:** gỡ chỉ là bỏ khỏi diagram, không xoá khỏi Stage. Một người có nhiều vai (D-005) và còn thuộc nhánh khác chưa bị xoá thì cần giữ — chi tiết cài đặt prune xác định khi làm code.
+- **Nguồn:** owner 26/10/2026, trả lời Q-011.
