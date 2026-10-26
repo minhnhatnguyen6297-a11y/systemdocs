@@ -99,6 +99,13 @@ def test_representation_splits_by_branch_at_each_generation_not_flat_descendants
     assert _share(result, "B") == Fraction(1, 2)
     assert _share(result, "C") == Fraction(1, 4)
     assert _share(result, "E") == _share(result, "F") == Fraction(1, 8)
+    for breakdown in result["breakdowns"]:
+        for term in breakdown["terms"]:
+            assert term["heirRank"] == 1
+            assert "relationshipRoles" not in term
+    e_terms = next(item["terms"] for item in result["breakdowns"] if item["personId"] == "E")
+    assert e_terms[0]["kind"] == "representation"
+    assert e_terms[0]["viaBranchPersonIds"] == ["Q", "D"]
 
 
 def test_non_owner_child_dead_before_source_has_no_estate_but_descendant_represents():
@@ -207,6 +214,7 @@ def test_living_land_owner_keeps_base_when_receive_is_off():
     assert result["status"] == "complete"
     assert _share(result, "A") == 1
     assert result["allocations"]["A"]["baseShare"] == "1"
+    assert result["breakdowns"][0]["terms"] == [{"kind": "base", "fraction": "1"}]
 
 
 def test_living_nonreceiver_is_removed_without_opening_representation():
@@ -328,3 +336,402 @@ def test_explicit_parents_do_not_fallback_unrelated_person_to_land_owner_branch(
     assert result["status"] == "incomplete"
     assert _share(result, "Z") == 0
     assert result["unresolvedEstates"][0]["sourcePersonId"] == "X"
+
+
+@pytest.mark.parametrize("represented", [False, True], ids=["direct", "representation"])
+def test_first_rank_blocks_both_later_ranks(represented):
+    result = _run(
+        {"X": "2020", "P": "1980", "S": None, "N": None, "C": "2010" if represented else None, "D": None},
+        parents={"X": ["P"], "S": ["P"], "N": ["S"], "C": ["X"], "D": ["C"]},
+        owners={"X"},
+    )
+
+    recipient = "D" if represented else "C"
+    assert result["status"] == "complete"
+    assert _share(result, recipient) == 1
+    assert _share(result, "S") == _share(result, "N") == 0
+    terms = next(item["terms"] for item in result["breakdowns"] if item["personId"] == recipient)
+    assert terms == [{
+        "kind": "representation" if represented else "inheritance",
+        "fraction": "1",
+        "sourcePersonId": "X",
+        "heirRank": 1,
+        **({"viaBranchPersonIds": ["C"]} if represented else {}),
+    }]
+
+
+def test_first_rank_all_refuse_then_second_rank_receives():
+    result = _run(
+        {"X": "2020", "P": "1980", "S": None, "C": None},
+        parents={"X": ["P"], "S": ["P"], "C": ["X"]},
+        owners={"X"},
+        receive={"C": False},
+    )
+
+    assert result["status"] == "complete"
+    assert _share(result, "C") == 0
+    assert _share(result, "S") == 1
+    assert result["breakdowns"][0]["terms"] == [{
+        "kind": "inheritance", "fraction": "1", "sourcePersonId": "X",
+        "heirRank": 2, "relationshipRoles": ["sibling"],
+    }]
+
+
+@pytest.mark.parametrize(
+    ("rank", "role", "deaths", "parents", "receive"),
+    [
+        (
+            2, "grandparent", {"X": "2020", "P": "1980", "H": None, "J": None},
+            {"X": ["P"], "P": ["H", "J"]}, {},
+        ),
+        (
+            2, "sibling", {"X": "2020", "P": "1980", "H": None, "J": None},
+            {"X": ["P"], "H": ["P"], "J": ["P"]}, {},
+        ),
+        (
+            2, "grandchild", {"X": "2020", "C": None, "H": None, "J": None},
+            {"C": ["X"], "H": ["C"], "J": ["C"]}, {"C": False},
+        ),
+        (
+            3, "great_grandparent",
+            {"X": "2020", "P": "1980", "G": "1970", "H": None, "J": None},
+            {"X": ["P"], "P": ["G"], "G": ["H", "J"]}, {},
+        ),
+        (
+            3, "parent_sibling",
+            {"X": "2020", "P": "1980", "G": "1970", "H": None, "J": None},
+            {"X": ["P"], "P": ["G"], "H": ["G"], "J": ["G"]}, {},
+        ),
+        (
+            3, "sibling_child",
+            {"X": "2020", "P": "1980", "S": "2010", "H": None, "J": None},
+            {"X": ["P"], "S": ["P"], "H": ["S"], "J": ["S"]}, {},
+        ),
+        (
+            3, "great_grandchild", {"X": "2020", "C": None, "G": None, "H": None, "J": None},
+            {"C": ["X"], "G": ["C"], "H": ["G"], "J": ["G"]}, {"C": False, "G": False},
+        ),
+    ],
+    ids=[
+        "grandparents", "siblings", "grandchildren", "great-grandparents",
+        "parent-siblings", "sibling-children", "great-grandchildren",
+    ],
+)
+def test_all_later_rank_relationship_groups_share_equally(rank, role, deaths, parents, receive):
+    result = _run(deaths, parents=parents, owners={"X"}, receive=receive)
+
+    assert result["status"] == "complete"
+    assert _share(result, "H") == _share(result, "J") == Fraction(1, 2)
+    assert sum((_share(result, person_id) for person_id in deaths), Fraction(0)) == 1
+    assert result["conservation"] == {"allocated": "1", "unresolved": "0", "total": "1"}
+    for breakdown in result["breakdowns"]:
+        assert breakdown["personId"] in {"H", "J"}
+        assert breakdown["terms"] == [{
+            "kind": "inheritance", "fraction": "1/2", "sourcePersonId": "X",
+            "heirRank": rank, "relationshipRoles": [role],
+        }]
+    assert {item["reason"] for item in result["requiredSlots"]} == {"active_estate"}
+
+
+@pytest.mark.parametrize(
+    ("sibling_parents", "expected"),
+    [(["P"], 1), (["Q"], 1), (["P", "Q"], 1), (["R"], 0)],
+    ids=["shared-father", "shared-mother", "shared-both", "unlinked"],
+)
+def test_siblings_require_at_least_one_explicit_shared_parent(sibling_parents, expected):
+    result = _run(
+        {"X": "2020", "P": "1980", "Q": "1980", "R": "1980", "S": None},
+        parents={"X": ["P", "Q"], "S": sibling_parents},
+        owners={"X"},
+    )
+
+    assert _share(result, "S") == expected
+    assert result["status"] == ("complete" if expected else "incomplete")
+    assert result["conservation"]["total"] == "1"
+
+
+def test_second_rank_multiple_roles_get_one_share_with_sorted_metadata():
+    deaths = {"X": "2020", "P": "1980", "Q": "1970", "H": None, "J": None}
+    parents = {"X": ["P", "Q"], "P": ["H"], "H": ["Q"], "J": ["Q"]}
+    result = _run(deaths, parents=parents, owners={"X"})
+    reversed_result = _run(
+        dict(reversed(list(deaths.items()))),
+        parents={key: list(reversed(value)) for key, value in reversed(list(parents.items()))},
+        owners={"X"},
+    )
+
+    assert result == reversed_result
+    assert result["status"] == "complete"
+    assert _share(result, "H") == _share(result, "J") == Fraction(1, 2)
+    h_terms = next(item["terms"] for item in result["breakdowns"] if item["personId"] == "H")
+    assert h_terms == [{
+        "kind": "inheritance", "fraction": "1/2", "sourcePersonId": "X",
+        "heirRank": 2, "relationshipRoles": ["grandparent", "sibling"],
+    }]
+
+
+def test_third_rank_multiple_roles_get_one_share_without_representation():
+    result = _run(
+        {"X": "2020", "P": None, "G": "1970", "S": None, "H": None, "J": None},
+        parents={"X": ["P"], "P": ["G"], "S": ["P"], "H": ["G", "S"], "J": ["S"]},
+        owners={"X"},
+        receive={"P": False, "S": False},
+    )
+
+    assert result["status"] == "complete"
+    assert _share(result, "H") == _share(result, "J") == Fraction(1, 2)
+    h_terms = next(item["terms"] for item in result["breakdowns"] if item["personId"] == "H")
+    assert h_terms == [{
+        "kind": "inheritance", "fraction": "1/2", "sourcePersonId": "X",
+        "heirRank": 3, "relationshipRoles": ["parent_sibling", "sibling_child"],
+    }]
+
+
+def test_parent_sibling_group_excludes_source_and_own_parents_in_shared_ancestry():
+    result = _run(
+        {"X": "2020", "P": None, "Q": None, "G": "1970", "H": None},
+        parents={"X": ["P", "Q"], "P": ["G"], "Q": ["G"], "H": ["G"]},
+        owners={"X"},
+        receive={"P": False, "Q": False},
+    )
+
+    assert result["status"] == "complete"
+    assert _share(result, "X") == _share(result, "P") == _share(result, "Q") == 0
+    assert _share(result, "H") == 1
+    assert result["breakdowns"][0]["terms"][0]["relationshipRoles"] == ["parent_sibling"]
+
+
+@pytest.mark.parametrize("sibling_death", ["2010", "2020"], ids=["before", "same-day"])
+@pytest.mark.parametrize("has_living_sibling", [True, False], ids=["rank-two-blocks", "rank-three-own-share"])
+def test_dead_sibling_never_represents_but_their_child_can_receive_at_rank_three(
+    sibling_death, has_living_sibling
+):
+    result = _run(
+        {"X": "2020", "P": "1980", "S": sibling_death, "N": None, "T": None},
+        parents={"X": ["P"], "S": ["P"], "N": ["S"], "T": ["P"]},
+        owners={"X"},
+        receive={"T": has_living_sibling},
+    )
+
+    recipient = "T" if has_living_sibling else "N"
+    assert result["status"] == "complete"
+    assert _share(result, recipient) == 1
+    assert _share(result, "S") == 0
+    assert _share(result, "N" if has_living_sibling else "T") == 0
+    assert result["breakdowns"][0]["terms"] == [{
+        "kind": "inheritance", "fraction": "1", "sourcePersonId": "X",
+        "heirRank": 2 if has_living_sibling else 3,
+        "relationshipRoles": ["sibling" if has_living_sibling else "sibling_child"],
+    }]
+    assert {item["reason"] for item in result["requiredSlots"]} == {"active_estate"}
+
+
+@pytest.mark.parametrize("nephew_death", ["2010", "2020"], ids=["before", "same-day"])
+def test_dead_third_rank_candidate_does_not_pass_share_to_their_child(nephew_death):
+    result = _run(
+        {"X": "2020", "P": "1980", "S": "2000", "N": nephew_death, "H": None, "K": None},
+        parents={"X": ["P"], "S": ["P"], "N": ["S"], "H": ["S"], "K": ["N"]},
+        owners={"X"},
+    )
+
+    assert result["status"] == "complete"
+    assert _share(result, "H") == 1
+    assert _share(result, "N") == _share(result, "K") == 0
+    assert result["breakdowns"][0]["terms"][0]["heirRank"] == 3
+    assert {item["reason"] for item in result["requiredSlots"]} == {"active_estate"}
+
+
+@pytest.mark.parametrize(
+    ("receive", "recipient", "rank"),
+    [
+        ({"T": False}, "S", 2),
+        ({"S": False, "T": False}, "N", 3),
+        ({"S": False, "T": False, "N": False}, None, None),
+    ],
+    ids=["redistribute-within-rank", "all-second-rank-refuse", "all-ranks-empty"],
+)
+def test_later_rank_refusals_redistribute_then_fall_back_or_remain_unresolved(receive, recipient, rank):
+    result = _run(
+        {"X": "2020", "P": "1980", "S": None, "T": None, "N": None},
+        parents={"X": ["P"], "S": ["P"], "T": ["P"], "N": ["S"]},
+        owners={"X"},
+        receive=receive,
+    )
+
+    if recipient is None:
+        assert result["status"] == "incomplete"
+        assert result["breakdowns"] == []
+        assert result["unresolvedEstates"] == [{
+            "sourcePersonId": "X", "eventDate": "2020-01-01", "fraction": "1", "reason": "no_valid_heir",
+        }]
+        assert result["conservation"] == {"allocated": "0", "unresolved": "1", "total": "1"}
+    else:
+        assert result["status"] == "complete"
+        assert _share(result, recipient) == 1
+        assert result["breakdowns"][0]["terms"][0]["heirRank"] == rank
+        assert result["unresolvedEstates"] == []
+        assert result["conservation"] == {"allocated": "1", "unresolved": "0", "total": "1"}
+
+
+@pytest.mark.parametrize("rank", [2, 3], ids=["second-rank", "third-rank"])
+def test_later_rank_heir_dead_after_source_receives_despite_refusal_then_transmits(rank):
+    deaths = {"X": "2000", "P": "1980", "S": "2010" if rank == 2 else "1990", "N": "2010", "H": None, "T": None}
+    parents = {"X": ["P"], "S": ["P"], "N": ["S"], "H": ["N" if rank == 3 else "S"]}
+    if rank == 2:
+        parents["T"] = ["P"]
+    else:
+        parents["T"] = ["S"]
+    result = _run(deaths, parents=parents, owners={"X"}, receive={"S": False, "N": False})
+    intermediate = "S" if rank == 2 else "N"
+
+    assert result["status"] == "complete"
+    assert result["allocations"][intermediate]["inheritedShare"] == "1/2"
+    assert result["allocations"][intermediate]["distributedShare"] == "1/2"
+    assert _share(result, intermediate) == 0
+    assert _share(result, "H") == _share(result, "T") == Fraction(1, 2)
+    h_terms = next(item["terms"] for item in result["breakdowns"] if item["personId"] == "H")
+    assert h_terms == [{
+        "kind": "inheritance", "fraction": "1/2", "sourcePersonId": intermediate, "heirRank": 1,
+    }]
+    t_terms = next(item["terms"] for item in result["breakdowns"] if item["personId"] == "T")
+    assert t_terms[0]["heirRank"] == rank
+    assert t_terms[0]["relationshipRoles"] == ["sibling" if rank == 2 else "sibling_child"]
+    assert result["conservation"] == {"allocated": "1", "unresolved": "0", "total": "1"}
+
+
+def test_second_rank_transmission_reselects_third_rank_in_later_estate():
+    result = _run(
+        {"X": "2000", "P": "1980", "G": "1970", "S": "2010", "H": None, "A": None},
+        parents={"X": ["P"], "S": ["P"], "P": ["G"], "H": ["G"]},
+        owners={"X", "A"},
+        receive={"S": False},
+    )
+
+    assert result["status"] == "complete"
+    assert result["allocations"]["S"]["inheritedShare"] == "1/2"
+    assert result["allocations"]["S"]["distributedShare"] == "1/2"
+    assert _share(result, "H") == _share(result, "A") == Fraction(1, 2)
+    h_terms = next(item["terms"] for item in result["breakdowns"] if item["personId"] == "H")
+    assert h_terms == [{
+        "kind": "inheritance", "fraction": "1/2", "sourcePersonId": "S",
+        "heirRank": 3, "relationshipRoles": ["parent_sibling"],
+    }]
+    assert {item["anchorSlotId"] for item in result["requiredSlots"]} == {"slot_X", "slot_S"}
+    assert result["conservation"] == {"allocated": "1", "unresolved": "0", "total": "1"}
+
+
+def test_shared_ancestor_paths_and_same_day_estates_are_order_independent():
+    deaths = {"X": "2020", "Y": "2020", "P": "1980", "Q": "1980", "G": None, "H": None}
+    parents = {"X": ["P", "Q"], "Y": ["P", "Q"], "H": ["P", "Q"], "P": ["G"], "Q": ["G"]}
+    result = _run(deaths, parents=parents, owners={"X", "Y"})
+    reversed_result = _run(
+        dict(reversed(list(deaths.items()))),
+        parents={key: list(reversed(value)) for key, value in reversed(list(parents.items()))},
+        owners={"Y", "X"},
+    )
+
+    assert result == reversed_result
+    assert result["status"] == "complete"
+    assert _share(result, "G") == _share(result, "H") == Fraction(1, 2)
+    assert result["allocations"]["X"]["inheritedShare"] == result["allocations"]["Y"]["inheritedShare"] == "0"
+    for breakdown in result["breakdowns"]:
+        assert breakdown["terms"] == [
+            {
+                "kind": "inheritance", "fraction": "1/4", "sourcePersonId": source,
+                "heirRank": 2, "relationshipRoles": ["grandparent" if breakdown["personId"] == "G" else "sibling"],
+            }
+            for source in ("X", "Y")
+        ]
+    assert result["conservation"] == {"allocated": "1", "unresolved": "0", "total": "1"}
+
+
+def test_anonymized_female_x_eight_nephews_one_receiver_owns_both_assets():
+    """Shared engine result; two-asset persistence is exercised by the workspace smoke."""
+    deaths = {
+        "X": "2022-09-19", "P1": "1980-01-01", "P2": "1980-01-01",
+        "S1": "1994-04-20", "S2": "2021-10-13",
+        **{f"N{index}": None for index in range(1, 9)},
+    }
+    parents = {person_id: ["P1", "P2"] for person_id in ("X", "S1", "S2")}
+    parents.update({f"N{index}": ["S1" if index <= 4 else "S2"] for index in range(1, 9)})
+    result = _run(
+        deaths, parents=parents, owners={"X"},
+        receive={f"N{index}": index == 1 for index in range(1, 9)},
+    )
+
+    assert result["status"] == "complete"
+    assert _share(result, "N1") == 1
+    assert all(_share(result, f"N{index}") == 0 for index in range(2, 9))
+    assert _share(result, "X") == 0
+    assert result["breakdowns"] == [{
+        "personId": "N1", "total": "1",
+        "terms": [{
+            "kind": "inheritance", "fraction": "1", "sourcePersonId": "X",
+            "heirRank": 3, "relationshipRoles": ["sibling_child"],
+        }],
+    }]
+    assert {item["anchorSlotId"] for item in result["requiredSlots"]} == {"slot_X"}
+    assert result["conservation"] == {"allocated": "1", "unresolved": "0", "total": "1"}
+
+
+@pytest.mark.parametrize(
+    ("deaths", "parents", "receive", "roles"),
+    [
+        (
+            {"X": "2020", "P": "1980", "G": None, "S": None, "C": None, "H": None, "J": None},
+            {"X": ["P"], "P": ["G"], "S": ["P"], "C": ["X"], "H": ["C"], "J": ["C"]},
+            {"C": False},
+            {"G": "grandparent", "S": "sibling", "H": "grandchild", "J": "grandchild"},
+        ),
+        (
+            {
+                "X": "2020", "P": "1980", "G": "1970", "GG": None, "A": None,
+                "S": "2010", "N": None, "C": None, "GC": None, "H": None, "J": None,
+            },
+            {
+                "X": ["P"], "P": ["G"], "G": ["GG"], "A": ["G"], "S": ["P"],
+                "N": ["S"], "C": ["X"], "GC": ["C"], "H": ["GC"], "J": ["GC"],
+            },
+            {"C": False, "GC": False},
+            {
+                "GG": "great_grandparent", "A": "parent_sibling", "N": "sibling_child",
+                "H": "great_grandchild", "J": "great_grandchild",
+            },
+        ),
+    ],
+    ids=["all-second-rank-groups", "all-third-rank-groups"],
+)
+def test_mixed_relationship_groups_share_per_person_not_per_group(deaths, parents, receive, roles):
+    result = _run(deaths, parents=parents, owners={"X"}, receive=receive)
+    rank = 2 if len(roles) == 4 else 3
+    share = Fraction(1, len(roles))
+
+    assert result["status"] == "complete"
+    assert {item["personId"] for item in result["breakdowns"]} == set(roles)
+    for breakdown in result["breakdowns"]:
+        person_id = breakdown["personId"]
+        assert _share(result, person_id) == share
+        assert breakdown["terms"] == [{
+            "kind": "inheritance", "fraction": str(share), "sourcePersonId": "X",
+            "heirRank": rank, "relationshipRoles": [roles[person_id]],
+        }]
+    assert result["conservation"] == {"allocated": "1", "unresolved": "0", "total": "1"}
+
+
+def test_later_rank_transmission_without_any_eligible_heir_retains_unresolved_estate():
+    result = _run(
+        {"X": "2000", "P": "1980", "S": "2010", "W": None},
+        parents={"X": ["P"], "S": ["P"]},
+        spouses=[("S", "W")],
+        owners={"X"},
+        receive={"S": False, "W": False},
+    )
+
+    assert result["status"] == "incomplete"
+    assert result["allocations"]["S"]["inheritedShare"] == "1"
+    assert result["allocations"]["S"]["distributedShare"] == "1"
+    assert result["breakdowns"] == []
+    assert result["unresolvedEstates"] == [{
+        "sourcePersonId": "S", "eventDate": "2010-01-01", "fraction": "1", "reason": "no_valid_heir",
+    }]
+    assert result["conservation"] == {"allocated": "0", "unresolved": "1", "total": "1"}

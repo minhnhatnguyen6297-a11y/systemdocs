@@ -395,6 +395,211 @@ test('two_party: assign menu du 30 cho + swap bang ban phim', () => {
     'swap bang ban phim khong dung');
 });
 
+// ---------- Quan he tuong minh: chi o trong, khong tao ho so ----------
+
+function relationMenu(view, nodeId) {
+  const card = collect(view.el, (e) => e.dataset.nodeId === nodeId)[0];
+  assert.ok(card, `thieu card ${nodeId}`);
+  const control = byCls(card, 'js-node-relations')[0];
+  assert.ok(control, `thieu menu quan he ${nodeId}`);
+  assert.match(control.getAttribute('aria-label'), /Quan hệ của/);
+  control.onclick();
+  return byCls(view.el, 'modal')[0];
+}
+
+function chooseParent(dialog, nodeId, checked = true) {
+  const input = collect(dialog, (e) =>
+    e.tagName === 'INPUT' && e.type === 'checkbox' && e.value === nodeId)[0];
+  assert.ok(input, `thieu lua chon cha/me ${nodeId}`);
+  assert.equal(input.disabled, false);
+  assert.equal(input.parentElement.tagName, 'LABEL', 'checkbox can label');
+  input.checked = checked;
+  input.onchange();
+  return input;
+}
+
+test('quan he tung nguoi: them toi da 2 cha/me TRONG va chon lai o co san', (t) => {
+  const nodes = seedSlots();
+  nodes.find((n) => n.id === 'owner').personId = 'c1';
+  nodes.find((n) => n.id === 'child_1').personId = 'c3';
+  nodes.find((n) => n.id === 'child_1').parentSlotIds = [];
+  const { model, view } = build(t, { mode: 'case',
+    seed: { people: INH_PEOPLE, nodes } });
+  const stageBefore = structuredClone(model.state.stage);
+  const child = model.state.diagram.nodes.find((n) => n.id === 'child_1');
+  for (let i = 0; i < 2; i += 1) {
+    const dialog = relationMenu(view, child.id);
+    assert.equal(findBtns(dialog, 'Thêm cha/mẹ')[0].disabled, false);
+    findBtns(dialog, 'Thêm cha/mẹ')[0].onclick();
+    const parent = model.state.diagram.nodes.at(-1);
+    assert.equal(parent.personId, null, 'khong duoc tu tao/gan nguoi');
+    assert.ok(child.parentSlotIds.includes(parent.id));
+  }
+  let dialog = relationMenu(view, child.id);
+  const full = findBtns(dialog, 'Thêm cha/mẹ')[0];
+  assert.equal(full.disabled, true);
+  const count = model.state.diagram.nodes.length;
+  full.onclick(); // Handler cung giu gioi han khi goi truc tiep.
+  assert.equal(model.state.diagram.nodes.length, count);
+  findBtns(dialog, 'Chọn lại cha/mẹ')[0].onclick();
+  dialog = byCls(view.el, 'modal')[0];
+  assert.equal(collect(dialog, (e) => e.tagName === 'INPUT' &&
+    e.value === child.id).length, 0, 'khong chon chinh minh lam cha/me');
+  for (const id of [...child.parentSlotIds]) chooseParent(dialog, id, false);
+  assert.equal(findBtns(dialog, 'Áp dụng')[0].disabled, true);
+  chooseParent(dialog, 'owner');
+  chooseParent(dialog, 'mother'); // O cha/me co san, chua gan nguoi.
+  const third = collect(dialog, (e) => e.tagName === 'INPUT' &&
+    e.value === 'father')[0];
+  assert.equal(third.disabled, true, 'khong duoc chon qua 2 cha/me');
+  findBtns(dialog, 'Áp dụng')[0].onclick();
+  assert.deepEqual(child.parentSlotIds, ['owner', 'mother']);
+  assert.deepEqual(model.state.stage, stageBefore, 'chi doi diagram, khong doi Stage');
+});
+
+test('them con: chon ro 1–2 cha/me, khong mac dinh vo/chong, huy khong tao o', (t) => {
+  const nodes = seedSlots();
+  nodes.find((n) => n.id === 'owner').personId = 'c1';
+  nodes.find((n) => n.id === 'spouse').personId = 'c2';
+  const { model, view } = build(t, { mode: 'case',
+    seed: { people: INH_PEOPLE, nodes } });
+  const before = model.state.diagram.nodes.length;
+  let dialog = relationMenu(view, 'owner');
+  findBtns(dialog, 'Thêm con')[0].onclick();
+  dialog = byCls(view.el, 'modal')[0];
+  assert.ok(collect(dialog, (e) => e.tagName === 'INPUT')
+    .every((e) => !e.checked), 'khong duoc tu chon cha/me');
+  assert.equal(findBtns(dialog, 'Thêm ô con trống')[0].disabled, true);
+  findBtns(dialog, 'Hủy')[0].onclick();
+  assert.equal(model.state.diagram.nodes.length, before);
+  for (const parentIds of [['owner'], ['owner', 'spouse']]) {
+    dialog = relationMenu(view, 'owner');
+    findBtns(dialog, 'Thêm con')[0].onclick();
+    dialog = byCls(view.el, 'modal')[0];
+    for (const id of parentIds) chooseParent(dialog, id);
+    findBtns(dialog, 'Thêm ô con trống')[0].onclick();
+    const child = model.state.diagram.nodes.at(-1);
+    assert.equal(child.personId, null);
+    assert.deepEqual(child.parentSlotIds, parentIds);
+    assert.equal(child.spouseSlotId, null);
+  }
+  assert.equal(model.state.stage.people.length, INH_PEOPLE.length);
+});
+
+test('nhap du ong ba, cu, anh chi em, co chu, chau va chat qua menu va Pool', (t) => {
+  const ids = ['source', 'parent', 'grandparent', 'great_grandparent',
+    'sibling', 'parent_sibling', 'sibling_child', 'child', 'grandchild',
+    'great_grandchild'];
+  const people = ids.map((id) => ({ row_id: id, ho_ten: `Người ${id}` }));
+  const owner = seedSlots().find((n) => n.id === 'owner');
+  owner.personId = 'source';
+  owner.parentSlotIds = [];
+  owner.spouseSlotId = null;
+  const { model, view } = build(t, { mode: 'case',
+    seed: { people, nodes: [owner] } });
+  const slotFor = { source: 'owner' };
+  const add = (anchorPerson, personId, parent) => {
+    let dialog = relationMenu(view, slotFor[anchorPerson]);
+    findBtns(dialog, parent ? 'Thêm cha/mẹ' : 'Thêm con')[0].onclick();
+    if (!parent) {
+      dialog = byCls(view.el, 'modal')[0];
+      chooseParent(dialog, slotFor[anchorPerson]);
+      findBtns(dialog, 'Thêm ô con trống')[0].onclick();
+    }
+    const node = model.state.diagram.nodes.at(-1);
+    assert.equal(node.personId, null);
+    const poolCard = byCls(view.el, 'cd-pool-card')
+      .find((c) => c.textContent.includes(`Người ${personId}`));
+    assert.ok(poolCard);
+    if (parent) {
+      findBtns(poolCard, '→')[0].onclick();
+      const assignDialog = byCls(view.el, 'modal')[0];
+      findBtns(assignDialog, `Gán vào “${node.id}”`)[0].onclick();
+    } else {
+      const card = collect(view.el, (e) => e.dataset.nodeId === node.id)[0];
+      card.dispatch('drop', personPayload(personId));
+    }
+    assert.equal(node.personId, personId);
+    slotFor[personId] = node.id;
+  };
+  add('source', 'parent', true);
+  add('parent', 'grandparent', true);
+  add('grandparent', 'great_grandparent', true);
+  add('parent', 'sibling', false);
+  add('grandparent', 'parent_sibling', false);
+  add('sibling', 'sibling_child', false);
+  add('source', 'child', false);
+  add('child', 'grandchild', false);
+  add('grandchild', 'great_grandchild', false);
+  const parentPeople = (pid) => model.state.diagram.nodes
+    .find((n) => n.personId === pid).parentSlotIds
+    .map((slot) => model.state.diagram.nodes.find((n) => n.id === slot).personId);
+  assert.deepEqual(parentPeople('source'), ['parent']);
+  assert.deepEqual(parentPeople('parent'), ['grandparent']);
+  assert.deepEqual(parentPeople('grandparent'), ['great_grandparent']);
+  assert.deepEqual(parentPeople('sibling'), ['parent']);
+  assert.deepEqual(parentPeople('parent_sibling'), ['grandparent']);
+  assert.deepEqual(parentPeople('sibling_child'), ['sibling']);
+  assert.deepEqual(parentPeople('grandchild'), ['child']);
+  assert.deepEqual(parentPeople('great_grandchild'), ['grandchild']);
+  assert.equal(model.state.stage.people.length, ids.length);
+  assert.equal(byCls(view.el, 'cd-pool-card').length, 0);
+  assert.equal(byCls(view.el, 'cd-edge-parent').length, ids.length - 1);
+});
+
+test('menu quan he khong hien tren ho so khoa va two_party', (t) => {
+  const nodes = seedSlots();
+  nodes.find((n) => n.id === 'owner').personId = 'c1';
+  const { model, view } = build(t, { mode: 'case',
+    seed: { people: INH_PEOPLE, nodes } });
+  assert.equal(byCls(view.el, 'js-node-relations').length, 1);
+  model.state.locked = true;
+  model.dismissNotice();
+  assert.equal(byCls(view.el, 'js-node-relations').length, 0);
+  model.newDraft('two_party');
+  assert.equal(byCls(view.el, 'js-node-relations').length, 0);
+});
+
+test('cach tinh hien hang 2/3 va du 7 vai tieng Viet, giu nguyen phan so engine', async (t) => {
+  const client = {
+    run: async () => ({ ok: true, data: { evaluated_revision: 3,
+      render_model: {
+        status: 'complete',
+        allocations: { c3: { finalShare: '29/51', displayPercent: '56.86' } },
+        breakdowns: [{ personId: 'c3', total: '29/51', terms: [
+          { kind: 'base', fraction: '1/51' },
+          { kind: 'inheritance', fraction: '2/17', sourcePersonId: 'c1',
+            heirRank: 2, relationshipRoles: ['grandparent', 'sibling', 'grandchild'],
+            viaBranchPersonIds: [] },
+          { kind: 'inheritance', fraction: '7/51', sourcePersonId: 'c2',
+            heirRank: 3, relationshipRoles: ['great_grandparent',
+              'parent_sibling', 'sibling_child', 'great_grandchild'],
+            viaBranchPersonIds: [] },
+          { kind: 'representation', fraction: '5/17', sourcePersonId: 'c1',
+            heirRank: 1, viaBranchPersonIds: ['c2'] },
+        ] }],
+        requiredSlots: [], warnings: [], errors: [], unresolvedEstates: [],
+      } } }),
+  };
+  const { view } = build(t, { mode: 'case', client,
+    seed: { people: INH_PEOPLE, nodes: seedSlots() } });
+  await findBtns(view.el, 'Xem cách tính')[0].onclick();
+  const lines = byCls(view.el, 'cd-explain').map((e) => e.textContent);
+  assert.equal(lines[0], 'base: 1/51');
+  assert.match(lines[1], /inheritance: 2\/17 · từ Người Đã Lưu · hàng 2/);
+  for (const role of ['ông/bà nội/ngoại', 'anh/chị/em ruột',
+    'cháu ruột (người để lại là ông/bà)']) assert.ok(lines[1].includes(role));
+  assert.match(lines[2], /inheritance: 7\/51 · từ Vợ Hai · hàng 3/);
+  for (const role of ['cụ nội/ngoại', 'bác/chú/cậu/cô/dì ruột',
+    'cháu ruột (người để lại là bác/chú/cậu/cô/dì)', 'chắt ruột']) {
+    assert.ok(lines[2].includes(role));
+  }
+  assert.ok(!lines[1].includes('qua ') && !lines[2].includes('qua '),
+    'hang 2/3 la nhan truc tiep, khong phai the vi');
+  assert.equal(lines[3], 'representation: 5/17 · từ Người Đã Lưu · qua Vợ Hai');
+  assert.match(byCls(view.el, 'cd-calc')[0].textContent, /56.86%phần cuối 29\/51/);
+});
+
 // ---------- requiredSlots → tu sinh slot ----------
 
 test('requiredSlots: engine yeu cau → tao father/mother/spouse/child', async () => {
@@ -454,6 +659,8 @@ test('requiredSlots: engine yeu cau → tao father/mother/spouse/child', async (
   const kids = after.filter((n) =>
     !n.personId && (n.parentSlotIds || []).includes('owner'));
   assert.ok(kids.length >= 1, 'phai co ≥1 slot con trong cua owner');
+  assert.ok(kids.every((n) => n.parentSlotIds.length === 1),
+    'requiredSlots khong duoc suy vo/chong thanh cha/me thu hai');
   // Anchor child_1 bi deleted → request cua no bi bo qua.
 });
 
