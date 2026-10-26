@@ -92,15 +92,13 @@
       },
       "action": null,
       "expected": {
-        "status": "unsupported",
-        "reasons": [
-          "heir_rank_not_supported"
-        ],
-        "shares": {},
-        "unresolved": {},
+        "status": "complete",
+        "reasons": [],
+        "shares": {"1": {"P4": "1/1"}},
+        "unresolved": {"1": "0/1"},
         "remaining_node_ids": null,
-        "pending_decision": "Q-016",
-        "explanation": "R-04 chỉ tính hàng 1; cả cha mẹ đã chết trước, người chết không có vợ/chồng hay con. Anh/chị/em hoặc nhánh cháu còn sống thuộc hàng 2/3 nên chưa được chia, trạng thái unsupported chờ Q-016; dấu Nhận không thay đổi thứ bậc."
+        "pending_decision": null,
+        "explanation": "D-038/R-32: hàng 1 trống; P4 là anh/chị/em thuộc hàng 2 có dấu Nhận nên hưởng toàn bộ, không xét hàng 3."
       }
     },
     {
@@ -226,15 +224,13 @@
       },
       "action": null,
       "expected": {
-        "status": "unsupported",
-        "reasons": [
-          "heir_rank_not_supported"
-        ],
-        "shares": {},
-        "unresolved": {},
+        "status": "complete",
+        "reasons": [],
+        "shares": {"1": {"P5": "1/1"}},
+        "unresolved": {"1": "0/1"},
         "remaining_node_ids": null,
-        "pending_decision": "Q-016",
-        "explanation": "R-04 chỉ tính hàng 1; cả cha mẹ đã chết trước, người chết không có vợ/chồng hay con. Anh/chị/em hoặc nhánh cháu còn sống thuộc hàng 2/3 nên chưa được chia, trạng thái unsupported chờ Q-016; dấu Nhận không thay đổi thứ bậc."
+        "pending_decision": null,
+        "explanation": "D-038/R-32: hàng 1 và hàng 2 trống; chỉ P5 là cháu gọi người chết bằng bác/chú/cậu/cô/dì có dấu Nhận, hưởng toàn bộ ở hàng 3. Đây không phải thế vị anh/chị/em."
       }
     },
     {
@@ -344,15 +340,13 @@
       },
       "action": null,
       "expected": {
-        "status": "unsupported",
-        "reasons": [
-          "heir_rank_not_supported"
-        ],
-        "shares": {},
-        "unresolved": {},
+        "status": "incomplete",
+        "reasons": [],
+        "shares": {"1": {}},
+        "unresolved": {"1": "1/1"},
         "remaining_node_ids": null,
-        "pending_decision": "Q-016",
-        "explanation": "R-04 chỉ tính hàng 1; cả cha mẹ đã chết trước, người chết không có vợ/chồng hay con. Anh/chị/em hoặc nhánh cháu còn sống thuộc hàng 2/3 nên chưa được chia, trạng thái unsupported chờ Q-016; dấu Nhận không thay đổi thứ bậc."
+        "pending_decision": null,
+        "explanation": "D-038/R-32: hàng 1 và hàng 2 trống; cháu thuộc hàng 3 không có dấu Nhận nên từ chối theo R-19. Cả ba hàng không có người nhận: incomplete, toàn bộ di sản chưa phân bổ."
       }
     },
     {
@@ -496,15 +490,13 @@
       },
       "action": null,
       "expected": {
-        "status": "unsupported",
-        "reasons": [
-          "heir_rank_not_supported"
-        ],
-        "shares": {},
-        "unresolved": {},
+        "status": "complete",
+        "reasons": [],
+        "shares": {"1": {"P4": "1/1"}},
+        "unresolved": {"1": "0/1"},
         "remaining_node_ids": null,
-        "pending_decision": "Q-016",
-        "explanation": "R-04 chỉ tính hàng 1; cả cha mẹ đã chết trước, người chết không có vợ/chồng hay con. Anh/chị/em hoặc nhánh cháu còn sống thuộc hàng 2/3 nên chưa được chia, trạng thái unsupported chờ Q-016; dấu Nhận không thay đổi thứ bậc."
+        "pending_decision": null,
+        "explanation": "D-038/R-32: hàng 1 trống; P4 thuộc hàng 2 có dấu Nhận nên hưởng toàn bộ. Các con của P4 thuộc hàng 3 không được chia khi hàng 2 còn người nhận."
       }
     },
     {
@@ -662,15 +654,13 @@
       },
       "action": null,
       "expected": {
-        "status": "unsupported",
-        "reasons": [
-          "heir_rank_not_supported"
-        ],
-        "shares": {},
-        "unresolved": {},
+        "status": "complete",
+        "reasons": [],
+        "shares": {"1": {"P7": "1/1"}},
+        "unresolved": {"1": "0/1"},
         "remaining_node_ids": null,
-        "pending_decision": "Q-016",
-        "explanation": "R-04 chỉ tính hàng 1; cả cha mẹ đã chết trước, người chết không có vợ/chồng hay con. Anh/chị/em hoặc nhánh cháu còn sống thuộc hàng 2/3 nên chưa được chia, trạng thái unsupported chờ Q-016; dấu Nhận không thay đổi thứ bậc."
+        "pending_decision": null,
+        "explanation": "D-038/R-32: hàng 1 và hàng 2 trống; trong các cháu thuộc hàng 3 chỉ P7 có dấu Nhận nên hưởng toàn bộ. Không thế vị trong hàng 2/3."
       }
     },
     {
@@ -846,15 +836,13 @@
       },
       "action": null,
       "expected": {
-        "status": "unsupported",
-        "reasons": [
-          "heir_rank_not_supported"
-        ],
-        "shares": {},
-        "unresolved": {},
+        "status": "complete",
+        "reasons": [],
+        "shares": {"1": {"P5": "1/2", "P8": "1/2"}},
+        "unresolved": {"1": "0/1"},
         "remaining_node_ids": null,
-        "pending_decision": "Q-016",
-        "explanation": "R-04 chỉ tính hàng 1; cả cha mẹ đã chết trước, người chết không có vợ/chồng hay con. Anh/chị/em hoặc nhánh cháu còn sống thuộc hàng 2/3 nên chưa được chia, trạng thái unsupported chờ Q-016; dấu Nhận không thay đổi thứ bậc."
+        "pending_decision": null,
+        "explanation": "D-038/R-32: hàng 1 và hàng 2 trống; hàng 3 có P5 và P8 nhận, mỗi người một suất 1/2. Những cháu không có dấu Nhận từ chối theo R-19; không chia theo nhánh anh/chị/em."
       }
     },
     {
@@ -1044,15 +1032,13 @@
       },
       "action": null,
       "expected": {
-        "status": "unsupported",
-        "reasons": [
-          "heir_rank_not_supported"
-        ],
-        "shares": {},
-        "unresolved": {},
+        "status": "complete",
+        "reasons": [],
+        "shares": {"1": {"P4": "1/1"}},
+        "unresolved": {"1": "0/1"},
         "remaining_node_ids": null,
-        "pending_decision": "Q-016",
-        "explanation": "R-04 chỉ tính hàng 1; cả cha mẹ đã chết trước, người chết không có vợ/chồng hay con. Anh/chị/em hoặc nhánh cháu còn sống thuộc hàng 2/3 nên chưa được chia, trạng thái unsupported chờ Q-016; dấu Nhận không thay đổi thứ bậc."
+        "pending_decision": null,
+        "explanation": "D-038/R-32: hàng 1 trống; P4 thuộc hàng 2 có dấu Nhận nên hưởng toàn bộ, các cháu thuộc hàng 3 không có suất khi hàng 2 còn người nhận."
       }
     },
     {
@@ -1260,15 +1246,13 @@
       },
       "action": null,
       "expected": {
-        "status": "unsupported",
-        "reasons": [
-          "heir_rank_not_supported"
-        ],
-        "shares": {},
-        "unresolved": {},
+        "status": "complete",
+        "reasons": [],
+        "shares": {"1": {"P10": "1/2", "P6": "1/2"}},
+        "unresolved": {"1": "0/1"},
         "remaining_node_ids": null,
-        "pending_decision": "Q-016",
-        "explanation": "R-04 chỉ tính hàng 1; cả cha mẹ đã chết trước, người chết không có vợ/chồng hay con. Anh/chị/em hoặc nhánh cháu còn sống thuộc hàng 2/3 nên chưa được chia, trạng thái unsupported chờ Q-016; dấu Nhận không thay đổi thứ bậc."
+        "pending_decision": null,
+        "explanation": "D-038/R-32: hàng 1 và hàng 2 trống; hàng 3 có P6 và P10 nhận, mỗi người một suất 1/2. Các cháu còn lại thiếu dấu Nhận nên từ chối theo R-19; không thế vị."
       }
     },
     {
@@ -1378,15 +1362,13 @@
       },
       "action": null,
       "expected": {
-        "status": "unsupported",
-        "reasons": [
-          "heir_rank_not_supported"
-        ],
-        "shares": {},
-        "unresolved": {},
+        "status": "complete",
+        "reasons": [],
+        "shares": {"1": {"P4": "1/1"}},
+        "unresolved": {"1": "0/1"},
         "remaining_node_ids": null,
-        "pending_decision": "Q-016",
-        "explanation": "R-04 chỉ tính hàng 1; cả cha mẹ đã chết trước, người chết không có vợ/chồng hay con. Anh/chị/em hoặc nhánh cháu còn sống thuộc hàng 2/3 nên chưa được chia, trạng thái unsupported chờ Q-016; dấu Nhận không thay đổi thứ bậc."
+        "pending_decision": null,
+        "explanation": "D-038/R-32: hàng 1 trống; P4 thuộc hàng 2 có dấu Nhận nên hưởng toàn bộ, ưu tiên trước cháu thuộc hàng 3."
       }
     },
     {
@@ -1528,15 +1510,13 @@
       },
       "action": null,
       "expected": {
-        "status": "unsupported",
-        "reasons": [
-          "heir_rank_not_supported"
-        ],
-        "shares": {},
-        "unresolved": {},
+        "status": "complete",
+        "reasons": [],
+        "shares": {"1": {"P5": "1/1"}},
+        "unresolved": {"1": "0/1"},
         "remaining_node_ids": null,
-        "pending_decision": "Q-016",
-        "explanation": "R-04 chỉ tính hàng 1; cả cha mẹ đã chết trước, người chết không có vợ/chồng hay con. Anh/chị/em hoặc nhánh cháu còn sống thuộc hàng 2/3 nên chưa được chia, trạng thái unsupported chờ Q-016; dấu Nhận không thay đổi thứ bậc."
+        "pending_decision": null,
+        "explanation": "D-038/R-32: hàng 1 và hàng 2 trống; chỉ P5 thuộc hàng 3 có dấu Nhận nên hưởng toàn bộ. Người chết trước không hưởng và không được thế vị trong hàng 2/3."
       }
     }
   ]

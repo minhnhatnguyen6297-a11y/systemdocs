@@ -1,4 +1,4 @@
-"""Independent reference implementation of inheritance rules R-07–R-29."""
+"""Independent reference implementation of inheritance rules R-07–R-29 and R-32."""
 from datetime import date
 from fractions import Fraction
 
@@ -163,8 +163,19 @@ def solve(case):
                 if reasons:
                     return {"status": "unsupported", "reasons": sorted(set(reasons)), "shares": {}, "unresolved": {}, "remaining_node_ids": remaining if action else None, "pending_decision": None}
                 if not units:
-                    if _has_lower_rank_heirs(decedent, parent_ids, children, death, when):
-                        return {"status": "unsupported", "reasons": ["heir_rank_not_supported"], "shares": {}, "unresolved": {}, "remaining_node_ids": remaining if action else None, "pending_decision": "Q-016"}
+                    for candidates in _lower_ranks(decedent, parent_ids, children):
+                        units = [
+                            ("person", person)
+                            for person in sorted(candidates)
+                            if _order(when, death.get(person)) == -1
+                            or (
+                                death.get(person) is None
+                                and any(asset in n["receivePositions"] for n in person_nodes.get(person, []))
+                            )
+                        ]
+                        if units:
+                            break
+                if not units:
                     unresolved += value
                     overall = "incomplete"
                     continue
@@ -180,28 +191,28 @@ def solve(case):
     return {"status": overall, "reasons": [], "shares": output_shares, "unresolved": output_unresolved, "remaining_node_ids": remaining if action else None, "pending_decision": None}
 
 
-def _has_lower_rank_heirs(decedent, parent_ids, children, death, when):
-    """Detect eligible siblings and their descendants connected through a shared parent."""
-    siblings = {
-        sibling
-        for parent in parent_ids.get(decedent, ())
-        for sibling in children.get(parent, ())
-        if sibling != decedent
+def _lower_ranks(decedent, parent_ids, children):
+    """Collect explicit R-32 relations, deduplicated by person within each rank."""
+    parents = parent_ids.get(decedent, set())
+    grandparents = {p for parent in parents for p in parent_ids.get(parent, ())}
+    siblings = {p for parent in parents for p in children.get(parent, ())} - {decedent}
+    grandchildren = {
+        p for child in children.get(decedent, ()) for p in children.get(child, ())
     }
-    for sibling in siblings:
-        if death.get(sibling) is None or _order(when, death.get(sibling)) == -1:
-            return True
-        frontier = list(children.get(sibling, ()))
-        visited = set()
-        while frontier:
-            person = frontier.pop()
-            if person in visited:
-                continue
-            visited.add(person)
-            if death.get(person) is None or _order(when, death.get(person)) == -1:
-                return True
-            frontier.extend(children.get(person, ()))
-    return False
+    yield (grandparents | siblings | grandchildren) - {decedent}
+    great_grandparents = {
+        p for grandparent in grandparents for p in parent_ids.get(grandparent, ())
+    }
+    parent_siblings = {
+        p for grandparent in grandparents for p in children.get(grandparent, ())
+    } - parents
+    sibling_children = {p for sibling in siblings for p in children.get(sibling, ())}
+    great_grandchildren = {
+        p for grandchild in grandchildren for p in children.get(grandchild, ())
+    }
+    yield (
+        great_grandparents | parent_siblings | sibling_children | great_grandchildren
+    ) - {decedent}
 
 
 def _branch(child, children, death, person_nodes, asset, ancestor_death):

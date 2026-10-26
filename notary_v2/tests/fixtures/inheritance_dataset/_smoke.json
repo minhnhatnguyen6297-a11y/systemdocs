@@ -118,14 +118,14 @@
     {
       "id": "F00-009",
       "family": "_smoke",
-      "title": "Sibling rank heirs are unsupported pending decision",
-      "rules": ["R-04"],
+      "title": "Anh/chị/em hàng 2 nhận khi hàng 1 từ chối",
+      "rules": ["R-04", "R-15", "R-19", "R-32"],
       "meta": {},
       "asset_count": 1,
       "people": {"P1": {"ho_ten": "Người R", "ngay_chet": "2020"}, "P2": {"ho_ten": "Người S", "ngay_chet": null}, "P3": {"ho_ten": "Người T", "ngay_chet": null}},
       "diagram": {"version": 3, "domain": "inheritance", "nodes": [{"id": "n1", "personId": "P1", "parentSlotIds": ["n3"], "spouseSlotId": null, "ownPositions": [1], "receivePositions": [], "hidden": false, "deleted": false}, {"id": "n2", "personId": "P2", "parentSlotIds": ["n3"], "spouseSlotId": null, "ownPositions": [], "receivePositions": [1], "hidden": false, "deleted": false}, {"id": "n3", "personId": "P3", "parentSlotIds": [], "spouseSlotId": null, "ownPositions": [], "receivePositions": [], "hidden": false, "deleted": false}]},
       "action": null,
-      "expected": {"status": "unsupported", "reasons": ["heir_rank_not_supported"], "shares": {}, "unresolved": {}, "remaining_node_ids": null, "pending_decision": "Q-016", "explanation": "A sibling is connected through their shared parent; rank two awaits Q-016."}
+      "expected": {"status": "complete", "reasons": [], "shares": {"1": {"P2": "1/1"}}, "unresolved": {"1": "0/1"}, "remaining_node_ids": null, "pending_decision": null, "explanation": "D-038/R-32: cha/mẹ P3 không có dấu Nhận nên hàng 1 trống; anh/chị/em P2 thuộc hàng 2 có dấu Nhận, hưởng toàn bộ. Mỗi người một suất, không thế vị hàng 2/3."}
     },
     {
       "id": "F00-010",
