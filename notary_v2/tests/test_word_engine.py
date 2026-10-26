@@ -2083,3 +2083,63 @@ def test_two_party_no_assets_not_blocked_and_noted():
     missing = []
     build_template_mapping(case, missing=missing)
     assert "tài sản" in missing
+
+
+def test_word_spouse_role_uses_only_last_slot_member_and_preserves_other_roles():
+    from services.word_engine import (
+        WordPerson,
+        _apply_spouse_slot_roles,
+    )
+
+    deceased = WordPerson(row_id="dead", ngay_chet="2020-01-01")
+    faded = WordPerson(row_id="faded", role="Vợ/Chồng",
+                       relation="Vợ/Chồng")
+    faded_with_role = WordPerson(row_id="faded-role", role="Con")
+    lawful = WordPerson(row_id="lawful")
+    persons = [deceased, faded, faded_with_role, lawful]
+    nodes = [
+        {"id": "dead", "personId": "dead",
+         "spouseSlotIds": ["faded", "faded-role", "lawful"]},
+        {"id": "faded", "personId": "faded"},
+        {"id": "faded-role", "personId": "faded-role"},
+        {"id": "lawful", "personId": "lawful"},
+    ]
+
+    _apply_spouse_slot_roles(persons, nodes)
+
+    assert faded.role == "" and faded.relation == ""
+    assert faded_with_role.role == "Con"
+    assert lawful.role == "Vợ/Chồng"
+
+
+@pytest.mark.parametrize("undetermined", [False, True])
+def test_word_context_applies_saved_one_way_spouse_slots(undetermined):
+    owner = _person(1, "Chủ đất", dead=date(2024, 1, 1))
+    faded = _person(2, "Vợ trước")
+    lawful = _person(3, "Vợ sau")
+    representative = _person(4, "Đại diện")
+    owner_node = _node(1, role="Owner", is_land_owner=True)
+    owner_node.update(
+        spouseSlotIds=["node_2", "node_3"],
+        spouseUndetermined=undetermined)
+    nodes = [
+        _node(3, will_receive=True),
+        _node(2, role="Vợ/Chồng"),
+        owner_node,
+    ]
+    case = _make_case(
+        owner,
+        participants=[_participant(representative, "Người được ủy quyền")],
+        case_state=_case_state_v2(
+            owner, faded, lawful, representative, nodes=nodes,
+            allocations={"3": {"finalShare": "1/2"}}))
+
+    context = build_word_context(case)
+    by_name = {person.ho_ten: person for person in context.persons}
+    assert [person.ho_ten for person in context.persons] == [
+        "Chủ đất", "Vợ trước", "Vợ sau", "Đại diện"]
+    assert by_name["Vợ trước"].role == ""
+    assert by_name["Vợ sau"].role == ("Khac" if undetermined else "Vợ/Chồng")
+    assert by_name["Vợ sau"].share == "1/2"
+    assert context.receivers == [by_name["Vợ sau"]]
+    assert context.authorized_people == [by_name["Đại diện"]]

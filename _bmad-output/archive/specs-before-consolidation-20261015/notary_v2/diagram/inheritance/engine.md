@@ -110,7 +110,10 @@ theo `personId`, không tin bản sao trong browser.
       "relationType": "person",
       "roleLabel": "Chủ đất",
       "parentSlotIds": [],
+      "spouseSlotIds": ["slot_spouse"],
       "spouseSlotId": "slot_spouse",
+      "spouseSuggestionId": null,
+      "spouseUndetermined": false,
       "isLandOwner": true,
       "willReceive": false,
       "hidden": false,
@@ -129,7 +132,10 @@ Quy ước field:
 | `relationType` | Chỉ phục vụ UI/validation; engine lấy huyết thống từ các ID quan hệ rõ ràng. |
 | `roleLabel` | Nhãn hiển thị, không quyết định quyền thừa kế. |
 | `parentSlotIds` | 0-2 slot cha/mẹ. Không fallback về owner hoặc parent đầu tiên. |
-| `spouseSlotId` | Slot vợ/chồng; backend chuẩn hóa quan hệ hai chiều. |
+| `spouseSlotIds` | Danh sách slot vợ/chồng theo thứ tự thả; phần tử cuối là vợ/chồng hợp pháp. |
+| `spouseSlotId` | Mirror tương thích, bằng phần tử cuối của `spouseSlotIds` hoặc `null`. |
+| `spouseSuggestionId` | Gợi ý được migrate từ node còn sống; engine không sử dụng. |
+| `spouseUndetermined` | `true` khi migration tìm thấy hai ứng viên khác nhau; không tính phần vợ/chồng cho anchor đến khi người dùng xác định. |
 | `isLandOwner` | Trạng thái nút `Chủ đất`; có thể có nhiều người. |
 | `willReceive` | Trạng thái nút `Nhận`; chỉ điều khiển người còn sống ở kết quả cuối. |
 | `hidden/deleted` | Node bị ẩn/xóa không phải active node. |
@@ -141,15 +147,14 @@ Validation bắt buộc:
 
 - `id` duy nhất, `personId` tồn tại trong Stage và DB.
 - Mỗi active `personId` chỉ có một node.
-- Mọi `parentSlotIds` và `spouseSlotId` phải trỏ đến node tồn tại.
-- Tối đa hai cha/mẹ; không self-parent, self-spouse, chu kỳ huyết thống hoặc quan hệ vợ/chồng lệch.
-- Không suy quan hệ từ vị trí card, `roleLabel`, generation, `familyGroupId`, `sourceId` hoặc node đầu.
-- Có ít nhất một `Chủ đất`; các chủ đất được chia sở hữu gốc đều `1/n`.
-- Tỷ lệ sở hữu gốc không đều là `unsupported`, không tự tính gần đúng.
-
-Loader hồ sơ cũ được phép đọc `parentSlotId`, `parentPersonId`, `spouseOf`, `familyGroupId` để migrate
-trong bộ nhớ. Save V2 chỉ ghi contract chuẩn trên. Quan hệ legacy mơ hồ phải báo user đặt lại nhánh,
-không tự gắn.
+- Mọi `parentSlotIds` và `spouseSlotIds` phải trỏ đến node tồn tại.
+- Tối đa hai cha/mẹ; không self-parent, self-spouse hoặc chu kỳ huyết thống.
+- Vợ/chồng một chiều: chỉ slot của người chết có tài sản được đọc; không có yêu cầu liên kết ngược hay lỗi `spouse_conflict`.
+- Legacy engine input thiếu khóa `spouseSlotIds` được đọc từ `spouseSlotId` cùng node; không suy ngược.
+- Theo D-041 sửa đổi v2, chủ đất còn sống vẫn có ô vợ/chồng và ô dự phòng; người khác còn sống không sinh ô. Nhánh chuyển tiếp có ô vợ/chồng, nhánh thế vị chỉ có ô con.
+- Khi slot có nhiều người, chỉ người cuối là vợ/chồng hợp pháp; các phần tử trước đó không được tính phần vợ/chồng.
+- Migration v3→v4 thu ứng viên từ liên kết cũ hai chiều; có hai ứng viên khác nhau thì giữ thứ tự own-link trước rồi thứ tự node và đặt `spouseUndetermined=true`.
+- Node còn sống được migrate thành slot rỗng và `spouseSuggestionId`; khi đặt ngày chết, UI điền gợi ý nếu slot rỗng rồi xóa gợi ý.
 
 ## 4. Thuật toán nghiệp vụ bắt buộc
 
@@ -397,7 +402,7 @@ tài liệu cũ để không gợi ý một tính năng ngoài scope.
 
 ### 7.3 `diagram_edges.js`
 
-- Chỉ dựng kinship edges từ `parentSlotIds` và `spouseSlotId`.
+- Chỉ dựng kinship edges từ `parentSlotIds` và `spouseSlotIds`.
 - Cặp cha/mẹ cùng trỏ xuống con; Z phải nối đúng C/D nếu input ghi C/D.
 - Không build/render flow edge tài sản.
 - Quan hệ thiếu/mơ hồ không tự nối về A/B hoặc owner.

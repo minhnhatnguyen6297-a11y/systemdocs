@@ -126,7 +126,10 @@ def _node(nid, person_id=None, parents=(), spouse=None, own=(),
           receive=(), hidden=False, deleted=False):
     """diagram node v3 (§13.4)."""
     return {"id": nid, "personId": person_id,
-            "parentSlotIds": list(parents), "spouseSlotId": spouse,
+            "parentSlotIds": list(parents),
+            "spouseSlotIds": [spouse] if spouse else [],
+            "spouseSlotId": spouse,
+            "spouseSuggestionId": None, "spouseUndetermined": False,
             "ownPositions": list(own), "receivePositions": list(receive),
             "hidden": hidden, "deleted": deleted}
 

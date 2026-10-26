@@ -209,7 +209,8 @@
     "node_v3_inheritance": {
       "type": "object",
       "required": [
-        "id", "personId", "parentSlotIds", "spouseSlotId",
+        "id", "personId", "parentSlotIds", "spouseSlotIds",
+        "spouseSlotId", "spouseSuggestionId", "spouseUndetermined",
         "ownPositions", "receivePositions", "hidden", "deleted"
       ],
       "additionalProperties": false,
@@ -226,7 +227,14 @@
           "maxItems": 2,
           "items": { "type": "string", "minLength": 1 }
         },
+        "spouseSlotIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
         "spouseSlotId": { "type": ["string", "null"], "minLength": 1 },
+        "spouseSuggestionId": { "type": ["string", "null"], "minLength": 1 },
+        "spouseUndetermined": { "type": "boolean" },
         "ownPositions": {
           "type": "array",
           "uniqueItems": true,

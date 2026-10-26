@@ -759,6 +759,15 @@
 }
 .cd-node-owner { box-shadow: 0 0 0 2px var(--accent-soft), var(--sh-card); }
 .cd-node-hidden { opacity: .6; }
+.cd-node-spouse-lawful { border: 2px solid var(--accent); }
+.cd-node-spouse-faded { opacity: .58; }
+.cd-spouse-label {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 13px;
+}
+.cd-node-spouse-lawful .cd-spouse-label { font-weight: 700; }
+.cd-spouse-promote { margin: 2px 0; padding: 2px 4px; }
 /* Nút hành động trên node (gán lại / bỏ gán / xóa slot): nổi góc phải
  * trên, chỉ hiện khi hover/focus — vẫn trong tab order (MIN-133). */
 .cd-node-acts {

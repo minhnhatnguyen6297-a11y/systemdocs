@@ -613,6 +613,36 @@ def _apply_diagram_nodes(
     return persons
 
 
+def _apply_spouse_slot_roles(persons: list[WordPerson],
+                             nodes: list[dict[str, Any]]) -> None:
+    """Only the last spouse-slot person of a deceased node has spouse role."""
+    by_row = {person.row_id: person for person in persons if person.row_id}
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        candidates = node.get("spouseSlotIds")
+        if not isinstance(candidates, list):
+            legacy = node.get("spouseSlotId")
+            candidates = [legacy] if legacy else []
+        undetermined = node.get("spouseUndetermined") is True
+        person = by_row.get(_safe_text(node.get("personId")))
+        if person is None or not person.is_deceased:
+            continue
+        for index, slot_id in enumerate(candidates):
+            spouse_node = next(
+                (candidate for candidate in nodes
+                 if isinstance(candidate, dict)
+                 and candidate.get("id") == slot_id), None)
+            spouse = by_row.get(_safe_text((spouse_node or {}).get("personId")))
+            if spouse is not None:
+                if index == len(candidates) - 1 and not undetermined:
+                    spouse.role = "Vợ/Chồng"
+                    spouse.relation = "Vợ/Chồng"
+                elif _role_key(spouse.role) == "vo_chong":
+                    spouse.role = ""
+                    spouse.relation = ""
+
+
 def _apply_two_party_slots(
     persons: list[WordPerson],
     nodes: list[dict[str, Any]],
@@ -692,6 +722,7 @@ def _build_word_persons(case: Any) -> _WordPersonsBuild:
         persons = _apply_two_party_slots(persons, state_nodes)
     else:
         persons = _apply_diagram_nodes(persons, state_nodes, allocations)
+        _apply_spouse_slot_roles(persons, state_nodes)
     _merge_participant_roles(persons, case)
     if case_type != "two_party" and not has_diagram_state:
         # Chưa có Diagram: projection participant (đã ghi cùng transaction

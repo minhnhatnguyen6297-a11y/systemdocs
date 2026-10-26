@@ -129,7 +129,10 @@ def _node(nid, person_id=None, parents=(), spouse=None,
     """diagram node v3 (§13.4) — ownPositions/receivePositions ⊆ {1..5}."""
     return {
         "id": nid, "personId": person_id,
-        "parentSlotIds": list(parents), "spouseSlotId": spouse,
+        "parentSlotIds": list(parents),
+        "spouseSlotIds": [spouse] if spouse else [],
+        "spouseSlotId": spouse, "spouseSuggestionId": None,
+        "spouseUndetermined": False,
         "ownPositions": list(own), "receivePositions": list(receive),
         "hidden": hidden, "deleted": deleted,
     }
@@ -380,8 +383,10 @@ class TestWorkspaceGet:
         stage_ids = {p["row_id"] for p in data["stage"]["people"]}
         for n in data["diagram"]["state"]["nodes"]:
             assert set(n) <= {"id", "personId", "parentSlotIds",
-                              "spouseSlotId", "ownPositions",
-                              "receivePositions", "hidden", "deleted"}
+                              "spouseSlotIds", "spouseSlotId",
+                              "spouseSuggestionId", "spouseUndetermined",
+                              "ownPositions", "receivePositions",
+                              "hidden", "deleted"}
             if n["personId"] is not None:
                 assert n["personId"] in stage_ids
         _assert_contract(_job_doc(

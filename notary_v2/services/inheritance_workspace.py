@@ -10,8 +10,8 @@ v2 ở MIN-128).
 Wire diagram state V3 (§13.4):
     {"version": 3, "domain": "inheritance" | "two_party",
      "nodes": [node_v3_inheritance | node_v3_two_party]}
-
-- inheritance node: {id, personId, parentSlotIds, spouseSlotId,
+- inheritance node: {id, personId, parentSlotIds, spouseSlotIds,
+  spouseSlotId mirror, spouseSuggestionId, spouseUndetermined,
   ownPositions ⊆ {1,2,3}, receivePositions ⊆ {1,2,3}, hidden, deleted}
 - two_party node: đúng 30 phần tử theo thứ tự canonical {id ∈ p1..p30,
   personId, hidden, deleted} — ô trống giữ chỗ, KHÔNG compact; domain
@@ -50,8 +50,9 @@ from services.case_workspace import (
 
 
 _INHERITANCE_NODE_FIELDS = {
-    "id", "personId", "parentSlotIds", "spouseSlotId",
-    "ownPositions", "receivePositions", "hidden", "deleted"}
+    "id", "personId", "parentSlotIds", "spouseSlotId", "spouseSlotIds",
+    "spouseSuggestionId", "spouseUndetermined", "ownPositions",
+    "receivePositions", "hidden", "deleted"}
 _TWO_PARTY_NODE_FIELDS = {"id", "personId", "hidden", "deleted"}
 _TWO_PARTY_IDS = tuple(f"p{i}" for i in range(1, 31))
 _TWO_PARTY_ID_SET = set(_TWO_PARTY_IDS)
@@ -169,16 +170,32 @@ def _validate_diagram_wire(state: Any) -> list:
             errors.append({
                 "code": "self_parent",
                 "message": f"nodes[{i}] tự trỏ làm cha/mẹ"})
-        sl = node.get("spouseSlotId")
-        if sl is not None and (not isinstance(sl, str) or not sl):
+        spouse_ids = node.get("spouseSlotIds")
+        if not isinstance(spouse_ids, list) or any(
+                not isinstance(spouse_id, str) or not spouse_id
+                for spouse_id in spouse_ids):
             errors.append({
-                "code": "invalid_spouse",
-                "message": f"nodes[{i}].spouseSlotId phải là chuỗi node-id "
-                           "hoặc null"})
-        elif sl == nid:
+                "code": "invalid_spouse_slots",
+                "message": f"nodes[{i}].spouseSlotIds phải là mảng chuỗi"})
+            spouse_ids = []
+        elif len(set(spouse_ids)) != len(spouse_ids):
+            errors.append({
+                "code": "duplicate_spouse",
+                "message": f"nodes[{i}].spouseSlotIds không được trùng"})
+        elif nid in spouse_ids:
             errors.append({
                 "code": "self_spouse",
                 "message": f"nodes[{i}] tự trỏ làm vợ/chồng"})
+        suggestion = node.get("spouseSuggestionId")
+        if suggestion is not None and (
+                not isinstance(suggestion, str) or not suggestion):
+            errors.append({
+                "code": "invalid_spouse_suggestion",
+                "message": f"nodes[{i}].spouseSuggestionId phải là chuỗi hoặc null"})
+        if not isinstance(node.get("spouseUndetermined"), bool):
+            errors.append({
+                "code": "invalid_boolean",
+                "message": f"nodes[{i}].spouseUndetermined phải là boolean"})
         for pf in ("ownPositions", "receivePositions"):
             arr = node.get(pf)
             if not isinstance(arr, list):
@@ -209,18 +226,11 @@ def _validate_diagram_wire(state: Any) -> list:
                         "code": "dangling_parent",
                         "message": f"nodes[{i}] parentSlotIds '{p}' "
                                    "không tồn tại"})
-            sl = node.get("spouseSlotId")
-            if isinstance(sl, str) and sl not in ids:
-                errors.append({
-                    "code": "dangling_spouse",
-                    "message": f"nodes[{i}] spouseSlotId '{sl}' không tồn tại"})
-            elif (isinstance(sl, str) and sl in node_by_id
-                    and node_by_id[sl].get("spouseSlotId")
-                    != node.get("id")):
-                errors.append({
-                    "code": "spouse_conflict",
-                    "message": f"nodes[{i}] và '{sl}' không link vợ-chồng "
-                               "hai chiều"})
+            for spouse_id in node.get("spouseSlotIds") or []:
+                if spouse_id not in ids:
+                    errors.append({
+                        "code": "dangling_spouse",
+                        "message": f"nodes[{i}] spouseSlotIds '{spouse_id}' không tồn tại"})
         # Cycle trên cạnh cha-con.
         children = {}
         for node in node_by_id.values():
@@ -288,7 +298,10 @@ def _persisted_state(state: Mapping[str, Any]) -> dict:
             "id": n["id"],
             "personId": n.get("personId"),
             "parentSlotIds": list(n.get("parentSlotIds") or []),
-            "spouseSlotId": n.get("spouseSlotId"),
+            "spouseSlotIds": list(n.get("spouseSlotIds") or []),
+            "spouseSlotId": (n.get("spouseSlotIds") or [None])[-1],
+            "spouseSuggestionId": n.get("spouseSuggestionId"),
+            "spouseUndetermined": n.get("spouseUndetermined", False),
             "ownPositions": _positions(n.get("ownPositions")),
             "receivePositions": _positions(n.get("receivePositions")),
             "hidden": n["hidden"],
@@ -535,7 +548,8 @@ class InheritanceWorkspaceService:
             committed_state = case_ws._state_v3(
                 composed.payload, domain=case_type,
                 valid_row_ids=valid_rows,
-                asset_count=len(composed.assets))
+                asset_count=len(composed.assets),
+                person_rows={p["row_id"]: p for p in composed.people})
             owner_row_id = None
             if case_type == CASE_TYPE_INHERITANCE:
                 owner_row_id = case_ws._resolve_owner_row_id(

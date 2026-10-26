@@ -72,8 +72,10 @@ DOC_KEY_RX = re.compile(r"^[a-z][a-z0-9_]*$")
 GENDERS = ("Nam", "Nữ", None)
 INTAKE_KINDS = ("image", "pdf", "docx", "xlsx", "text")
 NODE_BOOL_FIELDS = ("hidden", "deleted")
-NODE_FIELDS = {"id", "personId", "parentSlotIds", "spouseSlotId",
-               "ownPositions", "receivePositions", "hidden", "deleted"}
+NODE_FIELDS = {
+    "id", "personId", "parentSlotIds", "spouseSlotIds", "spouseSlotId",
+    "spouseSuggestionId", "spouseUndetermined", "ownPositions",
+    "receivePositions", "hidden", "deleted"}
 NODE_FIELDS_TWO_PARTY = {"id", "personId", "hidden", "deleted"}
 PERSON_FIELDS = ("row_id", "entity_id", "ho_ten", "gioi_tinh", "ngay_sinh",
                  "ngay_chet", "so_giay_to", "ngay_cap", "noi_cap",
@@ -458,14 +460,27 @@ def _validate_diagram_state(state):
         elif nid in ps:
             errors.append({"code": "self_parent", "node": nid,
                            "message": f"{nid} tự làm cha"})
-        ss = n.get("spouseSlotId")
-        if ss is not None and not (isinstance(ss, str) and ss.strip()):
-            errors.append({"code": "invalid_spouse", "node": nid,
-                           "message": f"{w}.spouseSlotId phải là "
-                                      "string non-empty/null"})
-        elif ss == nid:
+        spouse_ids = n.get("spouseSlotIds")
+        if not isinstance(spouse_ids, list) or any(
+                not isinstance(value, str) or not value.strip()
+                for value in spouse_ids):
+            errors.append({"code": "invalid_spouse_slots", "node": nid,
+                           "message": f"{w}.spouseSlotIds phải là list "
+                                      "chuỗi không rỗng"})
+            spouse_ids = []
+        elif len(set(spouse_ids)) != len(spouse_ids):
+            errors.append({"code": "duplicate_spouse", "node": nid,
+                           "message": f"{w}.spouseSlotIds bị trùng"})
+        elif nid in spouse_ids:
             errors.append({"code": "self_spouse", "node": nid,
                            "message": f"{nid} tự làm vợ/chồng"})
+        expected = spouse_ids[-1] if spouse_ids else None
+        if n.get("spouseSlotId") != expected:
+            errors.append({"code": "invalid_spouse_mirror", "node": nid,
+                           "message": f"{w}.spouseSlotId không khớp slot"})
+        if not isinstance(n.get("spouseUndetermined"), bool):
+            errors.append({"code": "invalid_boolean", "node": nid,
+                           "message": f"{w}.spouseUndetermined phải bool"})
         for pf in ("ownPositions", "receivePositions"):
             arr = n.get(pf)
             if not isinstance(arr, list):
@@ -493,19 +508,11 @@ def _validate_diagram_state(state):
                     errors.append({"code": "dangling_parent", "node": nid,
                                    "message": f"{nid} tham chiếu parent "
                                               f"{p!r} không tồn tại"})
-            ss = n.get("spouseSlotId")
-            if isinstance(ss, str):
-                if ss not in ids:
+            for spouse_id in filter(None, n.get("spouseSlotIds") or []):
+                if spouse_id not in ids:
                     errors.append({"code": "dangling_spouse", "node": nid,
                                    "message": f"{nid} tham chiếu spouse "
-                                              f"{ss!r} không tồn tại"})
-                else:
-                    other = node_by_id.get(ss) or {}
-                    if other.get("spouseSlotId") != nid:
-                        errors.append({"code": "spouse_conflict",
-                                       "node": nid,
-                                       "message": f"{nid}↔{ss} spouse "
-                                                  "không đối xứng"})
+                                              f"{spouse_id!r} không tồn tại"})
         for nid in ids:
             seen = set()
             frontier = list(
@@ -550,7 +557,10 @@ def _persisted_diagram_state(state):
             "nodes": [{
                 "id": n["id"], "personId": n.get("personId"),
                 "parentSlotIds": list(n.get("parentSlotIds") or []),
+                "spouseSlotIds": list(n.get("spouseSlotIds") or []),
                 "spouseSlotId": n.get("spouseSlotId"),
+                "spouseSuggestionId": n.get("spouseSuggestionId"),
+                "spouseUndetermined": n.get("spouseUndetermined", False),
                 "ownPositions": list(n.get("ownPositions") or []),
                 "receivePositions": list(n.get("receivePositions") or []),
                 "hidden": n["hidden"], "deleted": n["deleted"]}
@@ -798,9 +808,12 @@ def _prune_diagram(case):
         if isinstance(n.get("parentSlotIds"), list):
             n["parentSlotIds"] = [p for p in n["parentSlotIds"]
                                   if p in node_ids and p not in dropped]
-        ss = n.get("spouseSlotId")
-        if ss is not None and (ss not in node_ids or ss in dropped):
-            n["spouseSlotId"] = None
+        spouses = n.get("spouseSlotIds") or []
+        n["spouseSlotIds"] = [
+            spouse for spouse in spouses
+            if spouse and spouse in node_ids and spouse not in dropped]
+        n["spouseSlotId"] = (
+            n["spouseSlotIds"][-1] if n["spouseSlotIds"] else None)
         if two_party:
             continue
         for k in ("ownPositions", "receivePositions"):
@@ -1159,6 +1172,17 @@ def _workspace_data(cid, case):
     if dom == CASE_TYPE_INHERITANCE:
         stage_out["owner_row_id"] = stage.get("owner_row_id")
     dg = case.get("diagram") or {}
+    persisted_state = copy.deepcopy(dg.get("state"))
+    if isinstance(persisted_state, dict) and dom == CASE_TYPE_INHERITANCE:
+        for node in persisted_state.get("nodes") or []:
+            if not isinstance(node, dict):
+                continue
+            spouse = node.get("spouseSlotId")
+            node.setdefault("spouseSlotIds", [spouse] if spouse else [])
+            node.setdefault("spouseSuggestionId", None)
+            node.setdefault("spouseUndetermined", False)
+            node["spouseSlotId"] = (
+                node["spouseSlotIds"][-1] if node["spouseSlotIds"] else None)
     data = {
         "schema_version": SCHEMA_VERSION,
         "backend_mode": "mock",          # contract §4 — nhan 'Dữ liệu mô phỏng'
@@ -1178,7 +1202,7 @@ def _workspace_data(cid, case):
         "stage": stage_out,
         "diagram": {
             "domain": dg.get("domain", ct),
-            "state": copy.deepcopy(dg.get("state")),
+            "state": persisted_state,
             "render_model": copy.deepcopy(dg.get("render_model")),
             "warnings": copy.deepcopy(dg.get("warnings") or []),
         },

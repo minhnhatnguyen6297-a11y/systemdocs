@@ -58,7 +58,10 @@
             ],
             "receivePositions": [],
             "hidden": false,
-            "deleted": false
+            "deleted": false,
+            "spouseSlotIds": [],
+            "spouseSuggestionId": null,
+            "spouseUndetermined": false
           }
         ]
       }

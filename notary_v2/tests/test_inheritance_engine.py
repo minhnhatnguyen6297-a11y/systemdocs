@@ -323,14 +323,6 @@ def _invalid_result(nodes, people):
             {key: {"ngay_chet": None} for key in "ABCD"},
             "too_many_parents",
         ),
-        (
-            [
-                {"id": "a", "personId": "A", "parentSlotIds": [], "spouseSlotId": "b", "isLandOwner": True},
-                {"id": "b", "personId": "B", "parentSlotIds": [], "spouseSlotId": None},
-            ],
-            {"A": {"ngay_chet": None}, "B": {"ngay_chet": None}},
-            "spouse_conflict",
-        ),
     ],
 )
 def test_invalid_graphs_are_rejected(nodes, people, code):
@@ -766,3 +758,63 @@ def test_later_rank_transmission_without_any_eligible_heir_retains_unresolved_es
         "sourcePersonId": "S", "eventDate": "2010-01-01", "fraction": "1", "reason": "no_valid_heir",
     }]
     assert result["conservation"] == {"allocated": "0", "unresolved": "1", "total": "1"}
+def test_spouse_slot_uses_only_last_candidate_as_lawful_spouse():
+    nodes = [
+        {"id": "dead", "personId": "D", "parentSlotIds": [],
+         "spouseSlotIds": ["first", "last"], "isLandOwner": True,
+         "willReceive": True, "hidden": False, "deleted": False},
+        {"id": "first", "personId": "A", "parentSlotIds": [],
+         "isLandOwner": False, "willReceive": True,
+         "hidden": False, "deleted": False},
+        {"id": "last", "personId": "B", "parentSlotIds": [],
+         "isLandOwner": False, "willReceive": True,
+         "hidden": False, "deleted": False},
+    ]
+    result = run_inheritance_case(
+        {"version": 2, "nodes": nodes},
+        {"D": {"ngay_chet": "2020"}, "A": {"ngay_chet": None},
+         "B": {"ngay_chet": None}},
+    )
+    assert result["status"] == "complete"
+    assert _share(result, "A") == 0
+    assert _share(result, "B") == 1
+
+
+def test_living_person_spouse_slot_is_ignored():
+    nodes = [
+        {"id": "living", "personId": "A", "parentSlotIds": [],
+         "spouseSlotIds": ["partner"], "isLandOwner": True,
+         "willReceive": True, "hidden": False, "deleted": False},
+        {"id": "partner", "personId": "B", "parentSlotIds": [],
+         "isLandOwner": False, "willReceive": True,
+         "hidden": False, "deleted": False},
+    ]
+    result = run_inheritance_case(
+        {"version": 2, "nodes": nodes},
+        {"A": {"ngay_chet": None}, "B": {"ngay_chet": None}},
+    )
+    assert result["status"] == "complete"
+    assert "B" not in result["allocations"] or _share(result, "B") == 0
+
+
+def test_undetermined_spouse_keeps_estate_incomplete_without_spouse_share():
+    nodes = [
+        {"id": "dead", "personId": "D", "parentSlotIds": [],
+         "spouseSlotIds": ["wife", "new-spouse"],
+         "spouseUndetermined": True, "isLandOwner": True,
+         "willReceive": True, "hidden": False, "deleted": False},
+        *[
+            {"id": nid, "personId": pid, "parentSlotIds": [],
+             "isLandOwner": False, "willReceive": True,
+             "hidden": False, "deleted": False}
+            for nid, pid in (("wife", "W"), ("new-spouse", "N"))
+        ],
+    ]
+    result = run_inheritance_case(
+        {"version": 2, "nodes": nodes},
+        {"D": {"ngay_chet": "2020"}, "W": {"ngay_chet": "2022"},
+         "N": {"ngay_chet": None}},
+    )
+    assert result["status"] == "incomplete"
+    assert result["allocations"]["N"]["finalShare"] == "0"
+    assert any(w["code"] == "spouse_undetermined" for w in result["warnings"])

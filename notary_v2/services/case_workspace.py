@@ -367,8 +367,11 @@ def _scrub_v2_links(nodes: list[dict]) -> list[dict]:
     ids = {n["id"] for n in nodes}
     for node in nodes:
         node["parentSlotIds"] = [p for p in node["parentSlotIds"] if p in ids]
-        if node["spouseSlotId"] and node["spouseSlotId"] not in ids:
-            node["spouseSlotId"] = None
+        spouses = node.get("spouseSlotIds", [])
+        node["spouseSlotIds"] = [p for p in spouses if p in ids]
+        node["spouseSlotId"] = node["spouseSlotIds"][-1] if node["spouseSlotIds"] else None
+        suggestion = node.get("spouseSuggestionId")
+        node["spouseSuggestionId"] = suggestion if suggestion in ids else None
     return nodes
 
 
@@ -411,12 +414,20 @@ def _sanitize_v3_nodes(raw_nodes: Any, valid_row_ids: set) -> list[dict]:
             "parentSlotIds": [
                 _clean(p) for p in parents if _clean(p)
             ][:2] if isinstance(parents, list) else [],
-            "spouseSlotId": _nn(raw.get("spouseSlotId")),
+            "spouseSlotIds": [
+                _clean(x) for x in raw.get("spouseSlotIds", [])
+                if _clean(x)
+            ] if isinstance(raw.get("spouseSlotIds"), list)
+            else ([_nn(raw.get("spouseSlotId"))]
+                  if _nn(raw.get("spouseSlotId")) else []),
+            "spouseSuggestionId": _nn(raw.get("spouseSuggestionId")),
+            "spouseUndetermined": _coerce_bool(
+                raw.get("spouseUndetermined"), False),
+            "hidden": _coerce_bool(raw.get("hidden"), False),
+            "deleted": _coerce_bool(raw.get("deleted"), False),
             "ownPositions": _sanitize_positions(raw.get("ownPositions")),
             "receivePositions": _sanitize_positions(
                 raw.get("receivePositions")),
-            "hidden": _coerce_bool(raw.get("hidden"), False),
-            "deleted": _coerce_bool(raw.get("deleted"), False),
         })
     return _scrub_v2_links(out)
 
@@ -462,6 +473,7 @@ def _canonical_two_party_nodes(nodes: list[dict]) -> list[dict]:
     return out
 
 
+
 def _v3_to_v2_nodes(nodes: list[dict]) -> list[dict]:
     """V3 → V2 engine projection (§13.4 A4): isLandOwner := ownPositions ≠ [],
     willReceive := receivePositions ≠ []."""
@@ -471,7 +483,10 @@ def _v3_to_v2_nodes(nodes: list[dict]) -> list[dict]:
             "id": n["id"],
             "personId": n.get("personId"),
             "parentSlotIds": list(n.get("parentSlotIds") or []),
+            "spouseSlotIds": list(n.get("spouseSlotIds") or []),
             "spouseSlotId": n.get("spouseSlotId"),
+            "spouseUndetermined": _coerce_bool(
+                n.get("spouseUndetermined"), False),
             "isLandOwner": bool(n.get("ownPositions")),
             "willReceive": bool(n.get("receivePositions")),
             "hidden": _coerce_bool(n.get("hidden"), False),
@@ -516,6 +531,13 @@ def _seed_inheritance_state(owner_row_id: Optional[str],
          "ownPositions": [], "receivePositions": [],
          "hidden": False, "deleted": False},
     ]
+    for node in nodes:
+        spouse = node.get("spouseSlotId")
+        node.update({
+            "spouseSlotIds": [spouse] if spouse else [],
+            "spouseSuggestionId": None,
+            "spouseUndetermined": False,
+        })
     return {"version": DIAGRAM_STATE_VERSION,
             "domain": CASE_TYPE_INHERITANCE, "nodes": nodes}
 
@@ -591,13 +613,16 @@ def _project_role_nodes(nodes: list[dict],
     def info_of(node: Mapping[str, Any]) -> Mapping[str, Any]:
         return people_map.get(node.get("personId")) or {}
 
+    def lawful_spouse(node: Mapping[str, Any]) -> Optional[str]:
+        slots = node.get("spouseSlotIds")
+        if isinstance(slots, list):
+            return slots[-1] if slots else None
+        return _nn(node.get("spouseSlotId"))
+
     owner = by_id.get("owner")
-    owner_spouse = _clean(owner.get("spouseSlotId")) if owner else ""
+    owner_spouse = lawful_spouse(owner) if owner else None
     if owner_spouse not in by_id:
-        owner_spouse = next(
-            (n["id"] for n in nodes
-             if n["id"] != "owner" and n.get("spouseSlotId") == "owner"),
-            "")
+        owner_spouse = ""
     owner_pair = {x for x in ("owner", owner_spouse) if x}
     owner_parents = set(owner.get("parentSlotIds") or []) if owner else set()
     spouse_node = by_id.get(owner_spouse) if owner_spouse else None
@@ -607,19 +632,21 @@ def _project_role_nodes(nodes: list[dict],
         n["id"] for n in nodes
         if n.get("parentSlotIds") and set(n["parentSlotIds"]) <= owner_pair
     }
+    child_spouses = {
+        lawful_spouse(n): n["id"] for n in nodes
+        if n["id"] in child_slots and lawful_spouse(n) in by_id
+    }
 
     out: list[dict] = []
     for node in nodes:
         nid = node["id"]
         parents = [p for p in (node.get("parentSlotIds") or []) if p in by_id]
-        spouse = node.get("spouseSlotId")
-        spouse = spouse if spouse in by_id else None
         person_id = _nn(node.get("personId"))
         info = info_of(node)
         relation = role = family = anchor = ""
         if nid == "owner":
             relation, role = "owner", "Owner"
-        elif spouse == "owner":
+        elif nid == owner_spouse:
             relation, role, anchor = "spouse", "Vợ/Chồng", "owner"
         elif nid in owner_parents:
             relation = "parent"
@@ -627,8 +654,9 @@ def _project_role_nodes(nodes: list[dict],
         elif nid in spouse_parents:
             relation = "spouseParent"
             role = _parent_role(nid, info, "Cha_vc", "Me_vc")
-        elif spouse and spouse in child_slots:
-            relation, role, anchor = "branchSpouse", "Con_dau_re", spouse
+        elif nid in child_spouses:
+            relation, role, anchor = (
+                "branchSpouse", "Con_dau_re", child_spouses[nid])
         elif parents and set(parents) <= owner_pair:
             relation, role, family = "child", "Con", "ownerSpouse"
         elif parents and set(parents) <= owner_parents:
@@ -704,12 +732,14 @@ class CaseWorkspaceService:
         valid_rows = {p["row_id"] for p in composed.people}
         state = self._state_v3(
             composed.payload, domain=domain, valid_row_ids=valid_rows,
-            asset_count=len(composed.assets))
+            asset_count=len(composed.assets),
+            person_rows={p["row_id"]: p for p in composed.people})
         owner_row_id = None
         if domain == CASE_TYPE_INHERITANCE:
             owner_row_id = self._resolve_owner_row_id(
                 composed.payload, state, valid_rows)
         render_model = self._render_model(composed.payload)
+
 
         stage_out = {"people": composed.people,
                      "assets": composed.assets}
@@ -1088,7 +1118,9 @@ class CaseWorkspaceService:
             valid_rows = {rid for rid, _e, _w in resolved_people}
             state = self._state_v3(
                 payload, domain=case_type, valid_row_ids=valid_rows,
-                asset_count=len(resolved_assets))
+                asset_count=len(resolved_assets),
+                person_rows={rid: wire for rid, _entity, wire
+                             in resolved_people})
             diagram_warnings: list = []
             if case_type == CASE_TYPE_INHERITANCE:
                 pruned = _prune_positions(state["nodes"],
@@ -2472,8 +2504,14 @@ class CaseWorkspaceService:
 
     def _state_v3(self, payload: Mapping[str, Any], *, domain: str,
                   valid_row_ids: Optional[set] = None,
-                  asset_count: int = 0) -> dict:
-        """Đọc `diagram.state` v4 (v3 wire) — không đọc legacy/column."""
+                  asset_count: int = 0,
+                  person_rows: Optional[
+                      Mapping[str, Mapping[str, Any]]] = None) -> dict:
+        """Đọc state Storage B, chuẩn hóa spouse singular trong RAM.
+
+        Payload A đã dùng schemaVersion 4: nhận diện node cũ bằng việc
+        thiếu spouseSlotIds, không dựa vào phiên bản payload. GET không ghi.
+        """
         valid = valid_row_ids if valid_row_ids is not None else set()
         diagram = payload.get("diagram") if isinstance(
             payload.get("diagram"), Mapping) else {}
@@ -2494,6 +2532,31 @@ class CaseWorkspaceService:
                 and raw_state.get("version") == DIAGRAM_STATE_VERSION
                 and isinstance(raw_state.get("nodes"), list)):
             nodes = _sanitize_v3_nodes(raw_state["nodes"], valid)
+            legacy_ids = {
+                _clean(raw.get("id")) for raw in raw_state["nodes"]
+                if isinstance(raw, Mapping) and "spouseSlotIds" not in raw
+            }
+            legacy_links = {
+                node["id"]: list(node["spouseSlotIds"])
+                for node in nodes if node["id"] in legacy_ids
+            }
+            for node in nodes:
+                if node["id"] not in legacy_ids:
+                    continue
+                incoming = [
+                    candidate_id for candidate_id, links in legacy_links.items()
+                    if candidate_id != node["id"] and node["id"] in links
+                ]
+                candidates = list(dict.fromkeys([
+                    *legacy_links[node["id"]], *incoming]))
+                person = (person_rows or {}).get(node.get("personId"), {})
+                deceased = bool(_clean(person.get("ngay_chet")))
+                node["spouseSlotIds"] = candidates if deceased else []
+                node["spouseSlotId"] = (
+                    candidates[-1] if deceased and candidates else None)
+                node["spouseSuggestionId"] = (
+                    candidates[0] if not deceased and candidates else None)
+                node["spouseUndetermined"] = deceased and len(candidates) > 1
             return {"version": DIAGRAM_STATE_VERSION,
                     "domain": CASE_TYPE_INHERITANCE, "nodes": nodes}
 
@@ -2556,6 +2619,7 @@ class CaseWorkspaceService:
                 "stage.owner_row_id phải là row_id của một dòng Người "
                 "trong stage (inheritance)")
         return oid
+
 
     # ----- validation
 

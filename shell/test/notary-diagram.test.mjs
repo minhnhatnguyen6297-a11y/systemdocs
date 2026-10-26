@@ -75,17 +75,21 @@ function tpNodes() {
 // nay; test giu de kiem render/layout/edges tren du lieu cu. Draft MOI
 // (MIN-136) chi seed 1 o 'owner' — xem test "draft moi: 1 o khoi tao".
 function seedSlots() {
-  const mk = (id, parents = [], spouse = null) =>
-    ({ id, personId: null, parentSlotIds: parents,
-       spouseSlotId: spouse, ownPositions: [], receivePositions: [],
+  const mk = (id, parents = []) =>
+    ({ id, personId: null, parentSlotIds: parents, spouseSlotIds: [],
+       spouseSlotId: null, spouseSuggestionId: null,
+       spouseUndetermined: false, ownPositions: [], receivePositions: [],
        hidden: false, deleted: false });
-  return structuredClone([
+  const nodes = [
     mk('father'), mk('mother'),
     mk('spouse_father'), mk('spouse_mother'),
-    mk('owner', ['father', 'mother'], 'spouse'),
-    mk('spouse', ['spouse_father', 'spouse_mother'], 'owner'),
+    mk('owner', ['father', 'mother']),
+    mk('spouse', ['spouse_father', 'spouse_mother']),
     mk('child_1', ['owner', 'spouse']),
-  ]);
+  ];
+  nodes.find((n) => n.id === 'owner').spouseSlotIds = ['spouse'];
+  nodes.find((n) => n.id === 'owner').spouseSlotId = 'spouse';
+  return structuredClone(nodes);
 }
 
 async function build(t, { mode = 'draft-inh', seed = {}, client } = {}) {
@@ -218,6 +222,94 @@ test('card truoc/sau gan: trong → day du ten+nam+role+chips+bo gan', async () 
     'can nut → cho duong ban phim');
 });
 
+
+test('spouse drops append without swapping; last is lawful and pool removal promotes previous', async () => {
+  const nodes = seedSlots();
+  nodes.find((n) => n.id === 'owner').personId = 'c1';
+  nodes.find((n) => n.id === 'spouse').personId = 'c2';
+  nodes.find((n) => n.id === 'owner').spouseSlotIds = ['spouse'];
+  nodes.find((n) => n.id === 'owner').spouseSlotId = 'spouse';
+  const { model, view } = await build(test, { mode: 'case',
+    seed: { people: INH_PEOPLE, nodes } });
+  const owner = model.state.diagram.nodes.find((n) => n.id === 'owner');
+  const spouse = collect(view.el, (e) => e.dataset.nodeId === 'spouse')[0];
+  spouse.dispatch('drop', personPayload('c3'));
+  const appendedId = owner.spouseSlotIds[1];
+  assert.equal(model.state.diagram.nodes.find((n) =>
+    n.id === appendedId).personId, 'c3');
+  assert.equal(model.state.diagram.nodes.find((n) =>
+    n.id === 'spouse').personId, 'c2', 'occupied spouse is never swapped');
+  assert.equal(byCls(view.el, 'modal').length, 0, 'drop opens no dialog');
+  spouse.dispatch('drop', personPayload('c2'));
+  assert.deepEqual(owner.spouseSlotIds, [appendedId, 'spouse'],
+    'dropping an existing candidate moves it to the end');
+  const last = collect(view.el, (e) => e.dataset.nodeId === 'spouse')[0];
+  assert.ok(last.classList.contains('cd-node-spouse-lawful'));
+  assert.match(last.textContent, /Vợ\/chồng hợp pháp/);
+  const earlier = collect(view.el, (e) =>
+    e.dataset.nodeId === appendedId)[0];
+  assert.ok(earlier.classList.contains('cd-node-spouse-faded'));
+  findBtns(earlier, 'Đặt làm vợ/chồng hợp pháp')[0].onclick();
+  assert.deepEqual(owner.spouseSlotIds, ['spouse', appendedId]);
+  assert.equal(collect(view.el, (e) => e.dataset.nodeId === appendedId)[0]
+    .classList.contains('cd-node-spouse-lawful'), true);
+  const pool = byCls(view.el, 'cd-pool-box')[0];
+  pool.dispatch('drop', personPayload('c2'));
+  assert.deepEqual(owner.spouseSlotIds, [appendedId]);
+  assert.equal(owner.spouseSlotId, appendedId);
+});
+
+test('undetermined spouse shows warning and drop clears it', async () => {
+  const nodes = seedSlots();
+  const owner = nodes.find((n) => n.id === 'owner');
+  owner.personId = 'c1';
+  owner.spouseSlotIds = ['spouse'];
+  owner.spouseSlotId = 'spouse';
+  owner.spouseUndetermined = true;
+  nodes.find((n) => n.id === 'spouse').personId = 'c2';
+  const { model, view } = await build(test, { mode: 'case',
+    seed: { people: INH_PEOPLE, nodes } });
+  const spouseCard = collect(view.el, (e) =>
+    e.dataset.nodeId === 'spouse')[0];
+  assert.match(spouseCard.textContent, /Chưa xác định vợ\/chồng hợp pháp/);
+  spouseCard.dispatch('drop', personPayload('c3'));
+  const updatedOwner = model.state.diagram.nodes.find((n) => n.id === 'owner');
+  assert.equal(updatedOwner.spouseUndetermined, false);
+  assert.equal(updatedOwner.spouseSlotIds.length, 2);
+});
+
+test('death date prefills an existing spouse suggestion', async () => {
+  const nodes = seedSlots();
+  const owner = nodes.find((n) => n.id === 'owner');
+  owner.personId = 'c1';
+  owner.spouseSlotIds = [];
+  owner.spouseSlotId = null;
+  owner.spouseSuggestionId = 'spouse';
+  const { model } = await build(test, { mode: 'case',
+    seed: { people: [{ row_id: 'c1', ho_ten: 'Người chết' }], nodes } });
+  model.updatePersonField('c1', 'ngay_chet', '2020-01-01');
+  const savedOwner = model.state.diagram.nodes.find((n) => n.id === 'owner');
+  assert.deepEqual(savedOwner.spouseSlotIds, ['spouse']);
+  assert.equal(savedOwner.spouseSlotId, 'spouse');
+  assert.equal(savedOwner.spouseSuggestionId, null);
+});
+
+test('living person never receives a required spouse slot', async () => {
+  const client = { run: async (cmd) => cmd === 'notary.diagram_evaluate'
+    ? { ok: true, data: { evaluated_revision: 3,
+      render_model: { requiredSlots: [{
+        anchorSlotId: 'owner', slotTypes: ['spouse'],
+      }] } } } : { ok: true, data: {} } };
+  const nodes = [{ id: 'owner', personId: 'c1', parentSlotIds: [],
+    spouseSlotIds: [], spouseSlotId: null, spouseSuggestionId: null,
+    spouseUndetermined: false, ownPositions: [], receivePositions: [],
+    hidden: false, deleted: false }];
+  const { model, view } = await build(test, { mode: 'case', client,
+    seed: { people: [{ row_id: 'c1', ho_ten: 'Người sống' }], nodes } });
+  await findBtns(view.el, 'Xem cách tính')[0].onclick();
+  assert.deepEqual(model.state.diagram.nodes[0].spouseSlotIds, []);
+  assert.equal(model.state.diagram.nodes.length, 1);
+});
 test('chip own/receive doc lap, multi-select, disable > so asset', async () => {
   // MIN-133: chip chi hien tren node DA GAN nguoi (node trong la o
   // trong) — seed case co father da gan c1 + 2 asset (pos 3 disabled).
@@ -638,12 +730,14 @@ test('requiredSlots: engine yeu cau → tao father/mother/spouse/child', async (
   // xoa quan he seed de engine yeu cau tat ca.
   for (const n of nodes) {
     if (n.id === 'owner') {
-      n.personId = 'c1'; n.parentSlotIds = []; n.spouseSlotId = null;
+      n.personId = 'c1'; n.parentSlotIds = []; n.spouseSlotIds = [];
+      n.spouseSlotId = null;
     }
     if (n.id === 'father' || n.id === 'mother' ||
-        n.id === 'spouse' || n.id === 'spouse_father' ||
+        n.id === 'spouse' || n.id === 'spouse_2' ||
+        n.id === 'spouse_father' ||
         n.id === 'spouse_mother' || n.id === 'child_1') {
-      n.deleted = true;            // gia lap bi xoa → required moi
+      n.deleted = true;
     }
   }
   const { model, view } = await build(test, {
@@ -663,12 +757,13 @@ test('requiredSlots: engine yeu cau → tao father/mother/spouse/child', async (
   for (const pid of owner.parentSlotIds) {
     assert.ok(ids.has(pid), `parent slot ${pid} khong duoc tao`);
   }
-  const spouse = after.find((n) => n.spouseSlotId === 'owner');
-  assert.ok(spouse, 'phai tao slot spouse tro ve owner');
-  // Wire §7.1: quan he vo/chong phai 2 chieu (lech cap -> spouse_conflict),
-  // neu khong state vua sinh se khong evaluate/save duoc.
+  const spouseId = owner.spouseSlotIds.at(-1);
+  const spouse = after.find((n) => n.id === spouseId);
+  assert.ok(spouse, 'slot spouse phai duoc tao');
   assert.equal(owner.spouseSlotId, spouse.id,
-    'owner phai tro nguoc lai spouse (2 chieu)');
+    'spouseSlotId mirror phai la phan tu cuoi');
+  assert.equal(spouse.spouseSlotId, null,
+    'slot spouse khong ghi lien ket nguoc');
   const kids = after.filter((n) =>
     !n.personId && (n.parentSlotIds || []).includes('owner'));
   assert.ok(kids.length >= 1, 'phai co ≥1 slot con trong cua owner');
@@ -936,6 +1031,12 @@ test('save → openCase round-trip: vi tri + quan he giu nguyen', async () => {
   const nodes = seedSlots().map((n) => ({ ...n }));
   nodes.find((n) => n.id === 'owner').personId = 'c1';
   nodes.find((n) => n.id === 'spouse').personId = 'c2';
+  nodes.push({ id: 'spouse_2', personId: 'c3', parentSlotIds: [],
+    spouseSlotIds: [], spouseSlotId: null, spouseSuggestionId: null,
+    spouseUndetermined: false, ownPositions: [], receivePositions: [],
+    hidden: false, deleted: false });
+  nodes.find((n) => n.id === 'owner').spouseSlotIds = ['spouse', 'spouse_2'];
+  nodes.find((n) => n.id === 'owner').spouseSlotId = 'spouse_2';
   const { model } = await build(test, {
     mode: 'case', client,
     seed: { people: INH_PEOPLE, assets: [{ row_id: 'a1' }], nodes } });
@@ -961,6 +1062,8 @@ test('save → openCase round-trip: vi tri + quan he giu nguyen', async () => {
     ['spouse_father', 'spouse_mother'],
     'quan he cha/me khong giu qua round-trip');
   assert.equal(spouse.personId, 'c2');
+  assert.deepEqual(owner.spouseSlotIds, ['spouse', 'spouse_2'],
+    'thu tu spouse khong duoc sap xep khi save/load');
 });
 
 test('two_party: assign → save → reopen giu 30 cho + nguoi dung cho', async () => {

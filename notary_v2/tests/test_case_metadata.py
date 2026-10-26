@@ -77,9 +77,10 @@ def _asset_row(**overrides):
 
 def _node(nid, person_id=None, own=(), receive=()):
     return {"id": nid, "personId": person_id, "parentSlotIds": [],
-            "spouseSlotId": None, "ownPositions": list(own),
-            "receivePositions": list(receive), "hidden": False,
-            "deleted": False}
+            "spouseSlotIds": [], "spouseSlotId": None,
+            "spouseSuggestionId": None, "spouseUndetermined": False,
+            "ownPositions": list(own), "receivePositions": list(receive),
+            "hidden": False, "deleted": False}
 
 
 def _create_args(people_overrides=(), case_meta=None, with_state=False,

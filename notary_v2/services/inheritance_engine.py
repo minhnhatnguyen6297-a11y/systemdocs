@@ -141,11 +141,18 @@ def _validate_and_build_graph(
             boolean_values[field] = value
 
         person_id = _person_id(raw.get("personId")) or None
+        spouse_ids = raw.get("spouseSlotIds")
+        if not isinstance(spouse_ids, list):
+            legacy_spouse = raw.get("spouseSlotId")
+            spouse_ids = [legacy_spouse] if legacy_spouse else []
         node = {
             "id": slot_id,
             "personId": person_id,
             "parentSlotIds": [_person_id(item) for item in parent_ids],
-            "spouseSlotId": _person_id(raw.get("spouseSlotId")) or None,
+            "spouseSlotIds": [
+                _person_id(item) for item in spouse_ids if _person_id(item)
+            ],
+            "spouseUndetermined": raw.get("spouseUndetermined") is True,
             **boolean_values,
         }
         nodes[slot_id] = node
@@ -180,20 +187,13 @@ def _validate_and_build_graph(
                 )
             elif parent_id == node["id"]:
                 errors.append(_error("self_parent", "Một người không thể là cha/mẹ của chính mình.", nodeId=node["id"]))
-        spouse_id = node["spouseSlotId"]
-        if spouse_id:
-            if spouse_id not in nodes:
+        for spouse_id in node["spouseSlotIds"]:
+            if not spouse_id or spouse_id not in nodes:
                 errors.append(
                     _error("dangling_spouse", "Quan hệ vợ/chồng trỏ tới node không tồn tại.", nodeId=node["id"])
                 )
             elif spouse_id == node["id"]:
                 errors.append(_error("self_spouse", "Một người không thể là vợ/chồng của chính mình.", nodeId=node["id"]))
-            else:
-                other = nodes[spouse_id]
-                if other.get("personId") in active_people and other.get("spouseSlotId") != node["id"]:
-                    errors.append(
-                        _error("spouse_conflict", "Quan hệ vợ/chồng bị lệch.", nodeId=node["id"])
-                    )
 
     children_by_person: dict[str, set[str]] = defaultdict(set)
     parents_by_person: dict[str, set[str]] = defaultdict(set)
@@ -207,10 +207,11 @@ def _validate_and_build_graph(
                 continue
             children_by_person[parent_id].add(child_id)
             parents_by_person[child_id].add(parent_id)
-        spouse_id = person_by_slot.get(node["spouseSlotId"] or "")
+        spouse_ids = node["spouseSlotIds"]
+        spouse_id = person_by_slot.get(spouse_ids[-1] if spouse_ids else "")
         if spouse_id:
             spouses_by_person[child_id].add(spouse_id)
-            spouses_by_person[spouse_id].add(child_id)
+
 
     visiting: set[str] = set()
     visited: set[str] = set()
@@ -351,7 +352,8 @@ def run_inheritance_case(
     def first_line_units(source_id: str, event_date: date) -> list[dict[str, Any]]:
         units: list[dict[str, Any]] = []
         seen_direct: set[str] = set()
-        for person_id in sorted(parents.get(source_id, set()) | spouses.get(source_id, set())):
+        spouse_slots = set() if nodes_by_person[source_id].get("spouseUndetermined") else spouses.get(source_id, set())
+        for person_id in sorted(parents.get(source_id, set()) | spouse_slots):
             comparison = death_comparison(person_id, event_date)
             if person_id not in seen_direct and accepts(person_id, comparison):
                 units.append({"type": "person", "personId": person_id, "via": []})
@@ -461,19 +463,26 @@ def run_inheritance_case(
         if death is not None:
             death_groups[death].append(person_id)
 
+    spouse_undetermined = False
+
     for event_date in sorted(death_groups):
         day_estates = {
             person_id: holdings[person_id]
             for person_id in sorted(death_groups[event_date])
             if holdings[person_id] > 0
         }
+        # Distribute estates in a distinct pass; preserve the original order
+        # of operations so transfers do not affect same-day estates.
         for source_id, estate in day_estates.items():
             holdings[source_id] = Fraction(0)
             distributed_shares[source_id] += estate
             add_requirement(source_id, "active_estate")
 
         for source_id, estate in day_estates.items():
+            if nodes_by_person[source_id].get("spouseUndetermined"):
+                spouse_undetermined = True
             units = first_line_units(source_id, event_date)
+
             heir_rank = 1
             if not units:
                 for heir_rank in (2, 3):
@@ -531,11 +540,12 @@ def run_inheritance_case(
 
     return {
         "engineVersion": ENGINE_VERSION,
-        "status": "incomplete" if unresolved else "complete",
+        "status": "incomplete" if unresolved or spouse_undetermined else "complete",
         "allocations": allocations,
         "breakdowns": breakdowns,
         "requiredSlots": list(required_slots.values()),
-        "warnings": [],
+        "warnings": ([_error("spouse_undetermined", "Chưa xác định vợ/chồng hợp pháp.")]
+                     if spouse_undetermined else []),
         "errors": [],
         "unresolvedEstates": unresolved_estates,
         "conservation": {

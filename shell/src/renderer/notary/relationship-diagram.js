@@ -11,10 +11,10 @@
  *   xuong Pool (khong co flow gan len node).
  *   Search chi loc hien thi — khong doi draft.
  * - Keo tha payload 'text/plain' JSON {kind:'person', row_id} — contract
- *   P6 giu nguyen: drop len node/slot = movePerson (move/swap), drop vao
- *   Pool = movePerson(row_id, null). Menu "Gán vị trí" = duong ban phim.
+ *   P6 giu nguyen: drop len node/slot = movePerson, drop vao Pool =
+ *   movePerson(row_id, null). Menu "Gán vị trí" = duong ban phim.
  * - Domain inheritance: canvas = world×zoom + SVG edges tu
- *   parentSlotIds/spouseSlotId cua DRAFT state (khong suy luan nghiep vu)
+ *   parentSlotIds/spouseSlotIds cua DRAFT state (khong suy luan nghiep vu)
  *   + card gon (ten, nam sinh–mat, vai tro, 2 hang chip "Chủ đất"/
  *   "Nhận đất" = ownPositions/receivePositions doc lap §13.4).
  * - Domain two_party: 30 cho canonical p1..p30 — Ben A = p1..p15, Ben B
@@ -117,8 +117,8 @@ function slotNum(id) {
 // Layout the he tu parentSlotIds cua DRAFT state — pure function, khong
 // suy luan nghiep vu: gen(n) = 0 neu khong co cha/me song, nguoc lai =
 // max(gen cha/me) + 1. Chu ky draft (engine se bao loi) → gen 0.
-// Trong mot gen: giu thu tu mang nodes, nhung cap vo/chong (spouseSlotId
-// 2 chieu hop le 1 chieu) duoc don sat nhau de edge ngang ngan gon.
+// Trong mot gen: danh sach spouseSlotIds chi mot chieu; slot spouse duoc
+// dat sat anchor de edge ngan gon.
 // MIN-133: kich thuoc theo trang thai node (da tha 144×87 / trong 88×24);
 // hang rong nhat can giua, hang tren/duoi can theo tam con/cha-me da dat
 // (cap vo/chong la mot khoi 28px). Chi la vi tri hien thi.
@@ -152,38 +152,48 @@ function layoutInheritance(nodes) {
     if (!gens.has(g)) gens.set(g, []);
     gens.get(g).push(n);
   }
-  const spouseOf = (n) => (n.spouseSlotId && byId.get(n.spouseSlotId)) ||
-    live.find((k) => k.spouseSlotId === n.id) || null;
   for (const arr of gens.values()) {
     const seen = new Set();
     const out = [];
     for (const n of arr) {
       if (seen.has(n.id)) continue;
-      out.push(n); seen.add(n.id);
-      const sp = spouseOf(n);
-      if (sp && !seen.has(sp.id) &&
-          memo.get(sp.id) === memo.get(n.id)) {
-        out.push(sp); seen.add(sp.id);
+      out.push(n);
+      seen.add(n.id);
+      for (const spouseId of n.spouseSlotIds || []) {
+        const spouse = byId.get(spouseId);
+        if (!spouse || seen.has(spouse.id) ||
+            memo.get(spouse.id) !== memo.get(n.id)) continue;
+        out.push(spouse);
+        seen.add(spouse.id);
       }
     }
     arr.splice(0, arr.length, ...out);
   }
   const size = new Map(live.map((n) => [n.id, nodeSize(n)]));
   const isPair = (a, b) =>
-    a.spouseSlotId === b.id || b.spouseSlotId === a.id;
+    (a.spouseSlotIds || []).includes(b.id);
   // Khoi: node don hoac cap vo/chong ke nhau (giu sat 28px).
   const blocksOf = (row) => {
     const out = [];
-    for (let i = 0; i < row.length; i += 1) {
-      if (i + 1 < row.length && isPair(row[i], row[i + 1])) {
-        out.push([row[i], row[i + 1]]); i += 1;
-      } else {
-        out.push([row[i]]);
+    const rowIds = new Set(row.map((n) => n.id));
+    const seen = new Set();
+    for (const n of row) {
+      if (seen.has(n.id)) continue;
+      const group = [n];
+      seen.add(n.id);
+      for (const id of n.spouseSlotIds || []) {
+        if (!rowIds.has(id) || seen.has(id)) continue;
+        const spouse = byId.get(id);
+        if (spouse && memo.get(spouse.id) === memo.get(n.id)) {
+          group.push(spouse);
+          seen.add(id);
+        }
       }
+      out.push(group);
     }
     return out.map((m) => ({
       m, w: m.reduce((s, n) => s + size.get(n.id).w, 0) +
-        (m.length > 1 ? SPOUSE_GAP : 0) }));
+        (m.length - 1) * SPOUSE_GAP }));
   };
   const gkeys = [...gens.keys()].sort((a, b) => a - b);
   const rows = gkeys.map((g) => blocksOf(gens.get(g)));
@@ -264,9 +274,9 @@ function layoutInheritance(nodes) {
   return { pos, w: Math.max(maxX, 0) + PAD, h };
 }
 
-function setSpousePair(model, firstId, secondId) {
-  return model.setNodeRelation(firstId, { spouseSlotId: secondId }) &&
-    model.setNodeRelation(secondId, { spouseSlotId: firstId });
+function spouseOwnerOf(nodeId, nodes) {
+  return (nodes || []).find((n) => !n.deleted &&
+    (n.spouseSlotIds || []).includes(nodeId)) || null;
 }
 
 function createDiagramPane(ctx) {
@@ -446,6 +456,12 @@ function createDiagramPane(ctx) {
     if (kids.length) {
       const names = kids.slice(0, 2).map(refName).join(', ');
       return `cha/mẹ của ${names}${kids.length > 2 ? '…' : ''}`;
+    }
+    const owner = spouseOwnerOf(n.id, liveNodes());
+    const ownerPerson = owner && owner.personId
+      ? personRow(owner.personId) : null;
+    if (owner && (!ownerPerson || ownerPerson.ngay_chet)) {
+      return `vợ/chồng của ${refName(owner)}`;
     }
     const ps = (n.parentSlotIds || []).map(nodeById).filter(Boolean);
     if (ps.length) return `con của ${ps.map(refName).join(' + ')}`;
@@ -707,11 +723,7 @@ function createDiagramPane(ctx) {
   // ---------- requiredSlots (engine la SOT cho cho con thieu) ----------
 
   // Tu sinh slot thieu theo render_model.requiredSlots cua engine —
-  // engine la SOT cho cho con thieu: view chi tao slot TRONG + noi quan
-  // he tuong ung (father/mother → parentSlotIds cua anchor; spouse →
-  // spouseSlotId; child → chi anchor, khong suy cha/me tu spouse).
-  // Chi ap cho anchor DA GAN NGUOI (engine that: anchor = nguoi da mat;
-  // mock dev emit ca cho slot trong → bo qua de khong no canvas).
+  // Tu sinh slot thieu mot chieu tu requiredSlots; engine la SOT.
   function applyRequiredSlots() {
     if (!model.canWrite() || isTp()) return false;
     const reqs = (model.state.renderModel &&
@@ -720,15 +732,14 @@ function createDiagramPane(ctx) {
     let touched = false;
     for (const req of reqs) {
       const anchor = nodeById(req.anchorSlotId);
-      if (!anchor || !anchor.personId) continue;
+      const person = anchor && personRow(anchor.personId);
+      if (!anchor || !person || !person.ngay_chet) continue;
       const types = new Set(req.slotTypes || []);
-      // Cha/me: dam bao du slot cha/me (toi da 2 — contract cap).
       const wantKinds = ['father', 'mother'].filter((t) => types.has(t));
       const haveParents = (anchor.parentSlotIds || [])
         .filter((p) => nodeById(p)).length;
       const needParents = Math.min(
-        Math.max(0, wantKinds.length - haveParents),
-        2 - haveParents);
+        Math.max(0, wantKinds.length - haveParents), 2 - haveParents);
       for (let i = 0; i < needParents; i += 1) {
         const kind = wantKinds[i] || 'parent';
         const node = model.addSlot(
@@ -738,22 +749,16 @@ function createDiagramPane(ctx) {
           parentSlotIds: [...(anchor.parentSlotIds || []), node.id] });
         touched = true;
       }
-      // Vo/chong: tao ca hai chieu lien ket.
-      if (types.has('spouse')) {
-        const hasSpouse = (anchor.spouseSlotId &&
-          nodeById(anchor.spouseSlotId)) || liveNodes().some(
-            (n) => n.spouseSlotId === anchor.id);
-        if (!hasSpouse) {
-          const node = model.addSlot(
-            freeSlotId(['spouse', `spouse_${anchor.id}`]));
-          if (node) {
-            setSpousePair(model, anchor.id, node.id);
-            touched = true;
-          }
+      if (types.has('spouse') &&
+          !(anchor.spouseSlotIds || []).some((id) => nodeById(id))) {
+        const node = model.addSlot(
+          freeSlotId(['spouse', `spouse_${anchor.id}`]));
+        if (node) {
+          model.setNodeRelation(anchor.id, {
+            spouseSlotIds: [...(anchor.spouseSlotIds || []), node.id] });
+          touched = true;
         }
       }
-      // Con: dam bao ≥ minimumEmptyChildSlots slot con TRONG; engine
-      // yeu cau con cua anchor, khong yeu cau con cua vo/chong anchor.
       if (types.has('child')) {
         const need = Math.max(0, req.minimumEmptyChildSlots || 0);
         const emptyKids = () => liveNodes().filter(
@@ -864,6 +869,17 @@ function createDiagramPane(ctx) {
     card.setAttribute('role', 'group');
     if (n.hidden) card.classList.add('cd-node-hidden');
     if (n.id === 'owner') card.classList.add('cd-node-owner');
+    const spouseOwner = spouseOwnerOf(n.id, liveNodes());
+    const spouseIndex = spouseOwner
+      ? spouseOwner.spouseSlotIds.indexOf(n.id) : -1;
+    const spouseUncertain = !!(spouseOwner &&
+      spouseOwner.spouseUndetermined);
+    const spouseLawful = !!(spouseOwner && !spouseUncertain &&
+      spouseIndex === spouseOwner.spouseSlotIds.length - 1);
+    if (spouseOwner) {
+      card.classList.add(spouseLawful
+        ? 'cd-node-spouse-lawful' : 'cd-node-spouse-faded');
+    }
 
     // Nut hanh dong: chi hien khi hover/focus (CSS .cd-node-acts) —
     // van nam trong tab order cho ban phim.
@@ -894,6 +910,27 @@ function createDiagramPane(ctx) {
     const nm = h('span', 'cd-node-name', name);
     nm.title = role ? `${name} — ${role}` : name;
     card.append(nm);
+    if (spouseOwner) {
+      const text = spouseUncertain
+        ? 'Chưa xác định vợ/chồng hợp pháp'
+        : spouseLawful ? 'Vợ/chồng hợp pháp'
+          : 'Không phải vợ/chồng hợp pháp';
+      card.append(h('div', 'cd-spouse-label', text));
+      if (!spouseLawful && !ro) {
+        const promote = btn('Đặt làm vợ/chồng hợp pháp',
+          'sm cd-spouse-promote', () => {
+            const ids = spouseOwner.spouseSlotIds
+              .filter((id) => id !== n.id);
+            ids.push(n.id);
+            if (model.setNodeRelation(spouseOwner.id, {
+              spouseSlotIds: ids, spouseUndetermined: false })) {
+              scheduleEvaluate();
+            }
+          });
+        promote.disabled = !model.state.capabilities.diagram;
+        card.append(promote);
+      }
+    }
     if (!ro) {
       // Ban phim: gan lai/doi cho cho nguoi dang o node (menu du nang
       // luc nhu keo-tha — move/swap) + bo gan ve Pool.
@@ -1063,11 +1100,21 @@ function createDiagramPane(ctx) {
   // ---------- canvas (pan + zoom, khong auto-fit) ----------
 
   function inheritanceInto(scale) {
-    const nodes = model.state.diagram.nodes || [];
+    const all = model.state.diagram.nodes || [];
+    const nodes = all.filter((n) => {
+      if (n.deleted || n.personId) return !n.deleted;
+      const owner = spouseOwnerOf(n.id, all);
+      const person = owner && owner.personId
+        ? personRow(owner.personId) : null;
+      return !person || !!person.ngay_chet;
+    }).map((n) => {
+      const person = n.personId ? personRow(n.personId) : null;
+      return person && !person.ngay_chet && (n.spouseSlotIds || []).length
+        ? { ...n, spouseSlotIds: [], spouseSlotId: null } : n;
+    });
     const lay = layoutInheritance(nodes);
     scale.append(edgesSvgEl(nodes, lay.pos, lay.w, lay.h));
     for (const n of nodes) {
-      if (n.deleted) continue;
       scale.append(inheritanceCardEl(n, lay.pos[n.id]));
     }
     return lay;
@@ -1117,7 +1164,7 @@ function createDiagramPane(ctx) {
   // ngang net dut giua hai card cung hang; cha/me → con = elbow tu day
   // card cha/me (hoac tu giua doan vo/chong khi ca hai la cha/me cua con)
   // xuong thanh ngang o giua khe the he roi xuong dinh card con. Doc tu
-  // parentSlotIds/spouseSlotId draft — khong suy luan. Kich thuoc lay
+  // parentSlotIds/spouseSlotIds draft — khong suy luan. Kich thuoc lay
   // tu pos (w/h theo node da tha/trong) nen khop layout.
   function edgesSvgEl(nodes, pos, w, hgt) {
     const ns = 'http://www.w3.org/2000/svg';
@@ -1135,7 +1182,8 @@ function createDiagramPane(ctx) {
     const byId = new Map(nodes.filter((n) => n && !n.deleted)
       .map((n) => [n.id, n]));
     const paired = (a, b) => !!(a && b &&
-      (a.spouseSlotId === b.id || b.spouseSlotId === a.id));
+      ((a.spouseSlotIds || []).includes(b.id) ||
+       (b.spouseSlotIds || []).includes(a.id)));
     // Doan vo/chong giua hai card cung hang: {x1, x2, y} hoac null.
     const spouseSeg = (a, b) => {
       const pa = pos[a], pb = pos[b];
@@ -1149,16 +1197,15 @@ function createDiagramPane(ctx) {
     for (const n of nodes) {
       if (n.deleted || !pos[n.id]) continue;
       const c = pos[n.id];
-      // Vo/chong: ve mot lan cho moi cap.
-      if (n.spouseSlotId && pos[n.spouseSlotId]) {
-        const key = [n.id, n.spouseSlotId].sort().join('|');
-        if (!drawn.has(key)) {
-          drawn.add(key);
-          const seg = spouseSeg(n.id, n.spouseSlotId);
-          if (seg) {
-            edgePath(`M${seg.x1} ${seg.y} H${seg.x2}`, 'cd-edge-spouse');
-          }
-        }
+      // Draw each one-way spouse link exactly once.
+      for (const spouseId of n.spouseSlotIds || []) {
+        if (!pos[spouseId]) continue;
+        const key = [n.id, spouseId].sort().join('|');
+        if (drawn.has(key)) continue;
+        drawn.add(key);
+        const seg = spouseSeg(n.id, spouseId);
+        if (seg) edgePath(`M${seg.x1} ${seg.y} H${seg.x2}`,
+          'cd-edge-spouse');
       }
       // Cha/me → con. Khi cha me la mot cap vo/chong: ve MOT edge tu
       // giua doan vo/chong (khong ve 2 edge trung nhau).
@@ -1667,7 +1714,7 @@ const G1_NOTARY_DIAGRAM = {
   createDiagramPane,
   // Export cho test thuan: layout thua ke + so cho canonical —
   // pure functions, khong can DOM/model.
-  _internals: { layoutInheritance, slotNum, setSpousePair, NODE_W, NODE_H, PAD,
+  _internals: { layoutInheritance, slotNum, NODE_W, NODE_H, PAD,
                 ROW_H, GAP_X, ZOOM_MIN, ZOOM_MAX },
 };
 

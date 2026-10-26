@@ -34,7 +34,12 @@
             ],
             "receivePositions": [],
             "hidden": false,
-            "deleted": false
+            "deleted": false,
+            "spouseSlotIds": [
+              "spouse"
+            ],
+            "spouseSuggestionId": null,
+            "spouseUndetermined": false
           },
           {
             "id": "spouse",
@@ -47,7 +52,12 @@
               2
             ],
             "hidden": false,
-            "deleted": false
+            "deleted": false,
+            "spouseSlotIds": [
+              "owner"
+            ],
+            "spouseSuggestionId": null,
+            "spouseUndetermined": false
           },
           {
             "id": "child_1",
@@ -63,7 +73,10 @@
               2
             ],
             "hidden": false,
-            "deleted": false
+            "deleted": false,
+            "spouseSlotIds": [],
+            "spouseSuggestionId": null,
+            "spouseUndetermined": false
           },
           {
             "id": "child_2",
@@ -78,7 +91,10 @@
               1
             ],
             "hidden": false,
-            "deleted": false
+            "deleted": false,
+            "spouseSlotIds": [],
+            "spouseSuggestionId": null,
+            "spouseUndetermined": false
           }
         ]
       }

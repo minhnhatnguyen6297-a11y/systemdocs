@@ -37,8 +37,9 @@ DRAFT_MAX_PEOPLE_TWO_PARTY = 30
 DRAFT_POSITIONS = {1, 2, 3, 4, 5}
 DRAFT_TWO_PARTY_IDS = [f"p{i}" for i in range(1, 31)]
 DRAFT_NODE_FIELDS = {
-    "id", "personId", "parentSlotIds", "spouseSlotId",
-    "ownPositions", "receivePositions", "hidden", "deleted",
+    "id", "personId", "parentSlotIds", "spouseSlotIds", "spouseSlotId",
+    "spouseSuggestionId", "spouseUndetermined", "ownPositions",
+    "receivePositions", "hidden", "deleted",
 }
 DRAFT_NODE_FIELDS_TWO_PARTY = {"id", "personId", "hidden", "deleted"}
 # asset_row_v2 = asset_row trừ is_primary (§13.3)
@@ -522,15 +523,27 @@ def check_diagram_state_v2(state, where, stage_ids, v, case_type):
                     and all(isinstance(x, str) for x in ps)):
                 v.append(("diagram_invalid_state",
                           f"{w} parentSlotIds={ps!r}"))
-            ss = n.get("spouseSlotId")
-            if ss is not None and not isinstance(ss, str):
+            spouse_ids = n.get("spouseSlotIds")
+            if not isinstance(spouse_ids, list) or any(
+                    not isinstance(x, str) or not x for x in spouse_ids):
                 v.append(("diagram_invalid_state",
-                          f"{w} spouseSlotId={ss!r}"))
+                          f"{w} spouseSlotIds={spouse_ids!r}"))
+                spouse_ids = []
+            if len(set(spouse_ids)) != len(spouse_ids):
+                v.append(("diagram_invalid_state", f"{w} duplicate_spouse"))
+            expected = spouse_ids[-1] if spouse_ids else None
+            if n.get("spouseSlotId") != expected:
+                v.append(("diagram_invalid_state", f"{w} spouseSlotId mirror"))
+            if n.get("spouseSuggestionId") is not None and not isinstance(
+                    n.get("spouseSuggestionId"), str):
+                v.append(("diagram_invalid_state", f"{w} spouseSuggestionId"))
+            if not isinstance(n.get("spouseUndetermined"), bool):
+                v.append(("diagram_invalid_state", f"{w} spouseUndetermined"))
             if isinstance(nid, str):
                 if isinstance(ps, list) and nid in ps:
                     v.append(("diagram_invalid_state",
                               f"{w} self_parent"))
-                if ss == nid:
+                if nid in spouse_ids:
                     v.append(("diagram_invalid_state",
                               f"{w} self_spouse"))
         check_person_id(n, w, stage_ids, v)

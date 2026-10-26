@@ -209,7 +209,10 @@ def _node(nid, person_id=None, parents=(), spouse=None, own=(),
           receive=(), hidden=False, deleted=False):
     """diagram node v3 (§13.4) — ownPositions/receivePositions ⊆ {1,2,3}."""
     return {"id": nid, "personId": person_id,
-            "parentSlotIds": list(parents), "spouseSlotId": spouse,
+            "parentSlotIds": list(parents),
+            "spouseSlotIds": [spouse] if spouse else [],
+            "spouseSlotId": spouse,
+            "spouseSuggestionId": None, "spouseUndetermined": False,
             "ownPositions": list(own), "receivePositions": list(receive),
             "hidden": hidden, "deleted": deleted}
 
@@ -334,6 +337,8 @@ def test_get_reads_second_asset_row(db):
     assets = {a["so_serial"]: a for a in _service(db).get(case.id)["stage"]["assets"]}
     assert set(assets) == {"DD123456", "EE654321"}
     assert assets["EE654321"]["land_rows"] is None
+    for asset in assets.values():
+        assert "is_primary" not in asset
 
 
 def test_get_two_party_case_state_and_capabilities(db):
@@ -1828,3 +1833,113 @@ def test_save_case_inheritance_25_rejects_binding_without_saved_value(
     assert "chưa có giá trị" in str(failure.value)
     assert db.query(InheritanceCase).count() == 0
     assert db.query(CasePersonRow).count() == 0
+
+
+@pytest.mark.parametrize("schema_version", [3, 4])
+def test_v3_spouse_migration_keeps_candidates_order_and_living_suggestion(
+        db, schema_version):
+    from services.case_workspace import _v3_to_v2_nodes
+    from services.inheritance_engine import run_inheritance_case
+    from services.inheritance_workspace import _validate_diagram_wire
+
+    deceased, first, second = (str(uuid.uuid4()) for _ in range(3))
+    raw_nodes = [
+        _node("dead", deceased, spouse="first", own=[1]),
+        _node("first", first, spouse="second", receive=[1]),
+        _node("second", second, spouse="dead", receive=[1]),
+    ]
+    for node in raw_nodes:
+        for key in ("spouseSlotIds", "spouseSuggestionId", "spouseUndetermined"):
+            node.pop(key)
+    payload = {
+        "schemaVersion": schema_version,
+        "diagram": {"state": _v3_state(raw_nodes)},
+    }
+    before = json.dumps(payload)
+    state = _service(db)._state_v3(
+        payload, domain="inheritance",
+        valid_row_ids={deceased, first, second},
+        person_rows={
+            deceased: {"row_id": deceased, "ngay_chet": "2020-01-01"},
+            first: {"row_id": first, "ngay_chet": None},
+            second: {"row_id": second, "ngay_chet": None},
+        })
+    nodes = {node["id"]: node for node in state["nodes"]}
+
+    assert json.dumps(payload) == before
+    assert nodes["dead"]["spouseSlotIds"] == ["first", "second"]
+    assert nodes["dead"]["spouseSlotId"] == "second"
+    assert nodes["dead"]["spouseUndetermined"] is True
+    assert nodes["first"]["spouseSlotIds"] == []
+    assert nodes["first"]["spouseSuggestionId"] == "second"
+    assert _validate_diagram_wire(state) == []
+    engine_nodes = _v3_to_v2_nodes(state["nodes"])
+    assert engine_nodes[0]["spouseUndetermined"] is True
+    rendered = run_inheritance_case(
+        {"version": 2, "nodes": engine_nodes},
+        {deceased: {"ngay_chet": "2020-01-01"},
+         first: {"ngay_chet": None}, second: {"ngay_chet": None}},
+    )
+    assert rendered["status"] == "incomplete", rendered["errors"]
+    assert any(warning["code"] == "spouse_undetermined"
+               for warning in rendered["warnings"])
+
+
+def test_get_normalizes_singular_spouse_without_writing_then_commit_persists(db):
+    case, _deceased, _prop, _heirs = _make_case(db, with_participant=True)
+    owner_row, spouse_row = (row.row_id for row in case.person_rows)
+    legacy_nodes = [
+        _node("owner", owner_row, spouse="spouse", own=[1]),
+        _node("spouse", spouse_row, spouse="owner", receive=[1]),
+    ]
+    for node in legacy_nodes:
+        for key in ("spouseSlotIds", "spouseSuggestionId", "spouseUndetermined"):
+            node.pop(key)
+    _write_state(case, db, _v3_state(legacy_nodes), owner_row_id=owner_row)
+    before = case.case_state_json
+    service = _service(db)
+
+    loaded = service.get(case.id)
+
+    nodes = {node["id"]: node for node in loaded["diagram"]["state"]["nodes"]}
+    assert nodes["owner"]["spouseSlotIds"] == ["spouse"]
+    assert nodes["spouse"]["spouseSlotIds"] == []
+    assert nodes["spouse"]["spouseSuggestionId"] == "owner"
+    assert case.case_state_json == before
+    assert service.get(case.id)["diagram"]["state"] == loaded["diagram"]["state"]
+    assert case.workspace_revision == 1
+
+    committed = service.commit_stage(case.id, 1, loaded["stage"])
+
+    persisted = json.loads(case.case_state_json)
+    assert persisted["diagram"]["state"] == committed["diagram"]["state"]
+    assert persisted["diagram"]["state"] == loaded["diagram"]["state"]
+    assert "stage" not in persisted and "assets" not in persisted
+    assert case.engine_state_json is None
+    assert case.workspace_revision == 2
+
+
+@pytest.mark.parametrize("spouse_slots,lawful", [
+    (["first", "second"], "second"),
+    ([], None),
+])
+def test_spouse_role_projection_uses_ordered_outgoing_links(
+        spouse_slots, lawful):
+    from services.case_workspace import _project_role_nodes
+
+    owner = _node("owner", spouse="first")
+    owner["spouseSlotIds"] = spouse_slots
+    nodes = [
+        owner,
+        _node("first", spouse="owner"),
+        _node("second"),
+        _node("child", parents=("owner",), spouse="child_spouse"),
+        _node("child_spouse"),
+    ]
+
+    roles = {node["id"]: node for node in _project_role_nodes(nodes, [])}
+
+    assert roles["first"]["relationType"] == ""
+    assert roles["second"]["relationType"] == ("spouse" if lawful else "")
+    assert roles["child_spouse"]["relationType"] == "branchSpouse"
+    assert roles["child_spouse"]["spouseOf"] == "child"

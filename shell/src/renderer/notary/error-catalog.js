@@ -167,10 +167,6 @@ const ERROR_CATALOG = {
     title: 'Quan hệ gia đình tạo vòng lặp',
     hint: 'Kiểm tra lại cha/mẹ — con trên các ô liên quan.',
   },
-  spouse_conflict: {
-    title: 'Quan hệ vợ/chồng mâu thuẫn',
-    hint: 'Hai ô phải khai báo vợ/chồng qua lại đúng một cặp.',
-  },
   self_parent: { title: 'Một ô tự nhận chính mình là cha/mẹ' },
   self_spouse: { title: 'Một ô tự nhận chính mình là vợ/chồng' },
   dangling_parent: { title: 'Quan hệ cha/mẹ trỏ tới ô không tồn tại' },

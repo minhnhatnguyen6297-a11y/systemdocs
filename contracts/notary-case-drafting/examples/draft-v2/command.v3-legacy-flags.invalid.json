@@ -33,7 +33,10 @@
             "receivePositions": [],
             "isLandOwner": true,
             "hidden": false,
-            "deleted": false
+            "deleted": false,
+            "spouseSlotIds": [],
+            "spouseSuggestionId": null,
+            "spouseUndetermined": false
           },
           {
             "id": "child_1",
@@ -47,7 +50,10 @@
               1
             ],
             "hidden": false,
-            "deleted": false
+            "deleted": false,
+            "spouseSlotIds": [],
+            "spouseSuggestionId": null,
+            "spouseUndetermined": false
           }
         ]
       }

@@ -153,7 +153,10 @@
               ],
               "receivePositions": [],
               "hidden": false,
-              "deleted": false
+              "deleted": false,
+              "spouseSlotIds": [],
+              "spouseSuggestionId": null,
+              "spouseUndetermined": false
             },
             {
               "id": "child_1",
@@ -169,7 +172,10 @@
                 3
               ],
               "hidden": false,
-              "deleted": false
+              "deleted": false,
+              "spouseSlotIds": [],
+              "spouseSuggestionId": null,
+              "spouseUndetermined": false
             }
           ]
         },
