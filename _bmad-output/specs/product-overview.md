@@ -197,7 +197,7 @@ phần theo luật và in Word; **người kết luận pháp lý vẫn là côn
 
 Quyết định nghiệp vụ D-xxx: [`decision-80`](../decisions/decision-80-so-quyet-dinh-nghiep-vu-thua-ke.md).
 Điều luật: [`legal-baseline.md`](./notary_v2/diagram/inheritance/legal-baseline.md).
-Câu hỏi mở Q-xxx: [`business-rules.md` §16](./notary_v2/diagram/inheritance/business-rules.md#16-câu-hỏi-mở-q-xxx).
+Câu hỏi mở Q-xxx: [`business-rules.md` §10](./notary_v2/diagram/inheritance/business-rules.md#10-câu-hỏi-mở-q-xxx).
 
 ## Cấu trúc repository
 

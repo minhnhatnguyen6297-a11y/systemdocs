@@ -17,7 +17,7 @@
 | Quan hệ code | `graphify-out/` |
 | Sổ quyết định nghiệp vụ thừa kế (D-xxx) | `_bmad-output/decisions/decision-80-so-quyet-dinh-nghiep-vu-thua-ke.md` |
 | Điều luật thừa kế (BLDS 2015, HNGĐ 2014) | `_bmad-output/specs/notary_v2/diagram/inheritance/legal-baseline.md` |
-| Câu hỏi mở (Q-xxx), bảng luật ↔ app | `business-rules.md` §15–§16 (cùng thư mục) |
+| Câu hỏi mở (Q-xxx), bảng luật ↔ app | `business-rules.md` §8–§10 (cùng thư mục; quy tắc R-xx) |
 
 - Spec quyết định hành vi; code chứng minh hiện trạng. Đổi hành vi thì cập nhật
   spec liên quan trước khi sửa code.

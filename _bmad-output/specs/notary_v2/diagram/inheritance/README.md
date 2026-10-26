@@ -84,7 +84,7 @@ ngược Stage/Pool/Diagram.
 ## 9. Câu hỏi và lịch sử
 
 - Sổ quyết định D-xxx: [`decision-80`](../../../../decisions/decision-80-so-quyet-dinh-nghiep-vu-thua-ke.md).
-  Câu hỏi mở Q-xxx: [`business-rules.md` §16](./business-rules.md#16-câu-hỏi-mở-q-xxx).
+  Câu hỏi mở Q-xxx: [`business-rules.md` §10](./business-rules.md#10-câu-hỏi-mở-q-xxx).
   Điều luật: [`legal-baseline.md`](./legal-baseline.md). D-002 (không chặn
   lưu/xuất) đã chốt; mục "Quy tắc lưu/xuất khi `incomplete`" dưới đây chỉ còn là
   việc đồng bộ contract/code.
