@@ -225,13 +225,9 @@ async function dragPoolToNode(name, nodeId) {
   await P().waitForTimeout(1800); // evaluate debounce → generated slots
 }
 async function dragNodeToPool(nodeId) {
-  const nb = await P().locator(`.cd-node[data-node-id="${nodeId}"]`).first().boundingBox();
-  const bb = await P().locator('.cd-pool-box').boundingBox();
-  const sx = nb.x + nb.width / 2, sy = nb.y + nb.height / 2, tx = bb.x + 30, ty = bb.y + bb.height - 20;
-  const m = P().mouse;
-  await m.move(sx, sy); await m.down();
-  for (let i = 1; i <= 15; i++) await m.move(sx + (tx - sx) * i / 15, sy + (ty - sy) * i / 15);
-  await m.up();
+  // HTML5 DnD: dùng dragTo (Playwright giả lập dataTransfer); cầm ở góc trên-trái để tránh chip/nút.
+  const card = P().locator(`.cd-node[data-node-id="${nodeId}"]`).first();
+  await card.dragTo(P().locator('.cd-pool-box'), { sourcePosition: { x: 6, y: 8 }, targetPosition: { x: 30, y: 10 } });
   await P().waitForTimeout(1800);
 }
 async function nodeOf(name) {
@@ -442,6 +438,11 @@ async function wordExport(mode, destDir) {
     if (!(await b.count())) return { error: 'no original-source button' };
     await b.first().click();
     await P().waitForTimeout(4000);
+    // Spec: vị trí Word gốc phải được xác nhận tường minh trước khi xuất.
+    const ap = P().locator('.cd-word-modal button', { hasText: 'Áp dụng vị trí đã chọn' });
+    const maps = P().locator('.cd-word-modal label', { hasText: '→' }).locator('input[type=checkbox]:not([disabled])');
+    for (let i = 0; i < await maps.count(); i++) await maps.nth(i).check().catch(() => {});
+    if (await ap.count()) { await ap.first().click(); await P().waitForTimeout(1500); }
   }
   await shot(`word-${mode}-options`);
   const dialogText = await P().locator('.cd-word-modal').innerText();
@@ -497,6 +498,11 @@ T.T6 = async () => {
   record('intakeText', intakeTxt.slice(0, 1500));
   const put = P().locator('button', { hasText: 'Đưa vào Stage' }).locator('visible=true');
   record('intakePutButtons', await put.count());
+  // Nguồn Word gốc chỉ gắn vào hồ sơ khi đưa ít nhất một gợi ý vào Stage.
+  const putIn = P().locator('.modal').last().locator('button', { hasText: 'Đưa vào Stage' });
+  if (await putIn.count()) { await putIn.first().click(); await P().waitForTimeout(800); }
+  const rawKeys = intakeTxt.split('\n').filter((l) => /^[a-z]+_[a-z_]+$/.test(l.trim()));
+  check('intake labels have no raw snake_case field names', rawKeys.length === 0, rawKeys);
   // close intake dialog
   const cl = P().locator('.modal button', { hasText: 'Đóng' }).locator('visible=true');
   if (await cl.count()) await cl.last().click();
@@ -590,12 +596,46 @@ T.T9 = async () => {
   for (let i = 0; i < n; i++) await typeField(af('so_thua_dat'), i, String(100 + i));
   const r0 = await save('assets-partial-saved');
   record('saveWithOnlyThua', { ok: r0.ok, errs: r0.errs });
-  check('save not blocked when Tờ bản đồ empty (UI philosophy)', r0.ok, r0.errs.errors);
+  // Owner S5b (decision-owner-gate-inventory-rulings-20261023): tài sản bắt buộc số thửa + số tờ → chặn Lưu, lỗi tại ô.
+  check('save blocked when Tờ bản đồ empty, error at field (S5b)', !r0.ok && r0.errs.errors.some((e) => /Tờ bản đồ/.test(e)), r0.errs.errors);
+  check('S5b error text short per asset', r0.errs.errors.every((e) => e.length <= 400), r0.errs.errors);
   for (let i = 0; i < n; i++) await typeField(af('so_to_ban_do'), i, String(10 + i));
   const r = await save('assets-saved');
   check('save with max assets', r.ok, r.errs);
   const c = lastCase();
   record('dbAssets', db('select count(*) n from case_asset_rows where case_id=?', [c.id])[0].n);
+};
+T.T9b = async () => {
+  // T9 bước 2–4: 30 người giả, lưu; Xuất Word chỉ bị chặn khi chưa chọn mẫu; xuất với 30 người.
+  await newCase();
+  for (let i = 0; i < 30; i++) await addPerson();
+  for (let i = 0; i < 30; i++) await typeField(pf('ho_ten'), i, `Người Thử Số ${String(i + 1).padStart(2, '0')}`);
+  await addAsset();
+  await typeField(af('so_thua_dat'), 0, '901'); await typeField(af('so_to_ban_do'), 0, '09');
+  const r = await save('30-people-saved');
+  check('save with 30 people', r.ok, r.errs);
+  const c = lastCase();
+  const n = c ? db('select count(*) n from case_person_rows where case_id=?', [c.id])[0].n : 0;
+  check('DB has 30 persons', n === 30, n);
+  check('no exception class names on save', !r.errs.errors.some((e) => /[A-Z][a-zA-Z]+Error:/.test(e)), r.errs.errors);
+  await P().locator('button', { hasText: 'Xuất Word' }).locator('visible=true').first().click();
+  await P().waitForSelector('.cd-word-modal', { timeout: 10000 });
+  await P().locator('.cd-word-modal .js-word-export').click();
+  await P().waitForTimeout(800);
+  const txt = await visibleText();
+  await shot('export-no-template');
+  check('export without template blocked with clear message', /Chưa chọn thư mục chứa file mẫu/.test(txt), txt.split('\n').filter((l) => /Chưa|chọn/.test(l)).slice(0, 5));
+  await P().locator('.cd-word-modal button', { hasText: 'Đóng' }).first().click().catch(() => {});
+  await P().waitForTimeout(300);
+  const dest = path.join(A.profile, 'export-30'); fs.mkdirSync(dest, { recursive: true });
+  const w = await wordExport('folder', dest);
+  // Spec word-templates.md §trần slot: Thừa kế >20 người → word.too_many_people theo từng văn bản, báo rõ, không treo/crash.
+  const res = (w.resText || '') + '\n' + (w.dialogText || '');
+  record('export30', { files: w.files.map((f) => path.basename(f)), tail: res.slice(-600) });
+  check('export with 30 people: clear per-document outcome (file or "quá … người" message)', w.files.length > 0 || /20 người|quá nhiều người|vượt/i.test(res), res.slice(-400));
+  check('export 30: no exception class names shown', !/[A-Z][a-zA-Z]+Error:/.test(res), res.slice(-300));
+  const an = analyzeDocx(w.files, []);
+  check('30-people docx: no leftover placeholders', an.every((a) => a.placeholders.length === 0), an.map((a) => [a.file, a.placeholders]));
 };
 
 T.PROBE = async () => {
