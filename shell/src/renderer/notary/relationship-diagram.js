@@ -264,6 +264,11 @@ function layoutInheritance(nodes) {
   return { pos, w: Math.max(maxX, 0) + PAD, h };
 }
 
+function setSpousePair(model, firstId, secondId) {
+  return model.setNodeRelation(firstId, { spouseSlotId: secondId }) &&
+    model.setNodeRelation(secondId, { spouseSlotId: firstId });
+}
+
 function createDiagramPane(ctx) {
   const model = ctx.model;
   const L = ctx.lib;
@@ -733,8 +738,7 @@ function createDiagramPane(ctx) {
           parentSlotIds: [...(anchor.parentSlotIds || []), node.id] });
         touched = true;
       }
-      // Vo/chong: anchor chua co spouse (khai bao 1 chieu la du —
-      // engine spouse_conflict chi khi lech cap).
+      // Vo/chong: tao ca hai chieu lien ket.
       if (types.has('spouse')) {
         const hasSpouse = (anchor.spouseSlotId &&
           nodeById(anchor.spouseSlotId)) || liveNodes().some(
@@ -743,10 +747,7 @@ function createDiagramPane(ctx) {
           const node = model.addSlot(
             freeSlotId(['spouse', `spouse_${anchor.id}`]));
           if (node) {
-            // Wire yêu cầu vợ/chồng 2 chiều (lệch cặp →
-            // spouse_conflict) — mirror cả hai phía.
-            model.setNodeRelation(node.id, { spouseSlotId: anchor.id });
-            model.setNodeRelation(anchor.id, { spouseSlotId: node.id });
+            setSpousePair(model, anchor.id, node.id);
             touched = true;
           }
         }
@@ -1666,7 +1667,7 @@ const G1_NOTARY_DIAGRAM = {
   createDiagramPane,
   // Export cho test thuan: layout thua ke + so cho canonical —
   // pure functions, khong can DOM/model.
-  _internals: { layoutInheritance, slotNum, NODE_W, NODE_H, PAD,
+  _internals: { layoutInheritance, slotNum, setSpousePair, NODE_W, NODE_H, PAD,
                 ROW_H, GAP_X, ZOOM_MIN, ZOOM_MAX },
 };
 

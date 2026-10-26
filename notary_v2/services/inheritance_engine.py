@@ -85,6 +85,12 @@ def _empty_result(errors: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _unsupported_result(errors: list[dict[str, Any]]) -> dict[str, Any]:
+    result = _empty_result(errors)
+    result["status"] = "unsupported"
+    return result
+
+
 def _validate_and_build_graph(
     engine_input: Mapping[str, Any], people_by_id: Mapping[Any, Any]
 ) -> tuple[dict[str, dict[str, Any]], dict[str, Any], list[dict[str, Any]]]:
@@ -184,7 +190,7 @@ def _validate_and_build_graph(
                 errors.append(_error("self_spouse", "Một người không thể là vợ/chồng của chính mình.", nodeId=node["id"]))
             else:
                 other = nodes[spouse_id]
-                if other.get("spouseSlotId") not in (None, node["id"]):
+                if other.get("personId") in active_people and other.get("spouseSlotId") != node["id"]:
                     errors.append(
                         _error("spouse_conflict", "Quan hệ vợ/chồng bị lệch.", nodeId=node["id"])
                     )
@@ -310,14 +316,24 @@ def run_inheritance_case(
             comparison == "alive" and nodes_by_person[person_id]["willReceive"]
         )
 
+    representation_depth_exceeded = False
+
     def descendant_plan(
-        person_id: str, event_date: date, via: tuple[str, ...], stack: frozenset[str]
+        person_id: str,
+        event_date: date,
+        via: tuple[str, ...],
+        stack: frozenset[str],
+        depth: int,
     ) -> dict[str, Any] | None:
+        nonlocal representation_depth_exceeded
         if person_id in stack:
             return None
         comparison = death_comparison(person_id, event_date)
         if comparison in ("alive", "after"):
             if not accepts(person_id, comparison):
+                return None
+            if depth > 3:
+                representation_depth_exceeded = True
                 return None
             return {"type": "person", "personId": person_id, "via": list(via)}
 
@@ -325,7 +341,7 @@ def run_inheritance_case(
         plans = []
         next_stack = stack | {person_id}
         for child_id in sorted(children.get(person_id, set())):
-            plan = descendant_plan(child_id, event_date, via + (person_id,), next_stack)
+            plan = descendant_plan(child_id, event_date, via + (person_id,), next_stack, depth + 1)
             if plan is not None:
                 plans.append(plan)
         if not plans:
@@ -341,7 +357,7 @@ def run_inheritance_case(
                 units.append({"type": "person", "personId": person_id, "via": []})
                 seen_direct.add(person_id)
         for child_id in sorted(children.get(source_id, set())):
-            plan = descendant_plan(child_id, event_date, (), frozenset({source_id}))
+            plan = descendant_plan(child_id, event_date, (), frozenset({source_id}), 1)
             if plan is not None:
                 units.append(plan)
         return units
@@ -477,6 +493,11 @@ def run_inheritance_case(
             unit_share = estate / len(units)
             for unit in units:
                 credit(unit, unit_share, source_id, heir_rank)
+
+    if representation_depth_exceeded:
+        return _unsupported_result(
+            [_error("representation_depth_exceeded", "Thế vị vượt quá giới hạn chắt.")]
+        )
 
     allocated = sum(holdings.values(), Fraction(0))
     unresolved = sum(

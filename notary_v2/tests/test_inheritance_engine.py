@@ -108,6 +108,29 @@ def test_representation_splits_by_branch_at_each_generation_not_flat_descendants
     assert e_terms[0]["viaBranchPersonIds"] == ["Q", "D"]
 
 
+
+def test_representation_at_great_grandchild_depth_remains_supported():
+    result = _run(
+        {"X": "2020", "A": "2010", "B": "2011", "C": None},
+        parents={"A": ["X"], "B": ["A"], "C": ["B"]},
+        owners={"X"},
+    )
+    assert result["status"] == "complete"
+    assert _share(result, "C") == 1
+
+
+def test_representation_beyond_great_grandchild_returns_unsupported_without_shares():
+    result = _run(
+        {"X": "2020", "A": "2010", "B": "2011", "C": "2012", "D": None},
+        parents={"A": ["X"], "B": ["A"], "C": ["B"], "D": ["C"]},
+        owners={"X"},
+    )
+    assert result["status"] == "unsupported"
+    assert result["errors"][0]["code"] == "representation_depth_exceeded"
+    assert result["errors"][0]["message"]
+    assert result["allocations"] == {}
+    assert result["breakdowns"] == []
+
 def test_non_owner_child_dead_before_source_has_no_estate_but_descendant_represents():
     result = _run(
         {"X": "2020", "Y": "2010", "Z": None},
@@ -299,6 +322,14 @@ def _invalid_result(nodes, people):
             ],
             {key: {"ngay_chet": None} for key in "ABCD"},
             "too_many_parents",
+        ),
+        (
+            [
+                {"id": "a", "personId": "A", "parentSlotIds": [], "spouseSlotId": "b", "isLandOwner": True},
+                {"id": "b", "personId": "B", "parentSlotIds": [], "spouseSlotId": None},
+            ],
+            {"A": {"ngay_chet": None}, "B": {"ngay_chet": None}},
+            "spouse_conflict",
         ),
     ],
 )

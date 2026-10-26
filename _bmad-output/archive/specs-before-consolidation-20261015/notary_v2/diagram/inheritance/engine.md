@@ -276,6 +276,11 @@ Không được trả một mảng phẳng toàn bộ hậu duệ rồi chia đ�
 }
 ```
 
+`status` có thể là `complete`, `incomplete`, `invalid` hoặc `unsupported`.
+`invalid` và `unsupported` giữ cùng shape kết quả rỗng, với `errors` là danh
+sách `{code, message}`; `representation_depth_exceeded` dùng `unsupported` và
+không trả allocations hoặc fractions.
+
 `requiredSlots` là output quyết định tập ô, không tham gia tính tỷ lệ.
 Ô do engine sở hữu; không tự tạo Người hoặc đoán người vào ô.
 

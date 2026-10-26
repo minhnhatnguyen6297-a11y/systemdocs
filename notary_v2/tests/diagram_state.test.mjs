@@ -4,6 +4,23 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const { createStore, normalizeSnapshot } = require("../frontend/static/diagram_state.js");
+const { createModel } = require("../../shell/src/renderer/notary/case-drafting-model.js");
+const { _internals: { setSpousePair } } = require("../../shell/src/renderer/notary/relationship-diagram.js");
+
+test("diagram spouse creation links both nodes and deleting one clears the partner", () => {
+  const model = createModel({ client: { run: async () => ({ ok: true }) } });
+  model.state.status = "ready";
+  model.state.diagram.nodes = [
+    { id: "anchor", spouseSlotId: null },
+    { id: "partner", spouseSlotId: null },
+  ];
+
+  assert.equal(setSpousePair(model, "anchor", "partner"), true);
+  assert.equal(model.state.diagram.nodes[0].spouseSlotId, "partner");
+  assert.equal(model.state.diagram.nodes[1].spouseSlotId, "anchor");
+  assert.equal(model.removeNode("partner"), true);
+  assert.equal(model.state.diagram.nodes[0].spouseSlotId, null);
+});
 
 test("normalizeSnapshot fills safe defaults", () => {
   const snapshot = normalizeSnapshot(null);
