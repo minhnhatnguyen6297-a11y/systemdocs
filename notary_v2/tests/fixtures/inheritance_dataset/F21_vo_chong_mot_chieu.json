@@ -1,0 +1,839 @@
+{
+  "family": "F21",
+  "cases": [
+    {
+      "id": "F21-001",
+      "family": "F21",
+      "title": "Liên kết vợ chồng một chiều; 1 người con",
+      "rules": [
+        "R-11",
+        "R-25"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": true,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 1
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Nguyễn Minh Khôi",
+          "ngay_chet": "15/03/2014"
+        },
+        "P2": {
+          "ho_ten": "Trần Thị Hạnh",
+          "ngay_chet": null
+        },
+        "P3": {
+          "ho_ten": "Phạm Quốc Bảo",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "invalid",
+        "reasons": [
+          "spouse_conflict"
+        ],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "Nút n1 trỏ tới nút phối ngẫu n2 nhưng n2 không trỏ ngược lại; liên kết hôn nhân một chiều vi phạm R-11 và làm hồ sơ invalid theo R-25, không có phân số. Số con, ngày mở và dấu nhận không làm thay đổi kết cục do lỗi cấu trúc."
+      }
+    },
+    {
+      "id": "F21-002",
+      "family": "F21",
+      "title": "Liên kết vợ chồng một chiều; 2 người con",
+      "rules": [
+        "R-11",
+        "R-25"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 2
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Nguyễn Minh Khôi",
+          "ngay_chet": "22/08/2018"
+        },
+        "P2": {
+          "ho_ten": "Trần Thị Hạnh",
+          "ngay_chet": null
+        },
+        "P3": {
+          "ho_ten": "Phạm Quốc Bảo",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Lê Thị Mai",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "invalid",
+        "reasons": [
+          "spouse_conflict"
+        ],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "Nút n1 trỏ tới nút phối ngẫu n2 nhưng n2 không trỏ ngược lại; liên kết hôn nhân một chiều vi phạm R-11 và làm hồ sơ invalid theo R-25, không có phân số. Số con, ngày mở và dấu nhận không làm thay đổi kết cục do lỗi cấu trúc."
+      }
+    },
+    {
+      "id": "F21-003",
+      "family": "F21",
+      "title": "Liên kết vợ chồng một chiều; 3 người con",
+      "rules": [
+        "R-11",
+        "R-25"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 3
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Nguyễn Minh Khôi",
+          "ngay_chet": "03/11/2021"
+        },
+        "P2": {
+          "ho_ten": "Trần Thị Hạnh",
+          "ngay_chet": null
+        },
+        "P3": {
+          "ho_ten": "Phạm Quốc Bảo",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Lê Thị Mai",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Đỗ Văn Nam",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "invalid",
+        "reasons": [
+          "spouse_conflict"
+        ],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "Nút n1 trỏ tới nút phối ngẫu n2 nhưng n2 không trỏ ngược lại; liên kết hôn nhân một chiều vi phạm R-11 và làm hồ sơ invalid theo R-25, không có phân số. Số con, ngày mở và dấu nhận không làm thay đổi kết cục do lỗi cấu trúc."
+      }
+    },
+    {
+      "id": "F21-004",
+      "family": "F21",
+      "title": "Liên kết vợ chồng một chiều; 4 người con",
+      "rules": [
+        "R-11",
+        "R-25"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 4
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Nguyễn Minh Khôi",
+          "ngay_chet": "1999"
+        },
+        "P2": {
+          "ho_ten": "Trần Thị Hạnh",
+          "ngay_chet": null
+        },
+        "P3": {
+          "ho_ten": "Phạm Quốc Bảo",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Lê Thị Mai",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Đỗ Văn Nam",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Hoàng Thị Thu",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "invalid",
+        "reasons": [
+          "spouse_conflict"
+        ],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "Nút n1 trỏ tới nút phối ngẫu n2 nhưng n2 không trỏ ngược lại; liên kết hôn nhân một chiều vi phạm R-11 và làm hồ sơ invalid theo R-25, không có phân số. Số con, ngày mở và dấu nhận không làm thay đổi kết cục do lỗi cấu trúc."
+      }
+    },
+    {
+      "id": "F21-005",
+      "family": "F21",
+      "title": "Liên kết vợ chồng một chiều; 6 người con",
+      "rules": [
+        "R-11",
+        "R-25"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 6
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Nguyễn Minh Khôi",
+          "ngay_chet": "07/06/2009"
+        },
+        "P2": {
+          "ho_ten": "Trần Thị Hạnh",
+          "ngay_chet": null
+        },
+        "P3": {
+          "ho_ten": "Phạm Quốc Bảo",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Lê Thị Mai",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Đỗ Văn Nam",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Hoàng Thị Thu",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Vũ Đức Long",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Bùi Ngọc Lan",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "invalid",
+        "reasons": [
+          "spouse_conflict"
+        ],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "Nút n1 trỏ tới nút phối ngẫu n2 nhưng n2 không trỏ ngược lại; liên kết hôn nhân một chiều vi phạm R-11 và làm hồ sơ invalid theo R-25, không có phân số. Số con, ngày mở và dấu nhận không làm thay đổi kết cục do lỗi cấu trúc."
+      }
+    },
+    {
+      "id": "F21-006",
+      "family": "F21",
+      "title": "Liên kết vợ chồng một chiều; 8 người con",
+      "rules": [
+        "R-11",
+        "R-25"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": true,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 8
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Nguyễn Minh Khôi",
+          "ngay_chet": "18/02/2024"
+        },
+        "P2": {
+          "ho_ten": "Trần Thị Hạnh",
+          "ngay_chet": null
+        },
+        "P3": {
+          "ho_ten": "Phạm Quốc Bảo",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Lê Thị Mai",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Đỗ Văn Nam",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Hoàng Thị Thu",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Vũ Đức Long",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Bùi Ngọc Lan",
+          "ngay_chet": null
+        },
+        "P9": {
+          "ho_ten": "Đặng Gia Huy",
+          "ngay_chet": null
+        },
+        "P10": {
+          "ho_ten": "Phan Thị Ngân",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n9",
+            "personId": "P9",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n10",
+            "personId": "P10",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "invalid",
+        "reasons": [
+          "spouse_conflict"
+        ],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "Nút n1 trỏ tới nút phối ngẫu n2 nhưng n2 không trỏ ngược lại; liên kết hôn nhân một chiều vi phạm R-11 và làm hồ sơ invalid theo R-25, không có phân số. Số con, ngày mở và dấu nhận không làm thay đổi kết cục do lỗi cấu trúc."
+      }
+    }
+  ]
+}

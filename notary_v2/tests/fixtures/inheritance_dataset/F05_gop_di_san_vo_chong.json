@@ -1,0 +1,1386 @@
+{
+  "family": "F05",
+  "cases": [
+    {
+      "id": "F05-001",
+      "family": "F05",
+      "title": "Gộp di sản vợ chồng, 2 người con, hồ sơ 01",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": true,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 2,
+        "merged_estate": true
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Nguyễn Văn An",
+          "ngay_chet": "03/01/2015"
+        },
+        "P2": {
+          "ho_ten": "Trần Thị Bình",
+          "ngay_chet": "04/01/2017"
+        },
+        "P3": {
+          "ho_ten": "Lê Minh Cường",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Phạm Thị Dung",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-015",
+        "explanation": "R-13: vợ chồng đồng chủ nên mỗi người có 1/2 phần gốc; R-14/R-16: hai ngày chết khác nhau tạo hai vòng nối tiếp; R-15, R-19, R-21 xác định người nhận/từ chối ở từng vòng. Tuy nhiên hồ sơ gộp di sản cần quyết định Q-015 trước khi chốt phân số; pending, không suy đoán phần cuối. Con gắn cả hai cha mẹ: 2."
+      }
+    },
+    {
+      "id": "F05-002",
+      "family": "F05",
+      "title": "Gộp di sản vợ chồng, 2 người con, hồ sơ 02",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": true,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 2,
+        "merged_estate": true
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Phan Thị Oanh",
+          "ngay_chet": "05/02/2016"
+        },
+        "P2": {
+          "ho_ten": "Ngô Văn Phúc",
+          "ngay_chet": "06/02/2018"
+        },
+        "P3": {
+          "ho_ten": "Mai Thị Quỳnh",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Đinh Văn Sơn",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-015",
+        "explanation": "R-13: vợ chồng đồng chủ nên mỗi người có 1/2 phần gốc; R-14/R-16: hai ngày chết khác nhau tạo hai vòng nối tiếp; R-15, R-19, R-21 xác định người nhận/từ chối ở từng vòng. Tuy nhiên hồ sơ gộp di sản cần quyết định Q-015 trước khi chốt phân số; pending, không suy đoán phần cuối. Con gắn cả hai cha mẹ: 2."
+      }
+    },
+    {
+      "id": "F05-003",
+      "family": "F05",
+      "title": "Gộp di sản vợ chồng, 3 người con, hồ sơ 03",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 3,
+        "merged_estate": true
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Lâm Văn Yến",
+          "ngay_chet": "07/03/2017"
+        },
+        "P2": {
+          "ho_ten": "Tạ Thị Ánh",
+          "ngay_chet": "08/03/2019"
+        },
+        "P3": {
+          "ho_ten": "Kiều Văn Bảo",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Châu Thị Chi",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "La Văn Đạt",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-015",
+        "explanation": "R-13: vợ chồng đồng chủ nên mỗi người có 1/2 phần gốc; R-14/R-16: hai ngày chết khác nhau tạo hai vòng nối tiếp; R-15, R-19, R-21 xác định người nhận/từ chối ở từng vòng. Tuy nhiên hồ sơ gộp di sản cần quyết định Q-015 trước khi chốt phân số; pending, không suy đoán phần cuối. Con gắn cả hai cha mẹ: 3."
+      }
+    },
+    {
+      "id": "F05-004",
+      "family": "F05",
+      "title": "Gộp di sản vợ chồng, 3 người con, hồ sơ 04",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 3,
+        "merged_estate": true
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Chu Thị Loan",
+          "ngay_chet": "09/04/2018"
+        },
+        "P2": {
+          "ho_ten": "Mạc Văn Minh",
+          "ngay_chet": "10/04/2020"
+        },
+        "P3": {
+          "ho_ten": "Ninh Thị Nga",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Ông Văn Phú",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Tăng Thị Quyên",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-015",
+        "explanation": "R-13: vợ chồng đồng chủ nên mỗi người có 1/2 phần gốc; R-14/R-16: hai ngày chết khác nhau tạo hai vòng nối tiếp; R-15, R-19, R-21 xác định người nhận/từ chối ở từng vòng. Tuy nhiên hồ sơ gộp di sản cần quyết định Q-015 trước khi chốt phân số; pending, không suy đoán phần cuối. Con gắn cả hai cha mẹ: 3."
+      }
+    },
+    {
+      "id": "F05-005",
+      "family": "F05",
+      "title": "Gộp di sản vợ chồng, 3 người con, hồ sơ 05",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 3,
+        "merged_estate": true
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Triệu Văn Xuân",
+          "ngay_chet": "11/05/2019"
+        },
+        "P2": {
+          "ho_ten": "Hứa Thị Yến",
+          "ngay_chet": "12/05/2021"
+        },
+        "P3": {
+          "ho_ten": "Doãn Văn An",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Lưu Thị Bích",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Tôn Văn Cường",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-015",
+        "explanation": "R-13: vợ chồng đồng chủ nên mỗi người có 1/2 phần gốc; R-14/R-16: hai ngày chết khác nhau tạo hai vòng nối tiếp; R-15, R-19, R-21 xác định người nhận/từ chối ở từng vòng. Tuy nhiên hồ sơ gộp di sản cần quyết định Q-015 trước khi chốt phân số; pending, không suy đoán phần cuối. Con gắn cả hai cha mẹ: 3."
+      }
+    },
+    {
+      "id": "F05-006",
+      "family": "F05",
+      "title": "Gộp di sản vợ chồng, 4 người con, hồ sơ 06",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 4,
+        "merged_estate": true
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Kha Thị Linh",
+          "ngay_chet": "13/06/2020"
+        },
+        "P2": {
+          "ho_ten": "Mễ Văn Nam",
+          "ngay_chet": "14/06/2022"
+        },
+        "P3": {
+          "ho_ten": "Từ Thị Oanh",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Cù Văn Phúc",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Sầm Thị Quỳnh",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Nguyễn Văn An",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-015",
+        "explanation": "R-13: vợ chồng đồng chủ nên mỗi người có 1/2 phần gốc; R-14/R-16: hai ngày chết khác nhau tạo hai vòng nối tiếp; R-15, R-19, R-21 xác định người nhận/từ chối ở từng vòng. Tuy nhiên hồ sơ gộp di sản cần quyết định Q-015 trước khi chốt phân số; pending, không suy đoán phần cuối. Con gắn cả hai cha mẹ: 4."
+      }
+    },
+    {
+      "id": "F05-007",
+      "family": "F05",
+      "title": "Gộp di sản vợ chồng, 4 người con, hồ sơ 07",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 4,
+        "merged_estate": true
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Hoàng Văn Em",
+          "ngay_chet": "15/07/2021"
+        },
+        "P2": {
+          "ho_ten": "Đỗ Thị Giang",
+          "ngay_chet": "16/07/2023"
+        },
+        "P3": {
+          "ho_ten": "Vũ Minh Hòa",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Bùi Thị Lan",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Đặng Văn Nam",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Phan Thị Oanh",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-015",
+        "explanation": "R-13: vợ chồng đồng chủ nên mỗi người có 1/2 phần gốc; R-14/R-16: hai ngày chết khác nhau tạo hai vòng nối tiếp; R-15, R-19, R-21 xác định người nhận/từ chối ở từng vòng. Tuy nhiên hồ sơ gộp di sản cần quyết định Q-015 trước khi chốt phân số; pending, không suy đoán phần cuối. Con gắn cả hai cha mẹ: 4."
+      }
+    },
+    {
+      "id": "F05-008",
+      "family": "F05",
+      "title": "Gộp di sản vợ chồng, 4 người con, hồ sơ 08",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 4,
+        "merged_estate": true
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Hồ Thị Thảo",
+          "ngay_chet": "17/08/2022"
+        },
+        "P2": {
+          "ho_ten": "Lý Văn Tùng",
+          "ngay_chet": "18/08/2024"
+        },
+        "P3": {
+          "ho_ten": "Cao Thị Uyên",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Trương Văn Vinh",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Dương Thị Xuân",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Lâm Văn Yến",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-015",
+        "explanation": "R-13: vợ chồng đồng chủ nên mỗi người có 1/2 phần gốc; R-14/R-16: hai ngày chết khác nhau tạo hai vòng nối tiếp; R-15, R-19, R-21 xác định người nhận/từ chối ở từng vòng. Tuy nhiên hồ sơ gộp di sản cần quyết định Q-015 trước khi chốt phân số; pending, không suy đoán phần cuối. Con gắn cả hai cha mẹ: 4."
+      }
+    },
+    {
+      "id": "F05-009",
+      "family": "F05",
+      "title": "Gộp di sản vợ chồng, 5 người con, hồ sơ 09",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 5,
+        "merged_estate": true
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "La Văn Đạt",
+          "ngay_chet": "19/09/2023"
+        },
+        "P2": {
+          "ho_ten": "Tô Thị Giang",
+          "ngay_chet": "20/09/2025"
+        },
+        "P3": {
+          "ho_ten": "Võ Văn Hải",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Hà Thị Ích",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Lương Văn Khánh",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Chu Thị Loan",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Mạc Văn Minh",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-015",
+        "explanation": "R-13: vợ chồng đồng chủ nên mỗi người có 1/2 phần gốc; R-14/R-16: hai ngày chết khác nhau tạo hai vòng nối tiếp; R-15, R-19, R-21 xác định người nhận/từ chối ở từng vòng. Tuy nhiên hồ sơ gộp di sản cần quyết định Q-015 trước khi chốt phân số; pending, không suy đoán phần cuối. Con gắn cả hai cha mẹ: 5."
+      }
+    },
+    {
+      "id": "F05-010",
+      "family": "F05",
+      "title": "Gộp di sản vợ chồng, 7 người con, hồ sơ 10",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 7,
+        "merged_estate": true
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Tăng Thị Quyên",
+          "ngay_chet": "21/10/2024"
+        },
+        "P2": {
+          "ho_ten": "Thái Văn Sơn",
+          "ngay_chet": "22/10/2026"
+        },
+        "P3": {
+          "ho_ten": "Quách Thị Tú",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Giang Văn Út",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Khưu Thị Vân",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Triệu Văn Xuân",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Hứa Thị Yến",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Doãn Văn An",
+          "ngay_chet": null
+        },
+        "P9": {
+          "ho_ten": "Lưu Thị Bích",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n9",
+            "personId": "P9",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-015",
+        "explanation": "R-13: vợ chồng đồng chủ nên mỗi người có 1/2 phần gốc; R-14/R-16: hai ngày chết khác nhau tạo hai vòng nối tiếp; R-15, R-19, R-21 xác định người nhận/từ chối ở từng vòng. Tuy nhiên hồ sơ gộp di sản cần quyết định Q-015 trước khi chốt phân số; pending, không suy đoán phần cuối. Con gắn cả hai cha mẹ: 7."
+      }
+    }
+  ]
+}

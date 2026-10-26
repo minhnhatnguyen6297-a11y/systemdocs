@@ -1,0 +1,4215 @@
+{
+  "family": "F03",
+  "cases": [
+    {
+      "id": "F03-001",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 2 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 2,
+        "parent_died_long_ago_person_ids": [
+          "P2",
+          "P3"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Phạm Hà",
+          "ngay_chet": null
+        },
+        "P3": {
+          "ho_ten": "Hoàng Minh",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Trần Dũng",
+          "ngay_chet": "08/01/2018"
+        },
+        "P4": {
+          "ho_ten": "Đặng Yến",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Lý Chi",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Mai Hà",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N3",
+            "personId": "P3",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2",
+              "N3"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-002",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 3 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": true,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 3,
+        "parent_died_long_ago_person_ids": [
+          "P2"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Hoàng Minh",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Lê Khánh",
+          "ngay_chet": "15/03/2020"
+        },
+        "P4": {
+          "ho_ten": "Bùi Diệp",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Mai Hà",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Đinh Minh",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Tạ Quân",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-003",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 4 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 4,
+        "parent_died_long_ago_person_ids": [
+          "P2",
+          "P3"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Vũ Quân",
+          "ngay_chet": null
+        },
+        "P3": {
+          "ho_ten": "Đặng Vân",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Phạm Ngọc",
+          "ngay_chet": "22/05/2022"
+        },
+        "P4": {
+          "ho_ten": "Đỗ Linh",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Đinh Minh",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Tạ Quân",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Hồ Vân",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Cao Bảo",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N3",
+            "personId": "P3",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2",
+              "N3"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-004",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 3 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 3,
+        "parent_died_long_ago_person_ids": [
+          "P2"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Đặng Vân",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Hoàng Thảo",
+          "ngay_chet": "02/07/2019"
+        },
+        "P4": {
+          "ho_ten": "Ngô An",
+          "ngay_chet": "03/06/2027"
+        },
+        "P5": {
+          "ho_ten": "Tạ Quân",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Hồ Vân",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Cao Bảo",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-005",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 5 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 5,
+        "parent_died_long_ago_person_ids": [
+          "P2",
+          "P3"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Bùi Bảo",
+          "ngay_chet": null
+        },
+        "P3": {
+          "ho_ten": "Đỗ Hương",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Vũ Xuân",
+          "ngay_chet": "09/09/2021"
+        },
+        "P4": {
+          "ho_ten": "Dương Dũng",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Hồ Vân",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Cao Bảo",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Võ Hương",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Tô Nam",
+          "ngay_chet": null
+        },
+        "P9": {
+          "ho_ten": "Chu Bình",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N3",
+            "personId": "P3",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2",
+              "N3"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N9",
+            "personId": "P9",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-006",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 4 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": true,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 4,
+        "parent_died_long_ago_person_ids": [
+          "P2"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Đỗ Hương",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Đặng Cường",
+          "ngay_chet": "16/11/2016"
+        },
+        "P4": {
+          "ho_ten": "Lý Khánh",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Cao Bảo",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Võ Hương",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Tô Nam",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Chu Bình",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-007",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 6 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 6,
+        "parent_died_long_ago_person_ids": [
+          "P2",
+          "P3"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Ngô Nam",
+          "ngay_chet": null
+        },
+        "P3": {
+          "ho_ten": "Dương Bình",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Bùi Khoa",
+          "ngay_chet": "23/02/2023"
+        },
+        "P4": {
+          "ho_ten": "Mai Ngọc",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Võ Hương",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Tô Nam",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Chu Bình",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Lâm Giang",
+          "ngay_chet": null
+        },
+        "P9": {
+          "ho_ten": "Trịnh Lan",
+          "ngay_chet": null
+        },
+        "P10": {
+          "ho_ten": "La Phúc",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N3",
+            "personId": "P3",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2",
+              "N3"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N9",
+            "personId": "P9",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N10",
+            "personId": "P10",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-008",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 3 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 3,
+        "parent_died_long_ago_person_ids": [
+          "P2"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Dương Bình",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Đỗ Oanh",
+          "ngay_chet": "03/04/2024"
+        },
+        "P4": {
+          "ho_ten": "Đinh Thảo",
+          "ngay_chet": "03/06/2032"
+        },
+        "P5": {
+          "ho_ten": "Tô Nam",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Chu Bình",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Lâm Giang",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-009",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 1 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 1,
+        "parent_died_long_ago_person_ids": [
+          "P2",
+          "P3"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Lý Giang",
+          "ngay_chet": null
+        },
+        "P3": {
+          "ho_ten": "Mai Lan",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Ngô Chi",
+          "ngay_chet": "10/06/2017"
+        },
+        "P4": {
+          "ho_ten": "Tạ Xuân",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Chu Bình",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N3",
+            "personId": "P3",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2",
+              "N3"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-010",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 4 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": true,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 4,
+        "parent_died_long_ago_person_ids": [
+          "P2"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Mai Lan",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Dương Hà",
+          "ngay_chet": "17/08/2020"
+        },
+        "P4": {
+          "ho_ten": "Hồ Cường",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Lâm Giang",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Trịnh Lan",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "La Phúc",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Phan Uyên",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-011",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 7 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 7,
+        "parent_died_long_ago_person_ids": [
+          "P2",
+          "P3"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Đinh Phúc",
+          "ngay_chet": null
+        },
+        "P3": {
+          "ho_ten": "Tạ Uyên",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Lý Minh",
+          "ngay_chet": "24/10/2015"
+        },
+        "P4": {
+          "ho_ten": "Cao Khoa",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Trịnh Lan",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "La Phúc",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Phan Uyên",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Tăng Yến",
+          "ngay_chet": null
+        },
+        "P9": {
+          "ho_ten": "Nguyễn Diệp",
+          "ngay_chet": null
+        },
+        "P10": {
+          "ho_ten": "Trần Linh",
+          "ngay_chet": null
+        },
+        "P11": {
+          "ho_ten": "Lê An",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N3",
+            "personId": "P3",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2",
+              "N3"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N9",
+            "personId": "P9",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N10",
+            "personId": "P10",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N11",
+            "personId": "P11",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-012",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 5 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 5,
+        "parent_died_long_ago_person_ids": [
+          "P2"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Tạ Uyên",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Mai Quân",
+          "ngay_chet": "04/12/2022"
+        },
+        "P4": {
+          "ho_ten": "Võ Oanh",
+          "ngay_chet": "03/06/2030"
+        },
+        "P5": {
+          "ho_ten": "La Phúc",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Phan Uyên",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Tăng Yến",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Nguyễn Diệp",
+          "ngay_chet": null
+        },
+        "P9": {
+          "ho_ten": "Trần Linh",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N9",
+            "personId": "P9",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-013",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 3 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 3,
+        "parent_died_long_ago_person_ids": [
+          "P2",
+          "P3"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Hồ Yến",
+          "ngay_chet": null
+        },
+        "P3": {
+          "ho_ten": "Cao Diệp",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Đinh Vân",
+          "ngay_chet": "11/01/2021"
+        },
+        "P4": {
+          "ho_ten": "Tô Chi",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Phan Uyên",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Tăng Yến",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Nguyễn Diệp",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N3",
+            "personId": "P3",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2",
+              "N3"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-014",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 4 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": true,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 4,
+        "parent_died_long_ago_person_ids": [
+          "P2"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Cao Diệp",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Tạ Bảo",
+          "ngay_chet": "18/03/2019"
+        },
+        "P4": {
+          "ho_ten": "Chu Hà",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Tăng Yến",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Nguyễn Diệp",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Trần Linh",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Lê An",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-015",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 8 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 8,
+        "parent_died_long_ago_person_ids": [
+          "P2",
+          "P3"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Võ Linh",
+          "ngay_chet": null
+        },
+        "P3": {
+          "ho_ten": "Tô An",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Hồ Hương",
+          "ngay_chet": "25/05/2024"
+        },
+        "P4": {
+          "ho_ten": "Lâm Minh",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Nguyễn Diệp",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Trần Linh",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Lê An",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Phạm Dũng",
+          "ngay_chet": null
+        },
+        "P9": {
+          "ho_ten": "Hoàng Khánh",
+          "ngay_chet": null
+        },
+        "P10": {
+          "ho_ten": "Vũ Ngọc",
+          "ngay_chet": null
+        },
+        "P11": {
+          "ho_ten": "Đặng Thảo",
+          "ngay_chet": null
+        },
+        "P12": {
+          "ho_ten": "Bùi Xuân",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N3",
+            "personId": "P3",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2",
+              "N3"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N9",
+            "personId": "P9",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N10",
+            "personId": "P10",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N11",
+            "personId": "P11",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N12",
+            "personId": "P12",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-016",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 2 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 2,
+        "parent_died_long_ago_person_ids": [
+          "P2"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Tô An",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Cao Nam",
+          "ngay_chet": "05/07/2018"
+        },
+        "P4": {
+          "ho_ten": "Trịnh Quân",
+          "ngay_chet": "03/06/2026"
+        },
+        "P5": {
+          "ho_ten": "Trần Linh",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Lê An",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-017",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 6 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 6,
+        "parent_died_long_ago_person_ids": [
+          "P2",
+          "P3"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Chu Dũng",
+          "ngay_chet": null
+        },
+        "P3": {
+          "ho_ten": "Lâm Khánh",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Võ Bình",
+          "ngay_chet": "12/09/2016"
+        },
+        "P4": {
+          "ho_ten": "La Vân",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Lê An",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Phạm Dũng",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Hoàng Khánh",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Vũ Ngọc",
+          "ngay_chet": null
+        },
+        "P9": {
+          "ho_ten": "Đặng Thảo",
+          "ngay_chet": null
+        },
+        "P10": {
+          "ho_ten": "Bùi Xuân",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N3",
+            "personId": "P3",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2",
+              "N3"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N9",
+            "personId": "P9",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N10",
+            "personId": "P10",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-018",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 3 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": true,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 3,
+        "parent_died_long_ago_person_ids": [
+          "P2"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Lâm Khánh",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Tô Giang",
+          "ngay_chet": "19/11/2023"
+        },
+        "P4": {
+          "ho_ten": "Phan Bảo",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Phạm Dũng",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Hoàng Khánh",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Vũ Ngọc",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-019",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 5 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 5,
+        "parent_died_long_ago_person_ids": [
+          "P2",
+          "P3"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Trịnh Ngọc",
+          "ngay_chet": null
+        },
+        "P3": {
+          "ho_ten": "La Thảo",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Chu Lan",
+          "ngay_chet": "26/02/2020"
+        },
+        "P4": {
+          "ho_ten": "Tăng Hương",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Hoàng Khánh",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Vũ Ngọc",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Đặng Thảo",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Bùi Xuân",
+          "ngay_chet": null
+        },
+        "P9": {
+          "ho_ten": "Đỗ Cường",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N3",
+            "personId": "P3",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2",
+              "N3"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N9",
+            "personId": "P9",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-020",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 4 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 4,
+        "parent_died_long_ago_person_ids": [
+          "P2"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "La Thảo",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Lâm Phúc",
+          "ngay_chet": "06/04/2021"
+        },
+        "P4": {
+          "ho_ten": "Nguyễn Nam",
+          "ngay_chet": "03/06/2029"
+        },
+        "P5": {
+          "ho_ten": "Vũ Ngọc",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Đặng Thảo",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Bùi Xuân",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Đỗ Cường",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-021",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 7 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 7,
+        "parent_died_long_ago_person_ids": [
+          "P2",
+          "P3"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Phan Xuân",
+          "ngay_chet": null
+        },
+        "P3": {
+          "ho_ten": "Tăng Cường",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Trịnh Uyên",
+          "ngay_chet": "13/06/2017"
+        },
+        "P4": {
+          "ho_ten": "Trần Bình",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Đặng Thảo",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Bùi Xuân",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Đỗ Cường",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Ngô Khoa",
+          "ngay_chet": null
+        },
+        "P9": {
+          "ho_ten": "Dương Oanh",
+          "ngay_chet": null
+        },
+        "P10": {
+          "ho_ten": "Lý Chi",
+          "ngay_chet": null
+        },
+        "P11": {
+          "ho_ten": "Mai Hà",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N3",
+            "personId": "P3",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2",
+              "N3"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N9",
+            "personId": "P9",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N10",
+            "personId": "P10",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N11",
+            "personId": "P11",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-022",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 3 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": true,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 3,
+        "parent_died_long_ago_person_ids": [
+          "P2"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Tăng Cường",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "La Yến",
+          "ngay_chet": "20/08/2022"
+        },
+        "P4": {
+          "ho_ten": "Lê Giang",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Bùi Xuân",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Đỗ Cường",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Ngô Khoa",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-023",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 4 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 4,
+        "parent_died_long_ago_person_ids": [
+          "P2",
+          "P3"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Nguyễn Khoa",
+          "ngay_chet": null
+        },
+        "P3": {
+          "ho_ten": "Trần Oanh",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Phan Diệp",
+          "ngay_chet": "27/10/2019"
+        },
+        "P4": {
+          "ho_ten": "Phạm Lan",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Đỗ Cường",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Ngô Khoa",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Dương Oanh",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Lý Chi",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N3",
+            "personId": "P3",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2",
+              "N3"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-024",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 5 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 5,
+        "parent_died_long_ago_person_ids": [
+          "P2"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Trần Oanh",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Tăng Linh",
+          "ngay_chet": "07/12/2024"
+        },
+        "P4": {
+          "ho_ten": "Hoàng Phúc",
+          "ngay_chet": "03/06/2032"
+        },
+        "P5": {
+          "ho_ten": "Ngô Khoa",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Dương Oanh",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Lý Chi",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Mai Hà",
+          "ngay_chet": null
+        },
+        "P9": {
+          "ho_ten": "Đinh Minh",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N9",
+            "personId": "P9",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    },
+    {
+      "id": "F03-025",
+      "family": "F03",
+      "title": "Cha/mẹ chết đã lâu không ngày; 9 người con",
+      "rules": [
+        "R-07",
+        "R-12",
+        "R-15"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 9,
+        "parent_died_long_ago_person_ids": [
+          "P2",
+          "P3"
+        ]
+      },
+      "people": {
+        "P2": {
+          "ho_ten": "Lê Chi",
+          "ngay_chet": null
+        },
+        "P3": {
+          "ho_ten": "Phạm Hà",
+          "ngay_chet": null
+        },
+        "P1": {
+          "ho_ten": "Nguyễn An",
+          "ngay_chet": "14/05/2018"
+        },
+        "P4": {
+          "ho_ten": "Vũ Uyên",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Dương Oanh",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Lý Chi",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Mai Hà",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Đinh Minh",
+          "ngay_chet": null
+        },
+        "P9": {
+          "ho_ten": "Tạ Quân",
+          "ngay_chet": null
+        },
+        "P10": {
+          "ho_ten": "Hồ Vân",
+          "ngay_chet": null
+        },
+        "P11": {
+          "ho_ten": "Cao Bảo",
+          "ngay_chet": null
+        },
+        "P12": {
+          "ho_ten": "Võ Hương",
+          "ngay_chet": null
+        },
+        "P13": {
+          "ho_ten": "Tô Nam",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "N2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N3",
+            "personId": "P3",
+            "parentSlotIds": [],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N1",
+            "personId": "P1",
+            "parentSlotIds": [
+              "N2",
+              "N3"
+            ],
+            "spouseSlotId": "N4",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N4",
+            "personId": "P4",
+            "parentSlotIds": [],
+            "spouseSlotId": "N1",
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N9",
+            "personId": "P9",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N10",
+            "personId": "P10",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N11",
+            "personId": "P11",
+            "parentSlotIds": [
+              "N1",
+              "N4"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N12",
+            "personId": "P12",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "N13",
+            "personId": "P13",
+            "parentSlotIds": [
+              "N1"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "pending",
+        "reasons": [],
+        "shares": {},
+        "unresolved": {},
+        "remaining_node_ids": null,
+        "pending_decision": "Q-013",
+        "explanation": "Q-013: cha/mẹ được khai là chết đã lâu nhưng ngày chết để trống. Theo R-07, null hiện được coi là còn sống; không thể tự suy ngày chết hoặc thứ tự với người để lại di sản. Chờ quyết định Q-013, nên chưa tính suất theo R-12/R-15 và chưa có phân số kỳ vọng."
+      }
+    }
+  ]
+}

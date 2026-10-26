@@ -1,0 +1,3087 @@
+{
+  "family": "F04",
+  "cases": [
+    {
+      "id": "F04-001",
+      "family": "F04",
+      "title": "Vợ chồng chết khác ngày; 1 người con, 1 người nhận",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": true,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 2,
+        "liet_si_person_ids": [],
+        "children_count": 1
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Nguyễn Văn Minh",
+          "ngay_chet": "12/03/2012"
+        },
+        "P2": {
+          "ho_ten": "Nguyễn Thị Lan",
+          "ngay_chet": "20/07/2013"
+        },
+        "P3": {
+          "ho_ten": "Minh An",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "complete",
+        "reasons": [],
+        "shares": {
+          "1": {
+            "P3": "1/1"
+          }
+        },
+        "unresolved": {
+          "1": "0/1"
+        },
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "R-13: mỗi người có gốc 1/2. R-14/R-16: vòng đầu chia 1/2 cho người phối ngẫu chết sau và 1 con nhận; người phối ngẫu giữ thêm 1/[2(1+1)] rồi vòng hai chia phần đang có cho 1 con. Cộng mỗi suất con ở hai vòng được 1/1; con không nhận bị loại theo R-19/R-21."
+      }
+    },
+    {
+      "id": "F04-002",
+      "family": "F04",
+      "title": "Vợ chồng chết khác ngày; 2 người con, 2 người nhận",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": true,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 3,
+        "liet_si_person_ids": [],
+        "children_count": 2
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Trần Văn Hòa",
+          "ngay_chet": "04/06/2014"
+        },
+        "P2": {
+          "ho_ten": "Trần Thị Hương",
+          "ngay_chet": "15/10/2015"
+        },
+        "P3": {
+          "ho_ten": "Hòa An",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Hòa Bình",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "complete",
+        "reasons": [],
+        "shares": {
+          "1": {
+            "P3": "1/2",
+            "P4": "1/2"
+          }
+        },
+        "unresolved": {
+          "1": "0/1"
+        },
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "R-13: mỗi người có gốc 1/2. R-14/R-16: vòng đầu chia 1/2 cho người phối ngẫu chết sau và 2 con nhận; người phối ngẫu giữ thêm 1/[2(2+1)] rồi vòng hai chia phần đang có cho 2 con. Cộng mỗi suất con ở hai vòng được 1/2; con không nhận bị loại theo R-19/R-21."
+      }
+    },
+    {
+      "id": "F04-003",
+      "family": "F04",
+      "title": "Vợ chồng chết khác ngày; 2 người con, 1 người nhận",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": true,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 2
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Lê Văn Đức",
+          "ngay_chet": "21/02/2015"
+        },
+        "P2": {
+          "ho_ten": "Lê Thị Mai",
+          "ngay_chet": "08/12/2015"
+        },
+        "P3": {
+          "ho_ten": "Đức An",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Đức Bình",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "complete",
+        "reasons": [],
+        "shares": {
+          "1": {
+            "P3": "1/1"
+          }
+        },
+        "unresolved": {
+          "1": "0/1"
+        },
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "R-13: mỗi người có gốc 1/2. R-14/R-16: vòng đầu chia 1/2 cho người phối ngẫu chết sau và 1 con nhận; người phối ngẫu giữ thêm 1/[2(1+1)] rồi vòng hai chia phần đang có cho 1 con. Cộng mỗi suất con ở hai vòng được 1/1; con không nhận bị loại theo R-19/R-21."
+      }
+    },
+    {
+      "id": "F04-004",
+      "family": "F04",
+      "title": "Vợ chồng chết khác ngày; 3 người con, 3 người nhận",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": true,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 2,
+        "liet_si_person_ids": [],
+        "children_count": 3
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Phạm Quốc Bảo",
+          "ngay_chet": "09/09/2016"
+        },
+        "P2": {
+          "ho_ten": "Phạm Thu Hà",
+          "ngay_chet": "21/01/2017"
+        },
+        "P3": {
+          "ho_ten": "Bảo An",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Bảo Bình",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Bảo Chi",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "complete",
+        "reasons": [],
+        "shares": {
+          "1": {
+            "P3": "1/3",
+            "P4": "1/3",
+            "P5": "1/3"
+          }
+        },
+        "unresolved": {
+          "1": "0/1"
+        },
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "R-13: mỗi người có gốc 1/2. R-14/R-16: vòng đầu chia 1/2 cho người phối ngẫu chết sau và 3 con nhận; người phối ngẫu giữ thêm 1/[2(3+1)] rồi vòng hai chia phần đang có cho 3 con. Cộng mỗi suất con ở hai vòng được 1/3; con không nhận bị loại theo R-19/R-21."
+      }
+    },
+    {
+      "id": "F04-005",
+      "family": "F04",
+      "title": "Vợ chồng chết khác ngày; 4 người con, 4 người nhận",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": true,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 3,
+        "liet_si_person_ids": [],
+        "children_count": 4
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Hoàng Văn Nam",
+          "ngay_chet": "17/11/2016"
+        },
+        "P2": {
+          "ho_ten": "Hoàng Thị Hoa",
+          "ngay_chet": "02/05/2017"
+        },
+        "P3": {
+          "ho_ten": "Nam An",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Nam Bình",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Nam Chi",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Nam Dũng",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "complete",
+        "reasons": [],
+        "shares": {
+          "1": {
+            "P3": "1/4",
+            "P4": "1/4",
+            "P5": "1/4",
+            "P6": "1/4"
+          }
+        },
+        "unresolved": {
+          "1": "0/1"
+        },
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "R-13: mỗi người có gốc 1/2. R-14/R-16: vòng đầu chia 1/2 cho người phối ngẫu chết sau và 4 con nhận; người phối ngẫu giữ thêm 1/[2(4+1)] rồi vòng hai chia phần đang có cho 4 con. Cộng mỗi suất con ở hai vòng được 1/4; con không nhận bị loại theo R-19/R-21."
+      }
+    },
+    {
+      "id": "F04-006",
+      "family": "F04",
+      "title": "Vợ chồng chết khác ngày; 4 người con, 1 người nhận",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 4
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Đỗ Thành Công",
+          "ngay_chet": "02/01/2018"
+        },
+        "P2": {
+          "ho_ten": "Đỗ Ngọc Anh",
+          "ngay_chet": "14/09/2018"
+        },
+        "P3": {
+          "ho_ten": "Công An",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Công Bình",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Công Chi",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Công Dũng",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "complete",
+        "reasons": [],
+        "shares": {
+          "1": {
+            "P3": "1/1"
+          }
+        },
+        "unresolved": {
+          "1": "0/1"
+        },
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "R-13: mỗi người có gốc 1/2. R-14/R-16: vòng đầu chia 1/2 cho người phối ngẫu chết sau và 1 con nhận; người phối ngẫu giữ thêm 1/[2(1+1)] rồi vòng hai chia phần đang có cho 1 con. Cộng mỗi suất con ở hai vòng được 1/1; con không nhận bị loại theo R-19/R-21."
+      }
+    },
+    {
+      "id": "F04-007",
+      "family": "F04",
+      "title": "Vợ chồng chết khác ngày; 4 người con, 4 người nhận",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 2,
+        "liet_si_person_ids": [],
+        "children_count": 4
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Vũ Hữu Phúc",
+          "ngay_chet": "19/07/2018"
+        },
+        "P2": {
+          "ho_ten": "Vũ Thị Thảo",
+          "ngay_chet": "27/02/2019"
+        },
+        "P3": {
+          "ho_ten": "Phúc An",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Phúc Bình",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Phúc Chi",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Phúc Dũng",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "complete",
+        "reasons": [],
+        "shares": {
+          "1": {
+            "P3": "1/4",
+            "P4": "1/4",
+            "P5": "1/4",
+            "P6": "1/4"
+          }
+        },
+        "unresolved": {
+          "1": "0/1"
+        },
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "R-13: mỗi người có gốc 1/2. R-14/R-16: vòng đầu chia 1/2 cho người phối ngẫu chết sau và 4 con nhận; người phối ngẫu giữ thêm 1/[2(4+1)] rồi vòng hai chia phần đang có cho 4 con. Cộng mỗi suất con ở hai vòng được 1/4; con không nhận bị loại theo R-19/R-21."
+      }
+    },
+    {
+      "id": "F04-008",
+      "family": "F04",
+      "title": "Vợ chồng chết khác ngày; 4 người con, 1 người nhận",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 3,
+        "liet_si_person_ids": [],
+        "children_count": 4
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Bùi Văn Lâm",
+          "ngay_chet": "25/12/2019"
+        },
+        "P2": {
+          "ho_ten": "Bùi Thu Trang",
+          "ngay_chet": "03/03/2020"
+        },
+        "P3": {
+          "ho_ten": "Lâm An",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Lâm Bình",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Lâm Chi",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Lâm Dũng",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "complete",
+        "reasons": [],
+        "shares": {
+          "1": {
+            "P3": "1/1"
+          }
+        },
+        "unresolved": {
+          "1": "0/1"
+        },
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "R-13: mỗi người có gốc 1/2. R-14/R-16: vòng đầu chia 1/2 cho người phối ngẫu chết sau và 1 con nhận; người phối ngẫu giữ thêm 1/[2(1+1)] rồi vòng hai chia phần đang có cho 1 con. Cộng mỗi suất con ở hai vòng được 1/1; con không nhận bị loại theo R-19/R-21."
+      }
+    },
+    {
+      "id": "F04-009",
+      "family": "F04",
+      "title": "Vợ chồng chết khác ngày; 3 người con, 3 người nhận",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 3
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Đặng Minh Khang",
+          "ngay_chet": "03/04/2020"
+        },
+        "P2": {
+          "ho_ten": "Đặng Thị Ngọc",
+          "ngay_chet": "19/11/2020"
+        },
+        "P3": {
+          "ho_ten": "Khang An",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Khang Bình",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Khang Chi",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "complete",
+        "reasons": [],
+        "shares": {
+          "1": {
+            "P3": "1/3",
+            "P4": "1/3",
+            "P5": "1/3"
+          }
+        },
+        "unresolved": {
+          "1": "0/1"
+        },
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "R-13: mỗi người có gốc 1/2. R-14/R-16: vòng đầu chia 1/2 cho người phối ngẫu chết sau và 3 con nhận; người phối ngẫu giữ thêm 1/[2(3+1)] rồi vòng hai chia phần đang có cho 3 con. Cộng mỗi suất con ở hai vòng được 1/3; con không nhận bị loại theo R-19/R-21."
+      }
+    },
+    {
+      "id": "F04-010",
+      "family": "F04",
+      "title": "Vợ chồng chết khác ngày; 5 người con, 1 người nhận",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 2,
+        "liet_si_person_ids": [],
+        "children_count": 5
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Ngô Quang Huy",
+          "ngay_chet": "14/08/2020"
+        },
+        "P2": {
+          "ho_ten": "Ngô Bích Liên",
+          "ngay_chet": "25/02/2021"
+        },
+        "P3": {
+          "ho_ten": "Huy An",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Huy Bình",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Huy Chi",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Huy Dũng",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Huy Giang",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "complete",
+        "reasons": [],
+        "shares": {
+          "1": {
+            "P3": "1/1"
+          }
+        },
+        "unresolved": {
+          "1": "0/1"
+        },
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "R-13: mỗi người có gốc 1/2. R-14/R-16: vòng đầu chia 1/2 cho người phối ngẫu chết sau và 1 con nhận; người phối ngẫu giữ thêm 1/[2(1+1)] rồi vòng hai chia phần đang có cho 1 con. Cộng mỗi suất con ở hai vòng được 1/1; con không nhận bị loại theo R-19/R-21."
+      }
+    },
+    {
+      "id": "F04-011",
+      "family": "F04",
+      "title": "Vợ chồng chết khác ngày; 5 người con, 5 người nhận",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 3,
+        "liet_si_person_ids": [],
+        "children_count": 5
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Dương Văn Sơn",
+          "ngay_chet": "30/01/2021"
+        },
+        "P2": {
+          "ho_ten": "Dương Thị Hạnh",
+          "ngay_chet": "12/06/2021"
+        },
+        "P3": {
+          "ho_ten": "Sơn An",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Sơn Bình",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Sơn Chi",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Sơn Dũng",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Sơn Giang",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "complete",
+        "reasons": [],
+        "shares": {
+          "1": {
+            "P3": "1/5",
+            "P4": "1/5",
+            "P5": "1/5",
+            "P6": "1/5",
+            "P7": "1/5"
+          }
+        },
+        "unresolved": {
+          "1": "0/1"
+        },
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "R-13: mỗi người có gốc 1/2. R-14/R-16: vòng đầu chia 1/2 cho người phối ngẫu chết sau và 5 con nhận; người phối ngẫu giữ thêm 1/[2(5+1)] rồi vòng hai chia phần đang có cho 5 con. Cộng mỗi suất con ở hai vòng được 1/5; con không nhận bị loại theo R-19/R-21."
+      }
+    },
+    {
+      "id": "F04-012",
+      "family": "F04",
+      "title": "Vợ chồng chết khác ngày; 5 người con, 5 người nhận",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 5
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Lý Quốc Thịnh",
+          "ngay_chet": "11/05/2021"
+        },
+        "P2": {
+          "ho_ten": "Lý Thu Hiền",
+          "ngay_chet": "30/09/2021"
+        },
+        "P3": {
+          "ho_ten": "Thịnh An",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Thịnh Bình",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Thịnh Chi",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Thịnh Dũng",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Thịnh Giang",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "complete",
+        "reasons": [],
+        "shares": {
+          "1": {
+            "P3": "1/5",
+            "P4": "1/5",
+            "P5": "1/5",
+            "P6": "1/5",
+            "P7": "1/5"
+          }
+        },
+        "unresolved": {
+          "1": "0/1"
+        },
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "R-13: mỗi người có gốc 1/2. R-14/R-16: vòng đầu chia 1/2 cho người phối ngẫu chết sau và 5 con nhận; người phối ngẫu giữ thêm 1/[2(5+1)] rồi vòng hai chia phần đang có cho 5 con. Cộng mỗi suất con ở hai vòng được 1/5; con không nhận bị loại theo R-19/R-21."
+      }
+    },
+    {
+      "id": "F04-013",
+      "family": "F04",
+      "title": "Vợ chồng chết khác ngày; 6 người con, 1 người nhận",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 2,
+        "liet_si_person_ids": [],
+        "children_count": 6
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Mai Thanh Tùng",
+          "ngay_chet": "22/10/2021"
+        },
+        "P2": {
+          "ho_ten": "Mai Thị Vân",
+          "ngay_chet": "06/01/2022"
+        },
+        "P3": {
+          "ho_ten": "Tùng An",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Tùng Bình",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Tùng Chi",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Tùng Dũng",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Tùng Giang",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Tùng Hạnh",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "complete",
+        "reasons": [],
+        "shares": {
+          "1": {
+            "P3": "1/1"
+          }
+        },
+        "unresolved": {
+          "1": "0/1"
+        },
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "R-13: mỗi người có gốc 1/2. R-14/R-16: vòng đầu chia 1/2 cho người phối ngẫu chết sau và 1 con nhận; người phối ngẫu giữ thêm 1/[2(1+1)] rồi vòng hai chia phần đang có cho 1 con. Cộng mỗi suất con ở hai vòng được 1/1; con không nhận bị loại theo R-19/R-21."
+      }
+    },
+    {
+      "id": "F04-014",
+      "family": "F04",
+      "title": "Vợ chồng chết khác ngày; 6 người con, 6 người nhận",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 3,
+        "liet_si_person_ids": [],
+        "children_count": 6
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Đinh Văn Long",
+          "ngay_chet": "08/02/2022"
+        },
+        "P2": {
+          "ho_ten": "Đinh Ngọc Diệp",
+          "ngay_chet": "17/07/2022"
+        },
+        "P3": {
+          "ho_ten": "Long An",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Long Bình",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Long Chi",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Long Dũng",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Long Giang",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Long Hạnh",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "complete",
+        "reasons": [],
+        "shares": {
+          "1": {
+            "P3": "1/6",
+            "P4": "1/6",
+            "P5": "1/6",
+            "P6": "1/6",
+            "P7": "1/6",
+            "P8": "1/6"
+          }
+        },
+        "unresolved": {
+          "1": "0/1"
+        },
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "R-13: mỗi người có gốc 1/2. R-14/R-16: vòng đầu chia 1/2 cho người phối ngẫu chết sau và 6 con nhận; người phối ngẫu giữ thêm 1/[2(6+1)] rồi vòng hai chia phần đang có cho 6 con. Cộng mỗi suất con ở hai vòng được 1/6; con không nhận bị loại theo R-19/R-21."
+      }
+    },
+    {
+      "id": "F04-015",
+      "family": "F04",
+      "title": "Vợ chồng chết khác ngày; 7 người con, 7 người nhận",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 7
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Hồ Minh Tuấn",
+          "ngay_chet": "16/06/2022"
+        },
+        "P2": {
+          "ho_ten": "Hồ Thị Yến",
+          "ngay_chet": "28/11/2022"
+        },
+        "P3": {
+          "ho_ten": "Tuấn An",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Tuấn Bình",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Tuấn Chi",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Tuấn Dũng",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Tuấn Giang",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Tuấn Hạnh",
+          "ngay_chet": null
+        },
+        "P9": {
+          "ho_ten": "Tuấn Khánh",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n9",
+            "personId": "P9",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "complete",
+        "reasons": [],
+        "shares": {
+          "1": {
+            "P3": "1/7",
+            "P4": "1/7",
+            "P5": "1/7",
+            "P6": "1/7",
+            "P7": "1/7",
+            "P8": "1/7",
+            "P9": "1/7"
+          }
+        },
+        "unresolved": {
+          "1": "0/1"
+        },
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "R-13: mỗi người có gốc 1/2. R-14/R-16: vòng đầu chia 1/2 cho người phối ngẫu chết sau và 7 con nhận; người phối ngẫu giữ thêm 1/[2(7+1)] rồi vòng hai chia phần đang có cho 7 con. Cộng mỗi suất con ở hai vòng được 1/7; con không nhận bị loại theo R-19/R-21."
+      }
+    },
+    {
+      "id": "F04-016",
+      "family": "F04",
+      "title": "Vợ chồng chết khác ngày; 4 người con, 1 người nhận",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 2,
+        "liet_si_person_ids": [],
+        "children_count": 4
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Cao Anh Dũng",
+          "ngay_chet": "29/09/2022"
+        },
+        "P2": {
+          "ho_ten": "Cao Thuỳ Linh",
+          "ngay_chet": "04/04/2023"
+        },
+        "P3": {
+          "ho_ten": "Dũng An",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Dũng Bình",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Dũng Chi",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Dũng Dũng",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "complete",
+        "reasons": [],
+        "shares": {
+          "1": {
+            "P3": "1/1"
+          }
+        },
+        "unresolved": {
+          "1": "0/1"
+        },
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "R-13: mỗi người có gốc 1/2. R-14/R-16: vòng đầu chia 1/2 cho người phối ngẫu chết sau và 1 con nhận; người phối ngẫu giữ thêm 1/[2(1+1)] rồi vòng hai chia phần đang có cho 1 con. Cộng mỗi suất con ở hai vòng được 1/1; con không nhận bị loại theo R-19/R-21."
+      }
+    },
+    {
+      "id": "F04-017",
+      "family": "F04",
+      "title": "Vợ chồng chết khác ngày; 3 người con, 3 người nhận",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 3,
+        "liet_si_person_ids": [],
+        "children_count": 3
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Phan Văn Khải",
+          "ngay_chet": "05/01/2023"
+        },
+        "P2": {
+          "ho_ten": "Phan Thị Thu",
+          "ngay_chet": "20/08/2023"
+        },
+        "P3": {
+          "ho_ten": "Khải An",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Khải Bình",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Khải Chi",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "complete",
+        "reasons": [],
+        "shares": {
+          "1": {
+            "P3": "1/3",
+            "P4": "1/3",
+            "P5": "1/3"
+          }
+        },
+        "unresolved": {
+          "1": "0/1"
+        },
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "R-13: mỗi người có gốc 1/2. R-14/R-16: vòng đầu chia 1/2 cho người phối ngẫu chết sau và 3 con nhận; người phối ngẫu giữ thêm 1/[2(3+1)] rồi vòng hai chia phần đang có cho 3 con. Cộng mỗi suất con ở hai vòng được 1/3; con không nhận bị loại theo R-19/R-21."
+      }
+    },
+    {
+      "id": "F04-018",
+      "family": "F04",
+      "title": "Vợ chồng chết khác ngày; 4 người con, 4 người nhận",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 1,
+        "liet_si_person_ids": [],
+        "children_count": 4
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Trịnh Quốc Việt",
+          "ngay_chet": "18/04/2023"
+        },
+        "P2": {
+          "ho_ten": "Trịnh Mỹ Dung",
+          "ngay_chet": "09/10/2023"
+        },
+        "P3": {
+          "ho_ten": "Việt An",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Việt Bình",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Việt Chi",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Việt Dũng",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "complete",
+        "reasons": [],
+        "shares": {
+          "1": {
+            "P3": "1/4",
+            "P4": "1/4",
+            "P5": "1/4",
+            "P6": "1/4"
+          }
+        },
+        "unresolved": {
+          "1": "0/1"
+        },
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "R-13: mỗi người có gốc 1/2. R-14/R-16: vòng đầu chia 1/2 cho người phối ngẫu chết sau và 4 con nhận; người phối ngẫu giữ thêm 1/[2(4+1)] rồi vòng hai chia phần đang có cho 4 con. Cộng mỗi suất con ở hai vòng được 1/4; con không nhận bị loại theo R-19/R-21."
+      }
+    },
+    {
+      "id": "F04-019",
+      "family": "F04",
+      "title": "Vợ chồng chết khác ngày; 8 người con, 1 người nhận",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 2,
+        "liet_si_person_ids": [],
+        "children_count": 8
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Tạ Minh Quân",
+          "ngay_chet": "27/08/2023"
+        },
+        "P2": {
+          "ho_ten": "Tạ Thị Oanh",
+          "ngay_chet": "31/12/2023"
+        },
+        "P3": {
+          "ho_ten": "Quân An",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Quân Bình",
+          "ngay_chet": null
+        },
+        "P5": {
+          "ho_ten": "Quân Chi",
+          "ngay_chet": null
+        },
+        "P6": {
+          "ho_ten": "Quân Dũng",
+          "ngay_chet": null
+        },
+        "P7": {
+          "ho_ten": "Quân Giang",
+          "ngay_chet": null
+        },
+        "P8": {
+          "ho_ten": "Quân Hạnh",
+          "ngay_chet": null
+        },
+        "P9": {
+          "ho_ten": "Quân Khánh",
+          "ngay_chet": null
+        },
+        "P10": {
+          "ho_ten": "Quân Linh",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n5",
+            "personId": "P5",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n6",
+            "personId": "P6",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n7",
+            "personId": "P7",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n8",
+            "personId": "P8",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n9",
+            "personId": "P9",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n10",
+            "personId": "P10",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "complete",
+        "reasons": [],
+        "shares": {
+          "1": {
+            "P3": "1/1"
+          }
+        },
+        "unresolved": {
+          "1": "0/1"
+        },
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "R-13: mỗi người có gốc 1/2. R-14/R-16: vòng đầu chia 1/2 cho người phối ngẫu chết sau và 1 con nhận; người phối ngẫu giữ thêm 1/[2(1+1)] rồi vòng hai chia phần đang có cho 1 con. Cộng mỗi suất con ở hai vòng được 1/1; con không nhận bị loại theo R-19/R-21."
+      }
+    },
+    {
+      "id": "F04-020",
+      "family": "F04",
+      "title": "Vợ chồng chết khác ngày; 2 người con, 2 người nhận",
+      "rules": [
+        "R-13",
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-19",
+        "R-21"
+      ],
+      "asset_count": 1,
+      "meta": {
+        "opened_before_2017": false,
+        "land_type": "ca_nhan",
+        "parcels_per_certificate": 3,
+        "liet_si_person_ids": [],
+        "children_count": 2
+      },
+      "people": {
+        "P1": {
+          "ho_ten": "Chu Thành Đạt",
+          "ngay_chet": "13/12/2023"
+        },
+        "P2": {
+          "ho_ten": "Chu Ngọc Ánh",
+          "ngay_chet": "01/05/2024"
+        },
+        "P3": {
+          "ho_ten": "Đạt An",
+          "ngay_chet": null
+        },
+        "P4": {
+          "ho_ten": "Đạt Bình",
+          "ngay_chet": null
+        }
+      },
+      "diagram": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": [
+          {
+            "id": "n1",
+            "personId": "P1",
+            "parentSlotIds": [],
+            "spouseSlotId": "n2",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n2",
+            "personId": "P2",
+            "parentSlotIds": [],
+            "spouseSlotId": "n1",
+            "ownPositions": [
+              1
+            ],
+            "receivePositions": [],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n3",
+            "personId": "P3",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          },
+          {
+            "id": "n4",
+            "personId": "P4",
+            "parentSlotIds": [
+              "n1",
+              "n2"
+            ],
+            "spouseSlotId": null,
+            "ownPositions": [],
+            "receivePositions": [
+              1
+            ],
+            "hidden": false,
+            "deleted": false
+          }
+        ]
+      },
+      "action": null,
+      "expected": {
+        "status": "complete",
+        "reasons": [],
+        "shares": {
+          "1": {
+            "P3": "1/2",
+            "P4": "1/2"
+          }
+        },
+        "unresolved": {
+          "1": "0/1"
+        },
+        "remaining_node_ids": null,
+        "pending_decision": null,
+        "explanation": "R-13: mỗi người có gốc 1/2. R-14/R-16: vòng đầu chia 1/2 cho người phối ngẫu chết sau và 2 con nhận; người phối ngẫu giữ thêm 1/[2(2+1)] rồi vòng hai chia phần đang có cho 2 con. Cộng mỗi suất con ở hai vòng được 1/2; con không nhận bị loại theo R-19/R-21."
+      }
+    }
+  ]
+}

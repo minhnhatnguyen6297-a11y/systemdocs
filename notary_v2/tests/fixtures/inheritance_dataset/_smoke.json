@@ -1,0 +1,143 @@
+{
+  "family": "_smoke",
+  "cases": [
+    {
+      "id": "F00-001",
+      "family": "_smoke",
+      "title": "Spouse and child divide equally",
+      "rules": ["R-13", "R-15"],
+      "meta": {},
+      "asset_count": 1,
+      "people": {"P1": {"ho_ten": "Người A", "ngay_chet": "01/01/2020"}, "P2": {"ho_ten": "Người B", "ngay_chet": null}, "P3": {"ho_ten": "Người C", "ngay_chet": null}},
+      "diagram": {"version": 3, "domain": "inheritance", "nodes": [
+        {"id": "n1", "personId": "P1", "parentSlotIds": [], "spouseSlotId": "n2", "ownPositions": [1], "receivePositions": [], "hidden": false, "deleted": false},
+        {"id": "n2", "personId": "P2", "parentSlotIds": [], "spouseSlotId": "n1", "ownPositions": [], "receivePositions": [1], "hidden": false, "deleted": false},
+        {"id": "n3", "personId": "P3", "parentSlotIds": ["n1"], "spouseSlotId": null, "ownPositions": [], "receivePositions": [1], "hidden": false, "deleted": false}
+      ]},
+      "action": null,
+      "expected": {"status": "complete", "reasons": [], "shares": {"1": {"P2": "1/2", "P3": "1/2"}}, "unresolved": {"1": "0/1"}, "remaining_node_ids": null, "pending_decision": null, "explanation": "P2 and P3 are two receiving units."}
+    },
+    {
+      "id": "F00-002",
+      "family": "_smoke",
+      "title": "No receiving heir leaves the estate unresolved",
+      "rules": ["R-15"],
+      "meta": {},
+      "asset_count": 1,
+      "people": {"P1": {"ho_ten": "Người D", "ngay_chet": "2020"}},
+      "diagram": {"version": 3, "domain": "inheritance", "nodes": [
+        {"id": "n1", "personId": "P1", "parentSlotIds": [], "spouseSlotId": null, "ownPositions": [1], "receivePositions": [], "hidden": false, "deleted": false}
+      ]},
+      "action": null,
+      "expected": {"status": "incomplete", "reasons": [], "shares": {"1": {}}, "unresolved": {"1": "1/1"}, "remaining_node_ids": null, "pending_decision": null, "explanation": "There is no eligible receiving unit."}
+    },
+    {
+      "id": "F00-003",
+      "family": "_smoke",
+      "title": "Predeceased child branch passes to two grandchildren",
+      "rules": ["R-17", "R-20"],
+      "meta": {},
+      "asset_count": 1,
+      "people": {"P1": {"ho_ten": "Người E", "ngay_chet": "01/01/2020"}, "P2": {"ho_ten": "Người F", "ngay_chet": "01/01/2019"}, "P3": {"ho_ten": "Người G", "ngay_chet": null}, "P4": {"ho_ten": "Người H", "ngay_chet": null}},
+      "diagram": {"version": 3, "domain": "inheritance", "nodes": [
+        {"id": "n1", "personId": "P1", "parentSlotIds": [], "spouseSlotId": null, "ownPositions": [1], "receivePositions": [], "hidden": false, "deleted": false},
+        {"id": "n2", "personId": "P2", "parentSlotIds": ["n1"], "spouseSlotId": null, "ownPositions": [], "receivePositions": [], "hidden": false, "deleted": false},
+        {"id": "n3", "personId": "P3", "parentSlotIds": ["n2"], "spouseSlotId": null, "ownPositions": [], "receivePositions": [1], "hidden": false, "deleted": false},
+        {"id": "n4", "personId": "P4", "parentSlotIds": ["n2"], "spouseSlotId": null, "ownPositions": [], "receivePositions": [1], "hidden": false, "deleted": false}
+      ]},
+      "action": null,
+      "expected": {"status": "complete", "reasons": [], "shares": {"1": {"P3": "1/2", "P4": "1/2"}}, "unresolved": {"1": "0/1"}, "remaining_node_ids": null, "pending_decision": null, "explanation": "The deceased child branch is one unit split equally between two grandchildren."}
+    },
+    {
+      "id": "F00-004",
+      "family": "_smoke",
+      "title": "Later death opens a successor estate",
+      "rules": ["R-14", "R-16"],
+      "meta": {},
+      "asset_count": 1,
+      "people": {"P1": {"ho_ten": "Người I", "ngay_chet": "01/01/2020"}, "P2": {"ho_ten": "Người J", "ngay_chet": "01/01/2022"}, "P3": {"ho_ten": "Người K", "ngay_chet": null}},
+      "diagram": {"version": 3, "domain": "inheritance", "nodes": [
+        {"id": "n1", "personId": "P1", "parentSlotIds": [], "spouseSlotId": null, "ownPositions": [1], "receivePositions": [], "hidden": false, "deleted": false},
+        {"id": "n2", "personId": "P2", "parentSlotIds": ["n1"], "spouseSlotId": null, "ownPositions": [], "receivePositions": [], "hidden": false, "deleted": false},
+        {"id": "n3", "personId": "P3", "parentSlotIds": ["n2"], "spouseSlotId": null, "ownPositions": [], "receivePositions": [1], "hidden": false, "deleted": false}
+      ]},
+      "action": null,
+      "expected": {"status": "complete", "reasons": [], "shares": {"1": {"P3": "1/1"}}, "unresolved": {"1": "0/1"}, "remaining_node_ids": null, "pending_decision": null, "explanation": "P2 receives at P1's death, then transfers the estate to P3 at P2's death."}
+    },
+    {
+      "id": "F00-005",
+      "family": "_smoke",
+      "title": "Receipt and unresolved value are asset-specific",
+      "rules": ["R-06", "R-23"],
+      "meta": {},
+      "asset_count": 2,
+      "people": {"P1": {"ho_ten": "Người L", "ngay_chet": "2020"}, "P2": {"ho_ten": "Người M", "ngay_chet": null}},
+      "diagram": {"version": 3, "domain": "inheritance", "nodes": [
+        {"id": "n1", "personId": "P1", "parentSlotIds": [], "spouseSlotId": null, "ownPositions": [1, 2], "receivePositions": [], "hidden": false, "deleted": false},
+        {"id": "n2", "personId": "P2", "parentSlotIds": ["n1"], "spouseSlotId": null, "ownPositions": [], "receivePositions": [1], "hidden": false, "deleted": false}
+      ]},
+      "action": null,
+      "expected": {"status": "incomplete", "reasons": [], "shares": {"1": {"P2": "1/1"}, "2": {}}, "unresolved": {"1": "0/1", "2": "1/1"}, "remaining_node_ids": null, "pending_decision": null, "explanation": "P2 receives asset 1 only; asset 2 has no receiving unit."}
+    },
+    {
+      "id": "F00-006",
+      "family": "_smoke",
+      "title": "Household land awaits owner decision",
+      "rules": ["R-06"],
+      "meta": {"land_type": "ho_gia_dinh"},
+      "asset_count": 1,
+      "people": {"P1": {"ho_ten": "Người N", "ngay_chet": "2020"}},
+      "diagram": {"version": 3, "domain": "inheritance", "nodes": [{"id": "n1", "personId": "P1", "parentSlotIds": [], "spouseSlotId": null, "ownPositions": [1], "receivePositions": [], "hidden": false, "deleted": false}]},
+      "action": null,
+      "expected": {"status": "pending", "reasons": [], "shares": {}, "unresolved": {}, "remaining_node_ids": null, "pending_decision": "Q-014", "explanation": "Household land ownership and division await Q-014."}
+    },
+    {
+      "id": "F00-007",
+      "family": "_smoke",
+      "title": "Merged estate awaits owner decision",
+      "rules": ["R-14"],
+      "meta": {"merged_estate": true},
+      "asset_count": 1,
+      "people": {"P1": {"ho_ten": "Người O", "ngay_chet": "2020"}},
+      "diagram": {"version": 3, "domain": "inheritance", "nodes": [{"id": "n1", "personId": "P1", "parentSlotIds": [], "spouseSlotId": null, "ownPositions": [1], "receivePositions": [], "hidden": false, "deleted": false}]},
+      "action": null,
+      "expected": {"status": "pending", "reasons": [], "shares": {}, "unresolved": {}, "remaining_node_ids": null, "pending_decision": "Q-015", "explanation": "Merged estates await Q-015."}
+    },
+    {
+      "id": "F00-008",
+      "family": "_smoke",
+      "title": "Long-ago parent death without date awaits decision",
+      "rules": ["R-07"],
+      "meta": {"parent_died_long_ago_person_ids": ["P2"]},
+      "asset_count": 1,
+      "people": {"P1": {"ho_ten": "Người P", "ngay_chet": "2020"}, "P2": {"ho_ten": "Người Q", "ngay_chet": null}},
+      "diagram": {"version": 3, "domain": "inheritance", "nodes": [{"id": "n1", "personId": "P1", "parentSlotIds": [], "spouseSlotId": null, "ownPositions": [1], "receivePositions": [], "hidden": false, "deleted": false}, {"id": "n2", "personId": "P2", "parentSlotIds": ["n1"], "spouseSlotId": null, "ownPositions": [], "receivePositions": [1], "hidden": false, "deleted": false}]},
+      "action": null,
+      "expected": {"status": "pending", "reasons": [], "shares": {}, "unresolved": {}, "remaining_node_ids": null, "pending_decision": "Q-013", "explanation": "Undated long-ago parent death awaits Q-013."}
+    },
+    {
+      "id": "F00-009",
+      "family": "_smoke",
+      "title": "Sibling rank heirs are unsupported pending decision",
+      "rules": ["R-04"],
+      "meta": {},
+      "asset_count": 1,
+      "people": {"P1": {"ho_ten": "Người R", "ngay_chet": "2020"}, "P2": {"ho_ten": "Người S", "ngay_chet": null}, "P3": {"ho_ten": "Người T", "ngay_chet": null}},
+      "diagram": {"version": 3, "domain": "inheritance", "nodes": [{"id": "n1", "personId": "P1", "parentSlotIds": ["n3"], "spouseSlotId": null, "ownPositions": [1], "receivePositions": [], "hidden": false, "deleted": false}, {"id": "n2", "personId": "P2", "parentSlotIds": ["n3"], "spouseSlotId": null, "ownPositions": [], "receivePositions": [1], "hidden": false, "deleted": false}, {"id": "n3", "personId": "P3", "parentSlotIds": [], "spouseSlotId": null, "ownPositions": [], "receivePositions": [], "hidden": false, "deleted": false}]},
+      "action": null,
+      "expected": {"status": "unsupported", "reasons": ["heir_rank_not_supported"], "shares": {}, "unresolved": {}, "remaining_node_ids": null, "pending_decision": "Q-016", "explanation": "A sibling is connected through their shared parent; rank two awaits Q-016."}
+    },
+    {
+      "id": "F00-010",
+      "family": "_smoke",
+      "title": "Predeceased sibling without descendants is no lower-rank heir",
+      "rules": ["R-04"],
+      "meta": {},
+      "asset_count": 1,
+      "people": {"P1": {"ho_ten": "Người U", "ngay_chet": "2020"}, "P2": {"ho_ten": "Người V", "ngay_chet": "2019"}, "P3": {"ho_ten": "Người W", "ngay_chet": null}},
+      "diagram": {"version": 3, "domain": "inheritance", "nodes": [{"id": "n1", "personId": "P1", "parentSlotIds": ["n3"], "spouseSlotId": null, "ownPositions": [1], "receivePositions": [], "hidden": false, "deleted": false}, {"id": "n2", "personId": "P2", "parentSlotIds": ["n3"], "spouseSlotId": null, "ownPositions": [], "receivePositions": [1], "hidden": false, "deleted": false}, {"id": "n3", "personId": "P3", "parentSlotIds": [], "spouseSlotId": null, "ownPositions": [], "receivePositions": [], "hidden": false, "deleted": false}]},
+      "action": null,
+      "expected": {"status": "incomplete", "reasons": [], "shares": {"1": {}}, "unresolved": {"1": "1/1"}, "remaining_node_ids": null, "pending_decision": null, "explanation": "The sibling predeceased the owner and left no descendants."}
+    }
+  ]
+}
