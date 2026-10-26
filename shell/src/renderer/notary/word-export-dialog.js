@@ -167,7 +167,7 @@ function createWordDialog(ctx) {
         }
       }
 
-      function renderDocs() {
+      function renderDocs(confirmedBindingCount = 0) {
         // Doi folder → selection cu mat (checkbox rebuilt tu options moi).
         checks = [];
         listBox.innerHTML = '';
@@ -178,14 +178,20 @@ function createWordDialog(ctx) {
           return;
         }
         for (const d of docs) {
+          // Chỉ mở chọn cục bộ để đi tới Lưu & xuất; model vẫn tải lại
+          // readiness từ server sau khi lưu bindings (W2).
+          const ready = d.ready || (originalSourceId &&
+            d.document_key === 'original.docx' &&
+            d.block_reason === 'word.original_mapping_invalid' &&
+            confirmedBindingCount > 0);
           const lab = h('label', 'cd-check-row');
           const cb = h('input');
           cb.type = 'checkbox';
-          cb.disabled = !d.ready;
-          cb.checked = !!d.ready;
+          cb.disabled = !ready;
+          cb.checked = !!ready;
           cb.setAttribute('aria-label', d.display_name || d.document_key);
           lab.append(cb, h('span', '', d.display_name || d.document_key));
-          if (!d.ready) {
+          if (!ready) {
             lab.append(h('span', 'muted',
               ` — ${WORD_BLOCK_LABEL[d.block_reason] || d.block_reason ||
                 'chưa sẵn sàng'}`));
@@ -462,6 +468,8 @@ function createWordDialog(ctx) {
                 b.occurrence_id === choice.proposal.occurrence_id &&
                 b.slot === choice.proposal.slot);
             }
+            renderDocs(bindings.length);
+            listBox.append(mappingBox);
             refreshScanLock();
             return true;
           }

@@ -430,6 +430,75 @@ test('original template mapping is explicitly selected and applied locally befor
     e.tagName === 'INPUT' && e.getAttribute('aria-label')?.includes('Tên gốc')).length, 1);
 });
 
+for (const applyFirst of [true, false]) {
+  test(`W2: initially blocked original exports after ${applyFirst ? 'local apply' : 'pending choices'}`, async () => {
+    const sourceId = uuid(), destination = { file_token: uuid() }, calls = [], exports = [];
+    const proposal = { candidate_id: uuid(), occurrence_id: uuid(), field_key: 'ho_ten',
+      slot: '[Người 1 - Họ tên]', raw_snippet: 'Tên tổng hợp', row_id: uuid(),
+      row_label: 'Tên đã sửa', value: 'Tên đã sửa', supported: true, selected: false };
+    let savedBindings = [];
+    const model = M.createModel({ client: { run: async (command, payload) => {
+      if (command === 'notary.workspace_source_latest') return { ok: true, data: {} };
+      calls.push([command, payload]);
+      if (command === 'notary.workspace_save_case') {
+        savedBindings = payload.docx_import.sources[0].bindings;
+        return { ok: true, data: saveCaseData(payload, { revision: 3 }) };
+      }
+      if (command === 'notary.word_export_options') return { ok: true, data: {
+        documents: [{ document_key: 'original.docx', display_name: 'Hợp đồng Word gốc',
+          ready: savedBindings.length > 0,
+          block_reason: savedBindings.length ? null : 'word.original_mapping_invalid' }],
+        binding_proposals: [proposal],
+      } };
+      return { ok: true, data: { documents: [] } };
+    } } });
+    await model.newDraft(); model.state.caseId = 1; model.state.revision = 2;
+    model.state.stageDirty = false; model.state.diagramDirty = false; model.state.metaDirty = false;
+    model.state.docxImport = { version: 1, sources: [
+      { source_id: sourceId, label: 'Tổng hợp.docx', records: [], bindings: [] },
+    ] };
+    const exportWord = model.exportWord;
+    model.exportWord = (...args) => { exports.push(args); return exportWord(...args); };
+    const { ctx, box } = dialogContext(model);
+    ctx.pickFiles = async () => ({ ok: true, data: {
+      files: [{ ...destination, is_dir: true, name: 'Đích tổng hợp' }],
+    } });
+    WORD.createWordDialog(ctx).open();
+    await button(box, 'Dùng hợp đồng Word đã nhập').onclick();
+    const originalCheck = () => collect(box, e =>
+      e.tagName === 'INPUT' && e.getAttribute('aria-label') === 'Hợp đồng Word gốc')[0];
+    assert.equal(originalCheck().disabled, true);
+    assert.equal(originalCheck().checked, false);
+    const choice = collect(box, e =>
+      e.tagName === 'INPUT' && e.getAttribute('aria-label')?.includes('Tên tổng hợp'))[0];
+    choice.checked = true; choice.onchange();
+    if (applyFirst) {
+      await button(box, 'Áp dụng vị trí đã chọn').onclick();
+      assert.equal(originalCheck().disabled, false);
+      assert.equal(originalCheck().checked, true);
+      assert.doesNotMatch(box.textContent, /Hãy kiểm tra và xác nhận lại/);
+      assert.equal(savedBindings.length, 0, 'local apply must not save');
+    }
+    await button(box, 'Chọn thư mục đích').onclick();
+    calls.length = 0;
+    await button(box, 'Xuất').onclick();
+    assert.equal(originalCheck().disabled, false);
+    assert.equal(originalCheck().checked, true);
+    assert.equal(exports.length, 1);
+    assert.deepEqual(exports[0][0], ['original.docx']);
+    assert.deepEqual(exports[0][1], destination);
+    assert.equal(exports[0][2].originalSourceId, sourceId);
+    assert.deepEqual(calls.map(c => c[0]), [
+      'notary.workspace_save_case', 'notary.word_export_options', 'notary.word_export_batch',
+    ]);
+    assert.deepEqual(savedBindings, [{ candidate_id: proposal.candidate_id,
+      occurrence_id: proposal.occurrence_id, field_key: proposal.field_key, slot: proposal.slot }]);
+    assert.equal(calls[2][1].original_source_id, sourceId);
+    assert.deepEqual(calls[2][1].document_keys, ['original.docx']);
+    assert.equal(calls[2][1].base_revision, 3);
+  });
+}
+
 test('each ambiguous land cell requires its own review and deletion preserves original land identity', async () => {
   const model = M.createModel({ client: { run: async () => ({ ok: true }) } }); await model.newDraft();
   const sug = suggestion();

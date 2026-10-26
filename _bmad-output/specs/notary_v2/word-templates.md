@@ -172,8 +172,11 @@ chọn cục bộ theo đúng occurrence + slot. Bỏ chọn hết rồi xác nh
 xóa bindings khi Lưu hồ sơ kế tiếp, chưa xóa bản DB ngay.
 Đổi Stage/Diagram/revision hoặc đổi hồ sơ làm bộ đề xuất cũ không còn dùng
 được: hành động xuất tự lưu bản đang sửa rồi nạp lại vị trí, nên không còn
-bước đóng/mở lại dialog. Không tự tính lại slot/giá trị/độ sẵn sàng hoặc
-hash mẫu ở frontend.
+bước đóng/mở lại dialog. Sau khi áp cục bộ thành công ít nhất một binding,
+hàng **Hợp đồng Word gốc** chỉ bị chặn bởi `word.original_mapping_invalid`
+được mở chọn và tích sẵn trong dialog, kể cả khi bấm Xuất để tự áp.
+Đây không phải xác nhận readiness: không tự tính lại slot/giá trị/hash mẫu;
+server vẫn kiểm tra độ sẵn sàng sau khi lưu, trước khi xuất.
 Khi provenance còn chờ lưu, hành động xuất ghi nó cùng lần lưu đó trước khi
 render. Lưu lỗi thật (xung đột revision, lỗi cấu trúc) dừng hành động và báo
 tại chỗ; giữ lựa chọn cục bộ để sửa/thử lại, không xuất bản DB cũ thay thế.

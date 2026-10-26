@@ -31,6 +31,8 @@ const INTAKE_FIELD_LABEL = {
   ngay_cap: 'Ngày cấp', noi_cap: 'Nơi cấp', dia_chi: 'Địa chỉ', so_serial: 'Serial giấy chứng nhận',
   so_vao_so: 'Số vào sổ', so_thua_dat: 'Số thửa đất', so_to_ban_do: 'Số tờ bản đồ',
   dien_tich: 'Diện tích', co_quan_cap: 'Cơ quan cấp', land_rows: 'Cụm đất',
+  gioi_tinh: 'Giới tính', loai_dat: 'Loại đất', thoi_han: 'Thời hạn', nguon_goc: 'Nguồn gốc',
+  hinh_thuc_su_dung: 'Hình thức sử dụng', loai_so: 'Loại sổ', place_of_origin: 'Quê quán',
 };
 
 // Same numeric rule as Intake normalization: 1.234,5 → 1234.5.
