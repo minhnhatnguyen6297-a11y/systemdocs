@@ -3,6 +3,11 @@
 The engine is intentionally pure: callers provide diagram nodes and person
 records, and receive a JSON-serializable result. Database and HTTP concerns
 belong to the router layer.
+
+Each estate selects the first eligible rank (1, 2, then 3). Rank 1 retains
+branch representation; ranks 2 and 3 split equally per distinct person without
+representation. Inherited terms expose heirRank; later-rank terms also expose
+sorted relationshipRoles derived only from explicit parent links.
 """
 
 from __future__ import annotations
@@ -249,7 +254,7 @@ def _validate_and_build_graph(
 def run_inheritance_case(
     engine_input: Mapping[str, Any], people_by_id: Mapping[Any, Any]
 ) -> dict[str, Any]:
-    """Calculate exact final ownership from Diagram V2 input."""
+    """Divide each estate by its first eligible rank, with representation only in rank 1."""
 
     if not isinstance(engine_input, Mapping) or not isinstance(people_by_id, Mapping):
         return _empty_result([_error("invalid_input", "Dữ liệu engine không hợp lệ.")])
@@ -341,12 +346,82 @@ def run_inheritance_case(
                 units.append(plan)
         return units
 
-    def credit(plan: dict[str, Any], amount: Fraction, source_id: str) -> None:
+    def siblings_of(person_id: str) -> set[str]:
+        return {
+            child_id
+            for parent_id in parents.get(person_id, set())
+            for child_id in children.get(parent_id, set())
+            if child_id != person_id
+        }
+
+    def later_line_candidates(source_id: str, rank: int) -> dict[str, set[str]]:
+        """Collect explicit graph roles; multiple paths still yield one person per rank."""
+        source_parents = parents.get(source_id, set())
+        grandparents = {
+            person_id
+            for parent_id in source_parents
+            for person_id in parents.get(parent_id, set())
+        }
+        source_siblings = siblings_of(source_id)
+        grandchildren = {
+            person_id
+            for child_id in children.get(source_id, set())
+            for person_id in children.get(child_id, set())
+        }
+        if rank == 2:
+            role_groups = {
+                "grandparent": grandparents,
+                "sibling": source_siblings,
+                "grandchild": grandchildren,
+            }
+        else:
+            role_groups = {
+                "great_grandparent": {
+                    person_id
+                    for grandparent_id in grandparents
+                    for person_id in parents.get(grandparent_id, set())
+                },
+                "parent_sibling": {
+                    person_id
+                    for parent_id in source_parents
+                    for person_id in siblings_of(parent_id)
+                } - source_parents,
+                "sibling_child": {
+                    person_id
+                    for sibling_id in source_siblings
+                    for person_id in children.get(sibling_id, set())
+                },
+                "great_grandchild": {
+                    person_id
+                    for grandchild_id in grandchildren
+                    for person_id in children.get(grandchild_id, set())
+                },
+            }
+        candidates: dict[str, set[str]] = defaultdict(set)
+        for role, person_ids in role_groups.items():
+            for person_id in person_ids - {source_id}:
+                candidates[person_id].add(role)
+        return candidates
+
+    def later_line_units(source_id: str, event_date: date, rank: int) -> list[dict[str, Any]]:
+        candidates = later_line_candidates(source_id, rank)
+        return [
+            {
+                "type": "person",
+                "personId": person_id,
+                "via": [],
+                "relationshipRoles": sorted(candidates[person_id]),
+            }
+            for person_id in sorted(candidates)
+            if accepts(person_id, death_comparison(person_id, event_date))
+        ]
+
+    def credit(plan: dict[str, Any], amount: Fraction, source_id: str, heir_rank: int) -> None:
         if plan["type"] == "split":
             child_plans = plan["children"]
             child_share = amount / len(child_plans)
             for child_plan in child_plans:
-                credit(child_plan, child_share, source_id)
+                credit(child_plan, child_share, source_id, heir_rank)
             return
 
         person_id = plan["personId"]
@@ -357,9 +432,12 @@ def run_inheritance_case(
             "kind": "representation" if via else "inheritance",
             "fraction": _fraction_text(amount),
             "sourcePersonId": source_id,
+            "heirRank": heir_rank,
         }
         if via:
             term["viaBranchPersonIds"] = via
+        if heir_rank > 1:
+            term["relationshipRoles"] = plan["relationshipRoles"]
         terms[person_id].append(term)
 
     death_groups: dict[date, list[str]] = defaultdict(list)
@@ -370,7 +448,7 @@ def run_inheritance_case(
     for event_date in sorted(death_groups):
         day_estates = {
             person_id: holdings[person_id]
-            for person_id in death_groups[event_date]
+            for person_id in sorted(death_groups[event_date])
             if holdings[person_id] > 0
         }
         for source_id, estate in day_estates.items():
@@ -380,6 +458,12 @@ def run_inheritance_case(
 
         for source_id, estate in day_estates.items():
             units = first_line_units(source_id, event_date)
+            heir_rank = 1
+            if not units:
+                for heir_rank in (2, 3):
+                    units = later_line_units(source_id, event_date, heir_rank)
+                    if units:
+                        break
             if not units:
                 unresolved_estates.append(
                     {
@@ -392,7 +476,7 @@ def run_inheritance_case(
                 continue
             unit_share = estate / len(units)
             for unit in units:
-                credit(unit, unit_share, source_id)
+                credit(unit, unit_share, source_id, heir_rank)
 
     allocated = sum(holdings.values(), Fraction(0))
     unresolved = sum(
