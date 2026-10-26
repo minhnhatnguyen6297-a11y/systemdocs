@@ -93,8 +93,7 @@
             "spouseSlotIds": [
               "spouse"
             ],
-            "spouseSuggestionId": null,
-            "spouseUndetermined": false
+            "spouseSuggestionId": null
           },
           {
             "id": "spouse",
@@ -110,8 +109,7 @@
             "spouseSlotIds": [
               "owner"
             ],
-            "spouseSuggestionId": null,
-            "spouseUndetermined": false
+            "spouseSuggestionId": null
           }
         ]
       }

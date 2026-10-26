@@ -78,8 +78,7 @@ function seedSlots() {
   const mk = (id, parents = []) =>
     ({ id, personId: null, parentSlotIds: parents, spouseSlotIds: [],
        spouseSlotId: null, spouseSuggestionId: null,
-       spouseUndetermined: false, ownPositions: [], receivePositions: [],
-       hidden: false, deleted: false });
+       ownPositions: [], receivePositions: [], hidden: false, deleted: false });
   const nodes = [
     mk('father'), mk('mother'),
     mk('spouse_father'), mk('spouse_mother'),
@@ -259,23 +258,28 @@ test('spouse drops append without swapping; last is lawful and pool removal prom
   assert.equal(owner.spouseSlotId, appendedId);
 });
 
-test('undetermined spouse shows warning and drop clears it', async () => {
+test('last spouse is highlighted and earlier candidate can be promoted', async () => {
   const nodes = seedSlots();
   const owner = nodes.find((n) => n.id === 'owner');
   owner.personId = 'c1';
-  owner.spouseSlotIds = ['spouse'];
-  owner.spouseSlotId = 'spouse';
-  owner.spouseUndetermined = true;
+  owner.spouseSlotIds = ['spouse', 'spouse_2'];
+  owner.spouseSlotId = 'spouse_2';
   nodes.find((n) => n.id === 'spouse').personId = 'c2';
+  nodes.push({ id: 'spouse_2', personId: 'c3', parentSlotIds: [],
+    spouseSlotIds: [], spouseSlotId: null, spouseSuggestionId: null,
+    ownPositions: [], receivePositions: [], hidden: false, deleted: false });
   const { model, view } = await build(test, { mode: 'case',
     seed: { people: INH_PEOPLE, nodes } });
-  const spouseCard = collect(view.el, (e) =>
+  const earlier = collect(view.el, (e) =>
     e.dataset.nodeId === 'spouse')[0];
-  assert.match(spouseCard.textContent, /Chưa xác định vợ\/chồng hợp pháp/);
-  spouseCard.dispatch('drop', personPayload('c3'));
-  const updatedOwner = model.state.diagram.nodes.find((n) => n.id === 'owner');
-  assert.equal(updatedOwner.spouseUndetermined, false);
-  assert.equal(updatedOwner.spouseSlotIds.length, 2);
+  const lawful = collect(view.el, (e) =>
+    e.dataset.nodeId === 'spouse_2')[0];
+  assert.ok(earlier.classList.contains('cd-node-spouse-faded'));
+  assert.match(earlier.textContent, /Không phải vợ\/chồng hợp pháp/);
+  assert.ok(lawful.classList.contains('cd-node-spouse-lawful'));
+  findBtns(earlier, 'Đặt làm vợ/chồng hợp pháp')[0].onclick();
+  assert.deepEqual(model.state.diagram.nodes.find((n) => n.id === 'owner')
+    .spouseSlotIds, ['spouse_2', 'spouse']);
 });
 
 test('death date prefills an existing spouse suggestion', async () => {
@@ -302,8 +306,7 @@ test('living person never receives a required spouse slot', async () => {
       }] } } } : { ok: true, data: {} } };
   const nodes = [{ id: 'owner', personId: 'c1', parentSlotIds: [],
     spouseSlotIds: [], spouseSlotId: null, spouseSuggestionId: null,
-    spouseUndetermined: false, ownPositions: [], receivePositions: [],
-    hidden: false, deleted: false }];
+    ownPositions: [], receivePositions: [], hidden: false, deleted: false }];
   const { model, view } = await build(test, { mode: 'case', client,
     seed: { people: [{ row_id: 'c1', ho_ten: 'Người sống' }], nodes } });
   await findBtns(view.el, 'Xem cách tính')[0].onclick();
@@ -1033,8 +1036,7 @@ test('save → openCase round-trip: vi tri + quan he giu nguyen', async () => {
   nodes.find((n) => n.id === 'spouse').personId = 'c2';
   nodes.push({ id: 'spouse_2', personId: 'c3', parentSlotIds: [],
     spouseSlotIds: [], spouseSlotId: null, spouseSuggestionId: null,
-    spouseUndetermined: false, ownPositions: [], receivePositions: [],
-    hidden: false, deleted: false });
+    ownPositions: [], receivePositions: [], hidden: false, deleted: false });
   nodes.find((n) => n.id === 'owner').spouseSlotIds = ['spouse', 'spouse_2'];
   nodes.find((n) => n.id === 'owner').spouseSlotId = 'spouse_2';
   const { model } = await build(test, {

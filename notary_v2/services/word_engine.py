@@ -624,7 +624,6 @@ def _apply_spouse_slot_roles(persons: list[WordPerson],
         if not isinstance(candidates, list):
             legacy = node.get("spouseSlotId")
             candidates = [legacy] if legacy else []
-        undetermined = node.get("spouseUndetermined") is True
         person = by_row.get(_safe_text(node.get("personId")))
         if person is None or not person.is_deceased:
             continue
@@ -635,7 +634,7 @@ def _apply_spouse_slot_roles(persons: list[WordPerson],
                  and candidate.get("id") == slot_id), None)
             spouse = by_row.get(_safe_text((spouse_node or {}).get("personId")))
             if spouse is not None:
-                if index == len(candidates) - 1 and not undetermined:
+                if index == len(candidates) - 1:
                     spouse.role = "Vợ/Chồng"
                     spouse.relation = "Vợ/Chồng"
                 elif _role_key(spouse.role) == "vo_chong":

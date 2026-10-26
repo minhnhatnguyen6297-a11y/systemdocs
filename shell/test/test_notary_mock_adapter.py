@@ -132,7 +132,6 @@ def _node(nid, person_id=None, parents=(), spouse=None,
         "parentSlotIds": list(parents),
         "spouseSlotIds": [spouse] if spouse else [],
         "spouseSlotId": spouse, "spouseSuggestionId": None,
-        "spouseUndetermined": False,
         "ownPositions": list(own), "receivePositions": list(receive),
         "hidden": hidden, "deleted": deleted,
     }
@@ -384,7 +383,7 @@ class TestWorkspaceGet:
         for n in data["diagram"]["state"]["nodes"]:
             assert set(n) <= {"id", "personId", "parentSlotIds",
                               "spouseSlotIds", "spouseSlotId",
-                              "spouseSuggestionId", "spouseUndetermined",
+                              "spouseSuggestionId",
                               "ownPositions", "receivePositions",
                               "hidden", "deleted"}
             if n["personId"] is not None:

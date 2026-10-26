@@ -152,7 +152,6 @@ def _validate_and_build_graph(
             "spouseSlotIds": [
                 _person_id(item) for item in spouse_ids if _person_id(item)
             ],
-            "spouseUndetermined": raw.get("spouseUndetermined") is True,
             **boolean_values,
         }
         nodes[slot_id] = node
@@ -352,7 +351,7 @@ def run_inheritance_case(
     def first_line_units(source_id: str, event_date: date) -> list[dict[str, Any]]:
         units: list[dict[str, Any]] = []
         seen_direct: set[str] = set()
-        spouse_slots = set() if nodes_by_person[source_id].get("spouseUndetermined") else spouses.get(source_id, set())
+        spouse_slots = spouses.get(source_id, set())
         for person_id in sorted(parents.get(source_id, set()) | spouse_slots):
             comparison = death_comparison(person_id, event_date)
             if person_id not in seen_direct and accepts(person_id, comparison):
@@ -463,7 +462,6 @@ def run_inheritance_case(
         if death is not None:
             death_groups[death].append(person_id)
 
-    spouse_undetermined = False
 
     for event_date in sorted(death_groups):
         day_estates = {
@@ -479,8 +477,6 @@ def run_inheritance_case(
             add_requirement(source_id, "active_estate")
 
         for source_id, estate in day_estates.items():
-            if nodes_by_person[source_id].get("spouseUndetermined"):
-                spouse_undetermined = True
             units = first_line_units(source_id, event_date)
 
             heir_rank = 1
@@ -540,12 +536,11 @@ def run_inheritance_case(
 
     return {
         "engineVersion": ENGINE_VERSION,
-        "status": "incomplete" if unresolved or spouse_undetermined else "complete",
+        "status": "incomplete" if unresolved else "complete",
         "allocations": allocations,
         "breakdowns": breakdowns,
         "requiredSlots": list(required_slots.values()),
-        "warnings": ([_error("spouse_undetermined", "Chưa xác định vợ/chồng hợp pháp.")]
-                     if spouse_undetermined else []),
+        "warnings": [],
         "errors": [],
         "unresolvedEstates": unresolved_estates,
         "conservation": {

@@ -149,8 +149,7 @@ function newAssetRow(uuid, fields) {
 function newNode(id) {
   return { id, personId: null, parentSlotIds: [], spouseSlotIds: [],
            spouseSlotId: null, spouseSuggestionId: null,
-           spouseUndetermined: false, ownPositions: [], receivePositions: [],
-           hidden: false, deleted: false };
+           ownPositions: [], receivePositions: [], hidden: false, deleted: false };
 }
 
 function newTwoPartyNode(id) {
@@ -1496,7 +1495,6 @@ function createModel(deps) {
             !n.spouseSlotIds.includes(sourceNode.id)) continue;
         n.spouseSlotIds = n.spouseSlotIds.filter((id) => id !== sourceNode.id);
         n.spouseSlotId = n.spouseSlotIds.at(-1) || null;
-        n.spouseUndetermined = false;
       }
       sourceNode.personId = null;
       touchDiagram();
@@ -1513,7 +1511,6 @@ function createModel(deps) {
           .filter((id) => id !== target.id);
         spouseOwner.spouseSlotIds.push(target.id);
         spouseOwner.spouseSlotId = target.id;
-        spouseOwner.spouseUndetermined = false;
         touchDiagram();
         return true;
       }
@@ -1538,7 +1535,6 @@ function createModel(deps) {
             .filter((id) => id !== sourceNode.id);
           spouseOwner.spouseSlotIds.push(sourceNode.id);
           spouseOwner.spouseSlotId = sourceNode.id;
-          spouseOwner.spouseUndetermined = false;
           touchDiagram();
           return true;
         }
@@ -1562,7 +1558,6 @@ function createModel(deps) {
           .filter((id) => id !== destination.id);
         spouseOwner.spouseSlotIds.push(destination.id);
         spouseOwner.spouseSlotId = destination.id;
-        spouseOwner.spouseUndetermined = false;
         applyAssignDefaults(destination);
         touchDiagram();
         return true;
@@ -1644,9 +1639,6 @@ function createModel(deps) {
     } else if (rel.spouseSlotId !== undefined) {
       node.spouseSlotIds = rel.spouseSlotId ? [rel.spouseSlotId] : [];
       node.spouseSlotId = node.spouseSlotIds.at(-1) || null;
-    }
-    if (rel.spouseUndetermined !== undefined) {
-      node.spouseUndetermined = !!rel.spouseUndetermined;
     }
     touchDiagram();
     return true;

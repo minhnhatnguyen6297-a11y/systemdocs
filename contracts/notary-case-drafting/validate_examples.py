@@ -38,8 +38,8 @@ DRAFT_POSITIONS = {1, 2, 3, 4, 5}
 DRAFT_TWO_PARTY_IDS = [f"p{i}" for i in range(1, 31)]
 DRAFT_NODE_FIELDS = {
     "id", "personId", "parentSlotIds", "spouseSlotIds", "spouseSlotId",
-    "spouseSuggestionId", "spouseUndetermined", "ownPositions",
-    "receivePositions", "hidden", "deleted",
+    "spouseSuggestionId", "ownPositions", "receivePositions",
+    "hidden", "deleted",
 }
 DRAFT_NODE_FIELDS_TWO_PARTY = {"id", "personId", "hidden", "deleted"}
 # asset_row_v2 = asset_row trừ is_primary (§13.3)
@@ -537,8 +537,6 @@ def check_diagram_state_v2(state, where, stage_ids, v, case_type):
             if n.get("spouseSuggestionId") is not None and not isinstance(
                     n.get("spouseSuggestionId"), str):
                 v.append(("diagram_invalid_state", f"{w} spouseSuggestionId"))
-            if not isinstance(n.get("spouseUndetermined"), bool):
-                v.append(("diagram_invalid_state", f"{w} spouseUndetermined"))
             if isinstance(nid, str):
                 if isinstance(ps, list) and nid in ps:
                     v.append(("diagram_invalid_state",

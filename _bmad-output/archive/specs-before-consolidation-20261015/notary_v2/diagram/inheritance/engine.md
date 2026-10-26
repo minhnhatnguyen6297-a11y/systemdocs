@@ -113,7 +113,6 @@ theo `personId`, không tin bản sao trong browser.
       "spouseSlotIds": ["slot_spouse"],
       "spouseSlotId": "slot_spouse",
       "spouseSuggestionId": null,
-      "spouseUndetermined": false,
       "isLandOwner": true,
       "willReceive": false,
       "hidden": false,
@@ -135,7 +134,6 @@ Quy ước field:
 | `spouseSlotIds` | Danh sách slot vợ/chồng theo thứ tự thả; phần tử cuối là vợ/chồng hợp pháp. |
 | `spouseSlotId` | Mirror tương thích, bằng phần tử cuối của `spouseSlotIds` hoặc `null`. |
 | `spouseSuggestionId` | Gợi ý được migrate từ node còn sống; engine không sử dụng. |
-| `spouseUndetermined` | `true` khi migration tìm thấy hai ứng viên khác nhau; không tính phần vợ/chồng cho anchor đến khi người dùng xác định. |
 | `isLandOwner` | Trạng thái nút `Chủ đất`; có thể có nhiều người. |
 | `willReceive` | Trạng thái nút `Nhận`; chỉ điều khiển người còn sống ở kết quả cuối. |
 | `hidden/deleted` | Node bị ẩn/xóa không phải active node. |
@@ -153,7 +151,7 @@ Validation bắt buộc:
 - Legacy engine input thiếu khóa `spouseSlotIds` được đọc từ `spouseSlotId` cùng node; không suy ngược.
 - Theo D-041 sửa đổi v2, chủ đất còn sống vẫn có ô vợ/chồng và ô dự phòng; người khác còn sống không sinh ô. Nhánh chuyển tiếp có ô vợ/chồng, nhánh thế vị chỉ có ô con.
 - Khi slot có nhiều người, chỉ người cuối là vợ/chồng hợp pháp; các phần tử trước đó không được tính phần vợ/chồng.
-- Migration v3→v4 thu ứng viên từ liên kết cũ hai chiều; có hai ứng viên khác nhau thì giữ thứ tự own-link trước rồi thứ tự node và đặt `spouseUndetermined=true`.
+- Migration v3→v4 thu ứng viên từ liên kết cũ hai chiều; có hai ứng viên khác nhau thì đưa cả hai vào `spouseSlotIds`, theo thứ tự own-link trước rồi thứ tự node. Phần tử cuối là vợ/chồng hợp pháp như mọi case.
 - Node còn sống được migrate thành slot rỗng và `spouseSuggestionId`; khi đặt ngày chết, UI điền gợi ý nếu slot rỗng rồi xóa gợi ý.
 
 ## 4. Thuật toán nghiệp vụ bắt buộc

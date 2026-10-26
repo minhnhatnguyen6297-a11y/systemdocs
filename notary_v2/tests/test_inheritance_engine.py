@@ -797,11 +797,10 @@ def test_living_person_spouse_slot_is_ignored():
     assert "B" not in result["allocations"] or _share(result, "B") == 0
 
 
-def test_undetermined_spouse_keeps_estate_incomplete_without_spouse_share():
+def test_last_migrated_spouse_candidate_receives_spouse_share():
     nodes = [
         {"id": "dead", "personId": "D", "parentSlotIds": [],
-         "spouseSlotIds": ["wife", "new-spouse"],
-         "spouseUndetermined": True, "isLandOwner": True,
+         "spouseSlotIds": ["wife", "new-spouse"], "isLandOwner": True,
          "willReceive": True, "hidden": False, "deleted": False},
         *[
             {"id": nid, "personId": pid, "parentSlotIds": [],
@@ -815,6 +814,5 @@ def test_undetermined_spouse_keeps_estate_incomplete_without_spouse_share():
         {"D": {"ngay_chet": "2020"}, "W": {"ngay_chet": "2022"},
          "N": {"ngay_chet": None}},
     )
-    assert result["status"] == "incomplete"
-    assert result["allocations"]["N"]["finalShare"] == "0"
-    assert any(w["code"] == "spouse_undetermined" for w in result["warnings"])
+    assert result["status"] == "complete"
+    assert _share(result, "N") > 0

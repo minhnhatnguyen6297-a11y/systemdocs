@@ -212,7 +212,7 @@ def _node(nid, person_id=None, parents=(), spouse=None, own=(),
             "parentSlotIds": list(parents),
             "spouseSlotIds": [spouse] if spouse else [],
             "spouseSlotId": spouse,
-            "spouseSuggestionId": None, "spouseUndetermined": False,
+            "spouseSuggestionId": None,
             "ownPositions": list(own), "receivePositions": list(receive),
             "hidden": hidden, "deleted": deleted}
 
@@ -1849,7 +1849,7 @@ def test_v3_spouse_migration_keeps_candidates_order_and_living_suggestion(
         _node("second", second, spouse="dead", receive=[1]),
     ]
     for node in raw_nodes:
-        for key in ("spouseSlotIds", "spouseSuggestionId", "spouseUndetermined"):
+        for key in ("spouseSlotIds", "spouseSuggestionId"):
             node.pop(key)
     payload = {
         "schemaVersion": schema_version,
@@ -1869,20 +1869,18 @@ def test_v3_spouse_migration_keeps_candidates_order_and_living_suggestion(
     assert json.dumps(payload) == before
     assert nodes["dead"]["spouseSlotIds"] == ["first", "second"]
     assert nodes["dead"]["spouseSlotId"] == "second"
-    assert nodes["dead"]["spouseUndetermined"] is True
     assert nodes["first"]["spouseSlotIds"] == []
     assert nodes["first"]["spouseSuggestionId"] == "second"
     assert _validate_diagram_wire(state) == []
     engine_nodes = _v3_to_v2_nodes(state["nodes"])
-    assert engine_nodes[0]["spouseUndetermined"] is True
     rendered = run_inheritance_case(
         {"version": 2, "nodes": engine_nodes},
         {deceased: {"ngay_chet": "2020-01-01"},
          first: {"ngay_chet": None}, second: {"ngay_chet": None}},
     )
-    assert rendered["status"] == "incomplete", rendered["errors"]
-    assert any(warning["code"] == "spouse_undetermined"
-               for warning in rendered["warnings"])
+    assert rendered["status"] == "complete", rendered["errors"]
+    assert rendered["allocations"][first]["finalShare"] == "0"
+    assert rendered["allocations"][second]["finalShare"] == "1"
 
 
 def test_get_normalizes_singular_spouse_without_writing_then_commit_persists(db):
@@ -1893,7 +1891,7 @@ def test_get_normalizes_singular_spouse_without_writing_then_commit_persists(db)
         _node("spouse", spouse_row, spouse="owner", receive=[1]),
     ]
     for node in legacy_nodes:
-        for key in ("spouseSlotIds", "spouseSuggestionId", "spouseUndetermined"):
+        for key in ("spouseSlotIds", "spouseSuggestionId"):
             node.pop(key)
     _write_state(case, db, _v3_state(legacy_nodes), owner_row_id=owner_row)
     before = case.case_state_json

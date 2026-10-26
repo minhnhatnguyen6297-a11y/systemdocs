@@ -129,7 +129,7 @@ def _node(nid, person_id=None, parents=(), spouse=None, own=(),
             "parentSlotIds": list(parents),
             "spouseSlotIds": [spouse] if spouse else [],
             "spouseSlotId": spouse,
-            "spouseSuggestionId": None, "spouseUndetermined": False,
+            "spouseSuggestionId": None,
             "ownPositions": list(own), "receivePositions": list(receive),
             "hidden": hidden, "deleted": deleted}
 

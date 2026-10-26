@@ -130,7 +130,7 @@ def _asset_row(**overrides):
 def _node(nid, person_id=None, own=(), receive=()):
     return {"id": nid, "personId": person_id, "parentSlotIds": [],
             "spouseSlotIds": [], "spouseSlotId": None,
-            "spouseSuggestionId": None, "spouseUndetermined": False,
+            "spouseSuggestionId": None,
             "ownPositions": list(own), "receivePositions": list(receive),
             "hidden": False, "deleted": False}
 

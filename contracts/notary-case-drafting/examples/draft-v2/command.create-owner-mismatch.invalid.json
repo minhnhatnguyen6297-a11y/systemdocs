@@ -60,8 +60,7 @@
             "hidden": false,
             "deleted": false,
             "spouseSlotIds": [],
-            "spouseSuggestionId": null,
-            "spouseUndetermined": false
+            "spouseSuggestionId": null
           }
         ]
       }

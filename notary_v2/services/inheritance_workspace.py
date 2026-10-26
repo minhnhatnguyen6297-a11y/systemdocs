@@ -11,7 +11,7 @@ Wire diagram state V3 (§13.4):
     {"version": 3, "domain": "inheritance" | "two_party",
      "nodes": [node_v3_inheritance | node_v3_two_party]}
 - inheritance node: {id, personId, parentSlotIds, spouseSlotIds,
-  spouseSlotId mirror, spouseSuggestionId, spouseUndetermined,
+  spouseSlotId mirror, spouseSuggestionId,
   ownPositions ⊆ {1,2,3}, receivePositions ⊆ {1,2,3}, hidden, deleted}
 - two_party node: đúng 30 phần tử theo thứ tự canonical {id ∈ p1..p30,
   personId, hidden, deleted} — ô trống giữ chỗ, KHÔNG compact; domain
@@ -51,7 +51,7 @@ from services.case_workspace import (
 
 _INHERITANCE_NODE_FIELDS = {
     "id", "personId", "parentSlotIds", "spouseSlotId", "spouseSlotIds",
-    "spouseSuggestionId", "spouseUndetermined", "ownPositions",
+    "spouseSuggestionId", "ownPositions",
     "receivePositions", "hidden", "deleted"}
 _TWO_PARTY_NODE_FIELDS = {"id", "personId", "hidden", "deleted"}
 _TWO_PARTY_IDS = tuple(f"p{i}" for i in range(1, 31))
@@ -192,10 +192,6 @@ def _validate_diagram_wire(state: Any) -> list:
             errors.append({
                 "code": "invalid_spouse_suggestion",
                 "message": f"nodes[{i}].spouseSuggestionId phải là chuỗi hoặc null"})
-        if not isinstance(node.get("spouseUndetermined"), bool):
-            errors.append({
-                "code": "invalid_boolean",
-                "message": f"nodes[{i}].spouseUndetermined phải là boolean"})
         for pf in ("ownPositions", "receivePositions"):
             arr = node.get(pf)
             if not isinstance(arr, list):
@@ -301,7 +297,6 @@ def _persisted_state(state: Mapping[str, Any]) -> dict:
             "spouseSlotIds": list(n.get("spouseSlotIds") or []),
             "spouseSlotId": (n.get("spouseSlotIds") or [None])[-1],
             "spouseSuggestionId": n.get("spouseSuggestionId"),
-            "spouseUndetermined": n.get("spouseUndetermined", False),
             "ownPositions": _positions(n.get("ownPositions")),
             "receivePositions": _positions(n.get("receivePositions")),
             "hidden": n["hidden"],

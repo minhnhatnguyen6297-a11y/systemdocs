@@ -421,8 +421,6 @@ def _sanitize_v3_nodes(raw_nodes: Any, valid_row_ids: set) -> list[dict]:
             else ([_nn(raw.get("spouseSlotId"))]
                   if _nn(raw.get("spouseSlotId")) else []),
             "spouseSuggestionId": _nn(raw.get("spouseSuggestionId")),
-            "spouseUndetermined": _coerce_bool(
-                raw.get("spouseUndetermined"), False),
             "hidden": _coerce_bool(raw.get("hidden"), False),
             "deleted": _coerce_bool(raw.get("deleted"), False),
             "ownPositions": _sanitize_positions(raw.get("ownPositions")),
@@ -474,6 +472,7 @@ def _canonical_two_party_nodes(nodes: list[dict]) -> list[dict]:
 
 
 
+
 def _v3_to_v2_nodes(nodes: list[dict]) -> list[dict]:
     """V3 → V2 engine projection (§13.4 A4): isLandOwner := ownPositions ≠ [],
     willReceive := receivePositions ≠ []."""
@@ -485,8 +484,6 @@ def _v3_to_v2_nodes(nodes: list[dict]) -> list[dict]:
             "parentSlotIds": list(n.get("parentSlotIds") or []),
             "spouseSlotIds": list(n.get("spouseSlotIds") or []),
             "spouseSlotId": n.get("spouseSlotId"),
-            "spouseUndetermined": _coerce_bool(
-                n.get("spouseUndetermined"), False),
             "isLandOwner": bool(n.get("ownPositions")),
             "willReceive": bool(n.get("receivePositions")),
             "hidden": _coerce_bool(n.get("hidden"), False),
@@ -536,7 +533,6 @@ def _seed_inheritance_state(owner_row_id: Optional[str],
         node.update({
             "spouseSlotIds": [spouse] if spouse else [],
             "spouseSuggestionId": None,
-            "spouseUndetermined": False,
         })
     return {"version": DIAGRAM_STATE_VERSION,
             "domain": CASE_TYPE_INHERITANCE, "nodes": nodes}
@@ -2556,7 +2552,6 @@ class CaseWorkspaceService:
                     candidates[-1] if deceased and candidates else None)
                 node["spouseSuggestionId"] = (
                     candidates[0] if not deceased and candidates else None)
-                node["spouseUndetermined"] = deceased and len(candidates) > 1
             return {"version": DIAGRAM_STATE_VERSION,
                     "domain": CASE_TYPE_INHERITANCE, "nodes": nodes}
 
@@ -2619,6 +2614,7 @@ class CaseWorkspaceService:
                 "stage.owner_row_id phải là row_id của một dòng Người "
                 "trong stage (inheritance)")
         return oid
+
 
 
     # ----- validation

@@ -1407,7 +1407,6 @@ diagram_state v3 (domain inheritance):
       spouseSlotIds: [<node.id>]   # theo thứ tự kéo; cuối là hợp pháp
       spouseSlotId: <node.id | null> # mirror cuối của spouseSlotIds
       spouseSuggestionId: <node.id | null> # migration living spouse link
-      spouseUndetermined: <bool>    # không chia spouse cho decedent này
       ownPositions: [<int 1..5>]    # vị trí tài sản người này SỞ HỮU
       receivePositions: [<int 1..5>]# vị trí tài sản người này ĐƯỢC NHẬN
       hidden: <bool>
@@ -1416,13 +1415,10 @@ diagram_state v3 (domain inheritance):
 - `spouseSlotIds` giữ nguyên thứ tự thao tác; chỉ phần tử cuối nhận phần
   thừa kế với vai trò vợ/chồng hợp pháp. Link ngược không có ngữ nghĩa.
   `spouseSlotId` là mirror tương thích với consumer cũ.
-- Node `spouseUndetermined:true` của decedent có estate làm kết quả
-  `incomplete`, cảnh báo `spouse_undetermined`, không tạo spouse unit.
-  Cảnh báo không làm state invalid hoặc ngăn save.
 - `spouseSuggestionId` chỉ giữ gợi ý migration của người còn sống;
-  engine bỏ qua trường này. Khi migrate schemaVersion 3, liên kết legacy
-  một phía được nâng thành slot; liên kết hai phía khác nhau tạo slot
-  theo thứ tự nguồn và đánh dấu chưa xác định.
+  engine bỏ qua trường này. Khi migrate schemaVersion 3, link legacy của
+  node được đưa đầu tiên; các link ngược theo thứ tự node nguồn được nối
+  sau.
 
 - `isLandOwner`/`willReceive` **cấm** trên wire v2 →
   `diagram_invalid_state` (`invalid_node` — trường lạ trên node).

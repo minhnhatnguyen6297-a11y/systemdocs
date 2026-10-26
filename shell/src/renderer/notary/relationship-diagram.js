@@ -872,9 +872,7 @@ function createDiagramPane(ctx) {
     const spouseOwner = spouseOwnerOf(n.id, liveNodes());
     const spouseIndex = spouseOwner
       ? spouseOwner.spouseSlotIds.indexOf(n.id) : -1;
-    const spouseUncertain = !!(spouseOwner &&
-      spouseOwner.spouseUndetermined);
-    const spouseLawful = !!(spouseOwner && !spouseUncertain &&
+    const spouseLawful = !!(spouseOwner &&
       spouseIndex === spouseOwner.spouseSlotIds.length - 1);
     if (spouseOwner) {
       card.classList.add(spouseLawful
@@ -911,10 +909,8 @@ function createDiagramPane(ctx) {
     nm.title = role ? `${name} — ${role}` : name;
     card.append(nm);
     if (spouseOwner) {
-      const text = spouseUncertain
-        ? 'Chưa xác định vợ/chồng hợp pháp'
-        : spouseLawful ? 'Vợ/chồng hợp pháp'
-          : 'Không phải vợ/chồng hợp pháp';
+      const text = spouseLawful ? 'Vợ/chồng hợp pháp'
+        : 'Không phải vợ/chồng hợp pháp';
       card.append(h('div', 'cd-spouse-label', text));
       if (!spouseLawful && !ro) {
         const promote = btn('Đặt làm vợ/chồng hợp pháp',
@@ -923,7 +919,7 @@ function createDiagramPane(ctx) {
               .filter((id) => id !== n.id);
             ids.push(n.id);
             if (model.setNodeRelation(spouseOwner.id, {
-              spouseSlotIds: ids, spouseUndetermined: false })) {
+              spouseSlotIds: ids })) {
               scheduleEvaluate();
             }
           });

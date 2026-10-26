@@ -2112,16 +2112,13 @@ def test_word_spouse_role_uses_only_last_slot_member_and_preserves_other_roles()
     assert lawful.role == "Vợ/Chồng"
 
 
-@pytest.mark.parametrize("undetermined", [False, True])
-def test_word_context_applies_saved_one_way_spouse_slots(undetermined):
+def test_word_context_applies_saved_one_way_spouse_slots():
     owner = _person(1, "Chủ đất", dead=date(2024, 1, 1))
     faded = _person(2, "Vợ trước")
     lawful = _person(3, "Vợ sau")
     representative = _person(4, "Đại diện")
     owner_node = _node(1, role="Owner", is_land_owner=True)
-    owner_node.update(
-        spouseSlotIds=["node_2", "node_3"],
-        spouseUndetermined=undetermined)
+    owner_node["spouseSlotIds"] = ["node_2", "node_3"]
     nodes = [
         _node(3, will_receive=True),
         _node(2, role="Vợ/Chồng"),
@@ -2139,7 +2136,7 @@ def test_word_context_applies_saved_one_way_spouse_slots(undetermined):
     assert [person.ho_ten for person in context.persons] == [
         "Chủ đất", "Vợ trước", "Vợ sau", "Đại diện"]
     assert by_name["Vợ trước"].role == ""
-    assert by_name["Vợ sau"].role == ("Khac" if undetermined else "Vợ/Chồng")
+    assert by_name["Vợ sau"].role == "Vợ/Chồng"
     assert by_name["Vợ sau"].share == "1/2"
     assert context.receivers == [by_name["Vợ sau"]]
     assert context.authorized_people == [by_name["Đại diện"]]

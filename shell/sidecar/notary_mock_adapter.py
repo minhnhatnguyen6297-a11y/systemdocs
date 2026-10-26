@@ -74,8 +74,8 @@ INTAKE_KINDS = ("image", "pdf", "docx", "xlsx", "text")
 NODE_BOOL_FIELDS = ("hidden", "deleted")
 NODE_FIELDS = {
     "id", "personId", "parentSlotIds", "spouseSlotIds", "spouseSlotId",
-    "spouseSuggestionId", "spouseUndetermined", "ownPositions",
-    "receivePositions", "hidden", "deleted"}
+    "spouseSuggestionId", "ownPositions", "receivePositions",
+    "hidden", "deleted"}
 NODE_FIELDS_TWO_PARTY = {"id", "personId", "hidden", "deleted"}
 PERSON_FIELDS = ("row_id", "entity_id", "ho_ten", "gioi_tinh", "ngay_sinh",
                  "ngay_chet", "so_giay_to", "ngay_cap", "noi_cap",
@@ -478,9 +478,6 @@ def _validate_diagram_state(state):
         if n.get("spouseSlotId") != expected:
             errors.append({"code": "invalid_spouse_mirror", "node": nid,
                            "message": f"{w}.spouseSlotId không khớp slot"})
-        if not isinstance(n.get("spouseUndetermined"), bool):
-            errors.append({"code": "invalid_boolean", "node": nid,
-                           "message": f"{w}.spouseUndetermined phải bool"})
         for pf in ("ownPositions", "receivePositions"):
             arr = n.get(pf)
             if not isinstance(arr, list):
@@ -560,7 +557,6 @@ def _persisted_diagram_state(state):
                 "spouseSlotIds": list(n.get("spouseSlotIds") or []),
                 "spouseSlotId": n.get("spouseSlotId"),
                 "spouseSuggestionId": n.get("spouseSuggestionId"),
-                "spouseUndetermined": n.get("spouseUndetermined", False),
                 "ownPositions": list(n.get("ownPositions") or []),
                 "receivePositions": list(n.get("receivePositions") or []),
                 "hidden": n["hidden"], "deleted": n["deleted"]}
@@ -1177,10 +1173,10 @@ def _workspace_data(cid, case):
         for node in persisted_state.get("nodes") or []:
             if not isinstance(node, dict):
                 continue
+            node.pop("spouseUndetermined", None)
             spouse = node.get("spouseSlotId")
             node.setdefault("spouseSlotIds", [spouse] if spouse else [])
             node.setdefault("spouseSuggestionId", None)
-            node.setdefault("spouseUndetermined", False)
             node["spouseSlotId"] = (
                 node["spouseSlotIds"][-1] if node["spouseSlotIds"] else None)
     data = {
