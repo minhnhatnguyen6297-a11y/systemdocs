@@ -202,7 +202,7 @@ review BLDS 2015) tổng hợp trong brainstorm "Kiến trúc Diagram trong So�
 ### D-029 — Tối đa 3 tài sản mỗi hồ sơ (Q-010)
 - **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** kỹ thuật
 - **Quyết định:** 3 tài sản.
-- **Hệ quả (việc code sau, chưa sửa):** `word_engine.py` có `MAX_WORD_ASSETS = 5`, UI là 3 — phải thống nhất về 3.
+- **Hệ quả:** `word_engine.py` có `MAX_WORD_ASSETS = 5`, UI là 3 — phải thống nhất về 3. **Việc sửa code hoãn cho tới khi owner yêu cầu** (owner huỷ lượt sửa code 26/10/2026).
 - **Nguồn:** owner 26/10/2026, trả lời Q-010.
 
 ### D-030 — Lỗi cấu trúc vẫn được lưu (Q-012)
