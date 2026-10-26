@@ -30,7 +30,7 @@ review BLDS 2015) tổng hợp trong brainstorm "Kiến trúc Diagram trong So�
 
 ### D-002 — Không bao giờ chặn lưu và xuất Word (QĐ-A)
 - **Ngày:** trước 26/10/2026 · **Trạng thái:** Đã chốt · **Loại:** kỹ thuật
-- **Bối cảnh:** chặn lưu khi engine chưa `complete` làm mất công nhập; hàng 2/3 luôn `unsupported`.
+- **Bối cảnh:** chặn lưu khi engine chưa `complete` làm mất công nhập; hàng 2/3 khi đó luôn `unsupported` (nay đã tính, D-038).
 - **Quyết định:** lưu và xuất Word được ở mọi trạng thái; trạng thái (`invalid`/`unsupported`/`incomplete`/`complete`) ghi vào `engineResult` và hiện nhãn trên UI/Word.
 - **Lý do:** công chứng viên mới là người kết luận; app chỉ cảnh báo (BR INV-11).
 - **Hệ quả:** **lệch code/contract hiện tại**: `diagram_invalid_state` vẫn chặn lỗi cấu trúc; README §8 ghi "invalid: save bị chặn". Phải sửa contract + code (BR §13 mục 5). Lỗi cấu trúc làm hỏng dữ liệu (vd. vòng tổ tiên thật) cần quyết định riêng cách lưu — xem Q-012.
@@ -63,7 +63,7 @@ review BLDS 2015) tổng hợp trong brainstorm "Kiến trúc Diagram trong So�
 - **Nguồn:** HT1; BR §4.3.
 
 ### D-007 — Ngày chỉ có năm = "không phân biệt được thứ tự"
-- **Trạng thái:** Đã chốt (user) · **Loại:** lệch nghiệp vụ (quy ước nhập liệu)
+- **Trạng thái:** **Bị thay bởi D-033** (26/10/2026) · **Loại:** lệch nghiệp vụ (quy ước nhập liệu)
 - **Quyết định:** `yyyy` không phải dữ liệu thiếu; `01/01/yyyy` chỉ là khoá sắp xếp nội bộ, không in, không dùng để nói ai chết trước.
 - **Hệ quả:** code hiện ép `2010` → `2010-01-01` và mất cờ độ phân giải (BR §11.1) — phải sửa.
 - **Nguồn:** BR §4.2.
@@ -184,7 +184,7 @@ review BLDS 2015) tổng hợp trong brainstorm "Kiến trúc Diagram trong So�
 - **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** giới hạn phạm vi (di chúc) + lệch nghiệp vụ (thai nhi)
 - **Bối cảnh:** 644 (phần bắt buộc) thuộc thừa kế theo di chúc; 613 người thành thai trước khi người để lại di sản chết và sinh ra còn sống vẫn được thừa kế.
 - **Quyết định:** hồ sơ chỉ làm thừa kế theo pháp luật. Không xử lý thai nhi: chỉ người có giấy tờ cá nhân mới được đưa vào; khách hàng chịu trách nhiệm về việc thành thai.
-- **Hệ quả:** không làm template Word cho nhánh di chúc. Hàng 2–3 vẫn `unsupported` (chưa có quyết định đổi).
+- **Hệ quả:** không làm template Word cho nhánh di chúc. Hàng 2–3 khi đó vẫn `unsupported`; nay được tính theo D-038.
 - **Nguồn:** owner 26/10/2026, trả lời Q-007.
 
 ### D-027 — Không xét ai ký; ai có tên trong Stage là người liên quan (Q-008)
@@ -201,7 +201,7 @@ review BLDS 2015) tổng hợp trong brainstorm "Kiến trúc Diagram trong So�
 - **Nguồn:** owner 26/10/2026; `inheritance_engine.py` :308-360.
 
 ### D-029 — Tối đa 3 tài sản mỗi hồ sơ (Q-010)
-- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** kỹ thuật
+- **Ngày:** 26/10/2026 · **Trạng thái:** **Bị thay bởi D-036** · **Loại:** kỹ thuật
 - **Quyết định:** 3 tài sản.
 - **Hệ quả:** `word_engine.py` có `MAX_WORD_ASSETS = 5`, UI là 3 — phải thống nhất về 3. **Việc sửa code hoãn cho tới khi owner yêu cầu** (owner huỷ lượt sửa code 26/10/2026).
 - **Nguồn:** owner 26/10/2026, trả lời Q-010.
@@ -218,3 +218,66 @@ review BLDS 2015) tổng hợp trong brainstorm "Kiến trúc Diagram trong So�
 - **Lý do:** owner: đúng đề xuất trong tài liệu owner gửi; vợ/chồng cùng là chủ đất vẫn còn tài sản gốc nên phải giữ.
 - **Hệ quả:** gỡ chỉ là bỏ khỏi diagram, không xoá khỏi Stage. Một người có nhiều vai (D-005) và còn thuộc nhánh khác chưa bị xoá thì cần giữ — chi tiết cài đặt prune xác định khi làm code.
 - **Nguồn:** owner 26/10/2026, trả lời Q-011.
+
+### D-032 — Cha/mẹ "chết từ lâu" không rõ ngày: trạng thái riêng (Q-013)
+- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** nghiệp vụ (quy ước nhập liệu)
+- **Quyết định:** thêm trạng thái tường minh "chết trước người để lại di sản, không rõ ngày". Chọn trạng thái này thì ngày trống **không** có nghĩa còn sống; người đó coi như chết trước mọi người để lại di sản trên sơ đồ.
+- **Lý do:** hồ sơ thật thường ghi cha mẹ "đã chết từ lâu" không có ngày; R-07 cũ (trống = sống) sẽ tính sai.
+- **Hệ quả:** sửa R-07, R-19, INV-7. Đóng Q-013. Cần thêm trường/trạng thái ở UI và engine.
+- **Nguồn:** owner 26/10/2026, sau phân tích 476 hồ sơ thật.
+
+### D-033 — Ngày hiển thị đúng như nhập; quy đổi ngầm khi tính
+- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** nghiệp vụ (quy ước nhập liệu)
+- **Quyết định:** ngày luôn hiển thị đúng như user nhập (màn hình, Word). Chỉ để tính, backend quy đổi ngầm `yyyy` → `01/01/yyyy`, `mm/yyyy` → `01/mm/yyyy`.
+- **Lý do:** đơn giản, dễ giải thích; không có trạng thái "không xác định thứ tự".
+- **Hệ quả:** thay D-007. Sửa R-08, R-09, R-14, R-17.
+- **Nguồn:** owner 26/10/2026, sau phân tích 476 hồ sơ thật.
+
+### D-034 — Từ chối: engine theo nhánh, Word liệt kê theo đầu người
+- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** trình bày văn bản
+- **Quyết định:** engine vẫn phân bổ phần từ chối theo nhánh (giữ D-025). Văn bản từ chối ký riêng theo nhánh vì người cùng nhánh cùng cách xưng hô. Văn bản phân chia cuối đếm/liệt kê người từ chối theo đầu người.
+- **Lý do:** khớp cách soạn hồ sơ thật.
+- **Hệ quả:** thêm R-33; cần đối chiếu template Word.
+- **Nguồn:** owner 26/10/2026, sau phân tích 476 hồ sơ thật.
+
+### D-035 — Hai người gốc chết, một con nhận: viết gộp
+- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** trình bày văn bản
+- **Quyết định:** engine tính theo vòng; Word được viết gộp "A và B để lại di sản cho C". Chỉ cảnh báo nếu kết quả cuối khác nhau.
+- **Lý do:** khớp hồ sơ thật; kết quả như nhau.
+- **Hệ quả:** thêm R-34.
+- **Nguồn:** owner 26/10/2026, sau phân tích 476 hồ sơ thật.
+
+### D-036 — Mỗi thửa đất một tài sản; tối đa 5
+- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** kỹ thuật
+- **Quyết định:** mỗi thửa đất là một tài sản; tối đa 5 tài sản mỗi hồ sơ.
+- **Lý do:** hồ sơ thật có hơn 3 thửa.
+- **Hệ quả:** thay D-029. Sửa R-06; code `MAX_ASSETS` chưa sửa (§8).
+- **Nguồn:** owner 26/10/2026, sau phân tích 476 hồ sơ thật.
+
+### D-037 — Đất hộ gia đình: không có khái niệm riêng
+- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** nghiệp vụ (trách nhiệm user)
+- **Quyết định:** không có khái niệm hộ gia đình; user tự đánh dấu các thành viên hộ là chủ đất.
+- **Lý do:** giữ mô hình đơn giản.
+- **Hệ quả:** thêm R-35.
+- **Nguồn:** owner 26/10/2026, sau phân tích 476 hồ sơ thật.
+
+### D-038 — Tính hàng 2 và hàng 3
+- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** nghiệp vụ (theo luật)
+- **Quyết định:** cài hàng 2 và hàng 3 (BLDS 651.1(b), (c); 652 khi áp dụng).
+- **Lý do:** hồ sơ thật có trường hợp không còn hàng 1.
+- **Hệ quả:** sửa R-04, R-15, D-026, D-002; thêm R-32; bỏ mã `heir_rank_not_supported` và trạng thái unsupported tương ứng. Code trên nhánh `agent/omp/hang-2-3`.
+- **Nguồn:** owner 26/10/2026, sau phân tích 476 hồ sơ thật.
+
+### D-039 — Vợ/chồng = người user đặt vào ô, tại ngày chết
+- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** lệch nghiệp vụ (trách nhiệm user)
+- **Quyết định:** vợ/chồng là người user đặt vào ô vợ/chồng, tức vợ/chồng hợp pháp tại ngày người gốc đó chết. App không theo dõi tái hôn.
+- **Lý do:** app không có dữ liệu hôn nhân đầy đủ; trường hợp BLDS 655 do user tự xác định.
+- **Hệ quả:** đổi tên R-11 từ "vợ/chồng hợp pháp cuối cùng" thành "vợ/chồng hợp pháp tại ngày chết, theo user nhập"; đánh dấu lệch.
+- **Nguồn:** owner 26/10/2026, sau phân tích 476 hồ sơ thật.
+
+### D-040 — Không suy luận tài sản chung vợ chồng
+- **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** lệch nghiệp vụ có chủ ý (trách nhiệm user)
+- **Quyết định:** app không suy luận tài sản chung vợ chồng. Phần di sản chỉ xác định theo người được đánh dấu chủ đất, chia đều; không cảnh báo.
+- **Lý do:** app không có dữ liệu nguồn gốc tài sản.
+- **Hệ quả:** sửa R-13; đánh dấu lệch HNGĐ 66.2.
+- **Nguồn:** owner 26/10/2026, sau phân tích 476 hồ sơ thật.

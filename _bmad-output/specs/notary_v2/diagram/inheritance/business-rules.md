@@ -33,7 +33,7 @@
 | INV-4 | Kết quả không phụ thuộc thứ tự dữ liệu vào; cùng dữ liệu cho cùng kết quả. |
 | INV-5 | Một người nhận từ nhiều nguồn/vai thì cộng dồn. |
 | INV-6 | Không mở vòng giá trị 0. |
-| INV-7 | App không tạo người, không đoán quan hệ, không kết luận điều không có trên sơ đồ (D-015). |
+| INV-7 | App không tạo người, không đoán quan hệ, không kết luận điều không có trên sơ đồ (D-015). Ngoại lệ đã được owner chốt: R-07 (ngày trống = còn sống, D-001, D-032) và R-19 (không dấu Nhận = từ chối, D-024). |
 | INV-8 | Mọi số hiển thị và in ra Word đọc từ cùng một kết quả của cùng một bản đã lưu (D-003). |
 
 ## 3. Quy tắc phạm vi
@@ -43,37 +43,41 @@
 | R-01 | Mọi hồ sơ | Chỉ chia **thừa kế theo pháp luật**. Không xử lý di chúc, phần bắt buộc. | BLDS 650.1(a), 644; D-026 | Giới hạn phạm vi |
 | R-02 | Người đã thành thai nhưng chưa sinh lúc mở thừa kế | Không xét; chỉ người có giấy tờ cá nhân mới được đưa vào. Khách hàng tự chịu trách nhiệm. | BLDS 613, 660.1, 662.1; D-026 | **Lệch**: luật buộc dành lại một suất cho thai nhi trước khi chia (660.1); thai nhi sinh ra còn sống sau khi đã chia thì phát sinh người thừa kế mới (662.1). App bỏ qua để đơn giản; trách nhiệm thuộc khách |
 | R-03 | Bất kỳ | App không xác định ai phải ký; ai có tên trong Stage là người liên quan. | BLDS 656; D-027 | **Lệch** (không can thiệp): luật yêu cầu thoả thuận của những người thừa kế, app không kiểm |
-| R-04 | Bất kỳ | Chỉ tính hàng thừa kế thứ nhất. Hàng 2, 3 không tính; khi người chết không có ai thuộc hàng 1 trên sơ đồ thì vòng đó `unsupported` (R-15). | BLDS 651; BR cũ | Giới hạn phạm vi |
+| R-04 | Bất kỳ | Tính đủ ba hàng thừa kế theo pháp luật: hàng 1, nếu không còn ai hàng 1 thì hàng 2, nếu không còn ai hàng 2 thì hàng 3 (R-15, R-32). | BLDS 651; D-038 | Không |
 | R-05 | Bất kỳ | Áp quy tắc BLDS 2015 cho mọi ngày mở thừa kế; không có logic theo phiên bản luật. | D-021 (tạm; Q-002) | **Lệch tạm**: luật áp dụng là luật tại thời điểm mở; owner đánh giá quy tắc ổn định |
-| R-06 | Bất kỳ | Tối đa **3** tài sản mỗi hồ sơ, ở mọi nơi (nhập, tính, Word). | D-029 | Kỹ thuật |
+| R-06 | Bất kỳ | Mỗi **thửa đất** là một tài sản. Tối đa **5** tài sản mỗi hồ sơ, ở mọi nơi (nhập, tính, Word). | D-036 (thay D-029) | Kỹ thuật |
 | R-30 | Người chết có nghĩa vụ tài sản (nợ, chi phí mai táng…) | App **không** khấu trừ nghĩa vụ trước khi chia; chia toàn bộ phần đứng tên. | BLDS 615, 658 | **Lệch** (giới hạn phạm vi, có chủ ý): luật buộc thanh toán nghĩa vụ trước khi chia; app chỉ chia quyền sử dụng/sở hữu đứng tên, việc thanh toán do các bên tự thoả thuận ngoài app |
 | R-31 | Thời điểm mở thừa kế đã lâu | App **không** cảnh báo thời hiệu. | BLDS 623 | **Lệch** (giới hạn phạm vi, có chủ ý): luật có thời hiệu yêu cầu chia di sản; app không kiểm, công chứng viên tự đánh giá |
+| R-35 | Đất hộ gia đình | Không có khái niệm riêng: user tự đánh dấu Chủ cho các thành viên hộ; chia theo R-13. | D-037 | **Lệch** (quy ước): app không xác định ai là thành viên có quyền chung; user tự chọn và tự chịu trách nhiệm |
 
 ## 4. Quy tắc dữ liệu và quan hệ
 
 | Mã | Điều kiện | Kết quả | Nguồn | Lệch luật? |
 |---|---|---|---|---|
-| R-07 | Ngày chết trống hoặc không đọc được | Coi là **còn sống**. | D-001 | **Lệch**: luật cần chứng cứ chết; app giảm nhập liệu. Ngoại lệ của INV-7 ("coi là còn sống" là một kết luận) — chờ owner quyết ở Q-013 |
-| R-08 | So thứ tự chết của hai người | Cả hai có ngày đủ: so ngày. Khác năm: so năm. **Cùng năm và ít nhất một người chỉ có năm** (kể cả cả hai cùng chỉ có năm): "không xác định thứ tự". Một người ngày đủ, người kia chỉ năm, khác năm: so năm. Ngày dạng **tháng/năm** (`mm/yyyy`) không thuộc định dạng nhận (`yyyy`, `dd/mm/yyyy`, ISO) nên hiện rơi vào R-07 (coi là còn sống) — khoảng trống, cần nhập lại dạng năm. | D-007 | **Lệch** (quy ước nhập): luật không quy định ngày thiếu |
-| R-09 | Hai người chết cùng ngày, hoặc "không xác định thứ tự" | Không thừa kế của nhau; nếu một người là con của người kia thì áp thế vị (R-17). | BLDS 619, 652; D-006 | **Lệch (quy ước)**: 619 nói "cùng thời điểm"; app coi **cùng ngày** là cùng thời điểm, không xét giờ chết, để đơn giản nhập liệu |
+| R-07 | Ngày chết trống hoặc không đọc được, **và không** chọn trạng thái "chết trước người để lại di sản, không rõ ngày" | Coi là **còn sống**. Nếu chọn trạng thái đó (thường gặp với cha mẹ "đã chết từ lâu"): coi là chết **trước** mọi người để lại di sản trên sơ đồ — không hưởng, không mở vòng di sản. Trạng thái in đúng như nhập. | D-001, D-032 | **Lệch**: luật cần chứng cứ chết; app giảm nhập liệu. Ngoại lệ của INV-7 đã chốt |
+| R-08 | Ngày chết nhập thiếu (chỉ năm `yyyy`, hoặc tháng/năm `mm/yyyy`) | **Hiển thị** luôn đúng như user nhập ở mọi đầu ra (màn hình, Word). Chỉ khi **tính** cần ngày đủ, backend quy đổi ngầm: `yyyy` → `01/01/yyyy`, `mm/yyyy` → `01/mm/yyyy`, rồi so như ngày đủ. | D-033 (thay D-007) | **Lệch (quy ước)**: ngày quy đổi có thể đảo thứ tự thật khi hai người chết cùng năm/tháng; owner chấp nhận |
+| R-09 | Hai người chết cùng ngày (sau quy đổi R-08) | Coi là cùng thời điểm: không thừa kế của nhau; nếu một người là con của người kia thì áp thế vị (R-17). | BLDS 619, 652; D-006 | **Lệch (quy ước)**: 619 nói "cùng thời điểm"; app coi **cùng ngày** là cùng thời điểm, không xét giờ chết |
 | R-10 | Con trên sơ đồ | "Con" gồm con đẻ và con nuôi, không phân loại. Mỗi con gắn tối đa 1 cha + 1 mẹ (được trống). Con chỉ hưởng từ cha/mẹ **được gắn**. | BLDS 651.1(a), 653, 654; D-023 | **Lệch**: (1) giới hạn 1 cha + 1 mẹ nên không biểu diễn được con nuôi vẫn hưởng của cha mẹ đẻ (653) hay con riêng hưởng của cả cha/mẹ đẻ lẫn bố dượng/mẹ kế (654), cũng không biểu diễn chiều bố dượng/mẹ kế hưởng của con riêng; (2) con riêng – bố dượng/mẹ kế chỉ hưởng khi user tự gắn, app không xét điều kiện nuôi dưỡng. Lý do: mô hình sơ đồ đơn giản (mỗi ô một cặp cha mẹ) |
-| R-11 | Vợ/chồng | Mỗi người có **tối đa một** vợ/chồng = vợ/chồng hợp pháp **cuối cùng**. Liên kết phải hai chiều. Vợ/chồng cũ không có suất; chỉ dùng làm cha/mẹ của con để phân biệt con chung/con riêng. | BLDS 651, 655; HNGĐ 65; D-022 | **Lệch**: trường hợp 655 (đang ly hôn, tái hôn sau) do user tự chọn ai là vợ/chồng cuối cùng |
+| R-11 | Vợ/chồng | Vợ/chồng = người user đặt vào ô vợ/chồng = **vợ/chồng hợp pháp tại ngày người đó chết, theo user nhập**. Tối đa một người mỗi ô, liên kết hai chiều. App không theo dõi tái hôn; vợ/chồng cũ không có suất, chỉ dùng làm cha/mẹ của con để phân biệt con chung/con riêng. | BLDS 651, 655; HNGĐ 65; D-022, D-039 | **Lệch** (trách nhiệm user): các trường hợp 655 (đang ly hôn, vợ/chồng còn sống tái hôn sau) do user tự chọn đúng người; app không kiểm |
 | R-12 | Cha mẹ của người chết | = hai người được gắn làm cha/mẹ của người đó (tối đa 1 cha + 1 mẹ). | BLDS 651.1(a), 653 | **Lệch**: người chết là con nuôi có thể có cả cha mẹ đẻ và cha mẹ nuôi trong hàng 1 (653); app chỉ biểu diễn được một cặp (cùng lý do R-10) |
 
 ## 5. Quy tắc chia
 
 | Mã | Điều kiện | Kết quả | Nguồn | Lệch luật? |
 |---|---|---|---|---|
-| R-13 | Tài sản `k` có `n` chủ đất | Mỗi chủ đất có phần gốc `1/n` của `k`. Hai vợ chồng cùng là chủ → mỗi người 1/2. | BLDS 612; HNGĐ 33, 66; D-020, D-017 | **Lệch** khi giấy tờ ghi tỷ lệ không đều: app luôn chia đều |
-| R-14 | Một người chết khi đang nắm phần `p > 0` của `k` | Mở một vòng giá trị `p` tại ngày chết. Các vòng xử lý theo thứ tự ngày; các vòng cùng ngày, hoặc không xác định được ai chết trước (R-08), được coi là cùng thời điểm (619): lấy giá trị đồng thời trước khi chia bất kỳ vòng nào trong nhóm đó. Phần của người chết về 0 sau khi chia. | BLDS 611, 612, 619 | Không |
-| R-15 | Vòng của người X | Đơn vị hàng 1 = cha, mẹ (R-12), vợ/chồng (R-11) **còn sống lúc X chết và là người nhận của `k`**, hoặc **chết sau X** (R-16); cộng mỗi con của X (R-10) mà nhánh còn ít nhất một người nhận (R-17, R-19). Giá trị vòng chia **đều** cho các đơn vị. Có người hàng 1 trên sơ đồ nhưng không còn đơn vị nào (tất cả từ chối theo R-19/R-21) → giá trị vòng là "chưa có người nhận", trạng thái `incomplete`. Không có người hàng 1 nào trên sơ đồ (cần hàng 2/3) → `unsupported` mã `heir_rank_not_supported` (R-04, D-002, D-026). | BLDS 651.1(a), 651.2, 651.3 | Không (hàng 2/3 là giới hạn phạm vi, R-04) |
+| R-13 | Tài sản `k` có `n` chủ đất | Phần di sản xác định **chỉ** theo những người user đánh dấu Chủ: mỗi người phần gốc `1/n`. App **không** suy luận tài sản chung vợ chồng và **không cảnh báo**. | BLDS 612; HNGĐ 33, 66.2; D-020, D-017, D-040 | **Lệch có chủ ý** (trách nhiệm user): giấy tờ ghi tỷ lệ không đều vẫn chia đều; tài sản chung vợ chồng chỉ đứng tên một người (66.2: chia đôi) hay tài sản riêng đứng tên hai người đều do user tự đánh dấu |
+| R-14 | Một người chết khi đang nắm phần `p > 0` của `k` | Mở một vòng giá trị `p` tại ngày chết. Các vòng xử lý theo thứ tự ngày; các vòng cùng ngày (sau quy đổi R-08) được coi là cùng thời điểm (619): lấy giá trị đồng thời trước khi chia bất kỳ vòng nào trong nhóm đó. Phần của người chết về 0 sau khi chia. | BLDS 611, 612, 619 | Không |
+| R-15 | Vòng của người X | Đơn vị hàng 1 = cha, mẹ (R-12), vợ/chồng (R-11) **còn sống lúc X chết và là người nhận của `k`**, hoặc **chết sau X** (R-16); cộng mỗi con của X (R-10) mà nhánh còn ít nhất một người nhận (R-17, R-19). Giá trị vòng chia **đều** cho các đơn vị. Không còn đơn vị hàng 1 (không có, chết trước, hoặc từ chối) → xét hàng 2, rồi hàng 3 (R-32). Cả ba hàng trống → "chưa có người nhận", `incomplete`. | BLDS 651.1(a), 651.2, 651.3; D-038 | Không |
 | R-16 | Người thừa kế (hàng 1 hoặc thế vị) chết **sau** X | Vẫn hưởng phần của mình tại lúc X chết (**chuyển tiếp**), luôn coi là nhận (không áp R-19 vì người chết không thể khai). Phần đó mở vòng mới khi người này chết (R-14). | BLDS 613, 614; D-010 | Không (quy ước "luôn nhận" là của app) |
-| R-17 | Con C của X chết **trước, cùng lúc, hoặc không xác định thứ tự** với X | Thế vị: nhánh C chia đều cho các con được gắn của C; cháu cũng ở tình huống đó thì xuống chắt, chia đều từng cấp trong nhánh. Phần thế vị không thuộc di sản của C. Vợ/chồng của C không nhận phần thế vị. | BLDS 652; D-016 | Không |
+| R-17 | Con C của X chết **trước hoặc cùng lúc** với X (R-09) | Thế vị: nhánh C chia đều cho các con được gắn của C; cháu cũng ở tình huống đó thì xuống chắt, chia đều từng cấp trong nhánh. Phần thế vị không thuộc di sản của C. Vợ/chồng của C không nhận phần thế vị. | BLDS 652; D-016 | Không |
 | R-18 | Thế vị phải xuống **dưới chắt** để có người nhận | Dừng ở chắt; hồ sơ trạng thái `unsupported` mã `representation_depth_exceeded`, không đưa phân số. | BLDS 652; D-012 | **Lệch / giới hạn phạm vi**: theo luật nhánh không có người thế vị trong giới hạn chắt chỉ không thành đơn vị và vòng vẫn chia được; app chọn thận trọng trả `unsupported` |
 | R-19 | Người có suất (hàng 1 hoặc thế vị), còn sống lúc X chết, **không** có dấu Nhận trên `k` | Coi là **từ chối** phần của mình trên `k`. Chủ đất không có dấu Nhận vẫn giữ phần gốc R-13, chỉ không nhận thêm. | BLDS 620, 621; D-024 | **Lệch**: luật đòi văn bản từ chối (620) và tách riêng người không được quyền hưởng (621); app gộp cả hai (và cả "nhường theo thoả thuận") vào nhãn "từ chối", user sửa tay khi khác. Đây cũng là ngoại lệ của INV-7 (app kết luận từ việc thiếu dấu) — chờ owner quyết ở Q-013 |
 | R-20 | Có người từ chối (R-19) trong một nhánh thế vị | Phần của họ **ở lại nhánh**: chia đều cho những người còn nhận trong nhánh, theo từng cấp. Cả nhánh không còn ai nhận → nhánh không thành đơn vị; giá trị chia đều cho các đơn vị còn lại của vòng (R-15). | BLDS 651.2, 652; D-024 (nhãn từ chối nghiệp vụ, không phải văn bản 620); D-025, D-011 | **Lệch nghiệp vụ** (theo D-011): cách hiểu suất gắn với nhánh và cách chia lại khi nhánh rỗng là quy ước của app |
 | R-21 | Người là đơn vị trực tiếp (cha, mẹ, vợ/chồng, con còn sống) từ chối | Không thành đơn vị; giá trị chia đều cho các đơn vị còn lại. | BLDS 651.2; D-024 (nhãn từ chối nghiệp vụ, không phải văn bản 620) | Không (ngoài lệch đã ghi ở R-19) |
 | R-22 | Một người nhận từ nhiều vòng/vai | Cộng dồn (INV-5). | D-005 | Không |
+| R-32 | Vòng của X không còn đơn vị hàng 1 (R-15) | **Hàng 2** (651.1(b)): ông bà nội/ngoại (cha/mẹ của cha/mẹ X); anh chị em ruột (chung ít nhất một cha/mẹ được gắn với X); cháu ruột mà X là ông/bà (con của con X). Không còn ai hàng 2 → **Hàng 3** (651.1(c)): cụ nội/ngoại (cha/mẹ của ông bà); bác, chú, cậu, cô, dì ruột (con khác của ông bà); cháu ruột mà X là bác/chú/cậu/cô/dì (con của anh chị em ruột X); chắt ruột mà X là cụ (con của cháu X). Mỗi **người** một suất, chia đều; một người nhiều vai trong cùng hàng chỉ một suất. Người chết trước/cùng lúc X không hưởng; **không thế vị** trong hàng 2/3 (652 chỉ áp cho con/cháu của X). Chết sau X: chuyển tiếp (R-16). Không dấu Nhận: từ chối (R-19), chia cho người còn lại cùng hàng; cả hàng từ chối → hàng sau. | BLDS 651.1(b)(c), 651.2, 651.3, 652; D-038 | Không. Cách hiểu cần reviewer kiểm: anh chị em cùng cha khác mẹ/cùng mẹ khác cha là "ruột" |
+| R-33 | Từ chối trên Word | Engine phân bổ theo nhánh (R-20, D-025). Văn bản từ chối ký riêng theo nhánh (người cùng nhánh cùng cách xưng hô); văn bản phân chia tổng kết liệt kê/đếm người từ chối **theo đầu người**. | D-034 | Không (cách trình bày) |
+| R-34 | Hai người gốc đều chết, một người nhận hết | Engine tính theo vòng (R-14, R-16). Word được viết gọn "A và B để lại di sản cho C". Chỉ cảnh báo khi kết quả cuối theo cách viết gọn **khác** kết quả tính theo vòng. | D-035 | Không (cách hành văn; kết quả giống nhau) |
 
 ## 6. Quy tắc thao tác sơ đồ và lưu
 
@@ -104,13 +108,14 @@
 
 | Quy tắc | Hiện trạng code |
 |---|---|
-| R-06 | Hồ sơ/UI giới hạn 3; xuất Word cho tới 5 (`MAX_WORD_ASSETS = 5`). Hoãn sửa (D-029). |
-| R-08 | Ngày chỉ năm bị ép thành 01/01, mất cờ "chỉ năm". |
+| R-06 | Hồ sơ/UI giới hạn 3; Word 5. Owner nâng lên 5 (D-036): **phải sửa** `MAX_ASSETS` lên 5 — chưa làm. |
+| R-07, R-08 | Quy đổi `yyyy` → 01/01 khi tính đã có; chưa có `mm/yyyy`; chưa kiểm hiển thị luôn giữ nguyên chuỗi nhập ở mọi đầu ra; chưa có trạng thái "chết trước, không rõ ngày" (D-032). |
 | R-18 | Engine không kiểm độ sâu, đi xuống không giới hạn. |
 | R-23 | Bước chuyển dữ liệu gộp dấu theo tài sản thành một cờ chung; engine tính một kết quả cho mọi tài sản. |
 | R-25, R-28 | Lỗi cấu trúc chặn cả xem kết quả lẫn lưu (`diagram_invalid_state`). |
 | R-11 | UI coi một chiều là vợ chồng; server đòi hai chiều → lỗi. |
-| R-15 | Engine trả `incomplete` (unresolved) cả khi không có ai hàng 1; chưa có mã `heir_rank_not_supported`. |
+| R-15, R-32 | Engine chỉ có hàng 1; hàng 2/3 đang cài trên nhánh `agent/omp/hang-2-3` (D-038). |
+| R-33, R-34 | Chưa đối chiếu Word: liệt kê người từ chối theo đầu người; cảnh báo khi cách viết gọn khác kết quả. |
 | R-26 | Kiểm vòng tổ tiên báo nhầm khi một người được tới bằng hai đường. |
 | R-27 | Chưa đối chiếu với code gỡ node. |
 | INV-8 | Lưu nhiều bản sao; Word có thể đọc bản cũ hoặc tỷ lệ của bảng người tham gia. |
@@ -118,17 +123,17 @@
 ## 9. Ánh xạ D-xxx → R-xx
 
 D-001→R-07 · D-002→R-25, R-28 · D-003→INV-8 · D-004→R-29 · D-005→R-22 ·
-D-006→R-09 · D-007→R-08 · D-008→R-23 · D-009→R-27 · D-010→R-16 ·
+D-006→R-09 · D-007 (bị D-033 thay) · D-008→R-23 · D-009→R-27 · D-010→R-16 ·
 D-011→R-20 · D-012→R-18 · D-013/D-020→R-13 · D-014/D-024→R-19 · D-015→INV-7 ·
-D-016→R-17 · D-017→R-13 · D-021→R-05 · D-022→R-11 · D-023→R-10 ·
-D-025→R-20 · D-026→R-01, R-02 · D-027→R-03 · D-028→R-29 · D-029→R-06 ·
-D-030→R-25, R-26 · D-031→R-27. R-30, R-31 không có D (lệch có chủ ý, ghi từ review độc lập 26/10/2026). (D-018, D-019 là quy trình.)
+D-016→R-17 · D-017→R-13 · D-021→R-05 · D-022/D-039→R-11 · D-023→R-10 ·
+D-025→R-20 · D-026→R-01, R-02 · D-027→R-03 · D-028→R-29 · D-029 (bị D-036 thay) ·
+D-030→R-25, R-26 · D-031→R-27. D-032→R-07 · D-033→R-08 · D-034→R-33 · D-035→R-34 · D-036→R-06 · D-037→R-35 · D-038→R-04, R-15, R-32 · D-039→R-11 · D-040→R-13. R-30, R-31 không có D (lệch có chủ ý, ghi từ review độc lập 26/10/2026). (D-018, D-019 là quy trình.)
 
 ## 10. Câu hỏi mở Q-xxx
 
-Q-001, Q-003…Q-012 đã chốt (xem ánh xạ §9 và decision-80). Còn mở:
+Q-001, Q-003…Q-013 đã chốt (Q-013 ở D-032); các điểm từ phân tích 476 hồ sơ thật chốt ở D-033…D-040 (26/10/2026). Còn mở:
 
 | Q | Câu hỏi | Trạng thái |
 |---|---|---|
 | Q-002 | Thừa kế mở trước 01/01/2017 có điểm nào luật cũ khác ảnh hưởng hồ sơ đất? | Mở, ưu tiên thấp; tạm theo R-05 (D-021); cần giải thích lại cho owner |
-| Q-013 | R-07 (ngày trống = còn sống, kể cả cha mẹ ghi "chết đã lâu" không ngày) và R-19 (không dấu Nhận = từ chối) là kết luận app tự rút ra, mâu thuẫn INV-7. Giữ hay đổi? | Mở, chờ owner |
+
