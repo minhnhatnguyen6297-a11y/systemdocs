@@ -589,6 +589,18 @@ test('MIN-133 D4: không nút ‹, tiêu đề, pill Nháp, nhãn trạng thái 
       (e) => e.classList && e.classList.contains('js-cd-update')).length, 0,
       'còn nút commit cũ .js-cd-update');
   });
+test('opening another case clears previous draft data before workspace response', async (t) => {
+  const { model } = await build(t, { draft: false });
+  model.state.renderModel = { requiredSlots: [{ anchorSlotId: 'owner' }] };
+  model.state.diagram.nodes.push({ id: 'old-slot', personId: 'c1' });
+  const pending = model.openCase(99);
+  assert.equal(model.state.status, 'loading');
+  assert.deepEqual(model.state.stage, { people: [], assets: [] });
+  assert.deepEqual(model.state.diagram.nodes, []);
+  assert.equal(model.state.renderModel, null);
+  assert.deepEqual(model.state.diagramWarnings, []);
+  await pending;
+});
 
 test('MIN-133 D4: case thật — chấm dirty theo Stage/Diagram/meta trên Lưu hồ sơ; pill loại · HS · trạng thái',
   async () => {

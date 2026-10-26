@@ -495,6 +495,106 @@ test('requiredSlots bo qua anchor trong (mock dev) — khong no canvas', async (
   assert.equal(model.state.diagram.nodes.length, 7,
     'anchor trong khong duoc sinh slot moi');
 });
+test('Pool drag starts a compatible move and first drop assigns the person', async (t) => {
+  const { model, view } = await build(t, { mode: 'case', seed: {
+    people: [{ row_id: 'c1', ho_ten: 'Người A' }],
+    nodes: [{ id: 'owner', personId: null, parentSlotIds: [],
+      spouseSlotId: null, ownPositions: [], receivePositions: [],
+      hidden: false, deleted: false }],
+  } });
+  const poolCard = byCls(view.el, 'cd-pool-card')[0];
+  const owner = collect(view.el,
+    (e) => e.dataset.nodeId === 'owner')[0];
+  const values = {};
+  const transfer = {
+    effectAllowed: 'uninitialized', dropEffect: 'none',
+    setData(type, value) { values[type] = value; },
+    getData(type) { return values[type] || ''; },
+  };
+  poolCard.dispatch('dragstart', { dataTransfer: transfer });
+  assert.equal(transfer.effectAllowed, 'move');
+  assert.equal(transfer.getData('text/plain'),
+    JSON.stringify({ kind: 'person', row_id: 'c1' }));
+  let prevented = false;
+  owner.dispatch('dragover', {
+    dataTransfer: transfer,
+    preventDefault() { prevented = true; },
+  });
+  assert.equal(prevented, true);
+  assert.equal(transfer.dropEffect, 'move');
+  owner.dispatch('drop', {
+    dataTransfer: transfer,
+    preventDefault() {},
+  });
+  assert.equal(model.state.diagram.nodes[0].personId, 'c1');
+  assert.equal(model.state.stage.owner_row_id, 'c1');
+  // Drop schedules an evaluation debounce; a new draft must cancel it.
+  const before = model.state.diagram.nodes;
+  const newCase = model.newDraft('inheritance');
+  await newCase;
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  assert.notEqual(model.state.diagram.nodes, before);
+  assert.equal(model.state.diagram.nodes[0].personId, null);
+});
+
+test('deceased owner evaluate response creates its required relationship slots', async (t) => {
+  const required = [{ anchorSlotId: 'owner', reason: 'active_estate',
+    slotTypes: ['father', 'mother', 'spouse', 'child'],
+    minimumEmptyChildSlots: 1 }];
+  const client = {
+    run: async (cmd) => cmd === 'notary.diagram_evaluate'
+      ? { ok: true, data: { render_model: { requiredSlots: required } } }
+      : { ok: true, data: {} },
+  };
+  const { model, view } = await build(t, {
+    mode: 'case', client,
+    seed: {
+      people: [{ row_id: 'c1', ho_ten: 'Người A', ngay_chet: '2020-01-01' }],
+      assets: [{ row_id: 'a1' }],
+      nodes: [{ id: 'owner', personId: 'c1', parentSlotIds: [],
+        spouseSlotId: null, ownPositions: [1], receivePositions: [],
+        hidden: false, deleted: false }],
+    },
+  });
+  await findBtns(view.el, 'Xem cách tính')[0].onclick();
+  const owner = model.state.diagram.nodes.find((n) => n.id === 'owner');
+  assert.equal(model.state.renderModel.requiredSlots, required);
+  assert.equal(owner.parentSlotIds.length, 2);
+  assert.ok(owner.spouseSlotId);
+  assert.ok(model.state.diagram.nodes.some((n) =>
+    !n.personId && n.parentSlotIds.includes('owner')));
+});
+test('stale evaluate response cannot apply its required slots to a changed diagram', async (t) => {
+  let resolveEvaluate;
+  const client = {
+    run: (cmd) => cmd === 'notary.diagram_evaluate'
+      ? new Promise((resolve) => { resolveEvaluate = resolve; })
+      : Promise.resolve({ ok: true, data: {} }),
+  };
+  const { model, view } = await build(t, {
+    mode: 'case', client,
+    seed: {
+      people: [{ row_id: 'c1', ho_ten: 'Người A' }],
+      nodes: [{ id: 'owner', personId: null, parentSlotIds: [],
+        spouseSlotId: null, ownPositions: [], receivePositions: [],
+        hidden: false, deleted: false }],
+    },
+  });
+  const oldRender = { requiredSlots: [{
+    anchorSlotId: 'owner', slotTypes: ['father'], minimumEmptyChildSlots: 0,
+  }] };
+  model.state.renderModel = oldRender;
+  const evaluation = findBtns(view.el, 'Xem cách tính')[0].onclick();
+  model.movePerson('c1', 'owner');
+  const evaluated = { requiredSlots: [{
+    anchorSlotId: 'owner', slotTypes: ['father', 'mother'],
+    minimumEmptyChildSlots: 0,
+  }] };
+  resolveEvaluate({ ok: true, data: { render_model: evaluated } });
+  await evaluation;
+  assert.equal(model.state.renderModel, oldRender);
+  assert.equal(model.state.diagram.nodes.some((n) => n.id === 'father'), false);
+});
 
 test('MIN-136: chủ đất sống → hint điền Ngày mất; đã mất → không hint', async () => {
   const { model, view } = await build(test, { mode: 'case', seed: {

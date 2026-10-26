@@ -581,9 +581,7 @@ def _render(state, stage):
     if not landowners:
         if not nodes:
             return empty
-        rm = copy.deepcopy(empty)
-        rm["requiredSlots"] = _required_slots(nodes)
-        return rm
+        return copy.deepcopy(empty)
     deceased = [n for n in landowners
                 if (stage_people.get(n["personId"]) or {}).get("ngay_chet")]
     assigned = {n["personId"] for n in nodes if n.get("personId")}
@@ -596,7 +594,7 @@ def _render(state, stage):
     receivers = [n for n in nodes
                  if n.get("receivePositions") and n.get("personId")]
     rm = {"engineVersion": 2, "status": "complete", "allocations": {},
-          "breakdowns": [], "requiredSlots": _required_slots(nodes),
+          "breakdowns": [], "requiredSlots": _required_slots(nodes, stage),
           "warnings": warnings, "errors": [], "unresolvedEstates": [],
           "conservation": {"allocated": "0", "unresolved": "0",
                            "total": "0"}}
@@ -657,14 +655,20 @@ def _alloc(base, inherited, distributed, final):
             "displayPercent": "0.00"}
 
 
-def _required_slots(nodes):
-    return [{"anchorSlotId": n["id"], "reason": "active_estate",
-             "slotTypes": ["father", "mother", "spouse", "child"],
-             "minimumEmptyChildSlots": 0}
-            for n in nodes
-            if isinstance(n, dict) and n.get("id") and not n.get("personId")
-            and not n.get("deleted")]
-
+def _required_slots(nodes, stage):
+    """Match active-estate slot requests from the inheritance engine."""
+    stage_people = _person_map({"stage": stage})
+    landowners = [
+        n for n in nodes
+        if isinstance(n, dict) and n.get("id") and n.get("personId")
+        and n.get("ownPositions") and not n.get("deleted")
+        and (stage_people.get(n["personId"]) or {}).get("ngay_chet")
+    ]
+    return [{
+        "anchorSlotId": n["id"], "reason": "active_estate",
+        "slotTypes": ["father", "mother", "spouse", "child"],
+        "minimumEmptyChildSlots": 1,
+    } for n in landowners]
 
 def _payload_diagram_state(payload):
     """Lay diagram.state tu payload — thieu field -> validation_error

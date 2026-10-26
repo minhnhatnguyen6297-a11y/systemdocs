@@ -311,7 +311,13 @@ function createDiagramPane(ctx) {
   // Canvas "Mở rộng" dang mo: emit moi → rebuild lai cho dong bo
   // (drag/drop/chip ben trong overlay mutate model → emit → ve lai).
   if (model.subscribe) {
-    model.subscribe(() => { if (expandBody) rebuildExpand(); });
+    model.subscribe(() => {
+      if (model.state.status === 'loading' && evalTimer) {
+        clearTimeout(evalTimer);
+        evalTimer = null;
+      }
+      if (expandBody) rebuildExpand();
+    });
   }
 
   // Stage dirty (case da ton tai): evaluate chay tren buffer dang sua
@@ -338,7 +344,11 @@ function createDiagramPane(ctx) {
     // R13: lỗi evaluate hiện MỘT dòng trong vùng sơ đồ (state.diagramErrors
     // hoặc state.error do model đặt) — không toast trùng.
     const r = await model.evaluateDiagram();
-    if (r.ok) applyRequiredSlots();     // engine-required slots (SOT)
+    // evaluateDiagram can return a successful but stale response. Only
+    // apply slots when this exact response became the current render model.
+    if (r.ok && model.state.renderModel === r.data?.render_model) {
+      applyRequiredSlots();
+    }
     return r;
   }
 
@@ -430,6 +440,7 @@ function createDiagramPane(ctx) {
     card.draggable = canDrag;
     const label = row.ho_ten || EMPTY_PERSON_NAME;
     const setPayload = (e) => {
+      e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain',
         JSON.stringify({ kind: 'person', row_id: row.row_id }));
       card.classList.add('dragging');
@@ -650,6 +661,7 @@ function createDiagramPane(ctx) {
   function wirePersonDrop(el, nodeId) {
     el.addEventListener('dragover', (e) => {
       e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
       el.classList.add('drop-hint');
     });
     el.addEventListener('dragleave', () =>
@@ -820,6 +832,7 @@ function createDiagramPane(ctx) {
     if (n.personId && !ro) {
       card.draggable = true;
       card.addEventListener('dragstart', (e) => {
+        e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain',
           JSON.stringify({ kind: 'person', row_id: n.personId }));
         card.classList.add('dragging');
@@ -871,6 +884,7 @@ function createDiagramPane(ctx) {
       if (!ro) {
         slot.draggable = true;
         slot.addEventListener('dragstart', (e) => {
+          e.dataTransfer.effectAllowed = 'move';
           e.dataTransfer.setData('text/plain',
             JSON.stringify({ kind: 'person', row_id: n.personId }));
           slot.classList.add('dragging');
@@ -1216,9 +1230,11 @@ function createDiagramPane(ctx) {
     // row_id} (P7 contract).
     box.addEventListener('dragover', (e) => {
       e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
       box.classList.add('drop-hint');
     });
-    box.addEventListener('dragleave', () => box.classList.remove('drop-hint'));
+    box.addEventListener('dragleave', () =>
+      box.classList.remove('drop-hint'));
     box.addEventListener('drop', (e) => {
       e.preventDefault();
       box.classList.remove('drop-hint');

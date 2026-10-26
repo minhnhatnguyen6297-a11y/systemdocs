@@ -2839,6 +2839,25 @@ function sourceStage() {
   };
 }
 
+test('movePerson: same owner pointer syncs empty diagram owner on first drop',
+  async () => {
+    const { model, client } = makeModel(seedCases('empty'));
+    const source = sourceStage();
+    client.setSourceLatest(source);
+    await model.newDraft();
+    const rowId = model.state.stage.owner_row_id;
+    const owner = model.state.diagram.nodes.find((n) => n.id === 'owner');
+
+    assert.equal(rowId, source.stage.owner_row_id);
+    assert.equal(owner.personId, null);
+    assert.equal(model.pool().people.some((p) => p.row_id === rowId), true);
+
+    assert.equal(model.movePerson(rowId, 'owner'), true);
+    assert.equal(owner.personId, rowId);
+    assert.equal(model.pool().people.some((p) => p.row_id === rowId), false);
+    assert.equal(model.state.diagramDirty, true);
+  });
+
 test('newDraft: đọc nguồn đúng 1 lần, stage nguồn + owner, không leak case/meta/diagram', async () => {
   const { model, client } = makeModel(seedCases('empty'));
   const src = sourceStage();

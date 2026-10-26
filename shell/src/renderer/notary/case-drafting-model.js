@@ -606,10 +606,52 @@ function createModel(deps) {
     state.status = 'loading';
     state.caseId = caseId;
     state.draftId = null;
+    state.backendMode = null;
+    state.caseInfo = null;
+    state.committedCaseInfo = null;
+    state.revision = 0;
+    state.locked = false;
+    state.unsupported = false;
+    state.capabilities = { intake: [], diagram: false, word_export: false };
+    state.committed = { people: [], assets: [] };
+    state.stage = { people: [], assets: [] };
+    state.stageDirty = false;
+    state.diagramDirty = false;
+    state.metaDirty = false;
+    state.diagram = { version: DIAGRAM_VERSION,
+      domain: CASE_TYPE_INHERITANCE, nodes: [] };
+    state.committedDiagram = clone(state.diagram);
+    diagramMutation += 1;
+    state.renderModel = null;
+    state.diagramWarnings = [];
+    state.diagramErrors = [];
+    state.evaluatedRevision = null;
+    state.fieldErrors = [];
+    state.conflict = null;
+    state.stale = false;
     state.error = null;
     state.notice = null;
+    state.suggestions = [];
+    state.intakeErrors = [];
+    state.intakePartial = false;
+    state.intakeBusy = false;
+    state.wordOptions = null;
+    state.wordBindingProposals = [];
+    state.wordProposalSnapshot = null;
+    state.wordResult = null;
+    state.wordBusy = false;
     state.busy = null;
     state.savingCase = false;
+    state.duplicatePending = null;
+    state.duplicating = null;
+    state.uqCatalog = null;
+    state.uqCatalogBusy = false;
+    state.docxImport = { version: 1, sources: [] };
+    state.committedDocxImport = clone(state.docxImport);
+    state.addressSlots = {};
+    state.addressFull = null;
+    state.addressSuggestions = {};
+    state.postingAssetId = null;
     emit();
     const r = await client.run('notary.workspace_get',
                                { case_id: caseId });
@@ -1201,9 +1243,15 @@ function createModel(deps) {
         !state.stage.people.some((p) => p.row_id === rowId)) {
       return false;
     }
-    if (state.stage.owner_row_id === rowId) return true;
-    state.stage.owner_row_id = rowId;
     const owner = findInNodes(state.diagram.nodes, 'owner');
+    if (state.stage.owner_row_id === rowId) {
+      if (owner && owner.personId !== rowId) {
+        owner.personId = rowId;
+        touchDiagram();
+      }
+      return true;
+    }
+    state.stage.owner_row_id = rowId;
     if (owner) {
       owner.personId = rowId;
       state.diagramDirty = true;
