@@ -248,6 +248,31 @@ def test_full_death_date_is_preserved_while_year_only_uses_first_of_january():
     assert _parse_death_date("2026") == date(2026, 1, 1)
 
 
+def test_year_only_death_orders_as_first_of_january_in_slot_table():
+    """Rule F: child '2020' vs owner 01/06/2020 is before → Con slots only."""
+    result = _run(
+        {"A": "01/06/2020", "C": "2020", "D": None},
+        parents={"C": ["A"], "D": ["C"]},
+        owners={"A"},
+    )
+    anchors = {item["anchorSlotId"]: item for item in result["requiredSlots"]}
+    assert anchors["slot_C"]["reason"] == "representation_branch"
+    assert anchors["slot_C"]["slotTypes"] == ["child"]
+    assert "slot_D" not in anchors
+    assert result["warnings"] == []
+
+    reverse = _run(
+        {"A": "2020", "C": "01/06/2020"},
+        parents={"C": ["A"]},
+        owners={"A"},
+    )
+    anchors = {item["anchorSlotId"]: item for item in reverse["requiredSlots"]}
+    assert anchors["slot_C"]["reason"] == "active_estate"
+    assert "father" not in anchors["slot_C"]["slotTypes"]
+    assert "mother" not in anchors["slot_C"]["slotTypes"]
+    assert reverse["warnings"] == []
+
+
 def test_five_living_land_owners_each_keep_one_fifth():
     ids = {"A", "B", "C", "D", "E"}
     result = _run({person_id: None for person_id in ids}, owners=ids)

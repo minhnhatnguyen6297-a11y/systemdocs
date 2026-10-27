@@ -267,12 +267,11 @@ def _required_slot_table(graph, active_estates):
     missing = {}
 
     def bounds(person_id):
-        raw = _value(graph["people"][person_id], "ngay_chet", "death_date", "deathDate", "death")
+        # Rule F: a year-only death ("2020") is 01/01 of that year when
+        # ordering deaths, exactly as _parse_death_date already normalizes it.
         death = deaths[person_id]
         if death is None:
             return None
-        if isinstance(raw, str) and len(raw.strip()) == 4:
-            return date(death.year, 1, 1), date(death.year, 12, 31)
         return death, death
 
     def is_deceased(person_id):
@@ -288,24 +287,132 @@ def _required_slot_table(graph, active_estates):
             anchorSlotId=active[person_id]["id"],
         )
 
+    person_by_slot = graph["personBySlot"]
+
+    def slot_id(node_id, role, ordinal):
+        return str(uuid5(NAMESPACE_URL, str((node_id, role, ordinal))))
+
+    def spouse_pair_slots(node, own_only=False):
+        """Pair slot ids in spouse-ordinal order (rule A).
+
+        Ordinal 0 is the pair (person + spouse slot 1) and always exists; each
+        further ordinal is the pair for a spouse placed in the spare slot.
+        Declared ids that are not engine ids (legacy/migrated state) keep their
+        place so children already paired to them stay in the same group —
+        except when the pair is anchored on the partner's node, which owns the
+        Con slots for those children.
+        """
+        declared = list(node["spouseSlotIds"])
+        occupied = [item for item in declared if item in person_by_slot]
+        count = max(2, len(occupied) + 1)
+        engine_ids = [slot_id(node["id"], "spouse", ordinal) for ordinal in range(count)]
+        if own_only:
+            return engine_ids, count
+        keys = list(engine_ids)
+        free = [index for index, item in enumerate(engine_ids) if item not in declared]
+        for item, index in zip([item for item in declared if item not in engine_ids], free):
+            keys[index] = item
+        return keys, count
+
+    def co_parents(person_id):
+        """Other parents of this person's children already on the diagram."""
+        node_id = active[person_id]["id"]
+        partners = set()
+        for child_id in graph["children"].get(person_id, ()):
+            for parent_slot_id in active[child_id]["parentSlotIds"]:
+                if parent_slot_id == node_id:
+                    continue
+                partner = person_by_slot.get(parent_slot_id)
+                if partner and partner != person_id:
+                    partners.add(partner)
+        return partners
+
+    def anchored_elsewhere(person_id):
+        """Rule C: the spouse relation is recorded on another node's slot.
+
+        A person whose own engine spouse slot already holds the partner anchors
+        the pair themselves, so the relation is not delegated.
+        """
+        node = active[person_id]
+        declared = node["spouseSlotIds"]
+        if any(slot_id(node["id"], "spouse", ordinal) in person_by_slot
+               for ordinal in range(len(declared) + 1)):
+            return False
+        node_id = node["id"]
+        return any(node_id in other["spouseSlotIds"]
+                   for other in active.values() if other["id"] != node_id)
+
+    def has_existing_spouse(person_id):
+        """Rule B/C: a spouse relation of this person is already on the diagram."""
+        node = active[person_id]
+        if any(item in person_by_slot for item in node["spouseSlotIds"]):
+            return True
+        return anchored_elsewhere(person_id) or bool(co_parents(person_id))
+
+    def has_existing_parents(node):
+        """True when this anchor is already someone's child on the diagram."""
+        own = {slot_id(node["id"], "father", 0), slot_id(node["id"], "mother", 0)}
+        return any(item and item not in own for item in node["parentSlotIds"])
+
+    def child_groups(person_id, reason):
+        """Con slots grouped per pair: key = pair ordinal, value = children."""
+        node = active[person_id]
+        keys, _count = spouse_pair_slots(node, own_only=anchored_elsewhere(person_id))
+        is_owner = person_id in graph["owners"]
+        groups: dict[int, list[str]] = defaultdict(list)
+        for child_id in sorted(graph["children"].get(person_id, ())):
+            other_slots = [
+                item for item in active[child_id]["parentSlotIds"]
+                if item != node["id"]
+            ]
+            index = next(
+                (keys.index(item) for item in other_slots if item in keys), None
+            )
+            if index is None:
+                # Unpaired child or a pair whose Con slots another anchor owns.
+                if (reason == "representation_branch" or is_owner
+                        or not other_slots or not has_existing_spouse(person_id)):
+                    index = 0
+                else:
+                    continue
+            groups[index].append(child_id)
+        return groups, keys
+
     def add(person_id, reason):
         node = active[person_id]
-        roles = (["child"] if reason == "representation_branch" else
-                 ["spouse"] if reason == "living_owner" else
-                 ["father", "mother", "spouse", "child"])
-        occupied_spouses = sum(
-            slot in graph["personBySlot"] for slot in node["spouseSlotIds"]
-        )
+        is_owner = person_id in graph["owners"]
+        groups, keys = child_groups(person_id, reason)
+        keys_count = len(keys)
+        if reason == "representation_branch":
+            roles = ["child"]
+        elif reason == "living_owner":
+            roles = ["spouse"]
+        else:
+            roles = []
+            if is_owner or not has_existing_parents(node):
+                roles += ["father", "mother"]
+            if is_owner or not has_existing_spouse(person_id):
+                roles.append("spouse")
+            if groups or "spouse" in roles or is_owner:
+                roles.append("child")
         slots = []
         for role in roles:
-            count = (max(2, occupied_spouses + 1) if role == "spouse" else
-                     max(2, len(graph["children"].get(person_id, ())) + 1)
-                     if role == "child" else 1)
-            for ordinal in range(count):
-                slots.append({
-                    "id": str(uuid5(NAMESPACE_URL, str((node["id"], role, ordinal)))),
-                    "role": role, "ordinal": ordinal,
-                })
+            if role in ("father", "mother"):
+                slots.append({"id": slot_id(node["id"], role, 0),
+                              "role": role, "ordinal": 0})
+            elif role == "spouse":
+                for ordinal in range(keys_count):
+                    slots.append({"id": slot_id(node["id"], "spouse", ordinal),
+                                  "role": "spouse", "ordinal": ordinal})
+            else:
+                ordinal = 0
+                for index in sorted(set(groups) | set(range(keys_count))):
+                    if index and keys[index] not in person_by_slot and not groups[index]:
+                        continue  # spare spouse slot: no pair until it is filled
+                    for _ in range(max(2, len(groups[index]) + 1)):
+                        slots.append({"id": slot_id(node["id"], "child", ordinal),
+                                      "role": "child", "ordinal": ordinal})
+                        ordinal += 1
         requirements[(node["id"], reason)] = {
             "anchorSlotId": node["id"], "reason": reason, "slotTypes": roles,
             "minimumEmptyChildSlots": int("child" in roles),
@@ -319,14 +426,11 @@ def _required_slot_table(graph, active_estates):
         if own is None or source is None:
             mark_missing(person_id)
             return "unknown"
-        if own[1] < source[0]:
+        if own[0] < source[0]:
             return "before"
-        if own[0] > source[1]:
+        if own[0] > source[0]:
             return "after"
-        if own[0] == own[1] == source[0] == source[1]:
-            return "same"
-        mark_missing(person_id)
-        return "unknown"
+        return "same"
 
     visited = set()
 
