@@ -35,14 +35,49 @@ Hoàn tác bảo vệ thao tác cascade mà không chặn luồng.
 Repo hiện tại không có bản ghi mang mã D-041; amendment này ghi theo plan
 đã duyệt, không tự khôi phục các nội dung khác từ nhánh B.
 
-- Giữ quy tắc **người vợ/chồng đặt cuối là hợp pháp**; nhiều thẻ vợ/chồng,
-  luôn đúng một ô trống dự phòng cuối nhóm. Không cảnh báo vợ/chồng.
-- Thay “người còn sống không có ô” bằng: **chủ đất còn sống có nhóm Vợ/chồng
-  (+1 dự phòng)**; người còn sống không phải chủ đất không sinh ô.
-- Chủ đất chết hoặc người chết sau chủ đất (chuyển tiếp): Cha, Mẹ,
-  Vợ/chồng (+1 dự phòng), Con (+1 dự phòng).
-- Người chết trước chủ đất (thế vị, Điều 652): chỉ Con (+1 dự phòng), tối đa
-  tới chắt (D-012); **không ô vợ/chồng**. Không dùng spouse để mở thế vị.
+WP-S (27/10/2026) thay cách hiểu **“cạnh cha-con tách riêng khỏi ô vợ/chồng”**
+bằng **luồng theo cặp**: ô Con thuộc về một cặp (người gốc + ô vợ/chồng), không
+thuộc riêng người gốc. Luật đang áp dụng:
+
+- **A. Sinh ô theo cặp.** Thả một người đã chết (chủ đất, hoặc người chết sau
+  chủ đất) thì sinh: Cha, Mẹ; ô Vợ/chồng số 1 + một ô vợ/chồng dự phòng; và
+  **một ô Con thuộc cặp (người đó + ô Vợ/chồng số 1)**, kể cả khi ô vợ/chồng số 1
+  còn trống. Con thả vào ô đó được ghi nhận cả cha lẫn mẹ; thả vợ/chồng số 1 vào
+  sau thì cha/mẹ còn thiếu được điền tự động. Mỗi vợ/chồng tiếp theo thả vào ô dự
+  phòng có ô Con riêng của cặp đó và sinh thêm một ô vợ/chồng dự phòng mới. Mỗi ô
+  Con được thả thì sinh lại một ô dự phòng. Nút `Con riêng` trên thẻ con xóa
+  cha/mẹ được điền tự động. Người vợ/chồng đặt cuối là hợp pháp; vợ/chồng đặt
+  trước bị làm nhạt nhưng con của họ vẫn là người thừa kế của người gốc. Chủ đất
+  còn sống chỉ có nhóm Vợ/chồng (+1 dự phòng), không có Cha/Mẹ/Con. Người chết
+  trước chủ đất chỉ có ô Con (thế vị, tối đa tới chắt).
+- **B. Con chết SAU chủ đất (chuyển tiếp)** là con của cặp đang có trên sơ đồ:
+  gắn vào đúng hai ô đó, **không sinh Cha/Mẹ mới**. Không sinh ô cho quan hệ đã
+  có trên sơ đồ. (Lỗi cũ: ba cha/mẹ làm sơ đồ đứng, lưu báo
+  `Quan hệ cha/mẹ không hợp lệ`.)
+- **C. Vợ/chồng chết sau chủ đất:** con chung đã nằm dưới cặp đó là con của
+  người này nên không sinh ô Con trùng; người này có Cha/Mẹ riêng, còn vợ/chồng
+  là chủ đất đã có trên sơ đồ — chỉ gắn, không sinh ô vợ/chồng mới.
+- **D. Nhãn ô không chứa UUID/ID thô:** `Cha của …`, `Mẹ của …`,
+  `Vợ/chồng của …`, `Con của … và …`.
+- **E. Sau `Hoàn tác`**, engine chạy lại trên dữ liệu hiện tại và bỏ những ô vừa
+  khôi phục mà luật hiện hành không cho phép.
+- **F. Ngày chỉ có năm = 01/01 của năm đó** khi engine so trước/sau; hiển thị
+  đúng như nhập. Con `2020` so với chủ đất 01/06/2020 là chết trước → nhánh thế vị.
+- **G. Ngày không hợp lệ/thiếu phần** (`06/2001`, `31/02/2001`): lỗi tiếng Việt
+  ngay tại ô ngày; thẻ có ngày không hợp lệ **không thả được** (Stage hoặc Pool)
+  và có tooltip ngắn nêu lý do. Sửa một thẻ đã đặt thành ngày không hợp lệ không
+  được xóa sơ đồ: đánh giá không fail toàn cục, giữ trạng thái hợp lệ cuối của
+  những người khác và chỉ hiện lỗi ở field đó.
+- **H. Con sinh sau khi người chết:** không luật, không cảnh báo.
+- **I. Vợ/chồng chết trước chủ đất:** không sinh ô (Điều 652 BLDS 2015); nhánh
+  chỉ có ô Con thế vị, tối đa tới chắt (D-012). Giữ luật này.
+- **J. Bố cục:** không chồng thẻ (thẻ vợ/chồng không che ô Con đang trống và
+  không đè thẻ con); vợ/chồng nằm ngay cạnh người gốc; ô Con của cặp nằm dưới
+  đúng cặp; mỗi thế hệ một hàng.
+- Ghi chú: thẻ chủ đất không tích `Chủ` vẫn giữ nguyên vị trí; trần tài sản vẫn 5.
+- WP-S ghi luật này vào `contracts/notary-case-drafting.md` §13.4 và
+  `_bmad-output/specs/notary_v2/diagram-rules.md` §9.2/§9.6/§9.7/§9.9/§11;
+  engine spec duy nhất vẫn nằm trong archive nên luật engine viết tại §11.
 - Plan chọn state v4 `spouseSlotIds`, người cuối hợp pháp và migrate v3→v4
   ở gói sau. WP0 không đổi schema/fixture/wire v3 hiện có; không coi bản ghi
   này là đã triển khai migration hoặc đưa code nhánh B vào nhánh hiện tại.

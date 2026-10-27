@@ -1417,7 +1417,7 @@ diagram_state v3 (domain inheritance):
   nodes:
     - id: <string non-empty>        # slot id — giữ namespace v1
       personId: <uuid4 | null>      # row_id Người trong Stage cùng ngữ cảnh (§13.2)
-      parentSlotIds: [<node.id>]    # giữ nguyên 0..2
+      parentSlotIds: [<node.id>]    # 0..2 — cặp cha/mẹ: người gốc + vợ/chồng của cặp
       spouseSlotIds: [<node.id>]   # theo thứ tự kéo; cuối là hợp pháp
       spouseSlotId: <node.id | null> # mirror cuối của spouseSlotIds
       spouseSuggestionId: <node.id | null> # migration living spouse link
@@ -1436,7 +1436,31 @@ diagram_state v3 (domain inheritance):
   engine bỏ qua trường này. Khi migrate schemaVersion 3, link legacy của
   node được đưa đầu tiên; các link ngược theo thứ tự node nguồn được nối
   sau.
-
+- **Con thuộc cặp (người gốc + ô vợ/chồng), không tách cạnh cha/mẹ riêng.**
+  `parentSlotIds` của một ô Con là cặp cha/mẹ của nó: node người gốc và node
+  vợ/chồng của cặp (vẫn 0..2). Con thả vào ô Con của cặp được ghi nhận cả hai
+  cha/mẹ; nếu ô vợ/chồng của cặp còn trống lúc thả thì thả người vào ô đó sẽ
+  điền cha/mẹ còn thiếu. Nút `Con riêng` trên thẻ con xóa cha/mẹ được điền
+  tự động. Mỗi vợ/chồng tiếp theo thả vào ô dự phòng có ô Con riêng của cặp
+  mình; mỗi ô Con được thả thì sinh lại một ô dự phòng.
+- **Không sinh node cho quan hệ đã có trên sơ đồ.** Con chết sau chủ đất
+  (chuyển tiếp) gắn vào cặp đang có, không sinh Cha/Mẹ mới; vợ/chồng chết sau
+  chủ đất gắn vào chủ đất đang có, không sinh ô vợ/chồng mới và con chung đã
+  nằm dưới cặp không sinh lại. Vi phạm điều này từng tạo ba cha/mẹ và làm lưu
+  báo `Quan hệ cha/mẹ không hợp lệ`.
+- **Ngày chỉ có năm = 01/01 của năm đó** khi so trước/sau giữa các thẻ; dữ
+  liệu lưu và hiển thị vẫn đúng như người dùng nhập.
+- **Ngày không hợp lệ/thiếu phần** (`06/2001`, `31/02/2001`): lỗi tại field
+  ngày; thẻ có ngày không hợp lệ không thả được (Stage hoặc Pool). Sửa một
+  thẻ đã đặt thành ngày không hợp lệ không được xóa sơ đồ: đánh giá không
+  fail toàn cục, giữ trạng thái hợp lệ cuối của những thẻ khác.
+- **Nhãn ô không chứa UUID/ID thô**: `Cha của …`, `Mẹ của …`,
+  `Vợ/chồng của …`, `Con của … và …`.
+- **Hoàn tác:** sau khi khôi phục, engine chạy lại trên dữ liệu hiện tại và
+  bỏ ô vừa khôi phục mà luật hiện hành không cho phép.
+- **Con sinh sau khi người chết:** không luật, không cảnh báo.
+- Luật đầy đủ và bố cục: `_bmad-output/specs/notary_v2/diagram-rules.md`
+  §9.2/§9.6/§9.7/§11.
 - `isLandOwner`/`willReceive` **cấm** trên wire v2 →
   `diagram_invalid_state` (`invalid_node` — trường lạ trên node).
 - `ownPositions`/`receivePositions`: array không trùng phần tử ⊆

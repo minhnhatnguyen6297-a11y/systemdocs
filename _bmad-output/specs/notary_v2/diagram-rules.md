@@ -1,6 +1,6 @@
 # Quy tắc sơ đồ Hai bên và Thừa kế
 
-**Cập nhật:** 27/10/2026. WP0 chốt lại luật sơ đồ v2; chỉ sửa tài liệu, chưa triển khai/nghiệm thu runtime mới. Luật gỡ thẻ §9.9 thay “B - gỡ cả nhánh” ngày 17/10/2026; bằng chứng #21B cũ không chứng minh luật mới.
+**Cập nhật:** 27/10/2026. WP0 chốt lại luật sơ đồ v2; chỉ sửa tài liệu, chưa triển khai/nghiệm thu runtime mới. Luật gỡ thẻ §9.9 thay “B - gỡ cả nhánh” ngày 17/10/2026; bằng chứng #21B cũ không chứng minh luật mới. WP-S (27/10/2026) bổ sung luồng theo cặp cho ô Con (§9.2/§9.6), luật ngày chỉ có năm và ngày không hợp lệ (§9.7), và §11 Engine — engine spec duy nhất còn nằm trong archive nên luật engine viết tại đây.
 
 ## 1. Luồng chung
 
@@ -176,13 +176,31 @@ Nhóm `[Người N - ...]` luôn theo dòng Stage đã lưu, không theo số gh
 ### 9.2. Quy tắc chính
 
 - Owner là một người Stage riêng, không suy từ cờ chủ đất cũ.
-- Quan hệ cha-con phải nhất quán; vợ/chồng theo D-041 sửa đổi: nhiều thẻ vợ/chồng, người đặt cuối là hợp pháp; ô dự phòng nằm cuối. Không cảnh báo vợ/chồng.
+- **Ô Con thuộc cặp (người gốc + ô vợ/chồng), không tách cạnh cha/mẹ riêng.**
+  Con thả vào ô Con của cặp được ghi nhận cả hai cha/mẹ; nếu ô vợ/chồng của cặp
+  còn trống lúc thả thì thả người vào ô đó sẽ điền cha/mẹ còn thiếu; nút
+  `Con riêng` trên thẻ con xóa cha/mẹ được điền tự động. Mỗi vợ/chồng tiếp theo
+  thả vào ô dự phòng có ô Con riêng của cặp mình và sinh thêm ô vợ/chồng dự phòng.
+  Mỗi ô Con được thả thì sinh lại một ô dự phòng.
+- **Quan hệ đã có trên sơ đồ thì gắn vào ô đang có, không sinh ô mới.** Con chết
+  sau chủ đất (chuyển tiếp) là con của cặp đang có: gắn vào đúng hai ô đó, không
+  sinh Cha/Mẹ mới. Vợ/chồng chết sau chủ đất: con chung đã nằm dưới cặp là con
+  của người này nên không sinh ô Con trùng; vợ/chồng của người này là chủ đất đã
+  có trên sơ đồ nên không sinh ô vợ/chồng mới.
+- Vợ/chồng theo D-041 sửa đổi: nhiều thẻ vợ/chồng, người đặt cuối là hợp pháp;
+  ô dự phòng nằm cuối. Vợ/chồng đặt trước bị làm nhạt, con của họ vẫn là người
+  thừa kế của người gốc. Không cảnh báo vợ/chồng.
+- Gỡ tích `Chủ` ở thẻ chủ đất duy nhất không làm thẻ rời vị trí; trần tài sản
+  vẫn 5 (§9.3).
+- Con sinh sau khi người chết: không luật riêng, không cảnh báo.
 - Không cho vòng quan hệ hoặc một người nằm ở nhiều slot xung đột.
 - Sau mỗi thay đổi thả/di chuyển/gỡ thẻ, tích Chủ/Nhận hoặc sửa ngày mất/còn
   sống ở Stage, engine chạy lại tới ổn định; không chờ `Xem cách tính`.
-- Thiếu ngày mất hoặc không so được trước/sau chủ đất: chưa sinh ô cho người
-  đó, hiện nhãn `thiếu ngày mất` trên thẻ tới khi nhập đủ. Không đoán nhánh,
-  không dùng ngày quy ước làm bằng chứng; input luôn hiển thị đúng như nhập.
+- Thiếu ngày mất: chưa sinh ô cho người đó, hiện nhãn `thiếu ngày mất` trên thẻ
+  tới khi nhập đủ. Ngày chỉ có năm (`2020`) được tính là **01/01 của năm đó**
+  khi so trước/sau. Ngày không hợp lệ/thiếu phần thì báo lỗi tại field và thẻ đó
+  không thả được (§9.7). Không đoán nhánh; ngày quy ước chỉ dùng trong tính toán,
+  input luôn hiển thị đúng như nhập.
 - Trên sơ đồ, người không tích Chủ/Nhận được coi là từ chối:
   `Người không nhận = tất cả người trên Diagram − Chủ đất − Người nhận`.
   Đây là quy ước sản phẩm; đoạn Word từ chối hoãn sang đợt Word sau (Q3),
@@ -244,27 +262,34 @@ vẫn giữ hiện trạng, không được dùng nhánh fallback đó làm ngu�
 
 | Người trong ô | Ô engine sinh ra |
 |---|---|
-| Chủ đất còn sống | Chỉ Vợ/chồng (+1 ô dự phòng). |
-| Chủ đất đã chết | Cha, Mẹ, Vợ/chồng (+1 dự phòng), Con (+1 dự phòng). |
-| Người chết SAU chủ đất (chuyển tiếp) | Cha, Mẹ, Vợ/chồng (+1 dự phòng), Con (+1 dự phòng). |
-| Người chết TRƯỚC chủ đất (thế vị, Điều 652) | Chỉ Con (+1 dự phòng), tối đa tới chắt (D-012); không ô vợ/chồng. |
+| Chủ đất còn sống | Chỉ nhóm Vợ/chồng (+1 ô dự phòng); không có Cha/Mẹ/Con. |
+| Chủ đất đã chết | Cha, Mẹ, Vợ/chồng (+1 dự phòng), và ô Con của cặp (người gốc + ô Vợ/chồng) +1 dự phòng. |
+| Người chết SAU chủ đất (chuyển tiếp) | Cha, Mẹ, Vợ/chồng (+1 dự phòng), ô Con của cặp +1 dự phòng — quan hệ nào đã có trên sơ đồ thì gắn vào ô đang có, không sinh ô mới. |
+| Người chết TRƯỚC chủ đất (thế vị, Điều 652 BLDS 2015) | Chỉ Con (+1 dự phòng), tối đa tới chắt (D-012); không ô vợ/chồng. |
 | Người còn sống, không phải chủ đất | Không sinh ô. |
 
 - Lần thả đầu vào ô Chủ đất chỉ phân biệt còn sống/đã chết theo bảng trên.
-  Thiếu ngày mất/không so được thời điểm áp dụng Q1 tại §9.2, không đoán.
+  Thiếu ngày mất áp dụng Q1 tại §9.2, không đoán.
   Mỗi nhóm vợ/chồng hoặc con được phép sinh luôn có đúng một ô trống dự phòng;
   thả vào dự phòng thì engine sinh dự phòng mới. Người vợ/chồng đặt cuối là
   hợp pháp (D-041); ca nhiều vợ hợp pháp hoãn (Q2).
 - WP2 trả tập ô đích `requiredSlots[].slots` với ID UUIDv5 theo
   `(anchorSlotId, role, ordinal)`, thứ tự bắt đầu 0. Cha/Mẹ mỗi vai trò
   một ô; nhóm Vợ/chồng/Con tối thiểu hai ô, tăng theo số người đã gán + 1.
+  Ô Con gắn theo cặp: `parentSlotIds` của con là cặp (người gốc + ô vợ/chồng
+  của cặp); thả vợ/chồng số 1 vào sau thì cha/mẹ còn thiếu được điền, nút
+  `Con riêng` xóa cha/mẹ tự điền; quan hệ đã có trên sơ đồ thì gắn vào ô đang có.
   Nhánh thế vị chỉ theo cạnh con, không lấy vợ/chồng chết trước làm gốc.
   Q1 trả warning `missing_death_date` kèm `personId`/`anchorSlotId`.
-  Năm riêng được so theo khoảng cả năm; khoảng chồng nhau chưa đủ để
-  kết luận trước/sau. Không đổi dữ kiện ngày nhập.
+  Ngày chỉ có năm (`2020`) được tính là 01/01 của năm đó khi so trước/sau:
+  con `2020` so với chủ đất 01/06/2020 là chết trước → nhánh thế vị.
+  Không đổi dữ kiện ngày nhập.
 - Mỗi thế hệ một hàng: cha/mẹ trên, vợ/chồng cùng hàng ngay cạnh người gốc,
-  con dưới theo ngày sinh; dự phòng cuối nhóm. Thế vị nằm dưới đúng người
-  trung gian. Ô trống có nhãn vai trò `Cha`, `Mẹ`, `Vợ/chồng`, `Con`.
+  ô Con của cặp nằm dưới đúng cặp, con trong nhóm theo ngày sinh; dự phòng cuối
+  nhóm. Thế vị nằm dưới đúng người trung gian. Không chồng thẻ: thẻ vợ/chồng
+  không che ô Con đang trống và không đè thẻ con.
+- Ô trống có nhãn vai trò kèm tên người gốc: `Cha của …`, `Mẹ của …`,
+  `Vợ/chồng của …`, `Con của … và …`; nhãn ô không chứa UUID/ID thô.
 - Thả/gỡ không debounce; gõ chữ khoảng 300ms. Mục tiêu thả → ô hiện
   ≤200ms p95; sửa sống/chết ở Stage → đối chiếu tập ô ≤200ms.
   Mỗi thay đổi chỉ vẽ lại một lần sau khi ổn định.
@@ -293,6 +318,11 @@ vẫn giữ hiện trạng, không được dùng nhánh fallback đó làm ngu�
   hành cho lưu và trả `requiredSlots`/warning. Owner chốt 15/10/2026: cho
   lưu bản nháp này, hiển thị rõ phần còn thiếu. Xuất Word vẫn theo điều kiện
   mode/mẫu hiện hành; không thêm lệnh chặn chỉ vì `incomplete`.
+- Ngày không hợp lệ/thiếu phần (`06/2001`, `31/02/2001`): lỗi tiếng Việt hiện
+  ngay tại ô ngày; thẻ có ngày không hợp lệ **không thả được** (Stage hoặc Pool)
+  và có tooltip ngắn nêu lý do. Sửa một thẻ đã đặt thành ngày không hợp lệ không
+  được xóa sơ đồ: đánh giá không fail toàn cục, giữ trạng thái hợp lệ cuối của
+  những người khác và chỉ hiện lỗi ở field đó.
 - Engine lỗi: không xóa state cũ.
 - Hiển thị lỗi dùng formatter của danh mục lỗi (`errText` ở
   `error-catalog.js`); `errText` chỉ trả **một câu** (title), không hint dạy
@@ -336,7 +366,9 @@ Owner chốt **27/10/2026**, thay quyết định **“B - gỡ cả nhánh” 1
    Pool theo thì gỡ im lặng. Nếu có cascade, hiện toast
    `Đã đưa N người về Pool · Hoàn tác` khoảng **5 giây**.
    Hoàn tác khôi phục nguyên trạng trước thay đổi, gồm gán người, quan hệ
-   và Chủ/Nhận. Công tắc thông báo trong cài đặt **mặc định bật** (Q4);
+   và Chủ/Nhận. Sau Hoàn tác, engine chạy lại trên dữ liệu hiện tại và bỏ
+   những ô vừa khôi phục mà luật hiện hành không cho phép. Công tắc thông báo
+   trong cài đặt **mặc định bật** (Q4);
    tắt thì hoàn toàn im lặng, không toast.
 4. Một thay đổi draft, chạy engine tới ổn định, vẽ lại một lần; thả/gỡ không
    debounce và không autosave. Lưu hồ sơ dùng transaction/revision/errors
@@ -355,3 +387,35 @@ sống thì chỉ còn nhóm vợ/chồng, C/D về Pool và có toast; gỡ A t
 ## 10. Điểm chưa chốt
 
 Ngày nhập/hiển thị giữ đúng độ đầy đủ; ngày quy ước chỉ dùng trong tính toán, không làm bằng chứng thứ tự chết. Q1–Q4 đã chốt tại §9.2/§9.5/§9.6/§9.9; nhiều vợ hợp pháp và đoạn Word từ chối hoãn sang đợt sau. Hàng 2/3 gác sau `ENABLE_LATER_LINES=False`; không sinh ô và không tự mở quyền lưu invalid/unsupported. Những công thức mở rộng khác vẫn cần duyệt riêng; WP0 chỉ sửa spec, không chứng minh runtime đã tuân thủ.
+
+<a id="engine"></a>
+## 11. Engine
+
+Engine spec duy nhất còn nằm trong archive
+([`engine.md`](../../archive/specs-before-consolidation-20261015/notary_v2/diagram/inheritance/engine.md),
+đã đính chính có giới hạn), nên luật engine của luật sơ đồ v2 viết tại đây.
+Mục này chỉ ghi hành vi engine phải theo; không nâng thiết kế React/API/DB cũ
+trong archive thành spec hiện hành và không chứng minh runtime đã tuân thủ.
+
+- Ô do engine sở hữu: engine trả `requiredSlots` và không tự tạo Người, không
+  đoán người vào ô. Tập ô theo bảng §9.6, sinh theo cặp ở §9.2.
+- Sinh ô theo cặp: mỗi cặp (người gốc + vợ/chồng) có ô Con riêng; ô Con được
+  thả thì sinh ô dự phòng mới; ô vợ/chồng dự phòng được thả thì sinh ô Con của
+  cặp mới và một ô vợ/chồng dự phòng mới. ID ô ổn định theo
+  `(anchorSlotId, role, ordinal)`, ordinal bắt đầu 0.
+- Không sinh ô cho quan hệ đã có trên sơ đồ: con chết sau chủ đất gắn vào cặp
+  đang có, không sinh Cha/Mẹ mới; vợ/chồng chết sau chủ đất gắn vào chủ đất
+  đang có, không sinh ô vợ/chồng mới, con chung đã nằm dưới cặp không sinh lại.
+  Đây là điều kiện bắt buộc để không tạo ba cha/mẹ làm sơ đồ đứng và lưu báo
+  `Quan hệ cha/mẹ không hợp lệ`.
+- Ngày chỉ có năm = **01/01 của năm đó** khi so trước/sau; `bounds()` phải theo
+  luật này thay vì so theo khoảng cả năm. Dữ liệu lưu/hiển thị vẫn đúng như nhập.
+- Ngày không hợp lệ/thiếu phần không được làm đánh giá fail toàn cục: engine bỏ
+  qua người có ngày không hợp lệ, giữ trạng thái hợp lệ cuối của những người
+  khác và trả lỗi ở mức field để UI hiện tại ô ngày.
+- Vợ/chồng chết trước chủ đất: engine không sinh ô vợ/chồng cho người đó; nhánh
+  chỉ có ô Con thế vị, tối đa tới chắt (Điều 652 BLDS 2015, D-012).
+- Sau `Hoàn tác`, engine chạy lại trên dữ liệu hiện tại và bỏ ô vừa khôi phục
+  nếu luật hiện hành không cho phép.
+- Con sinh sau khi người chết: engine không có luật riêng, không cảnh báo.
+- Nhãn ô do engine/UI sinh không chứa UUID/ID thô (§9.6).
