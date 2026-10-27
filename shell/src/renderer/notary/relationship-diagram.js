@@ -612,8 +612,6 @@ function createDiagramPane(ctx) {
     }, { bare: true });
   }
 
-  // ---------- Quan he tuong minh cho bat ky nguoi nao ----------
-
   function freeSlotId(bases) {
     const used = new Set(
       (model.state.diagram.nodes || []).map((n) => n && n.id));
@@ -622,102 +620,6 @@ function createDiagramPane(ctx) {
     let i = 2;
     while (used.has(`${last}_${i}`)) i += 1;
     return `${last}_${i}`;
-  }
-
-  function openRelationMenu(anchor) {
-    openModal((box, close) => {
-      box.setAttribute('aria-label', `Quan hệ — ${refName(anchor)}`);
-      const head = h('div', 'modal-head');
-      head.append(h('h2', 'modal-title', `Quan hệ — ${refName(anchor)}`));
-      const x = btn('×', 'modal-close', close);
-      x.setAttribute('aria-label', 'Đóng');
-      head.append(x);
-      box.append(head);
-      const body = h('div', 'modal-body cd-field-stack');
-      body.append(h('div', 'muted',
-        'Chỉ thêm ô trống; gán người đã có từ Stage/Pool. ' +
-        'Không tự gắn vợ/chồng làm cha/mẹ của con.'));
-      const addParent = btn('Thêm cha/mẹ', 'secondary', () => {
-        const current = nodeById(anchor.id);
-        if (!current || (current.parentSlotIds || []).length >= 2) return;
-        const parent = model.addSlot(freeSlotId([`parent_${anchor.id}`]));
-        if (parent && model.setNodeRelation(anchor.id, {
-          parentSlotIds: [...(current.parentSlotIds || []), parent.id],
-        })) scheduleEvaluate();
-        close();
-      });
-      addParent.disabled = (anchor.parentSlotIds || []).length >= 2;
-      body.append(addParent);
-      body.append(btn('Thêm con', 'secondary', () => {
-        close();
-        openParentMenu(anchor, true);
-      }));
-      body.append(btn('Chọn lại cha/mẹ', 'secondary', () => {
-        close();
-        openParentMenu(anchor, false);
-      }));
-      box.append(body);
-      const foot = h('div', 'modal-foot');
-      foot.append(btn('Đóng', '', close));
-      box.append(foot);
-    }, { bare: true });
-  }
-
-  // Moi con co 1–2 o cha/me do user chon. Ke ca vo/chong va o trong
-  // cung chi duoc noi neu da chon; khong tao nguoi hay tinh phan so.
-  function openParentMenu(anchor, addChild) {
-    openModal((box, close) => {
-      const title = `${addChild ? 'Thêm con — chọn cha/mẹ' : 'Chọn lại cha/mẹ'} — ${refName(anchor)}`;
-      box.setAttribute('aria-label', title);
-      const head = h('div', 'modal-head');
-      head.append(h('h2', 'modal-title', title));
-      const x = btn('×', 'modal-close', close);
-      x.setAttribute('aria-label', 'Đóng');
-      head.append(x);
-      box.append(head);
-      const body = h('div', 'modal-body cd-field-stack');
-      body.append(h('div', 'muted',
-        'Chọn 1–2 ô cha/mẹ có sẵn. Không mặc định chọn vợ/chồng.'));
-      const candidates = liveNodes().filter((n) => addChild || n.id !== anchor.id);
-      const selected = new Set(addChild ? [] : (anchor.parentSlotIds || [])
-        .filter((id) => candidates.some((n) => n.id === id)));
-      const inputs = [];
-      const apply = btn(addChild ? 'Thêm ô con trống' : 'Áp dụng', 'primary', () => {
-        if (!model.canWrite() || selected.size < 1 || selected.size > 2) return;
-        const target = addChild
-          ? model.addSlot(freeSlotId([`child_${anchor.id}`])) : nodeById(anchor.id);
-        if (target && model.setNodeRelation(target.id, {
-          parentSlotIds: [...selected],
-        })) scheduleEvaluate();
-        close();
-      });
-      const update = () => {
-        apply.disabled = selected.size < 1 || selected.size > 2;
-        for (const input of inputs) {
-          input.disabled = selected.size >= 2 && !input.checked;
-        }
-      };
-      for (const n of candidates) {
-        const label = h('label', 'cd-tight');
-        const input = h('input', '');
-        input.type = 'checkbox';
-        input.value = n.id;
-        input.checked = selected.has(n.id);
-        input.onchange = () => {
-          if (input.checked) selected.add(n.id);
-          else selected.delete(n.id);
-          update();
-        };
-        inputs.push(input);
-        label.append(input, h('span', '', `${refName(n)} — ô ${slotTag(n)}`));
-        body.append(label);
-      }
-      update();
-      box.append(body);
-      const foot = h('div', 'modal-foot');
-      foot.append(btn('Hủy', '', close), apply);
-      box.append(foot);
-    }, { bare: true });
   }
 
   // ---------- requiredSlots (engine la SOT cho cho con thieu) ----------
@@ -912,20 +814,6 @@ function createDiagramPane(ctx) {
       const text = spouseLawful ? 'Vợ/chồng hợp pháp'
         : 'Không phải vợ/chồng hợp pháp';
       card.append(h('div', 'cd-spouse-label', text));
-      if (!spouseLawful && !ro) {
-        const promote = btn('Đặt làm vợ/chồng hợp pháp',
-          'sm cd-spouse-promote', () => {
-            const ids = spouseOwner.spouseSlotIds
-              .filter((id) => id !== n.id);
-            ids.push(n.id);
-            if (model.setNodeRelation(spouseOwner.id, {
-              spouseSlotIds: ids })) {
-              scheduleEvaluate();
-            }
-          });
-        promote.disabled = !model.state.capabilities.diagram;
-        card.append(promote);
-      }
     }
     if (!ro) {
       // Ban phim: gan lai/doi cho cho nguoi dang o node (menu du nang
@@ -939,12 +827,7 @@ function createDiagramPane(ctx) {
       });
       un.title = 'Bỏ gán — trả người về Pool';
       un.setAttribute('aria-label', `Bỏ gán ${name} về Pool`);
-      const relations = btn('⋯', 'cd-mini-btn js-node-relations',
-        () => openRelationMenu(n));
-      relations.title = 'Thêm cha/mẹ, thêm con hoặc chọn lại cha/mẹ';
-      relations.setAttribute('aria-label', `Quan hệ của ${name}`);
-      relations.disabled = !model.state.capabilities.diagram;
-      acts.append(relations, mv, un);
+      acts.append(mv, un);
     }
     acts.append(del);
     card.append(acts);

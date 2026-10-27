@@ -93,6 +93,8 @@
               "personId": "33333333-bbbb-4bbb-8bbb-333333333333",
               "parentSlotIds": [],
               "spouseSlotId": null,
+              "spouseSlotIds": [],
+              "spouseSuggestionId": null,
               "ownPositions": [
                 1
               ],

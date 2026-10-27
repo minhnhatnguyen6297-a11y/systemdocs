@@ -297,14 +297,17 @@ def _f1_state(stage):
     owner, spouse, child = stage["people"]
     return {"version": 3, "domain": "inheritance", "nodes": [
         {"id": "owner", "personId": owner["row_id"], "parentSlotIds": [],
-         "spouseSlotId": "spouse", "ownPositions": [1],
+         "spouseSlotIds": ["spouse"], "spouseSlotId": "spouse",
+         "spouseSuggestionId": None, "ownPositions": [1],
          "receivePositions": [], "hidden": False, "deleted": False},
         {"id": "spouse", "personId": spouse["row_id"],
-         "parentSlotIds": [], "spouseSlotId": "owner",
+         "parentSlotIds": [], "spouseSlotIds": ["owner"],
+         "spouseSlotId": "owner", "spouseSuggestionId": None,
          "ownPositions": [1], "receivePositions": [1],
          "hidden": False, "deleted": False},
         {"id": "child", "personId": child["row_id"],
-         "parentSlotIds": ["owner", "spouse"], "spouseSlotId": None,
+         "parentSlotIds": ["owner", "spouse"], "spouseSlotIds": [],
+         "spouseSlotId": None, "spouseSuggestionId": None,
          "ownPositions": [], "receivePositions": [1],
          "hidden": False, "deleted": False},
     ]}

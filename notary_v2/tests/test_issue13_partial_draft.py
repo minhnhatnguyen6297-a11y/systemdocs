@@ -258,7 +258,8 @@ def test_commit_keeps_draft_then_save_case_turns_done(db, dataset):
     # hồ sơ mang asset prototype + slot owner đã gán.
     save_state = {"version": 3, "domain": "inheritance", "nodes": [{
         "id": "owner", "personId": row_id, "parentSlotIds": [],
-        "spouseSlotId": None, "ownPositions": [1], "receivePositions": [],
+        "spouseSlotIds": [], "spouseSlotId": None, "spouseSuggestionId": None,
+        "ownPositions": [1], "receivePositions": [],
         "hidden": False, "deleted": False}]}
     saved = _service(db).save_case(
         case_id=case_id, base_revision=2,

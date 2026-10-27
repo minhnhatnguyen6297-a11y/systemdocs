@@ -144,7 +144,8 @@ def _state_for(stage):
                 "nodes": []}
     return {"version": 3, "domain": "inheritance", "nodes": [{
         "id": "owner", "personId": stage.get("owner_row_id"),
-        "parentSlotIds": [], "spouseSlotId": None,
+        "parentSlotIds": [], "spouseSlotIds": [], "spouseSlotId": None,
+        "spouseSuggestionId": None,
         "ownPositions": [1] if stage.get("assets") else [],
         "receivePositions": [], "hidden": False, "deleted": False,
     }]}
@@ -479,7 +480,8 @@ def _stage_with_owner(stage):
 def _diagram_for(stage, domain="inheritance"):
     return {"version": 3, "domain": domain, "nodes": [{
         "id": "owner", "personId": stage.get("owner_row_id"),
-        "parentSlotIds": [], "spouseSlotId": None,
+        "parentSlotIds": [], "spouseSlotIds": [], "spouseSlotId": None,
+        "spouseSuggestionId": None,
         "ownPositions": [1] if stage.get("assets") else [],
         "receivePositions": [], "hidden": False, "deleted": False,
     }]}

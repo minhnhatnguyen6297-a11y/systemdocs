@@ -248,17 +248,43 @@ test('spouse drops append without swapping; last is lawful and pool removal prom
   const earlier = collect(view.el, (e) =>
     e.dataset.nodeId === appendedId)[0];
   assert.ok(earlier.classList.contains('cd-node-spouse-faded'));
-  findBtns(earlier, 'Đặt làm vợ/chồng hợp pháp')[0].onclick();
-  assert.deepEqual(owner.spouseSlotIds, ['spouse', appendedId]);
-  assert.equal(collect(view.el, (e) => e.dataset.nodeId === appendedId)[0]
-    .classList.contains('cd-node-spouse-lawful'), true);
   const pool = byCls(view.el, 'cd-pool-box')[0];
   pool.dispatch('drop', personPayload('c2'));
-  assert.deepEqual(owner.spouseSlotIds, [appendedId]);
+  assert.deepEqual(owner.spouseSlotIds, ['spouse', appendedId]);
   assert.equal(owner.spouseSlotId, appendedId);
+  pool.dispatch('drop', personPayload('c3'));
+  const originalSlot = collect(view.el, (e) => e.dataset.nodeId === 'spouse')[0];
+  originalSlot.dispatch('drop', personPayload('c2'));
+  assert.equal(owner.spouseSlotIds.at(-1), 'spouse');
+  assert.equal(owner.spouseSlotId, 'spouse');
+  assert.ok(collect(view.el, (e) => e.dataset.nodeId === 'spouse')[0]
+    .classList.contains('cd-node-spouse-lawful'),
+  'refilling the original empty slot must retain its spouse role');
 });
 
-test('last spouse is highlighted and earlier candidate can be promoted', async () => {
+test('moving between owner and spouse keeps the pointer and lawful spouse synchronized', async () => {
+  const { model } = await build(test, { mode: 'case',
+    seed: { people: INH_PEOPLE, nodes: seedSlots() } });
+  model.assignPerson('owner', 'c1');
+  const spouse = model.addSlot('branch_spouse');
+  model.setNodeRelation('child_1', { spouseSlotIds: [spouse.id] });
+  assert.equal(model.state.stage.owner_row_id, 'c1');
+
+  assert.equal(model.movePerson('c1', spouse.id), true);
+  assert.equal(model.state.stage.owner_row_id, null);
+  assert.equal(model.state.diagram.nodes.find((n) => n.id === 'owner').personId, null);
+  assert.equal(spouse.personId, 'c1');
+  const previous = model.addSlot('branch_first');
+  model.assignPerson(previous.id, 'c3');
+  model.setNodeRelation('child_1', { spouseSlotIds: [previous.id, spouse.id] });
+  assert.equal(model.movePerson('c1', 'owner'), true);
+  assert.equal(model.state.stage.owner_row_id, 'c1');
+  assert.equal(spouse.personId, null);
+  assert.equal(model.state.diagram.nodes.find((n) => n.id === 'child_1')
+    .spouseSlotIds.at(-1), previous.id);
+});
+
+test('last spouse is highlighted and earlier candidate stays faded', async () => {
   const nodes = seedSlots();
   const owner = nodes.find((n) => n.id === 'owner');
   owner.personId = 'c1';
@@ -277,9 +303,6 @@ test('last spouse is highlighted and earlier candidate can be promoted', async (
   assert.ok(earlier.classList.contains('cd-node-spouse-faded'));
   assert.match(earlier.textContent, /Không phải vợ\/chồng hợp pháp/);
   assert.ok(lawful.classList.contains('cd-node-spouse-lawful'));
-  findBtns(earlier, 'Đặt làm vợ/chồng hợp pháp')[0].onclick();
-  assert.deepEqual(model.state.diagram.nodes.find((n) => n.id === 'owner')
-    .spouseSlotIds, ['spouse_2', 'spouse']);
 });
 
 test('death date prefills an existing spouse suggestion', async () => {
@@ -499,171 +522,6 @@ test('two_party: assign menu du 30 cho + swap bang ban phim', async () => {
     'swap bang ban phim khong dung');
 });
 
-// ---------- Quan he tuong minh: chi o trong, khong tao ho so ----------
-
-function relationMenu(view, nodeId) {
-  const card = collect(view.el, (e) => e.dataset.nodeId === nodeId)[0];
-  assert.ok(card, `thieu card ${nodeId}`);
-  const control = byCls(card, 'js-node-relations')[0];
-  assert.ok(control, `thieu menu quan he ${nodeId}`);
-  assert.match(control.getAttribute('aria-label'), /Quan hệ của/);
-  control.onclick();
-  return byCls(view.el, 'modal')[0];
-}
-
-function chooseParent(dialog, nodeId, checked = true) {
-  const input = collect(dialog, (e) =>
-    e.tagName === 'INPUT' && e.type === 'checkbox' && e.value === nodeId)[0];
-  assert.ok(input, `thieu lua chon cha/me ${nodeId}`);
-  assert.equal(input.disabled, false);
-  assert.equal(input.parentElement.tagName, 'LABEL', 'checkbox can label');
-  input.checked = checked;
-  input.onchange();
-  return input;
-}
-
-test('quan he tung nguoi: them toi da 2 cha/me TRONG va chon lai o co san', (t) => {
-  const nodes = seedSlots();
-  nodes.find((n) => n.id === 'owner').personId = 'c1';
-  nodes.find((n) => n.id === 'child_1').personId = 'c3';
-  nodes.find((n) => n.id === 'child_1').parentSlotIds = [];
-  const { model, view } = build(t, { mode: 'case',
-    seed: { people: INH_PEOPLE, nodes } });
-  const stageBefore = structuredClone(model.state.stage);
-  const child = model.state.diagram.nodes.find((n) => n.id === 'child_1');
-  for (let i = 0; i < 2; i += 1) {
-    const dialog = relationMenu(view, child.id);
-    assert.equal(findBtns(dialog, 'Thêm cha/mẹ')[0].disabled, false);
-    findBtns(dialog, 'Thêm cha/mẹ')[0].onclick();
-    const parent = model.state.diagram.nodes.at(-1);
-    assert.equal(parent.personId, null, 'khong duoc tu tao/gan nguoi');
-    assert.ok(child.parentSlotIds.includes(parent.id));
-  }
-  let dialog = relationMenu(view, child.id);
-  const full = findBtns(dialog, 'Thêm cha/mẹ')[0];
-  assert.equal(full.disabled, true);
-  const count = model.state.diagram.nodes.length;
-  full.onclick(); // Handler cung giu gioi han khi goi truc tiep.
-  assert.equal(model.state.diagram.nodes.length, count);
-  findBtns(dialog, 'Chọn lại cha/mẹ')[0].onclick();
-  dialog = byCls(view.el, 'modal')[0];
-  assert.equal(collect(dialog, (e) => e.tagName === 'INPUT' &&
-    e.value === child.id).length, 0, 'khong chon chinh minh lam cha/me');
-  for (const id of [...child.parentSlotIds]) chooseParent(dialog, id, false);
-  assert.equal(findBtns(dialog, 'Áp dụng')[0].disabled, true);
-  chooseParent(dialog, 'owner');
-  chooseParent(dialog, 'mother'); // O cha/me co san, chua gan nguoi.
-  const third = collect(dialog, (e) => e.tagName === 'INPUT' &&
-    e.value === 'father')[0];
-  assert.equal(third.disabled, true, 'khong duoc chon qua 2 cha/me');
-  findBtns(dialog, 'Áp dụng')[0].onclick();
-  assert.deepEqual(child.parentSlotIds, ['owner', 'mother']);
-  assert.deepEqual(model.state.stage, stageBefore, 'chi doi diagram, khong doi Stage');
-});
-
-test('them con: chon ro 1–2 cha/me, khong mac dinh vo/chong, huy khong tao o', (t) => {
-  const nodes = seedSlots();
-  nodes.find((n) => n.id === 'owner').personId = 'c1';
-  nodes.find((n) => n.id === 'spouse').personId = 'c2';
-  const { model, view } = build(t, { mode: 'case',
-    seed: { people: INH_PEOPLE, nodes } });
-  const before = model.state.diagram.nodes.length;
-  let dialog = relationMenu(view, 'owner');
-  findBtns(dialog, 'Thêm con')[0].onclick();
-  dialog = byCls(view.el, 'modal')[0];
-  assert.ok(collect(dialog, (e) => e.tagName === 'INPUT')
-    .every((e) => !e.checked), 'khong duoc tu chon cha/me');
-  assert.equal(findBtns(dialog, 'Thêm ô con trống')[0].disabled, true);
-  findBtns(dialog, 'Hủy')[0].onclick();
-  assert.equal(model.state.diagram.nodes.length, before);
-  for (const parentIds of [['owner'], ['owner', 'spouse']]) {
-    dialog = relationMenu(view, 'owner');
-    findBtns(dialog, 'Thêm con')[0].onclick();
-    dialog = byCls(view.el, 'modal')[0];
-    for (const id of parentIds) chooseParent(dialog, id);
-    findBtns(dialog, 'Thêm ô con trống')[0].onclick();
-    const child = model.state.diagram.nodes.at(-1);
-    assert.equal(child.personId, null);
-    assert.deepEqual(child.parentSlotIds, parentIds);
-    assert.equal(child.spouseSlotId, null);
-  }
-  assert.equal(model.state.stage.people.length, INH_PEOPLE.length);
-});
-
-test('nhap du ong ba, cu, anh chi em, co chu, chau va chat qua menu va Pool', (t) => {
-  const ids = ['source', 'parent', 'grandparent', 'great_grandparent',
-    'sibling', 'parent_sibling', 'sibling_child', 'child', 'grandchild',
-    'great_grandchild'];
-  const people = ids.map((id) => ({ row_id: id, ho_ten: `Người ${id}` }));
-  const owner = seedSlots().find((n) => n.id === 'owner');
-  owner.personId = 'source';
-  owner.parentSlotIds = [];
-  owner.spouseSlotId = null;
-  const { model, view } = build(t, { mode: 'case',
-    seed: { people, nodes: [owner] } });
-  const slotFor = { source: 'owner' };
-  const add = (anchorPerson, personId, parent) => {
-    let dialog = relationMenu(view, slotFor[anchorPerson]);
-    findBtns(dialog, parent ? 'Thêm cha/mẹ' : 'Thêm con')[0].onclick();
-    if (!parent) {
-      dialog = byCls(view.el, 'modal')[0];
-      chooseParent(dialog, slotFor[anchorPerson]);
-      findBtns(dialog, 'Thêm ô con trống')[0].onclick();
-    }
-    const node = model.state.diagram.nodes.at(-1);
-    assert.equal(node.personId, null);
-    const poolCard = byCls(view.el, 'cd-pool-card')
-      .find((c) => c.textContent.includes(`Người ${personId}`));
-    assert.ok(poolCard);
-    if (parent) {
-      findBtns(poolCard, '→')[0].onclick();
-      const assignDialog = byCls(view.el, 'modal')[0];
-      findBtns(assignDialog, `Gán vào “${node.id}”`)[0].onclick();
-    } else {
-      const card = collect(view.el, (e) => e.dataset.nodeId === node.id)[0];
-      card.dispatch('drop', personPayload(personId));
-    }
-    assert.equal(node.personId, personId);
-    slotFor[personId] = node.id;
-  };
-  add('source', 'parent', true);
-  add('parent', 'grandparent', true);
-  add('grandparent', 'great_grandparent', true);
-  add('parent', 'sibling', false);
-  add('grandparent', 'parent_sibling', false);
-  add('sibling', 'sibling_child', false);
-  add('source', 'child', false);
-  add('child', 'grandchild', false);
-  add('grandchild', 'great_grandchild', false);
-  const parentPeople = (pid) => model.state.diagram.nodes
-    .find((n) => n.personId === pid).parentSlotIds
-    .map((slot) => model.state.diagram.nodes.find((n) => n.id === slot).personId);
-  assert.deepEqual(parentPeople('source'), ['parent']);
-  assert.deepEqual(parentPeople('parent'), ['grandparent']);
-  assert.deepEqual(parentPeople('grandparent'), ['great_grandparent']);
-  assert.deepEqual(parentPeople('sibling'), ['parent']);
-  assert.deepEqual(parentPeople('parent_sibling'), ['grandparent']);
-  assert.deepEqual(parentPeople('sibling_child'), ['sibling']);
-  assert.deepEqual(parentPeople('grandchild'), ['child']);
-  assert.deepEqual(parentPeople('great_grandchild'), ['grandchild']);
-  assert.equal(model.state.stage.people.length, ids.length);
-  assert.equal(byCls(view.el, 'cd-pool-card').length, 0);
-  assert.equal(byCls(view.el, 'cd-edge-parent').length, ids.length - 1);
-});
-
-test('menu quan he khong hien tren ho so khoa va two_party', (t) => {
-  const nodes = seedSlots();
-  nodes.find((n) => n.id === 'owner').personId = 'c1';
-  const { model, view } = build(t, { mode: 'case',
-    seed: { people: INH_PEOPLE, nodes } });
-  assert.equal(byCls(view.el, 'js-node-relations').length, 1);
-  model.state.locked = true;
-  model.dismissNotice();
-  assert.equal(byCls(view.el, 'js-node-relations').length, 0);
-  model.newDraft('two_party');
-  assert.equal(byCls(view.el, 'js-node-relations').length, 0);
-});
-
 test('cach tinh hien hang 2/3 va du 7 vai tieng Viet, giu nguyen phan so engine', async (t) => {
   const client = {
     run: async () => ({ ok: true, data: { evaluated_revision: 3,
@@ -685,7 +543,7 @@ test('cach tinh hien hang 2/3 va du 7 vai tieng Viet, giu nguyen phan so engine'
         requiredSlots: [], warnings: [], errors: [], unresolvedEstates: [],
       } } }),
   };
-  const { view } = build(t, { mode: 'case', client,
+  const { view } = await build(t, { mode: 'case', client,
     seed: { people: INH_PEOPLE, nodes: seedSlots() } });
   await findBtns(view.el, 'Xem cách tính')[0].onclick();
   const lines = byCls(view.el, 'cd-explain').map((e) => e.textContent);

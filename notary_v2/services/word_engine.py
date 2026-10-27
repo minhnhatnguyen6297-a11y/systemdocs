@@ -614,8 +614,9 @@ def _apply_diagram_nodes(
 
 
 def _apply_spouse_slot_roles(persons: list[WordPerson],
-                             nodes: list[dict[str, Any]]) -> None:
-    """Only the last spouse-slot person of a deceased node has spouse role."""
+                             nodes: list[dict[str, Any]],
+                             owner_row_id: str) -> None:
+    """Only the owner's last spouse has the owner-spouse role."""
     by_row = {person.row_id: person for person in persons if person.row_id}
     for node in nodes:
         if not isinstance(node, dict):
@@ -625,7 +626,7 @@ def _apply_spouse_slot_roles(persons: list[WordPerson],
             legacy = node.get("spouseSlotId")
             candidates = [legacy] if legacy else []
         person = by_row.get(_safe_text(node.get("personId")))
-        if person is None or not person.is_deceased:
+        if person is None or person.row_id != owner_row_id or not person.is_deceased:
             continue
         for index, slot_id in enumerate(candidates):
             spouse_node = next(
@@ -721,7 +722,7 @@ def _build_word_persons(case: Any) -> _WordPersonsBuild:
         persons = _apply_two_party_slots(persons, state_nodes)
     else:
         persons = _apply_diagram_nodes(persons, state_nodes, allocations)
-        _apply_spouse_slot_roles(persons, state_nodes)
+        _apply_spouse_slot_roles(persons, state_nodes, owner_row_id)
     _merge_participant_roles(persons, case)
     if case_type != "two_party" and not has_diagram_state:
         # Chưa có Diagram: projection participant (đã ghi cùng transaction

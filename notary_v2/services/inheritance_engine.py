@@ -4,10 +4,10 @@ The engine is intentionally pure: callers provide diagram nodes and person
 records, and receive a JSON-serializable result. Database and HTTP concerns
 belong to the router layer.
 
-Each estate selects the first eligible rank (1, 2, then 3). Rank 1 retains
-branch representation; ranks 2 and 3 split equally per distinct person without
-representation. Inherited terms expose heirRank; later-rank terms also expose
-sorted relationshipRoles derived only from explicit parent links.
+Each estate uses rank 1 with branch representation. Ranks 2 and 3 are parked
+behind ENABLE_LATER_LINES; without rank-1 heirs the default is unsupported.
+When enabled, later ranks split equally per distinct person without
+representation and expose sorted relationshipRoles from explicit parent links.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from typing import Any, Mapping
 
 
 ENGINE_VERSION = 2
+ENABLE_LATER_LINES = False
 
 
 def _value(record: Any, *names: str) -> Any:
@@ -480,7 +481,7 @@ def run_inheritance_case(
             units = first_line_units(source_id, event_date)
 
             heir_rank = 1
-            if not units:
+            if not units and ENABLE_LATER_LINES:
                 for heir_rank in (2, 3):
                     units = later_line_units(source_id, event_date, heir_rank)
                     if units:
@@ -534,14 +535,16 @@ def run_inheritance_case(
                 }
             )
 
+    later_lines_unsupported = bool(unresolved_estates) and not ENABLE_LATER_LINES
     return {
         "engineVersion": ENGINE_VERSION,
-        "status": "incomplete" if unresolved else "complete",
+        "status": ("unsupported" if later_lines_unsupported else "incomplete") if unresolved else "complete",
         "allocations": allocations,
         "breakdowns": breakdowns,
         "requiredSlots": list(required_slots.values()),
         "warnings": [],
-        "errors": [],
+        "errors": ([_error("second_order_required", "Chưa hỗ trợ hàng thừa kế 2/3 khi không có người thừa kế hàng 1.")]
+                   if later_lines_unsupported else []),
         "unresolvedEstates": unresolved_estates,
         "conservation": {
             "allocated": _fraction_text(allocated),

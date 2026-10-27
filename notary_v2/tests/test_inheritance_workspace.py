@@ -921,7 +921,7 @@ def test_branch_tombstones_coparent_save_reopen_and_reject_preserve(
     db.commit()
     before_stage = CaseWorkspaceService(db).get(case.id)["stage"]
     original = _draft_state(rows)
-    original["nodes"][2]["spouseSlotId"] = "S"
+    original["nodes"][2].update(spouseSlotIds=["S"], spouseSlotId="S")
     original["nodes"][3]["parentSlotIds"] = ["child", "S"]
     original["nodes"].extend([
         _node("S", rows["S"], spouse="child"),
@@ -932,9 +932,11 @@ def test_branch_tombstones_coparent_save_reopen_and_reject_preserve(
     removed = deepcopy(original)
     for node in removed["nodes"]:
         if node["id"] in {"child", "gc", "empty"}:
-            node.update(deleted=True, parentSlotIds=[], spouseSlotId=None)
+            node.update(deleted=True, parentSlotIds=[], spouseSlotIds=[],
+                        spouseSlotId=None, spouseSuggestionId=None)
         if node["id"] == "S":
-            node["spouseSlotId"] = None
+            node.update(spouseSlotIds=[], spouseSlotId=None,
+                        spouseSuggestionId=None)
         if node["id"] == "old":
             node["parentSlotIds"] = []
     data = _svc(db).save_diagram(case.id, first["revision"], removed)
@@ -947,7 +949,7 @@ def test_branch_tombstones_coparent_save_reopen_and_reject_preserve(
         assert reopened["stage"] == before_stage
         assert reopened["case"]["revision"] == data["revision"]
         bad = deepcopy(removed)
-        bad["nodes"][2]["spouseSlotId"] = "S"  # invalid outgoing tombstone
+        bad["nodes"][2].update(spouseSlotIds=["child"], spouseSlotId="child")
         for revision, state, code in [
             (data["revision"], bad, "diagram_invalid_state"),
             (first["revision"], removed, "workspace_conflict"),

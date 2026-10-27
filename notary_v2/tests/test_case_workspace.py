@@ -974,8 +974,8 @@ def test_commit_stage_projects_full_family_with_parent_anchor_and_word_slots(
         _node("spouse", rows["spouse"],
               parents=("spouse_father", "spouse_mother"), spouse="owner"),
         _node("child_1", rows["child"], parents=("owner", "spouse"),
-              receive=[1]),
-        _node("child_spouse", rows["child_spouse"], spouse="child_1"),
+              spouse="child_spouse", receive=[1]),
+        _node("child_spouse", rows["child_spouse"]),
         _node("grandchild", rows["grandchild"], parents=("child_1",))]),
         owner_row_id=owner_row)
     _commit(db, case.id, 1, people, [_asset_row(so_serial="DD123456")])

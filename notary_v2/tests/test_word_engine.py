@@ -2105,7 +2105,7 @@ def test_word_spouse_role_uses_only_last_slot_member_and_preserves_other_roles()
         {"id": "lawful", "personId": "lawful"},
     ]
 
-    _apply_spouse_slot_roles(persons, nodes)
+    _apply_spouse_slot_roles(persons, nodes, "dead")
 
     assert faded.role == "" and faded.relation == ""
     assert faded_with_role.role == "Con"
@@ -2140,3 +2140,33 @@ def test_word_context_applies_saved_one_way_spouse_slots():
     assert by_name["Vợ sau"].share == "1/2"
     assert context.receivers == [by_name["Vợ sau"]]
     assert context.authorized_people == [by_name["Đại diện"]]
+
+
+def test_branch_spouse_never_becomes_owners_spouse_in_family_output():
+    owner = _person(1, "Chủ đất", dead=date(2020, 1, 1))
+    branch_spouse = _person(2, "Con dâu")
+    child = _person(3, "Con trai", dead=date(2021, 1, 1))
+    owner_spouse = _person(4, "Vợ chủ đất")
+    nodes = [
+        {"id": "owner", "personId": "1", "isLandOwner": True,
+         "spouseSlotIds": ["spouse_owner"]},
+        {"id": "child", "personId": "3", "parentSlotIds": ["owner"],
+         "spouseSlotIds": ["spouse_branch"]},
+        {"id": "spouse_branch", "personId": "2"},
+        {"id": "spouse_owner", "personId": "4"},
+    ]
+    case = _make_case(
+        owner, participants=[
+            _participant(branch_spouse, "Con_dau_re"),
+            _participant(owner_spouse, "Vợ/Chồng"),
+        ], case_state=_case_state_v2(
+            branch_spouse, owner, child, owner_spouse,
+            nodes=nodes, allocations={}))
+
+    context = build_word_context(case)
+    assert next(p for p in context.persons if p.ho_ten == "Con dâu").role == "Con_dau_re"
+    family = build_template_mapping(case)["[Đoạn quan hệ gia đình]"]
+    spouse_lines = [line for line in family.splitlines() if "có vợ/chồng là" in line]
+    assert len(spouse_lines) == 1
+    assert "Vợ chủ đất" in spouse_lines[0]
+    assert "Con dâu" not in spouse_lines[0]

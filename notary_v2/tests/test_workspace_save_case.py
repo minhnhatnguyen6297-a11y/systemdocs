@@ -73,10 +73,11 @@ def _f1_stage(dataset):
     }
 
 
-def _node(nid, person_id=None, parents=(), spouse=None,
+def _node(nid, person_id=None, parents=(), spouses=(),
           own=(), receive=()):
     return {"id": nid, "personId": person_id,
-            "parentSlotIds": list(parents), "spouseSlotId": spouse,
+            "parentSlotIds": list(parents), "spouseSlotIds": list(spouses),
+            "spouseSuggestionId": None,
             "ownPositions": list(own), "receivePositions": list(receive),
             "hidden": False, "deleted": False}
 
@@ -84,10 +85,10 @@ def _node(nid, person_id=None, parents=(), spouse=None,
 def _f1_state():
     return {"version": 3, "domain": "inheritance", "nodes": [
         _node("owner", "00000000-0000-4000-8000-000000000101",
-              parents=("father", "mother"), spouse="spouse", own=[1]),
+              parents=("father", "mother"), spouses=("spouse",), own=[1]),
         _node("spouse", "00000000-0000-4000-8000-000000000102",
               parents=("spouse_father", "spouse_mother"),
-              spouse="owner", own=[1], receive=[1]),
+              spouses=("owner",), own=[1], receive=[1]),
         _node("child_1", "00000000-0000-4000-8000-000000000103",
               parents=("owner", "spouse"), receive=[1]),
         _node("father"), _node("mother"),
@@ -253,7 +254,7 @@ def test_save_case_done_stays_done_when_commit_and_resave(db, dataset):
 # ---------------------------------------------------------------- A3
 
 
-def test_save_case_keeps_valid_incomplete_diagram_done(db, dataset):
+def test_save_case_keeps_valid_unsupported_diagram_done(db, dataset):
     create = _create_draft(db, dataset)
     case_id = create["case"]["id"]
     state = {"version": 3, "domain": "inheritance",
@@ -264,26 +265,27 @@ def test_save_case_keeps_valid_incomplete_diagram_done(db, dataset):
         case_id=case_id, base_revision=1, idempotency_key=None,
         case_meta=_meta(), stage=_f1_stage(dataset), state=state)
     assert result["case"]["status"] == "done"
-    assert result["diagram"]["render_model"]["status"] == "incomplete"
+    assert result["diagram"]["render_model"]["status"] == "unsupported"
     codes = {w["code"]
              for w in result["diagram"]["render_model"]["warnings"]}
     assert "diagram.unassigned_pool_person" in codes
 
     reopened = CaseWorkspaceService(db).get(case_id)
     assert reopened["case"]["status"] == "done"
-    assert reopened["diagram"]["render_model"]["status"] == "incomplete"
+    assert reopened["diagram"]["render_model"]["status"] == "unsupported"
     assert {w["code"]
             for w in reopened["diagram"]["render_model"]["warnings"]} >= codes
 
 
-@pytest.mark.parametrize("state_factory", [
-    lambda: {"version": 2, "domain": "inheritance", "nodes": []},
-    lambda: {"version": 3, "domain": "inheritance", "nodes": [
+@pytest.mark.parametrize(("state_factory", "expected_error"), [
+    (lambda: {"version": 2, "domain": "inheritance", "nodes": []},
+     "invalid_version"),
+    (lambda: {"version": 3, "domain": "inheritance", "nodes": [
         _node("owner", "00000000-0000-4000-8000-000000000101",
-              spouse="owner")]},
+              spouses=("owner",))]}, "self_spouse"),
 ])
 def test_save_case_invalid_diagram_rolls_back_everything(
-        db, dataset, state_factory):
+        db, dataset, state_factory, expected_error):
     create = _create_draft(db, dataset)
     case_id = create["case"]["id"]
     before = _snapshot(db, case_id)
@@ -300,6 +302,8 @@ def test_save_case_invalid_diagram_rolls_back_everything(
             case_id=case_id, base_revision=1, idempotency_key=None,
             case_meta=meta, stage=stage, state=state_factory())
     assert exc.value.code == "diagram_invalid_state"
+    assert {error["code"] for error in exc.value.details["errors"]} == {
+        expected_error}
     db.expire_all()
     assert _snapshot(db, case_id) == before
     assert _counts(db) == counts

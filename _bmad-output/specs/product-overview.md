@@ -225,13 +225,20 @@ Việc đang mở được tổng hợp tại [catalog issue](../backlog/README.
   `diagram_invalid_state`, toast hiện lỗi sơ đồ đầu tiên, thiếu chi tiết thì
   hiện lỗi tổng. `missing_land_owner` chỉ rõ thiếu chip Chủ trên vị trí tài
   sản, không hướng dẫn gán lại người đã có trên sơ đồ.
-- **Luật sơ đồ v2 — owner 27/10/2026, chỉ WP0 tài liệu:** ô do engine tạo/xóa;
+- **Luật sơ đồ v2 — owner 27/10/2026, WP0 spec; WP1 triển khai có giới hạn:** ô do engine tạo/xóa;
   người dùng chỉ thao tác thẻ và Chủ/Nhận. Ô chủ đất mặc định Chủ, mọi ô
   khác không tích (= từ chối), không tự điền Nhận. Gỡ không modal; chỉ cascade
   mới toast + Hoàn tác khoảng 5 giây, công tắc mặc định bật. Engine phải
   đối chiếu tới ổn định sau sửa Stage; hàng 2/3 gác sau
   `ENABLE_LATER_LINES=False`, chỉ hàng 1 + thế vị + chuyển tiếp. Luật mới
-  thay G1 mặc định/đồng bộ Nhận và luật gỡ 17/10, **chưa triển khai runtime**.
+  thay G1 mặc định/đồng bộ Nhận và luật gỡ 17/10. **WP1 đã đưa code B vào:**
+  `spouseSlotIds`, người đặt cuối hợp pháp/thẻ trước nhạt, migration spouse
+  legacy trong RAM (chỉ ghi khi lưu), cap thế vị tới chắt. Engine mặc định
+  tắt hàng 2/3, thiếu người thừa kế hàng 1 trả `unsupported`/Chưa hỗ trợ
+  và không sinh ô hàng 2/3; vẫn giữ yêu cầu ô hàng 1 để điền tiếp. Đã bỏ
+  menu quan hệ, thêm ô cha/mẹ/con và chọn vợ/chồng
+  hợp pháp thủ công. **WP2–WP8 chưa triển khai:** bảng sinh/thu hồi ô tới
+  ổn định, mặc định từ chối, gỡ thẻ/Hoàn tác, bố cục và độ trễ mới vẫn chờ.
   [Quyết định và Q1–Q4](../decisions/decision-owner-diagram-rules-v2-20261027.md).
 - Sơ đồ: lưu bản hợp lệ còn thiếu giữ warning Pool/`requiredSlots` qua mở lại;
   state `invalid` bị từ chối và giữ nguyên bản cũ; cue chỉ-đọc (trạng thái +

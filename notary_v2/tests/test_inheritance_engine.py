@@ -8,6 +8,11 @@ import pytest
 from services.inheritance_engine import _parse_death_date, run_inheritance_case
 
 
+@pytest.fixture
+def later_lines(monkeypatch):
+    monkeypatch.setattr("services.inheritance_engine.ENABLE_LATER_LINES", True)
+
+
 def _run(
     deaths: dict[str, str | None],
     *,
@@ -43,6 +48,26 @@ def _run(
 
 def _share(result, person_id: str) -> Fraction:
     return Fraction(result["allocations"][person_id]["finalShare"])
+
+
+@pytest.mark.parametrize("recipient", ["S", "N"], ids=["rank-two", "rank-three"])
+def test_later_lines_disabled_keeps_only_first_line_slots_and_no_later_shares(recipient):
+    result = _run(
+        {"X": "2020", "P": "1980", "S": None if recipient == "S" else "2000", "N": None},
+        parents={"X": ["P"], "S": ["P"], "N": ["S"]},
+        owners={"X"},
+    )
+
+    assert result["status"] == "unsupported"
+    assert result["errors"][0]["code"] == "second_order_required"
+    assert _share(result, "S") == _share(result, "N") == 0
+    assert result["breakdowns"] == []
+    assert result["requiredSlots"] == [{
+        "anchorSlotId": "slot_X", "reason": "active_estate",
+        "slotTypes": ["father", "mother", "spouse", "child"],
+        "minimumEmptyChildSlots": 1,
+    }]
+    assert result["conservation"] == {"allocated": "0", "unresolved": "1", "total": "1"}
 
 
 def test_fixture_x_y_d_z_matches_exact_expected_fractions():
@@ -265,7 +290,7 @@ def test_dead_child_branch_without_descendants_is_removed_from_denominator():
     assert result["unresolvedEstates"] == []
 
 
-def test_estate_without_any_valid_receiver_is_incomplete_and_conserved():
+def test_estate_without_any_valid_receiver_is_incomplete_and_conserved(later_lines):
     result = _run(
         {"X": "2020", "A": None},
         parents={"A": ["X"]},
@@ -356,13 +381,13 @@ def test_explicit_parents_do_not_fallback_unrelated_person_to_land_owner_branch(
         owners={"X"},
     )
 
-    assert result["status"] == "incomplete"
+    assert result["status"] == "unsupported"
+    assert result["errors"][0]["code"] == "second_order_required"
     assert _share(result, "Z") == 0
-    assert result["unresolvedEstates"][0]["sourcePersonId"] == "X"
 
 
 @pytest.mark.parametrize("represented", [False, True], ids=["direct", "representation"])
-def test_first_rank_blocks_both_later_ranks(represented):
+def test_first_rank_blocks_both_later_ranks(represented, later_lines):
     result = _run(
         {"X": "2020", "P": "1980", "S": None, "N": None, "C": "2010" if represented else None, "D": None},
         parents={"X": ["P"], "S": ["P"], "N": ["S"], "C": ["X"], "D": ["C"]},
@@ -383,7 +408,7 @@ def test_first_rank_blocks_both_later_ranks(represented):
     }]
 
 
-def test_first_rank_all_refuse_then_second_rank_receives():
+def test_first_rank_all_refuse_then_second_rank_receives(later_lines):
     result = _run(
         {"X": "2020", "P": "1980", "S": None, "C": None},
         parents={"X": ["P"], "S": ["P"], "C": ["X"]},
@@ -440,7 +465,7 @@ def test_first_rank_all_refuse_then_second_rank_receives():
         "parent-siblings", "sibling-children", "great-grandchildren",
     ],
 )
-def test_all_later_rank_relationship_groups_share_equally(rank, role, deaths, parents, receive):
+def test_all_later_rank_relationship_groups_share_equally(rank, role, deaths, parents, receive, later_lines):
     result = _run(deaths, parents=parents, owners={"X"}, receive=receive)
 
     assert result["status"] == "complete"
@@ -461,7 +486,7 @@ def test_all_later_rank_relationship_groups_share_equally(rank, role, deaths, pa
     [(["P"], 1), (["Q"], 1), (["P", "Q"], 1), (["R"], 0)],
     ids=["shared-father", "shared-mother", "shared-both", "unlinked"],
 )
-def test_siblings_require_at_least_one_explicit_shared_parent(sibling_parents, expected):
+def test_siblings_require_at_least_one_explicit_shared_parent(sibling_parents, expected, later_lines):
     result = _run(
         {"X": "2020", "P": "1980", "Q": "1980", "R": "1980", "S": None},
         parents={"X": ["P", "Q"], "S": sibling_parents},
@@ -473,7 +498,7 @@ def test_siblings_require_at_least_one_explicit_shared_parent(sibling_parents, e
     assert result["conservation"]["total"] == "1"
 
 
-def test_second_rank_multiple_roles_get_one_share_with_sorted_metadata():
+def test_second_rank_multiple_roles_get_one_share_with_sorted_metadata(later_lines):
     deaths = {"X": "2020", "P": "1980", "Q": "1970", "H": None, "J": None}
     parents = {"X": ["P", "Q"], "P": ["H"], "H": ["Q"], "J": ["Q"]}
     result = _run(deaths, parents=parents, owners={"X"})
@@ -493,7 +518,7 @@ def test_second_rank_multiple_roles_get_one_share_with_sorted_metadata():
     }]
 
 
-def test_third_rank_multiple_roles_get_one_share_without_representation():
+def test_third_rank_multiple_roles_get_one_share_without_representation(later_lines):
     result = _run(
         {"X": "2020", "P": None, "G": "1970", "S": None, "H": None, "J": None},
         parents={"X": ["P"], "P": ["G"], "S": ["P"], "H": ["G", "S"], "J": ["S"]},
@@ -510,7 +535,7 @@ def test_third_rank_multiple_roles_get_one_share_without_representation():
     }]
 
 
-def test_parent_sibling_group_excludes_source_and_own_parents_in_shared_ancestry():
+def test_parent_sibling_group_excludes_source_and_own_parents_in_shared_ancestry(later_lines):
     result = _run(
         {"X": "2020", "P": None, "Q": None, "G": "1970", "H": None},
         parents={"X": ["P", "Q"], "P": ["G"], "Q": ["G"], "H": ["G"]},
@@ -527,7 +552,7 @@ def test_parent_sibling_group_excludes_source_and_own_parents_in_shared_ancestry
 @pytest.mark.parametrize("sibling_death", ["2010", "2020"], ids=["before", "same-day"])
 @pytest.mark.parametrize("has_living_sibling", [True, False], ids=["rank-two-blocks", "rank-three-own-share"])
 def test_dead_sibling_never_represents_but_their_child_can_receive_at_rank_three(
-    sibling_death, has_living_sibling
+    sibling_death, has_living_sibling, later_lines
 ):
     result = _run(
         {"X": "2020", "P": "1980", "S": sibling_death, "N": None, "T": None},
@@ -550,7 +575,7 @@ def test_dead_sibling_never_represents_but_their_child_can_receive_at_rank_three
 
 
 @pytest.mark.parametrize("nephew_death", ["2010", "2020"], ids=["before", "same-day"])
-def test_dead_third_rank_candidate_does_not_pass_share_to_their_child(nephew_death):
+def test_dead_third_rank_candidate_does_not_pass_share_to_their_child(nephew_death, later_lines):
     result = _run(
         {"X": "2020", "P": "1980", "S": "2000", "N": nephew_death, "H": None, "K": None},
         parents={"X": ["P"], "S": ["P"], "N": ["S"], "H": ["S"], "K": ["N"]},
@@ -573,7 +598,7 @@ def test_dead_third_rank_candidate_does_not_pass_share_to_their_child(nephew_dea
     ],
     ids=["redistribute-within-rank", "all-second-rank-refuse", "all-ranks-empty"],
 )
-def test_later_rank_refusals_redistribute_then_fall_back_or_remain_unresolved(receive, recipient, rank):
+def test_later_rank_refusals_redistribute_then_fall_back_or_remain_unresolved(receive, recipient, rank, later_lines):
     result = _run(
         {"X": "2020", "P": "1980", "S": None, "T": None, "N": None},
         parents={"X": ["P"], "S": ["P"], "T": ["P"], "N": ["S"]},
@@ -597,7 +622,7 @@ def test_later_rank_refusals_redistribute_then_fall_back_or_remain_unresolved(re
 
 
 @pytest.mark.parametrize("rank", [2, 3], ids=["second-rank", "third-rank"])
-def test_later_rank_heir_dead_after_source_receives_despite_refusal_then_transmits(rank):
+def test_later_rank_heir_dead_after_source_receives_despite_refusal_then_transmits(rank, later_lines):
     deaths = {"X": "2000", "P": "1980", "S": "2010" if rank == 2 else "1990", "N": "2010", "H": None, "T": None}
     parents = {"X": ["P"], "S": ["P"], "N": ["S"], "H": ["N" if rank == 3 else "S"]}
     if rank == 2:
@@ -622,7 +647,7 @@ def test_later_rank_heir_dead_after_source_receives_despite_refusal_then_transmi
     assert result["conservation"] == {"allocated": "1", "unresolved": "0", "total": "1"}
 
 
-def test_second_rank_transmission_reselects_third_rank_in_later_estate():
+def test_second_rank_transmission_reselects_third_rank_in_later_estate(later_lines):
     result = _run(
         {"X": "2000", "P": "1980", "G": "1970", "S": "2010", "H": None, "A": None},
         parents={"X": ["P"], "S": ["P"], "P": ["G"], "H": ["G"]},
@@ -643,7 +668,7 @@ def test_second_rank_transmission_reselects_third_rank_in_later_estate():
     assert result["conservation"] == {"allocated": "1", "unresolved": "0", "total": "1"}
 
 
-def test_shared_ancestor_paths_and_same_day_estates_are_order_independent():
+def test_shared_ancestor_paths_and_same_day_estates_are_order_independent(later_lines):
     deaths = {"X": "2020", "Y": "2020", "P": "1980", "Q": "1980", "G": None, "H": None}
     parents = {"X": ["P", "Q"], "Y": ["P", "Q"], "H": ["P", "Q"], "P": ["G"], "Q": ["G"]}
     result = _run(deaths, parents=parents, owners={"X", "Y"})
@@ -668,7 +693,7 @@ def test_shared_ancestor_paths_and_same_day_estates_are_order_independent():
     assert result["conservation"] == {"allocated": "1", "unresolved": "0", "total": "1"}
 
 
-def test_anonymized_female_x_eight_nephews_one_receiver_owns_both_assets():
+def test_anonymized_female_x_eight_nephews_one_receiver_owns_both_assets(later_lines):
     """Shared engine result; two-asset persistence is exercised by the workspace smoke."""
     deaths = {
         "X": "2022-09-19", "P1": "1980-01-01", "P2": "1980-01-01",
@@ -724,7 +749,7 @@ def test_anonymized_female_x_eight_nephews_one_receiver_owns_both_assets():
     ],
     ids=["all-second-rank-groups", "all-third-rank-groups"],
 )
-def test_mixed_relationship_groups_share_per_person_not_per_group(deaths, parents, receive, roles):
+def test_mixed_relationship_groups_share_per_person_not_per_group(deaths, parents, receive, roles, later_lines):
     result = _run(deaths, parents=parents, owners={"X"}, receive=receive)
     rank = 2 if len(roles) == 4 else 3
     share = Fraction(1, len(roles))
@@ -741,7 +766,7 @@ def test_mixed_relationship_groups_share_per_person_not_per_group(deaths, parent
     assert result["conservation"] == {"allocated": "1", "unresolved": "0", "total": "1"}
 
 
-def test_later_rank_transmission_without_any_eligible_heir_retains_unresolved_estate():
+def test_later_rank_transmission_without_any_eligible_heir_retains_unresolved_estate(later_lines):
     result = _run(
         {"X": "2000", "P": "1980", "S": "2010", "W": None},
         parents={"X": ["P"], "S": ["P"]},

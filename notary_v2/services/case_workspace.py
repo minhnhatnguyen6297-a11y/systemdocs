@@ -1244,7 +1244,8 @@ class CaseWorkspaceService:
             state = {
                 "version": DIAGRAM_STATE_VERSION, "domain": target,
                 "nodes": [{"id": "owner", "personId": owner,
-                           "parentSlotIds": [], "spouseSlotId": None,
+                           "parentSlotIds": [], "spouseSlotIds": [],
+                           "spouseSlotId": None, "spouseSuggestionId": None,
                            "ownPositions": [], "receivePositions": [],
                            "hidden": False, "deleted": False}],
             }

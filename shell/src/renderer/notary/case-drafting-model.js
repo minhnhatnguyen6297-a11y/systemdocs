@@ -1475,6 +1475,19 @@ function createModel(deps) {
     return true;
   }
 
+  // A card returning to Pool leaves its engine-created spouse slot intact.
+  // Empty slots precede candidates so the last placed person stays lawful.
+  function syncSpouseSlotOrder(node, exceptOwner = null) {
+    for (const owner of state.diagram.nodes || []) {
+      if (owner === exceptOwner ||
+          !(owner.spouseSlotIds || []).includes(node.id)) continue;
+      const others = owner.spouseSlotIds.filter((id) => id !== node.id);
+      owner.spouseSlotIds = node.personId
+        ? [...others, node.id] : [node.id, ...others];
+      owner.spouseSlotId = owner.spouseSlotIds.at(-1) || null;
+    }
+  }
+
   // movePerson(rowId, targetNodeId|null) — nen MIN-119 drag/drop:
   //   target node trong  → move (nguon ve Pool)
   //   target co nguoi    → swap personId hai node
@@ -1490,13 +1503,8 @@ function createModel(deps) {
       if (!sourceNode) return false;
       if (diagramDomain() === CASE_TYPE_INHERITANCE &&
           sourceNode.id === 'owner') return setOwnerRow(null);
-      for (const n of state.diagram.nodes || []) {
-        if (!Array.isArray(n.spouseSlotIds) ||
-            !n.spouseSlotIds.includes(sourceNode.id)) continue;
-        n.spouseSlotIds = n.spouseSlotIds.filter((id) => id !== sourceNode.id);
-        n.spouseSlotId = n.spouseSlotIds.at(-1) || null;
-      }
       sourceNode.personId = null;
+      syncSpouseSlotOrder(sourceNode);
       touchDiagram();
       return true;
     }
@@ -1519,7 +1527,10 @@ function createModel(deps) {
     if (diagramDomain() === CASE_TYPE_INHERITANCE &&
         target.id === 'owner') {
       if (!setOwnerRow(rowId)) return false;
-      if (sourceNode) sourceNode.personId = null;
+      if (sourceNode) {
+        sourceNode.personId = null;
+        syncSpouseSlotOrder(sourceNode);
+      }
       applyAssignDefaults(findInNodes(state.diagram.nodes, 'owner'));
       touchDiagram();
       return true;
@@ -1544,14 +1555,9 @@ function createModel(deps) {
           if (!destination) return false;
         }
         if (sourceNode) {
-          for (const n of state.diagram.nodes || []) {
-            if (n === spouseOwner || !Array.isArray(n.spouseSlotIds))
-              continue;
-            n.spouseSlotIds = n.spouseSlotIds
-              .filter((id) => id !== sourceNode.id);
-            n.spouseSlotId = n.spouseSlotIds.at(-1) || null;
-          }
+          if (sourceNode.id === 'owner') setOwnerRow(null);
           sourceNode.personId = null;
+          syncSpouseSlotOrder(sourceNode, spouseOwner);
         }
         destination.personId = rowId;
         spouseOwner.spouseSlotIds = spouseOwner.spouseSlotIds
@@ -1561,14 +1567,6 @@ function createModel(deps) {
         applyAssignDefaults(destination);
         touchDiagram();
         return true;
-      }
-    }
-    if (sourceNode) {
-      for (const n of state.diagram.nodes || []) {
-        if (!Array.isArray(n.spouseSlotIds)) continue;
-        n.spouseSlotIds = n.spouseSlotIds
-          .filter((id) => id !== sourceNode.id);
-        n.spouseSlotId = n.spouseSlotIds.at(-1) || null;
       }
     }
     const displaced = target.personId;
@@ -1584,6 +1582,7 @@ function createModel(deps) {
       }
     }                                   // displaced khong co sourceNode
                                         // → tu nhien ve Pool
+    if (sourceNode) syncSpouseSlotOrder(sourceNode);
     applyAssignDefaults(target);
     touchDiagram();
     return true;

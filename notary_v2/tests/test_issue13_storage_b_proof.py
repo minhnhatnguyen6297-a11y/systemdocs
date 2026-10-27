@@ -126,7 +126,9 @@ def _state(spec, dataset):
             "id": alias,
             "personId": dataset["people_prototypes"][alias]["row_id"],
             "parentSlotIds": [],
+            "spouseSlotIds": [],
             "spouseSlotId": None,
+            "spouseSuggestionId": None,
             "ownPositions": list(diagram.get("ownPositions", {}).get(alias, [])),
             "receivePositions": list(
                 diagram.get("receivePositions", {}).get(alias, [])),
@@ -139,8 +141,10 @@ def _state(spec, dataset):
         source = by_alias[relation["from"]]
         target = by_alias[relation["to"]]
         if relation["kind"] == "spouse":
-            source["spouseSlotId"] = target["id"]
-            target["spouseSlotId"] = source["id"]
+            source["spouseSlotIds"].append(target["id"])
+            source["spouseSlotId"] = source["spouseSlotIds"][-1]
+            target["spouseSlotIds"].append(source["id"])
+            target["spouseSlotId"] = target["spouseSlotIds"][-1]
         elif relation["kind"] == "parent_child":
             target["parentSlotIds"].append(source["id"])
     return {"version": 3, "domain": "inheritance", "nodes": nodes}

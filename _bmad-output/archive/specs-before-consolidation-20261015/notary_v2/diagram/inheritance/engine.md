@@ -228,7 +228,7 @@ Không được trả một mảng phẳng toàn bộ hậu duệ rồi chia đ�
   bổ trong `unresolvedEstates`, không báo complete hoặc làm mất tài sản.
   D-038/R-32 hàng 2/3 gác sau `ENABLE_LATER_LINES=False` mặc định tắt:
   không nối vào sơ đồ, không sinh ô hàng 2/3. Code hàng 2/3 chỉ được giữ
-  sau cờ; kiểm thử riêng hàng 2/3 dùng cờ bật ở gói triển khai sau.
+  sau cờ; kiểm thử riêng hàng 2/3 monkeypatch cờ bật. WP1 đã triển khai cờ.
 
 ### 4.6 Bảo toàn tài sản
 
@@ -280,9 +280,10 @@ Không được trả một mảng phẳng toàn bộ hậu duệ rồi chia đ�
 ```
 
 `status` có thể là `complete`, `incomplete`, `invalid` hoặc `unsupported`.
-`invalid` và `unsupported` giữ cùng shape kết quả rỗng, với `errors` là danh
-sách `{code, message}`; `representation_depth_exceeded` dùng `unsupported` và
-không trả allocations hoặc fractions.
+`invalid` trả kết quả rỗng với `errors` là danh sách `{code, message}`.
+`representation_depth_exceeded` dùng `unsupported`, không trả allocations hoặc
+fractions. `second_order_required` khi cờ hàng 2/3 tắt giữ di sản chưa chia,
+bảo toàn tài sản và yêu cầu ô hàng 1 để người dùng tiếp tục điền.
 
 `requiredSlots` là output quyết định tập ô, không tham gia tính tỷ lệ.
 Ô do engine sở hữu; không tự tạo Người hoặc đoán người vào ô.

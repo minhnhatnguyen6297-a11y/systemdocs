@@ -833,11 +833,11 @@ render_model:                       # null = chưa từng evaluate
     total: <fraction>
 ```
 
-- `status:unsupported` **reserved** cho trường hợp engine chưa hỗ trợ
-  (code hiện chưa sinh trạng thái này — spec.md §8 DRAFT). Candidate
-  error code khi unsupported: `second_order_required`,
-  `representation_depth_exceeded`. Không trình bày `unsupported` như
-  kết quả đã tính.
+- `status:unsupported`: `second_order_required` khi không có người thừa kế
+  hàng 1 và `ENABLE_LATER_LINES=False`; không tính/sinh ô hàng 2/3.
+  Giữ yêu cầu ô hàng 1 để người dùng điền tiếp và phần di sản chưa chia
+  trong `unresolvedEstates`. `representation_depth_exceeded` khi thế vị
+  vượt chắt (D-012). Không trình bày `unsupported` như kết quả đã tính.
 - `allocations` phủ mọi active person (kể cả share `0`); `breakdowns`
   chỉ người có `finalShare > 0`. `unresolvedEstates[].reason` v1 chỉ
   `no_valid_heir`.
@@ -861,7 +861,7 @@ ancestry_cycle, invalid_death_date, missing_land_owner,
 conservation_failed
 ```
 
-Reserved cho `unsupported`: `second_order_required`,
+Code cho `unsupported`: `second_order_required`,
 `representation_depth_exceeded`.
 
 ### 7.4 `notary.diagram_evaluate` — payload + result
@@ -1415,6 +1415,9 @@ diagram_state v3 (domain inheritance):
 - `spouseSlotIds` giữ nguyên thứ tự thao tác; chỉ phần tử cuối nhận phần
   thừa kế với vai trò vợ/chồng hợp pháp. Link ngược không có ngữ nghĩa.
   `spouseSlotId` là mirror tương thích với consumer cũ.
+  Gỡ hoặc di chuyển thẻ không ngắt quan hệ của ô vợ/chồng còn tồn tại:
+  ô vừa trống đứng trước các ô có thẻ để người đặt sau cùng còn lại là
+  hợp pháp; thả lại vào ô trống đưa ô đó về cuối danh sách.
 - `spouseSuggestionId` chỉ giữ gợi ý migration của người còn sống;
   engine bỏ qua trường này. Khi migrate schemaVersion 3, link legacy của
   node được đưa đầu tiên; các link ngược theo thứ tự node nguồn được nối

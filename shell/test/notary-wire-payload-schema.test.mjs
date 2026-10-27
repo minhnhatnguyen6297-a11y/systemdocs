@@ -276,7 +276,8 @@ function legacyGetResponse() {
     diagram: { domain: 'inheritance',
                state: { version: 3, domain: 'inheritance', nodes: [
                  { id: 'owner', personId: ownerId, parentSlotIds: [],
-                   spouseSlotId: null, ownPositions: [1],
+                   spouseSlotIds: [], spouseSlotId: null,
+                   spouseSuggestionId: null, ownPositions: [1],
                    receivePositions: [], hidden: false, deleted: false },
                ] },
                render_model: null, warnings: [] },
