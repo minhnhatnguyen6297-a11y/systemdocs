@@ -744,7 +744,7 @@
  * trống 88×24 viền đứt không chữ — khớp hằng relationship-diagram.js) ---------- */
 .cd-node {
   position: absolute;
-  width: 144px;
+  width: 173px;
   padding: 4px 5px 5px;
   overflow: hidden;
   border-radius: var(--r-ctl);

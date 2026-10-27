@@ -58,11 +58,13 @@ const relIsDiagramError =
     : () => true;
 
 // Kich thuoc layout canvas (px logic — scale boi zoom, khong co chu).
-// MIN-133 D7 / WP6: node DA THA 144×87 (ten 14px, nam 13px, 2 hang chip 22×19);
+// MIN-133 D7 / WP6: node DA THA 173×87 (ten 14px, nam 13px, 2 hang chip 22×19;
+// 173 = 163 hang chip (38 nhan + 15 gap + 5×22) + 2×5 padding — bo 144 lam
+// flex ep chip 22→15px va overflow:hidden cat chip vẹt, không click được);
 // node TRONG 88×24 vien dut, hien nhan vai tro (Chu dat, Cha, Me, Vo/chong, Con, Con cua <ten>).
 // Le 6px, giua the he 14px (plan 12–16), giua node 14px, cap vo/chong
 // 28px. CSS .cd-node/.cd-node-empty phai khop cac hang nay.
-const NODE_W = 144, NODE_H = 87;
+const NODE_W = 173, NODE_H = 87;
 const EMPTY_W = 88, EMPTY_H = 24;
 const PAD = 6, GAP_X = 14, SPOUSE_GAP = 28, GAP_Y = 14;
 const ROW_H = NODE_H + GAP_Y;          // buoc toi da giua 2 hang the he

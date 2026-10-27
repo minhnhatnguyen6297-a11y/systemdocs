@@ -555,9 +555,9 @@ test('MIN-133 D6: Lưu hồ sơ + Xuất Word trong card-head, không còn foote
   assert.match(save.getAttribute('aria-label'), /có thay đổi chưa lưu/);
 });
 
-test('MIN-133 D7: hang layout theo mockup (node 144 / trong 88x24)', () => {
+test('MIN-133 D7: hang layout theo mockup (node 173 / trong 88x24)', () => {
   const { NODE_W, NODE_H, GAP_X } = DIAGRAM._internals;
-  assert.equal(NODE_W, 144);
+  assert.equal(NODE_W, 173);
   assert.equal(NODE_H, 87);
   assert.equal(GAP_X, 14);
   const lay = DIAGRAM._internals.layoutInheritance(seedSlots());

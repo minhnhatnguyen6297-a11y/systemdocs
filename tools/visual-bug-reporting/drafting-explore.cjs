@@ -384,30 +384,20 @@ async function snap(label, { shotIt = true } = {}) {
 }
 const emptiesOf = (s, nm) => s.empties.filter((e) => e.includes(`của ${nm})`)).map((e) => e.split(' (')[0]);
 async function clickOwn(name, pos = 1) {
-  // Chip trên thẻ vợ/chồng bị overflow:hidden cắt mép; Playwright coi là
-  // không thấy. Bấm đúng nút trong trang (onclick Chủ/Nhận).
-  const clicked = await P().evaluate(({ name, pos }) => {
-    const nodes = [...document.querySelectorAll('.cd-node')];
-    const n = nodes.find((e) =>
-      (e.querySelector('.cd-node-name')?.textContent || '').includes(name));
-    const chip = n && n.querySelectorAll('.cd-posrow')[0]
-      ?.querySelectorAll('.cd-poschip')[pos - 1];
-    if (!chip) {
-      return {
-        ok: false,
-        names: nodes.map((e) => e.querySelector('.cd-node-name')?.textContent || null),
-      };
-    }
-    const r = chip.getBoundingClientRect();
-    chip.click();
-    return {
-      ok: true,
-      disabled: chip.disabled,
-      rect: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) },
-    };
-  }, { name, pos });
-  record('clickOwn:' + name, clicked);
-  if (!clicked || !clicked.ok) throw new Error('clickOwn ' + name);
+  // Chip chọn "Chủ" ở vị trí `pos` trên thẻ `name` — bấm bằng Playwright
+  // locator thật (hit-test, như người dùng). Không dùng page.evaluate +
+  // el.click() nữa: lần trước là workaround cho chip bị cắt mép.
+  const card = P().locator('.cd-node',
+    { has: P().locator('.cd-node-name', { hasText: name }) }).first();
+  const chip = card.locator('.cd-posrow').first()
+    .locator('.cd-poschip').nth(pos - 1);
+  await chip.waitFor({ state: 'visible', timeout: 5000 });
+  const rect = await chip.boundingBox();
+  const disabled = await chip.isDisabled().catch(() => null);
+  await chip.click();
+  record('clickOwn:' + name, { ok: true, disabled,
+    rect: rect && { x: Math.round(rect.x), y: Math.round(rect.y),
+      w: Math.round(rect.width), h: Math.round(rect.height) } });
   await P().waitForTimeout(900);
 }
 async function waitToastGone() { await P().waitForTimeout(5600); }
