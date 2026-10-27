@@ -687,7 +687,7 @@ async function dropInto(name, role, ofName) {
   if (!t) { check(`empty ${role} slot of ${ofName || '?'} available for ${name}`, false, null); return false; }
   await dragPoolToNode(name, t.id); return true;
 }
-async function setDeath(name, value) { await typeField(pf('ngay_chet'), await personIndex(name), value); await P().waitForTimeout(600); }
+async function setDeath(name, value) { await typeField(pf('ngay_chet'), await personIndex(name), value); await P().waitForTimeout(1000); }
 async function removeCard(name) {
   const b = P().locator('.cd-node', { hasText: name }).locator('.js-card-remove').first();
   record('removeBtn:' + name, await b.count());
