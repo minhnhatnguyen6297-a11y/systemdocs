@@ -680,7 +680,27 @@ async function stagePeople(rows) {
   await typeField(af('so_thua_dat'), 0, '100');
   await typeField(af('so_to_ban_do'), 0, '10');
 }
-const emptyOf = (nodes, role, ofName) => nodes.filter((n) => n.empty && (n.emptyRole === role || (n.emptyRole || '').startsWith(role + ' của ')) && (!ofName || (n.label || '').includes(`của ${ofName})`)));
+const emptyOf = (nodes, role, ofName) => nodes.filter((n) => {
+  if (!n.empty) return false;
+  const er = n.emptyRole || '';
+  if (!(er === role || er.startsWith(role + ' của '))) return false;
+  if (!ofName) return true;
+  return `${n.label || ''} ${er}`.includes(ofName);
+});
+async function boxOverlaps() {
+  return P().evaluate(() => {
+    const rs = [...document.querySelectorAll('.cd-node')].filter((e) => e.offsetWidth).map((e) => {
+      const r = e.getBoundingClientRect();
+      return { t: (e.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 40), x: r.x, y: r.y, w: r.width, h: r.height };
+    });
+    const ov = [];
+    for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) {
+      const a = rs[i], b = rs[j];
+      if (a.x < b.x + b.w - 1 && b.x < a.x + a.w - 1 && a.y < b.y + b.h - 1 && b.y < a.y + a.h - 1) ov.push([a.t, b.t]);
+    }
+    return ov;
+  });
+}
 const byName = (nodes, nm) => nodes.find((n) => !n.empty && n.name === nm);
 async function dropInto(name, role, ofName) {
   const t = emptyOf(await diagramNodes(), role, ofName)[0];
@@ -744,6 +764,8 @@ T.T10 = async () => {
   check('generation rows: Cha above A, B same row as A, C/D below', cha && cha.y < a.y && b.y === a.y && c.y > a.y && c.y === d.y, { cha: cha && cha.y, a: a.y, b: b.y, c: c.y, d: d.y });
   check('B directly beside A, spare spouse after B', b.x > a.x && spare && spare.y === a.y && spare.x > b.x && !nodes.some((n) => n.y === a.y && n.x > a.x && n.x < b.x), { a: a.x, b: b.x, spare: spare && spare.x });
   check('children ordered by birth (C 1975 left of D 1977)', c.x < d.x, { c: c.x, d: d.x });
+  check('A Con slot is tied to the pair (names A)', emptyOf(nodes, 'Con', U.A).every((n) => (n.emptyRole || '').includes(U.A) || (n.label || '').includes(U.A)), emptyOf(nodes, 'Con', U.A));
+  check('J no overlapping cards', (await boxOverlaps()).length === 0, await boxOverlaps());
   const uuidRx = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-/i;
   check('no internal ids (uuid) in node labels/tooltips', !nodes.some((n) => uuidRx.test(n.label) || uuidRx.test(n.text)), nodes.filter((n) => uuidRx.test(n.label)).map((n) => n.label));
   const r = await save('T10-saved');
@@ -764,6 +786,13 @@ T.T11 = async () => {
   check('living A: Vợ/chồng slot exists', nodes.some((n) => /Vợ\/chồng/.test(n.emptyRole || '') || n.name === U.B), nodes.map((n) => n.label));
   check('C and D returned to Pool', pool.includes(U.C) && pool.includes(U.D), pool);
   check('toast "Đã đưa N người về Pool" with Hoàn tác', ts.n >= 1 && ts.undo && /về Pool/.test(ts.text.join(' ')), ts);
+  if (ts.undo) {
+    await P().locator('.js-toast-undo').first().click();
+    await P().waitForTimeout(1200);
+    const undone = await diagramNodes();
+    const death = await P().locator(pf('ngay_chet')).nth(await personIndex(U.A)).inputValue();
+    check('E undo restores the death date and Cha slots', death === '2020' && emptyOf(undone, 'Cha', U.A).length === 1, { death, labels: undone.map((n) => n.emptyRole || n.name) });
+  }
   await setDeath(U.A, '2020');
   const back = await diagramNodes();
   check('A dead again → Cha/Mẹ/Con slots return', emptyOf(back, 'Cha', U.A).length === 1 && emptyOf(back, 'Con', U.A).length >= 1, back.map((n) => n.label));
@@ -791,6 +820,7 @@ T.T12 = async () => {
   pool = await poolNames();
   await shot('T12-undo');
   check('Hoàn tác restores A, B, C, D exactly', [U.A, U.B, U.C, U.D].every((nm) => byName(nodes, nm)) && pool.length === 0, { pool, names: nodes.map((n) => n.name) });
+  check('E after undo, B has no slots and C keeps thế vị Con', emptyOf(nodes, 'Vợ/chồng', U.B).length === 0 && emptyOf(nodes, 'Con', U.C).length >= 1, nodes.map((n) => n.emptyRole));
   // silent toggle
   await P().waitForTimeout(5500);
   await P().locator('.js-toggle-notify-on-remove').first().uncheck();
@@ -814,6 +844,39 @@ T.T13 = async () => {
   check('… and no Vợ/chồng slot for C', emptyOf(nodes, 'Vợ/chồng', U.C).length === 0, nodes.map((n) => n.label));
   const c = byName(nodes, U.C); const cc = emptyOf(nodes, 'Con', U.C)[0];
   check('Con của C one row below C', c && cc && cc.y > c.y, { c: c && c.y, cc: cc && cc.y });
+  await setDeath(U.C, '2020');
+  const yearShown = await P().locator(pf('ngay_chet')).nth(await personIndex(U.C)).inputValue();
+  nodes = await diagramNodes();
+  check('F year-only stays typed as 2020', yearShown === '2020', yearShown);
+  check('F year 2020 vs owner year 2020 counts as 01/01 → thế vị Con', emptyOf(nodes, 'Con', U.C).length >= 1, nodes.map((n) => n.emptyRole));
+  const beforeInvalid = nodes.filter((n) => !n.empty).map((n) => n.name);
+  await setDeath(U.C, '06/2001');
+  const bad = await P().evaluate((nm) => {
+    const rows = [...document.querySelectorAll('[data-fid$=":ho_ten"]')];
+    const i = rows.findIndex((e) => e.value === nm);
+    const inp = document.querySelectorAll('[data-fid$=":ngay_chet"]')[i];
+    const msg = inp && inp.nextElementSibling && inp.nextElementSibling.classList.contains('cd-date-msg') ? inp.nextElementSibling.textContent : '';
+    return { bad: !!(inp && inp.classList.contains('cd-input-bad')), msg, val: inp && inp.value };
+  }, U.C);
+  nodes = await diagramNodes();
+  check('G partial date shows a red message and stays typed', bad.bad && bad.msg === 'Ngày không hợp lệ' && bad.val === '06/2001', bad);
+  check('G invalid date does not wipe placed cards', beforeInvalid.every((nm) => nodes.some((n) => n.name === nm)), nodes.map((n) => n.name));
+  await removeCard(U.C);
+  const blockedTip = await P().locator('.cd-pool-card', { hasText: U.C }).first().getAttribute('title');
+  check('G pool tooltip explains why the card cannot be dropped', blockedTip === 'Không thả được: ngày không hợp lệ', blockedTip);
+  try { await dropInto(U.C, 'Con', U.A); } catch (e) { record('blockedDrag', String(e && e.message || e).slice(0, 200)); }
+  check('G invalid card stays in the pool', (await poolNames()).includes(U.C), await poolNames());
+  await setDeath(U.C, '2001');
+  await dropInto(U.C, 'Con', U.A);
+  await setDeath(U.D, '2022');
+  nodes = await diagramNodes();
+  check('B child died after: no Cha/Mẹ slot for that child', emptyOf(nodes, 'Cha', U.D).length === 0 && emptyOf(nodes, 'Mẹ', U.D).length === 0, nodes.map((n) => n.emptyRole));
+  check('B child died after: owner Cha slot remains', emptyOf(nodes, 'Cha', U.A).length === 1, nodes.map((n) => n.emptyRole));
+  const saved = await save('T13-after-child');
+  check('B save after child died after the owner', saved.ok, saved.errs);
+  await typeField(pf('ngay_sinh'), await personIndex(U.D), '01/01/2023');
+  const warn = await visibleText();
+  check('H no posthumous-child warning', !/sinh sau khi người chết|posthumous/i.test(warn));
 };
 
 T.T14 = async () => {
@@ -831,6 +894,14 @@ T.T14 = async () => {
   check('earlier (B) = Không phải vợ/chồng hợp pháp', /Không phải vợ\/chồng hợp pháp/.test(txt(U.B)), txt(U.B));
   const a = byName(nodes, U.A), b = byName(nodes, U.B), e = byName(nodes, U.E);
   check('both spouses on A\'s row', a && b && e && a.y === b.y && a.y === e.y, [a, b, e].map((n) => n && n.y));
+  check('A each spouse pair has its own Con slot', emptyOf(nodes, 'Con', U.B).length >= 1 && emptyOf(nodes, 'Con', U.E).length >= 1, nodes.map((n) => n.emptyRole));
+  check('J spouses and Con slots do not overlap', (await boxOverlaps()).length === 0, await boxOverlaps());
+  await setDeath(U.E, '2021');
+  const after = await diagramNodes();
+  await shot('T14-spouse-died-after');
+  check('C spouse died after: Cha and Mẹ, no spouse slot of her own', emptyOf(after, 'Cha', U.E).length === 1 && emptyOf(after, 'Mẹ', U.E).length === 1 && emptyOf(after, 'Vợ/chồng', U.E).length === 0, after.map((n) => n.emptyRole));
+  check('C no duplicate Con group on the spouse who died after', emptyOf(after, 'Con', U.E).length <= 2, after.map((n) => n.emptyRole));
+  check('I B died before and still has no slots', emptyOf(after, 'Cha', U.B).length === 0 && emptyOf(after, 'Vợ/chồng', U.B).length === 0, after.map((n) => n.emptyRole));
 };
 
 T.T15 = async () => {
@@ -848,13 +919,13 @@ T.T15 = async () => {
       const t0 = performance.now();
       target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
       card.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: dt }));
-      const ok = () => [...document.querySelectorAll('.cd-empty-label')].some((e) => e.textContent.trim() === 'Cha');
+      const ok = () => [...document.querySelectorAll('.cd-empty-label')].some((e) => { const t = e.textContent.trim(); return t === 'Cha' || t.startsWith('Cha của '); });
       while (!ok()) { if (performance.now() - t0 > 5000) return -1; await new Promise((r) => requestAnimationFrame(r)); }
       return performance.now() - t0;
     });
     ms.push(t);
     await removeCard(U.A);
-    await P().waitForFunction(() => ![...document.querySelectorAll('.cd-empty-label')].some((e) => e.textContent.trim() === 'Cha'), null, { timeout: 5000 }).catch(() => {});
+    await P().waitForFunction(() => ![...document.querySelectorAll('.cd-empty-label')].some((e) => { const t = e.textContent.trim(); return t === 'Cha' || t.startsWith('Cha của '); }), null, { timeout: 5000 }).catch(() => {});
   }
   const ok = ms.filter((x) => x >= 0).sort((x, y) => x - y);
   const p95 = ok[Math.ceil(ok.length * 0.95) - 1];

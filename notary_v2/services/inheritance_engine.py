@@ -233,14 +233,18 @@ def _validate_and_build_graph(
         visit(person_id)
 
     deaths: dict[str, date | None] = {}
+    # Rule G: a partial or impossible death date is a field error. It must
+    # not abort the case (that emptied requiredSlots and wiped the diagram).
+    invalid_deaths: set[str] = set()
     for person_id in active_people:
         raw_death = _value(
             normalized_people[person_id], "ngay_chet", "death_date", "deathDate", "death"
         )
         try:
             deaths[person_id] = _parse_death_date(raw_death)
-        except ValueError as exc:
-            errors.append(_error("invalid_death_date", str(exc), personId=person_id))
+        except ValueError:
+            deaths[person_id] = None
+            invalid_deaths.add(person_id)
 
     owners = [person_id for person_id, node in active_people.items() if node["isLandOwner"]]
     if not owners:
@@ -254,6 +258,7 @@ def _validate_and_build_graph(
         "parents": parents_by_person,
         "spouses": spouses_by_person,
         "deaths": deaths,
+        "invalidDeaths": invalid_deaths,
         "owners": owners,
     }
     return nodes, graph, errors
@@ -419,7 +424,11 @@ def _required_slot_table(graph, active_estates):
             "minimumEmptySpouseSlots": int("spouse" in roles), "slots": slots,
         }
 
+    invalid = graph.get("invalidDeaths") or set()
+
     def compare(person_id, source_id):
+        if person_id in invalid:
+            return "unknown"
         if not is_deceased(person_id):
             return "alive"
         own, source = bounds(person_id), bounds(source_id)
@@ -456,6 +465,8 @@ def _required_slot_table(graph, active_estates):
                 descendant(child_id, source_id, depth + 1)
 
     for person_id in sorted(graph["owners"]):
+        if person_id in invalid:
+            continue
         if not is_deceased(person_id):
             add(person_id, "living_owner")
         elif bounds(person_id) is None:

@@ -866,10 +866,28 @@ function createNotaryModuleView(deps) {
     inp.setAttribute('inputmode', 'numeric');
     inp.maxLength = 10;
     setCellTitle(inp);
+    const syncDateMsg = () => {
+      const bad = inp.classList.contains('cd-input-bad');
+      const parent = inp.parentElement;
+      if (!parent || typeof parent.insertBefore !== 'function') return;
+      let msg = inp.nextElementSibling;
+      const isMsg = msg && msg.classList && msg.classList.contains('cd-date-msg');
+      if (!bad) {
+        if (isMsg) msg.remove();
+        return;
+      }
+      if (!isMsg) {
+        msg = h('div', 'cd-date-msg');
+        msg.setAttribute('role', 'alert');
+        parent.insertBefore(msg, inp.nextSibling);
+      }
+      msg.textContent = 'Ngày không hợp lệ';
+    };
     inp.oninput = () => {
       setCellTitle(inp);
       inp.classList.remove('cd-input-bad');
       localSaveError = null;
+      syncDateMsg();
       onSet(inp.value.trim() === '' ? null : inp.value);
     };
     // Chuan hoa o ca 'change' LAN 'blur': go lai dung chuoi dang hien
@@ -881,13 +899,15 @@ function createNotaryModuleView(deps) {
       const r = parseDisplayDate(inp.value, allowYear);
       if (r.error) {
         inp.classList.add('cd-input-bad');
-        inp.title = 'Nhập ngày dạng dd/mm/yyyy';
+        inp.title = 'Ngày không hợp lệ';
+        syncDateMsg();
         return false;
       }
       inp.classList.remove('cd-input-bad');
       localSaveError = null;
       inp.value = fmtDisplayDate(r.iso);
       setCellTitle(inp);
+      syncDateMsg();
       const cur = getVal();
       if ((cur == null ? null : cur) !== r.iso) onSet(r.iso);
       return true;
@@ -896,6 +916,11 @@ function createNotaryModuleView(deps) {
     inp.onblur = commit;
     registerEditorFlush(inp, () => ({ ok: commit() }));
     if (aria) inp.setAttribute('aria-label', aria);
+    if (parseDisplayDate(inp.value, allowYear).error) {
+      inp.classList.add('cd-input-bad');
+      inp.title = 'Ngày không hợp lệ';
+    }
+    queueMicrotask(syncDateMsg);
     return inp;
   }
 

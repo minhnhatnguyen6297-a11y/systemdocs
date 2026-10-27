@@ -307,12 +307,29 @@ async function stagePeople(rows) {
   await typeField(af('so_thua_dat'), 0, '100');
   await typeField(af('so_to_ban_do'), 0, '10');
 }
-const emptyOf = (nodes, role, ofName) => nodes.filter((n) => n.empty && (n.emptyRole === role || (n.emptyRole || '').startsWith(role + ' của ')) && (!ofName || (n.label || '').includes(`của ${ofName})`)));
+const emptyOf = (nodes, role, ofName) => nodes.filter((n) => {
+  if (!n.empty) return false;
+  const er = n.emptyRole || '';
+  if (!(er === role || er.startsWith(role + ' của '))) return false;
+  if (!ofName) return true;
+  return `${n.label || ''} ${er}`.includes(ofName);
+});
 const byName = (nodes, nm) => nodes.find((n) => !n.empty && n.name === nm);
 async function dropInto(name, role, ofName) {
-  const t = emptyOf(await diagramNodes(), role, ofName)[0];
-  if (!t) { check(`empty ${role} slot of ${ofName || '?'} available for ${name}`, false, null); return false; }
-  await dragPoolToNode(name, t.id); return true;
+  // Một lần kéo có thể trượt ô Con 24px; thử lại đúng một lần.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const t = emptyOf(await diagramNodes(), role, ofName)[0];
+    if (!t) {
+      check(`empty ${role} slot of ${ofName || '?'} available for ${name}`, false, null);
+      return false;
+    }
+    await dragPoolToNode(name, t.id);
+    if (!(await poolNames()).includes(name)) return true;
+  }
+  return false;
+}
+function slotRole(label) {
+  return String(label || '').replace(/^Ô trống:\s*/, '').split(' của ')[0];
 }
 async function setDeath(name, value) { await typeField(pf('ngay_chet'), await personIndex(name), value); await P().waitForTimeout(1000); }
 async function removeCard(name) {
@@ -357,6 +374,9 @@ async function snap(label, { shotIt = true } = {}) {
   const dupIds = ids.filter((x, i) => ids.indexOf(x) !== i);
   const placedNames = nodes.filter((n) => !n.empty).map((n) => n.name);
   const dupPeople = placedNames.filter((x, i) => placedNames.indexOf(x) !== i);
+  const uuidRx = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-/i;
+  check(`${label} D no uuid in labels`, !nodes.some((n) => uuidRx.test(n.label) || uuidRx.test(n.text) || uuidRx.test(n.emptyRole || '')));
+  check(`${label} J no overlapping cards`, geo.overlaps.length === 0, geo.overlaps);
   const s = { label, empties: nodes.filter((n) => n.empty).map((n) => `${n.label}#${n.id.slice(0, 8)}`), placed: nodes.filter((n) => !n.empty).map((n) => `${n.name}@${n.id.slice(0, 8)}${n.ownChecked ? '[Chủ]' : ''}${n.receiveChecked ? '[Nhận]' : ''}`), pool, toast: ts, dupIds, dupPeople, ...geo, errs: A.pageErrors.length, cons: A.console.filter((c) => c.type === 'error').length };
   if (shotIt) s.shot = await shot(label.replace(/[^\w-]+/g, '_').slice(0, 50));
   record('S:' + label, s);
@@ -364,8 +384,30 @@ async function snap(label, { shotIt = true } = {}) {
 }
 const emptiesOf = (s, nm) => s.empties.filter((e) => e.includes(`của ${nm})`)).map((e) => e.split(' (')[0]);
 async function clickOwn(name, pos = 1) {
-  const n = P().locator('.cd-node', { has: P().locator('.cd-node-name', { hasText: name }) }).first();
-  await n.locator('.cd-posrow').first().locator('.cd-poschip').nth(pos - 1).click();
+  // Chip trên thẻ vợ/chồng bị overflow:hidden cắt mép; Playwright coi là
+  // không thấy. Bấm đúng nút trong trang (onclick Chủ/Nhận).
+  const clicked = await P().evaluate(({ name, pos }) => {
+    const nodes = [...document.querySelectorAll('.cd-node')];
+    const n = nodes.find((e) =>
+      (e.querySelector('.cd-node-name')?.textContent || '').includes(name));
+    const chip = n && n.querySelectorAll('.cd-posrow')[0]
+      ?.querySelectorAll('.cd-poschip')[pos - 1];
+    if (!chip) {
+      return {
+        ok: false,
+        names: nodes.map((e) => e.querySelector('.cd-node-name')?.textContent || null),
+      };
+    }
+    const r = chip.getBoundingClientRect();
+    chip.click();
+    return {
+      ok: true,
+      disabled: chip.disabled,
+      rect: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) },
+    };
+  }, { name, pos });
+  record('clickOwn:' + name, clicked);
+  if (!clicked || !clicked.ok) throw new Error('clickOwn ' + name);
   await P().waitForTimeout(900);
 }
 async function waitToastGone() { await P().waitForTimeout(5600); }
@@ -415,12 +457,25 @@ T.X1 = async () => {
     if ((await personIndex(nm)) < 0) continue;
     await setDeath(nm, v);
     const s = await snap(`X1-${nm.split(' ').pop()}-${v || 'living'}`);
+    if (nm === V.B && v === '01/01/1990') check('I spouse who died before has no own slots', emptiesOf(s, V.B).length === 0, emptiesOf(s, V.B));
+    if (nm === V.B && v === '01/01/2021') {
+      const roles = emptiesOf(s, V.B);
+      check('C spouse who died after has Cha and Mẹ', roles.some((e) => slotRole(e) === 'Cha') && roles.some((e) => slotRole(e) === 'Mẹ'), roles);
+      check('C spouse who died after has no spouse or duplicate Con slot', !roles.some((e) => slotRole(e) === 'Vợ/chồng' || slotRole(e) === 'Con'), roles);
+    }
     fsNotes(`${nm} death=${v || '∅'} → empties ${JSON.stringify(s.empties.map((e) => e.split('#')[0]))} pool=${JSON.stringify(s.pool)} toast=${s.toast.n}`);
     if (s.toast.n && nm === V.A && !v) {
       // Undo after a Stage-caused cascade
       await P().locator('.js-toast-undo').first().click(); await P().waitForTimeout(1200);
       const u = await snap('X1-undo-after-A-living');
-      record('undoAfterStageEdit', { pool: u.pool, placed: u.placed, deathA: await P().locator(pf('ngay_chet')).nth(await personIndex(V.A)).inputValue() });
+      const deathA = await P().locator(pf('ngay_chet')).nth(await personIndex(V.A)).inputValue();
+      record('undoAfterStageEdit', { pool: u.pool, placed: u.placed, deathA });
+      check('E undo restores the death date', deathA === '01/06/2020', deathA);
+      const namesOf = (rows) => rows.map((p) => p.split('@')[0]).sort();
+      check('E undo brings people back from the pool',
+        JSON.stringify(namesOf(u.placed)) === JSON.stringify(namesOf(s0.placed))
+        && JSON.stringify([...u.pool].sort()) === JSON.stringify([...s0.pool].sort()),
+        { pool: u.pool, placed: u.placed, basePool: s0.pool });
     }
   }
   // stable IDs: A's slots before vs after full cycle
@@ -463,17 +518,25 @@ T.X2 = async () => {
   await snap('X2-base');
   await clickOwn(V.A); await snap('X2-A-untick-Chu');
   await clickOwn(V.A); await snap('X2-A-retick-Chu');
+  // Bỏ tick Chủ đưa người thân về Pool; tick lại không kéo họ lên.
+  await dropInto(V.B, 'Vợ/chồng', V.A);
+  await dropInto(V.D, 'Con', V.A);
+  await dropInto(V.F, 'Con', V.A);
   await clickOwn(V.B); await snap('X2-B-living-spouse-ticked-Chu(2 owners)');
   await clickOwn(V.D); await snap('X2-D-living-child-ticked-Chu(3 owners)');
   await clickOwn(V.D); await snap('X2-D-untick');
   await clickOwn(V.B); await snap('X2-B-untick');
-  await clickOwn(V.A); await snap('X2-A-untick-again(no owner)');
-  await clickOwn(V.B); await snap('X2-B-only-owner(A unticked)');
+  // Bỏ tick Chủ cuối: isLandOwner = false → ô quan hệ rụng, thẻ chủ đất còn.
+  await clickOwn(V.A);
+  const noOwner = await snap('X2-A-untick-again(no owner)');
+  check('untick last Chủ keeps the owner card', noOwner.placed.some((p) => p.startsWith(V.A + '@')), noOwner.placed);
+  check('untick last Chủ returns relatives to the pool', noOwner.pool.includes(V.B) && noOwner.pool.includes(V.D), noOwner.pool);
   // living owner in owner slot
   await newCase();
   await stagePeople([{ name: V.D, birth: '01/01/1977', death: '' }, { name: V.E, birth: '01/01/1980', death: '' }]);
   await dragPoolToNode(V.D, 'owner');
-  await snap('X2b-living-owner');
+  const liveOwner = await snap('X2b-living-owner');
+  check('A living owner has only spouse slots', liveOwner.empties.every((e) => /Vợ\/chồng/.test(e)) && liveOwner.empties.length === 2, liveOwner.empties);
   await dropInto(V.E, 'Vợ/chồng', V.D);
   await snap('X2b-living-owner+spouse');
   await clickOwn(V.D); await snap('X2b-living-owner-untick(spouse slot should vanish)');
@@ -570,18 +633,25 @@ T.X5 = async () => {
   record('sameDate', emptiesOf(e1, V.C));
   // year-only same year as owner
   await setDeath(V.C, '2020'); const e2 = await snap('X5-C-year-2020-vs-A-01-06-2020');
-  record('yearSameYear', { cSlots: emptiesOf(e2, V.C), badges: e2.badges, input: await P().locator(pf('ngay_chet')).nth(await personIndex(V.C)).inputValue() });
+  const yearInput = await P().locator(pf('ngay_chet')).nth(await personIndex(V.C)).inputValue();
+  record('yearSameYear', { cSlots: emptiesOf(e2, V.C), badges: e2.badges, input: yearInput });
+  check('F year-only is displayed as typed', yearInput === '2020', yearInput);
+  check('F year-only 2020 is before 01/06/2020 so C has Con slots', emptiesOf(e2, V.C).some((e) => e.includes('Con')), emptiesOf(e2, V.C));
   await setDeath(V.C, '2001'); const e3 = await snap('X5-C-year-2001');
   record('year2001', { cSlots: emptiesOf(e3, V.C), badges: e3.badges });
   await setDeath(V.C, '06/2001'); const e4 = await snap('X5-C-month-year');
   record('monthYear', { cSlots: emptiesOf(e4, V.C), badges: e4.badges, input: await P().locator(pf('ngay_chet')).nth(await personIndex(V.C)).inputValue() });
   await setDeath(V.C, '31/02/2001'); const e5 = await snap('X5-C-invalid-31-02');
   record('invalidDate', { cSlots: emptiesOf(e5, V.C), badges: e5.badges, status: e5.status });
+  check('G invalid date does not wipe the owner', e5.placed.some((p) => p.startsWith(V.A)), e5.placed);
+  const badMsg = await P().evaluate(() => [...document.querySelectorAll('.cd-date-msg')].map((e) => e.textContent).join(' '));
+  check('G invalid date shows Ngày không hợp lệ', badMsg.includes('Ngày không hợp lệ'), badMsg);
   await setDeath(V.C, '01/01/2001');
   // child born after parent died
   await typeField(pf('ngay_sinh'), await personIndex(V.D), '01/01/2023');
   const b1 = await snap('X5-D-born-after-A-death');
   record('posthumous', { status: b1.status, badges: b1.badges, errs: await uiErrors() });
+  check('H no posthumous-child warning', !/sinh sau khi người chết|posthumous/i.test(`${b1.status} ${JSON.stringify(b1.badges)} ${await visibleText()}`));
   // undo after another edit
   await waitToastGone();
   await removeCard(V.A);
@@ -608,17 +678,25 @@ T.X6 = async () => {
   await snap('X6-base');
   await clickOwn(V.A); await snap('X6-A-untick(no owner)');
   await clickOwn(V.A); await snap('X6-A-retick');
+  await dropInto(V.B, 'Vợ/chồng', V.A);
+  await dropInto(V.D, 'Con', V.A);
   await clickOwn(V.B); await snap('X6-B-living-spouse-Chu(2 owners)');
   await clickOwn(V.D); await snap('X6-D-living-child-Chu(3 owners)');
   await clickOwn(V.D); await snap('X6-D-untick');
   await clickOwn(V.B); await snap('X6-B-untick');
-  await clickOwn(V.A); await clickOwn(V.B); await snap('X6-B-only-owner');
+  await clickOwn(V.A);
+  const noOwner = await snap('X6-A-untick-last-Chu');
+  check('untick last Chủ keeps the owner card', noOwner.placed.some((p) => p.startsWith(V.A + '@')), noOwner.placed);
+  check('untick last Chủ returns relatives to the pool', noOwner.pool.includes(V.B), noOwner.pool);
   const sv = await save('X6-saved'); record('save', { ok: sv.ok, errs: sv.errs });
 };
 T.X7 = async () => {
   await buildV(['A', 'F']);
   const s = await snap('X7-child-died-after');
+  const fRoles = emptiesOf(s, V.F);
+  check('B child who died after has no Cha/Mẹ', !fRoles.some((e) => e.includes('Cha') || e.includes('Mẹ')), fRoles);
   const sv = await save('X7-save'); record('saveWithAfterChild', { ok: sv.ok, errs: sv.errs });
+  check('B saving the child who died after succeeds', sv.ok, sv.errs);
   await setDeath(V.F, ''); const s2 = await snap('X7-F-living(should drop F slots)');
   record('afterLiving', emptiesOf(s2, V.F));
   // clean toggle cycle (no after-child) then save + reopen
@@ -678,6 +756,11 @@ T.X9 = async () => {
     fsNotes(`done in ${Math.round((Date.now() - t0) / 1000)}s → ${OUT}/results-${id}.json`);
   }
   results.sidecar = (results.logs || {}).sidecar;
+  const summary = {};
+  for (const [id, r] of Object.entries(results.tests)) summary[id] = { pass: r.checks.filter((c) => c.pass).length, fail: r.checks.filter((c) => !c.pass).length, verdict: r.checks.every((c) => c.pass) ? 'ĐẠT' : 'KHÔNG ĐẠT' };
+  results.summary = summary;
   fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2));
+  console.log('SUMMARY ' + JSON.stringify(summary));
   console.log('EVIDENCE ' + OUT);
+  process.exitCode = Object.values(summary).every((s) => s.fail === 0) ? 0 : 1;
 })();

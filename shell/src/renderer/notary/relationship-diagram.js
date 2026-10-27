@@ -142,9 +142,15 @@ function parseBirthKey(raw) {
   return null;
 }
 
-function nodeSize(n) {
-  return n && n.personId ? { w: NODE_W, h: NODE_H }
-                         : { w: EMPTY_W, h: EMPTY_H };
+function nodeSize(n, live) {
+  if (!n || !n.personId) return { w: EMPTY_W, h: EMPTY_H };
+  let h = NODE_H;
+  const spouseCard = (live || []).some((k) => k && k !== n && (
+    (k.spouseSlotIds || []).includes(n.id) || k.spouseSlotId === n.id));
+  // Nhãn vợ/chồng một dòng, và nút Con riêng, làm thẻ cao hơn NODE_H.
+  if (spouseCard) h += 18;
+  if ((n.parentSlotIds || []).length >= 2) h += 26;
+  return { w: NODE_W, h };
 }
 
 function layoutInheritance(nodes, people = []) {
@@ -230,7 +236,7 @@ function layoutInheritance(nodes, people = []) {
     if (!gens.has(g)) gens.set(g, []);
     gens.get(g).push(n);
   }
-  const size = new Map(live.map((n) => [n.id, nodeSize(n)]));
+  const size = new Map(live.map((n) => [n.id, nodeSize(n, live)]));
   // Khoi: partner va cac vo/chong ke nhau (sat 28px).
   const blocksOf = (row, gen) => {
     const rowIds = new Set(row.map((n) => n.id));
@@ -355,11 +361,30 @@ function layoutInheritance(nodes, people = []) {
   }
   const mean = (arr) => (arr.length
     ? arr.reduce((s, v) => s + v, 0) / arr.length : null);
-  let anchor = 0;
-  rows.forEach((bs, i) => { if (rowW(bs) > rowW(rows[anchor])) anchor = i; });
+  // Hàng thế hệ của chủ đất đặt trước để Con nằm dưới đúng cặp.
+  let anchor = gkeys.indexOf(0);
+  if (anchor < 0) {
+    anchor = 0;
+    rows.forEach((bs, i) => { if (rowW(bs) > rowW(rows[anchor])) anchor = i; });
+  }
   if (rows.length) placeRow(rows[anchor], () => null);
-  // Hang duoi hang rong nhat: theo tam cha/me da dat.
+  const parentCenter = (b) => {
+    const ids = b.m.flatMap((n) =>
+      (n.parentSlotIds || []).filter((p) => left.has(p)));
+    if (!ids.length) return null;
+    return ids.reduce((s, id) => s + center(id), 0) / ids.length;
+  };
+  // Hang duoi: Con dưới cặp cha/mẹ; cùng cặp giữ thứ tự ngày sinh.
   for (let i = anchor + 1; i < rows.length; i += 1) {
+    rows[i].sort((a, b) => {
+      const ca = parentCenter(a);
+      const cb = parentCenter(b);
+      if (ca == null && cb == null) return 0;
+      if (ca == null) return 1;
+      if (cb == null) return -1;
+      if (Math.abs(ca - cb) < 0.5) return 0;
+      return ca - cb;
+    });
     placeRow(rows[i], (b) => mean(b.m.flatMap((n) =>
       (n.parentSlotIds || []).filter((p) => left.has(p)).map(center))));
   }
@@ -374,7 +399,7 @@ function layoutInheritance(nodes, people = []) {
   let minX = Infinity;
   for (const x of left.values()) minX = Math.min(minX, x);
   const dx = Number.isFinite(minX) ? PAD - minX : PAD;
-  let maxX = 0, y = PAD;
+  let y = PAD;
   for (const [gi, g] of gkeys.entries()) {
     let rowH = 0;
     for (const b of rows[gi]) {
@@ -382,14 +407,49 @@ function layoutInheritance(nodes, people = []) {
         const s = size.get(n.id);
         const x = Math.round(left.get(n.id) + dx);
         pos[n.id] = { x, y, w: s.w, h: s.h, gen: g };
-        maxX = Math.max(maxX, x + s.w);
         rowH = Math.max(rowH, s.h);
       }
     }
     y += rowH + GAP_Y;
   }
-  const h = rows.length ? y - GAP_Y + PAD : PAD * 2;
+  separateBoxes(pos);
+  let maxX = 0, maxY = PAD;
+  for (const p of Object.values(pos)) {
+    maxX = Math.max(maxX, p.x + p.w);
+    maxY = Math.max(maxY, p.y + p.h);
+  }
+  const h = rows.length ? maxY + PAD : PAD * 2;
   return { pos, w: Math.max(maxX, 0) + PAD, h };
+}
+
+// Lưới an toàn: hộp chữ nhật không được chồng. Cùng hàng đẩy ngang,
+// khác hàng đẩy thẻ thấp hơn xuống.
+function separateBoxes(pos) {
+  const ids = Object.keys(pos);
+  for (let pass = 0; pass < 6; pass += 1) {
+    let moved = false;
+    for (let i = 0; i < ids.length; i += 1) {
+      for (let j = i + 1; j < ids.length; j += 1) {
+        const a = pos[ids[i]];
+        const b = pos[ids[j]];
+        const overlapX = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+        const overlapY = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+        if (overlapX <= 0.5 || overlapY <= 0.5) continue;
+        const sameRow = Math.abs(a.y - b.y) < 4;
+        if (sameRow) {
+          const push = overlapX + GAP_X;
+          if (a.x <= b.x) b.x += push;
+          else a.x += push;
+        } else if (a.y <= b.y) {
+          b.y += overlapY + GAP_Y;
+        } else {
+          a.y += overlapY + GAP_Y;
+        }
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
 }
 
 function spouseOwnerOf(nodeId, nodes) {
@@ -397,48 +457,50 @@ function spouseOwnerOf(nodeId, nodes) {
     (n.spouseSlotIds || []).includes(nodeId)) || null;
 }
 
-// WP6: nhãn vai trò ô trống (Chủ đất, Cha, Mẹ, Vợ/chồng, Con, 'Con của <tên>' thế vị)
+function slotPersonName(node, people) {
+  if (!node || !node.personId) return '';
+  const list = Array.isArray(people) ? people : Object.values(people || {});
+  const p = list.find((x) => x &&
+    (x.row_id === node.personId || x.id === node.personId));
+  const name = p && p.ho_ten != null ? String(p.ho_ten).trim() : '';
+  return name;
+}
+
+// Nhãn ô trống: vai trò tiếng Việt, không id/uuid.
+// Không có tên thì giữ ngắn (Cha, Mẹ, Vợ/chồng, Con) để khớp ô canonical.
 function emptySlotRole(n, live = [], people = []) {
   if (!n) return 'Ô trống';
   if (n.id === 'owner') return 'Chủ đất';
   const nodes = (live && live.length) ? live : [];
-  const owner = nodes.find((k) => k && k.id === 'owner');
 
-  // Vợ/chồng
-  const spOwner = spouseOwnerOf(n.id, nodes);
-  if (spOwner || nodes.some((k) => k && ((k.spouseSlotIds || []).includes(n.id) || k.spouseSlotId === n.id))) {
-    return 'Vợ/chồng';
+  const host = spouseOwnerOf(n.id, nodes) || nodes.find((k) => k && (
+    (k.spouseSlotIds || []).includes(n.id) || k.spouseSlotId === n.id));
+  if (host) {
+    const name = slotPersonName(host, people);
+    return name ? `Vợ/chồng của ${name}` : 'Vợ/chồng';
   }
 
-  // Cha / Mẹ của chủ đất
-  if (owner && (owner.parentSlotIds || []).includes(n.id)) {
-    const idx = owner.parentSlotIds.indexOf(n.id);
-    if (idx === 0 || n.id === 'father' || n.role === 'father') return 'Cha';
-    if (idx === 1 || n.id === 'mother' || n.role === 'mother') return 'Mẹ';
+  const child = nodes.find((k) => k && k.id !== n.id &&
+    (k.parentSlotIds || []).includes(n.id));
+  if (child || n.id === 'father' || n.id === 'mother' ||
+      n.role === 'father' || n.role === 'mother') {
+    const idx = child ? (child.parentSlotIds || []).indexOf(n.id) : -1;
+    let role = 'Cha';
+    if (idx === 1 || n.id === 'mother' || n.role === 'mother') role = 'Mẹ';
+    if (idx === 0 || n.id === 'father' || n.role === 'father') role = 'Cha';
+    const name = child ? slotPersonName(child, people) : '';
+    return name ? `${role} của ${name}` : role;
   }
-  if (n.id === 'father' || n.role === 'father') return 'Cha';
-  if (n.id === 'mother' || n.role === 'mother') return 'Mẹ';
 
-  // Con / Con của <tên> (thế vị)
-  const parents = (n.parentSlotIds || []).map((id) => nodes.find((k) => k && k.id === id)).filter(Boolean);
-  if (parents.length > 0) {
-    if (parents.some((p) => p.id === 'owner')) {
-      return 'Con';
-    }
-    const anchor = parents[0];
-    let anchorName = '';
-    const pList = Array.isArray(people) ? people : Object.values(people || {});
-    if (anchor && anchor.personId) {
-      const p = pList.find((x) => x && (x.row_id === anchor.personId || x.id === anchor.personId));
-      if (p && p.ho_ten) anchorName = p.ho_ten;
-    }
-    if (!anchorName && anchor) {
-      anchorName = anchor.ho_ten || anchor.id;
-    }
-    return anchorName ? `Con của ${anchorName}` : 'Con';
+  const parents = (n.parentSlotIds || [])
+    .map((id) => nodes.find((k) => k && k.id === id)).filter(Boolean);
+  if (parents.length || /^child(?:_|$)/.test(n.id || '') || n.role === 'child') {
+    const names = parents.map((p) => slotPersonName(p, people)).filter(Boolean);
+    if (names.length >= 2) return `Con của ${names[0]} và ${names[1]}`;
+    if (names.length === 1) return `Con của ${names[0]}`;
+    return 'Con';
   }
-  if (/^child(?:_|$)/.test(n.id || '') || n.role === 'child') return 'Con';
-  return SLOT_LABEL[n.id] || n.id || 'Ô trống';
+  return SLOT_LABEL[n.id] || 'Ô trống';
 }
 const REMOVAL_NOTIFY_KEY = 'notary.diagram.notify_on_remove';
 const _memStorage = new Map();
@@ -606,11 +668,12 @@ function createDiagramPane(ctx) {
     return emptySlotRole(n, liveNodes(), model.state.stage?.people) || 'Ô trống';
   }
   // Ten ngan de tham chieu slot: ten nguoi neu da gan, nhan slot neu
-  // trong.
+  // trong. Không bao giờ rơi về id thô.
   function refName(n) {
     if (!n) return '—';
     if (n.personId) return personName(n.personId);
-    return emptySlotRole(n, liveNodes(), model.state.stage?.people) || SLOT_LABEL[n.id] || 'Ô trống';
+    return emptySlotRole(n, liveNodes(), model.state.stage?.people) ||
+      SLOT_LABEL[n.id] || 'Ô trống';
   }
 
   // Vai tro hien thi tu quan he draft da khai bao — presentation only,
@@ -650,8 +713,14 @@ function createDiagramPane(ctx) {
   // gan len node). Card = ten + grip keo + nut → menu gan vi tri.
   function poolCardEl(row, sub) {
     const card = h('div', 'cd-pool-card');
-    const canDrag = model.canWrite();
+    const block = typeof model.personDropBlock === 'function'
+      ? model.personDropBlock(row.row_id) : null;
+    const canDrag = model.canWrite() && !block;
     card.draggable = canDrag;
+    if (block) {
+      card.title = block;
+      card.classList.add('cd-pool-blocked');
+    }
     const label = row.ho_ten || EMPTY_PERSON_NAME;
     const setPayload = (e) => {
       e.dataTransfer.effectAllowed = 'move';
@@ -677,10 +746,10 @@ function createDiagramPane(ctx) {
     // Pool rong chi con ten) — van trong tab order.
     const assign = btn('→', 'sm cd-pool-assign',
       () => openAssignMenu(row));
-    assign.title = 'Gán vị trí (bàn phím — thay cho kéo thả)';
+    assign.title = block || 'Gán vị trí (bàn phím — thay cho kéo thả)';
     assign.setAttribute('aria-label', `Gán vị trí cho ${label}`);
     assign.disabled = !model.canWrite() ||
-      !model.state.capabilities.diagram;
+      !model.state.capabilities.diagram || !!block;
     card.append(assign);
     card.addEventListener('dragstart', setPayload);
     card.addEventListener('dragend', () =>
@@ -712,6 +781,17 @@ function createDiagramPane(ctx) {
       box.append(head);
       const body = h('div', 'modal-body cd-field-stack');
       const nodes = liveNodes();
+      const placedHere = nodes.some((n) => n.personId === row.row_id);
+      const block = !placedHere && typeof model.personDropBlock === 'function'
+        ? model.personDropBlock(row.row_id) : null;
+      if (block) {
+        body.append(h('div', 'error small', block));
+        box.append(body);
+        const foot = h('div', 'modal-foot');
+        foot.append(btn('Đóng', '', close));
+        box.append(foot);
+        return;
+      }
       const assign = (nodeId) => () => {
         // movePerson bao trum ca move vao cho trong LAN swap khi cho
         // da co nguoi — cung semantics voi keo-tha (§13.5 Q9).
@@ -833,7 +913,7 @@ function createDiagramPane(ctx) {
     const sep = h('span', 'toast-sep', ' · ');
     const undoBtn = btn('Hoàn tác', 'toast-action js-toast-undo', () => {
       dismissActiveToast();
-      onUndo();
+      Promise.resolve(onUndo()).catch(() => {});
     });
     undoBtn.setAttribute('aria-label', 'Hoàn tác');
     item.append(msg, sep, undoBtn);
@@ -859,8 +939,11 @@ function createDiagramPane(ctx) {
     const res = await model.removeCard(personId);
     if (!res || !res.ok) return;
     if (res.cascadeOthers.length > 0 && isRemovalNotifyEnabled()) {
-      showUndoToast(res.cascadeOthers.length, () => {
+      showUndoToast(res.cascadeOthers.length, async () => {
         model.restoreDraftSnapshot(res.snapshot);
+        if (typeof model.evaluateDiagram === 'function') {
+          await model.evaluateDiagram();
+        }
       });
     }
     return res;
@@ -869,8 +952,11 @@ function createDiagramPane(ctx) {
   if (model && typeof model.setOnCascade === 'function') {
     model.setOnCascade((count, snapshot) => {
       if (isRemovalNotifyEnabled()) {
-        showUndoToast(count, () => {
+        showUndoToast(count, async () => {
           if (snapshot) model.restoreDraftSnapshot(snapshot);
+          if (typeof model.evaluateDiagram === 'function') {
+            await model.evaluateDiagram();
+          }
         });
       }
     });
@@ -884,16 +970,21 @@ function createDiagramPane(ctx) {
     const card = h('div', 'cd-node');
     card.style.left = `${at.x}px`;
     card.style.top = `${at.y}px`;
+    if (at.w) card.style.width = `${at.w}px`;
+    if (at.h) card.style.height = `${at.h}px`;
     card.dataset.nodeId = n.id;
     card.setAttribute('role', 'group');
     if (n.hidden) card.classList.add('cd-node-hidden');
     if (n.id === 'owner') card.classList.add('cd-node-owner');
     const spouseOwner = spouseOwnerOf(n.id, liveNodes());
-    const spouseIndex = spouseOwner
-      ? spouseOwner.spouseSlotIds.indexOf(n.id) : -1;
-    const spouseLawful = !!(spouseOwner &&
-      spouseIndex === spouseOwner.spouseSlotIds.length - 1);
-    if (spouseOwner) {
+    const filledSpouseIds = spouseOwner
+      ? (spouseOwner.spouseSlotIds || []).filter((id) => {
+          const s = nodeById(id);
+          return s && s.personId;
+        }) : [];
+    const spouseLawful = !!(spouseOwner && n.personId &&
+      n.id === filledSpouseIds[filledSpouseIds.length - 1]);
+    if (spouseOwner && n.personId) {
       card.classList.add(spouseLawful
         ? 'cd-node-spouse-lawful' : 'cd-node-spouse-faded');
     }
@@ -921,10 +1012,19 @@ function createDiagramPane(ctx) {
       warning.code === 'missing_death_date' && warning.personId === n.personId)) {
       card.append(h('div', 'cd-badge cd-badge-warn', 'thiếu ngày mất'));
     }
-    if (spouseOwner) {
+    if (spouseOwner && n.personId) {
       const text = spouseLawful ? 'Vợ/chồng hợp pháp'
         : 'Không phải vợ/chồng hợp pháp';
       card.append(h('div', 'cd-spouse-label', text));
+    }
+    if (!ro && n.personId && (n.parentSlotIds || []).length >= 2 &&
+        typeof model.clearAutoParent === 'function') {
+      const rieng = btn('Con riêng', 'cd-mini-btn js-con-rieng', () => {
+        model.clearAutoParent(n.id);
+      });
+      rieng.title = 'Bỏ cha/mẹ được điền tự động';
+      rieng.setAttribute('aria-label', 'Con riêng');
+      card.append(rieng);
     }
     if (!ro) {
       // Ban phim: gan lai/doi cho cho nguoi dang o node (menu du nang

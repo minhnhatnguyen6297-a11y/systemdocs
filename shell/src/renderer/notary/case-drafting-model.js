@@ -152,6 +152,72 @@ function newNode(id) {
            ownPositions: [], receivePositions: [], hidden: false, deleted: false };
 }
 
+// Năm riêng là hợp lệ (luật F: tính 01/01, hiển thị nguyên văn).
+// Thiếu phần ('06/2001') hoặc ngày không có thật ('31/02/2001') → câu lỗi.
+function personDateIssue(value) {
+  if (value == null) return null;
+  const t = String(value).trim();
+  if (!t) return null;
+  if (/^\d{4}$/.test(t)) return null;
+  let y;
+  let m;
+  let d;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+  const dmy = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(t);
+  if (iso) {
+    y = +iso[1]; m = +iso[2]; d = +iso[3];
+  } else if (dmy) {
+    d = +dmy[1]; m = +dmy[2]; y = +dmy[3];
+  } else {
+    return 'Ngày không hợp lệ';
+  }
+  if (m < 1 || m > 12 || d < 1 || d > 31) return 'Ngày không hợp lệ';
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 ||
+      dt.getUTCDate() !== d) {
+    return 'Ngày không hợp lệ';
+  }
+  return null;
+}
+
+const PERSON_DATE_FIELDS_CHECK = ['ngay_sinh', 'ngay_chet', 'ngay_cap'];
+
+function personDropBlockReason(people, rowId) {
+  const row = (people || []).find((p) => p && p.row_id === rowId);
+  if (!row) return null;
+  for (const field of PERSON_DATE_FIELDS_CHECK) {
+    if (personDateIssue(row[field])) return 'Không thả được: ngày không hợp lệ';
+  }
+  return null;
+}
+
+// Con ordinal → ô vợ/chồng của cặp. Khớp engine: cặp 0 luôn có ô Con;
+// cặp sau chỉ khi ô vợ/chồng đã có người hoặc đã có con.
+function spouseForChildOrdinal(ordinal, spouseIds, anchorId, oldNodes, oldParents) {
+  if (!spouseIds.length || ordinal == null) return null;
+  const groups = spouseIds.map(() => 0);
+  for (const n of oldNodes) {
+    if (!n || !n.personId) continue;
+    const parents = oldParents.get(n.id) || [];
+    if (!parents.includes(anchorId)) continue;
+    const other = parents.find((id) => id !== anchorId && spouseIds.includes(id));
+    const index = other != null ? spouseIds.indexOf(other) : 0;
+    if (index >= 0) groups[index] += 1;
+  }
+  const filled = spouseIds.map((id) => {
+    const n = oldNodes.find((x) => x && x.id === id);
+    return !!(n && n.personId);
+  });
+  let cursor = 0;
+  for (let index = 0; index < spouseIds.length; index += 1) {
+    if (index && !filled[index] && !groups[index]) continue;
+    const count = Math.max(2, groups[index] + 1);
+    if (ordinal < cursor + count) return spouseIds[index];
+    cursor += count;
+  }
+  return spouseIds[0];
+}
+
 function newTwoPartyNode(id) {
   return { id, personId: null, hidden: false, deleted: false };
 }
@@ -1200,8 +1266,17 @@ function createModel(deps) {
     if (!canWrite()) return;
     const row = state.stage.people.find((p) => p.row_id === rowId);
     if (!row || !PERSON_FIELDS.includes(field)) return;
-    row[field] = value === '' ? null : value;
-    if (field === 'ngay_chet' && row.ngay_chet) {
+    const next = value === '' ? null : value;
+    const placed = (state.diagram.nodes || []).some(
+      (n) => n && !n.deleted && n.personId === rowId);
+    const affectsSlots = (field === 'ngay_chet' || field === 'loai_giay_to') && placed;
+    const deathInvalid = field === 'ngay_chet' && !!personDateIssue(next);
+    // Chụp trước khi ghi để Hoàn tác trả ngày cũ, rồi engine chạy lại.
+    if (affectsSlots && !deathInvalid && !pendingStageSnapshot) {
+      pendingStageSnapshot = captureDraftSnapshot();
+    }
+    row[field] = next;
+    if (field === 'ngay_chet' && row.ngay_chet && !deathInvalid) {
       const node = (state.diagram.nodes || []).find(
         (n) => n && !n.deleted && n.personId === rowId);
       if (node && !(node.spouseSlotIds || []).length &&
@@ -1215,13 +1290,23 @@ function createModel(deps) {
         state.diagramDirty = true;
       }
     }
-    if ((field === 'ngay_chet' || field === 'loai_giay_to') &&
-        (state.diagram.nodes || []).some((n) => !n.deleted && n.personId === rowId)) {
-      if (!pendingStageSnapshot) pendingStageSnapshot = captureDraftSnapshot();
+    if (affectsSlots && deathInvalid) {
+      // Luật G: không đánh giá lại — giữ sơ đồ, chỉ báo lỗi tại ô ngày.
+      diagramMutation += 1;
+      pendingStageSnapshot = null;
+    } else if (affectsSlots) {
       diagramMutation += 1;
       requestReconcile({ typing: true });
     }
     clearRowFieldError(rowId, field);
+    if (PERSON_DATE_FIELDS_CHECK.includes(field)) {
+      const msg = personDateIssue(row[field]);
+      if (msg) {
+        state.fieldErrors.push({
+          row_id: rowId, field, code: 'invalid_date', message: msg,
+        });
+      }
+    }
     if (field === 'dia_chi' || field === 'noi_cap') noteLookupSourceChanged();
     touchStage();
   }
@@ -1535,6 +1620,10 @@ function createModel(deps) {
     if (!canWrite()) return false;
     const node = findNode(nodeId);
     if (!node) return false;
+    const already = (state.diagram.nodes || []).some(
+      (n) => n && !n.deleted && n.personId === rowId);
+    if (rowId && !already &&
+        personDropBlockReason(state.stage.people, rowId)) return false;
     // Node 'owner' la mirror cua stage.owner_row_id — gan qua setter de
     // pointer stage cap nhat cung (contract §13.4).
     if (diagramDomain() === CASE_TYPE_INHERITANCE &&
@@ -1591,6 +1680,10 @@ function createModel(deps) {
     if (rowId == null) return false;
     const sourceNode = (state.diagram.nodes || []).find(
       (n) => n && !n.deleted && n.personId === rowId) || null;
+    // Thẻ có ngày sai không thả từ Stage/Pool lên sơ đồ. Gỡ về Pool,
+    // và thẻ đã nằm trên sơ đồ, vẫn được.
+    if (targetNodeId != null && !sourceNode &&
+        personDropBlockReason(state.stage.people, rowId)) return false;
     if (targetNodeId == null) {
       if (!sourceNode) return false;
       if (diagramDomain() === CASE_TYPE_INHERITANCE &&
@@ -1873,20 +1966,35 @@ function createModel(deps) {
     const reqs = new Map(requirements.map((r) => [r.anchorSlotId, r]));
     const queue = ['owner'];
     const relations = [];
+    const spouseIdsOf = new Map();
     for (let i = 0; i < queue.length; i += 1) {
       const anchorId = queue[i];
       const req = reqs.get(anchorId);
       if (!req) continue;
       const anchor = byId.get(anchorId);
       if (!anchor) continue;
-      const parents = anchor.parentSlotIds || [];
+      const parents = oldParents.get(anchorId) || anchor.parentSlotIds || [];
+      const existingParents = parents.filter(Boolean);
       const candidates = {
         father: parents.slice(0, 1).map((id) => byId.get(id)),
         mother: parents.slice(1, 2).map((id) => byId.get(id)),
-        spouse: (anchor.spouseSlotIds || []).map((id) => byId.get(id)),
-        child: old.filter((n) => (n.parentSlotIds || []).includes(anchorId)),
+        spouse: (oldSpouses.get(anchorId) || anchor.spouseSlotIds || [])
+          .map((id) => byId.get(id)),
+        child: old.filter((n) => (oldParents.get(n.id) || n.parentSlotIds || [])
+          .includes(anchorId)),
       };
+      const spouseIds = [];
+      let childOrdinal = 0;
+      // Luật B: người này đã là con của chủ đất / vợ chồng trên sơ đồ
+      // thì không đúc thêm ô Cha/Mẹ (id mới ≠ id cha mẹ đang nối).
+      const linkedElsewhere = existingParents.some((id) => id === 'owner' ||
+        old.some((n) => n && ((n.spouseSlotIds || []).includes(id) ||
+          n.spouseSlotId === id)));
       for (const spec of req.slots || []) {
+        if ((spec.role === 'father' || spec.role === 'mother') &&
+            linkedElsewhere) {
+          continue;
+        }
         let node = byId.get(spec.id);
         if (!node || used.has(node.id)) {
           node = (candidates[spec.role] || []).find((n) => n && !used.has(n.id));
@@ -1900,8 +2008,14 @@ function createModel(deps) {
         }
         used.add(spec.id);
         result.push(node);
-        relations.push({ anchorId, id: spec.id, role: spec.role });
+        const ordinal = spec.ordinal == null ? childOrdinal : spec.ordinal;
+        if (spec.role === 'child') childOrdinal += 1;
+        if (spec.role === 'spouse') spouseIds.push(spec.id);
+        relations.push({
+          anchorId, id: spec.id, role: spec.role, ordinal, oldId,
+        });
       }
+      spouseIdsOf.set(anchorId, spouseIds);
     }
     const retained = new Set(result.map((n) => n.personId).filter(Boolean));
     const returnedToPool = [...new Set(old.map((n) => n.personId)
@@ -1912,20 +2026,38 @@ function createModel(deps) {
       node.spouseSlotIds = [];
       node.spouseSlotId = null;
     }
-    for (const { anchorId, id, role } of relations) {
+    const omitAuto = new Map();
+    for (const { anchorId, id, role, ordinal, oldId } of relations) {
       const anchor = nextById.get(remap.get(anchorId) || anchorId);
       const node = nextById.get(id);
+      if (!anchor || !node) continue;
       if (role === 'father' || role === 'mother') anchor.parentSlotIds.push(id);
       else if (role === 'spouse') anchor.spouseSlotIds.push(id);
-      else if (role === 'child' && !node.parentSlotIds.includes(anchor.id)) {
-        node.parentSlotIds.push(anchor.id);
+      else if (role === 'child' && !node.parentSlotIds.length) {
+        const spouseIds = spouseIdsOf.get(anchorId) || [];
+        const spouseId = spouseForChildOrdinal(
+          ordinal, spouseIds, anchorId, old, oldParents);
+        const prev = oldParents.get(oldId) || [];
+        const prevMapped = prev.map((p) => remap.get(p) || p);
+        // Con riêng: đã xóa cha/mẹ tự điền thì không gắn lại.
+        if (prev.length && prevMapped.includes(anchor.id) && spouseId &&
+            !prevMapped.includes(spouseId)) {
+          node.parentSlotIds = [anchor.id];
+          omitAuto.set(id, spouseId);
+        } else {
+          node.parentSlotIds = spouseId ? [anchor.id, spouseId] : [anchor.id];
+        }
       }
     }
     for (const [oldId, newId] of remap) {
       const node = nextById.get(newId);
+      if (!node) continue;
       for (const parentId of oldParents.get(oldId) || []) {
         const mapped = remap.get(parentId);
-        if (mapped && !node.parentSlotIds.includes(mapped)) node.parentSlotIds.push(mapped);
+        if (!mapped || node.parentSlotIds.includes(mapped)) continue;
+        if (node.parentSlotIds.length >= 2) continue;
+        if (omitAuto.get(newId) === mapped) continue;
+        node.parentSlotIds.push(mapped);
       }
       const order = (oldSpouses.get(oldId) || []).map((id) => remap.get(id));
       node.spouseSlotIds.sort((a, b) =>
@@ -1947,6 +2079,33 @@ function createModel(deps) {
     return { changed, returnedToPool };
   }
 
+  function placedPersonHasInvalidDate() {
+    for (const n of state.diagram.nodes || []) {
+      if (!n || n.deleted || !n.personId) continue;
+      if (personDropBlockReason(state.stage.people, n.personId)) return true;
+    }
+    return false;
+  }
+
+  // Con riêng: bỏ cha/mẹ được điền tự động (ô vợ/chồng của cha/mẹ còn lại).
+  // Không thêm field — lần đối chiếu sau thấy thiếu id đó thì không gắn lại.
+  function clearAutoParent(nodeId) {
+    if (!canWrite()) return false;
+    const node = findNode(nodeId);
+    if (!node || (node.parentSlotIds || []).length < 2) return false;
+    const parents = node.parentSlotIds;
+    const auto = parents.find((id) => parents.some((other) => {
+      if (other === id) return false;
+      const host = findNode(other);
+      return !!(host && ((host.spouseSlotIds || []).includes(id) ||
+        host.spouseSlotId === id));
+    }));
+    if (!auto) return false;
+    node.parentSlotIds = parents.filter((id) => id !== auto);
+    touchDiagram();
+    return true;
+  }
+
   function evaluateDiagram() {
     clearTimeout(reconcileTimer);
     reconcileTimer = null;
@@ -1958,6 +2117,11 @@ function createModel(deps) {
     if (state.unsupported) {
       return { ok: false, error: errObj('case_type_unsupported',
                                         'Loại việc chưa hỗ trợ') };
+    }
+    // Luật G: ngày sai trên thẻ đã đặt không được đánh giá lại —
+    // requiredSlots rỗng sẽ xóa cả sơ đồ.
+    if (placedPersonHasInvalidDate()) {
+      return { ok: true, returnedToPool: [] };
     }
     const call = ++evaluateSeq;
     let diagramAtIssue = diagramMutation;
@@ -1980,6 +2144,7 @@ function createModel(deps) {
         return r;
       }
       if (!deps.reconcileEngine) break;
+      if (placedPersonHasInvalidDate()) break;
       const reqs = r.data?.render_model?.requiredSlots;
       if (!r.ok || diagramDomain() !== CASE_TYPE_INHERITANCE ||
           !Array.isArray(reqs) ||
@@ -2561,7 +2726,8 @@ function createModel(deps) {
     moveAsset, setOwnerRow,
     removeStageRow, fieldErrorsFor,
     pool,
-    addSlot, assignPerson, movePerson,
+    addSlot, assignPerson, movePerson, clearAutoParent,
+    personDropBlock: (rowId) => personDropBlockReason(state.stage.people, rowId),
     setNodeFlag, toggleNodePosition, setNodeRelation, nodeRemovalImpact, removeNode,
     evaluateDiagram, reconcileRequiredSlots,
     captureDraftSnapshot, restoreDraftSnapshot, removeCard,
@@ -2590,6 +2756,7 @@ const G1_NOTARY_MODEL = {
   CASE_DOCUMENT_TYPES_TWO_PARTY,
   documentTypesFor,
   DIAGRAM_VERSION,
+  personDateIssue,
   MAX_ASSETS,
   MAX_PEOPLE_TWO_PARTY,
   POSITIONS,

@@ -469,6 +469,18 @@ test('WP6 node tests: y(spouse)==y(partner); children x ordered by birth; empty 
   assert.ok(lay.pos.child_1980.x < lay.pos.child_unk.x, 'child known birth phai dung truoc child unknown birth');
   assert.ok(lay.pos.child_unk.x < lay.pos.child_spare.x, 'child unknown phai dung truoc spare child slot');
 
+  const boxes = Object.values(lay.pos);
+  for (let i = 0; i < boxes.length; i += 1) {
+    for (let j = i + 1; j < boxes.length; j += 1) {
+      const a = boxes[i], b = boxes[j];
+      const overlap = a.x < b.x + b.w - 0.5 && b.x < a.x + a.w - 0.5 &&
+        a.y < b.y + b.h - 0.5 && b.y < a.y + a.h - 0.5;
+      assert.equal(overlap, false, `overlap ${JSON.stringify(a)} ${JSON.stringify(b)}`);
+    }
+  }
+  assert.ok(lay.pos.child_1960.y > lay.pos.owner.y + lay.pos.owner.h - 1,
+    'Con nằm dưới hàng của cặp');
+
   // 2. empty slots labelled
   const emptyOwner = mk('owner');
   const emptyFa = mk('father');
@@ -492,6 +504,14 @@ test('WP6 node tests: y(spouse)==y(partner); children x ordered by birth; empty 
   assert.equal(emptySlotRole(emptySp, testNodes, testPeople), 'Vợ/chồng');
   assert.equal(emptySlotRole(emptyCh, testNodes, testPeople), 'Con');
   assert.equal(emptySlotRole(emptyRepChild, testNodes, testPeople), 'Con của Nguyễn Văn C');
+  const uuid = '11111111-1111-4111-8111-111111111111';
+  const namedOwner = { id: 'owner', personId: 'p_owner', parentSlotIds: [uuid],
+    spouseSlotIds: [] };
+  const uuidFather = { id: uuid, personId: null, parentSlotIds: [] };
+  assert.equal(emptySlotRole(uuidFather, [namedOwner, uuidFather],
+    [{ row_id: 'p_owner', ho_ten: 'Người để lại' }]), 'Cha của Người để lại');
+  assert.doesNotMatch(emptySlotRole(uuidFather, [namedOwner, uuidFather],
+    [{ row_id: 'p_owner', ho_ten: 'Người để lại' }]), /[0-9a-f]{8}-/i);
 
   // Check DOM rendering in view
   const { view } = await build(t, { mode: 'case', seed: {
@@ -721,7 +741,7 @@ test('requiredSlots (engine slots[]): tao father/mother/spouse/child voi ID on d
   assert.equal(owner.spouseSlotId, 's_spouse_1');
   for (const kid of ['s_child_0', 's_child_1']) {
     assert.deepEqual(
-      after.find((n) => n.id === kid).parentSlotIds, ['owner']);
+      after.find((n) => n.id === kid).parentSlotIds, ['owner', 's_spouse_0']);
   }
   assert.equal(model.state.renderModel.requiredSlots, required);
 });
@@ -825,7 +845,7 @@ test('deceased owner evaluate response creates its required relationship slots',
   assert.ok(owner.spouseSlotId);
   const child = model.state.diagram.nodes.find((n) => n.id === 's_child_0');
   assert.ok(child && !child.personId);
-  assert.deepEqual(child.parentSlotIds, ['owner']);
+  assert.deepEqual(child.parentSlotIds, ['owner', 's_spouse_0']);
 });
 test('stale evaluate response cannot apply its required slots to a changed diagram', async (t) => {
   let resolveEvaluate;

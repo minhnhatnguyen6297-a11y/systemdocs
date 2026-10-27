@@ -248,6 +248,28 @@ def test_full_death_date_is_preserved_while_year_only_uses_first_of_january():
     assert _parse_death_date("2026") == date(2026, 1, 1)
 
 
+def test_invalid_partial_death_date_does_not_fail_the_case():
+    """Rule G: '06/2001' / '31/02/2001' skip that person; others keep slots."""
+    partial = _run(
+        {"A": "01/06/2020", "C": "06/2001"},
+        parents={"C": ["A"]},
+        owners={"A"},
+    )
+    assert partial["status"] != "invalid"
+    assert not any(e.get("code") == "invalid_death_date" for e in partial["errors"])
+    anchors = {item["anchorSlotId"]: item for item in partial["requiredSlots"]}
+    assert anchors["slot_A"]["slotTypes"] == ["father", "mother", "spouse", "child"]
+    assert "slot_C" not in anchors
+
+    impossible = _run(
+        {"A": "01/06/2020", "C": "31/02/2001"},
+        parents={"C": ["A"]},
+        owners={"A"},
+    )
+    assert impossible["status"] != "invalid"
+    assert {item["anchorSlotId"] for item in impossible["requiredSlots"]} >= {"slot_A"}
+
+
 def test_year_only_death_orders_as_first_of_january_in_slot_table():
     """Rule F: child '2020' vs owner 01/06/2020 is before → Con slots only."""
     result = _run(
