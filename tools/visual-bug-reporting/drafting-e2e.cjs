@@ -213,9 +213,28 @@ async function stageSnapshot() {
   });
 }
 async function diagramNodes() {
-  return P().evaluate(() => [...document.querySelectorAll('.cd-node[data-node-id], .cd-tp-slot[data-slot-id]')].map((e) => ({
-    id: e.dataset.nodeId || e.dataset.slotId, empty: e.classList.contains('cd-node-empty') || !e.classList.contains('filled') && !!e.dataset.slotId,
-    label: e.getAttribute('aria-label'), text: e.innerText.replace(/\s+/g, ' ').trim().slice(0, 80) })));
+  return P().evaluate(() => [...document.querySelectorAll('.cd-node[data-node-id], .cd-tp-slot[data-slot-id]')].map((e) => {
+    const empty = e.classList.contains('cd-node-empty') || (!e.classList.contains('filled') && !!e.dataset.slotId);
+    const nameEl = e.querySelector('.cd-node-name');
+    const emptyEl = e.querySelector('.cd-empty-label');
+    const rows = e.querySelectorAll('.cd-posrow');
+    const ownChips = rows[0] ? [...rows[0].querySelectorAll('.cd-poschip.on')] : [];
+    const recChips = rows[1] ? [...rows[1].querySelectorAll('.cd-poschip.on')] : [];
+    const x = parseFloat(e.style.left) || 0;
+    const y = parseFloat(e.style.top) || 0;
+    return {
+      id: e.dataset.nodeId || e.dataset.slotId,
+      empty,
+      label: e.getAttribute('aria-label') || '',
+      text: e.innerText.replace(/\s+/g, ' ').trim().slice(0, 80),
+      name: nameEl ? nameEl.textContent.trim() : null,
+      emptyRole: emptyEl ? emptyEl.textContent.trim() : null,
+      x,
+      y,
+      ownChecked: ownChips.length > 0,
+      receiveChecked: recChips.length > 0,
+    };
+  }));
 }
 async function poolNames() { return P().locator('.cd-pool-card .cd-pool-nm').evaluateAll((els) => els.map((e) => e.firstChild ? e.firstChild.textContent.trim() : e.textContent.trim())); }
 async function dragPoolToNode(name, nodeId) {
@@ -360,8 +379,11 @@ T.T3 = async () => {
   const leaks = nodes.filter((n) => /[a-z]+_[a-z]+/.test(n.label || ''));
   check('slot labels/tooltips have no internal ids', leaks.length === 0, leaks.map((n) => n.label));
   await shot('final-deceased-B');
-  const childSlots = nodes.filter((n) => ['father', 'mother', 'spouse'].includes(n.id) || /^child/.test(n.id));
-  check('deceased placed person has father/mother/spouse/child slots', ['father', 'mother', 'spouse'].every((id) => childSlots.some((n) => n.id === id)) && childSlots.some((n) => /^child/.test(n.id)), nodes.map((n) => n.id));
+  const hasFather = nodes.some((n) => /Cha/.test(n.label || n.text));
+  const hasMother = nodes.some((n) => /Mẹ/.test(n.label || n.text));
+  const hasSpouse = nodes.some((n) => /Vợ\/chồng/.test(n.label || n.text));
+  const hasChild = nodes.some((n) => /Con/.test(n.label || n.text));
+  check('deceased placed person has father/mother/spouse/child slots', hasFather && hasMother && hasSpouse && hasChild, nodes.map((n) => n.label || n.text));
   const c = lastCase();
   const cs = JSON.parse(c.case_state_json || '{}');
   record('caseStateKeys', Object.keys(cs));
@@ -524,19 +546,20 @@ T.T7 = async () => {
   await dragPoolToNode(NAMES.B, decSlot);
   const nodes = await diagramNodes();
   record('nodesAfterB', nodes);
-  const spouse = nodes.find((n) => n.id === 'spouse');
+  const spouse = nodes.find((n) => n.empty && /Vợ\/chồng/.test(n.label || n.text));
   record('spouseSlot', spouse || null);
   if (!check('spouse slot exists after deceased placed', !!spouse, nodes)) return;
   await dragPoolToNode(NAMES.A, spouse.id);
   let r = await save('spouse-X');
   check('save with spouse X', r.ok, r.errs);
   const idA = await nodeOf(NAMES.A); if (idA) await dragNodeToPool(idA);
-  await dragPoolToNode(NAMES.E, spouse.id);
+  const targetSpouse = (await diagramNodes()).find((n) => n.empty && /Vợ\/chồng/.test(n.label || n.text));
+  await dragPoolToNode(NAMES.E, targetSpouse.id);
   r = await save('spouse-Y');
   check('save with spouse Y', r.ok, r.errs);
   const placed = (await diagramNodes()).filter((n) => !n.empty);
   record('placed', placed);
-  check('spouse slot holds Y (E)', placed.some((n) => n.id === spouse.id && n.text.includes(NAMES.E)), placed);
+  check('spouse slot holds Y (E)', placed.some((n) => n.id === targetSpouse.id && n.text.includes(NAMES.E)), placed);
   const dest = path.join(A.profile, 'export-t7'); fs.mkdirSync(dest, { recursive: true });
   const w = await wordExport('folder', dest);
   const an = analyzeDocx(w.files, [NAMES.E], [NAMES.A]);
@@ -636,6 +659,225 @@ T.T9b = async () => {
   check('export 30: no exception class names shown', !/[A-Z][a-zA-Z]+Error:/.test(res), res.slice(-300));
   const an = analyzeDocx(w.files, []);
   check('30-people docx: no leftover placeholders', an.every((a) => a.placeholders.length === 0), an.map((a) => [a.file, a.placeholders]));
+};
+// ---- v2 rules (plan WP8): user scenario A/B/C/D ----
+const U = { A: 'Nguyễn Văn A', B: 'Trần Thị B', C: 'Nguyễn Văn C', D: 'Nguyễn Thị D', E: 'Lê Thị E' };
+const U_DATA = [
+  { name: U.A, birth: '1950', death: '2020' },
+  { name: U.B, birth: '1955', death: '1997' },
+  { name: U.C, birth: '1975', death: '2001' },
+  { name: U.D, birth: '1977', death: '' },
+  { name: U.E, birth: '1958', death: '' },
+];
+async function stagePeople(rows) {
+  for (let i = 0; i < rows.length; i++) await addPerson();
+  for (let i = 0; i < rows.length; i++) {
+    await typeField(pf('ho_ten'), i, rows[i].name);
+    if (rows[i].birth) await typeField(pf('ngay_sinh'), i, rows[i].birth);
+    if (rows[i].death) await typeField(pf('ngay_chet'), i, rows[i].death);
+  }
+  await addAsset();
+  await typeField(af('so_thua_dat'), 0, '100');
+  await typeField(af('so_to_ban_do'), 0, '10');
+}
+const emptyOf = (nodes, role, ofName) => nodes.filter((n) => n.empty && (n.emptyRole === role || (n.emptyRole || '').startsWith(role + ' của ')) && (!ofName || (n.label || '').includes(`của ${ofName})`)));
+const byName = (nodes, nm) => nodes.find((n) => !n.empty && n.name === nm);
+async function dropInto(name, role, ofName) {
+  const t = emptyOf(await diagramNodes(), role, ofName)[0];
+  if (!t) { check(`empty ${role} slot of ${ofName || '?'} available for ${name}`, false, null); return false; }
+  await dragPoolToNode(name, t.id); return true;
+}
+async function setDeath(name, value) { await typeField(pf('ngay_chet'), await personIndex(name), value); await P().waitForTimeout(600); }
+async function removeCard(name) {
+  const b = P().locator('.cd-node', { hasText: name }).locator('.js-card-remove').first();
+  record('removeBtn:' + name, await b.count());
+  await b.click();
+  await P().waitForTimeout(600);
+}
+async function toastState() {
+  return P().evaluate(() => {
+    const t = [...document.querySelectorAll('.toast-undo')].filter((e) => e.offsetWidth || e.offsetHeight);
+    return { n: t.length, text: t.map((e) => e.innerText.replace(/\s+/g, ' ').trim()), undo: t.some((e) => !!e.querySelector('.js-toast-undo')) };
+  });
+}
+async function buildUserScenario({ cLiving = false } = {}) {
+  await newCase();
+  const rows = U_DATA.slice(0, 4).map((r) => ({ ...r }));
+  if (cLiving) rows[2].death = '';
+  await stagePeople(rows);
+  await dragPoolToNode(U.A, 'owner');
+  await dropInto(U.B, 'Vợ/chồng', U.A);
+  await dropInto(U.C, 'Con', U.A);
+  await dropInto(U.D, 'Con', U.A);
+}
+
+T.T10 = async () => {
+  await newCase();
+  await stagePeople(U_DATA.slice(0, 4));
+  await dragPoolToNode(U.A, 'owner');
+  let nodes = await diagramNodes();
+  record('nodesAfterA', nodes);
+  check('dead owner A → 1 Cha + 1 Mẹ', emptyOf(nodes, 'Cha', U.A).length === 1 && emptyOf(nodes, 'Mẹ', U.A).length === 1, nodes.map((n) => n.label));
+  check('dead owner A → 2 Vợ/chồng slots (1 + spare)', emptyOf(nodes, 'Vợ/chồng', U.A).length === 2, nodes.map((n) => n.label));
+  check('dead owner A → 2 Con slots (1 + spare)', emptyOf(nodes, 'Con', U.A).length === 2, nodes.map((n) => n.label));
+  await dropInto(U.B, 'Vợ/chồng', U.A);
+  nodes = await diagramNodes();
+  check('B (died 1997, before A) generates no slots of her own', !nodes.some((n) => n.empty && (n.label || '').includes(`của ${U.B})`)), nodes.map((n) => n.label));
+  check('after B: spare Vợ/chồng slot still present', emptyOf(nodes, 'Vợ/chồng', U.A).length === 1, nodes.map((n) => n.label));
+  await dropInto(U.C, 'Con', U.A);
+  await dropInto(U.D, 'Con', U.A);
+  nodes = await diagramNodes();
+  record('nodesFinal', nodes);
+  await shot('T10-user-scenario');
+  const [a, b, c, d] = [U.A, U.B, U.C, U.D].map((nm) => byName(nodes, nm));
+  check('A, B, C, D all placed', a && b && c && d, nodes.map((n) => n.name));
+  if (!(a && b && c && d)) return;
+  check('C (died 2001, before A) → Con slot(s) under C (thế vị)', emptyOf(nodes, 'Con', U.C).length >= 1, nodes.map((n) => n.label));
+  check('C → no Vợ/chồng slot (Điều 652)', emptyOf(nodes, 'Vợ/chồng', U.C).length === 0 && emptyOf(nodes, 'Cha', U.C).length === 0 && emptyOf(nodes, 'Mẹ', U.C).length === 0, nodes.map((n) => n.label));
+  check('D (living, non-owner) → no slots', !nodes.some((n) => n.empty && (n.label || '').includes(`của ${U.D})`)), nodes.map((n) => n.label));
+  check('A keeps a spare Con slot', emptyOf(nodes, 'Con', U.A).length === 1, emptyOf(nodes, 'Con', U.A));
+  check('A keeps a spare Vợ/chồng slot', emptyOf(nodes, 'Vợ/chồng', U.A).length === 1, emptyOf(nodes, 'Vợ/chồng', U.A));
+  check('only A ticked Chủ by default', a.ownChecked && ![b, c, d].some((n) => n.ownChecked), [a, b, c, d].map((n) => [n.name, n.ownChecked]));
+  check('nobody ticked Nhận by default', ![a, b, c, d].some((n) => n.receiveChecked), [a, b, c, d].map((n) => [n.name, n.receiveChecked]));
+  const cha = emptyOf(nodes, 'Cha', U.A)[0];
+  const spare = emptyOf(nodes, 'Vợ/chồng', U.A)[0];
+  check('generation rows: Cha above A, B same row as A, C/D below', cha && cha.y < a.y && b.y === a.y && c.y > a.y && c.y === d.y, { cha: cha && cha.y, a: a.y, b: b.y, c: c.y, d: d.y });
+  check('B directly beside A, spare spouse after B', b.x > a.x && spare && spare.y === a.y && spare.x > b.x && !nodes.some((n) => n.y === a.y && n.x > a.x && n.x < b.x), { a: a.x, b: b.x, spare: spare && spare.x });
+  check('children ordered by birth (C 1975 left of D 1977)', c.x < d.x, { c: c.x, d: d.x });
+  const uuidRx = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-/i;
+  check('no internal ids (uuid) in node labels/tooltips', !nodes.some((n) => uuidRx.test(n.label) || uuidRx.test(n.text)), nodes.filter((n) => uuidRx.test(n.label)).map((n) => n.label));
+  const r = await save('T10-saved');
+  check('save scenario ok', r.ok, r.errs);
+};
+
+T.T11 = async () => {
+  await buildUserScenario();
+  await setDeath(U.A, '');
+  const nodes = await diagramNodes();
+  record('nodesAfterALiving', nodes);
+  const ts = await toastState();
+  record('toast', ts);
+  await shot('T11-A-living');
+  const pool = await poolNames();
+  record('pool', pool);
+  check('living A: no Cha/Mẹ/Con slots', ['Cha', 'Mẹ', 'Con'].every((r) => emptyOf(nodes, r).length === 0) && !nodes.some((n) => (n.label || '').includes(`của ${U.C})`)), nodes.map((n) => n.label));
+  check('living A: Vợ/chồng slot exists', nodes.some((n) => /Vợ\/chồng/.test(n.emptyRole || '') || n.name === U.B), nodes.map((n) => n.label));
+  check('C and D returned to Pool', pool.includes(U.C) && pool.includes(U.D), pool);
+  check('toast "Đã đưa N người về Pool" with Hoàn tác', ts.n >= 1 && ts.undo && /về Pool/.test(ts.text.join(' ')), ts);
+  await setDeath(U.A, '2020');
+  const back = await diagramNodes();
+  check('A dead again → Cha/Mẹ/Con slots return', emptyOf(back, 'Cha', U.A).length === 1 && emptyOf(back, 'Con', U.A).length >= 1, back.map((n) => n.label));
+};
+
+T.T12 = async () => {
+  await buildUserScenario();
+  // leaf removal: D → silent
+  await removeCard(U.D);
+  let ts = await toastState();
+  check('removing D (no cascade) → no toast', ts.n === 0, ts);
+  await dropInto(U.D, 'Con', U.A);
+  record('poolAfterReDropD', await poolNames());
+  await P().waitForTimeout(5500); // let any toast expire
+  await removeCard(U.A);
+  ts = await toastState();
+  let pool = await poolNames();
+  await shot('T12-remove-A-toast');
+  check('removing A → B, C, D back to Pool (incl. spouse)', [U.A, U.B, U.C, U.D].every((n) => pool.includes(n)), pool);
+  check('cascade → toast with Hoàn tác', ts.n >= 1 && ts.undo && /3 người/.test(ts.text.join(' ')), ts);
+  check('no generated slots remain', (await diagramNodes()).every((n) => n.id === 'owner'), (await diagramNodes()).map((n) => n.label));
+  await P().locator('.js-toast-undo').first().click();
+  await P().waitForTimeout(800);
+  const nodes = await diagramNodes();
+  pool = await poolNames();
+  await shot('T12-undo');
+  check('Hoàn tác restores A, B, C, D exactly', [U.A, U.B, U.C, U.D].every((nm) => byName(nodes, nm)) && pool.length === 0, { pool, names: nodes.map((n) => n.name) });
+  // silent toggle
+  await P().waitForTimeout(5500);
+  await P().locator('.js-toggle-notify-on-remove').first().uncheck();
+  await removeCard(U.A);
+  ts = await toastState();
+  pool = await poolNames();
+  check('toggle off → cascade still happens', [U.A, U.B, U.C, U.D].every((n) => pool.includes(n)), pool);
+  check('toggle off → no toast', ts.n === 0, ts);
+  await P().locator('.js-toggle-notify-on-remove').first().check();
+};
+
+T.T13 = async () => {
+  await buildUserScenario({ cLiving: true });
+  let nodes = await diagramNodes();
+  check('C living → no slots under C', !nodes.some((n) => n.empty && (n.label || '').includes(`của ${U.C})`)), nodes.map((n) => n.label));
+  await setDeath(U.C, '2001');
+  nodes = await diagramNodes();
+  record('nodesAfterCDead', nodes);
+  await shot('T13-C-dead-stage');
+  check('Stage edit C dead 2001 → "Con" slot of C appears', emptyOf(nodes, 'Con', U.C).length >= 1, nodes.map((n) => n.label));
+  check('… and no Vợ/chồng slot for C', emptyOf(nodes, 'Vợ/chồng', U.C).length === 0, nodes.map((n) => n.label));
+  const c = byName(nodes, U.C); const cc = emptyOf(nodes, 'Con', U.C)[0];
+  check('Con của C one row below C', c && cc && cc.y > c.y, { c: c && c.y, cc: cc && cc.y });
+};
+
+T.T14 = async () => {
+  await newCase();
+  await stagePeople(U_DATA);
+  await dragPoolToNode(U.A, 'owner');
+  await dropInto(U.B, 'Vợ/chồng', U.A);
+  await dropInto(U.E, 'Vợ/chồng', U.A);
+  const nodes = await diagramNodes();
+  record('nodes', nodes);
+  await shot('T14-second-spouse');
+  check('2nd spouse into spare → a new spare Vợ/chồng slot', emptyOf(nodes, 'Vợ/chồng', U.A).length === 1, nodes.map((n) => n.label));
+  const txt = (nm) => (byName(nodes, nm) || {}).text || '';
+  check('last placed (E) = Vợ/chồng hợp pháp', /Vợ\/chồng hợp pháp/.test(txt(U.E)) && !/Không phải/.test(txt(U.E)), txt(U.E));
+  check('earlier (B) = Không phải vợ/chồng hợp pháp', /Không phải vợ\/chồng hợp pháp/.test(txt(U.B)), txt(U.B));
+  const a = byName(nodes, U.A), b = byName(nodes, U.B), e = byName(nodes, U.E);
+  check('both spouses on A\'s row', a && b && e && a.y === b.y && a.y === e.y, [a, b, e].map((n) => n && n.y));
+};
+
+T.T15 = async () => {
+  await newCase();
+  await stagePeople(U_DATA.slice(0, 1));
+  const ms = [];
+  for (let i = 0; i < 20; i++) {
+    const t = await P().evaluate(async () => {
+      const card = document.querySelector('.cd-pool-card');
+      const target = document.querySelector('.cd-node[data-node-id="owner"]');
+      const dt = new DataTransfer();
+      card.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+      target.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: dt }));
+      target.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
+      const t0 = performance.now();
+      target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+      card.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: dt }));
+      const ok = () => [...document.querySelectorAll('.cd-empty-label')].some((e) => e.textContent.trim() === 'Cha');
+      while (!ok()) { if (performance.now() - t0 > 5000) return -1; await new Promise((r) => requestAnimationFrame(r)); }
+      return performance.now() - t0;
+    });
+    ms.push(t);
+    await removeCard(U.A);
+    await P().waitForFunction(() => ![...document.querySelectorAll('.cd-empty-label')].some((e) => e.textContent.trim() === 'Cha'), null, { timeout: 5000 }).catch(() => {});
+  }
+  const ok = ms.filter((x) => x >= 0).sort((x, y) => x - y);
+  const p95 = ok[Math.ceil(ok.length * 0.95) - 1];
+  record('dropToSlotMs', ms.map((x) => Math.round(x)));
+  record('p95', p95);
+  check('all 20 drops produced slots', ok.length === 20, ms);
+  check(`drop → slots p95 ≤ 200ms (got ${Math.round(p95)}ms)`, p95 <= 200, { p95, median: ok[10] });
+};
+
+T.T16 = async () => {
+  await buildUserScenario();
+  await shot('T16-no-delete');
+  const r = await P().evaluate(() => {
+    const nodes = [...document.querySelectorAll('.cd-node')];
+    const btns = nodes.flatMap((n) => [...n.querySelectorAll('button')].map((b) => ({ t: b.textContent.trim(), cls: b.className, aria: b.getAttribute('aria-label') || '' })));
+    const emptyBtns = [...document.querySelectorAll('.cd-node-empty button')].length;
+    const body = document.body.innerText;
+    return { btns, emptyBtns, menu: /Quan hệ|Thêm cha\/mẹ|Thêm con|Xóa ô|Xoá ô|Thêm ô/.test(body) };
+  });
+  record('nodeButtons', [...new Set(r.btns.map((b) => b.t + '|' + b.aria.replace(/ .*/, '')))]);
+  check('no × / delete-slot button on any node', !r.btns.some((b) => /^[×✕x]$/.test(b.t) || /xóa|xoá|delete/i.test(b.aria + b.cls)), r.btns.filter((b) => /×|xóa|xoá/i.test(b.t + b.aria)));
+  check('empty (engine) slots have no buttons', r.emptyBtns === 0, r.emptyBtns);
+  check('no relationship menu / add-slot actions', !r.menu, null);
 };
 
 T.PROBE = async () => {
