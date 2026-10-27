@@ -1426,15 +1426,13 @@ diagram_state v3 (domain inheritance):
   `personId` §13.19 — trả `diagram.warnings` data-code
   `diagram.selection_pruned`; UI được disable chip tài sản chưa tồn tại.
   Không reject cả lần ghi chỉ vì dấu chọn pending này.
-- **Mặc định khi gán (Q5):** node `owner` → `ownPositions`, slot thừa
-  kế khác → `receivePositions`: mảng rỗng được điền tất cả vị trí đang có
-  ({1..len(assets)}). Khi thêm/gỡ tài sản và khi Lưu hồ sơ, client
-  đồng bộ đầy đủ tập vị trí hiện có nếu user chưa tự chỉnh chip cho đúng
-  node + loại Chủ/Nhận trong phiên; lựa chọn tay, kể cả tắt hết, không bị
-  tự ghi đè. Riêng owner đang rỗng không được tự điền nếu node khác đã có
-  `ownPositions` không rỗng. Đây là tiện ích **client-side**, wire luôn
-  mang mảng explicit; dấu đã chỉnh chỉ ở state phiên, reset khi mở hồ sơ/
-  phiên mới. *Hiệu chỉnh từ vòng lặp sửa lỗi E2E 23/10 — phương án B.*
+- **Mặc định khi gán (Q5, owner 27/10/2026):** ô chủ đất → `ownPositions`
+  = mọi vị trí tài sản hiện có, `receivePositions = []`. Mọi ô khác:
+  `ownPositions = []`, `receivePositions = []` (= từ chối trong văn bản).
+  Không tự tích Nhận. Khi thêm tài sản, chỉ người đã tích Chủ/Nhận mới
+  được nối thêm vị trí mới vào đúng loại đã tích; người chưa tích không
+  được tự điền. Lựa chọn đã lưu, kể cả `receivePositions`, giữ nguyên khi
+  mở hồ sơ cũ; mặc định mới chỉ áp dụng người mới thả. Wire mang mảng explicit.
 - **Slot `owner` (mirror):** node `id:"owner"` tồn tại như v1 nhưng
   `personId` của nó do server căn theo `stage.owner_row_id` (§13.6).
   `diagram_save` gửi `owner.personId` khác `owner_row_id` →
@@ -1446,25 +1444,24 @@ diagram_state v3 (domain inheritance):
   đã biết:* engine coi di sản là một khối — ownership theo từng vị trí
   được lưu cho văn bản/Word (tương lai) nhưng **chưa** ảnh hưởng công
   thức chia; cần task engine riêng nếu muốn tính theo từng tài sản.
-- Quan hệ (`parentSlotIds`, `spouseSlotId`), `duplicate_person` (1
-  người / 1 node active — A3), `hidden`/`deleted`, auto-seed slot theo
-  `requiredSlots` — **giữ nguyên** semantics §7.1.
-- **Gỡ cả nhánh Thừa kế (owner 17/10/2026, “B - gỡ cả nhánh”):**
-  xóa node gỡ node đó và mọi hậu duệ active theo cạnh cha/mẹ → con,
-  kể cả slot trống/ẩn hoặc con còn parent khác. Không mở rộng tập theo
-  spouse, không tự reparent hoặc giữ ô trung gian rỗng. Trước mutation
-  phải liệt kê node/quan hệ thực tế bị tác động và cảnh báo phần hưởng.
-  Hủy/Escape/đóng không mutate draft/dirty/revision hay phát evaluate/save
-  do thao tác này; xác nhận một mutation draft rồi evaluate hiện có,
-  không autosave. Graph thay đổi thì không áp cảnh báo cũ âm thầm.
-  Giữ Node v3 canonical với `deleted:true`, ID/`personId`/Chủ/Nhận;
-  xóa toàn bộ quan hệ đi ra từ tập bị gỡ và mọi tham chiếu đi vào tập
-  này trên tất cả node, kể cả tombstone cũ, để không sinh spouse lệch
-  hai chiều/parent sai. Stage Người/Tài sản, thứ tự/vị trí/giá trị và
-  graph/dấu không bị tác động giữ nguyên. Save/revision/atomic/errors
-  dùng đường hiện có; mở lại giữ đúng canonical, không store/API mới.
+- Quan hệ và dấu chọn của ô còn cần được giữ nguyên; một người chỉ được
+  gán vào một ô active. **Ô do engine sở hữu**, ID ổn định theo
+  (người gốc, vai trò, thứ tự). Người dùng chỉ thả/di chuyển/gỡ thẻ và
+  tích Chủ/Nhận; không tạo/xóa ô hoặc nối quan hệ bằng tay.
+- **Gỡ thẻ (owner 27/10/2026, thay quyết định 17/10):** đưa người về Pool,
+  không xóa Người trong Stage. Sau mỗi thay đổi, kể cả sửa ngày mất/còn sống
+  ở Stage, engine chạy tới ổn định và quyết định tập ô theo spec Sơ đồ §9.6.
+  Ô thừa trống bỏ im lặng; ô thừa có thẻ thì thẻ về Pool. Gỡ chủ đất trả
+  mọi người trong ô sinh ra từ chủ đất về Pool, **kể cả vợ/chồng**.
+  Không hộp xác nhận. Chỉ khi có người khác bị đẩy về Pool mới hiện
+  `Đã đưa N người về Pool · Hoàn tác` khoảng 5 giây; Hoàn tác khôi phục
+  nguyên trạng trước thay đổi. Công tắc thông báo trong cài đặt mặc định
+  bật, tắt thì hoàn toàn im lặng. Một lượt thay đổi chỉ vẽ lại một lần,
+  không tự lưu; Lưu hồ sơ giữ atomic/revision/errors hiện có.
+  Tombstone `deleted:true` cũ bỏ qua khi đọc, dọn khi lưu lại; không tạo
+  tombstone mới để biểu diễn thao tác gỡ thẻ.
   Quy tắc đầy đủ: `_bmad-output/specs/notary_v2/diagram-rules.md` §9.9;
-  quyết định: `decision-owner-inheritance-remove-entire-branch-20261017.md`.
+  quyết định: `decision-owner-diagram-rules-v2-20261027.md`.
 
 ### 13.5 Domain `two_party` — sơ đồ hai bên 30 vị trí (Q7, Q8)
 

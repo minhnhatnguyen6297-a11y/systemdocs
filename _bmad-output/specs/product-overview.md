@@ -225,10 +225,14 @@ Việc đang mở được tổng hợp tại [catalog issue](../backlog/README.
   `diagram_invalid_state`, toast hiện lỗi sơ đồ đầu tiên, thiếu chi tiết thì
   hiện lỗi tổng. `missing_land_owner` chỉ rõ thiếu chip Chủ trên vị trí tài
   sản, không hướng dẫn gán lại người đã có trên sơ đồ.
-- Hiệu chỉnh G1 cùng vòng E2E 23/10 (B): mặc định Chủ của owner/Nhận của
-  node thừa kế khác đồng bộ đủ tập tài sản khi thêm/gỡ và khi Lưu, đến khi
-  user tự chỉnh chip cho đúng node + loại trong phiên. Lựa chọn tay kể cả
-  rỗng giữ nguyên; owner rỗng không tự điền nếu node khác đã có Chủ.
+- **Luật sơ đồ v2 — owner 27/10/2026, chỉ WP0 tài liệu:** ô do engine tạo/xóa;
+  người dùng chỉ thao tác thẻ và Chủ/Nhận. Ô chủ đất mặc định Chủ, mọi ô
+  khác không tích (= từ chối), không tự điền Nhận. Gỡ không modal; chỉ cascade
+  mới toast + Hoàn tác khoảng 5 giây, công tắc mặc định bật. Engine phải
+  đối chiếu tới ổn định sau sửa Stage; hàng 2/3 gác sau
+  `ENABLE_LATER_LINES=False`, chỉ hàng 1 + thế vị + chuyển tiếp. Luật mới
+  thay G1 mặc định/đồng bộ Nhận và luật gỡ 17/10, **chưa triển khai runtime**.
+  [Quyết định và Q1–Q4](../decisions/decision-owner-diagram-rules-v2-20261027.md).
 - Sơ đồ: lưu bản hợp lệ còn thiếu giữ warning Pool/`requiredSlots` qua mở lại;
   state `invalid` bị từ chối và giữ nguyên bản cũ; cue chỉ-đọc (trạng thái +
   phần thiếu) hiện khi panel cách tính đóng. Bằng chứng service/adapter và
@@ -237,6 +241,8 @@ Việc đang mở được tổng hợp tại [catalog issue](../backlog/README.
   `engine_unavailable` khi mở danh sách; danh sách tự retry. Đây là giới hạn
   đã quan sát, không thuộc scope #5 và không được tuyên bố đã khắc phục.
   [#5](../backlog/story-save-valid-incomplete-diagram.md).
+- **Lịch sử #21B bên dưới đã bị thay thế về hành vi** bởi §9.9 luật gỡ thẻ
+  ngày 27/10/2026; bằng chứng cũ không nghiệm thu luật mới.
 - Sơ đồ Thừa kế **#21B BUILT 17/10/2026** theo owner **“B - gỡ cả nhánh”**; retained Quick CODE t3 **No actionable findings**, parent accepted AC1–4. Node full 198 trước patch bỏ assertion chữ; affected file 25 sau patch, service 106 (24 warnings hiện có). Source Electron + real IPC/SQLite riêng đạt cảnh báo/dismiss/focus/atomic cut/Pool/Save invalid và fresh reopen exact. Không claim packaged/Word; startup toast `engine_unavailable` còn quan sát. #21 vẫn là spike nhận đáp án, không chứa implementation. [Proof](../tmp/issue-21b-branch-removal/evidence/ui-ipc-proof.json) · [Quy tắc](notary_v2/diagram-rules.md#branch-removal).
 - Ngày Người giữ độ đầy đủ qua lưu/đọc/sửa/xuất Word: `2010` (chỉ năm) không
   bị đệm thành `01/01/2010`; snapshot hồ sơ là bằng chứng, master chỉ fallback

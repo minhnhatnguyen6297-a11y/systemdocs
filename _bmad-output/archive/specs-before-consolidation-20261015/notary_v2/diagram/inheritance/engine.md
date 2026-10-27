@@ -1,5 +1,12 @@
 > **Lịch sử trước đợt gom 15/10/2026. Không phải nguồn hành vi hiện hành; không nạp mặc định đầu phiên. Trạng thái Draft/đã duyệt trong bản gốc được giữ nguyên.**
 
+> **Đính chính WP0 — owner 27/10/2026:** các luật sinh/thu hồi ô, mặc định
+> Chủ/Nhận và gỡ thẻ dưới đây đã được duyệt lại theo luật sơ đồ v2.
+> Chỉ các luật được đính chính có hiệu lực; không nâng toàn bộ thiết kế
+> React/API/DB cũ trong archive thành spec hiện hành, không chứng minh runtime.
+> Nguồn hiện hành: [quy tắc sơ đồ](../../../../../specs/notary_v2/diagram-rules.md) §9,
+> [quyết định v2 và D-041 sửa đổi](../../../../../decisions/decision-owner-diagram-rules-v2-20261027.md).
+
 # Inheritance Engine V2 — Technical contract
 
 Status: target contract pending implementation commit; non-normative
@@ -35,8 +42,8 @@ Các lỗi gốc đã được audit và user duyệt:
   chọn người nhận hoặc tỷ lệ chuyển quyền.
 - Frontend, backend, `InheritanceParticipant`, Word và legacy tree đang giữ nhiều projection khác
   nhau; UI có thể đúng nhưng save/reload/Word sai.
-- Hệ thống đang suy mọi người không nhận là `Người từ chối`, tạo nội dung pháp lý không có dữ liệu
-  chứng minh.
+- Quy ước 27/10/2026: người không tích Chủ/Nhận được coi là từ chối trên sơ đồ;
+  đoạn Word từ chối hoãn sang đợt Word sau, không tự tạo bằng chứng pháp lý.
 - `form.html` vẫn chạy engine legacy `recalcShares()` dù tree legacy đã ẩn.
 
 ## 2. Quyết định kiến trúc bắt buộc
@@ -159,6 +166,9 @@ không tự gắn.
   nhánh đó bị loại khỏi mẫu số; quota được chia lại cho các đơn vị hợp lệ còn lại. Đây là cách
   engine đạt mục tiêu phân phối hết tài sản, không phải kết luận rằng anchor đã sở hữu quota.
   Đây là quy ước tính toán của hệ thống, không trình bày như nguyên văn pháp luật.
+- Q1 (27/10/2026): thiếu ngày mất hoặc không so được với chủ đất thì chưa sinh
+  ô cho người đó tới khi nhập đủ ngày; thẻ hiện `thiếu ngày mất`. Không đoán
+  trước/sau từ ngày quy ước. Input luôn hiển thị đúng như nhập.
 
 ### 4.2 Khởi tạo tài sản
 
@@ -196,8 +206,8 @@ Viết helper tương đương `allocate_descendant_branch(branch_person_id, sou
   `ineligible_branch` để loại khỏi mẫu số của estate cha; không tạo ownership cho anchor.
 - Chỉ hậu duệ trong chính nhánh nhận thế vị. Cha/mẹ, vợ/chồng và người ngoài dòng con cháu của
   anchor không nhận phần này.
-- Vợ/chồng anchor vẫn là đồng phụ huynh trong graph và được UI hiển thị, nhưng bị loại khỏi phép chia
-  phần thế vị.
+- Nhánh thế vị chỉ sinh ô Con (+1 dự phòng), tối đa tới chắt (D-012, Điều 652);
+  không sinh ô vợ/chồng cho anchor để phục vụ thế vị.
 - Nếu anchor có tài sản độc lập từ nguồn khác, estate độc lập của họ vẫn chia theo hàng thứ nhất và
   vợ/chồng có thể nhận ở estate đó.
 - `path` lưu các anchor đã đi qua để output giải thích `thế vị nhánh Y`, kể cả nhiều tầng.
@@ -208,11 +218,14 @@ Không được trả một mảng phẳng toàn bộ hậu duệ rồi chia đ�
 
 - Với người còn sống ở kết quả cuối, `willReceive=false` loại họ khỏi đơn vị nhận theo quy ước sản
   phẩm và mẫu số được tính lại giữa người/nhánh hợp lệ còn lại.
-- Người đó không được gọi là `Người từ chối`.
+- Người không tích Chủ/Nhận được coi là từ chối trên sơ đồ (owner 27/10/2026);
+  không suy loại giao dịch hoặc tài sản chung, không cảnh báo vợ/chồng.
 - Sở hữu gốc của chủ đất còn sống không bị loại bởi `willReceive=false`.
-- Nếu loại tất cả đơn vị nhận của một estate thì trả `unresolvedEstates` với reason `no_valid_heir`;
-  không làm mất phần đó hoặc báo kết quả complete. Nếu còn ít nhất một đơn vị hợp lệ thì phải
-  chia lại để không còn unresolved quota.
+- Khi thiếu hàng 1, trả `unsupported` (UI: `Chưa hỗ trợ`), giữ phần chưa phân
+  bổ trong `unresolvedEstates`, không báo complete hoặc làm mất tài sản.
+  D-038/R-32 hàng 2/3 gác sau `ENABLE_LATER_LINES=False` mặc định tắt:
+  không nối vào sơ đồ, không sinh ô hàng 2/3. Code hàng 2/3 chỉ được giữ
+  sau cờ; kiểm thử riêng hàng 2/3 dùng cờ bật ở gói triển khai sau.
 
 ### 4.6 Bảo toàn tài sản
 
@@ -263,15 +276,41 @@ Không được trả một mảng phẳng toàn bộ hậu duệ rồi chia đ�
 }
 ```
 
-`requiredSlots` là output UI, không tham gia tính tỷ lệ:
+`requiredSlots` là output quyết định tập ô, không tham gia tính tỷ lệ.
+Ô do engine sở hữu; không tự tạo Người hoặc đoán người vào ô.
 
-| Reason | Slot cần hiển thị |
+| Người trong ô | Ô engine sinh ra (owner 27/10/2026) |
 |---|---|
-| `active_estate` | Hai cha/mẹ, một vợ/chồng và ít nhất một slot con của người có estate. |
-| `representation_branch` | Một vợ/chồng và ít nhất một slot con của anchor chết trước/cùng ngày. |
+| Chủ đất còn sống | Chỉ Vợ/chồng (+1 ô dự phòng). |
+| Chủ đất đã chết | Cha, Mẹ, Vợ/chồng (+1 dự phòng), Con (+1 dự phòng). |
+| Người chết SAU chủ đất (chuyển tiếp) | Cha, Mẹ, Vợ/chồng (+1 dự phòng), Con (+1 dự phòng). |
+| Người chết TRƯỚC chủ đất (thế vị, Điều 652) | Chỉ Con (+1 dự phòng), tối đa tới chắt (D-012); không ô vợ/chồng. |
+| Người còn sống, không phải chủ đất | Không sinh ô. |
 
-Mỗi requirement có `anchorSlotId`, `reason`, `slotTypes` và `minimumEmptyChildSlots`. Engine không
-tự tạo Customer hoặc đoán người vào slot.
+Mỗi requirement xác định người gốc, vai trò và thứ tự để ID ô ổn định.
+Mỗi nhóm vợ/chồng hoặc con được phép sinh có đúng một ô trống dự phòng;
+thả vào thì thêm dự phòng mới. D-041 sửa đổi: chủ đất sống vẫn có nhóm
+vợ/chồng; người khác sống không sinh ô; người vợ/chồng đặt cuối là hợp pháp.
+Nhiều vợ hợp pháp hoãn (Q2), không cảnh báo vợ/chồng.
+
+Sau mọi thay đổi thả/di chuyển/gỡ thẻ, tích Chủ/Nhận hoặc sửa ngày mất/còn
+sống ở Stage, engine chạy tới ổn định: thêm ô thiếu, bỏ ô trống thừa im lặng,
+ô có thẻ không còn cần thì thẻ về Pool. Một lần vẽ/thay đổi; không chờ mở
+`Xem cách tính`. Thả/gỡ không debounce, gõ chữ khoảng 300ms; thả → ô
+≤200ms p95, sửa sống/chết → đối chiếu tập ô ≤200ms.
+Mỗi thế hệ một hàng: cha/mẹ trên, vợ/chồng ngay cạnh cùng hàng, con dưới
+theo ngày sinh, ô dự phòng cuối nhóm; ô trống có nhãn vai trò.
+
+Mặc định người mới thả vào ô chủ đất tích Chủ mọi vị trí hiện có, không
+tích Nhận; mọi ô khác `ownPositions=[]`, `receivePositions=[]` (= từ chối
+trong văn bản). Không tự điền khi thêm tài sản cho người chưa tích; chỉ người
+đã tích được nối thêm vị trí mới vào đúng loại đã tích. Giữ lựa chọn đã lưu.
+
+Người dùng chỉ thao tác thẻ, không tạo/xóa ô hoặc nối quan hệ. Gỡ chủ đất
+trả mọi người trong ô sinh ra từ chủ đất về Pool, kể cả vợ/chồng. Không
+modal; chỉ cascade đẩy người khác về Pool mới có toast + Hoàn tác khoảng
+5 giây, khôi phục nguyên trạng. Công tắc mặc định bật, tắt thì hoàn toàn
+im lặng (Q4). Không autosave hoặc xóa Người khỏi Stage.
 
 `breakdowns` là nguồn duy nhất của `Xem cách tính`. UI format một dòng/người:
 
@@ -334,8 +373,8 @@ tài liệu cũ để không gợi ý một tính năng ngoài scope.
   nhất.
 - `resolveSubRelations()` không tính share và không dùng heuristic ngày chết. Hàm chỉ ghép node đã
   persist với slot trống được derive từ `requiredSlots`.
-- Không tự xóa node đã có người khi requirement biến mất. Đánh dấu quan hệ không còn hợp lệ và yêu
-  cầu user xử lý.
+- Engine thu hồi ô không còn cần; ô trống bỏ im lặng, ô có thẻ thì đưa người
+  về Pool. Không giữ ô chỉ vì đã có người; không yêu cầu người dùng xóa ô.
 - Hydrate legacy không fallback về owner/father/mother đầu tiên. Thiếu parent rõ ràng phải giữ node
   ở trạng thái ambiguous và báo lỗi.
 - `Nhận` tương tác với người còn sống. Card người đã chết hiển thị control disabled/read-only vì
@@ -372,11 +411,10 @@ tài liệu cũ để không gợi ý một tính năng ngoài scope.
 
 ### 8.1 Rule bắt buộc
 
-- `Người không nhận` là trạng thái sản phẩm từ Diagram.
-- `Người từ chối nhận di sản` chỉ tồn tại khi có dữ liệu pháp lý xác nhận riêng.
-- Hiện chưa có input Diagram cho việc từ chối hợp lệ; các placeholder `Người từ chối` phải để
-  trống, không suy từ `willReceive=false`.
-- Không được tạo câu “đã từ chối theo Văn bản...” nếu hồ sơ không có dữ liệu văn bản từ chối.
+- Người không tích Chủ/Nhận được coi là từ chối theo quy ước sơ đồ.
+- Q3: đoạn Word từ chối hoãn sang đợt Word sau; cập nhật mặc định sơ đồ không
+  đồng nghĩa đã bổ sung đoạn Word hoặc xác nhận từ chối hợp pháp.
+- Không tạo câu “đã từ chối theo Văn bản...” nếu không có dữ kiện văn bản đó.
 
 ## 9. Test matrix bắt buộc
 
@@ -413,11 +451,13 @@ tài liệu cũ để không gợi ý một tính năng ngoài scope.
 
 21. Response calculate cũ không ghi đè response mới.
 22. Save bị khóa trong khi quick-update/calculation pending.
-23. Slot bố mẹ chỉ sinh cho active estate; branch thế vị sinh spouse + child, không sinh bố mẹ anchor.
-24. Populated node không tự biến mất sau recalculation.
+23. Bảng sinh ô §5: đủ năm trường hợp; thế vị chỉ Con và tối đa tới chắt;
+    thiếu ngày/không so được thì chưa sinh ô, hiện `thiếu ngày mất`.
+24. Ô thừa có thẻ đưa người về Pool; gỡ chủ đất đưa cả vợ/chồng về Pool;
+    Hoàn tác khôi phục nguyên trạng, công tắc im lặng tắt toast.
 25. `Xem cách tính` một dòng/người, hiện nguồn và nhánh thế vị.
 26. Canvas chỉ có kinship edge; không có asset flow edge.
-27. Word, detail và fallback route không suy `Người từ chối`.
+27. Word từ chối hoãn; không kiểm nhận đã có đoạn Word mới ở WP0.
 28. Save/reload/export Word dùng cùng final fraction và display percent.
 
 ## 10. Verification commands
@@ -437,8 +477,8 @@ rg -n "recalcShares|buildFlowEdges|flowFrom|Đã nhận/chảy qua|Tặng phần
 rg -n "Người từ chối|Từ chối nhận" frontend routers services tests docs
 ```
 
-Kết quả `Người từ chối` còn lại chỉ được phép là placeholder/nhánh dữ liệu pháp lý có nguồn xác
-nhận, không phải phép suy từ `Nhận=false`.
+Quy ước sơ đồ 27/10/2026 coi người không tích Chủ/Nhận là từ chối; đoạn
+Word từ chối vẫn hoãn, không tự bịa dữ kiện về văn bản từ chối.
 
 ## 11. Bằng chứng lịch sử và giới hạn
 

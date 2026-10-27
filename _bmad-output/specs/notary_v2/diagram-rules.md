@@ -1,6 +1,6 @@
 # Quy tắc sơ đồ Hai bên và Thừa kế
 
-**Cập nhật:** 17/10/2026. Gỡ cả nhánh **#21B BUILT**, retained Quick CODE t3 **No actionable findings**, parent chấp nhận AC1–4; behavior §9.9 không đổi. Node full 198 + affected-file 25 sau patch test-only; service 106 (24 warnings hiện có), Source Electron real IPC/SQLite riêng. Không nghiệm thu packaged/Word hoặc các thiết kế/công thức thừa kế Draft mở rộng.
+**Cập nhật:** 27/10/2026. WP0 chốt lại luật sơ đồ v2; chỉ sửa tài liệu, chưa triển khai/nghiệm thu runtime mới. Luật gỡ thẻ §9.9 thay “B - gỡ cả nhánh” ngày 17/10/2026; bằng chứng #21B cũ không chứng minh luật mới.
 
 ## 1. Luồng chung
 
@@ -176,16 +176,22 @@ Nhóm `[Người N - ...]` luôn theo dòng Stage đã lưu, không theo số gh
 ### 9.2. Quy tắc chính
 
 - Owner là một người Stage riêng, không suy từ cờ chủ đất cũ.
-- Quan hệ vợ/chồng và cha-con phải nhất quán hai chiều theo engine.
+- Quan hệ cha-con phải nhất quán; vợ/chồng theo D-041 sửa đổi: nhiều thẻ vợ/chồng, người đặt cuối là hợp pháp; ô dự phòng nằm cuối. Không cảnh báo vợ/chồng.
 - Không cho vòng quan hệ hoặc một người nằm ở nhiều slot xung đột.
-- Người chết trước/sau owner ảnh hưởng nhánh thế vị; dữ liệu ngày thiếu phải tạo
-  warning hoặc slot cần bổ sung, không tự đoán.
-- Người từ chối nhận di sản là khái niệm pháp lý riêng, không đồng nghĩa người
-  không được đánh dấu nhận trên UI.
-- Frontend không tính phân số. Python tạo allocation, breakdown, warning và
-  `requiredSlots`.
-- `Người không nhận = tất cả người trên Diagram − Chủ đất − Người nhận` là
-  công thức UI owner giữ ngày 24/09/2026. Đây không đồng nghĩa từ chối pháp lý.
+- Sau mỗi thay đổi thả/di chuyển/gỡ thẻ, tích Chủ/Nhận hoặc sửa ngày mất/còn
+  sống ở Stage, engine chạy lại tới ổn định; không chờ `Xem cách tính`.
+- Thiếu ngày mất hoặc không so được trước/sau chủ đất: chưa sinh ô cho người
+  đó, hiện nhãn `thiếu ngày mất` trên thẻ tới khi nhập đủ. Không đoán nhánh,
+  không dùng ngày quy ước làm bằng chứng; input luôn hiển thị đúng như nhập.
+- Trên sơ đồ, người không tích Chủ/Nhận được coi là từ chối:
+  `Người không nhận = tất cả người trên Diagram − Chủ đất − Người nhận`.
+  Đây là quy ước sản phẩm; đoạn Word từ chối hoãn sang đợt Word sau (Q3),
+  không tự bịa văn bản từ chối hoặc coi đã đáp ứng thủ tục pháp lý.
+- App không suy loại giao dịch, không suy tài sản chung, không cảnh báo vợ/chồng.
+- Frontend không tính phân số. Python tạo allocation, breakdown và `requiredSlots`.
+- Chỉ hỗ trợ hàng 1 + thế vị + chuyển tiếp. Hàng 2/3 (D-038, R-32) gác sau
+  `ENABLE_LATER_LINES=False`, không nối vào sơ đồ; thiếu hàng 1 trả
+  `Chưa hỗ trợ`, không sinh ô hàng 2/3.
 
 Các công thức mở rộng còn Draft; không có quyền thay công thức đang được duyệt.
 
@@ -195,13 +201,12 @@ Các công thức mở rộng còn Draft; không có quyền thay công thức �
 - Vị trí tài sản là index 1..5 của Stage assets.
 - `ownPositions`: tài sản người đó sở hữu.
 - `receivePositions`: tài sản người đó nhận.
-- Mặc định khi gán: owner nhận đủ vị trí Chủ, node thừa kế khác nhận đủ
-  vị trí Nhận nếu mảng đang rỗng. Khi thêm/gỡ tài sản hoặc Lưu hồ sơ/Lưu
-  nháp, mảng chưa được user chỉnh chip cho đúng node + Chủ/Nhận trong phiên
-  đồng bộ đủ tập vị trí hiện có. Mảng đã chỉnh, kể cả tắt hết, giữ nguyên.
-  Owner đang rỗng không tự điền nếu node khác đã có vị trí Chủ; không đổi
-  mặc định tại thời điểm gán. Dấu đã chỉnh chỉ ở phiên, reset khi mở hồ sơ/
-  phiên mới, không vào wire. Hiệu chỉnh G1 vòng sửa lỗi E2E 23/10 (B).
+- Mặc định người mới thả vào ô chủ đất tích Chủ cho mọi vị trí hiện có,
+  không tích Nhận. Mọi ô khác có `ownPositions = []`, `receivePositions = []`
+  (= từ chối trong văn bản); không tự điền Nhận.
+- Khi thêm tài sản, chỉ người đã tích mới được nối thêm vị trí mới vào
+  đúng loại Chủ/Nhận đã tích; người chưa tích giữ rỗng. Lựa chọn đã lưu
+  giữ nguyên, không xóa `receivePositions` cũ khi mở hồ sơ.
 - Reorder tài sản đổi vật đang ở vị trí; dấu chọn bám số vị trí, không bám
   `row_id`. UI phải cảnh báo khi reorder/xóa làm đổi nghĩa.
 
@@ -225,28 +230,50 @@ vẫn giữ hiện trạng, không được dùng nhánh fallback đó làm ngu�
 - Thông tin cá nhân lấy từ Stage.
 - Quan hệ và người nhận lấy từ Diagram/engine result.
 - Chủ tài sản lấy từ `ownPositions`.
-- Người không nhận và người từ chối phải theo rule riêng; không suy một nhóm từ
-  nhóm kia.
+- Người không tích Chủ/Nhận được coi là từ chối trên sơ đồ. Đoạn Word từ chối
+  hoãn sang đợt Word sau (Q3); không coi cập nhật spec này là đã cập nhật Word.
 
 ### 9.6. Giao diện
 
-- Tree theo thế hệ; cặp vợ/chồng thành một cụm, nhánh thế vị nằm dưới đúng
-  người trung gian. Node đã có dữ liệu không tự biến mất sau evaluate.
-- Card chỉ có quyết định `Chủ`/`Nhận` theo vị trí tài sản; không có nút `Từ
-  chối`. Slot chỉ sinh khi backend trả là cần.
+- Ô (node) là chỗ trống do engine tạo/xóa; thẻ là người được thả vào ô.
+  Người dùng chỉ thả/di chuyển/gỡ thẻ và tích Chủ/Nhận; không có nút tạo ô,
+  xóa ô, nối quan hệ hoặc menu thêm cha/mẹ/con.
+- Sau mỗi thay đổi, engine chạy tới ổn định: thêm ô thiếu; ô thừa trống bỏ
+  im lặng, ô thừa có thẻ thì thẻ về Pool. ID ô ổn định theo
+  (người gốc, vai trò, thứ tự). Không mất Người khỏi Stage.
+
+| Người trong ô | Ô engine sinh ra |
+|---|---|
+| Chủ đất còn sống | Chỉ Vợ/chồng (+1 ô dự phòng). |
+| Chủ đất đã chết | Cha, Mẹ, Vợ/chồng (+1 dự phòng), Con (+1 dự phòng). |
+| Người chết SAU chủ đất (chuyển tiếp) | Cha, Mẹ, Vợ/chồng (+1 dự phòng), Con (+1 dự phòng). |
+| Người chết TRƯỚC chủ đất (thế vị, Điều 652) | Chỉ Con (+1 dự phòng), tối đa tới chắt (D-012); không ô vợ/chồng. |
+| Người còn sống, không phải chủ đất | Không sinh ô. |
+
+- Lần thả đầu vào ô Chủ đất chỉ phân biệt còn sống/đã chết theo bảng trên.
+  Thiếu ngày mất/không so được thời điểm áp dụng Q1 tại §9.2, không đoán.
+  Mỗi nhóm vợ/chồng hoặc con được phép sinh luôn có đúng một ô trống dự phòng;
+  thả vào dự phòng thì engine sinh dự phòng mới. Người vợ/chồng đặt cuối là
+  hợp pháp (D-041); ca nhiều vợ hợp pháp hoãn (Q2).
+- Mỗi thế hệ một hàng: cha/mẹ trên, vợ/chồng cùng hàng ngay cạnh người gốc,
+  con dưới theo ngày sinh; dự phòng cuối nhóm. Thế vị nằm dưới đúng người
+  trung gian. Ô trống có nhãn vai trò `Cha`, `Mẹ`, `Vợ/chồng`, `Con`.
+- Thả/gỡ không debounce; gõ chữ khoảng 300ms. Mục tiêu thả → ô hiện
+  ≤200ms p95; sửa sống/chết ở Stage → đối chiếu tập ô ≤200ms.
+  Mỗi thay đổi chỉ vẽ lại một lần sau khi ổn định.
+- Card chỉ có lựa chọn `Chủ`/`Nhận` theo vị trí tài sản; không nút `Từ chối`.
 - `Xem cách tính` hiển thị một dòng cho mỗi người, gồm tổng và từng nguồn; UI
   không hiển thị JSON và không tự tính lại.
 - Canvas rộng dùng cuộn ngang/pan/zoom, không bẻ nhánh hoặc thu node đến mức
   khó đọc. Cảnh báo gom thành vùng rõ ràng, không chồng popup.
-- Khi panel `Xem cách tính` đóng, vùng cảnh báo dưới sơ đồ hiện trạng thái tính
-  và danh sách chỗ engine yêu cầu (`requiredSlots`) dạng chỉ-đọc, kể cả ngay
-  sau khi lưu hoặc mở lại; ô chỉ được sinh khi người dùng bấm `Xem cách tính`.
+- Khi panel `Xem cách tính` đóng, vùng trạng thái dưới sơ đồ vẫn hiện
+  trạng thái tính và phần thiếu; việc sinh/thu hồi ô luôn chạy tự động,
+  không phụ thuộc mở panel, kể cả sau khi lưu hoặc mở lại.
 - Nhãn hiển thị (owner 23/10/2026): người chưa có tên dùng đúng **một** nhãn
   `(chưa có tên)` ở mọi vị trí (Pool, node, menu, Hai bên). Node còn sống chỉ
   hiện năm sinh; có năm mất hiện `{sinh} – {mất}`; không dùng dấu `…` lửng.
   Node không hiện badge `%` — phần trăm chỉ nằm trong panel `Xem cách tính`.
-  Danh sách gỡ nhánh không gắn `(đã gỡ)` sau tên; node đã gỡ không nằm trong
-  danh sách gỡ. Phụ chú phân biệt trùng tên trong Pool (`sinh {năm}` /
+  Phụ chú phân biệt trùng tên trong Pool (`sinh {năm}` /
   `GT {số}`) được giữ vì giúp chọn đúng người. Nhãn provenance
   (`đọc được`/`đã chuẩn hóa`/`suy luận`) không gắn lên giá trị hiển thị;
   provenance vẫn nằm trong record.
@@ -287,19 +314,37 @@ vẫn giữ hiện trạng, không được dùng nhánh fallback đó làm ngu�
   toàn Graph/Diagram chỉ để sửa một connector.
 
 <a id="branch-removal"></a>
-### 9.9. Gỡ cả nhánh khỏi Diagram
+### 9.9. Gỡ thẻ
 
-Owner chốt ngày **17/10/2026**, nguyên văn **“B - gỡ cả nhánh”** ([decision](../../decisions/decision-owner-inheritance-remove-entire-branch-20261017.md)).
+Owner chốt **27/10/2026**, thay quyết định **“B - gỡ cả nhánh” 17/10/2026**
+([quyết định mới](../../decisions/decision-owner-diagram-rules-v2-20261027.md)).
 
-1. Từ node được xóa, lấy node đó và toàn bộ hậu duệ **active** qua cạnh `parentSlotIds` cha/mẹ → con, ở mọi độ sâu. Slot rỗng/ẩn cũng thuộc graph active. Con có hai cha/mẹ vẫn bị gỡ khi chỉ một cha/mẹ trong tập bị gỡ. Không dùng cạnh `spouseSlotId` để mở rộng tập; spouse chỉ bị gỡ nếu bản thân cũng là hậu duệ theo cạnh cha/mẹ.
-2. Trước mutation, hiện danh sách node sẽ gỡ (tên người + slot để phân biệt; slot chưa gán ghi ô trống) và các quan hệ cha/mẹ–con, vợ/chồng thực tế sẽ ngắt. Báo người vẫn ở Stage/trở lại Pool, kết quả/phần hưởng có thể đổi, chỉ Lưu hồ sơ mới ghi. Danh sách dài cuộn được; không chỉ báo số lượng.
-3. Hủy, Escape, nút đóng và đóng nền không đổi draft/dirty/revision hay phát evaluate/save từ thao tác gỡ. Xác nhận chỉ áp tập tác động vừa xem; graph hoặc phiên hồ sơ đã đổi thì không gỡ âm thầm theo cảnh báo cũ. Xác nhận hợp lệ thực hiện **một** mutation draft rồi dùng evaluate/debounce hiện có, không tự save.
-4. Đánh dấu toàn bộ tập `deleted:true` và giữ trong canonical Node v3 hiện có; giữ ID, `personId`, `ownPositions`, `receivePositions`, `hidden`. Xóa `parentSlotIds`/`spouseSlotId` đi ra từ node bị gỡ và dọn mọi tham chiếu đi vào tập này trên tất cả node, **kể cả tombstone cũ**. Không còn spouse một chiều hoặc parent không hợp lệ do thao tác; node/quan hệ/Chủ/Nhận không bị tác động giữ nguyên.
-5. Stage Người/Tài sản (ID, thứ tự, giá trị) không đổi. Pool vẫn là Stage trừ gán trên node active, không tính `personId` còn giữ trên tombstone. Không dồn/đánh lại số slot, đổi vị trí tài sản, tự reparent hoặc giữ ô trung gian rỗng thay cho node đã xóa.
-6. Dùng evaluate/Save hiện có; không store/API/schema mới. Save giữ atomic/revision/errors: invalid hoặc lỗi không ghi và giữ draft; Save thành công rồi mở lại khớp state canonical. Giữ nguyên cơ chế slot trống do `requiredSlots` tạo khi evaluate hiện hành, không hồi sinh người/quan hệ nhánh đã gỡ hoặc tái dùng ID tombstone. Không đổi công thức Python.
+1. Người dùng gỡ **thẻ**, không xóa ô. Người về Pool, vẫn nguyên ID/thứ tự/
+   dữ kiện trong Stage; engine tính lại tập ô tới ổn định theo §9.6.
+   Ô thừa trống bỏ im lặng; ô thừa có thẻ thì đưa người về Pool.
+2. Gỡ chủ đất trả mọi người trong ô sinh ra từ chủ đất về Pool, **kể cả
+   vợ/chồng**. Không chỉ duyệt hậu duệ qua `parentSlotIds` và bỏ sót spouse;
+   không tự reparent. Nhánh/Chủ/Nhận ngoài tác động giữ nguyên.
+3. Không modal, không xác nhận trước mutation. Nếu không có người khác về
+   Pool theo thì gỡ im lặng. Nếu có cascade, hiện toast
+   `Đã đưa N người về Pool · Hoàn tác` khoảng **5 giây**.
+   Hoàn tác khôi phục nguyên trạng trước thay đổi, gồm gán người, quan hệ
+   và Chủ/Nhận. Công tắc thông báo trong cài đặt **mặc định bật** (Q4);
+   tắt thì hoàn toàn im lặng, không toast.
+4. Một thay đổi draft, chạy engine tới ổn định, vẽ lại một lần; thả/gỡ không
+   debounce và không autosave. Lưu hồ sơ dùng transaction/revision/errors
+   hiện có; lỗi giữ bản đang sửa và bản lưu cũ, không ghi một phần.
+5. Khi mở hồ sơ cũ, engine đối chiếu tập ô: ô trống thừa bỏ im lặng; thẻ
+   trong ô thừa về Pool, không mất khỏi Stage. Ghi chú một lần khi mở:
+   `N người đã về Pool do luật sơ đồ mới`. Giữ `receivePositions` đã lưu;
+   mặc định mới chỉ dành cho người mới thả. Tombstone `deleted:true` cũ
+   bỏ qua khi đọc, dọn khi lưu; ID `slot_n` cũ ánh xạ sang ID ổn định khi migrate.
 
-Ví dụ A → B → C, B↔S, C có parents `[B,S]`: xóa B gỡ B, C và hậu duệ của C; S còn node nhưng mất spouse B và các liên kết tới tập bị gỡ. A cùng các nhánh khác giữ nguyên; không nối C lên A. Đây là quy tắc đã chọn, chưa phải nghiệm thu implementation #21B.
+Ví dụ: A chủ đất chết 2020; B vợ chết 1997; C con chết 2001; D con còn sống.
+A sinh Cha/Mẹ, Vợ/chồng + dự phòng, Con + dự phòng. C chỉ sinh Con thế vị,
+không ô vợ/chồng; D không sinh ô. Chỉ A mặc định tích Chủ. Sửa A thành còn
+sống thì chỉ còn nhóm vợ/chồng, C/D về Pool và có toast; gỡ A thì B cũng về Pool.
 
 ## 10. Điểm chưa chốt
 
-Ngày nhập/hiển thị phải giữ đúng độ đầy đủ; ngày quy ước chỉ nằm trong tính toán. Cách tính các tình huống thừa kế mở rộng, thuật toán và ví dụ Draft vẫn cần đối chiếu/duyệt riêng. Không dùng ngày quy ước để tạo bằng chứng về thời điểm chết. Xóa node Thừa kế áp dụng quy tắc gỡ cả nhánh đã chốt ở §9.9, không còn câu hỏi giữ/gỡ nhánh đang chờ owner. Không tự mở quyền lưu invalid/unsupported.
+Ngày nhập/hiển thị giữ đúng độ đầy đủ; ngày quy ước chỉ dùng trong tính toán, không làm bằng chứng thứ tự chết. Q1–Q4 đã chốt tại §9.2/§9.5/§9.6/§9.9; nhiều vợ hợp pháp và đoạn Word từ chối hoãn sang đợt sau. Hàng 2/3 gác sau `ENABLE_LATER_LINES=False`; không sinh ô và không tự mở quyền lưu invalid/unsupported. Những công thức mở rộng khác vẫn cần duyệt riêng; WP0 chỉ sửa spec, không chứng minh runtime đã tuân thủ.
