@@ -56,8 +56,8 @@ const relIsDiagramError =
     : () => true;
 
 // Kich thuoc layout canvas (px logic — scale boi zoom, khong co chu).
-// MIN-133 D7 (mockup duyet 28/09/2026): node DA THA 144×87 (ten 14px,
-// nam 13px, 2 hang chip 22×19); node TRONG 88×24 vien dut, khong chu.
+// MIN-133 D7 / WP6: node DA THA 144×87 (ten 14px, nam 13px, 2 hang chip 22×19);
+// node TRONG 88×24 vien dut, hien nhan vai tro (Chu dat, Cha, Me, Vo/chong, Con, Con cua <ten>).
 // Le 6px, giua the he 14px (plan 12–16), giua node 14px, cap vo/chong
 // 28px. CSS .cd-node/.cd-node-empty phai khop cac hang nay.
 const NODE_W = 144, NODE_H = 87;
@@ -114,89 +114,205 @@ function slotNum(id) {
   return m ? Number(m[1]) : null;
 }
 
-// Layout the he tu parentSlotIds cua DRAFT state — pure function, khong
-// suy luan nghiep vu: gen(n) = 0 neu khong co cha/me song, nguoc lai =
-// max(gen cha/me) + 1. Chu ky draft (engine se bao loi) → gen 0.
-// Trong mot gen: danh sach spouseSlotIds chi mot chieu; slot spouse duoc
-// dat sat anchor de edge ngan gon.
-// MIN-133: kich thuoc theo trang thai node (da tha 144×87 / trong 88×24);
-// hang rong nhat can giua, hang tren/duoi can theo tam con/cha-me da dat
-// (cap vo/chong la mot khoi 28px). Chi la vi tri hien thi.
+// Layout the he tu chu dat (owner) — WP6: moi the he mot hang tinh tu chu dat:
+// cha me hang -1, chu dat + vo/chong hang 0, con hang +1, chau +2, chat +3.
+// Trong mot gen: vo/chong cung hang ngay canh partner, o du phong vo/chong cuoi.
+// Con sap xep theo ngay sinh (unknown cuoi, on dinh), o con du phong cuoi.
 // Tra {pos: {id:{x,y,w,h,gen}}, w, h} — vi tri TOP-LEFT tren world logic.
+function parseBirthKey(raw) {
+  if (raw == null) return null;
+  if (typeof raw === 'number') return `${raw}-00-00`;
+  if (typeof raw !== 'string') return null;
+  const s = raw.trim();
+  if (!s) return null;
+  const dmy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+  if (dmy) {
+    return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+  }
+  const ymd = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
+  if (ymd) {
+    return `${ymd[1]}-${ymd[2].padStart(2, '0')}-${ymd[3].padStart(2, '0')}`;
+  }
+  const y = /^(\d{4})$/.exec(s);
+  if (y) return `${y[1]}-00-00`;
+  const m = /(\d{4})/.exec(s);
+  if (m) return `${m[1]}-00-00`;
+  return null;
+}
+
 function nodeSize(n) {
   return n && n.personId ? { w: NODE_W, h: NODE_H }
                          : { w: EMPTY_W, h: EMPTY_H };
 }
 
-function layoutInheritance(nodes) {
+function layoutInheritance(nodes, people = []) {
   const live = (nodes || []).filter((n) => n && !n.deleted);
+  if (!live.length) return { pos: {}, w: PAD * 2, h: PAD * 2 };
   const byId = new Map(live.map((n) => [n.id, n]));
-  const gens = new Map();                    // gen -> [nodes array order]
-  const memo = new Map();
-  const visiting = new Set();
-  function genOf(n) {
-    if (memo.has(n.id)) return memo.get(n.id);
-    if (visiting.has(n.id)) return 0;        // chu ky — layout fallback
-    visiting.add(n.id);
-    const ps = (n.parentSlotIds || []).filter((p) => byId.has(p));
-    let g = 0;
-    if (ps.length) {
-      g = Math.max(...ps.map((p) => genOf(byId.get(p)))) + 1;
-    }
-    visiting.delete(n.id);
-    memo.set(n.id, g);
-    return g;
-  }
+  const personById = new Map(
+    (Array.isArray(people) ? people : Object.values(people || {}))
+      .filter(Boolean)
+      .map((p) => [p.row_id || p.id, p])
+  );
+
+  // 1. Tinh the he theo chu dat (owner = 0, cha/me = -1, con = +1, chau = +2, chat = +3)
+  const ownerNode = byId.get('owner') || live[0];
+  const genMap = new Map();
+  genMap.set(ownerNode.id, 0);
+
+  const adj = new Map();
+  for (const n of live) adj.set(n.id, []);
+
   for (const n of live) {
-    const g = genOf(n);
+    const spouseIds = new Set([
+      ...(n.spouseSlotIds || []),
+      ...(n.spouseSlotId ? [n.spouseSlotId] : []),
+    ]);
+    for (const sid of spouseIds) {
+      if (byId.has(sid)) {
+        adj.get(n.id).push({ to: sid, diff: 0 });
+        adj.get(sid).push({ to: n.id, diff: 0 });
+      }
+    }
+    for (const pid of n.parentSlotIds || []) {
+      if (byId.has(pid)) {
+        adj.get(n.id).push({ to: pid, diff: -1 });
+        adj.get(pid).push({ to: n.id, diff: +1 });
+      }
+    }
+  }
+
+  const queue = [ownerNode.id];
+  const visited = new Set([ownerNode.id]);
+  while (queue.length > 0) {
+    const curr = queue.shift();
+    const currGen = genMap.get(curr);
+    for (const edge of adj.get(curr) || []) {
+      if (!visited.has(edge.to)) {
+        visited.add(edge.to);
+        genMap.set(edge.to, currGen + edge.diff);
+        queue.push(edge.to);
+      }
+    }
+  }
+
+  for (const n of live) {
+    if (!visited.has(n.id)) {
+      let baseGen = 0;
+      for (const edge of adj.get(n.id) || []) {
+        if (visited.has(edge.to)) {
+          baseGen = genMap.get(edge.to) - edge.diff;
+          break;
+        }
+      }
+      genMap.set(n.id, baseGen);
+      visited.add(n.id);
+      const subQueue = [n.id];
+      while (subQueue.length > 0) {
+        const c = subQueue.shift();
+        const cg = genMap.get(c);
+        for (const edge of adj.get(c) || []) {
+          if (!visited.has(edge.to)) {
+            visited.add(edge.to);
+            genMap.set(edge.to, cg + edge.diff);
+            subQueue.push(edge.to);
+          }
+        }
+      }
+    }
+  }
+
+  const gens = new Map();
+  for (const n of live) {
+    const g = genMap.get(n.id) ?? 0;
     if (!gens.has(g)) gens.set(g, []);
     gens.get(g).push(n);
   }
-  for (const arr of gens.values()) {
-    const seen = new Set();
-    const out = [];
-    for (const n of arr) {
-      if (seen.has(n.id)) continue;
-      out.push(n);
-      seen.add(n.id);
-      for (const spouseId of n.spouseSlotIds || []) {
-        const spouse = byId.get(spouseId);
-        if (!spouse || seen.has(spouse.id) ||
-            memo.get(spouse.id) !== memo.get(n.id)) continue;
-        out.push(spouse);
-        seen.add(spouse.id);
-      }
-    }
-    arr.splice(0, arr.length, ...out);
-  }
   const size = new Map(live.map((n) => [n.id, nodeSize(n)]));
-  const isPair = (a, b) =>
-    (a.spouseSlotIds || []).includes(b.id);
-  // Khoi: node don hoac cap vo/chong ke nhau (giu sat 28px).
-  const blocksOf = (row) => {
-    const out = [];
+  // Khoi: partner va cac vo/chong ke nhau (sat 28px).
+  const blocksOf = (row, gen) => {
     const rowIds = new Set(row.map((n) => n.id));
-    const seen = new Set();
+    const spouseOf = new Map();
+    const spousesByPartner = new Map();
+
     for (const n of row) {
-      if (seen.has(n.id)) continue;
-      const group = [n];
-      seen.add(n.id);
-      for (const id of n.spouseSlotIds || []) {
-        if (!rowIds.has(id) || seen.has(id)) continue;
-        const spouse = byId.get(id);
-        if (spouse && memo.get(spouse.id) === memo.get(n.id)) {
-          group.push(spouse);
-          seen.add(id);
+      const spIds = [
+        ...(n.spouseSlotIds || []),
+        ...(n.spouseSlotId ? [n.spouseSlotId] : []),
+      ].filter((sid) => rowIds.has(sid) && sid !== n.id);
+
+      if (spIds.length > 0) {
+        if (!spousesByPartner.has(n.id)) spousesByPartner.set(n.id, []);
+        for (const sid of spIds) {
+          const spouse = byId.get(sid);
+          if (spouse && !spouseOf.has(sid)) {
+            spouseOf.set(sid, n.id);
+            spousesByPartner.get(n.id).push(spouse);
+          }
         }
       }
-      out.push(group);
     }
-    return out.map((m) => ({
-      m, w: m.reduce((s, n) => s + size.get(n.id).w, 0) +
-        (m.length - 1) * SPOUSE_GAP }));
+
+    const units = [];
+    const seen = new Set();
+    for (const n of row) {
+      if (seen.has(n.id) || spouseOf.has(n.id)) continue;
+      seen.add(n.id);
+      const group = [n];
+      const partnerSpouses = spousesByPartner.get(n.id) || [];
+      // WP6: vo/chong canh partner, o du phong vo/chong cuoi
+      const occupied = partnerSpouses.filter((s) => s.personId);
+      const spare = partnerSpouses.filter((s) => !s.personId);
+      for (const s of [...occupied, ...spare]) {
+        seen.add(s.id);
+        group.push(s);
+      }
+      units.push(group);
+    }
+    for (const n of row) {
+      if (!seen.has(n.id)) {
+        seen.add(n.id);
+        units.push([n]);
+      }
+    }
+
+    // WP6: con theo ngay sinh (unknown cuoi, on dinh), o con du phong cuoi
+    if (gen >= 1) {
+      units.sort((a, b) => {
+        const na = a[0], nb = b[0];
+        const aParents = (na.parentSlotIds || []).slice().sort().join(',');
+        const bParents = (nb.parentSlotIds || []).slice().sort().join(',');
+        if (aParents !== bParents) {
+          return aParents.localeCompare(bParents);
+        }
+        const aIsSpare = !na.personId;
+        const bIsSpare = !nb.personId;
+        if (aIsSpare && !bIsSpare) return 1;
+        if (!aIsSpare && bIsSpare) return -1;
+        if (aIsSpare && bIsSpare) return 0;
+
+        const pa = personById.get(na.personId) || na.person;
+        const pb = personById.get(nb.personId) || nb.person;
+        const ka = parseBirthKey(pa?.ngay_sinh);
+        const kb = parseBirthKey(pb?.ngay_sinh);
+        if (ka && kb) {
+          if (ka < kb) return -1;
+          if (ka > kb) return 1;
+          return 0;
+        }
+        if (ka && !kb) return -1;
+        if (!ka && kb) return 1;
+        return 0;
+      });
+    }
+
+    return units.map((m) => ({
+      m,
+      w: m.reduce((s, n) => s + size.get(n.id).w, 0) + (m.length - 1) * SPOUSE_GAP,
+    }));
   };
   const gkeys = [...gens.keys()].sort((a, b) => a - b);
-  const rows = gkeys.map((g) => blocksOf(gens.get(g)));
+  const rows = gkeys.map((g) => blocksOf(gens.get(g), g));
   const rowW = (bs) => bs.reduce((s, b) => s + b.w, 0) +
     Math.max(0, bs.length - 1) * GAP_X;
   const left = new Map();                    // id -> x trai (tuong doi)
@@ -277,6 +393,50 @@ function layoutInheritance(nodes) {
 function spouseOwnerOf(nodeId, nodes) {
   return (nodes || []).find((n) => !n.deleted &&
     (n.spouseSlotIds || []).includes(nodeId)) || null;
+}
+
+// WP6: nhãn vai trò ô trống (Chủ đất, Cha, Mẹ, Vợ/chồng, Con, 'Con của <tên>' thế vị)
+function emptySlotRole(n, live = [], people = []) {
+  if (!n) return 'Ô trống';
+  if (n.id === 'owner') return 'Chủ đất';
+  const nodes = (live && live.length) ? live : [];
+  const owner = nodes.find((k) => k && k.id === 'owner');
+
+  // Vợ/chồng
+  const spOwner = spouseOwnerOf(n.id, nodes);
+  if (spOwner || nodes.some((k) => k && ((k.spouseSlotIds || []).includes(n.id) || k.spouseSlotId === n.id))) {
+    return 'Vợ/chồng';
+  }
+
+  // Cha / Mẹ của chủ đất
+  if (owner && (owner.parentSlotIds || []).includes(n.id)) {
+    const idx = owner.parentSlotIds.indexOf(n.id);
+    if (idx === 0 || n.id === 'father' || n.role === 'father') return 'Cha';
+    if (idx === 1 || n.id === 'mother' || n.role === 'mother') return 'Mẹ';
+  }
+  if (n.id === 'father' || n.role === 'father') return 'Cha';
+  if (n.id === 'mother' || n.role === 'mother') return 'Mẹ';
+
+  // Con / Con của <tên> (thế vị)
+  const parents = (n.parentSlotIds || []).map((id) => nodes.find((k) => k && k.id === id)).filter(Boolean);
+  if (parents.length > 0) {
+    if (parents.some((p) => p.id === 'owner')) {
+      return 'Con';
+    }
+    const anchor = parents[0];
+    let anchorName = '';
+    const pList = Array.isArray(people) ? people : Object.values(people || {});
+    if (anchor && anchor.personId) {
+      const p = pList.find((x) => x && (x.row_id === anchor.personId || x.id === anchor.personId));
+      if (p && p.ho_ten) anchorName = p.ho_ten;
+    }
+    if (!anchorName && anchor) {
+      anchorName = anchor.ho_ten || anchor.id;
+    }
+    return anchorName ? `Con của ${anchorName}` : 'Con';
+  }
+  if (/^child(?:_|$)/.test(n.id || '') || n.role === 'child') return 'Con';
+  return SLOT_LABEL[n.id] || n.id || 'Ô trống';
 }
 const REMOVAL_NOTIFY_KEY = 'notary.diagram.notify_on_remove';
 const _memStorage = new Map();
@@ -476,6 +636,7 @@ function createDiagramPane(ctx) {
     if (ps.length) return `con của ${ps.map(refName).join(' + ')}`;
     return SLOT_LABEL[n.id] || '';
   }
+
 
   // ---------- Pool ----------
   // Contract keo-tha GIU NGUYEN cho P7: dragstart set 'text/plain' =
@@ -728,14 +889,14 @@ function createDiagramPane(ctx) {
     }
 
     if (!n.personId) {
-      // MIN-133 D7: node TRONG 88×24 vien dut — khong nhan vai tro,
-      // khong hint, khong chip. Van la drop target; vai tro doc qua
-      // aria-label/tooltip (screen reader + ban phim qua menu Gán vị trí).
+      // WP6: node TRONG 88×24 vien dut, hien nhan vai tro (Chu dat, Cha, Me, Vo/chong, Con, Con cua <ten>).
       card.classList.add('cd-node-empty');
-      const what = n.id === 'owner' ? 'Chủ đất' : (role || slotTag(n));
-      const label = `Ô trống: ${what}`;
+      const what = emptySlotRole(n, liveNodes(), model.state.stage?.people);
+      const label = `Ô trống: ${what}${role ? ` (${role})` : ''}`;
       card.setAttribute('aria-label', label);
       card.title = label;
+      const nm = h('span', 'cd-empty-label', what);
+      card.append(nm);
       wirePersonDrop(card, n.id);
       return card;
     }
@@ -917,7 +1078,7 @@ function createDiagramPane(ctx) {
 
   function inheritanceInto(scale) {
     const nodes = (model.state.diagram.nodes || []).filter((n) => !n.deleted);
-    const lay = layoutInheritance(nodes);
+    const lay = layoutInheritance(nodes, model.state.stage?.people);
     scale.append(edgesSvgEl(nodes, lay.pos, lay.w, lay.h));
     for (const n of nodes) {
       scale.append(inheritanceCardEl(n, lay.pos[n.id]));
@@ -1535,7 +1696,7 @@ const G1_NOTARY_DIAGRAM = {
   REMOVAL_NOTIFY_KEY,
   // Export cho test thuan: layout thua ke + so cho canonical —
   // pure functions, khong can DOM/model.
-  _internals: { layoutInheritance, slotNum, NODE_W, NODE_H, PAD,
+  _internals: { layoutInheritance, emptySlotRole, slotNum, NODE_W, NODE_H, PAD,
                 ROW_H, GAP_X, ZOOM_MIN, ZOOM_MAX },
 };
 

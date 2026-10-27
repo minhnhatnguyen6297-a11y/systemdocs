@@ -394,17 +394,123 @@ test('chip own/receive doc lap, multi-select, disable > so asset', async () => {
 test('layoutInheritance: gen tu parentSlotIds, spouse ke nhau', () => {
   const { layoutInheritance } = DIAGRAM._internals;
   const lay = layoutInheritance(seedSlots());
-  assert.equal(lay.pos.father.gen, 0);
-  assert.equal(lay.pos.mother.gen, 0);
-  assert.equal(lay.pos.owner.gen, 1);
-  assert.equal(lay.pos.spouse.gen, 1);
-  assert.equal(lay.pos.child_1.gen, 2);
+  assert.equal(lay.pos.father.gen, -1);
+  assert.equal(lay.pos.mother.gen, -1);
+  assert.equal(lay.pos.owner.gen, 0);
+  assert.equal(lay.pos.spouse.gen, 0);
+  assert.equal(lay.pos.child_1.gen, 1);
   // owner + spouse ke nhau tren truc X.
   const gap = Math.abs(lay.pos.owner.x - lay.pos.spouse.x);
   assert.ok(gap <= DIAGRAM._internals.NODE_W +
     DIAGRAM._internals.GAP_X + 1,
     'cap vo/chong phai dung canh nhau');
   assert.ok(lay.w > 0 && lay.h > 0);
+});
+
+test('WP6 node tests: y(spouse)==y(partner); children x ordered by birth; empty slots labelled', async (t) => {
+  const { layoutInheritance, emptySlotRole } = DIAGRAM._internals;
+
+  // 1. y(spouse) == y(partner), spare spouse slot last
+  const mk = (id, parents = [], spouses = []) => ({
+    id, personId: null, parentSlotIds: parents, spouseSlotIds: spouses,
+    spouseSlotId: spouses.at(-1) || null, ownPositions: [], receivePositions: [],
+    hidden: false, deleted: false,
+  });
+  const nodes = [
+    { ...mk('father'), personId: 'p_fa' },
+    { ...mk('mother'), personId: 'p_mo' },
+    { ...mk('owner', ['father', 'mother'], ['spouse_1', 'spouse_spare']), personId: 'p_owner' },
+    { ...mk('spouse_1'), personId: 'p_sp1' },
+    { ...mk('spouse_spare'), personId: null },
+    { ...mk('child_1960', ['owner', 'spouse_1']), personId: 'p_c1960' },
+    { ...mk('child_1980', ['owner', 'spouse_1']), personId: 'p_c1980' },
+    { ...mk('child_unk', ['owner', 'spouse_1']), personId: 'p_cunk' },
+    { ...mk('child_spare', ['owner', 'spouse_1']), personId: null },
+    { ...mk('grandchild', ['child_1960']), personId: 'p_gc' },
+    { ...mk('great_grandchild', ['grandchild']), personId: 'p_ggc' },
+  ];
+  const people = [
+    { row_id: 'p_fa', ho_ten: 'Ông Cha' },
+    { row_id: 'p_mo', ho_ten: 'Bà Mẹ' },
+    { row_id: 'p_owner', ho_ten: 'Chủ đất A' },
+    { row_id: 'p_sp1', ho_ten: 'Bà Vợ 1' },
+    { row_id: 'p_c1960', ho_ten: 'Con 1960', ngay_sinh: '1960-05-10' },
+    { row_id: 'p_c1980', ho_ten: 'Con 1980', ngay_sinh: '1980-02-01' },
+    { row_id: 'p_cunk', ho_ten: 'Con Không Ngày Sinh' },
+    { row_id: 'p_gc', ho_ten: 'Cháu' },
+    { row_id: 'p_ggc', ho_ten: 'Chắt' },
+  ];
+
+  const lay = layoutInheritance(nodes, people);
+
+  // Check generational rows: parents -1, holder+spouses 0, children +1, grandchildren +2, chắt +3
+  assert.equal(lay.pos.father.gen, -1);
+  assert.equal(lay.pos.mother.gen, -1);
+  assert.equal(lay.pos.owner.gen, 0);
+  assert.equal(lay.pos.spouse_1.gen, 0);
+  assert.equal(lay.pos.spouse_spare.gen, 0);
+  assert.equal(lay.pos.child_1960.gen, 1);
+  assert.equal(lay.pos.child_1980.gen, 1);
+  assert.equal(lay.pos.child_unk.gen, 1);
+  assert.equal(lay.pos.child_spare.gen, 1);
+  assert.equal(lay.pos.grandchild.gen, 2);
+  assert.equal(lay.pos.great_grandchild.gen, 3);
+
+  // y(spouse) == y(partner)
+  assert.equal(lay.pos.spouse_1.y, lay.pos.owner.y, 'y(spouse_1) phai bang y(owner)');
+  assert.equal(lay.pos.spouse_spare.y, lay.pos.owner.y, 'y(spouse_spare) phai bang y(owner)');
+
+  // spouse slots immediately beside partner, spare spouse slot last
+  assert.ok(lay.pos.owner.x < lay.pos.spouse_1.x);
+  assert.ok(lay.pos.spouse_1.x < lay.pos.spouse_spare.x, 'spare spouse slot last');
+
+  // children ordered by birth date (unknown last, stable), spare child slot last
+  assert.ok(lay.pos.child_1960.x < lay.pos.child_1980.x, 'child 1960 phai dung truoc child 1980');
+  assert.ok(lay.pos.child_1980.x < lay.pos.child_unk.x, 'child known birth phai dung truoc child unknown birth');
+  assert.ok(lay.pos.child_unk.x < lay.pos.child_spare.x, 'child unknown phai dung truoc spare child slot');
+
+  // 2. empty slots labelled
+  const emptyOwner = mk('owner');
+  const emptyFa = mk('father');
+  const emptyMo = mk('mother');
+  const emptySp = mk('spouse_new');
+  const emptyCh = mk('child_new', ['owner']);
+  const cRep = { ...mk('c_anchor'), personId: 'p_crep' };
+  const emptyRepChild = mk('rep_child_new', ['c_anchor']);
+  const testNodes = [
+    emptyOwner, emptyFa, emptyMo, emptySp, emptyCh, cRep, emptyRepChild,
+  ];
+  emptyOwner.parentSlotIds = [emptyFa.id, emptyMo.id];
+  emptyOwner.spouseSlotIds = [emptySp.id];
+  const testPeople = [
+    { row_id: 'p_crep', ho_ten: 'Nguyễn Văn C' },
+  ];
+
+  assert.equal(emptySlotRole(emptyOwner, testNodes, testPeople), 'Chủ đất');
+  assert.equal(emptySlotRole(emptyFa, testNodes, testPeople), 'Cha');
+  assert.equal(emptySlotRole(emptyMo, testNodes, testPeople), 'Mẹ');
+  assert.equal(emptySlotRole(emptySp, testNodes, testPeople), 'Vợ/chồng');
+  assert.equal(emptySlotRole(emptyCh, testNodes, testPeople), 'Con');
+  assert.equal(emptySlotRole(emptyRepChild, testNodes, testPeople), 'Con của Nguyễn Văn C');
+
+  // Check DOM rendering in view
+  const { view } = await build(t, { mode: 'case', seed: {
+    people: testPeople,
+    assets: [{ row_id: 'a1' }],
+    nodes: testNodes,
+  }});
+  const emptyCards = collect(view.el, (e) => e.classList.contains('cd-node-empty'));
+  const labels = emptyCards.map((c) => {
+    const lbl = collect(c, (el) => el.classList.contains('cd-empty-label'))[0];
+    return [c.dataset.nodeId, lbl ? lbl.textContent : ''];
+  });
+  const labelMap = Object.fromEntries(labels);
+  assert.equal(labelMap.owner, 'Chủ đất');
+  assert.equal(labelMap.father, 'Cha');
+  assert.equal(labelMap.mother, 'Mẹ');
+  assert.equal(labelMap.spouse_new, 'Vợ/chồng');
+  assert.equal(labelMap.child_new, 'Con');
+  assert.equal(labelMap.rep_child_new, 'Con của Nguyễn Văn C');
 });
 
 // ---------- MIN-133: nut so do len head, kich thuoc mockup ----------
