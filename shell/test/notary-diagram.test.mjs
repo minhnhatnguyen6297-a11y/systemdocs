@@ -1530,3 +1530,53 @@ test('Q1: missing death date is labeled on the affected card only', async (t) =>
   assert.doesNotMatch(owner.textContent, /thiếu ngày mất/);
   assert.equal(model.state.stage.people[0].ngay_chet, '2020');
 });
+
+test('WP7: drop triggers evaluate immediately without timer delay, text typing debounce ~300ms', async (t) => {
+  const evaluateTimes = [];
+  const client = {
+    run: async (cmd, payload) => {
+      if (cmd === 'notary.diagram_evaluate') {
+        evaluateTimes.push(Date.now());
+        return { ok: true, data: { render_model: { requiredSlots: [], status: 'complete' } } };
+      }
+      return { ok: true, data: {} };
+    },
+  };
+  const { model, view } = await build(t, {
+    mode: 'case',
+    seed: {
+      people: [{ row_id: 'p1', ho_ten: 'A', ngay_chet: '2020-01-01' }],
+      assets: [{ row_id: 'a1' }],
+      nodes: [{ id: 'owner', personId: null, ownPositions: [1], parentSlotIds: [], spouseSlotIds: [] }],
+    },
+    client,
+    reconcileEngine: true,
+  });
+
+  // Drop triggers evaluate immediately without timer delay
+  const ownerEl = collect(view.el, (e) => e.dataset.nodeId === 'owner')[0];
+  const start = Date.now();
+  ownerEl.dispatch('drop', {
+    preventDefault: () => {},
+    dataTransfer: {
+      getData: () => JSON.stringify({ kind: 'person', row_id: 'p1' }),
+    },
+  });
+
+  // After 40ms (microtasks settled), evaluate has already been called
+  await new Promise((r) => setTimeout(r, 40));
+  assert.ok(evaluateTimes.length >= 1, 'Drop phải kích hoạt evaluate ngay lập tức không có timer delay');
+  const delay = evaluateTimes[0] - start;
+  assert.ok(delay < 150, `Drop evaluate không được có debounce timer (thực tế: ${delay}ms)`);
+
+  // Text typing triggers reconcile with ~300ms debounce
+  evaluateTimes.length = 0;
+  model.updatePersonField('p1', 'ngay_chet', '2022-01-01');
+  // At 50ms, evaluate has not fired yet because of 300ms typing debounce
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(evaluateTimes.length, 0, 'Text typing phải có debounce ~300ms, chưa được gọi ở 50ms');
+
+  // After 350ms, evaluate has fired
+  await new Promise((r) => setTimeout(r, 350));
+  assert.equal(evaluateTimes.length, 1, 'Sau ~300ms debounce, evaluate phải được gọi');
+});

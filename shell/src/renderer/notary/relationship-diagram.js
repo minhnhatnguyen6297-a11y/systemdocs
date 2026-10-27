@@ -28,8 +28,8 @@
  * - Zoom (−/%/+ trong 0.5–1.6) + pan (keo nen) + "Mở rộng" overlay
  *   ~toan man (Esc/x + tra focus — openModal xu ly). Khong auto-fit/ep
  *   nho chu — 60+ node van thao tac bang cuon/pan/zoom.
- * - Moi draft-mutation schedule evaluateDiagram debounce ~500ms — chi
- *   domain inheritance (two_party engine khong ho tro — §13.5).
+ * - Thả/gỡ không debounce (immediate evaluate); gõ chữ debounce ~300ms;
+ *   chỉ domain inheritance (two_party engine không hỗ trợ — §13.5).
  * - Xoa slot (x) chi o inheritance va chi la draft Diagram — khong xoa
  *   dong Stage; two_party 30 slot canonical khong xoa duoc.
  *
@@ -37,7 +37,9 @@
  * build() (file load duoc trong node --test de static test).
  */
 
-const REL_EVALUATE_DEBOUNCE_MS = 500;   // spec: 400–600ms sau draft doi
+// WP7: Thả/gỡ không debounce (immediate evaluate), gõ chữ debounce ~300ms (thay spec 400–600ms cũ).
+const TEXT_TYPING_DEBOUNCE_MS = 300;
+const REL_EVALUATE_DEBOUNCE_MS = 0;
 const TWO_PARTY = 'two_party';
 
 // N3: MỘT nhãn duy nhất cho người chưa có tên ở mọi vị trí sơ đồ.

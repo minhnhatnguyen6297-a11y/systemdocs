@@ -251,6 +251,14 @@ function createModel(deps) {
   let evaluateError = null;
   let reconcilePending = false;
   let reconcileTask = null;
+  let reconcileTimer = null;
+  const TEXT_TYPING_DEBOUNCE_MS = 300;
+
+  function clearReconcile() {
+    clearTimeout(reconcileTimer);
+    reconcileTimer = null;
+    reconcilePending = false;
+  }
   state.addressSlots = {};
   state.addressFull = null;
   state.addressSuggestions = {};
@@ -301,6 +309,7 @@ function createModel(deps) {
   // Chuyen case/nhap moi: xoa ket qua tra cuu cu — session guard loai
   // response tre cua case cu.
   function clearAddressLookups() {
+    clearReconcile();
     lookupSeq += 1;
     state.addressSlots = {};
     state.addressFull = null;
@@ -482,14 +491,14 @@ function createModel(deps) {
   }
 
   function emit() {
+    if (reconcilePending && !reconcileTask && !reconcileTimer) {
+      reconcileTask = Promise.resolve().then(async () => {
+        reconcilePending = false;
+        try { return await runEvaluation(); }
+        finally { reconcileTask = null; }
+      });
+    }
     if (reconcilePending) {
-      if (!reconcileTask) {
-        reconcileTask = Promise.resolve().then(async () => {
-          reconcilePending = false;
-          try { return await runEvaluation(); }
-          finally { reconcileTask = null; }
-        });
-      }
       return;
     }
     // Bao main biet hasUnsaved doi → window-close guard (MIN-112). Tinh o
@@ -1207,7 +1216,7 @@ function createModel(deps) {
     if ((field === 'ngay_chet' || field === 'loai_giay_to') &&
         (state.diagram.nodes || []).some((n) => !n.deleted && n.personId === rowId)) {
       diagramMutation += 1;
-      requestReconcile();
+      requestReconcile({ typing: true });
     }
     clearRowFieldError(rowId, field);
     if (field === 'dia_chi' || field === 'noi_cap') noteLookupSourceChanged();
@@ -1392,11 +1401,26 @@ function createModel(deps) {
 
   // ---------- Diagram draft ----------
 
-  function requestReconcile() {
+  function requestReconcile(opts = {}) {
     if (deps.reconcileEngine &&
         diagramDomain() === CASE_TYPE_INHERITANCE &&
         state.capabilities.diagram && !state.unsupported) {
+      clearTimeout(reconcileTimer);
+      reconcileTimer = null;
       reconcilePending = true;
+      const isTyping = typeof opts === 'boolean' ? opts : !!opts.typing;
+      if (isTyping) {
+        reconcileTimer = setTimeout(() => {
+          reconcileTimer = null;
+          if (reconcilePending && !reconcileTask) {
+            reconcileTask = Promise.resolve().then(async () => {
+              reconcilePending = false;
+              try { return await runEvaluation(); }
+              finally { reconcileTask = null; }
+            });
+          }
+        }, TEXT_TYPING_DEBOUNCE_MS);
+      }
     }
   }
 
@@ -1917,6 +1941,8 @@ function createModel(deps) {
   }
 
   function evaluateDiagram() {
+    clearTimeout(reconcileTimer);
+    reconcileTimer = null;
     return reconcileTask || runEvaluation();
   }
 
