@@ -603,15 +603,14 @@ function createDiagramPane(ctx) {
       const m = /^child_(\d+)$/.exec(n.id || '');
       return m ? `Con ${m[1]}` : 'Con';
     }
-    if (/^[a-z]+_[a-z]+$/.test(n.id || '')) return 'Ô trống';
-    return n.id || 'Ô trống';
+    return emptySlotRole(n, liveNodes(), model.state.stage?.people) || 'Ô trống';
   }
   // Ten ngan de tham chieu slot: ten nguoi neu da gan, nhan slot neu
   // trong.
   function refName(n) {
     if (!n) return '—';
     if (n.personId) return personName(n.personId);
-    return SLOT_LABEL[n.id] || slotTag(n);
+    return emptySlotRole(n, liveNodes(), model.state.stage?.people) || SLOT_LABEL[n.id] || 'Ô trống';
   }
 
   // Vai tro hien thi tu quan he draft da khai bao — presentation only,
@@ -623,7 +622,7 @@ function createDiagramPane(ctx) {
       liveNodes().find((k) => k.spouseSlotId === n.id);
     if (sp) return `vợ/chồng của ${refName(sp)}`;
     const kids = liveNodes().filter(
-      (k) => (k.parentSlotIds || []).includes(n.id));
+      (k) => (k.parentSlotIds || []).includes(n.id) && (k.personId || k.id === 'owner'));
     if (kids.length) {
       const names = kids.slice(0, 2).map(refName).join(', ');
       return `cha/mẹ của ${names}${kids.length > 2 ? '…' : ''}`;
@@ -867,6 +866,15 @@ function createDiagramPane(ctx) {
     return res;
   }
 
+  if (model && typeof model.setOnCascade === 'function') {
+    model.setOnCascade((count, snapshot) => {
+      if (isRemovalNotifyEnabled()) {
+        showUndoToast(count, () => {
+          if (snapshot) model.restoreDraftSnapshot(snapshot);
+        });
+      }
+    });
+  }
   // ---------- card thua ke ----------
 
   function inheritanceCardEl(n, at) {

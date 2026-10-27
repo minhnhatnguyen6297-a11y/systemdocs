@@ -253,7 +253,9 @@ function createModel(deps) {
   let reconcileTask = null;
   let reconcileTimer = null;
   const TEXT_TYPING_DEBOUNCE_MS = 300;
-
+  let onCascadeCallback = deps.onCascade || null;
+  let pendingStageSnapshot = null;
+  let activeRemoval = false;
   function clearReconcile() {
     clearTimeout(reconcileTimer);
     reconcileTimer = null;
@@ -1215,6 +1217,7 @@ function createModel(deps) {
     }
     if ((field === 'ngay_chet' || field === 'loai_giay_to') &&
         (state.diagram.nodes || []).some((n) => !n.deleted && n.personId === rowId)) {
+      if (!pendingStageSnapshot) pendingStageSnapshot = captureDraftSnapshot();
       diagramMutation += 1;
       requestReconcile({ typing: true });
     }
@@ -1839,19 +1842,23 @@ function createModel(deps) {
   async function removeCard(personId) {
     if (!canWrite() || !personId) return { ok: false, returnedToPool: [], cascadeOthers: [] };
     const snapshot = captureDraftSnapshot();
-    const ok = movePerson(personId, null);
-    if (!ok) return { ok: false, returnedToPool: [], cascadeOthers: [] };
-    const res = await evaluateDiagram();
-    const returned = (res && res.returnedToPool) || [];
-    const cascadeOthers = returned.filter((id) => id !== personId);
-    return {
-      ok: true,
-      snapshot,
-      cascadeOthers,
-      returnedToPool: returned,
-    };
+    activeRemoval = true;
+    try {
+      const ok = movePerson(personId, null);
+      if (!ok) return { ok: false, returnedToPool: [], cascadeOthers: [] };
+      const res = await evaluateDiagram();
+      const returned = (res && res.returnedToPool) || [];
+      const cascadeOthers = returned.filter((id) => id !== personId);
+      return {
+        ok: true,
+        snapshot,
+        cascadeOthers,
+        returnedToPool: returned,
+      };
+    } finally {
+      activeRemoval = false;
+    }
   }
-
   // Requirements describe the complete engine-owned slot set, not just additions.
   function reconcileRequiredSlots(requirements) {
     const before = JSON.stringify(state.diagram.nodes);
@@ -2020,9 +2027,15 @@ function createModel(deps) {
       (r.data.render_model && r.data.render_model.warnings) || [];
     state.diagramErrors = [];
     emit();
+    if (!activeRemoval && returnedToPool.size > 0 && typeof onCascadeCallback === 'function') {
+      const snap = pendingStageSnapshot;
+      pendingStageSnapshot = null;
+      onCascadeCallback(returnedToPool.size, snap);
+    } else if (returnedToPool.size === 0) {
+      pendingStageSnapshot = null;
+    }
     return { ...r, returnedToPool: [...returnedToPool] };
   }
-
   // ---------- conflict ----------
 
   // mode: 'reload' = tai ban moi tu server (mat nhap);
@@ -2556,6 +2569,7 @@ function createModel(deps) {
     intakeAnalyze, acceptSuggestion, discardSuggestion, reviewSuggestion, confirmOriginalBindings, detachOriginalSource,
     loadWordOptions, exportWord,
     dismissNotice,
+    setOnCascade: (cb) => { onCascadeCallback = cb; },
   };
 }
 

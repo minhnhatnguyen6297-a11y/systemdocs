@@ -497,9 +497,11 @@ async function awaitJob(jobId, timeoutMs = 120000, onTick) {
   // onTick(job) sau moi poll: dialogs hien thi progress (MIN-112).
   let cur = jobs.get(jobId);
   const deadline = Date.now() + timeoutMs;
+  let interval = 20;
   while (cur && !L.isTerminal(cur.status) && Date.now() < deadline) {
     if (cur.status === 'waiting_user') return cur;
-    await sleep(400);
+    await sleep(interval);
+    if (interval < 200) interval = Math.min(200, Math.round(interval * 1.5));
     const g = await api.getJob(cur.job_id);
     if (g.ok) { cur = g.data; jobs.set(cur.job_id, cur); }
     if (onTick) onTick(cur);
