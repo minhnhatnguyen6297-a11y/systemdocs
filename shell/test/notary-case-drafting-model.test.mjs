@@ -1722,7 +1722,7 @@ test('toggleNodePosition/setNodeRelation/addSlot: no-op tren two_party', async (
   assert.equal(model.state.diagramDirty, false);
 });
 
-test('applyAssignDefaults: owner → ownPositions het; node khac → receivePositions het', async () => {
+test('applyAssignDefaults: owner → ownPositions het; node khac → own=[], receive=[] (= từ chối)', async () => {
   const { model } = makeModel(seedCases('empty'));
   await model.newDraft();                          // MIN-136: 1 node owner
   const a = model.addPerson({ ho_ten: 'Owner' });
@@ -1734,16 +1734,14 @@ test('applyAssignDefaults: owner → ownPositions het; node khac → receivePosi
   const owner = model.state.diagram.nodes.find((n) => n.id === 'owner');
   assert.deepEqual(owner.ownPositions, [1, 2]);
   assert.deepEqual(owner.receivePositions, []);
-  // Slot thua ke khac → receivePositions default [1,2]
+  // Slot thua ke khac → own=[], receive=[] (= tu choi)
   const sp = model.addSlot();
   model.assignPerson(sp.id, b.row_id);
   const spouse = model.state.diagram.nodes.find((n) => n.id === sp.id);
-  assert.deepEqual(spouse.receivePositions, [1, 2]);
-  // Mang explicit khong bi ghi de: tat 1 chip roi gan lai → giu explicit
-  model.toggleNodePosition(sp.id, 'receive', 2);
-  const c = model.addPerson({ ho_ten: 'C' });
-  const kid = model.addSlot();
-  model.assignPerson(kid.id, c.row_id);
+  assert.deepEqual(spouse.ownPositions, []);
+  assert.deepEqual(spouse.receivePositions, []);
+  // Tick receive 1 thu cong
+  model.toggleNodePosition(sp.id, 'receive', 1);
   assert.deepEqual(model.state.diagram.nodes
     .find((n) => n.id === sp.id).receivePositions, [1]);
 });
@@ -1824,23 +1822,39 @@ test('position defaults: empty owner stays empty when another node owns assets',
   assert.deepEqual(slot.ownPositions, [1]);
 });
 
-test('position defaults: assigned heir receives all assets until receive chips are touched', async () => {
+test('WP5 node tests: drop 2nd person → own=[], receive=[]; add asset doesn\'t change unticked; owner gets new position', async () => {
   const { model } = makeModel({});
   await model.newDraft();
-  const person = model.addPerson({ ho_ten: 'Heir' });
+  const ownerPerson = model.addPerson({ ho_ten: 'Owner' });
+  const secondPerson = model.addPerson({ ho_ten: 'Second' });
+  model.addAsset({ so_serial: 'A1' });
+
+  // Drop owner → owner gets all positions
+  model.assignPerson('owner', ownerPerson.row_id);
+  const ownerNode = model.state.diagram.nodes.find((n) => n.id === 'owner');
+  assert.deepEqual(ownerNode.ownPositions, [1]);
+  assert.deepEqual(ownerNode.receivePositions, []);
+
+  // Drop 2nd person → own=[], receive=[] (= tu choi)
   const slot = model.addSlot();
-  model.assignPerson(slot.id, person.row_id);
-  model.addAsset({ so_serial: 'G1-1' });
-  assert.deepEqual(slot.receivePositions, [1]);
-  model.toggleNodePosition(slot.id, 'own', 1);
-  model.addAsset({ so_serial: 'G1-2' });
-  assert.deepEqual(slot.receivePositions, [1, 2]);
+  model.assignPerson(slot.id, secondPerson.row_id);
+  const secondNode = model.state.diagram.nodes.find((n) => n.id === slot.id);
+  assert.deepEqual(secondNode.ownPositions, []);
+  assert.deepEqual(secondNode.receivePositions, []);
+
+  // Add asset doesn't change unticked; owner gets new position
+  model.addAsset({ so_serial: 'A2' });
+  assert.deepEqual(ownerNode.ownPositions, [1, 2]);
+  assert.deepEqual(secondNode.ownPositions, []);
+  assert.deepEqual(secondNode.receivePositions, []);
+
+  // Adding asset appends position only to people who already ticked that kind
   model.toggleNodePosition(slot.id, 'receive', 1);
-  model.toggleNodePosition(slot.id, 'receive', 2);
-  model.addAsset({ so_serial: 'G1-3' });
-  assert.deepEqual(slot.receivePositions, []);
-  model.removeStageRow(model.state.stage.assets[0].row_id);
-  assert.deepEqual(slot.receivePositions, []);
+  assert.deepEqual(secondNode.receivePositions, [1]);
+  model.addAsset({ so_serial: 'A3' });
+  assert.deepEqual(ownerNode.ownPositions, [1, 2, 3]);
+  assert.deepEqual(secondNode.receivePositions, [1, 3]);
+  assert.deepEqual(secondNode.ownPositions, []);
 });
 
 test('position defaults: saveCase synchronizes defaults before capturing payload', async () => {

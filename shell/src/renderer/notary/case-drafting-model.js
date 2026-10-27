@@ -1427,10 +1427,8 @@ function createModel(deps) {
     return node;
   }
 
-  // Mac dinh khi gan (contract §13.4 Q5 — tien ich client): node owner
-  // → ownPositions = moi vi tri dang co; slot thua ke khac →
-  // receivePositions = moi vi tri dang co. Chi ap khi mang dang rong
-  // (khong ghi de lua chon user); wire luon mang mang explicit.
+  // Mặc định khi gán (contract §13.4 Q5 — WP5): ô chủ đất → ownPositions = mọi vị trí đang có,
+  // receivePositions = []. Mọi ô khác: ownPositions = [], receivePositions = [] (= từ chối).
   function applyAssignDefaults(node) {
     if (!node || diagramDomain() !== CASE_TYPE_INHERITANCE) return;
     if (!node.personId) return;
@@ -1439,11 +1437,16 @@ function createModel(deps) {
       if (!node.ownPositions || !node.ownPositions.length) {
         node.ownPositions = all.slice();
       }
-    } else if (!node.receivePositions || !node.receivePositions.length) {
-      node.receivePositions = all.slice();
+      if (!Array.isArray(node.receivePositions)) node.receivePositions = [];
+    } else {
+      node.ownPositions = [];
+      node.receivePositions = [];
     }
   }
 
+  // Đồng bộ vị trí khi thêm/bớt tài sản (WP5):
+  // Thêm tài sản: chỉ nối vị trí mới vào người ĐÃ TÍCH loại đó; người chưa tích giữ nguyên rỗng (= từ chối).
+  // Ô chủ đất được nối vị trí mới vào ownPositions. Bớt tài sản: prune vị trí vượt quá số asset hiện có.
   function syncPositionDefaults() {
     if (diagramDomain() !== CASE_TYPE_INHERITANCE) return;
     const nodes = state.diagram.nodes || [];
@@ -1453,15 +1456,47 @@ function createModel(deps) {
     let changed = false;
     for (const node of nodes) {
       if (!node || node.deleted || !node.personId) continue;
-      const kind = node.id === 'owner' ? 'own' : 'receive';
-      if (state.positionTouched.has(`${node.id}:${kind}`)) continue;
-      const field = kind === 'own' ? 'ownPositions' : 'receivePositions';
-      const positions = node[field] || [];
-      if (kind === 'own' && !positions.length && otherOwner) continue;
-      if (positions.length === count &&
-          positions.every((pos, i) => pos === i + 1)) continue;
-      node[field] = Array.from({ length: count }, (_, i) => i + 1);
-      changed = true;
+      // Ô chủ đất: mặc định tích Chủ tất cả vị trí (nếu chưa chỉnh tay)
+      if (node.id === 'owner') {
+        const own = node.ownPositions || [];
+        if (!state.positionTouched.has('owner:own')) {
+          if (!own.length && !otherOwner && count > 0) {
+            node.ownPositions = Array.from({ length: count }, (_, i) => i + 1);
+            changed = true;
+          } else if (own.length > 0 && count > 0 && !own.includes(count) && count > (own.at(-1) || 0)) {
+            node.ownPositions = [...own.filter((p) => p <= count), count];
+            changed = true;
+          } else {
+            const pruned = own.filter((p) => p <= count);
+            if (pruned.length !== own.length) {
+              node.ownPositions = pruned;
+              changed = true;
+            }
+          }
+        } else {
+          const pruned = own.filter((p) => p <= count);
+          if (pruned.length !== own.length) {
+            node.ownPositions = pruned;
+            changed = true;
+          }
+        }
+        continue;
+      }
+
+      // Người khác: chỉ nối vị trí mới nếu ĐÃ TÍCH loại đó; người chưa tích giữ nguyên rỗng (= từ chối)
+      for (const kind of ['own', 'receive']) {
+        const field = kind === 'own' ? 'ownPositions' : 'receivePositions';
+        const positions = node[field] || [];
+        if (!positions.length) continue;
+        let next = positions.filter((p) => p <= count);
+        if (count > 0 && !next.includes(count) && count > (positions.at(-1) || 0)) {
+          next = [...next, count];
+        }
+        if (next.length !== positions.length || next.some((p, i) => p !== positions[i])) {
+          node[field] = next;
+          changed = true;
+        }
+      }
     }
     if (changed) touchDiagram();
   }

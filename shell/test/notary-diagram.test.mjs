@@ -1301,13 +1301,13 @@ test('removed child branch prunes; evaluate recreates required child slot with s
   // reconcileEngine defers emit; wait for microtask reconcile + re-render.
   await new Promise((r) => setTimeout(r, 50));
   assert.equal(fresh.personId, 'c2');
-  assert.deepEqual(fresh.receivePositions, [1], 'existing assignment default');
+  assert.deepEqual(fresh.receivePositions, [], 'WP5: non-owner default is unticked (= từ chối)');
   const assigned = collect(view.el, e => e.dataset.nodeId === fresh.id)[0];
   const receive = byCls(assigned, 'cd-posrow')[1];
   byCls(receive, 'cd-poschip')[0].click();
   // After toggle + reconcile, the node object may be replaced; re-find.
   const afterToggle = model.state.diagram.nodes.find(n => n.id === fresh.id);
-  assert.deepEqual(afterToggle.receivePositions, []);
+  assert.deepEqual(afterToggle.receivePositions, [1]);
 });
 
 test('inheritance labels never expose slot ids; spouse empty slot names its spouse', async (t) => {
