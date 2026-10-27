@@ -144,8 +144,26 @@ function parseBirthKey(raw) {
   return null;
 }
 
+// Ô trống là Con: không phải Vợ/chồng của ai (host), có parentSlotIds hoặc
+// id/role child — cùng điều kiện nhánh Con của emptySlotRole. Cha/Mẹ và
+// Vợ/chồng trống không rơi vào đây.
+function isEmptyChildSlot(n, live) {
+  if (!n || n.personId || n.id === 'owner') return false;
+  const nodes = live || [];
+  const host = spouseOwnerOf(n.id, nodes) || nodes.find((k) => k && (
+    (k.spouseSlotIds || []).includes(n.id) || k.spouseSlotId === n.id));
+  if (host) return false;
+  return (n.parentSlotIds || []).length > 0 ||
+    /^child(?:_|$)/.test(n.id || '') || n.role === 'child';
+}
+
 function nodeSize(n, live) {
-  if (!n || !n.personId) return { w: EMPTY_W, h: EMPTY_H };
+  if (!n || !n.personId) {
+    // Ô Con trống cao bằng thẻ (NODE_H) để vùng thả lớn, một lần kéo là đủ;
+    // quy tắc J (không chồng, 1 hàng/thế hệ) vẫn do layout + separateBoxes giữ.
+    if (isEmptyChildSlot(n, live)) return { w: EMPTY_W, h: NODE_H };
+    return { w: EMPTY_W, h: EMPTY_H };
+  }
   let h = NODE_H;
   const spouseCard = (live || []).some((k) => k && k !== n && (
     (k.spouseSlotIds || []).includes(n.id) || k.spouseSlotId === n.id));

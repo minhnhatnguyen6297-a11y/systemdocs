@@ -316,16 +316,27 @@ const emptyOf = (nodes, role, ofName) => nodes.filter((n) => {
 });
 const byName = (nodes, nm) => nodes.find((n) => !n.empty && n.name === nm);
 async function dropInto(name, role, ofName) {
-  // Một lần kéo có thể trượt ô Con 24px; thử lại đúng một lần.
+  // Chờ engine sinh ô (không phải thử thả lại): tối đa ~10s.
+  let t = null;
+  for (let i = 0; i < 50 && !t; i++) {
+    t = emptyOf(await diagramNodes(), role, ofName)[0];
+    if (!t) await new Promise((r) => setTimeout(r, 200));
+  }
+  if (!t) {
+    check(`empty ${role} slot of ${ofName || '?'} available for ${name}`, false, null);
+    return false;
+  }
+  // Một lần kéo có thể trượt (engine re-layout sau drop trước); thử lại đúng một lần.
   for (let attempt = 0; attempt < 2; attempt++) {
-    const t = emptyOf(await diagramNodes(), role, ofName)[0];
-    if (!t) {
-      check(`empty ${role} slot of ${ofName || '?'} available for ${name}`, false, null);
-      return false;
+    if (attempt > 0) {
+      t = emptyOf(await diagramNodes(), role, ofName)[0];
+      if (!t) break;
     }
     await dragPoolToNode(name, t.id);
     if (!(await poolNames()).includes(name)) return true;
+    await P().waitForTimeout(500);
   }
+  check(`drop ${name} into ${role} slot of ${ofName || '?'}`, false, null);
   return false;
 }
 function slotRole(label) {
