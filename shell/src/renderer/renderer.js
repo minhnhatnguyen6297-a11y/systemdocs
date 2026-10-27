@@ -698,6 +698,24 @@ function buildStatus(entry) {
   s.append(el('div', 'muted',
     'G1-SM: light theme; cấu hình server/LAN sẽ có ở G1.5. ' +
     'Dữ liệu app nằm ngoài thư mục cài đặt (%APPDATA%/g1-shell).'));
+  const notifyWrap = el('label', 'cd-toggle-setting');
+  notifyWrap.style.display = 'inline-flex';
+  notifyWrap.style.alignItems = 'center';
+  notifyWrap.style.gap = '8px';
+  notifyWrap.style.marginTop = '8px';
+  notifyWrap.style.cursor = 'pointer';
+  const notifyCheck = el('input');
+  notifyCheck.type = 'checkbox';
+  notifyCheck.checked = typeof window !== 'undefined' && window.G1_NOTARY_DIAGRAM
+    ? window.G1_NOTARY_DIAGRAM.isRemovalNotifyEnabled() : true;
+  notifyCheck.setAttribute('aria-label', 'Thông báo khi gỡ');
+  notifyCheck.onchange = () => {
+    if (typeof window !== 'undefined' && window.G1_NOTARY_DIAGRAM) {
+      window.G1_NOTARY_DIAGRAM.setRemovalNotifyEnabled(notifyCheck.checked);
+    }
+  };
+  notifyWrap.append(notifyCheck, el('span', '', 'Thông báo khi gỡ'));
+  s.append(notifyWrap);
 
   return {
     el: s,

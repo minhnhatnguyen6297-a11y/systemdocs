@@ -1745,6 +1745,54 @@ function createModel(deps) {
     return true;
   }
 
+  function captureDraftSnapshot() {
+    return {
+      stage: clone(state.stage),
+      diagram: clone(state.diagram),
+      positionTouched: new Set(state.positionTouched),
+      stageDirty: state.stageDirty,
+      diagramDirty: state.diagramDirty,
+      metaDirty: state.metaDirty,
+      renderModel: clone(state.renderModel),
+      diagramErrors: clone(state.diagramErrors),
+      diagramWarnings: clone(state.diagramWarnings),
+      evaluatedRevision: state.evaluatedRevision,
+    };
+  }
+
+  function restoreDraftSnapshot(snapshot) {
+    if (!snapshot) return false;
+    state.stage = clone(snapshot.stage);
+    state.diagram = clone(snapshot.diagram);
+    state.positionTouched = new Set(snapshot.positionTouched || []);
+    state.stageDirty = Boolean(snapshot.stageDirty);
+    state.diagramDirty = Boolean(snapshot.diagramDirty);
+    state.metaDirty = Boolean(snapshot.metaDirty);
+    state.renderModel = clone(snapshot.renderModel);
+    state.diagramErrors = clone(snapshot.diagramErrors || []);
+    state.diagramWarnings = clone(snapshot.diagramWarnings || []);
+    state.evaluatedRevision = snapshot.evaluatedRevision;
+    diagramMutation += 1;
+    emit();
+    return true;
+  }
+
+  async function removeCard(personId) {
+    if (!canWrite() || !personId) return { ok: false, returnedToPool: [], cascadeOthers: [] };
+    const snapshot = captureDraftSnapshot();
+    const ok = movePerson(personId, null);
+    if (!ok) return { ok: false, returnedToPool: [], cascadeOthers: [] };
+    const res = await evaluateDiagram();
+    const returned = (res && res.returnedToPool) || [];
+    const cascadeOthers = returned.filter((id) => id !== personId);
+    return {
+      ok: true,
+      snapshot,
+      cascadeOthers,
+      returnedToPool: returned,
+    };
+  }
+
   // Requirements describe the complete engine-owned slot set, not just additions.
   function reconcileRequiredSlots(requirements) {
     const before = JSON.stringify(state.diagram.nodes);
@@ -2442,6 +2490,7 @@ function createModel(deps) {
     addSlot, assignPerson, movePerson,
     setNodeFlag, toggleNodePosition, setNodeRelation, nodeRemovalImpact, removeNode,
     evaluateDiagram, reconcileRequiredSlots,
+    captureDraftSnapshot, restoreDraftSnapshot, removeCard,
     resolveConflict,
     intakeAnalyze, acceptSuggestion, discardSuggestion, reviewSuggestion, confirmOriginalBindings, detachOriginalSource,
     loadWordOptions, exportWord,

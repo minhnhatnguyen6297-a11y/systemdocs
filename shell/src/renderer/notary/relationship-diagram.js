@@ -73,7 +73,7 @@ const ZOOM_MIN = 0.5, ZOOM_MAX = 1.6;
 
 // Nhan hien thi cho slot id canonical seed (chi label — khong luat).
 const SLOT_LABEL = {
-  owner: 'Người để lại', father: 'Cha', mother: 'Mẹ',
+  owner: 'Chủ đất', father: 'Cha', mother: 'Mẹ',
   spouse: 'Vợ/chồng', spouse_father: 'Cha vợ/chồng',
   spouse_mother: 'Mẹ vợ/chồng',
 };
@@ -278,6 +278,35 @@ function spouseOwnerOf(nodeId, nodes) {
   return (nodes || []).find((n) => !n.deleted &&
     (n.spouseSlotIds || []).includes(nodeId)) || null;
 }
+const REMOVAL_NOTIFY_KEY = 'notary.diagram.notify_on_remove';
+const _memStorage = new Map();
+
+function isRemovalNotifyEnabled() {
+  try {
+    const raw = (typeof window !== 'undefined' && window.localStorage)
+      ? window.localStorage.getItem(REMOVAL_NOTIFY_KEY)
+      : (typeof localStorage !== 'undefined'
+        ? localStorage.getItem(REMOVAL_NOTIFY_KEY)
+        : _memStorage.get(REMOVAL_NOTIFY_KEY));
+    if (raw === '0' || raw === 'false') return false;
+    return true;
+  } catch (_) {
+    return true;
+  }
+}
+
+function setRemovalNotifyEnabled(enabled) {
+  const val = enabled ? '1' : '0';
+  _memStorage.set(REMOVAL_NOTIFY_KEY, val);
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(REMOVAL_NOTIFY_KEY, val);
+    } else if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(REMOVAL_NOTIFY_KEY, val);
+    }
+  } catch (_) {}
+}
+
 
 function createDiagramPane(ctx) {
   const model = ctx.model;
@@ -427,7 +456,7 @@ function createDiagramPane(ctx) {
   // KHONG suy luan nghiep vu (khong phan biet cha vs me — engine cung
   // khong: parentSlotIds la tap cha/me).
   function roleLabel(n) {
-    if (n.id === 'owner') return 'Người để lại';
+    if (n.id === 'owner') return 'Chủ đất';
     const sp = nodeById(n.spouseSlotId) ||
       liveNodes().find((k) => k.spouseSlotId === n.id);
     if (sp) return `vợ/chồng của ${refName(sp)}`;
@@ -615,60 +644,64 @@ function createDiagramPane(ctx) {
     });
   }
 
-  function openRemovalDialog(nodeId) {
-    if (!model.canWrite()) return;
-    const impact = model.nodeRemovalImpact(nodeId);
-    if (!impact) return;
-    const diagram = model.state.diagram;
-    const snapshot = JSON.stringify(diagram);
-    const caseId = model.state.caseId;
-    const draftId = model.state.draftId;
-    const nodes = new Map(diagram.nodes.map((n) => [n.id, n]));
-    const label = (id) => {
-      const n = nodes.get(id);
-      if (!n) return id;
-      return `${n.personId ? personName(n.personId) : 'Ô trống'} — ${slotTag(n)}`;
-    };
-    openModal((box, close) => {
-      const head = h('div', 'modal-head');
-      const x = btn('×', 'modal-close', close);
-      x.setAttribute('aria-label', 'Đóng');
-      head.append(h('h2', 'modal-title', 'Gỡ cả nhánh khỏi sơ đồ?'), x);
-      const body = h('div', 'modal-body cd-field-stack');
-      body.append(h('div', 'banner warn',
-        'Gỡ vị trí đã chọn và mọi hậu duệ theo cha/mẹ. Phần hưởng có thể thay đổi.'),
-      h('h3', '', `${impact.nodeIds.length} vị trí sẽ gỡ`));
-      const list = h('ul', '');
-      for (const id of impact.nodeIds) list.append(h('li', '', label(id)));
-      body.append(list, h('h3', '', 'Quan hệ sẽ ngắt'));
-      const relations = h('ul', '');
-      for (const rel of impact.relations) {
-        relations.append(h('li', '', rel.kind === 'parent'
-          ? `Cha/mẹ–con: ${label(rel.from)} → ${label(rel.to)}`
-          : `Vợ/chồng: ${label(rel.from)} ↔ ${label(rel.to)}`));
+
+  let activeUndoToast = null;
+
+  function dismissActiveToast() {
+    if (activeUndoToast) {
+      activeUndoToast.dismiss();
+      activeUndoToast = null;
+    }
+  }
+
+  function showUndoToast(count, onUndo) {
+    dismissActiveToast();
+    let box = typeof document?.getElementById === 'function'
+      ? document.getElementById('toast')
+      : (typeof document?.querySelector === 'function' ? document.querySelector('#toast') : null);
+    if (!box) {
+      box = h('div', 'toast-root');
+      box.id = 'toast';
+      const target = document.body || (typeof uiRoot === 'function' ? uiRoot() : null);
+      if (target) target.append(box);
+    }
+    const item = h('div', 'toast toast-undo');
+    item.setAttribute('role', 'status');
+    const msg = h('span', 'toast-text', `Đã đưa ${count} người về Pool`);
+    const sep = h('span', 'toast-sep', ' · ');
+    const undoBtn = btn('Hoàn tác', 'toast-action js-toast-undo', () => {
+      dismissActiveToast();
+      onUndo();
+    });
+    undoBtn.setAttribute('aria-label', 'Hoàn tác');
+    item.append(msg, sep, undoBtn);
+    box.append(item);
+    const timer = setTimeout(() => {
+      if (activeUndoToast && activeUndoToast.el === item) {
+        item.remove();
+        activeUndoToast = null;
       }
-      body.append(relations, h('p', '',
-        'Người vẫn ở Stage và trở lại Pool. Vợ/chồng không bị gỡ chỉ vì quan hệ hôn nhân. Không tự nối lại cha/mẹ.'),
-      h('p', 'muted', 'Chỉ đổi bản nháp. Bấm Lưu hồ sơ sau đó mới ghi hồ sơ.'));
-      const foot = h('div', 'modal-foot');
-      const apply = btn('Gỡ cả nhánh', 'primary danger', () => {
-        if (apply.disabled) return;
-        if (model.state.caseId !== caseId || model.state.draftId !== draftId ||
-            model.state.diagram !== diagram ||
-            JSON.stringify(model.state.diagram) !== snapshot ||
-            !model.canWrite()) {
-          body.replaceChildren(h('div', 'banner warn',
-            'Sơ đồ đã thay đổi. Chưa gỡ nhánh; hãy đóng và xem lại tác động.'));
-          apply.disabled = true;
-          return;
-        }
-        apply.disabled = true;
-        close();
-        model.removeNode(nodeId);
+    }, 5000);
+    activeUndoToast = {
+      el: item,
+      dismiss() {
+        clearTimeout(timer);
+        item.remove();
+      },
+    };
+    return activeUndoToast;
+  }
+
+  async function handleCardRemoval(personId) {
+    if (!model.canWrite() || !personId) return;
+    const res = await model.removeCard(personId);
+    if (!res || !res.ok) return;
+    if (res.cascadeOthers.length > 0 && isRemovalNotifyEnabled()) {
+      showUndoToast(res.cascadeOthers.length, () => {
+        model.restoreDraftSnapshot(res.snapshot);
       });
-      foot.append(btn('Hủy', '', close), apply);
-      box.append(head, body, foot);
-    }, { bare: true });
+    }
+    return res;
   }
 
   // ---------- card thua ke ----------
@@ -694,25 +727,15 @@ function createDiagramPane(ctx) {
         ? 'cd-node-spouse-lawful' : 'cd-node-spouse-faded');
     }
 
-    // Nut hanh dong: chi hien khi hover/focus (CSS .cd-node-acts) —
-    // van nam trong tab order cho ban phim.
-    const acts = h('div', 'cd-node-acts');
-    const del = btn('×', 'icon-x', () => openRemovalDialog(n.id));
-    del.title = `Gỡ slot ${slotTag(n)} và cả nhánh khỏi sơ đồ (không xóa Stage)`;
-    del.setAttribute('aria-label', `Xóa slot ${slotTag(n)}`);
-    del.disabled = ro;
-
     if (!n.personId) {
       // MIN-133 D7: node TRONG 88×24 vien dut — khong nhan vai tro,
       // khong hint, khong chip. Van la drop target; vai tro doc qua
       // aria-label/tooltip (screen reader + ban phim qua menu Gán vị trí).
       card.classList.add('cd-node-empty');
-      const what = role || slotTag(n);
+      const what = n.id === 'owner' ? 'Chủ đất' : (role || slotTag(n));
       const label = `Ô trống: ${what}`;
       card.setAttribute('aria-label', label);
       card.title = label;
-      acts.append(del);
-      card.append(acts);
       wirePersonDrop(card, n.id);
       return card;
     }
@@ -735,20 +758,19 @@ function createDiagramPane(ctx) {
     if (!ro) {
       // Ban phim: gan lai/doi cho cho nguoi dang o node (menu du nang
       // luc nhu keo-tha — move/swap) + bo gan ve Pool.
+      const acts = h('div', 'cd-node-acts');
       const mv = btn('→', 'cd-mini-btn', () => openAssignMenu(p, 'person'));
       mv.title = 'Gán lại/đổi chỗ (bàn phím — thay cho kéo thả)';
       mv.setAttribute('aria-label', `Gán lại ${name}`);
       mv.disabled = !model.state.capabilities.diagram;
-      const un = btn('↩', 'cd-mini-btn js-node-unassign', () => {
-        model.movePerson(n.personId, null);
-      });
+      const un = btn('↩', 'cd-mini-btn js-node-unassign js-card-remove', () =>
+        handleCardRemoval(n.personId)
+      );
       un.title = 'Bỏ gán — trả người về Pool';
       un.setAttribute('aria-label', `Bỏ gán ${name} về Pool`);
       acts.append(mv, un);
+      card.append(acts);
     }
-    acts.append(del);
-    card.append(acts);
-
     const meta = h('div', 'cd-node-meta');
     meta.append(h('span', '', personYears(n.personId) || '—'));
     card.append(meta);
@@ -910,15 +932,7 @@ function createDiagramPane(ctx) {
     wrap.setAttribute('aria-label',
       tp ? 'Sơ đồ hai bên' : 'Sơ đồ thừa kế');
     if (!liveNodes().length && !tp) {
-      // Canvas rong chi xay ra khi user xoa het o — khoi phuc lai o
-      // 'owner' khoi tao (seed 1 node MIN-136), khong phai them moi.
-      const e = face(L.faceEmpty('Sơ đồ trống.'));
-      if (model.canWrite()) {
-        e.append(btn('Khôi phục ô khởi tạo', 'secondary', () => {
-          model.addSlot('owner');
-        }));
-      }
-      wrap.append(e);
+      wrap.append(face(L.faceEmpty('Sơ đồ trống.')));
       return wrap;
     }
     const scale = h('div', 'cd-canvas-scale');
@@ -1198,7 +1212,10 @@ function createDiagramPane(ctx) {
       box.classList.remove('drop-hint');
       try {
         const d = JSON.parse(e.dataTransfer.getData('text/plain'));
-        if (d.kind === 'person' && d.row_id) model.movePerson(d.row_id, null);
+        if (d.kind === 'person' && d.row_id) {
+          if (isTp()) model.movePerson(d.row_id, null);
+          else handleCardRemoval(d.row_id);
+        }
       } catch (err) { /* bo qua */ }
     });
     pane.append(box);
@@ -1455,6 +1472,19 @@ function createDiagramPane(ctx) {
     expand.setAttribute('aria-label', 'Mở rộng sơ đồ toàn màn');
     expand.title = 'Xem sơ đồ ở cửa sổ lớn gần toàn màn hình';
     tools.append(expand);
+    if (!tp) {
+      const toggleWrap = h('label', 'cd-toggle-setting');
+      toggleWrap.title = 'Thông báo và cho phép hoàn tác khi gỡ thẻ làm người khác bị đưa về Pool';
+      const toggle = h('input', 'cd-toggle-checkbox js-toggle-notify-on-remove');
+      toggle.type = 'checkbox';
+      toggle.checked = isRemovalNotifyEnabled();
+      toggle.setAttribute('aria-label', 'Thông báo khi gỡ');
+      toggle.onchange = () => {
+        setRemovalNotifyEnabled(toggle.checked);
+      };
+      toggleWrap.append(toggle, h('span', 'cd-toggle-label', 'Thông báo khi gỡ'));
+      tools.append(toggleWrap);
+    }
     // Nút "Lưu hồ sơ" gọi coordinator view → flush editor rồi
     // model.saveCase (workspace_save_case: Stage+meta+Diagram, done).
     // Không disable vì caseId=null, Diagram sạch hay stageDirty; chỉ
@@ -1489,11 +1519,20 @@ function createDiagramPane(ctx) {
     return card;
   }
 
-  return { build, refresh };
+  return {
+    build,
+    refresh,
+    removeCard: handleCardRemoval,
+    isRemovalNotifyEnabled,
+    setRemovalNotifyEnabled,
+  };
 }
 
 const G1_NOTARY_DIAGRAM = {
   createDiagramPane,
+  isRemovalNotifyEnabled,
+  setRemovalNotifyEnabled,
+  REMOVAL_NOTIFY_KEY,
   // Export cho test thuan: layout thua ke + so cho canonical —
   // pure functions, khong can DOM/model.
   _internals: { layoutInheritance, slotNum, NODE_W, NODE_H, PAD,

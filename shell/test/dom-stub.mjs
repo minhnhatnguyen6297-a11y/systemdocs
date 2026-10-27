@@ -42,7 +42,9 @@ function matches(el, selector) {
 }
 
 export function collect(root, pred, out = []) {
-  if (!root || !root.children) return out;
+  if (!root) return out;
+  if (root.body && !root.children) return collect(root.body, pred, out);
+  if (!root.children) return out;
   for (const c of root.children) {
     if (pred(c)) out.push(c);
     collect(c, pred, out);
@@ -63,6 +65,9 @@ export function makeDom() {
     },
     dispatch(t, ev) {
       for (const f of this._ev[t] || []) f(ev);
+    },
+    getElementById(id) {
+      return collect(this.body || this, (e) => e.id === id)[0] || null;
     },
   };
 

@@ -5,6 +5,8 @@
 // round-trip qua mock adapter, 60 node van render.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { makeDom, collect } from './dom-stub.mjs';
 
@@ -94,10 +96,17 @@ function seedSlots() {
 async function build(t, { mode = 'draft-inh', seed = {}, client, reconcileEngine } = {}) {
   const { document } = makeDom();
   global.document = document;
+  const memStore = new Map();
   global.window = {
     G1_NOTARY_MODEL: M, G1_NOTARY_VIEW: VIEW,
     G1_NOTARY_INTAKE: INTAKE, G1_NOTARY_DIAGRAM: DIAGRAM,
     G1_NOTARY_WORD: WORD,
+    localStorage: {
+      getItem: (k) => memStore.get(k) ?? null,
+      setItem: (k, v) => { memStore.set(k, String(v)); },
+      removeItem: (k) => { memStore.delete(k); },
+      clear: () => { memStore.clear(); },
+    },
   };
   const calls = [];
   const cl = client || {
@@ -145,7 +154,7 @@ test('draft moi inheritance: DUNG 1 o owner trong (MIN-136)', async () => {
   assert.ok(owner, 'thieu o owner');
   assert.ok(owner.classList.contains('cd-node-empty'),
     'o khoi tao phai la node trong');
-  assert.match(owner.getAttribute('aria-label'), /Người để lại/);
+  assert.match(owner.getAttribute('aria-label'), /Chủ đất/);
   // Khong co edges khi chi co 1 node.
   assert.equal(collect(view.el, (e) =>
     e.classList.contains('cd-edge')).length, 0);
@@ -188,7 +197,7 @@ test('legacy 7 slot (case cu): card + edges van render; node trống không ch�
   // owner trong: aria-label giu vai tro "Người để lại".
   const owner = collect(view.el, (e) =>
     e.dataset.nodeId === 'owner')[0];
-  assert.match(owner.getAttribute('aria-label'), /Người để lại/);
+  assert.match(owner.getAttribute('aria-label'), /Chủ đất/);
 });
 
 test('card truoc/sau gan: trong → day du ten+nam+role+chips+bo gan', async () => {
@@ -1141,84 +1150,126 @@ test('two_party: assign/drop KHONG goi diagram_evaluate', async () => {
     'two_party khong duoc goi engine evaluate');
 });
 
-test('branch warning: all dismissals are inert; confirm returns descendants to visible Pool', async (t) => {
-  const people = ['A', 'B', 'S', 'C', 'D', 'U'].map(id => ({
-    row_id: id, ho_ten: `Người ${id}`,
-  }));
-  const mk = (id, parents = [], spouse = null, extra = {}) => ({
-    id, personId: id, parentSlotIds: parents, spouseSlotId: spouse,
-    ownPositions: [], receivePositions: [1], hidden: false, deleted: false, ...extra,
-  });
-  const nodes = [mk('owner', [], null, { personId: 'A', ownPositions: [1] }),
-    mk('B', ['owner'], 'S'), mk('S', [], 'B'), mk('C', ['B', 'S']),
-    mk('D', ['C'], null, { hidden: true }),
-    mk('empty', ['B'], null, { personId: null }), mk('U', ['owner'])];
-  const { model, view, document, calls } = await build(t, { mode: 'case',
-    seed: { people, assets: [{ row_id: 'asset' }], nodes } });
-  const before = structuredClone(model.state);
-  const open = () => {
-    const card = collect(view.el, e => e.dataset.nodeId === 'B')[0];
-    findBtns(card, '×')[0].click();
-    return byCls(view.el, 'modal')[0];
-  };
-  for (const dismiss of ['cancel', 'escape', 'close', 'backdrop']) {
-    const modal = open();
-    const labels = collect(modal, e => e.tagName === 'LI').map(e => e.textContent);
-    assert.equal(labels.length, 10, '4 nodes and 6 parent/spouse edges');
-    assert.ok(labels.includes('Người C — C'));
-    assert.ok(labels.includes('Ô trống — empty'));
-    assert.ok(labels.some(v => v.includes('Người S — S → Người C — C')));
-    assert.ok(labels.some(v => v.includes('Người B — B ↔ Người S — S')));
-    if (dismiss === 'cancel') findBtns(modal, 'Hủy')[0].click();
-    if (dismiss === 'escape') document.dispatch('keydown', { key: 'Escape' });
-    if (dismiss === 'close') byCls(modal, 'modal-close')[0].click();
-    if (dismiss === 'backdrop') byCls(view.el, 'modal-overlay')[0].click();
-    assert.equal(byCls(view.el, 'modal').length, 0);
-    assert.deepEqual(model.state, before);
-  }
-  await new Promise(resolve => setTimeout(resolve, 650));
-  assert.equal(calls.filter(([c]) => c.startsWith('notary.diagram_')).length, 0);
-  const modal = open();
-  let notifications = 0;
-  const unsubscribe = model.subscribe(() => { notifications += 1; });
-  findBtns(modal, 'Gỡ cả nhánh')[0].click();
-  assert.equal(notifications, 1);
-  unsubscribe();
-  assert.deepEqual(model.state.stage, before.stage);
-  assert.equal(model.state.revision, before.revision);
-  assert.equal(model.state.diagram.nodes.filter(n => n.deleted).length, 4);
-  assert.equal(model.state.diagram.nodes.find(n => n.id === 'S').spouseSlotId, null);
-  assert.equal(byCls(view.el, 'modal').length, 0);
-  const poolNames = byCls(view.el, 'cd-pool-card').map(e => e.textContent);
-  assert.equal(poolNames.length, 3);
-  for (const id of ['B', 'C', 'D']) assert.ok(poolNames.some(v => v.includes(`Người ${id}`)));
-  await new Promise(resolve => setTimeout(resolve, 650));
-  // WP3: doi chieu toi co dinh nam trong model (che do engine); view khong
-  // tu lap lich evaluate nua — model test khong bat co reconcileEngine.
-  assert.equal(calls.filter(([c]) => c === 'notary.diagram_evaluate').length, 0);
-  assert.equal(calls.filter(([c]) => c === 'notary.diagram_save').length, 0);
-});
+test('WP4: remove D → no toast; remove A → B,C,D to Pool + toast; Hoàn tác restores identical state; toggle off → no toast; no slot delete button rendered', async (t) => {
+  const rootDir = fileURLToPath(new URL('../../', import.meta.url));
+  const engineScript = `import sys,json
+sys.path.insert(0, 'notary_v2')
+from services.inheritance_engine import run_inheritance_case
+p=json.load(sys.stdin)
+nodes=p['diagram']['state']['nodes']
+for n in nodes:
+ n['isLandOwner']=bool(n.get('ownPositions'))
+ n['willReceive']=bool(n.get('receivePositions'))
+print(json.dumps(run_inheritance_case({'version':2,'nodes':nodes}, {r['row_id']:r for r in p['stage']['people']})))`;
 
-test('branch warning refuses a changed graph or reopened workspace', async (t) => {
-  const nodes = seedSlots();
-  const { model, view } = await build(t, { mode: 'case',
-    seed: { people: INH_PEOPLE, nodes } });
-  const open = () => {
-    findBtns(collect(view.el, e => e.dataset.nodeId === 'child_1')[0], '×')[0].click();
-    return byCls(view.el, 'modal')[0];
+  const client = {
+    run: async (cmd, payload) => {
+      if (cmd !== 'notary.diagram_evaluate') return { ok: true, data: {} };
+      const render_model = JSON.parse(execFileSync(process.env.G1_PYTHON || 'python3', ['-c', engineScript], {
+        cwd: rootDir, input: JSON.stringify(payload), encoding: 'utf8',
+      }));
+      return { ok: true, data: { render_model } };
+    },
   };
-  for (const changed of ['mutation', 'replacement', 'case']) {
-    const modal = open();
-    if (changed === 'mutation') model.setNodeRelation('child_1', { parentSlotIds: ['owner'] });
-    if (changed === 'replacement') model.state.diagram = structuredClone(model.state.diagram);
-    if (changed === 'case') model.state.caseId += 1;
-    const before = structuredClone(model.state);
-    const apply = findBtns(modal, 'Gỡ cả nhánh')[0];
-    apply.click();
-    assert.equal(apply.disabled, true);
-    assert.deepEqual(model.state, before);
-    findBtns(modal, 'Hủy')[0].click();
+
+  const { model, view, document } = await build(t, {
+    mode: 'draft-inh',
+    client,
+    reconcileEngine: true,
+  });
+
+  // Setup family: A (owner, deceased 2020), B (spouse, deceased 1997), C (child, deceased 2001), D (child, living)
+  const pA = model.addPerson({ ho_ten: 'Người A', ngay_chet: '2020' });
+  const pB = model.addPerson({ ho_ten: 'Người B', ngay_chet: '1997' });
+  const pC = model.addPerson({ ho_ten: 'Người C', ngay_chet: '2001' });
+  const pD = model.addPerson({ ho_ten: 'Người D' });
+  model.addAsset({ so_thua: '1', so_to: '2' });
+
+  // 1. Assign A to owner slot
+  model.movePerson(pA.row_id, 'owner');
+  await model.evaluateDiagram();
+
+  // Find required slots for spouse and children
+  const spouseSlotId = model.state.diagram.nodes.find(n => n.id === 'owner')?.spouseSlotIds?.[0];
+  assert.ok(spouseSlotId, 'Phải có ô vợ/chồng cho A');
+  model.movePerson(pB.row_id, spouseSlotId);
+  await model.evaluateDiagram();
+
+  const childSlots = model.state.diagram.nodes.filter(n => !n.deleted && n.parentSlotIds.includes('owner') && !n.personId);
+  assert.ok(childSlots.length >= 2, 'Phải có ít nhất 2 ô con');
+  model.movePerson(pC.row_id, childSlots[0].id);
+  await model.evaluateDiagram();
+
+  const nextChildSlot = model.state.diagram.nodes.filter(n => !n.deleted && n.parentSlotIds.includes('owner') && !n.personId)[0];
+  assert.ok(nextChildSlot, 'Phải có ô con tiếp theo cho D');
+  model.movePerson(pD.row_id, nextChildSlot.id);
+  await model.evaluateDiagram();
+
+  // (1) No slot delete button rendered anywhere on diagram
+  const cards = byCls(view.el, 'cd-node');
+  assert.ok(cards.length > 0);
+  for (const card of cards) {
+    assert.equal(findBtns(card, '×').length, 0, 'Không được có nút × trên ô sơ đồ');
   }
+
+  // (2) Remove D → no toast
+  const cardD = collect(view.el, e => e.dataset.nodeId && model.state.diagram.nodes.find(n => n.id === e.dataset.nodeId && n.personId === pD.row_id))[0];
+  assert.ok(cardD, 'Phải tìm thấy thẻ D');
+  const unassignD = findBtns(cardD, '↩')[0];
+  assert.ok(unassignD, 'Phải có nút bỏ gán ↩ trên thẻ D');
+  await unassignD.onclick();
+
+  // D is in pool, no toast rendered
+  assert.equal(model.state.diagram.nodes.find(n => n.personId === pD.row_id), undefined);
+  assert.equal(byCls(document, 'toast').length, 0, 'Gỡ D không làm ai khác về Pool → không hiện toast');
+
+  // Put D back for next test
+  const emptyChildSlot = model.state.diagram.nodes.find(n => !n.deleted && n.parentSlotIds.includes('owner') && !n.personId);
+  model.movePerson(pD.row_id, emptyChildSlot.id);
+  await model.evaluateDiagram();
+
+  // (3) Remove A → B,C,D to Pool + toast
+  const beforeA = structuredClone(model.state.diagram);
+  const cardA = collect(view.el, e => e.dataset.nodeId === 'owner')[0];
+  assert.ok(cardA, 'Phải tìm thấy thẻ A trên ô owner');
+  const unassignA = findBtns(cardA, '↩')[0];
+  assert.ok(unassignA, 'Phải có nút bỏ gán ↩ trên thẻ A');
+  await unassignA.onclick();
+
+  // Check: B, C, D to Pool via reconcile
+  const activeNodes = model.state.diagram.nodes.filter(n => !n.deleted);
+  assert.deepEqual(activeNodes.map(n => n.id), ['owner'], 'Chỉ còn lại ô owner trống');
+  assert.equal(activeNodes[0].personId, null, 'Ô owner phải trống');
+  assert.equal(byCls(view.el, 'cd-pool-card').length, 4, 'Cả 4 người A, B, C, D đều đã về Pool');
+
+  // Toast shown: "Đã đưa 3 người về Pool · Hoàn tác"
+  const toasts = byCls(document, 'toast');
+  assert.equal(toasts.length, 1, 'Phải hiện đúng 1 toast khi cascade');
+  assert.match(toasts[0].textContent, /Đã đưa 3 người về Pool · Hoàn tác/);
+
+  // (4) Hoàn tác restores identical state
+  const undoBtn = findBtns(toasts[0], 'Hoàn tác')[0];
+  assert.ok(undoBtn, 'Phải có nút Hoàn tác trong toast');
+  undoBtn.click();
+
+  assert.equal(byCls(document, 'toast').length, 0, 'Toast phải đóng sau khi Hoàn tác');
+  assert.deepEqual(model.state.diagram, beforeA, 'Hoàn tác phải khôi phục y nguyên sơ đồ trước khi gỡ');
+
+  // (5) Toggle off → no toast
+  const toggle = collect(view.el, e => e.tagName === 'INPUT' && e.type === 'checkbox' && e.getAttribute('aria-label') === 'Thông báo khi gỡ')[0];
+  assert.ok(toggle, 'Phải có công tắc Thông báo khi gỡ');
+  assert.equal(toggle.checked, true, 'Mặc định công tắc phải bật');
+  toggle.checked = false;
+  toggle.onchange();
+
+  const cardA2 = collect(view.el, e => e.dataset.nodeId === 'owner')[0];
+  await findBtns(cardA2, '↩')[0].onclick();
+
+  assert.equal(byCls(document, 'toast').length, 0, 'Công tắc tắt → gỡ cascade hoàn toàn im lặng, không toast');
+  assert.deepEqual(model.state.diagram.nodes.filter(n => !n.deleted).map(n => n.id), ['owner']);
+
+  // Reset toggle back to default
+  DIAGRAM.setRemovalNotifyEnabled(true);
 });
 
 test('removed child branch prunes; evaluate recreates required child slot with stable id', async (t) => {
@@ -1237,10 +1288,7 @@ test('removed child branch prunes; evaluate recreates required child slot with s
       mk('child_owner', 'c2', ['owner']), mk('gc', 'c3', ['child_owner'])],
   } });
   const card = collect(view.el, e => e.dataset.nodeId === 'child_owner')[0];
-  findBtns(card, '×')[0].click();
-  findBtns(byCls(view.el, 'modal')[0], 'Gỡ cả nhánh')[0].click();
-  assert.equal(model.state.diagram.nodes
-    .find(n => n.id === 'child_owner').deleted, true);
+  await findBtns(card, '↩')[0].onclick();
   await findBtns(view.el, 'Xem cách tính')[0].onclick();
   const active = model.state.diagram.nodes.filter((n) => !n.deleted);
   const fresh = active.find(n => n.id === 'child_stable');
@@ -1358,25 +1406,6 @@ test('N3/N5/N6: tên trống một nhãn, năm sống chỉ năm sinh, không ba
     /thả người từ Pool/);
 });
 
-test('N2: danh sách gỡ nhánh không gắn hậu tố "(đã gỡ)"', async () => {
-  const people = [
-    { row_id: 'c1', ho_ten: 'Người Một', ngay_sinh: '1950' },
-    { row_id: 'c2', ho_ten: 'Người Hai', ngay_sinh: '1960' },
-  ];
-  const nodes = seedSlots().map((n) =>
-    n.id === 'father' ? { ...n, personId: 'c1' }
-      : n.id === 'spouse' ? { ...n, personId: 'c2' } : n);
-  // Node đã gỡ từ trước vẫn tham chiếu quan hệ → không được gắn hậu tố.
-  nodes.push({ id: 'ghost', personId: null, parentSlotIds: [],
-               spouseSlotId: 'father', deleted: true });
-  const { view } = await build(test, { mode: 'case', seed: {
-    people, assets: [{ row_id: 'a1' }], nodes } });
-  const card = collect(view.el, (e) => e.dataset.nodeId === 'father')[0];
-  findBtns(card, '×')[0].click();
-  const modal = byCls(view.el, 'modal')[0];
-  assert.ok(modal);
-  assert.doesNotMatch(modal.textContent, /\(đã gỡ\)/);
-});
 
 test('Q1: missing death date is labeled on the affected card only', async (t) => {
   const { model, view } = await build(t, { mode: 'case', seed: {

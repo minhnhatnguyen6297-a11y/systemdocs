@@ -1086,3 +1086,15 @@
 .cd-root .cd-lookup-list { max-height: 40vh; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
 .cd-root .cd-lookup-item { display: flex; gap: 8px; align-items: flex-start; }
 .cd-root .cd-lookup-item span { flex: 1; min-width: 0; }
+.cd-toggle-setting {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-small, 13px);
+  color: var(--text-secondary, #64748b);
+  cursor: pointer;
+  user-select: none;
+}
+.cd-toggle-checkbox {
+  cursor: pointer;
+}
