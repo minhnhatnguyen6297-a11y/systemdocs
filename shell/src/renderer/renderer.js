@@ -590,6 +590,9 @@ function buildNotaryView(entry, mod) {
   const runner = makeCommandRunner();
   const model = window.G1_NOTARY_MODEL.createModel({
     client: runner,
+    // Engine-requiredSlots co slot IDs on dinh (WP2) → model doi chieu
+    // toi co dinh sau moi thay doi so do/ngay mat (1 emit/lan thay doi).
+    reconcileEngine: true,
     // Dirty flag → main window-close guard (MIN-112). Fire-and-forget;
     // loi bridge khong lam sap draft. invoke() tra promise — .catch de
     // tranh unhandled rejection khi channel loi.

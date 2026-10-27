@@ -249,6 +249,8 @@ function createModel(deps) {
   // chinh evaluate dat (khong dung loi cua duong ghi).
   let evaluateSeq = 0;
   let evaluateError = null;
+  let reconcilePending = false;
+  let reconcileTask = null;
   state.addressSlots = {};
   state.addressFull = null;
   state.addressSuggestions = {};
@@ -480,6 +482,16 @@ function createModel(deps) {
   }
 
   function emit() {
+    if (reconcilePending) {
+      if (!reconcileTask) {
+        reconcileTask = Promise.resolve().then(async () => {
+          reconcilePending = false;
+          try { return await runEvaluation(); }
+          finally { reconcileTask = null; }
+        });
+      }
+      return;
+    }
     // Bao main biet hasUnsaved doi → window-close guard (MIN-112). Tinh o
     // day vi moi thay doi draft deu di qua emit (touchStage/touchDiagram/
     // commit/save/applyWorkspace).
@@ -1192,6 +1204,11 @@ function createModel(deps) {
         state.diagramDirty = true;
       }
     }
+    if ((field === 'ngay_chet' || field === 'loai_giay_to') &&
+        (state.diagram.nodes || []).some((n) => !n.deleted && n.personId === rowId)) {
+      diagramMutation += 1;
+      requestReconcile();
+    }
     clearRowFieldError(rowId, field);
     if (field === 'dia_chi' || field === 'noi_cap') noteLookupSourceChanged();
     touchStage();
@@ -1281,6 +1298,7 @@ function createModel(deps) {
     // movePerson ve Pool goi thang setOwnerRow(null), khong qua touchDiagram,
     // nen phai don tai day.
     state.diagramErrors = [];
+    requestReconcile();
     touchStage();
     return true;
   }
@@ -1304,14 +1322,17 @@ function createModel(deps) {
     }
     // Mirror _prune_diagram phia backend: draft diagram bo tham chieu
     // toi dong vua xoa de save sau khong bi reference_outside_stage.
+    let diagramChanged = false;
     for (const n of state.diagram.nodes || []) {
       if (n.personId === rowId) {
         n.personId = null;
         state.diagramDirty = true;
         diagramMutation += 1;         // tham chieu node bi go
+        diagramChanged = true;
       }
     }
     state.fieldErrors = state.fieldErrors.filter((e) => e.row_id !== rowId);
+    if (diagramChanged) requestReconcile();
     touchStage();
     if (state.stage.assets.length !== assetCount) syncPositionDefaults();
   }
@@ -1371,12 +1392,21 @@ function createModel(deps) {
 
   // ---------- Diagram draft ----------
 
+  function requestReconcile() {
+    if (deps.reconcileEngine &&
+        diagramDomain() === CASE_TYPE_INHERITANCE &&
+        state.capabilities.diagram && !state.unsupported) {
+      reconcilePending = true;
+    }
+  }
+
   function touchDiagram() {
     state.diagramDirty = true;
     diagramMutation += 1;
     // Sua so do → diagramErrors cua lan Luu truoc khong con la ket qua
     // hien tai. Khong dung fieldErrors/error: chung thuoc du lieu stage.
     state.diagramErrors = [];
+    requestReconcile();
     emit();
   }
 
@@ -1715,34 +1745,147 @@ function createModel(deps) {
     return true;
   }
 
-  async function evaluateDiagram() {
+  // Requirements describe the complete engine-owned slot set, not just additions.
+  function reconcileRequiredSlots(requirements) {
+    const before = JSON.stringify(state.diagram.nodes);
+    const old = (state.diagram.nodes || []).filter((n) => n && !n.deleted);
+    const byId = new Map(old.map((n) => [n.id, n]));
+    const oldParents = new Map(old.map((n) => [n.id, [...(n.parentSlotIds || [])]]));
+    const oldSpouses = new Map(old.map((n) => [n.id, [...(n.spouseSlotIds || [])]]));
+    const owner = byId.get('owner') || newNode('owner');
+    const result = [owner];
+    const used = new Set(['owner']);
+    const remap = new Map([['owner', 'owner']]);
+    const reqs = new Map(requirements.map((r) => [r.anchorSlotId, r]));
+    const queue = ['owner'];
+    const relations = [];
+    for (let i = 0; i < queue.length; i += 1) {
+      const anchorId = queue[i];
+      const req = reqs.get(anchorId);
+      if (!req) continue;
+      const anchor = byId.get(anchorId);
+      if (!anchor) continue;
+      const parents = anchor.parentSlotIds || [];
+      const candidates = {
+        father: parents.slice(0, 1).map((id) => byId.get(id)),
+        mother: parents.slice(1, 2).map((id) => byId.get(id)),
+        spouse: (anchor.spouseSlotIds || []).map((id) => byId.get(id)),
+        child: old.filter((n) => (n.parentSlotIds || []).includes(anchorId)),
+      };
+      for (const spec of req.slots || []) {
+        let node = byId.get(spec.id);
+        if (!node || used.has(node.id)) {
+          node = (candidates[spec.role] || []).find((n) => n && !used.has(n.id));
+        }
+        const oldId = node?.id;
+        node = node ? { ...node, id: spec.id } : newNode(spec.id);
+        if (oldId) {
+          used.add(oldId);
+          remap.set(oldId, spec.id);
+          queue.push(oldId);
+        }
+        used.add(spec.id);
+        result.push(node);
+        relations.push({ anchorId, id: spec.id, role: spec.role });
+      }
+    }
+    const retained = new Set(result.map((n) => n.personId).filter(Boolean));
+    const returnedToPool = [...new Set(old.map((n) => n.personId)
+      .filter((id) => id && !retained.has(id)))];
+    const nextById = new Map(result.map((n) => [n.id, n]));
+    for (const node of result) {
+      node.parentSlotIds = [];
+      node.spouseSlotIds = [];
+      node.spouseSlotId = null;
+    }
+    for (const { anchorId, id, role } of relations) {
+      const anchor = nextById.get(remap.get(anchorId) || anchorId);
+      const node = nextById.get(id);
+      if (role === 'father' || role === 'mother') anchor.parentSlotIds.push(id);
+      else if (role === 'spouse') anchor.spouseSlotIds.push(id);
+      else if (role === 'child' && !node.parentSlotIds.includes(anchor.id)) {
+        node.parentSlotIds.push(anchor.id);
+      }
+    }
+    for (const [oldId, newId] of remap) {
+      const node = nextById.get(newId);
+      for (const parentId of oldParents.get(oldId) || []) {
+        const mapped = remap.get(parentId);
+        if (mapped && !node.parentSlotIds.includes(mapped)) node.parentSlotIds.push(mapped);
+      }
+      const order = (oldSpouses.get(oldId) || []).map((id) => remap.get(id));
+      node.spouseSlotIds.sort((a, b) =>
+        Number(!!nextById.get(a).personId) - Number(!!nextById.get(b).personId) ||
+        order.indexOf(a) - order.indexOf(b));
+      node.spouseSlotId = node.spouseSlotIds.at(-1) || null;
+      for (const kind of ['own', 'receive']) {
+        if (oldId !== newId && state.positionTouched.delete(`${oldId}:${kind}`)) {
+          state.positionTouched.add(`${newId}:${kind}`);
+        }
+      }
+    }
+    state.diagram.nodes = result;
+    const changed = before !== JSON.stringify(result);
+    if (changed) {
+      state.diagramDirty = true;
+      diagramMutation += 1;
+    }
+    return { changed, returnedToPool };
+  }
+
+  function evaluateDiagram() {
+    return reconcileTask || runEvaluation();
+  }
+
+  async function runEvaluation() {
     // Read-only theo DB — duoc phep tren case locked (contract §7.4).
     if (state.unsupported) {
       return { ok: false, error: errObj('case_type_unsupported',
                                         'Loại việc chưa hỗ trợ') };
     }
     const call = ++evaluateSeq;
-    const diagramAtIssue = diagramMutation;
+    let diagramAtIssue = diagramMutation;
     state.busy = 'notary.diagram_evaluate';
-    emit();
     const s = session;
-    // Mọi workspace đang sửa (kể cả case đã lưu) evaluate trên buffer:
-    // nhánh draft của adapter — case hint + Stage + Diagram, KHÔNG
-    // case_id/base_revision, không ghi DB (§2.1a, §13.2).
-    const payload = { case: { case_type: caseType() },
-      stage: stageForWire(state.stage, state.committed),
-      diagram: { state: clone(state.diagram) } };
-    const r = await client.run('notary.diagram_evaluate', payload);
-    const isLatest = call === evaluateSeq;
-    if (isLatest) state.busy = null;
-    if (s !== session) return r;      // response tre — bo
-    if (!isLatest || diagramMutation !== diagramAtIssue) {
-      // Response tre: so do da sua/thay hoac da co lan evaluate moi hon.
-      // Chi don busy cua chinh no; khong dung error/diagramErrors/
-      // renderModel/warnings cua trang thai hien tai (§7.1 D2).
-      if (isLatest) emit();
-      return r;
+    const returnedToPool = new Set();
+    let r;
+    // Migration of legacy IDs can change descendant anchors; evaluate again
+    // after each pass. The cap also bounds a malformed/oscillating engine.
+    for (let iteration = 0; iteration < 16; iteration += 1) {
+      reconcilePending = false;
+      const payload = { case: { case_type: caseType() },
+        stage: stageForWire(state.stage, state.committed),
+        diagram: { state: clone(state.diagram) } };
+      r = await client.run('notary.diagram_evaluate', payload);
+      const latest = call === evaluateSeq;
+      if (s !== session || !latest || diagramMutation !== diagramAtIssue) {
+        if (latest) state.busy = null;
+        if (s === session && latest && reconcilePending) return runEvaluation();
+        return r;
+      }
+      if (!deps.reconcileEngine) break;
+      const reqs = r.data?.render_model?.requiredSlots;
+      if (!r.ok || diagramDomain() !== CASE_TYPE_INHERITANCE ||
+          !Array.isArray(reqs) ||
+          reqs.some((req) => !Array.isArray(req.slots))) break;
+      // Empty reqs (e.g. owner alive/missing date) → prune surplus once.
+      if (!reqs.length) {
+        const pass = reconcileRequiredSlots([]);
+        for (const id of pass.returnedToPool) returnedToPool.add(id);
+        break;
+      }
+      if (r.data.render_model.status === 'invalid' &&
+          (r.data.render_model.errors || []).some((e) => e.code !== 'missing_land_owner')) break;
+      const pass = reconcileRequiredSlots(r.data.render_model.requiredSlots);
+      for (const id of pass.returnedToPool) returnedToPool.add(id);
+      diagramAtIssue = diagramMutation;
+      if (!pass.changed) break;
+      if (iteration === 15) {
+        r = { ok: false, error: errObj('diagram_reconcile_limit',
+          'Sơ đồ chưa ổn định sau 16 lần đối chiếu.') };
+      }
     }
+    state.busy = null;
     // Ket qua moi nhat cho dung so do hien tai — loi do evaluate dat
     // truoc do khong con la ket qua hien tai; loi cua duong ghi thi
     // KHONG duoc don o day.
@@ -1768,7 +1911,7 @@ function createModel(deps) {
       (r.data.render_model && r.data.render_model.warnings) || [];
     state.diagramErrors = [];
     emit();
-    return r;
+    return { ...r, returnedToPool: [...returnedToPool] };
   }
 
   // ---------- conflict ----------
@@ -2298,7 +2441,7 @@ function createModel(deps) {
     pool,
     addSlot, assignPerson, movePerson,
     setNodeFlag, toggleNodePosition, setNodeRelation, nodeRemovalImpact, removeNode,
-    evaluateDiagram,
+    evaluateDiagram, reconcileRequiredSlots,
     resolveConflict,
     intakeAnalyze, acceptSuggestion, discardSuggestion, reviewSuggestion, confirmOriginalBindings, detachOriginalSource,
     loadWordOptions, exportWord,

@@ -82,7 +82,7 @@ function seedCase(model) {
   model.dismissNotice();
 }
 
-function build(t, { withCatalog = true, client } = {}) {
+function build(t, { withCatalog = true, client, reconcileEngine } = {}) {
   const { document } = makeDom();
   global.document = document;
   loadDiagram({ withCatalog });
@@ -93,7 +93,7 @@ function build(t, { withCatalog = true, client } = {}) {
     calls.push([cmd, payload]);
     return run(cmd, payload);
   } };
-  const model = M.createModel({ client: cl });
+  const model = M.createModel({ client: cl, reconcileEngine });
   const view = VIEW.createNotaryModuleView({
     model, lib: L, notify: (msg, isErr) => notices.push([msg, isErr]),
     confirm: async () => true,
@@ -154,26 +154,22 @@ test('R12/R13 evaluate lỗi: một dòng trong vùng sơ đồ, không toast', 
   assert.equal(model.state.error.code, 'stage_validation_error');
 });
 
-test('tu danh gia sau thao tac (debounce ~500ms): một dòng lỗi, không bỏ mặc Promise',
+test('tu danh gia sau thao tac (khong debounce): một dòng lỗi, không bỏ mặc Promise',
   async () => {
     const { view, model, notices, CAT } = build(test, {
+      reconcileEngine: true,
       client: errorClient({ 'notary.diagram_evaluate':
         { ok: false, error: { ...EVAL_ERR } } }) });
-    // Thao tac phai KHONG qua Stage gate: bo gan tren node owner bat
-    // stageDirty (owner la du lieu Stage) nen debounce se bi bo qua.
+    // Bo gan ve Pool: mutation bi giu lai, model tu danh gia roi ve 1 lan.
     assert.equal(model.movePerson('c2', 'child_1'), true);
-    const card = collect(view.el, (e) => e.dataset.nodeId === 'child_1')[0];
-    assert.ok(card, 'thieu card child_1');
-    const un = byCls(card, 'js-node-unassign')[0];
-    assert.ok(un, 'thieu nut bo gan tren card co nguoi');
+    await new Promise((r) => setTimeout(r, 50));
+    assert.equal(model.movePerson('c2', null), true);
     const rejections = [];
     const onRej = (e) => rejections.push(String(e && e.message || e));
     process.on('unhandledRejection', onRej);
     test.after(() => process.off('unhandledRejection', onRej));
-    un.click();
-    assert.deepEqual(notices, [], 'chua het debounce thi chua co loi');
-    await new Promise((r) => setTimeout(r, 650));
-    assert.deepEqual(notices, [], 'debounce cũng không toast');
+    await new Promise((r) => setTimeout(r, 50));
+    assert.deepEqual(notices, [], 'tự đánh giá không toast');
     assert.deepEqual(errLines(view), [CAT.errText(EVAL_ERR)],
       'tự đánh giá báo lỗi đúng một lần tại vùng sơ đồ');
     assert.deepEqual(rejections, [],

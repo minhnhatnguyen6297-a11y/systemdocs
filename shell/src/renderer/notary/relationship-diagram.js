@@ -362,29 +362,9 @@ function createDiagramPane(ctx) {
     return model.diagramDomain && model.diagramDomain() === TWO_PARTY;
   }
 
-  // Debounce evaluate sau moi draft-mutating action (§7.4: evaluate la
-  // read-only — chay duoc ca khi locked; unsupported thi bo qua).
-  // two_party: engine khong ho tro (§13.5) — khong goi evaluate.
-  function scheduleEvaluate() {
-    if (isTp() || !model.state.capabilities.diagram ||
-        model.state.unsupported) {
-      return;
-    }
-    if (evalTimer) clearTimeout(evalTimer);
-    evalTimer = setTimeout(() => { void runEvaluate(); },
-      REL_EVALUATE_DEBOUNCE_MS);
-  }
 
   async function runEvaluate() {
-    // R13: lỗi evaluate hiện MỘT dòng trong vùng sơ đồ (state.diagramErrors
-    // hoặc state.error do model đặt) — không toast trùng.
-    const r = await model.evaluateDiagram();
-    // evaluateDiagram can return a successful but stale response. Only
-    // apply slots when this exact response became the current render model.
-    if (r.ok && model.state.renderModel === r.data?.render_model) {
-      applyRequiredSlots();
-    }
-    return r;
+    return model.evaluateDiagram();
   }
 
   function personRow(rowId) {
@@ -544,7 +524,7 @@ function createDiagramPane(ctx) {
       const assign = (nodeId) => () => {
         // movePerson bao trum ca move vao cho trong LAN swap khi cho
         // da co nguoi — cung semantics voi keo-tha (§13.5 Q9).
-        if (model.movePerson(row.row_id, nodeId)) scheduleEvaluate();
+        model.movePerson(row.row_id, nodeId);
         close();
       };
       if (isTp()) {
@@ -612,70 +592,6 @@ function createDiagramPane(ctx) {
     }, { bare: true });
   }
 
-  function freeSlotId(bases) {
-    const used = new Set(
-      (model.state.diagram.nodes || []).map((n) => n && n.id));
-    for (const b of bases) if (!used.has(b)) return b;
-    const last = bases[bases.length - 1];
-    let i = 2;
-    while (used.has(`${last}_${i}`)) i += 1;
-    return `${last}_${i}`;
-  }
-
-  // ---------- requiredSlots (engine la SOT cho cho con thieu) ----------
-
-  // Tu sinh slot thieu theo render_model.requiredSlots cua engine —
-  // Tu sinh slot thieu mot chieu tu requiredSlots; engine la SOT.
-  function applyRequiredSlots() {
-    if (!model.canWrite() || isTp()) return false;
-    const reqs = (model.state.renderModel &&
-                  model.state.renderModel.requiredSlots) || [];
-    if (!reqs.length) return false;
-    let touched = false;
-    for (const req of reqs) {
-      const anchor = nodeById(req.anchorSlotId);
-      const person = anchor && personRow(anchor.personId);
-      if (!anchor || !person || !person.ngay_chet) continue;
-      const types = new Set(req.slotTypes || []);
-      const wantKinds = ['father', 'mother'].filter((t) => types.has(t));
-      const haveParents = (anchor.parentSlotIds || [])
-        .filter((p) => nodeById(p)).length;
-      const needParents = Math.min(
-        Math.max(0, wantKinds.length - haveParents), 2 - haveParents);
-      for (let i = 0; i < needParents; i += 1) {
-        const kind = wantKinds[i] || 'parent';
-        const node = model.addSlot(
-          freeSlotId([kind, `${kind}_${anchor.id}`]));
-        if (!node) break;
-        model.setNodeRelation(anchor.id, {
-          parentSlotIds: [...(anchor.parentSlotIds || []), node.id] });
-        touched = true;
-      }
-      if (types.has('spouse') &&
-          !(anchor.spouseSlotIds || []).some((id) => nodeById(id))) {
-        const node = model.addSlot(
-          freeSlotId(['spouse', `spouse_${anchor.id}`]));
-        if (node) {
-          model.setNodeRelation(anchor.id, {
-            spouseSlotIds: [...(anchor.spouseSlotIds || []), node.id] });
-          touched = true;
-        }
-      }
-      if (types.has('child')) {
-        const need = Math.max(0, req.minimumEmptyChildSlots || 0);
-        const emptyKids = () => liveNodes().filter(
-          (n) => !n.personId &&
-            (n.parentSlotIds || []).includes(anchor.id)).length;
-        for (let i = emptyKids(); i < need; i += 1) {
-          const node = model.addSlot(freeSlotId([`child_${anchor.id}`]));
-          if (!node) break;
-          model.setNodeRelation(node.id, { parentSlotIds: [anchor.id] });
-          touched = true;
-        }
-      }
-    }
-    return touched;
-  }
 
   // ---------- Diagram ----------
 
@@ -694,10 +610,7 @@ function createDiagramPane(ctx) {
       el.classList.remove('drop-hint');
       try {
         const d = JSON.parse(e.dataTransfer.getData('text/plain'));
-        if (d.kind === 'person' &&
-            model.movePerson(d.row_id, nodeId)) {
-          scheduleEvaluate();
-        }
+        if (d.kind === 'person') model.movePerson(d.row_id, nodeId);
       } catch (err) { /* payload rac — bo qua */ }
     });
   }
@@ -751,7 +664,7 @@ function createDiagramPane(ctx) {
         }
         apply.disabled = true;
         close();
-        if (model.removeNode(nodeId)) scheduleEvaluate();
+        model.removeNode(nodeId);
       });
       foot.append(btn('Hủy', '', close), apply);
       box.append(head, body, foot);
@@ -810,6 +723,10 @@ function createDiagramPane(ctx) {
     const nm = h('span', 'cd-node-name', name);
     nm.title = role ? `${name} — ${role}` : name;
     card.append(nm);
+    if ((model.state.renderModel?.warnings || []).some((warning) =>
+      warning.code === 'missing_death_date' && warning.personId === n.personId)) {
+      card.append(h('div', 'cd-badge cd-badge-warn', 'thiếu ngày mất'));
+    }
     if (spouseOwner) {
       const text = spouseLawful ? 'Vợ/chồng hợp pháp'
         : 'Không phải vợ/chồng hợp pháp';
@@ -823,7 +740,7 @@ function createDiagramPane(ctx) {
       mv.setAttribute('aria-label', `Gán lại ${name}`);
       mv.disabled = !model.state.capabilities.diagram;
       const un = btn('↩', 'cd-mini-btn js-node-unassign', () => {
-        if (model.movePerson(n.personId, null)) scheduleEvaluate();
+        model.movePerson(n.personId, null);
       });
       un.title = 'Bỏ gán — trả người về Pool';
       un.setAttribute('aria-label', `Bỏ gán ${name} về Pool`);
@@ -851,9 +768,7 @@ function createDiagramPane(ctx) {
         const on = Array.isArray(arr) && arr.includes(pos);
         const chip = btn(`${pos}`,
           `cd-poschip${on ? ' on' : ''}`, () => {
-            if (model.toggleNodePosition(n.id, kind, pos)) {
-              scheduleEvaluate();
-            }
+            model.toggleNodePosition(n.id, kind, pos);
           });
         chip.disabled = ro || pos > assetCount;
         chip.setAttribute('aria-pressed', String(on));
@@ -911,7 +826,7 @@ function createDiagramPane(ctx) {
       mv.setAttribute('aria-label', `Đổi chỗ ${p.ho_ten || 'người này'}`);
       mv.disabled = ro || !model.state.capabilities.diagram;
       const del = btn('×', 'icon-x', () => {
-        if (model.movePerson(n.personId, null)) scheduleEvaluate();
+        model.movePerson(n.personId, null);
       });
       del.title = `Bỏ ${p.ho_ten || ''} khỏi chỗ ${num} (về Pool)`;
       del.setAttribute('aria-label', `Bỏ khỏi chỗ ${num}`);
@@ -979,18 +894,7 @@ function createDiagramPane(ctx) {
   // ---------- canvas (pan + zoom, khong auto-fit) ----------
 
   function inheritanceInto(scale) {
-    const all = model.state.diagram.nodes || [];
-    const nodes = all.filter((n) => {
-      if (n.deleted || n.personId) return !n.deleted;
-      const owner = spouseOwnerOf(n.id, all);
-      const person = owner && owner.personId
-        ? personRow(owner.personId) : null;
-      return !person || !!person.ngay_chet;
-    }).map((n) => {
-      const person = n.personId ? personRow(n.personId) : null;
-      return person && !person.ngay_chet && (n.spouseSlotIds || []).length
-        ? { ...n, spouseSlotIds: [], spouseSlotId: null } : n;
-    });
+    const nodes = (model.state.diagram.nodes || []).filter((n) => !n.deleted);
     const lay = layoutInheritance(nodes);
     scale.append(edgesSvgEl(nodes, lay.pos, lay.w, lay.h));
     for (const n of nodes) {
@@ -1011,7 +915,7 @@ function createDiagramPane(ctx) {
       const e = face(L.faceEmpty('Sơ đồ trống.'));
       if (model.canWrite()) {
         e.append(btn('Khôi phục ô khởi tạo', 'secondary', () => {
-          if (model.addSlot('owner')) scheduleEvaluate();
+          model.addSlot('owner');
         }));
       }
       wrap.append(e);
@@ -1294,8 +1198,7 @@ function createDiagramPane(ctx) {
       box.classList.remove('drop-hint');
       try {
         const d = JSON.parse(e.dataTransfer.getData('text/plain'));
-        if (d.kind === 'person' && d.row_id &&
-            model.movePerson(d.row_id, null)) scheduleEvaluate();
+        if (d.kind === 'person' && d.row_id) model.movePerson(d.row_id, null);
       } catch (err) { /* bo qua */ }
     });
     pane.append(box);

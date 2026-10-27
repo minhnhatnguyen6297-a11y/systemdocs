@@ -91,7 +91,7 @@ function seedSlots() {
   return structuredClone(nodes);
 }
 
-async function build(t, { mode = 'draft-inh', seed = {}, client } = {}) {
+async function build(t, { mode = 'draft-inh', seed = {}, client, reconcileEngine } = {}) {
   const { document } = makeDom();
   global.document = document;
   global.window = {
@@ -106,7 +106,7 @@ async function build(t, { mode = 'draft-inh', seed = {}, client } = {}) {
       return { ok: true, data: {} };
     },
   };
-  const model = M.createModel({ client: cl });
+  const model = M.createModel({ client: cl, reconcileEngine });
   const view = VIEW.createNotaryModuleView({
     model, lib: L, notify: () => {},
     confirm: async () => true,
@@ -564,73 +564,51 @@ test('cach tinh hien hang 2/3 va du 7 vai tieng Viet, giu nguyen phan so engine'
 
 // ---------- requiredSlots → tu sinh slot ----------
 
-test('requiredSlots: engine yeu cau → tao father/mother/spouse/child', async () => {
+test('requiredSlots (engine slots[]): tao father/mother/spouse/child voi ID on dinh', async () => {
+  const required = [{ anchorSlotId: 'owner', reason: 'active_estate',
+    slotTypes: ['father', 'mother', 'spouse', 'child'],
+    minimumEmptyChildSlots: 1, minimumEmptySpouseSlots: 1,
+    slots: [
+      { id: 's_father', role: 'father', ordinal: 0 },
+      { id: 's_mother', role: 'mother', ordinal: 0 },
+      { id: 's_spouse_0', role: 'spouse', ordinal: 0 },
+      { id: 's_spouse_1', role: 'spouse', ordinal: 1 },
+      { id: 's_child_0', role: 'child', ordinal: 0 },
+      { id: 's_child_1', role: 'child', ordinal: 1 }] }];
   const client = {
-    run: async (cmd) => {
-      if (cmd === 'notary.diagram_evaluate') {
-        return { ok: true, data: {
-          evaluated_revision: 3,
-          render_model: {
-            engineVersion: 2, status: 'incomplete', allocations: {},
-            breakdowns: [],
-            requiredSlots: [
-              { anchorSlotId: 'owner', reason: 'active_estate',
-                slotTypes: ['father', 'mother', 'spouse', 'child'],
-                minimumEmptyChildSlots: 1 },
-              { anchorSlotId: 'child_1', reason: 'representation_branch',
-                slotTypes: ['spouse', 'child'],
-                minimumEmptyChildSlots: 1 }],
-            warnings: [], errors: [], unresolvedEstates: [],
-            conservation: {} } } };
-      }
-      return { ok: true, data: {} };
-    },
+    run: async (cmd) => cmd === 'notary.diagram_evaluate'
+      ? { ok: true, data: { evaluated_revision: 3, render_model: {
+          engineVersion: 2, status: 'incomplete', allocations: {},
+          breakdowns: [], requiredSlots: required, warnings: [],
+          errors: [], unresolvedEstates: [], conservation: {} } } }
+      : { ok: true, data: {} },
   };
   const nodes = seedSlots().map((n) => ({ ...n }));
-  // Owner da gan nguoi (da mat) nhung THIEU cha/me + vo/chong + con:
-  // xoa quan he seed de engine yeu cau tat ca.
   for (const n of nodes) {
     if (n.id === 'owner') {
       n.personId = 'c1'; n.parentSlotIds = []; n.spouseSlotIds = [];
       n.spouseSlotId = null;
-    }
-    if (n.id === 'father' || n.id === 'mother' ||
-        n.id === 'spouse' || n.id === 'spouse_2' ||
-        n.id === 'spouse_father' ||
-        n.id === 'spouse_mother' || n.id === 'child_1') {
+    } else {
       n.deleted = true;
     }
   }
   const { model, view } = await build(test, {
-    mode: 'case', client,
+    mode: 'case', client, reconcileEngine: true,
     seed: { people: INH_PEOPLE, nodes } });
-  // MIN-136: khong con nut "Đánh giá thử" — "Xem cách tính" trigger
-  // evaluate + mo panel breakdown.
-  const evalBtn = findBtns(view.el, 'Xem cách tính')[0];
-  await evalBtn.onclick();
+  await findBtns(view.el, 'Xem cách tính')[0].onclick();
   const after = model.state.diagram.nodes.filter((n) => !n.deleted);
-  const ids = new Set(after.map((n) => n.id));
-  // owner can father+mother+spouse+child: seed ids 'father','mother',
-  // 'spouse','child_1' bi deleted → id moi theo pattern <kind>_owner.
+  assert.deepEqual(new Set(after.map((n) => n.id)), new Set(
+    ['owner', 's_father', 's_mother', 's_spouse_0', 's_spouse_1',
+     's_child_0', 's_child_1']));
   const owner = after.find((n) => n.id === 'owner');
-  assert.equal((owner.parentSlotIds || []).length, 2,
-    'owner phai co 2 slot cha/me tu requiredSlots');
-  for (const pid of owner.parentSlotIds) {
-    assert.ok(ids.has(pid), `parent slot ${pid} khong duoc tao`);
+  assert.deepEqual(owner.parentSlotIds, ['s_father', 's_mother']);
+  assert.deepEqual(owner.spouseSlotIds, ['s_spouse_0', 's_spouse_1']);
+  assert.equal(owner.spouseSlotId, 's_spouse_1');
+  for (const kid of ['s_child_0', 's_child_1']) {
+    assert.deepEqual(
+      after.find((n) => n.id === kid).parentSlotIds, ['owner']);
   }
-  const spouseId = owner.spouseSlotIds.at(-1);
-  const spouse = after.find((n) => n.id === spouseId);
-  assert.ok(spouse, 'slot spouse phai duoc tao');
-  assert.equal(owner.spouseSlotId, spouse.id,
-    'spouseSlotId mirror phai la phan tu cuoi');
-  assert.equal(spouse.spouseSlotId, null,
-    'slot spouse khong ghi lien ket nguoc');
-  const kids = after.filter((n) =>
-    !n.personId && (n.parentSlotIds || []).includes('owner'));
-  assert.ok(kids.length >= 1, 'phai co ≥1 slot con trong cua owner');
-  assert.ok(kids.every((n) => n.parentSlotIds.length === 1),
-    'requiredSlots khong duoc suy vo/chong thanh cha/me thu hai');
-  // Anchor child_1 bi deleted → request cua no bi bo qua.
+  assert.equal(model.state.renderModel.requiredSlots, required);
 });
 
 test('requiredSlots bo qua anchor trong (mock dev) — khong no canvas', async () => {
@@ -704,14 +682,19 @@ test('Pool drag starts a compatible move and first drop assigns the person', asy
 test('deceased owner evaluate response creates its required relationship slots', async (t) => {
   const required = [{ anchorSlotId: 'owner', reason: 'active_estate',
     slotTypes: ['father', 'mother', 'spouse', 'child'],
-    minimumEmptyChildSlots: 1 }];
+    minimumEmptyChildSlots: 1, minimumEmptySpouseSlots: 1,
+    slots: [
+      { id: 's_father', role: 'father', ordinal: 0 },
+      { id: 's_mother', role: 'mother', ordinal: 0 },
+      { id: 's_spouse_0', role: 'spouse', ordinal: 0 },
+      { id: 's_child_0', role: 'child', ordinal: 0 }] }];
   const client = {
     run: async (cmd) => cmd === 'notary.diagram_evaluate'
       ? { ok: true, data: { render_model: { requiredSlots: required } } }
       : { ok: true, data: {} },
   };
   const { model, view } = await build(t, {
-    mode: 'case', client,
+    mode: 'case', client, reconcileEngine: true,
     seed: {
       people: [{ row_id: 'c1', ho_ten: 'Người A', ngay_chet: '2020-01-01' }],
       assets: [{ row_id: 'a1' }],
@@ -723,10 +706,11 @@ test('deceased owner evaluate response creates its required relationship slots',
   await findBtns(view.el, 'Xem cách tính')[0].onclick();
   const owner = model.state.diagram.nodes.find((n) => n.id === 'owner');
   assert.equal(model.state.renderModel.requiredSlots, required);
-  assert.equal(owner.parentSlotIds.length, 2);
+  assert.deepEqual(owner.parentSlotIds, ['s_father', 's_mother']);
   assert.ok(owner.spouseSlotId);
-  assert.ok(model.state.diagram.nodes.some((n) =>
-    !n.personId && n.parentSlotIds.includes('owner')));
+  const child = model.state.diagram.nodes.find((n) => n.id === 's_child_0');
+  assert.ok(child && !child.personId);
+  assert.deepEqual(child.parentSlotIds, ['owner']);
 });
 test('stale evaluate response cannot apply its required slots to a changed diagram', async (t) => {
   let resolveEvaluate;
@@ -1209,7 +1193,9 @@ test('branch warning: all dismissals are inert; confirm returns descendants to v
   assert.equal(poolNames.length, 3);
   for (const id of ['B', 'C', 'D']) assert.ok(poolNames.some(v => v.includes(`Người ${id}`)));
   await new Promise(resolve => setTimeout(resolve, 650));
-  assert.equal(calls.filter(([c]) => c === 'notary.diagram_evaluate').length, 1);
+  // WP3: doi chieu toi co dinh nam trong model (che do engine); view khong
+  // tu lap lich evaluate nua — model test khong bat co reconcileEngine.
+  assert.equal(calls.filter(([c]) => c === 'notary.diagram_evaluate').length, 0);
   assert.equal(calls.filter(([c]) => c === 'notary.diagram_save').length, 0);
 });
 
@@ -1235,15 +1221,17 @@ test('branch warning refuses a changed graph or reopened workspace', async (t) =
   }
 });
 
-test('removed default child slot stays tombstoned; new required slot can assign and toggle', async (t) => {
+test('removed child branch prunes; evaluate recreates required child slot with stable id', async (t) => {
   const mk = (id, personId, parents = [], extra = {}) => ({
     id, personId, parentSlotIds: parents, spouseSlotId: null,
     ownPositions: [], receivePositions: [], hidden: false, deleted: false, ...extra,
   });
   const client = { run: async (cmd) => ({ ok: true, data: cmd === 'notary.diagram_evaluate'
     ? { render_model: { requiredSlots: [{ anchorSlotId: 'owner',
-      slotTypes: ['child'], minimumEmptyChildSlots: 1 }] } } : {} }) };
-  const { model, view } = await build(t, { mode: 'case', client, seed: {
+        slotTypes: ['child'], minimumEmptyChildSlots: 1,
+        slots: [{ id: 'child_stable', role: 'child', ordinal: 0 }] }] } }
+    : {} }) };
+  const { model, view } = await build(t, { mode: 'case', client, reconcileEngine: true, seed: {
     people: INH_PEOPLE, assets: [{ row_id: 'asset' }],
     nodes: [mk('owner', 'c1', [], { ownPositions: [1] }),
       mk('child_owner', 'c2', ['owner']), mk('gc', 'c3', ['child_owner'])],
@@ -1251,23 +1239,27 @@ test('removed default child slot stays tombstoned; new required slot can assign 
   const card = collect(view.el, e => e.dataset.nodeId === 'child_owner')[0];
   findBtns(card, '×')[0].click();
   findBtns(byCls(view.el, 'modal')[0], 'Gỡ cả nhánh')[0].click();
-  await new Promise(resolve => setTimeout(resolve, 650));
-  const nodes = model.state.diagram.nodes;
-  assert.equal(nodes.find(n => n.id === 'child_owner').deleted, true);
-  assert.equal(nodes.find(n => n.id === 'gc').deleted, true);
-  const fresh = nodes.find(n => n.id === 'child_owner_2');
-  assert.ok(fresh && !fresh.personId && !fresh.deleted);
+  assert.equal(model.state.diagram.nodes
+    .find(n => n.id === 'child_owner').deleted, true);
+  await findBtns(view.el, 'Xem cách tính')[0].onclick();
+  const active = model.state.diagram.nodes.filter((n) => !n.deleted);
+  const fresh = active.find(n => n.id === 'child_stable');
+  assert.ok(fresh && !fresh.personId);
   assert.deepEqual(fresh.parentSlotIds, ['owner']);
+  assert.ok(!active.some(n => n.id === 'gc'),
+    'nhánh da go khong duoc tai hien sau doi chieu');
   collect(view.el, e => e.dataset.nodeId === fresh.id)[0]
     .dispatch('drop', personPayload('c2'));
+  // reconcileEngine defers emit; wait for microtask reconcile + re-render.
+  await new Promise((r) => setTimeout(r, 50));
   assert.equal(fresh.personId, 'c2');
   assert.deepEqual(fresh.receivePositions, [1], 'existing assignment default');
   const assigned = collect(view.el, e => e.dataset.nodeId === fresh.id)[0];
   const receive = byCls(assigned, 'cd-posrow')[1];
   byCls(receive, 'cd-poschip')[0].click();
-  assert.deepEqual(fresh.receivePositions, []);
-  assert.equal(nodes.find(n => n.id === 'child_owner').deleted, true);
-  await new Promise(resolve => setTimeout(resolve, 650));
+  // After toggle + reconcile, the node object may be replaced; re-find.
+  const afterToggle = model.state.diagram.nodes.find(n => n.id === fresh.id);
+  assert.deepEqual(afterToggle.receivePositions, []);
 });
 
 test('inheritance labels never expose slot ids; spouse empty slot names its spouse', async (t) => {
@@ -1384,4 +1376,22 @@ test('N2: danh sách gỡ nhánh không gắn hậu tố "(đã gỡ)"', async (
   const modal = byCls(view.el, 'modal')[0];
   assert.ok(modal);
   assert.doesNotMatch(modal.textContent, /\(đã gỡ\)/);
+});
+
+test('Q1: missing death date is labeled on the affected card only', async (t) => {
+  const { model, view } = await build(t, { mode: 'case', seed: {
+    people: [{ row_id: 'A', ho_ten: 'A', ngay_chet: '2020' },
+             { row_id: 'C', ho_ten: 'C', loai_giay_to: 'Giấy chứng tử' }],
+    nodes: [{ id: 'owner', personId: 'A', parentSlotIds: [], spouseSlotIds: [] },
+            { id: 'child', personId: 'C', parentSlotIds: ['owner'], spouseSlotIds: [] }],
+  } });
+  model.state.renderModel = { status: 'incomplete', requiredSlots: [], warnings: [
+    { code: 'missing_death_date', personId: 'C', anchorSlotId: 'child' },
+  ] };
+  model.dismissNotice();
+  const child = collect(view.el, (e) => e.dataset.nodeId === 'child')[0];
+  const owner = collect(view.el, (e) => e.dataset.nodeId === 'owner')[0];
+  assert.match(child.textContent, /thiếu ngày mất/);
+  assert.doesNotMatch(owner.textContent, /thiếu ngày mất/);
+  assert.equal(model.state.stage.people[0].ngay_chet, '2020');
 });
