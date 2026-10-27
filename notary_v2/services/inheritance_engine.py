@@ -17,6 +17,7 @@ from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP
 from fractions import Fraction
 from typing import Any, Mapping
+from uuid import NAMESPACE_URL, uuid5
 
 
 ENGINE_VERSION = 2
@@ -258,6 +259,117 @@ def _validate_and_build_graph(
     return nodes, graph, errors
 
 
+def _required_slot_table(graph, active_estates):
+    """Build diagram requirements independently of acceptance/share calculation."""
+    active = graph["nodesByPerson"]
+    deaths = graph["deaths"]
+    requirements = {}
+    missing = {}
+
+    def bounds(person_id):
+        raw = _value(graph["people"][person_id], "ngay_chet", "death_date", "deathDate", "death")
+        death = deaths[person_id]
+        if death is None:
+            return None
+        if isinstance(raw, str) and len(raw.strip()) == 4:
+            return date(death.year, 1, 1), date(death.year, 12, 31)
+        return death, death
+
+    def is_deceased(person_id):
+        record = graph["people"][person_id]
+        return deaths[person_id] is not None or _value(record, "loai_giay_to") in (
+            "Giấy chứng tử", "Giấy chứng tử (bản sao)",
+            "Trích lục khai tử", "Trích lục khai tử (bản sao)",
+        )
+
+    def mark_missing(person_id):
+        missing[person_id] = _error(
+            "missing_death_date", "thiếu ngày mất", personId=person_id,
+            anchorSlotId=active[person_id]["id"],
+        )
+
+    def add(person_id, reason):
+        node = active[person_id]
+        roles = (["child"] if reason == "representation_branch" else
+                 ["spouse"] if reason == "living_owner" else
+                 ["father", "mother", "spouse", "child"])
+        occupied_spouses = sum(
+            slot in graph["personBySlot"] for slot in node["spouseSlotIds"]
+        )
+        slots = []
+        for role in roles:
+            count = (max(2, occupied_spouses + 1) if role == "spouse" else
+                     max(2, len(graph["children"].get(person_id, ())) + 1)
+                     if role == "child" else 1)
+            for ordinal in range(count):
+                slots.append({
+                    "id": str(uuid5(NAMESPACE_URL, str((node["id"], role, ordinal)))),
+                    "role": role, "ordinal": ordinal,
+                })
+        requirements[(node["id"], reason)] = {
+            "anchorSlotId": node["id"], "reason": reason, "slotTypes": roles,
+            "minimumEmptyChildSlots": int("child" in roles),
+            "minimumEmptySpouseSlots": int("spouse" in roles), "slots": slots,
+        }
+
+    def compare(person_id, source_id):
+        if not is_deceased(person_id):
+            return "alive"
+        own, source = bounds(person_id), bounds(source_id)
+        if own is None or source is None:
+            mark_missing(person_id)
+            return "unknown"
+        if own[1] < source[0]:
+            return "before"
+        if own[0] > source[1]:
+            return "after"
+        if own[0] == own[1] == source[0] == source[1]:
+            return "same"
+        mark_missing(person_id)
+        return "unknown"
+
+    visited = set()
+
+    def estate(source_id):
+        if source_id in visited:
+            return
+        visited.add(source_id)
+        add(source_id, "active_estate")
+        for person_id in sorted(graph["parents"].get(source_id, set()) |
+                                graph["spouses"].get(source_id, set())):
+            if compare(person_id, source_id) == "after":
+                estate(person_id)
+        for person_id in sorted(graph["children"].get(source_id, ())):
+            descendant(person_id, source_id, 1)
+
+    def descendant(person_id, source_id, depth):
+        comparison = compare(person_id, source_id)
+        if comparison == "after":
+            estate(person_id)
+        elif comparison in ("before", "same") and depth < 3:
+            add(person_id, "representation_branch")
+            for child_id in sorted(graph["children"].get(person_id, ())):
+                descendant(child_id, source_id, depth + 1)
+
+    for person_id in sorted(graph["owners"]):
+        if not is_deceased(person_id):
+            add(person_id, "living_owner")
+        elif bounds(person_id) is None:
+            mark_missing(person_id)
+        else:
+            estate(person_id)
+    if ENABLE_LATER_LINES:
+        for person_id in sorted(active_estates):
+            if person_id not in missing:
+                estate(person_id)
+    # A person with incomparable dates must never receive slots via another path.
+    return (
+        [value for key, value in sorted(requirements.items())
+         if graph["personBySlot"][key[0]] not in missing],
+        list(missing.values()),
+    )
+
+
 def run_inheritance_case(
     engine_input: Mapping[str, Any], people_by_id: Mapping[Any, Any]
 ) -> dict[str, Any]:
@@ -282,7 +394,7 @@ def run_inheritance_case(
     inherited_shares = {person_id: Fraction(0) for person_id in nodes_by_person}
     distributed_shares = {person_id: Fraction(0) for person_id in nodes_by_person}
     terms: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    required_slots: dict[tuple[str, str], dict[str, Any]] = {}
+    active_estates = set()
     unresolved_estates: list[dict[str, Any]] = []
 
     base = Fraction(1, len(owners))
@@ -291,16 +403,6 @@ def run_inheritance_case(
         base_shares[person_id] += base
         terms[person_id].append({"kind": "base", "fraction": _fraction_text(base)})
 
-    def add_requirement(person_id: str, reason: str) -> None:
-        node = nodes_by_person[person_id]
-        key = (node["id"], reason)
-        slot_types = ["father", "mother", "spouse", "child"] if reason == "active_estate" else ["spouse", "child"]
-        required_slots[key] = {
-            "anchorSlotId": node["id"],
-            "reason": reason,
-            "slotTypes": slot_types,
-            "minimumEmptyChildSlots": 1,
-        }
 
     def death_comparison(person_id: str, event_date: date) -> str:
         death = deaths[person_id]
@@ -338,7 +440,6 @@ def run_inheritance_case(
                 return None
             return {"type": "person", "personId": person_id, "via": list(via)}
 
-        add_requirement(person_id, "representation_branch")
         plans = []
         next_stack = stack | {person_id}
         for child_id in sorted(children.get(person_id, set())):
@@ -475,7 +576,7 @@ def run_inheritance_case(
         for source_id, estate in day_estates.items():
             holdings[source_id] = Fraction(0)
             distributed_shares[source_id] += estate
-            add_requirement(source_id, "active_estate")
+            active_estates.add(source_id)
 
         for source_id, estate in day_estates.items():
             units = first_line_units(source_id, event_date)
@@ -535,14 +636,15 @@ def run_inheritance_case(
                 }
             )
 
+    required_slots, slot_warnings = _required_slot_table(graph, active_estates)
     later_lines_unsupported = bool(unresolved_estates) and not ENABLE_LATER_LINES
     return {
         "engineVersion": ENGINE_VERSION,
         "status": ("unsupported" if later_lines_unsupported else "incomplete") if unresolved else "complete",
         "allocations": allocations,
         "breakdowns": breakdowns,
-        "requiredSlots": list(required_slots.values()),
-        "warnings": [],
+        "requiredSlots": required_slots,
+        "warnings": slot_warnings,
         "errors": ([_error("second_order_required", "Chưa hỗ trợ hàng thừa kế 2/3 khi không có người thừa kế hàng 1.")]
                    if later_lines_unsupported else []),
         "unresolvedEstates": unresolved_estates,

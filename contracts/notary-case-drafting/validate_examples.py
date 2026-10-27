@@ -674,7 +674,7 @@ def check_render_model(rm, where, v):
         v.append(("validation_error", f"{where}.conservation missing keys"))
     for i, r in enumerate(rm.get("requiredSlots") or []):
         if isinstance(r, dict) and r.get("reason") not in (
-                "active_estate", "representation_branch"):
+                "active_estate", "representation_branch", "living_owner"):
             v.append(("validation_error",
                       f"{where}.requiredSlots[{i}].reason="
                       f"{r.get('reason')!r}"))

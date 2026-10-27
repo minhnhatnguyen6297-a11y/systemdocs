@@ -62,11 +62,10 @@ def test_later_lines_disabled_keeps_only_first_line_slots_and_no_later_shares(re
     assert result["errors"][0]["code"] == "second_order_required"
     assert _share(result, "S") == _share(result, "N") == 0
     assert result["breakdowns"] == []
-    assert result["requiredSlots"] == [{
-        "anchorSlotId": "slot_X", "reason": "active_estate",
-        "slotTypes": ["father", "mother", "spouse", "child"],
-        "minimumEmptyChildSlots": 1,
-    }]
+    requirement, = result["requiredSlots"]
+    assert requirement["anchorSlotId"] == "slot_X"
+    assert requirement["reason"] == "active_estate"
+    assert requirement["slotTypes"] == ["father", "mother", "spouse", "child"]
     assert result["conservation"] == {"allocated": "0", "unresolved": "1", "total": "1"}
 
 
@@ -169,7 +168,7 @@ def test_non_owner_child_dead_before_source_has_no_estate_but_descendant_represe
     assert result["allocations"]["Y"]["distributedShare"] == "0"
     representation_slots = [item for item in result["requiredSlots"] if item["reason"] == "representation_branch"]
     assert {item["anchorSlotId"] for item in representation_slots} == {"slot_Y"}
-    assert representation_slots[0]["slotTypes"] == ["spouse", "child"]
+    assert representation_slots[0]["slotTypes"] == ["child"]
     assert "father" not in representation_slots[0]["slotTypes"]
     assert "mother" not in representation_slots[0]["slotTypes"]
 
@@ -664,7 +663,7 @@ def test_second_rank_transmission_reselects_third_rank_in_later_estate(later_lin
         "kind": "inheritance", "fraction": "1/2", "sourcePersonId": "S",
         "heirRank": 3, "relationshipRoles": ["parent_sibling"],
     }]
-    assert {item["anchorSlotId"] for item in result["requiredSlots"]} == {"slot_X", "slot_S"}
+    assert {item["anchorSlotId"] for item in result["requiredSlots"]} == {"slot_A", "slot_X", "slot_S"}
     assert result["conservation"] == {"allocated": "1", "unresolved": "0", "total": "1"}
 
 

@@ -1133,7 +1133,8 @@ class CaseWorkspaceService:
                     self.db)._evaluate_inheritance(
                         state, valid_row_ids=valid_rows,
                         people=[{"row_id": rid,
-                                 "ngay_chet": wire.get("ngay_chet")}
+                                 "ngay_chet": wire.get("ngay_chet"),
+                                 "loai_giay_to": wire.get("loai_giay_to")}
                                 for rid, _entity, wire in resolved_people])
             else:
                 state["nodes"] = _canonical_two_party_nodes(state["nodes"])

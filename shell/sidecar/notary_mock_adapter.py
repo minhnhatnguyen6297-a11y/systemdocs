@@ -592,7 +592,8 @@ def _render(state, stage):
                 if (stage_people.get(n["personId"]) or {}).get("ngay_chet")]
     assigned = {n["personId"] for n in nodes if n.get("personId")}
     unassigned_pool = [rid for rid in stage_people if rid not in assigned]
-    warnings = []
+    slot_model = _slot_evaluation(state.get("nodes") or [], stage)
+    warnings = list(slot_model["warnings"])
     if unassigned_pool:
         warnings.append({
             "code": "diagram.unassigned_pool_person",
@@ -600,7 +601,7 @@ def _render(state, stage):
     receivers = [n for n in nodes
                  if n.get("receivePositions") and n.get("personId")]
     rm = {"engineVersion": 2, "status": "complete", "allocations": {},
-          "breakdowns": [], "requiredSlots": _required_slots(nodes, stage),
+          "breakdowns": [], "requiredSlots": slot_model["requiredSlots"],
           "warnings": warnings, "errors": [], "unresolvedEstates": [],
           "conservation": {"allocated": "0", "unresolved": "0",
                            "total": "0"}}
@@ -661,20 +662,23 @@ def _alloc(base, inherited, distributed, final):
             "displayPercent": "0.00"}
 
 
+def _slot_evaluation(nodes, stage):
+    """Use the authoritative pure engine, retaining tombstones for references."""
+    from engine_roots import import_engine_module
+
+    engine = import_engine_module("notary_v2", "services.inheritance_engine")
+    engine_nodes = [{
+        **node,
+        "isLandOwner": bool(node.get("ownPositions")),
+        "willReceive": bool(node.get("receivePositions")),
+    } for node in nodes if isinstance(node, dict)]
+    return engine.run_inheritance_case(
+        {"version": 2, "nodes": engine_nodes}, _person_map({"stage": stage}),
+    )
+
+
 def _required_slots(nodes, stage):
-    """Match active-estate slot requests from the inheritance engine."""
-    stage_people = _person_map({"stage": stage})
-    landowners = [
-        n for n in nodes
-        if isinstance(n, dict) and n.get("id") and n.get("personId")
-        and n.get("ownPositions") and not n.get("deleted")
-        and (stage_people.get(n["personId"]) or {}).get("ngay_chet")
-    ]
-    return [{
-        "anchorSlotId": n["id"], "reason": "active_estate",
-        "slotTypes": ["father", "mother", "spouse", "child"],
-        "minimumEmptyChildSlots": 1,
-    } for n in landowners]
+    return _slot_evaluation(nodes, stage)["requiredSlots"]
 
 def _payload_diagram_state(payload):
     """Lay diagram.state tu payload — thieu field -> validation_error

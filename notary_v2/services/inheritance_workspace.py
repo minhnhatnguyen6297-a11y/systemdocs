@@ -627,7 +627,8 @@ class InheritanceWorkspaceService:
                     if n.get("personId") in valid_row_ids
                     or n.get("personId") is None]
         people_by_id = {
-            p["row_id"]: {"ngay_chet": p.get("ngay_chet")}
+            p["row_id"]: {"ngay_chet": p.get("ngay_chet"),
+                          "loai_giay_to": p.get("loai_giay_to")}
             for p in people}
         render_model = run_inheritance_case(
             {"version": 2, "nodes": _v3_to_v2_nodes(v3_nodes)},

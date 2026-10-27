@@ -817,9 +817,11 @@ render_model:                       # null = chưa từng evaluate
           viaBranchPersonIds: [<uuid4>]
   requiredSlots:
     - anchorSlotId: <node.id>
-      reason: active_estate | representation_branch
+      reason: active_estate | representation_branch | living_owner
       slotTypes: [father | mother | spouse | child]
-      minimumEmptyChildSlots: <int>
+      minimumEmptyChildSlots: <int>   # 1 khi có child, ngược lại 0
+      minimumEmptySpouseSlots: <int>  # 1 khi có spouse, ngược lại 0
+      slots: [{id: <stable slot id>, role: <slotType>, ordinal: <int>}]
   warnings: [{code, message}]
   errors: [{code, message, ...details}]
   unresolvedEstates:
@@ -832,6 +834,18 @@ render_model:                       # null = chưa từng evaluate
     unresolved: <fraction>
     total: <fraction>
 ```
+
+WP2: `slots` là tập ô đích theo từng anchor; ID UUIDv5 từ
+`(anchorSlotId, role, ordinal)` (ordinal bắt đầu 0), không phụ thuộc lượt tính.
+Cha/Mẹ mỗi vai trò một ô; Vợ/chồng và Con có tối thiểu hai ô (ô đầu +
+ô dự phòng), hoặc số ô có người + một ô trống, lấy số lớn hơn.
+Chủ đất sống chỉ Vợ/chồng; chủ đất chết và người chuyển tiếp có Cha, Mẹ,
+Vợ/chồng, Con; thế vị chỉ Con và không sinh tiếp từ chắt. Người sống khác
+và vợ/chồng chết trước chủ đất không sinh ô. Ngày mất thiếu hoặc các
+khoảng ngày một phần chồng nhau nên không so được: không sinh ô cho người
+đó, trả warning `missing_death_date` kèm `personId`, `anchorSlotId`
+để UI ghi “thiếu ngày mất”. Năm riêng khác nhau vẫn so được trước/sau;
+không tự đệm ngày nhập thành dữ kiện đầy đủ.
 
 - `status:unsupported`: `second_order_required` khi không có người thừa kế
   hàng 1 và `ENABLE_LATER_LINES=False`; không tính/sinh ô hàng 2/3.

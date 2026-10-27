@@ -273,16 +273,30 @@
     },
     "required_slot": {
       "type": "object",
-      "required": ["anchorSlotId", "reason", "slotTypes", "minimumEmptyChildSlots"],
+      "required": ["anchorSlotId", "reason", "slotTypes", "minimumEmptyChildSlots", "minimumEmptySpouseSlots", "slots"],
       "additionalProperties": false,
       "properties": {
         "anchorSlotId": { "type": "string" },
-        "reason": { "enum": ["active_estate", "representation_branch"] },
+        "reason": { "enum": ["active_estate", "representation_branch", "living_owner"] },
         "slotTypes": {
           "type": "array",
           "items": { "enum": ["father", "mother", "spouse", "child"] }
         },
-        "minimumEmptyChildSlots": { "type": "integer", "minimum": 0 }
+        "minimumEmptyChildSlots": { "type": "integer", "minimum": 0 },
+        "minimumEmptySpouseSlots": { "type": "integer", "minimum": 0 },
+        "slots": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "role", "ordinal"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "role": { "enum": ["father", "mother", "spouse", "child"] },
+              "ordinal": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
       }
     },
     "engine_error": {

@@ -1225,6 +1225,24 @@ def _create(db, people, assets, state, key=_UNSET, meta=_UNSET,
         stage, state)
 
 
+@pytest.mark.parametrize("person_index", [0, 1], ids=["owner", "non-owner"])
+def test_q1_certificate_without_date_survives_create_and_evaluate(db, person_index):
+    from services.inheritance_workspace import InheritanceWorkspaceService
+
+    people, assets, state = _create_args()
+    person = people[person_index]
+    person.update(ngay_chet=None, loai_giay_to="Giấy chứng tử")
+    created = _create(db, people, assets, state)
+    evaluated = InheritanceWorkspaceService(db).evaluate_diagram(
+        created["case"]["id"], state)
+    for render_model in (created["diagram"]["render_model"], evaluated["render_model"]):
+        assert all(r["anchorSlotId"] != state["nodes"][person_index]["id"]
+                   for r in render_model["requiredSlots"])
+        assert any(w["code"] == "missing_death_date"
+                   and w.get("personId") == person["row_id"]
+                   for w in render_model["warnings"])
+
+
 def test_create_persists_case_rows_and_diagram_one_transaction(db):
     people, assets, state = _create_args()
     meta = {"document_type": "khai_nhan", "ngay_lap_ho_so": "2026-09-26",

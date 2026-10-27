@@ -255,6 +255,13 @@ vẫn giữ hiện trạng, không được dùng nhánh fallback đó làm ngu�
   Mỗi nhóm vợ/chồng hoặc con được phép sinh luôn có đúng một ô trống dự phòng;
   thả vào dự phòng thì engine sinh dự phòng mới. Người vợ/chồng đặt cuối là
   hợp pháp (D-041); ca nhiều vợ hợp pháp hoãn (Q2).
+- WP2 trả tập ô đích `requiredSlots[].slots` với ID UUIDv5 theo
+  `(anchorSlotId, role, ordinal)`, thứ tự bắt đầu 0. Cha/Mẹ mỗi vai trò
+  một ô; nhóm Vợ/chồng/Con tối thiểu hai ô, tăng theo số người đã gán + 1.
+  Nhánh thế vị chỉ theo cạnh con, không lấy vợ/chồng chết trước làm gốc.
+  Q1 trả warning `missing_death_date` kèm `personId`/`anchorSlotId`.
+  Năm riêng được so theo khoảng cả năm; khoảng chồng nhau chưa đủ để
+  kết luận trước/sau. Không đổi dữ kiện ngày nhập.
 - Mỗi thế hệ một hàng: cha/mẹ trên, vợ/chồng cùng hàng ngay cạnh người gốc,
   con dưới theo ngày sinh; dự phòng cuối nhóm. Thế vị nằm dưới đúng người
   trung gian. Ô trống có nhãn vai trò `Cha`, `Mẹ`, `Vợ/chồng`, `Con`.

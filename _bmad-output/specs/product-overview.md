@@ -237,8 +237,21 @@ Việc đang mở được tổng hợp tại [catalog issue](../backlog/README.
   tắt hàng 2/3, thiếu người thừa kế hàng 1 trả `unsupported`/Chưa hỗ trợ
   và không sinh ô hàng 2/3; vẫn giữ yêu cầu ô hàng 1 để điền tiếp. Đã bỏ
   menu quan hệ, thêm ô cha/mẹ/con và chọn vợ/chồng
-  hợp pháp thủ công. **WP2–WP8 chưa triển khai:** bảng sinh/thu hồi ô tới
-  ổn định, mặc định từ chối, gỡ thẻ/Hoàn tác, bố cục và độ trễ mới vẫn chờ.
+  hợp pháp thủ công. **WP2 đã triển khai ở engine/mock:** chủ đất sống chỉ
+  ô vợ/chồng; chủ đất chết/chuyển tiếp có Cha, Mẹ, Vợ/chồng, Con; thế vị
+  chỉ Con, không sinh tiếp từ chắt. Vợ/chồng và Con có một ô dự phòng,
+  ID ô đích ổn định theo anchor/vai trò/thứ tự. Ngày mất không so được
+  không sinh ô, trả `missing_death_date` theo người (UI chưa nối nhãn).
+  **WP3–WP8 chưa triển khai:** client chưa dùng tập ID ô đích/đối chiếu tới
+  ổn định; mặc định từ chối, gỡ thẻ/Hoàn tác, bố cục và độ trễ mới vẫn chờ.
+  Kiểm chứng WP2: 202 pytest liên quan đạt; smoke engine/mock A–D và
+  create/evaluate SQLite riêng đạt; schema/example 121 file đúng kỳ vọng;
+  Quick review sạch sau sửa ba gap Q1/provenance và tombstone mock.
+  Toàn suite cuối: pytest 1331 đạt/19 lỗi/7 bỏ qua (WP1 1314/18/7),
+  JS 444 đạt/22 lỗi (WP1 442/24). Lượt pytest trước đạt 1327/18/7;
+  lượt cuối thêm 5 regression nhưng test hash fixture
+  `test_golden_fixture_materialization_is_byte_repeatable` đổi sang fail.
+  Không sửa các test/code ngoài WP2; toàn suite chưa xanh.
   [Quyết định và Q1–Q4](../decisions/decision-owner-diagram-rules-v2-20261027.md).
 - Sơ đồ: lưu bản hợp lệ còn thiếu giữ warning Pool/`requiredSlots` qua mở lại;
   state `invalid` bị từ chối và giữ nguyên bản cũ; cue chỉ-đọc (trạng thái +

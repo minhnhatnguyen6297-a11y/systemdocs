@@ -72,7 +72,16 @@
               "spouse",
               "child"
             ],
-            "minimumEmptyChildSlots": 1
+            "minimumEmptyChildSlots": 1,
+            "minimumEmptySpouseSlots": 1,
+            "slots": [
+              {"id": "d5d8842a-2b98-596e-a58f-5ed880eabbf5", "role": "father", "ordinal": 0},
+              {"id": "805ff434-b03a-5824-980e-f56b2c2e221f", "role": "mother", "ordinal": 0},
+              {"id": "606ba8ae-7361-5845-b8e3-9f1d660437a8", "role": "spouse", "ordinal": 0},
+              {"id": "cbcea237-4316-545d-8bdc-557b4b8187c9", "role": "spouse", "ordinal": 1},
+              {"id": "f9164a13-3779-5cad-9f5c-5ed19489eb62", "role": "child", "ordinal": 0},
+              {"id": "942f7985-5b63-56aa-8262-3ea0f0d1d140", "role": "child", "ordinal": 1}
+            ]
           }
         ],
         "warnings": [

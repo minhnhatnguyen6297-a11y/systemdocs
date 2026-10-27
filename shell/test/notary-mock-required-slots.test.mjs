@@ -15,9 +15,12 @@ test('mock adapter requests slots for an assigned deceased owner', () => {
     encoding: 'utf8',
   });
   assert.equal(result.status, 0, result.stderr);
-  assert.deepEqual(JSON.parse(result.stdout), [{
-    anchorSlotId: 'owner', reason: 'active_estate',
-    slotTypes: ['father', 'mother', 'spouse', 'child'],
-    minimumEmptyChildSlots: 1,
-  }]);
+  const [requirement] = JSON.parse(result.stdout);
+  assert.equal(requirement.anchorSlotId, 'owner');
+  assert.equal(requirement.reason, 'active_estate');
+  assert.deepEqual(requirement.slotTypes, ['father', 'mother', 'spouse', 'child']);
+  assert.equal(requirement.minimumEmptyChildSlots, 1);
+  assert.equal(requirement.minimumEmptySpouseSlots, 1);
+  assert.deepEqual(requirement.slots.map(({ role }) => role),
+    ['father', 'mother', 'spouse', 'spouse', 'child', 'child']);
 });
