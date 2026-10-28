@@ -1,8 +1,5 @@
 # Quyết định: sổ quyết định nghiệp vụ thừa kế (D-xxx)
 
-> **TODO (link hỏng trên `consolidate/monorepo`):** `legal-baseline.md`, `business-rules.md` (`docs/specs/notary_v2/diagram/inheritance/`), `docs/specs/notary_v2/diagram-rules.md` và `decision-owner-diagram-rules-v2-20261027.md` **chưa có trên nhánh chính**. Chúng chỉ có ở nhánh `agent/mika/docs-consolidation` / `agent/omp/diagram-rules-v2`. Các mục D-xxx vẫn đọc được độc lập.
-
-
 Ngày lập: 2026-10-26. Owner yêu cầu có "project memory" để agent không hỏi lại
 những gì đã chốt; câu hỏi phải có lý do; nghiệp vụ được phép lệch luật nếu ghi rõ.
 
@@ -12,8 +9,8 @@ những gì đã chốt; câu hỏi phải có lý do; nghiệp vụ được ph
   xoá: quyết định bị thay thì đổi `Trạng thái` thành `Bị thay bởi D-yyy`.
 - **Loại:** `luật` (làm theo điều luật) · `lệch nghiệp vụ` (owner chủ động khác
   hoặc thêm ngoài luật) · `kỹ thuật` (cách app lưu/hiển thị, không đổi quyền hưởng).
-- Điều luật: [`legal-baseline.md`](../specs/notary_v2/diagram/inheritance/legal-baseline.md).
-  Câu hỏi chưa chốt: [`business-rules.md` §10](../specs/notary_v2/diagram/inheritance/business-rules.md#10-câu-hỏi-mở-q-xxx).
+- Điều luật: [`legal-baseline.md`](../../_bmad-output/specs/notary_v2/diagram/inheritance/legal-baseline.md).
+  Câu hỏi chưa chốt: [`business-rules.md` §10](../../_bmad-output/specs/notary_v2/diagram/inheritance/business-rules.md#10-câu-hỏi-mở-q-xxx).
 - Từ 26/10/2026 `business-rules.md` là bộ quy tắc R-xx (ánh xạ D→R ở §9). Tham chiếu `BR §x` trong các mục dưới trỏ về bản cũ trước commit `7e4e9e4`.
 - Khi owner trả lời một Q-xxx: thêm D-xxx ngay trong phiên, đánh dấu Q đó `Đã chốt → D-xxx`.
 
@@ -311,12 +308,12 @@ review BLDS 2015) tổng hợp trong brainstorm "Kiến trúc Diagram trong So�
   - Không có trạng thái "chưa xác định", không cảnh báo. Hồ sơ cũ tự chuyển đổi (D-041).
 - **Lý do:** giữ flow kéo thả; user chịu trách nhiệm chọn đúng vợ/chồng (D-039).
 - **Hệ quả:** sửa D-041 (điểm "người đang sống không có ô"); sửa R-11, §1 thuật ngữ. Code: state v4 `spouseSlotIds`, migrate v3→v4 (gói sau).
-- **Nguồn:** owner 27/10/2026; [`decision-owner-diagram-rules-v2-20261027`](decision-owner-diagram-rules-v2-20261027.md) §D-041.
+- **Nguồn:** owner 27/10/2026; [`decision-owner-diagram-rules-v2-20261027`](../../_bmad-output/decisions/decision-owner-diagram-rules-v2-20261027.md) §D-041.
 
 ### D-043 — Sinh ô theo cặp và luật sơ đồ A–J
 - **Ngày:** 27/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** kỹ thuật + nghiệp vụ
-- **Quyết định:** áp luật A–J tại [`decision-owner-diagram-rules-v2-20261027`](decision-owner-diagram-rules-v2-20261027.md): ô Con thuộc cặp (người gốc + vợ/chồng số 1); `Con riêng` xoá cha/mẹ tự điền; con chết sau chủ đất gắn vào cha/mẹ có sẵn; vợ/chồng chết sau không sinh ô trùng; nhãn ô không chứa UUID; Hoàn tác chạy lại engine; ngày chỉ có năm = 01/01 khi so; ngày nhập sai chặn thả; không luật 300 ngày; vợ/chồng chết trước chủ đất không sinh ô (Điều 652); thẻ không chồng nhau.
-- **Hệ quả:** mục này là con trỏ; nội dung chuẩn ở decision v2 và [`diagram-rules.md`](../specs/notary_v2/diagram-rules.md) §9/§11.
+- **Quyết định:** áp luật A–J tại [`decision-owner-diagram-rules-v2-20261027`](../../_bmad-output/decisions/decision-owner-diagram-rules-v2-20261027.md): ô Con thuộc cặp (người gốc + vợ/chồng số 1); `Con riêng` xoá cha/mẹ tự điền; con chết sau chủ đất gắn vào cha/mẹ có sẵn; vợ/chồng chết sau không sinh ô trùng; nhãn ô không chứa UUID; Hoàn tác chạy lại engine; ngày chỉ có năm = 01/01 khi so; ngày nhập sai chặn thả; không luật 300 ngày; vợ/chồng chết trước chủ đất không sinh ô (Điều 652); thẻ không chồng nhau.
+- **Hệ quả:** mục này là con trỏ; nội dung chuẩn ở decision v2 và [`diagram-rules.md`](../../_bmad-output/specs/notary_v2/diagram-rules.md) §9/§11.
 - **Nguồn:** owner 27/10/2026 (WP-S).
 
 ### D-044 — Hàng 2/3 gác sau cờ; sơ đồ chỉ hàng 1 + thế vị + chuyển tiếp

@@ -1,5 +1,7 @@
 ﻿# AGENTS.md — luật làm việc trong systemdocs
 
+> Đọc [`docs/STACK.md`](docs/STACK.md) trước (stack, nơi lưu, vòng chuẩn). Mục lục nguồn chuẩn: [`docs/README.md`](docs/README.md).
+
 ## Dùng BMAD
 
 - Dùng workflow BMAD và customization của repo trong `_bmad/custom/`; đọc skill
@@ -21,6 +23,12 @@
 - Ghi quyết định của owner vào `_bmad-output/decisions/` trong phiên hiện tại.
   Task, handoff và file tạm nằm trong `_bmad-output/tmp/`.
 - Đọc `graphify-out/` trước khi dò code thủ công.
+
+## Dẫn nguồn trước khi hỏi hoặc kết luận
+
+- Trước khi hỏi owner câu nghiệp vụ hoặc đưa kết luận: dẫn `file:dòng`, mã `D-xxx`, hoặc số issue.
+- Tìm không ra ⇒ ghi rõ "chưa kiểm chứng"; không đoán.
+- Chỉ dùng thuật ngữ có trong [`docs/glossary.md`](docs/glossary.md).
 
 ## Trình bày
 
