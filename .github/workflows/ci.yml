@@ -78,6 +78,9 @@ jobs:
   pytest-windows:
     runs-on: windows-latest
     timeout-minutes: 40
+    env:
+      # stdout mặc định cp1252 trên Windows: in ghi chú tiếng Việt của known-failures sẽ crash.
+      PYTHONUTF8: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
