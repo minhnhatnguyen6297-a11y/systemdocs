@@ -48,6 +48,29 @@
   File tạm nằm trong `docs/tmp/` (ignored).
 - Đọc `graphify-out/` trước khi dò code thủ công.
 - Plan/spec viết bằng Markdown; không còn export HTML plan.
+- **Ghi đè đường dẫn Superpowers:** skill brainstorming/writing-plans mặc định ghi
+  `docs/superpowers/...`. Trong repo này: spec/design → `docs/specs/<module>/`,
+  plan → `docs/plans/YYYY-MM-DD-<slug>.md`. Không tạo `docs/superpowers/`.
+- Thuật ngữ: `docs/glossary.md`. Danh mục quyết định: `docs/decisions/README.md`.
+
+## Thứ tự đọc trước việc nghiệp vụ
+
+`docs/specs/product-overview.md` → `docs/decisions/README.md` → sổ D-xxx
+(`docs/decisions/decision-80-so-quyet-dinh-nghiep-vu-thua-ke.md`) →
+`docs/specs/notary_v2/diagram/inheritance/legal-baseline.md` →
+`business-rules.md` → `docs/specs/notary_v2/diagram-rules.md` → `graphify-out/` → code.
+
+## Giao thức hỏi owner (D/Q)
+
+- Trước khi hỏi: tra D-xxx → luật → code. Đã có câu trả lời thì dùng, không hỏi lại.
+  Mặc định theo luật trừ khi D-xxx chốt lệch.
+- Chỉ hỏi lựa chọn nghiệp vụ thật; gom một lượt; mỗi câu có bối cảnh, mặc định luật
+  (số điều), khuyến nghị, lý do, ảnh hưởng code. Ghi câu hỏi vào Q-xxx
+  (`business-rules.md` §10).
+- Owner trả lời xong: thêm D-xxx vào cuối decision-80 ngay trong phiên (không đánh
+  số lại, không xoá; bị thay thì sửa dòng Trạng thái) và đánh dấu Q-xxx đã chốt.
+- Trích dẫn luôn kèm file: `decision-80 §D-041` (khác `decision-41`).
+- Bộ nhớ của agent không phải nơi lưu quyết định; chỉ giữ con trỏ.
 
 ## Commit
 

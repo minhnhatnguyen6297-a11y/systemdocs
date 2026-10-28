@@ -1,5 +1,7 @@
 # Delegation mặc định theo harness; Orca chỉ khi user yêu cầu
 
+> **Bị thay bởi [decision-81](decision-81%20-%20Bo-BMAD-thu-Superpowers-docs-chuyen-sang-docs.md) (28/10/2026).** Giữ để tra lịch sử.
+
 ## LÀ GÌ
 
 - Bỏ luật Orca-only. Mặc định dùng cơ chế subagent của harness hiện tại (OMP hoặc agent khác).

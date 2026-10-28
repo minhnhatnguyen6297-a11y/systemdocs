@@ -1,5 +1,7 @@
 # HTML chỉ dành cho plan, spec, brainstorming hoặc minh họa cấu trúc
 
+> **Bị thay bởi [decision-81](decision-81%20-%20Bo-BMAD-thu-Superpowers-docs-chuyen-sang-docs.md) (28/10/2026).** Giữ để tra lịch sử.
+
 Ngày: 2026-10-11. Nguồn: yêu cầu hiện tại của owner.
 
 ## Quyết định — WHAT
