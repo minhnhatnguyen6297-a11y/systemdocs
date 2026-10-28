@@ -321,7 +321,8 @@ class PathHelperTests(unittest.TestCase):
         self.assertTrue(_is_abs("\\\\?\\D:\\duong\\dan.pdf"))
 
     def test_is_abs_posix_absolute(self):
-        self.assertTrue(_is_abs("/home/user/a.pdf"))
+        self.assertTrue(_is_abs("/home/user/a.pdf", windows=False))
+        self.assertFalse(_is_abs("/home/user/a.pdf", windows=True))
 
     def test_is_abs_relative_rejected(self):
         for p in ("docs/x.pdf", "a.pdf", "./x", "..\\y"):

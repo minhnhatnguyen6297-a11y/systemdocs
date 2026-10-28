@@ -15,7 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import ntpath
+import os
 import re
 from pathlib import Path
 from time import perf_counter
@@ -79,12 +79,16 @@ def _is_unc(path: str) -> bool:
     return path.startswith("\\\\") or path.startswith("//")
 
 
-def _is_abs(path: str) -> bool:
+def _is_abs(path: str, *, windows: Optional[bool] = None) -> bool:
     # Absolute theo host OS (pathlib) HOAC theo Windows drive/long path
     # (ntpath, _ABS_DRIVE) — chay dung ca tren Windows lan Linux (test/CI).
-    if Path(path).is_absolute():
+    # Path goc khong o dia (\foo, /foo) KHONG absolute tren Windows
+    # (review PR #25 — ntpath.isabs tren Python 3.12 tra True cho \foo).
+    if path.startswith(_LONG_PREFIX) or _ABS_DRIVE.match(path):
         return True
-    return bool(_ABS_DRIVE.match(path)) or ntpath.isabs(path)
+    if windows is None:
+        windows = os.name == "nt"
+    return (not windows) and path.startswith("/") and not path.startswith("//")
 
 
 def _validate_sources(sources: Any) -> list[SourceSpec]:
