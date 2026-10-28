@@ -1,7 +1,7 @@
 # Lỗi JS đã biết trên origin/consolidate/monorepo @7850897, đo 2026-10-28 (Linux, Node 20.19.2): 4/399 fail.
-# Mỗi dòng: <tên test TAP>  # <issue ref> <lý do>. Issue ref "ISSUE-TBD" = cần người dùng tạo issue GitHub rồi thay.
+# Mỗi dòng: <tên test TAP>  # <issue ref> <lý do>. Issue ref = issue GitHub theo nhóm nguyên nhân.
 # Không skip: test vẫn chạy; tools/ci/known_failures.py chỉ chặn lỗi MỚI.
-fileTokenStore: issue/resolve tra FileRef; entry cho renderer khong co path  # ISSUE-TBD basename của path Windows 'D:\in\anh1.png' trên Linux (nền tảng)
-native DOCX free text enters existing Stage fields and manual edits survive commit and reload  # ISSUE-TBD spawnSync python ENOENT (không có lệnh `python` trên PATH local; CI có setup-python nên có thể pass)
-JSON download keeps original schema-valid result after review and invalid pending edits  # ISSUE-TBD spawnSync python ENOENT (như trên)
-file:test/shell-chrome.test.mjs  # ISSUE-TBD thiếu docs/spec/ui/tokens.json trong monorepo (ENOENT khi import)
+fileTokenStore: issue/resolve tra FileRef; entry cho renderer khong co path  # #15 basename của path Windows 'D:\in\anh1.png' trên Linux (nền tảng)
+native DOCX free text enters existing Stage fields and manual edits survive commit and reload  # #19 spawnSync python ENOENT (không có lệnh `python` trên PATH local; CI có setup-python nên có thể pass)
+JSON download keeps original schema-valid result after review and invalid pending edits  # #19 spawnSync python ENOENT (như trên)
+file:test/shell-chrome.test.mjs  # #17 thiếu docs/spec/ui/tokens.json trong monorepo (ENOENT khi import)
