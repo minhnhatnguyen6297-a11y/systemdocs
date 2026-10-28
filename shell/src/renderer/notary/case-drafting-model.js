@@ -287,6 +287,10 @@ function createModel(deps) {
     wordBusy: false,
     busy: null,                  // command dang chay (commit/evaluate/save)
     savingCase: false,           // request workspace_save_case dang chay
+    // Lưu vừa bị từ chối (validation) — nhãn nút Lưu hồ sơ giữ trạng thái
+    // "chưa lưu được" tới lần lưu thành công kế tiếp (edit sửa lỗi không
+    // tự xóa cờ; applyWorkspace/applyWriteResult OK mới gỡ).
+    saveRejected: false,
     duplicatePending: null,      // {sourceId, key} — giu key qua retry
     duplicating: null,           // sourceCaseId dang cho nhân bản
   };
@@ -663,6 +667,7 @@ function createModel(deps) {
     state.conflict = null;
     state.stale = false;
     state.error = null;
+    state.saveRejected = false;
     // Aux state la per-case — reset het khi mo case khac, tranh leak
     // suggestion/word result/notice cua case truoc sang case moi.
     state.notice = null;
@@ -719,6 +724,7 @@ function createModel(deps) {
     state.conflict = null;
     state.stale = false;
     state.error = null;
+    state.saveRejected = false;
     state.notice = null;
     state.suggestions = [];
     state.intakeErrors = [];
@@ -843,6 +849,7 @@ function createModel(deps) {
     state.stale = false;
     state.fieldErrors = [];
     state.error = null;
+    state.saveRejected = false;
     state.notice = null;
     state.suggestions = [];
     state.intakeErrors = [];
@@ -1101,9 +1108,13 @@ function createModel(deps) {
       if (!applyStageWriteError(err)) {
         applyWriteResult(r, 'workspace_save_case');
       }
+      // Lưu bị từ chối — giữ nhãn "chưa lưu được" trên nút Lưu hồ sơ tới
+      // lần lưu thành công kế tiếp (giữ cho cả nhánh không còn lỗi).
+      state.saveRejected = true;
       emit();
       return r;
     }
+    state.saveRejected = false;
     applyWorkspace(r.data || {});
     emit();
     return r;
@@ -1260,6 +1271,9 @@ function createModel(deps) {
     if (!state.fieldErrors.length) return;
     state.fieldErrors = state.fieldErrors.filter(
       (e) => !(e.row_id === rowId && (!field || e.field === field)));
+    // Đang sửa xong lỗi của ô này → nhãn nút Lưu hồ sơ thoát "chưa lưu
+    // được" (state.fieldErrors đã không còn lỗi của lần lưu vừa từ chối).
+    if (!state.fieldErrors.length) state.saveRejected = false;
   }
 
   function updatePersonField(rowId, field, value) {

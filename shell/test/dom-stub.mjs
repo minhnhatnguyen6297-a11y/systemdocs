@@ -87,6 +87,14 @@ export function makeDom() {
       this.hidden = false;
       this.checked = false;
       this.selected = false;
+      // <select> — options read-only array; selectedOptions = option
+      // selected thật (screen reader đọc giá trị từ đây).
+      Object.defineProperty(this, 'options', {
+        get() { return this.children.filter((c) => c.tagName === 'OPTION'); },
+      });
+      Object.defineProperty(this, 'selectedOptions', {
+        get() { return this.options.filter((o) => o.selected); },
+      });
       this.draggable = false;
       this.onclick = null;
       this.oninput = null;

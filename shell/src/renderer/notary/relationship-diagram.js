@@ -619,6 +619,9 @@ function createDiagramPane(ctx) {
   let currentDiagramRegion = null;
   let currentSaveBtn = null;
   let currentRenderPool = null;
+  // row_id → fn cập nhật nhãn nắm kéo trên Pool card khi tên được gõ
+  // trong bảng Người (tránh re-render cả pane khi đang focus ô nhập).
+  let syncPersonRowNameFns = new Map();
 
   if (typeof document !== 'undefined' && document.addEventListener) {
     document.addEventListener('mousemove', (e) => {
@@ -804,8 +807,17 @@ function createDiagramPane(ctx) {
       const grip = h('button', 'drag-handle', '⋮⋮');
       grip.type = 'button';
       grip.draggable = true;
-      grip.title = `kéo ${label} lên sơ đồ`;
-      grip.setAttribute('aria-label', `kéo ${label} lên sơ đồ`);
+      const gripLabel = () =>
+        `kéo ${(row.ho_ten || EMPTY_PERSON_NAME)} lên sơ đồ`;
+      grip.title = gripLabel();
+      grip.setAttribute('aria-label', gripLabel());
+      // Khi tên người này được gõ trong bảng Người, view gọi
+      // syncPersonRowName → refresh pool card để nhãn kéo luôn đúng tên.
+      syncPersonRowNameFns.set(row.row_id, (name) => {
+        const t = `kéo ${(name && name.trim()) || EMPTY_PERSON_NAME} lên sơ đồ`;
+        grip.title = t;
+        grip.setAttribute('aria-label', t);
+      });
       grip.addEventListener('dragstart', setPayload);
       card.append(grip);
     }
@@ -1170,8 +1182,11 @@ function createDiagramPane(ctx) {
         : 'Không phải vợ/chồng hợp pháp';
       card.append(h('div', 'cd-spouse-label', text));
     }
-    if (!ro && n.personId && (n.parentSlotIds || []).length >= 2 &&
+    if (!ro && n.personId && n.id !== 'owner' &&
+        (n.parentSlotIds || []).length >= 2 &&
         typeof model.clearAutoParent === 'function') {
+      // Con riêng: không trên thẻ Chủ đất (owner là gốc — không có
+      // cha/mẹ tự điền để bỏ); giữ nguyên ở các thẻ người khác.
       const rieng = btn('Con riêng', 'cd-mini-btn js-con-rieng', () => {
         model.clearAutoParent(n.id);
       });
@@ -1654,6 +1669,9 @@ function createDiagramPane(ctx) {
 
     function renderPool() {
       box.innerHTML = '';
+      // Đăng ký label-sync mới cho các card vừa dựng; đăng ký cũ là DOM
+      // đã tháo — bỏ để Map không phình vô hạn qua các lần render.
+      syncPersonRowNameFns = new Map();
       const poolPeople = model.pool().people;
       title.textContent = `Danh sách chờ (${poolPeople.length})`;
       const pp = poolPeople.filter((r) => poolMatch(r, poolQuery));
@@ -1812,7 +1830,10 @@ function createDiagramPane(ctx) {
     if (!dirty && dot) dot.remove();
     currentSaveBtn.disabled = model.isWriteBusy() ||
       !s.capabilities.diagram || !model.canWrite();
-    if (dirty) {
+    if (dirty && s.saveRejected) {
+      currentSaveBtn.setAttribute('aria-label',
+        'Lưu hồ sơ — chưa lưu được (còn lỗi)');
+    } else if (dirty) {
       currentSaveBtn.setAttribute('aria-label',
         'Lưu hồ sơ — có thay đổi chưa lưu');
     } else {
@@ -1960,6 +1981,12 @@ function createDiagramPane(ctx) {
   return {
     build,
     refresh,
+    // Cập nhật nhãn nắm kéo của đúng card Pool khi tên người đổi (gõ
+    // trong bảng Người) — không re-render cả pane.
+    syncPersonRowName: (rowId, name) => {
+      const fn = syncPersonRowNameFns.get(rowId);
+      if (fn) fn(name);
+    },
     removeCard: handleCardRemoval,
     isRemovalNotifyEnabled,
     setRemovalNotifyEnabled,

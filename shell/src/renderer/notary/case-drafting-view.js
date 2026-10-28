@@ -642,7 +642,10 @@ function createNotaryModuleView(deps) {
     if (dirty && !dot) upd.append(h('span', 'dirty-dot', ''));
     if (!dirty && dot) dot.remove();
     const label = upd.dataset.label || upd.textContent;
-    if (dirty) {
+    if (dirty && model.state.saveRejected) {
+      upd.setAttribute('aria-label',
+        `${label} — chưa lưu được (còn lỗi)`);
+    } else if (dirty) {
       upd.setAttribute('aria-label', `${label} — có thay đổi chưa lưu`);
     } else {
       upd.removeAttribute('aria-label');
@@ -1676,8 +1679,17 @@ function createNotaryModuleView(deps) {
         tr.classList.add('cd-row-owner');
       }
       const tdh = h('td', 'cd-drag-col');
-      const grip = dragHandle(
-        `kéo đổi thứ tự dòng ${ri + 1} (${p.ho_ten || '(chưa có tên)'})`);
+      // Nhãn nắm kéo lấy tên hiện tại; khi gõ Họ tên, cập nhật trực tiếp
+      // nhãn này (không re-render) để screen reader đọc đúng người.
+      const gripLabel = () =>
+        `kéo đổi thứ tự dòng ${ri + 1} ` +
+        `(${(p.ho_ten && p.ho_ten.trim()) || '(chưa có tên)'})`;
+      const grip = dragHandle(gripLabel());
+      const syncGripLabel = () => {
+        const t = gripLabel();
+        grip.title = `${t} — kéo hoặc Ctrl+phím mũi tên`;
+        grip.setAttribute('aria-label', t);
+      };
       grip.draggable = !ro;
       grip.dataset.fid = `pdrag:${p.row_id}`;
       grip.addEventListener('dragstart', (e) => {
@@ -1712,6 +1724,17 @@ function createNotaryModuleView(deps) {
             if ((p.gioi_tinh || '') === v) o.selected = true;
             ctl.append(o);
           }
+          // A11y: select rỗng ("—") không có option selected tự nhiên —
+          // ép chọn option đúng giá trị hiện tại (rỗng → option đầu)
+          // để screen reader đọc đúng.
+          let selected = false;
+          for (const o of ctl.options) {
+            o.selected = (p.gioi_tinh || '') === o.value;
+            selected = selected || o.selected;
+          }
+          if (!selected) ctl.options[0].selected = true;
+          ctl.setAttribute('aria-label',
+            `${label} — dòng ${ri + 1}`);
           ctl.onchange = () => model.updatePersonField(
             p.row_id, key, ctl.value);
           registerValueFlush(ctl, () => p[key],
@@ -1730,6 +1753,10 @@ function createNotaryModuleView(deps) {
           inp.oninput = () => {
             setCellTitle(inp);
             model.updatePersonField(p.row_id, key, inp.value);
+            if (key === 'ho_ten') {
+              syncGripLabel();
+              if (diagramPane && diagramPane.syncPersonRowName) diagramPane.syncPersonRowName(p.row_id, inp.value);
+            }
           };
           registerValueFlush(inp, () => p[key],
             (v) => model.updatePersonField(p.row_id, key, v));
