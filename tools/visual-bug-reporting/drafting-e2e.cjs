@@ -738,7 +738,8 @@ T.T10 = async () => {
   let nodes = await diagramNodes();
   record('nodesAfterA', nodes);
   check('dead owner A → 1 Cha + 1 Mẹ', emptyOf(nodes, 'Cha', U.A).length === 1 && emptyOf(nodes, 'Mẹ', U.A).length === 1, nodes.map((n) => n.label));
-  check('dead owner A → 2 Vợ/chồng slots (1 + spare)', emptyOf(nodes, 'Vợ/chồng', U.A).length === 2, nodes.map((n) => n.label));
+  check('dead owner A → 2 Vợ/chồng slots (1 + spare)', emptyOf(nodes, 'Vợ/chồng', U.A).length + emptyOf(nodes, 'Vợ/chồng khác', U.A).length === 2, nodes.map((n) => n.label));
+  check('spare Vợ/chồng slot has distinct label', emptyOf(nodes, 'Vợ/chồng khác', U.A).length === 1, nodes.map((n) => n.label));
   check('dead owner A → 2 Con slots (1 + spare)', emptyOf(nodes, 'Con', U.A).length === 2, nodes.map((n) => n.label));
   await dropInto(U.B, 'Vợ/chồng', U.A);
   nodes = await diagramNodes();
