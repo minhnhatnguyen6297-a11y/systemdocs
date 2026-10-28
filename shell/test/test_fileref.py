@@ -70,3 +70,25 @@ class TestValidateFileRef(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# Review PR #25: path goc khong o dia (\foo, /foo) resolve theo o dia hien hanh
+# tren Windows -> khong duoc coi la absolute.
+import pytest as _pytest  # noqa: E402
+import fileref as _fileref  # noqa: E402
+
+
+@_pytest.mark.parametrize("p", ["\\foo\\a.pdf", "/foo/a.pdf", "C:foo", "foo\\a.pdf"])
+def test_is_absolute_rejects_driveless_on_windows(p):
+    assert _fileref.is_absolute(p, windows=True) is False
+
+
+@_pytest.mark.parametrize("p", ["C:\\in\\a.pdf", "d:/in/a.pdf"])
+def test_is_absolute_accepts_drive_on_any_host(p):
+    assert _fileref.is_absolute(p, windows=True) is True
+    assert _fileref.is_absolute(p, windows=False) is True
+
+
+def test_is_absolute_posix_only_off_windows():
+    assert _fileref.is_absolute("/home/u/a.pdf", windows=False) is True
+    assert _fileref.is_absolute("//srv/share/a", windows=False) is False

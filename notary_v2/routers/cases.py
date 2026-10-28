@@ -19,6 +19,20 @@ router = APIRouter()
 _BASE_DIR = Path(__file__).resolve().parent.parent
 templates = Jinja2Templates(directory=_BASE_DIR / "frontend" / "templates")
 WORD_TEMPLATE_UPLOAD_DIR = _BASE_DIR / "word_templates" / "custom"
+
+
+def _is_safe_builtin_name(fname: str) -> bool:
+    """Ten builtin hop le: chi mot thanh phan, duoi .docx, khong tach thu muc."""
+    return (
+        bool(fname)
+        and "/" not in fname
+        and "\\" not in fname
+        and ":" not in fname
+        and fname not in (".", "..")
+        and fname.lower().endswith(".docx")
+    )
+
+
 def _hang_for_role(role: str) -> int:
     role = (role or "").strip()
     if role in ("Cha", "Mẹ", "Cha_vc", "Me_vc", "Vợ/Chồng", "Con", "Cháu", "Con_dau_re"):
@@ -1780,7 +1794,9 @@ def export_word_from_template(cid: int, db: Session = Depends(get_db), template_
         if str(template_id).startswith("builtin:"):
             fname = str(template_id)[len("builtin:"):]
             p = _BASE_DIR / "word_templates" / fname
-            if p.exists():
+            # Chi nhan ten file .docx tran trong word_templates/ — chan
+            # builtin:../x, builtin:C:\x, builtin:/etc/x (review PR #25).
+            if _is_safe_builtin_name(fname) and p.exists():
                 template_path = p
         else:
             try:

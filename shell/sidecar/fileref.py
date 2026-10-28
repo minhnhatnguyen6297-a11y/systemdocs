@@ -6,12 +6,14 @@ logic chay dung tren Windows va tren Linux (test/CI). UNC bi tu choi o moi
 dang: \\\\server\\share, //server/share, \\\\?\\UNC\\server\\share (dang extended
 cua UNC). Prefix \\\\?\\ cho local drive duoc phep (long path, finding F2 cua P1).
 """
-import ntpath
+import os
+import re
 from pathlib import Path
 
 from errors import CommandError
 
 _LONG_PREFIX = "\\\\?\\"
+_ABS_DRIVE = re.compile(r"^[A-Za-z]:[\\/]")
 
 
 def is_unc(path):
@@ -26,17 +28,20 @@ def is_unc(path):
     return path.startswith("\\\\") or path.startswith("//")
 
 
-def is_absolute(path):
-    r"""True neu `path` absolute theo host OS hoac theo Windows.
+def is_absolute(path, *, windows=None):
+    r"""True neu `path` la absolute THAT SU (co o dia) theo Windows, hoac
+    absolute POSIX khi host khong phai Windows.
 
-    Windows drive va \\?\ long path duoc nhan ca khi host khong phai
-    Windows (test/CI tren Linux). UNC khong nam o day — is_unc tu choi
-    rieng truoc khi goi. notary_v2/document_intake giung logic tuong tu
-    nhung dat local (khong import qua package).
+    Path chi co goc ma khong co o dia (\foo, /foo) bi TU CHOI tren Windows:
+    no resolve theo o dia hien hanh cua process (review PR #25 — ntpath.isabs
+    tren Python 3.12 tra True cho \foo). UNC va \\?\ duoc xu ly rieng.
     """
-    if Path(path).is_absolute():
+    if path.startswith(_LONG_PREFIX) or _ABS_DRIVE.match(path):
         return True
-    return ntpath.isabs(path)
+    if windows is None:
+        windows = os.name == "nt"
+    return (not windows) and path.startswith("/") and not path.startswith("//")
+
 
 def validate_file_ref(ref):
     """Tra Path da kiem hoac raise CommandError(file_scope_not_supported)."""
