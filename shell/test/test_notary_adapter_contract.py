@@ -1165,13 +1165,16 @@ def test_word_export_two_party_allowed(adapter_db, tmp_path):
     assert docs["niem_yet"]["block_reason"] == "word.template_missing"
     if os.name != "nt":
         return      # destination FileRef chỉ hợp lệ trên Windows
-    with pytest.raises(CommandError) as exc:
-        notary_adapter.word_export_batch(_Job(), {
-            "case_id": case.id,
-            "document_keys": ["khai_nhan_di_san"],
-            "destination": _dest(tmp_path)})
-    err = exc.value
-    assert err.result["data"]["documents"][0]["error"] is None
+    # Phần W (owner 23/10/2026, W6/W8): thiếu dữ kiện không chặn xuất -> two_party
+    # xuất được, không còn job failed.
+    res = notary_adapter.word_export_batch(_Job(), {
+        "case_id": case.id,
+        "document_keys": ["khai_nhan_di_san"],
+        "destination": _dest(tmp_path)})
+    doc = res["data"]["documents"][0]
+    assert doc["status"] == "saved"
+    assert doc["error"] is None
+    assert res["data"]["breakdown"]["succeeded"] == ["khai_nhan_di_san"]
 
 
 @WINDOWS_ONLY
