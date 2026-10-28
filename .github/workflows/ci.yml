@@ -32,8 +32,8 @@ jobs:
         working-directory: shell
         run: |
           set +e
-          npm test -- --test-reporter=tap > ../js-test.tap 2>&1
-          echo "npm test exit=$?"
+          node --test --test-reporter=tap test/*.test.mjs > ../js-test.tap 2>&1
+          echo "node --test exit=$?"
           exit 0
       - name: So với known-failures
         run: python tools/ci/known_failures.py tap js-test.tap tools/ci/known-failures-js.txt
