@@ -86,10 +86,12 @@ const PYTHON_INHERIT_DENYLIST = [
 class VersionMismatchError extends Error {}
 
 class SidecarManager extends EventEmitter {
-  constructor({ command, logger }) {
+  constructor({ command, logger, outputLogger }) {
     super();
     this.command = command;      // {cmd, args, cwd}
     this.log = logger;
+    // stdout/stderr cua Python sidecar -> sidecar.log (neu co)
+    this.outLog = outputLogger || logger;
     this.child = null;
     this.token = null;
     this.baseUrl = null;
@@ -170,9 +172,9 @@ class SidecarManager extends EventEmitter {
     });
     this.child = child;
     child.stdout.on('data', (d) =>
-      this.log.info('sidecar.out', { line: String(d).trim() }));
+      this.outLog.info('sidecar.out', { line: String(d).trim() }));
     child.stderr.on('data', (d) =>
-      this.log.warn('sidecar.err', { line: String(d).trim() }));
+      this.outLog.warn('sidecar.err', { line: String(d).trim() }));
     const onDead = (info) => {
       if (gen !== this._spawnGen || child !== this.child) return; // stale
       this.child = null;

@@ -46,6 +46,8 @@ Agent khi báo lỗi phải đính kèm đủ:
 4. **Ảnh chụp/video** (ví dụ ảnh từ harness CDP trong `/workspace/usability`, `/workspace/e2e-run`).
 5. Kết quả mong đợi vs thực tế, môi trường.
 
+Log cố định: app ghi `<userData>/logs/main.log` và `sidecar.log` (xoay vòng 5 MB × 3 bản; userData = `%APPDATA%\g1-shell` trên Windows, `~/.config/g1-shell` trên Linux; bản test là `g1-shell-test`). Script đọc mặc định từ đây.
+
 Sinh nội dung nhanh: `tools/file-bug.sh --title "..." --repro "lệnh" [--log file]... [--shot file.png]` → in markdown ra stdout và chép ảnh vào `docs/evidence/<mã>/`. Script không tạo issue.
 
 **Đính kèm ảnh khi không có trình duyệt:** API GitHub không upload được file đính kèm issue. Cách dùng: commit ảnh/log vào `docs/evidence/<mã>/` trên nhánh riêng `evidence/<mã>` (không merge vào nhánh chính), push nhánh đó, rồi dẫn link `https://github.com/<owner>/<repo>/blob/evidence/<mã>/docs/evidence/<mã>/<file>?raw=true` trong issue. Dùng link `blob/...?raw=true` thay vì `raw.githubusercontent.com` vì repo private: link blob dùng phiên đăng nhập GitHub nên hiển thị được cho người có quyền. Mã là ngày-giờ + slug, sau khi có số issue thì ghi số issue vào README trong thư mục.
