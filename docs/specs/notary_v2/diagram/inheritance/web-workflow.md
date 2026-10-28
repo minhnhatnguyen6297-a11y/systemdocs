@@ -157,7 +157,7 @@ Người không nhận = Tất cả người trên Diagram - Chủ đất - Ngư
   nhóm `Chủ đất` nên bỏ sót chủ đất còn sống đã tắt `Nhận` ở một vòng di sản
   khác, và không phân biệt `chưa quyết` với `đã quyết không nhận`) đã được
   owner quyết theo phương án giữ công thức hiện tại; [`workspace-detail.md`](../../workspace-detail.md) §6
-  ghi cùng quyết định. Nếu bản Draft [`business-rules.md`](./business-rules.md) §11.3 được duyệt sau này phải sửa lại
+  ghi cùng quyết định. Nếu bản Draft [`business-rules.md`](./business-rules.md) §11.3 (bản cũ trước `7e4e9e4`; nay là §8) được duyệt sau này phải sửa lại
   cho khớp.
 
 ## 7. Delete / clear permissions

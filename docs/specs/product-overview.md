@@ -184,6 +184,21 @@ Một số tài liệu cũ nhắc React hoặc giao diện Qt. Khi tìm hiểu �
 
 Đường đi chung là: **nguồn gốc → chữ/sự kiện gốc → chuẩn hóa → gợi ý → xác nhận**.
 
+### Triết lý thiết kế Soạn hồ sơ thừa kế (owner chốt 26/10/2026)
+
+Người dùng là công chứng viên và chuyên viên văn phòng soạn văn bản khai nhận /
+thoả thuận phân chia di sản (chủ yếu là đất). App giúp dựng cây gia đình, tính
+phần theo luật và in Word; **người kết luận pháp lý vẫn là công chứng viên**.
+
+1. **Không bao giờ chặn lưu và xuất Word.** Trạng thái tính (`invalid`/`unsupported`/`incomplete`/`complete`) chỉ là nhãn và cảnh báo (D-002).
+2. **Một nguồn sự thật.** Diagram, bảng giải thích, danh sách người ký và Word đều là view của cùng một revision đã lưu (D-003).
+3. **ID ổn định, mã chỉ là nhãn.** Quan hệ bám `personId`; mã 1.1.x chỉ để hiển thị (D-004).
+4. **Mặc định theo luật; lệch phải ghi lý do** (D-019).
+
+Quyết định nghiệp vụ D-xxx: [`decision-80`](../decisions/decision-80-so-quyet-dinh-nghiep-vu-thua-ke.md).
+Điều luật: [`legal-baseline.md`](./notary_v2/diagram/inheritance/legal-baseline.md).
+Câu hỏi mở Q-xxx: [`business-rules.md` §10](./notary_v2/diagram/inheritance/business-rules.md#10-câu-hỏi-mở-q-xxx).
+
 ## Cấu trúc repository
 
 ```text

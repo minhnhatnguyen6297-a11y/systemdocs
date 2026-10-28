@@ -146,7 +146,7 @@ màu/kích thước.
   web persist `engineState` lẫn trong `diagram` (`form.html:8474-8483`).
 - **Đã chốt (owner 24/09/2026):** giữ công thức `Người không nhận = Tất cả
   người trên Diagram − Chủ đất − Người nhận` (workflow.md L146). Tranh cãi với
-  `diagram/inheritance/business-rules.md` §11.3 (DRAFT — đánh dấu sai vì bỏ sót
+  `diagram/inheritance/business-rules.md` §11.3 (bản cũ trước `7e4e9e4`, nay §8; DRAFT — đánh dấu sai vì bỏ sót
   chủ đất sống đã tắt `Nhận` ở vòng khác và không phân biệt `chưa quyết`) được
   owner quyết định theo phương án giữ công thức hiện tại; §11.3 nếu được duyệt
   sau này phải sửa lại cho khớp quyết định này.

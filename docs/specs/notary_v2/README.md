@@ -81,6 +81,10 @@ Quy tắc màu, chữ, khoảng cách và thao tác dùng chung nằm tại
 
 ### Đã chốt
 
+- Quyết định nghiệp vụ thừa kế (sống/chết, nhận/nhường, thế vị, chuyển tiếp,
+  không chặn lưu/xuất…) nằm trong sổ D-xxx
+  [`decision-80`](../../decisions/decision-80-so-quyet-dinh-nghiep-vu-thua-ke.md);
+  câu hỏi mở Q-xxx ở [`business-rules.md` §10](./diagram/inheritance/business-rules.md#10-câu-hỏi-mở-q-xxx).
 - Flow Electron giữ Stage/Pool/Diagram, không port engine Python sang JavaScript.
 - Stage commit gồm Người + Tài sản trong một transaction.
 - Xóa phần tử Stage rồi commit phải prune tham chiếu Diagram trong cùng
