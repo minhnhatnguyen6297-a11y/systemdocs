@@ -518,10 +518,10 @@ T.T6 = async () => {
   await shot('intake-result');
   const intakeTxt = await P().locator('.modal').last().innerText().catch(() => '');
   record('intakeText', intakeTxt.slice(0, 1500));
-  const put = P().locator('button', { hasText: 'Đưa vào Stage' }).locator('visible=true');
+  const put = P().locator('button', { hasText: 'Đưa vào hồ sơ' }).locator('visible=true');
   record('intakePutButtons', await put.count());
   // Nguồn Word gốc chỉ gắn vào hồ sơ khi đưa ít nhất một gợi ý vào Stage.
-  const putIn = P().locator('.modal').last().locator('button', { hasText: 'Đưa vào Stage' });
+  const putIn = P().locator('.modal').last().locator('button', { hasText: 'Đưa vào hồ sơ' });
   if (await putIn.count()) { await putIn.first().click(); await P().waitForTimeout(800); }
   const rawKeys = intakeTxt.split('\n').filter((l) => /^[a-z]+_[a-z_]+$/.test(l.trim()));
   check('intake labels have no raw snake_case field names', rawKeys.length === 0, rawKeys);
