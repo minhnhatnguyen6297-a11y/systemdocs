@@ -1634,3 +1634,87 @@ test('WP7: drop triggers evaluate immediately without timer delay, text typing d
   await new Promise((r) => setTimeout(r, 350));
   assert.equal(evaluateTimes.length, 1, 'Sau ~300ms debounce, evaluate phải được gọi');
 });
+
+// ---------- nhan vai tro theo gioi tinh ----------
+
+// Con gái đã mất của chủ đất, có con riêng (Lý Minh Khoa): người Nữ ở
+// vai cha/mẹ phải hiện "Mẹ của ..." chứ không "Cha của ..."; người không
+// rõ giới tính giữ "Cha/mẹ"; vợ/chồng theo giới tính khi đã rõ.
+test('vai tro theo gioi tinh: me cua con (aria node, chip, o trong, hint, vo)', async () => {
+  const people = [
+    { row_id: 'c1', ho_ten: 'Lý Ông Chủ', ngay_sinh: '1930-01-01',
+      ngay_chet: '2020-05-10', gioi_tinh: 'Nam' },
+    { row_id: 'c2', ho_ten: 'Lý Thị Gái', ngay_sinh: '1960-02-02',
+      ngay_chet: '2019-01-01', gioi_tinh: 'Nữ' },
+    { row_id: 'c3', ho_ten: 'Lý Minh Khoa', ngay_sinh: '1985-03-02',
+      gioi_tinh: 'Nam' },
+    { row_id: 'c4', ho_ten: 'Lý Chưa Rõ', ngay_sinh: '1970-01-01' },
+    { row_id: 'c5', ho_ten: 'Lý Cháu', ngay_sinh: '1995-01-01' },
+  ];
+  const mk = (id, personId, parents = []) =>
+    ({ id, personId, parentSlotIds: parents, spouseSlotIds: [],
+       spouseSlotId: null, spouseSuggestionId: null,
+       ownPositions: [], receivePositions: [], hidden: false, deleted: false });
+  const nodes = [
+    mk('owner', 'c1'),
+    mk('child_1', 'c2', ['owner']),          // con gai Nữ đã mất
+    mk('child_2', 'c3', ['child_1']),        // cháu — con của con gái
+    mk('child_3', 'c4', ['owner']),          // con không rõ giới tính
+    mk('p_slot', null),                      // o trong cha/me cua child_2
+  ];
+  nodes.find((n) => n.id === 'child_2').parentSlotIds.push('p_slot');
+  nodes.find((n) => n.id === 'child_1').receivePositions = [1];
+  // Con thứ của chủ đất (không rõ giới tính) cũng có con riêng để hiện
+  // vai cha/mẹ theo giới tính.
+  nodes.push(mk('child_4', 'c5', ['child_3']));
+  const { view } = await build(test, { mode: 'case',
+    seed: { people, assets: [{ row_id: 'a1', so_serial: 'S1' }], nodes } });
+
+  // Node group aria-label: Nữ → "Mẹ của ...", không rõ → "Cha/mẹ của ...".
+  const c1 = collect(view.el, (e) => e.dataset.nodeId === 'child_1')[0];
+  assert.match(c1.getAttribute('aria-label'),
+    /Lý Thị Gái — mẹ của Lý Minh Khoa/,
+    'nguoi Nu o vai cha/me phai nhan "mẹ của ..."');
+  assert.doesNotMatch(c1.getAttribute('aria-label'), /Cha của|mẹ\/cha/);
+  const c3 = collect(view.el, (e) => e.dataset.nodeId === 'child_3')[0];
+  assert.match(c3.getAttribute('aria-label'), /— cha\/mẹ của Lý Cháu/i,
+    'gioi tinh khong ro giu "cha/mẹ của ..."');
+
+  // Chip aria-label: "Nhận đất tài sản 1 — Mẹ của Lý Minh Khoa".
+  const chip = collect(c1, (e) => e.classList.contains('cd-poschip'))[0];
+  assert.match(chip.getAttribute('aria-label'),
+    /tài sản 1 — Mẹ của Lý Minh Khoa/,
+    'chip phai doc vai tro theo gioi tinh');
+  assert.doesNotMatch(chip.getAttribute('aria-label'), /— Cha của/);
+  // Ô trống cha/mẹ không rõ → "Mẹ của <ten>" theo vị trí (1) trong
+  // parentSlotIds của con.
+  const ps = collect(view.el, (e) => e.dataset.nodeId === 'p_slot')[0];
+  assert.match(ps.getAttribute('aria-label'),
+    /Ô trống: Mẹ của Lý Minh Khoa/,
+    'o trong p_slot theo vi tri 1 → "Mẹ của <ten>"');
+
+  // Hint "Cần bổ sung ...": anchor đã gán người → nói theo người
+  // (slotTag theo giới tính); không nói "Cha" cho người Nữ.
+  const { model: m3, view: v3 } = await build(test, { mode: 'case',
+    seed: { people, assets: [{ row_id: 'a1', so_serial: 'S1' }], nodes } });
+  m3.state.renderModel = { status: 'incomplete',
+    requiredSlots: [{ anchorSlotId: 'child_1', slotTypes: ['spouse'] }] };
+  v3.refresh();
+  assert.match(v3.el.textContent,
+    /Cần bổ sung Vợ\/chồng cho ô “Lý Thị Gái”/,
+    'hint phai noi theo nguoi da gan (ten), khong noi "Cha"');
+
+  // Vợ/chồng theo giới tính: người Nữ gán chỗ vợ chồng → "vợ của ...".
+  const { model: m2, view: v2 } = await build(test, { mode: 'case',
+    seed: { people, assets: [{ row_id: 'a1', so_serial: 'S1' }],
+      nodes: nodes.concat([mk('spouse', null, [])]) } });
+  const owner = m2.state.diagram.nodes.find((n) => n.id === 'owner');
+  owner.spouseSlotIds = ['spouse'];
+  owner.spouseSlotId = 'spouse';
+  const res = m2.movePerson('c2', 'spouse');
+  assert.notEqual(res, false, 'gan nguoi vao o spouse');
+  v2.refresh();
+  const spouseCard = collect(v2.el, (e) => e.dataset.nodeId === 'spouse')[0];
+  assert.match(spouseCard.getAttribute('aria-label'),
+    /— vợ của Lý Ông Chủ/, 'nguoi Nu o cho vo/chong → "vợ của ..."');
+});

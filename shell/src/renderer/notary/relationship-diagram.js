@@ -486,6 +486,27 @@ function slotPersonName(node, people) {
   return name;
 }
 
+// Gioi tinh cua nguoi da gan: 'Nam'/'Nữ' theo PERSON_FIELDS (case-drafting-
+// view.js GIOI_TINH_OPTS), null khi trống/không rõ. Dùng cho nhãn vai trò.
+function personGender(rowId, people) {
+  const p = (people || []).find((x) => x && x.row_id === rowId);
+  const g = p ? String(p.gioi_tinh || '').trim() : '';
+  return g === 'Nam' || g === 'Nữ' ? g : null;
+}
+
+// Nhan vai tro cha/mẹ theo gioi tinh nguoi da gan trong o: Nữ → Mẹ,
+// Nam → Cha, không rõ → Cha/mẹ (không suy từ vị trí ô/id khi có người).
+function parentRoleWord(n, people) {
+  const g = n.personId ? personGender(n.personId, people) : null;
+  return g === 'Nữ' ? 'Mẹ' : g === 'Nam' ? 'Cha' : 'Cha/mẹ';
+}
+
+// Vợ/Chồng theo gioi tinh nguoi da gan; không rõ → Vợ/chồng.
+function spouseWord(rowId, people) {
+  const g = personGender(rowId, people);
+  return g === 'Nữ' ? 'Vợ' : g === 'Nam' ? 'Chồng' : 'Vợ/chồng';
+}
+
 // Nhãn ô trống: vai trò tiếng Việt, không id/uuid.
 // Không có tên thì giữ ngắn (Cha, Mẹ, Vợ/chồng, Con) để khớp ô canonical.
 function emptySlotRole(n, live = [], people = []) {
@@ -497,17 +518,24 @@ function emptySlotRole(n, live = [], people = []) {
     (k.spouseSlotIds || []).includes(n.id) || k.spouseSlotId === n.id));
   if (host) {
     const name = slotPersonName(host, people);
-    return name ? `Vợ/chồng của ${name}` : 'Vợ/chồng';
+    const g = n.personId ? personGender(n.personId, people) : null;
+    const word = g === 'Nữ' ? 'Vợ' : g === 'Nam' ? 'Chồng' : 'Vợ/chồng';
+    return name ? `${word} của ${name}` : word;
   }
 
   const child = nodes.find((k) => k && k.id !== n.id &&
     (k.parentSlotIds || []).includes(n.id));
   if (child || n.id === 'father' || n.id === 'mother' ||
       n.role === 'father' || n.role === 'mother') {
+    // Gioi tinh nguoi da gan uu tien (Nữ → Mẹ, Nam → Cha); ô trống
+    // chưa gán người → vị trí trong parentSlotIds của con (0=Cha,
+    // 1=Mẹ, >1 hoặc không rõ → Cha/Mẹ).
+    const g = n.personId ? personGender(n.personId, people) : null;
     const idx = child ? (child.parentSlotIds || []).indexOf(n.id) : -1;
-    let role = 'Cha';
-    if (idx === 1 || n.id === 'mother' || n.role === 'mother') role = 'Mẹ';
-    if (idx === 0 || n.id === 'father' || n.role === 'father') role = 'Cha';
+    const role = g ? (g === 'Nữ' ? 'Mẹ' : 'Cha')
+      : (idx === 1 || n.id === 'mother' || n.role === 'mother') ? 'Mẹ'
+      : (idx === 0 || n.id === 'father' || n.role === 'father') ? 'Cha'
+      : 'Cha/Mẹ';
     const name = child ? slotPersonName(child, people) : '';
     return name ? `${role} của ${name}` : role;
   }
@@ -676,16 +704,34 @@ function createDiagramPane(ctx) {
     return liveNodes().find((n) => n.id === id) || null;
   }
 
-  // Nhan identity cua slot (label canonical hoac id tho) — khong phu
-  // thuoc nguoi dang gan.
+  // Nhan identity cua slot — voi o DA GAN nguoi: vai tro theo quan he +
+  // gioi tinh (Mẹ của X, Vợ của Y); o trong: nhan canonical hoac id tho.
   function slotTag(n) {
     if (!n) return '—';
+    const people = model.state.stage?.people;
+    if (n.personId) {
+      // Người đã gán: vai trò theo quan hệ + giới tính (Mẹ của X,
+      // Vợ của Y); không suy từ id ô.
+      const parent = parentRoleWord(n, people);
+      if (parent !== 'Cha/mẹ' || (n.parentSlotIds || []).length) {
+        const kids = liveNodes().filter(
+          (k) => (k.parentSlotIds || []).includes(n.id) &&
+            (k.personId || k.id === 'owner'));
+        if (kids.length) {
+          return `${parent} của ${kids.slice(0, 1)
+            .map(refName).join(', ')}`;
+        }
+      }
+      const sp = nodeById(n.spouseSlotId) ||
+        liveNodes().find((k) => k.spouseSlotId === n.id);
+      if (sp) return `${spouseWord(n.personId, people)} của ${refName(sp)}`;
+    }
     if (SLOT_LABEL[n.id]) return SLOT_LABEL[n.id];
     if (/^child(?:_|$)/.test(n.id || '')) {
       const m = /^child_(\d+)$/.exec(n.id || '');
       return m ? `Con ${m[1]}` : 'Con';
     }
-    return emptySlotRole(n, liveNodes(), model.state.stage?.people) || 'Ô trống';
+    return emptySlotRole(n, liveNodes(), people) || 'Ô trống';
   }
   // Ten ngan de tham chieu slot: ten nguoi neu da gan, nhan slot neu
   // trong. Không bao giờ rơi về id thô.
@@ -697,24 +743,28 @@ function createDiagramPane(ctx) {
   }
 
   // Vai tro hien thi tu quan he draft da khai bao — presentation only,
-  // KHONG suy luan nghiep vu (khong phan biet cha vs me — engine cung
-  // khong: parentSlotIds la tap cha/me).
+  // KHONG suy luan nghiep vu; cha/me, vo/chong theo gioi tinh nguoi da
+  // gan (khong ro → cha/mẹ, vợ/chồng).
   function roleLabel(n) {
     if (n.id === 'owner') return 'Chủ đất';
+    const people = model.state.stage?.people;
     const sp = nodeById(n.spouseSlotId) ||
       liveNodes().find((k) => k.spouseSlotId === n.id);
-    if (sp) return `vợ/chồng của ${refName(sp)}`;
+    if (sp) {
+      return `${spouseWord(n.personId, people).toLowerCase()} của ${refName(sp)}`;
+    }
     const kids = liveNodes().filter(
       (k) => (k.parentSlotIds || []).includes(n.id) && (k.personId || k.id === 'owner'));
     if (kids.length) {
       const names = kids.slice(0, 2).map(refName).join(', ');
-      return `cha/mẹ của ${names}${kids.length > 2 ? '…' : ''}`;
+      const w = parentRoleWord(n, people);
+      return `${w === 'Cha/mẹ' ? 'cha/mẹ' : w.toLowerCase()} của ${names}${kids.length > 2 ? '…' : ''}`;
     }
     const owner = spouseOwnerOf(n.id, liveNodes());
     const ownerPerson = owner && owner.personId
       ? personRow(owner.personId) : null;
     if (owner && (!ownerPerson || ownerPerson.ngay_chet)) {
-      return `vợ/chồng của ${refName(owner)}`;
+      return `${spouseWord(n.personId, people).toLowerCase()} của ${refName(owner)}`;
     }
     const ps = (n.parentSlotIds || []).map(nodeById).filter(Boolean);
     if (ps.length) return `con của ${ps.map(refName).join(' + ')}`;
@@ -1708,9 +1758,15 @@ function createDiagramPane(ctx) {
           .map((t) => SLOT_LABEL[t] || (t === 'child' ? 'Con' : t))
           .join(', ');
         if (!kinds) continue;
+        // Ô đã gán người → nhắc theo người (tên hoặc Mẹ/Cha theo giới
+        // tính qua slotTag); ô trống → giữ nhãn canonical của ô.
+        const anchorTag = anchor
+          ? (anchor.personId
+            ? (personRow(anchor.personId)?.ho_ten?.trim() || slotTag(anchor))
+            : slotTag(anchor))
+          : req.anchorSlotId;
         extra.append(h('div', 'muted warn-text',
-          `Cần bổ sung ${kinds} cho ô “${anchor ? slotTag(anchor)
-            : req.anchorSlotId}” — bấm “Xem cách tính” để sinh ô.`));
+          `Cần bổ sung ${kinds} cho ô “${anchorTag}” — bấm “Xem cách tính” để sinh ô.`));
       }
       // Loi engine cua render_model da luu; save vua bi tu choi da co
       // diagramErrors rieng nen khong lap lai.
