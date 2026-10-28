@@ -60,7 +60,7 @@ Một dòng chỉ mang một `vai_tro`: nếu người vừa có vị trí quan 
 tay vai trò khác thì vai trò gán tay thắng ở cột này; Word vẫn đọc vị trí sơ
 đồ cho các nhóm người/thừa kế khác. Người bị gỡ/ẩn node bị xóa khỏi bảng như
 trước. Cặp vợ–chồng thuộc nhánh (con dâu/rể) hiện chỉ còn trong state Diagram,
-chưa có trường chuẩn — [#45 TC3](../../backlog/bug-participant-role-projection-stale-spouse-anchor.md)
+chưa có trường chuẩn — #45 TC3 (chỉ còn trong lịch sử Git: `git show f6705c8:docs/archive/backlog/bug-participant-role-projection-stale-spouse-anchor.md`)
 đang mở, tạm dừng chờ chốt mô hình quan hệ.
 
 Ví dụ: kéo người A vào slot `child_1` của owner và spouse:
@@ -152,7 +152,7 @@ domain này; readiness riêng qua `block_reason` `word.*` (chỉ kiểm tra kỹ
 thuật — không áp điều kiện thừa kế). Mapping `[Bên A N - *]`/`[Bên B
 N - *]` theo slot `p1..p15`/`p16..p30` và mẫu do người dùng chọn trong
 thư mục mẫu — spec hiện hành tại
-`_bmad-output/specs/notary_v2/word-templates.md`. Chi tiết wire
+`word-templates.md` (bản BMAD, chưa chuyển sang docs/; xem tag bmad-archive-20261028). Chi tiết wire
 và fixture:
 [`contracts/notary-case-drafting.md`](../../../contracts/notary-case-drafting.md)
 mục 13.5 và `contracts/notary-case-drafting/examples/draft-v2/`.
@@ -392,7 +392,7 @@ Ngày nhập/hiển thị giữ đúng độ đầy đủ; ngày quy ước ch�
 ## 11. Engine
 
 Engine spec duy nhất còn nằm trong archive
-([`engine.md`](../../archive/specs-before-consolidation-20261015/notary_v2/diagram/inheritance/engine.md),
+([`engine.md`](diagram/inheritance/engine.md),
 đã đính chính có giới hạn), nên luật engine của luật sơ đồ v2 viết tại đây.
 Mục này chỉ ghi hành vi engine phải theo; không nâng thiết kế React/API/DB cũ
 trong archive thành spec hiện hành và không chứng minh runtime đã tuân thủ.
