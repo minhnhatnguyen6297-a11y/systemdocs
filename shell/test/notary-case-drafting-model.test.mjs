@@ -4073,34 +4073,3 @@ test('D-048 updateField: lưu bị chặn → sửa đủ trường → gỡ l�
                 JSON.stringify(second.error.details));
   }
 });
-
-// ---- Luật A (D-048 v2): người còn sống không gán làm chủ đất ----
-
-test('Luật A assignPerson owner: người còn sống → chặn; đã mất → cho', async () => {
-  const { model } = makeModel(seedCases('ready'));
-  await model.openCase(42);
-  const alive = model.addPerson({ ho_ten: 'Còn Sống' });
-  assert.ok(alive);
-  assert.equal(model.assignPerson('owner', alive.row_id), false,
-               'người còn sống không gán được vào owner');
-  const dead = model.addPerson({ ho_ten: 'Đã Mất', ngay_chet: '2020-01-02' });
-  assert.ok(dead);
-  assert.equal(model.assignPerson('owner', dead.row_id), true);
-});
-
-test('Luật A movePerson sang owner: người còn sống → chặn', async () => {
-  const { model } = makeModel(seedCases('ready'));
-  await model.openCase(42);
-  const alive = model.addPerson({ ho_ten: 'Còn Sống' });
-  assert.equal(model.movePerson(alive.row_id, 'owner'), false);
-});
-
-test('Luật A pool.personDropBlock: flag forOwnerSlot đúng ý', async () => {
-  const { model } = makeModel(seedCases('ready'));
-  await model.openCase(42);
-  const alive = model.addPerson({ ho_ten: 'Còn Sống' });
-  assert.equal(model.personDropBlock(alive.row_id, true) != null, true,
-               'slot owner: người còn sống bị chặn');
-  assert.equal(model.personDropBlock(alive.row_id, false), null,
-               'slot thường: người còn sống vẫn thả được');
-});

@@ -213,14 +213,9 @@ function errTextRequiredAsset(field) {
     : 'Mục bắt buộc chưa có giá trị';
 }
 
-function personDropBlockReason(people, rowId, forOwnerSlot) {
+function personDropBlockReason(people, rowId) {
   const row = (people || []).find((p) => p && p.row_id === rowId);
   if (!row) return null;
-  // Luật A (D-048 v2): người CÒN SỐNG (ngày mất trống) không được gán
-  // vào vị trí chủ đất trên sơ đồ — chặn từ pool, không cần chờ wire.
-  if (forOwnerSlot && !String(row.ngay_chet || '').trim()) {
-    return 'Chỉ người đã mất mới gán được làm chủ đất';
-  }
   for (const field of PERSON_DATE_FIELDS_CHECK) {
     if (personDateIssue(row[field])) return 'Không thả được: ngày không hợp lệ';
   }
@@ -1687,10 +1682,7 @@ function createModel(deps) {
     const already = (state.diagram.nodes || []).some(
       (n) => n && !n.deleted && n.personId === rowId);
     if (rowId && !already &&
-        personDropBlockReason(state.stage.people, rowId,
-          diagramDomain() === CASE_TYPE_INHERITANCE && nodeId === 'owner')) {
-      return false;
-    }
+        personDropBlockReason(state.stage.people, rowId)) return false;
     // Node 'owner' la mirror cua stage.owner_row_id — gan qua setter de
     // pointer stage cap nhat cung (contract §13.4).
     if (diagramDomain() === CASE_TYPE_INHERITANCE &&
@@ -1750,11 +1742,7 @@ function createModel(deps) {
     // Thẻ có ngày sai không thả từ Stage/Pool lên sơ đồ. Gỡ về Pool,
     // và thẻ đã nằm trên sơ đồ, vẫn được.
     if (targetNodeId != null && !sourceNode &&
-        personDropBlockReason(state.stage.people, rowId,
-          diagramDomain() === CASE_TYPE_INHERITANCE &&
-          targetNodeId === 'owner')) {
-      return false;
-    }
+        personDropBlockReason(state.stage.people, rowId)) return false;
     if (targetNodeId == null) {
       if (!sourceNode) return false;
       if (diagramDomain() === CASE_TYPE_INHERITANCE &&
@@ -2840,8 +2828,7 @@ function createModel(deps) {
     removeStageRow, fieldErrorsFor,
     pool,
     addSlot, assignPerson, movePerson, clearAutoParent,
-    personDropBlock: (rowId, forOwnerSlot) =>
-      personDropBlockReason(state.stage.people, rowId, forOwnerSlot),
+    personDropBlock: (rowId) => personDropBlockReason(state.stage.people, rowId),
     setNodeFlag, toggleNodePosition, setNodeRelation, nodeRemovalImpact, removeNode,
     evaluateDiagram, reconcileRequiredSlots,
     captureDraftSnapshot, restoreDraftSnapshot, removeCard,

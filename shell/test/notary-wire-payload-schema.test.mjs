@@ -295,6 +295,7 @@ test('wire: saveCase tạo mới — payload thật khớp payload workspace_sav
   const p = model.addPerson({ ho_ten: 'Nguyễn Văn Chết',
                               ngay_chet: '2011-05-15' });
   const a = model.addAsset({ so_serial: 'MM000001',
+                             so_thua_dat: '99', so_to_ban_do: '9',
                              dia_chi: 'Thửa 99, xã Y' });
   model.updateAssetField(a.row_id, 'land_rows',
                          [{ loai_dat: 'ODT', dien_tich: 85.5,
