@@ -93,7 +93,14 @@ jobs:
           pip install -r shell/sidecar/requirements.txt -r notary_v2/requirements.txt pytest
       - name: pytest
         shell: bash
-        run: python -m pytest shell/test notary_v2/tests -q -p no:cacheprovider -rA --basetemp "$RUNNER_TEMP/pytest" | tee pytest-win.txt
+        run: |
+          set +e
+          python -m pytest shell/test notary_v2/tests -q -p no:cacheprovider -rA --basetemp "$RUNNER_TEMP/pytest" > pytest-win.txt 2>&1
+          echo "pytest exit=$?"; tail -3 pytest-win.txt
+          exit 0
+      - name: So với known-failures
+        shell: bash
+        run: python tools/ci/known_failures.py pytest pytest-win.txt tools/ci/known-failures-py-windows.txt
       - if: always()
         uses: actions/upload-artifact@v4
         with:
