@@ -2,8 +2,11 @@
 # Sinh noi dung issue loi kem bang chung (KHONG tao issue).
 # Dung: tools/file-bug.sh --title T --repro CMD [--expected E] [--actual A]
 #        [--log FILE]... [--lines N] [--shot PNG] [--no-copy]
-# Mac dinh: tu tim *.log moi nhat va anh .png moi nhat trong
-#   $BUG_EVIDENCE_DIRS (mac dinh "/workspace/usability /workspace/e2e-run").
+# Log mac dinh: <userData>/logs/main.log + sidecar.log cua app (g1-shell,
+#   hoac g1-shell-test neu G1_APP_NAME=g1-shell-test; G1_USER_DATA ghi de).
+#   Khong co thi tim *.log moi nhat trong $BUG_EVIDENCE_DIRS.
+# Anh mac dinh: .png moi nhat trong $BUG_EVIDENCE_DIRS
+#   (mac dinh "/workspace/usability /workspace/e2e-run").
 set -eu
 TITLE="" REPRO="" EXPECTED="(điền)" ACTUAL="(điền)" LINES=60 SHOT="" COPY=1; LOGS=()
 while [ $# -gt 0 ]; do case "$1" in
@@ -19,6 +22,16 @@ BRANCH=$(git rev-parse --abbrev-ref HEAD); SHA=$(git rev-parse HEAD)
 DIRTY=$(git status --porcelain | grep -qv '^??' && echo " (có thay đổi chưa commit)" || true)
 DIRS=${BUG_EVIDENCE_DIRS:-/workspace/usability /workspace/e2e-run}
 newest() { find $DIRS -type f -name "$1" -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -n "${2:-1}" | cut -d' ' -f2-; }
+user_data() {
+  [ -n "${G1_USER_DATA:-}" ] && { echo "$G1_USER_DATA"; return; }
+  local name=${G1_APP_NAME:-g1-shell}
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) echo "$(cygpath -u "${APPDATA:-$HOME/AppData/Roaming}" 2>/dev/null || echo "$APPDATA")/$name";;
+    Darwin) echo "$HOME/Library/Application Support/$name";;
+    *) echo "${XDG_CONFIG_HOME:-$HOME/.config}/$name";;
+  esac; }
+if [ ${#LOGS[@]} -eq 0 ]; then UD=$(user_data)
+  for f in "$UD/logs/main.log" "$UD/logs/sidecar.log"; do [ -f "$f" ] && LOGS+=("$f"); done; fi
 [ ${#LOGS[@]} -eq 0 ] && mapfile -t LOGS < <(newest '*.log' 2)
 [ -z "$SHOT" ] && SHOT=$(newest '*.png' 1)
 SLUG=$(python3 -c "import sys,unicodedata,re;s=unicodedata.normalize(\"NFKD\",sys.argv[1].replace(\"đ\",\"d\").replace(\"Đ\",\"D\")).encode(\"ascii\",\"ignore\").decode().lower();print(re.sub(\"[^a-z0-9]+\",\"-\",s).strip(\"-\")[:40])" "$TITLE")
