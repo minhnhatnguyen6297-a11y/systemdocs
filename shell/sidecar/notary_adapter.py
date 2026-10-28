@@ -348,14 +348,33 @@ def case_create(job, payload):
         if not sess.get(models.Property, tai_san_id):
             raise CommandError("file_not_found",
                                f"khong co tai san #{tai_san_id}")
-        case = models.InheritanceCase(
-            nguoi_chet_id=nguoi_id, tai_san_id=tai_san_id,
-            ngay_lap_ho_so=ngay_lap, loai_van_ban=loai,
-            noi_niem_yet=p.get("noi_niem_yet") or None,
-            ghi_chu=p.get("ghi_chu") or None,
-            trang_thai="draft",
-            updated_at=models.case_saved_at())
-        sess.add(case)
+        # Storage B (issue 13): Word/Stage đọc dòng Người/Tài sản của chính
+        # hồ sơ, không đọc master. Tạo qua CaseWorkspaceService như web
+        # /cases/create (hydrate dòng từ master được chọn) để hồ sơ tạo bằng
+        # lệnh legacy vẫn xuất Word được.
+        from uuid import uuid4
+        cases_router = _router("cases")
+        ws = _svc("case_workspace")
+        owner = cases_router._people_from_customer(
+            sess.get(models.Customer, nguoi_id))
+        stage = {"people": [owner],
+                 "assets": [cases_router._asset_row_from_property(
+                     sess.get(models.Property, tai_san_id))],
+                 "owner_row_id": owner["row_id"]}
+        meta = {"case_type": "inheritance", "document_type": loai,
+                "ngay_lap_ho_so": ngay_lap.isoformat(),
+                "noi_niem_yet": p.get("noi_niem_yet") or None,
+                "ghi_chu": p.get("ghi_chu") or None}
+        try:
+            data = ws.CaseWorkspaceService(sess).create(
+                str(uuid4()), meta, stage, None)
+        except ws.WorkspaceError as exc:
+            raise CommandError("validation_error", exc.message,
+                               details=exc.details) from exc
+        case = sess.get(models.InheritanceCase, data["case"]["id"])
+        # Cột legacy giữ cho case_get/participant (không phải nguồn Word).
+        case.nguoi_chet_id = nguoi_id
+        case.tai_san_id = tai_san_id
         sess.commit()
         sess.refresh(case)
         return _result("case_created", {"case": _case_row(case)})

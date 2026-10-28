@@ -118,7 +118,8 @@ class WebBoundaryTests(unittest.TestCase):
             child = Customer(ho_ten="Child", so_giay_to="002",
                              name_anchor="child", document_anchor="002")
             prop = Property(so_serial="WEB-1", dia_chi="Dia chi dat",
-                            so_thua_dat="12")
+                            so_thua_dat="12",
+                            so_to_ban_do="7")  # S5b: tờ bản đồ bắt buộc
             db.add_all([owner, child, prop])
             db.commit()
             self.owner_id, self.child_id = owner.id, child.id
