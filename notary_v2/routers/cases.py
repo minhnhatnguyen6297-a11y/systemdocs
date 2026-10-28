@@ -16,8 +16,9 @@ from database import get_db
 from models import InheritanceCase, Customer, Property, InheritanceParticipant, InheritanceCaseProperty, WordTemplate
 
 router = APIRouter()
-templates = Jinja2Templates(directory="frontend/templates")
-WORD_TEMPLATE_UPLOAD_DIR = Path("word_templates/custom")
+_BASE_DIR = Path(__file__).resolve().parent.parent
+templates = Jinja2Templates(directory=_BASE_DIR / "frontend" / "templates")
+WORD_TEMPLATE_UPLOAD_DIR = _BASE_DIR / "word_templates" / "custom"
 def _hang_for_role(role: str) -> int:
     role = (role or "").strip()
     if role in ("Cha", "Mẹ", "Cha_vc", "Me_vc", "Vợ/Chồng", "Con", "Cháu", "Con_dau_re"):
@@ -1028,7 +1029,7 @@ def _get_selected_word_template_path(db: Session) -> Optional[Path]:
 
     template_candidates = [
         Path(r"\\maychu\D\Minh\HỒ SƠ UBND CÁC XÃ\2. Mẫu thừa kế\xã_PCDS -.docx"),
-        Path("word_templates/xa_PCDS_template.docx"),
+        _BASE_DIR / "word_templates" / "xa_PCDS_template.docx",
     ]
     existing_templates = [p for p in template_candidates if p.exists()]
     if not existing_templates:
@@ -1042,7 +1043,7 @@ def list_templates_json(db: Session = Depends(get_db)):
     items = db.query(WordTemplate).order_by(WordTemplate.id.desc()).all()
     # Also include built-in templates from word_templates/ dir
     builtin = []
-    for p in Path("word_templates").glob("*.docx"):
+    for p in (_BASE_DIR / "word_templates").glob("*.docx"):
         if p.exists():
             builtin.append({"id": f"builtin:{p.name}", "ten_mau": p.stem, "is_active": False, "builtin": True})
     return {
@@ -1778,7 +1779,7 @@ def export_word_from_template(cid: int, db: Session = Depends(get_db), template_
     if template_id:
         if str(template_id).startswith("builtin:"):
             fname = str(template_id)[len("builtin:"):]
-            p = Path("word_templates") / fname
+            p = _BASE_DIR / "word_templates" / fname
             if p.exists():
                 template_path = p
         else:

@@ -11,7 +11,7 @@ from docx import Document
 
 from services import word_template_migration as wtm
 
-SRC = Path("word_templates")
+SRC = Path(__file__).resolve().parent.parent / "word_templates"
 
 
 def _docx(path: Path, paragraphs: list[str]) -> Path:
@@ -49,6 +49,20 @@ def test_scan_source_templates_reports_excluded_files(tmp_path):
     assert [p.name for p in kept] == ["a.docx", "b.docx"]
     assert "~$lock.docx" in excluded
     assert "xlsx/data.xlsx" in excluded
+
+
+def test_scan_source_templates_dedupes_in_root_dir_alias(tmp_path):
+    """Junction trỏ sang thư mục khác TRONG src: file thật vào kept đúng 1
+    lần — migrate 2 lần sẽ ghi trùng đích và đếm file_count sai."""
+    src = tmp_path / "src"
+    _docx(src / "2026" / "mau.docx", ["x"])
+    if not _make_dir_link(src / "Latest", src / "2026"):
+        pytest.skip("môi trường không tạo được junction/symlink thư mục")
+
+    kept, excluded = wtm.scan_source_templates(src)
+
+    assert [p.relative_to(src).as_posix() for p in kept] == ["2026/mau.docx"]
+    assert excluded == []
 
 
 def test_real_docm_is_excluded_and_reported_before_any_write(tmp_path, monkeypatch):
@@ -845,7 +859,9 @@ def test_write_guard_blocks_junction_swapped_after_copy(tmp_path, monkeypatch):
             real_dir = path.parent
             moved = path.parent.parent / "sub_real"
             real_dir.rename(moved)
-            os.system(f'cmd /c mklink /J "{real_dir}" "{sentinel}" >nul')
+            if not _make_dir_link(real_dir, sentinel):
+                moved.rename(real_dir)
+                pytest.skip("môi trường không tạo được junction/symlink")
             assert real_dir.is_symlink() or wtm._real_path(real_dir) != real_dir
         return result
 
@@ -1178,6 +1194,10 @@ def test_write_guard_blocks_same_path_swap_before_rewrite(
             # Thay inode TẠI CÙNG PATH — realpath không đổi nên chỉ fd
             # ràng buộc inode (fstat) mới phân biệt được file của run
             # với file cạnh tranh.
+            # Giữ inode cũ sống (hard link) để FS không tái dùng ngay số
+            # inode vừa giải phóng (ext4/overlayfs trên Linux hay làm vậy,
+            # NTFS thì không) -> inode mới chắc chắn khác (#19).
+            os.link(path, tmp_path / "keep-old-inode")
             Path(path).unlink()
             Path(path).write_bytes(sentinel)
         return real_open(self, path, what)

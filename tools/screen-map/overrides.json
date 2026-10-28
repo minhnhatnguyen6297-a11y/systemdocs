@@ -1,0 +1,20 @@
+{
+  "launch": "REPO=<worktree> CDP=1 CDP_PORT=9333 /workspace/usability/launch-app-cdp.sh  (Xvfb + CDP, profile tạm rỗng); dừng: CDP_PORT=9333 /workspace/usability/stop-app-cdp.sh",
+  "flows": [
+    { "id": "notary_v2/Soạn hồ sơ (hồ sơ mới)", "steps": [["click", "button:notary_v2"], ["click", "tab:Soạn hồ sơ"], ["click", "button:+ Hồ sơ mới"]] }
+  ],
+  "screens": {
+    "notary_v2": { "purpose": "Module công chứng: tổng quan, soạn hồ sơ (sơ đồ thừa kế), xuất Word",
+      "tests": ["shell/test/navigation.test.mjs", "shell/test/state-faces.test.mjs"] },
+    "notary_v2/Tổng quan hồ sơ": { "purpose": "Danh sách hồ sơ", "tests": ["shell/test/notary-case-drafting-model.test.mjs"] },
+    "notary_v2/Soạn hồ sơ": { "purpose": "Soạn hồ sơ khi chưa mở hồ sơ (trạng thái rỗng)",
+      "tests": ["shell/test/notary-case-drafting-view.test.mjs", "shell/test/notary-case-drafting-static.test.mjs"] },
+    "notary_v2/Soạn hồ sơ (hồ sơ mới)": { "purpose": "Soạn hồ sơ: người, tài sản, sơ đồ quan hệ, tra địa chỉ",
+      "tests": ["shell/test/notary-case-drafting-view.test.mjs", "shell/test/notary-diagram.test.mjs", "shell/test/notary-address-lookup.test.mjs", "shell/test/notary-docx-intake.test.mjs"],
+      "gotchas": ["Cần sidecar healthy (status không còn engine_unavailable) trước khi thao tác", "Kéo thẻ người lên sơ đồ: ux.cjs drag \"button:kéo <tên> lên sơ đồ\" \"~group:Ô trống: ...\""] },
+    "notary_v2/Word": { "purpose": "Xuất văn bản Word theo mẫu", "tests": ["shell/test/notary-wire-payload-schema.test.mjs", "notary_v2/tests/test_word_batch_export.py"],
+      "gotchas": ["Mẫu Word thật không có trong repo; dùng /workspace/usability/mau-word (giả lập)"] },
+    "upload_lab": { "purpose": "Upload/scan tài liệu", "tests": ["shell/test/upload-routing.test.mjs", "shell/test/upload-state.test.mjs", "shell/test/test_upload_workflow.py"] },
+    "Trạng thái/Cài đặt": { "purpose": "Trạng thái engine/sidecar", "tests": ["shell/test/sidecar-lifecycle.test.mjs", "shell/test/state-faces.test.mjs"] }
+  }
+}

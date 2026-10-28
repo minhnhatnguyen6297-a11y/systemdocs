@@ -1,0 +1,5 @@
+# Lỗi JS đã biết trên origin/consolidate/monorepo @7850897, đo 2026-10-28 (Linux, Node 20.19.2): 4/399 fail.
+# Mỗi dòng: <tên test TAP>  # <issue ref> <lý do>. Issue ref = issue GitHub theo nhóm nguyên nhân.
+# Không skip: test vẫn chạy; tools/ci/known_failures.py chỉ chặn lỗi MỚI.
+native DOCX free text enters existing Stage fields and manual edits survive commit and reload  # #19 spawnSync python ENOENT (không có lệnh `python` trên PATH local; CI có setup-python nên có thể pass)
+JSON download keeps original schema-valid result after review and invalid pending edits  # #19 spawnSync python ENOENT (như trên)

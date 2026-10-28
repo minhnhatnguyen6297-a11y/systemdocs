@@ -34,7 +34,11 @@ def _pdf(path: Path, *, text: str | None) -> None:
     page = document.new_page()
     if text:
         page.insert_text((72, 72), text)
-    data = document.tobytes()
+    # MuPDF otherwise generates a random /ID; when its bytes are not
+    # hex-friendly it is written as a literal (...) string that the regex
+    # below cannot match (~1% of saves), making fixtures non-repeatable.
+    document.xref_set_key(-1, "ID", "[<00000000000000000000000000000000><11111111111111111111111111111111>]")
+    data = document.tobytes(no_new_id=True)
     data = re.sub(
         rb"/ID\s*\[<[^>]+><[^>]+>\]",
         b"/ID [<00000000000000000000000000000000><11111111111111111111111111111111>]",
@@ -54,6 +58,13 @@ def _normalize_office_zip(path: Path) -> None:
                 normalized = zipfile.ZipInfo(info.filename, date_time=(1980, 1, 1, 0, 0, 0))
                 normalized.compress_type = zipfile.ZIP_DEFLATED
                 normalized.external_attr = info.external_attr
+                if (info.external_attr >> 16) & 0o170000 == 0o100000:
+                    # Entry openpyxl ghi từ file tạm mang st_mode của OS
+                    # (Linux 0600, Windows 0666) -> cố định như Windows.
+                    normalized.external_attr = 0o100666 << 16
+                # ZipInfo mặc định create_system=3 trên POSIX, 0 trên Windows
+                # -> byte khác theo OS. Cố định 0 (manifest sinh trên Windows).
+                normalized.create_system = 0
                 payload = source.read(info.filename)
                 if info.filename == "docProps/core.xml":
                     payload = re.sub(

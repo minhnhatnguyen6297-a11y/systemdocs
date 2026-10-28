@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import ntpath
 import re
 from pathlib import Path
 from time import perf_counter
@@ -63,8 +64,11 @@ def _log(event: str, **fields: Any) -> None:
 
 
 def _is_unc(path: str) -> bool:
+    # Logic UNC cua shell/sidecar/fileref.py, dat local: notary_v2 chay
+    # standalone (web app), khong duoc phu thuoc import sang shell/sidecar.
     if path.startswith(_LONG_PREFIX):
         rest = path[len(_LONG_PREFIX):]
+        # \\?\UNC\server\share la UNC dang extended; \\?\D:\... la local
         low = rest.lower()
         return (
             low.startswith("unc\\")
@@ -76,7 +80,11 @@ def _is_unc(path: str) -> bool:
 
 
 def _is_abs(path: str) -> bool:
-    return path.startswith(_LONG_PREFIX) or bool(_ABS_DRIVE.match(path))
+    # Absolute theo host OS (pathlib) HOAC theo Windows drive/long path
+    # (ntpath, _ABS_DRIVE) — chay dung ca tren Windows lan Linux (test/CI).
+    if Path(path).is_absolute():
+        return True
+    return bool(_ABS_DRIVE.match(path)) or ntpath.isabs(path)
 
 
 def _validate_sources(sources: Any) -> list[SourceSpec]:
