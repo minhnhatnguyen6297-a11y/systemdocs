@@ -28,8 +28,9 @@ Bằng chứng sinh ra (tách theo tầng):
   * ``batch``      — export_options + từng document result + assertion nội
                      dung (người được ủy quyền, nơi niêm yết, diện tích từng
                      dòng đất) trích từ DOCX đầu ra;
-  * ``negative``   — cùng batch trên hồ sơ THIẾU vai trò ủy quyền phải fail
-                     bằng ``word.missing_authorized_person``;
+  * ``negative``   — cùng batch trên hồ sơ THIẾU vai trò ủy quyền: theo
+                     W6/W8 vẫn xuất nhưng phải ghi "người được ủy quyền N"
+                     vào ``missing`` và không lộ tên đại diện;
   * ``format_compare`` — so khung cấu trúc/định dạng nguồn->đích (docx->docx:
                      section, bảng, đoạn, header/footer, style, font) và
                      ComputeStatistics qua Word COM khi có Word;
@@ -1897,12 +1898,29 @@ def run(src_dir: Path, out_dir: Path) -> dict:
             # rỗng (job lỗi không result_data) KHÔNG được tính là pass.
             returned_keys = {d["document_key"] for d in neg_docs}
             missing_results = sorted(set(uq_keys) - returned_keys)
-            bad = [
-                d["document_key"] for d in neg_docs
-                if d["status"] != "failed"
-                or (d.get("error") or {}).get("code")
-                != "word.missing_authorized_person"]
-            leaked = list(exports_neg_dir.glob("*_HS-*.docx"))
+            # W6/W8 (ce798f9, owner 23/10): thiếu người được ủy quyền KHÔNG
+            # chặn xuất nữa — file vẫn lưu nhưng phải ghi "người được ủy
+            # quyền N" vào `missing` cho MỌI slot mẫu đòi, và không được lộ
+            # tên đại diện (hồ sơ phản ví dụ không có ai được ủy quyền).
+            bad = []
+            leaked = []
+            for d in neg_docs:
+                key = d["document_key"]
+                slots = word_engine.required_authorized_slots(
+                    docx.Document(str(migrated_dir / key)))
+                need = {f"người được ủy quyền {n}" for n in slots}
+                if (d["status"] != "saved"
+                        or not need <= set(d.get("missing") or [])):
+                    bad.append(key)
+                    continue
+                path = (d.get("output_file") or {}).get("path")
+                outs = ([Path(path)] if path
+                        else list(exports_neg_dir.glob(f"*{Path(key).stem}*.docx")))
+                for out_file in outs:
+                    text = "\n".join(
+                        p.text for p in docx.Document(str(out_file)).paragraphs)
+                    if PROXY_NAME in text:
+                        leaked.append(out_file)
             ok_neg = (not bad and not leaked and not missing_results
                       and len(neg_docs) == len(uq_keys))
             negative = {
@@ -1911,6 +1929,7 @@ def run(src_dir: Path, out_dir: Path) -> dict:
                 "documents": [
                     {"document_key": d["document_key"],
                      "status": d["status"],
+                     "missing": d.get("missing"),
                      "error_code": (d.get("error") or {}).get("code")}
                     for d in neg_docs],
                 "missing_results": missing_results,
@@ -1918,7 +1937,7 @@ def run(src_dir: Path, out_dir: Path) -> dict:
                 "outputs_leaked": [p.name for p in leaked],
             }
             check(
-                "negative.missing_authorized_fails", ok_neg,
+                "negative.missing_authorized_noted", ok_neg,
                 f"{len(neg_docs)}/{len(uq_keys)} văn bản UQ có kết quả; "
                 f"bad={bad[:5]}; thiếu result={missing_results[:5]}; "
                 f"leaked={len(leaked)}")

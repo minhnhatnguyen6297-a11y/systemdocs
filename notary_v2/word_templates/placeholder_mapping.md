@@ -196,8 +196,9 @@ files_untouched`).
 Nguồn: participants đã LƯU vai trò `Người được ủy quyền` — không yêu cầu node
 Diagram (NAIA-8). Engine đọc slot `N` từ mọi dạng token trên (kể cả
 `inline N`); token không hậu tố tính slot 1. Mẫu yêu cầu slot N lớn hơn số
-đại diện đã lưu → export trả `word.missing_authorized_person` và KHÔNG tạo
-file (review NAIA-12: `[Người được ủy quyền inline 2]` từng bị nhận nhầm
+đại diện đã lưu → theo W6/W8 (23/10/2026) export vẫn tạo file, slot trống,
+và ghi "người được ủy quyền N" vào `missing` của kết quả (trước đây: lỗi
+`word.missing_authorized_person`, review NAIA-12: `[Người được ủy quyền inline 2]` từng bị nhận nhầm
 slot 1 nên slot 2 trống vẫn xuất).
 
 ## 12. Quyết định Owner 02/10/2026 và tương thích MIN-141
