@@ -409,6 +409,12 @@ async function clickOwn(name, pos = 1) {
   record('clickOwn:' + name, { ok: true, disabled,
     rect: rect && { x: Math.round(rect.x), y: Math.round(rect.y),
       w: Math.round(rect.width), h: Math.round(rect.height) } });
+  // Bỏ Chủ cuối cùng (N>0) giờ hỏi xác nhận → explore chọn "Tiếp tục".
+  const dlg = P().getByRole('alertdialog');
+  if (await dlg.waitFor({ state: 'visible', timeout: 700 }).then(() => true, () => false)) {
+    record('confirmLastOwner:' + name, (await dlg.innerText()).trim());
+    await dlg.getByRole('button', { name: 'Tiếp tục' }).click();
+  }
   await P().waitForTimeout(900);
 }
 async function waitToastGone() { await P().waitForTimeout(5600); }
