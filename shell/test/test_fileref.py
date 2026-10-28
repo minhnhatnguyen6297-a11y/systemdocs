@@ -23,7 +23,8 @@ class TestIsAbsolute(unittest.TestCase):
         self.assertTrue(fileref.is_absolute("\\\\?\\D:\\duong\\dan.docx"))
 
     def test_posix_absolute_accepted(self):
-        self.assertTrue(fileref.is_absolute("/home/user/a.docx"))
+        self.assertTrue(fileref.is_absolute("/home/user/a.docx", windows=False))
+        self.assertFalse(fileref.is_absolute("/home/user/a.docx", windows=True))
 
     def test_relative_rejected(self):
         for p in ("relative/path.docx", "a.docx", "./x", "..\\y"):
