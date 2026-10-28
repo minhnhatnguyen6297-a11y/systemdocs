@@ -520,6 +520,12 @@ function emptySlotRole(n, live = [], people = []) {
     const name = slotPersonName(host, people);
     const g = n.personId ? personGender(n.personId, people) : null;
     const word = g === 'Nữ' ? 'Vợ' : g === 'Nam' ? 'Chồng' : 'Vợ/chồng';
+    // Ô dự phòng (ô vợ/chồng trống thứ 2 trở đi) có nhãn riêng để không
+    // nhầm với ô Vợ/chồng chính.
+    const idx = (host.spouseSlotIds || []).indexOf(n.id);
+    if (!n.personId && idx > 0) {
+      return name ? `Vợ/chồng khác của ${name}` : 'Vợ/chồng khác';
+    }
     return name ? `${word} của ${name}` : word;
   }
 

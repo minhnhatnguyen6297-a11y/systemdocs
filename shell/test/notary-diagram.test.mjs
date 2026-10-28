@@ -1888,3 +1888,20 @@ test("'Không có vợ/con': ô chỉ hiện cho người đã mất, bật đ�
   const owner = model.state.diagram.nodes.find((n) => n.id === 'owner');
   assert.equal(owner.noSpouseChildren, true);
 });
+
+test('ô vợ/chồng dự phòng có nhãn riêng "Vợ/chồng khác"', () => {
+  const { emptySlotRole } = DIAGRAM._internals;
+  const people = [{ row_id: 'c1', ho_ten: 'Người Mẫu A', gioi_tinh: 'Nam' },
+                  { row_id: 'c2', ho_ten: 'Người Mẫu B', gioi_tinh: 'Nữ' }];
+  const owner = { id: 'owner', personId: 'c1', parentSlotIds: [],
+                  spouseSlotIds: ['sp0', 'sp1'] };
+  const sp0 = { id: 'sp0', personId: 'c2', parentSlotIds: [] };
+  const sp1 = { id: 'sp1', personId: null, parentSlotIds: [] };
+  const nodes = [owner, sp0, sp1];
+  assert.equal(emptySlotRole(sp1, nodes, people), 'Vợ/chồng khác của Người Mẫu A');
+  assert.notEqual(emptySlotRole(sp0, nodes, people),
+    emptySlotRole(sp1, nodes, people));
+  const sp0Empty = { ...sp0, personId: null };
+  assert.equal(emptySlotRole(sp0Empty, [owner, sp0Empty, sp1], people),
+    'Vợ/chồng của Người Mẫu A');
+});
