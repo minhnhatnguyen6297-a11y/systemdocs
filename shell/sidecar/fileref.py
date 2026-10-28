@@ -1,27 +1,42 @@
 """file_ref validation theo desktopcommand.v1 §6 — machine_local only (O1).
 
-G1-SM chi chap nhan path tuyet doi tren may nay; UNC bi tu choi o moi dang:
-\\\\server\\share, \\\\?\\UNC\\server\\share (dang extended cua UNC).
-Prefix \\\\?\\ cho local drive duoc phep (long path, finding F2 cua P1).
+Path tuyet doi: chap nhan absolute path cua host OS qua pathlib
+(Path(p).is_absolute()) VA Windows drive/long-path (ntpath) — de cung mot
+logic chay dung tren Windows va tren Linux (test/CI). UNC bi tu choi o moi
+dang: \\\\server\\share, //server/share, \\\\?\\UNC\\server\\share (dang extended
+cua UNC). Prefix \\\\?\\ cho local drive duoc phep (long path, finding F2 cua P1).
 """
-import re
+import ntpath
 from pathlib import Path
 
 from errors import CommandError
 
-_ABS_DRIVE = re.compile(r"^[A-Za-z]:[\\/]")
 _LONG_PREFIX = "\\\\?\\"
 
 
-def _is_unc(path):
+def is_unc(path):
+    r"""True neu `path` la UNC o bat ky dang nao (\\server\share,
+    //server/share, \\?\UNC\server\share). \\?\D:\... la local, khong phai UNC."""
     if path.startswith(_LONG_PREFIX):
         rest = path[len(_LONG_PREFIX):]
         # \\?\UNC\server\share la UNC dang extended; \\?\D:\... la local
         low = rest.lower()
         return (low.startswith("unc\\") or low.startswith("unc/")
                 or rest.startswith("\\\\") or rest.startswith("//"))
-    return path.startswith("\\\\")
+    return path.startswith("\\\\") or path.startswith("//")
 
+
+def is_absolute(path):
+    r"""True neu `path` absolute theo host OS hoac theo Windows.
+
+    Windows drive va \\?\ long path duoc nhan ca khi host khong phai
+    Windows (test/CI tren Linux). UNC khong nam o day — is_unc tu choi
+    rieng truoc khi goi. notary_v2/document_intake giung logic tuong tu
+    nhung dat local (khong import qua package).
+    """
+    if Path(path).is_absolute():
+        return True
+    return ntpath.isabs(path)
 
 def validate_file_ref(ref):
     """Tra Path da kiem hoac raise CommandError(file_scope_not_supported)."""
@@ -35,11 +50,11 @@ def validate_file_ref(ref):
             f"scope={scope!r}: G1-SM chi chap nhan machine_local")
     if not isinstance(path, str) or not path:
         raise CommandError("validation_error", "file_ref.path rong/khong phai chuoi")
-    if _is_unc(path):
+    if is_unc(path):
         raise CommandError(
             "file_scope_not_supported",
             "UNC path bi tu choi trong G1-SM (mot may)")
-    if not (path.startswith(_LONG_PREFIX) or _ABS_DRIVE.match(path)):
+    if not (path.startswith(_LONG_PREFIX) or is_absolute(path)):
         raise CommandError(
             "file_scope_not_supported",
             "path khong tuyet doi")
