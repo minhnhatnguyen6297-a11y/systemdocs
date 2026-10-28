@@ -2769,6 +2769,8 @@ class CaseWorkspaceService:
                 if ho_ten is not None and not isinstance(ho_ten, str):
                     emit("ho_ten", "invalid_type",
                          "ho_ten phải là chuỗi hoặc null")
+            elif ho_ten is not None and not isinstance(ho_ten, str):
+                emit("ho_ten", "invalid_type", "ho_ten phải là chuỗi")
             elif not isinstance(ho_ten, str) or not ho_ten.strip():
                 emit("ho_ten", "required", "ho_ten bắt buộc")
             if row.get("gioi_tinh") not in (None, *_GENDER_VALUES):

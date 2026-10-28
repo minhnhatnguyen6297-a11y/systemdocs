@@ -403,6 +403,15 @@ class InheritanceWorkspaceService:
             stage, people, ct, allow_unassigned=True)
         field_errors = CaseWorkspaceService(self.db)._validate_stage(
             people, assets, ct)
+        # S19 chỉ nới lỗi THIẾU/rỗng; sai KIỂU (vd ho_ten không phải chuỗi)
+        # vẫn là dữ liệu hỏng -> raise như trước (quyết định kỹ thuật 29/10).
+        type_errors = [e for e in field_errors
+                       if e.get("code") == "invalid_type"]
+        if type_errors:
+            raise WorkspaceError(
+                "stage_validation_error",
+                f"Stage có {len(type_errors)} lỗi kiểu dữ liệu",
+                details={"field_errors": type_errors})
         row_ids = {p.get("row_id") for p in people
                    if isinstance(p, Mapping)}
         _check_person_refs(state, row_ids)
