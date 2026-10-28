@@ -59,4 +59,4 @@
 - Nếu gặp vấn đề mới hoặc không chắc chắn có bằng chứng, hãy tra cứu GitHub để tìm kiếm lời giải/repo/skill tương tự trước khi tự xây từ đầu.
 - Dùng skill `search-first` (repo, package, GitHub, web) và `find-skills` (skills.sh / `npx skills find`) để tìm có hệ thống, không tìm mò.
 - Không mặc định đồng ý với người dùng. Nếu thấy giả định sai hoặc đã có lời giải sẵn, nói rõ bất đồng kèm bằng chứng.
-- Thứ tự trả lời: (1) phát hiện/bất đồng có bằng chứng, (2) nguồn đã tìm (link), (3) rồi mới đề xuất: dùng lại / mở rộng / tự xây. Nói rõ kênh tìm nào không dùng được.
+- Thứ tự trả lời: (1) phát hiện/bất đồng có bằng chứng, (2) nguồn đã tìm, mỗi nguồn BẮT BUỘC kèm URL đầy đủ và đã kiểm tra tồn tại, (3) rồi mới đề xuất: dùng lại / mở rộng / tự xây. Nói rõ kênh tìm nào không dùng được.
