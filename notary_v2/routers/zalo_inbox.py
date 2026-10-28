@@ -53,7 +53,8 @@ from services.zalo_inbox import (
 )
 
 router = APIRouter(prefix="/zalo-inbox", tags=["zalo-inbox"])
-templates = Jinja2Templates(directory="frontend/templates")
+_BASE_DIR = Path(__file__).resolve().parent.parent
+templates = Jinja2Templates(directory=_BASE_DIR / "frontend" / "templates")
 UTC = timezone.utc
 _connector_process: subprocess.Popen | None = None
 _connector_lock = threading.RLock()

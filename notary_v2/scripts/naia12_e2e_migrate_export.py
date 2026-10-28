@@ -2066,20 +2066,22 @@ def run(src_dir: Path, out_dir: Path) -> dict:
                               wtm._norm_key(out_dir).rstrip("\\/")):
         raise ValueError(
             f"e2e_report.json resolve ra ngoài thư mục đích: {report_path}")
+    initial_payload = json.dumps(
+        report, ensure_ascii=False, indent=2).encode("utf-8")
     with open(report_path, "xb") as handle:
-        handle.write(
-            json.dumps(report, ensure_ascii=False, indent=2).encode("utf-8"))
-        report_stat = os.fstat(handle.fileno())
-        report_identity = (report_stat.st_dev, report_stat.st_ino)
+        handle.write(initial_payload)
+        report_identity = _file_key(os.fstat(handle.fileno()))
     # Kiểm nguồn SAU lần ghi cuối — bắt cả file mới (report/export lọt vào
     # nguồn) lẫn sửa nội dung; lệch thì sửa lại report thành kết quả fail.
     # Report phải còn đúng file run tạo Ở CẢ HAI NHÁNH: report bị thay sau
     # capture nhưng nguồn nguyên cũng là failure (review NAIA-12: chỉ nhánh
     # nguồn đổi kiểm ownership nên trả ok=true trên report của file ngoài).
-    # Khi report còn đúng inode run: ghi lại qua fd r+b ràng buộc inode —
-    # KHÔNG stat->unlink (khe thay file giữa hai thao tác). Khi report bị
-    # thay/xoá: GIỮ NGUYÊN file ngoài (không xoá/ghi đè), bản fail ghi sang
-    # e2e_report.failed.json 'xb' — hoặc vào đúng tên chuẩn nếu path trống.
+    # Khi report còn đúng danh tính run (inode + đúng bytes run vừa ghi —
+    # Linux có thể tái dùng inode ngay sau unlink nên inode một mình không
+    # đủ): ghi lại qua fd r+b ràng buộc inode — KHÔNG stat->unlink (khe
+    # thay file giữa hai thao tác). Khi report bị thay/xoá: GIỮ NGUYÊN file
+    # ngoài (không xoá/ghi đè), bản fail ghi sang e2e_report.failed.json
+    # 'xb' — hoặc vào đúng tên chuẩn nếu path trống.
     snapshot_final = _snapshot_source_tree(src_dir)
     source_changed = snapshot_final != snapshot_before
     if source_changed:
@@ -2095,10 +2097,17 @@ def run(src_dir: Path, out_dir: Path) -> dict:
         report_now = report_path.stat()
     except OSError:
         report_now = None
+    report_bytes = b""
+    if report_now is not None:
+        try:
+            report_bytes = report_path.read_bytes()
+        except OSError:
+            report_bytes = b""
     report_missing = report_now is None
     report_foreign = (
         report_missing
-        or (report_now.st_dev, report_now.st_ino) != report_identity)
+        or _file_key(report_now) != report_identity
+        or report_bytes != initial_payload)
     if report_foreign:
         report["ok"] = False
         report["checks"].append({
@@ -2139,7 +2148,7 @@ def run(src_dir: Path, out_dir: Path) -> dict:
             # mở r+b rồi fstat đối chiếu danh tính; file bị thay ngay trong
             # khe kiểm->ghi thì KHÔNG ghi đè file ngoài mà ghi failed.json.
             rewritten = _rewrite_owned_report(
-                report_path, report_identity, payload)
+                report_path, report_identity, initial_payload, payload)
             if not rewritten:
                 report["ok"] = False
                 report["checks"].append({
@@ -2165,8 +2174,15 @@ def run(src_dir: Path, out_dir: Path) -> dict:
     return report
 
 
+def _file_key(stat) -> tuple[int, int]:
+    """(volume, inode) — cặp mà ``unlink`` rồi tạo file khác tại cùng path
+    có thể tái dùng trên Linux; vì vậy nơi gọi so thêm ĐÚNG bytes run ghi."""
+    return (stat.st_dev, stat.st_ino)
+
+
 def _rewrite_owned_report(
-        report_path: Path, identity: tuple[int, int], payload: bytes) -> bool:
+        report_path: Path, identity: tuple[int, int],
+        expected: bytes, payload: bytes) -> bool:
     """Ghi lại report QUA fd ràng buộc inode run tạo — không ``unlink``.
 
     Mở ``r+b``, ``fstat`` trên chính fd đó chứng minh fd trỏ tới inode run
@@ -2180,12 +2196,16 @@ def _rewrite_owned_report(
     except OSError:
         return False
     try:
-        stat = os.fstat(handle.fileno())
-        if (stat.st_dev, stat.st_ino) != identity:
+        if _file_key(os.fstat(handle.fileno())) != identity:
+            return False
+        if handle.read() != expected:
             return False
         handle.seek(0)
         handle.truncate(0)
         handle.write(payload)
+        handle.flush()
+    except OSError:
+        return False
     finally:
         handle.close()
     return True

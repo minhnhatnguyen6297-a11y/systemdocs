@@ -1,0 +1,123 @@
+# CI cho systemdocs. Không skip test: lỗi đã biết nằm trong tools/ci/known-failures-*.txt
+# và chỉ lỗi MỚI làm đỏ job (xem tools/ci/known_failures.py).
+name: ci
+on:
+  pull_request:
+  push:
+    branches: ["agent/**", "consolidate/monorepo"]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  js-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: shell/package-lock.json
+      - uses: actions/setup-python@v5   # 2 test JS gọi `python`
+        with:
+          python-version: "3.12"
+      - name: npm ci
+        working-directory: shell
+        run: npm ci --no-audit --no-fund
+      - name: npm test (TAP)
+        working-directory: shell
+        run: |
+          set +e
+          node --test --test-reporter=tap test/*.test.mjs > ../js-test.tap 2>&1
+          echo "node --test exit=$?"
+          exit 0
+      - name: So với known-failures
+        run: python tools/ci/known_failures.py tap js-test.tap tools/ci/known-failures-js.txt
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: js-test-tap
+          path: js-test.tap
+
+  pytest-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            shell/sidecar/requirements.txt
+            notary_v2/requirements.txt
+      - name: pip install
+        run: |
+          python -m pip install -U pip
+          pip install -r shell/sidecar/requirements.txt -r notary_v2/requirements.txt pytest
+      - name: pytest (sidecar + engine)
+        run: |
+          set +e
+          python -m pytest shell/test notary_v2/tests -q -p no:cacheprovider -rA \
+            --basetemp "$RUNNER_TEMP/pytest" > pytest.txt 2>&1
+          echo "pytest exit=$?"; tail -3 pytest.txt
+          exit 0
+      - name: So với known-failures
+        run: python tools/ci/known_failures.py pytest pytest.txt tools/ci/known-failures-py-linux.txt
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-linux
+          path: pytest.txt
+
+  # App nhắm Windows. Từ khi gộp #15-#19 Windows xanh 0 lỗi => job BẮT BUỘC (không continue-on-error).
+  pytest-windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            shell/sidecar/requirements.txt
+            notary_v2/requirements.txt
+      - name: pip install
+        run: |
+          python -m pip install -U pip
+          pip install -r shell/sidecar/requirements.txt -r notary_v2/requirements.txt pytest
+      - name: pytest
+        shell: bash
+        run: python -m pytest shell/test notary_v2/tests -q -p no:cacheprovider -rA --basetemp "$RUNNER_TEMP/pytest" | tee pytest-win.txt
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-windows
+          path: pytest-win.txt
+
+  # Smoke Electron dưới Xvfb (CDP). Non-blocking ban đầu: GPU/Xvfb trên runner có thể flaky,
+  # và chưa có lần chạy CI nào để đo. Bật blocking sau ~10 lần xanh liên tiếp.
+  e2e-smoke:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: shell/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: sudo apt-get update && sudo apt-get install -y xvfb
+      - run: pip install -r shell/sidecar/requirements.txt -r notary_v2/requirements.txt
+      - working-directory: shell
+        run: npm ci --no-audit --no-fund
+      - run: G1_PYTHON="$(command -v python)" tools/ci/e2e-smoke.sh

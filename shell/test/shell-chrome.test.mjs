@@ -10,6 +10,11 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const RENDERER = path.join(HERE, '..', 'src', 'renderer');
 const read = (rel) => fs.readFileSync(path.join(RENDERER, rel), 'utf8');
+const TOKENS = JSON.parse(fs.readFileSync(
+  path.join(HERE, '..', '..', '_bmad-output', 'specs', 'ui', 'tokens.json'), 'utf8'));
+
+const htmlSrc = read('index.html');
+const stylesSrc = read('styles.css');
 const rendererSrc = read('renderer.js');
 
 function extractSetStatus() {

@@ -33,6 +33,15 @@ function makeFileTokenStore() {
   };
 }
 
+// Basename cross-platform: path Windows (D:\in\anh1.png) phai cat dung
+// ca tren Linux/macOS, nen dung path.win32 khi thay drive/backslash.
+function baseName(p) {
+  const s = String(p || '');
+  return /^[a-zA-Z]:[\\/]/.test(s) || s.includes('\\')
+    ? path.win32.basename(s)
+    : path.basename(s);
+}
+
 // Shape gui renderer tu mot path + fs.Stats: basename de hien thi,
 // KHONG path/scope. st la fs.Stats (isFile()/isDirectory()/size).
 function pickedEntry(store, p, st) {
@@ -45,7 +54,7 @@ function pickedEntry(store, p, st) {
       path: p, scope: 'machine_local',
       size_bytes: sizeBytes, is_dir: isDir,
     }),
-    name: path.basename(p || ''),
+    name: baseName(p),
     size_bytes: sizeBytes,
     is_dir: isDir,
   };

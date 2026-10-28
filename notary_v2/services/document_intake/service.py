@@ -64,8 +64,11 @@ def _log(event: str, **fields: Any) -> None:
 
 
 def _is_unc(path: str) -> bool:
+    # Logic UNC cua shell/sidecar/fileref.py, dat local: notary_v2 chay
+    # standalone (web app), khong duoc phu thuoc import sang shell/sidecar.
     if path.startswith(_LONG_PREFIX):
         rest = path[len(_LONG_PREFIX):]
+        # \\?\UNC\server\share la UNC dang extended; \\?\D:\... la local
         low = rest.lower()
         return (
             low.startswith("unc\\")
@@ -76,9 +79,16 @@ def _is_unc(path: str) -> bool:
     return path.startswith("\\\\") or path.startswith("//")
 
 
-def _is_abs(path: str) -> bool:
-    posix_absolute = os.name != "nt" and path.startswith("/") and not path.startswith("//")
-    return path.startswith(_LONG_PREFIX) or bool(_ABS_DRIVE.match(path)) or posix_absolute
+def _is_abs(path: str, *, windows: Optional[bool] = None) -> bool:
+    # Absolute theo host OS (pathlib) HOAC theo Windows drive/long path
+    # (ntpath, _ABS_DRIVE) — chay dung ca tren Windows lan Linux (test/CI).
+    # Path goc khong o dia (\foo, /foo) KHONG absolute tren Windows
+    # (review PR #25 — ntpath.isabs tren Python 3.12 tra True cho \foo).
+    if path.startswith(_LONG_PREFIX) or _ABS_DRIVE.match(path):
+        return True
+    if windows is None:
+        windows = os.name == "nt"
+    return (not windows) and path.startswith("/") and not path.startswith("//")
 
 
 def _validate_sources(sources: Any) -> list[SourceSpec]:

@@ -1,0 +1,27 @@
+# gitleaks (https://github.com/gitleaks/gitleaks-action) + actionlint (https://github.com/rhysd/actionlint).
+name: security-lint
+on:
+  pull_request:
+  push:
+    branches: ["agent/**", "consolidate/monorepo"]
+permissions:
+  contents: read
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE chỉ cần cho repo thuộc organization; repo cá nhân không cần.
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: actionlint
+        run: |
+          bash <(curl -sSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash) 1.7.7
+          ./actionlint -color

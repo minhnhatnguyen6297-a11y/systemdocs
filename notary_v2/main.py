@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from pathlib import Path
 from time import perf_counter
 
 from dotenv import load_dotenv
@@ -129,8 +130,10 @@ async def http_timing_log(request: Request, call_next):
     return response
 
 
-app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
-templates = Jinja2Templates(directory="frontend/templates")
+BASE_DIR = Path(__file__).resolve().parent
+
+app.mount("/static", StaticFiles(directory=BASE_DIR / "frontend" / "static"), name="static")
+templates = Jinja2Templates(directory=BASE_DIR / "frontend" / "templates")
 
 app.include_router(customers.router, prefix="/customers", tags=["Khach hang"])
 app.include_router(properties.router, prefix="/properties", tags=["Tai san"])

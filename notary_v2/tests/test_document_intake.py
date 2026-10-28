@@ -21,6 +21,7 @@ from services.document_intake import (
 )
 from services.document_intake.docx_source import read_docx
 from services.document_intake import service as document_intake_service
+from services.document_intake.service import _is_abs, _is_unc
 
 
 def _sid(n):
@@ -334,6 +335,38 @@ class SourceValidationTests(unittest.TestCase):
         with self.assertRaises(IntakeError) as cm:
             analyze([src])
         self.assertEqual(cm.exception.code, "validation_error")
+
+
+class PathHelperTests(unittest.TestCase):
+    r"""Helper absolute/UNC local cua document_intake — dung cho Windows
+    drive, \\?\ long path, POSIX absolute; tu choi relative va UNC."""
+
+    def test_is_abs_windows_drive(self):
+        for p in ("D:\\intake\\f.pdf", "X:/tmp/a.jpg", "z:\\x"):
+            self.assertTrue(_is_abs(p), p)
+
+    def test_is_abs_long_prefix(self):
+        self.assertTrue(_is_abs("\\\\?\\D:\\duong\\dan.pdf"))
+
+    def test_is_abs_posix_absolute(self):
+        self.assertTrue(_is_abs("/home/user/a.pdf", windows=False))
+        self.assertFalse(_is_abs("/home/user/a.pdf", windows=True))
+
+    def test_is_abs_relative_rejected(self):
+        for p in ("docs/x.pdf", "a.pdf", "./x", "..\\y"):
+            self.assertFalse(_is_abs(p), p)
+
+    def test_is_unc_forms(self):
+        for p in ("\\\\server\\share\\f.pdf",
+                  "//server/share/f.pdf",
+                  "\\\\?\\UNC\\server\\share\\f.pdf"):
+            self.assertTrue(_is_unc(p), p)
+
+    def test_is_unc_long_prefix_local_not_unc(self):
+        self.assertFalse(_is_unc("\\\\?\\D:\\duong\\dan.pdf"))
+        self.assertFalse(_is_unc("D:\\a.pdf"))
+        self.assertFalse(_is_unc("/home/u/a.pdf"))
+
 
 
 class ShapeInvariantTests(unittest.TestCase):

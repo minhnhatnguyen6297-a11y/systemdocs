@@ -142,3 +142,16 @@
 
 - Khi xong, tạo commit nhỏ, rõ ràng. Trước khi xóa hoặc move hàng loạt, tạo commit
   bảo lưu; hỏi owner nếu phạm vi chưa rõ.
+
+## Luật cho coder agent
+
+- **Review bắt buộc trước khi báo xong**: chạy Superpowers `requesting-code-review`
+  hoặc agent Reviewer trên diff; xử lý góp ý hoặc ghi lý do.
+- Không dùng `git stash` (dùng commit WIP hoặc worktree riêng). Không code trên `main`.
+- **Tìm trên GitHub trước** khi tự viết công cụ/pattern; ghi URL đã tham khảo.
+- Quyết định nhỏ: tự quyết và ghi lại. Thay đổi kiến trúc, schema/contract hoặc
+  dependency: dừng, báo các phương án + đánh đổi, chờ owner.
+- Báo cáo phải có lệnh đã chạy + output (kể cả lỗi, bước bị bỏ qua), tách đã kiểm
+  chứng / chưa kiểm chứng, và nêu giả định.
+- Không skip test để cho xanh: lỗi đã biết ghi vào `tools/ci/known-failures-*.txt`
+  kèm issue ref. Chuẩn "xong": `docs/definition-of-done.md`.

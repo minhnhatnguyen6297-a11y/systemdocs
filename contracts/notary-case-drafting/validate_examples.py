@@ -16,6 +16,7 @@ trạng thái server giả định để validator kiểm rule ngữ cảnh:
 """
 import json
 import ntpath
+import os
 import re
 import sys
 from pathlib import Path
@@ -250,6 +251,11 @@ def is_abs_local(p):
         return True
     if p.startswith("\\\\"):
         return False                      # UNC
+    if os.name != "nt" and p.startswith("/") and not p.startswith("//"):
+        # Host POSIX (test/CI Linux): path tuyệt đối của host là local,
+        # giống shell/sidecar/fileref.is_absolute (#15). Trên Windows
+        # không đổi gì.
+        return True
     return bool(re.match(r"^[A-Za-z]:[\\/]", p))
 
 

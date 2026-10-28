@@ -1,0 +1,18 @@
+# Cấu hình gitleaks: rule mặc định + allowlist cho false positive đã xác minh 2026-10-28
+# (quét toàn lịch sử 612 commit: 48218 hit, 100% rule generic-api-key, đều không phải secret).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "False positive đã xác minh thủ công"
+paths = [
+  # source_key/row_key dạng 'diaphanhanhchinhcapxa_2025.<số>' (mã đơn vị hành chính công khai)
+  '''notary_v2/data/administrative_units/ledger\.json''',
+  '''\.agents/review-plan-20261004/evidence/address-extra\.json''',
+  # sha256 của file nguồn trong manifest snapshot
+  '''zalo/SNAPSHOT_MANIFEST\.json''',
+]
+regexes = [
+  # tên file fixture '*_HS-99.docx' (cạnh auth_short_...) bị nhận nhầm là key
+  '''^[A-Za-z_]*HS-\d+\.docx$''',
+]
