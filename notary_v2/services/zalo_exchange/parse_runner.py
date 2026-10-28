@@ -26,6 +26,7 @@ from typing import Any
 from sqlalchemy import text as _sa_text
 from sqlalchemy.orm import Session
 
+from pii_redact import redact_exception
 from models import ZaloIntakeResult, ZaloParseJob, ZaloRawRecord
 from services.document_intake import ocr_pipeline as _ocr
 
@@ -37,8 +38,9 @@ _MAX_ERROR_CHARS = 500
 
 
 def _sanitize_error(exc: BaseException) -> str:
-    """Loi gon cho `zalo_parse_jobs.error` — khong stack trace, cat ngan."""
-    message = f"{type(exc).__name__}: {exc}"
+    """Loi gon cho `zalo_parse_jobs.error` — khong stack trace, cat ngan,
+    da che PII/duong dan/token (pii_redact)."""
+    message = redact_exception(exc)
     message = " ".join(str(message).split())
     return message[:_MAX_ERROR_CHARS]
 

@@ -12,6 +12,7 @@ const { sidecarCommand, SHELL_VERSION, stripNotaryMockEnv } =
   require('./config');
 const { makeLogger, redactString } = require('./redact');
 const { SidecarManager } = require('./sidecar');
+const { makeRotatingStream } = require('./rotating-log');
 const { JobTracker } = require('./job-tracker');
 const { registerIpc } = require('./ipc');
 const { makeFileTokenStore, pickedEntry } = require('./file-tokens');
@@ -321,16 +322,20 @@ async function start() {
   const logDir = path.join(app.getPath('userData'), 'logs');
   fs.mkdirSync(logDir, { recursive: true });
   logPath = path.join(logDir, 'main.log');
-  const fileStream = fs.createWriteStream(logPath, { flags: 'a' });
+  // main.log + sidecar.log xoay vong 5 MB x 3 ban; tools/file-bug.sh doc
+  // mac dinh tu day. Moi dong da qua redact (makeLogger).
+  const fileStream = makeRotatingStream(logPath);
+  const sidecarFile = makeRotatingStream(path.join(logDir, 'sidecar.log'));
   const stderr = process.stderr;
   log = makeLogger({ write: (s) => { fileStream.write(s); stderr.write(s); } });
+  const sidecarLog = makeLogger({ write: (s) => { sidecarFile.write(s); fileStream.write(s); stderr.write(s); } });
   // G1_DEV_NOTARY_MOCK (MIN-106): dev truyen xuong sidecar qua env ke thua;
   // packaged luon strip truoc khi spawn — mock khong bao gio chay packaged.
   stripNotaryMockEnv(app.isPackaged, log);
   const cmd = sidecarCommand(
     app.isPackaged, process.resourcesPath, SHELL_ROOT,
     { buildLabel: isTestBuild() ? 'test' : 'production' });
-  sidecar = new SidecarManager({ command: cmd, logger: log });
+  sidecar = new SidecarManager({ command: cmd, logger: log, outputLogger: sidecarLog });
   tracker = new JobTracker({ sidecar, logger: log });
   tracker.on('job', (job) => {
     if (win) win.webContents.send('desktop.v1.jobUpdate', job);

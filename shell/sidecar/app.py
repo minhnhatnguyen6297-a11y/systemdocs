@@ -20,6 +20,7 @@ from errors import CommandError, error_object
 from fileref import validate_file_ref
 from job_repository import JobRepository
 from jobstore import JobStore
+import pii_redact
 
 CONTRACT_VERSION = "desktopcommand.v1"
 # desktopcommand.v1 = envelope transport; upload.workflow.v1 = workflow
@@ -29,6 +30,9 @@ ENGINE_VERSION = "g1-shell-sidecar/0.1.0"
 ENGINE_INSTANCE_ID = uuid.uuid4().hex  # doi moi moi lan process start — §5 restart
 
 TOKEN = os.environ.get("SIDECAR_TOKEN")
+# Che PII/duong dan/token o moi stdout/stderr + logging truoc khi Electron
+# ghi vao sidecar.log (bug-evidence: log co the bi dinh kem vao issue).
+pii_redact.install(secrets=(TOKEN,))
 if not TOKEN:
     print("FATAL: thieu SIDECAR_TOKEN", file=sys.stderr)
     sys.exit(2)
@@ -57,7 +61,8 @@ def _build_store():
         return JobStore(
             repository=JobRepository(upload_workspace.workspace_db_path()))
     except Exception as exc:  # noqa: BLE001 — boot khong duoc chet vi journal
-        print(f"WARN: job repository khong mo duoc ({exc}) — "
+        print(f"WARN: job repository khong mo duoc "
+              f"({pii_redact.redact_exception(exc)}) — "
               "chay in-memory", file=sys.stderr)
         return JobStore()
 
