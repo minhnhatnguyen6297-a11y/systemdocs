@@ -389,6 +389,133 @@ test('chip own/receive doc lap, multi-select, disable > so asset', async () => {
   assert.deepEqual(n.receivePositions, []);
 });
 
+// ---------- nhắc "Chưa tick Nhận" (display-only) ----------
+
+function reminderNodes(root) {
+  return byCls(root, 'cd-receive-reminder');
+}
+
+function receiveChipOf(root, nodeId) {
+  const card = collect(root, (e) => e.dataset.nodeId === nodeId)[0];
+  if (!card) return null;
+  const rows = collect(card, (e) => e.classList.contains('cd-posrow'));
+  const recvRow = rows.find((r) => collect(r,
+    (e) => e.classList.contains('cd-posrow-label'))[0]?.textContent === 'Nhận');
+  return recvRow
+    ? collect(recvRow, (e) => e.classList.contains('cd-poschip'))[0] : null;
+}
+
+test('nhac Chua tick Nhan: ten la nut nhay toi chip, an theo tung nguoi, khong doi du lieu', async (t) => {
+  const { model, view } = await build(t, { mode: 'case', seed: {
+    people: INH_PEOPLE,
+    assets: [{ row_id: 'a1', so_serial: 'S1' }],
+    nodes: seedSlots().map((n) => {
+      if (n.id === 'owner') return { ...n, personId: 'c1', ownPositions: [1] };
+      if (n.id === 'spouse') return { ...n, personId: 'c2' };
+      if (n.id === 'child_1') return { ...n, personId: 'c3' };
+      return n;
+    }) } });
+  // c1 đã mất (Chủ đất); c2/c3 còn sống, chưa tick Nhận → được nhắc.
+  const hints = byCls(view.el, 'cd-receive-reminder');
+  assert.equal(hints.length, 1);
+  assert.ok(hints[0].textContent.includes('Chưa tick Nhận cho'));
+  assert.ok(hints[0].textContent.includes('— tick để tính phần thừa kế.'));
+  const names = collect(hints[0], (e) =>
+    e.classList.contains('cd-receive-reminder-name'))
+    .map((b) => b.textContent);
+  assert.deepEqual(names, ['Vợ Hai', 'Con Ba']);
+  // Card nhỏ: hint trên thẻ người chưa tick, không trên thẻ Chủ đất.
+  const cardHasHint = (id) => {
+    const card = collect(view.el, (e) => e.dataset.nodeId === id)[0];
+    return !!collect(card, (e) =>
+      e.classList.contains('cd-receive-hint')).length;
+  };
+  assert.ok(cardHasHint('spouse') && cardHasHint('child_1'));
+  assert.ok(!cardHasHint('owner'));
+  // Bấm tên → focus + nháy chip Nhận đầu tiên của thẻ người đó.
+  const nameBtn = collect(hints[0], (e) =>
+    e.classList.contains('cd-receive-reminder-name'))[0];
+  nameBtn.click();
+  const chip = receiveChipOf(view.el, 'spouse');
+  assert.ok(chip.classList.contains('cd-receive-flash'));
+  assert.equal(document.activeElement, chip);
+  // Tick Nhận cho Vợ Hai → hint theo người biến mất, Con Ba vẫn được nhắc.
+  chip.click();
+  assert.deepEqual(
+    model.state.diagram.nodes.find((n) => n.id === 'spouse').receivePositions,
+    [1]);
+  const names2 = collect(byCls(view.el, 'cd-receive-reminder')[0], (e) =>
+    e.classList.contains('cd-receive-reminder-name'))
+    .map((b) => b.textContent);
+  assert.deepEqual(names2, ['Con Ba']);
+  assert.ok(!cardHasHint('spouse') && cardHasHint('child_1'));
+});
+
+test('nhac Chua tick Nhan: khong hien khi khong asset co chu, nguoi da mat, hoac hai ben', async (t) => {
+  // Owner chưa gán → không tài sản nào có chủ → không nhắc dù c2/c3 sống.
+  const a = await build(t, { mode: 'case', seed: {
+    people: INH_PEOPLE,
+    assets: [{ row_id: 'a1', so_serial: 'S1' }],
+    nodes: seedSlots().map((n) => {
+      if (n.id === 'spouse') return { ...n, personId: 'c2' };
+      if (n.id === 'child_1') return { ...n, personId: 'c3' };
+      return n;
+    }) } });
+  assert.equal(reminderNodes(a.view.el).length, 0);
+  // Người đã mất (c1) chưa tick Nhận → không nhắc.
+  const b = await build(t, { mode: 'case', seed: {
+    people: INH_PEOPLE,
+    assets: [{ row_id: 'a1', so_serial: 'S1' }],
+    nodes: seedSlots().map((n) => {
+      if (n.id === 'owner') return { ...n, personId: 'c1', ownPositions: [1] };
+      if (n.id === 'spouse') return { ...n, personId: 'c1' };
+      return n;
+    }) } });
+  assert.equal(reminderNodes(b.view.el).length, 0);
+  // Sơ đồ hai bên không có nhắc.
+  const c = await build(t, { mode: 'draft-tp' });
+  assert.equal(reminderNodes(c.view.el).length, 0);
+});
+
+test('nhac Chua tick Nhan: hien dau breakdown "Xem cach tinh", khong doi ket qua engine', async (t) => {
+  const client = {
+    run: async () => ({ ok: true, data: { evaluated_revision: 3,
+      render_model: {
+        status: 'complete',
+        allocations: { c3: { finalShare: '29/51', displayPercent: '56.86' } },
+        breakdowns: [{ personId: 'c3', total: '29/51', terms: [
+          { kind: 'base', fraction: '1/51' },
+          { kind: 'inheritance', fraction: '2/17', sourcePersonId: 'c1',
+            heirRank: 2, relationshipRoles: ['grandparent'],
+            viaBranchPersonIds: [] },
+        ] }],
+        requiredSlots: [], warnings: [], errors: [], unresolvedEstates: [],
+      } } }),
+  };
+  const { view } = await build(t, { mode: 'case', client,
+    seed: { people: INH_PEOPLE,
+            assets: [{ row_id: 'a1', so_serial: 'S1' }],
+            nodes: seedSlots().map((n) => {
+              if (n.id === 'owner') {
+                return { ...n, personId: 'c1', ownPositions: [1] };
+              }
+              if (n.id === 'spouse') return { ...n, personId: 'c2' };
+              if (n.id === 'child_1') return { ...n, personId: 'c3' };
+              return n;
+            }) } });
+  await findBtns(view.el, 'Xem cách tính')[0].onclick();
+  const calc = byCls(view.el, 'cd-calc')[0];
+  const kids = calc.children ? calc.children : collect(calc, () => true);
+  // Nhắc nằm trên cùng, trước "Trạng thái tính".
+  assert.ok(kids[0].classList.contains('cd-receive-reminder'));
+  assert.ok(kids[1].textContent.startsWith('Trạng thái tính:'));
+  // Kết quả engine giữ nguyên từng ký tự — nhắc chỉ là lớp hiển thị.
+  const lines = byCls(view.el, 'cd-explain').map((e) => e.textContent);
+  assert.equal(lines[0], 'cơ bản: 1/51');
+  assert.match(lines[1], /thừa kế: 2\/17 · từ Người Đã Lưu · hàng 2/);
+  assert.match(calc.textContent, /56\.86%/);
+});
+
 // ---------- layoutInheritance (pure) ----------
 
 test('layoutInheritance: gen tu parentSlotIds, spouse ke nhau', () => {

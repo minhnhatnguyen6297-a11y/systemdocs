@@ -619,6 +619,9 @@ function createDiagramPane(ctx) {
   let currentDiagramRegion = null;
   let currentSaveBtn = null;
   let currentRenderPool = null;
+  // Vùng diagram gần nhất — gốc dò chip Nhận cho nút tên trong nhắc
+  // "Chưa tick Nhận" (stub DOM không có querySelector toàn document).
+  let lastDiagramRegion = null;
   // row_id → fn cập nhật nhãn nắm kéo trên Pool card khi tên được gõ
   // trong bảng Người (tránh re-render cả pane khi đang focus ô nhập).
   let syncPersonRowNameFns = new Map();
@@ -707,6 +710,77 @@ function createDiagramPane(ctx) {
 
   function nodeById(id) {
     return liveNodes().find((n) => n.id === id) || null;
+  }
+
+  // Nhắc "Chưa tick Nhận" (chỉ hiển thị — display-only): người CÒN SỐNG
+  // đặt ở vai trò thừa kế (không phải ô Chủ đất) nhưng chưa tick chip
+  // Nhận nào, khi sơ đồ có ít nhất một tài sản đã có chủ. KHÔNG tự tick,
+  // KHÔNG coi chưa tick là từ chối — kết quả engine giữ nguyên.
+  function receiveReminderPeople() {
+    if (isTp()) return [];
+    const assetCount = (model.state.stage.assets || []).length;
+    if (!assetCount) return [];
+    const owner = nodeById('owner');
+    const hasOwnedAsset = !!(owner &&
+      Array.isArray(owner.ownPositions) &&
+      owner.ownPositions.some((pos) => pos >= 1 && pos <= assetCount));
+    if (!hasOwnedAsset) return [];
+    const seen = new Set();
+    const out = [];
+    for (const n of liveNodes()) {
+      if (!n.personId || n.id === 'owner' || seen.has(n.personId)) continue;
+      const p = personRow(n.personId);
+      if (!p || p.ngay_chet) continue; // chỉ người còn sống
+      if (Array.isArray(n.receivePositions) && n.receivePositions.length) {
+        continue; // đã tick Nhận — ẩn nhắc cho người này
+      }
+      seen.add(n.personId);
+      out.push({ nodeId: n.id, personId: n.personId,
+                 name: personName(n.personId) });
+    }
+    return out;
+  }
+
+  function receiveReminderEl() {
+    const missing = receiveReminderPeople();
+    if (!missing.length) return null;
+    const wrap = h('div', 'cd-receive-reminder');
+    wrap.setAttribute('role', 'status');
+    wrap.append(h('span', '', 'Chưa tick Nhận cho'));
+    missing.forEach((m, i) => {
+      if (i) wrap.append(h('span', '', ','));
+      const b = btn(m.name, 'cd-receive-reminder-name', () => {
+        focusReceiveChip(m.nodeId);
+      });
+      b.dataset.personId = m.personId;
+      wrap.append(b);
+    });
+    wrap.append(h('span', '', '— tick để tính phần thừa kế.'));
+    return wrap;
+  }
+
+  // Bấm tên → cuộn tới/tập trung chip Nhận đầu tiên của người đó và
+  // nháy sáng ngắn (class tạm thời — không đổi dữ liệu).
+  function focusReceiveChip(nodeId) {
+    const root = lastDiagramRegion || uiRoot();
+    const card = root && typeof root.querySelector === 'function'
+      ? root.querySelector(`[data-node-id="${nodeId}"]`) : null;
+    if (!card) return;
+    let target = null;
+    for (const row of card.querySelectorAll('.cd-posrow')) {
+      const lb = row.querySelector('.cd-posrow-label');
+      if (lb && lb.textContent === 'Nhận') {
+        target = row.querySelector('.cd-poschip');
+        break;
+      }
+    }
+    const flash = target || card;
+    flash.classList.add('cd-receive-flash');
+    if (typeof flash.scrollIntoView === 'function') {
+      flash.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+    if (typeof flash.focus === 'function') flash.focus();
+    setTimeout(() => flash.classList.remove('cd-receive-flash'), 1600);
   }
 
   // Nhan identity cua slot — voi o DA GAN nguoi: vai tro theo quan he +
@@ -1241,6 +1315,12 @@ function createDiagramPane(ctx) {
       }
       card.append(wrap);
     }
+    // Nhắc nhỏ trên card người sống ở vai trò thừa kế chưa tick Nhận nào
+    // (chỉ hiển thị — không tự tick, không coi là từ chối).
+    if (n.personId && n.id !== 'owner' &&
+        receiveReminderPeople().some((m) => m.nodeId === n.id)) {
+      card.append(h('div', 'cd-receive-hint', 'Chưa tick Nhận'));
+    }
 
     // Drag: nguoi tren node keo di — cung payload Pool card.
     if (n.personId && !ro) {
@@ -1477,6 +1557,9 @@ function createDiagramPane(ctx) {
     }
     const status = displayCalcStatus(rm);
     const statusLabel = CALC_STATUS_LABEL[status] || status;
+    // Nhắc tick Nhận — đặt trên cùng của breakdown, trước trạng thái.
+    const recvReminder = receiveReminderEl();
+    if (recvReminder) box.append(recvReminder);
     box.append(h('div', 'cd-calc-status',
       `Trạng thái tính: ${statusLabel}`));
     if (status === 'unsupported') {
@@ -1742,6 +1825,9 @@ function createDiagramPane(ctx) {
     // vùng khác không nhảy khi lỗi xuất hiện/biến mất.
     const errSlot = h('div', 'cd-diagram-errslot');
     extra.append(errSlot);
+    // Nhắc tick Nhận cho người sống chưa tick (display-only).
+    const recvReminder = receiveReminderEl();
+    if (recvReminder) extra.append(recvReminder);
     // MIN-136: chu dat DA GAN nhung chua co ngay mat → engine khong
     // spawn nhanh (dung nghiep vu — thua ke chi phat sinh khi co nguoi
     // chet). Hint user dien Ngay mat o bang Nguoi; evaluate tu chay lai
@@ -1818,6 +1904,7 @@ function createDiagramPane(ctx) {
     }
     if (calcOpen) extra.append(calcPanelEl());
     dg.append(extra);
+    lastDiagramRegion = dg;
     return dg;
   }
 

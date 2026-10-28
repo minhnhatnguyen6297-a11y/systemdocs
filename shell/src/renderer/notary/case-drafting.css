@@ -862,6 +862,36 @@
 }
 .cd-poschip:focus-visible { outline: 2px solid var(--focus-ring); }
 .cd-poschip:disabled { opacity: .45; }
+/* Nhắc "Chưa tick Nhận" — display-only, không đổi dữ liệu/engine. */
+.cd-receive-reminder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  font-size: var(--cd-fs-data);
+}
+.cd-receive-reminder-name {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.cd-receive-hint {
+  font-size: 11px;
+  color: #92400e;
+  margin-top: 2px;
+}
+/* Nháy sáng ngắn khi bấm tên trong nhắc — tạm thời, class tự gỡ. */
+.cd-receive-flash { outline: 2px solid var(--focus-ring); }
 .cd-badge {
   display: inline-block;
   padding: 1px 6px;
