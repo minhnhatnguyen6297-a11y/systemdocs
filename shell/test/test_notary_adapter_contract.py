@@ -254,7 +254,7 @@ def _seed_case(sess, loai_van_ban="khai_nhan"):
             "diagram": {"state": {
                 "version": 3, "domain": "inheritance",
                 "nodes": [{"id": "owner", "personId": person_row_id,
-                           "parentSlotIds": [], "spouseSlotId": None,
+                           "parentSlotIds": [], "spouseSlotIds": [],
                            "ownPositions": [1], "receivePositions": [],
                            "hidden": False, "deleted": False}]},
                 "render_model": None}}
@@ -288,8 +288,8 @@ def _person_row(entity_id=None, **kw):
 def _asset_row(entity_id=None, **kw):
     row = {
         "row_id": _uuid4(), "entity_id": entity_id,
-        "so_serial": "AA123456", "so_vao_so": None, "so_thua_dat": None,
-        "so_to_ban_do": None, "dia_chi": "1 duong test", "loai_so": None,
+        "so_serial": "AA123456", "so_vao_so": None, "so_thua_dat": "1",
+        "so_to_ban_do": "1", "dia_chi": "1 duong test", "loai_so": None,
         "hinh_thuc_su_dung": None, "thoi_han": None, "nguon_goc": None,
         "ngay_cap": None, "co_quan_cap": None, "land_rows": None,
     }
@@ -318,7 +318,8 @@ def _diagram_node(nid, person_id=None, parents=(), spouse=None,
                   own=(), receive=(), hidden=False, deleted=False):
     """diagram node v3 (§13.4)."""
     return {"id": nid, "personId": person_id,
-            "parentSlotIds": list(parents), "spouseSlotId": spouse,
+            "parentSlotIds": list(parents),
+            "spouseSlotIds": [spouse] if spouse else [],  # D-041
             "ownPositions": list(own), "receivePositions": list(receive),
             "hidden": hidden, "deleted": deleted}
 
@@ -587,8 +588,9 @@ def test_workspace_commit_stage_is_primary_rejected(adapter_db):
 
 def test_workspace_commit_stage_asset_limit(adapter_db):
     case, deceased, prop = _seed_case(adapter_db)
+    # S7 (owner 23/10): trần 5 tài sản -> 6 dòng mới vượt.
     assets = [_asset_row()] + [
-        _asset_row(so_serial=f"AA{i:06d}") for i in range(3)]
+        _asset_row(so_serial=f"AA{i:06d}") for i in range(5)]
     p = _commit_inheritance(
         case.id, 1, [_person_row()], assets)
     with pytest.raises(CommandError) as exc:
@@ -798,7 +800,8 @@ def test_diagram_evaluate_contract_shape(adapter_db):
     assert data["evaluated_revision"] == 2
     rm = data["render_model"]
     assert rm["engineVersion"] == 2
-    assert rm["status"] in ("incomplete", "complete", "invalid")
+    # WP1: ENABLE_LATER_LINES=False -> chỉ Chủ đất, không hàng 1 = unsupported.
+    assert rm["status"] in ("incomplete", "complete", "invalid", "unsupported")
     assert rm["allocations"][owner_row]["baseShare"] == "1"
 
 
@@ -843,7 +846,7 @@ def test_diagram_evaluate_legacy_node_flags_invalid(adapter_db):
 def test_diagram_evaluate_position_out_of_range(adapter_db):
     case, owner_row = _committed_case(adapter_db)
     state = _v3_state([
-        _diagram_node("owner", owner_row, own=[4])])
+        _diagram_node("owner", owner_row, own=[6])])  # S7: vị trí 1..5
     with pytest.raises(CommandError) as exc:
         notary_adapter.diagram_evaluate(_Job(), _eval_payload(case.id, state))
     assert exc.value.code == "diagram_invalid_state"
@@ -906,7 +909,12 @@ def test_diagram_save_persists_and_bumps_revision(adapter_db):
     data = res["data"]
     assert data["schema_version"] == SCHEMA
     assert data["revision"] == 3
-    assert data["diagram"]["state"] == state
+    # Server chuẩn hóa node (thêm spouseSlotId/spouseSuggestionId dẫn xuất, D-041).
+    saved_state = data["diagram"]["state"]
+    assert {k: v for k, v in saved_state.items() if k != "nodes"} == \
+        {k: v for k, v in state.items() if k != "nodes"}
+    for got, sent in zip(saved_state["nodes"], state["nodes"], strict=True):
+        assert {k: got[k] for k in sent} == sent
     assert data["diagram"]["state"]["domain"] == "inheritance"
     assert data["diagram"]["render_model"]["engineVersion"] == 2
     adapter_db.refresh(case)
@@ -1025,8 +1033,8 @@ def test_diagram_save_incomplete_reopen_keeps_warning(adapter_db):
     rm = saved["data"]["diagram"]["render_model"]
     codes = [w["code"] for w in rm["warnings"]]
     assert "diagram.unassigned_pool_person" in codes
-    assert rm["status"] == "incomplete"
-    assert rm["requiredSlots"]
+    # WP1: chưa có hàng 1 -> unsupported (ENABLE_LATER_LINES=False).
+    assert rm["status"] == "unsupported"
 
     reopened = notary_adapter.workspace_get(_Job(), {"case_id": case.id})
     assert reopened["data"]["diagram"]["render_model"] == rm
@@ -1068,7 +1076,7 @@ def test_workspace_commit_stage_keeps_unassigned_pool_warning(adapter_db):
     rm = commit["diagram"]["render_model"]
     codes = [w["code"] for w in rm["warnings"]]
     assert "diagram.unassigned_pool_person" in codes
-    assert rm["status"] == "incomplete"
+    assert rm["status"] == "unsupported"  # WP1
 
     reopened = notary_adapter.workspace_get(_Job(), {"case_id": case.id})
     stored = reopened["data"]["diagram"]["render_model"]
@@ -1680,12 +1688,7 @@ def test_workspace_create_owner_pointer_rules(adapter_db):
 
 def test_workspace_create_entity_id_and_stage_errors(adapter_db):
     people, assets, state = _create_args()
-    # entity_id non-null trên dòng mới -> stage_validation_error
-    bad_people = [dict(people[0], entity_id=5), people[1]]
-    with pytest.raises(CommandError) as exc:
-        notary_adapter.workspace_create(
-            _Job(), _inheritance_create(bad_people, assets, state))
-    assert exc.value.code == "stage_validation_error"
+    # 8688107: entity_id là hint nội bộ — không chặn Lưu (bỏ assert cũ).
     # Sai kiểu tên vẫn lỗi (nháp chỉ nới null, không nới type).
     bad_name = [dict(people[0], ho_ten=5), people[1]]
     with pytest.raises(CommandError) as exc:
@@ -1849,7 +1852,8 @@ def test_diagram_evaluate_draft_requires_stage(adapter_db):
 
 def test_diagram_evaluate_draft_stage_errors(adapter_db):
     stage = _draft_stage()
-    stage["people"][0]["ho_ten"] = "   "
+    # S4: nháp nới chuỗi rỗng -> null; sai KIỂU vẫn lỗi.
+    stage["people"][0]["ho_ten"] = 5
     with pytest.raises(CommandError) as exc:
         notary_adapter.diagram_evaluate(_Job(), {
             "stage": stage,
