@@ -371,11 +371,17 @@ def case_create(job, payload):
         except ws.WorkspaceError as exc:
             raise CommandError("validation_error", exc.message,
                                details=exc.details) from exc
-        case = sess.get(models.InheritanceCase, data["case"]["id"])
+        case_id = data["case"]["id"]
         # Cột legacy giữ cho case_get/participant (không phải nguồn Word).
-        case.nguoi_chet_id = nguoi_id
-        case.tai_san_id = tai_san_id
+        # Giữ nguyên mốc lưu của create (một lần lưu = một mốc): ghi
+        # updated_at tường minh để onupdate không đóng mốc thứ hai.
+        tbl = models.InheritanceCase.__table__
+        sess.execute(
+            tbl.update().where(tbl.c.id == case_id).values(
+                nguoi_chet_id=nguoi_id, tai_san_id=tai_san_id,
+                updated_at=tbl.c.updated_at))
         sess.commit()
+        case = sess.get(models.InheritanceCase, case_id)
         sess.refresh(case)
         return _result("case_created", {"case": _case_row(case)})
     finally:

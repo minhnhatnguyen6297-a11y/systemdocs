@@ -2073,11 +2073,15 @@ def test_legacy_case_create_stamps_microsecond(adapter_db, monkeypatch):
     """NA `case_create` legacy đóng mốc lưu microsecond như mọi writer."""
     sess = adapter_db
     customer = Customer(ho_ten="Khách Legacy")
-    prop = Property(so_serial="LEGACY 001")
+    # S5b: case_create đi qua CaseWorkspaceService → thửa/tờ bắt buộc.
+    prop = Property(so_serial="LEGACY 001", so_thua_dat="12", so_to_ban_do="7")
     sess.add_all([customer, prop])
     sess.commit()
     stamp = datetime(2026, 10, 22, 9, 0, 0, 654321)
     monkeypatch.setattr(engine_models, "case_saved_at", lambda: stamp)
+    # Storage B: case_create tạo qua CaseWorkspaceService (writer đóng mốc).
+    from services import case_workspace as _cw
+    monkeypatch.setattr(_cw, "case_saved_at", lambda: stamp)
     res = notary_adapter.case_create(_Job(), {
         "nguoi_chet_id": customer.id, "tai_san_id": prop.id,
         "loai_van_ban": "khai_nhan"})

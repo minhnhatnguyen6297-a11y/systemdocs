@@ -786,7 +786,7 @@ T.T11 = async () => {
   check('living A: no Cha/Mẹ/Con slots', ['Cha', 'Mẹ', 'Con'].every((r) => emptyOf(nodes, r).length === 0) && !nodes.some((n) => (n.label || '').includes(`của ${U.C})`)), nodes.map((n) => n.label));
   check('living A: Vợ/chồng slot exists', nodes.some((n) => /Vợ\/chồng/.test(n.emptyRole || '') || n.name === U.B), nodes.map((n) => n.label));
   check('C and D returned to Pool', pool.includes(U.C) && pool.includes(U.D), pool);
-  check('toast "Đã đưa N người về Pool" with Hoàn tác', ts.n >= 1 && ts.undo && /về Pool/.test(ts.text.join(' ')), ts);
+  check('toast "Đã đưa N người về Danh sách chờ" with Hoàn tác', ts.n >= 1 && ts.undo && /về Danh sách chờ/.test(ts.text.join(' ')), ts);
   if (ts.undo) {
     await P().locator('.js-toast-undo').first().click();
     await P().waitForTimeout(1200);
@@ -964,7 +964,7 @@ T.T17 = async () => {
   const role = await dlg.getAttribute('role');
   const msg = await dlg.locator('.cd-confirm-owner-msg').innerText();
   check('untick last Chủ → role=alertdialog confirm', role === 'alertdialog', role);
-  check('dialog names the impacted people count (owner + spouse + 1 child)', /Bỏ chủ đất cuối cùng sẽ đưa 3 người về danh sách/.test(msg), msg);
+  check('dialog names the impacted people count (owner + spouse + 1 child)', /Bỏ chủ đất cuối cùng sẽ đưa 3 người về Danh sách chờ/.test(msg), msg);
   await shot('T17-dialog');
   await dlg.locator('.cd-confirm-cancel').click();
   await P().waitForTimeout(600);
