@@ -1889,7 +1889,10 @@ function createDiagramPane(ctx) {
         extra.append(h('div', 'muted warn-text',
           `Trạng thái tính: ${CALC_STATUS_LABEL[status]}`));
       }
-      for (const req of rm.requiredSlots || []) {
+      // Hồ sơ đã hoàn chỉnh → không nhắc 'Cần bổ sung' (kể cả khi
+      // render_model cũ còn sót requiredSlots).
+      const reqs = status === 'complete' ? [] : (rm.requiredSlots || []);
+      for (const req of reqs) {
         const anchor = nodeById(req.anchorSlotId);
         const kinds = (req.slotTypes || [])
           .map((t) => SLOT_LABEL[t] || (t === 'child' ? 'Con' : t))

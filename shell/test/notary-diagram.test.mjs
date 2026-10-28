@@ -1346,8 +1346,9 @@ test('cue trạng thái: chuyển sang complete thì xoá dòng thiếu', async 
     warnings: [{ code: 'diagram.unassigned_pool_person',
                  message: 'Người trong Stage chưa được gán trên sơ đồ' }],
     errors: [], unresolvedEstates: [], conservation: {} };
+  // requiredSlots cố ý còn sót: complete vẫn phải ẩn 'Cần bổ sung'.
   const rmComplete = { ...structuredClone(rmIncomplete),
-                       status: 'complete', requiredSlots: [], warnings: [] };
+                       status: 'complete', warnings: [] };
   const client = { run: async (cmd, payload) => {
     calls.push([cmd, payload]);
     if (cmd === 'notary.workspace_save_case') {
