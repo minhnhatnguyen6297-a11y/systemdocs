@@ -4,4 +4,3 @@
 fileTokenStore: issue/resolve tra FileRef; entry cho renderer khong co path  # #15 basename của path Windows 'D:\in\anh1.png' trên Linux (nền tảng)
 native DOCX free text enters existing Stage fields and manual edits survive commit and reload  # #19 spawnSync python ENOENT (không có lệnh `python` trên PATH local; CI có setup-python nên có thể pass)
 JSON download keeps original schema-valid result after review and invalid pending edits  # #19 spawnSync python ENOENT (như trên)
-file:test/shell-chrome.test.mjs  # #17 thiếu docs/spec/ui/tokens.json trong monorepo (ENOENT khi import)
