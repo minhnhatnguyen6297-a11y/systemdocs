@@ -185,7 +185,7 @@ def _result_row(db, package_id: str) -> ZaloIntakeResult | None:
     )
 
 
-def test_parse_job_pairs_cccd_pages_and_merges_property(db):
+def test_parse_job_keeps_cccd_pages_independent_and_merges_property(db):
     _seed_record(
         db,
         record_id="01000000-0000-4000-8000-000000000001",
@@ -252,14 +252,18 @@ def test_parse_job_pairs_cccd_pages_and_merges_property(db):
     assert result["package_id"] == PACKAGE_ID
     assert result["record_count"] == 4
 
-    assert len(result["persons"]) == 1
-    person = result["persons"][0]
-    assert person["paired"] is True
-    assert person["side"] == "front_back"
-    assert person["ho_ten"] == "NGUYỄN VĂN AN"
-    assert person["so_giay_to"] == "001234567890"
-    assert person["ngay_cap"] == "15/01/2021"
-    assert person["_source"] == "zalo"
+    # f6d53b5: mỗi file/record là nguồn độc lập — không ghép mặt trước/sau
+    # khác file theo số giấy tờ, không làm giàu chéo (như ocr_ai
+    # test_analyze_images_keeps_front_back_sources_independent).
+    assert len(result["persons"]) == 2
+    assert {p["so_giay_to"] for p in result["persons"]} == {"001234567890"}
+    assert all(p["paired"] is False for p in result["persons"])
+    assert all(p["_source"] == "zalo" for p in result["persons"])
+    front = next(p for p in result["persons"] if p["side"] == "front")
+    back = next(p for p in result["persons"] if p["side"] == "back")
+    assert front["ho_ten"] == "NGUYỄN VĂN AN"
+    assert not front.get("ngay_cap")
+    assert back["ngay_cap"] == "15/01/2021"
 
     assert len(result["properties"]) == 1
     prop = result["properties"][0]
@@ -272,7 +276,7 @@ def test_parse_job_pairs_cccd_pages_and_merges_property(db):
     assert message_entry["status"] == "message"
 
     # message_text khong aggregate len persons/properties
-    assert len(result["persons"]) == 1
+    assert len(result["persons"]) == 2
 
     # Khong ghi business tables
     assert db.query(Customer).count() == 0
