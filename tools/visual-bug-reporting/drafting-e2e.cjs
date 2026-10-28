@@ -951,36 +951,41 @@ T.T16 = async () => {
   check('no relationship menu / add-slot actions', !r.menu, null);
 };
 
-T.PROBE = async () => {
-  await buildABED();
-  await dragPoolToNode(NAMES.A, 'owner');
-  record('afterPlace', await poolNames());
-  const node = P().locator('.cd-node[data-node-id="owner"]').first();
-  record('draggableAttr', await node.getAttribute('draggable'));
-  // synthetic HTML5 DnD with a shared DataTransfer
-  await P().evaluate(() => {
-    const src = document.querySelector('.cd-node[data-node-id="owner"]');
-    const box = document.querySelector('.cd-pool-box');
-    const dt = new DataTransfer();
-    src.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
-    box.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
-    box.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
-    src.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: dt }));
-  });
-  await P().waitForTimeout(1500);
-  record('afterSyntheticDrop', await poolNames());
-  await dragPoolToNode(NAMES.A, 'owner');
-  await dragNodeToPool('owner');
-  record('afterPlaywrightDrag', await poolNames());
-  const nb = await P().locator('.cd-node[data-node-id="owner"]').first().boundingBox();
-  const bb = await P().locator('.cd-pool-box').boundingBox();
-  const m = P().mouse;
-  await m.move(nb.x + 30, nb.y + 30); await m.down();
-  for (let i = 1; i <= 15; i++) await m.move(nb.x + 30 + (bb.x + 30 - nb.x - 30) * i / 15, nb.y + 30 + (bb.y + bb.height - 20 - nb.y - 30) * i / 15);
-  await m.up(); await P().waitForTimeout(1500);
-  record('afterManualMouse(center)', await poolNames());
-  record('nodeBox', nb);
-  await shot('probe');
+T.T17 = async () => {
+  await buildUserScenario();
+  const chip = P().locator('.cd-node[data-node-id="owner"]').locator('.cd-poschip').first();
+  const slotKey = (n) => `${n.id}|${n.name || ''}|${Math.round(n.x)},${Math.round(n.y)}`;
+  const placedKey = (nodes) => nodes.filter((n) => !n.empty).map(slotKey).sort().join(';');
+  const before = placedKey(await diagramNodes());
+  await chip.click();
+  const dlg = P().locator('.cd-confirm-owner');
+  await dlg.waitFor({ state: 'visible', timeout: 3000 });
+  const role = await dlg.getAttribute('role');
+  const msg = await dlg.locator('.cd-confirm-owner-msg').innerText();
+  check('untick last Chủ → role=alertdialog confirm', role === 'alertdialog', role);
+  check('dialog names the impacted people count (owner + spouse + 1 child)', /Bỏ chủ đất cuối cùng sẽ đưa 3 người về danh sách/.test(msg), msg);
+  await shot('T17-dialog');
+  await dlg.locator('.cd-confirm-cancel').click();
+  await P().waitForTimeout(600);
+  check('dialog gone after Hủy', (await dlg.count()) === 0, await dlg.count());
+  check('Hủy → tree unchanged (same placed people/slots)', placedKey(await diagramNodes()) === before, { before, after: placedKey(await diagramNodes()) });
+  check('Hủy → owner chip still ticked', (await chip.getAttribute('aria-pressed')) === 'true', await chip.getAttribute('aria-pressed'));
+  await chip.click();
+  await dlg.waitFor({ state: 'visible', timeout: 3000 });
+  await dlg.locator('.cd-confirm-continue').click();
+  await P().waitForTimeout(2500);
+  const ts = await toastState();
+  const pool = await poolNames();
+  await shot('T17-after-continue');
+  check('Tiếp tục → B, C, D back to Pool (A stays as Chủ đất slot)', [U.B, U.C, U.D].every((nm) => pool.includes(nm)), pool);
+  check('Tiếp tục → toast with Hoàn tác', ts.n >= 1 && ts.undo, ts);
+  await P().locator('.js-toast-undo').first().click();
+  await P().waitForTimeout(2500);
+  const nodes = await diagramNodes();
+  const poolAfter = await poolNames();
+  await shot('T17-after-undo');
+  check('Hoàn tác → same placed node ids/roles/positions as before', placedKey(nodes) === before, { before, after: placedKey(nodes) });
+  check('Hoàn tác → pool empty again', poolAfter.length === 0, poolAfter);
 };
 (async () => {
   const ids = Object.keys(T).filter((k) => ONLY.length ? ONLY.includes(k) : k !== 'PROBE');

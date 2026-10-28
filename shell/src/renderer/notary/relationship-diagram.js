@@ -954,6 +954,83 @@ function createDiagramPane(ctx) {
     return activeUndoToast;
   }
 
+  // Bỏ tick chip "Chủ" cuối cùng → toàn bộ người trên sơ đồ về Pool
+  // (đúng luật BLHS Đ.612/Đ.651) — nhưng cần xác nhận trước.
+  // N = số người sẽ về Pool, tính bằng cùng code prune của model trên
+  // bản clone (lastOwnerCascadeNodes). N=0 thì không hỏi.
+  // Trả true nếu đã áp toggle; false nếu bị chặn (hủy) hoặc chờ xác nhận.
+  function confirmLastOwnerUntick(node, kind, pos, apply) {
+    if (kind !== 'own' || !node.personId ||
+        !Array.isArray(node.ownPositions) ||
+        !node.ownPositions.includes(pos)) {
+      apply();
+      return true;
+    }
+    const others = liveNodes().filter((x) => x.personId);
+    const stillHasOwner = others.some((x) =>
+      x.id !== node.id && Array.isArray(x.ownPositions) &&
+      x.ownPositions.length > 0);
+    if (stillHasOwner) {
+      apply();
+      return true;
+    }
+    let impacted = [];
+    if (typeof model.lastOwnerCascadeNodes === 'function') {
+      impacted = model.lastOwnerCascadeNodes(node.id) || [];
+    }
+    const n = impacted.length;
+    if (!n) {
+      apply();
+      return true;
+    }
+    const opener = typeof document !== 'undefined'
+      ? document.activeElement : null;
+    const wrap = h('div', 'modal-overlay');
+    const box = h('div', 'modal cd-modal cd-confirm-owner');
+    box.setAttribute('role', 'alertdialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-labelledby', 'cd-confirm-owner-msg');
+    const close = () => {
+      document.removeEventListener('keydown', onKey);
+      wrap.remove();
+      if (opener && opener.isConnected && opener.focus) opener.focus();
+    };
+    function onKey(e) {
+      if (e.key === 'Escape') { close(); return; }
+      if (e.key !== 'Tab') return;
+      const items = [...box.querySelectorAll('button')]
+        .filter((x) => !x.disabled);
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const ae = document.activeElement;
+      if (e.shiftKey && (ae === first || !box.contains(ae))) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && (ae === last || !box.contains(ae))) {
+        e.preventDefault(); first.focus();
+      }
+    }
+    const msg = h('p', 'cd-confirm-owner-msg',
+      `Bỏ chủ đất cuối cùng sẽ đưa ${n} người về danh sách. Tiếp tục?`);
+    msg.id = 'cd-confirm-owner-msg';
+    box.append(msg);
+    const foot = h('div', 'modal-actions');
+    const cancel = btn('Hủy', 'btn secondary cd-confirm-cancel', close);
+    const ok = btn('Tiếp tục', 'btn primary cd-confirm-continue', () => {
+      close();
+      apply();
+    });
+    foot.append(cancel, ok);
+    box.append(foot);
+    wrap.append(box);
+    const target = document.body ||
+      (typeof uiRoot === 'function' ? uiRoot() : null);
+    if (target) target.append(wrap);
+    document.addEventListener('keydown', onKey);
+    cancel.focus();
+    return false;
+  }
+
   async function handleCardRemoval(personId) {
     if (!model.canWrite() || !personId) return;
     const res = await model.removeCard(personId);
@@ -1081,7 +1158,8 @@ function createDiagramPane(ctx) {
         const on = Array.isArray(arr) && arr.includes(pos);
         const chip = btn(`${pos}`,
           `cd-poschip${on ? ' on' : ''}`, () => {
-            model.toggleNodePosition(n.id, kind, pos);
+            confirmLastOwnerUntick(n, kind, pos, () =>
+              model.toggleNodePosition(n.id, kind, pos));
           });
         chip.disabled = ro || pos > assetCount;
         chip.setAttribute('aria-pressed', String(on));

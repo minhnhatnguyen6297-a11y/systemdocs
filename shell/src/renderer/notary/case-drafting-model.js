@@ -1797,6 +1797,16 @@ function createModel(deps) {
     if (!node) return false;
     const arr = Array.isArray(node[field]) ? node[field].slice() : [];
     const i = arr.indexOf(pos);
+    // Bỏ tick "Chủ" cuối cùng có thể dọn cả cây → chụp snapshot để nút
+    // Hoàn tác của toast cascade trả lại đúng sơ đồ trước đó (như đường
+    // ghi ngày mất ở trên).
+    const lastOwnRemoval = kind === 'own' && i >= 0 && arr.length === 1 &&
+      !(state.diagram.nodes || []).some((x) => x && !x.deleted &&
+        x.id !== nodeId && Array.isArray(x.ownPositions) &&
+        x.ownPositions.length > 0);
+    if (lastOwnRemoval && !pendingStageSnapshot) {
+      pendingStageSnapshot = captureDraftSnapshot();
+    }
     if (i >= 0) arr.splice(i, 1); else arr.push(pos);
     node[field] = arr;
     state.positionTouched.add(`${nodeId}:${kind}`);
@@ -1930,6 +1940,38 @@ function createModel(deps) {
     diagramMutation += 1;
     emit();
     return true;
+  }
+
+  // Pre-check UI (renderer goi truoc khi bo tick Chu cuoi cung): ai se ve
+  // Pool neu cay bi don het (reconcileRequiredSlots([]) — dung code prune
+  // voi luong that nen N khong lech). Chay tren snapshot state, khong
+  // touch draft that, khong goi engine, khong emit.
+  function lastOwnerCascadeNodes(nodeId) {
+    if (!canWrite()) return null;
+    const node = findNode(nodeId);
+    if (!node || !node.personId) return null;
+    if (diagramDomain() !== CASE_TYPE_INHERITANCE) return null;
+    const snap = {
+      diagram: clone(state.diagram),
+      touched: new Set(state.positionTouched),
+      dirty: state.diagramDirty,
+      mutation: diagramMutation,
+      stage: clone(state.stage),
+    };
+    // Position touched phai trong khi prune (tick tay khong duoc ke thua
+    // khi so do da khong con); nao la so do trong, chua tinh day.
+    state.diagram = { version: DIAGRAM_VERSION,
+      domain: CASE_TYPE_INHERITANCE, nodes: clone(state.diagram.nodes),
+      positionTouched: new Set() };
+    try {
+      return reconcileRequiredSlots([]).returnedToPool;
+    } finally {
+      state.diagram = snap.diagram;
+      state.positionTouched = snap.touched;
+      state.diagramDirty = snap.dirty;
+      diagramMutation = snap.mutation;
+      state.stage = snap.stage;
+    }
   }
 
   async function removeCard(personId) {
@@ -2731,6 +2773,7 @@ function createModel(deps) {
     setNodeFlag, toggleNodePosition, setNodeRelation, nodeRemovalImpact, removeNode,
     evaluateDiagram, reconcileRequiredSlots,
     captureDraftSnapshot, restoreDraftSnapshot, removeCard,
+    lastOwnerCascadeNodes,
     resolveConflict,
     intakeAnalyze, acceptSuggestion, discardSuggestion, reviewSuggestion, confirmOriginalBindings, detachOriginalSource,
     loadWordOptions, exportWord,

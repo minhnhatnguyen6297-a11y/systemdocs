@@ -1436,6 +1436,40 @@ test('removed child branch prunes; evaluate recreates required child slot with s
   assert.deepEqual(afterToggle.receivePositions, [1]);
 });
 
+test('last owner untick → confirm modal; Tiếp tục applies, Hủy giữ nguyên', async (t) => {
+  const mk = (id, personId, parents = [], extra = {}) => ({
+    id, personId, parentSlotIds: parents, spouseSlotId: null,
+    ownPositions: [], receivePositions: [], hidden: false, deleted: false, ...extra,
+  });
+  const { model, view, document } = await build(t, { mode: 'case', seed: {
+    people: INH_PEOPLE, assets: [{ row_id: 'asset' }],
+    nodes: [mk('owner', 'c1', [], { ownPositions: [1] }),
+      mk('child_owner', 'c2', ['owner'])],
+  } });
+  const card = collect(view.el, e => e.dataset.nodeId === 'owner')[0];
+  const ownRow = byCls(card, 'cd-posrow')[0];
+  const chip = byCls(ownRow, 'cd-poschip')[0];   // own/1 đang on
+  assert.ok(chip.classList.contains('on'));
+  chip.click();
+  // Modal xuất hiện: chỉ c2 về Pool (owner node giữ c1) → N=1.
+  const modal = byCls(document, 'cd-confirm-owner')[0];
+  assert.ok(modal, 'modal phai xuat hien khi bo tick Chu cuoi cung');
+  assert.match(modal.textContent, /Tiếp tục/);
+  assert.match(modal.textContent, /1/);
+  // Hủy → giữ nguyên tick
+  byCls(document, 'cd-confirm-cancel')[0].click();
+  assert.equal(byCls(document, 'cd-confirm-owner').length, 0);
+  const n1 = model.state.diagram.nodes.find(n => n.id === 'owner');
+  assert.deepEqual(n1.ownPositions, [1]);
+  // Tiếp tục → toggle áp dụng
+  const chip2 = byCls(byCls(collect(view.el,
+    e => e.dataset.nodeId === 'owner')[0], 'cd-posrow')[0], 'cd-poschip')[0];
+  chip2.click();
+  byCls(document, 'cd-confirm-continue')[0].click();
+  const n2 = model.state.diagram.nodes.find(n => n.id === 'owner');
+  assert.deepEqual(n2.ownPositions, []);
+});
+
 test('inheritance labels never expose slot ids; spouse empty slot names its spouse', async (t) => {
   const nodes = [
     { id: 'owner', personId: 'c1', parentSlotIds: ['father', 'mother'],

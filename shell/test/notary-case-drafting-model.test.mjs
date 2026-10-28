@@ -1689,6 +1689,71 @@ test('branch removal does not remove canonical two-party slots', async () => {
   assert.equal(model.state.diagramDirty, dirty);
 });
 
+test('lastOwnerCascadeNodes: pre-check N khong touch draft, khong goi engine', () => {
+  const client = { calls: [], async run(command) {
+    client.calls.push(command);
+    return { ok: true, data: {} };
+  } };
+  const model = M.createModel({ client, uuid });
+  const s = model.state;
+  s.status = 'ready';
+  s.caseId = 43;
+  s.caseInfo = { id: 43, case_type: 'inheritance',
+                 document_type: 'khai_nhan', status: 'draft',
+                 locked: false, revision: 1, ngay_lap_ho_so: null,
+                 noi_niem_yet: null, ghi_chu: null,
+                 nguoi_nhan_uy_quyen: null,
+                 nguoi_nhan_uy_quyen_id: null, noi_dung_viec: null };
+  s.backendMode = 'real';
+  s.locked = false;
+  s.unsupported = false;
+  s.capabilities = { intake: [], diagram: true, word_export: true };
+  s.committed = { people: [
+    { row_id: 'c1', ho_ten: 'Owner' },
+    { row_id: 'c2', ho_ten: 'Con' },
+    { row_id: 'c3', ho_ten: 'Chau' }],
+    assets: [{ row_id: 'a1', so_serial: 'MM000001' }] };
+  s.stage = structuredClone(s.committed);
+  s.stage.owner_row_id = 'c1';
+  s.committedDiagram = { version: M.DIAGRAM_VERSION, domain: 'inheritance',
+    nodes: [
+      { id: 'owner', personId: 'c1', parentSlotIds: [], spouseSlotId: null,
+        ownPositions: [1], receivePositions: [], hidden: false, deleted: false },
+      { id: 'p2', personId: 'c2', parentSlotIds: ['owner'],
+        spouseSlotId: null, ownPositions: [], receivePositions: [1],
+        hidden: false, deleted: false },
+      { id: 'p3', personId: 'c3', parentSlotIds: ['p2'],
+        spouseSlotId: null, ownPositions: [], receivePositions: [1],
+        hidden: false, deleted: false }] };
+  s.diagram = structuredClone(s.committedDiagram);
+  s.diagramDirty = false;
+  s.positionTouched = new Set();
+  const before = JSON.stringify(model.state.diagram);
+  const touchedBefore = [...model.state.positionTouched];
+  // Pre-check: cay bi don het requirements → chi con node owner;
+  // con (c2) va chau (c3) ve Pool (2 nguoi). Owner giu node owner
+  // (chidao owner_row_id khong doi khi bo tick chip).
+  const impacted = model.lastOwnerCascadeNodes('owner');
+  assert.ok(Array.isArray(impacted) && impacted.length === 2,
+    `expected 2 impacted, got ${JSON.stringify(impacted)}`);
+  assert.ok(impacted.includes('c2') && impacted.includes('c3'),
+    `expected c2+c3, got ${JSON.stringify(impacted)}`);
+  // Khong lam loi draft: diagram, dirty, touched giu nguyen
+  assert.equal(JSON.stringify(model.state.diagram), before);
+  assert.equal(model.state.diagramDirty, false);
+  assert.deepEqual([...model.state.positionTouched], touchedBefore);
+  // Khong goi engine trong pre-check
+  assert.deepEqual(client.calls, []);
+  // Node khong co nguoi → null
+  assert.equal(model.lastOwnerCascadeNodes('spouse-slot-xyz'), null);
+  // Sau pre-check luong that van binh thuong (engine van duoc goi)
+  const r = model.toggleNodePosition('owner', 'own', 2);
+  assert.equal(r, true);
+  assert.equal(model.state.diagramDirty, true);
+  assert.equal(model.state.diagram.nodes.find((n) => n.id === 'owner')
+    .ownPositions.length, 2);
+});
+
 test('toggleNodePosition: own/receive doc lap, dedupe, chan ngoai {1..5}', async () => {
   const { model } = makeModel(seedCases('ready'));
   await model.openCase(42);
