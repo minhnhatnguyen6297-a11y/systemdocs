@@ -901,7 +901,8 @@ test('requiredSlots bo qua anchor trong (mock dev) — khong no canvas', async (
 });
 test('Pool drag starts a compatible move and first drop assigns the person', async (t) => {
   const { model, view } = await build(t, { mode: 'case', seed: {
-    people: [{ row_id: 'c1', ho_ten: 'Người A' }],
+    people: [{ row_id: 'c1', ho_ten: 'Người A',
+      ngay_chet: '2020-05-10' }],
     nodes: [{ id: 'owner', personId: null, parentSlotIds: [],
       spouseSlotId: null, ownPositions: [], receivePositions: [],
       hidden: false, deleted: false }],
@@ -984,7 +985,8 @@ test('stale evaluate response cannot apply its required slots to a changed diagr
   const { model, view } = await build(t, {
     mode: 'case', client,
     seed: {
-      people: [{ row_id: 'c1', ho_ten: 'Người A' }],
+      people: [{ row_id: 'c1', ho_ten: 'Người A',
+      ngay_chet: '2020-05-10' }],
       nodes: [{ id: 'owner', personId: null, parentSlotIds: [],
         spouseSlotId: null, ownPositions: [], receivePositions: [],
         hidden: false, deleted: false }],
